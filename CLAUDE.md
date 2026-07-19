@@ -159,8 +159,9 @@ carries its own `?v=` — bump it there when editing the worker.
   small shell first and hydrates the full QC data in the background — login
   and Firebase sync wait for full hydration. Corrupt/invalid `localStorage`
   payloads are quarantined (`quarantineCorruptLocal()`) rather than silently
-  dropped. Saves are debounced 400ms (`lsFlush`), flushed on
-  `beforeunload`/`visibilitychange`, and mirrored to `LocalStore`.
+  dropped. Saves are debounced via `lsSaveDelay()` — 400ms normally, backing
+  off to 700ms/1200ms as payload size or serialize time grows — flushed on
+  `beforeunload`/`pagehide`/`visibilitychange`, and mirrored to `LocalStore`.
 - `qc-rules.js`, `period-service.js`, `sigma-cohort-service.js`, `entry-service.js`,
   `action-workflow-service.js` — smaller service-style modules (some
   IIFE-wrapped) layered on `state`/`qc-domain`. `PeriodService` locks/unlocks

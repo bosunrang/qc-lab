@@ -18,7 +18,7 @@
   function buildEntryWindow({points=[],days=30,start='',end='',today=''}){
     const all=Array.isArray(points)?points.slice():[];
     const ordered=all.slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))||pointRunNoFor(a)-pointRunNoFor(b));
-    const safeEnd=end||((ordered.length&&ordered[ordered.length-1].date)||today);
+    const safeEnd=end||today||((ordered.length&&ordered[ordered.length-1].date)||'');
     let safeStart=start;
     if(!safeStart&&safeEnd){
       const date=new Date(safeEnd+'T00:00:00Z');

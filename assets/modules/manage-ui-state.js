@@ -1,7 +1,6 @@
 /* ===== MANAGEMENT UI STATE ===== */
 (function(root){
   const state={
-    manageEditId:null,
     manageQ:'',
     manageTab:'instruments',
     manageTargetPanel:'',

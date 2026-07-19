@@ -180,11 +180,19 @@
 }
 
 .sg-row-action-buttons{
-  display:flex; align-items:center; justify-content:center; gap:4px; white-space:nowrap;
+  display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:4px;
 }
 
 .sg-row-action-buttons .btn{
   min-height:32px; padding:4px 7px;
+}
+
+.sg-row-action-buttons .sg-row-cv{
+  flex:0 0 auto; border-color:var(--teal); background:var(--panel); color:var(--teal);
+}
+
+.sg-row-action-buttons .sg-row-cv:hover{
+  border-color:var(--teal); background:#eef8f7; color:var(--teal);
 }
 
 .sg-row-action-buttons .sg-row-delete{
@@ -422,6 +430,25 @@
 #sgFreq table th:nth-child(3), #sgFreq table td:nth-child(3){width:34%;}
 #sgFreq table th:nth-child(4), #sgFreq table td:nth-child(4){width:18%;}
 #sgFreq table th:nth-child(5), #sgFreq table td:nth-child(5){width:30%;}
+
+/* Dưới 760px, 5 cột theo % (8%/10%/…) của #sgFreq không đủ chỗ — "Mức"/"Sigma"
+   bị bẻ từng chữ xuống dòng. #sgFreq không nằm trong wrapper cuộn ngang chung
+   nào (là div thường trong .panel, không phải table trực tiếp) nên tự mở cuộn
+   ngang ở đây và nhường bảng rộng theo nội dung thay vì ép 100%. */
+@media(max-width:760px){
+#sgFreq{
+  overflow-x:auto; -webkit-overflow-scrolling:touch;
+}
+#sgFreq table{
+  width:max-content !important; min-width:100%; table-layout:auto;
+}
+/* Mức 8%/Sigma 10% vẫn quá hẹp cho "Mức 1"/"Sigma" dưới table-layout:auto, chữ
+   bị bẻ 2 dòng. Nới hai cột này, bớt lại ở cột Bộ quy tắc OPSpecs (34% → 26%)
+   vì nó vốn có nhiều chỗ trống nhất. */
+#sgFreq table th:nth-child(1), #sgFreq table td:nth-child(1){width:12%; min-width:76px; white-space:nowrap; overflow-wrap:normal; word-break:normal;}
+#sgFreq table th:nth-child(2), #sgFreq table td:nth-child(2){width:14%; min-width:72px; white-space:nowrap; overflow-wrap:normal; word-break:normal;}
+#sgFreq table th:nth-child(3), #sgFreq table td:nth-child(3){width:26%;}
+}
 
 .sgcards{
   gap:14px;

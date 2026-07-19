@@ -20,6 +20,23 @@ const plain = v => JSON.parse(JSON.stringify(v));
   assert.equal(window.start, '2026-07-04');
   assert.equal(window.end, '2026-07-10');
 
+  const currentWindow = ctx.EntryService.buildEntryWindow({
+    points: [{ id: 'latest', date: '2026-07-01', runId: '2026-07-01-1' }],
+    days: 60,
+    today: '2026-07-19',
+  });
+  assert.equal(currentWindow.start, '2026-05-21', 'preset range counts back from today');
+  assert.equal(currentWindow.end, '2026-07-19', 'default end date is today, not the latest QC point');
+
+  const manualWindow = ctx.EntryService.buildEntryWindow({
+    points: [{ id: 'latest', date: '2026-07-01', runId: '2026-07-01-1' }],
+    days: 60,
+    end: '2026-07-01',
+    today: '2026-07-19',
+  });
+  assert.equal(manualWindow.start, '2026-05-03');
+  assert.equal(manualWindow.end, '2026-07-01', 'a manually selected end date remains authoritative');
+
   const grouped = ctx.EntryService.groupByMachine([
     { id: 'T2', machine: 'Máy B' },
     { id: 'T1', machine: '' },

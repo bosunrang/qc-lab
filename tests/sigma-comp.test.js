@@ -51,6 +51,7 @@ assert.equal(ctx.sgInputDisplayValue(''),'');
   assert.match(sigmaCss, /input\.sg-number:focus/, 'Sigma numeric inputs reveal their editor affordance on focus');
   assert.match(sigmaCss, /border-color:transparent; background:transparent;/, 'Sigma numeric inputs stay visually clean at rest');
   assert.match(sigmaCss, /\.sg-simple-table \.sg-action-col\{[\s\S]*?border-left:2px solid var\(--line\);/, 'the action column has a visible vertical separator');
+  assert.match(sigmaCss, /\.sg-row-action-buttons \.sg-row-cv\{[\s\S]*?border-color:var\(--teal\);[\s\S]*?color:var\(--teal\);/, 'lot CV action uses a teal border and teal text');
   assert.match(sigmaCss, /\.sg-row-action-buttons \.sg-row-delete\{[\s\S]*?border-color:var\(--red\);[\s\S]*?color:var\(--red\);/, 'period delete uses a red bordered button');
   assert.match(sigmaCss, /tr\.sg-period-selected td\{[\s\S]*?background:/, 'the selected status period is visibly highlighted');
   assert.doesNotMatch(sigmaCss, /\.sg-period-radio\{/, 'the obsolete period radio styling is removed');
@@ -69,6 +70,8 @@ assert.equal(ctx.sgInputDisplayValue(''),'');
   assert.match(sigmaCss, /#sgFreq table th:nth-child\(3\), #sgFreq table td:nth-child\(3\)\{width:34%;\}/, 'Sigma QC-design table gives OPSpecs 34%');
   assert.match(sigmaCss, /#sgFreq table th:nth-child\(4\), #sgFreq table td:nth-child\(4\)\{width:18%;\}/, 'Sigma QC-design table gives risk 18%');
   assert.match(sigmaCss, /#sgFreq table th:nth-child\(5\), #sgFreq table td:nth-child\(5\)\{width:30%;\}/, 'Sigma QC-design table gives action 30%');
+  assert.match(sigmaCss, /@media\(max-width:760px\)[\s\S]*?#sgFreq table th:nth-child\(1\)[\s\S]*?min-width:76px;[\s\S]*?white-space:nowrap;/, 'mobile QC-design level column stays on one line');
+  assert.match(sigmaCss, /@media\(max-width:760px\)[\s\S]*?#sgFreq table th:nth-child\(2\)[\s\S]*?min-width:72px;[\s\S]*?white-space:nowrap;/, 'mobile QC-design Sigma column stays on one line');
 }
 
 // --- Manual CV/Bias edits mark persistence dirty immediately. ---

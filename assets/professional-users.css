@@ -25,6 +25,19 @@
   width:38%;white-space:normal;
 }
 
+/* Dưới 760px, cột Vai trò/Trạng thái (16% mỗi cột) hẹp hơn badge "Hoạt động"
+   (white-space:nowrap của .tag) nên chữ tràn đè lên cột Hành động bên cạnh.
+   Bốn cột không còn đủ chỗ ở bề ngang điện thoại thật — mở lại cuộn ngang đã
+   tắt ở trên thay vì để chữ chồng chéo. */
+@media(max-width:760px){
+.panel:has(> h3:first-child + table.user-table){
+  overflow-x:auto !important;
+}
+.panel > h3:first-child + table.user-table{
+  min-width:480px;
+}
+}
+
 .user-table th, .user-table td{
   padding-left:14px; padding-right:14px;
 }

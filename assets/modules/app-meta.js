@@ -1,8 +1,8 @@
 ﻿window.QCLAB_APP = {
   name: 'QC Lab',
-  version: '2.3.5',
+  version: '2.3.6',
   releaseDate: '2026-07-19',
-  build: 'sigma-scroll-mdc-tooltip'
+  build: 'lot-date-warning'
 };
 
 // Cấu hình đám mây khi deploy (tùy chọn).

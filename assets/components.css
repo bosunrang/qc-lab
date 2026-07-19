@@ -1,7 +1,7 @@
 /* Shared component primitives: panels, forms, buttons, tables, tags, alerts, modals, and auth shell.
    Page-specific CSS may extend these selectors in later files. */
 .modal-bg{position:fixed;inset:0;background:rgba(20,33,43,.45);display:flex;align-items:center;justify-content:center;z-index:900;padding:20px}
-#dialogRoot .modal-bg{z-index:950}
+#dialogRoot .modal-bg{z-index:950;background:rgba(21,35,44,.54);backdrop-filter:blur(2px)}
       .modal-h h3{ margin:0; }
   .modal-b{padding:16px 18px;overflow:auto}
   .modal-f{padding:12px 18px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px}
@@ -98,69 +98,69 @@ table{ width:100%; border-collapse:separate; min-width:640px; border:1px solid v
    says"). Dùng cho các thao tác không thể hoàn tác/quan trọng; xem
    confirmDialog() trong modals.js. */
 .confirm-modal{
-  width:460px;
+  position:relative; width:min(440px,calc(100vw - 32px)); border:1px solid rgba(202,215,222,.9); border-radius:16px; box-shadow:0 28px 80px rgba(12,27,36,.32),0 2px 8px rgba(12,27,36,.08); animation:dialog-enter .16s ease-out;
 }
 
 .confirm-modal-h{
-  display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:20px 22px 0;
+  display:flex; align-items:flex-start; justify-content:space-between; gap:12px; min-height:42px; padding:18px 20px 0 24px;
 }
 
 .confirm-modal-kicker{
-  color:#a52b24; font-size:11px; font-weight:800; letter-spacing:.04em; text-transform:uppercase;
+  padding-top:5px; color:#9d3c35; font-size:10.5px; font-weight:800; letter-spacing:.055em; text-transform:uppercase;
 }
 
 .confirm-modal-h .modal-close{
-  flex:none;
+  flex:none; width:32px; height:32px; border-color:#d8e2e7; border-radius:9px; background:#f9fbfc; color:#526b78; transition:background .15s ease,border-color .15s ease,color .15s ease;
 }
 
+.confirm-modal-h .modal-close:hover{border-color:#b9cbd3;background:#eef4f6;color:#183642}
+.confirm-modal-h .modal-close:focus-visible{outline:3px solid rgba(11,119,119,.18);outline-offset:2px}
+
 .confirm-modal-title{
-  margin:8px 22px 0; font-size:16px; font-weight:800; color:var(--ink); line-height:1.3;
+  margin:2px 64px 0 24px; color:#172d39; font-size:18px; font-weight:820; line-height:1.3;
 }
 
 .confirm-modal-body{
-  display:flex; align-items:flex-start; gap:14px; padding:16px 22px 22px;
+  display:flex; align-items:flex-start; gap:14px; padding:18px 24px 20px;
 }
 
 .confirm-modal-icon{
-  flex:none; width:34px; height:34px; border-radius:50%; background:#f8dfdd; color:#a52b24; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:800;
+  flex:none; width:38px; height:38px; border:1px solid #efc2bd; border-radius:12px; background:#fff2f0; color:#a63c33; display:flex; align-items:center; justify-content:center; font-size:17px; font-weight:850;
 }
 
-.confirm-modal-icon.info{
-  background:#dff2ef; color:var(--tealink);
-}
+.confirm-modal-icon.info{border-color:#b7d9d6;background:#eef8f7;color:#0b7777}
+.info-modal-icon.warn{border-color:#eed39f;background:#fff7e7;color:#9b650c}
+.info-modal-icon.success{border-color:#b7d9d6;background:#eef8f7;color:#0b7777}
 
-.info-modal-icon.warn{
-  background:#fff2d9; color:#9b650c;
-}
-
-.info-modal-icon.success{
-  background:#dff2ef; color:var(--tealink);
-}
-
-.confirm-modal-text b{
-  display:block; color:var(--ink); font-size:13.5px; line-height:1.4;
-}
-
-.confirm-modal-text p{
-  margin:6px 0 0; color:var(--muted); font-size:13px; line-height:1.5;
-}
+.confirm-modal-text{min-width:0;padding-top:1px}
+.confirm-modal-text b{display:block;color:#203744;font-size:14px;font-weight:760;line-height:1.5;white-space:pre-line}
+.confirm-modal-text p{margin:6px 0 0;color:#647985;font-size:12.5px;line-height:1.55;white-space:pre-line}
 
 .confirm-modal-actions{
-  display:flex; justify-content:flex-end; gap:10px; padding:0 22px 22px;
+  display:flex; justify-content:flex-end; gap:9px; padding:14px 24px 20px; border-top:1px solid #e4ebee; background:#fbfcfd;
 }
 
-.confirm-modal-actions .btn{
-  min-height:38px; padding:0 16px;
-}
+.confirm-modal-actions .btn{min-height:38px;padding:0 17px;border-radius:9px}
+
+/* Thông báo một nút: gom nội dung và hành động thành một khối ngắn, tránh khoảng trắng lớn. */
+.info-modal{width:min(420px,calc(100vw - 32px))}
+.info-modal .confirm-modal-h{position:absolute;z-index:1;top:16px;right:16px;min-height:0;padding:0}
+.info-modal .confirm-modal-title{margin:24px 64px 0 76px;font-size:16px}
+.info-modal .confirm-modal-body{padding:28px 64px 22px 24px;align-items:center}
+.info-modal .confirm-modal-title+.confirm-modal-body{padding-top:12px}
+.info-modal .confirm-modal-actions{padding:14px 20px 18px}
+
+@keyframes dialog-enter{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media(prefers-reduced-motion:reduce){.confirm-modal{animation:none}}
 
 @media(max-width:640px){
-.confirm-modal-actions{
-  flex-direction:column-reverse;
-}
-
-.confirm-modal-actions .btn{
-  width:100%;
-}
+  #dialogRoot .modal-bg{align-items:center;padding:12px}
+  #dialogRoot .confirm-modal{width:100%;border-radius:14px}
+  .confirm-modal-title{margin-right:56px}
+  .confirm-modal-actions{flex-direction:column-reverse}
+  .confirm-modal-actions .btn{width:100%}
+  .info-modal .confirm-modal-actions{flex-direction:row}
+  .info-modal .confirm-modal-actions .btn{width:auto;min-width:112px}
 }
   .auth-card{background:var(--panel);width:min(380px, calc(100vw - 32px));padding:32px 30px;border:1px solid #ccd8de;border-radius:var(--radius-lg);box-shadow:none;}
   .auth-card label{margin-top:12px}
