@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "scenario": {
+    "tests": 20,
+    "levels": 3,
+    "days": 365
+  },
+  "budgets": {
+    "bootShellMaxRatio": 0.03,
+    "shellInitMaxMs": 100,
+    "fullStartupMaxMs": 1500,
+    "coldDomainMaxMs": 2500,
+    "warmDomainMaxColdRatio": 0.02,
+    "unrelatedChangeMaxColdRatio": 0.02,
+    "oneTestMaxColdRatio": 0.2,
+    "displaySampleMaxPoints": 650,
+    "displaySamplingMaxMs": 200,
+    "mapLookupMaxMs": 20
+  }
+}

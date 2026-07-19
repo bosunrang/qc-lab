@@ -1,0 +1,20 @@
+# Generated test and tooling output
+coverage/
+dist/
+.cache/
+*.log
+*.tmp
+*.bak
+*.orig
+*.rej
+
+# Local dependency/install artifacts
+node_modules/
+
+# Editor and operating-system metadata
+.DS_Store
+Thumbs.db
+*~
+
+# License signing private key — never commit secrets
+tools/qclab-license-private-key.pem

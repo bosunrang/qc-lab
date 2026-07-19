@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';">
+<title>Kích hoạt QC Lab</title>
+<style>
+  :root{--teal:#0b747d;--ink:#1f2a30;--muted:#6b7a82;--line:#dce3e9;--panel:#fff;--bg:#f2f5f7;--red:#c0362c}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--ink);display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;max-width:560px;width:100%;padding:28px 30px;box-shadow:0 8px 30px rgba(20,40,50,.08)}
+  h1{font-size:20px;margin:0 0 4px}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:20px}
+  label{display:block;font-size:12px;font-weight:700;color:var(--muted);margin:16px 0 6px;text-transform:uppercase;letter-spacing:.03em}
+  .mid{display:flex;gap:8px;align-items:center}
+  .mid code{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:15px;font-family:'Consolas',monospace;letter-spacing:.04em;word-break:break-all}
+  textarea{width:100%;min-height:90px;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-family:'Consolas',monospace;font-size:12px;resize:vertical}
+  button{border:0;border-radius:8px;padding:10px 16px;font-weight:700;font-size:14px;cursor:pointer}
+  .btn-teal{background:var(--teal);color:#fff;width:100%;margin-top:16px;padding:12px}
+  .btn-ghost{background:var(--bg);color:var(--ink);border:1px solid var(--line);white-space:nowrap}
+  .hint{font-size:12px;color:var(--muted);margin-top:14px;line-height:1.5}
+  .msg{margin-top:12px;font-size:13px;font-weight:600;display:none}
+  .msg.err{display:block;color:var(--red)}
+  .msg.ok{display:block;color:var(--teal)}
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Kích hoạt QC Lab</h1>
+    <div class="sub">Phần mềm cấp phép theo từng máy. Hãy gửi <b>Mã máy</b> bên dưới cho người cung cấp để nhận Khoá kích hoạt.</div>
+
+    <label>Mã máy (gửi cho người cung cấp)</label>
+    <div class="mid">
+      <code id="machineId">…</code>
+      <button class="btn-ghost" id="copyBtn" type="button">Sao chép</button>
+    </div>
+
+    <label>Khoá kích hoạt (dán vào đây)</label>
+    <textarea id="licenseInput" placeholder="Dán chuỗi khoá kích hoạt nhận được…" spellcheck="false"></textarea>
+
+    <button class="btn-teal" id="activateBtn" type="button">Kích hoạt</button>
+    <div class="msg" id="msg"></div>
+
+    <div class="hint">Mỗi khoá chỉ dùng cho đúng máy này và có giá trị vĩnh viễn. Nếu cài lại Windows hoặc đổi máy, mã máy sẽ thay đổi và cần cấp lại khoá.</div>
+  </div>
+
+<script>
+  const api = window.qcActivation;
+  const $ = id => document.getElementById(id);
+
+  (async () => {
+    const st = api ? await api.status() : { machineId: '(không khả dụng ngoài Electron)' };
+    $('machineId').textContent = st.machineId || '(không đọc được mã máy)';
+  })();
+
+  $('copyBtn').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText($('machineId').textContent); $('copyBtn').textContent = 'Đã chép'; setTimeout(() => $('copyBtn').textContent = 'Sao chép', 1500); }
+    catch (e) { /* clipboard có thể bị chặn; khách vẫn tự bôi chọn được */ }
+  });
+
+  $('activateBtn').addEventListener('click', async () => {
+    const msg = $('msg'); msg.className = 'msg';
+    const value = $('licenseInput').value.trim();
+    if (!value) { msg.className = 'msg err'; msg.textContent = 'Hãy dán khoá kích hoạt.'; return; }
+    if (!api) { msg.className = 'msg err'; msg.textContent = 'Chỉ kích hoạt được trong ứng dụng cài đặt.'; return; }
+    $('activateBtn').disabled = true;
+    const res = await api.activate(value);
+    if (res && res.valid) { msg.className = 'msg ok'; msg.textContent = 'Kích hoạt thành công! Đang mở phần mềm…'; }
+    else {
+      $('activateBtn').disabled = false;
+      const reasons = { machine: 'Khoá này không dành cho máy hiện tại.', signature: 'Khoá không hợp lệ (sai chữ ký).', format: 'Định dạng khoá không đúng.', payload: 'Không đọc được nội dung khoá.', empty: 'Khoá trống.' };
+      msg.className = 'msg err'; msg.textContent = (res && reasons[res.reason]) || 'Khoá không hợp lệ.';
+    }
+  });
+</script>
+</body>
+</html>

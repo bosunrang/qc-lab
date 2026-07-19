@@ -1,0 +1,213 @@
+/* ===== SETTINGS / CLOUD ===== */
+async function saveLab(){if(!requireAdmin())return;state.lab={...(state.lab||{}),name:QCCore.cleanText(document.getElementById('labName').value),dept:QCCore.cleanText(document.getElementById('labDept').value),address:QCCore.cleanText(document.getElementById('labAddr').value,5000)};save({clearDerived:false});await infoDialog('Đã lưu thông tin đơn vị.',{type:'success'});}
+function ensureLabBrandShape(){
+  state.lab=state.lab||{};
+  state.lab.brandTitle=QCCore.cleanText(state.lab.brandTitle||'QC Lab',80);
+  state.lab.brandSub=QCCore.cleanText(state.lab.brandSub||'Nội kiểm xét nghiệm',120);
+  state.lab.logoText=QCCore.cleanText(state.lab.logoText||'QC',8).slice(0,4);
+  state.lab.logoData=QCCore.cleanText(state.lab.logoData||'',120000);
+}
+async function saveBrand(){
+  if(!requireAdmin())return;
+  state.lab=state.lab||{};
+  state.lab.brandTitle=QCCore.cleanText(document.getElementById('brandTitle').value||'QC Lab',80);
+  state.lab.brandSub=QCCore.cleanText(document.getElementById('brandSub').value||'Nội kiểm xét nghiệm',120);
+  state.lab.logoText=QCCore.cleanText(document.getElementById('logoText').value||'QC',8).slice(0,4);
+  save({clearDerived:false});renderBrand();rerender();await infoDialog('Đã lưu logo và tên hiển thị.',{type:'success'});
+}
+function readBrandInputs(){
+  state.lab=state.lab||{};
+  const title=document.getElementById('brandTitle'),sub=document.getElementById('brandSub'),txt=document.getElementById('logoText');
+  if(title)state.lab.brandTitle=QCCore.cleanText(title.value||'QC Lab',80);
+  if(sub)state.lab.brandSub=QCCore.cleanText(sub.value||'Nội kiểm xét nghiệm',120);
+  if(txt)state.lab.logoText=QCCore.cleanText(txt.value||'QC',8).slice(0,4);
+}
+async function pickLogo(e){
+  if(!requireAdmin())return;
+  const f=e&&e.target&&e.target.files&&e.target.files[0];
+  const nameEl=document.getElementById('logoFileName');
+  if(!f)return;
+  if(nameEl)nameEl.textContent=f.name;
+  if(!/^image\//.test(f.type)){await infoDialog('Vui lòng chọn file ảnh.');return;}
+  const r=new FileReader();
+  r.onload=()=>{const img=new Image();img.onload=()=>{
+    const size=160,c=document.createElement('canvas'),ctx=c.getContext('2d');c.width=size;c.height=size;
+    ctx.fillStyle='#fff';ctx.fillRect(0,0,size,size);
+    const scale=Math.min(size/img.width,size/img.height),w=img.width*scale,h=img.height*scale,x=(size-w)/2,y=(size-h)/2;
+    ctx.drawImage(img,x,y,w,h);
+    readBrandInputs();state.lab.logoData=c.toDataURL('image/png');
+    save({clearDerived:false});renderBrand();rerender();
+  };img.onerror=async()=>{await infoDialog('Không đọc được ảnh logo.');};img.src=r.result;};
+  r.readAsDataURL(f);
+}
+function clearLogo(){if(!requireAdmin())return;state.lab=state.lab||{};state.lab.logoData='';save({clearDerived:false});renderBrand();rerender();}
+function firebaseAclHelp(code){
+  const user=(typeof firebase!=='undefined'&&firebase.auth&&firebase.auth().currentUser)||fb.authUser||null;
+  const uid=user&&user.uid||'UID_TAI_KHOAN_FIREBASE';
+  return `Đăng nhập Firebase đã thành công nhưng tài khoản chưa có quyền với mã phòng "${code}".\n\nVào Realtime Database → Data và tạo:\nqclab-acl/${code}/${uid} = true\n\nSau đó bấm Lưu & kết nối lại.`;
+}
+async function saveFb(){
+  if(!requireAdmin())return;
+  const code=document.getElementById('fbCode').value.trim()||'default',email=document.getElementById('fbEmail').value.trim(),password=document.getElementById('fbPassword').value;
+  let cfg;try{cfg=parseFirebaseConfig(document.getElementById('fbConfig').value);}catch(e){await infoDialog(e&&e.message?e.message:'Firebase config không hợp lệ.');return;}
+  if(!email||!password){await infoDialog('Nhập email và mật khẩu Firebase Authentication để kết nối an toàn.');return;}
+  try{
+    setCloudStatus('Đang kết nối Firebase...',false);markSaved('đang kết nối','Firebase');
+    if(typeof firebase==='undefined'||typeof firebase.auth!=='function')throw new Error('Chưa tải được Firebase Authentication.');
+    await ensureFirebaseApp(cfg);
+    await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+    await firebase.auth().signInWithEmailAndPassword(email,password);
+    localStorage.setItem('qclab_fb',JSON.stringify({labCode:code,email,anonymous:false,config:cfg}));
+    fbDisconnect();
+    setCloudStatus(email+' · '+code,true);
+    document.getElementById('fbPassword').value='';
+    await initFirebase();
+    if(fb.ref){
+      const snap=await fb.ref.once('value');
+      if(snap.exists())markSaved('đã kết nối','Đã tải dữ liệu từ Firebase');
+      else{fb.ready=true;fb.initialized=true;await syncNow();}
+    }
+    await infoDialog('Đã xác thực và bật đồng bộ Firebase.\nVào Realtime Database xem tại: '+(fbDataPath()||'qclab-shared/{labCode}'),{type:'success'});
+  }catch(e){
+    const msg=e&&e.message?e.message:'Kiểm tra tài khoản và cấu hình.';
+    setCloudStatus(msg.indexOf('permission_denied')>=0?'Chưa được cấp quyền Firebase':'Đăng nhập Firebase thất bại',false);
+    await infoDialog(msg.indexOf('permission_denied')>=0?firebaseAclHelp(code):'Không thể đăng nhập Firebase: '+msg);
+  }
+}
+function parseFirebaseConfig(raw){
+  raw=String(raw||'').trim();
+  if(!raw)throw new Error('Dán Firebase config trước khi kết nối.');
+  let text=raw;
+  try{return validateFirebaseConfig(JSON.parse(text));}catch(e){}
+  const start=text.indexOf('{'),end=text.lastIndexOf('}');
+  if(start<0||end<=start)throw new Error('Không tìm thấy object firebaseConfig. Hãy dán đoạn Config từ Firebase console.');
+  text=text.slice(start,end+1)
+    .replace(/\/\*[\s\S]*?\*\//g,'')
+    .replace(/(^|[^:])\/\/.*$/gm,'$1')
+    .replace(/([{,]\s*)([A-Za-z_$][\w$]*)\s*:/g,'$1"$2":')
+    .replace(/,\s*([}\]])/g,'$1');
+  try{return validateFirebaseConfig(JSON.parse(text));}
+  catch(e){throw new Error('Firebase config không hợp lệ. Có thể dán nguyên đoạn từ tab Config của Firebase console, ví dụ: const firebaseConfig = { ... };');}
+}
+function validateFirebaseConfig(cfg){
+  if(!cfg||typeof cfg!=='object'||Array.isArray(cfg))throw new Error('Firebase config phải là một object.');
+  const required=['apiKey','authDomain','databaseURL','projectId','appId'],missing=required.filter(k=>!String(cfg[k]||'').trim());
+  if(missing.length)throw new Error('Firebase config thiếu: '+missing.join(', ')+'.');
+  return cfg;
+}
+async function clearFb(){
+  if(!requireAdmin())return;
+  localStorage.removeItem('qclab_fb');fbDisconnect();
+  try{if(typeof firebase!=='undefined'&&typeof firebase.auth==='function')await firebase.auth().signOut();}catch(e){}
+  fb.authUser=null;setCloudStatus('Đang chạy cục bộ',false);markSaved('đã lưu cục bộ','Đã ngắt Firebase');await infoDialog('Đã ngắt đám mây. Dữ liệu vẫn lưu cục bộ.',{type:'success'});
+}
+function firebaseRulesText(){
+  return `{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "qclab-acl": {
+      "$labCode": {
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": false
+        }
+      }
+    },
+    "qclab-shared": {
+      "$labCode": {
+        ".read":  "auth != null && root.child('qclab-acl').child($labCode).child(auth.uid).exists()",
+        ".write": "auth != null && root.child('qclab-acl').child($labCode).child(auth.uid).exists()",
+        ".validate": "newData.hasChildren(['_ts'])",
+        "_ts": { ".validate": "newData.isNumber()" },
+        "_client": { ".validate": "newData.isString()" }
+      }
+    }
+  }
+}`;
+}
+function firebaseGuideHtml(){
+  const step=(n,title,body)=>`<div class="fb-step"><div class="fb-num">${n}</div><div class="fb-step-body"><h4>${title}</h4>${body}</div></div>`;
+  return `<details class="firebase-guide"><summary>Hướng dẫn Firebase chi tiết</summary>
+    <div class="firebase-guide-body">
+      <div class="alert info">Mặc định ai cũng đọc/ghi được (Anonymous). Làm 5 bước dưới để chỉ tài khoản được duyệt mới đồng bộ được.</div>
+      ${step(1,'Bật đăng nhập Email/Password','<p>Firebase Console → Authentication → Sign-in method: tắt <b>Anonymous</b>, bật <b>Email/Password</b>.</p>')}
+      ${step(2,'Tạo tài khoản, lấy UID','<p>Authentication → Users → Add user — mỗi máy/người 1 tài khoản, sau đó copy <b>User UID</b>.</p>')}
+      ${step(3,'Thêm UID vào danh sách được phép','<p>Realtime Database → Data, tạo đúng cấu trúc theo mã phòng (labCode) đang dùng:</p><pre>qclab-acl\n  khoaXN\n    UID_TAI_KHOAN_1: true\n    UID_TAI_KHOAN_2: true</pre><p>Đổi labCode thành <code>labA</code> thì ACL nằm ở <code>qclab-acl/labA/{uid}</code>.</p>')}
+      ${step(4,'Dán Rules','<p>Realtime Database → Rules → dán nguyên nội dung khung <b>Firebase Rules</b> bên dưới → Publish. Không sửa <code>$labCode</code>/<code>$uid</code>.</p>')}
+      ${step(5,'Kết nối trong app','<p>Thẻ Đồng bộ đám mây → nhập labCode, email/mật khẩu, dán Firebase config → bấm <b>Lưu &amp; kết nối</b>.</p>')}
+      <section><h4>Kiểm tra nhanh</h4><ul class="fb-check">
+        <li><b>✓</b> UID có trong ACL — đồng bộ được.</li>
+        <li><b>✕</b> UID không có trong ACL — bị từ chối đọc/ghi.</li>
+        <li><b>ℹ</b> <code>qclab-shared/{labCode}</code>: dữ liệu app tự đồng bộ · <code>qclab-acl/{labCode}</code>: danh sách UID bạn tự tạo.</li>
+      </ul></section>
+    </div>
+  </details>`;
+}
+async function copyFirebaseRules(){
+  const text=firebaseRulesText();
+  try{
+    if(navigator.clipboard&&navigator.clipboard.writeText)await navigator.clipboard.writeText(text);
+    else{const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();}
+    await infoDialog('Đã copy Firebase Rules.',{type:'success'});
+  }catch(e){await infoDialog('Không copy được tự động. Bạn có thể chọn và copy trong thẻ Firebase Rules.');}
+}
+/* ===== SETTINGS PAGE ROUTE ===== */
+function pageSettings(){
+  const fbcfg=getFbCfg()||{};
+  const lockedCloud=!!(fbcfg&&fbcfg.locked);
+  const logo=brandLogo();
+  const brandPreview=`<div class="brand-preview"><div class="brand-mark">${logo?`<img src="${escAttr(logo)}" alt="">`:esc(brandMarkText())}</div><div><b>${esc(brandTitle())}</b><small>${esc(brandSub())}</small></div></div>`;
+  return headOnly('Cài đặt & Đồng bộ','Thông tin đơn vị, backup và kết nối Firebase')+
+   `<div class="settings-profile-grid">
+    <div class="panel"><h3>Thông tin đơn vị</h3>
+      <div class="settings-unit-fields"><div><label>Tên bệnh viện / đơn vị</label><input id="labName" value="${escAttr(state.lab.name||'')}"></div>
+        <div><label>Khoa / phòng</label><input id="labDept" value="${escAttr(state.lab.dept||'')}"></div>
+        <div><label>Địa chỉ</label><input id="labAddr" value="${escAttr(state.lab.address||'')}"></div></div>
+     <div class="settings-panel-actions"><button class="btn teal" onclick="saveLab()">Lưu thông tin</button></div>
+    </div>
+    <div class="panel"><h3>Logo & tên phần mềm</h3>
+     <div class="grid2">
+       <div>
+         <label>Tên hiển thị trên thanh bên</label><input id="brandTitle" value="${escAttr(brandTitle())}">
+         <label>Dòng phụ</label><input id="brandSub" value="${escAttr(brandSub())}">
+         <label>Chữ trong logo khi chưa dùng ảnh</label><input id="logoText" maxlength="4" value="${escAttr(brandMarkText())}">
+       </div>
+       <div>
+         <label>Logo hiện tại</label>${brandPreview}
+         <label>Chọn ảnh logo</label>
+         <div class="file-pick"><button type="button" class="btn ghost sm" onclick="document.getElementById('logoFile').click()">Chọn tệp</button><span id="logoFileName" class="hint">Chưa chọn tệp</span></div>
+         <input id="logoFile" type="file" accept="image/*" style="display:none" onchange="pickLogo(event)">
+         <div class="hint settings-brand-note">Nên dùng ảnh vuông PNG/JPG, dung lượng nhỏ. Logo được lưu cùng dữ liệu phần mềm.</div>
+       </div>
+     </div>
+     <div class="settings-panel-actions"><button class="btn teal" onclick="saveBrand()">Lưu logo</button><button class="btn ghost" onclick="clearLogo()">Bỏ ảnh logo</button></div>
+    </div>
+   </div>
+   <div class="panel"><h3>Quản trị dữ liệu</h3>
+     <div class="admin-tools">
+        <div class="admin-tool"><b>Xuất backup</b><span>Lưu toàn bộ dữ liệu hiện tại ra file để cất giữ hoặc chuyển sang máy khác. ${backupStatusText()}</span><button class="btn ghost" onclick="exportData()">Xuất backup</button></div>
+        <div class="admin-tool"><b>Nhập backup</b><span>Khôi phục dữ liệu từ file đã xuất trước đó. Chỉ tài khoản quản trị được phép nhập.</span><button class="btn ghost" onclick="document.getElementById('imp').click()">Chọn file backup</button><input id="imp" type="file" accept="application/json" style="display:none" onchange="importData(event)"></div>
+        <div class="admin-tool"><b>Xóa sạch dữ liệu test</b><span>Đưa app về trạng thái trắng, giữ tài khoản đăng nhập hiện tại để không bị khóa.</span><button class="btn danger" onclick="resetAllData()">Xóa sạch dữ liệu</button></div>
+      </div></div>
+   <div class="panel firebase-sync-panel"><h3>Đồng bộ đám mây (Firebase Realtime Database)</h3>
+     <div class="firebase-auth-grid"><div><label>Mã phòng</label><input id="fbCode" value="${escAttr(fbcfg.labCode||'khoaXN')}" ${lockedCloud?'readonly':''}></div>
+       <div><label>Email Firebase Authentication</label><input id="fbEmail" type="email" autocomplete="username" value="${escAttr(fbcfg.email||'')}"></div>
+       <div><label>Mật khẩu Firebase</label><input id="fbPassword" type="password" autocomplete="current-password" placeholder="Chỉ dùng để đăng nhập, không lưu"></div></div>
+     ${lockedCloud?`<div class="hint" style="margin-top:6px">Bản deploy này khóa sẵn <code>${esc(fbDataPath())}</code>. Muốn đổi mã phòng cần sửa <code>assets/modules/app-meta.js</code>.</div>`:''}
+     <label>Firebase config (dán nguyên đoạn từ tab Config của Firebase console)</label>
+     <textarea id="fbConfig" class="firebase-config-input" ${lockedCloud?'readonly':''} placeholder='const firebaseConfig = {
+  apiKey: "...",
+  authDomain: "yourapp.firebaseapp.com",
+  databaseURL: "https://yourapp-default-rtdb.firebaseio.com",
+  projectId: "yourapp",
+  storageBucket: "yourapp.firebasestorage.app",
+  messagingSenderId: "...",
+  appId: "..."
+};'>${fbcfg.config?JSON.stringify(fbcfg.config,null,2):''}</textarea>
+     <div class="firebase-actions"><button class="btn teal" onclick="saveFb()">Lưu &amp; kết nối</button> <button class="btn ghost" onclick="clearFb()">Ngắt đám mây</button></div></div>
+   <div class="panel"><h3>Firebase Rules</h3>
+     ${firebaseGuideHtml()}
+     <div class="rules-tools"><span>Copy cố định vào Realtime Database → Rules. Không sửa <code>$labCode</code> hoặc <code>$uid</code>.</span><button class="btn ghost sm" onclick="copyFirebaseRules()">Copy rules</button></div>
+     <pre class="rules-code">${esc(firebaseRulesText())}</pre></div>`;
+}

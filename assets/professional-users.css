@@ -1,0 +1,107 @@
+/* Người dùng (user management) page.
+   Split from the original monolithic professional.css on 2026-07-11 — see CLAUDE.md
+   for the full file list and load order. Loading order matters: keep new rules in
+   whichever file matches the page/selector, and keep this file after professional-base.css. */
+
+.user-table{
+  width:100%; min-width:0; table-layout:fixed;
+}
+
+/* .user-table only has 4 narrow columns and never needs horizontal scroll,
+   but it matches professional-base.css's generic `.panel:has(> h3:first-child
+   + table)` wide-table-scroll wrapper (built for genuinely wide tables like
+   .audit-table), which forces min-width:100% and overflow-x:auto !important
+   on it too — showing a scrollbar with empty space to scroll into. Opt this
+   table back out. */
+.panel:has(> h3:first-child + table.user-table){
+  overflow-x:hidden !important;
+}
+
+.panel > h3:first-child + table.user-table{
+  min-width:0;
+}
+
+.user-table th:nth-child(4),.user-table td:nth-child(4){
+  width:38%;white-space:normal;
+}
+
+.user-table th, .user-table td{
+  padding-left:14px; padding-right:14px;
+}
+
+.user-row-actions{
+  display:flex;flex-wrap:wrap;gap:6px;align-items:center;
+}
+
+.user-create-card{
+  background:var(--panel); border:1px solid #dde7ec; border-radius:var(--radius-lg); overflow:hidden; box-shadow:0 1px 2px rgba(20,33,43,.05);
+}
+
+.user-create-card-title{
+  margin:0; padding:11px 18px; border-bottom:1px solid var(--section-head-border); background:var(--section-head-bg); color:var(--section-head-ink); font-size:var(--section-head-size); font-weight:800; letter-spacing:0; text-transform:none;
+}
+
+.user-create-fields{
+  display:grid; grid-template-columns:1fr; gap:10px; padding:18px;
+}
+
+.user-create-actions .btn{
+  min-width:88px;
+}
+
+.user-create-hint{
+  margin:0 16px 16px;
+}
+
+.user-perm-block{
+  margin-top:0; min-width:0; padding:18px;
+}
+
+.user-perm-grid{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:8px; margin-top:8px;
+}
+
+.user-perm-grid label{
+  display:flex; align-items:center; gap:8px; min-height:38px; padding:8px 10px; border:1px solid #d8e5ea; border-radius:var(--radius-md); background:var(--surface-card-soft); color:#183542; font-size:12.5px; font-weight:750; cursor:pointer; box-shadow:none;
+}
+
+.user-perm-grid label.disabled{
+  opacity:.46; background:#f1f5f7; cursor:not-allowed;
+}
+
+.user-perm-grid input[type="checkbox"]{
+  appearance:auto; -webkit-appearance:checkbox; box-sizing:border-box; width:17px; min-width:17px; max-width:17px; height:17px; min-height:0; flex:0 0 17px; margin:0; padding:0; border:1px solid #b8c8d2; border-radius:3px; background:var(--panel); box-shadow:none; accent-color:var(--teal);
+}
+
+.user-perm-grid input[type="checkbox"]:focus{
+  outline:none; box-shadow:none;
+}
+
+.user-perm-grid input[type="checkbox"]:focus-visible{
+  outline:2px solid var(--teal); outline-offset:3px; box-shadow:0 0 0 3px rgba(12,111,120,.14);
+}
+
+.rc-crit-text div,
+.rc-verdict-desc,
+.user-create-actions{
+  margin-top:2px;
+}
+
+/* User management rules migrated out of professional-base.css. */
+.user-create-layout{
+  display:grid; grid-template-columns:minmax(280px,380px) minmax(0,1fr); gap:20px; align-items:start; margin:16px; padding:16px;
+}
+
+.user-table th:nth-child(1), .user-table td:nth-child(1){
+  width:30%
+}
+
+.user-table th:nth-child(2), .user-table td:nth-child(2), .user-table th:nth-child(3), .user-table td:nth-child(3){
+  width:16%
+}
+
+@media(max-width:980px){
+.user-create-layout{
+  grid-template-columns:1fr;
+}
+}

@@ -1,0 +1,278 @@
+/* Khắc phục sự cố & Báo cáo (corrective actions + report) pages.
+   Split from the original monolithic professional.css on 2026-07-11 — see CLAUDE.md
+   for the full file list and load order. Loading order matters: keep new rules in
+   whichever file matches the page/selector, and keep this file after professional-base.css. */
+
+.action-form-panel,.action-log-panel{
+  margin-top:24px;
+}
+
+.action-form-body{
+  padding:16px;
+}
+
+.panel>h3:first-child+.action-form-body{
+  margin:0;
+}
+
+.panel>h3:first-child+.action-log-tools{
+  margin:0;
+}
+
+#aLevelLabel[readonly]{
+  background:#f7fbfc; color:#24404c; font-weight:750;
+}
+
+.action-date{
+  display:flex; width:100%;
+}
+
+.action-date input.date-text{
+  max-width:none; flex:1;
+}
+
+.datebox.action-date{
+  height:38px;
+}
+
+.action-log-panel{
+  overflow:hidden;
+}
+
+.action-log-panel .action-log-tools{
+  display:flex; justify-content:flex-end; padding:14px 16px 10px;
+}
+
+.action-log-wrap{
+  margin:0 16px 16px; overflow-x:auto; border:1px solid #d7e3e9; border-radius:var(--radius-md); background:var(--panel);
+}
+
+.action-log-table{
+  width:100%; min-width:1040px; margin:0; border:0; border-radius:0; table-layout:fixed;
+}
+
+.action-log-table th, .action-log-table td{
+  vertical-align:top; padding:13px 12px;
+}
+
+.action-log-table th{
+  height:42px; background:var(--section-head-bg); color:var(--card-head-ink); font-size:var(--table-head-size); letter-spacing:0; text-transform:none;
+}
+
+.action-log-table th:nth-child(1), .action-log-table td:nth-child(1){
+  width:90px
+}
+
+.action-log-table th:nth-child(2), .action-log-table td:nth-child(2){
+  width:230px
+}
+
+.action-log-table th:nth-child(3), .action-log-table td:nth-child(3){
+  width:360px
+}
+
+.action-log-table th:nth-child(4), .action-log-table td:nth-child(4){
+  width:270px
+}
+
+.action-date, .action-test{
+  font-weight:800; color:#153043;
+}
+
+.action-time{
+  margin-top:4px; color:#607486; font-size:12px; line-height:1.35; font-weight:600;
+}
+
+.action-sub, .action-rule, .action-note{
+  margin-top:4px; color:#607486; font-size:12px; line-height:1.35;
+}
+
+.action-text{
+  color:#243848; line-height:1.45;
+}
+
+.action-status-stack{
+  display:flex; flex-direction:column; align-items:flex-start; gap:6px;
+}
+
+.action-chip{
+  display:inline-flex; align-items:center; width:max-content; max-width:230px; min-height:22px; padding:4px 9px; border-radius:var(--radius-pill); font-size:11px; font-weight:800; line-height:1.25; white-space:normal;
+}
+
+.action-chip.ok{
+  background:#dff2ef;color:var(--tealink)
+}
+
+.action-chip.warn{
+  background:#fff2d9;color:#9b650c
+}
+
+.action-chip.rej{
+  background:#f8dfdd;color:#a52b24
+}
+
+.action-chip.none{
+  background:var(--surface-neutral);color:#647686
+}
+
+.action-row-actions{
+  display:flex; flex-direction:column; align-items:stretch; gap:7px;
+}
+
+.action-row-actions .btn{
+  justify-content:center; min-height:32px;
+}
+
+.action-row-actions .btn.icon{
+  width:100%; min-width:0;
+}
+
+.action-date{
+  white-space:nowrap;
+}
+
+.rc-stat-sub,
+.action-chipline{
+  margin-top:6px;
+}
+
+/* Sự cố cần xử lý (2026-07-18): trước đây mỗi vi phạm x mức x lô là một
+   .shift-item riêng, cùng viền đỏ/đậm và cùng câu gợi ý lặp lại nhiều lần —
+   với vài tuần dữ liệu thật thành một bức tường thẻ giống hệt nhau. Gộp theo
+   xét nghiệm + ngày chạy vào một .issue-group; .issue-row bên trong chỉ khác
+   nhau bằng độ đậm nhạt theo mức nghiêm trọng (loại bỏ đậm hơn cảnh báo),
+   không lặp lại toàn bộ khung thẻ cho từng vi phạm. */
+.issue-group{
+  border:1px solid var(--line); border-radius:var(--surface-radius); overflow:hidden; background:var(--panel);
+}
+
+.issue-group.rej{
+  border-left:4px solid #b93a32;
+}
+
+.issue-group.warn{
+  border-left:4px solid #9a6700;
+}
+
+.issue-group-h{
+  display:flex; align-items:baseline; justify-content:space-between; gap:10px; padding:10px 14px; background:var(--section-head-bg); border-bottom:1px solid var(--section-head-border);
+}
+
+.issue-group-h b{
+  color:var(--ink); font-size:13px;
+}
+
+.issue-group-date{
+  margin-left:8px; color:var(--muted); font-size:12px; font-weight:650;
+}
+
+.issue-group-count{
+  flex:none; color:var(--muted); font-size:11.5px; font-weight:700; white-space:nowrap;
+}
+
+.issue-group-body{
+  display:grid;
+}
+
+.issue-row{
+  display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 14px; border-top:1px solid var(--line2);
+}
+
+.issue-group-body .issue-row:first-child{
+  border-top:none;
+}
+
+.issue-row.rej{
+  background:#f8e4e2;
+}
+
+.issue-row-main{
+  min-width:0;
+}
+
+.issue-row-main b{
+  font-size:12.5px; color:var(--ink);
+}
+
+.issue-row-main .meta{
+  margin-top:2px;
+}
+
+.issue-row.rej .meta{
+  color:#7d2a23;
+}
+
+.issue-row.warn .meta{
+  color:#7a5310;
+}
+
+.issue-row-main .hint{
+  margin-top:4px;
+}
+
+@media(max-width:640px){
+.issue-row{
+  flex-direction:column; align-items:stretch;
+}
+}
+
+/* Corrective action and report rules migrated out of professional-base.css. */
+.action-form-main{
+  display:grid; grid-template-columns:minmax(220px,1fr) minmax(360px,1.7fr) minmax(170px,.85fr) minmax(190px,.9fr); gap:10px;
+}
+
+.action-form-row2{
+  display:grid; grid-template-columns:.7fr .8fr 1.7fr; gap:10px;
+}
+
+.action-log-table th:nth-child(5), .action-log-table td:nth-child(5){
+  width:110px
+}
+
+.action-log-table th:nth-child(5){
+  text-align:center;
+}
+
+.panel:has(#reportSearch){
+  padding-bottom:16px;
+}
+
+.panel:has(#reportSearch) .datebox{
+  width:100%; height:38px;
+}
+
+.panel:has(#reportSearch) .datebox input.date-text{
+  max-width:none; flex:1; height:36px;
+}
+
+.report-actions{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-top:12px;
+}
+
+.panel:has(#reportSearch) > .hint{
+  margin:12px 16px 0 !important;
+}
+
+@media(max-width:980px){
+.action-form-row2 > div:last-child{
+  grid-column:1/-1;
+}
+
+.action-form-main, .action-form-row2{
+  grid-template-columns:1fr 1fr;
+}
+}
+
+@media(max-width:760px){
+.action-form-main, .action-form-row2{
+  grid-template-columns:1fr;
+}
+
+.panel:has(#reportSearch) > .hint{
+  margin-left:12px !important; margin-right:12px !important;
+}
+}

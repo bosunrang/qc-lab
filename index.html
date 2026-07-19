@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QC Lab - Nội kiểm chất lượng xét nghiệm</title>
+<link rel="stylesheet" href="assets/tokens.css?v=ui-review-font-self-host-20260718-1">
+<link rel="stylesheet" href="assets/app.css?v=dedupe-audit-20260713-1">
+<link rel="stylesheet" href="assets/professional-base.css?v=ui-review-20260718-1">
+<link rel="stylesheet" href="assets/components.css?v=sigma-unused-style-cleanup-20260718-1">
+<link rel="stylesheet" href="assets/professional-settings.css?v=settings-profile-cleanup-20260716-4">
+<link rel="stylesheet" href="assets/professional-dashboard.css?v=ui-review-20260718-1">
+<link rel="stylesheet" href="assets/professional-entry.css?v=qc-input-focus-20260718-1">
+<link rel="stylesheet" href="assets/professional-westgard.css?v=table-type-unified-20260716-1">
+<link rel="stylesheet" href="assets/professional-sigma.css?v=sigma-period-row-select-20260718-1">
+<link rel="stylesheet" href="assets/professional-reagent.css?v=sigma-unused-style-cleanup-20260718-1">
+<link rel="stylesheet" href="assets/professional-config.css?v=remove-config-eyebrows-20260719-1">
+<link rel="stylesheet" href="assets/professional-reports.css?v=issue-grouping-20260718-1">
+<link rel="stylesheet" href="assets/professional-users.css?v=user-table-no-scroll-20260713-1">
+<link rel="stylesheet" href="assets/professional-audit.css?v=split-20260711-3">
+<script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="brand" id="brandBox"><div class="brand-mark">QC</div><div>QC Lab<small>Nội kiểm xét nghiệm</small></div></div>
+    <div class="cloud offline" id="cloudStatus" role="status" aria-live="polite">Đang chạy cục bộ</div>
+    <button type="button" id="backupDot" class="backup-dot" hidden onclick="exportData()"></button>
+    <div class="save-status" id="saveStatus" role="status" aria-live="polite">Lưu trữ: <b>cục bộ</b></div>
+    <div id="userBox"></div>
+    <nav id="nav" aria-label="Điều hướng chính"></nav>
+    <div class="side-foot" id="sideFoot"></div>
+  </aside>
+  <main id="main" tabindex="-1"></main>
+</div>
+<div id="modalRoot"></div>
+<div id="dialogRoot"></div>
+<script>
+// Electron only (window.qcDialog comes from electron/preload.js): route alert()
+// through a native OS dialog instead of Chromium's own, which has a Windows-only bug
+// where the renderer's inputs stop responding after the dialog closes. No-op in a plain
+// browser (python -m http.server), where window.qcDialog is never defined.
+// confirm() has no app callers anymore (see modals.js confirmDialog()), so it's not
+// overridden here.
+if (window.qcDialog) {
+  window.alert = function (message) { return window.qcDialog.alert(message); };
+}
+</script>
+
+<script defer src="assets/core.js?v=lot-transition-four-statuses-20260719-1"></script>
+<script defer src="assets/modules/app-meta.js?v=sigma-scroll-mdc-tooltip-20260719-1"></script>
+<script defer src="assets/modules/analyte-catalog.js?v=hematology-coagulation-20260716-1"></script>
+<script defer src="assets/modules/state.js?v=lot-target-history-20260719-1"></script>
+<script defer src="assets/modules/qc-domain.js?v=stopped-group-entry-lock-20260716-3"></script>
+<script defer src="assets/modules/local-store.js?v=qc-performance-20260716-2"></script>
+<script defer src="assets/modules/firebase-sync.js?v=fb-synced-snap-cache-20260719-3"></script>
+<script defer src="assets/modules/state-storage.js?v=storage-interface-contract-20260719-2"></script>
+<script defer src="assets/modules/qc-rules.js?v=audit-20260707-2"></script>
+<script defer src="assets/modules/period-service.js?v=lock-ui-20260714-1"></script>
+<script defer src="assets/modules/sigma-cohort-service.js?v=sigma-deadcode-cleanup-20260717-1"></script>
+<script defer src="assets/modules/entry-service.js?v=action-time-20260714-1"></script>
+<script defer src="assets/modules/westgard-view-model.js?v=westgard-business-20260716-1"></script>
+<script defer src="assets/modules/entry-ui-state.js?v=entry-partial-render-20260716-3"></script>
+<script defer src="assets/modules/analysis-ui-state.js?v=westgard-row-window-20260714-1"></script>
+<script defer src="assets/modules/sigma-ui-state.js?v=sigma-period-status-selection-20260718-1"></script>
+<script defer src="assets/modules/reagent-ui-state.js?v=reagent-cleanup-20260716-1"></script>
+<script defer src="assets/modules/manage-ui-state.js?v=remove-config-overview-20260719-1"></script>
+<script defer src="assets/modules/auth-ui-state.js?v=auth-ui-state-20260714-1"></script>
+<script defer src="assets/modules/action-workflow-service.js?v=rerun-cross-day-20260714-2"></script>
+<script defer src="assets/modules/draw.js?v=westgard-business-20260716-1"></script>
+<script defer src="assets/modules/chart-view-model.js?v=display-downsampling-20260714-1"></script>
+<script defer src="assets/modules/router-render.js?v=sigma-scroll-keep-20260718-1"></script>
+<script defer src="assets/modules/audit.js?v=audit-relink-20260719-1"></script>
+<script defer src="assets/modules/sigma.js?v=sigma-mdc-tooltip-20260718-1"></script>
+<script defer src="assets/modules/actions-routes.js?v=info-dialog-20260718-1"></script>
+<script defer src="assets/modules/manage-routes.js?v=remove-config-overview-20260719-1"></script>
+<script defer src="assets/modules/after-render.js?v=render-batch-20260714-1"></script>
+<script defer src="assets/modules/entry-tests-actions.js?v=remove-config-eyebrows-20260719-1"></script>
+<script defer src="assets/modules/modals.js?v=info-dialog-20260718-1"></script>
+<script defer src="assets/modules/range.js?v=info-dialog-20260718-1"></script>
+<script defer src="assets/modules/settings.js?v=info-dialog-20260718-1"></script>
+<script defer src="assets/modules/data-io.js?v=sigma-combined-export-compact-20260718-1"></script>
+<script defer src="assets/modules/reports.js?v=sigma-period-print-20260718-1"></script>
+<script defer src="assets/modules/users-auth.js?v=login-focus-fix-20260718-1"></script>
+<script defer src="assets/modules/reagent.js?v=info-dialog-20260718-1"></script>
+<script defer src="assets/app.js?v=partitioned-hydration-20260714-1"></script>
+</body>
+</html>

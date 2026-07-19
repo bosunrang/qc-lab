@@ -1,0 +1,207 @@
+/* Phân tích Westgard (Westgard rule analysis) page.
+   Split from the original monolithic professional.css on 2026-07-11 — see CLAUDE.md
+   for the full file list and load order. Loading order matters: keep new rules in
+   whichever file matches the page/selector, and keep this file after professional-base.css. */
+
+.panel.wg-prev-lot{
+  background:#f7f9fa; border:1px dashed var(--line);
+}
+
+.panel.wg-prev-lot .wg-lot-name{
+  color:#8f5a52;
+}
+
+.wg-test-picker{
+  display:grid; grid-template-columns:minmax(240px,1fr) minmax(300px,1.15fr); gap:12px; align-items:end; margin:14px 16px 0; max-width:760px;
+}
+
+.wg-test-picker label{
+  margin-top:0;
+}
+
+.wg-test-picker.wg-test-picker-3{
+  grid-template-columns:minmax(200px,0.9fr) minmax(220px,1fr) minmax(240px,1.05fr); max-width:1100px;
+}
+
+.wg-rules{
+  margin:12px 16px 0;
+}
+
+.panel>h3:first-child:has(.wg-lot-name){
+  justify-content:space-between; gap:14px;
+}
+
+.wg-level-title{
+  display:flex; align-items:baseline; gap:8px; min-width:0;
+}
+
+.wg-level-meta{
+  display:flex; align-items:center; gap:7px; margin-left:auto; color:#4f6875; font-size:11px; font-weight:750; white-space:nowrap;
+}
+
+.wg-level-meta span+span:before{
+  content:"|"; margin-right:7px; color:#9aabb4;
+}
+
+.wg-lot-name{
+  font-size:12px; font-weight:800; color:#47636f;
+}
+
+.wg-prev-toggle{
+  margin-left:8px; padding:3px 10px; font-size:11px; font-weight:700;
+}
+
+.wg-guide{
+  margin:12px 16px 0; border:1px solid var(--line); border-radius:var(--radius-md); background:#fbfcfd; overflow:hidden;
+}
+
+.wg-guide summary{
+  cursor:pointer; padding:10px 12px; font-size:13px; font-weight:700; color:var(--ink); list-style:none;
+}
+
+.wg-guide summary::-webkit-details-marker{
+  display:none;
+}
+
+.wg-guide summary:after{
+  content:"+"; float:right; color:var(--muted); font-weight:800;
+}
+
+.wg-guide[open] summary:after{
+  content:"-";
+}
+
+.wg-guide .chart-scroll{
+  padding:0 12px 14px;
+}
+
+.wg-guide table{
+  border:1px solid var(--line); border-radius:var(--surface-radius); min-width:760px; margin:0;
+}
+
+.wg-guide th,.wg-guide td{
+  padding:10px 12px; font-size:var(--table-body-size); vertical-align:top;
+}
+
+.wg-guide th{font-size:var(--table-head-size)}
+
+.wg-guide td:first-child{
+  font-weight:800; white-space:nowrap;
+}
+
+.wg-guide .warn{
+  color:var(--amber); font-weight:800;
+}
+
+.wg-guide .rej{
+  color:var(--red); font-weight:800;
+}
+
+.wg-error-type{
+  display:grid; gap:3px; line-height:1.35;
+}
+
+.wg-error-type b{
+  color:#415967; font-weight:800;
+}
+
+.wg-error-type small{
+  color:var(--muted); font-size:11.5px;
+}
+
+.wg-rule-item{
+  display:inline-flex; align-items:center; gap:8px; margin:4px 12px 4px 0; font-size:13px; vertical-align:middle;
+}
+
+.wg-rule-item label{
+  display:inline-flex; align-items:center; gap:6px; margin:0;
+}
+
+.wg-rule-item input{
+  width:auto;
+}
+
+.wg-rule-reset{
+  display:flex; margin-top:8px;
+}
+
+.wg-rule-reset .btn{
+  border-color:#b9dadd; background:#eef8f8; color:#0a6f72; font-weight:800;
+}
+
+.wg-rule-reset .btn:hover{
+  background:#dff1f1; border-color:#8ec8cc; color:#075f62;
+}
+
+.panel > table.wg-table, .panel > h3:first-child + table.wg-table, .panel > h3:first-child ~ table.wg-table, .wg-table{
+  width:calc(100% - 32px) !important; min-width:920px !important; table-layout:fixed !important;
+}
+
+.history-table th:nth-child(9), .history-table td:nth-child(9), .wg-table th:nth-child(1), .wg-table td:nth-child(1){
+  width:7%
+}
+
+.wg-table th, .wg-table td, .wg-table th:nth-child(7), .wg-table td:nth-child(7){
+  text-align:center;
+}
+
+.wg-table th:nth-child(2), .wg-table td:nth-child(2){
+  width:16%
+}
+
+.wg-table th:nth-child(3), .wg-table td:nth-child(3), .wg-table th:nth-child(5), .wg-table td:nth-child(5){
+  width:15%
+}
+
+.wg-table th:nth-child(4), .wg-table td:nth-child(4){
+  width:13%
+}
+
+.wg-table th:nth-child(6), .wg-table td:nth-child(6){
+  width:14%
+}
+
+.wg-table th:nth-child(7), .wg-table td:nth-child(7){
+  width:20%
+}
+
+.wg-table .wg-error-type{
+  justify-items:center; text-align:center;
+}
+
+.wg-guide{
+  margin-bottom:16px !important;
+}
+
+@media(max-width:760px){
+.panel > table.wg-table, .panel > h3:first-child + table.wg-table, .panel > h3:first-child ~ table.wg-table, .wg-table{
+  width:calc(100% - 24px) !important; min-width:820px !important;
+}
+
+.wg-guide{
+  margin-bottom:12px !important;
+}
+
+.wg-test-picker{
+  grid-template-columns:1fr;margin-left:12px;margin-right:12px
+}
+
+.wg-test-picker.wg-test-picker-3{
+  grid-template-columns:1fr;max-width:none
+}
+
+.wg-rules{
+  margin-left:12px;margin-right:12px
+}
+
+.wg-level-meta{
+  width:100%;margin-left:0;white-space:normal
+}
+
+.panel>h3:first-child:has(.wg-level-title){
+  flex-wrap:wrap
+}
+}
+.wg-row-window{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 16px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--teal) 4%,var(--panel));color:var(--muted);font-size:12px;font-weight:700}
+.wg-row-window .btn{flex:0 0 auto}
+@media (max-width:640px){.wg-row-window{align-items:flex-start;flex-direction:column}}

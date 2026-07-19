@@ -1,0 +1,295 @@
+/* Shared component primitives: panels, forms, buttons, tables, tags, alerts, modals, and auth shell.
+   Page-specific CSS may extend these selectors in later files. */
+.modal-bg{position:fixed;inset:0;background:rgba(20,33,43,.45);display:flex;align-items:center;justify-content:center;z-index:900;padding:20px}
+#dialogRoot .modal-bg{z-index:950}
+      .modal-h h3{ margin:0; }
+  .modal-b{padding:16px 18px;overflow:auto}
+  .modal-f{padding:12px 18px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px}
+  .modal-close{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-md);width:30px;height:30px;cursor:pointer;font-size:15px;color:var(--muted)}
+
+.panel{ padding:0; margin-bottom:16px; }
+  .panel>h3:first-child,.panel>.row-flex:first-child h3{ display:flex; align-items:center; margin:0; padding:12px 16px; border-bottom:1px solid var(--section-head-border); }
+  .panel>.row-flex:first-child{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .lj-toolbar h3{font-size:14px;font-weight:850;color:var(--section-head-ink)}
+  .panel>.row-flex:first-child label,.panel>.row-flex:first-child .hint,.lj-toolbar .hint{color:#5d7481}
+  .panel>h3:first-child+*,.panel>h3:first-child~*:not(h3),.panel>.row-flex:first-child+*{margin-left:16px;margin-right:16px}
+  .panel>h3:first-child+*,.panel>.row-flex:first-child+*{margin-top:14px}
+  .panel>h3:first-child~*:last-child,.panel>.row-flex:first-child~*:last-child{margin-bottom:16px}
+  .panel>table,.panel>h3:first-child+table,.panel>h3:first-child~table{width:calc(100% - 32px)}
+  .panel>label:first-child,.panel>.hint:first-child,.panel>.empty:first-child,.panel>table:first-child{margin:16px}
+  .panel h3{ margin:0 0 12px; font-size:11px; color:var(--muted); font-weight:600; }
+  .panel h3:not(:first-child){ margin:16px 16px 10px; }
+
+/* Shared card surface used by entry and Sigma modules. Page files should only
+   define their internal layout and module-specific states. */
+.qc-table-card,
+.tree,
+.lj-mini,
+.sg-chart-box{
+  border:1px solid var(--line);
+  border-radius:var(--surface-radius);
+  box-shadow:var(--surface-shadow);
+  overflow:hidden;
+  background:var(--panel);
+}
+
+.qc-table-card h4,
+.lj-mini-h,
+.tree h4,
+.sg-chart-box h4{
+  min-height:44px;
+  margin:0;
+  padding:10px 12px;
+  background:var(--section-head-bg);
+  border-bottom:1px solid var(--section-head-border);
+  box-shadow:none;
+  color:var(--card-head-ink);
+  font-size:var(--section-head-size);
+  font-weight:800;
+  letter-spacing:0;
+  text-transform:none;
+}
+
+  label{display:block;font-size:11.5px;color:var(--muted);margin:9px 0 4px;font-weight:760;}
+  input:not([type="checkbox"]):not([type="radio"]),select,textarea{ width:100%; padding:8px 10px; height:auto; border-color:#d5e0e6; box-shadow:inset 0 1px 0 rgba(19,32,42,.02); }
+  textarea{ font-family:var(--sans); }
+  button.btn{ font-family:var(--sans); font-weight:760; border:none; cursor:pointer; background:var(--ink); color:var(--on-accent); display:inline-flex; align-items:center; justify-content:center; gap:6px; }
+  button.btn.teal{background:var(--teal);}
+  button.btn.ghost{ color:#253946; }
+  button.btn.ghost:hover{ opacity:1; }
+  button.btn.danger{background:#b8322a;}
+  button.btn.sm{padding:5px 9px;font-size:12px;min-height:28px}
+  button.btn.icon{width:32px;padding:0;font-size:14px}
+  button.btn:hover{opacity:.92}
+  .row-flex{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+  .row-flex>div{flex:1;min-width:120px}
+
+table{ width:100%; border-collapse:separate; min-width:640px; border:1px solid var(--line); border-radius:9px; border-spacing:0; background:var(--panel); overflow:hidden; border-color:var(--section-head-border); }
+  th{text-transform:none;position:sticky;top:0;z-index:1;}
+  th,td{ text-align:left; padding:11px 12px; border-bottom:1px solid var(--surface-border-soft); vertical-align:middle; }
+  thead th{border-bottom:1px solid var(--card-head-border)}
+
+  tbody tr:last-child td{border-bottom:none}
+  td.num,th.num{font-family:var(--sans);font-variant-numeric:tabular-nums;text-align:right;font-weight:650;}
+  td b{font-weight:750;color:#172633}
+  td .hint{margin-top:2px;color:#6b7e8d}
+  .tag{ display:inline-block; font-family:var(--sans); }
+  .tag.ok{background:var(--success-bg);color:var(--success-ink);border:1px solid var(--success-border);}
+  .tag.warn{background:#fbf1de;color:var(--amber);border:1px solid #e4c273;}
+  .tag.rej{background:#f7e7e5;color:#9e3b34;border:1px solid #e2a8a2;}
+  .pill{ display:inline-block; font-family:var(--sans); margin:1px 3px 1px 0; }
+  /* Generic primitives moved from app.css (2026-07-12). */
+  button.x{background:transparent;border:none;color:var(--red);cursor:pointer;font-size:13px;padding:2px 6px}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;vertical-align:middle}
+  .empty{text-align:center;border:1px dashed var(--line)}
+  .empty .empty-title{font-weight:700;color:var(--ink);margin-bottom:4px}
+  .empty .empty-actions{margin-top:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+  .tag.none{background:var(--surface-neutral);color:#647686;border:1px solid var(--line);}
+  .alert{ display:flex; gap:10px; align-items:flex-start; margin-bottom:8px; border-left:4px solid transparent; border-left-width:5px; }
+  .alert.info{background:#eaf2f8;color:#2f5878;border-left-color:#4f789d;}
+  .alert.warn{background:var(--warning-soft);color:#7a5310;border-left-color:var(--amber)}
+  .alert.rej{background:var(--danger-soft);color:#7d2a23;border-left-color:var(--red)}
+  .alert.ok{background:var(--success-bg);color:var(--success-ink);border-left-color:var(--success-ink)}
+
+.modal{background:var(--panel);border-radius:13px;width:560px;max-width:100%;max-height:86vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.32);}
+  .modal-h{display:flex;align-items:center;justify-content:space-between;padding:15px 18px;border-bottom:1px solid var(--line);background:var(--surface-subtle);}
+
+/* Hộp thoại xác nhận thay cho confirm()/alert() gốc của trình duyệt ("page
+   says"). Dùng cho các thao tác không thể hoàn tác/quan trọng; xem
+   confirmDialog() trong modals.js. */
+.confirm-modal{
+  width:460px;
+}
+
+.confirm-modal-h{
+  display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:20px 22px 0;
+}
+
+.confirm-modal-kicker{
+  color:#a52b24; font-size:11px; font-weight:800; letter-spacing:.04em; text-transform:uppercase;
+}
+
+.confirm-modal-h .modal-close{
+  flex:none;
+}
+
+.confirm-modal-title{
+  margin:8px 22px 0; font-size:16px; font-weight:800; color:var(--ink); line-height:1.3;
+}
+
+.confirm-modal-body{
+  display:flex; align-items:flex-start; gap:14px; padding:16px 22px 22px;
+}
+
+.confirm-modal-icon{
+  flex:none; width:34px; height:34px; border-radius:50%; background:#f8dfdd; color:#a52b24; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:800;
+}
+
+.confirm-modal-icon.info{
+  background:#dff2ef; color:var(--tealink);
+}
+
+.info-modal-icon.warn{
+  background:#fff2d9; color:#9b650c;
+}
+
+.info-modal-icon.success{
+  background:#dff2ef; color:var(--tealink);
+}
+
+.confirm-modal-text b{
+  display:block; color:var(--ink); font-size:13.5px; line-height:1.4;
+}
+
+.confirm-modal-text p{
+  margin:6px 0 0; color:var(--muted); font-size:13px; line-height:1.5;
+}
+
+.confirm-modal-actions{
+  display:flex; justify-content:flex-end; gap:10px; padding:0 22px 22px;
+}
+
+.confirm-modal-actions .btn{
+  min-height:38px; padding:0 16px;
+}
+
+@media(max-width:640px){
+.confirm-modal-actions{
+  flex-direction:column-reverse;
+}
+
+.confirm-modal-actions .btn{
+  width:100%;
+}
+}
+  .auth-card{background:var(--panel);width:min(380px, calc(100vw - 32px));padding:32px 30px;border:1px solid #ccd8de;border-radius:var(--radius-lg);box-shadow:none;}
+  .auth-card label{margin-top:12px}
+  #authOverlay{position:fixed;inset:0;background:linear-gradient(135deg,#101c26 0,#0b7777 100%);display:flex;align-items:center;justify-content:center;z-index:1000;font-family:var(--sans);}
+
+/* Canonical component refinement layer. These rules previously lived in
+   professional-base.css even though they style reusable UI primitives. */
+.panel,
+.admin-tool{
+  border:1px solid var(--line); border-radius:var(--surface-radius); box-shadow:var(--surface-shadow); overflow:hidden; background:var(--panel);
+}
+
+.shift-item{
+  border:1px solid var(--line); overflow:hidden; padding:10px 12px; border-radius:var(--surface-radius); background:var(--panel); box-shadow:none;
+}
+
+.panel > h3:first-child{
+  min-height:44px; margin:0; padding:10px 14px; background:var(--section-head-bg); border-bottom:1px solid var(--section-head-border); box-shadow:none;
+}
+
+.panel > .row-flex:first-child{
+  min-height:44px; margin:0; padding:10px 14px; background:var(--section-head-bg); border-bottom:1px solid var(--section-head-border); color:var(--card-head-ink); font-size:var(--surface-head-size); font-weight:800; text-transform:none; letter-spacing:0; box-shadow:none;
+}
+
+.panel h3{
+  text-transform:none; letter-spacing:0;
+}
+
+.alert{
+  width:fit-content; max-width:100%; box-sizing:border-box;
+  border-radius:var(--surface-radius); padding:10px 12px; line-height:1.55;
+}
+
+.empty{
+  border-radius:var(--surface-radius); padding:36px 20px; background:var(--surface-card-soft);
+}
+
+input:not([type="checkbox"]):not([type="radio"]), select, textarea{
+  min-height:38px; border:1px solid var(--line); border-radius:var(--surface-radius); background:var(--panel);
+}
+
+input:not([type="checkbox"]):not([type="radio"]):focus, select:focus, textarea:focus{
+  border-color:var(--focus-outline);box-shadow:none;
+}
+
+:where(button,a[href],[role="button"],[role="treeitem"],input,select,textarea,[tabindex]:not([tabindex="-1"])):focus-visible{
+  outline:2px solid var(--focus-outline);outline-offset:1px;
+}
+
+:where(input:not([type="checkbox"]):not([type="radio"]),select,textarea):focus-visible{
+  border-color:var(--focus-outline);box-shadow:none;outline:1px solid var(--focus-outline);outline-offset:0;
+}
+
+main:focus{outline:none}
+
+button.btn{
+  min-height:36px; padding:8px 14px; border-radius:var(--surface-radius); box-shadow:none; letter-spacing:0;
+}
+
+button.btn.teal{color:var(--on-accent)}
+button.btn:disabled{opacity:.45; filter:grayscale(.4); cursor:not-allowed}
+button.btn.ghost{background:var(--panel); border:1px solid var(--line)}
+button.btn.ghost:hover{background:#f6fafb; border-color:#c9d6dc}
+button.btn.ghost.btn-stop-tint{color:#b5453c}
+button.btn.ghost.btn-stop-tint:hover{color:#9e3b34}
+button.btn.ghost.btn-teal-tint{color:var(--teal); border-color:var(--teal)}
+button.btn.ghost.btn-teal-tint:hover{background:#eef7f6}
+button.btn.ghost.btn-remove-tint{color:#b5453c; border-color:var(--line)}
+button.btn.ghost.btn-remove-tint:hover{background:#fbeeed; border-color:#c9d6dc}
+.btn-ico{width:15px; height:15px; flex:0 0 auto}
+
+table{font-size:var(--table-body-size); line-height:1.45}
+th{background:var(--section-head-bg);color:var(--card-head-ink);font-size:var(--table-head-size);letter-spacing:0;border-bottom-color:var(--section-head-border);font-weight:800}
+tbody tr:nth-child(even){background:var(--surface-card-soft)}
+tbody tr:hover{background:#f5f9fb}
+.tag{padding:4px 8px;border-radius:var(--radius-pill);font-size:var(--type-micro);font-weight:800;letter-spacing:0;white-space:nowrap;font-variant-numeric:tabular-nums}
+.pill{padding:4px 9px;border:1px solid var(--surface-border-soft);border-radius:var(--radius-pill);background:#eef3f6;color:#516672;font-size:var(--type-micro);font-weight:650;letter-spacing:0}
+
+.hint,
+.empty,
+.shift-item .meta,
+.admin-tool span{
+  color:var(--muted);font-size:var(--type-body-sm);line-height:1.55;
+}
+
+.legend,.auth-hint,.empty,.hint{color:var(--muted);font-weight:500}
+
+.refcat{font-weight:800}
+
+.panel > h3:first-child,
+.panel > .row-flex:first-child h3,
+.panel h3:not(:first-child),
+.modal-h h3{
+  color:var(--card-head-ink); font-size:var(--section-head-size); font-weight:800; letter-spacing:0; text-transform:none;
+}
+
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea,
+button.btn,
+td,
+.refrow,
+.mrow,
+.alert,
+.shift-item b,
+.auth-card label{
+  font-size:var(--type-body);
+}
+
+td{font-size:var(--table-body-size)}
+
+input:not([type="checkbox"]):not([type="radio"]),select,textarea,td,.refrow,.mrow,.alert,.shift-item b{color:var(--ink)}
+
+@media(max-width:760px){
+  body{font-size:13px}
+  .panel{padding:12px;border-radius:var(--radius-md)}
+  button.btn{min-height:38px;font-size:12.5px}
+  table{font-size:var(--table-body-size);min-width:560px}
+  th,td{padding:9px 10px}
+  th{font-size:var(--table-head-size)}
+  td{font-size:var(--table-body-size)}
+  input:not([type="checkbox"]):not([type="radio"]),select,textarea{font-size:16px}
+  .modal-bg{align-items:flex-end;padding:10px}
+  .modal{width:100%;max-height:92vh;border-radius:12px 12px 0 0}
+  .row-flex{align-items:stretch}
+  .row-flex>div{min-width:100%}
+  .panel>h3:first-child,.panel>.row-flex:first-child h3{min-height:43px;padding:10px 12px;font-size:13.5px}
+  .panel>h3:first-child+*,.panel>h3:first-child~*:not(h3),.panel>.row-flex:first-child+*{margin-left:12px;margin-right:12px}
+  .panel>table,.panel>h3:first-child+table,.panel>h3:first-child~table{width:calc(100% - 24px)}
+  .panel>.row-flex:first-child{padding:10px 12px}
+  .hint,.empty,.shift-item .meta,.admin-tool span{font-size:12px}
+}

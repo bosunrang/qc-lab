@@ -1,0 +1,57 @@
+{
+  "name": "qc-lab",
+  "version": "2.3.5",
+  "description": "QC Lab - Nội kiểm chất lượng xét nghiệm (IQC) cho phòng xét nghiệm lâm sàng",
+  "author": "QC Lab",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test tests/*.test.js",
+    "patch-build": "node scripts/patch-7za-symlink.js",
+    "dist": "node scripts/patch-7za-symlink.js && electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "vn.qclab.desktop",
+    "productName": "QC Lab",
+    "copyright": "QC Lab",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "index.html",
+      "assets/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "QC-Lab-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "allowElevation": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "QC Lab",
+      "installerLanguages": [
+        "vi_VN",
+        "en_US"
+      ]
+    }
+  }
+}

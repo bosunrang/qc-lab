@@ -1,0 +1,1402 @@
+/* Cấu hình chung (instruments/panels/lot groups/Mean-SD/lot transitions/history) page.
+   Split from the original monolithic professional.css on 2026-07-11 — see CLAUDE.md
+   for the full file list and load order. Loading order matters: keep new rules in
+   whichever file matches the page/selector, and keep this file after professional-base.css. */
+
+.manage-date{
+  display:flex; width:100%;
+}
+
+.manage-date input.date-text{
+  max-width:none; flex:1;
+}
+
+.datebox.manage-date{
+  height:38px;
+}
+
+.manage-actions{
+  display:flex; gap:6px; justify-content:flex-end; flex-wrap:wrap; white-space:nowrap;
+}
+
+.config-form-section{
+  display:flex; align-items:baseline; gap:8px; margin:18px 0 8px; padding-bottom:7px; border-bottom:1px solid var(--line);
+}
+
+.config-form-section b{
+  font-size:12px; text-transform:uppercase; letter-spacing:.05em;
+}
+
+.config-form-section span{
+  color:var(--muted); font-size:11px;
+}
+
+.config-shell{
+  display:grid; grid-template-columns:clamp(184px,17vw,230px) minmax(0,1fr); min-height:670px; border:1px solid #cfd9df; border-radius:9px; background:var(--panel); overflow:hidden; box-shadow:0 1px 2px rgba(19,32,42,.05),0 16px 36px rgba(19,32,42,.055);
+}
+
+.config-shell-nav{
+  position:static; height:auto; padding:0; color:#30414f; border:0; border-right:1px solid #d5dee3;
+}
+
+.rcfg-title{
+  height:48px; padding:17px 18px 0; color:var(--teal); font-size:10px; font-weight:850; letter-spacing:.13em;
+}
+
+.config-shell-nav button{
+  display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:9px; width:100%; min-height:46px; padding:7px 18px; border:0; border-top:1px solid transparent; border-bottom:1px solid transparent; background:transparent; color:#435461; text-align:left; cursor:pointer; font-family:var(--sans);
+}
+
+.config-shell-nav button>b{
+  overflow:hidden; font-size:12px; font-weight:760; text-overflow:ellipsis; white-space:nowrap;
+}
+
+.config-shell-nav button>small{
+  min-width:20px; padding:2px 6px; border-radius:var(--radius-pill); background:#dce4e8; color:#4d6270; text-align:center; font-size:10px; font-weight:800;
+}
+
+.config-shell-nav button:hover{
+  background:#e5ebee;
+}
+
+.config-shell-nav button.on{
+  border-top-color:#bed7d5; border-bottom-color:#bed7d5; background:var(--panel); color:#075f5c; box-shadow:inset 4px 0 var(--teal);
+}
+
+.config-shell-main{
+  background:#f7f9fa;
+}
+
+.rcfg-toolbar{
+  display:flex; justify-content:space-between;
+}
+
+.rcfg-toolbar h2{
+  margin:0; font-size:17px;
+}
+
+.rcfg-tools{
+  display:flex; align-items:center; gap:8px;
+}
+
+.rcfg-tools input{
+  height:34px; background:#f9fbfc;
+}
+
+.rcfg-kpis{
+  display:grid;
+}
+
+.rcfg-kpis button{
+  display:grid; gap:2px; min-height:112px; padding:14px; border:1px solid #d6e0e5; border-radius:var(--surface-radius); background:var(--panel); color:#20333e; text-align:left; cursor:pointer; font-family:var(--sans); box-shadow:0 1px 2px rgba(19,32,42,.035);
+}
+
+.rcfg-kpis button:hover{
+  border-color:#91bfbd;
+}
+
+.rcfg-kpis span{
+  color:#647986; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.06em;
+}
+
+.rcfg-kpis b{
+  color:#0b7777; font-size:31px; line-height:1.15;
+}
+
+.rcfg-kpis small{
+  color:var(--muted); font-size:11px;
+}
+
+.rcfg-grid{
+  display:grid; gap:14px; padding:0 16px 16px;
+}
+
+.rcfg-grid .panel,.rcfg-list{
+  margin:0;
+}
+
+.lot-config-grid{
+  display:grid; align-items:start; background:#f6f9fa;
+}
+
+.lot-config-grid .panel{
+  margin:0;
+}
+
+.lot-config-left,.lot-config-right{
+  border:1px solid #d7e2e7; background:var(--panel); overflow:hidden;
+}
+
+.lot-table{
+  table-layout:fixed; margin:14px; width:calc(100% - 28px); border:0; border-radius:0; border-collapse:collapse; background:var(--panel); overflow:hidden;
+}
+
+.lot-table th,.lot-table td{
+  vertical-align:middle; background:var(--panel); border-right:0; border-bottom:1px solid var(--surface-neutral);
+}
+
+.lot-table tbody tr:last-child td{
+  border-bottom:0;
+}
+
+.lot-table thead th, .transition-table thead th, .instrument-table thead th, .assay-table thead th, .panel-qc-table thead th, .history-table thead th, .history-detail-table thead th, .tea-ref-table thead th{
+  height:42px; background:var(--section-head-bg); border-bottom:1px solid #dbe6eb; color:var(--card-head-ink); font-size:var(--table-head-size); text-transform:none; letter-spacing:.03em;
+}
+
+.lot-table td{
+  padding-top:12px; padding-bottom:12px;
+}
+
+.lot-table th:first-child,.lot-table td:first-child{
+  padding-left:14px;
+}
+
+.lot-table th:last-child,.lot-table td:last-child{
+  padding-right:14px;
+}
+
+.lot-table tbody tr:nth-child(even) td{
+  background:var(--surface-card-soft);
+}
+
+.lot-table .tag{
+  white-space:nowrap; border-radius:var(--radius-pill); padding:5px 10px; line-height:1.1;
+}
+
+.lot-row-actions{
+  display:grid; grid-template-columns:48px 48px; justify-content:center; align-items:center; white-space:nowrap;
+}
+
+.lot-row-actions .btn{
+  text-align:center;
+}
+
+.lot-group-list{
+  display:grid; gap:10px; padding:12px; background:var(--panel);
+}
+
+.lot-group-card{
+  border:1px solid #dbe5ea; border-radius:var(--radius-lg); background:var(--panel); box-shadow:0 1px 2px rgba(19,32,42,.025); overflow:hidden;
+}
+
+.lot-group-card-h{
+  display:flex; align-items:flex-start; justify-content:space-between; gap:10px;
+}
+
+.lot-group-card-h b{
+  display:block;
+}
+
+.lot-group-card-h small{
+  display:block; margin-top:3px; line-height:1.35;
+}
+
+.lot-group-chipline{
+  display:flex; gap:6px; flex-wrap:wrap; padding:0 12px 10px;
+}
+
+.lot-group-actions{
+  display:flex; flex-wrap:wrap; justify-content:flex-end; gap:6px; padding:9px 12px; border-top:1px solid #edf2f4; background:var(--surface-subtle);
+}
+
+.lot-group-actions .btn{
+  padding:4px 8px; font-size:11px; min-height:24px;
+}
+
+.rcfg-panel-h{
+  display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:48px; padding:10px 14px; border-bottom:1px solid #dce5e9; background:#f1f5f6;
+}
+
+.rcfg-panel-h h3{
+  margin:0; color:#35505c; font-size:11px; font-weight:850; letter-spacing:.04em; text-transform:uppercase;
+}
+
+.rcfg-list table{
+  border:0; border-radius:0;
+}
+
+.rcfg-list th{
+  top:0;
+}
+
+.tea-ref-panel{
+  padding:0; overflow-x:auto;
+}
+
+.tea-source-registry{
+  display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin:14px 16px 0;
+}
+
+.tea-source-card{
+  min-width:0; padding:11px 12px; border:1px solid var(--line); border-radius:var(--surface-radius); background:var(--panel);
+}
+
+.tea-source-card>div{display:flex; align-items:center; justify-content:space-between; gap:8px}
+.tea-source-card b{font-size:13px}
+.tea-source-card p{margin:5px 0; color:var(--muted); font-size:12px; line-height:1.4}
+.tea-source-card a{color:var(--tealink); font-size:12px; font-weight:750; text-decoration:none}
+.tea-source-card.retired{border-color:#ead6ad; background:#fffaf1}
+.tea-source-actions{display:flex; flex:1 1 auto; flex-direction:column; align-items:stretch; gap:4px; min-width:0}
+.tea-source-actions .btn{height:auto; min-height:25px; padding:4px 7px; white-space:normal; line-height:1.2}
+.tea-ref-status{display:flex; align-items:center; justify-content:center; gap:6px; min-width:0; white-space:nowrap}
+.tea-ref-status .btn{min-height:28px; padding:5px 9px}
+.rcfg-tea-source-modal{width:min(760px,94vw)}
+
+@media(max-width:900px){
+  .tea-source-registry{grid-template-columns:1fr; margin-left:10px; margin-right:10px}
+}
+
+.tea-ref-table{
+  width:100%; min-width:760px; table-layout:fixed; border-collapse:separate; border-spacing:0;
+}
+
+.tea-ref-table th,.tea-ref-table td{
+  vertical-align:middle;
+}
+
+.tea-ref-table tbody td{
+  padding-top:8px; padding-bottom:8px;
+}
+
+.tea-ref-table th:nth-child(1),.tea-ref-table td:nth-child(1){width:22%;text-align:left;padding-left:34px}
+.tea-ref-table th:nth-child(2),.tea-ref-table td:nth-child(2){width:9%;text-align:center}
+.tea-ref-table th:nth-child(3),.tea-ref-table td:nth-child(3){width:12%;text-align:center}
+.tea-ref-table th:nth-child(4),.tea-ref-table td:nth-child(4){width:10%;text-align:center}
+.tea-ref-table th:nth-child(5),.tea-ref-table td:nth-child(5){width:10%;text-align:center}
+.tea-ref-table th:nth-child(6),.tea-ref-table td:nth-child(6){width:23%;text-align:center}
+.tea-ref-table th:nth-child(7),.tea-ref-table td:nth-child(7){width:14%;text-align:center}
+
+.tea-ref-table input.tea-ref-value{
+  display:block; box-sizing:border-box; width:min(100%,88px); height:34px; min-height:34px; margin:0 auto; padding:4px 8px; text-align:center;
+}
+
+.rcfg-checks{
+  display:grid;
+}
+
+.rcfg-checks>div{
+  display:flex; align-items:center; gap:10px;
+}
+
+.rcfg-checks>div>b{
+  display:grid; place-items:center; border-radius:50%;
+}
+
+.rcfg-checks span{
+  display:grid; font-weight:800;
+}
+
+.rcfg-checks small{
+  font-weight:650;
+}
+
+.rcfg-modal{
+  width:700px;
+}
+
+.rcfg-assay-modal{
+  width:880px;
+}
+
+.rcfg-history-detail-modal{
+  width:min(1280px,94vw);
+}
+
+.rcfg-history-detail-modal .modal-b{
+  max-height:72vh; overflow:auto;
+}
+
+.rcfg-history-detail-modal table{
+  min-width:900px;
+}
+
+.rcfg-assay-modal .modal-b{
+  padding-bottom:24px;
+}
+
+.assay-main-grid{
+  display:grid; grid-template-columns:minmax(220px,1.2fr) minmax(220px,1.2fr) minmax(150px,.72fr); gap:10px; align-items:end;
+}
+
+.assay-main-grid > div{
+  min-width:0;
+}
+
+.rcfg-check{
+  display:flex; align-items:center; gap:8px; margin-top:14px; color:#304650; font-weight:750;
+}
+
+.rcfg-check input{
+  width:auto;
+}
+
+.lot-assay-check{
+  display:flex; align-items:center; justify-content:center; margin:0;
+}
+
+.lot-assay-check input{
+  width:18px; height:18px; accent-color:var(--teal);
+}
+
+.lot-assay-name{
+  display:grid; min-width:0;
+}
+
+.lot-assay-name b{
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+
+.lot-assay-name small{
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+
+.target-selector{
+  display:grid; gap:10px; padding:12px 14px; border-bottom:1px solid var(--section-head-border); background:var(--section-head-bg); align-items:end;
+}
+
+.target-selector label{
+  margin-top:0;
+}
+
+.target-selector select,.target-selector input{
+  height:36px;
+}
+
+.target-lot-info{
+  display:inline-flex; align-items:center; gap:6px; min-height:36px; padding:0 10px; border:1px solid #d5e1e7; border-radius:var(--surface-radius); background:var(--panel); color:#5d7180; font-size:11px; font-weight:750;
+}
+
+.target-lot-info b{
+  color:var(--tealink); font-size:14px;
+}
+
+.target-lot-info span{
+  font-size:11px;
+}
+
+.target-summary{
+  display:flex; gap:8px; flex-wrap:wrap; padding:10px 14px 0;
+}
+
+.target-summary span{
+  display:flex; align-items:center; gap:5px; padding:6px 9px; border-radius:var(--radius-pill); background:var(--surface-neutral); font-weight:750;
+}
+
+.target-summary b{
+  font-size:13px;
+}
+
+.target-summary .ok{
+  background:#e2f2ef; color:var(--tealink);
+}
+
+.target-summary .warn{
+  background:#fff0d7; color:#a96b0b;
+}
+
+.target-matrix-panel{
+  overflow:hidden;
+}
+
+.target-table{
+  margin:10px 14px 0; max-height:430px; overflow:auto; border:1px solid #d7e1e6; border-radius:var(--surface-radius); background:var(--panel);
+}
+
+.target-head,.target-row{
+  display:grid; grid-template-columns:54px minmax(280px,1.7fr) repeat(4,minmax(145px,1fr)) minmax(130px,.8fr); column-gap:10px; align-items:center;
+}
+
+.target-head{
+  position:sticky; top:0; z-index:2; min-height:38px; padding:7px 10px; font-weight:850;
+}
+
+.target-row{
+  min-height:56px; padding:8px 10px; border-bottom:1px solid var(--surface-neutral);
+}
+
+.target-row:last-child{
+  border-bottom:0;
+}
+
+.target-row:hover{
+  background:#f7fbfb;
+}
+
+.target-row-locked{
+  background:#fbf6f5;
+}
+
+.target-row-locked:hover{
+  background:#faf1f0;
+}
+
+.target-row-locked .lot-assay-name b{
+  color:#8a5a52;
+}
+
+.target-head>*,.target-row>*{
+  min-width:0;
+}
+
+.target-head>span,.target-row>span{
+  display:flex; align-items:center;
+}
+
+.target-row input[type=number]{
+  min-width:0; height:34px; margin:0; background:var(--panel); font-variant-numeric:tabular-nums;
+}
+
+.target-row input:disabled{
+  border-color:#e5eaed; background:#f0f3f4; color:#a1aeb6;
+}
+
+.target-actions{
+  justify-content:flex-end; margin-top:0; padding:12px 14px; border-top:0; background:var(--panel);
+}
+
+.target-head>span:first-child,.target-row>.lot-assay-check{
+  justify-content:center;
+}
+
+.group-lot-picker{
+  display:grid; gap:7px; max-height:280px; overflow:auto; padding:8px; border:1px solid #d8e2e7; border-radius:var(--surface-radius); background:#f8fafb;
+}
+
+.group-lot-picker label{
+  display:flex; align-items:center; gap:9px; margin:0; padding:9px; border:1px solid #dbe4e8; border-radius:var(--radius-sm); background:var(--panel); cursor:pointer;
+}
+
+.group-lot-picker label:hover{
+  border-color:#8fc0bd;
+}
+
+.group-lot-picker input{
+  width:17px; height:17px; accent-color:var(--teal);
+}
+
+.group-lot-picker span{
+  display:grid;
+}
+
+.lot-level-picker{
+  display:grid; gap:9px; max-height:300px; overflow:auto; padding:8px; border:1px solid #d8e2e7; border-radius:var(--surface-radius); background:#f8fafb;
+}
+
+.lot-level-col{
+  display:grid; align-content:start; gap:7px; min-width:0;
+}
+
+.lot-level-title{
+  padding:3px 2px; color:#48646e; font-size:10px; font-weight:850; text-transform:uppercase; letter-spacing:.035em;
+}
+
+.lot-level-col label{
+  display:flex; align-items:center; gap:9px; margin:0; padding:9px; border:1px solid #dbe4e8; border-radius:var(--radius-sm); background:var(--panel); cursor:pointer;
+}
+
+.lot-level-col label:hover{
+  border-color:#8fc0bd;
+}
+
+.lot-level-col input{
+  width:17px; height:17px; accent-color:var(--teal);
+}
+
+.lot-level-col span{
+  display:grid; min-width:0;
+}
+
+.lot-level-col b{
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+
+.lot-level-col label.lot-opt-depleted{
+  opacity:.5; background:#f1f4f5; cursor:not-allowed;
+}
+
+.lot-level-col label.lot-opt-depleted:hover{
+  border-color:#dbe4e8;
+}
+
+.lot-level-col label.lot-opt-depleted small{
+  color:#c0392b;
+}
+
+.lot-level-col label.lot-opt-depleted input{
+  cursor:not-allowed;
+}
+
+.assay-rule-grid{
+  display:grid; gap:7px;
+}
+
+.assay-rule-row{
+  display:grid; grid-template-columns:62px minmax(150px,.8fr) minmax(190px,1.2fr); gap:8px; align-items:center; padding:5px 9px; border:1px solid #dce5e9; border-radius:var(--radius-sm); background:#f8fafb;
+}
+
+.assay-rule-row b{
+  font-size:11px;
+}
+
+.assay-rule-row select{
+  height:30px; padding:0 10px; line-height:30px;
+}
+
+.rcfg-grid > .panel{
+  display:flex; flex-direction:column; min-height:100%;
+}
+
+.rcfg-grid > .panel .rcfg-panel-h{
+  min-height:40px; padding:8px 11px; background:linear-gradient(180deg,#f6fafb 0%,#eef4f7 100%);
+}
+
+.rcfg-grid > .panel .rcfg-panel-h h3{
+  color:#24414e; font-size:10.5px; letter-spacing:.07em;
+}
+
+.lot-config-grid .panel .rcfg-panel-h{
+  background:var(--section-head-bg); border-bottom:1px solid var(--section-head-border);
+}
+
+.lot-config-grid .panel .rcfg-panel-h h3{
+  color:var(--card-head-ink);
+}
+
+.rcfg-grid > .panel:first-child table{
+  margin:12px; width:calc(100% - 24px); min-width:0; border:1px solid #d7e1e7; border-radius:var(--radius-lg); overflow:hidden; background:var(--panel); table-layout:fixed;
+}
+
+.rcfg-grid > .panel:first-child table thead th{
+  background:var(--section-head-bg); color:var(--card-head-ink); font-size:var(--table-head-size); letter-spacing:.02em; padding-top:9px; padding-bottom:9px;
+}
+
+.rcfg-grid > .panel:first-child table tbody tr{
+  height:46px;
+}
+
+.rcfg-grid > .panel:first-child table tbody td{
+  border-bottom:1px solid #edf2f5; vertical-align:middle; padding-top:8px; padding-bottom:8px;
+}
+
+.rcfg-grid > .panel:first-child table th:nth-child(2), .rcfg-grid > .panel:first-child table td:nth-child(2){
+  width:32%;
+}
+
+.rcfg-grid > .panel:first-child table th:nth-child(3), .rcfg-grid > .panel:first-child table td:nth-child(3){
+  width:12%; text-align:center;
+}
+
+.rcfg-grid > .panel:first-child table tbody td:first-child b{
+  color:#173541; font-size:13px;
+}
+
+.rcfg-grid > .panel:first-child table tbody td:nth-child(2){
+  color:#617783; font-size:var(--type-body); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+
+.rcfg-grid > .panel:first-child table tbody td:nth-child(3), .rcfg-grid > .panel:first-child table tbody td:nth-child(4){
+  color:#304b57; font-size:var(--type-body); font-weight:700; white-space:nowrap;
+}
+
+.rcfg-grid > .panel:first-child .tag{
+  min-width:88px; padding:4px 8px; font-size:var(--type-micro); text-align:center;
+}
+
+.config-shell-main > .panel{
+  margin:14px 16px 18px;
+}
+
+.config-shell-main > .rcfg-list:not(:has(table)){
+  padding-bottom:18px;
+}
+
+.rcfg-checks{
+  gap:9px; padding:12px; background:linear-gradient(180deg,var(--panel) 0%,var(--surface-card-soft) 100%);
+}
+
+.rcfg-checks > div{
+  min-height:54px; padding:9px 10px; border:1px solid #dbe4e9; border-radius:var(--radius-lg); background:var(--panel);
+}
+
+.rcfg-checks > div.ok{
+  background:linear-gradient(180deg,#fbfefe 0%,#f5fafb 100%); border-left:3px solid var(--teal);
+}
+
+.rcfg-checks > div.warn{
+  background:linear-gradient(180deg,#fffdf9 0%,#fff8ef 100%); border-left:3px solid var(--amber);
+}
+
+.rcfg-checks > div.rej{
+  background:linear-gradient(180deg,#fffbfa 0%,#fef3f1 100%); border-left:3px solid var(--red);
+}
+
+.rcfg-checks > div > b{
+  width:30px; height:30px; font-size:12px;
+}
+
+.rcfg-checks > div.ok > b{
+  background:#e6f1f4; color:#0d6068;
+}
+
+.rcfg-checks > div.warn > b{
+  background:#fbefd9; color:#9e6a12;
+}
+
+.rcfg-checks > div.rej > b{
+  background:#fbe4e1; color:var(--red);
+}
+
+.rcfg-checks span{
+  color:var(--muted); font-size:12px;
+}
+
+.rcfg-checks small{
+  margin-top:2px; color:var(--muted); font-size:10.5px;
+}
+
+.rcfg-alerts{
+  padding:12px;
+}
+
+.rcfg-alerts .alert:last-child{
+  margin-bottom:0;
+}
+
+.lot-table td:nth-child(4) .tag{
+  max-width:100%; white-space:normal; line-height:1.25; text-align:center;
+}
+
+.lot-group-card-h{
+  padding:10px 11px 7px;
+}
+
+.lot-table th, .lot-table td{
+  height:56px;
+}
+
+.lot-row-actions .btn{
+  width:42px; min-width:42px; min-height:30px; padding:6px 0;
+}
+
+.lot-row-actions{
+  gap:6px;
+}
+
+aside,
+.panel,
+.config-shell,
+.config-shell-main,
+.target-matrix-panel{
+  min-width:0; max-width:100%;
+}
+
+.lot-config-left,
+.lot-config-right{
+  max-width:100%;
+}
+
+.rcfg-toolbar{
+  flex-wrap:wrap;align-items:center;gap:12px 18px;min-height:44px;margin:0;padding:10px 14px;background:var(--section-head-bg);border-bottom:1px solid var(--section-head-border);color:var(--card-head-ink);font-size:var(--surface-head-size);font-weight:800;text-transform:none;letter-spacing:0;box-shadow:none;
+}
+
+.rcfg-toolbar h2{
+  color:var(--ink);
+}
+
+.rcfg-toolbar p{
+  margin:3px 0 0; color:var(--muted); font-size:13px; font-weight:500;
+}
+
+.rcfg-toolbar > div:first-child{
+  flex:1 1 320px; min-width:min(100%,260px);
+}
+
+.rcfg-tools{
+  flex:1 1 300px;min-width:0;justify-content:flex-end;flex-wrap:wrap;
+}
+
+.rcfg-tools input{
+  width:auto;flex:1 1 220px;max-width:320px;
+}
+
+.rcfg-grid > .panel:nth-child(2){
+  max-width:340px;justify-self:stretch;
+}
+
+.lot-config-grid{
+  grid-template-columns:minmax(0,1fr) clamp(280px,26vw,360px);
+}
+
+.target-selector.history-selector{
+  grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));
+}
+
+.target-lot-info{
+  justify-content:flex-start; white-space:normal;
+}
+
+/* The two @1280 blocks in this file are deliberately NOT merged: this one must
+   stay before the @1100 .config-shell override further down (breakpoint ladder). */
+@media(max-width:1280px){
+.config-shell{
+  grid-template-columns:180px minmax(0,1fr);
+}
+
+.lot-config-grid{
+  grid-template-columns:1fr;
+}
+}
+
+.config-shell-main th{
+  font-size:var(--table-head-size); text-transform:none; letter-spacing:.03em;
+}
+
+.rcfg-group-modal{
+  width:min(960px,94vw);
+}
+
+.rcfg-group-modal .modal-b{
+  max-height:72vh; overflow:auto;
+}
+
+.rcfg-group-modal .lot-level-col label{
+  min-height:62px;
+}
+
+.rcfg-group-modal .cfg-group-lot{
+  flex:0 0 17px; width:17px; height:17px; margin:0; accent-color:var(--teal);
+}
+
+.rcfg-modal input[type=checkbox], .config-shell input[type=checkbox]{
+  accent-color:var(--teal);
+}
+
+.rcfg-group-modal .cfg-group-lot:focus, .rcfg-modal input[type=checkbox]:focus, .config-shell input[type=checkbox]:focus{
+  outline:none; outline-offset:0; box-shadow:none;
+}
+
+.rcfg-group-modal .cfg-group-lot:focus-visible, .rcfg-modal input[type=checkbox]:focus-visible, .config-shell input[type=checkbox]:focus-visible{
+  outline:2px solid var(--teal); outline-offset:3px; box-shadow:0 0 0 3px rgba(12,111,120,.14);
+}
+
+.transition-list{
+  overflow-x:auto;
+}
+
+.transition-table th:nth-child(1), .transition-table td:nth-child(1){
+  width:14%;text-align:left
+}
+
+.rcfg-grid > .panel:first-child table th:nth-child(5), .rcfg-grid > .panel:first-child table td:nth-child(5), .transition-table th:nth-child(2), .transition-table td:nth-child(2){
+  width:22%;text-align:center
+}
+
+.transition-table th:nth-child(5), .transition-table td:nth-child(5){
+  width:22%
+}
+
+.transition-table .hint{
+  line-height:1.35;
+}
+
+.transition-table td:last-child .manage-actions{
+  display:flex; justify-content:center; flex-wrap:nowrap; gap:8px;
+}
+
+.transition-table td:last-child .btn{
+  white-space:nowrap; padding-left:10px; padding-right:10px;
+}
+
+.instrument-table .manage-actions, .assay-table .manage-actions, .panel-qc-table .manage-actions{
+  justify-content:center;
+}
+
+.instrument-table th:first-child, .instrument-table td:first-child, .panel-qc-table th:first-child, .panel-qc-table td:first-child, .history-detail-table td:first-child, .history-detail-table th:first-child{
+  text-align:left;
+}
+
+.instrument-table th:last-child, .assay-table th:last-child, .panel-qc-table th:last-child{
+  text-align:center;
+}
+
+.target-head > span, .target-row > span, .target-row > div{
+  justify-content:center; text-align:center;
+}
+
+.target-head > span:nth-child(2), .target-row > .lot-assay-name{
+  justify-content:flex-start; text-align:left;
+}
+
+.target-row .tag{
+  margin-left:auto; margin-right:auto;
+}
+
+.target-head{
+  background:#f7fafb; border-bottom:1px solid #d7e1e6; font-size:var(--table-head-size); text-transform:none; letter-spacing:0;
+}
+
+.target-head, .target-row{
+  box-sizing:border-box; width:max(100%,1124px); min-width:0;
+}
+
+.target-level-toolbar{
+  display:flex; align-items:center; justify-content:space-between; gap:12px; margin:10px 14px 0; padding:10px 12px; border:1px solid #d7e1e6; border-radius:var(--radius-md) 8px 0 0; background:#f7fafb;
+}
+
+.target-level-toolbar > div:first-child{
+  display:flex; align-items:center; gap:8px; min-width:0; color:#294653; font-size:12px;
+}
+
+.target-level-toolbar > div:first-child b{
+  font-size:14px;
+}
+
+.target-level-toolbar > div:first-child .target-level-lot{
+  overflow:hidden; color:var(--teal); font-size:14px; font-weight:700; text-overflow:ellipsis; white-space:nowrap;
+}
+
+.target-level-toolbar .dayseg{
+  flex:0 0 auto;
+}
+
+.target-row input[type=number]{
+  width:116px; max-width:100%; justify-self:center; text-align:center; font-size:13px;
+}
+
+.target-row, .target-row .lot-assay-name b{
+  font-size:13px;
+}
+
+.target-row .lot-assay-name small{
+  font-size:11px;
+}
+
+.config-shell-main > .rcfg-list, .config-shell-main > .target-matrix-panel{
+  margin:14px 16px 18px;
+}
+
+.target-matrix-panel .target-table{
+  margin-top:0; border-top:0; border-top-left-radius:0; border-top-right-radius:0; margin-bottom:14px;
+}
+
+.config-shell-main > .rcfg-toolbar{
+  min-height:64px; padding:14px 18px; align-items:center;
+}
+
+@media(min-width:1151px){
+.config-shell{
+  height:clamp(520px,calc(100vh - 178px),760px); min-height:0; overflow:hidden;
+}
+
+.config-shell-nav{
+  height:100%; overflow-y:auto; overscroll-behavior:contain;
+}
+
+.config-shell-main{
+  height:100%; overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain;
+}
+}
+
+.lot-group-card-h b, .lot-assay-name b, .group-lot-picker b, .lot-level-col b{
+  color:var(--ink); font-size:12.5px; font-weight:800;
+}
+
+.target-matrix-panel{
+  padding-bottom:14px;
+}
+
+.target-matrix-panel .target-lot-info{
+  min-height:40px; padding:0 14px; border:1px solid #dbe5ea; border-radius:var(--radius-md); background:var(--surface-subtle); color:var(--muted); display:flex; align-items:center; gap:8px; font-size:var(--type-micro);
+}
+
+.target-matrix-panel .target-lot-info b{
+  font-size:14px; color:var(--teal);
+}
+
+.target-matrix-panel .target-lot-info span{
+  color:#6e828e; font-size:12.5px;
+}
+
+.lot-group-card-h small,
+.lot-assay-name small,
+.group-lot-picker small,
+.lot-level-col small,
+.target-summary span{
+  color:var(--muted); font-size:var(--type-micro);
+}
+
+.target-head,
+.assay-rule-row b,
+.config-form-section b{
+  color:var(--muted);
+}
+
+.target-matrix-panel .rcfg-list table{
+  margin:0; border:none; border-radius:0;
+}
+
+.rcfg-grid > .panel:first-child table tbody tr:last-child td, .target-matrix-panel .rcfg-list tbody tr:last-child td{
+  border-bottom:none;
+}
+
+.config-shell-main > .rcfg-list:has(> table), .lot-config-left:has(> .lot-table){
+  padding:0 !important;
+}
+
+.config-shell-main > .rcfg-list table, .lot-config-left > .lot-table{
+  margin:0 !important; border:0; border-radius:0; border-collapse:separate; border-spacing:0;
+}
+
+.lot-table th:nth-child(5), .lot-table td:nth-child(5), .history-table th:nth-child(6), .history-table td:nth-child(6), .history-table th:nth-child(8), .history-table td:nth-child(8){
+  width:8%
+}
+
+.history-table th:nth-child(1), .history-table td:nth-child(1), .assay-table th:nth-child(1), .assay-table td:nth-child(1){
+  width:6%
+}
+
+.assay-table th:nth-child(2), .assay-table td:nth-child(2){
+  text-align:left;width:22%;
+}
+
+.rcfg-grid > .panel:first-child table th:nth-child(1), .rcfg-grid > .panel:first-child table td:nth-child(1), .lot-table th:nth-child(1), .lot-table td:nth-child(1), .modal.rcfg-history-detail-modal .history-detail-table th:nth-child(6), .modal.rcfg-history-detail-modal .history-detail-table td:nth-child(6), .assay-table th:nth-child(3), .assay-table td:nth-child(3){
+  width:18%
+}
+
+.history-table th:nth-child(5), .history-table td:nth-child(5), .assay-table th:nth-child(5), .assay-table td:nth-child(5){
+  width:10%
+}
+
+.panel-qc-table th:nth-child(3), .panel-qc-table td:nth-child(3){
+  width:28%
+}
+
+.panel-qc-table th:nth-child(4), .panel-qc-table td:nth-child(4){
+  width:12%;white-space:nowrap
+}
+
+.lot-table th:nth-child(2), .lot-table td:nth-child(2), .history-table th:nth-child(3), .history-table td:nth-child(3), .history-table th:nth-child(4), .history-table td:nth-child(4), .history-table th:nth-child(10), .history-table td:nth-child(10), .instrument-table th:nth-child(5), .instrument-table td:nth-child(5), .panel-qc-table th:nth-child(5), .panel-qc-table td:nth-child(5){
+  width:9%
+}
+
+.panel-qc-table th:nth-child(6), .panel-qc-table td:nth-child(6){
+  width:24%
+}
+
+.config-shell-nav{
+  background:#eef2f4;
+}
+
+.rcfg-kpis button:hover{
+  box-shadow:none;
+}
+
+.lot-config-left, .lot-config-right{
+  min-width:0;border-radius:var(--radius-lg);box-shadow:none;contain:paint;
+}
+
+.config-shell-main .rcfg-list:has(> .empty:first-child), .config-shell-main .target-matrix-panel .rcfg-list:has(> .empty:first-child){
+  padding:0; overflow:hidden;
+}
+
+.config-shell-main > .rcfg-list > .empty:first-child, .config-shell-main .lot-config-grid .rcfg-list > .empty:first-child, .config-shell-main .lot-config-grid .rcfg-list > .rcfg-panel-h + .empty, .config-shell-main .rcfg-grid > .panel > .rcfg-panel-h + .empty, .config-shell-main > .panel > .empty:first-child, .config-shell-main > .panel > .rcfg-panel-h + .empty, .config-shell-main .target-matrix-panel .rcfg-list > .empty:first-child, .config-shell-main .target-matrix-panel > .empty{
+  box-sizing:border-box; width:calc(100% - 32px); min-height:118px; margin:16px; padding:24px 20px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; border:1px dashed #cbdce4; border-radius:var(--radius-md); background:var(--surface-card-soft); color:#506575; line-height:1.45;
+}
+
+.config-shell-main .empty .empty-title{
+  margin-bottom:2px; color:#102d3d; font-size:13px; font-weight:800;
+}
+
+.config-shell-main .rcfg-grid > .panel:first-child:has(> .rcfg-panel-h + .empty){
+  display:flex; flex-direction:column;
+}
+
+.config-shell-main .rcfg-grid > .panel:first-child > .rcfg-panel-h + .empty{
+  flex:1 1 auto; width:calc(100% - 24px); min-height:0; margin:12px;
+}
+
+@media(max-width:640px){
+.assay-main-grid{
+  grid-template-columns:1fr;
+}
+
+.rcfg-toolbar, .rcfg-kpis, .rcfg-grid, .lot-config-grid{
+  padding-left:10px; padding-right:10px;
+}
+}
+
+/* Configuration page rules migrated out of professional-base.css. */
+.rcfg-kpis{
+  gap:10px; padding:14px;
+}
+
+.rcfg-grid{
+  align-items:stretch;grid-template-columns:minmax(0,1fr) clamp(260px,24vw,340px);
+}
+
+.lot-config-grid{
+  gap:14px; padding:14px;
+}
+
+.target-matrix-panel .target-selector:not(.history-selector){
+  grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));
+}
+
+.rcfg-kpis, .group-lot-picker, .lot-level-picker{
+  grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr));
+}
+
+.assay-rule-grid{
+  grid-template-columns:repeat(auto-fit,minmax(min(430px,100%),1fr));
+}
+
+@media(max-width:640px){
+  .assay-rule-row{grid-template-columns:56px minmax(0,1fr)}
+  .assay-rule-row .cfg-assay-scope{grid-column:2}
+}
+
+.rcfg-group-modal .lot-level-picker{
+  grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; max-height:none; overflow:visible; padding:10px;
+}
+
+.target-matrix-panel .rcfg-list{
+  margin:12px 16px 0; padding:0; border:1px solid var(--line-strong); border-radius:var(--radius-lg); background:var(--panel);
+}
+
+.config-shell-main > .rcfg-list,
+.target-matrix-panel .rcfg-list{
+  display:block; max-width:100%; overflow-x:auto !important; overflow-y:auto !important; -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain; scrollbar-gutter:auto; scrollbar-width:thin; scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track); padding-bottom:0 !important; contain:paint;
+}
+
+.rcfg-list{
+  overflow:auto; scrollbar-width:thin; scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+.config-shell-nav,
+.rcfg-history-detail-modal .modal-b{
+  scrollbar-width:thin; scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+.config-shell-nav::-webkit-scrollbar,
+.rcfg-list::-webkit-scrollbar,
+.rcfg-history-detail-modal .modal-b::-webkit-scrollbar{
+  width:var(--scrollbar-size); height:var(--scrollbar-size);
+}
+
+.config-shell-nav::-webkit-scrollbar-track,
+.rcfg-list::-webkit-scrollbar-track,
+.rcfg-history-detail-modal .modal-b::-webkit-scrollbar-track{
+  background:var(--scrollbar-track); border-radius:var(--radius-pill);
+}
+
+.config-shell-nav::-webkit-scrollbar-thumb,
+.rcfg-list::-webkit-scrollbar-thumb,
+.rcfg-history-detail-modal .modal-b::-webkit-scrollbar-thumb{
+  background:var(--scrollbar-thumb); border-radius:var(--radius-pill); border:2px solid var(--scrollbar-track);
+}
+
+.config-shell-nav::-webkit-scrollbar-thumb:hover,
+.rcfg-list::-webkit-scrollbar-thumb:hover,
+.rcfg-history-detail-modal .modal-b::-webkit-scrollbar-thumb:hover{
+  background:var(--scrollbar-thumb-hover);
+}
+
+.config-shell-main > .rcfg-list::-webkit-scrollbar-button,
+.target-matrix-panel .rcfg-list::-webkit-scrollbar-button{
+  width:0; height:0; display:none;
+}
+
+.target-table{
+  display:block; max-width:100%; overflow-x:auto; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain; scrollbar-gutter:auto; scrollbar-width:thin; scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track); padding-bottom:0; contain:paint;
+}
+
+.target-table::-webkit-scrollbar{
+  width:var(--scrollbar-size); height:var(--scrollbar-size);
+}
+
+.target-table::-webkit-scrollbar-track{
+  background:var(--scrollbar-track); border-radius:var(--radius-pill);
+}
+
+.target-table::-webkit-scrollbar-thumb{
+  background:var(--scrollbar-thumb); border-radius:var(--radius-pill); border:2px solid var(--scrollbar-track); background-clip:padding-box;
+}
+
+.target-table::-webkit-scrollbar-thumb:hover{
+  background:var(--scrollbar-thumb-hover);
+}
+
+.target-table::-webkit-scrollbar-button{
+  width:0; height:0; display:none;
+}
+
+.config-shell-main > .rcfg-list table,
+.target-matrix-panel .rcfg-list table,
+.target-table table{
+  width:max-content !important; min-width:100%;
+}
+
+.modal.rcfg-history-detail-modal .history-detail-table, .config-shell-main > .rcfg-list table:is(.instrument-table,.assay-table,.panel-qc-table,.transition-table,.history-table,.tea-ref-table), .lot-config-left > .lot-table{
+  width:100% !important; min-width:0; table-layout:fixed;
+}
+
+.history-table th:nth-child(2), .history-table td:nth-child(2){
+  text-align:left;width:17%;
+}
+
+.rcfg-grid > .panel:first-child table th:nth-child(4), .rcfg-grid > .panel:first-child table td:nth-child(4){
+  width:16%;text-align:center
+}
+
+.transition-table th:nth-child(4), .transition-table td:nth-child(4){
+  width:30%
+}
+
+.transition-table th, .transition-table td, .instrument-table th, .instrument-table td, .assay-table th, .assay-table td, .panel-qc-table th, .panel-qc-table td, .history-table th, .history-table td, .history-detail-table th, .history-detail-table td{
+  text-align:center; vertical-align:middle;
+}
+
+.modal.rcfg-history-detail-modal{
+  width:min(1160px,94vw); max-width:94vw;
+}
+
+.modal.rcfg-history-detail-modal .history-detail-table th, .modal.rcfg-history-detail-modal .history-detail-table td{
+  padding-left:14px; padding-right:14px;
+}
+
+.modal.rcfg-history-detail-modal .history-detail-table th:nth-child(7), .modal.rcfg-history-detail-modal .history-detail-table td:nth-child(7){
+  width:11%
+}
+
+.modal.rcfg-history-detail-modal .history-detail-table th:nth-child(8), .modal.rcfg-history-detail-modal .history-detail-table td:nth-child(8){
+  width:5%
+}
+
+.rcfg-list > .empty:first-child, .transition-list > .empty:first-child{
+  margin:0;
+}
+
+.lot-table th:nth-child(3), .lot-table td:nth-child(3), .instrument-table th:nth-child(6), .instrument-table td:nth-child(6), .panel-qc-table th:nth-child(1), .panel-qc-table td:nth-child(1){
+  width:13%
+}
+
+/* .lot-table column widths (2026-07-12): the shared nth-child rules above give
+   this table the same percentages as unrelated tables (instrument/panel-qc/
+   history), which badly mismatches its actual content — "Trạng thái" ended up
+   at 31% for a short status pill, leaving a large empty gap before "Gán"/
+   "Thao tác". Override with widths sized from this table's own content
+   (measured natural column widths), summing to 100%; placed last so it wins
+   over the shared rules above without touching the other tables. */
+.lot-table th:nth-child(1), .lot-table td:nth-child(1){width:14%}
+.lot-table th:nth-child(2), .lot-table td:nth-child(2){width:12%}
+.lot-table th:nth-child(3), .lot-table td:nth-child(3){width:17%}
+.lot-table th:nth-child(4), .lot-table td:nth-child(4){width:24%}
+.lot-table th:nth-child(5), .lot-table td:nth-child(5){width:9%}
+.lot-table th:nth-child(6), .lot-table td:nth-child(6){width:24%}
+
+/* Center every header and its column's content (2026-07-12), including the
+   "Gán" number column (overriding the generic right-aligned .num class here)
+   and the "Thao tác" action buttons (overriding .lot-row-actions's default
+   left-start, see below), so header labels line up with what's under them. */
+.lot-table th, .lot-table td{text-align:center}
+.lot-table th.num, .lot-table td.num{text-align:center}
+
+.modal.rcfg-history-detail-modal .history-detail-table th:nth-child(1), .modal.rcfg-history-detail-modal .history-detail-table td:nth-child(1), .instrument-table th:nth-child(3), .instrument-table td:nth-child(3), .instrument-table th:nth-child(7), .instrument-table td:nth-child(7), .panel-qc-table th:nth-child(2), .panel-qc-table td:nth-child(2){
+  width:14%
+}
+
+.instrument-table th:nth-child(1), .instrument-table td:nth-child(1){
+  width:20%
+}
+
+.instrument-table td.num, .instrument-table th.num, .assay-table td.num, .assay-table th.num, .panel-qc-table td.num, .panel-qc-table th.num, .history-table td.num, .history-table th.num, .history-detail-table td.num, .history-detail-table th.num{
+  text-align:center;
+}
+
+.transition-table th:nth-child(3), .transition-table td:nth-child(3), .modal.rcfg-history-detail-modal .history-detail-table th:nth-child(3), .modal.rcfg-history-detail-modal .history-detail-table td:nth-child(3), .modal.rcfg-history-detail-modal .history-detail-table th:nth-child(4), .modal.rcfg-history-detail-modal .history-detail-table td:nth-child(4), .modal.rcfg-history-detail-modal .history-detail-table th:nth-child(5), .modal.rcfg-history-detail-modal .history-detail-table td:nth-child(5), .assay-table th:nth-child(6), .assay-table td:nth-child(6){
+  width:12%
+}
+
+.history-table th:nth-child(7), .history-table td:nth-child(7){
+  width:17%
+}
+
+.instrument-table th:nth-child(2), .instrument-table td:nth-child(2), .instrument-table th:nth-child(4), .instrument-table td:nth-child(4){
+  width:15%
+}
+
+/* Instrument table: current 6-column layout. Keep the name column compact and
+   distribute the remaining width across the metadata, status, and action columns.
+   Placed late so these table-specific widths win over shared nth-child rules. */
+.instrument-table th:nth-child(1), .instrument-table td:nth-child(1){width:22%}
+.instrument-table th:nth-child(2), .instrument-table td:nth-child(2){width:16%}
+.instrument-table th:nth-child(3), .instrument-table td:nth-child(3){width:15%}
+.instrument-table th:nth-child(4), .instrument-table td:nth-child(4){width:14%}
+.instrument-table th:nth-child(5), .instrument-table td:nth-child(5){width:16%}
+.instrument-table th:nth-child(6), .instrument-table td:nth-child(6){width:17%}
+
+.modal.rcfg-history-detail-modal .history-detail-table th:nth-child(2), .modal.rcfg-history-detail-modal .history-detail-table td:nth-child(2), .assay-table th:nth-child(4), .assay-table td:nth-child(4), .assay-table th:nth-child(7), .assay-table td:nth-child(7){
+  width:16%
+}
+
+.history-table td:nth-child(7), .history-detail-table td:nth-child(6), .target-level-toolbar > div:first-child b, .history-table td:nth-child(10) .btn{
+  white-space:nowrap;
+}
+
+@media(max-width:1280px){
+.rcfg-grid{
+  grid-template-columns:minmax(0,1fr) clamp(220px,22vw,280px);
+}
+}
+
+@media(max-width:1150px){
+.config-shell{
+  grid-template-columns:1fr; min-height:auto;
+}
+
+.config-shell-nav{
+  display:flex; flex-direction:row; align-items:center; overflow-x:auto; overflow-y:hidden; border-right:0; border-bottom:1px solid #d5dee3; -webkit-overflow-scrolling:touch;
+}
+
+.rcfg-title{
+  display:none;
+}
+
+.config-shell-nav button{
+  flex:0 0 auto; width:auto; min-width:max-content; grid-template-columns:auto auto; min-height:44px; padding:7px 13px;
+}
+
+.rcfg-toolbar{
+  align-items:stretch; flex-direction:column;
+}
+
+.rcfg-tools{
+  width:100%; justify-content:flex-start;
+}
+
+.rcfg-grid > .panel:nth-child(2), .rcfg-tools input{
+  max-width:none;
+}
+
+.rcfg-grid{
+  grid-template-columns:1fr;
+}
+}
+
+@media(max-width:900px){
+.rcfg-kpis, .rcfg-group-modal .lot-level-picker{
+  grid-template-columns:repeat(2,minmax(0,1fr));
+}
+}
+
+@media(max-width:760px){
+.manage-actions{
+  justify-content:flex-start;
+}
+
+.config-form-section{
+  align-items:flex-start; flex-direction:column; gap:2px;
+}
+
+.rcfg-tools{
+  align-items:stretch; flex-direction:column;
+}
+
+.rcfg-kpis button{
+  min-height:92px;
+}
+
+.rcfg-grid{
+  padding:0 12px 12px;
+}
+
+.rcfg-modal,.rcfg-assay-modal{
+  width:100%;
+}
+
+.target-head,.target-row{
+  grid-template-columns:44px minmax(200px,1fr) repeat(4,135px) 125px;
+}
+
+.rcfg-grid > .panel:first-child table{
+  table-layout:auto; width:max-content !important; min-width:100%;
+}
+
+.rcfg-grid > .panel:first-child .tag{
+  white-space:nowrap;
+}
+
+.rcfg-toolbar{
+  justify-content:flex-start;
+}
+
+.rcfg-toolbar > div:first-child, .rcfg-tools, .rcfg-tools input{
+  flex:0 1 auto;
+}
+
+.target-level-toolbar{
+  align-items:stretch; flex-direction:column;
+}
+
+.target-matrix-panel .target-lot-info{
+  min-height:38px; padding:0 12px;
+}
+
+.config-shell-main > .rcfg-list table.history-table{
+  min-width:980px;
+}
+
+.config-shell-main > .rcfg-list table.instrument-table{
+  min-width:760px;
+}
+
+.config-shell-main > .rcfg-list table.assay-table{
+  min-width:780px;
+}
+
+.config-shell-main > .rcfg-list table.panel-qc-table{
+  min-width:860px;
+}
+
+.config-shell-main > .rcfg-list table.transition-table{
+  min-width:600px;
+}
+
+.target-head, .target-row{
+  width:max(100%,989px);
+}
+
+.config-shell-main > .rcfg-list > .empty:first-child, .config-shell-main .lot-config-grid .rcfg-list > .empty:first-child, .config-shell-main .lot-config-grid .rcfg-list > .rcfg-panel-h + .empty, .config-shell-main .rcfg-grid > .panel > .rcfg-panel-h + .empty, .config-shell-main > .panel > .empty:first-child, .config-shell-main > .panel > .rcfg-panel-h + .empty, .config-shell-main .target-matrix-panel .rcfg-list > .empty:first-child, .config-shell-main .target-matrix-panel > .empty{
+  width:calc(100% - 24px); min-height:108px; margin:12px; padding:22px 16px;
+}
+
+.config-shell-main .rcfg-grid > .panel:first-child > .rcfg-panel-h + .empty{
+  width:calc(100% - 20px); margin:10px;
+}
+
+.config-shell-main > .rcfg-list,
+.config-shell-main > .target-matrix-panel,
+.config-shell-main > .panel{
+  margin:12px;
+}
+
+.target-matrix-panel .target-selector:not(.history-selector){
+  grid-template-columns:1fr;
+}
+
+.target-level-toolbar .dayseg{
+  width:100%;
+}
+
+.target-matrix-panel .rcfg-list{
+  margin-left:12px; margin-right:12px;
+}
+
+.history-detail-table, .modal.rcfg-history-detail-modal .history-detail-table{
+  min-width:820px;
+}
+
+.rcfg-grid > .panel:first-child table th, .rcfg-grid > .panel:first-child table td{
+  width:auto !important; white-space:nowrap;
+}
+}

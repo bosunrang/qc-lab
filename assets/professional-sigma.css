@@ -1,0 +1,524 @@
+/* Six Sigma & Sai số (Six Sigma metrics) page.
+   Split from the original monolithic professional.css on 2026-07-11 — see CLAUDE.md
+   for the full file list and load order. Loading order matters: keep new rules in
+   whichever file matches the page/selector, and keep this file after professional-base.css. */
+
+.sgcards{
+  display:grid;
+}
+
+.sgbig{
+  color:var(--on-accent);
+}
+
+.sgbig .lab{
+  font-size:11px; text-transform:uppercase; opacity:.9;
+}
+
+.sgbig .v{
+  font-size:34px; font-weight:700; line-height:1.1;
+}
+
+.sgbig .grade{
+  font-size:13px; font-weight:600; margin-bottom:6px;
+}
+
+.sgbig .sub{
+  font-size:11px; opacity:.92; line-height:1.5;
+}
+
+.sg-simple-table-wrap{
+  display:block; max-width:100%; margin:10px 16px 12px; overflow-x:auto; overflow-y:hidden; border:1px solid var(--line); border-radius:var(--radius-md); -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain; scrollbar-gutter:auto; scrollbar-width:thin; scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track); padding-bottom:0; contain:paint;
+}
+
+.sg-simple-table-wrap::-webkit-scrollbar{
+  width:var(--scrollbar-size); height:var(--scrollbar-size);
+}
+
+.sg-simple-table-wrap::-webkit-scrollbar-track{
+  background:var(--scrollbar-track); border-radius:var(--radius-pill);
+}
+
+.sg-simple-table-wrap::-webkit-scrollbar-thumb{
+  background:var(--scrollbar-thumb); border-radius:var(--radius-pill); border:2px solid var(--scrollbar-track); background-clip:padding-box;
+}
+
+.sg-simple-table-wrap::-webkit-scrollbar-thumb:hover{
+  background:var(--scrollbar-thumb-hover);
+}
+
+.sg-simple-table-wrap::-webkit-scrollbar-button{
+  width:0; height:0; display:none;
+}
+
+.sg-simple-table{
+  width:100%; min-width:760px; border-collapse:collapse; table-layout:fixed;
+}
+
+.sg-simple-table th{
+  padding:7px; text-align:center; background:var(--section-head-bg); color:var(--card-head-ink); border-bottom-color:var(--section-head-border); font-size:var(--table-head-size);
+}
+
+.sg-simple-table thead tr:first-child th{
+  font-size:var(--table-head-size); font-weight:800;
+}
+
+.sg-simple-table td{
+  padding:6px 7px 5px; text-align:center; vertical-align:top;
+}
+
+.sg-simple-table .sg-group-start{
+  border-left:2px solid var(--line);
+}
+
+.sg-simple-table .sg-period-cell{
+  vertical-align:middle; white-space:nowrap;
+}
+
+.sg-simple-table .sg-period-cell>div{
+  display:flex !important; width:100%; margin:0 auto; align-items:center; justify-content:center; vertical-align:middle;
+}
+
+.sg-period-select-wrap{
+  gap:0;
+}
+
+/* Cả hàng là vùng chọn kỳ (thay cho ô radio cũ) — chỉ dải teal bên trái + nền nhạt
+   báo hàng đang chọn. cursor/hover gợi ý bấm được; focus-visible cho điều hướng bàn phím. */
+.sg-simple-table tr.sg-period-row{
+  cursor:pointer;
+}
+
+.sg-simple-table tr.sg-period-row:hover:not(.sg-period-selected) td{
+  background:color-mix(in srgb,var(--teal) 4%,var(--panel));
+}
+
+.sg-simple-table tr.sg-period-row:focus-visible{
+  outline:2px solid var(--teal); outline-offset:-2px;
+}
+
+.sg-simple-table tr.sg-period-selected td{
+  background:color-mix(in srgb,var(--teal) 7%,var(--panel));
+}
+
+.sg-simple-table tr.sg-period-selected td:first-child{
+  box-shadow:inset 4px 0 0 var(--teal);
+}
+
+.sg-simple-table .sg-period-cell select{
+  box-sizing:border-box; height:32px; min-height:32px; padding:4px 5px; font-size:var(--table-body-size);
+}
+
+.sg-period-controls{
+  display:flex; gap:3px; min-width:0;
+}
+
+.sg-period-controls .sg-period-month{
+  width:50px; min-width:50px;
+}
+
+.sg-period-controls .sg-period-year{
+  width:66px; min-width:66px;
+}
+
+.sg-simple-table input.sg-number{
+  box-sizing:border-box; flex:none; width:84px; min-width:84px; max-width:84px; height:32px; min-height:32px; margin:0 auto; padding:4px 6px; border-color:transparent; background:transparent; box-shadow:none; text-align:center; font-size:var(--table-body-size); font-weight:700; cursor:text; appearance:textfield; -moz-appearance:textfield; transition:background-color .15s ease,border-color .15s ease,box-shadow .15s ease;
+}
+
+.sg-simple-table input.sg-number::-webkit-inner-spin-button,
+.sg-simple-table input.sg-number::-webkit-outer-spin-button{
+  margin:0; -webkit-appearance:none;
+}
+
+.sg-simple-table input.sg-number:hover:not(:disabled),
+.sg-simple-table input.sg-number:focus{
+  border-color:var(--line); background:var(--panel); box-shadow:0 0 0 3px rgba(11,116,125,.08);
+}
+
+.sg-simple-table input.sg-number:focus{
+  border-color:var(--teal); outline:none;
+}
+
+.sg-simple-table input.sg-number::placeholder{
+  color:var(--muted); opacity:.55;
+}
+
+.sg-cell-stack{
+  min-height:45px; display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
+}
+
+.sg-result-cell .tag{
+  box-sizing:border-box; min-width:62px; min-height:32px; display:inline-flex; align-items:center; justify-content:center; font-size:14px; font-weight:800;
+}
+
+.sg-result-cell .tag.sg-zone{
+  color:var(--sg-color); border-color:var(--sg-color); background:color-mix(in srgb,var(--sg-color) 10%,transparent);
+}
+
+.sg-result-cell .sg-cell-meta{
+  font-weight:700;
+}
+
+.sg-cell-meta{
+  max-width:100%; margin-top:3px; overflow:hidden; color:var(--muted); font-size:10px; line-height:1.15; text-overflow:ellipsis; white-space:nowrap;
+}
+
+.sg-cell-meta.sg-cv-meta{
+  color:var(--teal); font-weight:700;
+}
+
+.sg-cell-meta-empty{
+  visibility:hidden;
+}
+
+.sg-row-action{
+  padding:6px !important; vertical-align:middle !important;
+}
+
+.sg-simple-table .sg-action-col{
+  border-left:2px solid var(--line);
+}
+
+.sg-row-action-buttons{
+  display:flex; align-items:center; justify-content:center; gap:4px; white-space:nowrap;
+}
+
+.sg-row-action-buttons .btn{
+  min-height:32px; padding:4px 7px;
+}
+
+.sg-row-action-buttons .sg-row-delete{
+  flex:0 0 auto; border-color:var(--red); background:transparent; color:var(--red);
+}
+
+.sg-row-action-buttons .sg-row-delete:hover{
+  border-color:var(--red); background:var(--danger-soft); color:var(--red);
+}
+
+.sg-data-head{
+  min-height:50px; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:7px 16px; border-bottom:1px solid var(--section-head-border); background:var(--section-head-bg);
+}
+
+.sg-data-head h3{
+  margin:0; color:var(--section-head-ink); font-size:14px; font-weight:850;
+}
+
+.sg-data-head-actions{
+  display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap;
+}
+
+.sg-data-head-actions .btn{
+  min-height:34px; padding-left:12px; padding-right:12px;
+}
+
+.sg-bias-action-icon{
+  display:inline-flex; align-items:center; justify-content:center; width:17px; font-size:15px; line-height:1; filter:saturate(.9);
+}
+
+.sg-chart-grid{
+  display:grid; grid-template-columns:1fr; gap:16px; align-items:start;
+}
+
+.sg-chart-box .hint{
+  padding:8px 13px 0;
+}
+
+.sg-chart-box .chart-inner{
+  padding:6px 12px 12px;
+}
+
+.sg-chart-box .chart-inner svg{
+  width:100%; height:auto; display:block; max-height:285px;
+}
+
+.sg-eqa-modal{width:620px;}
+.sg-eqa-table-wrap{overflow-x:auto;}
+.sg-eqa-table{width:100%;min-width:500px;margin:0 0 10px;border:1px solid var(--line);border-radius:var(--radius-md);border-collapse:separate;border-spacing:0;overflow:hidden;table-layout:fixed;font:var(--table-body-size) var(--sans);}
+.sg-eqa-table th{position:static;padding:8px;background:var(--section-head-bg);color:var(--section-head-ink);border-bottom:1px solid var(--section-head-border);font-size:var(--table-head-size);font-weight:800;letter-spacing:0;text-align:center;text-transform:none;}
+.sg-eqa-table th:first-child{width:34px;}.sg-eqa-table th:nth-last-child(2){width:84px;}.sg-eqa-table th:last-child{width:34px;}
+.sg-eqa-table tbody tr:last-child td{border-bottom:0;}
+.sg-eqa-table td{padding:4px;border-bottom:1px solid var(--line);color:var(--ink);text-align:center;}
+.sg-eqa-table input{box-sizing:border-box;width:100%;height:32px;padding:4px 8px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--surface-subtle);color:var(--ink);font:700 var(--table-body-size) var(--sans);text-align:center;}
+.sg-eqa-table input:focus{border-color:var(--teal);background:var(--panel);box-shadow:0 0 0 3px rgba(11,116,125,.1);outline:none;}
+.sg-eqa-index{color:var(--muted);font-size:11px;}.sg-eqa-bias{color:var(--muted);font-weight:750;}
+.sg-eqa-del{padding:4px 7px;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--muted);cursor:pointer;}.sg-eqa-del:hover{background:var(--danger-soft);color:var(--red);}
+.sg-eqa-add{margin:12px 0 0;}
+.sg-eqa-summary{display:flex;flex-wrap:wrap;gap:12px 28px;min-height:66px;margin-top:12px;}
+.sg-eqa-summary>div:not(.sg-eqa-warning){display:flex;min-width:105px;flex-direction:column;gap:2px;}.sg-eqa-summary span{color:var(--muted);font-size:10px;font-weight:750;letter-spacing:0;text-transform:none;}.sg-eqa-summary b{color:var(--ink);font-size:16px;}.sg-eqa-summary .sg-eqa-average{color:var(--teal-deep);}.sg-eqa-empty{align-self:center;font-size:13px!important;letter-spacing:0!important;text-transform:none!important;}
+.sg-eqa-summary.is-empty{box-sizing:border-box;display:flex;width:fit-content;max-width:100%;min-height:48px;margin-top:14px;padding:11px 16px;border-left:4px solid var(--amber);background:var(--warning-soft);}
+.sg-eqa-summary.is-empty .sg-eqa-empty{color:var(--amber);font-weight:650;}
+.sg-eqa-warning{align-self:center;color:var(--amber);font-size:11px;font-weight:700;}
+.sg-eqa-period-wrap{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);}.sg-eqa-period-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px;}.sg-eqa-period-head>div{display:flex;gap:6px;}.sg-eqa-period-list{display:flex;max-height:120px;flex-wrap:wrap;gap:8px 16px;overflow-y:auto;padding:2px;}
+.sg-eqa-period{display:flex;align-items:center;gap:6px;margin:0;color:var(--ink);font-size:13px;font-weight:550;cursor:pointer;user-select:none;white-space:nowrap;}.sg-eqa-period input{width:16px;height:16px;margin:0;accent-color:var(--teal);}
+
+@media(max-width:980px){
+.sg-top-grid{
+  grid-template-columns:1fr;
+}
+
+.sg-chart-grid{
+  grid-template-columns:1fr;
+}
+}
+
+.sg-sigma-input-note{
+  margin:10px 16px 16px; padding:12px 0 0; border-top:1px solid var(--line2); border-radius:var(--radius-md); line-height:1.6;
+}
+
+.sg-control-row .sg-inline-btns{
+  flex:0 0 auto; min-width:0;
+}
+
+.sg-control-row{
+  flex-wrap:wrap;
+}
+
+.sg-control-row > .sg-test-picker{
+  flex:1 1 360px;
+  max-width:420px;
+}
+
+.sg-setup-fields{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 118px minmax(0,1fr);
+  column-gap:12px;
+  row-gap:12px;
+  margin:9px 16px 0;
+}
+
+.sg-setup-fields > div{
+  min-width:0;
+}
+
+.sg-setup-fields label{
+  margin-top:0;
+}
+
+.sg-setup-fields .sg-tea-source{
+  grid-column:1 / span 2;
+  grid-row:2;
+}
+
+.sg-setup-fields .sg-tea-input{
+  grid-column:3;
+  grid-row:2;
+}
+
+.sg-setup-fields .sg-tea-input input[type="number"]{
+  -moz-appearance:textfield;
+}
+
+.sg-setup-fields .sg-tea-input input[type="number"]::-webkit-inner-spin-button,
+.sg-setup-fields .sg-tea-input input[type="number"]::-webkit-outer-spin-button{
+  -webkit-appearance:none;
+  margin:0;
+}
+
+.sg-control-row .sg-inline-btns label{
+  visibility:hidden;
+}
+
+.sg-inline-btns-row{
+  display:flex; gap:8px; align-items:center; min-height:38px;
+}
+
+.sg-inline-btns-row .btn{
+  min-height:38px;
+}
+
+.sg-control-row{
+  align-items:flex-end;
+}
+
+#sgStatus .alert{
+  border-radius:var(--radius-md); margin-top:10px;
+}
+
+#sgStatus, #sgFreq, .sg-chart-grid, .sg-chart-box .chart-inner{
+  background:transparent;
+}
+
+.dash-hero,
+#sgStatus .sgcards{
+  align-items:stretch;
+}
+
+.qc-month-picker,
+.sg-chart-box h4{
+  display:flex; align-items:center;
+}
+
+/* Sigma page rules migrated out of professional-base.css. */
+.sg-setup-heading{
+  display:flex !important;
+  align-items:center;
+  min-height:0;
+  padding:12px 16px !important;
+  color:var(--ink) !important;
+  background:var(--section-head-bg);
+  font-size:14px !important;
+  font-weight:850 !important;
+}
+
+.sg-top-grid{
+  display:grid;
+  grid-template-columns:minmax(0,1.15fr) minmax(360px,.85fr);
+  gap:14px;
+  align-items:stretch;
+}
+
+.sg-top-grid > .panel{
+  min-width:0;
+}
+
+.sg-eflm-box{
+  display:grid; grid-template-columns:minmax(0,1.25fr) minmax(150px,.85fr) minmax(160px,1fr) minmax(0,1.45fr); gap:12px; margin:0 16px;
+}
+
+.sgbig{
+  border-radius:var(--radius-md);box-shadow:inset 0 0 0 1px rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.18);display:grid;align-content:start;min-height:168px;padding:14px 15px;text-align:center;
+}
+
+.sgbig .lab{
+  letter-spacing:.08em;
+}
+
+.sgbig .v{
+  margin-top:4px; margin-bottom:4px; letter-spacing:-.03em;
+}
+
+.sgbig .v{
+  font-family:var(--sans); font-variant-numeric:tabular-nums;
+}
+
+.sgbig .sub{
+  margin-top:auto;
+}
+
+#sgFreq table th{
+  background:var(--section-head-bg);
+}
+
+#sgTrend,
+#sgMDC{
+  border-top:1px solid var(--line2); padding:8px 0 2px;
+}
+
+#sgFreq table{
+  width:100%;margin-top:2px;border:1px solid var(--card-head-border);border-radius:var(--radius-md);overflow:hidden;table-layout:fixed;
+}
+
+#sgFreq table tr:first-child th, #sgFreq table tr:first-child td{
+  border-top:none;
+}
+
+#sgFreq table th, #sgFreq table td{
+  box-sizing:border-box;padding:11px 16px;vertical-align:middle;overflow-wrap:anywhere;
+}
+
+/* Tỷ lệ cố định 5 cột: Mức 8% · Sigma 10% · Bộ quy tắc OPSpecs 34% · Mức nguy cơ 18% · Hành động 30% */
+#sgFreq table th:nth-child(1), #sgFreq table td:nth-child(1){width:8%;}
+#sgFreq table th:nth-child(2), #sgFreq table td:nth-child(2){width:10%;text-align:center;}
+#sgFreq table th:nth-child(3), #sgFreq table td:nth-child(3){width:34%;}
+#sgFreq table th:nth-child(4), #sgFreq table td:nth-child(4){width:18%;}
+#sgFreq table th:nth-child(5), #sgFreq table td:nth-child(5){width:30%;}
+
+.sgcards{
+  gap:14px;
+  grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),240px));
+  justify-content:center;
+  margin:14px;
+}
+
+.sg-chart-grid{
+  margin:14px;
+}
+
+@media(max-width:760px){
+.sg-eqa-modal{width:100%;}.sg-eqa-period-head{align-items:flex-start;flex-direction:column;}
+.sg-setup-fields{
+  grid-template-columns:1fr;
+}
+
+.sg-setup-fields .sg-tea-input{
+  grid-column:auto;
+  grid-row:auto;
+}
+
+.sg-setup-fields .sg-tea-source{
+  grid-column:auto;
+  grid-row:auto;
+}
+
+.sg-data-head{
+  align-items:flex-start; flex-direction:column;
+}
+
+.sg-data-head-actions{
+  width:100%; justify-content:flex-start;
+}
+
+.sg-chart-grid{
+  margin-left:10px; margin-right:10px;
+}
+
+.sg-chart-box h4{
+  min-height:42px;
+}
+
+.sgcards,
+.sg-chart-grid{
+  margin:12px;
+}
+}
+
+@media(max-width:1280px){
+.sg-eflm-box{
+  grid-template-columns:minmax(0,1.35fr) minmax(120px,.65fr);
+}
+
+.sgbig{
+  min-height:154px; padding:13px 14px;
+}
+}
+
+@media(max-width:1150px){
+.sgbig{
+  min-height:146px; padding:12px 13px;
+}
+
+}
+
+/* Keep the two primary Sigma panels readable on narrow windows.  This rule
+   intentionally comes after the desktop grid so it wins in the cascade. */
+@media(max-width:980px){
+.sg-top-grid{
+  grid-template-columns:1fr;
+}
+}
+
+@media(min-width:500px){
+  #sgStatus .sgcards{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+
+.sg-add-test-list{
+  margin-top:10px;
+}
+
+.refrow.sg-add-test-row{
+  display:flex; align-items:center; justify-content:space-between; gap:14px;
+}
+
+.sg-add-test-row > span:first-child{
+  display:grid; gap:3px; min-width:0;
+}
+
+.sg-add-test-row .meta{
+  display:block;
+}
+
+.sg-add-test-row.is-tracked{
+  cursor:default; opacity:.72; background:var(--panel2);
+}

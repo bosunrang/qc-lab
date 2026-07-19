@@ -1,0 +1,101 @@
+const assert = require('node:assert/strict');
+const { loadSandbox, run } = require('./helpers/sandbox');
+
+const ctx = loadSandbox([
+  'core.js',
+  'modules/state.js',
+  'modules/entry-ui-state.js',
+  'modules/analysis-ui-state.js',
+  'modules/router-render.js',
+], { document: { addEventListener() {} } });
+
+const result = run(ctx, `
+  (function(){
+    function option(){return{value:'',textContent:''};}
+    var select={value:'B',disabled:false,children:[],replaceChildren:function(){this.children=[].slice.call(arguments);}};
+    document={createElement:function(tag){if(tag!=='option')throw new Error('unexpected tag');return option();}};
+    replaceSelectItems(select,[{value:'A',label:'Assay A'},{value:'B',label:'Assay B'}],'Empty');
+    var kept={value:select.value,disabled:select.disabled,labels:select.children.map(x=>x.textContent)};
+    replaceSelectItems(select,[],'Không tìm thấy');
+    return{kept,empty:{disabled:select.disabled,value:select.children[0].value,label:select.children[0].textContent}};
+  })()
+`);
+
+const value = JSON.parse(JSON.stringify(result));
+assert.deepEqual(value.kept, { value: 'B', disabled: false, labels: ['Assay A', 'Assay B'] });
+assert.deepEqual(value.empty, { disabled: true, value: '', label: 'Không tìm thấy' });
+
+const rowWindow = run(ctx, `
+  (function(){
+    var rows=Array.from({length:250},function(_,i){return{id:i};});
+    var compact=wgRowsWindow(rows,'current:T1|1|L1');
+    wgExpandedRows.add('current:T1|1|L1');
+    var expanded=wgRowsWindow(rows,'current:T1|1|L1');
+    var short=wgRowsWindow(rows.slice(0,40),'short');
+    return{
+      compact:{length:compact.rows.length,first:compact.rows[0].id,last:compact.rows[compact.rows.length-1].id,total:compact.total,limited:compact.limited},
+      expanded:{length:expanded.rows.length,first:expanded.rows[0].id,total:expanded.total,limited:expanded.limited},
+      short:{length:short.rows.length,limited:short.limited}
+    };
+  })()
+`);
+const windowValue = JSON.parse(JSON.stringify(rowWindow));
+assert.deepEqual(windowValue.compact, { length: 120, first: 130, last: 249, total: 250, limited: true });
+assert.deepEqual(windowValue.expanded, { length: 250, first: 0, total: 250, limited: false });
+assert.deepEqual(windowValue.short, { length: 40, limited: false });
+
+const entryWindow = run(ctx, `
+  (function(){
+    var rows=Array.from({length:420},function(_,i){return{id:i};}),key='T1|1|L1|2026-01-01|2026-03-31';
+    var compact=entryRowsWindow(rows,key);
+    entryExpandedTables.add(key);
+    var expanded=entryRowsWindow(rows,key);
+    return{
+      compact:{length:compact.rows.length,first:compact.rows[0].id,last:compact.rows[compact.rows.length-1].id,total:compact.total,limited:compact.limited},
+      expanded:{length:expanded.rows.length,first:expanded.rows[0].id,total:expanded.total,limited:expanded.limited,expanded:expanded.expanded}
+    };
+  })()
+`);
+const entryWindowValue = JSON.parse(JSON.stringify(entryWindow));
+assert.deepEqual(entryWindowValue.compact, { length:180, first:240, last:419, total:420, limited:true });
+assert.deepEqual(entryWindowValue.expanded, { length:420, first:0, total:420, limited:false, expanded:true });
+
+const keyboardTree = run(ctx, `
+  (function(){
+    var events=[],items=[0,1,2].map(function(i){return{offsetParent:{},focus:function(){events.push('focus:'+i);},click:function(){events.push('click:'+i);},getAttribute:function(name){return name==='aria-expanded'&&i===0?'false':null;}};});
+    document={querySelectorAll:function(){return items;}};
+    entryTreeKey({currentTarget:items[1],key:'ArrowDown',preventDefault:function(){events.push('prevent:down');}});
+    entryTreeKey({currentTarget:items[1],key:'Enter',preventDefault:function(){events.push('prevent:enter');}});
+    entryTreeKey({currentTarget:items[0],key:'ArrowRight',preventDefault:function(){events.push('prevent:right');}});
+    return events;
+  })()
+`);
+assert.deepEqual(JSON.parse(JSON.stringify(keyboardTree)), ['prevent:down','focus:2','prevent:enter','click:1','prevent:right','click:0']);
+
+const sheetArrows = run(ctx, `
+  (function(){
+    function cell(id,date,level,run){return{id:id,dataset:{focusDate:date,focusLevel:String(level),focusRun:String(run)}};}
+    var a=cell('a','2026-07-01',0,1),b=cell('b','2026-07-01',1,1),c=cell('c','2026-07-02',0,1),d=cell('d','2026-07-02',1,1),cells=[a,b,c,d];
+    function id(value){return value&&value.id||null;}
+    return{right:id(entrySheetTarget(cells,a,'ArrowRight')),left:id(entrySheetTarget(cells,b,'ArrowLeft')),down:id(entrySheetTarget(cells,a,'ArrowDown')),up:id(entrySheetTarget(cells,c,'ArrowUp')),rightEdge:id(entrySheetTarget(cells,b,'ArrowRight')),upEdge:id(entrySheetTarget(cells,a,'ArrowUp')),enterWrap:id(entrySheetTarget(cells,c,'Enter')),tabWrap:id(entrySheetTarget(cells,b,'Tab'))};
+  })()
+`);
+assert.deepEqual(JSON.parse(JSON.stringify(sheetArrows)), { right:'b', left:'a', down:'c', up:'a', rightEdge:null, upEdge:null, enterWrap:'a', tabWrap:'a' });
+
+const restoredFilters = run(ctx, `
+  (function(){
+    var calls=[];
+    dashTestFilter=function(value){calls.push('dash:'+value);};
+    entryFilter=function(value){calls.push('entry:'+value);};
+    page='dash';dashTestQ='glucose';entryQ='';restoreRouteFilters();
+    page='entry';entryQ='lot-01';restoreRouteFilters();
+    page='westgard';restoreRouteFilters();
+    return calls;
+  })()
+`);
+assert.deepEqual(JSON.parse(JSON.stringify(restoredFilters)), ['dash:glucose','entry:lot-01']);
+assert.equal(run(ctx,"entryLotLabels([{lot:'1101'},{lot:'1102'}])"),'1101 / 1102');
+assert.equal(run(ctx,"entryLotLabels([])"),'Chưa gán lô');
+assert.ok(run(ctx,"String(pageEntry).includes('entryLotLabels(opLevels)')"),'entry lot heading must use operational levels only');
+
+console.log('Partial render helper tests passed');

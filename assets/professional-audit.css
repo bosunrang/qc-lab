@@ -1,0 +1,79 @@
+/* Nhật ký hoạt động (audit/activity log) page.
+   Split from the original monolithic professional.css on 2026-07-11 — see CLAUDE.md
+   for the full file list and load order. Loading order matters: keep new rules in
+   whichever file matches the page/selector, and keep this file after professional-base.css. */
+
+.audit-table{
+  table-layout:fixed;
+}
+
+.audit-table th, .audit-table td{
+  text-align:center;
+}
+
+.audit-table th:nth-child(5),.audit-table td:nth-child(5){
+  width:40%
+}
+
+.audit-table td{
+  vertical-align:middle; padding-top:10px; padding-bottom:10px;
+}
+
+.audit-time-cell{
+  display:flex; flex-direction:column; align-items:center; gap:2px;
+}
+
+.audit-seq{
+  font-size:10.5px; font-weight:700; color:#7c8e9a;
+}
+
+.audit-time{
+  font-weight:600; color:#2c3e48;
+}
+
+.audit-detail{
+  color:#41545f; line-height:1.5; word-break:break-word; white-space:normal; text-align:center;
+}
+
+@media(max-width:760px){
+.audit-detail{
+  white-space:normal; max-width:240px;
+}
+}
+
+/* Audit table rules migrated out of professional-base.css. */
+.panel>h3:first-child~table.audit-table, .panel>table.audit-table{
+  width:calc(100% - 32px) !important; max-width:calc(100% - 32px) !important; min-width:0 !important;
+}
+
+.audit-table th:nth-child(1), .audit-table td:nth-child(1){
+  width:12%
+}
+
+.audit-table th:nth-child(2), .audit-table td:nth-child(2){
+  width:17%
+}
+
+.audit-table th:nth-child(3), .audit-table td:nth-child(3){
+  width:15%
+}
+
+.audit-table th:nth-child(4), .audit-table td:nth-child(4){
+  width:16%
+}
+
+.audit-table td:first-child{
+  white-space:nowrap;
+}
+
+@media(max-width:760px){
+.panel>h3:first-child~table.audit-table, .panel>table.audit-table{
+  width:max-content !important; max-width:none !important; min-width:100% !important; table-layout:auto !important;
+}
+}
+
+@media(max-width:760px){
+.audit-table th, .audit-table td{
+  width:auto !important; white-space:nowrap;
+}
+}
