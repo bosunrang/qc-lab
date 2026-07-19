@@ -24,11 +24,12 @@ port 8080, for Claude Code's browser preview.)
 
 `package.json` also carries Electron desktop packaging (`npm start` →
 `electron .`, `npm run dist` → NSIS installer via electron-builder, with
-`scripts/patch-7za-symlink.js` as a pre-step). **The `electron/` folder
-(`electron/main.js`) is referenced by that config but is not in this repo**, so
-those scripts only work where that folder is supplied; for development use the
-static server. `index.html`'s Electron-only branch (`window.qcDialog`, routing
-`alert()`/`confirm()` through a native dialog) no-ops in a plain browser.
+`scripts/patch-7za-symlink.js` as a pre-step). The `electron/` folder is part of
+the repo (`main.js`, `preload.js`, `license.js`, `activation.html` — main process,
+license activation), so those scripts work here once `npm install` has run; for
+development use the static server. `index.html`'s Electron-only branch
+(`window.qcDialog`, routing `alert()`/`confirm()` through a native dialog) no-ops
+in a plain browser.
 
 ## Tests
 
