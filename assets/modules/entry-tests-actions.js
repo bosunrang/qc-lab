@@ -196,7 +196,7 @@ async function saveLotTransitionV2(id){
   const status=document.getElementById('cfgTransStatus').value,startRaw=document.getElementById('cfgTransStart').value.trim(),startDate=parseVN(startRaw);if(startRaw&&!startDate){await infoDialog('Ngày bắt đầu không hợp lệ. Dùng dạng dd/mm/yyyy.');return;}
   const old=state.lotTransitions.find(x=>x.id===id),nowFinal=['accepted','rejected'].includes(status),finalChanged=nowFinal&&(!old||old.status!==status);
   if(old&&transitionSwitchesLot(old)&&status!=='accepted'){await infoDialog('Hồ sơ đã chấp nhận lô mới và đã áp dụng vào nhóm lô/Mean-SD, không thể đổi ngược trạng thái.');return;}
-  const data={panelId,fromLotId,toLotId,startDate:startDate||isoToday(),status,criteria:'',conclusion:'',approvedBy:finalChanged?userName():(old&&old.approvedBy||''),approvedAt:finalChanged?new Date().toISOString():(old&&old.approvedAt||''),note:''};
+  const data={panelId,fromLotId,toLotId,startDate:startDate||isoToday(),status,criteria:old&&old.criteria||'',conclusion:old&&old.conclusion||'',approvedBy:finalChanged?userName():(old&&old.approvedBy||''),approvedAt:finalChanged?new Date().toISOString():(old&&old.approvedAt||''),note:old&&old.note||''};
   if(status==='accepted'&&finalChanged){const check=inspectAcceptedLotTransition(data);if(!check.rows.length){await infoDialog('Panel đã chọn không có xét nghiệm nào đang sử dụng lô cũ. Hãy kiểm tra lại Panel và lô chuyển tiếp.');return;}if(check.missing.length){await infoDialog(`Chưa thể chấp nhận lô mới: ${check.missing.map(x=>x.t.name).join(', ')} chưa có Mean/SD riêng cho lô ${toLot.lotNo}. Hãy lưu Mean/SD ở chế độ “Dự kiến” trước.`);return;}}
   const tr=old?Object.assign(old,data):{id:uid(),...data};if(!old)state.lotTransitions.push(tr);
   const switched=applyAcceptedLotTransitionToConfig(tr);
@@ -345,9 +345,14 @@ async function saveConfigInstrument(id){
   state.machines=[...new Set(state.instruments.map(x=>x.name))];logAct(old?'Cập nhật máy':'Thêm máy xét nghiệm',name,'Máy xét nghiệm');closeModal();save();rerender();
 }
 async function deleteConfigInstrument(id){if(!requireAdmin())return;const i=state.instruments.find(x=>x.id===id);if(!i)return;if(state.tests.some(t=>t.instrumentId===id)){await infoDialog('Máy này đang được gắn với xét nghiệm. Hãy chuyển xét nghiệm sang máy khác trước.');return;}if(state.qcPanels.some(p=>p.instrumentId===id)){await infoDialog('Máy này đang được gắn với Panel QC. Hãy chuyển hoặc xóa Panel QC trước.');return;}if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa máy xét nghiệm',message:`Xóa máy ${i.name}?`,confirmLabel:'Xóa máy',cancelLabel:'Hủy'}))return;state.instruments=state.instruments.filter(x=>x.id!==id);state.machines=state.instruments.map(x=>x.name);logAct('Xóa máy xét nghiệm',i.name,'Máy xét nghiệm');save();rerender();}
+/* Xét nghiệm mới luôn bắt đầu với đúng 1 mức (Mức 1) — KHÔNG suy theo các mức
+   lô đang có ở NƠI KHÁC trong hệ thống (từng làm vậy trước đây, khiến xét
+   nghiệm mới tự dính thêm mức rỗng không liên quan chỉ vì lab có lô ở mức đó
+   cho xét nghiệm khác). Các mức khác tự thêm đúng lúc người dùng gán lô cho
+   xét nghiệm này qua Mean/SD theo nhóm lô (applyTargetPick tự push level mới
+   nếu chưa có). */
 function defaultAssayLevels(){
-  const levels=[...new Set(state.qcLots.map(l=>+l.level).filter(Number.isFinite))].sort((a,b)=>a-b);
-  return (levels.length?levels:[1]).map(level=>({level,mean:null,sd:null,low:null,high:null,rangeK:2,mfgMean:null,mfgSd:null,applied:'mfg',meanSdHistory:[]}));
+  return[{level:1,mean:null,sd:null,low:null,high:null,rangeK:2,mfgMean:null,mfgSd:null,applied:'mfg',meanSdHistory:[]}];
 }
 function configAssayTeaRefs(){return typeof effectiveTeaRefs==='function'?effectiveTeaRefs():REFTESTS.map(([name,unit,clia,ricos,section])=>[name,unit,clia,ricos,section,null,teaAnalyteMeta(name).analyteId]);}
 function configAssayRefRecord(name,analyteId=''){const key=teaAnalyteKey(name);return(state.teaRefs||[]).find(r=>analyteId&&r.analyteId===analyteId)||(state.teaRefs||[]).find(r=>teaAnalyteKey(r.name)===key)||null;}
@@ -402,4 +407,4 @@ async function saveConfigAssay(id){
   if(existing){Object.assign(existing,data);if(oldInstrumentId&&oldInstrumentId!==instrumentId)state.qcPanels.forEach(p=>{if(p.instrumentId!==instrumentId)p.testIds=(p.testIds||[]).filter(testId=>testId!==id);});logAct('Cập nhật xét nghiệm',`${inst.name} · ${levels.length} mức QC`,name);}else{const test={id:uid(),...data};state.tests.push(test);state.data[test.id]=[];logAct('Thêm xét nghiệm',`${inst.name} · ${levels.length} mức QC`,name);}
   closeModal();save();rerender();
 }
-async function delTest(id){if(!requireAdmin())return;const t=state.tests.find(x=>x.id===id);if(!t)return;if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa xét nghiệm',message:`Xóa xét nghiệm ${t.name} và toàn bộ dữ liệu QC?`,detail:'Toàn bộ điểm QC, Westgard và Sigma của xét nghiệm này sẽ mất, không thể khôi phục.',confirmLabel:'Xóa xét nghiệm',cancelLabel:'Hủy'}))return;state.tests=state.tests.filter(t=>t.id!==id);state.qcPanels.forEach(p=>p.testIds=(p.testIds||[]).filter(testId=>testId!==id));state.assayGroups.forEach(g=>g.testIds=(g.testIds||[]).filter(testId=>testId!==id));delete state.data[id];if(selTest===id)selTest=state.tests[0]&&state.tests[0].id||null;if(entrySel&&entrySel.testId===id)entrySel=null;logAct('Xóa test/lô','Xóa xét nghiệm và toàn bộ dữ liệu QC',t.name);save();rerender();}
+async function delTest(id){if(!requireAdmin())return;const t=state.tests.find(x=>x.id===id);if(!t)return;if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa xét nghiệm',message:`Xóa xét nghiệm ${t.name} và toàn bộ dữ liệu QC?`,detail:'Toàn bộ điểm QC, Westgard và Sigma của xét nghiệm này sẽ mất, không thể khôi phục.',confirmLabel:'Xóa xét nghiệm',cancelLabel:'Hủy'}))return;state.tests=state.tests.filter(t=>t.id!==id);state.qcPanels.forEach(p=>p.testIds=(p.testIds||[]).filter(testId=>testId!==id));state.assayGroups.forEach(g=>g.testIds=(g.testIds||[]).filter(testId=>testId!==id));delete state.data[id];delete state.sigmaData[id];if(selTest===id)selTest=state.tests[0]&&state.tests[0].id||null;if(entrySel&&entrySel.testId===id)entrySel=null;logAct('Xóa test/lô','Xóa xét nghiệm và toàn bộ dữ liệu QC',t.name);save();rerender();}

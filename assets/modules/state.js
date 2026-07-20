@@ -33,7 +33,31 @@ function ensureShape(opts={}){const previousSchema=Number(state&&state.schemaVer
      sgReconcileAllTeaSnapshots() trong sigma.js. */
   if(typeof sgReconcileAllTeaSnapshots==='function')sgReconcileAllTeaSnapshots();
   normalizePointLots();
+  pruneUnusedTestLevels();
   state.tests.forEach(t=>t.levels.forEach(l=>{if(l.mfgMean==null){l.mfgMean=l.mean;l.mfgSd=l.sd;l.applied='mfg';}}));}
+/* Xóa mục Mức QC "ma": chưa từng gán lô, chưa từng có Mean, chưa có lịch sử
+   Mean/SD và chưa có điểm QC nào — di sản của defaultAssayLevels() từng gán
+   mặc định theo TOÀN BỘ mức lô đang có trong hệ thống (đã sửa ở
+   entry-tests-actions.js), để lại các mục rỗng trên xét nghiệm không liên
+   quan. Luôn giữ lại ít nhất 1 mức trên mỗi xét nghiệm — nếu lọc còn 0, giữ
+   lại mục đầu tiên thay vì để mảng rỗng. */
+function pruneUnusedTestLevels(){
+  let pruned=0;
+  (state.tests||[]).forEach(t=>{
+    const levels=Array.isArray(t.levels)?t.levels:[];
+    if(levels.length<=1)return;
+    const dataPoints=state.data&&state.data[t.id]||[];
+    /* sanitizeBackup() (chạy đầu ensureShape(), trước khi hàm này chạy) đã ép
+       mean/sd null thành 0 — kiểm tra sd>0 thay vì mean==null để nhận diện
+       đúng "chưa từng cấu hình" ở cả dạng thô (mean:null) lẫn dạng đã qua
+       sanitize (mean:0,sd:0), khớp đúng quy tắc SD>0 mới coi là dùng được. */
+    const isUnused=l=>!l.qcLotId&&!(Number.isFinite(+l.sd)&&+l.sd>0)&&(!Array.isArray(l.meanSdHistory)||!l.meanSdHistory.length)&&!dataPoints.some(p=>+p.level===+l.level);
+    let kept=levels.filter(l=>!isUnused(l));
+    if(!kept.length)kept=[levels[0]];
+    if(kept.length!==levels.length){pruned+=levels.length-kept.length;t.levels=kept;}
+  });
+  return pruned;
+}
 function uid(){return Math.random().toString(36).slice(2,9);}
 /* Đồng bộ mức Sigma với quan hệ lô ↔ nhóm lô. Nhóm "Đã dừng/Dự kiến" vẫn được tính
    là còn quan hệ để giữ lịch sử; chỉ mức có lô đã bị tháo khỏi MỌI nhóm mới bị gỡ.
