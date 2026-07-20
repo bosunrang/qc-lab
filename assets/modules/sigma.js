@@ -149,7 +149,7 @@ function sgSelectPeriod(eid){
   sgRefresh();
 }
 function sgRemoveTracked(id){
-  if(!requireWrite())return;const t=state.tests.find(x=>x.id===id);if(!t)return;
+  if(!requireAdmin())return;const t=state.tests.find(x=>x.id===id);if(!t)return;
   t.sgTracked=false;
   if(sgTest===id){const remain=sgTrackedTests();sgTest=remain.length?remain[0].id:null;}
   save({clearDerived:false});rerender();
@@ -176,7 +176,7 @@ function pageSigma(){
   if(!sgTest||!tests.find(t=>t.id===sgTest))sgTest=tests[0].id;
   const t=tests.find(t=>t.id===sgTest);
   const trashIcon='<svg class="btn-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>',printIcon='<svg class="btn-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/></svg>';
-  const testActions=`${role()==='admin'?'<button class="btn teal" onclick="sgOpenAddTest()">+ Thêm</button>':''}${canWrite()?`<button class="btn danger" onclick="sgRemoveTracked('${t.id}')">${trashIcon}Xóa</button>`:''}`;
+  const testActions=`${role()==='admin'?'<button class="btn teal" onclick="sgOpenAddTest()">+ Thêm</button>':''}${role()==='admin'?`<button class="btn danger" onclick="sgRemoveTracked('${t.id}')">${trashIcon}Xóa</button>`:''}`;
   const testSelectFields=`<div class="sg-test-picker"><label>Chọn xét nghiệm</label><select id="sgTestSelect" onchange="sgPickTest(this.value)">${sgTrackedOptions(tests,sgTest)}</select></div><div class="sg-inline-btns"><label>&nbsp;</label><div class="sg-inline-btns-row">${testActions}</div></div>`;
   const levels=sgVisibleLevels(t);
   if(!levels.length)return headOnly('Six Sigma & Sai số','Đánh giá hiệu năng phương pháp theo TEa, CV IQC và Bias EQA/EQC')+
@@ -397,7 +397,13 @@ function sgClearImportedCV(L){if(!sgIsAutoCV(L))return false;['cv','cvSource','n
 function sgCohortCutoff(period){const ym=SigmaCohortService.normalizePeriod(period),today=isoToday();if(!ym)return'';const [y,m]=ym.split('-').map(Number),last=new Date(Date.UTC(y,m,0)).toISOString().slice(0,10);return last<today?last:today;}
 function sgCohortGroups(t,e){const cutoff=sgCohortCutoff(e.period),periodStart=e.period+'-01';return operationalLevels(t).map(l=>{const raw=SigmaCohortService.cohortsForLevelByLot(state,{testId:t.id,level:l.level,endDate:cutoff}).filter(c=>c.n>0&&c.end>=periodStart),cohorts=raw.filter(c=>c.lot),missingLotN=raw.filter(c=>!c.lot).reduce((s,c)=>s+c.n,0);return{level:l.level,configuredLot:String(l.lot||''),cohorts,missingLotN};});}
 function sgCohortStatusText(a){return a.status==='eligible'?'Đủ dữ liệu':a.status==='provisional'?'Tạm thời':a.status==='insufficient'?'Chưa đủ':'Không ổn định';}
-function sgImportCohort(t,e,level,cohort){const st=cohort&&cohort.stats,existing=e.lv[level];if(!(st&&st.n>=2&&st.cv>0)){const cleared=sgClearImportedCV(existing);if(cleared)sgSetLevelTeaSnapshot(t,e,level,true);return{imported:false,cleared};}const L=e.lv[level]=existing||{},assessment=SigmaCohortService.assess(cohort);['sourceTargetMean','sourceTargetSd','cohortIssues','sourceExcludedVoided','sourceExcludedInvalid'].forEach(k=>delete L[k]);L.cv=st.cv;L.cvSource='iqc-cohort';L.n=st.n;L.sourceStart=cohort.start;L.sourceEnd=cohort.end;L.sourceLot=cohort.lot;L.cohortStatus=assessment.status;L.cohortIssues=cohort.issues;L.sourceExcludedVoided=cohort.excluded.voided;L.sourceExcludedInvalid=cohort.excluded.invalidValue;if(cohort.targetMean!=null&&cohort.targetMean!==0)L.sourceTargetMean=cohort.targetMean;if(cohort.targetSd!=null&&cohort.targetSd>0)L.sourceTargetSd=cohort.targetSd;sgSetLevelTeaSnapshot(t,e,level,true);return{imported:true,cleared:false,status:assessment.status,mixedTarget:cohort.issues.includes('mixed-target-mean')||cohort.issues.includes('mixed-target-sd')};}
+/* force=true trên sgSetLevelTeaSnapshot chỉ dùng cho ĐÚNG kỳ hiện tại (isoMonth()),
+   giống hệt quy tắc của sgSyncCurrentPeriodTea() — kỳ cũ chỉ được ĐIỀN TEa nếu
+   chưa có (force=false), không bị kéo lại theo Bảng TEa tham chiếu hôm nay. Trước
+   đây luôn force=true bất kể kỳ nào, nên bấm "CV lô" cho một kỳ cũ đã chốt TEa từ
+   trước sẽ âm thầm đổi TEa của kỳ đó sang giá trị tham chiếu MỚI NHẤT — phá vỡ
+   tính truy xuất lịch sử mà teaEffectiveDate/teaReviewedDate của kỳ đang ghi lại. */
+function sgImportCohort(t,e,level,cohort){const st=cohort&&cohort.stats,existing=e.lv[level],forceTea=e.period===isoMonth();if(!(st&&st.n>=2&&st.cv>0)){const cleared=sgClearImportedCV(existing);if(cleared)sgSetLevelTeaSnapshot(t,e,level,forceTea);return{imported:false,cleared};}const L=e.lv[level]=existing||{},assessment=SigmaCohortService.assess(cohort);['sourceTargetMean','sourceTargetSd','cohortIssues','sourceExcludedVoided','sourceExcludedInvalid'].forEach(k=>delete L[k]);L.cv=st.cv;L.cvSource='iqc-cohort';L.n=st.n;L.sourceStart=cohort.start;L.sourceEnd=cohort.end;L.sourceLot=cohort.lot;L.cohortStatus=assessment.status;L.cohortIssues=cohort.issues;L.sourceExcludedVoided=cohort.excluded.voided;L.sourceExcludedInvalid=cohort.excluded.invalidValue;if(cohort.targetMean!=null&&cohort.targetMean!==0)L.sourceTargetMean=cohort.targetMean;if(cohort.targetSd!=null&&cohort.targetSd>0)L.sourceTargetSd=cohort.targetSd;sgSetLevelTeaSnapshot(t,e,level,forceTea);return{imported:true,cleared:false,status:assessment.status,mixedTarget:cohort.issues.includes('mixed-target-mean')||cohort.issues.includes('mixed-target-sd')};}
 function sgApplyCohortChoices(t,e,groups,choices){const summary={imported:0,cleared:0,insufficient:0,unstable:0,mixedTargets:0,missingLotN:0,missingLotLevels:0};(groups||[]).forEach(g=>{const lot=choices&&choices[g.level],cohort=g.cohorts.find(c=>c.lot===lot),r=sgImportCohort(t,e,g.level,cohort);if(r.imported){summary.imported++;if(r.status==='insufficient')summary.insufficient++;if(r.status==='unstable')summary.unstable++;if(r.mixedTarget)summary.mixedTargets++;}if(r.cleared)summary.cleared++;
   /* Điểm IQC chưa gắn mã lô bị loại khỏi cohort (không thể tách lô) — chỉ báo khi
      mức đó không có cohort hợp lệ nào, để không nhiễu khi đã lấy được CV từ lô đúng. */

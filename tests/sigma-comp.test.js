@@ -21,6 +21,8 @@ assert.equal(ctx.sgInputDisplayValue(''),'');
   const source = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'sigma.js'), 'utf8');
   const sigmaCss = fs.readFileSync(path.join(__dirname, '..', 'assets', 'professional-sigma.css'), 'utf8');
   assert.match(source, /class="sg-simple-table"/, 'Sigma periods use the compact CV–Bias–Sigma table');
+  assert.match(source, /function sgRemoveTracked\(id\)\{\s*if\(!requireAdmin\(\)\)return;/, 'untracking a test from Sigma requires admin, matching the admin-only "+ Thêm" action');
+  assert.doesNotMatch(source, /role\(\)==='admin'\?'<button class="btn teal" onclick="sgOpenAddTest\(\)">\+ Thêm<\/button>':''\}\$\{canWrite\(\)/, 'the "Xóa" tracked-test button is no longer shown to non-admin roles that can only canWrite()');
   assert.doesNotMatch(source, /<label>Độ lệch so với target IQC%<\/label>/, 'Bias IQC input is absent from the Sigma UI');
   assert.match(source, /Chọn CV IQC theo lô/, 'automatic import is labelled as a lot-based CV cohort');
   assert.doesNotMatch(source, /Bias Peer|Peer group|sg-bias-source/, 'Peer is absent from the Sigma UI and business logic');
@@ -399,6 +401,52 @@ assert.equal(ctx.sgInputDisplayValue(''),'');
       `SG_CLIA_FIXED["${key}"] unit "${fixed[key].unit}" no longer matches REFTESTS unit "${refUnit.get(key)}" — the pre-converted absolute limit is now in the wrong unit`
     );
   });
+}
+
+// --- Pulling CV via the cohort import ("CV lô") must not re-snapshot TEa for a period
+// other than the current one — mirrors the guarantee sgSyncCurrentPeriodTea() already
+// gives manual TEa edits (see the "an earlier reviewed period keeps its historical TEa"
+// assertion above). Regression: sgImportCohort() used to always pass force=true to
+// sgSetLevelTeaSnapshot() regardless of which period was being pulled, so re-pulling CV
+// for an old, already-reviewed period silently rewrote its TEa to today's reference
+// table value instead of leaving the historically captured one alone.
+{
+  const currentPeriod = run(ctx, 'isoMonth()');
+  const fakeCohort = {
+    lot: 'L1', n: 3, stats: { cv: 1.8, n: 3 }, start: '2025-12-15', end: '2025-12-17',
+    issues: [], excluded: { voided: 0, invalidValue: 0 }, targetMean: 5.5, targetSd: 0.3,
+  };
+  run(ctx, `
+    state.tests=[{id:'T1',name:'Glucose',tea:0,teaSource:'ricos',levels:[{level:1,mean:5.5,sd:0.3,lot:'L1'}]}];
+    state.sigmaData={T1:[
+      {id:'OLD',period:'2025-12',tea:8,teaEffectiveDate:'2020-01-01',lv:{1:{tea:8,teaEffectiveDate:'2020-01-01'}}},
+      {id:'CUR',period:'${currentPeriod}',tea:8,teaEffectiveDate:'2020-01-01',lv:{1:{tea:8,teaEffectiveDate:'2020-01-01'}}},
+      {id:'EMPTY',period:'2025-11',lv:{1:{}}}
+    ]};
+    const t=state.tests[0],data=state.sigmaData.T1,cohort=${JSON.stringify(fakeCohort)};
+    sgImportCohort(t,data.find(x=>x.id==='OLD'),1,cohort);
+    sgImportCohort(t,data.find(x=>x.id==='CUR'),1,cohort);
+    sgImportCohort(t,data.find(x=>x.id==='EMPTY'),1,cohort);
+  `);
+  assert.equal(run(ctx, "state.sigmaData.T1.find(x=>x.id==='OLD').lv[1].tea"), 8, 'pulling CV for an old, already-TEa-reviewed period leaves its historical TEa untouched');
+  assert.equal(run(ctx, "state.sigmaData.T1.find(x=>x.id==='CUR').lv[1].tea"), 6.96, 'pulling CV for the current period still refreshes TEa from the live reference table');
+  assert.equal(run(ctx, "state.sigmaData.T1.find(x=>x.id==='EMPTY').lv[1].tea"), 6.96, 'a period that never had a TEa captured still gets one filled in on first import, even if not the current period');
+}
+
+// --- Untracking a test from Sigma is admin-only, same as adding one ---
+{
+  run(ctx, `
+    function requireAdmin(){return globalThis.__isAdmin===true;}
+    function save(){}
+    function rerender(){}
+    state.tests=[{id:'T1',name:'Glucose',sgTracked:true}];
+    sgTest='T1';
+    globalThis.__isAdmin=false;
+    sgRemoveTracked('T1');
+  `);
+  assert.equal(run(ctx, 'state.tests[0].sgTracked'), true, 'a non-admin call to sgRemoveTracked() is blocked and the test stays tracked');
+  run(ctx, `globalThis.__isAdmin=true; sgRemoveTracked('T1');`);
+  assert.equal(run(ctx, 'state.tests[0].sgTracked'), false, 'an admin can still untrack a test');
 }
 
 console.log('Sigma bias/TEa source-selection tests passed');
