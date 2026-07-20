@@ -628,12 +628,16 @@ label, .rc-field label{
 }
 
 .rc-verdict-desc{
-  color:var(--muted); font-size:var(--type-body-sm); line-height:1.55;
+  color:var(--muted); font-size:var(--type-body-sm); line-height:1.55; margin-top:2px;
 }
 
 .rc-stat-sub,
 .rc-crit-text div{
   color:var(--muted); font-size:var(--type-body-sm); font-weight:500; line-height:1.55;
+}
+
+.rc-crit-text div{
+  margin-top:2px;
 }
 
 @media(max-width:760px){

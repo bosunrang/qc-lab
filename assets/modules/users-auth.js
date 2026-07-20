@@ -5,7 +5,7 @@ function pageUsers(){
     <td>${roleLabel(u.role)}</td>
     <td>${u.active===false?'<span class="tag rej">Khóa</span>':'<span class="tag ok">Hoạt động</span>'}</td>
     <td><div class="user-row-actions">${u.id===currentUser.id?'<span class="hint">(bạn)</span> <button class="btn ghost sm" onclick="resetPass(\''+u.id+'\')">Đổi mật khẩu</button>'
-      :'<button class="btn ghost sm" onclick="openUserPerms(\''+u.id+'\')">Sửa quyền</button> <button class="btn ghost sm" onclick="resetPass(\''+u.id+'\')">Đặt lại MK</button> <button class="btn ghost sm" onclick="toggleUser(\''+u.id+'\')">'+(u.active===false?'Mở khóa':'Khóa')+'</button> <button class="x" onclick="delUser(\''+u.id+'\')">✕</button>'}</div></td></tr>`).join('');
+      :'<button class="btn ghost sm" onclick="openUserPerms(\''+u.id+'\')">Sửa quyền</button> <button class="btn ghost sm" onclick="resetPass(\''+u.id+'\')">Đặt lại MK</button> <button class="btn ghost sm" onclick="toggleUser(\''+u.id+'\')">'+(u.active===false?'Mở khóa':'Khóa')+'</button> <button class="btn danger sm" onclick="delUser(\''+u.id+'\')">Xóa</button>'}</div></td></tr>`).join('');
   return headOnly('Quản lý người dùng','Phân quyền thao tác và kiểm soát tài khoản')+
    `<div class="panel"><h3>Thêm người dùng</h3><div class="user-create-layout">
      <div class="user-create-card">
@@ -14,15 +14,17 @@ function pageUsers(){
        <div><label>Tên đăng nhập</label><input id="uUser" placeholder="vd: lan.nt"></div>
        <div><label>Họ tên</label><input id="uName"></div>
        <div><label>Mã viết tắt</label><input id="uInitials" maxlength="12" placeholder="NTL"></div>
-       <div><label>Vai trò</label><select id="uRole" onchange="syncUserPermChecks('newUserPerms',this.value)"><option value="admin">Quản trị</option><option value="technician" selected>KTV (nhập liệu)</option><option value="viewer">Chỉ xem</option></select></div>
+       <div><label>Vai trò</label><select id="uRole" onchange="syncUserPermChecks('newUserPerms',this.value)"><option value="admin">Quản trị</option><option value="technician" selected>KTV</option><option value="viewer">Chỉ xem</option></select></div>
        <div><label>Mật khẩu tạm</label><input id="uPass" type="password" autocomplete="new-password"></div>
        <div class="user-create-actions"><button class="btn teal" onclick="addUser()">Thêm</button></div>
        </div>
      </div>
-     <div class="user-create-card"><div class="user-create-card-title">Thẻ được phép dùng</div><div class="user-perm-block">${userPermChecks(rolePageIds('technician'),'newUserPerms','technician')}</div></div>
+     <div class="user-create-access">
+       <div class="user-create-card"><div class="user-create-card-title">Thẻ được phép dùng</div><div class="user-perm-block">${userPermChecks(rolePageIds('technician'),'newUserPerms','technician')}</div></div>
+       <div class="user-list-section"><div class="user-list-title">Danh sách người dùng</div><div class="user-table-wrap"><table class="user-table"><thead><tr><th>Người dùng</th><th>Vai trò</th><th>Trạng thái</th><th>Hành động</th></tr></thead><tbody>${rows}</tbody></table></div></div>
      </div>
-     <div class="hint user-create-hint"><b>Vai trò</b> quyết định quyền sửa/quản trị trong các thẻ được tick. <b>KTV:</b> nhập/sửa dữ liệu vận hành · <b>Chỉ xem:</b> chỉ đọc. Người dùng mới sẽ phải đổi mật khẩu khi đăng nhập lần đầu.</div></div>
-   <div class="panel"><h3>Danh sách người dùng</h3><table class="user-table"><thead><tr><th>Người dùng</th><th>Vai trò</th><th>Trạng thái</th><th>Hành động</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+     </div>
+     <div class="hint user-create-hint"><b>Vai trò</b> quyết định quyền sửa/quản trị trong các thẻ được tick. <b>KTV:</b> nhập/sửa dữ liệu vận hành · <b>Chỉ xem:</b> chỉ đọc. Người dùng mới sẽ phải đổi mật khẩu khi đăng nhập lần đầu.</div></div>`;
 }
 function pageAudit(){
   const total=(state.activity||[]).length;
@@ -78,7 +80,7 @@ async function openUserPerms(id){
   if(!requireAdmin())return;
   const u=state.users.find(x=>x.id===id);if(!u)return;
   if(currentUser&&currentUser.id===id){await infoDialog('Không thể tự sửa quyền của tài khoản đang đăng nhập. Hãy dùng tài khoản quản trị khác nếu cần thay đổi.');return;}
-  const roleSelect=`<select id="editUserRole" onchange="syncUserPermChecks('editUserPerms',this.value)"><option value="admin" ${u.role==='admin'?'selected':''}>Quản trị</option><option value="technician" ${u.role==='technician'?'selected':''}>KTV (nhập liệu)</option><option value="viewer" ${u.role==='viewer'?'selected':''}>Chỉ xem</option></select>`;
+  const roleSelect=`<select id="editUserRole" onchange="syncUserPermChecks('editUserPerms',this.value)"><option value="admin" ${u.role==='admin'?'selected':''}>Quản trị</option><option value="technician" ${u.role==='technician'?'selected':''}>KTV</option><option value="viewer" ${u.role==='viewer'?'selected':''}>Chỉ xem</option></select>`;
   openModal(`<div class="modal"><div class="modal-h"><h3>Sửa quyền người dùng</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
     <div class="modal-b">
       <div class="hint"><b>${esc(u.name||u.username)}</b> · @${esc(u.username)}</div>

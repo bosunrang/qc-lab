@@ -4,6 +4,8 @@ function qcPointWarnings(t,cfg,date,runId,val){
   if(!Number.isFinite(+cfg.sd)||+cfg.sd<=0)issues.push('SD đang bằng 0 hoặc chưa hợp lệ, không thể đánh giá Westgard.');
   if(Number.isFinite(+cfg.mean)&&+cfg.mean>=0&&val<0)issues.push('Giá trị âm trong khi Mean mục tiêu không âm.');
   if(Number.isFinite(+cfg.mean)&&Number.isFinite(+cfg.sd)&&+cfg.sd>0&&Math.abs((val-+cfg.mean)/+cfg.sd)>5)issues.push('Giá trị lệch quá 5SD so với Mean/SD hiện tại.');
+  if(date&&date>isoToday())issues.push('Ngày nhập nằm trong tương lai — kiểm tra lại trước khi lưu.');
+  if(cfg.exp&&date>cfg.exp)issues.push(`Lô ${cfg.lot||'hiện tại'} đã hết hạn sử dụng từ ${vnDate(cfg.exp)} — kiểm tra lại lô QC trước khi lưu.`);
   const dup=(state.data[t.id]||[]).find(p=>!p.voided&&p.date===date&&+p.level===+cfg.level&&(p.runId||'')===runId&&(p.lot||'')===(cfg.lot||''));
   if(dup)issues.push('Đã có điểm QC cùng ngày, cùng mức, cùng lô và cùng lần chạy.');
   const latest=(cfg.meanSdHistory||[]).slice().reverse().find(h=>h.effectiveFrom)||null,ref=latest&&latest.effectiveFrom||'';

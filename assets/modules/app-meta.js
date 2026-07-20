@@ -1,8 +1,8 @@
 ﻿window.QCLAB_APP = {
   name: 'QC Lab',
-  version: '2.3.6',
+  version: '2.3.7',
   releaseDate: '2026-07-19',
-  build: 'lot-date-warning'
+  build: 'user-page-relayout'
 };
 
 // Cấu hình đám mây khi deploy (tùy chọn).

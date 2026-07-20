@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 ## What this is
 
@@ -19,8 +19,8 @@ e.g.:
 python -m http.server
 ```
 
-(`.claude/launch.json` defines a `qc-lab-static` config doing exactly that on
-port 8080, for Claude Code's browser preview.)
+(`.Codex/launch.json` defines a `qc-lab-static` config doing exactly that on
+port 8080, for Codex's browser preview.)
 
 `package.json` also carries Electron desktop packaging (`npm start` →
 `electron .`, `npm run dist` → NSIS installer via electron-builder, with

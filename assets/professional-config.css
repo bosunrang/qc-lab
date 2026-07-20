@@ -208,12 +208,8 @@
 .tea-source-card p{margin:5px 0; color:var(--muted); font-size:12px; line-height:1.4}
 .tea-source-card a{color:var(--tealink); font-size:12px; font-weight:750; text-decoration:none}
 .tea-source-card.retired{border-color:#ead6ad; background:#fffaf1}
-.tea-source-actions{display:flex; flex:1 1 auto; flex-direction:column; align-items:stretch; gap:4px; min-width:0}
-.tea-source-actions .btn{height:auto; min-height:25px; padding:4px 7px; white-space:normal; line-height:1.2}
 .tea-ref-status{display:flex; align-items:center; justify-content:center; gap:6px; min-width:0; white-space:nowrap}
 .tea-ref-status .btn{min-height:28px; padding:5px 9px}
-.rcfg-tea-source-modal{width:min(760px,94vw)}
-
 @media(max-width:900px){
   .tea-source-registry{grid-template-columns:1fr; margin-left:10px; margin-right:10px}
 }
@@ -230,16 +226,30 @@
   padding-top:8px; padding-bottom:8px;
 }
 
-.tea-ref-table th:nth-child(1),.tea-ref-table td:nth-child(1){width:22%;text-align:left;padding-left:34px}
-.tea-ref-table th:nth-child(2),.tea-ref-table td:nth-child(2){width:9%;text-align:center}
-.tea-ref-table th:nth-child(3),.tea-ref-table td:nth-child(3){width:12%;text-align:center}
-.tea-ref-table th:nth-child(4),.tea-ref-table td:nth-child(4){width:10%;text-align:center}
-.tea-ref-table th:nth-child(5),.tea-ref-table td:nth-child(5){width:10%;text-align:center}
-.tea-ref-table th:nth-child(6),.tea-ref-table td:nth-child(6){width:23%;text-align:center}
-.tea-ref-table th:nth-child(7),.tea-ref-table td:nth-child(7){width:14%;text-align:center}
+.tea-ref-table th,.tea-ref-table td{text-align:center}
+.tea-ref-table th:nth-child(1),.tea-ref-table td:nth-child(1){width:30%;text-align:left;padding-left:34px}
+.tea-ref-table th:nth-child(2),.tea-ref-table td:nth-child(2),
+.tea-ref-table th:nth-child(3),.tea-ref-table td:nth-child(3),
+.tea-ref-table th:nth-child(4),.tea-ref-table td:nth-child(4),
+.tea-ref-table th:nth-child(5),.tea-ref-table td:nth-child(5){width:12%}
+.tea-ref-table th:nth-child(6),.tea-ref-table td:nth-child(6){width:22%}
 
 .tea-ref-table input.tea-ref-value{
-  display:block; box-sizing:border-box; width:min(100%,88px); height:34px; min-height:34px; margin:0 auto; padding:4px 8px; text-align:center;
+  display:block; box-sizing:border-box; width:min(100%,88px); height:34px; min-height:34px; margin:0 auto; padding:4px 8px; border-color:transparent; background:transparent; box-shadow:none; text-align:center; cursor:text; appearance:textfield; -moz-appearance:textfield; transition:background-color .15s ease,border-color .15s ease,box-shadow .15s ease;
+}
+
+.tea-ref-table input.tea-ref-value::-webkit-inner-spin-button,
+.tea-ref-table input.tea-ref-value::-webkit-outer-spin-button{
+  margin:0; -webkit-appearance:none;
+}
+
+.tea-ref-table input.tea-ref-value:hover:not(:disabled),
+.tea-ref-table input.tea-ref-value:focus{
+  border-color:var(--line); background:var(--panel); box-shadow:0 0 0 3px rgba(11,116,125,.08);
+}
+
+.tea-ref-table input.tea-ref-value:focus{
+  border-color:var(--teal); outline:none;
 }
 
 .rcfg-modal{
@@ -689,7 +699,7 @@ aside,
 }
 
 .target-head > span:nth-child(2), .target-row > .lot-assay-name{
-  justify-content:flex-start; text-align:left;
+  justify-content:flex-start; padding-left:12px; text-align:left;
 }
 
 .target-row .tag{

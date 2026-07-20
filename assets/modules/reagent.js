@@ -84,7 +84,7 @@ function pageReagent(){
   return headOnly('So sánh 2 lô hóa chất','Sàng lọc định lượng · hồi quy mô tả · Bland-Altman · phê duyệt theo SOP')+
    `<div class="panel rc-toolbar-panel"><h3>Thiết lập so sánh</h3><div class="rc-toolbar">
      <div class="rc-toolbar-selcol"><label>Chọn hóa chất</label><select id="rcSel" onchange="rcSwitch(this.value)">${rcSelectOptions()}</select></div>
-     ${canWrite()?`<div class="rc-toolbar-primary"><div><button class="btn teal rc-add-btn" onclick="openRcCreateModal()">+ Thêm</button><button class="btn ghost btn-remove-tint rc-delete-btn" onclick="rcDeleteCurrent()">${rcToolIcon('trash')} Xóa</button></div></div>`:''}
+     ${canWrite()?`<div class="rc-toolbar-primary"><div><button class="btn teal rc-add-btn" onclick="openRcCreateModal()">+ Thêm</button><button class="btn danger rc-delete-btn" onclick="rcDeleteCurrent()">${rcToolIcon('trash')} Xóa</button></div></div>`:''}
      <div class="rc-toolbar-secondary">${canWrite()?`<button class="btn ghost rc-find-btn" onclick="openRcModal()">${rcToolIcon('search')} Tìm</button>`:''}<button class="btn ghost rc-report-btn" onclick="rcPrint()">${rcToolIcon('print')} In hóa chất này</button><button class="btn teal rc-report-main" onclick="rcPrintSummary()">${rcToolIcon('report')} Báo cáo tổng hợp</button></div></div></div>
    <div class="rc-entry-grid"><div class="panel rc-info-panel"><h3>Thông tin đánh giá</h3><div class="rc-info-grid">
      <div class="rc-field"><label>Tên hóa chất</label><input ${ro} value="${escAttr(t.reagent)}" oninput="rcMeta('reagent',this.value)" placeholder="Tên hóa chất / xét nghiệm"></div>

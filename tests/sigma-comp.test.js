@@ -33,7 +33,7 @@ assert.equal(ctx.sgInputDisplayValue(''),'');
   assert.match(source, /sgFrequencyHTML\(t,selectedRow,levels\)/, 'the QC design table follows the period selected for status');
   assert.match(source, /sg-selected-period-hint[\s\S]*?Kỳ đang xem:/, 'the QC design table identifies the period it is evaluating');
   assert.match(source, /exportSigmaPeriodXLSX\('\$\{e\.id\}'\)/, 'each period row exports its own workbook');
-  assert.match(source, /class="btn sm sg-row-delete"[\s\S]*?>Xóa<\/button>/, 'each writable period row has a labelled delete button');
+  assert.match(source, /class="btn danger sm sg-row-delete"[\s\S]*?>Xóa<\/button>/, 'each writable period row uses the labelled system-danger delete button');
   assert.doesNotMatch(source, /class="x" onclick="sgDelPeriod/, 'the obsolete icon-only period delete control is removed');
   assert.match(source, /onclick="exportSigmaPeriodsXLSX\(\)"/, 'the footer exports the combined multi-period comparison workbook');
   assert.match(source, /Xuất tổng hợp các kỳ/, 'combined export is clearly distinguished from row export');
@@ -43,16 +43,17 @@ assert.equal(ctx.sgInputDisplayValue(''),'');
   assert.doesNotMatch(source, /sg-period-actions/, 'the obsolete footer action row is removed');
   assert.doesNotMatch(source, /<button class="btn ghost sm" title="Tính Bias EQA\/EQC từ nhiều vòng"/, 'period cells no longer repeat a Bias calculation button');
   assert.match(source, /class="sg-eqa-table"/, 'EQA Bias modal uses the compact reference-style table');
-  assert.match(source, /Thêm xét nghiệm vào Six Sigma/, 'Sigma add opens an in-page assay picker');
+  assert.match(source, /Chọn hoặc thêm xét nghiệm vào Six Sigma/, 'Sigma add opens a picker that also navigates tracked assays');
   assert.match(source, /sgTrackTest/, 'Sigma picker tracks an assay selected from the shared catalog');
+  assert.match(source, /sgViewTrackedTest/, 'Sigma picker can open an already-tracked assay for inspection');
   assert.doesNotMatch(source, /sgGoAssayCatalog/, 'Sigma add no longer redirects to the assay configuration page');
   assert.match(source, /Áp dụng cho kỳ nào\?/, 'EQA Bias modal can apply the reviewed Bias to selected periods');
   assert.match(sigmaCss, /input\.sg-number:hover:not\(:disabled\)/, 'Sigma numeric inputs reveal their editor affordance on hover');
   assert.match(sigmaCss, /input\.sg-number:focus/, 'Sigma numeric inputs reveal their editor affordance on focus');
   assert.match(sigmaCss, /border-color:transparent; background:transparent;/, 'Sigma numeric inputs stay visually clean at rest');
   assert.match(sigmaCss, /\.sg-simple-table \.sg-action-col\{[\s\S]*?border-left:2px solid var\(--line\);/, 'the action column has a visible vertical separator');
-  assert.match(sigmaCss, /\.sg-row-action-buttons \.sg-row-cv\{[\s\S]*?border-color:var\(--teal\);[\s\S]*?color:var\(--teal\);/, 'lot CV action uses a teal border and teal text');
-  assert.match(sigmaCss, /\.sg-row-action-buttons \.sg-row-delete\{[\s\S]*?border-color:var\(--red\);[\s\S]*?color:var\(--red\);/, 'period delete uses a red bordered button');
+  assert.match(sigmaCss, /button\.btn\.ghost\.sg-row-cv\{[\s\S]*?border:1px solid var\(--teal\);[\s\S]*?color:var\(--teal\);/, 'lot CV action always uses a teal border and teal text');
+  assert.doesNotMatch(sigmaCss, /sg-row-delete/, 'period delete relies on the shared system-danger button without local color overrides');
   assert.match(sigmaCss, /tr\.sg-period-selected td\{[\s\S]*?background:/, 'the selected status period is visibly highlighted');
   assert.doesNotMatch(sigmaCss, /\.sg-period-radio\{/, 'the obsolete period radio styling is removed');
   assert.match(sigmaCss, /tr\.sg-period-selected td:first-child\{[\s\S]*?box-shadow:inset 4px 0 0 var\(--teal\)/, 'the selected period row is marked by the teal left stripe');
@@ -107,6 +108,17 @@ assert.equal(ctx.sgInputDisplayValue(''),'');
     sgTrackTest('T1');return{tracked:state.tests[0].sgTracked,selected:sgTest,visibleLevels:sgVisibleLevels(state.tests[0]),saved:__saved,closed:__closed,rendered:__rendered};
   })()`);
   assert.deepEqual(JSON.parse(JSON.stringify(added)),{tracked:true,selected:'T1',visibleLevels:[1,2],saved:true,closed:true,rendered:true});
+}
+
+// --- Already-tracked assays in the picker can be selected for inspection ---
+{
+  const pickerCtx=loadSandbox(['core.js','modules/state.js','modules/sigma-cohort-service.js','modules/sigma-ui-state.js','modules/sigma.js']);
+  const selected=run(pickerCtx, `(function(){
+    state.tests=[{id:'T1',name:'Glucose',sgTracked:true},{id:'T2',name:'Sodium',sgTracked:true}];sgTest='T1';
+    closeModal=function(){globalThis.__closed=true;};rerender=function(){globalThis.__rendered=true;};
+    sgViewTrackedTest('T2');return{selected:sgTest,closed:__closed,rendered:__rendered};
+  })()`);
+  assert.deepEqual(JSON.parse(JSON.stringify(selected)),{selected:'T2',closed:true,rendered:true});
 }
 
 // --- Applying a reviewed EQA Bias to selected periods only ---

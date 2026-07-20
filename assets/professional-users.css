@@ -7,47 +7,41 @@
   width:100%; min-width:0; table-layout:fixed;
 }
 
-/* .user-table only has 4 narrow columns and never needs horizontal scroll,
-   but it matches professional-base.css's generic `.panel:has(> h3:first-child
-   + table)` wide-table-scroll wrapper (built for genuinely wide tables like
-   .audit-table), which forces min-width:100% and overflow-x:auto !important
-   on it too — showing a scrollbar with empty space to scroll into. Opt this
-   table back out. */
-.panel:has(> h3:first-child + table.user-table){
-  overflow-x:hidden !important;
-}
-
-.panel > h3:first-child + table.user-table{
-  min-width:0;
-}
-
-.user-table th:nth-child(4),.user-table td:nth-child(4){
-  width:38%;white-space:normal;
-}
-
-/* Dưới 760px, cột Vai trò/Trạng thái (16% mỗi cột) hẹp hơn badge "Hoạt động"
-   (white-space:nowrap của .tag) nên chữ tràn đè lên cột Hành động bên cạnh.
-   Bốn cột không còn đủ chỗ ở bề ngang điện thoại thật — mở lại cuộn ngang đã
-   tắt ở trên thay vì để chữ chồng chéo. */
-@media(max-width:760px){
-.panel:has(> h3:first-child + table.user-table){
-  overflow-x:auto !important;
-}
-.panel > h3:first-child + table.user-table{
-  min-width:480px;
-}
-}
-
 .user-table th, .user-table td{
   padding-left:14px; padding-right:14px;
 }
 
+.user-table th:not(:first-child), .user-table td:not(:first-child){
+  text-align:center;
+}
+
+.user-table th:nth-child(1), .user-table td:nth-child(1){width:24%}
+.user-table th:nth-child(2), .user-table td:nth-child(2),
+.user-table th:nth-child(3), .user-table td:nth-child(3){width:16%}
+.user-table th:nth-child(4), .user-table td:nth-child(4){width:44%}
+
 .user-row-actions{
-  display:flex;flex-wrap:wrap;gap:6px;align-items:center;
+  display:flex;flex-wrap:nowrap;gap:6px;align-items:center;justify-content:center;white-space:nowrap;
 }
 
 .user-create-card{
   background:var(--panel); border:1px solid #dde7ec; border-radius:var(--radius-lg); overflow:hidden; box-shadow:0 1px 2px rgba(20,33,43,.05);
+}
+
+.user-create-access{
+  display:grid; gap:16px; min-width:0;
+}
+
+.user-list-section{
+  min-width:0;
+}
+
+.user-list-title{
+  margin:0 0 10px; color:var(--ink); font-size:var(--section-head-size); font-weight:800;
+}
+
+.user-table-wrap{
+  min-width:0; overflow-x:hidden;
 }
 
 .user-create-card-title{
@@ -94,8 +88,6 @@
   outline:2px solid var(--teal); outline-offset:3px; box-shadow:0 0 0 3px rgba(12,111,120,.14);
 }
 
-.rc-crit-text div,
-.rc-verdict-desc,
 .user-create-actions{
   margin-top:2px;
 }
@@ -105,16 +97,17 @@
   display:grid; grid-template-columns:minmax(280px,380px) minmax(0,1fr); gap:20px; align-items:start; margin:16px; padding:16px;
 }
 
-.user-table th:nth-child(1), .user-table td:nth-child(1){
-  width:30%
-}
-
-.user-table th:nth-child(2), .user-table td:nth-child(2), .user-table th:nth-child(3), .user-table td:nth-child(3){
-  width:16%
-}
-
 @media(max-width:980px){
 .user-create-layout{
   grid-template-columns:1fr;
+}
+}
+
+@media(max-width:760px){
+.user-table-wrap{
+  overflow-x:auto;
+}
+.user-table-wrap > .user-table{
+  min-width:760px;
 }
 }

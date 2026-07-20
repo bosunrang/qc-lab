@@ -181,7 +181,6 @@ function manageHistory(){
   </div>`;
 }
 /* ===== Bảng TEa tham chiếu (CLIA/Ricos) sửa được trong app ===== */
-let teaRefSourceCtx=null;
 function teaRefFind(refKey){const k=teaRefName(refKey);return (state.teaRefs||[]).find(r=>r.analyteId===refKey)||(state.teaRefs||[]).find(r=>teaRefName(r.name)===k);}
 function teaRefNumOrNull(v){const n=Number(v);return String(v==null?'':v).trim()!==''&&Number.isFinite(n)&&n>0?n:null;}
 function teaRefSourceMeta(name,src){const base=TEA_SOURCE_REGISTRY[src]||{},row=teaRefFind(name),custom=row&&row.sources&&row.sources[src]||{};return{...base,...Object.fromEntries(Object.entries(custom).filter(([,v])=>String(v??'').trim()!==''))};}
@@ -198,22 +197,6 @@ function teaRefEnsure(refKey){
    khi ai đó tình cờ mở lại trang đó. */
 function teaRefEdit(name,field,val){if(!requireAdmin())return;const e=teaRefEnsure(name),before=e[field];e[field]=teaRefNumOrNull(val);teaRefStampSource(e,field);logAct('Cập nhật TEa tham chiếu',`${e.name} · ${field.toUpperCase()}: ${before??'—'} → ${e[field]??'—'} · ${e.sources[field].version||'không phiên bản'}`,'Bảng TEa');if(typeof sgReconcileAllTeaSnapshots==='function')sgReconcileAllTeaSnapshots();save({clearDerived:false});rerender();}
 function teaRefRemove(refKey){if(!requireAdmin())return;const row=teaRefFind(refKey);state.teaRefs=(state.teaRefs||[]).filter(r=>r.analyteId!==refKey&&teaRefName(r.name)!==teaRefName(refKey));logAct(teaRefIsDefault(refKey)?'Khôi phục TEa mặc định':'Xóa TEa tự thêm',row&&row.name||refKey,'Bảng TEa');if(typeof sgReconcileAllTeaSnapshots==='function')sgReconcileAllTeaSnapshots();save({clearDerived:false});rerender();}
-function teaRefOpenSource(name,src){
-  const meta=teaRefSourceMeta(name,src),row=teaRefFind(name),label=teaAnalyteDisplay(row&&row.name||name,row);teaRefSourceCtx={name,src};
-  openModal(`<div class="modal rcfg-tea-source-modal"><div class="modal-h"><h3>Truy xuất nguồn ${src.toUpperCase()} — ${esc(label)}</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
-    <div class="modal-b"><div class="grid2"><div><label>Phiên bản / mã tài liệu</label><input id="trMetaVersion" value="${escAttr(meta.version||'')}"></div><div><label>Ngày hiệu lực</label>${dateBox('trMetaEffective',meta.effectiveDate||'','manage-date')}</div></div>
-      <label>Tên tài liệu</label><input id="trMetaDocument" value="${escAttr(meta.document||'')}">
-      <label>URL nguồn chính thức</label><input id="trMetaUrl" value="${escAttr(meta.url||'')}" placeholder="https://...">
-      <div class="grid2"><div><label>Người rà soát</label><input id="trMetaReviewedBy" value="${escAttr(meta.reviewedBy||userName())}"></div><div><label>Ngày rà soát</label>${dateBox('trMetaReviewedDate',meta.reviewedDate||isoToday(),'manage-date')}</div></div>
-      <label>Ghi chú áp dụng</label><textarea id="trMetaNote" rows="3">${esc(meta.note||'')}</textarea></div>
-    <div class="modal-f"><button class="btn ghost" onclick="closeModal()">Đóng</button>${role()==='admin'?'<button class="btn teal" onclick="teaRefSaveSource()">Lưu truy xuất</button>':''}</div></div>`);
-}
-async function teaRefSaveSource(){
-  if(!requireAdmin()||!teaRefSourceCtx)return;const{name,src}=teaRefSourceCtx,e=teaRefEnsure(name),url=QCCore.cleanText(document.getElementById('trMetaUrl').value,1000).trim();
-  if(url&&!/^https:\/\//i.test(url)){await infoDialog('URL nguồn phải bắt đầu bằng https://');return;}
-  e.sources=e.sources||{};e.sources[src]={id:(TEA_SOURCE_REGISTRY[src]||{}).id||'',version:QCCore.cleanText(document.getElementById('trMetaVersion').value,120),document:QCCore.cleanText(document.getElementById('trMetaDocument').value,500),url,effectiveDate:parseVN(document.getElementById('trMetaEffective').value)||'',reviewedDate:parseVN(document.getElementById('trMetaReviewedDate').value)||isoToday(),reviewedBy:QCCore.cleanText(document.getElementById('trMetaReviewedBy').value,120).trim()||userName(),status:'reviewed',note:QCCore.cleanText(document.getElementById('trMetaNote').value,5000)};
-  logAct('Cập nhật truy xuất TEa',`${e.name} · ${src.toUpperCase()} · ${e.sources[src].version||'không phiên bản'}`,'Bảng TEa');teaRefSourceCtx=null;if(typeof sgReconcileAllTeaSnapshots==='function')sgReconcileAllTeaSnapshots();save({clearDerived:false});closeModal();rerender();
-}
 function teaSourceRegistryHtml(){return`<div class="tea-source-registry">${['clia','ricos','eflm'].map(src=>{const m=TEA_SOURCE_REGISTRY[src],status=m.status==='retired'?'Nguồn cũ':m.status==='dynamic'?'Cập nhật liên tục':'Hiện hành',tagClass=m.status==='retired'?'warn':m.status==='dynamic'?'ok':'none';return`<div class="tea-source-card ${m.status}"><div><b>${esc(m.label)}</b><span class="tag ${tagClass}">${esc(status)}</span></div><p>${esc(m.version)}${m.effectiveDate?' · hiệu lực '+vnDate(m.effectiveDate):''} · rà soát ${vnDate(m.reviewedDate)}</p><a href="${escAttr(m.url)}" target="_blank" rel="noopener">Mở nguồn chính thức</a></div>`;}).join('')}</div>`;}
 function teaRefOpenAdd(){
   if(!requireAdmin())return;
@@ -258,10 +241,10 @@ function manageTeaRefs(){
     return `<tr><td><b title="${escAttr(namingTitle)}">${esc(r.displayName||r.name)}</b></td><td>${esc(r.unit||'—')}</td><td>${esc(r.section||'—')}</td>
       <td><input class="tea-ref-value" ${ro} type="number" step="any" value="${r.clia==null?'':r.clia}" onchange="teaRefEdit('${escAttr(r.analyteId)}','clia',this.value)"></td>
       <td><input class="tea-ref-value" ${ro} type="number" step="any" value="${r.ricos==null?'':r.ricos}" onchange="teaRefEdit('${escAttr(r.analyteId)}','ricos',this.value)"></td>
-      <td><div class="tea-source-actions">${['clia','ricos'].map(src=>{const m=teaRefSourceMeta(r.analyteId,src);return`<button class="btn ghost sm" onclick="teaRefOpenSource('${escAttr(r.analyteId)}','${src}')" title="${escAttr(m.document||'')}">${src.toUpperCase()} ${esc(m.version||'—')}</button>`;}).join('')}</div></td><td><div class="tea-ref-status">${kindTag[r.kind]}${act}</div></td></tr>`;
+      <td><div class="tea-ref-status">${kindTag[r.kind]}${act}</div></td></tr>`;
   }).join('');
   return manageToolbar('Bảng TEa tham chiếu','Registry v'+TEA_REFERENCE_SCHEMA_VERSION+' · CLIA PT, Ricos legacy và EFLM được quản lý theo phiên bản/truy xuất nguồn.',canManage?'teaRefOpenAdd()':'','Thêm xét nghiệm')+teaSourceRegistryHtml()+
-    `<div class="panel rcfg-list tea-ref-panel">${rows.length?`<table class="tea-ref-table"><thead><tr><th>Xét nghiệm</th><th>Đơn vị</th><th>Nhóm</th><th>TEa CLIA %</th><th>TEa Ricos %</th><th>Truy xuất nguồn</th><th>Trạng thái</th></tr></thead><tbody>${body}</tbody></table>`:(searchText(manageQ)?emptyState('Không tìm thấy','Thử từ khóa khác.'):emptyState('Chưa có bảng tham chiếu','Không có xét nghiệm nào.'))}</div>`;
+    `<div class="panel rcfg-list tea-ref-panel">${rows.length?`<table class="tea-ref-table"><thead><tr><th>Xét nghiệm</th><th>Đơn vị</th><th>Nhóm</th><th>TEa CLIA %</th><th>TEa Ricos %</th><th>Trạng thái</th></tr></thead><tbody>${body}</tbody></table>`:(searchText(manageQ)?emptyState('Không tìm thấy','Thử từ khóa khác.'):emptyState('Chưa có bảng tham chiếu','Không có xét nghiệm nào.'))}</div>`;
 }
 function manageView(){
   const views={lots:manageLots,panels:managePanels,targets:manageTargets,history:manageHistory,transitions:manageTransitionsV2,assays:manageAssays,instruments:manageInstruments,tearefs:manageTeaRefs};
