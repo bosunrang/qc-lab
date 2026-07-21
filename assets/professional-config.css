@@ -264,6 +264,47 @@
   width:min(1280px,94vw);
 }
 
+.lot-trans-modal{
+  width:min(1040px,94vw);
+}
+
+.lot-trans-modal .modal-b{
+  max-height:76vh; overflow:auto;
+}
+
+.lot-trans-target-head-row{
+  display:flex; align-items:center; gap:10px; margin-top:14px;
+}
+
+.lot-trans-target-head-row label{
+  margin:0;
+}
+
+.lot-trans-target-head-row input.lot-trans-target-search{
+  flex:0 0 220px; width:220px; max-width:45%; height:32px; margin-left:auto; padding:0 10px; border:1px solid var(--line); border-radius:var(--surface-radius); font-size:12.5px; background:var(--panel);
+}
+
+.lot-trans-target-table .target-head,.lot-trans-target-table .target-row{
+  grid-template-columns:32px 210px repeat(4,minmax(108px,1fr)) minmax(84px,.75fr);
+  column-gap:12px; width:100%; padding-left:12px; padding-right:12px;
+}
+
+.target-table.lot-trans-target-table{
+  margin-left:0; margin-right:0;
+}
+
+.lot-trans-target-table .target-head{
+  min-height:46px;
+}
+
+.lot-trans-target-table .target-head>span{
+  font-size:var(--table-head-size); line-height:1.25; white-space:normal;
+}
+
+.lot-trans-target-table .target-row input[type=number]{
+  width:104px; max-width:100%; justify-self:center;
+}
+
 .rcfg-history-detail-modal .modal-b{
   max-height:72vh; overflow:auto;
 }

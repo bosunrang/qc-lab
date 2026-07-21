@@ -242,6 +242,49 @@ function lotTargetSnapshot(t,level,lotId,lotNo){
   const h=(l.meanSdHistory||[]).slice().reverse().find(e=>(e.qcLotId?e.qcLotId===lotId:(e.lot||'')===(lotNo||''))&&Number.isFinite(+e.mean)&&Number.isFinite(+e.sd));
   return h?{mean:+h.mean,sd:+h.sd,low:h.low==null?null:+h.low,high:h.high==null?null:+h.high}:null;
 }
+/* ===== CHẠY SONG SONG 2 LÔ (lot-to-lot verification) =====
+   Khi hồ sơ chuyển tiếp ở trạng thái 'active', lô mới được chạy song song với lô
+   đang dùng để thu thập dữ liệu riêng trước khi quyết định chấp nhận.
+   Ranh giới cố ý: lô ĐANG DÙNG vẫn là lô duy nhất quyết định nhận/loại kết quả
+   bệnh nhân (activeWestgard không hề đọc lô song song); lô song song chỉ được
+   đánh giá riêng cho chính nó. Trả null nếu lô mới chưa có Mean/SD riêng —
+   không bao giờ mượn Mean/SD của lô cũ (xem applyAcceptedLotTransitionToConfig). */
+function parallelLotForLevel(t,level){
+  const l=lvlCfg(t,+level);if(!l||!l.qcLotId)return null;
+  const panel=operationalPanelForTest(t);if(!panel)return null;
+  const tr=(state.lotTransitions||[]).find(x=>x&&x.status==='active'&&x.panelId===panel.id&&x.fromLotId===l.qcLotId);
+  if(!tr)return null;
+  const lot=(state.qcLots||[]).find(x=>x.id===tr.toLotId);if(!lot||+lot.level!==+l.level)return null;
+  const snap=lotTargetSnapshot(t,l.level,lot.id,lot.lotNo);
+  if(!snap||!Number.isFinite(+snap.mean)||!(+snap.sd>0))return null;
+  return{tr,lot,lotNo:lot.lotNo||'',mean:+snap.mean,sd:+snap.sd,low:snap.low,high:snap.high,exp:lot.exp||''};
+}
+/* Cột nhập QC = cặp (mức, lô). Bình thường mỗi mức đúng 1 cột; mức nào đang có
+   lô chạy song song thì có thêm cột thứ hai cho lô mới. `key` là định danh cột
+   dùng xuyên suốt bảng nhập (thay cho `level` trước đây, vốn giả định 1 lô/mức). */
+function entryColumns(t){
+  const out=[];
+  operationalLevels(t).forEach(l=>{
+    out.push({key:String(l.level),level:l.level,lot:l.lot||'',mean:l.mean,sd:l.sd,exp:l.exp,applied:l.applied,parallel:false});
+    const par=parallelLotForLevel(t,l.level);
+    if(par)out.push({key:l.level+'|'+par.lotNo,level:l.level,lot:par.lotNo,mean:par.mean,sd:par.sd,exp:par.exp,applied:'mfg',parallel:true});
+  });
+  return out;
+}
+function entryColumnPoints(t,col,withIndex=false){
+  if(!t||!col)return[];
+  return col.parallel?pointsForLot(t.id,col.level,col.lot||'',withIndex):operationalLotPoints(t,col.level,withIndex);
+}
+/* Westgard cho lô chạy song song: chỉ xét trong nội bộ lô đó (luật within-run),
+   không ghép chuỗi với lô đang dùng và không chạy luật chéo mức — lô đang đánh
+   giá không được làm đổi kết luận của lô đang vận hành, và ngược lại. */
+function parallelWestgard(t,col){
+  const pts=entryColumnPoints(t,col,true),byPoint=new Map();
+  if(!pts.length)return{pts,byPoint};
+  const wg=QCCore.westgardByPoint(pts,col.mean,col.sd,rule=>testRuleOnWithin(t,rule));
+  pts.forEach((p,i)=>{const f=wg.F[i]||{},rules=[...new Set(f.rules||[])];byPoint.set(p.id,{level:ruleResultLevel(t,rules),rules,supportRules:[...new Set(f.supportRules||[])],z:wg.zs[i]});});
+  return{pts,byPoint};
+}
 /* Mean/SD đã lưu "Dự kiến" (chưa áp dụng) cho một lô cụ thể chưa phải lô đang
    gắn với mức — xem applyPlannedTarget()/saveTargetMatrix() trong entry-tests-actions.js. */
 function plannedTargetFor(t,lot){

@@ -172,7 +172,9 @@
   function buildSheetRowsData({levels,sheetStart,sheetEnd,sheetDays,pointsByLevel,previousPointsByLevel,pointRunNo}){
     const groupsByDate=new Map();
     (levels||[]).forEach(l=>{
-      const level=l&&l.level;
+      // `key` = định danh cột (mức+lô) khi có lô chạy song song; không có thì
+      // rơi về `level` như cũ, nên caller cũ và test cũ không phải đổi gì.
+      const level=(l&&l.key!=null)?l.key:(l&&l.level);
       const prev=(previousPointsByLevel&&previousPointsByLevel[level])||[];
       const cur=(pointsByLevel&&pointsByLevel[level])||[];
       prev.concat(cur).filter(p=>p&&p.date>=sheetStart&&p.date<=sheetEnd).forEach(p=>{

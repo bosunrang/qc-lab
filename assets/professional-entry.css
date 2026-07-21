@@ -260,6 +260,21 @@
   position:relative;
 }
 
+/* Cột/thẻ của lô đang chạy song song (lot-to-lot verification): nền hổ phách nhạt
+   để không lẫn với lô đang vận hành — lô song song không quyết định nhận/loại
+   kết quả bệnh nhân (xem parallelLotForLevel trong qc-domain.js). */
+.qc-parallel-cell{
+  background:var(--surface-warn-soft,#fdf8ee);
+}
+
+.qc-parallel-card{
+  border-color:#e6d3ab;
+}
+
+.lj-mini-parallel{
+  border-color:#e6d3ab; background:#fffdf8;
+}
+
 .qc-run-grid{
   gap:6px;
 }

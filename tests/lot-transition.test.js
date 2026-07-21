@@ -79,6 +79,43 @@ const acceptedTr = { id: 'tr1', panelId: 'p1', fromLotId: 'lotA', toLotId: 'lotB
   assert.equal(synced.qcLots.find(l => l.id === 'lotB').depleted, false);
 }
 
+// --- Case 1c: stale lot.groupId must not resurrect the retired lot into the active group on reload ---
+// Regression: accepting a transition rewired g.lotIds but left the old lot's legacy
+// groupId pointing at the active group; ensureShape()'s legacy migration then pushed
+// the old lot back in on the next load (group became "NEW/other/OLD").
+{
+  run(ctx, 'function ensureLabBrandShape(){} function normalizePointLots(){} function reconcileSigmaLevelsWithLotGroups(){return{pruned:0};} function sgReconcileAllTeaSnapshots(){}');
+  const fixture = makeFixture();
+  fixture.tests[0].levels[0].meanSdHistory.push({id:'hB',qcLotId:'lotB',lot:'LOT-B',mean:12,sd:1.2,low:9.6,high:14.4,effectiveFrom:'',effectiveTo:'',source:'mfg',planned:true,note:'Dự kiến'});
+  fixture.qcLots[0].groupId = 'g1'; // legacy pointer at the active group
+  fixture.lotTransitions = [acceptedTr];
+  fixture.machines = []; fixture.actions = []; fixture.users = [];
+  ctx.__setState(fixture);
+  ctx.applyAcceptedLotTransitionToConfig(acceptedTr);
+  const applied = getState();
+  assert.notEqual(applied.qcLots.find(l => l.id === 'lotA').groupId, 'g1', 'accept must repoint the retired lot\'s groupId away from the active group');
+  ctx.ensureShape(); // simulate next page load
+  const reloaded = getState();
+  assert.deepEqual(reloaded.lotGroups.find(g => g.id === 'g1').lotIds, ['lotB'], 'reload must not resurrect the retired lot into the active group');
+
+  // Already-corrupted saved data (pre-fix) must self-heal on load.
+  const corrupt = makeFixture();
+  corrupt.tests[0].levels[0]={...corrupt.tests[0].levels[0],qcLotId:'lotB',lot:'LOT-B',mean:12,sd:1.2};
+  corrupt.lotGroups=[
+    {id:'g1',name:'LOT-B/LOT-A',lotIds:['lotB','lotA'],active:true},
+    {id:'g2',name:'LOT-A',lotIds:['lotA'],active:false,status:'stopped',stoppedByTransitionId:'tr1'}
+  ];
+  corrupt.qcLots[0].groupId='g1'; corrupt.qcLots[0].depleted=true;
+  corrupt.lotTransitions=[acceptedTr];
+  corrupt.machines = []; corrupt.actions = []; corrupt.users = [];
+  ctx.__setState(corrupt);
+  ctx.ensureShape();
+  const healed = getState();
+  assert.deepEqual(healed.lotGroups.find(g => g.id === 'g1').lotIds, ['lotB'], 'corrupted active group must drop the retired lot on load');
+  assert.deepEqual(healed.lotGroups.find(g => g.id === 'g2').lotIds, ['lotA'], 'archived group must keep its history untouched');
+  assert.equal(healed.qcLots.find(l => l.id === 'lotA').groupId, 'g2', 'retired lot must repoint at its archived group');
+}
+
 // --- Case 1b: no Mean/SD for the new lot -> atomic refusal, no copied old target or group rewrite ---
 {
   const fixture = makeFixture();fixture.lotTransitions=[acceptedTr];ctx.__setState(fixture);

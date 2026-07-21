@@ -182,11 +182,75 @@ async function openLotTransitionV2(id=''){
   const tr=state.lotTransitions.find(x=>x.id===id)||{panelId:state.qcPanels[0]&&state.qcPanels[0].id,fromLotId:'',toLotId:'',startDate:isoToday(),status:'planned',approvedBy:'',approvedAt:''};
   const panels=`<option value="">— Chọn Panel QC —</option>`+state.qcPanels.map(p=>`<option value="${p.id}" ${p.id===tr.panelId?'selected':''}>${esc(p.name)} · ${esc(instrumentName(p.instrumentId))}</option>`).join('');
   const lotOptions=selected=>`<option value="">— Chọn lô QC —</option>`+state.qcLots.filter(l=>!l.depleted||l.id===selected).map(l=>{const to=l.depleted?lotTransitionToNo(l.id):'';return `<option value="${l.id}" ${l.id===selected?'selected':''}>${esc(l.lotNo)} · Mức ${l.level}${l.exp?' · HSD '+vnDate(l.exp):''}${l.depleted?' · '+(to?'đã chuyển tiếp qua lô '+to:'đã hết QC'):''}</option>`;}).join('');
-  openModal(`<div class="modal rcfg-modal"><div class="modal-h"><div><h3>${id?'Sửa hồ sơ chuyển lô':'Tạo hồ sơ chuyển lô'}</h3></div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
-    <label>Panel QC áp dụng</label><select id="cfgTransPanel">${panels}</select>
-    <div class="grid2"><div><label>Lô cũ</label><select id="cfgTransFrom">${lotOptions(tr.fromLotId)}</select></div><div><label>Lô mới</label><select id="cfgTransTo">${lotOptions(tr.toLotId)}</select></div></div>
-    <div class="grid2"><div><label>Ngày bắt đầu (dd/mm/yyyy)</label>${dateBox('cfgTransStart',tr.startDate||'')}</div><div><label>Trạng thái</label><select id="cfgTransStatus"><option value="planned" ${tr.status==='planned'?'selected':''}>Dự kiến</option><option value="active" ${tr.status==='active'||tr.status==='completed'?'selected':''}>Đang chạy song song</option><option value="accepted" ${tr.status==='accepted'?'selected':''}>Chấp nhận lô mới</option><option value="rejected" ${tr.status==='rejected'?'selected':''}>Không chấp nhận</option></select></div></div></div>
+  openModal(`<div class="modal rcfg-modal lot-trans-modal"><div class="modal-h"><div><h3>${id?'Sửa hồ sơ chuyển lô':'Tạo hồ sơ chuyển lô'}</h3></div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
+    <label>Panel QC áp dụng</label><select id="cfgTransPanel" onchange="refreshLotTransitionTargets()">${panels}</select>
+    <div class="grid2"><div><label>Lô cũ</label><select id="cfgTransFrom" onchange="refreshLotTransitionTargets()">${lotOptions(tr.fromLotId)}</select></div><div><label>Lô mới</label><select id="cfgTransTo" onchange="refreshLotTransitionTargets()">${lotOptions(tr.toLotId)}</select></div></div>
+    <div class="grid2"><div><label>Ngày bắt đầu (dd/mm/yyyy)</label>${dateBox('cfgTransStart',tr.startDate||'')}</div><div><label>Trạng thái</label><select id="cfgTransStatus"><option value="planned" ${tr.status==='planned'?'selected':''}>Dự kiến</option><option value="active" ${tr.status==='active'||tr.status==='completed'?'selected':''}>Đang chạy song song</option><option value="accepted" ${tr.status==='accepted'?'selected':''}>Chấp nhận lô mới</option><option value="rejected" ${tr.status==='rejected'?'selected':''}>Không chấp nhận</option></select></div></div>
+    <div id="cfgTransTargets">${lotTransitionTargetsHtml(tr.panelId,tr.fromLotId,tr.toLotId)}</div>
+    </div>
     <div class="modal-f"><button class="btn ghost" onclick="closeModal()">Hủy</button><button class="btn teal" onclick="saveLotTransitionV2('${id}')">Lưu hồ sơ</button></div></div>`);
+}
+/* Bảng Mean/SD nhúng ngay trong hồ sơ chuyển lô — cùng danh sách xét nghiệm mà
+   inspectAcceptedLotTransition() sẽ kiểm tra lúc chấp nhận, để không lệch tiêu
+   chí giữa lúc nhập và lúc chặn. Chỉ đọc/hiển thị; refreshLotTransitionTargets()
+   render lại đúng vùng này mỗi khi đổi Panel/Lô cũ/Lô mới, không đụng phần còn
+   lại của modal (giữ giá trị người dùng đã gõ ở Ngày/Trạng thái). */
+function lotTransitionTargetsHtml(panelId,fromLotId,toLotId){
+  if(!panelId||!fromLotId||!toLotId||fromLotId===toLotId)return `<div class="hint" style="margin-top:12px">Chọn Panel QC, Lô cũ và Lô mới (khác nhau, cùng mức) để nhập Mean/SD cho lô mới.</div>`;
+  const check=inspectAcceptedLotTransition({panelId,fromLotId,toLotId,status:'accepted'});
+  if(!check.valid)return `<div class="hint" style="margin-top:12px">Lô cũ và lô mới phải cùng mức QC.</div>`;
+  if(!check.rows.length)return `<div class="hint" style="margin-top:12px">Panel đã chọn không có xét nghiệm nào đang dùng lô cũ ${esc(check.from.lotNo)}.</div>`;
+  const rows=check.rows.map(({t,nextHist})=>{
+    const draft=targetRangeDraft(nextHist||{}),has=Number.isFinite(draft.mean)&&((Number.isFinite(draft.sd)&&draft.sd>0)||(Number.isFinite(draft.low)&&Number.isFinite(draft.high)));
+    return `<div class="target-row" data-test="${t.id}">
+      <label class="lot-assay-check"><input type="checkbox" checked disabled><span></span></label>
+      <div class="lot-assay-name"><b>${esc(testDisplayName(t))}</b><small>${esc(t.unit||'Chưa có đơn vị')}</small></div>
+      <input class="tm-mean" type="number" step="any" value="${escAttr(targetNumberText(draft.mean))}" placeholder="Trung bình" oninput="syncTargetRange(this,'target')">
+      <input class="tm-low" type="number" step="any" value="${escAttr(targetNumberText(draft.low))}" placeholder="Giới hạn dưới" oninput="syncTargetRange(this,'limits')">
+      <input class="tm-high" type="number" step="any" value="${escAttr(targetNumberText(draft.high))}" placeholder="Giới hạn trên" oninput="syncTargetRange(this,'limits')">
+      <input class="tm-sd" type="number" step="any" value="${escAttr(targetNumberText(draft.sd))}" placeholder="Độ lệch chuẩn" oninput="syncTargetRange(this,'target')">
+      <span>${has?'<b class="tag ok">Đã nhập</b>':'<b class="tag none">Chưa nhập</b>'}</span>
+    </div>`;
+  }).join('');
+  return `<div class="lot-trans-target-head-row"><label>Mean/SD cho lô mới ${esc(check.to.lotNo)}</label><input type="search" class="lot-trans-target-search" placeholder="Tìm xét nghiệm..." oninput="filterLotTransitionTargets(this.value)"></div>
+    <div class="target-table lot-trans-target-table"><div class="target-head"><span></span><span>Xét nghiệm</span><span>Trung bình mục tiêu</span><span>Giới hạn dưới</span><span>Giới hạn trên</span><span>Độ lệch chuẩn</span><span>Trạng thái</span></div>${rows}</div>`;
+}
+/* Lọc thuần DOM (ẩn/hiện .target-row), không render lại — nếu gọi lại
+   lotTransitionTargetsHtml() ở đây sẽ xóa mất giá trị người dùng đang gõ dở ở
+   các dòng khác. */
+function filterLotTransitionTargets(term){
+  const q=searchText(term||'');
+  document.querySelectorAll('#cfgTransTargets .target-row').forEach(row=>{
+    const name=row.querySelector('.lot-assay-name b');
+    row.style.display=(!q||searchText(name?name.textContent:'').includes(q))?'':'none';
+  });
+}
+function refreshLotTransitionTargets(){
+  const panelId=document.getElementById('cfgTransPanel').value,fromLotId=document.getElementById('cfgTransFrom').value,toLotId=document.getElementById('cfgTransTo').value;
+  const el=document.getElementById('cfgTransTargets');if(el)el.innerHTML=lotTransitionTargetsHtml(panelId,fromLotId,toLotId);
+}
+/* Đọc bảng Mean/SD nhúng trong modal chuyển lô. Dòng để trống hoàn toàn (cả 4 ô)
+   được bỏ qua, không báo lỗi — cho phép lưu hồ sơ ở trạng thái Dự kiến/Đang chạy
+   song song mà chưa cần điền đủ; chỉ khi "Chấp nhận lô mới" mới bắt buộc đủ,
+   thông qua inspectAcceptedLotTransition() chạy sau bước này. */
+async function readLotTransitionTargetPicks(rows){
+  const picks=[];
+  for(const{t}of rows){
+    const row=document.querySelector(`#cfgTransTargets .target-row[data-test="${t.id}"]`);if(!row){picks.push({t,use:false});continue;}
+    const meanRaw=row.querySelector('.tm-mean').value.trim(),lowRaw=row.querySelector('.tm-low').value.trim(),highRaw=row.querySelector('.tm-high').value.trim(),sdRaw=row.querySelector('.tm-sd').value.trim();
+    if(!meanRaw&&!lowRaw&&!highRaw&&!sdRaw){picks.push({t,use:false});continue;}
+    let mean=meanRaw===''?null:parseFloat(meanRaw),low=lowRaw===''?null:parseFloat(lowRaw),high=highRaw===''?null:parseFloat(highRaw),sd=sdRaw===''?null:parseFloat(sdRaw);
+    const fromLimits=QCCore.targetFromLimits(low,high);
+    if(fromLimits){if(!Number.isFinite(mean))mean=fromLimits.mean;if(!Number.isFinite(sd)||sd<=0)sd=fromLimits.sd;}
+    if(!Number.isFinite(mean)){await infoDialog(`${testDisplayName(t)}: nhập trung bình mục tiêu hợp lệ cho lô mới.`);return null;}
+    if((lowRaw!==''&&!Number.isFinite(low))||(highRaw!==''&&!Number.isFinite(high))){await infoDialog(`${testDisplayName(t)}: giới hạn dưới/trên phải là số hợp lệ.`);return null;}
+    if((lowRaw!==''||highRaw!=='')&&(!Number.isFinite(low)||!Number.isFinite(high)||high<=low)){await infoDialog(`${testDisplayName(t)}: nếu nhập giới hạn, cần nhập đủ giới hạn dưới và trên; giới hạn trên phải lớn hơn giới hạn dưới.`);return null;}
+    if(sdRaw!==''&&(!Number.isFinite(sd)||sd<=0)){await infoDialog(`${testDisplayName(t)}: độ lệch chuẩn phải là số lớn hơn 0.`);return null;}
+    if((sd==null||!Number.isFinite(sd))&&Number.isFinite(low)&&Number.isFinite(high))sd=(high-low)/4; // ±2SD only — xem readTargetMatrixPicks()
+    if(!Number.isFinite(sd)||sd<=0){await infoDialog(`${testDisplayName(t)}: cần độ lệch chuẩn, hoặc đủ giới hạn dưới/trên để ước tính SD.`);return null;}
+    picks.push({t,use:true,mean,low,high,sd});
+  }
+  return picks;
 }
 async function saveLotTransitionV2(id){
   if(!requireAdmin())return;
@@ -197,7 +261,12 @@ async function saveLotTransitionV2(id){
   const old=state.lotTransitions.find(x=>x.id===id),nowFinal=['accepted','rejected'].includes(status),finalChanged=nowFinal&&(!old||old.status!==status);
   if(old&&transitionSwitchesLot(old)&&status!=='accepted'){await infoDialog('Hồ sơ đã chấp nhận lô mới và đã áp dụng vào nhóm lô/Mean-SD, không thể đổi ngược trạng thái.');return;}
   const data={panelId,fromLotId,toLotId,startDate:startDate||isoToday(),status,criteria:old&&old.criteria||'',conclusion:old&&old.conclusion||'',approvedBy:finalChanged?userName():(old&&old.approvedBy||''),approvedAt:finalChanged?new Date().toISOString():(old&&old.approvedAt||''),note:old&&old.note||''};
-  if(status==='accepted'&&finalChanged){const check=inspectAcceptedLotTransition(data);if(!check.rows.length){await infoDialog('Panel đã chọn không có xét nghiệm nào đang sử dụng lô cũ. Hãy kiểm tra lại Panel và lô chuyển tiếp.');return;}if(check.missing.length){await infoDialog(`Chưa thể chấp nhận lô mới: ${check.missing.map(x=>testDisplayName(x.t)).join(', ')} chưa có Mean/SD riêng cho lô ${toLot.lotNo}. Hãy lưu Mean/SD ở chế độ “Dự kiến” trước.`);return;}}
+  const targetCheck=inspectAcceptedLotTransition({panelId,fromLotId,toLotId,status:'accepted'});
+  if(targetCheck.valid&&targetCheck.rows.length){
+    const picks=await readLotTransitionTargetPicks(targetCheck.rows);if(picks===null)return;
+    picks.forEach(pick=>{if(pick.use)applyPlannedTarget(pick.t,toLot,pick,'Nhập khi tạo hồ sơ chuyển lô');});
+  }
+  if(status==='accepted'&&finalChanged){const check=inspectAcceptedLotTransition(data);if(!check.rows.length){await infoDialog('Panel đã chọn không có xét nghiệm nào đang sử dụng lô cũ. Hãy kiểm tra lại Panel và lô chuyển tiếp.');return;}if(check.missing.length){await infoDialog(`Chưa thể chấp nhận lô mới: ${check.missing.map(x=>testDisplayName(x.t)).join(', ')} chưa có Mean/SD hợp lệ cho lô ${toLot.lotNo}. Hãy điền đủ ở bảng Mean/SD phía trên rồi lưu lại.`);return;}}
   const tr=old?Object.assign(old,data):{id:uid(),...data};if(!old)state.lotTransitions.push(tr);
   const switched=applyAcceptedLotTransitionToConfig(tr);
   const wasDepleted=!!(state.qcLots.find(l=>l.id===fromLotId)||{}).depleted;

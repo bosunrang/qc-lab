@@ -96,6 +96,10 @@ const restoredFilters = run(ctx, `
 assert.deepEqual(JSON.parse(JSON.stringify(restoredFilters)), ['dash:glucose','entry:lot-01']);
 assert.equal(run(ctx,"entryLotLabels([{lot:'1101'},{lot:'1102'}])"),'1101 / 1102');
 assert.equal(run(ctx,"entryLotLabels([])"),'Chưa gán lô');
-assert.ok(run(ctx,"String(pageEntry).includes('entryLotLabels(opLevels)')"),'entry lot heading must use operational levels only');
+// Tiêu đề lô đi qua entryColumns() (dựng từ operationalLevels + lô đang chạy song
+// song), không bao giờ từ t.levels thô — giữ nguyên ý ban đầu của guard này.
+// Vế "entryColumns chỉ dựng từ operationalLevels" được khoá ở parallel-lot-run.test.js,
+// vì qc-domain.js không nằm trong sandbox của file này.
+assert.ok(run(ctx,"String(pageEntry).includes('entryLotLabels(entryCols)')"),'entry lot heading must use entry columns');
 
 console.log('Partial render helper tests passed');

@@ -108,6 +108,11 @@ function ensureConfigurationShape(){
   }
   state.lotGroups.forEach(g=>{g.lotIds=Array.isArray(g.lotIds)?[...new Set(g.lotIds)].filter(id=>state.qcLots.some(l=>l.id===id)):[];});
   state.qcLots.forEach(l=>{if(l.groupId){const g=state.lotGroups.find(x=>x.id===l.groupId);if(g&&!g.lotIds.includes(l.id))g.lotIds.push(l.id);}});
+  /* Chữa dữ liệu hỏng do groupId cũ (kể cả bản đã lưu trước fix): trong nhóm ĐANG
+     hoạt động, một lô đã bị chuyển tiếp (accepted) không được đứng cạnh chính lô
+     thay thế nó — chỗ của nó là nhóm lưu trữ. Nhóm active:false giữ nguyên lịch sử. */
+  {const retiredTo=new Map((state.lotTransitions||[]).filter(transitionSwitchesLot).map(x=>[String(x.fromLotId),String(x.toLotId)]));
+   state.lotGroups.forEach(g=>{if(g.active===false)return;g.lotIds=(g.lotIds||[]).filter(id=>{const to=retiredTo.get(String(id));return !(to&&(g.lotIds||[]).some(x=>String(x)===to));});});}
   state.lotGroups.forEach(g=>{g.lotIds=[...new Set(g.lotIds||[])].filter(id=>state.qcLots.some(l=>l.id===id));});
   state.qcLots.forEach(l=>{const g=state.lotGroups.find(x=>(x.lotIds||[]).includes(l.id));l.groupId=g?g.id:'';});
   state.assayGroups.forEach(g=>{g.testIds=Array.isArray(g.testIds)?g.testIds.filter(id=>state.tests.some(t=>t.id===id)):[];});
@@ -184,6 +189,10 @@ function applyAcceptedLotTransitionToConfig(tr){
   });
   if(removeGroups.size)state.lotGroups=state.lotGroups.filter(g=>!removeGroups.has(g.id));
   normalizeLotGroups();
+  /* Đồng bộ lại lot.groupId ngay sau khi tráo nhóm: nếu để lô cũ vẫn trỏ groupId
+     về nhóm đang hoạt động, bước di trú legacy trong ensureShape() sẽ "phục hồi"
+     lô cũ vào lại nhóm ở lần tải sau (nhóm thành 1111/1102/1101). */
+  state.qcLots.forEach(l=>{const g=state.lotGroups.find(x=>(x.lotIds||[]).includes(l.id));l.groupId=g?g.id:'';});
   let count=0;
   rows.forEach(({cfg,nextHist})=>{
     if(Number.isFinite(+cfg.mean)&&Number.isFinite(+cfg.sd)&&+cfg.sd>0)upsertLotTargetHistory(cfg,from,{mean:+cfg.mean,sd:+cfg.sd,low:cfg.low==null?null:+cfg.low,high:cfg.high==null?null:+cfg.high,effectiveFrom:(cfg.meanSdHistory||[]).find(h=>h.qcLotId===from.id)?.effectiveFrom||'',effectiveTo:tr.startDate||from.exp||'',source:cfg.applied||'mfg',planned:false,note:'Trước chuyển tiếp lô'});

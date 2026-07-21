@@ -89,4 +89,29 @@ assert.ok(expiryResult.afterExpiry.some(x => x.includes('LOT-Y') && x.includes('
 assert.ok(!expiryResult.onExpiry.some(x => x.includes('hết hạn')), 'the expiry date itself is not flagged (still within HSD)');
 assert.ok(!expiryResult.beforeExpiry.some(x => x.includes('hết hạn')), 'a result before expiry is not flagged');
 
+/* Mean/SD "Dự kiến" của một lô khác (lô chạy song song, hoặc lô chuẩn bị chuyển
+   tiếp) chưa được áp dụng nên không có effectiveFrom/To — không được coi là giai
+   đoạn đang có hiệu lực, nếu không sẽ cảnh báo sai cho chính lô đang chạy. */
+const plannedCfg = {
+  level: 1, qcLotId: 'lotLive', lot: 'LIVE', mean: 141, sd: 2.5, exp: '', meanSdHistory: [
+    { id: 'h1', qcLotId: 'lotNew', lot: 'NEW', mean: 150, sd: 3, effectiveFrom: '', effectiveTo: '', planned: true },
+  ],
+};
+const appliedCfg = {
+  level: 1, qcLotId: 'lotLive', lot: 'LIVE', mean: 141, sd: 2.5, exp: '', meanSdHistory: [
+    { id: 'h2', qcLotId: 'lotOld', lot: 'OLD', mean: 140, sd: 2.4, effectiveFrom: '', effectiveTo: '2026-07-01', planned: false },
+  ],
+};
+const plannedBuilt = run(ctx, `(function(){
+  state = { data: { T1: [] } };
+  const t = { id: 'T1' };
+  return {
+    planned: qcPointWarnings(t, ${JSON.stringify(plannedCfg)}, '2026-07-21', 'r-1', 141),
+    appliedInsidePeriod: qcPointWarnings(t, ${JSON.stringify(appliedCfg)}, '2026-06-15', 'r-1', 141),
+  };
+})()`);
+const plannedResult = plain(plannedBuilt);
+assert.ok(!plannedResult.planned.some(x => x.includes('thuộc giai đoạn')), 'a planned (not yet applied) target for another lot must not be treated as an active period');
+assert.ok(plannedResult.appliedInsidePeriod.some(x => x.includes('thuộc giai đoạn') && x.includes('OLD')), 'a genuinely applied period of another lot is still flagged');
+
 console.log('QC point warnings tests passed');

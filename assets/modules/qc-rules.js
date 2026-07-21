@@ -21,6 +21,10 @@ function qcPointWarnings(t,cfg,date,runId,val){
      cảnh báo khác ở trên. */
   const otherLot=(cfg.meanSdHistory||[]).find(h=>{
     if(!h||(h.qcLotId?h.qcLotId===cfg.qcLotId:(h.lot||'')===(cfg.lot||'')))return false;
+    /* Bản ghi "Dự kiến" (lô mới đã nhập Mean/SD nhưng CHƯA áp dụng — lô chạy song
+       song hoặc lô chuẩn bị chuyển tiếp) không có effectiveFrom/To, nếu không loại
+       ra sẽ bị hiểu là đang có hiệu lực và cảnh báo sai cho chính lô đang chạy. */
+    if(h.planned)return false;
     if(h.effectiveFrom&&date<h.effectiveFrom)return false;
     if(h.effectiveTo&&date>=h.effectiveTo)return false;
     return true;
