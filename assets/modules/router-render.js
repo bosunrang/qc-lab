@@ -793,7 +793,7 @@ function pageWestgard(){
     <tr><td>12x</td><td>12 điểm liên tiếp nằm cùng một phía so với Mean</td><td><span class="rej">Loại bỏ</span></td><td>Biến thể ít nhạy hơn 8x/10x, dùng để theo dõi bias dài hơn.</td></tr>
     <tr><td>7T</td><td>7 điểm tăng dần hoặc giảm dần liên tiếp</td><td><span class="warn">Cảnh báo</span></td><td>Theo dõi xu hướng, kiểm tra bảo quản QC, thuốc thử, môi trường.</td></tr>
   </tbody></table></div></details>`;
-  const printBtn=wgChartMode==='lj'?'<div><label>&nbsp;</label><button class="btn ghost sm" onclick="printWestgard()" title="Tạo bản in PDF/HTML biểu đồ Levey-Jennings và các vi phạm đang xem">'+icoPrint()+'In PDF</button></div>':'';
+  const printBtn=wgChartMode==='lj'?'<div><label>&nbsp;</label><button class="btn wg-print-btn" onclick="printWestgard()" title="Tạo bản in PDF/HTML biểu đồ Levey-Jennings và các vi phạm đang xem">'+icoPrint()+'In PDF</button></div>':'';
   return headOnly('Phân tích Westgard','Đối chiếu luật theo mức QC, lô và lần chạy')+
    `<div class="panel"><h3>Thiết lập phân tích</h3>${wgViewModeTabs(archivedGroups)}<div class="wg-test-picker${printBtn?' wg-test-picker-3':''}"><div><label>Tìm nhanh</label><input id="wgTestSearch" type="search" placeholder="Tên xét nghiệm, LOT hoặc máy..." value="${escAttr(wgTestQ)}" oninput="wgFilterTests(this.value)"></div><div><label>Chọn xét nghiệm <span id="wgTestCount" class="hint">(${matched.length}/${tests.length})</span></label><select id="wgTestSelect" ${matched.length?'':'disabled'} onchange="if(this.value){selTest=this.value;rerender()}">${opts}</select></div>${printBtn}</div>
      <div class="wg-rules"><b style="font-size:12px">Cấu hình chung của luật</b><div style="margin-top:6px">${ruleToggles}</div></div>

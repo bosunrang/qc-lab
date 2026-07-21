@@ -23,6 +23,14 @@
   grid-template-columns:minmax(200px,0.9fr) minmax(220px,1fr) minmax(240px,1.05fr); max-width:1100px;
 }
 
+.wg-test-picker .wg-print-btn{
+  width:auto; min-height:38px; padding:8px 9px; background:var(--teal); border:1px solid var(--teal-deep); color:var(--on-accent);
+}
+
+.wg-test-picker .wg-print-btn:hover{
+  background:var(--teal-deep); border-color:var(--teal-deep); color:var(--on-accent);
+}
+
 .wg-rules{
   margin:12px 16px 0;
 }

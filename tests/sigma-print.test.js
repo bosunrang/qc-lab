@@ -17,6 +17,7 @@ run(ctx, `
   function sgVisibleLevels(){return[1,2];}
   function sgRows(){return[{e:__entry,rs:[__metric,null]}];}
   function sigmaReportRows(){return[{period:'07/2026'}];}
+  function sigmaExportPeriods(){return'07/2026';}
   function sigmaTeaTrace(){return'EFLM · Analyte: Sodium';}
   function vnPeriod(){return'07/2026';}
   function instrumentName(){return'Máy A';}
@@ -44,8 +45,15 @@ assert.match(rowHtml, /Chưa đủ CV IQC và Bias EQA\/EQC/);
   assert.match(printed.body, /id="sigma-chart"/);
   assert.match(printed.body, /id="mdc-chart"/);
 
+  await ctx.printSigmaPeriods();
+  const combined = JSON.parse(run(ctx, 'JSON.stringify(__printed)'));
+  assert.equal(combined.options.landscape, true, 'combined Sigma reports should print on A4 landscape');
+  assert.match(combined.title, /tổng hợp Six Sigma theo kỳ/i);
+  assert.match(combined.body, /So sánh kết quả Six Sigma theo kỳ/);
+
   const sigmaSource = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'sigma.js'), 'utf8');
   assert.match(sigmaSource, /onclick="printSigmaPeriod\('\$\{e\.id\}'\)"/);
+  assert.match(sigmaSource, /onclick="printSigmaPeriods\(\)"/);
   assert.match(sigmaSource, />\$\{printIcon\}In PDF<\/button>/);
   console.log('Sigma period print tests passed');
 })().catch(error=>{console.error(error);process.exitCode=1;});

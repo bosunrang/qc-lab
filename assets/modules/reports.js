@@ -22,6 +22,9 @@ async function openPrint(title,bodyHtml,options={}){
 function sigmaPeriodPrintRows(row,levels){
   return(levels||[]).map((level,i)=>{const r=row&&row.rs&&row.rs[i];if(!r)return'<tr><td>Mức '+level+'</td><td colspan="9" class="muted">Chưa đủ CV IQC và Bias EQA/EQC để tính Sigma</td></tr>';const source=r.cvSource==='iqc-period'||r.cvSource==='iqc-cohort'?((r.n||0)+' điểm'+(r.sourceLot?' · Lô '+esc(r.sourceLot):'')):'Nhập tay',sigma=(r.classifiable?'':'≈')+fmt(r.sigma,2);return'<tr><td><b>Mức '+level+'</b></td><td class="num">'+fmt(r.tea,2)+'</td><td class="num"><b style="color:'+escAttr(r.c)+'">'+sigma+'</b></td><td><span class="pill" style="color:'+escAttr(r.c)+'">'+esc(r.label)+'</span></td><td class="num">'+fmt(r.cv,2)+'</td><td class="num">'+fmt(r.bias,2)+'</td><td class="num">'+sgFmtDPMO(r.dpmo)+'</td><td class="num">'+fmt(r.yld,4)+'%</td><td>'+source+'</td><td>'+esc(r.readinessLabel||r.cohortStatus||'—')+'</td></tr>';}).join('');
 }
+function sigmaPeriodsPrintRows(rows,levels){
+  return(rows||[]).flatMap(row=>{const period=vnPeriod(row.e.period)||row.e.period||'?';return(levels||[]).map((level,i)=>{const r=row.rs&&row.rs[i];if(!r)return'<tr><td><b>'+esc(period)+'</b></td><td>Mức '+level+'</td><td colspan="9" class="muted">Chưa đủ CV IQC và Bias EQA/EQC để tính Sigma</td></tr>';const source=r.cvSource==='iqc-period'||r.cvSource==='iqc-cohort'?((r.n||0)+' điểm'+(r.sourceLot?' · Lô '+esc(r.sourceLot):'')):'Nhập tay',sigma=(r.classifiable?'':'≈')+fmt(r.sigma,2);return'<tr><td><b>'+esc(period)+'</b></td><td><b>Mức '+level+'</b></td><td class="num">'+fmt(r.tea,2)+'</td><td class="num"><b style="color:'+escAttr(r.c)+'">'+sigma+'</b></td><td><span class="pill" style="color:'+escAttr(r.c)+'">'+esc(r.label)+'</span></td><td class="num">'+fmt(r.cv,2)+'</td><td class="num">'+fmt(r.bias,2)+'</td><td class="num">'+sgFmtDPMO(r.dpmo)+'</td><td class="num">'+fmt(r.yld,4)+'%</td><td>'+source+'</td><td>'+esc(r.readinessLabel||r.cohortStatus||'—')+'</td></tr>';});}).join('');
+}
 async function printSigmaPeriod(periodId){
   const t=state.tests.find(x=>x.id===sgTest),entry=t&&sgData(t.id).find(x=>x.id===periodId);if(!t||!entry){await infoDialog('Chưa chọn được kỳ Sigma để in.');return;}
   const levels=sgVisibleLevels(t),row=sgRows(t,[entry],levels)[0],exportRows=sigmaReportRows(t.id,'period',entry.period,entry.id);if(!row||!row.rs.some(Boolean)||!exportRows.length){await infoDialog('Kỳ này chưa đủ dữ liệu Sigma để tạo báo cáo in.');return;}
@@ -33,6 +36,17 @@ async function printSigmaPeriod(periodId){
   if(valid.length)body+='<div class="rpt-chart-grid"><div class="rpt-card rpt-chart"><h3>Biểu đồ Sigma</h3><div class="body">'+sgTrendSVG(t,valid,levels)+'</div></div><div class="rpt-card rpt-chart"><h3>Biểu đồ Quyết định Phương pháp (MDC)</h3><div class="body">'+sgMDCSVG(t,valid,levels)+'</div></div></div>';
   else body+='<p class="soft-note">Kỳ này chưa có mức đủ điều kiện phân loại để vẽ biểu đồ Sigma và MDC.</p>';
   body+=signBlock();await openPrint('Báo cáo Six Sigma — '+testDisplayName(t)+' — '+period,body,{landscape:true});
+}
+async function printSigmaPeriods(){
+  const t=state.tests.find(x=>x.id===sgTest);if(!t){await infoDialog('Chưa chọn xét nghiệm để in.');return;}
+  const levels=sgVisibleLevels(t),rows=sgRows(t,sgData(t.id),levels),exportRows=sigmaReportRows(t.id,'all');if(!rows.some(row=>row.rs.some(Boolean))||!exportRows.length){await infoDialog('Xét nghiệm này chưa có kỳ Sigma đủ dữ liệu để tạo báo cáo in tổng hợp.');return;}
+  const valid=rows.filter(row=>row.rs.some(r=>r&&r.classifiable)),periods=sigmaExportPeriods(exportRows),trace=sigmaTeaTrace(exportRows),machine=instrumentName(t.instrumentId,t.machine)||t.machine||'—';
+  let body=reportHeader('BÁO CÁO TỔNG HỢP SIX SIGMA THEO KỲ — '+esc(testDisplayName(t)),'So sánh hiệu năng phương pháp giữa các kỳ đánh giá');
+  body+='<table><tr><th style="width:18%">Xét nghiệm</th><td>'+esc(testDisplayName(t))+(t.unit?' · '+esc(t.unit):'')+'</td><th style="width:15%">Các kỳ báo cáo</th><td>'+esc(periods||'—')+'</td></tr><tr><th>Thiết bị</th><td>'+esc(machine)+'</td><th>Nguồn TEa</th><td>'+esc(trace||'Chưa có thông tin truy xuất')+'</td></tr></table>';
+  body+='<div class="rpt-card"><h3>So sánh kết quả Six Sigma theo kỳ</h3><div class="body"><table><tr><th>Kỳ</th><th>Mức</th><th>TEa (%)</th><th>Sigma</th><th>Xếp loại</th><th>CV IQC (%)</th><th>Bias EQA (%)</th><th>DPMO</th><th>Yield</th><th>Nguồn CV</th><th>Trạng thái dữ liệu</th></tr>'+sigmaPeriodsPrintRows(rows,levels)+'</table><p class="soft-note">DPMO và Yield là quy đổi tham khảo với dịch 1,5σ. CV nhập tay vẫn được tính Sigma nhưng không dùng để tự động đề xuất thiết kế QC.</p></div></div>';
+  if(valid.length)body+='<div class="rpt-chart-grid"><div class="rpt-card rpt-chart"><h3>Xu hướng Sigma theo kỳ</h3><div class="body">'+sgTrendSVG(t,valid,levels)+'</div></div><div class="rpt-card rpt-chart"><h3>Biểu đồ Quyết định Phương pháp (MDC)</h3><div class="body">'+sgMDCSVG(t,valid,levels)+'</div></div></div>';
+  else body+='<p class="soft-note">Các kỳ hiện có chưa đủ điều kiện phân loại để vẽ biểu đồ Sigma và MDC.</p>';
+  body+=signBlock();await openPrint('Báo cáo tổng hợp Six Sigma theo kỳ — '+testDisplayName(t),body,{landscape:true});
 }
 /* In trang Phân tích Westgard đang xem (mức/lô đang chọn, kể cả "xem lô cũ").
    Chỉ in bảng VI PHẠM/cảnh báo (không phải toàn bộ điểm) vì trang này không có

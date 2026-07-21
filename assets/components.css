@@ -226,8 +226,6 @@ button.btn.ghost{background:var(--panel); border:1px solid var(--line)}
 button.btn.ghost:hover{background:#f6fafb; border-color:#c9d6dc}
 button.btn.ghost.btn-stop-tint{color:#b5453c}
 button.btn.ghost.btn-stop-tint:hover{color:#9e3b34}
-button.btn.ghost.btn-teal-tint{color:var(--teal); border-color:var(--teal)}
-button.btn.ghost.btn-teal-tint:hover{background:#eef7f6}
 .btn-ico{width:15px; height:15px; flex:0 0 auto}
 
 table{font-size:var(--table-body-size); line-height:1.45}

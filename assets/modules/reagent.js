@@ -3,7 +3,6 @@ const RC_MIN_PAIRS=5;
 /* palette khớp design token trong app.css; dùng cho SVG/báo cáo (in ở document riêng, không đọc được var()) */
 const RCC={teal:'#0c6f78',tealDeep:'#0a5d65',ink:'#172833',muted:'#667b89',line:'#d4dde3',grid:'#e9eff3',red:'#a43a33',amber:'#a36f15',green:'#087044',okBg:'#e3f3f0',okFg:'#0a5e67',midBg:'#fbf0db',midFg:'#a36f15',noBg:'#f7e4e2',noFg:'#a43a33'};
 const RCPAD={l:54,r:18,t:18,b:46};
-const reagentUiState=ReagentUIState;
 function rcBlank(){return {id:uid(),test:{reagent:'Hóa chất mới',lotOld:'',lotNew:'',date:'',operator:'',sampleType:'Mẫu bệnh nhân',unit:'',biasTarget:6,alpha:0.05,coverageConfirmed:false},rows:[['',''],['',''],['',''],['',''],['','']]};}
 function rcLabel(d){const t=d.test;let s=teaAnalyteDisplay(t.reagent)||t.reagent||'Hóa chất mới';if(t.lotOld||t.lotNew)s+=' — '+(t.lotOld||'?')+'→'+(t.lotNew||'?');return s;}
 function rcAct(){return state.reagentTests.find(d=>d.id===rcId);}

@@ -452,7 +452,7 @@ main{
   margin-left:auto;
 }
 
-.grid2, .grid3, .grid4{
+.grid2, .grid4{
   grid-template-columns:1fr;
 }
 }
@@ -527,7 +527,7 @@ nav button:hover{
   margin-top:5px; color:var(--muted); font-size:13px; max-width:72ch; font-weight:500;
 }
 
-.panel > .grid2:first-child, .panel > .grid3:first-child, .panel > .grid4:first-child{
+.panel > .grid2:first-child, .panel > .grid4:first-child{
   margin:16px 16px 0 !important;
 }
 
@@ -692,7 +692,7 @@ nav button{
   min-height:40px; padding:8px 12px; font-size:12.5px;
 }
 
-.panel > .grid2:first-child, .panel > .grid3:first-child, .panel > .grid4:first-child{
+.panel > .grid2:first-child, .panel > .grid4:first-child{
   margin:12px 12px 0 !important;
 }
 

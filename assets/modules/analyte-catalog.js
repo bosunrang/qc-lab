@@ -78,4 +78,3 @@ const TEA_ANALYTE_CATALOG=Object.freeze([
   {analyteId:'qclab-fibrinogen',name:'Fibrinogen',abbreviation:'FIB',matrix:'Platelet-poor plasma',unit:'mg/dL',section:'Đông máu',tea:{clia:20,ricos:null}},
   {analyteId:'qclab-d-dimer',name:'D-dimer',abbreviation:'D-Dimer',matrix:'Platelet-poor plasma',unit:'mg/L FEU',section:'Đông máu',tea:{clia:null,ricos:null}}
 ].map(row=>Object.freeze({...row,matrix:row.matrix||(row.section==='Khí máu'?'Whole blood':'Serum/Plasma'),aliases:Object.freeze(row.abbreviation?[row.abbreviation]:[]),tea:Object.freeze({...row.tea})})));
-const TEA_ANALYTE_CATALOG_BY_ID=Object.freeze(Object.fromEntries(TEA_ANALYTE_CATALOG.map(row=>[row.analyteId,row])));
