@@ -934,71 +934,18 @@ aside,
   margin:12px 16px 0; padding:0; border:1px solid var(--line-strong); border-radius:var(--radius-lg); background:var(--panel);
 }
 
+/* Thanh cuộn dùng mặc định chung ở professional-base.css. */
 .config-shell-main > .rcfg-list,
 .target-matrix-panel .rcfg-list{
-  display:block; max-width:100%; overflow-x:auto !important; overflow-y:auto !important; -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain; scrollbar-gutter:auto; scrollbar-width:thin; scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track); padding-bottom:0 !important; contain:paint;
+  display:block; max-width:100%; overflow-x:auto !important; overflow-y:auto !important; -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain; scrollbar-gutter:auto; padding-bottom:0 !important; contain:paint;
 }
 
 .rcfg-list{
-  overflow:auto; scrollbar-width:thin; scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track);
-}
-
-.config-shell-nav,
-.rcfg-history-detail-modal .modal-b{
-  scrollbar-width:thin; scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track);
-}
-
-.config-shell-nav::-webkit-scrollbar,
-.rcfg-list::-webkit-scrollbar,
-.rcfg-history-detail-modal .modal-b::-webkit-scrollbar{
-  width:var(--scrollbar-size); height:var(--scrollbar-size);
-}
-
-.config-shell-nav::-webkit-scrollbar-track,
-.rcfg-list::-webkit-scrollbar-track,
-.rcfg-history-detail-modal .modal-b::-webkit-scrollbar-track{
-  background:var(--scrollbar-track); border-radius:var(--radius-pill);
-}
-
-.config-shell-nav::-webkit-scrollbar-thumb,
-.rcfg-list::-webkit-scrollbar-thumb,
-.rcfg-history-detail-modal .modal-b::-webkit-scrollbar-thumb{
-  background:var(--scrollbar-thumb); border-radius:var(--radius-pill); border:2px solid var(--scrollbar-track);
-}
-
-.config-shell-nav::-webkit-scrollbar-thumb:hover,
-.rcfg-list::-webkit-scrollbar-thumb:hover,
-.rcfg-history-detail-modal .modal-b::-webkit-scrollbar-thumb:hover{
-  background:var(--scrollbar-thumb-hover);
-}
-
-.config-shell-main > .rcfg-list::-webkit-scrollbar-button,
-.target-matrix-panel .rcfg-list::-webkit-scrollbar-button{
-  width:0; height:0; display:none;
+  overflow:auto;
 }
 
 .target-table{
-  display:block; max-width:100%; overflow-x:auto; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain; scrollbar-gutter:auto; scrollbar-width:thin; scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track); padding-bottom:0; contain:paint;
-}
-
-.target-table::-webkit-scrollbar{
-  width:var(--scrollbar-size); height:var(--scrollbar-size);
-}
-
-.target-table::-webkit-scrollbar-track{
-  background:var(--scrollbar-track); border-radius:var(--radius-pill);
-}
-
-.target-table::-webkit-scrollbar-thumb{
-  background:var(--scrollbar-thumb); border-radius:var(--radius-pill); border:2px solid var(--scrollbar-track); background-clip:padding-box;
-}
-
-.target-table::-webkit-scrollbar-thumb:hover{
-  background:var(--scrollbar-thumb-hover);
-}
-
-.target-table::-webkit-scrollbar-button{
-  width:0; height:0; display:none;
+  display:block; max-width:100%; overflow-x:auto; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain; scrollbar-gutter:auto; padding-bottom:0; contain:paint;
 }
 
 .config-shell-main > .rcfg-list table,

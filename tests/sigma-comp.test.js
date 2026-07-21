@@ -39,6 +39,7 @@ assert.equal(ctx.sgInputDisplayValue(''),'');
 {
   const source = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'sigma.js'), 'utf8');
   const sigmaCss = fs.readFileSync(path.join(__dirname, '..', 'assets', 'professional-sigma.css'), 'utf8');
+  const baseCss = fs.readFileSync(path.join(__dirname, '..', 'assets', 'professional-base.css'), 'utf8');
   assert.match(source, /class="sg-simple-table"/, 'Sigma periods use the compact CV–Bias–Sigma table');
   assert.match(source, /function sgRemoveTracked\(id\)\{\s*if\(!requireAdmin\(\)\)return;/, 'untracking a test from Sigma requires admin, matching the admin-only "+ Thêm" action');
   assert.doesNotMatch(source, /role\(\)==='admin'\?'<button class="btn teal" onclick="sgOpenAddTest\(\)">\+ Thêm<\/button>':''\}\$\{canWrite\(\)/, 'the "Xóa" tracked-test button is no longer shown to non-admin roles that can only canWrite()');
@@ -79,8 +80,10 @@ assert.equal(ctx.sgInputDisplayValue(''),'');
   assert.doesNotMatch(sigmaCss, /\.sg-period-radio\{/, 'the obsolete period radio styling is removed');
   assert.match(sigmaCss, /tr\.sg-period-selected td:first-child\{[\s\S]*?box-shadow:inset 4px 0 0 var\(--teal\)/, 'the selected period row is marked by the teal left stripe');
   assert.match(sigmaCss, /tr\.sg-period-row\{[\s\S]*?cursor:pointer;/, 'the whole period row is clickable to select');
-  assert.match(sigmaCss, /\.sg-simple-table-wrap::-webkit-scrollbar\{[\s\S]*?height:var\(--scrollbar-size\);/, 'Sigma table uses the same thin scrollbar token as the QC entry table');
-  assert.match(sigmaCss, /\.sg-simple-table-wrap::-webkit-scrollbar-button\{[\s\S]*?display:none;/, 'Sigma scrollbar removes the bulky native arrow buttons');
+  // Scrollbar styling is a global default now (professional-base.css `*::-webkit-scrollbar*`),
+  // not a per-selector rule — the Sigma table inherits it like every other scroll box.
+  assert.match(baseCss, /\*::-webkit-scrollbar\{[\s\S]*?height:var\(--scrollbar-size\);/, 'the global thin-scrollbar default (inherited by the Sigma table) uses the shared token');
+  assert.match(baseCss, /\*::-webkit-scrollbar-button\{[\s\S]*?display:none;/, 'the global scrollbar default removes the bulky native arrow buttons everywhere, including Sigma');
   assert.match(source, /<col style="width:140px">/, 'the period/year column has a little more room while staying compact');
   assert.match(source, /<col style="width:228px"><\/colgroup>/, 'the action column gives a small share back to the period column while retaining all row actions');
   assert.match(source, /tableMin=368\+levels\.length\*295/, 'the minimum table width is derived from the compact columns');

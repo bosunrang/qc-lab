@@ -546,63 +546,36 @@ nav button:hover{
   min-width:100%;
 }
 
-.panel:has(> table)::-webkit-scrollbar-thumb,
-.panel:has(> h3:first-child + table)::-webkit-scrollbar-thumb{
-  background-clip:padding-box;
-}
-
-main,
-nav,
-.dayseg,
-.modal-b,
-.panel:has(> table),
-.panel:has(> h3:first-child + table),
-.panel:has(> .chart-scroll){
+/* Thanh cuộn mỏng MẶC ĐỊNH cho toàn hệ thống (2026-07-21) — trước đây phải liệt
+   kê từng selector (main, nav, .dayseg, .modal-b, các bảng/chart-scroll...) lặp
+   lại ở mọi professional-*.css, giờ gộp về một rule chung dùng selector `*` nên
+   MỌI vùng cuộn (kể cả textarea, modal, trang tương lai) đều tự động mỏng —
+   không cần khai báo riêng nữa. scrollbar-width/-color là thuộc tính chuẩn kế
+   thừa được (Firefox + Chromium mới); phần ::-webkit-scrollbar* là fallback cho
+   mọi engine dựa trên WebKit/Chromium (kể cả bản cũ), áp trực tiếp lên từng
+   phần tử có scrollbar riêng nên không phụ thuộc kế thừa. */
+*{
   scrollbar-width:thin; scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
-main::-webkit-scrollbar,
-nav::-webkit-scrollbar,
-.dayseg::-webkit-scrollbar,
-.modal-b::-webkit-scrollbar,
-.panel:has(> table)::-webkit-scrollbar,
-.panel:has(> h3:first-child + table)::-webkit-scrollbar,
-.panel:has(> .chart-scroll)::-webkit-scrollbar{
+*::-webkit-scrollbar{
   width:var(--scrollbar-size); height:var(--scrollbar-size);
 }
 
-.chart-scroll::-webkit-scrollbar{
-  width:var(--scrollbar-size);
-}
-
-main::-webkit-scrollbar-track,
-nav::-webkit-scrollbar-track,
-.dayseg::-webkit-scrollbar-track,
-.modal-b::-webkit-scrollbar-track,
-.panel:has(> table)::-webkit-scrollbar-track,
-.panel:has(> h3:first-child + table)::-webkit-scrollbar-track,
-.panel:has(> .chart-scroll)::-webkit-scrollbar-track{
+*::-webkit-scrollbar-track{
   background:var(--scrollbar-track); border-radius:var(--radius-pill);
 }
 
-main::-webkit-scrollbar-thumb,
-nav::-webkit-scrollbar-thumb,
-.dayseg::-webkit-scrollbar-thumb,
-.modal-b::-webkit-scrollbar-thumb,
-.panel:has(> table)::-webkit-scrollbar-thumb,
-.panel:has(> h3:first-child + table)::-webkit-scrollbar-thumb,
-.panel:has(> .chart-scroll)::-webkit-scrollbar-thumb{
-  background:var(--scrollbar-thumb); border-radius:var(--radius-pill); border:2px solid var(--scrollbar-track);
+*::-webkit-scrollbar-thumb{
+  background:var(--scrollbar-thumb); border-radius:var(--radius-pill); border:2px solid var(--scrollbar-track); background-clip:padding-box;
 }
 
-main::-webkit-scrollbar-thumb:hover,
-nav::-webkit-scrollbar-thumb:hover,
-.dayseg::-webkit-scrollbar-thumb:hover,
-.modal-b::-webkit-scrollbar-thumb:hover,
-.panel:has(> table)::-webkit-scrollbar-thumb:hover,
-.panel:has(> h3:first-child + table)::-webkit-scrollbar-thumb:hover,
-.panel:has(> .chart-scroll)::-webkit-scrollbar-thumb:hover{
+*::-webkit-scrollbar-thumb:hover{
   background:var(--scrollbar-thumb-hover);
+}
+
+*::-webkit-scrollbar-button{
+  width:0; height:0; display:none;
 }
 
 html{
@@ -663,10 +636,6 @@ nav button.active .ic{
 
 .shift-item.rej, .shift-item.warn, .shift-item.ok{
   background:var(--panel); border-left-width:3px;
-}
-
-.panel:has(> table)::-webkit-scrollbar-button, .panel:has(> h3:first-child + table)::-webkit-scrollbar-button{
-  width:0; height:0; display:none;
 }
 
 .panel > table, .panel > h3:first-child + table, .panel > h3:first-child ~ table{

@@ -98,28 +98,9 @@
   background:#0b7780; color:var(--on-accent);
 }
 
+/* Thanh cuộn dùng mặc định chung ở professional-base.css. */
 .dash-test-list{
-  display:block; max-width:100%; margin:15px; overflow-x:auto; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain; scrollbar-gutter:auto; scrollbar-width:thin; scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track); padding-bottom:0; contain:paint;
-}
-
-.dash-test-list::-webkit-scrollbar{
-  width:var(--scrollbar-size); height:var(--scrollbar-size);
-}
-
-.dash-test-list::-webkit-scrollbar-track{
-  background:var(--scrollbar-track); border-radius:var(--radius-pill);
-}
-
-.dash-test-list::-webkit-scrollbar-thumb{
-  background:var(--scrollbar-thumb); border-radius:var(--radius-pill); border:2px solid var(--scrollbar-track); background-clip:padding-box;
-}
-
-.dash-test-list::-webkit-scrollbar-thumb:hover{
-  background:var(--scrollbar-thumb-hover);
-}
-
-.dash-test-list::-webkit-scrollbar-button{
-  width:0; height:0; display:none;
+  display:block; max-width:100%; margin:15px; overflow-x:auto; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain; scrollbar-gutter:auto; padding-bottom:0; contain:paint;
 }
 
 .dash-test-list table{

@@ -27,28 +27,9 @@
   font-size:11px; opacity:.92; line-height:1.5;
 }
 
+/* Thanh cuộn dùng mặc định chung ở professional-base.css. */
 .sg-simple-table-wrap{
-  display:block; max-width:100%; margin:10px 16px 12px; overflow-x:auto; overflow-y:hidden; border:1px solid var(--line); border-radius:var(--radius-md); -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain; scrollbar-gutter:auto; scrollbar-width:thin; scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track); padding-bottom:0; contain:paint;
-}
-
-.sg-simple-table-wrap::-webkit-scrollbar{
-  width:var(--scrollbar-size); height:var(--scrollbar-size);
-}
-
-.sg-simple-table-wrap::-webkit-scrollbar-track{
-  background:var(--scrollbar-track); border-radius:var(--radius-pill);
-}
-
-.sg-simple-table-wrap::-webkit-scrollbar-thumb{
-  background:var(--scrollbar-thumb); border-radius:var(--radius-pill); border:2px solid var(--scrollbar-track); background-clip:padding-box;
-}
-
-.sg-simple-table-wrap::-webkit-scrollbar-thumb:hover{
-  background:var(--scrollbar-thumb-hover);
-}
-
-.sg-simple-table-wrap::-webkit-scrollbar-button{
-  width:0; height:0; display:none;
+  display:block; max-width:100%; margin:10px 16px 12px; overflow-x:auto; overflow-y:hidden; border:1px solid var(--line); border-radius:var(--radius-md); -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain; scrollbar-gutter:auto; padding-bottom:0; contain:paint;
 }
 
 .sg-simple-table{

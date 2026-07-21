@@ -646,84 +646,20 @@
   color:#9b6712; background:#fff6e6; border:1px solid #e4c273; font-weight:800;
 }
 
-.lj-qc-strip, .chart-scroll{
-  scrollbar-width:thin; scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track);
-}
-
 @media(min-width:761px) and (min-height:481px){
 .entrygrid > .tree{
-  position:sticky; top:112px; max-height:calc(100vh - 132px); overflow-y:auto; overscroll-behavior:contain; align-self:start; scrollbar-width:thin; scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track);
+  position:sticky; top:112px; max-height:calc(100vh - 132px); overflow-y:auto; overscroll-behavior:contain; align-self:start;
 }
 }
 
-.panel:has(> .qc-sheet-wrap){
-  scrollbar-width:thin; scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track);
-}
-
-.lj-qc-strip::-webkit-scrollbar,
-.chart-scroll::-webkit-scrollbar{
-  height:8px;
-}
-
-.lj-qc-strip::-webkit-scrollbar-track,
-.chart-scroll::-webkit-scrollbar-track{
-  background:var(--scrollbar-track); border-radius:var(--radius-pill);
-}
-
-.lj-qc-strip::-webkit-scrollbar-thumb,
-.chart-scroll::-webkit-scrollbar-thumb{
-  background:var(--scrollbar-thumb); border-radius:var(--radius-pill); border:2px solid var(--scrollbar-track); background-clip:padding-box;
-}
-
-.lj-qc-strip::-webkit-scrollbar-thumb:hover,
-.chart-scroll::-webkit-scrollbar-thumb:hover{
-  background:var(--scrollbar-thumb-hover);
-}
-
-/* Entry/LJ rules migrated out of professional-base.css. */
+/* Entry/LJ rules migrated out of professional-base.css. Thanh cuộn (scrollbar-*)
+   giờ dùng mặc định chung ở professional-base.css, không khai báo riêng nữa. */
 .qc-sheet-wrap{
-  display:block; max-width:100%; margin:14px; border:1px solid var(--line); border-radius:9px; max-height:574px; overflow-x:auto; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain; scrollbar-gutter:auto; scrollbar-width:thin; scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track); padding-bottom:0; contain:paint; background:var(--panel); position:relative;
+  display:block; max-width:100%; margin:14px; border:1px solid var(--line); border-radius:9px; max-height:574px; overflow-x:auto; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain; scrollbar-gutter:auto; padding-bottom:0; contain:paint; background:var(--panel); position:relative;
 }
 
 .qc-table-card{
-  display:block; max-width:100%; overflow-x:auto; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain; scrollbar-gutter:auto; scrollbar-width:thin; scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track); padding-bottom:0; contain:paint;
-}
-
-.qc-sheet-wrap::-webkit-scrollbar,
-.qc-table-card::-webkit-scrollbar,
-.panel:has(> .qc-sheet-wrap)::-webkit-scrollbar,
-.entrygrid > .tree::-webkit-scrollbar{
-  width:var(--scrollbar-size); height:var(--scrollbar-size);
-}
-
-.qc-sheet-wrap::-webkit-scrollbar-track,
-.qc-table-card::-webkit-scrollbar-track,
-.panel:has(> .qc-sheet-wrap)::-webkit-scrollbar-track,
-.entrygrid > .tree::-webkit-scrollbar-track{
-  background:var(--scrollbar-track); border-radius:var(--radius-pill);
-}
-
-.qc-sheet-wrap::-webkit-scrollbar-thumb,
-.qc-table-card::-webkit-scrollbar-thumb,
-.panel:has(> .qc-sheet-wrap)::-webkit-scrollbar-thumb,
-.entrygrid > .tree::-webkit-scrollbar-thumb{
-  background:var(--scrollbar-thumb); border-radius:var(--radius-pill); border:2px solid var(--scrollbar-track); background-clip:padding-box;
-}
-
-.qc-sheet-wrap::-webkit-scrollbar-thumb:hover,
-.qc-table-card::-webkit-scrollbar-thumb:hover,
-.panel:has(> .qc-sheet-wrap)::-webkit-scrollbar-thumb:hover,
-.entrygrid > .tree::-webkit-scrollbar-thumb:hover{
-  background:var(--scrollbar-thumb-hover);
-}
-
-.qc-sheet-wrap::-webkit-scrollbar-button,
-.qc-table-card::-webkit-scrollbar-button,
-.panel:has(> .qc-sheet-wrap)::-webkit-scrollbar-button,
-.lj-qc-strip::-webkit-scrollbar-button,
-.chart-scroll::-webkit-scrollbar-button,
-.entrygrid > .tree::-webkit-scrollbar-button{
-  width:0; height:0; display:none;
+  display:block; max-width:100%; overflow-x:auto; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain; scrollbar-gutter:auto; padding-bottom:0; contain:paint;
 }
 
 .lj-toolbar{
