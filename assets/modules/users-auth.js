@@ -188,12 +188,14 @@ function showLogin(msg){
   const app=window.QCLAB_APP||{version:'dev'};
   const admin=(state.users||[]).find(u=>u.username==='admin');
   const defaultHint=admin&&admin.mustChangePassword?'Tài khoản mặc định: <b>admin</b> / <b>admin</b><br>Hệ thống sẽ yêu cầu đổi mật khẩu ở lần đăng nhập đầu tiên.<br>':'';
+  const trial=window.qcLicense&&window.qcLicense.trial;
+  const trialLine=trial&&trial.active?`<div class="auth-hint" style="color:${trial.daysLeft<=7?'#c77a1f':'#0b747d'}">Bản dùng thử: còn ${trial.daysLeft}/${trial.totalDays} ngày</div>`:'';
   ov.innerHTML=`<div class="auth-card"><div class="auth-brand">QC Lab</div><div class="auth-sub">Quản lý nội kiểm chất lượng xét nghiệm</div>
     <label>Tên đăng nhập</label><input id="liUser" autocomplete="username" autofocus>
     <label>Mật khẩu</label><input id="liPass" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
     ${msg?`<div class="auth-err">${esc(msg)}</div>`:''}
     <button class="btn teal" style="width:100%;margin-top:16px" onclick="doLogin()">Đăng nhập</button>
-    <div class="auth-hint">${defaultHint}Phiên bản ${esc(app.version||'dev')}</div></div>`;
+    ${trialLine}<div class="auth-hint">${defaultHint}Phiên bản ${esc(app.version||'dev')}</div></div>`;
   requestAnimationFrame(focusLoginField);setTimeout(focusLoginField,50);
 }
 /* Đưa focus về ô đăng nhập theo kiểu "nhường": chỉ focus khi lớp đăng nhập đang

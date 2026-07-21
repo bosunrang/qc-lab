@@ -32,6 +32,11 @@ function applyChrome(win) {
     if (/^https?:/i.test(url)) shell.openExternal(url);
     return { action: 'deny' };
   });
+  // Không còn menu ứng dụng nên phím tắt DevTools mặc định (Ctrl+Shift+I, gắn qua
+  // menu) không hoạt động — tự bắt F12 để mở/đóng, phục vụ debug khi cần.
+  win.webContents.on('before-input-event', (event, input) => {
+    if (input.type === 'keyDown' && input.key === 'F12') win.webContents.toggleDevTools();
+  });
 }
 
 function createActivationWindow() {
@@ -47,9 +52,13 @@ function createActivationWindow() {
 function createMainWindow(status) {
   // Tên lab + mã license đã xác minh, truyền cho preload (đọc từ process.argv,
   // mã hoá base64 để an toàn với dấu cách/tiếng Việt) để watermark trong app.
+  // Trạng thái dùng thử (nếu đang chạy bằng trial, không phải license) cũng
+  // truyền kèm để app hiện dòng đếm ngược ở màn đăng nhập (users-auth.js).
+  const trial = status.trial || { active: false, daysLeft: 0, totalDays: license.TRIAL_DAYS };
   const args = [
     '--qclab-lab=' + Buffer.from(String(status.lab || ''), 'utf8').toString('base64'),
-    '--qclab-id=' + Buffer.from(String(status.licenseId || ''), 'utf8').toString('base64')
+    '--qclab-id=' + Buffer.from(String(status.licenseId || ''), 'utf8').toString('base64'),
+    '--qclab-trial=' + Buffer.from(JSON.stringify({ active: !!trial.active, daysLeft: trial.daysLeft || 0, totalDays: trial.totalDays || license.TRIAL_DAYS }), 'utf8').toString('base64')
   ];
   mainWindow = new BrowserWindow({
     width: 1280, height: 860, minWidth: 900, minHeight: 600,
@@ -61,13 +70,33 @@ function createMainWindow(status) {
 }
 
 function launch() {
-  const status = license.currentStatus(app.getPath('userData'));
-  if (status.valid) createMainWindow(status);
-  else createActivationWindow();
+  const userDataDir = app.getPath('userData');
+  const status = license.currentStatus(userDataDir);
+  if (status.valid) { createMainWindow(status); return; }
+  // Chưa có license hợp lệ: còn hạn dùng thử (30 ngày kể từ lần chạy đầu tiên
+  // trên máy) thì vào thẳng app chính, không chặn — chỉ khi hết hạn mới bắt
+  // buộc qua màn kích hoạt.
+  const trial = license.trialStatus(userDataDir);
+  if (trial.active) { createMainWindow({ lab: '', licenseId: '', trial }); return; }
+  createActivationWindow();
 }
 
-// Trang kích hoạt hỏi mã máy + trạng thái license hiện tại.
-ipcMain.handle('qc-license:status', () => license.currentStatus(app.getPath('userData')));
+// Trang kích hoạt hỏi mã máy + trạng thái license hiện tại + hạn dùng thử còn lại.
+ipcMain.handle('qc-license:status', () => {
+  const userDataDir = app.getPath('userData');
+  return { ...license.currentStatus(userDataDir), trial: license.trialStatus(userDataDir) };
+});
+
+// Màn kích hoạt còn hạn dùng thử thì cho "Dùng thử tiếp" thay vì bắt nhập khoá
+// ngay — mở cửa sổ app chính rồi đóng cửa sổ kích hoạt, không cần relaunch.
+ipcMain.handle('qc-license:continue-trial', () => {
+  const trial = license.trialStatus(app.getPath('userData'));
+  if (!trial.active) return { ok: false };
+  const oldWin = mainWindow;
+  createMainWindow({ lab: '', licenseId: '', trial });
+  if (oldWin && !oldWin.isDestroyed()) oldWin.close();
+  return { ok: true };
+});
 
 // Nhận khoá dán vào: xác minh chữ ký + khớp máy; hợp lệ thì lưu rồi khởi động lại
 // sạch để nạp app chính (tránh mọi vấn đề truyền trạng thái vào cửa sổ cũ).

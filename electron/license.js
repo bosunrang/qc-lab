@@ -63,6 +63,41 @@ function licenseFilePath(userDataDir) {
   return path.join(userDataDir, 'qclab-license.dat');
 }
 
+// Dùng thử 30 ngày kể từ lần chạy đầu tiên trên máy, không cần license. Mốc thời
+// gian lưu ở file RIÊNG (không phải license file) để activate() ở lượt sau không
+// đụng vào nó. Cùng giới hạn trung thực như license: xoá file này sẽ reset đếm
+// ngày — cơ chế chặn dùng lại tuỳ tiện, không phải khoá chống được người quyết tâm.
+const TRIAL_DAYS = 30;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+function trialFilePath(userDataDir) {
+  return path.join(userDataDir, 'qclab-trial.dat');
+}
+
+// Đọc mốc bắt đầu dùng thử; nếu chưa có (lần chạy đầu tiên) hoặc file hỏng thì
+// tạo mới NGAY LÚC NÀY — im lặng, không làm gián đoạn lần mở app đầu tiên.
+function ensureTrialStarted(userDataDir) {
+  const file = trialFilePath(userDataDir);
+  try {
+    const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const startedAt = new Date(raw && raw.startedAt).toISOString();
+    return startedAt;
+  } catch (e) {
+    const startedAt = new Date().toISOString();
+    try { fs.writeFileSync(file, JSON.stringify({ startedAt }), 'utf8'); } catch (e2) { /* không ghi được thì vẫn cho dùng thử phiên này */ }
+    return startedAt;
+  }
+}
+
+// Số ngày còn lại của dùng thử, kẹp trong [0, TRIAL_DAYS] — kể cả khi đồng hồ hệ
+// thống bị lùi lại (không cho phép daysLeft vượt quá tổng số ngày cấp ban đầu).
+function trialStatus(userDataDir) {
+  const startedAt = ensureTrialStarted(userDataDir);
+  const elapsedDays = Math.floor((Date.now() - new Date(startedAt).getTime()) / MS_PER_DAY);
+  const daysLeft = Math.max(0, Math.min(TRIAL_DAYS, TRIAL_DAYS - elapsedDays));
+  return { active: daysLeft > 0, daysLeft, totalDays: TRIAL_DAYS, startedAt };
+}
+
 // Tách "payloadB64.sigB64", xác minh chữ ký rồi khớp mã máy. Trả về thông tin đã
 // xác minh (tên lab, mã license) để watermark, hoặc {valid:false, reason}.
 function verifyLicenseString(licenseString) {
@@ -104,4 +139,5 @@ function currentStatus(userDataDir) {
 module.exports = {
   machineIdCanonical, machineIdDisplay,
   verifyLicenseString, readStoredLicense, saveLicense, currentStatus,
+  TRIAL_DAYS, trialStatus,
 };

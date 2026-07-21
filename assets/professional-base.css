@@ -495,7 +495,7 @@ aside{
   padding:10px 10px 14px;gap:13px;font-weight:800;font-size:16px;letter-spacing:-.01em;
 }
 
-.brand small, .cloud, .cloud small, .save-status, .side-foot, .side-foot .foot-title{
+.brand small, .cloud, .cloud small, .save-status, .side-foot{
   font-size:var(--type-micro);color:#99adb9;
 }
 
@@ -702,7 +702,6 @@ table{
 .cloud small,
 .save-status,
 .side-foot,
-.side-foot .foot-title,
 .side-foot button{
   letter-spacing:0;
 }

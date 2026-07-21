@@ -22,12 +22,19 @@
   .msg{margin-top:12px;font-size:13px;font-weight:600;display:none}
   .msg.err{display:block;color:var(--red)}
   .msg.ok{display:block;color:var(--teal)}
+  .trial-box{border-radius:8px;padding:12px 14px;font-size:13px;line-height:1.5;margin-bottom:4px}
+  .trial-box.trial-active{background:#eaf6f4;border:1px solid #bfe3dd;color:#0b5c62}
+  .trial-box.trial-expired{background:#fbeceb;border:1px solid #f1c2bd;color:#8a2a22}
+  .trial-box b{display:block;font-size:14px;margin-bottom:2px}
+  #continueTrialBtn{margin-top:10px}
 </style>
 </head>
 <body>
   <div class="card">
     <h1>Kích hoạt QC Lab</h1>
     <div class="sub">Phần mềm cấp phép theo từng máy. Hãy gửi <b>Mã máy</b> bên dưới cho người cung cấp để nhận Khoá kích hoạt.</div>
+
+    <div id="trialBox" style="display:none"></div>
 
     <label>Mã máy (gửi cho người cung cấp)</label>
     <div class="mid">
@@ -51,6 +58,24 @@
   (async () => {
     const st = api ? await api.status() : { machineId: '(không khả dụng ngoài Electron)' };
     $('machineId').textContent = st.machineId || '(không đọc được mã máy)';
+
+    const trial = st.trial;
+    if (trial) {
+      const box = $('trialBox');
+      box.style.display = 'block';
+      if (trial.active) {
+        box.className = 'trial-box trial-active';
+        box.innerHTML = `<b>Còn ${trial.daysLeft}/${trial.totalDays} ngày dùng thử</b>Bạn có thể dùng thử đầy đủ tính năng, hoặc kích hoạt bằng khoá ngay bây giờ để dùng vĩnh viễn.<button class="btn-teal" id="continueTrialBtn" type="button">Dùng thử tiếp (${trial.daysLeft} ngày)</button>`;
+        $('continueTrialBtn').addEventListener('click', async () => {
+          $('continueTrialBtn').disabled = true;
+          const res = api ? await api.continueTrial() : { ok: false };
+          if (!res || !res.ok) { $('continueTrialBtn').disabled = false; $('msg').className = 'msg err'; $('msg').textContent = 'Không mở được bản dùng thử. Hãy thử lại.'; }
+        });
+      } else {
+        box.className = 'trial-box trial-expired';
+        box.innerHTML = `<b>Đã hết ${trial.totalDays} ngày dùng thử</b>Hãy dán khoá kích hoạt bên dưới để tiếp tục sử dụng.`;
+      }
+    }
   })();
 
   $('copyBtn').addEventListener('click', async () => {

@@ -12,10 +12,12 @@ contextBridge.exposeInMainWorld('qcDialog', {
   alert: (message) => ipcRenderer.invoke('qc-dialog:alert', message == null ? '' : String(message))
 });
 
-// Cầu nối cho trang kích hoạt (activation.html): đọc mã máy + gửi khoá để xác minh.
+// Cầu nối cho trang kích hoạt (activation.html): đọc mã máy + gửi khoá để xác minh,
+// hoặc "Dùng thử tiếp" khi còn hạn 30 ngày.
 contextBridge.exposeInMainWorld('qcActivation', {
   status: () => ipcRenderer.invoke('qc-license:status'),
-  activate: (licenseString) => ipcRenderer.invoke('qc-license:activate', String(licenseString || ''))
+  activate: (licenseString) => ipcRenderer.invoke('qc-license:activate', String(licenseString || '')),
+  continueTrial: () => ipcRenderer.invoke('qc-license:continue-trial')
 });
 
 // Thông tin license đã xác minh (main truyền qua additionalArguments, base64),
@@ -26,7 +28,12 @@ function argVal(prefix) {
   if (!found) return '';
   try { return Buffer.from(found.slice(prefix.length), 'base64').toString('utf8'); } catch (e) { return ''; }
 }
+function trialArg() {
+  try { return JSON.parse(argVal('--qclab-trial=')) || { active: false, daysLeft: 0 }; }
+  catch (e) { return { active: false, daysLeft: 0 }; }
+}
 contextBridge.exposeInMainWorld('qcLicense', {
   lab: argVal('--qclab-lab='),
-  licenseId: argVal('--qclab-id=')
+  licenseId: argVal('--qclab-id='),
+  trial: trialArg()
 });

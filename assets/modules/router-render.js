@@ -151,7 +151,11 @@ function nav(){const groups=[['Theo dõi',['dash','entry','westgard','sigma']],[
 /* Watermark tên lab được cấp phép (bản Electron có license). Chạy trong trình
    duyệt thường thì window.qcLicense không tồn tại nên bỏ qua — không ảnh hưởng. */
 function licensedLabName(){const lic=window.qcLicense;return lic&&lic.lab?String(lic.lab):'';}
-function sideFoot(){const el=document.getElementById('sideFoot');if(!el)return;const app=window.QCLAB_APP||{version:'dev',releaseDate:''};const lab=licensedLabName();const licLine=lab?`<div class="hint" style="margin-top:6px;color:#8ea3b2">Cấp phép cho: <b style="color:#c3d3dd">${esc(lab)}</b></div>`:'';el.innerHTML=`<div class="foot-panel"><div class="foot-title">Phiên bản</div><div><b>${esc(app.name||'QC Lab')} ${esc(app.version||'dev')}</b></div><div>${esc(app.releaseDate||'Bản phát triển')}</div><div class="hint" style="margin-top:6px;color:#8ea3b2">Nội kiểm xét nghiệm · chạy cục bộ</div>${licLine}</div>`;}
+/* Bản Electron chưa kích hoạt license nhưng còn hạn dùng thử 30 ngày (xem
+   electron/license.js) truyền trạng thái này qua window.qcLicense.trial. Chạy
+   trong trình duyệt thường hoặc bản đã có license thì trial luôn {active:false}. */
+function trialInfo(){return window.qcLicense&&window.qcLicense.trial&&window.qcLicense.trial.active?window.qcLicense.trial:null;}
+function sideFoot(){const el=document.getElementById('sideFoot');if(!el)return;const app=window.QCLAB_APP||{version:'dev'};const lab=licensedLabName();const licLine=lab?`<div class="hint" style="color:#8ea3b2">Cấp phép: <b style="color:#c3d3dd">${esc(lab)}</b></div>`:'';const trial=trialInfo(),trialLine=trial?`<div class="hint" style="color:${trial.daysLeft<=7?'#e2a33d':'#8ea3b2'}">Dùng thử: còn <b style="color:${trial.daysLeft<=7?'#e2a33d':'#c3d3dd'}">${trial.daysLeft} ngày</b></div>`:'';el.innerHTML=`<div class="foot-panel"><div class="hint">Ver: ${esc(app.version||'dev')}</div>${licLine}${trialLine}</div>`;}
 /* Ẩn/hiện thanh điều hướng bên trái: sở thích hiển thị riêng của máy này, không
    phải dữ liệu nghiệp vụ nên lưu localStorage thay vì state/sync. Script đồng bộ
    trong index.html đọc cùng khóa để áp trạng thái ngay khi tải trang, tránh nháy. */
