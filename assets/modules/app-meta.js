@@ -1,8 +1,8 @@
 ﻿window.QCLAB_APP = {
   name: 'QC Lab',
-  version: '2.3.8',
+  version: '2.3.9',
   releaseDate: '2026-07-21',
-  build: 'trial-license-30d'
+  build: 'westgard-print-hidpi'
 };
 
 // Cấu hình đám mây khi deploy (tùy chọn).

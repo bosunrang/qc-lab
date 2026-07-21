@@ -34,6 +34,37 @@ async function printSigmaPeriod(periodId){
   else body+='<p class="soft-note">Kỳ này chưa có mức đủ điều kiện phân loại để vẽ biểu đồ Sigma và MDC.</p>';
   body+=signBlock();await openPrint('Báo cáo Six Sigma — '+testDisplayName(t)+' — '+period,body,{landscape:true});
 }
+/* In trang Phân tích Westgard đang xem (mức/lô đang chọn, kể cả "xem lô cũ").
+   Chỉ in bảng VI PHẠM/cảnh báo (không phải toàn bộ điểm) vì trang này không có
+   khoảng ngày giới hạn như Báo cáo — một lô có thể có hàng nghìn điểm qua
+   nhiều năm, in hết sẽ ra một bản in không thực dụng. */
+async function printWestgard(){
+  const t=state.tests.find(x=>x.id===selTest);if(!t){await infoDialog('Chưa chọn được xét nghiệm để in.');return;}
+  const wg=activeWestgard(t);if(!wg.views.length){await infoDialog('Xét nghiệm này chưa có mức QC đang vận hành để in.');return;}
+  const machine=instrumentName(t.instrumentId,t.machine)||t.machine||'—',rulesOn=WG_RULES.filter(r=>testRuleOn(t,r)).join(', ')||'Chưa bật luật nào';
+  let body=reportHeader('PHÂN TÍCH WESTGARD — '+esc(testDisplayName(t)),'Đối chiếu luật theo mức QC, lô và lần chạy');
+  body+='<table><tr><th style="width:20%">Xét nghiệm</th><td>'+esc(testDisplayName(t))+(t.unit?' · '+esc(t.unit):'')+'</td><th style="width:18%">Thiết bị</th><td>'+esc(machine)+'</td></tr><tr><th>Bộ luật đang áp dụng</th><td colspan="3">'+esc(rulesOn)+'</td></tr></table>';
+  const multiViews=wg.views.map(v=>({level:v.l.level,lot:v.l.lot,mean:v.l.mean,sd:v.l.sd,pts:v.pts,label:'M'+v.l.level+'·'+(v.l.lot||'?')}));
+  if(multiViews.filter(v=>v.pts.length).length>=2)body+='<h3>Levey-Jennings tổng hợp theo Z-score</h3><img src="'+ljMultiDataURL(multiViews,t)+'">';
+  wg.views.forEach(v=>{
+    const l=v.l,prevSeries=previousLotSeries(t,l.level),prevOpen=wgPrevOpen.has(t.id+'|'+l.level);
+    if(prevOpen&&prevSeries.length){
+      const s=prevSeries[0],wgP=QCCore.westgardByPoint(s.pts,s.mean,s.sd,rule=>testRuleOnWithin(t,rule)),idxOf=new Map(s.pts.map((p,i)=>[p.id,i]));
+      body+='<h3>Mức '+l.level+' — Lô cũ '+esc(s.lot)+' · đã chuyển tiếp (Mean='+fmt(s.mean)+', SD='+fmt(s.sd,3)+')</h3>';
+      body+='<p class="soft-note">Vi phạm ở lô cũ chỉ đánh giá luật Westgard theo từng mức riêng lẻ, không gồm luật liên mức (như R4s giữa các mức cùng lần chạy).</p>';
+      body+='<img src="'+ljDataURL(s.pts,s.mean,s.sd)+'">';
+      const viol=s.pts.map((p,i)=>{const raw=wgP.F[i]||{rules:[]};return{p,f:{...raw,level:ruleResultLevel(t,raw.rules||[])},z:wgP.zs[i]};}).filter(o=>o.f.level!=='ok');
+      body+=viol.length?'<p style="margin-top:8px"><b>Điểm vi phạm/cảnh báo (lô cũ):</b></p>'+reportPointsTableHtml(viol):'<p><i>Không có điểm vi phạm/cảnh báo (lô cũ).</i></p>';
+      return;
+    }
+    body+='<h3>Mức '+l.level+' — Lô '+esc(l.lot||'?')+' (Mean='+fmt(l.mean)+', SD='+fmt(l.sd,3)+')</h3>';
+    if(!v.pts.length){body+='<p><i>Chưa có dữ liệu QC ở mức này.</i></p>';return;}
+    body+='<img src="'+ljDataURL(v.pts,l.mean,l.sd)+'">';
+    const viol=v.pts.map(p=>{const f=wg.byPoint.get(p.id)||{level:'ok',rules:[],z:(p.val-l.mean)/l.sd};return{p,f,z:f.z};}).filter(o=>o.f.level!=='ok');
+    body+=viol.length?'<p style="margin-top:8px"><b>Điểm vi phạm/cảnh báo:</b></p>'+reportPointsTableHtml(viol):'<p><i>Không có điểm vi phạm/cảnh báo.</i></p>';
+  });
+  body+=signBlock();await openPrint('Phân tích Westgard — '+testDisplayName(t),body);
+}
 function reportPointsTableHtml(items){
   if(!items.length)return '<p><i>Không có điểm nào trong khoảng ngày đã chọn.</i></p>';
   const rows=items.map(o=>{

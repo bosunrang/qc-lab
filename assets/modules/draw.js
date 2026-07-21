@@ -28,10 +28,10 @@ function setupHiDPICanvas(canvas){
   if(!canvas.dataset.baseW){canvas.dataset.baseW=canvas.getAttribute('width')||canvas.width;canvas.dataset.baseH=canvas.getAttribute('height')||canvas.height;}
   const baseW=parseFloat(canvas.dataset.baseW)||1400,baseH=parseFloat(canvas.dataset.baseH)||430;
   const cssW=Math.max(760,Math.round(canvas.clientWidth||baseW)),cssH=Math.round(cssW*baseH/baseW);
-  /* Match the real screen density instead of forcing 2x supersampling on every
-     display. Capping at 2x prevents several large charts from allocating tens of
-     megabytes of backing pixels on high-DPI screens. */
-  const dpr=Math.min(2,Math.max(1,window.devicePixelRatio||1)),pxW=Math.round(cssW*dpr),pxH=Math.round(cssH*dpr);
+  /* Match the real screen density instead of forcing supersampling on every
+     display. Capping at 3x still bounds backing-pixel memory on very high-DPI
+     screens while looking sharp on today's common 2x/3x Windows scaling. */
+  const dpr=Math.min(3,Math.max(1,window.devicePixelRatio||1)),pxW=Math.round(cssW*dpr),pxH=Math.round(cssH*dpr);
   if(canvas.width!==pxW||canvas.height!==pxH){canvas.width=pxW;canvas.height=pxH;canvas.style.height=cssH+'px';}
   const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);
   return{ctx,W:cssW,H:cssH};
