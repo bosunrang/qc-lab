@@ -6,7 +6,7 @@ function openRangeWorkflow(tid,level){
   const checklist=rows.map(x=>`<tr><td>${x[0]}</td><td class="num">${x[1]}</td><td>${x[2]}</td><td><span class="tag ${x[3]?'ok':'rej'}">${x[3]?'Đạt':'Chưa đạt'}</span></td></tr>`).join('');
   const c=r.c;
   openModal(`<div class="modal" style="width:760px"><div class="modal-h"><h3>Workflow thiết lập dải QC mới</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
-    <div class="modal-b"><div class="hint"><b>${esc(r.t.name)}</b> · Mức ${level} · Lô ${esc(r.l.lot||'?')} · ${esc(r.t.machine||'')}</div>
+    <div class="modal-b"><div class="hint"><b>${esc(testDisplayName(r.t))}</b> · Mức ${level} · Lô ${esc(r.l.lot||'?')} · ${esc(r.t.machine||'')}</div>
       <table style="margin-top:10px"><thead><tr><th>Điều kiện</th><th class="num">Hiện tại</th><th>Chuẩn kiểm tra</th><th>Kết quả</th></tr></thead><tbody>${checklist}</tbody></table>
       <h3 style="margin:16px 0 8px">So sánh dải kiểm soát</h3>
       <table><thead><tr><th>Dải</th><th class="num">Mean</th><th class="num">SD</th><th class="num">CV%</th><th class="num">±2SD</th></tr></thead><tbody>

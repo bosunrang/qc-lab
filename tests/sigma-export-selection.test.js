@@ -13,6 +13,7 @@ run(ctx, `
   function sgRows(t,data){return data.map(e=>({e,rs:[{cv:2,bias:1,sigma:4,dpmo:100,yld:99,label:'Tốt',tea:6},null,{cv:3,bias:1,sigma:3,dpmo:200,yld:98,label:'Cận biên',tea:6}]}));}
   function sgTea(){return 6;}
   function vnPeriod(v){return v.slice(5)+'/'+v.slice(0,4);}
+  function testDisplayName(t){return t&&t.name||'';}
   function __reportRows(testId,mode,period,periodId){return sigmaReportRows(testId,mode,period,periodId);}
 `);
 

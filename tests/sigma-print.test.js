@@ -20,6 +20,7 @@ run(ctx, `
   function sigmaTeaTrace(){return'EFLM · Analyte: Sodium';}
   function vnPeriod(){return'07/2026';}
   function instrumentName(){return'Máy A';}
+  function testDisplayName(t){return t&&t.name||'';}
   function sgFrequencyHTML(){return'<div id="opspecs">OPSpecs</div>';}
   function sgTrendSVG(){return'<svg id="sigma-chart"></svg>';}
   function sgMDCSVG(){return'<svg id="mdc-chart"></svg>';}

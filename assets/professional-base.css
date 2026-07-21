@@ -35,6 +35,59 @@ nav button{
 nav .ic{
   display:inline-flex; align-items:center; justify-content:center; opacity:1; flex:0 0 30px; flex-basis:28px;
 }
+
+/* Thu gọn/mở thanh điều hướng (2026-07-20): .nav-toggle nằm trong aside, ẩn hẳn
+   aside khi bấm; .nav-expand là nút nổi cố định để mở lại (không nằm trong aside
+   vì aside display:none sẽ ẩn luôn nút bên trong nó). Trạng thái lưu localStorage
+   (sở thích hiển thị riêng của máy, không phải dữ liệu nghiệp vụ nên không qua
+   state/sync) và được áp ngay bằng script đồng bộ trong index.html để tránh
+   nháy sidebar lúc tải trang. */
+.brand-row{
+  display:flex; align-items:flex-start; justify-content:space-between; gap:6px;
+}
+.brand-row .brand{
+  margin-bottom:0; min-width:0; flex:1 1 auto;
+}
+.nav-toggle{
+  flex:none; width:30px; height:30px; display:flex; align-items:center; justify-content:center; background:rgba(47,179,166,.14); border:1px solid rgba(47,179,166,.35); border-radius:var(--radius-md); color:#6fd1c4; cursor:pointer; padding:0;
+}
+.nav-toggle:hover{
+  background:rgba(47,179,166,.24);
+}
+.nav-toggle svg{
+  width:16px; height:16px;
+}
+.nav-expand{
+  display:none; position:fixed; top:10px; left:12px; z-index:95; width:28px; height:28px; align-items:center; justify-content:center; background:var(--teal); border:none; border-radius:var(--radius-md); color:var(--on-accent); cursor:pointer; padding:0; box-shadow:0 10px 24px rgba(18,32,43,.28);
+}
+.nav-expand:hover{
+  background:color-mix(in srgb, var(--teal) 88%, black);
+}
+.nav-expand svg{
+  width:15px; height:15px;
+}
+.app.nav-collapsed > aside{
+  display:none;
+}
+.app.nav-collapsed .nav-expand{
+  display:flex;
+}
+.app.nav-collapsed{
+  grid-template-columns:minmax(0,1fr);
+}
+/* Ở màn hẹp, main gần như không có padding-top riêng (.head tự lo phần đó chỉ ở
+   breakpoint ≥761px+≥481px) nên nút nổi (28px, top:10px) sẽ đè lên chữ tiêu đề —
+   chừa thêm khoảng trống phía trên khi đã thu gọn sidebar. */
+@media(max-width:900px){
+.app.nav-collapsed main{
+  padding-top:50px;
+}
+}
+@media(min-width:761px) and (max-height:480px){
+.app.nav-collapsed main{
+  padding-top:50px;
+}
+}
 .head{
   display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;
 }
@@ -338,6 +391,10 @@ main{
 .head{
   position:sticky; top:0; z-index:90; margin:0 calc(-1 * clamp(14px,2vw,30px)) 22px; padding:clamp(14px,2vw,28px) clamp(14px,2vw,30px) 16px; background:linear-gradient(180deg,rgba(243,246,248,.98) 0%,rgba(243,246,248,.94) 100%); backdrop-filter:blur(8px);
 }
+
+.app.nav-collapsed .head{
+  padding-top:44px;
+}
 }
 
 @media(min-width:761px) and (max-height:480px){
@@ -494,6 +551,7 @@ nav button:hover{
   background-clip:padding-box;
 }
 
+main,
 nav,
 .dayseg,
 .modal-b,
@@ -503,6 +561,7 @@ nav,
   scrollbar-width:thin; scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
+main::-webkit-scrollbar,
 nav::-webkit-scrollbar,
 .dayseg::-webkit-scrollbar,
 .modal-b::-webkit-scrollbar,
@@ -516,6 +575,7 @@ nav::-webkit-scrollbar,
   width:var(--scrollbar-size);
 }
 
+main::-webkit-scrollbar-track,
 nav::-webkit-scrollbar-track,
 .dayseg::-webkit-scrollbar-track,
 .modal-b::-webkit-scrollbar-track,
@@ -525,6 +585,7 @@ nav::-webkit-scrollbar-track,
   background:var(--scrollbar-track); border-radius:var(--radius-pill);
 }
 
+main::-webkit-scrollbar-thumb,
 nav::-webkit-scrollbar-thumb,
 .dayseg::-webkit-scrollbar-thumb,
 .modal-b::-webkit-scrollbar-thumb,
@@ -534,6 +595,7 @@ nav::-webkit-scrollbar-thumb,
   background:var(--scrollbar-thumb); border-radius:var(--radius-pill); border:2px solid var(--scrollbar-track);
 }
 
+main::-webkit-scrollbar-thumb:hover,
 nav::-webkit-scrollbar-thumb:hover,
 .dayseg::-webkit-scrollbar-thumb:hover,
 .modal-b::-webkit-scrollbar-thumb:hover,

@@ -652,7 +652,7 @@
 
 @media(min-width:761px) and (min-height:481px){
 .entrygrid > .tree{
-  position:sticky; top:112px; max-height:calc(100vh - 132px); overflow-y:auto; overscroll-behavior:contain; align-self:start;
+  position:sticky; top:112px; max-height:calc(100vh - 132px); overflow-y:auto; overscroll-behavior:contain; align-self:start; scrollbar-width:thin; scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track);
 }
 }
 
@@ -691,25 +691,29 @@
 
 .qc-sheet-wrap::-webkit-scrollbar,
 .qc-table-card::-webkit-scrollbar,
-.panel:has(> .qc-sheet-wrap)::-webkit-scrollbar{
+.panel:has(> .qc-sheet-wrap)::-webkit-scrollbar,
+.entrygrid > .tree::-webkit-scrollbar{
   width:var(--scrollbar-size); height:var(--scrollbar-size);
 }
 
 .qc-sheet-wrap::-webkit-scrollbar-track,
 .qc-table-card::-webkit-scrollbar-track,
-.panel:has(> .qc-sheet-wrap)::-webkit-scrollbar-track{
+.panel:has(> .qc-sheet-wrap)::-webkit-scrollbar-track,
+.entrygrid > .tree::-webkit-scrollbar-track{
   background:var(--scrollbar-track); border-radius:var(--radius-pill);
 }
 
 .qc-sheet-wrap::-webkit-scrollbar-thumb,
 .qc-table-card::-webkit-scrollbar-thumb,
-.panel:has(> .qc-sheet-wrap)::-webkit-scrollbar-thumb{
+.panel:has(> .qc-sheet-wrap)::-webkit-scrollbar-thumb,
+.entrygrid > .tree::-webkit-scrollbar-thumb{
   background:var(--scrollbar-thumb); border-radius:var(--radius-pill); border:2px solid var(--scrollbar-track); background-clip:padding-box;
 }
 
 .qc-sheet-wrap::-webkit-scrollbar-thumb:hover,
 .qc-table-card::-webkit-scrollbar-thumb:hover,
-.panel:has(> .qc-sheet-wrap)::-webkit-scrollbar-thumb:hover{
+.panel:has(> .qc-sheet-wrap)::-webkit-scrollbar-thumb:hover,
+.entrygrid > .tree::-webkit-scrollbar-thumb:hover{
   background:var(--scrollbar-thumb-hover);
 }
 
@@ -717,7 +721,8 @@
 .qc-table-card::-webkit-scrollbar-button,
 .panel:has(> .qc-sheet-wrap)::-webkit-scrollbar-button,
 .lj-qc-strip::-webkit-scrollbar-button,
-.chart-scroll::-webkit-scrollbar-button{
+.chart-scroll::-webkit-scrollbar-button,
+.entrygrid > .tree::-webkit-scrollbar-button{
   width:0; height:0; display:none;
 }
 

@@ -79,16 +79,16 @@ function issueRowHtml(o){
   return `<div class="issue-row ${o.f.level}"><div class="issue-row-main"><b>${esc(actionLevelShort(o.t,o.l.level,o.l.lot))} · ${stateName(o.f.level)}</b><div class="meta">${fmt(o.p.val)} ${esc(o.t.unit||'')} · ${rules||'—'} · ${err}</div><div class="action-chipline"><span class="action-chip ${wf.cls}">${esc(wf.label)}</span></div><div class="hint">${hint}</div></div>${canWrite()?`<button class="btn ghost sm" onclick="fillAction('${o.t.id}',${o.l.level},'${jsq(rules)}','${jsq(err)}','${jsq(hint)}','${jsq(o.p.id||'')}','${jsq(o.p.date||'')}')">${hasAction?'Bổ sung':'Ghi nhận'}</button>`:''}</div>`;
 }
 function pageActionsV4(){
-  const tests=operationalTests(),opts=tests.map(t=>`<option value="${escAttr(t.id)}">${esc(t.name)}</option>`).join('');
+  const tests=operationalTests(),opts=tests.map(t=>`<option value="${escAttr(t.id)}">${esc(testDisplayName(t))}</option>`).join('');
   const firstTest=tests[0],firstLevel=firstTest&&operationalLevels(firstTest)[0],firstLevelLabel=firstLevel?actionLevelLabel(firstLevel):'';
   const issues=currentIssues();
   const issueGroups=groupIssuesByTestDate(issues);
-  const issueHtml=issueGroups.length?issueGroups.map(g=>`<div class="issue-group ${g.worst}"><div class="issue-group-h"><div><b>${esc(g.t.name)}</b><span class="issue-group-date">${vnDate(g.date)}</span></div><span class="issue-group-count">${g.items.length} vi phạm</span></div><div class="issue-group-body">${g.items.map(issueRowHtml).join('')}</div></div>`).join(''):'<div class="alert ok">Không có vi phạm/cảnh báo mới cần ghi nhận.</div>';
+  const issueHtml=issueGroups.length?issueGroups.map(g=>`<div class="issue-group ${g.worst}"><div class="issue-group-h"><div><b>${esc(testDisplayName(g.t))}</b><span class="issue-group-date">${vnDate(g.date)}</span></div><span class="issue-group-count">${g.items.length} vi phạm</span></div><div class="issue-group-body">${g.items.map(issueRowHtml).join('')}</div></div>`).join(''):'<div class="alert ok">Không có vi phạm/cảnh báo mới cần ghi nhận.</div>';
   const rows=(state.actions||[]).slice().reverse().map((a,idx)=>{const realIdx=state.actions.length-1-idx,t=state.tests.find(x=>x.id===a.testId),wf=actionWorkflowStatus(a),rerun=actionRerunStatus(a),approval=actionApprovalStatus(a),createdTime=a.createdAt?formatDateTimeVN(a.createdAt).split(' ')[0]:'';
     const approveMeta=approval==='pending'?'':`<div class="action-note">${esc(a.approvedBy||'')} ${a.approvedAt?formatDateTimeVN(a.approvedAt):''}${a.approvalNote?' · '+esc(a.approvalNote):''}</div>`;
     return `<tr>
       <td><div class="action-date">${vnDate(a.date)}</div>${createdTime?`<div class="action-time">${esc(createdTime)}</div>`:''}</td>
-      <td><div class="action-test">${t?esc(t.name):esc(a.rule||'Cập nhật')}</div><div class="action-sub">${t?esc(actionLevelShort(t,a.level,a.lot)):esc(a.lot?'Nhóm lô '+a.lot:'—')}</div><div class="action-rule">${t?esc(a.rule||'—')+' · '+esc(a.errorType||'—'):esc(a.errorType||'—')}</div></td>
+      <td><div class="action-test">${t?esc(testDisplayName(t)):esc(a.rule||'Cập nhật')}</div><div class="action-sub">${t?esc(actionLevelShort(t,a.level,a.lot)):esc(a.lot?'Nhóm lô '+a.lot:'—')}</div><div class="action-rule">${t?esc(a.rule||'—')+' · '+esc(a.errorType||'—'):esc(a.errorType||'—')}</div></td>
       <td><div class="action-text">${esc(a.action||'')}</div><div class="action-sub">Người thực hiện: ${esc(a.by||'—')}</div></td>
       <td><div class="action-status-stack"><span class="action-chip ${rerun.cls}">${esc(rerun.label)}</span>${actionApprovalTag(a)}<span class="action-chip ${wf.cls}">${esc(wf.complete?'Hoàn tất':'Chưa hoàn tất')}</span>${approveMeta}</div></td>
       <td>${actionReviewButtons(realIdx,a)}</td>

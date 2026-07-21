@@ -17,6 +17,25 @@ const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/sigma-cohort-se
 assert.equal(ctx.sgInputDisplayValue(.721694321),'0.72','CV/Bias display is concise while stored precision remains unchanged');
 assert.equal(ctx.sgInputDisplayValue(''),'');
 
+// A stopped lot group is no longer operational for new QC entry, but its levels,
+// lot-specific IQC cohort and target snapshots must remain available to old Sigma periods.
+{
+  const historical=run(ctx, `(function(){
+    state.tests=[{id:'H1',name:'Sodium',levels:[{level:1,qcLotId:'L1',lot:'1101',mean:140,sd:2.5,meanSdHistory:[{qcLotId:'L1',lot:'1101',mean:140,sd:2.5}]}]}];
+    state.qcLots=[{id:'L1',lotNo:'1101',level:1}];
+    state.lotGroups=[{id:'G1',name:'1101',lotIds:['L1'],active:true,status:'stopped'}];
+    state.data={H1:[
+      {id:'a',date:'2020-06-02',level:1,lot:'1101',val:139,qcMean:140,qcSd:2.5},
+      {id:'b',date:'2020-06-20',level:1,lot:'1101',val:141,qcMean:140,qcSd:2.5}
+    ]};
+    state.sigmaData={H1:[{id:'P1',period:'2020-06',lv:{}}]};
+    operationalLevels=function(){return[];};
+    const t=state.tests[0],e=state.sigmaData.H1[0],groups=sgCohortGroups(t,e);
+    return{levels:sgVisibleLevels(t),periodLevels:sgPeriodLevels(t,e),groups:groups.map(g=>({level:g.level,configuredLot:g.configuredLot,lots:g.cohorts.map(c=>c.lot),targetMean:g.cohorts[0]&&g.cohorts[0].targetMean,targetSd:g.cohorts[0]&&g.cohorts[0].targetSd}))};
+  })()`);
+  assert.deepEqual(JSON.parse(JSON.stringify(historical)),{levels:[1],periodLevels:[1],groups:[{level:1,configuredLot:'1101',lots:['1101'],targetMean:140,targetSd:2.5}]},'stopping a lot group must not hide or detach its historical Sigma cohort');
+}
+
 {
   const source = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'sigma.js'), 'utf8');
   const sigmaCss = fs.readFileSync(path.join(__dirname, '..', 'assets', 'professional-sigma.css'), 'utf8');
@@ -224,6 +243,10 @@ assert.equal(ctx.sgInputDisplayValue(''),'');
   const stats=ctx.sgBiasStats([{lab:98,target:100},{lab:102,target:100}]);
   assert.equal(stats.signedMean,0,'opposite signed Bias values cancel in the diagnostic signed mean');
   assert.equal(stats.rms,2,'RMS keeps the analytical error magnitude used by Sigma');
+  // A single round has nothing to cancel: keep its sign instead of forcing sqrt(bias²).
+  const single=ctx.sgBiasStats([{lab:98,target:100}]);
+  assert.equal(single.signedMean,-2);
+  assert.equal(single.rms,-2,'with one round, the applied Bias keeps its sign instead of losing direction to RMS');
 }
 
 // --- CLIA absolute limits may only be converted at a matching measurement unit ---
@@ -237,6 +260,13 @@ assert.equal(ctx.sgInputDisplayValue(''),'');
   ctx.sgSetLevelTeaSnapshot(mismatch,entry,1,true);
   assert.equal(entry.lv[1].teaCriterionRule,'percent','the saved criterion records what was actually applied');
   assert.equal(entry.lv[1].teaCriterionAbsolute,undefined,'an incompatible absolute limit is not persisted as if it had been used');
+  // Calcium has no CLIA percentage alternative (only an absolute limit) — with a
+  // mismatched unit there is nothing usable at all, so no rule should be recorded.
+  const noFallback={name:'Calcium',unit:'mg/dL',teaSource:'clia'};
+  const entry2={teaSource:'clia',lv:{1:{sourceTargetMean:1}}};
+  ctx.sgSetLevelTeaSnapshot(noFallback,entry2,1,true);
+  assert.equal(entry2.lv[1].tea,undefined,'no TEa could be resolved');
+  assert.equal(entry2.lv[1].teaCriterionRule,undefined,'must not record a rule label with no value behind it');
 }
 
 // --- A period snapshot must keep its reviewed TEa when the current reference later changes ---

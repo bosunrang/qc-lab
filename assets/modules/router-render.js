@@ -152,6 +152,14 @@ function nav(){const groups=[['Theo dõi',['dash','entry','westgard','sigma']],[
    duyệt thường thì window.qcLicense không tồn tại nên bỏ qua — không ảnh hưởng. */
 function licensedLabName(){const lic=window.qcLicense;return lic&&lic.lab?String(lic.lab):'';}
 function sideFoot(){const el=document.getElementById('sideFoot');if(!el)return;const app=window.QCLAB_APP||{version:'dev',releaseDate:''};const lab=licensedLabName();const licLine=lab?`<div class="hint" style="margin-top:6px;color:#8ea3b2">Cấp phép cho: <b style="color:#c3d3dd">${esc(lab)}</b></div>`:'';el.innerHTML=`<div class="foot-panel"><div class="foot-title">Phiên bản</div><div><b>${esc(app.name||'QC Lab')} ${esc(app.version||'dev')}</b></div><div>${esc(app.releaseDate||'Bản phát triển')}</div><div class="hint" style="margin-top:6px;color:#8ea3b2">Nội kiểm xét nghiệm · chạy cục bộ</div>${licLine}</div>`;}
+/* Ẩn/hiện thanh điều hướng bên trái: sở thích hiển thị riêng của máy này, không
+   phải dữ liệu nghiệp vụ nên lưu localStorage thay vì state/sync. Script đồng bộ
+   trong index.html đọc cùng khóa để áp trạng thái ngay khi tải trang, tránh nháy. */
+function toggleSidebarNav(){
+  const app=document.getElementById('appShell');if(!app)return;
+  const collapsed=app.classList.toggle('nav-collapsed');
+  try{localStorage.setItem('qclab_nav_collapsed',collapsed?'1':'0');}catch(e){}
+}
 function go(p){if(!canAccessPage(p))return;page=p;nav();rerender();resetMainScroll();requestAnimationFrame(()=>{const main=document.getElementById('main');if(main)main.focus({preventScroll:true});});}
 function resetMainScroll(){const m=document.querySelector('main');if(m)m.scrollTop=0;window.scrollTo(0,0);}
 function topUserBox(){if(!currentUser)return '';const name=currentUser.name||currentUser.username;const initial=esc(String(name||'U').trim().charAt(0).toUpperCase()||'U');return `<div class="top-user"><div class="avatar">${initial}</div><div class="meta"><div class="name">${esc(name)}</div><div class="role">${roleLabel(currentUser.role)}</div></div><button onclick="logout()" title="Đăng xuất"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M21 5v14"/></svg>Đăng xuất</button></div>`;}
@@ -190,7 +198,7 @@ function pageDash(){
       const d=daysToExp(l.exp);if(d!=null&&d<=30)exp.push({t,l,d});
     });
     const latest=lastPoints.sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''),'vi',{numeric:true})||pointRunNo(a)-pointRunNo(b)).slice(-1)[0];
-    const search=searchText([t.name,t.machine,t.section,t.method,t.unit,...levelData.map(x=>`M${x.l.level} ${x.l.lot||''}`)].join(' '));
+    const search=searchText([t.name,testDisplayName(t),t.machine,t.section,t.method,t.unit,...levelData.map(x=>`M${x.l.level} ${x.l.lot||''}`)].join(' '));
     statusMemo.set(t.id,s);
     return{t,s,levelData,todayCount,totalPoints,latest,search,missingToday:todayCount<levelData.length};
   });
@@ -201,7 +209,7 @@ function pageDash(){
      dòng cảnh báo hết hạn cho từng xét nghiệm riêng lẻ. */
   const expByLot=new Map();
   exp.forEach(e=>{const key=e.l.qcLotId||(e.l.lot||'')+'|'+e.l.level;const cur=expByLot.get(key);if(!cur||e.d<cur.d)expByLot.set(key,{...e,count:(cur?cur.count:0)+1});else cur.count++;});
-  const shiftItem=(o,cls)=>`<div class="shift-item ${cls}"><div><b>${esc(o.t.name)} · M${o.l.level}</b><div class="meta">${vnDate(o.p.date)} · ${fmt(o.p.val)} ${esc(o.t.unit||'')} · ${o.rules.join(', ')||'—'}</div></div><button class="btn ghost sm" onclick="entrySel={testId:'${o.t.id}',level:${o.l.level}};entryStart=null;entryEnd=null;go('entry')">Xem</button></div>`;
+  const shiftItem=(o,cls)=>`<div class="shift-item ${cls}"><div><b>${esc(testDisplayName(o.t))} · M${o.l.level}</b><div class="meta">${vnDate(o.p.date)} · ${fmt(o.p.val)} ${esc(o.t.unit||'')} · ${o.rules.join(', ')||'—'}</div></div><button class="btn ghost sm" onclick="entrySel={testId:'${o.t.id}',level:${o.l.level}};entryStart=null;entryEnd=null;go('entry')">Xem</button></div>`;
   const urgentHtml=urgent.slice(0,5).map(o=>shiftItem(o,'rej')).join('');
   const watchHtml=watch.slice(0,4).map(o=>shiftItem(o,'warn')).join('');
   const followHtml=urgentHtml||watchHtml?`<div class="dash-list">${urgentHtml}${watchHtml}</div>`:'<div class="alert ok">Không có điểm bị loại/cảnh báo cần xử lý ngay.</div>';
@@ -222,7 +230,7 @@ function pageDash(){
     const levels=levelData.map(x=>`<span class="dash-level-pill ${x.todayLevel?'done':''}">M${x.l.level}${x.l.lot?` · ${esc(x.l.lot)}`:''}${x.st?` · CV ${fmt(x.st.cv)}%`:''}</span>`).join('');
     const latestText=latest?`${vnDate(latest.date)} · M${latest._level} · ${fmt(latest.val)}`:'Chưa có điểm';
     const rank=s==='rej'?0:s==='warn'?1:todayCount<lvls.length?2:s==='ok'?3:4;
-    return{rank,name:t.name,html:`<tr class="${s}" data-search="${escAttr(search)}"><td><div class="dash-test-name">${esc(t.name)}</div><div class="dash-test-sub">${esc(t.machine||'Chưa gán máy')}</div></td><td><div class="dash-level-list">${levels}</div></td><td>${todayTag}</td><td class="num"><b>${totalPoints}</b></td><td>${statusTag}</td><td><span class="dash-latest">${latestText}</span></td><td><button class="btn ghost sm" onclick="entrySel={testId:'${t.id}',level:${lvls[0].level}};entryStart=null;entryEnd=null;go('entry')">Xem QC</button></td></tr>`};
+    return{rank,name:t.name,html:`<tr class="${s}" data-search="${escAttr(search)}"><td><div class="dash-test-name">${esc(testDisplayName(t))}</div><div class="dash-test-sub">${esc(t.machine||'Chưa gán máy')}</div></td><td><div class="dash-level-list">${levels}</div></td><td>${todayTag}</td><td class="num"><b>${totalPoints}</b></td><td>${statusTag}</td><td><span class="dash-latest">${latestText}</span></td><td><button class="btn ghost sm" onclick="entrySel={testId:'${t.id}',level:${lvls[0].level}};entryStart=null;entryEnd=null;go('entry')">Xem QC</button></td></tr>`};
   }).sort((a,b)=>a.rank-b.rank||String(a.name||'').localeCompare(String(b.name||''),'vi')).map(x=>x.html).join('');
   const testListHtml=statusItems.length?`<div class="dash-test-list"><table><thead><tr><th>Xét nghiệm</th><th>Mức QC / lô</th><th>QC hôm nay</th><th class="num">Tổng điểm</th><th>Westgard</th><th>Gần nhất</th><th></th></tr></thead><tbody>${testRows}</tbody></table></div><div id="dashTestEmpty" class="dash-test-empty" style="display:none">Không tìm thấy xét nghiệm phù hợp.</div>`:`<div class="dash-test-empty">Không tìm thấy xét nghiệm phù hợp.</div>`;
   const done=todayPts,doneTests=Math.max(0,tests.length-missingToday.length),pct=tests.length?Math.round(doneTests/tests.length*100):0;
@@ -289,8 +297,8 @@ function pageEntry(rightOnly=false){
         const rows=grp.tests.sort((a,b)=>operationalTestOrder(a)-operationalTestOrder(b)).map(t=>{const levels=operationalLevels(t),on=entrySel.testId===t.id,preferred=levels.find(x=>entrySel.level===x.level)||levels[0],wg=activeWestgard(t);let worst='none';
           levels.forEach(l=>{const pts=pointsForLot(t.id,l.level,l.lot||''),lastPoint=pts[pts.length-1],last=lastPoint&&wg.byPoint.get(lastPoint.id)||null,lastLevel=last?last.level:'none';if(ord[lastLevel]>ord[worst])worst=lastLevel;});
           if(ord[worst]>ord[groupWorst])groupWorst=worst;
-          const s=searchText([t.name,t.machine,grp.name,...levels.map(l=>l.lot)].join(' '));
-          return `<div class="tnode tn-config ${on?'on':''}" data-tree-role="assay" data-test-id="${escAttr(t.id)}" data-search="${escAttr(s)}" role="treeitem" tabindex="0" aria-current="${on?'true':'false'}" style="${mo&&go?'':'display:none'}" onclick="entryPick('${t.id}',${preferred?preferred.level:1})" onkeydown="entryTreeKey(event)"><span class="config-name">${esc(t.name)}</span><span class="state ${worst==='none'?'':worst}">${stateName(worst)}</span></div>`;});
+          const s=searchText([t.name,testDisplayName(t),t.machine,grp.name,...levels.map(l=>l.lot)].join(' '));
+          return `<div class="tnode tn-config ${on?'on':''}" data-tree-role="assay" data-test-id="${escAttr(t.id)}" data-search="${escAttr(s)}" role="treeitem" tabindex="0" aria-current="${on?'true':'false'}" style="${mo&&go?'':'display:none'}" onclick="entryPick('${t.id}',${preferred?preferred.level:1})" onkeydown="entryTreeKey(event)"><span class="config-name">${esc(testDisplayName(t))}</span><span class="state ${worst==='none'?'':worst}">${stateName(worst)}</span></div>`;});
         tree+=`<div class="tnode tn-test ${go?'open':''}" data-tree-role="group" data-key="${escAttr(gk)}" data-search="${escAttr(searchText(grp.name+' '+grp.tests.map(t=>t.name).join(' ')))}" role="treeitem" tabindex="0" aria-expanded="${go}" style="${mo?'':'display:none'}" onclick="treeToggle('${jsq(gk)}')" onkeydown="entryTreeKey(event)"><span class="caret" aria-hidden="true">${go?'−':'+'}</span>${esc(grp.name)}<span class="state ${groupWorst==='none'?'':groupWorst}">${stateName(groupWorst)}</span></div>`;
         tree+=rows.join('');
       });
@@ -381,7 +389,7 @@ function pageEntry(rightOnly=false){
     const doneLevels=opLevels.filter(x=>dayGroup.runs.some(g=>g.levels[x.level])).length,rowCls=[dayGroup.date===today?'today':'',dayGroup.date<=today&&doneLevels<opLevels.length?'missing':'',hasPoint?'has-data':''].filter(Boolean).join(' ');
     return `<tr class="${rowCls}" data-date="${dayGroup.date}"><td><span>${dateObj(dayGroup.date).getDate()}</span>${dayGroup.date===today?'<b>Hôm nay</b>':''}</td>${cells}<td class="qc-staff-cell">${staffCell}</td><td>${[...new Set(warnRules)].join(', ')||'—'}</td><td>${[...new Set(rejRules)].join(', ')||'—'}</td><td>${status}</td><td>${note}</td></tr>`;}).join('');
   const worksheet=`<div class="panel qc-sheet-panel"><div class="qc-sheet-heading">
-      <div class="qc-sheet-title"><span>Bảng nhập QC</span><strong>${esc(t.name)}</strong><small>Lô ${esc(entryLotLabels(opLevels))}</small></div>
+      <div class="qc-sheet-title"><span>Bảng nhập QC</span><strong>${esc(testDisplayName(t))}</strong><small>Lô ${esc(entryLotLabels(opLevels))}</small></div>
       <div class="qc-month-area"><div class="qc-month-picker"><select aria-label="Chọn tháng" onchange="entrySetSheetPart('month',this.value)">${sheetMonthOptions}</select><select aria-label="Chọn năm" onchange="entrySetSheetPart('year',this.value)">${sheetYearOptions}</select><button class="btn ghost sm qc-current-month" onclick="entrySetSheetMonth(isoMonth())">Tháng hiện tại</button><button class="btn teal sm qc-today-jump" onclick="entryGoToday()">Tới hôm nay</button></div></div></div>
       <div class="qc-sheet-wrap" role="region" aria-label="Bảng nhập QC theo tháng" tabindex="0"><table class="qc-sheet"><thead><tr><th>Ngày</th>${levelHead}<th>NV thực hiện</th><th>Vi phạm cảnh báo</th><th>Vi phạm loại bỏ</th><th>Chấp nhận</th><th>Ghi chú</th></tr></thead>
        <tbody>${sheetRows||`<tr><td colspan="${6+opLevels.length}" class="empty-cell">Chưa có điểm nào trong khoảng này.</td></tr>`}</tbody></table></div>
@@ -721,11 +729,11 @@ function pageWestgardArchived(archivedGroups){
   if(!testEntries.length)return headOnly('Phân tích Westgard','Xem lại Westgard theo nhóm lô đã dừng/lưu trữ')+
     `<div class="panel"><h3>Thiết lập phân tích</h3>${wgViewModeTabs(archivedGroups)}<div class="wg-test-picker">${searchBox}${groupPicker}</div></div>
      <div class="panel">${emptyState('Không tìm thấy xét nghiệm nào','Nhóm lô này không gắn với xét nghiệm/mức nào có Mean/SD hợp lệ.')}</div>`;
-  const matchedTests=testEntries.filter(e=>!q||searchText(e.t.name).includes(q)||searchText(instrumentName(e.t.instrumentId,e.t.machine)).includes(q));
+  const matchedTests=testEntries.filter(e=>!q||searchText(e.t.name).includes(q)||searchText(testDisplayName(e.t)).includes(q)||searchText(instrumentName(e.t.instrumentId,e.t.machine)).includes(q));
   const testList=matchedTests.length?matchedTests:testEntries; // gõ số lô (không khớp tên xét nghiệm nào) thì vẫn cho chọn đủ xét nghiệm của nhóm vừa nhảy tới
   if(matchedTests.length&&!matchedTests.some(e=>e.t.id===wgArchivedTestId))wgArchivedTestId=matchedTests[0].t.id;
   else if(!testEntries.some(e=>e.t.id===wgArchivedTestId))wgArchivedTestId=testEntries[0].t.id;
-  const testOpts=testList.map(e=>`<option value="${e.t.id}" ${e.t.id===wgArchivedTestId?'selected':''}>${esc(e.t.name)}</option>`).join('');
+  const testOpts=testList.map(e=>`<option value="${e.t.id}" ${e.t.id===wgArchivedTestId?'selected':''}>${esc(testDisplayName(e.t))}</option>`).join('');
   const testPicker=`<div><label>Chọn xét nghiệm <span class="hint">(${testList.length}/${testEntries.length})</span></label><select onchange="if(this.value){wgSetArchivedTest(this.value)}">${testOpts}</select></div>`;
   const entry=testEntries.find(e=>e.t.id===wgArchivedTestId)||testEntries[0];
   const sortedRows=entry.rows.slice().sort((a,b)=>a.l.level-b.l.level);

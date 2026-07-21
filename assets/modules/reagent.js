@@ -5,7 +5,7 @@ const RCC={teal:'#0c6f78',tealDeep:'#0a5d65',ink:'#172833',muted:'#667b89',line:
 const RCPAD={l:54,r:18,t:18,b:46};
 const reagentUiState=ReagentUIState;
 function rcBlank(){return {id:uid(),test:{reagent:'Hóa chất mới',lotOld:'',lotNew:'',date:'',operator:'',sampleType:'Mẫu bệnh nhân',unit:'',biasTarget:6,alpha:0.05,coverageConfirmed:false},rows:[['',''],['',''],['',''],['',''],['','']]};}
-function rcLabel(d){const t=d.test;let s=t.reagent||'Hóa chất mới';if(t.lotOld||t.lotNew)s+=' — '+(t.lotOld||'?')+'→'+(t.lotNew||'?');return s;}
+function rcLabel(d){const t=d.test;let s=teaAnalyteDisplay(t.reagent)||t.reagent||'Hóa chất mới';if(t.lotOld||t.lotNew)s+=' — '+(t.lotOld||'?')+'→'+(t.lotNew||'?');return s;}
 function rcAct(){return state.reagentTests.find(d=>d.id===rcId);}
 function rcSaveSoon(){clearTimeout(rcSaveT);rcSaveT=setTimeout(save,600);}
 /* stats */
@@ -231,8 +231,8 @@ function rcCreateSearchSet(v){
 }
 function renderRcCreateModal(){
   const q=rcCreateModalQ.trim(),ql=searchText(q);
-  const cats={};REFTESTS.forEach(r=>{if(ql&&![r[0],r[1],r[4]].some(v=>searchText(v).includes(ql)))return;(cats[r[4]]=cats[r[4]]||[]).push(r);});
-  let refs='';Object.keys(cats).forEach(cat=>{refs+=`<div class="refcat">${esc(cat)}</div>`;cats[cat].forEach(r=>{refs+=`<button class="refrow" onclick="rcCreateFrom('${jsq(r[0])}','${jsq(r[1]||'')}')">${esc(r[0])}</button>`;});});
+  const cats={};REFTESTS.forEach(r=>{if(ql&&![r[0],r[1],r[4],teaAnalyteDisplay(r[0])].some(v=>searchText(v).includes(ql)))return;(cats[r[4]]=cats[r[4]]||[]).push(r);});
+  let refs='';Object.keys(cats).forEach(cat=>{refs+=`<div class="refcat">${esc(cat)}</div>`;cats[cat].forEach(r=>{refs+=`<button class="refrow" onclick="rcCreateFrom('${jsq(r[0])}','${jsq(r[1]||'')}')">${esc(teaAnalyteDisplay(r[0]))}</button>`;});});
   const createTyped=q?`<button class="refrow" onclick="rcCreateFrom('${jsq(q)}','')">+ Tạo "${esc(q)}"</button>`:'<button class="refrow" onclick="rcCreateFrom(\'Hóa chất mới\',\'\')">+ Tạo hóa chất trống</button>';
   openModal(`<div class="modal"><div class="modal-h"><h3>Thêm hóa chất</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
     <div class="modal-b"><input id="rcCreateSearch" placeholder="Tìm xét nghiệm hoặc gõ tên hóa chất mới..." value="${escAttr(rcCreateModalQ)}" oninput="rcCreateSearchSet(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();rcCreateFrom(this.value,'')}">

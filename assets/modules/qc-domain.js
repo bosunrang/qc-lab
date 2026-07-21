@@ -319,5 +319,5 @@ function acceptedLotPoints(t,level,withIndex=false){
   if(memoKey)acceptedMemo.set(memoKey,out);
   return out;
 }
-function testSelectLabel(t,list=state.tests){const lvls=isOperationalTest(t)?operationalLevels(t):(t.levels||[]),lots=[...new Set(lvls.map(l=>l.lot).filter(Boolean))],same=(list||[]).filter(x=>String(x.name||'').trim().toLowerCase()===String(t.name||'').trim().toLowerCase()).length>1;return`${t.name}${lots.length?' · LOT '+lots.join('/'):''}${same&&t.machine?' · '+t.machine:''}`;}
+function testSelectLabel(t,list=state.tests){const lvls=isOperationalTest(t)?operationalLevels(t):(t.levels||[]),lots=[...new Set(lvls.map(l=>l.lot).filter(Boolean))],same=(list||[]).filter(x=>String(x.name||'').trim().toLowerCase()===String(t.name||'').trim().toLowerCase()).length>1;return`${testDisplayName(t)}${lots.length?' · LOT '+lots.join('/'):''}${same&&t.machine?' · '+t.machine:''}`;}
 function searchText(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').toLowerCase().trim();}

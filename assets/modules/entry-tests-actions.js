@@ -98,7 +98,7 @@ async function saveTargetMatrix(){
 }
 function openTargetSwitchModal(){
   const {group,overwrites}=targetSwitchCtx||{};if(!group)return;
-  const names=[...new Set(overwrites.map(pick=>(state.tests.find(t=>t.id===pick.testId)||{}).name).filter(Boolean))].join(', ');
+  const names=[...new Set(overwrites.map(pick=>{const pt=state.tests.find(t=>t.id===pick.testId);return pt&&testDisplayName(pt);}).filter(Boolean))].join(', ');
   openModal(`<div class="modal">
     <div class="modal-h"><h3>Áp dụng nhóm lô ${esc(group.name)}?</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
     <div class="modal-b">
@@ -143,7 +143,7 @@ function openQcHistoryDetail(tid,level,lotNo=''){
   const histRows=hist.length?hist.map(h=>`<tr><td><b>${esc(h.lot||lotNo||'—')}</b></td><td class="num">${fmt(h.mean)}</td><td class="num">${h.low!=null?fmt(h.low):'—'}</td><td class="num">${h.high!=null?fmt(h.high):'—'}</td><td class="num">${fmt(h.sd,3)}</td><td>${h.effectiveFrom?vnDate(h.effectiveFrom):'Không giới hạn'} → ${h.effectiveTo?vnDate(h.effectiveTo):'Không giới hạn'}</td><td>${h.source==='lab'?'PXN':'NSX'}</td></tr>`).join(''):'';
   const pts=(state.data[tid]||[]).filter(p=>+p.level===+level&&(!lotNo||(p.lot||'')===lotNo)).sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))||String(a.runId||'').localeCompare(String(b.runId||''),'vi',{numeric:true}));
   const ptRows=pts.map(p=>{const mean=Number.isFinite(+p.qcMean)?+p.qcMean:+l.mean,sd=Number.isFinite(+p.qcSd)&&+p.qcSd>0?+p.qcSd:+l.sd,z=sd?(+p.val-mean)/sd:NaN,abs=Math.abs(z),lv=abs>3?'Loại bỏ':abs>2?'Cảnh báo':'Đạt',cls=abs>3?'rej':abs>2?'warn':'ok',staff=pointStaff(p);return `<tr><td>${vnDate(p.date)}</td><td>${esc(p.runId||'—')}</td><td class="num">${fmt(p.val)}</td><td class="num">${Number.isFinite(z)?(z>=0?'+':'')+fmt(z)+'s':'—'}</td><td class="num">${fmt(mean)}</td><td class="num">${fmt(sd,3)}</td><td><span class="tag ${cls}">${lv}</span></td><td>${esc(staff.code||'—')}</td></tr>`;}).join('');
-  openModal(`<div class="modal rcfg-history-detail-modal"><div class="modal-h"><div><h3>${esc(t.name)} · Mức ${level}${lotNo?' · Lô '+esc(lotNo):''}</h3></div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
+  openModal(`<div class="modal rcfg-history-detail-modal"><div class="modal-h"><div><h3>${esc(testDisplayName(t))} · Mức ${level}${lotNo?' · Lô '+esc(lotNo):''}</h3></div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
     <h4>Mean/SD đã dùng</h4>${histRows?`<table class="history-detail-table"><thead><tr><th>Lô QC</th><th class="num">Mean</th><th class="num">Giới hạn dưới</th><th class="num">Giới hạn trên</th><th class="num">SD</th><th>Hiệu lực</th><th>Nguồn</th></tr></thead><tbody>${histRows}</tbody></table>`:emptyState('Chưa có mốc Mean/SD','Không tìm thấy lịch sử Mean/SD cho lô này.')}
     <h4 style="margin-top:18px">Điểm QC đã nhập (${pts.length})</h4>${ptRows?`<table class="history-detail-table"><thead><tr><th>Ngày</th><th>Lần chạy</th><th class="num">Giá trị</th><th class="num">Z</th><th class="num">Mean lúc nhập</th><th class="num">SD lúc nhập</th><th>Kết luận nhanh</th><th>NV</th></tr></thead><tbody>${ptRows}</tbody></table>`:emptyState('Chưa có điểm QC','Không có điểm QC nào khớp với lô/mức này.')}</div><div class="modal-f"><button class="btn teal" onclick="closeModal()">Đóng</button></div></div>`);
 }
@@ -152,7 +152,7 @@ async function openConfigPanel(id=''){
   if(!state.instruments.length){await infoDialog('Hãy tạo máy xét nghiệm trước khi tạo Panel QC.');setManageTab('instruments');return;}
   const p=state.qcPanels.find(x=>x.id===id)||{testIds:[],instrumentId:state.instruments[0]&&state.instruments[0].id,active:true};
   const instruments=state.instruments.map(i=>`<option value="${i.id}" ${i.id===p.instrumentId?'selected':''}>${esc(i.name)}${i.model?' · '+esc(i.model):''}</option>`).join('');
-  const panelTestRows=(instrumentId,selected=[])=>state.tests.filter(t=>t.instrumentId===instrumentId).map(t=>`<label><input class="cfg-panel-test" type="checkbox" value="${t.id}" ${selected.includes(t.id)?'checked':''}><span><b>${esc(t.name)}</b><small>${esc(instrumentName(t.instrumentId,t.machine))} · ${esc(t.unit||'Chưa có đơn vị')}</small></span></label>`).join('')||'<div class="empty" style="padding:14px">Máy này chưa có xét nghiệm.</div>';
+  const panelTestRows=(instrumentId,selected=[])=>state.tests.filter(t=>t.instrumentId===instrumentId).map(t=>`<label><input class="cfg-panel-test" type="checkbox" value="${t.id}" ${selected.includes(t.id)?'checked':''}><span><b>${esc(testDisplayName(t))}</b><small>${esc(instrumentName(t.instrumentId,t.machine))} · ${esc(t.unit||'Chưa có đơn vị')}</small></span></label>`).join('')||'<div class="empty" style="padding:14px">Máy này chưa có xét nghiệm.</div>';
   openModal(`<div class="modal rcfg-modal"><div class="modal-h"><div><h3>${id?'Sửa Panel QC':'Tạo Panel QC'}</h3></div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
     <div class="grid2"><div><label>Tên Panel QC</label><input id="cfgPanelName" value="${escAttr(p.name||'')}" placeholder="VD: Sinh hóa AU5800"></div><div><label>Máy xét nghiệm</label><select id="cfgPanelInstrument" onchange="renderConfigPanelTests()">${instruments}</select></div></div>
     <label>Chọn xét nghiệm trong panel</label><div id="cfgPanelTests" class="group-lot-picker assay-group-picker">${panelTestRows(p.instrumentId,p.testIds||[])}</div>
@@ -163,7 +163,7 @@ async function openConfigPanel(id=''){
 function renderConfigPanelTests(){
   const root=document.getElementById('cfgPanelTests'),instrumentId=document.getElementById('cfgPanelInstrument').value;
   if(!root)return;
-  const rows=state.tests.filter(t=>t.instrumentId===instrumentId).map(t=>`<label><input class="cfg-panel-test" type="checkbox" value="${t.id}"><span><b>${esc(t.name)}</b><small>${esc(instrumentName(t.instrumentId,t.machine))} · ${esc(t.unit||'Chưa có đơn vị')}</small></span></label>`).join('');
+  const rows=state.tests.filter(t=>t.instrumentId===instrumentId).map(t=>`<label><input class="cfg-panel-test" type="checkbox" value="${t.id}"><span><b>${esc(testDisplayName(t))}</b><small>${esc(instrumentName(t.instrumentId,t.machine))} · ${esc(t.unit||'Chưa có đơn vị')}</small></span></label>`).join('');
   root.innerHTML=rows||'<div class="empty" style="padding:14px">Máy này chưa có xét nghiệm.</div>';
 }
 async function saveConfigPanel(id){
@@ -197,7 +197,7 @@ async function saveLotTransitionV2(id){
   const old=state.lotTransitions.find(x=>x.id===id),nowFinal=['accepted','rejected'].includes(status),finalChanged=nowFinal&&(!old||old.status!==status);
   if(old&&transitionSwitchesLot(old)&&status!=='accepted'){await infoDialog('Hồ sơ đã chấp nhận lô mới và đã áp dụng vào nhóm lô/Mean-SD, không thể đổi ngược trạng thái.');return;}
   const data={panelId,fromLotId,toLotId,startDate:startDate||isoToday(),status,criteria:old&&old.criteria||'',conclusion:old&&old.conclusion||'',approvedBy:finalChanged?userName():(old&&old.approvedBy||''),approvedAt:finalChanged?new Date().toISOString():(old&&old.approvedAt||''),note:old&&old.note||''};
-  if(status==='accepted'&&finalChanged){const check=inspectAcceptedLotTransition(data);if(!check.rows.length){await infoDialog('Panel đã chọn không có xét nghiệm nào đang sử dụng lô cũ. Hãy kiểm tra lại Panel và lô chuyển tiếp.');return;}if(check.missing.length){await infoDialog(`Chưa thể chấp nhận lô mới: ${check.missing.map(x=>x.t.name).join(', ')} chưa có Mean/SD riêng cho lô ${toLot.lotNo}. Hãy lưu Mean/SD ở chế độ “Dự kiến” trước.`);return;}}
+  if(status==='accepted'&&finalChanged){const check=inspectAcceptedLotTransition(data);if(!check.rows.length){await infoDialog('Panel đã chọn không có xét nghiệm nào đang sử dụng lô cũ. Hãy kiểm tra lại Panel và lô chuyển tiếp.');return;}if(check.missing.length){await infoDialog(`Chưa thể chấp nhận lô mới: ${check.missing.map(x=>testDisplayName(x.t)).join(', ')} chưa có Mean/SD riêng cho lô ${toLot.lotNo}. Hãy lưu Mean/SD ở chế độ “Dự kiến” trước.`);return;}}
   const tr=old?Object.assign(old,data):{id:uid(),...data};if(!old)state.lotTransitions.push(tr);
   const switched=applyAcceptedLotTransitionToConfig(tr);
   const wasDepleted=!!(state.qcLots.find(l=>l.id===fromLotId)||{}).depleted;

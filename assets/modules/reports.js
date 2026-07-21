@@ -26,13 +26,13 @@ async function printSigmaPeriod(periodId){
   const t=state.tests.find(x=>x.id===sgTest),entry=t&&sgData(t.id).find(x=>x.id===periodId);if(!t||!entry){await infoDialog('Chưa chọn được kỳ Sigma để in.');return;}
   const levels=sgVisibleLevels(t),row=sgRows(t,[entry],levels)[0],exportRows=sigmaReportRows(t.id,'period',entry.period,entry.id);if(!row||!row.rs.some(Boolean)||!exportRows.length){await infoDialog('Kỳ này chưa đủ dữ liệu Sigma để tạo báo cáo in.');return;}
   const period=vnPeriod(entry.period)||entry.period||'?',trace=sigmaTeaTrace(exportRows),valid=row.rs.some(r=>r&&r.classifiable)?[row]:[],machine=instrumentName(t.instrumentId,t.machine)||t.machine||'—';
-  let body=reportHeader('BÁO CÁO SIX SIGMA — '+esc(t.name)+' — '+esc(period),'Đánh giá hiệu năng phương pháp theo kỳ');
-  body+='<table><tr><th style="width:18%">Xét nghiệm</th><td>'+esc(t.name)+(t.unit?' ('+esc(t.unit)+')':'')+'</td><th style="width:15%">Kỳ báo cáo</th><td>'+esc(period)+'</td></tr><tr><th>Thiết bị</th><td>'+esc(machine)+'</td><th>Nguồn TEa</th><td>'+esc(trace||'Chưa có thông tin truy xuất')+'</td></tr></table>';
+  let body=reportHeader('BÁO CÁO SIX SIGMA — '+esc(testDisplayName(t))+' — '+esc(period),'Đánh giá hiệu năng phương pháp theo kỳ');
+  body+='<table><tr><th style="width:18%">Xét nghiệm</th><td>'+esc(testDisplayName(t))+(t.unit?' · '+esc(t.unit):'')+'</td><th style="width:15%">Kỳ báo cáo</th><td>'+esc(period)+'</td></tr><tr><th>Thiết bị</th><td>'+esc(machine)+'</td><th>Nguồn TEa</th><td>'+esc(trace||'Chưa có thông tin truy xuất')+'</td></tr></table>';
   body+='<div class="rpt-card"><h3>Kết quả Six Sigma theo mức QC</h3><div class="body"><table><tr><th>Mức</th><th>TEa (%)</th><th>Sigma</th><th>Xếp loại</th><th>CV IQC (%)</th><th>Bias EQA (%)</th><th>DPMO</th><th>Yield</th><th>Nguồn CV</th><th>Trạng thái dữ liệu</th></tr>'+sigmaPeriodPrintRows(row,levels)+'</table><p class="soft-note">DPMO và Yield là quy đổi tham khảo với dịch 1,5σ. CV nhập tay vẫn được tính Sigma nhưng không dùng để tự động đề xuất thiết kế QC.</p></div></div>';
   body+='<div class="rpt-card"><h3>Thiết kế QC theo Sigma (OPSpecs)</h3><div class="body">'+sgFrequencyHTML(t,row,levels)+'</div></div>';
   if(valid.length)body+='<div class="rpt-chart-grid"><div class="rpt-card rpt-chart"><h3>Biểu đồ Sigma</h3><div class="body">'+sgTrendSVG(t,valid,levels)+'</div></div><div class="rpt-card rpt-chart"><h3>Biểu đồ Quyết định Phương pháp (MDC)</h3><div class="body">'+sgMDCSVG(t,valid,levels)+'</div></div></div>';
   else body+='<p class="soft-note">Kỳ này chưa có mức đủ điều kiện phân loại để vẽ biểu đồ Sigma và MDC.</p>';
-  body+=signBlock();await openPrint('Báo cáo Six Sigma — '+t.name+' — '+period,body,{landscape:true});
+  body+=signBlock();await openPrint('Báo cáo Six Sigma — '+testDisplayName(t)+' — '+period,body,{landscape:true});
 }
 function reportPointsTableHtml(items){
   if(!items.length)return '<p><i>Không có điểm nào trong khoảng ngày đã chọn.</i></p>';
@@ -48,7 +48,7 @@ async function printReport(){
   const inMonth=p=>(!start||p.date>=start)&&(!end||p.date<=end),wg=activeWestgard(t);
   let body=reportHeader('BÁO CÁO NỘI KIỂM CHẤT LƯỢNG XÉT NGHIỆM');
   const teaVal=typeof sgTea==='function'?sgTea(t):(t.tea||0),teaSourceText=typeof sgTeaLabel==='function'?sgTeaLabel(sgTeaSource(t)):'Ricos / Westgard biological variation';
-  body+='<table><tr><th style="width:25%">Xét nghiệm</th><td>'+esc(t.name)+' ('+esc(t.unit||'')+')</td><th style="width:18%">Máy</th><td>'+esc(t.machine||'')+'</td></tr>'+
+  body+='<table><tr><th style="width:25%">Xét nghiệm</th><td>'+esc(testDisplayName(t))+(t.unit?' · '+esc(t.unit):'')+'</td><th style="width:18%">Máy</th><td>'+esc(t.machine||'')+'</td></tr>'+
         '<tr><th>Khoảng ngày báo cáo</th><td>'+esc(reportRangeText(start,end))+'</td><th>TEa%</th><td>'+(teaVal||'—')+'</td></tr>'+
         '<tr><th>Nguồn TEa</th><td colspan="3">'+esc(teaSourceText)+(typeof sgTeaRefText==='function'&&sgTeaRefText(t)?' · '+esc(sgTeaRefText(t)):'')+(t.teaDoc?' · '+esc(t.teaDoc):'')+(t.teaEffectiveDate?' · hiệu lực '+vnDate(t.teaEffectiveDate):'')+(t.teaApprovedBy?' · duyệt '+esc(t.teaApprovedBy):'')+'</td></tr></table>';
   body+='<p class="soft-note">Cột "Sigma (kỳ)" dưới đây tính từ Mean/CV thực tế trong đúng khoảng ngày báo cáo này — khác với Sigma đã thẩm định ở trang Six Sigma &amp; Sai số (dùng CV IQC và Bias EQA/EQC đã rà soát). Hai số có thể khác nhau; dấu * bên cạnh Sigma nghĩa là kỳ này có n &lt; 20 kết quả, CV/Sigma chưa đủ ổn định để tham khảo.</p>';
@@ -90,13 +90,13 @@ async function printReport(){
   if(acts.length){body+='<h3>Hành động khắc phục trong khoảng ngày đã chọn</h3><table><tr><th>Ngày</th><th>Mức / lô</th><th>Luật</th><th>Loại SS</th><th>Hành động</th><th>Người</th><th>QC chạy lại</th><th>Duyệt</th><th>Khép vòng</th><th>Ý kiến</th></tr>'+
     acts.map(a=>{const wf=typeof actionWorkflowStatus==='function'?actionWorkflowStatus(a):{complete:false},rr=typeof actionRerunStatus==='function'?actionRerunStatus(a):{label:''};return '<tr><td>'+vnDate(a.date)+'</td><td>'+esc(actionLevelShort(t,a.level,a.lot))+'</td><td>'+esc(a.rule)+'</td><td>'+esc(a.errorType)+'</td><td>'+esc(a.action)+'</td><td>'+esc(a.by)+'</td><td>'+esc(rr.label||'')+'</td><td>'+esc(typeof actionApprovalLabel==='function'?actionApprovalLabel(a):(a.approvalStatus||'pending'))+(a.approvedBy?'<br><span style="font-size:10px;color:#647686">'+esc(a.approvedBy)+'</span>':'')+'</td><td>'+esc(wf.complete?'Hoàn tất':'Chưa hoàn tất')+'</td><td>'+esc(a.approvalNote||'')+'</td></tr>';}).join('')+'</table>';}
   body+=signBlock();
-  await openPrint('Báo cáo nội kiểm — '+t.name,body);
+  await openPrint('Báo cáo nội kiểm — '+testDisplayName(t),body);
 }
 async function printRangeForm(tid,level){
   const t=state.tests.find(x=>x.id===tid);const l=lvlCfg(t,level),pts=operationalLotPoints(t,level);
   const c=stats(pts.map(p=>p.val)),days=new Set(pts.map(p=>p.date)).size;if(!c){await infoDialog('Chưa đủ dữ liệu.');return;}
   let body=reportHeader('BIỂU MẪU THIẾT LẬP DẢI KIỂM SOÁT QC MỚI');
-  body+='<table><tr><th style="width:25%">Xét nghiệm</th><td>'+esc(t.name)+' ('+esc(t.unit||'')+')</td><th style="width:18%">Mức / Lô</th><td>M'+level+' / '+esc(l.lot||'?')+'</td></tr>'+
+  body+='<table><tr><th style="width:25%">Xét nghiệm</th><td>'+esc(testDisplayName(t))+(t.unit?' · '+esc(t.unit):'')+'</td><th style="width:18%">Mức / Lô</th><td>M'+level+' / '+esc(l.lot||'?')+'</td></tr>'+
         '<tr><th>Máy</th><td>'+esc(t.machine||'')+'</td><th>Số kết quả / ngày độc lập</th><td>'+c.n+' / '+days+'</td></tr></table>';
   body+='<h3>So sánh dải kiểm soát</h3><table><tr><th></th><th class="num">Mean</th><th class="num">SD</th><th class="num">CV%</th><th class="num">±2SD</th></tr>'+
     '<tr><td>Dải nhà sản xuất / hiện tại</td><td class="num">'+fmt(l.mean)+'</td><td class="num">'+fmt(l.sd,3)+'</td><td class="num">'+fmt(l.mean?l.sd/Math.abs(l.mean)*100:0)+'</td><td class="num">'+fmt(l.mean-2*l.sd)+' – '+fmt(l.mean+2*l.sd)+'</td></tr>'+
@@ -104,5 +104,5 @@ async function printRangeForm(tid,level){
   body+='<img src="'+ljDataURL(pts,c.m,c.sd)+'">';
   body+='<p style="margin-top:8px"><b>Điều kiện:</b> tối thiểu 20 kết quả trên 20 ngày độc lập, cùng lô QC, không có điểm vi phạm/cảnh báo chưa xử lý; áp dụng khi hệ thống ổn định và được phê duyệt theo SOP.</p>';
   body+='<p>Kết luận: ☐ Áp dụng dải PXN mới &nbsp;&nbsp; ☐ Giữ dải nhà sản xuất</p>';
-  body+=signBlock();await openPrint('Biểu mẫu thiết lập dải QC — '+t.name,body);
+  body+=signBlock();await openPrint('Biểu mẫu thiết lập dải QC — '+testDisplayName(t),body);
 }
