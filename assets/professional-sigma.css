@@ -398,12 +398,12 @@
   box-sizing:border-box;padding:11px 16px;vertical-align:middle;overflow-wrap:anywhere;
 }
 
-/* Tỷ lệ cố định 5 cột: Mức 8% · Sigma 10% · Bộ quy tắc OPSpecs 34% · Mức nguy cơ 18% · Hành động 30% */
-#sgFreq table th:nth-child(1), #sgFreq table td:nth-child(1){width:8%;}
-#sgFreq table th:nth-child(2), #sgFreq table td:nth-child(2){width:10%;text-align:center;}
-#sgFreq table th:nth-child(3), #sgFreq table td:nth-child(3){width:34%;}
-#sgFreq table th:nth-child(4), #sgFreq table td:nth-child(4){width:18%;}
-#sgFreq table th:nth-child(5), #sgFreq table td:nth-child(5){width:30%;}
+/* Tỷ lệ cố định 5 cột: ưu tiên nội dung dài ở Mức nguy cơ/Hành động, thu gọn Mức/Sigma/OPSpecs. */
+#sgFreq table th:nth-child(1), #sgFreq table td:nth-child(1){width:7%;}
+#sgFreq table th:nth-child(2), #sgFreq table td:nth-child(2){width:8%;text-align:center;}
+#sgFreq table th:nth-child(3), #sgFreq table td:nth-child(3){width:27%;}
+#sgFreq table th:nth-child(4), #sgFreq table td:nth-child(4){width:22%;}
+#sgFreq table th:nth-child(5), #sgFreq table td:nth-child(5){width:36%;}
 
 /* Dưới 760px, 5 cột theo % (8%/10%/…) của #sgFreq không đủ chỗ — "Mức"/"Sigma"
    bị bẻ từng chữ xuống dòng. #sgFreq không nằm trong wrapper cuộn ngang chung
@@ -416,12 +416,14 @@
 #sgFreq table{
   width:max-content !important; min-width:100%; table-layout:auto;
 }
-/* Mức 8%/Sigma 10% vẫn quá hẹp cho "Mức 1"/"Sigma" dưới table-layout:auto, chữ
-   bị bẻ 2 dòng. Nới hai cột này, bớt lại ở cột Bộ quy tắc OPSpecs (34% → 26%)
+/* Mức 7%/Sigma 8% vẫn quá hẹp cho "Mức 1"/"Sigma" dưới table-layout:auto, chữ
+   bị bẻ 2 dòng. Nới hai cột này, bớt lại ở cột Bộ quy tắc OPSpecs (27% → 26%)
    vì nó vốn có nhiều chỗ trống nhất. */
 #sgFreq table th:nth-child(1), #sgFreq table td:nth-child(1){width:12%; min-width:76px; white-space:nowrap; overflow-wrap:normal; word-break:normal;}
 #sgFreq table th:nth-child(2), #sgFreq table td:nth-child(2){width:14%; min-width:72px; white-space:nowrap; overflow-wrap:normal; word-break:normal;}
 #sgFreq table th:nth-child(3), #sgFreq table td:nth-child(3){width:26%;}
+#sgFreq table th:nth-child(4), #sgFreq table td:nth-child(4){width:18%;}
+#sgFreq table th:nth-child(5), #sgFreq table td:nth-child(5){width:30%;}
 }
 
 .sgcards{

@@ -19,17 +19,32 @@ e.g.:
 python -m http.server
 ```
 
-(`.Codex/launch.json` defines a `qc-lab-static` config doing exactly that on
-port 8080, for Codex's browser preview.)
+(`.claude/launch.json` defines a `qc-lab-static` config doing exactly that on
+port 8080, for Claude Code's browser preview.)
 
 `package.json` also carries Electron desktop packaging (`npm start` →
 `electron .`, `npm run dist` → NSIS installer via electron-builder, with
 `scripts/patch-7za-symlink.js` as a pre-step). The `electron/` folder is part of
-the repo (`main.js`, `preload.js`, `license.js`, `activation.html` — main process,
-license activation), so those scripts work here once `npm install` has run; for
-development use the static server. `index.html`'s Electron-only branch
-(`window.qcDialog`, routing `alert()`/`confirm()` through a native dialog) no-ops
-in a plain browser.
+the repo (`main.js`, `preload.js`, `license.js`, `activation.html`,
+`auto-update.js` — main process, license activation with a 30-day unactivated
+trial: first-run timestamp kept in its own `qclab-trial.dat`, separate from
+the license file; F12 toggles DevTools since the app menu is disabled), so
+those scripts work here once `npm install` has run; for development use the
+static server. `index.html`'s Electron-only branch (`window.qcDialog`,
+routing `alert()`/`confirm()` through a native dialog) no-ops in a plain
+browser.
+
+`electron/auto-update.js` (`initAutoUpdate()`, wired in `main.js` after
+`app.whenReady()`) checks GitHub Releases on the public `bosunrang/qc-lab`
+repo (`build.publish` in `package.json`) on every launch, silently
+downloads in the background, and only interrupts the user once the update is
+ready — asking to restart now or later; picking "later" still installs it on
+the next natural quit (`autoInstallOnAppQuit`). It no-ops when
+`!app.isPackaged` (dev runs). `npm run dist` only builds locally (no token
+needed); `npm run dist:publish` additionally uploads the installer to GitHub
+Releases, which requires a `GH_TOKEN` env var (a GitHub personal access token
+with `repo` scope) — don't run it without one configured, and never commit
+that token.
 
 ## Tests
 
@@ -51,14 +66,39 @@ node tests/qccore.test.js
 ```
 
 `tests/helpers/sandbox.js` loads real `assets/*.js` files into a `vm` context
-to test them without a browser — only usable for files with no top-level
-DOM/`window`/`localStorage` side effects (`core.js`, `state.js`,
-`firebase-sync.js`, `data-io.js`, `audit.js`, the worker
-`assets/workers/westgard-worker.js`, and the service/view-model/ui-state
-modules: `period-service.js`, `entry-service.js`, `local-store.js`,
-`sigma-cohort-service.js`, `westgard-view-model.js`, `chart-view-model.js`,
-`*-ui-state.js`). The page-rendering modules touch `document` at call time and
-can't be sandboxed this way.
+(in `index.html` load order; it auto-inserts `analyte-catalog.js` before
+`state.js`) to test them without a browser. The requirement is that the file's
+*top level* is side-effect-free — no DOM/`window`/`localStorage` at load time —
+which nearly every module satisfies: existing tests sandbox everything from
+`core.js`/`state.js`/`qc-domain.js`/`qc-rules.js`/the services, view-models and
+`*-ui-state.js` files up to render modules (`draw.js`, `sigma.js`,
+`reports.js`, `settings.js`), passing stub globals for whatever the function
+under test touches. What can't run in the sandbox is *calling* the
+DOM-rendering functions themselves — tests against render modules exercise
+only their pure helpers.
+
+A pre-commit hook (`.githooks/pre-commit`, installed into `.git/hooks/`) runs
+`node --test tests/*.test.js` and blocks the commit on failure; needs no `npm
+install` since tests only use Node core modules. `.github/workflows/test.yml`
+reruns the same command on every push/PR once the repo has a GitHub remote.
+
+## Type checking
+
+`npm run typecheck` (`tsc --noEmit`, config in `tsconfig.json`) runs
+TypeScript's `checkJs` over `assets/**/*.js` — no code is written in
+TypeScript, this only catches typos/wrong-arity calls/etc. ahead of runtime.
+This is a no-module, one-global-scope codebase (see "Architecture" below) that
+also *constructs* several of its globals at runtime instead of declaring them
+syntactically — `*-ui-state.js` accessor fields, a couple of
+`Object.assign(root, {...})` service exports, `core.js`'s UMD `window.QCCore`.
+`global.d.ts` declares all of these ambiently so real typos still get caught
+instead of drowning in "Cannot find name" noise — **update it when you add a
+new field to a `*-ui-state.js` state bag or a new bare-global export**, or
+`npm run typecheck` will report a false positive for every reference to it.
+`global.d.ts` also loosens `Document#getElementById`/`Element`/`EventTarget`
+to `any`, since this codebase reads `.value`/`.dataset`/`.checked`/etc.
+straight off DOM query results everywhere without casting — that's expected
+here, not something to "fix" by re-tightening those types.
 
 ## Benchmarks and release gate
 
@@ -140,7 +180,13 @@ carries its own `?v=` — bump it there when editing the worker.
   (`WG_WORKER_POINT_THRESHOLD`) the dashboard offloads Westgard evaluation to
   `assets/workers/westgard-worker.js`, hydrating results only when the
   generation/revision still matches current state, and falls back to the
-  synchronous engine if Workers are unavailable or error out.
+  synchronous engine if Workers are unavailable or error out. Also owns the
+  parallel-lot machinery for lot transitions (`parallelLotForLevel()`,
+  `parallelWestgard()` — see the parallel-run decision below). Each rule's
+  action (`inactive`/`alert`/`reject`) and scope (`within`/`across`/`both`
+  run) can be overridden per test via `t.ruleActions`/`t.ruleScopes`
+  (`testRuleAction()`/`testRuleScope()`), layered on top of the global
+  defaults in `state.westgardRules`.
 - `local-store.js` — IIFE `LocalStore`: an IndexedDB snapshot mirror used as a
   recovery fallback for `localStorage`. Writes are partitioned (boot shell +
   per-test records) and rotate between slots A/B with a manifest — the active
@@ -216,14 +262,24 @@ carries its own `?v=` — bump it there when editing the worker.
 - `draw.js`, `router-render.js`, `sigma.js`, `actions-routes.js`,
   `manage-routes.js`, `after-render.js`, `entry-tests-actions.js`, `modals.js`
   — UI/rendering and routing. `router-render.js` owns the page list
-  (`PAGES`) and per-role page permissions (`PERM`); page-level UI state lives
-  in the `*-ui-state.js` modules above. `sigma.js` renders the Six Sigma page
-  (see "Confirmed business-logic decisions" below for how its numbers relate
-  to reports.js).
+  (`PAGES`) and per-role page permissions (`PERM`): `rolePageIds(role)` gives
+  each role's default page set, and a user's own `pagePerms` (edited in
+  `users-auth.js`) can only narrow that set further, never expand past it.
+  Page-level UI state lives in the `*-ui-state.js` modules above. `sigma.js`
+  renders the Six Sigma page (see "Confirmed business-logic decisions" below
+  for how its numbers relate to reports.js).
 - `range.js`, `settings.js`, `data-io.js`, `reports.js`, `users-auth.js`,
   `reagent.js` — feature-specific logic (target-range calc, settings page,
   backup import/export + XLSX generation, printed reports, auth/user
-  management, reagent lot comparison stats).
+  management, reagent lot comparison stats). `users-auth.js` hashes passwords
+  with PBKDF2-SHA256 at `PASS_ITERATIONS=600000` (OWASP minimum); the stored
+  `pbkdf2$<iterations>$<salt>$<hash>` string carries its own iteration count,
+  so legacy 210k-iteration hashes still verify and silently re-hash at the
+  current count on next successful login — don't lower `PASS_ITERATIONS` or
+  drop that upgrade path. `reagent.js` implements its regression stats
+  (Passing-Bablok, Deming/OLS, Bland-Altman, plus a from-scratch incomplete-beta
+  t-distribution for CIs) by hand, no stats library — pure like `core.js` but
+  page-scoped, covered by `tests/reagent-stats.test.js`.
 - `app.js` — small async boot entry point at the bottom of `index.html`
   (`boot()` awaits `loadBootState()` before login/Firebase init).
 
@@ -297,10 +353,24 @@ it implies.
 - Mean/SD-from-limits intentionally supports ±2SD only
   (`readTargetMatrixPicks()` in `entry-tests-actions.js` hardcodes
   `sd=(high-low)/4`) — the QC lot inserts actually used never state ±3SD.
+- Parallel lot run (chạy song song 2 lô, 2026-07-21): during a lot transition
+  the entry sheet renders one column per (level, lot) — a level whose
+  transition record (`state.lotTransitions`, synced) is `active` AND whose new
+  lot already has its own Mean/SD gets an extra "Song song" column
+  (`parallelLotForLevel()` in `qc-domain.js`); it never borrows the old lot's
+  Mean/SD. Safety boundary, locked by `tests/parallel-lot-run.test.js`: the
+  operating lot stays the only lot deciding patient-result accept/reject —
+  parallel points never enter `activeWestgard()`, each lot's chain rules
+  (4-1s, 6x, 10x…) run separately via `parallelWestgard()`, and a parallel-lot
+  violation never marks the day rejected.
+- CUSUM (`cusum()` in `core.js`, opt-in per test via `t.cusum{on,k,h}`,
+  configured in the assay modal in `entry-tests-actions.js`) is a reference
+  trend chart only (`drawCUSUM()` in `draw.js`, the "Xu hướng CUSUM" tab on
+  the Westgard page) — it never changes a point's accept/reject/Westgard
+  status; only the Westgard rule engine does that.
 - The CLIA/Ricos TEa reference table (`REFTESTS` in `state.js`, now derived
   from `TEA_ANALYTE_CATALOG` in `analyte-catalog.js`) is a built-in default;
-  users
-  override/extend it via `state.teaRefs` (synced list branch, edited in the
+  users override/extend it via `state.teaRefs` (synced list branch, edited in the
   "Bảng TEa tham chiếu" tab of the manage page). `sgRef` in `sigma.js`
   resolves a test against `effectiveTeaRefs()` (defaults overlaid with
   `state.teaRefs`), matching **exact name first** then longest-prefix — so

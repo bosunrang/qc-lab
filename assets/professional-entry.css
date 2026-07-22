@@ -275,6 +275,10 @@
   border-color:#e6d3ab; background:#fffdf8;
 }
 
+.qc-parallel-label{
+  display:inline;color:var(--amber);font-size:var(--type-micro);font-weight:800;white-space:nowrap;
+}
+
 .qc-run-grid{
   gap:6px;
 }

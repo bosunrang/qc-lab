@@ -57,7 +57,7 @@
 
   /* Cohort Sigma theo vòng đời lô QC, không bị cắt ở ranh giới tháng. startDate/endDate
      là thời điểm chụp dữ liệu của lần đánh giá; các lô vẫn luôn được tách riêng. */
-  function cohortsForLevelByLot(state,{testId,level,startDate='',endDate=''}={}){
+  function cohortsForLevelByLot(state,/** @type {{testId?:any,level?:any,startDate?:string,endDate?:string}} */{testId,level,startDate='',endDate=''}={}){
     const numericLevel=Number(level),start=startDate?normalizeDate(startDate):'',end=endDate?normalizeDate(endDate):'';
     if(!state||!testId||!Number.isFinite(numericLevel)||(startDate&&!start)||(endDate&&!end)||start&&end&&start>end)return[];
     const groups=new Map();

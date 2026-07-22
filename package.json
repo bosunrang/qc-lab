@@ -9,17 +9,25 @@
   "scripts": {
     "start": "electron .",
     "test": "node --test tests/*.test.js",
+    "typecheck": "tsc --noEmit",
     "patch-build": "node scripts/patch-7za-symlink.js",
-    "dist": "node scripts/patch-7za-symlink.js && electron-builder --win nsis"
+    "dist": "node scripts/patch-7za-symlink.js && electron-builder --win nsis",
+    "dist:publish": "node scripts/patch-7za-symlink.js && electron-builder --win nsis --publish always"
   },
   "devDependencies": {
     "electron": "^31.7.7",
-    "electron-builder": "^24.13.3"
+    "electron-builder": "^24.13.3",
+    "typescript": "^7.0.2"
   },
   "build": {
     "appId": "vn.qclab.desktop",
     "productName": "QC Lab",
     "copyright": "QC Lab",
+    "publish": {
+      "provider": "github",
+      "owner": "bosunrang",
+      "repo": "qc-lab"
+    },
     "directories": {
       "output": "dist"
     },
@@ -54,5 +62,8 @@
         "en_US"
       ]
     }
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
   }
 }

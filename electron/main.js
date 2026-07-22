@@ -5,6 +5,7 @@
 const { app, BrowserWindow, ipcMain, dialog, Menu, shell } = require('electron');
 const path = require('path');
 const license = require('./license');
+const { initAutoUpdate } = require('./auto-update');
 
 // Chỉ cho phép một tiến trình chạy: mở app lần hai sẽ focus cửa sổ đang có.
 if (!app.requestSingleInstanceLock()) { app.quit(); }
@@ -123,6 +124,7 @@ ipcMain.handle('qc-dialog:alert', async (event, message) => {
 
 app.whenReady().then(() => {
   launch();
+  initAutoUpdate(app, () => mainWindow);
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) launch();
   });

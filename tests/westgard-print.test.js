@@ -82,7 +82,7 @@ run(ctx, `
 
   const source = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'router-render.js'), 'utf8');
   assert.match(source, /onclick="printWestgard\(\)"/, 'the Westgard page wires up a print action');
-  assert.match(source, /wgChartMode==='lj'\?'<div>/, 'the print button only shows in the default Levey-Jennings view, not CUSUM');
+  assert.match(source, /wgChartMode==='lj'\?'<div>/, 'the export actions only show in the default Levey-Jennings view, not CUSUM');
 
   console.log('Westgard print tests passed');
 })().catch(error=>{console.error(error);process.exitCode=1;});

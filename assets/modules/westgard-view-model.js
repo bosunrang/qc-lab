@@ -5,7 +5,7 @@
     return{};
   }
 
-  function summarizeTestStatus({views=[],verdicts,today=''}={}){
+  function summarizeTestStatus(/** @type {{views?:any[],verdicts?:any,today?:string}} */{views=[],verdicts,today=''}={}){
     const order={none:-1,ok:0,warn:1,rej:2};
     let status='none',todayCount=0,totalPoints=0;
     const lastPoints=[],alerts=[];
@@ -22,7 +22,7 @@
     return{status,todayCount,totalPoints,lastPoints,alerts};
   }
 
-  function buildMultiViews({levels=[],previousByLevel={},openLevels=[]}={}){
+  function buildMultiViews(/** @type {{levels?:any[],previousByLevel?:any,openLevels?:any[]}} */{levels=[],previousByLevel={},openLevels=[]}={}){
     const open=new Set(openLevels),getPrevious=level=>previousByLevel&&typeof previousByLevel.get==='function'?previousByLevel.get(level)||[]:(previousByLevel&&previousByLevel[level])||[],views=[];
     (Array.isArray(levels)?levels:[]).forEach(level=>{
       views.push({level:level.level,lot:level.lot,mean:level.mean,sd:level.sd,pts:Array.isArray(level.pts)?level.pts:[],label:`M${level.level}·${level.lot||'?'}`});
@@ -31,7 +31,7 @@
     return views;
   }
 
-  function buildPointRows({points=[],verdicts,zs=[],mean,sd}={}){
+  function buildPointRows(/** @type {{points?:any[],verdicts?:any,zs?:any[],mean?:number,sd?:number}} */{points=[],verdicts,zs=[],mean,sd}={}){
     const source=Array.isArray(points)?points:[];
     const getVerdict=(point,index)=>{
       if(verdicts&&typeof verdicts.get==='function')return verdicts.get(point.id)||{};

@@ -115,7 +115,19 @@ function entryNames(zip) { return zip.entries.map(e => e.name); }
   assert.match(sheet, /<drawing r:id="rId1"\/>/, 'worksheet must reference the drawing part when images are present');
   assert.match(sheet, /<row r="5" ht="32"[^>]*><c r="A5"/, 'an empty report keeps only one placeholder row before the note');
   const drawing = zip.entries.find(e => e.name === 'xl/drawings/drawing1.xml').data.toString('utf8');
-  assert.match(drawing, /<xdr:row>4<\/xdr:row>/, 'the first chart must move up with the note and begin after the placeholder row');
+  assert.match(drawing, /<xdr:row>6<\/xdr:row>/, 'an empty report leaves one blank row after its note before the chart');
+
+  const metric = { cv: 2, bias: 0.5, sigma: 4, dpmo: 6210, yld: 99.38, label: 'Tốt', n: 30 };
+  const periodRows = [{ name: 'Glucose', period: '07/2026', tea: 6.96, levels: [{ level: 1, metric }, { level: 2, metric }] }];
+  const periodDrawing = parseZip(ctx.__buildXlsx(periodRows, meta, [fakePng])).entries.find(e => e.name === 'xl/drawings/drawing1.xml').data.toString('utf8');
+  assert.match(periodDrawing, /<xdr:row>7<\/xdr:row>/, 'a period report with its note on row 6 must begin the chart on Excel row 8');
+  const secondPng = { ...fakePng, dispW: 420, dispH: 230 };
+  const twoChartDrawing = parseZip(ctx.__buildXlsx(periodRows, meta, [fakePng, secondPng])).entries.find(e => e.name === 'xl/drawings/drawing1.xml').data.toString('utf8');
+  assert.deepEqual([...twoChartDrawing.matchAll(/<xdr:row>(\d+)<\/xdr:row>/g)].map(m => Number(m[1])), [7, 22], 'MDC must begin after the Sigma chart height plus exactly one blank row');
+
+  const longRows = Array.from({ length: 4 }, (_, i) => ({ name: 'Glucose', period: `0${i + 4}/2026`, tea: 6.96, levels: [{ level: 1, metric }, { level: 2, metric }] }));
+  const longDrawing = parseZip(ctx.__buildXlsx(longRows, meta, [fakePng])).entries.find(e => e.name === 'xl/drawings/drawing1.xml').data.toString('utf8');
+  assert.match(longDrawing, /<xdr:row>13<\/xdr:row>/, 'a combined report with its note on row 12 must begin the chart on Excel row 14');
 }
 
 // --- XML injection / escaping: hostile-looking test names must not break the worksheet XML. ---

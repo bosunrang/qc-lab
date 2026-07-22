@@ -1,17 +1,17 @@
 /* ===== CHART VIEW MODEL ===== */
 (function(root){
-  function filterPoints(points,{start='',end='',lot}={}){
+  function filterPoints(points,/** @type {{start?:string,end?:string,lot?:any}} */{start='',end='',lot}={}){
     return(Array.isArray(points)?points:[]).filter(point=>{
       const date=String(point&&point.date||'');
       return(!start||date>=start)&&(!end||date<=end)&&(lot===undefined||(point&&point.lot||'')===lot);
     });
   }
 
-  function buildLeveyJennings({points=[],mean,sd,start='',end='',lot}={}){
+  function buildLeveyJennings(/** @type {{points?:any[],mean?:number,sd?:number,start?:string,end?:string,lot?:any}} */{points=[],mean,sd,start='',end='',lot}={}){
     return{points:filterPoints(points,{start,end,lot}),mean:Number(mean),sd:Number(sd)};
   }
 
-  function buildCusum({points=[],series}={}){
+  function buildCusum(/** @type {{points?:any[],series?:any}} */{points=[],series}={}){
     return{points:Array.isArray(points)?points:[],series:series||{cPos:[],cNeg:[],ma:[],flags:[]}};
   }
 
@@ -22,7 +22,7 @@
   /* Reduce only the pixels/markers drawn on canvas. Domain calculations continue
      to use every point. Each bucket keeps its minimum and maximum so short spikes
      survive, while callers can force important indices (for example violations). */
-  function sampleIndices({length=0,maxPoints=600,valueAt,preserve=[]}={}){
+  function sampleIndices(/** @type {{length?:number,maxPoints?:number,valueAt?:(i:number)=>any,preserve?:any[]}} */{length=0,maxPoints=600,valueAt,preserve=[]}={}){
     const n=Math.max(0,Math.floor(Number(length)||0)),limit=Math.max(2,Math.floor(Number(maxPoints)||600));
     if(!n)return[];
     if(n<=limit)return Array.from({length:n},(_,i)=>i);

@@ -9,7 +9,7 @@ function qcPointWarnings(t,cfg,date,runId,val){
   const dup=(state.data[t.id]||[]).find(p=>!p.voided&&p.date===date&&+p.level===+cfg.level&&(p.runId||'')===runId&&(p.lot||'')===(cfg.lot||''));
   if(dup)issues.push('Đã có điểm QC cùng ngày, cùng mức, cùng lô và cùng lần chạy.');
   const latest=(cfg.meanSdHistory||[]).slice().reverse().find(h=>h.effectiveFrom)||null,ref=latest&&latest.effectiveFrom||'';
-  if(ref){const age=Math.floor((new Date(date)-new Date(ref))/86400000);if(Number.isFinite(age)&&age>365)issues.push('Mean/SD đang dùng đã quá 12 tháng, nên rà soát lại dải kiểm soát.');}
+  if(ref){const age=Math.floor((new Date(date).getTime()-new Date(ref).getTime())/86400000);if(Number.isFinite(age)&&age>365)issues.push('Mean/SD đang dùng đã quá 12 tháng, nên rà soát lại dải kiểm soát.');}
   const pts=(state.data[t.id]||[]).filter(p=>!p.voided&&+p.level===+cfg.level&&(p.lot||'')===(cfg.lot||'')),st=stats(pts.map(p=>p.val)),targetCv=cfg.mean?Math.abs(cfg.sd/cfg.mean*100):0;
   if(st&&st.n>=10&&targetCv>0&&st.cv>targetCv*1.5)issues.push(`CV thực tế đang cao hơn CV mục tiêu (${fmt(st.cv)}% so với ${fmt(targetCv)}%).`);
   /* Nhập liệu luôn dùng Mean/SD của lô ĐANG hoạt động (cfg), bất kể ngày được chọn —

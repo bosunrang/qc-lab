@@ -91,11 +91,11 @@ assert.equal(ctx.sgInputDisplayValue(''),'');
   assert.match(source, /class="sg-period-month"[\s\S]*?class="sg-period-year"/, 'month and year selectors have dedicated compact sizing hooks');
   assert.doesNotMatch(sigmaCss, /\.sg-period-actions\{/, 'unused footer action styling is removed');
   assert.match(sigmaCss, /#sgFreq table\{[\s\S]*?table-layout:fixed;/, 'Sigma QC-frequency table uses a stable fixed column layout');
-  assert.match(sigmaCss, /#sgFreq table th:nth-child\(1\), #sgFreq table td:nth-child\(1\)\{width:8%;\}/, 'Sigma QC-design table gives Mức 8%');
-  assert.match(sigmaCss, /#sgFreq table th:nth-child\(2\), #sgFreq table td:nth-child\(2\)\{width:10%;/, 'Sigma QC-design table gives Sigma 10%');
-  assert.match(sigmaCss, /#sgFreq table th:nth-child\(3\), #sgFreq table td:nth-child\(3\)\{width:34%;\}/, 'Sigma QC-design table gives OPSpecs 34%');
-  assert.match(sigmaCss, /#sgFreq table th:nth-child\(4\), #sgFreq table td:nth-child\(4\)\{width:18%;\}/, 'Sigma QC-design table gives risk 18%');
-  assert.match(sigmaCss, /#sgFreq table th:nth-child\(5\), #sgFreq table td:nth-child\(5\)\{width:30%;\}/, 'Sigma QC-design table gives action 30%');
+  assert.match(sigmaCss, /#sgFreq table th:nth-child\(1\), #sgFreq table td:nth-child\(1\)\{width:7%;\}/, 'Sigma QC-design table gives Mức 7%');
+  assert.match(sigmaCss, /#sgFreq table th:nth-child\(2\), #sgFreq table td:nth-child\(2\)\{width:8%;/, 'Sigma QC-design table gives Sigma 8%');
+  assert.match(sigmaCss, /#sgFreq table th:nth-child\(3\), #sgFreq table td:nth-child\(3\)\{width:27%;\}/, 'Sigma QC-design table gives OPSpecs 27%');
+  assert.match(sigmaCss, /#sgFreq table th:nth-child\(4\), #sgFreq table td:nth-child\(4\)\{width:22%;\}/, 'Sigma QC-design table gives risk 22%');
+  assert.match(sigmaCss, /#sgFreq table th:nth-child\(5\), #sgFreq table td:nth-child\(5\)\{width:36%;\}/, 'Sigma QC-design table gives action 36%');
   assert.match(sigmaCss, /@media\(max-width:760px\)[\s\S]*?#sgFreq table th:nth-child\(1\)[\s\S]*?min-width:76px;[\s\S]*?white-space:nowrap;/, 'mobile QC-design level column stays on one line');
   assert.match(sigmaCss, /@media\(max-width:760px\)[\s\S]*?#sgFreq table th:nth-child\(2\)[\s\S]*?min-width:72px;[\s\S]*?white-space:nowrap;/, 'mobile QC-design Sigma column stays on one line');
 }

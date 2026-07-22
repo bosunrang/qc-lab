@@ -21,6 +21,7 @@
      gian 1 mức) và westgardMulti() (chuỗi level×run): [tên,N,vị-từ dương,vị-từ
      âm] trên z. 2-2s = "2 điểm z>2 HOẶC 2 điểm z<-2"; multi KHÔNG dùng bản 2-2s
      này (nó xét 2-2s chéo level trong cùng run), nên lọc bỏ khi gọi từ multi. */
+  /** @type {[string,number,(z:number)=>boolean,(z:number)=>boolean][]} */
   const WG_RUN_RULES=[['2-2s',2,z=>z>2,z=>z<-2],['3-1s',3,z=>z>1,z=>z<-1],['4-1s',4,z=>z>1,z=>z<-1],['6x',6,z=>z>0,z=>z<0],['8x',8,z=>z>0,z=>z<0],['9x',9,z=>z>0,z=>z<0],['10x',10,z=>z>0,z=>z<0],['12x',12,z=>z>0,z=>z<0]];
   /* Quét zs[]: mỗi rule bật, mọi cửa sổ N liên tiếp mà TẤT CẢ thỏa pos (hoặc tất
      cả thỏa neg) → onHit(mảngChỉSố,tên). Không biết phần tử là điểm hay item —
@@ -115,6 +116,7 @@
     return{n,m,sd,cv:m?sd/Math.abs(m)*100:0};
   }
 
+  /** @param {(rule:string)=>boolean} [isOn] */
   function westgard(points,mean,sd,isOn=()=>true){
     mean=Number(mean);sd=Number(sd);
     if(!Number.isFinite(mean)||!Number.isFinite(sd)||sd<=0)return{F:(points||[]).map(()=>({level:'ok',rules:[],supportRules:[]})),zs:(points||[]).map(()=>NaN)};
@@ -139,7 +141,9 @@
     return{F,zs};
   }
 
+  /** @param {(rule:string)=>boolean} [isOn] */
   function westgardMulti(levelSets,isOn=()=>true){
+    /** @type {any} */
     const flags=new Map(),supportFlags=new Map(),runs={};
     (levelSets||[]).forEach(s=>(s.pts||[]).forEach(p=>{
       if(!Number.isFinite(+s.sd)||+s.sd<=0)return;
@@ -175,6 +179,7 @@
     return Number.isFinite(mean)&&Number.isFinite(sd)&&sd>0?(Number(point&&point.val)-mean)/sd:NaN;
   }
 
+  /** @param {(rule:string)=>boolean} [isOn] */
   function westgardByPoint(points,mean,sd,isOn=()=>true){
     const normalized=(points||[]).map(p=>({val:pointZ(p,mean,sd)}));
     return westgard(normalized,0,1,isOn);
@@ -184,6 +189,7 @@
      westgardByPoint(...).F.at(-1), nhưng không clone toàn bộ điểm, không tạo
      bảng verdict trung gian và không quét lại các cửa sổ không thể chứa điểm
      cuối. Dùng khi lần lượt chọn điểm QC được chấp nhận theo lần chạy. */
+  /** @param {(rule:string)=>boolean} [isOn] */
   function westgardLatestRulesFromZ(values,isOn=()=>true){
     const source=values||[],start=Math.max(0,source.length-12),zs=source.slice(start);
     if(!zs.length)return[];
@@ -209,12 +215,14 @@
     return rules;
   }
 
+  /** @param {(rule:string)=>boolean} [isOn] */
   function westgardLatestRules(points,mean,sd,isOn=()=>true){
     const rows=points||[],start=Math.max(0,rows.length-12),zs=[];
     for(let i=start;i<rows.length;i++)zs.push(pointZ(rows[i],mean,sd));
     return westgardLatestRulesFromZ(zs,isOn);
   }
 
+  /** @param {(rule:string)=>boolean} [isOn] */
   function westgardMultiByPoint(levelSets,isOn=()=>true){
     const sourceByNormalized=new Map();
     const normalized=(levelSets||[]).map(s=>({
@@ -224,7 +232,10 @@
         return np;
       })
     }));
-    const raw=westgardMulti(normalized,isOn),flags=new Map(),supportFlags=new Map();
+    /** @type {any} */
+    const raw=westgardMulti(normalized,isOn);
+    /** @type {any} */
+    const flags=new Map(),supportFlags=new Map();
     raw.forEach((rules,np)=>flags.set(sourceByNormalized.get(np),rules));
     if(raw.support)raw.support.forEach((rules,np)=>supportFlags.set(sourceByNormalized.get(np),rules));
     flags.support=supportFlags;

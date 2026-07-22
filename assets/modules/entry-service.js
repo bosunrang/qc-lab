@@ -76,7 +76,7 @@
     return{hasPoint,worst,rulesAll,warnRules,rejRules};
   }
 
-  function buildPointView({point,verdict={},mean,sd,previousLot}={}){
+  function buildPointView(/** @type {{point?:any,verdict?:any,mean?:number,sd?:number,previousLot?:any}} */{point,verdict={},mean,sd,previousLot}={}){
     const level=verdict&&verdict.level||'ok',rules=Array.isArray(verdict&&verdict.rules)?verdict.rules:[];
     const verdictZ=Number(verdict&&verdict.z),value=Number(point&&point.val),targetMean=Number(mean),targetSd=Number(sd);
     const z=Number.isFinite(verdictZ)?verdictZ:Number.isFinite(value)&&Number.isFinite(targetMean)&&Number.isFinite(targetSd)&&targetSd!==0?(value-targetMean)/targetSd:NaN;

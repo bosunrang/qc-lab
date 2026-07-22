@@ -69,7 +69,9 @@ function westgardWorkerJob(t,generation,revision=westgardWorkerRevision(t&&t.id)
 function hydrateWestgardWorkerResult(message){
   if(!message||message.generation!==wgWorkerGeneration||(message.revision||0)!==westgardWorkerRevision(message.testId))return false;
   const t=(state.tests||[]).find(test=>test.id===message.testId);if(!t)return false;
-  const resultLevels=new Map((message.levels||[]).map(level=>[String(level.level),level])),views=[],cross=new Map(),crossSupport=new Map(),byPoint=new Map();
+  /** @type {any} */
+  const cross=new Map();
+  const resultLevels=new Map((message.levels||[]).map(level=>[String(level.level),level])),views=[],crossSupport=new Map(),byPoint=new Map();
   for(const l of operationalLevels(t)){
     const pts=operationalLotPoints(t,l.level),source=resultLevels.get(String(l.level));
     if(!source||source.points.length!==pts.length)return false;

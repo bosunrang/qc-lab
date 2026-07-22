@@ -142,6 +142,7 @@ function mirrorIndexedDb(raw){
   write.catch(()=>{lsDirty=true;lsSaveFailures++;scheduleLocalRetry();});return true;
 }
 let lsSaveT=null,lsIdleHandle=null,lsDirty=false,lsFullDirty=false,lsDirtyTestIds=new Set(),lsRevision=0,lsSerializedRevision=-1,lsSerialized='',lsLastBytes=0,lsLastSerializeMs=0,lsSerializeCount=0,lsSaveFailures=0;
+/** @type {Promise<any>} */
 let partitionWrite=Promise.resolve();
 /* Ghi tăng dần (incremental) chỉ đè shell + các test đổi NGAY TRÊN slot đang hoạt
    động — khác với ghi đầy đủ (xoay sang slot còn lại, slot cũ giữ nguyên làm lưới

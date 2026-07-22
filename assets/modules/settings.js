@@ -37,7 +37,7 @@ async function pickLogo(e){
     ctx.drawImage(img,x,y,w,h);
     readBrandInputs();state.lab.logoData=c.toDataURL('image/png');
     save({clearDerived:false});renderBrand();rerender();
-  };img.onerror=async()=>{await infoDialog('Không đọc được ảnh logo.');};img.src=r.result;};
+  };img.onerror=async()=>{await infoDialog('Không đọc được ảnh logo.');};img.src=String(r.result);};
   r.readAsDataURL(f);
 }
 function clearLogo(){if(!requireAdmin())return;state.lab=state.lab||{};state.lab.logoData='';save({clearDerived:false});renderBrand();rerender();}

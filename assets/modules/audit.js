@@ -9,7 +9,9 @@ function auditCanonical(value){
 function auditSha256(ascii){
   function rightRotate(value,amount){return(value>>>amount)|(value<<(32-amount));}
   const mathPow=Math.pow,maxWord=mathPow(2,32),lengthProperty='length',words=[];
-  let hash=auditSha256.h=auditSha256.h||[],k=auditSha256.k=auditSha256.k||[],primeCounter=k[lengthProperty],isComposite={};
+  /** @type {any} */
+  const self=auditSha256;
+  let hash=self.h=self.h||[],k=self.k=self.k||[],primeCounter=k[lengthProperty],isComposite={};
   for(let candidate=2;primeCounter<64;candidate++){
     if(!isComposite[candidate]){
       for(let i=0;i<313;i+=candidate)isComposite[i]=candidate;

@@ -20,15 +20,23 @@
 }
 
 .wg-test-picker.wg-test-picker-3{
-  grid-template-columns:minmax(200px,0.9fr) minmax(220px,1fr) minmax(240px,1.05fr); max-width:1100px;
+  grid-template-columns:minmax(200px,0.9fr) minmax(220px,1fr) minmax(270px,auto); max-width:1100px;
+}
+
+.wg-export-actions{
+  display:flex; align-items:center; gap:8px; min-height:38px;
+}
+
+.wg-test-picker .wg-excel-btn{
+  width:auto; min-height:38px; padding:8px 9px; white-space:nowrap;
 }
 
 .wg-test-picker .wg-print-btn{
-  width:auto; min-height:38px; padding:8px 9px; background:var(--teal); border:1px solid var(--teal-deep); color:var(--on-accent);
+  width:auto; min-height:38px; padding:8px 9px; background:var(--teal); border:none; color:var(--on-accent);
 }
 
 .wg-test-picker .wg-print-btn:hover{
-  background:var(--teal-deep); border-color:var(--teal-deep); color:var(--on-accent);
+  background:var(--teal-deep); border:none; color:var(--on-accent);
 }
 
 .wg-rules{
@@ -196,6 +204,10 @@
 
 .wg-test-picker.wg-test-picker-3{
   grid-template-columns:1fr;max-width:none
+}
+
+.wg-export-actions{
+  flex-wrap:wrap
 }
 
 .wg-rules{
