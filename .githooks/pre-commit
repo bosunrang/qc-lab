@@ -1,0 +1,4 @@
+#!/bin/sh
+# Blocks the commit if tests/*.test.js fail. Tests need no npm install (Node
+# core modules only), so this stays fast (~2s) even on a cold checkout.
+node --test tests/*.test.js

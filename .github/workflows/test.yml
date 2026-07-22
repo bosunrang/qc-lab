@@ -1,0 +1,18 @@
+name: Test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+      # No npm install: tests/*.test.js and tests/helpers/sandbox.js depend
+      # only on Node core modules (fs/path/vm/assert), not on any package in
+      # node_modules.
+      - run: node --test tests/*.test.js
