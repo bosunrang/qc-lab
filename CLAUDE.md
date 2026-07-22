@@ -211,8 +211,12 @@ carries its own `?v=` — bump it there when editing the worker.
 - `qc-rules.js`, `period-service.js`, `sigma-cohort-service.js`, `entry-service.js`,
   `action-workflow-service.js` — smaller service-style modules (some
   IIFE-wrapped) layered on `state`/`qc-domain`. `PeriodService` locks/unlocks
-  reporting periods (`state.periodLocks`; used by `entry-service.js` and
-  `settings.js`). `EntryService` normalizes QC-point input
+  reporting periods (`state.periodLocks`, a synced list branch); `entry-service.js`
+  enforces the lock (blocks add/edit/void once a period is locked), and the
+  "Khóa kỳ báo cáo" panel on the Reports page (`actions-routes.js`) is the only
+  UI that actually calls `PeriodService.lock()`/`.unlock()` — until 2026-07-22
+  this service had no caller at all, so locks could never actually be created.
+  `EntryService` normalizes QC-point input
   (`preparePointInput`/`addPoint`/`voidPoint`/`recordPoint`) and builds the
   entry sheet/window data; called from `router-render.js`.
   (`action-workflow-service.js` actually loads a bit later, after the

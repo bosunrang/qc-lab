@@ -107,7 +107,63 @@ function pageActionsV4(){
    <div class="panel action-log-panel"><h3>Nhật ký khắc phục</h3>${rows?`<div class="action-log-tools"><button class="btn ghost sm" onclick="exportActionsCSV()">Xuất Excel nhật ký</button></div><div class="action-log-wrap"><table class="action-log-table"><thead><tr><th>Ngày</th><th>Sự cố</th><th>Hành động</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table></div>`:emptyState('Chưa có nhật ký','Các hành động khắc phục sẽ xuất hiện ở đây sau khi được lưu.')}</div>`;
 }
 
-let reportQ='',reportTest='',reportRangeStart='',reportRangeEnd='';
+let reportQ='',reportTest='',reportRangeStart='',reportRangeEnd='',reportLockYm='';
+/* Khóa kỳ báo cáo: hành động toàn phòng lab (mọi xét nghiệm), tách khỏi phần
+   chọn xét nghiệm/khoảng ngày phía trên — PeriodService.lock()/unlock() đã có
+   sẵn từ trước và được entry-service.js chặn sửa điểm QC khi kỳ bị khóa, chỉ
+   thiếu giao diện gọi tới nên tính năng chưa dùng được trên thực tế. */
+function reportLockYmValue(){return/^\d{4}-\d{2}$/.test(reportLockYm)?reportLockYm:isoMonth();}
+function reportSetLockPart(part,value){
+  const m=/^(\d{4})-(\d{2})$/.exec(reportLockYmValue());
+  let year=+m[1],month=+m[2];
+  if(part==='year')year=+value;else month=+value;
+  reportLockYm=`${year}-${String(month).padStart(2,'0')}`;
+  rerender();
+}
+async function reportLockPeriod(){
+  if(!requireAdmin())return;
+  const ym=reportLockYmValue(),label=monthVN(ym);
+  if(!await confirmDialog({kicker:'Khóa kỳ báo cáo',title:`Khóa kỳ ${label}?`,message:'Sau khi khóa, không ai (kể cả admin) sửa/hủy được điểm QC trong kỳ này ở bất kỳ xét nghiệm nào cho tới khi mở khóa.',detail:'Chỉ nên khóa sau khi đã xuất xong báo cáo chính thức của kỳ.',confirmLabel:'Khóa kỳ',cancelLabel:'Hủy'}))return;
+  const result=PeriodService.lock(state,{ym,lockedAt:new Date().toISOString(),lockedBy:userName(),id:uid()});
+  if(result.error){await infoDialog(result.error==='already-locked'?`Kỳ ${label} đã được khóa từ trước.`:'Không khóa được kỳ này.');return;}
+  logAct('Khóa kỳ báo cáo',label,'Kỳ báo cáo');save({clearDerived:false});rerender();
+  await infoDialog(`Đã khóa kỳ ${label}.`,{type:'success'});
+}
+function reportUnlockPeriod(ym){
+  if(!requireAdmin())return;
+  const label=monthVN(ym);
+  openModal(`<div class="modal">
+    <div class="modal-h"><h3>Mở khóa kỳ ${esc(label)}</h3><button class="modal-close" onclick="closeModal()">×</button></div>
+    <div class="modal-b">
+      <div class="hint">Sau khi mở khóa, điểm QC trong kỳ ${esc(label)} có thể được sửa/hủy trở lại.</div>
+      <label>Lý do mở khóa (tối thiểu 5 ký tự)</label>
+      <textarea id="unlockReasonInput" placeholder="VD: Bổ sung đối soát, phát hiện sai sót cần chỉnh lại..." oninput="document.getElementById('unlockReasonErr').style.display='none'"></textarea>
+      <div id="unlockReasonErr" class="hint" style="color:var(--red);display:none;margin-top:6px">Cần ghi lý do mở khóa tối thiểu 5 ký tự.</div>
+    </div>
+    <div class="modal-f"><button class="btn ghost" onclick="closeModal()">Đóng</button><button class="btn danger" onclick="reportConfirmUnlockPeriod('${jsq(ym)}')">Xác nhận mở khóa</button></div>
+  </div>`);
+  setTimeout(()=>{const e=document.getElementById('unlockReasonInput');if(e)e.focus();},50);
+}
+async function reportConfirmUnlockPeriod(ym){
+  const input=document.getElementById('unlockReasonInput'),clean=QCCore.cleanText(input?input.value:'',1000).trim();
+  if(clean.length<5){
+    const err=document.getElementById('unlockReasonErr');
+    if(err)err.style.display='';
+    if(input)input.focus();
+    return;
+  }
+  closeModal();
+  const label=monthVN(ym),result=PeriodService.unlock(state,{ym,reason:clean});
+  if(result.error){await infoDialog('Kỳ này hiện không bị khóa.');rerender();return;}
+  logAct('Mở khóa kỳ báo cáo',`${label} · Lý do: ${clean}`,'Kỳ báo cáo');save({clearDerived:false});rerender();
+  await infoDialog(`Đã mở khóa kỳ ${label}.`,{type:'success'});
+}
+function reportLockListHtml(){
+  const locks=[...(state.periodLocks||[])].sort((a,b)=>String(b.ym||'').localeCompare(String(a.ym||'')));
+  if(!locks.length)return '<div class="hint">Chưa có kỳ nào được khóa.</div>';
+  const isAdmin=role()==='admin';
+  return `<div class="period-lock-list">${locks.map(l=>`<div class="period-lock-row"><div><b>Kỳ ${esc(monthVN(l.ym))}</b><span class="hint"> · Khóa bởi ${esc(l.lockedBy||'—')}${l.lockedAt?' lúc '+formatDateTimeVN(l.lockedAt):''}</span></div>${isAdmin?`<button class="btn ghost sm" onclick="reportUnlockPeriod('${jsq(l.ym)}')">Mở khóa</button>`:''}</div>`).join('')}</div>`;
+}
 function reportSearchValues(t){
   const levels=operationalLevels(t),panel=operationalPanelForTest(t),lotGroup=operationalLotGroupForTest(t);
   return [
@@ -158,9 +214,25 @@ function reportActionIcon(type){
   const paths=REPORT_ACTION_ICON_PATHS[type]||REPORT_ACTION_ICON_PATHS.csv;
   return `<svg class="btn-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
 }
+function reportLockPanelHtml(){
+  const isAdmin=role()==='admin',ym=reportLockYmValue(),m=/^(\d{4})-(\d{2})$/.exec(ym),year=+m[1],month=+m[2];
+  const nowYear=new Date().getFullYear(),yearMin=nowYear-3,yearMax=nowYear+1;
+  const monthOptions=Array.from({length:12},(_,i)=>`<option value="${i+1}" ${month===i+1?'selected':''}>Tháng ${i+1}</option>`).join('');
+  const yearOptions=Array.from({length:yearMax-yearMin+1},(_,i)=>yearMin+i).map(y=>`<option value="${y}" ${year===y?'selected':''}>${y}</option>`).join('');
+  const already=PeriodService.findLock(state,ym);
+  return `<div class="panel"><h3>Khóa kỳ báo cáo</h3>
+     <div class="hint">Khóa 1 kỳ (theo tháng) sẽ chặn sửa/hủy điểm QC của kỳ đó ở <b>mọi xét nghiệm</b> — nên làm sau khi đã xuất xong báo cáo chính thức của kỳ.</div>
+     <div class="grid4" style="margin-top:10px">
+       <div><label>Tháng</label><select ${isAdmin?'':'disabled'} onchange="reportSetLockPart('month',this.value)">${monthOptions}</select></div>
+       <div><label>Năm</label><select ${isAdmin?'':'disabled'} onchange="reportSetLockPart('year',this.value)">${yearOptions}</select></div>
+       <div style="align-self:end">${isAdmin?(already?`<button class="btn ghost" disabled>Kỳ này đã khóa</button>`:btn('Khóa kỳ này','reportLockPeriod()','teal')):'<span class="hint">Chỉ admin mới khóa/mở khóa được kỳ báo cáo.</span>'}</div>
+     </div>
+     <div style="margin-top:16px">${reportLockListHtml()}</div>
+   </div>`;
+}
 function pageReportV2(){
   const tests=operationalTests();
-  if(!tests.length)return headOnly('Báo cáo & Biểu mẫu','')+`<div class="panel">${emptyState('Chưa có xét nghiệm đang vận hành','Cần có Panel QC, Nhóm lô QC, Mean/SD và dữ liệu QC trước khi tạo báo cáo.',role()==='admin'?btn('Cấu hình Mean/SD',`go('manage');setManageTab('targets')`,'teal'):'')}</div>`;
+  if(!tests.length)return headOnly('Báo cáo & Biểu mẫu','')+`<div class="panel">${emptyState('Chưa có xét nghiệm đang vận hành','Cần có Panel QC, Nhóm lô QC, Mean/SD và dữ liệu QC trước khi tạo báo cáo.',role()==='admin'?btn('Cấu hình Mean/SD',`go('manage');setManageTab('targets')`,'teal'):'')}</div>`+reportLockPanelHtml();
   const q=searchText(reportQ),matched=tests.filter(t=>!q||reportSearchValues(t).some(v=>searchText(v).includes(q)));
   if(matched.length&&(!reportTest||!matched.some(t=>t.id===reportTest)))reportTest=matched[0].id;
   if(!matched.length)reportTest='';
@@ -177,7 +249,7 @@ function pageReportV2(){
        <button class="btn ghost" data-report-action ${matched.length?'':'disabled'} onclick="exportReportCSV()">${reportActionIcon('csv')}Xuất CSV</button>
      </div>
      <div class="hint">Báo cáo gồm: thông tin đơn vị, biểu đồ Levey-Jennings tổng hợp và từng mức, bảng Mean/SD/CV/Bias/TE/TEa/Sigma, các điểm vi phạm Westgard, nhật ký khắc phục trong khoảng ngày đã chọn, và ô ký duyệt. File .xlsx giữ nguyên bảng cột và biểu đồ như báo cáo in; bản in bấm “Lưu thành PDF”.</div>
-   </div>`;
+   </div>`+reportLockPanelHtml();
 }
 function reportRangePicker(start,end){
   return `<div><label>Từ ngày</label>${dateBox('rStartDate',start,'','onchange="reportRangeChanged()"')}</div>
