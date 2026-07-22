@@ -26,7 +26,8 @@
     "publish": {
       "provider": "github",
       "owner": "bosunrang",
-      "repo": "qc-lab"
+      "repo": "qc-lab",
+      "draft": false
     },
     "directories": {
       "output": "dist"
