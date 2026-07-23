@@ -17,7 +17,7 @@ function csvCell(v){
   return /[",\n\r;]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;
 }
 function downloadCSV(name,rows){const csv='\ufeff'+rows.map(r=>r.map(csvCell).join(',')).join('\r\n');const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
-function exportMetaRows(kind='Báo cáo'){const app=window.QCLAB_APP||{version:'dev',build:''},rules=Object.entries(state.westgardRules||{}).filter(x=>x[1]!==false).map(x=>x[0]).join(', ');return[['Metadata',kind],['Phiên bản app',`${app.name||'QC Lab'} ${app.version||'dev'}${app.build?' · '+app.build:''}`],['Người xuất',userName()],['Thời gian xuất',formatDateTimeVN(new Date().toISOString())],['Bộ luật áp dụng',rules||'Chưa cấu hình']];}
+function exportMetaRows(kind='Báo cáo'){const app=window.QCLAB_APP||{version:'dev'},rules=Object.entries(state.westgardRules||{}).filter(x=>x[1]!==false).map(x=>x[0]).join(', ');return[['Metadata',kind],['Phiên bản app',`${app.name||'QC Lab'} ${app.version||'dev'}`],['Người xuất',userName()],['Thời gian xuất',formatDateTimeVN(new Date().toISOString())],['Bộ luật áp dụng',rules||'Chưa cấu hình']];}
 function reportRows(tid,start,end){const t=state.tests.find(x=>x.id===tid);if(!t)return[];const inMonth=p=>(!start||p.date>=start)&&(!end||p.date<=end),wg=activeWestgard(t),teaVal=typeof sgTea==='function'?sgTea(t):(t.tea||0);let rows=[...exportMetaRows('Báo cáo nội kiểm'),[],['BÁO CÁO NỘI KIỂM',state.lab.name||'',state.lab.dept||'',reportRangeText(start,end)],[],['Xét nghiệm',testDisplayName(t),'Máy',t.machine||'','Đơn vị',t.unit||'','TEa%',teaVal||''],['Nguồn TEa',typeof sgTeaLabel==='function'?sgTeaLabel(sgTeaSource(t)):'Ricos / Westgard biological variation','Cơ sở',typeof sgTeaRefText==='function'?sgTeaRefText(t):'','Tài liệu',t.teaDoc||'','Người duyệt',t.teaApprovedBy||''],['Ghi chú','Cột "Sigma (kỳ)" tính từ Mean/CV thực tế trong đúng khoảng ngày báo cáo này, khác với Sigma đã thẩm định ở trang Six Sigma & Sai số. Dấu * bên cạnh Sigma nghĩa là n<20, CV/Sigma chưa đủ ổn định để tham khảo.']];operationalLevels(t).forEach(l=>{(typeof previousLotSeries==='function'?previousLotSeries(t,l.level):[]).forEach(s=>{const inPts=s.pts.filter(inMonth);if(!inPts.length)return;const wgP=QCCore.westgardByPoint(s.pts,s.mean,s.sd,rule=>testRuleOn(t,rule)),idxOf=new Map(s.pts.map((p,i)=>[p.id,i]));rows.push([],['Mức '+l.level,'Lô '+s.lot,'Đã chuyển tiếp','Mean',s.mean,'SD',s.sd]);rows.push(['Ghi chú','Vi phạm ở lô cũ chỉ đánh giá luật Westgard theo từng mức riêng lẻ, không gồm luật liên mức (như R4s giữa các mức cùng lần chạy).']);rows.push(['Ngày','Lần chạy','NV thực hiện','Họ tên nhân viên','Giá trị','Z','Kết luận','Luật','Loại sai số']);inPts.forEach(p=>{const i=idxOf.get(p.id),f=wgP.F[i]||{level:'ok',rules:[]},z=wgP.zs[i],staff=pointStaff(p);rows.push([vnDate(p.date),p.runId||'',staff.code,staff.name,p.val,(z>=0?'+':'')+fmt(z)+'s',stateName(ruleResultLevel(t,f.rules||[])),((f.rules||[]).join(' | ')||((f.supportRules||[]).length?'Bằng chứng: '+f.supportRules.join(' | '):'')),errorType(f.rules||[])]);});const{st:stP,bias:biasP,te:teP,sigma:sigmaP}=reportLevelStats(inPts,s.mean,teaVal);rows.push(['Thống kê (lô cũ)','n',stP.n,'Mean thực',fmt(stP.m),'SD',fmt(stP.sd,3),'CV%',fmt(stP.cv),'Bias%',fmt(biasP),'TE%',fmt(teP),'Sigma (kỳ)',sigmaP==null?'':fmt(sigmaP,2)+(stP.n<20?' *':'')]);});const pts=operationalLotPoints(t,l.level).filter(inMonth);rows.push([],['Mức '+l.level,'Lô '+(l.lot||''),'Dải '+(l.applied==='lab'?'PXN':'NSX'),'Mean',l.mean,'SD',l.sd]);rows.push(['Ngày','Lần chạy','NV thực hiện','Họ tên nhân viên','Giá trị','Z','Kết luận','Luật','Loại sai số']);if(pts.length){pts.forEach(p=>{const f=wg.byPoint.get(p.id)||{level:'ok',rules:[],z:(p.val-l.mean)/l.sd},staff=pointStaff(p);rows.push([vnDate(p.date),p.runId||'',staff.code,staff.name,p.val,(f.z>=0?'+':'')+fmt(f.z)+'s',stateName(f.level),(f.rules.join(' | ')||((f.supportRules||[]).length?'Bằng chứng: '+f.supportRules.join(' | '):'')),errorType(f.rules)]);});const{st,bias,te,sigma}=reportLevelStats(pts,l.mean,teaVal);rows.push(['Thống kê','n',st.n,'Mean thực',fmt(st.m),'SD',fmt(st.sd,3),'CV%',fmt(st.cv),'Bias%',fmt(bias),'TE%',fmt(te),'Sigma (kỳ)',sigma==null?'':fmt(sigma,2)+(st.n<20?' *':'')]);}else rows.push(['Không có dữ liệu trong khoảng ngày đã chọn']);});const acts=(state.actions||[]).filter(a=>a.testId===tid&&inMonth(a));rows.push([],['NHẬT KÝ KHẮC PHỤC'],['Ngày','Mức / lô','Luật','Loại sai số','Hành động','Người thực hiện','QC chạy lại','Trạng thái duyệt','Người duyệt','Ý kiến duyệt','Khép vòng']);acts.forEach(a=>{const wf=typeof actionWorkflowStatus==='function'?actionWorkflowStatus(a):{complete:false},rr=typeof actionRerunStatus==='function'?actionRerunStatus(a):{label:''};rows.push([vnDate(a.date),actionLevelShort(t,a.level,a.lot),a.rule||'',a.errorType||'',a.action||'',a.by||'',rr.label||'',typeof actionApprovalLabel==='function'?actionApprovalLabel(a):(a.approvalStatus||'pending'),a.approvedBy||'',a.approvalNote||'',wf.complete?'Hoàn tất':'Chưa hoàn tất']);});return rows;}
 function exportReportCSV(){const tid=document.getElementById('rTest').value,{start,end}=typeof reportDateRange==='function'?reportDateRange():{start:'',end:''};const t=state.tests.find(x=>x.id===tid);if(!t)return;const label=start||end?(start||'batdau')+'_'+(end||'hientai'):'toanbo';downloadCSV('Bao_cao_IQC_'+safeName(t.name)+'_'+safeName(label)+'.csv',reportRows(tid,start,end));}
 function exportActionsCSV(){const rows=[...exportMetaRows('Nhật ký khắc phục'),[],['Ngày','Thời điểm ghi nhận','Xét nghiệm','Mức / lô','Luật','Loại sai số','Hành động','Người thực hiện','QC chạy lại','Trạng thái duyệt','Người duyệt','Thời điểm duyệt','Ý kiến duyệt','Khép vòng']];(state.actions||[]).forEach(a=>{const t=state.tests.find(x=>x.id===a.testId),wf=typeof actionWorkflowStatus==='function'?actionWorkflowStatus(a):{complete:false},rr=typeof actionRerunStatus==='function'?actionRerunStatus(a):{label:''};rows.push([vnDate(a.date),a.createdAt?formatDateTimeVN(a.createdAt):'',t?testDisplayName(t):'',actionLevelShort(t,a.level,a.lot),a.rule||'',a.errorType||'',a.action||'',a.by||'',rr.label||'',typeof actionApprovalLabel==='function'?actionApprovalLabel(a):(a.approvalStatus||'pending'),a.approvedBy||'',a.approvedAt?formatDateTimeVN(a.approvedAt):'',a.approvalNote||'',wf.complete?'Hoàn tất':'Chưa hoàn tất']);});downloadCSV('Nhat_ky_khac_phuc_QC.csv',rows);}
@@ -237,7 +237,7 @@ const ReportXlsx=(()=>{
    Cần DOM để render biểu đồ (ljDataURL/ljMultiDataURL) nên chỉ chạy trong trình duyệt. */
 function reportXlsxDoc(tid,start,end){
   const t=state.tests.find(x=>x.id===tid);if(!t)return null;
-  const ST=RXST,NCOL=10,LASTCOL='J',CHART_W=760,CHART_H=Math.round(760*430/1400);
+  const ST=RXST,NCOL=10,LASTCOL='J',CHART_W=930,CHART_H=Math.round(930*430/1400),ROW_PX=17;
   const inMonth=p=>(!start||p.date>=start)&&(!end||p.date<=end),wg=activeWestgard(t);
   const teaVal=typeof sgTea==='function'?sgTea(t):(t.tea||0);
   const teaSourceText=typeof sgTeaLabel==='function'?sgTeaLabel(sgTeaSource(t)):'Ricos / Westgard biological variation';
@@ -247,35 +247,36 @@ function reportXlsxDoc(tid,start,end){
   const push=cells=>{rows.push(cells);return ++R;};                       // trả về số hàng 1-based vừa thêm
   const fullMerge=r=>merges.push('A'+r+':'+LASTCOL+r);
   const blank=()=>push([]);
-  const section=txt=>{const r=push([S(txt,ST.SECTION)]);fullMerge(r);rowHeights[r]=18;};
+  const section=txt=>{const r=push([S(txt,ST.SECTION)]);fullMerge(r);rowHeights[r]=21;};
   const note=txt=>{const r=push([S(txt,ST.NOTE)]);fullMerge(r);rowHeights[r]=Math.min(60,14+Math.ceil(String(txt).length/95)*13);};
   const imgBytes=typeof sigmaDataURLBytes==='function'?sigmaDataURLBytes:null;
-  const chart=durl=>{if(!durl||!imgBytes)return;const row0=R;let bytes;try{bytes=imgBytes(durl);}catch(e){return;}images.push({bytes,dispW:CHART_W,dispH:CHART_H,row0});const spacer=Math.ceil(CHART_H/15)+1;for(let i=0;i<spacer;i++)blank();};
+  const chart=durl=>{if(!durl||!imgBytes)return;const row0=R;let bytes;try{bytes=imgBytes(durl);}catch(e){return;}images.push({bytes,dispW:CHART_W,dispH:CHART_H,row0});const spacer=Math.ceil(CHART_H/ROW_PX)+1;for(let i=0;i<spacer;i++)blank();};
   // ---- Tiêu đề + thông tin đơn vị (bám theo báo cáo in: tiêu đề căn giữa, thanh app/luật, bảng meta cân đối) ----
   const appMeta=window.QCLAB_APP||{},rulesStr=Object.entries(state.westgardRules||{}).filter(x=>x[1]!==false).map(x=>x[0]).join(', ')||'Chưa cấu hình';
   let r=push([S('BÁO CÁO NỘI KIỂM CHẤT LƯỢNG XÉT NGHIỆM',ST.TITLE)]);fullMerge(r);rowHeights[r]=24;
   const brandLine=(state.lab.name||'BỆNH VIỆN / ĐƠN VỊ')+' · '+(state.lab.dept||'Khoa Xét nghiệm')+(state.lab.address?' · '+state.lab.address:'')+'   ·   Xuất '+formatDateTimeVN(new Date().toISOString())+' · Người xuất: '+userName();
   r=push([S(brandLine,ST.SUB)]);fullMerge(r);rowHeights[r]=brandLine.length>120?29:15;
   blank();
-  // Mỗi hàng meta: nhãn A | giá trị B:F | nhãn2 G:H | giá trị2 I:J — hai nửa cân nhau, nhãn2 đủ rộng để không xuống dòng.
+  // Mỗi hàng meta: nhãn A:B | giá trị C:F | nhãn2 G:H | giá trị2 I:J — cùng một lưới cân đối.
   // Mọi ô trong vùng gộp phải mang style có viền, nếu không Excel bỏ vẽ cạnh của ô gộp (nhìn như bị cắt viền).
-  const metaRow=(l1,v1,l2,v2)=>{const rr=push([S(l1,ST.LABEL),S(v1,ST.VAL),S('',ST.VAL),S('',ST.VAL),S('',ST.VAL),S('',ST.VAL),S(l2,ST.LABEL),S('',ST.LABEL),S(v2,ST.VAL),S('',ST.VAL)]);merges.push('B'+rr+':F'+rr,'G'+rr+':H'+rr,'I'+rr+':J'+rr);rowHeights[rr]=18;};
-  const metaWide=(l,v)=>{const cells=[S(l,ST.LABEL),S(v,ST.VAL)];for(let i=0;i<8;i++)cells.push(S('',ST.VAL));const rr=push(cells);merges.push('B'+rr+':J'+rr);rowHeights[rr]=Math.min(48,16+Math.ceil(String(v).length/112)*13);};
-  metaRow('Phiên bản app',(appMeta.name||'QC Lab')+' '+(appMeta.version||'dev')+(appMeta.build?' · '+appMeta.build:''),'Bộ luật áp dụng',rulesStr);
+  const metaRow=(l1,v1,l2,v2)=>{const rr=push([S(l1,ST.LABEL),S('',ST.LABEL),S(v1,ST.VAL),S('',ST.VAL),S('',ST.VAL),S('',ST.VAL),S(l2,ST.LABEL),S('',ST.LABEL),S(v2,ST.VAL),S('',ST.VAL)]);merges.push('A'+rr+':B'+rr,'C'+rr+':F'+rr,'G'+rr+':H'+rr,'I'+rr+':J'+rr);rowHeights[rr]=21;};
+  const metaWide=(l,v)=>{const cells=[S(l,ST.LABEL),S('',ST.LABEL),S(v,ST.VAL)];for(let i=0;i<7;i++)cells.push(S('',ST.VAL));const rr=push(cells);merges.push('A'+rr+':B'+rr,'C'+rr+':J'+rr);rowHeights[rr]=Math.min(54,18+Math.ceil(String(v).length/110)*12);};
+  metaRow('Phiên bản app',(appMeta.name||'QC Lab')+' '+(appMeta.version||'dev'),'Bộ luật áp dụng',rulesStr);
   metaRow('Xét nghiệm',testDisplayName(t)+(t.unit?' · '+t.unit:''),'Máy',t.machine||'');
   metaRow('Khoảng ngày',reportRangeText(start,end),'TEa%',teaVal||'—');
   metaWide('Nguồn TEa',teaSourceText+(typeof sgTeaRefText==='function'&&sgTeaRefText(t)?' · '+sgTeaRefText(t):'')+(t.teaDoc?' · '+t.teaDoc:'')+(t.teaApprovedBy?' · duyệt '+t.teaApprovedBy:''));
-  note('Cột "Sigma (kỳ)" tính từ Mean/CV thực tế trong đúng khoảng ngày báo cáo này — khác với Sigma đã thẩm định ở trang Six Sigma & Sai số. Dấu * nghĩa là kỳ này có n < 20 kết quả, CV/Sigma chưa đủ ổn định.');
+  metaWide('Ghi chú Sigma','Sigma (kỳ) tính từ Mean/CV thực tế trong đúng khoảng ngày báo cáo này, khác với Sigma đã thẩm định ở trang Six Sigma & Sai số. Dấu * nghĩa là kỳ có n < 20 kết quả, CV/Sigma chưa đủ ổn định.');
   // ---- Biểu đồ LJ tổng hợp (nếu có ≥2 mức có điểm) ----
   const multiViews=operationalLevels(t).map(l=>({level:l.level,lot:l.lot,mean:l.mean,sd:l.sd,pts:operationalLotPoints(t,l.level).filter(inMonth),label:'M'+l.level+'·'+(l.lot||'?')}));
   if(multiViews.filter(v=>v.pts.length).length>=2){blank();section('Levey-Jennings tổng hợp theo Z-score');chart(typeof ljMultiDataURL==='function'?ljMultiDataURL(multiViews,t):null);}
   // ---- Bảng ô cho từng mục ----
-  const statsHeader=()=>push([S('n',ST.TH),S('Mean thực',ST.TH),S('SD',ST.TH),S('CV%',ST.TH),S('Bias%',ST.TH),S('TE%',ST.TH),S('TEa%',ST.TH),S('Sigma (kỳ)',ST.TH)]);
-  const statsRow=(st,bias,te,sigma)=>push([Nn(st.n,ST.TD),Nn(n2(st.m),ST.TD),Nn(n3(st.sd),ST.TD),Nn(n2(st.cv),ST.TD),Nn(n2(bias),ST.TD),Nn(n2(te),ST.TD),(teaVal?Nn(n2(teaVal),ST.TD):S('—',ST.TD)),(sigma==null?S('—',ST.TD):(st.n<20?S(fmt(sigma,1)+' *',ST.TD):Nn(n1(sigma),ST.TD)))]);
-  const pointsHeader=()=>push([S('Ngày',ST.TH),S('Lần chạy',ST.TH),S('NV',ST.TH),S('Giá trị',ST.TH),S('Z',ST.TH),S('Kết luận',ST.TH),S('Luật / bằng chứng',ST.TH)]);
-  const pointsRow=o=>{const rules=[...new Set(o.f.rules||[])],support=[...new Set(o.f.supportRules||[])].filter(rule=>!rules.includes(rule)),ruleText=rules.join(', ')||(support.length?'Bằng chứng: '+support.join(', '):'—'),staff=pointStaff(o.p),vs=o.f.level==='rej'?ST.REJ:o.f.level==='warn'?ST.WARN:ST.TD;push([S(vnDate(o.p.date),ST.TD),S(o.p.runId||'—',ST.TD),S(staff.code||'—',ST.TD),Nn(Number.isFinite(o.p.val)?o.p.val:'',ST.TD),S((o.z>=0?'+':'')+fmt(o.z)+'s',ST.TD),S(stateName(o.f.level),vs),S(ruleText,ST.TD)]);};
-  const violHeader=()=>push([S('Ngày',ST.TH),S('NV',ST.TH),S('Giá trị',ST.TH),S('Z',ST.TH),S('Luật',ST.TH),S('Loại sai số',ST.TH)]);
-  const violRow=o=>{const rules=[...new Set(o.f.rules||[])];push([S(vnDate(o.p.date),ST.TD),S(pointStaff(o.p).code||'—',ST.TD),Nn(Number.isFinite(o.p.val)?o.p.val:'',ST.TD),S((o.z>=0?'+':'')+fmt(o.z)+'s',ST.TD),S(rules.join(', '),ST.WARN),S(errorType(rules),ST.TD)]);};
+  const mergePairs=(r,pairs)=>pairs.forEach(([a,b])=>merges.push(a+r+':'+b+r));
+  const statsHeader=()=>{const r=push([S('n',ST.TH),S('Mean thực',ST.TH),S('',ST.TH),S('SD',ST.TH),S('CV%',ST.TH),S('Bias%',ST.TH),S('TE%',ST.TH),S('TEa%',ST.TH),S('Sigma (kỳ)',ST.TH),S('',ST.TH)]);mergePairs(r,[['B','C'],['I','J']]);rowHeights[r]=18;};
+  const statsRow=(st,bias,te,sigma)=>{const sg=sigma==null?S('—',ST.TD):(st.n<20?S(fmt(sigma,1)+' *',ST.TD):Nn(n1(sigma),ST.TD)),r=push([Nn(st.n,ST.TD),Nn(n2(st.m),ST.TD),S('',ST.TD),Nn(n3(st.sd),ST.TD),Nn(n2(st.cv),ST.TD),Nn(n2(bias),ST.TD),Nn(n2(te),ST.TD),(teaVal?Nn(n2(teaVal),ST.TD):S('—',ST.TD)),sg,S('',ST.TD)]);mergePairs(r,[['B','C'],['I','J']]);};
+  const pointsHeader=()=>{const r=push([S('Ngày',ST.TH),S('',ST.TH),S('Lần chạy',ST.TH),S('',ST.TH),S('NV',ST.TH),S('Giá trị',ST.TH),S('Z',ST.TH),S('Kết luận',ST.TH),S('Luật / bằng chứng',ST.TH),S('',ST.TH)]);mergePairs(r,[['A','B'],['C','D'],['I','J']]);rowHeights[r]=18;};
+  const pointsRow=o=>{const rules=[...new Set(o.f.rules||[])],support=[...new Set(o.f.supportRules||[])].filter(rule=>!rules.includes(rule)),ruleText=rules.join(', ')||(support.length?'Bằng chứng: '+support.join(', '):'—'),staff=pointStaff(o.p),vs=o.f.level==='rej'?ST.REJ:o.f.level==='warn'?ST.WARN:ST.TD,r=push([S(vnDate(o.p.date),ST.TD),S('',ST.TD),S(o.p.runId||'—',ST.TD),S('',ST.TD),S(staff.code||'—',ST.TD),Nn(Number.isFinite(o.p.val)?o.p.val:'',ST.TD),S((o.z>=0?'+':'')+fmt(o.z)+'s',ST.TD),S(stateName(o.f.level),vs),S(ruleText,ST.TDL),S('',ST.TDL)]);mergePairs(r,[['A','B'],['C','D'],['I','J']]);};
+  const violHeader=()=>{const r=push([S('Ngày',ST.TH),S('',ST.TH),S('NV',ST.TH),S('Giá trị',ST.TH),S('Z',ST.TH),S('Luật',ST.TH),S('',ST.TH),S('Loại sai số',ST.TH),S('',ST.TH),S('',ST.TH)]);mergePairs(r,[['A','B'],['F','G'],['H','J']]);rowHeights[r]=18;};
+  const violRow=o=>{const rules=[...new Set(o.f.rules||[])],r=push([S(vnDate(o.p.date),ST.TD),S('',ST.TD),S(pointStaff(o.p).code||'—',ST.TD),Nn(Number.isFinite(o.p.val)?o.p.val:'',ST.TD),S((o.z>=0?'+':'')+fmt(o.z)+'s',ST.TD),S(rules.join(', '),ST.WARN),S('',ST.WARN),S(errorType(rules),ST.TDL),S('',ST.TDL),S('',ST.TDL)]);mergePairs(r,[['A','B'],['F','G'],['H','J']]);};
   // ---- Từng mức ----
   operationalLevels(t).forEach(l=>{
     (typeof previousLotSeries==='function'?previousLotSeries(t,l.level):[]).forEach(s=>{
@@ -308,7 +309,7 @@ function reportXlsxDoc(tid,start,end){
     acts.forEach(a=>{const wf=typeof actionWorkflowStatus==='function'?actionWorkflowStatus(a):{complete:false},rr=typeof actionRerunStatus==='function'?actionRerunStatus(a):{label:''};push([S(vnDate(a.date),ST.TD),S(actionLevelShort(t,a.level,a.lot),ST.TD),S(a.rule||'',ST.TD),S(a.errorType||'',ST.TD),S(a.action||'',ST.TDL),S(a.by||'',ST.TD),S(rr.label||'',ST.TD),S((typeof actionApprovalLabel==='function'?actionApprovalLabel(a):(a.approvalStatus||'pending'))+(a.approvedBy?' ('+a.approvedBy+')':''),ST.TD),S(wf.complete?'Hoàn tất':'Chưa hoàn tất',ST.TD),S(a.approvalNote||'',ST.TDL)]);});
   }
   blank();const sr=push([S('Người thực hiện — Người kiểm tra — Phụ trách khoa (ký, ghi rõ họ tên)',ST.NOTE)]);fullMerge(sr);
-  return{sheetName:'Báo cáo nội kiểm',cols:[14,12,11,11,10,10,13,12,14,26].slice(0,NCOL),rows,merges,rowHeights,images};
+  return{sheetName:'Báo cáo nội kiểm',cols:[8,12,12,10,10,10,13,13,17,22].slice(0,NCOL),rows,merges,rowHeights,images};
 }
 async function exportReportXLSX(){
   const tid=document.getElementById('rTest').value,{start,end}=typeof reportDateRange==='function'?reportDateRange():{start:'',end:''};
@@ -324,20 +325,21 @@ async function exportReportXLSX(){
 function westgardXlsxDoc(tid){
   const t=state.tests.find(x=>x.id===tid);if(!t)return null;
   const wg=activeWestgard(t);if(!wg.views.length)return null;
-  const ST=RXST,LASTCOL='I',CHART_W=760,CHART_H=Math.round(760*430/1400),rows=[],merges=[],images=[],rowHeights={};let R=0;
+  const ST=RXST,LASTCOL='I',CHART_W=900,CHART_H=Math.round(900*430/1400),ROW_PX=17,rows=[],merges=[],images=[],rowHeights={};let R=0;
   const S=(v,s)=>({v,s}),Nn=(v,s)=>({v,s,num:true}),push=cells=>{rows.push(cells);return ++R;},blank=()=>push([]),fullMerge=r=>merges.push('A'+r+':'+LASTCOL+r);
-  const section=txt=>{const r=push([S(txt,ST.SECTION)]);fullMerge(r);rowHeights[r]=18;};
+  const section=txt=>{const r=push([S(txt,ST.SECTION)]);fullMerge(r);rowHeights[r]=21;};
   const note=txt=>{const r=push([S(txt,ST.NOTE)]);fullMerge(r);rowHeights[r]=Math.min(60,14+Math.ceil(String(txt).length/90)*13);};
-  const metaRow=(l1,v1,l2,v2)=>{const r=push([S(l1,ST.LABEL),S(v1,ST.VAL),S('',ST.VAL),S('',ST.VAL),S('',ST.VAL),S(l2,ST.LABEL),S('',ST.LABEL),S(v2,ST.VAL),S('',ST.VAL)]);merges.push('B'+r+':E'+r,'F'+r+':G'+r,'H'+r+':I'+r);rowHeights[r]=18;};
-  const chart=durl=>{if(!durl||typeof sigmaDataURLBytes!=='function')return;let bytes;try{bytes=sigmaDataURLBytes(durl);}catch(e){return;}images.push({bytes,dispW:CHART_W,dispH:CHART_H,row0:R});for(let i=0;i<Math.ceil(CHART_H/15)+1;i++)blank();};
+  const metaRow=(l1,v1,l2,v2)=>{const r=push([S(l1,ST.LABEL),S('',ST.LABEL),S(v1,ST.VAL),S('',ST.VAL),S('',ST.VAL),S(l2,ST.LABEL),S('',ST.LABEL),S(v2,ST.VAL),S('',ST.VAL)]);merges.push('A'+r+':B'+r,'C'+r+':E'+r,'F'+r+':G'+r,'H'+r+':I'+r);rowHeights[r]=21;};
+  const metaWide=(l,v)=>{const r=push([S(l,ST.LABEL),S('',ST.LABEL),S(v,ST.VAL),S('',ST.VAL),S('',ST.VAL),S('',ST.VAL),S('',ST.VAL),S('',ST.VAL),S('',ST.VAL)]);merges.push('A'+r+':B'+r,'C'+r+':I'+r);rowHeights[r]=Math.min(48,18+Math.ceil(String(v).length/105)*12);};
+  const chart=durl=>{if(!durl||typeof sigmaDataURLBytes!=='function')return;let bytes;try{bytes=sigmaDataURLBytes(durl);}catch(e){return;}images.push({bytes,dispW:CHART_W,dispH:CHART_H,row0:R});for(let i=0;i<Math.ceil(CHART_H/ROW_PX)+1;i++)blank();};
   const app=window.QCLAB_APP||{},machine=instrumentName(t.instrumentId,t.machine)||t.machine||'—',rulesOn=WG_RULES.filter(rule=>testRuleOn(t,rule)).join(', ')||'Chưa bật luật nào';
   let r=push([S('PHÂN TÍCH WESTGARD — '+testDisplayName(t),ST.TITLE)]);fullMerge(r);rowHeights[r]=24;
   const brand=(state.lab.name||'BỆNH VIỆN / ĐƠN VỊ')+' · '+(state.lab.dept||'Khoa Xét nghiệm')+(state.lab.address?' · '+state.lab.address:'')+'   ·   Xuất '+formatDateTimeVN(new Date().toISOString())+' · Người xuất: '+userName();
   r=push([S(brand,ST.SUB)]);fullMerge(r);rowHeights[r]=brand.length>115?29:15;blank();
   metaRow('Xét nghiệm',testDisplayName(t)+(t.unit?' · '+t.unit:''),'Thiết bị',machine);
-  metaRow('Phiên bản app',(app.name||'QC Lab')+' '+(app.version||'dev')+(app.build?' · '+app.build:''),'Phạm vi','Lô/mức đang xem');
-  note('Bộ luật áp dụng: '+rulesOn);
-  note('Bảng chi tiết chỉ gồm điểm cảnh báo/loại và điểm lịch sử cấu thành quy tắc; các điểm QC bình thường không được xuất để giữ báo cáo gọn và đúng mục đích phân tích.');
+  metaRow('Phiên bản app',(app.name||'QC Lab')+' '+(app.version||'dev'),'Phạm vi','Lô/mức đang xem');
+  metaWide('Bộ luật áp dụng',rulesOn);
+  metaWide('Dữ liệu chi tiết','Chỉ gồm điểm cảnh báo/loại và điểm lịch sử cấu thành quy tắc; các điểm QC bình thường không được xuất.');
   const multiViews=typeof wgMultiViews==='function'?wgMultiViews(t):wg.views.map(v=>({level:v.l.level,lot:v.l.lot,mean:v.l.mean,sd:v.l.sd,pts:v.pts,label:'M'+v.l.level+'·'+(v.l.lot||'?')}));
   if(multiViews.filter(v=>v.pts&&v.pts.length).length>=2){blank();section('Levey-Jennings tổng hợp theo Z-score');chart(typeof ljMultiDataURL==='function'?ljMultiDataURL(multiViews,t):null);}
   const head=()=>push([S('#',ST.TH),S('Ngày',ST.TH),S('Lần chạy',ST.TH),S('NV',ST.TH),S('Giá trị',ST.TH),S('Z',ST.TH),S('Kết luận',ST.TH),S('Luật / bằng chứng',ST.TH),S('Loại sai số',ST.TH)]);
@@ -356,7 +358,7 @@ function westgardXlsxDoc(tid){
     head();relevant.forEach(o=>detail(o,pointIndex.get(o.p.id)||1));
   });
   blank();r=push([S('Người thực hiện — Người kiểm tra — Phụ trách khoa (ký, ghi rõ họ tên)',ST.NOTE)]);fullMerge(r);
-  return{sheetName:'Phân tích Westgard',cols:[12,14,14,10,12,11,14,24,22],rows,merges,rowHeights,images};
+  return{sheetName:'Phân tích Westgard',cols:[7,12,14,9,12,9,15,23,22],rows,merges,rowHeights,images};
 }
 async function exportWestgardXLSX(){
   const t=state.tests.find(x=>x.id===selTest);if(!t){await infoDialog('Chưa chọn được xét nghiệm để xuất Excel.');return;}

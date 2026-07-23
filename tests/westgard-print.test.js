@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
-const ctx = loadSandbox(['modules/reports.js'], { window: { QCLAB_APP: { name: 'QC Lab', version: 'test' } } });
+const ctx = loadSandbox(['modules/reports.js'], { window: { QCLAB_APP: { name: 'QC Lab', version: '2.4.0', build: 'westgard-print-hidpi' } } });
 run(ctx, `
   state={lab:{name:'PXN',dept:'Hóa sinh'},westgardRules:{'1-3s':true,'1-2s':false},tests:[{id:'T1',name:'Sodium',unit:'mmol/L',machine:'Máy A'}]};
   selTest='T1';
@@ -51,6 +51,8 @@ run(ctx, `
   await ctx.printWestgard();
   let printed = JSON.parse(run(ctx, 'JSON.stringify(__printed)'));
   assert.match(printed.title, /Sodium/, 'print title identifies the test');
+  assert.match(printed.body, /QC Lab 2\.4\.0/);
+  assert.doesNotMatch(printed.body, /westgard-print-hidpi/, 'internal build label is hidden from printed reports');
   assert.match(printed.body, /Mức 1 — Lô 1101/, 'body identifies level and lot');
   assert.match(printed.body, /data:lj:2:140:2\.5/, 'the LJ chart is rendered from the level\'s own points/mean/sd');
   assert.match(printed.body, /Điểm vi phạm\/cảnh báo/, 'the violations table is included when a rejected point exists');
@@ -81,7 +83,7 @@ run(ctx, `
   assert.match(printed.body, /không gồm luật liên mức/, 'the previous-lot caveat about cross-level rules is included');
 
   const source = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'router-render.js'), 'utf8');
-  assert.match(source, /onclick="printWestgard\(\)"/, 'the Westgard page wires up a print action');
+  assert.match(source, /'printWestgard\(\)'/, 'the Westgard page wires up a print action');
   assert.match(source, /wgChartMode==='lj'\?'<div>/, 'the export actions only show in the default Levey-Jennings view, not CUSUM');
 
   console.log('Westgard print tests passed');

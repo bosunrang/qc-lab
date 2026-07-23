@@ -4,19 +4,19 @@ function pageUsers(){
     <td><b>${esc(u.name||u.username)}</b><div class="hint">@${esc(u.username)}${u.initials?' · '+esc(u.initials):''}</div></td>
     <td>${roleLabel(u.role)}</td>
     <td>${u.active===false?'<span class="tag rej">Khóa</span>':'<span class="tag ok">Hoạt động</span>'}</td>
-    <td><div class="user-row-actions">${u.id===currentUser.id?'<span class="hint">(bạn)</span> <button class="btn ghost sm" onclick="resetPass(\''+u.id+'\')">Đổi mật khẩu</button>'
-      :'<button class="btn ghost sm" onclick="openUserPerms(\''+u.id+'\')">Sửa quyền</button> <button class="btn ghost sm" onclick="resetPass(\''+u.id+'\')">Đặt lại MK</button> <button class="btn ghost sm" onclick="toggleUser(\''+u.id+'\')">'+(u.active===false?'Mở khóa':'Khóa')+'</button> <button class="btn danger sm" onclick="delUser(\''+u.id+'\')">Xóa</button>'}</div></td></tr>`).join('');
+    <td><div class="user-row-actions">${u.id===currentUser.id?'<span class="hint">(bạn)</span> '+btn('Đổi mật khẩu',"resetPass('"+u.id+"')",'ghost sm')
+      :btn('Sửa quyền',"openUserPerms('"+u.id+"')",'ghost sm')+' '+btn('Đặt lại MK',"resetPass('"+u.id+"')",'ghost sm')+' '+btn(u.active===false?'Mở khóa':'Khóa',"toggleUser('"+u.id+"')",'ghost sm')+' '+btn('Xóa',"delUser('"+u.id+"')",'danger sm')}</div></td></tr>`).join('');
   return headOnly('Quản lý người dùng','Phân quyền thao tác và kiểm soát tài khoản')+
-   `<div class="panel"><h3>Thêm người dùng</h3><div class="user-create-layout">
+   `<div class="panel"><h3 role="heading" aria-level="2">Thêm người dùng</h3><div class="user-create-layout">
      <div class="user-create-card">
        <div class="user-create-card-title">Thông tin tài khoản</div>
        <div class="user-create-fields">
        <div><label>Tên đăng nhập</label><input id="uUser" placeholder="vd: lan.nt"></div>
-       <div><label>Họ tên</label><input id="uName"></div>
+       <div><label>Họ tên</label><input id="uName" aria-label="Họ tên"></div>
        <div><label>Mã viết tắt</label><input id="uInitials" maxlength="12" placeholder="NTL"></div>
-       <div><label>Vai trò</label><select id="uRole" onchange="syncUserPermChecks('newUserPerms',this.value)"><option value="admin">Quản trị</option><option value="technician" selected>KTV</option><option value="viewer">Chỉ xem</option></select></div>
-       <div><label>Mật khẩu tạm</label><input id="uPass" type="password" autocomplete="new-password"></div>
-       <div class="user-create-actions"><button class="btn teal" onclick="addUser()">Thêm</button></div>
+       <div><label>Vai trò</label><select id="uRole" aria-label="Vai trò" onchange="syncUserPermChecks('newUserPerms',this.value)"><option value="admin">Quản trị</option><option value="technician" selected>KTV</option><option value="viewer">Chỉ xem</option></select></div>
+       <div><label>Mật khẩu tạm</label><input id="uPass" aria-label="Mật khẩu tạm" type="password" autocomplete="new-password"></div>
+       <div class="user-create-actions">${btn('Thêm','addUser()','teal')}</div>
        </div>
      </div>
      <div class="user-create-access">
@@ -32,9 +32,9 @@ function pageAudit(){
   const chainHtml=chain.ok?`<span class="tag ok">Chuỗi hash hợp lệ</span> <span class="hint">${chain.checked} dòng đã khóa hash${chain.legacy?` · ${chain.legacy} dòng cũ chưa có hash`:''}</span>`:`<span class="tag rej">Audit có dấu hiệu bị sửa</span> <span class="hint">Lỗi tại dòng #${(state.activity[chain.brokenIndex]||{}).seq||chain.brokenIndex+1}: ${esc(chain.reason)}</span>`;
   const rows=(state.activity||[]).slice().reverse().map(a=>`<tr><td><div class="audit-time-cell"><span class="audit-seq">${a.seq?'#'+a.seq:''}</span><span class="audit-time">${formatDateTimeVN(a.ts)}</span></div></td><td><b>${esc(a.user||'')}</b><div class="hint">${roleLabel(a.role||'viewer')}${a.username?' · @'+esc(a.username):''}</div></td><td><span class="pill">${esc(a.type||'')}</span></td><td>${esc(a.target||'')||'<span class="hint">—</span>'}</td><td class="audit-detail">${esc(a.detail||'')||'<span class="hint">—</span>'}</td></tr>`).join('');
   return headOnly('Nhật ký hoạt động','Lưu vết các thao tác quan trọng; chỉ quản trị viên được xem')+
-    `<div class="panel"><h3>Công cụ</h3><div class="row-flex">
-      <button class="btn ghost sm" onclick="exportActivityCSV()">Xuất Excel nhật ký</button>
-      ${total?`<button class="btn danger sm" onclick="clearActivityLog()">Xóa nhật ký</button>`:''}
+    `<div class="panel"><h3 role="heading" aria-level="2">Công cụ</h3><div class="row-flex">
+      ${btn('Xuất Excel nhật ký','exportActivityCSV()','teal sm')}
+      ${total?btn('Xóa nhật ký','clearActivityLog()','danger sm'):''}
       <div class="hint" style="align-self:center">${total} dòng hoạt động đã ghi nhận. ${chainHtml}</div>
     </div></div>
     <div class="panel"><h3>Hoạt động gần đây</h3>${rows?`<table class="audit-table"><thead><tr><th>Thời gian</th><th>Người dùng</th><th>Hành động</th><th>Đối tượng</th><th>Chi tiết</th></tr></thead><tbody>${rows}</tbody></table>`:emptyState('Chưa có hoạt động','Nhật ký sẽ bắt đầu ghi từ các thao tác tiếp theo.')}</div>`;
@@ -80,7 +80,7 @@ async function openUserPerms(id){
   if(!requireAdmin())return;
   const u=state.users.find(x=>x.id===id);if(!u)return;
   if(currentUser&&currentUser.id===id){await infoDialog('Không thể tự sửa quyền của tài khoản đang đăng nhập. Hãy dùng tài khoản quản trị khác nếu cần thay đổi.');return;}
-  const roleSelect=`<select id="editUserRole" onchange="syncUserPermChecks('editUserPerms',this.value)"><option value="admin" ${u.role==='admin'?'selected':''}>Quản trị</option><option value="technician" ${u.role==='technician'?'selected':''}>KTV</option><option value="viewer" ${u.role==='viewer'?'selected':''}>Chỉ xem</option></select>`;
+  const roleSelect=`<select id="editUserRole" aria-label="Vai trò" onchange="syncUserPermChecks('editUserPerms',this.value)"><option value="admin" ${u.role==='admin'?'selected':''}>Quản trị</option><option value="technician" ${u.role==='technician'?'selected':''}>KTV</option><option value="viewer" ${u.role==='viewer'?'selected':''}>Chỉ xem</option></select>`;
   openModal(`<div class="modal"><div class="modal-h"><h3>Sửa quyền người dùng</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
     <div class="modal-b">
       <div class="hint"><b>${esc(u.name||u.username)}</b> · @${esc(u.username)}</div>
@@ -88,7 +88,7 @@ async function openUserPerms(id){
       <label style="margin-top:12px">Thẻ được phép dùng</label>${userPermChecks(u.pagePerms,'editUserPerms',u.role)}
       <div class="hint" style="margin-top:10px">Vai trò quyết định quyền sửa/quản trị; danh sách thẻ chỉ quyết định người dùng thấy và mở được màn hình nào.</div>
     </div>
-    <div class="modal-f"><button class="btn ghost" onclick="closeModal()">Hủy</button><button class="btn teal" onclick="applyUserPerms('${id}')">Lưu quyền</button></div></div>`);
+    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn('Lưu quyền',`applyUserPerms('${id}')`,'teal')}</div></div>`);
 }
 async function applyUserPerms(id){
   if(!requireAdmin())return;
@@ -110,7 +110,7 @@ function resetPass(id){
       <label>Nhập lại mật khẩu</label><input id="resetPass2" type="password" autocomplete="new-password" onkeydown="if(event.key==='Enter')applyResetPass('${id}')">
       <div id="resetPassMsg"></div>
     </div>
-    <div class="modal-f"><button class="btn ghost" onclick="closeModal()">Hủy</button><button class="btn teal" onclick="applyResetPass('${id}')">Lưu mật khẩu</button></div></div>`);
+    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn('Lưu mật khẩu',`applyResetPass('${id}')`,'teal')}</div></div>`);
   setTimeout(()=>{const e=document.getElementById('resetPass1');if(e)e.focus();},50);
 }
 async function applyResetPass(id){
@@ -176,8 +176,8 @@ function showStartupRecovery(){
   ov.innerHTML=`<div class="auth-card"><div class="auth-brand">Cần phục hồi dữ liệu</div>
     <div class="auth-sub">QC Lab phát hiện dữ liệu cục bộ không hợp lệ và đã dừng để tránh ghi đè.</div>
     <div class="auth-err">${esc(startupProblem&&startupProblem.message||'Không đọc được dữ liệu.')}</div>
-    <button class="btn teal" style="width:100%;margin-top:16px" onclick="downloadStartupData()">Tải dữ liệu gốc xuống</button>
-    <button class="btn ghost" style="width:100%;margin-top:8px" onclick="resetStartupData()">Tạo dữ liệu mới</button>
+    ${btn('Tải dữ liệu gốc xuống','downloadStartupData()','teal','',{attrs:{style:'width:100%;margin-top:16px'}})}
+    ${btn('Tạo dữ liệu mới','resetStartupData()','ghost','',{attrs:{style:'width:100%;margin-top:8px'}})}
     <div class="auth-hint">Ưu tiên tải dữ liệu gốc xuống trước để có thể kiểm tra và phục hồi.</div></div>`;
 }
 function showLogin(msg){
@@ -194,7 +194,7 @@ function showLogin(msg){
     <label>Tên đăng nhập</label><input id="liUser" autocomplete="username" autofocus>
     <label>Mật khẩu</label><input id="liPass" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
     ${msg?`<div class="auth-err">${esc(msg)}</div>`:''}
-    <button class="btn teal" style="width:100%;margin-top:16px" onclick="doLogin()">Đăng nhập</button>
+    ${btn('Đăng nhập','doLogin()','teal','',{attrs:{style:'width:100%;margin-top:16px'}})}
     ${trialLine}<div class="auth-hint">${defaultHint}Phiên bản ${esc(app.version||'dev')}</div></div>`;
   requestAnimationFrame(focusLoginField);setTimeout(focusLoginField,50);
 }
@@ -235,7 +235,7 @@ function showPasswordChange(msg){
     <label>Mật khẩu mới</label><input id="newPass1" type="password" autocomplete="new-password">
     <label>Nhập lại mật khẩu mới</label><input id="newPass2" type="password" autocomplete="new-password" onkeydown="if(event.key==='Enter')changeRequiredPassword()">
     ${msg?`<div class="auth-err">${esc(msg)}</div>`:''}
-    <button class="btn teal" style="width:100%;margin-top:16px" onclick="changeRequiredPassword()">Lưu mật khẩu mới</button>
+    ${btn('Lưu mật khẩu mới','changeRequiredPassword()','teal','',{attrs:{style:'width:100%;margin-top:16px'}})}
     <div class="auth-hint">Mật khẩu cần ít nhất 8 ký tự và không nên dùng lại mật khẩu mặc định.</div></div>`;
   setTimeout(()=>{const e=document.getElementById('newPass1');if(e)e.focus();},50);
 }

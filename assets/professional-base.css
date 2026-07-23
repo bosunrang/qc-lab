@@ -27,7 +27,7 @@ main{
 }
 .brand small{ display:block; color:#8ea3b2; font-weight:600; font-size:10px; text-transform:uppercase; letter-spacing:.08em; margin-top:2px; }
 nav{
-  display:flex; flex-direction:column; overflow:auto; min-width:0; max-width:100%;
+  display:flex; flex-direction:column; overflow:auto; min-width:0; max-width:100%; gap:6px; margin-top:14px;
 }
 nav button{
   position:relative; display:flex; align-items:center; width:100%; text-align:left; background:transparent; border:none; cursor:pointer; font-family:var(--sans); isolation:isolate; margin:1px 0; overflow:hidden;
@@ -358,16 +358,8 @@ aside{
   margin:2px 4px 8px;
 }
 
-nav{
-  flex-direction:row; flex-wrap:nowrap; padding-bottom:2px; overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch;
-}
-
 .nav-group{
   flex:0 0 auto; align-self:center; white-space:nowrap;
-}
-
-nav button{
-  flex:0 0 auto; width:auto; white-space:nowrap;
 }
 
 main{
@@ -418,20 +410,28 @@ aside{
   display:none
 }
 
-nav{
-  position:relative; flex-direction:row; flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; max-width:100%; padding-bottom:2px; -webkit-overflow-scrolling:touch; mask-image:linear-gradient(90deg, #000 calc(100% - 28px), transparent 100%); -webkit-mask-image:linear-gradient(90deg, #000 calc(100% - 28px), transparent 100%);
-}
-
 .nav-group{
   display:none
 }
 
-nav button{
-  flex:0 0 auto;width:auto;white-space:nowrap
-}
-
 main{
   height:auto; max-height:none; overflow:visible; padding:16px 20px 44px;
+}
+}
+
+/* Horizontal-scrolling nav is identical whether triggered by narrow width or
+   short height — one shared rule instead of two copies to keep in sync (see
+   CLAUDE.md "professional-*.css" note on overlapping breakpoints; this is
+   the exact class of bug the 2026-07-23 nav-scroll-fade fix hit, when the
+   mask-image only existed in one of these two copies). `.nav-group`/`main`
+   still differ per breakpoint above, so those stay split. */
+@media (max-width:900px), (min-width:761px) and (max-height:480px){
+nav{
+  position:relative; flex-direction:row; flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; max-width:100%; padding-bottom:2px; -webkit-overflow-scrolling:touch; mask-image:linear-gradient(90deg, #000 calc(100% - 28px), transparent 100%); -webkit-mask-image:linear-gradient(90deg, #000 calc(100% - 28px), transparent 100%);
+}
+
+nav button{
+  flex:0 0 auto; width:auto; white-space:nowrap;
 }
 }
 
@@ -505,10 +505,6 @@ aside{
 
 .side-foot button{
   font-size:12px; font-weight:700;
-}
-
-nav{
-  gap:6px;margin-top:14px;
 }
 
 .nav-group{

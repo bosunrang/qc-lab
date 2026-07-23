@@ -72,7 +72,7 @@ table{ width:100%; border-collapse:separate; min-width:640px; border:1px solid v
   tbody tr:last-child td{border-bottom:none}
   td.num,th.num{font-family:var(--sans);font-variant-numeric:tabular-nums;text-align:right;font-weight:650;}
   td b{font-weight:750;color:#172633}
-  td .hint{margin-top:2px;color:#6b7e8d}
+  td .hint{margin-top:2px;color:var(--muted)}
   .tag{ display:inline-block; font-family:var(--sans); }
   .tag.ok{background:var(--success-bg);color:var(--success-ink);border:1px solid var(--success-border);}
   .tag.warn{background:#fbf1de;color:var(--amber);border:1px solid #e4c273;}
@@ -134,7 +134,7 @@ table{ width:100%; border-collapse:separate; min-width:640px; border:1px solid v
 
 .confirm-modal-text{min-width:0;padding-top:1px}
 .confirm-modal-text b{display:block;color:#203744;font-size:14px;font-weight:760;line-height:1.5;white-space:pre-line}
-.confirm-modal-text p{margin:6px 0 0;color:#647985;font-size:12.5px;line-height:1.55;white-space:pre-line}
+.confirm-modal-text p{margin:6px 0 0;color:var(--muted);font-size:12.5px;line-height:1.55;white-space:pre-line}
 
 .confirm-modal-actions{
   display:flex; justify-content:flex-end; gap:9px; padding:14px 24px 20px; border-top:1px solid #e4ebee; background:#fbfcfd;

@@ -4,7 +4,7 @@ const path = require('node:path');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
 const ctx = loadSandbox(['modules/data-io.js'], {
-  window: { QCLAB_APP: { name: 'QC Lab', version: 'test' } },
+  window: { QCLAB_APP: { name: 'QC Lab', version: '2.4.0', build: 'westgard-print-hidpi' } },
   atob: value => Buffer.from(value, 'base64').toString('binary'),
 });
 
@@ -28,7 +28,7 @@ run(ctx, `
   function ljDataURL(){return 'data:image/png;base64,iVBORw0KGgo=';}
   function ljMultiDataURL(){return 'data:image/png;base64,iVBORw0KGgo=';}
   QCCore={westgardByPoint:()=>({F:[],zs:[]})};
-  function __doc(){const d=westgardXlsxDoc('T1');return JSON.parse(JSON.stringify({sheetName:d.sheetName,rows:d.rows,merges:d.merges,images:d.images.map(x=>({row0:x.row0,dispW:x.dispW,dispH:x.dispH}))}));}
+  function __doc(){const d=westgardXlsxDoc('T1');return JSON.parse(JSON.stringify({sheetName:d.sheetName,cols:d.cols,rows:d.rows,merges:d.merges,rowHeights:d.rowHeights,images:d.images.map(x=>({row0:x.row0,dispW:x.dispW,dispH:x.dispH}))}));}
 `);
 
 run(ctx, `
@@ -48,13 +48,22 @@ run(ctx, `
 let doc = ctx.__doc();
 let text = doc.rows.flatMap(row => row.map(cell => cell && cell.v)).filter(v => v!==undefined).join(' | ');
 assert.equal(doc.sheetName, 'Phân tích Westgard');
-assert.match(text, /Bộ luật áp dụng: 1-3s, 2-2s/);
+assert.match(text, /QC Lab 2\.4\.0/);
+assert.doesNotMatch(text, /westgard-print-hidpi/, 'internal build label is hidden from the Westgard workbook');
+assert.match(text, /Bộ luật áp dụng/);
+assert.match(text, /1-3s, 2-2s/);
 assert.match(text, /Bằng chứng: 2-2s/, 'support-only points are explicitly exported as evidence');
 assert.match(text, /Loại bỏ/);
 assert.match(text, /R1/);
 assert.match(text, /R3/);
 assert.doesNotMatch(text, /R2/, 'ordinary passing points are omitted');
 assert.equal(doc.images.length, 1, 'a single visible level receives its own LJ chart');
+assert.equal(Array.from(doc.cols).join(','), '7,12,14,9,12,9,15,23,22', 'the detail grid stays compact and aligned with the chart width');
+assert.equal(doc.images[0].dispW, 900, 'the chart aligns with the full nine-column report grid');
+assert.equal(doc.images[0].dispH, 276, 'the chart preserves the Levey-Jennings aspect ratio');
+assert.ok(doc.merges.includes('A4:B4')&&doc.merges.includes('C4:E4')&&doc.merges.includes('F4:G4')&&doc.merges.includes('H4:I4'), 'metadata labels and values use balanced merged blocks');
+assert.ok(doc.merges.includes('A6:B6')&&doc.merges.includes('C6:I6'), 'rules metadata uses the same aligned card grid');
+assert.equal(doc.images[0].row0+18, doc.rows.findIndex(row=>row.some(cell=>cell&&/^Tổng 3 điểm/.test(String(cell.v)))), 'chart reservation leaves enough room for Excel to render the image without covering the following row');
 
 run(ctx, `
   wgPrevOpen=new Set(['T1|1']);
@@ -69,7 +78,7 @@ assert.doesNotMatch(text, /R3/, 'when old lot is open, its detail table replaces
 assert.match(text, /không gồm luật liên mức/);
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'router-render.js'), 'utf8');
-assert.match(source, /onclick="exportWestgardXLSX\(\)"/);
+assert.match(source, /'exportWestgardXLSX\(\)'/);
 assert.match(source, /wgChartMode==='lj'\?'<div>/, 'Excel/PDF actions only show in Levey-Jennings mode');
 
 console.log('Westgard Excel tests passed');

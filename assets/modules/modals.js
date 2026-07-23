@@ -72,7 +72,7 @@ function confirmDialog(opts){
       <div class="confirm-modal-h">${kicker?`<div class="confirm-modal-kicker">${esc(kicker)}</div>`:'<div></div>'}<button class="modal-close" onclick="confirmDialogAnswer(false)">×</button></div>
       <h3 class="confirm-modal-title">${esc(title)}</h3>
       <div class="confirm-modal-body"><div class="confirm-modal-icon${danger?'':' info'}" aria-hidden="true">!</div><div class="confirm-modal-text"><b>${esc(message)}</b>${detail?`<p>${esc(detail)}</p>`:''}</div></div>
-      <div class="confirm-modal-actions"><button class="btn ghost" onclick="confirmDialogAnswer(false)">${esc(cancelLabel)}</button><button class="btn ${danger?'danger':'teal'}" onclick="confirmDialogAnswer(true)">${esc(confirmLabel)}</button></div>
+      <div class="confirm-modal-actions">${btn(esc(cancelLabel),'confirmDialogAnswer(false)','ghost')}${btn(esc(confirmLabel),'confirmDialogAnswer(true)',danger?'danger':'teal')}</div>
     </div>`,resolve);
   });
 }
@@ -88,7 +88,7 @@ function infoDialog(message,opts={}){
       <div class="confirm-modal-h"><div></div><button class="modal-close" onclick="infoDialogAnswer()">×</button></div>
       ${title?`<h3 class="confirm-modal-title">${esc(title)}</h3>`:''}
       <div class="confirm-modal-body"><div class="confirm-modal-icon info-modal-icon ${type}" aria-hidden="true">${glyph}</div><div class="confirm-modal-text"><b>${esc(message)}</b></div></div>
-      <div class="confirm-modal-actions"><button class="btn teal" onclick="infoDialogAnswer()">Đã hiểu</button></div>
+      <div class="confirm-modal-actions">${btn('Đã hiểu','infoDialogAnswer()','teal')}</div>
     </div>`,resolve);
   });
 }

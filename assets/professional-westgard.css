@@ -27,14 +27,12 @@
   display:flex; align-items:center; gap:8px; min-height:38px;
 }
 
-.wg-test-picker .wg-excel-btn{
-  width:auto; min-height:38px; padding:8px 9px; white-space:nowrap;
-}
-
+.wg-test-picker .wg-excel-btn,
 .wg-test-picker .wg-print-btn{
-  width:auto; min-height:38px; padding:8px 9px; background:var(--teal); border:none; color:var(--on-accent);
+  width:auto; min-height:38px; padding:8px 9px; white-space:nowrap; background:var(--teal); border:none; color:var(--on-accent);
 }
 
+.wg-test-picker .wg-excel-btn:hover,
 .wg-test-picker .wg-print-btn:hover{
   background:var(--teal-deep); border:none; color:var(--on-accent);
 }

@@ -160,39 +160,39 @@ function pageSettings(){
   const brandPreview=`<div class="brand-preview"><div class="brand-mark">${logo?`<img src="${escAttr(logo)}" alt="">`:esc(brandMarkText())}</div><div><b>${esc(brandTitle())}</b><small>${esc(brandSub())}</small></div></div>`;
   return headOnly('Cài đặt & Đồng bộ','Thông tin đơn vị, backup và kết nối Firebase')+
    `<div class="settings-profile-grid">
-    <div class="panel"><h3>Thông tin đơn vị</h3>
-      <div class="settings-unit-fields"><div><label>Tên bệnh viện / đơn vị</label><input id="labName" value="${escAttr(state.lab.name||'')}"></div>
-        <div><label>Khoa / phòng</label><input id="labDept" value="${escAttr(state.lab.dept||'')}"></div>
-        <div><label>Địa chỉ</label><input id="labAddr" value="${escAttr(state.lab.address||'')}"></div></div>
-     <div class="settings-panel-actions"><button class="btn teal" onclick="saveLab()">Lưu thông tin</button></div>
+    <div class="panel"><h3 role="heading" aria-level="2">Thông tin đơn vị</h3>
+      <div class="settings-unit-fields"><div><label>Tên bệnh viện / đơn vị</label><input id="labName" aria-label="Tên bệnh viện / đơn vị" value="${escAttr(state.lab.name||'')}"></div>
+        <div><label>Khoa / phòng</label><input id="labDept" aria-label="Khoa / phòng" value="${escAttr(state.lab.dept||'')}"></div>
+        <div><label>Địa chỉ</label><input id="labAddr" aria-label="Địa chỉ" value="${escAttr(state.lab.address||'')}"></div></div>
+     <div class="settings-panel-actions">${btn('Lưu thông tin','saveLab()','teal')}</div>
     </div>
     <div class="panel"><h3>Logo & tên phần mềm</h3>
      <div class="grid2">
        <div>
-         <label>Tên hiển thị trên thanh bên</label><input id="brandTitle" value="${escAttr(brandTitle())}">
-         <label>Dòng phụ</label><input id="brandSub" value="${escAttr(brandSub())}">
-         <label>Chữ trong logo khi chưa dùng ảnh</label><input id="logoText" maxlength="4" value="${escAttr(brandMarkText())}">
+         <label>Tên hiển thị trên thanh bên</label><input id="brandTitle" aria-label="Tên hiển thị trên thanh bên" value="${escAttr(brandTitle())}">
+         <label>Dòng phụ</label><input id="brandSub" aria-label="Dòng phụ" value="${escAttr(brandSub())}">
+         <label>Chữ trong logo khi chưa dùng ảnh</label><input id="logoText" aria-label="Chữ trong logo khi chưa dùng ảnh" maxlength="4" value="${escAttr(brandMarkText())}">
        </div>
        <div>
          <label>Logo hiện tại</label>${brandPreview}
          <label>Chọn ảnh logo</label>
-         <div class="file-pick"><button type="button" class="btn ghost sm" onclick="document.getElementById('logoFile').click()">Chọn tệp</button><span id="logoFileName" class="hint">Chưa chọn tệp</span></div>
+         <div class="file-pick">${btn('Chọn tệp',"document.getElementById('logoFile').click()",'ghost sm','',{attrs:{type:'button'}})}<span id="logoFileName" class="hint">Chưa chọn tệp</span></div>
          <input id="logoFile" type="file" accept="image/*" style="display:none" onchange="pickLogo(event)">
          <div class="hint settings-brand-note">Nên dùng ảnh vuông PNG/JPG, dung lượng nhỏ. Logo được lưu cùng dữ liệu phần mềm.</div>
        </div>
      </div>
-     <div class="settings-panel-actions"><button class="btn teal" onclick="saveBrand()">Lưu logo</button><button class="btn ghost" onclick="clearLogo()">Bỏ ảnh logo</button></div>
+     <div class="settings-panel-actions">${btn('Lưu logo','saveBrand()','teal')}${btn('Bỏ ảnh logo','clearLogo()','ghost')}</div>
     </div>
    </div>
    <div class="panel"><h3>Quản trị dữ liệu</h3>
      <div class="admin-tools">
-        <div class="admin-tool"><b>Xuất backup</b><span>Lưu toàn bộ dữ liệu hiện tại ra file để cất giữ hoặc chuyển sang máy khác. ${backupStatusText()}</span><button class="btn ghost" onclick="exportData()">Xuất backup</button></div>
-        <div class="admin-tool"><b>Nhập backup</b><span>Khôi phục dữ liệu từ file đã xuất trước đó. Chỉ tài khoản quản trị được phép nhập.</span><button class="btn ghost" onclick="document.getElementById('imp').click()">Chọn file backup</button><input id="imp" type="file" accept="application/json" style="display:none" onchange="importData(event)"></div>
-        <div class="admin-tool"><b>Xóa sạch dữ liệu test</b><span>Đưa app về trạng thái trắng, giữ tài khoản đăng nhập hiện tại để không bị khóa.</span><button class="btn danger" onclick="resetAllData()">Xóa sạch dữ liệu</button></div>
+        <div class="admin-tool"><b>Xuất backup</b><span>Lưu toàn bộ dữ liệu hiện tại ra file để cất giữ hoặc chuyển sang máy khác. ${backupStatusText()}</span>${btn('Xuất backup','exportData()','ghost')}</div>
+        <div class="admin-tool"><b>Nhập backup</b><span>Khôi phục dữ liệu từ file đã xuất trước đó. Chỉ tài khoản quản trị được phép nhập.</span>${btn('Chọn file backup',"document.getElementById('imp').click()",'ghost')}<input id="imp" type="file" accept="application/json" style="display:none" onchange="importData(event)"></div>
+        <div class="admin-tool"><b>Xóa sạch dữ liệu test</b><span>Đưa app về trạng thái trắng, giữ tài khoản đăng nhập hiện tại để không bị khóa.</span>${btn('Xóa sạch dữ liệu','resetAllData()','danger')}</div>
       </div></div>
    <div class="panel firebase-sync-panel"><h3>Đồng bộ đám mây (Firebase Realtime Database)</h3>
-     <div class="firebase-auth-grid"><div><label>Mã phòng</label><input id="fbCode" value="${escAttr(fbcfg.labCode||'khoaXN')}" ${lockedCloud?'readonly':''}></div>
-       <div><label>Email Firebase Authentication</label><input id="fbEmail" type="email" autocomplete="username" value="${escAttr(fbcfg.email||'')}"></div>
+     <div class="firebase-auth-grid"><div><label>Mã phòng</label><input id="fbCode" aria-label="Mã phòng" value="${escAttr(fbcfg.labCode||'khoaXN')}" ${lockedCloud?'readonly':''}></div>
+       <div><label>Email Firebase Authentication</label><input id="fbEmail" aria-label="Email Firebase Authentication" type="email" autocomplete="username" value="${escAttr(fbcfg.email||'')}"></div>
        <div><label>Mật khẩu Firebase</label><input id="fbPassword" type="password" autocomplete="current-password" placeholder="Chỉ dùng để đăng nhập, không lưu"></div></div>
      ${lockedCloud?`<div class="hint" style="margin-top:6px">Bản deploy này khóa sẵn <code>${esc(fbDataPath())}</code>. Muốn đổi mã phòng cần sửa <code>assets/modules/app-meta.js</code>.</div>`:''}
      <label>Firebase config (dán nguyên đoạn từ tab Config của Firebase console)</label>
@@ -205,9 +205,9 @@ function pageSettings(){
   messagingSenderId: "...",
   appId: "..."
 };'>${fbcfg.config?JSON.stringify(fbcfg.config,null,2):''}</textarea>
-     <div class="firebase-actions"><button class="btn teal" onclick="saveFb()">Lưu &amp; kết nối</button> <button class="btn ghost" onclick="clearFb()">Ngắt đám mây</button></div></div>
+     <div class="firebase-actions">${btn('Lưu &amp; kết nối','saveFb()','teal')} ${btn('Ngắt đám mây','clearFb()','ghost')}</div></div>
    <div class="panel"><h3>Firebase Rules</h3>
      ${firebaseGuideHtml()}
-     <div class="rules-tools"><span>Copy cố định vào Realtime Database → Rules. Không sửa <code>$labCode</code> hoặc <code>$uid</code>.</span><button class="btn ghost sm" onclick="copyFirebaseRules()">Copy rules</button></div>
-     <pre class="rules-code">${esc(firebaseRulesText())}</pre></div>`;
+     <div class="rules-tools"><span>Copy cố định vào Realtime Database → Rules. Không sửa <code>$labCode</code> hoặc <code>$uid</code>.</span>${btn('Copy rules','copyFirebaseRules()','ghost sm')}</div>
+     <pre class="rules-code" tabindex="0">${esc(firebaseRulesText())}</pre></div>`;
 }

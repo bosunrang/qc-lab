@@ -52,8 +52,8 @@ assert.match(rowHtml, /Chưa đủ CV IQC và Bias EQA\/EQC/);
   assert.match(combined.body, /So sánh kết quả Six Sigma theo kỳ/);
 
   const sigmaSource = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'sigma.js'), 'utf8');
-  assert.match(sigmaSource, /onclick="printSigmaPeriod\('\$\{e\.id\}'\)"/);
-  assert.match(sigmaSource, /onclick="printSigmaPeriods\(\)"/);
-  assert.match(sigmaSource, />\$\{printIcon\}In PDF<\/button>/);
+  assert.match(sigmaSource, /`printSigmaPeriod\('\$\{e\.id\}'\)`/);
+  assert.match(sigmaSource, /'printSigmaPeriods\(\)'/);
+  assert.match(sigmaSource, /printIcon\+'In PDF'/);
   console.log('Sigma period print tests passed');
 })().catch(error=>{console.error(error);process.exitCode=1;});

@@ -82,6 +82,45 @@ A pre-commit hook (`.githooks/pre-commit`, installed into `.git/hooks/`) runs
 install` since tests only use Node core modules. `.github/workflows/test.yml`
 reruns the same command on every push/PR once the repo has a GitHub remote.
 
+### Visual/print and accessibility checks
+
+`npm run visual-check` and `npm run a11y-audit` are real-browser checks (need
+`npm install` + `npx playwright install chromium` first — unlike everything
+above, so they're deliberately **not** in `npm test` or the pre-commit hook,
+and run in their own `visual-and-a11y` CI job instead of the fast one).
+`scripts/lib/seed-browser-session.js` boots the static app in headless
+Chromium with a minimal valid QC dataset and an already-authenticated admin
+session (no login/password-change UI to fight through), shared by both:
+
+- `scripts/visual-check.js` captures the actual HTML `openPrint()`
+  (`reports.js`) writes for the Westgard and Báo cáo reports, renders it
+  under `@media print`, and asserts every header box with a background color
+  has `print-color-adjust:exact` — this is the property that keeps a header's
+  fill printing regardless of the browser's own "print backgrounds" setting;
+  checking `backgroundColor` instead would not have caught the 2026-07-23 bug
+  this exists for, since that computed value doesn't change based on the
+  property. Screenshots go to `tests/__visual__/*.png` (gitignored) for human
+  review only — not pixel-diffed, since font rendering varies across
+  machines.
+- `scripts/a11y-audit.js` runs axe-core against every page in `PAGES`
+  (`router-render.js`), the primary "add new X" modal on each page that has
+  one (`MODALS` in the script — manage's lot/instrument/assay modals, Sigma's
+  add-test modal, reagent's create-comparison modal, users' edit-permissions
+  modal), and a keyboard-Tab smoke pass on `dash`/`entry`, writing
+  `tests/__a11y__/report.json` (gitignored). The 2026-07-23 baseline run only
+  ever saw each page in its default just-loaded state with no modal open and
+  Sigma untracked/empty — 0 violations there said nothing about the modals or
+  Sigma's real content, since most of this app's forms live in a modal, not
+  the page body; `seed-browser-session.js`'s seed only covers operational QC
+  data, so `a11y-audit.js` separately calls `sgTrackTest()`/`sgAddPeriod()`
+  itself before auditing. `MODALS` is a representative sample (the biggest
+  form per area), not exhaustive — extend it if you add a major new modal.
+  A run with 0 violations everywhere is a baseline only — it always exits 0.
+  Turning specific violation counts into a
+  hard-fail ratchet (same pattern as `tests/button-conventions.test.js`) is a
+  deliberate follow-up decision, not automatic, since a threshold set before
+  anyone reviewed the actual findings would be arbitrary.
+
 ## Type checking
 
 `npm run typecheck` (`tsc --noEmit`, config in `tsconfig.json`) runs
@@ -286,6 +325,25 @@ carries its own `?v=` — bump it there when editing the worker.
   page-scoped, covered by `tests/reagent-stats.test.js`.
 - `app.js` — small async boot entry point at the bottom of `index.html`
   (`boot()` awaits `loadBootState()` before login/Firebase init).
+
+### Button convention
+
+Three color variants, always in this order right after `btn`: `teal`
+(primary action), `ghost` (secondary/cancel), `danger` (destructive). Append
+`sm` for compact/table-row buttons. `btn(label,onclick,cls='ghost sm',title='',opts={})`
+in `router-render.js` is the shared builder — **always use it**, never
+hand-write `<button class="btn ...">`; `opts` supports `{disabled, attrs}` for
+disabled state, `style`, `data-*`, or any other extra attribute a button
+needs. As of 2026-07-23 every hand-written button in `assets/modules/*.js`
+(previously ~140 of them) was converted to call `btn()`, including the ones
+that needed dynamic disabled state or a `style=`/`data-*` attribute — so
+there's no remaining case that justifies writing one by hand.
+`tests/button-conventions.test.js` enforces this as a flat ban (0 hand-written
+`<button class="btn ...">` anywhere), not a ratchet, and separately rejects
+any hand-written button missing a real teal/ghost/danger variant. Buttons
+whose variant is chosen dynamically at runtime (e.g.
+`class="btn ${danger?'danger':'teal'}"`) are unaffected — pass that
+expression straight through as `btn()`'s `cls` argument.
 
 ### CSS structure
 

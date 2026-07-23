@@ -106,7 +106,7 @@ function openTargetSwitchModal(){
       <div class="hint" style="margin-top:10px"><b>Chuyển qua nhóm lô này</b>: áp dụng ngay cho các dòng trên, nhóm lô đang dùng trước đó sẽ được đánh dấu "Đã dừng" (vẫn xem/nhập được nếu cần, không bị khóa).</div>
       <div class="hint" style="margin-top:6px"><b>Dự kiến</b>: chỉ lưu lại Mean/SD đã nhập cho nhóm lô mới, chưa áp dụng — nhóm lô đang dùng vẫn tiếp tục như bình thường.</div>
     </div>
-    <div class="modal-f"><button class="btn ghost" onclick="closeModal()">Hủy</button><button class="btn ghost" onclick="resolveTargetSwitch('planned')">Dự kiến</button><button class="btn teal" onclick="resolveTargetSwitch('switch')">Chuyển qua nhóm lô này</button></div>
+    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn('Dự kiến',"resolveTargetSwitch('planned')",'ghost')}${btn('Chuyển qua nhóm lô này',"resolveTargetSwitch('switch')",'teal')}</div>
   </div>`);
 }
 function resolveTargetSwitch(mode){
@@ -145,7 +145,7 @@ function openQcHistoryDetail(tid,level,lotNo=''){
   const ptRows=pts.map(p=>{const mean=Number.isFinite(+p.qcMean)?+p.qcMean:+l.mean,sd=Number.isFinite(+p.qcSd)&&+p.qcSd>0?+p.qcSd:+l.sd,z=sd?(+p.val-mean)/sd:NaN,abs=Math.abs(z),lv=abs>3?'Loại bỏ':abs>2?'Cảnh báo':'Đạt',cls=abs>3?'rej':abs>2?'warn':'ok',staff=pointStaff(p);return `<tr><td>${vnDate(p.date)}</td><td>${esc(p.runId||'—')}</td><td class="num">${fmt(p.val)}</td><td class="num">${Number.isFinite(z)?(z>=0?'+':'')+fmt(z)+'s':'—'}</td><td class="num">${fmt(mean)}</td><td class="num">${fmt(sd,3)}</td><td><span class="tag ${cls}">${lv}</span></td><td>${esc(staff.code||'—')}</td></tr>`;}).join('');
   openModal(`<div class="modal rcfg-history-detail-modal"><div class="modal-h"><div><h3>${esc(testDisplayName(t))} · Mức ${level}${lotNo?' · Lô '+esc(lotNo):''}</h3></div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
     <h4>Mean/SD đã dùng</h4>${histRows?`<table class="history-detail-table"><thead><tr><th>Lô QC</th><th class="num">Mean</th><th class="num">Giới hạn dưới</th><th class="num">Giới hạn trên</th><th class="num">SD</th><th>Hiệu lực</th><th>Nguồn</th></tr></thead><tbody>${histRows}</tbody></table>`:emptyState('Chưa có mốc Mean/SD','Không tìm thấy lịch sử Mean/SD cho lô này.')}
-    <h4 style="margin-top:18px">Điểm QC đã nhập (${pts.length})</h4>${ptRows?`<table class="history-detail-table"><thead><tr><th>Ngày</th><th>Lần chạy</th><th class="num">Giá trị</th><th class="num">Z</th><th class="num">Mean lúc nhập</th><th class="num">SD lúc nhập</th><th>Kết luận nhanh</th><th>NV</th></tr></thead><tbody>${ptRows}</tbody></table>`:emptyState('Chưa có điểm QC','Không có điểm QC nào khớp với lô/mức này.')}</div><div class="modal-f"><button class="btn teal" onclick="closeModal()">Đóng</button></div></div>`);
+    <h4 style="margin-top:18px">Điểm QC đã nhập (${pts.length})</h4>${ptRows?`<table class="history-detail-table"><thead><tr><th>Ngày</th><th>Lần chạy</th><th class="num">Giá trị</th><th class="num">Z</th><th class="num">Mean lúc nhập</th><th class="num">SD lúc nhập</th><th>Kết luận nhanh</th><th>NV</th></tr></thead><tbody>${ptRows}</tbody></table>`:emptyState('Chưa có điểm QC','Không có điểm QC nào khớp với lô/mức này.')}</div><div class="modal-f">${btn('Đóng','closeModal()','teal')}</div></div>`);
 }
 async function openConfigPanel(id=''){
   if(!state.tests.length){await infoDialog('Hãy tạo xét nghiệm trước khi tạo Panel QC.');setManageTab('assays');return;}
@@ -158,7 +158,7 @@ async function openConfigPanel(id=''){
     <label>Chọn xét nghiệm trong panel</label><div id="cfgPanelTests" class="group-lot-picker assay-group-picker">${panelTestRows(p.instrumentId,p.testIds||[])}</div>
     <label>Ghi chú</label><textarea id="cfgPanelNote">${esc(p.note||'')}</textarea>
     <label class="rcfg-check"><input id="cfgPanelActive" type="checkbox" ${p.active!==false?'checked':''}> Panel đang sử dụng</label></div>
-    <div class="modal-f"><button class="btn ghost" onclick="closeModal()">Hủy</button><button class="btn teal" onclick="saveConfigPanel('${id}')">Lưu Panel QC</button></div></div>`);
+    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn('Lưu Panel QC',`saveConfigPanel('${id}')`,'teal')}</div></div>`);
 }
 function renderConfigPanelTests(){
   const root=document.getElementById('cfgPanelTests'),instrumentId=document.getElementById('cfgPanelInstrument').value;
@@ -188,7 +188,7 @@ async function openLotTransitionV2(id=''){
     <div class="grid2"><div><label>Ngày bắt đầu (dd/mm/yyyy)</label>${dateBox('cfgTransStart',tr.startDate||'')}</div><div><label>Trạng thái</label><select id="cfgTransStatus"><option value="planned" ${tr.status==='planned'?'selected':''}>Dự kiến</option><option value="active" ${tr.status==='active'||tr.status==='completed'?'selected':''}>Đang chạy song song</option><option value="accepted" ${tr.status==='accepted'?'selected':''}>Chấp nhận lô mới</option><option value="rejected" ${tr.status==='rejected'?'selected':''}>Không chấp nhận</option></select></div></div>
     <div id="cfgTransTargets">${lotTransitionTargetsHtml(tr.panelId,tr.fromLotId,tr.toLotId)}</div>
     </div>
-    <div class="modal-f"><button class="btn ghost" onclick="closeModal()">Hủy</button><button class="btn teal" onclick="saveLotTransitionV2('${id}')">Lưu hồ sơ</button></div></div>`);
+    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn('Lưu hồ sơ',`saveLotTransitionV2('${id}')`,'teal')}</div></div>`);
 }
 /* Bảng Mean/SD nhúng ngay trong hồ sơ chuyển lô — cùng danh sách xét nghiệm mà
    inspectAcceptedLotTransition() sẽ kiểm tra lúc chấp nhận, để không lệch tiêu
@@ -288,7 +288,7 @@ async function openConfigGroup(id=''){
     <div class="lot-level-picker">${lotColumns}</div>
     <label>Tên nhóm lô</label><input id="cfgGroupName" value="${escAttr(g.name||'')}" placeholder="Tự động: 1102/1103">
     <label>Ghi chú</label><textarea id="cfgGroupNote">${esc(g.note||'')}</textarea></div>
-    <div class="modal-f"><button class="btn ghost" onclick="closeModal()">Hủy</button><button class="btn teal" onclick="saveConfigGroup('${id}')">Lưu nhóm lô</button></div></div>`);
+    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn('Lưu nhóm lô',`saveConfigGroup('${id}')`,'teal')}</div></div>`);
 }
 function suggestConfigGroupName(){const ids=[...document.querySelectorAll('.cfg-group-lot:checked')].map(x=>x.value),name=ids.map(id=>(state.qcLots.find(l=>l.id===id)||{}).lotNo).filter(Boolean).join('/'),el=document.getElementById('cfgGroupName');if(el)el.value=name;}
 async function saveConfigGroup(id){
@@ -351,11 +351,11 @@ async function activateLotGroup(id){
 function openConfigLot(id=''){
   const l=state.qcLots.find(x=>x.id===id)||{level:1,active:true};
   openModal(`<div class="modal rcfg-modal"><div class="modal-h"><div><h3>${id?'Sửa thông tin lô QC':'Tạo lô QC mới'}</h3></div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
-    <div class="grid2"><div><label>Số lô</label><input id="cfgLotNo" value="${escAttr(l.lotNo||'')}" placeholder="VD: 1234UE"></div><div><label>Mức QC</label><select id="cfgLotLevel">${[1,2,3,4,5,6].map(n=>`<option ${+l.level===n?'selected':''}>${n}</option>`).join('')}</select></div></div>
+    <div class="grid2"><div><label>Số lô</label><input id="cfgLotNo" value="${escAttr(l.lotNo||'')}" placeholder="VD: 1234UE"></div><div><label>Mức QC</label><select id="cfgLotLevel" aria-label="Mức QC">${[1,2,3,4,5,6].map(n=>`<option ${+l.level===n?'selected':''}>${n}</option>`).join('')}</select></div></div>
     <div class="grid2"><div><label>Mô tả</label><input id="cfgLotDescription" value="${escAttr(l.description||'')}" placeholder="VD: Acusera Assayed Chemistry Control"></div><div><label>Nhà cung cấp</label><input id="cfgLotSupplier" value="${escAttr(l.supplier||'')}" placeholder="Randox"></div></div>
     <div class="grid2"><div><label>Ngày mở (dd/mm/yyyy)</label>${dateBox('cfgLotOpened',l.opened||'')}</div><div><label>Hạn sử dụng (dd/mm/yyyy)</label>${dateBox('cfgLotExp',l.exp||'')}</div></div>
-    <label>Ghi chú</label><textarea id="cfgLotNote">${esc(l.note||'')}</textarea></div>
-    <div class="modal-f"><button class="btn ghost" onclick="closeModal()">Hủy</button><button class="btn teal" onclick="saveConfigLot('${id}')">Lưu lô</button></div></div>`);
+    <label>Ghi chú</label><textarea id="cfgLotNote" aria-label="Ghi chú">${esc(l.note||'')}</textarea></div>
+    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn('Lưu lô',`saveConfigLot('${id}')`,'teal')}</div></div>`);
 }
 async function saveConfigLot(id){
   if(!requireAdmin())return;
@@ -401,9 +401,9 @@ function openConfigInstrument(id=''){
   const i=state.instruments.find(x=>x.id===id)||{active:true};
   openModal(`<div class="modal rcfg-modal"><div class="modal-h"><div><h3>${id?'Sửa máy xét nghiệm':'Thêm máy xét nghiệm'}</h3></div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
     <div class="grid2"><div><label>Tên hiển thị</label><input id="cfgInstName" value="${escAttr(i.name||'')}" placeholder="VD: AU5800-01"></div><div><label>Khoa / Khu vực</label><input id="cfgInstSection" value="${escAttr(i.section||'')}" placeholder="Hóa sinh"></div></div>
-    <div class="grid2"><div><label>Nhà sản xuất</label><input id="cfgInstMfr" value="${escAttr(i.manufacturer||'')}" placeholder="Beckman Coulter"></div><div><label>Số sê-ri</label><input id="cfgInstSerial" value="${escAttr(i.serial||'')}"></div></div>
+    <div class="grid2"><div><label>Nhà sản xuất</label><input id="cfgInstMfr" value="${escAttr(i.manufacturer||'')}" placeholder="Beckman Coulter"></div><div><label>Số sê-ri</label><input id="cfgInstSerial" aria-label="Số sê-ri" value="${escAttr(i.serial||'')}"></div></div>
     <label class="rcfg-check"><input id="cfgInstActive" type="checkbox" ${i.active!==false?'checked':''}> Máy đang hoạt động</label></div>
-    <div class="modal-f"><button class="btn ghost" onclick="closeModal()">Hủy</button><button class="btn teal" onclick="saveConfigInstrument('${id}')">Lưu máy xét nghiệm</button></div></div>`);
+    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn('Lưu máy xét nghiệm',`saveConfigInstrument('${id}')`,'teal')}</div></div>`);
 }
 async function saveConfigInstrument(id){
   if(!requireAdmin())return;
@@ -453,14 +453,14 @@ function openConfigAssay(id=''){
   const initialRef=configAssayTeaRefs().find(r=>t.analyteId&&r[6]===t.analyteId)||configAssayFindRef(t.name||t.displayName||''),initialNaming=initialRef?configAssayNaming(initialRef):null,initialName=initialNaming&&initialNaming.displayName||t.displayName||t.name||'',initialSource=initialRef?(initialRef[2]!=null?'clia':initialRef[3]!=null?'ricos':''):(t.teaSource||'');
   const teaOptions=configAssayTeaRefs().map(ref=>({ref,naming:configAssayNaming(ref)})).sort((a,b)=>String(a.ref[4]||'').localeCompare(String(b.ref[4]||''),'vi')||String(a.naming.displayName||'').localeCompare(String(b.naming.displayName||''),'vi')).map(({ref,naming})=>{const extra=[naming.standardName!==naming.displayName?naming.standardName:'',naming.abbreviation,...naming.aliases.filter(x=>x!==ref[0]&&x!==naming.displayName&&x!==naming.standardName).slice(0,3),ref[1],ref[4]].filter(Boolean).join(' · ');return`<option value="${escAttr(naming.displayName||ref[0])}" label="${escAttr(extra)}"></option>`;}).join('');
   openModal(`<div class="modal rcfg-modal rcfg-assay-modal"><div class="modal-h"><div><h3>${id?'Sửa xét nghiệm':'Thêm xét nghiệm'}</h3></div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
-    <div class="assay-main-grid"><div><label>Chọn / tìm xét nghiệm</label><input id="cfgAssayName" list="cfgAssayTeaSuggestions" autocomplete="off" value="${escAttr(initialName)}" placeholder="Gõ tên, viết tắt hoặc bí danh..." oninput="configAssaySuggestionInput(this.value)"><datalist id="cfgAssayTeaSuggestions">${teaOptions}</datalist><input id="cfgAssayTeaRefKey" type="hidden" value="${escAttr(initialRef&&(initialRef[6]||initialRef[0])||'')}"><input id="cfgAssayTeaSource" type="hidden" value="${escAttr(initialSource)}"></div><div><label>Máy xét nghiệm</label><select id="cfgAssayInstrument" onchange="const o=this.selectedOptions[0];const e=document.getElementById('cfgAssaySection');if(e)e.value=o?o.dataset.section||'':''">${instruments}</select></div><div><label>Khoa / Khu vực</label><input id="cfgAssaySection" value="${escAttr(t.section||(defaultInst&&defaultInst.section)||'')}" placeholder="VD: Điện giải"></div></div>
-    <div class="assay-detail-grid"><div><label>Đơn vị</label><input id="cfgAssayUnit" value="${escAttr(t.unit||'')}"></div><div><label>Phương pháp</label><input id="cfgAssayMethod" value="${escAttr(t.method||'')}"></div><div><label>TEa %</label><input id="cfgAssayTea" type="number" step="any" value="${escAttr(t.tea||'')}"></div><div><label>Hóa chất</label><input id="cfgAssayReagent" value="${escAttr(t.reagent||'')}"></div></div>
+    <div class="assay-main-grid"><div><label>Chọn / tìm xét nghiệm</label><input id="cfgAssayName" list="cfgAssayTeaSuggestions" autocomplete="off" value="${escAttr(initialName)}" placeholder="Gõ tên, viết tắt hoặc bí danh..." oninput="configAssaySuggestionInput(this.value)"><datalist id="cfgAssayTeaSuggestions">${teaOptions}</datalist><input id="cfgAssayTeaRefKey" type="hidden" value="${escAttr(initialRef&&(initialRef[6]||initialRef[0])||'')}"><input id="cfgAssayTeaSource" type="hidden" value="${escAttr(initialSource)}"></div><div><label>Máy xét nghiệm</label><select id="cfgAssayInstrument" aria-label="Máy xét nghiệm" onchange="const o=this.selectedOptions[0];const e=document.getElementById('cfgAssaySection');if(e)e.value=o?o.dataset.section||'':''">${instruments}</select></div><div><label>Khoa / Khu vực</label><input id="cfgAssaySection" value="${escAttr(t.section||(defaultInst&&defaultInst.section)||'')}" placeholder="VD: Điện giải"></div></div>
+    <div class="assay-detail-grid"><div><label>Đơn vị</label><input id="cfgAssayUnit" aria-label="Đơn vị" value="${escAttr(t.unit||'')}"></div><div><label>Phương pháp</label><input id="cfgAssayMethod" aria-label="Phương pháp" value="${escAttr(t.method||'')}"></div><div><label>TEa %</label><input id="cfgAssayTea" aria-label="TEa %" type="number" step="any" value="${escAttr(t.tea||'')}"></div><div><label>Hóa chất</label><input id="cfgAssayReagent" aria-label="Hóa chất" value="${escAttr(t.reagent||'')}"></div></div>
     <div class="config-form-section"><b>Luật Westgard riêng cho xét nghiệm</b><span>Chọn hành động và phạm vi áp dụng. “SOP khuyến nghị” tránh tính trùng trong từng mức và chéo mức.</span></div><div class="assay-rule-grid">${ruleRows}</div>
     <div class="config-form-section"><b>Giám sát xu hướng CUSUM</b><span>Biểu đồ tham khảo bắt trôi/shift kéo dài sớm hơn Westgard — không đổi trạng thái đạt/loại QC</span></div>
     <label class="rcfg-check"><input id="cfgAssayCusumOn" type="checkbox" ${cusum.on?'checked':''}> Bật biểu đồ CUSUM cho xét nghiệm này</label>
-    <div class="grid2"><div><label>Ngưỡng tích lũy k (SD)</label><input id="cfgAssayCusumK" type="number" step="0.1" min="0.1" value="${escAttr(cusum.k)}"></div><div><label>Ngưỡng cảnh báo h (SD)</label><input id="cfgAssayCusumH" type="number" step="0.5" min="0.5" value="${escAttr(cusum.h)}"></div></div>
+    <div class="grid2"><div><label>Ngưỡng tích lũy k (SD)</label><input id="cfgAssayCusumK" aria-label="Ngưỡng tích lũy k (SD)" type="number" step="0.1" min="0.1" value="${escAttr(cusum.k)}"></div><div><label>Ngưỡng cảnh báo h (SD)</label><input id="cfgAssayCusumH" aria-label="Ngưỡng cảnh báo h (SD)" type="number" step="0.5" min="0.5" value="${escAttr(cusum.h)}"></div></div>
     <label class="rcfg-check"><input id="cfgAssayClosed" type="checkbox" ${t.closed?'checked':''}> Đóng QC Test, không dùng cho cấu hình mới</label></div>
-    <div class="modal-f"><button class="btn ghost" onclick="closeModal()">Hủy</button><button class="btn teal" onclick="saveConfigAssay('${id}')">Lưu xét nghiệm</button></div></div>`);
+    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn('Lưu xét nghiệm',`saveConfigAssay('${id}')`,'teal')}</div></div>`);
 }
 async function saveConfigAssay(id){
   if(!requireAdmin())return;

@@ -7,6 +7,9 @@ dist/
 *.bak
 *.orig
 *.rej
+outputs/
+tests/__visual__/
+tests/__a11y__/
 
 # Local dependency/install artifacts
 node_modules/

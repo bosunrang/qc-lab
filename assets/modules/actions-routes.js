@@ -22,7 +22,7 @@ async function approveAction(i){
       <textarea id="actionNoteInput" placeholder="Nhận xét về hành động khắc phục..." oninput="document.getElementById('actionNoteErr').style.display='none'"></textarea>
       <div id="actionNoteErr" class="hint" style="color:var(--red);display:none;margin-top:6px">Cần nhập ý kiến duyệt tối thiểu 3 ký tự.</div>
     </div>
-    <div class="modal-f"><button class="btn ghost" onclick="closeModal()">Đóng</button><button class="btn teal" onclick="confirmApproveAction(${i})">Duyệt</button></div>
+    <div class="modal-f">${btn('Đóng','closeModal()','ghost')}${btn('Duyệt',`confirmApproveAction(${i})`,'teal')}</div>
   </div>`);
   setTimeout(()=>{const e=document.getElementById('actionNoteInput');if(e)e.focus();},50);
 }
@@ -44,7 +44,7 @@ function returnAction(i){
       <textarea id="actionNoteInput" placeholder="Vì sao trả lại hành động khắc phục này..." oninput="document.getElementById('actionNoteErr').style.display='none'"></textarea>
       <div id="actionNoteErr" class="hint" style="color:var(--red);display:none;margin-top:6px">Cần nhập lý do tối thiểu 3 ký tự.</div>
     </div>
-    <div class="modal-f"><button class="btn ghost" onclick="closeModal()">Đóng</button><button class="btn danger" onclick="confirmReturnAction(${i})">Trả lại</button></div>
+    <div class="modal-f">${btn('Đóng','closeModal()','ghost')}${btn('Trả lại',`confirmReturnAction(${i})`,'danger')}</div>
   </div>`);
   setTimeout(()=>{const e=document.getElementById('actionNoteInput');if(e)e.focus();},50);
 }
@@ -61,7 +61,7 @@ function actionReviewButtons(i,a){
   if(role()!=='admin')return '';
   if(!actionRecorded(a))return '<span class="hint">Chờ KTV ghi nhận</span>';
   const s=actionApprovalStatus(a);
-  return `<div class="action-row-actions">${s!=='approved'?`<button class="btn ghost sm" onclick="approveAction(${i})">Duyệt</button>`:''}${s!=='returned'?`<button class="btn ghost sm" onclick="returnAction(${i})">Trả lại</button>`:''}${btn('✕',`delAction(${i})`,'danger icon','Xóa nhật ký')}</div>`;
+  return `<div class="action-row-actions">${s!=='approved'?btn('Duyệt',`approveAction(${i})`,'ghost sm'):''}${s!=='returned'?btn('Trả lại',`returnAction(${i})`,'ghost sm'):''}${btn('✕',`delAction(${i})`,'danger icon','Xóa nhật ký')}</div>`;
 }
 function groupIssuesByTestDate(issues){
   const groups=[],byKey=new Map();
@@ -76,7 +76,7 @@ function groupIssuesByTestDate(issues){
 }
 function issueRowHtml(o){
   const rules=o.rules.join(', '),err=errorType(o.rules),hint=fixHint(o.rules),wf=pointWorkflowSummary(o.p.id),hasAction=typeof pointRealActions==='function'&&pointRealActions(o.p.id).length>0;
-  return `<div class="issue-row ${o.f.level}"><div class="issue-row-main"><b>${esc(actionLevelShort(o.t,o.l.level,o.l.lot))} · ${stateName(o.f.level)}</b><div class="meta">${fmt(o.p.val)} ${esc(o.t.unit||'')} · ${rules||'—'} · ${err}</div><div class="action-chipline"><span class="action-chip ${wf.cls}">${esc(wf.label)}</span></div><div class="hint">${hint}</div></div>${canWrite()?`<button class="btn ghost sm" onclick="fillAction('${o.t.id}',${o.l.level},'${jsq(rules)}','${jsq(err)}','${jsq(hint)}','${jsq(o.p.id||'')}','${jsq(o.p.date||'')}')">${hasAction?'Bổ sung':'Ghi nhận'}</button>`:''}</div>`;
+  return `<div class="issue-row ${o.f.level}"><div class="issue-row-main"><b>${esc(actionLevelShort(o.t,o.l.level,o.l.lot))} · ${stateName(o.f.level)}</b><div class="meta">${fmt(o.p.val)} ${esc(o.t.unit||'')} · ${rules||'—'} · ${err}</div><div class="action-chipline"><span class="action-chip ${wf.cls}">${esc(wf.label)}</span></div><div class="hint">${hint}</div></div>${canWrite()?btn(hasAction?'Bổ sung':'Ghi nhận',`fillAction('${o.t.id}',${o.l.level},'${jsq(rules)}','${jsq(err)}','${jsq(hint)}','${jsq(o.p.id||'')}','${jsq(o.p.date||'')}')`,'ghost sm'):''}</div>`;
 }
 function pageActionsV4(){
   const tests=operationalTests(),opts=tests.map(t=>`<option value="${escAttr(t.id)}">${esc(testDisplayName(t))}</option>`).join('');
@@ -94,17 +94,17 @@ function pageActionsV4(){
       <td>${actionReviewButtons(realIdx,a)}</td>
     </tr>`;}).join('');
   return headOnly('Khắc phục sự cố','Ghi nhận, chạy lại QC sau điểm loại và phê duyệt hành động')+
-   `<div class="panel action-issues-panel"><h3>Sự cố cần xử lý</h3><div class="dash-list">${issueHtml}</div></div>`+
+   `<div class="panel action-issues-panel"><h3 role="heading" aria-level="2">Sự cố cần xử lý</h3><div class="dash-list">${issueHtml}</div></div>`+
    `<div class="panel action-form-panel"><h3>Ghi nhận hành động</h3>${tests.length?`<div class="action-form-body"><div class="action-form-main">
      <input id="aPointId" type="hidden">
      <input id="aLevel" type="hidden" value="${firstLevel?firstLevel.level:''}">
-     <div><label>Xét nghiệm</label><select id="aTest" onchange="syncActLevels()">${opts}</select></div>
-     <div><label>Ngữ cảnh QC</label><input id="aLevelLabel" readonly value="${escAttr(firstLevelLabel)}"></div>
+     <div><label>Xét nghiệm</label><select id="aTest" aria-label="Xét nghiệm" onchange="syncActLevels()">${opts}</select></div>
+     <div><label>Ngữ cảnh QC</label><input id="aLevelLabel" aria-label="Ngữ cảnh QC" readonly value="${escAttr(firstLevelLabel)}"></div>
      <div><label>Ngày</label>${dateBox('aDate',isoToday(),'action-date')}</div>
      <div><label>Luật vi phạm</label><input id="aRule" placeholder="VD: 2-2s"></div></div>
-     <div class="action-form-row2" style="margin-top:8px"><div><label>Loại sai số</label><select id="aErr"><option>SE — Sai số hệ thống</option><option>RE — Sai số ngẫu nhiên</option></select></div><div><label>Người thực hiện</label><input id="aBy"></div><div><label>Hành động khắc phục</label><input id="aAct" placeholder="VD: Hiệu chuẩn lại, chạy QC mới, kiểm tra hóa chất..."></div></div>
-      <div style="margin-top:12px"><button class="btn teal" onclick="addAction()">Lưu hành động</button></div></div>`:emptyState('Cần có xét nghiệm trước','Khai báo xét nghiệm rồi quay lại ghi nhận hành động khắc phục.',role()==='admin'?btn('Thêm xét nghiệm',`go('manage')`,'teal'):'')}</div>
-   <div class="panel action-log-panel"><h3>Nhật ký khắc phục</h3>${rows?`<div class="action-log-tools"><button class="btn ghost sm" onclick="exportActionsCSV()">Xuất Excel nhật ký</button></div><div class="action-log-wrap"><table class="action-log-table"><thead><tr><th>Ngày</th><th>Sự cố</th><th>Hành động</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table></div>`:emptyState('Chưa có nhật ký','Các hành động khắc phục sẽ xuất hiện ở đây sau khi được lưu.')}</div>`;
+     <div class="action-form-row2" style="margin-top:8px"><div><label>Loại sai số</label><select id="aErr" aria-label="Loại sai số"><option>SE — Sai số hệ thống</option><option>RE — Sai số ngẫu nhiên</option></select></div><div><label>Người thực hiện</label><input id="aBy" aria-label="Người thực hiện"></div><div><label>Hành động khắc phục</label><input id="aAct" placeholder="VD: Hiệu chuẩn lại, chạy QC mới, kiểm tra hóa chất..."></div></div>
+      <div style="margin-top:12px">${btn('Lưu hành động','addAction()','teal')}</div></div>`:emptyState('Cần có xét nghiệm trước','Khai báo xét nghiệm rồi quay lại ghi nhận hành động khắc phục.',role()==='admin'?btn('Thêm xét nghiệm',`go('manage')`,'teal'):'')}</div>
+   <div class="panel action-log-panel"><h3>Nhật ký khắc phục</h3>${rows?`<div class="action-log-tools">${btn('Xuất Excel nhật ký','exportActionsCSV()','teal sm')}</div><div class="action-log-wrap"><table class="action-log-table"><thead><tr><th>Ngày</th><th>Sự cố</th><th>Hành động</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table></div>`:emptyState('Chưa có nhật ký','Các hành động khắc phục sẽ xuất hiện ở đây sau khi được lưu.')}</div>`;
 }
 
 let reportQ='',reportTest='',reportRangeStart='',reportRangeEnd='',reportLockYm='';
@@ -140,7 +140,7 @@ function reportUnlockPeriod(ym){
       <textarea id="unlockReasonInput" placeholder="VD: Bổ sung đối soát, phát hiện sai sót cần chỉnh lại..." oninput="document.getElementById('unlockReasonErr').style.display='none'"></textarea>
       <div id="unlockReasonErr" class="hint" style="color:var(--red);display:none;margin-top:6px">Cần ghi lý do mở khóa tối thiểu 5 ký tự.</div>
     </div>
-    <div class="modal-f"><button class="btn ghost" onclick="closeModal()">Đóng</button><button class="btn danger" onclick="reportConfirmUnlockPeriod('${jsq(ym)}')">Xác nhận mở khóa</button></div>
+    <div class="modal-f">${btn('Đóng','closeModal()','ghost')}${btn('Xác nhận mở khóa',`reportConfirmUnlockPeriod('${jsq(ym)}')`,'danger')}</div>
   </div>`);
   setTimeout(()=>{const e=document.getElementById('unlockReasonInput');if(e)e.focus();},50);
 }
@@ -162,7 +162,7 @@ function reportLockListHtml(){
   const locks=[...(state.periodLocks||[])].sort((a,b)=>String(b.ym||'').localeCompare(String(a.ym||'')));
   if(!locks.length)return '<div class="hint">Chưa có kỳ nào được khóa.</div>';
   const isAdmin=role()==='admin';
-  return `<div class="period-lock-list">${locks.map(l=>`<div class="period-lock-row"><div><b>Kỳ ${esc(monthVN(l.ym))}</b><span class="hint"> · Khóa bởi ${esc(l.lockedBy||'—')}${l.lockedAt?' lúc '+formatDateTimeVN(l.lockedAt):''}</span></div>${isAdmin?`<button class="btn ghost sm" onclick="reportUnlockPeriod('${jsq(l.ym)}')">Mở khóa</button>`:''}</div>`).join('')}</div>`;
+  return `<div class="period-lock-list">${locks.map(l=>`<div class="period-lock-row"><div><b>Kỳ ${esc(monthVN(l.ym))}</b><span class="hint"> · Khóa bởi ${esc(l.lockedBy||'—')}${l.lockedAt?' lúc '+formatDateTimeVN(l.lockedAt):''}</span></div>${isAdmin?btn('Mở khóa',`reportUnlockPeriod('${jsq(l.ym)}')`,'ghost sm'):''}</div>`).join('')}</div>`;
 }
 function reportSearchValues(t){
   const levels=operationalLevels(t),panel=operationalPanelForTest(t),lotGroup=operationalLotGroupForTest(t);
@@ -206,12 +206,10 @@ function reportRangeText(start,end){
   return start?('Từ '+vnDate(start)):('Đến '+vnDate(end));
 }
 const REPORT_ACTION_ICON_PATHS={
-  print:'<path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/><path d="M18 12h.01"/>',
-  excel:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 12h8M8 16h8M12 10v8"/>',
-  csv:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 12h8M8 16h8M8 20h5"/>'
+  print:'<path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/><path d="M18 12h.01"/>'
 };
 function reportActionIcon(type){
-  const paths=REPORT_ACTION_ICON_PATHS[type]||REPORT_ACTION_ICON_PATHS.csv;
+  const paths=REPORT_ACTION_ICON_PATHS[type];
   return `<svg class="btn-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
 }
 function reportLockPanelHtml(){
@@ -223,9 +221,9 @@ function reportLockPanelHtml(){
   return `<div class="panel"><h3>Khóa kỳ báo cáo</h3>
      <div class="hint">Khóa 1 kỳ (theo tháng) sẽ chặn sửa/hủy điểm QC của kỳ đó ở <b>mọi xét nghiệm</b> — nên làm sau khi đã xuất xong báo cáo chính thức của kỳ.</div>
      <div class="grid4" style="margin-top:10px">
-       <div><label>Tháng</label><select ${isAdmin?'':'disabled'} onchange="reportSetLockPart('month',this.value)">${monthOptions}</select></div>
-       <div><label>Năm</label><select ${isAdmin?'':'disabled'} onchange="reportSetLockPart('year',this.value)">${yearOptions}</select></div>
-       <div style="align-self:end">${isAdmin?(already?`<button class="btn ghost" disabled>Kỳ này đã khóa</button>`:btn('Khóa kỳ này','reportLockPeriod()','teal')):'<span class="hint">Chỉ admin mới khóa/mở khóa được kỳ báo cáo.</span>'}</div>
+       <div><label>Tháng</label><select aria-label="Tháng" ${isAdmin?'':'disabled'} onchange="reportSetLockPart('month',this.value)">${monthOptions}</select></div>
+       <div><label>Năm</label><select aria-label="Năm" ${isAdmin?'':'disabled'} onchange="reportSetLockPart('year',this.value)">${yearOptions}</select></div>
+       <div style="align-self:end">${isAdmin?(already?btn('Kỳ này đã khóa','','ghost','',{disabled:true}):btn('Khóa kỳ này','reportLockPeriod()','teal')):'<span class="hint">Chỉ admin mới khóa/mở khóa được kỳ báo cáo.</span>'}</div>
      </div>
      <div style="margin-top:16px">${reportLockListHtml()}</div>
    </div>`;
@@ -239,14 +237,14 @@ function pageReportV2(){
   const opts=matched.length?matched.map(t=>`<option value="${escAttr(t.id)}" ${t.id===reportTest?'selected':''}>${esc(testSelectLabel(t,tests))}</option>`).join(''):'<option value="">Không tìm thấy xét nghiệm phù hợp</option>';
   const{start,end}=reportRangeDefaults();
   return headOnly('Báo cáo & Biểu mẫu','Tổng hợp hồ sơ nội kiểm theo khoảng ngày lựa chọn')+
-   `<div class="panel"><h3>Báo cáo nội kiểm theo ngày</h3>
+   `<div class="panel"><h3 role="heading" aria-level="2">Báo cáo nội kiểm theo ngày</h3>
      <div class="grid4"><div><label>Tìm xét nghiệm</label><input id="reportSearch" type="search" placeholder="Tìm tên xét nghiệm" value="${escAttr(reportQ)}" oninput="reportSearchSet(this.value)"></div>
-       <div><label>Xét nghiệm <span id="reportTestCount" class="hint">(${matched.length}/${tests.length})</span></label><select id="rTest" ${matched.length?'':'disabled'} onchange="reportTest=this.value">${opts}</select></div>
+       <div><label>Xét nghiệm <span id="reportTestCount" class="hint">(${matched.length}/${tests.length})</span></label><select id="rTest" aria-label="Xét nghiệm" ${matched.length?'':'disabled'} onchange="reportTest=this.value">${opts}</select></div>
        ${reportRangePicker(start,end)}</div>
      <div class="report-actions">
-       <button class="btn teal" data-report-action ${matched.length?'':'disabled'} onclick="printReport()">${reportActionIcon('print')}Tạo báo cáo &amp; In</button>
-       <button class="btn ghost" data-report-action ${matched.length?'':'disabled'} onclick="exportReportXLSX()">${reportActionIcon('excel')}Xuất Excel</button>
-       <button class="btn ghost" data-report-action ${matched.length?'':'disabled'} onclick="exportReportCSV()">${reportActionIcon('csv')}Xuất CSV</button>
+       ${btn(reportActionIcon('print')+'Tạo báo cáo &amp; In','printReport()','teal','',{disabled:!matched.length,attrs:{'data-report-action':''}})}
+       ${btn('Xuất Excel','exportReportXLSX()','teal','',{disabled:!matched.length,attrs:{'data-report-action':''}})}
+       ${btn('Xuất CSV','exportReportCSV()','teal','',{disabled:!matched.length,attrs:{'data-report-action':''}})}
      </div>
      <div class="hint">Báo cáo gồm: thông tin đơn vị, biểu đồ Levey-Jennings tổng hợp và từng mức, bảng Mean/SD/CV/Bias/TE/TEa/Sigma, các điểm vi phạm Westgard, nhật ký khắc phục trong khoảng ngày đã chọn, và ô ký duyệt. File .xlsx giữ nguyên bảng cột và biểu đồ như báo cáo in; bản in bấm “Lưu thành PDF”.</div>
    </div>`+reportLockPanelHtml();

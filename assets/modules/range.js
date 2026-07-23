@@ -14,7 +14,7 @@ function openRangeWorkflow(tid,level){
         ${c?`<tr><td><b>Đề xuất PXN</b></td><td class="num"><b>${fmt(c.m)}</b></td><td class="num"><b>${fmt(c.sd,3)}</b></td><td class="num"><b>${fmt(c.cv)}</b></td><td class="num"><b>${fmt(c.m-2*c.sd)} – ${fmt(c.m+2*c.sd)}</b></td></tr>`:''}
       </tbody></table>
       <div class="alert info" style="margin-top:12px">Mean/SD được tính từ toàn bộ tập dữ liệu đã chọn. Không tự loại điểm vi phạm để làm giảm SD. Chỉ áp dụng khi cùng lô QC, tối thiểu 20 ngày độc lập, quá trình ổn định và có phê duyệt theo SOP.</div></div>
-    <div class="modal-f"><button class="btn ghost" onclick="printRangeForm('${tid}',${level})">In biểu mẫu</button>${canWrite()?`<button class="btn teal" ${r.eligible?'':'disabled'} onclick="closeModal();applyNewRange('${tid}',${level})">Áp dụng dải PXN</button>`:''}<button class="btn ghost" onclick="closeModal()">Đóng</button></div></div>`);
+    <div class="modal-f">${btn('In biểu mẫu',`printRangeForm('${tid}',${level})`,'ghost')}${canWrite()?btn('Áp dụng dải PXN',`closeModal();applyNewRange('${tid}',${level})`,'teal','',{disabled:!r.eligible}):''}${btn('Đóng','closeModal()','ghost')}</div></div>`);
 }
 async function applyNewRange(tid,level){
   if(!requireWrite())return;
@@ -28,7 +28,7 @@ async function applyNewRange(tid,level){
       <textarea id="rangeReasonInput" placeholder="VD: Theo SOP-XXX, phê duyệt bởi..." oninput="document.getElementById('rangeReasonErr').style.display='none'"></textarea>
       <div id="rangeReasonErr" class="hint" style="color:var(--red);display:none;margin-top:6px">Cần ghi căn cứ phê duyệt tối thiểu 10 ký tự.</div>
     </div>
-    <div class="modal-f"><button class="btn ghost" onclick="closeModal()">Hủy</button><button class="btn teal" onclick="confirmApplyNewRange('${tid}',${level})">Áp dụng</button></div>
+    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn('Áp dụng',`confirmApplyNewRange('${tid}',${level})`,'teal')}</div>
   </div>`);
   setTimeout(()=>{const e=document.getElementById('rangeReasonInput');if(e)e.focus();},50);
 }
@@ -54,7 +54,7 @@ function revertRange(tid,level){
       <textarea id="rangeReasonInput" placeholder="VD: Dải PXN không còn phù hợp, hoàn theo yêu cầu..." oninput="document.getElementById('rangeReasonErr').style.display='none'"></textarea>
       <div id="rangeReasonErr" class="hint" style="color:var(--red);display:none;margin-top:6px">Cần ghi lý do tối thiểu 5 ký tự.</div>
     </div>
-    <div class="modal-f"><button class="btn ghost" onclick="closeModal()">Hủy</button><button class="btn danger" onclick="confirmRevertRange('${tid}',${level})">Hoàn về dải NSX</button></div>
+    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn('Hoàn về dải NSX',`confirmRevertRange('${tid}',${level})`,'danger')}</div>
   </div>`);
   setTimeout(()=>{const e=document.getElementById('rangeReasonInput');if(e)e.focus();},50);
 }

@@ -40,8 +40,6 @@ assert.match(sigmaCss, /\.sg-eqa-table th\{[^}]*text-transform:none/);
 assert.match(sigmaCss, /\.sg-eqa-summary span\{[^}]*text-transform:none/);
 assert.match(actionsRoutes, /function reportActionIcon\(type\)/);
 assert.match(actionsRoutes, /reportActionIcon\('print'\)/);
-assert.match(actionsRoutes, /reportActionIcon\('excel'\)/);
-assert.match(actionsRoutes, /reportActionIcon\('csv'\)/);
 assert.match(actionsRoutes, /aria-hidden="true"/);
 
 const canonicalWidths = new Set([640, 760, 900, 980, 1150, 1280]);

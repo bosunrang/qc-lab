@@ -81,23 +81,23 @@ function pageReagent(){
   const oldLotHead='Lô cũ'+(t.lotOld?`: ${esc(t.lotOld)}`:''),newLotHead='Lô mới'+(t.lotNew?`: ${esc(t.lotNew)}`:'');
   const rows=ds.rows.map((r,i)=>{const c=rcPairCalc(r);return `<div class="rc-pair-row" data-rc-row="${i}"><div class="rc-idx">${i+1}</div><input ${ro} value="${r[0]}" oninput="rcCell(${i},0,this.value)" type="number" step="any" placeholder="–"><input ${ro} value="${r[1]}" oninput="rcCell(${i},1,this.value)" type="number" step="any" placeholder="–"><div class="rc-calc avg">${c?fmt(c.avg,3):'–'}</div><div class="rc-calc dif ${c&&c.dif<0?'neg':''}">${c?fmt(c.dif,3):'–'}</div>${canWrite()?`<button class="x" onclick="rcRmRow(${i})" title="Xóa dòng">✕</button>`:'<span></span>'}</div>`;}).join('');
   return headOnly('So sánh 2 lô hóa chất','Sàng lọc định lượng · hồi quy mô tả · Bland-Altman · phê duyệt theo SOP')+
-   `<div class="panel rc-toolbar-panel"><h3>Thiết lập so sánh</h3><div class="rc-toolbar">
-     <div class="rc-toolbar-selcol"><label>Chọn hóa chất</label><select id="rcSel" onchange="rcSwitch(this.value)">${rcSelectOptions()}</select></div>
-     ${canWrite()?`<div class="rc-toolbar-primary"><div><button class="btn teal rc-add-btn" onclick="openRcCreateModal()">+ Thêm</button><button class="btn danger rc-delete-btn" onclick="rcDeleteCurrent()">${rcToolIcon('trash')} Xóa</button></div></div>`:''}
-     <div class="rc-toolbar-secondary">${canWrite()?`<button class="btn ghost rc-find-btn" onclick="openRcModal()">${rcToolIcon('search')} Tìm</button>`:''}<button class="btn ghost rc-report-btn" onclick="rcPrint()">${rcToolIcon('print')} In hóa chất này</button><button class="btn teal rc-report-main" onclick="rcPrintSummary()">${rcToolIcon('report')} Báo cáo tổng hợp</button></div></div></div>
+   `<div class="panel rc-toolbar-panel"><h3 role="heading" aria-level="2">Thiết lập so sánh</h3><div class="rc-toolbar">
+     <div class="rc-toolbar-selcol"><label>Chọn hóa chất</label><select id="rcSel" aria-label="Chọn hóa chất" onchange="rcSwitch(this.value)">${rcSelectOptions()}</select></div>
+     ${canWrite()?`<div class="rc-toolbar-primary"><div>${btn('+ Thêm','openRcCreateModal()','teal rc-add-btn')}${btn(rcToolIcon('trash')+' Xóa','rcDeleteCurrent()','danger rc-delete-btn')}</div></div>`:''}
+     <div class="rc-toolbar-secondary">${canWrite()?btn(rcToolIcon('search')+' Tìm','openRcModal()','ghost rc-find-btn'):''}${btn(rcToolIcon('print')+' In hóa chất này','rcPrint()','ghost rc-report-btn')}${btn(rcToolIcon('report')+' Báo cáo tổng hợp','rcPrintSummary()','teal rc-report-main')}</div></div></div>
    <div class="rc-entry-grid"><div class="panel rc-info-panel"><h3>Thông tin đánh giá</h3><div class="rc-info-grid">
      <div class="rc-field"><label>Tên hóa chất</label><input ${ro} value="${escAttr(t.reagent)}" oninput="rcMeta('reagent',this.value)" placeholder="Tên hóa chất / xét nghiệm"></div>
      <div class="rc-field"><label>Đơn vị</label><input ${ro} value="${escAttr(t.unit)}" oninput="rcMeta('unit',this.value)" placeholder="mmol/L..."></div>
-     <div class="rc-field"><label>Số lô cũ</label><input ${ro} value="${escAttr(t.lotOld)}" oninput="rcMeta('lotOld',this.value)"></div>
-     <div class="rc-field"><label>Số lô mới</label><input ${ro} value="${escAttr(t.lotNew)}" oninput="rcMeta('lotNew',this.value)"></div>
+     <div class="rc-field"><label>Số lô cũ</label><input ${ro} aria-label="Số lô cũ" value="${escAttr(t.lotOld)}" oninput="rcMeta('lotOld',this.value)"></div>
+     <div class="rc-field"><label>Số lô mới</label><input ${ro} aria-label="Số lô mới" value="${escAttr(t.lotNew)}" oninput="rcMeta('lotNew',this.value)"></div>
      <div class="rc-field rc-date-field"><label>Ngày thực hiện</label>${dateBox('rcDate',t.date||'','',`${ro} onchange="rcMeta('date',this.value)"`)}</div>
      <div class="rc-field"><label>Người thực hiện</label><div class="rc-quick-field"><input ${ro} value="${escAttr(t.operator)}" oninput="rcMeta('operator',this.value)" placeholder="Họ tên"><button class="rc-icon-btn" ${canWrite()?'':'disabled'} onclick="rcOpenQuick('operator')" title="Chọn nhanh người thực hiện" aria-label="Chọn nhanh người thực hiện">${rcMiniIcon('user')}</button></div></div>
      <div class="rc-field"><label>Loại mẫu</label><div class="rc-quick-field"><input ${ro} value="${escAttr(t.sampleType)}" oninput="rcMeta('sampleType',this.value)" placeholder="Loại mẫu"><button class="rc-icon-btn" ${canWrite()?'':'disabled'} onclick="rcOpenQuick('sampleType')" title="Chọn nhanh loại mẫu" aria-label="Chọn nhanh loại mẫu">${rcMiniIcon('sample')}</button></div></div>
-     <div class="rc-field"><label>Bias mong muốn (%)</label><input ${ro} type="number" step="any" value="${t.biasTarget}" oninput="rcMeta('biasTarget',this.value)"></div>
-     <div class="rc-field"><label>Mức ý nghĩa (α, alpha)</label><input ${ro} type="number" step="any" value="${t.alpha}" oninput="rcMeta('alpha',this.value)"></div>
+     <div class="rc-field"><label>Bias mong muốn (%)</label><input ${ro} aria-label="Bias mong muốn (%)" type="number" step="any" value="${t.biasTarget}" oninput="rcMeta('biasTarget',this.value)"></div>
+     <div class="rc-field"><label>Mức ý nghĩa (α, alpha)</label><input ${ro} aria-label="Mức ý nghĩa (alpha)" type="number" step="any" value="${t.alpha}" oninput="rcMeta('alpha',this.value)"></div>
      <div class="rc-field rc-coverage-cell"><label class="rc-coverage-check"><input ${ro} type="checkbox" ${t.coverageConfirmed?'checked':''} onchange="rcMeta('coverageConfirmed',this.checked)"><span>Mẫu đã bao phủ khoảng đo và/hoặc điểm quyết định lâm sàng theo SOP</span></label></div></div></div>
    <div class="panel rc-pair-panel"><h3>Dữ liệu đo bắt cặp</h3><div class="rc-pair-wrap"><div class="rc-pair-head"><div>Mẫu</div><div id="rcOldLotHead">${oldLotHead}</div><div id="rcNewLotHead">${newLotHead}</div><div>Trung bình</div><div>Hiệu số (cũ − mới)</div><div></div></div>${rows}</div>
-     ${canWrite()?`<div class="rc-pair-actions"><button class="btn ghost sm" onclick="rcAddRow()">+ Thêm mẫu</button> <button class="btn ghost sm" onclick="rcClearRows()">Xóa dữ liệu</button></div>`:''}
+     ${canWrite()?`<div class="rc-pair-actions">${btn('+ Thêm mẫu','rcAddRow()','ghost sm')} ${btn('Xóa dữ liệu','rcClearRows()','ghost sm')}</div>`:''}
      <div class="hint" style="margin:8px 16px 16px">Nhập tối thiểu ${RC_MIN_PAIRS} cặp để tính mô tả; để phần mềm đánh dấu “đạt sàng lọc” cần ≥20 cặp hợp lệ, bao phủ khoảng đo/điểm quyết định lâm sàng và %bias trong giới hạn SOP. Không dùng p-value để tự chấp nhận lô.</div></div></div>
    <div class="panel rc-stats-panel"><h3>Kết quả thống kê</h3><div id="rcStats"></div></div>
    <div class="panel rc-crit-panel"><h3>Tiêu chí chấp nhận &amp; kết luận</h3><div id="rcCrit"></div><div id="rcVerdict"></div></div>
@@ -186,10 +186,10 @@ function rcQuickList(type){
 function rcOpenQuick(type){if(!requireWrite())return;rcQuickType=type;rcRenderQuickModal();}
 function rcRenderQuickModal(){
   const type=rcQuickType||'operator',items=rcQuickList(type),label=rcQuickLabel(type);
-  const rows=items.length?items.map((name,i)=>`<div class="mrow"><span><b>${esc(name)}</b></span><span class="acts"><button class="btn teal sm" onclick="rcPickQuick(${i})">Chọn</button><button class="x" onclick="rcDelQuick(${i})" title="Xóa">✕</button></span></div>`).join(''):`<div class="empty">Chưa có ${esc(label)} trong danh sách.</div>`;
+  const rows=items.length?items.map((name,i)=>`<div class="mrow"><span><b>${esc(name)}</b></span><span class="acts">${btn('Chọn',`rcPickQuick(${i})`,'teal sm')}<button class="x" onclick="rcDelQuick(${i})" title="Xóa">✕</button></span></div>`).join(''):`<div class="empty">Chưa có ${esc(label)} trong danh sách.</div>`;
   openModal(`<div class="modal"><div class="modal-h"><h3>Chọn nhanh ${esc(label)}</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
-    <div class="modal-b">${rows}<div class="rc-quick-add"><input id="rcQuickNew" placeholder="Thêm ${escAttr(label)} mới" onkeydown="if(event.key==='Enter'){event.preventDefault();rcAddQuick()}"><button class="btn teal sm" onclick="rcAddQuick()">Thêm</button></div></div>
-    <div class="modal-f"><button class="btn ghost" onclick="closeModal()">Đóng</button></div></div>`);
+    <div class="modal-b">${rows}<div class="rc-quick-add"><input id="rcQuickNew" placeholder="Thêm ${escAttr(label)} mới" onkeydown="if(event.key==='Enter'){event.preventDefault();rcAddQuick()}">${btn('Thêm','rcAddQuick()','teal sm')}</div></div>
+    <div class="modal-f">${btn('Đóng','closeModal()','ghost')}</div></div>`);
   setTimeout(()=>{const e=document.getElementById('rcQuickNew');if(e)e.focus();},0);
 }
 function rcPickQuick(i){
@@ -218,7 +218,7 @@ function renderRcModal(){
   openModal(`<div class="modal"><div class="modal-h"><h3>Chọn phép so sánh</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
     <div class="modal-b"><input id="rcModalSearch" placeholder="Tìm phép so sánh..." value="${escAttr(rcModalQ)}" oninput="rcModalSearchSet(this.value)">
       <div style="margin-top:10px">${rows}</div></div>
-    <div class="modal-f"><button class="btn ghost" onclick="closeModal()">Đóng</button></div></div>`);
+    <div class="modal-f">${btn('Đóng','closeModal()','ghost')}</div></div>`);
   setTimeout(()=>{const e=document.getElementById('rcModalSearch');if(e){e.focus();e.setSelectionRange(e.value.length,e.value.length);}},0);
 }
 function rcPick(id){rcId=id;closeModal();rerender();}
@@ -237,7 +237,7 @@ function renderRcCreateModal(){
     <div class="modal-b"><input id="rcCreateSearch" placeholder="Tìm xét nghiệm hoặc gõ tên hóa chất mới..." value="${escAttr(rcCreateModalQ)}" oninput="rcCreateSearchSet(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();rcCreateFrom(this.value,'')}">
       <div style="margin-top:10px">${createTyped}</div>
       <div class="refcat">Danh mục chuẩn</div>${refs||'<div class="empty" style="padding:18px">Không tìm thấy trong danh mục chuẩn.</div>'}</div>
-    <div class="modal-f"><button class="btn ghost" onclick="closeModal()">Đóng</button></div></div>`);
+    <div class="modal-f">${btn('Đóng','closeModal()','ghost')}</div></div>`);
   setTimeout(()=>{const e=document.getElementById('rcCreateSearch');if(e){e.focus();e.setSelectionRange(e.value.length,e.value.length);}},0);
 }
 function rcCreateFrom(name,unit){if(!requireWrite())return;const d=rcBlank();d.test.reagent=QCCore.cleanText(name||'Hóa chất mới').trim()||'Hóa chất mới';if(unit)d.test.unit=QCCore.cleanText(unit);state.reagentTests.push(d);rcId=d.id;save({clearDerived:false});closeModal();rerender();}

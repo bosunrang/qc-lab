@@ -1,7 +1,7 @@
 ﻿window.QCLAB_APP = {
   name: 'QC Lab',
-  version: '2.3.9',
-  releaseDate: '2026-07-21',
+  version: '2.4.0',
+  releaseDate: '2026-07-23',
   build: 'westgard-print-hidpi'
 };
 

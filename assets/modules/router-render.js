@@ -175,7 +175,7 @@ function resetMainScroll(){const m=document.querySelector('main');if(m)m.scrollT
 function topUserBox(){if(!currentUser)return '';const name=currentUser.name||currentUser.username;const initial=esc(String(name||'U').trim().charAt(0).toUpperCase()||'U');return `<div class="top-user"><div class="avatar">${initial}</div><div class="meta"><div class="name">${esc(name)}</div><div class="role">${roleLabel(currentUser.role)}</div></div><button onclick="logout()" title="Đăng xuất"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M21 5v14"/></svg>Đăng xuất</button></div>`;}
 function headOnly(t,p,actions=''){return `<div class="head"><div><h1>${t}</h1>${p?`<p>${p}</p>`:''}</div><div class="head-actions">${actions}${topUserBox()}</div></div>`;}
 function emptyState(title,body,actions=''){return `<div class="empty"><div class="empty-title">${title}</div><div>${body}</div>${actions?`<div class="empty-actions">${actions}</div>`:''}</div>`;}
-function btn(label,onclick,cls='ghost sm',title=''){return `<button class="btn ${cls}" onclick="${onclick}"${title?` title="${escAttr(title)}"`:''}>${label}</button>`;}
+function btn(label,onclick,cls='ghost sm',title='',opts={}){const{disabled=false,attrs={}}=opts,attrStr=Object.entries(attrs).map(([k,v])=>` ${k}="${escAttr(v)}"`).join('');return `<button class="btn ${cls}"${disabled?' disabled':''} onclick="${onclick}"${title?` title="${escAttr(title)}"`:''}${attrStr}>${label}</button>`;}
 function rangeActions(tid,level,eligible,applied){let h='';if(eligible)h+=btn('Workflow dải QC',`openRangeWorkflow('${tid}',${level})`,'teal sm','Xem điều kiện, dải đề xuất và phê duyệt');if(applied==='lab'&&canWrite())h+=btn('↶',`revertRange('${tid}',${level})`,'ghost icon','Về dải nhà sản xuất');return h?`<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">${h}</div>`:'';}
 function stateName(s){return s==='rej'?'Loại':s==='warn'?'Cảnh báo':s==='ok'?'Đạt':'Chưa có';}
 function qcVerdictLabel(level){return level==='ok'?'Đạt':level==='warn'?'Cảnh báo':'Loại bỏ';}
@@ -219,7 +219,7 @@ function pageDash(){
      dòng cảnh báo hết hạn cho từng xét nghiệm riêng lẻ. */
   const expByLot=new Map();
   exp.forEach(e=>{const key=e.l.qcLotId||(e.l.lot||'')+'|'+e.l.level;const cur=expByLot.get(key);if(!cur||e.d<cur.d)expByLot.set(key,{...e,count:(cur?cur.count:0)+1});else cur.count++;});
-  const shiftItem=(o,cls)=>`<div class="shift-item ${cls}"><div><b>${esc(testDisplayName(o.t))} · M${o.l.level}</b><div class="meta">${vnDate(o.p.date)} · ${fmt(o.p.val)} ${esc(o.t.unit||'')} · ${o.rules.join(', ')||'—'}</div></div><button class="btn ghost sm" onclick="entrySel={testId:'${o.t.id}',level:${o.l.level}};entryStart=null;entryEnd=null;go('entry')">Xem</button></div>`;
+  const shiftItem=(o,cls)=>`<div class="shift-item ${cls}"><div><b>${esc(testDisplayName(o.t))} · M${o.l.level}</b><div class="meta">${vnDate(o.p.date)} · ${fmt(o.p.val)} ${esc(o.t.unit||'')} · ${o.rules.join(', ')||'—'}</div></div>${btn('Xem',`entrySel={testId:'${o.t.id}',level:${o.l.level}};entryStart=null;entryEnd=null;go('entry')`,'ghost sm')}</div>`;
   const urgentHtml=urgent.slice(0,5).map(o=>shiftItem(o,'rej')).join('');
   const watchHtml=watch.slice(0,4).map(o=>shiftItem(o,'warn')).join('');
   const followHtml=urgentHtml||watchHtml?`<div class="dash-list">${urgentHtml}${watchHtml}</div>`:'<div class="alert ok">Không có điểm bị loại/cảnh báo cần xử lý ngay.</div>';
@@ -240,9 +240,9 @@ function pageDash(){
     const levels=levelData.map(x=>`<span class="dash-level-pill ${x.todayLevel?'done':''}">M${x.l.level}${x.l.lot?` · ${esc(x.l.lot)}`:''}${x.st?` · CV ${fmt(x.st.cv)}%`:''}</span>`).join('');
     const latestText=latest?`${vnDate(latest.date)} · M${latest._level} · ${fmt(latest.val)}`:'Chưa có điểm';
     const rank=s==='rej'?0:s==='warn'?1:todayCount<lvls.length?2:s==='ok'?3:4;
-    return{rank,name:t.name,html:`<tr class="${s}" data-search="${escAttr(search)}"><td><div class="dash-test-name">${esc(testDisplayName(t))}</div><div class="dash-test-sub">${esc(t.machine||'Chưa gán máy')}</div></td><td><div class="dash-level-list">${levels}</div></td><td>${todayTag}</td><td class="num"><b>${totalPoints}</b></td><td>${statusTag}</td><td><span class="dash-latest">${latestText}</span></td><td><button class="btn ghost sm" onclick="entrySel={testId:'${t.id}',level:${lvls[0].level}};entryStart=null;entryEnd=null;go('entry')">Xem QC</button></td></tr>`};
+    return{rank,name:t.name,html:`<tr class="${s}" data-search="${escAttr(search)}"><td><div class="dash-test-name">${esc(testDisplayName(t))}</div><div class="dash-test-sub">${esc(t.machine||'Chưa gán máy')}</div></td><td><div class="dash-level-list">${levels}</div></td><td>${todayTag}</td><td class="num"><b>${totalPoints}</b></td><td>${statusTag}</td><td><span class="dash-latest">${latestText}</span></td><td>${btn('Xem QC',`entrySel={testId:'${t.id}',level:${lvls[0].level}};entryStart=null;entryEnd=null;go('entry')`,'ghost sm')}</td></tr>`};
   }).sort((a,b)=>a.rank-b.rank||String(a.name||'').localeCompare(String(b.name||''),'vi')).map(x=>x.html).join('');
-  const testListHtml=statusItems.length?`<div class="dash-test-list"><table><thead><tr><th>Xét nghiệm</th><th>Mức QC / lô</th><th>QC hôm nay</th><th class="num">Tổng điểm</th><th>Westgard</th><th>Gần nhất</th><th></th></tr></thead><tbody>${testRows}</tbody></table></div><div id="dashTestEmpty" class="dash-test-empty" style="display:none">Không tìm thấy xét nghiệm phù hợp.</div>`:`<div class="dash-test-empty">Không tìm thấy xét nghiệm phù hợp.</div>`;
+  const testListHtml=statusItems.length?`<div class="dash-test-list"><table><thead><tr><th>Xét nghiệm</th><th>Mức QC / lô</th><th>QC hôm nay</th><th class="num">Tổng điểm</th><th>Westgard</th><th>Gần nhất</th><th><span style="position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">Thao tác</span></th></tr></thead><tbody>${testRows}</tbody></table></div><div id="dashTestEmpty" class="dash-test-empty" style="display:none">Không tìm thấy xét nghiệm phù hợp.</div>`:`<div class="dash-test-empty">Không tìm thấy xét nghiệm phù hợp.</div>`;
   const done=todayPts,doneTests=Math.max(0,tests.length-missingToday.length),pct=tests.length?Math.round(doneTests/tests.length*100):0;
   const mood=rej?'Cần xử lý ngay':warn?'Có cảnh báo cần theo dõi':missingToday.length?'Còn QC cần nhập':'Đang trong kiểm soát';
   const moodText=rej?'Có xét nghiệm đang bị loại, ưu tiên kiểm tra và ghi nhận khắc phục.':warn?'Có tín hiệu cảnh báo, nên xem lại biểu đồ và xu hướng trước khi trả kết quả.':missingToday.length?'Một số xét nghiệm chưa đủ QC hôm nay, nên hoàn tất trước giờ chạy mẫu.':'Không có cảnh báo trọng yếu trong dữ liệu hiện tại.';
@@ -289,7 +289,7 @@ function pageEntry(rightOnly=false){
   if(!entrySheetMonth)entrySheetMonth=isoMonth();
   let selT=entrySel&&entryTests.find(t=>t.id===entrySel.testId);
   if(!selT||!operationalLevels(selT).some(l=>l.level===entrySel.level)){selT=entryTests[0];const l0=operationalLevels(selT)[0];entrySel={testId:selT.id,level:l0.level};entryAutoOpenKey=null;}
-  let tree='';
+  let tree='',treeHead='';
   if(!rightOnly){
     const byMAll=EntryService.groupByMachine(entryTests),machinesAll=[...byMAll.keys()],selM=selT.machine||'(Chưa gán máy)';
     if(entryMachine!=='all'&&!machinesAll.includes(entryMachine))entryMachine='all';
@@ -297,8 +297,12 @@ function pageEntry(rightOnly=false){
     const selGroup=operationalLotGroupForTest(selT),autoKey=selM+'|'+selGroup.key+'|'+entrySel.testId;if(entryAutoOpenKey!==autoKey){treeOpen.add('m:'+selM);treeOpen.add('lg:'+selM+'|'+selGroup.key);entryAutoOpenKey=autoKey;}
     const byM=EntryService.groupByMachine(entryTests.filter(t=>entryMachine==='all'||(t.machine||'(Chưa gán máy)')===entryMachine)),machines=[...byM.keys()];
     const machineOpts=['<option value="all">Tất cả máy</option>'].concat(machinesAll.map(m=>`<option value="${escAttr(m)}" ${entryMachine===m?'selected':''}>${esc(m)}</option>`)).join('');
-    tree=`<h4>Danh mục nội kiểm</h4><div class="tree-tools"><input id="entrySearch" aria-label="Tìm xét nghiệm, máy hoặc lô" placeholder="Tìm test, máy hoặc lô..." value="${escAttr(entryQ)}" oninput="entryFilter(this.value)"><select aria-label="Lọc theo máy xét nghiệm" onchange="entrySetMachine(this.value)">${machineOpts}</select></div>`;
-    if(!machines.length)tree+='<div class="tree-empty">Không có xét nghiệm phù hợp.</div>';
+    /* h4/tree-tools nằm NGOÀI div role="tree" (chỉ bọc quanh các .tnode role="treeitem")
+       — ARIA tree chỉ được phép chứa treeitem/group, aria-required-children sẽ báo lỗi
+       nếu heading/input/select nằm trực tiếp trong đó. CSS `.tree h4`/`.tree-tools ...`
+       vẫn là descendant selector nên không cần đổi gì ở CSS. */
+    treeHead=`<h4 role="heading" aria-level="2">Danh mục nội kiểm</h4><div class="tree-tools"><input id="entrySearch" aria-label="Tìm xét nghiệm, máy hoặc lô" placeholder="Tìm test, máy hoặc lô..." value="${escAttr(entryQ)}" oninput="entryFilter(this.value)"><select aria-label="Lọc theo máy xét nghiệm" onchange="entrySetMachine(this.value)">${machineOpts}</select></div>`;
+    if(!machines.length)tree+='<div class="tree-empty" role="presentation">Không có xét nghiệm phù hợp.</div>';
     machines.forEach(mc=>{const mk='m:'+mc,mo=treeOpen.has(mk);
     tree+=`<div class="tnode tn-machine" data-tree-role="machine" data-key="${escAttr(mk)}" role="treeitem" tabindex="0" aria-expanded="${mo}" onclick="treeToggle('${jsq(mk)}')" onkeydown="entryTreeKey(event)"><span class="caret" aria-hidden="true">${mo?'−':'+'}</span>${esc(mc)}</div>`;
     const groups=new Map();byM.get(mc).forEach(t=>{const g=operationalLotGroupForTest(t);if(!groups.has(g.key))groups.set(g.key,{name:g.name,tests:[],order:operationalTestOrder(t)});const grp=groups.get(g.key);grp.tests.push(t);grp.order=Math.min(grp.order,operationalTestOrder(t));});
@@ -348,7 +352,7 @@ function pageEntry(rightOnly=false){
       <div><span>SD tích lũy</span><b>${cumulativeSt?fmt(cumulativeSt.sd,3):'—'}</b></div>
       <div><span>CV tích lũy</span><b>${cumulativeSt?fmt(cumulativeSt.cv)+'%':'—'}</b></div>
     </div>`;
-    const rowControl=rowWindow.limited?`<div class="table-window-note">Đang hiển thị ${rowWindow.rows.length}/${rowWindow.total} điểm gần nhất. <button class="btn ghost sm" onclick="entryToggleRows('${jsq(tableKey)}')">Hiện toàn bộ</button></div>`:rowWindow.expanded&&rowWindow.total>ENTRY_TABLE_INITIAL_ROWS?`<div class="table-window-note">Đang hiển thị toàn bộ ${rowWindow.total} điểm. <button class="btn ghost sm" onclick="entryToggleRows('${jsq(tableKey)}')">Thu gọn</button></div>`:'';
+    const rowControl=rowWindow.limited?`<div class="table-window-note">Đang hiển thị ${rowWindow.rows.length}/${rowWindow.total} điểm gần nhất. ${btn('Hiện toàn bộ',`entryToggleRows('${jsq(tableKey)}')`,'ghost sm')}</div>`:rowWindow.expanded&&rowWindow.total>ENTRY_TABLE_INITIAL_ROWS?`<div class="table-window-note">Đang hiển thị toàn bộ ${rowWindow.total} điểm. ${btn('Thu gọn',`entryToggleRows('${jsq(tableKey)}')`,'ghost sm')}</div>`:'';
     return `<div class="qc-table-card${x.parallel?' qc-parallel-card':''}" role="region" aria-label="Điểm QC mức ${x.level}, lô ${escAttr(lvlLot||'?')}${x.parallel?', lô chạy song song':''}" tabindex="0"><h4><span>Mức ${x.level} · ${prevView?'Lô cũ':'Lô'} ${esc(lvlLot||'?')}${x.parallel?' <span class="qc-parallel-label">Song song</span>':''}</span><span class="hint">${allPtsIdx.length} điểm trong khoảng</span></h4>${cumulative}${ptsIdx.length?`<table><thead><tr><th>Ngày</th><th class="num">Giá trị</th><th class="num">Z</th><th>Kết luận</th><th>Luật</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table>${rowControl}`:'<div class="empty qc-table-empty">Chưa có điểm nào trong khoảng này.</div>'}</div>`;}).join('');
   const prevLotByLevel=new Map(levelViews.filter(v=>v.prevView).map(v=>[v.x.level,v.prevView.lot]));
   const voidedRows=(state.data[t.id]||[]).filter(p=>{if(!p.voided)return false;const pv=prevLotByLevel.get(p.level);return pv!=null?(p.lot||'')===pv:(p.date>=W.start&&p.date<=W.end);}).sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))||pointRunNo(a)-pointRunNo(b)).map(p=>`<tr><td>${vnDate(p.date)}</td><td>Mức ${p.level} · Lô ${esc(p.lot||'?')}</td><td class="num">${fmt(p.val)}</td><td>${esc(p.runId||'—')}</td><td>${esc(p.voidedBy||'')}</td><td>${esc(p.voidReason||'')}</td></tr>`).join('');
@@ -366,8 +370,8 @@ function pageEntry(rightOnly=false){
     entryLjRenderCache.levels.set(`${x.level}|${chartLot||''}`,chartPts);
     const metric=(k,v,control=false)=>`<div class="lj-qc-stat${control?' control':''}"><span class="k">${k}</span><span class="v">${v}</span></div>`;
     const strip=metric('Số điểm','N = '+chartPts.length)+metric('Mean thực',st?fmt(st.m):'—')+metric('SD thực',st?fmt(st.sd,3):'—')+metric('CV thực',st?fmt(st.cv)+'%':'—')+metric('Mean mục tiêu',fmt(chartMean),true)+metric('SD mục tiêu',fmt(chartSd,3),true)+metric('Khoảng ±2SD',fmt(lo2)+' – '+fmt(hi2),true)+metric('LOT / Hạn dùng',esc(chartLot||'?')+' · '+(prevView?'Đã chuyển tiếp':(x.exp?vnDate(x.exp):'Chưa nhập')),true);
-    const prevBtn=x.parallel?'<span class="hint">Đang đánh giá</span>':prevSeries.length?(prevView?`<button class="btn teal sm" onclick="event.stopPropagation();entryShowCurrentLot(${x.level})">Xem lô mới</button>`:`<button class="btn ghost sm" onclick="event.stopPropagation();entryShowPrevLot(${x.level},'${jsq(prevSeries[0].lot||'')}')">Xem lô cũ</button>`):`<span class="hint">${x.applied==='lab'?'Dải PXN':'Dải NSX'}</span>`;
-    return `<div class="lj-mini ${on?'on':''}${x.parallel?' lj-mini-parallel':''}" onclick="entryFocusLevel(${x.level})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();entryFocusLevel(${x.level})}" role="button" tabindex="0" aria-label="Chọn mức ${x.level}, lô ${escAttr(chartLot||'?')}${x.parallel?', lô chạy song song':''}"><div class="lj-mini-h"><b>Mức ${x.level} · ${prevView?'Lô cũ':'Lô'} ${esc(chartLot||'?')}${x.parallel?' <span class="qc-parallel-label">Song song</span>':''}</b>${prevBtn}</div><div class="lj-qc-strip">${strip}</div><div class="chart-scroll"><canvas class="entryLJStack" data-test="${t.id}" data-level="${x.level}" data-lot="${escAttr(chartLot||'')}" data-mean="${escAttr(chartMean)}" data-sd="${escAttr(chartSd)}" data-start="${W.start}" data-end="${W.end}" width="1400" height="380"></canvas></div></div>`;}).join('');
+    const prevBtn=x.parallel?'<span class="hint">Đang đánh giá</span>':prevSeries.length?(prevView?btn('Xem lô mới',`event.stopPropagation();entryShowCurrentLot(${x.level})`,'teal sm'):btn('Xem lô cũ',`event.stopPropagation();entryShowPrevLot(${x.level},'${jsq(prevSeries[0].lot||'')}')`,'ghost sm')):`<span class="hint">${x.applied==='lab'?'Dải PXN':'Dải NSX'}</span>`;
+    return `<div class="lj-mini ${on?'on':''}${x.parallel?' lj-mini-parallel':''}" onclick="entryFocusLevel(${x.level})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();entryFocusLevel(${x.level})}" role="button" tabindex="0" aria-label="Chọn mức ${x.level}, lô ${escAttr(chartLot||'?')}${x.parallel?', lô chạy song song':''}"><div class="lj-mini-h"><b>Mức ${x.level} · ${prevView?'Lô cũ':'Lô'} ${esc(chartLot||'?')}${x.parallel?' <span class="qc-parallel-label">Song song</span>':''}</b>${prevBtn}</div><div class="lj-qc-strip" tabindex="0">${strip}</div><div class="chart-scroll" tabindex="0"><canvas class="entryLJStack" data-test="${t.id}" data-level="${x.level}" data-lot="${escAttr(chartLot||'')}" data-mean="${escAttr(chartMean)}" data-sd="${escAttr(chartSd)}" data-start="${W.start}" data-end="${W.end}" width="1400" height="380"></canvas></div></div>`;}).join('');
   const levelHead=entryCols.map(x=>`<th>Mức ${x.level} · Lô ${esc(x.lot||'?')}${x.parallel?' <span class="qc-parallel-label">Song song</span>':''}</th>`).join('');
   const sheetCalendar=EntryService.buildSheetCalendar(entrySheetMonth,isoToday()),activeSheetMonth=sheetCalendar.activeMonth;
   entrySheetMonth=activeSheetMonth;
@@ -414,7 +418,7 @@ function pageEntry(rightOnly=false){
     return `<tr class="${rowCls}" data-date="${dayGroup.date}"><td><span>${dateObj(dayGroup.date).getDate()}</span>${dayGroup.date===today?'<b>Hôm nay</b>':''}</td>${cells}<td class="qc-staff-cell">${staffCell}</td><td>${[...new Set(warnRules)].join(', ')||'—'}</td><td>${[...new Set(rejRules)].join(', ')||'—'}</td><td>${status}</td><td>${note}</td></tr>`;}).join('');
   const worksheet=`<div class="panel qc-sheet-panel"><div class="qc-sheet-heading">
       <div class="qc-sheet-title"><span>Bảng nhập QC</span><strong>${esc(testDisplayName(t))}</strong><small>Lô ${esc(entryLotLabels(entryCols))}</small></div>
-      <div class="qc-month-area"><div class="qc-month-picker"><select aria-label="Chọn tháng" onchange="entrySetSheetPart('month',this.value)">${sheetMonthOptions}</select><select aria-label="Chọn năm" onchange="entrySetSheetPart('year',this.value)">${sheetYearOptions}</select><button class="btn ghost sm qc-current-month" onclick="entrySetSheetMonth(isoMonth())">Tháng hiện tại</button><button class="btn teal sm qc-today-jump" onclick="entryGoToday()">Tới hôm nay</button></div></div></div>
+      <div class="qc-month-area"><div class="qc-month-picker"><select aria-label="Chọn tháng" onchange="entrySetSheetPart('month',this.value)">${sheetMonthOptions}</select><select aria-label="Chọn năm" onchange="entrySetSheetPart('year',this.value)">${sheetYearOptions}</select>${btn('Tháng hiện tại','entrySetSheetMonth(isoMonth())','ghost sm qc-current-month')}${btn('Tới hôm nay','entryGoToday()','teal sm qc-today-jump')}</div></div></div>
       <div class="qc-sheet-wrap" role="region" aria-label="Bảng nhập QC theo tháng" tabindex="0"><table class="qc-sheet"><thead><tr><th>Ngày</th>${levelHead}<th>NV thực hiện</th><th>Vi phạm cảnh báo</th><th>Vi phạm loại bỏ</th><th>Chấp nhận</th><th>Ghi chú</th></tr></thead>
        <tbody>${sheetRows||`<tr><td colspan="${6+entryCols.length}" class="empty-cell">Chưa có điểm nào trong khoảng này.</td></tr>`}</tbody></table></div>
       <div id="entryMsg" role="status" aria-live="polite" style="margin:12px 16px 16px">${entryLastMsg}</div></div>`;
@@ -430,7 +434,7 @@ function pageEntry(rightOnly=false){
   entryPartialRenderCache={testId:t.id,right};
   if(rightOnly)return right;
   return headOnly('Nhập QC','Ghi nhận kết quả theo ngày, mức QC và lô đang vận hành')+
-   `<div class="entrygrid"><div class="tree" role="tree" aria-label="Danh mục nội kiểm">${tree}</div><div class="entry-main">${right}</div></div>`;
+   `<div class="entrygrid"><div class="tree">${treeHead}<div role="tree" aria-label="Danh mục nội kiểm">${tree}</div></div><div class="entry-main">${right}</div></div>`;
 }
 function jsq(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r/g,'\\r').replace(/\n/g,'\\n').replace(/&/g,'\\u0026').replace(/</g,'\\u003c').replace(/>/g,'\\u003e').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029');}
 function entryRestoreTreeNode(datasetKey,value){requestAnimationFrame(()=>{const node=[...document.querySelectorAll('.tree .tnode')].find(el=>el.dataset[datasetKey]===String(value));if(node)node.focus({preventScroll:true});});}
@@ -595,7 +599,7 @@ async function entryInlineSave(tid,level,date,value,runIdHint='',lotNo=''){
     openModal(`<div class="modal">
       <div class="modal-h"><h3>Cảnh báo dữ liệu bất thường</h3><button class="modal-close" onclick="closeModal();entryRenderKeepScroll()">×</button></div>
       <div class="modal-b">${preIssues.map(x=>`<div class="alert warn">${esc(x)}</div>`).join('')}<div class="hint">Bạn vẫn muốn lưu điểm QC này?</div></div>
-      <div class="modal-f"><button class="btn ghost" onclick="closeModal();entryRenderKeepScroll()">Hủy</button><button class="btn teal" onclick="closeModal();entryInlineSaveCommit('${jsq(tid)}',${level},'${jsq(date)}',${val},'${jsq(runId)}','${jsq(lotNo)}')">Vẫn lưu</button></div>
+      <div class="modal-f">${btn('Hủy','closeModal();entryRenderKeepScroll()','ghost')}${btn('Vẫn lưu',`closeModal();entryInlineSaveCommit('${jsq(tid)}',${level},'${jsq(date)}',${val},'${jsq(runId)}','${jsq(lotNo)}')`,'teal')}</div>
     </div>`);
     return;
   }
@@ -636,7 +640,7 @@ async function voidQcPoint(tid,pointId){
       <textarea id="voidReasonInput" placeholder="VD: Nhập nhầm giá trị, lỗi máy đo, hủy do lấy mẫu lại..." oninput="document.getElementById('voidReasonErr').style.display='none'"></textarea>
       <div id="voidReasonErr" class="hint" style="color:var(--red);display:none;margin-top:6px">Cần ghi lý do hủy tối thiểu 5 ký tự.</div>
     </div>
-    <div class="modal-f"><button class="btn ghost" onclick="closeModal()">Đóng</button><button class="btn danger" onclick="confirmVoidQcPoint('${tid}','${pointId}')">Xác nhận hủy</button></div>
+    <div class="modal-f">${btn('Đóng','closeModal()','ghost')}${btn('Xác nhận hủy',`confirmVoidQcPoint('${tid}','${pointId}')`,'danger')}</div>
   </div>`);
   setTimeout(()=>{const e=document.getElementById('voidReasonInput');if(e)e.focus();},50);
 }
@@ -701,7 +705,7 @@ function pageWestgardCusum(t){
     if(!pts.length)return `<div class="panel">${title}${emptyState('Chưa có dữ liệu','LOT đang dùng chưa có điểm QC.')}</div>`;
     return `<div class="panel">${title}
       <div class="hint" style="margin:12px 16px 8px">Đường CUSUM+ (teal)/CUSUM− (xanh tím) cộng dồn độ lệch z-score qua từng điểm; vượt vạch đứt ±h là dấu hiệu trôi/shift kéo dài. Đường xám mờ là trung bình động 5 điểm, chỉ để tham khảo hình dạng xu hướng.</div>
-      <div class="chart-scroll"><canvas class="cusumChart" data-test="${t.id}" data-level="${l.level}" width="1400" height="430"></canvas></div></div>`;
+      <div class="chart-scroll" tabindex="0"><canvas class="cusumChart" data-test="${t.id}" data-level="${l.level}" width="1400" height="430"></canvas></div></div>`;
   }).join('');
 }
 function wgSetArchivedGroup(id){wgArchivedGroupId=id;wgArchivedTestId='';rerender();}
@@ -717,7 +721,7 @@ function wgRowsWindow(rows,key){
 function wgToggleRows(key){if(wgExpandedRows.has(key))wgExpandedRows.delete(key);else wgExpandedRows.add(key);rerender();}
 function wgRowsControl(view,key){
   if(view.total<=WG_TABLE_INITIAL_ROWS)return'';
-  return `<div class="wg-row-window"><span>Đang hiển thị ${view.rows.length}/${view.total} điểm${view.expanded?'':' mới nhất'}</span><button class="btn ghost sm" onclick="wgToggleRows('${jsq(key)}')">${view.expanded?`Thu gọn còn ${WG_TABLE_INITIAL_ROWS} điểm`:`Xem toàn bộ ${view.total} điểm`}</button></div>`;
+  return `<div class="wg-row-window"><span>Đang hiển thị ${view.rows.length}/${view.total} điểm${view.expanded?'':' mới nhất'}</span>${btn(view.expanded?`Thu gọn còn ${WG_TABLE_INITIAL_ROWS} điểm`:`Xem toàn bộ ${view.total} điểm`,`wgToggleRows('${jsq(key)}')`,'ghost sm')}</div>`;
 }
 function wgPointRowsHtml(rows){return rows.map(row=>{const lv=qcVerdictLabel(row.level),err=row.rules.length?errorTypeDetailParts(row.rules):null,errHtml=err?`<div class="wg-error-type"><b>${esc(err.type)}</b>${err.desc?`<small>${esc(err.desc)}</small>`:''}</div>`:'—',support=(row.supportRules||[]).map(r=>`<span class="pill" title="Điểm lịch sử cấu thành quy tắc, không bị loại hồi tố">${icoRefArrow()} ${r}</span>`).join('');
   return `<tr><td>${row.index}</td><td>${vnDate(row.date)}</td><td class="num">${fmt(row.value)}</td><td class="num">${row.z>=0?'+':''}${fmt(row.z)}s</td><td><span class="tag ${row.level}">${lv}</span></td><td>${row.rules.map(r=>`<span class="pill">${r}</span>`).join('')||support||'—'}${row.rules.length&&support?`<div class="hint" style="margin-top:4px">Bằng chứng: ${support}</div>`:''}</td><td class="hint">${errHtml}</td></tr>`;}).join('');}
@@ -766,7 +770,7 @@ function pageWestgardArchived(archivedGroups){
   rows.forEach(r=>{if(!byTest.has(r.t.id))byTest.set(r.t.id,{t:r.t,rows:[]});byTest.get(r.t.id).rows.push(r);});
   const testEntries=[...byTest.values()].sort((a,b)=>operationalTestOrder(a.t)-operationalTestOrder(b.t)||String(a.t.name||'').localeCompare(String(b.t.name||''),'vi'));
   if(!testEntries.length)return headOnly('Phân tích Westgard','Xem lại Westgard theo nhóm lô đã dừng/lưu trữ')+
-    `<div class="panel"><h3>Thiết lập phân tích</h3>${wgViewModeTabs(archivedGroups)}<div class="wg-test-picker">${searchBox}${groupPicker}</div></div>
+    `<div class="panel"><h3 role="heading" aria-level="2">Thiết lập phân tích</h3>${wgViewModeTabs(archivedGroups)}<div class="wg-test-picker">${searchBox}${groupPicker}</div></div>
      <div class="panel">${emptyState('Không tìm thấy xét nghiệm nào','Nhóm lô này không gắn với xét nghiệm/mức nào có Mean/SD hợp lệ.')}</div>`;
   const matchedTests=testEntries.filter(e=>!q||searchText(e.t.name).includes(q)||searchText(testDisplayName(e.t)).includes(q)||searchText(instrumentName(e.t.instrumentId,e.t.machine)).includes(q));
   const testList=matchedTests.length?matchedTests:testEntries; // gõ số lô (không khớp tên xét nghiệm nào) thì vẫn cho chọn đủ xét nghiệm của nhóm vừa nhảy tới
@@ -778,10 +782,10 @@ function pageWestgardArchived(archivedGroups){
   const sortedRows=entry.rows.slice().sort((a,b)=>a.l.level-b.l.level);
   const multiChart=sortedRows.length>=2?`<div class="panel"><h3>Levey-Jennings tổng hợp</h3>
     <div class="hint" style="margin:12px 16px 8px">Biểu đồ quy đổi các mức QC về Z-score để so sánh trên cùng trục; kết luận Đạt/Cảnh báo/Loại bỏ được tính theo bộ luật Westgard đang bật cho xét nghiệm.</div>
-    <div class="chart-scroll"><canvas class="wgLJMultiArchived" data-group="${group.id}" data-test="${entry.t.id}" width="1400" height="430"></canvas></div></div>`:'';
+    <div class="chart-scroll" tabindex="0"><canvas class="wgLJMultiArchived" data-group="${group.id}" data-test="${entry.t.id}" width="1400" height="430"></canvas></div></div>`:'';
   const blocks=sortedRows.map(({t,l,lot,mean,sd})=>wgLotBlock(t,l.level,lot.lotNo,mean,sd,lotPointsByNo(t.id,l.level,lot.lotNo),badge,`Mức ${l.level}`,`Lô ${esc(lot.lotNo)}`)).join('');
   return headOnly('Phân tích Westgard','Xem lại Westgard theo nhóm lô đã dừng/lưu trữ')+
-   `<div class="panel"><h3>Thiết lập phân tích</h3>${wgViewModeTabs(archivedGroups)}
+   `<div class="panel"><h3 role="heading" aria-level="2">Thiết lập phân tích</h3>${wgViewModeTabs(archivedGroups)}
      <div class="wg-test-picker wg-test-picker-3">${searchBox}${testPicker}${groupPicker}</div>
      <div class="hint" style="margin-top:8px">Đánh giá dưới đây dùng bộ luật Westgard đang bật hiện nay, không phải cấu hình luật tại thời điểm nhóm lô này còn hoạt động.</div></div>${multiChart}${blocks}`;
 }
@@ -797,17 +801,17 @@ function pageWestgard(){
   const wg=activeWestgard(t),levelViews=wg.views.map(v=>({l:v.l,pts:v.pts,cfg:{mean:v.l.mean,sd:v.l.sd},single:v.single,lotPicker:`<span class="wg-lot-name">Lô ${esc(v.l.lot||'?')}</span>`}));
   const multiChart=wgMultiViews(t).length>=2?`<div class="panel"><h3>Levey-Jennings tổng hợp</h3>
     <div class="hint" style="margin:12px 16px 8px">Biểu đồ quy đổi các mức QC về Z-score để so sánh trên cùng trục; kết luận Đạt/Cảnh báo/Loại bỏ được tính theo bộ luật Westgard đang bật cho xét nghiệm. Bật "Xem lô cũ" ở mức tương ứng để thêm đường của lô đã chuyển tiếp.</div>
-    <div class="chart-scroll"><canvas class="wgLJMulti" data-test="${t.id}" width="1400" height="430"></canvas></div></div>`:'';
+    <div class="chart-scroll" tabindex="0"><canvas class="wgLJMulti" data-test="${t.id}" width="1400" height="430"></canvas></div></div>`:'';
   const blocks=levelViews.map(v=>{const{l,pts,cfg,lotPicker}=v;
     const prevSeries=previousLotSeries(t,l.level),hasPrev=prevSeries.length>0,prevOpen=wgPrevOpen.has(t.id+'|'+l.level);
-    const prevBtn=hasPrev?`<button class="btn ghost sm wg-prev-toggle" onclick="wgTogglePrevLot(${l.level})">${prevOpen?'Xem lô mới':'Xem lô cũ'}</button>`:'';
+    const prevBtn=hasPrev?btn(prevOpen?'Xem lô mới':'Xem lô cũ',`wgTogglePrevLot(${l.level})`,'ghost sm wg-prev-toggle'):'';
     if(prevOpen&&hasPrev){const s=prevSeries[0];return wgLotBlock(t,l.level,s.lot,s.mean,s.sd,s.pts,'Đã chuyển tiếp',`Mức ${l.level}`,`Lô cũ ${esc(s.lot)}`,prevBtn);}
     const title=`<h3><span class="wg-level-title"><span>Mức ${l.level}</span>${lotPicker}</span><span class="wg-level-meta"><span>Mean ${fmt(cfg.mean)}</span><span>SD ${fmt(cfg.sd,3)}</span><span>${pts.length} điểm</span>${prevBtn}</span></h3>`;
     if(!pts.length)return `<div class="panel">${title}${emptyState('Chưa có dữ liệu','LOT đang dùng chưa có điểm QC. Bạn có thể chọn LOT cũ hoặc nhập điểm mới.',btn('Nhập QC',`entrySel={testId:'${t.id}',level:${l.level}};entryStart=null;entryEnd=null;go('entry')`,'teal'))}</div>`;
     const{zs}=v.single,rows=WestgardViewModel.buildPointRows({points:pts,verdicts:wg.byPoint,zs,mean:cfg.mean,sd:cfg.sd}),key=`current:${t.id}|${l.level}|${l.lot||''}`,view=wgRowsWindow(rows,key),rowsHtml=wgPointRowsHtml(view.rows);
     return `<div class="panel">${title}${wgRowsControl(view,key)}<table class="wg-table"><thead><tr><th>#</th><th>Ngày</th><th class="num">Giá trị</th><th class="num">Z</th><th>Kết luận</th><th>Luật / bằng chứng</th><th>Loại sai số</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`;}).join('');
-  const ruleToggles=WG_RULES.map(r=>`<span class="wg-rule-item"><label><input type="checkbox" ${wgOn(r)?'checked':''} ${!canWrite()?'disabled':''} onchange="wgSet('${r}',this.checked)"> <span class="pill">${r}</span></label></span>`).join('')+(canWrite()?`<div class="wg-rule-reset"><button class="btn ghost sm" onclick="wgReset()">Khôi phục mặc định</button></div>`:'');
-  const ruleGuide=`<details class="wg-guide"><summary>Hướng dẫn nhanh luật Westgard</summary><div class="alert info" style="margin:10px 12px 18px">Ký hiệu ${icoRefArrow()} trong bảng là điểm lịch sử cấu thành quy tắc. Điểm này chỉ là bằng chứng; trạng thái cảnh báo/loại được gắn cho lần chạy phát hiện hiện tại, không đổi hồi tố kết luận cũ.</div><div class="chart-scroll"><table><thead><tr><th>Luật</th><th>Điều kiện</th><th>Kết luận</th><th>Gợi ý xử lý</th></tr></thead><tbody>
+  const ruleToggles=WG_RULES.map(r=>`<span class="wg-rule-item"><label><input type="checkbox" ${wgOn(r)?'checked':''} ${!canWrite()?'disabled':''} onchange="wgSet('${r}',this.checked)"> <span class="pill">${r}</span></label></span>`).join('')+(canWrite()?`<div class="wg-rule-reset">${btn('Khôi phục mặc định','wgReset()','ghost sm')}</div>`:'');
+  const ruleGuide=`<details class="wg-guide"><summary>Hướng dẫn nhanh luật Westgard</summary><div class="alert info" style="margin:10px 12px 18px">Ký hiệu ${icoRefArrow()} trong bảng là điểm lịch sử cấu thành quy tắc. Điểm này chỉ là bằng chứng; trạng thái cảnh báo/loại được gắn cho lần chạy phát hiện hiện tại, không đổi hồi tố kết luận cũ.</div><div class="chart-scroll" tabindex="0"><table><thead><tr><th>Luật</th><th>Điều kiện</th><th>Kết luận</th><th>Gợi ý xử lý</th></tr></thead><tbody>
     <tr><td>1-2s</td><td>1 điểm QC vượt ±2SD</td><td><span class="warn">Cảnh báo</span></td><td>Theo dõi điểm kế tiếp, chưa loại bỏ nếu không kèm luật khác.</td></tr>
     <tr><td>1-3s</td><td>1 điểm QC vượt ±3SD</td><td><span class="rej">Loại bỏ</span></td><td>Kiểm tra sai số ngẫu nhiên: thao tác, bọt khí, pipet, QC pha/bảo quản.</td></tr>
     <tr><td>2-2s</td><td>2 điểm liên tiếp hoặc 2 mức cùng lần chạy, cùng phía vượt ±2SD</td><td><span class="rej">Loại bỏ</span></td><td>Nghi sai số hệ thống: hiệu chuẩn, lô QC/hóa chất, nhiệt độ, máy.</td></tr>
@@ -822,9 +826,9 @@ function pageWestgard(){
     <tr><td>12x</td><td>12 điểm liên tiếp nằm cùng một phía so với Mean</td><td><span class="rej">Loại bỏ</span></td><td>Biến thể ít nhạy hơn 8x/10x, dùng để theo dõi bias dài hơn.</td></tr>
     <tr><td>7T</td><td>7 điểm tăng dần hoặc giảm dần liên tiếp</td><td><span class="warn">Cảnh báo</span></td><td>Theo dõi xu hướng, kiểm tra bảo quản QC, thuốc thử, môi trường.</td></tr>
   </tbody></table></div></details>`;
-  const exportActions=wgChartMode==='lj'?'<div><label>&nbsp;</label><div class="wg-export-actions"><button class="btn ghost wg-excel-btn" onclick="exportWestgardXLSX()" title="Xuất Excel biểu đồ Levey-Jennings, các vi phạm và điểm bằng chứng đang xem">'+icoDownload()+'Xuất Excel</button><button class="btn wg-print-btn" onclick="printWestgard()" title="Tạo bản in PDF/HTML biểu đồ Levey-Jennings và các vi phạm đang xem">'+icoPrint()+'In PDF</button></div></div>':'';
+  const exportActions=wgChartMode==='lj'?'<div><label>&nbsp;</label><div class="wg-export-actions">'+btn(icoDownload()+'Xuất Excel','exportWestgardXLSX()','teal wg-excel-btn','Xuất Excel biểu đồ Levey-Jennings, các vi phạm và điểm bằng chứng đang xem')+btn(icoPrint()+'In PDF','printWestgard()','teal wg-print-btn','Tạo bản in PDF/HTML biểu đồ Levey-Jennings và các vi phạm đang xem')+'</div></div>':'';
   return headOnly('Phân tích Westgard','Đối chiếu luật theo mức QC, lô và lần chạy')+
-   `<div class="panel"><h3>Thiết lập phân tích</h3>${wgViewModeTabs(archivedGroups)}<div class="wg-test-picker${exportActions?' wg-test-picker-3':''}"><div><label>Tìm nhanh</label><input id="wgTestSearch" type="search" placeholder="Tên xét nghiệm, LOT hoặc máy..." value="${escAttr(wgTestQ)}" oninput="wgFilterTests(this.value)"></div><div><label>Chọn xét nghiệm <span id="wgTestCount" class="hint">(${matched.length}/${tests.length})</span></label><select id="wgTestSelect" ${matched.length?'':'disabled'} onchange="if(this.value){selTest=this.value;rerender()}">${opts}</select></div>${exportActions}</div>
+   `<div class="panel"><h3 role="heading" aria-level="2">Thiết lập phân tích</h3>${wgViewModeTabs(archivedGroups)}<div class="wg-test-picker${exportActions?' wg-test-picker-3':''}"><div><label>Tìm nhanh</label><input id="wgTestSearch" type="search" placeholder="Tên xét nghiệm, LOT hoặc máy..." value="${escAttr(wgTestQ)}" oninput="wgFilterTests(this.value)"></div><div><label>Chọn xét nghiệm <span id="wgTestCount" class="hint">(${matched.length}/${tests.length})</span></label><select id="wgTestSelect" aria-label="Chọn xét nghiệm" ${matched.length?'':'disabled'} onchange="if(this.value){selTest=this.value;rerender()}">${opts}</select></div>${exportActions}</div>
      <div class="wg-rules"><b style="font-size:12px">Cấu hình chung của luật</b><div style="margin-top:6px">${ruleToggles}</div></div>
      ${ruleGuide}${wgChartModeTabs()}</div>${wgChartMode==='cusum'?pageWestgardCusum(t):multiChart+blocks}`;
 }
