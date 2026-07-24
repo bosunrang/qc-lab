@@ -1,8 +1,8 @@
 window.QCLAB_APP = {
   name: 'QC Lab',
-  version: '2.4.4',
+  version: '2.4.5',
   releaseDate: '2026-07-24',
-  build: 'electron-printtopdf'
+  build: 'electron-pdf-only'
 };
 
 // Cấu hình đám mây khi deploy (tùy chọn).
