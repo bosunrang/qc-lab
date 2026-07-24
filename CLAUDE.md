@@ -225,9 +225,11 @@ the Google Fonts link, offline labs must print with correct metrics.
   `sigmaData[testId][].lv[level]`, while stopped/planned groups retain history.
 - `analyte-catalog.js` — `TEA_ANALYTE_CATALOG`, a frozen built-in measurand
   registry (one international name + abbreviation per analyte, with CLIA/Ricos
-  TEa values). No source-documentation file exists for these values in the
-  repo — treat any edit to a `clia`/`ricos`/`cliaAbsolute` figure as a data
-  change needing its own justification, not a routine code edit.
+  TEa values). Provenance lives in `docs/tea-sources.md` (CLIA 2024 final rule
+  + EFLM BV database references, per-measurand trace table, review log) —
+  treat any edit to a `clia`/`ricos`/`cliaAbsolute` figure as a data change
+  needing its own justification recorded there, not a routine code edit.
+  `tests/tea-sources.test.js` fails if any measurand loses its source row.
 - `qc-domain.js` — Westgard rule wiring, error-type classification (thin
   re-exports of the pure helpers in `core.js`), point derivation helpers
   (`pointsOf`, `derived()`, lot/panel lookups) built on top of `state`, and
