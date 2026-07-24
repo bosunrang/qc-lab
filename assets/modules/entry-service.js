@@ -152,6 +152,8 @@
       id,
       date:today,
       createdAt:nowIso,
+      createdByUserId:staff.operatorId||'',
+      createdByUsername:staff.operatorUsername||'',
       testId:tid,
       level:p.level,
       lot:p.lot||'',

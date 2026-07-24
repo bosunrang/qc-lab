@@ -70,6 +70,15 @@ function fixture(actionOverrides = {}) {
 }
 
 {
+  const action=fixture().actions[0];
+  action.createdByUserId='u1';action.createdByUsername='ktv-a';
+  assert.equal(ctx.actionCanApprove(action,{id:'u1',username:'admin',name:'Quản trị'}),false,'creator cannot self-approve');
+  assert.equal(ctx.actionCanApprove(action,{id:'u2',username:'admin',name:'Quản trị'}),true,'independent admin can approve');
+  delete action.createdByUserId;delete action.createdByUsername;action.by='Quản trị';
+  assert.equal(ctx.actionCanApprove(action,{id:'legacy-admin',username:'admin',name:'Quản trị'}),false,'legacy actions fall back to performer name');
+}
+
+{
   ctx.__setState(fixture({ approvalStatus: 'approved' }));
   const wf = ctx.actionWorkflowStatus(ctx.__getState().actions[0]);
   assert.equal(wf.complete, true);

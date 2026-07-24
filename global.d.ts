@@ -42,7 +42,7 @@ declare var EntryService: any, PeriodService: any, ChartViewModel: any,
 declare var nextRunId: any, cleanEntryRunId: any;
 
 // action-workflow-service.js does Object.assign(root, root.ActionWorkflowService)
-declare var actionApprovalStatus: any, actionApprovalLabel: any, actionRecorded: any,
+declare var actionApprovalStatus: any, actionApprovalLabel: any, actionRecorded: any, actionCanApprove: any,
   actionPoint: any, actionNeedsRerun: any, actionRerunStatus: any, actionWorkflowStatus: any,
   pointActions: any, pointRealActions: any, pointWorkflowComplete: any, pointWorkflowSummary: any;
 

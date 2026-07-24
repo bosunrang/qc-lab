@@ -17,6 +17,18 @@ jobs:
       # node_modules.
       - run: node --test tests/*.test.js
 
+  release-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run verify-release
+
   # Separate from the job above on purpose: visual-check/a11y-audit need
   # Playwright + a real Chromium download, which would slow down and add a
   # dependency-install step to the fast, install-free job every other test

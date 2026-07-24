@@ -59,6 +59,7 @@ const MODALS = [
   // confirmDialog trả Promise chờ người dùng bấm — bọc thân hàm {} để evaluate
   // không await promise đó (treo script); dialog vẫn render đồng bộ trong thân hàm.
   { page: 'dash', label: 'shared:confirm-dialog', open: () => { confirmDialog({kicker:'Kiểm tra',title:'Xác nhận thao tác',message:'Nội dung xác nhận mẫu để audit accessibility.',detail:'Chi tiết bổ sung cho ngữ cảnh.'}); } },
+  { page: 'dash', label: 'shared:reauth-dialog', open: () => { reauthenticateCurrentUser({title:'Xác thực kiểm thử',message:'Nhập lại mật khẩu để kiểm tra accessibility.'}); } },
 ];
 
 async function runAxe(page) {

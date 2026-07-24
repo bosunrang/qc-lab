@@ -18,7 +18,19 @@ process.stdout.write(`Functional tests: ${tests.length-failures.length}/${tests.
 if (failures.length) {
   process.stderr.write(`Failed tests: ${failures.join(', ')}\n`);process.exitCode=1;
 } else {
-  const gate = spawnSync(process.execPath, [path.join(__dirname, 'performance-regression.js')], { cwd:root,encoding:'utf8' });
-  process.stdout.write(gate.stdout||'');process.stderr.write(gate.stderr||'');
-  if (gate.status !== 0)process.exitCode=gate.status||1;
+  const npm=process.platform==='win32'?'npm.cmd':'npm';
+  const bundledNpm=process.env.npm_execpath||path.join(path.dirname(process.execPath),'node_modules','npm','bin','npm-cli.js');
+  const audit=fs.existsSync(bundledNpm)
+    ?spawnSync(process.execPath,[bundledNpm,'audit','--audit-level=high'],{cwd:root,encoding:'utf8'})
+    :spawnSync(npm,['audit','--audit-level=high'],{cwd:root,encoding:'utf8'});
+  process.stdout.write(audit.stdout||'');process.stderr.write(audit.stderr||'');
+  if(audit.status!==0){
+    if(audit.error)process.stderr.write(String(audit.error)+'\n');
+    process.stderr.write('Dependency audit failed; performance gate skipped.\n');
+    process.exitCode=audit.status||1;
+  }else{
+    const gate = spawnSync(process.execPath, [path.join(__dirname, 'performance-regression.js')], { cwd:root,encoding:'utf8' });
+    process.stdout.write(gate.stdout||'');process.stderr.write(gate.stderr||'');
+    if (gate.status !== 0)process.exitCode=gate.status||1;
+  }
 }

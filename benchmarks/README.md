@@ -56,10 +56,11 @@ Run the complete pre-release check with:
 node benchmarks/verify-release.js
 ```
 
-This runs every `tests/*.test.js` file first. Only when all functional tests pass
-does it run `performance-regression.js`. A failed functional test, exceeded budget,
-lost display signal, or non-zero child process exits with a non-zero status suitable
-for a CI job or deployment script.
+This runs every `tests/*.test.js` file first, then `npm audit --audit-level=high`.
+Only when both checks pass does it run `performance-regression.js`. A failed
+functional test, high/critical dependency advisory, exceeded budget, lost display
+signal, or non-zero child process exits with a non-zero status suitable for a CI job
+or deployment script.
 
 Budgets live in `performance-budget.json`. The gate uses a deterministic 20-test,
 3-level, 365-day state (21,900 QC points) and checks:

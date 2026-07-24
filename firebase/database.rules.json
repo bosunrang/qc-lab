@@ -1,0 +1,27 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "qclab-acl": {
+      "$labCode": {
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": false
+        }
+      }
+    },
+    "qclab-shared": {
+      "$labCode": {
+        ".read": "auth != null && root.child('qclab-acl').child($labCode).child(auth.uid).exists()",
+        ".write": "auth != null && root.child('qclab-acl').child($labCode).child(auth.uid).exists()",
+        ".validate": "newData.hasChildren(['_ts'])",
+        "_ts": {
+          ".validate": "newData.isNumber()"
+        },
+        "_client": {
+          ".validate": "newData.isString()"
+        }
+      }
+    }
+  }
+}

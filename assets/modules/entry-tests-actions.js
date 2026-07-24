@@ -92,7 +92,7 @@ async function saveTargetMatrix(){
     const t=state.tests.find(x=>x.id===pick.testId),same=t&&t.levels.find(x=>+x.level===+pick.lot.level);
     return same&&((same.qcLotId&&same.qcLotId!==pick.lot.id)||(!same.qcLotId&&same.lot&&same.lot!==pick.lot.lotNo));
   });
-  if(!overwrites.length){commitTargetMatrix(picked,group,panel,'switch',[]);return;}
+  if(!overwrites.length){if(!await reauthenticateCurrentUser({title:'Xác thực Mean/SD',message:'Nhập lại mật khẩu trước khi lưu Mean/SD cho lô QC.'}))return;commitTargetMatrix(picked,group,panel,'switch',[]);return;}
   targetSwitchCtx={panel,group,picked,overwrites};
   openTargetSwitchModal();
 }
@@ -109,8 +109,9 @@ function openTargetSwitchModal(){
     <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn('Dự kiến',"resolveTargetSwitch('planned')",'ghost')}${btn('Chuyển qua nhóm lô này',"resolveTargetSwitch('switch')",'teal')}</div>
   </div>`);
 }
-function resolveTargetSwitch(mode){
+async function resolveTargetSwitch(mode){
   const ctx=targetSwitchCtx;closeModal();targetSwitchCtx=null;if(!ctx)return;
+  if(!await reauthenticateCurrentUser({title:'Xác thực chuyển lô',message:'Nhập lại mật khẩu trước khi lưu hoặc áp dụng Mean/SD cho nhóm lô mới.'}))return;
   commitTargetMatrix(ctx.picked,ctx.group,ctx.panel,mode,ctx.overwrites);
 }
 function commitTargetMatrix(picked,group,panel,mode,overwrites){
@@ -261,6 +262,7 @@ async function saveLotTransitionV2(id){
   const old=state.lotTransitions.find(x=>x.id===id),nowFinal=['accepted','rejected'].includes(status),finalChanged=nowFinal&&(!old||old.status!==status);
   if(old&&transitionSwitchesLot(old)&&status!=='accepted'){await infoDialog('Hồ sơ đã chấp nhận lô mới và đã áp dụng vào nhóm lô/Mean-SD, không thể đổi ngược trạng thái.');return;}
   const data={panelId,fromLotId,toLotId,startDate:startDate||isoToday(),status,criteria:old&&old.criteria||'',conclusion:old&&old.conclusion||'',approvedBy:finalChanged?userName():(old&&old.approvedBy||''),approvedAt:finalChanged?new Date().toISOString():(old&&old.approvedAt||''),note:old&&old.note||''};
+  if(finalChanged&&!await reauthenticateCurrentUser({title:'Xác thực kết luận chuyển lô',message:'Nhập lại mật khẩu trước khi chấp nhận hoặc từ chối lô QC mới.'}))return;
   const targetCheck=inspectAcceptedLotTransition({panelId,fromLotId,toLotId,status:'accepted'});
   if(targetCheck.valid&&targetCheck.rows.length){
     const picks=await readLotTransitionTargetPicks(targetCheck.rows);if(picks===null)return;

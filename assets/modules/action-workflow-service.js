@@ -10,6 +10,14 @@
   function actionRecorded(a){
     return !!(a&&!a.autoCreated&&String(a.action||'').trim().length>=5&&String(a.by||'').trim());
   }
+  function identityText(value){return String(value||'').trim().toLocaleLowerCase('vi');}
+  function actionCanApprove(a,user){
+    if(!a||!user)return false;
+    if(a.createdByUserId&&user.id)return String(a.createdByUserId)!==String(user.id);
+    if(a.createdByUsername&&user.username)return identityText(a.createdByUsername)!==identityText(user.username);
+    const creator=identityText(a.by),identities=[user.name,user.username].map(identityText).filter(Boolean);
+    return !creator||!identities.includes(creator);
+  }
   function actionPoint(a){
     return a&&a.pointId?((state.data&&state.data[a.testId])||[]).find(p=>p.id===a.pointId)||null:null;
   }
@@ -58,6 +66,6 @@
     return actionWorkflowStatus(real[real.length-1]);
   }
 
-  root.ActionWorkflowService={actionApprovalStatus,actionApprovalLabel,actionRecorded,actionPoint,actionNeedsRerun,actionRerunStatus,actionWorkflowStatus,pointActions,pointRealActions,pointWorkflowComplete,pointWorkflowSummary};
+  root.ActionWorkflowService={actionApprovalStatus,actionApprovalLabel,actionRecorded,actionCanApprove,actionPoint,actionNeedsRerun,actionRerunStatus,actionWorkflowStatus,pointActions,pointRealActions,pointWorkflowComplete,pointWorkflowSummary};
   Object.assign(root,root.ActionWorkflowService);
 })(typeof globalThis!=='undefined'?globalThis:this);

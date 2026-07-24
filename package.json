@@ -1,6 +1,6 @@
 {
   "name": "qc-lab",
-  "version": "2.4.5",
+  "version": "2.5.0",
   "description": "QC Lab - Nội kiểm chất lượng xét nghiệm (IQC) cho phòng xét nghiệm lâm sàng",
   "author": "QC Lab",
   "license": "UNLICENSED",
@@ -13,14 +13,15 @@
     "visual-check": "node scripts/visual-check.js",
     "a11y-audit": "node scripts/a11y-audit.js",
     "print-check": "node scripts/print-check.js",
+    "verify-release": "node benchmarks/verify-release.js",
     "patch-build": "node scripts/patch-7za-symlink.js",
     "dist": "node scripts/patch-7za-symlink.js && electron-builder --win nsis",
     "dist:publish": "node scripts/patch-7za-symlink.js && electron-builder --win nsis --publish always"
   },
   "devDependencies": {
     "axe-core": "^4.12.1",
-    "electron": "^31.7.7",
-    "electron-builder": "^24.13.3",
+    "electron": "^43.2.0",
+    "electron-builder": "^26.15.3",
     "playwright": "^1.61.1",
     "typescript": "^7.0.2"
   },

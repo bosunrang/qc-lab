@@ -224,7 +224,7 @@ the Google Fonts link, offline labs must print with correct metrics.
 
 - `core.js` — pure domain math, UMD (see above). Also
   `validateStateInvariants()`, run at every load/merge/import gateway
-  (`state-storage.js`, `firebase-sync.js`, `data-io.js`), and
+  (`state-storage.js`, `firebase-sync.js`, `backup-service.js`), and
   `STATE_SCHEMA_VERSION` (currently 4). Holds the pure error-classification
   helpers too (`errorType`, `primaryErrorRule`, `fixHint`,
   `WG_RULE_DESCRIPTIONS`); `qc-domain.js` re-exports them under the same global
@@ -347,9 +347,9 @@ the Google Fonts link, offline labs must print with correct metrics.
   Page-level UI state lives in the `*-ui-state.js` modules above. `sigma.js`
   renders the Six Sigma page (see "Confirmed business-logic decisions" below
   for how its numbers relate to reports.js).
-- `range.js`, `settings.js`, `data-io.js`, `reports.js`, `users-auth.js`,
+- `range.js`, `settings.js`, `backup-service.js`, `data-io.js`, `reports.js`, `users-auth.js`,
   `reagent.js` — feature-specific logic (target-range calc, settings page,
-  backup import/export + XLSX generation, printed reports, auth/user
+  backup/restore service + XLSX generation, printed reports, auth/user
   management, reagent lot comparison stats). `users-auth.js` hashes passwords
   with PBKDF2-SHA256 at `PASS_ITERATIONS=600000` (OWASP minimum); the stored
   `pbkdf2$<iterations>$<salt>$<hash>` string carries its own iteration count,

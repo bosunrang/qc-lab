@@ -1,8 +1,8 @@
 window.QCLAB_APP = {
   name: 'QC Lab',
-  version: '2.4.5',
+  version: '2.5.0',
   releaseDate: '2026-07-24',
-  build: 'electron-pdf-only'
+  build: 'validated-operations'
 };
 
 // Cấu hình đám mây khi deploy (tùy chọn).

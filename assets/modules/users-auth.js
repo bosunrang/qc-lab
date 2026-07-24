@@ -142,6 +142,26 @@ async function verifyPass(p,stored){
   if(String(stored||'').startsWith('pbkdf2$')){const [,it,saltHex,want]=stored.split('$'),key=await crypto.subtle.importKey('raw',new TextEncoder().encode(p),'PBKDF2',false,['deriveBits']),bits=await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:hexBytes(saltHex),iterations:+it},key,256);return bytesHex(new Uint8Array(bits))===want;}
   return await legacyHashPass(p)===stored;
 }
+async function confirmReauthentication(){
+  const input=document.getElementById('reauthPassword'),err=document.getElementById('reauthError');
+  if(!currentUser||!input){closeDialogOverlay(false);return;}
+  let ok=false;try{ok=await verifyPass(input.value,currentUser.passHash);}catch(e){}
+  input.value='';
+  if(!ok){if(err)err.hidden=false;input.focus();return;}
+  closeDialogOverlay(true);
+}
+function reauthenticateCurrentUser({title='Xác thực lại',message='Nhập lại mật khẩu để tiếp tục.'}={}){
+  if(!currentUser)return Promise.resolve(false);
+  return new Promise(resolve=>openDialogOverlay(`<div class="modal confirm-modal">
+    <div class="confirm-modal-h"><div class="confirm-modal-kicker">Thao tác được kiểm soát</div>${modalCloseButton('closeDialogOverlay(false)')}</div>
+    <h3 class="confirm-modal-title">${esc(title)}</h3>
+    <div class="confirm-modal-body"><div class="confirm-modal-icon info" aria-hidden="true">✓</div><div class="confirm-modal-text"><b>${esc(message)}</b><p>Tài khoản: ${esc(currentUser.name||currentUser.username||'')}</p></div></div>
+    <label for="reauthPassword">Mật khẩu hiện tại</label>
+    <input id="reauthPassword" type="password" autocomplete="current-password" autofocus onkeydown="if(event.key==='Enter'){event.preventDefault();confirmReauthentication()}">
+    <div id="reauthError" class="auth-err" hidden>Mật khẩu không đúng.</div>
+    <div class="confirm-modal-actions">${btn('Hủy','closeDialogOverlay(false)','ghost')}${btn('Xác thực','confirmReauthentication()','teal')}</div>
+  </div>`,resolve));
+}
 async function ensureAdmin(){if(!state.users||!state.users.length){state.users=[{id:uid(),username:'admin',name:'Quản trị viên',role:'admin',passHash:await legacyHashPass('admin'),active:true,mustChangePassword:true}];save({cloud:false,clearDerived:false});}}
 function blankAppState(users){
   return{lab:{name:'',dept:'',address:'',brandTitle:'QC Lab',brandSub:'Nội kiểm xét nghiệm',logoText:'QC',logoData:''},tests:[],machines:[],instruments:[],assayGroups:[],qcPanels:[],lotTransitions:[],lotGroups:[],qcLots:[],data:{},actions:[],activity:[],users:Array.isArray(users)?users:[],reagentTests:[],reagentOperators:[],reagentSampleTypes:['Mẫu bệnh nhân','Mẫu nội kiểm (IQC)','Mẫu ngoại kiểm (EQA)'],sigmaData:{},periodLocks:[],teaRefs:[],teaRegistryVersion:TEA_REFERENCE_SCHEMA_VERSION,westgardRules:{...WG_DEFAULT},westgardProfileVersion:2,configMigrationVersion:1,schemaVersion:STATE_SCHEMA_VERSION};

@@ -32,16 +32,16 @@ async function applyNewRange(tid,level){
   </div>`);
   setTimeout(()=>{const e=document.getElementById('rangeReasonInput');if(e)e.focus();},50);
 }
-function confirmApplyNewRange(tid,level){
+async function confirmApplyNewRange(tid,level){
   const {t,l,c,days}=rangeCandidate(tid,level);
   const input=document.getElementById('rangeReasonInput');
   const reason=QCCore.cleanText(input?input.value:'',1000).trim();
   if(reason.length<10){const err=document.getElementById('rangeReasonErr');if(err)err.style.display='';return;}
-  closeModal();
+  closeModal();if(!await reauthenticateCurrentUser({title:'Xác thực thay đổi dải QC',message:'Nhập lại mật khẩu trước khi áp dụng Mean/SD của phòng xét nghiệm.'}))return;
   const oldM=l.mean,oldSd=l.sd;l.mean=c.m;l.sd=c.sd;l.cvRef=c.cv;l.applied='lab';l.rangeDate=isoToday();
   l.meanSdHistory=Array.isArray(l.meanSdHistory)?l.meanSdHistory:[];
   l.meanSdHistory.push({id:uid(),qcLotId:l.qcLotId||'',lot:l.lot||'',mean:c.m,sd:c.sd,low:c.m-2*c.sd,high:c.m+2*c.sd,effectiveFrom:isoToday(),effectiveTo:l.exp||'',source:'lab',note:reason});
-  state.actions.push({id:uid(),date:isoToday(),createdAt:new Date().toISOString(),testId:tid,level,lot:l.lot||'',rule:'Thiết lập dải QC mới',errorType:'Quản lý dải kiểm soát',action:`Áp dụng dải PXN: Mean ${fmt(oldM)}→${fmt(c.m)}, SD ${fmt(oldSd,3)}→${fmt(c.sd,3)}, n=${c.n}, ${days} ngày. Phê duyệt: ${reason}`,by:currentUser?(currentUser.name||currentUser.username):'',approvalStatus:'pending',approvedAt:'',approvedBy:'',approvalNote:''});
+  state.actions.push({id:uid(),date:isoToday(),createdAt:new Date().toISOString(),createdByUserId:currentUser&&currentUser.id||'',createdByUsername:currentUser&&currentUser.username||'',testId:tid,level,lot:l.lot||'',rule:'Thiết lập dải QC mới',errorType:'Quản lý dải kiểm soát',action:`Áp dụng dải PXN: Mean ${fmt(oldM)}→${fmt(c.m)}, SD ${fmt(oldSd,3)}→${fmt(c.sd,3)}, n=${c.n}, ${days} ngày. Phê duyệt: ${reason}`,by:currentUser?(currentUser.name||currentUser.username):'',approvalStatus:'pending',approvedAt:'',approvedBy:'',approvalNote:''});
   logAct('Áp dụng dải QC',`M${level}: Mean ${fmt(oldM)}→${fmt(c.m)}, SD ${fmt(oldSd,3)}→${fmt(c.sd,3)}`,t?t.name:'');
   save({testId:tid});rerender();
 }
@@ -58,13 +58,13 @@ function revertRange(tid,level){
   </div>`);
   setTimeout(()=>{const e=document.getElementById('rangeReasonInput');if(e)e.focus();},50);
 }
-function confirmRevertRange(tid,level){
+async function confirmRevertRange(tid,level){
   const t=state.tests.find(x=>x.id===tid);const l=lvlCfg(t,level);
   const input=document.getElementById('rangeReasonInput');
   const reason=QCCore.cleanText(input?input.value:'',1000).trim();
   if(reason.length<5){const err=document.getElementById('rangeReasonErr');if(err)err.style.display='';return;}
-  closeModal();
-  const oldM=l.mean,oldSd=l.sd;l.mean=l.mfgMean;l.sd=l.mfgSd;l.applied='mfg';l.meanSdHistory=Array.isArray(l.meanSdHistory)?l.meanSdHistory:[];l.meanSdHistory.push({id:uid(),qcLotId:l.qcLotId||'',lot:l.lot||'',mean:l.mean,sd:l.sd,low:l.low,high:l.high,effectiveFrom:isoToday(),effectiveTo:l.exp||'',source:'mfg',note:reason});state.actions.push({id:uid(),date:isoToday(),createdAt:new Date().toISOString(),testId:tid,level,lot:l.lot||'',rule:'Hoàn dải QC',errorType:'Quản lý dải kiểm soát',action:`Hoàn về dải NSX: Mean ${fmt(oldM)}→${fmt(l.mean)}, SD ${fmt(oldSd,3)}→${fmt(l.sd,3)}. Lý do: ${reason}`,by:currentUser?(currentUser.name||currentUser.username):'',approvalStatus:'pending',approvedAt:'',approvedBy:'',approvalNote:''});logAct('Hoàn dải QC',`M${level}: Mean ${fmt(oldM)}→${fmt(l.mean)}, SD ${fmt(oldSd,3)}→${fmt(l.sd,3)} · ${reason}`,t?t.name:'');save({testId:tid});rerender();
+  closeModal();if(!await reauthenticateCurrentUser({title:'Xác thực hoàn dải QC',message:'Nhập lại mật khẩu trước khi hoàn về Mean/SD nhà sản xuất.'}))return;
+  const oldM=l.mean,oldSd=l.sd;l.mean=l.mfgMean;l.sd=l.mfgSd;l.applied='mfg';l.meanSdHistory=Array.isArray(l.meanSdHistory)?l.meanSdHistory:[];l.meanSdHistory.push({id:uid(),qcLotId:l.qcLotId||'',lot:l.lot||'',mean:l.mean,sd:l.sd,low:l.low,high:l.high,effectiveFrom:isoToday(),effectiveTo:l.exp||'',source:'mfg',note:reason});state.actions.push({id:uid(),date:isoToday(),createdAt:new Date().toISOString(),createdByUserId:currentUser&&currentUser.id||'',createdByUsername:currentUser&&currentUser.username||'',testId:tid,level,lot:l.lot||'',rule:'Hoàn dải QC',errorType:'Quản lý dải kiểm soát',action:`Hoàn về dải NSX: Mean ${fmt(oldM)}→${fmt(l.mean)}, SD ${fmt(oldSd,3)}→${fmt(l.sd,3)}. Lý do: ${reason}`,by:currentUser?(currentUser.name||currentUser.username):'',approvalStatus:'pending',approvedAt:'',approvedBy:'',approvalNote:''});logAct('Hoàn dải QC',`M${level}: Mean ${fmt(oldM)}→${fmt(l.mean)}, SD ${fmt(oldSd,3)}→${fmt(l.sd,3)} · ${reason}`,t?t.name:'');save({testId:tid});rerender();
 }
 
 
