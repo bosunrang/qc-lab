@@ -1,8 +1,8 @@
-﻿window.QCLAB_APP = {
+window.QCLAB_APP = {
   name: 'QC Lab',
-  version: '2.4.1',
+  version: '2.4.2',
   releaseDate: '2026-07-24',
-  build: 'ui-route-refactor'
+  build: 'electron-print-fix'
 };
 
 // Cấu hình đám mây khi deploy (tùy chọn).

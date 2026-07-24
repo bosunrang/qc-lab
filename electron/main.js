@@ -30,7 +30,14 @@ function applyChrome(win) {
   win.once('ready-to-show', () => { win.show(); win.focus(); win.webContents.focus(); });
   // Liên kết ngoài (http/https) mở bằng trình duyệt OS; không bao giờ đẻ cửa sổ Electron mới.
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^https?:/i.test(url)) shell.openExternal(url);
+    if (/^https?:/i.test(url)) { shell.openExternal(url); return { action: 'deny' }; }
+    // Cửa sổ in báo cáo: openPrint() trong reports.js gọi window.open('','_blank')
+    // rồi document.write HTML vào — trước 2026-07-24 handler deny tất cả nên in
+    // PDF trên bản desktop luôn báo "Trình duyệt chặn cửa sổ". Chỉ mở đúng
+    // about:blank; nội dung cửa sổ do chính app sinh ra, mọi URL khác vẫn deny.
+    if (url === 'about:blank' || url === '') {
+      return { action: 'allow', overrideBrowserWindowOptions: { autoHideMenuBar: true, width: 1180, height: 800, backgroundColor: '#eef2f5' } };
+    }
     return { action: 'deny' };
   });
   // Không còn menu ứng dụng nên phím tắt DevTools mặc định (Ctrl+Shift+I, gắn qua
