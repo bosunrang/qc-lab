@@ -3,6 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- CSP: han che nguon tai. script-src 'unsafe-inline' vi app dung inline event handler
+     va vai khoi <script> noi tuyen trong file nay; CDN duy nhat duoc phep la gstatic
+     (Firebase, kem SRI ben duoi). connect-src mo dung cac endpoint Firebase Auth/RTDB;
+     font/anh/worker gioi han ve chinh app. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self';script-src 'self' 'unsafe-inline' https://www.gstatic.com;style-src 'self' 'unsafe-inline';img-src 'self' data: blob:;font-src 'self';connect-src 'self' https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasedatabase.app wss://*.firebasedatabase.app https://identitytoolkit.googleapis.com https://securetoken.googleapis.com;worker-src 'self';object-src 'none';base-uri 'self';form-action 'self'">
 <title>QC Lab - Nội kiểm chất lượng xét nghiệm</title>
 <link rel="stylesheet" href="assets/tokens.css?v=ui-review-font-self-host-20260718-1">
 <link rel="stylesheet" href="assets/app.css?v=dead-code-cleanup-20260721-1">
@@ -18,9 +23,9 @@
 <link rel="stylesheet" href="assets/professional-reports.css?v=period-lock-ui-20260722-1">
 <link rel="stylesheet" href="assets/professional-users.css?v=user-cleanup-20260719-1">
 <link rel="stylesheet" href="assets/professional-audit.css?v=split-20260711-3">
-<script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-<script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js" integrity="sha384-sEVIly94UBRLKWdkYoPpSG7GD/e79YHMrxVyZaOk712Ga7+EAw6w1EFi+xBzBdd+" crossorigin="anonymous"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js" integrity="sha384-EkqK+ezBWJuvO3hfrSx2iVqr3YQbhmnzn8kPhOpBZ+0GMVU5oGSgptwIu8D84HjE" crossorigin="anonymous"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js" integrity="sha384-1/m+A1jVWbD3yiK3/vtFvm1+LjK1WLpSoDY+Kaxppwn/yP9BVSgdHTNQVOjrzUO5" crossorigin="anonymous"></script>
 </head>
 <body>
 <div class="app" id="appShell">
@@ -55,7 +60,7 @@ if (window.qcDialog) {
 </script>
 
 <script defer src="assets/core.js?v=typecheck-jsdoc-20260722-1"></script>
-<script defer src="assets/modules/app-meta.js?v=v2.4.0-20260723-1"></script>
+<script defer src="assets/modules/app-meta.js?v=v2.4.1-20260724-1"></script>
 <script defer src="assets/modules/analyte-catalog.js?v=dead-code-cleanup-20260721-1"></script>
 <script defer src="assets/modules/state.js?v=typecheck-jsdoc-20260722-1"></script>
 <script defer src="assets/modules/qc-domain.js?v=typecheck-jsdoc-20260722-1"></script>
@@ -76,18 +81,21 @@ if (window.qcDialog) {
 <script defer src="assets/modules/action-workflow-service.js?v=rerun-cross-day-20260714-2"></script>
 <script defer src="assets/modules/draw.js?v=hidpi-3x-20260721-1"></script>
 <script defer src="assets/modules/chart-view-model.js?v=typecheck-jsdoc-20260722-1"></script>
-<script defer src="assets/modules/router-render.js?v=btn-consolidate-20260723-1"></script>
+<script defer src="assets/modules/router-render.js?v=ui-route-split-20260724-1"></script>
+<script defer src="assets/modules/dashboard-routes.js?v=ui-route-split-20260724-1"></script>
+<script defer src="assets/modules/entry-routes.js?v=ui-route-split-20260724-1"></script>
+<script defer src="assets/modules/westgard-routes.js?v=ui-route-split-20260724-1"></script>
 <script defer src="assets/modules/audit.js?v=typecheck-jsdoc-20260722-1"></script>
 <script defer src="assets/modules/sigma.js?v=btn-consolidate-20260723-1"></script>
-<script defer src="assets/modules/actions-routes.js?v=btn-consolidate-20260723-1"></script>
+<script defer src="assets/modules/actions-routes.js?v=ui-refactor-20260724-1"></script>
 <script defer src="assets/modules/manage-routes.js?v=btn-consolidate-20260723-1"></script>
 <script defer src="assets/modules/after-render.js?v=render-batch-20260714-1"></script>
 <script defer src="assets/modules/entry-tests-actions.js?v=btn-consolidate-20260723-1"></script>
-<script defer src="assets/modules/modals.js?v=btn-consolidate-20260723-1"></script>
+<script defer src="assets/modules/modals.js?v=ui-refactor-20260724-1"></script>
 <script defer src="assets/modules/range.js?v=btn-consolidate-20260723-1"></script>
 <script defer src="assets/modules/settings.js?v=btn-consolidate-20260723-1"></script>
 <script defer src="assets/modules/data-io.js?v=report-version-label-20260723-1"></script>
-<script defer src="assets/modules/reports.js?v=report-version-label-20260723-1"></script>
+<script defer src="assets/modules/reports.js?v=print-font-self-host-20260724-1"></script>
 <script defer src="assets/modules/users-auth.js?v=btn-consolidate-20260723-1"></script>
 <script defer src="assets/modules/reagent.js?v=btn-consolidate-20260723-1"></script>
 <script defer src="assets/app.js?v=partitioned-hydration-20260714-1"></script>

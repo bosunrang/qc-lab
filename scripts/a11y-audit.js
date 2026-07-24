@@ -6,12 +6,15 @@
 // can't tell if a label is actually reachable from its control, etc).
 //
 // Not part of `npm test` — needs Playwright + a Chromium download, so it's a
-// separate opt-in script (see CLAUDE.md "Tests"). This first run is a
-// baseline: it always exits 0 and just writes the report. Once a human has
-// reviewed tests/__a11y__/report.json and decided what to fix, a follow-up
-// pass can turn specific counts into a ratchet (same pattern as
-// tests/button-conventions.test.js) — doing that *before* seeing real
-// results would mean guessing at a threshold nobody has looked at yet.
+// separate opt-in script (see CLAUDE.md "Tests").
+//
+// Hard-fail ratchet (2026-07-24): every run is compared against the committed
+// baseline tests/a11y-ratchet.json. Any page/modal/keyboard count ABOVE the
+// baseline fails with exit 1; a surface missing from the baseline must come
+// back clean; a modal that was auditable before but now won't open also fails
+// (silent coverage loss). After fixing violations, tighten the ratchet with
+//   node scripts/a11y-audit.js --update-baseline
+// so improved counts become the new ceiling and regressions cannot return.
 'use strict';
 const fs = require('node:fs');
 const path = require('node:path');
@@ -32,25 +35,30 @@ const KEYBOARD_STEPS = 25;
 // not the page body. These are the primary "add new X" modals per page
 // (the most complex, most-used form in each area) — not every dialog in the
 // app, but enough to stop auditing a hollow shell.
+// `open` là FUNCTION (không phải chuỗi để eval): Playwright serialize hàm sang
+// trang và gọi trực tiếp, nên audit vẫn chạy được dưới CSP không có 'unsafe-eval'
+// (index.html đặt script-src không gồm unsafe-eval từ 2026-07-24).
 const MODALS = [
-  { page: 'manage', label: 'manage:add-instrument', open: 'openConfigInstrument()' },
-  { page: 'manage', label: 'manage:add-lot', open: 'openConfigLot()' },
-  { page: 'manage', label: 'manage:add-assay', open: 'openConfigAssay()' },
+  { page: 'manage', label: 'manage:add-instrument', open: () => openConfigInstrument() },
+  { page: 'manage', label: 'manage:add-lot', open: () => openConfigLot() },
+  { page: 'manage', label: 'manage:add-assay', open: () => openConfigAssay() },
   // "Edit" variants render extra fields (history, etc.) the "add" form
   // doesn't, so they're checked separately, not assumed identical.
-  { page: 'manage', label: 'manage:edit-instrument', open: "openConfigInstrument('I1')" },
-  { page: 'manage', label: 'manage:edit-lot', open: "openConfigLot('L1101')" },
-  { page: 'manage', label: 'manage:edit-assay', open: "openConfigAssay('T-NA')" },
-  { page: 'sigma', label: 'sigma:add-test', open: 'sgOpenAddTest()' },
-  { page: 'sigma', label: 'sigma:add-bias', open: "sgOpenBias(sgData(state.tests[0].id)[0].id, 1)" },
-  { page: 'reagent', label: 'reagent:create-comparison', open: 'openRcCreateModal()' },
-  { page: 'reagent', label: 'reagent:find-existing', open: 'openRcModal()' },
-  { page: 'users', label: 'users:edit-permissions', open: 'openUserPerms(state.users[1].id)' },
+  { page: 'manage', label: 'manage:edit-instrument', open: () => openConfigInstrument('I1') },
+  { page: 'manage', label: 'manage:edit-lot', open: () => openConfigLot('L1101') },
+  { page: 'manage', label: 'manage:edit-assay', open: () => openConfigAssay('T-NA') },
+  { page: 'sigma', label: 'sigma:add-test', open: () => sgOpenAddTest() },
+  { page: 'sigma', label: 'sigma:add-bias', open: () => sgOpenBias(sgData(state.tests[0].id)[0].id, 1) },
+  { page: 'reagent', label: 'reagent:create-comparison', open: () => openRcCreateModal() },
+  { page: 'reagent', label: 'reagent:find-existing', open: () => openRcModal() },
+  { page: 'users', label: 'users:edit-permissions', open: () => openUserPerms(state.users[1].id) },
   // Shared confirm-dialog component (modals.js #dialogRoot layer, separate
   // from #modalRoot) — every delete/destructive confirmation across the app
   // renders through this one function, so testing it once covers all of
   // them rather than chasing down each individual caller.
-  { page: 'dash', label: 'shared:confirm-dialog', open: "confirmDialog({kicker:'Kiểm tra',title:'Xác nhận thao tác',message:'Nội dung xác nhận mẫu để audit accessibility.',detail:'Chi tiết bổ sung cho ngữ cảnh.'})" },
+  // confirmDialog trả Promise chờ người dùng bấm — bọc thân hàm {} để evaluate
+  // không await promise đó (treo script); dialog vẫn render đồng bộ trong thân hàm.
+  { page: 'dash', label: 'shared:confirm-dialog', open: () => { confirmDialog({kicker:'Kiểm tra',title:'Xác nhận thao tác',message:'Nội dung xác nhận mẫu để audit accessibility.',detail:'Chi tiết bổ sung cho ngữ cảnh.'}); } },
 ];
 
 async function runAxe(page) {
@@ -82,12 +90,20 @@ async function auditPage(page, id, title) {
 async function auditModal(page, modal) {
   await page.evaluate((pageId) => go(pageId), modal.page);
   await page.waitForTimeout(150);
-  const opened = await page.evaluate((expr) => {
-    try { window.eval(expr); } catch (e) { return String(e); }
-    if (document.querySelector('#modalRoot .modal')) return 'modalRoot';
-    if (document.getElementById('dialogRoot') && document.getElementById('dialogRoot').innerHTML.trim()) return 'dialogRoot';
-    return 'modal did not open (gate blocked it, or neither #modalRoot nor #dialogRoot got content)';
-  }, modal.open);
+  // modal.open là hàm chính của evaluate (Playwright serialize hàm chính, không
+  // serialize hàm ở vị trí tham số). Hàm chạy thẳng trong page context — không
+  // qua window.eval nên không cần 'unsafe-eval' trong CSP.
+  let opened;
+  try {
+    await page.evaluate(modal.open);
+    opened = await page.evaluate(() => {
+      if (document.querySelector('#modalRoot .modal')) return 'modalRoot';
+      if (document.getElementById('dialogRoot') && document.getElementById('dialogRoot').innerHTML.trim()) return 'dialogRoot';
+      return 'modal did not open (gate blocked it, or neither #modalRoot nor #dialogRoot got content)';
+    });
+  } catch (e) {
+    opened = String(e);
+  }
   if (opened !== 'modalRoot' && opened !== 'dialogRoot') return { label: modal.label, skipped: opened };
   // #dialogRoot's confirm/info dialogs run a 160ms `dialog-enter` opacity
   // animation (components.css) — scanning mid-animation makes axe compute
@@ -180,6 +196,55 @@ async function main() {
     }
 
     console.log(`\nBáo cáo đầy đủ: ${path.join(OUT_DIR, 'report.json')}`);
+
+    // --- Hard-fail ratchet ---
+    const BASELINE_PATH = path.join(__dirname, '..', 'tests', 'a11y-ratchet.json');
+    if (process.argv.includes('--update-baseline')) {
+      const baseline = {
+        generatedAt: report.generatedAt,
+        note: 'Trần vi phạm a11y cho phép. Sau khi sửa violation, chạy lại với --update-baseline để siết ratchet; không nâng tay các con số.',
+        pages: Object.fromEntries(results.map((r) => [r.id, r.counts])),
+        modals: Object.fromEntries(checkedModals.map((m) => [m.label, m.counts])),
+        keyboard: Object.fromEntries(keyboard.map((k) => [k.page, k.issues.length])),
+      };
+      fs.writeFileSync(BASELINE_PATH, JSON.stringify(baseline, null, 2) + '\n');
+      console.log(`Đã cập nhật baseline ratchet: ${BASELINE_PATH}`);
+    } else if (fs.existsSync(BASELINE_PATH)) {
+      const baseline = JSON.parse(fs.readFileSync(BASELINE_PATH, 'utf8'));
+      const failures = [], improvements = [];
+      const check = (scope, key, counts, base) => {
+        for (const i of IMPACTS) {
+          // Surface chưa có trong baseline phải sạch hoàn toàn (trần = 0).
+          const b = base && Number.isFinite(base[i]) ? base[i] : 0;
+          if (counts[i] > b) failures.push(`${scope} ${key}: ${i} = ${counts[i]} > baseline ${b}`);
+          else if (base && counts[i] < b) improvements.push(`${scope} ${key}: ${i} ${b} → ${counts[i]}`);
+        }
+      };
+      for (const r of results) check('Trang', r.id, r.counts, baseline.pages && baseline.pages[r.id]);
+      for (const m of checkedModals) check('Modal', m.label, m.counts, baseline.modals && baseline.modals[m.label]);
+      // Modal từng audit được mà giờ không mở được = mất phủ sót âm thầm, tính là hồi quy.
+      for (const m of modalResults) {
+        if (m.skipped && baseline.modals && baseline.modals[m.label]) failures.push(`Modal ${m.label}: trước audit được, giờ bị bỏ qua (${m.skipped})`);
+      }
+      for (const k of keyboard) {
+        const b = baseline.keyboard && Number.isFinite(baseline.keyboard[k.page]) ? baseline.keyboard[k.page] : 0;
+        if (k.issues.length > b) failures.push(`Keyboard ${k.page}: ${k.issues.length} lần Tab mất focus > baseline ${b}`);
+        else if (k.issues.length < b) improvements.push(`Keyboard ${k.page}: ${b} → ${k.issues.length}`);
+      }
+      if (failures.length) {
+        console.error('\nA11Y RATCHET FAILED — hồi quy so với baseline:');
+        for (const f of failures) console.error('  ✗ ' + f);
+        process.exitCode = 1;
+      } else {
+        console.log('\nA11y ratchet: PASS — không chỗ nào vượt baseline.');
+        if (improvements.length) {
+          console.log('Có cải thiện so với baseline; nên siết lại bằng node scripts/a11y-audit.js --update-baseline:');
+          for (const i of improvements) console.log('  ↓ ' + i);
+        }
+      }
+    } else {
+      console.log(`\nChưa có baseline ratchet (${BASELINE_PATH}) — chạy với --update-baseline để tạo lần đầu.`);
+    }
   } finally {
     await session.close();
   }

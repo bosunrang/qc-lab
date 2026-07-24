@@ -1,4 +1,4 @@
-﻿/* ===== REPORTS (printable) ===== */
+/* ===== REPORTS (printable) ===== */
 function esc(s){return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function escAttr(s){return esc(s);}
 function reportHeader(title,subtitle='Nội kiểm chất lượng xét nghiệm'){const L=state.lab,app=window.QCLAB_APP||{version:'dev',build:''},rules=Object.entries(state.westgardRules||{}).filter(x=>x[1]!==false).map(x=>x[0]).join(', ');return '<div class="rpt-head">'+
@@ -9,7 +9,13 @@ function reportHeader(title,subtitle='Nội kiểm chất lượng xét nghiệm
 function signBlock(){return '<div class="sign-grid"><div><b>Người thực hiện</b><span>(Ký, ghi rõ họ tên)</span></div><div><b>Người kiểm tra</b><span>(Ký, ghi rõ họ tên)</span></div><div><b>Phụ trách khoa</b><span>(Ký, ghi rõ họ tên)</span></div></div>';}
 async function openPrint(title,bodyHtml,options={}){
   const w=window.open('','_blank');if(!w){await infoDialog('Trình duyệt chặn cửa sổ. Cho phép pop-up để in báo cáo.');return;}
-  w.document.write('<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>'+esc(title)+'</title><link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"><style>'+
+  /* Font Manrope tự host (assets/tokens.css @font-face → assets/fonts/*.woff2),
+     KHÔNG tải từ Google Fonts: phòng xét nghiệm offline vẫn phải in đúng font,
+     đúng metric bố cục. Cửa sổ in là about:blank nên phải dùng URL tuyệt đối —
+     đường dẫn tương đối bên trong tokens.css (fonts/...) tự phân giải theo vị
+     trí file CSS nên vẫn đúng. */
+  const printFontCss=new URL('assets/tokens.css',location.href).href;
+  w.document.write('<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>'+esc(title)+'</title><link rel="stylesheet" href="'+printFontCss+'"><style>'+
     '@page{size:'+(options.landscape?'A4 landscape':'A4')+';margin:13mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:"Manrope",Arial,Helvetica,sans-serif;color:#14202b;margin:0;background:#eef2f5;font-size:12px;line-height:1.42}'+
     '.page{max-width:1120px;margin:18px auto;background:#fff;padding:22px 26px 28px;border:1px solid #dce3e9;box-shadow:0 10px 30px rgba(20,33,43,.08)}'+
     '.rpt-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;border-bottom:2px solid #14202b;padding-bottom:12px;margin-bottom:14px}.rpt-brand{display:flex;gap:12px;align-items:center}.rpt-hosp{font-size:15px;font-weight:850}.rpt-dept{font-weight:700;margin-top:1px}.rpt-addr{font-size:11px;color:#647686;margin-top:1px}.rpt-meta{text-align:right;color:#647686;font-size:11px}.rpt-meta b{display:block;color:#14202b}.rpt-title{text-align:center;margin:12px 0 16px}.rpt-title div{font-size:19px;font-weight:850;text-transform:uppercase;letter-spacing:.02em}.rpt-title span{display:block;font-size:11px;color:#647686;margin-top:3px}'+

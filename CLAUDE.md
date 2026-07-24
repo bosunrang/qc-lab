@@ -115,11 +115,15 @@ session (no login/password-change UI to fight through), shared by both:
   data, so `a11y-audit.js` separately calls `sgTrackTest()`/`sgAddPeriod()`
   itself before auditing. `MODALS` is a representative sample (the biggest
   form per area), not exhaustive — extend it if you add a major new modal.
-  A run with 0 violations everywhere is a baseline only — it always exits 0.
-  Turning specific violation counts into a
-  hard-fail ratchet (same pattern as `tests/button-conventions.test.js`) is a
-  deliberate follow-up decision, not automatic, since a threshold set before
-  anyone reviewed the actual findings would be arbitrary.
+  Since 2026-07-24 the audit is a hard-fail ratchet (same pattern as
+  `tests/button-conventions.test.js`): every run is compared against the
+  committed `tests/a11y-ratchet.json`; any page/modal/keyboard count above
+  the baseline, a new surface with any violation, or a previously-auditable
+  modal that no longer opens fails the script with exit 1. After fixing
+  violations, tighten the baseline with
+  `node scripts/a11y-audit.js --update-baseline` — never raise a number by
+  hand. `MODALS.open` entries are real functions (not eval'd strings) so the
+  audit works under the CSP, which has no `unsafe-eval`.
 
 ## Type checking
 
@@ -185,6 +189,18 @@ review harder and pollutes the `?v=` cache-busting query strings (see below).
 any file you edit so browsers pick up the change (there's no build hash). The
 Westgard worker URL in `qc-domain.js` (`new Worker('assets/workers/...')`)
 carries its own `?v=` — bump it there when editing the worker.
+
+**CSP + SRI (2026-07-24).** `index.html` sets a `<meta>` Content-Security-Policy:
+scripts limited to self + inline + `www.gstatic.com`, connections limited to the
+Firebase Auth/RTDB endpoints, fonts/images/workers to self. The three Firebase
+CDN tags carry `integrity="sha384-..."` + `crossorigin="anonymous"` — when
+bumping the Firebase version, recompute each hash
+(`curl -sf <url> | openssl dgst -sha384 -binary | openssl base64 -A`) or the
+browser will refuse to load the SDK. The CSP deliberately has no `unsafe-eval`;
+dev scripts (a11y audit) call app functions directly via Playwright instead of
+`window.eval`. The print window (`openPrint()` in `reports.js`) inherits this
+CSP and loads Manrope from self-hosted `assets/tokens.css` — do not reintroduce
+the Google Fonts link, offline labs must print with correct metrics.
 
 ### Module roles (load order matters — see `index.html`)
 
