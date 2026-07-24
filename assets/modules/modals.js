@@ -1,6 +1,11 @@
 /* ===== MODAL chung ===== */
 let modalReturnFocus=null;
 function modalFocusable(modal){return[...modal.querySelectorAll('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),a[href],[tabindex]:not([tabindex="-1"])')].filter(el=>el.offsetParent!==null);}
+function modalCloseButton(action='closeModal()'){return `<button class="modal-close" onclick="${escAttr(action)}" aria-label="Đóng hộp thoại">✕</button>`;}
+function modalTemplate({title='',body='',footer='',cls='',closeAction='closeModal()',bodyClass='modal-b',footerClass='modal-f'}={}){
+  const classes=['modal',cls].filter(Boolean).join(' ');
+  return `<div class="${escAttr(classes)}"><div class="modal-h"><h3>${title}</h3>${modalCloseButton(closeAction)}</div>${bodyClass?`<div class="${escAttr(bodyClass)}">${body}</div>`:body}${footer?`<div class="${escAttr(footerClass)}">${footer}</div>`:''}</div>`;
+}
 function modalKeydown(event){
   const modal=document.querySelector('#modalRoot .modal');if(!modal)return;
   if(event.key==='Escape'){event.preventDefault();closeModal();return;}
@@ -69,7 +74,7 @@ function confirmDialog(opts){
   const{kicker='',title='',message='',detail='',confirmLabel='Xác nhận',cancelLabel='Hủy',danger=true}=opts||{};
   return new Promise(resolve=>{
     openDialogOverlay(`<div class="modal confirm-modal">
-      <div class="confirm-modal-h">${kicker?`<div class="confirm-modal-kicker">${esc(kicker)}</div>`:'<div></div>'}<button class="modal-close" onclick="confirmDialogAnswer(false)">×</button></div>
+      <div class="confirm-modal-h">${kicker?`<div class="confirm-modal-kicker">${esc(kicker)}</div>`:'<div></div>'}${modalCloseButton('confirmDialogAnswer(false)')}</div>
       <h3 class="confirm-modal-title">${esc(title)}</h3>
       <div class="confirm-modal-body"><div class="confirm-modal-icon${danger?'':' info'}" aria-hidden="true">!</div><div class="confirm-modal-text"><b>${esc(message)}</b>${detail?`<p>${esc(detail)}</p>`:''}</div></div>
       <div class="confirm-modal-actions">${btn(esc(cancelLabel),'confirmDialogAnswer(false)','ghost')}${btn(esc(confirmLabel),'confirmDialogAnswer(true)',danger?'danger':'teal')}</div>
@@ -85,26 +90,11 @@ function infoDialog(message,opts={}){
   const glyph=type==='success'?'✓':'!';
   return new Promise(resolve=>{
     openDialogOverlay(`<div class="modal confirm-modal info-modal">
-      <div class="confirm-modal-h"><div></div><button class="modal-close" onclick="infoDialogAnswer()">×</button></div>
+      <div class="confirm-modal-h"><div></div>${modalCloseButton('infoDialogAnswer()')}</div>
       ${title?`<h3 class="confirm-modal-title">${esc(title)}</h3>`:''}
       <div class="confirm-modal-body"><div class="confirm-modal-icon info-modal-icon ${type}" aria-hidden="true">${glyph}</div><div class="confirm-modal-text"><b>${esc(message)}</b></div></div>
       <div class="confirm-modal-actions">${btn('Đã hiểu','infoDialogAnswer()','teal')}</div>
     </div>`,resolve);
   });
 }
-function syncActLevels(){
-  const t=state.tests.find(x=>x.id===document.getElementById('aTest').value),levelEl=document.getElementById('aLevel'),labelEl=document.getElementById('aLevelLabel');
-  if(!t||!levelEl)return;
-  const levels=operationalLevels(t),l=levels.find(x=>String(x.level)===String(levelEl.value))||levels[0];
-  if(l)levelEl.value=l.level;
-  if(labelEl)labelEl.value=l?actionLevelLabel(l):'';
-}
-function currentIssues(){
-  const out=[],rank={rej:2,warn:1,ok:0};
-  operationalTests().forEach(t=>{const wg=activeWestgard(t);wg.views.forEach(v=>{const l=v.l;(v.pts||[]).forEach(p=>{const f=wg.byPoint.get(p.id);if(!f||f.level==='ok'||(typeof pointWorkflowComplete==='function'&&pointWorkflowComplete(p.id)))return;out.push({t,l,p,f,rules:f.rules});});});});
-  return out.sort((a,b)=>(rank[b.f.level]||0)-(rank[a.f.level]||0)||String(b.p.date||'').localeCompare(String(a.p.date||'')));
-}
-function fillAction(tid,level,rule,err,act,pointId='',pointDate=''){document.getElementById('aTest').value=tid;document.getElementById('aLevel').value=level;syncActLevels();document.getElementById('aDate').value=vnDate(pointDate||isoToday());document.getElementById('aRule').value=rule;document.getElementById('aErr').value=err;document.getElementById('aAct').value=act;document.getElementById('aBy').value=currentUser?(currentUser.name||currentUser.username):'';const pid=document.getElementById('aPointId');if(pid)pid.value=pointId;document.getElementById('aAct').focus();}
-async function addAction(){if(!requireWrite())return;state.actions=state.actions||[];const tid=document.getElementById('aTest').value,t=state.tests.find(x=>x.id===tid),level=parseInt(document.getElementById('aLevel').value),l=t?lvlCfg(t,level):null,rule=QCCore.cleanText(document.getElementById('aRule').value),action=QCCore.cleanText(document.getElementById('aAct').value,5000).trim(),by=QCCore.cleanText(document.getElementById('aBy').value).trim(),errorType=QCCore.cleanText(document.getElementById('aErr').value),pointId=QCCore.cleanText((document.getElementById('aPointId')||{}).value,80).trim();if(action.length<5){await infoDialog('Cần ghi hành động khắc phục tối thiểu 5 ký tự.');return;}if(!by){await infoDialog('Nhập người thực hiện hành động khắc phục.');return;}state.actions.push({id:uid(),date:parseVN(document.getElementById('aDate').value)||isoToday(),createdAt:new Date().toISOString(),testId:tid,level,lot:l&&l.lot||'',pointId,rule,errorType,action,by,approvalStatus:'pending',approvedAt:'',approvedBy:'',approvalNote:''});logAct('Ghi khắc phục',`${actionLevelShort(t,level,l&&l.lot)} · ${rule||'—'} · ${action||''} · chờ duyệt`,t?t.name:'');save({clearDerived:false});rerender();}
-async function delAction(i){if(!requireAdmin())return;const a=state.actions&&state.actions[i];if(!a)return;if(actionApprovalStatus(a)==='approved'){await infoDialog('Không xóa hành động đã duyệt. Nếu cần, hãy ghi bổ sung một hành động mới.');return;}if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa hành động khắc phục',message:'Xóa hành động khắc phục này?',detail:'Nhật ký audit vẫn giữ lại thao tác xóa.',confirmLabel:'Xóa',cancelLabel:'Hủy'}))return;state.actions.splice(i,1);logAct('Xóa khắc phục',`${a.rule||'—'} · ${a.action||''}`,a.testId?(state.tests.find(t=>t.id===a.testId)||{}).name||'Khắc phục':'Khắc phục');save({clearDerived:false});rerender();}
 

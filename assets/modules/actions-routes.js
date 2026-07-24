@@ -11,19 +11,30 @@ function actionLevelShort(t,level,lotSnap){
   const lot=lotSnap||(l&&l.lot)||'?';
   return `M${level} · Lô ${lot}`;
 }
+function syncActLevels(){
+  const t=state.tests.find(x=>x.id===document.getElementById('aTest').value),levelEl=document.getElementById('aLevel'),labelEl=document.getElementById('aLevelLabel');
+  if(!t||!levelEl)return;
+  const levels=operationalLevels(t),l=levels.find(x=>String(x.level)===String(levelEl.value))||levels[0];
+  if(l)levelEl.value=l.level;
+  if(labelEl)labelEl.value=l?actionLevelLabel(l):'';
+}
+function currentIssues(){
+  const out=[],rank={rej:2,warn:1,ok:0};
+  operationalTests().forEach(t=>{const wg=activeWestgard(t);wg.views.forEach(v=>{const l=v.l;(v.pts||[]).forEach(p=>{const f=wg.byPoint.get(p.id);if(!f||f.level==='ok'||(typeof pointWorkflowComplete==='function'&&pointWorkflowComplete(p.id)))return;out.push({t,l,p,f,rules:f.rules});});});});
+  return out.sort((a,b)=>(rank[b.f.level]||0)-(rank[a.f.level]||0)||String(b.p.date||'').localeCompare(String(a.p.date||'')));
+}
+function fillAction(tid,level,rule,err,act,pointId='',pointDate=''){document.getElementById('aTest').value=tid;document.getElementById('aLevel').value=level;syncActLevels();document.getElementById('aDate').value=vnDate(pointDate||isoToday());document.getElementById('aRule').value=rule;document.getElementById('aErr').value=err;document.getElementById('aAct').value=act;document.getElementById('aBy').value=currentUser?(currentUser.name||currentUser.username):'';const pid=document.getElementById('aPointId');if(pid)pid.value=pointId;document.getElementById('aAct').focus();}
+async function addAction(){if(!requireWrite())return;state.actions=state.actions||[];const tid=document.getElementById('aTest').value,t=state.tests.find(x=>x.id===tid),level=parseInt(document.getElementById('aLevel').value),l=t?lvlCfg(t,level):null,rule=QCCore.cleanText(document.getElementById('aRule').value),action=QCCore.cleanText(document.getElementById('aAct').value,5000).trim(),by=QCCore.cleanText(document.getElementById('aBy').value).trim(),errorType=QCCore.cleanText(document.getElementById('aErr').value),pointId=QCCore.cleanText((document.getElementById('aPointId')||{}).value,80).trim();if(action.length<5){await infoDialog('Cần ghi hành động khắc phục tối thiểu 5 ký tự.');return;}if(!by){await infoDialog('Nhập người thực hiện hành động khắc phục.');return;}state.actions.push({id:uid(),date:parseVN(document.getElementById('aDate').value)||isoToday(),createdAt:new Date().toISOString(),testId:tid,level,lot:l&&l.lot||'',pointId,rule,errorType,action,by,approvalStatus:'pending',approvedAt:'',approvedBy:'',approvalNote:''});logAct('Ghi khắc phục',`${actionLevelShort(t,level,l&&l.lot)} · ${rule||'—'} · ${action||''} · chờ duyệt`,t?t.name:'');save({clearDerived:false});rerender();}
+async function delAction(i){if(!requireAdmin())return;const a=state.actions&&state.actions[i];if(!a)return;if(actionApprovalStatus(a)==='approved'){await infoDialog('Không xóa hành động đã duyệt. Nếu cần, hãy ghi bổ sung một hành động mới.');return;}if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa hành động khắc phục',message:'Xóa hành động khắc phục này?',detail:'Nhật ký audit vẫn giữ lại thao tác xóa.',confirmLabel:'Xóa',cancelLabel:'Hủy'}))return;state.actions.splice(i,1);logAct('Xóa khắc phục',`${a.rule||'—'} · ${a.action||''}`,a.testId?(state.tests.find(t=>t.id===a.testId)||{}).name||'Khắc phục':'Khắc phục');save({clearDerived:false});rerender();}
 function actionApprovalTag(a){const s=actionApprovalStatus(a),cls=s==='approved'?'ok':s==='returned'?'rej':'warn';return `<span class="tag ${cls}">${actionApprovalLabel(a)}</span>`;}
 async function approveAction(i){
   if(!requireAdmin())return;const a=state.actions&&state.actions[i];if(!a)return;
   if(!actionRecorded(a)){await infoDialog('Chưa có hành động khắc phục thực tế để duyệt. Hãy ghi hành động trước.');return;}
-  openModal(`<div class="modal">
-    <div class="modal-h"><h3>Duyệt hành động khắc phục</h3><button class="modal-close" onclick="closeModal()">×</button></div>
-    <div class="modal-b">
+  openModal(modalTemplate({title:'Duyệt hành động khắc phục',body:`
       <label>Ý kiến duyệt (tối thiểu 3 ký tự)</label>
       <textarea id="actionNoteInput" placeholder="Nhận xét về hành động khắc phục..." oninput="document.getElementById('actionNoteErr').style.display='none'"></textarea>
       <div id="actionNoteErr" class="hint" style="color:var(--red);display:none;margin-top:6px">Cần nhập ý kiến duyệt tối thiểu 3 ký tự.</div>
-    </div>
-    <div class="modal-f">${btn('Đóng','closeModal()','ghost')}${btn('Duyệt',`confirmApproveAction(${i})`,'teal')}</div>
-  </div>`);
+    `,footer:btn('Đóng','closeModal()','ghost')+btn('Duyệt',`confirmApproveAction(${i})`,'teal')}));
   setTimeout(()=>{const e=document.getElementById('actionNoteInput');if(e)e.focus();},50);
 }
 function confirmApproveAction(i){
@@ -37,15 +48,11 @@ function confirmApproveAction(i){
 }
 function returnAction(i){
   if(!requireAdmin())return;const a=state.actions&&state.actions[i];if(!a)return;
-  openModal(`<div class="modal">
-    <div class="modal-h"><h3>Trả lại hành động khắc phục</h3><button class="modal-close" onclick="closeModal()">×</button></div>
-    <div class="modal-b">
+  openModal(modalTemplate({title:'Trả lại hành động khắc phục',body:`
       <label>Lý do trả lại (tối thiểu 3 ký tự)</label>
       <textarea id="actionNoteInput" placeholder="Vì sao trả lại hành động khắc phục này..." oninput="document.getElementById('actionNoteErr').style.display='none'"></textarea>
       <div id="actionNoteErr" class="hint" style="color:var(--red);display:none;margin-top:6px">Cần nhập lý do tối thiểu 3 ký tự.</div>
-    </div>
-    <div class="modal-f">${btn('Đóng','closeModal()','ghost')}${btn('Trả lại',`confirmReturnAction(${i})`,'danger')}</div>
-  </div>`);
+    `,footer:btn('Đóng','closeModal()','ghost')+btn('Trả lại',`confirmReturnAction(${i})`,'danger')}));
   setTimeout(()=>{const e=document.getElementById('actionNoteInput');if(e)e.focus();},50);
 }
 function confirmReturnAction(i){
@@ -132,16 +139,12 @@ async function reportLockPeriod(){
 function reportUnlockPeriod(ym){
   if(!requireAdmin())return;
   const label=monthVN(ym);
-  openModal(`<div class="modal">
-    <div class="modal-h"><h3>Mở khóa kỳ ${esc(label)}</h3><button class="modal-close" onclick="closeModal()">×</button></div>
-    <div class="modal-b">
+  openModal(modalTemplate({title:`Mở khóa kỳ ${esc(label)}`,body:`
       <div class="hint">Sau khi mở khóa, điểm QC trong kỳ ${esc(label)} có thể được sửa/hủy trở lại.</div>
       <label>Lý do mở khóa (tối thiểu 5 ký tự)</label>
       <textarea id="unlockReasonInput" placeholder="VD: Bổ sung đối soát, phát hiện sai sót cần chỉnh lại..." oninput="document.getElementById('unlockReasonErr').style.display='none'"></textarea>
       <div id="unlockReasonErr" class="hint" style="color:var(--red);display:none;margin-top:6px">Cần ghi lý do mở khóa tối thiểu 5 ký tự.</div>
-    </div>
-    <div class="modal-f">${btn('Đóng','closeModal()','ghost')}${btn('Xác nhận mở khóa',`reportConfirmUnlockPeriod('${jsq(ym)}')`,'danger')}</div>
-  </div>`);
+    `,footer:btn('Đóng','closeModal()','ghost')+btn('Xác nhận mở khóa',`reportConfirmUnlockPeriod('${jsq(ym)}')`,'danger')}));
   setTimeout(()=>{const e=document.getElementById('unlockReasonInput');if(e)e.focus();},50);
 }
 async function reportConfirmUnlockPeriod(ym){

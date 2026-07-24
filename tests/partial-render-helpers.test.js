@@ -7,6 +7,9 @@ const ctx = loadSandbox([
   'modules/entry-ui-state.js',
   'modules/analysis-ui-state.js',
   'modules/router-render.js',
+  'modules/dashboard-routes.js',
+  'modules/entry-routes.js',
+  'modules/westgard-routes.js',
 ], { document: { addEventListener() {} } });
 
 const result = run(ctx, `

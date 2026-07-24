@@ -82,7 +82,7 @@ run(ctx, `
   assert.match(printed.body, /data:lj:1:139:2\.4/, 'the previous lot\'s own points/mean/sd feed the chart, not the current lot\'s');
   assert.match(printed.body, /không gồm luật liên mức/, 'the previous-lot caveat about cross-level rules is included');
 
-  const source = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'router-render.js'), 'utf8');
+  const source = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'westgard-routes.js'), 'utf8');
   assert.match(source, /'printWestgard\(\)'/, 'the Westgard page wires up a print action');
   assert.match(source, /wgChartMode==='lj'\?'<div>/, 'the export actions only show in the default Levey-Jennings view, not CUSUM');
 

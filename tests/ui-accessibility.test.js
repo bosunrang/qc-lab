@@ -4,7 +4,7 @@ const path = require('node:path');
 
 const root = path.join(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
-const router = read('assets/modules/router-render.js');
+const router = read('assets/modules/router-render.js') + read('assets/modules/entry-routes.js');
 const modals = read('assets/modules/modals.js');
 const components = read('assets/components.css');
 const entryCss = read('assets/professional-entry.css');

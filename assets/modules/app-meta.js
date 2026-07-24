@@ -1,8 +1,8 @@
 ﻿window.QCLAB_APP = {
   name: 'QC Lab',
-  version: '2.4.0',
-  releaseDate: '2026-07-23',
-  build: 'westgard-print-hidpi'
+  version: '2.4.1',
+  releaseDate: '2026-07-24',
+  build: 'ui-route-refactor'
 };
 
 // Cấu hình đám mây khi deploy (tùy chọn).
