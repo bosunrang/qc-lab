@@ -4,6 +4,7 @@
 // một instance duy nhất, và cung cấp hộp thoại alert native cho preload.js.
 const { app, BrowserWindow, ipcMain, dialog, Menu, shell } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const license = require('./license');
 const { initAutoUpdate } = require('./auto-update');
 
@@ -35,8 +36,12 @@ function applyChrome(win) {
     // rồi document.write HTML vào — trước 2026-07-24 handler deny tất cả nên in
     // PDF trên bản desktop luôn báo "Trình duyệt chặn cửa sổ". Chỉ mở đúng
     // about:blank; nội dung cửa sổ do chính app sinh ra, mọi URL khác vẫn deny.
+    // backgroundColor phải TRẮNG: khi in (printToPDF lẫn hộp thoại in hệ thống),
+    // Blink không phủ màu nền body lên canvas in — màu nền CỬA SỔ lộ ra thành
+    // nền cả trang (lỗi "viền xám phủ kín PDF" ở 2.4.2/2.4.3, đã dựng lại và
+    // đo được trong content stream của PDF).
     if (url === 'about:blank' || url === '') {
-      return { action: 'allow', overrideBrowserWindowOptions: { autoHideMenuBar: true, width: 1180, height: 800, backgroundColor: '#eef2f5' } };
+      return { action: 'allow', overrideBrowserWindowOptions: { autoHideMenuBar: true, width: 1180, height: 800, backgroundColor: '#ffffff' } };
     }
     return { action: 'deny' };
   });
@@ -129,6 +134,52 @@ ipcMain.handle('qc-dialog:alert', async (event, message) => {
   });
 });
 
+// Tìm cửa sổ in (popup about:blank do openPrint mở) theo token ghi sẵn trong
+// trang — nút "Lưu PDF" trong popup gọi opener.qcPrintPdf.save(token, ...).
+async function findPrintWindow(token) {
+  if (!token) return null;
+  for (const w of BrowserWindow.getAllWindows()) {
+    if (w.isDestroyed()) continue;
+    const wc = w.webContents;
+    if (wc.getURL() !== 'about:blank') continue;
+    try { if (await wc.executeJavaScript('window.__qcPrintToken||""') === token) return w; } catch (e) { /* cửa sổ đang đóng dở */ }
+  }
+  return null;
+}
+
+// Lưu PDF: printToPDF đi qua đường in headless CHUẨN của Chromium (tôn trọng
+// @media print + @page) — khác hẳn hộp thoại in hệ thống của Electron/Windows
+// vốn raster bằng CSS màn hình và in cả nền xám #eef2f5 vào file. Bật thêm class
+// .printing phòng hờ, rồi mở hộp thoại lưu file.
+ipcMain.handle('qc-print:pdf', async (event, payload) => {
+  const { token, name } = payload || {};
+  const win = await findPrintWindow(String(token || ''));
+  if (!win) return { ok: false, reason: 'no-print-window' };
+  await win.webContents.executeJavaScript('document.body&&document.body.classList.add("printing")').catch(() => {});
+  const pdf = await win.webContents.printToPDF({ printBackground: true, preferCSSPageSize: true });
+  const safe = (String(name || 'Bao-cao').replace(/[\\/:*?"<>|]+/g, '-').trim() || 'Bao-cao').slice(0, 120);
+  const { canceled, filePath } = await dialog.showSaveDialog(win, {
+    title: 'Lưu báo cáo PDF',
+    defaultPath: /\.pdf$/i.test(safe) ? safe : safe + '.pdf',
+    filters: [{ name: 'PDF', extensions: ['pdf'] }]
+  });
+  if (canceled || !filePath) return { ok: false, canceled: true };
+  await fs.promises.writeFile(filePath, pdf);
+  return { ok: true, path: filePath };
+});
+
+// In giấy: bật class .printing từ main process TRƯỚC khi print() — window.print()
+// gọi từ renderer cũng được, nhưng đi qua đây thì thứ tự "sạch nền → in" được
+// main process đảm bảo, không lệ thuộc sự kiện beforeprint vốn không đáng tin
+// trên đường in hệ thống của Electron/Windows.
+ipcMain.handle('qc-print:paper', async (event, token) => {
+  const win = await findPrintWindow(String(token || ''));
+  if (!win) return { ok: false, reason: 'no-print-window' };
+  await win.webContents.executeJavaScript('document.body&&document.body.classList.add("printing")').catch(() => {});
+  win.webContents.print({});
+  return { ok: true };
+});
+
 app.whenReady().then(() => {
   launch();
   initAutoUpdate(app, () => mainWindow);
@@ -146,4 +197,19 @@ app.on('second-instance', () => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
+});
+
+// Ctrl+P trong cửa sổ in (about:blank): chặn xử lý mặc định, bật class .printing
+// từ main process rồi mới print() — cùng lý do với qc-print:paper ở trên, không
+// dựa vào beforeprint của renderer. Chỉ áp cho popup in; cửa sổ app chính có URL
+// file:// nên không bị ảnh hưởng.
+app.on('web-contents-created', (event, contents) => {
+  contents.on('before-input-event', (ev, input) => {
+    if (input.type === 'keyDown' && input.control && String(input.key).toLowerCase() === 'p' && contents.getURL() === 'about:blank') {
+      ev.preventDefault();
+      contents.executeJavaScript('document.body&&document.body.classList.add("printing")')
+        .catch(() => {})
+        .finally(() => { if (!contents.isDestroyed()) contents.print({}); });
+    }
+  });
 });

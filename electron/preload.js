@@ -12,6 +12,17 @@ contextBridge.exposeInMainWorld('qcDialog', {
   alert: (message) => ipcRenderer.invoke('qc-dialog:alert', message == null ? '' : String(message))
 });
 
+// In báo cáo (openPrint trong reports.js). Popup about:blank KHÔNG được inject
+// preload (contextIsolation) nên nút trong popup gọi qua window.opener.qcPrintPdf —
+// opener là cửa sổ app chính, có cầu nối này. save() dùng printToPDF của main
+// process (đường in headless chuẩn, tôn trọng @media print) để tránh lỗi hộp
+// thoại in hệ thống của Electron/Windows raster bằng CSS màn hình (nền xám
+// phủ kín trang PDF); printPaper() bật class .printing từ main trước khi print().
+contextBridge.exposeInMainWorld('qcPrintPdf', {
+  save: (token, suggestedName) => ipcRenderer.invoke('qc-print:pdf', { token: String(token || ''), name: String(suggestedName || 'Bao-cao') }),
+  printPaper: (token) => ipcRenderer.invoke('qc-print:paper', String(token || ''))
+});
+
 // Cầu nối cho trang kích hoạt (activation.html): đọc mã máy + gửi khoá để xác minh,
 // hoặc "Dùng thử tiếp" khi còn hạn 30 ngày.
 contextBridge.exposeInMainWorld('qcActivation', {
