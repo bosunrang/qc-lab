@@ -10,6 +10,7 @@ dist/
 outputs/
 tests/__visual__/
 tests/__a11y__/
+tests/__print__/
 
 # Local dependency/install artifacts
 node_modules/

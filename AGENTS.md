@@ -84,13 +84,16 @@ reruns the same command on every push/PR once the repo has a GitHub remote.
 
 ### Visual/print and accessibility checks
 
-`npm run visual-check` and `npm run a11y-audit` are real-browser checks (need
-`npm install` + `npx playwright install chromium` first — unlike everything
-above, so they're deliberately **not** in `npm test` or the pre-commit hook,
-and run in their own `visual-and-a11y` CI job instead of the fast one).
-`scripts/lib/seed-browser-session.js` boots the static app in headless
-Chromium with a minimal valid QC dataset and an already-authenticated admin
-session (no login/password-change UI to fight through), shared by both:
+`npm run visual-check`, `npm run a11y-audit` and `npm run print-check` are
+real-browser checks (need `npm install` + `npx playwright install chromium`
+first — unlike everything above, so they're deliberately **not** in `npm test`
+or the pre-commit hook, and run in their own `visual-and-a11y` CI job instead
+of the fast one). `scripts/lib/seed-browser-session.js` boots the static app
+in headless Chromium with a minimal valid QC dataset and an
+already-authenticated admin session (no login/password-change UI to fight
+through), shared by visual-check/a11y-audit (print-check reuses its
+`buildSeedState()` but boots the app in Electron instead — on headless Linux
+it runs under `xvfb-run`, see the CI job):
 
 - `scripts/visual-check.js` captures the actual HTML `openPrint()`
   (`reports.js`) writes for the Westgard and Báo cáo reports, renders it
@@ -124,6 +127,21 @@ session (no login/password-change UI to fight through), shared by both:
   `node scripts/a11y-audit.js --update-baseline` — never raise a number by
   hand. `MODALS.open` entries are real functions (not eval'd strings) so the
   audit works under the CSP, which has no `unsafe-eval`.
+- `scripts/print-check.js` covers the DESKTOP print-to-PDF pipeline that
+  nothing else in the repo can see: it boots the real app in Electron, opens
+  the real print window via `printWestgard()` → `openPrint()`, drives the same
+  main-process path the "Lưu PDF" button uses (`printToPDF` with
+  `printBackground` + `preferCSSPageSize`), then asserts on the generated
+  PDF's decompressed content stream — no large rect filled with the
+  screen-preview background `#EEF2F5` (the 2026-07-24 defect where the print
+  window's `backgroundColor` showed through the whole PDF page, because Blink
+  does not paint the body background onto the print canvas; small `#EEF2F5`
+  table-border rects are legitimate and ignored), the teal header `#0E8F8F`
+  still paints, and the report text is present. It also pins the desktop UX
+  contract: exactly one "Lưu PDF" button wired to `opener.qcPrintPdf`. The
+  review PDF lands in `tests/__print__/` (gitignored). The check was proven
+  discriminating by temporarily reverting `backgroundColor` to `#eef2f5` and
+  watching it fail.
 
 ## Type checking
 

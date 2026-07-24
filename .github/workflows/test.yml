@@ -33,6 +33,11 @@ jobs:
       - run: npm run visual-check
       - run: npm run a11y-audit
         if: always()
+      # print-check boots the real app in Electron (print-to-PDF pipeline), so
+      # it needs a display on Linux — xvfb-run provides a virtual one. The
+      # Electron binary itself comes with `npm ci` above.
+      - run: xvfb-run -a npm run print-check
+        if: always()
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -40,4 +45,5 @@ jobs:
           path: |
             tests/__visual__/
             tests/__a11y__/
+            tests/__print__/
           if-no-files-found: ignore
