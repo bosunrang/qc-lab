@@ -15,6 +15,9 @@
     "oneTestMaxColdRatio": 0.2,
     "displaySampleMaxPoints": 650,
     "displaySamplingMaxMs": 200,
-    "mapLookupMaxMs": 20
+    "mapLookupMaxMs": 20,
+    "saveIncrementalMaxMs": 500,
+    "saveIncrementalMaxBytesRatio": 0.25,
+    "saveIncrementalMaxPartitions": 1
   }
 }

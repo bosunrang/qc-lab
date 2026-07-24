@@ -18,6 +18,8 @@ function measure(fn, repeats = 1) {
 }
 
 const source = makeState(config.scenario),raw = JSON.stringify(source),shell = { ...source, data:{} },shellRaw = JSON.stringify({ format:1, slot:'a', shell });
+
+(async () => {
 const startup = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'modules/settings.js']);
 startup.__shellCopies = Array.from({ length:3 }, () => JSON.parse(shellRaw));
 const shellInit = measure(i => {
@@ -42,6 +44,37 @@ const sample = sampling.value;
 const runs = Array.from({ length:10000 }, (_, i) => `run-${i}`),queries = runs.slice().reverse(),runIndex = new Map(runs.map((value, i) => [value, i]));
 const mapLookup = measure(() => queries.forEach(value => runIndex.get(value)), 3);
 
+/* Đường LƯU: ghi tăng dần (writePartitioned + dirtyTestIds) là tối ưu đã chốt —
+   gate này khóa cả tín hiệu cấu trúc (chỉ 1 partition được ghi lại, byte ghi
+   nhỏ hơn nhiều ghi đầy đủ) lẫn thời gian. IndexedDB giả đếm byte qua put() để
+   xấp xỉ chi phí structured-clone thật của trình duyệt. */
+const saveCtx = loadSandbox(['modules/local-store.js'], { performance });
+saveCtx.__state = source;
+const saveBench = await run(saveCtx, `
+  var __records=new Map(),__hasStore=false,__putBytes=0;
+  var __db={objectStoreNames:{contains:function(){return __hasStore;}},createObjectStore:function(){__hasStore=true;},close:function(){},transaction:function(){return{objectStore:function(){return{
+    get:function(key){var req={};Promise.resolve().then(function(){req.result=__records.get(key);if(req.onsuccess)req.onsuccess();});return req;},
+    put:function(value){var req={};Promise.resolve().then(function(){__records.set(value.key,value);__putBytes+=JSON.stringify(value).length;if(req.onsuccess)req.onsuccess();});return req;},
+    delete:function(key){var req={};Promise.resolve().then(function(){__records.delete(key);if(req.onsuccess)req.onsuccess();});return req;}
+  };}};}};
+  indexedDB={open:function(){var req={result:__db};Promise.resolve().then(function(){if(req.onupgradeneeded)req.onupgradeneeded();if(req.onsuccess)req.onsuccess();});return req;}};
+  (async()=>{
+    const seed=await LocalStore.writePartitioned(__state,'');
+    const t1=performance.now(),b1=__putBytes;
+    const full=await LocalStore.writePartitioned(__state,seed.slot);
+    const fullMs=performance.now()-t1,fullBytes=__putBytes-b1;
+    const dirtyId=__state.tests[0].id,incSamples=[];
+    let inc=null,incBytes=0;
+    for(let i=0;i<5;i++){
+      const t=performance.now(),b=__putBytes;
+      inc=await LocalStore.writePartitioned(__state,i?inc.slot:full.slot,{dirtyTestIds:[dirtyId]});
+      incSamples.push(performance.now()-t);if(!i)incBytes=__putBytes-b;
+    }
+    incSamples.sort((a,b)=>a-b);
+    return{fullMs,fullBytes,fullMode:full.mode,incMs:incSamples[2],incBytes,incPartitions:inc.partitionsWritten,incMode:inc.mode};
+  })()
+`);
+
 const metrics = {
   points:Object.values(source.data).reduce((sum, rows) => sum + rows.length, 0),
   bootShellRatio:Number((Buffer.byteLength(shellRaw) / Buffer.byteLength(raw)).toFixed(5)),
@@ -55,6 +88,10 @@ const metrics = {
   displaySamplingMs:sampling.ms,
   mapLookupMs:mapLookup.ms,
   preservedDisplaySignals:sample.includes(0)&&sample.includes(renderValues.length-1)&&sample.includes(12345)&&sample.includes(87654)&&sample.includes(50000),
+  saveFullMs:Number(saveBench.fullMs.toFixed(2)),
+  saveIncrementalMs:Number(saveBench.incMs.toFixed(2)),
+  saveIncrementalBytesRatio:Number((saveBench.incBytes / Math.max(saveBench.fullBytes, 1)).toFixed(5)),
+  saveIncrementalPartitions:saveBench.incPartitions,
 };
 
 const failures = [];
@@ -69,8 +106,12 @@ max('oneTestColdRatio',metrics.oneTestColdRatio,budget.oneTestMaxColdRatio);
 max('displaySamplePoints',metrics.displaySamplePoints,budget.displaySampleMaxPoints);
 max('displaySamplingMs',metrics.displaySamplingMs,budget.displaySamplingMaxMs);
 max('mapLookupMs',metrics.mapLookupMs,budget.mapLookupMaxMs);
+max('saveIncrementalMs',metrics.saveIncrementalMs,budget.saveIncrementalMaxMs);
+max('saveIncrementalBytesRatio',metrics.saveIncrementalBytesRatio,budget.saveIncrementalMaxBytesRatio);
+max('saveIncrementalPartitions',metrics.saveIncrementalPartitions,budget.saveIncrementalMaxPartitions);
 if(!metrics.preservedDisplaySignals)failures.push({name:'preservedDisplaySignals',actual:false,expected:'true'});
 
 const report={gate:'QC Lab performance regression',pass:failures.length===0,node:process.version,platform:`${process.platform}-${process.arch}`,scenario:config.scenario,budgets:budget,metrics,failures};
 process.stdout.write(`${JSON.stringify(report,null,2)}\n`);
 if(failures.length)process.exitCode=1;
+})().catch((error) => { console.error(error); process.exitCode = 1; });

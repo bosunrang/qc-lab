@@ -90,6 +90,30 @@ node benchmarks/performance-baseline.js --quick
 Smoke-test Web Worker qua HTTP: mở `benchmarks/worker-smoke.html` từ cùng web server
 với ứng dụng; trang phải hiển thị `pass`.
 
+## Đường lưu tăng dần (incremental save)
+
+Ghi tăng dần qua `LocalStore.writePartitioned(state, slot, {dirtyTestIds})` đã là
+đường lưu mặc định: chỉ ghi lại shell + các phân vùng test thay đổi ngay trên slot
+đang hoạt động; một lần ghi đầy đủ (xoay slot A/B) bị ép sau
+`LS_FULL_ROTATE_MAX_INCREMENTALS` lần tăng dần liên tiếp hoặc
+`LS_FULL_ROTATE_MAX_MS`, để giới hạn cửa sổ mất dữ liệu nếu app tắt giữa một lần
+ghi tăng dần (manifest lệch `savedAt` → `readPartitionSlot()` bỏ cả slot, quay về
+slot an toàn). Hành vi này được khóa bởi `tests/local-store.test.js` và
+`tests/storage-pipeline.test.js`.
+
+`performance-regression.js` đo lại đường lưu ở kịch bản gate (21.900 điểm) với
+IndexedDB giả đếm byte qua `put()` (xấp xỉ chi phí structured-clone thật):
+
+| Phép đo | Ngân sách | Ý nghĩa |
+|---|---:|---|
+| `saveIncrementalPartitions` | ≤ 1 | Tín hiệu cấu trúc: chỉ phân vùng test bẩn được ghi lại |
+| `saveIncrementalBytesRatio` | ≤ 0,25 | Byte ghi tăng dần / byte ghi đầy đủ |
+| `saveIncrementalMs` | ≤ 500 | Ngân sách tuyệt đối cố ý rộng, không phải tín hiệu chính |
+
+Kết quả tham khảo (2026-07-24, Windows x64, Node v24): tỉ lệ byte ~0,05 (ghi
+tăng dần một test chỉ tốn khoảng 5% byte của ghi đầy đủ), thời gian 0,56 ms so
+với 10,49 ms của ghi đầy đủ.
+
 ## Baseline ngày 2026-07-14
 
 Môi trường: Windows x64, Node v26.4.0.
