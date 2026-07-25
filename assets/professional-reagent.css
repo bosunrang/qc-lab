@@ -60,7 +60,7 @@
 }
 
 .rc-toolbar select{
-  height:36px; font-weight:750;
+  height:36px; font-weight:500;
 }
 
 .rc-toolbar button.rc-add-btn,.rc-toolbar button.rc-delete-btn,.rc-toolbar button.rc-find-btn,.rc-toolbar button.rc-report-btn,.rc-toolbar button.rc-report-main{
@@ -149,7 +149,7 @@
 }
 
 .rc-report-btn{
-  background:var(--panel); color:var(--ink);
+  background:var(--teal); border-color:var(--teal); color:var(--on-accent);
 }
 
 .rc-quick-add{

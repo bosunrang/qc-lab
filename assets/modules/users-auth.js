@@ -33,7 +33,7 @@ function pageAudit(){
   const rows=(state.activity||[]).slice().reverse().map(a=>`<tr><td><div class="audit-time-cell"><span class="audit-seq">${a.seq?'#'+a.seq:''}</span><span class="audit-time">${formatDateTimeVN(a.ts)}</span></div></td><td><b>${esc(a.user||'')}</b><div class="hint">${roleLabel(a.role||'viewer')}${a.username?' · @'+esc(a.username):''}</div></td><td><span class="pill">${esc(a.type||'')}</span></td><td>${esc(a.target||'')||'<span class="hint">—</span>'}</td><td class="audit-detail">${esc(a.detail||'')||'<span class="hint">—</span>'}</td></tr>`).join('');
   return headOnly('Nhật ký hoạt động','Lưu vết các thao tác quan trọng; chỉ quản trị viên được xem')+
     `<div class="panel"><h3 role="heading" aria-level="2">Công cụ</h3><div class="row-flex">
-      ${btn('Xuất Excel nhật ký','exportActivityCSV()','teal sm')}
+      ${btn('Xuất CSV nhật ký','exportActivityCSV()','teal sm')}
       ${total?btn('Xóa nhật ký','clearActivityLog()','danger sm'):''}
       <div class="hint" style="align-self:center">${total} dòng hoạt động đã ghi nhận. ${chainHtml}</div>
     </div></div>
@@ -156,9 +156,11 @@ function reauthenticateCurrentUser({title='Xác thực lại',message='Nhập l�
     <div class="confirm-modal-h"><div class="confirm-modal-kicker">Thao tác được kiểm soát</div>${modalCloseButton('closeDialogOverlay(false)')}</div>
     <h3 class="confirm-modal-title">${esc(title)}</h3>
     <div class="confirm-modal-body"><div class="confirm-modal-icon info" aria-hidden="true">✓</div><div class="confirm-modal-text"><b>${esc(message)}</b><p>Tài khoản: ${esc(currentUser.name||currentUser.username||'')}</p></div></div>
-    <label for="reauthPassword">Mật khẩu hiện tại</label>
-    <input id="reauthPassword" type="password" autocomplete="current-password" autofocus onkeydown="if(event.key==='Enter'){event.preventDefault();confirmReauthentication()}">
-    <div id="reauthError" class="auth-err" hidden>Mật khẩu không đúng.</div>
+    <div class="reauth-modal-field">
+      <label for="reauthPassword">Mật khẩu hiện tại</label>
+      <input id="reauthPassword" type="password" autocomplete="current-password" autofocus onkeydown="if(event.key==='Enter'){event.preventDefault();confirmReauthentication()}">
+      <div id="reauthError" class="auth-err" hidden>Mật khẩu không đúng.</div>
+    </div>
     <div class="confirm-modal-actions">${btn('Hủy','closeDialogOverlay(false)','ghost')}${btn('Xác thực','confirmReauthentication()','teal')}</div>
   </div>`,resolve));
 }

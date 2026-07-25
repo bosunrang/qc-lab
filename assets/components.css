@@ -136,6 +136,9 @@ table{ width:100%; border-collapse:separate; min-width:640px; border:1px solid v
 .confirm-modal-text b{display:block;color:#203744;font-size:14px;font-weight:760;line-height:1.5;white-space:pre-line}
 .confirm-modal-text p{margin:6px 0 0;color:var(--muted);font-size:12.5px;line-height:1.55;white-space:pre-line}
 
+.reauth-modal-field{padding:0 24px 14px}
+.reauth-modal-field label{display:block;margin-bottom:6px}
+
 .confirm-modal-actions{
   display:flex; justify-content:flex-end; gap:9px; padding:14px 24px 20px; border-top:1px solid #e4ebee; background:#fbfcfd;
 }

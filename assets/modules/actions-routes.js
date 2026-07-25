@@ -115,7 +115,7 @@ function pageActionsV4(){
      <div><label>Luật vi phạm</label><input id="aRule" placeholder="VD: 2-2s"></div></div>
      <div class="action-form-row2" style="margin-top:8px"><div><label>Loại sai số</label><select id="aErr" aria-label="Loại sai số"><option>SE — Sai số hệ thống</option><option>RE — Sai số ngẫu nhiên</option></select></div><div><label>Người thực hiện</label><input id="aBy" aria-label="Người thực hiện"></div><div><label>Hành động khắc phục</label><input id="aAct" placeholder="VD: Hiệu chuẩn lại, chạy QC mới, kiểm tra hóa chất..."></div></div>
       <div style="margin-top:12px">${btn('Lưu hành động','addAction()','teal')}</div></div>`:emptyState('Cần có xét nghiệm trước','Khai báo xét nghiệm rồi quay lại ghi nhận hành động khắc phục.',role()==='admin'?btn('Thêm xét nghiệm',`go('manage')`,'teal'):'')}</div>
-   <div class="panel action-log-panel"><h3>Nhật ký khắc phục</h3>${rows?`<div class="action-log-tools">${btn('Xuất Excel nhật ký','exportActionsCSV()','teal sm')}</div><div class="action-log-wrap"><table class="action-log-table"><thead><tr><th>Ngày</th><th>Sự cố</th><th>Hành động</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table></div>`:emptyState('Chưa có nhật ký','Các hành động khắc phục sẽ xuất hiện ở đây sau khi được lưu.')}</div>`;
+   <div class="panel action-log-panel"><h3>Nhật ký khắc phục</h3>${rows?`<div class="action-log-tools">${btn('Xuất CSV nhật ký','exportActionsCSV()','teal sm')}</div><div class="action-log-wrap"><table class="action-log-table"><thead><tr><th>Ngày</th><th>Sự cố</th><th>Hành động</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table></div>`:emptyState('Chưa có nhật ký','Các hành động khắc phục sẽ xuất hiện ở đây sau khi được lưu.')}</div>`;
 }
 
 let reportQ='',reportTest='',reportRangeStart='',reportRangeEnd='',reportLockYm='';
@@ -254,7 +254,6 @@ function pageReportV2(){
        ${btn('Xuất Excel','exportReportXLSX()','teal','',{disabled:!matched.length,attrs:{'data-report-action':''}})}
        ${btn('Xuất CSV','exportReportCSV()','teal','',{disabled:!matched.length,attrs:{'data-report-action':''}})}
      </div>
-     <div class="hint">Báo cáo gồm: thông tin đơn vị, biểu đồ Levey-Jennings tổng hợp và từng mức, bảng Mean/SD/CV/Bias/TE/TEa/Sigma, các điểm vi phạm Westgard, nhật ký khắc phục trong khoảng ngày đã chọn, và ô ký duyệt. File .xlsx giữ nguyên bảng cột và biểu đồ như báo cáo in; bản in bấm “Lưu thành PDF”.</div>
    </div>`+reportLockPanelHtml();
 }
 function reportRangePicker(start,end){
