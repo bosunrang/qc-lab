@@ -321,13 +321,14 @@ function westgardXlsxDoc(tid){
   const metaRow=(l1,v1,l2,v2)=>{const r=push([S(l1,ST.LABEL),S('',ST.LABEL),S(v1,ST.VAL),S('',ST.VAL),S('',ST.VAL),S(l2,ST.LABEL),S('',ST.LABEL),S(v2,ST.VAL),S('',ST.VAL)]);merges.push('A'+r+':B'+r,'C'+r+':E'+r,'F'+r+':G'+r,'H'+r+':I'+r);rowHeights[r]=21;};
   const metaWide=(l,v)=>{const r=push([S(l,ST.LABEL),S('',ST.LABEL),S(v,ST.VAL),S('',ST.VAL),S('',ST.VAL),S('',ST.VAL),S('',ST.VAL),S('',ST.VAL),S('',ST.VAL)]);merges.push('A'+r+':B'+r,'C'+r+':I'+r);rowHeights[r]=Math.min(48,18+Math.ceil(String(v).length/105)*12);};
   const chart=durl=>{if(!durl||typeof sigmaDataURLBytes!=='function')return;let bytes;try{bytes=sigmaDataURLBytes(durl);}catch(e){return;}images.push({bytes,dispW:CHART_W,dispH:CHART_H,row0:R});for(let i=0;i<Math.ceil(CHART_H/ROW_PX)+1;i++)blank();};
-  const app=window.QCLAB_APP||{},machine=instrumentName(t.instrumentId,t.machine)||t.machine||'—',rulesOn=WG_RULES.filter(rule=>testRuleOn(t,rule)).join(', ')||'Chưa bật luật nào';
+  const app=window.QCLAB_APP||{},machine=instrumentName(t.instrumentId,t.machine)||t.machine||'—',withinRules=WG_RULES.filter(rule=>testRuleOnWithin(t,rule)).join(', ')||'Không có',acrossRules=WG_RULES.filter(rule=>testRuleOnAcross(t,rule)).join(', ')||'Không có';
   let r=push([S('PHÂN TÍCH WESTGARD — '+testDisplayName(t),ST.TITLE)]);fullMerge(r);rowHeights[r]=24;
   const brand=(state.lab.name||'BỆNH VIỆN / ĐƠN VỊ')+' · '+(state.lab.dept||'Khoa Xét nghiệm')+(state.lab.address?' · '+state.lab.address:'')+'   ·   Xuất '+formatDateTimeVN(new Date().toISOString())+' · Người xuất: '+userName();
   r=push([S(brand,ST.SUB)]);fullMerge(r);rowHeights[r]=brand.length>115?29:15;blank();
   metaRow('Xét nghiệm',testDisplayName(t)+(t.unit?' · '+t.unit:''),'Thiết bị',machine);
   metaRow('Phiên bản app',(app.name||'QC Lab')+' '+(app.version||'dev'),'Phạm vi','Lô/mức đang xem');
-  metaWide('Bộ luật áp dụng',rulesOn);
+  metaWide('Luật theo từng mức',withinRules);
+  metaWide('Luật liên mức / lần chạy',acrossRules);
   metaWide('Dữ liệu chi tiết','Chỉ gồm điểm cảnh báo/loại và điểm lịch sử cấu thành quy tắc; các điểm QC bình thường không được xuất.');
   const multiViews=typeof wgMultiViews==='function'?wgMultiViews(t):wg.views.map(v=>({level:v.l.level,lot:v.l.lot,mean:v.l.mean,sd:v.l.sd,pts:v.pts,label:'M'+v.l.level+'·'+(v.l.lot||'?')}));
   if(multiViews.filter(v=>v.pts&&v.pts.length).length>=2){blank();section('Levey-Jennings tổng hợp theo Z-score');chart(typeof ljMultiDataURL==='function'?ljMultiDataURL(multiViews,t):null);}

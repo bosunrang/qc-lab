@@ -7,11 +7,12 @@ const ctx = loadSandbox(['modules/reports.js'], { window: { QCLAB_APP: { name: '
 run(ctx, `
   state={lab:{name:'PXN',dept:'Hóa sinh'},westgardRules:{'1-3s':true,'1-2s':false},tests:[{id:'T1',name:'Sodium',unit:'mmol/L',machine:'Máy A'}]};
   selTest='T1';
-  WG_RULES=['1-3s','1-2s'];
+  WG_RULES=['1-3s','R4s','1-2s'];
   wgPrevOpen=new Set();
   QCCore={westgardByPoint:(pts)=>({F:pts.map(()=>({rules:[]})),zs:pts.map(()=>0)})};
   function testRuleOn(t,rule){return !!(t.wgOnOverride&&t.wgOnOverride[rule])||(state.westgardRules||{})[rule]!==false;}
-  function testRuleOnWithin(t,rule){return testRuleOn(t,rule);}
+  function testRuleOnWithin(t,rule){return rule!=='R4s'&&testRuleOn(t,rule);}
+  function testRuleOnAcross(t,rule){return rule==='R4s'&&testRuleOn(t,rule);}
   function ruleResultLevel(t,rules){return rules&&rules.length?'rej':'ok';}
   function instrumentName(){return 'Máy A';}
   function testDisplayName(t){return t&&t.name||'';}
@@ -53,6 +54,8 @@ run(ctx, `
   assert.match(printed.title, /Sodium/, 'print title identifies the test');
   assert.match(printed.body, /QC Lab 2\.4\.0/);
   assert.doesNotMatch(printed.body, /westgard-print-hidpi/, 'internal build label is hidden from printed reports');
+  assert.match(printed.body, /Luật theo từng mức<\/th><td colspan="3">1-3s/, 'the report identifies rules evaluated within each QC level');
+  assert.match(printed.body, /Luật liên mức \/ lần chạy<\/th><td colspan="3">R4s/, 'the report separately identifies cross-level/run rules');
   assert.match(printed.body, /Mức 1 — Lô 1101/, 'body identifies level and lot');
   assert.match(printed.body, /data:lj:2:140:2\.5/, 'the LJ chart is rendered from the level\'s own points/mean/sd');
   assert.match(printed.body, /Điểm vi phạm\/cảnh báo/, 'the violations table is included when a rejected point exists');

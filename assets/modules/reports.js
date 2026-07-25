@@ -79,9 +79,9 @@ async function printSigmaPeriods(){
 async function printWestgard(){
   const t=state.tests.find(x=>x.id===selTest);if(!t){await infoDialog('Chưa chọn được xét nghiệm để in.');return;}
   const wg=activeWestgard(t);if(!wg.views.length){await infoDialog('Xét nghiệm này chưa có mức QC đang vận hành để in.');return;}
-  const machine=instrumentName(t.instrumentId,t.machine)||t.machine||'—',rulesOn=WG_RULES.filter(r=>testRuleOn(t,r)).join(', ')||'Chưa bật luật nào';
+  const machine=instrumentName(t.instrumentId,t.machine)||t.machine||'—',withinRules=WG_RULES.filter(r=>testRuleOnWithin(t,r)).join(', ')||'Không có',acrossRules=WG_RULES.filter(r=>testRuleOnAcross(t,r)).join(', ')||'Không có';
   let body=reportHeader('PHÂN TÍCH WESTGARD — '+esc(testDisplayName(t)),'Đối chiếu luật theo mức QC, lô và lần chạy');
-  body+='<table><tr><th style="width:20%">Xét nghiệm</th><td>'+esc(testDisplayName(t))+(t.unit?' · '+esc(t.unit):'')+'</td><th style="width:18%">Thiết bị</th><td>'+esc(machine)+'</td></tr><tr><th>Bộ luật đang áp dụng</th><td colspan="3">'+esc(rulesOn)+'</td></tr></table>';
+  body+='<table><tr><th style="width:20%">Xét nghiệm</th><td>'+esc(testDisplayName(t))+(t.unit?' · '+esc(t.unit):'')+'</td><th style="width:18%">Thiết bị</th><td>'+esc(machine)+'</td></tr><tr><th>Luật theo từng mức</th><td colspan="3">'+esc(withinRules)+'</td></tr><tr><th>Luật liên mức / lần chạy</th><td colspan="3">'+esc(acrossRules)+'</td></tr></table>';
   const multiViews=wg.views.map(v=>({level:v.l.level,lot:v.l.lot,mean:v.l.mean,sd:v.l.sd,pts:v.pts,label:'M'+v.l.level+'·'+(v.l.lot||'?')}));
   if(multiViews.filter(v=>v.pts.length).length>=2)body+='<h3>Levey-Jennings tổng hợp theo Z-score</h3><img src="'+ljMultiDataURL(multiViews,t)+'">';
   wg.views.forEach(v=>{

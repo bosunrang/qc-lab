@@ -1,7 +1,7 @@
 window.QCLAB_APP = {
   name: 'QC Lab',
-  version: '2.5.0',
-  releaseDate: '2026-07-24',
+  version: '2.5.1',
+  releaseDate: '2026-07-25',
   build: 'validated-operations'
 };
 
