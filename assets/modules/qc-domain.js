@@ -205,6 +205,11 @@ function operationalLevels(t){
   idx.levels.set(t.id,levels);
   return levels;
 }
+/* Mức đang vận hành nhưng thiếu Mean/SD hợp lệ: engine Westgard (core) trả "ok"
+   cho MỌI điểm khi sd<=0 hoặc mean không hợp lệ (guard ở westgard()) — nếu không
+   báo riêng, mức này hiển thị "Đạt" giả trên dashboard/trang Westgard. */
+function levelTargetOk(l){return!!l&&Number.isFinite(+l.mean)&&Number.isFinite(+l.sd)&&+l.sd>0;}
+function levelsMissingTarget(t){return operationalLevels(t).filter(l=>!levelTargetOk(l));}
 function isOperationalTest(t){return!!(t&&t.active!==false&&operationalPanelForTest(t)&&operationalLotGroupForTest(t)&&operationalLevels(t).length);}
 function canEnterQcForLevel(t,level){
   const cfg=t&&lvlCfg(t,+level);

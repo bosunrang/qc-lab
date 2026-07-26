@@ -143,6 +143,10 @@
   border-color:#c5e3df; background:#edf8f6; color:var(--tealink);
 }
 
+.dash-level-pill.missing-target{
+  border-color:#e4c273; background:#fbf1de; color:var(--amber);
+}
+
 .dash-test-list .tag.none{
   background:#edf2f5; color:#5c7180;
 }

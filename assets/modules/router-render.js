@@ -178,7 +178,7 @@ function emptyState(title,body,actions=''){return `<div class="empty"><div class
 function btn(label,onclick,cls='ghost sm',title='',opts={}){const{disabled=false,attrs={}}=opts,attrStr=Object.entries(attrs).map(([k,v])=>` ${k}="${escAttr(v)}"`).join('');return `<button class="btn ${cls}"${disabled?' disabled':''} onclick="${onclick}"${title?` title="${escAttr(title)}"`:''}${attrStr}>${label}</button>`;}
 function rangeActions(tid,level,eligible,applied){let h='';if(eligible)h+=btn('Workflow dải QC',`openRangeWorkflow('${tid}',${level})`,'teal sm','Xem điều kiện, dải đề xuất và phê duyệt');if(applied==='lab'&&canWrite())h+=btn('↶',`revertRange('${tid}',${level})`,'ghost icon','Về dải nhà sản xuất');return h?`<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">${h}</div>`:'';}
 function stateName(s){return s==='rej'?'Loại':s==='warn'?'Cảnh báo':s==='ok'?'Đạt':'Chưa có';}
-function qcVerdictLabel(level){return level==='ok'?'Đạt':level==='warn'?'Cảnh báo':'Loại bỏ';}
+function qcVerdictLabel(level){return level==='ok'?'Đạt':level==='warn'?'Cảnh báo':level==='none'?'Chưa đánh giá':'Loại bỏ';}
 
 /* ===== STATUS ===== */
 /* ===== RENDER ===== */

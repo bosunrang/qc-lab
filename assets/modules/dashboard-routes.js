@@ -3,7 +3,7 @@ function pageDash(){
   const tests=operationalTests(),missingWestgard=tests.filter(t=>!wgMemo.has(t.id));
   if(missingWestgard.length&&scheduleWestgardPrewarm(missingWestgard))return pageDashLoading(tests,missingWestgard.length);
   const today=isoToday();
-  const urgent=[],watch=[],exp=[];
+  const urgent=[],watch=[],exp=[],noTarget=[];
   const dashItems=tests.map(t=>{
     const wg=activeWestgard(t);
     const summary=WestgardViewModel.summarizeTestStatus({views:wg.views,verdicts:wg.byPoint,today});
@@ -15,6 +15,7 @@ function pageDash(){
       levelData.push({l,pts,st,todayLevel});
       const d=daysToExp(l.exp);if(d!=null&&d<=30)exp.push({t,l,d});
     });
+    levelsMissingTarget(t).forEach(l=>noTarget.push({t,l}));
     const latest=lastPoints.sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''),'vi',{numeric:true})||pointRunNo(a)-pointRunNo(b)).slice(-1)[0];
     const search=searchText([t.name,testDisplayName(t),t.machine,t.section,t.method,t.unit,...levelData.map(x=>`M${x.l.level} ${x.l.lot||''}`)].join(' '));
     statusMemo.set(t.id,s);
@@ -30,7 +31,8 @@ function pageDash(){
   const shiftItem=(o,cls)=>`<div class="shift-item ${cls}"><div><b>${esc(testDisplayName(o.t))} · M${o.l.level}</b><div class="meta">${vnDate(o.p.date)} · ${fmt(o.p.val)} ${esc(o.t.unit||'')} · ${o.rules.join(', ')||'—'}</div></div>${btn('Xem',`entrySel={testId:'${o.t.id}',level:${o.l.level}};entryStart=null;entryEnd=null;go('entry')`,'ghost sm')}</div>`;
   const urgentHtml=urgent.slice(0,5).map(o=>shiftItem(o,'rej')).join('');
   const watchHtml=watch.slice(0,4).map(o=>shiftItem(o,'warn')).join('');
-  const followHtml=urgentHtml||watchHtml?`<div class="dash-list">${urgentHtml}${watchHtml}</div>`:'<div class="alert ok">Không có điểm bị loại/cảnh báo cần xử lý ngay.</div>';
+  const noTargetHtml=noTarget.slice(0,4).map(o=>`<div class="shift-item warn"><div><b>${esc(testDisplayName(o.t))} · M${o.l.level}</b><div class="meta">Chưa có Mean/SD hợp lệ — điểm QC mức này không được đánh giá Westgard</div></div>${btn('Gán Mean/SD',`go('manage');setManageTab('targets')`,'ghost sm')}</div>`).join('');
+  const followHtml=urgentHtml||watchHtml||noTargetHtml?`<div class="dash-list">${urgentHtml}${noTargetHtml}${watchHtml}</div>`:'<div class="alert ok">Không có điểm bị loại/cảnh báo cần xử lý ngay.</div>';
   const expHtml=[...expByLot.values()].sort((a,b)=>a.d-b.d).slice(0,5).map(e=>`<div class="shift-item ${e.d<0?'rej':'warn'}"><div><b>Lô ${esc(e.l.lot||'?')} · M${e.l.level}</b><div class="meta">${e.count>1?e.count+' xét nghiệm · ':''}${e.d<0?'Hết hạn '+(-e.d)+' ngày':'Còn '+e.d+' ngày'}</div></div><span class="tag ${e.d<0?'rej':'warn'}">${e.d<0?'HSD':'Sắp hết'}</span></div>`).join('')||'<div class="hint">Không có lô sắp hết hạn trong 30 ngày.</div>';
   const dashStatusMatch=(item,key=dashTestStatus)=>{
     if(key==='all')return true;
@@ -45,7 +47,7 @@ function pageDash(){
   const testRows=statusItems.map(item=>{const {t,s,levelData,todayCount,totalPoints,latest,search}=item,lvls=levelData.map(x=>x.l);
     const statusTag=s==='rej'?'<span class="tag rej">Loại bỏ</span>':s==='warn'?'<span class="tag warn">Cảnh báo</span>':s==='ok'?'<span class="tag ok">Đạt</span>':'<span class="pill">chưa có</span>';
     const todayTag=todayCount>=lvls.length&&lvls.length?'<span class="tag ok">Đủ hôm nay</span>':todayCount?`<span class="tag warn">${todayCount}/${lvls.length} mức</span>`:'<span class="tag none">Chưa QC</span>';
-    const levels=levelData.map(x=>`<span class="dash-level-pill ${x.todayLevel?'done':''}">M${x.l.level}${x.l.lot?` · ${esc(x.l.lot)}`:''}${x.st?` · CV ${fmt(x.st.cv)}%`:''}</span>`).join('');
+    const levels=levelData.map(x=>{const ok=levelTargetOk(x.l);return `<span class="dash-level-pill ${x.todayLevel?'done':''}${ok?'':' missing-target'}"${ok?'':' title="Chưa có Mean/SD hợp lệ — không đánh giá Westgard"'}>M${x.l.level}${x.l.lot?` · ${esc(x.l.lot)}`:''}${x.st?` · CV ${fmt(x.st.cv)}%`:''}${ok?'':' · thiếu Mean/SD'}</span>`;}).join('');
     const latestText=latest?`${vnDate(latest.date)} · M${latest._level} · ${fmt(latest.val)}`:'Chưa có điểm';
     const rank=s==='rej'?0:s==='warn'?1:todayCount<lvls.length?2:s==='ok'?3:4;
     return{rank,name:t.name,html:`<tr class="${s}" data-search="${escAttr(search)}"><td><div class="dash-test-name">${esc(testDisplayName(t))}</div><div class="dash-test-sub">${esc(t.machine||'Chưa gán máy')}</div></td><td><div class="dash-level-list">${levels}</div></td><td>${todayTag}</td><td class="num"><b>${totalPoints}</b></td><td>${statusTag}</td><td><span class="dash-latest">${latestText}</span></td><td>${btn('Xem QC',`entrySel={testId:'${t.id}',level:${lvls[0].level}};entryStart=null;entryEnd=null;go('entry')`,'ghost sm')}</td></tr>`};
