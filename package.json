@@ -72,5 +72,8 @@
   },
   "dependencies": {
     "electron-updater": "^6.8.9"
+  },
+  "overrides": {
+    "brace-expansion": "^5.0.8"
   }
 }
