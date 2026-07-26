@@ -1,4 +1,4 @@
-﻿(function(root,factory){
+(function(root,factory){
   const api=factory();
   if(typeof module==='object'&&module.exports)module.exports=api;
   root.QCCore=api;
@@ -134,7 +134,11 @@
         if(zs[i]>2&&pos.length>=1){set(i,'rej','2of3-2s');pos.forEach(k=>support(k,'2of3-2s'));}
         if(zs[i]<-2&&neg.length>=1){set(i,'rej','2of3-2s');neg.forEach(k=>support(k,'2of3-2s'));}
       }
-      if(isOn('7T')&&i>=6){let inc=true,dec=true;for(let k=i-5;k<=i;k++){const cur=Number(points[k].val),prev=Number(points[k-1].val);if(!(cur>prev))inc=false;if(!(cur<prev))dec=false;}if(inc||dec){set(i,'warn','7T');for(let k=i-6;k<i;k++)support(k,'7T');}}
+      /* 7T quét trên z (không phải giá trị thô) để thống nhất với fast path
+         westgardLatestRulesFromZ và không báo trend giả khi Mean/SD được gán
+         lại giữa cửa sổ: đổi target làm z "reset" thì chuỗi trend cũng đứt.
+         z=NaN (thiếu target) khiến mọi so sánh false → trend tự đứt. */
+      if(isOn('7T')&&i>=6){let inc=true,dec=true;for(let k=i-5;k<=i;k++){if(!(zs[k]>zs[k-1]))inc=false;if(!(zs[k]<zs[k-1]))dec=false;}if(inc||dec){set(i,'warn','7T');for(let k=i-6;k<i;k++)support(k,'7T');}}
     }
     // 2-2s/3-1s/4-1s/6x..12x: quét "N liên tiếp cùng phía" dùng chung với multi
     wgScanRuns(zs,WG_RUN_RULES,isOn,(idx,rule)=>{const trigger=idx[idx.length-1];set(trigger,'rej',rule);idx.slice(0,-1).forEach(k=>support(k,rule));});
