@@ -127,6 +127,17 @@ it runs under `xvfb-run`, see the CI job):
   `node scripts/a11y-audit.js --update-baseline` — never raise a number by
   hand. `MODALS.open` entries are real functions (not eval'd strings) so the
   audit works under the CSP, which has no `unsafe-eval`.
+- `scripts/nce-workflow-check.js` (`npm run nce-check`) drives the NCE record
+  lifecycle on the "Khắc phục sự cố" page in real Chromium, because every bug it
+  guards only appears once the form is rendered *and re-rendered*: the edit/new
+  form must survive `rerender()` (a Firebase pull mid-typing used to blank it and
+  the next save wrote empty strings over the checklist), the incident identity
+  (`testId`/`level`/`lot`/`pointId`) must stay immutable once the record exists
+  (changing the test dropdown made `actionPoint()` return null and silently
+  dropped the QC-rerun gate), and the rerun/overdue/escalation chips must match
+  between "Sự cố cần xử lý" and "Hồ sơ NCE đang mở". Each area was proven
+  discriminating by reintroducing the original bug and watching the matching
+  checks fail.
 - `scripts/print-check.js` covers the DESKTOP print-to-PDF pipeline that
   nothing else in the repo can see: it boots the real app in Electron, opens
   the real print window via `printWestgard()` → `openPrint()`, drives the same

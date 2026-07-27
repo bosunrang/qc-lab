@@ -167,7 +167,9 @@ const plain = v => JSON.parse(JSON.stringify(v));
   const result = plain(ctx.EntryService.voidPoint(state, {
     tid: 'T1',
     pointId: 'p2',
-    reason: 'nhập nhầm giá trị',
+    reason: '',
+    kind: 'data-entry',
+    openNce: false,
     staff: { operatorName: 'KTV A' },
     nowIso: '2026-07-11T00:00:00.000Z',
     today: '2026-07-11',
@@ -177,14 +179,67 @@ const plain = v => JSON.parse(JSON.stringify(v));
     formatNumber: n => String(n),
   }));
   assert.equal(result.point.voided, true);
-  assert.equal(result.reason, 'nhập nhầm giá trị');
+  assert.equal(result.reason, 'Nhập sai dữ liệu');
+  assert.equal(result.point.voidKind, 'data-entry');
+  assert.equal(result.point.voidRequiresRerun, false);
   assert.equal(state.data.T1.find(p => p.id === 'p3').runId, '2026-07-01-3', 'historical run ids must remain stable after voiding a point');
   ctx.__setState(state);
   ctx.normalizePointLots();
   assert.equal(ctx.__getState().data.T1.find(p => p.id === 'p3').runId, '2026-07-01-3', 'normalization must not re-number historical runs after reload');
+  assert.equal(state.actions.length, 0, 'nhập sai dữ liệu chỉ để lại audit, không tự mở NCE');
+}
+
+{
+  const state = {
+    tests: [{ id: 'T1', levels: [{ level: 1, lot: 'L1', mean: 10, sd: 1 }] }],
+    data: { T1: [{ id: 'p1', date: '2026-07-01', runId: '2026-07-01-1', level: 1, lot: 'L1', val: 14 }] },
+    actions: [],
+  };
+  const result = plain(ctx.EntryService.voidPoint(state, {
+    tid: 'T1', pointId: 'p1', reason: '', kind: 'analytical', openNce: true, rule: '1-3s', errorType: 'RE — Sai số ngẫu nhiên', qcVerdict: 'rej',
+    staff: { operatorId: 'u1', operatorUsername: 'ktv', operatorName: 'KTV A' },
+    nowIso: '2026-07-11T00:00:00.000Z', today: '2026-07-11', dueDate: '2026-07-18',
+    id: 'a1', nceId: 'NCE-20260711-A001', formatDate: s => s, formatNumber: n => String(n),
+  }));
+  assert.equal(result.point.voidRequiresRerun, true);
   assert.equal(state.actions.length, 1);
-  assert.equal(state.actions[0].rule, 'Hủy điểm QC');
-  assert.equal(state.actions[0].approvalStatus, 'pending');
+  assert.equal(state.actions[0].protocolVersion, 2);
+  assert.equal(state.actions[0].nceId, 'NCE-20260711-A001');
+  assert.equal(state.actions[0].eventSource, 'iqc');
+  assert.equal(state.actions[0].rule, '1-3s');
+  assert.equal(state.actions[0].errorType, 'RE — Sai số ngẫu nhiên');
+  assert.equal(state.actions[0].qcVerdict, 'rej');
+  assert.match(state.actions[0].correction, /Kết quả QC thực tế không hợp lệ/);
+}
+
+{
+  const existing={id:'nce1',protocolVersion:2,nceId:'NCE-CU',pointId:'p1',approvalStatus:'pending'};
+  const state={tests:[{id:'T1'}],data:{T1:[{id:'p1',date:'2026-07-01',runId:'1',level:1,lot:'L1',val:14}]},actions:[existing]};
+  const result=plain(ctx.EntryService.voidPoint(state,{tid:'T1',pointId:'p1',reason:'Máy báo lỗi khi chạy QC',kind:'analytical',openNce:true,staff:{operatorName:'KTV A'},nowIso:'2026-07-11T00:00:00.000Z',today:'2026-07-11',id:'a2',nceId:'NCE-MOI',formatDate:s=>s,formatNumber:n=>String(n)}));
+  assert.equal(state.actions.length,1,'không tạo NCE trùng khi điểm đã có hồ sơ đang mở');
+  assert.equal(result.reusedAction,true);
+  assert.equal(result.action.id,'nce1');
+}
+
+{
+  const state={tests:[{id:'T1'}],data:{T1:[{id:'p1',date:'2026-07-01',level:1,val:10}]},actions:[]};
+  const result=plain(ctx.EntryService.voidPoint(state,{tid:'T1',pointId:'p1',reason:'',kind:'other',openNce:false,staff:{operatorName:'KTV A'},nowIso:'2026-07-11T00:00:00.000Z',today:'2026-07-11',id:'a1',formatDate:s=>s,formatNumber:n=>String(n)}));
+  assert.equal(result.error,'reason-too-short','lý do khác vẫn bắt buộc nội dung giải thích');
+  assert.equal(state.data.T1[0].voided,undefined);
+}
+
+{
+  // ISO 15189 đòi lý do cho mọi thao tác hủy dữ liệu: nhãn loại hủy là phân loại,
+  // ghi chú tự do của người dùng phải được giữ lại chứ không bị chuỗi mẫu nuốt mất.
+  const state={tests:[{id:'T1'}],data:{T1:[
+    {id:'p1',date:'2026-07-01',runId:'1',level:1,lot:'L1',val:14},
+    {id:'p2',date:'2026-07-02',runId:'1',level:1,lot:'L1',val:14},
+  ]},actions:[]};
+  const withNote=plain(ctx.EntryService.voidPoint(state,{tid:'T1',pointId:'p1',reason:'Máy báo lỗi hút mẫu lúc 08:15',kind:'analytical',openNce:true,staff:{operatorName:'KTV A'},nowIso:'2026-07-11T00:00:00.000Z',today:'2026-07-11',id:'a1',nceId:'NCE-1',formatDate:s=>s,formatNumber:n=>String(n)}));
+  assert.equal(withNote.reason,'Kết quả QC thực tế không hợp lệ — Máy báo lỗi hút mẫu lúc 08:15','ghi chú được nối vào sau nhãn loại hủy');
+  assert.equal(state.data.T1[0].voidReason,withNote.reason);
+  const withoutNote=plain(ctx.EntryService.voidPoint(state,{tid:'T1',pointId:'p2',reason:'',kind:'analytical',openNce:true,staff:{operatorName:'KTV A'},nowIso:'2026-07-11T00:00:00.000Z',today:'2026-07-11',id:'a2',nceId:'NCE-2',formatDate:s=>s,formatNumber:n=>String(n)}));
+  assert.equal(withoutNote.reason,'Kết quả QC thực tế không hợp lệ','không ghi chú thì vẫn giữ nhãn loại hủy');
 }
 
 {

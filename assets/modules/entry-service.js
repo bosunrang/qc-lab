@@ -137,19 +137,31 @@
     return{ok:true,point:saved};
   }
 
-  function voidPoint(state,{tid,pointId,reason,staff,nowIso,today,id,formatDate,formatNumber}){
+  function voidPoint(state,{tid,pointId,reason,kind='analytical',openNce=true,rule='Không có luật Westgard',errorType='—',qcVerdict='invalid',staff,nowIso,today,id,nceId,dueDate,formatDate,formatNumber}){
     const p=((state.data&&state.data[tid])||[]).find(x=>x.id===pointId);
     if(!p||p.voided)return null;
     if(root.PeriodService&&root.PeriodService.findLock(state,root.PeriodService.periodForDate(p.date)))return{error:'period-locked'};
-    const clean=QCCore.cleanText(reason,1000).trim();
-    if(clean.length<5)return{error:'reason-too-short'};
+    /* ISO 15189 đòi lý do cho MỌI thao tác sửa/hủy dữ liệu. Nhãn loại hủy là phân loại,
+       không thay được lời giải thích — nên ghi chú tự do luôn được nối vào voidReason,
+       và với loại "khác" thì bắt buộc vì nhãn không nói lên điều gì. */
+    const normalizedKind=['data-entry','analytical','other'].includes(kind)?kind:'other';
+    const kindLabel=normalizedKind==='analytical'?'Kết quả QC thực tế không hợp lệ':normalizedKind==='data-entry'?'Nhập sai dữ liệu':'';
+    const note=QCCore.cleanText(reason,1000).trim();
+    if(!kindLabel&&note.length<5)return{error:'reason-too-short'};
+    const clean=kindLabel?(note?`${kindLabel} — ${note}`:kindLabel):note;
     p.voided=true;
     p.voidReason=clean;
+    p.voidKind=normalizedKind;
+    p.voidRequiresRerun=!!openNce;
     p.voidedAt=nowIso;
     p.voidedBy=staff.operatorName||staff.operatorUsername||'';
     state.actions=state.actions||[];
-    const action={
+    const existing=[...state.actions].reverse().find(a=>a.pointId===p.id&&+a.protocolVersion>=2&&(a.approvalStatus||'pending')!=='approved');
+    let action=existing||null;
+    if(openNce&&!action)action={
       id,
+      protocolVersion:2,
+      nceId,
       date:today,
       createdAt:nowIso,
       createdByUserId:staff.operatorId||'',
@@ -158,17 +170,23 @@
       level:p.level,
       lot:p.lot||'',
       pointId:p.id,
-      rule:'Hủy điểm QC',
-      errorType:'Quản lý dữ liệu QC',
-      action:`Hủy điểm ngày ${formatDate(p.date)}, lần ${p.runId||'—'}, giá trị ${formatNumber(p.val)}. Lý do: ${clean}`,
+      rule:QCCore.cleanText(rule,200).trim()||'Không có luật Westgard',
+      errorType:QCCore.cleanText(errorType,120).trim()||'—',
+      qcVerdict:['warn','rej','invalid'].includes(qcVerdict)?qcVerdict:'invalid',
+      eventSource:'iqc',
+      processPhase:'exam',
+      correction:`Hủy điểm ngày ${formatDate(p.date)}, lần ${p.runId||'—'}, giá trị ${formatNumber(p.val)}. Lý do: ${clean}`,
       by:p.voidedBy,
+      dueDate:dueDate||'',
+      containmentStatus:'',
+      effectivenessStatus:'pending',
       approvalStatus:'pending',
       approvedAt:'',
       approvedBy:'',
       approvalNote:''
     };
-    state.actions.push(action);
-    return{point:p,action,reason:clean};
+    if(openNce&&!existing)state.actions.push(action);
+    return{point:p,action,reason:clean,openNce:!!openNce,reusedAction:!!existing};
   }
 
   function buildSheetRowsData({levels,sheetStart,sheetEnd,sheetDays,pointsByLevel,previousPointsByLevel,pointRunNo}){

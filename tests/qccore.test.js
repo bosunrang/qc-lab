@@ -397,6 +397,47 @@ function close(actual, expected, epsilon = 1e-9) {
 
 {
   const cleaned = QCCore.sanitizeBackup({
+    lab: {},tests: [],data: {},activity: [],users: [],
+    actions: [{id:'A1',protocolVersion:1,containmentStatus:'held',containmentNote:'Giữ kết quả',qcMaterialStatus:'ok',instrumentStatus:'abnormal',instrumentNote:'Cờ lỗi kim hút',reagentStatus:'ok',calibrationStatus:'na',calibrationNote:'Không có chỉ định',lotToLotStatus:'not-needed',causeCategory:'instrument',cause:'Kim hút bẩn',patientImpact:'none',patientAction:'',unsafe:{html:'<script>'}}]
+  });
+  const action=cleaned.actions[0];
+  assert.equal(action.protocolVersion,1);
+  assert.equal(action.instrumentStatus,'abnormal');
+  assert.equal(action.causeCategory,'instrument');
+  assert.equal(action.patientImpact,'none');
+}
+
+{
+  const cleaned=QCCore.sanitizeBackup({lab:{},tests:[],data:{},activity:[],users:[],actions:[{id:'NCE1',protocolVersion:2,nceId:'NCE-20260727-A001',eventSource:'iqc',processPhase:'exam',correction:'Dừng trả kết quả',dueDate:'2026-07-30',qcVerdict:'rej',riskSeverity:7,riskOccurrence:2,riskDetectability:1,riskLevel:'high',effectivenessStatus:'effective',effectivenessDate:'2026-07-31',effectivenessNote:'Không tái diễn',effectivenessBy:'QO'}]});
+  const action=cleaned.actions[0];
+  assert.equal(action.protocolVersion,2);
+  assert.equal(action.nceId,'NCE-20260727-A001');
+  assert.equal(action.qcVerdict,'rej');
+  assert.equal(action.riskSeverity,5,'risk score components are clamped to the 1–5 scale');
+  assert.equal(action.effectivenessStatus,'effective');
+}
+
+{
+  // Chuỗi escalate và lý do trả lại phải sống sót qua backup/đồng bộ, nếu không
+  // actionEffectivenessStatus() sẽ khoá lại hồ sơ đã chuyển và lý do trả lại biến mất.
+  const cleaned=QCCore.sanitizeBackup({lab:{},tests:[],data:{},activity:[],users:[],actions:[{id:'N1',protocolVersion:2,nceId:'NCE-B',parentNceId:'NCE-A',followUpNceId:'NCE-C',returnNote:'Thiếu bằng chứng hiệu chuẩn',returnBy:'Quản trị',returnAt:'2026-07-27T02:00:00.000Z'}]});
+  const action=cleaned.actions[0];
+  assert.equal(action.parentNceId,'NCE-A');
+  assert.equal(action.followUpNceId,'NCE-C');
+  assert.equal(action.returnNote,'Thiếu bằng chứng hiệu chuẩn');
+  assert.equal(action.returnBy,'Quản trị');
+  assert.equal(action.returnAt,'2026-07-27T02:00:00.000Z');
+}
+
+{
+  const cleaned=QCCore.sanitizeBackup({lab:{},tests:[{id:'T1',name:'Glucose',levels:[{level:1}]}],data:{T1:[{id:'p1',date:'2026-07-01',level:1,val:10,voided:true,voidKind:'data-entry',voidRequiresRerun:false}]},activity:[],users:[],actions:[]});
+  const point=cleaned.data.T1[0];
+  assert.equal(point.voidKind,'data-entry');
+  assert.equal(point.voidRequiresRerun,false);
+}
+
+{
+  const cleaned = QCCore.sanitizeBackup({
     lab: {},
     tests: [{ id: 'T1', name: 'Glucose', levels: [{ level: 1 }] }],
     data: {},

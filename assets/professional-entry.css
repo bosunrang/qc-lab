@@ -451,6 +451,22 @@
   margin:16px 16px 0; overflow-x:auto;
 }
 
+.void-nce-choice{
+  margin-top:10px; padding:10px 12px; border:1px solid var(--line); border-radius:var(--radius-md); background:var(--surface-subtle);
+}
+
+.void-nce-choice label{
+  display:flex; align-items:center; gap:8px; margin:0; color:var(--ink);
+}
+
+.void-nce-choice input{
+  flex:none;
+}
+
+.void-nce-choice .hint{
+  margin-top:4px;
+}
+
 .qc-voided-box h4{
   margin:0 0 10px; font-size:13.5px; font-weight:750; color:#203846;
 }

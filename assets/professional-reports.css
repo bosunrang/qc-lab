@@ -11,6 +11,180 @@
   padding:var(--panel-content-gap) 16px 16px;
 }
 
+.action-form-section{
+  padding:16px 0; border-top:1px solid var(--line);
+}
+
+.action-form-section:first-child{
+  padding-top:0; border-top:0;
+}
+
+.action-form-section-title{
+  display:flex; align-items:center; gap:10px; margin-bottom:12px;
+}
+
+.action-form-section-title>span{
+  display:inline-flex; align-items:center; justify-content:center; flex:none; min-width:30px; height:30px; padding:0 7px; border-radius:var(--radius-pill); background:var(--teal); color:var(--on-accent); font-size:12px; font-weight:850;
+}
+
+.action-form-section-title b,.action-form-section-title small{
+  display:block;
+}
+
+.action-form-section-title small,.action-investigation-item small,.action-form-submit span{
+  margin-top:2px; color:var(--muted); font-size:11.5px; line-height:1.4;
+}
+
+.action-form-grid2{
+  display:grid; grid-template-columns:1fr 1.4fr; gap:10px;
+}
+
+.action-form-grid3{
+  display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-top:10px;
+}
+
+.action-ident-groups{
+  display:grid; gap:10px;
+}
+
+.action-ident-group{
+  padding:12px; border:1px solid var(--line); border-radius:var(--radius-md); background:var(--surface-subtle);
+}
+
+.action-ident-group-title{
+  display:flex; align-items:baseline; gap:8px; margin-bottom:9px;
+}
+
+.action-ident-group-title b{
+  color:var(--ink); font-size:12.5px;
+}
+
+.action-ident-group-title small{
+  color:var(--muted); font-size:11px;
+}
+
+.action-form-meta{
+  display:grid; grid-template-columns:minmax(180px,.75fr) minmax(150px,.65fr) 1fr 1fr 1.1fr; gap:10px;
+}
+
+.action-form-owner{
+  display:grid; grid-template-columns:minmax(260px,1fr) 240px; gap:10px; max-width:720px;
+}
+
+.action-form-wide{
+  grid-column:1/-1;
+}
+
+/* focusActionField() gắn class này lên đúng ô còn thiếu khi bấm lưu, và tự gỡ ngay khi
+   người dùng bắt đầu sửa ô đó. */
+.action-form-body .field-invalid{
+  border-color:var(--red); box-shadow:0 0 0 3px color-mix(in srgb, var(--red) 22%, transparent);
+}
+
+.action-form-grid2 textarea{
+  min-height:64px; resize:vertical;
+}
+
+.action-form-grid2 textarea.action-textarea-compact{
+  min-height:38px; height:38px; resize:vertical;
+}
+
+.action-form-grid3 textarea{
+  min-height:64px; resize:vertical;
+}
+
+.action-risk-grid{
+  display:grid; grid-template-columns:repeat(4,minmax(0,1fr)) 88px; align-items:end; gap:10px;
+}
+
+.action-risk-score{
+  display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:62px; border:1px solid var(--section-head-border); border-radius:var(--radius-md); background:var(--section-head-bg);
+}
+
+.action-risk-score span{
+  color:var(--muted); font-size:11px; font-weight:750;
+}
+
+.action-risk-score b{
+  color:var(--tealink); font-size:22px;
+}
+
+.action-investigation-grid{
+  display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px;
+}
+
+.action-investigation-item{
+  display:grid; grid-template-columns:minmax(180px,1.1fr) minmax(145px,.7fr) minmax(180px,1fr); align-items:end; gap:8px; padding:10px; border:1px solid var(--line); border-radius:var(--radius-md); background:var(--surface-neutral);
+}
+
+.action-investigation-item:last-child{
+  grid-column:1/-1;
+}
+
+.action-investigation-item b,.action-investigation-item small{
+  display:block;
+}
+
+.action-form-submit{
+  display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px; border-radius:var(--radius-md); background:var(--section-head-bg); border:1px solid var(--section-head-border);
+}
+
+.action-form-submit b,.action-form-submit span{
+  display:block;
+}
+
+.action-form-submit .btn{
+  flex:none;
+}
+
+.action-submit-buttons{
+  display:flex; align-items:center; gap:8px; flex:none;
+}
+
+.action-guide-list,.action-detail-steps{
+  display:grid; gap:10px; margin:0; padding-left:24px;
+}
+
+.action-guide-list li,.action-detail-steps>li{
+  padding:10px 12px; border:1px solid var(--line); border-radius:var(--radius-md); background:var(--surface-neutral);
+}
+
+.action-guide-list b,.action-guide-list span{
+  display:block;
+}
+
+.action-guide-list span{
+  margin-top:3px; color:var(--muted); line-height:1.45;
+}
+
+.action-detail-meta{
+  display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px;
+}
+
+.action-detail-meta>div{
+  padding:10px 12px; border-radius:var(--radius-md); background:var(--section-head-bg);
+}
+
+.action-detail-meta span,.action-detail-meta b{
+  display:block;
+}
+
+.action-detail-meta span{
+  color:var(--muted); font-size:11px; font-weight:700;
+}
+
+.action-detail-check{
+  display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:7px;
+}
+
+.action-detail-check .tag{
+  flex:none;
+}
+
+.action-detail-legacy{
+  padding:12px; border:1px solid var(--line); border-radius:var(--radius-md); background:var(--surface-neutral); line-height:1.5;
+}
+
 .action-form-body label{
   margin-top:0;
 }
@@ -23,7 +197,7 @@
   margin:0;
 }
 
-#aLevelLabel[readonly]{
+#aLevelLabel[readonly],#aNceId[readonly]{
   background:#f7fbfc; color:#24404c; font-weight:750;
 }
 
@@ -222,11 +396,7 @@
 
 /* Corrective action and report rules migrated out of professional-base.css. */
 .action-form-main{
-  display:grid; grid-template-columns:minmax(220px,1fr) minmax(360px,1.7fr) minmax(170px,.85fr) minmax(190px,.9fr); gap:10px;
-}
-
-.action-form-row2{
-  display:grid; grid-template-columns:.7fr .8fr 1.7fr; gap:10px;
+  display:grid; grid-template-columns:minmax(220px,.8fr) minmax(280px,1fr) minmax(420px,1.7fr); gap:10px;
 }
 
 .action-log-table th:nth-child(5), .action-log-table td:nth-child(5){
@@ -261,19 +431,67 @@
   margin:12px 16px 0 !important;
 }
 
-@media(max-width:980px){
-.action-form-row2 > div:last-child{
-  grid-column:1/-1;
+@media(max-width:1280px){
+.action-investigation-grid{
+  grid-template-columns:1fr;
 }
 
-.action-form-main, .action-form-row2{
+.action-risk-grid{
   grid-template-columns:1fr 1fr;
+}
+
+.action-risk-score{
+  min-height:58px;
+}
+
+.action-investigation-item:last-child{
+  grid-column:auto;
+}
+
+.action-form-main{
+  grid-template-columns:1fr 1fr;
+}
+
+.action-form-meta{
+  grid-template-columns:1fr 1fr;
+}
+
+.action-form-main>div:last-child{
+  grid-column:1/-1;
 }
 }
 
 @media(max-width:760px){
-.action-form-main, .action-form-row2{
+.action-form-main, .action-form-grid2, .action-form-grid3, .action-form-meta, .action-form-owner, .action-risk-grid, .action-detail-meta{
   grid-template-columns:1fr;
+}
+
+.action-form-wide{
+  grid-column:auto;
+}
+
+.action-form-main>div:last-child{
+  grid-column:auto;
+}
+
+.action-ident-group-title{
+  display:block;
+}
+
+.action-ident-group-title small{
+  display:block; margin-top:2px;
+}
+
+.action-investigation-item{
+  grid-template-columns:1fr;
+}
+
+.action-form-submit{
+  align-items:stretch; flex-direction:column;
+}
+
+.action-submit-buttons{
+  align-items:stretch; flex-direction:column-reverse;
 }
 
 .panel:has(#reportSearch) > .hint{

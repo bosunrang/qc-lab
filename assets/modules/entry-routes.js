@@ -358,6 +358,17 @@ function entryInlineSaveCommit(tid,level,date,val,runId,lotNo=''){
   entrySel={testId:tid,level};entryLastMsg=f.level==='rej'?`<div class="alert rej"><b>⚠ ${tag} vi phạm — ${rules.join(', ')}</b></div>`:f.level==='warn'?`<div class="alert warn"><b>${tag} cảnh báo — ${rules.join(', ')}</b></div>`:`<div class="alert ok">✓ Đã lưu ${tag} ngày ${vnDate(date)}.</div>`;
   entryRenderKeepScroll();
 }
+function syncVoidNceChoice(){
+  const kind=(document.getElementById('voidKindInput')||{}).value,box=document.getElementById('voidOpenNce'),hint=document.getElementById('voidNceHint'),reasonBox=document.getElementById('voidReasonBox'),reasonErr=document.getElementById('voidReasonErr');
+  if(!box)return;
+  if(kind==='analytical'){box.checked=true;box.disabled=true;if(hint)hint.textContent='Hệ thống sẽ mở hoặc tái sử dụng hồ sơ NCE và chờ một kết quả QC chạy lại được chấp nhận.';}
+  else if(kind==='data-entry'){box.checked=false;box.disabled=true;if(hint)hint.textContent='Chỉ lưu dấu vết hủy; không mở NCE và không yêu cầu chạy lại QC.';}
+  else{box.checked=false;box.disabled=false;if(hint)hint.textContent='Chọn mục này nếu sự việc cần điều tra và xác nhận QC chạy lại.';}
+  const label=document.getElementById('voidReasonLabel');
+  if(label)label.textContent=kind==='other'?'Lý do hủy (bắt buộc, tối thiểu 5 ký tự)':'Ghi chú / bằng chứng (khuyến nghị)';
+  if(reasonBox)reasonBox.hidden=false;
+  if(reasonErr)reasonErr.style.display='none';
+}
 async function voidQcPoint(tid,pointId){
   if(!requireWrite())return;
   const t=state.tests.find(x=>x.id===tid),p=(state.data[tid]||[]).find(x=>x.id===pointId);
@@ -367,20 +378,27 @@ async function voidQcPoint(tid,pointId){
     <div class="modal-h"><h3>Hủy điểm QC</h3><button class="modal-close" onclick="closeModal()">×</button></div>
     <div class="modal-b">
       <div class="hint">Ngày ${vnDate(p.date)} · Mức ${p.level} · Giá trị ${fmt(p.val)}</div>
-      <label>Lý do hủy (tối thiểu 5 ký tự)</label>
-      <textarea id="voidReasonInput" placeholder="VD: Nhập nhầm giá trị, lỗi máy đo, hủy do lấy mẫu lại..." oninput="document.getElementById('voidReasonErr').style.display='none'"></textarea>
-      <div id="voidReasonErr" class="hint" style="color:var(--red);display:none;margin-top:6px">Cần ghi lý do hủy tối thiểu 5 ký tự.</div>
+      <label>Loại hủy</label>
+      <select id="voidKindInput" aria-label="Loại hủy điểm QC" onchange="syncVoidNceChoice()">
+        <option value="analytical">Kết quả QC thực tế không hợp lệ</option>
+        <option value="data-entry">Nhập sai dữ liệu</option>
+        <option value="other">Lý do khác</option>
+      </select>
+      <div class="void-nce-choice"><label><input id="voidOpenNce" type="checkbox" checked disabled> Mở hồ sơ NCE và yêu cầu chạy lại QC</label><div id="voidNceHint" class="hint">Hệ thống sẽ mở hoặc tái sử dụng hồ sơ NCE và chờ một kết quả QC chạy lại được chấp nhận.</div></div>
+      <div id="voidReasonBox"><label id="voidReasonLabel">Ghi chú / bằng chứng (khuyến nghị)</label>
+        <textarea id="voidReasonInput" aria-label="Ghi chú lý do hủy điểm QC" placeholder="VD: Máy báo lỗi hút mẫu lúc 08:15, đã ghi nhận trong sổ bảo trì..." oninput="document.getElementById('voidReasonErr').style.display='none'"></textarea>
+        <div id="voidReasonErr" class="hint" style="color:var(--red);display:none;margin-top:6px">Cần ghi lý do hủy tối thiểu 5 ký tự.</div>
+      </div>
     </div>
     <div class="modal-f">${btn('Đóng','closeModal()','ghost')}${btn('Xác nhận hủy',`confirmVoidQcPoint('${tid}','${pointId}')`,'danger')}</div>
   </div>`);
-  setTimeout(()=>{const e=document.getElementById('voidReasonInput');if(e)e.focus();},50);
+  setTimeout(()=>{const e=document.getElementById('voidKindInput');if(e)e.focus();},50);
 }
 async function confirmVoidQcPoint(tid,pointId){
   const t=state.tests.find(x=>x.id===tid),p=(state.data[tid]||[]).find(x=>x.id===pointId);
   if(!t||!p||p.voided){closeModal();return;}
-  const input=document.getElementById('voidReasonInput');
-  const clean=QCCore.cleanText(input?input.value:'',1000).trim();
-  if(clean.length<5){
+  const input=document.getElementById('voidReasonInput'),kind=(document.getElementById('voidKindInput')||{}).value||'other',openNce=!!((document.getElementById('voidOpenNce')||{}).checked),clean=QCCore.cleanText(input?input.value:'',1000).trim(),verdict=activeWestgard(t).byPoint.get(p.id)||{level:'ok',rules:[]},rules=[...new Set(verdict.rules||[])],rule=rules.join(', ')||'Không có luật Westgard',qcVerdict=['warn','rej'].includes(verdict.level)?verdict.level:'invalid',qcErrorType=errorType(rules);
+  if(kind==='other'&&clean.length<5){
     const err=document.getElementById('voidReasonErr');
     if(err)err.style.display='';
     if(input)input.focus();
@@ -389,14 +407,16 @@ async function confirmVoidQcPoint(tid,pointId){
   // confirmDialog() render vào #dialogRoot, tách khỏi #modalRoot đang giữ modal
   // "Hủy điểm QC" phía sau — nên Hủy ở đây không đụng gì tới modal đó, giữ nguyên
   // lý do người dùng đã gõ mà không cần dựng lại.
-  if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Hủy điểm QC',message:'Hủy điểm QC này khỏi tính toán Westgard/thống kê?',detail:'Điểm vẫn được giữ trong nhật ký dữ liệu.',confirmLabel:'Hủy điểm QC',cancelLabel:'Quay lại'}))return;
+  const detail=openNce?'Điểm vẫn được giữ trong nhật ký; hồ sơ NCE sẽ được mở hoặc tái sử dụng và yêu cầu QC chạy lại.':'Điểm vẫn được giữ trong nhật ký; thao tác này không tự mở hồ sơ NCE.';
+  if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Hủy điểm QC',message:'Hủy điểm QC này khỏi tính toán Westgard/thống kê?',detail,confirmLabel:'Hủy điểm QC',cancelLabel:'Quay lại'}))return;
   closeModal();
-  const result=EntryService.voidPoint(state,{tid,pointId,reason:clean,staff:currentStaff(),nowIso:new Date().toISOString(),today:isoToday(),id:uid(),formatDate:vnDate,formatNumber:fmt});
+  const result=EntryService.voidPoint(state,{tid,pointId,reason:clean,kind,openNce,rule,errorType:qcErrorType,qcVerdict,staff:currentStaff(),nowIso:new Date().toISOString(),today:isoToday(),id:uid(),nceId:nextNceId(isoToday()),dueDate:nceDueDate(7),formatDate:vnDate,formatNumber:fmt});
   if(result&&result.error==='period-locked'){entrySetLastMsg('<div class="alert warn">Kỳ này đã chốt, không thể hủy điểm QC.</div>');return;}
   if(!result||result.error)return;
   clearDerivedForTest(tid);
   logAct('Hủy điểm QC',`Ngày ${vnDate(result.point.date)}, M${result.point.level}, giá trị ${fmt(result.point.val)} · ${result.reason}`,t.name);
-  save({clearDerived:false,testId:tid});entryLastMsg=`<div class="alert warn">Đã hủy điểm QC ngày ${vnDate(result.point.date)}. Điểm không còn tham gia tính toán.</div>`;entryRenderKeepScroll();
+  const followup=result.openNce?(result.reusedAction?' Đã giữ liên kết với hồ sơ NCE đang mở.':` Đã mở hồ sơ ${esc(result.action&&result.action.nceId||'NCE')} để tiếp tục điều tra.`):' Không yêu cầu NCE/QC chạy lại.';
+  save({clearDerived:false,testId:tid});entryLastMsg=`<div class="alert warn">Đã hủy điểm QC ngày ${vnDate(result.point.date)}. Điểm không còn tham gia tính toán.${followup}</div>`;entryRenderKeepScroll();
 }
 function entrySetSheetMonth(v){if(!/^\d{4}-\d{2}$/.test(v))return;entrySheetMonth=v;entryLastMsg='';rerender();}
 function entryGoToday(){entrySheetMonth=isoMonth();entryJumpToday=true;entryLastMsg='';rerender();}
