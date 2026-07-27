@@ -146,6 +146,37 @@ const plain = (v) => JSON.parse(JSON.stringify(v));
   assert.equal(ctx.statesLikelyEqual(a, bDifferentContent), false, 'real content differs -> should compare unequal (prompt before letting cloud overwrite)');
 }
 
+// --- Scenario 8b: statesLikelyEqual() chỉ được so các nhánh THỰC SỰ được đồng bộ.
+// Bug thật (2026-07-27): hàm cũ so JSON.stringify toàn bộ state, nên luôn lệch ít nhất
+// ở schemaVersion/teaRegistryVersion — state cục bộ có, cloud không bao giờ có vì
+// FB_TOP không đẩy chúng lên. Hậu quả: hộp thoại "Dữ liệu cục bộ khác dữ liệu trung
+// tâm" bật lên MỖI lần đăng nhập dù hai bên đã đồng bộ y hệt. Fixture của Scenario 8
+// đối xứng nhân tạo (cùng thứ tự khóa, không có field cục bộ) nên không bắt được. ---
+{
+  const cloudPoints = { T1: [{ id: 'p1', val: 5 }] };
+  const local = Object.assign(baseState({ tests: [{ id: 'T1', name: 'Glucose' }], data: { T1: [{ id: 'p1', val: 5 }] } }), {
+    schemaVersion: 4, teaRegistryVersion: 3, _ts: 999, _client: 'c_local',
+  });
+
+  const cloud = baseState({ tests: [{ id: 'T1', name: 'Glucose' }], data: cloudPoints });
+  assert.equal(ctx.statesLikelyEqual(local, cloud), true, 'field chỉ tồn tại cục bộ (schemaVersion/teaRegistryVersion/_ts/_client) không được tính là khác biệt');
+
+  // RTDB không lưu mảng/đối tượng rỗng: nhánh rỗng trên máy biến mất hẳn khi tải về.
+  const cloudMissingEmpties = baseState({ tests: [{ id: 'T1', name: 'Glucose' }], data: cloudPoints });
+  delete cloudMissingEmpties.machines; delete cloudMissingEmpties.periodLocks; delete cloudMissingEmpties.sigmaData;
+  assert.equal(ctx.statesLikelyEqual(local, cloudMissingEmpties), true, 'nhánh rỗng trên máy vs thiếu hẳn trên cloud phải coi là giống nhau');
+
+  // RTDB không giữ thứ tự khóa — trả về theo thứ tự của nó, không theo thứ tự đã ghi.
+  const reordered = { data: { T1: [{ val: 5, id: 'p1' }] }, tests: [{ name: 'Glucose', id: 'T1' }] };
+  Object.keys(cloud).forEach(k => { if (!(k in reordered)) reordered[k] = cloud[k]; });
+  assert.equal(ctx.statesLikelyEqual(local, reordered), true, 'khác thứ tự khóa không phải là khác dữ liệu');
+
+  // Nhưng khác biệt THẬT vẫn phải bị bắt, kể cả nằm sâu trong data/{testId}.
+  assert.equal(ctx.statesLikelyEqual(local, baseState({ tests: [{ id: 'T1', name: 'Glucose' }], data: { T1: [{ id: 'p1', val: 9 }] } })), false, 'điểm QC khác giá trị vẫn phải hỏi trước khi ghi đè');
+  assert.equal(ctx.statesLikelyEqual(local, baseState({ tests: [{ id: 'T1', name: 'Glucose' }], data: { T1: [{ id: 'p1', val: 5 }, { id: 'p2', val: 6 }] } })), false, 'cloud có thêm điểm QC vẫn phải hỏi trước khi ghi đè');
+  assert.equal(ctx.statesLikelyEqual(local, baseState({ tests: [{ id: 'T1', name: 'Glucose' }], data: cloudPoints, qcLots: [{ id: 'l1', lotNo: 'L1' }] })), false, 'danh mục cấu hình khác nhau vẫn phải hỏi');
+}
+
 // --- Scenario 9: autosave must not push before the first Firebase snapshot is loaded ---
 {
   run(ctx, `
