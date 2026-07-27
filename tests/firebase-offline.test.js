@@ -81,5 +81,28 @@ const result = run(ctx, `
   assert.equal(cache.recomputed, true, 'a new baseline object recomputes');
   assert.equal(cache.sameContent, true, 'recomputation yields the same content');
   assert.equal(cache.nullOk, true, 'a null baseline is handled');
+
+  const ctx4 = loadSandbox(['core.js', 'modules/state.js', 'modules/firebase-sync.js', 'modules/state-storage.js', 'modules/qc-domain.js']);
+  const denied = JSON.parse(JSON.stringify(await run(ctx4, `
+    (async()=>{
+      document={getElementById:function(){return null;},addEventListener:function(){}};
+      localStorage={setItem:function(){}};
+      navigator={onLine:true};
+      clearTimeout=function(){};
+      var timers=[];
+      setTimeout=function(fn,delay){timers.push({fn,delay});return timers.length;};
+      var base={lab:{name:'Lab'},machines:[],instruments:[],assayGroups:[],qcPanels:[],lotTransitions:[],lotGroups:[],qcLots:[],tests:[],actions:[],activity:[],users:[{id:'u1',username:'admin'}],reagentTests:[],reagentOperators:[],reagentSampleTypes:[],periodLocks:[],westgardRules:{},configMigrationVersion:1,data:{},sigmaData:{}};
+      state=JSON.parse(JSON.stringify(base));state.users.push({id:'u2',username:'new-user'});
+      fb.ready=true;fb.initialized=true;fb.ref={update:function(){return Promise.reject(new Error('PERMISSION_DENIED: permission_denied'));}};
+      fb.synced=JSON.parse(JSON.stringify(base));fb.dirty=true;fb.retryT=null;fb.retryMs=1000;
+      await fbFlushPush();
+      return{dirty:fb.dirty,retryPending:fb.retryT!==null,timers:timers.length,label:saveLabel,detail:saveDetail};
+    })()
+  `)));
+  assert.equal(denied.dirty, true, 'permission denial keeps the unsynced local change visible');
+  assert.equal(denied.retryPending, false, 'permission denial does not enter an endless network retry loop');
+  assert.equal(denied.timers, 0);
+  assert.match(denied.label, /bị từ chối/);
+  assert.match(denied.detail, /admin: true/);
   console.log('Firebase offline retry tests passed');
 })().catch(error=>{console.error(error);process.exitCode=1;});

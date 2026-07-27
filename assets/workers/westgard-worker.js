@@ -3,7 +3,7 @@
     module.exports=factory(require('../core.js'));
     return;
   }
-  if(typeof importScripts==='function'&&typeof root.QCCore==='undefined')importScripts('../core.js?v=seven-t-zscan-20260726-1');
+  if(typeof importScripts==='function'&&typeof root.QCCore==='undefined')importScripts('../core.js?v=seven-t-seven-points-20260727-1');
   const api=factory(root.QCCore);
   root.onmessage=function(event){
     const job=event&&event.data;

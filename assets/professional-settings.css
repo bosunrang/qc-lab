@@ -18,7 +18,12 @@
 .settings-unit-fields{
   display:grid;
   gap:10px;
-  margin:16px 16px 0;
+  margin:var(--panel-content-gap) 16px 0;
+}
+
+.settings-unit-fields label,
+.firebase-auth-grid label{
+  margin-top:0;
 }
 
 .settings-panel-actions{
@@ -33,7 +38,7 @@
 }
 
 .rules-tools{
-  display:flex; align-items:center; justify-content:space-between; gap:12px; margin:14px 16px 0; padding:10px 12px; border:1px solid #dbe7ed; border-radius:var(--radius-md); background:var(--surface-subtle);
+  display:flex; align-items:center; justify-content:space-between; gap:12px; margin:var(--panel-content-gap) 16px 0; padding:10px 12px; border:1px solid #dbe7ed; border-radius:var(--radius-md); background:var(--surface-subtle);
 }
 
 .rules-tools span{
@@ -41,7 +46,7 @@
 }
 
 .firebase-guide{
-  margin:14px 16px 0; border:1px solid #dbe7ed; border-radius:var(--radius-md); background:var(--surface-card-soft); overflow:hidden;
+  margin:var(--panel-content-gap) 16px 0; border:1px solid #dbe7ed; border-radius:var(--radius-md); background:var(--surface-card-soft); overflow:hidden;
 }
 
 .firebase-guide summary{
@@ -132,6 +137,10 @@
   min-width:0;
 }
 
+.firebase-acl-status{
+  margin:10px 16px 0;
+}
+
 .firebase-sync-panel > label,
 .firebase-sync-panel > .hint{
   display:block; margin-left:16px; margin-right:16px;
@@ -167,6 +176,10 @@
 
 .firebase-sync-panel > label,
 .firebase-sync-panel > .hint{
+  margin-left:12px; margin-right:12px;
+}
+
+.firebase-acl-status{
   margin-left:12px; margin-right:12px;
 }
 

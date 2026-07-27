@@ -60,6 +60,9 @@
   --section-head-border:var(--gray-200);
   --section-head-ink:var(--gray-900);
   --section-head-size:14px;
+  --panel-header-min-height:44px;
+  --subpanel-header-min-height:42px;
+  --panel-content-gap:14px;
   --card-head-bg:var(--gray-100);
   --card-head-border:var(--gray-200);
   --card-head-ink:var(--gray-900);

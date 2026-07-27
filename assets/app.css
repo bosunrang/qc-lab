@@ -12,7 +12,7 @@
   .side-foot{margin-top:auto;padding:10px 4px 0;line-height:1.5;}
   .side-foot .foot-panel{padding:9px;}
   .side-foot button{width:100%;margin-top:6px;background:#223644;color:#d5e2ea;border:1px solid #2b4352;border-radius:var(--surface-radius);padding:7px;cursor:pointer;font-family:var(--sans);}
-  .admin-tools{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:14px 16px 16px;align-items:stretch}
+  .admin-tools{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:var(--panel-content-gap) 16px 16px;align-items:stretch}
   .admin-tool{padding:13px;display:grid;grid-template-rows:auto minmax(66px,1fr) auto;gap:8px;min-height:188px;}
   .admin-tool b{font-size:13px}.admin-tool .btn{width:100%;align-self:end}
   .top-user button{height:30px;border-radius:var(--surface-radius);border:1px solid var(--line);background:#f8fafb;color:#30414f;cursor:pointer;font-size:12px;font-weight:750;font-family:var(--sans);display:inline-flex;align-items:center;gap:6px;padding:0 10px}

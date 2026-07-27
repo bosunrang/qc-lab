@@ -196,7 +196,7 @@
 }
 
 .tea-source-registry{
-  display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin:14px 16px 0;
+  display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin:var(--panel-content-gap) 16px 0;
 }
 
 .tea-source-card{

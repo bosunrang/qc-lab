@@ -126,34 +126,43 @@ function close(actual, expected, epsilon = 1e-9) {
   assert.ok(wg.F.every(f => !f.rules.includes('6x')));
 }
 
-{ // 7T: 7 điểm tăng dần → 7T; có điểm bằng nhau (plateau) → KHÔNG phải trend
-  const up = [9.4, 9.6, 9.8, 10.0, 10.2, 10.4, 10.6].map(v => ({ val: v }));
+{ // 7T: 7 điểm QC liên tiếp tăng/giảm; 6 điểm hoặc plateau → KHÔNG phải trend
+  const six = [9.3, 9.4, 9.6, 9.8, 10.0, 10.2].map(v => ({ val: v }));
+  assert.ok(QCCore.westgard(six,10,1,r=>r==='7T').F.every(f=>!f.rules.includes('7T')));
+  const up = [...six, { val: 10.4 }];
   const trend=QCCore.westgard(up,10,1,r=>r==='7T');
   assert.ok(trend.F.slice(0,-1).every(f=>f.supportRules.includes('7T')));
   assert.ok(trend.F[6].rules.includes('7T'));
-  const flat = [9.4, 9.6, 9.8, 9.8, 10.0, 10.2, 10.4].map(v => ({ val: v }));
+  const flat = [9.2, 9.4, 9.6, 9.8, 9.8, 10.0, 10.2].map(v => ({ val: v }));
   assert.ok(QCCore.westgard(flat, 10, 1, r => r === '7T').F.every(f => !f.rules.includes('7T')));
 }
 
-{ // 7T quét trên z: giá trị thô tăng nghiêm ngặt nhưng target được gán lại giữa
-  // cửa sổ (snapshot qcMean/qcSd của điểm cuối khác hẳn) → z "reset", KHÔNG phải
-  // trend. Trước 2026-07-26 engine chính quét giá trị thô nên báo 7T giả ở ca này;
-  // fast path westgardLatestRules vốn đã quét z — hai engine phải khớp nhau.
+{ // 7T quét trên z nhưng reset TƯỜNG MINH khi target snapshot đổi. Ca này cố ý
+  // làm z vẫn tăng nghiêm ngặt qua ranh giới target để chứng minh không thể dựa
+  // vào việc z "tự reset"; engine đầy đủ và fast path phải cùng không báo 7T.
   const pts = [
-    { val: 100, qcMean: 100, qcSd: 2 }, // z: 0, 0.5, 1, 1.5, 2, 2.5
+    { val: 100, qcMean: 100, qcSd: 2 }, // z: 0, 0.5, 1
     { val: 101, qcMean: 100, qcSd: 2 },
     { val: 102, qcMean: 100, qcSd: 2 },
-    { val: 103, qcMean: 100, qcSd: 2 },
-    { val: 104, qcMean: 100, qcSd: 2 },
-    { val: 105, qcMean: 100, qcSd: 2 },
-    { val: 201, qcMean: 200, qcSd: 2 }, // z = 0.5 — thô vẫn tăng (105 → 201)
+    { val: 203, qcMean: 200, qcSd: 2 }, // z tiếp tục: 1.5, 2, 2.5, 3, 3.5
+    { val: 204, qcMean: 200, qcSd: 2 },
+    { val: 205, qcMean: 200, qcSd: 2 },
+    { val: 206, qcMean: 200, qcSd: 2 },
+    { val: 207, qcMean: 200, qcSd: 2 },
   ];
   const wg = QCCore.westgardByPoint(pts, 100, 2, r => r === '7T');
   assert.ok(wg.F.every(f => !f.rules.includes('7T')), 'đổi target giữa cửa sổ phải cắt đứt 7T');
   assert.deepEqual(QCCore.westgardLatestRules(pts, 100, 2, r => r === '7T'), [], 'fast path phải khớp engine chính');
   // Cùng chuỗi đó nhưng target thống nhất → z tăng đều → 7T vẫn bắt đúng.
   const steady = pts.map(p => ({ val: p.val, qcMean: 100, qcSd: 2 }));
-  assert.ok(QCCore.westgardByPoint(steady, 100, 2, r => r === '7T').F[6].rules.includes('7T'), 'target thống nhất vẫn bắt 7T bình thường');
+  assert.ok(QCCore.westgardByPoint(steady, 100, 2, r => r === '7T').F[6].rules.includes('7T'), 'target thống nhất vẫn bắt 7T bình thường tại điểm thứ 7');
+
+  const sdChanged = Array.from({ length: 8 }, (_, i) => ({ val: i, qcMean: 0, qcSd: i < 4 ? 1 : 2 }));
+  assert.ok(QCCore.westgardByPoint(sdChanged, 0, 1, r => r === '7T').F.every(f => !f.rules.includes('7T')), 'đổi SD cũng phải cắt đứt 7T');
+  assert.deepEqual(QCCore.westgardLatestRules(sdChanged, 0, 1, r => r === '7T'), [], 'fast path phải reset khi SD đổi');
+
+  const missing = Array.from({ length: 8 }, (_, i) => ({ val: i }));
+  assert.ok(QCCore.westgardByPoint(missing, NaN, NaN, r => r === '7T').F.every(f => !f.rules.includes('7T')), 'thiếu Mean/SD không được tạo 7T');
 }
 
 { // 2of3-2s single-track: 2 trong 3 điểm cùng phía >2SD → đánh dấu đúng 2 điểm đó

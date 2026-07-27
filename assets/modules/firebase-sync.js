@@ -1,5 +1,5 @@
 /* ===== FIREBASE ===== */
-let fb={ready:false,initialized:false,ref:null,dirty:false,clientId:'c_'+uid(),authUser:null,pendingRenderT:null,pullT:null,seenSig:null,synced:null,retryT:null,retryMs:1000},fbSaveT=null;
+let fb={ready:false,initialized:false,ref:null,dirty:false,clientId:'c_'+uid(),authUser:null,authAcl:null,connectError:null,pendingRenderT:null,pullT:null,seenSig:null,synced:null,retryT:null,retryMs:1000},fbSaveT=null;
 /* Các nhánh dữ liệu cấp cao nhất được đồng bộ độc lập với nhau. Trong đó, các nhánh
    là DANH SÁCH (FB_LIST_KEYS) — gồm cả 'data'/'sigmaData' (tách thêm theo từng mã xét
    nghiệm) — được trộn theo TỪNG PHẦN TỬ (khóa `id`, hoặc theo nội dung nếu không có id)
@@ -65,6 +65,17 @@ function fbAddChildUpdates(payload,snapBranch,baseBranch,curBranch,path){
   Object.keys(snapBranch).forEach(id=>{if(snapBranch[id]!==baseBranch[id])payload[path+'/'+id]=curBranch[id];});
   Object.keys(baseBranch).forEach(id=>{if(!(id in snapBranch))payload[path+'/'+id]=null;});
 }
+/* Firebase Rules khóa từng activity/{index} theo kiểu append-only. Không gửi cả mảng
+   activity tại path cha vì một quyền ghi ở path cha sẽ bỏ qua rào chắn từng dòng.
+   Chỉ mở rộng các index thực sự khác baseline; sửa/xóa lịch sử vẫn được gửi để server
+   từ chối rõ ràng, thay vì âm thầm bỏ qua và báo đồng bộ thành công sai. */
+function fbExpandProtectedUpdates(payload,cur,base){
+  if(!Object.prototype.hasOwnProperty.call(payload,'activity'))return payload;
+  delete payload.activity;
+  const current=Array.isArray(cur&&cur.activity)?cur.activity:[],previous=Array.isArray(base&&base.activity)?base.activity:[],n=Math.max(current.length,previous.length);
+  for(let i=0;i<n;i++)if(fbJson(current[i])!==fbJson(previous[i]))payload['activity/'+i]=i<current.length?current[i]:null;
+  return payload;
+}
 /* So sánh state hiện tại với baseline thô (fb.synced) để chỉ đẩy đúng các nhánh đã
    thay đổi. Việc đẩy lên cloud vẫn theo cấp xét nghiệm (data/{testId} nguyên khối) —
    chỉ phần TRỘN khi nhận dữ liệu về (fbMerge) mới đi sâu tới từng điểm. */
@@ -73,7 +84,7 @@ function fbBuildUpdate(cur){
   FB_TOP.forEach(k=>{if(snap.keys[k]!==base.keys[k])payload[k]=cur[k]===undefined?null:cur[k];});
   fbAddChildUpdates(payload,snap.data,base.data,cur.data||{},'data');
   fbAddChildUpdates(payload,snap.sigma,base.sigma,cur.sigmaData||{},'sigmaData');
-  return{payload};
+  return{payload:fbExpandProtectedUpdates(payload,cur,fb.synced)};
 }
 function fbHasLocalChanges(){return Object.keys(fbBuildUpdate(state).payload).length>0;}
 /* Khóa nhận dạng một phần tử (điểm QC/kỳ Sigma, hoặc phần tử của một nhánh FB_LIST_KEYS
@@ -171,12 +182,36 @@ function fbFirstConnectMerge(local,remote){
 let saveLabel='Cục bộ',saveDetail='';
 function getDeployFbCfg(){
   const c=window.QCLAB_CLOUD;
-  if(c&&c.config)return{labCode:c.labCode||'khoaXN',email:c.email||(c.anonymous?'anonymous':''),anonymous:c.anonymous!==false,config:c.config,deploy:true,locked:c.locked===true};
+  if(c&&c.config)return{labCode:c.labCode||'default',email:c.email||(c.anonymous?'anonymous':''),anonymous:c.anonymous!==false,config:c.config,deploy:true,locked:c.locked===true};
   return null;
 }
 function getStoredFbCfg(){try{const c=JSON.parse(localStorage.getItem('qclab_fb')||'null');if(!c||typeof c!=='object')return null;return{...c,anonymous:c.anonymous===true};}catch(e){return null;}}
 function getFbCfg(){const deploy=getDeployFbCfg(),stored=getStoredFbCfg();if(deploy&&deploy.locked)return deploy;return stored||deploy;}
 function fbConfigSig(cfg){const keys=['apiKey','authDomain','databaseURL','projectId','appId'];return JSON.stringify(Object.fromEntries(keys.map(k=>[k,String(cfg&&cfg[k]||'')])));}
+function fbAclCapabilities(raw){
+  if(raw===true)return{read:true,write:true,admin:false,legacy:true};
+  const acl=raw&&typeof raw==='object'?raw:{},admin=acl.admin===true,write=admin||acl.write===true;
+  return{read:write||acl.read===true,write,admin,legacy:false};
+}
+function fbAclRoleLabel(acl=fb.authAcl){
+  if(!acl||!acl.read)return'Chưa có quyền';
+  if(acl.admin)return'Quản trị Firebase';
+  if(acl.write)return acl.legacy?'Ghi nghiệp vụ (ACL cũ)':'Nhập liệu';
+  return'Chỉ xem';
+}
+function fbCanWriteBusiness(){return!(fb&&fb.ref&&fb.authUser)||!!(fb.authAcl&&fb.authAcl.write);}
+function fbCanManageUsers(){return!(fb&&fb.ref&&fb.authUser)||!!(fb.authAcl&&fb.authAcl.admin);}
+function requireFirebaseUserAdmin(){
+  if(fbCanManageUsers())return true;
+  infoDialog('Tài khoản Firebase của máy này không có quyền admin. Không thể thay đổi tài khoản hoặc mật khẩu khi đang đồng bộ. Hãy dùng máy có ACL admin: true, hoặc ngắt Firebase để chỉ thay đổi dữ liệu cục bộ.');
+  return false;
+}
+function fbPermissionDenied(error){return/permission_denied/i.test(String(error&&error.message||error||''));}
+async function fbLoadAcl(code,uid){
+  const snap=await firebase.database().ref('qclab-acl/'+code+'/'+uid).once('value'),acl=fbAclCapabilities(snap.val());
+  if(!acl.read)throw new Error('permission_denied: UID chưa có quyền đọc mã phòng '+code);
+  return acl;
+}
 async function ensureFirebaseApp(cfg){
   if(typeof firebase==='undefined'||typeof firebase.initializeApp!=='function')throw new Error('Chưa tải được Firebase.');
   const desired=fbConfigSig(cfg),apps=firebase.apps||[];
@@ -204,7 +239,7 @@ function fbDataPath(){
 }
 function fbStatusLabel(){
   const cfg=getFbCfg()||{},u=fb.authUser||{};
-  return (u.email||(u.isAnonymous?'ẩn danh':'đã xác thực'))+' · '+(cfg.labCode||'default')+' · '+fbDataPath();
+  return (u.email||(u.isAnonymous?'ẩn danh':'đã xác thực'))+' · '+fbAclRoleLabel()+' · '+(cfg.labCode||'default')+' · '+fbDataPath();
 }
 function fbSnapshotSig(v){
   if(!v)return'empty';
@@ -223,7 +258,7 @@ function fbDisconnect(clearAuthUser){
   if(fbSaveT){clearTimeout(fbSaveT);fbSaveT=null;}
   fbResetRetry();
   if(fb.ref)fb.ref.off();
-  fb.ready=false;fb.initialized=false;fb.ref=null;fb.synced=null;fb.seenSig=null;
+  fb.ready=false;fb.initialized=false;fb.ref=null;fb.synced=null;fb.seenSig=null;fb.authAcl=null;
   if(clearAuthUser)fb.authUser=null;
 }
 async function fbPullOnce(){
@@ -262,6 +297,14 @@ async function fbHandleValue(v,opts={}){
     return;
   }
   const remote=QCCore.sanitizeBackup(v),base=fb.synced;
+  const localAudit=typeof auditVerifyChain==='function'?auditVerifyChain(state.activity||[]):{ok:true};
+  const remoteAudit=typeof auditVerifyChain==='function'?auditVerifyChain(remote.activity||[]):{ok:true};
+  if(!localAudit.ok||!remoteAudit.ok){
+    const side=!localAudit.ok?'cục bộ':'đám mây',check=!localAudit.ok?localAudit:remoteAudit;
+    fbSetReady();
+    markSaved(`audit ${side} không hợp lệ`,`Dòng #${(+check.brokenIndex||0)+1}: ${check.reason||'không xác định'} · đã dừng đồng bộ`);
+    return;
+  }
   // Bỏ qua chính bản ghi do máy này vừa đẩy lên (chống tự dội: mất focus/nháy màn hình),
   // nhưng vẫn đánh dấu snapshot đầu tiên đã tải để các lần lưu sau mới được push.
   if(v._client&&v._client===fb.clientId){
@@ -314,12 +357,15 @@ async function fbHandleValue(v,opts={}){
   // Các lần sau: trộn 3 chiều theo từng phần tử với base = bản đồng bộ gần nhất.
   const previousState=state;
   state=base?fbMerge(state,remote,base):(mergeFirstConnect?fbFirstConnectMerge(state,remote):remote);
-  /* mergePointArray() (fbMerge/fbFirstConnectMerge) ghép activity theo từng phần tử,
-     không theo đúng thứ tự chuỗi hash logic của từng máy — hai dòng liền kề trong
-     chuỗi hash gốc của MỘT máy có thể bị chen dòng của máy kia vào giữa sau khi
-     ghép. Nối lại chuỗi hash theo đúng thứ tự mảng SAU khi ghép để auditVerifyChain()
-     không báo "bị sửa" sai chỉ vì thứ tự đổi — xem auditRelinkChain() ở audit.js. */
-  if(typeof auditRelinkChain==='function'&&Array.isArray(state.activity))state.activity=auditRelinkChain(state.activity);
+  /* Giữ nguyên hash lịch sử của từng máy. Nếu đồng bộ tạo nhiều nhánh audit hợp lệ,
+     chỉ nối các đầu nhánh bằng một mốc hợp nhất mới; tuyệt đối không ký lại lịch sử. */
+  const mergedAudit=typeof auditMergeChains==='function'?auditMergeChains(state.activity||[]):{ok:true,activity:state.activity||[]};
+  if(!mergedAudit.ok){
+    state=previousState;clearDerived();fb.dirty=hadLocalChanges;fbSetReady();
+    markSaved('audit sau hợp nhất không hợp lệ',`Dòng #${(+mergedAudit.brokenIndex||0)+1}: ${mergedAudit.reason||'không xác định'} · đã dừng đồng bộ`);
+    return;
+  }
+  state.activity=mergedAudit.activity;
   clearDerived();
   ensureShape();
   const invariantErrors=QCCore.validateStateInvariants(state);
@@ -343,6 +389,7 @@ async function fbHandleValue(v,opts={}){
 }
 async function initFirebase(){
   const cfg=getFbCfg();
+  fb.connectError=null;
   if(!cfg||!cfg.config){setCloudStatus('Đang chạy cục bộ',false);return;}
   if(typeof firebase==='undefined'||typeof firebase.auth!=='function'){setCloudStatus('Thiếu Firebase Authentication',false);return;}
   try{
@@ -357,6 +404,7 @@ async function initFirebase(){
     fb.authUser=authUser;
     const code=(cfg.labCode||'default').replace(/[.#$/\[\]]/g,'_');
     fbDisconnect();
+    fb.authAcl=await fbLoadAcl(code,authUser.uid);
     fb.ref=firebase.database().ref('qclab-shared/'+code);
     fb.ref.on('value',snap=>{
       fbHandleValue(snap.val());
@@ -370,7 +418,7 @@ async function initFirebase(){
     });
     fbStartPull();
     setCloudStatus('Đang tải dữ liệu Firebase · '+fbDataPath(),true);markSaved('đang tải dữ liệu','Firebase');
-  }catch(e){fbDisconnect();setCloudStatus('Lỗi xác thực/kết nối Firebase',false);markSaved('lỗi kết nối',e&&e.message?e.message:'Firebase');}
+  }catch(e){fbDisconnect();fb.connectError=e;setCloudStatus(fbPermissionDenied(e)?'Chưa được cấp quyền Firebase':'Lỗi xác thực/kết nối Firebase',false);markSaved('lỗi kết nối',e&&e.message?e.message:'Firebase');}
 }
 /* Không vẽ lại toàn trang khi người dùng đang thao tác dở (đang mở modal hoặc đang gõ trong ô nhập),
    để dữ liệu đồng bộ từ máy khác không xóa mất nội dung đang nhập. Hoãn lại rồi tự áp dụng sau. */
@@ -397,14 +445,14 @@ function applyRemoteRender(){
 async function syncNow(){
   if(!fbCanWrite())return false;
   mem=state;state._ts=Date.now();state._client=fb.clientId;markSaved('đang đồng bộ','Firebase');
-  const payload=fbClone(state),draftStamp=typeof sigmaDraftStamp==='function'?sigmaDraftStamp():0;
+  const snapshot=fbClone(state),payload=fbExpandProtectedUpdates(fbClone(snapshot),snapshot,null),draftStamp=typeof sigmaDraftStamp==='function'?sigmaDraftStamp():0;
   try{
-    await fb.ref.set(payload);
-    fb.synced=payload;fb.dirty=false;markSaved('đã đồng bộ','Lúc '+saveTime());
+    await fb.ref.update(payload);
+    fb.synced=snapshot;fb.dirty=false;markSaved('đã đồng bộ','Lúc '+saveTime());
     if(typeof clearSigmaDraftThrough==='function')clearSigmaDraftThrough(draftStamp);
     fbStoreLocal();
     return true;
-  }catch(e){markSaved('lỗi đồng bộ','Dữ liệu cục bộ vẫn còn');throw e;}
+  }catch(e){markSaved(fbPermissionDenied(e)?'đồng bộ bị từ chối':'lỗi đồng bộ',fbPermissionDenied(e)?'Kiểm tra quyền read/write/admin trong Firebase ACL':'Dữ liệu cục bộ vẫn còn');throw e;}
 }
 /* Đẩy NỀN theo từng nhánh (dùng cho mọi lần lưu tự động): chỉ gửi nhánh đã đổi
    -> nhẹ hơn (không kéo lại logo/toàn bộ nhật ký) và không đè nhánh máy khác đang sửa. */
@@ -431,5 +479,14 @@ async function fbFlushPush(){
      (seed phòng trống lần đầu kết nối, đẩy hội tụ sau merge) — nếu không set lại,
      fbScheduleRetry thoát ngay ở !fb.dirty và lần đẩy đó không bao giờ được thử
      lại tới tận khi người dùng có thao tác lưu mới. */
-  }catch(e){fb.dirty=true;markSaved('lỗi đồng bộ','Dữ liệu cục bộ vẫn còn · sẽ tự thử lại');fbScheduleRetry();}
+  }catch(e){
+    fb.dirty=true;
+    if(fbPermissionDenied(e)){
+      fbResetRetry();
+      const userWrite=Object.keys(payload).some(path=>path==='users'||path.startsWith('users/'));
+      markSaved('đồng bộ bị từ chối',userWrite?'Firebase ACL cần admin: true để thay đổi người dùng':'Firebase ACL không cho phép thao tác ghi này');
+      return;
+    }
+    markSaved('lỗi đồng bộ','Dữ liệu cục bộ vẫn còn · sẽ tự thử lại');fbScheduleRetry();
+  }
 }

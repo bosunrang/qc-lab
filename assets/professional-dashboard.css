@@ -307,7 +307,7 @@ textarea:focus,
 .dash-main .panel > .alert,
 .panel > h3:first-child + .dash-list,
 .panel > h3:first-child ~ .dash-list{
-  margin:16px 16px 14px;
+  margin:var(--panel-content-gap) 16px 14px;
 }
 
 @media(max-width:760px){

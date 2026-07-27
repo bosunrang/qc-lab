@@ -1,13 +1,15 @@
 /* ===== USERS PAGE ===== */
 function pageUsers(){
+  const cloudAdmin=fbCanManageUsers(),cloudDisabled=!cloudAdmin;
   const rows=state.users.map(u=>`<tr>
     <td><b>${esc(u.name||u.username)}</b><div class="hint">@${esc(u.username)}${u.initials?' · '+esc(u.initials):''}</div></td>
     <td>${roleLabel(u.role)}</td>
     <td>${u.active===false?'<span class="tag rej">Khóa</span>':'<span class="tag ok">Hoạt động</span>'}</td>
-    <td><div class="user-row-actions">${u.id===currentUser.id?'<span class="hint">(bạn)</span> '+btn('Đổi mật khẩu',"resetPass('"+u.id+"')",'ghost sm')
-      :btn('Sửa quyền',"openUserPerms('"+u.id+"')",'ghost sm')+' '+btn('Đặt lại MK',"resetPass('"+u.id+"')",'ghost sm')+' '+btn(u.active===false?'Mở khóa':'Khóa',"toggleUser('"+u.id+"')",'ghost sm')+' '+btn('Xóa',"delUser('"+u.id+"')",'danger sm')}</div></td></tr>`).join('');
+    <td><div class="user-row-actions">${u.id===currentUser.id?'<span class="hint">(bạn)</span> '+btn('Đổi mật khẩu',"resetPass('"+u.id+"')",'ghost sm','',{disabled:cloudDisabled})
+      :btn('Sửa quyền',"openUserPerms('"+u.id+"')",'ghost sm','',{disabled:cloudDisabled})+' '+btn('Đặt lại MK',"resetPass('"+u.id+"')",'ghost sm','',{disabled:cloudDisabled})+' '+btn(u.active===false?'Mở khóa':'Khóa',"toggleUser('"+u.id+"')",'ghost sm','',{disabled:cloudDisabled})+' '+btn('Xóa',"delUser('"+u.id+"')",'danger sm','',{disabled:cloudDisabled})}</div></td></tr>`).join('');
   return headOnly('Quản lý người dùng','Phân quyền thao tác và kiểm soát tài khoản')+
-   `<div class="panel"><h3 role="heading" aria-level="2">Thêm người dùng</h3><div class="user-create-layout">
+   `${cloudAdmin?'':`<div class="alert warn user-cloud-admin-warning"><b>Firebase chỉ cấp quyền ${esc(fbAclRoleLabel())}.</b> Quản lý người dùng và mật khẩu bị khóa trên máy này; cần ACL <code>admin: true</code>.</div>`}
+   <div class="panel"><h3 role="heading" aria-level="2">Thêm người dùng</h3><div class="user-create-layout">
      <div class="user-create-card">
        <div class="user-create-card-title">Thông tin tài khoản</div>
        <div class="user-create-fields">
@@ -16,7 +18,7 @@ function pageUsers(){
        <div><label>Mã viết tắt</label><input id="uInitials" maxlength="12" placeholder="NTL"></div>
        <div><label>Vai trò</label><select id="uRole" aria-label="Vai trò" onchange="syncUserPermChecks('newUserPerms',this.value)"><option value="admin">Quản trị</option><option value="technician" selected>KTV</option><option value="viewer">Chỉ xem</option></select></div>
        <div><label>Mật khẩu tạm</label><input id="uPass" aria-label="Mật khẩu tạm" type="password" autocomplete="new-password"></div>
-       <div class="user-create-actions">${btn('Thêm','addUser()','teal')}</div>
+       <div class="user-create-actions">${btn('Thêm','addUser()','teal','',{disabled:cloudDisabled})}</div>
        </div>
      </div>
      <div class="user-create-access">
@@ -26,35 +28,66 @@ function pageUsers(){
      </div>
      <div class="hint user-create-hint"><b>Vai trò</b> quyết định quyền sửa/quản trị trong các thẻ được tick. <b>KTV:</b> nhập/sửa dữ liệu vận hành · <b>Chỉ xem:</b> chỉ đọc. Người dùng mới sẽ phải đổi mật khẩu khi đăng nhập lần đầu.</div></div>`;
 }
+let auditQ='',auditFrom='',auditTo='',auditPage=1,auditPageSize=25;
+const AUDIT_PAGE_SIZES=[25,50,100];
+function auditDateKey(a){
+  const d=new Date(a&&a.ts);
+  return Number.isFinite(+d)?isoDate(d):'';
+}
+function auditFilteredActivities(items=state.activity||[]){
+  const q=searchText(auditQ);
+  return (items||[]).filter(a=>{
+    const date=auditDateKey(a);
+    if(auditFrom&&(!date||date<auditFrom))return false;
+    if(auditTo&&(!date||date>auditTo))return false;
+    if(!q)return true;
+    return searchText([a.seq,formatDateTimeVN(a.ts),a.user,a.username,roleLabel(a.role||'viewer'),a.type,a.target,a.detail].join(' ')).includes(q);
+  }).slice().reverse();
+}
+function auditSetQuery(value){
+  auditQ=value;auditPage=1;
+  scheduleSearchRender(auditSetQuery,rerender,'auditSearch');
+}
+function auditSetDate(field,value){
+  const iso=value?(vnPickerParse(value)||parseVN(value)||''):'';
+  if(field==='from'){auditFrom=iso;if(iso&&auditTo&&iso>auditTo)auditTo=iso;}
+  else{auditTo=iso;if(iso&&auditFrom&&iso<auditFrom)auditFrom=iso;}
+  auditPage=1;rerender();
+}
+function auditSetPageSize(value){
+  const size=Number(value);auditPageSize=AUDIT_PAGE_SIZES.includes(size)?size:25;auditPage=1;rerender();
+}
+function auditSetPage(value){
+  auditPage=Math.max(1,Number(value)||1);rerender();
+}
+function auditClearFilters(){
+  auditQ='';auditFrom='';auditTo='';auditPage=1;rerender();
+}
 function pageAudit(){
   const total=(state.activity||[]).length;
   const chain=typeof auditVerifyChain==='function'?auditVerifyChain():{ok:true,checked:0,legacy:total};
   const chainHtml=chain.ok?`<span class="tag ok">Chuỗi hash hợp lệ</span> <span class="hint">${chain.checked} dòng đã khóa hash${chain.legacy?` · ${chain.legacy} dòng cũ chưa có hash`:''}</span>`:`<span class="tag rej">Audit có dấu hiệu bị sửa</span> <span class="hint">Lỗi tại dòng #${(state.activity[chain.brokenIndex]||{}).seq||chain.brokenIndex+1}: ${esc(chain.reason)}</span>`;
-  const rows=(state.activity||[]).slice().reverse().map(a=>`<tr><td><div class="audit-time-cell"><span class="audit-seq">${a.seq?'#'+a.seq:''}</span><span class="audit-time">${formatDateTimeVN(a.ts)}</span></div></td><td><b>${esc(a.user||'')}</b><div class="hint">${roleLabel(a.role||'viewer')}${a.username?' · @'+esc(a.username):''}</div></td><td><span class="pill">${esc(a.type||'')}</span></td><td>${esc(a.target||'')||'<span class="hint">—</span>'}</td><td class="audit-detail">${esc(a.detail||'')||'<span class="hint">—</span>'}</td></tr>`).join('');
+  const filtered=auditFilteredActivities(),pageCount=Math.max(1,Math.ceil(filtered.length/auditPageSize));
+  auditPage=Math.min(Math.max(1,auditPage),pageCount);
+  const offset=(auditPage-1)*auditPageSize,pageRows=filtered.slice(offset,offset+auditPageSize);
+  const rows=pageRows.map(a=>`<tr><td><div class="audit-time-cell"><span class="audit-seq">${a.seq?'#'+a.seq:''}</span><span class="audit-time">${formatDateTimeVN(a.ts)}</span></div></td><td><b>${esc(a.user||'')}</b><div class="hint">${roleLabel(a.role||'viewer')}${a.username?' · @'+esc(a.username):''}</div></td><td><span class="pill">${esc(a.type||'')}</span></td><td>${esc(a.target||'')||'<span class="hint">—</span>'}</td><td class="audit-detail">${esc(a.detail||'')||'<span class="hint">—</span>'}</td></tr>`).join('');
+  const hasFilter=!!(auditQ||auditFrom||auditTo);
+  const pageSizeOptions=AUDIT_PAGE_SIZES.map(size=>`<option value="${size}" ${size===auditPageSize?'selected':''}>${size} dòng</option>`).join('');
+  const resultFrom=filtered.length?offset+1:0,resultTo=Math.min(offset+auditPageSize,filtered.length);
+  const pagination=filtered.length?`<div class="audit-pagination"><span class="hint">Hiển thị ${resultFrom}–${resultTo} / ${filtered.length} dòng</span><div>${btn('‹ Trước',`auditSetPage(${auditPage-1})`,'ghost sm','',{disabled:auditPage<=1})}<b>Trang ${auditPage}/${pageCount}</b>${btn('Sau ›',`auditSetPage(${auditPage+1})`,'ghost sm','',{disabled:auditPage>=pageCount})}</div></div>`:'';
   return headOnly('Nhật ký hoạt động','Lưu vết các thao tác quan trọng; chỉ quản trị viên được xem')+
     `<div class="panel"><h3 role="heading" aria-level="2">Công cụ</h3><div class="row-flex">
       ${btn('Xuất CSV nhật ký','exportActivityCSV()','teal sm')}
-      ${total?btn('Xóa nhật ký','clearActivityLog()','danger sm'):''}
       <div class="hint" style="align-self:center">${total} dòng hoạt động đã ghi nhận. ${chainHtml}</div>
     </div></div>
-    <div class="panel"><h3>Hoạt động gần đây</h3>${rows?`<table class="audit-table"><thead><tr><th>Thời gian</th><th>Người dùng</th><th>Hành động</th><th>Đối tượng</th><th>Chi tiết</th></tr></thead><tbody>${rows}</tbody></table>`:emptyState('Chưa có hoạt động','Nhật ký sẽ bắt đầu ghi từ các thao tác tiếp theo.')}</div>`;
+    <div class="panel audit-log-panel"><div class="audit-log-head"><h3 role="heading" aria-level="2">Hoạt động gần đây</h3><input id="auditSearch" type="search" aria-label="Tìm nhật ký hoạt động" placeholder="Tìm người dùng, hành động, đối tượng..." value="${escAttr(auditQ)}" oninput="auditSetQuery(this.value)"></div>
+      <div class="audit-filterbar"><div><label>Từ ngày</label>${dateBox('auditFromDate',auditFrom,'audit-date',`aria-label="Lọc nhật ký từ ngày" onchange="auditSetDate('from',this.value)"`)}</div><div><label>Đến ngày</label>${dateBox('auditToDate',auditTo,'audit-date',`aria-label="Lọc nhật ký đến ngày" onchange="auditSetDate('to',this.value)"`)}</div><div><label>Số dòng mỗi trang</label><select aria-label="Số dòng nhật ký mỗi trang" onchange="auditSetPageSize(this.value)">${pageSizeOptions}</select></div>${hasFilter?btn('Xóa bộ lọc','auditClearFilters()','ghost sm audit-clear-filter'):''}<div class="audit-filter-summary" role="status">${filtered.length}/${total} dòng</div></div>
+      ${rows?`<div class="audit-table-wrap"><table class="audit-table"><thead><tr><th>Thời gian</th><th>Người dùng</th><th>Hành động</th><th>Đối tượng</th><th>Chi tiết</th></tr></thead><tbody>${rows}</tbody></table></div>`:emptyState(total?'Không tìm thấy nhật ký':'Chưa có hoạt động',total?'Thử từ khóa hoặc khoảng ngày khác.':'Nhật ký sẽ bắt đầu ghi từ các thao tác tiếp theo.')}
+      ${pagination}</div>`;
 }
-function exportActivityCSV(){const rows=[['Seq','Thời gian','Người dùng','Tên đăng nhập','Vai trò','Hành động','Đối tượng','Chi tiết','PrevHash','Hash']];(state.activity||[]).forEach(a=>rows.push([a.seq||'',formatDateTimeVN(a.ts),a.user||'',a.username||'',roleLabel(a.role||'viewer'),a.type||'',a.target||'',a.detail||'',a.prevHash||'',a.hash||'']));downloadCSV('Nhat_ky_hoat_dong_QCLab.csv',rows);}
-/* Xóa vĩnh viễn toàn bộ nhật ký hoạt động — khác với "Xóa sạch dữ liệu test" (resetAllData)
-   vốn CHỦ ĐỘNG giữ lại nhật ký. Đây là ngoại lệ duy nhất cho quy tắc "chỉ ghi nối tiếp,
-   không tự cắt bớt dòng" — chỉ admin bấm được, có xác nhận, và tự ghi lại đúng 1 dòng nhật ký
-   mới ghi nhận việc đã xóa (để vẫn còn dấu vết là đã có một lần xóa, dù không phục hồi được nội dung cũ). */
-async function clearActivityLog(){
-  if(!requireAdmin())return;
-  const count=(state.activity||[]).length;if(!count)return;
-  if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa nhật ký hoạt động',message:`Xóa vĩnh viễn toàn bộ ${count} dòng nhật ký hoạt động?`,detail:'Không thể khôi phục lại được — nên xuất Excel nhật ký trước nếu cần lưu lại.',confirmLabel:'Xóa nhật ký',cancelLabel:'Hủy'}))return;
-  state.activity=[];
-  logAct('Xóa nhật ký hoạt động',`Đã xóa vĩnh viễn ${count} dòng nhật ký trước đó`,'Nhật ký');
-  save({clearDerived:false});rerender();
-  await infoDialog('Đã xóa nhật ký hoạt động.',{type:'success'});
-}
+function exportActivityCSV(){const rows=[['Seq','Thời gian','Người dùng','Tên đăng nhập','Vai trò','Hành động','Đối tượng','Chi tiết','PrevHash','MergeParents','Hash']];(state.activity||[]).forEach(a=>rows.push([a.seq||'',formatDateTimeVN(a.ts),a.user||'',a.username||'',roleLabel(a.role||'viewer'),a.type||'',a.target||'',a.detail||'',a.prevHash||'',(a.mergePrevHashes||[]).join(' | '),a.hash||'']));downloadCSV('Nhat_ky_hoat_dong_QCLab.csv',rows);}
 async function addUser(){
-  if(!requireAdmin())return;
+  if(!requireAdmin()||!requireFirebaseUserAdmin())return;
   const username=document.getElementById('uUser').value.trim().toLowerCase();const name=document.getElementById('uName').value.trim();const initials=QCCore.cleanText(document.getElementById('uInitials').value,12).trim().toUpperCase();const rolev=document.getElementById('uRole').value;const pass=document.getElementById('uPass').value;
   if(!username||!pass){await infoDialog('Nhập tên đăng nhập và mật khẩu.');return;}
   const passErr=passwordError(pass);if(passErr){await infoDialog(passErr);return;}
@@ -77,7 +110,7 @@ async function collectUserPerms(groupId,roleValue){
   return [...new Set(picked)];
 }
 async function openUserPerms(id){
-  if(!requireAdmin())return;
+  if(!requireAdmin()||!requireFirebaseUserAdmin())return;
   const u=state.users.find(x=>x.id===id);if(!u)return;
   if(currentUser&&currentUser.id===id){await infoDialog('Không thể tự sửa quyền của tài khoản đang đăng nhập. Hãy dùng tài khoản quản trị khác nếu cần thay đổi.');return;}
   const roleSelect=`<select id="editUserRole" aria-label="Vai trò" onchange="syncUserPermChecks('editUserPerms',this.value)"><option value="admin" ${u.role==='admin'?'selected':''}>Quản trị</option><option value="technician" ${u.role==='technician'?'selected':''}>KTV</option><option value="viewer" ${u.role==='viewer'?'selected':''}>Chỉ xem</option></select>`;
@@ -91,7 +124,7 @@ async function openUserPerms(id){
     <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn('Lưu quyền',`applyUserPerms('${id}')`,'teal')}</div></div>`);
 }
 async function applyUserPerms(id){
-  if(!requireAdmin())return;
+  if(!requireAdmin()||!requireFirebaseUserAdmin())return;
   const u=state.users.find(x=>x.id===id);if(!u)return;
   if(currentUser&&currentUser.id===id){await infoDialog('Không thể tự sửa quyền của tài khoản đang đăng nhập.');return;}
   const rolev=document.getElementById('editUserRole').value,pagePerms=await collectUserPerms('editUserPerms',rolev);if(!pagePerms)return;
@@ -100,7 +133,7 @@ async function applyUserPerms(id){
   save({clearDerived:false});closeModal();if(!canAccessPage(page))page=firstAccessPage();renderBrand();nav();rerender();
 }
 function resetPass(id){
-  if(!requireAdmin())return;
+  if(!requireAdmin()||!requireFirebaseUserAdmin())return;
   const u=state.users.find(x=>x.id===id);if(!u)return;
   const self=currentUser&&currentUser.id===id;
   openModal(`<div class="modal"><div class="modal-h"><h3>${self?'Đổi mật khẩu':'Đặt lại mật khẩu'}</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
@@ -114,7 +147,7 @@ function resetPass(id){
   setTimeout(()=>{const e=document.getElementById('resetPass1');if(e)e.focus();},50);
 }
 async function applyResetPass(id){
-  if(!requireAdmin())return;
+  if(!requireAdmin()||!requireFirebaseUserAdmin())return;
   const u=state.users.find(x=>x.id===id);if(!u)return;
   const p1=document.getElementById('resetPass1').value,p2=document.getElementById('resetPass2').value,msg=document.getElementById('resetPassMsg'),err=passwordError(p1);
   if(err||p1!==p2){if(msg)msg.innerHTML=`<div class="auth-err">${esc(err||'Hai mật khẩu không khớp.')}</div>`;return;}
@@ -123,8 +156,8 @@ async function applyResetPass(id){
   logAct('Đổi mật khẩu',u.mustChangePassword?'Đặt mật khẩu tạm và yêu cầu đổi lại':'Người dùng đổi mật khẩu',u.username);
   save({clearDerived:false});closeModal();rerender();await infoDialog(u.mustChangePassword?'Đã đặt mật khẩu tạm. Người dùng sẽ phải đổi mật khẩu khi đăng nhập.':'Đã cập nhật mật khẩu.',{type:'success'});
 }
-function toggleUser(id){if(!requireAdmin())return;const u=state.users.find(x=>x.id===id);u.active=u.active===false?true:false;logAct(u.active?'Mở khóa người dùng':'Khóa người dùng','Cập nhật trạng thái tài khoản',u.username);save({clearDerived:false});rerender();}
-async function delUser(id){if(!requireAdmin())return;if(id===currentUser.id){await infoDialog('Không thể xóa chính mình.');return;}const u=state.users.find(x=>x.id===id);if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa người dùng',message:`Xóa người dùng ${u?(u.name||u.username):''}?`,confirmLabel:'Xóa người dùng',cancelLabel:'Hủy'}))return;state.users=state.users.filter(u=>u.id!==id);logAct('Xóa người dùng','Xóa tài khoản khỏi hệ thống',u?u.username:'');save({clearDerived:false});rerender();}
+function toggleUser(id){if(!requireAdmin()||!requireFirebaseUserAdmin())return;const u=state.users.find(x=>x.id===id);u.active=u.active===false?true:false;logAct(u.active?'Mở khóa người dùng':'Khóa người dùng','Cập nhật trạng thái tài khoản',u.username);save({clearDerived:false});rerender();}
+async function delUser(id){if(!requireAdmin()||!requireFirebaseUserAdmin())return;if(id===currentUser.id){await infoDialog('Không thể xóa chính mình.');return;}const u=state.users.find(x=>x.id===id);if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa người dùng',message:`Xóa người dùng ${u?(u.name||u.username):''}?`,confirmLabel:'Xóa người dùng',cancelLabel:'Hủy'}))return;state.users=state.users.filter(u=>u.id!==id);logAct('Xóa người dùng','Xóa tài khoản khỏi hệ thống',u?u.username:'');save({clearDerived:false});rerender();}
 
 /* ===== AUTH ===== */
 const PASS_ITERATIONS=600000; /* OWASP: >=600k vòng PBKDF2-SHA256. Hash cũ 210k vẫn xác thực (verifyPass đọc số vòng từ chuỗi hash) và tự nâng cấp khi đăng nhập. */
@@ -245,7 +278,7 @@ async function doLogin(){
   loginFails=0;loginLockUntil=0;
   currentUser=user;logAct('Đăng nhập','Đăng nhập thành công','Tài khoản');
   if(user.username==='admin'&&p==='admin'&&!String(user.passHash||'').startsWith('pbkdf2$'))user.mustChangePassword=true;
-  else if(!String(user.passHash||'').startsWith('pbkdf2$')||+(String(user.passHash).split('$')[1]||0)<PASS_ITERATIONS){
+  else if(fbCanManageUsers()&&(!String(user.passHash||'').startsWith('pbkdf2$')||+(String(user.passHash).split('$')[1]||0)<PASS_ITERATIONS)){
     /* Nâng cấp hash trong suốt: dùng đúng mật khẩu vừa xác thực để băm lại theo chuẩn mới. */
     try{user.passHash=await hashPass(p);logAct('Nâng cấp mật khẩu','Tự động băm lại theo chuẩn mới khi đăng nhập','Tài khoản');}catch(e){}
   }
@@ -262,6 +295,7 @@ function showPasswordChange(msg){
   setTimeout(()=>{const e=document.getElementById('newPass1');if(e)e.focus();},50);
 }
 async function changeRequiredPassword(){
+  if(!fbCanManageUsers()){showPasswordChange('Máy này chưa có quyền Firebase admin để đồng bộ mật khẩu. Hãy đổi mật khẩu trên máy có ACL admin: true.');return;}
   const p1=document.getElementById('newPass1').value,p2=document.getElementById('newPass2').value,err=passwordError(p1);
   if(err){showPasswordChange(err);return;}if(p1!==p2){showPasswordChange('Hai mật khẩu không khớp.');return;}
   currentUser.passHash=await hashPass(p1);currentUser.mustChangePassword=false;logAct('Đổi mật khẩu','Người dùng cập nhật mật khẩu','Tài khoản');save({cloud:!!(fb&&fb.initialized),clearDerived:false});showApp();

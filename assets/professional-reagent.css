@@ -44,15 +44,19 @@
 }
 
 .rc-toolbar{
-  display:flex; flex-wrap:wrap; padding:8px 16px; background:var(--panel);
+  display:flex; flex-wrap:wrap; padding:0 16px; background:var(--panel);
 }
 
 .rc-toolbar-panel > .rc-toolbar{
-  margin-top:10px !important; margin-bottom:10px !important;
+  margin-top:var(--panel-content-gap) !important; margin-bottom:var(--panel-content-gap) !important;
 }
 
 .rc-toolbar-selcol{
-  display:flex; flex-direction:column; align-items:flex-start; gap:8px;
+  display:flex; flex-direction:column; align-items:flex-start; gap:6px;
+}
+
+.rc-toolbar-selcol label{
+  margin:0;
 }
 
 .rc-toolbar-selcol select{
@@ -105,7 +109,7 @@
 
 
 .rc-info-grid{
-  display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px 22px; padding:24px 28px 26px;
+  display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px 22px; padding:var(--panel-content-gap) 28px 26px;
 }
 
 .rc-field{
@@ -297,7 +301,7 @@
 }
 
 .rc-info-panel > .rc-info-grid{
-  display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px 22px; margin:0 !important; padding:24px 28px 26px;
+  margin:0 !important;
 }
 
 .rc-info-panel .rc-field label{
@@ -415,8 +419,9 @@
 }
 
 
-.rc-stats-panel > #rcStats, .rc-chart-panel > .rc-charts{
-  padding:16px;
+.rc-stats-panel > h3:first-child + #rcStats,
+.rc-chart-panel > h3:first-child + .rc-charts{
+  padding:var(--panel-content-gap) 16px 16px;
 }
 
 .rc-stat-kpis{
@@ -444,7 +449,7 @@
 }
 
 .rc-crit-panel > #rcCrit{
-  margin:16px; padding:0; border:1px solid var(--line-strong); border-radius:var(--radius-md); overflow:hidden;
+  margin:var(--panel-content-gap) 16px 16px; padding:0; border:1px solid var(--line-strong); border-radius:var(--radius-md); overflow:hidden;
 }
 
 .rc-crit-panel > #rcVerdict{
@@ -493,7 +498,7 @@
 }
 
 .rc-pair-panel > .rc-pair-wrap{
-  margin:16px !important; border:1px solid var(--line-strong); border-radius:var(--radius-md); background:var(--panel); overflow-x:auto;
+  margin:var(--panel-content-gap) 16px 16px !important; border:1px solid var(--line-strong); border-radius:var(--radius-md); background:var(--panel); overflow-x:auto;
 }
 
 .rc-pair-panel .rc-pair-head, .rc-pair-panel .rc-pair-row{
@@ -697,8 +702,9 @@ label, .rc-field label{
   min-height:42px; padding:10px 12px;
 }
 
-.rc-stats-panel > #rcStats, .rc-chart-panel > .rc-charts{
-  padding:12px;
+.rc-stats-panel > h3:first-child + #rcStats,
+.rc-chart-panel > h3:first-child + .rc-charts{
+  padding:var(--panel-content-gap) 12px 12px;
 }
 
 .rc-crit-panel > #rcVerdict{
@@ -706,7 +712,7 @@ label, .rc-field label{
 }
 
 .rc-crit-panel > #rcCrit, .rc-pair-panel > .rc-pair-wrap{
-  margin:12px !important;
+  margin:var(--panel-content-gap) 12px 12px !important;
 }
 
 .rc-pair-panel .rc-pair-actions{
@@ -742,7 +748,7 @@ label, .rc-field label{
 }
 
 #rcStats table{
-  margin-top:2px;border:1px solid var(--card-head-border);border-radius:var(--radius-md);overflow:hidden;
+  margin-top:0;border:1px solid var(--card-head-border);border-radius:var(--radius-md);overflow:hidden;
 }
 
 #rcStats table tr:first-child th, #rcStats table tr:first-child td{

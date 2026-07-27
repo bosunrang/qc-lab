@@ -73,8 +73,11 @@ Bản đã cài sẽ tự kiểm tra cập nhật từ GitHub Releases của rep
 
 ## Firebase (đồng bộ đám mây, tuỳ chọn)
 
-- Cấu hình nằm ở `assets/modules/app-meta.js` (`window.QCLAB_CLOUD`): `labCode`,
-  cờ `anonymous`/`locked` và config Firebase project.
+- Bản phân phối không gắn sẵn Firebase project hoặc mã phòng. Mỗi đơn vị nhập
+  Firebase config, `labCode`, email và mật khẩu riêng trong trang Cài đặt; cấu
+  hình chỉ được lưu trên máy của đơn vị đó.
+- `assets/modules/app-meta.js` để `window.QCLAB_CLOUD = null`. Chỉ bản OEM riêng
+  mới nên inject `{labCode, anonymous:false, locked, config}` tại đây.
 - Firebase Rules mẫu ở `firebase/database.rules.json` — giới hạn truy cập theo
   UID qua nhánh `qclab-acl`. Hướng dẫn cấp quyền chi tiết:
   `firebase/HUONG-DAN-FIREBASE-RULES.md`.
