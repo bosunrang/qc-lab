@@ -137,10 +137,6 @@
   min-width:0;
 }
 
-.firebase-acl-status{
-  margin:10px 16px 0;
-}
-
 .firebase-sync-panel > label,
 .firebase-sync-panel > .hint{
   display:block; margin-left:16px; margin-right:16px;
@@ -176,10 +172,6 @@
 
 .firebase-sync-panel > label,
 .firebase-sync-panel > .hint{
-  margin-left:12px; margin-right:12px;
-}
-
-.firebase-acl-status{
   margin-left:12px; margin-right:12px;
 }
 

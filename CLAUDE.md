@@ -344,16 +344,14 @@ the Google Fonts link, offline labs must print with correct metrics.
   routing. `router-render.js` owns the page list (`PAGES`) and per-role page
   permissions (`PERM`): `rolePageIds(role)` gives each role's default page
   set, and a user's own `pagePerms` (edited in `users-auth.js`) can only
-  narrow that set further, never expand past it; it also holds the
-  `btn()` builder, `confirmDialog`/`infoDialog` call sites like
-  `requireWrite()`/`requireAdmin()`, and other cross-page UI primitives
-  (search/filter helpers, the VN date picker, icon SVGs). As of 2026-07-22
-  the actual page-render functions for the three biggest pages were split out
-  into their own files loaded right after it — `pageDash()` into
-  `dashboard-routes.js`, `pageEntry()` into `entry-routes.js`, `pageWestgard()`
-  into `westgard-routes.js` — so `router-render.js` itself must never
-  redefine `pageDash`/`pageEntry`/`pageWestgard`, and the three files must
-  load in that order (all enforced by `tests/ui-route-structure.test.js`).
+  narrow that set further, never expand past it; it also holds the `btn()`
+  builder, the `requireWrite()`/`requireAdmin()` guards, and other cross-page
+  UI primitives (search/filter helpers, the VN date picker, icon SVGs). The
+  page-render functions for the three biggest pages live in their own files
+  loaded right after it — `pageDash()` in `dashboard-routes.js`, `pageEntry()`
+  in `entry-routes.js`, `pageWestgard()` in `westgard-routes.js` — so
+  `router-render.js` itself must never redefine those three, and the files
+  must load in that order (enforced by `tests/ui-route-structure.test.js`).
   Page-level UI state lives in the `*-ui-state.js` modules above. `sigma.js`
   renders the Six Sigma page (see "Confirmed business-logic decisions" below
   for how its numbers relate to reports.js).

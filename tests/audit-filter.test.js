@@ -59,8 +59,6 @@ assert.match(firstPage, /placeholder="dd\/mm\/yyyy"/);
 assert.match(firstPage, /class="audit-table-wrap"/);
 assert.match(firstPage, /Hiển thị 1–25 \/ 30 dòng/);
 assert.match(firstPage, /Trang 1\/2/);
-assert.doesNotMatch(firstPage, /Xóa nhật ký|Firebase đang bảo vệ nhật ký/, 'không hiển thị hành động audit mà server luôn từ chối');
-assert.equal(run(ctx, `typeof clearActivityLog`), 'undefined', 'code xóa audit không còn tồn tại');
 
 run(ctx, 'auditPage=2;');
 const secondPage = run(ctx, 'pageAudit()');

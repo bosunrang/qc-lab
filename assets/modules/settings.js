@@ -44,18 +44,11 @@ function clearLogo(){if(!requireAdmin())return;state.lab=state.lab||{};state.lab
 function firebaseAclHelp(code){
   const user=(typeof firebase!=='undefined'&&firebase.auth&&firebase.auth().currentUser)||fb.authUser||null;
   const uid=user&&user.uid||'UID_TAI_KHOAN_FIREBASE';
-  return `Đăng nhập Firebase đã thành công nhưng tài khoản chưa có quyền với mã phòng "${code}".\n\nVào Realtime Database → Data và tạo:\nqclab-acl/${code}/${uid}/read = true\nqclab-acl/${code}/${uid}/write = true\nqclab-acl/${code}/${uid}/admin = true (chỉ tài khoản quản trị)\n\nSau đó bấm Lưu & kết nối lại.`;
-}
-function firebaseAclStatusHtml(){
-  const user=fb&&fb.authUser,acl=fb&&fb.authAcl;
-  if(!user||!fb.ref)return'<div class="alert info firebase-acl-status">Chưa kết nối nên quyền quản trị người dùng chỉ áp dụng cục bộ.</div>';
-  const cls=acl&&acl.admin?'ok':acl&&acl.write?'info':'warn',uid=esc(user.uid||'—'),label=esc(fbAclRoleLabel(acl));
-  return`<div class="alert ${cls} firebase-acl-status"><b>Quyền Firebase: ${label}</b> · UID <code>${uid}</code>${acl&&acl.admin?' · được quản lý người dùng':acl&&acl.write?' · không được sửa người dùng/mật khẩu':' · mọi thao tác ghi sẽ bị từ chối'}</div>`;
+  return `Đăng nhập Firebase đã thành công nhưng tài khoản chưa có quyền với mã phòng "${code}".\n\nVào Realtime Database → Data và tạo:\nqclab-acl/${code}/${uid} = true\n\nSau đó bấm Lưu & kết nối lại.`;
 }
 async function saveFb(){
-  if(!requireAppAdmin())return;
-  const code=document.getElementById('fbCode').value.trim(),email=document.getElementById('fbEmail').value.trim(),password=document.getElementById('fbPassword').value;
-  if(!code){await infoDialog('Nhập mã phòng riêng của đơn vị trước khi kết nối.');return;}
+  if(!requireAdmin())return;
+  const code=document.getElementById('fbCode').value.trim()||'default',email=document.getElementById('fbEmail').value.trim(),password=document.getElementById('fbPassword').value;
   let cfg;try{cfg=parseFirebaseConfig(document.getElementById('fbConfig').value);}catch(e){await infoDialog(e&&e.message?e.message:'Firebase config không hợp lệ.');return;}
   if(!email||!password){await infoDialog('Nhập email và mật khẩu Firebase Authentication để kết nối an toàn.');return;}
   try{
@@ -69,13 +62,12 @@ async function saveFb(){
     setCloudStatus(email+' · '+code,true);
     document.getElementById('fbPassword').value='';
     await initFirebase();
-    if(!fb.ref)throw fb.connectError||new Error('Không thể mở kết nối Firebase.');
     if(fb.ref){
       const snap=await fb.ref.once('value');
       if(snap.exists())markSaved('đã kết nối','Đã tải dữ liệu từ Firebase');
       else{fb.ready=true;fb.initialized=true;await syncNow();}
     }
-    rerender();await infoDialog('Đã xác thực và bật đồng bộ Firebase.\nVào Realtime Database xem tại: '+(fbDataPath()||'qclab-shared/{labCode}'),{type:'success'});
+    await infoDialog('Đã xác thực và bật đồng bộ Firebase.\nVào Realtime Database xem tại: '+(fbDataPath()||'qclab-shared/{labCode}'),{type:'success'});
   }catch(e){
     const msg=e&&e.message?e.message:'Kiểm tra tài khoản và cấu hình.';
     setCloudStatus(msg.indexOf('permission_denied')>=0?'Chưa được cấp quyền Firebase':'Đăng nhập Firebase thất bại',false);
@@ -104,10 +96,10 @@ function validateFirebaseConfig(cfg){
   return cfg;
 }
 async function clearFb(){
-  if(!requireAppAdmin())return;
+  if(!requireAdmin())return;
   localStorage.removeItem('qclab_fb');fbDisconnect();
   try{if(typeof firebase!=='undefined'&&typeof firebase.auth==='function')await firebase.auth().signOut();}catch(e){}
-  fb.authUser=null;setCloudStatus('Đang chạy cục bộ',false);markSaved('đã lưu cục bộ','Đã ngắt Firebase');rerender();await infoDialog('Đã ngắt đám mây. Dữ liệu vẫn lưu cục bộ.',{type:'success'});
+  fb.authUser=null;setCloudStatus('Đang chạy cục bộ',false);markSaved('đã lưu cục bộ','Đã ngắt Firebase');await infoDialog('Đã ngắt đám mây. Dữ liệu vẫn lưu cục bộ.',{type:'success'});
 }
 function firebaseRulesText(){
   return `{
@@ -124,28 +116,11 @@ function firebaseRulesText(){
     },
     "qclab-shared": {
       "$labCode": {
-        ".read": "auth != null && (root.child('qclab-acl').child($labCode).child(auth.uid).val() === true || root.child('qclab-acl').child($labCode).child(auth.uid).child('read').val() === true || root.child('qclab-acl').child($labCode).child(auth.uid).child('write').val() === true || root.child('qclab-acl').child($labCode).child(auth.uid).child('admin').val() === true)",
+        ".read":  "auth != null && root.child('qclab-acl').child($labCode).child(auth.uid).exists()",
+        ".write": "auth != null && root.child('qclab-acl').child($labCode).child(auth.uid).exists()",
         ".validate": "newData.hasChildren(['_ts'])",
-        "_ts": {
-          ".write": "auth != null && (root.child('qclab-acl').child($labCode).child(auth.uid).val() === true || root.child('qclab-acl').child($labCode).child(auth.uid).child('write').val() === true || root.child('qclab-acl').child($labCode).child(auth.uid).child('admin').val() === true)",
-          ".validate": "newData.isNumber()"
-        },
-        "_client": {
-          ".write": "auth != null && (root.child('qclab-acl').child($labCode).child(auth.uid).val() === true || root.child('qclab-acl').child($labCode).child(auth.uid).child('write').val() === true || root.child('qclab-acl').child($labCode).child(auth.uid).child('admin').val() === true)",
-          ".validate": "newData.isString()"
-        },
-        "activity": {
-          "$index": {
-            ".write": "auth != null && (root.child('qclab-acl').child($labCode).child(auth.uid).val() === true || root.child('qclab-acl').child($labCode).child(auth.uid).child('write').val() === true || root.child('qclab-acl').child($labCode).child(auth.uid).child('admin').val() === true) && (!data.exists() || newData.val() === data.val())",
-            ".validate": "newData.hasChildren(['id', 'ts', 'type', 'hash']) && newData.child('id').isString() && newData.child('ts').isString() && newData.child('type').isString() && newData.child('hash').isString() && newData.child('hash').val().length === 64"
-          }
-        },
-        "users": {
-          ".write": "auth != null && root.child('qclab-acl').child($labCode).child(auth.uid).child('admin').val() === true"
-        },
-        "$branch": {
-          ".write": "auth != null && $branch !== 'activity' && $branch !== 'users' && (root.child('qclab-acl').child($labCode).child(auth.uid).val() === true || root.child('qclab-acl').child($labCode).child(auth.uid).child('write').val() === true || root.child('qclab-acl').child($labCode).child(auth.uid).child('admin').val() === true)"
-        }
+        "_ts": { ".validate": "newData.isNumber()" },
+        "_client": { ".validate": "newData.isString()" }
       }
     }
   }
@@ -158,13 +133,12 @@ function firebaseGuideHtml(){
       <div class="alert info">Mặc định ai cũng đọc/ghi được (Anonymous). Làm 5 bước dưới để chỉ tài khoản được duyệt mới đồng bộ được.</div>
       ${step(1,'Bật đăng nhập Email/Password','<p>Firebase Console → Authentication → Sign-in method: tắt <b>Anonymous</b>, bật <b>Email/Password</b>.</p>')}
       ${step(2,'Tạo tài khoản, lấy UID','<p>Authentication → Users → Add user — mỗi máy/người 1 tài khoản, sau đó copy <b>User UID</b>.</p>')}
-      ${step(3,'Gán quyền UID trong ACL','<p>Realtime Database → Data, tạo đúng cấu trúc theo mã phòng riêng của đơn vị. Ít nhất một UID phải có <code>admin: true</code> để quản lý người dùng:</p><pre>qclab-acl\n  MA_PHONG_XN\n    UID_QUAN_TRI\n      read: true\n      write: true\n      admin: true\n    UID_NHAP_LIEU\n      read: true\n      write: true\n      admin: false\n    UID_CHI_XEM\n      read: true\n      write: false\n      admin: false</pre><p>Thay <code>MA_PHONG_XN</code> bằng đúng mã nhập trong app. ACL dạng cũ <code>UID: true</code> vẫn được đọc/ghi nghiệp vụ nhưng không được sửa danh sách người dùng.</p>')}
+      ${step(3,'Thêm UID vào danh sách được phép','<p>Realtime Database → Data, tạo đúng cấu trúc theo mã phòng (labCode) đang dùng:</p><pre>qclab-acl\n  khoaXN\n    UID_TAI_KHOAN_1: true\n    UID_TAI_KHOAN_2: true</pre><p>Đổi labCode thành <code>labA</code> thì ACL nằm ở <code>qclab-acl/labA/{uid}</code>.</p>')}
       ${step(4,'Dán Rules','<p>Realtime Database → Rules → dán nguyên nội dung khung <b>Firebase Rules</b> bên dưới → Publish. Không sửa <code>$labCode</code>/<code>$uid</code>.</p>')}
       ${step(5,'Kết nối trong app','<p>Thẻ Đồng bộ đám mây → nhập labCode, email/mật khẩu, dán Firebase config → bấm <b>Lưu &amp; kết nối</b>.</p>')}
       <section><h4>Kiểm tra nhanh</h4><ul class="fb-check">
-        <li><b>✓</b> UID có <code>write: true</code> — đồng bộ dữ liệu nghiệp vụ và chỉ được thêm audit mới.</li>
-        <li><b>✓</b> Chỉ UID có <code>admin: true</code> — được đồng bộ thay đổi danh sách người dùng.</li>
-        <li><b>✕</b> UID chỉ có <code>read: true</code> — xem dữ liệu nhưng mọi ghi bị từ chối.</li>
+        <li><b>✓</b> UID có trong ACL — đồng bộ được.</li>
+        <li><b>✕</b> UID không có trong ACL — bị từ chối đọc/ghi.</li>
         <li><b>ℹ</b> <code>qclab-shared/{labCode}</code>: dữ liệu app tự đồng bộ · <code>qclab-acl/{labCode}</code>: danh sách UID bạn tự tạo.</li>
       </ul></section>
     </div>
@@ -217,10 +191,9 @@ function pageSettings(){
         <div class="admin-tool"><b>Xóa sạch dữ liệu test</b><span>Đưa app về trạng thái trắng, giữ tài khoản đăng nhập hiện tại để không bị khóa.</span>${btn('Xóa sạch dữ liệu','resetAllData()','danger')}</div>
       </div></div>
    <div class="panel firebase-sync-panel"><h3>Đồng bộ đám mây (Firebase Realtime Database)</h3>
-     <div class="firebase-auth-grid"><div><label>Mã phòng</label><input id="fbCode" aria-label="Mã phòng" placeholder="vd: PXN_BENHVIEN_A" value="${escAttr(fbcfg.labCode||'')}" ${lockedCloud?'readonly':''}></div>
+     <div class="firebase-auth-grid"><div><label>Mã phòng</label><input id="fbCode" aria-label="Mã phòng" value="${escAttr(fbcfg.labCode||'khoaXN')}" ${lockedCloud?'readonly':''}></div>
        <div><label>Email Firebase Authentication</label><input id="fbEmail" aria-label="Email Firebase Authentication" type="email" autocomplete="username" value="${escAttr(fbcfg.email||'')}"></div>
        <div><label>Mật khẩu Firebase</label><input id="fbPassword" type="password" autocomplete="current-password" placeholder="Chỉ dùng để đăng nhập, không lưu"></div></div>
-     ${firebaseAclStatusHtml()}
      ${lockedCloud?`<div class="hint" style="margin-top:6px">Bản deploy này khóa sẵn <code>${esc(fbDataPath())}</code>. Muốn đổi mã phòng cần sửa <code>assets/modules/app-meta.js</code>.</div>`:''}
      <label>Firebase config (dán nguyên đoạn từ tab Config của Firebase console)</label>
      <textarea id="fbConfig" class="firebase-config-input" ${lockedCloud?'readonly':''} placeholder='const firebaseConfig = {

@@ -1,14 +1,5 @@
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 const { loadSandbox, run } = require('./helpers/sandbox');
-
-{
-  const appMetaPath=path.join(__dirname,'..','assets','modules','app-meta.js'),source=fs.readFileSync(appMetaPath,'utf8');
-  const appMetaCtx=loadSandbox(['modules/app-meta.js'],{window:{}});
-  assert.equal(run(appMetaCtx,'window.QCLAB_CLOUD'),null,'bản phân phối không được tự trỏ vào Firebase của nhà phát triển');
-  assert.doesNotMatch(source,/qclab1102|AIza[0-9A-Za-z_-]+/,'runtime source không được chứa project/API key của một đơn vị cụ thể');
-}
 
 const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/firebase-sync.js']);
 const result = run(ctx, `

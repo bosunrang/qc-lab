@@ -102,7 +102,7 @@ function westgardWorkerMessage(event){
 function ensureWestgardWorker(){
   if(wgWorker)return wgWorker;if(typeof Worker!=='function'||wgWorkerFailed)return null;
   try{
-    wgWorker=new Worker('assets/workers/westgard-worker.js?v=seven-t-seven-points-20260727-1');
+    wgWorker=new Worker('assets/workers/westgard-worker.js?v=seven-t-target-reset-20260727-1');
     wgWorker.onmessage=westgardWorkerMessage;
     wgWorker.onerror=()=>{wgWorkerFailed=true;wgWorkerPending.clear();if(wgWorker){try{wgWorker.terminate();}catch(e){}wgWorker=null;}if(typeof page!=='undefined'&&page==='dash')setTimeout(()=>rerender(),0);};
     return wgWorker;

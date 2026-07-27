@@ -3,16 +3,15 @@ const PAGES=[['dash','Bảng điều khiển'],['entry','Nhập QC & Biểu đ�
 const PERM={dash:['admin','technician','viewer'],entry:['admin','technician','viewer'],westgard:['admin','technician','viewer'],sigma:['admin','technician','viewer'],reagent:['admin','technician','viewer'],actions:['admin','technician'],report:['admin','technician','viewer'],manage:['admin'],users:['admin'],audit:['admin'],settings:['admin']};
 let page='dash';
 function role(){return currentUser?currentUser.role:'viewer';}
-function canWrite(){return(role()==='admin'||role()==='technician')&&(typeof fbCanWriteBusiness!=='function'||fbCanWriteBusiness());}
+function canWrite(){return role()==='admin'||role()==='technician';}
 /* requireWrite()/requireAdmin() stay synchronous on purpose — 68 call sites
    across the app do `if(!requireWrite())return;`, and making that async would
    force `await` onto every one of them just to reskin a permission-denied
    message. infoDialog() is fired without awaiting: it opens immediately
    (synchronous DOM write inside), the caller still gets its boolean back the
    same tick either way. */
-function requireWrite(message='Bạn không có quyền sửa dữ liệu.'){if(canWrite())return true;infoDialog((role()==='admin'||role()==='technician')?'Firebase ACL của máy này chỉ có quyền xem. Không thể thay đổi dữ liệu đang đồng bộ.':message);return false;}
-function requireAppAdmin(message='Chỉ quản trị mới được thực hiện thao tác này.'){if(role()==='admin')return true;infoDialog(message);return false;}
-function requireAdmin(message='Chỉ quản trị mới được thực hiện thao tác này.'){if(!requireAppAdmin(message))return false;if(typeof fbCanWriteBusiness==='function'&&!fbCanWriteBusiness()){infoDialog('Firebase ACL của máy này chỉ có quyền xem. Không thể thay đổi dữ liệu đang đồng bộ.');return false;}return true;}
+function requireWrite(message='Bạn không có quyền sửa dữ liệu.'){if(canWrite())return true;infoDialog(message);return false;}
+function requireAdmin(message='Chỉ quản trị mới được thực hiện thao tác này.'){if(role()==='admin')return true;infoDialog(message);return false;}
 function roleLabel(r){return r==='admin'?'Quản trị':r==='technician'?'KTV':'Chỉ xem';}
 function rolePageIds(r=role()){return PAGES.map(x=>x[0]).filter(id=>PERM[id]&&PERM[id].includes(r));}
 function userPageIds(u=currentUser){

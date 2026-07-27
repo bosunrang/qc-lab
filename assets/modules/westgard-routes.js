@@ -153,7 +153,7 @@ function pageWestgard(){
     <tr><td>9x</td><td>9 điểm liên tiếp nằm cùng một phía so với Mean</td><td><span class="rej">Loại bỏ</span></td><td>Biến thể phù hợp khi chạy 3 mức QC qua nhiều lần chạy.</td></tr>
     <tr><td>10x</td><td>10 điểm liên tiếp nằm cùng một phía so với mean</td><td><span class="rej">Loại bỏ</span></td><td>Nghi dịch chuyển nền, xem lại mean/SD, lô mới, hiệu chuẩn.</td></tr>
     <tr><td>12x</td><td>12 điểm liên tiếp nằm cùng một phía so với Mean</td><td><span class="rej">Loại bỏ</span></td><td>Biến thể ít nhạy hơn 8x/10x, dùng để theo dõi bias dài hơn.</td></tr>
-    <tr><td>7T</td><td>7 điểm QC liên tiếp tăng dần hoặc giảm dần</td><td><span class="warn">Cảnh báo</span></td><td>Theo dõi xu hướng, kiểm tra bảo quản QC, thuốc thử, môi trường.</td></tr>
+    <tr><td>7T</td><td>7 lần tăng dần hoặc giảm dần liên tiếp (8 điểm QC)</td><td><span class="warn">Cảnh báo</span></td><td>Theo dõi xu hướng, kiểm tra bảo quản QC, thuốc thử, môi trường.</td></tr>
   </tbody></table></div></details>`;
   const exportActions=wgChartMode==='lj'?'<div><label>&nbsp;</label><div class="wg-export-actions">'+btn(icoDownload()+'Xuất Excel','exportWestgardXLSX()','teal wg-excel-btn','Xuất Excel biểu đồ Levey-Jennings, các vi phạm và điểm bằng chứng đang xem')+btn(icoPrint()+'In PDF','printWestgard()','teal wg-print-btn','Tạo bản in PDF/HTML biểu đồ Levey-Jennings và các vi phạm đang xem')+'</div></div>':'';
   return headOnly('Phân tích Westgard','Đối chiếu luật theo mức QC, lô và lần chạy')+

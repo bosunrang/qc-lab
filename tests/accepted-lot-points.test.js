@@ -50,13 +50,13 @@ function baseState(points) {
   changedState.westgardRules['7T'] = true;
   changedState.tests[0].ruleActions = { '7T': 'reject' };
   ctx.__setState(changedState);
-  assert.equal(ctx.acceptedLotPoints(ctx.__getState().tests[0], 1).length, 8, 'đổi target phải reset 7T, không nối chuỗi qua hai Mean/SD');
+  assert.equal(ctx.acceptedLotPoints(ctx.__getState().tests[0], 1).length, 8, 'đổi target phải reset 7T, không loại điểm thứ 8');
 
-  const stableState = baseState(Array.from({ length: 7 }, (_, i) => makePoint(i,100+i,100)));
+  const stableState = baseState(Array.from({ length: 8 }, (_, i) => makePoint(i,100+i,100)));
   stableState.westgardRules['7T'] = true;
   stableState.tests[0].ruleActions = { '7T': 'reject' };
   ctx.__setState(stableState);
-  assert.deepEqual(plain(ctx.acceptedLotPoints(ctx.__getState().tests[0], 1).map(point => point.id)), ['trend0','trend1','trend2','trend3','trend4','trend5'], 'target ổn định phải loại điểm thứ 7 khi đủ 7 điểm trend');
+  assert.deepEqual(plain(ctx.acceptedLotPoints(ctx.__getState().tests[0], 1).map(point => point.id)), ['trend0','trend1','trend2','trend3','trend4','trend5','trend6'], 'target ổn định phải loại điểm thứ 8 khi đủ 7 bước trend');
 }
 
 {

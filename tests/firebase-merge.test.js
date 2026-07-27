@@ -32,20 +32,6 @@ function baseState(overrides = {}) {
 // fails on cross-realm Array/Object prototypes.
 const plain = (v) => JSON.parse(JSON.stringify(v));
 
-// Firebase ACL capabilities are independent from the app's admin/technician/viewer role.
-{
-  assert.deepEqual(plain(ctx.fbAclCapabilities(true)), { read: true, write: true, admin: false, legacy: true });
-  assert.deepEqual(plain(ctx.fbAclCapabilities({ read: true })), { read: true, write: false, admin: false, legacy: false });
-  assert.deepEqual(plain(ctx.fbAclCapabilities({ write: true })), { read: true, write: true, admin: false, legacy: false });
-  assert.deepEqual(plain(ctx.fbAclCapabilities({ admin: true })), { read: true, write: true, admin: true, legacy: false });
-  assert.equal(run(ctx, `fb.ref=null;fb.authUser=null;fb.authAcl=null;fbCanManageUsers();`), true, 'local-only mode keeps existing app-admin user management');
-  assert.equal(run(ctx, `fb.ref={};fb.authUser={uid:'writer'};fb.authAcl=fbAclCapabilities({write:true});fbCanManageUsers();`), false, 'Firebase writer cannot mutate the shared users branch');
-  assert.equal(run(ctx, `fb.authAcl=fbAclCapabilities({admin:true});fbCanManageUsers();`), true, 'Firebase ACL admin can mutate the shared users branch');
-  assert.equal(run(ctx, `fb.authAcl=fbAclCapabilities({read:true});fbCanWriteBusiness();`), false, 'Firebase read-only ACL makes the connected app read-only');
-  assert.equal(run(ctx, `fb.authAcl=fbAclCapabilities({write:true});fbCanWriteBusiness();`), true);
-  run(ctx, `fb.ref=null;fb.authUser=null;fb.authAcl=null;`);
-}
-
 // --- Scenario 1: two machines edit different top-level branches concurrently -> both survive ---
 {
   const base = baseState({ data: { T1: [{ id: 'p1', val: 1 }] } });
@@ -357,9 +343,13 @@ const plain = (v) => JSON.parse(JSON.stringify(v));
   assert.equal(dirtyAfterLocalOnlySave, false, 'login/logout audit saves are local-only and must not make the next Firebase snapshot push this device over the cloud');
 }
 
-// --- Scenario 20b: two machines each log DIFFERENT audit entries offline from the same base.
-// Their immutable histories form two valid branches. Sync must preserve every historical hash
-// and add one deterministic merge anchor that references both branch heads.
+// --- Scenario 20b: two machines each log DIFFERENT audit entries offline from the same base,
+// then sync -> mergePointArray() (activity is a FB_LIST_KEYS branch) orders the merged array as
+// "all of remote's entries, then any local-only entries appended after" — NOT by timestamp. That
+// breaks the strict prevHash linkage each machine built independently from the shared base, so
+// auditVerifyChain() used to report a false "tampered" chain after a perfectly legitimate merge.
+// The fix: fbHandleValue() now calls auditRelinkChain() on the merged activity array right after
+// fbMerge()/fbFirstConnectMerge(), re-stamping prevHash/hash to match the array's FINAL order.
 {
   const emptyBase = baseState({ activity: [] });
   const built = run(ctx, `
@@ -393,69 +383,23 @@ const plain = (v) => JSON.parse(JSON.stringify(v));
       return ok;
     })();
 
-    var historicalHashes = mergedRaw.activity.map(function(a){ return a.hash; });
-    var mergeResult = auditMergeChains(mergedRaw.activity);
-    state = Object.assign({}, mergedRaw, { activity: mergeResult.activity });
+    var relinked = auditRelinkChain(mergedRaw.activity);
+    state = Object.assign({}, mergedRaw, { activity: relinked });
     var chainAfterFix = auditVerifyChain();
-    var anchor = state.activity[state.activity.length - 1];
-    var hashesPreserved = historicalHashes.every(function(hash, i){ return state.activity[i].hash === hash; });
 
-    // Tamper detection must still identify a genuinely modified historical entry.
+    // Tamper detection must still work on the relinked chain — the fix must not
+    // paper over genuine tampering, only the merge-reordering false positive.
     state.activity[1].detail = 'HACKED';
     var chainAfterTamper = auditVerifyChain();
 
-    ({
-      chainBeforeFix: chainBeforeFix,
-      mergeOk: mergeResult.ok,
-      chainAfterFixOk: chainAfterFix.ok,
-      chainAfterFixChecked: chainAfterFix.checked,
-      hashesPreserved: hashesPreserved,
-      anchorParents: anchor.mergePrevHashes.length,
-      anchorType: anchor.type,
-      chainAfterTamperOk: chainAfterTamper.ok,
-      brokenIndex: chainAfterTamper.brokenIndex
-    });
+    ({ chainBeforeFix: chainBeforeFix, chainAfterFixOk: chainAfterFix.ok, chainAfterFixChecked: chainAfterFix.checked, chainAfterTamperOk: chainAfterTamper.ok, brokenIndex: chainAfterTamper.brokenIndex });
   `);
   const result = plain(built);
   assert.equal(result.chainBeforeFix, false, 'sanity check: the raw merged activity order really does break strict prevHash linkage (reproduces the bug)');
-  assert.equal(result.mergeOk, true);
-  assert.equal(result.chainAfterFixOk, true, 'a genuine multi-device branch merge must remain a valid audit history');
-  assert.equal(result.chainAfterFixChecked, 5, '4 historical entries plus the merge anchor participate in verification');
-  assert.equal(result.hashesPreserved, true, 'sync must never rewrite historical audit hashes');
-  assert.equal(result.anchorParents, 2, 'the merge anchor references both branch heads');
-  assert.equal(result.anchorType, 'Hợp nhất nhật ký');
-  assert.equal(result.chainAfterTamperOk, false, 'branch merging must not weaken real tamper detection');
+  assert.equal(result.chainAfterFixOk, true, 'auditRelinkChain() must restore a valid chain after a genuine multi-device merge with no real tampering');
+  assert.equal(result.chainAfterFixChecked, 4, 'all 4 merged entries participate in the relinked chain');
+  assert.equal(result.chainAfterTamperOk, false, 'relinking must not weaken real tamper detection');
   assert.equal(result.brokenIndex, 1, 'tampering the entry actually modified is still located precisely');
-}
-
-// --- Scenario 20c: protected audit updates are written per index so Firebase child
-// rules can allow append while rejecting modification/deletion of existing rows.
-{
-  const protectedPayloads = plain(run(ctx, `
-    var base20c = ${JSON.stringify(baseState({
-      activity: [
-        { id: 'a0', ts: '2026-07-01T00:00:00.000Z', type: 'A', hash: 'a'.repeat(64), prevHash: '' },
-        { id: 'a1', ts: '2026-07-01T00:01:00.000Z', type: 'B', hash: 'b'.repeat(64), prevHash: 'a'.repeat(64) }
-      ]
-    }))};
-    fb.synced = base20c;
-    var appended = JSON.parse(JSON.stringify(base20c));
-    appended.activity.push({ id: 'a2', ts: '2026-07-01T00:02:00.000Z', type: 'C', hash: 'c'.repeat(64), prevHash: 'b'.repeat(64) });
-    var appendPayload = fbBuildUpdate(appended).payload;
-
-    var modified = JSON.parse(JSON.stringify(base20c));
-    modified.activity[0].type = 'HACKED';
-    var modifyPayload = fbBuildUpdate(modified).payload;
-
-    var shortened = JSON.parse(JSON.stringify(base20c));
-    shortened.activity.pop();
-    var deletePayload = fbBuildUpdate(shortened).payload;
-    ({ appendPayload: appendPayload, modifyPayload: modifyPayload, deletePayload: deletePayload });
-  `));
-  assert.equal('activity' in protectedPayloads.appendPayload, false, 'whole audit array must never be written at its parent path');
-  assert.equal(protectedPayloads.appendPayload['activity/2'].id, 'a2');
-  assert.equal(protectedPayloads.modifyPayload['activity/0'].type, 'HACKED', 'historical edits reach Firebase child rules and are rejected there');
-  assert.equal(protectedPayloads.deletePayload['activity/1'], null, 'historical deletions reach Firebase child rules and are rejected there');
 }
 
 // fbHandleValue() awaits confirmDialog() (a custom modal, see modals.js) instead of
@@ -546,78 +490,6 @@ const plain = (v) => JSON.parse(JSON.stringify(v));
   assert.equal(pending.level.cv, 1.25);
   assert.equal(pending.level.biasEqa, 2.5);
   assert.ok(pending.updates >= 1, 'the recovered edit is pushed back to Firebase');
-}
-
-// --- Scenario 24: a cloud snapshot with a modified audit row is rejected before merge.
-// Local business data remains untouched and no corrupted snapshot becomes the merge base.
-{
-  const rejectedAudit = await run(ctx, `
-    window = { QCLAB_CLOUD: null };
-    document = { getElementById: function(){ return null; }, addEventListener: function(){} };
-    localStorage = { setItem: function(){} };
-    currentUser = { id: 'u1', username: 'admin', name: 'Admin', role: 'admin' };
-    role = function(){ return 'admin'; };
-    userName = function(){ return currentUser.name; };
-    ensureLabBrandShape = function(){};
-    ensureAdmin = function(){};
-    renderBrand = function(){};
-    applyRemoteRender = function(){};
-    setTimeout = function(){ return 0; };
-    clearTimeout = function(){};
-    confirmDialog = function(){ return Promise.resolve(true); };
-
-    fb.clientId = 'cloud-builder';
-    state = ${JSON.stringify(baseState({ tests: [{ id: 'CLOUD', name: 'Cloud', levels: [{ level: 1 }] }] }))};
-    logAct('Nhập QC', 'Dữ liệu hợp lệ ban đầu', 'Sodium');
-    var remote24 = JSON.parse(JSON.stringify(state));
-    remote24.activity[0].detail = 'HACKED';
-
-    state = ${JSON.stringify(baseState({ tests: [{ id: 'LOCAL_SAFE', name: 'Local safe', levels: [{ level: 1 }] }] }))};
-    fb.clientId = 'local-machine'; fb.ready = false; fb.initialized = false; fb.dirty = true;
-    fb.synced = null; fb.seenSig = null;
-    fb.ref = { update: function(){ return Promise.resolve(); } };
-    saveLabel = '';
-    fbHandleValue(remote24, { silent: true }).then(function(){
-      return {
-        testIds: state.tests.map(function(t){ return t.id; }).join(','),
-        syncedIsNull: fb.synced === null,
-        dirty: fb.dirty,
-        label: saveLabel
-      };
-    });
-  `);
-  const rejected = plain(rejectedAudit);
-  assert.equal(rejected.testIds, 'LOCAL_SAFE', 'tampered cloud audit must not overwrite local business data');
-  assert.equal(rejected.syncedIsNull, true, 'tampered cloud audit must not become the synchronized merge base');
-  assert.equal(rejected.dirty, true, 'pending local changes remain pending after rejecting cloud data');
-  assert.match(rejected.label, /audit đám mây không hợp lệ/);
-}
-
-// --- Scenario 25: seeding an empty room uses a multi-path update, never a room-level
-// set(), so Firebase can enforce the child rules for users and immutable audit rows.
-{
-  const seeded = plain(await run(ctx, `
-    localStorage = { setItem: function(){} };
-    mirrorIndexedDb = function(){};
-    var __seedPayload = null, __setCalled = false;
-    state = ${JSON.stringify(baseState({
-      activity: [{ id: 'seed-audit', ts: '2026-07-01T00:00:00.000Z', type: 'Khởi tạo', hash: 'a'.repeat(64), prevHash: '' }],
-      users: [{ id: 'admin', username: 'admin', role: 'admin', passHash: 'x' }]
-    }))};
-    fb.ready = true; fb.initialized = true;
-    fb.ref = {
-      update: function(payload){ __seedPayload = payload; return Promise.resolve(); },
-      set: function(){ __setCalled = true; return Promise.reject(new Error('set must not be called')); }
-    };
-    syncNow().then(function(ok){
-      return { ok: ok, setCalled: __setCalled, hasParentActivity: Object.prototype.hasOwnProperty.call(__seedPayload, 'activity'), auditId: __seedPayload['activity/0'].id, hasUsers: Array.isArray(__seedPayload.users) };
-    });
-  `));
-  assert.equal(seeded.ok, true);
-  assert.equal(seeded.setCalled, false);
-  assert.equal(seeded.hasParentActivity, false);
-  assert.equal(seeded.auditId, 'seed-audit');
-  assert.equal(seeded.hasUsers, true);
 }
 
 console.log('Firebase merge tests passed');

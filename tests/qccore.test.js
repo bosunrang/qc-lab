@@ -126,14 +126,14 @@ function close(actual, expected, epsilon = 1e-9) {
   assert.ok(wg.F.every(f => !f.rules.includes('6x')));
 }
 
-{ // 7T: 7 điểm QC liên tiếp tăng/giảm; 6 điểm hoặc plateau → KHÔNG phải trend
-  const six = [9.3, 9.4, 9.6, 9.8, 10.0, 10.2].map(v => ({ val: v }));
-  assert.ok(QCCore.westgard(six,10,1,r=>r==='7T').F.every(f=>!f.rules.includes('7T')));
-  const up = [...six, { val: 10.4 }];
+{ // 7T: 7 bước tăng dần cần 8 điểm; 7 điểm hoặc plateau → KHÔNG phải trend
+  const seven = [9.3, 9.4, 9.6, 9.8, 10.0, 10.2, 10.4].map(v => ({ val: v }));
+  assert.ok(QCCore.westgard(seven,10,1,r=>r==='7T').F.every(f=>!f.rules.includes('7T')));
+  const up = [...seven, { val: 10.6 }];
   const trend=QCCore.westgard(up,10,1,r=>r==='7T');
   assert.ok(trend.F.slice(0,-1).every(f=>f.supportRules.includes('7T')));
-  assert.ok(trend.F[6].rules.includes('7T'));
-  const flat = [9.2, 9.4, 9.6, 9.8, 9.8, 10.0, 10.2].map(v => ({ val: v }));
+  assert.ok(trend.F[7].rules.includes('7T'));
+  const flat = [9.2, 9.4, 9.6, 9.8, 9.8, 10.0, 10.2, 10.4].map(v => ({ val: v }));
   assert.ok(QCCore.westgard(flat, 10, 1, r => r === '7T').F.every(f => !f.rules.includes('7T')));
 }
 
@@ -155,7 +155,7 @@ function close(actual, expected, epsilon = 1e-9) {
   assert.deepEqual(QCCore.westgardLatestRules(pts, 100, 2, r => r === '7T'), [], 'fast path phải khớp engine chính');
   // Cùng chuỗi đó nhưng target thống nhất → z tăng đều → 7T vẫn bắt đúng.
   const steady = pts.map(p => ({ val: p.val, qcMean: 100, qcSd: 2 }));
-  assert.ok(QCCore.westgardByPoint(steady, 100, 2, r => r === '7T').F[6].rules.includes('7T'), 'target thống nhất vẫn bắt 7T bình thường tại điểm thứ 7');
+  assert.ok(QCCore.westgardByPoint(steady, 100, 2, r => r === '7T').F[7].rules.includes('7T'), 'target thống nhất vẫn bắt 7T bình thường');
 
   const sdChanged = Array.from({ length: 8 }, (_, i) => ({ val: i, qcMean: 0, qcSd: i < 4 ? 1 : 2 }));
   assert.ok(QCCore.westgardByPoint(sdChanged, 0, 1, r => r === '7T').F.every(f => !f.rules.includes('7T')), 'đổi SD cũng phải cắt đứt 7T');

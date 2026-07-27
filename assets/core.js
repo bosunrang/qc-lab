@@ -134,11 +134,11 @@
         if(zs[i]>2&&pos.length>=1){set(i,'rej','2of3-2s');pos.forEach(k=>support(k,'2of3-2s'));}
         if(zs[i]<-2&&neg.length>=1){set(i,'rej','2of3-2s');neg.forEach(k=>support(k,'2of3-2s'));}
       }
-      /* 7T = 7 điểm QC liên tiếp tăng/giảm, tương ứng 6 bước chuyển. Quét trên z để cùng
+      /* 7T = 7 bước tăng/giảm liên tiếp, nên cần 8 điểm. Quét trên z để cùng
          hệ quy chiếu với biểu đồ LJ, nhưng không được nối chuỗi qua hai target:
          westgardByPoint gắn trendTarget theo snapshot Mean/SD của từng điểm.
          z=NaN (thiếu target), plateau hoặc đổi target đều cắt đứt xu hướng. */
-      if(isOn('7T')&&i>=6&&sameTrendTarget(points,i-6,i)){let inc=true,dec=true;for(let k=i-5;k<=i;k++){if(!(zs[k]>zs[k-1]))inc=false;if(!(zs[k]<zs[k-1]))dec=false;}if(inc||dec){set(i,'warn','7T');for(let k=i-6;k<i;k++)support(k,'7T');}}
+      if(isOn('7T')&&i>=7&&sameTrendTarget(points,i-7,i)){let inc=true,dec=true;for(let k=i-6;k<=i;k++){if(!(zs[k]>zs[k-1]))inc=false;if(!(zs[k]<zs[k-1]))dec=false;}if(inc||dec){set(i,'warn','7T');for(let k=i-7;k<i;k++)support(k,'7T');}}
     }
     // 2-2s/3-1s/4-1s/6x..12x: quét "N liên tiếp cùng phía" dùng chung với multi
     wgScanRuns(zs,WG_RUN_RULES,isOn,(idx,rule)=>{const trigger=idx[idx.length-1];set(trigger,'rej',rule);idx.slice(0,-1).forEach(k=>support(k,rule));});
@@ -214,9 +214,9 @@
       const a=zs[i-2],b=zs[i-1];
       if(z>2&&(a>2||b>2))add('2of3-2s');else if(z<-2&&(a<-2||b<-2))add('2of3-2s');
     }
-    if(isOn('7T')&&i>=6&&(!targets||targets.slice(i-6,i+1).every(key=>key===targets[i]))){
+    if(isOn('7T')&&i>=7&&(!targets||targets.slice(i-7,i+1).every(key=>key===targets[i]))){
       let inc=true,dec=true;
-      for(let k=i-5;k<=i;k++){if(!(zs[k]>zs[k-1]))inc=false;if(!(zs[k]<zs[k-1]))dec=false;}
+      for(let k=i-6;k<=i;k++){if(!(zs[k]>zs[k-1]))inc=false;if(!(zs[k]<zs[k-1]))dec=false;}
       if(inc||dec)add('7T');
     }
     WG_RUN_RULES.forEach(([rule,n,pos,neg])=>{
@@ -439,7 +439,7 @@
       return{...p,id:cleanId(p.id),date,runId:cleanText(p.runId,120),lot:cleanText(p.lot),level:finiteNumber(p.level,1),val,qcMean:snap?qm:0,qcSd:snap?qs:0,note:cleanText(p.note,LONG_TEXT_LIMIT),operatorId:cleanId(p.operatorId),operatorUsername:cleanText(p.operatorUsername,80).trim().toLowerCase(),operatorName:cleanText(p.operatorName,120),operatorCode:cleanText(p.operatorCode,12).toUpperCase(),voided:!!p.voided,voidReason:cleanText(p.voidReason,LONG_TEXT_LIMIT),voidedAt:cleanText(p.voidedAt,40),voidedBy:cleanText(p.voidedBy,120)};
     }).filter(Boolean)]));
     source.actions=(source.actions||[]).slice(-100000).map(a=>({...a,id:cleanId(a.id)||undefined,date:cleanDate(a.date),createdAt:cleanText(a.createdAt,40),createdByUserId:cleanId(a.createdByUserId),createdByUsername:cleanText(a.createdByUsername,80).trim().toLowerCase(),testId:cleanId(a.testId),level:finiteNumber(a.level,0),lot:cleanText(a.lot),pointId:cleanId(a.pointId),rule:cleanText(a.rule),errorType:cleanText(a.errorType),action:cleanText(a.action,LONG_TEXT_LIMIT),by:cleanText(a.by),approvalStatus:['pending','approved','returned'].includes(a.approvalStatus)?a.approvalStatus:'pending',approvedAt:cleanText(a.approvedAt,40),approvedBy:cleanText(a.approvedBy,120),approvalNote:cleanText(a.approvalNote,LONG_TEXT_LIMIT),autoCreated:!!a.autoCreated})).filter(a=>!a.autoCreated&&a.rule!=='Cập nhật Mean/SD');
-    source.activity=(source.activity||[]).map(a=>{const row={...a,id:cleanId(a.id),seq:finiteNumber(a.seq,0),ts:cleanText(a.ts,40),user:cleanText(a.user),username:cleanText(a.username,80),userId:cleanId(a.userId),role:cleanRole(a.role),type:cleanText(a.type),detail:cleanText(a.detail,LONG_TEXT_LIMIT),target:cleanText(a.target),clientId:cleanText(a.clientId,80),prevHash:cleanText(a.prevHash,80),hash:cleanText(a.hash,80)};if(Array.isArray(a.mergePrevHashes))row.mergePrevHashes=[...new Set(a.mergePrevHashes.slice(0,32).map(x=>cleanText(x,80)).filter(Boolean))];else delete row.mergePrevHashes;return row;});
+    source.activity=(source.activity||[]).map(a=>({...a,id:cleanId(a.id),seq:finiteNumber(a.seq,0),ts:cleanText(a.ts,40),user:cleanText(a.user),username:cleanText(a.username,80),userId:cleanId(a.userId),role:cleanRole(a.role),type:cleanText(a.type),detail:cleanText(a.detail,LONG_TEXT_LIMIT),target:cleanText(a.target),clientId:cleanText(a.clientId,80),prevHash:cleanText(a.prevHash,80),hash:cleanText(a.hash,80)}));
     source.users=(source.users||[]).slice(0,1000).map(u=>({...u,id:cleanId(u.id),username:cleanText(u.username,80).trim().toLowerCase(),name:cleanText(u.name),initials:cleanText(u.initials,12).toUpperCase(),externalCode:cleanText(u.externalCode,40),role:cleanRole(u.role),pagePerms:Array.isArray(u.pagePerms)?[...new Set(u.pagePerms.map(cleanId).filter(id=>PAGE_SET.has(id)))]:null,passHash:cleanText(u.passHash,500),active:u.active!==false,mustChangePassword:!!u.mustChangePassword}));
     source.reagentTests=(source.reagentTests||[]).slice(0,5000).map(d=>{const{reviewStatus:_rs,reviewedBy:_rb,reviewedAt:_ra,reviewNote:_rn,...tRest}=(d.test||{});return{...d,id:cleanId(d.id),test:{...tRest,reagent:cleanText(d.test&&d.test.reagent),lotOld:cleanText(d.test&&d.test.lotOld),lotNew:cleanText(d.test&&d.test.lotNew),date:cleanDate(d.test&&d.test.date),operator:cleanText(d.test&&d.test.operator),sampleType:cleanText(d.test&&d.test.sampleType),unit:cleanText(d.test&&d.test.unit),biasTarget:finiteNumber(d.test&&d.test.biasTarget,6),alpha:finiteNumber(d.test&&d.test.alpha,.05),coverageConfirmed:!!(d.test&&d.test.coverageConfirmed)},rows:(d.rows||[]).slice(0,10000).map(r=>[numericCell(r&&r[0]),numericCell(r&&r[1])])};});
     source.reagentOperators=(source.reagentOperators||[]).slice(0,1000).map(v=>cleanText(v,120)).filter(Boolean);
@@ -480,7 +480,7 @@
     '9x':'9 điểm liên tiếp nằm cùng một phía so với Mean',
     '10x':'10 điểm liên tiếp nằm cùng một phía so với Mean',
     '12x':'12 điểm liên tiếp nằm cùng một phía so với Mean',
-    '7T':'7 điểm QC liên tiếp tăng dần hoặc giảm dần'
+    '7T':'7 lần tăng dần hoặc giảm dần liên tiếp (8 điểm QC)'
   };
   function primaryErrorRule(rules){const priority=['1-3s','R4s','2-2s','2of3-2s','3-1s','4-1s','6x','8x','9x','10x','12x','7T','1-2s'];return priority.find(r=>(rules||[]).includes(r))||((rules||[])[0]||'');}
   function errorType(rules){rules=rules||[];if(rules.some(r=>WG_SE_RULES.includes(r)))return'SE — Sai số hệ thống';if(rules.some(r=>WG_RE_RULES.includes(r)))return'RE — Sai số ngẫu nhiên';return'—';}

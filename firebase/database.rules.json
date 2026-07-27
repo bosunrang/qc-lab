@@ -12,27 +12,14 @@
     },
     "qclab-shared": {
       "$labCode": {
-        ".read": "auth != null && (root.child('qclab-acl').child($labCode).child(auth.uid).val() === true || root.child('qclab-acl').child($labCode).child(auth.uid).child('read').val() === true || root.child('qclab-acl').child($labCode).child(auth.uid).child('write').val() === true || root.child('qclab-acl').child($labCode).child(auth.uid).child('admin').val() === true)",
+        ".read": "auth != null && root.child('qclab-acl').child($labCode).child(auth.uid).exists()",
+        ".write": "auth != null && root.child('qclab-acl').child($labCode).child(auth.uid).exists()",
         ".validate": "newData.hasChildren(['_ts'])",
         "_ts": {
-          ".write": "auth != null && (root.child('qclab-acl').child($labCode).child(auth.uid).val() === true || root.child('qclab-acl').child($labCode).child(auth.uid).child('write').val() === true || root.child('qclab-acl').child($labCode).child(auth.uid).child('admin').val() === true)",
           ".validate": "newData.isNumber()"
         },
         "_client": {
-          ".write": "auth != null && (root.child('qclab-acl').child($labCode).child(auth.uid).val() === true || root.child('qclab-acl').child($labCode).child(auth.uid).child('write').val() === true || root.child('qclab-acl').child($labCode).child(auth.uid).child('admin').val() === true)",
           ".validate": "newData.isString()"
-        },
-        "activity": {
-          "$index": {
-            ".write": "auth != null && (root.child('qclab-acl').child($labCode).child(auth.uid).val() === true || root.child('qclab-acl').child($labCode).child(auth.uid).child('write').val() === true || root.child('qclab-acl').child($labCode).child(auth.uid).child('admin').val() === true) && (!data.exists() || newData.val() === data.val())",
-            ".validate": "newData.hasChildren(['id', 'ts', 'type', 'hash']) && newData.child('id').isString() && newData.child('ts').isString() && newData.child('type').isString() && newData.child('hash').isString() && newData.child('hash').val().length === 64"
-          }
-        },
-        "users": {
-          ".write": "auth != null && root.child('qclab-acl').child($labCode).child(auth.uid).child('admin').val() === true"
-        },
-        "$branch": {
-          ".write": "auth != null && $branch !== 'activity' && $branch !== 'users' && (root.child('qclab-acl').child($labCode).child(auth.uid).val() === true || root.child('qclab-acl').child($labCode).child(auth.uid).child('write').val() === true || root.child('qclab-acl').child($labCode).child(auth.uid).child('admin').val() === true)"
         }
       }
     }
