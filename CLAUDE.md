@@ -338,12 +338,22 @@ the Google Fonts link, offline labs must print with correct metrics.
     awaiting is safe because the dialog's own DOM write happens synchronously
     before the returned Promise settles — the caller's boolean is unaffected
     either way.
-- `draw.js`, `router-render.js`, `sigma.js`, `actions-routes.js`,
-  `manage-routes.js`, `after-render.js`, `entry-tests-actions.js`, `modals.js`
-  — UI/rendering and routing. `router-render.js` owns the page list
-  (`PAGES`) and per-role page permissions (`PERM`): `rolePageIds(role)` gives
-  each role's default page set, and a user's own `pagePerms` (edited in
-  `users-auth.js`) can only narrow that set further, never expand past it.
+- `draw.js`, `router-render.js`, `dashboard-routes.js`, `entry-routes.js`,
+  `westgard-routes.js`, `sigma.js`, `actions-routes.js`, `manage-routes.js`,
+  `after-render.js`, `entry-tests-actions.js`, `modals.js` — UI/rendering and
+  routing. `router-render.js` owns the page list (`PAGES`) and per-role page
+  permissions (`PERM`): `rolePageIds(role)` gives each role's default page
+  set, and a user's own `pagePerms` (edited in `users-auth.js`) can only
+  narrow that set further, never expand past it; it also holds the
+  `btn()` builder, `confirmDialog`/`infoDialog` call sites like
+  `requireWrite()`/`requireAdmin()`, and other cross-page UI primitives
+  (search/filter helpers, the VN date picker, icon SVGs). As of 2026-07-22
+  the actual page-render functions for the three biggest pages were split out
+  into their own files loaded right after it — `pageDash()` into
+  `dashboard-routes.js`, `pageEntry()` into `entry-routes.js`, `pageWestgard()`
+  into `westgard-routes.js` — so `router-render.js` itself must never
+  redefine `pageDash`/`pageEntry`/`pageWestgard`, and the three files must
+  load in that order (all enforced by `tests/ui-route-structure.test.js`).
   Page-level UI state lives in the `*-ui-state.js` modules above. `sigma.js`
   renders the Six Sigma page (see "Confirmed business-logic decisions" below
   for how its numbers relate to reports.js).
