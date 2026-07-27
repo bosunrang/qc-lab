@@ -5,9 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- CSP: han che nguon tai. script-src 'unsafe-inline' vi app dung inline event handler
      va vai khoi <script> noi tuyen trong file nay; CDN duy nhat duoc phep la gstatic
-     (Firebase, kem SRI ben duoi). connect-src mo dung cac endpoint Firebase Auth/RTDB;
-     font/anh/worker gioi han ve chinh app. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self';script-src 'self' 'unsafe-inline' https://www.gstatic.com;style-src 'self' 'unsafe-inline';img-src 'self' data: blob:;font-src 'self';connect-src 'self' https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasedatabase.app wss://*.firebasedatabase.app https://identitytoolkit.googleapis.com https://securetoken.googleapis.com;worker-src 'self';object-src 'none';base-uri 'self';form-action 'self'">
+     (Firebase, kem SRI ben duoi). Hai host RTDB nam trong script-src KHONG phai thua:
+     khi WebSocket khong dung duoc (mo bang file://, hoac mang chan wss) thi RTDB tu lui
+     ve long-polling, ma co che do chen the <script> tro thang toi host database — thieu
+     chung thi dong bo chet im lang, chi thay loi CSP trong console. connect-src mo dung
+     cac endpoint Firebase Auth/RTDB; font/anh/worker gioi han ve chinh app. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self';script-src 'self' 'unsafe-inline' https://www.gstatic.com https://*.firebaseio.com https://*.firebasedatabase.app;style-src 'self' 'unsafe-inline';img-src 'self' data: blob:;font-src 'self';connect-src 'self' https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasedatabase.app wss://*.firebasedatabase.app https://identitytoolkit.googleapis.com https://securetoken.googleapis.com;worker-src 'self';object-src 'none';base-uri 'self';form-action 'self'">
 <title>QC Lab - Nội kiểm chất lượng xét nghiệm</title>
 <link rel="stylesheet" href="assets/tokens.css?v=panel-content-normalize-20260727-2">
 <link rel="stylesheet" href="assets/app.css?v=panel-content-normalize-20260727-2">
