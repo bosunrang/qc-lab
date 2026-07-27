@@ -11,6 +11,8 @@
 //   3. Số lô của sự cố bị ghi đè theo lô hiện hành sau mỗi lần chuyển lô.
 //   4. Chip "QC đạt lại" chỉ hiện ở mục "Hồ sơ NCE đang mở" chứ không hiện ở mục
 //      "Sự cố cần xử lý" — đúng chỗ người dùng nhìn sau khi vừa chạy lại QC.
+//   5. Hồ sơ NCE quá hạn không nổi lên dashboard, nên hạn xử lý là trường bắt buộc
+//      nhập mà không có hệ quả nào.
 //
 // Chạy: npm run nce-check   (cần `npm install` + `npx playwright install chromium`)
 'use strict';
@@ -220,6 +222,38 @@ async function checkOverdueAndEscalation(page) {
   check('Không escalate hai lần cùng một hồ sơ', out.stillEscalatable === false);
 }
 
+async function checkOverdueReachesDashboard(page) {
+  const out = await page.evaluate(() => {
+    const t = state.tests[0];
+    state.actions = [
+      { id: 'D1', nceId: 'NCE-QUA-HAN', protocolVersion: 2, testId: t.id, level: 1, lot: t.levels[0].lot, pointId: '',
+        date: '2026-07-01', rule: '1-3s', errorType: 'SE — Sai số hệ thống', eventSource: 'iqc', processPhase: 'exam',
+        containmentStatus: 'held', correction: 'Dừng trả kết quả liên quan', by: 'Kỹ thuật viên', dueDate: '2020-01-01',
+        effectivenessStatus: 'pending', approvalStatus: 'pending' },
+      { id: 'D2', nceId: 'NCE-CON-HAN', protocolVersion: 2, testId: t.id, level: 1, lot: t.levels[0].lot, pointId: '',
+        date: '2026-07-01', rule: '1-2s', errorType: 'SE — Sai số hệ thống', eventSource: 'iqc', processPhase: 'exam',
+        containmentStatus: 'held', correction: 'Dừng trả kết quả liên quan', by: 'Kỹ thuật viên', dueDate: '2099-01-01',
+        effectivenessStatus: 'pending', approvalStatus: 'pending' },
+    ];
+    go('dash');
+    const main = document.getElementById('main');
+    return {
+      text: main.innerText,
+      hasOverdueRow: /NCE-QUA-HAN/.test(main.innerHTML),
+      hasInTimeRow: /NCE-CON-HAN/.test(main.innerHTML),
+      opensRecord: /go\('actions'\);editAction\(0\)/.test(main.innerHTML),
+    };
+  });
+  check('Dashboard nêu hồ sơ NCE quá hạn', out.hasOverdueRow === true, out.text.slice(0, 200));
+  check('Hồ sơ còn trong hạn không bị báo nhầm', out.hasInTimeRow === false);
+  check('Nhãn "Quá hạn N ngày" hiện trên dashboard', /Quá hạn \d+ ngày/.test(out.text));
+  check('Câu trạng thái trực ca phản ánh hồ sơ quá hạn', /hồ sơ NCE quá hạn/i.test(out.text), out.text.slice(0, 200));
+  check('Nút mở thẳng đúng hồ sơ', out.opensRecord === true);
+
+  const cleared = await page.evaluate(() => { state.actions = []; go('dash'); return document.getElementById('main').innerText; });
+  check('Hết hồ sơ quá hạn thì dashboard không còn cảnh báo', !/Quá hạn \d+ ngày/.test(cleared));
+}
+
 (async () => {
   const session = await openSeededSession();
   const pageErrors = [];
@@ -233,6 +267,7 @@ async function checkOverdueAndEscalation(page) {
     await checkMissingFieldIsPinpointed(session.page);
     await checkRerunChipOnBothSurfaces(session.page);
     await checkOverdueAndEscalation(session.page);
+    await checkOverdueReachesDashboard(session.page);
     check('Không có lỗi console/page', pageErrors.length === 0, pageErrors.join(' | '));
   } catch (err) {
     fails.push('NGOẠI LỆ: ' + err.message);

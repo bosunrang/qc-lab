@@ -31,8 +31,20 @@ function pageDash(){
   const shiftItem=(o,cls)=>`<div class="shift-item ${cls}"><div><b>${esc(testDisplayName(o.t))} · M${o.l.level}</b><div class="meta">${vnDate(o.p.date)} · ${fmt(o.p.val)} ${esc(o.t.unit||'')} · ${o.rules.join(', ')||'—'}</div></div>${btn('Xem',`entrySel={testId:'${o.t.id}',level:${o.l.level}};entryStart=null;entryEnd=null;go('entry')`,'ghost sm')}</div>`;
   const urgentHtml=urgent.slice(0,5).map(o=>shiftItem(o,'rej')).join('');
   const watchHtml=watch.slice(0,4).map(o=>shiftItem(o,'warn')).join('');
+  /* Hồ sơ NCE quá hạn: lọc thô theo dueDate trước rồi mới gọi actionOverdue() — hàm đó
+     phải chạy actionWorkflowStatus()/actionRerunStatus() nên chỉ đáng trả giá cho vài
+     hồ sơ thật sự đã qua hạn, không phải cho toàn bộ nhật ký ở mỗi lần vẽ dashboard. */
+  const overdue=(state.actions||[]).map((a,idx)=>({a,idx}))
+    .filter(({a})=>a.dueDate&&a.dueDate<today)
+    .map(({a,idx})=>({a,idx,info:actionOverdue(a)}))
+    .filter(x=>x.info.overdue)
+    .sort((x,y)=>y.info.days-x.info.days);
+  const overdueHtml=overdue.slice(0,4).map(({a,idx,info})=>{
+    const t=state.tests.find(x=>x.id===a.testId);
+    return `<div class="shift-item rej"><div><b>${esc(a.nceId||'Hồ sơ khắc phục')} · ${t?esc(testDisplayName(t)):esc(a.rule||'Sự cố')}</b><div class="meta">${esc(info.label)} · hạn ${vnDate(a.dueDate)} · phụ trách ${esc(a.by||'—')}</div></div>${btn('Mở hồ sơ',`go('actions');editAction(${idx})`,'ghost sm')}</div>`;
+  }).join('');
   const noTargetHtml=noTarget.slice(0,4).map(o=>`<div class="shift-item warn"><div><b>${esc(testDisplayName(o.t))} · M${o.l.level}</b><div class="meta">Chưa có Mean/SD hợp lệ — điểm QC mức này không được đánh giá Westgard</div></div>${btn('Gán Mean/SD',`go('manage');setManageTab('targets')`,'ghost sm')}</div>`).join('');
-  const followHtml=urgentHtml||watchHtml||noTargetHtml?`<div class="dash-list">${urgentHtml}${noTargetHtml}${watchHtml}</div>`:'<div class="alert ok">Không có điểm bị loại/cảnh báo cần xử lý ngay.</div>';
+  const followHtml=urgentHtml||overdueHtml||watchHtml||noTargetHtml?`<div class="dash-list">${urgentHtml}${overdueHtml}${noTargetHtml}${watchHtml}</div>`:'<div class="alert ok">Không có điểm bị loại/cảnh báo cần xử lý ngay.</div>';
   const expHtml=[...expByLot.values()].sort((a,b)=>a.d-b.d).slice(0,5).map(e=>`<div class="shift-item ${e.d<0?'rej':'warn'}"><div><b>Lô ${esc(e.l.lot||'?')} · M${e.l.level}</b><div class="meta">${e.count>1?e.count+' xét nghiệm · ':''}${e.d<0?'Hết hạn '+(-e.d)+' ngày':'Còn '+e.d+' ngày'}</div></div><span class="tag ${e.d<0?'rej':'warn'}">${e.d<0?'HSD':'Sắp hết'}</span></div>`).join('')||'<div class="hint">Không có lô sắp hết hạn trong 30 ngày.</div>';
   const dashStatusMatch=(item,key=dashTestStatus)=>{
     if(key==='all')return true;
@@ -54,8 +66,8 @@ function pageDash(){
   }).sort((a,b)=>a.rank-b.rank||String(a.name||'').localeCompare(String(b.name||''),'vi')).map(x=>x.html).join('');
   const testListHtml=statusItems.length?`<div class="dash-test-list"><table><thead><tr><th>Xét nghiệm</th><th>Mức QC / lô</th><th>QC hôm nay</th><th class="num">Tổng điểm</th><th>Westgard</th><th>Gần nhất</th><th><span style="position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">Thao tác</span></th></tr></thead><tbody>${testRows}</tbody></table></div><div id="dashTestEmpty" class="dash-test-empty" style="display:none">Không tìm thấy xét nghiệm phù hợp.</div>`:`<div class="dash-test-empty">Không tìm thấy xét nghiệm phù hợp.</div>`;
   const done=todayPts,doneTests=Math.max(0,tests.length-missingToday.length),pct=tests.length?Math.round(doneTests/tests.length*100):0;
-  const mood=rej?'Cần xử lý ngay':warn?'Có cảnh báo cần theo dõi':missingToday.length?'Còn QC cần nhập':'Đang trong kiểm soát';
-  const moodText=rej?'Có xét nghiệm đang bị loại, ưu tiên kiểm tra và ghi nhận khắc phục.':warn?'Có tín hiệu cảnh báo, nên xem lại biểu đồ và xu hướng trước khi trả kết quả.':missingToday.length?'Một số xét nghiệm chưa đủ QC hôm nay, nên hoàn tất trước giờ chạy mẫu.':'Không có cảnh báo trọng yếu trong dữ liệu hiện tại.';
+  const mood=rej?'Cần xử lý ngay':overdue.length?'Có hồ sơ NCE quá hạn':warn?'Có cảnh báo cần theo dõi':missingToday.length?'Còn QC cần nhập':'Đang trong kiểm soát';
+  const moodText=rej?'Có xét nghiệm đang bị loại, ưu tiên kiểm tra và ghi nhận khắc phục.':overdue.length?`${overdue.length} hồ sơ khắc phục đã qua hạn xử lý mà chưa khép vòng.`:warn?'Có tín hiệu cảnh báo, nên xem lại biểu đồ và xu hướng trước khi trả kết quả.':missingToday.length?'Một số xét nghiệm chưa đủ QC hôm nay, nên hoàn tất trước giờ chạy mẫu.':'Không có cảnh báo trọng yếu trong dữ liệu hiện tại.';
   return `<div class="head"><div><h1>Bảng điều khiển</h1><p>${esc(state.lab.name||'Khoa Xét nghiệm')}${state.lab.dept?' · '+esc(state.lab.dept):''}</p></div>${topUserBox()}</div>
    <div class="dash-hero">
      <div class="dash-status"><div class="eyebrow">Trạng thái trực ca · ${vnDate(today)}</div><h2>${mood}</h2><p>${moodText}</p>
