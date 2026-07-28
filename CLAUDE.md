@@ -150,6 +150,15 @@ it runs under `xvfb-run`, see the CI job):
   `node scripts/a11y-audit.js --update-baseline` — never raise a number by
   hand. `MODALS.open` entries are real functions (not eval'd strings) so the
   audit works under the CSP, which has no `unsafe-eval`.
+- The NCE form on the "Khắc phục sự cố" page renders every field straight from state
+  (`actionFormModel()`), keeps in-progress typing across `rerender()` via
+  `captureActionDraft()`, and collapses sections 2–8 into `<details>` whose open/closed
+  state lives in `actionOpenSections`. The narrative fields carry insert-and-edit
+  suggestion chips (`ACT_SUGGEST`, `actionSuggestRow()`) rather than closed dropdowns —
+  a fixed picker for "root cause" would make every NCE record read identically and
+  prove nothing under an ISO 15189 review, which is the same reason the void reason
+  keeps a free-text note. Chips for cause/corrective action are context-driven by
+  `causeCategory` and the SE/RE split that `fixHint()` already owns.
 - `scripts/nce-workflow-check.js` (`npm run nce-check`) drives the NCE record
   lifecycle on the "Khắc phục sự cố" page in real Chromium, because every bug it
   guards only appears once the form is rendered *and re-rendered*: the edit/new

@@ -13,6 +13,8 @@
 //      "Sự cố cần xử lý" — đúng chỗ người dùng nhìn sau khi vừa chạy lại QC.
 //   5. Hồ sơ NCE quá hạn không nổi lên dashboard, nên hạn xử lý là trường bắt buộc
 //      nhập mà không có hệ quả nào.
+//   6. Form bung hết 7 mục ngay từ đầu (2350px) và bắt gõ tay 13 ô — mục 2–8 phải thu
+//      gọn sẵn, chip gợi ý phải chèn được và vẫn sửa được sau khi chèn.
 //
 // Chạy: npm run nce-check   (cần `npm install` + `npx playwright install chromium`)
 'use strict';
@@ -102,9 +104,95 @@ async function checkIdentityIsImmutable(page) {
   check('Nội dung điều tra không bị ghi rỗng khi lưu', saved.cause === NCE.cause && saved.action === NCE.action);
 }
 
-async function checkNewRecordDraftSurvivesRerender(page) {
+// Mục 2–8 mặc định thu gọn; mở bằng cách bấm đúng dải tiêu đề như người dùng thật.
+async function openAllSections(page) {
+  const closed = await page.$$('details.action-form-section:not([open]) > summary');
+  for (const summary of closed) await summary.click();
+}
+
+async function checkSectionsStartCollapsed(page) {
   await page.evaluate(() => { state.actions = []; state.tests = state.tests.filter(t => t.id !== 'T2'); state.tests[0].levels[0].lot = '1101'; clearDerived(); cancelActionEdit(); });
   await page.waitForSelector('#aCorrection');
+  const shape = await page.evaluate(() => {
+    const body = document.querySelector('.action-form-body');
+    return {
+      collapsed: [...body.querySelectorAll('details.action-form-section')].filter(d => !d.open).length,
+      total: body.querySelectorAll('details.action-form-section').length,
+      correctionVisible: !!document.getElementById('aCorrection').offsetParent,
+      causeVisible: document.getElementById('aCause').checkVisibility(),
+      height: Math.round(body.getBoundingClientRect().height),
+      summaries: [...body.querySelectorAll('summary .action-chip')].map(c => c.textContent),
+    };
+  });
+  check('Hồ sơ mới: mục 2–8 thu gọn sẵn', shape.collapsed === shape.total && shape.total === 5, JSON.stringify(shape));
+  check('Phần tối thiểu (mục 1) vẫn mở sẵn', shape.correctionVisible === true);
+  check('Mục điều tra được giấu cho tới khi cần', shape.causeVisible === false);
+  // Ngưỡng tương đối, tự hiệu chỉnh: so chính form này lúc thu gọn với lúc bung hết,
+  // để check không mục ruỗng khi nội dung form đổi sau này.
+  const openHeight = await page.evaluate(() => {
+    const body = document.querySelector('.action-form-body');
+    body.querySelectorAll('details.action-form-section').forEach(d => { d.open = true; });
+    const h = Math.round(body.getBoundingClientRect().height);
+    body.querySelectorAll('details.action-form-section').forEach(d => { d.open = false; });
+    return h;
+  });
+  check('Thu gọn cắt được ít nhất 1/3 chiều cao form',
+    shape.height < openHeight * 0.67, `thu gọn ${shape.height}px / bung hết ${openHeight}px`);
+  check('Dải tóm tắt nêu số mục còn thiếu', shape.summaries.some(t => /Còn thiếu \d+ mục/.test(t)), JSON.stringify(shape.summaries));
+
+  await openAllSections(page);
+  const opened = await page.evaluate(() => document.getElementById('aCause').checkVisibility());
+  check('Bấm dải tiêu đề mở được mục', opened === true);
+  await page.evaluate(() => rerender());
+  check('Trạng thái mở/đóng sống sót qua rerender()',
+    await page.evaluate(() => document.getElementById('aCause').checkVisibility()));
+}
+
+async function checkSuggestionChips(page) {
+  await page.selectOption('#aCauseCategory', 'instrument');
+  const chips = await page.evaluate(() => [...document.querySelectorAll('#sugg-aCause .sugg-chip')].map(c => c.textContent));
+  check('Chip nguyên nhân đổi theo nhóm đã chọn',
+    chips.length > 0 && chips.some(c => /kim hút|điện cực|buồng ủ/i.test(c)), JSON.stringify(chips));
+
+  await page.click('#sugg-aCause .sugg-chip');
+  const first = await page.evaluate(() => document.getElementById('aCause').value);
+  check('Bấm chip là chèn câu vào ô', first.length > 5, first);
+
+  await page.click('#sugg-aCause .sugg-chip:nth-child(2)');
+  const second = await page.evaluate(() => document.getElementById('aCause').value);
+  check('Chèn tiếp thì nối thêm chứ không đè', second.startsWith(first) && second.length > first.length, second);
+
+  await page.fill('#aCause', first + ' — ghi thêm chi tiết cụ thể');
+  check('Chèn xong vẫn sửa tự do được',
+    await page.evaluate(() => /ghi thêm chi tiết cụ thể/.test(document.getElementById('aCause').value)));
+
+  await page.selectOption('#aErr', 'RE — Sai số ngẫu nhiên');
+  const actChips = await page.evaluate(() => [...document.querySelectorAll('#sugg-aAct .sugg-chip')].map(c => c.textContent));
+  check('Chip hành động khắc phục đổi theo loại sai số',
+    actChips.some(c => /bọt khí|trộn đều|thao tác/i.test(c)), JSON.stringify(actChips));
+}
+
+async function checkPickersReplaceTyping(page) {
+  const out = await page.evaluate(() => {
+    const rule = document.getElementById('aRule'), by = document.getElementById('aBy');
+    return {
+      ruleIsSelect: rule.tagName === 'SELECT',
+      ruleOptions: [...rule.options].map(o => o.value),
+      byHasList: by.getAttribute('list') === 'aByList',
+      staffNames: [...document.querySelectorAll('#aByList option')].map(o => o.value),
+    };
+  });
+  check('Luật vi phạm thành dropdown', out.ruleIsSelect === true);
+  check('Dropdown liệt kê đủ bộ luật Westgard',
+    ['1-2s', '1-3s', '2-2s', 'R4s', '10x'].every(r => out.ruleOptions.includes(r)), JSON.stringify(out.ruleOptions));
+  check('Người phụ trách có danh sách nhân viên',
+    out.byHasList === true && out.staffNames.length > 0, JSON.stringify(out.staffNames));
+}
+
+async function checkNewRecordDraftSurvivesRerender(page) {
+  await page.evaluate(() => { state.actions = []; cancelActionEdit(); });
+  await page.waitForSelector('#aCorrection');
+  await openAllSections(page);
   await page.fill('#aCorrection', 'Dừng trả kết quả và cô lập lô QC');
   await page.selectOption('#aContainment', 'held');
   await page.fill('#aCause', 'Kim hút bẩn làm sai thể tích hút');
@@ -263,6 +351,9 @@ async function checkOverdueReachesDashboard(page) {
   try {
     await checkEditedFormSurvivesRerender(session.page);
     await checkIdentityIsImmutable(session.page);
+    await checkSectionsStartCollapsed(session.page);
+    await checkSuggestionChips(session.page);
+    await checkPickersReplaceTyping(session.page);
     await checkNewRecordDraftSurvivesRerender(session.page);
     await checkMissingFieldIsPinpointed(session.page);
     await checkRerunChipOnBothSurfaces(session.page);

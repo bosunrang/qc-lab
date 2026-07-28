@@ -52,29 +52,41 @@
     need(!String(a.dueDate||'').trim(),'hạn hoàn thành','dueDate');
     return{complete:!missing.length,missing,missingKeys};
   }
+  /* missingBySection gom cung mot danh sach thieu theo tung muc cua form, de dai tom
+     tat tren muc dang thu gon khong phai tu suy doan lai dieu kien — mot nguon su that
+     duy nhat cho ca viec chan khep vong lan viec hien "con thieu N muc". */
   function actionProtocolStatus(a){
-    if(!a||!a.protocolVersion)return{required:false,complete:true,label:'Hồ sơ cũ',missing:[]};
-    const missing=[];
+    if(!a||!a.protocolVersion)return{required:false,complete:true,label:'Hồ sơ cũ',missing:[],missingBySection:{}};
+    const missing=[],bySection={ident:[],immediate:[],risk:[],check:[],cause:[],patient:[],eff:[]};
+    /* Truong nao thuoc muc nao tren form — nguon phat hien/giai doan/phu trach/han nam
+       o khoi "Ho so", chi containment va correction moi thuoc muc 1. */
+    const DRAFT_SECTION={eventSource:'ident',processPhase:'ident',by:'ident',dueDate:'ident',containmentStatus:'immediate',correction:'immediate',action:'cause'};
+    const need=(cond,label,section)=>{if(cond){missing.push(label);if(bySection[section])bySection[section].push(label);}};
     if(a.protocolVersion>=2){
-      const draft=actionDraftStatus(a);missing.push(...draft.missing);
-      if(!RISK_LABELS[a.riskLevel]||![1,2,3,4,5].includes(+a.riskSeverity)||![1,2,3,4,5].includes(+a.riskOccurrence)||![1,2,3,4,5].includes(+a.riskDetectability))missing.push('đánh giá nguy cơ');
+      const draft=actionDraftStatus(a);
+      draft.missing.forEach((label,i)=>{missing.push(label);const section=DRAFT_SECTION[draft.missingKeys[i]]||'ident';bySection[section].push(label);});
+      need(!RISK_LABELS[a.riskLevel]||![1,2,3,4,5].includes(+a.riskSeverity)||![1,2,3,4,5].includes(+a.riskOccurrence)||![1,2,3,4,5].includes(+a.riskDetectability),'đánh giá nguy cơ','risk');
     }
-    if(!CONTAINMENT_LABELS[a.containmentStatus])missing.push('kiểm soát tức thời');
+    /* Chi ho so v1 moi can kiem rieng — v2 da kiem containment trong actionDraftStatus,
+       lap lai se dem thanh hai muc thieu khac chuoi va thoi phong so tren dai tom tat. */
+    need(a.protocolVersion<2&&!CONTAINMENT_LABELS[a.containmentStatus],'kiểm soát tức thời','immediate');
     PROTOCOL_CHECKS.forEach(([key,label])=>{
-      if(!CHECK_LABELS[a[key]])missing.push(label.toLocaleLowerCase('vi'));
-      else if(['abnormal','na','checked-abnormal'].includes(a[key])&&String(a[key.replace('Status','Note')]||'').trim().length<3)missing.push(`${label.toLocaleLowerCase('vi')} (ghi chú)`);
+      const low=label.toLocaleLowerCase('vi');
+      need(!CHECK_LABELS[a[key]],low,'check');
+      need(!!CHECK_LABELS[a[key]]&&['abnormal','na','checked-abnormal'].includes(a[key])&&String(a[key.replace('Status','Note')]||'').trim().length<3,`${low} (ghi chú)`,'check');
     });
-    if(!CAUSE_LABELS[a.causeCategory]||String(a.cause||'').trim().length<5)missing.push('nguyên nhân');
-    if(String(a.action||'').trim().length<5)missing.push('hành động khắc phục');
-    if(!PATIENT_LABELS[a.patientImpact])missing.push('đánh giá ảnh hưởng bệnh nhân');
-    if(['held','affected'].includes(a.patientImpact)&&String(a.patientAction||'').trim().length<5)missing.push('xử lý kết quả bệnh nhân');
+    need(!CAUSE_LABELS[a.causeCategory]||String(a.cause||'').trim().length<5,'nguyên nhân','cause');
+    need(String(a.action||'').trim().length<5,'hành động khắc phục','cause');
+    need(!PATIENT_LABELS[a.patientImpact],'đánh giá ảnh hưởng bệnh nhân','patient');
+    need(['held','affected'].includes(a.patientImpact)&&String(a.patientAction||'').trim().length<5,'xử lý kết quả bệnh nhân','patient');
     /* Mục 1 nói "không có kết quả bệnh nhân liên quan" mà mục 7 lại kết luận có kết quả
        bị giữ/cần xử lý lại thì một trong hai ghi sai — không cho khép vòng với hồ sơ
        tự mâu thuẫn. Chiều ngược lại (giữ kết quả rồi rà soát thấy không ảnh hưởng) là
        hợp lệ nên không chặn. */
-    if(a.containmentStatus==='none'&&['held','affected'].includes(a.patientImpact))missing.push('mâu thuẫn giữa mục 1 (không có kết quả liên quan) và mục 7');
+    need(a.containmentStatus==='none'&&['held','affected'].includes(a.patientImpact),'mâu thuẫn giữa mục 1 (không có kết quả liên quan) và mục 7','patient');
     const unique=[...new Set(missing)];
-    return{required:true,complete:!unique.length,label:unique.length?'Thiếu: '+unique.join(', '):'Đã hoàn tất checklist điều tra',missing:unique};
+    const missingBySection={};Object.keys(bySection).forEach(k=>{missingBySection[k]=[...new Set(bySection[k])];});
+    return{required:true,complete:!unique.length,label:unique.length?'Thiếu: '+unique.join(', '):'Đã hoàn tất checklist điều tra',missing:unique,missingBySection};
   }
   function actionProtocolSummary(a){
     if(!a||!a.protocolVersion)return'';

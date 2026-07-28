@@ -23,6 +23,62 @@
   display:flex; align-items:center; gap:10px; margin-bottom:12px;
 }
 
+/* Mục thu gọn: <summary> mặc định là list-item, đổi sang flex để dòng tiêu đề nằm
+   ngang như các mục luôn mở, và tự vẽ mũi tên thay cho marker mặc định. */
+summary.action-form-section-title{
+  margin-bottom:0; padding:4px 0; cursor:pointer; list-style:none;
+}
+
+summary.action-form-section-title::-webkit-details-marker{
+  display:none;
+}
+
+summary.action-form-section-title::after{
+  content:''; flex:none; width:8px; height:8px; margin-left:2px; border-right:2px solid var(--muted); border-bottom:2px solid var(--muted); transform:rotate(45deg) translate(-2px,-2px); transition:transform .15s ease;
+}
+
+details[open]>summary.action-form-section-title{
+  margin-bottom:12px;
+}
+
+details[open]>summary.action-form-section-title::after{
+  transform:rotate(-135deg) translate(-2px,-2px);
+}
+
+summary.action-form-section-title .action-chip{
+  margin-left:auto;
+}
+
+summary.action-form-section-title:hover b{
+  color:var(--teal);
+}
+
+summary.action-form-section-title:focus-visible{
+  outline:2px solid var(--focus-outline); outline-offset:2px; border-radius:var(--radius);
+}
+
+/* Chip gợi ý: bấm là chèn câu vào ô ngay phía trên, chèn xong vẫn sửa được. Không
+   dùng .btn vì đây là gợi ý nhập liệu, không phải nút hành động teal/ghost/danger. */
+.sugg-row{
+  display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;
+}
+
+.sugg-chip{
+  padding:4px 10px; border:1px dashed var(--line-strong); border-radius:var(--radius-pill); background:transparent; color:var(--muted); font:inherit; font-size:12px; line-height:1.35; cursor:pointer; text-align:left;
+}
+
+.sugg-chip:hover{
+  border-style:solid; border-color:var(--teal); color:var(--teal);
+}
+
+.sugg-chip:focus-visible{
+  outline:2px solid var(--focus-outline); outline-offset:1px;
+}
+
+.action-investigation-note{
+  display:flex; flex-direction:column; min-width:0;
+}
+
 .action-form-section-title>span{
   display:inline-flex; align-items:center; justify-content:center; flex:none; min-width:30px; height:30px; padding:0 7px; border-radius:var(--radius-pill); background:var(--teal); color:var(--on-accent); font-size:12px; font-weight:850;
 }
