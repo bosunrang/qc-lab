@@ -18,7 +18,11 @@ function actionSectionToggled(key,open){
 function actionDefaultOpenSections(editing,protocol){
   if(!editing)return new Set();
   const miss=protocol&&protocol.missingBySection||{};
-  return new Set(['risk','check','cause','patient','eff'].filter(k=>(miss[k]||[]).length));
+  const open=new Set(['risk','check','cause','patient'].filter(k=>(miss[k]||[]).length));
+  /* Mục 8 mở sẵn khi hồ sơ đã qua được checklist — lúc đó đánh giá hiệu lực mới là
+     việc còn lại phải làm. */
+  if(!open.size&&editing&&!actionEffectivenessStatus({...editing,protocolVersion:2}).complete)open.add('eff');
+  return open;
 }
 /* Luật Westgard là bộ từ vựng đóng — không có lý do gì để gõ tay. actSel() tự thêm
    option cho giá trị lạ nên hồ sơ cũ (hoặc chuỗi nhiều luật "1-3s, 2-2s" sinh từ dòng
@@ -212,7 +216,7 @@ async function addAction(){
     logAct('Cập nhật hồ sơ NCE',`${editing.nceId||'NCE'} · ${actionWorkflowStatus(editing).label}`,t?t.name:'');actionEditId='';
   }else{
     const record={id:uid(),nceId,date:parseVN(document.getElementById('aDate').value)||isoToday(),createdAt:now,createdByUserId:currentUser&&currentUser.id||'',createdByUsername:currentUser&&currentUser.username||'',testId:tid,level,lot,pointId,rule,errorType,action,by,...protocol,effectivenessBy:protocol.effectivenessStatus!=='pending'?userName():'',effectivenessAt:protocol.effectivenessStatus!=='pending'?now:'',approvalStatus:'pending',approvedAt:'',approvedBy:'',approvalNote:''};
-    state.actions.push(record);logAct('Mở hồ sơ NCE',`${record.nceId} · ${actionLevelShort(t,level,lot)} · đang điều tra`,t?t.name:'');
+    state.actions.push(record);logAct('Lập hồ sơ NCE',`${record.nceId} · ${actionLevelShort(t,level,lot)} · đang điều tra`,t?t.name:'');
   }
   actionSeed=null;clearActionDraft();actionOpenSections=null;save({clearDerived:false});rerender();
 }
@@ -284,7 +288,7 @@ async function escalateAction(i){
   if(!requireWrite())return;const a=state.actions&&state.actions[i];if(!a)return;
   if(!actionCanEscalate(a)){await infoDialog('Chỉ mở hồ sơ tiếp theo cho hồ sơ đã kết luận "chưa hiệu lực" và chưa từng chuyển.');return;}
   const t=state.tests.find(x=>x.id===a.testId),parent=a.nceId||'hồ sơ trước';
-  if(!await confirmDialog({kicker:'Vòng điều tra mới',title:'Mở hồ sơ NCE tiếp theo?',message:`Hành động của ${parent} được kết luận chưa hiệu lực. Mở một hồ sơ mới để điều tra lại cùng sự cố này?`,detail:'Hồ sơ cũ sẽ được khép lại với kết luận "chưa hiệu lực — đã chuyển", giữ nguyên toàn bộ nội dung điều tra.',confirmLabel:'Mở hồ sơ tiếp theo',cancelLabel:'Hủy'}))return;
+  if(!await confirmDialog({kicker:'Vòng điều tra mới',title:'Lập hồ sơ NCE tiếp theo?',message:`Hành động của ${parent} được kết luận chưa hiệu lực. Mở một hồ sơ mới để điều tra lại cùng sự cố này?`,detail:'Hồ sơ cũ sẽ được khép lại với kết luận "chưa hiệu lực — đã chuyển", giữ nguyên toàn bộ nội dung điều tra.',confirmLabel:'Lập hồ sơ tiếp theo',cancelLabel:'Hủy'}))return;
   const now=new Date().toISOString(),nceId=nextNceId(isoToday());
   const record={id:uid(),nceId,parentNceId:a.nceId||'',date:isoToday(),createdAt:now,createdByUserId:currentUser&&currentUser.id||'',createdByUsername:currentUser&&currentUser.username||'',
     testId:a.testId,level:a.level,lot:a.lot||'',pointId:a.pointId||'',rule:a.rule||'',errorType:a.errorType||'',qcVerdict:a.qcVerdict||'',
@@ -293,7 +297,7 @@ async function escalateAction(i){
     effectivenessStatus:'pending',approvalStatus:'pending',approvedAt:'',approvedBy:'',approvalNote:''};
   a.followUpNceId=nceId;
   state.actions.push(record);
-  logAct('Mở hồ sơ NCE tiếp theo',`${nceId} · nối tiếp ${parent} (hành động chưa hiệu lực)`,t?t.name:'Khắc phục');
+  logAct('Lập hồ sơ NCE tiếp theo',`${nceId} · nối tiếp ${parent} (hành động chưa hiệu lực)`,t?t.name:'Khắc phục');
   save({clearDerived:false});actionEditId=record.id;actionSeed=null;clearActionDraft();rerender();
   const panel=document.querySelector('.action-form-panel');if(panel)panel.scrollIntoView({behavior:'smooth',block:'start'});
 }
@@ -327,7 +331,7 @@ function confirmReopenAction(i){
 }
 function actionReviewButtons(i,a){
   const s=actionApprovalStatus(a),wf=actionWorkflowStatus(a),edit=s!=='approved'&&canWrite()?btn('Tiếp tục',`editAction(${i})`,'ghost sm'):'';
-  const escalate=actionCanEscalate(a)&&canWrite()?btn('Mở hồ sơ tiếp theo',`escalateAction(${i})`,'teal sm','Hành động chưa hiệu lực — mở vòng điều tra mới'):'';
+  const escalate=actionCanEscalate(a)&&canWrite()?btn('Lập hồ sơ tiếp theo',`escalateAction(${i})`,'teal sm','Hành động chưa hiệu lực — mở vòng điều tra mới'):'';
   if(role()!=='admin')return `<div class="action-row-actions">${btn('Chi tiết',`viewActionDetail(${i})`,'ghost sm')}${edit}${escalate}</div>`;
   return `<div class="action-row-actions">${btn('Chi tiết',`viewActionDetail(${i})`,'ghost sm')}${edit}${escalate}${wf.stage==='approval'?btn('Duyệt',`approveAction(${i})`,'teal sm'):''}${wf.stage==='approval'?btn('Trả lại',`returnAction(${i})`,'ghost sm'):''}${actionCanReopen(a)?btn('Mở lại',`reopenAction(${i})`,'danger sm','Hồ sơ đã duyệt nhưng không còn đủ điều kiện khép vòng'):''}${s!=='approved'?btn('✕',`delAction(${i})`,'danger icon','Xóa nhật ký'):''}</div>`;
 }
@@ -384,7 +388,7 @@ function issueRowHtml(o){
   const rules=o.rules.join(', '),err=errorType(o.rules),hint=fixHint(o.rules),wf=pointWorkflowSummary(o.p.id),acts=typeof pointRealActions==='function'?pointRealActions(o.p.id):[],latest=acts[acts.length-1],idx=latest?(state.actions||[]).indexOf(latest):-1;
   const sideChips=latest?actionSideChips(latest,actionWorkflowStatus(latest).stage):'';
   const foot=latest?`${latest.nceId?esc(latest.nceId)+' · ':''}Phụ trách: ${esc(latest.by||'—')}${latest.dueDate?' · hạn '+vnDate(latest.dueDate):''}`:hint;
-  return `<div class="issue-row ${o.f.level}"><div class="issue-row-main"><b>${esc(actionLevelShort(o.t,o.l.level,o.l.lot))} · ${stateName(o.f.level)}</b><div class="meta">${fmt(o.p.val)} ${esc(o.t.unit||'')} · ${rules||'—'} · ${err}</div><div class="action-chipline"><span class="action-chip ${wf.cls}">${esc(wf.label)}</span>${sideChips}</div><div class="hint">${foot}</div></div>${canWrite()?(idx>=0?btn('Tiếp tục hồ sơ',`editAction(${idx})`,'ghost sm'):btn('Ghi nhận',`beginActionFromIssue('${o.t.id}',${o.l.level},'${jsq(rules)}','${jsq(err)}','${jsq(hint)}','${jsq(o.p.id||'')}','${jsq(o.p.date||'')}')`,'ghost sm')):''}</div>`;
+  return `<div class="issue-row ${o.f.level}"><div class="issue-row-main"><b>${esc(actionLevelShort(o.t,o.l.level,o.l.lot))} · ${stateName(o.f.level)}</b><div class="meta">${fmt(o.p.val)} ${esc(o.t.unit||'')} · ${rules||'—'} · ${err}</div><div class="action-chipline"><span class="action-chip ${wf.cls}">${esc(wf.label)}</span>${sideChips}</div><div class="hint">${foot}</div></div>${canWrite()?(idx>=0?btn('Tiếp tục hồ sơ',`editAction(${idx})`,'ghost sm'):btn('Lập hồ sơ',`beginActionFromIssue('${o.t.id}',${o.l.level},'${jsq(rules)}','${jsq(err)}','${jsq(hint)}','${jsq(o.p.id||'')}','${jsq(o.p.date||'')}')`,'ghost sm')):''}</div>`;
 }
 /* Hồ sơ cũ tự sinh lúc hủy điểm chỉ lưu rule='Hủy điểm QC' — không phải luật Westgard.
    Suy |Z| của chính điểm đó ra ngữ cảnh đọc được, nhưng LUÔN gắn nhãn "suy từ Z" và
@@ -412,9 +416,18 @@ function actionInvestigationField(statusId,noteId,title,hint,form,statusKey,note
 /* Bọc một mục thành <details> thu gọn được. Dùng thẻ gốc thay vì tự dựng bằng JS:
    bàn phím, ARIA và trạng thái mở/đóng do trình duyệt lo, không phát sinh vi phạm
    a11y nào. ontoggle ghi lại trạng thái để rerender() không bung/thu lung tung. */
-function actionSection(key,badge,title,hint,bodyHtml,missing,openSet){
-  const open=openSet.has(key),n=(missing||[]).length;
-  const chip=n?`<span class="action-chip warn">Còn thiếu ${n} mục</span>`:'<span class="action-chip ok">Đã xong</span>';
+function actionSectionChip(missing){
+  const n=(missing||[]).length;
+  return n?{cls:'warn',label:`Còn thiếu ${n} mục`}:{cls:'ok',label:'Đã xong'};
+}
+/* Mục 8 không nằm trong checklist khép vòng nên không có số "còn thiếu" — chip lấy
+   thẳng từ cổng hiệu lực, nếu không sẽ luôn hiện "Đã xong" cho hồ sơ còn trắng. */
+function actionEffSectionChip(form){
+  const eff=actionEffectivenessStatus({...form,protocolVersion:2});
+  return{cls:eff.cls==='none'?'none':eff.cls,label:eff.complete?eff.label:(form.effectivenessStatus==='ineffective'?eff.label:'Chưa đánh giá')};
+}
+function actionSection(key,badge,title,hint,bodyHtml,chipInfo,openSet){
+  const open=openSet.has(key),chip=`<span class="action-chip ${chipInfo.cls}">${esc(chipInfo.label)}</span>`;
   return `<details class="action-form-section" ${open?'open':''} ontoggle="actionSectionToggled('${jsq(key)}',this.open)">
      <summary class="action-form-section-title"><span>${esc(badge)}</span><div><b>${esc(title)}</b><small>${esc(hint)}</small></div>${chip}</summary>
      ${bodyHtml}</details>`;
@@ -476,7 +489,7 @@ function pageActionsV4(){
     </tr>`;}).join('');
   return headOnly('Khắc phục sự cố','Điều tra nguyên nhân, ghi nhận, chạy lại QC và phê duyệt khép vòng',btn('Quy trình 8 bước','openActionGuide()','ghost sm'))+
    `<div class="panel action-issues-panel"><h3 role="heading" aria-level="2">Sự cố cần xử lý</h3><div class="dash-list">${issueHtml}</div></div>`+
-   `<div class="panel action-form-panel"><h3>${editing?'Tiếp tục hồ sơ '+esc(editing.nceId||'NCE'):'Mở hồ sơ sự không phù hợp (NCE)'}</h3>${tests.length?`<div class="action-form-body" oninput="captureActionDraft()" onchange="captureActionDraft()"><div class="action-form-section"><div class="action-form-section-title"><span>Hồ sơ</span><div><b>Nhận diện sự cố</b><small>Có thể lưu ngay sau khi kiểm soát tức thời; không cần chờ điều tra xong</small></div></div>
+   `<div class="panel action-form-panel"><h3>${editing?'Tiếp tục hồ sơ '+esc(editing.nceId||'NCE'):'Lập hồ sơ sự không phù hợp (NCE)'}</h3>${tests.length?`<div class="action-form-body" oninput="captureActionDraft()" onchange="captureActionDraft()"><div class="action-form-section"><div class="action-form-section-title"><span>Hồ sơ</span><div><b>Nhận diện sự cố</b><small>Có thể lưu ngay sau khi kiểm soát tức thời; không cần chờ điều tra xong</small></div></div>
      <input id="aPointId" type="hidden" value="${escAttr(form.pointId||'')}">
      <input id="aLevel" type="hidden" value="${escAttr(form.level==null?'':form.level)}">
      <div class="action-ident-groups">
@@ -498,18 +511,18 @@ function pageActionsV4(){
        </div></div>
      </div></div>
      <div class="action-form-section"><div class="action-form-section-title"><span>1</span><div><b>Kiểm soát và xử lý tức thời</b><small>Phần tối thiểu bắt buộc để mở hồ sơ NCE; kết luận ảnh hưởng bệnh nhân ghi ở mục 7</small></div></div><div class="action-form-grid2"><div><label>Phạm vi kiểm soát tức thời</label>${actSel('aContainment','Phạm vi kiểm soát tức thời',ACT_CONTAIN_OPTS,form.containmentStatus)}</div><div><label>Ghi chú phạm vi</label><input id="aContainmentNote" placeholder="VD: Giữ kết quả từ 08:00 đến khi QC đạt" value="${escAttr(form.containmentNote||'')}">${actionSuggestRow('aContainmentNote',ACT_SUGGEST.containmentNote)}</div><div class="action-form-wide"><label>Xử lý tức thời đã thực hiện</label><textarea id="aCorrection" rows="2" placeholder="VD: Dừng trả kết quả, cô lập lô QC và thông báo phụ trách...">${esc(form.correction||'')}</textarea>${actionSuggestRow('aCorrection',ACT_SUGGEST.correction)}</div></div></div>
-     ${actionSection('risk','2','Đánh giá nguy cơ','RPN = mức độ × khả năng xảy ra × khả năng không phát hiện',`<div class="action-risk-grid"><div><label>Mức độ ảnh hưởng (S)</label>${actSel('aRiskSeverity','Mức độ ảnh hưởng',ACT_SEVERITY_OPTS,form.riskSeverity,'onchange="syncActionRiskScore()"')}</div><div><label>Khả năng xảy ra (O)</label>${actSel('aRiskOccurrence','Khả năng xảy ra',ACT_OCCURRENCE_OPTS,form.riskOccurrence,'onchange="syncActionRiskScore()"')}</div><div><label>Khả năng không phát hiện (D)</label>${actSel('aRiskDetectability','Khả năng không phát hiện',ACT_DETECT_OPTS,form.riskDetectability,'onchange="syncActionRiskScore()"')}</div><div><label>Phân loại theo SOP</label>${actSel('aRiskLevel','Phân loại nguy cơ',ACT_RISK_LEVEL_OPTS,form.riskLevel)}</div><div class="action-risk-score"><span>RPN</span><b id="aRiskScore">${actionRiskScore(form)||'—'}</b></div></div>`,miss.risk,openSet)}
+     ${actionSection('risk','2','Đánh giá nguy cơ','RPN = mức độ × khả năng xảy ra × khả năng không phát hiện',`<div class="action-risk-grid"><div><label>Mức độ ảnh hưởng (S)</label>${actSel('aRiskSeverity','Mức độ ảnh hưởng',ACT_SEVERITY_OPTS,form.riskSeverity,'onchange="syncActionRiskScore()"')}</div><div><label>Khả năng xảy ra (O)</label>${actSel('aRiskOccurrence','Khả năng xảy ra',ACT_OCCURRENCE_OPTS,form.riskOccurrence,'onchange="syncActionRiskScore()"')}</div><div><label>Khả năng không phát hiện (D)</label>${actSel('aRiskDetectability','Khả năng không phát hiện',ACT_DETECT_OPTS,form.riskDetectability,'onchange="syncActionRiskScore()"')}</div><div><label>Phân loại theo SOP</label>${actSel('aRiskLevel','Phân loại nguy cơ',ACT_RISK_LEVEL_OPTS,form.riskLevel)}</div><div class="action-risk-score"><span>RPN</span><b id="aRiskScore">${actionRiskScore(form)||'—'}</b></div></div>`,actionSectionChip(miss.risk),openSet)}
      ${actionSection('check','3','Checklist điều tra','Ghi rõ khi bất thường hoặc không áp dụng',`<div class="action-investigation-grid">
        ${actionInvestigationField('aQcMaterial','aQcMaterialNote','Vật liệu QC','Hạn dùng, bảo quản, hoàn nguyên',form,'qcMaterialStatus','qcMaterialNote')}
        ${actionInvestigationField('aInstrument','aInstrumentNote','Máy phân tích','Điện, nước, nhiệt độ, cảnh báo, bảo trì',form,'instrumentStatus','instrumentNote')}
        ${actionInvestigationField('aReagent','aReagentNote','Hóa chất / calibrator','Hạn dùng, số lô và điều kiện bảo quản',form,'reagentStatus','reagentNote')}
        ${actionInvestigationField('aCalibration','aCalibrationNote','Hiệu chuẩn','Tình trạng và chỉ định tái hiệu chuẩn',form,'calibrationStatus','calibrationNote')}
        ${actionInvestigationField('aLotToLot','aLotToLotNote','So sánh lot-to-lot','Dùng khi có thay đổi lô gần đây',form,'lotToLotStatus','lotToLotNote',true)}
-     </div>`,miss.check,openSet)}
-     ${actionSection('cause','4–6','Nguyên nhân gốc và hành động khắc phục','Tách khỏi xử lý tức thời; QC chạy lại được tự liên kết',`<div class="action-form-grid2"><div><label>Nhóm nguyên nhân</label>${actSel('aCauseCategory','Nhóm nguyên nhân',ACT_CAUSE_OPTS,form.causeCategory,'onchange="syncActionSuggestions()"')}</div><div><label>Nguyên nhân gốc hoặc nghi ngờ</label><textarea id="aCause" class="action-textarea-compact" rows="1" placeholder="Mô tả bằng chứng và nguyên nhân...">${esc(form.cause||'')}</textarea>${actionSuggestRow('aCause',actionCausePhrases(form.causeCategory))}</div><div class="action-form-wide"><label>Hành động khắc phục để ngăn tái diễn</label><textarea id="aAct" rows="2" placeholder="VD: Thay lọ QC mới, vệ sinh kim hút, cập nhật lịch bảo trì...">${esc(form.action||'')}</textarea>${actionSuggestRow('aAct',actionActionPhrases(form.errorType))}</div></div>`,miss.cause,openSet)}
-     ${actionSection('patient','7','Đánh giá ảnh hưởng bệnh nhân','Ghi rõ phạm vi và cách xử lý nếu có liên quan',`<div class="action-form-grid2"><div><label>Kết luận ảnh hưởng</label>${actSel('aPatientImpact','Kết luận ảnh hưởng',ACT_PATIENT_OPTS,form.patientImpact)}</div><div><label>Xử lý mẫu/kết quả liên quan</label><textarea id="aPatientAction" class="action-textarea-compact" rows="1" placeholder="VD: Rà soát các mẫu từ 08:00–10:00; chạy lại 3 mẫu...">${esc(form.patientAction||'')}</textarea>${actionSuggestRow('aPatientAction',ACT_SUGGEST.patientAction)}</div></div>`,miss.patient,openSet)}
-     ${actionSection('eff','8','Đánh giá hiệu lực','Làm sau thời gian theo dõi; “chưa hiệu lực” giữ hồ sơ mở',`<div class="action-form-grid3"><div><label>Kết luận hiệu lực</label>${actSel('aEffectivenessStatus','Kết luận hiệu lực',ACT_EFF_OPTS,form.effectivenessStatus||'pending')}</div><div><label>Ngày đánh giá</label>${dateBox('aEffectivenessDate',form.effectivenessDate||'','action-date')}</div><div class="action-form-wide"><label>Bằng chứng/nhận xét hiệu lực</label><textarea id="aEffectivenessNote" rows="2" placeholder="VD: Theo dõi 20 lần chạy tiếp theo không tái diễn...">${esc(form.effectivenessNote||'')}</textarea>${actionSuggestRow('aEffectivenessNote',ACT_SUGGEST.effectivenessNote)}</div></div>`,miss.eff,openSet)}
-     <div class="action-form-submit"><div><b>${editing?'Cập nhật tiến độ hồ sơ':'Mở hồ sơ ngay ở trạng thái đang điều tra'}</b><span>Chỉ cần hoàn tất phần nhận diện và kiểm soát tức thời để lưu; phê duyệt chỉ xuất hiện khi hồ sơ đủ điều kiện khép vòng.</span></div><div class="action-submit-buttons">${editing?btn('Hủy chỉnh sửa','cancelActionEdit()','ghost'):''}${btn(editing?'Cập nhật hồ sơ':'Mở hồ sơ NCE','addAction()','teal')}</div></div></div>`:emptyState('Cần có xét nghiệm trước','Khai báo xét nghiệm rồi quay lại ghi nhận hành động khắc phục.',role()==='admin'?btn('Thêm xét nghiệm',`go('manage')`,'teal'):'')}</div>
+     </div>`,actionSectionChip(miss.check),openSet)}
+     ${actionSection('cause','4–6','Nguyên nhân gốc và hành động khắc phục','Tách khỏi xử lý tức thời; QC chạy lại được tự liên kết',`<div class="action-form-grid2"><div><label>Nhóm nguyên nhân</label>${actSel('aCauseCategory','Nhóm nguyên nhân',ACT_CAUSE_OPTS,form.causeCategory,'onchange="syncActionSuggestions()"')}</div><div><label>Nguyên nhân gốc hoặc nghi ngờ</label><textarea id="aCause" class="action-textarea-compact" rows="1" placeholder="Mô tả bằng chứng và nguyên nhân...">${esc(form.cause||'')}</textarea>${actionSuggestRow('aCause',actionCausePhrases(form.causeCategory))}</div><div class="action-form-wide"><label>Hành động khắc phục để ngăn tái diễn</label><textarea id="aAct" rows="2" placeholder="VD: Thay lọ QC mới, vệ sinh kim hút, cập nhật lịch bảo trì...">${esc(form.action||'')}</textarea>${actionSuggestRow('aAct',actionActionPhrases(form.errorType))}</div></div>`,actionSectionChip(miss.cause),openSet)}
+     ${actionSection('patient','7','Đánh giá ảnh hưởng bệnh nhân','Ghi rõ phạm vi và cách xử lý nếu có liên quan',`<div class="action-form-grid2"><div><label>Kết luận ảnh hưởng</label>${actSel('aPatientImpact','Kết luận ảnh hưởng',ACT_PATIENT_OPTS,form.patientImpact)}</div><div><label>Xử lý mẫu/kết quả liên quan</label><textarea id="aPatientAction" class="action-textarea-compact" rows="1" placeholder="VD: Rà soát các mẫu từ 08:00–10:00; chạy lại 3 mẫu...">${esc(form.patientAction||'')}</textarea>${actionSuggestRow('aPatientAction',ACT_SUGGEST.patientAction)}</div></div>`,actionSectionChip(miss.patient),openSet)}
+     ${actionSection('eff','8','Đánh giá hiệu lực','Làm sau thời gian theo dõi; “chưa hiệu lực” giữ hồ sơ mở',`<div class="action-form-grid3"><div><label>Kết luận hiệu lực</label>${actSel('aEffectivenessStatus','Kết luận hiệu lực',ACT_EFF_OPTS,form.effectivenessStatus||'pending')}</div><div><label>Ngày đánh giá</label>${dateBox('aEffectivenessDate',form.effectivenessDate||'','action-date')}</div><div class="action-form-wide"><label>Bằng chứng/nhận xét hiệu lực</label><textarea id="aEffectivenessNote" rows="2" placeholder="VD: Theo dõi 20 lần chạy tiếp theo không tái diễn...">${esc(form.effectivenessNote||'')}</textarea>${actionSuggestRow('aEffectivenessNote',ACT_SUGGEST.effectivenessNote)}</div></div>`,actionEffSectionChip(form),openSet)}
+     <div class="action-form-submit"><div><b>${editing?'Cập nhật tiến độ hồ sơ':'Lưu ngay ở trạng thái đang điều tra'}</b><span>Chỉ cần hoàn tất phần nhận diện và kiểm soát tức thời để lưu; phê duyệt chỉ xuất hiện khi hồ sơ đủ điều kiện khép vòng.</span></div><div class="action-submit-buttons">${editing?btn('Hủy chỉnh sửa','cancelActionEdit()','ghost'):''}${btn(editing?'Lưu thay đổi':'Lập hồ sơ NCE','addAction()','teal')}</div></div></div>`:emptyState('Cần có xét nghiệm trước','Khai báo xét nghiệm rồi quay lại ghi nhận hành động khắc phục.',role()==='admin'?btn('Thêm xét nghiệm',`go('manage')`,'teal'):'')}</div>
    <div class="panel action-log-panel"><h3>Nhật ký khắc phục</h3>${rows?`<div class="action-log-tools">${btn('Xuất CSV nhật ký','exportActionsCSV()','teal sm')}</div><div class="action-log-wrap"><table class="action-log-table"><thead><tr><th>Ngày</th><th>Sự cố</th><th>Hành động</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table></div>`:emptyState('Chưa có nhật ký','Các hành động khắc phục sẽ xuất hiện ở đây sau khi được lưu.')}</div>`;
 }
 

@@ -41,7 +41,7 @@ function pageDash(){
     .sort((x,y)=>y.info.days-x.info.days);
   const overdueHtml=overdue.slice(0,4).map(({a,idx,info})=>{
     const t=state.tests.find(x=>x.id===a.testId);
-    return `<div class="shift-item rej"><div><b>${esc(a.nceId||'Hồ sơ khắc phục')} · ${t?esc(testDisplayName(t)):esc(a.rule||'Sự cố')}</b><div class="meta">${esc(info.label)} · hạn ${vnDate(a.dueDate)} · phụ trách ${esc(a.by||'—')}</div></div>${btn('Mở hồ sơ',`go('actions');editAction(${idx})`,'ghost sm')}</div>`;
+    return `<div class="shift-item rej"><div><b>${esc(a.nceId||'Hồ sơ khắc phục')} · ${t?esc(testDisplayName(t)):esc(a.rule||'Sự cố')}</b><div class="meta">${esc(info.label)} · hạn ${vnDate(a.dueDate)} · phụ trách ${esc(a.by||'—')}</div></div>${btn('Tiếp tục hồ sơ',`go('actions');editAction(${idx})`,'ghost sm')}</div>`;
   }).join('');
   const noTargetHtml=noTarget.slice(0,4).map(o=>`<div class="shift-item warn"><div><b>${esc(testDisplayName(o.t))} · M${o.l.level}</b><div class="meta">Chưa có Mean/SD hợp lệ — điểm QC mức này không được đánh giá Westgard</div></div>${btn('Gán Mean/SD',`go('manage');setManageTab('targets')`,'ghost sm')}</div>`).join('');
   const followHtml=urgentHtml||overdueHtml||watchHtml||noTargetHtml?`<div class="dash-list">${urgentHtml}${overdueHtml}${noTargetHtml}${watchHtml}</div>`:'<div class="alert ok">Không có điểm bị loại/cảnh báo cần xử lý ngay.</div>';

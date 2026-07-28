@@ -57,7 +57,10 @@
      duy nhat cho ca viec chan khep vong lan viec hien "con thieu N muc". */
   function actionProtocolStatus(a){
     if(!a||!a.protocolVersion)return{required:false,complete:true,label:'Hồ sơ cũ',missing:[],missingBySection:{}};
-    const missing=[],bySection={ident:[],immediate:[],risk:[],check:[],cause:[],patient:[],eff:[]};
+    /* Khong co nhom 'eff': danh gia hieu luc la mot CONG RIENG (actionEffectivenessStatus)
+       chu khong nam trong checklist khep vong, nen de mot nhom rong o day chi khien dai
+       tom tat muc 8 luon bao "Da xong" cho ca ho so con trang. */
+    const missing=[],bySection={ident:[],immediate:[],risk:[],check:[],cause:[],patient:[]};
     /* Truong nao thuoc muc nao tren form — nguon phat hien/giai doan/phu trach/han nam
        o khoi "Ho so", chi containment va correction moi thuoc muc 1. */
     const DRAFT_SECTION={eventSource:'ident',processPhase:'ident',by:'ident',dueDate:'ident',containmentStatus:'immediate',correction:'immediate',action:'cause'};

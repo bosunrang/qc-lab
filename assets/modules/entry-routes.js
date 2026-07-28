@@ -361,7 +361,7 @@ function entryInlineSaveCommit(tid,level,date,val,runId,lotNo=''){
 function syncVoidNceChoice(){
   const kind=(document.getElementById('voidKindInput')||{}).value,box=document.getElementById('voidOpenNce'),hint=document.getElementById('voidNceHint'),reasonBox=document.getElementById('voidReasonBox'),reasonErr=document.getElementById('voidReasonErr');
   if(!box)return;
-  if(kind==='analytical'){box.checked=true;box.disabled=true;if(hint)hint.textContent='Hệ thống sẽ mở hoặc tái sử dụng hồ sơ NCE và chờ một kết quả QC chạy lại được chấp nhận.';}
+  if(kind==='analytical'){box.checked=true;box.disabled=true;if(hint)hint.textContent='Hệ thống sẽ lập hồ sơ NCE mới, hoặc dùng lại hồ sơ đang mở của điểm này, rồi chờ một kết quả QC chạy lại được chấp nhận.';}
   else if(kind==='data-entry'){box.checked=false;box.disabled=true;if(hint)hint.textContent='Chỉ lưu dấu vết hủy; không mở NCE và không yêu cầu chạy lại QC.';}
   else{box.checked=false;box.disabled=false;if(hint)hint.textContent='Chọn mục này nếu sự việc cần điều tra và xác nhận QC chạy lại.';}
   const label=document.getElementById('voidReasonLabel');
@@ -384,7 +384,7 @@ async function voidQcPoint(tid,pointId){
         <option value="data-entry">Nhập sai dữ liệu</option>
         <option value="other">Lý do khác</option>
       </select>
-      <div class="void-nce-choice"><label><input id="voidOpenNce" type="checkbox" checked disabled> Mở hồ sơ NCE và yêu cầu chạy lại QC</label><div id="voidNceHint" class="hint">Hệ thống sẽ mở hoặc tái sử dụng hồ sơ NCE và chờ một kết quả QC chạy lại được chấp nhận.</div></div>
+      <div class="void-nce-choice"><label><input id="voidOpenNce" type="checkbox" checked disabled> Lập hồ sơ NCE và yêu cầu chạy lại QC</label><div id="voidNceHint" class="hint">Hệ thống sẽ mở hoặc tái sử dụng hồ sơ NCE và chờ một kết quả QC chạy lại được chấp nhận.</div></div>
       <div id="voidReasonBox"><label id="voidReasonLabel">Ghi chú / bằng chứng (khuyến nghị)</label>
         <textarea id="voidReasonInput" aria-label="Ghi chú lý do hủy điểm QC" placeholder="VD: Máy báo lỗi hút mẫu lúc 08:15, đã ghi nhận trong sổ bảo trì..." oninput="document.getElementById('voidReasonErr').style.display='none'"></textarea>
         <div id="voidReasonErr" class="hint" style="color:var(--red);display:none;margin-top:6px">Cần ghi lý do hủy tối thiểu 5 ký tự.</div>
@@ -407,7 +407,7 @@ async function confirmVoidQcPoint(tid,pointId){
   // confirmDialog() render vào #dialogRoot, tách khỏi #modalRoot đang giữ modal
   // "Hủy điểm QC" phía sau — nên Hủy ở đây không đụng gì tới modal đó, giữ nguyên
   // lý do người dùng đã gõ mà không cần dựng lại.
-  const detail=openNce?'Điểm vẫn được giữ trong nhật ký; hồ sơ NCE sẽ được mở hoặc tái sử dụng và yêu cầu QC chạy lại.':'Điểm vẫn được giữ trong nhật ký; thao tác này không tự mở hồ sơ NCE.';
+  const detail=openNce?'Điểm vẫn được giữ trong nhật ký; hồ sơ NCE sẽ được lập mới hoặc dùng lại, và yêu cầu QC chạy lại.':'Điểm vẫn được giữ trong nhật ký; thao tác này không tự mở hồ sơ NCE.';
   if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Hủy điểm QC',message:'Hủy điểm QC này khỏi tính toán Westgard/thống kê?',detail,confirmLabel:'Hủy điểm QC',cancelLabel:'Quay lại'}))return;
   closeModal();
   const result=EntryService.voidPoint(state,{tid,pointId,reason:clean,kind,openNce,rule,errorType:qcErrorType,qcVerdict,staff:currentStaff(),nowIso:new Date().toISOString(),today:isoToday(),id:uid(),nceId:nextNceId(isoToday()),dueDate:nceDueDate(7),formatDate:vnDate,formatNumber:fmt});

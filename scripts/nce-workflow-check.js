@@ -139,6 +139,11 @@ async function checkSectionsStartCollapsed(page) {
   check('Thu gọn cắt được ít nhất 1/3 chiều cao form',
     shape.height < openHeight * 0.67, `thu gọn ${shape.height}px / bung hết ${openHeight}px`);
   check('Dải tóm tắt nêu số mục còn thiếu', shape.summaries.some(t => /Còn thiếu \d+ mục/.test(t)), JSON.stringify(shape.summaries));
+  // Muc 8 khong nam trong checklist khep vong nen khong duoc lay so "con thieu" cua
+  // no tu actionProtocolStatus — de nhu vay thi ho so con trang van bao "Da xong".
+  check('Mục 8 không báo "Đã xong" khi chưa đánh giá hiệu lực',
+    !/Đã xong/.test(shape.summaries[shape.summaries.length - 1] || '') && /Chưa đánh giá/.test(shape.summaries.join('|')),
+    JSON.stringify(shape.summaries));
 
   await openAllSections(page);
   const opened = await page.evaluate(() => document.getElementById('aCause').checkVisibility());
@@ -173,6 +178,15 @@ async function checkSuggestionChips(page) {
 }
 
 async function checkPickersReplaceTyping(page) {
+  // "Mở hồ sơ" tung mang hai nghia nguoc nhau: nut luu form (tao moi) va nut o dong
+  // qua han tren dashboard (xem ho so da co). Chi duoc con MOT dong tu cho moi viec.
+  const verbs = await page.evaluate(() => {
+    const text = document.querySelector('.action-form-panel').innerText;
+    return { save: text.includes('Lập hồ sơ NCE'), noOpenVerb: !/Mở hồ sơ/.test(text) };
+  });
+  check('Nút lưu nói rõ là lập hồ sơ mới', verbs.save === true);
+  check('Không còn chữ "Mở hồ sơ" mang nghĩa tạo mới', verbs.noOpenVerb === true);
+
   const out = await page.evaluate(() => {
     const rule = document.getElementById('aRule'), by = document.getElementById('aBy');
     return {
