@@ -20,17 +20,27 @@ if (failures.length) {
 } else {
   const npm=process.platform==='win32'?'npm.cmd':'npm';
   const bundledNpm=process.env.npm_execpath||path.join(path.dirname(process.execPath),'node_modules','npm','bin','npm-cli.js');
-  const audit=fs.existsSync(bundledNpm)
-    ?spawnSync(process.execPath,[bundledNpm,'audit','--audit-level=high'],{cwd:root,encoding:'utf8'})
-    :spawnSync(npm,['audit','--audit-level=high'],{cwd:root,encoding:'utf8'});
-  process.stdout.write(audit.stdout||'');process.stderr.write(audit.stderr||'');
-  if(audit.status!==0){
-    if(audit.error)process.stderr.write(String(audit.error)+'\n');
-    process.stderr.write('Dependency audit failed; performance gate skipped.\n');
-    process.exitCode=audit.status||1;
-  }else{
-    const gate = spawnSync(process.execPath, [path.join(__dirname, 'performance-regression.js')], { cwd:root,encoding:'utf8' });
-    process.stdout.write(gate.stdout||'');process.stderr.write(gate.stderr||'');
-    if (gate.status !== 0)process.exitCode=gate.status||1;
-  }
+  const runAudit=args=>fs.existsSync(bundledNpm)
+    ?spawnSync(process.execPath,[bundledNpm,'audit',...args],{cwd:root,encoding:'utf8'})
+    :spawnSync(npm,['audit',...args],{cwd:root,encoding:'utf8'});
+  // Chặn phát hành: chỉ nhánh dependency thực sự đi vào bản cài (electron-updater
+  // và cây con của nó). `build.files` chỉ đóng gói index.html/assets/electron/
+  // package.json, nên devDependencies không bao giờ tới tay người dùng.
+  const prodAudit=runAudit(['--omit=dev','--audit-level=high']);
+  process.stdout.write(prodAudit.stdout||'');process.stderr.write(prodAudit.stderr||'');
+  if(prodAudit.error)process.stderr.write(String(prodAudit.error)+'\n');
+  if(prodAudit.status!==0)process.stderr.write('Runtime dependency audit FAILED — chặn phát hành.\n');
+  // Báo cáo (không chặn): cây đầy đủ gồm chuỗi công cụ build. CVE ở đây chỉ đe dọa
+  // máy chạy `npm run dist`, và thường không có đường vá vì upstream chưa phát hành
+  // bản sửa — xử lý bằng đánh giá rủi ro (RISK-ASSESSMENT.md R-12), không phải bằng
+  // override làm hỏng build. Không được để nó bỏ qua performance gate như trước.
+  const devAudit=runAudit(['--audit-level=high','--json']);
+  let devCounts=null;
+  try{devCounts=JSON.parse(devAudit.stdout||'{}').metadata.vulnerabilities;}catch(e){}
+  if(devCounts&&(devCounts.high||devCounts.critical))
+    process.stdout.write(`Build tooling audit: ${devCounts.critical} critical / ${devCounts.high} high trong devDependencies — không chặn, phải có dòng rủi ro tương ứng trong docs/validation/RISK-ASSESSMENT.md.\n`);
+  else process.stdout.write('Build tooling audit: không có lỗ hổng high/critical.\n');
+  const gate = spawnSync(process.execPath, [path.join(__dirname, 'performance-regression.js')], { cwd:root,encoding:'utf8' });
+  process.stdout.write(gate.stdout||'');process.stderr.write(gate.stderr||'');
+  process.exitCode=prodAudit.status||gate.status||0;
 }

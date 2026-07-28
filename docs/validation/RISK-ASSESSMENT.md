@@ -16,7 +16,8 @@ RPN = S × P × D. RPN ≥40 phải có hành động trước go-live.
 | R-09 | UID ngoài phòng truy cập cloud | 5/2/2 | 20 | Default deny, ACL theo labCode/UID, rules contract test |
 | R-10 | Client bị sửa để vượt quyền | 5/2/4 | 40 | Chấp nhận giới hạn client-only; dùng máy quản lý, ACL server, kiểm soát OS |
 | R-11 | Audit bị dựng lại | 4/2/4 | 32 | Công bố giới hạn; backup/hash; cân nhắc backend append-only |
-| R-12 | Dependency desktop có CVE | 5/2/2 | 20 | Electron/builder được nâng; release gate chạy npm audit high |
+| R-12 | Dependency desktop có CVE | 5/2/2 | 20 | Electron/builder được nâng; release gate chặn ở `npm audit --omit=dev` |
+| R-12b | CVE trong chuỗi công cụ build | 2/3/2 | 12 | Không đóng gói vào bản cài; audit dev chỉ báo cáo; xem ghi chú bên dưới |
 | R-13 | Cold calculation làm treo UI | 3/2/2 | 12 | Cache theo test, worker, performance gate |
 | R-14 | Báo cáo PDF sai layout | 3/2/2 | 12 | Visual/print check trên browser và Electron |
 | R-15 | Đồng hồ máy sai | 4/3/3 | 36 | OQ kiểm tra NTP; SOP cấm chỉnh giờ; audit theo timestamp máy |
@@ -24,3 +25,19 @@ RPN = S × P × D. RPN ≥40 phải có hành động trước go-live.
 R-10 là rủi ro tồn dư đáng kể: trước khi dùng làm hồ sơ duy nhất, đơn vị phải quyết
 định bổ sung backend identity/audit append-only hoặc chấp nhận bằng đánh giá rủi ro
 có chữ ký.
+
+R-12b (rà soát 2026-07-28): `npm audit` báo 16 lỗ hổng high trong cây
+devDependencies, tất cả bắt nguồn từ một advisory duy nhất — `brace-expansion`
+GHSA-mh99-v99m-4gvg (DoS, dải bị ảnh hưởng `<=5.0.7`) — lan qua
+`minimatch → glob/rimraf/temp/dir-compare/@electron/asar → electron-builder`.
+Đánh giá: dependency runtime duy nhất của bản desktop là `electron-updater`, và cây
+phụ thuộc của nó không chạm gói nào trong danh sách này; `build.files` cũng chỉ đóng
+gói `index.html`/`assets`/`electron`/`package.json`. Do đó không có mã lỗi nào trong
+bản cài đặt giao cho phòng xét nghiệm — phơi nhiễm giới hạn ở máy chạy `npm run dist`.
+Không có đường vá: `electron-builder` 26.15.3 đã là bản mới nhất, upstream chưa phát
+hành `minimatch` vá cho các nhánh 1.x/2.x, và ép `overrides: brace-expansion@^5.0.8`
+đã được thử rồi loại bỏ — bản 5.x đổi sang named export `{ expand }` nên
+`minimatch@3.1.5`/`5.1.9` ném `expand is not a function`, tức là audit xanh nhưng
+build hỏng. Kiểm soát: chấp nhận rủi ro, rà lại mỗi kỳ phát hành khi
+`npm run verify-release` in dòng "Build tooling audit", và chỉ dựng bản phát hành
+trên máy build được kiểm soát.

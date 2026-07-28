@@ -2,6 +2,10 @@
 
 This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
+`AGENTS.md` at the repo root is a byte-identical mirror of this file except for
+its first three lines (title + "guidance to Codex" sentence). Any edit here must
+be copied there in the same commit, or the two agent briefs drift apart.
+
 ## What this is
 
 QC Lab — a Vietnamese-language internal-quality-control (IQC) management app for
@@ -77,10 +81,29 @@ under test touches. What can't run in the sandbox is *calling* the
 DOM-rendering functions themselves — tests against render modules exercise
 only their pure helpers.
 
+Several tests are **source scanners, not behaviour tests** — they read the repo
+as text and enforce conventions no compiler here can. Expect them to fail on a
+structural change and fix the structure, not the test:
+
+- `global-name-uniqueness.test.js` — no two files in the single shared global
+  scope may declare the same top-level name (see "Architecture"). Its scanner is
+  line/indent-based to match this codebase's style: top-level declarations must
+  sit at column 0 and stay one logical declaration per line, or it can't see
+  them. Workers are excluded (own global scope).
+- `ui-route-structure.test.js` — pins the router/page split and the
+  `index.html` load order of `router-render.js` → `*-routes.js`.
+- `button-conventions.test.js` — the `btn()` ban on hand-written buttons (see
+  "Button convention").
+- `firebase-rules.test.js` — the rules text the Settings page shows
+  (`firebaseRulesText()`) must equal `firebase/database.rules.json` verbatim.
+- `tea-sources.test.js` — every measurand keeps a row in `docs/tea-sources.md`.
+
 A pre-commit hook (`.githooks/pre-commit`, installed into `.git/hooks/`) runs
 `node --test tests/*.test.js` and blocks the commit on failure; needs no `npm
 install` since tests only use Node core modules. `.github/workflows/test.yml`
-reruns the same command on every push/PR once the repo has a GitHub remote.
+has three jobs: `test` (the same install-free command), `release-gate`
+(`npm ci` → `npm run typecheck` → `npm run verify-release`), and
+`visual-and-a11y` (Playwright/Electron checks below).
 
 ### Visual/print and accessibility checks
 
@@ -168,10 +191,22 @@ methodology, recorded baselines, and which optimizations they justified — read
 it before touching startup, storage, Westgard, or chart-render hot paths.
 
 - `node benchmarks/verify-release.js` — pre-release gate: runs all functional
-  tests, then `performance-regression.js` against budgets in
-  `performance-budget.json`. Ratio/structural checks are the real regression
-  signal; absolute ms budgets are intentionally generous — don't tighten them
-  from a single fast local run.
+  tests, then two dependency audits, then `performance-regression.js` against
+  budgets in `performance-budget.json`. Ratio/structural checks are the real
+  regression signal; absolute ms budgets are intentionally generous — don't
+  tighten them from a single fast local run. The audit step is deliberately
+  split (2026-07-28): `npm audit --omit=dev --audit-level=high` **blocks** the
+  release, because that tree is what actually ships (`build.files` packages
+  only `index.html`/`assets`/`electron`/`package.json`, so the sole runtime
+  dependency is `electron-updater`); the full-tree audit only **reports**, since
+  a devDependency CVE threatens the build machine, not the lab. Handle those
+  with a risk row in `docs/validation/RISK-ASSESSMENT.md`, not with an
+  `overrides` entry — forcing `brace-expansion@^5.0.8` to clear the current 16
+  findings was tried and reverted: 5.x switched to the named export
+  `{ expand }`, so `minimatch@3.1.5`/`5.1.9` inside electron-builder throw
+  `expand is not a function` and packaging breaks while `npm audit` reads
+  green. Neither audit may skip the performance gate — that's how a red gate
+  used to hide whether performance still passed.
 - `node benchmarks/performance-baseline.js [--quick]` — full/smoke benchmark.
 - `startup-pipeline.js`, `partitioned-startup.js`, `render-pipeline.js` —
   focused profiles; `worker-smoke.html` (served over HTTP alongside the app)
@@ -185,8 +220,11 @@ it before touching startup, storage, Westgard, or chart-render hot paths.
 `core.js`) declares top-level `function`/`const`/`let` directly into global
 scope; later files freely call functions and read state defined by earlier
 ones. There is no namespacing — when adding a function, check the existing
-global name isn't already taken by another module. If you reorder or split
-`<script>` tags in `index.html`, you can break forward references.
+global name isn't already taken by another module; a collision silently
+replaces the other module's binding and only surfaces weeks later, so
+`tests/global-name-uniqueness.test.js` scans every file and fails on
+duplicates. If you reorder or split `<script>` tags in `index.html`, you can
+break forward references.
 
 `assets/core.js` is the one exception: it's wrapped in a UMD shim
 (`(function(root, factory){...})`) so it also works via `require()` — that's
@@ -283,6 +321,17 @@ the Google Fonts link, offline labs must print with correct metrics.
   dropped. Saves are debounced via `lsSaveDelay()` — 400ms normally, backing
   off to 700ms/1200ms as payload size or serialize time grows — flushed on
   `beforeunload`/`pagehide`/`visibilitychange`, and mirrored to `LocalStore`.
+  It also owns `save(opts)`, the app's single write gateway, whose `opts` do
+  three separate jobs at once — pass them deliberately
+  (`tests/cache-invalidation.test.js` locks the semantics):
+  `{}` (default) is the fail-safe: drops every derived cache
+  (`pointsCache`/`wgMemo`/`acceptedMemo`/`cusumMemo`/`derivedIndex`) and marks
+  the whole snapshot dirty. `{testId}`/`{testIds}` narrows both the cache drop
+  and the partitioned localStorage write to those tests — use it whenever a QC
+  point changed, it's what keeps large datasets fast. `{clearDerived:false}` is
+  for saves that touch no QC math at all (actions, period locks, settings,
+  backup bookkeeping); using it after a data change leaves stale Westgard
+  results on screen. `{cloud:false}` skips the Firebase push and the `_ts` bump.
 - `qc-rules.js`, `period-service.js`, `sigma-cohort-service.js`, `entry-service.js`,
   `action-workflow-service.js` — smaller service-style modules (some
   IIFE-wrapped) layered on `state`/`qc-domain`. `PeriodService` locks/unlocks
@@ -296,6 +345,13 @@ the Google Fonts link, offline labs must print with correct metrics.
   entry sheet/window data; called from `router-render.js`.
   (`action-workflow-service.js` actually loads a bit later, after the
   `*-ui-state.js` files.)
+  `action-workflow-service.js` owns the corrective-action lifecycle:
+  `approvalStatus` is `pending`/`approved`/`returned`, and
+  `actionWorkflowStatus()` only reports an action complete when its rerun
+  requirement is met *and* it is approved. Approval is deliberately
+  independent — `actionCanApprove()` refuses the action's own author, matching
+  on `createdByUserId`, then `createdByUsername`, then the free-text `by`
+  field — and approved actions can no longer be deleted.
   `SigmaCohortService` builds period/level cohorts directly from raw QC data,
   split by lot; Sigma precision imports must not reuse `acceptedLotPoints()`
   because that display/operational helper selects one acceptable rerun per day.
@@ -338,9 +394,18 @@ the Google Fonts link, offline labs must print with correct metrics.
     awaiting is safe because the dialog's own DOM write happens synchronously
     before the returned Promise settles — the caller's boolean is unaffected
     either way.
-- `draw.js`, `router-render.js`, `sigma.js`, `actions-routes.js`,
+- `draw.js`, `router-render.js`, `dashboard-routes.js`, `entry-routes.js`,
+  `westgard-routes.js`, `sigma.js`, `actions-routes.js`,
   `manage-routes.js`, `after-render.js`, `entry-tests-actions.js`, `modals.js`
-  — UI/rendering and routing. `router-render.js` owns the page list
+  — UI/rendering and routing. Since 2026-07-24 the three biggest pages live in
+  their own files: `router-render.js` keeps only dispatch + shared UI
+  primitives (`btn()`, `requireWrite()`…), while `pageDash()`, `pageEntry()`
+  and `pageWestgard()` live in `dashboard-routes.js`/`entry-routes.js`/
+  `westgard-routes.js`, which must load after it in that order; `modals.js`
+  likewise keeps only the modal machinery (`modalTemplate()`,
+  `modalCloseButton()`), not page logic. `tests/ui-route-structure.test.js`
+  fails if a `page*()` function or an Actions-page helper migrates back.
+  `router-render.js` owns the page list
   (`PAGES`) and per-role page permissions (`PERM`): `rolePageIds(role)` gives
   each role's default page set, and a user's own `pagePerms` (edited in
   `users-auth.js`) can only narrow that set further, never expand past it.
@@ -355,7 +420,14 @@ the Google Fonts link, offline labs must print with correct metrics.
   `pbkdf2$<iterations>$<salt>$<hash>` string carries its own iteration count,
   so legacy 210k-iteration hashes still verify and silently re-hash at the
   current count on next successful login — don't lower `PASS_ITERATIONS` or
-  drop that upgrade path. `reagent.js` implements its regression stats
+  drop that upgrade path. It also exports `reauthenticateCurrentUser({title,
+  message})` — a password re-prompt gating the app's *critical* operations
+  (approving/returning a corrective action, locking/unlocking a reporting
+  period, writing or reverting a lot's Mean/SD, concluding a lot transition);
+  wire any new operation of that weight the same way, `await`-ing it before
+  mutating state. `backup-service.js` (split out of `data-io.js` on
+  2026-07-24) rejects imports over `BACKUP_IMPORT_MAX_BYTES` (64 MB) before
+  parsing. `reagent.js` implements its regression stats
   (Passing-Bablok, Deming/OLS, Bland-Altman, plus a from-scratch incomplete-beta
   t-distribution for CIs) by hand, no stats library — pure like `core.js` but
   page-scoped, covered by `tests/reagent-stats.test.js`.
@@ -424,6 +496,28 @@ state is a JS variable, not a server-verified token/session, and Firebase
 Rules by UID are the only real write boundary when sync is enabled. Don't
 "fix" client-side auth without discussing the backend-authentication tradeoff
 it implies.
+
+Those Rules are a versioned artifact, not something to hand-edit in the
+Firebase console: `firebase/database.rules.json` is the single source of truth
+(deployment steps and the five post-deploy checks are in
+`firebase/HUONG-DAN-FIREBASE-RULES.md`), and the Settings page renders the same
+text via `firebaseRulesText()` in `settings.js` — `tests/firebase-rules.test.js`
+fails if the two diverge, so change both together. The model: a room is
+readable/writable only by UIDs listed under `qclab-acl/{labCode}/{uid}`, which
+clients can read for themselves but never write; every snapshot must carry a
+numeric `_ts`. QC Lab's own admin/technician/viewer roles are client-side UI
+permissions layered on top, not a server write boundary.
+
+### Validation dossier (ISO 15189 / IVDR-style)
+
+`docs/validation/` holds the controlled protocol set — `URS.md`,
+`RISK-ASSESSMENT.md`, `TRACEABILITY.md`, `IQ-OQ-PQ-UAT.md`,
+`BACKUP-RESTORE-DRILL.md` — applying to 2.5.0 onward. `TRACEABILITY.md` maps
+each URS requirement to the code and the *named automated tests* that evidence
+it; if you rename, delete or add a test that is someone's evidence row, update
+that table in the same commit. Release evidence is the stdout of `npm ci`,
+`npm test`, `npm run typecheck`, `npm run verify-release`, `npm run
+visual-check`, `npm run a11y-audit`, `npm run print-check`.
 
 ### Confirmed business-logic decisions (don't re-litigate without new input)
 

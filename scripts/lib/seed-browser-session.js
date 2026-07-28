@@ -98,18 +98,34 @@ function buildSeedState() {
  */
 async function openSeededSession({ headless = true } = {}) {
   const server = await startStaticServer();
-  const { port } = server.address();
-  const baseUrl = `http://127.0.0.1:${port}`;
-  const browser = await chromium.launch({ headless });
-  const page = await browser.newPage();
-  const seedState = buildSeedState();
+  // Everything after the server is listening runs under this guard: the HTTP
+  // server keeps the event loop alive, so a failure here (Chromium missing or
+  // crashing on launch, seed page never reaching showApp()) would leave the
+  // caller's error handler unable to exit — the script would print the error
+  // and then hang until the CI job's timeout instead of failing fast.
+  let browser = null;
+  try {
+    const { port } = server.address();
+    const baseUrl = `http://127.0.0.1:${port}`;
+    browser = await chromium.launch({ headless });
+    const page = await browser.newPage();
+    const seedState = buildSeedState();
 
-  await page.addInitScript((state) => { localStorage.setItem('qclab', JSON.stringify(state)); }, seedState);
-  await page.goto(baseUrl, { waitUntil: 'load' });
-  await page.waitForFunction(() => typeof showApp === 'function' && typeof state !== 'undefined' && Array.isArray(state.users) && state.users.length > 0);
-  await page.evaluate(() => { currentUser = state.users[0]; showApp(); });
-  await page.waitForSelector('#nav button', { timeout: 10000 });
+    await page.addInitScript((state) => { localStorage.setItem('qclab', JSON.stringify(state)); }, seedState);
+    await page.goto(baseUrl, { waitUntil: 'load' });
+    await page.waitForFunction(() => typeof showApp === 'function' && typeof state !== 'undefined' && Array.isArray(state.users) && state.users.length > 0);
+    await page.evaluate(() => { currentUser = state.users[0]; showApp(); });
+    await page.waitForSelector('#nav button', { timeout: 10000 });
 
+    return buildSession(server, browser, page, baseUrl, seedState);
+  } catch (err) {
+    if (browser) await browser.close().catch(() => {});
+    await new Promise((resolve) => server.close(resolve));
+    throw err;
+  }
+}
+
+function buildSession(server, browser, page, baseUrl, seedState) {
   return {
     browser,
     page,
