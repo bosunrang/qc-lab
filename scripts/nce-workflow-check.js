@@ -27,19 +27,26 @@ function check(name, ok, detail = '') {
   else fails.push(name + (detail ? ' — ' + detail : ''));
 }
 
-// Hồ sơ NCE đầy đủ, gắn với một điểm QC bị loại, dùng làm nền cho phần lớn kiểm tra.
-const NCE = {
-  id: 'A1', nceId: 'NCE-20260705-T001', protocolVersion: 2, testId: 'T1', level: 1, lot: '1101', pointId: 'T1-L1-3',
-  date: '2026-07-05', createdAt: '2026-07-05T01:00:00.000Z', createdByUserId: 'U2', createdByUsername: 'ktv1',
-  rule: '1-3s', errorType: 'SE — Sai số hệ thống', eventSource: 'iqc', processPhase: 'exam',
-  containmentStatus: 'held', containmentNote: 'Giữ kết quả từ 08:00', correction: 'Dừng trả kết quả liên quan',
-  by: 'Kỹ thuật viên', dueDate: '2026-07-12',
-  riskSeverity: 4, riskOccurrence: 2, riskDetectability: 3, riskLevel: 'high',
-  qcMaterialStatus: 'ok', instrumentStatus: 'abnormal', instrumentNote: 'Kim hút có cặn',
-  reagentStatus: 'ok', calibrationStatus: 'ok', lotToLotStatus: 'not-needed',
-  causeCategory: 'instrument', cause: 'Kim hút bẩn làm sai thể tích hút', action: 'Vệ sinh kim hút và cập nhật lịch bảo trì',
-  patientImpact: 'none', effectivenessStatus: 'pending', approvalStatus: 'pending',
-};
+/* Hồ sơ NCE đầy đủ, gắn với một điểm QC CÓ THẬT trong seed. Lấy id từ seed thay vì
+   viết cứng 'T1'/'T1-L1-3': bản trước viết cứng nên bản ghi trỏ vào một xét nghiệm và
+   một điểm không tồn tại, khiến mọi khẳng định về liên kết điểm QC đều rỗng ruột. */
+function buildNce(seed) {
+  const test = seed.tests[0], level = test.levels[0];
+  return {
+    id: 'A1', nceId: 'NCE-20260705-T001', protocolVersion: 2, testId: test.id, level: level.level, lot: level.lot,
+    pointId: seed.data[test.id].filter(p => p.level === level.level)[3].id,
+    date: '2026-07-05', createdAt: '2026-07-05T01:00:00.000Z', createdByUserId: 'U2', createdByUsername: 'ktv1',
+    rule: '1-3s', errorType: 'SE — Sai số hệ thống', eventSource: 'iqc', processPhase: 'exam',
+    containmentStatus: 'held', containmentNote: 'Giữ kết quả từ 08:00', correction: 'Dừng trả kết quả liên quan',
+    by: 'Kỹ thuật viên', dueDate: '2026-07-12',
+    riskSeverity: 4, riskOccurrence: 2, riskDetectability: 3, riskLevel: 'high',
+    qcMaterialStatus: 'ok', instrumentStatus: 'abnormal', instrumentNote: 'Kim hút có cặn',
+    reagentStatus: 'ok', calibrationStatus: 'ok', lotToLotStatus: 'not-needed',
+    causeCategory: 'instrument', cause: 'Kim hút bẩn làm sai thể tích hút', action: 'Vệ sinh kim hút và cập nhật lịch bảo trì',
+    patientImpact: 'none', effectivenessStatus: 'pending', approvalStatus: 'pending',
+  };
+}
+let NCE = null;
 
 const FORM_SNAPSHOT = () => ({
   correction: document.getElementById('aCorrection').value,
@@ -65,7 +72,7 @@ async function checkEditedFormSurvivesRerender(page) {
   check('Ô "Xét nghiệm" bị khoá khi sửa hồ sơ',
     await page.evaluate(() => document.getElementById('aTest').disabled === true));
   check('Ngữ cảnh QC dùng lô đã ghi trong hồ sơ',
-    await page.evaluate(() => /1101/.test(document.getElementById('aLevelLabel').value) && /đã ghi nhận/.test(document.getElementById('aLevelLabel').value)));
+    await page.evaluate(lot => /đã ghi nhận/.test(document.getElementById('aLevelLabel').value) && document.getElementById('aLevelLabel').value.includes(lot), NCE.lot));
 
   await page.evaluate(() => rerender());
   const survived = await page.evaluate(FORM_SNAPSHOT);
@@ -97,9 +104,9 @@ async function checkIdentityIsImmutable(page) {
     const a = state.actions[0];
     return { testId: a.testId, level: a.level, lot: a.lot, pointId: a.pointId, cause: a.cause, action: a.action };
   });
-  check('Đổi dropdown xét nghiệm không đổi được testId của hồ sơ', saved.testId === 'T1', saved.testId);
+  check('Đổi dropdown xét nghiệm không đổi được testId của hồ sơ', saved.testId === NCE.testId, saved.testId);
   check('Liên kết điểm QC (pointId) được giữ nguyên', saved.pointId === NCE.pointId, saved.pointId);
-  check('Số lô giữ ảnh chụp lúc xảy ra sự cố', saved.lot === '1101', saved.lot);
+  check('Số lô giữ ảnh chụp lúc xảy ra sự cố', saved.lot === NCE.lot, saved.lot);
   check('Mức QC không bị nhảy', saved.level === 1, String(saved.level));
   check('Nội dung điều tra không bị ghi rỗng khi lưu', saved.cause === NCE.cause && saved.action === NCE.action);
 }
@@ -111,7 +118,7 @@ async function openAllSections(page) {
 }
 
 async function checkSectionsStartCollapsed(page) {
-  await page.evaluate(() => { state.actions = []; state.tests = state.tests.filter(t => t.id !== 'T2'); state.tests[0].levels[0].lot = '1101'; clearDerived(); cancelActionEdit(); });
+  await page.evaluate(lot => { state.actions = []; state.tests = state.tests.filter(t => t.id !== 'T2'); state.tests[0].levels[0].lot = lot; clearDerived(); closeActionForm(); beginActionManual(); }, NCE.lot);
   await page.waitForSelector('#aCorrection');
   const shape = await page.evaluate(() => {
     const body = document.querySelector('.action-form-body');
@@ -204,7 +211,7 @@ async function checkPickersReplaceTyping(page) {
 }
 
 async function checkNewRecordDraftSurvivesRerender(page) {
-  await page.evaluate(() => { state.actions = []; cancelActionEdit(); });
+  await page.evaluate(() => { state.actions = []; closeActionForm(); beginActionManual(); });
   await page.waitForSelector('#aCorrection');
   await openAllSections(page);
   await page.fill('#aCorrection', 'Dừng trả kết quả và cô lập lô QC');
@@ -219,6 +226,9 @@ async function checkNewRecordDraftSurvivesRerender(page) {
   await page.selectOption('#aRiskLevel', 'high');
   await page.selectOption('#aCauseCategory', 'instrument');
   await page.selectOption('#aPatientImpact', 'none');
+  // Nguồn phát hiện không còn mặc định 'iqc' cho hồ sơ mở thủ công — phải chọn thật,
+  // đúng như người dùng, nếu không addAction() dừng ở hộp thoại "còn thiếu".
+  await page.selectOption('#aEventSource', 'iqc');
 
   const before = await page.evaluate(FORM_SNAPSHOT);
   await page.evaluate(() => rerender());
@@ -235,12 +245,17 @@ async function checkNewRecordDraftSurvivesRerender(page) {
     saved && saved.n === 1 && saved.correction.startsWith('Dừng trả'), JSON.stringify(saved));
   check('Checklist và đánh giá nguy cơ vào đúng bản ghi',
     saved && saved.rpn === 24 && saved.instrument === 'abnormal', JSON.stringify(saved));
-  check('Nháp được dọn sau khi lưu', await page.evaluate(() => document.getElementById('aCorrection').value === ''));
+  // Lưu xong thì form đóng lại — vừa là tín hiệu "đã xong", vừa đảm bảo không còn
+  // nháp lơ lửng gắn nhầm vào hồ sơ tiếp theo.
+  check('Lưu xong thì form đóng lại', await page.evaluate(() => !document.getElementById('aCorrection')));
 }
 
 async function checkMissingFieldIsPinpointed(page) {
   // Cố tình chỉ để THIẾU "xử lý tức thời": đây là ô hay bị nhầm với "hành động khắc
   // phục" ở mục 4–6, nên phải chắc là thông báo và con trỏ trỏ đúng vào nó.
+  await page.evaluate(() => { closeActionForm(); beginActionManual(); });
+  await page.waitForSelector('#aCorrection');
+  await page.selectOption('#aEventSource', 'iqc');
   await page.selectOption('#aContainment', 'held');
   await page.fill('#aCorrection', '');
   const flagged = await page.evaluate(() => {
@@ -324,6 +339,84 @@ async function checkOverdueAndEscalation(page) {
   check('Không escalate hai lần cùng một hồ sơ', out.stillEscalatable === false);
 }
 
+/* Form phải gắn với MỘT hồ sơ cụ thể. Trước đây nó luôn bung sẵn kể cả khi không có sự
+   cố nào, nên vừa chiếm chỗ vừa khiến người dùng mất dấu đang xử lý cái gì. */
+async function checkFormIsBoundToAnIncident(page) {
+  const closed = await page.evaluate(() => {
+    state.actions = []; closeActionForm();
+    const panel = document.querySelector('.action-form-panel');
+    return { hasForm: !!document.getElementById('aCorrection'), text: panel.innerText, manualBtn: /Lập hồ sơ từ nguồn khác/.test(panel.innerText) };
+  });
+  check('Không có sự cố thì form không bung sẵn', closed.hasForm === false, closed.text.slice(0, 120));
+  check('Vẫn còn đường lập hồ sơ cho nguồn ngoài IQC', closed.manualBtn === true, closed.text.slice(0, 200));
+
+  // Mở từ một vi phạm -> dải nhận diện phải nói rõ đang xử lý điểm QC nào.
+  const fromIssue = await page.evaluate(() => {
+    const t = state.tests[0], lvl = t.levels[0];
+    state.data[t.id] = [{ id: 'v1', date: '2026-07-20', runId: '2026-07-20-1', level: 1, lot: lvl.lot, val: lvl.mean + lvl.sd * 4, qcMean: lvl.mean, qcSd: lvl.sd }];
+    clearDerived(); go('actions');
+    const issue = currentIssues()[0];
+    beginActionFromIssue(t.id, 1, '1-3s', 'RE — Sai số ngẫu nhiên', 'hint', issue.p.id, issue.p.date);
+    const banner = document.querySelector('.action-incident-banner');
+    return { hasForm: !!document.getElementById('aCorrection'), banner: banner ? banner.innerText : '' };
+  });
+  check('Bấm "Lập hồ sơ" trên dòng vi phạm thì form mở ra', fromIssue.hasForm === true);
+  check('Dải nhận diện nói rõ đang lập cho vi phạm nào',
+    /Đang lập hồ sơ cho vi phạm này/.test(fromIssue.banner) && /20\/07\/2026/.test(fromIssue.banner) && /1-3s/.test(fromIssue.banner),
+    fromIssue.banner);
+
+  /* Hồ sơ chưa gắn điểm QC thì KHÔNG được có dải nhận diện: bản trước hiện "không gắn
+     với điểm QC nào" rồi lại liệt kê Mean/SD/lô của xét nghiệm đầu dropdown mà người
+     dùng chưa chọn — vừa thừa vừa tự mâu thuẫn. */
+  const manual = await page.evaluate(() => {
+    closeActionForm(); beginActionManual();
+    const banner = document.querySelector('.action-incident-banner');
+    return { hasBanner: !!banner, banner: banner ? banner.innerText : '', hasForm: !!document.getElementById('aCorrection') };
+  });
+  check('Hồ sơ nguồn ngoài IQC vẫn mở form được', manual.hasForm === true);
+  check('Nhưng không hiện dải nhận diện rỗng nghĩa', manual.hasBanner === false, manual.banner);
+
+  /* Không có điểm QC thì không được bịa ra danh tính QC: bản trước lặng lẽ điền xét
+     nghiệm đầu dropdown + Mức 1 của nó, và để "Nguồn phát hiện" mặc định là Nội kiểm
+     IQC — ngay sau khi người dùng bấm nút nói rằng đây KHÔNG phải IQC. */
+  const shape = await page.evaluate(() => ({
+    hasQcContext: !!document.getElementById('aLevelLabel'),
+    hasLevel: !!document.getElementById('aLevel'),
+    testValue: document.getElementById('aTest').value,
+    testHasBlank: [...document.getElementById('aTest').options].some(o => o.value === ''),
+    source: document.getElementById('aEventSource').value,
+  }));
+  check('Không hiện "Ngữ cảnh QC" cho hồ sơ không gắn điểm QC', shape.hasQcContext === false);
+  check('Không âm thầm gán mức QC', shape.hasLevel === false);
+  check('Không âm thầm gán xét nghiệm', shape.testValue === '' && shape.testHasBlank === true, JSON.stringify(shape));
+  check('Nguồn phát hiện để trống, buộc chọn thật', shape.source === '', shape.source);
+
+  const blocked = await page.evaluate(() => {
+    const protocol = readActionProtocolForm();
+    const d = actionDraftStatus({ ...protocol, action: '', by: actionFieldValue('aBy') });
+    return { missing: d.missing.join('; '), keys: d.missingKeys };
+  });
+  check('Chưa chọn nguồn thì bị chặn lưu', /nguồn phát hiện/.test(blocked.missing), blocked.missing);
+
+  const savedManual = await page.evaluate(async () => {
+    document.getElementById('aEventSource').value = 'eqa';
+    document.getElementById('aProcessPhase').value = 'exam';
+    document.getElementById('aContainment').value = 'none';
+    document.getElementById('aCorrection').value = 'Giữ kết quả EQA để rà soát';
+    await addAction();
+    const a = (state.actions || [])[state.actions.length - 1];
+    return a ? { testId: a.testId, level: a.level, lot: a.lot, source: a.eventSource, label: actionLevelShort(null, a.level, a.lot), rerun: actionRerunStatus(a).needed } : null;
+  });
+  check('Lưu được hồ sơ nguồn ngoài IQC', savedManual && savedManual.source === 'eqa', JSON.stringify(savedManual));
+  check('Bản ghi không dính xét nghiệm/mức/lô giả', savedManual && !savedManual.testId && !savedManual.level && !savedManual.lot, JSON.stringify(savedManual));
+  check('Nhật ký hiện "Không gắn mức QC" thay vì "M0 · Lô ?"', savedManual && savedManual.label === 'Không gắn mức QC', savedManual && savedManual.label);
+  check('Và hồ sơ đó không bị đòi QC chạy lại', savedManual && savedManual.rerun === false);
+  await page.evaluate(() => { state.actions = []; closeActionForm(); });
+
+  const afterClose = await page.evaluate(() => { closeActionForm(); return !!document.getElementById('aCorrection'); });
+  check('Đóng form được', afterClose === false);
+}
+
 async function checkOverdueReachesDashboard(page) {
   const out = await page.evaluate(() => {
     const t = state.tests[0];
@@ -358,6 +451,7 @@ async function checkOverdueReachesDashboard(page) {
 
 (async () => {
   const session = await openSeededSession();
+  NCE = buildNce(session.seedState);
   const pageErrors = [];
   session.page.on('pageerror', e => pageErrors.push('pageerror: ' + e.message));
   session.page.on('console', m => { if (m.type() === 'error') pageErrors.push('console: ' + m.text()); });
@@ -365,6 +459,7 @@ async function checkOverdueReachesDashboard(page) {
   try {
     await checkEditedFormSurvivesRerender(session.page);
     await checkIdentityIsImmutable(session.page);
+    await checkFormIsBoundToAnIncident(session.page);
     await checkSectionsStartCollapsed(session.page);
     await checkSuggestionChips(session.page);
     await checkPickersReplaceTyping(session.page);

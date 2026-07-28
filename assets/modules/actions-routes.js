@@ -65,7 +65,7 @@ function captureActionDraft(){
 }
 function actionDraftValues(){return actionDraft&&actionDraft.id===(actionEditId||'')?actionDraft.values:null;}
 function clearActionDraft(){actionDraft=null;}
-const ACT_SOURCE_OPTS=Object.entries(ACTION_LABELS.source);
+const ACT_SOURCE_OPTS=[['','— Chọn nguồn —'],...Object.entries(ACTION_LABELS.source)];
 const ACT_PHASE_OPTS=Object.entries(ACTION_LABELS.phase);
 const ACT_ERR_OPTS=[['','— Chưa xác định —'],['SE — Sai số hệ thống','SE — Sai số hệ thống'],['RE — Sai số ngẫu nhiên','RE — Sai số ngẫu nhiên']];
 const ACT_CONTAIN_OPTS=[['','— Chọn —'],...Object.entries(ACTION_LABELS.containment)];
@@ -147,10 +147,13 @@ function actionLevelLabel(l){
   const band=l.applied?` · ${l.applied==='lab'?'PXN':'NSX'}`:'';
   return `Mức ${l.level}${lot}${range}${band}`;
 }
+/* Hồ sơ nguồn ngoài IQC không có mức/lô — không được hiện "M0 · Lô ?" ở nhật ký,
+   báo cáo và phiếu chi tiết. */
 function actionLevelShort(t,level,lotSnap){
-  const l=t&&lvlCfg(t,parseInt(level));
-  const lot=lotSnap||(l&&l.lot)||'?';
-  return `M${level} · Lô ${lot}`;
+  const n=parseInt(level);
+  if(!Number.isFinite(n)||n<=0)return'Không gắn mức QC';
+  const l=t&&lvlCfg(t,n),lot=lotSnap||(l&&l.lot)||'?';
+  return `M${n} · Lô ${lot}`;
 }
 /* Chỉ chạy cho hồ sơ MỚI — khi sửa, ô "Xét nghiệm" bị disabled và addAction() lấy
    testId/level/lot thẳng từ bản ghi nên hàm này không đụng tới được. */
@@ -175,6 +178,40 @@ function currentIssues(){
   operationalTests().forEach(t=>{const wg=activeWestgard(t);wg.views.forEach(v=>{const l=v.l;(v.pts||[]).forEach(p=>{const f=wg.byPoint.get(p.id);if(!f||f.level==='ok'||(typeof pointWorkflowComplete==='function'&&pointWorkflowComplete(p.id)))return;out.push({t,l,p,f,rules:f.rules});});});});
   return out.sort((a,b)=>(rank[b.f.level]||0)-(rank[a.f.level]||0)||String(b.p.date||'').localeCompare(String(a.p.date||'')));
 }
+/* Nguồn ngoài IQC (EQA, cảnh báo thiết bị, phản hồi lâm sàng, đánh giá/audit) không
+   bao giờ xuất hiện ở "Sự cố cần xử lý" vì không phải vi phạm Westgard — nhưng vẫn là
+   sự không phù hợp phải lập hồ sơ. Đây là đường vào có chủ đích cho chúng, tách khỏi
+   đường chính đi từ một vi phạm cụ thể. */
+function beginActionManual(){
+  if(!requireWrite())return;
+  actionEditId='';actionSeed={manual:true};clearActionDraft();actionOpenSections=null;rerender();
+  const e=document.getElementById('aCorrection');if(e)e.focus();
+}
+function closeActionForm(){actionEditId='';actionSeed=null;clearActionDraft();actionOpenSections=null;rerender();}
+/* Dải nhận diện đặt ngay đầu form: trước đây form luôn bung sẵn và không nói đang lập
+   hồ sơ cho sự cố nào, nên mở lên là mất phương hướng. */
+/* Trạng thái đóng: nói rõ hai đường vào thay vì để một form trống lơ lửng. */
+function actionFormClosedHtml(issueCount){
+  const manual=canWrite()?btn('Lập hồ sơ từ nguồn khác','beginActionManual()','ghost'):'';
+  return issueCount
+    ?emptyState('Chọn một sự cố để lập hồ sơ',`Có ${issueCount} sự cố ở trên — bấm "Lập hồ sơ" ngay trên dòng cần xử lý để hồ sơ được gắn đúng điểm QC và tự theo dõi QC chạy lại.`,manual)
+    :emptyState('Không có vi phạm nào cần lập hồ sơ','Hồ sơ NCE thường bắt đầu từ một vi phạm ở trên. Nếu sự không phù hợp đến từ EQA, cảnh báo thiết bị, phản hồi lâm sàng hay đánh giá nội bộ thì mở hồ sơ thủ công.',manual);
+}
+/* Dải nhận diện chỉ xuất hiện khi có ĐIỂM QC THẬT để nhận diện. Hồ sơ nguồn ngoài IQC
+   chưa gắn điểm nào thì không có gì để nói: bản trước hiện "không gắn với điểm QC nào"
+   rồi lại liệt kê Mean/SD/lô của xét nghiệm đầu dropdown mà người dùng chưa hề chọn —
+   vừa thừa vừa tự mâu thuẫn. Việc hồ sơ đó không cần QC chạy lại vẫn đọc được ở phiếu
+   chi tiết (bước 6 hiện "Không yêu cầu"). */
+function actionIncidentBanner(form,editing){
+  const p=form.pointId?((state.data&&state.data[form.testId])||[]).find(x=>x.id===form.pointId):null;
+  if(!p)return'';
+  const t=state.tests.find(x=>x.id===form.testId);
+  const title=editing?`Đang tiếp tục hồ sơ ${editing.nceId||'NCE'}`:'Đang lập hồ sơ cho vi phạm này';
+  const bits=[];
+  if(t)bits.push(`${testDisplayName(t)} · ${actionLevelContext(form.testId,form.level,form.lot)}`);
+  bits.push(`${vnDate(p.date)} · ${fmt(p.val)} ${t&&t.unit||''} · ${form.rule||'—'}`);
+  return `<div class="action-incident-banner"><b>${esc(title)}</b><div>${bits.map(esc).join(' · ')}</div></div>`;
+}
 function beginActionFromIssue(tid,level,rule,err,act,pointId='',pointDate=''){
   actionEditId='';
   actionSeed={testId:tid,level,rule,errorType:err==='—'?'':err,pointId,date:pointDate||isoToday()};clearActionDraft();actionOpenSections=null;
@@ -194,7 +231,8 @@ async function addAction(){
      còn lấy lại lot theo lvlCfg() hiện hành thì ghi đè số lô của sự cố sau mỗi lần
      chuyển lô. */
   const tid=editing?editing.testId:document.getElementById('aTest').value,t=state.tests.find(x=>x.id===tid);
-  const level=editing?editing.level:parseInt(document.getElementById('aLevel').value),l=t?lvlCfg(t,level):null;
+  const levelEl=document.getElementById('aLevel');
+  const level=editing?editing.level:(levelEl?parseInt(levelEl.value)||0:0),l=t&&level?lvlCfg(t,level):null;
   const lot=editing?(editing.lot||''):(l&&l.lot||''),pointId=editing?(editing.pointId||''):actionFieldValue('aPointId',80);
   const rule=actionFieldValue('aRule'),action=actionFieldValue('aAct'),by=actionFieldValue('aBy'),errorType=actionFieldValue('aErr'),nceId=actionFieldValue('aNceId',80)||nextNceId(isoToday()),protocol=readActionProtocolForm();
   const candidate={...protocol,action,by},draft=actionDraftStatus(candidate);
@@ -444,12 +482,18 @@ function actionFormModel(editing,tests){
   ACT_FIELDS.forEach(([id,key,kind])=>{if(id in draft)out[key]=kind==='num'?(+draft[id]||0):draft[id];});
   return out;
 }
+/* Hồ sơ mở từ nút "Lập hồ sơ từ nguồn khác" KHÔNG được bịa ra danh tính QC: không có
+   điểm QC nào thì xét nghiệm/mức/lô đều chưa xác định, mà bản trước lại lặng lẽ điền
+   xét nghiệm đầu dropdown và Mức 1 của nó. Nguồn phát hiện cũng để trống thay vì mặc
+   định "Nội kiểm IQC" — người dùng vừa bấm đúng nút nói rằng đây KHÔNG phải IQC. */
 function actionFormDefaults(tests){
-  const firstTest=tests[0],seed=actionSeed||{};
-  const testId=seed.testId||(firstTest&&firstTest.id)||'',t=state.tests.find(x=>x.id===testId);
-  const levels=t?operationalLevels(t):[],level=levels.some(l=>String(l.level)===String(seed.level))?seed.level:(levels[0]&&levels[0].level)||'';
+  const firstTest=tests[0],seed=actionSeed||{},manual=!!seed.manual;
+  const testId=manual?'':(seed.testId||(firstTest&&firstTest.id)||''),t=state.tests.find(x=>x.id===testId);
+  const levels=t?operationalLevels(t):[];
+  const level=manual?'':(levels.some(l=>String(l.level)===String(seed.level))?seed.level:(levels[0]&&levels[0].level)||'');
   return{testId,level,lot:'',date:seed.date||isoToday(),rule:seed.rule||'',errorType:seed.errorType||'',pointId:seed.pointId||'',
-    by:currentUser?(currentUser.name||currentUser.username):'',dueDate:nceDueDate(7),eventSource:'iqc',processPhase:'exam',effectivenessStatus:'pending'};
+    by:currentUser?(currentUser.name||currentUser.username):'',dueDate:nceDueDate(7),
+    eventSource:manual?'':'iqc',processPhase:'exam',effectivenessStatus:'pending'};
 }
 /* Đưa con trỏ tới đúng ô còn thiếu thay vì chỉ hiện hộp thoại: nhãn "xử lý tức thời"
    nằm ở cuối mục 1, cách xa nút Lưu ở cuối trang. */
@@ -465,12 +509,20 @@ function focusActionField(key){
 function pageActionsV4(){
   const tests=operationalTests();
   const editing=actionEditId&&(state.actions||[]).find(a=>a.id===actionEditId),form=actionFormModel(editing,tests);
+  /* Form chỉ hiện khi thật sự đang làm MỘT hồ sơ cụ thể — mở từ một vi phạm, mở lại hồ
+     sơ cũ, hoặc chủ động mở cho nguồn ngoài IQC. Trước đây nó luôn bung sẵn, không gắn
+     với sự cố nào, nên vừa chiếm chỗ vừa khiến người dùng mất dấu đang xử lý cái gì. */
+  const formOpen=!!(editing||actionSeed);
   /* Tinh tren FORM dang hien chu khong tren ban ghi da luu: dai tom tat phai phan anh
      nhung gi nguoi dung vua go, khong phai trang thai luc mo ho so. */
   const formProtocol=actionProtocolStatus({...form,protocolVersion:2}),miss=formProtocol.missingBySection||{};
   const openSet=actionOpenSections||actionDefaultOpenSections(editing,formProtocol);
+  /* Chỉ hồ sơ gắn một điểm QC thật mới có mức/lô. Hồ sơ nguồn ngoài IQC (EQA, thiết bị,
+     lâm sàng, đánh giá) thì xét nghiệm là tùy chọn và không có ngữ cảnh QC nào cả. */
+  const qcBound=!!(form.pointId&&((state.data&&state.data[form.testId])||[]).some(x=>x.id===form.pointId));
   const knownTest=tests.some(t=>t.id===form.testId),missingTest=!knownTest&&form.testId?state.tests.find(t=>t.id===form.testId):null;
-  const opts=(missingTest||(!knownTest&&form.testId)?`<option value="${escAttr(form.testId)}" selected>${esc(missingTest?testDisplayName(missingTest):'Xét nghiệm không còn vận hành')}</option>`:'')+
+  const opts=(qcBound?'':`<option value="" ${form.testId?'':'selected'}>— Không gắn xét nghiệm —</option>`)+
+    (missingTest||(!knownTest&&form.testId)?`<option value="${escAttr(form.testId)}" selected>${esc(missingTest?testDisplayName(missingTest):'Xét nghiệm không còn vận hành')}</option>`:'')+
     tests.map(t=>`<option value="${escAttr(t.id)}" ${t.id===form.testId?'selected':''}>${esc(testDisplayName(t))}</option>`).join('');
   const issues=currentIssues(),activePointIds=new Set(issues.map(o=>o.p.id));
   const issueGroups=groupIssuesByTestDate(issues);
@@ -489,19 +541,19 @@ function pageActionsV4(){
     </tr>`;}).join('');
   return headOnly('Khắc phục sự cố','Điều tra nguyên nhân, ghi nhận, chạy lại QC và phê duyệt khép vòng',btn('Quy trình 8 bước','openActionGuide()','ghost sm'))+
    `<div class="panel action-issues-panel"><h3 role="heading" aria-level="2">Sự cố cần xử lý</h3><div class="dash-list">${issueHtml}</div></div>`+
-   `<div class="panel action-form-panel"><h3>${editing?'Tiếp tục hồ sơ '+esc(editing.nceId||'NCE'):'Lập hồ sơ sự không phù hợp (NCE)'}</h3>${tests.length?`<div class="action-form-body" oninput="captureActionDraft()" onchange="captureActionDraft()"><div class="action-form-section"><div class="action-form-section-title"><span>Hồ sơ</span><div><b>Nhận diện sự cố</b><small>Có thể lưu ngay sau khi kiểm soát tức thời; không cần chờ điều tra xong</small></div></div>
+   `<div class="panel action-form-panel"><h3>${editing?'Tiếp tục hồ sơ '+esc(editing.nceId||'NCE'):'Lập hồ sơ sự không phù hợp (NCE)'}</h3>${!tests.length?emptyState('Cần có xét nghiệm trước','Khai báo xét nghiệm rồi quay lại ghi nhận hành động khắc phục.',role()==='admin'?btn('Thêm xét nghiệm',`go('manage')`,'teal'):''):!formOpen?actionFormClosedHtml(issues.length):`<div class="action-form-body" oninput="captureActionDraft()" onchange="captureActionDraft()">${actionIncidentBanner(form,editing)}<div class="action-form-section"><div class="action-form-section-title"><span>Hồ sơ</span><div><b>Nhận diện sự cố</b><small>Có thể lưu ngay sau khi kiểm soát tức thời; không cần chờ điều tra xong</small></div></div>
      <input id="aPointId" type="hidden" value="${escAttr(form.pointId||'')}">
-     <input id="aLevel" type="hidden" value="${escAttr(form.level==null?'':form.level)}">
+     ${qcBound?`<input id="aLevel" type="hidden" value="${escAttr(form.level==null?'':form.level)}">`:''}
      <div class="action-ident-groups">
        <div class="action-ident-group"><div class="action-ident-group-title"><b>Đối tượng QC</b><small>${editing?'Khóa theo hồ sơ đã mở — sai đối tượng thì xóa và mở hồ sơ mới':'Hồ sơ và cấu hình QC đang xảy ra sự cố'}</small></div><div class="action-form-main">
          <div><label>Mã hồ sơ</label><input id="aNceId" aria-label="Mã hồ sơ NCE" readonly value="${escAttr(editing?(editing.nceId||nextNceId(isoToday())):nextNceId(isoToday()))}"></div>
-         <div><label>Xét nghiệm</label><select id="aTest" aria-label="Xét nghiệm" ${editing?'disabled':'onchange="syncActLevels()"'}>${opts}</select></div>
-         <div><label>Ngữ cảnh QC</label><input id="aLevelLabel" aria-label="Ngữ cảnh QC" readonly value="${escAttr(actionLevelContext(form.testId,form.level,form.lot))}"></div>
+         <div><label>Xét nghiệm${qcBound?'':' <span class="hint">(nếu có)</span>'}</label><select id="aTest" aria-label="Xét nghiệm" ${editing?'disabled':'onchange="syncActLevels()"'}>${opts}</select></div>
+         ${qcBound?`<div><label>Ngữ cảnh QC</label><input id="aLevelLabel" aria-label="Ngữ cảnh QC" readonly value="${escAttr(actionLevelContext(form.testId,form.level,form.lot))}"></div>`:''}
        </div></div>
        <div class="action-ident-group"><div class="action-ident-group-title"><b>Phân loại sự cố</b><small>Thời điểm, dấu hiệu phát hiện và loại sai số</small></div><div class="action-form-meta">
          <div><label>Ngày</label>${dateBox('aDate',form.date||isoToday(),'action-date')}</div>
          <div><label>Luật vi phạm</label>${actSel('aRule','Luật vi phạm',actionRuleOptions(),form.rule)}</div>
-         <div><label>Nguồn phát hiện</label>${actSel('aEventSource','Nguồn phát hiện',ACT_SOURCE_OPTS,form.eventSource||'iqc')}</div>
+         <div><label>Nguồn phát hiện</label>${actSel('aEventSource','Nguồn phát hiện',ACT_SOURCE_OPTS,form.eventSource||'')}</div>
          <div><label>Giai đoạn</label>${actSel('aProcessPhase','Giai đoạn quá trình',ACT_PHASE_OPTS,form.processPhase||'exam')}</div>
          <div><label>Loại sai số</label>${actSel('aErr','Loại sai số',ACT_ERR_OPTS,form.errorType,'onchange="syncActionSuggestions()"')}</div>
        </div></div>
@@ -522,7 +574,7 @@ function pageActionsV4(){
      ${actionSection('cause','4–6','Nguyên nhân gốc và hành động khắc phục','Tách khỏi xử lý tức thời; QC chạy lại được tự liên kết',`<div class="action-form-grid2"><div><label>Nhóm nguyên nhân</label>${actSel('aCauseCategory','Nhóm nguyên nhân',ACT_CAUSE_OPTS,form.causeCategory,'onchange="syncActionSuggestions()"')}</div><div><label>Nguyên nhân gốc hoặc nghi ngờ</label><textarea id="aCause" class="action-textarea-compact" rows="1" placeholder="Mô tả bằng chứng và nguyên nhân...">${esc(form.cause||'')}</textarea>${actionSuggestRow('aCause',actionCausePhrases(form.causeCategory))}</div><div class="action-form-wide"><label>Hành động khắc phục để ngăn tái diễn</label><textarea id="aAct" rows="2" placeholder="VD: Thay lọ QC mới, vệ sinh kim hút, cập nhật lịch bảo trì...">${esc(form.action||'')}</textarea>${actionSuggestRow('aAct',actionActionPhrases(form.errorType))}</div></div>`,actionSectionChip(miss.cause),openSet)}
      ${actionSection('patient','7','Đánh giá ảnh hưởng bệnh nhân','Ghi rõ phạm vi và cách xử lý nếu có liên quan',`<div class="action-form-grid2"><div><label>Kết luận ảnh hưởng</label>${actSel('aPatientImpact','Kết luận ảnh hưởng',ACT_PATIENT_OPTS,form.patientImpact)}</div><div><label>Xử lý mẫu/kết quả liên quan</label><textarea id="aPatientAction" class="action-textarea-compact" rows="1" placeholder="VD: Rà soát các mẫu từ 08:00–10:00; chạy lại 3 mẫu...">${esc(form.patientAction||'')}</textarea>${actionSuggestRow('aPatientAction',ACT_SUGGEST.patientAction)}</div></div>`,actionSectionChip(miss.patient),openSet)}
      ${actionSection('eff','8','Đánh giá hiệu lực','Làm sau thời gian theo dõi; “chưa hiệu lực” giữ hồ sơ mở',`<div class="action-form-grid3"><div><label>Kết luận hiệu lực</label>${actSel('aEffectivenessStatus','Kết luận hiệu lực',ACT_EFF_OPTS,form.effectivenessStatus||'pending')}</div><div><label>Ngày đánh giá</label>${dateBox('aEffectivenessDate',form.effectivenessDate||'','action-date')}</div><div class="action-form-wide"><label>Bằng chứng/nhận xét hiệu lực</label><textarea id="aEffectivenessNote" rows="2" placeholder="VD: Theo dõi 20 lần chạy tiếp theo không tái diễn...">${esc(form.effectivenessNote||'')}</textarea>${actionSuggestRow('aEffectivenessNote',ACT_SUGGEST.effectivenessNote)}</div></div>`,actionEffSectionChip(form),openSet)}
-     <div class="action-form-submit"><div><b>${editing?'Cập nhật tiến độ hồ sơ':'Lưu ngay ở trạng thái đang điều tra'}</b><span>Chỉ cần hoàn tất phần nhận diện và kiểm soát tức thời để lưu; phê duyệt chỉ xuất hiện khi hồ sơ đủ điều kiện khép vòng.</span></div><div class="action-submit-buttons">${editing?btn('Hủy chỉnh sửa','cancelActionEdit()','ghost'):''}${btn(editing?'Lưu thay đổi':'Lập hồ sơ NCE','addAction()','teal')}</div></div></div>`:emptyState('Cần có xét nghiệm trước','Khai báo xét nghiệm rồi quay lại ghi nhận hành động khắc phục.',role()==='admin'?btn('Thêm xét nghiệm',`go('manage')`,'teal'):'')}</div>
+     <div class="action-form-submit"><div><b>${editing?'Cập nhật tiến độ hồ sơ':'Lưu ngay ở trạng thái đang điều tra'}</b><span>Chỉ cần hoàn tất phần nhận diện và kiểm soát tức thời để lưu; phê duyệt chỉ xuất hiện khi hồ sơ đủ điều kiện khép vòng.</span></div><div class="action-submit-buttons">${btn(editing?'Hủy chỉnh sửa':'Đóng','closeActionForm()','ghost')}${btn(editing?'Lưu thay đổi':'Lập hồ sơ NCE','addAction()','teal')}</div></div></div>`}</div>
    <div class="panel action-log-panel"><h3>Nhật ký khắc phục</h3>${rows?`<div class="action-log-tools">${btn('Xuất CSV nhật ký','exportActionsCSV()','teal sm')}</div><div class="action-log-wrap"><table class="action-log-table"><thead><tr><th>Ngày</th><th>Sự cố</th><th>Hành động</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table></div>`:emptyState('Chưa có nhật ký','Các hành động khắc phục sẽ xuất hiện ở đây sau khi được lưu.')}</div>`;
 }
 
