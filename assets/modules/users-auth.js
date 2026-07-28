@@ -63,8 +63,11 @@ function auditClearFilters(){
 }
 function pageAudit(){
   const total=(state.activity||[]).length;
-  const chain=typeof auditVerifyChain==='function'?auditVerifyChain():{ok:true,checked:0,legacy:total};
-  const chainHtml=chain.ok?`<span class="tag ok">Chuỗi hash hợp lệ</span> <span class="hint">${chain.checked} dòng đã khóa hash${chain.legacy?` · ${chain.legacy} dòng cũ chưa có hash`:''}</span>`:`<span class="tag rej">Audit có dấu hiệu bị sửa</span> <span class="hint">Lỗi tại dòng #${(state.activity[chain.brokenIndex]||{}).seq||chain.brokenIndex+1}: ${esc(chain.reason)}</span>`;
+  const oversizeWarn=total>ACTIVITY_ROTATE_TO?` <span class="tag warn">Nhật ký đang rất lớn</span> <span class="hint">Nên lưu trữ bớt dòng cũ — hệ thống sẽ tự xoay vòng ở ${ACTIVITY_HARD_CAP} dòng (không xuất CSV).</span>`:'';
+  const chain=typeof auditChainStatus==='function'?auditChainStatus():{ok:true,checked:0,legacy:total,idle:false};
+  const chainHtml=chain.idle
+    ?`<span class="tag none">Chưa kiểm chuỗi hash</span> ${btn('Kiểm tra chuỗi hash','auditVerifyChainNow()','ghost sm')} <span class="hint">Nhật ký lớn (${chain.total} dòng) nên không tự kiểm mỗi lần mở trang.</span>`
+    :chain.ok?`<span class="tag ok">Chuỗi hash hợp lệ</span> <span class="hint">${chain.checked} dòng đã khóa hash${chain.legacy?` · ${chain.legacy} dòng cũ chưa có hash`:''}</span>`:`<span class="tag rej">Audit có dấu hiệu bị sửa</span> <span class="hint">Lỗi tại dòng #${(state.activity[chain.brokenIndex]||{}).seq||chain.brokenIndex+1}: ${esc(chain.reason)}</span>`;
   const filtered=auditFilteredActivities(),pageCount=Math.max(1,Math.ceil(filtered.length/auditPageSize));
   auditPage=Math.min(Math.max(1,auditPage),pageCount);
   const offset=(auditPage-1)*auditPageSize,pageRows=filtered.slice(offset,offset+auditPageSize);
@@ -76,15 +79,17 @@ function pageAudit(){
   return headOnly('Nhật ký hoạt động','Lưu vết các thao tác quan trọng; chỉ quản trị viên được xem')+
     `<div class="panel"><h3 role="heading" aria-level="2">Công cụ</h3><div class="row-flex">
       ${btn('Xuất CSV nhật ký','exportActivityCSV()','teal sm')}
+      ${total?btn('Lưu trữ nhật ký cũ','archiveActivityLog()','ghost sm'):''}
       ${total?btn('Xóa nhật ký','clearActivityLog()','danger sm'):''}
-      <div class="hint" style="align-self:center">${total} dòng hoạt động đã ghi nhận. ${chainHtml}</div>
+      <div class="hint" style="align-self:center">${total} dòng hoạt động đã ghi nhận. ${chainHtml}${oversizeWarn}</div>
     </div></div>
     <div class="panel audit-log-panel"><div class="audit-log-head"><h3 role="heading" aria-level="2">Hoạt động gần đây</h3><input id="auditSearch" type="search" aria-label="Tìm nhật ký hoạt động" placeholder="Tìm người dùng, hành động, đối tượng..." value="${escAttr(auditQ)}" oninput="auditSetQuery(this.value)"></div>
       <div class="audit-filterbar"><div><label>Từ ngày</label>${dateBox('auditFromDate',auditFrom,'audit-date',`aria-label="Lọc nhật ký từ ngày" onchange="auditSetDate('from',this.value)"`)}</div><div><label>Đến ngày</label>${dateBox('auditToDate',auditTo,'audit-date',`aria-label="Lọc nhật ký đến ngày" onchange="auditSetDate('to',this.value)"`)}</div><div><label>Số dòng mỗi trang</label><select aria-label="Số dòng nhật ký mỗi trang" onchange="auditSetPageSize(this.value)">${pageSizeOptions}</select></div>${hasFilter?btn('Xóa bộ lọc','auditClearFilters()','ghost sm audit-clear-filter'):''}<div class="audit-filter-summary" role="status">${filtered.length}/${total} dòng</div></div>
       ${rows?`<div class="audit-table-wrap"><table class="audit-table"><thead><tr><th>Thời gian</th><th>Người dùng</th><th>Hành động</th><th>Đối tượng</th><th>Chi tiết</th></tr></thead><tbody>${rows}</tbody></table></div>`:emptyState(total?'Không tìm thấy nhật ký':'Chưa có hoạt động',total?'Thử từ khóa hoặc khoảng ngày khác.':'Nhật ký sẽ bắt đầu ghi từ các thao tác tiếp theo.')}
       ${pagination}</div>`;
 }
-function exportActivityCSV(){const rows=[['Seq','Thời gian','Người dùng','Tên đăng nhập','Vai trò','Hành động','Đối tượng','Chi tiết','PrevHash','Hash']];(state.activity||[]).forEach(a=>rows.push([a.seq||'',formatDateTimeVN(a.ts),a.user||'',a.username||'',roleLabel(a.role||'viewer'),a.type||'',a.target||'',a.detail||'',a.prevHash||'',a.hash||'']));downloadCSV('Nhat_ky_hoat_dong_QCLab.csv',rows);}
+function activityCSVRows(items){const rows=[['Seq','Thời gian','Người dùng','Tên đăng nhập','Vai trò','Hành động','Đối tượng','Chi tiết','PrevHash','Hash']];(items||[]).forEach(a=>rows.push([a.seq||'',formatDateTimeVN(a.ts),a.user||'',a.username||'',roleLabel(a.role||'viewer'),a.type||'',a.target||'',a.detail||'',a.prevHash||'',a.hash||'']));return rows;}
+function exportActivityCSV(){downloadCSV('Nhat_ky_hoat_dong_QCLab.csv',activityCSVRows(state.activity));}
 /* Xóa vĩnh viễn toàn bộ nhật ký hoạt động — khác với "Xóa sạch dữ liệu test" (resetAllData)
    vốn CHỦ ĐỘNG giữ lại nhật ký. Đây là ngoại lệ duy nhất cho quy tắc "chỉ ghi nối tiếp,
    không tự cắt bớt dòng" — chỉ admin bấm được, có xác nhận, và tự ghi lại đúng 1 dòng nhật ký
@@ -93,11 +98,55 @@ async function clearActivityLog(){
   if(!requireAdmin())return;
   const count=(state.activity||[]).length;if(!count)return;
   if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa nhật ký hoạt động',message:`Xóa vĩnh viễn toàn bộ ${count} dòng nhật ký hoạt động?`,detail:'Không thể khôi phục lại được — nên xuất Excel nhật ký trước nếu cần lưu lại.',confirmLabel:'Xóa nhật ký',cancelLabel:'Hủy'}))return;
-  state.activity=[];
+  if(!await reauthenticateCurrentUser({title:'Xác thực xóa nhật ký',message:'Nhập lại mật khẩu trước khi xóa toàn bộ nhật ký hoạt động.'}))return;
+  state.activity=[];state.activityAnchor='';
   logAct('Xóa nhật ký hoạt động',`Đã xóa vĩnh viễn ${count} dòng nhật ký trước đó`,'Nhật ký');
   auditQ='';auditFrom='';auditTo='';auditPage=1;
   save({clearDerived:false});rerender();
   await infoDialog('Đã xóa nhật ký hoạt động.',{type:'success'});
+}
+/* Lưu trữ CÓ CHỦ ĐÍCH nhật ký cũ: xuất CSV phần bị cắt TRƯỚC, chỉ khi file đã
+   tạo xong mới gỡ khỏi state — khác với xoay vòng tự động (auditRotateOverflow),
+   đường này không mất dữ liệu. CSV giữ nguyên cột PrevHash/Hash để phần đã lưu
+   trữ kiểm chứng độc lập được: hash dòng cuối file phải khớp tipHash trong dòng
+   checkpoint ghi lại sau khi cắt. */
+function archiveActivityLog(){
+  if(!requireAdmin())return;
+  const total=(state.activity||[]).length;if(!total)return;
+  openModal(modalTemplate({title:'Lưu trữ nhật ký cũ',body:`
+      <div class="hint">Nhật ký hiện có <b>${total}</b> dòng. Các dòng cũ hơn mốc chọn sẽ được <b>xuất ra file CSV</b> (kèm PrevHash/Hash), sau đó mới bị gỡ khỏi hệ thống — hash dòng cuối file trở thành điểm nối vào chuỗi còn lại nên phần lưu trữ vẫn kiểm chứng được.</div>
+      <label style="margin-top:12px">Chỉ giữ lại nhật ký trong</label>
+      <select id="auditArchiveMonths" aria-label="Mốc tuổi nhật ký được giữ lại">
+        <option value="12">12 tháng gần nhất</option>
+        <option value="24" selected>24 tháng gần nhất</option>
+        <option value="36">36 tháng gần nhất</option>
+      </select>
+    `,footer:btn('Hủy','closeModal()','ghost')+btn('Xuất CSV và lưu trữ','confirmArchiveActivityLog()','teal')}));
+}
+async function confirmArchiveActivityLog(){
+  if(!requireAdmin())return;
+  const months=Math.max(1,Math.floor(Number((document.getElementById('auditArchiveMonths')||{}).value)||24));
+  const cutoff=new Date();cutoff.setMonth(cutoff.getMonth()-months);
+  const{segment,retained,tipHash}=auditArchiveCut(state.activity,cutoff.toISOString());
+  if(!segment.length){closeModal();await infoDialog('Không có dòng nhật ký nào cũ hơn mốc đã chọn.');return;}
+  if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Lưu trữ nhật ký cũ',message:`Xuất CSV rồi gỡ ${segment.length} dòng nhật ký cũ hơn ${months} tháng?`,detail:`Còn lại ${retained.length} dòng trong hệ thống. File CSV giữ nguyên PrevHash/Hash từng dòng và nối tiếp được vào chuỗi còn lại.`,confirmLabel:'Lưu trữ',cancelLabel:'Hủy'}))return;
+  /* Gỡ vĩnh viễn hàng chục nghìn dòng audit nặng ngang các thao tác trọng yếu khác
+     (duyệt hành động, khóa kỳ, ghi Mean/SD) nên đi cùng một cổng xác thực. */
+  if(!await reauthenticateCurrentUser({title:'Xác thực lưu trữ nhật ký',message:'Nhập lại mật khẩu trước khi gỡ nhật ký cũ khỏi hệ thống.'}))return;
+  try{downloadCSV('Luu_tru_nhat_ky_QCLab_'+cutoff.toISOString().slice(0,10)+'.csv',activityCSVRows(segment));}
+  catch(e){await infoDialog('Không tạo được file CSV lưu trữ. Nhật ký chưa bị thay đổi.');return;}
+  /* downloadCSV() chỉ tạo blob rồi a.click(): trình duyệt chặn tải, người dùng bấm Hủy
+     ở hộp lưu file hay đĩa đầy đều KHÔNG ném lỗi. Vì vậy phải để người dùng tự xác nhận
+     đã thấy file — try/catch ở trên một mình không đảm bảo được điều đó. */
+  if(!await confirmDialog({kicker:'Kiểm tra trước khi gỡ',title:'Đã có file CSV lưu trữ chưa?',message:'Mở thư mục Tải xuống và kiểm tra file vừa tải có mở được và đủ dòng.',detail:'Chỉ bấm "Đã kiểm tra" khi bạn thực sự thấy file — sau bước này các dòng cũ bị gỡ khỏi hệ thống.',confirmLabel:'Đã kiểm tra, gỡ khỏi hệ thống',cancelLabel:'Chưa, giữ nguyên'}))return;
+  /* Cắt prefix + đặt neo, KHÔNG relink: giữ nguyên hash gốc của phần còn lại nên file
+     CSV vừa xuất nối thẳng vào chuỗi đang sống bằng mật mã (hash dòng cuối file chính
+     là neo), và thao tác thành O(1) thay vì băm lại toàn chuỗi. */
+  state.activity=retained;
+  state.activityAnchor=tipHash||'';
+  logAct('Lưu trữ nhật ký hoạt động',`Đã xuất CSV và gỡ ${segment.length} dòng cũ hơn ${months} tháng (mốc ${vnDate(cutoff.toISOString().slice(0,10))}), còn lại ${retained.length} dòng. Hash đỉnh phần lưu trữ: ${tipHash||'—'}`,'Nhật ký');
+  auditPage=1;save({clearDerived:false});closeModal();rerender();
+  await infoDialog(`Đã lưu trữ ${segment.length} dòng nhật ký cũ — file CSV đã được tải xuống.`,{type:'success'});
 }
 async function addUser(){
   if(!requireAdmin())return;
@@ -212,7 +261,7 @@ function reauthenticateCurrentUser({title='Xác thực lại',message='Nhập l�
 }
 async function ensureAdmin(){if(!state.users||!state.users.length){state.users=[{id:uid(),username:'admin',name:'Quản trị viên',role:'admin',passHash:await legacyHashPass('admin'),active:true,mustChangePassword:true}];save({cloud:false,clearDerived:false});}}
 function blankAppState(users){
-  return{lab:{name:'',dept:'',address:'',brandTitle:'QC Lab',brandSub:'Nội kiểm xét nghiệm',logoText:'QC',logoData:''},tests:[],machines:[],instruments:[],assayGroups:[],qcPanels:[],lotTransitions:[],lotGroups:[],qcLots:[],data:{},actions:[],activity:[],users:Array.isArray(users)?users:[],reagentTests:[],reagentOperators:[],reagentSampleTypes:['Mẫu bệnh nhân','Mẫu nội kiểm (IQC)','Mẫu ngoại kiểm (EQA)'],sigmaData:{},periodLocks:[],teaRefs:[],teaRegistryVersion:TEA_REFERENCE_SCHEMA_VERSION,westgardRules:{...WG_DEFAULT},westgardProfileVersion:2,configMigrationVersion:1,schemaVersion:STATE_SCHEMA_VERSION};
+  return{lab:{name:'',dept:'',address:'',brandTitle:'QC Lab',brandSub:'Nội kiểm xét nghiệm',logoText:'QC',logoData:''},tests:[],machines:[],instruments:[],assayGroups:[],qcPanels:[],lotTransitions:[],lotGroups:[],qcLots:[],data:{},actions:[],activity:[],activityAnchor:'',users:Array.isArray(users)?users:[],reagentTests:[],reagentOperators:[],reagentSampleTypes:['Mẫu bệnh nhân','Mẫu nội kiểm (IQC)','Mẫu ngoại kiểm (EQA)'],sigmaData:{},periodLocks:[],teaRefs:[],teaRegistryVersion:TEA_REFERENCE_SCHEMA_VERSION,westgardRules:{...WG_DEFAULT},westgardProfileVersion:2,configMigrationVersion:1,schemaVersion:STATE_SCHEMA_VERSION};
 }
 async function resetAllData(){
   if(!requireAdmin())return;
@@ -220,10 +269,12 @@ async function resetAllData(){
   if(!await confirmDialog({kicker:'Xác nhận lần cuối',title:'Xóa sạch dữ liệu test',message:'Dữ liệu QC, cấu hình, lô, panel và khắc phục sẽ bị xóa.',detail:'Nhật ký audit vẫn được giữ. Nếu đang bật đám mây, trạng thái trắng cũng sẽ được đồng bộ lên Firebase.',confirmLabel:'Xóa sạch dữ liệu',cancelLabel:'Hủy'}))return;
   if(typeof backupCurrentData==='function'&&!backupCurrentData('truoc-xoa')){await infoDialog('Không tạo được bản backup an toàn. Dữ liệu chưa bị xóa.');return;}
   const keepUsers=(state.users||[]).length?state.users:[];
-  const keepActivity=[...(state.activity||[])];
+  /* Neo chuoi hash di kem nhat ky: giu nhat ky ma bo neo thi auditVerifyChain() se
+     bao "audit bi sua" gia ngay o dong dau tien neu lab da tung luu tru. */
+  const keepActivity=[...(state.activity||[])],keepAnchor=state.activityAnchor||'';
   localStorage.removeItem('qclab');localStorage.removeItem('qclab_boot');if(typeof clearSigmaDraftThrough==='function')clearSigmaDraftThrough(Number.MAX_SAFE_INTEGER);if(typeof LocalStore!=='undefined')LocalStore.clear().catch(()=>{});
   state=blankAppState(keepUsers);
-  state.activity=keepActivity;
+  state.activity=keepActivity;state.activityAnchor=keepAnchor;
   ensureShape();await ensureAdmin();logAct('Xóa sạch dữ liệu test','Đưa app về trạng thái trắng, giữ người dùng và nhật ký audit','Dữ liệu');save();rerender();await infoDialog('Đã xóa sạch dữ liệu test. App đã về trạng thái trắng.',{type:'success'});
 }
 function downloadStartupData(){

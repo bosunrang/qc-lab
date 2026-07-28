@@ -52,6 +52,10 @@ const MODALS = [
   { page: 'reagent', label: 'reagent:create-comparison', open: () => openRcCreateModal() },
   { page: 'reagent', label: 'reagent:find-existing', open: () => openRcModal() },
   { page: 'users', label: 'users:edit-permissions', open: () => openUserPerms(state.users[1].id) },
+  // archiveActivityLog() thoát sớm khi nhật ký rỗng, mà seed chỉ có dữ liệu QC vận
+  // hành — ghi một dòng trước để cổng đó không chặn (cùng lý do Sigma phải tự
+  // sgTrackTest/sgAddPeriod trước khi audit).
+  { page: 'audit', label: 'audit:archive-log', open: () => { logAct('Nhập QC', 'seed cho a11y audit', 'Glucose'); archiveActivityLog(); } },
   // Shared confirm-dialog component (modals.js #dialogRoot layer, separate
   // from #modalRoot) — every delete/destructive confirmation across the app
   // renders through this one function, so testing it once covers all of

@@ -523,6 +523,36 @@ const plain = (v) => JSON.parse(JSON.stringify(v));
   assert.ok(pending.updates >= 1, 'the recovered edit is pushed back to Firebase');
 }
 
+/* Luu tru nhat ky khi DANG BAT dong bo: may A cat bot dong cu va day len cloud, may B
+   chua cat. Rui ro nghi ngo: mergePointArray() co ngoai le "ban sua thang lenh xoa", ma
+   auditRelinkChain() chay sau moi merge va co the ghi lai hash cac dong cu -> lenh xoa
+   cua A bi bo qua va dong da luu tru "hoi sinh" tren B. Test nay chot lai rang khong
+   xay ra: order cua mergePointArray() xep phan tu chi-co-o-local vao CUOI nen cac dong
+   cu giu nguyen vi tri, relink thanh no-op va lS===bS. Neu ai doi thu tu merge sau nay,
+   test do se do. */
+{
+  ctx.__setState(baseState({ activity: [], activityAnchor: '' }));
+  run(ctx, `for(let i=1;i<=4;i++) logAct('Thao tác '+i,'chi tiết '+i,'mục '+i);`);
+  const cloudOld = JSON.parse(JSON.stringify(ctx.__getState().activity));
+
+  // May B ghi them 1 dong cuc bo chua push, roi nhan mot ban dong bo tu cloud.
+  run(ctx, `logAct('Thao tác B','chi tiết B','mục B');`);
+  const remote1 = baseState({ activity: cloudOld, activityAnchor: '' });
+  run(ctx, `__r1=${JSON.stringify(remote1)};state=fbMerge(state,__r1,null)||state;state.activity=auditRelinkChain(state.activity,state.activityAnchor||'');`);
+  const oldRowsUntouched = ctx.__getState().activity.slice(0, 4).every((a, i) => a.hash === cloudOld[i].hash);
+  assert.equal(oldRowsUntouched, true, 'merge không được ghi lại hash các dòng cũ, nếu không lệnh xóa sẽ bị vô hiệu');
+
+  // May A luu tru: cat 3 dong cu nhat, dat neo, day len cloud.
+  const anchor = cloudOld[2].hash;
+  const remote2 = baseState({ activity: [cloudOld[3]], activityAnchor: anchor });
+  run(ctx, `fb.synced=${JSON.stringify(remote1)};__r2=${JSON.stringify(remote2)};state=fbMerge(state,__r2,fb.synced)||state;`);
+  const merged = ctx.__getState().activity;
+  const resurrected = merged.filter(a => /chi tiết [123]$/.test(a.detail || ''));
+  assert.equal(resurrected.length, 0, 'dòng đã lưu trữ trên máy A không được sống lại trên máy B');
+  assert.equal(merged.some(a => a.detail === 'chi tiết B'), true, 'thao tác cục bộ chưa push vẫn phải giữ');
+  assert.equal(ctx.__getState().activityAnchor, anchor, 'neo phải theo bản đồng bộ về, nếu không B sẽ báo "audit bị sửa" giả');
+}
+
 console.log('Firebase merge tests passed');
 
 })().catch(err => { console.error(err); process.exitCode = 1; });

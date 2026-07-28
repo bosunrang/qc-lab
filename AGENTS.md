@@ -381,7 +381,24 @@ the Google Fonts link, offline labs must print with correct metrics.
 - `audit.js` — tamper-evident audit log: `logAct()` appends hash-chained
   entries using a synchronous pure-JS SHA-256 (`auditSha256`) over a canonical
   JSON form; `auditVerifyChain()` validates the chain. Not for passwords —
-  those use PBKDF2 in `users-auth.js`.
+  those use PBKDF2 in `users-auth.js`. Retention: cutting old rows (the admin
+  "Lưu trữ nhật ký cũ" flow in `users-auth.js`, or `auditRotateOverflow()` past
+  `ACTIVITY_HARD_CAP`) removes a **prefix** and records the removed segment's
+  tip hash in `state.activityAnchor`; `auditVerifyChain()`/`auditRelinkChain()`
+  seed from that anchor instead of `''`. Do not go back to re-hashing the
+  retained rows: that cost 2 235ms per 20 000 rows (~11s at the old 120 000
+  cap) *inside* `logAct()`, i.e. a silent freeze in the middle of an unrelated
+  save, and it rewrote historical hashes so an archived CSV no longer matched
+  the live chain. The anchor keeps the cut O(1) and keeps the archive CSV
+  cryptographically continuous with what remains. The anchor is only meaningful
+  while the log is non-empty — `auditPushRaw()` clears it when appending to an
+  empty list, so every path that rebuilds the log (clear, backup import, reset)
+  is covered without remembering to. `activityAnchor` is in `FB_TOP` because a
+  machine that pulls a cut log without the anchor would report a false "audit
+  bị sửa". `pageAudit()` no longer verifies on every render (paging/filtering
+  rerenders): `auditChainStatus()` caches by (row count, last hash, anchor) and
+  skips auto-verification above `AUDIT_AUTO_VERIFY_MAX`, offering a button
+  instead.
 - `modals.js` — two independent, non-nesting modal layers, each a single
   slot (opening a second modal in the same layer replaces the first, no
   stacking within a layer):

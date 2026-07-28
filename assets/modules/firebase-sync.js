@@ -9,7 +9,7 @@ let fb={ready:false,initialized:false,ref:null,dirty:false,clientId:'c_'+uid(),a
    'configMigrationVersion') vẫn trộn theo kiểu "cả khối": bên nào đổi so với base thì
    lấy nguyên bên đó. fb.synced lưu nguyên state thô của lần đồng bộ gần nhất (không chỉ
    chuỗi snapshot) để có đủ dữ liệu gốc cho việc so khớp theo điểm. */
-const FB_TOP=['lab','machines','instruments','assayGroups','qcPanels','lotTransitions','lotGroups','qcLots','tests','actions','activity','users','reagentTests','reagentOperators','reagentSampleTypes','periodLocks','teaRefs','westgardRules','configMigrationVersion'];
+const FB_TOP=['lab','machines','instruments','assayGroups','qcPanels','lotTransitions','lotGroups','qcLots','tests','actions','activity','activityAnchor','users','reagentTests','reagentOperators','reagentSampleTypes','periodLocks','teaRefs','westgardRules','configMigrationVersion'];
 /* Các nhánh FB_TOP có dạng danh sách (mảng đối tượng có `id`, hoặc mảng chuỗi/giá trị
    đơn) — trộn theo từng phần tử thay vì "cả khối". Không gồm 'lab' (object đơn),
    'westgardRules' (dict cờ bật/tắt) và 'configMigrationVersion' (số) vì không phải danh
@@ -333,7 +333,7 @@ async function fbHandleValue(v,opts={}){
      chuỗi hash gốc của MỘT máy có thể bị chen dòng của máy kia vào giữa sau khi
      ghép. Nối lại chuỗi hash theo đúng thứ tự mảng SAU khi ghép để auditVerifyChain()
      không báo "bị sửa" sai chỉ vì thứ tự đổi — xem auditRelinkChain() ở audit.js. */
-  if(typeof auditRelinkChain==='function'&&Array.isArray(state.activity))state.activity=auditRelinkChain(state.activity);
+  if(typeof auditRelinkChain==='function'&&Array.isArray(state.activity))state.activity=auditRelinkChain(state.activity,state.activityAnchor||'');
   clearDerived();
   ensureShape();
   const invariantErrors=QCCore.validateStateInvariants(state);

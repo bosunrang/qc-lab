@@ -12,7 +12,7 @@
 | 10 | Sigma services/UI/export | sigma cohort/comp/xlsx/print/export tests |
 | 11 | reagent statistics | reagent-stats test |
 | 12 | data-io/reports/Electron print | report/westgard/sigma xlsx+print, print-check |
-| 13 | audit | audit-hash, firebase-merge tests |
+| 13 | audit | audit-hash, audit-retention, audit-filter, firebase-merge tests |
 | 14 | router/auth | UI route/accessibility, auth-security tests |
 | 15 | local/state storage | local-store, storage-pipeline/safety tests |
 | 16 | data-io/core | backup-roundtrip, qccore tests |

@@ -22,6 +22,8 @@ const ctx = loadSandbox(['modules/users-auth.js'], {
   emptyState: (title, message) => `<div class="empty"><b>${title}</b>${message}</div>`,
   dateBox: (id, value, cls, attrs) => `<span class="datebox ${cls}"><input id="${id}" class="date-text" placeholder="dd/mm/yyyy" ${attrs}><input class="native-date" type="date"></span>`,
   auditVerifyChain: () => ({ ok: true, checked: 0, legacy: 0 }),
+  ACTIVITY_HARD_CAP: 120000,
+  ACTIVITY_ROTATE_TO: 100000,
   rerender: () => {},
   vnPickerParse: parseDate,
   parseVN: parseDate,
@@ -59,6 +61,7 @@ assert.match(firstPage, /placeholder="dd\/mm\/yyyy"/);
 assert.match(firstPage, /class="audit-table-wrap"/);
 assert.match(firstPage, /Hiển thị 1–25 \/ 30 dòng/);
 assert.match(firstPage, /Trang 1\/2/);
+assert.match(firstPage, /Lưu trữ nhật ký cũ/, 'Trang nhật ký phải có nút lưu trữ nhật ký cũ');
 
 run(ctx, 'auditPage=2;');
 const secondPage = run(ctx, 'pageAudit()');

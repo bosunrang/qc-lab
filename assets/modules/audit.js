@@ -50,8 +50,12 @@ function auditLastHash(){
   for(let i=(state.activity||[]).length-1;i>=0;i--){const h=state.activity[i]&&state.activity[i].hash;if(h)return h;}
   return '';
 }
-function auditVerifyChain(activity=state.activity||[]){
-  let prev='',checked=0,legacy=0;
+/* anchor = hash dong cuoi cua phan da bi cat khoi nhat ky (luu tru / xoay vong).
+   Bat dau tu neo thay vi tu '' cho phep phan con lai GIU NGUYEN hash goc — vua re
+   (cat la O(1) thay vi bam lai ca chuoi) vua dung nghia tamper-evident hon: file CSV
+   luu tru noi thang vao chuoi dang song bang mat ma, khong chi bang mot dong ghi chu. */
+function auditVerifyChain(activity=state.activity||[],anchor=(typeof state!=='undefined'&&state&&state.activityAnchor)||''){
+  let prev=String(anchor||''),checked=0,legacy=0;
   for(let i=0;i<activity.length;i++){
     const a=activity[i]||{};
     if(!a.hash&&!a.prevHash){legacy++;continue;}
@@ -61,8 +65,47 @@ function auditVerifyChain(activity=state.activity||[]){
   }
   return{ok:true,checked,legacy,brokenIndex:-1,reason:''};
 }
-function logAct(type,detail,target=''){
+/* GIỚI HẠN NHẬT KÝ (log rotation). state.activity không có ngưỡng tự nhiên: mỗi
+   thao tác nghiệp vụ đều qua logAct, nên 1–2 năm vận hành có thể phình snapshot
+   tới mức hydrate/serialize/sync Firebase đều chậm hẳn. Hai cơ chế bổ sung nhau:
+   - Lưu trữ CÓ CHỦ ĐÍCH (archiveActivityLog ở users-auth.js): admin chọn mốc
+     thời gian, app xuất CSV phần cũ TRƯỚC rồi mới cắt — đây là đường khuyến
+     nghị, dòng đã cắt vẫn truy xuất được từ file.
+   - Xoay vòng TỰ ĐỘNG (auditRotateOverflow bên dưới): van an toàn khi nhật ký
+     vượt ACTIVITY_HARD_CAP mà chưa ai lưu trữ — giữ ACTIVITY_ROTATE_TO dòng mới
+     nhất, KHÔNG xuất CSV (logAct đồng bộ, không thể tự bật download giữa một
+     thao tác khác). Mất phần cũ là đánh đổi có ý thức để tránh hỏng cả hệ thống
+     lưu trữ; dòng checkpoint ghi lại hash đỉnh của phần đã loại để còn điểm
+     đối chiếu nếu lab giữ backup. Khai báo `let` để test chỉnh ngưỡng thấp
+     (cùng lý do LS_FULL_ROTATE_MAX_INCREMENTALS ở state-storage.js). */
+/* Tran ha tu 120 000/100 000: chi phi con lai la auditVerifyChain(), do duoc ~1 921ms
+   cho 20 000 dong nen 50 000 la ~4,8s — chap nhan duoc khi da co cache + chi chay theo
+   yeu cau (xem auditChainStatus). Nguong cu 120 000 cho ~11,5s moi lan kiem. */
+let ACTIVITY_HARD_CAP=50000,ACTIVITY_ROTATE_TO=40000;
+function auditLastHashOf(list){
+  for(let i=(list||[]).length-1;i>=0;i--){const h=list[i]&&list[i].hash;if(h)return h;}
+  return '';
+}
+/* Tách phần nhật ký CŨ HƠN cutoffIso (ISO string) để lưu trữ. Dòng thiếu/sai ts
+   được giữ lại phía retained (an toàn hơn là xóa nhầm dòng không định tuổi
+   được). tipHash = hash đỉnh của phần bị cắt — điểm đối chiếu mật mã giữa file
+   CSV lưu trữ và chuỗi còn lại (CSV xuất kèm cột PrevHash/Hash nên kiểm chứng
+   độc lập được: hash cuối file phải bằng tipHash trong dòng checkpoint). */
+function auditArchiveCut(activity,cutoffIso){
+  const cutoff=String(cutoffIso||''),segment=[],retained=[];
+  (activity||[]).forEach(a=>{
+    const ts=String(a&&a.ts||'');
+    if(ts&&ts<cutoff)segment.push(a);else retained.push(a);
+  });
+  return{segment,retained,tipHash:auditLastHashOf(segment)};
+}
+function auditPushRaw(type,detail,target=''){
   state.activity=state.activity||[];
+  /* Neo chi co nghia khi con dong de noi vao. Nhat ky rong ma con neo cu (xoa nhat ky,
+     nhap backup, reset) se lam auditVerifyChain() bao "audit bi sua" gia ngay tu dong
+     dau tien — giu bat bien nay o day de moi duong dung lai nhat ky deu duoc bao ve,
+     khong phai nho tung noi goi nho tay. */
+  if(!state.activity.length&&state.activityAnchor)state.activityAnchor='';
   const entry={
     id:uid(),
     seq:auditNextSeq(),
@@ -80,6 +123,44 @@ function logAct(type,detail,target=''){
   entry.hash=auditEntryHash(entry);
   state.activity.push(entry);
 }
+/* Cat prefix va DAT NEO thay vi relink: relink phai bam lai SHA-256 cho tung dong con
+   lai — do duoc 2 235ms cho 20 000 dong, tuc ~11 GIAY o nguong xoay vong. Ham nay chay
+   ben trong logAct(), giua mot thao tac khong lien quan (dang luu diem QC), nen 11 giay
+   do la treo giao dien khong bao truoc. Dat neo lam viec do thanh O(1). */
+function auditRotateOverflow(){
+  const list=state.activity||[];
+  if(list.length<=ACTIVITY_HARD_CAP)return;
+  const dropped=list.slice(0,list.length-ACTIVITY_ROTATE_TO),tip=auditLastHashOf(dropped);
+  state.activity=list.slice(-ACTIVITY_ROTATE_TO);
+  if(tip)state.activityAnchor=tip;
+  auditPushRaw('Xoay vòng nhật ký hoạt động',`Nhật ký vượt ${ACTIVITY_HARD_CAP} dòng: tự động loại ${dropped.length} dòng cũ nhất, giữ lại ${ACTIVITY_ROTATE_TO} dòng mới nhất (không xuất CSV). Hash đỉnh phần đã loại: ${tip||'—'}. Nên dùng "Lưu trữ nhật ký cũ" ở trang Nhật ký để có file CSV trước khi cắt.`,'Nhật ký');
+}
+function logAct(type,detail,target=''){
+  auditPushRaw(type,detail,target);
+  auditRotateOverflow();
+}
+/* Kiem chuoi la O(n) SHA-256 (~1 921ms/20 000 dong) nhung pageAudit() goi no o MOI lan
+   render, ma doi trang / doi bo loc / go tim kiem deu rerender() — tuc la o nguong tran
+   thi moi cu bam la mot lan dung hinh. Cache theo chu ky (so dong + hash cuoi + neo):
+   loc/phan trang khong lam chu ky doi nen chi kiem lai khi nhat ky that su thay doi.
+   Voi nhat ky lon thi khong tu kiem nua — tra ve trang thai 'idle' de giao dien moi
+   nguoi dung bam kiem, thay vi treo giao dien khong bao truoc. */
+let auditChainCache={sig:'',result:null};
+const AUDIT_AUTO_VERIFY_MAX=5000;
+function auditChainSignature(){
+  const list=state.activity||[],last=list[list.length-1]||{};
+  return `${list.length}|${last.hash||''}|${state.activityAnchor||''}`;
+}
+function auditChainStatus(force=false){
+  const sig=auditChainSignature();
+  if(auditChainCache.sig===sig&&auditChainCache.result)return auditChainCache.result;
+  const list=state.activity||[];
+  if(!force&&list.length>AUDIT_AUTO_VERIFY_MAX)return{idle:true,total:list.length};
+  const result={...auditVerifyChain(),idle:false};
+  auditChainCache={sig,result};
+  return result;
+}
+function auditVerifyChainNow(){auditChainCache={sig:'',result:null};auditChainStatus(true);rerender();}
 function auditNextSeq(){return(state.activity||[]).reduce((m,a)=>Math.max(m,+a.seq||0),0)+1;}
 /* Tính lại chuỗi hash theo ĐÚNG thứ tự hiện tại của mảng — dùng sau khi Firebase
    merge (fbMerge()) ghép activity của 2 máy lại. mergePointArray() trộn theo
@@ -95,8 +176,8 @@ function auditNextSeq(){return(state.activity||[]).reduce((m,a)=>Math.max(m,+a.s
    được giữ nguyên, không ép vào chuỗi, khớp với cách auditVerifyChain() đã bỏ
    qua các dòng đó. Hàm này idempotent: gọi lại trên một chuỗi đã hợp lệ sẵn cho
    ra đúng hash/prevHash cũ, nên gọi vô điều kiện sau mỗi lần merge là an toàn. */
-function auditRelinkChain(activity){
-  let prev='';
+function auditRelinkChain(activity,anchor=''){
+  let prev=String(anchor||'');
   return(activity||[]).map(a=>{
     if(!a||(!a.hash&&!a.prevHash))return a;
     const relinked={...a,prevHash:prev};
