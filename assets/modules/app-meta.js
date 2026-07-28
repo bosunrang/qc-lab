@@ -1,8 +1,8 @@
 window.QCLAB_APP = {
   name: 'QC Lab',
-  version: '2.5.0',
-  releaseDate: '2026-07-24',
-  build: 'validated-operations'
+  version: '2.5.3',
+  releaseDate: '2026-07-28',
+  build: 'release-gate-scope'
 };
 
 // Cấu hình đám mây khi deploy (tùy chọn).
