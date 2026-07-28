@@ -1,10 +1,10 @@
 /* ===== ACTIONS & REPORT PAGE ROUTES ===== */
 /* Form hồ sơ NCE được render THẲNG TỪ STATE (bản ghi đang sửa qua actionEditId, hoặc
-   actionSeed khi mở từ một vi phạm) chứ không đổ giá trị vào DOM sau render. Trước đây
-   populateActionForm() chạy một lần trong setTimeout của editAction(), nên mọi rerender()
-   sau đó — đổi trang rồi quay lại, hay một bản đồng bộ Firebase dội về — đều xoá trắng
-   form trong khi tiêu đề vẫn ghi "Tiếp tục hồ sơ", và lần lưu kế tiếp ghi rỗng đè lên
-   checklist/nguyên nhân/hành động đã có. */
+   actionSeed khi mở từ một vi phạm) chứ không đổ giá trị vào DOM sau render. Bản đầu
+   đổ giá trị vào DOM một lần sau render, nên mọi rerender() sau đó — đổi trang rồi quay
+   lại, hay một bản đồng bộ Firebase dội về — đều xoá trắng form trong khi tiêu đề vẫn
+   ghi "Tiếp tục hồ sơ", và lần lưu kế tiếp ghi rỗng đè lên checklist/nguyên nhân/hành
+   động đã có. */
 let actionEditId='',actionSeed=null,actionDraft=null;
 /* Mục nào đang mở. null = chưa ai đụng tới, dùng mặc định theo giai đoạn hồ sơ: hồ sơ
    mới chỉ mở khối nhận diện + mục 1 (đúng phần tối thiểu để lưu), hồ sơ đang sửa mở
@@ -274,7 +274,6 @@ async function editAction(i){
   actionEditId=a.id;actionSeed=null;clearActionDraft();actionOpenSections=null;rerender();
   const panel=document.querySelector('.action-form-panel');if(panel)panel.scrollIntoView({behavior:'smooth',block:'start'});
 }
-function cancelActionEdit(){actionEditId='';actionSeed=null;clearActionDraft();actionOpenSections=null;rerender();}
 async function delAction(i){if(!requireAdmin())return;const a=state.actions&&state.actions[i];if(!a)return;if(actionApprovalStatus(a)==='approved'){await infoDialog('Không xóa hành động đã duyệt. Nếu cần, hãy ghi bổ sung một hành động mới.');return;}if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa hành động khắc phục',message:'Xóa hành động khắc phục này?',detail:'Nhật ký audit vẫn giữ lại thao tác xóa.',confirmLabel:'Xóa',cancelLabel:'Hủy'}))return;state.actions.splice(i,1);logAct('Xóa khắc phục',`${a.rule||'—'} · ${a.action||''}`,a.testId?(state.tests.find(t=>t.id===a.testId)||{}).name||'Khắc phục':'Khắc phục');save({clearDerived:false});rerender();}
 function actionApprovalTag(a){const s=actionApprovalStatus(a),cls=s==='approved'?'ok':s==='returned'?'rej':'warn';return `<span class="tag ${cls}">${actionApprovalLabel(a)}</span>`;}
 async function approveAction(i){

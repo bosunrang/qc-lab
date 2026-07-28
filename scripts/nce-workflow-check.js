@@ -1,6 +1,6 @@
 // Kiểm chứng vòng đời hồ sơ NCE (trang "Khắc phục sự cố") trong Chromium thật.
 //
-// Vì sao cần script riêng thay vì thêm test vào `npm test`: cả bốn lỗi script này
+// Vì sao cần script riêng thay vì thêm test vào `npm test`: mọi lỗi script này
 // canh đều chỉ lộ ra khi form thật sự được render và render LẠI trong trình duyệt —
 // tests/*.test.js chạy trong vm không có DOM nên không thể thấy chúng:
 //   1. Form hồ sơ bị xoá trắng sau mỗi rerender() (đổi trang rồi quay lại, hoặc một
@@ -15,6 +15,9 @@
 //      nhập mà không có hệ quả nào.
 //   6. Form bung hết 7 mục ngay từ đầu (2350px) và bắt gõ tay 13 ô — mục 2–8 phải thu
 //      gọn sẵn, chip gợi ý phải chèn được và vẫn sửa được sau khi chèn.
+//   7. Form luôn hiện dù không có sự cố nào, và tự bịa ra xét nghiệm/mức/lô cho hồ sơ
+//      nguồn ngoài IQC — kể cả nguồn "Nội kiểm IQC" không gắn điểm QC, vốn là đường
+//      vòng né mất rào QC chạy lại.
 //
 // Chạy: npm run nce-check   (cần `npm install` + `npx playwright install chromium`)
 'use strict';
