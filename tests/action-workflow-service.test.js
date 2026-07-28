@@ -251,4 +251,33 @@ function fixture(actionOverrides = {}) {
   assert.equal(ctx.actionOverdue(action).overdue, false, 'không có hạn thì không cảnh báo');
 }
 
+{
+  /* Sự cố nội kiểm phải gắn một điểm QC. Không gắn thì actionPoint() trả null ->
+     actionNeedsRerun() false -> hồ sơ khép vòng được mà KHÔNG cần bằng chứng QC chạy
+     lại. Tức là mở hồ sơ thủ công rồi chọn nguồn "Nội kiểm IQC" là đường vòng né đúng
+     rào an toàn quan trọng nhất của quy trình. */
+  const draft = {
+    protocolVersion: 2, nceId: 'NCE-20260728-C001', eventSource: 'iqc', processPhase: 'exam',
+    containmentStatus: 'held', correction: 'Dừng trả kết quả liên quan', by: 'KTV A', dueDate: '2099-01-01',
+  };
+  const unbound = { ...draft, pointId: '' };
+  const status = ctx.actionDraftStatus(unbound);
+  assert.equal(status.complete, false, 'nguồn IQC mà không gắn điểm QC thì không được mở hồ sơ');
+  assert.ok(status.missing.some(m => /mở từ dòng vi phạm/.test(m)), status.missing.join('; '));
+  assert.ok(status.missingKeys.includes('eventSource'));
+
+  assert.equal(ctx.actionDraftStatus({ ...draft, pointId: 'p1' }).complete, true, 'gắn điểm QC thì hợp lệ');
+  assert.equal(ctx.actionDraftStatus({ ...unbound, eventSource: 'eqa' }).complete, true, 'nguồn ngoài IQC không cần điểm QC');
+  assert.equal(ctx.actionDraftStatus({ ...unbound, eventSource: 'clinical' }).complete, true);
+
+  // Rào này phải chặn cả lúc khép vòng, không chỉ lúc mở.
+  ctx.__setState(fixture({ ...unbound, riskSeverity: 2, riskOccurrence: 2, riskDetectability: 2, riskLevel: 'low',
+    qcMaterialStatus: 'ok', instrumentStatus: 'ok', reagentStatus: 'ok', calibrationStatus: 'ok', lotToLotStatus: 'not-needed',
+    causeCategory: 'operator', cause: 'Thao tác chưa đúng', action: 'Đào tạo lại thao tác', patientImpact: 'none',
+    effectivenessStatus: 'effective', effectivenessDate: '2026-07-28', effectivenessNote: 'Không tái diễn sau theo dõi' }));
+  const action = ctx.__getState().actions[0];
+  action.pointId = '';
+  assert.equal(ctx.actionProtocolStatus(action).complete, false, 'không khép vòng được khi nguồn IQC mà thiếu điểm QC');
+}
+
 console.log('ActionWorkflowService tests passed');

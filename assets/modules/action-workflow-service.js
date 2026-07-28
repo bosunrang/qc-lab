@@ -50,6 +50,11 @@
     need(String(a.correction||'').trim().length<5,'xử lý tức thời đã thực hiện — ô cuối mục 1, tối thiểu 5 ký tự','correction');
     need(!String(a.by||'').trim(),'người phụ trách','by');
     need(!String(a.dueDate||'').trim(),'hạn hoàn thành','dueDate');
+    /* Sự cố nội kiểm PHẢI gắn một điểm QC. Không gắn thì actionPoint() trả null,
+       actionNeedsRerun() trả false, và hồ sơ khép vòng được mà không cần bằng chứng QC
+       chạy lại — tức là mở hồ sơ thủ công rồi chọn nguồn "Nội kiểm IQC" là đường vòng
+       né đúng cái rào an toàn quan trọng nhất của quy trình. */
+    need(a.eventSource==='iqc'&&!String(a.pointId||'').trim(),'sự cố nội kiểm IQC phải mở từ dòng vi phạm để hệ thống theo dõi QC chạy lại','eventSource');
     return{complete:!missing.length,missing,missingKeys};
   }
   /* missingBySection gom cung mot danh sach thieu theo tung muc cua form, de dai tom

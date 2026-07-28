@@ -66,6 +66,12 @@ function captureActionDraft(){
 function actionDraftValues(){return actionDraft&&actionDraft.id===(actionEditId||'')?actionDraft.values:null;}
 function clearActionDraft(){actionDraft=null;}
 const ACT_SOURCE_OPTS=[['','— Chọn nguồn —'],...Object.entries(ACTION_LABELS.source)];
+/* Hồ sơ không gắn điểm QC thì không được chọn "Nội kiểm IQC": sự cố IQC phải mở từ dòng
+   vi phạm, nếu không hệ thống mất đường theo dõi QC chạy lại. Hồ sơ cũ lỡ mang giá trị
+   đó vẫn giữ option để hiện đúng tên — phần chặn do actionDraftStatus() lo. */
+function actionSourceOptions(qcBound,current){
+  return(qcBound||current==='iqc')?ACT_SOURCE_OPTS:ACT_SOURCE_OPTS.filter(([v])=>v!=='iqc');
+}
 const ACT_PHASE_OPTS=Object.entries(ACTION_LABELS.phase);
 const ACT_ERR_OPTS=[['','— Chưa xác định —'],['SE — Sai số hệ thống','SE — Sai số hệ thống'],['RE — Sai số ngẫu nhiên','RE — Sai số ngẫu nhiên']];
 const ACT_CONTAIN_OPTS=[['','— Chọn —'],...Object.entries(ACTION_LABELS.containment)];
@@ -235,7 +241,7 @@ async function addAction(){
   const level=editing?editing.level:(levelEl?parseInt(levelEl.value)||0:0),l=t&&level?lvlCfg(t,level):null;
   const lot=editing?(editing.lot||''):(l&&l.lot||''),pointId=editing?(editing.pointId||''):actionFieldValue('aPointId',80);
   const rule=actionFieldValue('aRule'),action=actionFieldValue('aAct'),by=actionFieldValue('aBy'),errorType=actionFieldValue('aErr'),nceId=actionFieldValue('aNceId',80)||nextNceId(isoToday()),protocol=readActionProtocolForm();
-  const candidate={...protocol,action,by},draft=actionDraftStatus(candidate);
+  const candidate={...protocol,action,by,pointId},draft=actionDraftStatus(candidate);
   if(!draft.complete){await infoDialog('Còn thiếu để mở hồ sơ: '+draft.missing.join('; ')+'.');focusActionField((draft.missingKeys||[])[0]);return;}
   if(protocol.effectivenessStatus!=='pending'&&(protocol.effectivenessNote.length<5||!protocol.effectivenessDate)){await infoDialog('Khi đánh giá hiệu lực, cần nhập ngày và nhận xét tối thiểu 5 ký tự.');focusActionField(protocol.effectivenessDate?'effectivenessNote':'effectivenessDate');return;}
   const now=new Date().toISOString();
@@ -553,7 +559,7 @@ function pageActionsV4(){
        <div class="action-ident-group"><div class="action-ident-group-title"><b>Phân loại sự cố</b><small>Thời điểm, dấu hiệu phát hiện và loại sai số</small></div><div class="action-form-meta">
          <div><label>Ngày</label>${dateBox('aDate',form.date||isoToday(),'action-date')}</div>
          <div><label>Luật vi phạm</label>${actSel('aRule','Luật vi phạm',actionRuleOptions(),form.rule)}</div>
-         <div><label>Nguồn phát hiện</label>${actSel('aEventSource','Nguồn phát hiện',ACT_SOURCE_OPTS,form.eventSource||'')}</div>
+         <div><label>Nguồn phát hiện</label>${actSel('aEventSource','Nguồn phát hiện',actionSourceOptions(qcBound,form.eventSource),form.eventSource||'')}${qcBound?'':'<small class="hint">Sự cố nội kiểm phải mở từ dòng vi phạm ở trên</small>'}</div>
          <div><label>Giai đoạn</label>${actSel('aProcessPhase','Giai đoạn quá trình',ACT_PHASE_OPTS,form.processPhase||'exam')}</div>
          <div><label>Loại sai số</label>${actSel('aErr','Loại sai số',ACT_ERR_OPTS,form.errorType,'onchange="syncActionSuggestions()"')}</div>
        </div></div>

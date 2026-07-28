@@ -226,9 +226,10 @@ async function checkNewRecordDraftSurvivesRerender(page) {
   await page.selectOption('#aRiskLevel', 'high');
   await page.selectOption('#aCauseCategory', 'instrument');
   await page.selectOption('#aPatientImpact', 'none');
-  // Nguồn phát hiện không còn mặc định 'iqc' cho hồ sơ mở thủ công — phải chọn thật,
-  // đúng như người dùng, nếu không addAction() dừng ở hộp thoại "còn thiếu".
-  await page.selectOption('#aEventSource', 'iqc');
+  // Hồ sơ mở thủ công không còn lựa chọn 'iqc' (sự cố nội kiểm phải mở từ dòng vi
+  // phạm), và nguồn cũng không còn mặc định — phải chọn thật như người dùng, nếu
+  // không addAction() dừng ở hộp thoại "còn thiếu".
+  await page.selectOption('#aEventSource', 'eqa');
 
   const before = await page.evaluate(FORM_SNAPSHOT);
   await page.evaluate(() => rerender());
@@ -255,7 +256,7 @@ async function checkMissingFieldIsPinpointed(page) {
   // phục" ở mục 4–6, nên phải chắc là thông báo và con trỏ trỏ đúng vào nó.
   await page.evaluate(() => { closeActionForm(); beginActionManual(); });
   await page.waitForSelector('#aCorrection');
-  await page.selectOption('#aEventSource', 'iqc');
+  await page.selectOption('#aEventSource', 'eqa');
   await page.selectOption('#aContainment', 'held');
   await page.fill('#aCorrection', '');
   const flagged = await page.evaluate(() => {
@@ -390,6 +391,33 @@ async function checkFormIsBoundToAnIncident(page) {
   check('Không âm thầm gán mức QC', shape.hasLevel === false);
   check('Không âm thầm gán xét nghiệm', shape.testValue === '' && shape.testHasBlank === true, JSON.stringify(shape));
   check('Nguồn phát hiện để trống, buộc chọn thật', shape.source === '', shape.source);
+
+  /* Sự cố nội kiểm phải mở từ dòng vi phạm. Nếu lập hồ sơ thủ công rồi chọn nguồn
+     "Nội kiểm IQC" thì hồ sơ không có pointId -> actionNeedsRerun() false -> khép vòng
+     được mà không cần bằng chứng QC chạy lại, tức là né đúng rào an toàn của quy trình. */
+  const iqcGate = await page.evaluate(() => {
+    const sel = document.getElementById('aEventSource');
+    const before = [...sel.options].map(o => o.value);
+    sel.value = 'iqc';
+    const forced = actionDraftStatus({ ...readActionProtocolForm(), eventSource: 'iqc', by: 'KTV', pointId: '' });
+    return { options: before, blocked: !forced.complete, why: forced.missing.join('; ') };
+  });
+  check('Bỏ hẳn lựa chọn "Nội kiểm IQC" khi hồ sơ không gắn điểm QC',
+    !iqcGate.options.includes('iqc'), JSON.stringify(iqcGate.options));
+  check('Và chặn ở tầng lưu nếu giá trị đó lọt vào bằng đường khác',
+    iqcGate.blocked === true && /mở từ dòng vi phạm/.test(iqcGate.why), iqcGate.why);
+
+  const boundKeepsIqc = await page.evaluate(() => {
+    closeActionForm();
+    const t = state.tests[0];
+    const p = state.data[t.id].find(x => x.level === t.levels[0].level);
+    beginActionFromIssue(t.id, t.levels[0].level, '1-3s', 'RE — Sai số ngẫu nhiên', 'hint', p.id, p.date);
+    return [...document.getElementById('aEventSource').options].map(o => o.value);
+  });
+  check('Hồ sơ mở từ dòng vi phạm vẫn chọn được "Nội kiểm IQC"',
+    boundKeepsIqc.includes('iqc'), JSON.stringify(boundKeepsIqc));
+  await page.evaluate(() => { closeActionForm(); beginActionManual(); });
+  await page.waitForSelector('#aCorrection');
 
   const blocked = await page.evaluate(() => {
     const protocol = readActionProtocolForm();
