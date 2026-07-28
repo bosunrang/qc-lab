@@ -6,7 +6,7 @@
   <script>
     const output=document.getElementById('result');
     try{
-      const worker=new Worker('../assets/workers/westgard-worker.js?v=clean-text-core-20260714-1');
+      const worker=new Worker('../assets/workers/westgard-worker.js?v=seven-t-target-reset-20260727-1');
       const timer=setTimeout(()=>{output.textContent='error: timeout';worker.terminate();},5000);
       worker.onmessage=event=>{
         clearTimeout(timer);worker.terminate();

@@ -84,7 +84,7 @@ function pageReagent(){
    `<div class="panel rc-toolbar-panel"><h3 role="heading" aria-level="2">Thiết lập so sánh</h3><div class="rc-toolbar">
      <div class="rc-toolbar-selcol"><label>Chọn hóa chất</label><select id="rcSel" aria-label="Chọn hóa chất" onchange="rcSwitch(this.value)">${rcSelectOptions()}</select></div>
      ${canWrite()?`<div class="rc-toolbar-primary"><div>${btn('+ Thêm','openRcCreateModal()','teal rc-add-btn')}${btn(rcToolIcon('trash')+' Xóa','rcDeleteCurrent()','danger rc-delete-btn')}</div></div>`:''}
-     <div class="rc-toolbar-secondary">${canWrite()?btn(rcToolIcon('search')+' Tìm','openRcModal()','ghost rc-find-btn'):''}${btn(rcToolIcon('print')+' In hóa chất này','rcPrint()','ghost rc-report-btn')}${btn(rcToolIcon('report')+' Báo cáo tổng hợp','rcPrintSummary()','teal rc-report-main')}</div></div></div>
+     <div class="rc-toolbar-secondary">${canWrite()?btn(rcToolIcon('search')+' Tìm','openRcModal()','ghost rc-find-btn'):''}${btn(rcToolIcon('print')+' In hóa chất này','rcPrint()','teal rc-report-btn')}${btn(rcToolIcon('report')+' Báo cáo tổng hợp','rcPrintSummary()','teal rc-report-main')}</div></div></div>
    <div class="rc-entry-grid"><div class="panel rc-info-panel"><h3>Thông tin đánh giá</h3><div class="rc-info-grid">
      <div class="rc-field"><label>Tên hóa chất</label><input ${ro} value="${escAttr(t.reagent)}" oninput="rcMeta('reagent',this.value)" placeholder="Tên hóa chất / xét nghiệm"></div>
      <div class="rc-field"><label>Đơn vị</label><input ${ro} value="${escAttr(t.unit)}" oninput="rcMeta('unit',this.value)" placeholder="mmol/L..."></div>
@@ -290,6 +290,7 @@ async function rcPrintSummary(){
   const items=rcReportItems();
   if(!items.length){await infoDialog('Chưa có phép so sánh hóa chất.');return;}
   const valid=items.filter(x=>x.R).length;
+  if(!valid){await infoDialog(`Chưa đủ dữ liệu để tạo báo cáo tổng hợp (mỗi hóa chất cần tối thiểu ${RC_MIN_PAIRS} cặp giá trị hợp lệ).`);return;}
   let body=rcReportHeader('BÁO CÁO SO SÁNH 2 LÔ HÓA CHẤT',`Tổng hợp ${items.length} hóa chất · ${valid} phép đủ dữ liệu · Ngày xuất: ${formatDateTimeVN(new Date().toISOString())}`);
   body+=rcReportSummaryTable(items);
   items.forEach((it,i)=>body+=rcReportDetail(it.ds,i,i>0));

@@ -31,7 +31,7 @@
 .qc-table-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr))}
 .qc-table-card h4{position:sticky;left:0;z-index:3;display:flex;justify-content:space-between;align-items:center;gap:10px}
 .qc-points-panel{margin-top:16px}
-.qc-cumulative-note{margin:11px 16px 0}
+.qc-cumulative-note{margin:var(--panel-content-gap) 16px 0}
 .qc-table-card table{border:none;border-radius:0;table-layout:fixed}
 .qc-table-card th,.qc-table-card td{text-align:center}
 .qc-table-card td.num,.qc-table-card th.num{text-align:center;font-variant-numeric:tabular-nums}
@@ -125,7 +125,7 @@
 }
 
 .lj-range{
-  margin:10px 16px 12px;
+  margin:var(--panel-content-gap) 16px 12px;
 }
 
 .lj-stack{
@@ -449,6 +449,22 @@
 
 .qc-voided-box{
   margin:16px 16px 0; overflow-x:auto;
+}
+
+.void-nce-choice{
+  margin-top:10px; padding:10px 12px; border:1px solid var(--line); border-radius:var(--radius-md); background:var(--surface-subtle);
+}
+
+.void-nce-choice label{
+  display:flex; align-items:center; gap:8px; margin:0; color:var(--ink);
+}
+
+.void-nce-choice input{
+  flex:none;
+}
+
+.void-nce-choice .hint{
+  margin-top:4px;
 }
 
 .qc-voided-box h4{

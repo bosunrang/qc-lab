@@ -1,4 +1,4 @@
-﻿const assert = require('node:assert/strict');
+const assert = require('node:assert/strict');
 const QCCore = require('../assets/core.js');
 assert.ok(QCCore.WG_DEFAULT_ON.has('6x'), '6x phải được bật trong bộ Westgard mặc định');
 
@@ -126,13 +126,43 @@ function close(actual, expected, epsilon = 1e-9) {
   assert.ok(wg.F.every(f => !f.rules.includes('6x')));
 }
 
-{ // 7T: 7 điểm tăng dần → 7T; có điểm bằng nhau (plateau) → KHÔNG phải trend
-  const up = [9.4, 9.6, 9.8, 10.0, 10.2, 10.4, 10.6].map(v => ({ val: v }));
+{ // 7T: 7 bước tăng dần cần 8 điểm; 7 điểm hoặc plateau → KHÔNG phải trend
+  const seven = [9.3, 9.4, 9.6, 9.8, 10.0, 10.2, 10.4].map(v => ({ val: v }));
+  assert.ok(QCCore.westgard(seven,10,1,r=>r==='7T').F.every(f=>!f.rules.includes('7T')));
+  const up = [...seven, { val: 10.6 }];
   const trend=QCCore.westgard(up,10,1,r=>r==='7T');
   assert.ok(trend.F.slice(0,-1).every(f=>f.supportRules.includes('7T')));
-  assert.ok(trend.F[6].rules.includes('7T'));
-  const flat = [9.4, 9.6, 9.8, 9.8, 10.0, 10.2, 10.4].map(v => ({ val: v }));
+  assert.ok(trend.F[7].rules.includes('7T'));
+  const flat = [9.2, 9.4, 9.6, 9.8, 9.8, 10.0, 10.2, 10.4].map(v => ({ val: v }));
   assert.ok(QCCore.westgard(flat, 10, 1, r => r === '7T').F.every(f => !f.rules.includes('7T')));
+}
+
+{ // 7T quét trên z nhưng reset TƯỜNG MINH khi target snapshot đổi. Ca này cố ý
+  // làm z vẫn tăng nghiêm ngặt qua ranh giới target để chứng minh không thể dựa
+  // vào việc z "tự reset"; engine đầy đủ và fast path phải cùng không báo 7T.
+  const pts = [
+    { val: 100, qcMean: 100, qcSd: 2 }, // z: 0, 0.5, 1
+    { val: 101, qcMean: 100, qcSd: 2 },
+    { val: 102, qcMean: 100, qcSd: 2 },
+    { val: 203, qcMean: 200, qcSd: 2 }, // z tiếp tục: 1.5, 2, 2.5, 3, 3.5
+    { val: 204, qcMean: 200, qcSd: 2 },
+    { val: 205, qcMean: 200, qcSd: 2 },
+    { val: 206, qcMean: 200, qcSd: 2 },
+    { val: 207, qcMean: 200, qcSd: 2 },
+  ];
+  const wg = QCCore.westgardByPoint(pts, 100, 2, r => r === '7T');
+  assert.ok(wg.F.every(f => !f.rules.includes('7T')), 'đổi target giữa cửa sổ phải cắt đứt 7T');
+  assert.deepEqual(QCCore.westgardLatestRules(pts, 100, 2, r => r === '7T'), [], 'fast path phải khớp engine chính');
+  // Cùng chuỗi đó nhưng target thống nhất → z tăng đều → 7T vẫn bắt đúng.
+  const steady = pts.map(p => ({ val: p.val, qcMean: 100, qcSd: 2 }));
+  assert.ok(QCCore.westgardByPoint(steady, 100, 2, r => r === '7T').F[7].rules.includes('7T'), 'target thống nhất vẫn bắt 7T bình thường');
+
+  const sdChanged = Array.from({ length: 8 }, (_, i) => ({ val: i, qcMean: 0, qcSd: i < 4 ? 1 : 2 }));
+  assert.ok(QCCore.westgardByPoint(sdChanged, 0, 1, r => r === '7T').F.every(f => !f.rules.includes('7T')), 'đổi SD cũng phải cắt đứt 7T');
+  assert.deepEqual(QCCore.westgardLatestRules(sdChanged, 0, 1, r => r === '7T'), [], 'fast path phải reset khi SD đổi');
+
+  const missing = Array.from({ length: 8 }, (_, i) => ({ val: i }));
+  assert.ok(QCCore.westgardByPoint(missing, NaN, NaN, r => r === '7T').F.every(f => !f.rules.includes('7T')), 'thiếu Mean/SD không được tạo 7T');
 }
 
 { // 2of3-2s single-track: 2 trong 3 điểm cùng phía >2SD → đánh dấu đúng 2 điểm đó
@@ -363,6 +393,47 @@ function close(actual, expected, epsilon = 1e-9) {
     users: []
   });
   assert.equal(cleaned.actions.length, 0, 'placeholder autoCreated không được tồn tại trong nhật ký khắc phục');
+}
+
+{
+  const cleaned = QCCore.sanitizeBackup({
+    lab: {},tests: [],data: {},activity: [],users: [],
+    actions: [{id:'A1',protocolVersion:1,containmentStatus:'held',containmentNote:'Giữ kết quả',qcMaterialStatus:'ok',instrumentStatus:'abnormal',instrumentNote:'Cờ lỗi kim hút',reagentStatus:'ok',calibrationStatus:'na',calibrationNote:'Không có chỉ định',lotToLotStatus:'not-needed',causeCategory:'instrument',cause:'Kim hút bẩn',patientImpact:'none',patientAction:'',unsafe:{html:'<script>'}}]
+  });
+  const action=cleaned.actions[0];
+  assert.equal(action.protocolVersion,1);
+  assert.equal(action.instrumentStatus,'abnormal');
+  assert.equal(action.causeCategory,'instrument');
+  assert.equal(action.patientImpact,'none');
+}
+
+{
+  const cleaned=QCCore.sanitizeBackup({lab:{},tests:[],data:{},activity:[],users:[],actions:[{id:'NCE1',protocolVersion:2,nceId:'NCE-20260727-A001',eventSource:'iqc',processPhase:'exam',correction:'Dừng trả kết quả',dueDate:'2026-07-30',qcVerdict:'rej',riskSeverity:7,riskOccurrence:2,riskDetectability:1,riskLevel:'high',effectivenessStatus:'effective',effectivenessDate:'2026-07-31',effectivenessNote:'Không tái diễn',effectivenessBy:'QO'}]});
+  const action=cleaned.actions[0];
+  assert.equal(action.protocolVersion,2);
+  assert.equal(action.nceId,'NCE-20260727-A001');
+  assert.equal(action.qcVerdict,'rej');
+  assert.equal(action.riskSeverity,5,'risk score components are clamped to the 1–5 scale');
+  assert.equal(action.effectivenessStatus,'effective');
+}
+
+{
+  // Chuỗi escalate và lý do trả lại phải sống sót qua backup/đồng bộ, nếu không
+  // actionEffectivenessStatus() sẽ khoá lại hồ sơ đã chuyển và lý do trả lại biến mất.
+  const cleaned=QCCore.sanitizeBackup({lab:{},tests:[],data:{},activity:[],users:[],actions:[{id:'N1',protocolVersion:2,nceId:'NCE-B',parentNceId:'NCE-A',followUpNceId:'NCE-C',returnNote:'Thiếu bằng chứng hiệu chuẩn',returnBy:'Quản trị',returnAt:'2026-07-27T02:00:00.000Z'}]});
+  const action=cleaned.actions[0];
+  assert.equal(action.parentNceId,'NCE-A');
+  assert.equal(action.followUpNceId,'NCE-C');
+  assert.equal(action.returnNote,'Thiếu bằng chứng hiệu chuẩn');
+  assert.equal(action.returnBy,'Quản trị');
+  assert.equal(action.returnAt,'2026-07-27T02:00:00.000Z');
+}
+
+{
+  const cleaned=QCCore.sanitizeBackup({lab:{},tests:[{id:'T1',name:'Glucose',levels:[{level:1}]}],data:{T1:[{id:'p1',date:'2026-07-01',level:1,val:10,voided:true,voidKind:'data-entry',voidRequiresRerun:false}]},activity:[],users:[],actions:[]});
+  const point=cleaned.data.T1[0];
+  assert.equal(point.voidKind,'data-entry');
+  assert.equal(point.voidRequiresRerun,false);
 }
 
 {

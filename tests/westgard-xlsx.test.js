@@ -14,7 +14,8 @@ run(ctx, `
   function testDisplayName(t){return t.name;}
   function instrumentName(){return 'Máy A';}
   function testRuleOn(){return true;}
-  function testRuleOnWithin(){return true;}
+  function testRuleOnWithin(t,rule){return rule==='1-3s';}
+  function testRuleOnAcross(t,rule){return rule==='2-2s';}
   function ruleResultLevel(t,rules){return rules.length?'rej':'ok';}
   function formatDateTimeVN(){return '22/07/2026 10:00';}
   function userName(){return 'Quản trị viên';}
@@ -50,8 +51,8 @@ let text = doc.rows.flatMap(row => row.map(cell => cell && cell.v)).filter(v => 
 assert.equal(doc.sheetName, 'Phân tích Westgard');
 assert.match(text, /QC Lab 2\.4\.0/);
 assert.doesNotMatch(text, /westgard-print-hidpi/, 'internal build label is hidden from the Westgard workbook');
-assert.match(text, /Bộ luật áp dụng/);
-assert.match(text, /1-3s, 2-2s/);
+assert.match(text, /Luật theo từng mức.*1-3s/);
+assert.match(text, /Luật liên mức \/ lần chạy.*2-2s/);
 assert.match(text, /Bằng chứng: 2-2s/, 'support-only points are explicitly exported as evidence');
 assert.match(text, /Loại bỏ/);
 assert.match(text, /R1/);
@@ -63,6 +64,7 @@ assert.equal(doc.images[0].dispW, 900, 'the chart aligns with the full nine-colu
 assert.equal(doc.images[0].dispH, 276, 'the chart preserves the Levey-Jennings aspect ratio');
 assert.ok(doc.merges.includes('A4:B4')&&doc.merges.includes('C4:E4')&&doc.merges.includes('F4:G4')&&doc.merges.includes('H4:I4'), 'metadata labels and values use balanced merged blocks');
 assert.ok(doc.merges.includes('A6:B6')&&doc.merges.includes('C6:I6'), 'rules metadata uses the same aligned card grid');
+assert.ok(doc.merges.includes('A7:B7')&&doc.merges.includes('C7:I7'), 'cross-level rules receive their own aligned metadata row');
 assert.equal(doc.images[0].row0+18, doc.rows.findIndex(row=>row.some(cell=>cell&&/^Tổng 3 điểm/.test(String(cell.v)))), 'chart reservation leaves enough room for Excel to render the image without covering the following row');
 
 run(ctx, `

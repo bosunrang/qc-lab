@@ -30,7 +30,7 @@ function pageWestgardCusum(t){
     const title=`<h3><span class="wg-level-title"><span>Mức ${l.level}</span><span class="wg-lot-name">Lô ${esc(l.lot||'?')}</span></span><span class="wg-level-meta"><span>Mean ${fmt(l.mean)}</span><span>SD ${fmt(l.sd,3)}</span><span>${pts.length} điểm</span><span>k=${fmt(cfg.k,2)} · h=${fmt(cfg.h,2)}</span></span></h3>`;
     if(!pts.length)return `<div class="panel">${title}${emptyState('Chưa có dữ liệu','LOT đang dùng chưa có điểm QC.')}</div>`;
     return `<div class="panel">${title}
-      <div class="hint" style="margin:12px 16px 8px">Đường CUSUM+ (teal)/CUSUM− (xanh tím) cộng dồn độ lệch z-score qua từng điểm; vượt vạch đứt ±h là dấu hiệu trôi/shift kéo dài. Đường xám mờ là trung bình động 5 điểm, chỉ để tham khảo hình dạng xu hướng.</div>
+      <div class="hint wg-panel-intro">Đường CUSUM+ (teal)/CUSUM− (xanh tím) cộng dồn độ lệch z-score qua từng điểm; vượt vạch đứt ±h là dấu hiệu trôi/shift kéo dài. Đường xám mờ là trung bình động 5 điểm, chỉ để tham khảo hình dạng xu hướng.</div>
       <div class="chart-scroll" tabindex="0"><canvas class="cusumChart" data-test="${t.id}" data-level="${l.level}" width="1400" height="430"></canvas></div></div>`;
   }).join('');
 }
@@ -50,7 +50,7 @@ function wgRowsControl(view,key){
   return `<div class="wg-row-window"><span>Đang hiển thị ${view.rows.length}/${view.total} điểm${view.expanded?'':' mới nhất'}</span>${btn(view.expanded?`Thu gọn còn ${WG_TABLE_INITIAL_ROWS} điểm`:`Xem toàn bộ ${view.total} điểm`,`wgToggleRows('${jsq(key)}')`,'ghost sm')}</div>`;
 }
 function wgPointRowsHtml(rows){return rows.map(row=>{const lv=qcVerdictLabel(row.level),err=row.rules.length?errorTypeDetailParts(row.rules):null,errHtml=err?`<div class="wg-error-type"><b>${esc(err.type)}</b>${err.desc?`<small>${esc(err.desc)}</small>`:''}</div>`:'—',support=(row.supportRules||[]).map(r=>`<span class="pill" title="Điểm lịch sử cấu thành quy tắc, không bị loại hồi tố">${icoRefArrow()} ${r}</span>`).join('');
-  return `<tr><td>${row.index}</td><td>${vnDate(row.date)}</td><td class="num">${fmt(row.value)}</td><td class="num">${row.z>=0?'+':''}${fmt(row.z)}s</td><td><span class="tag ${row.level}">${lv}</span></td><td>${row.rules.map(r=>`<span class="pill">${r}</span>`).join('')||support||'—'}${row.rules.length&&support?`<div class="hint" style="margin-top:4px">Bằng chứng: ${support}</div>`:''}</td><td class="hint">${errHtml}</td></tr>`;}).join('');}
+  return `<tr><td>${row.index}</td><td>${vnDate(row.date)}</td><td class="num">${fmt(row.value)}</td><td class="num">${Number.isFinite(row.z)?(row.z>=0?'+':'')+fmt(row.z)+'s':'—'}</td><td><span class="tag ${row.level}">${lv}</span></td><td>${row.rules.map(r=>`<span class="pill">${r}</span>`).join('')||support||'—'}${row.rules.length&&support?`<div class="hint" style="margin-top:4px">Bằng chứng: ${support}</div>`:''}</td><td class="hint">${errHtml}</td></tr>`;}).join('');}
 /* Một khối Westgard cho MỘT lô (đang dùng, đã chuyển tiếp, hoặc thuộc nhóm lô đã dừng/lưu
    trữ) — dùng chung cho cả "Xem lô cũ" (theo dòng đời của 1 xét nghiệm) và màn hình duyệt
    theo nhóm lô cũ. Chỉ bảng số liệu, không vẽ biểu đồ riêng từng mức — biểu đồ tổng hợp
@@ -107,7 +107,7 @@ function pageWestgardArchived(archivedGroups){
   const entry=testEntries.find(e=>e.t.id===wgArchivedTestId)||testEntries[0];
   const sortedRows=entry.rows.slice().sort((a,b)=>a.l.level-b.l.level);
   const multiChart=sortedRows.length>=2?`<div class="panel"><h3>Levey-Jennings tổng hợp</h3>
-    <div class="hint" style="margin:12px 16px 8px">Biểu đồ quy đổi các mức QC về Z-score để so sánh trên cùng trục; kết luận Đạt/Cảnh báo/Loại bỏ được tính theo bộ luật Westgard đang bật cho xét nghiệm.</div>
+    <div class="hint wg-panel-intro">Biểu đồ quy đổi các mức QC về Z-score để so sánh trên cùng trục; kết luận Đạt/Cảnh báo/Loại bỏ được tính theo bộ luật Westgard đang bật cho xét nghiệm.</div>
     <div class="chart-scroll" tabindex="0"><canvas class="wgLJMultiArchived" data-group="${group.id}" data-test="${entry.t.id}" width="1400" height="430"></canvas></div></div>`:'';
   const blocks=sortedRows.map(({t,l,lot,mean,sd})=>wgLotBlock(t,l.level,lot.lotNo,mean,sd,lotPointsByNo(t.id,l.level,lot.lotNo),badge,`Mức ${l.level}`,`Lô ${esc(lot.lotNo)}`)).join('');
   return headOnly('Phân tích Westgard','Xem lại Westgard theo nhóm lô đã dừng/lưu trữ')+
@@ -126,7 +126,7 @@ function pageWestgard(){
   const q=searchText(wgTestQ),matched=tests.filter(x=>!q||searchText(testSelectLabel(x)).includes(q)),opts=matched.length?matched.map(x=>`<option value="${x.id}" ${x.id===selTest?'selected':''}>${esc(testSelectLabel(x))}</option>`).join(''):'<option value="">Không tìm thấy xét nghiệm phù hợp</option>';
   const wg=activeWestgard(t),levelViews=wg.views.map(v=>({l:v.l,pts:v.pts,cfg:{mean:v.l.mean,sd:v.l.sd},single:v.single,lotPicker:`<span class="wg-lot-name">Lô ${esc(v.l.lot||'?')}</span>`}));
   const multiChart=wgMultiViews(t).length>=2?`<div class="panel"><h3>Levey-Jennings tổng hợp</h3>
-    <div class="hint" style="margin:12px 16px 8px">Biểu đồ quy đổi các mức QC về Z-score để so sánh trên cùng trục; kết luận Đạt/Cảnh báo/Loại bỏ được tính theo bộ luật Westgard đang bật cho xét nghiệm. Bật "Xem lô cũ" ở mức tương ứng để thêm đường của lô đã chuyển tiếp.</div>
+    <div class="hint wg-panel-intro">Biểu đồ quy đổi các mức QC về Z-score để so sánh trên cùng trục; kết luận Đạt/Cảnh báo/Loại bỏ được tính theo bộ luật Westgard đang bật cho xét nghiệm. Bật "Xem lô cũ" ở mức tương ứng để thêm đường của lô đã chuyển tiếp.</div>
     <div class="chart-scroll" tabindex="0"><canvas class="wgLJMulti" data-test="${t.id}" width="1400" height="430"></canvas></div></div>`:'';
   const blocks=levelViews.map(v=>{const{l,pts,cfg,lotPicker}=v;
     const prevSeries=previousLotSeries(t,l.level),hasPrev=prevSeries.length>0,prevOpen=wgPrevOpen.has(t.id+'|'+l.level);
@@ -134,8 +134,11 @@ function pageWestgard(){
     if(prevOpen&&hasPrev){const s=prevSeries[0];return wgLotBlock(t,l.level,s.lot,s.mean,s.sd,s.pts,'Đã chuyển tiếp',`Mức ${l.level}`,`Lô cũ ${esc(s.lot)}`,prevBtn);}
     const title=`<h3><span class="wg-level-title"><span>Mức ${l.level}</span>${lotPicker}</span><span class="wg-level-meta"><span>Mean ${fmt(cfg.mean)}</span><span>SD ${fmt(cfg.sd,3)}</span><span>${pts.length} điểm</span>${prevBtn}</span></h3>`;
     if(!pts.length)return `<div class="panel">${title}${emptyState('Chưa có dữ liệu','LOT đang dùng chưa có điểm QC. Bạn có thể chọn LOT cũ hoặc nhập điểm mới.',btn('Nhập QC',`entrySel={testId:'${t.id}',level:${l.level}};entryStart=null;entryEnd=null;go('entry')`,'teal'))}</div>`;
-    const{zs}=v.single,rows=WestgardViewModel.buildPointRows({points:pts,verdicts:wg.byPoint,zs,mean:cfg.mean,sd:cfg.sd}),key=`current:${t.id}|${l.level}|${l.lot||''}`,view=wgRowsWindow(rows,key),rowsHtml=wgPointRowsHtml(view.rows);
-    return `<div class="panel">${title}${wgRowsControl(view,key)}<table class="wg-table"><thead><tr><th>#</th><th>Ngày</th><th class="num">Giá trị</th><th class="num">Z</th><th>Kết luận</th><th>Luật / bằng chứng</th><th>Loại sai số</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`;}).join('');
+    const{zs}=v.single,rows=WestgardViewModel.buildPointRows({points:pts,verdicts:wg.byPoint,zs,mean:cfg.mean,sd:cfg.sd}),key=`current:${t.id}|${l.level}|${l.lot||''}`,view=wgRowsWindow(rows,key);
+    const targetOk=levelTargetOk(l),targetWarn=targetOk?'':`<div class="alert warn wg-target-warning">Mức này <b>chưa có Mean/SD hợp lệ</b> — các điểm QC không được đánh giá Westgard; bảng dưới chỉ liệt kê giá trị, không có kết luận Đạt/Cảnh báo/Loại bỏ. ${role()==='admin'?btn('Cấu hình Mean/SD',`go('manage');setManageTab('targets')`,'teal sm'):''}</div>`;
+    if(!targetOk)view.rows.forEach(r=>{r.level='none';r.rules=[];r.supportRules=[];});
+    const rowsHtml=wgPointRowsHtml(view.rows);
+    return `<div class="panel">${title}${targetWarn}${wgRowsControl(view,key)}<table class="wg-table"><thead><tr><th>#</th><th>Ngày</th><th class="num">Giá trị</th><th class="num">Z</th><th>Kết luận</th><th>Luật / bằng chứng</th><th>Loại sai số</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`;}).join('');
   const ruleToggles=WG_RULES.map(r=>`<span class="wg-rule-item"><label><input type="checkbox" ${wgOn(r)?'checked':''} ${!canWrite()?'disabled':''} onchange="wgSet('${r}',this.checked)"> <span class="pill">${r}</span></label></span>`).join('')+(canWrite()?`<div class="wg-rule-reset">${btn('Khôi phục mặc định','wgReset()','ghost sm')}</div>`:'');
   const ruleGuide=`<details class="wg-guide"><summary>Hướng dẫn nhanh luật Westgard</summary><div class="alert info" style="margin:10px 12px 18px">Ký hiệu ${icoRefArrow()} trong bảng là điểm lịch sử cấu thành quy tắc. Điểm này chỉ là bằng chứng; trạng thái cảnh báo/loại được gắn cho lần chạy phát hiện hiện tại, không đổi hồi tố kết luận cũ.</div><div class="chart-scroll" tabindex="0"><table><thead><tr><th>Luật</th><th>Điều kiện</th><th>Kết luận</th><th>Gợi ý xử lý</th></tr></thead><tbody>
     <tr><td>1-2s</td><td>1 điểm QC vượt ±2SD</td><td><span class="warn">Cảnh báo</span></td><td>Theo dõi điểm kế tiếp, chưa loại bỏ nếu không kèm luật khác.</td></tr>
@@ -150,7 +153,7 @@ function pageWestgard(){
     <tr><td>9x</td><td>9 điểm liên tiếp nằm cùng một phía so với Mean</td><td><span class="rej">Loại bỏ</span></td><td>Biến thể phù hợp khi chạy 3 mức QC qua nhiều lần chạy.</td></tr>
     <tr><td>10x</td><td>10 điểm liên tiếp nằm cùng một phía so với mean</td><td><span class="rej">Loại bỏ</span></td><td>Nghi dịch chuyển nền, xem lại mean/SD, lô mới, hiệu chuẩn.</td></tr>
     <tr><td>12x</td><td>12 điểm liên tiếp nằm cùng một phía so với Mean</td><td><span class="rej">Loại bỏ</span></td><td>Biến thể ít nhạy hơn 8x/10x, dùng để theo dõi bias dài hơn.</td></tr>
-    <tr><td>7T</td><td>7 điểm tăng dần hoặc giảm dần liên tiếp</td><td><span class="warn">Cảnh báo</span></td><td>Theo dõi xu hướng, kiểm tra bảo quản QC, thuốc thử, môi trường.</td></tr>
+    <tr><td>7T</td><td>7 lần tăng dần hoặc giảm dần liên tiếp (8 điểm QC)</td><td><span class="warn">Cảnh báo</span></td><td>Theo dõi xu hướng, kiểm tra bảo quản QC, thuốc thử, môi trường.</td></tr>
   </tbody></table></div></details>`;
   const exportActions=wgChartMode==='lj'?'<div><label>&nbsp;</label><div class="wg-export-actions">'+btn(icoDownload()+'Xuất Excel','exportWestgardXLSX()','teal wg-excel-btn','Xuất Excel biểu đồ Levey-Jennings, các vi phạm và điểm bằng chứng đang xem')+btn(icoPrint()+'In PDF','printWestgard()','teal wg-print-btn','Tạo bản in PDF/HTML biểu đồ Levey-Jennings và các vi phạm đang xem')+'</div></div>':'';
   return headOnly('Phân tích Westgard','Đối chiếu luật theo mức QC, lô và lần chạy')+

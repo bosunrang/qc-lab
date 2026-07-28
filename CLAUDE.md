@@ -150,6 +150,17 @@ it runs under `xvfb-run`, see the CI job):
   `node scripts/a11y-audit.js --update-baseline` — never raise a number by
   hand. `MODALS.open` entries are real functions (not eval'd strings) so the
   audit works under the CSP, which has no `unsafe-eval`.
+- `scripts/nce-workflow-check.js` (`npm run nce-check`) drives the NCE record
+  lifecycle on the "Khắc phục sự cố" page in real Chromium, because every bug it
+  guards only appears once the form is rendered *and re-rendered*: the edit/new
+  form must survive `rerender()` (a Firebase pull mid-typing used to blank it and
+  the next save wrote empty strings over the checklist), the incident identity
+  (`testId`/`level`/`lot`/`pointId`) must stay immutable once the record exists
+  (changing the test dropdown made `actionPoint()` return null and silently
+  dropped the QC-rerun gate), and the rerun/overdue/escalation chips must match
+  between "Sự cố cần xử lý" and "Hồ sơ NCE đang mở". Each area was proven
+  discriminating by reintroducing the original bug and watching the matching
+  checks fail.
 - `scripts/print-check.js` covers the DESKTOP print-to-PDF pipeline that
   nothing else in the repo can see: it boots the real app in Electron, opens
   the real print window via `printWestgard()` → `openPrint()`, drives the same
@@ -395,14 +406,16 @@ the Google Fonts link, offline labs must print with correct metrics.
     before the returned Promise settles — the caller's boolean is unaffected
     either way.
 - `draw.js`, `router-render.js`, `dashboard-routes.js`, `entry-routes.js`,
-  `westgard-routes.js`, `sigma.js`, `actions-routes.js`,
-  `manage-routes.js`, `after-render.js`, `entry-tests-actions.js`, `modals.js`
-  — UI/rendering and routing. Since 2026-07-24 the three biggest pages live in
-  their own files: `router-render.js` keeps only dispatch + shared UI
-  primitives (`btn()`, `requireWrite()`…), while `pageDash()`, `pageEntry()`
-  and `pageWestgard()` live in `dashboard-routes.js`/`entry-routes.js`/
-  `westgard-routes.js`, which must load after it in that order; `modals.js`
-  likewise keeps only the modal machinery (`modalTemplate()`,
+  `westgard-routes.js`, `sigma.js`, `actions-routes.js`, `manage-routes.js`,
+  `after-render.js`, `entry-tests-actions.js`, `modals.js` — UI/rendering and
+  routing. Since 2026-07-24 the three biggest pages live in their own files:
+  `router-render.js` keeps only dispatch plus cross-page UI primitives (the
+  `btn()` builder, the `requireWrite()`/`requireAdmin()` guards, search/filter
+  helpers, the VN date picker, icon SVGs), while `pageDash()` lives in
+  `dashboard-routes.js`, `pageEntry()` in `entry-routes.js` and
+  `pageWestgard()` in `westgard-routes.js` — `router-render.js` must never
+  redefine those three, and the files must load right after it in that order;
+  `modals.js` likewise keeps only the modal machinery (`modalTemplate()`,
   `modalCloseButton()`), not page logic. `tests/ui-route-structure.test.js`
   fails if a `page*()` function or an Actions-page helper migrates back.
   `router-render.js` owns the page list

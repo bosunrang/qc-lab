@@ -143,6 +143,10 @@
   border-color:#c5e3df; background:#edf8f6; color:var(--tealink);
 }
 
+.dash-level-pill.missing-target{
+  border-color:#e4c273; background:#fbf1de; color:var(--amber);
+}
+
 .dash-test-list .tag.none{
   background:#edf2f5; color:#5c7180;
 }
@@ -303,7 +307,7 @@ textarea:focus,
 .dash-main .panel > .alert,
 .panel > h3:first-child + .dash-list,
 .panel > h3:first-child ~ .dash-list{
-  margin:16px 16px 14px;
+  margin:var(--panel-content-gap) 16px 14px;
 }
 
 @media(max-width:760px){

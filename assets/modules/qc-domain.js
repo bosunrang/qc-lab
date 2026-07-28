@@ -102,7 +102,7 @@ function westgardWorkerMessage(event){
 function ensureWestgardWorker(){
   if(wgWorker)return wgWorker;if(typeof Worker!=='function'||wgWorkerFailed)return null;
   try{
-    wgWorker=new Worker('assets/workers/westgard-worker.js?v=westgard-2of3-2s-fix-20260718-1');
+    wgWorker=new Worker('assets/workers/westgard-worker.js?v=seven-t-target-reset-20260727-1');
     wgWorker.onmessage=westgardWorkerMessage;
     wgWorker.onerror=()=>{wgWorkerFailed=true;wgWorkerPending.clear();if(wgWorker){try{wgWorker.terminate();}catch(e){}wgWorker=null;}if(typeof page!=='undefined'&&page==='dash')setTimeout(()=>rerender(),0);};
     return wgWorker;
@@ -205,6 +205,11 @@ function operationalLevels(t){
   idx.levels.set(t.id,levels);
   return levels;
 }
+/* Mức đang vận hành nhưng thiếu Mean/SD hợp lệ: engine Westgard (core) trả "ok"
+   cho MỌI điểm khi sd<=0 hoặc mean không hợp lệ (guard ở westgard()) — nếu không
+   báo riêng, mức này hiển thị "Đạt" giả trên dashboard/trang Westgard. */
+function levelTargetOk(l){return!!l&&Number.isFinite(+l.mean)&&Number.isFinite(+l.sd)&&+l.sd>0;}
+function levelsMissingTarget(t){return operationalLevels(t).filter(l=>!levelTargetOk(l));}
 function isOperationalTest(t){return!!(t&&t.active!==false&&operationalPanelForTest(t)&&operationalLotGroupForTest(t)&&operationalLevels(t).length);}
 function canEnterQcForLevel(t,level){
   const cfg=t&&lvlCfg(t,+level);
@@ -350,16 +355,15 @@ function cusumSeries(t,l){
   return result;
 }
 const ACCEPTED_WG_LOOKBACK=11; // 12x is the widest single-level rule: candidate + 11 prior accepted points.
-function acceptedPointOkFromTail(l,acceptedZTail,candidate,withinRules,rejectRules){
-  const z=QCCore.pointZ(candidate,l.mean,l.sd),zs=[...acceptedZTail,z];
-  const rules=QCCore.westgardLatestRulesFromZ(zs,rule=>withinRules.has(rule));
+function acceptedPointOkFromTail(l,acceptedPointTail,candidate,withinRules,rejectRules){
+  const z=QCCore.pointZ(candidate,l.mean,l.sd),rules=QCCore.westgardLatestRules([...acceptedPointTail,candidate],l.mean,l.sd,rule=>withinRules.has(rule));
   return{ok:!rules.some(rule=>rejectRules.has(rule)),z};
 }
 function acceptedLotPoints(t,level,withIndex=false){
   const memoKey=t&&t.id?t.id+'|'+level+'|'+(withIndex?1:0):'';
   if(memoKey&&acceptedMemo.has(memoKey))return acceptedMemo.get(memoKey);
   const l=lvlCfg(t,level),pts=operationalLotPoints(t,level,withIndex),accepted=[],tail=[],withinRules=testRuleSet(t,'within'),rejectRules=new Set(WG_RULES.filter(rule=>testRuleAction(t,rule)==='reject'));
-  pts.forEach(p=>{const verdict=acceptedPointOkFromTail(l,tail,p,withinRules,rejectRules);if(!verdict.ok)return;accepted.push(p);tail.push(verdict.z);if(tail.length>ACCEPTED_WG_LOOKBACK)tail.shift();});
+  pts.forEach(p=>{const verdict=acceptedPointOkFromTail(l,tail,p,withinRules,rejectRules);if(!verdict.ok)return;accepted.push(p);tail.push(p);if(tail.length>ACCEPTED_WG_LOOKBACK)tail.shift();});
   const out=accepted.filter(Boolean);
   if(memoKey)acceptedMemo.set(memoKey,out);
   return out;

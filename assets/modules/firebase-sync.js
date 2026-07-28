@@ -40,12 +40,26 @@ function hasLocalQcContent(s){
   if(Object.values(s.data||{}).some(arr=>Array.isArray(arr)&&arr.length))return true;
   return FB_LOCAL_CONTENT_KEYS.some(k=>(s[k]||[]).length);
 }
-/* So sánh gần đúng hai state đã sanitize (bỏ qua field vận hành _ts/_client)
-   để biết cục bộ có thật sự khác cloud hay chỉ là bản đồng bộ cũ tải lại. */
-function statesLikelyEqual(a,b){
-  const strip=s=>{const c=fbClone(s||{});delete c._ts;delete c._client;return c;};
-  return JSON.stringify(strip(a))===JSON.stringify(strip(b));
+/* Dạng chuẩn để so khớp cục bộ với cloud: sắp xếp khóa, coi rỗng/null ≡ thiếu. RTDB
+   không lưu mảng/đối tượng rỗng và không giữ thứ tự khóa, nên cùng một dữ liệu vẫn ra
+   hai CHUỖI JSON khác nhau sau một vòng đẩy lên - tải về. */
+function fbCanon(v){
+  if(v===undefined||v===null)return null;
+  if(Array.isArray(v)){const a=v.map(fbCanon);while(a.length&&a[a.length-1]===null)a.pop();return a.length?a:null;}
+  if(typeof v!=='object')return v;
+  const out={};Object.keys(v).sort().forEach(k=>{const c=fbCanon(v[k]);if(c!==null)out[k]=c;});
+  return Object.keys(out).length?out:null;
 }
+/* So sánh cục bộ với cloud để biết có THẬT SỰ khác nhau hay chỉ là bản đã đồng bộ tải
+   lại. Chỉ so đúng các nhánh được đồng bộ (FB_TOP + data/sigmaData): các field còn lại
+   của state là cục bộ thuần (schemaVersion, teaRegistryVersion, _ts/_client...) và
+   fbFlushPush() không bao giờ đẩy chúng lên, nên cloud không có. Trước đây hàm này so
+   JSON.stringify TOÀN BỘ state nên luôn lệch ít nhất ở schemaVersion -> hộp thoại
+   "dữ liệu cục bộ khác dữ liệu trung tâm" bật lên MỖI lần đăng nhập dù hai bên đã
+   đồng bộ y hệt. Đừng đổi lại thành so cả state. */
+const FB_COMPARE_KEYS=FB_TOP.concat(['data','sigmaData']);
+function fbSyncedShape(s){const out={};FB_COMPARE_KEYS.forEach(k=>{const c=fbCanon(s&&s[k]);if(c!==null)out[k]=c;});return out;}
+function statesLikelyEqual(a,b){return JSON.stringify(fbSyncedShape(a))===JSON.stringify(fbSyncedShape(b));}
 function fbMapJson(o){const out={};Object.keys(o||{}).forEach(id=>out[id]=JSON.stringify(o[id]));return out;}
 function fbSnapKeys(s){
   s=s||{};

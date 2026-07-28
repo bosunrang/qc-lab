@@ -5,24 +5,27 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- CSP: han che nguon tai. script-src 'unsafe-inline' vi app dung inline event handler
      va vai khoi <script> noi tuyen trong file nay; CDN duy nhat duoc phep la gstatic
-     (Firebase, kem SRI ben duoi). connect-src mo dung cac endpoint Firebase Auth/RTDB;
-     font/anh/worker gioi han ve chinh app. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self';script-src 'self' 'unsafe-inline' https://www.gstatic.com;style-src 'self' 'unsafe-inline';img-src 'self' data: blob:;font-src 'self';connect-src 'self' https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasedatabase.app wss://*.firebasedatabase.app https://identitytoolkit.googleapis.com https://securetoken.googleapis.com;worker-src 'self';object-src 'none';base-uri 'self';form-action 'self'">
+     (Firebase, kem SRI ben duoi). Hai host RTDB nam trong script-src KHONG phai thua:
+     khi WebSocket khong dung duoc (mo bang file://, hoac mang chan wss) thi RTDB tu lui
+     ve long-polling, ma co che do chen the <script> tro thang toi host database — thieu
+     chung thi dong bo chet im lang, chi thay loi CSP trong console. connect-src mo dung
+     cac endpoint Firebase Auth/RTDB; font/anh/worker gioi han ve chinh app. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self';script-src 'self' 'unsafe-inline' https://www.gstatic.com https://*.firebaseio.com https://*.firebasedatabase.app;style-src 'self' 'unsafe-inline';img-src 'self' data: blob:;font-src 'self';connect-src 'self' https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasedatabase.app wss://*.firebasedatabase.app https://identitytoolkit.googleapis.com https://securetoken.googleapis.com;worker-src 'self';object-src 'none';base-uri 'self';form-action 'self'">
 <title>QC Lab - Nội kiểm chất lượng xét nghiệm</title>
-<link rel="stylesheet" href="assets/tokens.css?v=ui-review-font-self-host-20260718-1">
-<link rel="stylesheet" href="assets/app.css?v=dead-code-cleanup-20260721-1">
+<link rel="stylesheet" href="assets/tokens.css?v=panel-content-normalize-20260727-2">
+<link rel="stylesheet" href="assets/app.css?v=panel-content-normalize-20260727-2">
 <link rel="stylesheet" href="assets/professional-base.css?v=nav-css-dedup-20260723-1">
-<link rel="stylesheet" href="assets/components.css?v=a11y-fixes-20260723-2">
-<link rel="stylesheet" href="assets/professional-settings.css?v=settings-profile-cleanup-20260716-4">
-<link rel="stylesheet" href="assets/professional-dashboard.css?v=global-thin-scrollbar-20260721-1">
-<link rel="stylesheet" href="assets/professional-entry.css?v=parallel-label-plain-20260722-1">
-<link rel="stylesheet" href="assets/professional-westgard.css?v=westgard-excel-teal-20260723-1">
-<link rel="stylesheet" href="assets/professional-sigma.css?v=opspecs-column-balance-20260722-1">
-<link rel="stylesheet" href="assets/professional-reagent.css?v=rc-verdict-margin-restore-20260720-1">
-<link rel="stylesheet" href="assets/professional-config.css?v=lot-trans-layout-cleanup-20260721-8">
-<link rel="stylesheet" href="assets/professional-reports.css?v=period-lock-ui-20260722-1">
-<link rel="stylesheet" href="assets/professional-users.css?v=user-cleanup-20260719-1">
-<link rel="stylesheet" href="assets/professional-audit.css?v=split-20260711-3">
+<link rel="stylesheet" href="assets/components.css?v=panel-content-normalize-20260727-2">
+<link rel="stylesheet" href="assets/professional-settings.css?v=panel-content-normalize-20260727-2">
+<link rel="stylesheet" href="assets/professional-dashboard.css?v=panel-content-normalize-20260727-2">
+<link rel="stylesheet" href="assets/professional-entry.css?v=void-nce-routing-20260727-1">
+<link rel="stylesheet" href="assets/professional-westgard.css?v=panel-content-normalize-20260727-2">
+<link rel="stylesheet" href="assets/professional-sigma.css?v=panel-content-normalize-20260727-2">
+<link rel="stylesheet" href="assets/professional-reagent.css?v=nce-form-from-state-20260727-1">
+<link rel="stylesheet" href="assets/professional-config.css?v=panel-content-normalize-20260727-2">
+<link rel="stylesheet" href="assets/professional-reports.css?v=nce-draft-keep-20260727-2">
+<link rel="stylesheet" href="assets/professional-users.css?v=panel-content-normalize-20260727-2">
+<link rel="stylesheet" href="assets/professional-audit.css?v=audit-filter-pagination-20260727-5">
 <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js" integrity="sha384-sEVIly94UBRLKWdkYoPpSG7GD/e79YHMrxVyZaOk712Ga7+EAw6w1EFi+xBzBdd+" crossorigin="anonymous"></script>
 <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js" integrity="sha384-EkqK+ezBWJuvO3hfrSx2iVqr3YQbhmnzn8kPhOpBZ+0GMVU5oGSgptwIu8D84HjE" crossorigin="anonymous"></script>
 <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js" integrity="sha384-1/m+A1jVWbD3yiK3/vtFvm1+LjK1WLpSoDY+Kaxppwn/yP9BVSgdHTNQVOjrzUO5" crossorigin="anonymous"></script>
@@ -59,18 +62,18 @@ if (window.qcDialog) {
 }
 </script>
 
-<script defer src="assets/core.js?v=independent-approval-20260724-1"></script>
+<script defer src="assets/core.js?v=nce-escalate-overdue-20260727-4"></script>
 <script defer src="assets/modules/app-meta.js?v=v2.5.3-20260728-1"></script>
 <script defer src="assets/modules/analyte-catalog.js?v=dead-code-cleanup-20260721-1"></script>
 <script defer src="assets/modules/state.js?v=typecheck-jsdoc-20260722-1"></script>
-<script defer src="assets/modules/qc-domain.js?v=typecheck-jsdoc-20260722-1"></script>
+<script defer src="assets/modules/qc-domain.js?v=seven-t-target-reset-20260727-1"></script>
 <script defer src="assets/modules/local-store.js?v=qc-performance-20260716-2"></script>
-<script defer src="assets/modules/firebase-sync.js?v=fb-synced-snap-cache-20260719-3"></script>
+<script defer src="assets/modules/firebase-sync.js?v=state-compare-synced-branches-20260727-1"></script>
 <script defer src="assets/modules/state-storage.js?v=typecheck-jsdoc-20260722-1"></script>
 <script defer src="assets/modules/qc-rules.js?v=typecheck-jsdoc-20260722-1"></script>
 <script defer src="assets/modules/period-service.js?v=lock-ui-20260714-1"></script>
 <script defer src="assets/modules/sigma-cohort-service.js?v=typecheck-jsdoc-20260722-1"></script>
-<script defer src="assets/modules/entry-service.js?v=action-creator-id-20260724-1"></script>
+<script defer src="assets/modules/entry-service.js?v=void-reason-note-20260727-4"></script>
 <script defer src="assets/modules/westgard-view-model.js?v=typecheck-jsdoc-20260722-1"></script>
 <script defer src="assets/modules/entry-ui-state.js?v=entry-partial-render-20260716-3"></script>
 <script defer src="assets/modules/analysis-ui-state.js?v=westgard-row-window-20260714-1"></script>
@@ -78,16 +81,16 @@ if (window.qcDialog) {
 <script defer src="assets/modules/reagent-ui-state.js?v=reagent-cleanup-20260716-1"></script>
 <script defer src="assets/modules/manage-ui-state.js?v=config-dead-state-cleanup-20260719-1"></script>
 <script defer src="assets/modules/auth-ui-state.js?v=auth-ui-state-20260714-1"></script>
-<script defer src="assets/modules/action-workflow-service.js?v=independent-approval-20260724-1"></script>
+<script defer src="assets/modules/action-workflow-service.js?v=nce-duedate-local-20260727-1"></script>
 <script defer src="assets/modules/draw.js?v=hidpi-3x-20260721-1"></script>
 <script defer src="assets/modules/chart-view-model.js?v=typecheck-jsdoc-20260722-1"></script>
-<script defer src="assets/modules/router-render.js?v=ui-route-split-20260724-1"></script>
-<script defer src="assets/modules/dashboard-routes.js?v=ui-route-split-20260724-1"></script>
-<script defer src="assets/modules/entry-routes.js?v=ui-route-split-20260724-1"></script>
-<script defer src="assets/modules/westgard-routes.js?v=ui-route-split-20260724-1"></script>
+<script defer src="assets/modules/router-render.js?v=missing-target-warn-20260726-1"></script>
+<script defer src="assets/modules/dashboard-routes.js?v=dash-overdue-nce-20260727-1"></script>
+<script defer src="assets/modules/entry-routes.js?v=void-reason-note-20260727-4"></script>
+<script defer src="assets/modules/westgard-routes.js?v=panel-content-normalize-20260727-2"></script>
 <script defer src="assets/modules/audit.js?v=typecheck-jsdoc-20260722-1"></script>
 <script defer src="assets/modules/sigma.js?v=btn-consolidate-20260723-1"></script>
-<script defer src="assets/modules/actions-routes.js?v=critical-reauth-20260724-1"></script>
+<script defer src="assets/modules/actions-routes.js?v=nce-escalate-overdue-20260727-4"></script>
 <script defer src="assets/modules/manage-routes.js?v=btn-consolidate-20260723-1"></script>
 <script defer src="assets/modules/after-render.js?v=render-batch-20260714-1"></script>
 <script defer src="assets/modules/entry-tests-actions.js?v=critical-reauth-20260724-1"></script>
@@ -95,10 +98,10 @@ if (window.qcDialog) {
 <script defer src="assets/modules/range.js?v=critical-reauth-20260724-1"></script>
 <script defer src="assets/modules/settings.js?v=btn-consolidate-20260723-1"></script>
 <script defer src="assets/modules/backup-service.js?v=backup-64mb-20260724-1"></script>
-<script defer src="assets/modules/data-io.js?v=backup-service-split-20260724-1"></script>
-<script defer src="assets/modules/reports.js?v=electron-pdf-only-20260724-1"></script>
-<script defer src="assets/modules/users-auth.js?v=critical-reauth-20260724-1"></script>
-<script defer src="assets/modules/reagent.js?v=btn-consolidate-20260723-1"></script>
+<script defer src="assets/modules/data-io.js?v=nce-lifecycle-20260727-1"></script>
+<script defer src="assets/modules/reports.js?v=nce-lifecycle-20260727-1"></script>
+<script defer src="assets/modules/users-auth.js?v=audit-filter-pagination-20260727-5"></script>
+<script defer src="assets/modules/reagent.js?v=reagent-print-guard-20260725-1"></script>
 <script defer src="assets/app.js?v=partitioned-hydration-20260714-1"></script>
 </body>
 </html>

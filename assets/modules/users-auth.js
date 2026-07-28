@@ -26,18 +26,63 @@ function pageUsers(){
      </div>
      <div class="hint user-create-hint"><b>Vai trò</b> quyết định quyền sửa/quản trị trong các thẻ được tick. <b>KTV:</b> nhập/sửa dữ liệu vận hành · <b>Chỉ xem:</b> chỉ đọc. Người dùng mới sẽ phải đổi mật khẩu khi đăng nhập lần đầu.</div></div>`;
 }
+let auditQ='',auditFrom='',auditTo='',auditPage=1,auditPageSize=25;
+const AUDIT_PAGE_SIZES=[25,50,100];
+function auditDateKey(a){
+  const d=new Date(a&&a.ts);
+  return Number.isFinite(+d)?isoDate(d):'';
+}
+function auditFilteredActivities(items=state.activity||[]){
+  const q=searchText(auditQ);
+  return (items||[]).filter(a=>{
+    const date=auditDateKey(a);
+    if(auditFrom&&(!date||date<auditFrom))return false;
+    if(auditTo&&(!date||date>auditTo))return false;
+    if(!q)return true;
+    return searchText([a.seq,formatDateTimeVN(a.ts),a.user,a.username,roleLabel(a.role||'viewer'),a.type,a.target,a.detail].join(' ')).includes(q);
+  }).slice().reverse();
+}
+function auditSetQuery(value){
+  auditQ=value;auditPage=1;
+  scheduleSearchRender(auditSetQuery,rerender,'auditSearch');
+}
+function auditSetDate(field,value){
+  const iso=value?(vnPickerParse(value)||parseVN(value)||''):'';
+  if(field==='from'){auditFrom=iso;if(iso&&auditTo&&iso>auditTo)auditTo=iso;}
+  else{auditTo=iso;if(iso&&auditFrom&&iso<auditFrom)auditFrom=iso;}
+  auditPage=1;rerender();
+}
+function auditSetPageSize(value){
+  const size=Number(value);auditPageSize=AUDIT_PAGE_SIZES.includes(size)?size:25;auditPage=1;rerender();
+}
+function auditSetPage(value){
+  auditPage=Math.max(1,Number(value)||1);rerender();
+}
+function auditClearFilters(){
+  auditQ='';auditFrom='';auditTo='';auditPage=1;rerender();
+}
 function pageAudit(){
   const total=(state.activity||[]).length;
   const chain=typeof auditVerifyChain==='function'?auditVerifyChain():{ok:true,checked:0,legacy:total};
   const chainHtml=chain.ok?`<span class="tag ok">Chuỗi hash hợp lệ</span> <span class="hint">${chain.checked} dòng đã khóa hash${chain.legacy?` · ${chain.legacy} dòng cũ chưa có hash`:''}</span>`:`<span class="tag rej">Audit có dấu hiệu bị sửa</span> <span class="hint">Lỗi tại dòng #${(state.activity[chain.brokenIndex]||{}).seq||chain.brokenIndex+1}: ${esc(chain.reason)}</span>`;
-  const rows=(state.activity||[]).slice().reverse().map(a=>`<tr><td><div class="audit-time-cell"><span class="audit-seq">${a.seq?'#'+a.seq:''}</span><span class="audit-time">${formatDateTimeVN(a.ts)}</span></div></td><td><b>${esc(a.user||'')}</b><div class="hint">${roleLabel(a.role||'viewer')}${a.username?' · @'+esc(a.username):''}</div></td><td><span class="pill">${esc(a.type||'')}</span></td><td>${esc(a.target||'')||'<span class="hint">—</span>'}</td><td class="audit-detail">${esc(a.detail||'')||'<span class="hint">—</span>'}</td></tr>`).join('');
+  const filtered=auditFilteredActivities(),pageCount=Math.max(1,Math.ceil(filtered.length/auditPageSize));
+  auditPage=Math.min(Math.max(1,auditPage),pageCount);
+  const offset=(auditPage-1)*auditPageSize,pageRows=filtered.slice(offset,offset+auditPageSize);
+  const rows=pageRows.map(a=>`<tr><td><div class="audit-time-cell"><span class="audit-seq">${a.seq?'#'+a.seq:''}</span><span class="audit-time">${formatDateTimeVN(a.ts)}</span></div></td><td><b>${esc(a.user||'')}</b><div class="hint">${roleLabel(a.role||'viewer')}${a.username?' · @'+esc(a.username):''}</div></td><td><span class="pill">${esc(a.type||'')}</span></td><td>${esc(a.target||'')||'<span class="hint">—</span>'}</td><td class="audit-detail">${esc(a.detail||'')||'<span class="hint">—</span>'}</td></tr>`).join('');
+  const hasFilter=!!(auditQ||auditFrom||auditTo);
+  const pageSizeOptions=AUDIT_PAGE_SIZES.map(size=>`<option value="${size}" ${size===auditPageSize?'selected':''}>${size} dòng</option>`).join('');
+  const resultFrom=filtered.length?offset+1:0,resultTo=Math.min(offset+auditPageSize,filtered.length);
+  const pagination=filtered.length?`<div class="audit-pagination"><span class="hint">Hiển thị ${resultFrom}–${resultTo} / ${filtered.length} dòng</span><div>${btn('‹ Trước',`auditSetPage(${auditPage-1})`,'ghost sm','',{disabled:auditPage<=1})}<b>Trang ${auditPage}/${pageCount}</b>${btn('Sau ›',`auditSetPage(${auditPage+1})`,'ghost sm','',{disabled:auditPage>=pageCount})}</div></div>`:'';
   return headOnly('Nhật ký hoạt động','Lưu vết các thao tác quan trọng; chỉ quản trị viên được xem')+
     `<div class="panel"><h3 role="heading" aria-level="2">Công cụ</h3><div class="row-flex">
-      ${btn('Xuất Excel nhật ký','exportActivityCSV()','teal sm')}
+      ${btn('Xuất CSV nhật ký','exportActivityCSV()','teal sm')}
       ${total?btn('Xóa nhật ký','clearActivityLog()','danger sm'):''}
       <div class="hint" style="align-self:center">${total} dòng hoạt động đã ghi nhận. ${chainHtml}</div>
     </div></div>
-    <div class="panel"><h3>Hoạt động gần đây</h3>${rows?`<table class="audit-table"><thead><tr><th>Thời gian</th><th>Người dùng</th><th>Hành động</th><th>Đối tượng</th><th>Chi tiết</th></tr></thead><tbody>${rows}</tbody></table>`:emptyState('Chưa có hoạt động','Nhật ký sẽ bắt đầu ghi từ các thao tác tiếp theo.')}</div>`;
+    <div class="panel audit-log-panel"><div class="audit-log-head"><h3 role="heading" aria-level="2">Hoạt động gần đây</h3><input id="auditSearch" type="search" aria-label="Tìm nhật ký hoạt động" placeholder="Tìm người dùng, hành động, đối tượng..." value="${escAttr(auditQ)}" oninput="auditSetQuery(this.value)"></div>
+      <div class="audit-filterbar"><div><label>Từ ngày</label>${dateBox('auditFromDate',auditFrom,'audit-date',`aria-label="Lọc nhật ký từ ngày" onchange="auditSetDate('from',this.value)"`)}</div><div><label>Đến ngày</label>${dateBox('auditToDate',auditTo,'audit-date',`aria-label="Lọc nhật ký đến ngày" onchange="auditSetDate('to',this.value)"`)}</div><div><label>Số dòng mỗi trang</label><select aria-label="Số dòng nhật ký mỗi trang" onchange="auditSetPageSize(this.value)">${pageSizeOptions}</select></div>${hasFilter?btn('Xóa bộ lọc','auditClearFilters()','ghost sm audit-clear-filter'):''}<div class="audit-filter-summary" role="status">${filtered.length}/${total} dòng</div></div>
+      ${rows?`<div class="audit-table-wrap"><table class="audit-table"><thead><tr><th>Thời gian</th><th>Người dùng</th><th>Hành động</th><th>Đối tượng</th><th>Chi tiết</th></tr></thead><tbody>${rows}</tbody></table></div>`:emptyState(total?'Không tìm thấy nhật ký':'Chưa có hoạt động',total?'Thử từ khóa hoặc khoảng ngày khác.':'Nhật ký sẽ bắt đầu ghi từ các thao tác tiếp theo.')}
+      ${pagination}</div>`;
 }
 function exportActivityCSV(){const rows=[['Seq','Thời gian','Người dùng','Tên đăng nhập','Vai trò','Hành động','Đối tượng','Chi tiết','PrevHash','Hash']];(state.activity||[]).forEach(a=>rows.push([a.seq||'',formatDateTimeVN(a.ts),a.user||'',a.username||'',roleLabel(a.role||'viewer'),a.type||'',a.target||'',a.detail||'',a.prevHash||'',a.hash||'']));downloadCSV('Nhat_ky_hoat_dong_QCLab.csv',rows);}
 /* Xóa vĩnh viễn toàn bộ nhật ký hoạt động — khác với "Xóa sạch dữ liệu test" (resetAllData)
@@ -50,6 +95,7 @@ async function clearActivityLog(){
   if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa nhật ký hoạt động',message:`Xóa vĩnh viễn toàn bộ ${count} dòng nhật ký hoạt động?`,detail:'Không thể khôi phục lại được — nên xuất Excel nhật ký trước nếu cần lưu lại.',confirmLabel:'Xóa nhật ký',cancelLabel:'Hủy'}))return;
   state.activity=[];
   logAct('Xóa nhật ký hoạt động',`Đã xóa vĩnh viễn ${count} dòng nhật ký trước đó`,'Nhật ký');
+  auditQ='';auditFrom='';auditTo='';auditPage=1;
   save({clearDerived:false});rerender();
   await infoDialog('Đã xóa nhật ký hoạt động.',{type:'success'});
 }
@@ -156,9 +202,11 @@ function reauthenticateCurrentUser({title='Xác thực lại',message='Nhập l�
     <div class="confirm-modal-h"><div class="confirm-modal-kicker">Thao tác được kiểm soát</div>${modalCloseButton('closeDialogOverlay(false)')}</div>
     <h3 class="confirm-modal-title">${esc(title)}</h3>
     <div class="confirm-modal-body"><div class="confirm-modal-icon info" aria-hidden="true">✓</div><div class="confirm-modal-text"><b>${esc(message)}</b><p>Tài khoản: ${esc(currentUser.name||currentUser.username||'')}</p></div></div>
-    <label for="reauthPassword">Mật khẩu hiện tại</label>
-    <input id="reauthPassword" type="password" autocomplete="current-password" autofocus onkeydown="if(event.key==='Enter'){event.preventDefault();confirmReauthentication()}">
-    <div id="reauthError" class="auth-err" hidden>Mật khẩu không đúng.</div>
+    <div class="reauth-modal-field">
+      <label for="reauthPassword">Mật khẩu hiện tại</label>
+      <input id="reauthPassword" type="password" autocomplete="current-password" autofocus onkeydown="if(event.key==='Enter'){event.preventDefault();confirmReauthentication()}">
+      <div id="reauthError" class="auth-err" hidden>Mật khẩu không đúng.</div>
+    </div>
     <div class="confirm-modal-actions">${btn('Hủy','closeDialogOverlay(false)','ghost')}${btn('Xác thực','confirmReauthentication()','teal')}</div>
   </div>`,resolve));
 }

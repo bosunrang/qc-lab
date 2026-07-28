@@ -45,6 +45,11 @@ jobs:
       - run: npm run visual-check
       - run: npm run a11y-audit
         if: always()
+      # nce-workflow-check lái vòng đời hồ sơ NCE trong Chromium thật: form phải sống
+      # sót qua rerender(), danh tính sự cố phải bất biến, chip QC chạy lại/quá hạn
+      # phải khớp giữa các mục. Không đưa vào `npm test` được vì cần DOM thật.
+      - run: npm run nce-check
+        if: always()
       # print-check boots the real app in Electron (print-to-PDF pipeline), so
       # it needs a display on Linux — xvfb-run provides a virtual one. The
       # Electron binary itself comes with `npm ci` above.

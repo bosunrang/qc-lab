@@ -1,4 +1,4 @@
-﻿(function(root,factory){
+(function(root,factory){
   const api=factory();
   if(typeof module==='object'&&module.exports)module.exports=api;
   root.QCCore=api;
@@ -134,7 +134,11 @@
         if(zs[i]>2&&pos.length>=1){set(i,'rej','2of3-2s');pos.forEach(k=>support(k,'2of3-2s'));}
         if(zs[i]<-2&&neg.length>=1){set(i,'rej','2of3-2s');neg.forEach(k=>support(k,'2of3-2s'));}
       }
-      if(isOn('7T')&&i>=6){let inc=true,dec=true;for(let k=i-5;k<=i;k++){const cur=Number(points[k].val),prev=Number(points[k-1].val);if(!(cur>prev))inc=false;if(!(cur<prev))dec=false;}if(inc||dec){set(i,'warn','7T');for(let k=i-6;k<i;k++)support(k,'7T');}}
+      /* 7T = 7 bước tăng/giảm liên tiếp, nên cần 8 điểm. Quét trên z để cùng
+         hệ quy chiếu với biểu đồ LJ, nhưng không được nối chuỗi qua hai target:
+         westgardByPoint gắn trendTarget theo snapshot Mean/SD của từng điểm.
+         z=NaN (thiếu target), plateau hoặc đổi target đều cắt đứt xu hướng. */
+      if(isOn('7T')&&i>=7&&sameTrendTarget(points,i-7,i)){let inc=true,dec=true;for(let k=i-6;k<=i;k++){if(!(zs[k]>zs[k-1]))inc=false;if(!(zs[k]<zs[k-1]))dec=false;}if(inc||dec){set(i,'warn','7T');for(let k=i-7;k<i;k++)support(k,'7T');}}
     }
     // 2-2s/3-1s/4-1s/6x..12x: quét "N liên tiếp cùng phía" dùng chung với multi
     wgScanRuns(zs,WG_RUN_RULES,isOn,(idx,rule)=>{const trigger=idx[idx.length-1];set(trigger,'rej',rule);idx.slice(0,-1).forEach(k=>support(k,rule));});
@@ -171,17 +175,26 @@
     return flags;
   }
 
-  function pointZ(point,fallbackMean,fallbackSd){
+  function pointTarget(point,fallbackMean,fallbackSd){
     const savedMean=Number(point&&point.qcMean),savedSd=Number(point&&point.qcSd);
     const hasSnapshot=Number.isFinite(savedMean)&&Number.isFinite(savedSd)&&savedSd>0;
     const mean=hasSnapshot?savedMean:Number(fallbackMean);
     const sd=hasSnapshot?savedSd:Number(fallbackSd);
-    return Number.isFinite(mean)&&Number.isFinite(sd)&&sd>0?(Number(point&&point.val)-mean)/sd:NaN;
+    const key=Number.isFinite(mean)&&Number.isFinite(sd)&&sd>0?mean+'\u0000'+sd:'';
+    return{mean,sd,key,z:key?(Number(point&&point.val)-mean)/sd:NaN};
+  }
+  function pointZ(point,fallbackMean,fallbackSd){
+    return pointTarget(point,fallbackMean,fallbackSd).z;
+  }
+  function sameTrendTarget(points,start,end){
+    const first=points&&points[start]&&points[start].trendTarget;
+    for(let i=start+1;i<=end;i++)if((points[i]&&points[i].trendTarget)!==first)return false;
+    return true;
   }
 
   /** @param {(rule:string)=>boolean} [isOn] */
   function westgardByPoint(points,mean,sd,isOn=()=>true){
-    const normalized=(points||[]).map(p=>({val:pointZ(p,mean,sd)}));
+    const normalized=(points||[]).map(p=>{const target=pointTarget(p,mean,sd);return{val:target.z,trendTarget:target.key};});
     return westgard(normalized,0,1,isOn);
   }
 
@@ -190,8 +203,8 @@
      bảng verdict trung gian và không quét lại các cửa sổ không thể chứa điểm
      cuối. Dùng khi lần lượt chọn điểm QC được chấp nhận theo lần chạy. */
   /** @param {(rule:string)=>boolean} [isOn] */
-  function westgardLatestRulesFromZ(values,isOn=()=>true){
-    const source=values||[],start=Math.max(0,source.length-12),zs=source.slice(start);
+  function westgardLatestRulesFromZ(values,isOn=()=>true,trendTargets=null){
+    const source=values||[],start=Math.max(0,source.length-12),zs=source.slice(start),targets=Array.isArray(trendTargets)?trendTargets.slice(start):null;
     if(!zs.length)return[];
     const i=zs.length-1,z=zs[i],rules=[],add=rule=>{if(!rules.includes(rule))rules.push(rule);};
     const abs=Math.abs(z);
@@ -201,9 +214,9 @@
       const a=zs[i-2],b=zs[i-1];
       if(z>2&&(a>2||b>2))add('2of3-2s');else if(z<-2&&(a<-2||b<-2))add('2of3-2s');
     }
-    if(isOn('7T')&&i>=6){
+    if(isOn('7T')&&i>=7&&(!targets||targets.slice(i-7,i+1).every(key=>key===targets[i]))){
       let inc=true,dec=true;
-      for(let k=i-5;k<=i;k++){if(!(zs[k]>zs[k-1]))inc=false;if(!(zs[k]<zs[k-1]))dec=false;}
+      for(let k=i-6;k<=i;k++){if(!(zs[k]>zs[k-1]))inc=false;if(!(zs[k]<zs[k-1]))dec=false;}
       if(inc||dec)add('7T');
     }
     WG_RUN_RULES.forEach(([rule,n,pos,neg])=>{
@@ -217,9 +230,9 @@
 
   /** @param {(rule:string)=>boolean} [isOn] */
   function westgardLatestRules(points,mean,sd,isOn=()=>true){
-    const rows=points||[],start=Math.max(0,rows.length-12),zs=[];
-    for(let i=start;i<rows.length;i++)zs.push(pointZ(rows[i],mean,sd));
-    return westgardLatestRulesFromZ(zs,isOn);
+    const rows=points||[],start=Math.max(0,rows.length-12),zs=[],targets=[];
+    for(let i=start;i<rows.length;i++){const target=pointTarget(rows[i],mean,sd);zs.push(target.z);targets.push(target.key);}
+    return westgardLatestRulesFromZ(zs,isOn,targets);
   }
 
   /** @param {(rule:string)=>boolean} [isOn] */
@@ -423,9 +436,9 @@
       const val=Number(p.val),date=cleanDate(p.date);
       if(!Number.isFinite(val)||!date)return null; /* loại điểm hỏng (val không phải số / ngày sai) thay vì ép về 0 */
       const qm=Number(p.qcMean),qs=Number(p.qcSd),snap=Number.isFinite(qm)&&Number.isFinite(qs)&&qs>0; /* snapshot Mean/SD chỉ giữ khi trọn vẹn */
-      return{...p,id:cleanId(p.id),date,runId:cleanText(p.runId,120),lot:cleanText(p.lot),level:finiteNumber(p.level,1),val,qcMean:snap?qm:0,qcSd:snap?qs:0,note:cleanText(p.note,LONG_TEXT_LIMIT),operatorId:cleanId(p.operatorId),operatorUsername:cleanText(p.operatorUsername,80).trim().toLowerCase(),operatorName:cleanText(p.operatorName,120),operatorCode:cleanText(p.operatorCode,12).toUpperCase(),voided:!!p.voided,voidReason:cleanText(p.voidReason,LONG_TEXT_LIMIT),voidedAt:cleanText(p.voidedAt,40),voidedBy:cleanText(p.voidedBy,120)};
+      return{...p,id:cleanId(p.id),date,runId:cleanText(p.runId,120),lot:cleanText(p.lot),level:finiteNumber(p.level,1),val,qcMean:snap?qm:0,qcSd:snap?qs:0,note:cleanText(p.note,LONG_TEXT_LIMIT),operatorId:cleanId(p.operatorId),operatorUsername:cleanText(p.operatorUsername,80).trim().toLowerCase(),operatorName:cleanText(p.operatorName,120),operatorCode:cleanText(p.operatorCode,12).toUpperCase(),voided:!!p.voided,voidReason:cleanText(p.voidReason,LONG_TEXT_LIMIT),voidKind:['data-entry','analytical','other'].includes(p.voidKind)?p.voidKind:'',voidRequiresRerun:p.voidRequiresRerun==null?undefined:!!p.voidRequiresRerun,voidedAt:cleanText(p.voidedAt,40),voidedBy:cleanText(p.voidedBy,120)};
     }).filter(Boolean)]));
-    source.actions=(source.actions||[]).slice(-100000).map(a=>({...a,id:cleanId(a.id)||undefined,date:cleanDate(a.date),createdAt:cleanText(a.createdAt,40),createdByUserId:cleanId(a.createdByUserId),createdByUsername:cleanText(a.createdByUsername,80).trim().toLowerCase(),testId:cleanId(a.testId),level:finiteNumber(a.level,0),lot:cleanText(a.lot),pointId:cleanId(a.pointId),rule:cleanText(a.rule),errorType:cleanText(a.errorType),action:cleanText(a.action,LONG_TEXT_LIMIT),by:cleanText(a.by),approvalStatus:['pending','approved','returned'].includes(a.approvalStatus)?a.approvalStatus:'pending',approvedAt:cleanText(a.approvedAt,40),approvedBy:cleanText(a.approvedBy,120),approvalNote:cleanText(a.approvalNote,LONG_TEXT_LIMIT),autoCreated:!!a.autoCreated})).filter(a=>!a.autoCreated&&a.rule!=='Cập nhật Mean/SD');
+    source.actions=(source.actions||[]).slice(-100000).map(a=>({...a,id:cleanId(a.id)||undefined,date:cleanDate(a.date),createdAt:cleanText(a.createdAt,40),createdByUserId:cleanId(a.createdByUserId),createdByUsername:cleanText(a.createdByUsername,80).trim().toLowerCase(),testId:cleanId(a.testId),level:finiteNumber(a.level,0),lot:cleanText(a.lot),pointId:cleanId(a.pointId),rule:cleanText(a.rule),errorType:cleanText(a.errorType),qcVerdict:['warn','rej','invalid'].includes(a.qcVerdict)?a.qcVerdict:'',action:cleanText(a.action,LONG_TEXT_LIMIT),by:cleanText(a.by),protocolVersion:[1,2].includes(+a.protocolVersion)?+a.protocolVersion:0,nceId:cleanText(a.nceId,40),parentNceId:cleanText(a.parentNceId,40),followUpNceId:cleanText(a.followUpNceId,40),eventSource:['iqc','eqa','instrument','clinical','audit','other'].includes(a.eventSource)?a.eventSource:'',processPhase:['pre','exam','post'].includes(a.processPhase)?a.processPhase:'',correction:cleanText(a.correction,LONG_TEXT_LIMIT),dueDate:cleanDate(a.dueDate),riskSeverity:Math.min(5,Math.max(0,Math.floor(finiteNumber(a.riskSeverity,0)))),riskOccurrence:Math.min(5,Math.max(0,Math.floor(finiteNumber(a.riskOccurrence,0)))),riskDetectability:Math.min(5,Math.max(0,Math.floor(finiteNumber(a.riskDetectability,0)))),riskLevel:['low','medium','high','critical'].includes(a.riskLevel)?a.riskLevel:'',containmentStatus:['held','none'].includes(a.containmentStatus)?a.containmentStatus:'',containmentNote:cleanText(a.containmentNote,LONG_TEXT_LIMIT),qcMaterialStatus:['ok','abnormal','na'].includes(a.qcMaterialStatus)?a.qcMaterialStatus:'',qcMaterialNote:cleanText(a.qcMaterialNote,LONG_TEXT_LIMIT),instrumentStatus:['ok','abnormal','na'].includes(a.instrumentStatus)?a.instrumentStatus:'',instrumentNote:cleanText(a.instrumentNote,LONG_TEXT_LIMIT),reagentStatus:['ok','abnormal','na'].includes(a.reagentStatus)?a.reagentStatus:'',reagentNote:cleanText(a.reagentNote,LONG_TEXT_LIMIT),calibrationStatus:['ok','abnormal','na'].includes(a.calibrationStatus)?a.calibrationStatus:'',calibrationNote:cleanText(a.calibrationNote,LONG_TEXT_LIMIT),lotToLotStatus:['not-needed','checked-ok','checked-abnormal'].includes(a.lotToLotStatus)?a.lotToLotStatus:'',lotToLotNote:cleanText(a.lotToLotNote,LONG_TEXT_LIMIT),causeCategory:['qc','operator','instrument','reagent','calibration','environment','unknown'].includes(a.causeCategory)?a.causeCategory:'',cause:cleanText(a.cause,LONG_TEXT_LIMIT),patientImpact:['none','held','affected'].includes(a.patientImpact)?a.patientImpact:'',patientAction:cleanText(a.patientAction,LONG_TEXT_LIMIT),effectivenessStatus:['pending','effective','ineffective'].includes(a.effectivenessStatus)?a.effectivenessStatus:'pending',effectivenessDate:cleanDate(a.effectivenessDate),effectivenessNote:cleanText(a.effectivenessNote,LONG_TEXT_LIMIT),effectivenessBy:cleanText(a.effectivenessBy,120),effectivenessAt:cleanText(a.effectivenessAt,40),approvalStatus:['pending','approved','returned'].includes(a.approvalStatus)?a.approvalStatus:'pending',approvedAt:cleanText(a.approvedAt,40),approvedBy:cleanText(a.approvedBy,120),approvalNote:cleanText(a.approvalNote,LONG_TEXT_LIMIT),returnNote:cleanText(a.returnNote,LONG_TEXT_LIMIT),returnBy:cleanText(a.returnBy,120),returnAt:cleanText(a.returnAt,40),autoCreated:!!a.autoCreated})).filter(a=>!a.autoCreated&&a.rule!=='Cập nhật Mean/SD');
     source.activity=(source.activity||[]).map(a=>({...a,id:cleanId(a.id),seq:finiteNumber(a.seq,0),ts:cleanText(a.ts,40),user:cleanText(a.user),username:cleanText(a.username,80),userId:cleanId(a.userId),role:cleanRole(a.role),type:cleanText(a.type),detail:cleanText(a.detail,LONG_TEXT_LIMIT),target:cleanText(a.target),clientId:cleanText(a.clientId,80),prevHash:cleanText(a.prevHash,80),hash:cleanText(a.hash,80)}));
     source.users=(source.users||[]).slice(0,1000).map(u=>({...u,id:cleanId(u.id),username:cleanText(u.username,80).trim().toLowerCase(),name:cleanText(u.name),initials:cleanText(u.initials,12).toUpperCase(),externalCode:cleanText(u.externalCode,40),role:cleanRole(u.role),pagePerms:Array.isArray(u.pagePerms)?[...new Set(u.pagePerms.map(cleanId).filter(id=>PAGE_SET.has(id)))]:null,passHash:cleanText(u.passHash,500),active:u.active!==false,mustChangePassword:!!u.mustChangePassword}));
     source.reagentTests=(source.reagentTests||[]).slice(0,5000).map(d=>{const{reviewStatus:_rs,reviewedBy:_rb,reviewedAt:_ra,reviewNote:_rn,...tRest}=(d.test||{});return{...d,id:cleanId(d.id),test:{...tRest,reagent:cleanText(d.test&&d.test.reagent),lotOld:cleanText(d.test&&d.test.lotOld),lotNew:cleanText(d.test&&d.test.lotNew),date:cleanDate(d.test&&d.test.date),operator:cleanText(d.test&&d.test.operator),sampleType:cleanText(d.test&&d.test.sampleType),unit:cleanText(d.test&&d.test.unit),biasTarget:finiteNumber(d.test&&d.test.biasTarget,6),alpha:finiteNumber(d.test&&d.test.alpha,.05),coverageConfirmed:!!(d.test&&d.test.coverageConfirmed)},rows:(d.rows||[]).slice(0,10000).map(r=>[numericCell(r&&r[0]),numericCell(r&&r[1])])};});
@@ -467,7 +480,7 @@
     '9x':'9 điểm liên tiếp nằm cùng một phía so với Mean',
     '10x':'10 điểm liên tiếp nằm cùng một phía so với Mean',
     '12x':'12 điểm liên tiếp nằm cùng một phía so với Mean',
-    '7T':'7 điểm tăng dần hoặc giảm dần liên tiếp'
+    '7T':'7 lần tăng dần hoặc giảm dần liên tiếp (8 điểm QC)'
   };
   function primaryErrorRule(rules){const priority=['1-3s','R4s','2-2s','2of3-2s','3-1s','4-1s','6x','8x','9x','10x','12x','7T','1-2s'];return priority.find(r=>(rules||[]).includes(r))||((rules||[])[0]||'');}
   function errorType(rules){rules=rules||[];if(rules.some(r=>WG_SE_RULES.includes(r)))return'SE — Sai số hệ thống';if(rules.some(r=>WG_RE_RULES.includes(r)))return'RE — Sai số ngẫu nhiên';return'—';}

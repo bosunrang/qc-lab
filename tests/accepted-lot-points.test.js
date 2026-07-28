@@ -37,6 +37,28 @@ function baseState(points) {
   assert.ok(!actual.includes('rejected'), 'a rejected run must not contribute to accepted statistics');
 }
 
+{ // 7T cấu hình "Loại": fast path chọn điểm phải reset khi Mean/SD snapshot đổi.
+  const makePoint = (i, val, qcMean, qcSd = 10) => ({
+    id: 'trend' + i, date: `2026-07-${String(i + 1).padStart(2, '0')}`,
+    runId: `2026-07-${String(i + 1).padStart(2, '0')}-1`, level: 1, lot: 'L1', val, qcMean, qcSd,
+  });
+  const changedTarget = [
+    makePoint(0,100,100), makePoint(1,101,100), makePoint(2,102,100),
+    makePoint(3,203,200), makePoint(4,204,200), makePoint(5,205,200), makePoint(6,206,200), makePoint(7,207,200),
+  ];
+  const changedState = baseState(changedTarget);
+  changedState.westgardRules['7T'] = true;
+  changedState.tests[0].ruleActions = { '7T': 'reject' };
+  ctx.__setState(changedState);
+  assert.equal(ctx.acceptedLotPoints(ctx.__getState().tests[0], 1).length, 8, 'đổi target phải reset 7T, không loại điểm thứ 8');
+
+  const stableState = baseState(Array.from({ length: 8 }, (_, i) => makePoint(i,100+i,100)));
+  stableState.westgardRules['7T'] = true;
+  stableState.tests[0].ruleActions = { '7T': 'reject' };
+  ctx.__setState(stableState);
+  assert.deepEqual(plain(ctx.acceptedLotPoints(ctx.__getState().tests[0], 1).map(point => point.id)), ['trend0','trend1','trend2','trend3','trend4','trend5','trend6'], 'target ổn định phải loại điểm thứ 8 khi đủ 7 bước trend');
+}
+
 {
   const running = baseState([]);
   ctx.__setState(running);

@@ -12,11 +12,19 @@
 }
 
 .wg-test-picker{
-  display:grid; grid-template-columns:minmax(240px,1fr) minmax(300px,1.15fr); gap:12px; align-items:end; margin:14px 16px 0; max-width:760px;
+  display:grid; grid-template-columns:minmax(240px,1fr) minmax(300px,1.15fr); gap:12px; align-items:end; margin:var(--panel-content-gap) 16px 0; max-width:760px;
 }
 
 .wg-test-picker label{
   margin-top:0;
+}
+
+.wg-panel-intro{
+  margin:var(--panel-content-gap) 16px 8px;
+}
+
+.wg-target-warning{
+  margin:var(--panel-content-gap) 16px 0;
 }
 
 .wg-test-picker.wg-test-picker-3{
