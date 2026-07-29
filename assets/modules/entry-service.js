@@ -156,16 +156,19 @@
     p.voidedAt=nowIso;
     p.voidedBy=staff.operatorName||staff.operatorUsername||'';
     state.actions=state.actions||[];
-    const existing=[...state.actions].reverse().find(a=>a.pointId===p.id&&+a.protocolVersion>=2&&(a.approvalStatus||'pending')!=='approved');
+    const existing=[...state.actions].reverse().find(a=>a.pointId===p.id&&+a.protocolVersion>=2&&a.recordStatus!=='cancelled'&&(a.approvalStatus||'pending')!=='approved');
     let action=existing||null;
     if(openNce&&!action)action={
       id,
-      protocolVersion:2,
+      protocolVersion:3,
       nceId,
       date:today,
       createdAt:nowIso,
+      updatedAt:nowIso,
       createdByUserId:staff.operatorId||'',
       createdByUsername:staff.operatorUsername||'',
+      contentEditorUserIds:[staff.operatorId||''].filter(Boolean),
+      contentEditorUsernames:[String(staff.operatorUsername||'').trim().toLowerCase()].filter(Boolean),
       testId:tid,
       level:p.level,
       lot:p.lot||'',
@@ -181,6 +184,7 @@
       containmentStatus:'',
       effectivenessStatus:'pending',
       approvalStatus:'pending',
+      recordStatus:'active',
       approvedAt:'',
       approvedBy:'',
       approvalNote:''

@@ -134,7 +134,7 @@ async function checkSectionsStartCollapsed(page) {
       summaries: [...body.querySelectorAll('summary .action-chip')].map(c => c.textContent),
     };
   });
-  check('Hồ sơ mới: mục 2–8 thu gọn sẵn', shape.collapsed === shape.total && shape.total === 5, JSON.stringify(shape));
+  check('Hồ sơ mới: mục 2–8 thu gọn sẵn', shape.collapsed === shape.total - 1 && shape.total === 6, JSON.stringify(shape));
   check('Phần tối thiểu (mục 1) vẫn mở sẵn', shape.correctionVisible === true);
   check('Mục điều tra được giấu cho tới khi cần', shape.causeVisible === false);
   // Ngưỡng tương đối, tự hiệu chỉnh: so chính form này lúc thu gọn với lúc bung hết,
@@ -169,6 +169,11 @@ async function checkSuggestionChips(page) {
   check('Chip nguyên nhân đổi theo nhóm đã chọn',
     chips.length > 0 && chips.some(c => /kim hút|điện cực|buồng ủ/i.test(c)), JSON.stringify(chips));
 
+  check('Gợi ý nhập mặc định được thu gọn',
+    await page.evaluate(() => !document.querySelector('#sugg-aCause').closest('details').open));
+  await page.click('details.action-suggestions:has(#sugg-aCause) > summary');
+  check('Bấm tiêu đề thì mở được gợi ý',
+    await page.evaluate(() => document.querySelector('#sugg-aCause').closest('details').open));
   await page.click('#sugg-aCause .sugg-chip');
   const first = await page.evaluate(() => document.getElementById('aCause').value);
   check('Bấm chip là chèn câu vào ô', first.length > 5, first);
@@ -211,6 +216,51 @@ async function checkPickersReplaceTyping(page) {
     ['1-2s', '1-3s', '2-2s', 'R4s', '10x'].every(r => out.ruleOptions.includes(r)), JSON.stringify(out.ruleOptions));
   check('Người phụ trách có danh sách nhân viên',
     out.byHasList === true && out.staffNames.length > 0, JSON.stringify(out.staffNames));
+}
+
+async function checkSectionChipsRefreshWhileTyping(page) {
+  await page.evaluate(() => { closeActionForm(); beginActionManual(); });
+  await page.waitForSelector('#aCorrection');
+  await openAllSections(page);
+  const chip = key => page.locator(`details[data-action-section="${key}"] .action-chip`);
+
+  check('Chip xử lý tức thời ban đầu báo đúng hai mục còn thiếu', /Còn thiếu 2 mục/.test(await chip('immediate').innerText()));
+  await page.selectOption('#aContainment', 'held');
+  check('Chọn giữ kết quả thì ghi chú phạm vi trở thành bắt buộc', /Còn thiếu 2 mục/.test(await chip('immediate').innerText()));
+  await page.fill('#aCorrection', 'Dừng trả kết quả và cô lập lô QC');
+  const immediateNeedsNote = { text: await chip('immediate').innerText(), title: await chip('immediate').getAttribute('title') };
+  check('Chip xử lý tức thời còn thiếu đúng ghi chú phạm vi',
+    /Còn thiếu 1 mục/.test(immediateNeedsNote.text) && /ghi chú phạm vi/i.test(immediateNeedsNote.title || ''), JSON.stringify(immediateNeedsNote));
+  await page.fill('#aContainmentNote', 'Giữ kết quả từ 08:00 đến khi QC đạt');
+  check('Chip xử lý tức thời đổi sang đã xong ngay khi nhập đủ ba ô', /Đã xong/.test(await chip('immediate').innerText()));
+
+  check('Chip nguy cơ ban đầu báo đúng số mục còn thiếu', /Còn thiếu 1 mục/.test(await chip('risk').innerText()));
+  await page.selectOption('#aRiskSeverity', '4');
+  await page.selectOption('#aRiskOccurrence', '2');
+  await page.selectOption('#aRiskDetectability', '3');
+  await page.selectOption('#aRiskLevel', 'high');
+  check('Phân loại nguy cơ còn thiếu căn cứ SOP', /Còn thiếu 1 mục/.test(await chip('risk').innerText()));
+  await page.fill('#aRiskBasis', 'SOP-QC-07, ma trận nguy cơ bảng 3');
+  check('Chip nguy cơ đổi ngay khi có đủ điểm và căn cứ SOP', /Đã xong/.test(await chip('risk').innerText()));
+
+  check('Chip nguyên nhân ban đầu tính cả cổng cho phép trở lại', /Còn thiếu 3 mục/.test(await chip('cause').innerText()));
+  await page.selectOption('#aCauseCategory', 'instrument');
+  await page.fill('#aCause', 'Kim hút bẩn làm sai thể tích hút');
+  await page.fill('#aAct', 'Vệ sinh kim hút và cập nhật lịch bảo trì');
+  const causeNeedsDate = { text: await chip('cause').innerText(), title: await chip('cause').getAttribute('title') };
+  check('Chip nguyên nhân còn ngày hoàn thành và quyết định cho phép trở lại',
+    /Còn thiếu 2 mục/.test(causeNeedsDate.text) && /ngày hoàn thành/i.test(causeNeedsDate.title || '') && /quyết định cho phép/i.test(causeNeedsDate.title || ''), JSON.stringify(causeNeedsDate));
+  await page.fill('#aActionCompletedDate', '29/07/2026');
+  check('Sau ngày hoàn thành, cổng cho phép trở lại vẫn còn thiếu', /Còn thiếu 1 mục/.test(await chip('cause').innerText()));
+  await page.selectOption('#aReleaseStatus', 'released');
+  await page.fill('#aReleaseDate', '29/07/2026');
+  await page.fill('#aReleaseBy', 'Quản trị viên');
+  await page.fill('#aReleaseNote', 'Đã xác nhận điều kiện hoạt động an toàn');
+  check('Chip nguyên nhân đổi sang đã xong khi đủ quyết định cho phép trở lại', /Đã xong/.test(await chip('cause').innerText()));
+
+  await page.selectOption('#aPatientImpact', 'none');
+  check('Chip ảnh hưởng bệnh nhân đổi ngay khi chọn kết luận', /Đã xong/.test(await chip('patient').innerText()));
+  await page.evaluate(() => closeActionForm());
 }
 
 async function checkNewRecordDraftSurvivesRerender(page) {
@@ -327,6 +377,7 @@ async function checkOverdueAndEscalation(page) {
     const blocked = actionEffectivenessStatus(a);
     const canEscalate = actionCanEscalate(a);
     a.followUpNceId = 'NCE-TIEP-THEO';
+    state.actions.push({ id: 'FOLLOW-UP', nceId: 'NCE-TIEP-THEO', parentNceId: a.nceId, recordStatus: 'active' });
     const escalated = actionEffectivenessStatus(a);
     return {
       overdue: overdue.overdue, overdueChip: chips.some(c => /Quá hạn/.test(c)),
@@ -494,6 +545,7 @@ async function checkOverdueReachesDashboard(page) {
     await checkSectionsStartCollapsed(session.page);
     await checkSuggestionChips(session.page);
     await checkPickersReplaceTyping(session.page);
+    await checkSectionChipsRefreshWhileTyping(session.page);
     await checkNewRecordDraftSurvivesRerender(session.page);
     await checkMissingFieldIsPinpointed(session.page);
     await checkRerunChipOnBothSurfaces(session.page);

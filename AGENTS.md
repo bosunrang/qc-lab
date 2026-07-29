@@ -158,7 +158,11 @@ it runs under `xvfb-run`, see the CI job):
   a fixed picker for "root cause" would make every NCE record read identically and
   prove nothing under an ISO 15189 review, which is the same reason the void reason
   keeps a free-text note. Chips for cause/corrective action are context-driven by
-  `causeCategory` and the SE/RE split that `fixHint()` already owns.
+  `causeCategory` and the SE/RE split that `fixHint()` already owns. Protocol-v3
+  records additionally require a traceable SOP basis for the initial risk,
+  an explicit release-to-service decision after held results, and a residual-risk
+  reassessment before an "effective" conclusion; these fields are retained by
+  backup sanitization and the full NCE audit CSV.
 - `scripts/nce-workflow-check.js` (`npm run nce-check`) drives the NCE record
   lifecycle on the "Khắc phục sự cố" page in real Chromium, because every bug it
   guards only appears once the form is rendered *and re-rendered*: the edit/new
@@ -283,7 +287,7 @@ the Google Fonts link, offline labs must print with correct metrics.
 - `core.js` — pure domain math, UMD (see above). Also
   `validateStateInvariants()`, run at every load/merge/import gateway
   (`state-storage.js`, `firebase-sync.js`, `backup-service.js`), and
-  `STATE_SCHEMA_VERSION` (currently 4). Holds the pure error-classification
+  `STATE_SCHEMA_VERSION` (currently 5). Holds the pure error-classification
   helpers too (`errorType`, `primaryErrorRule`, `fixHint`,
   `WG_RULE_DESCRIPTIONS`); `qc-domain.js` re-exports them under the same global
   names for the UI.
@@ -366,12 +370,16 @@ the Google Fonts link, offline labs must print with correct metrics.
   (`action-workflow-service.js` actually loads a bit later, after the
   `*-ui-state.js` files.)
   `action-workflow-service.js` owns the corrective-action lifecycle:
-  `approvalStatus` is `pending`/`approved`/`returned`, and
+  `approvalStatus` is `pending`/`approved`/`returned`; physical deletion has been
+  replaced by `recordStatus='cancelled'` plus a reason/actor/timestamp. The service
+  ignores cancelled records when deciding whether a QC point has a real NCE, and
   `actionWorkflowStatus()` only reports an action complete when its rerun
-  requirement is met *and* it is approved. Approval is deliberately
+  requirement, release-to-service gate, effectiveness/residual-risk review and
+  independent approval are all met. Approval is deliberately
   independent — `actionCanApprove()` refuses the action's own author, matching
-  on `createdByUserId`, then `createdByUsername`, then the free-text `by`
-  field — and approved actions can no longer be deleted.
+  both the creator and later content editors by stable user ID/username, with the
+  free-text `by` field as the legacy fallback — and approved actions cannot be
+  cancelled or edited.
   `SigmaCohortService` builds period/level cohorts directly from raw QC data,
   split by lot; Sigma precision imports must not reuse `acceptedLotPoints()`
   because that display/operational helper selects one acceptable rerun per day.

@@ -203,7 +203,7 @@ const plain = v => JSON.parse(JSON.stringify(v));
   }));
   assert.equal(result.point.voidRequiresRerun, true);
   assert.equal(state.actions.length, 1);
-  assert.equal(state.actions[0].protocolVersion, 2);
+  assert.equal(state.actions[0].protocolVersion, 3);
   assert.equal(state.actions[0].nceId, 'NCE-20260711-A001');
   assert.equal(state.actions[0].eventSource, 'iqc');
   assert.equal(state.actions[0].rule, '1-3s');
@@ -219,6 +219,16 @@ const plain = v => JSON.parse(JSON.stringify(v));
   assert.equal(state.actions.length,1,'không tạo NCE trùng khi điểm đã có hồ sơ đang mở');
   assert.equal(result.reusedAction,true);
   assert.equal(result.action.id,'nce1');
+}
+
+{
+  const cancelled={id:'nce-cu',protocolVersion:3,nceId:'NCE-DA-HUY',pointId:'p1',approvalStatus:'pending',recordStatus:'cancelled'};
+  const state={tests:[{id:'T1'}],data:{T1:[{id:'p1',date:'2026-07-01',runId:'1',level:1,lot:'L1',val:14}]},actions:[cancelled]};
+  const result=plain(ctx.EntryService.voidPoint(state,{tid:'T1',pointId:'p1',reason:'Máy báo lỗi khi chạy QC',kind:'analytical',openNce:true,staff:{operatorName:'KTV A'},nowIso:'2026-07-11T00:00:00.000Z',today:'2026-07-11',id:'nce-moi',nceId:'NCE-MOI',formatDate:s=>s,formatNumber:n=>String(n)}));
+  assert.equal(state.actions.length,2,'hồ sơ đã hủy chỉ là lịch sử, không được tái sử dụng cho sự cố mới');
+  assert.equal(result.reusedAction,false);
+  assert.equal(result.action.id,'nce-moi');
+  assert.equal(result.action.recordStatus,'active');
 }
 
 {

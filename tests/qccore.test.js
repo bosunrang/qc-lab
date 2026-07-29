@@ -408,25 +408,42 @@ function close(actual, expected, epsilon = 1e-9) {
 }
 
 {
-  const cleaned=QCCore.sanitizeBackup({lab:{},tests:[],data:{},activity:[],users:[],actions:[{id:'NCE1',protocolVersion:2,nceId:'NCE-20260727-A001',eventSource:'iqc',processPhase:'exam',correction:'Dừng trả kết quả',dueDate:'2026-07-30',qcVerdict:'rej',riskSeverity:7,riskOccurrence:2,riskDetectability:1,riskLevel:'high',effectivenessStatus:'effective',effectivenessDate:'2026-07-31',effectivenessNote:'Không tái diễn',effectivenessBy:'QO'}]});
+  const cleaned=QCCore.sanitizeBackup({lab:{},tests:[],data:{},activity:[],users:[],actions:[{id:'NCE1',protocolVersion:3,nceId:'NCE-20260727-A001',eventSource:'iqc',processPhase:'exam',correction:'Dừng trả kết quả',dueDate:'2026-07-30',updatedAt:'2026-07-28T01:00:00.000Z',contentEditorUserIds:['u1','u1',''],contentEditorUsernames:['Admin','admin',''],qcVerdict:'rej',riskSeverity:7,riskOccurrence:2,riskDetectability:1,riskLevel:'high',riskBasis:'SOP-QC-07, bảng 3',actionCompletedDate:'2026-07-30',releaseStatus:'released',releaseDate:'2026-07-30',releaseBy:'Phụ trách khoa',releaseNote:'QC đã được chấp nhận',effectivenessStatus:'effective',effectivenessDate:'2026-07-31',effectivenessNote:'Không tái diễn',residualSeverity:3,residualOccurrence:1,residualDetectability:2,residualRiskLevel:'low',residualRiskBasis:'Đánh giá lại theo SOP-QC-07',effectivenessBy:'QO'}]});
   const action=cleaned.actions[0];
-  assert.equal(action.protocolVersion,2);
+  assert.equal(action.protocolVersion,3);
+  assert.deepEqual(action.contentEditorUserIds,['u1']);
+  assert.deepEqual(action.contentEditorUsernames,['admin']);
+  assert.equal(action.actionCompletedDate,'2026-07-30');
+  assert.equal(action.releaseStatus,'released');
+  assert.equal(action.releaseDate,'2026-07-30');
+  assert.equal(action.releaseBy,'Phụ trách khoa');
+  assert.equal(action.releaseNote,'QC đã được chấp nhận');
+  assert.equal(action.residualSeverity,3);
+  assert.equal(action.residualOccurrence,1);
+  assert.equal(action.residualDetectability,2);
+  assert.equal(action.residualRiskLevel,'low');
+  assert.equal(action.residualRiskBasis,'Đánh giá lại theo SOP-QC-07');
   assert.equal(action.nceId,'NCE-20260727-A001');
   assert.equal(action.qcVerdict,'rej');
   assert.equal(action.riskSeverity,5,'risk score components are clamped to the 1–5 scale');
+  assert.equal(action.riskBasis,'SOP-QC-07, bảng 3');
   assert.equal(action.effectivenessStatus,'effective');
 }
 
 {
   // Chuỗi escalate và lý do trả lại phải sống sót qua backup/đồng bộ, nếu không
   // actionEffectivenessStatus() sẽ khoá lại hồ sơ đã chuyển và lý do trả lại biến mất.
-  const cleaned=QCCore.sanitizeBackup({lab:{},tests:[],data:{},activity:[],users:[],actions:[{id:'N1',protocolVersion:2,nceId:'NCE-B',parentNceId:'NCE-A',followUpNceId:'NCE-C',returnNote:'Thiếu bằng chứng hiệu chuẩn',returnBy:'Quản trị',returnAt:'2026-07-27T02:00:00.000Z'}]});
+  const cleaned=QCCore.sanitizeBackup({lab:{},tests:[],data:{},activity:[],users:[],actions:[{id:'N1',protocolVersion:2,nceId:'NCE-B',parentNceId:'NCE-A',followUpNceId:'NCE-C',returnNote:'Thiếu bằng chứng hiệu chuẩn',returnBy:'Quản trị',returnAt:'2026-07-27T02:00:00.000Z',recordStatus:'cancelled',cancelReason:'Mở nhầm hồ sơ',cancelledBy:'Quản trị',cancelledAt:'2026-07-29T02:00:00.000Z'}]});
   const action=cleaned.actions[0];
   assert.equal(action.parentNceId,'NCE-A');
   assert.equal(action.followUpNceId,'NCE-C');
   assert.equal(action.returnNote,'Thiếu bằng chứng hiệu chuẩn');
   assert.equal(action.returnBy,'Quản trị');
   assert.equal(action.returnAt,'2026-07-27T02:00:00.000Z');
+  assert.equal(action.recordStatus,'cancelled');
+  assert.equal(action.cancelReason,'Mở nhầm hồ sơ');
+  assert.equal(action.cancelledBy,'Quản trị');
+  assert.equal(action.cancelledAt,'2026-07-29T02:00:00.000Z');
 }
 
 {

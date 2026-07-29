@@ -14,9 +14,10 @@
   const SOURCE_LABELS={iqc:'Nội kiểm IQC',eqa:'Ngoại kiểm EQA',instrument:'Cảnh báo thiết bị',clinical:'Phản hồi lâm sàng',audit:'Đánh giá / audit',other:'Nguồn khác'};
   const PHASE_LABELS={pre:'Trước xét nghiệm',exam:'Trong xét nghiệm',post:'Sau xét nghiệm'};
   const RISK_LABELS={low:'Thấp',medium:'Trung bình',high:'Cao',critical:'Nghiêm trọng'};
+  const RELEASE_LABELS={released:'Đã cho phép hoạt động/trả kết quả trở lại'};
   /* Một nguồn nhãn duy nhất cho cả service (tóm tắt/xuất file) lẫn UI trang Actions —
      trước đây actionDetailCheck()/viewActionDetail() chép lại y hệt các map này. */
-  const ACTION_LABELS={check:CHECK_LABELS,containment:CONTAINMENT_LABELS,patient:PATIENT_LABELS,cause:CAUSE_LABELS,source:SOURCE_LABELS,phase:PHASE_LABELS,risk:RISK_LABELS};
+  const ACTION_LABELS={check:CHECK_LABELS,containment:CONTAINMENT_LABELS,patient:PATIENT_LABELS,cause:CAUSE_LABELS,source:SOURCE_LABELS,phase:PHASE_LABELS,risk:RISK_LABELS,release:RELEASE_LABELS};
   /* Cấp mã NCE và hạn xử lý mặc định: dùng chung cho trang Actions (mở hồ sơ thủ công)
      và entry-routes (hủy điểm QC tự mở hồ sơ) để hai luồng không sinh mã theo hai kiểu. */
   function nextNceId(today){
@@ -30,7 +31,14 @@
   function actionApprovalStatus(a){
     return(a&&['pending','approved','returned'].includes(a.approvalStatus))?a.approvalStatus:'pending';
   }
+  function actionRecordStatus(a){
+    return a&&a.recordStatus==='cancelled'?'cancelled':'active';
+  }
+  function actionCancelled(a){
+    return actionRecordStatus(a)==='cancelled';
+  }
   function actionApprovalLabel(a){
+    if(actionCancelled(a))return'Đã hủy hồ sơ';
     const s=actionApprovalStatus(a);
     return s==='approved'?'Đã duyệt':s==='returned'?'Trả lại':'Chờ duyệt';
   }
@@ -44,6 +52,7 @@
     if(!a||!(+a.protocolVersion>=2))return{complete:actionRecorded(a),missing:actionRecorded(a)?[]:['hành động và người thực hiện'],missingKeys:actionRecorded(a)?[]:['action']};
     const missing=[],missingKeys=[];
     const need=(cond,label,key)=>{if(cond){missing.push(label);missingKeys.push(key);}};
+    need(!!a.date&&a.date>isoToday(),'ngày xảy ra sự cố không được ở tương lai','date');
     need(!SOURCE_LABELS[a.eventSource],'nguồn phát hiện','eventSource');
     need(!PHASE_LABELS[a.processPhase],'giai đoạn quá trình','processPhase');
     need(!CONTAINMENT_LABELS[a.containmentStatus],'kiểm soát tức thời (mục 1)','containmentStatus');
@@ -55,6 +64,7 @@
        chạy lại — tức là mở hồ sơ thủ công rồi chọn nguồn "Nội kiểm IQC" là đường vòng
        né đúng cái rào an toàn quan trọng nhất của quy trình. */
     need(a.eventSource==='iqc'&&!String(a.pointId||'').trim(),'sự cố nội kiểm IQC phải mở từ dòng vi phạm để hệ thống theo dõi QC chạy lại','eventSource');
+    need(a.eventSource==='iqc'&&!!String(a.pointId||'').trim()&&!actionPoint(a),'điểm QC liên kết không còn tồn tại hoặc không thuộc đúng xét nghiệm; hãy hủy có lưu vết và lập hồ sơ mới từ dòng vi phạm','eventSource');
     return{complete:!missing.length,missing,missingKeys};
   }
   /* missingBySection gom cung mot danh sach thieu theo tung muc cua form, de dai tom
@@ -68,16 +78,19 @@
     const missing=[],bySection={ident:[],immediate:[],risk:[],check:[],cause:[],patient:[]};
     /* Truong nao thuoc muc nao tren form — nguon phat hien/giai doan/phu trach/han nam
        o khoi "Ho so", chi containment va correction moi thuoc muc 1. */
-    const DRAFT_SECTION={eventSource:'ident',processPhase:'ident',by:'ident',dueDate:'ident',containmentStatus:'immediate',correction:'immediate',action:'cause'};
+    const DRAFT_SECTION={date:'ident',eventSource:'ident',processPhase:'ident',by:'ident',dueDate:'ident',containmentStatus:'immediate',correction:'immediate',action:'cause',actionCompletedDate:'cause'};
     const need=(cond,label,section)=>{if(cond){missing.push(label);if(bySection[section])bySection[section].push(label);}};
     if(a.protocolVersion>=2){
       const draft=actionDraftStatus(a);
       draft.missing.forEach((label,i)=>{missing.push(label);const section=DRAFT_SECTION[draft.missingKeys[i]]||'ident';bySection[section].push(label);});
       need(!RISK_LABELS[a.riskLevel]||![1,2,3,4,5].includes(+a.riskSeverity)||![1,2,3,4,5].includes(+a.riskOccurrence)||![1,2,3,4,5].includes(+a.riskDetectability),'đánh giá nguy cơ','risk');
+      need(+a.protocolVersion>=3&&!!RISK_LABELS[a.riskLevel]&&[a.riskSeverity,a.riskOccurrence,a.riskDetectability].every(v=>[1,2,3,4,5].includes(+v))&&String(a.riskBasis||'').trim().length<5,'căn cứ phân loại nguy cơ theo SOP','risk');
+      need(!!a.date&&!!a.dueDate&&a.dueDate<a.date,'hạn hoàn thành không được trước ngày sự cố','ident');
     }
     /* Chi ho so v1 moi can kiem rieng — v2 da kiem containment trong actionDraftStatus,
        lap lai se dem thanh hai muc thieu khac chuoi va thoi phong so tren dai tom tat. */
     need(a.protocolVersion<2&&!CONTAINMENT_LABELS[a.containmentStatus],'kiểm soát tức thời','immediate');
+    need(+a.protocolVersion>=2&&a.containmentStatus==='held'&&String(a.containmentNote||'').trim().length<3,'ghi chú phạm vi kiểm soát tức thời','immediate');
     PROTOCOL_CHECKS.forEach(([key,label])=>{
       const low=label.toLocaleLowerCase('vi');
       need(!CHECK_LABELS[a[key]],low,'check');
@@ -85,6 +98,19 @@
     });
     need(!CAUSE_LABELS[a.causeCategory]||String(a.cause||'').trim().length<5,'nguyên nhân','cause');
     need(String(a.action||'').trim().length<5,'hành động khắc phục','cause');
+    need(+a.protocolVersion>=3&&String(a.action||'').trim().length>=5&&!a.actionCompletedDate,'ngày hoàn thành hành động khắc phục','cause');
+    need(!!a.actionCompletedDate&&!!a.date&&a.actionCompletedDate<a.date,'ngày hoàn thành hành động không được trước ngày sự cố','cause');
+    need(!!a.actionCompletedDate&&a.actionCompletedDate>isoToday(),'ngày hoàn thành hành động không được ở tương lai','cause');
+    const releaseRequired=+a.protocolVersion>=3&&a.containmentStatus==='held';
+    need(releaseRequired&&!RELEASE_LABELS[a.releaseStatus],'quyết định cho phép hoạt động/trả kết quả trở lại','cause');
+    if(releaseRequired&&RELEASE_LABELS[a.releaseStatus]){
+      need(!a.releaseDate,'ngày cho phép hoạt động/trả kết quả trở lại','cause');
+      need(String(a.releaseBy||'').trim().length<2,'người cho phép hoạt động/trả kết quả trở lại','cause');
+      need(String(a.releaseNote||'').trim().length<5,'căn cứ cho phép hoạt động/trả kết quả trở lại','cause');
+      need(!!a.releaseDate&&!!a.actionCompletedDate&&a.releaseDate<a.actionCompletedDate,'ngày cho phép trở lại không được trước ngày hoàn thành hành động','cause');
+      need(!!a.releaseDate&&a.releaseDate>isoToday(),'ngày cho phép trở lại không được ở tương lai','cause');
+      need(a.releaseStatus==='released'&&actionNeedsRerun(a)&&!actionRerunStatus(a).ok,'chỉ được cho phép trở lại sau khi QC chạy lại được chấp nhận','cause');
+    }
     need(!PATIENT_LABELS[a.patientImpact],'đánh giá ảnh hưởng bệnh nhân','patient');
     need(['held','affected'].includes(a.patientImpact)&&String(a.patientAction||'').trim().length<5,'xử lý kết quả bệnh nhân','patient');
     /* Mục 1 nói "không có kết quả bệnh nhân liên quan" mà mục 7 lại kết luận có kết quả
@@ -98,19 +124,30 @@
   }
   function actionProtocolSummary(a){
     if(!a||!a.protocolVersion)return'';
-    const checks=PROTOCOL_CHECKS.map(([key,label])=>`${label}: ${CHECK_LABELS[a[key]]||'Chưa ghi'}${a[key.replace('Status','Note')]?' ('+a[key.replace('Status','Note')]+')':''}`);
+    const checks=PROTOCOL_CHECKS.map(([key,label])=>`${label}: ${CHECK_LABELS[a[key]]||'Chưa ghi'}${a[key.replace('Status','Note')]?' ('+a[key.replace('Status','Note')]+')':''}`),residual=actionResidualRiskScore(a);
     return[
-      ...(a.protocolVersion>=2?[`Mã NCE: ${a.nceId||'Chưa cấp'} · Nguồn: ${SOURCE_LABELS[a.eventSource]||'Chưa ghi'} · Giai đoạn: ${PHASE_LABELS[a.processPhase]||'Chưa ghi'}`,`Nguy cơ: ${RISK_LABELS[a.riskLevel]||'Chưa đánh giá'} · S×O×D ${a.riskSeverity||0}×${a.riskOccurrence||0}×${a.riskDetectability||0} = ${actionRiskScore(a)}`]:[]),
+      ...(a.protocolVersion>=2?[`Mã NCE: ${a.nceId||'Chưa cấp'} · Nguồn: ${SOURCE_LABELS[a.eventSource]||'Chưa ghi'} · Giai đoạn: ${PHASE_LABELS[a.processPhase]||'Chưa ghi'}`,`Nguy cơ: ${RISK_LABELS[a.riskLevel]||'Chưa đánh giá'} · S×O×D ${a.riskSeverity||0}×${a.riskOccurrence||0}×${a.riskDetectability||0} = ${actionRiskScore(a)}${a.riskBasis?' · Căn cứ: '+a.riskBasis:''}`]:[]),
       `Kiểm soát tức thời: ${CONTAINMENT_LABELS[a.containmentStatus]||'Chưa ghi'}${a.containmentNote?' ('+a.containmentNote+')':''}`,
       ...(a.protocolVersion>=2?[`Xử lý tức thời: ${a.correction||'Chưa ghi'}`]:[]),
       ...checks,
       `Nguyên nhân: ${CAUSE_LABELS[a.causeCategory]||'Chưa phân loại'}${a.cause?' — '+a.cause:''}`,
-      `Ảnh hưởng bệnh nhân: ${PATIENT_LABELS[a.patientImpact]||'Chưa ghi'}${a.patientAction?' — '+a.patientAction:''}`
+      ...(a.protocolVersion>=3&&a.containmentStatus==='held'?[`Cho phép trở lại: ${RELEASE_LABELS[a.releaseStatus]||'Chưa xác nhận'}${a.releaseDate?' · '+vnDate(a.releaseDate):''}${a.releaseBy?' · '+a.releaseBy:''}${a.releaseNote?' — '+a.releaseNote:''}`]:[]),
+      `Ảnh hưởng bệnh nhân: ${PATIENT_LABELS[a.patientImpact]||'Chưa ghi'}${a.patientAction?' — '+a.patientAction:''}`,
+      ...(a.protocolVersion>=2?[`Hiệu lực: ${a.effectivenessStatus==='effective'?'Có hiệu lực':a.effectivenessStatus==='ineffective'?'Chưa hiệu lực':'Chưa đánh giá'}${a.effectivenessDate?' · '+vnDate(a.effectivenessDate):''}${a.effectivenessNote?' — '+a.effectivenessNote:''}${a.effectivenessBy?' · '+a.effectivenessBy:''}`]:[]),
+      ...(a.protocolVersion>=3&&residual?[`Nguy cơ còn lại: ${RISK_LABELS[a.residualRiskLevel]||'Chưa phân loại'} · S×O×D ${a.residualSeverity||0}×${a.residualOccurrence||0}×${a.residualDetectability||0} = ${residual}${a.residualRiskBasis?' · Căn cứ: '+a.residualRiskBasis:''}`]:[]),
+      ...(actionCancelled(a)?[`Hồ sơ đã hủy: ${a.cancelReason||'Không ghi lý do'}${a.cancelledBy?' · '+a.cancelledBy:''}${a.cancelledAt?' · '+a.cancelledAt:''}`]:[])
     ].join(' | ');
   }
   function actionRiskScore(a){
     const values=[a&&a.riskSeverity,a&&a.riskOccurrence,a&&a.riskDetectability].map(Number);
     return values.every(v=>Number.isInteger(v)&&v>=1&&v<=5)?values.reduce((x,v)=>x*v,1):0;
+  }
+  function actionResidualRiskScore(a){
+    return actionRiskScore({riskSeverity:a&&a.residualSeverity,riskOccurrence:a&&a.residualOccurrence,riskDetectability:a&&a.residualDetectability});
+  }
+  function actionActiveFollowUp(a){
+    const id=String(a&&a.followUpNceId||'').trim();
+    return id?(state.actions||[]).find(x=>x.nceId===id&&!actionCancelled(x))||null:null;
   }
   /* "Chưa hiệu lực" KHÔNG được treo hồ sơ vô thời hạn: theo thực hành CAPA, hành động
      không hiệu lực phải mở một vòng điều tra mới. Khi đã chuyển sang hồ sơ tiếp theo
@@ -118,19 +155,34 @@
      nếu không thì vẫn chặn để buộc người dùng escalate. */
   function actionEffectivenessStatus(a){
     if(!a||!(+a.protocolVersion>=2))return{required:false,complete:true,effective:true,label:'Không yêu cầu cho hồ sơ cũ',cls:'none',escalated:false};
-    if(a.effectivenessStatus==='effective'&&String(a.effectivenessNote||'').trim().length>=5&&a.effectivenessDate)return{required:true,complete:true,effective:true,label:'Đã xác nhận hiệu lực',cls:'ok',escalated:false};
+    if(a.effectivenessStatus!=='pending'&&+a.protocolVersion>=3){
+      if(String(a.effectivenessNote||'').trim().length<5||!a.effectivenessDate)return{required:true,complete:false,effective:false,label:'Cần ngày và bằng chứng đánh giá hiệu lực',cls:'rej',escalated:false};
+      if(!a.actionCompletedDate)return{required:true,complete:false,effective:false,label:'Cần ngày hoàn thành hành động trước khi đánh giá hiệu lực',cls:'rej',escalated:false};
+      const earliest=[a.date,a.actionCompletedDate,a.releaseDate].filter(Boolean).sort().pop()||'';
+      if(earliest&&a.effectivenessDate<earliest)return{required:true,complete:false,effective:false,label:'Ngày đánh giá hiệu lực phải sau ngày hoàn thành hành động',cls:'rej',escalated:false};
+      if(a.effectivenessDate>isoToday())return{required:true,complete:false,effective:false,label:'Ngày đánh giá hiệu lực không được ở tương lai',cls:'rej',escalated:false};
+    }
+    if(a.effectivenessStatus==='effective'){
+      if(+a.protocolVersion>=3){
+        const residual=actionResidualRiskScore(a),initial=actionRiskScore(a);
+        if(!residual||!RISK_LABELS[a.residualRiskLevel]||String(a.residualRiskBasis||'').trim().length<5)return{required:true,complete:false,effective:false,label:'Cần đánh giá đầy đủ nguy cơ còn lại và căn cứ SOP',cls:'rej',escalated:false};
+        if(initial&&residual>initial)return{required:true,complete:false,effective:false,label:`RPN còn lại ${residual} cao hơn RPN ban đầu ${initial} — chưa thể kết luận có hiệu lực`,cls:'rej',escalated:false};
+      }
+      if(+a.protocolVersion<3&&(String(a.effectivenessNote||'').trim().length<5||!a.effectivenessDate))return{required:true,complete:false,effective:false,label:'Chờ đánh giá hiệu lực',cls:'warn',escalated:false};
+      return{required:true,complete:true,effective:true,label:+a.protocolVersion>=3?`Đã xác nhận hiệu lực · RPN còn lại ${actionResidualRiskScore(a)}`:'Đã xác nhận hiệu lực',cls:'ok',escalated:false};
+    }
     if(a.effectivenessStatus==='ineffective'){
       const followUp=String(a.followUpNceId||'').trim();
-      return followUp
+      return followUp&&actionActiveFollowUp(a)
         ?{required:true,complete:true,effective:false,label:`Chưa hiệu lực — đã chuyển ${followUp}`,cls:'warn',escalated:true}
-        :{required:true,complete:false,effective:false,label:'Chưa hiệu lực — cần mở hồ sơ tiếp theo',cls:'rej',escalated:false};
+        :{required:true,complete:false,effective:false,label:followUp?'Hồ sơ tiếp theo đã hủy hoặc không còn tồn tại — cần mở vòng mới':'Chưa hiệu lực — cần mở hồ sơ tiếp theo',cls:'rej',escalated:false};
     }
     return{required:true,complete:false,effective:false,label:'Chờ đánh giá hiệu lực',cls:'warn',escalated:false};
   }
   /* Quá hạn chỉ tính cho hồ sơ còn mở — khép vòng rồi thì hạn không còn ý nghĩa. */
   function actionOverdue(a){
     const due=String(a&&a.dueDate||'').trim();
-    if(!due||!actionRecorded(a)||actionWorkflowStatus(a).complete)return{overdue:false,days:0,label:''};
+    if(!due||actionCancelled(a)||!actionRecorded(a)||actionWorkflowStatus(a).complete)return{overdue:false,days:0,label:''};
     const today=isoToday();
     if(due>=today)return{overdue:false,days:0,label:''};
     const days=Math.round((Date.parse(today+'T00:00:00Z')-Date.parse(due+'T00:00:00Z'))/86400000);
@@ -138,9 +190,13 @@
   }
   function identityText(value){return String(value||'').trim().toLocaleLowerCase('vi');}
   function actionCanApprove(a,user){
-    if(!a||!user)return false;
-    if(a.createdByUserId&&user.id)return String(a.createdByUserId)!==String(user.id);
-    if(a.createdByUsername&&user.username)return identityText(a.createdByUsername)!==identityText(user.username);
+    if(!a||!user||actionCancelled(a))return false;
+    const userId=String(user.id||''),username=identityText(user.username);
+    const contributorIds=new Set([a.createdByUserId,...(Array.isArray(a.contentEditorUserIds)?a.contentEditorUserIds:[])].map(x=>String(x||'')).filter(Boolean));
+    const contributorNames=new Set([a.createdByUsername,...(Array.isArray(a.contentEditorUsernames)?a.contentEditorUsernames:[])].map(identityText).filter(Boolean));
+    if(userId&&contributorIds.has(userId))return false;
+    if(username&&contributorNames.has(username))return false;
+    if(contributorIds.size||contributorNames.size)return true;
     const creator=identityText(a.by),identities=[user.name,user.username].map(identityText).filter(Boolean);
     return !creator||!identities.includes(creator);
   }
@@ -154,17 +210,31 @@
     const f=activeWestgard(t).byPoint.get(p.id);
     return !!(f&&f.level==='rej');
   }
+  /* Bằng chứng QC phải có quan hệ nhân-quả với hành động khắc phục. Hồ sơ v3 chỉ được
+     dùng điểm phát sinh từ ngày hoàn thành hành động; hồ sơ nối tiếp còn phải bắt đầu
+     từ ngày mở vòng mới để không tái sử dụng QC của vòng trước. Dữ liệu QC hiện chỉ có
+     độ phân giải theo ngày, nên cùng ngày vẫn hợp lệ nhưng với điểm sự cố cùng ngày thì
+     số lần chạy phải lớn hơn như rào cũ. */
+  function actionRerunGateDate(a,p){
+    const gates=[p&&p.date||''];
+    if(+a.protocolVersion>=3&&a.actionCompletedDate)gates.push(a.actionCompletedDate);
+    if(a.parentNceId&&a.date)gates.push(a.date);
+    return gates.filter(Boolean).sort().pop()||'';
+  }
   function actionRerunStatus(a){
     if(!actionNeedsRerun(a))return{needed:false,ok:true,label:'Không yêu cầu',cls:'none',point:null};
     const t=state.tests.find(x=>x.id===a.testId),p=actionPoint(a),wg=activeWestgard(t),runNo=pointRunNo(p);
+    if(+a.protocolVersion>=3&&!a.actionCompletedDate)return{needed:true,ok:false,label:'Chờ hoàn thành hành động trước khi xác nhận QC chạy lại',cls:'warn',point:null};
+    const gateDate=actionRerunGateDate(a,p);
     const rerun=((state.data&&state.data[a.testId])||[])
-      .filter(x=>!x.voided&&x.id!==p.id&&x.level===p.level&&(x.date>p.date||(x.date===p.date&&pointRunNo(x)>runNo))&&(x.lot||'')===(p.lot||''))
+      .filter(x=>!x.voided&&x.id!==p.id&&x.level===p.level&&x.date>=gateDate&&(x.date>p.date||(x.date===p.date&&pointRunNo(x)>runNo))&&(x.lot||'')===(p.lot||''))
       .sort((x,y)=>String(x.date||'').localeCompare(String(y.date||''))||pointRunNo(x)-pointRunNo(y))
       .find(x=>{const f=wg.byPoint.get(x.id)||{level:'ok'};return f.level!=='rej';});
     if(rerun){const verdict=wg.byPoint.get(rerun.id)||{level:'ok'},warning=verdict.level==='warn';return{needed:true,ok:true,label:`${warning?'QC chấp nhận lại (cảnh báo)':'QC đạt lại'}: ${fmt(rerun.val)} (${rerun.runId||'lần sau'})`,cls:warning?'warn':'ok',point:rerun};}
-    return{needed:true,ok:false,label:'Chờ QC chạy lại không bị loại',cls:'warn',point:null};
+    return{needed:true,ok:false,label:`Chờ QC chạy lại không bị loại${gateDate?' từ '+vnDate(gateDate):''}`,cls:'warn',point:null};
   }
   function actionWorkflowStatus(a){
+    if(actionCancelled(a))return{complete:false,cancelled:true,cls:'none',label:'Đã hủy hồ sơ',stage:'cancelled',rerun:{needed:false,ok:false,label:'Hồ sơ đã hủy',cls:'none',point:null},protocol:actionProtocolStatus(a),effectiveness:actionEffectivenessStatus(a)};
     if(!actionRecorded(a))return{complete:false,cls:'rej',label:'Chưa ghi khắc phục',rerun:{needed:false,ok:false,label:'Chưa ghi khắc phục',cls:'rej',point:null}};
     const rerun=actionRerunStatus(a),approval=actionApprovalStatus(a),protocol=actionProtocolStatus(a),effectiveness=actionEffectivenessStatus(a);
     let stage='investigating',label='Đang điều tra',cls='warn';
@@ -180,7 +250,7 @@
     return(state.actions||[]).filter(a=>a.pointId===pointId);
   }
   function pointRealActions(pointId){
-    return pointActions(pointId).filter(actionRecorded);
+    return pointActions(pointId).filter(a=>!actionCancelled(a)&&actionRecorded(a));
   }
   function pointWorkflowComplete(pointId){
     return pointRealActions(pointId).some(a=>actionWorkflowStatus(a).complete);
@@ -195,6 +265,6 @@
     return actionWorkflowStatus(real[real.length-1]);
   }
 
-  root.ActionWorkflowService={ACTION_LABELS,nextNceId,nceDueDate,actionApprovalStatus,actionApprovalLabel,actionRecorded,actionDraftStatus,actionProtocolStatus,actionProtocolSummary,actionRiskScore,actionEffectivenessStatus,actionOverdue,actionCanApprove,actionPoint,actionNeedsRerun,actionRerunStatus,actionWorkflowStatus,pointActions,pointRealActions,pointWorkflowComplete,pointWorkflowSummary};
+  root.ActionWorkflowService={ACTION_LABELS,nextNceId,nceDueDate,actionApprovalStatus,actionRecordStatus,actionCancelled,actionApprovalLabel,actionRecorded,actionDraftStatus,actionProtocolStatus,actionProtocolSummary,actionRiskScore,actionResidualRiskScore,actionActiveFollowUp,actionEffectivenessStatus,actionOverdue,actionCanApprove,actionPoint,actionNeedsRerun,actionRerunStatus,actionWorkflowStatus,pointActions,pointRealActions,pointWorkflowComplete,pointWorkflowSummary};
   Object.assign(root,root.ActionWorkflowService);
 })(typeof globalThis!=='undefined'?globalThis:this);

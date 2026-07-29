@@ -22,8 +22,13 @@ for(let i=1;i<loadOrder.length;i++)assert.ok(index.indexOf(loadOrder[i-1])<index
 
 assert.match(modals,/function modalTemplate\(/);
 assert.match(modals,/function modalCloseButton\(/);
-assert.doesNotMatch(modals,/function (?:syncActLevels|currentIssues|beginActionFromIssue|addAction|delAction)\(/,'modals.js không chứa logic trang Actions');
-for(const name of ['syncActLevels','currentIssues','beginActionFromIssue','addAction','delAction'])assert.match(actions,new RegExp(`function ${name}\\(`));
+assert.doesNotMatch(modals,/function (?:syncActLevels|currentIssues|beginActionFromIssue|addAction|cancelAction)\(/,'modals.js không chứa logic trang Actions');
+for(const name of ['syncActLevels','currentIssues','beginActionFromIssue','addAction','cancelAction'])assert.match(actions,new RegExp(`function ${name}\\(`));
+assert.doesNotMatch(actions,/state\.actions\.splice\(/,'hồ sơ NCE không được xóa vật lý; phải hủy có lưu vết');
+assert.match(actions,/recordStatus='cancelled'/,'quy trình hủy phải giữ bản ghi và đánh dấu trạng thái');
+assert.doesNotMatch(actions,/function confirmReturnAction\(i\)/,'xác nhận trả lại không được dựa vào vị trí mảng có thể thay đổi khi đồng bộ');
+assert.match(actions,/function confirmReturnAction\(id,token\)/,'xác nhận trả lại phải khóa theo ID và token phiên bản');
+assert.match(actions,/confirmReturnAction\('\$\{jsq\(current\.id\)\}','\$\{jsq\(token\)\}'\)/,'hộp thoại trả lại phải truyền đúng ID và token của hồ sơ sau xác thực');
 
 /* Form hồ sơ NCE phải render THẲNG từ state qua actionFormModel(): bản cũ đổ giá trị
    vào DOM sau render (populateActionForm trong setTimeout) nên mọi rerender() — đổi
@@ -38,5 +43,25 @@ assert.match(actions,/const lot=editing\?\(editing\.lot\|\|''\):/,'lot phải gi
 /* Lối thoát cho hồ sơ đã duyệt nhưng không còn đủ điều kiện khép vòng (sửa/xóa/duyệt
    đều bị chặn) — xem actionCanReopen() trong actions-routes.js. */
 assert.match(actions,/function actionCanReopen\(/,'phải có đường mở lại hồ sơ duyệt-nhưng-hở');
+assert.match(actions,/function confirmApproveAction\(id,token\)/,'xác nhận duyệt phải tìm hồ sơ theo id và khóa phiên bản đã xem');
+assert.match(actions,/actionApprovalToken\(a\)!==token/,'phải chặn duyệt nếu hồ sơ hoặc bằng chứng QC đổi khi hộp duyệt đang mở');
+assert.doesNotMatch(actions,/!tests\.length\?emptyState\('Cần có xét nghiệm trước'/,'NCE nguồn ngoài IQC phải mở được cả khi chưa có xét nghiệm vận hành');
+assert.match(actions,/function actionInvestigationChoose\(/,'checklist điều tra phải dùng lựa chọn trạng thái dạng nút');
+assert.match(actions,/class="action-investigation-select"/,'select dữ liệu gốc phải được giữ để tương thích state và kiểm thử');
+assert.match(actions,/function actionChecklistChip\(/,'tiêu đề checklist phải hiển thị tiến độ hoàn tất');
+assert.match(actions,/function actionSuggestBox\(/,'gợi ý nhập liệu NCE phải dùng cùng một khối thu gọn');
+assert.match(actions,/class="action-form-panel-head".*btn\('Quy trình 8 bước'/,'nút quy trình phải nằm cạnh tiêu đề panel lập hồ sơ NCE');
+assert.doesNotMatch(actions,/headOnly\([^;\n]+btn\('Quy trình 8 bước'/,'nút quy trình không được chiếm chỗ trên header trang');
+assert.match(actions,/cls:'action-guide-modal'/,'hướng dẫn 8 bước phải dùng popup NCE chuyên biệt');
+for(const id of ['aContainmentNote','aCorrection','aCause','aAct','aPatientAction','aEffectivenessNote'])assert.match(actions,new RegExp(`actionSuggestBox\\('${id}'`),`${id} phải dùng gợi ý thu gọn`);
+
+assert.match(actions,/const candidate=\{\.\.\.protocol,testId:tid,date,action,by,pointId\}/,'IQC link validation must receive both testId and pointId before opening the record');
+for(const id of ['aReleaseStatus','aReleaseDate','aReleaseBy','aReleaseNote'])assert.match(actions,new RegExp(`['"]${id}['"]`),`${id} must remain in the release-decision form`);
+assert.match(actions,/actionSuggestBox\('aReleaseNote'/,'release rationale must keep the same editable suggestion pattern');
+assert.match(actions,/actionSuggestBox\('aRiskBasis'/,'risk classification must keep an editable SOP-basis field');
+assert.match(actions,/actionSuggestBox\('aResidualRiskBasis'/,'residual-risk reassessment must keep an editable evidence field');
+for(const id of ['aResidualSeverity','aResidualOccurrence','aResidualDetectability','aResidualRiskLevel','aResidualRiskBasis'])assert.match(actions,new RegExp(`['"]${id}['"]`),`${id} must remain in the effectiveness section`);
+assert.match(actions,/function actionEffectivenessMissingKey\(/,'effectiveness validation must focus the exact missing residual-risk field');
+assert.match(actions,/\['effectivenessStatus','effectivenessNote','effectivenessDate','residualSeverity','residualOccurrence','residualDetectability','residualRiskLevel','residualRiskBasis'\]\.some/,'changing residual risk must refresh effectiveness reviewer attribution');
 
 console.log('UI route structure tests passed');
