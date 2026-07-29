@@ -459,6 +459,17 @@ the Google Fonts link, offline labs must print with correct metrics.
   Page-level UI state lives in the `*-ui-state.js` modules above. `sigma.js`
   renders the Six Sigma page (see "Confirmed business-logic decisions" below
   for how its numbers relate to reports.js).
+- `dashboard-routes.js` còn dựng bảng KPI chất lượng & CAPA (`dashboardKpiSnapshot()`):
+  tỷ lệ QC được chấp nhận/bị loại, số NCE đang mở, tỷ lệ CAPA có hiệu lực, xu hướng 6
+  tháng, luồng giai đoạn CAPA và nhóm nguyên nhân. Kỳ và phạm vi (thiết bị/xét nghiệm)
+  nằm ở `dashKpi*` trong `analysis-ui-state.js`; ngưỡng đạt/không đạt lấy từ
+  `state.lab.kpiTargets`, sửa ở panel `#kpiTargets` trang Cài đặt và được
+  `sanitizeBackup()` kẹp lại theo min/max nên bản backup hỏng không đặt được ngưỡng vô
+  lý. Bốn ô KPI là nút bấm mở modal liệt kê đúng tập dữ liệu đã tính (`dashKpiLast`),
+  nên KHÔNG được tính lại tập đó trong modal — chỉ số hiện trên ô và danh sách người
+  dùng bấm vào xem phải là cùng một phép tính. Thống kê điểm QC chỉ gồm xét nghiệm đang
+  vận hành, còn thống kê CAPA lấy mọi hồ sơ khi không lọc phạm vi — hồ sơ nguồn ngoài
+  IQC không có `testId` nên sẽ biến mất nếu lọc theo thiết bị/xét nghiệm.
 - `range.js`, `settings.js`, `backup-service.js`, `data-io.js`, `reports.js`, `users-auth.js`,
   `reagent.js` — feature-specific logic (target-range calc, settings page,
   backup/restore service + XLSX generation, printed reports, auth/user

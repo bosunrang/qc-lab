@@ -28,6 +28,42 @@ const value = JSON.parse(JSON.stringify(result));
 assert.deepEqual(value.kept, { value: 'B', disabled: false, labels: ['Assay A', 'Assay B'] });
 assert.deepEqual(value.empty, { disabled: true, value: '', label: 'Không tìm thấy' });
 
+const dashboardKpis = run(ctx, `
+  (function(){
+    state.data={T1:[
+      {id:'old',date:'2026-06-25',level:1,val:10},
+      {id:'ok',date:'2026-07-01',level:1,val:10},
+      {id:'warn',date:'2026-07-02',level:1,val:11},
+      {id:'rej',date:'2026-07-03',level:1,val:14},
+      {id:'void',date:'2026-07-04',level:1,val:15,voided:true}
+    ]};
+    ACTION_LABELS={cause:{instrument:'Thiết bị'}};
+    actionCancelled=function(a){return a.recordStatus==='cancelled';};
+    actionRecorded=function(a){return !!a.action;};
+    actionWorkflowStatus=function(a){return{complete:a.stage==='closed',stage:a.stage};};
+    actionEventDate=function(a){return a.date;};
+    actionOverdue=function(a){return{overdue:a.stage!=='closed'&&a.dueDate<'2026-07-29'};};
+    var test={id:'T1',name:'Sodium'},wg={byPoint:new Map([['warn',{level:'warn'}],['rej',{level:'rej'}],['void',{level:'rej'}]])};
+    return dashboardKpiSnapshot([{t:test,wg:wg}],[
+      {id:'a1',action:'Điều tra',stage:'investigating',date:'2026-07-10',createdAt:'2026-07-10T00:00:00Z',dueDate:'2026-07-20',causeCategory:'instrument',effectivenessStatus:'pending'},
+      {id:'a2',action:'Vệ sinh máy',stage:'closed',date:'2026-07-01',createdAt:'2026-07-01T00:00:00Z',approvedAt:'2026-07-04T00:00:00Z',dueDate:'2026-07-05',causeCategory:'instrument',effectivenessStatus:'effective'},
+      {id:'a3',action:'Mở nhầm',stage:'cancelled',date:'2026-07-01',recordStatus:'cancelled'}
+    ],'2026-07-29');
+  })()
+`);
+const kpiValue = JSON.parse(JSON.stringify(dashboardKpis));
+assert.deepEqual(kpiValue.quality, { points:3, rejected:1, warnings:1, acceptedRate:66.7, rejectRate:33.3, previousRejectRate:0, rejectRateDelta:33.3 });
+assert.equal(kpiValue.capa.open, 1);
+assert.equal(kpiValue.capa.closed, 1);
+assert.equal(kpiValue.capa.overdue, 1);
+assert.equal(kpiValue.capa.evaluated, 1);
+assert.equal(kpiValue.capa.effectiveRate, 100);
+assert.equal(kpiValue.capa.averageCloseDays, 3);
+assert.equal(kpiValue.capa.onTimeRate, 100);
+assert.deepEqual(kpiValue.capa.stages, { investigating:1, rerun:0, effectiveness:0, approval:0, closed:1 });
+assert.deepEqual(kpiValue.causes, [{ label:'Thiết bị', count:2 }]);
+assert.equal(kpiValue.months.find(x=>x.key==='2026-07').rejected, 1);
+
 const rowWindow = run(ctx, `
   (function(){
     var rows=Array.from({length:250},function(_,i){return{id:i};});

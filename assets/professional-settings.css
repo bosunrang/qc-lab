@@ -37,6 +37,18 @@
   margin-top:6px;
 }
 
+.settings-kpi-panel{scroll-margin-top:16px}
+.settings-kpi-intro{margin:var(--panel-content-gap) 16px 0;padding:10px 12px;border:1px solid #dce8eb;border-radius:var(--radius-md);background:var(--surface-card-soft);color:var(--muted);font-size:12px;line-height:1.5}
+.settings-kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:12px 16px 0}
+.settings-kpi-grid > div{min-width:0;padding:11px;border:1px solid #dfe8eb;border-radius:var(--radius-md);background:#fbfcfd}
+.settings-kpi-grid label{margin:0 0 7px;color:#365563;font-size:11.5px;font-weight:800}
+.settings-kpi-grid small{display:block;margin-top:5px;color:var(--muted);font-size:10px}
+.settings-kpi-input{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;overflow:hidden;border:1px solid #d5e1e5;border-radius:var(--radius-md);background:var(--panel)}
+.settings-kpi-input:focus-within{border-color:var(--teal);box-shadow:0 0 0 3px color-mix(in srgb,var(--teal) 14%,transparent)}
+.settings-kpi-input input{min-width:0;border:0;border-radius:0;box-shadow:none}
+.settings-kpi-input input:focus{box-shadow:none}
+.settings-kpi-input span{padding:0 9px;color:#55707d;font-size:11px;font-weight:800}
+
 .rules-tools{
   display:flex; align-items:center; justify-content:space-between; gap:12px; margin:var(--panel-content-gap) 16px 0; padding:10px 12px; border:1px solid #dbe7ed; border-radius:var(--radius-md); background:var(--surface-subtle);
 }
@@ -154,6 +166,7 @@
 .settings-profile-grid{
   grid-template-columns:1fr;
 }
+.settings-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 
 @media(max-width:760px){
@@ -182,6 +195,9 @@
 .rules-tools{
   align-items:flex-start; flex-direction:column;
 }
+
+.settings-kpi-intro{margin-right:12px;margin-left:12px}
+.settings-kpi-grid{grid-template-columns:1fr;margin-right:12px;margin-left:12px}
 }
 
 /* Moved from app.css (2026-07-12): only the settings page uses it. */

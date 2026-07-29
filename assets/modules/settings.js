@@ -1,5 +1,14 @@
 /* ===== SETTINGS / CLOUD ===== */
 async function saveLab(){if(!requireAdmin())return;state.lab={...(state.lab||{}),name:QCCore.cleanText(document.getElementById('labName').value),dept:QCCore.cleanText(document.getElementById('labDept').value),address:QCCore.cleanText(document.getElementById('labAddr').value,5000)};save({clearDerived:false});await infoDialog('Đã lưu thông tin đơn vị.',{type:'success'});}
+async function saveKpiTargets(){
+  if(!requireAdmin())return;
+  const read=(id,min,max)=>{const value=Number((document.getElementById(id)||{}).value);return Number.isFinite(value)&&value>=min&&value<=max?value:null;};
+  const qcRejectMax=read('kpiQcRejectMax',.1,50),capaEffectiveMin=read('kpiCapaEffectiveMin',1,100),closeDaysMax=read('kpiCloseDaysMax',1,365),onTimeMin=read('kpiOnTimeMin',1,100);
+  if([qcRejectMax,capaEffectiveMin,closeDaysMax,onTimeMin].some(x=>x==null)){await infoDialog('Mục tiêu KPI không hợp lệ. Kiểm tra lại giới hạn hiển thị dưới từng ô.');return;}
+  state.lab=state.lab||{};state.lab.kpiTargets={qcRejectMax,capaEffectiveMin,closeDaysMax,onTimeMin};
+  logAct('Cập nhật mục tiêu KPI',`QC loại tối đa ${qcRejectMax}% · CAPA hiệu lực tối thiểu ${capaEffectiveMin}% · khép vòng tối đa ${closeDaysMax} ngày · đúng hạn tối thiểu ${onTimeMin}%`,'Dashboard');
+  save({clearDerived:false});await infoDialog('Đã lưu mục tiêu KPI chất lượng và CAPA.',{type:'success'});
+}
 function ensureLabBrandShape(){
   state.lab=state.lab||{};
   state.lab.brandTitle=QCCore.cleanText(state.lab.brandTitle||'QC Lab',80);
@@ -157,6 +166,7 @@ function pageSettings(){
   const fbcfg=getFbCfg()||{};
   const lockedCloud=!!(fbcfg&&fbcfg.locked);
   const logo=brandLogo();
+  const kpi=dashboardKpiTargets();
   const brandPreview=`<div class="brand-preview"><div class="brand-mark">${logo?`<img src="${escAttr(logo)}" alt="">`:esc(brandMarkText())}</div><div><b>${esc(brandTitle())}</b><small>${esc(brandSub())}</small></div></div>`;
   return headOnly('Cài đặt & Đồng bộ','Thông tin đơn vị, backup và kết nối Firebase')+
    `<div class="settings-profile-grid">
@@ -183,6 +193,16 @@ function pageSettings(){
      </div>
      <div class="settings-panel-actions">${btn('Lưu logo','saveBrand()','teal')}${btn('Bỏ ảnh logo','clearLogo()','ghost')}</div>
     </div>
+   </div>
+   <div id="kpiTargets" class="panel settings-kpi-panel"><h3>Mục tiêu KPI chất lượng & CAPA</h3>
+     <div class="settings-kpi-intro">Các ngưỡng này quyết định màu xanh, vàng và đỏ trên Dashboard. Chỉ thay đổi khi đơn vị đã phê duyệt mục tiêu chất lượng tương ứng.</div>
+     <div class="settings-kpi-grid">
+       <div><label for="kpiQcRejectMax">Tỷ lệ QC bị loại tối đa</label><div class="settings-kpi-input"><input id="kpiQcRejectMax" type="number" min="0.1" max="50" step="0.1" value="${escAttr(kpi.qcRejectMax)}"><span>%</span></div><small>Hợp lệ: 0,1–50%</small></div>
+       <div><label for="kpiCapaEffectiveMin">CAPA có hiệu lực tối thiểu</label><div class="settings-kpi-input"><input id="kpiCapaEffectiveMin" type="number" min="1" max="100" step="1" value="${escAttr(kpi.capaEffectiveMin)}"><span>%</span></div><small>Hợp lệ: 1–100%</small></div>
+       <div><label for="kpiCloseDaysMax">Thời gian khép NCE tối đa</label><div class="settings-kpi-input"><input id="kpiCloseDaysMax" type="number" min="1" max="365" step="1" value="${escAttr(kpi.closeDaysMax)}"><span>ngày</span></div><small>Hợp lệ: 1–365 ngày</small></div>
+       <div><label for="kpiOnTimeMin">Hồ sơ khép đúng hạn tối thiểu</label><div class="settings-kpi-input"><input id="kpiOnTimeMin" type="number" min="1" max="100" step="1" value="${escAttr(kpi.onTimeMin)}"><span>%</span></div><small>Hợp lệ: 1–100%</small></div>
+     </div>
+     <div class="settings-panel-actions">${btn('Lưu mục tiêu KPI','saveKpiTargets()','teal')}</div>
    </div>
    <div class="panel"><h3>Quản trị dữ liệu</h3>
      <div class="admin-tools">
