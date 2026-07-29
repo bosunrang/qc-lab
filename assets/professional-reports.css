@@ -251,7 +251,7 @@ summary.action-form-section-title:focus-visible{
 }
 
 .action-form-owner{
-  display:grid; grid-template-columns:minmax(260px,1fr) 240px; gap:10px; max-width:720px;
+  display:grid; grid-template-columns:360px 240px; gap:10px; max-width:610px;
 }
 
 /* focusActionField() gắn class này lên đúng ô còn thiếu khi bấm lưu, và tự gỡ ngay khi
@@ -386,6 +386,74 @@ summary.action-form-section-title:focus-visible{
 
 .action-submit-buttons{
   display:flex; align-items:center; gap:8px; flex:none;
+}
+
+.action-evidence-timeline{
+  display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin:12px 0;
+}
+
+.action-evidence-timeline>div{
+  min-width:0; padding:10px 12px; border:1px solid var(--line); border-radius:var(--radius-md); background:var(--surface);
+}
+
+.action-evidence-timeline span,.action-evidence-timeline b,.action-evidence-timeline small{
+  display:block;
+}
+
+.action-evidence-timeline span{
+  color:var(--muted); font-size:var(--type-micro); font-weight:750;
+}
+
+.action-evidence-timeline b{
+  margin-top:3px; color:var(--ink); font-size:var(--type-meta);
+}
+
+.action-evidence-timeline small{
+  margin-top:2px; overflow:hidden; color:var(--muted); font-size:var(--type-micro); text-overflow:ellipsis; white-space:nowrap;
+}
+
+.action-rerun-evidence{
+  display:grid; grid-template-columns:42px minmax(0,1fr) auto; align-items:center; gap:12px; margin:12px 0; padding:12px; border:1px solid var(--line); border-radius:var(--radius-lg); background:var(--surface);
+}
+
+.action-rerun-evidence.ok{
+  border-color:color-mix(in srgb,var(--teal) 38%,var(--line)); background:color-mix(in srgb,var(--teal) 5%,var(--surface));
+}
+
+.action-rerun-evidence.warn{
+  border-color:color-mix(in srgb,var(--amber) 40%,var(--line)); background:color-mix(in srgb,var(--amber) 6%,var(--surface));
+}
+
+.action-rerun-mark{
+  display:flex; align-items:center; justify-content:center; width:42px; height:42px; border-radius:12px; background:var(--section-head-bg); color:var(--ink); font-size:var(--type-micro); font-weight:900;
+}
+
+.action-rerun-evidence.ok .action-rerun-mark{
+  background:var(--teal); color:var(--on-accent);
+}
+
+.action-rerun-copy small,.action-rerun-copy b,.action-rerun-copy span{
+  display:block;
+}
+
+.action-rerun-copy small{
+  color:var(--muted); font-size:var(--type-micro); font-weight:750;
+}
+
+.action-rerun-copy b{
+  margin-top:2px; color:var(--ink); font-size:var(--type-meta);
+}
+
+.action-rerun-copy span{
+  margin-top:2px; color:var(--muted); font-size:var(--type-body-sm);
+}
+
+.action-rerun-actions{
+  display:flex; align-items:center; flex:none;
+}
+
+.qc-point-evidence-focus{
+  position:relative; outline:3px solid color-mix(in srgb,var(--teal) 52%,transparent); outline-offset:-3px; background:color-mix(in srgb,var(--teal) 12%,var(--surface)) !important;
 }
 
 .action-detail-steps{
@@ -893,6 +961,22 @@ summary.action-form-section-title:focus-visible{
 @media(max-width:760px){
 .action-form-main, .action-form-meta, .action-form-owner, .action-risk-grid, .action-detail-meta{
   grid-template-columns:1fr;
+}
+
+.action-evidence-timeline{
+  grid-template-columns:repeat(2,minmax(0,1fr));
+}
+
+.action-rerun-evidence{
+  grid-template-columns:42px minmax(0,1fr);
+}
+
+.action-rerun-actions{
+  grid-column:1/-1;
+}
+
+.action-rerun-actions .btn{
+  width:100%;
 }
 
 .action-risk-level{

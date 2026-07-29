@@ -163,6 +163,22 @@ it runs under `xvfb-run`, see the CI job):
   an explicit release-to-service decision after held results, and a residual-risk
   reassessment before an "effective" conclusion; these fields are retained by
   backup sanitization and the full NCE audit CSV.
+- `action-workflow-service.js` phải giữ chi phí `actionRerunStatus()` không tăng theo
+  tổng số điểm QC: nó bị gọi 5 lần cho CÙNG một hồ sơ trong một lần vẽ
+  (`actionWorkflowStatus()` → `actionProtocolStatus()` nhánh release →
+  `actionEffectivenessStatus()`), và bản đầu mỗi lần quét lại toàn bộ
+  `state.data[testId]` — đo được 5 894ms mỗi lần vẽ bảng nhật ký với 40 000 điểm × 600
+  hồ sơ, còn 171ms sau khi thêm `actionLotPoints()` (index theo xét nghiệm/mức/lô, đã
+  bỏ điểm hủy và sắp sẵn nên dừng ở ứng viên đầu tiên) cùng memo cho
+  `actionRerunStatus()`/`actionPoint()`. KHÔNG dùng `pointsForLot()` của `qc-domain.js`
+  cho việc này: cache đó chỉ được xả qua `clearDerived()`, trong khi lưu hồ sơ dùng
+  `save({clearDerived:false})`. Mọi cache ở đây TỰ KIỂM CHỨNG — chữ ký gồm tham chiếu và
+  độ dài mảng điểm QC, cộng các trường của hồ sơ mà phép tính đọc tới — nên thay nguyên
+  `state` hay thêm/bớt điểm đều tự trượt. `clearDerived()`/`clearDerivedForTest()` gọi
+  thêm `invalidateActionCaches()` cho trường hợp sửa giá trị tại chỗ. Đừng chốt phần này
+  bằng mốc thời gian trong test: hai tối ưu che lẫn nhau nên phép đo không phân biệt
+  được cái nào hỏng (bỏ index còn cho tỉ lệ NHỎ hơn giữ index) — hãy chốt bằng việc
+  cache tự trượt, như `tests/action-workflow-service.test.js` đang làm.
 - `scripts/nce-workflow-check.js` (`npm run nce-check`) drives the NCE record
   lifecycle on the "Khắc phục sự cố" page in real Chromium, because every bug it
   guards only appears once the form is rendered *and re-rendered*: the edit/new

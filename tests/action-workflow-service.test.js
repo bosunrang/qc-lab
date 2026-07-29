@@ -421,4 +421,29 @@ function fixture(actionOverrides = {}) {
   assert.equal(ctx.actionCanApprove(action,{id:'u2',username:'admin'}),false,'hồ sơ hủy không thể được duyệt');
 }
 
+{
+  /* actionRerunStatus() bị gọi 5 lần cho CÙNG một hồ sơ trong một lần vẽ
+     (actionWorkflowStatus -> actionProtocolStatus nhánh release -> actionEffectivenessStatus),
+     và trước đây mỗi lần quét lại toàn bộ state.data[testId]: 5 894ms mỗi lần vẽ với
+     40 000 điểm × 600 hồ sơ, còn 171ms sau khi thêm index theo (xét nghiệm, mức, lô) và
+     memo. CỐ Ý KHÔNG chốt bằng mốc thời gian: hai tối ưu che lẫn nhau nên đo thời gian
+     không phân biệt được cái nào hỏng (đã thử — bỏ index lại cho tỉ lệ NHỎ hơn giữ
+     index), mà số đo còn flake theo tải máy. Thay vào đó chốt tính đúng đắn của cache:
+     nó phải tự trượt, vì đó mới là chỗ dễ hỏng âm thầm. */
+  // Memo phải tự trượt khi dữ liệu QC đổi, không trông chờ ai gọi clearDerived.
+  // clearDerived() ở đây chỉ để dọn wgMemo còn sót từ khối đo phía trên (wgMemo dùng
+  // chung khoá testId nên rò giữa các khối test), không phải điều kiện của phép thử.
+  ctx.__setState(fixture());
+  ctx.clearDerived();
+  assert.equal(ctx.actionRerunStatus(ctx.__getState().actions[0]).ok, true);
+  ctx.__getState().data.T1.pop();
+  assert.equal(ctx.actionRerunStatus(ctx.__getState().actions[0]).ok, false, 'bớt điểm QC phải làm memo trượt ngay');
+  ctx.__setState(fixture());
+  assert.equal(ctx.actionRerunStatus(ctx.__getState().actions[0]).ok, true, 'thay nguyên state phải làm memo trượt ngay');
+  ctx.clearDerived();
+  const action = ctx.__getState().actions[0];
+  action.protocolVersion = 3; action.actionCompletedDate = '';
+  assert.equal(ctx.actionRerunStatus(action).ok, false, 'đổi chính hồ sơ cũng phải làm memo trượt');
+}
+
 console.log('ActionWorkflowService tests passed');

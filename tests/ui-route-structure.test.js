@@ -55,7 +55,7 @@ assert.doesNotMatch(actions,/headOnly\([^;\n]+btn\('Quy trình 8 bước'/,'nút
 assert.match(actions,/cls:'action-guide-modal'/,'hướng dẫn 8 bước phải dùng popup NCE chuyên biệt');
 for(const id of ['aContainmentNote','aCorrection','aCause','aAct','aPatientAction','aEffectivenessNote'])assert.match(actions,new RegExp(`actionSuggestBox\\('${id}'`),`${id} phải dùng gợi ý thu gọn`);
 
-assert.match(actions,/const candidate=\{\.\.\.protocol,testId:tid,date,action,by,pointId\}/,'IQC link validation must receive both testId and pointId before opening the record');
+assert.match(actions,/const candidate=\{\.\.\.\(editing\|\|\{\}\),\.\.\.protocol,testId:tid,level,lot,pointId,date,action,by\}/,'candidate khi sửa phải giữ nguồn tạo và toàn bộ danh tính IQC trước khi kiểm tra cổng chạy lại');
 for(const id of ['aReleaseStatus','aReleaseDate','aReleaseBy','aReleaseNote'])assert.match(actions,new RegExp(`['"]${id}['"]`),`${id} must remain in the release-decision form`);
 assert.match(actions,/actionSuggestBox\('aReleaseNote'/,'release rationale must keep the same editable suggestion pattern');
 assert.match(actions,/actionSuggestBox\('aRiskBasis'/,'risk classification must keep an editable SOP-basis field');
@@ -63,5 +63,10 @@ assert.match(actions,/actionSuggestBox\('aResidualRiskBasis'/,'residual-risk rea
 for(const id of ['aResidualSeverity','aResidualOccurrence','aResidualDetectability','aResidualRiskLevel','aResidualRiskBasis'])assert.match(actions,new RegExp(`['"]${id}['"]`),`${id} must remain in the effectiveness section`);
 assert.match(actions,/function actionEffectivenessMissingKey\(/,'effectiveness validation must focus the exact missing residual-risk field');
 assert.match(actions,/\['effectivenessStatus','effectivenessNote','effectivenessDate','residualSeverity','residualOccurrence','residualDetectability','residualRiskLevel','residualRiskBasis'\]\.some/,'changing residual risk must refresh effectiveness reviewer attribution');
+assert.match(actions,/function actionEvidenceTimelineHtml\(/,'chi tiết NCE phải tách các mốc xảy ra, chạy lại, hủy điểm và mở hồ sơ');
+for(const label of ['Ngày xảy ra','QC chạy lại','Hủy điểm','Mở hồ sơ'])assert.match(actions,new RegExp(`\\['${label}'`),`timeline NCE phải giữ mốc ${label}`);
+assert.match(actions,/function actionRerunEvidenceHtml\(/,'NCE phải có khung bằng chứng QC chạy lại riêng');
+assert.match(actions,/function openActionQcEvidence\(/,'khung bằng chứng phải mở được đúng điểm QC');
+assert.match(entry,/data-qc-point-id=/,'dòng dữ liệu QC phải mang ID để liên kết từ hồ sơ NCE');
 
 console.log('UI route structure tests passed');

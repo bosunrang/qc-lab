@@ -365,6 +365,35 @@ async function checkRerunChipOnBothSurfaces(page) {
     JSON.stringify({ issue: out.issueChips, nce: out.nceChips }));
 }
 
+async function checkEvidenceTimelineAndLink(page) {
+  await page.evaluate(() => viewActionDetail(0));
+  await page.waitForSelector('.action-evidence-timeline');
+  const detail = await page.evaluate(() => ({
+    timelineLabels: [...document.querySelectorAll('.action-evidence-timeline span')].map(x => x.textContent),
+    evidence: (document.querySelector('.action-rerun-evidence') || {}).innerText || '',
+    buttons: [...document.querySelectorAll('.action-rerun-evidence button')].map(x => x.textContent),
+  }));
+  check('Chi tiết NCE tách đủ bốn mốc thời gian',
+    ['Ngày xảy ra','QC chạy lại','Hủy điểm','Mở hồ sơ'].every(x => detail.timelineLabels.includes(x)),
+    JSON.stringify(detail.timelineLabels));
+  check('Khung bằng chứng nêu đúng giá trị, ngày và lần chạy',
+    /5\.72/.test(detail.evidence) && /14\/07\/2026/.test(detail.evidence) && /2026-07-14-2/.test(detail.evidence),
+    detail.evidence);
+  check('Khung bằng chứng có nút mở điểm QC', detail.buttons.includes('Xem điểm QC'), JSON.stringify(detail.buttons));
+
+  await page.click('.action-rerun-evidence button');
+  await page.waitForSelector('[data-qc-point-id="k2"].qc-point-evidence-focus');
+  const linked = await page.evaluate(() => {
+    const row=document.querySelector('[data-qc-point-id="k2"]');
+    return{page,entryStart,entryEnd,highlighted:!!(row&&row.classList.contains('qc-point-evidence-focus')),text:row&&row.innerText||''};
+  });
+  check('Nút bằng chứng mở đúng trang và đúng ngày QC',
+    linked.page==='entry'&&linked.entryStart==='2026-07-14'&&linked.entryEnd==='2026-07-14',
+    JSON.stringify(linked));
+  check('Dòng QC làm bằng chứng được cuộn tới và tô sáng',
+    linked.highlighted&&/5\.72/.test(linked.text),JSON.stringify(linked));
+}
+
 async function checkOverdueAndEscalation(page) {
   const out = await page.evaluate(() => {
     const a = state.actions[0];
@@ -531,6 +560,50 @@ async function checkOverdueReachesDashboard(page) {
   check('Hết hồ sơ quá hạn thì dashboard không còn cảnh báo', !/Quá hạn \d+ ngày/.test(cleared));
 }
 
+async function checkDashboardKpiControls(page) {
+  const rendered = await page.evaluate(() => {
+    const t=state.tests[0],l=t.levels[0];
+    state.data[t.id].push({id:'KPI-REJ',date:'2026-07-28',runId:'2026-07-28-1',level:l.level,lot:l.lot,val:l.mean+l.sd*4,qcMean:l.mean,qcSd:l.sd});
+    clearDerived();dashKpiPeriod='30';dashKpiInstrument='all';dashKpiTest='all';go('dash');
+    return{
+      cards:document.querySelectorAll('.dash-quality-kpi').length,
+      filters:document.querySelectorAll('.dash-kpi-filters select').length,
+      hasRejected:[...document.querySelectorAll('.dash-quality-kpi')].some(x=>/Tỷ lệ QC bị loại/.test(x.innerText)&&!/—/.test(x.innerText))
+    };
+  });
+  check('Dashboard KPI có đủ bốn thẻ có thể mở chi tiết',rendered.cards===4,JSON.stringify(rendered));
+  check('Dashboard KPI có bộ lọc kỳ, thiết bị và xét nghiệm',rendered.filters===3,JSON.stringify(rendered));
+  check('KPI nhận đúng điểm Westgard bị loại trong kỳ',rendered.hasRejected===true,JSON.stringify(rendered));
+
+  const filtered = await page.evaluate(() => {
+    dashboardKpiSetPeriod('90');
+    dashboardKpiSetScope('instrument','I1');
+    return{period:dashKpiPeriod,instrument:dashKpiInstrument,start:dashKpiLast.insight.period.start,end:dashKpiLast.insight.period.end,scope:dashKpiLast.items.length};
+  });
+  check('Bộ lọc 90 ngày cập nhật đúng khoảng KPI',filtered.period==='90'&&filtered.start==='2026-05-01'&&filtered.end==='2026-07-29',JSON.stringify(filtered));
+  check('Lọc thiết bị thu hẹp đúng phạm vi xét nghiệm',filtered.instrument==='I1'&&filtered.scope===1,JSON.stringify(filtered));
+
+  await page.evaluate(() => {dashKpiPeriod='30';dashKpiInstrument='all';dashboardKpiSetScope('test','T-NA');dashboardKpiOpenDetail('rejected');});
+  await page.waitForSelector('.dash-kpi-detail-wrap [data-qc-point-id], .dash-kpi-detail-wrap tbody tr');
+  const detail = await page.evaluate(() => ({title:(document.querySelector('.dash-kpi-modal h3')||{}).innerText||'',rows:document.querySelectorAll('.dash-kpi-detail-wrap tbody tr').length,text:(document.querySelector('.dash-kpi-detail-wrap')||{}).innerText||''}));
+  check('Bấm KPI mở danh sách điểm bị loại đúng phạm vi',detail.rows>=1&&/28\/07\/2026/.test(detail.text),JSON.stringify(detail));
+  await page.locator('.dash-kpi-detail-wrap tbody tr').filter({hasText:'28/07/2026'}).locator('.btn').click();
+  await page.waitForSelector('[data-qc-point-id="KPI-REJ"].qc-point-evidence-focus');
+  const linked=await page.evaluate(()=>({page,entryStart,entryEnd}));
+  check('Drill-down KPI mở đúng điểm QC nguồn',linked.page==='entry'&&linked.entryStart==='2026-07-28'&&linked.entryEnd==='2026-07-28',JSON.stringify(linked));
+
+  await page.evaluate(()=>go('settings'));
+  await page.fill('#kpiQcRejectMax','3.5');
+  await page.fill('#kpiCapaEffectiveMin','88');
+  await page.fill('#kpiCloseDaysMax','10');
+  await page.fill('#kpiOnTimeMin','92');
+  await page.click('#kpiTargets .btn.teal');
+  await page.waitForSelector('#dialogRoot .modal');
+  const targets=await page.evaluate(()=>({...state.lab.kpiTargets}));
+  check('Quản trị lưu được mục tiêu KPI tùy chỉnh',JSON.stringify(targets)===JSON.stringify({qcRejectMax:3.5,capaEffectiveMin:88,closeDaysMax:10,onTimeMin:92}),JSON.stringify(targets));
+  await page.evaluate(()=>closeDialogOverlay());
+}
+
 (async () => {
   const session = await openSeededSession();
   NCE = buildNce(session.seedState);
@@ -549,8 +622,10 @@ async function checkOverdueReachesDashboard(page) {
     await checkNewRecordDraftSurvivesRerender(session.page);
     await checkMissingFieldIsPinpointed(session.page);
     await checkRerunChipOnBothSurfaces(session.page);
+    await checkEvidenceTimelineAndLink(session.page);
     await checkOverdueAndEscalation(session.page);
     await checkOverdueReachesDashboard(session.page);
+    await checkDashboardKpiControls(session.page);
     check('Không có lỗi console/page', pageErrors.length === 0, pageErrors.join(' | '));
   } catch (err) {
     fails.push('NGOẠI LỆ: ' + err.message);

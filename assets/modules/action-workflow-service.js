@@ -52,7 +52,7 @@
     if(!a||!(+a.protocolVersion>=2))return{complete:actionRecorded(a),missing:actionRecorded(a)?[]:['hành động và người thực hiện'],missingKeys:actionRecorded(a)?[]:['action']};
     const missing=[],missingKeys=[];
     const need=(cond,label,key)=>{if(cond){missing.push(label);missingKeys.push(key);}};
-    need(!!a.date&&a.date>isoToday(),'ngày xảy ra sự cố không được ở tương lai','date');
+    need(!!a.date&&a.date>isoToday(),'ngày ghi nhận sự cố không được ở tương lai','date');
     need(!SOURCE_LABELS[a.eventSource],'nguồn phát hiện','eventSource');
     need(!PHASE_LABELS[a.processPhase],'giai đoạn quá trình','processPhase');
     need(!CONTAINMENT_LABELS[a.containmentStatus],'kiểm soát tức thời (mục 1)','containmentStatus');
@@ -85,7 +85,7 @@
       draft.missing.forEach((label,i)=>{missing.push(label);const section=DRAFT_SECTION[draft.missingKeys[i]]||'ident';bySection[section].push(label);});
       need(!RISK_LABELS[a.riskLevel]||![1,2,3,4,5].includes(+a.riskSeverity)||![1,2,3,4,5].includes(+a.riskOccurrence)||![1,2,3,4,5].includes(+a.riskDetectability),'đánh giá nguy cơ','risk');
       need(+a.protocolVersion>=3&&!!RISK_LABELS[a.riskLevel]&&[a.riskSeverity,a.riskOccurrence,a.riskDetectability].every(v=>[1,2,3,4,5].includes(+v))&&String(a.riskBasis||'').trim().length<5,'căn cứ phân loại nguy cơ theo SOP','risk');
-      need(!!a.date&&!!a.dueDate&&a.dueDate<a.date,'hạn hoàn thành không được trước ngày sự cố','ident');
+      need(!!a.date&&!!a.dueDate&&a.dueDate<a.date,'hạn hoàn thành không được trước ngày ghi nhận sự cố','ident');
     }
     /* Chi ho so v1 moi can kiem rieng — v2 da kiem containment trong actionDraftStatus,
        lap lai se dem thanh hai muc thieu khac chuoi va thoi phong so tren dai tom tat. */
@@ -99,17 +99,19 @@
     need(!CAUSE_LABELS[a.causeCategory]||String(a.cause||'').trim().length<5,'nguyên nhân','cause');
     need(String(a.action||'').trim().length<5,'hành động khắc phục','cause');
     need(+a.protocolVersion>=3&&String(a.action||'').trim().length>=5&&!a.actionCompletedDate,'ngày hoàn thành hành động khắc phục','cause');
-    need(!!a.actionCompletedDate&&!!a.date&&a.actionCompletedDate<a.date,'ngày hoàn thành hành động không được trước ngày sự cố','cause');
+    need(!!a.actionCompletedDate&&!!a.date&&a.actionCompletedDate<a.date,'ngày hoàn thành hành động không được trước ngày ghi nhận sự cố','cause');
     need(!!a.actionCompletedDate&&a.actionCompletedDate>isoToday(),'ngày hoàn thành hành động không được ở tương lai','cause');
     const releaseRequired=+a.protocolVersion>=3&&a.containmentStatus==='held';
     need(releaseRequired&&!RELEASE_LABELS[a.releaseStatus],'quyết định cho phép hoạt động/trả kết quả trở lại','cause');
     if(releaseRequired&&RELEASE_LABELS[a.releaseStatus]){
+      const rerun=actionNeedsRerun(a)?actionRerunStatus(a):null;
       need(!a.releaseDate,'ngày cho phép hoạt động/trả kết quả trở lại','cause');
       need(String(a.releaseBy||'').trim().length<2,'người cho phép hoạt động/trả kết quả trở lại','cause');
       need(String(a.releaseNote||'').trim().length<5,'căn cứ cho phép hoạt động/trả kết quả trở lại','cause');
       need(!!a.releaseDate&&!!a.actionCompletedDate&&a.releaseDate<a.actionCompletedDate,'ngày cho phép trở lại không được trước ngày hoàn thành hành động','cause');
+      need(!!a.releaseDate&&!!(rerun&&rerun.point&&rerun.point.date)&&a.releaseDate<rerun.point.date,'ngày cho phép trở lại không được trước QC chạy lại được dùng làm bằng chứng','cause');
       need(!!a.releaseDate&&a.releaseDate>isoToday(),'ngày cho phép trở lại không được ở tương lai','cause');
-      need(a.releaseStatus==='released'&&actionNeedsRerun(a)&&!actionRerunStatus(a).ok,'chỉ được cho phép trở lại sau khi QC chạy lại được chấp nhận','cause');
+      need(a.releaseStatus==='released'&&actionNeedsRerun(a)&&!(rerun&&rerun.ok),'chỉ được cho phép trở lại sau khi QC chạy lại được chấp nhận','cause');
     }
     need(!PATIENT_LABELS[a.patientImpact],'đánh giá ảnh hưởng bệnh nhân','patient');
     need(['held','affected'].includes(a.patientImpact)&&String(a.patientAction||'').trim().length<5,'xử lý kết quả bệnh nhân','patient');
@@ -158,8 +160,8 @@
     if(a.effectivenessStatus!=='pending'&&+a.protocolVersion>=3){
       if(String(a.effectivenessNote||'').trim().length<5||!a.effectivenessDate)return{required:true,complete:false,effective:false,label:'Cần ngày và bằng chứng đánh giá hiệu lực',cls:'rej',escalated:false};
       if(!a.actionCompletedDate)return{required:true,complete:false,effective:false,label:'Cần ngày hoàn thành hành động trước khi đánh giá hiệu lực',cls:'rej',escalated:false};
-      const earliest=[a.date,a.actionCompletedDate,a.releaseDate].filter(Boolean).sort().pop()||'';
-      if(earliest&&a.effectivenessDate<earliest)return{required:true,complete:false,effective:false,label:'Ngày đánh giá hiệu lực phải sau ngày hoàn thành hành động',cls:'rej',escalated:false};
+      const rerun=actionNeedsRerun(a)?actionRerunStatus(a):null,latestPrereq=[a.date,a.actionCompletedDate,a.releaseDate,rerun&&rerun.point&&rerun.point.date].filter(Boolean).sort().pop()||'';
+      if(latestPrereq&&a.effectivenessDate<latestPrereq)return{required:true,complete:false,effective:false,label:'Ngày đánh giá hiệu lực không được trước hành động, quyết định cho phép hoặc QC chạy lại dùng làm bằng chứng',cls:'rej',escalated:false};
       if(a.effectivenessDate>isoToday())return{required:true,complete:false,effective:false,label:'Ngày đánh giá hiệu lực không được ở tương lai',cls:'rej',escalated:false};
     }
     if(a.effectivenessStatus==='effective'){
@@ -200,8 +202,52 @@
     const creator=identityText(a.by),identities=[user.name,user.username].map(identityText).filter(Boolean);
     return !creator||!identities.includes(creator);
   }
+  /* actionRerunStatus() quet toan bo state.data[testId], va gio con bi goi tu
+     actionProtocolStatus() (nhanh release) lan actionEffectivenessStatus() chu khong
+     chi tu actionWorkflowStatus() — do duoc 5 lan quet lai CUNG mot ho so cho moi dong
+     bang nhat ky. Voi 40 000 diem x 600 ho so la 1 602ms moi lan ve, ma trang nay
+     rerender o moi lan luu / loc / dong bo Firebase doi ve.
+     Memo hoa theo id ho so, chu ky gom moi truong cua ho so ma phep tinh doc toi, nen
+     sua ho so (vd doi actionCompletedDate) tu lam moi ma khong can clearDerived —
+     quan trong vi luu ho so dung save({clearDerived:false}). Du lieu QC doi thi
+     clearDerived()/clearDerivedForTest() goi invalidateActionCaches() nhu cac memo khac
+     (wgMemo/acceptedMemo/cusumMemo). Ho so chua co id (object tam trong addAction)
+     khong duoc memo de map khong phinh vo han. */
+  const rerunMemo=new Map(),pointIndexMemo=new Map(),lotIndexMemo=new Map();
+  function invalidateActionCaches(testId){
+    if(testId==null){rerunMemo.clear();pointIndexMemo.clear();lotIndexMemo.clear();return;}
+    pointIndexMemo.delete(testId);
+    [...lotIndexMemo.keys()].forEach(k=>{if(String(k).startsWith(testId+'|'))lotIndexMemo.delete(k);});
+    [...rerunMemo.keys()].forEach(k=>{const hit=rerunMemo.get(k);if(hit&&hit.testId===testId)rerunMemo.delete(k);});
+  }
+  /* Diem cua dung (xet nghiem, muc, lo), da bo diem huy va sap theo ngay/lan chay.
+     Khong dung pointsForLot() cua qc-domain vi cache do chi duoc xa qua clearDerived();
+     index o day tu kiem chung bang tham chieu + do dai mang nhu rerunMemo, nen thay
+     nguyen state hay them/bot diem deu tu truot. */
+  function actionLotPoints(testId,level,lot){
+    const points=(state.data&&state.data[testId])||null,key=testId+'|'+level+'|'+(lot||''),hit=lotIndexMemo.get(key);
+    if(hit&&hit.points===points&&hit.len===(points?points.length:-1))return hit.list;
+    const list=(points||[]).filter(x=>!x.voided&&+x.level===+level&&(x.lot||'')===(lot||''))
+      .sort((x,y)=>String(x.date||'').localeCompare(String(y.date||''))||pointRunNo(x)-pointRunNo(y));
+    lotIndexMemo.set(key,{points,len:points?points.length:-1,list});
+    return list;
+  }
+  function actionPointIndex(testId){
+    const points=(state.data&&state.data[testId])||null,hit=pointIndexMemo.get(testId);
+    if(hit&&hit.points===points&&hit.len===(points?points.length:-1))return hit.index;
+    const index=new Map((points||[]).map(p=>[p.id,p]));
+    pointIndexMemo.set(testId,{points,len:points?points.length:-1,index});
+    return index;
+  }
   function actionPoint(a){
-    return a&&a.pointId?((state.data&&state.data[a.testId])||[]).find(p=>p.id===a.pointId)||null:null;
+    return a&&a.pointId?actionPointIndex(a.testId).get(a.pointId)||null:null;
+  }
+  function actionEventDate(a){
+    const p=actionPoint(a);
+    return p&&p.date||a&&a.date||'';
+  }
+  function actionOpenedFromVoid(a,p){
+    return !!(a&&p&&p.voided&&(a.openedFromVoid===true||(p.voidedAt&&a.createdAt&&p.voidedAt===a.createdAt)));
   }
   function actionNeedsRerun(a){
     const t=state.tests.find(x=>x.id===(a&&a.testId)),p=actionPoint(a);
@@ -217,21 +263,52 @@
      số lần chạy phải lớn hơn như rào cũ. */
   function actionRerunGateDate(a,p){
     const gates=[p&&p.date||''];
-    if(+a.protocolVersion>=3&&a.actionCompletedDate)gates.push(a.actionCompletedDate);
+    /* Hồ sơ sinh ngay lúc hủy điểm dùng cùng timestamp cho point.voidedAt và
+       action.createdAt. Khi đó lượt QC hợp lệ có thể đã được chạy sau điểm sai
+       nhưng trước thao tác hủy hành chính, nên không chặn nó bằng ngày hoàn
+       thành hồ sơ. Hồ sơ mở theo cách thông thường vẫn giữ rào nhân-quả này. */
+    const openedFromVoid=actionOpenedFromVoid(a,p);
+    if(+a.protocolVersion>=3&&a.actionCompletedDate&&!openedFromVoid)gates.push(a.actionCompletedDate);
     if(a.parentNceId&&a.date)gates.push(a.date);
     return gates.filter(Boolean).sort().pop()||'';
   }
-  function actionRerunStatus(a){
+  function actionRerunSignature(a){
+    return[a.id,a.testId,a.pointId,+a.protocolVersion||0,a.actionCompletedDate||'',a.parentNceId||'',a.date||'',a.openedFromVoid?1:0].join('|');
+  }
+  function computeActionRerunStatus(a){
     if(!actionNeedsRerun(a))return{needed:false,ok:true,label:'Không yêu cầu',cls:'none',point:null};
     const t=state.tests.find(x=>x.id===a.testId),p=actionPoint(a),wg=activeWestgard(t),runNo=pointRunNo(p);
     if(+a.protocolVersion>=3&&!a.actionCompletedDate)return{needed:true,ok:false,label:'Chờ hoàn thành hành động trước khi xác nhận QC chạy lại',cls:'warn',point:null};
     const gateDate=actionRerunGateDate(a,p);
-    const rerun=((state.data&&state.data[a.testId])||[])
-      .filter(x=>!x.voided&&x.id!==p.id&&x.level===p.level&&x.date>=gateDate&&(x.date>p.date||(x.date===p.date&&pointRunNo(x)>runNo))&&(x.lot||'')===(p.lot||''))
-      .sort((x,y)=>String(x.date||'').localeCompare(String(y.date||''))||pointRunNo(x)-pointRunNo(y))
-      .find(x=>{const f=wg.byPoint.get(x.id)||{level:'ok'};return f.level!=='rej';});
+    /* Duyet actionLotPoints() — da loc san dung muc + dung lo, da bo diem huy va da sap
+       theo ngay/lan chay. Truoc day ham nay quet
+       TOAN BO state.data[testId] cho tung ho so: voi 40 000 diem x 600 ho so la 5 894ms
+       moi lan ve bang nhat ky. Mang da sap nen dung ngay o ung vien dau tien hop le. */
+    let rerun=null;
+    const candidates=actionLotPoints(a.testId,p.level,p.lot||'');
+    for(let i=0;i<candidates.length;i++){
+      const x=candidates[i];
+      if(x.voided||x.id===p.id||+x.level!==+p.level||(x.lot||'')!==(p.lot||''))continue;
+      if(x.date<gateDate)continue;
+      if(!(x.date>p.date||(x.date===p.date&&pointRunNo(x)>runNo)))continue;
+      if((wg.byPoint.get(x.id)||{level:'ok'}).level==='rej')continue;
+      rerun=x;break;
+    }
     if(rerun){const verdict=wg.byPoint.get(rerun.id)||{level:'ok'},warning=verdict.level==='warn';return{needed:true,ok:true,label:`${warning?'QC chấp nhận lại (cảnh báo)':'QC đạt lại'}: ${fmt(rerun.val)} (${rerun.runId||'lần sau'})`,cls:warning?'warn':'ok',point:rerun};}
-    return{needed:true,ok:false,label:`Chờ QC chạy lại không bị loại${gateDate?' từ '+vnDate(gateDate):''}`,cls:'warn',point:null};
+    return{needed:true,ok:false,label:`Chờ QC chạy lại được chấp nhận${gateDate?' từ '+vnDate(gateDate):''}`,cls:'warn',point:null};
+  }
+  /* Memo TU KIEM CHUNG: ngoai chu ky cua ho so, con giu chinh THAM CHIEU mang diem QC
+     va do dai cua no. Nho vay thay nguyen state (test swap state, boot lai, merge) hay
+     them/bot diem deu tu truot cache ma khong phai trong cho ai do nho goi clearDerived.
+     Sua gia tri tai cho van di qua save({testId}) -> clearDerivedForTest nhu moi memo
+     khac trong app, nen invalidateActionCaches() ben duoi lo not truong hop do. */
+  function actionRerunStatus(a){
+    if(!a||!a.id)return computeActionRerunStatus(a);
+    const points=(state.data&&state.data[a.testId])||null,sig=actionRerunSignature(a),hit=rerunMemo.get(a.id);
+    if(hit&&hit.sig===sig&&hit.points===points&&hit.len===(points?points.length:-1))return hit.result;
+    const result=computeActionRerunStatus(a);
+    rerunMemo.set(a.id,{sig,testId:a.testId,points,len:points?points.length:-1,result});
+    return result;
   }
   function actionWorkflowStatus(a){
     if(actionCancelled(a))return{complete:false,cancelled:true,cls:'none',label:'Đã hủy hồ sơ',stage:'cancelled',rerun:{needed:false,ok:false,label:'Hồ sơ đã hủy',cls:'none',point:null},protocol:actionProtocolStatus(a),effectiveness:actionEffectivenessStatus(a)};
@@ -265,6 +342,6 @@
     return actionWorkflowStatus(real[real.length-1]);
   }
 
-  root.ActionWorkflowService={ACTION_LABELS,nextNceId,nceDueDate,actionApprovalStatus,actionRecordStatus,actionCancelled,actionApprovalLabel,actionRecorded,actionDraftStatus,actionProtocolStatus,actionProtocolSummary,actionRiskScore,actionResidualRiskScore,actionActiveFollowUp,actionEffectivenessStatus,actionOverdue,actionCanApprove,actionPoint,actionNeedsRerun,actionRerunStatus,actionWorkflowStatus,pointActions,pointRealActions,pointWorkflowComplete,pointWorkflowSummary};
+  root.ActionWorkflowService={ACTION_LABELS,invalidateActionCaches,nextNceId,nceDueDate,actionApprovalStatus,actionRecordStatus,actionCancelled,actionApprovalLabel,actionRecorded,actionDraftStatus,actionProtocolStatus,actionProtocolSummary,actionRiskScore,actionResidualRiskScore,actionActiveFollowUp,actionEffectivenessStatus,actionOverdue,actionCanApprove,actionPoint,actionEventDate,actionNeedsRerun,actionRerunStatus,actionWorkflowStatus,pointActions,pointRealActions,pointWorkflowComplete,pointWorkflowSummary};
   Object.assign(root,root.ActionWorkflowService);
 })(typeof globalThis!=='undefined'?globalThis:this);

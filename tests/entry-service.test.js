@@ -209,6 +209,8 @@ const plain = v => JSON.parse(JSON.stringify(v));
   assert.equal(state.actions[0].rule, '1-3s');
   assert.equal(state.actions[0].errorType, 'RE — Sai số ngẫu nhiên');
   assert.equal(state.actions[0].qcVerdict, 'rej');
+  assert.equal(state.actions[0].date, '2026-07-01', 'ngày hồ sơ phải phản ánh ngày điểm QC xảy ra, không phải ngày thao tác hủy');
+  assert.equal(state.actions[0].openedFromVoid, true, 'hồ sơ sinh từ thao tác hủy phải giữ nguồn tạo rõ ràng');
   assert.match(state.actions[0].correction, /Kết quả QC thực tế không hợp lệ/);
 }
 

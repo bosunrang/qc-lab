@@ -16,7 +16,7 @@
 // name set changes.
 
 // --- UI state accessors (Object.defineProperty(globalThis, ...) in *-ui-state.js) ---
-declare var selTest: any, statusMemo: any, wgTestQ: any, dashTestQ: any, dashTestStatus: any,
+declare var selTest: any, statusMemo: any, wgTestQ: any, dashTestQ: any, dashTestStatus: any, dashKpiPeriod: any, dashKpiStart: any, dashKpiEnd: any, dashKpiInstrument: any, dashKpiTest: any, dashKpiLast: any,
   wgPrevOpen: any, wgExpandedRows: any, wgViewMode: any, wgArchivedGroupId: any,
   wgArchivedTestId: any, wgArchivedTestQ: any, wgChartMode: any;
 declare var currentUser: any, loginFails: any, loginLockUntil: any;
@@ -43,9 +43,9 @@ declare var nextRunId: any, cleanEntryRunId: any;
 
 // action-workflow-service.js does Object.assign(root, root.ActionWorkflowService)
 declare var actionApprovalStatus: any, actionRecordStatus: any, actionCancelled: any, actionApprovalLabel: any, actionRecorded: any, actionCanApprove: any,
-  actionPoint: any, actionNeedsRerun: any, actionRerunStatus: any, actionWorkflowStatus: any,
+  actionPoint: any, actionEventDate: any, actionNeedsRerun: any, actionRerunStatus: any, actionWorkflowStatus: any,
   actionDraftStatus: any, actionProtocolStatus: any, actionProtocolSummary: any, actionRiskScore: any, actionResidualRiskScore: any, actionActiveFollowUp: any, actionEffectivenessStatus: any,
-  ACTION_LABELS: any, nextNceId: any, nceDueDate: any, actionOverdue: any,
+  ACTION_LABELS: any, invalidateActionCaches: any, nextNceId: any, nceDueDate: any, actionOverdue: any,
   pointActions: any, pointRealActions: any, pointWorkflowComplete: any, pointWorkflowSummary: any;
 
 // core.js (UMD) exposes itself as window.QCCore; referenced bare everywhere else

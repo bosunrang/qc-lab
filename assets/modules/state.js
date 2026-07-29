@@ -220,7 +220,7 @@ function normalizeLotGroups(){
   });
   if(drop.size)state.lotGroups=state.lotGroups.filter(g=>!drop.has(g.id));
 }
-function clearDerived(){pointsCache.clear();pointsIndexCache.clear();pointsLotCache.clear();wgMemo.clear();acceptedMemo.clear();cusumMemo.clear();derivedIndex=null;try{statusMemo=new Map();}catch(e){}try{invalidateWestgardWorker();}catch(e){}}
+function clearDerived(){pointsCache.clear();pointsIndexCache.clear();pointsLotCache.clear();wgMemo.clear();acceptedMemo.clear();cusumMemo.clear();derivedIndex=null;try{statusMemo=new Map();}catch(e){}try{invalidateWestgardWorker();}catch(e){}try{invalidateActionCaches();}catch(e){}}
 function clearDerivedForTest(testId){
   const prefix=String(testId||'')+'|';
   [pointsCache,pointsIndexCache,pointsLotCache,cusumMemo].forEach(cache=>[...cache.keys()].forEach(k=>{if(String(k).startsWith(prefix))cache.delete(k);}));
@@ -228,6 +228,7 @@ function clearDerivedForTest(testId){
   [...acceptedMemo.keys()].forEach(k=>{if(String(k).startsWith(prefix))acceptedMemo.delete(k);});
   try{if(statusMemo&&statusMemo.delete)statusMemo.delete(testId);}catch(e){}
   try{invalidateWestgardWorker(testId);}catch(e){}
+  try{invalidateActionCaches(testId);}catch(e){}
 }
 function userName(){return currentUser?(currentUser.name||currentUser.username||'Người dùng'):'Hệ thống';}
 function staffInitials(name){return String(name||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').split(/[^A-Za-z0-9]+/).filter(Boolean).map(x=>x.charAt(0)).join('').toUpperCase().slice(0,8)||'—';}

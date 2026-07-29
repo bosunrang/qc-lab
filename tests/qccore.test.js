@@ -249,7 +249,7 @@ function close(actual, expected, epsilon = 1e-9) {
 
 {
   const backup = QCCore.sanitizeBackup({
-    lab: { name: 'Lab <A>' },
+    lab: { name: 'Lab <A>', kpiTargets: { qcRejectMax: '4.5', capaEffectiveMin: 120, closeDaysMax: 0, onTimeMin: 85 } },
     tests: [{
       id: 'T1',
       name: 'Glucose',
@@ -268,6 +268,7 @@ function close(actual, expected, epsilon = 1e-9) {
     users: []
   });
   assert.equal(backup.lab.name, 'Lab ‹A›');
+  assert.deepEqual(backup.lab.kpiTargets, { qcRejectMax: 4.5, capaEffectiveMin: 100, closeDaysMax: 1, onTimeMin: 85 });
   assert.equal(backup.data.T1.length, 1);
   assert.equal(backup.data.T1[0].val, 10.5);
   assert.equal(backup.tests[0].ruleScopes['6x'], 'across');
@@ -408,13 +409,14 @@ function close(actual, expected, epsilon = 1e-9) {
 }
 
 {
-  const cleaned=QCCore.sanitizeBackup({lab:{},tests:[],data:{},activity:[],users:[],actions:[{id:'NCE1',protocolVersion:3,nceId:'NCE-20260727-A001',eventSource:'iqc',processPhase:'exam',correction:'Dừng trả kết quả',dueDate:'2026-07-30',updatedAt:'2026-07-28T01:00:00.000Z',contentEditorUserIds:['u1','u1',''],contentEditorUsernames:['Admin','admin',''],qcVerdict:'rej',riskSeverity:7,riskOccurrence:2,riskDetectability:1,riskLevel:'high',riskBasis:'SOP-QC-07, bảng 3',actionCompletedDate:'2026-07-30',releaseStatus:'released',releaseDate:'2026-07-30',releaseBy:'Phụ trách khoa',releaseNote:'QC đã được chấp nhận',effectivenessStatus:'effective',effectivenessDate:'2026-07-31',effectivenessNote:'Không tái diễn',residualSeverity:3,residualOccurrence:1,residualDetectability:2,residualRiskLevel:'low',residualRiskBasis:'Đánh giá lại theo SOP-QC-07',effectivenessBy:'QO'}]});
+  const cleaned=QCCore.sanitizeBackup({lab:{},tests:[],data:{},activity:[],users:[],actions:[{id:'NCE1',protocolVersion:3,nceId:'NCE-20260727-A001',openedFromVoid:true,eventSource:'iqc',processPhase:'exam',correction:'Dừng trả kết quả',dueDate:'2026-07-30',updatedAt:'2026-07-28T01:00:00.000Z',contentEditorUserIds:['u1','u1',''],contentEditorUsernames:['Admin','admin',''],qcVerdict:'rej',riskSeverity:7,riskOccurrence:2,riskDetectability:1,riskLevel:'high',riskBasis:'SOP-QC-07, bảng 3',actionCompletedDate:'2026-07-30',releaseStatus:'released',releaseDate:'2026-07-30',releaseBy:'Phụ trách khoa',releaseNote:'QC đã được chấp nhận',effectivenessStatus:'effective',effectivenessDate:'2026-07-31',effectivenessNote:'Không tái diễn',residualSeverity:3,residualOccurrence:1,residualDetectability:2,residualRiskLevel:'low',residualRiskBasis:'Đánh giá lại theo SOP-QC-07',effectivenessBy:'QO'}]});
   const action=cleaned.actions[0];
   assert.equal(action.protocolVersion,3);
   assert.deepEqual(action.contentEditorUserIds,['u1']);
   assert.deepEqual(action.contentEditorUsernames,['admin']);
   assert.equal(action.actionCompletedDate,'2026-07-30');
   assert.equal(action.releaseStatus,'released');
+  assert.equal(action.openedFromVoid,true);
   assert.equal(action.releaseDate,'2026-07-30');
   assert.equal(action.releaseBy,'Phụ trách khoa');
   assert.equal(action.releaseNote,'QC đã được chấp nhận');
