@@ -1,8 +1,8 @@
 window.QCLAB_APP = {
   name: 'QC Lab',
-  version: '2.5.4',
-  releaseDate: '2026-07-28',
-  build: 'nce-workflow'
+  version: '2.5.5',
+  releaseDate: '2026-07-29',
+  build: 'nce-v3-kpi'
 };
 
 // Cấu hình đám mây khi deploy (tùy chọn).
