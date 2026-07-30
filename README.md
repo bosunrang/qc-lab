@@ -5,7 +5,7 @@ quy tắc Westgard đa mức, chỉ số Six Sigma, biểu đồ Levey-Jennings,
 thuốc thử, CUSUM và quy trình QC theo hướng ISO 15189. Toàn bộ giao diện bằng
 tiếng Việt.
 
-Phiên bản hiện tại: **2.5.1**
+Phiên bản hiện tại: **2.6.0**
 
 ## Đặc điểm kỹ thuật
 

@@ -1,8 +1,8 @@
 window.QCLAB_APP = {
   name: 'QC Lab',
-  version: '2.5.5',
-  releaseDate: '2026-07-29',
-  build: 'nce-v3-kpi'
+  version: '2.6.0',
+  releaseDate: '2026-07-30',
+  build: 'mu-uncertainty'
 };
 
 // Cấu hình đám mây khi deploy (tùy chọn).
