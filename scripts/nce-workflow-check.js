@@ -30,6 +30,14 @@ function check(name, ok, detail = '') {
   else fails.push(name + (detail ? ' — ' + detail : ''));
 }
 
+/* Mọi mốc ngày phải so với NGÀY CHẠY, không viết cứng: bản đầu ghi thẳng '29/07/2026'
+   và '2026-05-01'/'2026-07-29' nên CI xanh đúng một ngày rồi đỏ mãi từ 30/07/2026 —
+   ngày hoàn thành hành động rơi vào TRƯỚC ngày ghi nhận (bị actionMissing() tính là
+   còn thiếu) và khoảng KPI 90 ngày trôi đi một ngày. `today` luôn lấy từ isoToday()
+   của trang, không phải Date của Node, để khớp múi giờ app đang thấy. */
+const shiftIso = (iso, days) => { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + days); return d.toISOString().slice(0, 10); };
+const vnOf = iso => iso.split('-').reverse().join('/');
+
 /* Hồ sơ NCE đầy đủ, gắn với một điểm QC CÓ THẬT trong seed. Lấy id từ seed thay vì
    viết cứng 'T1'/'T1-L1-3': bản trước viết cứng nên bản ghi trỏ vào một xét nghiệm và
    một điểm không tồn tại, khiến mọi khẳng định về liên kết điểm QC đều rỗng ruột. */
@@ -250,10 +258,13 @@ async function checkSectionChipsRefreshWhileTyping(page) {
   const causeNeedsDate = { text: await chip('cause').innerText(), title: await chip('cause').getAttribute('title') };
   check('Chip nguyên nhân còn ngày hoàn thành và quyết định cho phép trở lại',
     /Còn thiếu 2 mục/.test(causeNeedsDate.text) && /ngày hoàn thành/i.test(causeNeedsDate.title || '') && /quyết định cho phép/i.test(causeNeedsDate.title || ''), JSON.stringify(causeNeedsDate));
-  await page.fill('#aActionCompletedDate', '29/07/2026');
+  // Lấy đúng ngày ghi nhận đang hiện trên form (mặc định hôm nay): ngày hoàn thành và
+  // ngày cho phép trở lại không được nằm trước nó, xem action-workflow-service.js.
+  const eventDateVn = await page.inputValue('#aDate');
+  await page.fill('#aActionCompletedDate', eventDateVn);
   check('Sau ngày hoàn thành, cổng cho phép trở lại vẫn còn thiếu', /Còn thiếu 1 mục/.test(await chip('cause').innerText()));
   await page.selectOption('#aReleaseStatus', 'released');
-  await page.fill('#aReleaseDate', '29/07/2026');
+  await page.fill('#aReleaseDate', eventDateVn);
   await page.fill('#aReleaseBy', 'Quản trị viên');
   await page.fill('#aReleaseNote', 'Đã xác nhận điều kiện hoạt động an toàn');
   check('Chip nguyên nhân đổi sang đã xong khi đủ quyết định cho phép trở lại', /Đã xong/.test(await chip('cause').innerText()));
@@ -561,16 +572,18 @@ async function checkOverdueReachesDashboard(page) {
 }
 
 async function checkDashboardKpiControls(page) {
-  const rendered = await page.evaluate(() => {
+  // Điểm bị loại phải nằm trong kỳ 30 ngày đang xét → tính lùi từ hôm nay.
+  const today = await page.evaluate(() => isoToday()), rejDate = shiftIso(today, -2);
+  const rendered = await page.evaluate((rejDate) => {
     const t=state.tests[0],l=t.levels[0];
-    state.data[t.id].push({id:'KPI-REJ',date:'2026-07-28',runId:'2026-07-28-1',level:l.level,lot:l.lot,val:l.mean+l.sd*4,qcMean:l.mean,qcSd:l.sd});
+    state.data[t.id].push({id:'KPI-REJ',date:rejDate,runId:rejDate+'-1',level:l.level,lot:l.lot,val:l.mean+l.sd*4,qcMean:l.mean,qcSd:l.sd});
     clearDerived();dashKpiPeriod='30';dashKpiInstrument='all';dashKpiTest='all';go('dash');
     return{
       cards:document.querySelectorAll('.dash-quality-kpi').length,
       filters:document.querySelectorAll('.dash-kpi-filters select').length,
       hasRejected:[...document.querySelectorAll('.dash-quality-kpi')].some(x=>/Tỷ lệ QC bị loại/.test(x.innerText)&&!/—/.test(x.innerText))
     };
-  });
+  }, rejDate);
   check('Dashboard KPI có đủ bốn thẻ có thể mở chi tiết',rendered.cards===4,JSON.stringify(rendered));
   check('Dashboard KPI có bộ lọc kỳ, thiết bị và xét nghiệm',rendered.filters===3,JSON.stringify(rendered));
   check('KPI nhận đúng điểm Westgard bị loại trong kỳ',rendered.hasRejected===true,JSON.stringify(rendered));
@@ -580,17 +593,17 @@ async function checkDashboardKpiControls(page) {
     dashboardKpiSetScope('instrument','I1');
     return{period:dashKpiPeriod,instrument:dashKpiInstrument,start:dashKpiLast.insight.period.start,end:dashKpiLast.insight.period.end,scope:dashKpiLast.items.length};
   });
-  check('Bộ lọc 90 ngày cập nhật đúng khoảng KPI',filtered.period==='90'&&filtered.start==='2026-05-01'&&filtered.end==='2026-07-29',JSON.stringify(filtered));
+  check('Bộ lọc 90 ngày cập nhật đúng khoảng KPI',filtered.period==='90'&&filtered.start===shiftIso(today,-89)&&filtered.end===today,JSON.stringify({...filtered,expect:shiftIso(today,-89)+'..'+today}));
   check('Lọc thiết bị thu hẹp đúng phạm vi xét nghiệm',filtered.instrument==='I1'&&filtered.scope===1,JSON.stringify(filtered));
 
   await page.evaluate(() => {dashKpiPeriod='30';dashKpiInstrument='all';dashboardKpiSetScope('test','T-NA');dashboardKpiOpenDetail('rejected');});
   await page.waitForSelector('.dash-kpi-detail-wrap [data-qc-point-id], .dash-kpi-detail-wrap tbody tr');
   const detail = await page.evaluate(() => ({title:(document.querySelector('.dash-kpi-modal h3')||{}).innerText||'',rows:document.querySelectorAll('.dash-kpi-detail-wrap tbody tr').length,text:(document.querySelector('.dash-kpi-detail-wrap')||{}).innerText||''}));
-  check('Bấm KPI mở danh sách điểm bị loại đúng phạm vi',detail.rows>=1&&/28\/07\/2026/.test(detail.text),JSON.stringify(detail));
-  await page.locator('.dash-kpi-detail-wrap tbody tr').filter({hasText:'28/07/2026'}).locator('.btn').click();
+  check('Bấm KPI mở danh sách điểm bị loại đúng phạm vi',detail.rows>=1&&detail.text.includes(vnOf(rejDate)),JSON.stringify(detail));
+  await page.locator('.dash-kpi-detail-wrap tbody tr').filter({hasText:vnOf(rejDate)}).locator('.btn').click();
   await page.waitForSelector('[data-qc-point-id="KPI-REJ"].qc-point-evidence-focus');
   const linked=await page.evaluate(()=>({page,entryStart,entryEnd}));
-  check('Drill-down KPI mở đúng điểm QC nguồn',linked.page==='entry'&&linked.entryStart==='2026-07-28'&&linked.entryEnd==='2026-07-28',JSON.stringify(linked));
+  check('Drill-down KPI mở đúng điểm QC nguồn',linked.page==='entry'&&linked.entryStart===rejDate&&linked.entryEnd===rejDate,JSON.stringify(linked));
 
   await page.evaluate(()=>go('settings'));
   await page.fill('#kpiQcRejectMax','3.5');
