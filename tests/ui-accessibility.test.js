@@ -20,6 +20,7 @@ const settingsCss = read('assets/professional-settings.css');
 const usersCss = read('assets/professional-users.css');
 const westgardCss = read('assets/professional-westgard.css');
 const actionsRoutes = read('assets/modules/actions-routes.js');
+const reportRoutes = read('assets/modules/report-routes.js');
 const westgardRoutes = read('assets/modules/westgard-routes.js');
 const indexHtml = read('index.html');
 const cssFiles = fs.readdirSync(path.join(root, 'assets')).filter(name => name.endsWith('.css'));
@@ -48,8 +49,10 @@ assert.equal((entryCss.match(/!important/g) || []).length, 0, 'entry UI must not
 assert.equal((dashboardCss.match(/!important/g) || []).length, 0, 'dashboard UI must not depend on !important');
 assert.match(sigmaCss, /\.sg-eqa-table th\{[^}]*text-transform:none/);
 assert.match(sigmaCss, /\.sg-eqa-summary span\{[^}]*text-transform:none/);
-assert.match(actionsRoutes, /function reportActionIcon\(type\)/);
-assert.match(actionsRoutes, /reportActionIcon\('print'\)/);
+// Icon nút của trang Báo cáo đi theo trang sang report-routes.js (tách 2026-07-30).
+assert.match(reportRoutes, /function reportActionIcon\(type\)/);
+assert.match(reportRoutes, /reportActionIcon\('print'\)/);
+assert.match(reportRoutes, /aria-hidden="true"/);
 assert.match(actionsRoutes, /aria-hidden="true"/);
 assert.match(tokens, /--panel-content-gap:14px/);
 assert.match(tokens, /--panel-header-min-height:44px/);

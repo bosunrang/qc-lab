@@ -20,6 +20,7 @@
 | 18 | benchmark gate | `npm run verify-release` |
 | 19 | CSS/modal/router | `npm run a11y-audit` |
 | 20 | electron main/preload/license | license, electron-preload, print-check |
+| 21 | core `uncertaintyBudget`, sigma MU panel/modal, reports MU card | uncertainty, sigma-print tests; `npm run a11y-audit` (modal `sigma:mu-budget`) |
 
 Mỗi lần release, lưu stdout của:
 

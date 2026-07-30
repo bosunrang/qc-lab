@@ -49,6 +49,38 @@ function sigmaPeriodPrintRows(row,levels){
 function sigmaPeriodsPrintRows(rows,levels){
   return(rows||[]).flatMap(row=>{const period=vnPeriod(row.e.period)||row.e.period||'?';return(levels||[]).map((level,i)=>{const r=row.rs&&row.rs[i];if(!r)return'<tr><td><b>'+esc(period)+'</b></td><td>Mức '+level+'</td><td colspan="9" class="muted">Chưa đủ CV IQC và Bias EQA/EQC để tính Sigma</td></tr>';const source=r.cvSource==='iqc-period'||r.cvSource==='iqc-cohort'?((r.n||0)+' điểm'+(r.sourceLot?' · Lô '+esc(r.sourceLot):'')):'Nhập tay',sigma=(r.classifiable?'':'≈')+fmt(r.sigma,2);return'<tr><td><b>'+esc(period)+'</b></td><td><b>Mức '+level+'</b></td><td class="num">'+fmt(r.tea,2)+'</td><td class="num"><b style="color:'+escAttr(r.c)+'">'+sigma+'</b></td><td><span class="pill" style="color:'+escAttr(r.c)+'">'+esc(r.label)+'</span></td><td class="num">'+fmt(r.cv,2)+'</td><td class="num">'+fmt(r.bias,2)+'</td><td class="num">'+sgFmtDPMO(r.dpmo)+'</td><td class="num">'+fmt(r.yld,4)+'%</td><td>'+source+'</td><td>'+esc(r.readinessLabel||r.cohortStatus||'—')+'</td></tr>';});}).join('');
 }
+/* Bảng công bố độ không đảm bảo đo cho bản in. Số liệu lấy THẲNG r.mu mà sgComp()
+   đã gắn — cùng một phép tính với panel MU trên trang Sigma — và chỉ rơi về sgMU()
+   cho những mức chưa ra được Sigma (thiếu Bias), để bản in không bao giờ khác màn
+   hình. Không tự điền 0 cho thành phần còn thiếu: cột Trạng thái phải nói ra. */
+function sigmaMuCells(t,row,level,i){
+  const r=row&&row.rs&&row.rs[i],mu=(r&&r.mu)||sgMU(t,row.e,level),unit=t&&t.unit||'';
+  if(!mu)return'<td colspan="7" class="muted">Chưa có CV IQC — chưa lập được ngân sách MU</td>';
+  const uBias=!mu.includeBias?'Không cộng':mu.uBias==null?'Chưa có Bias':fmt(mu.uBias,2),uCal=mu.uCal==null?'Chưa có CoA':fmt(mu.uCal,2);
+  const abs=mu.absoluteU==null?'—':fmt(mu.absoluteU,3)+(unit?' '+esc(unit):'');
+  return'<td class="num">'+fmt(mu.uRw,2)+'</td><td class="num">'+uBias+'</td><td class="num">'+uCal+'</td><td class="num">'+fmt(mu.uc,2)+'</td><td class="num"><b>'+fmt(mu.U,2)+'</b></td><td class="num">'+abs+'</td><td>'+(mu.complete?'<span class="pill">Đủ thành phần</span>':'Thiếu '+esc(mu.missing.join(', ')))+'</td>';
+}
+function sigmaMuPrintRows(t,row,levels){
+  return(levels||[]).map((level,i)=>'<tr><td><b>Mức '+level+'</b></td>'+sigmaMuCells(t,row,level,i)+'</tr>').join('');
+}
+function sigmaMuPeriodsPrintRows(t,rows,levels){
+  return(rows||[]).flatMap(row=>{const period=vnPeriod(row.e.period)||row.e.period||'?';
+    return(levels||[]).map((level,i)=>'<tr><td><b>'+esc(period)+'</b></td><td><b>Mức '+level+'</b></td>'+sigmaMuCells(t,row,level,i)+'</tr>');}).join('');
+}
+function sigmaMuTrace(row,levels){
+  const trace=[];
+  (levels||[]).forEach(level=>{const L=(row.e.lv&&row.e.lv[level])||{};if(L.uCalBasis)trace.push('Mức '+level+' · nguồn u(cal): '+esc(L.uCalBasis));});
+  const signed=(levels||[]).map(level=>(row.e.lv&&row.e.lv[level])||{}).find(L=>L.muReviewedBy||L.muReviewedDate);
+  if(signed)trace.push('Người rà soát ngân sách MU: '+esc(signed.muReviewedBy||'—')+(signed.muReviewedDate?' · '+vnDate(signed.muReviewedDate):''));
+  return trace;
+}
+const SIGMA_MU_PRINT_NOTE='<p class="soft-note">Mô hình top-down (ISO/TS 20914 · Nordtest TR 537): u(Rw) là CV% dài hạn của IQC, u(bias) = √(Bias² + u(Cref)²) từ EQA/EQC, u(cal) chép từ CoA của calibrator; u<sub>c</sub> = √(Σu²) và U = 2·u<sub>c</sub> (xấp xỉ 95%). Giới hạn MU cho phép (MAU) do SOP của đơn vị ấn định — báo cáo này không tự kết luận đạt/không đạt. Ngân sách còn thiếu thành phần không được công bố như một giá trị MU hoàn chỉnh.</p>';
+function sigmaMuPrintCard(t,row,levels){
+  const trace=sigmaMuTrace(row,levels);
+  return'<div class="rpt-card"><h3>Độ không đảm bảo đo (MU) — ISO 15189:2022 §7.3.4</h3><div class="body">'+
+    '<table><tr><th>Mức</th><th>u(Rw) %</th><th>u(bias) %</th><th>u(cal) %</th><th>u<sub>c</sub> %</th><th>U (k=2) %</th><th>U tại Mean</th><th>Trạng thái</th></tr>'+sigmaMuPrintRows(t,row,levels)+'</table>'+
+    (trace.length?'<p class="hint">'+trace.join('<br>')+'</p>':'')+SIGMA_MU_PRINT_NOTE+'</div></div>';
+}
 async function printSigmaPeriod(periodId){
   const t=state.tests.find(x=>x.id===sgTest),entry=t&&sgData(t.id).find(x=>x.id===periodId);if(!t||!entry){await infoDialog('Chưa chọn được kỳ Sigma để in.');return;}
   const levels=sgVisibleLevels(t),row=sgRows(t,[entry],levels)[0],exportRows=sigmaReportRows(t.id,'period',entry.period,entry.id);if(!row||!row.rs.some(Boolean)||!exportRows.length){await infoDialog('Kỳ này chưa đủ dữ liệu Sigma để tạo báo cáo in.');return;}
@@ -57,6 +89,7 @@ async function printSigmaPeriod(periodId){
   body+='<table><tr><th style="width:18%">Xét nghiệm</th><td>'+esc(testDisplayName(t))+(t.unit?' · '+esc(t.unit):'')+'</td><th style="width:15%">Kỳ báo cáo</th><td>'+esc(period)+'</td></tr><tr><th>Thiết bị</th><td>'+esc(machine)+'</td><th>Nguồn TEa</th><td>'+esc(trace||'Chưa có thông tin truy xuất')+'</td></tr></table>';
   body+='<div class="rpt-card"><h3>Kết quả Six Sigma theo mức QC</h3><div class="body"><table><tr><th>Mức</th><th>TEa (%)</th><th>Sigma</th><th>Xếp loại</th><th>CV IQC (%)</th><th>Bias EQA (%)</th><th>DPMO</th><th>Yield</th><th>Nguồn CV</th><th>Trạng thái dữ liệu</th></tr>'+sigmaPeriodPrintRows(row,levels)+'</table><p class="soft-note">DPMO và Yield là quy đổi tham khảo với dịch 1,5σ. CV nhập tay vẫn được tính Sigma nhưng không dùng để tự động đề xuất thiết kế QC.</p></div></div>';
   body+='<div class="rpt-card"><h3>Thiết kế QC theo Sigma (OPSpecs)</h3><div class="body">'+sgFrequencyHTML(t,row,levels)+'</div></div>';
+  body+=sigmaMuPrintCard(t,row,levels);
   if(valid.length)body+='<div class="rpt-chart-grid"><div class="rpt-card rpt-chart"><h3>Biểu đồ Sigma</h3><div class="body">'+sgTrendSVG(t,valid,levels)+'</div></div><div class="rpt-card rpt-chart"><h3>Biểu đồ Quyết định Phương pháp (MDC)</h3><div class="body">'+sgMDCSVG(t,valid,levels)+'</div></div></div>';
   else body+='<p class="soft-note">Kỳ này chưa có mức đủ điều kiện phân loại để vẽ biểu đồ Sigma và MDC.</p>';
   body+=signBlock();await openPrint('Báo cáo Six Sigma — '+testDisplayName(t)+' — '+period,body,{landscape:true});
@@ -68,6 +101,7 @@ async function printSigmaPeriods(){
   let body=reportHeader('BÁO CÁO TỔNG HỢP SIX SIGMA THEO KỲ — '+esc(testDisplayName(t)),'So sánh hiệu năng phương pháp giữa các kỳ đánh giá');
   body+='<table><tr><th style="width:18%">Xét nghiệm</th><td>'+esc(testDisplayName(t))+(t.unit?' · '+esc(t.unit):'')+'</td><th style="width:15%">Các kỳ báo cáo</th><td>'+esc(periods||'—')+'</td></tr><tr><th>Thiết bị</th><td>'+esc(machine)+'</td><th>Nguồn TEa</th><td>'+esc(trace||'Chưa có thông tin truy xuất')+'</td></tr></table>';
   body+='<div class="rpt-card"><h3>So sánh kết quả Six Sigma theo kỳ</h3><div class="body"><table><tr><th>Kỳ</th><th>Mức</th><th>TEa (%)</th><th>Sigma</th><th>Xếp loại</th><th>CV IQC (%)</th><th>Bias EQA (%)</th><th>DPMO</th><th>Yield</th><th>Nguồn CV</th><th>Trạng thái dữ liệu</th></tr>'+sigmaPeriodsPrintRows(rows,levels)+'</table><p class="soft-note">DPMO và Yield là quy đổi tham khảo với dịch 1,5σ. CV nhập tay vẫn được tính Sigma nhưng không dùng để tự động đề xuất thiết kế QC.</p></div></div>';
+  body+='<div class="rpt-card"><h3>Độ không đảm bảo đo (MU) theo kỳ — ISO 15189:2022 §7.3.4</h3><div class="body"><table><tr><th>Kỳ</th><th>Mức</th><th>u(Rw) %</th><th>u(bias) %</th><th>u(cal) %</th><th>u<sub>c</sub> %</th><th>U (k=2) %</th><th>U tại Mean</th><th>Trạng thái</th></tr>'+sigmaMuPeriodsPrintRows(t,rows,levels)+'</table>'+SIGMA_MU_PRINT_NOTE+'</div></div>';
   if(valid.length)body+='<div class="rpt-chart-grid"><div class="rpt-card rpt-chart"><h3>Xu hướng Sigma theo kỳ</h3><div class="body">'+sgTrendSVG(t,valid,levels)+'</div></div><div class="rpt-card rpt-chart"><h3>Biểu đồ Quyết định Phương pháp (MDC)</h3><div class="body">'+sgMDCSVG(t,valid,levels)+'</div></div></div>';
   else body+='<p class="soft-note">Các kỳ hiện có chưa đủ điều kiện phân loại để vẽ biểu đồ Sigma và MDC.</p>';
   body+=signBlock();await openPrint('Báo cáo tổng hợp Six Sigma theo kỳ — '+testDisplayName(t),body,{landscape:true});

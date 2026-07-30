@@ -28,7 +28,7 @@ declare var entrySel: any, entryDays: any, entryStart: any, entryEnd: any, entry
 declare var manageQ: any, manageTab: any, manageTargetPanel: any, manageTargetGroup: any,
   manageTargetLevel: any, manageHistoryTest: any, targetSwitchCtx: any, configNavScroll: any;
 declare var rcId: any, rcSaveT: any, rcModalQ: any, rcCreateModalQ: any, rcQuickType: any;
-declare var sgTest: any, sgRefreshT: any, sgBiasCtx: any, sgAddTestQ: any, sgSelectedPeriods: any;
+declare var sgTest: any, sgRefreshT: any, sgBiasCtx: any, sgMuCtx: any, sgAddTestQ: any, sgSelectedPeriods: any;
 
 // --- UI state namespace bags (`root.XxxUIState = state`) ---
 declare var AnalysisUIState: any, AuthUIState: any, EntryUIState: any, ManageUIState: any,

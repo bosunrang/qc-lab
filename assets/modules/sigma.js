@@ -106,7 +106,31 @@ function sgSetLevelTeaSnapshot(t,e,level,force=false){e.lv=e.lv||{};const L=e.lv
 function sgEntryTea(t,e,level,refs){const L=e&&e.lv&&e.lv[level]||{};if(Number.isFinite(+L.tea)&&+L.tea>0)return+L.tea;if(e&&Number.isFinite(+e.tea)&&+e.tea>0)return+e.tea;return sgTeaBySource(t,e&&e.teaSource||sgTeaSource(t),sgLevelTarget(t,L,level),refs);}
 function sgIsAutoCV(L){return!!L&&['iqc-period','iqc-cohort'].includes(L.cvSource);}
 function sgReadiness(L){if(!sgIsAutoCV(L))return{status:'manual',label:'CV nhập tay — chưa xác nhận bằng nhóm dữ liệu IQC cùng lô/mức',classifiable:true,qcpEligible:false};const status=['insufficient','provisional','eligible','unstable'].includes(L.cohortStatus)?L.cohortStatus:(+L.n<20?'insufficient':+L.n<30?'provisional':'eligible');if(status==='insufficient')return{status,label:'Chưa đủ 20 điểm QC',classifiable:false,qcpEligible:false};if(status==='unstable')return{status,label:'Nhóm dữ liệu IQC không ổn định',classifiable:false,qcpEligible:false};if(status==='provisional')return{status,label:'Kết quả tạm thời (20–29 điểm)',classifiable:true,qcpEligible:false};return{status:'eligible',label:'Đủ điều kiện dữ liệu',classifiable:true,qcpEligible:true};}
-function sgComp(t,e,level,refs){const L=(e.lv&&e.lv[level])||{},cv=parseFloat(L.cv),b=parseFloat(sgBiasVal(L)),tea=sgEntryTea(t,e,level,refs),metric=QCCore.sigmaMetric(tea,b,cv);if(!metric)return null;const{sigma,dpmo}=metric,ready=sgReadiness(L),zone=ready.classifiable?sgZone(sigma):{c:'#6b756f',label:ready.label},warnings=[],meta=sgTeaSourceMeta(t,e.teaSource||sgTeaSource(t));if(Math.abs(b)>=tea)warnings.push('|Bias| đã bằng hoặc vượt TEa');if(ready.status!=='eligible')warnings.push(ready.label);return{cv,bias:b,biasMethod:L.biasEqaMethod||'manual',biasLabel:L.biasEqaMethod==='rms'?SG_BIAS_LABEL+' (RMS)':SG_BIAS_LABEL,tea,teaTarget:Number.isFinite(+L.teaTarget)?+L.teaTarget:null,teaCriterionRule:L.teaCriterionRule||'',teaCriterionPercent:Number.isFinite(+L.teaCriterionPercent)?+L.teaCriterionPercent:null,teaCriterionAbsolute:Number.isFinite(+L.teaCriterionAbsolute)?+L.teaCriterionAbsolute:null,teaCriterionUnit:L.teaCriterionUnit||'',teaSource:e.teaSource||sgTeaSource(t),teaLabel:e.teaLabel||sgTeaLabel(sgTeaSource(t)),teaReference:e.teaReference||sgTeaRefText(t),teaSourceId:e.teaSourceId||meta.id||'',teaSourceVersion:e.teaSourceVersion||meta.version||'',teaSourceUrl:e.teaSourceUrl||meta.url||'',teaEffectiveDate:e.teaEffectiveDate||meta.effectiveDate||'',teaReviewedDate:e.teaReviewedDate||meta.reviewedDate||'',teaReviewedBy:e.teaReviewedBy||meta.reviewedBy||'',cvSource:L.cvSource||'manual',n:Number.isFinite(+L.n)?+L.n:null,sourceStart:L.sourceStart||'',sourceEnd:L.sourceEnd||'',sourceLot:L.sourceLot||'',cohortStatus:ready.status,classifiable:ready.classifiable,qcpEligible:ready.qcpEligible,readinessLabel:ready.label,warning:warnings.join(' · ')||null,sigma,dpmo,yld:metric.yieldPercent,dse:sigma-1.65,run:ready.qcpEligible?sgRun(sigma):null,...zone};}
+/* ===== Độ không đảm bảo đo (MU) — ISO 15189:2022 §7.3.4 =====
+   Toán nằm ở QCCore.uncertaintyBudget(); phần này chỉ nối các đầu vào ĐÃ CÓ của
+   trang Sigma vào đó: CV cohort một lô → u(Rw), các vòng EQA → u(bias), CoA
+   calibrator do người dùng nhập → u(cal). */
+/* u(Cref) của chính ước lượng Bias: sai số chuẩn của trung bình các vòng EQA
+   (SD giữa các vòng / √n). Một vòng duy nhất không có độ phân tán để ước lượng
+   — trả null, ngân sách khi đó chỉ còn |bias| đúng như Nordtest TR 537 cho phép. */
+function sgBiasRefU(rounds){
+  const b=sgBiasStats(rounds).valid.map(r=>r.bias);if(b.length<2)return null;
+  const m=b.reduce((s,v)=>s+v,0)/b.length,sd=Math.sqrt(b.reduce((s,v)=>s+(v-m)*(v-m),0)/(b.length-1));
+  return Number.isFinite(sd)?sd/Math.sqrt(b.length):null;
+}
+function sgMuBiasMode(L){return L&&L.muBiasMode==='exclude'?'exclude':'include';}
+/* MU phải tính TỪ CÙNG MỘT CHỖ cho màn hình, báo cáo in và Excel: sgComp() gắn
+   sẵn kết quả vào r.mu, còn panel gọi lại sgMU() cho những mức chưa ra Sigma —
+   thiếu Bias thì sgComp() trả null nhưng MU vẫn phải hiện kèm cờ thiếu thành phần,
+   vì một ngân sách còn hở chính là thứ đánh giá viên cần nhìn thấy. */
+function sgMU(t,e,level,tea,refs){
+  const L=(e&&e.lv&&e.lv[level])||{},teaNum=Number(tea);
+  return QCCore.uncertaintyBudget({cv:L.cv,bias:sgBiasVal(L),biasRefU:sgBiasRefU(L.eqaRounds),uCal:L.uCal,
+    includeBias:sgMuBiasMode(L)==='include',
+    tea:Number.isFinite(teaNum)&&teaNum>0?teaNum:sgEntryTea(t,e,level,refs),
+    target:sgLevelTarget(t,L,level),k:2});
+}
+function sgComp(t,e,level,refs){const L=(e.lv&&e.lv[level])||{},cv=parseFloat(L.cv),b=parseFloat(sgBiasVal(L)),tea=sgEntryTea(t,e,level,refs),metric=QCCore.sigmaMetric(tea,b,cv);if(!metric)return null;const{sigma,dpmo}=metric,ready=sgReadiness(L),zone=ready.classifiable?sgZone(sigma):{c:'#6b756f',label:ready.label},warnings=[],meta=sgTeaSourceMeta(t,e.teaSource||sgTeaSource(t));if(Math.abs(b)>=tea)warnings.push('|Bias| đã bằng hoặc vượt TEa');if(ready.status!=='eligible')warnings.push(ready.label);return{cv,bias:b,biasMethod:L.biasEqaMethod||'manual',biasLabel:L.biasEqaMethod==='rms'?SG_BIAS_LABEL+' (RMS)':SG_BIAS_LABEL,tea,teaTarget:Number.isFinite(+L.teaTarget)?+L.teaTarget:null,teaCriterionRule:L.teaCriterionRule||'',teaCriterionPercent:Number.isFinite(+L.teaCriterionPercent)?+L.teaCriterionPercent:null,teaCriterionAbsolute:Number.isFinite(+L.teaCriterionAbsolute)?+L.teaCriterionAbsolute:null,teaCriterionUnit:L.teaCriterionUnit||'',teaSource:e.teaSource||sgTeaSource(t),teaLabel:e.teaLabel||sgTeaLabel(sgTeaSource(t)),teaReference:e.teaReference||sgTeaRefText(t),teaSourceId:e.teaSourceId||meta.id||'',teaSourceVersion:e.teaSourceVersion||meta.version||'',teaSourceUrl:e.teaSourceUrl||meta.url||'',teaEffectiveDate:e.teaEffectiveDate||meta.effectiveDate||'',teaReviewedDate:e.teaReviewedDate||meta.reviewedDate||'',teaReviewedBy:e.teaReviewedBy||meta.reviewedBy||'',cvSource:L.cvSource||'manual',n:Number.isFinite(+L.n)?+L.n:null,sourceStart:L.sourceStart||'',sourceEnd:L.sourceEnd||'',sourceLot:L.sourceLot||'',cohortStatus:ready.status,classifiable:ready.classifiable,qcpEligible:ready.qcpEligible,readinessLabel:ready.label,warning:warnings.join(' · ')||null,mu:sgMU(t,e,level,tea,refs),muBiasMode:sgMuBiasMode(L),uCalBasis:L.uCalBasis||'',muReviewedBy:L.muReviewedBy||'',muReviewedDate:L.muReviewedDate||'',sigma,dpmo,yld:metric.yieldPercent,dse:sigma-1.65,run:ready.qcpEligible?sgRun(sigma):null,...zone};}
 /* Dựng effectiveTeaRefs() một lần cho cả lượt (mọi kỳ × mọi mức của xét nghiệm
    đang xem) thay vì để mỗi ô tự build lại — bảng TEa hiệu lực không đổi trong
    một lượt render. sgPendingRows cache kết quả cho đúng MỘT lần sgRefresh() gọi
@@ -253,6 +277,7 @@ function pageSigma(){
       <div class="hint sg-sigma-input-note">${esc(teaHint)} Mỗi mức dùng <b>CV từ IQC</b> và <b>Bias từ EQA/EQC</b>; nhiều vòng EQA được tổng hợp bằng <b>RMS</b> để tránh triệt tiêu dấu. Dữ liệu IQC không được dùng để tính Bias. Quy tắc thận trọng của phần mềm: &lt;20 điểm chỉ hiển thị ước tính, 20–29 điểm là tạm thời, ≥30 điểm mới dùng để gợi ý QC. DPMO/Yield chỉ là quy đổi tham khảo với dịch 1,5σ.${isOperational?'':' Nhóm lô hiện không vận hành; các kỳ cũ vẫn lấy CV theo đúng lô và Mean/SD đã lưu trong lịch sử IQC.'}</div></div>
    <div class="panel"><h3 class="sg-setup-heading">Tình trạng</h3><div id="sgStatus"></div></div></div>
    <div class="panel"><h3>Thiết kế QC theo Sigma (OPSpecs)</h3><div id="sgFreq"></div></div>
+   <div class="panel"><h3>Độ không đảm bảo đo (MU) — ISO 15189:2022 §7.3.4</h3><div id="sgMU"></div></div>
     <div class="panel"><div class="sg-data-head"><h3>Số liệu theo kỳ</h3><div class="sg-data-head-actions">${headerActions}</div></div>
      ${data.length?`<div class="sg-simple-table-wrap"><table class="sg-simple-table" style="min-width:${tableMin}px">${colGroup}${tableHead}<tbody>${rows}</tbody></table></div>`:'<div class="empty" style="margin:14px 16px 10px">Chưa có kỳ nào.</div>'}
     </div>
@@ -281,6 +306,51 @@ function sgFrequencyHTML(t,selectedRow,levels){
   return `${periodHint}<table><thead><tr><th>Mức</th><th class="num">Sigma</th><th>Bộ quy tắc QC gợi ý (OPSpecs)</th><th>Mức nguy cơ tham khảo</th><th>Hành động</th></tr></thead><tbody>${rows}</tbody></table>${govBlock}
     <div class="alert info" style="display:block;margin-top:8px">Gợi ý theo <b>Westgard Sigma Rules</b> chỉ là điểm khởi đầu. Phần mềm <b>không tự đổi</b> bộ quy tắc của xét nghiệm — người phụ trách rà soát rồi tự cấu hình trong Cài đặt Westgard theo đánh giá nguy cơ, độ ổn định hệ thống, khối lượng mẫu và hậu quả lâm sàng.</div>`;
 }
+const SG_MU_MODEL_NOTE='Mô hình <b>top-down</b> (ISO/TS 20914 · Nordtest TR 537): <b>u(Rw)</b> là CV% dài hạn của IQC (cùng cohort một lô đang dùng cho Sigma), <b>u(bias)</b> = √(Bias² + u(Cref)²) từ các vòng EQA/EQC, <b>u(cal)</b> chép từ CoA của calibrator. u<sub>c</sub> = √(Σu²) và <b>U = 2·u<sub>c</sub></b> (xấp xỉ 95%).';
+const SG_MU_COMPONENT_LABELS={uRw:'u(Rw)',uBias:'u(bias)',uCal:'u(cal)'};
+/* Thành phần chiếm phần lớn PHƯƠNG SAI mới là thứ đáng đi sửa trước: u_c cộng bậc
+   hai nên một thành phần gấp đôi thành phần kia đã chiếm ~80% ngân sách. Chỉ nêu
+   khi nó thực sự trội (>50%), tránh gợi ý sai khi ba thành phần xấp xỉ nhau. */
+function sgMuDominant(mu){
+  const entries=Object.entries((mu&&mu.shares)||{}).filter(([,v])=>Number.isFinite(v));
+  if(entries.length<2)return'';
+  const top=entries.sort((a,b)=>b[1]-a[1])[0];
+  return top[1]>.5?`${SG_MU_COMPONENT_LABELS[top[0]]||top[0]} chiếm ${fmt(top[1]*100,0)}%`:'';
+}
+function sgMuStateChip(mu){
+  if(!mu)return '<span class="tag none">Chưa có CV IQC</span>';
+  if(!mu.complete)return `<span class="tag warn">Thiếu ${esc(mu.missing.join(', '))}</span>`;
+  return '<span class="tag ok">Đủ thành phần</span>';
+}
+/* Không tự chấm đạt/không đạt: giới hạn MU cho phép (MAU) phải do SOP của đơn vị
+   ấn định. Phần mềm chỉ đặt U cạnh TEa để thấy tỉ lệ, và tô đỏ khi U đã vượt TEa
+   — lúc đó khoảng 95% của phép đo đã rộng hơn sai số tổng cho phép, là điều không
+   cần SOP nào cũng thấy được là bất thường. */
+function sgMuHTML(t,row,levels){
+  if(!row)return '<div class="hint">Chưa có kỳ Sigma nào để lập ngân sách độ không đảm bảo đo.</div>';
+  const unit=t.unit||'',e=row.e,trace=[];
+  const cells=levels.map((l,i)=>{
+    const r=row.rs[i],mu=(r&&r.mu)||sgMU(t,e,l),L=(e.lv&&e.lv[l])||{};
+    if(L.uCalBasis)trace.push(`Mức ${l} · nguồn u(cal): ${esc(L.uCalBasis)}`);
+    if(!mu)return `<tr><td><b>Mức ${l}</b></td><td colspan="8" class="muted">Chưa có CV IQC — chưa tính được MU</td></tr>`;
+    const uBias=!mu.includeBias?'<span class="muted">không cộng</span>':mu.uBias==null?'<span class="muted">chưa có Bias</span>':fmt(mu.uBias,2)+(mu.biasRefU!=null?`<div class="sg-cell-meta">gồm u(Cref) ${fmt(mu.biasRefU,2)}</div>`:'');
+    const uCal=mu.uCal==null?'<span class="muted">chưa nhập CoA</span>':fmt(mu.uCal,2);
+    const abs=mu.absoluteU==null?'<span class="muted">chưa có Mean</span>':fmt(mu.absoluteU,3)+(unit?' '+esc(unit):'');
+    const ratio=mu.teaRatio==null?'<span class="muted">—</span>':`<b style="color:${mu.withinTea?'var(--teal)':'var(--red)'}">${fmt(mu.teaRatio*100,0)}%</b>`;
+    const dominant=sgMuDominant(mu);
+    return `<tr><td><b>Mức ${l}</b></td><td class="num">${fmt(mu.uRw,2)}</td><td class="num">${uBias}</td><td class="num">${uCal}</td><td class="num">${fmt(mu.uc,2)}${dominant?`<div class="sg-cell-meta">${esc(dominant)}</div>`:''}</td><td class="num"><b>${fmt(mu.U,2)}</b></td><td class="num">${abs}</td><td class="num">${ratio}</td><td>${sgMuStateChip(mu)}</td></tr>`;
+  }).join('');
+  const reviewer=levels.map(l=>(e.lv&&e.lv[l])||{}).find(L=>L.muReviewedBy||L.muReviewedDate);
+  if(reviewer)trace.push(`Người rà soát: ${esc(reviewer.muReviewedBy||'—')}${reviewer.muReviewedDate?' · '+vnDate(reviewer.muReviewedDate):''}`);
+  const excluded=levels.filter(l=>sgMuBiasMode((e.lv&&e.lv[l])||{})==='exclude');
+  const exclNote=excluded.length?`<div class="alert warn" style="display:block;margin-top:8px">Mức ${excluded.join(', ')} đang <b>không cộng u(bias)</b> vào ngân sách. ISO/TS 20914 chỉ chấp nhận điều này khi độ chệch đã được điều tra và hiệu chỉnh — hãy lưu bằng chứng hiệu chỉnh trong SOP/hồ sơ tương ứng.</div>`:'';
+  const action=canWrite()?btn('Nhập u(cal) từ CoA & rà soát MU',`sgOpenMU('${jsq(e.id)}')`,'teal sm','Nhập độ không đảm bảo của calibrator, chọn cách xử lý độ chệch và ghi người rà soát'):'';
+  return `<div class="hint sg-selected-period-hint">Kỳ đang xem: <b>${esc(vnPeriod(e.period)||e.period||'?')}</b>${action?' ':''}${action}</div>
+    <table><thead><tr><th>Mức</th><th class="num">u(Rw) %</th><th class="num">u(bias) %</th><th class="num">u(cal) %</th><th class="num">u<sub>c</sub> %</th><th class="num">U (k=2) %</th><th class="num">U tại Mean</th><th class="num">U / TEa</th><th>Trạng thái</th></tr></thead><tbody>${cells}</tbody></table>
+    ${trace.length?`<div class="hint" style="margin-top:6px">${trace.join('<br>')}</div>`:''}
+    ${exclNote}
+    <div class="alert info" style="display:block;margin-top:8px">${SG_MU_MODEL_NOTE} Giới hạn MU cho phép (MAU) <b>phải do SOP của đơn vị ấn định</b> — phần mềm chỉ đặt U cạnh TEa để so sánh, không tự kết luận đạt/không đạt. Ngân sách còn thiếu thành phần thì <b>không được công bố</b> như một giá trị MU hoàn chỉnh.</div>`;
+}
 function sgRefresh(){
   const t=state.tests.find(x=>x.id===sgTest);if(!t)return;const data=sgData(t.id);const levels=sgVisibleLevels(t);
   const cached=sgPendingRows&&sgPendingRows.tid===t.id&&sgPendingRows.data===data?sgPendingRows.rows:null;sgPendingRows=null;
@@ -300,6 +370,7 @@ function sgRefresh(){
   const tr=document.getElementById('sgTrend');if(tr)tr.innerHTML=sgTrendSVG(t,classifiable,levels);
   const md=document.getElementById('sgMDC');if(md)md.innerHTML=sgMDCSVG(t,classifiable,levels);
   const fq=document.getElementById('sgFreq');if(fq)fq.innerHTML=sgFrequencyHTML(t,selectedRow,levels);
+  const muBox=document.getElementById('sgMU');if(muBox)muBox.innerHTML=sgMuHTML(t,selectedRow,levels);
 }
 function sgTips(t,r,lvl){
   if(!r||!r.classifiable||r.sigma>=4)return '';
@@ -420,6 +491,92 @@ async function sgBiasApply(){
   if(!sgBiasCtx)return;sgBiasCtx.rounds=sgBiasRowsFromDom();const stats=sgBiasStats(sgBiasCtx.rounds);if(!stats.valid.length){await infoDialog('Chưa có vòng hợp lệ để tính Bias.');return;}
   sgBiasCtx.periodIds=sgBiasPeriodsFromDom();if(!sgBiasCtx.periodIds.length){await infoDialog('Chưa chọn kỳ nào để áp dụng Bias.');return;}
   const validRounds=stats.valid.map(r=>({lab:r.lab,target:r.target})),applied=sgApplyBiasToPeriods(sgData(sgTest),sgBiasCtx.periodIds,sgBiasCtx.level,stats.rms,validRounds);if(!applied)return;save({clearDerived:false,sigmaTestId:sgTest});closeModal();rerender();
+}
+/* Modal MU sửa MỘT LẦN mọi mức của kỳ đang xem rồi áp cho nhiều kỳ, giống modal
+   Bias: u(cal) là thuộc tính của LÔ CALIBRATOR chứ không của tháng, nên bắt nhập
+   lại từng kỳ chỉ tạo cơ hội gõ lệch nhau giữa các kỳ dùng chung một CoA. */
+function sgMuRowsFromDom(){
+  return [...document.querySelectorAll('.sg-mu-row')].map(tr=>({level:Number(tr.dataset.level),uCal:tr.querySelector('[data-f="uCal"]').value,uCalBasis:tr.querySelector('[data-f="uCalBasis"]').value,muBiasMode:tr.querySelector('[data-f="muBiasMode"]').value}));
+}
+function sgMuPeriodsFromDom(){const boxes=[...document.querySelectorAll('[data-sg-mu-period]')];return boxes.length?boxes.filter(x=>x.checked).map(x=>x.value):(sgMuCtx&&sgMuCtx.periodIds||[]);}
+function sgMuCaptureDom(){
+  if(!sgMuCtx)return;
+  if(document.querySelector('.sg-mu-row'))sgMuCtx.rows=sgMuRowsFromDom();
+  sgMuCtx.periodIds=sgMuPeriodsFromDom();
+  const by=document.getElementById('sgMuBy'),dt=document.getElementById('sgMuDate');
+  if(by)sgMuCtx.reviewedBy=by.value;if(dt)sgMuCtx.reviewedDate=dt.value;
+}
+/* Xem trước dùng ĐÚNG QCCore.uncertaintyBudget() như bảng ngoài trang, chỉ thay
+   u(cal)/chế độ bias bằng thứ đang gõ dở — nếu tự nhân chia lại ở đây thì con số
+   trong modal và con số sau khi bấm "Áp dụng" có thể lệch nhau mà không ai biết. */
+function sgMuPreview(level){
+  if(!sgMuCtx)return null;
+  const t=state.tests.find(x=>x.id===sgTest),e=sgData(sgTest).find(x=>x.id===sgMuCtx.eid);if(!t||!e)return null;
+  const row=(sgMuCtx.rows||[]).find(r=>r.level===level)||{},L=(e.lv&&e.lv[level])||{};
+  return QCCore.uncertaintyBudget({cv:L.cv,bias:sgBiasVal(L),biasRefU:sgBiasRefU(L.eqaRounds),uCal:row.uCal,includeBias:row.muBiasMode!=='exclude',tea:sgEntryTea(t,e,level),target:sgLevelTarget(t,L,level),k:2});
+}
+function sgMuUpdatePreview(){
+  sgMuCaptureDom();
+  document.querySelectorAll('[data-sg-mu-preview]').forEach(cell=>{
+    const mu=sgMuPreview(Number(cell.dataset.sgMuPreview));
+    cell.innerHTML=mu?`u<sub>c</sub> ${fmt(mu.uc,2)}% · <b>U ${fmt(mu.U,2)}%</b>${mu.complete?'':` <span class="muted">(thiếu ${esc(mu.missing.join(', '))})</span>`}`:'<span class="muted">chưa có CV IQC</span>';
+  });
+}
+function sgOpenMU(eid){
+  if(!requireWrite())return;
+  const t=state.tests.find(x=>x.id===sgTest),e=sgData(sgTest).find(x=>x.id===eid);if(!t||!e)return;
+  e.lv=e.lv||{};
+  const levels=sgVisibleLevels(t),signed=levels.map(l=>e.lv[l]||{}).find(L=>L.muReviewedBy||L.muReviewedDate)||{};
+  sgMuCtx={eid,levels,periodIds:[eid],
+    rows:levels.map(l=>{const L=e.lv[l]||{};return{level:l,uCal:L.uCal??'',uCalBasis:L.uCalBasis||'',muBiasMode:sgMuBiasMode(L)};}),
+    reviewedBy:signed.muReviewedBy||userName(),reviewedDate:vnDate(signed.muReviewedDate||isoDate())};
+  sgRenderMuModal();
+}
+function sgRenderMuModal(){
+  const c=sgMuCtx;if(!c)return;
+  const periods=[...sgData(sgTest)].sort((a,b)=>String(a.period||'').localeCompare(String(b.period||'')));
+  const rows=c.rows.map(r=>`<tr class="sg-mu-row" data-level="${r.level}"><td><b>Mức ${r.level}</b></td>
+    <td><input type="number" step="any" min="0" data-f="uCal" aria-label="u(cal) phần trăm cho mức ${r.level}" value="${escAttr(r.uCal??'')}" placeholder="%" oninput="sgMuUpdatePreview()"></td>
+    <td><input type="text" data-f="uCalBasis" aria-label="Nguồn CoA của u(cal) cho mức ${r.level}" value="${escAttr(r.uCalBasis||'')}" placeholder="VD: CoA calibrator lô 1234, mục U(k=2)" oninput="sgMuUpdatePreview()"></td>
+    <td><select data-f="muBiasMode" aria-label="Cách xử lý độ chệch cho mức ${r.level}" onchange="sgMuUpdatePreview()"><option value="include" ${r.muBiasMode!=='exclude'?'selected':''}>Cộng u(bias)</option><option value="exclude" ${r.muBiasMode==='exclude'?'selected':''}>Đã hiệu chỉnh — không cộng</option></select></td>
+    <td class="sg-mu-preview" data-sg-mu-preview="${r.level}"></td></tr>`).join('');
+  const periodRows=periods.map(e=>`<label class="sg-eqa-period"><input type="checkbox" data-sg-mu-period value="${escAttr(e.id)}" ${(c.periodIds||[]).includes(e.id)?'checked':''}><span>${esc(vnPeriod(e.period)||'Chưa chọn kỳ')}</span></label>`).join('');
+  openModal(`<div class="modal sg-eqa-modal sg-mu-modal"><div class="modal-h"><h3>Ngân sách độ không đảm bảo đo (MU)</h3><button class="modal-close" onclick="closeModal()" aria-label="Đóng">✕</button></div>
+    <div class="modal-b"><div class="sg-eqa-table-wrap"><table class="sg-eqa-table sg-mu-table"><thead><tr><th>Mức</th><th>u(cal) %</th><th>Nguồn CoA / tài liệu</th><th>Độ chệch</th><th>Xem trước</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div class="alert info" style="display:block">${SG_MU_MODEL_NOTE}</div>
+      <div class="sg-setup-fields">
+        <div><label for="sgMuBy">Người rà soát</label><input id="sgMuBy" value="${escAttr(c.reviewedBy||'')}" placeholder="Họ tên người rà soát ngân sách MU"></div>
+        <div><label for="sgMuDate">Ngày rà soát</label>${dateBox('sgMuDate',c.reviewedDate||'','manage-date')}</div>
+      </div>
+      <div class="sg-eqa-period-wrap"><div class="sg-eqa-period-head"><b>Áp dụng cho kỳ nào?</b><div>${btn('Chọn tất cả','sgMuSelectPeriods(true)','ghost sm')}${btn('Bỏ chọn','sgMuSelectPeriods(false)','ghost sm')}</div></div><div class="sg-eqa-period-list">${periodRows}</div></div></div>
+    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn('✓ Áp dụng ngân sách MU','sgMuApply()','teal')}</div></div>`);
+  sgMuUpdatePreview();
+}
+function sgMuSelectPeriods(checked){document.querySelectorAll('[data-sg-mu-period]').forEach(x=>x.checked=checked);sgMuCaptureDom();}
+async function sgMuApply(){
+  if(!requireWrite())return;
+  if(!sgMuCtx)return;
+  sgMuCaptureDom();
+  if(!sgMuCtx.periodIds.length){await infoDialog('Chưa chọn kỳ nào để áp dụng ngân sách MU.');return;}
+  const t=state.tests.find(x=>x.id===sgTest);if(!t)return;
+  const data=sgData(sgTest),by=QCCore.cleanText(sgMuCtx.reviewedBy,120),date=parseVN(sgMuCtx.reviewedDate)||'';
+  let applied=0;
+  data.forEach(e=>{
+    if(!sgMuCtx.periodIds.includes(e.id))return;
+    e.lv=e.lv||{};
+    sgMuCtx.rows.forEach(row=>{
+      const L=e.lv[row.level]=e.lv[row.level]||{},raw=String(row.uCal??'').trim(),n=Number(raw);
+      if(raw!==''&&Number.isFinite(n)&&n>=0)L.uCal=n;else delete L.uCal;
+      const basis=QCCore.cleanText(row.uCalBasis,500);if(basis)L.uCalBasis=basis;else delete L.uCalBasis;
+      L.muBiasMode=row.muBiasMode==='exclude'?'exclude':'include';
+      if(by)L.muReviewedBy=by;else delete L.muReviewedBy;
+      if(date)L.muReviewedDate=date;else delete L.muReviewedDate;
+    });
+    applied++;
+  });
+  if(!applied)return;
+  logAct('Cập nhật ngân sách MU',`${applied} kỳ · ${sgMuCtx.rows.length} mức · u(cal) ${sgMuCtx.rows.map(r=>`M${r.level}=${String(r.uCal??'').trim()||'—'}`).join(', ')}`,testDisplayName(t));
+  save({clearDerived:false,sigmaTestId:sgTest});closeModal();rerender();
 }
 function sgCell(eid,level,field,val){if(!requireWrite())return;const t=state.tests.find(x=>x.id===sgTest),e=sgData(sgTest).find(x=>x.id===eid);if(!e||!t)return;sgEnsureTeaSnapshot(t,e);e.lv=e.lv||{};const L=e.lv[level]=e.lv[level]||{};L[field]=sgCleanCell(field,val);if(field==='biasEqa'){if(L.biasEqa==='')delete L.biasEqaMethod;else L.biasEqaMethod='manual';delete L.eqaRounds;delete L.eqaBatchId;}if(field==='cv'){L.cvSource='manual';['n','sourceStart','sourceEnd','sourceLot','cohortStatus','cohortIssues','sourceExcludedVoided','sourceExcludedInvalid','sourceTargetMean','sourceTargetSd'].forEach(k=>delete L[k]);}sgSetLevelTeaSnapshot(t,e,level);save({clearDerived:false,sigmaTestId:sgTest});sgRefreshSoon();}
 function sgPeriodSel(e,ro){const [y,mo]=(e.period||'').split('-'),nowYear=new Date().getFullYear();const yr=y||String(nowYear),mm=mo?+mo:new Date().getMonth()+1;

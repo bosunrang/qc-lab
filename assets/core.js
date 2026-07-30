@@ -105,6 +105,13 @@
     const eqaRounds=cleanSigmaRounds(raw.eqaRounds);
     if(eqaRounds.length)out.eqaRounds=eqaRounds;
     const eqaBatchId=cleanId(raw.eqaBatchId);if(eqaBatchId)out.eqaBatchId=eqaBatchId;
+    /* Ngân sách MU (xem uncertaintyBudget). uCal=0 là giá trị HỢP LỆ (CoA công bố
+       không đáng kể) và phải khác hẳn "chưa nhập" — nên chỉ lọc số âm, không lọc 0. */
+    const uCal=numericCell(raw.uCal);if(uCal!==''&&uCal>=0)out.uCal=uCal;
+    const uCalBasis=cleanText(raw.uCalBasis,500);if(uCalBasis)out.uCalBasis=uCalBasis;
+    if(['include','exclude'].includes(raw.muBiasMode))out.muBiasMode=raw.muBiasMode;
+    const muReviewedBy=cleanText(raw.muReviewedBy,120);if(muReviewedBy)out.muReviewedBy=muReviewedBy;
+    const muReviewedDate=cleanDate(raw.muReviewedDate);if(muReviewedDate)out.muReviewedDate=muReviewedDate;
     return out;
   }
 
@@ -305,6 +312,47 @@
     const sigma=(tea-Math.abs(bias))/cv,dpmo=dpmoFromSigma(sigma);
     return{tea,bias,cv,sigma,dpmo,yieldPercent:100-dpmo/1e4};
   }
+  /* ===== Độ không đảm bảo đo (MU) — ISO 15189:2022 §7.3.4 =====
+     Mô hình TOP-DOWN (ISO/TS 20914; Nordtest TR 537): không mổ xẻ từng bước của
+     quy trình mà lấy thẳng dữ liệu vận hành sẵn có. Mọi thành phần ở dạng TƯƠNG
+     ĐỐI (%) nên cộng bậc hai được với nhau ở mọi mức nồng độ:
+       u(Rw)   = CV% dài hạn của IQC (độ chụm trung gian) — thành phần BẮT BUỘC.
+       u(bias) = √(bias² + u(Cref)²); bias là Bias% từ EQA/EQC, u(Cref) là sai số
+                 chuẩn của chính ước lượng đó (SD giữa các vòng / √n).
+       u(cal)  = độ không đảm bảo của calibrator, chép từ CoA nhà sản xuất.
+     u_c = √(Σuᵢ²); U = k·u_c với k=2 (~95%).
+
+     Hai điểm KHÔNG được "tiện tay" đơn giản hóa:
+     1. ISO/TS 20914 yêu cầu ĐIỀU TRA và loại bỏ độ chệch, chỉ phần dư chưa hiệu
+        chỉnh mới cộng vào ngân sách — nên bật/tắt nhánh bias là quyết định của
+        người phụ trách (muBiasMode ở sigma.js), phần mềm không tự chọn hộ.
+     2. Thiếu CoA thì u(cal) VẮNG MẶT và ngân sách bị đánh dấu chưa đủ, tuyệt đối
+        không thay bằng 0 — coi như 0 sẽ in ra một U nhỏ hơn sự thật mà không có
+        gì trên báo cáo cho thấy thành phần đó chưa từng được đánh giá. */
+  function uncertaintyBudget(input){
+    const o=input&&typeof input==='object'?input:{};
+    const pct=v=>{const n=Number(v);return String(v==null?'':v).trim()!==''&&Number.isFinite(n)&&n>=0?n:null;};
+    const uRw=pct(o.cv);
+    if(uRw==null||uRw<=0)return null;
+    const k=Number.isFinite(+o.k)&&+o.k>0?+o.k:2,includeBias=o.includeBias!==false;
+    const biasRaw=Number(o.bias),bias=String(o.bias==null?'':o.bias).trim()!==''&&Number.isFinite(biasRaw)?Math.abs(biasRaw):null;
+    const biasRefU=pct(o.biasRefU),uCal=pct(o.uCal);
+    const uBias=includeBias&&bias!=null?Math.sqrt(bias*bias+(biasRefU||0)*(biasRefU||0)):null;
+    /* Thành phần bằng 0 (CoA công bố không đáng kể) là hợp lệ nhưng không góp
+       phương sai — lọc >0 ở đây, còn "chưa đánh giá" (null) thì rơi vào missing. */
+    const parts=Object.entries({uRw,uBias,uCal}).filter(([,v])=>v!=null&&v>0);
+    const variance=parts.reduce((s,[,v])=>s+Number(v)*Number(v),0),uc=Math.sqrt(variance),U=k*uc;
+    const missing=[];
+    if(includeBias&&bias==null)missing.push('u(bias)');
+    if(uCal==null)missing.push('u(cal)');
+    const shares=Object.fromEntries(parts.map(([key,v])=>[key,variance>0?Number(v)*Number(v)/variance:null]));
+    const teaRaw=Number(o.tea),tea=Number.isFinite(teaRaw)&&teaRaw>0?teaRaw:null;
+    const targetRaw=Number(o.target),target=Number.isFinite(targetRaw)&&targetRaw!==0?Math.abs(targetRaw):null;
+    return{k,uRw,uBias,uCal,bias:includeBias?bias:null,biasRefU:includeBias?biasRefU:null,includeBias,
+      uc,U,shares,complete:!missing.length,missing,
+      target,absoluteUc:target!=null?uc*target/100:null,absoluteU:target!=null?U*target/100:null,
+      tea,teaRatio:tea!=null?U/tea:null,withinTea:tea!=null?U<=tea:null};
+  }
   /* Westgard Sigma Rules — chọn THIẾT KẾ QC (bộ quy tắc + số điểm N mỗi lần chạy
      và số lần chạy R) theo Sigma đo được, cho QC 2 mức. Bảng kinh điển của
      Westgard: Sigma càng cao thì càng ít quy tắc / N nhỏ (giảm báo động giả);
@@ -497,5 +545,5 @@
   function errorType(rules){rules=rules||[];if(rules.some(r=>WG_SE_RULES.includes(r)))return'SE — Sai số hệ thống';if(rules.some(r=>WG_RE_RULES.includes(r)))return'RE — Sai số ngẫu nhiên';return'—';}
   function fixHint(rules){rules=rules||[];if(rules.some(r=>WG_SE_RULES.includes(r)))return'Hướng hệ thống: kiểm tra hiệu chuẩn, lô hóa chất/QC mới, nhiệt độ, đầu hút, đèn quang.';if(rules.some(r=>WG_RE_RULES.includes(r)))return'Hướng ngẫu nhiên: bọt khí, thể tích hút, mẫu QC pha/bảo quản, điện áp, thao tác.';return'';}
 
-  return{STATE_SCHEMA_VERSION,WG_RULES,WG_DEFAULT_ON,WG_RULE_DESCRIPTIONS,cleanText,cleanId,finiteNumber,stats,westgard,westgardMulti,pointZ,westgardByPoint,westgardLatestRules,westgardLatestRulesFromZ,westgardMultiByPoint,cusum,movingAverage,erf,normalCdf,dpmoFromSigma,sigmaMetric,westgardSigmaRules,targetFromLimits,limitsFromTarget,primaryErrorRule,errorType,fixHint,validateBackup,validateStateInvariants,sanitizeBackup};
+  return{STATE_SCHEMA_VERSION,WG_RULES,WG_DEFAULT_ON,WG_RULE_DESCRIPTIONS,cleanText,cleanId,finiteNumber,stats,westgard,westgardMulti,pointZ,westgardByPoint,westgardLatestRules,westgardLatestRulesFromZ,westgardMultiByPoint,cusum,movingAverage,erf,normalCdf,dpmoFromSigma,sigmaMetric,uncertaintyBudget,westgardSigmaRules,targetFromLimits,limitsFromTarget,primaryErrorRule,errorType,fixHint,validateBackup,validateStateInvariants,sanitizeBackup};
 });

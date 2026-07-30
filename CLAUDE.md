@@ -131,8 +131,8 @@ it runs under `xvfb-run`, see the CI job):
 - `scripts/a11y-audit.js` runs axe-core against every page in `PAGES`
   (`router-render.js`), the primary "add new X" modal on each page that has
   one (`MODALS` in the script — manage's lot/instrument/assay modals, Sigma's
-  add-test modal, reagent's create-comparison modal, users' edit-permissions
-  modal), and a keyboard-Tab smoke pass on `dash`/`entry`, writing
+  add-test/EQA-bias/MU-budget modals, reagent's create-comparison modal, users'
+  edit-permissions modal), and a keyboard-Tab smoke pass on `dash`/`entry`, writing
   `tests/__a11y__/report.json` (gitignored). The 2026-07-23 baseline run only
   ever saw each page in its default just-loaded state with no modal open and
   Sigma untracked/empty — 0 violations there said nothing about the modals or
@@ -270,8 +270,8 @@ break forward references.
 (`(function(root, factory){...})`) so it also works via `require()` — that's
 what makes it usable from both the browser (as `window.QCCore`) and Node test
 files (`require('../assets/core.js')`). It holds pure, side-effect-free domain
-math (stats, Westgard rule evaluation, Sigma metric, CUSUM, backup
-validation/sanitization) with no DOM or state dependency — new pure
+math (stats, Westgard rule evaluation, Sigma metric, measurement uncertainty,
+CUSUM, backup validation/sanitization) with no DOM or state dependency — new pure
 calculations belong here, not in `state.js`/`qc-domain.js`.
 
 **Code style is dense/minified-looking by convention, not generated.** Most
@@ -456,9 +456,11 @@ the Google Fonts link, offline labs must print with correct metrics.
     before the returned Promise settles — the caller's boolean is unaffected
     either way.
 - `draw.js`, `router-render.js`, `dashboard-routes.js`, `entry-routes.js`,
-  `westgard-routes.js`, `sigma.js`, `actions-routes.js`, `manage-routes.js`,
-  `after-render.js`, `entry-tests-actions.js`, `modals.js` — UI/rendering and
-  routing. Since 2026-07-24 the three biggest pages live in their own files:
+  `westgard-routes.js`, `sigma.js`, `actions-routes.js`, `action-form.js`,
+  `report-routes.js`, `manage-routes.js`, `after-render.js`,
+  `entry-tests-actions.js`, `modals.js` —
+  UI/rendering and routing. Since 2026-07-24 the three biggest pages live in
+  their own files:
   `router-render.js` keeps only dispatch plus cross-page UI primitives (the
   `btn()` builder, the `requireWrite()`/`requireAdmin()` guards, search/filter
   helpers, the VN date picker, icon SVGs), while `pageDash()` lives in
@@ -466,8 +468,36 @@ the Google Fonts link, offline labs must print with correct metrics.
   `pageWestgard()` in `westgard-routes.js` — `router-render.js` must never
   redefine those three, and the files must load right after it in that order;
   `modals.js` likewise keeps only the modal machinery (`modalTemplate()`,
-  `modalCloseButton()`), not page logic. `tests/ui-route-structure.test.js`
-  fails if a `page*()` function or an Actions-page helper migrates back.
+  `modalCloseButton()`), not page logic. On 2026-07-30 the same treatment
+  reached `actions-routes.js`, which had been holding **two** whole pages and
+  had grown to 105 KB, in two steps:
+  - `pageReportV2()` and every `report*` helper (period lock/unlock, test
+    search, date range, print icons) moved to `report-routes.js`. Those two
+    pages share no function — only `professional-reports.css`, see "CSS
+    structure" — so that cut left **no** cross-reference in either direction.
+  - The NCE form then moved to `action-form.js`: the `ACT_*` option/suggestion
+    constants, `actSel()`, the `<details>` section machinery, the investigation
+    checklist, the draft that survives `rerender()`, `actionFormModel()`,
+    `addAction()`, and `actionFormHtml()` — which was extracted out of
+    `pageActionsV4()`, a single 17 KB function that had been rendering the
+    8-section form, the issue list and the log table together. `pageActionsV4()`
+    is now ~20 lines and passes the already-computed issue count into
+    `actionFormHtml(issues.length)` rather than calling `currentIssues()` a
+    second time (two calls could disagree). `actions-routes.js` keeps the issue
+    list, the record lifecycle (approve/return/cancel/escalate/reopen + version
+    tokens) and the detail sheet.
+
+  Unlike the report cut, **this one is deliberately not one-directional**: the
+  form calls back into the page's evidence builders (`actionEvidenceTimelineHtml`,
+  `actionRerunEvidenceHtml`, `actionLevelShort`) because the detail sheet renders
+  the very same blocks, and the page calls into the form to open/save a record.
+  In one shared global scope that is harmless — what is being pinned is the
+  **split of responsibility**, not an acyclic dependency graph, and
+  `tests/ui-route-structure.test.js` asserts it that way (which function lives in
+  which file, plus load order). Both files must load right after
+  `router-render.js`'s page trio, in the order `actions-routes.js` →
+  `action-form.js` → `report-routes.js`. That test also fails if a `page*()`
+  function or an Actions-page helper migrates back.
   `router-render.js` owns the page list
   (`PAGES`) and per-role page permissions (`PERM`): `rolePageIds(role)` gives
   each role's default page set, and a user's own `pagePerms` (edited in
@@ -549,7 +579,9 @@ Settings page, which is `professional-settings.css`),
 `professional-audit.css`. `professional-reports.css` covers both the Báo
 cáo page and the `actions` page (Khắc phục sự cố) — despite the filename,
 that's where `.action-chip`/`.action-log-*`/`.issue-group`/`.issue-row`
-live; the `actions` page has no separate file of its own. These files have
+live; the `actions` page has no separate file of its own — so the two pages
+stay coupled in CSS even though their JS was split apart on 2026-07-30
+(`actions-routes.js` / `report-routes.js`). These files have
 overlapping `@media` breakpoints and
 height queries and rely on cascade/shorthand ordering between files — check
 neighboring `professional-*.css` files for conflicting rules before adding
@@ -642,3 +674,25 @@ visual-check`, `npm run a11y-audit`, `npm run print-check`.
   `state.teaRefs`), matching **exact name first** then longest-prefix — so
   e.g. "CK-MB" no longer inherits "CK". EFLM TEa stays a per-test manual value
   (`t.tea`), not part of this table.
+- Measurement uncertainty (MU, ISO 15189:2022 §7.3.4) is a **top-down** budget
+  (ISO/TS 20914 + Nordtest TR 537): `uncertaintyBudget()` in `core.js` does the
+  math, `sgMU()`/`sgMuHTML()` + the MU modal (`sgOpenMU()`) surface it on the
+  Sigma page, and `sigmaMuPrintCard()`/`sigmaMuPeriodsPrintRows()` in
+  `reports.js` put it on both Sigma print reports. Inputs are the ones the page
+  already holds — u(Rw) is the *same* long-term IQC CV% the Sigma cohort uses,
+  u(bias) = √(bias² + u(Cref)²) over the stored EQA rounds (u(Cref) = SD between
+  rounds / √n, null with a single round), u(cal) is typed from the calibrator
+  CoA; u_c = √(Σu²), U = 2·u_c. Four rules are locked by
+  `tests/uncertainty.test.js` and must not be "simplified":
+  (1) a component that was never assessed stays `null` and lands in `missing[]`
+  — it is **never** silently read as 0, because that prints a smaller U than the
+  truth with nothing on the report saying so; (2) `uCal: 0` is a *valid
+  conclusion* ("CoA says negligible") and must stay distinguishable from "not
+  entered", which is why `cleanSigmaLevel()` filters only negatives;
+  (3) dropping the bias term is a per-level human decision (`muBiasMode`), never
+  automatic, since ISO/TS 20914 only allows it once the bias has been
+  investigated and corrected; (4) screen, print and the modal preview all call
+  the same `uncertaintyBudget()` — `sgComp()` hangs the result on `r.mu` and
+  everything else reads that back, so a level can never show one U on screen and
+  another on paper. The app does **not** judge MU pass/fail: the allowable limit
+  (MAU) comes from the lab's SOP; it only puts U next to TEa and flags U > TEa.

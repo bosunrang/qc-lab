@@ -7,8 +7,9 @@ const ctx = loadSandbox(['modules/reports.js'], { window: { QCLAB_APP: { name: '
 run(ctx, `
   state={lab:{name:'PXN',dept:'Hóa sinh'},westgardRules:{'1-3s':true},tests:[{id:'T1',name:'Sodium',unit:'mmol/L',machine:'Máy A'}]};
   sgTest='T1';
-  const __entry={id:'P7',period:'2026-07',lv:{}};
-  const __metric={tea:5,sigma:5.63,classifiable:true,c:'#2c7d5c',label:'Xuất sắc',cv:0.77,bias:0.67,dpmo:17,yld:99.9983,cvSource:'iqc-cohort',n:30,sourceLot:'1101',readinessLabel:'Đủ điều kiện dữ liệu'};
+  const __entry={id:'P7',period:'2026-07',lv:{1:{uCalBasis:'CoA calibrator lô 9',muReviewedBy:'KTV A',muReviewedDate:'2026-07-30'}}};
+  const __mu={k:2,uRw:0.77,uBias:0.9,uCal:1.2,uc:1.68,U:3.36,includeBias:true,complete:true,missing:[],absoluteU:2.35,teaRatio:0.672,withinTea:true};
+  const __metric={tea:5,sigma:5.63,classifiable:true,c:'#2c7d5c',label:'Xuất sắc',cv:0.77,bias:0.67,dpmo:17,yld:99.9983,cvSource:'iqc-cohort',n:30,sourceLot:'1101',readinessLabel:'Đủ điều kiện dữ liệu',mu:__mu};
   function formatDateTimeVN(){return '18/07/2026 18:00';}
   function userName(){return 'Quản trị viên';}
   function fmt(v,d=2){return Number(v).toFixed(d);}
@@ -20,6 +21,10 @@ run(ctx, `
   function sigmaExportPeriods(){return'07/2026';}
   function sigmaTeaTrace(){return'EFLM · Analyte: Sodium';}
   function vnPeriod(){return'07/2026';}
+  function vnDate(s){return'30/07/2026';}
+  /* Mức 2 không có metric nên bản in phải tự lập ngân sách qua sgMU() — trả về một
+     ngân sách CÒN HỞ để kiểm tra bản in có nói ra thành phần thiếu hay không. */
+  function sgMU(){return{k:2,uRw:1.5,uBias:null,uCal:null,uc:1.5,U:3,includeBias:true,complete:false,missing:['u(bias)','u(cal)'],absoluteU:null,teaRatio:null,withinTea:null};}
   function instrumentName(){return'Máy A';}
   function testDisplayName(t){return t&&t.name||'';}
   function sgFrequencyHTML(){return'<div id="opspecs">OPSpecs</div>';}
@@ -44,12 +49,24 @@ assert.match(rowHtml, /Chưa đủ CV IQC và Bias EQA\/EQC/);
   assert.match(printed.body, /id="opspecs"/);
   assert.match(printed.body, /id="sigma-chart"/);
   assert.match(printed.body, /id="mdc-chart"/);
+  /* Bảng công bố MU (ISO 15189:2022 §7.3.4). Mức 1 phải lấy ĐÚNG r.mu mà sgComp()
+     đã tính (U 3.36) chứ không tự tính lại, còn mức 2 — chưa ra Sigma nên rơi về
+     sgMU() — phải in ra thành phần còn thiếu thay vì im lặng công bố một U đẹp. */
+  assert.match(printed.body, /Độ không đảm bảo đo \(MU\) — ISO 15189:2022 §7\.3\.4/);
+  assert.match(printed.body, /<b>3\.36<\/b>/, 'MU của mức 1 phải là ngân sách sgComp() gắn sẵn, không phải bản tính lại');
+  assert.match(printed.body, /2\.350 mmol\/L/, 'U được quy về đơn vị đo tại Mean của mức');
+  assert.match(printed.body, /Thiếu u\(bias\), u\(cal\)/, 'ngân sách còn hở phải được nói rõ trên bản in');
+  assert.match(printed.body, /nguồn u\(cal\): CoA calibrator lô 9/, 'nguồn CoA đi kèm bản in để truy xuất');
+  assert.match(printed.body, /Người rà soát ngân sách MU: KTV A · 30\/07\/2026/);
+  assert.match(printed.body, /MAU\) do SOP của đơn vị ấn định/, 'bản in không tự kết luận đạt/không đạt MU');
 
   await ctx.printSigmaPeriods();
   const combined = JSON.parse(run(ctx, 'JSON.stringify(__printed)'));
   assert.equal(combined.options.landscape, true, 'combined Sigma reports should print on A4 landscape');
   assert.match(combined.title, /tổng hợp Six Sigma theo kỳ/i);
   assert.match(combined.body, /So sánh kết quả Six Sigma theo kỳ/);
+  assert.match(combined.body, /Độ không đảm bảo đo \(MU\) theo kỳ/, 'báo cáo tổng hợp cũng phải kèm MU của từng kỳ');
+  assert.match(combined.body, /<td><b>07\/2026<\/b><\/td><td><b>Mức 1<\/b><\/td>/, 'bảng MU tổng hợp tách theo kỳ × mức');
 
   const sigmaSource = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'sigma.js'), 'utf8');
   assert.match(sigmaSource, /`printSigmaPeriod\('\$\{e\.id\}'\)`/);

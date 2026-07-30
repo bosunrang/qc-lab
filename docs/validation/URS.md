@@ -22,6 +22,7 @@
 | URS-18 | Hiệu năng | Release gate đạt ngân sách trong `benchmarks/performance-budget.json` |
 | URS-19 | Accessibility | Không tăng vi phạm so với ratchet; thao tác bàn phím có focus rõ |
 | URS-20 | Desktop | Installer, activation, auto-update và print-to-PDF hoạt động trên Windows hỗ trợ |
+| URS-21 | Độ không đảm bảo đo (MU) | Ngân sách top-down u(Rw)/u(bias)/u(cal), U=k·u_c với k=2; thành phần chưa đánh giá phải hiện là thiếu, không được coi bằng 0; có nguồn CoA, người rà soát và xuất ra báo cáo |
 
 ## Ngoài phạm vi
 
@@ -29,3 +30,5 @@
 - Không thay thế server-side identity hoặc chữ ký số chống chối bỏ.
 - Audit hash phía client là tamper-evident trong snapshot, không phải kho append-only.
 - Việc lựa chọn luật Westgard, TEa và tần suất QC vẫn phải theo SOP của đơn vị.
+- Giới hạn MU cho phép (MAU) và quyết định coi độ chệch là "đã hiệu chỉnh" do đơn
+  vị ấn định; phần mềm tính và trình bày ngân sách chứ không kết luận đạt/không đạt.

@@ -49,6 +49,9 @@ const MODALS = [
   { page: 'manage', label: 'manage:edit-assay', open: () => openConfigAssay('T-NA') },
   { page: 'sigma', label: 'sigma:add-test', open: () => sgOpenAddTest() },
   { page: 'sigma', label: 'sigma:add-bias', open: () => sgOpenBias(sgData(state.tests[0].id)[0].id, 1) },
+  // Ngân sách MU (ISO 15189:2022 §7.3.4) — form nhiều mức, có input số, select và
+  // ô ngày, tức đúng loại nội dung mà audit trên thân trang không nhìn thấy.
+  { page: 'sigma', label: 'sigma:mu-budget', open: () => sgOpenMU(sgData(state.tests[0].id)[0].id) },
   { page: 'reagent', label: 'reagent:create-comparison', open: () => openRcCreateModal() },
   { page: 'reagent', label: 'reagent:find-existing', open: () => openRcModal() },
   { page: 'dash', label: 'dash:kpi-detail', open: () => dashboardKpiOpenDetail('accepted') },
