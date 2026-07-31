@@ -11,6 +11,7 @@ validation sau khi đã thực thi, lưu bằng chứng và ký duyệt tại m�
 | `TRACEABILITY.md` | Ánh xạ yêu cầu → code/test/bằng chứng |
 | `IQ-OQ-PQ-UAT.md` | Protocol cài đặt, vận hành, hiệu năng và nghiệm thu |
 | `BACKUP-RESTORE-DRILL.md` | Quy trình diễn tập phục hồi và biên bản thực hiện |
+| `RELEASE-PUBLISH.md` | Phát hành bản desktop lên GitHub Releases và kiểm tra auto-update |
 
 ## Kiểm soát tài liệu
 
