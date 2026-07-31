@@ -51,9 +51,46 @@ Lưu ý: vì nó build lại nên binary khác với bản `npm run dist` đã t
 lần build đó nên vẫn nhất quán. Nếu hồ sơ đã ghi SHA-256 của một binary cụ thể thì
 phải ghi lại theo binary vừa upload, hoặc dùng Cách B.
 
+### 1b. Khi `dist:publish` lỗi giữa chừng
+
+Đã xảy ra thật khi phát hành 2.6.1 (2026-07-31): lệnh build lại xong, upload `.exe`
+thành công, rồi ném lỗi HTTP (`builder-util-runtime/httpExecutor`) và dừng — release
+chỉ có đúng một asset, thiếu cả `latest.yml` lẫn `.blockmap`.
+
+**Cứ chạy lại `npm run dist:publish`.** electron-builder **ghi đè** asset trùng tên
+chứ không trả 422 như thường bị suy đoán; lần chạy thứ hai đã upload trọn cả ba file
+và chuỗi checksum khớp. Đừng vá bằng tay khi chưa thử chạy lại.
+
+Hai điều phải nhớ khi chạy lại:
+
+- Mỗi lần chạy là **build lại**, sinh binary mới với sha khác. SHA-256 đã ghi vào hồ
+  sơ phải cập nhật theo binary **cuối cùng thực sự nằm trên release**, không phải theo
+  bản build đầu tiên.
+- **Cái bẫy:** khi lỗi xảy ra *sau* bước build, `dist/*.exe` đã bị ghi đè nhưng
+  `dist/latest.yml` có thể vẫn là bản của lần build **trước**. Upload tay đúng file
+  `latest.yml` đó lên sẽ khiến updater tải bản cài về rồi **từ chối cài vì sai
+  checksum** — hỏng khó lần hơn hẳn lỗi 404, vì nhìn bề ngoài release đã đủ ba file.
+
+Nhận biết nhanh bằng mốc thời gian — `latest.yml` phải mới **bằng hoặc hơn** `.exe`:
+
+```powershell
+Get-ChildItem dist -File | Sort-Object LastWriteTime |
+  Select-Object Name, Length, LastWriteTime | Format-Table -AutoSize
+```
+
+Nếu chỉ muốn dựng lại `latest.yml` cho khớp `.exe` đang có (không build lại, giữ
+nguyên binary đã lên release):
+
+```powershell
+node -e "const c=require('crypto'),f=require('fs');const e='dist/QC-Lab-Setup-<ver>.exe';const b=f.readFileSync(e);const s=c.createHash('sha512').update(b).digest('base64');f.writeFileSync('dist/latest.yml',`version: <ver>\nfiles:\n  - url: ${e.split('/').pop()}\n    sha512: ${s}\n    size: ${b.length}\npath: ${e.split('/').pop()}\nsha512: ${s}\nreleaseDate: '${new Date(f.statSync(e).mtime).toISOString()}'\n`);console.log('da dung lai dist/latest.yml')"
+```
+
+Rồi **bắt buộc** chạy khối đối chiếu ở Cách B trước khi upload.
+
 ## 2. Cách B — upload đúng binary đã kiểm chứng
 
-Dùng khi hồ sơ thẩm định đã chốt SHA-256 của bản trong `dist/` và không muốn build lại.
+Dùng khi hồ sơ thẩm định đã chốt SHA-256 của bản trong `dist/` và không muốn build lại,
+hoặc để kiểm tra sau một lần `dist:publish` lỗi giữa chừng (xem 1b).
 
 ```powershell
 # Đối chiếu latest.yml với chính installer trong dist/ trước khi upload
@@ -79,32 +116,43 @@ gh release create v2.6.1 `
 <https://cli.github.com/> rồi `gh auth login`, hoặc làm bằng giao diện web GitHub và
 **kéo đủ ba file** vào phần Assets.
 
-## 3. Kiểm tra sau khi phát hành (bắt buộc, đủ 4 mục)
+## 3. Kiểm tra sau khi phát hành (bắt buộc, đủ 5 mục)
 
-```powershell
-$repo = 'bosunrang/qc-lab'; $ver = '2.6.1'
-$h = @{'User-Agent'='qclab-release-check'}
+Chạy bằng Node cho gọn và tránh một cái bẫy có thật của PowerShell: trong môi trường
+này `(Invoke-WebRequest ...).Content` trả về **mảng byte** chứ không phải chuỗi, nên
+mọi phép `-match` trên đó đều ra `False` — báo sai là release hỏng trong khi nó tốt.
 
-# (1) release mới nhất đúng là bản vừa phát hành
-$latest = Invoke-RestMethod "https://api.github.com/repos/$repo/releases/latest" -Headers $h
-"latest = $($latest.tag_name)"
-
-# (2) có đủ ba asset
-$latest.assets | ForEach-Object { $_.name }
-
-# (3) tải latest.yml đúng bằng đường electron-updater đi — phải 200, không 404
-$url = "https://github.com/$repo/releases/download/$($latest.tag_name)/latest.yml"
-$yml = (Invoke-WebRequest $url -Headers $h -UseBasicParsing).Content
-$yml
-
-# (4) version trong latest.yml khớp bản vừa phát hành
-"version khop? " + ($yml -match "version:\s*$([regex]::Escape($ver))")
+```bash
+node -e "
+const c=require('crypto'), f=require('fs');
+const REPO='bosunrang/qc-lab', VER='2.6.1', EXE='dist/QC-Lab-Setup-'+VER+'.exe';
+const H={'User-Agent':'qclab-release-check'};
+(async()=>{
+  const rel=await (await fetch('https://api.github.com/repos/'+REPO+'/releases/latest',{headers:H})).json();
+  console.log('(1) latest =', rel.tag_name, 'draft='+rel.draft, 'prerelease='+rel.prerelease);
+  const have=rel.assets.map(a=>a.name);
+  console.log('(2) assets:', rel.assets.map(a=>a.name+' ('+a.size+'B)').join(' | '));
+  const need=['latest.yml','QC-Lab-Setup-'+VER+'.exe','QC-Lab-Setup-'+VER+'.exe.blockmap'];
+  console.log('    du 3 asset:', need.every(n=>have.includes(n))?'OK':'THIEU '+need.filter(n=>!have.includes(n)));
+  const r=await fetch('https://github.com/'+REPO+'/releases/download/'+rel.tag_name+'/latest.yml',{headers:H});
+  console.log('(3) GET latest.yml ->', r.status, r.ok?'OK':'LOI');
+  const yml=await r.text(); console.log(yml.trim());
+  console.log('(4) version:', /version:\s*(\S+)/.exec(yml)[1]===VER?'OK':'LECH');
+  const b=f.readFileSync(EXE);
+  console.log('(5) sha512 latest.yml == exe:', /sha512:\s*(\S+)/.exec(yml)[1]===c.createHash('sha512').update(b).digest('base64')?'OK':'LECH');
+  console.log('    size   latest.yml == exe:', +/size:\s*(\d+)/.exec(yml)[1]===b.length?'OK':'LECH');
+  console.log('    size   exe local  == exe GitHub:', b.length===rel.assets.find(a=>a.name.endsWith('.exe')).size?'OK':'LECH');
+})();
+"
 ```
 
-**(5)** Trên một máy đang chạy bản *cũ hơn*: mở app, chờ vài giây, xác nhận không
-còn dòng `[auto-update] check failed ... 404` trong console và app báo có bản mới.
-Đây là mục duy nhất chứng minh đường cập nhật thật sự thông; bốn mục trên chỉ chứng
-minh artefact đã nằm đúng chỗ.
+Mục **(5)** là mục bắt được cái bẫy ở 1b: `latest.yml` có mặt và trả 200 nhưng trỏ vào
+một binary khác. Thiếu mục này thì release nhìn "đủ ba file" mà updater vẫn từ chối cài.
+
+**(6)** Trên một máy đang chạy bản *cũ hơn*: mở app, chờ vài giây, xác nhận không
+còn dòng `[auto-update] check failed` trong console (F12) và app báo có bản mới.
+Đây là mục duy nhất chứng minh đường cập nhật thật sự thông; năm mục trên chỉ chứng
+minh artefact đã nằm đúng chỗ và nhất quán với nhau.
 
 ## 4. Dọn release hỏng
 
@@ -114,7 +162,16 @@ Xử lý một trong hai cách:
 - Bổ sung `latest.yml` (và `.blockmap`) đúng của bản đó vào release cũ, **hoặc**
 - Xoá / đánh dấu pre-release cho nó, để `latest` rơi về một release đầy đủ.
 
-Riêng **v2.6.0** đang ở tình trạng này tính đến 2026-07-31.
+Đã xử lý: **v2.6.0** (phát hành 2026-07-30, chỉ có `.exe`) được xoá hẳn ngày
+2026-07-31, nên `latest` rơi về **v2.6.1** đầy đủ ba asset.
+
+## 4b. Nhật ký phát hành
+
+| Bản | Ngày | Kết quả |
+|---|---|---|
+| v2.5.5 | 2026-07-2x | Đủ 3 asset |
+| v2.6.0 | 2026-07-30 | **Hỏng** — chỉ `.exe`, auto-update 404 trên mọi máy. Đã xoá 2026-07-31 |
+| v2.6.1 | 2026-07-31 | Đạt cả 6 mục kiểm tra. exe `sha256:f9c011f1…`, size 100 563 254 B |
 
 ## 5. Ghi vào hồ sơ
 
