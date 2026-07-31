@@ -1,7 +1,7 @@
 window.QCLAB_APP = {
   name: 'QC Lab',
-  version: '2.6.0',
-  releaseDate: '2026-07-30',
+  version: '2.6.1',
+  releaseDate: '2026-07-31',
   build: 'mu-uncertainty'
 };
 
