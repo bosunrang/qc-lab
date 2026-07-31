@@ -85,7 +85,11 @@ table{ width:100%; border-collapse:separate; min-width:640px; border:1px solid v
   .empty{text-align:center;border:1px dashed var(--line)}
   .empty .empty-title{font-weight:700;color:var(--ink);margin-bottom:4px}
   .empty .empty-actions{margin-top:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
-  .tag.none{background:var(--surface-neutral);color:#647686;border:1px solid var(--line);}
+  /* Mau chu truoc day la #647686 — mot hex lac khong thuoc bang primitive, va tren
+   nen --surface-neutral chi dat 4.16:1 o co chu --type-micro in dam, duoi nguong
+   4.5:1 cua WCAG AA (a11y ratchet bat duoc khi mot .tag none loi vao modal MU).
+   --muted (--gray-600 #506674) cho 5.33:1 tren dung nen do. */
+.tag.none{background:var(--surface-neutral);color:var(--muted);border:1px solid var(--line);}
   .alert{ display:flex; gap:10px; align-items:flex-start; margin-bottom:8px; border-left:4px solid transparent; border-left-width:5px; }
   .alert.info{background:#eaf2f8;color:#2f5878;border-left-color:#4f789d;}
   .alert.warn{background:var(--warning-soft);color:#7a5310;border-left-color:var(--amber)}

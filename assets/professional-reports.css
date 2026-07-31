@@ -716,8 +716,10 @@ summary.action-form-section-title:focus-visible{
   background:#f8dfdd;color:#a52b24
 }
 
+/* Cung ly do voi .tag.none trong components.css: bo hex lac #647686 (4.16:1)
+   ve --muted (5.33:1) tren nen --surface-neutral. */
 .action-chip.none{
-  background:var(--surface-neutral);color:#647686
+  background:var(--surface-neutral);color:var(--muted)
 }
 
 .action-row-actions{
