@@ -276,11 +276,11 @@ function pageSigma(){
      ${eflmBox}
       <div class="hint sg-sigma-input-note">${esc(teaHint)} Mỗi mức dùng <b>CV từ IQC</b> và <b>Bias từ EQA/EQC</b>; nhiều vòng EQA được tổng hợp bằng <b>RMS</b> để tránh triệt tiêu dấu. Dữ liệu IQC không được dùng để tính Bias. Quy tắc thận trọng của phần mềm: &lt;20 điểm chỉ hiển thị ước tính, 20–29 điểm là tạm thời, ≥30 điểm mới dùng để gợi ý QC. DPMO/Yield chỉ là quy đổi tham khảo với dịch 1,5σ.${isOperational?'':' Nhóm lô hiện không vận hành; các kỳ cũ vẫn lấy CV theo đúng lô và Mean/SD đã lưu trong lịch sử IQC.'}</div></div>
    <div class="panel"><h3 class="sg-setup-heading">Tình trạng</h3><div id="sgStatus"></div></div></div>
-   <div class="panel"><h3>Thiết kế QC theo Sigma (OPSpecs)</h3><div id="sgFreq"></div></div>
-   <div class="panel"><h3>Độ không đảm bảo đo (MU) — ISO 15189:2022 §7.3.4</h3><div id="sgMU"></div></div>
-    <div class="panel"><div class="sg-data-head"><h3>Số liệu theo kỳ</h3><div class="sg-data-head-actions">${headerActions}</div></div>
+   <div class="panel"><div class="sg-data-head"><h3>Số liệu theo kỳ</h3><div class="sg-data-head-actions">${headerActions}</div></div>
      ${data.length?`<div class="sg-simple-table-wrap"><table class="sg-simple-table" style="min-width:${tableMin}px">${colGroup}${tableHead}<tbody>${rows}</tbody></table></div>`:'<div class="empty" style="margin:14px 16px 10px">Chưa có kỳ nào.</div>'}
     </div>
+   <div class="panel"><h3>Thiết kế QC theo Sigma (OPSpecs)</h3><div id="sgFreq"></div></div>
+   <div class="panel sg-mu-panel"><div class="sg-data-head"><h3>Độ không đảm bảo đo (MU) — ISO 15189:2022</h3><div id="sgMUAction" class="sg-data-head-actions"></div></div><div id="sgMU"></div></div>
    <div class="panel"><h3>Biểu đồ Sigma & MDC</h3><div class="sg-chart-grid">
      <div class="sg-chart-box"><h4>Xu hướng Sigma theo kỳ</h4><div class="chart-inner" id="sgTrend"></div></div>
      <div class="sg-chart-box"><h4>Biểu đồ Quyết định Phương pháp (MDC)</h4><div class="hint">X = CV/TEA, Y = |BIAS|/TEA. Điểm to nhất là kỳ gần nhất.</div><div class="chart-inner" id="sgMDC"></div></div>
@@ -344,9 +344,8 @@ function sgMuHTML(t,row,levels){
   if(reviewer)trace.push(`Người rà soát: ${esc(reviewer.muReviewedBy||'—')}${reviewer.muReviewedDate?' · '+vnDate(reviewer.muReviewedDate):''}`);
   const excluded=levels.filter(l=>sgMuBiasMode((e.lv&&e.lv[l])||{})==='exclude');
   const exclNote=excluded.length?`<div class="alert warn" style="display:block;margin-top:8px">Mức ${excluded.join(', ')} đang <b>không cộng u(bias)</b> vào ngân sách. ISO/TS 20914 chỉ chấp nhận điều này khi độ chệch đã được điều tra và hiệu chỉnh — hãy lưu bằng chứng hiệu chỉnh trong SOP/hồ sơ tương ứng.</div>`:'';
-  const action=canWrite()?btn('Nhập u(cal) từ CoA & rà soát MU',`sgOpenMU('${jsq(e.id)}')`,'teal sm','Nhập độ không đảm bảo của calibrator, chọn cách xử lý độ chệch và ghi người rà soát'):'';
-  return `<div class="hint sg-selected-period-hint">Kỳ đang xem: <b>${esc(vnPeriod(e.period)||e.period||'?')}</b>${action?' ':''}${action}</div>
-    <table><thead><tr><th>Mức</th><th class="num">u(Rw) %</th><th class="num">u(bias) %</th><th class="num">u(cal) %</th><th class="num">u<sub>c</sub> %</th><th class="num">U (k=2) %</th><th class="num">U tại Mean</th><th class="num">U / TEa</th><th>Trạng thái</th></tr></thead><tbody>${cells}</tbody></table>
+  return `<div class="hint sg-selected-period-hint">Kỳ đang xem: <b>${esc(vnPeriod(e.period)||e.period||'?')}</b></div>
+    <div class="sg-mu-table-wrap"><table class="sg-mu-summary-table"><colgroup><col><col><col><col><col><col><col><col><col></colgroup><thead><tr><th>Mức</th><th class="num">u(Rw) %</th><th class="num">u(bias) %</th><th class="num">u(cal) %</th><th class="num">u<sub>c</sub> %</th><th class="num">U (k=2) %</th><th class="num">U tại Mean</th><th class="num">U / TEa</th><th>Trạng thái</th></tr></thead><tbody>${cells}</tbody></table></div>
     ${trace.length?`<div class="hint" style="margin-top:6px">${trace.join('<br>')}</div>`:''}
     ${exclNote}
     <div class="alert info" style="display:block;margin-top:8px">${SG_MU_MODEL_NOTE} Giới hạn MU cho phép (MAU) <b>phải do SOP của đơn vị ấn định</b> — phần mềm chỉ đặt U cạnh TEa để so sánh, không tự kết luận đạt/không đạt. Ngân sách còn thiếu thành phần thì <b>không được công bố</b> như một giá trị MU hoàn chỉnh.</div>`;
@@ -370,6 +369,7 @@ function sgRefresh(){
   const tr=document.getElementById('sgTrend');if(tr)tr.innerHTML=sgTrendSVG(t,classifiable,levels);
   const md=document.getElementById('sgMDC');if(md)md.innerHTML=sgMDCSVG(t,classifiable,levels);
   const fq=document.getElementById('sgFreq');if(fq)fq.innerHTML=sgFrequencyHTML(t,selectedRow,levels);
+  const muAction=document.getElementById('sgMUAction');if(muAction)muAction.innerHTML=selectedRow&&canWrite()?btn('Nhập u(Cal) từ CoA & rà soát MU',`sgOpenMU('${jsq(selectedRow.e.id)}')`,'teal sm','Nhập độ không đảm bảo của calibrator, chọn cách xử lý độ chệch và ghi người rà soát'):'';
   const muBox=document.getElementById('sgMU');if(muBox)muBox.innerHTML=sgMuHTML(t,selectedRow,levels);
 }
 function sgTips(t,r,lvl){
@@ -519,7 +519,7 @@ function sgMuUpdatePreview(){
   sgMuCaptureDom();
   document.querySelectorAll('[data-sg-mu-preview]').forEach(cell=>{
     const mu=sgMuPreview(Number(cell.dataset.sgMuPreview));
-    cell.innerHTML=mu?`u<sub>c</sub> ${fmt(mu.uc,2)}% · <b>U ${fmt(mu.U,2)}%</b>${mu.complete?'':` <span class="muted">(thiếu ${esc(mu.missing.join(', '))})</span>`}`:'<span class="muted">chưa có CV IQC</span>';
+    cell.innerHTML=mu?`<div class="sg-mu-preview-values"><span><small>u<sub>c</sub></small><b>${fmt(mu.uc,2)}%</b></span><span class="is-u"><small>U (k=2)</small><b>${fmt(mu.U,2)}%</b></span></div><div class="sg-mu-preview-state ${mu.complete?'ok':'warn'}">${mu.complete?'Đủ thành phần':'Thiếu '+esc(mu.missing.join(', '))}</div>`:'<div class="sg-mu-preview-empty">Chưa có CV IQC</div>';
   });
 }
 function sgOpenMU(eid){
@@ -535,20 +535,23 @@ function sgOpenMU(eid){
 function sgRenderMuModal(){
   const c=sgMuCtx;if(!c)return;
   const periods=[...sgData(sgTest)].sort((a,b)=>String(a.period||'').localeCompare(String(b.period||'')));
+  const sourcePeriod=periods.find(e=>e.id===c.eid),sourceLabel=sourcePeriod?(vnPeriod(sourcePeriod.period)||sourcePeriod.period||'—'):'—';
   const rows=c.rows.map(r=>`<tr class="sg-mu-row" data-level="${r.level}"><td><b>Mức ${r.level}</b></td>
-    <td><input type="number" step="any" min="0" data-f="uCal" aria-label="u(cal) phần trăm cho mức ${r.level}" value="${escAttr(r.uCal??'')}" placeholder="%" oninput="sgMuUpdatePreview()"></td>
-    <td><input type="text" data-f="uCalBasis" aria-label="Nguồn CoA của u(cal) cho mức ${r.level}" value="${escAttr(r.uCalBasis||'')}" placeholder="VD: CoA calibrator lô 1234, mục U(k=2)" oninput="sgMuUpdatePreview()"></td>
+    <td><div class="sg-mu-number-field"><input type="number" step="any" min="0" data-f="uCal" aria-label="u(cal) phần trăm cho mức ${r.level}" value="${escAttr(r.uCal??'')}" placeholder="0,00" oninput="sgMuUpdatePreview()"><span aria-hidden="true">%</span></div></td>
+    <td><input type="text" data-f="uCalBasis" aria-label="Nguồn CoA của u(cal) cho mức ${r.level}" value="${escAttr(r.uCalBasis||'')}" placeholder="VD: CoA lô 1234, mục U(k=2)" oninput="sgMuUpdatePreview()"></td>
     <td><select data-f="muBiasMode" aria-label="Cách xử lý độ chệch cho mức ${r.level}" onchange="sgMuUpdatePreview()"><option value="include" ${r.muBiasMode!=='exclude'?'selected':''}>Cộng u(bias)</option><option value="exclude" ${r.muBiasMode==='exclude'?'selected':''}>Đã hiệu chỉnh — không cộng</option></select></td>
     <td class="sg-mu-preview" data-sg-mu-preview="${r.level}"></td></tr>`).join('');
   const periodRows=periods.map(e=>`<label class="sg-eqa-period"><input type="checkbox" data-sg-mu-period value="${escAttr(e.id)}" ${(c.periodIds||[]).includes(e.id)?'checked':''}><span>${esc(vnPeriod(e.period)||'Chưa chọn kỳ')}</span></label>`).join('');
   openModal(`<div class="modal sg-eqa-modal sg-mu-modal"><div class="modal-h"><h3>Ngân sách độ không đảm bảo đo (MU)</h3><button class="modal-close" onclick="closeModal()" aria-label="Đóng">✕</button></div>
-    <div class="modal-b"><div class="sg-eqa-table-wrap"><table class="sg-eqa-table sg-mu-table"><thead><tr><th>Mức</th><th>u(cal) %</th><th>Nguồn CoA / tài liệu</th><th>Độ chệch</th><th>Xem trước</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="modal-b"><div class="sg-mu-intro"><div><b>Nhập thông tin theo từng mức QC</b><span>u(cal) lấy từ chứng nhận CoA của calibrator.</span></div><span class="tag none">Kỳ gốc: ${esc(sourceLabel)}</span></div>
+      <div class="sg-eqa-table-wrap"><table class="sg-eqa-table sg-mu-table"><thead><tr><th>Mức QC</th><th>u(cal) từ CoA</th><th>Nguồn / mã CoA</th><th>Xử lý u(bias)</th><th>MU dự kiến</th></tr></thead><tbody>${rows}</tbody></table></div>
       <div class="alert info" style="display:block">${SG_MU_MODEL_NOTE}</div>
+      <div class="sg-mu-section-title"><b>Thông tin rà soát</b><span>Ghi nhận người chịu trách nhiệm xác nhận ngân sách MU.</span></div>
       <div class="sg-setup-fields">
         <div><label for="sgMuBy">Người rà soát</label><input id="sgMuBy" value="${escAttr(c.reviewedBy||'')}" placeholder="Họ tên người rà soát ngân sách MU"></div>
         <div><label for="sgMuDate">Ngày rà soát</label>${dateBox('sgMuDate',c.reviewedDate||'','manage-date')}</div>
       </div>
-      <div class="sg-eqa-period-wrap"><div class="sg-eqa-period-head"><b>Áp dụng cho kỳ nào?</b><div>${btn('Chọn tất cả','sgMuSelectPeriods(true)','ghost sm')}${btn('Bỏ chọn','sgMuSelectPeriods(false)','ghost sm')}</div></div><div class="sg-eqa-period-list">${periodRows}</div></div></div>
+      <div class="sg-eqa-period-wrap sg-mu-period-wrap"><div class="sg-eqa-period-head"><div><b>Kỳ áp dụng</b><span>Chọn các kỳ dùng cùng calibrator và nguồn CoA.</span></div><div>${btn('Chọn tất cả','sgMuSelectPeriods(true)','ghost sm')}${btn('Bỏ chọn','sgMuSelectPeriods(false)','ghost sm')}</div></div><div class="sg-eqa-period-list">${periodRows}</div></div></div>
     <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn('✓ Áp dụng ngân sách MU','sgMuApply()','teal')}</div></div>`);
   sgMuUpdatePreview();
 }

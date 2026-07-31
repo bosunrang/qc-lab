@@ -189,7 +189,37 @@
 }
 
 .sg-data-head-actions .btn{
-  height:34px; min-height:34px; padding-left:12px; padding-right:12px;
+  height:30px; min-height:30px; padding:3px 12px;
+}
+
+.sg-selected-period-hint{
+  margin-bottom:8px;
+}
+
+.sg-mu-panel > #sgMU{
+  min-width:0; margin:var(--panel-content-gap) 16px 16px;
+}
+
+.sg-mu-table-wrap{
+  max-width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch;
+}
+
+.sg-mu-summary-table{
+  min-width:1000px; margin:0; table-layout:fixed;
+}
+
+.sg-mu-summary-table col:nth-child(1){width:8%;}
+.sg-mu-summary-table col:nth-child(2){width:10%;}
+.sg-mu-summary-table col:nth-child(3){width:11%;}
+.sg-mu-summary-table col:nth-child(4){width:11%;}
+.sg-mu-summary-table col:nth-child(5){width:9%;}
+.sg-mu-summary-table col:nth-child(6){width:10%;}
+.sg-mu-summary-table col:nth-child(7){width:13%;}
+.sg-mu-summary-table col:nth-child(8){width:9%;}
+.sg-mu-summary-table col:nth-child(9){width:19%;}
+.sg-mu-summary-table th:not(:first-child):not(:last-child),
+.sg-mu-summary-table td:not(:first-child):not(:last-child){
+  text-align:center;
 }
 
 .sg-bias-action-icon{
@@ -238,27 +268,52 @@
 .sg-eqa-summary.is-empty{box-sizing:border-box;display:flex;width:fit-content;max-width:100%;min-height:32px;margin-top:10px;padding:5px 10px;border-left:4px solid var(--amber);background:var(--warning-soft);line-height:1.2;}
 .sg-eqa-summary.is-empty .sg-eqa-empty{color:var(--amber);font-weight:650;}
 .sg-eqa-warning{align-self:center;color:var(--amber);font-size:11px;font-weight:700;}
-.sg-eqa-period-wrap{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);}.sg-eqa-period-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px;}.sg-eqa-period-head>div{display:flex;gap:6px;}.sg-eqa-period-list{display:flex;max-height:120px;flex-wrap:wrap;gap:8px 16px;overflow-y:auto;padding:2px;}
+.sg-eqa-period-wrap{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);}.sg-eqa-period-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px;}.sg-eqa-period-head>div{display:flex;gap:6px;}.sg-eqa-period-list{display:flex;max-height:120px;flex-wrap:wrap;gap:8px;overflow-y:auto;padding:2px;}
 .sg-eqa-period{display:flex;align-items:center;gap:6px;margin:0;color:var(--ink);font-size:13px;font-weight:550;cursor:pointer;user-select:none;white-space:nowrap;}.sg-eqa-period input{width:16px;height:16px;margin:0;accent-color:var(--teal);}
-/* Modal MU dùng lại khung và bảng của modal Bias, nhưng có một cột VĂN BẢN TỰ DO
-   (nguồn CoA) và một cột xem trước hai dòng — mà độ rộng cột của .sg-eqa-table
-   được tinh riêng cho 5 cột số hẹp, nên phải nới khung và chia lại cột ở đây. */
-.sg-mu-modal{width:660px;}
-.sg-mu-table{min-width:600px;}
-.sg-mu-table th:first-child,.sg-mu-table td:first-child{width:64px;}
-.sg-mu-table th:nth-child(2){width:104px;}
-.sg-mu-table th:nth-child(3){width:auto;}
-.sg-mu-table th:nth-child(4){width:150px;}
-.sg-mu-table th:last-child{width:132px;}
-.sg-mu-table td{padding:6px 5px;}
-.sg-mu-table td input[type=text],.sg-mu-table td select{box-sizing:border-box;width:100%;height:28px;min-height:28px;padding:2px 6px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--surface-subtle);color:var(--ink);font:600 var(--table-body-size) var(--sans);}
-.sg-mu-preview{color:var(--muted);font-size:12px;line-height:1.35;text-align:center;}
-.sg-mu-preview b{color:var(--teal-deep);}
+.sg-eqa-period-list .sg-eqa-period{padding:7px 10px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--panel);}
+.sg-eqa-period-list .sg-eqa-period:has(input:checked){border-color:color-mix(in srgb,var(--teal) 55%,var(--line));background:color-mix(in srgb,var(--teal) 8%,var(--panel));color:var(--teal-deep);}
+.sg-mu-modal{width:860px;}
+.sg-mu-intro{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:10px;}
+.sg-mu-intro>div{display:flex;min-width:0;flex-direction:column;gap:2px;}
+.sg-mu-intro>div>b{color:var(--ink);font-size:13px;}
+.sg-mu-intro>div>span{color:var(--muted);font-size:12px;}
+.sg-mu-intro>.tag{flex:0 0 auto;}
+.sg-mu-table{min-width:790px;}
+.sg-mu-table th:first-child,.sg-mu-table td:first-child{width:68px;}
+.sg-mu-table th:nth-child(2){width:126px;}
+.sg-mu-table th:nth-child(3){width:245px;}
+.sg-mu-table th:nth-child(4){width:180px;}
+.sg-mu-table th:last-child{width:170px;}
+.sg-mu-table td{height:62px;padding:8px;}
+.sg-mu-table tbody tr:nth-child(even) td{background:color-mix(in srgb,var(--section-head-bg) 42%,var(--panel));}
+.sg-mu-table td:first-child{white-space:nowrap;}
+.sg-mu-table td input[type=text],.sg-mu-table td select{box-sizing:border-box;width:100%;height:36px;min-height:36px;padding:5px 9px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--panel);color:var(--ink);font:600 var(--table-body-size) var(--sans);}
+.sg-mu-table td select{padding-right:28px;}
+.sg-mu-number-field{position:relative;}
+.sg-mu-number-field input[type=number]{width:100%;height:36px;min-height:36px;padding:5px 30px 5px 9px;text-align:right;}
+.sg-mu-number-field>span{position:absolute;top:50%;right:10px;transform:translateY(-50%);color:var(--muted);font-size:12px;font-weight:750;pointer-events:none;}
+.sg-mu-preview{color:var(--muted);font-size:12px;line-height:1.3;text-align:left;}
+.sg-mu-preview-values{display:grid;grid-template-columns:1fr 1fr;gap:5px;}
+.sg-mu-preview-values>span{display:flex;min-width:0;flex-direction:column;gap:1px;padding:4px 6px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--panel);}
+.sg-mu-preview-values small{color:var(--muted);font-size:10px;font-weight:750;line-height:1.1;}
+.sg-mu-preview-values b{color:var(--ink);font-size:13px;font-variant-numeric:tabular-nums;}
+.sg-mu-preview-values .is-u{border-color:color-mix(in srgb,var(--teal) 35%,var(--line));background:color-mix(in srgb,var(--teal) 6%,var(--panel));}
+.sg-mu-preview-values .is-u b{color:var(--teal-deep);}
+.sg-mu-preview-state{margin-top:4px;font-size:10.5px;font-weight:750;}
+.sg-mu-preview-state.ok{color:var(--success-ink);}
+.sg-mu-preview-state.warn{color:var(--amber);}
+.sg-mu-preview-empty{padding:7px;border:1px dashed var(--line);border-radius:var(--radius-sm);color:var(--muted);text-align:center;}
+.sg-mu-section-title{display:flex;align-items:baseline;gap:8px;margin-top:14px;padding-top:13px;border-top:1px solid var(--line);}
+.sg-mu-section-title>b{color:var(--ink);font-size:13px;}
+.sg-mu-section-title>span{color:var(--muted);font-size:11.5px;}
 /* .sg-setup-fields được chia cột cho panel "Thiết lập phân tích" (5 ô ngang); trong
    modal chỉ có 2 ô nên phải chia lại, kèm cho ô ngày tràn hết cột — độ rộng mặc
    định của .manage-date cắt mất chữ số cuối của dd/mm/yyyy. */
-.sg-mu-modal .sg-setup-fields{grid-template-columns:1fr 210px;margin-top:14px;}
+.sg-mu-modal .sg-setup-fields{grid-template-columns:minmax(240px,360px) 220px;justify-content:start;margin-top:9px;}
 .sg-mu-modal .sg-setup-fields .datebox,.sg-mu-modal .sg-setup-fields .datebox .date-text{width:100%;}
+.sg-mu-period-wrap{margin-top:14px;}
+.sg-mu-period-wrap .sg-eqa-period-head>div:first-child{display:flex;min-width:0;flex-direction:column;gap:2px;}
+.sg-mu-period-wrap .sg-eqa-period-head>div:first-child>span{color:var(--muted);font-size:11.5px;}
 
 @media(max-width:980px){
 .sg-top-grid{
@@ -469,6 +524,10 @@
   grid-template-columns:1fr;
 }
 
+.sg-mu-modal .sg-setup-fields{
+  grid-template-columns:1fr;
+}
+
 .sg-setup-fields .sg-tea-input{
   grid-column:auto;
   grid-row:auto;
@@ -485,6 +544,10 @@
 
 .sg-data-head-actions{
   width:100%; justify-content:flex-start;
+}
+
+.sg-mu-panel > #sgMU{
+  margin-left:12px; margin-right:12px;
 }
 
 .sg-chart-grid{

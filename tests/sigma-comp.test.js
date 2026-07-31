@@ -47,6 +47,7 @@ assert.equal(ctx.sgInputDisplayValue(''),'');
   assert.match(source, /Chọn CV IQC theo lô/, 'automatic import is labelled as a lot-based CV cohort');
   assert.doesNotMatch(source, /Bias Peer|Peer group|sg-bias-source/, 'Peer is absent from the Sigma UI and business logic');
   assert.match(source, /class="sg-data-head-actions"/, 'per-level EQA Bias actions are placed in the period header');
+  assert.ok(source.indexOf('<h3>Số liệu theo kỳ</h3>')<source.indexOf('<h3>Thiết kế QC theo Sigma (OPSpecs)</h3>')&&source.indexOf('<h3>Thiết kế QC theo Sigma (OPSpecs)</h3>')<source.indexOf('<h3>Độ không đảm bảo đo (MU) — ISO 15189:2022</h3>'), 'Sigma follows the input-to-results order: period data, QC design, then MU');
   assert.match(source, /class="sg-action-col">Thao tác<\/th>/, 'period table has a labelled and separated action column');
   assert.match(source, /data-sg-period-id="\$\{escAttr\(e\.id\)\}"[\s\S]*?onclick="sgSelectPeriod\('\$\{e\.id\}'\)"/, 'each period row is selected by clicking the row');
   assert.doesNotMatch(source, /name="sgStatusPeriod"/, 'the per-row status radio is removed in favour of clicking the row');

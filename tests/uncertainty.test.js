@@ -240,7 +240,7 @@ const sigmaSrc = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules',
 const reportsSrc = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'reports.js'), 'utf8');
 const coreSrc = fs.readFileSync(path.join(__dirname, '..', 'assets', 'core.js'), 'utf8');
 
-assert.match(sigmaSrc, /<div class="panel"><h3>Độ không đảm bảo đo \(MU\)[^<]*<\/h3><div id="sgMU">/, 'trang Sigma phải có panel MU riêng');
+assert.match(sigmaSrc, /<div class="panel sg-mu-panel"><div class="sg-data-head"><h3>Độ không đảm bảo đo \(MU\) — ISO 15189:2022<\/h3><div id="sgMUAction" class="sg-data-head-actions"><\/div><\/div><div id="sgMU">/, 'trang Sigma phải có panel MU riêng, nút nhập CoA nằm trong header');
 assert.match(sigmaSrc, /muBox\.innerHTML=sgMuHTML\(t,selectedRow,levels\)/, 'panel MU phải bám theo ĐÚNG kỳ đang chọn như bảng OPSpecs, không phải kỳ mới nhất');
 assert.match(sigmaSrc, /function sgMuApply\(\)[\s\S]{0,80}requireWrite\(\)/, 'ghi ngân sách MU phải qua cổng quyền ghi');
 assert.match(sigmaSrc, /logAct\('Cập nhật ngân sách MU'/, 'sửa ngân sách MU phải để lại vết trong nhật ký');
