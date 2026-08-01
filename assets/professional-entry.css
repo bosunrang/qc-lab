@@ -546,7 +546,11 @@
 }
 
 .qc-sheet .qc-run-slot .qc-inline-input{
-  width:84px; min-width:84px; max-width:84px; height:28px; min-height:28px; padding:0 8px; line-height:26px; border:1px dashed #d2dee5; border-radius:var(--radius-md); background:var(--panel); box-shadow:none; color:#6f8390; font-size:12px; font-weight:700; text-align:center;
+  /* color: --muted (6,01:1 trên nền trắng) chứ không phải hex lạc #6f8390 — màu
+     đó chỉ đạt 3,94:1, dưới ngưỡng 4,5:1 của chữ 12px đậm. Ô nhập trống chiếm
+     gần hết bảng khi sang tháng mới nên axe chỉ bắt được lỗi này vào những ngày
+     đầu tháng (bản ghi baseline 2026-07-24 không thấy, 2026-08-01 thì thấy). */
+  width:84px; min-width:84px; max-width:84px; height:28px; min-height:28px; padding:0 8px; line-height:26px; border:1px dashed #d2dee5; border-radius:var(--radius-md); background:var(--panel); box-shadow:none; color:var(--muted); font-size:12px; font-weight:700; text-align:center;
 }
 
 .qc-sheet .qc-run-slot .qc-inline-input:hover, .qc-sheet .qc-run-slot .qc-inline-input:focus{

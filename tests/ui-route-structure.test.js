@@ -12,6 +12,8 @@ const modals=read('assets/modules/modals.js');
 const actions=read('assets/modules/actions-routes.js');
 const form=read('assets/modules/action-form.js');
 const report=read('assets/modules/report-routes.js');
+const sigma=read('assets/modules/sigma.js');
+const sigmaTea=read('assets/modules/sigma-tea.js');
 const index=read('index.html');
 /* Vài quy ước là "không được xuất hiện Ở BẤT KỲ ĐÂU trong trang Khắc phục sự cố"
    (xóa vật lý hồ sơ, đổ giá trị vào form sau render...). Sau khi tách file, chỉ soi
@@ -38,6 +40,18 @@ assert.match(report,/^let reportQ=/m,'state của trang Báo cáo đi cùng tran
 assert.doesNotMatch(actions,/\breport[A-Z_]/,'actions-routes.js không còn tham chiếu nào tới trang Báo cáo');
 assert.doesNotMatch(report,/\bpageActionsV4\b|\bACT_[A-Z]/,'report-routes.js không được kéo theo logic trang Khắc phục sự cố');
 assert.doesNotMatch(actions,/===== ACTIONS & REPORT PAGE ROUTES =====/,'tiêu đề file phải theo kịp việc tách trang');
+
+/* Lớp giải TEa tách khỏi sigma.js (2026-08-01) sau khi bản đồ độ phủ
+   (`npm run coverage-map`) chỉ ra sigma.js 85 KB chỉ chạy 34,4% và 51 hàm chưa
+   test nào chạm tới — phần lớn điểm mù nằm ở đúng lớp THUẦN này. Cắt một chiều:
+   sigma.js gọi sang sigma-tea.js, chiều ngược lại phải TRỐNG, nếu không lớp này
+   hết test được bằng Node. Test riêng: tests/sigma-tea.test.js. */
+for(const name of ['effectiveTeaRefs','sgRef','sgTeaInfo','sgTeaSource','sgTeaSnapshot','sgSetLevelTeaSnapshot','sgEntryTea','sgCliaCriterion','sgUnitsMatch','teaRefRecordForName'])assert.match(sigmaTea,new RegExp(`function ${name}\\(`),`${name} thuộc lớp giải TEa`);
+assert.match(sigmaTea,/^const SG_TEA_SOURCES=/m,'danh mục nguồn TEa đi cùng lớp giải TEa');
+assert.doesNotMatch(sigma,/function (?:effectiveTeaRefs|sgRef|sgTeaInfo|sgTeaSnapshot|sgCliaCriterion)\(/,'sigma.js không được giữ lại lớp giải TEa');
+assert.doesNotMatch(sigmaTea,/function (?:pageSigma|sgComp|sgMU|sgRefresh|sgOpenMU|sgOpenBias)\(/,'sigma-tea.js không được kéo theo trang Sigma, MU hay modal');
+assert.doesNotMatch(sigmaTea,/document\.|openModal\(|rerender\(/,'sigma-tea.js phải thuần — chạm DOM là hết test bằng Node');
+assert.ok(index.indexOf('sigma-tea.js')<index.indexOf('sigma.js?'),'sigma-tea.js phải tải trước sigma.js');
 
 assert.match(modals,/function modalTemplate\(/);
 assert.match(modals,/function modalCloseButton\(/);

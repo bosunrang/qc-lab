@@ -1,10 +1,10 @@
 # Backlog — việc còn lại sau đợt rà soát 2026-08-01
 
 Danh sách này ra đời từ một lượt rà soát toàn bộ codebase theo ba trục: **vận hành
-tốt**, **nghiệp vụ chắc chắn**, **dễ sửa và dễ nâng cấp**. Hai mục đầu đã làm xong
-và nằm trong commit cùng file này; bốn mục dưới còn nguyên.
+tốt**, **nghiệp vụ chắc chắn**, **dễ sửa và dễ nâng cấp**.
 
-Xếp theo mức độ gây đau, không theo mức độ dễ làm.
+Xếp theo mức độ gây đau, không theo mức độ dễ làm. Số hiệu mục giữ nguyên khi làm
+xong (mục làm xong chuyển lên phần "Đã xong") để tham chiếu cũ không lệch.
 
 ---
 
@@ -16,86 +16,51 @@ Xếp theo mức độ gây đau, không theo mức độ dễ làm.
   → `tests/locked-period-guards.test.js`
 - **`derived()` tự kiểm chứng.** Trước là memo thuần, chỉ đúng khi mọi đường ghi cấu
   hình nhớ gọi `clearDerived()`. → `tests/derived-cache.test.js`
+- **Job CI cho Windows.** `.github/workflows/test.yml` có thêm job `windows`
+  (`runs-on: windows-latest`) chạy `node scripts/run-tests.js` (trước `npm ci`, giữ
+  tính chất không-cần-cài) rồi `npm ci` + `npm run print-check` — không cần
+  `xvfb-run`, runner Windows có session desktop thật. Đã xác minh `print-check` chạy
+  qua trên Windows thật trước khi thêm job (120,7 KB PDF, 0 khối xám lớn, 3 vùng tô
+  header teal, 641 thao tác chữ).
+  **Sửa trong lượt rà soát lại:** bản đầu của job này gọi thẳng `node --test
+  tests/*.test.js`. PowerShell không nở glob và `node --test` với mẫu không khớp gì
+  thì **exit 0** — job sẽ xanh mà chạy 0 test. Nay cả ba đường (hook pre-commit,
+  job `test` Linux, job `windows`) đều đi qua `scripts/run-tests.js`, tự liệt kê file
+  và coi "0 file test" là lỗi; `verify-release.js` cũng từ chối danh sách rỗng.
+- **Cổng hiệu năng nâng lên cỡ triển khai.** `performance-budget.json` (`version: 2`)
+  đổi kịch bản từ 20 × 3 × 365 (21.900 điểm) sang **50 × 3 × 730 (109.500 điểm)** —
+  đúng hình dạng `deployment` mà `performance-baseline.js` đã định nghĩa. Chỉ nới hai
+  ngưỡng thời gian (`fullStartupMs` 1500 → 3500, `coldDomainMs` 2500 → 12000, giữ
+  khoảng dư ~3–5 lần như bản cũ) và **siết** hai tỉ lệ đếm byte thuần
+  (`bootShellRatio` 0,03 → 0,006, `saveIncrementalBytesRatio` 0,25 → 0,05) vì chúng
+  cho cùng một con số ở mọi máy. Bảng số đo cũ/mới nằm trong `benchmarks/README.md`.
+- **Bảng đăng ký luật Westgard.** `WG_RULE_REGISTRY` trong `core.js` là nguồn duy
+  nhất; `WG_RULES`, `WG_DEFAULT_ON`, `WG_RUN_RULES`, `WG_ALERT_RULES`,
+  `WG_SE_RULES`/`WG_RE_RULES`, `WG_RULE_DESCRIPTIONS`, thứ tự ưu tiên của
+  `primaryErrorRule` và **bảng hướng dẫn trên trang Westgard** đều dẫn xuất từ nó.
+  Bảng hướng dẫn trước đây gõ tay 13 dòng kèm cột kết luận — không ai đối chiếu nó
+  với engine bao giờ. → `tests/westgard-rule-registry.test.js` (chốt cả nửa dẫn xuất
+  lẫn nửa quét nguồn: ngoài `core.js`, không file nào được liệt kê ≥ 3 id luật)
+- **Đo độ phủ rồi tách `sigma.js`.** `npm run coverage-map` (`scripts/coverage-map.js`,
+  dùng `NODE_V8_COVERAGE` có sẵn của Node, không cài gì, KHÔNG phải cổng chặn) sinh
+  `docs/coverage-map.md`. Có bản đồ rồi thì đường cắt không còn là phỏng đoán: lớp giải
+  TEa — phần thuần quyết định con số TEa đi vào mọi phép Sigma/MU/báo cáo — tách sang
+  `sigma-tea.js`, ranh giới một chiều chốt bằng `tests/ui-route-structure.test.js`,
+  và có test riêng `tests/sigma-tea.test.js` (nạp sandbox chỉ với `core.js` +
+  `state.js`, nên nếu ai kéo mã dựng giao diện vào đó thì đổ ngay).
+  Trước tách: `sigma.js` 85 KB, 34,4%, 51 hàm chưa chạy — một con số trung bình không
+  nói lên gì. Sau tách: `sigma.js` 26,9% (toàn giao diện) và `sigma-tea.js` **90,4%,
+  không còn hàm nào chưa chạy**.
 
----
+**Phát sinh trong lúc chạy đủ bộ kiểm tra (không nằm trong danh sách rà soát):**
 
-## 3. Job CI cho Windows
-
-**Vấn đề.** `npm run dist` xuất **NSIS Windows x64** — 100% người dùng chạy Windows.
-Cả ba job trong `.github/workflows/test.yml` đều `runs-on: ubuntu-latest`.
-
-Không phải lo hão: `index.html` đang mang sẵn một đoạn vá cho **lỗi chỉ có trên
-Windows** (dialog Chromium làm ô nhập chết cứng sau khi đóng → phải định tuyến
-`alert()` qua dialog hệ điều hành). Và `print-check` — thứ kiểm đường in ra PDF của
-bản desktop — đang chạy Electron dưới `xvfb` **trên Linux**, tức kiểm một đường mã
-trên hệ điều hành mà sản phẩm không bao giờ chạy.
-
-**Việc cần làm.** Thêm job `runs-on: windows-latest` chạy `npm test` + `npm run
-print-check` (bản Windows không cần `xvfb-run`).
-
-**Ước lượng.** Nhỏ. Chỉ sửa `.github/workflows/test.yml`.
-
----
-
-## 4. Cổng hiệu năng đang canh ở cỡ nhỏ hơn cỡ triển khai 5 lần
-
-| | Số xét nghiệm | Ngày | Điểm QC |
-|---|---|---|---|
-| `benchmarks/performance-baseline.js` mốc `deployment` | 50 | 730 | ~109.500 |
-| **`verify-release` thực sự chặn ở** | **20** | **365** | **21.900** |
-
-Hình dạng "triển khai thật" đã được tự định nghĩa là 50×3×730 và có sẵn profile, nhưng
-cổng phát hành chỉ gác ở một phần năm. Hồi quy chỉ lộ ra ở cỡ lớn sẽ đi lọt. Đây cũng là
-nơi mốc `WG_WORKER_POINT_THRESHOLD=3000` mới bắt đầu có ý nghĩa thật.
-
-**Càng đáng làm sau 2026-08-01** vì `derived()` vừa đổi từ memo thuần sang so chữ ký —
-đường warm là đúng thứ cổng này canh (`warmDomainMaxColdRatio`).
-
-**Việc cần làm.** Nâng kịch bản trong `benchmarks/performance-regression.js` lên cỡ
-`deployment`, chạy vài lần lấy số thật rồi chỉnh lại ngưỡng trong
-`performance-budget.json`. **Đừng siết ngưỡng ms tuyệt đối từ một lần chạy nhanh cục bộ**
-— tỉ lệ và kiểm tra cấu trúc mới là tín hiệu hồi quy thật (xem `benchmarks/README.md`).
-
-**Ước lượng.** Nhỏ–vừa. Chủ yếu là đo lại và chỉnh ngưỡng.
-
----
-
-## 5. Bảng đăng ký luật Westgard
-
-**Vấn đề.** Ngày 2026-08-01 đã gộp *ngữ nghĩa* luật (hành động + phạm vi) về `core.js`
-làm nguồn duy nhất. Nhưng **danh sách luật** vẫn rải khắp 8 file nguồn:
-
-`core.js` (`WG_RULES`, mô tả, phân loại SE/RE) · `state.js` · `qc-domain.js` ·
-`westgard-routes.js` (ô bật/tắt) · `entry-tests-actions.js` (ghi đè theo xét nghiệm) ·
-`action-form.js` · `data-io.js` · `reports.js`
-
-**Việc cần làm.** Một bảng đăng ký duy nhất trong `core.js`, mỗi luật là một object:
-
-```js
-{ id:'2of3-2s', mô tả, loạiSaiSố:'SE', mặcĐịnhBật:false,
-  hànhĐộngMặcĐịnh:'reject', phạmViTheoSốMức: … }
-```
-
-Các file khác **đọc bảng** thay vì tự liệt kê. Biến "thêm một luật" từ 8 chỗ thành 1.
-
-**Ước lượng.** Vừa. Là refactor thật — nên làm sau khi mục 3 và 4 đã ổn định.
-
----
-
-## 6. Đo độ phủ test → rồi mới tách `sigma.js`
-
-**Vấn đề.** 60 file test nhưng **không có công cụ đo độ phủ nào**. Con số 60 nghe yên tâm
-nhưng không trả lời được câu duy nhất đáng hỏi: *phần nào của `sigma.js` (87 KB — file lớn
-nhất repo), `entry-tests-actions.js`, `firebase-sync.js` chưa có dòng nào chạm tới?*
-
-**Việc cần làm.**
-1. Chạy **một lần** bằng cờ đo độ phủ có sẵn của Node (không cần cài gì) để lấy bản đồ
-   điểm mù. Không cần biến nó thành cổng chặn.
-2. Có bản đồ rồi mới tách `sigma.js` — repo đã có tiền lệ tốt: `actions-routes.js` 105 KB
-   tách thành `report-routes.js` + `action-form.js`, và `tests/ui-route-structure.test.js`
-   chốt lại ranh giới.
-
-**Ước lượng.** Bước 1 nhỏ. Bước 2 vừa.
+- `a11y-audit` **đang đỏ sẵn ở HEAD**: ô nhập QC trống dùng hex lạc `#6f8390` trên nền
+  trắng, chỉ đạt 3,94:1 (chữ 12px đậm cần 4,5:1). Lỗi này chỉ lộ vào những ngày đầu
+  tháng — khi bảng nhập gần như trống nên axe mới thấy đủ nhiều ô. Đã đổi sang
+  `var(--muted)` (6,01:1).
+- `nce-check` cũng **đỏ sẵn ở HEAD**: script còn gọi `dashboardKpiSetScope()`, một hàm
+  không tồn tại — commit KPI trước đó tách nó thành `dashboardKpiSetInstrument()` và
+  `dashboardKpiSetTest()` mà quên sửa script. Đã sửa (99 đạt / 0 lỗi).
 
 ---
 

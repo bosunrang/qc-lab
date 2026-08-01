@@ -63,6 +63,18 @@ npm test
 node --test tests/*.test.js
 ```
 
+`npm test` runs `scripts/run-tests.js`, which lists `tests/*.test.js` with `fs`
+and passes the files explicitly, instead of relying on a glob. The reason is not
+style: **`node --test` exits 0 when its pattern matches nothing** (verified —
+`node --test "tests/khong-ton-tai-*.test.js"` prints `tests 0` and returns 0). A
+shell that doesn't expand the glob would therefore make the pre-commit hook and
+the CI job pass while running zero tests. On Linux the shell always expanded it,
+but the Windows CI job added 2026-08-01 depends entirely on Node's own glob
+support. The script treats "0 test files" as a failure; the hook and all CI jobs
+go through it, and `benchmarks/verify-release.js` (which already enumerated the
+files itself) now refuses an empty list too. The bare glob above is still fine
+for a one-off local run.
+
 Run one file (either works):
 ```
 node --test tests/qccore.test.js
@@ -97,13 +109,38 @@ structural change and fix the structure, not the test:
 - `firebase-rules.test.js` — the rules text the Settings page shows
   (`firebaseRulesText()`) must equal `firebase/database.rules.json` verbatim.
 - `tea-sources.test.js` — every measurand keeps a row in `docs/tea-sources.md`.
+- `westgard-rule-registry.test.js` — the Westgard rule list lives only in
+  `core.js`'s `WG_RULE_REGISTRY`; no other source file may spell out three or
+  more rule ids (see "Module roles" → `core.js`).
 
 A pre-commit hook (`.githooks/pre-commit`, installed into `.git/hooks/`) runs
-`node --test tests/*.test.js` and blocks the commit on failure; needs no `npm
+`node scripts/run-tests.js` and blocks the commit on failure; needs no `npm
 install` since tests only use Node core modules. `.github/workflows/test.yml`
-has three jobs: `test` (the same install-free command), `release-gate`
-(`npm ci` → `npm run typecheck` → `npm run verify-release`), and
-`visual-and-a11y` (Playwright/Electron checks below).
+has four jobs: `test` (the same install-free command), `release-gate`
+(`npm ci` → `npm run typecheck` → `npm run verify-release`),
+`visual-and-a11y` (Playwright/Electron checks below), and `windows`
+(`runs-on: windows-latest` — the same install-free `node scripts/run-tests.js`
+plus `npm run print-check` without `xvfb-run`). The Windows job exists because
+the product ships as NSIS Windows x64 only, `index.html` carries a patch for a
+Windows-only Chromium dialog bug, and `print-check` otherwise exercises the
+desktop print path on Linux, an OS the product never runs on.
+
+### Coverage blind-spot map
+
+`npm run coverage-map` (`scripts/coverage-map.js`) runs the whole suite under
+Node's built-in `NODE_V8_COVERAGE` — no extra dependency — and writes
+`docs/coverage-map.md`: percent of each `assets/**/*.js` executed, which files no
+test loads at all, and the names+lines of functions never executed. It is
+deliberately **not a gate**: no thresholds, and it only exits non-zero if the test
+suite itself fails or no coverage data was found. Two things to know when reading
+it: V8's offsets are source *character* offsets (not UTF-8 bytes — this codebase is
+full of Vietnamese, so the two differ a lot), and render modules can only run their
+pure halves inside the `vm` sandbox, so a low number there is the sandbox boundary,
+not test debt. The 2026-08-01 baseline: 40.5% overall, 9 files never loaded by any
+test, `sigma.js` at 26.9% (all UI) with 49 never-executed functions, and the TEa
+layer it was split into (`sigma-tea.js`) at 90.4% with none. That contrast is the
+map's whole point: before the split those two numbers were averaged into one
+uninformative 34.4%.
 
 ### Visual/print and accessibility checks
 
@@ -319,6 +356,21 @@ the Google Fonts link, offline labs must print with correct metrics.
   while silently changing accept/reject verdicts for any test over
   `WG_WORKER_POINT_THRESHOLD` points. `tests/westgard-worker.test.js` now pins
   main-thread/worker parity across every rule × level count × override case.
+  Also since 2026-08-01, the **rule list itself** is one registry:
+  `WG_RULE_REGISTRY` — one object per rule carrying `id`, `desc`, `err` (SE/RE/''),
+  `defaultOn`, `alert`, `scope`+`scopeMin`, `priority`, the `run` predicate triple
+  for the "N consecutive points" family, and the `fix` hint. `WG_RULES`,
+  `WG_DEFAULT_ON`, `WG_RUN_RULES`, `WG_ALERT_RULES`, `WG_SE_RULES`/`WG_RE_RULES`,
+  `WG_RULE_DESCRIPTIONS`, `primaryErrorRule`'s priority order and the Westgard
+  page's guide table are all **derived** from it — before this, that list was
+  spelled out in 8 source files, so adding a rule meant 8 edits and one forgotten
+  edit drifted silently (the guide table's descriptions and reject/warn column
+  were hand-typed and nothing compared them to the engine). Adding a rule is now
+  one row here, plus engine work only if it isn't a `run`-family rule.
+  `tests/westgard-rule-registry.test.js` pins both halves: every derived list must
+  match the registry, and **no source file outside `core.js` may spell out three or
+  more rule ids** (a text scan, like `button-conventions.test.js`; 1–2 ids is
+  legitimate single-rule logic).
 - `app-meta.js` — loads right after `core.js`, before `state.js`. Sets
   `window.QCLAB_APP` (name/version/releaseDate — bump both per
   `docs/validation/RELEASE-PUBLISH.md`) and `window.QCLAB_CLOUD` (Firebase
@@ -548,6 +600,18 @@ the Google Fonts link, offline labs must print with correct metrics.
   Page-level UI state lives in the `*-ui-state.js` modules above. `sigma.js`
   renders the Six Sigma page (see "Confirmed business-logic decisions" below
   for how its numbers relate to reports.js).
+- `sigma-tea.js` — the Six Sigma page's **TEa resolution layer**, split out of
+  `sigma.js` on 2026-08-01 (loads immediately before it; `SG_TEA_DEFAULT_REF` and
+  `SG_CLIA_FIXED` read `TEA_SOURCE_REGISTRY`/`TEA_ANALYTE_CATALOG` at load time).
+  It answers "what is this assay's TEa, from which source, with what traceability":
+  the effective TEa table (`REFTESTS` defaults overlaid with `state.teaRefs`),
+  assay↔reference-row matching (`sgRef`, exact-then-longest-prefix), the CLIA
+  percent/absolute/greater-of criterion, and the per-period TEa snapshot. It knows
+  nothing about Sigma, MU, charts or modals — that boundary is one-directional and
+  pinned by `tests/ui-route-structure.test.js`, and it is what makes the layer
+  testable in Node (`tests/sigma-tea.test.js` loads it with only `core.js` +
+  `state.js`). `tests/helpers/sandbox.js` auto-inserts it before `modules/sigma.js`,
+  like it does `analyte-catalog.js` before `state.js`.
 - `dashboard-routes.js` còn dựng bảng KPI chất lượng & CAPA (`dashboardKpiSnapshot()`):
   tỷ lệ QC được chấp nhận/bị loại, số NCE đang mở, tỷ lệ CAPA có hiệu lực, xu hướng 6
   tháng, luồng giai đoạn CAPA và nhóm nguyên nhân. Kỳ và phạm vi (thiết bị/xét nghiệm)

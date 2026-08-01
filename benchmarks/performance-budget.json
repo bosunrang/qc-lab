@@ -1,15 +1,15 @@
 {
-  "version": 1,
+  "version": 2,
   "scenario": {
-    "tests": 20,
+    "tests": 50,
     "levels": 3,
-    "days": 365
+    "days": 730
   },
   "budgets": {
-    "bootShellMaxRatio": 0.03,
+    "bootShellMaxRatio": 0.006,
     "shellInitMaxMs": 100,
-    "fullStartupMaxMs": 1500,
-    "coldDomainMaxMs": 2500,
+    "fullStartupMaxMs": 3500,
+    "coldDomainMaxMs": 12000,
     "warmDomainMaxColdRatio": 0.02,
     "unrelatedChangeMaxColdRatio": 0.02,
     "oneTestMaxColdRatio": 0.2,
@@ -17,7 +17,7 @@
     "displaySamplingMaxMs": 200,
     "mapLookupMaxMs": 20,
     "saveIncrementalMaxMs": 500,
-    "saveIncrementalMaxBytesRatio": 0.25,
+    "saveIncrementalMaxBytesRatio": 0.05,
     "saveIncrementalMaxPartitions": 1
   }
 }

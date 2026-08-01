@@ -1,4 +1,8 @@
 #!/bin/sh
 # Blocks the commit if tests/*.test.js fail. Tests need no npm install (Node
 # core modules only), so this stays fast (~2s) even on a cold checkout.
-node --test tests/*.test.js
+# Goes through scripts/run-tests.js instead of a bare glob: `node --test` exits 0
+# when the pattern matches nothing, so an unexpanded glob would let every commit
+# through as if the suite had passed. The script lists the files itself and
+# treats "0 test files" as a failure.
+node scripts/run-tests.js

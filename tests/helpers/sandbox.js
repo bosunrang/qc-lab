@@ -27,6 +27,10 @@ function loadSandbox(relFiles, globals = {}) {
   const files=[...relFiles];
   const stateIndex=files.indexOf('modules/state.js');
   if(stateIndex>=0&&!files.includes('modules/analyte-catalog.js'))files.splice(stateIndex,0,'modules/analyte-catalog.js');
+  // sigma.js không còn tự giải TEa từ 2026-08-01 (tách sang sigma-tea.js, nạp
+  // ngay trước nó trong index.html) — chèn giúp để mọi test cũ khỏi phải liệt kê.
+  const sigmaIndex=files.indexOf('modules/sigma.js');
+  if(sigmaIndex>=0&&!files.includes('modules/sigma-tea.js'))files.splice(sigmaIndex,0,'modules/sigma-tea.js');
   files.forEach(relPath => {
     const code = fs.readFileSync(path.join(ASSETS_DIR, relPath), 'utf8');
     vm.runInContext(code, context, { filename: relPath });

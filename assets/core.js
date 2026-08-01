@@ -11,18 +11,61 @@
   const ID_RE=/^[A-Za-z0-9_-]{1,80}$/;
   const ROLE_SET=new Set(['admin','technician','viewer']);
   const PAGE_SET=new Set(['dash','entry','westgard','sigma','reagent','actions','report','manage','users','audit','settings']);
-  const WG_RULES=['1-2s','1-3s','2-2s','R4s','3-1s','4-1s','6x','8x','9x','10x','12x','7T','2of3-2s'];
-  /* 1_3s/2_2s/R_4s/4_1s/10x là bộ multirule kinh điển Westgard (1981) cho QC
+  /* ===== BẢNG ĐĂNG KÝ LUẬT WESTGARD — NGUỒN DUY NHẤT (2026-08-01) =====
+     Trước đó "danh sách luật" nằm rải ở 8 file nguồn (core.js giữ 5 mảng riêng,
+     westgard-routes.js gõ tay lại cả 13 dòng bảng hướng dẫn kèm kết luận mặc
+     định). Thêm một luật phải sửa từng chỗ, và một chỗ quên là lệch âm thầm.
+     Nay MỌI danh sách bên dưới đều DẪN XUẤT từ bảng này — thêm một luật = thêm
+     một dòng ở đây (cộng phần engine nếu luật không thuộc họ "N điểm liên tiếp").
+     Các trường:
+       id        khóa dùng trong state.westgardRules / t.ruleActions / t.ruleScopes
+       desc      điều kiện của luật — hiện ở bảng hướng dẫn, báo cáo, hồ sơ NCE
+       err       'SE' | 'RE' | '' — 1-2s chỉ sàng lọc nên KHÔNG quy loại sai số
+       defaultOn bật sẵn trong cấu hình chung
+       alert     mặc định chỉ cảnh báo thay vì loại bỏ (vẫn nâng được theo SOP)
+       scope     phạm vi mặc định KHI đủ scopeMin mức QC; dưới ngưỡng luôn 'within'
+       scopeMin  số mức QC tối thiểu để dùng scope trên
+       priority  thứ tự chọn luật đại diện trong primaryErrorRule (nhỏ = ưu tiên)
+       run       [N,vị-từ dương,vị-từ âm] nếu thuộc họ "N điểm liên tiếp cùng phía"
+       fix       gợi ý xử lý ở bảng hướng dẫn trang Westgard
+     1_3s/2_2s/R_4s/4_1s/10x là bộ multirule kinh điển Westgard (1981) cho QC
      2 mức; 1-2s đi kèm chỉ để cảnh báo sàng lọc (không tự loại bỏ — xem
      westgard() bên dưới), không phải một trong 5 rule loại bỏ cốt lõi. */
-  const WG_DEFAULT_ON=new Set(['1-2s','1-3s','2-2s','R4s','4-1s','6x','10x']);
+  /** @typedef {{id:string,desc:string,err:string,defaultOn:boolean,alert:boolean,scope:string,scopeMin:number,priority:number,run:[number,(z:number)=>boolean,(z:number)=>boolean]|null,fix:string}} WgRuleDef */
+  /** @type {WgRuleDef[]} */
+  const WG_RULE_REGISTRY=[
+    {id:'1-2s',desc:'1 điểm QC vượt ±2SD',err:'',defaultOn:true,alert:true,scope:'within',scopeMin:2,priority:13,run:null,fix:'Theo dõi điểm kế tiếp, chưa loại bỏ nếu không kèm luật khác.'},
+    {id:'1-3s',desc:'1 điểm QC vượt ±3SD',err:'RE',defaultOn:true,alert:false,scope:'within',scopeMin:2,priority:1,run:null,fix:'Kiểm tra sai số ngẫu nhiên: thao tác, bọt khí, pipet, QC pha/bảo quản.'},
+    {id:'2-2s',desc:'2 điểm liên tiếp hoặc 2 mức cùng lần chạy, cùng phía vượt ±2SD',err:'SE',defaultOn:true,alert:false,scope:'both',scopeMin:2,priority:3,run:[2,z=>z>2,z=>z<-2],fix:'Nghi sai số hệ thống: hiệu chuẩn, lô QC/hóa chất, nhiệt độ, máy.'},
+    {id:'R4s',desc:'Cùng lần chạy có 1 mức > +2SD và 1 mức < -2SD, chênh nhau trên 4SD',err:'RE',defaultOn:true,alert:false,scope:'across',scopeMin:2,priority:2,run:null,fix:'Nghi sai số ngẫu nhiên lớn: hút mẫu, bọt khí, thao tác, điện áp.'},
+    {id:'3-1s',desc:'3 điểm liên tiếp hoặc 3 mức cùng phía vượt ±1SD',err:'SE',defaultOn:false,alert:false,scope:'across',scopeMin:3,priority:5,run:[3,z=>z>1,z=>z<-1],fix:'Nghi dịch chuyển hệ thống nhỏ; kiểm tra hiệu chuẩn và lô thuốc thử.'},
+    {id:'4-1s',desc:'4 điểm liên tiếp cùng phía vượt ±1SD',err:'SE',defaultOn:true,alert:false,scope:'both',scopeMin:2,priority:6,run:[4,z=>z>1,z=>z<-1],fix:'Nghi lệch hệ thống nhẹ, kiểm tra xu hướng và hiệu chuẩn.'},
+    {id:'6x',desc:'6 điểm liên tiếp nằm cùng một phía so với Mean',err:'SE',defaultOn:true,alert:true,scope:'across',scopeMin:2,priority:7,run:[6,z=>z>0,z=>z<0],fix:'Phát hiện dịch chuyển sớm, khá nhạy khi gộp nhiều mức; xem lại Mean, hiệu chuẩn và lô mới. Có thể nâng thành loại bỏ theo SOP từng xét nghiệm.'},
+    {id:'8x',desc:'8 điểm liên tiếp nằm cùng một phía so với Mean',err:'SE',defaultOn:false,alert:false,scope:'across',scopeMin:2,priority:8,run:[8,z=>z>0,z=>z<0],fix:'Biến thể thường dùng khi chạy 2 hoặc 4 mức QC; nghi lệch hệ thống.'},
+    {id:'9x',desc:'9 điểm liên tiếp nằm cùng một phía so với Mean',err:'SE',defaultOn:false,alert:false,scope:'across',scopeMin:2,priority:9,run:[9,z=>z>0,z=>z<0],fix:'Biến thể phù hợp khi chạy 3 mức QC qua nhiều lần chạy.'},
+    {id:'10x',desc:'10 điểm liên tiếp nằm cùng một phía so với Mean',err:'SE',defaultOn:true,alert:false,scope:'across',scopeMin:2,priority:10,run:[10,z=>z>0,z=>z<0],fix:'Nghi dịch chuyển nền, xem lại Mean/SD, lô mới, hiệu chuẩn.'},
+    {id:'12x',desc:'12 điểm liên tiếp nằm cùng một phía so với Mean',err:'SE',defaultOn:false,alert:false,scope:'across',scopeMin:2,priority:11,run:[12,z=>z>0,z=>z<0],fix:'Biến thể ít nhạy hơn 8x/10x, dùng để theo dõi bias dài hơn.'},
+    {id:'7T',desc:'7 lần tăng dần hoặc giảm dần liên tiếp (8 điểm QC)',err:'SE',defaultOn:false,alert:true,scope:'within',scopeMin:2,priority:12,run:null,fix:'Theo dõi xu hướng, kiểm tra bảo quản QC, thuốc thử, môi trường.'},
+    {id:'2of3-2s',desc:'Trong 3 kết quả, có ít nhất 2 điểm cùng phía vượt ±2SD',err:'SE',defaultOn:false,alert:false,scope:'across',scopeMin:3,priority:4,run:null,fix:'Nghi sai số hệ thống; đặc biệt hữu ích khi chạy 3 mức QC.'}
+  ];
+  /* Đóng băng: bảng này được EXPORT ra ngoài (QCCore.WG_RULE_REGISTRY) và cả app
+     lẫn worker đọc nó để quyết định chấp nhận/loại bỏ điểm QC. Một dòng mã lỡ tay
+     sửa `r.alert` hay `r.scope` sẽ đổi kết luận Westgard trên toàn hệ thống mà
+     không để lại dấu vết nào — đúng loại hỏng mà việc gộp về một nguồn duy nhất
+     phải ngăn, chứ không phải tạo ra. Mảng `run` đóng băng luôn vì nó là hợp đồng
+     của engine, không phải dữ liệu tạm. */
+  WG_RULE_REGISTRY.forEach(r=>{if(r.run)Object.freeze(r.run);Object.freeze(r);});
+  Object.freeze(WG_RULE_REGISTRY);
+  const WG_RULE_BY_ID=Object.fromEntries(WG_RULE_REGISTRY.map(r=>[r.id,r]));
+  const WG_RULES=WG_RULE_REGISTRY.map(r=>r.id);
+  const WG_DEFAULT_ON=new Set(WG_RULE_REGISTRY.filter(r=>r.defaultOn).map(r=>r.id));
 
   /* Họ rule "N điểm liên tiếp cùng phía" dùng chung cho westgard() (chuỗi thời
      gian 1 mức) và westgardMulti() (chuỗi level×run): [tên,N,vị-từ dương,vị-từ
      âm] trên z. 2-2s = "2 điểm z>2 HOẶC 2 điểm z<-2"; multi KHÔNG dùng bản 2-2s
      này (nó xét 2-2s chéo level trong cùng run), nên lọc bỏ khi gọi từ multi. */
   /** @type {[string,number,(z:number)=>boolean,(z:number)=>boolean][]} */
-  const WG_RUN_RULES=[['2-2s',2,z=>z>2,z=>z<-2],['3-1s',3,z=>z>1,z=>z<-1],['4-1s',4,z=>z>1,z=>z<-1],['6x',6,z=>z>0,z=>z<0],['8x',8,z=>z>0,z=>z<0],['9x',9,z=>z>0,z=>z<0],['10x',10,z=>z>0,z=>z<0],['12x',12,z=>z>0,z=>z<0]];
+  const WG_RUN_RULES=WG_RULE_REGISTRY.filter(r=>r.run).map(r=>/** @type {[string,number,(z:number)=>boolean,(z:number)=>boolean]} */([r.id,r.run[0],r.run[1],r.run[2]]));
   /* Quét zs[]: mỗi rule bật, mọi cửa sổ N liên tiếp mà TẤT CẢ thỏa pos (hoặc tất
      cả thỏa neg) → onHit(mảngChỉSố,tên). Không biết phần tử là điểm hay item —
      caller tự map chỉ số về dữ liệu của mình. */
@@ -532,8 +575,9 @@
   const RULE_ACTIONS=['inactive','alert','reject'];
   const RULE_SCOPES=['within','across','both'];
   /* 1-2s là sàng lọc, 6x/7T phát hiện shift/trend sớm nên khá nhạy — cả ba mặc
-     định chỉ cảnh báo, vẫn nâng lên 'reject' được theo SOP qua ruleActions. */
-  const WG_ALERT_RULES=['1-2s','6x','7T'];
+     định chỉ cảnh báo, vẫn nâng lên 'reject' được theo SOP qua ruleActions.
+     Dẫn xuất từ WG_RULE_REGISTRY (cột `alert`), không liệt kê lại. */
+  const WG_ALERT_RULES=WG_RULE_REGISTRY.filter(r=>r.alert).map(r=>r.id);
   function ruleEnabled(toggles,rule){return !toggles||toggles[rule]!==false;}
   function defaultRuleAction(rule,enabled){return enabled?(WG_ALERT_RULES.includes(rule)?'alert':'reject'):'inactive';}
   function resolveRuleAction(rule,enabled,override){return RULE_ACTIONS.includes(override)?override:defaultRuleAction(rule,enabled);}
@@ -541,40 +585,25 @@
      chéo mức. Với nhiều mức QC, các luật thiết kế theo N vật liệu ưu tiên chéo
      mức; 2-2s/4-1s vẫn cho phép cả hai cách kinh điển. */
   function defaultRuleScope(rule,levelCount){
-    const levels=+levelCount||0;
-    if(levels<2||['1-2s','1-3s','7T'].includes(rule))return'within';
-    if(rule==='R4s')return'across';
-    if(['2of3-2s','3-1s'].includes(rule))return levels>=3?'across':'within';
-    if(['6x','8x','9x','10x','12x'].includes(rule))return'across';
-    return'both';
+    const levels=+levelCount||0,def=WG_RULE_BY_ID[rule];
+    if(!def)return levels>=2?'both':'within';   // luật lạ (không có trong bảng đăng ký) — giữ nguyên hành vi cũ
+    return levels>=def.scopeMin?def.scope:'within';
   }
   function resolveRuleScope(rule,levelCount,override){return RULE_SCOPES.includes(override)?override:defaultRuleScope(rule,levelCount);}
   function ruleOnInScope(rule,levelCount,override,action,channel){if(action==='inactive')return false;const scope=resolveRuleScope(rule,levelCount,override);return scope==='both'||scope===channel;}
   function ruleVerdictLevel(rules,actionOf){const list=rules||[];return list.some(r=>actionOf(r)==='reject')?'rej':list.some(r=>actionOf(r)==='alert')?'warn':'ok';}
 
   /* ===== Phân loại sai số (thuần, không phụ thuộc state) — đặt ở core để
-     unit-test được; qc-domain.js re-export lại các tên này cho phần UI. Hai
-     danh sách SE/RE là NGUỒN DUY NHẤT, dùng chung cho errorType và fixHint. ===== */
-  const WG_RE_RULES=['1-3s','R4s'];                                                    // sai số ngẫu nhiên
-  const WG_SE_RULES=['2-2s','2of3-2s','3-1s','4-1s','6x','8x','9x','10x','12x','7T'];   // sai số hệ thống
-  const WG_RULE_DESCRIPTIONS={
-    '1-2s':'1 điểm QC vượt ±2SD',
-    '1-3s':'1 điểm QC vượt ±3SD',
-    '2-2s':'2 điểm liên tiếp hoặc 2 mức cùng lần chạy, cùng phía vượt ±2SD',
-    'R4s':'Cùng lần chạy có 1 mức > +2SD và 1 mức < -2SD, chênh nhau trên 4SD',
-    '2of3-2s':'Trong 3 kết quả, có ít nhất 2 điểm cùng phía vượt ±2SD',
-    '3-1s':'3 điểm liên tiếp hoặc 3 mức cùng phía vượt ±1SD',
-    '4-1s':'4 điểm liên tiếp cùng phía vượt ±1SD',
-    '6x':'6 điểm liên tiếp nằm cùng một phía so với Mean',
-    '8x':'8 điểm liên tiếp nằm cùng một phía so với Mean',
-    '9x':'9 điểm liên tiếp nằm cùng một phía so với Mean',
-    '10x':'10 điểm liên tiếp nằm cùng một phía so với Mean',
-    '12x':'12 điểm liên tiếp nằm cùng một phía so với Mean',
-    '7T':'7 lần tăng dần hoặc giảm dần liên tiếp (8 điểm QC)'
-  };
-  function primaryErrorRule(rules){const priority=['1-3s','R4s','2-2s','2of3-2s','3-1s','4-1s','6x','8x','9x','10x','12x','7T','1-2s'];return priority.find(r=>(rules||[]).includes(r))||((rules||[])[0]||'');}
+     unit-test được; qc-domain.js re-export lại các tên này cho phần UI. Cả bốn
+     danh sách dưới đây DẪN XUẤT từ WG_RULE_REGISTRY (cột `err`, `desc`,
+     `priority`), nên không có bản liệt kê thứ hai để lệch. ===== */
+  const WG_RE_RULES=WG_RULE_REGISTRY.filter(r=>r.err==='RE').map(r=>r.id);   // sai số ngẫu nhiên
+  const WG_SE_RULES=WG_RULE_REGISTRY.filter(r=>r.err==='SE').map(r=>r.id);   // sai số hệ thống
+  const WG_RULE_DESCRIPTIONS=Object.fromEntries(WG_RULE_REGISTRY.map(r=>[r.id,r.desc]));
+  const WG_RULE_PRIORITY=WG_RULE_REGISTRY.slice().sort((a,b)=>a.priority-b.priority).map(r=>r.id);
+  function primaryErrorRule(rules){return WG_RULE_PRIORITY.find(r=>(rules||[]).includes(r))||((rules||[])[0]||'');}
   function errorType(rules){rules=rules||[];if(rules.some(r=>WG_SE_RULES.includes(r)))return'SE — Sai số hệ thống';if(rules.some(r=>WG_RE_RULES.includes(r)))return'RE — Sai số ngẫu nhiên';return'—';}
   function fixHint(rules){rules=rules||[];if(rules.some(r=>WG_SE_RULES.includes(r)))return'Hướng hệ thống: kiểm tra hiệu chuẩn, lô hóa chất/QC mới, nhiệt độ, đầu hút, đèn quang.';if(rules.some(r=>WG_RE_RULES.includes(r)))return'Hướng ngẫu nhiên: bọt khí, thể tích hút, mẫu QC pha/bảo quản, điện áp, thao tác.';return'';}
 
-  return{STATE_SCHEMA_VERSION,WG_RULES,WG_DEFAULT_ON,WG_RULE_DESCRIPTIONS,RULE_ACTIONS,RULE_SCOPES,WG_ALERT_RULES,cleanText,cleanId,finiteNumber,stats,westgard,westgardMulti,pointZ,westgardByPoint,westgardLatestRules,westgardLatestRulesFromZ,westgardMultiByPoint,cusum,movingAverage,erf,normalCdf,dpmoFromSigma,sigmaMetric,uncertaintyBudget,westgardSigmaRules,targetFromLimits,limitsFromTarget,ruleEnabled,defaultRuleAction,resolveRuleAction,defaultRuleScope,resolveRuleScope,ruleOnInScope,ruleVerdictLevel,primaryErrorRule,errorType,fixHint,validateBackup,validateStateInvariants,sanitizeBackup};
+  return{STATE_SCHEMA_VERSION,WG_RULE_REGISTRY,WG_RULES,WG_DEFAULT_ON,WG_RULE_DESCRIPTIONS,RULE_ACTIONS,RULE_SCOPES,WG_ALERT_RULES,cleanText,cleanId,finiteNumber,stats,westgard,westgardMulti,pointZ,westgardByPoint,westgardLatestRules,westgardLatestRulesFromZ,westgardMultiByPoint,cusum,movingAverage,erf,normalCdf,dpmoFromSigma,sigmaMetric,uncertaintyBudget,westgardSigmaRules,targetFromLimits,limitsFromTarget,ruleEnabled,defaultRuleAction,resolveRuleAction,defaultRuleScope,resolveRuleScope,ruleOnInScope,ruleVerdictLevel,primaryErrorRule,errorType,fixHint,validateBackup,validateStateInvariants,sanitizeBackup};
 });

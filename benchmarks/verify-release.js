@@ -6,6 +6,14 @@ const root = path.join(__dirname, '..'),testsDir = path.join(root, 'tests');
 const tests = fs.readdirSync(testsDir).filter(name => name.endsWith('.test.js')).sort();
 const failures = [];
 
+/* Không có file test nào là LỖI, không phải "không có gì để chạy": nếu không chặn,
+   cổng phát hành in "0/0 passed" rồi đi tiếp như thể bộ test đã xanh. Cùng họ với
+   lỗ mà scripts/run-tests.js đóng cho glob `tests/*.test.js`. */
+if (!tests.length) {
+  process.stderr.write(`Không tìm thấy file test nào trong ${testsDir} — cổng phát hành không thể kết luận.\n`);
+  process.exit(1);
+}
+
 for (const name of tests) {
   const result = spawnSync(process.execPath, [path.join(testsDir, name)], { cwd:root,encoding:'utf8' });
   if (result.status !== 0) {

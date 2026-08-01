@@ -62,8 +62,8 @@ functional test, high/critical dependency advisory, exceeded budget, lost displa
 signal, or non-zero child process exits with a non-zero status suitable for a CI job
 or deployment script.
 
-Budgets live in `performance-budget.json`. The gate uses a deterministic 20-test,
-3-level, 365-day state (21,900 QC points) and checks:
+Budgets live in `performance-budget.json`. The gate uses a deterministic 50-test,
+3-level, 730-day state (109,500 QC points) and checks:
 
 - boot-shell size relative to the full snapshot;
 - shell and full startup time;
@@ -75,6 +75,37 @@ Ratio/structural checks are the primary regression signals. Absolute millisecond
 budgets are intentionally generous to tolerate ordinary differences between local
 and CI machines. Tighten them only after collecting several runs on the actual
 deployment/CI hardware; do not replace the budget with the fastest observed run.
+
+### Ngày 2026-08-01: nâng kịch bản gate lên cỡ triển khai (`version: 2`)
+
+Trước đó gate chặn ở 20 × 3 × 365 (21.900 điểm) trong khi hình dạng "triển khai
+thật" đã được chính repo định nghĩa là 50 × 3 × 730 (109.500 điểm) và có sẵn
+profile `deployment` trong `performance-baseline.js` — gate gác ở một phần năm cỡ
+thật, nên hồi quy chỉ lộ ra ở cỡ lớn sẽ đi lọt. Đây cũng là cỡ duy nhất mà mốc
+`WG_WORKER_POINT_THRESHOLD = 3000` bắt đầu có nghĩa, và là cỡ đáng canh sau khi
+`derived()` đổi từ memo thuần sang so chữ ký (đường warm chính là thứ
+`warmDomainMaxColdRatio` đo).
+
+Số đo ở cỡ mới (Windows x64, Node v26.4.0, trung vị của 3 lần chạy):
+
+| Phép đo | 21.900 điểm | 109.500 điểm | Ngân sách mới |
+|---|---:|---:|---:|
+| `bootShellRatio` | 0,00568 | 0,00280 | ≤ 0,006 |
+| `shellInitMs` | 2,38 | 5,48 | ≤ 100 |
+| `fullStartupMs` | 131,43 | 633,07 | ≤ 3500 |
+| `coldDomainMs` | 760,52 | 3.726,86 | ≤ 12000 |
+| `warmDomainColdRatio` | 0,00014 | 0,00010 | ≤ 0,02 |
+| `oneTestColdRatio` | 0,04271 | 0,01815 | ≤ 0,2 |
+| `saveIncrementalMs` | 0,47 | 1,02 | ≤ 500 |
+| `saveIncrementalBytesRatio` | 0,05154 | 0,02118 | ≤ 0,05 |
+
+Chỉ hai ngưỡng **thời gian** được nới (`fullStartupMs`, `coldDomainMs`), giữ đúng
+khoảng dư ~3–5 lần so với số đo cục bộ như bản cũ — đừng siết chúng lại từ một lần
+chạy nhanh trên máy cá nhân. Hai ngưỡng được **siết** (`bootShellRatio`,
+`saveIncrementalBytesRatio`) là tỉ lệ **đếm byte thuần**, cho ra cùng một con số ở
+mọi lần chạy và mọi máy, nên siết chúng không tạo ra hỏng ngẫu nhiên theo tốc độ
+máy — chúng chỉ trượt khi hình dạng dữ liệu boot shell hoặc phân vùng ghi tăng dần
+thật sự đổi, đúng thứ cần biết.
 
 Chạy benchmark đầy đủ:
 
@@ -102,18 +133,21 @@ ghi tăng dần (manifest lệch `savedAt` → `readPartitionSlot()` bỏ cả s
 slot an toàn). Hành vi này được khóa bởi `tests/local-store.test.js` và
 `tests/storage-pipeline.test.js`.
 
-`performance-regression.js` đo lại đường lưu ở kịch bản gate (21.900 điểm) với
+`performance-regression.js` đo lại đường lưu ở kịch bản gate (109.500 điểm) với
 IndexedDB giả đếm byte qua `put()` (xấp xỉ chi phí structured-clone thật):
 
 | Phép đo | Ngân sách | Ý nghĩa |
 |---|---:|---|
 | `saveIncrementalPartitions` | ≤ 1 | Tín hiệu cấu trúc: chỉ phân vùng test bẩn được ghi lại |
-| `saveIncrementalBytesRatio` | ≤ 0,25 | Byte ghi tăng dần / byte ghi đầy đủ |
+| `saveIncrementalBytesRatio` | ≤ 0,05 | Byte ghi tăng dần / byte ghi đầy đủ |
 | `saveIncrementalMs` | ≤ 500 | Ngân sách tuyệt đối cố ý rộng, không phải tín hiệu chính |
 
-Kết quả tham khảo (2026-07-24, Windows x64, Node v24): tỉ lệ byte ~0,05 (ghi
-tăng dần một test chỉ tốn khoảng 5% byte của ghi đầy đủ), thời gian 0,56 ms so
-với 10,49 ms của ghi đầy đủ.
+Kết quả tham khảo (2026-07-24, kịch bản gate cũ 21.900 điểm, Windows x64, Node
+v24): tỉ lệ byte ~0,05 (ghi tăng dần một test chỉ tốn khoảng 5% byte của ghi đầy
+đủ), thời gian 0,56 ms so với 10,49 ms của ghi đầy đủ. Sau khi nâng gate lên
+109.500 điểm (2026-08-01, Node v26.4.0): tỉ lệ byte 0,02118 — càng nhiều xét
+nghiệm thì một phân vùng bẩn càng chiếm phần nhỏ hơn của snapshot đầy đủ — thời
+gian 1,02 ms so với 50,62 ms của ghi đầy đủ (đều là trung vị của 3 lần chạy).
 
 ## Baseline ngày 2026-07-14
 

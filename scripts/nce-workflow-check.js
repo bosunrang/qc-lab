@@ -590,13 +590,13 @@ async function checkDashboardKpiControls(page) {
 
   const filtered = await page.evaluate(() => {
     dashboardKpiSetPeriod('90');
-    dashboardKpiSetScope('instrument','I1');
+    dashboardKpiSetInstrument('I1');
     return{period:dashKpiPeriod,instrument:dashKpiInstrument,start:dashKpiLast.insight.period.start,end:dashKpiLast.insight.period.end,scope:dashKpiLast.items.length};
   });
   check('Bộ lọc 90 ngày cập nhật đúng khoảng KPI',filtered.period==='90'&&filtered.start===shiftIso(today,-89)&&filtered.end===today,JSON.stringify({...filtered,expect:shiftIso(today,-89)+'..'+today}));
   check('Lọc thiết bị thu hẹp đúng phạm vi xét nghiệm',filtered.instrument==='I1'&&filtered.scope===1,JSON.stringify(filtered));
 
-  await page.evaluate(() => {dashKpiPeriod='30';dashKpiInstrument='all';dashboardKpiSetScope('test','T-NA');dashboardKpiOpenDetail('rejected');});
+  await page.evaluate(() => {dashKpiPeriod='30';dashKpiInstrument='all';dashboardKpiSetTest('T-NA');dashboardKpiOpenDetail('rejected');});
   await page.waitForSelector('.dash-kpi-detail-wrap [data-qc-point-id], .dash-kpi-detail-wrap tbody tr');
   const detail = await page.evaluate(() => ({title:(document.querySelector('.dash-kpi-modal h3')||{}).innerText||'',rows:document.querySelectorAll('.dash-kpi-detail-wrap tbody tr').length,text:(document.querySelector('.dash-kpi-detail-wrap')||{}).innerText||''}));
   check('Bấm KPI mở danh sách điểm bị loại đúng phạm vi',detail.rows>=1&&detail.text.includes(vnOf(rejDate)),JSON.stringify(detail));
