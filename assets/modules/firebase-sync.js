@@ -9,12 +9,12 @@ let fb={ready:false,initialized:false,ref:null,dirty:false,clientId:'c_'+uid(),a
    'configMigrationVersion') vẫn trộn theo kiểu "cả khối": bên nào đổi so với base thì
    lấy nguyên bên đó. fb.synced lưu nguyên state thô của lần đồng bộ gần nhất (không chỉ
    chuỗi snapshot) để có đủ dữ liệu gốc cho việc so khớp theo điểm. */
-const FB_TOP=['lab','machines','instruments','assayGroups','qcPanels','lotTransitions','lotGroups','qcLots','tests','actions','activity','activityAnchor','users','reagentTests','reagentOperators','reagentSampleTypes','periodLocks','archiveRegistry','teaRefs','westgardRules','configMigrationVersion'];
+const FB_TOP=['lab','machines','instruments','assayGroups','qcPanels','lotTransitions','lotGroups','qcLots','tests','actions','activity','activityAnchor','users','reagentTests','reagentOperators','reagentSampleTypes','periodLocks','teaRefs','westgardRules','configMigrationVersion'];
 /* Các nhánh FB_TOP có dạng danh sách (mảng đối tượng có `id`, hoặc mảng chuỗi/giá trị
    đơn) — trộn theo từng phần tử thay vì "cả khối". Không gồm 'lab' (object đơn),
    'westgardRules' (dict cờ bật/tắt) và 'configMigrationVersion' (số) vì không phải danh
    sách các phần tử độc lập. */
-const FB_LIST_KEYS=['machines','instruments','assayGroups','qcPanels','lotTransitions','lotGroups','qcLots','tests','actions','activity','users','reagentTests','reagentOperators','reagentSampleTypes','periodLocks','archiveRegistry','teaRefs'];
+const FB_LIST_KEYS=['machines','instruments','assayGroups','qcPanels','lotTransitions','lotGroups','qcLots','tests','actions','activity','users','reagentTests','reagentOperators','reagentSampleTypes','periodLocks','teaRefs'];
 const FB_LIST_SET=new Set(FB_LIST_KEYS);
 const FB_LOCAL_CONTENT_KEYS=['tests','actions','instruments','qcPanels','lotGroups','qcLots','assayGroups'];
 function fbClone(v){return v===undefined?undefined:JSON.parse(JSON.stringify(v));}

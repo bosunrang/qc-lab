@@ -340,7 +340,13 @@ the Google Fonts link, offline labs must print with correct metrics.
 - `core.js` — pure domain math, UMD (see above). Also
   `validateStateInvariants()`, run at every load/merge/import gateway
   (`state-storage.js`, `firebase-sync.js`, `backup-service.js`), and
-  `STATE_SCHEMA_VERSION` (currently 6 — 6 added the `archiveRegistry` branch).
+  `STATE_SCHEMA_VERSION` (currently 6). Version 6 introduced an `archiveRegistry`
+  branch for a year-archive feature that was **removed again on 2026-08-01, before
+  any release** — do not roll the number back to 5, because dev states already stamped
+  6 and `validateStateInvariants()` rejects a state whose `schemaVersion` exceeds the
+  app's. `sanitizeBackup()` only overwrites the fields it knows and does **not** strip
+  unknown ones, so `ensureShape()` deletes the stale `archiveRegistry` explicitly;
+  that is the pattern to copy whenever a state branch is retired.
   Holds the pure error-classification
   helpers too (`errorType`, `primaryErrorRule`, `fixHint`,
   `WG_RULE_DESCRIPTIONS`); `qc-domain.js` re-exports them under the same global
@@ -624,18 +630,6 @@ the Google Fonts link, offline labs must print with correct metrics.
   dùng bấm vào xem phải là cùng một phép tính. Thống kê điểm QC chỉ gồm xét nghiệm đang
   vận hành, còn thống kê CAPA lấy mọi hồ sơ khi không lọc phạm vi — hồ sơ nguồn ngoài
   IQC không có `testId` nên sẽ biến mất nếu lọc theo thiết bị/xét nghiệm.
-- `archive-service.js` — `ArchiveService`, pure year-slicing over `state` (no DOM):
-  builds a single-year read-only snapshot, summarizes it, canonical-compares a year's
-  points against an archive file, and registers verified archives in
-  `state.archiveRegistry` (schema 6, a synced list branch; id = `year + checksum` so two
-  machines verifying the same file don't duplicate). Exporting an archive **never**
-  deletes anything. `removeYearPoints()`/`restoreRemovedPoints()` exist and are tested,
-  but the destructive path that calls them (`cleanupYearFromArchive()` in
-  `backup-service.js`) is **deliberately not wired to any button** — read the comment
-  block above `archiveCleanupOpenNces()` before re-enabling it, and see
-  `docs/year-archive.md` for the measurements behind that decision.
-  `tests/archive-cleanup.test.js` ratchets the un-wiring, so hooking the button back up
-  fails that test until both blockers are fixed.
 - `range.js`, `settings.js`, `backup-service.js`, `data-io.js`, `reports.js`, `users-auth.js`,
   `reagent.js` — feature-specific logic (target-range calc, settings page,
   backup/restore service + XLSX generation, printed reports, auth/user
@@ -749,6 +743,21 @@ leaves a dossier record.
 
 ### Confirmed business-logic decisions (don't re-litigate without new input)
 
+- **The app does not delete QC data to save space, and has no year-archive feature.**
+  Both were built and then removed on 2026-08-01, before any release (`3e90819`,
+  `408170a` hold the full code if it is ever needed again). The measurements that
+  settled it: 10 years × 50 tests × 3 levels = 547,500 points = 78 MB and a 14,008 ms
+  one-off cold domain (warm stays 0.77 ms); a mid-size lab at 20 tests × 2 levels ×
+  2 years is 29,200 points / 4.2 MB. QC points do not live in `localStorage` at all
+  (partitioned save writes a shell and `removeItem('qclab')`, data goes to IndexedDB),
+  so the 5–10 MB cap is not the constraint. Deleting regulated QC records permanently,
+  from a client-only app with no server, no transaction and no undo beyond a file the
+  user may have cancelled, is not worth ~13 s of boot time at a scale almost no lab
+  reaches. If a real lab ever hits a wall, reopen this with **their** numbers — and
+  note the two blockers recorded in `408170a`'s message (Firebase resurrects
+  per-point deletions; the NCE guard misses records whose rerun evidence is in the
+  deleted year). Backup keeps its SHA-256 package format and the read-only
+  "Kiểm tra backup" verifier — those earned their place independently.
 - Two "Sigma" numbers are intentionally different: the printed/CSV report's
   Sigma (`reportLevelStats()` in `reports.js`/`data-io.js`) is an observed,
   period-specific value; the Six Sigma page (`sigma.js`) uses explicitly

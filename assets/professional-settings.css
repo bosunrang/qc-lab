@@ -33,17 +33,6 @@
   margin:12px 16px 16px;
 }
 
-.archive-year-actions{
-  display:grid;
-  grid-template-columns:minmax(88px,112px) minmax(0,1fr);
-  align-items:center;
-  gap:10px;
-}
-
-.archive-year-actions select{
-  width:100%;
-}
-
 .lis-gateway-body{display:grid;gap:10px;margin:var(--panel-content-gap) 16px 0}
 .lis-gateway-grid{display:grid;grid-template-columns:minmax(280px,1fr) minmax(260px,.8fr);align-items:end;gap:12px}
 .lis-gateway-grid label{margin-top:0}

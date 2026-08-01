@@ -35,7 +35,7 @@ declare var AnalysisUIState: any, AuthUIState: any, EntryUIState: any, ManageUIS
   ReagentUIState: any, SigmaUIState: any;
 
 // --- Service / view-model namespaces (`root.Foo = {...}`) ---
-declare var ArchiveService: any, EntryService: any, PeriodService: any, ReagentComparisonService: any, ChartViewModel: any,
+declare var EntryService: any, PeriodService: any, ReagentComparisonService: any, ChartViewModel: any,
   SigmaCohortService: any, WestgardViewModel: any, ActionWorkflowService: any;
 
 // entry-service.js also aliases two of its members directly onto root

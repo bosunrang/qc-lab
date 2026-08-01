@@ -80,6 +80,14 @@ function makeState() {
   run(integration, 'state.reagentTests=[];ensureShape();globalThis.__reagentShape=state.reagentTests;');
   assert.equal(integration.__reagentShape.length, 1, 'ensureShape phải tạo dữ liệu mặc định ngoài render');
   assert.equal(integration.__reagentShape[0].rows.length, 5);
+
+  /* Nhánh archiveRegistry (schema 6) đã bị gỡ cùng chức năng lưu trữ theo năm.
+     sanitizeBackup() KHÔNG bỏ trường lạ, nên nếu ensureShape() không xóa tường minh thì
+     mảng cũ bám theo mọi lần lưu và mọi file backup mãi mãi. schemaVersion vẫn phải là 6:
+     hạ về 5 sẽ làm validateStateInvariants() báo "schemaVersion cao hơn app hỗ trợ". */
+  run(integration, 'state.archiveRegistry=[{id:"arc1",year:"2026"}];state.schemaVersion=6;ensureShape();globalThis.__afterShape={hasRegistry:"archiveRegistry" in state,schema:state.schemaVersion};');
+  assert.equal(integration.__afterShape.hasRegistry, false, 'ensureShape phải xóa hẳn nhánh archiveRegistry cũ khỏi state');
+  assert.equal(integration.__afterShape.schema, 6, 'schemaVersion giữ nguyên 6, không hạ ngược');
 }
 
 {

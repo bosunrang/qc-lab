@@ -435,7 +435,7 @@
     const schema=Number(x.schemaVersion);
     if(Number.isFinite(schema)&&schema>STATE_SCHEMA_VERSION)errors.push(`schemaVersion ${schema} cao hơn phiên bản app hỗ trợ (${STATE_SCHEMA_VERSION}).`);
     obj(x.lab,'lab');arr(x.tests,'tests');obj(x.data,'data');arr(x.actions,'actions');arr(x.activity,'activity');arr(x.users,'users');
-    if(x.machines!=null)arr(x.machines,'machines');if(x.instruments!=null)arr(x.instruments,'instruments');if(x.assayGroups!=null)arr(x.assayGroups,'assayGroups');if(x.qcPanels!=null)arr(x.qcPanels,'qcPanels');if(x.lotTransitions!=null)arr(x.lotTransitions,'lotTransitions');if(x.lotGroups!=null)arr(x.lotGroups,'lotGroups');if(x.qcLots!=null)arr(x.qcLots,'qcLots');if(x.reagentTests!=null)arr(x.reagentTests,'reagentTests');if(x.reagentOperators!=null)arr(x.reagentOperators,'reagentOperators');if(x.reagentSampleTypes!=null)arr(x.reagentSampleTypes,'reagentSampleTypes');if(x.archiveRegistry!=null)arr(x.archiveRegistry,'archiveRegistry');if(x.sigmaData!=null)obj(x.sigmaData,'sigmaData');if(x.teaRefs!=null)arr(x.teaRefs,'teaRefs');
+    if(x.machines!=null)arr(x.machines,'machines');if(x.instruments!=null)arr(x.instruments,'instruments');if(x.assayGroups!=null)arr(x.assayGroups,'assayGroups');if(x.qcPanels!=null)arr(x.qcPanels,'qcPanels');if(x.lotTransitions!=null)arr(x.lotTransitions,'lotTransitions');if(x.lotGroups!=null)arr(x.lotGroups,'lotGroups');if(x.qcLots!=null)arr(x.qcLots,'qcLots');if(x.reagentTests!=null)arr(x.reagentTests,'reagentTests');if(x.reagentOperators!=null)arr(x.reagentOperators,'reagentOperators');if(x.reagentSampleTypes!=null)arr(x.reagentSampleTypes,'reagentSampleTypes');if(x.sigmaData!=null)obj(x.sigmaData,'sigmaData');if(x.teaRefs!=null)arr(x.teaRefs,'teaRefs');
     (Array.isArray(x.tests)?x.tests:[]).forEach((t,i)=>{
       if(!t||typeof t!=='object'||!cleanId(t.id)||!cleanText(t.name).trim())errors.push(`tests[${i}] thiếu id hoặc tên hợp lệ.`);
       if(!Array.isArray(t&&t.levels)||!t.levels.length||t.levels.length>10)errors.push(`tests[${i}].levels không hợp lệ.`);
@@ -465,7 +465,6 @@
     seen(x.lotGroups,'lotGroups');
     seen(x.qcLots,'qcLots');
     seen(x.teaRefs,'teaRefs');
-    seen(x.archiveRegistry,'archiveRegistry');
     const usernames=new Set();
     (Array.isArray(x.users)?x.users:[]).forEach((u,i)=>{
       const name=String(u&&u.username||'').trim().toLowerCase();
@@ -488,7 +487,6 @@
       if(!ym)return;
       if(lockPeriods.has(ym))errors.push(`periodLocks[${i}] trùng kỳ ${ym}.`);else lockPeriods.add(ym);
     });
-    const archiveKeys=new Set();(Array.isArray(x.archiveRegistry)?x.archiveRegistry:[]).forEach((a,i)=>{const year=String(a&&a.year||''),checksum=String(a&&a.checksum||''),key=year+'|'+checksum;if(!/^\d{4}$/.test(year)||!(/^[a-f0-9]{64}$/.test(checksum)))errors.push(`archiveRegistry[${i}] thiếu năm hoặc SHA-256 hợp lệ.`);else if(archiveKeys.has(key))errors.push(`archiveRegistry[${i}] trùng archive ${year}.`);else archiveKeys.add(key);});
     return errors.slice(0,20);
   }
 
@@ -548,7 +546,6 @@
     source.reagentOperators=(source.reagentOperators||[]).slice(0,1000).map(v=>cleanText(v,120)).filter(Boolean);
     source.reagentSampleTypes=(source.reagentSampleTypes||['Mẫu bệnh nhân','Mẫu nội kiểm (IQC)','Mẫu ngoại kiểm (EQA)']).slice(0,1000).map(v=>cleanText(v,120)).filter(Boolean);
     source.periodLocks=(source.periodLocks||[]).slice(-1000).map((x,i)=>({id:cleanId(x.id)||('lock_'+i),ym:cleanPeriod(x.ym),lockedAt:cleanText(x.lockedAt,40),lockedBy:cleanText(x.lockedBy,120),note:cleanText(x.note,LONG_TEXT_LIMIT)})).filter(x=>x.ym);
-    source.archiveRegistry=(source.archiveRegistry||[]).slice(-500).map((x,i)=>({id:cleanId(x.id)||('archive_'+i),year:/^\d{4}$/.test(String(x.year||''))?String(x.year):'',filename:cleanText(x.filename,240),checksum:/^[a-f0-9]{64}$/.test(String(x.checksum||''))?String(x.checksum):'',sizeBytes:Math.max(0,Math.floor(finiteNumber(x.sizeBytes,0))),points:Math.max(0,Math.floor(finiteNumber(x.points,0))),tests:Math.max(0,Math.floor(finiteNumber(x.tests,0))),minDate:cleanDate(x.minDate),maxDate:cleanDate(x.maxDate),createdAt:cleanText(x.createdAt,40),verifiedAt:cleanText(x.verifiedAt,40),verifiedBy:cleanText(x.verifiedBy,120),appVersion:cleanText(x.appVersion,40),schemaVersion:Math.max(1,Math.floor(finiteNumber(x.schemaVersion,1))),cleanedAt:cleanText(x.cleanedAt,40),cleanedBy:cleanText(x.cleanedBy,120),removedPoints:Math.max(0,Math.floor(finiteNumber(x.removedPoints,0))),testCounts:(Array.isArray(x.testCounts)?x.testCounts:[]).slice(0,5000).map(r=>({testId:cleanId(r&&r.testId),name:cleanText(r&&r.name,160),points:Math.max(0,Math.floor(finiteNumber(r&&r.points,0)))})).filter(r=>r.testId)})).filter(x=>x.year&&x.checksum);
     source.teaRefs=(source.teaRefs||[]).slice(0,2000).map((x,i)=>{const num=v=>{const n=Number(v);return String(v==null?'':v).trim()!==''&&Number.isFinite(n)&&n>0?n:null;},rule=['percent','absolute','greater-of'].includes(x.cliaRule)?x.cliaRule:null,meta=v=>{v=v&&typeof v==='object'&&!Array.isArray(v)?v:{};const status=['reference','reviewed','retired','dynamic'].includes(v.status)?v.status:'reference',url=/^https:\/\//i.test(String(v.url||''))?cleanText(v.url,1000):'';return{id:cleanId(v.id),version:cleanText(v.version,120),document:cleanText(v.document,500),url,effectiveDate:cleanDate(v.effectiveDate),reviewedDate:cleanDate(v.reviewedDate),reviewedBy:cleanText(v.reviewedBy,120),status,note:cleanText(v.note,LONG_TEXT_LIMIT)};},out={id:cleanId(x.id)||('tref_'+i),analyteId:cleanId(x.analyteId),name:cleanText(x.name,120),displayName:cleanText(x.displayName,160),standardName:cleanText(x.standardName,160),abbreviation:cleanText(x.abbreviation,40),aliases:(Array.isArray(x.aliases)?x.aliases:[]).slice(0,30).map(v=>cleanText(v,120)).filter(Boolean),matrix:cleanText(x.matrix,80),unit:cleanText(x.unit,40),section:cleanText(x.section,80),clia:num(x.clia),ricos:num(x.ricos),sources:{clia:meta(x.sources&&x.sources.clia),ricos:meta(x.sources&&x.sources.ricos)}},absolute=num(x.cliaAbsolute),absoluteUnit=cleanText(x.cliaAbsoluteUnit,40);if(rule)out.cliaRule=rule;if(absolute!=null)out.cliaAbsolute=absolute;if(absoluteUnit)out.cliaAbsoluteUnit=absoluteUnit;return out;}).filter(x=>x.id&&x.name);
     source.teaRegistryVersion=Math.max(1,Math.floor(finiteNumber(source.teaRegistryVersion,1)));
     source.sigmaData=source.sigmaData&&typeof source.sigmaData==='object'&&!Array.isArray(source.sigmaData)?Object.fromEntries(Object.entries(source.sigmaData).filter(([id,v])=>ids.has(id)&&Array.isArray(v)).map(([id,rows])=>[id,rows.slice(-1000).map((e,i)=>{
