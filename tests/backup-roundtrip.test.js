@@ -24,6 +24,8 @@ const { makeState } = require('../benchmarks/performance-baseline');
         data:{t1:points}
       };
       const json=serializeBackupData(source),pack=await createBackupPackage(source),restored=await prepareBackupImport(pack.text),legacy=await prepareBackupImport(json),inspected=await inspectBackupText(pack.text,pack.bytes);
+      const oldChecksum=await backupChecksum(json),oldHeader={format:'qclab-backup',formatVersion:1,type:'year-archive',createdAt:'2026-08-01T00:00:00.000Z',schemaVersion:source.schemaVersion,year:'2026',checksum:oldChecksum},oldArchive=JSON.stringify(oldHeader).slice(0,-1)+',"data":'+json+'}';
+      let oldImportError='',oldInspectError='';try{await prepareBackupImport(oldArchive);}catch(e){oldImportError=e.message;}try{await inspectBackupText(oldArchive);}catch(e){oldInspectError=e.message;}
       let corruptError='';try{await inspectBackupText(pack.text.replace('"id":"p0"','"id":"changed"'));}catch(e){corruptError=e.message;}
       return{
         bytes:new TextEncoder().encode(json).length,packBytes:pack.bytes,
@@ -32,7 +34,7 @@ const { makeState } = require('../benchmarks/performance-baseline');
         oversizedError:backupImportSizeError(BACKUP_IMPORT_MAX_BYTES+1),
         warning:backupSizeWarning(BACKUP_IMPORT_WARN_BYTES),
         compact:!json.includes(String.fromCharCode(10)+'  '),checksumStatus:inspected.meta.checksumStatus,checksumLength:inspected.meta.checksum.length,corruptError,
-        pointCount:restored.data.t1.length,legacyCount:legacy.data.t1.length,
+        pointCount:restored.data.t1.length,legacyCount:legacy.data.t1.length,oldImportError,oldInspectError,
         first:restored.data.t1[0],last:restored.data.t1[restored.data.t1.length-1]
       };
     })()
@@ -52,6 +54,8 @@ const { makeState } = require('../benchmarks/performance-baseline');
   assert.match(value.corruptError, /Checksum SHA-256 không khớp/);
   assert.equal(value.pointCount, 30000);
   assert.equal(value.legacyCount, 30000, 'backup JSON cũ vẫn phải nhập được');
+  assert.match(value.oldImportError,/archive theo năm/,'file archive thử nghiệm cũ phải bị chặn khi nhập');
+  assert.match(value.oldInspectError,/archive theo năm.*không còn được hỗ trợ/,'kiểm tra file không được gọi archive cũ là backup đầy đủ hợp lệ');
   assert.equal(value.first.id, 'p0');
   assert.equal(value.first.note.startsWith('Dữ liệu QC phục hồi'), true);
   assert.equal(value.last.id, 'p29999');

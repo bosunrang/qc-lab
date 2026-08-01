@@ -20,6 +20,14 @@ const index=read('index.html');
    một trong hai file sẽ để lọt — nên các quy ước đó soi trên phần nối. */
 const actionsArea=actions+'\n'+form;
 
+/* CSP là một hợp đồng bảo mật nhưng HTML sai thuộc tính vẫn render bình thường, nên
+   browser smoke/a11y không tự báo. Chốt đúng một thẻ meta hợp lệ để cache-buster hoặc
+   thao tác thay chuỗi không thể vô tình chèn vào giữa `http-equiv` lần nữa. */
+const cspTags=index.match(/<meta\s+http-equiv="Content-Security-Policy"\s+content="[^"]+">/g)||[];
+assert.equal(cspTags.length,1,'index.html phải có đúng một thẻ CSP hợp lệ');
+assert.match(cspTags[0],/object-src 'none'/,'CSP phải tiếp tục chặn object nhúng');
+assert.doesNotMatch(index,/http-equi\?+/,'thuộc tính http-equiv không được bị hỏng bởi chuỗi cache version');
+
 assert.doesNotMatch(router,/function page(?:Dash|Entry|Westgard)\(/,'router-render chỉ giữ điều phối và UI primitives');
 assert.match(dashboard,/function pageDash\(/);
 assert.match(entry,/function pageEntry\(/);
