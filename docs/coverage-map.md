@@ -5,9 +5,9 @@ Sinh bằng `npm run coverage-map` (`NODE_V8_COVERAGE` của Node, không cài t
 hoặc tách file. Phần dựng DOM của các file render không gọi được trong sandbox `vm`,
 nên độ phủ thấp ở đó là đúng thiết kế; thứ đáng nhìn là **hàm thuần chưa ai chạm tới**.
 
-Sinh ngày 2026-08-01 · Node v26.4.0 · 48 file · 41.8% mã nguồn đã chạy.
+Sinh ngày 2026-08-01 · Node v26.4.0 · 48 file · 41.9% mã nguồn đã chạy.
 
-## 9 file KHÔNG test nào nạp tới
+## 8 file KHÔNG test nào nạp tới
 
 Không phải "độ phủ thấp" mà là **không có dữ liệu độ phủ nào** — chưa test nào
 nạp file này vào sandbox. Với file render thuần DOM thì đó là giới hạn của
@@ -17,7 +17,6 @@ sandbox `vm`; với file có hàm thuần thì đây là điểm mù thật.
 - `modules/actions-routes.js` (40.7 KB)
 - `modules/manage-routes.js` (36.8 KB)
 - `modules/report-routes.js` (12.1 KB)
-- `modules/range.js` (8.8 KB)
 - `modules/modals.js` (7.9 KB)
 - `modules/after-render.js` (5.0 KB)
 - `modules/app-meta.js` (1.3 KB)
@@ -44,9 +43,9 @@ sandbox `vm`; với file có hàm thuần thì đây là điểm mù thật.
 | `modules/backup-service.js` | 25.0 | 48.4% | 12.071 | 13 |
 | `modules/draw.js` | 17.4 | 33.2% | 11.733 | 7 |
 | `modules/report-routes.js` | 12.1 | chưa nạp | 11.607 | — |
-| `modules/range.js` | 8.8 | chưa nạp | 8.439 | — |
+| `modules/range.js` | 9.5 | 13.1% | 7.901 | 5 |
 | `modules/modals.js` | 7.9 | chưa nạp | 7.899 | — |
-| `modules/qc-domain.js` | 28.6 | 72.8% | 7.586 | 27 |
+| `modules/qc-domain.js` | 28.6 | 73.0% | 7.542 | 27 |
 | `modules/firebase-sync.js` | 31.2 | 80.6% | 5.541 | 5 |
 | `modules/after-render.js` | 5.0 | chưa nạp | 5.014 | — |
 | `modules/state.js` | 26.0 | 80.6% | 4.986 | 12 |
@@ -91,6 +90,7 @@ sandbox `vm`; với file có hàm thuần thì đây là điểm mù thật.
 - **modules/router-render.js** — 50 hàm: `role` (dòng 5) · `canWrite` (dòng 6) · `requireWrite` (dòng 13) · `requireAdmin` (dòng 14) · `roleLabel` (dòng 15) · `rolePageIds` (dòng 16) · `userPageIds` (dòng 17) · `setSearchCount` (dòng 22) · `showSearchEmpty` (dòng 23) · `liveRowFilter` (dòng 31) …
 - **modules/backup-service.js** — 13 hàm: `downloadBackupText` (dòng 56) · `importData` (dòng 68) · `registerVerifiedArchive` (dòng 85) · `verifyBackupFile` (dòng 90) · `exportYearArchive` (dòng 91) · `checkStorageUsage` (dòng 118) · `viewRegisteredArchive` (dòng 119) · `markBackupDone` (dòng 123) · `lastBackupInfo` (dòng 124) · `backupStatusText` (dòng 130) …
 - **modules/draw.js** — 7 hàm: `drawRuleAcross` (dòng 3) · `qcTooltip` (dòng 4) · `hide` (dòng 7) · `ljDataURL` (dòng 123) · `drawLJMultiZ` (dòng 126) · `ljMultiDataURL` (dòng 197) · `drawCUSUM` (dòng 205)
+- **modules/range.js** — 5 hàm: `openRangeWorkflow` (dòng 11) · `applyNewRange` (dòng 27) · `confirmApplyNewRange` (dòng 43) · `revertRange` (dòng 56) · `confirmRevertRange` (dòng 69)
 - **modules/qc-domain.js** — 27 hàm: `reportLevelStats` (dòng 6) · `wgSet` (dòng 11) · `wgReset` (dòng 12) · `testRuleOn` (dòng 20) · `defaultRuleScope` (dòng 21) · `testRuleOnAcross` (dòng 25) · `westgard` (dòng 28) · `westgardMulti` (dòng 29) · `westgardByPoint` (dòng 30) · `westgardMultiByPoint` (dòng 31) …
 - **modules/firebase-sync.js** — 5 hàm: `fbStartPull` (dòng 233) · `fbPullOnce` (dòng 246) · `initFirebase` (dòng 362) · `remoteRenderUnsafe` (dòng 395) · `syncNow` (dòng 415)
 - **modules/state.js** — 12 hàm: `staffInitials` (dòng 236) · `currentStaff` (dòng 237) · `pointStaff` (dòng 238) · `dateObj` (dòng 239) · `daysToExp` (dòng 240) · `periodOfDate` (dòng 245) · `periodLock` (dòng 246) · `isPeriodLocked` (dòng 247) · `periodLockText` (dòng 248) · `requireUnlockedPeriod` (dòng 249) …

@@ -1,5 +1,13 @@
 /* ===== NEW QC RANGE ===== */
-function rangeCandidate(tid,level){const t=state.tests.find(x=>x.id===tid),l=lvlCfg(t,level),pts=operationalLotPoints(t,level),allWG=activeWestgard(t),F=pts.map(p=>allWG.byPoint.get(p.id)||{level:'ok',rules:[]}),zs=pts.map(p=>QCCore.pointZ(p,l.mean,l.sd)),wg={F,zs},c=stats(pts.map(p=>p.val)),days=new Set(pts.map(p=>p.date)).size,bad=F.filter(f=>f.level==='rej').length,warn=F.filter(f=>f.level==='warn').length,eligible=!!(c&&c.n>=20&&days>=20&&bad===0&&warn===0&&c.sd>0);return{t,l,pts,wg,c,days,bad,warn,eligible};}
+/* Thoát sớm khi không tìm thấy xét nghiệm/mức: openRangeWorkflow() vốn đã có
+   `if(!r.t||!r.l)return;` nhưng guard đó là CODE CHẾT — lvlCfg(undefined,...) đọc
+   t.levels nên hàm này nổ trước khi caller kịp kiểm tra. Xảy ra khi tid đã biến mất
+   giữa chừng: modal/biểu mẫu in còn giữ tid cũ trong khi xét nghiệm bị xóa ở máy
+   khác rồi merge Firebase về. Trả đúng hình dạng cũ với eligible=false để mọi caller
+   (openRangeWorkflow, applyNewRange, entry-routes) đi vào nhánh "chưa đủ điều kiện"
+   thay vì ném lỗi ra giữa lúc render. */
+function rangeCandidate(tid,level){const t=state.tests.find(x=>x.id===tid),l=t&&lvlCfg(t,level);if(!t||!l)return{t,l,pts:[],wg:{F:[],zs:[]},c:null,days:0,bad:0,warn:0,eligible:false};
+  const pts=operationalLotPoints(t,level),allWG=activeWestgard(t),F=pts.map(p=>allWG.byPoint.get(p.id)||{level:'ok',rules:[]}),zs=pts.map(p=>QCCore.pointZ(p,l.mean,l.sd)),wg={F,zs},c=stats(pts.map(p=>p.val)),days=new Set(pts.map(p=>p.date)).size,bad=F.filter(f=>f.level==='rej').length,warn=F.filter(f=>f.level==='warn').length,eligible=!!(c&&c.n>=20&&days>=20&&bad===0&&warn===0&&c.sd>0);return{t,l,pts,wg,c,days,bad,warn,eligible};}
 function openRangeWorkflow(tid,level){
   const r=rangeCandidate(tid,level);if(!r.t||!r.l)return;
   const rows=[['Tổng số kết quả',r.c?r.c.n:0,'≥20',r.c&&r.c.n>=20],['Số ngày độc lập',r.days,'≥20 ngày',r.days>=20],['Điểm bị loại Westgard',r.bad,'Phải bằng 0; không tự loại điểm để làm đẹp SD',r.bad===0],['Điểm cảnh báo',r.warn,'Phải bằng 0 trước khi phê duyệt dải',r.warn===0],['SD đề xuất hợp lệ',r.c?fmt(r.c.sd,3):'—','>0',r.c&&r.c.sd>0]];
