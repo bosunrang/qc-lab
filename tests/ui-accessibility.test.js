@@ -25,6 +25,10 @@ const westgardRoutes = read('assets/modules/westgard-routes.js');
 const indexHtml = read('index.html');
 const cssFiles = fs.readdirSync(path.join(root, 'assets')).filter(name => name.endsWith('.css'));
 
+const dialogZ=Number((/#dialogRoot \.modal-bg\{[^}]*z-index:(\d+)/.exec(components)||[])[1]);
+const authZ=Number((/#authOverlay\{[^}]*z-index:(\d+)/.exec(components)||[])[1]);
+assert.ok(dialogZ>authZ, 'dialog xác nhận phải nằm trên auth/recovery overlay');
+
 assert.match(router, /role="tree" aria-label="Danh mục nội kiểm"/);
 assert.match(router, /role="treeitem" tabindex="0" aria-expanded=/);
 assert.match(router, /function entryTreeKey\(event\)/);

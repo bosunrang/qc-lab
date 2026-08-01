@@ -18,15 +18,16 @@ const WG_RULE_REGISTRY=QCCore.WG_RULE_REGISTRY;   // bảng đăng ký luật, n
 const WG_RULES=QCCore.WG_RULES;
 const WG_DEFAULT=Object.fromEntries(WG_RULES.map(r=>[r,QCCore.WG_DEFAULT_ON.has(r)]));
 const STATE_SCHEMA_VERSION=QCCore.STATE_SCHEMA_VERSION;
-let state={lab:/** @type {any} */({name:'',dept:'',address:''}),tests:[],machines:["Máy A"],instruments:[],assayGroups:[],qcPanels:[],lotTransitions:[],lotGroups:[],qcLots:[],data:{},actions:[],activity:[],activityAnchor:'',users:[],reagentTests:[],reagentOperators:[],reagentSampleTypes:['Mẫu bệnh nhân','Mẫu nội kiểm (IQC)','Mẫu ngoại kiểm (EQA)'],sigmaData:{},periodLocks:[],teaRefs:[],teaRegistryVersion:TEA_REFERENCE_SCHEMA_VERSION,westgardRules:{...WG_DEFAULT},configMigrationVersion:1,schemaVersion:STATE_SCHEMA_VERSION};
+let state={lab:/** @type {any} */({name:'',dept:'',address:''}),tests:[],machines:["Máy A"],instruments:[],assayGroups:[],qcPanels:[],lotTransitions:[],lotGroups:[],qcLots:[],data:{},actions:[],activity:[],activityAnchor:'',users:[],reagentTests:[],reagentOperators:[],reagentSampleTypes:['Mẫu bệnh nhân','Mẫu nội kiểm (IQC)','Mẫu ngoại kiểm (EQA)'],sigmaData:{},periodLocks:[],archiveRegistry:[],teaRefs:[],teaRegistryVersion:TEA_REFERENCE_SCHEMA_VERSION,westgardRules:{...WG_DEFAULT},configMigrationVersion:1,schemaVersion:STATE_SCHEMA_VERSION};
 let mem=null,pointsCache=new Map(),pointsIndexCache=new Map(),pointsLotCache=new Map(),wgMemo=new Map(),acceptedMemo=new Map(),cusumMemo=new Map(),derivedIndex=null,startupProblem=null;
-function ensureShape(opts={}){const previousSchema=Number(state&&state.schemaVersion||1),merged={lab:/** @type {any} */({name:'',dept:'',address:''}),tests:[],machines:["Máy A"],instruments:[],assayGroups:[],qcPanels:[],lotTransitions:[],lotGroups:[],qcLots:[],data:{},actions:[],activity:[],activityAnchor:'',users:[],reagentTests:[],reagentOperators:[],reagentSampleTypes:['Mẫu bệnh nhân','Mẫu nội kiểm (IQC)','Mẫu ngoại kiểm (EQA)'],sigmaData:{},periodLocks:[],teaRefs:[],teaRegistryVersion:TEA_REFERENCE_SCHEMA_VERSION,westgardRules:{...WG_DEFAULT},...(state||{})};state=opts.sanitized?merged:QCCore.sanitizeBackup(merged);
+function ensureShape(opts={}){const previousSchema=Number(state&&state.schemaVersion||1),merged={lab:/** @type {any} */({name:'',dept:'',address:''}),tests:[],machines:["Máy A"],instruments:[],assayGroups:[],qcPanels:[],lotTransitions:[],lotGroups:[],qcLots:[],data:{},actions:[],activity:[],activityAnchor:'',users:[],reagentTests:[],reagentOperators:[],reagentSampleTypes:['Mẫu bệnh nhân','Mẫu nội kiểm (IQC)','Mẫu ngoại kiểm (EQA)'],sigmaData:{},periodLocks:[],archiveRegistry:[],teaRefs:[],teaRegistryVersion:TEA_REFERENCE_SCHEMA_VERSION,westgardRules:{...WG_DEFAULT},...(state||{})};state=opts.sanitized?merged:QCCore.sanitizeBackup(merged);
   if(previousSchema<2){state.periodLocks=Array.isArray(state.periodLocks)?state.periodLocks:[];}
   if(previousSchema<3||!state.teaRegistryVersion||state.teaRegistryVersion<TEA_REFERENCE_SCHEMA_VERSION)state.teaRegistryVersion=TEA_REFERENCE_SCHEMA_VERSION;
   state.schemaVersion=STATE_SCHEMA_VERSION;
   if(!state.westgardProfileVersion){state.westgardRules={...WG_DEFAULT};state.westgardProfileVersion=2;}
   ensureLabBrandShape();
   ensureConfigurationShape();
+  if(typeof ReagentComparisonService!=='undefined')ReagentComparisonService.ensureOne(state,{id:uid()});
   reconcileSigmaLevelsWithLotGroups();
   /* sigma.js load sau state.js nên chưa định nghĩa lúc parse — nhưng ensureShape()
      chỉ thực sự CHẠY lúc boot()/merge Firebase/nhập backup, tức sau khi mọi

@@ -76,4 +76,11 @@ function close(actual, expected, epsilon = 1e-9) {
   assert.equal(QCCore.movingAverage([], 10, 1).length, 0);
 }
 
+{ // Đường gộp chỉ quét pointTarget một lần nhưng phải tương đương hai API cũ.
+  const points=[{val:10,qcMean:10,qcSd:1},{val:11,qcMean:10,qcSd:1},{val:'x',qcMean:10,qcSd:1},{val:13,qcMean:10,qcSd:1}];
+  const combined=QCCore.cusumMovingAverage(points,10,1,.5,4,3),separate=QCCore.cusum(points,10,1,.5,4);
+  assert.deepEqual({cPos:combined.cPos,cNeg:combined.cNeg,flags:combined.flags,k:combined.k,h:combined.h},separate);
+  assert.deepEqual(combined.ma,QCCore.movingAverage(points,10,1,3));
+}
+
 console.log('CUSUM tests passed');

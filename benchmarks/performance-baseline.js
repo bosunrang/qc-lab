@@ -5,8 +5,10 @@ const DEFAULT_SCENARIOS = [
   { name: 'small', tests: 10, levels: 2, days: 365 },
   { name: 'deployment', tests: 50, levels: 3, days: 730 },
 ];
+const TEN_YEAR_SCENARIO = { name: 'ten-years', tests: 50, levels: 3, days: 3650 };
 
 function parseScenarios(argv) {
+  if (argv.includes('--ten-years')) return [TEN_YEAR_SCENARIO];
   if (argv.includes('--deployment-only')) return [DEFAULT_SCENARIOS[1]];
   if (!argv.includes('--quick')) return DEFAULT_SCENARIOS;
   return [{ name: 'quick', tests: 5, levels: 2, days: 90 }];
@@ -217,4 +219,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { makeState, measure, withoutValue };
+module.exports = { makeState, measure, withoutValue, parseScenarios };

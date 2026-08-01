@@ -196,7 +196,7 @@ function actionEvidenceTime(value,dateOnly=false){
   return dateOnly?vnDate(value):(formatDateTimeVN(value)||vnDate(value));
 }
 function actionEvidenceTimelineHtml(a,rr){
-  const p=actionPoint(a),rerun=rr&&rr.point,eventDate=actionEventDate(a),voidText=!p?'Không áp dụng':p.voided?(p.voidedAt?actionEvidenceTime(p.voidedAt):'Đã hủy · thiếu thời điểm'):'Chưa hủy',openedText=a.createdAt?actionEvidenceTime(a.createdAt):actionEvidenceTime(a.date,true);
+  const p=actionPoint(a),rerun=rr&&rr.point,eventDate=actionEventDate(a),archive=!p&&a.pointId&&typeof ArchiveService!=='undefined'?ArchiveService.evidenceForDate(state,eventDate):null,voidText=!p?(archive?'Đã lưu trữ năm '+archive.year:'Không áp dụng'):p.voided?(p.voidedAt?actionEvidenceTime(p.voidedAt):'Đã hủy · thiếu thời điểm'):'Chưa hủy',openedText=a.createdAt?actionEvidenceTime(a.createdAt):actionEvidenceTime(a.date,true);
   const items=[
     ['Ngày xảy ra',actionEvidenceTime(eventDate,true),p&&p.runId?`Lần ${p.runId}`:''],
     ['QC chạy lại',!p?'Không áp dụng':rerun?actionEvidenceTime(rerun.date,true):'—',!p?'Nguồn ngoài IQC':rerun&&rerun.runId?`Lần ${rerun.runId}`:'Chưa có điểm phù hợp'],
@@ -205,6 +205,7 @@ function actionEvidenceTimelineHtml(a,rr){
   ];
   return `<div class="action-evidence-timeline" aria-label="Các mốc thời gian hồ sơ">${items.map(([label,value,note])=>`<div><span>${esc(label)}</span><b>${esc(value)}</b>${note?`<small>${esc(note)}</small>`:''}</div>`).join('')}</div>`;
 }
+function actionArchiveEvidenceHtml(a){if(actionPoint(a)||!a.pointId||typeof ArchiveService==='undefined')return'';const r=ArchiveService.evidenceForDate(state,actionEventDate(a));if(!r)return'';return`<div class="alert ok"><b>Điểm QC gốc nằm trong archive năm ${esc(r.year)}.</b><div>${esc(r.filename||'File archive')} · SHA-256 <code>${esc(String(r.checksum||'').slice(0,16))}…</code> · ${Number(r.points)||0} điểm</div><div style="margin-top:8px">${btn('Xem bằng chứng archive',`viewRegisteredArchive('${jsq(r.id)}')`,'ghost sm')}</div></div>`;}
 function actionRerunEvidenceHtml(a,rr,t){
   const p=actionPoint(a);if(!p||!rr||!rr.needed)return'';
   if(!rr.point)return `<div class="action-rerun-evidence warn"><div class="action-rerun-mark" aria-hidden="true">QC</div><div class="action-rerun-copy"><small>Bằng chứng QC chạy lại</small><b>Chưa có kết quả phù hợp</b><span>${esc(rr.label||'Đang chờ QC chạy lại được chấp nhận')}</span></div></div>`;
@@ -229,7 +230,7 @@ function viewActionDetail(i){
   const verdict=actionQcVerdictLabel(a),violation=actionViolationInfo(a),meta=`<div class="action-detail-meta"><div><span>${modern?esc(a.nceId||'Mã NCE'):'Sự cố'}</span><b>${t?esc(testDisplayName(t)):'—'} · ${esc(actionLevelShort(t,a.level,a.lot))}</b></div><div><span>Kết luận / luật / loại sai số</span><b>${verdict?esc(verdict)+' · ':''}${esc(violation.rule)} · ${esc(violation.errorType)}</b></div>${modern?`<div><span>Nguồn / giai đoạn</span><b>${esc(sourceLabels[a.eventSource]||'—')} · ${esc(phaseLabels[a.processPhase]||'—')}</b></div><div><span>Nguy cơ</span><b>${esc(riskLabels[a.riskLevel]||'Chưa đánh giá')} · RPN ${actionRiskScore(a)||'—'}</b>${a.riskBasis?`<small>${esc(a.riskBasis)}</small>`:''}</div><div><span>Phụ trách / hạn xử lý</span><b>${esc(a.by||'—')} · ${a.dueDate?vnDate(a.dueDate):'—'}${actionOverdue(a).overdue?' · '+esc(actionOverdue(a).label):''}</b></div><div><span>Trạng thái</span><b>${esc(wf.label)}</b></div>`:''}</div>`;
   const cancelledAlert=actionCancelled(a)?`<div class="alert warn"><b>Hồ sơ đã hủy — dữ liệu được giữ để truy xuất.</b><div>${esc(a.cancelReason||'Không có lý do')}${a.cancelledBy?' · '+esc(a.cancelledBy):''}${a.cancelledAt?' · '+formatDateTimeVN(a.cancelledAt):''}</div></div>`:'';
   const body=legacy?`${cancelledAlert}<div class="alert warn">Bản ghi được tạo trước khi có phiếu điều tra 8 bước. Dữ liệu hành động cũ vẫn được giữ nguyên.</div>${meta}<div class="action-detail-legacy"><b>Hành động đã ghi</b><div>${esc(a.action||'—')}</div><div class="hint">${esc(a.by||'—')} · ${esc(rr.label||'Chưa có dữ liệu')} · ${esc(actionApprovalLabel(a))}</div></div>`:`
-    ${cancelledAlert}${meta}${actionEvidenceTimelineHtml(a,rr)}${actionRerunEvidenceHtml(a,rr,t)}
+    ${cancelledAlert}${meta}${actionEvidenceTimelineHtml(a,rr)}${actionArchiveEvidenceHtml(a)}${actionRerunEvidenceHtml(a,rr,t)}
     <ol class="action-detail-steps">
       <li><b>Kiểm soát tức thời</b><div>${esc(ACTION_LABELS.containment[a.containmentStatus]||'Chưa ghi')}</div>${modern?`<div>${esc(a.correction||'Chưa ghi xử lý tức thời')}</div>`:''}${a.containmentNote?`<div class="hint">${esc(a.containmentNote)}</div>`:''}</li>
       <li><b>Kiểm tra vật liệu QC</b>${actionDetailCheck('Hạn dùng, bảo quản, hoàn nguyên và chuẩn bị',a.qcMaterialStatus,a.qcMaterialNote)}</li>

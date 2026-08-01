@@ -1,7 +1,7 @@
 /* Shared component primitives: panels, forms, buttons, tables, tags, alerts, modals, and auth shell.
    Page-specific CSS may extend these selectors in later files. */
 .modal-bg{position:fixed;inset:0;background:rgba(20,33,43,.45);display:flex;align-items:center;justify-content:center;z-index:900;padding:20px}
-#dialogRoot .modal-bg{z-index:950;background:rgba(21,35,44,.54);backdrop-filter:blur(2px)}
+#dialogRoot .modal-bg{z-index:1100;background:rgba(21,35,44,.54);backdrop-filter:blur(2px)}
       .modal-h h3{ margin:0; }
   .modal-b{padding:16px 18px;overflow:auto}
   .modal-f{padding:12px 18px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px}

@@ -104,11 +104,15 @@ async function openSeededSession({ headless = true } = {}) {
   // caller's error handler unable to exit — the script would print the error
   // and then hang until the CI job's timeout instead of failing fast.
   let browser = null;
+  const diagnostics = [];
   try {
     const { port } = server.address();
     const baseUrl = `http://127.0.0.1:${port}`;
     browser = await chromium.launch({ headless });
     const page = await browser.newPage();
+    page.on('pageerror', error => diagnostics.push(`pageerror: ${error.message}`));
+    page.on('console', message => { if (message.type() === 'error') diagnostics.push(`console: ${message.text()}`); });
+    page.on('requestfailed', request => diagnostics.push(`requestfailed: ${request.url()} · ${request.failure()&&request.failure().errorText||''}`));
     const seedState = buildSeedState();
 
     await page.addInitScript((state) => { localStorage.setItem('qclab', JSON.stringify(state)); }, seedState);
@@ -121,6 +125,7 @@ async function openSeededSession({ headless = true } = {}) {
   } catch (err) {
     if (browser) await browser.close().catch(() => {});
     await new Promise((resolve) => server.close(resolve));
+    if (diagnostics.length) console.error('Browser diagnostics:\n' + diagnostics.join('\n'));
     throw err;
   }
 }

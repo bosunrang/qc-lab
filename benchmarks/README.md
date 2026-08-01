@@ -119,6 +119,22 @@ Chạy nhanh để kiểm tra benchmark vẫn hoạt động:
 node benchmarks/performance-baseline.js --quick
 ```
 
+Stress test dữ liệu 10 năm (50 xét nghiệm × 3 mức × 3.650 ngày = 547.500
+điểm QC):
+
+```powershell
+npm run benchmark:10y
+```
+
+Đây là phép đo định hướng, không phải release gate: chạy trên máy tham chiếu
+Windows x64/Node v26.4.0 ngày 2026-08-01 cho snapshot JSON gọn 78,18 MB. Sau
+tối ưu tail z-score của accepted-points và gộp CUSUM/moving-average thành một
+lượt quét, `cold_domain_all_tests` còn khoảng 11,5 giây,
+`one_test_recompute` khoảng 0,19 giây và cache ấm dưới 1 ms; accepted-points
+riêng giảm từ khoảng 10,2 giây xuống 2,7 giây trong lệnh benchmark đầy đủ.
+Kịch bản giả định một điểm mỗi mức mỗi ngày; labo chạy hai lần/ngày sẽ đạt cùng
+số điểm sau khoảng 5 năm.
+
 Smoke-test Web Worker qua HTTP: mở `benchmarks/worker-smoke.html` từ cùng web server
 với ứng dụng; trang phải hiển thị `pass`.
 

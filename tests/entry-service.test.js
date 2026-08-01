@@ -1,10 +1,19 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
 const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'modules/entry-service.js']);
 run(ctx, 'function __getState(){return state;} function __setState(s){state=s;}');
 
 const plain = v => JSON.parse(JSON.stringify(v));
+
+{
+  const routeSource = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'entry-routes.js'), 'utf8');
+  assert.match(routeSource, /EntryService\.updateDateNoteCommand\(/, 'route phải dùng date-note command');
+  assert.doesNotMatch(routeSource, /EntryService\.saveDateNote\(/, 'route không được gọi mutation primitive trực tiếp');
+  assert.match(routeSource, /save\(result\.effects\.save\)/, 'route phải dùng save policy do command trả về');
+}
 
 {
   const window = ctx.EntryService.buildEntryWindow({
@@ -112,6 +121,30 @@ const plain = v => JSON.parse(JSON.stringify(v));
   assert.equal(note.note, 'ghi chú mới');
   assert.equal(state.data.T1[0].note, 'ghi chú mới');
   assert.equal(state.data.T1[1].note, 'ghi chú mới');
+
+  const command = plain(ctx.EntryService.updateDateNoteCommand(state, {
+    testId: 'T1', date: '2026-07-01', value: ' ghi chú command ', formatDate: value => '01/07/2026'
+  }));
+  assert.equal(command.ok, true);
+  assert.equal(command.note, 'ghi chú command');
+  assert.equal(command.messageCode, 'note-saved');
+  assert.deepEqual(command.effects.audit, {
+    action: 'Ghi chú QC', detail: 'Ngày 01/07/2026 · ghi chú command', target: ''
+  });
+  assert.deepEqual(command.effects.save, { clearDerived: false, testId: 'T1' });
+  assert.equal(state.data.T1[0].note, 'ghi chú command');
+
+  const removedNote = plain(ctx.EntryService.updateDateNoteCommand(state, {
+    testId: 'T1', date: '2026-07-01', value: '', formatDate: () => '01/07/2026'
+  }));
+  assert.equal(removedNote.messageCode, 'note-removed');
+  assert.equal(removedNote.effects.audit.detail, 'Ngày 01/07/2026 · xóa ghi chú');
+  assert.equal(state.data.T1[1].note, '');
+
+  assert.equal(ctx.EntryService.updateDateNoteCommand(state, { testId: '', date: '2026-07-01' }).error, 'invalid-test');
+  assert.equal(ctx.EntryService.updateDateNoteCommand(state, { testId: 'T1', date: '01/07/2026' }).error, 'invalid-date');
+  assert.equal(ctx.EntryService.updateDateNoteCommand(state, { testId: 'T2', date: '2026-07-01' }).error, 'test-not-found');
+  assert.equal(ctx.EntryService.updateDateNoteCommand(state, { testId: 'T1', date: '2026-07-09' }).error, 'no-points');
 
   const added = plain(ctx.EntryService.addPoint(state, {
     tid: 'T1',

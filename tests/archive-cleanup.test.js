@@ -1,0 +1,44 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const {webcrypto}=require('node:crypto');
+const {loadSandbox}=require('./helpers/sandbox');
+
+(async()=>{
+  const root=path.join(__dirname,'..'),source=fs.readFileSync(path.join(root,'assets/modules/backup-service.js'),'utf8'),settings=fs.readFileSync(path.join(root,'assets/modules/settings.js'),'utf8');
+  const start=source.indexOf('async function cleanupYearFromArchive'),end=source.indexOf('\nasync function checkStorageUsage',start),body=source.slice(start,end);
+  assert.ok(start>=0&&end>start,'phải có đường dọn archive riêng');
+  assert.match(body,/archiveCleanupGuard\(report\.state,m\.year\)/,'phải đối chiếu lại archive ngay trước khi xóa');
+  assert.equal((body.match(/archiveCleanupGuard\(report\.state,m\.year\)/g)||[]).length,2,'phải kiểm tra trước và sau hai hộp xác nhận');
+  assert.match(source,/PeriodService\.lockedPoints\(state,affected\)/,'phải chặn điểm thuộc kỳ đã khóa');
+  assert.match(source,/archiveCleanupOpenNces\(comparison\.pointIds\)/,'phải chặn NCE đang mở');
+  assert.match(body,/backupCurrentData\('truoc-don-'\+m\.year\)/,'phải tạo backup đầy đủ trước mutation');
+  assert.equal((body.match(/confirmDialog\(/g)||[]).length,2,'phải xác nhận hai bước');
+  assert.match(body,/QCCore\.validateStateInvariants\(state\)/,'phải kiểm tra invariant sau mutation');
+  assert.match(body,/ArchiveService\.restoreRemovedPoints\(state,removal\)/,'phải rollback nếu invariant hỏng');
+  assert.match(body,/save\(\{testIds:removal\.testIds\}\)/,'phải ghi đúng partition xét nghiệm bị thay đổi');
+  assert.match(settings,/id="cleanupArchive"[^>]+onchange="cleanupYearFromArchive\(event\)"/,'Cài đặt phải có file picker dọn archive');
+
+  const ctx=loadSandbox(['core.js','modules/archive-service.js','modules/backup-service.js'],{crypto:webcrypto});
+  const live=ctx.QCCore.sanitizeBackup({schemaVersion:ctx.QCCore.STATE_SCHEMA_VERSION,lab:{name:'PXN'},tests:[{id:'T1',name:'Glucose',levels:[{level:1}]}],data:{T1:[{id:'p25',date:'2025-12-31',runId:'2025-12-31-1',level:1,val:1},{id:'p26',date:'2026-01-02',runId:'2026-01-02-1',level:1,val:2}]},actions:[],activity:[],users:[]});
+  const built=ctx.ArchiveService.build(live,'2026'),pack=await ctx.createBackupPackage(built.state,{type:'year-archive',year:'2026'});
+  ctx.ArchiveService.register(live,{year:'2026',filename:'archive.json',checksum:pack.meta.checksum,points:1,tests:1});
+  ctx.state=live;ctx.currentUser={name:'Admin'};ctx.requireAdmin=()=>true;ctx.actionCancelled=()=>false;ctx.actionWorkflowStatus=()=>({complete:false});
+  ctx.PeriodService={lockedPoints:()=>({count:1,periods:['2026-01']})};
+  assert.throws(()=>ctx.archiveCleanupGuard(built.state,'2026'),/kỳ đã khóa/);
+  ctx.PeriodService={lockedPoints:()=>({count:0,periods:[]})};
+  live.actions.push({id:'n1',pointId:'p26'});
+  assert.throws(()=>ctx.archiveCleanupGuard(built.state,'2026'),/NCE đang mở/);
+  live.actions=[];
+  let confirmations=0,saved=null,audited='';ctx.confirmDialog=async()=>{confirmations++;return true;};ctx.backupCurrentData=async()=>true;ctx.infoDialog=async()=>{};ctx.logAct=(name)=>{audited=name;};ctx.save=opts=>{saved=opts;};ctx.rerender=()=>{};
+  const event={target:{files:[{name:'archive.json',size:pack.bytes,text:async()=>pack.text}],value:'archive.json'}};
+  await ctx.cleanupYearFromArchive(event);
+  assert.deepEqual([...live.data.T1].map(p=>p.id),['p25'],'chỉ điểm của năm archive được xóa');
+  assert.equal(confirmations,2);
+  assert.equal(saved.testIds[0],'T1');
+  assert.equal(audited,'Dọn dữ liệu archive năm');
+  assert.equal(live.archiveRegistry[0].removedPoints,1);
+  assert.ok(live.archiveRegistry[0].cleanedAt);
+  assert.equal(event.target.value,'');
+  console.log('Archive cleanup safety contract tests passed');
+})().catch(error=>{console.error(error);process.exitCode=1;});

@@ -3,9 +3,8 @@ const RC_MIN_PAIRS=5;
 /* palette khớp design token trong app.css; dùng cho SVG/báo cáo (in ở document riêng, không đọc được var()) */
 const RCC={teal:'#0c6f78',tealDeep:'#0a5d65',ink:'#172833',muted:'#667b89',line:'#d4dde3',grid:'#e9eff3',red:'#a43a33',amber:'#a36f15',green:'#087044',okBg:'#e3f3f0',okFg:'#0a5e67',midBg:'#fbf0db',midFg:'#a36f15',noBg:'#f7e4e2',noFg:'#a43a33'};
 const RCPAD={l:54,r:18,t:18,b:46};
-function rcBlank(){return {id:uid(),test:{reagent:'Hóa chất mới',lotOld:'',lotNew:'',date:'',operator:'',sampleType:'Mẫu bệnh nhân',unit:'',biasTarget:6,alpha:0.05,coverageConfirmed:false},rows:[['',''],['',''],['',''],['',''],['','']]};}
 function rcLabel(d){const t=d.test;let s=teaAnalyteDisplay(t.reagent)||t.reagent||'Hóa chất mới';if(t.lotOld||t.lotNew)s+=' — '+(t.lotOld||'?')+'→'+(t.lotNew||'?');return s;}
-function rcAct(){return state.reagentTests.find(d=>d.id===rcId);}
+function rcAct(){return ReagentComparisonService.find(state,rcId);}
 function rcSaveSoon(){clearTimeout(rcSaveT);rcSaveT=setTimeout(save,600);}
 /* stats */
 function rcBetacf(a,b,x){const MAXIT=200,EPS=3e-12,FP=1e-300;let qab=a+b,qap=a+1,qam=a-1,c=1,d=1-qab*x/qap;if(Math.abs(d)<FP)d=FP;d=1/d;let h=d;
@@ -75,7 +74,7 @@ function rcBlandSVG(R){const W=460,H=380,av=R.o.map((v,i)=>(v+R.n[i])/2),up=R.md
 /* page */
 function rcSelectOptions(){return state.reagentTests.map(d=>`<option value="${escAttr(d.id)}"${d.id===rcId?' selected':''}>${esc(rcLabel(d))}</option>`).join('');}
 function pageReagent(){
-  if(!state.reagentTests.length)state.reagentTests.push(rcBlank());
+  if(!state.reagentTests.length)return headOnly('So sánh 2 lô hóa chất','')+`<div class="panel">${emptyState('Chưa có phép so sánh','Tải lại dữ liệu hoặc tạo phép so sánh mới.','')}</div>`;
   if(!rcId||!state.reagentTests.find(d=>d.id===rcId))rcId=state.reagentTests[0].id;
   const ds=rcAct(),t=ds.test,ro=!canWrite()?'disabled':'';
   const oldLotHead='Lô cũ'+(t.lotOld?`: ${esc(t.lotOld)}`:''),newLotHead='Lô mới'+(t.lotNew?`: ${esc(t.lotNew)}`:'');
@@ -158,30 +157,26 @@ function rcCompute(){
   vd.innerHTML=`<div class="rc-verdict ${vcls}"><div class="rc-verdict-icon">${vicon}</div><div><div class="rc-verdict-title">${vtitle}</div><div class="rc-verdict-desc">${vdesc}</div></div></div>`;
   sc.innerHTML=rcScatterSVG(R,ds.test);bl.innerHTML=rcBlandSVG(R);
 }
-function rcMeta(k,v){if(!requireWrite())return;const ds=rcAct();ds.test[k]=k==='coverageConfirmed'?!!v:(['biasTarget','alpha'].includes(k)?QCCore.finiteNumber(v,0):(k==='date'?(parseVN(v)||QCCore.cleanText(v,20)):QCCore.cleanText(v)));rcSaveSoon();rcCompute();if(k==='reagent'||k==='lotOld'||k==='lotNew'){const d=document.getElementById('rcCmpDisp');if(d)d.textContent=rcLabel(rcAct());const s=document.getElementById('rcSel');if(s){const o=[...s.options].find(o=>o.value===rcId);if(o)o.textContent=rcLabel(rcAct());}const oh=document.getElementById('rcOldLotHead'),nh=document.getElementById('rcNewLotHead');if(oh)oh.textContent='Lô cũ'+(ds.test.lotOld?': '+ds.test.lotOld:'');if(nh)nh.textContent='Lô mới'+(ds.test.lotNew?': '+ds.test.lotNew:'');}}
+function rcMeta(k,v){if(!requireWrite())return;const result=ReagentComparisonService.updateMetadata(state,{id:rcId,key:k,value:k==='date'?(parseVN(v)||QCCore.cleanText(v,20)):v});if(result.error)return;const ds=result.comparison;rcSaveSoon();rcCompute();if(k==='reagent'||k==='lotOld'||k==='lotNew'){const d=document.getElementById('rcCmpDisp');if(d)d.textContent=rcLabel(rcAct());const s=document.getElementById('rcSel');if(s){const o=[...s.options].find(o=>o.value===rcId);if(o)o.textContent=rcLabel(rcAct());}const oh=document.getElementById('rcOldLotHead'),nh=document.getElementById('rcNewLotHead');if(oh)oh.textContent='Lô cũ'+(ds.test.lotOld?': '+ds.test.lotOld:'');if(nh)nh.textContent='Lô mới'+(ds.test.lotNew?': '+ds.test.lotNew:'');}}
 function rcUpdateRowCalc(i){
   const row=document.querySelector(`[data-rc-row="${i}"]`),ds=rcAct();if(!row||!ds||!ds.rows[i])return;
   const c=rcPairCalc(ds.rows[i]),avg=row.querySelector('.rc-calc.avg'),dif=row.querySelector('.rc-calc.dif');
   if(avg)avg.textContent=c?fmt(c.avg,3):'–';
   if(dif){dif.textContent=c?fmt(c.dif,3):'–';dif.classList.toggle('neg',!!(c&&c.dif<0));}
 }
-function rcCell(i,w,v){if(!requireWrite())return;const ds=rcAct();ds.rows[i][w]=v;rcSaveSoon();rcUpdateRowCalc(i);rcCompute();}
-function rcAddRow(){if(!requireWrite())return;rcAct().rows.push(['','']);save({clearDerived:false});rerender();}
-function rcRmRow(i){if(!requireWrite())return;const a=rcAct();a.rows.splice(i,1);if(!a.rows.length)a.rows.push(['','']);save({clearDerived:false});rerender();}
-function rcClearRows(){if(!requireWrite())return;rcAct().rows=[['',''],['',''],['',''],['',''],['','']];save({clearDerived:false});rerender();}
+function rcCell(i,w,v){if(!requireWrite())return;const result=ReagentComparisonService.updateCell(state,{id:rcId,rowIndex:i,column:w,value:v});if(result.error)return;rcSaveSoon();rcUpdateRowCalc(i);rcCompute();}
+function rcAddRow(){if(!requireWrite())return;if(ReagentComparisonService.addRow(state,{id:rcId}).error)return;save({clearDerived:false});rerender();}
+function rcRmRow(i){if(!requireWrite())return;if(ReagentComparisonService.removeRow(state,{id:rcId,rowIndex:i}).error)return;save({clearDerived:false});rerender();}
+function rcClearRows(){if(!requireWrite())return;if(ReagentComparisonService.clearRows(state,{id:rcId}).error)return;save({clearDerived:false});rerender();}
 function rcSwitch(id){rcId=id;rerender();}
 async function rcDelete(id,keepModal=false){if(!requireWrite())return;if(state.reagentTests.length<=1){await infoDialog('Phải còn ít nhất 1 phép so sánh.');return;}
   if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa phép so sánh',message:'Xóa phép so sánh này?',confirmLabel:'Xóa',cancelLabel:'Hủy'}))return;
-  state.reagentTests=state.reagentTests.filter(d=>d.id!==id);if(rcId===id)rcId=state.reagentTests[0].id;save({clearDerived:false});if(keepModal)renderRcModal();rerender();}
+  const result=ReagentComparisonService.remove(state,{id});if(result.error)return;if(rcId===id)rcId=result.nextId;save({clearDerived:false});if(keepModal)renderRcModal();rerender();}
 function rcDeleteCurrent(){rcDelete(rcId);}
-function rcQuickKey(type){return type==='sampleType'?'reagentSampleTypes':'reagentOperators';}
 function rcQuickLabel(type){return type==='sampleType'?'loại mẫu':'người thực hiện';}
-function rcQuickField(type){return type==='sampleType'?'sampleType':'operator';}
 function rcQuickList(type){
-  const key=rcQuickKey(type);
-  if(!Array.isArray(state[key]))state[key]=type==='sampleType'?['Mẫu bệnh nhân','Mẫu nội kiểm (IQC)','Mẫu ngoại kiểm (EQA)']:[];
-  if(type==='sampleType'&&!state[key].length)state[key]=['Mẫu bệnh nhân','Mẫu nội kiểm (IQC)','Mẫu ngoại kiểm (EQA)'];
-  return state[key];
+  const result=ReagentComparisonService.ensureQuickList(state,type);
+  return result.error?[]:result.items;
 }
 function rcOpenQuick(type){if(!requireWrite())return;rcQuickType=type;rcRenderQuickModal();}
 function rcRenderQuickModal(){
@@ -193,18 +188,18 @@ function rcRenderQuickModal(){
   setTimeout(()=>{const e=document.getElementById('rcQuickNew');if(e)e.focus();},0);
 }
 function rcPickQuick(i){
-  const ds=rcAct(),items=rcQuickList(rcQuickType),v=items[i];if(!ds||!v)return;
-  ds.test[rcQuickField(rcQuickType)]=v;save({clearDerived:false});closeModal();rerender();
+  const result=ReagentComparisonService.pickQuick(state,{id:rcId,type:rcQuickType,index:i});if(result.error)return;
+  save({clearDerived:false});closeModal();rerender();
 }
 function rcAddQuick(){
   const input=document.getElementById('rcQuickNew'),v=QCCore.cleanText(input&&input.value,120).trim();if(!v)return;
-  const items=rcQuickList(rcQuickType);if(!items.some(x=>searchText(x)===searchText(v)))items.push(v);
+  const result=ReagentComparisonService.addQuick(state,{type:rcQuickType,value:v});if(result.error)return;
   save({clearDerived:false});rcRenderQuickModal();
 }
 async function rcDelQuick(i){
   const items=rcQuickList(rcQuickType),v=items[i];if(!v)return;
   if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa khỏi danh sách',message:`Xóa "${v}" khỏi danh sách?`,confirmLabel:'Xóa',cancelLabel:'Hủy'}))return;
-  items.splice(i,1);save({clearDerived:false});rcRenderQuickModal();
+  if(ReagentComparisonService.removeQuick(state,{type:rcQuickType,index:i}).error)return;save({clearDerived:false});rcRenderQuickModal();
 }
 function openRcModal(){rcModalQ='';renderRcModal();}
 function rcModalSearchSet(v){
@@ -240,7 +235,7 @@ function renderRcCreateModal(){
     <div class="modal-f">${btn('Đóng','closeModal()','ghost')}</div></div>`);
   setTimeout(()=>{const e=document.getElementById('rcCreateSearch');if(e){e.focus();e.setSelectionRange(e.value.length,e.value.length);}},0);
 }
-function rcCreateFrom(name,unit){if(!requireWrite())return;const d=rcBlank();d.test.reagent=QCCore.cleanText(name||'Hóa chất mới').trim()||'Hóa chất mới';if(unit)d.test.unit=QCCore.cleanText(unit);state.reagentTests.push(d);rcId=d.id;save({clearDerived:false});closeModal();rerender();}
+function rcCreateFrom(name,unit){if(!requireWrite())return;const result=ReagentComparisonService.create(state,{id:uid(),name,unit});if(result.error)return;rcId=result.comparison.id;save({clearDerived:false});closeModal();rerender();}
 function rcFmt(x,k=4){return isFinite(x)?Number(x.toFixed(k)).toString():'—';}
 function rcFmtT(x){return isFinite(x)?Number(x.toFixed(4)).toString():(x>0?'+∞':'−∞');}
 function rcDateText(v){return v?esc(vnDate(v)):formatDateTimeVN(new Date().toISOString()).split(' ').slice(1).join(' ');}

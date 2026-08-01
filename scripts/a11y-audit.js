@@ -61,6 +61,7 @@ const MODALS = [
   // hành — ghi một dòng trước để cổng đó không chặn (cùng lý do Sigma phải tự
   // sgTrackTest/sgAddPeriod trước khi audit).
   { page: 'audit', label: 'audit:archive-log', open: () => { logAct('Nhập QC', 'seed cho a11y audit', 'Glucose'); archiveActivityLog(); } },
+  { page: 'settings', label: 'settings:archive-viewer', open: () => { state.archiveRegistry=[{id:'arc-a11y',year:'2025',filename:'qclab-archive-2025.json',checksum:'a'.repeat(64),sizeBytes:1024,points:365,tests:1,minDate:'2025-01-01',maxDate:'2025-12-31',verifiedAt:'2026-08-01T00:00:00Z',verifiedBy:'Admin',testCounts:[{testId:state.tests[0].id,name:state.tests[0].name,points:365}]}];viewRegisteredArchive('arc-a11y'); } },
   // Shared confirm-dialog component (modals.js #dialogRoot layer, separate
   // from #modalRoot) — every delete/destructive confirmation across the app
   // renders through this one function, so testing it once covers all of

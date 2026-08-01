@@ -9,6 +9,7 @@ assert.equal(ctx.PeriodService.periodForDate('2026-07-14'), '2026-07');
 
 const state = {
   periodLocks: [],
+  tests: [{ id: 'T1', name: 'Glucose' }],
   data: { T1: [{ id: 'p1', date: '2026-07-14', level: 1, lot: 'L1', val: 10 }] },
   actions: [],
 };
@@ -23,6 +24,10 @@ assert.equal(ctx.EntryService.addPoint(state, {
   cfg: { lot: 'L1', mean: 10, sd: 1 }, staff: {}, id: 'p2'
 }).error, 'period-locked');
 assert.equal(ctx.EntryService.saveDateNote(state, 'T1', '2026-07-14', 'sửa').error, 'period-locked');
+assert.equal(ctx.EntryService.updateDateNoteCommand(state, {
+  testId: 'T1', date: '2026-07-14', value: 'sửa', formatDate: value => value
+}).error, 'period-locked');
+assert.equal(state.data.T1[0].note, undefined, 'command bị khóa không được mutation ghi chú');
 assert.equal(ctx.EntryService.voidPoint(state, {
   tid: 'T1', pointId: 'p1', reason: 'nhập nhầm', staff: { operatorName: 'Admin' },
   nowIso: '2026-07-14T00:00:00.000Z', today: '2026-07-14', id: 'a1', pointRunNo: () => 1,

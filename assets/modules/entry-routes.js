@@ -292,12 +292,11 @@ function entryUnlockExtraRun(tid,colKey,date,levelIdx,runNo){
 async function entryDateNoteSave(tid,date,value){
   if(!requireWrite())return;
   if(!await requireUnlockedPeriod(date,'ghi chú QC'))return;
-  const result=EntryService.saveDateNote(state,tid,date,value);
-  if(result&&result.error==='period-locked'){entrySetLastMsg('<div class="alert warn">Kỳ này đã chốt, không thể sửa ghi chú.</div>');return;}
-  if(!result)return;
+  const result=EntryService.updateDateNoteCommand(state,{testId:tid,date,value,formatDate:vnDate});
+  if(!result.ok){if(result.error==='period-locked')entrySetLastMsg('<div class="alert warn">Kỳ này đã chốt, không thể sửa ghi chú.</div>');return;}
   const note=result.note;
-  logAct('Ghi chú QC',`Ngày ${vnDate(date)}${note?' · '+note:' · xóa ghi chú'}`,(state.tests.find(t=>t.id===tid)||{}).name||'');
-  save({clearDerived:false,testId:tid});
+  logAct(result.effects.audit.action,result.effects.audit.detail,result.effects.audit.target);
+  save(result.effects.save);
   entrySetLastMsg(note?`<div class="alert ok">✓ Đã lưu ghi chú ngày ${vnDate(date)}.</div>`:`<div class="alert ok">✓ Đã xóa ghi chú ngày ${vnDate(date)}.</div>`);
 }
 /* cfg dùng khi ghi điểm. Mặc định là cấu hình sống của mức; nếu lotNo trỏ đúng lô

@@ -491,4 +491,16 @@ function close(actual, expected, epsilon = 1e-9) {
   [s6,s5,s4,s3,sLow].forEach(spec => spec.rules.forEach(r => assert.ok(QCCore.WG_RULES.includes(r), r + ' phải là quy tắc hợp lệ')));
 }
 
+{ // Registry archive schema-v6: chỉ giữ metadata SHA-256 đã kiểm chứng.
+  const checksum='a'.repeat(64),cleaned=QCCore.sanitizeBackup({archiveRegistry:[{id:'arc1',year:'2026',filename:'a.json',checksum,sizeBytes:'123',points:'4',tests:1,cleanedAt:'2026-08-01T10:00:00.000Z',cleanedBy:'Admin',removedPoints:'4',testCounts:[{testId:'T1',name:'Glucose',points:'4'}]},{id:'bad',year:'26',checksum:'x'}]});
+  assert.equal(QCCore.STATE_SCHEMA_VERSION,6);
+  assert.equal(cleaned.archiveRegistry.length,1);
+  assert.equal(cleaned.archiveRegistry[0].sizeBytes,123);
+  assert.equal(cleaned.archiveRegistry[0].testCounts[0].points,4);
+  assert.equal(cleaned.archiveRegistry[0].removedPoints,4);
+  assert.equal(cleaned.archiveRegistry[0].cleanedBy,'Admin');
+  assert.deepEqual(QCCore.validateStateInvariants({...cleaned,archiveRegistry:[cleaned.archiveRegistry[0],{...cleaned.archiveRegistry[0],id:'arc2'}]}).filter(x=>x.includes('archiveRegistry')),['archiveRegistry[1] trùng archive 2026.']);
+  assert.match(QCCore.validateBackup({archiveRegistry:{}}).join('\n'),/archiveRegistry phải là mảng/);
+}
+
 console.log('QCCore tests passed');

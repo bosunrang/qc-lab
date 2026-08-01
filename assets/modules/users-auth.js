@@ -261,13 +261,13 @@ function reauthenticateCurrentUser({title='Xác thực lại',message='Nhập l�
 }
 async function ensureAdmin(){if(!state.users||!state.users.length){state.users=[{id:uid(),username:'admin',name:'Quản trị viên',role:'admin',passHash:await legacyHashPass('admin'),active:true,mustChangePassword:true}];save({cloud:false,clearDerived:false});}}
 function blankAppState(users){
-  return{lab:{name:'',dept:'',address:'',brandTitle:'QC Lab',brandSub:'Nội kiểm xét nghiệm',logoText:'QC',logoData:''},tests:[],machines:[],instruments:[],assayGroups:[],qcPanels:[],lotTransitions:[],lotGroups:[],qcLots:[],data:{},actions:[],activity:[],activityAnchor:'',users:Array.isArray(users)?users:[],reagentTests:[],reagentOperators:[],reagentSampleTypes:['Mẫu bệnh nhân','Mẫu nội kiểm (IQC)','Mẫu ngoại kiểm (EQA)'],sigmaData:{},periodLocks:[],teaRefs:[],teaRegistryVersion:TEA_REFERENCE_SCHEMA_VERSION,westgardRules:{...WG_DEFAULT},westgardProfileVersion:2,configMigrationVersion:1,schemaVersion:STATE_SCHEMA_VERSION};
+  return{lab:{name:'',dept:'',address:'',brandTitle:'QC Lab',brandSub:'Nội kiểm xét nghiệm',logoText:'QC',logoData:''},tests:[],machines:[],instruments:[],assayGroups:[],qcPanels:[],lotTransitions:[],lotGroups:[],qcLots:[],data:{},actions:[],activity:[],activityAnchor:'',users:Array.isArray(users)?users:[],reagentTests:[],reagentOperators:[],reagentSampleTypes:['Mẫu bệnh nhân','Mẫu nội kiểm (IQC)','Mẫu ngoại kiểm (EQA)'],sigmaData:{},periodLocks:[],archiveRegistry:[],teaRefs:[],teaRegistryVersion:TEA_REFERENCE_SCHEMA_VERSION,westgardRules:{...WG_DEFAULT},westgardProfileVersion:2,configMigrationVersion:1,schemaVersion:STATE_SCHEMA_VERSION};
 }
 async function resetAllData(){
   if(!requireAdmin())return;
   if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa sạch dữ liệu test',message:'Xóa sạch toàn bộ dữ liệu test?',detail:'Nhật ký hoạt động sẽ được giữ lại và ghi nhận thao tác này.',confirmLabel:'Tiếp tục',cancelLabel:'Hủy'}))return;
   if(!await confirmDialog({kicker:'Xác nhận lần cuối',title:'Xóa sạch dữ liệu test',message:'Dữ liệu QC, cấu hình, lô, panel và khắc phục sẽ bị xóa.',detail:'Nhật ký audit vẫn được giữ. Nếu đang bật đám mây, trạng thái trắng cũng sẽ được đồng bộ lên Firebase.',confirmLabel:'Xóa sạch dữ liệu',cancelLabel:'Hủy'}))return;
-  if(typeof backupCurrentData==='function'&&!backupCurrentData('truoc-xoa')){await infoDialog('Không tạo được bản backup an toàn. Dữ liệu chưa bị xóa.');return;}
+  if(typeof backupCurrentData==='function'&&!await backupCurrentData('truoc-xoa')){await infoDialog('Không tạo được bản backup an toàn. Dữ liệu chưa bị xóa.');return;}
   const keepUsers=(state.users||[]).length?state.users:[];
   /* Neo chuoi hash di kem nhat ky: giu nhat ky ma bo neo thi auditVerifyChain() se
      bao "audit bi sua" gia ngay o dong dau tien neu lab da tung luu tru. */

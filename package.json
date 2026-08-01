@@ -15,6 +15,7 @@
     "a11y-audit": "node scripts/a11y-audit.js",
     "print-check": "node scripts/print-check.js",
     "coverage-map": "node scripts/coverage-map.js",
+    "benchmark:10y": "node benchmarks/performance-baseline.js --ten-years",
     "verify-release": "node benchmarks/verify-release.js",
     "patch-build": "node scripts/patch-7za-symlink.js",
     "dist": "node scripts/patch-7za-symlink.js && electron-builder --win nsis",

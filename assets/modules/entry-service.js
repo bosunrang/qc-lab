@@ -118,6 +118,22 @@
     return{note,rows};
   }
 
+  function updateDateNoteCommand(state,/** @type {any} */{testId,date,value,formatDate}={}){
+    const tid=QCCore.cleanId(testId),cleanDate=QCCore.cleanText(date,20).trim();
+    if(!tid)return{ok:false,error:'invalid-test'};
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(cleanDate))return{ok:false,error:'invalid-date'};
+    const test=((state&&state.tests)||[]).find(item=>item&&item.id===tid);
+    if(!test)return{ok:false,error:'test-not-found'};
+    const result=saveDateNote(state,tid,cleanDate,value);
+    if(result&&result.error)return{ok:false,error:result.error};
+    if(!result)return{ok:false,error:'no-points'};
+    const shownDate=typeof formatDate==='function'?formatDate(cleanDate):cleanDate,note=result.note;
+    return{ok:true,note,rows:result.rows,messageCode:note?'note-saved':'note-removed',effects:{
+      audit:{action:'Ghi chú QC',detail:`Ngày ${shownDate}${note?' · '+note:' · xóa ghi chú'}`,target:test.name||''},
+      save:{clearDerived:false,testId:tid}
+    }};
+  }
+
   function addPoint(state,{tid,level,date,val,runId,cfg,staff,id}){
     if(root.PeriodService&&root.PeriodService.findLock(state,root.PeriodService.periodForDate(date)))return{error:'period-locked'};
     state.data=state.data||{};
@@ -230,7 +246,7 @@
     return(dayGroup&&dayGroup.runs||[]).filter(r=>r.levels&&r.levels[level]).sort((a,b)=>a.runNo-b.runNo);
   }
 
-  root.EntryService={nextRunIdFor,cleanRunId,preparePointInput,saveDateNote,addPoint,recordPoint,voidPoint,buildEntryWindow,groupByMachine,buildSheetCalendar,summarizeRunStatus,buildPointView,buildSheetRowsData,sheetFirstRunNo,sheetLevelRuns};
+  root.EntryService={nextRunIdFor,cleanRunId,preparePointInput,saveDateNote,updateDateNoteCommand,addPoint,recordPoint,voidPoint,buildEntryWindow,groupByMachine,buildSheetCalendar,summarizeRunStatus,buildPointView,buildSheetRowsData,sheetFirstRunNo,sheetLevelRuns};
   root.nextRunId=function(testId,date){return nextRunIdFor(state,testId,date);};
   root.cleanEntryRunId=cleanRunId;
 })(typeof globalThis!=='undefined'?globalThis:this);

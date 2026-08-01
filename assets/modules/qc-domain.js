@@ -367,22 +367,22 @@ function cusumSeries(t,l){
   const memoKey=t.id+'|'+l.level;
   if(cusumMemo.has(memoKey))return cusumMemo.get(memoKey);
   const cfg=testCusumConfig(t),pts=operationalLotPoints(t,l.level),
-    c=pts.length?QCCore.cusum(pts,l.mean,l.sd,cfg.k,cfg.h):{cPos:[],cNeg:[],flags:[],k:cfg.k,h:cfg.h},
-    ma=pts.length?QCCore.movingAverage(pts,l.mean,l.sd):[],
-    result={...c,ma};
+    result=pts.length?QCCore.cusumMovingAverage(pts,l.mean,l.sd,cfg.k,cfg.h):{cPos:[],cNeg:[],flags:[],k:cfg.k,h:cfg.h,ma:[]};
   cusumMemo.set(memoKey,result);
   return result;
 }
 const ACCEPTED_WG_LOOKBACK=11; // 12x is the widest single-level rule: candidate + 11 prior accepted points.
-function acceptedPointOkFromTail(l,acceptedPointTail,candidate,withinRules,rejectRules){
-  const z=QCCore.pointZ(candidate,l.mean,l.sd),rules=QCCore.westgardLatestRules([...acceptedPointTail,candidate],l.mean,l.sd,rule=>withinRules.has(rule));
-  return{ok:!rules.some(rule=>rejectRules.has(rule)),z};
+function acceptedPointOkFromTail(l,acceptedZTail,acceptedTargetTail,candidate,withinRules,rejectRules){
+  const target=QCCore.pointTarget(candidate,l.mean,l.sd);acceptedZTail.push(target.z);acceptedTargetTail.push(target.key);
+  const rules=QCCore.westgardLatestRulesFromZ(acceptedZTail,rule=>withinRules.has(rule),acceptedTargetTail),ok=!rules.some(rule=>rejectRules.has(rule));
+  if(!ok){acceptedZTail.pop();acceptedTargetTail.pop();}else if(acceptedZTail.length>ACCEPTED_WG_LOOKBACK){acceptedZTail.shift();acceptedTargetTail.shift();}
+  return{ok,z:target.z};
 }
 function acceptedLotPoints(t,level,withIndex=false){
   const memoKey=t&&t.id?t.id+'|'+level+'|'+(withIndex?1:0):'';
   if(memoKey&&acceptedMemo.has(memoKey))return acceptedMemo.get(memoKey);
-  const l=lvlCfg(t,level),pts=operationalLotPoints(t,level,withIndex),accepted=[],tail=[],withinRules=testRuleSet(t,'within'),rejectRules=new Set(WG_RULES.filter(rule=>testRuleAction(t,rule)==='reject'));
-  pts.forEach(p=>{const verdict=acceptedPointOkFromTail(l,tail,p,withinRules,rejectRules);if(!verdict.ok)return;accepted.push(p);tail.push(p);if(tail.length>ACCEPTED_WG_LOOKBACK)tail.shift();});
+  const l=lvlCfg(t,level),pts=operationalLotPoints(t,level,withIndex),accepted=[],zTail=[],targetTail=[],withinRules=testRuleSet(t,'within'),rejectRules=new Set(WG_RULES.filter(rule=>testRuleAction(t,rule)==='reject'));
+  pts.forEach(p=>{const verdict=acceptedPointOkFromTail(l,zTail,targetTail,p,withinRules,rejectRules);if(verdict.ok)accepted.push(p);});
   const out=accepted.filter(Boolean);
   if(memoKey)acceptedMemo.set(memoKey,out);
   return out;

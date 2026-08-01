@@ -167,6 +167,8 @@ function pageSettings(){
   const lockedCloud=!!(fbcfg&&fbcfg.locked);
   const logo=brandLogo();
   const kpi=dashboardKpiTargets();
+  const archiveYears=typeof ArchiveService!=='undefined'?ArchiveService.availableYears(state):[],archiveOptions=archiveYears.length?archiveYears.map(y=>`<option value="${escAttr(y)}">${esc(y)}</option>`).join(''):'<option value="">Chưa có dữ liệu theo năm</option>';
+  const archiveRegistry=(state.archiveRegistry||[]).slice().sort((a,b)=>String(b.year||'').localeCompare(String(a.year||''))),archiveRegistryHtml=archiveRegistry.length?`<div class="table-wrap"><table><thead><tr><th>Năm</th><th>File đã xác minh</th><th>Điểm QC</th><th>Trạng thái</th><th>Checksum</th><th></th></tr></thead><tbody>${archiveRegistry.map(r=>`<tr><td>${esc(r.year)}</td><td>${esc(r.filename||'—')}<div class="hint">${esc(formatDateTimeVN(r.verifiedAt)||r.verifiedAt||'')}</div></td><td>${Number(r.points)||0}</td><td>${r.cleanedAt?`<span class="tag ok">Đã dọn ${Number(r.removedPoints)||0} điểm</span><div class="hint">${esc(formatDateTimeVN(r.cleanedAt)||r.cleanedAt)}</div>`:'<span class="tag warn">Còn trong app</span>'}</td><td><code>${esc(String(r.checksum||'').slice(0,12))}…</code></td><td>${btn('Xem',`viewRegisteredArchive('${jsq(r.id)}')`,'ghost sm')}</td></tr>`).join('')}</tbody></table></div>`:'<div class="hint">Chưa có archive nào được chọn lại và xác minh checksum.</div>';
   const brandPreview=`<div class="brand-preview"><div class="brand-mark">${logo?`<img src="${escAttr(logo)}" alt="">`:esc(brandMarkText())}</div><div><b>${esc(brandTitle())}</b><small>${esc(brandSub())}</small></div></div>`;
   return headOnly('Cài đặt & Đồng bộ','Thông tin đơn vị, backup và kết nối Firebase')+
    `<div class="settings-profile-grid">
@@ -206,10 +208,14 @@ function pageSettings(){
    </div>
    <div class="panel"><h3>Quản trị dữ liệu</h3>
      <div class="admin-tools">
-        <div class="admin-tool"><b>Xuất backup</b><span>Lưu toàn bộ dữ liệu hiện tại ra file để cất giữ hoặc chuyển sang máy khác. ${backupStatusText()}</span>${btn('Xuất backup','exportData()','ghost')}</div>
-        <div class="admin-tool"><b>Nhập backup</b><span>Khôi phục dữ liệu từ file đã xuất trước đó. Chỉ tài khoản quản trị được phép nhập.</span>${btn('Chọn file backup',"document.getElementById('imp').click()",'ghost')}<input id="imp" type="file" accept="application/json" style="display:none" onchange="importData(event)"></div>
+        <div class="admin-tool"><b>Xuất backup</b><span>Lưu toàn bộ dữ liệu hiện tại ra file để cất giữ hoặc chuyển sang máy khác. ${backupStatusText()} ${backupCapacityText()}</span>${btn('Xuất backup','exportData()','ghost')}</div>
+        <div class="admin-tool"><b>Nhập backup</b><span>Khôi phục dữ liệu từ file đã xuất trước đó. Hỗ trợ backup JSON đến 128 MB; chỉ tài khoản quản trị được phép nhập.</span>${btn('Chọn file backup',"document.getElementById('imp').click()",'ghost')}<input id="imp" type="file" accept="application/json" style="display:none" onchange="importData(event)"></div>
+        <div class="admin-tool"><b>Kiểm tra backup / archive</b><span>Kiểm tra checksum, cấu trúc, số điểm và khoảng ngày mà không thay đổi dữ liệu đang vận hành.</span>${btn('Chọn file để kiểm tra',"document.getElementById('verifyBackup').click()",'ghost')}<input id="verifyBackup" type="file" accept="application/json" style="display:none" onchange="verifyBackupFile(event)"></div>
+        <div class="admin-tool"><b>Lưu trữ theo năm</b><span>Tạo archive chỉ đọc có SHA-256. Thao tác này không xóa điểm QC khỏi app.</span><div class="archive-year-actions"><select id="archiveYear" aria-label="Năm cần lưu trữ">${archiveOptions}</select>${btn('Xuất archive năm','exportYearArchive()','ghost')}</div></div>
+        <div class="admin-tool"><b>Dọn dữ liệu đã lưu trữ</b><span>Chọn lại archive đã xác minh để đối chiếu từng điểm rồi dọn điểm QC của năm đó. Kỳ đã khóa hoặc NCE đang mở sẽ chặn thao tác; app tạo backup đầy đủ và hỏi xác nhận hai lần.</span>${btn('Chọn archive để dọn',"document.getElementById('cleanupArchive').click()",'danger')}<input id="cleanupArchive" type="file" accept="application/json" style="display:none" onchange="cleanupYearFromArchive(event)"></div>
+        <div class="admin-tool"><b>Dung lượng cục bộ</b><span>Xem số điểm QC và tỷ lệ IndexedDB/trình duyệt đang sử dụng.</span>${btn('Kiểm tra dung lượng','checkStorageUsage()','ghost')}</div>
         <div class="admin-tool"><b>Xóa sạch dữ liệu test</b><span>Đưa app về trạng thái trắng, giữ tài khoản đăng nhập hiện tại để không bị khóa.</span>${btn('Xóa sạch dữ liệu','resetAllData()','danger')}</div>
-      </div></div>
+      </div><div class="settings-archive-registry"><h4>Archive đã xác minh</h4>${archiveRegistryHtml}</div></div>
    <div class="panel firebase-sync-panel"><h3>Đồng bộ đám mây (Firebase Realtime Database)</h3>
      <div class="firebase-auth-grid"><div><label>Mã phòng</label><input id="fbCode" aria-label="Mã phòng" value="${escAttr(fbcfg.labCode||'khoaXN')}" ${lockedCloud?'readonly':''}></div>
        <div><label>Email Firebase Authentication</label><input id="fbEmail" aria-label="Email Firebase Authentication" type="email" autocomplete="username" value="${escAttr(fbcfg.email||'')}"></div>
