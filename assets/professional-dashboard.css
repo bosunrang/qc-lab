@@ -356,6 +356,12 @@ textarea:focus,
 .dash-kpi-filters > div{min-width:0}
 .dash-kpi-filters label{margin:0 0 4px;color:#496573;font-size:var(--type-micro);font-weight:800}
 .dash-kpi-filters select,.dash-kpi-filters input{min-height:36px;font-size:var(--type-body)}
+/* Ô "Xét nghiệm" xếp 2 tầng trong đúng 1 cột lưới: hàng tìm kiếm (ô nhập + bộ
+   đếm khớp) rồi tới <select>, nên không phải đổi grid-template-columns ở trên
+   hay ở hai @media phía dưới. */
+.dash-kpi-testpick{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.dash-kpi-testpick input{min-width:0;flex:1}
+.dash-kpi-testpick #dashKpiTestCount{flex:none;color:var(--muted);font-size:var(--type-micro);font-weight:800;font-variant-numeric:tabular-nums}
 .dash-quality-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;padding:14px 15px}
 .dash-quality-kpi{position:relative;display:flex;flex-direction:column;min-height:112px;padding:14px 15px;border:1px solid #d9e4e8;border-radius:var(--radius-lg);background:#f9fbfc;overflow:hidden;color:inherit;font-family:var(--sans);text-align:left;cursor:pointer}
 .dash-quality-kpi:hover{border-color:#b9cdd4;background:#f5f9fa;transform:translateY(-1px)}

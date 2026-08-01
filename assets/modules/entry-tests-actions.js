@@ -369,6 +369,25 @@ async function saveConfigLot(id){
   if(state.qcLots.some(x=>x.id!==id&&+x.level===level&&sameText(x.lotNo,lotNo))){await infoDialog('Số lô QC này đã tồn tại ở cùng mức QC.');return;}
   const oldLotNo=old&&old.lotNo||'',oldLevel=old?+old.level:level;
   const data={lotNo,level,description:QCCore.cleanText(document.getElementById('cfgLotDescription').value),supplier:QCCore.cleanText(document.getElementById('cfgLotSupplier').value),program:old&&old.program||'',opened,exp,note:QCCore.cleanText(document.getElementById('cfgLotNote').value,5000),active:true};
+  /* Đổi số lô là VIẾT LẠI HÀNG LOẠT bản ghi lịch sử, không phải sửa một ô cấu
+     hình: p.lot là chuỗi tĩnh nên không đổi theo thì điểm cũ biến mất khỏi mọi
+     bộ lọc lô (xem chú thích ở renameLotAcrossPoints). Người dùng phải thấy con
+     số TRƯỚC khi làm, chứ không chỉ đọc được trong nhật ký SAU khi làm. Hỏi
+     trước khi chạm vào state để bấm Hủy là không còn dấu vết gì. */
+  if(old&&oldLotNo&&oldLotNo!==lotNo){
+    const affected=lotPointsToRename(oldLevel,oldLotNo);
+    if(affected.length){
+      const locked=PeriodService.lockedPoints(state,affected);
+      const lockNote=locked.count?` Trong đó ${locked.count} điểm thuộc kỳ đã khóa (${locked.periods.map(monthVN).join(', ')}).`:'';
+      if(!await confirmDialog({
+        kicker:'Cập nhật hàng loạt',
+        title:'Đổi số lô QC',
+        message:`Đổi số lô "${oldLotNo}" thành "${lotNo}" sẽ cập nhật ${affected.length} điểm QC đã ghi.`,
+        detail:`Số lô là nhãn nhận dạng — giá trị, ngày và Mean/SD của từng điểm không đổi.${lockNote}`,
+        confirmLabel:'Đổi số lô',cancelLabel:'Hủy',danger:false
+      }))return;
+    }
+  }
   const lot=old||{id:uid()};Object.assign(lot,data);if(!old)state.qcLots.push(lot);
   state.tests.forEach(t=>t.levels.filter(x=>x.qcLotId===lot.id).forEach(x=>{x.level=data.level;x.lot=data.lotNo;x.exp=data.exp;(x.meanSdHistory||[]).filter(h=>h.qcLotId===lot.id).forEach(h=>{h.lot=data.lotNo;});}));
   const renamedPoints=old?renameLotAcrossPoints(oldLevel,oldLotNo,data.lotNo):0;
@@ -383,13 +402,21 @@ async function saveConfigLot(id){
    cascade khi số lô THẬT SỰ đổi, quét toàn bộ state.data vì lô có thể dùng chung cho
    nhiều xét nghiệm (panel) và có thể còn nằm trong lịch sử của xét nghiệm không còn
    gắn lô này nữa. Tách hàm riêng (không đọc DOM) để test trực tiếp được qua sandbox. */
+/* Tách phần TÌM khỏi phần SỬA: saveConfigLot() cần đếm và soi kỳ đã khóa TRƯỚC
+   khi động vào state, để hộp xác nhận nói đúng số điểm sắp bị viết lại. */
+function lotPointsToRename(oldLevel,oldLotNo){
+  if(!oldLotNo)return[];
+  const rows=[];
+  Object.keys(state.data||{}).forEach(testId=>{
+    (state.data[testId]||[]).forEach(p=>{if(+p.level===+oldLevel&&(p.lot||'')===oldLotNo)rows.push(p);});
+  });
+  return rows;
+}
 function renameLotAcrossPoints(oldLevel,oldLotNo,newLotNo){
   if(!oldLotNo||oldLotNo===newLotNo)return 0;
-  let renamed=0;
-  Object.keys(state.data||{}).forEach(testId=>{
-    (state.data[testId]||[]).filter(p=>+p.level===+oldLevel&&(p.lot||'')===oldLotNo).forEach(p=>{p.lot=newLotNo;renamed++;});
-  });
-  return renamed;
+  const rows=lotPointsToRename(oldLevel,oldLotNo);
+  rows.forEach(p=>{p.lot=newLotNo;});
+  return rows.length;
 }
 /* Lô đã "hết QC" qua chuyển tiếp ĐÃ CHẤP NHẬN không còn test nào trỏ qcLotId vào nó
    (đã chuyển hết sang lô mới) nên guard "đang gắn với xét nghiệm" bên dưới không chặn
@@ -478,4 +505,19 @@ async function saveConfigAssay(id){
   if(existing){Object.assign(existing,data);if(oldInstrumentId&&oldInstrumentId!==instrumentId)state.qcPanels.forEach(p=>{if(p.instrumentId!==instrumentId)p.testIds=(p.testIds||[]).filter(testId=>testId!==id);});logAct('Cập nhật xét nghiệm',`${inst.name} · ${levels.length} mức QC`,name);}else{const test={id:uid(),...data};state.tests.push(test);state.data[test.id]=[];logAct('Thêm xét nghiệm',`${inst.name} · ${levels.length} mức QC`,name);}
   closeModal();save();rerender();
 }
-async function delTest(id){if(!requireAdmin())return;const t=state.tests.find(x=>x.id===id);if(!t)return;if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa xét nghiệm',message:`Xóa xét nghiệm ${t.name} và toàn bộ dữ liệu QC?`,detail:'Toàn bộ điểm QC, Westgard và Sigma của xét nghiệm này sẽ mất, không thể khôi phục.',confirmLabel:'Xóa xét nghiệm',cancelLabel:'Hủy'}))return;state.tests=state.tests.filter(t=>t.id!==id);state.qcPanels.forEach(p=>p.testIds=(p.testIds||[]).filter(testId=>testId!==id));state.assayGroups.forEach(g=>g.testIds=(g.testIds||[]).filter(testId=>testId!==id));delete state.data[id];delete state.sigmaData[id];if(selTest===id)selTest=state.tests[0]&&state.tests[0].id||null;if(entrySel&&entrySel.testId===id)entrySel=null;logAct('Xóa test/lô','Xóa xét nghiệm và toàn bộ dữ liệu QC',t.name);save();rerender();}
+/* Panel "Khóa kỳ báo cáo" hứa với người dùng rằng khóa kỳ chặn sửa/hủy điểm QC của
+   kỳ đó ở MỌI xét nghiệm. Xóa nguyên xét nghiệm mà không kiểm thì lời hứa đó sai —
+   và mất luôn hồ sơ của kỳ đã chốt. Chặn ở đây KHÔNG phải ngõ cụt: mở khóa kỳ là
+   thao tác có sẵn, bắt nhập lý do và tự ghi nhật ký, nên đường đúng vẫn đi được
+   và để lại dấu vết đúng như ISO 15189 mong đợi. */
+async function delTest(id){
+  if(!requireAdmin())return;
+  const t=state.tests.find(x=>x.id===id);if(!t)return;
+  const points=state.data[id]||[],locked=PeriodService.lockedPoints(state,points);
+  if(locked.count){await infoDialog(`Không thể xóa "${testDisplayName(t)}": còn ${locked.count} điểm QC thuộc kỳ đã khóa (${locked.periods.map(monthVN).join(', ')}). Hãy mở khóa các kỳ này ở trang Báo cáo trước — thao tác mở khóa yêu cầu lý do và được ghi vào nhật ký.`);return;}
+  if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa xét nghiệm',message:`Xóa xét nghiệm ${t.name} và toàn bộ dữ liệu QC?`,detail:`${points.length} điểm QC cùng toàn bộ kết quả Westgard và Sigma của xét nghiệm này sẽ mất, không thể khôi phục.`,confirmLabel:'Xóa xét nghiệm',cancelLabel:'Hủy'}))return;
+  state.tests=state.tests.filter(x=>x.id!==id);state.qcPanels.forEach(p=>p.testIds=(p.testIds||[]).filter(testId=>testId!==id));state.assayGroups.forEach(g=>g.testIds=(g.testIds||[]).filter(testId=>testId!==id));
+  delete state.data[id];delete state.sigmaData[id];
+  if(selTest===id)selTest=state.tests[0]&&state.tests[0].id||null;if(entrySel&&entrySel.testId===id)entrySel=null;
+  logAct('Xóa test/lô',`Xóa xét nghiệm và ${points.length} điểm QC`,t.name);save();rerender();
+}

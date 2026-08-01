@@ -38,5 +38,22 @@
     return{lock:removed,reason:cleanReason};
   }
 
-  root.PeriodService={normalizePeriod,periodForDate,findLock,lock,unlock};
+  /* Đếm điểm QC rơi vào kỳ ĐÃ KHÓA, gộp theo kỳ. Thuần (không DOM, không đọc
+     state.data) để mọi thao tác phá hủy hoặc viết lại HÀNG LOẠT đều hỏi được
+     cùng một câu trước khi làm: "việc này có đụng vào kỳ đã chốt không?".
+     Trước 2026-08-01 chỉ có addPoint/voidPoint/saveDateNote kiểm khóa kỳ, nên
+     xóa cả xét nghiệm hoặc đổi số lô vẫn đi xuyên qua khóa mà không ai biết.
+     Điểm đã hủy vẫn được tính: chúng vẫn là hồ sơ của kỳ đó. */
+  function lockedPoints(state,points){
+    const byPeriod=new Map();
+    (Array.isArray(points)?points:[]).forEach(p=>{
+      const ym=periodForDate(p&&p.date);
+      if(!ym||!findLock(state,ym))return;
+      byPeriod.set(ym,(byPeriod.get(ym)||0)+1);
+    });
+    const periods=[...byPeriod.keys()].sort();
+    return{count:periods.reduce((n,ym)=>n+byPeriod.get(ym),0),periods,byPeriod};
+  }
+
+  root.PeriodService={normalizePeriod,periodForDate,findLock,lock,unlock,lockedPoints};
 })(typeof globalThis!=='undefined'?globalThis:this);

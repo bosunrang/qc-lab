@@ -1,7 +1,7 @@
 /* ===== REPORTS (printable) ===== */
 function esc(s){return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function escAttr(s){return esc(s);}
-function reportHeader(title,subtitle='Nội kiểm chất lượng xét nghiệm'){const L=state.lab,app=window.QCLAB_APP||{version:'dev',build:''},rules=Object.entries(state.westgardRules||{}).filter(x=>x[1]!==false).map(x=>x[0]).join(', ');return '<div class="rpt-head">'+
+function reportHeader(title,subtitle='Nội kiểm chất lượng xét nghiệm'){const L=state.lab,app=window.QCLAB_APP||{version:'dev'},rules=Object.entries(state.westgardRules||{}).filter(x=>x[1]!==false).map(x=>x[0]).join(', ');return '<div class="rpt-head">'+
   '<div class="rpt-brand"><div><div class="rpt-hosp">'+esc(L.name||'BỆNH VIỆN / ĐƠN VỊ')+'</div><div class="rpt-dept">'+esc(L.dept||'Khoa Xét nghiệm')+'</div><div class="rpt-addr">'+esc(L.address||'')+'</div></div></div>'+
   '<div class="rpt-meta"><b>Thời gian xuất</b><span>'+formatDateTimeVN(new Date().toISOString())+'</span><b style="margin-top:5px">Người xuất</b><span>'+esc(userName())+'</span></div></div>'+
   '<table class="meta-table"><tr><th>Phiên bản app</th><td>'+esc((app.name||'QC Lab')+' '+(app.version||'dev'))+'</td><th>Bộ luật áp dụng</th><td>'+esc(rules||'Chưa cấu hình')+'</td></tr></table>'+
@@ -31,8 +31,8 @@ async function openPrint(title,bodyHtml,options={}){
     '.page{max-width:1120px;margin:18px auto;background:#fff;padding:22px 26px 28px;border:1px solid #dce3e9;box-shadow:0 10px 30px rgba(20,33,43,.08)}'+
     '.rpt-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;border-bottom:2px solid #14202b;padding-bottom:12px;margin-bottom:14px}.rpt-brand{display:flex;gap:12px;align-items:center}.rpt-hosp{font-size:15px;font-weight:850}.rpt-dept{font-weight:700;margin-top:1px}.rpt-addr{font-size:11px;color:#647686;margin-top:1px}.rpt-meta{text-align:right;color:#647686;font-size:11px}.rpt-meta b{display:block;color:#14202b}.rpt-title{text-align:center;margin:12px 0 16px}.rpt-title div{font-size:19px;font-weight:850;text-transform:uppercase;letter-spacing:.02em}.rpt-title span{display:block;font-size:11px;color:#647686;margin-top:3px}'+
     '.rpt-card{border:1px solid #dce3e9;border-radius:8px;margin:12px 0 14px;overflow:hidden;background:#fff}.rpt-card h3{margin:0;padding:10px 12px;background:#0e8f8f;color:#fff;border-bottom:1px solid #0b7777;font-size:14px;font-weight:800}.rpt-card .body{padding:12px}h3{margin:16px 0 8px;padding:9px 10px;border:1px solid #0b7777;border-radius:7px;background:#0e8f8f;color:#fff;font-size:14px;font-weight:800}.meta-table th{width:16%;background:#e7f1f4;color:#244452}.soft-note{color:#647686;font-style:italic;margin:8px 0 0}.chart-img,.page img{display:block;width:100%;max-height:360px;object-fit:contain;border:1px solid #dce3e9;border-radius:6px;background:#fff;margin:0 auto 10px}'+
-    'table{width:100%;border-collapse:separate;border-spacing:0;margin:0 0 8px;border:1px solid #dce3e9;border-radius:7px;overflow:hidden}th,td{padding:7px 9px;text-align:center;border-bottom:1px solid #eef2f5}tr:last-child td{border-bottom:none}th{background:#e7f1f4;color:#244452;font-size:11px;font-weight:800}td.num,th.num{font-variant-numeric:tabular-nums}.pill{display:inline-block;border-radius:999px;background:#e8f3f2;color:#0a6e6e;padding:2px 8px;font-weight:800;font-size:10.5px}.hint,.muted{color:#647686}.alert{display:block;margin:8px 0;padding:9px 11px;border-left:3px solid #3f7795;background:#edf5fa;border-radius:5px}.rpt-chart-grid{display:grid;grid-template-columns:1fr;gap:12px}.rpt-chart svg{display:block;width:100%;height:auto;max-height:315px}.sign-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:36px}.sign-grid div{text-align:center;padding-top:48px;border-top:1px solid #9aa8b3}.sign-grid b{display:block}.sign-grid span{font-size:11px;color:#647686;font-style:italic}.print-btn{position:fixed;top:12px;right:12px;border:none;border-radius:8px;background:#14202b;color:#fff;padding:9px 13px;font-weight:800;box-shadow:0 8px 22px rgba(20,33,43,.22);cursor:pointer}'+
-    '@media print{body{background:#fff}.page{max-width:none;margin:0;padding:0;border:none;box-shadow:none}.print-btn{display:none}.rpt-card{break-inside:avoid}.chart-img{max-height:310px}}'+
+    'table{width:100%;border-collapse:separate;border-spacing:0;margin:0 0 8px;border:1px solid #dce3e9;border-radius:7px;overflow:hidden}th,td{padding:7px 9px;text-align:center;border-bottom:1px solid #eef2f5}tr:last-child td{border-bottom:none}th{background:#e7f1f4;color:#244452;font-size:11px;font-weight:800}td.num,th.num{font-variant-numeric:tabular-nums}.pill{display:inline-block;border-radius:999px;background:#e8f3f2;color:#0a6e6e;padding:2px 8px;font-weight:800;font-size:10.5px}.hint,.muted{color:#647686}.alert{display:block;margin:8px 0;padding:9px 11px;border-left:3px solid #3f7795;background:#edf5fa;border-radius:5px}.rpt-chart-grid{display:grid;grid-template-columns:1fr;gap:12px}.rpt-chart svg{display:block;width:100%;height:auto;max-height:315px}.sign-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:36px}.sign-grid div{text-align:center;padding-top:48px;border-top:1px solid #9aa8b3}.sign-grid b{display:block}.sign-grid span{font-size:11px;color:#647686;font-style:italic}.nce-summary-table{font-size:10.5px}.nce-summary-cell{text-align:left;min-width:240px}.nce-summary div+div{margin-top:3px}.nce-summary b{color:#244452}.nce-appendix{margin-top:18px}.nce-appendix-intro{margin:0 0 12px;color:#647686}.nce-detail{margin-top:16px}.nce-detail-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:8px}.nce-detail-head h3{flex:1;margin:0}.nce-detail-status{white-space:nowrap;font-weight:800;color:#0a6e6e;padding-top:9px}.nce-detail h4{margin:14px 0 7px;color:#244452;font-size:12px}.nce-detail-text{min-height:42px;padding:8px 10px;border:1px solid #dce3e9;border-radius:6px;background:#f8fafb;text-align:left;white-space:pre-wrap}.nce-detail-stack{display:grid;gap:7px;break-inside:avoid}.nce-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:1fr;gap:7px}.nce-detail-grid>div{display:flex;min-height:52px;padding:7px 9px;border:1px solid #dce3e9;border-radius:6px;background:#f8fafb;flex-direction:column;justify-content:center}.nce-detail-grid>div.nce-detail-wide{grid-column:1/-1}.nce-detail-grid span{display:block;color:#647686;font-size:10px}.nce-detail-grid b{display:block;margin-top:2px}.nce-check-table{table-layout:fixed}.nce-check-table th,.nce-check-table td{height:38px;padding:8px 10px;vertical-align:middle}.nce-check-table th:nth-child(1),.nce-check-table td:nth-child(1),.nce-check-table th:nth-child(3),.nce-check-table td:nth-child(3){text-align:left}.nce-check-table th:nth-child(2),.nce-check-table td:nth-child(2){text-align:center}.print-btn{position:fixed;top:12px;right:12px;border:none;border-radius:8px;background:#14202b;color:#fff;padding:9px 13px;font-weight:800;box-shadow:0 8px 22px rgba(20,33,43,.22);cursor:pointer}'+
+    '@media print{body{background:#fff}.page{max-width:none;margin:0;padding:0;border:none;box-shadow:none}.print-btn{display:none}.rpt-card{break-inside:avoid}.chart-img{max-height:310px}.nce-appendix{break-before:page}.nce-detail+.nce-detail{break-before:page}.nce-detail h4{break-after:avoid-page;page-break-after:avoid}.nce-detail-grid>div,.nce-detail-text,.nce-check-table tr{break-inside:avoid}}'+
     /* Electron/Windows in qua hộp thoại hệ thống raster bằng MEDIA MÀN HÌNH (bỏ
        qua @media print) → nền xám #eef2f5 + khung .page bị in vào bản giấy/PDF.
        Chế độ .printing do JS bật (click nút / beforeprint / main process) đảm
@@ -145,54 +145,75 @@ function reportPointsTableHtml(items){
   }).join('');
   return '<table><tr><th>Ngày</th><th>Lần chạy</th><th>NV</th><th class="num">Giá trị</th><th class="num">Z</th><th>Kết luận</th><th>Luật / bằng chứng</th></tr>'+rows+'</table>';
 }
+/* Nội dung phiếu NCE (bóc nhãn, cắt đoạn, dựng checklist) nằm ở reportNceModel/
+   reportNceSummaryParts trong data-io.js — dùng chung với bản Excel. Ở đây chỉ
+   còn phần trình bày HTML. */
+function reportNceSummaryHtml(a){
+  return '<div class="nce-summary">'+reportNceSummaryParts(a).map(([label,text])=>'<div><b>'+esc(label)+':</b> '+esc(text)+'</div>').join('')+'</div>';
+}
+function reportNceDetailField(label,value,wide=false){return '<div'+(wide?' class="nce-detail-wide"':'')+'><span>'+esc(label)+'</span><b>'+esc(value||'—')+'</b></div>';}
+function reportNceDetailHtml(a,t){
+  const m=reportNceModel(a,t),F=reportNceDetailField;
+  const checkRows=m.checks.map(([label,statusText,noteText])=>'<tr><td><b>'+esc(label)+'</b></td><td>'+esc(statusText)+'</td><td>'+esc(noteText)+'</td></tr>').join('');
+  let html='<section class="nce-detail"><div class="nce-detail-head"><h3>Phiếu NCE '+esc(m.nceTitle)+'</h3><div class="nce-detail-status">'+esc(m.wfLabel)+'</div></div><div class="nce-detail-grid">'+F('Ngày xảy ra',m.eventDateText)+F('Xét nghiệm / mức / lô',m.testLevelText)+F('Luật / loại sai số',m.ruleErrText)+F('Nguồn / giai đoạn',m.sourcePhaseText)+F('Người phụ trách / hạn',m.ownerDueText)+F('Trạng thái bản ghi',m.recordStatusText)+'</div>';
+  if(!m.modern)return html+'<h4>Hành động đã ghi</h4><div class="nce-detail-text">'+esc(m.legacyActionText)+'</div><h4>QC chạy lại / duyệt</h4><div class="nce-detail-grid">'+F('QC chạy lại',m.rerunText)+F('Phê duyệt',m.approvalShortText)+'</div></section>';
+  html+='<h4>1. Kiểm soát và xử lý tức thời</h4><div class="nce-detail-stack"><div class="nce-detail-grid">'+F('Phạm vi kiểm soát',m.containmentText)+F('Ghi chú phạm vi',m.containmentNote)+'</div><div class="nce-detail-text">'+esc(m.correctionText)+'</div></div>';
+  html+='<h4>2. Đánh giá nguy cơ ban đầu</h4><div class="nce-detail-grid">'+F('Phân loại / RPN',m.riskText)+F('S x O x D',m.sodText)+F('Căn cứ SOP',m.riskBasis,true)+'</div>';
+  html+='<h4>3. Checklist điều tra</h4><table class="nce-check-table"><colgroup><col style="width:30%"><col style="width:22%"><col style="width:48%"></colgroup><tr><th>Hạng mục</th><th>Kết luận</th><th>Ghi chú / bằng chứng</th></tr>'+checkRows+'</table>';
+  html+='<h4>4. Nguyên nhân và hành động khắc phục</h4><div class="nce-detail-stack"><div class="nce-detail-grid">'+F('Nhóm nguyên nhân',m.causeCategoryText)+F('Ngày hoàn thành hành động',m.actionCompletedText)+'</div><div class="nce-detail-text"><b>Nguyên nhân:</b> '+esc(m.causeText)+'\n<b>Hành động khắc phục:</b> '+esc(m.actionText)+'</div></div>';
+  html+='<h4>5. Bằng chứng QC chạy lại và cho phép trở lại</h4><div class="nce-detail-grid">'+F('QC chạy lại',m.rerunText)+F('Quyết định',m.releaseText)+F('Ngày / người cho phép',m.releaseWhoText)+F('Căn cứ cho phép',m.releaseNote)+'</div>';
+  html+='<h4>6. Ảnh hưởng người bệnh</h4><div class="nce-detail-grid">'+F('Kết luận',m.patientText)+F('Xử lý kết quả liên quan',m.patientAction)+'</div>';
+  html+='<h4>7. Hiệu lực, nguy cơ còn lại và phê duyệt</h4><div class="nce-detail-grid">'+F('Đánh giá hiệu lực',m.effLabel)+F('Ngày / người đánh giá',m.effWhoText)+F('Bằng chứng hiệu lực',m.effNote)+F('Nguy cơ còn lại',m.residualText)+F('Căn cứ đánh giá lại',m.residualBasis)+F('Phê duyệt',m.approvalText)+F('Ý kiến duyệt',m.approvalNote,true)+'</div>';
+  if(m.cancelled)html+='<h4>Thông tin hủy hồ sơ</h4><div class="nce-detail-text">'+esc(m.cancelText)+'</div>';
+  return html+'</section>';
+}
+function reportNceAppendixHtml(actions,t){return '<div class="nce-appendix"><h3>Phụ lục - Hồ sơ NCE chi tiết</h3><p class="nce-appendix-intro">Phụ lục giữ đầy đủ nội dung điều tra, bằng chứng QC chạy lại, đánh giá hiệu lực và phê duyệt. Bảng tổng hợp phía trên chỉ trình bày thông tin trọng yếu.</p>'+actions.map(a=>reportNceDetailHtml(a,t)).join('')+'</div>';}
 async function printReport(){
-  const tid=document.getElementById('rTest').value,{start,end}=typeof reportDateRange==='function'?reportDateRange():{start:'',end:''};
-  const t=state.tests.find(x=>x.id===tid);if(!t)return;
-  const inMonth=p=>(!start||p.date>=start)&&(!end||p.date<=end),wg=activeWestgard(t);
+  const{tid,t,start,end,includeNceAppendix}=reportExportSelection();if(!t)return;
+  const inMonth=reportInRange(start,end),wg=activeWestgard(t);
   let body=reportHeader('BÁO CÁO NỘI KIỂM CHẤT LƯỢNG XÉT NGHIỆM');
-  const teaVal=typeof sgTea==='function'?sgTea(t):(t.tea||0),teaSourceText=typeof sgTeaLabel==='function'?sgTeaLabel(sgTeaSource(t)):'Ricos / Westgard biological variation';
+  const{teaVal,teaSourceText}=reportTeaInfo(t);
   body+='<table><tr><th style="width:25%">Xét nghiệm</th><td>'+esc(testDisplayName(t))+(t.unit?' · '+esc(t.unit):'')+'</td><th style="width:18%">Máy</th><td>'+esc(t.machine||'')+'</td></tr>'+
         '<tr><th>Khoảng ngày báo cáo</th><td>'+esc(reportRangeText(start,end))+'</td><th>TEa%</th><td>'+(teaVal||'—')+'</td></tr>'+
         '<tr><th>Nguồn TEa</th><td colspan="3">'+esc(teaSourceText)+(typeof sgTeaRefText==='function'&&sgTeaRefText(t)?' · '+esc(sgTeaRefText(t)):'')+(t.teaDoc?' · '+esc(t.teaDoc):'')+(t.teaEffectiveDate?' · hiệu lực '+vnDate(t.teaEffectiveDate):'')+(t.teaApprovedBy?' · duyệt '+esc(t.teaApprovedBy):'')+'</td></tr></table>';
   body+='<p class="soft-note">Cột "Sigma (kỳ)" dưới đây tính từ Mean/CV thực tế trong đúng khoảng ngày báo cáo này — khác với Sigma đã thẩm định ở trang Six Sigma &amp; Sai số (dùng CV IQC và Bias EQA/EQC đã rà soát). Hai số có thể khác nhau; dấu * bên cạnh Sigma nghĩa là kỳ này có n &lt; 20 kết quả, CV/Sigma chưa đủ ổn định để tham khảo.</p>';
-  const multiViews=operationalLevels(t).map(l=>({level:l.level,lot:l.lot,mean:l.mean,sd:l.sd,pts:operationalLotPoints(t,l.level).filter(inMonth),label:'M'+l.level+'·'+(l.lot||'?')}));
+  const multiViews=reportMultiViews(t,inMonth);
   if(multiViews.filter(v=>v.pts.length).length>=2){
     body+='<h3>Levey-Jennings tổng hợp theo Z-score</h3>';
     body+='<img src="'+ljMultiDataURL(multiViews,t)+'">';
   }
   operationalLevels(t).forEach(l=>{
-    (typeof previousLotSeries==='function'?previousLotSeries(t,l.level):[]).forEach(s=>{const inPts=s.pts.filter(inMonth);if(!inPts.length)return;const wgP=QCCore.westgardByPoint(s.pts,s.mean,s.sd,rule=>testRuleOnWithin(t,rule)),idxOf=new Map(s.pts.map((p,i)=>[p.id,i]));
+    (typeof previousLotSeries==='function'?previousLotSeries(t,l.level):[]).forEach(s=>{const{inPts,items:allS}=reportPrevLotRows(t,s,inMonth);if(!inPts.length)return;
       body+='<h3>Mức '+l.level+' — Lô cũ '+esc(s.lot)+' · đã chuyển tiếp (Mean='+fmt(s.mean)+', SD='+fmt(s.sd,3)+')</h3>';
       body+='<p class="soft-note">Vi phạm ở lô cũ chỉ đánh giá luật Westgard theo từng mức riêng lẻ, không gồm luật liên mức (như R4s giữa các mức cùng lần chạy) — phạm vi hẹp hơn lô đang dùng ở mục bên dưới.</p>';
       body+='<img src="'+ljDataURL(inPts,s.mean,s.sd)+'">';
       const{st:stS,bias:biasS,te:teS,sigma:sigmaS}=reportLevelStats(inPts,s.mean,teaVal);
       body+='<table><tr><th>n</th><th class="num">Mean thực</th><th class="num">SD</th><th class="num">CV%</th><th class="num">Bias%</th><th class="num">TE%</th><th class="num">TEa%</th><th class="num">Sigma (kỳ)</th></tr>'+
         '<tr><td>'+stS.n+'</td><td class="num">'+fmt(stS.m)+'</td><td class="num">'+fmt(stS.sd,3)+'</td><td class="num">'+fmt(stS.cv)+'</td><td class="num">'+fmt(biasS)+'</td><td class="num">'+fmt(teS)+'</td><td class="num">'+(teaVal||'—')+'</td><td class="num">'+(sigmaS==null?'—':fmt(sigmaS,1)+(stS.n<20?' *':''))+'</td></tr></table>';
-      const allS=inPts.map(p=>{const i=idxOf.get(p.id),raw=wgP.F[i]||{rules:[]},f={...raw,level:ruleResultLevel(t,raw.rules||[])},z=wgP.zs[i];return{p,f,z};});
       body+='<p style="margin-top:8px"><b>Điểm trong khoảng xem (lô cũ):</b></p>'+reportPointsTableHtml(allS);
       const violS=allS.filter(o=>o.f.level!=='ok');
       if(violS.length){body+='<p style="margin-top:8px"><b>Điểm vi phạm/cảnh báo (lô cũ):</b></p><table><tr><th>Ngày</th><th>NV</th><th class="num">Giá trị</th><th class="num">Z</th><th>Luật</th><th>Loại sai số</th></tr>'+
         violS.map(o=>'<tr><td>'+vnDate(o.p.date)+'</td><td>'+esc(pointStaff(o.p).code||'—')+'</td><td class="num">'+fmt(o.p.val)+'</td><td class="num">'+(o.z>=0?'+':'')+fmt(o.z)+'s</td><td>'+[...new Set(o.f.rules)].join(', ')+'</td><td>'+errorType([...new Set(o.f.rules)])+'</td></tr>').join('')+'</table>';}
       else body+='<p><i>Không có điểm vi phạm trong khoảng ngày đã chọn (lô cũ).</i></p>';
     });
-    const pts=operationalLotPoints(t,l.level).filter(inMonth);
+    const{pts,items:all}=reportLevelRows(t,l,wg,inMonth);
     body+='<h3>Mức '+l.level+' — Lô '+esc(l.lot||'?')+' · Dải '+(l.applied==='lab'?'PXN':'NSX')+' (Mean='+fmt(l.mean)+', SD='+fmt(l.sd,3)+')</h3>';
     if(!pts.length){body+='<p><i>Không có dữ liệu trong khoảng ngày đã chọn.</i></p>';return;}
     body+='<img src="'+ljDataURL(pts,l.mean,l.sd)+'">';
     const{st,bias,te,sigma}=reportLevelStats(pts,l.mean,teaVal);
     body+='<table><tr><th>n</th><th class="num">Mean thực</th><th class="num">SD</th><th class="num">CV%</th><th class="num">Bias%</th><th class="num">TE%</th><th class="num">TEa%</th><th class="num">Sigma (kỳ)</th></tr>'+
       '<tr><td>'+st.n+'</td><td class="num">'+fmt(st.m)+'</td><td class="num">'+fmt(st.sd,3)+'</td><td class="num">'+fmt(st.cv)+'</td><td class="num">'+fmt(bias)+'</td><td class="num">'+fmt(te)+'</td><td class="num">'+(teaVal||'—')+'</td><td class="num">'+(sigma==null?'—':fmt(sigma,1)+(st.n<20?' *':''))+'</td></tr></table>';
-    const all=pts.map(p=>{const f=wg.byPoint.get(p.id)||{level:'ok',rules:[],z:(p.val-l.mean)/l.sd};return{p,f,z:f.z};});
     body+='<p style="margin-top:8px"><b>Điểm trong khoảng xem:</b></p>'+reportPointsTableHtml(all);
     const viol=all.filter(o=>o.f.level!=='ok');
     if(viol.length){body+='<p style="margin-top:8px"><b>Điểm vi phạm/cảnh báo:</b></p><table><tr><th>Ngày</th><th>NV</th><th class="num">Giá trị</th><th class="num">Z</th><th>Luật</th><th>Loại sai số</th></tr>'+
       viol.map(o=>'<tr><td>'+vnDate(o.p.date)+'</td><td>'+esc(pointStaff(o.p).code||'—')+'</td><td class="num">'+fmt(o.p.val)+'</td><td class="num">'+(o.z>=0?'+':'')+fmt(o.z)+'s</td><td>'+[...new Set(o.f.rules)].join(', ')+'</td><td>'+errorType([...new Set(o.f.rules)])+'</td></tr>').join('')+'</table>';}
     else body+='<p><i>Không có điểm vi phạm trong khoảng ngày đã chọn.</i></p>';
   });
-  const acts=(state.actions||[]).filter(a=>a.testId===tid&&inMonth({date:typeof actionEventDate==='function'?actionEventDate(a):a.date}));
-  if(acts.length){body+='<h3>Hành động khắc phục trong khoảng ngày đã chọn</h3><table><tr><th>Ngày</th><th>Mức / lô</th><th>Luật</th><th>Loại SS</th><th>Hành động</th><th>Người</th><th>QC chạy lại</th><th>Duyệt</th><th>Khép vòng</th><th>Ý kiến</th></tr>'+
-    acts.map(a=>{const wf=typeof actionWorkflowStatus==='function'?actionWorkflowStatus(a):{complete:false,label:'Chưa hoàn tất'},rr=typeof actionRerunStatus==='function'?actionRerunStatus(a):{label:''},protocol=typeof actionProtocolSummary==='function'?actionProtocolSummary(a):'';return '<tr><td>'+(a.nceId?'<b>'+esc(a.nceId)+'</b><br>':'')+vnDate(typeof actionEventDate==='function'?actionEventDate(a):a.date)+'</td><td>'+esc(actionLevelShort(t,a.level,a.lot))+'</td><td>'+esc(a.rule)+'</td><td>'+esc(a.errorType)+'</td><td>'+esc(a.action||a.correction||'')+(protocol?'<br><span style="font-size:9px;color:#647686">'+esc(protocol)+'</span>':'')+'</td><td>'+esc(a.by)+'</td><td>'+esc(rr.label||'')+'</td><td>'+esc(typeof actionApprovalLabel==='function'?actionApprovalLabel(a):(a.approvalStatus||'pending'))+(a.approvedBy?'<br><span style="font-size:10px;color:#647686">'+esc(a.approvedBy)+'</span>':'')+'</td><td>'+esc(wf.label||'Chưa hoàn tất')+'</td><td>'+esc(a.approvalNote||'')+'</td></tr>';}).join('')+'</table>';}
+  const acts=reportActionsInRange(tid,inMonth);
+  if(acts.length){body+='<h3>Hành động khắc phục trong khoảng ngày đã chọn</h3><p class="soft-note">Bảng dưới đây là bản tóm tắt. Nội dung đầy đủ nằm trong phụ lục NCE khi tùy chọn kèm phụ lục được bật.</p><table class="nce-summary-table"><tr><th>Ngày / mã NCE</th><th>Mức / lô</th><th>Luật / loại SS</th><th>Tóm tắt xử lý</th><th>Người</th><th>QC chạy lại</th><th>Duyệt</th><th>Khép vòng</th></tr>'+
+    acts.map(a=>{const m=reportNceModel(a,t),rr=typeof actionRerunStatus==='function'?actionRerunStatus(a):{label:''};return '<tr><td>'+(a.nceId?'<b>'+esc(a.nceId)+'</b><br>':'')+m.eventDateText+'</td><td>'+esc(actionLevelShort(t,a.level,a.lot))+'</td><td>'+esc(a.rule||'—')+'<br><span class="muted">'+esc(a.errorType||'—')+'</span></td><td class="nce-summary-cell">'+reportNceSummaryHtml(a)+'</td><td>'+esc(a.by||'—')+'</td><td>'+esc(rr.label||'—')+'</td><td>'+esc(typeof actionApprovalLabel==='function'?actionApprovalLabel(a):(a.approvalStatus||'pending'))+(a.approvedBy?'<br><span class="muted">'+esc(a.approvedBy)+'</span>':'')+'</td><td>'+esc(m.wfLabel)+'</td></tr>';}).join('')+'</table>';}
   body+=signBlock();
+  if(acts.length&&includeNceAppendix)body+=reportNceAppendixHtml(acts,t);
   await openPrint('Báo cáo nội kiểm — '+testDisplayName(t),body);
 }
 async function printRangeForm(tid,level){

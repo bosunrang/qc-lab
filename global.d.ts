@@ -16,7 +16,7 @@
 // name set changes.
 
 // --- UI state accessors (Object.defineProperty(globalThis, ...) in *-ui-state.js) ---
-declare var selTest: any, statusMemo: any, wgTestQ: any, dashTestQ: any, dashTestStatus: any, dashKpiPeriod: any, dashKpiStart: any, dashKpiEnd: any, dashKpiInstrument: any, dashKpiTest: any, dashKpiLast: any,
+declare var selTest: any, statusMemo: any, wgTestQ: any, dashTestQ: any, dashTestStatus: any, dashKpiPeriod: any, dashKpiStart: any, dashKpiEnd: any, dashKpiInstrument: any, dashKpiTest: any, dashKpiTestQ: any, dashKpiTestChoices: any, dashKpiLast: any,
   wgPrevOpen: any, wgExpandedRows: any, wgViewMode: any, wgArchivedGroupId: any,
   wgArchivedTestId: any, wgArchivedTestQ: any, wgChartMode: any;
 declare var currentUser: any, loginFails: any, loginLockUntil: any;

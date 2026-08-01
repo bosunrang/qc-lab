@@ -116,6 +116,8 @@ function sampleDoc(overrides = {}) {
   const st = ctx.__RXST();
   const maxStyleIdx = Math.max(...Object.values(st));
   assert.ok(maxStyleIdx < cellXfsCount, `every RXST style id (max ${maxStyleIdx}) must index into cellXfs (count ${cellXfsCount})`);
+  const xfBlock = /<cellXfs count="\d+">([\s\S]*?)<\/cellXfs>/.exec(styles)[1];
+  assert.equal((xfBlock.match(/wrapText="1"/g)||[]).length,9,'mọi style bảng có nội dung dài, gồm TD/REJ/WARN, phải bật wrap text');
 }
 
 // --- With embedded chart images: extra drawing/media parts appear and are wired up,
@@ -159,6 +161,33 @@ function sampleDoc(overrides = {}) {
   const workbook = zip.entries.find(e => e.name === 'xl/workbook.xml').data.toString('utf8');
   assert.ok(!/name="BC <x>/.test(workbook), 'sheet name must be escaped in workbook.xml');
   assert.match(workbook, /name="BC &lt;x&gt;&amp;&quot;"/, 'sheet name special chars escaped');
+}
+
+// --- NCE form parity: Excel uses the same compact summary + seven-section appendix
+//     as the PDF, and the shared checkbox can suppress only the appendix. ---
+{
+  run(ctx, `
+    window={QCLAB_APP:{name:'QC Lab',version:'test'}};
+    state={lab:{name:'PXN',dept:'Hóa sinh'},westgardRules:{'1-3s':true},tests:[{id:'T1',name:'Sodium (Na)',unit:'mmol/L',machine:'EasyLyte',levels:[]}],actions:[{id:'A1',protocolVersion:3,nceId:'NCE-20260729-DIG4',testId:'T1',date:'2026-07-17',level:1,lot:'1101',rule:'1-3s',errorType:'Sai số ngẫu nhiên',eventSource:'iqc',processPhase:'exam',by:'Quản trị viên',dueDate:'2026-07-24',containmentStatus:'held',containmentNote:'Giữ kết quả từ 08:00',correction:'Vệ sinh kim hút, loại bọt khí',riskLevel:'high',riskSeverity:4,riskOccurrence:3,riskDetectability:5,riskBasis:'SOP-QC-07',qcMaterialStatus:'ok',qcMaterialNote:'Đạt',instrumentStatus:'abnormal',instrumentNote:'Kim hút có bọt khí',reagentStatus:'ok',reagentNote:'Đạt',calibrationStatus:'ok',calibrationNote:'Đạt',lotToLotStatus:'ok',lotToLotNote:'Không cần',causeCategory:'instrument',cause:'Bọt khí tại kim hút',action:'Vệ sinh kim hút và kiểm tra lại đường ống',actionCompletedDate:'2026-07-17',releaseStatus:'released',releaseDate:'2026-07-17',releaseBy:'Phụ trách khoa',releaseNote:'QC chạy lại được chấp nhận',patientImpact:'none',patientAction:'Không có kết quả cần thu hồi',effectivenessStatus:'effective',effectivenessDate:'2026-07-29',effectivenessBy:'Quản trị viên',effectivenessNote:'Không tái diễn trong 10 lần chạy',residualRiskLevel:'low',residualSeverity:2,residualOccurrence:2,residualDetectability:2,residualRiskBasis:'Theo dõi sau CAPA',approvalStatus:'approved',approvedBy:'Trưởng khoa',approvedAt:'2026-07-29T10:00:00Z',approvalNote:'Đủ bằng chứng'}]};
+    ACTION_LABELS={source:{iqc:'Nội kiểm IQC'},phase:{exam:'Trong xét nghiệm'},risk:{high:'Cao',low:'Thấp'},containment:{held:'Đã dừng/giữ kết quả liên quan'},patient:{none:'Không ảnh hưởng'},release:{released:'Cho phép trở lại'},cause:{instrument:'Máy phân tích'},check:{ok:'Đạt',abnormal:'Bất thường'}};
+    operationalLevels=()=>[];activeWestgard=()=>({});sgTea=()=>5;sgTeaSource=()=>'';sgTeaLabel=()=>'';sgTeaRefText=()=>'';formatDateTimeVN=v=>String(v);userName=()=>'Tester';reportRangeText=()=>'17/07/2026 - 29/07/2026';testDisplayName=t=>t.name;actionEventDate=a=>a.date;actionWorkflowStatus=()=>({label:'Đã khép vòng'});actionRerunStatus=()=>({label:'QC đạt lại',point:{val:140.2,date:'2026-07-17',runId:'2'}});actionLevelShort=()=> 'M1 - Lô 1101';actionApprovalLabel=()=> 'Đã duyệt';actionEffectivenessStatus=()=>({label:'Có hiệu lực'});actionRiskScore=()=>60;actionResidualRiskScore=()=>8;vnDate=v=>String(v);fmt=v=>String(v);
+  `);
+  const withAppendix = JSON.parse(run(ctx, `JSON.stringify(reportXlsxDoc('T1','','',true))`));
+  const withoutAppendix = JSON.parse(run(ctx, `JSON.stringify(reportXlsxDoc('T1','','',false))`));
+  const texts = doc => doc.rows.flat().filter(Boolean).map(cell => String(cell.v || ''));
+  const all = texts(withAppendix), summary = all.find(x => x.startsWith('Tức thời:'));
+  assert.match(summary, /Nguyên nhân: Máy phân tích - Bọt khí tại kim hút/);
+  assert.match(summary, /Khắc phục: Vệ sinh kim hút và kiểm tra lại đường ống/);
+  for (const label of ['Phụ lục - Hồ sơ NCE chi tiết','Phiếu NCE NCE-20260729-DIG4 · Đã khép vòng','1. Kiểm soát và xử lý tức thời','2. Đánh giá nguy cơ ban đầu','3. Checklist điều tra','4. Nguyên nhân và hành động khắc phục','5. Bằng chứng QC chạy lại và cho phép trở lại','6. Ảnh hưởng người bệnh','7. Hiệu lực, nguy cơ còn lại và phê duyệt']) assert.ok(all.includes(label), `Excel phải có mục "${label}"`);
+  assert.ok(all.includes('SOP-QC-07'), 'phụ lục Excel giữ căn cứ SOP đầy đủ');
+  assert.ok(!texts(withoutAppendix).includes('Phụ lục - Hồ sơ NCE chi tiết'), 'bỏ chọn phụ lục phải ẩn phần chi tiết khỏi Excel');
+  assert.ok(texts(withoutAppendix).some(x => x.startsWith('Tức thời:')), 'bảng tóm tắt NCE vẫn phải còn khi ẩn phụ lục');
+  const st = ctx.__RXST(), summaryRow = withAppendix.rows.find(row => row.some(cell => cell && String(cell.v || '').startsWith('NCE-20260729-DIG4\n')));
+  assert.deepEqual(summaryRow.map(cell => cell && cell.s), [st.TD,st.TD,st.TD,st.TDL,st.TDL,st.TDL,st.TD,st.TD,st.TD,st.TD], 'mọi cột hành động phải căn giữa, riêng tóm tắt xử lý căn trái');
+  for (const label of ['1. Kiểm soát và xử lý tức thời','2. Đánh giá nguy cơ ban đầu','3. Checklist điều tra','4. Nguyên nhân và hành động khắc phục','5. Bằng chứng QC chạy lại và cho phép trở lại','6. Ảnh hưởng người bệnh','7. Hiệu lực, nguy cơ còn lại và phê duyệt']) {
+    const index=withAppendix.rows.findIndex(row=>row.some(cell=>cell&&cell.v===label));
+    assert.ok(index>0&&withAppendix.rows[index-1].length===0, `phải có một hàng trống trước mục "${label}"`);
+  }
 }
 
 console.log('ReportXlsx tests passed');

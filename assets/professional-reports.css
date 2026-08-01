@@ -872,6 +872,38 @@ summary.action-form-section-title:focus-visible{
   margin-top:12px;
 }
 
+.report-nce-option{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  min-height:36px;
+  margin:0 0 0 4px;
+  color:#496573;
+  font-size:var(--type-small);
+  font-weight:700;
+  cursor:pointer;
+}
+
+.report-nce-option input{
+  width:16px;
+  height:16px;
+  margin:0;
+}
+
+.report-lock-controls{
+  display:grid;
+  grid-template-columns:190px 140px max-content;
+  align-items:end;
+  gap:10px;
+  margin-top:10px;
+}
+
+@media(max-width:760px){
+.report-lock-controls{
+  grid-template-columns:1fr;
+}
+}
+
 .panel:has(#reportSearch) > .hint{
   margin:12px 16px 0 !important;
 }

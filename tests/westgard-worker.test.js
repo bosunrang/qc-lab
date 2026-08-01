@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const QCCore = require('../assets/core.js');
-const { computeWestgardJob, verdictLevel, ruleScope } = require('../assets/workers/westgard-worker.js');
+const { computeWestgardJob, ruleAction, verdictLevel, ruleScope, ruleOnIn } = require('../assets/workers/westgard-worker.js');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
 const levels = [
@@ -118,5 +118,45 @@ assert.equal(scopedInvalidation.afterTest.workerAlive, true);
 assert.equal(scopedInvalidation.afterGlobal.generation, scopedInvalidation.generation + 1);
 assert.equal(scopedInvalidation.afterGlobal.terminated, 1, 'global invalidation still terminates stale work');
 assert.equal(scopedInvalidation.afterGlobal.workerAlive, false);
+
+/* ===== Ngữ nghĩa luật: luồng chính và worker phải khớp TUYỆT ĐỐI =====
+   Worker quyết định nhận/loại cho mọi xét nghiệm từ WG_WORKER_POINT_THRESHOLD
+   điểm trở lên, nên một bảng luật lệch sẽ cho kết luận khác nhau CHỈ vì bộ dữ
+   liệu to hay nhỏ — đúng loại sai lệch im lặng nhất. Vì thế bảng hành động và
+   phạm vi sống ở core.js, không chép hai bản. Kiểm chứng 2026-08-01: hồi còn
+   hai bản, sửa riêng bảng trong worker vẫn qua sạch cả 58 test. */
+{
+  const overrideCases = [
+    {},
+    { ruleActions: { 'R4s': 'inactive', '1-2s': 'reject' } },
+    { ruleScopes: { 'R4s': 'within', '10x': 'both', '1-3s': 'across' } },
+    { ruleActions: { '6x': 'reject' }, ruleScopes: { '6x': 'within' } },
+    { ruleActions: { 'R4s': 'khong-hop-le' }, ruleScopes: { '2-2s': 'protocol' } }, // giá trị rác phải cùng rơi về mặc định
+  ];
+  // Bật/tắt xen kẽ để cả nhánh 'inactive' lẫn nhánh alert/reject đều được đi qua.
+  const globalRules = Object.fromEntries(QCCore.WG_RULES.map((rule, i) => [rule, i % 5 !== 0]));
+  ctx.__parityState = { ...state, westgardRules: globalRules };
+  let parityChecks = 0;
+  for (const levelCount of [1, 2, 3, 4]) {
+    overrideCases.forEach((overrides, caseIndex) => {
+      // Không gắn qcLotId ⇒ operationalLevels() rỗng ⇒ testLevelCount() lùi về
+      // t.levels.length, đúng số mức ta muốn thử mà không phải dựng cả lô/panel.
+      const levels = Array.from({ length: levelCount }, (_, i) => ({ level: i + 1, mean: 100, sd: 10 }));
+      ctx.__test = { id: `parity-${levelCount}-${caseIndex}`, name: 'Parity', levels, ...overrides };
+      const mainSide = run(ctx, `state=__parityState;clearDerived();JSON.stringify(QCCore.WG_RULES.map(rule=>[
+        testRuleAction(__test,rule),testRuleScope(__test,rule),
+        testRuleOnIn(__test,rule,'within'),testRuleOnIn(__test,rule,'across'),
+        ruleResultLevel(__test,[rule])]))`);
+      const job = { levels, globalRules, ...overrides };
+      const workerSide = JSON.stringify(QCCore.WG_RULES.map(rule => [
+        ruleAction(job, rule), ruleScope(job, rule),
+        ruleOnIn(job, rule, 'within'), ruleOnIn(job, rule, 'across'),
+        verdictLevel(job, [rule])]));
+      assert.equal(mainSide, workerSide, `luật lệch giữa luồng chính và worker: ${levelCount} mức, case ${caseIndex}`);
+      parityChecks += QCCore.WG_RULES.length;
+    });
+  }
+  assert.equal(parityChecks, QCCore.WG_RULES.length * 4 * overrideCases.length);
+}
 
 console.log('Westgard worker tests passed');

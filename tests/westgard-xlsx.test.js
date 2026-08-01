@@ -4,7 +4,7 @@ const path = require('node:path');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
 const ctx = loadSandbox(['modules/data-io.js'], {
-  window: { QCLAB_APP: { name: 'QC Lab', version: '2.4.0', build: 'westgard-print-hidpi' } },
+  window: { QCLAB_APP: { name: 'QC Lab', version: '2.4.0' } },
   atob: value => Buffer.from(value, 'base64').toString('binary'),
 });
 

@@ -92,6 +92,13 @@ function reportDateRange(){
   const s=parseVN((document.getElementById('rStartDate')||{}).value||'')||'',e=parseVN((document.getElementById('rEndDate')||{}).value||'')||'';
   return(s&&e&&s>e)?{start:e,end:s}:{start:s,end:e};
 }
+/* Cả ba nút xuất (In / Excel / CSV) đọc cùng một bộ điều khiển trên trang Báo
+   cáo. Gom về đây để đổi id ô nhập chỉ phải sửa một chỗ, và để bản in với bản
+   Excel không thể lệch nhau về xét nghiệm, khoảng ngày hay tùy chọn phụ lục. */
+function reportExportSelection(){
+  const tid=(document.getElementById('rTest')||{}).value||'',{start,end}=typeof reportDateRange==='function'?reportDateRange():{start:'',end:''};
+  return{tid,t:state.tests.find(x=>x.id===tid),start,end,includeNceAppendix:(document.getElementById('reportNceAppendix')||{}).checked!==false};
+}
 function reportRangeChanged(){
   const{start,end}=reportDateRange();
   reportRangeStart=start;reportRangeEnd=end;
@@ -116,7 +123,7 @@ function reportLockPanelHtml(){
   const already=PeriodService.findLock(state,ym);
   return `<div class="panel"><h3>Khóa kỳ báo cáo</h3>
      <div class="hint">Khóa 1 kỳ (theo tháng) sẽ chặn sửa/hủy điểm QC của kỳ đó ở <b>mọi xét nghiệm</b> — nên làm sau khi đã xuất xong báo cáo chính thức của kỳ.</div>
-     <div class="grid4" style="margin-top:10px">
+     <div class="report-lock-controls">
        <div><label>Tháng</label><select aria-label="Tháng" ${isAdmin?'':'disabled'} onchange="reportSetLockPart('month',this.value)">${monthOptions}</select></div>
        <div><label>Năm</label><select aria-label="Năm" ${isAdmin?'':'disabled'} onchange="reportSetLockPart('year',this.value)">${yearOptions}</select></div>
        <div style="align-self:end">${isAdmin?(already?btn('Kỳ này đã khóa','','ghost','',{disabled:true}):btn('Khóa kỳ này','reportLockPeriod()','teal')):'<span class="hint">Chỉ admin mới khóa/mở khóa được kỳ báo cáo.</span>'}</div>
@@ -141,6 +148,7 @@ function pageReportV2(){
        ${btn(reportActionIcon('print')+'Tạo báo cáo &amp; In','printReport()','teal','',{disabled:!matched.length,attrs:{'data-report-action':''}})}
        ${btn('Xuất Excel','exportReportXLSX()','teal','',{disabled:!matched.length,attrs:{'data-report-action':''}})}
        ${btn('Xuất CSV','exportReportCSV()','teal','',{disabled:!matched.length,attrs:{'data-report-action':''}})}
+       <label class="report-nce-option"><input id="reportNceAppendix" type="checkbox" checked> Kèm phụ lục NCE đầy đủ trong PDF/Excel</label>
      </div>
    </div>`+reportLockPanelHtml();
 }

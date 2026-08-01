@@ -306,9 +306,22 @@ the Google Fonts link, offline labs must print with correct metrics.
   `STATE_SCHEMA_VERSION` (currently 5). Holds the pure error-classification
   helpers too (`errorType`, `primaryErrorRule`, `fixHint`,
   `WG_RULE_DESCRIPTIONS`); `qc-domain.js` re-exports them under the same global
-  names for the UI.
+  names for the UI. Since 2026-08-01 it also owns the **rule-semantics tables**
+  — `defaultRuleAction`/`resolveRuleAction` (which rules only warn:
+  `WG_ALERT_RULES` = 1-2s/6x/7T) and `defaultRuleScope`/`resolveRuleScope`
+  (within/across/both by rule and QC level count), plus `ruleEnabled`,
+  `ruleOnInScope`, `ruleVerdictLevel`. These are the SINGLE SOURCE for both
+  Westgard engines: `qc-domain.js` feeds them state (global toggles, per-test
+  `ruleActions`/`ruleScopes`, `operationalLevels().length`) and
+  `workers/westgard-worker.js` feeds them the job payload. Do not re-inline
+  either table into a caller — until 2026-08-01 both files carried their own
+  hand-written copy, and mutating only the worker's copy passed all 58 tests
+  while silently changing accept/reject verdicts for any test over
+  `WG_WORKER_POINT_THRESHOLD` points. `tests/westgard-worker.test.js` now pins
+  main-thread/worker parity across every rule × level count × override case.
 - `app-meta.js` — loads right after `core.js`, before `state.js`. Sets
-  `window.QCLAB_APP` (name/version/build) and `window.QCLAB_CLOUD` (Firebase
+  `window.QCLAB_APP` (name/version/releaseDate — bump both per
+  `docs/validation/RELEASE-PUBLISH.md`) and `window.QCLAB_CLOUD` (Firebase
   config, `labCode`, `anonymous`/`locked` flags). Contains the live Firebase
   project keys — treat edits here as deploy/config changes, not routine code
   changes.
@@ -340,6 +353,22 @@ the Google Fonts link, offline labs must print with correct metrics.
   run) can be overridden per test via `t.ruleActions`/`t.ruleScopes`
   (`testRuleAction()`/`testRuleScope()`), layered on top of the global
   defaults in `state.westgardRules`.
+  `derived()` (index cấu hình: panel/thứ tự test/lô/nhóm lô/chuyển tiếp đã duyệt)
+  TỰ KIỂM CHỨNG từ 2026-08-01, cùng kỹ thuật với cache của
+  `action-workflow-service.js`: `derivedStampWalk()` so tham chiếu + độ dài của
+  đúng những lát state mà nó đọc, cộng các trường vô hướng nó lọc theo
+  (`active`/`status`/`fromLotId`/`toLotId`). Trước đó nó là memo thuần nên chỉ
+  đúng khi MỌI đường ghi cấu hình nhớ gọi `clearDerived()` — quên một chỗ thì màn
+  hình hiện panel/nhóm lô/mức vận hành cũ mà không có gì báo. **Đọc thêm trường
+  nào của cấu hình thì phải thêm trường đó vào chữ ký**, nếu không cache sẽ không
+  trượt khi trường đó đổi tại chỗ. Một hàm duy nhất lo cả dựng lẫn đối chiếu
+  (`prev=null` là dựng) để hai chiều không lệch thứ tự; đường warm cố ý KHÔNG cấp
+  phát mảng — bản dựng mảng mỗi lần gọi làm `derived()` chậm 29 lần (2,7 µs so với
+  0,095 µs, đo ở 50 xét nghiệm × 3 mức) và đẩy `warmDomainColdRatio` từ 0,0001 lên
+  0,00035. `tests/derived-cache.test.js` chốt CẢ HAI nửa hợp đồng: đổi thứ
+  `derived()` đọc thì phải dựng lại, đổi thứ nó không đọc (điểm QC, Mean/SD, NCE,
+  khóa kỳ) thì phải giữ nguyên — thiếu nửa sau, một chữ ký hỏng kiểu "luôn khác
+  nhau" vẫn qua sạch. Chốt bằng tính tự trượt, không bằng mốc thời gian.
 - `local-store.js` — IIFE `LocalStore`: an IndexedDB snapshot mirror used as a
   recovery fallback for `localStorage`. Writes are partitioned (boot shell +
   per-test records) and rotate between slots A/B with a manifest — the active
@@ -377,9 +406,23 @@ the Google Fonts link, offline labs must print with correct metrics.
   IIFE-wrapped) layered on `state`/`qc-domain`. `PeriodService` locks/unlocks
   reporting periods (`state.periodLocks`, a synced list branch); `entry-service.js`
   enforces the lock (blocks add/edit/void once a period is locked), and the
-  "Khóa kỳ báo cáo" panel on the Reports page (`actions-routes.js`) is the only
+  "Khóa kỳ báo cáo" panel on the Reports page (`report-routes.js`) is the only
   UI that actually calls `PeriodService.lock()`/`.unlock()` — until 2026-07-22
   this service had no caller at all, so locks could never actually be created.
+  The lock panel promises users it blocks editing/voiding QC points of that
+  period **across every test**, so any BULK destroy-or-rewrite path must ask
+  `PeriodService.lockedPoints(state, points)` (pure; counts per period,
+  voided points included — they are still that period's records) before
+  touching state. Two paths went straight through the lock until 2026-08-01:
+  `delTest()`'s `delete state.data[id]` and `renameLotAcrossPoints()`. `delTest()`
+  now **refuses** — the correct route is to unlock the period first, which
+  demands a reason and logs itself, exactly the ISO 15189 trail. The lot rename
+  is still allowed (a lot number is an identity label, and not rewriting old
+  points makes them vanish from every lot filter) but now **asks first**, with
+  the affected count and which locked periods it touches, before any mutation —
+  cancelling must leave no trace. `tests/locked-period-guards.test.js` pins both,
+  and was verified to fail when either guard is removed. Adding another bulk
+  path over `state.data` means adding the same question.
   `EntryService` normalizes QC-point input
   (`preparePointInput`/`addPoint`/`voidPoint`/`recordPoint`) and builds the
   entry sheet/window data; called from `router-render.js`.
@@ -623,7 +666,9 @@ each URS requirement to the code and the *named automated tests* that evidence
 it; if you rename, delete or add a test that is someone's evidence row, update
 that table in the same commit. Release evidence is the stdout of `npm ci`,
 `npm test`, `npm run typecheck`, `npm run verify-release`, `npm run
-visual-check`, `npm run a11y-audit`, `npm run print-check`.
+visual-check`, `npm run a11y-audit`, `npm run nce-check`, `npm run
+print-check` — the same set CI runs, so every check that gates a merge also
+leaves a dossier record.
 
 ### Confirmed business-logic decisions (don't re-litigate without new input)
 

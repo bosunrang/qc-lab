@@ -7,8 +7,84 @@ function csvCell(v){
 }
 function downloadCSV(name,rows){const csv='\ufeff'+rows.map(r=>r.map(csvCell).join(',')).join('\r\n');const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
 function exportMetaRows(kind='Báo cáo'){const app=window.QCLAB_APP||{version:'dev'},rules=Object.entries(state.westgardRules||{}).filter(x=>x[1]!==false).map(x=>x[0]).join(', ');return[['Metadata',kind],['Phiên bản app',`${app.name||'QC Lab'} ${app.version||'dev'}`],['Người xuất',userName()],['Thời gian xuất',formatDateTimeVN(new Date().toISOString())],['Bộ luật áp dụng',rules||'Chưa cấu hình']];}
+/* ===== TẦNG DỮ LIỆU DÙNG CHUNG CHO BÁO CÁO NỘI KIỂM =====
+   Bản in (printReport trong reports.js) và bản Excel (reportXlsxDoc bên dưới)
+   trình bày khác nhau nhưng lấy CÙNG một tập dữ liệu. Trước 2026-08-01 mỗi bên
+   tự dựng lại tập đó — 8 dòng dài giống hệt nhau, cộng nguyên khối bóc nhãn hồ
+   sơ NCE — nên thêm một trường vào hồ sơ là phải sửa hai nơi và không có gì bắt
+   được nếu quên một. Mọi thứ dưới đây THUẦN DỮ LIỆU: không sinh HTML, không
+   sinh ô Excel, chỉ trả chuỗi/mảng để hai bên tự trình bày. data-io.js nạp
+   TRƯỚC reports.js nên chiều phụ thuộc là một chiều, không vòng.
+   (exportActionsCSV/reportRows cố tình KHÔNG dùng: CSV giữ mã gốc làm giá trị
+   dự phòng khi thiếu nhãn, khác với bản in/Excel luôn hiển thị "—".) */
+function reportInRange(start,end){return p=>(!start||p.date>=start)&&(!end||p.date<=end);}
+function reportTeaInfo(t){return{teaVal:typeof sgTea==='function'?sgTea(t):(t.tea||0),teaSourceText:typeof sgTeaLabel==='function'?sgTeaLabel(sgTeaSource(t)):'Ricos / Westgard biological variation'};}
+function reportMultiViews(t,inRange){return operationalLevels(t).map(l=>({level:l.level,lot:l.lot,mean:l.mean,sd:l.sd,pts:operationalLotPoints(t,l.level).filter(inRange),label:'M'+l.level+'·'+(l.lot||'?')}));}
+/* Lô cũ đã chuyển tiếp: chỉ chấm luật theo từng mức riêng lẻ (within), không
+   gồm luật liên mức — nên phải tự chạy westgardByPoint chứ không dùng wg chung. */
+function reportPrevLotRows(t,s,inRange){
+  const inPts=s.pts.filter(inRange);if(!inPts.length)return{inPts,items:[]};
+  const wgP=QCCore.westgardByPoint(s.pts,s.mean,s.sd,rule=>testRuleOnWithin(t,rule)),idxOf=new Map(s.pts.map((p,i)=>[p.id,i]));
+  return{inPts,items:inPts.map(p=>{const i=idxOf.get(p.id),raw=wgP.F[i]||{rules:[]};return{p,f:{...raw,level:ruleResultLevel(t,raw.rules||[])},z:wgP.zs[i]};})};
+}
+function reportLevelRows(t,l,wg,inRange){
+  const pts=operationalLotPoints(t,l.level).filter(inRange);
+  return{pts,items:pts.map(p=>{const f=wg.byPoint.get(p.id)||{level:'ok',rules:[],z:(p.val-l.mean)/l.sd};return{p,f,z:f.z};})};
+}
+function reportActionsInRange(tid,inRange){return(state.actions||[]).filter(a=>a.testId===tid&&inRange({date:typeof actionEventDate==='function'?actionEventDate(a):a.date}));}
+function reportNceExcerpt(value,max=150){
+  const text=String(value||'').replace(/\s+/g,' ').trim();if(text.length<=max)return text||'—';
+  const cut=text.slice(0,max-1).replace(/\s+\S*$/,'').trim();return(cut||text.slice(0,max-1))+'…';
+}
+/* Ba dòng tóm tắt ở bảng nhật ký: bản in xếp thành <div>, bản Excel nối bằng \n. */
+function reportNceSummaryParts(a){
+  const labels=typeof ACTION_LABELS==='object'?ACTION_LABELS:{},causeLabel=labels.cause&&labels.cause[a.causeCategory];
+  return[['Tức thời',reportNceExcerpt(a.correction||a.containmentNote||'Chưa ghi',120)],
+         ['Nguyên nhân',reportNceExcerpt([causeLabel,a.cause].filter(Boolean).join(' - ')||'Chưa xác định',140)],
+         ['Khắc phục',reportNceExcerpt(a.action||'Chưa ghi',160)]];
+}
+/* Toàn bộ nội dung một phiếu NCE đã bóc nhãn xong, dạng chuỗi thô (chưa esc).
+   Thêm trường mới vào phiếu ⇒ thêm ở ĐÂY, cả bản in lẫn bản Excel nhận cùng lúc. */
+function reportNceModel(a,t){
+  const labels=typeof ACTION_LABELS==='object'?ACTION_LABELS:{},pick=(group,key)=>labels[group]&&labels[group][key];
+  const rr=typeof actionRerunStatus==='function'?actionRerunStatus(a):{label:''},wf=typeof actionWorkflowStatus==='function'?actionWorkflowStatus(a):{label:'Chưa hoàn tất'},eff=typeof actionEffectivenessStatus==='function'?actionEffectivenessStatus(a):{label:'Chưa đánh giá'};
+  const risk=typeof actionRiskScore==='function'?actionRiskScore(a):0,residual=typeof actionResidualRiskScore==='function'?actionResidualRiskScore(a):0;
+  const eventDate=typeof actionEventDate==='function'?actionEventDate(a):a.date,approval=typeof actionApprovalLabel==='function'?actionApprovalLabel(a):(a.approvalStatus||'Chờ duyệt');
+  const rerunPoint=rr&&rr.point,rerunText=rerunPoint?fmt(rerunPoint.val)+' '+(t&&t.unit||'')+' - '+vnDate(rerunPoint.date)+(rerunPoint.runId?' - lần '+rerunPoint.runId:''):(rr.label||'Chưa có kết quả phù hợp');
+  return{
+    modern:+a.protocolVersion>=2,cancelled:a.recordStatus==='cancelled',
+    nceTitle:a.nceId||'chưa cấp mã',wfLabel:wf.label||'Chưa hoàn tất',
+    eventDateText:vnDate(eventDate),
+    testLevelText:(t?testDisplayName(t):'—')+' - '+actionLevelShort(t,a.level,a.lot),
+    ruleErrText:(a.rule||'—')+' - '+(a.errorType||'—'),
+    sourcePhaseText:(pick('source',a.eventSource)||'—')+' - '+(pick('phase',a.processPhase)||'—'),
+    ownerDueText:(a.by||'—')+' - '+(a.dueDate?vnDate(a.dueDate):'—'),
+    recordStatusText:a.recordStatus==='cancelled'?'Đã hủy':'Đang hiệu lực',
+    containmentText:pick('containment',a.containmentStatus)||'Chưa ghi',containmentNote:a.containmentNote||'—',
+    correctionText:a.correction||'Chưa ghi xử lý tức thời',
+    riskText:(pick('risk',a.riskLevel)||'Chưa đánh giá')+' / '+(risk||'—'),
+    sodText:(a.riskSeverity||'—')+' x '+(a.riskOccurrence||'—')+' x '+(a.riskDetectability||'—'),
+    riskBasis:a.riskBasis||'—',
+    checks:[['Vật liệu QC',a.qcMaterialStatus,a.qcMaterialNote],['Máy phân tích',a.instrumentStatus,a.instrumentNote],['Hóa chất / calibrator',a.reagentStatus,a.reagentNote],['Hiệu chuẩn',a.calibrationStatus,a.calibrationNote],['So sánh lot-to-lot',a.lotToLotStatus,a.lotToLotNote]]
+      .map(([label,status,note])=>[label,pick('check',status)||'Chưa ghi',note||'—']),
+    causeCategoryText:pick('cause',a.causeCategory)||'Chưa phân loại',
+    actionCompletedText:a.actionCompletedDate?vnDate(a.actionCompletedDate):'—',
+    causeText:a.cause||'Chưa xác định',actionText:a.action||'Chưa ghi',
+    legacyActionText:a.action||a.correction||'—',
+    rerunText,releaseText:pick('release',a.releaseStatus)||'Không áp dụng',
+    releaseWhoText:(a.releaseDate?vnDate(a.releaseDate):'—')+' - '+(a.releaseBy||'—'),releaseNote:a.releaseNote||'—',
+    patientText:pick('patient',a.patientImpact)||'Chưa đánh giá',patientAction:a.patientAction||'—',
+    effLabel:eff.label||'Chưa đánh giá',
+    effWhoText:(a.effectivenessDate?vnDate(a.effectivenessDate):'—')+' - '+(a.effectivenessBy||'—'),effNote:a.effectivenessNote||'—',
+    residualText:(pick('risk',a.residualRiskLevel)||'Chưa đánh giá')+' / RPN '+(residual||'—'),residualBasis:a.residualRiskBasis||'—',
+    approvalShortText:approval+(a.approvedBy?' - '+a.approvedBy:''),
+    approvalText:approval+(a.approvedBy?' - '+a.approvedBy:'')+(a.approvedAt?' - '+formatDateTimeVN(a.approvedAt):''),
+    approvalNote:a.approvalNote||a.returnNote||'—',
+    cancelText:(a.cancelReason||'Không ghi lý do')+(a.cancelledBy?' - '+a.cancelledBy:'')+(a.cancelledAt?' - '+formatDateTimeVN(a.cancelledAt):'')
+  };
+}
 function reportRows(tid,start,end){const t=state.tests.find(x=>x.id===tid);if(!t)return[];const inMonth=p=>(!start||p.date>=start)&&(!end||p.date<=end),wg=activeWestgard(t),teaVal=typeof sgTea==='function'?sgTea(t):(t.tea||0);let rows=[...exportMetaRows('Báo cáo nội kiểm'),[],['BÁO CÁO NỘI KIỂM',state.lab.name||'',state.lab.dept||'',reportRangeText(start,end)],[],['Xét nghiệm',testDisplayName(t),'Máy',t.machine||'','Đơn vị',t.unit||'','TEa%',teaVal||''],['Nguồn TEa',typeof sgTeaLabel==='function'?sgTeaLabel(sgTeaSource(t)):'Ricos / Westgard biological variation','Cơ sở',typeof sgTeaRefText==='function'?sgTeaRefText(t):'','Tài liệu',t.teaDoc||'','Người duyệt',t.teaApprovedBy||''],['Ghi chú','Cột "Sigma (kỳ)" tính từ Mean/CV thực tế trong đúng khoảng ngày báo cáo này, khác với Sigma đã thẩm định ở trang Six Sigma & Sai số. Dấu * bên cạnh Sigma nghĩa là n<20, CV/Sigma chưa đủ ổn định để tham khảo.']];operationalLevels(t).forEach(l=>{(typeof previousLotSeries==='function'?previousLotSeries(t,l.level):[]).forEach(s=>{const inPts=s.pts.filter(inMonth);if(!inPts.length)return;const wgP=QCCore.westgardByPoint(s.pts,s.mean,s.sd,rule=>testRuleOn(t,rule)),idxOf=new Map(s.pts.map((p,i)=>[p.id,i]));rows.push([],['Mức '+l.level,'Lô '+s.lot,'Đã chuyển tiếp','Mean',s.mean,'SD',s.sd]);rows.push(['Ghi chú','Vi phạm ở lô cũ chỉ đánh giá luật Westgard theo từng mức riêng lẻ, không gồm luật liên mức (như R4s giữa các mức cùng lần chạy).']);rows.push(['Ngày','Lần chạy','NV thực hiện','Họ tên nhân viên','Giá trị','Z','Kết luận','Luật','Loại sai số']);inPts.forEach(p=>{const i=idxOf.get(p.id),f=wgP.F[i]||{level:'ok',rules:[]},z=wgP.zs[i],staff=pointStaff(p);rows.push([vnDate(p.date),p.runId||'',staff.code,staff.name,p.val,(z>=0?'+':'')+fmt(z)+'s',stateName(ruleResultLevel(t,f.rules||[])),((f.rules||[]).join(' | ')||((f.supportRules||[]).length?'Bằng chứng: '+f.supportRules.join(' | '):'')),errorType(f.rules||[])]);});const{st:stP,bias:biasP,te:teP,sigma:sigmaP}=reportLevelStats(inPts,s.mean,teaVal);rows.push(['Thống kê (lô cũ)','n',stP.n,'Mean thực',fmt(stP.m),'SD',fmt(stP.sd,3),'CV%',fmt(stP.cv),'Bias%',fmt(biasP),'TE%',fmt(teP),'Sigma (kỳ)',sigmaP==null?'':fmt(sigmaP,2)+(stP.n<20?' *':'')]);});const pts=operationalLotPoints(t,l.level).filter(inMonth);rows.push([],['Mức '+l.level,'Lô '+(l.lot||''),'Dải '+(l.applied==='lab'?'PXN':'NSX'),'Mean',l.mean,'SD',l.sd]);rows.push(['Ngày','Lần chạy','NV thực hiện','Họ tên nhân viên','Giá trị','Z','Kết luận','Luật','Loại sai số']);if(pts.length){pts.forEach(p=>{const f=wg.byPoint.get(p.id)||{level:'ok',rules:[],z:(p.val-l.mean)/l.sd},staff=pointStaff(p);rows.push([vnDate(p.date),p.runId||'',staff.code,staff.name,p.val,(f.z>=0?'+':'')+fmt(f.z)+'s',stateName(f.level),(f.rules.join(' | ')||((f.supportRules||[]).length?'Bằng chứng: '+f.supportRules.join(' | '):'')),errorType(f.rules)]);});const{st,bias,te,sigma}=reportLevelStats(pts,l.mean,teaVal);rows.push(['Thống kê','n',st.n,'Mean thực',fmt(st.m),'SD',fmt(st.sd,3),'CV%',fmt(st.cv),'Bias%',fmt(bias),'TE%',fmt(te),'Sigma (kỳ)',sigma==null?'':fmt(sigma,2)+(st.n<20?' *':'')]);}else rows.push(['Không có dữ liệu trong khoảng ngày đã chọn']);});const acts=(state.actions||[]).filter(a=>a.testId===tid&&inMonth(a));rows.push([],['NHẬT KÝ KHẮC PHỤC'],['Ngày','Mã NCE','Mức / lô','Luật','Loại sai số','Hành động','Điều tra & ảnh hưởng','Người phụ trách','QC chạy lại','Trạng thái duyệt','Người duyệt','Ý kiến duyệt','Trạng thái hồ sơ']);acts.forEach(a=>{const wf=typeof actionWorkflowStatus==='function'?actionWorkflowStatus(a):{complete:false,label:'Chưa hoàn tất'},rr=typeof actionRerunStatus==='function'?actionRerunStatus(a):{label:''};rows.push([vnDate(a.date),a.nceId||'',actionLevelShort(t,a.level,a.lot),a.rule||'',a.errorType||'',a.action||a.correction||'',typeof actionProtocolSummary==='function'?actionProtocolSummary(a):'',a.by||'',rr.label||'',typeof actionApprovalLabel==='function'?actionApprovalLabel(a):(a.approvalStatus||'pending'),a.approvedBy||'',a.approvalNote||'',wf.label||'Chưa hoàn tất']);});return rows;}
-function exportReportCSV(){const tid=document.getElementById('rTest').value,{start,end}=typeof reportDateRange==='function'?reportDateRange():{start:'',end:''};const t=state.tests.find(x=>x.id===tid);if(!t)return;const label=start||end?(start||'batdau')+'_'+(end||'hientai'):'toanbo';downloadCSV('Bao_cao_IQC_'+safeName(t.name)+'_'+safeName(label)+'.csv',reportRows(tid,start,end));}
+function exportReportCSV(){const{tid,t,start,end}=reportExportSelection();if(!t)return;const label=start||end?(start||'batdau')+'_'+(end||'hientai'):'toanbo';downloadCSV('Bao_cao_IQC_'+safeName(t.name)+'_'+safeName(label)+'.csv',reportRows(tid,start,end));}
 function exportActionsCSV(){
   const rows=[...exportMetaRows('Nhật ký khắc phục'),[],['Mã NCE','Ngày xảy ra','Thời điểm mở hồ sơ','Nguồn phát hiện','Giai đoạn','Xét nghiệm','Mức / lô','Luật','Loại sai số','Hành động','Điều tra & ảnh hưởng','Người phụ trách','Hạn hoàn thành','S ban đầu','O ban đầu','D ban đầu','RPN ban đầu','Phân loại nguy cơ','Căn cứ SOP','Quyết định cho phép trở lại','Ngày cho phép','Người cho phép','Căn cứ cho phép','QC chạy lại','Kết luận hiệu lực','Ngày đánh giá hiệu lực','Bằng chứng hiệu lực','Người đánh giá','S còn lại','O còn lại','D còn lại','RPN còn lại','Phân loại nguy cơ còn lại','Căn cứ đánh giá lại','Trạng thái duyệt','Người duyệt','Thời điểm duyệt','Ý kiến duyệt','Lý do trả lại','Người trả lại','Thời điểm trả lại','Trạng thái bản ghi','Lý do hủy','Người hủy','Thời điểm hủy','Hồ sơ trước','Hồ sơ tiếp theo','Trạng thái hồ sơ']];
   const effLabels={pending:'Chưa đánh giá',effective:'Có hiệu lực',ineffective:'Chưa hiệu lực'};
@@ -192,11 +268,11 @@ const ReportXlsx=(()=>{
       xf(5,3,1,'left','center',1),   /*4 LABEL*/
       xf(0,4,1,'left','center',1),   /*5 VAL*/
       xf(5,3,1,'center','center',1), /*6 TH*/
-      xf(0,4,1,'center','center',0), /*7 TD*/
+      xf(0,4,1,'center','center',1), /*7 TD*/
       xf(0,4,1,'left','center',1),   /*8 TDL*/
       xf(6,0,0,'left','center',1),   /*9 NOTE*/
-      xf(1,5,1,'center','center',0), /*10 REJ*/
-      xf(1,6,1,'center','center',0)];/*11 WARN*/
+      xf(1,5,1,'center','center',1), /*10 REJ*/
+      xf(1,6,1,'center','center',1)];/*11 WARN*/
     return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="'+fonts.length+'">'+fonts.join('')+'</fonts><fills count="'+fills.length+'">'+fills.join('')+'</fills><borders count="'+borders.length+'">'+borders.join('')+'</borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="'+xfs.length+'">'+xfs.join('')+'</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
   };
   const sheetXml=(doc)=>{
@@ -232,12 +308,11 @@ const ReportXlsx=(()=>{
    bảng thông tin đơn vị, biểu đồ LJ tổng hợp (nếu ≥2 mức), rồi từng mức: biểu đồ LJ,
    bảng Mean/SD/CV/Bias/TE/Sigma, bảng điểm, điểm vi phạm; cuối cùng là nhật ký khắc phục.
    Cần DOM để render biểu đồ (ljDataURL/ljMultiDataURL) nên chỉ chạy trong trình duyệt. */
-function reportXlsxDoc(tid,start,end){
+function reportXlsxDoc(tid,start,end,includeNceAppendix=true){
   const t=state.tests.find(x=>x.id===tid);if(!t)return null;
   const ST=RXST,NCOL=10,LASTCOL='J',CHART_W=930,CHART_H=Math.round(930*430/1400),ROW_PX=17;
-  const inMonth=p=>(!start||p.date>=start)&&(!end||p.date<=end),wg=activeWestgard(t);
-  const teaVal=typeof sgTea==='function'?sgTea(t):(t.tea||0);
-  const teaSourceText=typeof sgTeaLabel==='function'?sgTeaLabel(sgTeaSource(t)):'Ricos / Westgard biological variation';
+  const inMonth=reportInRange(start,end),wg=activeWestgard(t);
+  const{teaVal,teaSourceText}=reportTeaInfo(t);
   const rows=[],merges=[],images=[],rowHeights={};let R=0;
   const S=(v,s)=>({v,s}),Nn=(v,s)=>({v,s,num:true});
   const n1=v=>Number.isFinite(v)?Number(Number(v).toFixed(1)):'',n2=v=>Number.isFinite(v)?Number(Number(v).toFixed(2)):'',n3=v=>Number.isFinite(v)?Number(Number(v).toFixed(3)):'';
@@ -246,6 +321,10 @@ function reportXlsxDoc(tid,start,end){
   const blank=()=>push([]);
   const section=txt=>{const r=push([S(txt,ST.SECTION)]);fullMerge(r);rowHeights[r]=21;};
   const note=txt=>{const r=push([S(txt,ST.NOTE)]);fullMerge(r);rowHeights[r]=Math.min(60,14+Math.ceil(String(txt).length/95)*13);};
+  const nceCells=(value,style,count)=>Array.from({length:count},(_,i)=>S(i?'':value,style));
+  const nceSub=txt=>{blank();const r=push(nceCells(txt,ST.LABEL,NCOL));fullMerge(r);rowHeights[r]=19;};
+  const ncePair=(l1,v1,l2,v2)=>{const a=String(v1||'—'),b=String(v2||'—'),rr=push([...nceCells(l1,ST.LABEL,2),...nceCells(a,ST.VAL,3),...nceCells(l2,ST.LABEL,2),...nceCells(b,ST.VAL,3)]);merges.push('A'+rr+':B'+rr,'C'+rr+':E'+rr,'F'+rr+':G'+rr,'H'+rr+':J'+rr);rowHeights[rr]=Math.min(54,21+Math.max(Math.ceil(a.length/42),Math.ceil(b.length/42)-1)*12);};
+  const nceWide=(label,value)=>{const text=String(value||'—'),rr=push([...nceCells(label,ST.LABEL,2),...nceCells(text,ST.VAL,8)]);merges.push('A'+rr+':B'+rr,'C'+rr+':J'+rr);rowHeights[rr]=Math.min(72,21+Math.max(0,Math.ceil(text.length/105)-1)*12);};
   const imgBytes=typeof sigmaDataURLBytes==='function'?sigmaDataURLBytes:null;
   const chart=durl=>{if(!durl||!imgBytes)return;const row0=R;let bytes;try{bytes=imgBytes(durl);}catch(e){return;}images.push({bytes,dispW:CHART_W,dispH:CHART_H,row0});const spacer=Math.ceil(CHART_H/ROW_PX)+1;for(let i=0;i<spacer;i++)blank();};
   // ---- Tiêu đề + thông tin đơn vị (bám theo báo cáo in: tiêu đề căn giữa, thanh app/luật, bảng meta cân đối) ----
@@ -264,54 +343,67 @@ function reportXlsxDoc(tid,start,end){
   metaWide('Nguồn TEa',teaSourceText+(typeof sgTeaRefText==='function'&&sgTeaRefText(t)?' · '+sgTeaRefText(t):'')+(t.teaDoc?' · '+t.teaDoc:'')+(t.teaApprovedBy?' · duyệt '+t.teaApprovedBy:''));
   metaWide('Ghi chú Sigma','Sigma (kỳ) tính từ Mean/CV thực tế trong đúng khoảng ngày báo cáo này, khác với Sigma đã thẩm định ở trang Six Sigma & Sai số. Dấu * nghĩa là kỳ có n < 20 kết quả, CV/Sigma chưa đủ ổn định.');
   // ---- Biểu đồ LJ tổng hợp (nếu có ≥2 mức có điểm) ----
-  const multiViews=operationalLevels(t).map(l=>({level:l.level,lot:l.lot,mean:l.mean,sd:l.sd,pts:operationalLotPoints(t,l.level).filter(inMonth),label:'M'+l.level+'·'+(l.lot||'?')}));
+  const multiViews=reportMultiViews(t,inMonth);
   if(multiViews.filter(v=>v.pts.length).length>=2){blank();section('Levey-Jennings tổng hợp theo Z-score');chart(typeof ljMultiDataURL==='function'?ljMultiDataURL(multiViews,t):null);}
   // ---- Bảng ô cho từng mục ----
   const mergePairs=(r,pairs)=>pairs.forEach(([a,b])=>merges.push(a+r+':'+b+r));
   const statsHeader=()=>{const r=push([S('n',ST.TH),S('Mean thực',ST.TH),S('',ST.TH),S('SD',ST.TH),S('CV%',ST.TH),S('Bias%',ST.TH),S('TE%',ST.TH),S('TEa%',ST.TH),S('Sigma (kỳ)',ST.TH),S('',ST.TH)]);mergePairs(r,[['B','C'],['I','J']]);rowHeights[r]=18;};
   const statsRow=(st,bias,te,sigma)=>{const sg=sigma==null?S('—',ST.TD):(st.n<20?S(fmt(sigma,1)+' *',ST.TD):Nn(n1(sigma),ST.TD)),r=push([Nn(st.n,ST.TD),Nn(n2(st.m),ST.TD),S('',ST.TD),Nn(n3(st.sd),ST.TD),Nn(n2(st.cv),ST.TD),Nn(n2(bias),ST.TD),Nn(n2(te),ST.TD),(teaVal?Nn(n2(teaVal),ST.TD):S('—',ST.TD)),sg,S('',ST.TD)]);mergePairs(r,[['B','C'],['I','J']]);};
   const pointsHeader=()=>{const r=push([S('Ngày',ST.TH),S('',ST.TH),S('Lần chạy',ST.TH),S('',ST.TH),S('NV',ST.TH),S('Giá trị',ST.TH),S('Z',ST.TH),S('Kết luận',ST.TH),S('Luật / bằng chứng',ST.TH),S('',ST.TH)]);mergePairs(r,[['A','B'],['C','D'],['I','J']]);rowHeights[r]=18;};
-  const pointsRow=o=>{const rules=[...new Set(o.f.rules||[])],support=[...new Set(o.f.supportRules||[])].filter(rule=>!rules.includes(rule)),ruleText=rules.join(', ')||(support.length?'Bằng chứng: '+support.join(', '):'—'),staff=pointStaff(o.p),vs=o.f.level==='rej'?ST.REJ:o.f.level==='warn'?ST.WARN:ST.TD,r=push([S(vnDate(o.p.date),ST.TD),S('',ST.TD),S(o.p.runId||'—',ST.TD),S('',ST.TD),S(staff.code||'—',ST.TD),Nn(Number.isFinite(o.p.val)?o.p.val:'',ST.TD),S((o.z>=0?'+':'')+fmt(o.z)+'s',ST.TD),S(stateName(o.f.level),vs),S(ruleText,ST.TDL),S('',ST.TDL)]);mergePairs(r,[['A','B'],['C','D'],['I','J']]);};
+  const pointsRow=o=>{const rules=[...new Set(o.f.rules||[])],support=[...new Set(o.f.supportRules||[])].filter(rule=>!rules.includes(rule)),ruleText=rules.join(', ')||(support.length?'Bằng chứng: '+support.join(', '):'—'),staff=pointStaff(o.p),vs=o.f.level==='rej'?ST.REJ:o.f.level==='warn'?ST.WARN:ST.TD,r=push([S(vnDate(o.p.date),ST.TD),S('',ST.TD),S(o.p.runId||'—',ST.TD),S('',ST.TD),S(staff.code||'—',ST.TD),Nn(Number.isFinite(o.p.val)?o.p.val:'',ST.TD),S((o.z>=0?'+':'')+fmt(o.z)+'s',ST.TD),S(stateName(o.f.level),vs),S(ruleText,ST.TD),S('',ST.TD)]);mergePairs(r,[['A','B'],['C','D'],['I','J']]);};
   const violHeader=()=>{const r=push([S('Ngày',ST.TH),S('',ST.TH),S('NV',ST.TH),S('Giá trị',ST.TH),S('Z',ST.TH),S('Luật',ST.TH),S('',ST.TH),S('Loại sai số',ST.TH),S('',ST.TH),S('',ST.TH)]);mergePairs(r,[['A','B'],['F','G'],['H','J']]);rowHeights[r]=18;};
   const violRow=o=>{const rules=[...new Set(o.f.rules||[])],r=push([S(vnDate(o.p.date),ST.TD),S('',ST.TD),S(pointStaff(o.p).code||'—',ST.TD),Nn(Number.isFinite(o.p.val)?o.p.val:'',ST.TD),S((o.z>=0?'+':'')+fmt(o.z)+'s',ST.TD),S(rules.join(', '),ST.WARN),S('',ST.WARN),S(errorType(rules),ST.TDL),S('',ST.TDL),S('',ST.TDL)]);mergePairs(r,[['A','B'],['F','G'],['H','J']]);};
   // ---- Từng mức ----
   operationalLevels(t).forEach(l=>{
     (typeof previousLotSeries==='function'?previousLotSeries(t,l.level):[]).forEach(s=>{
-      const inPts=s.pts.filter(inMonth);if(!inPts.length)return;
-      const wgP=QCCore.westgardByPoint(s.pts,s.mean,s.sd,rule=>testRuleOnWithin(t,rule)),idxOf=new Map(s.pts.map((p,i)=>[p.id,i]));
+      const{inPts,items:allS}=reportPrevLotRows(t,s,inMonth);if(!inPts.length)return;
       blank();section('Mức '+l.level+' — Lô cũ '+(s.lot||'?')+' · đã chuyển tiếp (Mean='+fmt(s.mean)+', SD='+fmt(s.sd,3)+')');
       note('Vi phạm ở lô cũ chỉ đánh giá luật Westgard theo từng mức riêng lẻ, không gồm luật liên mức (như R4s giữa các mức cùng lần chạy).');
       chart(typeof ljDataURL==='function'?ljDataURL(inPts,s.mean,s.sd):null);
       const stat=reportLevelStats(inPts,s.mean,teaVal);statsHeader();statsRow(stat.st,stat.bias,stat.te,stat.sigma);
-      const allS=inPts.map(p=>{const i=idxOf.get(p.id),raw=wgP.F[i]||{rules:[]},f={...raw,level:ruleResultLevel(t,raw.rules||[])},z=wgP.zs[i];return{p,f,z};});
       blank();pointsHeader();allS.forEach(pointsRow);
       const violS=allS.filter(o=>o.f.level!=='ok');
       if(violS.length){blank();violHeader();violS.forEach(violRow);}
     });
-    const pts=operationalLotPoints(t,l.level).filter(inMonth);
+    const{pts,items:all}=reportLevelRows(t,l,wg,inMonth);
     blank();section('Mức '+l.level+' — Lô '+(l.lot||'?')+' · Dải '+(l.applied==='lab'?'PXN':'NSX')+' (Mean='+fmt(l.mean)+', SD='+fmt(l.sd,3)+')');
     if(!pts.length){note('Không có dữ liệu trong khoảng ngày đã chọn.');return;}
     chart(typeof ljDataURL==='function'?ljDataURL(pts,l.mean,l.sd):null);
     const stat=reportLevelStats(pts,l.mean,teaVal);statsHeader();statsRow(stat.st,stat.bias,stat.te,stat.sigma);
-    const all=pts.map(p=>{const f=wg.byPoint.get(p.id)||{level:'ok',rules:[],z:(p.val-l.mean)/l.sd};return{p,f,z:f.z};});
     blank();pointsHeader();all.forEach(pointsRow);
     const viol=all.filter(o=>o.f.level!=='ok');
     if(viol.length){blank();violHeader();viol.forEach(violRow);}
   });
   // ---- Nhật ký khắc phục ----
-  const acts=(state.actions||[]).filter(a=>a.testId===tid&&inMonth({date:typeof actionEventDate==='function'?actionEventDate(a):a.date}));
+  const acts=reportActionsInRange(tid,inMonth);
   if(acts.length){
     blank();section('Hành động khắc phục trong khoảng ngày đã chọn');
-    push([S('Ngày',ST.TH),S('Mức / lô',ST.TH),S('Luật',ST.TH),S('Loại SS',ST.TH),S('Hành động',ST.TH),S('Người',ST.TH),S('QC chạy lại',ST.TH),S('Duyệt',ST.TH),S('Khép vòng',ST.TH),S('Ý kiến',ST.TH)]);
-    acts.forEach(a=>{const wf=typeof actionWorkflowStatus==='function'?actionWorkflowStatus(a):{complete:false,label:'Chưa hoàn tất'},rr=typeof actionRerunStatus==='function'?actionRerunStatus(a):{label:''},protocol=typeof actionProtocolSummary==='function'?actionProtocolSummary(a):'';push([S((a.nceId?a.nceId+'\n':'')+vnDate(typeof actionEventDate==='function'?actionEventDate(a):a.date),ST.TD),S(actionLevelShort(t,a.level,a.lot),ST.TD),S(a.rule||'',ST.TD),S(a.errorType||'',ST.TD),S((a.action||a.correction||'')+(protocol?'\n'+protocol:''),ST.TDL),S(a.by||'',ST.TD),S(rr.label||'',ST.TD),S((typeof actionApprovalLabel==='function'?actionApprovalLabel(a):(a.approvalStatus||'pending'))+(a.approvedBy?' ('+a.approvedBy+')':''),ST.TD),S(wf.label||'Chưa hoàn tất',ST.TD),S(a.approvalNote||'',ST.TDL)]);});
+    note('Bảng dưới đây là bản tóm tắt. Nội dung đầy đủ nằm trong phụ lục NCE khi tùy chọn kèm phụ lục được bật.');
+    let hr=push([S('Ngày / mã NCE',ST.TH),S('Mức / lô',ST.TH),S('Luật / loại SS',ST.TH),S('Tóm tắt xử lý',ST.TH),S('',ST.TH),S('',ST.TH),S('Người',ST.TH),S('QC chạy lại',ST.TH),S('Duyệt',ST.TH),S('Khép vòng',ST.TH)]);merges.push('D'+hr+':F'+hr);rowHeights[hr]=25;
+    acts.forEach(a=>{const m=reportNceModel(a,t),rr=typeof actionRerunStatus==='function'?actionRerunStatus(a):{label:''},summary=reportNceSummaryParts(a).map(([label,text])=>label+': '+text).join('\n'),ar=push([S((a.nceId?a.nceId+'\n':'')+m.eventDateText,ST.TD),S(actionLevelShort(t,a.level,a.lot),ST.TD),S((a.rule||'—')+'\n'+(a.errorType||'—'),ST.TD),S(summary,ST.TDL),S('',ST.TDL),S('',ST.TDL),S(a.by||'—',ST.TD),S(rr.label||'—',ST.TD),S((typeof actionApprovalLabel==='function'?actionApprovalLabel(a):(a.approvalStatus||'pending'))+(a.approvedBy?'\n'+a.approvedBy:''),ST.TD),S(m.wfLabel,ST.TD)]);merges.push('D'+ar+':F'+ar);rowHeights[ar]=96;});
+    if(includeNceAppendix){
+      blank();section('Phụ lục - Hồ sơ NCE chi tiết');note('Phụ lục giữ đầy đủ nội dung điều tra, bằng chứng QC chạy lại, đánh giá hiệu lực và phê duyệt. Bảng tổng hợp phía trên chỉ trình bày thông tin trọng yếu.');
+      acts.forEach(a=>{const m=reportNceModel(a,t);
+        blank();section('Phiếu NCE '+m.nceTitle+' · '+m.wfLabel);
+        ncePair('Ngày xảy ra',m.eventDateText,'Xét nghiệm / mức / lô',m.testLevelText);ncePair('Luật / loại sai số',m.ruleErrText,'Nguồn / giai đoạn',m.sourcePhaseText);ncePair('Người phụ trách / hạn',m.ownerDueText,'Trạng thái bản ghi',m.recordStatusText);
+        if(!m.modern){nceSub('Hành động đã ghi');nceWide('Nội dung',m.legacyActionText);nceSub('QC chạy lại / duyệt');ncePair('QC chạy lại',m.rerunText,'Phê duyệt',m.approvalShortText);return;}
+        nceSub('1. Kiểm soát và xử lý tức thời');ncePair('Phạm vi kiểm soát',m.containmentText,'Ghi chú phạm vi',m.containmentNote);nceWide('Xử lý tức thời',m.correctionText);
+        nceSub('2. Đánh giá nguy cơ ban đầu');ncePair('Phân loại / RPN',m.riskText,'S x O x D',m.sodText);nceWide('Căn cứ SOP',m.riskBasis);
+        nceSub('3. Checklist điều tra');let cr=push([S('Hạng mục',ST.TH),S('',ST.TH),S('',ST.TH),S('',ST.TH),S('Kết luận',ST.TH),S('',ST.TH),S('Ghi chú / bằng chứng',ST.TH),S('',ST.TH),S('',ST.TH),S('',ST.TH)]);merges.push('A'+cr+':D'+cr,'E'+cr+':F'+cr,'G'+cr+':J'+cr);m.checks.forEach(([label,statusText,noteText])=>{const rrr=push([...nceCells(label,ST.TDL,4),...nceCells(statusText,ST.TD,2),...nceCells(noteText,ST.TDL,4)]);merges.push('A'+rrr+':D'+rrr,'E'+rrr+':F'+rrr,'G'+rrr+':J'+rrr);rowHeights[rrr]=Math.min(54,23+Math.max(0,Math.ceil(noteText.length/55)-1)*12);});
+        nceSub('4. Nguyên nhân và hành động khắc phục');ncePair('Nhóm nguyên nhân',m.causeCategoryText,'Ngày hoàn thành hành động',m.actionCompletedText);nceWide('Nguyên nhân',m.causeText);nceWide('Hành động khắc phục',m.actionText);
+        nceSub('5. Bằng chứng QC chạy lại và cho phép trở lại');ncePair('QC chạy lại',m.rerunText,'Quyết định',m.releaseText);ncePair('Ngày / người cho phép',m.releaseWhoText,'Căn cứ cho phép',m.releaseNote);
+        nceSub('6. Ảnh hưởng người bệnh');ncePair('Kết luận',m.patientText,'Xử lý kết quả liên quan',m.patientAction);
+        nceSub('7. Hiệu lực, nguy cơ còn lại và phê duyệt');ncePair('Đánh giá hiệu lực',m.effLabel,'Ngày / người đánh giá',m.effWhoText);ncePair('Bằng chứng hiệu lực',m.effNote,'Nguy cơ còn lại',m.residualText);ncePair('Căn cứ đánh giá lại',m.residualBasis,'Phê duyệt',m.approvalText);nceWide('Ý kiến duyệt',m.approvalNote);
+        if(m.cancelled){nceSub('Thông tin hủy hồ sơ');nceWide('Lý do / người / thời điểm',m.cancelText);}
+      });
+    }
   }
   blank();const sr=push([S('Người thực hiện — Người kiểm tra — Phụ trách khoa (ký, ghi rõ họ tên)',ST.NOTE)]);fullMerge(sr);
-  return{sheetName:'Báo cáo nội kiểm',cols:[8,12,12,10,10,10,13,13,17,22].slice(0,NCOL),rows,merges,rowHeights,images};
+  return{sheetName:'Báo cáo nội kiểm',cols:[13,12,14,10,10,10,12,13,15,18].slice(0,NCOL),rows,merges,rowHeights,images};
 }
 async function exportReportXLSX(){
-  const tid=document.getElementById('rTest').value,{start,end}=typeof reportDateRange==='function'?reportDateRange():{start:'',end:''};
-  const t=state.tests.find(x=>x.id===tid);if(!t)return;
-  let doc;try{doc=reportXlsxDoc(tid,start,end);}catch(e){await infoDialog('Không thể tạo báo cáo Excel:\n'+(e&&e.message?e.message:e));return;}
+  const{tid,t,start,end,includeNceAppendix}=reportExportSelection();if(!t)return;
+  let doc;try{doc=reportXlsxDoc(tid,start,end,includeNceAppendix);}catch(e){await infoDialog('Không thể tạo báo cáo Excel:\n'+(e&&e.message?e.message:e));return;}
   if(!doc)return;
   try{const bytes=ReportXlsx.build(doc),label=start||end?(start||'batdau')+'_'+(end||'hientai'):'toanbo';downloadBlob('Bao_cao_IQC_'+safeName(t.name)+'_'+safeName(label)+'.xlsx',new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));}
   catch(e){await infoDialog('Không thể xuất Excel:\n'+(e&&e.message?e.message:e));}

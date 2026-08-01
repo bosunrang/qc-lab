@@ -29,6 +29,32 @@ assert.equal(ctx.EntryService.voidPoint(state, {
   formatDate: s => s, formatNumber: n => String(n)
 }).error, 'period-locked');
 
+/* lockedPoints(): câu hỏi dùng chung cho MỌI thao tác phá hủy/viết lại hàng loạt.
+   Gộp theo kỳ, bỏ qua điểm ngoài kỳ khóa và ngày hỏng; điểm đã hủy VẪN tính vì
+   chúng vẫn là hồ sơ của kỳ đó. */
+{
+  const many = [
+    { id: 'a', date: '2026-07-01' },            // trong kỳ khóa
+    { id: 'b', date: '2026-07-31' },            // trong kỳ khóa
+    { id: 'c', date: '2026-07-05', voided: true }, // đã hủy nhưng vẫn là hồ sơ kỳ khóa
+    { id: 'd', date: '2026-08-01' },            // kỳ chưa khóa
+    { id: 'e', date: '' },                      // ngày hỏng
+    null,
+  ];
+  // periods sinh trong realm vm nên sao chép sang mảng của Node trước khi deepEqual
+  const summary = ctx.PeriodService.lockedPoints(state, many);
+  assert.equal(summary.count, 3, 'chỉ đếm điểm thuộc kỳ đã khóa, gồm cả điểm đã hủy');
+  assert.deepEqual([...summary.periods], ['2026-07']);
+  assert.equal(ctx.PeriodService.lockedPoints(state, []).count, 0);
+  assert.equal(ctx.PeriodService.lockedPoints(state, null).count, 0);
+
+  ctx.PeriodService.lock(state, { ym: '2026-08', lockedAt: '', lockedBy: 'Admin', id: 'lock2' });
+  const twoPeriods = ctx.PeriodService.lockedPoints(state, many);
+  assert.equal(twoPeriods.count, 4);
+  assert.deepEqual([...twoPeriods.periods], ['2026-07', '2026-08'], 'các kỳ phải được sắp xếp để hiện ra ổn định');
+  ctx.PeriodService.unlock(state, { ym: '2026-08', reason: 'dọn sau khi kiểm' });
+}
+
 assert.equal(ctx.PeriodService.unlock(state, { ym: '2026-07', reason: 'Bổ sung đối soát' }).reason, 'Bổ sung đối soát');
 assert.equal(ctx.PeriodService.findLock(state, '2026-07'), null);
 assert.equal(ctx.PeriodService.unlock(state, { ym: '2026-07', reason: 'mở lại kiểm tra' }).error, 'not-locked');

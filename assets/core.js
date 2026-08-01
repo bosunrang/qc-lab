@@ -521,6 +521,37 @@
     return source;
   }
 
+  /* ===== Ngữ nghĩa luật: hành động + phạm vi (thuần, không phụ thuộc state) =====
+     ĐÂY LÀ NGUỒN DUY NHẤT cho hai bảng này. Trước 2026-08-01 chúng tồn tại hai
+     bản chép tay giống hệt nhau: qc-domain.js (luồng chính) và
+     workers/westgard-worker.js (luồng nền, chạy từ WG_WORKER_POINT_THRESHOLD
+     điểm trở lên). Sửa một bên mà quên bên kia thì CÙNG một bộ dữ liệu sẽ cho
+     kết luận nhận/loại khác nhau chỉ vì nó to hay nhỏ — và không có test nào
+     bắt được (đã kiểm chứng: làm lệch riêng worker vẫn qua sạch cả bộ test).
+     Số mức QC do bên gọi truyền vào vì nó phụ thuộc state; phần còn lại thuần. */
+  const RULE_ACTIONS=['inactive','alert','reject'];
+  const RULE_SCOPES=['within','across','both'];
+  /* 1-2s là sàng lọc, 6x/7T phát hiện shift/trend sớm nên khá nhạy — cả ba mặc
+     định chỉ cảnh báo, vẫn nâng lên 'reject' được theo SOP qua ruleActions. */
+  const WG_ALERT_RULES=['1-2s','6x','7T'];
+  function ruleEnabled(toggles,rule){return !toggles||toggles[rule]!==false;}
+  function defaultRuleAction(rule,enabled){return enabled?(WG_ALERT_RULES.includes(rule)?'alert':'reject'):'inactive';}
+  function resolveRuleAction(rule,enabled,override){return RULE_ACTIONS.includes(override)?override:defaultRuleAction(rule,enabled);}
+  /* Phạm vi "protocol" tránh chạy cùng một luật ở cả chuỗi từng mức lẫn chuỗi
+     chéo mức. Với nhiều mức QC, các luật thiết kế theo N vật liệu ưu tiên chéo
+     mức; 2-2s/4-1s vẫn cho phép cả hai cách kinh điển. */
+  function defaultRuleScope(rule,levelCount){
+    const levels=+levelCount||0;
+    if(levels<2||['1-2s','1-3s','7T'].includes(rule))return'within';
+    if(rule==='R4s')return'across';
+    if(['2of3-2s','3-1s'].includes(rule))return levels>=3?'across':'within';
+    if(['6x','8x','9x','10x','12x'].includes(rule))return'across';
+    return'both';
+  }
+  function resolveRuleScope(rule,levelCount,override){return RULE_SCOPES.includes(override)?override:defaultRuleScope(rule,levelCount);}
+  function ruleOnInScope(rule,levelCount,override,action,channel){if(action==='inactive')return false;const scope=resolveRuleScope(rule,levelCount,override);return scope==='both'||scope===channel;}
+  function ruleVerdictLevel(rules,actionOf){const list=rules||[];return list.some(r=>actionOf(r)==='reject')?'rej':list.some(r=>actionOf(r)==='alert')?'warn':'ok';}
+
   /* ===== Phân loại sai số (thuần, không phụ thuộc state) — đặt ở core để
      unit-test được; qc-domain.js re-export lại các tên này cho phần UI. Hai
      danh sách SE/RE là NGUỒN DUY NHẤT, dùng chung cho errorType và fixHint. ===== */
@@ -545,5 +576,5 @@
   function errorType(rules){rules=rules||[];if(rules.some(r=>WG_SE_RULES.includes(r)))return'SE — Sai số hệ thống';if(rules.some(r=>WG_RE_RULES.includes(r)))return'RE — Sai số ngẫu nhiên';return'—';}
   function fixHint(rules){rules=rules||[];if(rules.some(r=>WG_SE_RULES.includes(r)))return'Hướng hệ thống: kiểm tra hiệu chuẩn, lô hóa chất/QC mới, nhiệt độ, đầu hút, đèn quang.';if(rules.some(r=>WG_RE_RULES.includes(r)))return'Hướng ngẫu nhiên: bọt khí, thể tích hút, mẫu QC pha/bảo quản, điện áp, thao tác.';return'';}
 
-  return{STATE_SCHEMA_VERSION,WG_RULES,WG_DEFAULT_ON,WG_RULE_DESCRIPTIONS,cleanText,cleanId,finiteNumber,stats,westgard,westgardMulti,pointZ,westgardByPoint,westgardLatestRules,westgardLatestRulesFromZ,westgardMultiByPoint,cusum,movingAverage,erf,normalCdf,dpmoFromSigma,sigmaMetric,uncertaintyBudget,westgardSigmaRules,targetFromLimits,limitsFromTarget,primaryErrorRule,errorType,fixHint,validateBackup,validateStateInvariants,sanitizeBackup};
+  return{STATE_SCHEMA_VERSION,WG_RULES,WG_DEFAULT_ON,WG_RULE_DESCRIPTIONS,RULE_ACTIONS,RULE_SCOPES,WG_ALERT_RULES,cleanText,cleanId,finiteNumber,stats,westgard,westgardMulti,pointZ,westgardByPoint,westgardLatestRules,westgardLatestRulesFromZ,westgardMultiByPoint,cusum,movingAverage,erf,normalCdf,dpmoFromSigma,sigmaMetric,uncertaintyBudget,westgardSigmaRules,targetFromLimits,limitsFromTarget,ruleEnabled,defaultRuleAction,resolveRuleAction,defaultRuleScope,resolveRuleScope,ruleOnInScope,ruleVerdictLevel,primaryErrorRule,errorType,fixHint,validateBackup,validateStateInvariants,sanitizeBackup};
 });

@@ -4,6 +4,7 @@ const { loadSandbox, run } = require('./helpers/sandbox');
 const ctx = loadSandbox([
   'core.js',
   'modules/state.js',
+  'modules/qc-domain.js', // searchText() — bộ lọc KPI dùng, phải là bản thật để đúng cách bỏ dấu tiếng Việt
   'modules/entry-ui-state.js',
   'modules/analysis-ui-state.js',
   'modules/router-render.js',
@@ -63,6 +64,54 @@ assert.equal(kpiValue.capa.onTimeRate, 100);
 assert.deepEqual(kpiValue.capa.stages, { investigating:1, rerun:0, effectiveness:0, approval:0, closed:1 });
 assert.deepEqual(kpiValue.causes, [{ label:'Thiết bị', count:2 }]);
 assert.equal(kpiValue.months.find(x=>x.key==='2026-07').rejected, 1);
+
+/* Ô lọc KPI theo xét nghiệm phải theo đúng quy ước tìm kiếm của app: gõ dở thì
+   thu hẹp danh sách TẠI CHỖ (không vẽ lại trang, không tự đổi lựa chọn), chỉ khi
+   chọn ở <select> mới tính lại KPI. Bản dùng datalist trước đó đòi gõ khớp CHÍNH
+   XÁC cả tên mới lọc được, và rời ô khi đang gõ dở thì âm thầm nhảy về "Tất cả". */
+const kpiTestPicker = run(ctx, `
+  (function(){
+    var renders=0,count={textContent:''};
+    var select={value:'all',disabled:false,children:[],replaceChildren:function(){this.children=[].slice.call(arguments);}};
+    document={createElement:function(){return{value:'',textContent:''};},
+      getElementById:function(id){return id==='dashKpiTest'?select:id==='dashKpiTestCount'?count:null;}};
+    rerender=function(){renders++;};
+    dashKpiTestChoices=[{id:'T1',label:'Sodium (Na)'},{id:'T2',label:'Glucose (GLU)'},{id:'T3',label:'Sodium niệu'}];
+    dashKpiTest='all';dashKpiTestQ='';
+    var labels=function(){return select.children.map(function(x){return x.textContent;});};
+
+    dashKpiTestQ='sod';dashboardKpiApplyTestSearch();
+    var partial={labels:labels(),count:count.textContent,selected:dashKpiTest,renders:renders};
+
+    dashKpiTestQ='khong khop gi';dashboardKpiApplyTestSearch();
+    var noHit={labels:labels(),count:count.textContent,selected:dashKpiTest,renders:renders};
+
+    dashboardKpiSetTest('T2');
+    var committed={selected:dashKpiTest,renders:renders};
+
+    dashKpiTestQ='sod';dashboardKpiApplyTestSearch();
+    var keepsSelected={labels:labels(),value:select.value,count:count.textContent};
+
+    // Ô tìm phải LÊN LỊCH cập nhật (debounce của scheduleSearchRender) chứ không
+    // vẽ lại trang ngay; hủy timer sau khi kiểm để không rớt ra ngoài bài test.
+    var before=renders;dashboardKpiTestSearch('sodi');
+    var scheduled=!!dashboardKpiTestSearch.searchTimer;
+    clearTimeout(dashboardKpiTestSearch.searchTimer);
+    return{partial:partial,noHit:noHit,committed:committed,keepsSelected:keepsSelected,
+      query:dashKpiTestQ,searchRenders:renders-before,scheduled:scheduled};
+  })()
+`);
+const kpiPickerValue = JSON.parse(JSON.stringify(kpiTestPicker));
+assert.deepEqual(kpiPickerValue.partial, { labels:['Tất cả xét nghiệm','Sodium (Na)','Sodium niệu'], count:'2/3', selected:'all', renders:0 },
+  'gõ dở phải lọc được ngay và không vẽ lại trang');
+assert.deepEqual(kpiPickerValue.noHit, { labels:['Tất cả xét nghiệm'], count:'0/3', selected:'all', renders:0 },
+  'không khớp gì thì vẫn còn "Tất cả" và không tự đổi lựa chọn');
+assert.deepEqual(kpiPickerValue.committed, { selected:'T2', renders:1 }, 'chọn ở <select> mới là hành vi chốt');
+assert.deepEqual(kpiPickerValue.keepsSelected, { labels:['Tất cả xét nghiệm','Glucose (GLU)','Sodium (Na)','Sodium niệu'], value:'T2', count:'2/3' },
+  'xét nghiệm đang chọn phải ở lại danh sách dù không khớp từ khóa, nếu không ô chọn sẽ lệch với state');
+assert.equal(kpiPickerValue.searchRenders, 0, 'ô tìm kiếm không được tự vẽ lại trang');
+assert.equal(kpiPickerValue.scheduled, true, 'ô tìm kiếm phải đi qua scheduleSearchRender (debounce + trả lại con trỏ)');
+assert.equal(kpiPickerValue.query, 'sodi', 'ô tìm kiếm phải giữ lại từ khóa vừa gõ');
 
 const rowWindow = run(ctx, `
   (function(){

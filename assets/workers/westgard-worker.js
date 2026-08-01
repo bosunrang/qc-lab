@@ -3,7 +3,7 @@
     module.exports=factory(require('../core.js'));
     return;
   }
-  if(typeof importScripts==='function'&&typeof root.QCCore==='undefined')importScripts('../core.js?v=seven-t-target-reset-20260727-1');
+  if(typeof importScripts==='function'&&typeof root.QCCore==='undefined')importScripts('../core.js?v=rule-table-single-source-20260801-1');
   const api=factory(root.QCCore);
   root.onmessage=function(event){
     const job=event&&event.data;
@@ -14,25 +14,14 @@
 })(typeof self!=='undefined'?self:globalThis,function(QCCore){
   'use strict';
 
-  function ruleAction(job,rule){
-    const explicit=job.ruleActions&&job.ruleActions[rule];
-    if(explicit==='inactive'||explicit==='alert'||explicit==='reject')return explicit;
-    const on=!job.globalRules||job.globalRules[rule]!==false;
-    return on?(rule==='1-2s'||rule==='6x'||rule==='7T'?'alert':'reject'):'inactive';
-  }
-  function verdictLevel(job,rules){
-    return rules.some(rule=>ruleAction(job,rule)==='reject')?'rej':rules.some(rule=>ruleAction(job,rule)==='alert')?'warn':'ok';
-  }
-  function defaultRuleScope(job,rule){
-    const levels=(job.levels||[]).length;
-    if(levels<2||['1-2s','1-3s','7T'].includes(rule))return'within';
-    if(rule==='R4s')return'across';
-    if(['2of3-2s','3-1s'].includes(rule))return levels>=3?'across':'within';
-    if(['6x','8x','9x','10x','12x'].includes(rule))return'across';
-    return'both';
-  }
-  function ruleScope(job,rule){const scope=job.ruleScopes&&job.ruleScopes[rule];return ['within','across','both'].includes(scope)?scope:defaultRuleScope(job,rule);}
-  function ruleOnIn(job,rule,channel){if(ruleAction(job,rule)==='inactive')return false;const scope=ruleScope(job,rule);return scope==='both'||scope===channel;}
+  /* Hành động + phạm vi của luật phải GIỐNG HỆT luồng chính, nếu không thì cùng
+     một bộ dữ liệu sẽ cho kết luận nhận/loại khác nhau chỉ vì nó vượt
+     WG_WORKER_POINT_THRESHOLD. Nên cả hai bên đều gọi cùng một bảng thuần trong
+     core.js — đừng chép lại bảng đó vào đây. */
+  function ruleAction(job,rule){return QCCore.resolveRuleAction(rule,QCCore.ruleEnabled(job.globalRules,rule),job.ruleActions&&job.ruleActions[rule]);}
+  function verdictLevel(job,rules){return QCCore.ruleVerdictLevel(rules,rule=>ruleAction(job,rule));}
+  function ruleScope(job,rule){return QCCore.resolveRuleScope(rule,(job.levels||[]).length,job.ruleScopes&&job.ruleScopes[rule]);}
+  function ruleOnIn(job,rule,channel){return QCCore.ruleOnInScope(rule,(job.levels||[]).length,job.ruleScopes&&job.ruleScopes[rule],ruleAction(job,rule),channel);}
   function pointRunNo(point){const match=/-(\d+)$/.exec(String(point&&point.runId||''));return match?parseInt(match[1]):1;}
   function pointOrder(a,b){return String(a.date||'').localeCompare(String(b.date||''))||pointRunNo(a)-pointRunNo(b);}
   function computeWestgardJob(job){
@@ -57,5 +46,5 @@
     return{generation:job.generation,revision:job.revision,testId:job.testId,levels};
   }
 
-  return{computeWestgardJob,ruleAction,verdictLevel,ruleScope};
+  return{computeWestgardJob,ruleAction,verdictLevel,ruleScope,ruleOnIn};
 });

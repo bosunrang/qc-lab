@@ -7,34 +7,24 @@ function reportLevelStats(pts,mean,teaVal){
   const st=stats(pts.map(p=>p.val)),den=Math.abs(Number(mean)),bias=den?Math.abs(st.m-mean)/den*100:0,te=bias+1.65*st.cv,sigma=st.cv>0&&teaVal?(teaVal-bias)/st.cv:null;
   return{st,bias,te,sigma};
 }
-function wgOn(rule){return !state.westgardRules||state.westgardRules[rule]!==false;}
+function wgOn(rule){return QCCore.ruleEnabled(state.westgardRules,rule);}
 function wgSet(rule,on){if(!requireWrite())return;state.westgardRules=state.westgardRules||{...WG_DEFAULT};state.westgardRules[rule]=!!on;save();rerender();}
 function wgReset(){if(!requireWrite())return;state.westgardRules={...WG_DEFAULT};save();rerender();}
-/* 1-2s, 6x và 7T mặc định là CẢNH BÁO (không tự loại): 1-2s là luật sàng lọc;
-   6x phát hiện shift sớm nhưng khá nhạy, nhất là khi gộp 2 mức qua 3 run; 7T
-   chỉ ra hệ thống đang trôi dần. Cả ba vẫn nâng lên 'reject' được theo SOP của
-   từng xét nghiệm qua ruleActions. */
-function defaultRuleAction(rule){return wgOn(rule)?(rule==='1-2s'||rule==='6x'||rule==='7T'?'alert':'reject'):'inactive';}
-function testRuleAction(t,rule){const action=t&&t.ruleActions&&t.ruleActions[rule];return ['inactive','alert','reject'].includes(action)?action:defaultRuleAction(rule);}
+/* Bảng hành động + phạm vi nằm ở core.js (NGUỒN DUY NHẤT, dùng chung với
+   workers/westgard-worker.js — xem chú thích ở đó). Ở đây chỉ nối state vào:
+   bật/tắt toàn cục, ghi đè theo từng xét nghiệm và số mức đang vận hành. */
+function testLevelCount(t){return operationalLevels(t).length||(t&&t.levels||[]).length;}
+function defaultRuleAction(rule){return QCCore.defaultRuleAction(rule,wgOn(rule));}
+function testRuleAction(t,rule){return QCCore.resolveRuleAction(rule,wgOn(rule),t&&t.ruleActions&&t.ruleActions[rule]);}
 /* Alias cũ dùng cho các báo cáo một mức; mặc định phải tôn trọng phạm vi within. */
 function testRuleOn(t,rule){return testRuleOnWithin(t,rule);}
-/* Phạm vi "protocol" tránh tự động chạy cùng một luật ở cả chuỗi từng mức và
-   chuỗi chéo mức. Với nhiều mức QC, các luật được thiết kế theo N vật liệu ưu
-   tiên chéo mức; 2-2s/4-1s vẫn cho phép cả hai cách kinh điển. */
-function defaultRuleScope(t,rule){
-  const levels=operationalLevels(t).length||(t&&t.levels||[]).length;
-  if(levels<2||['1-2s','1-3s','7T'].includes(rule))return'within';
-  if(rule==='R4s')return'across';
-  if(['2of3-2s','3-1s'].includes(rule))return levels>=3?'across':'within';
-  if(['6x','8x','9x','10x','12x'].includes(rule))return'across';
-  return'both';
-}
-function testRuleScope(t,rule){const scope=t&&t.ruleScopes&&t.ruleScopes[rule];return ['within','across','both'].includes(scope)?scope:defaultRuleScope(t,rule);}
-function testRuleOnIn(t,rule,channel){if(testRuleAction(t,rule)==='inactive')return false;const scope=testRuleScope(t,rule);return scope==='both'||scope===channel;}
+function defaultRuleScope(t,rule){return QCCore.defaultRuleScope(rule,testLevelCount(t));}
+function testRuleScope(t,rule){return QCCore.resolveRuleScope(rule,testLevelCount(t),t&&t.ruleScopes&&t.ruleScopes[rule]);}
+function testRuleOnIn(t,rule,channel){return QCCore.ruleOnInScope(rule,testLevelCount(t),t&&t.ruleScopes&&t.ruleScopes[rule],testRuleAction(t,rule),channel);}
 function testRuleOnWithin(t,rule){return testRuleOnIn(t,rule,'within');}
 function testRuleOnAcross(t,rule){return testRuleOnIn(t,rule,'across');}
 function testRuleSet(t,channel){return new Set(WG_RULES.filter(rule=>testRuleOnIn(t,rule,channel)));}
-function ruleResultLevel(t,rules){return rules.some(r=>testRuleAction(t,r)==='reject')?'rej':rules.some(r=>testRuleAction(t,r)==='alert')?'warn':'ok';}
+function ruleResultLevel(t,rules){return QCCore.ruleVerdictLevel(rules,r=>testRuleAction(t,r));}
 function westgard(points,mean,sd){return QCCore.westgard(points,mean,sd,wgOn);}
 function westgardMulti(levelSets){return QCCore.westgardMulti(levelSets,wgOn);}
 function westgardByPoint(points,mean,sd){return QCCore.westgardByPoint(points,mean,sd,wgOn);}
@@ -102,7 +92,7 @@ function westgardWorkerMessage(event){
 function ensureWestgardWorker(){
   if(wgWorker)return wgWorker;if(typeof Worker!=='function'||wgWorkerFailed)return null;
   try{
-    wgWorker=new Worker('assets/workers/westgard-worker.js?v=seven-t-target-reset-20260727-1');
+    wgWorker=new Worker('assets/workers/westgard-worker.js?v=rule-table-single-source-20260801-1');
     wgWorker.onmessage=westgardWorkerMessage;
     wgWorker.onerror=()=>{wgWorkerFailed=true;wgWorkerPending.clear();if(wgWorker){try{wgWorker.terminate();}catch(e){}wgWorker=null;}if(typeof page!=='undefined'&&page==='dash')setTimeout(()=>rerender(),0);};
     return wgWorker;
@@ -140,8 +130,37 @@ function normalizeDuplicateRunIds(){
     });
   });
 }
+/* Chữ ký TỰ KIỂM CHỨNG cho derivedIndex — cùng kỹ thuật đã dùng cho cache của
+   action-workflow-service.js: so THAM CHIẾU + ĐỘ DÀI của đúng những lát state mà
+   derived() đọc tới, cộng các trường vô hướng nó lọc theo (active/status/toLotId…).
+   Trước 2026-08-01 derived() chỉ là memo thuần (`if(derivedIndex)return derivedIndex`),
+   nên nó đúng CHỈ KHI mọi đường ghi cấu hình đều nhớ gọi clearDerived(). Quên một
+   chỗ thì màn hình hiện panel/nhóm lô/mức vận hành cũ mà KHÔNG có gì báo — lớp lỗi
+   không thể tự phát hiện. Chữ ký chỉ so tham chiếu và số, KHÔNG dựng chuỗi và
+   KHÔNG duyệt state.data, để đường warm vẫn rẻ; ngân sách warmDomainMaxColdRatio
+   trong performance-budget.json canh đúng chỗ này.
+   MỘT hàm duy nhất lo cả dựng lẫn đối chiếu (`prev=null` là dựng), để hai chiều
+   không thể lệch thứ tự duyệt. Đường warm — cấu hình không đổi, chạy vài nghìn
+   lần mỗi lần vẽ — KHÔNG cấp phát mảng: nó so tại chỗ theo con trỏ và dừng ngay
+   ở phần tử lệch đầu tiên. Dựng mảng ở đường warm từng làm derived() chậm 29 lần
+   (2,7 µs so với 0,095 µs mỗi lần gọi, đo ở cỡ 50 xét nghiệm × 3 mức). */
+function derivedStampWalk(prev){
+  const panels=state.qcPanels||[],lots=state.qcLots||[],groups=state.lotGroups||[],trans=state.lotTransitions||[],tests=state.tests||[];
+  const build=!prev,out=build?[]:null;let i=0,ok=true;
+  const put=v=>{if(build)out.push(v);else if(ok&&prev[i++]!==v)ok=false;};
+  put(state);put(panels);put(panels.length);put(lots);put(lots.length);
+  put(groups);put(groups.length);put(trans);put(trans.length);put(tests);put(tests.length);
+  if(!build&&!ok)return false;
+  for(let k=0;k<panels.length;k++){const p=panels[k],ids=p&&p.testIds;put(p);put(p&&p.active);put(ids);put(ids?ids.length:-1);}
+  for(let k=0;k<groups.length;k++){const g=groups[k],ids=g&&g.lotIds;put(g);put(g&&g.active);put(g&&g.status);put(ids);put(ids?ids.length:-1);}
+  for(let k=0;k<trans.length;k++){const tr=trans[k];put(tr);put(tr&&tr.fromLotId);put(tr&&tr.toLotId);put(tr&&tr.status);}
+  for(let k=0;k<lots.length;k++){const l=lots[k];put(l);put(l&&l.id);}
+  for(let k=0;k<tests.length;k++){const t=tests[k],lv=t&&t.levels;put(t);put(lv);put(lv?lv.length:-1);}
+  return build?out:(ok&&i===prev.length);
+}
 function derived(){
-  if(derivedIndex)return derivedIndex;
+  if(derivedIndex&&derivedStampWalk(derivedIndex.stamp)===true)return derivedIndex;
+  const stamp=derivedStampWalk(null);
   const panels=(state.qcPanels||[]).filter(p=>p.active!==false),testPanel=new Map(),testOrder=new Map();
   panels.forEach((p,pi)=>(p.testIds||[]).forEach((id,ti)=>{
     if(!testPanel.has(id))testPanel.set(id,p);
@@ -152,7 +171,7 @@ function derived(){
   (state.lotGroups||[]).filter(isOperationalLotGroup).forEach(g=>(g.lotIds||[]).forEach(id=>{if(!lotGroupByLotId.has(id))lotGroupByLotId.set(id,g);}));
   const acceptedTransitionToLot=new Map();
   (state.lotTransitions||[]).filter(transitionSwitchesLot).forEach(tr=>{if(!acceptedTransitionToLot.has(tr.toLotId))acceptedTransitionToLot.set(tr.toLotId,tr);});
-  derivedIndex={panels,testPanel,testOrder,lotById,lotGroupByLotId,acceptedTransitionToLot,operationalTests:null,levels:new Map(),groups:new Map()};
+  derivedIndex={stamp,panels,testPanel,testOrder,lotById,lotGroupByLotId,acceptedTransitionToLot,operationalTests:null,levels:new Map(),groups:new Map()};
   return derivedIndex;
 }
 function pointsOf(testId,level){
