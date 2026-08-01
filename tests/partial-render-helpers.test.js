@@ -65,10 +65,8 @@ assert.deepEqual(kpiValue.capa.stages, { investigating:1, rerun:0, effectiveness
 assert.deepEqual(kpiValue.causes, [{ label:'Thiết bị', count:2 }]);
 assert.equal(kpiValue.months.find(x=>x.key==='2026-07').rejected, 1);
 
-/* Ô lọc KPI theo xét nghiệm phải theo đúng quy ước tìm kiếm của app: gõ dở thì
-   thu hẹp danh sách TẠI CHỖ (không vẽ lại trang, không tự đổi lựa chọn), chỉ khi
-   chọn ở <select> mới tính lại KPI. Bản dùng datalist trước đó đòi gõ khớp CHÍNH
-   XÁC cả tên mới lọc được, và rời ô khi đang gõ dở thì âm thầm nhảy về "Tất cả". */
+/* Ô lọc KPI theo xét nghiệm thu hẹp danh sách TẠI CHỖ. Nhiều kết quả chưa tự
+   chọn; đúng một kết quả thì chốt luôn và tính lại KPI theo yêu cầu giao diện. */
 const kpiTestPicker = run(ctx, `
   (function(){
     var renders=0,count={textContent:''};
@@ -86,8 +84,11 @@ const kpiTestPicker = run(ctx, `
     dashKpiTestQ='khong khop gi';dashboardKpiApplyTestSearch();
     var noHit={labels:labels(),count:count.textContent,selected:dashKpiTest,renders:renders};
 
-    dashboardKpiSetTest('T2');
+    dashboardKpiSetTest('T1');
     var committed={selected:dashKpiTest,renders:renders};
+
+    dashKpiTestQ='glu';dashboardKpiApplyTestSearch();
+    var unique={labels:labels(),value:select.value,selected:dashKpiTest,count:count.textContent,renders:renders};
 
     dashKpiTestQ='sod';dashboardKpiApplyTestSearch();
     var keepsSelected={labels:labels(),value:select.value,count:count.textContent};
@@ -97,7 +98,7 @@ const kpiTestPicker = run(ctx, `
     var before=renders;dashboardKpiTestSearch('sodi');
     var scheduled=!!dashboardKpiTestSearch.searchTimer;
     clearTimeout(dashboardKpiTestSearch.searchTimer);
-    return{partial:partial,noHit:noHit,committed:committed,keepsSelected:keepsSelected,
+    return{partial:partial,noHit:noHit,committed:committed,unique:unique,keepsSelected:keepsSelected,
       query:dashKpiTestQ,searchRenders:renders-before,scheduled:scheduled};
   })()
 `);
@@ -106,10 +107,12 @@ assert.deepEqual(kpiPickerValue.partial, { labels:['Tất cả xét nghiệm','S
   'gõ dở phải lọc được ngay và không vẽ lại trang');
 assert.deepEqual(kpiPickerValue.noHit, { labels:['Tất cả xét nghiệm'], count:'0/3', selected:'all', renders:0 },
   'không khớp gì thì vẫn còn "Tất cả" và không tự đổi lựa chọn');
-assert.deepEqual(kpiPickerValue.committed, { selected:'T2', renders:1 }, 'chọn ở <select> mới là hành vi chốt');
+assert.deepEqual(kpiPickerValue.committed, { selected:'T1', renders:1 }, 'chọn ở <select> vẫn phải tính lại KPI');
+assert.deepEqual(kpiPickerValue.unique, { labels:['Tất cả xét nghiệm','Sodium (Na)','Glucose (GLU)'], value:'T2', selected:'T2', count:'1/3', renders:2 },
+  'một kết quả duy nhất phải tự hiện trong ô xét nghiệm và tính lại KPI');
 assert.deepEqual(kpiPickerValue.keepsSelected, { labels:['Tất cả xét nghiệm','Glucose (GLU)','Sodium (Na)','Sodium niệu'], value:'T2', count:'2/3' },
   'xét nghiệm đang chọn phải ở lại danh sách dù không khớp từ khóa, nếu không ô chọn sẽ lệch với state');
-assert.equal(kpiPickerValue.searchRenders, 0, 'ô tìm kiếm không được tự vẽ lại trang');
+assert.equal(kpiPickerValue.searchRenders, 0, 'lên lịch debounce chưa được vẽ lại trang ngay');
 assert.equal(kpiPickerValue.scheduled, true, 'ô tìm kiếm phải đi qua scheduleSearchRender (debounce + trả lại con trỏ)');
 assert.equal(kpiPickerValue.query, 'sodi', 'ô tìm kiếm phải giữ lại từ khóa vừa gõ');
 

@@ -5,7 +5,7 @@ Sinh bằng `npm run coverage-map` (`NODE_V8_COVERAGE` của Node, không cài t
 hoặc tách file. Phần dựng DOM của các file render không gọi được trong sandbox `vm`,
 nên độ phủ thấp ở đó là đúng thiết kế; thứ đáng nhìn là **hàm thuần chưa ai chạm tới**.
 
-Sinh ngày 2026-08-01 · Node v26.4.0 · 47 file · 41.4% mã nguồn đã chạy.
+Sinh ngày 2026-08-01 · Node v26.4.0 · 48 file · 41.8% mã nguồn đã chạy.
 
 ## 9 file KHÔNG test nào nạp tới
 
@@ -34,23 +34,24 @@ sandbox `vm`; với file có hàm thuần thì đây là điểm mù thật.
 | `modules/actions-routes.js` | 40.7 | chưa nạp | 38.228 | — |
 | `modules/manage-routes.js` | 36.8 | chưa nạp | 35.855 | — |
 | `modules/reagent.js` | 35.6 | 12.1% | 30.709 | 49 |
-| `modules/users-auth.js` | 36.7 | 20.4% | 27.656 | 35 |
-| `modules/dashboard-routes.js` | 32.4 | 20.2% | 25.354 | 12 |
+| `modules/users-auth.js` | 36.8 | 20.4% | 27.725 | 35 |
+| `modules/dashboard-routes.js` | 32.7 | 20.4% | 25.520 | 12 |
+| `modules/settings.js` | 21.9 | 5.7% | 19.923 | 14 |
 | `modules/data-io.js` | 74.1 | 73.3% | 19.459 | 17 |
-| `modules/settings.js` | 21.1 | 5.9% | 19.141 | 14 |
 | `modules/westgard-routes.js` | 21.4 | 11.0% | 18.207 | 20 |
 | `modules/reports.js` | 36.9 | 49.0% | 18.123 | 3 |
 | `modules/router-render.js` | 20.9 | 18.6% | 16.945 | 50 |
-| `modules/backup-service.js` | 19.7 | 34.6% | 12.404 | 15 |
+| `modules/backup-service.js` | 25.0 | 48.4% | 12.071 | 13 |
 | `modules/draw.js` | 17.4 | 33.2% | 11.733 | 7 |
 | `modules/report-routes.js` | 12.1 | chưa nạp | 11.607 | — |
 | `modules/range.js` | 8.8 | chưa nạp | 8.439 | — |
 | `modules/modals.js` | 7.9 | chưa nạp | 7.899 | — |
 | `modules/qc-domain.js` | 28.6 | 72.8% | 7.586 | 27 |
-| `modules/firebase-sync.js` | 30.8 | 80.3% | 5.541 | 5 |
+| `modules/firebase-sync.js` | 31.2 | 80.6% | 5.541 | 5 |
 | `modules/after-render.js` | 5.0 | chưa nạp | 5.014 | — |
 | `modules/state.js` | 26.0 | 80.6% | 4.986 | 12 |
-| `modules/state-storage.js` | 17.3 | 80.3% | 3.276 | 0 |
+| `modules/lis-client-service.js` | 6.3 | 46.1% | 3.392 | 5 |
+| `modules/state-storage.js` | 17.3 | 80.2% | 3.300 | 0 |
 | `modules/action-workflow-service.js` | 29.2 | 88.8% | 3.151 | 1 |
 | `core.js` | 59.9 | 95.8% | 2.438 | 6 |
 | `modules/app-meta.js` | 1.3 | chưa nạp | 1.188 | — |
@@ -60,12 +61,12 @@ sandbox `vm`; với file có hàm thuần thì đây là điểm mù thật.
 | `modules/audit.js` | 10.9 | 92.2% | 810 | 3 |
 | `workers/westgard-worker.js` | 3.4 | 77.3% | 778 | 2 |
 | `modules/local-store.js` | 6.0 | 91.2% | 542 | 6 |
-| `modules/archive-service.js` | 6.6 | 93.1% | 467 | 0 |
+| `modules/archive-service.js` | 7.2 | 93.5% | 467 | 0 |
 | `modules/reagent-comparison-service.js` | 5.8 | 92.2% | 462 | 0 |
 | `app.js` | 0.3 | chưa nạp | 277 | — |
 | `modules/sigma-cohort-service.js` | 4.4 | 96.0% | 179 | 0 |
 | `modules/period-service.js` | 2.7 | 94.0% | 160 | 0 |
-| `modules/westgard-view-model.js` | 3.2 | 95.2% | 157 | 0 |
+| `modules/westgard-view-model.js` | 3.2 | 95.4% | 150 | 0 |
 | `modules/chart-view-model.js` | 2.5 | 96.1% | 97 | 0 |
 | `modules/analysis-ui-state.js` | 0.7 | 99.3% | 5 | 0 |
 | `modules/auth-ui-state.js` | 0.3 | 98.5% | 5 | 0 |
@@ -83,16 +84,17 @@ sandbox `vm`; với file có hàm thuần thì đây là điểm mù thật.
 - **modules/reagent.js** — 49 hàm: `rcLabel` (dòng 6) · `rcAct` (dòng 7) · `rcSaveSoon` (dòng 8) · `rcPairCalc` (dòng 23) · `rcAxis` (dòng 37) · `rcPadr` (dòng 46) · `rcToolIcon` (dòng 47) · `rcMiniIcon` (dòng 56) · `rcScatterSVG` (dòng 60) · `rcBlandSVG` (dòng 66) …
 - **modules/users-auth.js** — 35 hàm: `pageUsers` (dòng 2) · `auditSetQuery` (dòng 45) · `auditSetPageSize` (dòng 55) · `auditSetPage` (dòng 58) · `auditClearFilters` (dòng 61) · `activityCSVRows` (dòng 91) · `exportActivityCSV` (dòng 92) · `clearActivityLog` (dòng 97) · `archiveActivityLog` (dòng 113) · `confirmArchiveActivityLog` (dòng 126) …
 - **modules/dashboard-routes.js** — 12 hàm: `dashboardKpiTargets` (dòng 3) · `dashboardKpiRange` (dòng 4) · `dashboardKpiScopeItems` (dòng 10) · `dashboardKpiSetPeriod` (dòng 75) · `dashboardKpiSetInstrument` (dòng 80) · `dashboardKpiCustomRange` (dòng 114) · `dashboardOpenAction` (dòng 118) · `dashboardKpiOpenDetail` (dòng 122) · `pageDash` (dòng 137) · `dashTestFilter` (dòng 257) …
-- **modules/data-io.js** — 17 hàm: `csvCell` (dòng 2) · `downloadCSV` (dòng 8) · `exportMetaRows` (dòng 9) · `reportPrevLotRows` (dòng 25) · `reportRows` (dòng 86) · `exportReportCSV` (dòng 87) · `downloadBlob` (dòng 97) · `sigmaCanvas` (dòng 114) · `drawSigmaReportChart` (dòng 115) · `drawSigmaReportMDC` (dòng 160) …
 - **modules/settings.js** — 14 hàm: `saveLab` (dòng 2) · `saveKpiTargets` (dòng 3) · `saveBrand` (dòng 19) · `readBrandInputs` (dòng 27) · `pickLogo` (dòng 34) · `clearLogo` (dòng 52) · `firebaseAclHelp` (dòng 53) · `saveFb` (dòng 58) · `parseFirebaseConfig` (dòng 86) · `validateFirebaseConfig` (dòng 101) …
+- **modules/data-io.js** — 17 hàm: `csvCell` (dòng 2) · `downloadCSV` (dòng 8) · `exportMetaRows` (dòng 9) · `reportPrevLotRows` (dòng 25) · `reportRows` (dòng 86) · `exportReportCSV` (dòng 87) · `downloadBlob` (dòng 97) · `sigmaCanvas` (dòng 114) · `drawSigmaReportChart` (dòng 115) · `drawSigmaReportMDC` (dòng 160) …
 - **modules/westgard-routes.js** — 20 hàm: `wgMultiViews` (dòng 2) · `wgTogglePrevLot` (dòng 8) · `wgArchivedGroups` (dòng 13) · `wgSetViewMode` (dòng 14) · `wgSetChartMode` (dòng 15) · `wgChartModeTabs` (dòng 16) · `pageWestgardCusum` (dòng 23) · `wgSetArchivedGroup` (dòng 37) · `wgSetArchivedTest` (dòng 38) · `wgViewModeTabs` (dòng 39) …
 - **modules/reports.js** — 3 hàm: `openPrint` (dòng 10) · `printReport` (dòng 171) · `printRangeForm` (dòng 219)
 - **modules/router-render.js** — 50 hàm: `role` (dòng 5) · `canWrite` (dòng 6) · `requireWrite` (dòng 13) · `requireAdmin` (dòng 14) · `roleLabel` (dòng 15) · `rolePageIds` (dòng 16) · `userPageIds` (dòng 17) · `setSearchCount` (dòng 22) · `showSearchEmpty` (dòng 23) · `liveRowFilter` (dòng 31) …
-- **modules/backup-service.js** — 15 hàm: `exportData` (dòng 38) · `downloadBackupText` (dòng 39) · `backupCurrentData` (dòng 40) · `importData` (dòng 47) · `registerVerifiedArchive` (dòng 64) · `verifyBackupFile` (dòng 65) · `exportYearArchive` (dòng 66) · `checkStorageUsage` (dòng 70) · `viewRegisteredArchive` (dòng 71) · `markBackupDone` (dòng 75) …
+- **modules/backup-service.js** — 13 hàm: `downloadBackupText` (dòng 56) · `importData` (dòng 68) · `registerVerifiedArchive` (dòng 85) · `verifyBackupFile` (dòng 90) · `exportYearArchive` (dòng 91) · `checkStorageUsage` (dòng 118) · `viewRegisteredArchive` (dòng 119) · `markBackupDone` (dòng 123) · `lastBackupInfo` (dòng 124) · `backupStatusText` (dòng 130) …
 - **modules/draw.js** — 7 hàm: `drawRuleAcross` (dòng 3) · `qcTooltip` (dòng 4) · `hide` (dòng 7) · `ljDataURL` (dòng 123) · `drawLJMultiZ` (dòng 126) · `ljMultiDataURL` (dòng 197) · `drawCUSUM` (dòng 205)
 - **modules/qc-domain.js** — 27 hàm: `reportLevelStats` (dòng 6) · `wgSet` (dòng 11) · `wgReset` (dòng 12) · `testRuleOn` (dòng 20) · `defaultRuleScope` (dòng 21) · `testRuleOnAcross` (dòng 25) · `westgard` (dòng 28) · `westgardMulti` (dòng 29) · `westgardByPoint` (dòng 30) · `westgardMultiByPoint` (dòng 31) …
-- **modules/firebase-sync.js** — 5 hàm: `fbStartPull` (dòng 230) · `fbPullOnce` (dòng 243) · `initFirebase` (dòng 358) · `remoteRenderUnsafe` (dòng 391) · `syncNow` (dòng 411)
+- **modules/firebase-sync.js** — 5 hàm: `fbStartPull` (dòng 233) · `fbPullOnce` (dòng 246) · `initFirebase` (dòng 362) · `remoteRenderUnsafe` (dòng 395) · `syncNow` (dòng 415)
 - **modules/state.js** — 12 hàm: `staffInitials` (dòng 236) · `currentStaff` (dòng 237) · `pointStaff` (dòng 238) · `dateObj` (dòng 239) · `daysToExp` (dòng 240) · `periodOfDate` (dòng 245) · `periodLock` (dòng 246) · `isPeriodLocked` (dòng 247) · `periodLockText` (dòng 248) · `requireUnlockedPeriod` (dòng 249) …
+- **modules/lis-client-service.js** — 5 hàm: `lisGatewayStatusText` (dòng 7) · `scheduleLisQcSync` (dòng 23) · `lisGatewayStart` (dòng 24) · `lisGatewaySaveSettings` (dòng 25) · `lisGatewaySyncNow` (dòng 26)
 - **modules/action-workflow-service.js** — 1 hàm: `actionEventDate` (dòng 245)
 - **core.js** — 6 hàm: `isOn` (dòng 170) · `isOn` (dòng 199) · `isOn` (dòng 246) · `isOn` (dòng 256) · `isOn` (dòng 282) · `isOn` (dòng 289)
 - **modules/entry-service.js** — 2 hàm: `pointRunNoFor` (dòng 32) · `root.nextRunId` (dòng 250)

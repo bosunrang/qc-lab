@@ -172,6 +172,9 @@ const plain = (v) => JSON.parse(JSON.stringify(v));
   Object.keys(cloud).forEach(k => { if (!(k in reordered)) reordered[k] = cloud[k]; });
   assert.equal(ctx.statesLikelyEqual(local, reordered), true, 'khác thứ tự khóa không phải là khác dữ liệu');
 
+  const localLoginAudit={...local,activity:[{id:'login-local',type:'Đăng nhập',detail:'Đăng nhập thành công'}]};
+  assert.equal(ctx.statesLikelyEqual(localLoginAudit,cloud),true,'audit đăng nhập cục bộ không được giả thành xung đột dữ liệu nghiệp vụ');
+
   // Nhưng khác biệt THẬT vẫn phải bị bắt, kể cả nằm sâu trong data/{testId}.
   assert.equal(ctx.statesLikelyEqual(local, baseState({ tests: [{ id: 'T1', name: 'Glucose' }], data: { T1: [{ id: 'p1', val: 9 }] } })), false, 'điểm QC khác giá trị vẫn phải hỏi trước khi ghi đè');
   assert.equal(ctx.statesLikelyEqual(local, baseState({ tests: [{ id: 'T1', name: 'Glucose' }], data: { T1: [{ id: 'p1', val: 5 }, { id: 'p2', val: 6 }] } })), false, 'cloud có thêm điểm QC vẫn phải hỏi trước khi ghi đè');
@@ -522,6 +525,29 @@ const plain = (v) => JSON.parse(JSON.stringify(v));
   assert.equal(pending.level.cv, 1.25);
   assert.equal(pending.level.biasEqa, 2.5);
   assert.ok(pending.updates >= 1, 'the recovered edit is pushed back to Firebase');
+}
+
+// --- Scenario 24: reload/login chỉ thêm audit cục bộ, dữ liệu nghiệp vụ vẫn giống cloud.
+// Không hỏi ghi đè; phải merge audit để lần push sau hội tụ thay vì làm mất dòng đăng nhập. ---
+{
+  const auditOnlyReload=await run(ctx, `
+    window={QCLAB_CLOUD:null};
+    document={getElementById:function(){return null;},addEventListener:function(){}};
+    localStorage={setItem:function(){}};currentUser=null;
+    ensureLabBrandShape=function(){};ensureAdmin=function(){};renderBrand=function(){};applyRemoteRender=function(){};
+    setTimeout=function(){return 0;};clearTimeout=function(){};
+    var __auditConfirmCalls=0;confirmDialog=function(){__auditConfirmCalls++;return Promise.resolve(true);};
+    state=QCCore.sanitizeBackup(${JSON.stringify(baseState({tests:[{id:'T1',name:'Glucose',levels:[{level:1}]}]}))});
+    logAct('Đăng nhập','Đăng nhập thành công','Tài khoản');
+    fb.ready=false;fb.initialized=false;fb.dirty=false;fb.synced=null;fb.seenSig=null;
+    fb.ref={update:function(){return Promise.resolve();}};
+    var remote24=${JSON.stringify(baseState({tests:[{id:'T1',name:'Glucose',levels:[{level:1}]}]}))};
+    fbHandleValue(remote24,{silent:true}).then(function(){return{confirmCalls:__auditConfirmCalls,loginRows:state.activity.filter(function(a){return a.type==='Đăng nhập';}).length,ready:fb.ready};});
+  `);
+  const reloadResult=plain(auditOnlyReload);
+  assert.equal(reloadResult.confirmCalls,0,'reload có thêm audit đăng nhập không được mở hộp thoại xung đột');
+  assert.equal(reloadResult.loginRows,1,'dòng audit đăng nhập cục bộ phải được giữ để đẩy hội tụ');
+  assert.equal(reloadResult.ready,true);
 }
 
 /* Luu tru nhat ky khi DANG BAT dong bo: may A cat bot dong cu va day len cloud, may B

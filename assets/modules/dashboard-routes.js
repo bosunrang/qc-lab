@@ -82,11 +82,10 @@ function dashboardKpiSetInstrument(value){
   dashKpiInstrument=value||'all';dashKpiTest='all';dashKpiTestQ='';
   rerender();
 }
-/* Ô "Xét nghiệm" đi theo đúng quy ước tìm kiếm của app (xem reportSearchSet ở
-   report-routes.js): ô tìm thu hẹp danh sách TẠI CHỖ qua scheduleSearchRender —
-   debounce, cập nhật từng phần, trả lại con trỏ — còn việc chọn ở <select> mới
-   là hành vi chốt và mới gọi rerender(), vì đổi xét nghiệm buộc phải tính lại
-   toàn bộ ảnh chụp KPI. Danh sách lựa chọn được pageDash() cất sẵn vào
+/* Ô "Xét nghiệm" thu hẹp danh sách TẠI CHỖ qua scheduleSearchRender — debounce,
+   cập nhật từng phần và trả lại con trỏ. Khi từ khóa chỉ còn đúng một kết quả,
+   app chốt luôn xét nghiệm đó và tính lại KPI; nhiều kết quả vẫn để người dùng
+   chọn trong <select>. Danh sách lựa chọn được pageDash() cất sẵn vào
    dashKpiTestChoices thay vì tính lại: dựng lại nó cần cả lượt Westgard của
    dashItems, và tính hai lần thì hai lần có thể lệch nhau (cùng lý do
    dashKpiLast tồn tại). */
@@ -99,11 +98,12 @@ function dashboardKpiTestOptions(){
   /* Luôn giữ mục đang chọn kể cả khi nó không khớp từ khóa — nếu bỏ đi, <select>
      sẽ hiển thị "Tất cả" trong khi state vẫn đang lọc theo xét nghiệm cũ. */
   if(dashKpiTest!=='all'&&!shown.some(x=>x.id===dashKpiTest)){const current=all.find(x=>x.id===dashKpiTest);if(current)shown.unshift(current);}
-  return{options:[{value:'all',label:'Tất cả xét nghiệm'},...shown.map(x=>({value:x.id,label:x.label}))],hits:hits.length,total:all.length};
+  return{options:[{value:'all',label:'Tất cả xét nghiệm'},...shown.map(x=>({value:x.id,label:x.label}))],hits:hits.length,total:all.length,uniqueId:q&&hits.length===1?hits[0].id:''};
 }
 function dashboardKpiApplyTestSearch(){
-  const{options,hits,total}=dashboardKpiTestOptions(),select=document.getElementById('dashKpiTest'),count=document.getElementById('dashKpiTestCount');
+  const{options,hits,total,uniqueId}=dashboardKpiTestOptions(),select=document.getElementById('dashKpiTest'),count=document.getElementById('dashKpiTestCount');
   replaceSelectItems(select,options,'Không tìm thấy xét nghiệm phù hợp');
+  if(uniqueId&&uniqueId!==dashKpiTest){dashKpiTest=uniqueId;if(select)select.value=uniqueId;if(count)count.textContent=`${hits}/${total}`;rerender();return;}
   if(select&&options.some(o=>o.value===dashKpiTest))select.value=dashKpiTest;
   if(count)count.textContent=`${hits}/${total}`;
 }
@@ -171,7 +171,7 @@ function pageDash(){
   const{options:kpiTestOptions,hits:kpiTestHits,total:kpiTestTotal}=dashboardKpiTestOptions();
   const testOptions=kpiTestOptions.map(o=>`<option value="${escAttr(o.value)}" ${dashKpiTest===o.value?'selected':''}>${esc(o.label)}</option>`).join('');
   const customRange=dashKpiPeriod==='custom'?`<div><label>Từ ngày</label>${dateBox('dashKpiStart',range.start,'','onchange="dashboardKpiCustomRange()"')}</div><div><label>Đến ngày</label>${dateBox('dashKpiEnd',range.end,'','onchange="dashboardKpiCustomRange()"')}</div>`:'';
-  const filterHtml=`<div class="dash-kpi-filters"><div><label>Kỳ KPI</label><select aria-label="Kỳ KPI" onchange="dashboardKpiSetPeriod(this.value)">${periodOptions}</select></div>${customRange}<div><label>Thiết bị</label><select aria-label="Lọc KPI theo thiết bị" onchange="dashboardKpiSetInstrument(this.value)">${instrumentOptions}</select></div><div><label>Xét nghiệm</label><div class="dash-kpi-testpick"><input id="dashKpiTestSearch" type="search" placeholder="Tìm xét nghiệm..." aria-label="Tìm xét nghiệm để lọc KPI" value="${escAttr(dashKpiTestQ)}" oninput="dashboardKpiTestSearch(this.value)"><span id="dashKpiTestCount">${kpiTestHits}/${kpiTestTotal}</span></div><select id="dashKpiTest" aria-label="Lọc KPI theo xét nghiệm" onchange="dashboardKpiSetTest(this.value)">${testOptions}</select></div></div>`;
+  const filterHtml=`<div class="dash-kpi-filters${dashKpiPeriod==='custom'?' has-custom':''}"><div class="dash-kpi-period"><label>Kỳ KPI</label><select aria-label="Kỳ KPI" onchange="dashboardKpiSetPeriod(this.value)">${periodOptions}</select></div>${customRange}<div class="dash-kpi-instrument"><label>Thiết bị</label><select aria-label="Lọc KPI theo thiết bị" onchange="dashboardKpiSetInstrument(this.value)">${instrumentOptions}</select></div><div class="dash-kpi-test-filter"><label>Xét nghiệm</label><div class="dash-kpi-test-controls"><div class="dash-kpi-testpick"><input id="dashKpiTestSearch" type="search" placeholder="Tìm xét nghiệm..." aria-label="Tìm xét nghiệm để lọc KPI" value="${escAttr(dashKpiTestQ)}" oninput="dashboardKpiTestSearch(this.value)"><span id="dashKpiTestCount">${kpiTestHits}/${kpiTestTotal}</span></div><select id="dashKpiTest" aria-label="Lọc KPI theo xét nghiệm" onchange="dashboardKpiSetTest(this.value)">${testOptions}</select></div></div></div>`;
   const trendHtml=insight.months.map(m=>{const height=Math.max(m.points?10:2,Math.round(m.points/maxMonthPoints*100)),rejHeight=m.points?Math.max(m.rejected?5:0,Math.round(m.rejected/m.points*height)):0;return `<div class="dash-trend-month" aria-label="${escAttr(`${m.label}: ${m.points} điểm QC, ${m.rejected} bị loại, ${m.nce} hồ sơ NCE`)}"><div class="dash-trend-count">${m.points}</div><div class="dash-trend-bar" style="height:${height}%"><span style="height:${rejHeight}%"></span></div><b>${esc(m.label)}</b><small>${m.nce} NCE</small></div>`;}).join('');
   const stageMeta=[['investigating','Điều tra'],['rerun','Chờ QC lại'],['effectiveness','Đánh giá hiệu lực'],['approval','Chờ duyệt'],['closed','Đã khép trong kỳ']],stageMax=Math.max(1,...stageMeta.map(([key])=>capa.stages[key]||0));
   const stageHtml=stageMeta.map(([key,label])=>`<div class="dash-capa-stage"><div><span>${esc(label)}</span><b>${capa.stages[key]||0}</b></div><div><span style="width:${Math.round((capa.stages[key]||0)/stageMax*100)}%"></span></div></div>`).join('');

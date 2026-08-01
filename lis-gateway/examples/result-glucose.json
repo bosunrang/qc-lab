@@ -1,0 +1,10 @@
+{
+  "messageId": "SIM-01-20260801-0001",
+  "analyzerId": "SIM-01",
+  "testCode": "GLU",
+  "measuredAt": "2026-08-01T08:30:00+07:00",
+  "value": 5.6,
+  "unit": "mmol/L",
+  "specimenRef": "DEMO-0001",
+  "flags": []
+}

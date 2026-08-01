@@ -6,7 +6,13 @@
 - Gói có năm, thời điểm tạo, phiên bản app/schema và SHA-256 của payload JSON.
 - Payload giữ cấu hình xét nghiệm, thiết bị, panel và lô để đọc ngữ cảnh; chỉ giữ
   điểm QC, Sigma, so sánh hóa chất, NCE và audit thuộc năm đã chọn.
-- `users` luôn rỗng để archive không mang hash mật khẩu.
+- `users` luôn rỗng để archive không mang hash mật khẩu, và `activityAnchor` bị xóa
+  chứ không thừa kế từ log sống — neo đó thuộc về một lát audit khác, giữ lại thì
+  `auditVerifyChain()` chạy trên archive báo "audit bị sửa" giả.
+- `BACKUP_IMPORT_MAX_BYTES` (128 MB) là **ngưỡng khuyến nghị, không phải rào chặn**:
+  mọi đường xuất/nhập chỉ hỏi xác nhận khi vượt, còn `backupCurrentData()` không có
+  rào nào. Trước 2026-08-01 nó chặn cứng cả ba đường cùng lúc nên vượt trần là không
+  xuất được, không nhập được, không reset được.
 - Nút **Kiểm tra backup / archive** xác minh checksum, schema, invariant, số điểm
   và khoảng ngày nhưng không gán vào `state`.
 - Nút **Nhập backup** từ chối `year-archive`; archive không được phép vô tình
@@ -21,9 +27,27 @@
 - Xuất archive không xóa dữ liệu. Đây là chủ ý an toàn, không phải phần việc còn
   thiếu của nút xuất.
 
-## Dọn dữ liệu đã lưu trữ
+## Dọn dữ liệu đã lưu trữ — CHƯA BẬT (2026-08-01)
 
-Nút **Chọn archive để dọn** chỉ mở đường dọn khi đáp ứng đủ các điều kiện sau:
+`cleanupYearFromArchive()` và toàn bộ guard của nó vẫn nằm trong
+`backup-service.js` và vẫn được `tests/archive-cleanup.test.js` chốt, nhưng
+**không nút nào trong Cài đặt gọi tới**. Xuất archive năm đã đủ làm hồ sơ lưu trữ
+theo ISO 15189; nửa phá hủy chưa được bật vì hai lý do:
+
+- **Chưa cần theo số đo.** Phòng 20 XN × 2 mức × 2 năm mới 29.200 điểm / 4,2 MB;
+  10 năm cực đoan (50 XN × 3 mức) là 547.500 điểm / 78,2 MB, vẫn dưới trần
+  import 128 MB. Điểm QC không còn nằm ở `localStorage` (partitioned save ghi
+  shell rồi `removeItem('qclab')`, dữ liệu ở IndexedDB) nên trần 5–10 MB không
+  phải nút thắt. Cái duy nhất vượt ngân sách là cold domain 14.008 ms so với
+  12.000 ms — một lần lạnh mỗi lần boot, phần lớn là Westgard vốn đã đẩy sang
+  worker, còn warm là 0,77 ms.
+- **Hai lỗi chặn còn mở.** Chi tiết và hướng sửa nằm trong khối chú thích ngay
+  trên `archiveCleanupOpenNces()`: (1) `fbMergeDataBranch()` không hỗ trợ xóa
+  từng điểm nên Firebase hồi sinh dữ liệu vừa dọn, trong khi `registry.cleanedAt`
+  đã ghi khiến không dọn lại được; (2) guard NCE bỏ sót hồ sơ dùng điểm QC chạy
+  lại thuộc năm bị dọn, làm hồ sơ đã khép tự mở lại.
+
+Khi bật lại, đường dọn chỉ được mở khi đáp ứng đủ các điều kiện sau:
 
 1. Người dùng chọn lại chính file archive; app xác minh SHA-256 và đối chiếu mọi
    điểm hiện có của năm đó theo test/id/nội dung, không chỉ đối chiếu số lượng.

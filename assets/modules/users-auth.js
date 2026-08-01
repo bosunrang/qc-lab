@@ -368,5 +368,5 @@ function showApp(){
   const ov=document.getElementById('authOverlay');if(ov)ov.style.display='none';
   if(!canAccessPage(page))page=firstAccessPage();
   document.getElementById('userBox').innerHTML='';
-  renderBrand();nav();sideFoot();rerender();
+  renderBrand();nav();sideFoot();rerender();if(typeof lisGatewayStart==='function')setTimeout(lisGatewayStart,0);
 }

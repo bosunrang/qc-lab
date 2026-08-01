@@ -1,0 +1,17 @@
+{
+  "staleMinutes": 720,
+  "allowedOrigins": [
+    "null",
+    "http://127.0.0.1:8080",
+    "http://localhost:8080"
+  ],
+  "mappings": [
+    {
+      "analyzerId": "SIM-01",
+      "testCode": "GLU",
+      "qclabTestId": "T1",
+      "displayName": "Glucose",
+      "expectedUnit": "mmol/L"
+    }
+  ]
+}

@@ -340,7 +340,8 @@ the Google Fonts link, offline labs must print with correct metrics.
 - `core.js` — pure domain math, UMD (see above). Also
   `validateStateInvariants()`, run at every load/merge/import gateway
   (`state-storage.js`, `firebase-sync.js`, `backup-service.js`), and
-  `STATE_SCHEMA_VERSION` (currently 5). Holds the pure error-classification
+  `STATE_SCHEMA_VERSION` (currently 6 — 6 added the `archiveRegistry` branch).
+  Holds the pure error-classification
   helpers too (`errorType`, `primaryErrorRule`, `fixHint`,
   `WG_RULE_DESCRIPTIONS`); `qc-domain.js` re-exports them under the same global
   names for the UI. Since 2026-08-01 it also owns the **rule-semantics tables**
@@ -454,7 +455,7 @@ the Google Fonts link, offline labs must print with correct metrics.
   backup bookkeeping); using it after a data change leaves stale Westgard
   results on screen. `{cloud:false}` skips the Firebase push and the `_ts` bump.
 - `qc-rules.js`, `period-service.js`, `sigma-cohort-service.js`, `entry-service.js`,
-  `action-workflow-service.js` — smaller service-style modules (some
+  `reagent-comparison-service.js`, `action-workflow-service.js` — smaller service-style modules (some
   IIFE-wrapped) layered on `state`/`qc-domain`. `PeriodService` locks/unlocks
   reporting periods (`state.periodLocks`, a synced list branch); `entry-service.js`
   enforces the lock (blocks add/edit/void once a period is locked), and the
@@ -623,6 +624,18 @@ the Google Fonts link, offline labs must print with correct metrics.
   dùng bấm vào xem phải là cùng một phép tính. Thống kê điểm QC chỉ gồm xét nghiệm đang
   vận hành, còn thống kê CAPA lấy mọi hồ sơ khi không lọc phạm vi — hồ sơ nguồn ngoài
   IQC không có `testId` nên sẽ biến mất nếu lọc theo thiết bị/xét nghiệm.
+- `archive-service.js` — `ArchiveService`, pure year-slicing over `state` (no DOM):
+  builds a single-year read-only snapshot, summarizes it, canonical-compares a year's
+  points against an archive file, and registers verified archives in
+  `state.archiveRegistry` (schema 6, a synced list branch; id = `year + checksum` so two
+  machines verifying the same file don't duplicate). Exporting an archive **never**
+  deletes anything. `removeYearPoints()`/`restoreRemovedPoints()` exist and are tested,
+  but the destructive path that calls them (`cleanupYearFromArchive()` in
+  `backup-service.js`) is **deliberately not wired to any button** — read the comment
+  block above `archiveCleanupOpenNces()` before re-enabling it, and see
+  `docs/year-archive.md` for the measurements behind that decision.
+  `tests/archive-cleanup.test.js` ratchets the un-wiring, so hooking the button back up
+  fails that test until both blockers are fixed.
 - `range.js`, `settings.js`, `backup-service.js`, `data-io.js`, `reports.js`, `users-auth.js`,
   `reagent.js` — feature-specific logic (target-range calc, settings page,
   backup/restore service + XLSX generation, printed reports, auth/user

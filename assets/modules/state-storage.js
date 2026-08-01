@@ -247,4 +247,5 @@ function save(opts={}){
   lsRevision++;lsDirty=true;markSaved('đang lưu','...');
   scheduleLocalSave();
   if(opts.cloud!==false){fb.dirty=true;scheduleFbPush();}
+  if(typeof scheduleLisQcSync==='function')scheduleLisQcSync(opts);
 }

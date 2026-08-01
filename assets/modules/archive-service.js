@@ -11,7 +11,12 @@
     const data={},pointIds=new Set();let points=0;
     Object.entries(state&&state.data||{}).forEach(([testId,rows])=>{const kept=(rows||[]).filter(p=>pointYear(p)===year);if(kept.length){data[testId]=kept;kept.forEach(p=>pointIds.add(String(p.id||'')));points+=kept.length;}});
     if(!points)return{error:'empty-year'};
-    const archived={...state,data,actions:(state.actions||[]).filter(a=>actionInYear(a,year,pointIds)),activity:(state.activity||[]).filter(a=>valueYear(a&&a.ts)===year),users:[],sigmaData:filterSigma(state.sigmaData,year),periodLocks:(state.periodLocks||[]).filter(x=>String(x&&x.ym||'').startsWith(year+'-')),reagentTests:(state.reagentTests||[]).filter(x=>valueYear(x&&x.test&&x.test.date)===year),archiveRegistry:[]};
+    /* activityAnchor phải bị xóa, KHÔNG được thừa kế qua {...state}: neo đó là hash tip
+       của đoạn audit đã cắt khỏi log SỐNG, còn activity ở đây là một lát khác hẳn (lọc
+       theo năm). Giữ nguyên neo thì auditVerifyChain() chạy trên archive sẽ báo "audit bị
+       sửa" giả ngay dòng đầu — đúng cái kết luận nguy hiểm nhất một file bằng chứng có
+       thể đưa ra. Rỗng nghĩa là "lát này tự nó không nối tiếp chuỗi nào", đúng bản chất. */
+    const archived={...state,data,actions:(state.actions||[]).filter(a=>actionInYear(a,year,pointIds)),activity:(state.activity||[]).filter(a=>valueYear(a&&a.ts)===year),activityAnchor:'',users:[],sigmaData:filterSigma(state.sigmaData,year),periodLocks:(state.periodLocks||[]).filter(x=>String(x&&x.ym||'').startsWith(year+'-')),reagentTests:(state.reagentTests||[]).filter(x=>valueYear(x&&x.test&&x.test.date)===year),archiveRegistry:[]};
     return{year,state:archived,summary:summarize(archived,year)};
   }
   function summarize(state,expectedYear=''){

@@ -51,13 +51,16 @@ function fbCanon(v){
   return Object.keys(out).length?out:null;
 }
 /* So sánh cục bộ với cloud để biết có THẬT SỰ khác nhau hay chỉ là bản đã đồng bộ tải
-   lại. Chỉ so đúng các nhánh được đồng bộ (FB_TOP + data/sigmaData): các field còn lại
+   lại. Chỉ so các nhánh nghiệp vụ được đồng bộ: activity/activityAnchor không dùng để
+   bật hộp thoại phá hủy vì đăng nhập/đăng xuất luôn thêm audit cục bộ trước khi snapshot
+   Firebase đầu tiên tới. Audit lệch được merge và đẩy hội tụ sau khi kết nối, không bị
+   bỏ. Các field còn lại
    của state là cục bộ thuần (schemaVersion, teaRegistryVersion, _ts/_client...) và
    fbFlushPush() không bao giờ đẩy chúng lên, nên cloud không có. Trước đây hàm này so
    JSON.stringify TOÀN BỘ state nên luôn lệch ít nhất ở schemaVersion -> hộp thoại
    "dữ liệu cục bộ khác dữ liệu trung tâm" bật lên MỖI lần đăng nhập dù hai bên đã
    đồng bộ y hệt. Đừng đổi lại thành so cả state. */
-const FB_COMPARE_KEYS=FB_TOP.concat(['data','sigmaData']);
+const FB_COMPARE_KEYS=FB_TOP.filter(k=>k!=='activity'&&k!=='activityAnchor').concat(['data','sigmaData']);
 function fbSyncedShape(s){const out={};FB_COMPARE_KEYS.forEach(k=>{const c=fbCanon(s&&s[k]);if(c!==null)out[k]=c;});return out;}
 function statesLikelyEqual(a,b){return JSON.stringify(fbSyncedShape(a))===JSON.stringify(fbSyncedShape(b));}
 function fbMapJson(o){const out={};Object.keys(o||{}).forEach(id=>out[id]=JSON.stringify(o[id]));return out;}
@@ -284,7 +287,8 @@ async function fbHandleValue(v,opts={}){
     return;
   }
   const hadLocalChanges=fb.dirty;
-  let mergeFirstConnect=hadLocalChanges;
+  const sameFirstConnectData=!base&&!hadLocalChanges&&hasLocalQcContent(state)&&statesLikelyEqual(state,remote);
+  let mergeFirstConnect=hadLocalChanges||sameFirstConnectData;
   // Lần nhận đầu tiên sau khi kết nối/đổi phòng (base=null): nếu máy đang có dữ
   // liệu nghiệp vụ khác trung tâm thì hỏi trước khi thay thế, kể cả dữ liệu đó
   // đến từ localStorage sau reload chứ không phải thay đổi mới trong phiên này.
@@ -296,7 +300,7 @@ async function fbHandleValue(v,opts={}){
   // này sẽ mất); Hủy = ngắt đồng bộ, giữ nguyên dữ liệu cục bộ (dùng khi nghi kết
   // nối nhầm mã phòng). Sau khi đã đồng bộ lần đầu, các lần sau vẫn là trộn 3
   // chiều hai máy như bình thường (base != null, xem nhánh fbMerge bên dưới).
-  if(!base&&!hadLocalChanges&&hasLocalQcContent(state)&&!statesLikelyEqual(state,remote)){
+  if(!base&&!hadLocalChanges&&hasLocalQcContent(state)&&!sameFirstConnectData){
     // Một hộp thoại xung đột tại một thời điểm: nếu snapshot mới tới trong lúc
     // hộp thoại trước đang chờ người dùng trả lời thì bỏ qua, không mở chồng.
     if(fbConflictDialogOpen)return;

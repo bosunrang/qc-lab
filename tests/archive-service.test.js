@@ -6,7 +6,7 @@ const { loadSandbox } = require('./helpers/sandbox');
   const ctx=loadSandbox(['core.js','modules/archive-service.js','modules/backup-service.js'],{crypto:webcrypto});
   const state={schemaVersion:ctx.QCCore.STATE_SCHEMA_VERSION,lab:{name:'PXN A'},tests:[{id:'T1',name:'Glucose',levels:[{level:1}]}],users:[{id:'u1',username:'admin',passHash:'secret'}],
     data:{T1:[{id:'p25',date:'2025-12-31',runId:'2025-12-31-1',level:1,val:1},{id:'p26a',date:'2026-01-01',runId:'2026-01-01-1',level:1,val:2},{id:'p26b',date:'2026-06-01',runId:'2026-06-01-1',level:1,val:3}],T2:[{id:'p27',date:'2027-01-01',runId:'2027-01-01-1',level:1,val:4}]},
-    actions:[{id:'a1',pointId:'p26a'},{id:'a2',eventDate:'2025-12-31'}],activity:[{id:'l1',ts:'2026-02-01T00:00:00Z'},{id:'l2',ts:'2025-02-01T00:00:00Z'}],
+    actions:[{id:'a1',pointId:'p26a'},{id:'a2',eventDate:'2025-12-31'}],activity:[{id:'l1',ts:'2026-02-01T00:00:00Z'},{id:'l2',ts:'2025-02-01T00:00:00Z'}],activityAnchor:'f'.repeat(64),
     sigmaData:{T1:[{period:'2026-01'},{period:'2025-12'}]},periodLocks:[{ym:'2026-01'},{ym:'2025-12'}],reagentTests:[{id:'r1',test:{date:'2026-03-01'}},{id:'r2',test:{date:'2025-03-01'}}]};
 
   assert.deepEqual([...ctx.ArchiveService.availableYears(state)],['2027','2026','2025']);
@@ -16,6 +16,10 @@ const { loadSandbox } = require('./helpers/sandbox');
   assert.equal(plain.state.users.length,0,'archive không chứa hash mật khẩu');
   assert.deepEqual(plain.state.actions.map(a=>a.id),['a1']);
   assert.deepEqual(plain.state.activity.map(a=>a.id),['l1']);
+  /* Neo hash của log sống KHÔNG được đi theo lát audit đã lọc theo năm: giữ lại thì
+     auditVerifyChain() chạy trên archive báo "audit bị sửa" giả. Chốt riêng vì lỗi này
+     đến từ {...state} nên bất kỳ ai thêm nhánh mới cũng dễ tái tạo. */
+  assert.equal(plain.state.activityAnchor,'','archive không được thừa kế activityAnchor của log sống');
   assert.equal(plain.state.sigmaData.T1.length,1);
   assert.equal(plain.state.periodLocks.length,1);
   assert.equal(plain.state.reagentTests.length,1);

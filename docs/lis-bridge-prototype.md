@@ -1,0 +1,86 @@
+# Prototype LIS Bridge + QC Gate
+
+## Phạm vi
+
+Prototype chạy thành tiến trình Node riêng, chỉ bind `127.0.0.1` mặc định. Nó nhận
+kết quả máy đã ẩn danh, mapping mã máy sang `qclabTestId`, rồi dùng trạng thái QC gần
+nhất để quyết định:
+
+- `accepted / QC_ACCEPTED`: được đi tiếp;
+- `review / QC_ALERT`: cần duyệt thủ công;
+- `held / QC_REJECTED`: giữ vì QC bị loại;
+- `held / QC_UNKNOWN|QC_STALE`: chưa có, chưa đủ bằng chứng hoặc QC quá cũ;
+- `held / UNMAPPED_TEST|UNIT_MISMATCH`: cấu hình giao tiếp chưa an toàn.
+
+Đây chưa phải LIS lâm sàng. Gateway chủ động từ chối các field như `patientName`,
+`patientId`, ngày sinh, điện thoại và địa chỉ. `specimenRef` trong demo chỉ là mã mẫu
+ẩn danh. Không dùng dữ liệu bệnh nhân thật ở giai đoạn này.
+
+## Chạy thử
+
+```powershell
+npm run lis:gateway
+```
+
+Terminal sẽ báo địa chỉ `http://127.0.0.1:8787` và journal tại
+`lis-gateway/.data/events.ndjson`. Thư mục này bị Git bỏ qua.
+
+Đặt trạng thái QC cho mapping mẫu:
+
+```powershell
+$qc = @{
+  qclabTestId = 'T1'
+  status = 'ok'
+  asOf = (Get-Date).ToString('o')
+  reason = 'Westgard đạt'
+} | ConvertTo-Json
+Invoke-RestMethod -Method Put -Uri http://127.0.0.1:8787/api/v1/qc-status -ContentType application/json -Body $qc
+```
+
+Hoặc vào **Cài đặt → LIS Gateway (thử nghiệm)** trong QC Lab, bật tự động và bấm
+**Lưu & kiểm tra**. App sẽ gửi snapshot ngay khi đăng nhập và lên lịch gửi lại sau
+các thay đổi ảnh hưởng phép tính QC. Không có điểm QC gửi `unknown`; thiếu mức trong
+ngày gửi `warn`; chỉ đủ mức và Westgard đạt mới gửi `ok`.
+
+Gửi kết quả máy giả lập:
+
+```powershell
+$result = Get-Content -Raw lis-gateway/examples/result-glucose.json
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8787/api/v1/messages -ContentType application/json -Body $result
+```
+
+Xem inbox và tình trạng dịch vụ:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8787/api/v1/messages
+Invoke-RestMethod http://127.0.0.1:8787/health
+```
+
+Gửi lại đúng `messageId` + nội dung trả về bản cũ với `duplicate: true`; cùng
+`messageId` nhưng nội dung khác trả HTTP 409. Journal append-only giúp dựng lại inbox
+và trạng thái QC sau khi tiến trình khởi động lại. Dòng cuối chưa hoàn chỉnh do tắt máy
+đột ngột được cách ly; lỗi ở giữa journal bị chặn thay vì âm thầm bỏ qua.
+
+## Cấu hình và bảo mật
+
+- Copy `config.example.json` ra ngoài repo rồi đặt đường dẫn bằng
+  `QCLAB_LIS_CONFIG`.
+- Đổi thư mục dữ liệu bằng `QCLAB_LIS_DATA`.
+- Đổi cổng bằng `QCLAB_LIS_PORT`.
+- Đặt `QCLAB_LIS_TOKEN` để yêu cầu `Authorization: Bearer ...`.
+- Gateway từ chối bind ra ngoài localhost nếu chưa có token.
+
+Journal NDJSON phù hợp cho prototype và kiểm chứng contract, không phải kho lâm sàng
+production. Bước production phải thay bằng PostgreSQL có transaction, inbox/outbox,
+mã hóa, backup và kiểm soát truy cập.
+
+Prototype hiện chỉ chạy từ source tree; `lis-gateway/` chưa được đóng vào bộ cài
+Electron dành cho người dùng cuối.
+
+## Bước tiếp theo
+
+1. Chốt mapping theo thiết bị + mã xét nghiệm + đơn vị với một máy thật.
+2. Viết adapter đầu tiên từ file/ASTM/HL7 của đúng model máy.
+3. Thêm màn hình inbox chỉ đọc và cơ chế giải phóng kết quả có audit.
+4. Chỉ sau khi hoàn tất threat model mới thêm Patient, ServiceRequest, Specimen,
+   Observation và DiagnosticReport vào PostgreSQL.

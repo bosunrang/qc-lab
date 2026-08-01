@@ -17,7 +17,13 @@ const {loadSandbox}=require('./helpers/sandbox');
   assert.match(body,/QCCore\.validateStateInvariants\(state\)/,'phải kiểm tra invariant sau mutation');
   assert.match(body,/ArchiveService\.restoreRemovedPoints\(state,removal\)/,'phải rollback nếu invariant hỏng');
   assert.match(body,/save\(\{testIds:removal\.testIds\}\)/,'phải ghi đúng partition xét nghiệm bị thay đổi');
-  assert.match(settings,/id="cleanupArchive"[^>]+onchange="cleanupYearFromArchive\(event\)"/,'Cài đặt phải có file picker dọn archive');
+  /* RATCHET NGƯỢC CHIỀU: đường dọn CỐ Ý chưa nối vào UI (xem khối chú thích trên
+     archiveCleanupOpenNces trong backup-service.js). Hợp đồng an toàn ở trên vẫn được
+     chốt để code không mục, nhưng không nút nào được gọi tới nó khi Firebase còn hồi
+     sinh điểm đã xóa và guard NCE còn bỏ sót điểm chạy lại. Sửa xong CẢ HAI thì đổi
+     assertion này thành kiểm tra sự tồn tại của file picker. */
+  assert.doesNotMatch(settings,/cleanupYearFromArchive/,'Cài đặt chưa được nối nút dọn archive khi hai lỗi chặn còn mở');
+  assert.match(source,/CỐ Ý CHƯA NỐI VÀO UI/,'phải giữ chú thích lý do chưa nối UI cạnh đường dọn');
 
   const ctx=loadSandbox(['core.js','modules/archive-service.js','modules/backup-service.js'],{crypto:webcrypto});
   const live=ctx.QCCore.sanitizeBackup({schemaVersion:ctx.QCCore.STATE_SCHEMA_VERSION,lab:{name:'PXN'},tests:[{id:'T1',name:'Glucose',levels:[{level:1}]}],data:{T1:[{id:'p25',date:'2025-12-31',runId:'2025-12-31-1',level:1,val:1},{id:'p26',date:'2026-01-02',runId:'2026-01-02-1',level:1,val:2}]},actions:[],activity:[],users:[]});

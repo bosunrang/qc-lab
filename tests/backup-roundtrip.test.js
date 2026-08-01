@@ -60,5 +60,36 @@ const { makeState } = require('../benchmarks/performance-baseline');
   assert.equal(ctx.backupImportSizeError(tenYearBytes),'',`backup 10 năm phải còn nhập được, thực tế ${(tenYearBytes/1024/1024).toFixed(1)} MB`);
   assert.ok(tenYearBytes<128*1024*1024,'snapshot 547.500 điểm phải nằm dưới hợp đồng 128 MB');
 
+  /* DUNG LƯỢNG KHÔNG ĐƯỢC KHÓA ĐƯỜNG RA. Trước 2026-08-01 trần 128 MB chặn cứng cả ba
+     đường cùng lúc (xuất, backup an toàn, nhập) nên vượt trần là không xuất được, không
+     nhập được, không reset được. Chốt ở đây bằng HÀNH VI chứ không bằng text: giả lập gói
+     200 MB rồi kiểm tra file vẫn được ghi ra. Stub createBackupPackage thay vì dựng state
+     200 MB thật để test không tốn vài giây và vài trăm MB RAM. */
+  {
+    const big=200*1024*1024;
+    assert.notEqual(ctx.backupImportSizeError(big),'','200 MB phải vẫn nằm trên ngưỡng khuyến nghị');
+    let downloaded=[],confirms=0;
+    ctx.createBackupPackage=async()=>({text:'{}',bytes:big,meta:{checksum:'x'}});
+    ctx.downloadBackupText=(name)=>{downloaded.push(name);return true;};
+    ctx.confirmDialog=async()=>{confirms++;return true;};
+    ctx.infoDialog=async()=>{};
+    ctx.markBackupDone=()=>{};ctx.updateBackupBanner=()=>{};ctx.logAct=()=>{};ctx.save=()=>{};
+    ctx.state={schemaVersion:ctx.QCCore.STATE_SCHEMA_VERSION};
+    ctx.vnDate=()=>'01/08/2026';ctx.isoToday=()=>'2026-08-01';
+
+    assert.equal(await ctx.backupCurrentData('truoc-nhap'),true,'backup an toàn KHÔNG được thất bại vì dung lượng — nhập backup và xóa sạch dữ liệu đều hủy khi nó trả false');
+    assert.equal(downloaded.length,1,'backup an toàn phải thực sự ghi ra file');
+    assert.equal(confirms,0,'backup an toàn chạy ngầm, không được chen hộp thoại vào giữa luồng đang hỏi');
+
+    downloaded=[];
+    await ctx.exportData();
+    assert.equal(downloaded.length,1,'xuất backup quá cỡ vẫn phải ra file sau khi người dùng xác nhận');
+    assert.equal(confirms,1,'và chỉ hỏi MỘT lần, không hỏi chồng thêm cảnh báo ngưỡng mềm');
+
+    downloaded=[];ctx.confirmDialog=async()=>{confirms++;return false;};
+    await ctx.exportData();
+    assert.equal(downloaded.length,0,'người dùng từ chối thì không ghi file');
+  }
+
   console.log(`Backup round-trip test passed (${(value.packBytes/1024/1024).toFixed(1)} MB package; ${(tenYearBytes/1024/1024).toFixed(1)} MB ten-year contract)`);
 })().catch(error=>{console.error(error);process.exitCode=1;});

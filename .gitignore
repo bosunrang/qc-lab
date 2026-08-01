@@ -11,6 +11,7 @@ outputs/
 tests/__visual__/
 tests/__a11y__/
 tests/__print__/
+lis-gateway/.data/
 
 # Local dependency/install artifacts
 node_modules/
