@@ -494,16 +494,15 @@ function close(actual, expected, epsilon = 1e-9) {
 { /* Schema 6 KHÔNG được hạ về 5 dù nhánh archiveRegistry của nó đã bị gỡ (2026-08-01,
      trước khi phát hành). Vài state dev đã đóng dấu 6; hạ số xuống khiến
      validateStateInvariants() báo "schemaVersion cao hơn phiên bản app hỗ trợ" trên chính
-     máy của người phát triển. sanitizeBackup() chỉ giữ các trường có trong danh sách nên
-     archiveRegistry cũ tự rụng, không cần bước migrate riêng — chốt luôn điều đó ở đây. */
+     máy của người phát triển. */
   assert.equal(QCCore.STATE_SCHEMA_VERSION,6);
   const cleaned=QCCore.sanitizeBackup({schemaVersion:6,archiveRegistry:[{id:'arc1',year:'26',checksum:'x'}]});
   assert.deepEqual(QCCore.validateStateInvariants(cleaned,{sanitized:true}).filter(x=>x.includes('archive')),[],'không còn invariant nào nhắc tới archive');
   assert.deepEqual(QCCore.validateBackup({...cleaned,lab:{},tests:[],data:{},actions:[],activity:[],users:[]}).filter(x=>x.includes('archive')),[],'archiveRegistry rác không còn bị bắt lỗi, cũng không được chặn nhập backup cũ');
   /* sanitizeBackup() CHỈ ghi đè các trường trong danh sách của nó, KHÔNG bỏ trường lạ —
      nên archiveRegistry cũ vẫn đi qua đây nguyên vẹn. Việc dọn nằm ở ensureShape()
-     (state.js), xem tests/storage-pipeline.test.js. Chốt lại sự thật này để không ai lầm
-     tưởng sanitize là chỗ lọc trường đã gỡ. */
+     (state.js), chốt tại tests/reagent-comparison-service.test.js. Ghi lại sự thật này để
+     không ai lầm tưởng sanitize là chỗ lọc trường đã gỡ. */
   assert.equal('archiveRegistry' in cleaned,true,'sanitizeBackup không bỏ trường lạ — việc dọn thuộc về ensureShape()');
 }
 
