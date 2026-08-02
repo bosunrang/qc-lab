@@ -460,6 +460,15 @@ function close(actual, expected, epsilon = 1e-9) {
   assert.equal(cleaned.tests[0].decimalPlaces,3,'giữ cấu hình số thập phân hợp lệ của xét nghiệm');
   assert.equal(cleaned.tests[1].decimalPlaces,null,'cấu hình ngoài khoảng 0–6 phải trở về Tự động');
 }
+{
+  /* 0 là LỰA CHỌN TAY hợp lệ (ví dụ đếm tế bào), không phải "chưa cấu hình" — nhưng
+     Number(null)===Number(0)===0, nên sanitize phải kiểm giá trị THÔ trước khi ép kiểu.
+     Thiếu bước đó thì "chưa cấu hình" (null/undefined) sẽ bị hiểu nhầm thành "đã chọn 0". */
+  const build=v=>({lab:{},tests:[{id:'T1',name:'WBC',decimalPlaces:v,levels:[]}],data:{},activity:[],users:[],actions:[]});
+  assert.equal(QCCore.sanitizeBackup(build(0)).tests[0].decimalPlaces,0,'0 chữ số là lựa chọn hợp lệ, phải giữ nguyên chứ không phải "chưa đặt"');
+  assert.equal(QCCore.sanitizeBackup(build(null)).tests[0].decimalPlaces,null,'chưa cấu hình (null) không được biến thành "đã chọn 0"');
+  assert.equal(QCCore.sanitizeBackup(build(undefined)).tests[0].decimalPlaces,null,'chưa cấu hình (undefined) không được biến thành "đã chọn 0"');
+}
 
 {
   const cleaned = QCCore.sanitizeBackup({

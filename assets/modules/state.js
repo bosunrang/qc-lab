@@ -246,8 +246,7 @@ function pointStaff(p){const name=String(p&&p.operatorName||'').trim(),code=Stri
 function dateObj(s){const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s||''));return m?new Date(+m[1],+m[2]-1,+m[3]):new Date(s);}
 function daysToExp(exp){if(!exp)return null;return Math.round((dateObj(exp).getTime()-new Date().getTime())/86400000);}
 function fmt(x,d=2){return(x==null||isNaN(x))?'—':Number(x).toFixed(d);}
-const QC_DECIMALS_DEFAULT=1;             // mặc định 1 chữ số thập phân cho mọi xét nghiệm
-const QC_DECIMALS_MIN_CUSTOM=2;          // tùy chỉnh tay: 2..6 (dưới mức đó dùng mặc định)
+const QC_DECIMALS_DEFAULT=1;             // mặc định 1 chữ số thập phân khi tạo xét nghiệm mới
 const QC_DECIMALS_MAX=6;                 // trần chung cho MỌI chỗ kẹp số lẻ
 const QC_STAT_EXTRA_DECIMALS=2;          // SD cần nhiều chữ số hơn giá trị đo
 /* `.5` cũng là số: cho phép thiếu phần nguyên, nếu không thì người nhập ".5" bị coi là 0
@@ -260,16 +259,22 @@ function qcValueDecimals(value){const text=String(value==null?'':value).trim(),m
       lên: nhập "5.6" với SD 0.153 thì hiện "5.600". Đó là độ chính xác giả — con số trong
       hồ sơ nội kiểm ngụ ý độ phân giải của máy, không phải của phép thống kê.
 
-   2. NHƯNG cũng không được để rơi về 0. Bỏ SD ra rồi thì điểm QC cũ (nhập trước khi có
-      point.valueDecimals) chỉ còn suy từ chính val, mà val=4 thì String(4)="4" → 0 chữ số
-      → Kali "4.0" hiện thành "4". Toàn bộ dữ liệu lịch sử mất phần thập phân trong im
-      lặng. Vì vậy mặc định là 1 và lấy MAX với độ chính xác người nhập: gõ "4" hay "4.0"
-      đều ra "4.0", còn gõ "7.405" vẫn giữ nguyên "7.405" chứ không bị làm tròn.
+   2. NHƯNG khi CHƯA cấu hình tay thì cũng không được để rơi về 0. Bỏ SD ra rồi thì điểm QC
+      cũ (nhập trước khi có point.valueDecimals) chỉ còn suy từ chính val, mà val=4 thì
+      String(4)="4" → 0 chữ số → Kali "4.0" hiện thành "4". Toàn bộ dữ liệu lịch sử mất
+      phần thập phân trong im lặng. Vì vậy KHÔNG cấu hình thì mặc định là 1 và lấy MAX với
+      độ chính xác người nhập: gõ "4" hay "4.0" đều ra "4.0", còn gõ "7.405" vẫn giữ
+      nguyên "7.405" chứ không bị làm tròn.
 
-   Thứ tự: cấu hình tay (2..6) > max(mặc định 1, độ chính xác đã lưu của điểm). */
+   Thứ tự: cấu hình tay (0..6, kể cả 0 — một số xét nghiệm như đếm tế bào cần số nguyên)
+   > max(mặc định 1, độ chính xác đã lưu của điểm) khi CHƯA cấu hình.
+   `test.decimalPlaces==null` (chưa từng đụng ô này) PHẢI tách khỏi "đã chọn 0": Number(null)
+   === 0, nên `Number(test.decimalPlaces)` một mình không phân biệt được hai trường hợp —
+   phải kiểm raw trước khi ép kiểu, nếu không mọi xét nghiệm chưa cấu hình sẽ bị hiểu nhầm
+   thành "đã chọn 0 chữ số" và mất luôn mặc định 1. */
 function testDecimalPlaces(test,point=null){
-  const configured=Number(test&&test.decimalPlaces);
-  if(Number.isInteger(configured)&&configured>=QC_DECIMALS_MIN_CUSTOM&&configured<=QC_DECIMALS_MAX)return configured;
+  const raw=test&&test.decimalPlaces,configured=Number(raw);
+  if(raw!=null&&raw!==''&&Number.isInteger(configured)&&configured>=0&&configured<=QC_DECIMALS_MAX)return configured;
   if(point){const saved=Number(point.valueDecimals),own=Number.isInteger(saved)&&saved>=0?saved:qcValueDecimals(point.val);return Math.min(QC_DECIMALS_MAX,Math.max(QC_DECIMALS_DEFAULT,own));}
   return QC_DECIMALS_DEFAULT;
 }

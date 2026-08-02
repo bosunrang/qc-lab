@@ -202,8 +202,14 @@ const plain = v => JSON.parse(JSON.stringify(v));
   assert.equal(ctx.fmtPointValue(ph.point),'7.405');
   assert.equal(ctx.fmtPointValue({val:7.405}),'7.405','điểm cũ chưa có metadata vẫn suy ra đủ chữ số');
   assert.equal(ctx.fmtPointValue({val:7.4,valueDecimals:3}),'7.400','giữ cả số 0 tận cùng đã nhập');
-  assert.equal(ctx.fmtPointValue({val:450},{decimalPlaces:1}),'450.0','1 không phải tùy chỉnh — đó chính là mặc định');
-  assert.equal(ctx.fmtPointValue({val:450},{decimalPlaces:0}),'450.0','0 chữ số không còn là lựa chọn — tùy chỉnh chỉ 2..6, ngoài khoảng thì về mặc định');
+  assert.equal(ctx.fmtPointValue({val:450},{decimalPlaces:1}),'450.0','1 trùng với mặc định nhưng vẫn phải cho ra cùng kết quả');
+  /* decimalPlaces=0 là LỰA CHỌN TAY hợp lệ (ví dụ đếm tế bào WBC/RBC), phải được tôn
+     trọng nguyên vẹn — không bị ép lên mặc định 1. Đây là chỗ dễ hỏng nhất: Number(null)
+     (chưa cấu hình) === Number(0) (đã chọn 0) === 0, nên phải kiểm giá trị THÔ trước khi
+     ép kiểu, nếu không mọi xét nghiệm chưa từng đụng ô này sẽ bị hiểu nhầm thành "đã chọn
+     0 chữ số" và mất mặc định 1 — chỉ ngược với hồi quy đã sửa bên dưới. */
+  assert.equal(ctx.fmtPointValue({val:450},{decimalPlaces:0}),'450','decimalPlaces=0 phải được tôn trọng, không bị ép về mặc định');
+  assert.equal(ctx.testDecimalPlaces({decimalPlaces:0}),0,'đã chọn tay 0 chữ số thì testDecimalPlaces phải trả đúng 0, không phải mặc định');
   /* HỒI QUY TỪ BÁO CÁO THẬT (2026-08-02). Sau khi bỏ SD ra khỏi phép suy, điểm QC cũ —
      nhập trước khi có point.valueDecimals — chỉ còn suy từ chính val. Kali "4.0" lưu thành
      val=4, mà String(4)="4" nên ra 0 chữ số: bảng nhập QC hiện "4". Toàn bộ dữ liệu lịch sử
@@ -235,7 +241,7 @@ const plain = v => JSON.parse(JSON.stringify(v));
     assert.equal(sd(fixed,0.153),'0.1530','cấu hình tay chỉ chi phối GIÁ TRỊ, không được cắt cụt SD');
 
     const natri={levels:[{level:1,mean:140,sd:1.5}]};
-    assert.equal(val(natri,{val:141,valueDecimals:0}),'141.0','xét nghiệm số nguyên không được thành "141.0"');
+    assert.equal(val(natri,{val:141,valueDecimals:0}),'141.0','chưa cấu hình tay thì mặc định 1 chữ số, kể cả khi người dùng gõ số nguyên');
     assert.equal(sd(natri,1.5),'1.500');
 
     const ph={levels:[{level:1,mean:7.4,sd:0.01}]};
