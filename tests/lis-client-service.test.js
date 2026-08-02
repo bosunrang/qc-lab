@@ -102,5 +102,92 @@ const { loadSandbox, run } = require('./helpers/sandbox');
   assert.doesNotMatch(stateStorage, /scheduleLisQcSync/, 'save() khong con day trang thai QC ra ngoai — chieu do da bi bo');
   run(ctx, 'clearInterval(lisGatewayRuntime.pollT);');
 
+  /* ============================================================================
+   * MAN HINH "QC CHO NHAP" — man hinh nay khong ton tai o commit truoc do: chi co
+   * lisImportResult()/lisRejectResult() ma khong co UI nao goi toi, nen cach duy
+   * nhat de nhan mot ban ghi la go tay vao DevTools console. Cac ham duoi day
+   * (lisQueueRowHtml/lisQueueSectionHtml/lisRenderQueueModal/lisOpenQueueModal)
+   * dung THAT esc/escAttr/jsq/btn tu reports.js/entry-routes.js/router-render.js
+   * — khong stub — vi day chinh la lop thoat HTML can chot lai (xem hoi quy XSS
+   * ben duoi), stub rieng se khong bat duoc regresion that trong cac ham do.
+   * ========================================================================= */
+  const openCalls = [];
+  const ctx2 = loadSandbox(['modules/router-render.js', 'modules/entry-routes.js', 'modules/reports.js', 'modules/lis-client-service.js'], {
+    URL, AbortController, setInterval, clearInterval,
+    window: { QCLAB_APP: { name: 'QC Lab', version: 'test' } },
+    document: { getElementById: () => null, addEventListener: () => {}, removeEventListener: () => {} },
+    openModal: (html) => { openCalls.push(html); },
+    fmt: (v) => Number(v).toFixed(1),
+    formatDateTimeVN: () => '10:00 02/08/2026',
+    fmtTestValue: (t, v) => Number(v).toFixed(1),
+    testDisplayName: (t) => t && t.name || '',
+    emptyState: (title, body) => `<div class="empty"><div class="empty-title">${title}</div><div>${body}</div></div>`,
+  });
+  run(ctx2, `state={tests:[{id:'T-NA',name:'Sodium (Na)',unit:'mmol/L',levels:[{level:1,lot:'1101'}]}]};`);
+
+  const okRecord = { message: { messageId: 'M-OK', analyzerId: 'EASYLYTE-01', testCode: 'NA', qcLevel: '1', value: 141.2, unit: 'mmol/L', measuredAt: '2026-08-02T03:00:00Z', runId: 'lan-1', operator: 'KTV A' }, resolved: { ok: true, qclabTestId: 'T-NA', level: 1, lot: '1101', displayName: '' } };
+  const badRecord = { message: { messageId: 'M-BAD', analyzerId: 'MAY-LA', testCode: 'XX', qcLevel: '1', value: 5, measuredAt: '2026-08-02T03:00:00Z' }, resolved: { ok: false, code: 'UNMAPPED_TEST', reason: 'Chưa mapping mã máy sang xét nghiệm QC Lab.' } };
+
+  {
+    const row = run(ctx2, `lisQueueRowHtml(${JSON.stringify(okRecord)})`);
+    assert.match(row, /Sodium \(Na\)/, 'dong da khop mapping phai hien ten xet nghiem');
+    assert.match(row, /M1/, 'phai hien muc QC');
+    assert.match(row, /1101/, 'phai hien so lo');
+    assert.match(row, /141\.2/, 'phai hien gia tri');
+    assert.match(row, />Nhận</, 'dong da khop phai co nut Nhan');
+    assert.match(row, />Bỏ</, 'va nut Bo');
+  }
+  {
+    const row = run(ctx2, `lisQueueRowHtml(${JSON.stringify(badRecord)})`);
+    assert.match(row, /MAY-LA\/XX/, 'dong chua khop phai hien ma may\/ma xet nghiem tho');
+    assert.match(row, /Chưa mapping mã máy/, 'phai hien ly do gateway tra ve de biet sua cau hinh cho nao');
+    assert.doesNotMatch(row, />Nhận</, 'dong CHUA khop KHONG duoc co nut Nhan — resolved.qclabTestId rong se lam EntryService nhan diem rac');
+    assert.match(row, />Bỏ</);
+  }
+  {
+    const empty = run(ctx2, `lisQueueSectionHtml('Sẵn sàng nhận',[],'Trống')`);
+    assert.match(empty, /Sẵn sàng nhận/); assert.match(empty, /Trống/); assert.doesNotMatch(empty, /<table/, 'danh sach rong khong duoc dung table rong');
+    const withRows = run(ctx2, `lisQueueSectionHtml('Sẵn sàng nhận',[${JSON.stringify(okRecord)}],'')`);
+    assert.match(withRows, /Sẵn sàng nhận \(1\)/, 'tieu de phai dem dung so dong');
+    assert.match(withRows, /<table/);
+  }
+
+  /* --- HOI QUY XSS: messageId la du lieu tu MIDDLEWARE BEN NGOAI (LIS Gateway
+     normalizeQcResult() chi trim + cat do dai, KHONG loc ky tu) — khac moi cho dung
+     jsq() con lai trong app, luon la id noi bo do uid()/cleanId() sinh ra. Ban dau
+     lisQueueRowHtml() dung jsq() suong (jsq khong escape dau ngoac kep ") nen mot
+     messageId nhu 'X" onmouseover="...' THOAT duoc khoi thuoc tinh onclick="...",
+     tiem duoc thuoc tinh/HTML tuy y vao trinh duyet cua quan tri vien — da xac minh
+     bang DOM parser that (Chromium): thuoc tinh onmouseover THAT su duoc tao tren
+     the <button>. Sua bang lisOnclick() boc escAttr() quanh CA chuoi onclick, khong
+     chi rieng id. Chot lai o day bang DOM parser that (khong so khop chuoi tho —
+     chuoi da escape van CHUA nguyen van "onmouseover=" duoi dang van ban vo hai,
+     so sanh chuoi se bao am tinh sai). */
+  {
+    const evilId = 'X" onmouseover="window.__pwned=true" data-x="';
+    const evilRecord = JSON.parse(JSON.stringify(okRecord));
+    evilRecord.message.messageId = evilId;
+    const row = run(ctx2, `lisQueueRowHtml(${JSON.stringify(evilRecord)})`);
+    // Dung 1 DOM that trong sandbox Node? khong co — dung phep giai ma HTML entity
+    // deu quy y het cac truong hop can, roi kiem tra thuoc tinh onmouseover KHONG
+    // con nam ngoai pham vi chuoi JS (tuong duong voi kiem tra bang trinh duyet that
+    // da lam o buoc phat trien — o day chot lai bang dac diem HTML: gia tri thuoc
+    // tinh onclick khong duoc chua ky tu " chua duoc entity-hoa).
+    const onclickValues = [...row.matchAll(/onclick="([^"]*)"/g)].map(m => m[1]);
+    // Neu messageId thoat duoc khoi thuoc tinh, regex /onclick="([^"]*)"/ se dung lai
+    // O DAU " THAT (khong phai " ma ung dung sinh ra), tuc so match se KHAC 2 hoac
+    // gia tri bat duoc se rat ngan (chi phan truoc dau " dau tien trong messageId).
+    assert.equal(onclickValues.length, 2, 'phai co dung 2 thuoc tinh onclick (Nhan + Bo) — neu messageId pha duoc thuoc tinh, regex se bat sai so luong hoac sai noi dung');
+    onclickValues.forEach(v => {
+      assert.doesNotMatch(v, /"/, 'gia tri thuoc tinh onclick khong duoc con ky tu " song — do la dieu kien de KHONG thoat duoc khoi thuoc tinh HTML');
+      // Giai ma dung nhung gi trinh duyet giai ma khi doc thuoc tinh HTML, roi kiem
+      // tra JS nguon con lai la MOT loi goi ham hop le voi DUNG 1 tham so — khong bi
+      // tach thanh nhieu tham so hay chen them ma.
+      const decoded = v.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+      assert.match(decoded, /^lis(QueueImport|QueueReject)\('X" onmouseover="window\.__pwned=true" data-x="'\)$/, 'sau khi giai ma, JS nguon phai la DUNG mot loi goi ham voi nguyen van messageId lam tham so, khong bi phan manh');
+    });
+    assert.equal(row.match(/<button/g).length, 2, 'DOM van chi co dung 2 <button>, khong bi tiem the/thuoc tinh moi');
+  }
+
   console.log('LIS client service tests passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-30T13:53:54.312Z",
+  "generatedAt": "2026-08-02T14:42:43.025Z",
   "note": "Trần vi phạm a11y cho phép. Sau khi sửa violation, chạy lại với --update-baseline để siết ratchet; không nâng tay các con số.",
   "pages": {
     "dash": {
@@ -149,6 +149,12 @@
       "minor": 0
     },
     "users:edit-permissions": {
+      "critical": 0,
+      "serious": 0,
+      "moderate": 0,
+      "minor": 0
+    },
+    "settings:lis-queue": {
       "critical": 0,
       "serious": 0,
       "moderate": 0,

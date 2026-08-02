@@ -57,6 +57,17 @@ const MODALS = [
   { page: 'dash', label: 'dash:kpi-detail', open: () => dashboardKpiOpenDetail('accepted') },
   { page: 'actions', label: 'actions:nce-guide', open: () => openActionGuide() },
   { page: 'users', label: 'users:edit-permissions', open: () => openUserPerms(state.users[1].id) },
+  // Modal nay ghi diem QC that qua EntryService khi bam Nhan, nen dang o muc "modal
+  // lon" dang audit. Khong co LIS Gateway that dang chay trong harness nay nen seed
+  // thang lisGatewayRuntime.pending/unresolved roi goi lisRenderQueueModal() — bo qua
+  // vong fetch mang cua lisOpenQueueModal(), giong cach Sigma tu goi sgTrackTest()/
+  // sgAddPeriod() truoc khi audit thay vi di qua luong nhap lieu day du.
+  { page: 'settings', label: 'settings:lis-queue', open: () => {
+      const t = state.tests[0], l = t.levels[0];
+      lisGatewayRuntime.pending = [{ message: { messageId: 'A11Y-OK', analyzerId: 'SIM-01', testCode: 'GLU', qcLevel: '1', value: 5.6, unit: t.unit || '', measuredAt: new Date().toISOString(), runId: 'r1', operator: 'KTV A11Y' }, resolved: { ok: true, qclabTestId: t.id, level: l.level, lot: l.lot || '', displayName: '' } }];
+      lisGatewayRuntime.unresolved = [{ message: { messageId: 'A11Y-BAD', analyzerId: 'MAY-LA', testCode: 'XX', qcLevel: '1', value: 1, measuredAt: new Date().toISOString() }, resolved: { ok: false, code: 'UNMAPPED_TEST', reason: 'Chưa mapping mã máy sang xét nghiệm QC Lab.' } }];
+      lisRenderQueueModal();
+    } },
   // archiveActivityLog() thoát sớm khi nhật ký rỗng, mà seed chỉ có dữ liệu QC vận
   // hành — ghi một dòng trước để cổng đó không chặn (cùng lý do Sigma phải tự
   // sgTrackTest/sgAddPeriod trước khi audit).
