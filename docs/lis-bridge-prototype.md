@@ -47,6 +47,44 @@ Ba lớp bảo vệ, mỗi lớp có test riêng trong `tests/lis-gateway.test.j
 `/health` không cần token (liveness) nên **không** kèm số liệu vận hành; số liệu nằm ở
 `GET /api/v1/status` phía sau token.
 
+## Mapping: sinh và đối chiếu bằng `npm run lis:config`
+
+`qclabTestId` là **ID nội bộ** do app sinh (`uid()`, dạng `a3f9k2p`), không phải tên hiển
+thị, và **không màn hình nào trong app hiện nó**. Gõ sai một ký tự thì gateway vẫn khởi
+động bình thường — chỉ có mọi kết quả của xét nghiệm đó lặng lẽ rơi vào
+`held / UNMAPPED_TEST`. An toàn, nhưng rất khó đoán ra. Script này biến loại lỗi im lặng
+đó thành lỗi ồn ào.
+
+State nằm trong localStorage/IndexedDB của trình duyệt nên script Node không đọc thẳng
+được; nguồn offline duy nhất là file backup do chính app xuất ra
+(**Cài đặt → Quản trị dữ liệu → Xuất backup**).
+
+```bash
+npm run lis:config -- qclab-backup.json -o D:\qclab-lis\config.json
+```
+
+Sinh sẵn một dòng mapping cho mỗi xét nghiệm đang bật, điền trước `qclabTestId`,
+`displayName`, `expectedUnit`; `analyzerId`/`testCode` để giá trị mẫu cho người dùng thay.
+Script **không ghi đè** file đã tồn tại. Nhận cả gói backup mới lẫn backup cũ dạng state thô.
+
+Sau khi điền mã máy thật, đối chiếu lại:
+
+```bash
+npm run lis:config -- qclab-backup.json --check D:\qclab-lis\config.json
+```
+
+Bắt bốn lớp lỗi, mỗi lớp có test riêng trong `tests/lis-config.test.js`:
+
+| Lỗi | Hậu quả nếu không bắt |
+|---|---|
+| Còn giá trị mẫu | chạy với mã máy giả, mọi kết quả bị giữ |
+| `qclabTestId` không có trong backup | `held / UNMAPPED_TEST` im lặng — lỗi khó tìm nhất |
+| `expectedUnit` lệch đơn vị xét nghiệm | mọi kết quả `held / UNIT_MISMATCH` |
+| Trùng `analyzerId`+`testCode` | gateway từ chối khởi động (bắt bằng chính `buildMappingIndex()`) |
+
+Thêm cảnh báo (không chặn) cho: xét nghiệm chưa được mapping, `allowedOrigins` rỗng, và
+`staleMinutes` dài quá 240 phút.
+
 ## Gửi trạng thái QC
 
 App gửi **cả lô trong một request** và tự gửi lại theo nhịp 30 phút
@@ -89,7 +127,7 @@ và trạng thái QC sau khi tiến trình khởi động lại. Dòng cuối ch
 ## Cấu hình và bảo mật
 
 - Copy `config.example.json` ra ngoài repo rồi đặt đường dẫn bằng
-  `QCLAB_LIS_CONFIG`.
+  `QCLAB_LIS_CONFIG`. Đừng gõ tay `qclabTestId` — dùng `npm run lis:config` (dưới).
 - Đổi thư mục dữ liệu bằng `QCLAB_LIS_DATA`.
 - `QCLAB_LIS_PORT` đổi cổng, **nhưng chỉ dùng được cho kiểm thử bằng curl/PowerShell**.
   App KHÔNG kết nối được sang cổng khác 8787: CSP `connect-src` trong `index.html` chỉ
