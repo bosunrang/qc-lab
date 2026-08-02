@@ -1,20 +1,25 @@
-# Prototype LIS Bridge + QC Gate
+# Prototype LIS Gateway — nhận kết quả QC từ middleware
 
-## Phạm vi
+## Phạm vi và chiều dữ liệu
 
-Prototype chạy thành tiến trình Node riêng, chỉ bind `127.0.0.1` mặc định. Nó nhận
-kết quả máy đã ẩn danh, mapping mã máy sang `qclabTestId`, rồi dùng trạng thái QC gần
-nhất để quyết định:
+Chiều: **máy xét nghiệm → middleware LIS (phần mềm trung gian sẵn có của phòng) →
+Gateway này → QC Lab**. Middleware vốn đã có kết quả chạy mẫu QC vì nó đi chung đường
+với mọi kết quả khác; mục tiêu là lấy từ nơi đã có, thay vì bắt KTV gõ tay lại.
 
-- `accepted / QC_ACCEPTED`: được đi tiếp;
-- `review / QC_ALERT`: cần duyệt thủ công;
-- `held / QC_REJECTED`: giữ vì QC bị loại;
-- `held / QC_UNKNOWN|QC_STALE`: chưa có, chưa đủ bằng chứng hoặc QC quá cũ;
-- `held / UNMAPPED_TEST|UNIT_MISMATCH`: cấu hình giao tiếp chưa an toàn.
+Gateway chạy thành tiến trình Node riêng, chỉ bind `127.0.0.1` mặc định. Nó **không**
+quyết định gì về việc phát hành kết quả bệnh nhân — không có khái niệm
+accepted/review/held. Nó chỉ nhận một loại bản ghi mới ("kết quả QC") và giữ ở hàng chờ
+cho tới khi người dùng QC Lab xem và xác nhận.
 
-Đây chưa phải LIS lâm sàng. Gateway chủ động từ chối các field như `patientName`,
-`patientId`, ngày sinh, điện thoại và địa chỉ. `specimenRef` trong demo chỉ là mã mẫu
-ẩn danh. Không dùng dữ liệu bệnh nhân thật ở giai đoạn này.
+Kết quả nhận vào **không tự thành điểm QC**. Nó nằm ở trạng thái `pending` cho tới khi
+KTV mở **QC Lab → Cài đặt → Xem hàng chờ QC**, đối chiếu mức/lô rồi bấm **Nhận** — lúc
+đó mới đi qua `EntryService` như một điểm nhập tay, nên vẫn chịu khóa kỳ báo cáo, vẫn
+ghi audit, vẫn lưu theo phân vùng.
+
+Gateway chủ động từ chối các trường như `patientName`, `patientId`, ngày sinh, điện
+thoại, địa chỉ, `specimenRef`. Đây chưa phải LIS lâm sàng — không dùng dữ liệu bệnh
+nhân thật ở giai đoạn này. `lis-gateway/` cũng chưa được đóng vào bộ cài Electron dành
+cho người dùng cuối, chỉ chạy được từ source tree.
 
 ## Chạy thử
 
@@ -22,26 +27,26 @@ nhất để quyết định:
 npm run lis:gateway
 ```
 
-Terminal sẽ báo địa chỉ `http://127.0.0.1:8787`, journal tại
+Terminal báo địa chỉ `http://127.0.0.1:8787`, journal tại
 `lis-gateway/.data/events.ndjson`, và **Bearer token**. Thư mục `.data/` bị Git bỏ qua.
 
 ## Xác thực — không có chế độ mở
 
-Gateway **không chạy nếu thiếu token**. Lần đầu chạy, nó tự sinh một token 32 byte và lưu
-vào `lis-gateway/.data/token.txt` (quyền 0600), rồi in ra terminal. Muốn tự đặt thì dùng
-biến môi trường `QCLAB_LIS_TOKEN`.
+Gateway **không chạy nếu thiếu token**. Lần đầu chạy, nó tự sinh một token 32 byte và
+lưu vào `lis-gateway/.data/token.txt` (quyền 0600), rồi in ra terminal. Muốn tự đặt thì
+dùng biến môi trường `QCLAB_LIS_TOKEN`.
 
-Dán token đó vào **Cài đặt → LIS Gateway → Bearer token** trong QC Lab. Token nằm ở
-`localStorage` của từng máy, không đồng bộ Firebase.
+Dán token đó vào **QC Lab → Cài đặt → LIS Gateway → Bearer token**. Token nằm ở
+`localStorage` của từng máy, không đồng bộ Firebase — mỗi máy chạy QC Lab phải dán
+riêng.
 
 Ba lớp bảo vệ, mỗi lớp có test riêng trong `tests/lis-gateway.test.js`:
 
 1. **Token bắt buộc** — `createLisServer()` ném lỗi nếu không có token; so sánh bằng
-   `crypto.timingSafeEqual`. Bản đầu có `if(!token)return true` nên mặc định là mở toang.
-2. **Bắt buộc `content-type: application/json`** cho mọi request có thân → 415 nếu khác.
-   Đây là rào chống CSRF: `POST` kèm `text/plain` là "simple request" nên trình duyệt
-   không preflight, và bản đầu `JSON.parse` bất kể content-type — một trang web bất kỳ
-   ghi thẳng được vào journal (đã đo: 201 từ `https://evil.example`; nay là 401/415).
+   `crypto.timingSafeEqual`.
+2. **Bắt buộc `content-type: application/json`** cho mọi request có thân → 415 nếu
+   khác. Đây là rào chống CSRF: `POST` kèm `text/plain` là "simple request" nên trình
+   duyệt không preflight.
 3. **Allowlist origin ở preflight** — origin lạ bị 403 trước khi tới handler.
 
 `/health` không cần token (liveness) nên **không** kèm số liệu vận hành; số liệu nằm ở
@@ -49,11 +54,12 @@ Ba lớp bảo vệ, mỗi lớp có test riêng trong `tests/lis-gateway.test.j
 
 ## Mapping: sinh và đối chiếu bằng `npm run lis:config`
 
-`qclabTestId` là **ID nội bộ** do app sinh (`uid()`, dạng `a3f9k2p`), không phải tên hiển
-thị, và **không màn hình nào trong app hiện nó**. Gõ sai một ký tự thì gateway vẫn khởi
-động bình thường — chỉ có mọi kết quả của xét nghiệm đó lặng lẽ rơi vào
-`held / UNMAPPED_TEST`. An toàn, nhưng rất khó đoán ra. Script này biến loại lỗi im lặng
-đó thành lỗi ồn ào.
+`qclabTestId` là **ID nội bộ** do app sinh (`uid()`, dạng `a3f9k2p`), không phải tên
+hiển thị, và không màn hình nào trong app hiện nó. Mapping còn cần khai **`levels`**
+(bắt buộc — mỗi hãng gọi mức QC một kiểu: `1/2/3`, `L/N/H`, `NORMAL/ABNORMAL`...) và
+**`lots`** (tùy chọn — không khai thì lấy nguyên mã lô middleware gửi). Đoán sai một
+mức QC là ghi điểm vào **nhầm mức**, hỏng cả Levey-Jennings lẫn Westgard của cả hai
+mức — đây là chỗ nghiêm trọng nhất trong toàn bộ cấu hình.
 
 State nằm trong localStorage/IndexedDB của trình duyệt nên script Node không đọc thẳng
 được; nguồn offline duy nhất là file backup do chính app xuất ra
@@ -64,8 +70,9 @@ npm run lis:config -- qclab-backup.json -o D:\qclab-lis\config.json
 ```
 
 Sinh sẵn một dòng mapping cho mỗi xét nghiệm đang bật, điền trước `qclabTestId`,
-`displayName`, `expectedUnit`; `analyzerId`/`testCode` để giá trị mẫu cho người dùng thay.
-Script **không ghi đè** file đã tồn tại. Nhận cả gói backup mới lẫn backup cũ dạng state thô.
+`displayName`, `expectedUnit`, `levels` và `lots` theo đúng cấu hình QC Lab hiện có;
+`analyzerId`/`testCode`/mã mức/mã lô để giá trị mẫu cho người dùng thay. Script
+**không ghi đè** file đã tồn tại. Nhận cả gói backup mới lẫn backup cũ dạng state thô.
 
 Sau khi điền mã máy thật, đối chiếu lại:
 
@@ -73,61 +80,75 @@ Sau khi điền mã máy thật, đối chiếu lại:
 npm run lis:config -- qclab-backup.json --check D:\qclab-lis\config.json
 ```
 
-Bắt bốn lớp lỗi, mỗi lớp có test riêng trong `tests/lis-config.test.js`:
+Bắt các lớp lỗi sau, mỗi lớp có test riêng trong `tests/lis-config.test.js`:
 
 | Lỗi | Hậu quả nếu không bắt |
 |---|---|
-| Còn giá trị mẫu | chạy với mã máy giả, mọi kết quả bị giữ |
-| `qclabTestId` không có trong backup | `held / UNMAPPED_TEST` im lặng — lỗi khó tìm nhất |
-| `expectedUnit` lệch đơn vị xét nghiệm | mọi kết quả `held / UNIT_MISMATCH` |
+| Còn giá trị mẫu | chạy với mã máy/mức/lô giả, mọi kết quả nằm mãi ở hàng chờ |
+| `qclabTestId` không có trong backup | nằm mãi ở hàng chờ với `UNMAPPED_TEST` — lỗi khó tìm nhất |
+| Mức QC không khớp cấu hình xét nghiệm | ghi điểm vào nhầm mức nếu lỡ nhận — sửa **trước khi** bấm Nhận |
+| `expectedUnit` lệch đơn vị xét nghiệm | mọi kết quả `UNIT_MISMATCH` |
 | Trùng `analyzerId`+`testCode` | gateway từ chối khởi động (bắt bằng chính `buildMappingIndex()`) |
 
-Thêm cảnh báo (không chặn) cho: xét nghiệm chưa được mapping, `allowedOrigins` rỗng, và
-`staleMinutes` dài quá 240 phút.
+Thêm cảnh báo (không chặn) cho: xét nghiệm chưa được mapping, mã lô không khớp cấu
+hình hiện tại, `allowedOrigins` rỗng.
 
-## Gửi trạng thái QC
-
-App gửi **cả lô trong một request** và tự gửi lại theo nhịp 30 phút
-(`LIS_HEARTBEAT_MS`). Gateway coi trạng thái hết hạn sau 90 phút
-(`DEFAULT_STALE_MINUTES`) và chuyển sang **giữ** kết quả — 90 phút cho phép lỡ 2 nhịp.
-
-Thử tay bằng PowerShell (thay `$tok` bằng token in ra ở trên):
+## Middleware đẩy kết quả QC vào
 
 ```powershell
 $h = @{ Authorization = "Bearer $tok" }
-$qc = @{ items = @(@{ qclabTestId='T1'; status='ok'; asOf=(Get-Date).ToString('o'); reason='Westgard đạt' }) } | ConvertTo-Json -Depth 4
-Invoke-RestMethod -Method Put -Uri http://127.0.0.1:8787/api/v1/qc-status -Headers $h -ContentType application/json -Body $qc
+$body = @{
+  messageId='M-001'; analyzerId='EASYLYTE-01'; testCode='NA'; qcLevel='1'
+  qcLotCode='LOT-2026-A'; value=141.2; unit='mmol/L'
+  measuredAt=(Get-Date).ToString('o'); runId='lan-1'; operator='KTV A'
+} | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8787/api/v1/qc-results -Headers $h -ContentType application/json -Body $body
 ```
 
-Hoặc vào **Cài đặt → LIS Gateway (thử nghiệm)** trong QC Lab, bật tự động và bấm
-**Lưu & kiểm tra**. App sẽ gửi snapshot ngay khi đăng nhập và lên lịch gửi lại sau
-các thay đổi ảnh hưởng phép tính QC. Không có điểm QC gửi `unknown`; thiếu mức trong
-ngày gửi `warn`; chỉ đủ mức và Westgard đạt mới gửi `ok`.
+Gửi cả lô trong một request: `{"items":[{...},{...}]}` (tối đa 500, tất cả được chuẩn
+hóa rồi mới ghi — một phần tử hỏng làm hỏng cả lô, thay vì ghi nửa chừng).
+`messageId` dùng để chống trùng: gửi lại đúng id + nội dung trả về bản cũ với
+`duplicate: true`; cùng id nhưng nội dung khác trả HTTP 409.
 
-Gửi kết quả máy giả lập:
+Kết quả nhận vào rơi vào một trong ba nhóm:
+- **`held`** (thực ra vẫn `pending`, nhưng `resolved.ok=false`) nếu thiếu mapping, sai
+  mức, hoặc lệch đơn vị — kèm `resolved.reason` để biết sửa cấu hình chỗ nào.
+- **`pending`, `resolved.ok=true`** nếu khớp mapping — sẵn sàng để nhận.
+- Middleware gửi trực tiếp trường bệnh nhân (`patientId`, `patientName`,...) hay
+  `specimenRef` → bị từ chối thẳng với `PHI_NOT_ALLOWED`, không được ghi vào journal.
+
+## QC Lab nhận kết quả
+
+**Cài đặt → LIS Gateway (thử nghiệm)**: dán token, tích **Tự động kiểm tra hàng chờ
+mỗi 5 phút**, bấm **Lưu & kiểm tra**. Sau đó bấm **Xem hàng chờ QC** bất kỳ lúc nào để
+mở danh sách:
+
+- **Sẵn sàng nhận** — đã khớp mapping. Bấm **Nhận** để ghi thành điểm QC thật (đi qua
+  `EntryService`, chịu khóa kỳ, ghi audit); bấm **Bỏ** để loại khỏi hàng chờ
+  (`confirmDialog` xác nhận trước).
+- **Chưa khớp cấu hình** — hiện lý do gateway trả về; chỉ có thể **Bỏ**, không thể
+  **Nhận** (tránh ghi điểm rác vào nhầm xét nghiệm/mức).
+
+Ngày của điểm QC lấy theo **giờ địa phương của máy chạy app**, không phải phần ngày
+của chuỗi UTC — một kết quả đo 06:05 sáng giờ Việt Nam có `measuredAt` là 23:05 UTC hôm
+trước.
+
+## Xem hàng chờ / trạng thái qua API
 
 ```powershell
-$result = Get-Content -Raw lis-gateway/examples/result-glucose.json
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8787/api/v1/messages -Headers $h -ContentType application/json -Body $result
-```
-
-Xem inbox và tình trạng dịch vụ:
-
-```powershell
-Invoke-RestMethod http://127.0.0.1:8787/api/v1/messages -Headers $h
+Invoke-RestMethod "http://127.0.0.1:8787/api/v1/qc-results?status=pending" -Headers $h
 Invoke-RestMethod http://127.0.0.1:8787/api/v1/status -Headers $h
 Invoke-RestMethod http://127.0.0.1:8787/health   # khong can token
 ```
 
-Gửi lại đúng `messageId` + nội dung trả về bản cũ với `duplicate: true`; cùng
-`messageId` nhưng nội dung khác trả HTTP 409. Journal append-only giúp dựng lại inbox
-và trạng thái QC sau khi tiến trình khởi động lại. Dòng cuối chưa hoàn chỉnh do tắt máy
-đột ngột được cách ly; lỗi ở giữa journal bị chặn thay vì âm thầm bỏ qua.
+Journal append-only giúp dựng lại hàng chờ và quyết định đã ghi sau khi tiến trình
+khởi động lại. Dòng cuối chưa hoàn chỉnh do tắt máy đột ngột được cách ly; lỗi ở giữa
+journal bị chặn thay vì âm thầm bỏ qua.
 
 ## Cấu hình và bảo mật
 
-- Copy `config.example.json` ra ngoài repo rồi đặt đường dẫn bằng
-  `QCLAB_LIS_CONFIG`. Đừng gõ tay `qclabTestId` — dùng `npm run lis:config` (dưới).
+- Copy `config.example.json` ra ngoài repo rồi đặt đường dẫn bằng `QCLAB_LIS_CONFIG`.
+  Đừng gõ tay `qclabTestId` — dùng `npm run lis:config` (ở trên).
 - Đổi thư mục dữ liệu bằng `QCLAB_LIS_DATA`.
 - `QCLAB_LIS_PORT` đổi cổng, **nhưng chỉ dùng được cho kiểm thử bằng curl/PowerShell**.
   App KHÔNG kết nối được sang cổng khác 8787: CSP `connect-src` trong `index.html` chỉ
@@ -141,13 +162,19 @@ Journal NDJSON phù hợp cho prototype và kiểm chứng contract, không ph�
 production. Bước production phải thay bằng PostgreSQL có transaction, inbox/outbox,
 mã hóa, backup và kiểm soát truy cập.
 
-Prototype hiện chỉ chạy từ source tree; `lis-gateway/` chưa được đóng vào bộ cài
-Electron dành cho người dùng cuối.
+## Ngoài phạm vi đã validate
+
+`docs/validation/URS.md` mục "Ngoài phạm vi" ghi rõ: `lis-gateway/` là prototype
+nghiên cứu, không thuộc sản phẩm đã validate — không nằm trong `build.files`, mặc định
+tắt phía app, không có hàng nào trong `TRACEABILITY.md`.
 
 ## Bước tiếp theo
 
-1. Chốt mapping theo thiết bị + mã xét nghiệm + đơn vị với một máy thật.
-2. Viết adapter đầu tiên từ file/ASTM/HL7 của đúng model máy.
-3. Thêm màn hình inbox chỉ đọc và cơ chế giải phóng kết quả có audit.
-4. Chỉ sau khi hoàn tất threat model mới thêm Patient, ServiceRequest, Specimen,
-   Observation và DiagnosticReport vào PostgreSQL.
+1. Chốt mapping (mã máy + mã xét nghiệm + mức + lô + đơn vị) với một máy thật, dùng
+   `npm run lis:config --check` để xác nhận trước khi chạy thật.
+2. Xác nhận với đơn vị vận hành middleware LIS: họ đẩy kết quả QC vào Gateway theo
+   đúng hợp đồng `POST /api/v1/qc-results` ở trên, không phải chỉnh quy trình phát
+   hành kết quả bệnh nhân của họ.
+3. Chỉ sau khi có nhu cầu thật từ một phòng cụ thể mới tính production: thay journal
+   NDJSON bằng kho có transaction, thêm kiểm soát truy cập/mã hóa, và đưa `lis-gateway/`
+   vào bộ cài Electron.
