@@ -24,7 +24,7 @@ contextBridge.exposeInMainWorld('qcPrintPdf', {
 });
 
 // Cầu nối cho trang kích hoạt (activation.html): đọc mã máy + gửi khoá để xác minh,
-// hoặc "Dùng thử tiếp" khi còn hạn 30 ngày.
+// hoặc "Dùng thử tiếp" khi còn hạn 14 ngày.
 contextBridge.exposeInMainWorld('qcActivation', {
   status: () => ipcRenderer.invoke('qc-license:status'),
   activate: (licenseString) => ipcRenderer.invoke('qc-license:activate', String(licenseString || '')),

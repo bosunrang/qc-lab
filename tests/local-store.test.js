@@ -125,5 +125,18 @@ const fakeIndexedDb = `
     assert.deepEqual(JSON.parse(JSON.stringify(result)), { supported: false, read: null, write: false, clear: false });
   }
 
+  {
+    let dialog=null;
+    const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/settings.js'],{
+      navigator:{storage:{estimate:async()=>({usage:1572864,quota:104857600,usageDetails:{indexedDB:1048576}})}},
+      infoDialog:async(message,opts)=>{dialog={message,opts};}
+    });
+    await run(ctx, `state.data={T1:[{id:'p1'},{id:'p2'}],T2:[{id:'p3'}]};checkStorageUsage()`);
+    assert.match(dialog.message,/Số điểm QC: 3\./);
+    assert.match(dialog.message,/Dung lượng IndexedDB: 1\.0 MB\./);
+    assert.match(dialog.message,/Tổng dung lượng app đang dùng: 1\.5 MB \/ 100 MB \(1\.50%\)\./);
+    assert.deepEqual(JSON.parse(JSON.stringify(dialog.opts)),{title:'Dung lượng cục bộ',type:'success'});
+  }
+
   console.log('Local store tests passed');
 })().catch(error=>{console.error(error);process.exitCode=1;});

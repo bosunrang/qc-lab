@@ -63,11 +63,11 @@ function licenseFilePath(userDataDir) {
   return path.join(userDataDir, 'qclab-license.dat');
 }
 
-// Dùng thử 30 ngày kể từ lần chạy đầu tiên trên máy, không cần license. Mốc thời
+// Dùng thử 14 ngày kể từ lần chạy đầu tiên trên máy, không cần license. Mốc thời
 // gian lưu ở file RIÊNG (không phải license file) để activate() ở lượt sau không
 // đụng vào nó. Cùng giới hạn trung thực như license: xoá file này sẽ reset đếm
 // ngày — cơ chế chặn dùng lại tuỳ tiện, không phải khoá chống được người quyết tâm.
-const TRIAL_DAYS = 30;
+const TRIAL_DAYS = 14;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 function trialFilePath(userDataDir) {

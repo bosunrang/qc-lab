@@ -157,7 +157,7 @@ function nav(){const groups=[['Theo dõi',['dash','entry','westgard','sigma']],[
 /* Watermark tên lab được cấp phép (bản Electron có license). Chạy trong trình
    duyệt thường thì window.qcLicense không tồn tại nên bỏ qua — không ảnh hưởng. */
 function licensedLabName(){const lic=window.qcLicense;return lic&&lic.lab?String(lic.lab):'';}
-/* Bản Electron chưa kích hoạt license nhưng còn hạn dùng thử 30 ngày (xem
+/* Bản Electron chưa kích hoạt license nhưng còn hạn dùng thử 14 ngày (xem
    electron/license.js) truyền trạng thái này qua window.qcLicense.trial. Chạy
    trong trình duyệt thường hoặc bản đã có license thì trial luôn {active:false}. */
 function trialInfo(){return window.qcLicense&&window.qcLicense.trial&&window.qcLicense.trial.active?window.qcLicense.trial:null;}

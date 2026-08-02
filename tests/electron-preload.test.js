@@ -9,7 +9,7 @@ const electron={
   ipcRenderer:{invoke(channel,payload){calls.push({channel,payload});return Promise.resolve({channel,payload});}}
 };
 const lab=Buffer.from('Phòng xét nghiệm A','utf8').toString('base64');
-const trial=Buffer.from(JSON.stringify({active:true,daysLeft:12,totalDays:30}),'utf8').toString('base64');
+const trial=Buffer.from(JSON.stringify({active:true,daysLeft:12,totalDays:14}),'utf8').toString('base64');
 const context=vm.createContext({
   require(name){if(name==='electron')return electron;throw new Error('Unexpected require: '+name);},
   process:{argv:['electron','app','--qclab-lab='+lab,'--qclab-id='+Buffer.from('LIC-1').toString('base64'),'--qclab-trial='+trial]},

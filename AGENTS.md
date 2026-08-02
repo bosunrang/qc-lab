@@ -30,7 +30,7 @@ port 8080, for Claude Code's browser preview.)
 `electron .`, `npm run dist` → NSIS installer via electron-builder, with
 `scripts/patch-7za-symlink.js` as a pre-step). The `electron/` folder is part of
 the repo (`main.js`, `preload.js`, `license.js`, `activation.html`,
-`auto-update.js` — main process, license activation with a 30-day unactivated
+`auto-update.js` — main process, license activation with a 14-day unactivated
 trial: first-run timestamp kept in its own `qclab-trial.dat`, separate from
 the license file; F12 toggles DevTools since the app menu is disabled), so
 those scripts work here once `npm install` has run; for development use the

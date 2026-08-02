@@ -22,9 +22,14 @@ try{
   assert.equal(license.currentStatus(dir).valid,false);
 
   const trial=license.trialStatus(dir);
+  assert.equal(license.TRIAL_DAYS,14,'thời hạn dùng thử phải được chốt ở 14 ngày');
   assert.equal(trial.active,true);
   assert.equal(trial.daysLeft,license.TRIAL_DAYS);
   assert.ok(fs.existsSync(path.join(dir,'qclab-trial.dat')));
+  fs.writeFileSync(path.join(dir,'qclab-trial.dat'),JSON.stringify({startedAt:new Date(Date.now()-13.5*24*60*60*1000).toISOString()}),'utf8');
+  const nearExpiry=license.trialStatus(dir);assert.equal(nearExpiry.active,true);assert.equal(nearExpiry.daysLeft,1,'qua 13 ngày vẫn còn đúng ngày dùng thử cuối');
+  fs.writeFileSync(path.join(dir,'qclab-trial.dat'),JSON.stringify({startedAt:new Date(Date.now()-14.1*24*60*60*1000).toISOString()}),'utf8');
+  const expired=license.trialStatus(dir);assert.equal(expired.active,false);assert.equal(expired.daysLeft,0,'qua 14 ngày phải yêu cầu kích hoạt');
   fs.writeFileSync(path.join(dir,'qclab-trial.dat'),'{broken','utf8');
   assert.equal(license.trialStatus(dir).active,true,'corrupt trial marker follows documented first-run recovery behavior');
   console.log('Electron license tests passed');

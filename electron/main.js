@@ -86,7 +86,7 @@ function launch() {
   const userDataDir = app.getPath('userData');
   const status = license.currentStatus(userDataDir);
   if (status.valid) { createMainWindow(status); return; }
-  // Chưa có license hợp lệ: còn hạn dùng thử (30 ngày kể từ lần chạy đầu tiên
+  // Chưa có license hợp lệ: còn hạn dùng thử (14 ngày kể từ lần chạy đầu tiên
   // trên máy) thì vào thẳng app chính, không chặn — chỉ khi hết hạn mới bắt
   // buộc qua màn kích hoạt.
   const trial = license.trialStatus(userDataDir);
