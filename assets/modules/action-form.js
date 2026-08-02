@@ -180,10 +180,10 @@ function actSel(id,label,list,cur,extra=''){
   const v=cur==null?'':String(cur),opts=list.some(o=>o[0]===v)||!v?list:[...list,[v,v]];
   return `<select id="${id}" aria-label="${escAttr(label)}" ${extra}>${opts.map(([value,text])=>`<option value="${escAttr(value)}" ${value===v?'selected':''}>${esc(text)}</option>`).join('')}</select>`;
 }
-function actionLevelLabel(l){
+function actionLevelLabel(l,t=null){
   if(!l)return 'Mức ?';
   const lot=l.lot?` · Lô ${l.lot}`:' · Chưa có lô';
-  const range=` · Mean ${fmt(l.mean)} · SD ${fmt(l.sd,3)}`;
+  const range=` · Mean ${fmtTestValue(t,l.mean)} · SD ${fmtTestStat(t,l.sd)}`;
   const band=l.applied?` · ${l.applied==='lab'?'PXN':'NSX'}`:'';
   return `Mức ${l.level}${lot}${range}${band}`;
 }
@@ -196,14 +196,14 @@ function syncActLevels(){
   if(!t)return;
   const levels=operationalLevels(t),l=levels.find(x=>String(x.level)===String(levelEl.value))||levels[0];
   if(l)levelEl.value=l.level;
-  if(labelEl)labelEl.value=l?actionLevelLabel(l):'';
+  if(labelEl)labelEl.value=l?actionLevelLabel(l,t):'';
 }
 /* Ngữ cảnh hiển thị khi sửa: ưu tiên số lô ĐÃ GHI trong hồ sơ, không lấy lô hiện hành
    của mức (lô có thể đã chuyển tiếp từ lúc xảy ra sự cố). */
 function actionLevelContext(testId,level,lot){
   const t=state.tests.find(x=>x.id===testId),l=t&&lvlCfg(t,+level);
   if(lot)return `Mức ${level} · Lô ${lot} (đã ghi nhận)`;
-  return l?actionLevelLabel(l):`Mức ${level||'?'} · Chưa có lô`;
+  return l?actionLevelLabel(l,t):`Mức ${level||'?'} · Chưa có lô`;
 }
 /* Nguồn ngoài IQC (EQA, cảnh báo thiết bị, phản hồi lâm sàng, đánh giá/audit) không
    bao giờ xuất hiện ở "Sự cố cần xử lý" vì không phải vi phạm Westgard — nhưng vẫn là
@@ -236,7 +236,7 @@ function actionIncidentBanner(form,editing){
   const title=editing?`Đang tiếp tục hồ sơ ${editing.nceId||'NCE'}`:'Đang lập hồ sơ cho vi phạm này';
   const bits=[];
   if(t)bits.push(`${testDisplayName(t)} · ${actionLevelContext(form.testId,form.level,form.lot)}`);
-  bits.push(`${vnDate(p.date)} · ${fmt(p.val)} ${t&&t.unit||''} · ${form.rule||'—'}`);
+  bits.push(`${vnDate(p.date)} · ${fmtPointValue(p,t)} ${t&&t.unit||''} · ${form.rule||'—'}`);
   return `<div class="action-incident-banner"><b>${esc(title)}</b><div>${bits.map(esc).join(' · ')}</div></div>`;
 }
 function beginActionFromIssue(tid,level,rule,err,act,pointId='',pointDate=''){

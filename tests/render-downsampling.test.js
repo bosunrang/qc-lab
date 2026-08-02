@@ -20,6 +20,8 @@ ctx.ruleResultLevel = () => 'ok';
 ctx.vnDate = value => value;
 ctx.esc = value => String(value);
 ctx.fmt = value => Number(value).toFixed(2);
+ctx.fmtTestValue = (test,value) => Number(value).toFixed(test&&Number.isInteger(test.decimalPlaces)?test.decimalPlaces:2);
+ctx.fmtPointValue = (point,test) => ctx.fmtTestValue(test,point.val);
 
 const canvas = {
   dataset:{ test:'T1', level:'1', lot:'L1' },style:{},width:1400,height:430,clientWidth:1400,

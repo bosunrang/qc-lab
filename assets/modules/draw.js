@@ -68,7 +68,7 @@ function drawLJ(canvas,points,mean,sd){
   band(-2,2,ljColors.okBand);
   band(-1,1,ljColors.okMid);
 
-  const rows=[3,2,1,0,-1,-2,-3];
+  const test=state.tests.find(t=>t.id===canvas.dataset.test),rows=[3,2,1,0,-1,-2,-3];
   rows.forEach(k=>{
     const yy=y(mean+k*sd),major=k===0;
     ctx.strokeStyle=major?ljColors.mean:ljColors.grid;
@@ -83,7 +83,7 @@ function drawLJ(canvas,points,mean,sd){
   rows.forEach(k=>{
     const yy=y(mean+k*sd);
     ctx.fillStyle='#17212b';ctx.textAlign='right';ctx.fillText(k===3?'> +3':k===-3?'< -3':String(k),padL-9,yy);
-    ctx.fillStyle='#17212b';ctx.textAlign='left';ctx.fillText(fmt(mean+k*sd,3),padL+cw+10,yy);
+    ctx.fillStyle='#17212b';ctx.textAlign='left';ctx.fillText(fmtTestValue(test,mean+k*sd),padL+cw+10,yy);
   });
 
   if(!n){
@@ -92,7 +92,7 @@ function drawLJ(canvas,points,mean,sd){
     return;
   }
 
-  const test=state.tests.find(t=>t.id===canvas.dataset.test),level=parseInt(canvas.dataset.level),lot=canvas.dataset.lot||(test&&lvlCfg(test,level)||{}).lot||'?';
+  const level=parseInt(canvas.dataset.level),lot=canvas.dataset.lot||(test&&lvlCfg(test,level)||{}).lot||'?';
   // Đánh giá theo cấu hình rule của từng xét nghiệm (testRuleOn) + mức độ qua
   // ruleResultLevel — nhất quán với trang Westgard và biểu đồ đa mức, thay vì
   // dùng wgOn toàn cục và mức độ cứng từ core.
@@ -113,7 +113,7 @@ function drawLJ(canvas,points,mean,sd){
     const status=ruleResultLevel(test,rules),pointColor=status==='rej'?ljColors.rejectPoint:status==='warn'?ljColors.warnPoint:ljColors.okPoint;
     ctx.fillStyle=pointColor;ctx.beginPath();ctx.arc(px,py,status==='ok'?4:5,0,Math.PI*2);ctx.fill();
     ctx.strokeStyle='#fff';ctx.lineWidth=1.8;ctx.stroke();
-    canvas._ljHover.push({x:px,y:py,hit:12,html:`<b>${vnDate(p.date)} · ${levelText}</b><div>Lô: <b style="display:inline">${esc(p.lot||lot)}</b></div><div>Giá trị: ${fmt(p.val)}${test&&test.unit?' '+esc(test.unit):''}</div><div>Z: ${zTxt}</div><div class="muted">Luật: ${rules.length?esc(rules.join(', ')):'Đạt'}</div>`});
+    canvas._ljHover.push({x:px,y:py,hit:12,html:`<b>${vnDate(p.date)} · ${levelText}</b><div>Lô: <b style="display:inline">${esc(p.lot||lot)}</b></div><div>Giá trị: ${fmtPointValue(p,test)}${test&&test.unit?' '+esc(test.unit):''}</div><div>Z: ${zTxt}</div><div class="muted">Luật: ${rules.length?esc(rules.join(', ')):'Đạt'}</div>`});
   });
   ctx.restore();
   bindLJTooltip(canvas);
@@ -187,7 +187,7 @@ function drawLJMultiZ(canvas,levelViews,test,opts){
       const px=xOfRun(String(p.runId||p.date||'')),py=clampY(z),pointColor=level==='rej'?ljColors.rejectPoint:level==='warn'?ljColors.warnPoint:color;
       ctx.fillStyle=pointColor;ctx.beginPath();ctx.arc(px,py,level==='ok'?4.2:5.4,0,Math.PI*2);ctx.fill();
       ctx.strokeStyle='#fff';ctx.lineWidth=1.8;ctx.stroke();
-      canvas._ljHover.push({x:px,y:py,hit:13,html:`<b>${vnDate(p.date)} · Mức ${v.level}</b><div>Lần chạy: <b style="display:inline">${esc(p.runId||'—')}</b></div><div>Lô: <b style="display:inline">${esc(p.lot||v.lot||'?')}</b></div><div>Giá trị: ${fmt(p.val)}${test&&test.unit?' '+esc(test.unit):''}</div><div>Z: ${(z>=0?'+':'')+fmt(z)}s</div><div class="muted">Luật: ${rules.length?esc(rules.join(', ')):'Đạt'}</div>`});
+      canvas._ljHover.push({x:px,y:py,hit:13,html:`<b>${vnDate(p.date)} · Mức ${v.level}</b><div>Lần chạy: <b style="display:inline">${esc(p.runId||'—')}</b></div><div>Lô: <b style="display:inline">${esc(p.lot||v.lot||'?')}</b></div><div>Giá trị: ${fmtPointValue(p,test)}${test&&test.unit?' '+esc(test.unit):''}</div><div>Z: ${(z>=0?'+':'')+fmt(z)}s</div><div class="muted">Luật: ${rules.length?esc(rules.join(', ')):'Đạt'}</div>`});
     });
   });
   ctx.restore();

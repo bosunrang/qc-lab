@@ -10,9 +10,23 @@ const plain = v => JSON.parse(JSON.stringify(v));
 
 {
   const routeSource = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'entry-routes.js'), 'utf8');
+  const entryActionsSource = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'entry-tests-actions.js'), 'utf8');
+  const drawSource = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'draw.js'), 'utf8');
+  const rangeSource = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'range.js'), 'utf8');
   assert.match(routeSource, /EntryService\.updateDateNoteCommand\(/, 'route phải dùng date-note command');
   assert.doesNotMatch(routeSource, /EntryService\.saveDateNote\(/, 'route không được gọi mutation primitive trực tiếp');
   assert.match(routeSource, /save\(result\.effects\.save\)/, 'route phải dùng save policy do command trả về');
+  assert.match(routeSource, /metric\('Mean thực',st\?fmtTestValue\(t,st\.m\)/, 'Mean thực phải dùng số thập phân của xét nghiệm');
+  assert.match(routeSource, /metric\('Mean mục tiêu',fmtTestValue\(t,chartMean\)/, 'Mean mục tiêu phải dùng số thập phân của xét nghiệm');
+  assert.match(routeSource, /metric\('Khoảng ±2SD',fmtTestValue\(t,lo2\)\+' – '\+fmtTestValue\(t,hi2\)/, 'khoảng ±2SD phải dùng số thập phân của xét nghiệm');
+  assert.match(routeSource, /<b>\$\{fmtPointValue\(p,t\)\}<\/b>/, 'điểm trong khoảng xem phải dùng số thập phân của xét nghiệm');
+  assert.match(routeSource, /Mean tích lũy<\/span><b>\$\{cumulativeSt\?fmtTestValue\(t,cumulativeSt\.m\)/, 'Mean tích lũy phải dùng số thập phân của xét nghiệm');
+  assert.match(routeSource, /class="qc-level-head" tabindex="0" data-qc-tooltip=/, 'tiêu đề mức phải có tooltip Mean\/SD dùng được bằng chuột và bàn phím');
+  assert.match(routeSource, /±2SD \$\{limits\}/, 'tooltip tiêu đề mức phải có khoảng ±2SD');
+  assert.match(entryActionsSource, /id="cfgAssayDecimals"/, 'form xét nghiệm phải có ô chọn số thập phân');
+  assert.match(entryActionsSource, /decimalPlaces=decimalRaw===''\?null:Number\(decimalRaw\)/, 'Tự động phải được lưu bằng null, lựa chọn thủ công phải lưu bằng số');
+  assert.match(rangeSource, /fmtTestValue\(r\.t,r\.l\.mean\)/, 'hộp dải kiểm soát phải dùng số thập phân của xét nghiệm');
+  assert.match(rangeSource, /fmtTestValue\(r\.t,r\.l\.mean-2\*r\.l\.sd\)/, 'giới hạn kiểm soát phải dùng số thập phân của xét nghiệm');
 }
 
 {
@@ -177,7 +191,67 @@ const plain = v => JSON.parse(JSON.stringify(v));
   assert.equal(prepared.point.tid, 'T1');
   assert.equal(prepared.point.level, 2);
   assert.equal(prepared.point.val, 12.5);
+  assert.equal(prepared.point.valueDecimals, 1);
   assert.equal(prepared.point.runId, '2026-07-03-2');
+
+  const ph = plain(ctx.EntryService.recordPoint({data:{}},{
+    tid:'PH',level:1,date:'2026-07-03',value:'7.405',runId:'2026-07-03-1',cfg:{lot:'2111',mean:7.4,sd:.01},id:'ph1'
+  }));
+  assert.equal(ph.point.val,7.405,'giá trị dùng tính toán không bị làm tròn');
+  assert.equal(ph.point.valueDecimals,3,'giữ độ chính xác từ chuỗi người dùng nhập');
+  assert.equal(ctx.fmtPointValue(ph.point),'7.405');
+  assert.equal(ctx.fmtPointValue({val:7.405}),'7.405','điểm cũ chưa có metadata vẫn suy ra đủ chữ số');
+  assert.equal(ctx.fmtPointValue({val:7.4,valueDecimals:3}),'7.400','giữ cả số 0 tận cùng đã nhập');
+  assert.equal(ctx.fmtPointValue({val:450},{decimalPlaces:0}),'450','xét nghiệm số lớn có thể không hiện phần thập phân');
+  assert.equal(ctx.fmtPointValue({val:450},{decimalPlaces:3}),'450.000','lựa chọn thủ công phải được áp dụng chính xác');
+  assert.equal(ctx.fmtPointValue({val:7.405},{decimalPlaces:2}),'7.41','lựa chọn thủ công chỉ làm tròn phần hiển thị');
+  assert.equal(ctx.fmtTestValue({decimalPlaces:1},100.25),'100.3');
+
+  /* SỐ LẺ CỦA SD PHẢI TÁCH KHỎI SỐ LẺ CỦA GIÁ TRỊ.
+     Bản đầu dùng chung testDecimalPlaces() lấy max của mean/sd/low/high nên hỏng theo CẢ
+     HAI chiều, tùy có cấu hình tay hay không:
+       - không cấu hình: SD 0.153 kéo giá trị nhập "5.6" thành "5.600" — độ chính xác giả,
+         mà con số trong hồ sơ nội kiểm ngụ ý độ phân giải của máy;
+       - cấu hình decimalPlaces=1: SD 0.153 hiện thành "0.2" — người đọc báo cáo hết tự
+         kiểm chứng được z-score và CV, đúng thứ mà fmt(sd,3) cũ bảo vệ.
+     Chốt nguyên bảng để không ai gộp lại hai đường này. */
+  const val=(t,p)=>ctx.fmtPointValue(p,t), sd=(t,v)=>ctx.fmtTestStat(t,v);
+  {
+    const glucose={levels:[{level:1,mean:5.6,sd:0.153}]};
+    assert.equal(val(glucose,{val:5.6,valueDecimals:1}),'5.6','SD nhiều chữ số KHÔNG được kéo số lẻ của giá trị lên');
+    assert.equal(sd(glucose,0.153),'0.153','SD giữ đủ chữ số như fmt(sd,3) trước đây');
+
+    const fixed={decimalPlaces:1,levels:[{level:1,mean:5.6,sd:0.153}]};
+    assert.equal(val(fixed,{val:5.6,valueDecimals:1}),'5.6');
+    assert.equal(sd(fixed,0.153),'0.153','cấu hình tay chỉ chi phối GIÁ TRỊ, không được cắt cụt SD');
+
+    const natri={levels:[{level:1,mean:140,sd:1.5}]};
+    assert.equal(val(natri,{val:141,valueDecimals:0}),'141','xét nghiệm số nguyên không được thành "141.0"');
+    assert.equal(sd(natri,1.5),'1.50');
+
+    const ph={levels:[{level:1,mean:7.4,sd:0.01}]};
+    assert.equal(val(ph,{val:7.405,valueDecimals:3}),'7.405');
+    assert.equal(val(ph,{val:7.405}),'7.405','điểm cũ chưa có metadata vẫn suy từ chính giá trị');
+    assert.equal(sd(ph,0.01),'0.010');
+    /* SD tính ra là số thực có nhiễu dấu phẩy động; số lẻ phải suy từ CẤU HÌNH chứ không
+       từ chính giá trị SD, nếu không sẽ ra 6 chữ số rác. */
+    assert.equal(sd(ph,0.009999999999999998),'0.010','nhiễu dấu phẩy động không được lọt ra hiển thị');
+  }
+  assert.equal(ctx.qcValueDecimals('.5'),1,'".5" cũng là số — thiếu phần nguyên không có nghĩa là 0 chữ số');
+  assert.equal(ctx.qcValueDecimals(',25'),2,'dấu phẩy thập phân theo thói quen nhập tiếng Việt');
+  assert.equal(ctx.qcValueDecimals('1.5e2'),0,'150 thì không còn phần thập phân');
+
+  /* valueDecimals là trường MỚI trên điểm QC nên phải được làm sạch tường minh:
+     sanitizeBackup() chỉ ghi đè trường nó biết, trường lạ đi qua tự do — đúng cái mẫu đã
+     cắn ở archiveRegistry. */
+  {
+    const build=v=>({lab:{},tests:[{id:'T1',name:'pH',levels:[{level:1,mean:7.4,sd:0.01}]}],
+      data:{T1:[{id:'p1',date:'2026-08-01',runId:'r1',level:1,val:7.405,valueDecimals:v}]},actions:[],activity:[],users:[]});
+    const clean=v=>ctx.QCCore.sanitizeBackup(build(v)).data.T1[0].valueDecimals;
+    assert.equal(clean(3),3);
+    assert.equal(clean(0),0,'0 chữ số là lựa chọn hợp lệ, không phải "chưa đặt"');
+    [1e9,-5,'abc','3',2.5,null,undefined].forEach(bad=>assert.equal(clean(bad),null,`valueDecimals rác (${String(bad)}) phải về null`));
+  }
 
   const invalid = ctx.EntryService.preparePointInput({
     tid: 'T1', level: 1, date: '2026-07-03', value: 'abc', cfg: {}

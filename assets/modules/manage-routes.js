@@ -166,9 +166,9 @@ function manageHistory(){
   });
   const visibleRows=rows.filter(r=>!q||[t.name,r.l.level,`M${r.l.level}`,`Mức ${r.l.level}`,r.lotNo].some(v=>searchText(v).includes(q)));
   const html=visibleRows.sort((a,b)=>(+a.l.level)-(+b.l.level)||(a.lotNo||'').localeCompare(b.lotNo||'','vi')||String(a.h.effectiveFrom||'').localeCompare(String(b.h.effectiveFrom||''))).map(r=>{
-    const range=(r.h.low!=null||r.h.high!=null)?`<div class="hint">GH ${r.h.low!=null?fmt(r.h.low):'—'} – ${r.h.high!=null?fmt(r.h.high):'—'}</div>`:'';
+    const range=(r.h.low!=null||r.h.high!=null)?`<div class="hint">GH ${r.h.low!=null?fmtTestValue(r.t,r.h.low):'—'} – ${r.h.high!=null?fmtTestValue(r.t,r.h.high):'—'}</div>`:'';
     const period=`${r.h.effectiveFrom?vnDate(r.h.effectiveFrom):'Không giới hạn'} → ${r.h.effectiveTo?vnDate(r.h.effectiveTo):'Không giới hạn'}`;
-    return `<tr><td><span class="pill">M${r.l.level}</span></td><td><b>${esc(r.lotNo||'—')}</b><div class="hint">${esc(r.group)}</div></td><td class="num">${fmt(r.h.mean)}</td><td class="num">${r.h.low!=null?fmt(r.h.low):'—'}</td><td class="num">${r.h.high!=null?fmt(r.h.high):'—'}</td><td class="num">${fmt(r.h.sd,3)}</td><td>${period}</td><td><span class="tag ${r.h.source==='lab'?'warn':'ok'}">${r.h.source==='lab'?'PXN':'NSX'}</span></td><td class="num">${r.pts.length}</td><td>${btn('Chi tiết',`openQcHistoryDetail('${r.t.id}',${r.l.level},'${jsq(r.lotNo||'')}')`,'ghost sm')}</td></tr>`;
+    return `<tr><td><span class="pill">M${r.l.level}</span></td><td><b>${esc(r.lotNo||'—')}</b><div class="hint">${esc(r.group)}</div></td><td class="num">${fmtTestValue(r.t,r.h.mean)}</td><td class="num">${r.h.low!=null?fmtTestValue(r.t,r.h.low):'—'}</td><td class="num">${r.h.high!=null?fmtTestValue(r.t,r.h.high):'—'}</td><td class="num">${fmtTestValue(r.t,r.h.sd)}</td><td>${period}</td><td><span class="tag ${r.h.source==='lab'?'warn':'ok'}">${r.h.source==='lab'?'PXN':'NSX'}</span></td><td class="num">${r.pts.length}</td><td>${btn('Chi tiết',`openQcHistoryDetail('${r.t.id}',${r.l.level},'${jsq(r.lotNo||'')}')`,'ghost sm')}</td></tr>`;
   }).join('');
   return manageToolbar('Lịch sử dữ liệu QC','Chọn một xét nghiệm để xem các lô/Mean-SD đã từng dùng.')+
   `<div class="panel target-matrix-panel">

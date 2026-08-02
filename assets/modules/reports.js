@@ -1,6 +1,11 @@
 /* ===== REPORTS (printable) ===== */
 function esc(s){return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function escAttr(s){return esc(s);}
+function reportQcValue(t,value){return typeof fmtTestValue==='function'?fmtTestValue(t,value):fmt(value,3);}
+/* SD/Mean thống kê: nhiều chữ số hơn giá trị đo. Fallback fmt(value,3) giữ đúng hành vi
+   trước 2026-08-02 khi state.js chưa nạp (in ở document riêng). */
+function reportQcStat(t,value){return typeof fmtTestStat==='function'?fmtTestStat(t,value):fmt(value,3);}
+function reportQcPoint(point,t){return typeof fmtPointValue==='function'?fmtPointValue(point,t):fmt(point&&point.val,Math.max(2,Number(point&&point.valueDecimals)||0));}
 function reportHeader(title,subtitle='Nội kiểm chất lượng xét nghiệm'){const L=state.lab,app=window.QCLAB_APP||{version:'dev'},rules=Object.entries(state.westgardRules||{}).filter(x=>x[1]!==false).map(x=>x[0]).join(', ');return '<div class="rpt-head">'+
   '<div class="rpt-brand"><div><div class="rpt-hosp">'+esc(L.name||'BỆNH VIỆN / ĐƠN VỊ')+'</div><div class="rpt-dept">'+esc(L.dept||'Khoa Xét nghiệm')+'</div><div class="rpt-addr">'+esc(L.address||'')+'</div></div></div>'+
   '<div class="rpt-meta"><b>Thời gian xuất</b><span>'+formatDateTimeVN(new Date().toISOString())+'</span><b style="margin-top:5px">Người xuất</b><span>'+esc(userName())+'</span></div></div>'+
@@ -122,26 +127,26 @@ async function printWestgard(){
     const l=v.l,prevSeries=previousLotSeries(t,l.level),prevOpen=wgPrevOpen.has(t.id+'|'+l.level);
     if(prevOpen&&prevSeries.length){
       const s=prevSeries[0],wgP=QCCore.westgardByPoint(s.pts,s.mean,s.sd,rule=>testRuleOnWithin(t,rule)),idxOf=new Map(s.pts.map((p,i)=>[p.id,i]));
-      body+='<h3>Mức '+l.level+' — Lô cũ '+esc(s.lot)+' · đã chuyển tiếp (Mean='+fmt(s.mean)+', SD='+fmt(s.sd,3)+')</h3>';
+      body+='<h3>Mức '+l.level+' — Lô cũ '+esc(s.lot)+' · đã chuyển tiếp (Mean='+reportQcValue(t,s.mean)+', SD='+reportQcStat(t,s.sd)+')</h3>';
       body+='<p class="soft-note">Vi phạm ở lô cũ chỉ đánh giá luật Westgard theo từng mức riêng lẻ, không gồm luật liên mức (như R4s giữa các mức cùng lần chạy).</p>';
       body+='<img src="'+ljDataURL(s.pts,s.mean,s.sd)+'">';
       const viol=s.pts.map((p,i)=>{const raw=wgP.F[i]||{rules:[]};return{p,f:{...raw,level:ruleResultLevel(t,raw.rules||[])},z:wgP.zs[i]};}).filter(o=>o.f.level!=='ok');
-      body+=viol.length?'<p style="margin-top:8px"><b>Điểm vi phạm/cảnh báo (lô cũ):</b></p>'+reportPointsTableHtml(viol):'<p><i>Không có điểm vi phạm/cảnh báo (lô cũ).</i></p>';
+      body+=viol.length?'<p style="margin-top:8px"><b>Điểm vi phạm/cảnh báo (lô cũ):</b></p>'+reportPointsTableHtml(viol,t):'<p><i>Không có điểm vi phạm/cảnh báo (lô cũ).</i></p>';
       return;
     }
-    body+='<h3>Mức '+l.level+' — Lô '+esc(l.lot||'?')+' (Mean='+fmt(l.mean)+', SD='+fmt(l.sd,3)+')</h3>';
+    body+='<h3>Mức '+l.level+' — Lô '+esc(l.lot||'?')+' (Mean='+reportQcValue(t,l.mean)+', SD='+reportQcStat(t,l.sd)+')</h3>';
     if(!v.pts.length){body+='<p><i>Chưa có dữ liệu QC ở mức này.</i></p>';return;}
     body+='<img src="'+ljDataURL(v.pts,l.mean,l.sd)+'">';
     const viol=v.pts.map(p=>{const f=wg.byPoint.get(p.id)||{level:'ok',rules:[],z:(p.val-l.mean)/l.sd};return{p,f,z:f.z};}).filter(o=>o.f.level!=='ok');
-    body+=viol.length?'<p style="margin-top:8px"><b>Điểm vi phạm/cảnh báo:</b></p>'+reportPointsTableHtml(viol):'<p><i>Không có điểm vi phạm/cảnh báo.</i></p>';
+    body+=viol.length?'<p style="margin-top:8px"><b>Điểm vi phạm/cảnh báo:</b></p>'+reportPointsTableHtml(viol,t):'<p><i>Không có điểm vi phạm/cảnh báo.</i></p>';
   });
   body+=signBlock();await openPrint('Phân tích Westgard — '+testDisplayName(t),body);
 }
-function reportPointsTableHtml(items){
+function reportPointsTableHtml(items,t){
   if(!items.length)return '<p><i>Không có điểm nào trong khoảng ngày đã chọn.</i></p>';
   const rows=items.map(o=>{
     const rules=[...new Set(o.f.rules||[])],support=[...new Set(o.f.supportRules||[])].filter(rule=>!rules.includes(rule)),ruleText=rules.join(', ')||(support.length?'Bằng chứng: '+support.join(', '):'—'),lv=qcVerdictLabel(o.f.level),staff=pointStaff(o.p);
-    return '<tr><td>'+vnDate(o.p.date)+'</td><td>'+esc(o.p.runId||'—')+'</td><td>'+esc(staff.code||'—')+'</td><td class="num">'+fmt(o.p.val)+'</td><td class="num">'+(o.z>=0?'+':'')+fmt(o.z)+'s</td><td>'+esc(lv)+'</td><td>'+esc(ruleText)+'</td></tr>';
+    return '<tr><td>'+vnDate(o.p.date)+'</td><td>'+esc(o.p.runId||'—')+'</td><td>'+esc(staff.code||'—')+'</td><td class="num">'+reportQcPoint(o.p,t)+'</td><td class="num">'+(o.z>=0?'+':'')+fmt(o.z)+'s</td><td>'+esc(lv)+'</td><td>'+esc(ruleText)+'</td></tr>';
   }).join('');
   return '<table><tr><th>Ngày</th><th>Lần chạy</th><th>NV</th><th class="num">Giá trị</th><th class="num">Z</th><th>Kết luận</th><th>Luật / bằng chứng</th></tr>'+rows+'</table>';
 }
@@ -184,29 +189,29 @@ async function printReport(){
   }
   operationalLevels(t).forEach(l=>{
     (typeof previousLotSeries==='function'?previousLotSeries(t,l.level):[]).forEach(s=>{const{inPts,items:allS}=reportPrevLotRows(t,s,inMonth);if(!inPts.length)return;
-      body+='<h3>Mức '+l.level+' — Lô cũ '+esc(s.lot)+' · đã chuyển tiếp (Mean='+fmt(s.mean)+', SD='+fmt(s.sd,3)+')</h3>';
+      body+='<h3>Mức '+l.level+' — Lô cũ '+esc(s.lot)+' · đã chuyển tiếp (Mean='+reportQcValue(t,s.mean)+', SD='+reportQcStat(t,s.sd)+')</h3>';
       body+='<p class="soft-note">Vi phạm ở lô cũ chỉ đánh giá luật Westgard theo từng mức riêng lẻ, không gồm luật liên mức (như R4s giữa các mức cùng lần chạy) — phạm vi hẹp hơn lô đang dùng ở mục bên dưới.</p>';
       body+='<img src="'+ljDataURL(inPts,s.mean,s.sd)+'">';
       const{st:stS,bias:biasS,te:teS,sigma:sigmaS}=reportLevelStats(inPts,s.mean,teaVal);
       body+='<table><tr><th>n</th><th class="num">Mean thực</th><th class="num">SD</th><th class="num">CV%</th><th class="num">Bias%</th><th class="num">TE%</th><th class="num">TEa%</th><th class="num">Sigma (kỳ)</th></tr>'+
-        '<tr><td>'+stS.n+'</td><td class="num">'+fmt(stS.m)+'</td><td class="num">'+fmt(stS.sd,3)+'</td><td class="num">'+fmt(stS.cv)+'</td><td class="num">'+fmt(biasS)+'</td><td class="num">'+fmt(teS)+'</td><td class="num">'+(teaVal||'—')+'</td><td class="num">'+(sigmaS==null?'—':fmt(sigmaS,1)+(stS.n<20?' *':''))+'</td></tr></table>';
-      body+='<p style="margin-top:8px"><b>Điểm trong khoảng xem (lô cũ):</b></p>'+reportPointsTableHtml(allS);
+        '<tr><td>'+stS.n+'</td><td class="num">'+reportQcValue(t,stS.m)+'</td><td class="num">'+reportQcStat(t,stS.sd)+'</td><td class="num">'+fmt(stS.cv)+'</td><td class="num">'+fmt(biasS)+'</td><td class="num">'+fmt(teS)+'</td><td class="num">'+(teaVal||'—')+'</td><td class="num">'+(sigmaS==null?'—':fmt(sigmaS,1)+(stS.n<20?' *':''))+'</td></tr></table>';
+      body+='<p style="margin-top:8px"><b>Điểm trong khoảng xem (lô cũ):</b></p>'+reportPointsTableHtml(allS,t);
       const violS=allS.filter(o=>o.f.level!=='ok');
       if(violS.length){body+='<p style="margin-top:8px"><b>Điểm vi phạm/cảnh báo (lô cũ):</b></p><table><tr><th>Ngày</th><th>NV</th><th class="num">Giá trị</th><th class="num">Z</th><th>Luật</th><th>Loại sai số</th></tr>'+
-        violS.map(o=>'<tr><td>'+vnDate(o.p.date)+'</td><td>'+esc(pointStaff(o.p).code||'—')+'</td><td class="num">'+fmt(o.p.val)+'</td><td class="num">'+(o.z>=0?'+':'')+fmt(o.z)+'s</td><td>'+[...new Set(o.f.rules)].join(', ')+'</td><td>'+errorType([...new Set(o.f.rules)])+'</td></tr>').join('')+'</table>';}
+        violS.map(o=>'<tr><td>'+vnDate(o.p.date)+'</td><td>'+esc(pointStaff(o.p).code||'—')+'</td><td class="num">'+reportQcPoint(o.p,t)+'</td><td class="num">'+(o.z>=0?'+':'')+fmt(o.z)+'s</td><td>'+[...new Set(o.f.rules)].join(', ')+'</td><td>'+errorType([...new Set(o.f.rules)])+'</td></tr>').join('')+'</table>';}
       else body+='<p><i>Không có điểm vi phạm trong khoảng ngày đã chọn (lô cũ).</i></p>';
     });
     const{pts,items:all}=reportLevelRows(t,l,wg,inMonth);
-    body+='<h3>Mức '+l.level+' — Lô '+esc(l.lot||'?')+' · Dải '+(l.applied==='lab'?'PXN':'NSX')+' (Mean='+fmt(l.mean)+', SD='+fmt(l.sd,3)+')</h3>';
+    body+='<h3>Mức '+l.level+' — Lô '+esc(l.lot||'?')+' · Dải '+(l.applied==='lab'?'PXN':'NSX')+' (Mean='+reportQcValue(t,l.mean)+', SD='+reportQcStat(t,l.sd)+')</h3>';
     if(!pts.length){body+='<p><i>Không có dữ liệu trong khoảng ngày đã chọn.</i></p>';return;}
     body+='<img src="'+ljDataURL(pts,l.mean,l.sd)+'">';
     const{st,bias,te,sigma}=reportLevelStats(pts,l.mean,teaVal);
     body+='<table><tr><th>n</th><th class="num">Mean thực</th><th class="num">SD</th><th class="num">CV%</th><th class="num">Bias%</th><th class="num">TE%</th><th class="num">TEa%</th><th class="num">Sigma (kỳ)</th></tr>'+
-      '<tr><td>'+st.n+'</td><td class="num">'+fmt(st.m)+'</td><td class="num">'+fmt(st.sd,3)+'</td><td class="num">'+fmt(st.cv)+'</td><td class="num">'+fmt(bias)+'</td><td class="num">'+fmt(te)+'</td><td class="num">'+(teaVal||'—')+'</td><td class="num">'+(sigma==null?'—':fmt(sigma,1)+(st.n<20?' *':''))+'</td></tr></table>';
-    body+='<p style="margin-top:8px"><b>Điểm trong khoảng xem:</b></p>'+reportPointsTableHtml(all);
+      '<tr><td>'+st.n+'</td><td class="num">'+reportQcValue(t,st.m)+'</td><td class="num">'+reportQcStat(t,st.sd)+'</td><td class="num">'+fmt(st.cv)+'</td><td class="num">'+fmt(bias)+'</td><td class="num">'+fmt(te)+'</td><td class="num">'+(teaVal||'—')+'</td><td class="num">'+(sigma==null?'—':fmt(sigma,1)+(st.n<20?' *':''))+'</td></tr></table>';
+    body+='<p style="margin-top:8px"><b>Điểm trong khoảng xem:</b></p>'+reportPointsTableHtml(all,t);
     const viol=all.filter(o=>o.f.level!=='ok');
     if(viol.length){body+='<p style="margin-top:8px"><b>Điểm vi phạm/cảnh báo:</b></p><table><tr><th>Ngày</th><th>NV</th><th class="num">Giá trị</th><th class="num">Z</th><th>Luật</th><th>Loại sai số</th></tr>'+
-      viol.map(o=>'<tr><td>'+vnDate(o.p.date)+'</td><td>'+esc(pointStaff(o.p).code||'—')+'</td><td class="num">'+fmt(o.p.val)+'</td><td class="num">'+(o.z>=0?'+':'')+fmt(o.z)+'s</td><td>'+[...new Set(o.f.rules)].join(', ')+'</td><td>'+errorType([...new Set(o.f.rules)])+'</td></tr>').join('')+'</table>';}
+      viol.map(o=>'<tr><td>'+vnDate(o.p.date)+'</td><td>'+esc(pointStaff(o.p).code||'—')+'</td><td class="num">'+reportQcPoint(o.p,t)+'</td><td class="num">'+(o.z>=0?'+':'')+fmt(o.z)+'s</td><td>'+[...new Set(o.f.rules)].join(', ')+'</td><td>'+errorType([...new Set(o.f.rules)])+'</td></tr>').join('')+'</table>';}
     else body+='<p><i>Không có điểm vi phạm trong khoảng ngày đã chọn.</i></p>';
   });
   const acts=reportActionsInRange(tid,inMonth);
@@ -223,8 +228,8 @@ async function printRangeForm(tid,level){
   body+='<table><tr><th style="width:25%">Xét nghiệm</th><td>'+esc(testDisplayName(t))+(t.unit?' · '+esc(t.unit):'')+'</td><th style="width:18%">Mức / Lô</th><td>M'+level+' / '+esc(l.lot||'?')+'</td></tr>'+
         '<tr><th>Máy</th><td>'+esc(t.machine||'')+'</td><th>Số kết quả / ngày độc lập</th><td>'+c.n+' / '+days+'</td></tr></table>';
   body+='<h3>So sánh dải kiểm soát</h3><table><tr><th></th><th class="num">Mean</th><th class="num">SD</th><th class="num">CV%</th><th class="num">±2SD</th></tr>'+
-    '<tr><td>Dải nhà sản xuất / hiện tại</td><td class="num">'+fmt(l.mean)+'</td><td class="num">'+fmt(l.sd,3)+'</td><td class="num">'+fmt(l.mean?l.sd/Math.abs(l.mean)*100:0)+'</td><td class="num">'+fmt(l.mean-2*l.sd)+' – '+fmt(l.mean+2*l.sd)+'</td></tr>'+
-    '<tr><td><b>Dải PXN đề xuất</b></td><td class="num"><b>'+fmt(c.m)+'</b></td><td class="num"><b>'+fmt(c.sd,3)+'</b></td><td class="num"><b>'+fmt(c.cv)+'</b></td><td class="num"><b>'+fmt(c.m-2*c.sd)+' – '+fmt(c.m+2*c.sd)+'</b></td></tr></table>';
+    '<tr><td>Dải nhà sản xuất / hiện tại</td><td class="num">'+reportQcValue(t,l.mean)+'</td><td class="num">'+reportQcStat(t,l.sd)+'</td><td class="num">'+fmt(l.mean?l.sd/Math.abs(l.mean)*100:0)+'</td><td class="num">'+reportQcValue(t,l.mean-2*l.sd)+' – '+reportQcValue(t,l.mean+2*l.sd)+'</td></tr>'+
+    '<tr><td><b>Dải PXN đề xuất</b></td><td class="num"><b>'+reportQcValue(t,c.m)+'</b></td><td class="num"><b>'+reportQcStat(t,c.sd)+'</b></td><td class="num"><b>'+fmt(c.cv)+'</b></td><td class="num"><b>'+reportQcValue(t,c.m-2*c.sd)+' – '+reportQcValue(t,c.m+2*c.sd)+'</b></td></tr></table>';
   body+='<img src="'+ljDataURL(pts,c.m,c.sd)+'">';
   body+='<p style="margin-top:8px"><b>Điều kiện:</b> tối thiểu 20 kết quả trên 20 ngày độc lập, cùng lô QC, không có điểm vi phạm/cảnh báo chưa xử lý; áp dụng khi hệ thống ổn định và được phê duyệt theo SOP.</p>';
   body+='<p>Kết luận: ☐ Áp dụng dải PXN mới &nbsp;&nbsp; ☐ Giữ dải nhà sản xuất</p>';

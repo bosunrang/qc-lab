@@ -456,6 +456,12 @@ function close(actual, expected, epsilon = 1e-9) {
 }
 
 {
+  const cleaned=QCCore.sanitizeBackup({lab:{},tests:[{id:'T1',name:'pH',decimalPlaces:3,levels:[]},{id:'T2',name:'Khác',decimalPlaces:9,levels:[]}],data:{},activity:[],users:[],actions:[]});
+  assert.equal(cleaned.tests[0].decimalPlaces,3,'giữ cấu hình số thập phân hợp lệ của xét nghiệm');
+  assert.equal(cleaned.tests[1].decimalPlaces,null,'cấu hình ngoài khoảng 0–6 phải trở về Tự động');
+}
+
+{
   const cleaned = QCCore.sanitizeBackup({
     lab: {},
     tests: [{ id: 'T1', name: 'Glucose', levels: [{ level: 1 }] }],

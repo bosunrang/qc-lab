@@ -27,7 +27,7 @@ function pageWestgardCusum(t){
   if(!levels.length)return `<div class="panel">${emptyState('Chưa có mức QC đang vận hành','Cần Panel QC, Nhóm lô QC và Mean/SD hợp lệ trước khi vẽ CUSUM.')}</div>`;
   return levels.map(l=>{
     const pts=operationalLotPoints(t,l.level);
-    const title=`<h3><span class="wg-level-title"><span>Mức ${l.level}</span><span class="wg-lot-name">Lô ${esc(l.lot||'?')}</span></span><span class="wg-level-meta"><span>Mean ${fmt(l.mean)}</span><span>SD ${fmt(l.sd,3)}</span><span>${pts.length} điểm</span><span>k=${fmt(cfg.k,2)} · h=${fmt(cfg.h,2)}</span></span></h3>`;
+    const title=`<h3><span class="wg-level-title"><span>Mức ${l.level}</span><span class="wg-lot-name">Lô ${esc(l.lot||'?')}</span></span><span class="wg-level-meta"><span>Mean ${fmtTestValue(t,l.mean)}</span><span>SD ${fmtTestValue(t,l.sd)}</span><span>${pts.length} điểm</span><span>k=${fmt(cfg.k,2)} · h=${fmt(cfg.h,2)}</span></span></h3>`;
     if(!pts.length)return `<div class="panel">${title}${emptyState('Chưa có dữ liệu','LOT đang dùng chưa có điểm QC.')}</div>`;
     return `<div class="panel">${title}
       <div class="hint wg-panel-intro">Đường CUSUM+ (teal)/CUSUM− (xanh tím) cộng dồn độ lệch z-score qua từng điểm; vượt vạch đứt ±h là dấu hiệu trôi/shift kéo dài. Đường xám mờ là trung bình động 5 điểm, chỉ để tham khảo hình dạng xu hướng.</div>
@@ -49,17 +49,17 @@ function wgRowsControl(view,key){
   if(view.total<=WG_TABLE_INITIAL_ROWS)return'';
   return `<div class="wg-row-window"><span>Đang hiển thị ${view.rows.length}/${view.total} điểm${view.expanded?'':' mới nhất'}</span>${btn(view.expanded?`Thu gọn còn ${WG_TABLE_INITIAL_ROWS} điểm`:`Xem toàn bộ ${view.total} điểm`,`wgToggleRows('${jsq(key)}')`,'ghost sm')}</div>`;
 }
-function wgPointRowsHtml(rows){return rows.map(row=>{const lv=qcVerdictLabel(row.level),err=row.rules.length?errorTypeDetailParts(row.rules):null,errHtml=err?`<div class="wg-error-type"><b>${esc(err.type)}</b>${err.desc?`<small>${esc(err.desc)}</small>`:''}</div>`:'—',support=(row.supportRules||[]).map(r=>`<span class="pill" title="Điểm lịch sử cấu thành quy tắc, không bị loại hồi tố">${icoRefArrow()} ${r}</span>`).join('');
-  return `<tr><td>${row.index}</td><td>${vnDate(row.date)}</td><td class="num">${fmt(row.value)}</td><td class="num">${Number.isFinite(row.z)?(row.z>=0?'+':'')+fmt(row.z)+'s':'—'}</td><td><span class="tag ${row.level}">${lv}</span></td><td>${row.rules.map(r=>`<span class="pill">${r}</span>`).join('')||support||'—'}${row.rules.length&&support?`<div class="hint" style="margin-top:4px">Bằng chứng: ${support}</div>`:''}</td><td class="hint">${errHtml}</td></tr>`;}).join('');}
+function wgPointRowsHtml(rows,t){return rows.map(row=>{const lv=qcVerdictLabel(row.level),err=row.rules.length?errorTypeDetailParts(row.rules):null,errHtml=err?`<div class="wg-error-type"><b>${esc(err.type)}</b>${err.desc?`<small>${esc(err.desc)}</small>`:''}</div>`:'—',support=(row.supportRules||[]).map(r=>`<span class="pill" title="Điểm lịch sử cấu thành quy tắc, không bị loại hồi tố">${icoRefArrow()} ${r}</span>`).join('');
+  return `<tr><td>${row.index}</td><td>${vnDate(row.date)}</td><td class="num">${fmtTestValue(t,row.value)}</td><td class="num">${Number.isFinite(row.z)?(row.z>=0?'+':'')+fmt(row.z)+'s':'—'}</td><td><span class="tag ${row.level}">${lv}</span></td><td>${row.rules.map(r=>`<span class="pill">${r}</span>`).join('')||support||'—'}${row.rules.length&&support?`<div class="hint" style="margin-top:4px">Bằng chứng: ${support}</div>`:''}</td><td class="hint">${errHtml}</td></tr>`;}).join('');}
 /* Một khối Westgard cho MỘT lô (đang dùng, đã chuyển tiếp, hoặc thuộc nhóm lô đã dừng/lưu
    trữ) — dùng chung cho cả "Xem lô cũ" (theo dòng đời của 1 xét nghiệm) và màn hình duyệt
    theo nhóm lô cũ. Chỉ bảng số liệu, không vẽ biểu đồ riêng từng mức — biểu đồ tổng hợp
    nhiều mức (Levey-Jennings) đã có riêng ở đầu trang (xem wgArchivedMultiViews()). */
 function wgLotBlock(t,level,lotNo,mean,sd,pts,badge,titleMain,lotLabel,extraMeta=''){
-  const title=`<h3><span class="wg-level-title"><span>${titleMain}</span><span class="wg-lot-name">${lotLabel}</span></span><span class="wg-level-meta"><span class="tag rej">${badge}</span><span>Mean ${fmt(mean)}</span><span>SD ${fmt(sd,3)}</span><span>${pts.length} điểm</span>${extraMeta}</span></h3>`;
+  const title=`<h3><span class="wg-level-title"><span>${titleMain}</span><span class="wg-lot-name">${lotLabel}</span></span><span class="wg-level-meta"><span class="tag rej">${badge}</span><span>Mean ${fmtTestValue(t,mean)}</span><span>SD ${fmtTestValue(t,sd)}</span><span>${pts.length} điểm</span>${extraMeta}</span></h3>`;
   if(!pts.length)return `<div class="panel wg-prev-lot">${title}${emptyState('Chưa có dữ liệu','Không tìm thấy điểm QC nào cho lô này.')}</div>`;
   const wgP=QCCore.westgardByPoint(pts,mean,sd,rule=>testRuleOnWithin(t,rule));
-  const rows=WestgardViewModel.buildPointRows({points:pts,verdicts:wgP.F.map(f=>({rules:f.rules,supportRules:f.supportRules,level:ruleResultLevel(t,f.rules)})),zs:wgP.zs,mean,sd}),key=`lot:${t.id}|${level}|${lotNo}`,view=wgRowsWindow(rows,key),rowsHtml=wgPointRowsHtml(view.rows);
+  const rows=WestgardViewModel.buildPointRows({points:pts,verdicts:wgP.F.map(f=>({rules:f.rules,supportRules:f.supportRules,level:ruleResultLevel(t,f.rules)})),zs:wgP.zs,mean,sd}),key=`lot:${t.id}|${level}|${lotNo}`,view=wgRowsWindow(rows,key),rowsHtml=wgPointRowsHtml(view.rows,t);
   return `<div class="panel wg-prev-lot">${title}${wgRowsControl(view,key)}<table class="wg-table"><thead><tr><th>#</th><th>Ngày</th><th class="num">Giá trị</th><th class="num">Z</th><th>Kết luận</th><th>Luật / bằng chứng</th><th>Loại sai số</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`;
 }
 /* Trang xem lại nhóm lô đã dừng/lưu trữ — cùng bố cục với pageWestgard() (mode "current"):
@@ -132,12 +132,12 @@ function pageWestgard(){
     const prevSeries=previousLotSeries(t,l.level),hasPrev=prevSeries.length>0,prevOpen=wgPrevOpen.has(t.id+'|'+l.level);
     const prevBtn=hasPrev?btn(prevOpen?'Xem lô mới':'Xem lô cũ',`wgTogglePrevLot(${l.level})`,'ghost sm wg-prev-toggle'):'';
     if(prevOpen&&hasPrev){const s=prevSeries[0];return wgLotBlock(t,l.level,s.lot,s.mean,s.sd,s.pts,'Đã chuyển tiếp',`Mức ${l.level}`,`Lô cũ ${esc(s.lot)}`,prevBtn);}
-    const title=`<h3><span class="wg-level-title"><span>Mức ${l.level}</span>${lotPicker}</span><span class="wg-level-meta"><span>Mean ${fmt(cfg.mean)}</span><span>SD ${fmt(cfg.sd,3)}</span><span>${pts.length} điểm</span>${prevBtn}</span></h3>`;
+    const title=`<h3><span class="wg-level-title"><span>Mức ${l.level}</span>${lotPicker}</span><span class="wg-level-meta"><span>Mean ${fmtTestValue(t,cfg.mean)}</span><span>SD ${fmtTestValue(t,cfg.sd)}</span><span>${pts.length} điểm</span>${prevBtn}</span></h3>`;
     if(!pts.length)return `<div class="panel">${title}${emptyState('Chưa có dữ liệu','LOT đang dùng chưa có điểm QC. Bạn có thể chọn LOT cũ hoặc nhập điểm mới.',btn('Nhập QC',`entrySel={testId:'${t.id}',level:${l.level}};entryStart=null;entryEnd=null;go('entry')`,'teal'))}</div>`;
     const{zs}=v.single,rows=WestgardViewModel.buildPointRows({points:pts,verdicts:wg.byPoint,zs,mean:cfg.mean,sd:cfg.sd}),key=`current:${t.id}|${l.level}|${l.lot||''}`,view=wgRowsWindow(rows,key);
     const targetOk=levelTargetOk(l),targetWarn=targetOk?'':`<div class="alert warn wg-target-warning">Mức này <b>chưa có Mean/SD hợp lệ</b> — các điểm QC không được đánh giá Westgard; bảng dưới chỉ liệt kê giá trị, không có kết luận Đạt/Cảnh báo/Loại bỏ. ${role()==='admin'?btn('Cấu hình Mean/SD',`go('manage');setManageTab('targets')`,'teal sm'):''}</div>`;
     if(!targetOk)view.rows.forEach(r=>{r.level='none';r.rules=[];r.supportRules=[];});
-    const rowsHtml=wgPointRowsHtml(view.rows);
+    const rowsHtml=wgPointRowsHtml(view.rows,t);
     return `<div class="panel">${title}${targetWarn}${wgRowsControl(view,key)}<table class="wg-table"><thead><tr><th>#</th><th>Ngày</th><th class="num">Giá trị</th><th class="num">Z</th><th>Kết luận</th><th>Luật / bằng chứng</th><th>Loại sai số</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`;}).join('');
   const ruleToggles=WG_RULES.map(r=>`<span class="wg-rule-item"><label><input type="checkbox" ${wgOn(r)?'checked':''} ${!canWrite()?'disabled':''} onchange="wgSet('${r}',this.checked)"> <span class="pill">${r}</span></label></span>`).join('')+(canWrite()?`<div class="wg-rule-reset">${btn('Khôi phục mặc định','wgReset()','ghost sm')}</div>`:'');
   /* Bảng hướng dẫn dựng từ WG_RULE_REGISTRY (core.js) — trước đây 13 dòng này gõ

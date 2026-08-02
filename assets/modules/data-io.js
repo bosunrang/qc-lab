@@ -1,4 +1,7 @@
 /* ===== DATA IO ===== */
+function dataIoQcValue(t,value){return typeof fmtTestValue==='function'?fmtTestValue(t,value):fmt(value,3);}
+function dataIoQcStat(t,value){return typeof fmtTestStat==='function'?fmtTestStat(t,value):fmt(value,3);}
+function dataIoQcPoint(point,t){return typeof fmtPointValue==='function'?fmtPointValue(point,t):fmt(point&&point.val,Math.max(2,Number(point&&point.valueDecimals)||0));}
 function csvCell(v){
   if(typeof v==='number')return Number.isFinite(v)?String(v):'';
   v=v==null?'':String(v);
@@ -50,7 +53,7 @@ function reportNceModel(a,t){
   const rr=typeof actionRerunStatus==='function'?actionRerunStatus(a):{label:''},wf=typeof actionWorkflowStatus==='function'?actionWorkflowStatus(a):{label:'Chưa hoàn tất'},eff=typeof actionEffectivenessStatus==='function'?actionEffectivenessStatus(a):{label:'Chưa đánh giá'};
   const risk=typeof actionRiskScore==='function'?actionRiskScore(a):0,residual=typeof actionResidualRiskScore==='function'?actionResidualRiskScore(a):0;
   const eventDate=typeof actionEventDate==='function'?actionEventDate(a):a.date,approval=typeof actionApprovalLabel==='function'?actionApprovalLabel(a):(a.approvalStatus||'Chờ duyệt');
-  const rerunPoint=rr&&rr.point,rerunText=rerunPoint?fmt(rerunPoint.val)+' '+(t&&t.unit||'')+' - '+vnDate(rerunPoint.date)+(rerunPoint.runId?' - lần '+rerunPoint.runId:''):(rr.label||'Chưa có kết quả phù hợp');
+  const rerunPoint=rr&&rr.point,rerunText=rerunPoint?dataIoQcPoint(rerunPoint,t)+' '+(t&&t.unit||'')+' - '+vnDate(rerunPoint.date)+(rerunPoint.runId?' - lần '+rerunPoint.runId:''):(rr.label||'Chưa có kết quả phù hợp');
   return{
     modern:+a.protocolVersion>=2,cancelled:a.recordStatus==='cancelled',
     nceTitle:a.nceId||'chưa cấp mã',wfLabel:wf.label||'Chưa hoàn tất',
@@ -357,7 +360,7 @@ function reportXlsxDoc(tid,start,end,includeNceAppendix=true){
   operationalLevels(t).forEach(l=>{
     (typeof previousLotSeries==='function'?previousLotSeries(t,l.level):[]).forEach(s=>{
       const{inPts,items:allS}=reportPrevLotRows(t,s,inMonth);if(!inPts.length)return;
-      blank();section('Mức '+l.level+' — Lô cũ '+(s.lot||'?')+' · đã chuyển tiếp (Mean='+fmt(s.mean)+', SD='+fmt(s.sd,3)+')');
+      blank();section('Mức '+l.level+' — Lô cũ '+(s.lot||'?')+' · đã chuyển tiếp (Mean='+dataIoQcValue(t,s.mean)+', SD='+dataIoQcStat(t,s.sd)+')');
       note('Vi phạm ở lô cũ chỉ đánh giá luật Westgard theo từng mức riêng lẻ, không gồm luật liên mức (như R4s giữa các mức cùng lần chạy).');
       chart(typeof ljDataURL==='function'?ljDataURL(inPts,s.mean,s.sd):null);
       const stat=reportLevelStats(inPts,s.mean,teaVal);statsHeader();statsRow(stat.st,stat.bias,stat.te,stat.sigma);
@@ -366,7 +369,7 @@ function reportXlsxDoc(tid,start,end,includeNceAppendix=true){
       if(violS.length){blank();violHeader();violS.forEach(violRow);}
     });
     const{pts,items:all}=reportLevelRows(t,l,wg,inMonth);
-    blank();section('Mức '+l.level+' — Lô '+(l.lot||'?')+' · Dải '+(l.applied==='lab'?'PXN':'NSX')+' (Mean='+fmt(l.mean)+', SD='+fmt(l.sd,3)+')');
+    blank();section('Mức '+l.level+' — Lô '+(l.lot||'?')+' · Dải '+(l.applied==='lab'?'PXN':'NSX')+' (Mean='+dataIoQcValue(t,l.mean)+', SD='+dataIoQcStat(t,l.sd)+')');
     if(!pts.length){note('Không có dữ liệu trong khoảng ngày đã chọn.');return;}
     chart(typeof ljDataURL==='function'?ljDataURL(pts,l.mean,l.sd):null);
     const stat=reportLevelStats(pts,l.mean,teaVal);statsHeader();statsRow(stat.st,stat.bias,stat.te,stat.sigma);
@@ -439,7 +442,7 @@ function westgardXlsxDoc(tid){
     let all;if(isPrev){const calc=QCCore.westgardByPoint(series.pts,series.mean,series.sd,rule=>testRuleOnWithin(t,rule));all=series.pts.map((p,i)=>{const raw=calc.F[i]||{rules:[],supportRules:[]},f={...raw,level:ruleResultLevel(t,raw.rules||[])};return{p,f,z:calc.zs[i]};});}
     else all=series.pts.map(p=>{const f=wg.byPoint.get(p.id)||{level:'ok',rules:[],supportRules:[],z:(p.val-series.mean)/series.sd};return{p,f,z:f.z};});
     const relevant=all.filter(o=>o.f.level!=='ok'||(o.f.supportRules||[]).length),pointIndex=new Map(series.pts.map((p,i)=>[p.id,i+1]));
-    blank();section('Mức '+l.level+' — '+(isPrev?'Lô cũ ':'Lô ')+(series.lot||'?')+(isPrev?' · đã chuyển tiếp':'')+' (Mean='+fmt(series.mean)+', SD='+fmt(series.sd,3)+')');
+    blank();section('Mức '+l.level+' — '+(isPrev?'Lô cũ ':'Lô ')+(series.lot||'?')+(isPrev?' · đã chuyển tiếp':'')+' (Mean='+dataIoQcValue(t,series.mean)+', SD='+dataIoQcStat(t,series.sd)+')');
     if(isPrev)note('Lô cũ chỉ được đánh giá luật Westgard theo từng mức riêng lẻ, không gồm luật liên mức (như R4s giữa các mức cùng lần chạy).');
     if(!series.pts.length){note('Chưa có dữ liệu QC ở mức này.');return;}
     chart(typeof ljDataURL==='function'?ljDataURL(series.pts,series.mean,series.sd):null);

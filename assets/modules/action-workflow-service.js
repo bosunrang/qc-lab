@@ -273,7 +273,8 @@
     return gates.filter(Boolean).sort().pop()||'';
   }
   function actionRerunSignature(a){
-    return[a.id,a.testId,a.pointId,+a.protocolVersion||0,a.actionCompletedDate||'',a.parentNceId||'',a.date||'',a.openedFromVoid?1:0].join('|');
+    const t=state.tests.find(x=>x.id===(a&&a.testId));
+    return[a.id,a.testId,a.pointId,+a.protocolVersion||0,a.actionCompletedDate||'',a.parentNceId||'',a.date||'',a.openedFromVoid?1:0,t&&t.decimalPlaces!=null?t.decimalPlaces:'auto'].join('|');
   }
   function computeActionRerunStatus(a){
     if(!actionNeedsRerun(a))return{needed:false,ok:true,label:'Không yêu cầu',cls:'none',point:null};
@@ -294,7 +295,7 @@
       if((wg.byPoint.get(x.id)||{level:'ok'}).level==='rej')continue;
       rerun=x;break;
     }
-    if(rerun){const verdict=wg.byPoint.get(rerun.id)||{level:'ok'},warning=verdict.level==='warn';return{needed:true,ok:true,label:`${warning?'QC chấp nhận lại (cảnh báo)':'QC đạt lại'}: ${fmt(rerun.val)} (${rerun.runId||'lần sau'})`,cls:warning?'warn':'ok',point:rerun};}
+    if(rerun){const verdict=wg.byPoint.get(rerun.id)||{level:'ok'},warning=verdict.level==='warn';return{needed:true,ok:true,label:`${warning?'QC chấp nhận lại (cảnh báo)':'QC đạt lại'}: ${fmtPointValue(rerun,t)} (${rerun.runId||'lần sau'})`,cls:warning?'warn':'ok',point:rerun};}
     return{needed:true,ok:false,label:`Chờ QC chạy lại được chấp nhận${gateDate?' từ '+vnDate(gateDate):''}`,cls:'warn',point:null};
   }
   /* Memo TU KIEM CHUNG: ngoai chu ky cua ho so, con giu chinh THAM CHIEU mang diem QC

@@ -246,6 +246,34 @@ function pointStaff(p){const name=String(p&&p.operatorName||'').trim(),code=Stri
 function dateObj(s){const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s||''));return m?new Date(+m[1],+m[2]-1,+m[3]):new Date(s);}
 function daysToExp(exp){if(!exp)return null;return Math.round((dateObj(exp).getTime()-new Date().getTime())/86400000);}
 function fmt(x,d=2){return(x==null||isNaN(x))?'—':Number(x).toFixed(d);}
+const QC_DECIMALS_MAX=6;                 // trần chung cho MỌI chỗ kẹp số lẻ
+const QC_STAT_EXTRA_DECIMALS=2;          // SD cần nhiều chữ số hơn giá trị đo
+/* `.5` cũng là số: cho phép thiếu phần nguyên, nếu không thì người nhập ".5" bị coi là 0
+   chữ số thập phân. Nhận cả dấu phẩy — thói quen nhập tiếng Việt. */
+function qcValueDecimals(value){const text=String(value==null?'':value).trim(),match=/^[+-]?(?:\d+(?:[.,](\d+))?|[.,](\d+))(?:e([+-]?\d+))?$/i.exec(text);if(!match)return 0;const fraction=(match[1]||match[2]||'').length,exponent=Number(match[3]||0);return Math.max(0,Math.min(QC_DECIMALS_MAX,fraction-exponent));}
+/* SỐ LẺ CỦA GIÁ TRỊ ĐO — không được lấy từ SD.
+   Bản đầu lấy max của mean/sd/low/high nên SD kéo số lẻ của giá trị lên: nhập "5.6" với SD
+   0.153 thì hiện "5.600", nhập Natri 141 với SD 1.5 thì hiện "141.0". Đó là ĐỘ CHÍNH XÁC
+   GIẢ — con số trong hồ sơ nội kiểm ngụ ý độ phân giải của máy, không phải của phép thống
+   kê. Thứ tự đúng: cấu hình tay > độ chính xác người nhập (đã lưu ở point.valueDecimals) >
+   số lẻ của Mean mục tiêu > 2. */
+function testDecimalPlaces(test,point=null){
+  const configured=test&&test.decimalPlaces;
+  if(configured!==null&&configured!==''&&Number.isInteger(Number(configured))&&Number(configured)>=0&&Number(configured)<=QC_DECIMALS_MAX)return Number(configured);
+  if(point){const saved=Number(point.valueDecimals);return Number.isInteger(saved)&&saved>=0?Math.min(QC_DECIMALS_MAX,saved):qcValueDecimals(point.val);}
+  const means=[];(test&&test.levels||[]).forEach(l=>{if(l&&l.mean!=null&&Number.isFinite(Number(l.mean)))means.push(qcValueDecimals(l.mean));});
+  return means.length?Math.min(QC_DECIMALS_MAX,Math.max(...means)):2;
+}
+/* SỐ LẺ CỦA SD — nhiều hơn giá trị 2 chữ số, KHÔNG dùng chung với giá trị.
+   Trước 2026-08-02 SD luôn là fmt(sd,3) và đó là chủ ý: người đọc báo cáo phải tự kiểm
+   chứng được z-score và CV. Khi decimalPlaces được đặt tay là 1 mà SD dùng chung số lẻ thì
+   SD 0.153 hiện thành "0.2" — mất hẳn khả năng đó. Cố tình KHÔNG suy số lẻ từ chính giá trị
+   SD: SD tính ra là số thực có nhiễu dấu phẩy động (5.599999999999999), suy từ nó sẽ cho
+   6 chữ số rác. */
+function testStatDecimals(test){return Math.min(QC_DECIMALS_MAX,Math.max(2,testDecimalPlaces(test)+QC_STAT_EXTRA_DECIMALS));}
+function fmtTestValue(test,value,point=null){const number=Number(value);return Number.isFinite(number)?number.toFixed(testDecimalPlaces(test,point)):'—';}
+function fmtTestStat(test,value){const number=Number(value);return Number.isFinite(number)?number.toFixed(testStatDecimals(test)):'—';}
+function fmtPointValue(point,test=null){return fmtTestValue(test,point&&point.val,point);}
 function isoDate(d=new Date()){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function isoToday(){return isoDate();}
 function isoMonth(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}

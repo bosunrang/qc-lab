@@ -326,7 +326,7 @@
 }
 
 .assay-detail-grid{
-  display:grid; grid-template-columns:minmax(90px,.62fr) minmax(170px,1.15fr) minmax(90px,.58fr) minmax(210px,1.45fr); gap:10px; align-items:end;
+  display:grid; grid-template-columns:minmax(90px,.58fr) minmax(105px,.6fr) minmax(150px,1fr) minmax(90px,.55fr) minmax(180px,1.3fr); gap:10px; align-items:end;
 }
 
 .assay-detail-grid > div{
@@ -935,7 +935,7 @@ aside,
 
 @media(min-width:641px) and (max-width:900px){
   .assay-detail-grid{grid-template-columns:minmax(100px,.7fr) minmax(180px,1.3fr) minmax(100px,.7fr)}
-  .assay-detail-grid > div:last-child{grid-column:1/-1}
+  .assay-detail-grid > div:nth-child(5){grid-column:1/-1}
 }
 
 .lot-config-grid{

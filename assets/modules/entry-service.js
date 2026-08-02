@@ -85,12 +85,12 @@
   }
 
   // Chuẩn hóa dữ liệu thô từ ô nhập trước khi router chạy các kiểm tra nghiệp vụ.
-  function preparePointInput({tid,level,date,value,runId,cfg,staff,id}){
+  function preparePointInput({tid,level,date,value,valueDecimals,runId,cfg,staff,id}){
     const errors=[];
     const cleanTid=QCCore.cleanId(tid);
     const cleanDate=QCCore.cleanText(date,20).trim();
     const numericLevel=Number(level);
-    const val=typeof value==='number'?value:parseFloat(String(value==null?'':value).trim());
+    const val=typeof value==='number'?value:parseFloat(String(value==null?'':value).trim()),savedDecimals=Number(valueDecimals),decimals=Number.isInteger(savedDecimals)&&savedDecimals>=0?Math.min(6,savedDecimals):qcValueDecimals(value);
     if(!cleanTid)errors.push('missing-test');
     if(!Number.isFinite(numericLevel))errors.push('invalid-level');
     if(!/^\d{4}-\d{2}-\d{2}$/.test(cleanDate))errors.push('invalid-date');
@@ -102,6 +102,7 @@
       level:numericLevel,
       date:cleanDate,
       val,
+      valueDecimals:decimals,
       runId:cleanRunId(runId)||`${cleanDate}-1`,
       cfg,
       staff:staff||{},
@@ -134,12 +135,12 @@
     }};
   }
 
-  function addPoint(state,{tid,level,date,val,runId,cfg,staff,id}){
+  function addPoint(state,{tid,level,date,val,valueDecimals,runId,cfg,staff,id}){
     if(root.PeriodService&&root.PeriodService.findLock(state,root.PeriodService.periodForDate(date)))return{error:'period-locked'};
     state.data=state.data||{};
     state.data[tid]=state.data[tid]||[];
     const dayNote=((state.data[tid]||[]).find(p=>!p.voided&&p.date===date&&String(p.note||'').trim())||{}).note||'';
-    const point={id,date,runId,level,val,lot:cfg.lot||'',qcMean:cfg.mean,qcSd:cfg.sd,note:dayNote,...staff};
+    const point={id,date,runId,level,val,valueDecimals,lot:cfg.lot||'',qcMean:cfg.mean,qcSd:cfg.sd,note:dayNote,...staff};
     state.data[tid].push(point);
     return point;
   }

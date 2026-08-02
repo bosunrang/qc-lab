@@ -209,7 +209,7 @@ function actionRerunEvidenceHtml(a,rr,t){
   const p=actionPoint(a);if(!p||!rr||!rr.needed)return'';
   if(!rr.point)return `<div class="action-rerun-evidence warn"><div class="action-rerun-mark" aria-hidden="true">QC</div><div class="action-rerun-copy"><small>Bằng chứng QC chạy lại</small><b>Chưa có kết quả phù hợp</b><span>${esc(rr.label||'Đang chờ QC chạy lại được chấp nhận')}</span></div></div>`;
   const q=rr.point,context=t?actionLevelShort(t,q.level,q.lot):`Mức ${q.level} · Lô ${q.lot||'—'}`,viewBtn=btn('Xem điểm QC',`openActionQcEvidence('${jsq(a.testId)}',${+q.level||0},'${jsq(q.id)}','${jsq(q.date||'')}','${jsq(q.lot||'')}')`,'ghost sm','Mở đúng điểm QC được dùng làm bằng chứng');
-  return `<div class="action-rerun-evidence ${rr.cls==='warn'?'warn':'ok'}"><div class="action-rerun-mark" aria-hidden="true">QC</div><div class="action-rerun-copy"><small>Bằng chứng QC chạy lại</small><b>${rr.cls==='warn'?'QC được chấp nhận kèm cảnh báo':'QC chạy lại được chấp nhận'}</b><span>${fmt(q.val)} ${esc(t&&t.unit||'')} · ${vnDate(q.date)} · ${esc(q.runId||'Không có mã lần chạy')}</span><span>${esc(context)}</span></div><div class="action-rerun-actions">${viewBtn}</div></div>`;
+  return `<div class="action-rerun-evidence ${rr.cls==='warn'?'warn':'ok'}"><div class="action-rerun-mark" aria-hidden="true">QC</div><div class="action-rerun-copy"><small>Bằng chứng QC chạy lại</small><b>${rr.cls==='warn'?'QC được chấp nhận kèm cảnh báo':'QC chạy lại được chấp nhận'}</b><span>${fmtPointValue(q,t)} ${esc(t&&t.unit||'')} · ${vnDate(q.date)} · ${esc(q.runId||'Không có mã lần chạy')}</span><span>${esc(context)}</span></div><div class="action-rerun-actions">${viewBtn}</div></div>`;
 }
 function openActionQcEvidence(tid,level,pointId,date,lot){
   if(typeof captureActionDraft==='function'&&page==='actions')captureActionDraft();
@@ -277,7 +277,7 @@ function issueRowHtml(o){
   const rules=o.rules.join(', '),err=errorType(o.rules),hint=fixHint(o.rules),wf=pointWorkflowSummary(o.p.id),acts=typeof pointRealActions==='function'?pointRealActions(o.p.id):[],latest=acts[acts.length-1],idx=latest?(state.actions||[]).indexOf(latest):-1;
   const sideChips=latest?actionSideChips(latest,actionWorkflowStatus(latest).stage):'';
   const foot=latest?`${latest.nceId?esc(latest.nceId)+' · ':''}Phụ trách: ${esc(latest.by||'—')}${latest.dueDate?' · hạn '+vnDate(latest.dueDate):''}`:hint;
-  return `<div class="issue-row ${o.f.level}"><div class="issue-row-main"><b>${esc(actionLevelShort(o.t,o.l.level,o.l.lot))} · ${stateName(o.f.level)}</b><div class="meta">${fmt(o.p.val)} ${esc(o.t.unit||'')} · ${rules||'—'} · ${err}</div><div class="action-chipline"><span class="action-chip ${wf.cls}">${esc(wf.label)}</span>${sideChips}</div><div class="hint">${foot}</div></div>${canWrite()?(idx>=0?btn('Tiếp tục hồ sơ',`editAction(${idx})`,'ghost sm'):btn('Lập hồ sơ',`beginActionFromIssue('${o.t.id}',${o.l.level},'${jsq(rules)}','${jsq(err)}','${jsq(hint)}','${jsq(o.p.id||'')}','${jsq(o.p.date||'')}')`,'ghost sm')):''}</div>`;
+  return `<div class="issue-row ${o.f.level}"><div class="issue-row-main"><b>${esc(actionLevelShort(o.t,o.l.level,o.l.lot))} · ${stateName(o.f.level)}</b><div class="meta">${fmtPointValue(o.p,o.t)} ${esc(o.t.unit||'')} · ${rules||'—'} · ${err}</div><div class="action-chipline"><span class="action-chip ${wf.cls}">${esc(wf.label)}</span>${sideChips}</div><div class="hint">${foot}</div></div>${canWrite()?(idx>=0?btn('Tiếp tục hồ sơ',`editAction(${idx})`,'ghost sm'):btn('Lập hồ sơ',`beginActionFromIssue('${o.t.id}',${o.l.level},'${jsq(rules)}','${jsq(err)}','${jsq(hint)}','${jsq(o.p.id||'')}','${jsq(o.p.date||'')}')`,'ghost sm')):''}</div>`;
 }
 /* Hồ sơ cũ tự sinh lúc hủy điểm chỉ lưu rule='Hủy điểm QC' — không phải luật Westgard.
    Suy |Z| của chính điểm đó ra ngữ cảnh đọc được, nhưng LUÔN gắn nhãn "suy từ Z" và
@@ -320,4 +320,3 @@ function pageActionsV4(){
    actionFormHtml(issues.length)+
    `<div class="panel action-log-panel"><h3>Nhật ký khắc phục</h3>${rows?`<div class="action-log-tools">${btn('Xuất CSV nhật ký','exportActionsCSV()','teal sm')}</div><div class="action-log-wrap"><table class="action-log-table"><thead><tr><th>Thời điểm</th><th>Sự cố</th><th>Hành động</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table></div>`:emptyState('Chưa có nhật ký','Các hành động khắc phục sẽ xuất hiện ở đây sau khi được lưu.')}</div>`;
 }
-

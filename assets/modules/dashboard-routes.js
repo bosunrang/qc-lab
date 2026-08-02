@@ -125,7 +125,7 @@ function dashboardKpiOpenDetail(kind){
   let title=qcKinds[kind]||actionKinds[kind]||'Chi tiết KPI',rows='';
   if(qcKinds[kind]){
     const points=insight.details.points.filter(x=>kind==='rejected'?x.verdict.level==='rej':x.verdict.level!=='rej').sort((a,b)=>String(b.p.date).localeCompare(String(a.p.date))||pointRunNo(b.p)-pointRunNo(a.p)),visible=points.slice(0,500);
-    rows=visible.map(({t,p,verdict})=>`<tr><td>${vnDate(p.date)}</td><td><b>${esc(testDisplayName(t))}</b><small>M${p.level} · Lô ${esc(p.lot||'—')}</small></td><td class="num"><b>${fmt(p.val)}</b> ${esc(t.unit||'')}</td><td><span class="tag ${verdict.level}">${verdict.level==='rej'?'Loại bỏ':verdict.level==='warn'?'Cảnh báo':'Đạt'}</span></td><td>${btn('Xem điểm',`closeModal();openActionQcEvidence('${jsq(t.id)}',${+p.level||0},'${jsq(p.id)}','${jsq(p.date)}','${jsq(p.lot||'')}')`,'ghost sm')}</td></tr>`).join('');
+    rows=visible.map(({t,p,verdict})=>`<tr><td>${vnDate(p.date)}</td><td><b>${esc(testDisplayName(t))}</b><small>M${p.level} · Lô ${esc(p.lot||'—')}</small></td><td class="num"><b>${fmtPointValue(p,t)}</b> ${esc(t.unit||'')}</td><td><span class="tag ${verdict.level}">${verdict.level==='rej'?'Loại bỏ':verdict.level==='warn'?'Cảnh báo':'Đạt'}</span></td><td>${btn('Xem điểm',`closeModal();openActionQcEvidence('${jsq(t.id)}',${+p.level||0},'${jsq(p.id)}','${jsq(p.date)}','${jsq(p.lot||'')}')`,'ghost sm')}</td></tr>`).join('');
     rows=rows?`${points.length>visible.length?`<div class="dash-kpi-detail-note">Hiển thị 500/${points.length} điểm mới nhất. Thu hẹp kỳ hoặc xét nghiệm để xem chính xác hơn.</div>`:''}<div class="dash-kpi-detail-wrap"><table><thead><tr><th>Ngày</th><th>Xét nghiệm</th><th class="num">Giá trị</th><th>Kết luận</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty">Không có điểm phù hợp trong phạm vi đang lọc.</div>';
   }else{
     const actions=(kind==='open'?insight.details.open:insight.details.evaluated).slice().sort((a,b)=>String(actionEventDate(b)).localeCompare(String(actionEventDate(a)))),visible=actions.slice(0,500);
@@ -199,7 +199,7 @@ function pageDash(){
      dòng cảnh báo hết hạn cho từng xét nghiệm riêng lẻ. */
   const expByLot=new Map();
   exp.forEach(e=>{const key=e.l.qcLotId||(e.l.lot||'')+'|'+e.l.level;const cur=expByLot.get(key);if(!cur||e.d<cur.d)expByLot.set(key,{...e,count:(cur?cur.count:0)+1});else cur.count++;});
-  const shiftItem=(o,cls)=>`<div class="shift-item ${cls}"><div><b>${esc(testDisplayName(o.t))} · M${o.l.level}</b><div class="meta">${vnDate(o.p.date)} · ${fmt(o.p.val)} ${esc(o.t.unit||'')} · ${o.rules.join(', ')||'—'}</div></div>${btn('Xem',`entrySel={testId:'${o.t.id}',level:${o.l.level}};entryStart=null;entryEnd=null;go('entry')`,'ghost sm')}</div>`;
+  const shiftItem=(o,cls)=>`<div class="shift-item ${cls}"><div><b>${esc(testDisplayName(o.t))} · M${o.l.level}</b><div class="meta">${vnDate(o.p.date)} · ${fmtPointValue(o.p,o.t)} ${esc(o.t.unit||'')} · ${o.rules.join(', ')||'—'}</div></div>${btn('Xem',`entrySel={testId:'${o.t.id}',level:${o.l.level}};entryStart=null;entryEnd=null;go('entry')`,'ghost sm')}</div>`;
   const urgentHtml=urgent.slice(0,5).map(o=>shiftItem(o,'rej')).join('');
   const watchHtml=watch.slice(0,4).map(o=>shiftItem(o,'warn')).join('');
   /* Hồ sơ NCE quá hạn: lọc thô theo dueDate trước rồi mới gọi actionOverdue() — hàm đó
@@ -231,7 +231,7 @@ function pageDash(){
     const statusTag=s==='rej'?'<span class="tag rej">Loại bỏ</span>':s==='warn'?'<span class="tag warn">Cảnh báo</span>':s==='ok'?'<span class="tag ok">Đạt</span>':'<span class="pill">chưa có</span>';
     const todayTag=todayCount>=lvls.length&&lvls.length?'<span class="tag ok">Đủ hôm nay</span>':todayCount?`<span class="tag warn">${todayCount}/${lvls.length} mức</span>`:'<span class="tag none">Chưa QC</span>';
     const levels=levelData.map(x=>{const ok=levelTargetOk(x.l);return `<span class="dash-level-pill ${x.todayLevel?'done':''}${ok?'':' missing-target'}"${ok?'':' title="Chưa có Mean/SD hợp lệ — không đánh giá Westgard"'}>M${x.l.level}${x.l.lot?` · ${esc(x.l.lot)}`:''}${x.st?` · CV ${fmt(x.st.cv)}%`:''}${ok?'':' · thiếu Mean/SD'}</span>`;}).join('');
-    const latestText=latest?`${vnDate(latest.date)} · M${latest._level} · ${fmt(latest.val)}`:'Chưa có điểm';
+    const latestText=latest?`${vnDate(latest.date)} · M${latest._level} · ${fmtPointValue(latest,t)}`:'Chưa có điểm';
     const rank=s==='rej'?0:s==='warn'?1:todayCount<lvls.length?2:s==='ok'?3:4;
     return{rank,name:t.name,html:`<tr class="${s}" data-search="${escAttr(search)}"><td><div class="dash-test-name">${esc(testDisplayName(t))}</div><div class="dash-test-sub">${esc(t.machine||'Chưa gán máy')}</div></td><td><div class="dash-level-list">${levels}</div></td><td>${todayTag}</td><td class="num"><b>${totalPoints}</b></td><td>${statusTag}</td><td><span class="dash-latest">${latestText}</span></td><td>${btn('Xem QC',`entrySel={testId:'${t.id}',level:${lvls[0].level}};entryStart=null;entryEnd=null;go('entry')`,'ghost sm')}</td></tr>`};
   }).sort((a,b)=>a.rank-b.rank||String(a.name||'').localeCompare(String(b.name||''),'vi')).map(x=>x.html).join('');
