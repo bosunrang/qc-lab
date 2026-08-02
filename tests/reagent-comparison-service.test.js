@@ -85,8 +85,9 @@ function makeState() {
      sanitizeBackup() KHÔNG bỏ trường lạ, nên nếu ensureShape() không xóa tường minh thì
      mảng cũ bám theo mọi lần lưu và mọi file backup mãi mãi. schemaVersion vẫn phải là 6:
      hạ về 5 sẽ làm validateStateInvariants() báo "schemaVersion cao hơn app hỗ trợ". */
-  run(integration, 'state.archiveRegistry=[{id:"arc1",year:"2026"}];state.schemaVersion=6;ensureShape();globalThis.__afterShape={hasRegistry:"archiveRegistry" in state,schema:state.schemaVersion};');
+  run(integration, 'state.archiveRegistry=[{id:"arc1",year:"2026"}];state.lab.kpiTargets={qcRejectMax:2};state.schemaVersion=6;ensureShape();globalThis.__afterShape={hasRegistry:"archiveRegistry" in state,hasKpiTargets:"kpiTargets" in state.lab,schema:state.schemaVersion};');
   assert.equal(integration.__afterShape.hasRegistry, false, 'ensureShape phải xóa hẳn nhánh archiveRegistry cũ khỏi state');
+  assert.equal(integration.__afterShape.hasKpiTargets, false, 'ensureShape phải xóa cấu hình KPI Dashboard đã ngừng sử dụng');
   assert.equal(integration.__afterShape.schema, 6, 'schemaVersion giữ nguyên 6, không hạ ngược');
 }
 

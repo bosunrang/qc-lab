@@ -29,6 +29,9 @@ function ensureShape(opts={}){const previousSchema=Number(state&&state.schemaVer
      dev đã đóng dấu 6, hạ xuống sẽ làm validateStateInvariants() báo "schemaVersion cao
      hơn phiên bản app hỗ trợ" ngay trên máy người phát triển. */
   delete state.archiveRegistry;
+  /* KPI Dashboard đã bị gỡ; xóa cấu hình mục tiêu cũ để nó không tiếp tục bám theo
+     state, Firebase và các file backup dù không còn màn hình nào sử dụng. */
+  if(state.lab&&typeof state.lab==='object')delete state.lab.kpiTargets;
   if(previousSchema<3||!state.teaRegistryVersion||state.teaRegistryVersion<TEA_REFERENCE_SCHEMA_VERSION)state.teaRegistryVersion=TEA_REFERENCE_SCHEMA_VERSION;
   state.schemaVersion=STATE_SCHEMA_VERSION;
   if(!state.westgardProfileVersion){state.westgardRules={...WG_DEFAULT};state.westgardProfileVersion=2;}

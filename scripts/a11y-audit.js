@@ -54,7 +54,6 @@ const MODALS = [
   { page: 'sigma', label: 'sigma:mu-budget', open: () => sgOpenMU(sgData(state.tests[0].id)[0].id) },
   { page: 'reagent', label: 'reagent:create-comparison', open: () => openRcCreateModal() },
   { page: 'reagent', label: 'reagent:find-existing', open: () => openRcModal() },
-  { page: 'dash', label: 'dash:kpi-detail', open: () => dashboardKpiOpenDetail('accepted') },
   { page: 'actions', label: 'actions:nce-guide', open: () => openActionGuide() },
   { page: 'users', label: 'users:edit-permissions', open: () => openUserPerms(state.users[1].id) },
   // Modal nay ghi diem QC that qua EntryService khi bam Nhan, nen dang o muc "modal

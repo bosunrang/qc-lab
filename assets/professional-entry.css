@@ -11,25 +11,26 @@
 .lj-mini:hover{border-color:var(--focus-border)}
 .lj-mini.on .lj-mini-h{background:var(--card-head-active);border-bottom-color:var(--focus-border)}
 .lj-mini-h{display:flex;align-items:center;justify-content:space-between;gap:10px}
-.lj-mini-h b{font-size:12px}
+.lj-mini-h b{color:#1a3946;font-size:var(--type-body)}
 .lj-mini-h .hint{font-size:11px}
+.lj-point-count{margin-left:8px;color:var(--muted);font-size:var(--type-micro);font-weight:700;white-space:nowrap}
 .lj-qc-stat{min-width:105px;border-right:1px solid #e1e9ed}
 .lj-qc-stat:last-child{border-right:none}
 .lj-qc-stat .k{display:block;white-space:nowrap}
-.lj-qc-stat .v{display:block;margin-top:2px;font-size:12px;font-weight:800;white-space:nowrap;font-variant-numeric:tabular-nums}
+.lj-qc-stat .v{display:block;margin-top:2px;color:#213e4b;font-size:var(--type-body);font-weight:800;white-space:nowrap;font-variant-numeric:tabular-nums}
 .lj-qc-stat.control .v{color:var(--tealink)}
+.lj-qc-stat.control{background:#f1f8f8}
+.lj-qc-stat:not(.control)+.lj-qc-stat.control{border-left:2px solid #b9d9d7}
 .entrygrid{display:grid}
-.tn-test .lots{margin-left:auto;color:var(--muted);font-size:11px;font-weight:700;padding-left:8px}
 .tn-config{position:relative}
 .tn-config:hover{background:#f3f8f8}
 .tnode:hover .caret{border-color:#73aaa8;background:#f4fbfa;color:var(--tealink)}
-.tnode .lot{margin-left:auto;padding-left:8px}
 .tnode .state{font-weight:700;border-radius:var(--radius-pill);margin-left:6px;background:#eef3f5}
 .tree-tools{display:grid;grid-template-columns:1fr}
 .tree-tools input,.tree-tools select{font-family:var(--sans)}
 .tree-empty{font-size:12px;padding:14px 8px;text-align:center;border:1px dashed var(--line);border-radius:var(--radius-md)}
 .qc-table-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr))}
-.qc-table-card h4{position:sticky;left:0;z-index:3;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.qc-table-card h4{position:sticky;left:0;z-index:3;display:flex;align-items:center}
 .qc-points-panel{margin-top:16px}
 .qc-cumulative-note{margin:var(--panel-content-gap) 16px 0}
 .qc-table-card table{border:none;border-radius:0;table-layout:fixed}
@@ -57,7 +58,7 @@
 .tn-test.open{background:#e9f4f4;color:#173f45}
 .tnode .caret{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;flex:0 0 16px;border:1px solid #c5d4dc;border-radius:3px;background:var(--panel);color:#456271;font-size:12px;font-weight:850;line-height:1;box-shadow:none}
 .lj-mini.on{background:#f7fcfc}
-.lj-qc-strip{display:grid;grid-template-columns:repeat(4,minmax(105px,1fr)) repeat(4,minmax(120px,1fr));border-bottom:1px solid var(--line);padding:0 12px;overflow-x:auto}
+.lj-qc-strip{display:grid;grid-template-columns:repeat(5,minmax(112px,1fr));border-bottom:1px solid var(--line);padding:0 12px;overflow-x:auto}
 .qc-month-area{flex:0 0 auto}
 .qc-month-picker select{width:auto;padding-top:0;padding-bottom:0;background:var(--panel);font-weight:750}
 .qc-current-month{white-space:nowrap}
@@ -86,8 +87,7 @@
   padding:3px 8px;
 }
 
-.tnode .state,
-.tnode .lot{
+.tnode .state{
   color:var(--muted);
   font-size:var(--type-micro);
 }
@@ -134,14 +134,6 @@
 
 .tn-test{
   color:#28414e;
-}
-
-.lj-mini-h b{
-  color:#1a3946;
-}
-
-.lj-qc-stat .v{
-  color:#213e4b;
 }
 
 .qc-sheet td:first-child, .qc-sheet th:first-child{
@@ -269,7 +261,7 @@
 }
 
 .qc-value-chip{
-  display:inline-flex;align-items:center;justify-content:center;width:88px;height:28px;padding:0 6px;border-radius:var(--radius-md);border:1px solid #d5e1e8;background:#f9fcfd;color:#163541;font-weight:800;font-variant-numeric:tabular-nums;box-sizing:border-box;min-width:68px;font-size:12px;box-shadow:inset 0 1px 0 rgba(255,255,255,.92);
+  display:inline-flex;align-items:center;justify-content:center;width:88px;height:32px;padding:0 6px;border-radius:var(--radius-md);border:1px solid #d5e1e8;background:#f9fcfd;color:#163541;font-weight:800;font-variant-numeric:tabular-nums;box-sizing:border-box;min-width:68px;font-size:var(--type-body);box-shadow:inset 0 1px 0 rgba(255,255,255,.92);
 }
 
 .qc-run-grid.has-add-btn{
@@ -416,7 +408,7 @@
 }
 
 .entrygrid > .tree{
-  width:max-content; min-width:320px; max-width:min(520px, 38vw);
+  width:max-content; min-width:280px; max-width:min(440px, 34vw);
 }
 
 .tree .tnode{
@@ -441,6 +433,14 @@
 
 .qc-table-card h4{
   box-sizing:border-box;
+}
+
+.qc-table-card h4 > span{
+  display:flex; align-items:center; gap:10px; min-width:0; flex-wrap:wrap;
+}
+
+.qc-table-count{
+  font-weight:700; white-space:nowrap;
 }
 
 .qc-row-actions{
@@ -570,7 +570,7 @@
      đó chỉ đạt 3,94:1, dưới ngưỡng 4,5:1 của chữ 12px đậm. Ô nhập trống chiếm
      gần hết bảng khi sang tháng mới nên axe chỉ bắt được lỗi này vào những ngày
      đầu tháng (bản ghi baseline 2026-07-24 không thấy, 2026-08-01 thì thấy). */
-  width:84px; min-width:84px; max-width:84px; height:28px; min-height:28px; padding:0 8px; line-height:26px; border:1px dashed #d2dee5; border-radius:var(--radius-md); background:var(--panel); box-shadow:none; color:var(--muted); font-size:12px; font-weight:700; text-align:center;
+  width:84px; min-width:84px; max-width:84px; height:32px; min-height:32px; padding:0 8px; line-height:30px; border:1px dashed #d2dee5; border-radius:var(--radius-md); background:var(--panel); box-shadow:none; color:var(--muted); font-size:var(--type-body); font-weight:700; text-align:center;
 }
 
 .qc-sheet .qc-run-slot .qc-inline-input:hover, .qc-sheet .qc-run-slot .qc-inline-input:focus{
@@ -590,7 +590,7 @@
 }
 
 .qc-sheet-heading{
-  background:var(--section-head-bg); border-bottom:1px solid var(--section-head-border); color:var(--card-head-ink); display:grid; align-items:center; justify-content:space-between; gap:14px; min-height:64px; padding:13px 16px; position:sticky; top:0; z-index:8; grid-template-columns:minmax(220px,1fr) auto; padding-top:10px; padding-bottom:10px;
+  background:var(--section-head-bg); border-bottom:1px solid var(--section-head-border); color:var(--card-head-ink); display:grid; align-items:center; justify-content:space-between; gap:14px; min-height:64px; padding:10px 16px; position:sticky; top:0; z-index:8; grid-template-columns:minmax(220px,1fr) auto;
 }
 
 .qc-sheet-title{
@@ -610,15 +610,11 @@
 }
 
 .tree-tools{
-  gap:8px;margin-bottom:8px;padding-bottom:0;border-bottom:1px solid var(--surface-border-soft);margin:10px 0 12px;padding:0 4px 10px;
+  gap:8px; margin:10px 0 12px; padding:0 4px 10px; border-bottom:1px solid var(--surface-border-soft);
 }
 
 .tnode{
-  min-height:32px;border-radius:var(--surface-radius);padding-top:6px;padding-bottom:6px;padding:6px 8px;font-size:var(--type-body);
-}
-
-.tnode .label{
-  font-size:12.5px;
+  min-height:32px; padding:6px 8px; border-radius:var(--surface-radius); font-size:var(--type-body);
 }
 
 .tnode:hover{
@@ -642,7 +638,7 @@
 }
 
 .range-band-note{
-  margin-top:12px; padding:14px 18px 14px 16px; border:0; border-left:5px solid #4f789d; border-radius:var(--radius-lg); background:#eaf2f8; color:var(--ink); line-height:1.55;
+  margin:12px 14px 0; padding:14px 18px 14px 16px; border:0; border-left:5px solid #4f789d; border-radius:var(--radius-lg); background:#eaf2f8; color:var(--ink); line-height:1.55;
 }
 
 .range-band-label, .range-band-source, .range-band-body{
@@ -657,14 +653,6 @@
   color:var(--ink); font-weight:850; white-space:nowrap; margin-right:4px;
 }
 
-.range-summary-panel > h3:first-child{
-  justify-content:space-between; gap:16px;
-}
-
-.range-summary-panel > h3:first-child > small{
-  color:#526a78; font-size:12.5px; font-weight:750; line-height:1.35; text-align:right; text-transform:none; letter-spacing:0; white-space:nowrap;
-}
-
 .tree .tn-machine, .tree .tn-test, .tree .tn-config{
   color:var(--card-head-ink);
 }
@@ -674,7 +662,7 @@
 }
 
 .tree .tn-config{
-  margin-left:42px;padding-left:10px;grid-template-columns:minmax(0,1fr) auto;font-size:12.5px;font-weight:600;
+  margin-left:42px;padding-left:10px;grid-template-columns:minmax(0,1fr) auto;font-size:var(--type-body);font-weight:600;
 }
 
 .qc-tooltip{
@@ -733,6 +721,50 @@
   padding:11px 12px;
 }
 
+.lj-mini .chart-scroll canvas.entryLJStack{
+  width:100%; min-width:0; max-width:none;
+}
+
+.entry-secondary-panel{
+  padding:0; overflow:hidden;
+}
+
+.entry-secondary-summary{
+  display:flex; align-items:center; justify-content:space-between; gap:16px; min-height:48px; padding:10px 16px; border-bottom:1px solid transparent; background:var(--section-head-bg); color:var(--card-head-ink); cursor:pointer; list-style:none;
+}
+
+.entry-secondary-summary::-webkit-details-marker{
+  display:none;
+}
+
+.entry-secondary-summary::after{
+  content:"+"; flex:none; display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border:1px solid #c9d9df; border-radius:var(--radius-sm); background:var(--panel); color:var(--tealink); font-size:16px; font-weight:800; line-height:1;
+}
+
+.entry-secondary-panel[open] > .entry-secondary-summary{
+  border-bottom-color:var(--section-head-border);
+}
+
+.entry-secondary-panel[open] > .entry-secondary-summary::after{
+  content:"−";
+}
+
+.entry-secondary-summary > span{
+  font-size:var(--section-head-size); font-weight:800;
+}
+
+.entry-secondary-summary > small{
+  flex:1; color:var(--muted); font-size:var(--type-body-sm); font-weight:700; text-align:right;
+}
+
+.entry-secondary-summary:focus-visible{
+  outline:2px solid var(--focus-outline); outline-offset:-3px;
+}
+
+.entry-secondary-body{
+  padding-bottom:14px;
+}
+
 .qc-sheet tbody tr.missing:not(.today) td:first-child{
   box-shadow:inset 4px 0 0 #d69a2d;
 }
@@ -780,15 +812,19 @@
 }
 
 .lj-qc-stat:nth-last-child(-n+2){
-  border-bottom:none;
+  border-bottom:1px solid #e1e9ed;
 }
 
-.range-summary-panel > h3:first-child{
-  align-items:flex-start; flex-direction:column; gap:4px;
+.lj-qc-stat:last-child{
+  grid-column:1/-1; border-right:none; border-bottom:none;
 }
 
-.range-summary-panel > h3:first-child > small{
-  text-align:left; white-space:normal;
+.entry-secondary-summary{
+  align-items:flex-start; flex-wrap:wrap; padding:10px 12px;
+}
+
+.entry-secondary-summary > small{
+  order:3; flex-basis:100%; text-align:left;
 }
 
 .range-band-note{

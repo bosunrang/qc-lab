@@ -495,7 +495,6 @@
        để tránh stringify+parse thêm một lần. Các caller thông thường vẫn nhận
        clone sâu như trước, giữ nguyên contract không mutate input. */
     const source=opts.owned&&input&&typeof input==='object'&&!Array.isArray(input)?input:JSON.parse(JSON.stringify(input));
-    const rawKpi=source.lab&&source.lab.kpiTargets||{},kpiNumber=(value,fallback,min,max)=>Math.min(max,Math.max(min,finiteNumber(value,fallback)));
     source.lab={
       name:cleanText(source.lab&&source.lab.name),
       dept:cleanText(source.lab&&source.lab.dept),
@@ -503,13 +502,7 @@
       brandTitle:cleanText(source.lab&&source.lab.brandTitle,80),
       brandSub:cleanText(source.lab&&source.lab.brandSub,120),
       logoText:cleanText(source.lab&&source.lab.logoText,8).slice(0,4),
-      logoData:cleanText(source.lab&&source.lab.logoData,120000),
-      kpiTargets:{
-        qcRejectMax:kpiNumber(rawKpi.qcRejectMax,2,0.1,50),
-        capaEffectiveMin:kpiNumber(rawKpi.capaEffectiveMin,90,1,100),
-        closeDaysMax:kpiNumber(rawKpi.closeDaysMax,7,1,365),
-        onTimeMin:kpiNumber(rawKpi.onTimeMin,90,1,100)
-      }
+      logoData:cleanText(source.lab&&source.lab.logoData,120000)
     };
     source.machines=(source.machines||[]).slice(0,1000).map(v=>cleanText(v)).filter(Boolean);
     source.instruments=(source.instruments||[]).slice(0,1000).map(x=>({...x,id:cleanId(x.id),name:cleanText(x.name),manufacturer:cleanText(x.manufacturer),model:cleanText(x.model),serial:cleanText(x.serial),section:cleanText(x.section),active:x.active!==false})).filter(x=>x.id&&x.name);

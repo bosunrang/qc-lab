@@ -31,7 +31,7 @@ function setupHiDPICanvas(canvas){
   /* Match the real screen density instead of forcing supersampling on every
      display. Capping at 3x still bounds backing-pixel memory on very high-DPI
      screens while looking sharp on today's common 2x/3x Windows scaling. */
-  const dpr=Math.min(3,Math.max(1,window.devicePixelRatio||1)),pxW=Math.round(cssW*dpr),pxH=Math.round(cssH*dpr);
+  const renderScale=Math.min(2,Math.max(1,Number(canvas.dataset.renderScale)||1)),dpr=Math.min(3,Math.max(renderScale,window.devicePixelRatio||1)),pxW=Math.round(cssW*dpr),pxH=Math.round(cssH*dpr);
   if(canvas.width!==pxW||canvas.height!==pxH){canvas.width=pxW;canvas.height=pxH;canvas.style.height=cssH+'px';}
   const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);
   return{ctx,W:cssW,H:cssH};
@@ -39,7 +39,7 @@ function setupHiDPICanvas(canvas){
 function drawLJ(canvas,points,mean,sd){
   const{ctx,W,H}=setupHiDPICanvas(canvas);
   canvas._ljCssW=W;canvas._ljCssH=H;
-  const padL=56,padR=78,padT=34,padB=32,cw=W-padL-padR,ch=H-padT-padB;
+  const padL=56,padR=78,padT=34,padB=48,cw=W-padL-padR,ch=H-padT-padB;
   const n=points.length,top=mean+3.25*sd,bot=mean-3.25*sd;
   const y=v=>padT+(top-v)/(top-bot)*ch,markPad=10;
   const clampY=v=>Math.max(padT,Math.min(padT+ch,y(v)));
@@ -116,6 +116,9 @@ function drawLJ(canvas,points,mean,sd){
     canvas._ljHover.push({x:px,y:py,hit:12,html:`<b>${vnDate(p.date)} · ${levelText}</b><div>Lô: <b style="display:inline">${esc(p.lot||lot)}</b></div><div>Giá trị: ${fmtPointValue(p,test)}${test&&test.unit?' '+esc(test.unit):''}</div><div>Z: ${zTxt}</div><div class="muted">Luật: ${rules.length?esc(rules.join(', ')):'Đạt'}</div>`});
   });
   ctx.restore();
+  const tickTotal=Math.min(5,n),tickIndices=tickTotal===1?[0]:[...new Set(Array.from({length:tickTotal},(_,i)=>Math.round(i*(n-1)/(tickTotal-1))))];
+  ctx.fillStyle='#536772';ctx.font='700 11px Manrope, Arial, sans-serif';ctx.textAlign='center';ctx.textBaseline='top';
+  tickIndices.forEach(i=>{const raw=String(points[i].date||''),label=/^\d{4}-\d{2}-\d{2}$/.test(raw)?raw.slice(8,10)+'/'+raw.slice(5,7):String(vnDate(points[i].date)||'').slice(0,5);ctx.fillText(label,x(i),padT+ch+10);});
   bindLJTooltip(canvas);
 
 

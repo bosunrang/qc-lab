@@ -249,7 +249,7 @@ function close(actual, expected, epsilon = 1e-9) {
 
 {
   const backup = QCCore.sanitizeBackup({
-    lab: { name: 'Lab <A>', kpiTargets: { qcRejectMax: '4.5', capaEffectiveMin: 120, closeDaysMax: 0, onTimeMin: 85 } },
+    lab: { name: 'Lab <A>' },
     tests: [{
       id: 'T1',
       name: 'Glucose',
@@ -268,7 +268,6 @@ function close(actual, expected, epsilon = 1e-9) {
     users: []
   });
   assert.equal(backup.lab.name, 'Lab ‹A›');
-  assert.deepEqual(backup.lab.kpiTargets, { qcRejectMax: 4.5, capaEffectiveMin: 100, closeDaysMax: 1, onTimeMin: 85 });
   assert.equal(backup.data.T1.length, 1);
   assert.equal(backup.data.T1[0].val, 10.5);
   assert.equal(backup.tests[0].ruleScopes['6x'], 'across');

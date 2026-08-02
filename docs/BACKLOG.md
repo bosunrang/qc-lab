@@ -58,10 +58,6 @@ xong (mục làm xong chuyển lên phần "Đã xong") để tham chiếu cũ k
   trắng, chỉ đạt 3,94:1 (chữ 12px đậm cần 4,5:1). Lỗi này chỉ lộ vào những ngày đầu
   tháng — khi bảng nhập gần như trống nên axe mới thấy đủ nhiều ô. Đã đổi sang
   `var(--muted)` (6,01:1).
-- `nce-check` cũng **đỏ sẵn ở HEAD**: script còn gọi `dashboardKpiSetScope()`, một hàm
-  không tồn tại — commit KPI trước đó tách nó thành `dashboardKpiSetInstrument()` và
-  `dashboardKpiSetTest()` mà quên sửa script. Đã sửa (99 đạt / 0 lỗi).
-
 ---
 
 ## Ngoài danh sách — cần quyết định của con người, không phải việc code

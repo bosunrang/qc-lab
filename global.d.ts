@@ -16,14 +16,14 @@
 // name set changes.
 
 // --- UI state accessors (Object.defineProperty(globalThis, ...) in *-ui-state.js) ---
-declare var selTest: any, statusMemo: any, wgTestQ: any, dashTestQ: any, dashTestStatus: any, dashKpiPeriod: any, dashKpiStart: any, dashKpiEnd: any, dashKpiInstrument: any, dashKpiTest: any, dashKpiTestQ: any, dashKpiTestChoices: any, dashKpiLast: any,
+declare var selTest: any, statusMemo: any, wgTestQ: any, dashTestQ: any, dashTestStatus: any,
   wgPrevOpen: any, wgExpandedRows: any, wgViewMode: any, wgArchivedGroupId: any,
   wgArchivedTestId: any, wgArchivedTestQ: any, wgChartMode: any;
 declare var currentUser: any, loginFails: any, loginLockUntil: any;
 declare var entrySel: any, entryDays: any, entryStart: any, entryEnd: any, entrySheetMonth: any,
   entryQ: any, entryMachine: any, entryLastMsg: any, entryAutoOpenKey: any,
   entryPendingSheetFocus: any, entryJumpToday: any, entryLjRenderCache: any,
-  entryPartialRenderCache: any, entryPrevOpen: any, entryExpandedTables: any, treeOpen: any,
+  entryPartialRenderCache: any, entryPrevOpen: any, entryExpandedTables: any, entryDetailOpen: any, treeOpen: any,
   entryExtraRun: any;
 declare var manageQ: any, manageTab: any, manageTargetPanel: any, manageTargetGroup: any,
   manageTargetLevel: any, manageHistoryTest: any, targetSwitchCtx: any, configNavScroll: any;
