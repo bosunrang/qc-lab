@@ -246,23 +246,32 @@ function pointStaff(p){const name=String(p&&p.operatorName||'').trim(),code=Stri
 function dateObj(s){const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s||''));return m?new Date(+m[1],+m[2]-1,+m[3]):new Date(s);}
 function daysToExp(exp){if(!exp)return null;return Math.round((dateObj(exp).getTime()-new Date().getTime())/86400000);}
 function fmt(x,d=2){return(x==null||isNaN(x))?'—':Number(x).toFixed(d);}
+const QC_DECIMALS_DEFAULT=1;             // mặc định 1 chữ số thập phân cho mọi xét nghiệm
+const QC_DECIMALS_MIN_CUSTOM=2;          // tùy chỉnh tay: 2..6 (dưới mức đó dùng mặc định)
 const QC_DECIMALS_MAX=6;                 // trần chung cho MỌI chỗ kẹp số lẻ
 const QC_STAT_EXTRA_DECIMALS=2;          // SD cần nhiều chữ số hơn giá trị đo
 /* `.5` cũng là số: cho phép thiếu phần nguyên, nếu không thì người nhập ".5" bị coi là 0
    chữ số thập phân. Nhận cả dấu phẩy — thói quen nhập tiếng Việt. */
 function qcValueDecimals(value){const text=String(value==null?'':value).trim(),match=/^[+-]?(?:\d+(?:[.,](\d+))?|[.,](\d+))(?:e([+-]?\d+))?$/i.exec(text);if(!match)return 0;const fraction=(match[1]||match[2]||'').length,exponent=Number(match[3]||0);return Math.max(0,Math.min(QC_DECIMALS_MAX,fraction-exponent));}
-/* SỐ LẺ CỦA GIÁ TRỊ ĐO — không được lấy từ SD.
-   Bản đầu lấy max của mean/sd/low/high nên SD kéo số lẻ của giá trị lên: nhập "5.6" với SD
-   0.153 thì hiện "5.600", nhập Natri 141 với SD 1.5 thì hiện "141.0". Đó là ĐỘ CHÍNH XÁC
-   GIẢ — con số trong hồ sơ nội kiểm ngụ ý độ phân giải của máy, không phải của phép thống
-   kê. Thứ tự đúng: cấu hình tay > độ chính xác người nhập (đã lưu ở point.valueDecimals) >
-   số lẻ của Mean mục tiêu > 2. */
+/* SỐ LẺ CỦA GIÁ TRỊ ĐO — mặc định 1 chữ số, KHÔNG bao giờ lấy từ SD.
+   Hai bài học nằm cả trong hàm này:
+
+   1. KHÔNG suy từ SD. Bản đầu lấy max của mean/sd/low/high nên SD kéo số lẻ của giá trị
+      lên: nhập "5.6" với SD 0.153 thì hiện "5.600". Đó là độ chính xác giả — con số trong
+      hồ sơ nội kiểm ngụ ý độ phân giải của máy, không phải của phép thống kê.
+
+   2. NHƯNG cũng không được để rơi về 0. Bỏ SD ra rồi thì điểm QC cũ (nhập trước khi có
+      point.valueDecimals) chỉ còn suy từ chính val, mà val=4 thì String(4)="4" → 0 chữ số
+      → Kali "4.0" hiện thành "4". Toàn bộ dữ liệu lịch sử mất phần thập phân trong im
+      lặng. Vì vậy mặc định là 1 và lấy MAX với độ chính xác người nhập: gõ "4" hay "4.0"
+      đều ra "4.0", còn gõ "7.405" vẫn giữ nguyên "7.405" chứ không bị làm tròn.
+
+   Thứ tự: cấu hình tay (2..6) > max(mặc định 1, độ chính xác đã lưu của điểm). */
 function testDecimalPlaces(test,point=null){
-  const configured=test&&test.decimalPlaces;
-  if(configured!==null&&configured!==''&&Number.isInteger(Number(configured))&&Number(configured)>=0&&Number(configured)<=QC_DECIMALS_MAX)return Number(configured);
-  if(point){const saved=Number(point.valueDecimals);return Number.isInteger(saved)&&saved>=0?Math.min(QC_DECIMALS_MAX,saved):qcValueDecimals(point.val);}
-  const means=[];(test&&test.levels||[]).forEach(l=>{if(l&&l.mean!=null&&Number.isFinite(Number(l.mean)))means.push(qcValueDecimals(l.mean));});
-  return means.length?Math.min(QC_DECIMALS_MAX,Math.max(...means)):2;
+  const configured=Number(test&&test.decimalPlaces);
+  if(Number.isInteger(configured)&&configured>=QC_DECIMALS_MIN_CUSTOM&&configured<=QC_DECIMALS_MAX)return configured;
+  if(point){const saved=Number(point.valueDecimals),own=Number.isInteger(saved)&&saved>=0?saved:qcValueDecimals(point.val);return Math.min(QC_DECIMALS_MAX,Math.max(QC_DECIMALS_DEFAULT,own));}
+  return QC_DECIMALS_DEFAULT;
 }
 /* SỐ LẺ CỦA SD — nhiều hơn giá trị 2 chữ số, KHÔNG dùng chung với giá trị.
    Trước 2026-08-02 SD luôn là fmt(sd,3) và đó là chủ ý: người đọc báo cáo phải tự kiểm

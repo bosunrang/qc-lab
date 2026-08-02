@@ -202,7 +202,16 @@ const plain = v => JSON.parse(JSON.stringify(v));
   assert.equal(ctx.fmtPointValue(ph.point),'7.405');
   assert.equal(ctx.fmtPointValue({val:7.405}),'7.405','điểm cũ chưa có metadata vẫn suy ra đủ chữ số');
   assert.equal(ctx.fmtPointValue({val:7.4,valueDecimals:3}),'7.400','giữ cả số 0 tận cùng đã nhập');
-  assert.equal(ctx.fmtPointValue({val:450},{decimalPlaces:0}),'450','xét nghiệm số lớn có thể không hiện phần thập phân');
+  assert.equal(ctx.fmtPointValue({val:450},{decimalPlaces:1}),'450.0','1 không phải tùy chỉnh — đó chính là mặc định');
+  assert.equal(ctx.fmtPointValue({val:450},{decimalPlaces:0}),'450.0','0 chữ số không còn là lựa chọn — tùy chỉnh chỉ 2..6, ngoài khoảng thì về mặc định');
+  /* HỒI QUY TỪ BÁO CÁO THẬT (2026-08-02). Sau khi bỏ SD ra khỏi phép suy, điểm QC cũ —
+     nhập trước khi có point.valueDecimals — chỉ còn suy từ chính val. Kali "4.0" lưu thành
+     val=4, mà String(4)="4" nên ra 0 chữ số: bảng nhập QC hiện "4". Toàn bộ dữ liệu lịch sử
+     mất phần thập phân trong im lặng. Mặc định 1 chữ số chặn đúng chỗ này. */
+  assert.equal(ctx.fmtPointValue({val:4},{levels:[{level:1,mean:4,sd:0.1}]}),'4.0','điểm QC cũ không có metadata vẫn phải giữ 1 chữ số thập phân');
+  assert.equal(ctx.fmtPointValue({val:4,valueDecimals:0},null),'4.0','gõ "4" hay "4.0" đều hiển thị như nhau');
+  assert.equal(ctx.fmtPointValue({val:7.405},null),'7.405','nhưng gõ nhiều chữ số hơn thì KHÔNG bị làm tròn xuống 1');
+  assert.equal(ctx.testDecimalPlaces({}),1,'xét nghiệm mới chưa cấu hình gì thì mặc định 1 chữ số');
   assert.equal(ctx.fmtPointValue({val:450},{decimalPlaces:3}),'450.000','lựa chọn thủ công phải được áp dụng chính xác');
   assert.equal(ctx.fmtPointValue({val:7.405},{decimalPlaces:2}),'7.41','lựa chọn thủ công chỉ làm tròn phần hiển thị');
   assert.equal(ctx.fmtTestValue({decimalPlaces:1},100.25),'100.3');
@@ -221,13 +230,13 @@ const plain = v => JSON.parse(JSON.stringify(v));
     assert.equal(val(glucose,{val:5.6,valueDecimals:1}),'5.6','SD nhiều chữ số KHÔNG được kéo số lẻ của giá trị lên');
     assert.equal(sd(glucose,0.153),'0.153','SD giữ đủ chữ số như fmt(sd,3) trước đây');
 
-    const fixed={decimalPlaces:1,levels:[{level:1,mean:5.6,sd:0.153}]};
-    assert.equal(val(fixed,{val:5.6,valueDecimals:1}),'5.6');
-    assert.equal(sd(fixed,0.153),'0.153','cấu hình tay chỉ chi phối GIÁ TRỊ, không được cắt cụt SD');
+    const fixed={decimalPlaces:2,levels:[{level:1,mean:5.6,sd:0.153}]};
+    assert.equal(val(fixed,{val:5.6,valueDecimals:1}),'5.60');
+    assert.equal(sd(fixed,0.153),'0.1530','cấu hình tay chỉ chi phối GIÁ TRỊ, không được cắt cụt SD');
 
     const natri={levels:[{level:1,mean:140,sd:1.5}]};
-    assert.equal(val(natri,{val:141,valueDecimals:0}),'141','xét nghiệm số nguyên không được thành "141.0"');
-    assert.equal(sd(natri,1.5),'1.50');
+    assert.equal(val(natri,{val:141,valueDecimals:0}),'141.0','xét nghiệm số nguyên không được thành "141.0"');
+    assert.equal(sd(natri,1.5),'1.500');
 
     const ph={levels:[{level:1,mean:7.4,sd:0.01}]};
     assert.equal(val(ph,{val:7.405,valueDecimals:3}),'7.405');
