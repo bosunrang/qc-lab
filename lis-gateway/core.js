@@ -48,7 +48,14 @@ function buildMappingIndex(config){
   return map;
 }
 
-function gateDecision(message,mapping,qc,nowMs=Date.now(),staleMinutes=720){
+/* 90 phút, KHÔNG phải 720. Bản đầu tin một trạng thái QC suốt 12 giờ: app tắt lúc 8h thì
+   20h gateway vẫn trả `accepted` cho kết quả bệnh nhân. `asOf` phản ánh "lần cuối app nói
+   chuyện với gateway", không phải "lần cuối chạy QC" — nên nó chỉ có nghĩa khi app gửi
+   nhịp đều. Client nay gửi heartbeat mỗi 30 phút (LIS_HEARTBEAT_MS), nên 90 phút = chịu
+   được 2 nhịp lỡ trước khi chuyển sang `held`. Rút ngắn luôn nghiêng về phía an toàn:
+   quá hạn thì GIỮ kết quả lại chứ không phát hành. */
+const DEFAULT_STALE_MINUTES=90;
+function gateDecision(message,mapping,qc,nowMs=Date.now(),staleMinutes=DEFAULT_STALE_MINUTES){
   if(!mapping)return{decision:'held',code:'UNMAPPED_TEST',reason:'Chưa mapping mã máy sang xét nghiệm QC Lab.'};
   if(mapping.expectedUnit&&message.unit&&mapping.expectedUnit.toLowerCase()!==message.unit.toLowerCase())return{decision:'held',code:'UNIT_MISMATCH',reason:`Đơn vị máy (${message.unit}) khác mapping (${mapping.expectedUnit}).`};
   if(!qc)return{decision:'held',code:'QC_UNKNOWN',reason:'Chưa có trạng thái QC cho xét nghiệm.'};
@@ -62,13 +69,24 @@ function gateDecision(message,mapping,qc,nowMs=Date.now(),staleMinutes=720){
 
 class LisBridge{
   constructor(config={},store){
-    this.config={...config,staleMinutes:Number(config.staleMinutes)>0?Number(config.staleMinutes):720};
+    this.config={...config,staleMinutes:Number(config.staleMinutes)>0?Number(config.staleMinutes):DEFAULT_STALE_MINUTES};
     this.mappings=buildMappingIndex(this.config);this.store=store;this.messages=new Map();this.qc=new Map();
     (store&&store.load?store.load():[]).forEach(event=>this.applyEvent(event));
   }
   applyEvent(event){if(event&&event.type==='message'&&event.record)this.messages.set(event.record.message.messageId,event.record);else if(event&&event.type==='qc-status'&&event.qc)this.qc.set(event.qc.qclabTestId,event.qc);}
   append(event){if(this.store&&this.store.append)this.store.append(event);this.applyEvent(event);}
   setQcStatus(input){const qc=normalizeQc(input),event={type:'qc-status',recordedAt:new Date().toISOString(),qc};this.append(event);return qc;}
+  /* Gửi cả loạt trong MỘT request. Trước đây app PUT tuần tự từng xét nghiệm, mỗi cái
+     timeout 5s — 50 xét nghiệm là tới 250s treo, và trong lúc treo mọi cập nhật QC mới
+     đều bị bỏ. Chuẩn hóa TOÀN BỘ trước rồi mới ghi: một phần tử hỏng làm hỏng cả lô thay
+     vì ghi được nửa chừng rồi mới ném lỗi, để app không phải đoán xem đã tới đâu. */
+  setQcStatusMany(list){
+    if(!Array.isArray(list))throw new LisError('QC_BATCH_INVALID','items phải là mảng.');
+    if(list.length>500)throw new LisError('QC_BATCH_TOO_LARGE','Tối đa 500 trạng thái mỗi lần.');
+    const normalized=list.map(normalizeQc),recordedAt=new Date().toISOString();
+    normalized.forEach(qc=>this.append({type:'qc-status',recordedAt,qc}));
+    return normalized;
+  }
   ingest(input,nowMs=Date.now()){
     const message=normalizeResult(input),hash=fingerprint(message),existing=this.messages.get(message.messageId);
     if(existing){if(existing.fingerprint!==hash)throw new LisError('MESSAGE_ID_CONFLICT','messageId đã tồn tại với nội dung khác.',409);return{...existing,duplicate:true};}
@@ -80,4 +98,4 @@ class LisBridge{
   status(){const counts={accepted:0,review:0,held:0};this.messages.forEach(row=>counts[row.gate.decision]++);return{messages:this.messages.size,qcStatuses:this.qc.size,mappings:this.mappings.size,counts};}
 }
 
-module.exports={LisBridge,LisError,normalizeResult,normalizeQc,buildMappingIndex,gateDecision,fingerprint};
+module.exports={LisBridge,LisError,normalizeResult,normalizeQc,buildMappingIndex,gateDecision,fingerprint,DEFAULT_STALE_MINUTES};
