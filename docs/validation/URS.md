@@ -17,7 +17,7 @@
 | URS-13 | Audit | Ghi loại thao tác, thời gian, tài khoản, vai trò và chuỗi hash kiểm tra sai lệch |
 | URS-14 | Phân quyền | Viewer chỉ đọc; technician vận hành; admin cấu hình và duyệt |
 | URS-15 | Lưu trữ cục bộ | IndexedDB phân vùng chịu được ghi gián đoạn và khôi phục slot trước |
-| URS-16 | Backup/restore | Backup JSON tới 64 MB nhập lại được sau validate/sanitize/invariant check |
+| URS-16 | Backup/restore | Gói backup JSON có SHA-256; nhập lại được sau validate/sanitize/invariant check. Ngưỡng khuyến nghị 128 MB chỉ cảnh báo, không được chặn xuất/nhập/reset |
 | URS-17 | Đồng bộ | Firebase yêu cầu UID có trong ACL đúng labCode; retry khi offline |
 | URS-18 | Hiệu năng | Release gate đạt ngân sách trong `benchmarks/performance-budget.json` |
 | URS-19 | Accessibility | Không tăng vi phạm so với ratchet; thao tác bàn phím có focus rõ |
@@ -26,7 +26,12 @@
 
 ## Ngoài phạm vi
 
-- Không phải LIS/HIS và không phát hành kết quả bệnh nhân.
+- Không phải LIS/HIS và không phát hành kết quả bệnh nhân. **`lis-gateway/` là
+  prototype nghiên cứu, KHÔNG thuộc sản phẩm đã validate**: nó không nằm trong
+  `build.files` nên không đi vào bộ cài, mặc định tắt ở phía app, và không có hàng
+  nào trong `TRACEABILITY.md`. Muốn dùng nó để quyết định phát hành kết quả bệnh
+  nhân thì phải mở rộng phạm vi trước — thêm URS riêng cho QC gate và hàng rủi ro
+  tương ứng trong `RISK-ASSESSMENT.md` — chứ không phải bật lên rồi dùng.
 - Không thay thế server-side identity hoặc chữ ký số chống chối bỏ.
 - Audit hash phía client là tamper-evident trong snapshot, không phải kho append-only.
 - Việc lựa chọn luật Westgard, TEa và tần suất QC vẫn phải theo SOP của đơn vị.
