@@ -21,6 +21,8 @@ const path = require('node:path');
 
 const PLACEHOLDER_ANALYZER = 'SUA-MA-MAY';
 const PLACEHOLDER_CODE = 'SUA-MA-XET-NGHIEM';
+const PLACEHOLDER_LEVEL = 'SUA-MA-MUC-';
+const PLACEHOLDER_LOT = 'SUA-MA-LO';
 const DEFAULT_ORIGINS = ['null', 'http://127.0.0.1:8080', 'http://localhost:8080'];
 
 /* Backup moi la goi {format:'qclab-backup', data:{...}}; backup cu la state tho. Nhan ca
@@ -42,6 +44,10 @@ function testRows(state) {
       ten: String(t.displayName || t.name || t.id),
       may: String(t.machine || t.instrumentId || ''),
       donVi: String(t.unit || ''),
+      /* Muc va so lo lay tu chinh cau hinh xet nghiem, nen khung sinh ra da dung phia
+         QC Lab; nguoi dung chi con dien ma phia may. */
+      mucs: (Array.isArray(t.levels) ? t.levels : []).map(l => Number(l && l.level)).filter(n => Number.isInteger(n) && n > 0),
+      los: [...new Set((Array.isArray(t.levels) ? t.levels : []).map(l => String((l && l.lot) || '')).filter(Boolean))],
     }))
     .sort((a, b) => a.ten.localeCompare(b.ten, 'vi'));
 }
@@ -51,12 +57,10 @@ function buildSkeleton(state) {
   return {
     _ghiChu: [
       `Sinh boi scripts/lis-config.js luc ${new Date().toISOString()}.`,
-      `Thay ${PLACEHOLDER_ANALYZER}/${PLACEHOLDER_CODE} bang ma that cua may xet nghiem.`,
+      `Thay ${PLACEHOLDER_ANALYZER}/${PLACEHOLDER_CODE}/${PLACEHOLDER_LEVEL}N bang ma that cua may.`,
+      'qclabTestId, level va lot da dien san theo cau hinh QC Lab — chi can dien phia may.',
       'Bo han nhung dong chua noi may. Doi chieu lai bang: npm run lis:config -- <backup> --check <config>',
-      'Danh sach nay gom moi xet nghiem dang bat; app chi dong bo nhung xet nghiem THUC SU van hanh',
-      '(co panel dang bat va nhom lo dang chay), nen so dong o day co the nhieu hon so app gui.',
     ],
-    staleMinutes: 90,
     allowedOrigins: DEFAULT_ORIGINS.slice(),
     mappings: rows.map(r => ({
       analyzerId: PLACEHOLDER_ANALYZER,
@@ -64,6 +68,10 @@ function buildSkeleton(state) {
       qclabTestId: r.qclabTestId,
       displayName: r.ten,
       expectedUnit: r.donVi,
+      levels: (r.mucs.length ? r.mucs : [1]).map(n => ({ qcLevel: PLACEHOLDER_LEVEL + n, level: n })),
+      /* Ma mau phai DUY NHAT tung dong: hai dong cung ma thi Map cua gateway de len nhau,
+         dong sau am tham thang, va nguoi dung khong thay minh mat mot lo. */
+      lots: r.los.map(lot => ({ qcLotCode: `${PLACEHOLDER_LOT}-${lot}`, lot })),
     })),
   };
 }
@@ -97,12 +105,30 @@ function checkConfig(state, config) {
     }
     const row = byId.get(id);
     if (!row) {
-      errors.push(`${at} tro toi qclabTestId "${id}" khong co trong backup — ket qua se roi vao held/UNMAPPED_TEST.`);
+      errors.push(`${at} tro toi qclabTestId "${id}" khong co trong backup — ket qua se nam mai o hang cho voi UNMAPPED_TEST.`);
       return;
     }
+    /* Muc QC la cho de sai nhat va hau qua nang nhat: doan nham mot muc la ghi diem vao
+       nham muc, hong ca Levey-Jennings lan Westgard cua ca hai muc. */
+    const levels = Array.isArray(m && m.levels) ? m.levels : [];
+    if (!levels.length) errors.push(`${at} (${row.ten}) chua khai bao levels — gateway se tu choi khoi dong.`);
+    levels.forEach((lv, j) => {
+      const from = String((lv && lv.qcLevel) || ''), to = Number(lv && lv.level);
+      if (from.startsWith(PLACEHOLDER_LEVEL)) { errors.push(`${at}.levels[${j}] con gia tri mau — chua dien ma muc QC cua may.`); return; }
+      if (row.mucs.length && !row.mucs.includes(to)) {
+        errors.push(`${at}.levels[${j}] tro toi muc ${to} nhung "${row.ten}" chi cau hinh muc ${row.mucs.join('/')}.`);
+      }
+    });
+    (Array.isArray(m && m.lots) ? m.lots : []).forEach((l, j) => {
+      const from = String((l && l.qcLotCode) || ''), to = String((l && l.lot) || '');
+      if (from.startsWith(PLACEHOLDER_LOT)) { errors.push(`${at}.lots[${j}] con gia tri mau — dien ma lo cua may, hoac xoa dong nay de lay nguyen ma lo may gui.`); return; }
+      if (row.los.length && to && !row.los.includes(to)) {
+        warnings.push(`${at}.lots[${j}] tro toi lo "${to}" khong co trong cau hinh hien tai cua "${row.ten}" (${row.los.join(', ') || 'chua co lo'}).`);
+      }
+    });
     const unit = String((m && m.expectedUnit) || '');
     if (unit && row && row.donVi && unit.toLowerCase() !== row.donVi.toLowerCase()) {
-      errors.push(`${at} expectedUnit "${unit}" khac don vi cua "${row.ten}" ("${row.donVi}") — moi ket qua se bi held/UNIT_MISMATCH.`);
+      errors.push(`${at} expectedUnit "${unit}" khac don vi cua "${row.ten}" ("${row.donVi}") — moi ket qua se bi hang cho voi UNIT_MISMATCH.`);
     }
   });
 
@@ -114,10 +140,6 @@ function checkConfig(state, config) {
   const origins = Array.isArray(config && config.allowedOrigins) ? config.allowedOrigins : [];
   if (!origins.length) warnings.push('allowedOrigins rong — trinh duyet se khong doc duoc phan hoi.');
 
-  const stale = Number(config && config.staleMinutes);
-  if (Number.isFinite(stale) && stale > 240) {
-    warnings.push(`staleMinutes ${stale} phut la dai: trang thai QC cu van duoc coi la con hieu luc suot khoang do.`);
-  }
   return { errors, warnings, tests: rows.length, mappings: mappings.length };
 }
 
@@ -180,4 +202,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { readState, testRows, buildSkeleton, checkConfig, PLACEHOLDER_ANALYZER, PLACEHOLDER_CODE };
+module.exports = { readState, testRows, buildSkeleton, checkConfig, PLACEHOLDER_ANALYZER, PLACEHOLDER_CODE, PLACEHOLDER_LEVEL, PLACEHOLDER_LOT };

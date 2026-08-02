@@ -52,9 +52,26 @@ function createLisServer(opts={}){
       if(req.method==='GET'&&url.pathname==='/health')return json(res,200,{ok:true,service:'qclab-lis-gateway'});
       if(!authorized(req,token))return json(res,401,{error:'UNAUTHORIZED',message:'Bearer token không hợp lệ.'});
       if(req.method==='GET'&&url.pathname==='/api/v1/status')return json(res,200,{ok:true,...bridge.status()});
-      if(req.method==='GET'&&url.pathname==='/api/v1/messages')return json(res,200,{items:bridge.listMessages(url.searchParams.get('limit'))});
-      if(req.method==='PUT'&&url.pathname==='/api/v1/qc-status'){requireJsonBody(req);const body=await readBody(req);return json(res,200,Array.isArray(body&&body.items)?{qc:bridge.setQcStatusMany(body.items)}:{qc:bridge.setQcStatus(body)});}
-      if(req.method==='POST'&&url.pathname==='/api/v1/messages'){requireJsonBody(req);const result=bridge.ingest(await readBody(req));return json(res,result.duplicate?200:201,result);}
+      /* MIDDLEWARE LIS DAY KET QUA QC VAO DAY. Nhan mot ban ghi hoac ca lo {items:[...]}.
+         Ca lo duoc chuan hoa het roi moi ghi: mot phan tu hong lam hong ca lo thay vi ghi
+         nua chung, de ben gui khong phai doan da toi dau ma retry. */
+      if(req.method==='POST'&&url.pathname==='/api/v1/qc-results'){
+        requireJsonBody(req);const body=await readBody(req);
+        if(Array.isArray(body&&body.items)){
+          if(body.items.length>500)throw new LisError('BATCH_TOO_LARGE','Toi da 500 ket qua moi lan.');
+          const items=body.items.map(x=>bridge.ingest(x));
+          return json(res,201,{items,nhan:items.filter(x=>!x.duplicate).length,trung:items.filter(x=>x.duplicate).length});
+        }
+        const result=bridge.ingest(body);return json(res,result.duplicate?200:201,result);
+      }
+      /* QC Lab keo ve. `resolvable=false` de xem rieng nhung ban ghi chua khop mapping. */
+      if(req.method==='GET'&&url.pathname==='/api/v1/qc-results'){
+        const q=url.searchParams,r=q.get('resolvable');
+        return json(res,200,{items:bridge.listResults({status:q.get('status')||'pending',limit:q.get('limit'),resolvable:r==null?null:r!=='false'})});
+      }
+      /* QC Lab bao da nhan vao du lieu noi kiem hay da bo. Khong xoa ban ghi: journal la
+         vet cho thay dieu gi da toi va ai quyet dinh gi voi no. */
+      if(req.method==='POST'&&url.pathname==='/api/v1/qc-results/decide'){requireJsonBody(req);return json(res,200,{record:bridge.decide(await readBody(req))});}
       return json(res,404,{error:'NOT_FOUND',message:'Endpoint không tồn tại.'});
     }catch(error){const status=error instanceof LisError?error.status:500;return json(res,status,{error:error.code||'INTERNAL_ERROR',message:status===500?'Lỗi LIS Gateway.':error.message});}
   });

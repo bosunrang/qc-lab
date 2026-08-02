@@ -12,21 +12,20 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { readState, testRows, buildSkeleton, checkConfig, PLACEHOLDER_ANALYZER, PLACEHOLDER_CODE } = require('../scripts/lis-config');
+const { readState, testRows, buildSkeleton, checkConfig, PLACEHOLDER_ANALYZER, PLACEHOLDER_CODE, PLACEHOLDER_LEVEL } = require('../scripts/lis-config');
 
 const state = {
   tests: [
-    { id: 'T-NA', name: 'Sodium (Na)', unit: 'mmol/L', machine: 'EasyLyte' },
-    { id: 'T-GLU', displayName: 'Glucose', name: 'GLU', unit: 'mmol/L', machine: 'AU480' },
-    { id: 'T-OFF', name: 'Da tat', unit: 'g/L', active: false },
+    { id: 'T-NA', name: 'Sodium (Na)', unit: 'mmol/L', machine: 'EasyLyte', levels: [{ level: 1, lot: '1101' }, { level: 2, lot: '1102' }] },
+    { id: 'T-GLU', displayName: 'Glucose', name: 'GLU', unit: 'mmol/L', machine: 'AU480', levels: [{ level: 1, lot: 'G1' }] },
+    { id: 'T-OFF', name: 'Da tat', unit: 'g/L', active: false, levels: [{ level: 1 }] },
   ],
 };
 const good = () => ({
-  staleMinutes: 90,
   allowedOrigins: ['http://127.0.0.1:8080'],
   mappings: [
-    { analyzerId: 'EASYLYTE-01', testCode: 'NA', qclabTestId: 'T-NA', expectedUnit: 'mmol/L' },
-    { analyzerId: 'AU480-01', testCode: 'GLU', qclabTestId: 'T-GLU', expectedUnit: 'mmol/L' },
+    { analyzerId: 'EASYLYTE-01', testCode: 'NA', qclabTestId: 'T-NA', expectedUnit: 'mmol/L', levels: [{ qcLevel: 'L1', level: 1 }, { qcLevel: 'L2', level: 2 }] },
+    { analyzerId: 'AU480-01', testCode: 'GLU', qclabTestId: 'T-GLU', expectedUnit: 'mmol/L', levels: [{ qcLevel: '1', level: 1 }] },
   ],
 });
 const only = (config, kind) => checkConfig(state, config)[kind];
@@ -53,7 +52,14 @@ const only = (config, kind) => checkConfig(state, config)[kind];
 
   const skeleton = buildSkeleton(state);
   assert.equal(skeleton.mappings.length, 2);
-  assert.equal(skeleton.staleMinutes, 90);
+  /* Khung dien san level/lot theo cau hinh QC Lab — nguoi dung chi con dien phia may.
+     Doan sai mot muc QC la ghi diem vao nham muc, hong ca hai muc. */
+  assert.deepEqual(skeleton.mappings.find(m => m.qclabTestId === 'T-NA').levels.map(l => l.level), [1, 2], 'level lay tu cau hinh xet nghiem');
+  assert.deepEqual(skeleton.mappings.find(m => m.qclabTestId === 'T-NA').lots.map(l => l.lot), ['1101', '1102'], 'so lo lay tu cau hinh xet nghiem');
+  /* Ma mau cua lots phai DUY NHAT tung dong: trung ma thi Map cua gateway de len nhau va
+     nguoi dung mat mot lo ma khong thay. */
+  const lotCodes = skeleton.mappings.find(m => m.qclabTestId === 'T-NA').lots.map(l => l.qcLotCode);
+  assert.equal(new Set(lotCodes).size, lotCodes.length, 'ma mau cua tung lo phai khac nhau');
   /* Khung sinh ra PHAI khong dat --check: neu no dat luon thi nguoi dung chay gateway voi
      ma may gia va moi ket qua bi giu lai ma khong hieu tai sao. */
   const errs = only(skeleton, 'errors');
@@ -97,8 +103,6 @@ const only = (config, kind) => checkConfig(state, config)[kind];
 
 /* --- Canh bao ve cau hinh nguy hiem nhung hop le --- */
 {
-  const longStale = good(); longStale.staleMinutes = 720;
-  assert.match(only(longStale, 'warnings')[0], /720/, 'cua so het han qua dai phai duoc nhac');
   const noOrigin = good(); noOrigin.allowedOrigins = [];
   assert.match(only(noOrigin, 'warnings')[0], /allowedOrigins/);
   assert.match(only({ mappings: [] }, 'errors')[0], /khong co mapping nao/);

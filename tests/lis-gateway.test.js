@@ -1,91 +1,173 @@
 'use strict';
+/**
+ * Tests cho LIS Gateway — chieu NHAN ket qua QC tu middleware LIS.
+ *
+ * Chieu du lieu: may -> middleware (phan mem trung gian san co) -> gateway -> QC Lab.
+ * Gateway KHONG quyet dinh gi ve ket qua benh nhan; ban dau no tung lam cong chan
+ * accepted/review/held nhung do la thu phai xin hang LIS sua quy trinh phat hanh, gan nhu
+ * khong kha thi. Nhan them mot loai ban ghi thi de duoc chap nhan hon nhieu.
+ *
+ * Hai tinh chat duoc chot o day:
+ *   1. Ket qua nhan vao KHONG tu thanh diem QC — no o `pending` cho KTV duyet.
+ *   2. Khong doan bua: thieu mapping / sai muc / lech don vi deu nam lai hang cho kem ly
+ *      do doc duoc, thay vi ghi vao nham muc roi hong ca Levey-Jennings lan Westgard.
+ */
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const http = require('node:http');
+const { LisBridge, LisError, resolveQcResult, buildMappingIndex } = require('../lis-gateway/core');
+const { JournalStore, MemoryStore } = require('../lis-gateway/store');
+const { createLisServer } = require('../lis-gateway/server');
 
-const assert=require('node:assert/strict');
-const fs=require('node:fs');
-const os=require('node:os');
-const path=require('node:path');
-const http=require('node:http');
-const {LisBridge,LisError}=require('../lis-gateway/core');
-const {JournalStore,MemoryStore}=require('../lis-gateway/store');
-const {createLisServer}=require('../lis-gateway/server');
+const NOW = Date.parse('2026-08-02T07:00:00.000Z');
+const config = {
+  mappings: [{
+    analyzerId: 'AU480-01', testCode: 'GLU', qclabTestId: 'T-GLU', expectedUnit: 'mmol/L',
+    levels: [{ qcLevel: '1', level: 1 }, { qcLevel: '2', level: 2 }],
+    lots: [{ qcLotCode: 'LOT-A', lot: 'L1' }],
+  }],
+};
+const qc = (id, over = {}) => ({ messageId: id, analyzerId: 'AU480-01', testCode: 'GLU', qcLevel: '1', qcLotCode: 'LOT-A', value: 5.6, unit: 'mmol/L', measuredAt: '2026-08-02T06:55:00Z', runId: 'r1', ...over });
 
-const NOW=Date.parse('2026-08-01T10:00:00.000Z');
-const config={staleMinutes:60,mappings:[{analyzerId:'SIM-01',testCode:'GLU',qclabTestId:'T1',displayName:'Glucose',expectedUnit:'mmol/L'}]};
-const message=(id,overrides={})=>({messageId:id,analyzerId:'SIM-01',testCode:'GLU',measuredAt:'2026-08-01T09:59:00Z',value:5.6,unit:'mmol/L',specimenRef:'DEMO-01',...overrides});
+function request(server, method, url, body, headers = {}, rawOverride = null) {
+  return new Promise((resolve, reject) => {
+    const a = server.address(), raw = rawOverride != null ? rawOverride : (body == null ? '' : JSON.stringify(body));
+    const req = http.request({ host: '127.0.0.1', port: a.port, path: url, method, headers: { ...(raw && rawOverride == null ? { 'content-type': 'application/json', 'content-length': Buffer.byteLength(raw) } : {}), ...headers } }, res => {
+      const c = []; res.on('data', d => c.push(d));
+      res.on('end', () => { const t = Buffer.concat(c).toString('utf8'); try { resolve({ status: res.statusCode, headers: res.headers, body: t ? JSON.parse(t) : null }); } catch (e) { reject(e); } });
+    });
+    req.on('error', reject); if (raw) req.write(raw); req.end();
+  });
+}
 
-function request(server,method,url,body,headers={},rawOverride=null){return new Promise((resolve,reject)=>{const address=server.address(),raw=rawOverride!=null?rawOverride:(body==null?'':JSON.stringify(body)),req=http.request({host:'127.0.0.1',port:address.port,path:url,method,headers:{...(raw&&rawOverride==null?{'content-type':'application/json','content-length':Buffer.byteLength(raw)}:{}),...headers}},res=>{const chunks=[];res.on('data',c=>chunks.push(c));res.on('end',()=>{const text=Buffer.concat(chunks).toString('utf8');try{resolve({status:res.statusCode,headers:res.headers,body:text?JSON.parse(text):null});}catch(error){reject(error);}});});req.on('error',reject);if(raw)req.write(raw);req.end();});}
+(async () => {
+  /* --- Mapping: muc QC la bat buoc, va trung khoa thi tu choi khoi dong --- */
+  assert.throws(() => buildMappingIndex({ mappings: [{ analyzerId: 'A', testCode: 'B', qclabTestId: 'T' }] }), /levels/i, 'khong khai levels thi khong duoc chay: doan muc QC la ghi diem vao nham muc');
+  assert.throws(() => buildMappingIndex({ mappings: [config.mappings[0], config.mappings[0]] }), /trung/i);
+  assert.throws(() => buildMappingIndex({ mappings: [{ ...config.mappings[0], levels: [{ qcLevel: '1', level: 1 }, { qcLevel: '1', level: 2 }] }] }), /trung qcLevel/i);
 
-(async()=>{
-  const memory=new MemoryStore(),bridge=new LisBridge(config,memory);
-  bridge.setQcStatus({qclabTestId:'T1',status:'ok',asOf:'2026-08-01T09:30:00Z',reason:'Westgard đạt'});
-  const accepted=bridge.ingest(message('M1'),NOW);
-  assert.equal(accepted.gate.decision,'accepted');assert.equal(accepted.gate.code,'QC_ACCEPTED');
-  const duplicate=bridge.ingest(message('M1'),NOW);assert.equal(duplicate.duplicate,true);assert.equal(memory.events.filter(x=>x.type==='message').length,1,'message trùng không được ghi journal lần hai');
-  assert.throws(()=>bridge.ingest(message('M1',{value:9.9}),NOW),e=>e instanceof LisError&&e.code==='MESSAGE_ID_CONFLICT');
+  /* --- Nhan vao: pending, khong tu thanh diem QC --- */
+  const memory = new MemoryStore(), bridge = new LisBridge(config, memory);
+  const first = bridge.ingest(qc('M1'), NOW);
+  assert.equal(first.status, 'pending', 'ket qua nhan vao phai cho KTV duyet, khong tu ghi vao du lieu noi kiem');
+  assert.equal(first.resolved.ok, true);
+  assert.equal(first.resolved.qclabTestId, 'T-GLU');
+  assert.equal(first.resolved.level, 1);
+  assert.equal(first.resolved.lot, 'L1', 'qcLotCode phai duoc doi sang so lo cua QC Lab');
 
-  bridge.setQcStatus({qclabTestId:'T1',status:'warn',asOf:'2026-08-01T09:45:00Z'});
-  assert.equal(bridge.ingest(message('M2'),NOW).gate.decision,'review');
-  bridge.setQcStatus({qclabTestId:'T1',status:'rej',asOf:'2026-08-01T09:50:00Z',reason:'Vi phạm 1-3s'});
-  assert.equal(bridge.ingest(message('M3'),NOW).gate.code,'QC_REJECTED');
-  assert.equal(bridge.ingest(message('M4',{testCode:'UNKNOWN'}),NOW).gate.code,'UNMAPPED_TEST');
-  assert.equal(bridge.ingest(message('M5',{unit:'mg/dL'}),NOW).gate.code,'UNIT_MISMATCH');
-  assert.throws(()=>bridge.ingest(message('M6',{patientName:'Nguyễn Văn A'}),NOW),e=>e.code==='PHI_NOT_ALLOWED');
+  /* Khong khai lots thi lay nguyen ma lo may gui — nhieu noi dung chung mot ma. */
+  const passthrough = new LisBridge({ mappings: [{ ...config.mappings[0], lots: [] }] }, new MemoryStore());
+  assert.equal(passthrough.ingest(qc('P1'), NOW).resolved.lot, 'LOT-A');
 
-  const stale=new LisBridge(config,new MemoryStore());stale.setQcStatus({qclabTestId:'T1',status:'ok',asOf:'2026-08-01T08:00:00Z'});
-  assert.equal(stale.ingest(message('STALE'),NOW).gate.code,'QC_STALE');
-  const unknown=new LisBridge(config,new MemoryStore());unknown.setQcStatus({qclabTestId:'T1',status:'unknown',asOf:'2026-08-01T09:50:00Z',reason:'Chưa có QC hôm nay'});
-  assert.equal(unknown.ingest(message('UNKNOWN'),NOW).gate.code,'QC_UNKNOWN');
+  /* --- Chong trung: retry mang la binh thuong, cung id khac noi dung thi khong --- */
+  assert.equal(bridge.ingest(qc('M1'), NOW).duplicate, true);
+  assert.equal(memory.events.filter(e => e.type === 'qc-result').length, 1, 'ban ghi trung khong duoc vao journal lan hai');
+  assert.throws(() => bridge.ingest(qc('M1', { value: 9.9 }), NOW), e => e instanceof LisError && e.code === 'MESSAGE_ID_CONFLICT');
 
-  const temp=fs.mkdtempSync(path.join(os.tmpdir(),'qclab-lis-'));
-  try{
-    const file=path.join(temp,'events.ndjson'),disk=new JournalStore(file),first=new LisBridge(config,disk);
-    first.setQcStatus({qclabTestId:'T1',status:'ok',asOf:'2026-08-01T09:45:00Z'});first.ingest(message('PERSIST'),NOW);
-    const restarted=new LisBridge(config,new JournalStore(file));assert.equal(restarted.status().messages,1);assert.equal(restarted.ingest(message('PERSIST'),NOW).duplicate,true,'restart vẫn phải chống message trùng');
-    fs.appendFileSync(file,'{"type":');const recoveredStore=new JournalStore(file),recovered=new LisBridge(config,recoveredStore);assert.equal(recovered.status().messages,1);assert.equal(recoveredStore.warnings.length,1,'dòng cuối bị cắt do mất điện phải được cách ly');
-    recovered.setQcStatus({qclabTestId:'T1',status:'warn',asOf:'2026-08-01T09:50:00Z'});const afterRepair=new LisBridge(config,new JournalStore(file));assert.equal(afterRepair.qc.get('T1').status,'warn','sau khi sửa tail, journal phải tiếp tục ghi và đọc được');
-  }finally{fs.rmSync(temp,{recursive:true,force:true});}
+  /* --- Khong doan bua khi cau hinh chua khop --- */
+  assert.equal(bridge.ingest(qc('M2', { testCode: 'LA' }), NOW).resolved.code, 'UNMAPPED_TEST');
+  assert.equal(bridge.ingest(qc('M3', { qcLevel: '9' }), NOW).resolved.code, 'UNMAPPED_LEVEL');
+  assert.equal(bridge.ingest(qc('M4', { unit: 'mg/dL' }), NOW).resolved.code, 'UNIT_MISMATCH');
+  assert.equal(bridge.listResults({ resolvable: false }).length, 3, 'ban ghi chua khop van nam lai hang cho de con sua cau hinh roi nhan lai');
+  assert.equal(bridge.listResults({ resolvable: true }).length, 1);
 
-  /* Cửa ngõ phải ĐÓNG theo mặc định: không có token thì không dựng nổi server, chứ không
-     phải dựng lên rồi cho qua hết. Bản đầu có `if(!token)return true` trong authorized()
-     và `npm run lis:gateway` không đặt token — tức mặc định là mở toang. */
-  assert.throws(()=>createLisServer({bridge:new LisBridge(config,new MemoryStore())}),/token/i,'không có token thì phải từ chối khởi tạo, không được chạy ở chế độ mở');
+  /* --- Tu choi du lieu benh nhan, ke ca ma mau --- */
+  ['patientId', 'patientName', 'specimenRef'].forEach(field => {
+    assert.throws(() => bridge.ingest(qc('PHI-' + field, { [field]: 'X' }), NOW), e => e.code === 'PHI_NOT_ALLOWED', `${field} phai bi tu choi`);
+  });
 
-  const TOKEN='t0ken-'+'a'.repeat(20),auth={authorization:`Bearer ${TOKEN}`};
-  const apiBridge=new LisBridge(config,new MemoryStore()),server=createLisServer({bridge:apiBridge,token:TOKEN});await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
-  try{
-    /* /health không cần token (liveness) nhưng vì thế KHÔNG được kèm số liệu vận hành. */
-    const health=await request(server,'GET','/health');assert.equal(health.status,200);assert.equal(health.body.service,'qclab-lis-gateway');
-    assert.equal('messages' in health.body,false,'/health không xác thực thì không được lộ số message/mapping');
-    const stats=await request(server,'GET','/api/v1/status',null,auth);assert.equal(stats.status,200);assert.equal(typeof stats.body.messages,'number');
-    assert.equal((await request(server,'GET','/api/v1/status')).status,401,'số liệu vận hành phải sau token');
+  /* --- Gia tri QC bat buoc la so --- */
+  assert.throws(() => bridge.ingest(qc('S1', { value: 'duong tinh' }), NOW), e => e.code === 'VALUE_INVALID', 'diem noi kiem phai tinh duoc z-score');
+  assert.throws(() => bridge.ingest(qc('S2', { value: null }), NOW), e => e.code === 'VALUE_INVALID');
+  assert.throws(() => bridge.ingest(qc('S3', { qcLevel: '' }), NOW), e => e.code === 'QC_LEVEL_REQUIRED');
 
-    assert.equal((await request(server,'GET','/api/v1/messages')).status,401,'thiếu token phải bị từ chối');
-    assert.equal((await request(server,'GET','/api/v1/messages',null,{authorization:'Bearer sai'})).status,401,'token sai phải bị từ chối');
+  /* --- Quyet dinh: mot lan, va khong xoa ban ghi --- */
+  const decided = bridge.decide({ messageId: 'M1', status: 'imported', by: 'KTV A' });
+  assert.equal(decided.status, 'imported');
+  assert.equal(decided.decidedBy, 'KTV A');
+  assert.throws(() => bridge.decide({ messageId: 'M1', status: 'rejected' }), e => e.code === 'ALREADY_DECIDED', 'da quyet dinh roi thi khong duoc lat lai am tham');
+  assert.throws(() => bridge.decide({ messageId: 'KHONG-CO', status: 'imported' }), e => e.code === 'RESULT_NOT_FOUND');
+  assert.throws(() => bridge.decide({ messageId: 'M2', status: 'xoa' }), e => e.code === 'STATUS_INVALID');
+  /* 4 = M1..M4. Cac ban ghi PHI va gia tri hong deu NEM LOI nen khong bao gio vao journal
+     — do la chu y: journal chi chua thu da qua chuan hoa. */
+  assert.equal(bridge.status().results, 4, 'ban ghi da quyet dinh van con trong journal lam vet');
+  assert.equal(bridge.status().counts.imported, 1);
 
-    const preflight=await request(server,'OPTIONS','/api/v1/qc-status',null,{origin:'http://localhost:8080'});assert.equal(preflight.status,204);assert.equal(preflight.headers['access-control-allow-origin'],'http://localhost:8080');
-    const denied=await request(server,'OPTIONS','/api/v1/qc-status',null,{origin:'https://evil.example'});assert.equal(denied.status,403);
+  /* --- Khoi dong lai: journal dung lai duoc ca ban ghi lan quyet dinh --- */
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'qclab-lis-'));
+  try {
+    const file = path.join(temp, 'events.ndjson');
+    const disk = new LisBridge(config, new JournalStore(file));
+    disk.ingest(qc('PERSIST'), NOW);
+    disk.decide({ messageId: 'PERSIST', status: 'imported', by: 'KTV B' });
+    const restarted = new LisBridge(config, new JournalStore(file));
+    assert.equal(restarted.status().counts.imported, 1, 'quyet dinh phai song sot qua khoi dong lai');
+    assert.equal(restarted.ingest(qc('PERSIST'), NOW).duplicate, true, 'chong trung phai song sot qua khoi dong lai');
 
-    /* CSRF: `POST` kèm content-type text/plain là "simple request" nên trình duyệt KHÔNG
-       preflight — bản đầu JSON.parse bất kể content-type nên một trang bất kỳ ghi thẳng
-       vào journal (đo được 201 từ https://evil.example). Đòi application/json biến nó
-       thành non-simple, buộc preflight, và preflight thì đã bị allowlist chặn ở trên. */
-    const raw=JSON.stringify(message('CSRF',{measuredAt:new Date().toISOString()}));
-    const csrf=await request(server,'POST','/api/v1/messages',null,{...auth,'content-type':'text/plain','content-length':Buffer.byteLength(raw)},raw);
-    assert.equal(csrf.status,415,'content-type không phải JSON phải bị từ chối');
-    assert.equal(apiBridge.status().messages,0,'request CSRF không được để lại dấu vết nào trong journal');
+    fs.appendFileSync(file, '{"type":');
+    const repairStore = new JournalStore(file), repaired = new LisBridge(config, repairStore);
+    assert.equal(repaired.status().results, 1);
+    assert.equal(repairStore.warnings.length, 1, 'dong cuoi bi cat do mat dien phai duoc cach ly');
+  } finally { fs.rmSync(temp, { recursive: true, force: true }); }
 
-    const qc=await request(server,'PUT','/api/v1/qc-status',{qclabTestId:'T1',status:'ok',asOf:new Date().toISOString()},auth);assert.equal(qc.status,200);
-    /* Cả lô trong MỘT request: bản đầu PUT tuần tự từng xét nghiệm, 50 xét nghiệm × 5s
-       timeout là tới 250s treo, và mọi cập nhật QC phát sinh trong lúc đó bị bỏ. */
-    const batch=await request(server,'PUT','/api/v1/qc-status',{items:[{qclabTestId:'T1',status:'warn',asOf:new Date().toISOString()},{qclabTestId:'T2',status:'ok',asOf:new Date().toISOString()}]},auth);
-    assert.equal(batch.status,200);assert.equal(batch.body.qc.length,2);
-    assert.equal(apiBridge.qc.get('T1').status,'warn','lô phải ghi đè trạng thái cũ');
-    const badBatch=await request(server,'PUT','/api/v1/qc-status',{items:[{qclabTestId:'T3',status:'ok',asOf:new Date().toISOString()},{qclabTestId:'',status:'ok'}]},auth);
-    assert.equal(badBatch.status,400);assert.equal(apiBridge.qc.has('T3'),false,'một phần tử hỏng thì cả lô bị từ chối, không ghi nửa chừng');
+  /* --- HTTP --- */
+  assert.throws(() => createLisServer({ bridge: new LisBridge(config, new MemoryStore()) }), /token/i, 'khong co token thi phai tu choi khoi tao, khong duoc chay o che do mo');
 
-    const result=await request(server,'POST','/api/v1/messages',message('HTTP',{measuredAt:new Date().toISOString()}),auth);assert.equal(result.status,201);
-    assert.equal(result.body.gate.decision,'review','T1 đang warn nên kết quả phải cần duyệt tay');
-    const inbox=await request(server,'GET','/api/v1/messages',null,auth);assert.equal(inbox.body.items.length,1);
-  }finally{await new Promise(resolve=>server.close(resolve));}
-  console.log('LIS Gateway prototype tests passed');
-})().catch(error=>{console.error(error);process.exitCode=1;});
+  const TOKEN = 'tok-' + 'a'.repeat(28), auth = { authorization: `Bearer ${TOKEN}` };
+  const apiBridge = new LisBridge(config, new MemoryStore());
+  const server = createLisServer({ bridge: apiBridge, token: TOKEN });
+  await new Promise(r => server.listen(0, '127.0.0.1', r));
+  try {
+    const health = await request(server, 'GET', '/health');
+    assert.equal(health.status, 200);
+    assert.equal('results' in health.body, false, '/health khong xac thuc thi khong duoc lo so lieu van hanh');
+    assert.equal((await request(server, 'GET', '/api/v1/qc-results')).status, 401, 'thieu token phai bi tu choi');
+    assert.equal((await request(server, 'GET', '/api/v1/status', null, { authorization: 'Bearer sai' })).status, 401);
+
+    assert.equal((await request(server, 'OPTIONS', '/api/v1/qc-results', null, { origin: 'https://evil.example' })).status, 403);
+    assert.equal((await request(server, 'OPTIONS', '/api/v1/qc-results', null, { origin: 'http://localhost:8080' })).status, 204);
+
+    /* CSRF: POST kem text/plain la "simple request" nen trinh duyet KHONG preflight. Doi
+       application/json bien no thanh non-simple, buoc preflight, ma preflight thi da bi
+       allowlist chan o tren. */
+    const raw = JSON.stringify(qc('CSRF'));
+    const csrf = await request(server, 'POST', '/api/v1/qc-results', null, { ...auth, 'content-type': 'text/plain', 'content-length': Buffer.byteLength(raw), origin: 'https://evil.example' }, raw);
+    assert.equal(csrf.status, 415);
+    assert.equal(apiBridge.status().results, 0, 'request CSRF khong duoc de lai dau vet nao');
+
+    const one = await request(server, 'POST', '/api/v1/qc-results', qc('H1'), auth);
+    assert.equal(one.status, 201);
+    assert.equal(one.body.status, 'pending');
+
+    const batch = await request(server, 'POST', '/api/v1/qc-results', { items: [qc('H2', { qcLevel: '2' }), qc('H3')] }, auth);
+    assert.equal(batch.status, 201);
+    assert.equal(batch.body.nhan, 2);
+    const again = await request(server, 'POST', '/api/v1/qc-results', { items: [qc('H2', { qcLevel: '2' })] }, auth);
+    assert.equal(again.body.trung, 1, 'middleware gui lai ca lo la binh thuong — phai dem rieng so trung');
+
+    const pending = await request(server, 'GET', '/api/v1/qc-results?status=pending', null, auth);
+    assert.equal(pending.body.items.length, 3);
+    assert.deepEqual(pending.body.items.map(x => x.message.messageId), ['H1', 'H2', 'H3'], 'hang cho xep theo thu tu nhan de KTV duyet tuan tu');
+
+    const decide = await request(server, 'POST', '/api/v1/qc-results/decide', { messageId: 'H1', status: 'imported', by: 'KTV A' }, auth);
+    assert.equal(decide.status, 200);
+    assert.equal(decide.body.record.status, 'imported');
+    assert.equal((await request(server, 'GET', '/api/v1/qc-results?status=pending', null, auth)).body.items.length, 2, 'da nhan roi thi khong con trong hang cho');
+    assert.equal((await request(server, 'POST', '/api/v1/qc-results/decide', { messageId: 'H1', status: 'rejected' }, auth)).status, 409);
+
+    const stats = await request(server, 'GET', '/api/v1/status', null, auth);
+    assert.equal(stats.body.counts.pending, 2);
+    assert.equal(stats.body.counts.imported, 1);
+  } finally { await new Promise(r => server.close(r)); }
+
+  /* --- resolveQcResult thuan: goi truc tiep khong can bridge --- */
+  /* Lay qua values() chu khong go tay khoa: dinh dang khoa la chi tiet noi bo cua
+     buildMappingIndex(), test khong nen chot vao no. */
+  const mapping = [...buildMappingIndex(config).values()][0];
+  assert.equal(resolveQcResult({ analyzerId: 'AU480-01', testCode: 'GLU', qcLevel: '2', qcLotCode: '', unit: '' }, mapping).level, 2);
+  assert.equal(resolveQcResult({ qcLevel: '1' }, null).code, 'UNMAPPED_TEST');
+
+  console.log('LIS Gateway (nhan ket qua QC) tests passed');
+})().catch(error => { console.error(error); process.exitCode = 1; });

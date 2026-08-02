@@ -1,5 +1,11 @@
 {
-  "staleMinutes": 90,
+  "_ghiChu": [
+    "Mapping tu ma cua may/middleware sang dinh danh trong QC Lab.",
+    "Sinh khung tu du lieu that: npm run lis:config -- <backup.json> -o <config.json>",
+    "Doi chieu truoc khi chay that: npm run lis:config -- <backup.json> --check <config.json>",
+    "levels BAT BUOC vi moi hang goi muc QC mot kieu (1/2/3, L/N/H, NORMAL/ABNORMAL...).",
+    "lots khong bat buoc: khong khai thi lay nguyen qcLotCode lam so lo."
+  ],
   "allowedOrigins": [
     "null",
     "http://127.0.0.1:8080",
@@ -7,11 +13,18 @@
   ],
   "mappings": [
     {
-      "analyzerId": "SIM-01",
+      "analyzerId": "AU480-01",
       "testCode": "GLU",
-      "qclabTestId": "T1",
+      "qclabTestId": "T-GLU",
       "displayName": "Glucose",
-      "expectedUnit": "mmol/L"
+      "expectedUnit": "mmol/L",
+      "levels": [
+        { "qcLevel": "1", "level": 1 },
+        { "qcLevel": "2", "level": 2 }
+      ],
+      "lots": [
+        { "qcLotCode": "LOT-2026-A", "lot": "L1" }
+      ]
     }
   ]
 }
