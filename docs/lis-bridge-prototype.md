@@ -91,7 +91,11 @@ và trạng thái QC sau khi tiến trình khởi động lại. Dòng cuối ch
 - Copy `config.example.json` ra ngoài repo rồi đặt đường dẫn bằng
   `QCLAB_LIS_CONFIG`.
 - Đổi thư mục dữ liệu bằng `QCLAB_LIS_DATA`.
-- Đổi cổng bằng `QCLAB_LIS_PORT`.
+- `QCLAB_LIS_PORT` đổi cổng, **nhưng chỉ dùng được cho kiểm thử bằng curl/PowerShell**.
+  App KHÔNG kết nối được sang cổng khác 8787: CSP `connect-src` trong `index.html` chỉ
+  mở `http://127.0.0.1:8787` và `http://localhost:8787`, và `lisNormalizeGatewayUrl()`
+  cũng chốt đúng hai origin đó. Đổi cổng mà quên hai chỗ này thì fetch bị chặn ở tầng
+  CSP — app chỉ hiện "Lỗi kết nối" chứ không nói vì sao. Muốn đổi thật thì sửa cả ba.
 - `QCLAB_LIS_TOKEN` ghi đè token tự sinh. Không có chế độ chạy thiếu token.
 - Token tự sinh nằm ở `<data>/token.txt`; xóa file này để cấp lại token mới.
 
