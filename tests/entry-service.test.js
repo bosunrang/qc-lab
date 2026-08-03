@@ -19,7 +19,13 @@ const plain = v => JSON.parse(JSON.stringify(v));
   assert.match(routeSource, /metric\('Mean thực',st\?fmtTestValue\(t,st\.m\)/, 'Mean thực phải dùng số thập phân của xét nghiệm');
   assert.match(routeSource, /metric\('SD thực',st\?fmtTestStat\(t,st\.sd\)/, 'SD thực phải dùng số thập phân thống kê của xét nghiệm');
   assert.match(routeSource, /metric\('Mean mục tiêu',fmtTestValue\(t,chartMean\)/, 'Mean mục tiêu phải dùng số thập phân của xét nghiệm');
-  assert.match(routeSource, /metric\('SD mục tiêu',fmtTestValue\(t,chartSd\)/, 'SD mục tiêu phải dùng số thập phân của xét nghiệm');
+  assert.match(routeSource, /targetCfg=prevView\|\|entryColumnCfg\(t,x\.level,x\.lot\)/, 'Mean/SD mục tiêu phải đọc cấu hình chung đang áp dụng cho đúng mức và lô');
+  assert.match(routeSource, /metric\('SD mục tiêu',fmtTestStat\(t,chartSd\)/, 'SD mục tiêu phải giữ độ chính xác thống kê, không được làm tròn thành 0 theo số lẻ của kết quả');
+  assert.match(routeSource, /function treeToggle\(k\).*entryFilter\(entryQ\);\}/, 'mở nhóm trong cây phải cập nhật tại chỗ để giữ nguyên vị trí cuộn');
+  assert.doesNotMatch(routeSource, /function treeToggle\(k\)[^\n]*rerender\(/, 'mở nhóm trong cây không được vẽ lại toàn trang');
+  assert.match(routeSource, /function entryPick\(tid,level\).*entryRenderKeepScroll\(\);\}/, 'chọn xét nghiệm chỉ được vẽ lại nội dung bên phải để cây không nhảy lên đầu');
+  assert.match(routeSource, /function toggleEntryTree\(\).*classList\.toggle\('tree-collapsed'/, 'ẩn/hiện danh mục nội kiểm phải cập nhật tại chỗ để giữ vị trí cuộn và nhóm đang mở');
+  assert.match(routeSource, /qclab_entry_tree_collapsed/, 'tùy chọn ẩn danh mục nội kiểm phải được ghi nhớ riêng trên máy');
   assert.match(routeSource, /<details class="panel entry-secondary-panel qc-points-panel"/, 'bảng điểm tra cứu phải thu gọn mặc định');
   assert.doesNotMatch(routeSource, /metric\('LOT \/ Hạn dùng'/, 'dải thông số biểu đồ không lặp lại lô và hạn dùng');
   assert.match(routeSource, /class="lj-point-count">\$\{chartPts\.length\} điểm/, 'số điểm biểu đồ phải nằm cạnh mức và lô');
@@ -30,7 +36,9 @@ const plain = v => JSON.parse(JSON.stringify(v));
   assert.match(routeSource, /class="qc-level-head" tabindex="0" data-qc-tooltip=/, 'tiêu đề mức phải có tooltip Mean\/SD dùng được bằng chuột và bàn phím');
   assert.match(routeSource, /±2SD \$\{limits\}/, 'tooltip tiêu đề mức phải có khoảng ±2SD');
   assert.match(entryActionsSource, /id="cfgAssayDecimals"/, 'form xét nghiệm phải có ô chọn số thập phân');
-  assert.match(entryActionsSource, /decimalPlaces=decimalRaw===''\?null:Number\(decimalRaw\)/, 'Tự động phải được lưu bằng null, lựa chọn thủ công phải lưu bằng số');
+  assert.match(entryActionsSource, /\[0,1,2,3,4,5,6\]/, 'form phải cho chọn đầy đủ số thập phân từ 0 đến 6');
+  assert.match(entryActionsSource, /decimalPlaces=Number\(decimalRaw\)/, 'lựa chọn số thập phân phải được lưu tường minh bằng số');
+  assert.match(entryActionsSource, /savedTeaSource=existing&&\['lab','eflm','clia','ricos'\]\.includes\(existing\.teaSource\)/, 'sửa cấu hình xét nghiệm không được âm thầm đổi nguồn TEa đang chọn ở Sigma');
   assert.match(rangeSource, /fmtTestValue\(r\.t,r\.l\.mean\)/, 'hộp dải kiểm soát phải dùng số thập phân của xét nghiệm');
   assert.match(rangeSource, /fmtTestValue\(r\.t,r\.l\.mean-2\*r\.l\.sd\)/, 'giới hạn kiểm soát phải dùng số thập phân của xét nghiệm');
 }
@@ -208,22 +216,22 @@ const plain = v => JSON.parse(JSON.stringify(v));
   assert.equal(ctx.fmtPointValue(ph.point),'7.405');
   assert.equal(ctx.fmtPointValue({val:7.405}),'7.405','điểm cũ chưa có metadata vẫn suy ra đủ chữ số');
   assert.equal(ctx.fmtPointValue({val:7.4,valueDecimals:3}),'7.400','giữ cả số 0 tận cùng đã nhập');
-  assert.equal(ctx.fmtPointValue({val:450},{decimalPlaces:1}),'450.0','1 trùng với mặc định nhưng vẫn phải cho ra cùng kết quả');
+  assert.equal(ctx.fmtPointValue({val:450},{decimalPlaces:1}),'450.0','vẫn phải cho phép chọn tay 1 chữ số');
   /* decimalPlaces=0 là LỰA CHỌN TAY hợp lệ (ví dụ đếm tế bào WBC/RBC), phải được tôn
-     trọng nguyên vẹn — không bị ép lên mặc định 1. Đây là chỗ dễ hỏng nhất: Number(null)
+     trọng nguyên vẹn — không bị ép lên mặc định 2. Đây là chỗ dễ hỏng nhất: Number(null)
      (chưa cấu hình) === Number(0) (đã chọn 0) === 0, nên phải kiểm giá trị THÔ trước khi
      ép kiểu, nếu không mọi xét nghiệm chưa từng đụng ô này sẽ bị hiểu nhầm thành "đã chọn
-     0 chữ số" và mất mặc định 1 — chỉ ngược với hồi quy đã sửa bên dưới. */
+     0 chữ số" và mất mặc định 2 — chỉ ngược với hồi quy đã sửa bên dưới. */
   assert.equal(ctx.fmtPointValue({val:450},{decimalPlaces:0}),'450','decimalPlaces=0 phải được tôn trọng, không bị ép về mặc định');
   assert.equal(ctx.testDecimalPlaces({decimalPlaces:0}),0,'đã chọn tay 0 chữ số thì testDecimalPlaces phải trả đúng 0, không phải mặc định');
   /* HỒI QUY TỪ BÁO CÁO THẬT (2026-08-02). Sau khi bỏ SD ra khỏi phép suy, điểm QC cũ —
      nhập trước khi có point.valueDecimals — chỉ còn suy từ chính val. Kali "4.0" lưu thành
      val=4, mà String(4)="4" nên ra 0 chữ số: bảng nhập QC hiện "4". Toàn bộ dữ liệu lịch sử
-     mất phần thập phân trong im lặng. Mặc định 1 chữ số chặn đúng chỗ này. */
-  assert.equal(ctx.fmtPointValue({val:4},{levels:[{level:1,mean:4,sd:0.1}]}),'4.0','điểm QC cũ không có metadata vẫn phải giữ 1 chữ số thập phân');
-  assert.equal(ctx.fmtPointValue({val:4,valueDecimals:0},null),'4.0','gõ "4" hay "4.0" đều hiển thị như nhau');
-  assert.equal(ctx.fmtPointValue({val:7.405},null),'7.405','nhưng gõ nhiều chữ số hơn thì KHÔNG bị làm tròn xuống 1');
-  assert.equal(ctx.testDecimalPlaces({}),1,'xét nghiệm mới chưa cấu hình gì thì mặc định 1 chữ số');
+     mất phần thập phân trong im lặng. Mặc định 2 chữ số chặn đúng chỗ này. */
+  assert.equal(ctx.fmtPointValue({val:4},{levels:[{level:1,mean:4,sd:0.1}]}),'4.00','điểm QC cũ không có metadata vẫn phải giữ 2 chữ số thập phân');
+  assert.equal(ctx.fmtPointValue({val:4,valueDecimals:0},null),'4.00','gõ số nguyên vẫn hiển thị theo mặc định 2 chữ số');
+  assert.equal(ctx.fmtPointValue({val:7.405},null),'7.405','dữ liệu cũ có độ chính xác cao hơn mặc định 2 vẫn phải được bảo toàn');
+  assert.equal(ctx.testDecimalPlaces({}),2,'xét nghiệm mới chưa cấu hình gì thì mặc định 2 chữ số');
   assert.equal(ctx.fmtPointValue({val:450},{decimalPlaces:3}),'450.000','lựa chọn thủ công phải được áp dụng chính xác');
   assert.equal(ctx.fmtPointValue({val:7.405},{decimalPlaces:2}),'7.41','lựa chọn thủ công chỉ làm tròn phần hiển thị');
   assert.equal(ctx.fmtTestValue({decimalPlaces:1},100.25),'100.3');
@@ -239,24 +247,24 @@ const plain = v => JSON.parse(JSON.stringify(v));
   const val=(t,p)=>ctx.fmtPointValue(p,t), sd=(t,v)=>ctx.fmtTestStat(t,v);
   {
     const glucose={levels:[{level:1,mean:5.6,sd:0.153}]};
-    assert.equal(val(glucose,{val:5.6,valueDecimals:1}),'5.6','SD nhiều chữ số KHÔNG được kéo số lẻ của giá trị lên');
-    assert.equal(sd(glucose,0.153),'0.153','SD giữ đủ chữ số như fmt(sd,3) trước đây');
+    assert.equal(val(glucose,{val:5.6,valueDecimals:1}),'5.60','mặc định mới giữ 2 chữ số nhưng SD không được kéo thêm số lẻ của giá trị');
+    assert.equal(sd(glucose,0.153),'0.1530','SD giữ thêm 2 chữ số so với cấu hình giá trị');
 
     const fixed={decimalPlaces:2,levels:[{level:1,mean:5.6,sd:0.153}]};
     assert.equal(val(fixed,{val:5.6,valueDecimals:1}),'5.60');
     assert.equal(sd(fixed,0.153),'0.1530','cấu hình tay chỉ chi phối GIÁ TRỊ, không được cắt cụt SD');
 
     const natri={levels:[{level:1,mean:140,sd:1.5}]};
-    assert.equal(val(natri,{val:141,valueDecimals:0}),'141.0','chưa cấu hình tay thì mặc định 1 chữ số, kể cả khi người dùng gõ số nguyên');
-    assert.equal(sd(natri,1.5),'1.500');
+    assert.equal(val(natri,{val:141,valueDecimals:0}),'141.00','chưa cấu hình tay thì mặc định 2 chữ số, kể cả khi người dùng gõ số nguyên');
+    assert.equal(sd(natri,1.5),'1.5000');
 
     const ph={levels:[{level:1,mean:7.4,sd:0.01}]};
     assert.equal(val(ph,{val:7.405,valueDecimals:3}),'7.405');
     assert.equal(val(ph,{val:7.405}),'7.405','điểm cũ chưa có metadata vẫn suy từ chính giá trị');
-    assert.equal(sd(ph,0.01),'0.010');
+    assert.equal(sd(ph,0.01),'0.0100');
     /* SD tính ra là số thực có nhiễu dấu phẩy động; số lẻ phải suy từ CẤU HÌNH chứ không
        từ chính giá trị SD, nếu không sẽ ra 6 chữ số rác. */
-    assert.equal(sd(ph,0.009999999999999998),'0.010','nhiễu dấu phẩy động không được lọt ra hiển thị');
+    assert.equal(sd(ph,0.009999999999999998),'0.0100','nhiễu dấu phẩy động không được lọt ra hiển thị');
   }
   assert.equal(ctx.qcValueDecimals('.5'),1,'".5" cũng là số — thiếu phần nguyên không có nghĩa là 0 chữ số');
   assert.equal(ctx.qcValueDecimals(',25'),2,'dấu phẩy thập phân theo thói quen nhập tiếng Việt');

@@ -13,6 +13,7 @@ function entryToggleRows(key){
   entryRenderKeepScroll();
 }
 function entryDetailToggled(key,open){if(open)entryDetailOpen.add(key);else entryDetailOpen.delete(key);}
+function entryTreeIsCollapsed(){if(entryTreeCollapsed!==null)return!!entryTreeCollapsed;try{entryTreeCollapsed=localStorage.getItem('qclab_entry_tree_collapsed')==='1';}catch(e){entryTreeCollapsed=false;}return!!entryTreeCollapsed;}
 function pageEntry(rightOnly=false){
   const today=isoToday();
   if(!state.tests.length)return headOnly('Nhập QC','')+`<div class="panel">${emptyState('Chưa có xét nghiệm','Cần khai báo xét nghiệm và mức QC trước khi nhập kết quả.',role()==='admin'?btn('Thêm xét nghiệm',`go('manage')`,'teal'):'')}</div>`;
@@ -21,6 +22,7 @@ function pageEntry(rightOnly=false){
   if(!entrySheetMonth)entrySheetMonth=isoMonth();
   let selT=entrySel&&entryTests.find(t=>t.id===entrySel.testId);
   if(!selT||!operationalLevels(selT).some(l=>l.level===entrySel.level)){selT=entryTests[0];const l0=operationalLevels(selT)[0];entrySel={testId:selT.id,level:l0.level};entryAutoOpenKey=null;}
+  const treeCollapsed=entryTreeIsCollapsed(),treePanelIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="9" y1="4" x2="9" y2="20"/></svg>';
   let tree='',treeHead='';
   if(!rightOnly){
     const byMAll=EntryService.groupByMachine(entryTests),machinesAll=[...byMAll.keys()],selM=selT.machine||'(Chưa gán máy)';
@@ -33,7 +35,7 @@ function pageEntry(rightOnly=false){
        — ARIA tree chỉ được phép chứa treeitem/group, aria-required-children sẽ báo lỗi
        nếu heading/input/select nằm trực tiếp trong đó. CSS `.tree h4`/`.tree-tools ...`
        vẫn là descendant selector nên không cần đổi gì ở CSS. */
-    treeHead=`<h4 role="heading" aria-level="2">Danh mục nội kiểm</h4><div class="tree-tools"><input id="entrySearch" aria-label="Tìm xét nghiệm, máy hoặc lô" placeholder="Tìm test, máy hoặc lô..." value="${escAttr(entryQ)}" oninput="entryFilter(this.value)"><select aria-label="Lọc theo máy xét nghiệm" onchange="entrySetMachine(this.value)">${machineOpts}</select></div>`;
+    treeHead=`<div class="entry-tree-head"><h4 role="heading" aria-level="2">Danh mục nội kiểm</h4>${btn(treePanelIcon,'toggleEntryTree()','ghost icon entry-tree-toggle','Ẩn danh mục nội kiểm',{attrs:{'aria-label':'Ẩn danh mục nội kiểm','aria-controls':'entryTreePanel','aria-expanded':'true'}})}</div><div class="tree-tools"><input id="entrySearch" aria-label="Tìm xét nghiệm, máy hoặc lô" placeholder="Tìm test, máy hoặc lô..." value="${escAttr(entryQ)}" oninput="entryFilter(this.value)"><select aria-label="Lọc theo máy xét nghiệm" onchange="entrySetMachine(this.value)">${machineOpts}</select></div>`;
     if(!machines.length)tree+='<div class="tree-empty" role="presentation">Không có xét nghiệm phù hợp.</div>';
     machines.forEach(mc=>{const mk='m:'+mc,mo=treeOpen.has(mk);
     tree+=`<div class="tnode tn-machine" data-tree-role="machine" data-key="${escAttr(mk)}" role="treeitem" tabindex="0" aria-expanded="${mo}" onclick="treeToggle('${jsq(mk)}')" onkeydown="entryTreeKey(event)"><span class="caret" aria-hidden="true">${mo?'−':'+'}</span>${esc(mc)}</div>`;
@@ -98,13 +100,13 @@ function pageEntry(rightOnly=false){
       // Lô song song dùng chính điểm của nó (không qua acceptedLotPoints — helper đó
       // chọn 1 lần chạy lại/ngày cho lô đang vận hành, không áp dụng cho lô đang đánh giá).
       curPts=(x.parallel?entryColumnPoints(t,x):acceptedForLevel(x.level)).filter(p=>p.date>=W.start&&p.date<=W.end&&(p.lot||'')===(x.lot||'')),
-      prevSeries=x.parallel?[]:previousLotSeries(t,x.level),prevLot=entryPrevOpen.get(t.id+'|'+x.level)||'',prevView=prevSeries.find(s=>(s.lot||'')===prevLot),chartPts=prevView?prevView.pts:curPts,chartLot=prevView?prevView.lot:x.lot,chartMean=prevView?prevView.mean:x.mean,chartSd=prevView?prevView.sd:x.sd,st=stats(chartPts.map(p=>p.val));
+      prevSeries=x.parallel?[]:previousLotSeries(t,x.level),prevLot=entryPrevOpen.get(t.id+'|'+x.level)||'',prevView=prevSeries.find(s=>(s.lot||'')===prevLot),targetCfg=prevView||entryColumnCfg(t,x.level,x.lot),chartPts=prevView?prevView.pts:curPts,chartLot=prevView?prevView.lot:x.lot,chartMean=targetCfg&&targetCfg.mean,chartSd=targetCfg&&targetCfg.sd,st=stats(chartPts.map(p=>p.val));
     entryLjRenderCache.levels.set(`${x.level}|${chartLot||''}`,chartPts);
     const metric=(k,v,control=false)=>`<div class="lj-qc-stat${control?' control':''}"><span class="k">${k}</span><span class="v">${v}</span></div>`;
-    const strip=metric('Mean thực',st?fmtTestValue(t,st.m):'—')+metric('SD thực',st?fmtTestStat(t,st.sd):'—')+metric('CV thực',st?fmt(st.cv)+'%':'—')+metric('Mean mục tiêu',fmtTestValue(t,chartMean),true)+metric('SD mục tiêu',fmtTestValue(t,chartSd),true);
+    const strip=metric('Mean thực',st?fmtTestValue(t,st.m):'—')+metric('SD thực',st?fmtTestStat(t,st.sd):'—')+metric('CV thực',st?fmt(st.cv)+'%':'—')+metric('Mean mục tiêu',fmtTestValue(t,chartMean),true)+metric('SD mục tiêu',fmtTestStat(t,chartSd),true);
     const prevBtn=x.parallel?'<span class="hint">Đang đánh giá</span>':prevSeries.length?(prevView?btn('Xem lô mới',`event.stopPropagation();entryShowCurrentLot(${x.level})`,'teal sm'):btn('Xem lô cũ',`event.stopPropagation();entryShowPrevLot(${x.level},'${jsq(prevSeries[0].lot||'')}')`,'ghost sm')):`<span class="hint">${x.applied==='lab'?'Dải PXN':'Dải NSX'}</span>`;
     return `<div class="lj-mini ${on?'on':''}${x.parallel?' lj-mini-parallel':''}" onclick="entryFocusLevel(${x.level})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();entryFocusLevel(${x.level})}" role="button" tabindex="0" aria-label="Chọn mức ${x.level}, lô ${escAttr(chartLot||'?')}, ${chartPts.length} điểm${x.parallel?', lô chạy song song':''}"><div class="lj-mini-h"><b>Mức ${x.level} · ${prevView?'Lô cũ':'Lô'} ${esc(chartLot||'?')}${x.parallel?' <span class="qc-parallel-label">Song song</span>':''}<span class="lj-point-count">${chartPts.length} điểm</span></b>${prevBtn}</div><div class="lj-qc-strip" tabindex="0">${strip}</div><div class="chart-scroll" tabindex="0"><canvas class="entryLJStack" data-render-scale="2" data-test="${t.id}" data-level="${x.level}" data-lot="${escAttr(chartLot||'')}" data-mean="${escAttr(chartMean)}" data-sd="${escAttr(chartSd)}" data-start="${W.start}" data-end="${W.end}" width="1400" height="380"></canvas></div></div>`;}).join('');
-  const levelHead=entryCols.map(x=>{const mean=Number(x.mean),sd=Number(x.sd),limits=Number.isFinite(mean)&&Number.isFinite(sd)?`${fmtTestValue(t,mean-2*sd)} – ${fmtTestValue(t,mean+2*sd)}`:'—',tip=`Mean ${Number.isFinite(mean)?fmtTestValue(t,mean):'—'} · SD ${Number.isFinite(sd)?fmtTestValue(t,sd):'—'} · ±2SD ${limits}`;return`<th class="qc-level-head" tabindex="0" data-qc-tooltip="${escAttr(tip)}" aria-label="Mức ${x.level}, lô ${escAttr(x.lot||'?')}. ${escAttr(tip)}">Mức ${x.level} · Lô ${esc(x.lot||'?')}${x.parallel?' <span class="qc-parallel-label">Song song</span>':''}</th>`;}).join('');
+  const levelHead=entryCols.map(x=>{const cfg=entryColumnCfg(t,x.level,x.lot),mean=Number(cfg&&cfg.mean),sd=Number(cfg&&cfg.sd),limits=Number.isFinite(mean)&&Number.isFinite(sd)?`${fmtTestValue(t,mean-2*sd)} – ${fmtTestValue(t,mean+2*sd)}`:'—',tip=`Mean ${Number.isFinite(mean)?fmtTestValue(t,mean):'—'} · SD ${Number.isFinite(sd)?fmtTestStat(t,sd):'—'} · ±2SD ${limits}`;return`<th class="qc-level-head" tabindex="0" data-qc-tooltip="${escAttr(tip)}" aria-label="Mức ${x.level}, lô ${escAttr(x.lot||'?')}. ${escAttr(tip)}">Mức ${x.level} · Lô ${esc(x.lot||'?')}${x.parallel?' <span class="qc-parallel-label">Song song</span>':''}</th>`;}).join('');
   const sheetCalendar=EntryService.buildSheetCalendar(entrySheetMonth,isoToday()),activeSheetMonth=sheetCalendar.activeMonth;
   entrySheetMonth=activeSheetMonth;
   const sheetYear=sheetCalendar.year,sheetMonthNo=sheetCalendar.month,sheetStart=sheetCalendar.start,sheetEnd=sheetCalendar.end;
@@ -166,11 +168,13 @@ function pageEntry(rightOnly=false){
   entryPartialRenderCache={testId:t.id,right};
   if(rightOnly)return right;
   return headOnly('Nhập QC','Ghi nhận kết quả theo ngày, mức QC và lô đang vận hành')+
-   `<div class="entrygrid"><div class="tree">${treeHead}<div role="tree" aria-label="Danh mục nội kiểm">${tree}</div></div><div class="entry-main">${right}</div></div>`;
+   `<div class="entrygrid${treeCollapsed?' tree-collapsed':''}">${btn(treePanelIcon,'toggleEntryTree()','teal icon entry-tree-expand','Hiện danh mục nội kiểm',{attrs:{'aria-label':'Hiện danh mục nội kiểm','aria-controls':'entryTreePanel','aria-expanded':'false'}})}<div class="tree" id="entryTreePanel">${treeHead}<div role="tree" aria-label="Danh mục nội kiểm">${tree}</div></div><div class="entry-main">${right}</div></div>`;
 }
 function jsq(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r/g,'\\r').replace(/\n/g,'\\n').replace(/&/g,'\\u0026').replace(/</g,'\\u003c').replace(/>/g,'\\u003e').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029');}
-function entryRestoreTreeNode(datasetKey,value){requestAnimationFrame(()=>{const node=[...document.querySelectorAll('.tree .tnode')].find(el=>el.dataset[datasetKey]===String(value));if(node)node.focus({preventScroll:true});});}
-function treeToggle(k){const restore=document.activeElement&&document.activeElement.dataset.key===String(k);if(treeOpen.has(k))treeOpen.delete(k);else treeOpen.add(k);rerender();if(restore)entryRestoreTreeNode('key',k);}
+/* Mở/thu nhánh ngay trên DOM, không vẽ lại toàn trang: khung cây có scroll riêng nên
+   thay cả `.tree` sẽ đưa scrollTop về 0 và làm người dùng mất vị trí ở danh sách dài. */
+function treeToggle(k){if(treeOpen.has(k))treeOpen.delete(k);else treeOpen.add(k);const open=treeOpen.has(k),node=[...document.querySelectorAll('.tree .tnode')].find(el=>el.dataset.key===String(k));if(node){node.setAttribute('aria-expanded',String(open));node.classList.toggle('open',open);const caret=node.querySelector('.caret');if(caret)caret.textContent=open?'−':'+';}entryFilter(entryQ);}
+function toggleEntryTree(){entryTreeCollapsed=!entryTreeIsCollapsed();try{localStorage.setItem('qclab_entry_tree_collapsed',entryTreeCollapsed?'1':'0');}catch(e){}const grid=document.querySelector('.entrygrid');if(!grid){rerender();return;}grid.classList.toggle('tree-collapsed',entryTreeCollapsed);const target=grid.querySelector(entryTreeCollapsed?'.entry-tree-expand':'.entry-tree-toggle');requestAnimationFrame(()=>{if(target)target.focus({preventScroll:true});});}
 function entryTreeKey(event){
   const item=event.currentTarget,key=event.key;
   if(key==='Enter'||key===' '){event.preventDefault();item.click();return;}
@@ -205,10 +209,10 @@ function entryFilter(v){
   });
 }
 function entrySetMachine(v){entryMachine=v;rerender();}
-function entryPick(tid,level){const restore=document.activeElement&&document.activeElement.dataset.testId===String(tid);entrySel={testId:tid,level};entryStart=null;entryEnd=null;entryLastMsg='';rerender();if(restore)entryRestoreTreeNode('testId',tid);}
-function entryFocusLevel(level){if(!entrySel)return;entrySel={testId:entrySel.testId,level};rerender();}
-function entryShowPrevLot(level,lot){if(!entrySel)return;entryPrevOpen.set(entrySel.testId+'|'+level,lot);rerender();}
-function entryShowCurrentLot(level){if(!entrySel)return;entryPrevOpen.delete(entrySel.testId+'|'+level);rerender();}
+function entryPick(tid,level){entrySel={testId:tid,level};entryStart=null;entryEnd=null;entryLastMsg='';document.querySelectorAll('.tree .tn-config').forEach(row=>{const on=row.dataset.testId===String(tid);row.classList.toggle('on',on);row.setAttribute('aria-current',String(on));});entryRenderKeepScroll();}
+function entryFocusLevel(level){if(!entrySel)return;entrySel={testId:entrySel.testId,level};entryRenderKeepScroll();}
+function entryShowPrevLot(level,lot){if(!entrySel)return;entryPrevOpen.set(entrySel.testId+'|'+level,lot);entryRenderKeepScroll();}
+function entryShowCurrentLot(level){if(!entrySel)return;entryPrevOpen.delete(entrySel.testId+'|'+level);entryRenderKeepScroll();}
 function entryFocusPendingSheet(){
   if(!entryPendingSheetFocus)return;
   const [date,level]=entryPendingSheetFocus.split('|');

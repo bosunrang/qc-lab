@@ -8,8 +8,9 @@ function teaAnalyteBuiltInMeta(value){const key=teaAnalyteKey(value);return TEA_
 /** @param {any} [record] @returns {any} */
 function teaAnalyteMeta(name,record){const custom=record&&typeof record==='object'?record:{},base=custom.analyteId&&TEA_ANALYTE_META_BY_ID[custom.analyteId]||teaAnalyteBuiltInMeta(name),aliases=[name,base.displayName,base.standardName,base.abbreviation,...(base.aliases||[]),custom.displayName,custom.standardName,custom.abbreviation,...(custom.aliases||[])].filter(Boolean);return{analyteId:custom.analyteId||base.analyteId||'',displayName:custom.displayName||base.displayName||name||'',standardName:custom.standardName||base.standardName||name||'',abbreviation:custom.abbreviation||base.abbreviation||'',aliases:[...new Set(aliases)],matrix:custom.matrix||base.matrix||''};}
 function teaAnalyteDisplay(name,record){return teaAnalyteMeta(name,record).displayName||name||'';}
-const TEA_REFERENCE_SCHEMA_VERSION=2;
+const TEA_REFERENCE_SCHEMA_VERSION=3;
 const TEA_SOURCE_REGISTRY=Object.freeze({
+  lab:Object.freeze({id:'qclab-standardized-tea',label:'TEa chuẩn hóa của phòng xét nghiệm',version:'Danh mục nội bộ',document:'Bảng TEa chuẩn hóa của phòng xét nghiệm',url:'',effectiveDate:'',reviewedDate:'',reviewedBy:'',status:'reviewed',note:'Giá trị TEa do phòng xét nghiệm lựa chọn, phê duyệt và duy trì nhất quán cho từng xét nghiệm.'}),
   clia:Object.freeze({id:'clia-cms-3355-f-2024',label:'CLIA PT (CMS-3355-F)',version:'CMS-3355-F / 42 CFR §§493.931, 493.941',document:'CLIA Proficiency Testing — Analytes and Acceptable Performance Criteria',url:'https://www.ecfr.gov/current/title-42/chapter-IV/subchapter-G/part-493/subpart-I',effectiveDate:'2024-07-11',reviewedDate:'2026-07-16',reviewedBy:'QC Lab built-in registry',status:'reference',note:'Tiêu chí chấp nhận PT được dùng làm mục tiêu TEa tham khảo; không phải tuyên bố tuân thủ CLIA của đơn vị.'}),
   ricos:Object.freeze({id:'ricos-bv-2014',label:'Ricos / Westgard BV',version:'2014',document:'Desirable Specifications for Total Error derived from Biological Variation — Ricos et al.',url:'https://westgard.com/clia-and-quality-regulation-requirements/quality-requirements/biodatabase1.html',effectiveDate:'',reviewedDate:'2026-07-16',reviewedBy:'QC Lab built-in registry',status:'retired',note:'Bộ dữ liệu legacy, cập nhật lần cuối năm 2014; EFLM hiện quản lý cơ sở dữ liệu biological variation mới.'}),
   eflm:Object.freeze({id:'eflm-bv-live',label:'EFLM Biological Variation Database',version:'Live database',document:'EFLM Biological Variation Database',url:'https://biologicalvariation.eu/',effectiveDate:'',reviewedDate:'2026-07-16',reviewedBy:'QC Lab built-in registry',status:'dynamic',note:'Giá trị thay đổi theo database; phải lưu analyte, mức APS, ngày tra cứu và tài liệu/link tại thời điểm áp dụng.'})
@@ -249,13 +250,13 @@ function pointStaff(p){const name=String(p&&p.operatorName||'').trim(),code=Stri
 function dateObj(s){const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s||''));return m?new Date(+m[1],+m[2]-1,+m[3]):new Date(s);}
 function daysToExp(exp){if(!exp)return null;return Math.round((dateObj(exp).getTime()-new Date().getTime())/86400000);}
 function fmt(x,d=2){return(x==null||isNaN(x))?'—':Number(x).toFixed(d);}
-const QC_DECIMALS_DEFAULT=1;             // mặc định 1 chữ số thập phân khi tạo xét nghiệm mới
+const QC_DECIMALS_DEFAULT=2;             // mặc định 2 chữ số thập phân khi tạo xét nghiệm mới
 const QC_DECIMALS_MAX=6;                 // trần chung cho MỌI chỗ kẹp số lẻ
 const QC_STAT_EXTRA_DECIMALS=2;          // SD cần nhiều chữ số hơn giá trị đo
 /* `.5` cũng là số: cho phép thiếu phần nguyên, nếu không thì người nhập ".5" bị coi là 0
    chữ số thập phân. Nhận cả dấu phẩy — thói quen nhập tiếng Việt. */
 function qcValueDecimals(value){const text=String(value==null?'':value).trim(),match=/^[+-]?(?:\d+(?:[.,](\d+))?|[.,](\d+))(?:e([+-]?\d+))?$/i.exec(text);if(!match)return 0;const fraction=(match[1]||match[2]||'').length,exponent=Number(match[3]||0);return Math.max(0,Math.min(QC_DECIMALS_MAX,fraction-exponent));}
-/* SỐ LẺ CỦA GIÁ TRỊ ĐO — mặc định 1 chữ số, KHÔNG bao giờ lấy từ SD.
+/* SỐ LẺ CỦA GIÁ TRỊ ĐO — mặc định 2 chữ số, KHÔNG bao giờ lấy từ SD.
    Hai bài học nằm cả trong hàm này:
 
    1. KHÔNG suy từ SD. Bản đầu lấy max của mean/sd/low/high nên SD kéo số lẻ của giá trị
@@ -265,16 +266,16 @@ function qcValueDecimals(value){const text=String(value==null?'':value).trim(),m
    2. NHƯNG khi CHƯA cấu hình tay thì cũng không được để rơi về 0. Bỏ SD ra rồi thì điểm QC
       cũ (nhập trước khi có point.valueDecimals) chỉ còn suy từ chính val, mà val=4 thì
       String(4)="4" → 0 chữ số → Kali "4.0" hiện thành "4". Toàn bộ dữ liệu lịch sử mất
-      phần thập phân trong im lặng. Vì vậy KHÔNG cấu hình thì mặc định là 1 và lấy MAX với
-      độ chính xác người nhập: gõ "4" hay "4.0" đều ra "4.0", còn gõ "7.405" vẫn giữ
+      phần thập phân trong im lặng. Vì vậy KHÔNG cấu hình thì mặc định là 2 và lấy MAX với
+      độ chính xác người nhập: gõ "4" hay "4.0" đều ra "4.00", còn gõ "7.405" vẫn giữ
       nguyên "7.405" chứ không bị làm tròn.
 
    Thứ tự: cấu hình tay (0..6, kể cả 0 — một số xét nghiệm như đếm tế bào cần số nguyên)
-   > max(mặc định 1, độ chính xác đã lưu của điểm) khi CHƯA cấu hình.
+   > max(mặc định 2, độ chính xác đã lưu của điểm) khi CHƯA cấu hình.
    `test.decimalPlaces==null` (chưa từng đụng ô này) PHẢI tách khỏi "đã chọn 0": Number(null)
    === 0, nên `Number(test.decimalPlaces)` một mình không phân biệt được hai trường hợp —
    phải kiểm raw trước khi ép kiểu, nếu không mọi xét nghiệm chưa cấu hình sẽ bị hiểu nhầm
-   thành "đã chọn 0 chữ số" và mất luôn mặc định 1. */
+   thành "đã chọn 0 chữ số" và mất luôn mặc định 2. */
 function testDecimalPlaces(test,point=null){
   const raw=test&&test.decimalPlaces,configured=Number(raw);
   if(raw!=null&&raw!==''&&Number.isInteger(configured)&&configured>=0&&configured<=QC_DECIMALS_MAX)return configured;

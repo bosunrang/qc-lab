@@ -215,7 +215,7 @@
 }
 
 .tea-ref-table{
-  width:100%; min-width:760px; table-layout:fixed; border-collapse:separate; border-spacing:0;
+  width:100%; min-width:900px; table-layout:fixed; border-collapse:separate; border-spacing:0;
 }
 
 .tea-ref-table th,.tea-ref-table td{
@@ -227,12 +227,13 @@
 }
 
 .tea-ref-table th,.tea-ref-table td{text-align:center}
-.tea-ref-table th:nth-child(1),.tea-ref-table td:nth-child(1){width:30%;text-align:left;padding-left:34px}
+.tea-ref-table th:nth-child(1),.tea-ref-table td:nth-child(1){width:26%;text-align:left;padding-left:34px}
 .tea-ref-table th:nth-child(2),.tea-ref-table td:nth-child(2),
 .tea-ref-table th:nth-child(3),.tea-ref-table td:nth-child(3),
 .tea-ref-table th:nth-child(4),.tea-ref-table td:nth-child(4),
-.tea-ref-table th:nth-child(5),.tea-ref-table td:nth-child(5){width:12%}
-.tea-ref-table th:nth-child(6),.tea-ref-table td:nth-child(6){width:22%}
+.tea-ref-table th:nth-child(5),.tea-ref-table td:nth-child(5),
+.tea-ref-table th:nth-child(6),.tea-ref-table td:nth-child(6){width:11%}
+.tea-ref-table th:nth-child(7),.tea-ref-table td:nth-child(7){width:19%}
 
 .tea-ref-table input.tea-ref-value{
   display:block; box-sizing:border-box; width:min(100%,88px); height:34px; min-height:34px; margin:0 auto; padding:4px 8px; border-color:transparent; background:transparent; box-shadow:none; text-align:center; cursor:text; appearance:textfield; -moz-appearance:textfield; transition:background-color .15s ease,border-color .15s ease,box-shadow .15s ease;
@@ -250,6 +251,20 @@
 
 .tea-ref-table input.tea-ref-value:focus{
   border-color:var(--teal); outline:none;
+}
+.tea-lab-cell{display:flex; align-items:center; justify-content:center; gap:7px; min-width:0; white-space:nowrap}
+.tea-lab-cell>b{font-size:13px; color:var(--ink)}
+.tea-lab-cell .btn{min-height:26px; padding:3px 8px}
+.tea-lab-profile-modal{width:min(660px,calc(100vw - 24px))}
+.tea-lab-profile-modal textarea{width:100%; resize:vertical}
+.tea-lab-profile-modal textarea.tea-lab-reason{height:38px; min-height:38px; overflow-y:auto}
+.tea-lab-meta-grid{display:grid; align-items:end; gap:12px}
+.tea-lab-meta-primary{grid-template-columns:minmax(150px,180px) minmax(150px,180px) minmax(220px,1fr)}
+.tea-lab-meta-approval{grid-template-columns:minmax(220px,340px) minmax(150px,180px); justify-content:start}
+.tea-lab-meta-grid .datebox.manage-date{width:100%}
+.tea-lab-meta-grid .datebox input.date-text{min-width:0; padding-left:10px; padding-right:6px}
+@media(max-width:760px){
+  .tea-lab-meta-primary,.tea-lab-meta-approval{grid-template-columns:1fr}
 }
 
 .rcfg-modal{

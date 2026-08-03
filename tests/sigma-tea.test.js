@@ -14,6 +14,8 @@
  * hình dạng tuple mà effectiveTeaRefs() trả về.
  */
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
 // fmt/vnDate là hàm định dạng của lớp UI; lớp TEa chỉ gọi chúng lúc xuất chuỗi.
@@ -35,6 +37,7 @@ assert.equal(ctx.sgUnitsMatch(null, null), false);
 //     trường teaSource rỗng/lạ (dữ liệu cũ hoặc bản backup hỏng). ---
 assert.equal(ctx.sgTea({ name: 'Glucose', teaSource: 'ricos' }), 6.96);
 assert.equal(ctx.sgTea({ name: 'Glucose', teaSource: 'clia' }), 8);
+assert.equal(ctx.sgTea({ name: 'Glucose', teaSource: 'lab' }), 0, 'chưa xây dựng TEa chuẩn hóa → chưa có giá trị');
 assert.equal(ctx.sgTea({ name: 'Glucose' }), 6.96, 'thiếu teaSource → Ricos, không phải 0');
 assert.equal(ctx.sgTea({ name: 'Glucose', teaSource: 'nguồn-lạ' }), 6.96, 'teaSource lạ → Ricos, không được nhận nguyên giá trị lạ');
 assert.equal(ctx.sgTea({ name: 'Không có trong bảng', teaSource: 'ricos' }), 0);
@@ -54,6 +57,7 @@ assert.equal(ctx.testDisplayName(null), '');
   assert.ok(glucose, 'Glucose phải có trong bảng TEa hiệu lực mặc định');
   assert.equal(glucose[2], 8, 'cột [2] là CLIA %');
   assert.equal(glucose[3], 6.96, 'cột [3] là Ricos %');
+  assert.equal(glucose[7], null, 'cột [7] là TEa chuẩn hóa của phòng xét nghiệm');
   assert.equal(typeof glucose[5], 'object', 'cột [5] là criterion đã dựng sẵn');
   assert.ok(['percent', 'absolute', 'greater-of'].includes(glucose[5].rule));
   assert.equal(refs.length, run(ctx, 'REFTESTS.length'), 'không có teaRefs của người dùng thì bảng hiệu lực đúng bằng bảng mặc định');
@@ -62,13 +66,23 @@ assert.equal(ctx.testDisplayName(null), '');
 // --- Người dùng ghi đè theo analyteId, kể cả khi đổi hẳn tên hiển thị. Đây là
 //     lý do registry v2 chuyển sang analyteId: đổi tên không được làm mất TEa. ---
 {
-  run(ctx, "state.teaRefs=[{id:'u1',analyteId:'qclab-glucose',name:'Đường huyết',unit:'mmol/L',clia:9,ricos:7.5,section:'Hóa sinh'}]");
+  run(ctx, "state.teaRefs=[{id:'u1',analyteId:'qclab-glucose',name:'Đường huyết',unit:'mmol/L',clia:9,ricos:7.5,lab:6.5,labSource:'regulation',labPreparedBy:'KTV A',labNextReviewDate:'2027-08-03',sources:{lab:{id:'lab-qclab-glucose',version:'Quy định pháp lý / CLIA / quốc gia',document:'CLIA 2024',effectiveDate:'2026-08-03',reviewedDate:'2026-08-03',reviewedBy:'Trưởng PXN',status:'reviewed',note:'Phù hợp mục đích sử dụng của xét nghiệm.'}},section:'Hóa sinh'}]");
   const refs = ctx.effectiveTeaRefs(), row = refs.find(r => r[6] === 'qclab-glucose');
   assert.equal(refs.length, run(ctx, 'REFTESTS.length'), 'ghi đè một dòng có sẵn KHÔNG được sinh thêm dòng mới');
   assert.equal(row[0], 'Đường huyết');
   assert.equal(row[2], 9);
+  assert.equal(row[7], 6.5);
   assert.equal(ctx.sgRef({ analyteId: 'qclab-glucose', name: 'Đường huyết' })[2], 9, 'sgRef vẫn bám theo analyteId sau khi đổi tên');
   assert.equal(ctx.sgTea({ name: 'Đường huyết', teaSource: 'ricos' }), 7.5);
+  assert.equal(ctx.sgTea({ name: 'Đường huyết', teaSource: 'lab' }), 6.5, 'nguồn lab dùng đúng cột TEa chuẩn hóa');
+  const labSnap=ctx.sgTeaSnapshot({analyteId:'qclab-glucose',name:'Đường huyết',teaSource:'lab'});
+  assert.equal(labSnap.tea,6.5,'kỳ Sigma chụp giá trị TEa chuẩn hóa hiện hành');
+  assert.equal(labSnap.teaSourceId,'lab-qclab-glucose');
+  assert.match(labSnap.teaReference,/Nguồn: Quy định pháp lý/,'ảnh chụp ghi nguồn gốc phía sau TEa chuẩn hóa');
+  assert.match(labSnap.teaReference,/Người xây dựng: KTV A/,'ảnh chụp ghi người xây dựng hồ sơ');
+  assert.match(labSnap.teaReference,/Lý do: Phù hợp mục đích/,'ảnh chụp ghi lý do lựa chọn');
+  assert.match(labSnap.teaReference,/Người duyệt: Trưởng PXN/,'ảnh chụp ghi người phê duyệt');
+  assert.match(labSnap.teaReference,/Xem xét lại: /,'ảnh chụp ghi lịch xem xét lại');
   run(ctx, 'state.teaRefs=[]');
 }
 
@@ -111,6 +125,17 @@ assert.equal(ctx.testDisplayName(null), '');
   assert.equal(pending.teaEffectiveDate, '2024-07-11');
   const e = { teaSource: 'ricos', tea: 1 };
   assert.equal(ctx.sgEnsureTeaSnapshot({ name: 'Glucose' }, e).tea, 1, 'kỳ đã có nguồn TEa thì không bị chụp đè');
+}
+
+// Hồ sơ TEa chuẩn hóa là form DOM nên phần lưu/xóa được chốt thêm bằng hợp đồng nguồn:
+// ngày phê duyệt không thể sau hiệu lực, nút xóa phải dùng đúng API nhãn của confirmDialog,
+// và xóa hồ sơ mặc định không được để lại một dòng ghi đè rỗng trong state.teaRefs.
+{
+  const manageSource=fs.readFileSync(path.join(__dirname,'..','assets','modules','manage-routes.js'),'utf8');
+  assert.match(manageSource,/if\(approvedDate>effective\)/,'phải chặn hồ sơ có ngày phê duyệt sau ngày hiệu lực');
+  assert.match(manageSource,/confirmLabel:'Xóa TEa'/,'hộp xác nhận phải hiện đúng nhãn thao tác xóa');
+  assert.doesNotMatch(manageSource,/confirmText:'Xóa TEa'/,'confirmDialog không hỗ trợ confirmText');
+  assert.match(manageSource,/teaRefIsDefault\(refKey\)&&!teaRefExternalChanged\(row,refKey\)/,'xóa TEa PXN mặc định phải dọn dòng ghi đè không còn dữ liệu riêng');
 }
 
 console.log('Sigma TEa layer tests passed');

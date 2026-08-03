@@ -14,11 +14,13 @@
    Nạp NGAY TRƯỚC sigma.js trong index.html: SG_TEA_DEFAULT_REF và SG_CLIA_FIXED
    đọc TEA_SOURCE_REGISTRY/TEA_ANALYTE_CATALOG ngay lúc nạp. */
 const SG_TEA_SOURCES=[
+  ['lab','TEa chuẩn hóa của phòng xét nghiệm'],
   ['eflm','EFLM - nhập từ database'],
   ['clia','CLIA PT (CMS-3355-F)'],
   ['ricos','Ricos / Westgard biological variation']
 ];
 const SG_TEA_DEFAULT_REF={
+  lab:TEA_SOURCE_REGISTRY.lab.document,
   eflm:TEA_SOURCE_REGISTRY.eflm.document,
   clia:TEA_SOURCE_REGISTRY.clia.document,
   ricos:TEA_SOURCE_REGISTRY.ricos.document
@@ -46,12 +48,13 @@ function sgTeaSourceMeta(t,src=sgTeaSource(t)){
 }
 function sgCliaCriterion(name,unit,percent,record){const analyteId=record&&record.analyteId||teaAnalyteMeta(name,record).analyteId,fixed=SG_CLIA_FIXED[analyteId],hasCustom=record&&(['percent','absolute','greater-of'].includes(record.cliaRule)||Number.isFinite(+record.cliaAbsolute)&&+record.cliaAbsolute>0),p=Number(percent),a=hasCustom?Number(record.cliaAbsolute):fixed&&fixed.absolute,rule=hasCustom?(record.cliaRule||((p>0&&a>0)?'greater-of':a>0?'absolute':'percent')):(a>0?(p>0?'greater-of':'absolute'):'percent');return{rule,percent:Number.isFinite(p)&&p>0?p:null,absolute:Number.isFinite(a)&&a>0?a:null,unit:hasCustom?(record.cliaAbsoluteUnit||unit||''):(fixed&&fixed.unit||unit||'')};}
 /* Bảng TEa tham chiếu HIỆU LỰC = REFTESTS mặc định phủ bởi state.teaRefs do người
-   dùng sửa/thêm. Registry v2 ghép bằng analyteId ổn định; tên chỉ còn là nhánh
-   tương thích dữ liệu v1. Tuple giữ 5 cột cũ, criterion ở [5], analyteId ở [6]. */
+   dùng sửa/thêm. Registry v2+ ghép bằng analyteId ổn định; tên chỉ còn là nhánh
+   tương thích dữ liệu v1. Tuple giữ 5 cột cũ, criterion ở [5], analyteId ở [6],
+   TEa chuẩn hóa của phòng xét nghiệm ở [7]. */
 function effectiveTeaRefs(){
   const over=new Map();(state&&state.teaRefs||[]).forEach(r=>{const key=r.analyteId||teaAnalyteMeta(r.name,r).analyteId||('custom-'+String(r.id||teaRefName(r.name)).replace(/[^A-Za-z0-9_-]/g,''));if(key)over.set(key,r);});
-  const out=REFTESTS.map(([name,unit,clia,ricos,section])=>{const analyteId=teaAnalyteMeta(name).analyteId,o=over.get(analyteId);return o?[o.name,o.unit,o.clia,o.ricos,o.section,sgCliaCriterion(o.name,o.unit,o.clia,o),analyteId]:[name,unit,clia,ricos,section,sgCliaCriterion(name,unit,clia,null),analyteId];});
-  (state&&state.teaRefs||[]).forEach(r=>{const analyteId=r.analyteId||teaAnalyteMeta(r.name,r).analyteId||('custom-'+String(r.id||teaRefName(r.name)).replace(/[^A-Za-z0-9_-]/g,''));if(analyteId&&!teaRefIsDefault(analyteId))out.push([r.name,r.unit,r.clia,r.ricos,r.section,sgCliaCriterion(r.name,r.unit,r.clia,r),analyteId]);});
+  const out=REFTESTS.map(([name,unit,clia,ricos,section])=>{const analyteId=teaAnalyteMeta(name).analyteId,o=over.get(analyteId);return o?[o.name,o.unit,o.clia,o.ricos,o.section,sgCliaCriterion(o.name,o.unit,o.clia,o),analyteId,o.lab]:[name,unit,clia,ricos,section,sgCliaCriterion(name,unit,clia,null),analyteId,null];});
+  (state&&state.teaRefs||[]).forEach(r=>{const analyteId=r.analyteId||teaAnalyteMeta(r.name,r).analyteId||('custom-'+String(r.id||teaRefName(r.name)).replace(/[^A-Za-z0-9_-]/g,''));if(analyteId&&!teaRefIsDefault(analyteId))out.push([r.name,r.unit,r.clia,r.ricos,r.section,sgCliaCriterion(r.name,r.unit,r.clia,r),analyteId,r.lab]);});
   return out;
 }
 /* refs: bảng effectiveTeaRefs() đã dựng sẵn (truyền từ sgRows() để khỏi build lại
@@ -73,7 +76,7 @@ function sgRef(t,refs){
   return best||undefined;
 }
 function sgTeaSource(t){return SG_TEA_SOURCES.some(x=>x[0]===t.teaSource)?t.teaSource:'ricos';}
-/* ref (Bảng TEa) chỉ cần cho nhánh 'clia'/'ricos' — tính bên trong từng nhánh đó
+/* ref (Bảng TEa) chỉ cần cho nhánh 'clia'/'ricos'/'lab' — tính bên trong từng nhánh đó
    thay vì luôn tính trước ở đầu hàm, để nhánh 'eflm' (không dùng ref) khỏi build
    effectiveTeaRefs() một cách vô ích. */
 function sgTeaInfo(t,src,target,refs){
@@ -89,13 +92,14 @@ function sgTeaInfo(t,src,target,refs){
     return{tea:allowable>0?allowable/den*100:(c.percent||0),criterion:c,needsTarget:!(den>0),unitMismatch,absoluteUsable};
   }
   if(src==='ricos'){const ref=sgRef(t,refs),value=ref&&Number.isFinite(+ref[3])&&+ref[3]>0?+ref[3]:0;return{tea:value,criterion:{rule:'percent',percent:value,absolute:null,unit:'%'}};}
+  if(src==='lab'){const ref=sgRef(t,refs),value=ref&&Number.isFinite(+ref[7])&&+ref[7]>0?+ref[7]:0;return{tea:value,criterion:{rule:'percent',percent:value,absolute:null,unit:'%'}};}
   const value=isFinite(tea)&&tea>0?tea:0;return{tea:value,criterion:{rule:'percent',percent:value,absolute:null,unit:'%'}};
 }
 function sgTeaBySource(t,src,target,refs){return sgTeaInfo(t,src,target,refs).tea;}
 function sgTea(t){return sgTeaBySource(t,sgTeaSource(t));}
 function sgTeaCriterionText(t,src=sgTeaSource(t)){const info=sgTeaInfo(t,src),c=info.criterion;if(src!=='clia'||!c)return info.tea?fmt(info.tea,2)+'%':'chưa có';if(info.unitMismatch){const note=' (không áp dụng giới hạn tuyệt đối: đơn vị phải là '+(c.unit||'đơn vị quy định')+')';return c.percent>0?'±'+fmt(c.percent,2)+'%'+note:'chưa tính được'+note;}if(c.rule==='absolute')return '±'+fmt(c.absolute,4)+' '+(c.unit||'đơn vị');if(c.rule==='greater-of')return 'mức lớn hơn giữa ±'+fmt(c.percent,2)+'% và ±'+fmt(c.absolute,4)+' '+(c.unit||'đơn vị');return c.percent>0?'±'+fmt(c.percent,2)+'%':'chưa có';}
 function sgTeaLabel(src){return (SG_TEA_SOURCES.find(x=>x[0]===src)||SG_TEA_SOURCES.find(x=>x[0]==='ricos'))[1];}
-function sgTeaRefText(t){const src=sgTeaSource(t),meta=sgTeaSourceMeta(t,src),parts=[meta.document||SG_TEA_DEFAULT_REF[src]||''];if(meta.version)parts.push('Phiên bản: '+meta.version);if(meta.effectiveDate)parts.push('Hiệu lực: '+vnDate(meta.effectiveDate));if(src==='eflm'){if(t.eflmAnalyte)parts.push('Analyte: '+t.eflmAnalyte);if(t.eflmAps)parts.push('APS: '+t.eflmAps);if(t.eflmLookupDate)parts.push('Tra cứu: '+vnDate(t.eflmLookupDate));if(t.eflmRef)parts.push(t.eflmRef);}else if(meta.reviewedDate)parts.push('Rà soát: '+vnDate(meta.reviewedDate));return parts.filter(Boolean).join(' · ');}
+function sgTeaRefText(t){const src=sgTeaSource(t),meta=sgTeaSourceMeta(t,src),stored=src==='lab'?sgTeaStoredRef(t):null,parts=[meta.document||SG_TEA_DEFAULT_REF[src]||''];if(meta.version)parts.push((src==='lab'?'Nguồn: ':'Phiên bản: ')+meta.version);if(meta.effectiveDate)parts.push('Hiệu lực: '+vnDate(meta.effectiveDate));if(src==='eflm'){if(t.eflmAnalyte)parts.push('Analyte: '+t.eflmAnalyte);if(t.eflmAps)parts.push('APS: '+t.eflmAps);if(t.eflmLookupDate)parts.push('Tra cứu: '+vnDate(t.eflmLookupDate));if(t.eflmRef)parts.push(t.eflmRef);}else if(meta.reviewedDate)parts.push((src==='lab'?'Phê duyệt: ':'Rà soát: ')+vnDate(meta.reviewedDate));if(src==='lab'&&stored&&stored.labPreparedBy)parts.push('Người xây dựng: '+stored.labPreparedBy);if(src==='lab'&&meta.reviewedBy)parts.push('Người duyệt: '+meta.reviewedBy);if(src==='lab'&&meta.note)parts.push('Lý do: '+meta.note);if(src==='lab'&&stored&&stored.labNextReviewDate)parts.push('Xem xét lại: '+vnDate(stored.labNextReviewDate));return parts.filter(Boolean).join(' · ');}
 function sgTeaSnapshot(t){const src=sgTeaSource(t),info=sgTeaInfo(t,src),meta=sgTeaSourceMeta(t,src),base={teaSource:src,teaLabel:sgTeaLabel(src),teaReference:sgTeaRefText(t),teaCapturedAt:new Date().toISOString(),teaSourceId:meta.id||'',teaSourceVersion:meta.version||'',teaSourceUrl:meta.url||'',teaEffectiveDate:meta.effectiveDate||'',teaReviewedDate:meta.reviewedDate||'',teaReviewedBy:meta.reviewedBy||''};return info.tea>0&&!info.needsTarget?{tea:info.tea,...base}:base;}
 function sgEnsureTeaSnapshot(t,e){if(!e||e.teaSource)return e;e&&Object.assign(e,sgTeaSnapshot(t));return e;}
 function sgLevelTarget(t,L,level){if(Number.isFinite(+L.sourceTargetMean)&&+L.sourceTargetMean!==0)return+L.sourceTargetMean;const cfg=(t.levels||[]).find(x=>+x.level===+level);return cfg&&Number.isFinite(+cfg.mean)&&+cfg.mean!==0?+cfg.mean:null;}

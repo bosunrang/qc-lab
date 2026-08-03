@@ -882,3 +882,17 @@
 .qc-table-card th:nth-child(6), .qc-table-card td:nth-child(6){
   width:21.3%; white-space:nowrap
 }
+
+/* Thu gọn riêng cây danh mục nội kiểm để nhường toàn bộ chiều ngang cho bảng nhập.
+   Cây chỉ bị ẩn, không bị dựng lại, nên vị trí cuộn và các nhóm đang mở được giữ nguyên. */
+.entrygrid{position:relative}
+.entry-tree-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 4px}
+.entry-tree-head h4{min-width:0;flex:1;margin:0;padding:10px 8px}
+button.btn.entry-tree-toggle,button.btn.entry-tree-expand{width:32px;height:32px;min-height:32px;flex:none;border-radius:var(--radius-md)}
+button.btn.entry-tree-toggle svg,button.btn.entry-tree-expand svg{width:17px;height:17px}
+button.btn.entry-tree-expand{display:none;position:absolute;left:12px;top:16px;z-index:12;box-shadow:0 8px 20px rgba(18,50,60,.18)}
+.entrygrid.tree-collapsed{grid-template-columns:minmax(0,1fr)}
+.entrygrid.tree-collapsed > .tree{display:none}
+.entrygrid.tree-collapsed > .entry-tree-expand{display:inline-flex}
+.entrygrid.tree-collapsed > .entry-main{grid-column:1;min-width:0}
+.entrygrid.tree-collapsed .qc-sheet-heading{padding-left:58px}

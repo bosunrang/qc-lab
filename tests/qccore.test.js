@@ -320,7 +320,7 @@ function close(actual, expected, epsilon = 1e-9) {
   const b = QCCore.sanitizeBackup({
     lab: {}, tests: [], data: {}, actions: [], activity: [], users: [],
     teaRefs: [
-      { analyteId: 'qclab-ck-mb', name: 'CK-MB', displayName: 'CK-MB', standardName: 'Creatine kinase MB', abbreviation: 'CK-MB', aliases: ['CKMB', '', 123], matrix: 'Huyết thanh/Huyết tương', unit: 'U/L', clia: '25', ricos: 30.06, section: 'Hóa sinh', sources: { clia: { id: 'clia-2024', version: 'CMS-3355-F', document: '42 CFR §493.931', url: 'https://www.ecfr.gov/', effectiveDate: '2024-07-11', reviewedDate: '2026-07-16', reviewedBy: 'Admin', status: 'reviewed' }, ricos: { url: 'javascript:alert(1)', status: 'invalid' } } }, // thiếu id
+      { analyteId: 'qclab-ck-mb', name: 'CK-MB', displayName: 'CK-MB', standardName: 'Creatine kinase MB', abbreviation: 'CK-MB', aliases: ['CKMB', '', 123], matrix: 'Huyết thanh/Huyết tương', unit: 'U/L', clia: '25', ricos: 30.06, lab: '24', labSource: 'professional', labPreparedBy: 'KTV A', labNextReviewDate: '2027-08-03', section: 'Hóa sinh', sources: { clia: { id: 'clia-2024', version: 'CMS-3355-F', document: '42 CFR §493.931', url: 'https://www.ecfr.gov/', effectiveDate: '2024-07-11', reviewedDate: '2026-07-16', reviewedBy: 'Admin', status: 'reviewed' }, ricos: { url: 'javascript:alert(1)', status: 'invalid' }, lab: { id: 'qclab-standardized-tea', version: 'Hiệp hội chuyên môn', document: 'Khuyến cáo CK-MB 2026', effectiveDate: '2026-08-03', reviewedDate: '2026-08-03', reviewedBy: 'Admin', status: 'reviewed', note: 'Phù hợp mục đích sử dụng.' } } }, // thiếu id
       { name: 'Bỏ', clia: 0, ricos: -5 },   // clia 0 / ricos âm → null
       { name: '', clia: 5 }                  // thiếu tên → loại
     ]
@@ -329,6 +329,7 @@ function close(actual, expected, epsilon = 1e-9) {
   assert.ok(b.teaRefs[0].id, 'tự gán id khi thiếu');
   assert.equal(b.teaRefs[0].clia, 25, 'chuỗi số được ép kiểu');
   assert.equal(b.teaRefs[0].ricos, 30.06);
+  assert.equal(b.teaRefs[0].lab, 24, 'giữ TEa chuẩn hóa của phòng xét nghiệm');
   assert.equal(b.teaRefs[0].analyteId, 'qclab-ck-mb', 'giữ định danh xét nghiệm độc lập với tên');
   assert.equal(b.teaRefs[0].standardName, 'Creatine kinase MB', 'giữ tên chuẩn tách khỏi khóa dữ liệu');
   assert.equal(b.teaRefs[0].matrix, 'Huyết thanh/Huyết tương');
@@ -337,6 +338,11 @@ function close(actual, expected, epsilon = 1e-9) {
   assert.equal(b.teaRefs[0].sources.clia.effectiveDate, '2024-07-11');
   assert.equal(b.teaRefs[0].sources.clia.status, 'reviewed');
   assert.equal(b.teaRefs[0].sources.ricos.url, '', 'chỉ giữ URL nguồn https');
+  assert.equal(b.teaRefs[0].sources.lab.reviewedBy, 'Admin', 'giữ truy vết nguồn TEa chuẩn hóa');
+  assert.equal(b.teaRefs[0].labSource, 'professional');
+  assert.equal(b.teaRefs[0].labPreparedBy, 'KTV A');
+  assert.equal(b.teaRefs[0].labNextReviewDate, '2027-08-03');
+  assert.equal(b.teaRefs[0].sources.lab.note, 'Phù hợp mục đích sử dụng.');
   assert.equal(b.teaRegistryVersion, 1, 'backup cũ được nâng lên registry TEa v1');
   assert.equal(b.teaRefs[1].clia, null, '0 → null');
   assert.equal(b.teaRefs[1].ricos, null, 'số âm → null');

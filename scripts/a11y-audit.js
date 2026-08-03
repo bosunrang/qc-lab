@@ -47,6 +47,7 @@ const MODALS = [
   { page: 'manage', label: 'manage:edit-instrument', open: () => openConfigInstrument('I1') },
   { page: 'manage', label: 'manage:edit-lot', open: () => openConfigLot('L1101') },
   { page: 'manage', label: 'manage:edit-assay', open: () => openConfigAssay('T-NA') },
+  { page: 'manage', label: 'manage:tea-lab-profile', open: () => teaLabProfileOpen('qclab-sodium') },
   { page: 'sigma', label: 'sigma:add-test', open: () => sgOpenAddTest() },
   { page: 'sigma', label: 'sigma:add-bias', open: () => sgOpenBias(sgData(state.tests[0].id)[0].id, 1) },
   // Ngân sách MU (ISO 15189:2022 §7.3.4) — form nhiều mức, có input số, select và

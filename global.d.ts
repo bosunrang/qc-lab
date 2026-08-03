@@ -24,7 +24,7 @@ declare var entrySel: any, entryDays: any, entryStart: any, entryEnd: any, entry
   entryQ: any, entryMachine: any, entryLastMsg: any, entryAutoOpenKey: any,
   entryPendingSheetFocus: any, entryJumpToday: any, entryLjRenderCache: any,
   entryPartialRenderCache: any, entryPrevOpen: any, entryExpandedTables: any, entryDetailOpen: any, treeOpen: any,
-  entryExtraRun: any;
+  entryExtraRun: any, entryTreeCollapsed: any;
 declare var manageQ: any, manageTab: any, manageTargetPanel: any, manageTargetGroup: any,
   manageTargetLevel: any, manageHistoryTest: any, targetSwitchCtx: any, configNavScroll: any;
 declare var rcId: any, rcSaveT: any, rcModalQ: any, rcCreateModalQ: any, rcQuickType: any;
