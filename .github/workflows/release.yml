@@ -8,6 +8,11 @@ on:
   push:
     tags:
       - 'v*'
+  # Cho phép chạy lại thủ công từ tab Actions (chọn nhánh main) mà không cần tạo
+  # tag mới — dùng khi cần build lại release hiện có sau khi sửa workflow, vì
+  # electron-builder tự suy ra tag release ("v"+version) từ package.json, không
+  # phụ thuộc ref nào đã trigger job.
+  workflow_dispatch: {}
 
 permissions:
   contents: write
@@ -22,6 +27,26 @@ jobs:
           node-version: lts/*
           cache: npm
       - run: npm ci
+      # electron-builder upload .exe/.blockmap/latest.yml song song; nếu release cho
+      # tag này CHƯA tồn tại, cả 3 lần upload cùng kiểm tra "có release chưa" gần như
+      # đồng thời rồi đều tự tạo mới — ra 2 release trùng tag, mỗi bên giữ một phần
+      # file (gặp thật ở v2.7.2, 2026-08-04: một release chỉ có .blockmap và chính
+      # release đó lại là bản GET /releases/latest trả về — electron-updater sẽ không
+      # thấy latest.yml, coi như lặp lại lỗi v2.6.0). Tạo sẵn release rỗng bằng gh ở
+      # đây để electron-builder tìm thấy nó mà dùng, không còn gì để đua nhau tạo mới.
+      # Tag tính từ package.json (không dùng github.ref_name) vì workflow_dispatch
+      # có thể chạy trên nhánh main, không phải trên chính tag đó.
+      - name: Ensure GitHub Release exists before electron-builder uploads
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v$(node -e "console.log(require('./package.json').version)")"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          if ! gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release create "$TAG" --repo "${{ github.repository }}" \
+              --title "QC Lab $TAG" --notes "Tu dong build boi GitHub Actions."
+          fi
       - run: npm run dist:publish
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
