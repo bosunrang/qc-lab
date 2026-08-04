@@ -168,12 +168,12 @@
   min-height:32px; padding:4px 7px;
 }
 
-.sg-row-action-buttons button.btn.teal.sg-row-cv{
-  box-sizing:border-box; flex:0 0 auto; height:28px; border:none; background:var(--teal); color:var(--on-accent);
+.sg-row-action-buttons button.btn.sg-row-cv{
+  box-sizing:border-box; flex:0 0 auto; height:28px; border:1px solid var(--success-border); background:var(--success-bg); color:var(--success-ink);
 }
 
-.sg-row-action-buttons button.btn.teal.sg-row-cv:hover{
-  background:var(--teal-deep); color:var(--on-accent);
+.sg-row-action-buttons button.btn.sg-row-cv:hover{
+  background:color-mix(in srgb, var(--success-bg) 70%, var(--success-ink) 30%);
 }
 
 .sg-data-head{
@@ -194,6 +194,55 @@
 
 .sg-selected-period-hint{
   margin-bottom:8px;
+}
+
+/* Xuất/in tổng hợp tách khỏi header (2026-08-04): trước gộp chung với "Bias EQA%
+   Mức.."/"+ Thêm kỳ" trên cùng một hàng — hai loại thao tác khác bản chất (nhập
+   liệu vs xuất báo cáo) nên tách ra chân bảng, đọc tự nhiên theo mạch tiêu đề →
+   bảng → xuất bảng. Chỉ render khi có kỳ (combinedExport rỗng nếu chưa có dữ liệu). */
+.sg-data-foot{
+  display:flex; justify-content:flex-start; gap:8px; flex-wrap:wrap; padding:8px 16px; border-top:1px solid var(--section-head-border);
+}
+
+/* Thu gọn OPSpecs/MU (2026-08-04): trang Sigma xếp 6 panel liên tiếp, hai panel
+   này là tra cứu/cấu hình chứ không xem hàng ngày như "Tình trạng"/"Số liệu theo
+   kỳ" — cùng cách làm với .wg-guide bên Westgard, đóng mặc định và không nhớ
+   trạng thái qua các lần rerender (Westgard cũng vậy). #sgFreq/#sgMU vẫn được
+   sgRefresh() điền nội dung qua getElementById() như cũ, bất kể đang đóng hay mở. */
+.sg-collapse-summary{
+  display:flex; align-items:center; gap:12px; min-height:var(--panel-header-min-height); padding:9px 14px; border-bottom:1px solid transparent; background:var(--section-head-bg); color:var(--section-head-ink); cursor:pointer; list-style:none;
+}
+
+.sg-collapse-summary::-webkit-details-marker{
+  display:none;
+}
+
+.sg-collapse-summary::after{
+  content:"+"; flex:none; color:var(--muted); font-weight:800; font-size:16px;
+}
+
+.sg-collapse-panel[open] > .sg-collapse-summary{
+  border-bottom-color:var(--section-head-border);
+}
+
+.sg-collapse-panel[open] > .sg-collapse-summary::after{
+  content:"−";
+}
+
+.sg-collapse-summary > span{
+  flex:1; min-width:0; font-size:14px; font-weight:850;
+}
+
+/* #sgMUAction tái dùng class .sg-data-head-actions (nút "Nhập u(Cal)...") để đồng bộ
+   kiểu nút với "Số liệu theo kỳ", nhưng rule mobile width:100% của class đó (dựng cho
+   .sg-data-head xếp cột) sẽ đè lên ngữ cảnh mới này và ép span tiêu đề co về 0, vỡ chữ
+   từng ký tự. Ghim lại auto để tiêu đề luôn có chỗ, bất kể breakpoint nào. */
+.sg-collapse-summary .sg-data-head-actions{
+  width:auto;
+}
+
+.sg-collapse-body{
+  margin:var(--panel-content-gap) 16px 16px;
 }
 
 .sg-mu-panel > #sgMU{
@@ -220,10 +269,6 @@
 .sg-mu-summary-table th:not(:first-child):not(:last-child),
 .sg-mu-summary-table td:not(:first-child):not(:last-child){
   text-align:center;
-}
-
-.sg-bias-action-icon{
-  display:inline-flex; align-items:center; justify-content:center; width:17px; font-size:15px; line-height:1; filter:saturate(.9);
 }
 
 .sg-chart-grid{

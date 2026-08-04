@@ -882,9 +882,11 @@
 /* Thu gọn riêng cây danh mục nội kiểm để nhường toàn bộ chiều ngang cho bảng nhập.
    Cây chỉ bị ẩn, không bị dựng lại, nên vị trí cuộn và các nhóm đang mở được giữ nguyên. */
 .entrygrid{position:relative}
-.entry-tree-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 4px}
-.entry-tree-head h4{min-width:0;flex:1;margin:0;padding:10px 8px}
+.entry-tree-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 6px 6px 4px;background:var(--section-head-bg);border-bottom:1px solid var(--section-head-border)}
+.entry-tree-head h4{min-width:0;flex:1;margin:0;padding:4px 8px;background:none;border-bottom:none;min-height:auto}
 button.btn.entry-tree-toggle,button.btn.entry-tree-expand{width:32px;height:32px;min-height:32px;flex:none;border-radius:var(--radius-md)}
+button.btn.entry-tree-toggle{background:rgba(11,116,125,.12);border:1px solid rgba(11,116,125,.35);color:var(--tealink)}
+button.btn.entry-tree-toggle:hover{background:rgba(11,116,125,.22)}
 button.btn.entry-tree-toggle svg,button.btn.entry-tree-expand svg{width:17px;height:17px}
 button.btn.entry-tree-expand{display:none;position:absolute;left:12px;top:16px;z-index:12;box-shadow:0 8px 20px rgba(18,50,60,.18)}
 .entrygrid.tree-collapsed{grid-template-columns:minmax(0,1fr)}
