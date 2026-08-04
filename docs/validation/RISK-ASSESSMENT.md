@@ -41,3 +41,14 @@ hành `minimatch` vá cho các nhánh 1.x/2.x, và ép `overrides: brace-expansi
 build hỏng. Kiểm soát: chấp nhận rủi ro, rà lại mỗi kỳ phát hành khi
 `npm run verify-release` in dòng "Build tooling audit", và chỉ dựng bản phát hành
 trên máy build được kiểm soát.
+
+Cập nhật 2026-08-04: `npm audit` (nhánh devDependencies) phát hiện thêm advisory
+`fast-uri` GHSA-7p8r-x3mc-p8w7 (host confusion qua dấu `\` mở đầu authority, severity
+high, dải bị ảnh hưởng `3.0.0 - 3.1.4`) — lan qua
+`electron-builder → app-builder-lib → ajv@8.20.0 → fast-uri@3.1.4`. Đánh giá giống hệt
+brace-expansion ở trên: đây là dependency của `ajv` (electron-builder dùng để validate
+schema config lúc build), không nằm trong cây phụ thuộc của `electron-updater` (dependency
+runtime duy nhất được đóng gói) và không thuộc `build.files`, nên không có mã lỗi nào lọt
+vào bản cài đặt giao cho phòng xét nghiệm — `npm audit --omit=dev --audit-level=high` (cổng
+chặn release) vẫn báo 0 lỗ hổng. Kiểm soát: chấp nhận rủi ro theo cùng cơ chế R-12b, không
+thêm `overrides` khi chưa xác nhận nó không phá `npm run dist`/`dist:publish`.

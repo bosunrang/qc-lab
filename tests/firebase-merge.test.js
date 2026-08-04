@@ -311,6 +311,19 @@ const plain = (v) => JSON.parse(JSON.stringify(v));
   assert.deepEqual(merged2.instruments, [], 'a local delete sticks even while the cloud still holds the old copy');
 }
 
+// --- Scenario 17c (2026-08-04 fix): a LOCAL delete must not silently discard a REMOTE edit ---
+// Before this fix, mergePointArray()'s local-delete branch returned unconditionally,
+// so device B deleting an instrument that device A had already renamed (and pushed)
+// would drop A's rename with no trace, even though the symmetric remote-delete case
+// (Scenario 17 above) already protected a local edit from a remote delete.
+{
+  const base = baseState({ instruments: [{ id: 'iA', name: 'Máy B' }] });
+  const localDeleted = baseState({ instruments: [] });
+  const remoteEdited = baseState({ instruments: [{ id: 'iA', name: 'Máy B - Khoa SH' }] });
+  const merged = plain(ctx.fbMerge(localDeleted, remoteEdited, base));
+  assert.deepEqual(merged.instruments.map(x => x.name), ['Máy B - Khoa SH'], 'a remote edit beats a local delete on the same item (symmetric with Scenario 17)');
+}
+
 // --- Scenario 17b: QC points keep the OLD semantics — absence is NOT a delete (deletes:true is list-only) ---
 // (scenario 3b already covers the stale-array case; this pins the base-has-it/remote-lacks-it case directly.)
 {

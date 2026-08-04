@@ -13,6 +13,12 @@ function rcLgamma(x){const c=[76.18009172947146,-86.50532032941677,24.0140982408
 function rcBetai(a,b,x){if(x<=0)return 0;if(x>=1)return 1;let bt=Math.exp(rcLgamma(a+b)-rcLgamma(a)-rcLgamma(b)+a*Math.log(x)+b*Math.log(1-x));return x<(a+1)/(a+b+2)?bt*rcBetacf(a,b,x)/a:1-bt*rcBetacf(b,a,1-x)/b;}
 function rcPTwo(t,df){return rcBetai(df/2,0.5,df/(df+t*t));}
 function rcTCrit(df,alpha){let lo=0,hi=1000;for(let i=0;i<200;i++){let mid=(lo+hi)/2;if(rcPTwo(mid,df)>alpha)lo=mid;else hi=mid;}return(lo+hi)/2;}
+/* rcMax/rcMin thay Math.max(...a)/Math.min(...a): spread mỗi phần tử thành một tham số
+   hàm riêng, nên mảng đủ lớn (nhập tay hiếm khi tới, nhưng import backup thì có thể) sẽ
+   ném RangeError "Maximum call stack size exceeded" và vỡ cả trang so sánh/báo cáo thay
+   vì chỉ chậm đi. reduce() không có giới hạn kiểu này. */
+function rcMax(a){return a.reduce((m,v)=>v>m?v:m,a[0]);}
+function rcMin(a){return a.reduce((m,v)=>v<m?v:m,a[0]);}
 function rcMean(a){return a.reduce((s,v)=>s+v,0)/a.length;}
 function rcVar(a){const mu=rcMean(a);return a.reduce((s,v)=>s+(v-mu)**2,0)/(a.length-1);}
 function rcPearson(x,y){const n=x.length;let sx=0,sy=0,sxy=0,sx2=0,sy2=0;for(let i=0;i<n;i++){sx+=x[i];sy+=y[i];sxy+=x[i]*y[i];sx2+=x[i]*x[i];sy2+=y[i]*y[i];}const den=Math.sqrt((n*sx2-sx*sx)*(n*sy2-sy*sy));return den===0?0:(n*sxy-sx*sy)/den;}
@@ -23,7 +29,7 @@ function rcValid(ds){const o=[],n=[];ds.rows.forEach(r=>{const a=parseFloat(r[0]
 function rcPairCalc(r){const a=parseFloat(r&&r[0]),b=parseFloat(r&&r[1]);return Number.isFinite(a)&&Number.isFinite(b)?{avg:(a+b)/2,dif:a-b}:null;}
 function rcCalc(ds){const {o,n}=rcValid(ds);if(o.length<RC_MIN_PAIRS)return null;
   const N=o.length,df=N-1,d=o.map((v,i)=>v-n[i]);const mO=rcMean(o),mN=rcMean(n),vO=rcVar(o),vN=rcVar(n),md=rcMean(d),sdd=Math.sqrt(rcVar(d));
-  const dRange=Math.max(...d)-Math.min(...d),degenerate=dRange<1e-9*(Math.abs(mO)+Math.abs(mN)+1);
+  const dRange=rcMax(d)-rcMin(d),degenerate=dRange<1e-9*(Math.abs(mO)+Math.abs(mN)+1);
   const tStat=degenerate?(md===0?0:(md>0?Infinity:-Infinity)):md/(sdd/Math.sqrt(N)),r=rcPearson(o,n);
   const alpha=parseFloat(ds.test.alpha)||0.05,p2=isFinite(tStat)?rcPTwo(tStat,df):0;
   const bias=mO?Math.abs((mO-mN)/Math.abs(mO))*100:(mN?Infinity:0),biasT=parseFloat(ds.test.biasTarget)||6,coverage=!!ds.test.coverageConfirmed,enoughN=N>=20;
@@ -57,14 +63,14 @@ function rcMiniIcon(type){
   if(type==='sample')return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5h6"/><path d="M9 3h6v4H9z"/><rect x="6" y="5" width="12" height="16" rx="2"/><path d="M9 11h6M9 15h6"/></svg>';
   return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 11a4 4 0 1 0-8 0"/><path d="M4 21a8 8 0 0 1 16 0"/><path d="M17.5 7.5a3 3 0 0 1 2.6 4.5"/><path d="M20.5 21a6 6 0 0 0-3-5.2"/></svg>';
 }
-function rcScatterSVG(R,t){const W=460,H=380;let lo=Math.min(...R.o,...R.n),hi=Math.max(...R.o,...R.n);[lo,hi]=rcPadr(lo,hi);
+function rcScatterSVG(R,t){const W=460,H=380;const both=R.o.concat(R.n);let lo=rcMin(both),hi=rcMax(both);[lo,hi]=rcPadr(lo,hi);
   const A=rcAxis(W,H,lo,hi,lo,hi,'Lô cũ ('+(t.lotOld||'cũ')+')','Lô mới ('+(t.lotNew||'mới')+')');let g=A.g;
   g+=`<line x1="${A.px(lo)}" y1="${A.py(lo)}" x2="${A.px(hi)}" y2="${A.py(hi)}" stroke="${RCC.muted}" stroke-width="1.4" stroke-dasharray="5 4"/>`;
   g+=`<line x1="${A.px(lo)}" y1="${A.py(R.pb.a+R.pb.b*lo)}" x2="${A.px(hi)}" y2="${A.py(R.pb.a+R.pb.b*hi)}" stroke="${RCC.teal}" stroke-width="2"/>`;
   R.o.forEach((v,i)=>g+=`<circle cx="${A.px(v)}" cy="${A.py(R.n[i])}" r="4.5" fill="${RCC.teal}" fill-opacity="0.78" stroke="#fff" stroke-width="1.2"/>`);
   return`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto" xmlns="http://www.w3.org/2000/svg">${g}</svg>`;}
 function rcBlandSVG(R){const W=460,H=380,av=R.o.map((v,i)=>(v+R.n[i])/2),up=R.md+1.96*R.sdd,low=R.md-1.96*R.sdd;
-  let xlo=Math.min(...av),xhi=Math.max(...av);[xlo,xhi]=rcPadr(xlo,xhi);let ylo=Math.min(...R.d,low),yhi=Math.max(...R.d,up);[ylo,yhi]=rcPadr(ylo,yhi);
+  let xlo=rcMin(av),xhi=rcMax(av);[xlo,xhi]=rcPadr(xlo,xhi);let ylo=rcMin(R.d.concat(low)),yhi=rcMax(R.d.concat(up));[ylo,yhi]=rcPadr(ylo,yhi);
   const A=rcAxis(W,H,xlo,xhi,ylo,yhi,'Trung bình (cũ + mới)/2','Hiệu số (cũ − mới)');let g=A.g;
   const ln=(yv,col,dash,txt)=>`<line x1="${A.px(xlo)}" y1="${A.py(yv)}" x2="${A.px(xhi)}" y2="${A.py(yv)}" stroke="${col}" stroke-width="1.6"${dash?' stroke-dasharray="5 4"':''}/><text x="${A.px(xhi)}" y="${A.py(yv)-4}" font-size="10" fill="${col}" text-anchor="end">${txt} ${+yv.toFixed(3)}</text>`;
   g+=`<line x1="${A.px(xlo)}" y1="${A.py(0)}" x2="${A.px(xhi)}" y2="${A.py(0)}" stroke="${RCC.line}"/>`;
@@ -78,7 +84,7 @@ function pageReagent(){
   if(!rcId||!state.reagentTests.find(d=>d.id===rcId))rcId=state.reagentTests[0].id;
   const ds=rcAct(),t=ds.test,ro=!canWrite()?'disabled':'';
   const oldLotHead='Lô cũ'+(t.lotOld?`: ${esc(t.lotOld)}`:''),newLotHead='Lô mới'+(t.lotNew?`: ${esc(t.lotNew)}`:'');
-  const rows=ds.rows.map((r,i)=>{const c=rcPairCalc(r);return `<div class="rc-pair-row" data-rc-row="${i}"><div class="rc-idx">${i+1}</div><input ${ro} value="${r[0]}" oninput="rcCell(${i},0,this.value)" type="number" step="any" placeholder="–"><input ${ro} value="${r[1]}" oninput="rcCell(${i},1,this.value)" type="number" step="any" placeholder="–"><div class="rc-calc avg">${c?fmt(c.avg,3):'–'}</div><div class="rc-calc dif ${c&&c.dif<0?'neg':''}">${c?fmt(c.dif,3):'–'}</div>${canWrite()?`<button class="x" onclick="rcRmRow(${i})" title="Xóa dòng">✕</button>`:'<span></span>'}</div>`;}).join('');
+  const rows=ds.rows.map((r,i)=>{const c=rcPairCalc(r);return `<div class="rc-pair-row" data-rc-row="${i}"><div class="rc-idx">${i+1}</div><input ${ro} value="${escAttr(r[0])}" oninput="rcCell(${i},0,this.value)" type="number" step="any" placeholder="–"><input ${ro} value="${escAttr(r[1])}" oninput="rcCell(${i},1,this.value)" type="number" step="any" placeholder="–"><div class="rc-calc avg">${c?fmt(c.avg,3):'–'}</div><div class="rc-calc dif ${c&&c.dif<0?'neg':''}">${c?fmt(c.dif,3):'–'}</div>${canWrite()?`<button class="x" onclick="rcRmRow(${i})" title="Xóa dòng">✕</button>`:'<span></span>'}</div>`;}).join('');
   return headOnly('So sánh 2 lô hóa chất','Sàng lọc định lượng · hồi quy mô tả · Bland-Altman · phê duyệt theo SOP')+
    `<div class="panel rc-toolbar-panel"><h3 role="heading" aria-level="2">Thiết lập so sánh</h3><div class="rc-toolbar">
      <div class="rc-toolbar-selcol"><label>Chọn hóa chất</label><select id="rcSel" aria-label="Chọn hóa chất" onchange="rcSwitch(this.value)">${rcSelectOptions()}</select></div>

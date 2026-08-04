@@ -721,10 +721,6 @@
   padding:11px 12px;
 }
 
-.lj-mini .chart-scroll canvas.entryLJStack{
-  width:100%; min-width:0; max-width:none;
-}
-
 .entry-secondary-panel{
   padding:0; overflow:hidden;
 }

@@ -81,7 +81,12 @@ assert.equal((dashboardCss.match(/\.dash-main \.alert\{/g)||[]).length,1,'dashbo
 assert.match(entryCss, /\.qc-cumulative-note\{margin:var\(--panel-content-gap\) 16px 0\}/);
 assert.match(entryCss, /\.lj-range\{\s*margin:var\(--panel-content-gap\) 16px 12px/);
 assert.match(entryCss, /\.entry-secondary-summary:focus-visible\{\s*outline:2px solid var\(--focus-outline\)/);
-assert.match(entryCss, /\.lj-mini \.chart-scroll canvas\.entryLJStack\{\s*width:100%; min-width:0;/);
+// 2026-08-04: gỡ bỏ override ép canvas.entryLJStack co về 100% bề rộng thẻ —
+// setupHiDPICanvas() luôn vẽ ở logic width tối thiểu 760px, nên ép CSS width
+// hẹp hơn mà không cho cuộn ngang khiến toàn bộ canvas bị bóp méo trên điện
+// thoại thật (khác hẳn bề rộng logic đã vẽ). Biểu đồ này giờ dùng chung quy tắc
+// .chart-scroll canvas với biểu đồ Westgard (min-width:780px/900px + cuộn ngang).
+assert.doesNotMatch(entryCss, /\.lj-mini \.chart-scroll canvas\.entryLJStack\{/);
 assert.match(entryCss, /\.tree \.tn-config\{[^}]*font-size:var\(--type-body\)/);
 assert.match(entryCss, /\.lj-qc-stat:not\(\.control\)\+\.lj-qc-stat\.control\{[^}]*border-left:2px solid/);
 assert.match(entryCss, /\.lj-mini-h b\{[^}]*font-size:var\(--type-body\)/);

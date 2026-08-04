@@ -102,18 +102,23 @@ function fbPointKey(p){return p&&p.id!=null?'#'+String(p.id):'~'+JSON.stringify(
 /* Trộn 3 chiều một mảng (data/{testId}, sigmaData/{testId}, hoặc bất kỳ nhánh nào trong
    FB_LIST_KEYS) theo TỪNG PHẦN TỬ, không theo toàn bộ mảng: hai máy cùng sửa một nhánh
    nhưng KHÁC phần tử nhau (thêm phần tử mới, sửa phần tử khác) sẽ giữ lại cả hai bên
-   thay vì một bên ghi đè toàn bộ bên kia. Quy ước xung đột: nếu CÙNG một phần tử (cùng
-   id) bị đổi khác nhau ở cả hai bên, bên cục bộ (local) thắng — nhất quán với cách các
-   nhánh "cả khối" còn lại xử lý xung đột (xem fbMerge). Với data/{testId}: điểm bị hủy
-   (voided) vẫn chỉ là một điểm bị SỬA (không bị xóa khỏi mảng) nên được xử lý như mọi
-   thay đổi khác, không cần logic riêng; normalizePointLots() chỉ xử lý runId trùng do
-   merge offline, không đánh lại runId lịch sử chỉ vì một điểm bị hủy. */
+   thay vì một bên ghi đè toàn bộ bên kia. Quy ước xung đột khi CÙNG một phần tử (cùng
+   id) bị SỬA khác nhau ở cả hai bên (không phần nào xóa): bên cục bộ (local) thắng —
+   nhất quán với cách các nhánh "cả khối" còn lại xử lý xung đột (xem fbMerge). Riêng
+   xóa-vs-sửa thì đối xứng, xem comment trong mergePointArray(). Với data/{testId}:
+   điểm bị hủy (voided) vẫn chỉ là một điểm bị SỬA (không bị xóa khỏi mảng) nên được xử
+   lý như mọi thay đổi khác, không cần logic riêng; normalizePointLots() chỉ xử lý runId
+   trùng do merge offline, không đánh lại runId lịch sử chỉ vì một điểm bị hủy. */
 function mergePointArray(localArr,remoteArr,baseArr,opts){
   // Chế độ xóa (opts.deletes — bật cho các nhánh FB_LIST_KEYS): phần tử có trong base
   // nhưng biến mất ở một bên là BỊ XÓA THẬT (nút Xóa trong danh mục máy/panel/lô/người
   // dùng...) và phải lan sang máy khác — nếu không, máy khác đang giữ bản cũ sẽ "hồi
-  // sinh" mục vừa xóa ở lần đồng bộ kế tiếp. Ngoại lệ: bên còn lại đã SỬA phần tử đó so
-  // với base thì bản sửa thắng lệnh xóa (không mất thay đổi thật).
+  // sinh" mục vừa xóa ở lần đồng bộ kế tiếp. Ngoại lệ ĐỐI XỨNG hai chiều: bên còn lại đã
+  // SỬA phần tử đó so với base thì bản sửa thắng lệnh xóa (không mất thay đổi thật) — dù
+  // bên xóa là local hay remote. Trước 2026-08-04 chỉ có remote-xóa mới được xử lý đối
+  // xứng; local-xóa luôn thắng vô điều kiện, nên máy B xóa một thiết bị mà máy A vừa đổi
+  // tên (và đã đồng bộ lên) sẽ âm thầm xóa mất luôn bản đổi tên đó khi B đồng bộ lại —
+  // đúng kiểu mất dữ liệu mà đoạn mở đầu file này (fbMerge) nói là phải tránh.
   // data/{testId}/sigmaData KHÔNG bật chế độ này: một điểm QC vắng mặt trong mảng không
   // phải tín hiệu xóa tin cậy (autosave ghi nguyên mảng, máy chưa cập nhật có thể thiếu
   // điểm máy khác vừa thêm) — hủy điểm QC thật được biểu diễn bằng field `voided`;
@@ -131,8 +136,9 @@ function mergePointArray(localArr,remoteArr,baseArr,opts){
   order.forEach(k=>{
     const bS=ser(bMap,k),lS=ser(lMap,k),rS=ser(rMap,k);
     if(respectDeletes&&bS!=null){
-      if(lS==null)return;          // máy này đã xóa -> quyết định xóa thắng (quy ước cục bộ thắng)
-      if(rS==null&&lS===bS)return; // máy khác xóa, máy này không sửa -> chấp nhận xóa
+      if(lS==null&&rS==null)return;                                        // cả hai đều xóa -> xóa thật
+      if(lS==null){if(rS===bS)return;out.push(fbClone(rMap.get(k)));return;} // local xóa: remote không đổi -> chấp nhận xóa; remote đã sửa -> bản sửa thắng
+      if(rS==null){if(lS===bS)return;out.push(fbClone(lMap.get(k)));return;} // remote xóa: local không đổi -> chấp nhận xóa; local đã sửa -> bản sửa thắng
     }
     const winner=lS!=null&&lS!==bS?lMap.get(k):(rS!=null&&rS!==bS?rMap.get(k):(rMap.get(k)||lMap.get(k)));
     if(winner)out.push(fbClone(winner));

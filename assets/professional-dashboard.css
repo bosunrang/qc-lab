@@ -319,7 +319,7 @@ textarea:focus,
 }
 
 .dash-test-filterbar .dash-test-search{
-  max-width:none; min-width:0; margin-left:0;
+  flex:none; max-width:none; min-width:0; margin-left:0;
 }
 
 .dash-status{

@@ -330,16 +330,23 @@ function focusLoginField(){
   const user=document.getElementById('liUser');
   if(user)user.focus();
 }
+/* Lưu số lần sai/thời điểm hết khóa vào localStorage — chỉ giữ trong biến JS thì tải
+   lại trang (F5) là reset về 0, vô hiệu hoá cơ chế chống dò mật khẩu ngay lập tức. */
+function persistLoginLockout(){try{localStorage.setItem('qclab_login_lockout',JSON.stringify({fails:loginFails,until:loginLockUntil}));}catch(e){}}
 async function doLogin(){
-  if(Date.now()<loginLockUntil){showLogin('Sai mật khẩu quá nhiều lần. Thử lại sau '+Math.ceil((loginLockUntil-Date.now())/1000)+' giây.');return;}
   const u=document.getElementById('liUser').value.trim().toLowerCase();const p=document.getElementById('liPass').value;
+  // Thông báo lỗi KHÔNG được phân biệt "tài khoản không tồn tại" với "sai mật khẩu" —
+  // nếu không kẻ dò có thể dùng đó để liệt kê username hợp lệ trước khi dò mật khẩu.
+  // Chi tiết thật (để phân biệt khi tra soát) chỉ ghi vào nhật ký hoạt động nội bộ.
+  const genericFailMsg='Tên đăng nhập hoặc mật khẩu không đúng.';
+  if(Date.now()<loginLockUntil){showLogin('Sai mật khẩu quá nhiều lần. Thử lại sau '+Math.ceil((loginLockUntil-Date.now())/1000)+' giây.');return;}
   if(typeof storageHydrationPromise!=='undefined'&&!await storageHydrationPromise){showStartupRecovery();return;}
   const user=state.users.find(x=>x.username===u);
-  const failOnce=msg=>{loginFails++;if(loginFails>=5){loginLockUntil=Date.now()+30000;loginFails=0;}showLogin(msg);};
-  if(!user||user.active===false){failOnce('Tài khoản không tồn tại hoặc đã bị khóa.');return;}
+  const failOnce=(logDetail,msg)=>{loginFails++;if(loginFails>=5){loginLockUntil=Date.now()+30000;loginFails=0;}persistLoginLockout();logAct('Đăng nhập thất bại',logDetail,u);save({cloud:false,clearDerived:false});showLogin(msg);};
+  if(!user||user.active===false){failOnce('Tài khoản không tồn tại hoặc đã bị khóa',genericFailMsg);return;}
   let ok=false;try{ok=await verifyPass(p,user.passHash);}catch(e){showLogin('Không thể kiểm tra mật khẩu trên trình duyệt này.');return;}
-  if(!ok){failOnce('Sai mật khẩu.');return;}
-  loginFails=0;loginLockUntil=0;
+  if(!ok){failOnce('Sai mật khẩu',genericFailMsg);return;}
+  loginFails=0;loginLockUntil=0;persistLoginLockout();
   currentUser=user;logAct('Đăng nhập','Đăng nhập thành công','Tài khoản');
   if(user.username==='admin'&&p==='admin'&&!String(user.passHash||'').startsWith('pbkdf2$'))user.mustChangePassword=true;
   else if(!String(user.passHash||'').startsWith('pbkdf2$')||+(String(user.passHash).split('$')[1]||0)<PASS_ITERATIONS){
