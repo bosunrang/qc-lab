@@ -38,9 +38,6 @@ declare var AnalysisUIState: any, AuthUIState: any, EntryUIState: any, ManageUIS
 declare var EntryService: any, PeriodService: any, ReagentComparisonService: any, ChartViewModel: any,
   SigmaCohortService: any, WestgardViewModel: any, ActionWorkflowService: any;
 
-// entry-service.js also aliases two of its members directly onto root
-declare var nextRunId: any, cleanEntryRunId: any;
-
 // action-workflow-service.js does Object.assign(root, root.ActionWorkflowService)
 declare var actionApprovalStatus: any, actionRecordStatus: any, actionCancelled: any, actionApprovalLabel: any, actionRecorded: any, actionCanApprove: any,
   actionPoint: any, actionEventDate: any, actionNeedsRerun: any, actionRerunStatus: any, actionWorkflowStatus: any,

@@ -1,0 +1,27 @@
+name: Release
+
+# Chạy khi push tag v* (v2.7.2, ...). Thay hoàn toàn bước kéo-thả tay file .exe
+# lên GitHub Releases — nguyên nhân v2.6.0 và v2.7.2 đều thiếu latest.yml/
+# .exe.blockmap (xem docs/validation/RELEASE-PUBLISH.md). `npm run dist:publish`
+# luôn build và upload cả ba file cùng lúc nên không còn chỗ để quên.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-publish:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+      - run: npm ci
+      - run: npm run dist:publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -599,8 +599,8 @@
   margin:0; padding:0 12px 10px; border-bottom:1px solid var(--section-head-border); color:var(--muted); font-size:var(--type-body-sm); font-weight:500; line-height:1.55;
 }
 
-label, .rc-field label{
-  color:var(--muted) !important; font-size:var(--type-meta) !important; font-weight:700 !important; letter-spacing:0 !important;
+.rc-field label, .rc-toolbar-selcol label{
+  color:var(--muted); font-size:var(--type-meta); font-weight:700; letter-spacing:0;
 }
 
 .rc-stat-value{

@@ -129,7 +129,12 @@ function ljDataURL(points,mean,sd){const c=document.createElement('canvas');c.wi
 function drawLJMultiZ(canvas,levelViews,test,opts){
   const{ctx,W,H}=setupHiDPICanvas(canvas);
   canvas._ljCssW=W;canvas._ljCssH=H;canvas._ljHover=[];
-  const padL=56,padR=78,padT=34,padB=46,cw=W-padL-padR,ch=H-padT-padB,markPad=10;
+  /* padT=44 (không phải 34): chừa riêng một dòng cho chú giải Mức/lô phía trên
+     dòng tiêu đề "Levey-Jennings tổng hợp theo Z-score" — lô dài (VD "TDM
+     79979900") kéo chú giải đủ rộng để chạm vào tiêu đề canh giữa nếu hai dòng
+     chỉ cách nhau vài px như trước (báo lỗi 2026-08-03, sau khi đã sửa khoảng
+     cách GIỮA các mục chú giải ở lượt trước). */
+  const padL=56,padR=78,padT=44,padB=46,cw=W-padL-padR,ch=H-padT-padB,markPad=10;
   const levels=(levelViews||[]).filter(v=>v&&v.pts&&v.pts.length&&Number.isFinite(+v.mean)&&Number.isFinite(+v.sd)&&+v.sd>0).slice(0,6);
   const all=levels.flatMap(v=>v.pts.map((p,i)=>({view:v,p,i,z:(Number(p.val)-Number(v.mean))/Number(v.sd),run:String(p.runId||p.date||''),date:p.date||''})));
   const runs=[...new Set(all.map(o=>o.run||o.date))].sort((a,b)=>String(a).localeCompare(String(b),'vi',{numeric:true})),runIndex=new Map(runs.map((run,i)=>[run,i]));
@@ -194,7 +199,20 @@ function drawLJMultiZ(canvas,levelViews,test,opts){
     });
   });
   ctx.restore();
-  levels.forEach((v,li)=>{const x=padL+8+li*118,y0=10,color=colors[li%colors.length];ctx.fillStyle=color;ctx.fillRect(x,y0,18,4);ctx.fillStyle='#17212b';ctx.font='800 11px Manrope, Arial, sans-serif';ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(v.label||`Mức ${v.level}`,x+25,y0+2);});
+  /* Chú giải: khoảng cách giữa các mục PHẢI theo đúng bề rộng chữ đo được (canvas
+     không tự xuống dòng/co chữ như HTML) — cố định 118px/mục từng khiến lô dài
+     (VD "M1·TDM 79979900") đè lên khối màu của mục kế tiếp, đúng lỗi người dùng
+     báo 2026-08-03. */
+  {
+    const y0=10;ctx.font='800 11px Manrope, Arial, sans-serif';ctx.textAlign='left';ctx.textBaseline='middle';
+    let legendX=padL+8;
+    levels.forEach((v,li)=>{
+      const color=colors[li%colors.length],label=v.label||`Mức ${v.level}`;
+      ctx.fillStyle=color;ctx.fillRect(legendX,y0,18,4);
+      ctx.fillStyle='#17212b';ctx.fillText(label,legendX+25,y0+2);
+      legendX+=25+ctx.measureText(label).width+20;
+    });
+  }
   bindLJTooltip(canvas);
 }
 function ljMultiDataURL(levelViews,test,opts){const c=document.createElement('canvas');c.width=1400;c.height=430;drawLJMultiZ(c,levelViews,test,opts);return c.toDataURL('image/png');}

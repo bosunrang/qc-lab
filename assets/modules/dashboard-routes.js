@@ -45,7 +45,7 @@ function pageDash(){
   }).join('');
   const noTargetHtml=noTarget.slice(0,4).map(o=>`<div class="shift-item warn"><div><b>${esc(testDisplayName(o.t))} · M${o.l.level}</b><div class="meta">Chưa có Mean/SD hợp lệ — điểm QC mức này không được đánh giá Westgard</div></div>${btn('Gán Mean/SD',`go('manage');setManageTab('targets')`,'ghost sm')}</div>`).join('');
   const followHtml=urgentHtml||overdueHtml||watchHtml||noTargetHtml?`<div class="dash-list">${urgentHtml}${overdueHtml}${noTargetHtml}${watchHtml}</div>`:'<div class="alert ok">Không có điểm bị loại/cảnh báo cần xử lý ngay.</div>';
-  const expHtml=[...expByLot.values()].sort((a,b)=>a.d-b.d).slice(0,5).map(e=>`<div class="shift-item ${e.d<0?'rej':'warn'}"><div><b>Lô ${esc(e.l.lot||'?')} · M${e.l.level}</b><div class="meta">${e.count>1?e.count+' xét nghiệm · ':''}${e.d<0?'Hết hạn '+(-e.d)+' ngày':'Còn '+e.d+' ngày'}</div></div><span class="tag ${e.d<0?'rej':'warn'}">${e.d<0?'HSD':'Sắp hết'}</span></div>`).join('')||'<div class="hint">Không có lô sắp hết hạn trong 30 ngày.</div>';
+  const expHtml=[...expByLot.values()].sort((a,b)=>a.d-b.d).slice(0,5).map(e=>`<div class="shift-item ${e.d<0?'rej':'warn'}"><div><b>Lô ${esc(e.l.lot||'?')} · M${e.l.level}</b><div class="meta">${e.count>1?e.count+' xét nghiệm · ':''}${e.d<0?'Hết hạn '+(-e.d)+' ngày':'Còn '+e.d+' ngày'}</div></div><span class="tag ${e.d<0?'rej':'warn'}">${e.d<0?'Hết hạn':'Sắp hết'}</span></div>`).join('')||'<div class="hint">Không có lô sắp hết hạn trong 30 ngày.</div>';
   const dashStatusMatch=(item,key=dashTestStatus)=>{
     if(key==='all')return true;
     if(key==='missing')return item.missingToday;

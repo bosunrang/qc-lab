@@ -254,7 +254,7 @@ function rcReportHeader(title,sub){
 }
 function rcReportSummaryTable(items){
   let h='<table><thead><tr><th>STT</th><th>Hóa chất</th><th>Lô cũ → Lô mới</th><th class="num">n</th><th class="num">r</th><th class="num">%Bias</th><th class="num">P hai phía</th><th>Kết luận</th></tr></thead><tbody>';
-  items.forEach((it,i)=>{const t=it.ds.test,R=it.R;h+=`<tr><td class="num">${i+1}</td><td><b>${esc(t.reagent||'Hóa chất mới')}</b>${t.unit?' <span style="color:${RCC.muted}">('+esc(t.unit)+')</span>':''}</td><td>${esc(t.lotOld||'?')} → ${esc(t.lotNew||'?')}</td><td class="num">${R?R.N:'—'}</td><td class="num">${R?rcFmt(R.r,4):'—'}</td><td class="num">${R?rcFmt(R.bias,2)+'%':'—'}</td><td class="num">${R?rcFmt(R.p2,4):'—'}</td><td>${rcReportPill(R)}</td></tr>`;});
+  items.forEach((it,i)=>{const t=it.ds.test,R=it.R;h+=`<tr><td class="num">${i+1}</td><td><b>${esc(t.reagent||'Hóa chất mới')}</b>${t.unit?` <span style="color:${RCC.muted}">(${esc(t.unit)})</span>`:''}</td><td>${esc(t.lotOld||'?')} → ${esc(t.lotNew||'?')}</td><td class="num">${R?R.N:'—'}</td><td class="num">${R?rcFmt(R.r,4):'—'}</td><td class="num">${R?rcFmt(R.bias,2)+'%':'—'}</td><td class="num">${R?rcFmt(R.p2,4):'—'}</td><td>${rcReportPill(R)}</td></tr>`;});
   return h+'</tbody></table>';
 }
 function rcReportDetail(ds,i=0,pagebreak=false){

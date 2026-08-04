@@ -109,4 +109,30 @@ for (const status of ['planned', 'accepted', 'rejected']) {
   assert.ok(par.byPoint.get('b1').rules.includes('1-3s'), '27 so với Mean 20/SD 2 là +3,5s => phải bắt 1-3s theo Mean/SD của chính lô mới');
 }
 
+// --- Hủy điểm QC (voidQcPoint): kết luận phải theo đúng lô, kể cả lô song song ---
+// Trước 2026-08-03, confirmVoidQcPoint() trong entry-routes.js chỉ tra activeWestgard(t),
+// vốn không phủ điểm của lô song song (xem test cách ly ở trên) — hủy một điểm 1-3s ở lô
+// song song sẽ ghi "Không có luật Westgard"/"invalid" lên hồ sơ NCE thay vì đúng vi phạm.
+// pointVoidVerdict(t,p) (qc-domain.js) là hàm dùng chung duy nhất cho việc này.
+{
+  const state = makeFixture();
+  state.data.t1 = [
+    { id: 'a1', date: '2026-07-01', runId: '2026-07-01-1', level: 1, val: 10.1, lot: 'LOT-A', qcMean: 10, qcSd: 1 },
+    { id: 'b1', date: '2026-07-01', runId: '2026-07-01-1', level: 1, val: 27, lot: 'LOT-B', qcMean: 20, qcSd: 2 }, // z = +3.5
+  ];
+  ctx.__setState(state);
+  const t = state.tests[0];
+
+  const activeVerdict = ctx.pointVoidVerdict(t, state.data.t1.find(p => p.id === 'a1'));
+  assert.equal(activeVerdict.level, 'ok', 'điểm của lô đang vận hành vẫn tra qua activeWestgard như cũ');
+
+  const parallelVerdict = ctx.pointVoidVerdict(t, state.data.t1.find(p => p.id === 'b1'));
+  assert.equal(parallelVerdict.level, 'rej', 'điểm 27 (Mean 20/SD 2 => +3,5s) của lô song song phải được nhận đúng là bị loại');
+  assert.ok(parallelVerdict.rules.includes('1-3s'), 'phải giữ đúng tên luật vi phạm để ghi lên hồ sơ NCE, không được rơi về rỗng');
+
+  const emptyVerdict = ctx.pointVoidVerdict(t, null);
+  assert.equal(emptyVerdict.level, 'ok', 'điểm rỗng không được ném lỗi');
+  assert.equal(emptyVerdict.rules.length, 0, 'điểm rỗng không có luật vi phạm nào');
+}
+
 console.log('Parallel lot run tests passed');

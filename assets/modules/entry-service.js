@@ -248,6 +248,4 @@
   }
 
   root.EntryService={nextRunIdFor,cleanRunId,preparePointInput,saveDateNote,updateDateNoteCommand,addPoint,recordPoint,voidPoint,buildEntryWindow,groupByMachine,buildSheetCalendar,summarizeRunStatus,buildPointView,buildSheetRowsData,sheetFirstRunNo,sheetLevelRuns};
-  root.nextRunId=function(testId,date){return nextRunIdFor(state,testId,date);};
-  root.cleanEntryRunId=cleanRunId;
 })(typeof globalThis!=='undefined'?globalThis:this);

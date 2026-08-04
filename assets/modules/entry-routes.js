@@ -401,7 +401,7 @@ async function voidQcPoint(tid,pointId){
 async function confirmVoidQcPoint(tid,pointId){
   const t=state.tests.find(x=>x.id===tid),p=(state.data[tid]||[]).find(x=>x.id===pointId);
   if(!t||!p||p.voided){closeModal();return;}
-  const input=document.getElementById('voidReasonInput'),kind=(document.getElementById('voidKindInput')||{}).value||'other',openNce=!!((document.getElementById('voidOpenNce')||{}).checked),clean=QCCore.cleanText(input?input.value:'',1000).trim(),verdict=activeWestgard(t).byPoint.get(p.id)||{level:'ok',rules:[]},rules=[...new Set(verdict.rules||[])],rule=rules.join(', ')||'Không có luật Westgard',qcVerdict=['warn','rej'].includes(verdict.level)?verdict.level:'invalid',qcErrorType=errorType(rules);
+  const input=document.getElementById('voidReasonInput'),kind=(document.getElementById('voidKindInput')||{}).value||'other',openNce=!!((document.getElementById('voidOpenNce')||{}).checked),clean=QCCore.cleanText(input?input.value:'',1000).trim(),verdict=pointVoidVerdict(t,p),rules=[...new Set(verdict.rules||[])],rule=rules.join(', ')||'Không có luật Westgard',qcVerdict=['warn','rej'].includes(verdict.level)?verdict.level:'invalid',qcErrorType=errorType(rules);
   if(kind==='other'&&clean.length<5){
     const err=document.getElementById('voidReasonErr');
     if(err)err.style.display='';

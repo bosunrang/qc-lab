@@ -10,6 +10,15 @@ dùng, chỉ thấy trong console.
 > thì release đó không những vô dụng, mà còn *chặn* cập nhật của các bản cũ hơn,
 > vì `electron-updater` luôn hỏi release **mới nhất** rồi mới đọc `latest.yml` ở đó.
 
+> **Từ sau v2.7.2 (lỗi lặp lại y hệt v2.6.0 — chỉ upload tay `.exe`, thiếu
+> `latest.yml`/`.blockmap`): dùng `.github/workflows/release.yml`.** Push tag
+> `v<version>` khớp `package.json` lên GitHub, CI tự chạy `npm run dist:publish`
+> trên Windows runner và upload đủ cả ba file trong một lần — không còn bước tay
+> nào để quên. Mục 1/2 dưới đây (chạy `dist:publish`/`gh release create` tại máy)
+> chỉ còn là phương án dự phòng khi CI không chạy được; **không tự tạo release
+> qua giao diện web và kéo thả riêng file `.exe`** — đó chính là cách hai lần lỗi
+> này xảy ra.
+
 | File | Vai trò | Thiếu thì sao |
 |---|---|---|
 | `QC-Lab-Setup-<ver>.exe` | Bản cài | Không tải được |

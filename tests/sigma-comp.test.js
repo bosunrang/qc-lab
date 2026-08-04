@@ -97,8 +97,11 @@ assert.equal(ctx.sgInputDisplayValue(''),'');
   assert.match(sigmaCss, /#sgFreq table th:nth-child\(3\), #sgFreq table td:nth-child\(3\)\{width:27%;\}/, 'Sigma QC-design table gives OPSpecs 27%');
   assert.match(sigmaCss, /#sgFreq table th:nth-child\(4\), #sgFreq table td:nth-child\(4\)\{width:22%;\}/, 'Sigma QC-design table gives risk 22%');
   assert.match(sigmaCss, /#sgFreq table th:nth-child\(5\), #sgFreq table td:nth-child\(5\)\{width:36%;\}/, 'Sigma QC-design table gives action 36%');
-  assert.match(sigmaCss, /@media\(max-width:760px\)[\s\S]*?#sgFreq table th:nth-child\(1\)[\s\S]*?min-width:76px;[\s\S]*?white-space:nowrap;/, 'mobile QC-design level column stays on one line');
-  assert.match(sigmaCss, /@media\(max-width:760px\)[\s\S]*?#sgFreq table th:nth-child\(2\)[\s\S]*?min-width:72px;[\s\S]*?white-space:nowrap;/, 'mobile QC-design Sigma column stays on one line');
+  // Ngưỡng 980px (không phải 760px) khớp với .sg-top-grid tự thu 1 cột phía trên —
+  // 761-980px (laptop nhỏ/cửa sổ chia đôi) từng không được bảo vệ và bị bẻ chữ
+  // từng ký tự ở cột Mức/Sigma trước 2026-08-03.
+  assert.match(sigmaCss, /@media\(max-width:980px\)[\s\S]*?#sgFreq table th:nth-child\(1\)[\s\S]*?min-width:76px;[\s\S]*?white-space:nowrap;/, 'QC-design level column stays on one line down to 980px, not just 760px');
+  assert.match(sigmaCss, /@media\(max-width:980px\)[\s\S]*?#sgFreq table th:nth-child\(2\)[\s\S]*?min-width:72px;[\s\S]*?white-space:nowrap;/, 'QC-design Sigma column stays on one line down to 980px, not just 760px');
 }
 
 // --- Manual CV/Bias edits mark persistence dirty immediately. ---

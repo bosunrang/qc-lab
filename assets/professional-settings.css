@@ -157,8 +157,18 @@
   display:flex; gap:8px; flex-wrap:wrap; margin:12px 16px 0;
 }
 
+/* .firebase-auth-grid dùng chung ngưỡng 1150px với .settings-profile-grid: 3 cột
+   180/260/260px + 2 khoảng cách 10px cần tối thiểu 720px, nhưng chỉ tự về 1 cột ở
+   760px — vùng 761-1150px (cửa sổ chia đôi màn hình/laptop nhỏ) không có gì bảo vệ,
+   khiến ô "Mật khẩu Firebase" tràn ra ngoài panel và bị overflow:hidden cắt mất một
+   phần (đo được 31px bị cắt ở khổ 950px, phát hiện 2026-08-03 — cùng dạng lỗi đã sửa
+   ở bảng OPSpecs trang Sigma). */
 @media(max-width:1150px){
 .settings-profile-grid{
+  grid-template-columns:1fr;
+}
+
+.firebase-auth-grid{
   grid-template-columns:1fr;
 }
 }

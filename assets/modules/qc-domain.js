@@ -311,6 +311,17 @@ function parallelWestgard(t,col){
   pts.forEach((p,i)=>{const f=wg.F[i]||{},rules=[...new Set(f.rules||[])];byPoint.set(p.id,{level:ruleResultLevel(t,rules),rules,supportRules:[...new Set(f.supportRules||[])],z:wg.zs[i]});});
   return{pts,byPoint};
 }
+/* Kết luận Westgard của MỘT điểm bất kỳ, dùng khi hủy điểm (confirmVoidQcPoint) cần
+   ghi đúng rule/qcVerdict lên hồ sơ NCE. Điểm thuộc lô đang chạy song song không nằm
+   trong activeWestgard() (chỉ phủ lô đang vận hành) nên phải tra bảng riêng của lô đó
+   qua parallelWestgard(), dùng lại Mean/SD đã chụp lúc nhập (p.qcMean/p.qcSd) — thiếu
+   nhánh này thì hủy một điểm vi phạm ở lô song song sẽ ghi "Không có luật Westgard". */
+function pointVoidVerdict(t,p){
+  if(!t||!p)return{level:'ok',rules:[]};
+  const cfgLot=(lvlCfg(t,p.level)||{}).lot||'';
+  if(p.lot&&String(p.lot)!==String(cfgLot))return parallelWestgard(t,{level:p.level,lot:p.lot,mean:+p.qcMean,sd:+p.qcSd,parallel:true}).byPoint.get(p.id)||{level:'ok',rules:[]};
+  return activeWestgard(t).byPoint.get(p.id)||{level:'ok',rules:[]};
+}
 /* Mean/SD đã lưu "Dự kiến" (chưa áp dụng) cho một lô cụ thể chưa phải lô đang
    gắn với mức — xem applyPlannedTarget()/saveTargetMatrix() trong entry-tests-actions.js. */
 function plannedTargetFor(t,lot){

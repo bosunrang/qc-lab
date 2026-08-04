@@ -179,11 +179,17 @@ function applyAcceptedLotTransitionToConfig(tr){
     const oldIds=[...new Set(g.lotIds||[])];
     const nextIds=[...new Set((g.lotIds||[]).map(id=>id===from.id?to.id:id))];
     const oldKey=groupKey(oldIds);
+    /* Tên nhóm chỉ được TỰ ĐỘNG đổi theo lô mới khi tên hiện tại vẫn còn khớp đúng
+       kiểu tự sinh "lô1/lô2" của chính danh sách lô CŨ — tức là chưa ai đặt tên
+       riêng cho nhóm. Nếu quản trị viên đã gõ một tên có ý nghĩa (VD "Nhóm lô Quý
+       3/2026"), tên đó phải giữ nguyên qua một lượt chuyển lô, không bị âm thầm
+       viết đè lại thành số lô thô. */
+    const autoNamed=!g.name||g.name===groupName(oldIds);
     const archived=state.lotGroups.find(x=>x.id!==g.id&&x.active===false&&x.stoppedByTransitionId===tr.id)||state.lotGroups.find(x=>x.active===false&&groupKey(x.lotIds)===oldKey);
     if(!archived){
       state.lotGroups.push({
         id:uid(),
-        name:groupName(oldIds)||g.name,
+        name:g.name||groupName(oldIds),
         lotIds:oldIds,
         note:`Đã dừng khi chuyển tiếp lô ${from.lotNo} sang ${to.lotNo}`,
         active:false,
@@ -199,7 +205,7 @@ function applyAcceptedLotTransitionToConfig(tr){
       try{if(typeof manageTargetGroup!=='undefined'&&manageTargetGroup===g.id)manageTargetGroup=existing.id;}catch(e){}
     }else{
       g.lotIds=nextIds;
-      g.name=groupName(nextIds)||g.name;
+      if(autoNamed)g.name=groupName(nextIds)||g.name;
     }
   });
   if(removeGroups.size)state.lotGroups=state.lotGroups.filter(g=>!removeGroups.has(g.id));
@@ -223,7 +229,13 @@ function normalizeLotGroups(){
     g.lotIds=[...new Set(g.lotIds||[])].filter(id=>state.qcLots.some(l=>l.id===id));
     if(!g.lotIds.length)return;
     const name=g.lotIds.map(id=>(state.qcLots.find(l=>l.id===id)||{}).lotNo).filter(Boolean).join('/');
-    if(name&&g.active!==false)g.name=name;
+    /* Chỉ đặt tên tự động khi nhóm CHƯA có tên — hàm này chạy ở MỌI lần tải/đồng bộ/
+       nhập backup (ensureShape()), nên nếu ghi đè bất cứ khi nào tính ra được tên thì
+       tên riêng người dùng gõ trong "Sửa nhóm lô" sẽ luôn biến mất ngay lần tải sau,
+       dù saveConfigGroup() vừa lưu đúng giá trị đó. Phát hiện 2026-08-03: gõ tên xong
+       lưu vẫn thấy đúng trong phiên đang mở, nhưng tải lại trang là mất, không có gì
+       báo hay ghi log — vì đây là chỗ duy nhất âm thầm viết đè lại g.name. */
+    if(name&&g.active!==false&&!g.name)g.name=name;
     const key=(g.active===false?'stopped':'active')+'|'+[...g.lotIds].sort().join('|');
     if(seen.has(key)){
       const keep=seen.get(key);

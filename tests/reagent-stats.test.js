@@ -6,9 +6,13 @@
  * automated coverage.
  */
 const assert = require('node:assert/strict');
-const { loadSandbox } = require('./helpers/sandbox');
+const { loadSandbox, run } = require('./helpers/sandbox');
 
 const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/reagent-ui-state.js', 'modules/reagent.js']);
+// esc()/escAttr() normally come from reports.js (not loaded here) — stub a plain
+// passthrough since Case 6 below only checks for a literal template-placeholder bug,
+// not HTML-escaping behavior.
+run(ctx, 'function esc(s){return s==null?"":String(s);} function escAttr(s){return esc(s);}');
 
 function makeDs(rows, testOverrides = {}) {
   return {
@@ -78,6 +82,21 @@ const close = (actual, expected, epsilon = 1e-9, message = '') =>
   const rows = oldVals.map(v => [v, v * 1.1]);
   const R = ctx.rcCalc(makeDs(rows));
   close(R.bias, 10, 1e-6);
+}
+
+// --- Case 6: summary-table unit color must be interpolated, not printed as literal text ---
+// The unit span was built with '...${RCC.muted}...' inside a SINGLE-quoted JS string
+// concatenation instead of a template literal, so the placeholder was never evaluated —
+// the printed/report summary table literally showed "color:${RCC.muted}" in the style
+// attribute (harmless CSS-wise, since browsers just ignore the invalid value and fall
+// back to inherited color, but the intended muted-gray unit text never appeared).
+{
+  const R = ctx.rcCalc(makeDs([[10, 10], [20, 20], [30, 30], [40, 40], [50, 50]]));
+  const html = ctx.rcReportSummaryTable([{ ds: makeDs([], { reagent: 'Glucose', unit: 'mmol/L' }), R }]);
+  assert.ok(!html.includes('${RCC.muted}'), 'unit color must be interpolated, not left as a literal template placeholder');
+  const mutedColor = run(ctx, 'RCC.muted'); // top-level const in reagent.js isn't exposed as ctx.RCC
+  assert.ok(html.includes(`color:${mutedColor}`), 'unit span must carry the real muted color value');
+  assert.ok(html.includes('(mmol/L)'), 'unit text itself must still render');
 }
 
 console.log('Reagent comparison stats tests passed');

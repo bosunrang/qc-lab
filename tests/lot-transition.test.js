@@ -11,6 +11,11 @@ const { loadSandbox, run } = require('./helpers/sandbox');
 
 const ctx = loadSandbox(['core.js', 'modules/state.js']);
 run(ctx, 'function __getState(){return state;} function __setState(s){state=s;}');
+// ensureShape() also touches searchText() (normally from router-render.js, not loaded
+// in this minimal sandbox) via a legacy state.machines->instruments migration step —
+// stub it with a case-insensitive compare, good enough since Case 4c below doesn't
+// exercise that migration path at all (fixture already has real instrument objects).
+run(ctx, "function searchText(s){return String(s==null?'':s).toLowerCase();}");
 // Values crossing the vm sandbox boundary belong to a different realm (their own
 // Array/Object prototypes), which makes assert.deepEqual/deepStrictEqual report
 // false mismatches even for identical-looking arrays/objects. Round-trip through
@@ -148,6 +153,48 @@ for (const status of ['planned', 'active', 'rejected']) {
   assert.equal(count, 0, 'must refuse to apply a transition across different QC levels');
   const state = getState();
   assert.equal(state.tests[0].levels[0].qcLotId, 'lotA', 'config must remain untouched when levels mismatch');
+}
+
+// --- Case 4: group naming across a transition — auto-named groups follow the new
+// lot number, but a lab-chosen custom name must survive untouched. ---
+// Before 2026-08-03, applyAcceptedLotTransitionToConfig() (and normalizeLotGroups(),
+// which every ensureShape() call runs) always overwrote g.name with the auto "lot/lot"
+// string whenever it computed a non-empty one — so typing a real name in "Sửa nhóm lô"
+// (saveConfigGroup()) worked only until the very next reload/Firebase merge/backup
+// import, then silently reverted with no error and no audit entry.
+{
+  // 4a: group name still matches the auto-derived pattern for its old lots -> keep following.
+  const fixture = makeFixture();
+  fixture.tests[0].levels[0].meanSdHistory.push({id:'hB',qcLotId:'lotB',lot:'LOT-B',mean:12,sd:1.2,low:9.6,high:14.4,effectiveFrom:'',effectiveTo:'',source:'mfg',planned:true,note:'Dự kiến'});
+  fixture.lotTransitions = [acceptedTr];
+  ctx.__setState(fixture);
+  ctx.applyAcceptedLotTransitionToConfig(acceptedTr);
+  const state4a = getState();
+  assert.equal(state4a.lotGroups.find(g => g.id === 'g1').name, 'LOT-B', 'auto-named group must keep following the lot it now holds');
+  assert.equal(state4a.lotGroups.find(g => g.active === false).name, 'LOT-A', 'the archived snapshot keeps the name the group had at that point');
+}
+{
+  // 4b: admin gave the group a real name -> must survive the transition untouched.
+  const fixture = makeFixture();
+  fixture.lotGroups[0].name = 'Nhóm lô Quý 3/2026';
+  fixture.tests[0].levels[0].meanSdHistory.push({id:'hB',qcLotId:'lotB',lot:'LOT-B',mean:12,sd:1.2,low:9.6,high:14.4,effectiveFrom:'',effectiveTo:'',source:'mfg',planned:true,note:'Dự kiến'});
+  fixture.lotTransitions = [acceptedTr];
+  ctx.__setState(fixture);
+  ctx.applyAcceptedLotTransitionToConfig(acceptedTr);
+  const state4b = getState();
+  assert.equal(state4b.lotGroups.find(g => g.id === 'g1').name, 'Nhóm lô Quý 3/2026', 'a custom group name must not be overwritten by the transition');
+  assert.equal(state4b.lotGroups.find(g => g.active === false).name, 'Nhóm lô Quý 3/2026', 'the archived snapshot must also keep the custom name, not the auto pattern');
+}
+{
+  // 4c: the same custom name must also survive a plain reload/merge (ensureShape()),
+  // not just an accepted transition — this was the actual user-visible bug.
+  const fixture = makeFixture();
+  fixture.lotGroups[0].name = 'Nhóm lô Quý 3/2026';
+  fixture.configMigrationVersion = 1; // skip the legacy one-time migration path
+  ctx.__setState(fixture);
+  ctx.ensureShape();
+  const reloaded = getState();
+  assert.equal(reloaded.lotGroups.find(g => g.id === 'g1').name, 'Nhóm lô Quý 3/2026', 'ensureShape() (every boot/Firebase merge/backup import) must not reset a custom group name');
 }
 
 console.log('Lot transition tests passed');
