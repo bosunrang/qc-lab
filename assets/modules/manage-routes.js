@@ -6,12 +6,12 @@ function manageSearchSet(v){
 function manageMatch(values){const q=searchText(manageQ);return !q||values.some(v=>searchText(v).includes(q));}
 function manageSearchPlaceholder(){
   const map={
-    instruments:'Tìm theo tên máy, hãng, model, serial, khoa/khu vực...',
+    instruments:'Tìm theo tên máy, hãng, số sê-ri...',
     assays:'Tìm theo tên xét nghiệm, máy, đơn vị, phương pháp, hóa chất, TEa...',
-    panels:'Tìm theo tên Panel QC, máy, xét nghiệm trong panel, ghi chú...',
-    lots:'Tìm theo số lô, nhóm lô, mức QC, hạn dùng, nhà cung cấp...',
-    targets:'Tìm theo tên xét nghiệm, máy, khoa, đơn vị...',
-    transitions:'Tìm theo Panel QC, lô cũ/mới, trạng thái, người duyệt...',
+    panels:'Tìm theo tên panel QC, máy và xét nghiệm...',
+    lots:'Tìm theo số lô, nhóm lô QC...',
+    targets:'Tìm theo tên xét nghiệm...',
+    transitions:'Tìm theo panel QC, lô cũ/mới...',
     history:'Tìm theo xét nghiệm, mức, lô QC...',
     tearefs:'Tìm theo tên xét nghiệm, nhóm, đơn vị...'
   };
@@ -50,7 +50,7 @@ function manageLots(){
       ?btn('Kích hoạt',`activateLotGroup('${g.id}')`,'teal sm')
       :btn('Dừng',`toggleLotGroupStatus('${g.id}')`,'ghost sm btn-stop-tint');
     return `<div class="lot-group-card${archived?' lot-opt-depleted':''}"><div class="lot-group-card-h"><div><b>${esc(g.name)}</b><small>${esc(g.note||'Nhóm lô để gán Mean/SD theo Panel')}</small></div><span class="tag ${statusTag.cls}">${statusTag.text}</span></div><div class="lot-group-chipline">${lots.map(l=>`<span class="pill">${esc(l.lotNo)} · M${l.level}</span>`).join('')||'<span class="hint">Chưa chọn lô</span>'}</div><div class="lot-group-actions">${btn('Sửa nhóm',`openConfigGroup('${g.id}')`,'ghost sm')}${btn('Mean/SD',`openTargetMatrix('','${g.id}')`,'ghost sm')}${toggleBtn}${btn('Xóa',`deleteConfigGroup('${g.id}')`,'danger sm')}</div></div>`;}).join('');
-  return manageToolbar('Lô & Nhóm QC','Quản lý từng lô QC và ghép nhóm lô ngay trong cùng một màn hình.')+
+  return manageToolbar('Lô & Nhóm QC','Quản lý từng lô và nhóm lô QC.')+
   `<div class="lot-config-grid">
     <div class="panel rcfg-list lot-config-left">
       <div class="rcfg-panel-h"><h3>Lô QC</h3>${btn('Thêm lô','openConfigLot()','teal sm')}</div>
@@ -64,7 +64,7 @@ function manageLots(){
 }
 function manageInstruments(){
   const rows=state.instruments.filter(i=>manageMatch([i.name,i.manufacturer,i.model,i.serial,i.section])).map(i=>{const n=state.tests.filter(t=>t.instrumentId===i.id).length;return `<tr><td><b>${esc(i.name)}</b><div class="hint">${esc(i.section||'Chưa phân khoa')}</div></td><td>${esc(i.manufacturer||'—')}</td><td>${esc(i.serial||'—')}</td><td class="num">${n}</td><td><span class="tag ${i.active?'ok':'none'}">${i.active?'Đang hoạt động':'Ngừng hoạt động'}</span></td><td><div class="manage-actions">${btn('Sửa',`openConfigInstrument('${i.id}')`,'ghost sm')}${btn('Xóa',`deleteConfigInstrument('${i.id}')`,'danger sm')}</div></td></tr>`;}).join('');
-  return manageToolbar('Máy xét nghiệm','Danh mục máy, hãng, số sê-ri và khu vực sử dụng.',"openConfigInstrument()",'Thêm máy')+`<div class="panel rcfg-list">${rows?`<table class="instrument-table"><thead><tr><th>Máy xét nghiệm</th><th>Nhà sản xuất</th><th>Số sê-ri</th><th class="num">Xét nghiệm</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table>`:emptyState('Chưa có máy xét nghiệm','Thêm máy trước khi cấu hình xét nghiệm.')}</div>`;
+  return manageToolbar('Máy xét nghiệm','Quản lý máy xét nghiệm, hãng và số sê-ri.',"openConfigInstrument()",'Thêm máy')+`<div class="panel rcfg-list">${rows?`<table class="instrument-table"><thead><tr><th>Máy xét nghiệm</th><th>Nhà sản xuất</th><th>Số sê-ri</th><th class="num">Xét nghiệm</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table>`:emptyState('Chưa có máy xét nghiệm','Thêm máy trước khi cấu hình xét nghiệm.')}</div>`;
 }
 function managePanels(){
   const rows=state.qcPanels.filter(p=>manageMatch([p.name,p.note,instrumentName(p.instrumentId),...(p.testIds||[]).map(id=>(state.tests.find(t=>t.id===id)||{}).name)])).map(p=>{const tests=(p.testIds||[]).map(id=>state.tests.find(t=>t.id===id)).filter(Boolean);return `<tr><td><b>${esc(p.name)}</b></td><td>${esc(instrumentName(p.instrumentId))}</td><td>${tests.map(t=>`<span class="pill">${esc(testDisplayName(t))}</span>`).join('')||'—'}</td><td class="num">${tests.length}</td><td><span class="tag ${p.active!==false?'ok':'none'}">${p.active!==false?'Đang dùng':'Tạm ngưng'}</span></td><td><div class="manage-actions">${btn('Sửa',`openConfigPanel('${p.id}')`,'ghost sm')}${btn('Xóa',`deleteConfigPanel('${p.id}')`,'danger sm')}</div></td></tr>`;}).join('');
@@ -133,7 +133,7 @@ function manageTargets(){
 function manageAssays(){
   const matched=state.tests.filter(t=>manageMatch([t.name,testDisplayName(t),t.unit,t.method,t.reagent,instrumentName(t.instrumentId,t.machine),t.section,t.tea]));
   const rows=matched.map((t,idx)=>`<tr><td class="num">${idx+1}</td><td><b>${esc(testDisplayName(t))}</b><div class="hint">${esc(t.method||'Chưa nhập phương pháp')} · ${esc(t.unit||'Chưa có đơn vị')}</div></td><td>${esc(instrumentName(t.instrumentId,t.machine))}<div class="hint">${esc(t.section||'Chưa gán khoa/khu vực')}</div></td><td>${esc(t.reagent||'—')}</td><td>${t.tea?esc(t.tea)+'%':'—'}</td><td><span class="tag ${t.closed?'none':'ok'}">${t.closed?'Ngưng dùng':'Đang dùng'}</span></td><td><div class="manage-actions">${btn('Sửa',`openConfigAssay('${t.id}')`,'ghost sm')}${btn('Xóa',`delTest('${t.id}')`,'danger sm')}</div></td></tr>`).join('');
-  return manageToolbar('Danh mục xét nghiệm','Chỉ quản lý tên xét nghiệm, máy, đơn vị, phương pháp và TEa.',"openConfigAssay()",'Thêm xét nghiệm')+`<div class="panel rcfg-list">${rows?`<table class="assay-table"><thead><tr><th class="num">STT</th><th>Tên xét nghiệm</th><th>Máy xét nghiệm</th><th>Hóa chất</th><th>TEa</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table>`:emptyState('Chưa có xét nghiệm','Tạo xét nghiệm trước, sau đó gán lô và Mean/SD ở các thẻ cấu hình tương ứng.')}</div>`;
+  return manageToolbar('Danh mục xét nghiệm','Quản lý xét nghiệm, máy, đơn vị, phương pháp và TEa.',"openConfigAssay()",'Thêm xét nghiệm')+`<div class="panel rcfg-list">${rows?`<table class="assay-table"><thead><tr><th class="num">STT</th><th>Tên xét nghiệm</th><th>Máy xét nghiệm</th><th>Hóa chất</th><th>TEa</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table>`:emptyState('Chưa có xét nghiệm','Tạo xét nghiệm trước, sau đó gán lô và Mean/SD ở các thẻ cấu hình tương ứng.')}</div>`;
 }
 function manageHistorySearchValues(t){
   const values=[t.name,testDisplayName(t)];
@@ -268,7 +268,7 @@ function manageTeaRefs(){
       <td><div class="tea-lab-cell">${r.lab==null?'':`<b>${fmt(r.lab,2)}%</b>`}${labButton}</div></td>
       <td><div class="tea-ref-status">${kindTag[r.kind]}${act}</div></td></tr>`;
   }).join('');
-  return manageToolbar('Bảng TEa tham chiếu','Registry v'+TEA_REFERENCE_SCHEMA_VERSION+' · xây dựng cột TEa chuẩn hóa của phòng xét nghiệm từ các nguồn tham chiếu và duy trì nhất quán khi tính Sigma.',canManage?'teaRefOpenAdd()':'','Thêm xét nghiệm')+teaSourceRegistryHtml()+
+  return manageToolbar('Bảng TEa tham chiếu','Tổng hợp TEa từ các nguồn tham chiếu, dùng thống nhất khi tính Sigma.',canManage?'teaRefOpenAdd()':'','Thêm xét nghiệm')+teaSourceRegistryHtml()+
     `<div class="panel rcfg-list tea-ref-panel">${rows.length?`<table class="tea-ref-table"><thead><tr><th>Xét nghiệm</th><th>Đơn vị</th><th>Nhóm</th><th>TEa CLIA %</th><th>TEa Ricos %</th><th>TEa chuẩn hóa %</th><th>Trạng thái</th></tr></thead><tbody>${body}</tbody></table>`:(searchText(manageQ)?emptyState('Không tìm thấy','Thử từ khóa khác.'):emptyState('Chưa có bảng tham chiếu','Không có xét nghiệm nào.'))}</div>`;
 }
 function manageView(){
