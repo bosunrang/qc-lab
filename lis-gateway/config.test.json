@@ -1,0 +1,110 @@
+{
+  "_ghiChu": [
+    "File TEST tu dung, gia lap - khong phai ma may that.",
+    "analyzerId dung chung 1 may gia lap TEST-ANALYZER-01, testCode phan biet tung xet nghiem.",
+    "qcLevel dung '1'/'2'/'3' cho don gian, qcLotCode = dung so lo noi bo."
+  ],
+  "allowedOrigins": [
+    "null",
+    "http://127.0.0.1:8080",
+    "http://localhost:8080"
+  ],
+  "mappings": [
+    {
+      "analyzerId": "TEST-ANALYZER-01",
+      "testCode": "PCO2",
+      "qclabTestId": "drshlke",
+      "displayName": "Carbon dioxide partial pressure (pCO2)",
+      "expectedUnit": "mmHg",
+      "levels": [
+        { "qcLevel": "1", "level": 1 },
+        { "qcLevel": "2", "level": 2 },
+        { "qcLevel": "3", "level": 3 }
+      ],
+      "lots": [
+        { "qcLotCode": "121025", "lot": "121025" },
+        { "qcLotCode": "220425", "lot": "220425" },
+        { "qcLotCode": "321025", "lot": "321025" }
+      ]
+    },
+    {
+      "analyzerId": "TEST-ANALYZER-01",
+      "testCode": "CL",
+      "qclabTestId": "ib5nj9a",
+      "displayName": "Chloride (Cl)",
+      "expectedUnit": "mmol/L",
+      "levels": [
+        { "qcLevel": "1", "level": 1 },
+        { "qcLevel": "2", "level": 2 }
+      ],
+      "lots": [
+        { "qcLotCode": "1101", "lot": "1101" },
+        { "qcLotCode": "1102", "lot": "1102" }
+      ]
+    },
+    {
+      "analyzerId": "TEST-ANALYZER-01",
+      "testCode": "PO2",
+      "qclabTestId": "pa4um3t",
+      "displayName": "Oxygen partial pressure (pO2)",
+      "expectedUnit": "mmHg",
+      "levels": [
+        { "qcLevel": "1", "level": 1 },
+        { "qcLevel": "2", "level": 2 },
+        { "qcLevel": "3", "level": 3 }
+      ],
+      "lots": [
+        { "qcLotCode": "121025", "lot": "121025" },
+        { "qcLotCode": "220425", "lot": "220425" },
+        { "qcLotCode": "321025", "lot": "321025" }
+      ]
+    },
+    {
+      "analyzerId": "TEST-ANALYZER-01",
+      "testCode": "PH",
+      "qclabTestId": "oosmw53",
+      "displayName": "pH",
+      "expectedUnit": "",
+      "levels": [
+        { "qcLevel": "1", "level": 1 },
+        { "qcLevel": "2", "level": 2 },
+        { "qcLevel": "3", "level": 3 }
+      ],
+      "lots": [
+        { "qcLotCode": "121025", "lot": "121025" },
+        { "qcLotCode": "220425", "lot": "220425" },
+        { "qcLotCode": "321025", "lot": "321025" }
+      ]
+    },
+    {
+      "analyzerId": "TEST-ANALYZER-01",
+      "testCode": "K",
+      "qclabTestId": "1ndau0d",
+      "displayName": "Potassium (K)",
+      "expectedUnit": "mmol/L",
+      "levels": [
+        { "qcLevel": "1", "level": 1 },
+        { "qcLevel": "2", "level": 2 }
+      ],
+      "lots": [
+        { "qcLotCode": "1101", "lot": "1101" },
+        { "qcLotCode": "1102", "lot": "1102" }
+      ]
+    },
+    {
+      "analyzerId": "TEST-ANALYZER-01",
+      "testCode": "NA",
+      "qclabTestId": "q0j6x2q",
+      "displayName": "Sodium (Na)",
+      "expectedUnit": "mmol/L",
+      "levels": [
+        { "qcLevel": "1", "level": 1 },
+        { "qcLevel": "2", "level": 2 }
+      ],
+      "lots": [
+        { "qcLotCode": "1101", "lot": "1101" },
+        { "qcLotCode": "1102", "lot": "1102" }
+      ]
+    }
+  ]
+}
