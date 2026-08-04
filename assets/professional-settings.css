@@ -39,6 +39,7 @@
 .lis-gateway-toggle{display:flex;align-items:center;gap:8px;min-height:38px;padding:8px 10px;border:1px solid var(--line);border-radius:var(--surface-radius);background:var(--surface-card-soft);color:#365563;font-size:var(--type-body-sm);font-weight:750}
 .lis-gateway-toggle input{flex:none}
 .lis-gateway-panel .alert{margin:0}
+.lis-queue-table td.num,.lis-queue-table th.num{text-align:center}
 
 .settings-brand-note{
   margin-top:6px;

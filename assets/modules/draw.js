@@ -199,6 +199,17 @@ function drawLJMultiZ(canvas,levelViews,test,opts){
     });
   });
   ctx.restore();
+  if(runs.length){
+    const runDateMap=new Map();
+    all.forEach(o=>{if(!runDateMap.has(o.run))runDateMap.set(o.run,o.date);});
+    const tickTotal=Math.min(5,runs.length),tickIndices=tickTotal===1?[0]:[...new Set(Array.from({length:tickTotal},(_,i)=>Math.round(i*(runs.length-1)/(tickTotal-1))))];
+    ctx.fillStyle='#536772';ctx.font='700 11px Manrope, Arial, sans-serif';ctx.textAlign='center';ctx.textBaseline='top';
+    tickIndices.forEach(i=>{
+      const run=runs[i],raw=String(runDateMap.get(run)||'');
+      const label=/^\d{4}-\d{2}-\d{2}$/.test(raw)?raw.slice(8,10)+'/'+raw.slice(5,7):String(vnDate(raw)||'').slice(0,5);
+      if(label)ctx.fillText(label,xOfRun(run),padT+ch+10);
+    });
+  }
   /* Chú giải: khoảng cách giữa các mục PHẢI theo đúng bề rộng chữ đo được (canvas
      không tự xuống dòng/co chữ như HTML) — cố định 118px/mục từng khiến lô dài
      (VD "M1·TDM 79979900") đè lên khối màu của mục kế tiếp, đúng lỗi người dùng

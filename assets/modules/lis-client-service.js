@@ -142,7 +142,7 @@ function lisQueueRowHtml(record){
 function lisQueueSectionHtml(title,records,emptyText){
   if(!records.length)return`<h4>${esc(title)}</h4><div class="hint">${esc(emptyText)}</div>`;
   const rows=records.map(lisQueueRowHtml).join('');
-  return`<h4>${esc(title)} (${records.length})</h4><div class="table-wrap"><table><thead><tr><th>Thời gian đo</th><th>Xét nghiệm</th><th>Giá trị</th><th>Lần chạy · NV</th><th><span style="position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">Thao tác</span></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  return`<h4>${esc(title)} (${records.length})</h4><div class="table-wrap"><table class="lis-queue-table"><thead><tr><th>Thời gian đo</th><th>Xét nghiệm</th><th class="num">Giá trị</th><th>Lần chạy · NV</th><th><span style="position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">Thao tác</span></th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 function lisRenderQueueModal(){
   const pending=lisGatewayRuntime.pending||[],unresolved=lisGatewayRuntime.unresolved||[];
