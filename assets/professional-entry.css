@@ -40,7 +40,7 @@
 .lj-toolbar{display:grid;align-items:center}
 .lj-toolbar h3{margin:0}
 .lj-filter{display:flex;gap:12px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
-.lj-date-field{display:grid;grid-template-columns:54px 164px;gap:8px;align-items:center}
+.lj-date-field{display:grid;grid-template-columns:54px 164px;gap:8px;align-items:center;margin:0}
 .lj-date-field .hint{display:flex;align-items:center;justify-content:flex-end;height:36px;white-space:nowrap;line-height:1}
 .lj-date-field .datebox{width:164px;height:36px}
 .lj-date-field input[type="month"]{width:164px;height:36px;padding-top:0;padding-bottom:0}
