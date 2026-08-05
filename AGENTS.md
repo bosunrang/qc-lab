@@ -649,6 +649,8 @@ the Google Fonts link, offline labs must print with correct metrics.
   (Passing-Bablok, Deming/OLS, Bland-Altman, plus a from-scratch incomplete-beta
   t-distribution for CIs) by hand, no stats library — pure like `core.js` but
   page-scoped, covered by `tests/reagent-stats.test.js`.
+- `lis-client-service.js` — browser-side client for the LIS Gateway prototype;
+  see "LIS Gateway" below.
 - `app.js` — small async boot entry point at the bottom of `index.html`
   (`boot()` awaits `loadBootState()` before login/Firebase init).
 
@@ -727,6 +729,68 @@ readable/writable only by UIDs listed under `qclab-acl/{labCode}/{uid}`, which
 clients can read for themselves but never write; every snapshot must carry a
 numeric `_ts`. QC Lab's own admin/technician/viewer roles are client-side UI
 permissions layered on top, not a server write boundary.
+
+### LIS Gateway (prototype, out of validation scope)
+
+`lis-gateway/` is a standalone Node HTTP/JSON server (plain `node:http`, zero
+dependencies, no HL7/ASTM) that lets an analyzer's existing middleware push QC
+results into QC Lab — it is **not** part of the Electron app (`package.json`
+`build.files` excludes `lis-gateway/` and `scripts/`) and only runs from the
+source tree via `npm run lis:gateway`. It is explicitly out-of-scope in
+`docs/validation/URS.md` (prototype/research, not in `TRACEABILITY.md`); see
+`docs/lis-bridge-prototype.md` for the full write-up. Direction was reversed
+once (`5d1a061`, "đảo chiều"): the original design had the gateway push QC
+accept/review/held gatekeeping status out toward the LIS so it could hold
+patient results — that required the LIS vendor to change their release
+workflow, which was infeasible, so the gateway now only **receives** QC
+results from middleware and makes no decision about patient-result release.
+Received results never auto-become QC points; they sit `pending` in an
+append-only NDJSON journal (`store.js`'s `JournalStore`, self-heals a
+truncated last line after a crash, entries are never deleted) until a tech
+reviews the queue in QC Lab and clicks Nhận, at which point they go through
+the same `EntryService` path as manual entry — period locks, audit log,
+partitioned storage all apply. PHI is hard-rejected (`PHI_NOT_ALLOWED`),
+including `specimenRef`, since this is deliberately not a clinical LIS
+integration.
+
+`server.js` refuses to start without a `QCLAB_LIS_TOKEN` — an earlier version
+fail-opened (`if(!token) return true`) and since `npm run lis:gateway` doesn't
+set that env var by default, every endpoint was unauthenticated on a port
+gatekeeping patient-adjacent data; the process now auto-generates and persists
+a token to `.data/token.txt` (mode 0600) if none is set. `/health` is the only
+unauthenticated endpoint and deliberately excludes `bridge.status()`
+(pending/mapping counts) — operational numbers require the token via
+`/api/v1/status`. All bodied requests must carry `Content-Type: application/json`;
+a `text/plain` POST is a CORS "simple request" with no preflight, so before
+this check any web page could POST straight into `/api/v1/qc-results`.
+
+Mapping config (`config.example.json`, shape:
+`{allowedOrigins, mappings:[{analyzerId, testCode, qclabTestId, displayName,
+expectedUnit, levels:[...], lots:[...]}]}`) keys results on `qclabTestId` —
+QC Lab's internal generated id (`uid()`, e.g. `a3f9k2p`), not shown in any
+screen. A typo doesn't fail to start; that test's results silently sit at
+`held/UNMAPPED_TEST` forever. Since app state lives in browser
+localStorage/IndexedDB, Node can't read it directly, so
+`node scripts/lis-config.js <backup.json> [-o <config.json> | --check <config.json>]`
+generates/validates the mapping skeleton from a Settings-page backup export;
+`--check` reuses the gateway's own `buildMappingIndex()` (`core.js`) rather
+than reimplementing validation, so the two can't drift.
+
+`assets/modules/lis-client-service.js` is the browser side — follows this
+codebase's plain global-scope convention (no IIFE), loaded after
+`state-storage.js`. It polls the gateway over HTTP (`LIS_POLL_MS`, 5 min), not
+a websocket. The gateway origin (`http://127.0.0.1:8787` by default) is
+hard-pinned in three places that must stay in sync: `index.html`'s CSP
+`connect-src`, `lisNormalizeGatewayUrl()`, and the gateway's own default
+`QCLAB_LIS_PORT` — changing the port in only one place fails silently as "Lỗi
+kết nối." The queue row's `onclick` wraps the *entire* attribute string in
+`escAttr()`, not just the id, because `messageId` is middleware-controlled
+(not an internal `uid()`) and so is an XSS-relevant input.
+`tests/lis-client-service.test.js` pins that a QC point's date uses local
+time (a 06:05 VN result has a UTC `measuredAt` of the previous day), and that
+the gateway is only told `imported` *after* the local point write succeeds, so
+a crash between the two can't silently drop a result from the queue with
+nothing to show for it.
 
 ### Validation dossier (ISO 15189 / IVDR-style)
 

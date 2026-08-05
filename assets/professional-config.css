@@ -287,6 +287,20 @@
   max-height:76vh; overflow:auto;
 }
 
+.lot-trans-row2{
+  display:grid; grid-template-columns:1fr 200px; gap:10px;
+}
+
+.lot-trans-row3{
+  display:grid; grid-template-columns:1fr 1fr 180px; gap:10px;
+}
+
+@media(max-width:760px){
+.lot-trans-row2, .lot-trans-row3{
+  grid-template-columns:1fr;
+}
+}
+
 .lot-trans-target-head-row{
   display:flex; align-items:center; gap:10px; margin-top:14px;
 }
@@ -890,7 +904,7 @@ aside,
   text-align:left;width:22%;
 }
 
-.lot-table th:nth-child(1), .lot-table td:nth-child(1), .modal.rcfg-history-detail-modal .history-detail-table th:nth-child(6), .modal.rcfg-history-detail-modal .history-detail-table td:nth-child(6), .assay-table th:nth-child(3), .assay-table td:nth-child(3){
+.lot-table th:nth-child(1), .lot-table td:nth-child(1), .assay-table th:nth-child(3), .assay-table td:nth-child(3){
   width:18%
 }
 
@@ -1052,14 +1066,6 @@ aside,
   padding-left:14px; padding-right:14px;
 }
 
-.modal.rcfg-history-detail-modal .history-detail-table th:nth-child(7), .modal.rcfg-history-detail-modal .history-detail-table td:nth-child(7){
-  width:11%
-}
-
-.modal.rcfg-history-detail-modal .history-detail-table th:nth-child(8), .modal.rcfg-history-detail-modal .history-detail-table td:nth-child(8){
-  width:5%
-}
-
 .rcfg-list > .empty:first-child, .transition-list > .empty:first-child{
   margin:0;
 }
@@ -1089,7 +1095,7 @@ aside,
 .lot-table th, .lot-table td{text-align:center}
 .lot-table th.num, .lot-table td.num{text-align:center}
 
-.modal.rcfg-history-detail-modal .history-detail-table th:nth-child(1), .modal.rcfg-history-detail-modal .history-detail-table td:nth-child(1), .instrument-table th:nth-child(3), .instrument-table td:nth-child(3), .instrument-table th:nth-child(7), .instrument-table td:nth-child(7), .panel-qc-table th:nth-child(2), .panel-qc-table td:nth-child(2){
+.instrument-table th:nth-child(3), .instrument-table td:nth-child(3), .instrument-table th:nth-child(7), .instrument-table td:nth-child(7), .panel-qc-table th:nth-child(2), .panel-qc-table td:nth-child(2){
   width:14%
 }
 
@@ -1101,7 +1107,7 @@ aside,
   text-align:center;
 }
 
-.transition-table th:nth-child(3), .transition-table td:nth-child(3), .modal.rcfg-history-detail-modal .history-detail-table th:nth-child(3), .modal.rcfg-history-detail-modal .history-detail-table td:nth-child(3), .modal.rcfg-history-detail-modal .history-detail-table th:nth-child(4), .modal.rcfg-history-detail-modal .history-detail-table td:nth-child(4), .modal.rcfg-history-detail-modal .history-detail-table th:nth-child(5), .modal.rcfg-history-detail-modal .history-detail-table td:nth-child(5), .assay-table th:nth-child(6), .assay-table td:nth-child(6){
+.transition-table th:nth-child(3), .transition-table td:nth-child(3), .assay-table th:nth-child(6), .assay-table td:nth-child(6){
   width:12%
 }
 
@@ -1123,7 +1129,7 @@ aside,
 .instrument-table th:nth-child(5), .instrument-table td:nth-child(5){width:16%}
 .instrument-table th:nth-child(6), .instrument-table td:nth-child(6){width:17%}
 
-.modal.rcfg-history-detail-modal .history-detail-table th:nth-child(2), .modal.rcfg-history-detail-modal .history-detail-table td:nth-child(2), .assay-table th:nth-child(4), .assay-table td:nth-child(4), .assay-table th:nth-child(7), .assay-table td:nth-child(7){
+.assay-table th:nth-child(4), .assay-table td:nth-child(4), .assay-table th:nth-child(7), .assay-table td:nth-child(7){
   width:16%
 }
 
@@ -1132,13 +1138,38 @@ aside,
 .assay-table th:nth-child(7), .assay-table td:nth-child(7){width:13%}
 .assay-table td:last-child .manage-actions{flex-wrap:nowrap}
 
+/* .hist-meansd-table ("Mean/SD đã dùng") và .hist-points-table ("Điểm QC đã
+   nhập") cùng nằm trong modal lịch sử lô và trước đây chia sẻ luôn class
+   .history-detail-table lẫn rule width theo nth-child với instrument-table/
+   panel-qc-table/assay-table/transition-table — sửa cột của bảng này lại ảnh
+   hưởng nhầm sang bảng khác không liên quan (2026-08-05). Tách hẳn 2 class
+   riêng cho 2 bảng, khai đủ 8 cột mỗi bảng ở đây, không còn phụ thuộc các rule
+   nth-child dùng chung phía trên nữa. */
+.hist-meansd-table th:nth-child(1), .hist-meansd-table td:nth-child(1){width:16%}
+.hist-meansd-table th:nth-child(2), .hist-meansd-table td:nth-child(2){width:10%}
+.hist-meansd-table th:nth-child(3), .hist-meansd-table td:nth-child(3){width:8%}
+.hist-meansd-table th:nth-child(4), .hist-meansd-table td:nth-child(4){width:13%}
+.hist-meansd-table th:nth-child(5), .hist-meansd-table td:nth-child(5){width:11%}
+.hist-meansd-table th:nth-child(6), .hist-meansd-table td:nth-child(6){width:11%}
+.hist-meansd-table th:nth-child(7), .hist-meansd-table td:nth-child(7){width:20%;white-space:nowrap}
+.hist-meansd-table th:nth-child(8), .hist-meansd-table td:nth-child(8){width:11%}
+
+.hist-points-table th:nth-child(1), .hist-points-table td:nth-child(1){width:9%}
+.hist-points-table th:nth-child(2), .hist-points-table td:nth-child(2){width:16%}
+.hist-points-table th:nth-child(3), .hist-points-table td:nth-child(3){width:12%}
+.hist-points-table th:nth-child(4), .hist-points-table td:nth-child(4){width:12%}
+.hist-points-table th:nth-child(5), .hist-points-table td:nth-child(5){width:12%}
+.hist-points-table th:nth-child(6), .hist-points-table td:nth-child(6){width:18%}
+.hist-points-table th:nth-child(7), .hist-points-table td:nth-child(7){width:11%}
+.hist-points-table th:nth-child(8), .hist-points-table td:nth-child(8){width:10%}
+
 .panel-qc-table th:nth-child(1), .panel-qc-table td:nth-child(1){width:16%}
 .panel-qc-table th:nth-child(2), .panel-qc-table td:nth-child(2){width:16%}
 .panel-qc-table th:nth-child(3), .panel-qc-table td:nth-child(3){width:31%}
 .panel-qc-table th:nth-child(5), .panel-qc-table td:nth-child(5){width:12%;white-space:nowrap}
 .panel-qc-table th:nth-child(6), .panel-qc-table td:nth-child(6){width:13%}
 
-.history-table td:nth-child(7), .history-detail-table td:nth-child(6), .target-level-toolbar > div:first-child b, .history-table td:nth-child(10) .btn{
+.history-table td:nth-child(7), .target-level-toolbar > div:first-child b, .history-table td:nth-child(10) .btn{
   white-space:nowrap;
 }
 

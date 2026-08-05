@@ -102,13 +102,13 @@ function lastBackupInfo(){
   return{never:false,ts:t,days:Math.floor((Date.now()-t)/86400000)};
 }
 function backupStatusText(){
-  if(typeof fb!=='undefined'&&fb&&fb.ready)return 'Đang đồng bộ đám mây (Firebase) — dữ liệu đã có bản sao từ xa.';
+  if(typeof fb!=='undefined'&&fb&&fb.ready)return 'Đang đồng bộ đám mây — đã có bản sao từ xa.';
   var i=lastBackupInfo();
-  if(i.never)return 'Chưa từng sao lưu trên máy này.';
+  if(i.never)return 'Chưa sao lưu trên máy này.';
   if(i.days<=0)return 'Sao lưu gần nhất: hôm nay.';
   return 'Sao lưu gần nhất: '+i.days+' ngày trước.';
 }
-function backupCapacityText(){var bytes=0;try{bytes=Number(localStorage.getItem('qclab_lastbackup_bytes')||0);}catch(e){}if(!bytes)return`Dung lượng khuyến nghị: dưới ${BACKUP_IMPORT_MAX_BYTES/1024/1024} MB.`;return`Backup gần nhất: ${backupSizeMB(bytes)} MB / khuyến nghị ${BACKUP_IMPORT_MAX_BYTES/1024/1024} MB.`+(backupSizeWarning(bytes)?' Dung lượng đang gần mức khuyến nghị.':'');}
+function backupCapacityText(){var bytes=0;try{bytes=Number(localStorage.getItem('qclab_lastbackup_bytes')||0);}catch(e){}if(!bytes)return`Khuyến nghị dưới ${BACKUP_IMPORT_MAX_BYTES/1024/1024} MB.`;return`Backup gần nhất ${backupSizeMB(bytes)} MB (khuyến nghị dưới ${BACKUP_IMPORT_MAX_BYTES/1024/1024} MB).`+(backupSizeWarning(bytes)?' Gần mức khuyến nghị.':'');}
 function backupOverdue(){if(typeof fb!=='undefined'&&fb&&fb.ready)return false;return lastBackupInfo().days>=BACKUP_REMIND_DAYS;}
 function updateBackupBanner(){
   var dot=document.getElementById('backupDot');if(!dot)return;

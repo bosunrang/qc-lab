@@ -19,12 +19,11 @@ function pageUsers(){
        <div class="user-create-actions">${btn('Thêm','addUser()','teal')}</div>
        </div>
      </div>
-     <div class="user-create-access">
-       <div class="user-create-card"><div class="user-create-card-title">Thẻ được phép dùng</div><div class="user-perm-block">${userPermChecks(rolePageIds('technician'),'newUserPerms','technician')}</div></div>
-       <div class="user-list-section"><div class="user-list-title">Danh sách người dùng</div><div class="user-table-wrap"><table class="user-table"><thead><tr><th>Người dùng</th><th>Vai trò</th><th>Trạng thái</th><th>Hành động</th></tr></thead><tbody>${rows}</tbody></table></div></div>
+     <div class="user-create-card"><div class="user-create-card-title">Thẻ được phép dùng</div><div class="user-perm-block">${userPermChecks(rolePageIds('technician'),'newUserPerms','technician')}</div></div>
      </div>
-     </div>
-     <div class="hint user-create-hint"><b>Vai trò</b> quyết định quyền sửa/quản trị trong các thẻ được tick. <b>KTV:</b> nhập/sửa dữ liệu vận hành · <b>Chỉ xem:</b> chỉ đọc. Người dùng mới sẽ phải đổi mật khẩu khi đăng nhập lần đầu.</div></div>`;
+     <div class="hint user-create-hint"><b>Vai trò</b> quyết định quyền sửa/quản trị trong các thẻ được tick. <b>KTV:</b> nhập/sửa dữ liệu vận hành · <b>Chỉ xem:</b> chỉ đọc. Người dùng mới sẽ phải đổi mật khẩu khi đăng nhập lần đầu.</div></div>
+   <div class="panel"><h3 role="heading" aria-level="2">Danh sách người dùng</h3>
+     <div class="user-table-wrap"><table class="user-table"><thead><tr><th>Người dùng</th><th>Vai trò</th><th>Trạng thái</th><th>Hành động</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
 }
 let auditQ='',auditFrom='',auditTo='',auditPage=1,auditPageSize=25;
 const AUDIT_PAGE_SIZES=[25,50,100];
