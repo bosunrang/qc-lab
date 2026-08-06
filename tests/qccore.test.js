@@ -248,6 +248,17 @@ function close(actual, expected, epsilon = 1e-9) {
 }
 
 {
+  const crit = QCCore.systematicShiftCritical(10, 2, 2);
+  assert.ok(Math.abs(crit.dSEcrit - 2.35) < 1e-9, 'dSEcrit = ((tea-bias)/sd) - 1.65');
+  assert.ok(Math.abs(crit.dREcrit - (8 / 3.3)) < 1e-9, 'dREcrit = (tea-bias) / (1.65*sd)');
+  assert.equal(QCCore.systematicShiftCritical(0, 2, 2), null, 'tea<=0 phải trả null');
+  assert.equal(QCCore.systematicShiftCritical(10, 2, 0), null, 'sd<=0 phải trả null');
+  assert.equal(QCCore.systematicShiftCritical(10, 2, -1), null, 'sd âm phải trả null');
+  assert.equal(QCCore.systematicShiftCritical(NaN, 2, 2), null, 'tea không hữu hạn phải trả null');
+  assert.equal(QCCore.systematicShiftCritical(10, undefined, 2), null, 'bias không hữu hạn phải trả null');
+}
+
+{
   const backup = QCCore.sanitizeBackup({
     lab: { name: 'Lab <A>' },
     tests: [{

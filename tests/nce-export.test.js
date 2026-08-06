@@ -9,21 +9,23 @@ const workflow=fs.readFileSync(path.join(root,'assets/modules/action-workflow-se
 for(const header of [
   'Căn cứ SOP','Quyết định cho phép trở lại','Ngày cho phép','Người cho phép','Căn cứ cho phép',
   'Kết luận hiệu lực','Bằng chứng hiệu lực','RPN còn lại','Căn cứ đánh giá lại',
-  'Lý do trả lại','Trạng thái bản ghi','Lý do hủy','Người hủy','Hồ sơ trước','Hồ sơ tiếp theo'
+  'Lý do trả lại','Trạng thái bản ghi','Lý do hủy','Người hủy','Hồ sơ trước','Hồ sơ tiếp theo',
+  'Bias trước khắc phục (%)','Bias sau khắc phục (%)'
 ])assert.ok(dataIo.includes(`'${header}'`),`CSV NCE phải có cột "${header}"`);
 
 for(const field of [
   'riskBasis','releaseStatus','releaseDate','releaseBy','releaseNote',
   'effectivenessStatus','effectivenessDate','effectivenessNote','effectivenessBy',
   'residualSeverity','residualOccurrence','residualDetectability','residualRiskLevel','residualRiskBasis',
-  'returnNote','returnBy','returnAt','recordStatus','cancelReason','cancelledBy','cancelledAt','parentNceId','followUpNceId'
+  'returnNote','returnBy','returnAt','recordStatus','cancelReason','cancelledBy','cancelledAt','parentNceId','followUpNceId',
+  'biasBefore','biasAfter'
 ])assert.match(dataIo,new RegExp(`a\\.${field}\\b`),`CSV NCE phải xuất trường ${field}`);
 
 for(const text of ['Hiệu lực:','Nguy cơ còn lại:','Hồ sơ đã hủy:'])assert.ok(workflow.includes(text),`bản in/XLSX phải có "${text}" trong tóm tắt NCE`);
 
 const ctx=loadSandbox(['modules/data-io.js']);
 run(ctx,`
-state={lab:{},tests:[],actions:[{nceId:'NCE-XUAT',date:'2026-07-29',riskBasis:'SOP-QC-07',releaseStatus:'released',releaseBy:'Phụ trách khoa',residualSeverity:2,residualOccurrence:1,residualDetectability:1,residualRiskLevel:'low',residualRiskBasis:'Theo dõi sau khắc phục',recordStatus:'cancelled',cancelReason:'Mở nhầm',parentNceId:'NCE-TRUOC',followUpNceId:'NCE-SAU'}]};
+state={lab:{},tests:[],actions:[{nceId:'NCE-XUAT',date:'2026-07-29',riskBasis:'SOP-QC-07',releaseStatus:'released',releaseBy:'Phụ trách khoa',residualSeverity:2,residualOccurrence:1,residualDetectability:1,residualRiskLevel:'low',residualRiskBasis:'Theo dõi sau khắc phục',recordStatus:'cancelled',cancelReason:'Mở nhầm',parentNceId:'NCE-TRUOC',followUpNceId:'NCE-SAU',biasBefore:'8.5',biasAfter:'1.2'}]};
 ACTION_LABELS={source:{},phase:{},risk:{low:'Thấp'},release:{released:'Đã cho phép trở lại'}};
 exportMetaRows=()=>[];vnDate=x=>x||'';formatDateTimeVN=x=>x||'';testDisplayName=t=>t&&t.name||'';actionLevelShort=()=>'';
 actionWorkflowStatus=()=>({label:'Đã hủy hồ sơ'});actionRerunStatus=()=>({label:''});actionProtocolSummary=()=>'';actionApprovalLabel=()=>'Đã hủy hồ sơ';actionRiskScore=()=>0;actionResidualRiskScore=()=>2;
@@ -38,5 +40,7 @@ assert.equal(at('RPN còn lại'),2);
 assert.equal(at('Lý do hủy'),'Mở nhầm');
 assert.equal(at('Hồ sơ trước'),'NCE-TRUOC');
 assert.equal(at('Hồ sơ tiếp theo'),'NCE-SAU');
+assert.equal(at('Bias trước khắc phục (%)'),'8.5');
+assert.equal(at('Bias sau khắc phục (%)'),'1.2');
 
 console.log('NCE export traceability tests passed');

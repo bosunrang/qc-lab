@@ -162,11 +162,11 @@ summary.action-form-section-title:focus-visible{
   min-height:38px; height:38px; resize:vertical;
 }
 
-.action-cause-date{
-  grid-column:1/-1; width:200px; max-width:100%;
+.action-cause-second-row{
+  display:grid; grid-template-columns:200px minmax(160px,1fr) minmax(160px,1fr); align-items:start; gap:10px; margin-top:10px;
 }
 
-.action-cause-date .datebox{
+.action-cause-second-row .datebox{
   width:100%;
 }
 
@@ -955,8 +955,8 @@ summary.action-form-section-title:focus-visible{
   grid-template-columns:1fr;
 }
 
-.action-cause-date{
-  grid-column:auto;
+.action-cause-second-row{
+  grid-template-columns:1fr;
 }
 
 .action-release-grid{

@@ -16,7 +16,7 @@
 const assert = require('node:assert/strict');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
-const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'modules/range.js']);
+const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'modules/action-workflow-service.js', 'modules/range.js']);
 run(ctx, 'function __setState(s){state=s;clearDerived();}');
 
 /* Chỉ bật 1-2s (cảnh báo) và 1-3s (loại): hai luật đơn điểm, không có luật chuỗi nào
@@ -143,6 +143,53 @@ function candidate(points) {
   const missing = JSON.parse(JSON.stringify(run(ctx, '(function(){const r=rangeCandidate("KHONG-CO",1);return{t:r.t===undefined,l:r.l===undefined,eligible:r.eligible};})()')));
   assert.equal(missing.t, true, 'không tìm thấy xét nghiệm thì t phải rỗng để caller thoát sớm');
   assert.equal(missing.eligible, false);
+}
+
+/* --- r.nce: dấu hiệu "đang có hồ sơ NCE hệ thống" cho đúng test/mức, dùng để bật
+   khối xác nhận 2 điều kiện trước khi áp dụng dải mới (range.js: rangeGateHtml/
+   rangeGatePasses). Không ảnh hưởng tới các cổng eligible đã có ở trên. */
+{
+  const s = baseState(cleanPoints(20));
+  s.actions = [{ id: 'a1', nceId: 'NCE-001', date: '2026-01-05', testId: 'T1', level: 1, rule: '8x', recordStatus: 'active', cause: 'Đổi lô hóa chất' }];
+  run(ctx, '__setState(' + JSON.stringify(s) + ')');
+  const r = JSON.parse(JSON.stringify(run(ctx, 'rangeCandidate("T1",1)')));
+  assert.ok(r.nce, 'hồ sơ NCE với luật hệ thống (8x) phải được nhận diện');
+  assert.equal(r.nce.id, 'a1');
+  assert.equal(r.eligible, true, 'sự có mặt của r.nce không đổi các cổng eligible đã có');
+}
+{
+  const r = candidate(cleanPoints(20));
+  assert.equal(r.nce, null, 'không có hồ sơ NCE liên quan thì nce phải là null');
+}
+{
+  /* 1-3s là luật NGẪU NHIÊN (RE), không thuộc nhóm dịch chuyển hệ thống — không
+     được kích hoạt khối xác nhận mean-chasing. */
+  const s = baseState(cleanPoints(20));
+  s.actions = [{ id: 'a1', nceId: 'NCE-002', date: '2026-01-05', testId: 'T1', level: 1, rule: '1-3s', recordStatus: 'active' }];
+  run(ctx, '__setState(' + JSON.stringify(s) + ')');
+  const r = JSON.parse(JSON.stringify(run(ctx, 'rangeCandidate("T1",1)')));
+  assert.equal(r.nce, null, 'luật ngẫu nhiên (RE) không được coi là dịch chuyển hệ thống');
+}
+{
+  /* Hồ sơ đã hủy không còn là căn cứ điều tra hợp lệ — cùng quy tắc mà
+     action-workflow-service.js đã áp dụng khi xét một điểm QC có NCE thật hay
+     không (actionCancelled). */
+  const s = baseState(cleanPoints(20));
+  s.actions = [{ id: 'a1', nceId: 'NCE-003', date: '2026-01-05', testId: 'T1', level: 1, rule: '8x', recordStatus: 'cancelled' }];
+  run(ctx, '__setState(' + JSON.stringify(s) + ')');
+  const r = JSON.parse(JSON.stringify(run(ctx, 'rangeCandidate("T1",1)')));
+  assert.equal(r.nce, null, 'hồ sơ NCE đã hủy không được dùng làm căn cứ');
+}
+{
+  /* Nhiều hồ sơ NCE hệ thống: lấy hồ sơ MỚI NHẤT theo ngày. */
+  const s = baseState(cleanPoints(20));
+  s.actions = [
+    { id: 'old', nceId: 'NCE-004', date: '2026-01-01', testId: 'T1', level: 1, rule: '8x', recordStatus: 'active' },
+    { id: 'new', nceId: 'NCE-005', date: '2026-01-10', testId: 'T1', level: 1, rule: '4-1s', recordStatus: 'active' },
+  ];
+  run(ctx, '__setState(' + JSON.stringify(s) + ')');
+  const r = JSON.parse(JSON.stringify(run(ctx, 'rangeCandidate("T1",1)')));
+  assert.equal(r.nce.id, 'new', 'phải lấy hồ sơ NCE hệ thống mới nhất theo ngày');
 }
 
 console.log('rangeCandidate() clinical gate tests passed');
