@@ -93,13 +93,13 @@ function pageReagent(){
    <div class="rc-entry-grid"><div class="panel rc-info-panel"><h3>Thông tin đánh giá</h3><div class="rc-info-grid">
      <div class="rc-field"><label>Tên hóa chất</label><input ${ro} value="${escAttr(t.reagent)}" oninput="rcMeta('reagent',this.value)" placeholder="Tên hóa chất / xét nghiệm"></div>
      <div class="rc-field"><label>Đơn vị</label><input ${ro} value="${escAttr(t.unit)}" oninput="rcMeta('unit',this.value)" placeholder="mmol/L..."></div>
-     <div class="rc-field"><label>Số lô cũ</label><input ${ro} aria-label="Số lô cũ" value="${escAttr(t.lotOld)}" oninput="rcMeta('lotOld',this.value)"></div>
-     <div class="rc-field"><label>Số lô mới</label><input ${ro} aria-label="Số lô mới" value="${escAttr(t.lotNew)}" oninput="rcMeta('lotNew',this.value)"></div>
+     <div class="rc-field"><label>Số lô cũ</label><input ${ro} aria-label="Số lô cũ" value="${escAttr(t.lotOld)}" oninput="rcMeta('lotOld',this.value)" onfocus="rcMetaFocus('lotOld')" onchange="rcMetaLog('lotOld')"></div>
+     <div class="rc-field"><label>Số lô mới</label><input ${ro} aria-label="Số lô mới" value="${escAttr(t.lotNew)}" oninput="rcMeta('lotNew',this.value)" onfocus="rcMetaFocus('lotNew')" onchange="rcMetaLog('lotNew')"></div>
      <div class="rc-field rc-date-field"><label>Ngày thực hiện</label>${dateBox('rcDate',t.date||'','',`${ro} onchange="rcMeta('date',this.value)"`)}</div>
      <div class="rc-field"><label>Người thực hiện</label><div class="rc-quick-field"><input ${ro} value="${escAttr(t.operator)}" oninput="rcMeta('operator',this.value)" placeholder="Họ tên"><button class="rc-icon-btn" ${canWrite()?'':'disabled'} onclick="rcOpenQuick('operator')" title="Chọn nhanh người thực hiện" aria-label="Chọn nhanh người thực hiện">${rcMiniIcon('user')}</button></div></div>
      <div class="rc-field"><label>Loại mẫu</label><div class="rc-quick-field"><input ${ro} value="${escAttr(t.sampleType)}" oninput="rcMeta('sampleType',this.value)" placeholder="Loại mẫu"><button class="rc-icon-btn" ${canWrite()?'':'disabled'} onclick="rcOpenQuick('sampleType')" title="Chọn nhanh loại mẫu" aria-label="Chọn nhanh loại mẫu">${rcMiniIcon('sample')}</button></div></div>
-     <div class="rc-field"><label>Bias mong muốn (%)</label><input ${ro} aria-label="Bias mong muốn (%)" type="number" step="any" value="${t.biasTarget}" oninput="rcMeta('biasTarget',this.value)"></div>
-     <div class="rc-field"><label>Mức ý nghĩa (α, alpha)</label><input ${ro} aria-label="Mức ý nghĩa (alpha)" type="number" step="any" value="${t.alpha}" oninput="rcMeta('alpha',this.value)"></div>
+     <div class="rc-field"><label>Bias mong muốn (%)</label><input ${ro} aria-label="Bias mong muốn (%)" type="number" step="any" value="${t.biasTarget}" oninput="rcMeta('biasTarget',this.value)" onfocus="rcMetaFocus('biasTarget')" onchange="rcMetaLog('biasTarget')"></div>
+     <div class="rc-field"><label>Mức ý nghĩa (α, alpha)</label><input ${ro} aria-label="Mức ý nghĩa (alpha)" type="number" step="any" value="${t.alpha}" oninput="rcMeta('alpha',this.value)" onfocus="rcMetaFocus('alpha')" onchange="rcMetaLog('alpha')"></div>
      <div class="rc-field rc-coverage-cell"><label class="rc-coverage-check"><input ${ro} type="checkbox" ${t.coverageConfirmed?'checked':''} onchange="rcMeta('coverageConfirmed',this.checked)"><span>Mẫu đã bao phủ khoảng đo và/hoặc điểm quyết định lâm sàng theo SOP</span></label></div></div></div>
    <div class="panel rc-pair-panel"><h3>Dữ liệu đo bắt cặp</h3><div class="rc-pair-wrap"><div class="rc-pair-head"><div>Mẫu</div><div id="rcOldLotHead">${oldLotHead}</div><div id="rcNewLotHead">${newLotHead}</div><div>Trung bình</div><div>Hiệu số (cũ − mới)</div><div></div></div>${rows}</div>
      ${canWrite()?`<div class="rc-pair-actions">${btn('+ Thêm mẫu','rcAddRow()','ghost sm')} ${btn('Xóa dữ liệu','rcClearRows()','ghost sm')}</div>`:''}
@@ -163,7 +163,15 @@ function rcCompute(){
   vd.innerHTML=`<div class="rc-verdict ${vcls}"><div class="rc-verdict-icon">${vicon}</div><div><div class="rc-verdict-title">${vtitle}</div><div class="rc-verdict-desc">${vdesc}</div></div></div>`;
   sc.innerHTML=rcScatterSVG(R,ds.test);bl.innerHTML=rcBlandSVG(R);
 }
-function rcMeta(k,v){if(!requireWrite())return;const result=ReagentComparisonService.updateMetadata(state,{id:rcId,key:k,value:k==='date'?(parseVN(v)||QCCore.cleanText(v,20)):v});if(result.error)return;const ds=result.comparison;rcSaveSoon();rcCompute();if(k==='reagent'||k==='lotOld'||k==='lotNew'){const d=document.getElementById('rcCmpDisp');if(d)d.textContent=rcLabel(rcAct());const s=document.getElementById('rcSel');if(s){const o=[...s.options].find(o=>o.value===rcId);if(o)o.textContent=rcLabel(rcAct());}const oh=document.getElementById('rcOldLotHead'),nh=document.getElementById('rcNewLotHead');if(oh)oh.textContent='Lô cũ'+(ds.test.lotOld?': '+ds.test.lotOld:'');if(nh)nh.textContent='Lô mới'+(ds.test.lotNew?': '+ds.test.lotNew:'');}}
+const RC_META_LOG_LABEL={lotOld:'Số lô cũ',lotNew:'Số lô mới',biasTarget:'Bias mong muốn (%)',alpha:'Mức ý nghĩa (α)'};
+function rcMetaFocus(k){rcMetaBefore=rcMetaBefore||{};const ds=rcAct();rcMetaBefore[k]=ds?ds.test[k]:undefined;}
+function rcMetaLog(k){
+  const ds=rcAct();if(!ds||!rcMetaBefore||!(k in rcMetaBefore))return;
+  const before=rcMetaBefore[k],after=ds.test[k];delete rcMetaBefore[k];
+  if(before===after)return;
+  logAct('Cập nhật so sánh hóa chất',`${RC_META_LOG_LABEL[k]||k}: ${before??'—'} → ${after??'—'}`,rcLabel(ds));
+}
+function rcMeta(k,v){if(!requireWrite())return;const before=rcAct()&&rcAct().test[k];const result=ReagentComparisonService.updateMetadata(state,{id:rcId,key:k,value:k==='date'?(parseVN(v)||QCCore.cleanText(v,20)):v});if(result.error)return;const ds=result.comparison;rcSaveSoon();rcCompute();if(k==='coverageConfirmed'&&before!==result.value)logAct('Xác nhận bao phủ SOP',`${result.value?'Đã xác nhận':'Chưa xác nhận'} bao phủ khoảng đo/điểm quyết định lâm sàng`,rcLabel(ds));if(k==='reagent'||k==='lotOld'||k==='lotNew'){const d=document.getElementById('rcCmpDisp');if(d)d.textContent=rcLabel(rcAct());const s=document.getElementById('rcSel');if(s){const o=[...s.options].find(o=>o.value===rcId);if(o)o.textContent=rcLabel(rcAct());}const oh=document.getElementById('rcOldLotHead'),nh=document.getElementById('rcNewLotHead');if(oh)oh.textContent='Lô cũ'+(ds.test.lotOld?': '+ds.test.lotOld:'');if(nh)nh.textContent='Lô mới'+(ds.test.lotNew?': '+ds.test.lotNew:'');}}
 function rcUpdateRowCalc(i){
   const row=document.querySelector(`[data-rc-row="${i}"]`),ds=rcAct();if(!row||!ds||!ds.rows[i])return;
   const c=rcPairCalc(ds.rows[i]),avg=row.querySelector('.rc-calc.avg'),dif=row.querySelector('.rc-calc.dif');
@@ -175,9 +183,10 @@ function rcAddRow(){if(!requireWrite())return;if(ReagentComparisonService.addRow
 function rcRmRow(i){if(!requireWrite())return;if(ReagentComparisonService.removeRow(state,{id:rcId,rowIndex:i}).error)return;save({clearDerived:false});rerender();}
 function rcClearRows(){if(!requireWrite())return;if(ReagentComparisonService.clearRows(state,{id:rcId}).error)return;save({clearDerived:false});rerender();}
 function rcSwitch(id){rcId=id;rerender();}
-async function rcDelete(id,keepModal=false){if(!requireWrite())return;if(state.reagentTests.length<=1){await infoDialog('Phải còn ít nhất 1 phép so sánh.');return;}
+async function rcDelete(id,keepModal=false){if(!requireAdmin())return;if(state.reagentTests.length<=1){await infoDialog('Phải còn ít nhất 1 phép so sánh.');return;}
+  const label=rcLabel(ReagentComparisonService.find(state,id)||{test:{}});
   if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa phép so sánh',message:'Xóa phép so sánh này?',confirmLabel:'Xóa',cancelLabel:'Hủy'}))return;
-  const result=ReagentComparisonService.remove(state,{id});if(result.error)return;if(rcId===id)rcId=result.nextId;save({clearDerived:false});if(keepModal)renderRcModal();rerender();}
+  const result=ReagentComparisonService.remove(state,{id});if(result.error)return;if(rcId===id)rcId=result.nextId;logAct('Xóa phép so sánh hóa chất',label,label);save({clearDerived:false});if(keepModal)renderRcModal();rerender();}
 function rcDeleteCurrent(){rcDelete(rcId);}
 function rcQuickLabel(type){return type==='sampleType'?'loại mẫu':'người thực hiện';}
 function rcQuickList(type){
@@ -241,7 +250,7 @@ function renderRcCreateModal(){
     <div class="modal-f">${btn('Đóng','closeModal()','ghost')}</div></div>`);
   setTimeout(()=>{const e=document.getElementById('rcCreateSearch');if(e){e.focus();e.setSelectionRange(e.value.length,e.value.length);}},0);
 }
-function rcCreateFrom(name,unit){if(!requireWrite())return;const result=ReagentComparisonService.create(state,{id:uid(),name,unit});if(result.error)return;rcId=result.comparison.id;save({clearDerived:false});closeModal();rerender();}
+function rcCreateFrom(name,unit){if(!requireWrite())return;const result=ReagentComparisonService.create(state,{id:uid(),name,unit});if(result.error)return;rcId=result.comparison.id;logAct('Tạo phép so sánh hóa chất',rcLabel(result.comparison),rcLabel(result.comparison));save({clearDerived:false});closeModal();rerender();}
 function rcFmt(x,k=4){return isFinite(x)?Number(x.toFixed(k)).toString():'—';}
 function rcFmtT(x){return isFinite(x)?Number(x.toFixed(4)).toString():(x>0?'+∞':'−∞');}
 function rcDateText(v){return v?esc(vnDate(v)):formatDateTimeVN(new Date().toISOString()).split(' ').slice(1).join(' ');}

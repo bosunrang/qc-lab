@@ -35,6 +35,21 @@ function makeState() {
   assert.equal(created.comparison.test.unsafe, undefined);
 }
 
+// --- biasTarget/alpha: a cleared or not-yet-finished numeric input must keep the previous
+// value, not snap to 0 — 0 feeds passBias/passP, the software's accept/reject gate for a new
+// reagent lot, so a mid-edit or blank field must never silently produce a false "lot rejected".
+{
+  const state = makeState();
+  service.create(state, { id: 'R1' });
+  service.updateMetadata(state, { id: 'R1', key: 'biasTarget', value: '8' });
+  assert.equal(service.updateMetadata(state, { id: 'R1', key: 'biasTarget', value: '' }).value, 8, 'blank input must keep the prior biasTarget, not fall to 0');
+  assert.equal(service.updateMetadata(state, { id: 'R1', key: 'biasTarget', value: 'abc' }).value, 8, 'non-numeric input must keep the prior biasTarget, not fall to 0');
+  assert.equal(state.reagentTests[0].test.biasTarget, 8);
+  service.updateMetadata(state, { id: 'R1', key: 'alpha', value: '0.01' });
+  assert.equal(service.updateMetadata(state, { id: 'R1', key: 'alpha', value: '' }).value, 0.01, 'blank input must keep the prior alpha, not fall to 0');
+  assert.equal(service.updateMetadata(state, { id: 'R1', key: 'biasTarget', value: '5.5' }).value, 5.5, 'a genuinely finite value must still apply');
+}
+
 {
   const state = makeState();
   service.create(state, { id: 'R1' });
@@ -96,6 +111,7 @@ function makeState() {
   assert.doesNotMatch(source, /state\.reagentTests\s*=/, 'UI không được thay cả nhánh reagentTests');
   assert.doesNotMatch(source, /state\.reagentTests\.(?:push|splice)\s*\(/, 'UI không được mutation reagentTests trực tiếp');
   assert.doesNotMatch(source, /state\[(?:rcQuickKey\([^)]*\)|key)\]\s*=/, 'UI không được thay danh mục nhanh trực tiếp');
+  assert.match(source, /async function rcDelete\(id,keepModal=false\)\{if\(!requireAdmin\(\)\)return;/, 'Xóa phép so sánh hóa chất phải yêu cầu quyền admin, không chỉ quyền ghi (giống delTest())');
 }
 
 {

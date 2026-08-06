@@ -36,7 +36,19 @@
     if(!comparison)return{error:'not-found'};
     if(!META_KEYS.has(key))return{error:'invalid-field'};
     comparison.test=comparison.test&&typeof comparison.test==='object'?comparison.test:{};
-    const clean=key==='coverageConfirmed'?!!value:(key==='biasTarget'||key==='alpha'?QCCore.finiteNumber(value,0):QCCore.cleanText(value,key==='date'?20:undefined));
+    let clean;
+    if(key==='coverageConfirmed'){
+      clean=!!value;
+    }else if(key==='biasTarget'||key==='alpha'){
+      /* Number('')===0 la huu han nen finiteNumber(value,0) khong bao gio roi vao fallback:
+         o trong hoac dang go do so thap phan (vd '0.') se chot thang ve 0 va lot vao
+         passBias/passP - tieu chi quyet dinh co dung lo hoa chat moi hay khong. Giu nguyen
+         gia tri cu cho den khi nguoi dung nhap duoc mot so huu han that su. */
+      const n=Number(value);
+      clean=(value===''||value==null||!Number.isFinite(n))?comparison.test[key]:n;
+    }else{
+      clean=QCCore.cleanText(value,key==='date'?20:undefined);
+    }
     comparison.test[key]=clean;
     return{comparison,key,value:clean};
   }
