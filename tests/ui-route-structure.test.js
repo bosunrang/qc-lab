@@ -133,6 +133,8 @@ assert.match(actions,/class="alert warn action-cancel-warning"/,'cảnh báo h�
 assert.match(reportsCss,/\.action-cancel-warning\{[^}]*width:100%;[^}]*flex-direction:column/,'cảnh báo hủy NCE phải xếp câu chính và giải thích theo chiều dọc');
 assert.match(report,/class="report-export-options"[\s\S]*?Kèm phụ lục NCE[\s\S]*?\(Áp dụng cho PDF và Excel\)[\s\S]*?class="report-actions"/,'tùy chọn phụ lục NCE phải nằm ở dòng riêng phía trên các nút xuất và có chú thích trong ngoặc');
 assert.match(reportsCss,/\.report-nce-option span\{[^}]*display:inline-flex;[^}]*align-items:baseline;[^}]*white-space:nowrap/,'nhãn và chú thích phụ lục NCE phải nằm cùng hàng');
+assert.match(reportsCss,/\.report-nce-option\{[^}]*align-items:center/,'ô tick phải căn giữa theo chiều dọc với nhãn phụ lục NCE');
+assert.match(reportsCss,/\.report-nce-option input\{[^}]*margin:0/,'ô tick phụ lục NCE không được giữ độ lệch thủ công');
 assert.match(reportsCss,/@media\(max-width:760px\)\{[\s\S]*?\.report-nce-option span\{[^}]*white-space:normal;[^}]*flex-wrap:wrap/,'nhãn phụ lục NCE được phép xuống hàng trên màn hình hẹp');
 assert.doesNotMatch(report,/class="report-actions"[\s\S]*?report-nce-option/,'checkbox phụ lục NCE không được trộn cùng hàng nút hành động');
 assert.doesNotMatch(actions,/action-guide-(?:mark|legend)/,'hướng dẫn NCE không được dùng logo phụ hoặc dải màu phân nhóm');
