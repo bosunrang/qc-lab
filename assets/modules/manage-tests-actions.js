@@ -1,4 +1,8 @@
-/* ===== ENTRY / TESTS / ACTIONS ===== */
+/* ===== MANAGE / TARGETS / PANELS / LOT TRANSITIONS =====
+   Đổi tên từ entry-tests-actions.js (2026-08-08): tên cũ gây hiểu lầm là logic
+   trang Nhập QC, trong khi toàn bộ nội dung (setManageTab, Mean/SD theo nhóm lô,
+   Panel QC, nhóm lô, chuyển tiếp lô) thuộc trang "Cấu hình chung" — file này vốn
+   đã nạp ngay sau manage-routes.js trong index.html, chỉ tên file chưa khớp. */
 function validIsoDate(s){const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s||''));if(!m)return'';const y=+m[1],mo=+m[2],d=+m[3],dt=new Date(Date.UTC(y,mo-1,d));return y>=1000&&dt.getUTCFullYear()===y&&dt.getUTCMonth()===mo-1&&dt.getUTCDate()===d?s:'';}
 function parseVN(s){if(!s)return '';s=String(s).trim();const m=/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/.exec(s);if(m)return validIsoDate(m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0'));if(/^\d{4}-\d{2}-\d{2}$/.test(s))return validIsoDate(s);return '';}
 function setManageTab(tab){manageTab=['lots','panels','targets','history','transitions','assays','instruments','tearefs'].includes(tab)?tab:'instruments';manageQ='';rerender();resetMainScroll();}

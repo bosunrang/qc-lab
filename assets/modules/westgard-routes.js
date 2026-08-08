@@ -96,7 +96,7 @@ function pageWestgardArchived(archivedGroups){
   rows.forEach(r=>{if(!byTest.has(r.t.id))byTest.set(r.t.id,{t:r.t,rows:[]});byTest.get(r.t.id).rows.push(r);});
   const testEntries=[...byTest.values()].sort((a,b)=>operationalTestOrder(a.t)-operationalTestOrder(b.t)||String(a.t.name||'').localeCompare(String(b.t.name||''),'vi'));
   if(!testEntries.length)return headOnly('Phân tích Westgard','Xem lại Westgard theo nhóm lô đã dừng/lưu trữ')+
-    `<div class="panel"><h3 role="heading" aria-level="2">Thiết lập phân tích</h3>${wgViewModeTabs(archivedGroups)}<div class="wg-test-picker">${searchBox}${groupPicker}</div></div>
+    `<div class="panel"><h2 class="panel-title">Thiết lập phân tích</h2>${wgViewModeTabs(archivedGroups)}<div class="wg-test-picker">${searchBox}${groupPicker}</div></div>
      <div class="panel">${emptyState('Không tìm thấy xét nghiệm nào','Nhóm lô này không gắn với xét nghiệm/mức nào có Mean/SD hợp lệ.')}</div>`;
   const matchedTests=testEntries.filter(e=>!q||searchText(e.t.name).includes(q)||searchText(testDisplayName(e.t)).includes(q)||searchText(instrumentName(e.t.instrumentId,e.t.machine)).includes(q));
   const testList=matchedTests.length?matchedTests:testEntries; // gõ số lô (không khớp tên xét nghiệm nào) thì vẫn cho chọn đủ xét nghiệm của nhóm vừa nhảy tới
@@ -106,12 +106,12 @@ function pageWestgardArchived(archivedGroups){
   const testPicker=`<div><label>Chọn xét nghiệm <span class="hint">(${testList.length}/${testEntries.length})</span></label><select onchange="if(this.value){wgSetArchivedTest(this.value)}">${testOpts}</select></div>`;
   const entry=testEntries.find(e=>e.t.id===wgArchivedTestId)||testEntries[0];
   const sortedRows=entry.rows.slice().sort((a,b)=>a.l.level-b.l.level);
-  const multiChart=sortedRows.length>=2?`<div class="panel"><h3>Levey-Jennings tổng hợp</h3>
+  const multiChart=sortedRows.length>=2?`<div class="panel"><h2 class="panel-title">Levey-Jennings tổng hợp</h2>
     <div class="hint wg-panel-intro">Biểu đồ quy đổi các mức QC về Z-score để so sánh trên cùng trục; kết luận Đạt/Cảnh báo/Loại bỏ được tính theo bộ luật Westgard đang bật cho xét nghiệm.</div>
     <div class="chart-scroll" tabindex="0"><canvas class="wgLJMultiArchived" data-group="${group.id}" data-test="${entry.t.id}" width="1400" height="430"></canvas></div></div>`:'';
   const blocks=sortedRows.map(({t,l,lot,mean,sd})=>wgLotBlock(t,l.level,lot.lotNo,mean,sd,lotPointsByNo(t.id,l.level,lot.lotNo),badge,`Mức ${l.level}`,`Lô ${esc(lot.lotNo)}`)).join('');
   return headOnly('Phân tích Westgard','Xem lại Westgard theo nhóm lô đã dừng/lưu trữ')+
-   `<div class="panel"><h3 role="heading" aria-level="2">Thiết lập phân tích</h3>${wgViewModeTabs(archivedGroups)}
+   `<div class="panel"><h2 class="panel-title">Thiết lập phân tích</h2>${wgViewModeTabs(archivedGroups)}
      <div class="wg-test-picker wg-test-picker-3">${searchBox}${testPicker}${groupPicker}</div>
      <div class="hint" style="margin-top:8px">Đánh giá dưới đây dùng bộ luật Westgard đang bật hiện nay, không phải cấu hình luật tại thời điểm nhóm lô này còn hoạt động.</div></div>${multiChart}${blocks}`;
 }
@@ -125,7 +125,7 @@ function pageWestgard(){
   const t=tests.find(t=>t.id===selTest);
   const q=searchText(wgTestQ),matched=tests.filter(x=>!q||searchText(testSelectLabel(x)).includes(q)),opts=matched.length?matched.map(x=>`<option value="${x.id}" ${x.id===selTest?'selected':''}>${esc(testSelectLabel(x))}</option>`).join(''):'<option value="">Không tìm thấy xét nghiệm phù hợp</option>';
   const wg=activeWestgard(t),levelViews=wg.views.map(v=>({l:v.l,pts:v.pts,cfg:{mean:v.l.mean,sd:v.l.sd},single:v.single,lotPicker:`<span class="wg-lot-name">Lô ${esc(v.l.lot||'?')}</span>`}));
-  const multiChart=wgMultiViews(t).length>=2?`<div class="panel"><h3>Levey-Jennings tổng hợp</h3>
+  const multiChart=wgMultiViews(t).length>=2?`<div class="panel"><h2 class="panel-title">Levey-Jennings tổng hợp</h2>
     <div class="hint wg-panel-intro">Biểu đồ quy đổi các mức QC về Z-score để so sánh trên cùng trục; kết luận Đạt/Cảnh báo/Loại bỏ được tính theo bộ luật Westgard đang bật cho xét nghiệm. Bật "Xem lô cũ" ở mức tương ứng để thêm đường của lô đã chuyển tiếp.</div>
     <div class="chart-scroll" tabindex="0"><canvas class="wgLJMulti" data-test="${t.id}" width="1400" height="430"></canvas></div></div>`:'';
   const blocks=levelViews.map(v=>{const{l,pts,cfg,lotPicker}=v;
@@ -147,8 +147,8 @@ function pageWestgard(){
   const ruleGuide=`<details class="wg-guide"><summary>Hướng dẫn nhanh luật Westgard</summary><div class="alert info" style="margin:10px 12px 18px"><span>Ký hiệu ${icoRefArrow()} trong bảng là điểm lịch sử cấu thành quy tắc. Điểm này chỉ là bằng chứng; trạng thái cảnh báo/loại được gắn cho lần chạy phát hiện hiện tại, không đổi hồi tố kết luận cũ.</span></div><div class="chart-scroll" tabindex="0"><table><thead><tr><th>Luật</th><th>Điều kiện</th><th>Kết luận</th><th>Gợi ý xử lý</th></tr></thead><tbody>${ruleGuideRows}</tbody></table></div></details>`;
   const exportActions=wgChartMode==='lj'?'<div><label>&nbsp;</label><div class="wg-export-actions">'+btn(icoDownload()+'Xuất Excel','exportWestgardXLSX()','teal wg-excel-btn','Xuất Excel biểu đồ Levey-Jennings, các vi phạm và điểm bằng chứng đang xem')+btn(icoPrint()+'In PDF','printWestgard()','teal wg-print-btn','Tạo bản in PDF/HTML biểu đồ Levey-Jennings và các vi phạm đang xem')+'</div></div>':'';
   return headOnly('Phân tích Westgard','Đối chiếu luật theo mức QC, lô và lần chạy')+
-   `<div class="panel"><h3 role="heading" aria-level="2">Thiết lập phân tích</h3>${wgViewModeTabs(archivedGroups)}<div class="wg-test-picker${exportActions?' wg-test-picker-3':''}"><div><label>Tìm nhanh</label><input id="wgTestSearch" type="search" placeholder="Tên xét nghiệm, LOT hoặc máy..." value="${escAttr(wgTestQ)}" oninput="wgFilterTests(this.value)"></div><div><label>Chọn xét nghiệm <span id="wgTestCount" class="hint">(${matched.length}/${tests.length})</span></label><select id="wgTestSelect" aria-label="Chọn xét nghiệm" ${matched.length?'':'disabled'} onchange="if(this.value){selTest=this.value;rerender()}">${opts}</select></div>${exportActions}</div>
-     <div class="wg-rules"><b style="font-size:12px">Cấu hình chung của luật</b><div style="margin-top:6px">${ruleToggles}</div></div>
+   `<div class="panel"><h2 class="panel-title">Thiết lập phân tích</h2>${wgViewModeTabs(archivedGroups)}<div class="wg-test-picker${exportActions?' wg-test-picker-3':''}"><div><label>Tìm nhanh</label><input id="wgTestSearch" type="search" placeholder="Tên xét nghiệm, LOT hoặc máy..." value="${escAttr(wgTestQ)}" oninput="wgFilterTests(this.value)"></div><div><label>Chọn xét nghiệm <span id="wgTestCount" class="hint">(${matched.length}/${tests.length})</span></label><select id="wgTestSelect" aria-label="Chọn xét nghiệm" ${matched.length?'':'disabled'} onchange="if(this.value){selTest=this.value;rerender()}">${opts}</select></div>${exportActions}</div>
+     <div class="wg-rules"><b style="font-size:var(--type-meta)">Cấu hình chung của luật</b><div style="margin-top:6px">${ruleToggles}</div></div>
      ${ruleGuide}${wgChartModeTabs()}</div>${wgChartMode==='cusum'?pageWestgardCusum(t):multiChart+blocks}`;
 }
 function wgFilterTests(v){

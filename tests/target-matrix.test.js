@@ -6,7 +6,7 @@
  * no record of what the previous lot's Mean/SD was - so switching the
  * "Nhóm lô QC" dropdown back and forth made values "leak" between groups.
  *
- * Fix: applyTargetPick() (assets/modules/entry-tests-actions.js) now snapshots
+ * Fix: applyTargetPick() (assets/modules/manage-tests-actions.js) now snapshots
  * the outgoing lot's Mean/SD into meanSdHistory before reassigning the slot,
  * and lotTargetSnapshot() (assets/modules/qc-domain.js) lets the read side look
  * up a specific lot's own value instead of falling back to whatever lot is
@@ -15,7 +15,7 @@
 const assert = require('node:assert/strict');
 const { loadSandbox } = require('./helpers/sandbox');
 
-const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'modules/entry-tests-actions.js']);
+const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'modules/manage-tests-actions.js']);
 // Values crossing the vm sandbox boundary belong to a different realm (their own
 // Object prototype), which makes assert.deepEqual report false mismatches even
 // for identical-looking plain objects. Round-trip through JSON first.
@@ -75,7 +75,7 @@ const lotB = { id: 'lotB', lotNo: '2122', level: 2, exp: '2027-01-01' };
 
 /**
  * "Dự kiến" (planned): saving Mean/SD for a new lot group without switching over yet.
- * applyPlannedTarget() (entry-tests-actions.js) must NOT touch the live qcLotId/lot -
+ * applyPlannedTarget() (manage-tests-actions.js) must NOT touch the live qcLotId/lot -
  * the currently-linked lot keeps running QC uninterrupted - it only records a
  * meanSdHistory entry tagged planned:true, which plannedTargetFor()/lotTargetSnapshot()
  * (qc-domain.js) can read back so the form pre-fills next time without being mistaken

@@ -177,7 +177,7 @@ function pageSigma(){
   const addPeriodAction=canWrite()?btn('+ Thêm kỳ','sgAddPeriod()','teal sm'):'';
   const headerActions=biasActions+addPeriodAction;
   return headOnly('Six Sigma & Sai số','Đánh giá hiệu năng phương pháp theo TEa, CV IQC và Bias EQA/EQC')+
-   `<div class="sg-top-grid"><div class="panel"><h3 class="sg-setup-heading" role="heading" aria-level="2">Thiết lập phân tích</h3><div class="row-flex sg-control-row">${testSelectFields}</div>
+   `<div class="sg-top-grid"><div class="panel"><h2 class="sg-setup-heading panel-title">Thiết lập phân tích</h2><div class="row-flex sg-control-row">${testSelectFields}</div>
      <div class="sg-setup-fields">
        <div><label>Tên xét nghiệm</label><input value="${escAttr(testDisplayName(t))}" aria-label="Tên xét nghiệm" readonly></div>
        <div><label>Đơn vị</label><input value="${escAttr(t.unit||'')}" aria-label="Đơn vị" readonly></div>
@@ -187,23 +187,23 @@ function pageSigma(){
      </div>
      ${eflmBox}
       <div class="hint sg-sigma-input-note">${esc(teaHint)} Mỗi mức dùng <b>CV từ IQC</b> và <b>Bias từ EQA/EQC</b>; nhiều vòng EQA được tổng hợp bằng <b>RMS</b> để tránh triệt tiêu dấu. Dữ liệu IQC không được dùng để tính Bias. Quy tắc thận trọng của phần mềm: &lt;20 điểm chỉ hiển thị ước tính, 20–29 điểm là tạm thời, ≥30 điểm mới dùng để gợi ý QC. DPMO/Yield chỉ là quy đổi tham khảo với dịch 1,5σ.${isOperational?'':' Nhóm lô hiện không vận hành; các kỳ cũ vẫn lấy CV theo đúng lô và Mean/SD đã lưu trong lịch sử IQC.'}</div></div>
-   <div class="panel"><h3 class="sg-setup-heading">Tình trạng</h3><div id="sgStatus"></div></div></div>
-   <div class="panel"><div class="sg-data-head"><h3>Số liệu theo kỳ</h3><div class="sg-data-head-actions">${headerActions}</div></div>
+   <div class="panel"><h2 class="sg-setup-heading panel-title">Tình trạng</h2><div id="sgStatus"></div></div></div>
+   <div class="panel"><div class="sg-data-head"><h2 class="panel-title">Số liệu theo kỳ</h2><div class="sg-data-head-actions">${headerActions}</div></div>
      ${data.length?`<div class="sg-simple-table-wrap"><table class="sg-simple-table" style="min-width:${tableMin}px">${colGroup}${tableHead}<tbody>${rows}</tbody></table></div>`:'<div class="empty" style="margin:14px 16px 10px">Chưa có kỳ nào.</div>'}
      ${combinedExport?`<div class="sg-data-foot">${combinedExport}</div>`:''}
     </div>
-   <details class="panel sg-collapse-panel"><summary class="sg-collapse-summary"><span>Thiết kế QC theo Sigma (OPSpecs)</span></summary><div class="sg-collapse-body" id="sgFreq"></div></details>
-   <details class="panel sg-collapse-panel sg-mu-panel"><summary class="sg-collapse-summary"><span>Độ không đảm bảo đo (MU)</span><div id="sgMUAction" class="sg-data-head-actions" onclick="event.stopPropagation()"></div></summary><div id="sgMU"></div></details>
-   <div class="panel"><h3>Biểu đồ Sigma & MDC</h3><div class="sg-chart-grid">
-     <div class="sg-chart-box"><h4>Xu hướng Sigma theo kỳ</h4><div class="chart-inner" id="sgTrend"></div></div>
-     <div class="sg-chart-box"><h4>Biểu đồ Quyết định Phương pháp (MDC)</h4><div class="hint">X = CV/TEA, Y = |BIAS|/TEA. Điểm to nhất là kỳ gần nhất.</div><div class="chart-inner" id="sgMDC"></div></div>
+   <details class="panel sg-collapse-panel"><summary class="sg-collapse-summary"><span role="heading" aria-level="2">Thiết kế QC theo Sigma (OPSpecs)</span></summary><div class="sg-collapse-body" id="sgFreq"></div></details>
+   <details class="panel sg-collapse-panel sg-mu-panel"><summary class="sg-collapse-summary"><span role="heading" aria-level="2">Độ không đảm bảo đo (MU)</span></summary><div id="sgMUAction" class="sg-data-head-actions"></div><div id="sgMU"></div></details>
+   <div class="panel"><h2 class="panel-title">Biểu đồ Sigma & MDC</h2><div class="sg-chart-grid">
+     <div class="sg-chart-box"><h3>Xu hướng Sigma theo kỳ</h3><div class="chart-inner" id="sgTrend"></div></div>
+     <div class="sg-chart-box"><h3>Biểu đồ Quyết định Phương pháp (MDC)</h3><div class="hint">X = CV/TEA, Y = |BIAS|/TEA. Điểm to nhất là kỳ gần nhất.</div><div class="chart-inner" id="sgMDC"></div></div>
    </div></div>`;
 }
 function sgOpSpecCell(spec){
   if(!spec)return '<span class="muted">—</span>';
   if(!spec.capable)return '<span style="color:var(--red);font-weight:700">Phương pháp chưa đủ năng lực (&lt;3σ)</span>';
   const nr='N='+spec.n+(spec.r>1?' · R='+spec.r:'')+' điểm/lần chạy';
-  return `<b>${spec.rules.join(' / ')}</b><div style="font-size:11px;color:var(--muted)">${nr}${spec.single?' · chỉ 1 quy tắc':''}${spec.marginal?' · tối đa + cải thiện PP':''}</div>`;
+  return `<b>${spec.rules.join(' / ')}</b><div style="font-size:var(--type-caption);color:var(--muted)">${nr}${spec.single?' · chỉ 1 quy tắc':''}${spec.marginal?' · tối đa + cải thiện PP':''}</div>`;
 }
 function sgFrequencyHTML(t,selectedRow,levels){
   if(!selectedRow)return '<div class="hint">Chưa có kỳ Sigma để đánh giá đầu vào QC.</div>';
@@ -282,7 +282,7 @@ function sgRefresh(){
   const tr=document.getElementById('sgTrend');if(tr)tr.innerHTML=sgTrendSVG(t,classifiable,levels);
   const md=document.getElementById('sgMDC');if(md)md.innerHTML=sgMDCSVG(t,classifiable,levels);
   const fq=document.getElementById('sgFreq');if(fq)fq.innerHTML=sgFrequencyHTML(t,selectedRow,levels);
-  const muAction=document.getElementById('sgMUAction');if(muAction)muAction.innerHTML=selectedRow&&canWrite()?btn('Nhập u(Cal) từ CoA',`sgOpenMU('${jsq(selectedRow.e.id)}')`,'teal sm','Nhập độ không đảm bảo của calibrator, chọn cách xử lý độ chệch và ghi người rà soát'):'';
+  const muAction=document.getElementById('sgMUAction');if(muAction)muAction.innerHTML=selectedRow&&canWrite()?btn('Nhập u(Cal)',`sgOpenMU('${jsq(selectedRow.e.id)}')`,'teal sm','Nhập độ không đảm bảo của calibrator từ CoA, chọn cách xử lý độ chệch và ghi người rà soát'):'';
   const muBox=document.getElementById('sgMU');if(muBox)muBox.innerHTML=sgMuHTML(t,selectedRow,levels);
 }
 function sgTips(t,r,lvl){
@@ -321,27 +321,27 @@ function sgTrendSVG(t,valid,levels){
   let g='';const band=(s1,s2,c)=>`<rect x="${L}" y="${py(s2)}" width="${W-L-R}" height="${py(s1)-py(s2)}" fill="${c}"/>`;
   g+=`<rect x="${L}" y="${T}" width="${W-L-R}" height="${H-T-B}" fill="#fff" stroke="#dce3e9"/>`;
   g+=band(6,8,'#edf5ef')+band(4,6,'#f6faf6')+band(3,4,'#fff6df')+band(0,3,'#fdebea');
-  for(let s=0;s<=8;s+=2)g+=`<line x1="${L}" y1="${py(s)}" x2="${W-R}" y2="${py(s)}" stroke="#dde5e9" stroke-width=".7"/><text x="${L-7}" y="${py(s)+3}" font-size="10" fill="#70818d" text-anchor="end">${s}</text>`;
-  g+=`<line x1="${L}" y1="${py(3)}" x2="${W-R}" y2="${py(3)}" stroke="#cf5a52" stroke-width=".85" stroke-dasharray="4 4"/><text x="${W-R-4}" y="${py(3)-4}" font-size="10" fill="#b83b33" text-anchor="end" font-weight="750">3σ</text>`;
-  g+=`<line x1="${L}" y1="${py(6)}" x2="${W-R}" y2="${py(6)}" stroke="#2f7d5b" stroke-width=".85" stroke-dasharray="4 4"/><text x="${W-R-4}" y="${py(6)-4}" font-size="10" fill="#216b4a" text-anchor="end" font-weight="750">6σ</text>`;
+  for(let s=0;s<=8;s+=2)g+=`<line x1="${L}" y1="${py(s)}" x2="${W-R}" y2="${py(s)}" stroke="#dde5e9" stroke-width=".7"/><text x="${L-7}" y="${py(s)+3}" font-size="var(--type-overline)" fill="#70818d" text-anchor="end">${s}</text>`;
+  g+=`<line x1="${L}" y1="${py(3)}" x2="${W-R}" y2="${py(3)}" stroke="#cf5a52" stroke-width=".85" stroke-dasharray="4 4"/><text x="${W-R-4}" y="${py(3)-4}" font-size="var(--type-overline)" fill="#b83b33" text-anchor="end" font-weight="750">3σ</text>`;
+  g+=`<line x1="${L}" y1="${py(6)}" x2="${W-R}" y2="${py(6)}" stroke="#2f7d5b" stroke-width=".85" stroke-dasharray="4 4"/><text x="${W-R-4}" y="${py(6)-4}" font-size="var(--type-overline)" fill="#216b4a" text-anchor="end" font-weight="750">6σ</text>`;
   const cols=['#0e4d4a','#7a4f9a','#c47d12'];
   levels.forEach((l,li)=>{const col=cols[li%3];const pts=[];valid.forEach((v,i)=>{const r=v.rs[li];if(r&&isFinite(r.sigma))pts.push([px(i),py(Math.max(0,Math.min(8,r.sigma)))]);});
     if(pts.length>1)g+=`<polyline points="${pts.map(p=>p.join(',')).join(' ')}" fill="none" stroke="${col}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`;
     pts.forEach((p,pi)=>g+=`<circle cx="${p[0]}" cy="${p[1]}" r="${pi===pts.length-1?3.7:3}" fill="${col}" stroke="#fff" stroke-width="1.2"/>`);
-    g+=`<rect x="${48+li*72}" y="9" width="12" height="3" rx="1.5" fill="${col}"/><text x="${65+li*72}" y="13" font-size="10" fill="${col}" font-weight="750">Mức ${l}</text>`;});
-  valid.forEach((v,i)=>{if(valid.length<=6||i===0||i===valid.length-1)g+=`<text x="${px(i)}" y="${H-B+14}" font-size="10" fill="#70818d" text-anchor="middle">${(v.e.period||'').split('-').reverse().join('/')}</text>`;});
+    g+=`<rect x="${48+li*72}" y="9" width="12" height="3" rx="1.5" fill="${col}"/><text x="${65+li*72}" y="13" font-size="var(--type-overline)" fill="${col}" font-weight="750">Mức ${l}</text>`;});
+  valid.forEach((v,i)=>{if(valid.length<=6||i===0||i===valid.length-1)g+=`<text x="${px(i)}" y="${H-B+14}" font-size="var(--type-overline)" fill="#70818d" text-anchor="middle">${(v.e.period||'').split('-').reverse().join('/')}</text>`;});
   g+=`<line x1="${L}" y1="${H-B}" x2="${W-R}" y2="${H-B}" stroke="#42515b" stroke-width=".9"/><line x1="${L}" y1="${T}" x2="${L}" y2="${H-B}" stroke="#42515b" stroke-width=".9"/>`;
-  g+=`<text transform="translate(13,${(T+H-B)/2}) rotate(-90)" font-size="10" fill="#40515c" text-anchor="middle" font-weight="700">Sigma</text>`;
+  g+=`<text transform="translate(13,${(T+H-B)/2}) rotate(-90)" font-size="var(--type-overline)" fill="#40515c" text-anchor="middle" font-weight="700">Sigma</text>`;
   return valid.length?`<div style="width:100%;margin:4px auto 0"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;display:block" xmlns="http://www.w3.org/2000/svg">${g}</svg></div>`:'<div class="hint">Chưa có dữ liệu.</div>';
 }
 function sgMDCSVG(t,valid,levels){
   const W=1000,H=275,L=45,R=16,T=23,B=42,xmax=60,ymax=100;
   const px=x=>L+x/xmax*(W-L-R),py=y=>H-B-y/ymax*(H-T-B);let g='';
   g+=`<rect x="${L}" y="${T}" width="${W-L-R}" height="${H-T-B}" fill="#fff" stroke="#dce3e9"/>`;
-  for(let y=0;y<=100;y+=20)g+=`<line x1="${L}" y1="${py(y)}" x2="${W-R}" y2="${py(y)}" stroke="#e5ecef" stroke-width=".7"/><text x="${L-7}" y="${py(y)+3}" font-size="10" fill="#70818d" text-anchor="end">${y}</text>`;
-  for(let x=0;x<=60;x+=10)g+=`<text x="${px(x)}" y="${H-B+15}" font-size="10" fill="#70818d" text-anchor="middle">${x}</text>`;
+  for(let y=0;y<=100;y+=20)g+=`<line x1="${L}" y1="${py(y)}" x2="${W-R}" y2="${py(y)}" stroke="#e5ecef" stroke-width=".7"/><text x="${L-7}" y="${py(y)+3}" font-size="var(--type-overline)" fill="#70818d" text-anchor="end">${y}</text>`;
+  for(let x=0;x<=60;x+=10)g+=`<text x="${px(x)}" y="${H-B+15}" font-size="var(--type-overline)" fill="#70818d" text-anchor="middle">${x}</text>`;
   /** @type {[number,string][]} */
-  ([[2,'#c0362c'],[3,'#dd8b1f'],[4,'#b59a00'],[5,'#3f9a55'],[6,'#0e8f8f']]).forEach(([s,c])=>{const x2=Math.min(xmax,100/s),y2=100-s*x2,lx=px(x2)+3,ly=py(y2)-6;g+=`<line x1="${px(0)}" y1="${py(100)}" x2="${px(x2)}" y2="${py(y2)}" stroke="${c}" stroke-width="1" stroke-linecap="round" opacity=".88"/><text x="${lx}" y="${ly}" font-size="10" fill="#fff" stroke="#fff" stroke-width="3" stroke-linejoin="round" font-weight="800">${s}σ</text><text x="${lx}" y="${ly}" font-size="10" fill="${c}" font-weight="800">${s}σ</text>`;});
+  ([[2,'#c0362c'],[3,'#dd8b1f'],[4,'#b59a00'],[5,'#3f9a55'],[6,'#0e8f8f']]).forEach(([s,c])=>{const x2=Math.min(xmax,100/s),y2=100-s*x2,lx=px(x2)+3,ly=py(y2)-6;g+=`<line x1="${px(0)}" y1="${py(100)}" x2="${px(x2)}" y2="${py(y2)}" stroke="${c}" stroke-width="1" stroke-linecap="round" opacity=".88"/><text x="${lx}" y="${ly}" font-size="var(--type-overline)" fill="#fff" stroke="#fff" stroke-width="3" stroke-linejoin="round" font-weight="800">${s}σ</text><text x="${lx}" y="${ly}" font-size="var(--type-overline)" fill="${c}" font-weight="800">${s}σ</text>`;});
   const cols=['#0e4d4a','#7a4f9a','#c47d12'];
   levels.forEach((l,li)=>{const col=cols[li%3],pts=[];valid.forEach((v,i)=>{const r=v.rs[li];if(!r)return;const tea=Number(r.tea)||sgTea(t)||1,X=r.cv/tea*100,Y=Math.abs(r.bias)/tea*100;pts.push({x:px(Math.min(xmax,X)),y:py(Math.min(ymax,Y)),i,r,X,Y,period:v.e.period});});
     if(pts.length>1)g+=`<polyline points="${pts.map(p=>p.x+','+p.y).join(' ')}" fill="none" stroke="${col}" stroke-opacity=".3" stroke-width=".9" stroke-dasharray="3 3"/>`;
@@ -352,10 +352,10 @@ function sgMDCSVG(t,valid,levels){
          không escape nháy kép, vì nó được thiết kế để nhúng trong CHUỖI JS nháy đơn). */
       const tip=`<b>${periodLabel} · Mức ${l}</b><div>Sigma: <b style='color:${r.c}'>${sigmaTxt}</b> · ${esc(r.label)}</div><div>CV/TEa: ${fmt(p.X,1)}% · |Bias|/TEa: ${fmt(p.Y,1)}%</div><div class='muted'>CV ${fmt(r.cv,2)}% · Bias ${fmt(r.bias,2)}%</div>`;
       g+=`<circle cx="${p.x}" cy="${p.y}" r="${big?4.8:3.2}" fill="${col}" fill-opacity="${big?0.95:0.62}" stroke="#fff" stroke-width="1.2" style="cursor:pointer" onmousemove="sgPointTipShow(event,'${jsq(tip)}')" onmouseleave="sgPointTipHide()"/>`;});
-    g+=`<rect x="${50+li*72}" y="9" width="12" height="3" rx="1.5" fill="${col}"/><text x="${67+li*72}" y="13" font-size="10" fill="${col}" font-weight="750">Mức ${l}</text>`;});
+    g+=`<rect x="${50+li*72}" y="9" width="12" height="3" rx="1.5" fill="${col}"/><text x="${67+li*72}" y="13" font-size="var(--type-overline)" fill="${col}" font-weight="750">Mức ${l}</text>`;});
   g+=`<line x1="${L}" y1="${H-B}" x2="${W-R}" y2="${H-B}" stroke="#42515b" stroke-width=".9"/><line x1="${L}" y1="${T}" x2="${L}" y2="${H-B}" stroke="#42515b" stroke-width=".9"/>`;
-  g+=`<text x="${(L+W-R)/2}" y="${H-7}" font-size="10" fill="#40515c" text-anchor="middle" font-weight="750">CV / TEA (%)</text>`;
-  g+=`<text transform="translate(13,${(T+H-B)/2}) rotate(-90)" font-size="10" fill="#40515c" text-anchor="middle" font-weight="750">|BIAS| / TEA (%)</text>`;
+  g+=`<text x="${(L+W-R)/2}" y="${H-7}" font-size="var(--type-overline)" fill="#40515c" text-anchor="middle" font-weight="750">CV / TEA (%)</text>`;
+  g+=`<text transform="translate(13,${(T+H-B)/2}) rotate(-90)" font-size="var(--type-overline)" fill="#40515c" text-anchor="middle" font-weight="750">|BIAS| / TEA (%)</text>`;
   return valid.length?`<div style="width:100%;margin:4px auto 0"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;display:block" xmlns="http://www.w3.org/2000/svg">${g}</svg></div>`:'<div class="hint">Chưa có dữ liệu.</div>';
 }
 function sgBiasRowsFromDom(){return [...document.querySelectorAll('.sg-eqa-row')].map(r=>({lab:r.querySelector('[data-f="lab"]').value,target:r.querySelector('[data-f="target"]').value}));}
@@ -386,7 +386,7 @@ function sgRenderBiasModal(){
     <div class="modal-b"><div class="sg-eqa-table-wrap"><table class="sg-eqa-table"><thead><tr><th>#</th><th>KQ PXN</th><th>Target EQA</th><th>Bias%</th><th><span style="position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">Thao tác</span></th></tr></thead><tbody>${rows}</tbody></table></div>
       ${btn('+ Thêm vòng','sgBiasAdd()','ghost sm sg-eqa-add')}<div id="sgBiasSummary" class="sg-eqa-summary alert info"></div>
       <div class="sg-eqa-period-wrap"><div class="sg-eqa-period-head"><b>Áp dụng cho kỳ nào?</b><div>${btn('Chọn tất cả','sgBiasSelectPeriods(true)','ghost sm')}${btn('Bỏ chọn','sgBiasSelectPeriods(false)','ghost sm')}</div></div><div class="sg-eqa-period-list">${periodRows}</div></div></div>
-    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn('✓ Áp dụng Bias%','sgBiasApply()','teal')}</div></div>`);
+    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn('Áp dụng Bias%','sgBiasApply()','teal')}</div></div>`);
   sgBiasUpdateSummary();
 }
 function sgBiasUpdateSummary(){
@@ -465,7 +465,7 @@ function sgRenderMuModal(){
         <div><label for="sgMuDate">Ngày rà soát</label>${dateBox('sgMuDate',c.reviewedDate||'','manage-date')}</div>
       </div>
       <div class="sg-eqa-period-wrap sg-mu-period-wrap"><div class="sg-eqa-period-head"><div><b>Kỳ áp dụng</b></div><div>${btn('Chọn tất cả','sgMuSelectPeriods(true)','ghost sm')}${btn('Bỏ chọn','sgMuSelectPeriods(false)','ghost sm')}</div></div><div class="sg-eqa-period-list">${periodRows}</div></div></div>
-    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn('✓ Áp dụng ngân sách MU','sgMuApply()','teal')}</div></div>`);
+    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn('Áp dụng ngân sách MU','sgMuApply()','teal')}</div></div>`);
   sgMuUpdatePreview();
 }
 function sgMuSelectPeriods(checked){document.querySelectorAll('[data-sg-mu-period]').forEach(x=>x.checked=checked);sgMuCaptureDom();}

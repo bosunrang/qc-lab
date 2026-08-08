@@ -257,9 +257,9 @@ function actionEffectivenessMissingKey(a){
   const rerun=actionNeedsRerun(a)?actionRerunStatus(a):null,earliest=[a.date,a.actionCompletedDate,a.releaseDate,rerun&&rerun.ok&&rerun.point&&rerun.point.date].filter(Boolean).sort().pop();
   if(a.effectivenessDate>isoToday()||(earliest&&a.effectivenessDate<earliest))return'effectivenessDate';
   if(a.effectivenessStatus==='effective'&&+a.protocolVersion>=3){
-    if(![1,2,3,4,5].includes(+a.residualSeverity))return'residualSeverity';
-    if(![1,2,3,4,5].includes(+a.residualOccurrence))return'residualOccurrence';
-    if(![1,2,3,4,5].includes(+a.residualDetectability))return'residualDetectability';
+    if(!RISK_SCALE.includes(+a.residualSeverity))return'residualSeverity';
+    if(!RISK_SCALE.includes(+a.residualOccurrence))return'residualOccurrence';
+    if(!RISK_SCALE.includes(+a.residualDetectability))return'residualDetectability';
     if(!ACTION_LABELS.risk[a.residualRiskLevel])return'residualRiskLevel';
     if(String(a.residualRiskBasis||'').trim().length<5)return'residualRiskBasis';
     const initial=actionRiskScore(a),residual=actionResidualRiskScore(a);
@@ -512,7 +512,7 @@ function actionFormHtml(issueCount){
   const {t:biasT,l:biasL}=actionBiasContext(form,editing),biasInfo=actionBiasInfo(biasT,biasL,form.biasBefore,form.biasAfter);
   const sigmaBias=actionLatestSigmaBias(biasT,editing?editing.level:form.level);
   const sigmaBiasChip=sigmaBias?`<div class="sugg-row"><button type="button" class="sugg-chip" onclick="actionFillBias('aBiasBefore',${sigmaBias.value})" title="Lấy từ Bias EQA/EQC kỳ ${escAttr(sigmaBias.period)} ở trang Six Sigma">Dùng Bias EQA gần nhất (kỳ ${esc(sigmaBias.period)}): ${fmt(sigmaBias.value)}%</button></div>`:'';
-  return `<div class="panel action-form-panel"><div class="action-form-panel-head"><h3>${editing?'Tiếp tục hồ sơ '+esc(editing.nceId||'NCE'):'Lập hồ sơ sự không phù hợp (NCE)'}</h3>${btn('Quy trình 8 bước','openActionGuide()','ghost sm')}</div>${!formOpen?actionFormClosedHtml(issueCount):`<div class="action-form-body" oninput="actionFormChanged()" onchange="actionFormChanged()">${actionIncidentBanner(form,editing)}<div class="action-form-section"><div class="action-form-section-title"><span>Hồ sơ</span><div><b>Nhận diện sự cố</b><small>Có thể lưu ngay sau khi kiểm soát tức thời; không cần chờ điều tra xong</small></div></div>
+  return `<div class="panel action-form-panel"><div class="action-form-panel-head"><h2 class="panel-title">${editing?'Tiếp tục hồ sơ '+esc(editing.nceId||'NCE'):'Lập hồ sơ sự không phù hợp (NCE)'}</h2>${btn('Quy trình 8 bước','openActionGuide()','ghost sm')}</div>${!formOpen?actionFormClosedHtml(issueCount):`<div class="action-form-body" oninput="actionFormChanged()" onchange="actionFormChanged()">${actionIncidentBanner(form,editing)}<div class="action-form-section"><div class="action-form-section-title"><span>Hồ sơ</span><div><b>Nhận diện sự cố</b><small>Có thể lưu ngay sau khi kiểm soát tức thời; không cần chờ điều tra xong</small></div></div>
      <input id="aPointId" type="hidden" value="${escAttr(form.pointId||'')}">
      ${qcBound?`<input id="aLevel" type="hidden" value="${escAttr(form.level==null?'':form.level)}">`:''}
      <div class="action-ident-groups">

@@ -121,7 +121,7 @@ function reportLockPanelHtml(){
   const monthOptions=Array.from({length:12},(_,i)=>`<option value="${i+1}" ${month===i+1?'selected':''}>Tháng ${i+1}</option>`).join('');
   const yearOptions=Array.from({length:yearMax-yearMin+1},(_,i)=>yearMin+i).map(y=>`<option value="${y}" ${year===y?'selected':''}>${y}</option>`).join('');
   const already=PeriodService.findLock(state,ym);
-  return `<div class="panel"><h3>Khóa kỳ báo cáo</h3>
+  return `<div class="panel"><h2 class="panel-title">Khóa kỳ báo cáo</h2>
      <div class="hint">Khóa 1 kỳ (theo tháng) sẽ chặn sửa/hủy điểm QC của kỳ đó ở <b>mọi xét nghiệm</b> — nên làm sau khi đã xuất xong báo cáo chính thức của kỳ.</div>
      <div class="report-lock-controls">
        <div><label>Tháng</label><select aria-label="Tháng" ${isAdmin?'':'disabled'} onchange="reportSetLockPart('month',this.value)">${monthOptions}</select></div>
@@ -140,15 +140,17 @@ function pageReportV2(){
   const opts=matched.length?matched.map(t=>`<option value="${escAttr(t.id)}" ${t.id===reportTest?'selected':''}>${esc(testSelectLabel(t,tests))}</option>`).join(''):'<option value="">Không tìm thấy xét nghiệm phù hợp</option>';
   const{start,end}=reportRangeDefaults();
   return headOnly('Báo cáo & Biểu mẫu','Tổng hợp hồ sơ nội kiểm theo khoảng ngày lựa chọn')+
-   `<div class="panel"><h3 role="heading" aria-level="2">Báo cáo nội kiểm theo ngày</h3>
+   `<div class="panel"><h2 class="panel-title">Báo cáo nội kiểm theo ngày</h2>
      <div class="grid4"><div><label>Tìm xét nghiệm</label><input id="reportSearch" type="search" placeholder="Tìm tên xét nghiệm" value="${escAttr(reportQ)}" oninput="reportSearchSet(this.value)"></div>
        <div><label>Xét nghiệm <span id="reportTestCount" class="hint">(${matched.length}/${tests.length})</span></label><select id="rTest" aria-label="Xét nghiệm" ${matched.length?'':'disabled'} onchange="reportTest=this.value">${opts}</select></div>
        ${reportRangePicker(start,end)}</div>
+     <div class="report-export-options">
+       <label class="report-nce-option"><input id="reportNceAppendix" type="checkbox" checked><span><b>Kèm phụ lục NCE</b><small>(Áp dụng cho PDF và Excel)</small></span></label>
+     </div>
      <div class="report-actions">
        ${btn(reportActionIcon('print')+'Tạo báo cáo &amp; In','printReport()','teal','',{disabled:!matched.length,attrs:{'data-report-action':''}})}
        ${btn('Xuất Excel','exportReportXLSX()','teal','',{disabled:!matched.length,attrs:{'data-report-action':''}})}
        ${btn('Xuất CSV','exportReportCSV()','teal','',{disabled:!matched.length,attrs:{'data-report-action':''}})}
-       <label class="report-nce-option"><input id="reportNceAppendix" type="checkbox" checked> Kèm phụ lục NCE đầy đủ trong PDF/Excel</label>
      </div>
    </div>`+reportLockPanelHtml();
 }

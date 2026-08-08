@@ -43,11 +43,11 @@ function rcCalc(ds){const {o,n}=rcValid(ds);if(o.length<RC_MIN_PAIRS)return null
 function rcAxis(W,H,xmin,xmax,ymin,ymax,xlab,ylab){const px=v=>RCPAD.l+(v-xmin)/(xmax-xmin)*(W-RCPAD.l-RCPAD.r),py=v=>H-RCPAD.b-(v-ymin)/(ymax-ymin)*(H-RCPAD.t-RCPAD.b);
   let g='';for(let i=0;i<=5;i++){const xv=xmin+(xmax-xmin)*i/5,yv=ymin+(ymax-ymin)*i/5;
     g+=`<line x1="${px(xv)}" y1="${RCPAD.t}" x2="${px(xv)}" y2="${H-RCPAD.b}" stroke="${RCC.grid}"/><line x1="${RCPAD.l}" y1="${py(yv)}" x2="${W-RCPAD.r}" y2="${py(yv)}" stroke="${RCC.grid}"/>`;
-    g+=`<text x="${px(xv)}" y="${H-RCPAD.b+15}" font-size="10" fill="${RCC.muted}" text-anchor="middle">${+xv.toFixed(2)}</text>`;
-    g+=`<text x="${RCPAD.l-7}" y="${py(yv)+3}" font-size="10" fill="${RCC.muted}" text-anchor="end">${+yv.toFixed(2)}</text>`;}
+    g+=`<text x="${px(xv)}" y="${H-RCPAD.b+15}" font-size="var(--type-overline)" fill="${RCC.muted}" text-anchor="middle">${+xv.toFixed(2)}</text>`;
+    g+=`<text x="${RCPAD.l-7}" y="${py(yv)+3}" font-size="var(--type-overline)" fill="${RCC.muted}" text-anchor="end">${+yv.toFixed(2)}</text>`;}
   g+=`<line x1="${RCPAD.l}" y1="${H-RCPAD.b}" x2="${W-RCPAD.r}" y2="${H-RCPAD.b}" stroke="${RCC.ink}" stroke-width="1.3"/><line x1="${RCPAD.l}" y1="${RCPAD.t}" x2="${RCPAD.l}" y2="${H-RCPAD.b}" stroke="${RCC.ink}" stroke-width="1.3"/>`;
-  g+=`<text x="${(RCPAD.l+W-RCPAD.r)/2}" y="${H-7}" font-size="10.5" fill="${RCC.ink}" text-anchor="middle" font-weight="600">${esc(xlab)}</text>`;
-  g+=`<text transform="translate(13,${(RCPAD.t+H-RCPAD.b)/2}) rotate(-90)" font-size="10.5" fill="${RCC.ink}" text-anchor="middle" font-weight="600">${esc(ylab)}</text>`;
+  g+=`<text x="${(RCPAD.l+W-RCPAD.r)/2}" y="${H-7}" font-size="var(--type-overline)" fill="${RCC.ink}" text-anchor="middle" font-weight="600">${esc(xlab)}</text>`;
+  g+=`<text transform="translate(13,${(RCPAD.t+H-RCPAD.b)/2}) rotate(-90)" font-size="var(--type-overline)" fill="${RCC.ink}" text-anchor="middle" font-weight="600">${esc(ylab)}</text>`;
   return{g,px,py};}
 function rcPadr(min,max){const r=(max-min)||Math.abs(max)||1;return[min-r*0.08,max+r*0.08];}
 function rcToolIcon(type){
@@ -72,7 +72,7 @@ function rcScatterSVG(R,t){const W=460,H=380;const both=R.o.concat(R.n);let lo=r
 function rcBlandSVG(R){const W=460,H=380,av=R.o.map((v,i)=>(v+R.n[i])/2),up=R.md+1.96*R.sdd,low=R.md-1.96*R.sdd;
   let xlo=rcMin(av),xhi=rcMax(av);[xlo,xhi]=rcPadr(xlo,xhi);let ylo=rcMin(R.d.concat(low)),yhi=rcMax(R.d.concat(up));[ylo,yhi]=rcPadr(ylo,yhi);
   const A=rcAxis(W,H,xlo,xhi,ylo,yhi,'Trung bình (cũ + mới)/2','Hiệu số (cũ − mới)');let g=A.g;
-  const ln=(yv,col,dash,txt)=>`<line x1="${A.px(xlo)}" y1="${A.py(yv)}" x2="${A.px(xhi)}" y2="${A.py(yv)}" stroke="${col}" stroke-width="1.6"${dash?' stroke-dasharray="5 4"':''}/><text x="${A.px(xhi)}" y="${A.py(yv)-4}" font-size="10" fill="${col}" text-anchor="end">${txt} ${+yv.toFixed(3)}</text>`;
+  const ln=(yv,col,dash,txt)=>`<line x1="${A.px(xlo)}" y1="${A.py(yv)}" x2="${A.px(xhi)}" y2="${A.py(yv)}" stroke="${col}" stroke-width="1.6"${dash?' stroke-dasharray="5 4"':''}/><text x="${A.px(xhi)}" y="${A.py(yv)-4}" font-size="var(--type-overline)" fill="${col}" text-anchor="end">${txt} ${+yv.toFixed(3)}</text>`;
   g+=`<line x1="${A.px(xlo)}" y1="${A.py(0)}" x2="${A.px(xhi)}" y2="${A.py(0)}" stroke="${RCC.line}"/>`;
   g+=ln(R.md,RCC.amber,false,'Bias')+ln(up,RCC.red,true,'+1.96SD')+ln(low,RCC.red,true,'−1.96SD');
   av.forEach((v,i)=>g+=`<circle cx="${A.px(v)}" cy="${A.py(R.d[i])}" r="4.5" fill="${RCC.amber}" fill-opacity="0.8" stroke="#fff" stroke-width="1.2"/>`);
@@ -86,11 +86,11 @@ function pageReagent(){
   const oldLotHead='Lô cũ'+(t.lotOld?`: ${esc(t.lotOld)}`:''),newLotHead='Lô mới'+(t.lotNew?`: ${esc(t.lotNew)}`:'');
   const rows=ds.rows.map((r,i)=>{const c=rcPairCalc(r);return `<div class="rc-pair-row" data-rc-row="${i}"><div class="rc-idx">${i+1}</div><input ${ro} value="${escAttr(r[0])}" oninput="rcCell(${i},0,this.value)" type="number" step="any" placeholder="–"><input ${ro} value="${escAttr(r[1])}" oninput="rcCell(${i},1,this.value)" type="number" step="any" placeholder="–"><div class="rc-calc avg">${c?fmt(c.avg,3):'–'}</div><div class="rc-calc dif ${c&&c.dif<0?'neg':''}">${c?fmt(c.dif,3):'–'}</div>${canWrite()?`<button class="x" onclick="rcRmRow(${i})" title="Xóa dòng">✕</button>`:'<span></span>'}</div>`;}).join('');
   return headOnly('So sánh 2 lô hóa chất','Sàng lọc định lượng · hồi quy mô tả · Bland-Altman · phê duyệt theo SOP')+
-   `<div class="panel rc-toolbar-panel"><h3 role="heading" aria-level="2">Thiết lập so sánh</h3><div class="rc-toolbar">
+   `<div class="panel rc-toolbar-panel"><h2 class="panel-title">Thiết lập so sánh</h2><div class="rc-toolbar">
      <div class="rc-toolbar-selcol"><label>Chọn hóa chất</label><select id="rcSel" aria-label="Chọn hóa chất" onchange="rcSwitch(this.value)">${rcSelectOptions()}</select></div>
      ${canWrite()?`<div class="rc-toolbar-primary"><div>${btn('+ Thêm','openRcCreateModal()','teal rc-add-btn')}${btn(rcToolIcon('trash')+' Xóa','rcDeleteCurrent()','danger rc-delete-btn')}</div></div>`:''}
      <div class="rc-toolbar-secondary">${canWrite()?btn(rcToolIcon('search')+' Tìm','openRcModal()','ghost rc-find-btn'):''}${btn(rcToolIcon('print')+' In hóa chất này','rcPrint()','teal rc-report-btn')}${btn(rcToolIcon('report')+' Báo cáo tổng hợp','rcPrintSummary()','teal rc-report-main')}</div></div></div>
-   <div class="rc-entry-grid"><div class="panel rc-info-panel"><h3>Thông tin đánh giá</h3><div class="rc-info-grid">
+   <div class="rc-entry-grid"><div class="panel rc-info-panel"><h2 class="panel-title">Thông tin đánh giá</h2><div class="rc-info-grid">
      <div class="rc-field"><label>Tên hóa chất</label><input ${ro} value="${escAttr(t.reagent)}" oninput="rcMeta('reagent',this.value)" placeholder="Tên hóa chất / xét nghiệm"></div>
      <div class="rc-field"><label>Đơn vị</label><input ${ro} value="${escAttr(t.unit)}" oninput="rcMeta('unit',this.value)" placeholder="mmol/L..."></div>
      <div class="rc-field"><label>Số lô cũ</label><input ${ro} aria-label="Số lô cũ" value="${escAttr(t.lotOld)}" oninput="rcMeta('lotOld',this.value)" onfocus="rcMetaFocus('lotOld')" onchange="rcMetaLog('lotOld')"></div>
@@ -101,14 +101,14 @@ function pageReagent(){
      <div class="rc-field"><label>Bias mong muốn (%)</label><input ${ro} aria-label="Bias mong muốn (%)" type="number" step="any" value="${t.biasTarget}" oninput="rcMeta('biasTarget',this.value)" onfocus="rcMetaFocus('biasTarget')" onchange="rcMetaLog('biasTarget')"></div>
      <div class="rc-field"><label>Mức ý nghĩa (α, alpha)</label><input ${ro} aria-label="Mức ý nghĩa (alpha)" type="number" step="any" value="${t.alpha}" oninput="rcMeta('alpha',this.value)" onfocus="rcMetaFocus('alpha')" onchange="rcMetaLog('alpha')"></div>
      <div class="rc-field rc-coverage-cell"><label class="rc-coverage-check"><input ${ro} type="checkbox" ${t.coverageConfirmed?'checked':''} onchange="rcMeta('coverageConfirmed',this.checked)"><span>Mẫu đã bao phủ khoảng đo và/hoặc điểm quyết định lâm sàng theo SOP</span></label></div></div></div>
-   <div class="panel rc-pair-panel"><h3>Dữ liệu đo bắt cặp</h3><div class="rc-pair-wrap"><div class="rc-pair-head"><div>Mẫu</div><div id="rcOldLotHead">${oldLotHead}</div><div id="rcNewLotHead">${newLotHead}</div><div>Trung bình</div><div>Hiệu số (cũ − mới)</div><div></div></div>${rows}</div>
+   <div class="panel rc-pair-panel"><h2 class="panel-title">Dữ liệu đo bắt cặp</h2><div class="rc-pair-wrap"><div class="rc-pair-head"><div>Mẫu</div><div id="rcOldLotHead">${oldLotHead}</div><div id="rcNewLotHead">${newLotHead}</div><div>Trung bình</div><div>Hiệu số (cũ − mới)</div><div></div></div>${rows}</div>
      ${canWrite()?`<div class="rc-pair-actions">${btn('+ Thêm mẫu','rcAddRow()','ghost sm')} ${btn('Xóa dữ liệu','rcClearRows()','ghost sm')}</div>`:''}
      <div class="hint" style="margin:8px 16px 16px">Nhập tối thiểu ${RC_MIN_PAIRS} cặp để tính mô tả; để phần mềm đánh dấu “đạt sàng lọc” cần ≥20 cặp hợp lệ, bao phủ khoảng đo/điểm quyết định lâm sàng và %bias trong giới hạn SOP. Không dùng p-value để tự chấp nhận lô.</div></div></div>
-   <div class="panel rc-stats-panel"><h3>Kết quả thống kê</h3><div id="rcStats"></div></div>
-   <div class="panel rc-crit-panel"><h3>Tiêu chí chấp nhận &amp; kết luận</h3><div id="rcCrit"></div><div id="rcVerdict"></div></div>
-   <div class="panel rc-chart-panel"><h3>Biểu đồ</h3><div class="rc-charts">
-     <div class="rc-chart-box"><h4>Biểu đồ tương quan</h4><p>Lô cũ (trục X) so với Lô mới (trục Y)</p><div id="rcScatter"></div><div class="rc-chart-legend"><span><i class="reg"></i>Đường hồi quy</span><span><i class="ideal"></i>Đường lý tưởng y = x</span></div></div>
-     <div class="rc-chart-box"><h4>Biểu đồ Bland-Altman</h4><p>Hiệu số (cũ − mới) so với giá trị trung bình</p><div id="rcBland"></div><div class="rc-chart-legend"><span><i class="bias"></i>Bias trung bình</span><span><i class="limit"></i>±1.96 SD</span></div></div></div></div>`;
+   <div class="panel rc-stats-panel"><h2 class="panel-title">Kết quả thống kê</h2><div id="rcStats"></div></div>
+   <div class="panel rc-crit-panel"><h2 class="panel-title">Tiêu chí chấp nhận &amp; kết luận</h2><div id="rcCrit"></div><div id="rcVerdict"></div></div>
+   <div class="panel rc-chart-panel"><h2 class="panel-title">Biểu đồ</h2><div class="rc-charts">
+     <div class="rc-chart-box"><h3>Biểu đồ tương quan</h3><p>Lô cũ (trục X) so với Lô mới (trục Y)</p><div id="rcScatter"></div><div class="rc-chart-legend"><span><i class="reg"></i>Đường hồi quy</span><span><i class="ideal"></i>Đường lý tưởng y = x</span></div></div>
+     <div class="rc-chart-box"><h3>Biểu đồ Bland-Altman</h3><p>Hiệu số (cũ − mới) so với giá trị trung bình</p><div id="rcBland"></div><div class="rc-chart-legend"><span><i class="bias"></i>Bias trung bình</span><span><i class="limit"></i>±1.96 SD</span></div></div></div></div>`;
 }
 function rcCompute(){
   const ds=rcAct();if(!ds)return;const R=rcCalc(ds);
@@ -224,7 +224,7 @@ function rcModalSearchSet(v){
 function renderRcModal(){
   const q=searchText(rcModalQ);
   const hit=d=>!q||[rcLabel(d),d.test.reagent,d.test.lotOld,d.test.lotNew,d.test.unit,d.test.operator].some(v=>searchText(v).includes(q));
-  const rows=state.reagentTests.filter(hit).map(d=>`<div class="mrow ${d.id===rcId?'on':''}"><span><b>${esc(rcLabel(d))}</b><div style="font-size:12px;color:var(--muted);font-family:var(--sans);margin-top:2px">${esc(d.test.unit||'')} ${d.rows&&d.rows.length?'· '+d.rows.length+' dòng':''}</div></span><span class="acts"><button class="btn ${d.id===rcId?'teal':'ghost'} sm" onclick="rcPick('${d.id}')">${d.id===rcId?'Đang chọn':'Chọn'}</button>${canWrite()?`<button class="x" onclick="rcDeleteFromModal('${d.id}')" title="Xóa">✕</button>`:''}</span></div>`).join('')||'<div class="empty">Không có phép so sánh phù hợp.</div>';
+  const rows=state.reagentTests.filter(hit).map(d=>`<div class="mrow ${d.id===rcId?'on':''}"><span><b>${esc(rcLabel(d))}</b><div style="font-size:var(--type-meta);color:var(--muted);font-family:var(--sans);margin-top:2px">${esc(d.test.unit||'')} ${d.rows&&d.rows.length?'· '+d.rows.length+' dòng':''}</div></span><span class="acts"><button class="btn ${d.id===rcId?'teal':'ghost'} sm" onclick="rcPick('${d.id}')">${d.id===rcId?'Đang chọn':'Chọn'}</button>${canWrite()?`<button class="x" onclick="rcDeleteFromModal('${d.id}')" title="Xóa">✕</button>`:''}</span></div>`).join('')||'<div class="empty">Không có phép so sánh phù hợp.</div>';
   openModal(`<div class="modal"><div class="modal-h"><h3>Chọn phép so sánh</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
     <div class="modal-b"><input id="rcModalSearch" placeholder="Tìm phép so sánh..." value="${escAttr(rcModalQ)}" oninput="rcModalSearchSet(this.value)">
       <div style="margin-top:10px">${rows}</div></div>
@@ -262,10 +262,10 @@ function rcReportVerdict(R){
 }
 function rcReportPill(R){
   const v=rcReportVerdict(R);
-  return `<span style="display:inline-block;border-radius:999px;padding:3px 9px;font-weight:800;font-size:10.5px;background:${v.bg};color:${v.fg}">${esc(v.text)}</span>`;
+  return `<span style="display:inline-block;border-radius:999px;padding:3px 9px;font-weight:800;font-size:var(--type-overline);background:${v.bg};color:${v.fg}">${esc(v.text)}</span>`;
 }
 function rcReportHeader(title,sub){
-  return reportHeader(title)+`<div style="color:${RCC.muted};font-size:12px;margin:-8px 0 14px;text-align:center">${esc(sub||'')}</div>`;
+  return reportHeader(title)+`<div style="color:${RCC.muted};font-size:var(--type-meta);margin:-8px 0 14px;text-align:center">${esc(sub||'')}</div>`;
 }
 function rcReportSummaryTable(items){
   let h='<table><thead><tr><th>STT</th><th>Hóa chất</th><th>Lô cũ → Lô mới</th><th class="num">n</th><th class="num">r</th><th class="num">%Bias</th><th class="num">P hai phía</th><th>Kết luận</th></tr></thead><tbody>';
@@ -275,12 +275,12 @@ function rcReportSummaryTable(items){
 function rcReportDetail(ds,i=0,pagebreak=false){
   const R=rcCalc(ds),t=ds.test;
   let h=`<div class="rpt-card" style="${pagebreak?'break-before:page;':''}"><h3>${i+1}. ${esc(t.reagent||'Hóa chất mới')} ${rcReportPill(R)}</h3><div class="body">`;
-  h+=`<div style="font-size:12px;color:${RCC.muted};margin-bottom:10px">Lô cũ: <b>${esc(t.lotOld||'—')}</b> · Lô mới: <b>${esc(t.lotNew||'—')}</b> · Ngày: ${rcDateText(t.date)} · Người thực hiện: ${esc(t.operator||'—')} · Loại mẫu: ${esc(t.sampleType||'—')} · Giới hạn chênh lệch &lt; ${esc(t.biasTarget||6)}% · α = ${esc(t.alpha||0.05)}</div>`;
+  h+=`<div style="font-size:var(--type-meta);color:${RCC.muted};margin-bottom:10px">Lô cũ: <b>${esc(t.lotOld||'—')}</b> · Lô mới: <b>${esc(t.lotNew||'—')}</b> · Ngày: ${rcDateText(t.date)} · Người thực hiện: ${esc(t.operator||'—')} · Loại mẫu: ${esc(t.sampleType||'—')} · Giới hạn chênh lệch &lt; ${esc(t.biasTarget||6)}% · α = ${esc(t.alpha||0.05)}</div>`;
   if(!R){h+=`<p><i>Chưa đủ dữ liệu (cần tối thiểu ${RC_MIN_PAIRS} cặp).</i></p></div></div>`;return h;}
   h+='<table><thead><tr><th>Mẫu</th><th class="num">Lô cũ</th><th class="num">Lô mới</th><th class="num">Trung bình</th><th class="num">Hiệu số</th></tr></thead><tbody>';
   R.o.forEach((o,k)=>{const n=R.n[k];h+=`<tr><td>${k+1}</td><td class="num">${o}</td><td class="num">${n}</td><td class="num">${((o+n)/2).toFixed(3)}</td><td class="num">${(o-n).toFixed(3)}</td></tr>`;});
   h+='</tbody></table>';
-  h+=`<div style="display:flex;flex-wrap:wrap;gap:6px 24px;font-size:12px;margin:10px 0 12px">
+  h+=`<div style="display:flex;flex-wrap:wrap;gap:6px 24px;font-size:var(--type-meta);margin:10px 0 12px">
     <span>Trung bình: <b>${rcFmt(R.mO,2)} / ${rcFmt(R.mN,2)}</b></span>
     <span>Pearson r: <b>${rcFmt(R.r,5)}</b></span>
     <span>t Stat: <b>${rcFmtT(R.tStat)}</b> (df ${R.df})</span>

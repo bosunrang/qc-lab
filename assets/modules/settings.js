@@ -158,13 +158,13 @@ function pageSettings(){
   const brandPreview=`<div class="brand-preview"><div class="brand-mark">${logo?`<img src="${escAttr(logo)}" alt="">`:esc(brandMarkText())}</div><div><b>${esc(brandTitle())}</b><small>${esc(brandSub())}</small></div></div>`;
   return headOnly('Cài đặt & Đồng bộ','Thông tin đơn vị, backup và kết nối Firebase')+
    `<div class="settings-profile-grid">
-    <div class="panel"><h3 role="heading" aria-level="2">Thông tin đơn vị</h3>
+    <div class="panel"><h2 class="panel-title">Thông tin đơn vị</h2>
       <div class="settings-unit-fields"><div><label>Tên bệnh viện / đơn vị</label><input id="labName" aria-label="Tên bệnh viện / đơn vị" value="${escAttr(state.lab.name||'')}"></div>
         <div><label>Khoa / phòng</label><input id="labDept" aria-label="Khoa / phòng" value="${escAttr(state.lab.dept||'')}"></div>
         <div><label>Địa chỉ</label><input id="labAddr" aria-label="Địa chỉ" value="${escAttr(state.lab.address||'')}"></div></div>
      <div class="settings-panel-actions">${btn('Lưu thông tin','saveLab()','teal')}</div>
     </div>
-    <div class="panel"><h3>Logo & tên phần mềm</h3>
+    <div class="panel"><h2 class="panel-title">Logo & tên phần mềm</h2>
      <div class="grid2">
        <div>
          <label>Tên hiển thị trên thanh bên</label><input id="brandTitle" aria-label="Tên hiển thị trên thanh bên" value="${escAttr(brandTitle())}">
@@ -182,7 +182,7 @@ function pageSettings(){
      <div class="settings-panel-actions">${btn('Lưu logo','saveBrand()','teal')}${btn('Bỏ ảnh logo','clearLogo()','ghost')}</div>
     </div>
    </div>
-   <div class="panel"><h3>Quản trị dữ liệu</h3>
+   <div class="panel"><h2 class="panel-title">Quản trị dữ liệu</h2>
      <div class="admin-tools">
         <div class="admin-tool"><b>Xuất backup</b><span>Lưu dữ liệu hiện tại ra file. ${backupStatusText()} ${backupCapacityText()}</span>${btn('Xuất backup','exportData()','ghost')}</div>
         <div class="admin-tool"><b>Nhập backup</b><span>Khôi phục dữ liệu từ file backup đã xuất. Chỉ quản trị viên được nhập.</span>${btn('Chọn file backup',"document.getElementById('imp').click()",'ghost')}<input id="imp" type="file" accept="application/json" style="display:none" onchange="importData(event)"></div>
@@ -191,7 +191,7 @@ function pageSettings(){
         <div class="admin-tool"><b>Xóa sạch dữ liệu test</b><span>Xóa toàn bộ dữ liệu, giữ lại tài khoản đang đăng nhập.</span>${btn('Xóa sạch dữ liệu','resetAllData()','danger')}</div>
       </div></div>
    <div class="settings-cloud-grid">
-   <div class="panel firebase-sync-panel"><h3>Đồng bộ đám mây (Firebase Realtime Database)</h3>
+   <div class="panel firebase-sync-panel"><h2 class="panel-title">Đồng bộ đám mây (Firebase Realtime Database)</h2>
      <div class="firebase-auth-grid"><div><label>Mã phòng</label><input id="fbCode" aria-label="Mã phòng" value="${escAttr(fbcfg.labCode||'khoaXN')}" ${lockedCloud?'readonly':''}></div>
        <div><label>Email Firebase Authentication</label><input id="fbEmail" aria-label="Email Firebase Authentication" type="email" autocomplete="username" value="${escAttr(fbcfg.email||'')}"></div>
        <div><label>Mật khẩu Firebase</label><input id="fbPassword" type="password" autocomplete="current-password" placeholder="Chỉ dùng để đăng nhập, không lưu"></div></div>
@@ -207,13 +207,13 @@ function pageSettings(){
   appId: "..."
 };'>${fbcfg.config?JSON.stringify(fbcfg.config,null,2):''}</textarea>
      <div class="firebase-actions">${btn('Lưu &amp; kết nối','saveFb()','teal')} ${btn('Ngắt đám mây','clearFb()','ghost')}</div></div>
-   <div class="panel lis-gateway-panel"><h3>LIS Gateway (thử nghiệm)</h3>
+   <div class="panel lis-gateway-panel"><h2 class="panel-title">LIS Gateway (thử nghiệm)</h2>
      <div class="lis-gateway-body"><div class="lis-gateway-grid"><div><label for="lisGatewayUrl">Địa chỉ Gateway cục bộ</label><input id="lisGatewayUrl" value="${escAttr(liscfg.url)}" placeholder="http://127.0.0.1:8787"></div><div><label for="lisGatewayToken">Bearer token${liscfg.token?' (đã lưu — để trống nếu giữ nguyên)':''}</label><input id="lisGatewayToken" type="password" autocomplete="off" placeholder="${liscfg.token?'••••••••':'Dán token in ra khi chạy npm run lis:gateway'}"></div><label class="lis-gateway-toggle"><input id="lisGatewayEnabled" type="checkbox" ${liscfg.enabled?'checked':''}><span>Tự động kiểm tra hàng chờ mỗi 5 phút</span></label></div>
        <div id="lisGatewayStatus" class="alert ${lisGatewayRuntime.status==='ok'?'ok':lisGatewayRuntime.status==='error'?'rej':''}">${esc(lisGatewayStatusText())}</div>
        <div class="hint">Lấy kết quả nội kiểm mà middleware LIS đã đẩy vào Gateway. Kết quả KHÔNG tự thành điểm QC — phải mở hàng chờ và xác nhận từng dòng thì mới ghi vào dữ liệu nội kiểm. Không nhận dữ liệu bệnh nhân. Prototype chỉ cho phép localhost:8787.</div></div>
      <div class="settings-panel-actions">${btn('Lưu &amp; kiểm tra','lisGatewaySaveSettings()','teal')}${btn('Xem hàng chờ QC','lisOpenQueueModal()','ghost')}</div></div>
    </div>
-   <div class="panel"><h3>Firebase Rules</h3>
+   <div class="panel"><h2 class="panel-title">Firebase Rules</h2>
      ${firebaseGuideHtml()}
      <div class="rules-tools"><span>Copy cố định vào Realtime Database → Rules. Không sửa <code>$labCode</code> hoặc <code>$uid</code>.</span>${btn('Copy rules','copyFirebaseRules()','ghost sm')}</div>
      <pre class="rules-code" tabindex="0">${esc(firebaseRulesText())}</pre></div>`;

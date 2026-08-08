@@ -1,5 +1,5 @@
 /**
- * Regression test: defaultAssayLevels() (assets/modules/entry-tests-actions.js) used to
+ * Regression test: defaultAssayLevels() (assets/modules/manage-tests-actions.js) used to
  * seed a NEW test's levels from every distinct level found across ALL QC lots in the
  * whole system, not just this test's own panel/lot group. So a lab that had ANY level-3
  * QC lot anywhere would silently attach an empty, unrelated "level 3" entry to every

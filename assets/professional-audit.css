@@ -11,7 +11,7 @@
   min-height:var(--panel-header-min-height); display:flex; align-items:center; justify-content:space-between; gap:12px; padding:5px 14px; border-bottom:1px solid var(--section-head-border); background:var(--section-head-bg);
 }
 
-.audit-log-head h3{
+.audit-log-head .panel-title{
   margin:0; color:var(--section-head-ink); font-size:var(--section-head-size); font-weight:800;
 }
 
@@ -45,7 +45,7 @@
 }
 
 .audit-filterbar > .audit-filter-summary{
-  align-self:flex-end; min-width:0; margin-left:auto; color:var(--muted); font-size:12px; font-weight:750; line-height:1.2; text-align:right;
+  align-self:flex-end; min-width:0; margin-left:auto; color:var(--muted); font-size:var(--type-meta); font-weight:750; line-height:1.2; text-align:right;
 }
 
 .audit-clear-filter{
@@ -61,7 +61,7 @@
 }
 
 .audit-pagination b{
-  min-width:82px; color:var(--muted); font-size:12px; text-align:center;
+  min-width:82px; color:var(--muted); font-size:var(--type-meta); text-align:center;
 }
 
 .audit-table-wrap{
@@ -93,7 +93,7 @@
 }
 
 .audit-seq{
-  font-size:10.5px; font-weight:700; color:#7c8e9a;
+  font-size:var(--type-overline); font-weight:700; color:#7c8e9a;
 }
 
 .audit-time{

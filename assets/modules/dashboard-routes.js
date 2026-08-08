@@ -76,10 +76,10 @@ function pageDash(){
        <div class="dash-kpi"><div class="k">Vi phạm</div><div class="v" style="color:var(--red)">${rej}</div></div><div class="dash-kpi"><div class="k">QC hôm nay</div><div class="v" style="color:var(--teal)">${done}</div></div></div>
    </div>
    <div class="dash-main">
-     <div class="panel"><h3>Cần xử lý / Theo dõi</h3>${followHtml}</div>
-     <div class="panel"><h3>Lô & hạn dùng</h3><div class="dash-list">${expHtml}</div></div>
+     <div class="panel"><h2 class="panel-title">Cần xử lý / Theo dõi</h2>${followHtml}</div>
+     <div class="panel"><h2 class="panel-title">Lô & hạn dùng</h2><div class="dash-list">${expHtml}</div></div>
    </div>
-    <div class="panel">${tests.length?`<div class="dash-test-toolbar"><h3>Danh sách xét nghiệm</h3></div><div class="dash-test-filterbar"><div class="dash-test-tabs">${dashStatusTabs}</div><div class="dash-test-search"><input id="dashTestSearch" type="search" placeholder="Tìm xét nghiệm, máy, lô..." value="${escAttr(dashTestQ)}" oninput="dashTestFilter(this.value)"><span id="dashTestCount">${statusItems.length}/${statusItems.length}</span></div></div>${testListHtml}`:emptyState('Chưa có xét nghiệm đang vận hành','Cần đưa xét nghiệm vào Panel QC, ghép Nhóm lô QC và gán Mean/SD trước khi theo dõi.')}</div>`;
+    <div class="panel">${tests.length?`<div class="dash-test-toolbar"><h2 class="panel-title">Danh sách xét nghiệm</h2></div><div class="dash-test-filterbar"><div class="dash-test-tabs">${dashStatusTabs}</div><div class="dash-test-search"><input id="dashTestSearch" type="search" placeholder="Tìm xét nghiệm, máy, lô..." value="${escAttr(dashTestQ)}" oninput="dashTestFilter(this.value)"><span id="dashTestCount">${statusItems.length}/${statusItems.length}</span></div></div>${testListHtml}`:emptyState('Chưa có xét nghiệm đang vận hành','Cần đưa xét nghiệm vào Panel QC, ghép Nhóm lô QC và gán Mean/SD trước khi theo dõi.',role()==='admin'?btn('Cấu hình Mean/SD',`go('manage');setManageTab('targets')`,'teal'):'')}</div>`;
 }
 
 function dashTestFilter(value){
@@ -97,5 +97,5 @@ function pageDashLoading(tests,pending){
       <div class="dash-status"><div class="eyebrow">Đang chuẩn bị dữ liệu</div><h2>Phân tích Westgard chạy nền</h2><p>Bạn có thể tiếp tục sử dụng ứng dụng. Bảng điều khiển sẽ tự cập nhật khi phân tích hoàn tất.</p><div class="dash-loading-bar"><span></span></div></div>
       <div class="dash-kpis"><div class="dash-kpi"><div class="k">Xét nghiệm</div><div class="v">${tests.length}</div></div><div class="dash-kpi"><div class="k">Điểm QC</div><div class="v">${points}</div></div><div class="dash-kpi"><div class="k">Đang xử lý</div><div class="v">${pending}</div></div><div class="dash-kpi"><div class="k">Giao diện</div><div class="v dash-ready-mark">✓</div></div></div>
     </div>
-    <div class="panel dash-loading-panel"><div class="dash-spinner"></div><div><h3>Đang tính trạng thái kiểm soát chất lượng</h3><p class="hint">Công việc nặng đã được chuyển khỏi luồng giao diện để thao tác không bị đóng băng.</p></div></div>`;
+    <div class="panel dash-loading-panel"><div class="dash-spinner"></div><div><h2 class="panel-title">Đang tính trạng thái kiểm soát chất lượng</h2><p class="hint">Công việc nặng đã được chuyển khỏi luồng giao diện để thao tác không bị đóng băng.</p></div></div>`;
 }

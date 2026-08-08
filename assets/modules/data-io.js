@@ -2,6 +2,8 @@
 function dataIoQcValue(t,value){return typeof fmtTestValue==='function'?fmtTestValue(t,value):fmt(value,3);}
 function dataIoQcStat(t,value){return typeof fmtTestStat==='function'?fmtTestStat(t,value):fmt(value,3);}
 function dataIoQcPoint(point,t){return typeof fmtPointValue==='function'?fmtPointValue(point,t):fmt(point&&point.val,Math.max(2,Number(point&&point.valueDecimals)||0));}
+function dataIoTypePx(token,fallback){if(typeof getComputedStyle==='function'&&typeof document!=='undefined'){const n=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--'+token));if(Number.isFinite(n))return n;}return fallback;}
+function dataIoCanvasFont(weight,token,fallback){return`${weight?weight+' ':''}${dataIoTypePx(token,fallback)}px Arial`;}
 function csvCell(v){
   if(typeof v==='number')return Number.isFinite(v)?String(v):'';
   v=v==null?'':String(v);
@@ -123,19 +125,19 @@ function drawSigmaReportChart(rows){
   const top=Math.max(8,Math.ceil(Math.max(...all)*1.05)),k=sigmaCanvas(W,H,scale),ctx=k.ctx,Y=v=>pt+ih-(v/top)*ih;
   /** @type {[number,number,string][]} */
   ([[0,3,'#f6dcd8'],[3,4,'#fdeecb'],[4,6,'#e4eee3'],[6,top,'#d6e8de']]).forEach(b=>{if(b[1]>b[0]){ctx.fillStyle=b[2];const y1=Y(Math.min(b[1],top)),y2=Y(b[0]);ctx.fillRect(pl,y1,iw,y2-y1);}});
-  ctx.font='12px Arial';ctx.fillStyle='#9a9486';ctx.textAlign='right';ctx.strokeStyle='rgba(0,0,0,.06)';ctx.lineWidth=1;
+  ctx.font=dataIoCanvasFont('','type-meta',12.5);ctx.fillStyle='#9a9486';ctx.textAlign='right';ctx.strokeStyle='rgba(0,0,0,.06)';ctx.lineWidth=1;
   for(let g=0;g<=top;g+=2){const y=Y(g);ctx.beginPath();ctx.moveTo(pl,y);ctx.lineTo(W-pr,y);ctx.stroke();ctx.fillText(String(g),pl-6,y+4);}
-  const refLine=(v,col)=>{ctx.save();ctx.strokeStyle=col;ctx.setLineDash([5,4]);ctx.lineWidth=1.3;const y=Y(v);ctx.beginPath();ctx.moveTo(pl,y);ctx.lineTo(W-pr,y);ctx.stroke();ctx.restore();ctx.fillStyle=col;ctx.textAlign='left';ctx.font='bold 12px Arial';ctx.fillText(v+'σ',W-pr-26,y-4);};
+  const refLine=(v,col)=>{ctx.save();ctx.strokeStyle=col;ctx.setLineDash([5,4]);ctx.lineWidth=1.3;const y=Y(v);ctx.beginPath();ctx.moveTo(pl,y);ctx.lineTo(W-pr,y);ctx.stroke();ctx.restore();ctx.fillStyle=col;ctx.textAlign='left';ctx.font=dataIoCanvasFont('bold','type-meta',12.5);ctx.fillText(v+'σ',W-pr-26,y-4);};
   refLine(3,'#c0392b');refLine(6,'#13603f');
   const slot=iw/N,maxLevels=Math.max(...data.map(x=>x.levels.length)),bw=Math.max(5,Math.min(24,slot*.72/maxLevels));
   data.forEach((x,i)=>{const cx=pl+(i+.5)*slot;
-    const bar=(s,lvl,ox)=>{if(s==null)return;const col=sgZone(s).c,bx=cx+ox-bw/2,y=Y(s),h=Y(0)-y;ctx.fillStyle=col;ctx.fillRect(bx,y,bw,h);ctx.strokeStyle='rgba(0,0,0,.18)';ctx.lineWidth=1;ctx.strokeRect(bx,y,bw,h);ctx.fillStyle='#16211f';ctx.font='bold 11px Arial';ctx.textAlign='center';ctx.fillText(s.toFixed(2),bx+bw/2,y-5);ctx.fillStyle='#fff';ctx.font='bold 10px Arial';ctx.fillText(String(lvl),bx+bw/2,Y(0)-4);};
-    x.levels.forEach((l,j)=>bar(l.metric.sigma,l.level,(j-(x.levels.length-1)/2)*bw*1.15));ctx.save();ctx.translate(cx,pt+ih+12);ctx.rotate(-Math.PI/4.2);ctx.fillStyle='#3a443f';ctx.font='11px Arial';ctx.textAlign='right';ctx.fillText(x.name.length>16?x.name.slice(0,15)+'…':x.name,0,0);ctx.restore();
+    const bar=(s,lvl,ox)=>{if(s==null)return;const col=sgZone(s).c,bx=cx+ox-bw/2,y=Y(s),h=Y(0)-y;ctx.fillStyle=col;ctx.fillRect(bx,y,bw,h);ctx.strokeStyle='rgba(0,0,0,.18)';ctx.lineWidth=1;ctx.strokeRect(bx,y,bw,h);ctx.fillStyle='#16211f';ctx.font=dataIoCanvasFont('bold','type-caption',11.5);ctx.textAlign='center';ctx.fillText(s.toFixed(2),bx+bw/2,y-5);ctx.fillStyle='#fff';ctx.font=dataIoCanvasFont('bold','type-overline',10.5);ctx.fillText(String(lvl),bx+bw/2,Y(0)-4);};
+    x.levels.forEach((l,j)=>bar(l.metric.sigma,l.level,(j-(x.levels.length-1)/2)*bw*1.15));ctx.save();ctx.translate(cx,pt+ih+12);ctx.rotate(-Math.PI/4.2);ctx.fillStyle='#3a443f';ctx.font=dataIoCanvasFont('','type-caption',11.5);ctx.textAlign='right';ctx.fillText(x.name.length>16?x.name.slice(0,15)+'…':x.name,0,0);ctx.restore();
   });
   ctx.strokeStyle='#16211f';ctx.lineWidth=1.3;ctx.beginPath();ctx.moveTo(pl,pt);ctx.lineTo(pl,pt+ih);ctx.lineTo(W-pr,pt+ih);ctx.stroke();
-  ctx.fillStyle='#16211f';ctx.font='bold 15px Arial';ctx.textAlign='left';ctx.fillText('Sigma theo xét nghiệm',pl,22);
-  let lx=pl,ly=38;[['#c0392b','<3σ'],['#dd8b1f','3–4σ'],['#3f9a55','4–6σ'],['#13603f','≥6σ']].forEach(z=>{ctx.fillStyle=z[0];ctx.fillRect(lx,ly-9,14,8);ctx.fillStyle='#16211f';ctx.font='bold 11px Arial';ctx.fillText(z[1],lx+18,ly-1);lx+=66;});
-  ctx.fillStyle='#6b756f';ctx.font='11px Arial';ctx.fillText('Số trong cột = mức QC',lx+6,ly-1);
+  ctx.fillStyle='#16211f';ctx.font=dataIoCanvasFont('bold','type-heading-sm',16);ctx.textAlign='left';ctx.fillText('Sigma theo xét nghiệm',pl,22);
+  let lx=pl,ly=38;[['#c0392b','<3σ'],['#dd8b1f','3–4σ'],['#3f9a55','4–6σ'],['#13603f','≥6σ']].forEach(z=>{ctx.fillStyle=z[0];ctx.fillRect(lx,ly-9,14,8);ctx.fillStyle='#16211f';ctx.font=dataIoCanvasFont('bold','type-caption',11.5);ctx.fillText(z[1],lx+18,ly-1);lx+=66;});
+  ctx.fillStyle='#6b756f';ctx.font=dataIoCanvasFont('','type-caption',11.5);ctx.fillText('Số trong cột = mức QC',lx+6,ly-1);
   return{bytes:sigmaDataURLBytes(k.cv.toDataURL('image/png')),dispW:W,dispH:H};
 }
 function sigmaMdcItems(rows){
@@ -164,17 +166,17 @@ function drawSigmaReportMDC(rows){
   const items=sigmaMdcItems(rows);
   if(!items.length)return null;
   const W=780,H=420,scale=SIGMA_EXPORT_PIXEL_RATIO,pl=58,pr=22,pt=50,pb=54,iw=W-pl-pr,ih=H-pt-pb,maxX=Math.max(50,Math.max(...items.map(p=>p.x)))*1.1,maxY=100,k=sigmaCanvas(W,H,scale),ctx=k.ctx,X=v=>pl+Math.min(v,maxX)/maxX*iw,Y=v=>pt+ih-Math.min(v,maxY)/maxY*ih;
-  ctx.font='11px Arial';ctx.fillStyle='#9a9486';ctx.strokeStyle='#eee7d8';ctx.lineWidth=1;ctx.textAlign='right';
+  ctx.font=dataIoCanvasFont('','type-caption',11.5);ctx.fillStyle='#9a9486';ctx.strokeStyle='#eee7d8';ctx.lineWidth=1;ctx.textAlign='right';
   for(let g=0;g<=maxY;g+=20){const y=Y(g);ctx.beginPath();ctx.moveTo(pl,y);ctx.lineTo(W-pr,y);ctx.stroke();ctx.fillText(String(g),pl-6,y+4);}
   ctx.textAlign='center';for(let gx=0;gx<=maxX;gx+=10)ctx.fillText(String(Math.round(gx)),X(gx),pt+ih+16);
   /** @type {[number,string][]} */
-  ([[2,'#c0392b'],[3,'#dd8b1f'],[4,'#b59a00'],[5,'#3f9a55'],[6,'#0e4d4a']]).forEach(p=>{const S=p[0],col=p[1],x2=100/S,ex=Math.min(x2,maxX),ey=Math.max(0,100-S*ex);ctx.strokeStyle=col;ctx.lineWidth=1.6;ctx.beginPath();ctx.moveTo(X(0),Y(100));ctx.lineTo(X(ex),Y(ey));ctx.stroke();ctx.fillStyle=col;ctx.font='bold 12px Arial';ctx.textAlign='left';ctx.fillText(S+'σ',x2<=maxX?X(x2)+2:W-pr-22,x2<=maxX?Y(0)-3:Y(100-S*maxX)-2);});
-  items.forEach(p=>{ctx.beginPath();ctx.arc(X(p.x),Y(p.y),7,0,2*Math.PI);ctx.fillStyle=sgZone(p.sigma).c;ctx.fill();ctx.lineWidth=1.5;ctx.strokeStyle='#fff';ctx.stroke();ctx.fillStyle='#fff';ctx.font='bold 9px Arial';ctx.textAlign='center';ctx.fillText(String(p.level),X(p.x),Y(p.y)+3);});
-  ctx.fillStyle='#16211f';ctx.font='10px Arial';ctx.textAlign='left';sigmaMdcLabelPlacements(items,X,Y,ctx,{left:pl,right:W-pr,top:pt,bottom:pt+ih}).forEach(p=>ctx.fillText(p.label,p.x,p.y));
+  ([[2,'#c0392b'],[3,'#dd8b1f'],[4,'#b59a00'],[5,'#3f9a55'],[6,'#0e4d4a']]).forEach(p=>{const S=p[0],col=p[1],x2=100/S,ex=Math.min(x2,maxX),ey=Math.max(0,100-S*ex);ctx.strokeStyle=col;ctx.lineWidth=1.6;ctx.beginPath();ctx.moveTo(X(0),Y(100));ctx.lineTo(X(ex),Y(ey));ctx.stroke();ctx.fillStyle=col;ctx.font=dataIoCanvasFont('bold','type-meta',12.5);ctx.textAlign='left';ctx.fillText(S+'σ',x2<=maxX?X(x2)+2:W-pr-22,x2<=maxX?Y(0)-3:Y(100-S*maxX)-2);});
+  items.forEach(p=>{ctx.beginPath();ctx.arc(X(p.x),Y(p.y),7,0,2*Math.PI);ctx.fillStyle=sgZone(p.sigma).c;ctx.fill();ctx.lineWidth=1.5;ctx.strokeStyle='#fff';ctx.stroke();ctx.fillStyle='#fff';ctx.font=dataIoCanvasFont('bold','type-overline',10.5);ctx.textAlign='center';ctx.fillText(String(p.level),X(p.x),Y(p.y)+3);});
+  ctx.fillStyle='#16211f';ctx.font=dataIoCanvasFont('','type-overline',10.5);ctx.textAlign='left';sigmaMdcLabelPlacements(items,X,Y,ctx,{left:pl,right:W-pr,top:pt,bottom:pt+ih}).forEach(p=>ctx.fillText(p.label,p.x,p.y));
   ctx.strokeStyle='#16211f';ctx.lineWidth=1.3;ctx.beginPath();ctx.moveTo(pl,pt);ctx.lineTo(pl,pt+ih);ctx.lineTo(W-pr,pt+ih);ctx.stroke();
-  ctx.fillStyle='#16211f';ctx.font='bold 15px Arial';ctx.textAlign='left';ctx.fillText('Biểu đồ Quyết định Phương pháp (MDC) — các mức QC',pl,22);
-  ctx.font='11px Arial';ctx.fillStyle='#6b756f';ctx.fillText('Màu điểm theo xếp loại Sigma · số trong điểm là mức QC · đường 2σ–6σ',pl,40);
-  ctx.font='12px Arial';ctx.fillStyle='#16211f';ctx.textAlign='center';ctx.fillText('CV / TEa (%)',(pl+W-pr)/2,H-8);ctx.save();ctx.translate(16,(pt+ih)/2);ctx.rotate(-Math.PI/2);ctx.fillText('|Bias| / TEa (%)',0,0);ctx.restore();
+  ctx.fillStyle='#16211f';ctx.font=dataIoCanvasFont('bold','type-heading-sm',16);ctx.textAlign='left';ctx.fillText('Biểu đồ Quyết định Phương pháp (MDC) — các mức QC',pl,22);
+  ctx.font=dataIoCanvasFont('','type-caption',11.5);ctx.fillStyle='#6b756f';ctx.fillText('Màu điểm theo xếp loại Sigma · số trong điểm là mức QC · đường 2σ–6σ',pl,40);
+  ctx.font=dataIoCanvasFont('','type-meta',12.5);ctx.fillStyle='#16211f';ctx.textAlign='center';ctx.fillText('CV / TEa (%)',(pl+W-pr)/2,H-8);ctx.save();ctx.translate(16,(pt+ih)/2);ctx.rotate(-Math.PI/2);ctx.fillText('|Bias| / TEa (%)',0,0);ctx.restore();
   return{bytes:sigmaDataURLBytes(k.cv.toDataURL('image/png')),dispW:W,dispH:H};
 }
 /* Lõi OOXML/ZIP dùng chung cho mọi bộ xuất .xlsx (SigmaXlsx + ReportXlsx): ghi ZIP

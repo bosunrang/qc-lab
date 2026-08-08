@@ -323,7 +323,7 @@ function pointVoidVerdict(t,p){
   return activeWestgard(t).byPoint.get(p.id)||{level:'ok',rules:[]};
 }
 /* Mean/SD đã lưu "Dự kiến" (chưa áp dụng) cho một lô cụ thể chưa phải lô đang
-   gắn với mức — xem applyPlannedTarget()/saveTargetMatrix() trong entry-tests-actions.js. */
+   gắn với mức — xem applyPlannedTarget()/saveTargetMatrix() trong manage-tests-actions.js. */
 function plannedTargetFor(t,lot){
   const l=lvlCfg(t,lot.level);if(!l||l.qcLotId===lot.id)return null;
   return (l.meanSdHistory||[]).find(h=>h.qcLotId===lot.id&&h.planned)||null;

@@ -53,7 +53,7 @@ function ensureShape(opts={}){const previousSchema=Number(state&&state.schemaVer
 /* Xóa mục Mức QC "ma": chưa từng gán lô, chưa từng có Mean, chưa có lịch sử
    Mean/SD và chưa có điểm QC nào — di sản của defaultAssayLevels() từng gán
    mặc định theo TOÀN BỘ mức lô đang có trong hệ thống (đã sửa ở
-   entry-tests-actions.js), để lại các mục rỗng trên xét nghiệm không liên
+   manage-tests-actions.js), để lại các mục rỗng trên xét nghiệm không liên
    quan. Luôn giữ lại ít nhất 1 mức trên mỗi xét nghiệm — nếu lọc còn 0, giữ
    lại mục đầu tiên thay vì để mảng rỗng. */
 function pruneUnusedTestLevels(){

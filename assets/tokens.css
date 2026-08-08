@@ -36,13 +36,24 @@
   --gray-900:#14242e;
 
   --teal-500:#0b747d;
+  --teal-600:#0f5f68;
   --teal-700:#064f57;
-  --amber-600:#855a0d;
+  --teal-300:#9fcfcd;
+  --teal-100:#e8f2f5;
+  --blue-600:#2f5878;
+  --blue-500:#4f789d;
+  --blue-300:#b7cfdf;
+  --blue-100:#eaf2f8;
+  --amber-600:#944f00;
+  --amber-500:#dd8b1f;
+  --amber-300:#e4c273;
   --amber-100:#fbf0db;
   --red-600:#a43a33;
+  --red-500:#b93a32;
+  --red-300:#e2a8a2;
   --red-100:#f7e4e2;
 
-  --focus-ring:#9fcfcd;
+  --focus-ring:var(--teal-300);
   --scrollbar-thumb-base:#a6b3bb;
 
   /* Semantic aliases — every other assets/*.css file references these names,
@@ -58,7 +69,7 @@
   --section-head-bg:var(--gray-100);
   --section-head-border:var(--gray-200);
   --section-head-ink:var(--gray-900);
-  --section-head-size:14px;
+  --section-head-size:var(--type-subhead);
   --panel-header-min-height:44px;
   --subpanel-header-min-height:42px;
   --panel-content-gap:14px;
@@ -71,10 +82,29 @@
   --tealink:var(--teal-700);
   --amber:var(--amber-600);
   --red:var(--red-600);
-  /* Canonical passed/accepted state, shared by badges and tree statuses. */
-  --success-ink:#0f5f68;
-  --success-bg:#e8f2f5;
-  --success-border:var(--focus-ring);
+  /* Canonical UI states. Badges, chips, alerts and status cards reference
+     these semantic trios; chart encodings keep their own palettes. */
+  --neutral-ink:var(--gray-600);
+  --neutral-bg:var(--gray-100);
+  --neutral-border:var(--gray-200);
+  --success-ink:var(--teal-600);
+  --success-bg:var(--teal-100);
+  --success-border:var(--teal-300);
+  --success-accent:var(--teal-500);
+  --info-ink:var(--blue-600);
+  --info-bg:var(--blue-100);
+  --info-border:var(--blue-300);
+  --info-accent:var(--blue-500);
+  /* Canonical warning state: every UI badge, chip, alert and status card uses
+     this ink/background/border trio. Chart encodings keep their own palette. */
+  --warning-ink:var(--amber-600);
+  --warning-bg:var(--amber-100);
+  --warning-border:var(--amber-300);
+  --warning-accent:var(--amber-500);
+  --danger-ink:var(--red-600);
+  --danger-bg:var(--red-100);
+  --danger-border:var(--red-300);
+  --danger-accent:var(--red-500);
   /* --line-strong stays its own primitive (--gray-300, one step darker than
      --line/--card-head-border/--section-head-border) — it's a panel's OUTER
      border, a different element from those tokens' header-strip bottom
@@ -88,18 +118,11 @@
      during the 2026-07-13 consolidation made table rows and headers render
      identically; split back out same day once reported. */
   --surface-subtle:var(--gray-25);
-  --surface-neutral:var(--gray-100);
-  --success-soft:var(--success-bg);
-  --warning-soft:var(--amber-100);
-  --danger-soft:var(--red-100);
+  --surface-neutral:var(--neutral-bg);
   --focus-border:var(--focus-ring);
   --focus-outline:color-mix(in srgb, var(--teal) 68%, var(--gray-600));
   --mono:"Manrope",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   --sans:"Manrope",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-  /* "Surface"/"type" scale, moved here from professional-base.css during the
-     2026-07-11 token cleanup. --surface-head-size (13px vs --section-head-size
-     14px) is a still-unreviewed near-duplicate — font-size, not a color, out
-     of scope for this pass. */
   --surface-card-soft:var(--gray-25);
   --surface-border-soft:var(--gray-200);
   --surface-shadow:none;
@@ -108,14 +131,24 @@
   --radius-md:8px;
   --radius-lg:10px;
   --radius-pill:999px;
-  --surface-head-size:13px;
-  --type-title:clamp(28px,2.4vw,32px);
-  --type-body:13.5px;
-  --type-body-sm:13px;
+  /* Thang chữ duy nhất của ứng dụng. Mỗi màn hình chọn token theo vai trò,
+     không khai báo kích thước px riêng trong CSS hoặc style nội tuyến. */
+  --type-overline:10.5px;
+  --type-caption:11.5px;
   --type-meta:12.5px;
-  --type-micro:11.5px;
-  --table-head-size:13px;
-  --table-body-size:13px;
+  --type-body-sm:13px;
+  --type-body:13.5px;
+  --type-subhead:14px;
+  --type-heading-sm:16px;
+  --type-dialog-title:18px;
+  --type-symbol-lg:20px;
+  --type-symbol-xl:22px;
+  --type-heading-lg:24px;
+  --type-page-title:26px;
+  --type-kpi:30px;
+  --surface-head-size:var(--type-body-sm);
+  --table-head-size:var(--type-body-sm);
+  --table-body-size:var(--type-body-sm);
   --scrollbar-size:8px;
   --scrollbar-track:var(--gray-100);
   --scrollbar-thumb:var(--scrollbar-thumb-base);

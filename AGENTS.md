@@ -560,7 +560,7 @@ the Google Fonts link, offline labs must print with correct metrics.
 - `draw.js`, `router-render.js`, `dashboard-routes.js`, `entry-routes.js`,
   `westgard-routes.js`, `sigma.js`, `actions-routes.js`, `action-form.js`,
   `report-routes.js`, `manage-routes.js`, `after-render.js`,
-  `entry-tests-actions.js`, `modals.js` —
+  `manage-tests-actions.js`, `modals.js` —
   UI/rendering and routing. Since 2026-07-24 the three biggest pages live in
   their own files:
   `router-render.js` keeps only dispatch plus cross-page UI primitives (the
@@ -844,7 +844,7 @@ leaves a dossier record.
   application rules, not a claimed CLIA/CLSI minimum: below 20 is estimate-only,
   20–29 is provisional, and only 30+ may drive the page's QC suggestion.
 - Mean/SD-from-limits intentionally supports ±2SD only
-  (`readTargetMatrixPicks()` in `entry-tests-actions.js` hardcodes
+  (`readTargetMatrixPicks()` in `manage-tests-actions.js` hardcodes
   `sd=(high-low)/4`) — the QC lot inserts actually used never state ±3SD.
 - Parallel lot run (chạy song song 2 lô, 2026-07-21): during a lot transition
   the entry sheet renders one column per (level, lot) — a level whose
@@ -857,7 +857,7 @@ leaves a dossier record.
   (4-1s, 6x, 10x…) run separately via `parallelWestgard()`, and a parallel-lot
   violation never marks the day rejected.
 - CUSUM (`cusum()` in `core.js`, opt-in per test via `t.cusum{on,k,h}`,
-  configured in the assay modal in `entry-tests-actions.js`) is a reference
+  configured in the assay modal in `manage-tests-actions.js`) is a reference
   trend chart only (`drawCUSUM()` in `draw.js`, the "Xu hướng CUSUM" tab on
   the Westgard page) — it never changes a point's accept/reject/Westgard
   status; only the Westgard rule engine does that.

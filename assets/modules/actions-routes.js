@@ -27,7 +27,7 @@ async function cancelAction(i){
   const current=(state.actions||[]).find(x=>x.id===id);
   if(!current||actionApprovalToken(current)!==token){await infoDialog('Hồ sơ đã thay đổi trong lúc xác thực. Vui lòng kiểm tra lại trước khi hủy.');return;}
   openModal(modalTemplate({title:'Hủy hồ sơ NCE',body:`
-      <div class="alert warn"><b>Hồ sơ sẽ không bị xóa.</b><div>Nội dung, người lập và toàn bộ bằng chứng vẫn được giữ để truy xuất. Nếu hồ sơ gắn với vi phạm QC, sự cố đó sẽ xuất hiện lại để lập hồ sơ mới.</div></div>
+      <div class="alert warn action-cancel-warning"><b>Hồ sơ sẽ không bị xóa.</b><div>Nội dung, người lập và toàn bộ bằng chứng vẫn được giữ để truy xuất. Nếu hồ sơ gắn với vi phạm QC, sự cố đó sẽ xuất hiện lại để lập hồ sơ mới.</div></div>
       <label>Lý do hủy (tối thiểu 5 ký tự)</label>
       <textarea id="actionCancelReason" placeholder="VD: Mở nhầm cho sai điểm QC; lập lại hồ sơ đúng đối tượng..." oninput="document.getElementById('actionCancelErr').style.display='none'"></textarea>
       <div id="actionCancelErr" class="hint" style="color:var(--red);display:none;margin-top:6px">Cần nhập lý do hủy tối thiểu 5 ký tự.</div>
@@ -214,6 +214,7 @@ function actionRerunEvidenceHtml(a,rr,t){
 function openActionQcEvidence(tid,level,pointId,date,lot){
   if(typeof captureActionDraft==='function'&&page==='actions')captureActionDraft();
   closeModal();entrySel={testId:tid,level:+level};entryStart=date||null;entryEnd=date||null;entryLastMsg=`<div class="alert ok">Đang hiển thị điểm QC được dùng làm bằng chứng ngày ${esc(vnDate(date))}.</div>`;
+  entryDetailOpen.add('points');
   const t=state.tests.find(x=>x.id===tid),l=t&&lvlCfg(t,+level);
   if(l&&lot&&String(lot)!==String(l.lot||''))entryPrevOpen.set(tid+'|'+level,lot);
   go('entry');
@@ -253,9 +254,9 @@ function openActionGuide(){
     ['verify','An toàn người bệnh','Đánh giá ảnh hưởng bệnh nhân','Khoanh vùng từ lần QC đạt cuối cùng và xử lý kết quả liên quan.'],
     ['close','Khép vòng','Đánh giá hiệu lực và phê duyệt','Ghi bằng chứng, đánh giá RPN còn lại và phê duyệt độc lập trước khi khép vòng.']
   ];
-  const list=steps.map(([stage,phase,title,text],i)=>`<li class="action-guide-card ${stage}"><span class="action-guide-number">${i+1}</span><div><small>${esc(phase)}</small><b>${esc(title)}</b><p>${esc(text)}</p></div></li>`).join('');
-  const body=`<div class="modal-b" tabindex="0" aria-label="Nội dung quy trình 8 bước"><div class="action-guide-intro"><div class="action-guide-mark">NCE</div><div><small>Nguyên tắc cốt lõi</small><b>Lưu sớm, hoàn thiện theo tiến độ</b><p>Sau bước 1, lưu hồ sơ ở trạng thái <strong>Đang điều tra</strong>; không chờ hoàn tất toàn bộ quy trình.</p></div></div><div class="action-guide-legend"><span class="control">1–2 · Kiểm soát</span><span class="investigate">3–5 · Điều tra & khắc phục</span><span class="verify">6–8 · Xác nhận & khép vòng</span></div><ol class="action-guide-list">${list}</ol></div>`;
-  const footer=`<div class="action-guide-footer-note"><b>Điều kiện khép vòng</b><span>Đủ bằng chứng QC, quyết định cho phép trở lại (nếu đã giữ kết quả), đánh giá nguy cơ còn lại và phê duyệt độc lập</span></div>${btn('Đóng hướng dẫn','closeModal()','teal')}`;
+  const list=steps.map(([,phase,title,text],i)=>`<li class="action-guide-card"><span class="action-guide-number">${i+1}</span><div><small>${esc(phase)}</small><b>${esc(title)}</b><p>${esc(text)}</p></div></li>`).join('');
+  const body=`<div class="modal-b" tabindex="0" aria-label="Nội dung quy trình 8 bước"><div class="action-guide-intro"><b>Nguyên tắc thực hiện</b><p>Lưu hồ sơ ngay sau bước 1 ở trạng thái <strong>Đang điều tra</strong>, sau đó hoàn thiện theo tiến độ xử lý.</p></div><ol class="action-guide-list">${list}</ol></div>`;
+  const footer=`<div class="action-guide-footer-note"><b>Điều kiện khép vòng</b><span>Đủ bằng chứng QC, quyết định cho phép trở lại khi cần, đánh giá nguy cơ còn lại và phê duyệt độc lập.</span></div>${btn('Đóng','closeModal()','ghost')}`;
   openModal(modalTemplate({title:'Quy trình 8 bước xử lý hồ sơ NCE',body,footer,cls:'action-guide-modal',bodyClass:''}));
 }
 function groupIssuesByTestDate(issues){
@@ -316,7 +317,7 @@ function pageActionsV4(){
       <td>${actionReviewButtons(realIdx,a)}</td>
     </tr>`;}).join('');
   return headOnly('Khắc phục sự cố','Điều tra nguyên nhân, ghi nhận, chạy lại QC và phê duyệt khép vòng')+
-   `<div class="panel action-issues-panel"><h3 role="heading" aria-level="2">Sự cố cần xử lý</h3><div class="dash-list">${issueHtml}</div></div>`+
+   `<div class="panel action-issues-panel"><h2 class="panel-title">Sự cố cần xử lý</h2><div class="dash-list">${issueHtml}</div></div>`+
    actionFormHtml(issues.length)+
-   `<div class="panel action-log-panel"><h3>Nhật ký khắc phục</h3>${rows?`<div class="action-log-tools">${btn('Xuất CSV nhật ký','exportActionsCSV()','teal sm')}</div><div class="action-log-wrap"><table class="action-log-table"><thead><tr><th>Thời điểm</th><th>Sự cố</th><th>Hành động</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table></div>`:emptyState('Chưa có nhật ký','Các hành động khắc phục sẽ xuất hiện ở đây sau khi được lưu.')}</div>`;
+   `<div class="panel action-log-panel"><h2 class="panel-title">Nhật ký khắc phục</h2>${rows?`<div class="action-log-tools">${btn('Xuất CSV nhật ký','exportActionsCSV()','teal sm')}</div><div class="action-log-wrap"><table class="action-log-table"><thead><tr><th>Thời điểm</th><th>Sự cố</th><th>Hành động</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table></div>`:emptyState('Chưa có nhật ký','Các hành động khắc phục sẽ xuất hiện ở đây sau khi được lưu.')}</div>`;
 }

@@ -19,7 +19,7 @@ const { loadSandbox, run } = require('./helpers/sandbox');
 
 const ctx = loadSandbox([
   'core.js', 'modules/state.js', 'modules/qc-domain.js',
-  'modules/period-service.js', 'modules/entry-tests-actions.js',
+  'modules/period-service.js', 'modules/manage-tests-actions.js',
 ]);
 const plain = (v) => JSON.parse(JSON.stringify(v));
 

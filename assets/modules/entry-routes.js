@@ -158,7 +158,7 @@ function pageEntry(rightOnly=false){
       <div id="entryMsg" role="status" aria-live="polite" style="margin:12px 16px 16px">${entryLastMsg}</div></div>`;
   const right=`${worksheet}
    <div class="panel"><div class="lj-toolbar">
-        <h3>Biểu đồ Levey-Jennings</h3>
+        <h2 class="panel-title">Biểu đồ Levey-Jennings</h2>
         <div class="lj-filter"><label class="lj-date-field"><span class="hint">Từ ngày</span>${dateBox('entryStartDate',W.start,'','onchange="entrySetStart(this.value)"')}</label><label class="lj-date-field"><span class="hint">Đến ngày</span>${dateBox('entryEndDate',W.end,'','onchange="entrySetEnd(this.value)"')}</label><div class="dayseg">${dayBtn(7)}${dayBtn(14)}${dayBtn(30)}${dayBtn(60)}${dayBtn(90)}</div></div></div>
       <div class="hint lj-range">Khoảng xem: ${vnDate(W.start)} – ${vnDate(W.end)} · ${operationalLevels(t).length} mức QC</div>
       <div class="lj-stack">${ljStack}</div>

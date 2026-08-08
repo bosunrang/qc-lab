@@ -1,6 +1,13 @@
 /* ===== ROUTER ===== */
-const PAGES=[['dash','Bảng điều khiển'],['entry','Nhập QC & Biểu đồ'],['westgard','Phân tích Westgard'],['sigma','Six Sigma & Sai số'],['reagent','So sánh hóa chất'],['actions','Khắc phục sự cố'],['report','Báo cáo & Biểu mẫu'],['manage','Cấu hình chung'],['users','Người dùng'],['audit','Nhật ký hoạt động'],['settings','Cài đặt & Đám mây']];
-const PERM={dash:['admin','technician','viewer'],entry:['admin','technician','viewer'],westgard:['admin','technician','viewer'],sigma:['admin','technician','viewer'],reagent:['admin','technician','viewer'],actions:['admin','technician'],report:['admin','technician','viewer'],manage:['admin'],users:['admin'],audit:['admin'],settings:['admin']};
+/* Nguồn duy nhất cho danh sách trang (id/nhãn/vai trò được phép) — trước đây PAGES và
+   PERM là hai mảng/đối tượng tách rời cùng liệt kê tay 11 id giống hệt nhau, dễ lệch
+   như bảng luật Westgard từng lệch giữa nhiều file (xem WG_RULE_REGISTRY ở core.js).
+   PAGES/PERM bên dưới chỉ là hai lát cắt DẪN XUẤT từ PAGE_DEFS, không tự liệt kê id nữa.
+   tests/ui-route-structure.test.js đối chiếu tập id này với PAGE_SET của core.js. */
+/** @type {[string,string,string[]][]} */
+const PAGE_DEFS=[['dash','Bảng điều khiển',['admin','technician','viewer']],['entry','Nhập QC & Biểu đồ',['admin','technician','viewer']],['westgard','Phân tích Westgard',['admin','technician','viewer']],['sigma','Six Sigma & Sai số',['admin','technician','viewer']],['reagent','So sánh hóa chất',['admin','technician','viewer']],['actions','Khắc phục sự cố',['admin','technician']],['report','Báo cáo & Biểu mẫu',['admin','technician','viewer']],['manage','Cấu hình chung',['admin']],['users','Người dùng',['admin']],['audit','Nhật ký hoạt động',['admin']],['settings','Cài đặt & Đám mây',['admin']]];
+const PAGES=PAGE_DEFS.map(([id,label])=>[id,label]);
+const PERM=Object.fromEntries(PAGE_DEFS.map(([id,,roles])=>[id,roles]));
 let page='dash';
 function role(){return currentUser?currentUser.role:'viewer';}
 function canWrite(){return role()==='admin'||role()==='technician';}
@@ -12,7 +19,9 @@ function canWrite(){return role()==='admin'||role()==='technician';}
    same tick either way. */
 function requireWrite(message='Bạn không có quyền sửa dữ liệu.'){if(canWrite())return true;infoDialog(message);return false;}
 function requireAdmin(message='Chỉ quản trị mới được thực hiện thao tác này.'){if(role()==='admin')return true;infoDialog(message);return false;}
+const ROLE_LIST=['admin','technician','viewer'];
 function roleLabel(r){return r==='admin'?'Quản trị':r==='technician'?'KTV':'Chỉ xem';}
+function roleSelectOptions(selected){return ROLE_LIST.map(r=>`<option value="${r}" ${r===selected?'selected':''}>${roleLabel(r)}</option>`).join('');}
 function rolePageIds(r=role()){return PAGES.map(x=>x[0]).filter(id=>PERM[id]&&PERM[id].includes(r));}
 function userPageIds(u=currentUser){
   if(!u)return rolePageIds('viewer');
@@ -152,7 +161,10 @@ function renderBrand(){
   el.innerHTML=`<div class="brand-mark">${logo?`<img src="${escAttr(logo)}" alt="">`:esc(brandMarkText())}</div><div>${esc(brandTitle())}<small>${esc(brandSub())}</small></div>`;
 }
 function nav(){const groups=[['Theo dõi',['dash','entry','westgard','sigma']],['Vận hành',['reagent','actions','report']],['Quản trị',['manage','users','audit','settings']]];
-  document.getElementById('nav').innerHTML=groups.map(([g,ids])=>{const items=PAGES.filter(([id])=>ids.includes(id)&&canAccessPage(id));return items.length?`<div class="nav-group">${g}</div>`+items.map(([id,t])=>`<button class="${id===page?'active':''}" aria-current="${id===page?'page':'false'}" onclick="go('${id}')"><span class="ic" aria-hidden="true">${icon(id)}</span>${t}</button>`).join(''):'';}).join('');
+  const el=document.getElementById('nav');if(!el)return;
+  const scrollTop=el.scrollTop;
+  el.innerHTML=groups.map(([g,ids])=>{const items=PAGES.filter(([id])=>ids.includes(id)&&canAccessPage(id));return items.length?`<div class="nav-group">${g}</div>`+items.map(([id,t])=>`<button class="${id===page?'active':''}" aria-current="${id===page?'page':'false'}" onclick="go('${id}')"><span class="ic" aria-hidden="true">${icon(id)}</span>${t}</button>`).join(''):'';}).join('');
+  el.scrollTop=scrollTop;
 }
 /* Watermark tên lab được cấp phép (bản Electron có license). Chạy trong trình
    duyệt thường thì window.qcLicense không tồn tại nên bỏ qua — không ảnh hưởng. */

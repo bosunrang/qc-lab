@@ -1,6 +1,6 @@
 /**
  * Regression test: renaming an in-use QC lot's lot number (assets/modules/
- * entry-tests-actions.js saveConfigLot()) used to orphan every previously-entered
+ * manage-tests-actions.js saveConfigLot()) used to orphan every previously-entered
  * QC point for that lot.
  *
  * QC points store their lot as a static string snapshot (p.lot), not a qcLotId
@@ -20,7 +20,7 @@
 const assert = require('node:assert/strict');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
-const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'modules/entry-tests-actions.js']);
+const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'modules/manage-tests-actions.js']);
 const plain = (v) => JSON.parse(JSON.stringify(v));
 
 const built = run(ctx, `(function(){
@@ -76,7 +76,7 @@ assert.equal(result.noopRenamed, 0, 'renaming a lot to the same number is a no-o
 // an audit-relevant historical record); deleting the lot underneath it must not be
 // a back door around that same protection.
 (async () => {
-  const deleteCtx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'modules/entry-tests-actions.js']);
+  const deleteCtx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'modules/manage-tests-actions.js']);
   const deleted = await run(deleteCtx, `(async function(){
     var lotOld = { id: 'L1', groupId: 'G1', lotNo: 'OLD1', level: 1, active: true, depleted: true };
     var lotNew = { id: 'L2', groupId: 'G1', lotNo: 'NEW1', level: 1, active: true, depleted: false };

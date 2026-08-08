@@ -2,7 +2,7 @@
 //
 // Repo có 60+ file test nhưng cho tới 2026-08-01 không có công cụ đo độ phủ nào,
 // nên con số "60 test" không trả lời được câu duy nhất đáng hỏi: phần nào của
-// sigma.js (file lớn nhất repo), entry-tests-actions.js, firebase-sync.js chưa có
+// sigma.js (file lớn nhất repo), manage-tests-actions.js, firebase-sync.js chưa có
 // dòng nào chạm tới? Script này lấy câu trả lời bằng cờ đo độ phủ CÓ SẴN của Node
 // (`NODE_V8_COVERAGE`) — không cài thêm gì, đúng tinh thần phần còn lại của repo.
 //

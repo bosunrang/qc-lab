@@ -42,7 +42,7 @@ declare var EntryService: any, PeriodService: any, ReagentComparisonService: any
 declare var actionApprovalStatus: any, actionRecordStatus: any, actionCancelled: any, actionApprovalLabel: any, actionRecorded: any, actionCanApprove: any,
   actionPoint: any, actionEventDate: any, actionNeedsRerun: any, actionRerunStatus: any, actionWorkflowStatus: any,
   actionDraftStatus: any, actionProtocolStatus: any, actionProtocolSummary: any, actionRiskScore: any, actionResidualRiskScore: any, actionActiveFollowUp: any, actionEffectivenessStatus: any,
-  ACTION_LABELS: any, invalidateActionCaches: any, nextNceId: any, nceDueDate: any, actionOverdue: any,
+  ACTION_LABELS: any, RISK_SCALE: any, invalidateActionCaches: any, nextNceId: any, nceDueDate: any, actionOverdue: any,
   pointActions: any, pointRealActions: any, pointWorkflowComplete: any, pointWorkflowSummary: any;
 
 // core.js (UMD) exposes itself as window.QCCore; referenced bare everywhere else

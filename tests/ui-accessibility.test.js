@@ -20,9 +20,13 @@ const settingsCss = read('assets/professional-settings.css');
 const usersCss = read('assets/professional-users.css');
 const westgardCss = read('assets/professional-westgard.css');
 const actionsRoutes = read('assets/modules/actions-routes.js');
+const actionForm = read('assets/modules/action-form.js');
 const reportRoutes = read('assets/modules/report-routes.js');
 const westgardRoutes = read('assets/modules/westgard-routes.js');
 const dashboardRoutes = read('assets/modules/dashboard-routes.js');
+const sigmaRoutes = read('assets/modules/sigma.js');
+const reagentRoutes = read('assets/modules/reagent.js');
+const settingsRoutes = read('assets/modules/settings.js');
 const indexHtml = read('index.html');
 const cssFiles = fs.readdirSync(path.join(root, 'assets')).filter(name => name.endsWith('.css'));
 
@@ -50,6 +54,14 @@ assert.match(components, /outline:1px solid var\(--focus-outline\);outline-offse
 assert.match(indexHtml, /<nav id="nav" aria-label="Điều hướng chính">/);
 assert.match(indexHtml, /<main id="main" tabindex="-1">/);
 
+const semanticPageRoutes=[dashboardRoutes,sigmaRoutes,reagentRoutes,actionsRoutes,actionForm,reportRoutes,settingsRoutes,router].join('\n');
+for(const title of ['Cần xử lý / Theo dõi','Lô & hạn dùng','Tình trạng','Số liệu theo kỳ','Biểu đồ Sigma & MDC','Thông tin đánh giá','Dữ liệu đo bắt cặp','Kết quả thống kê','Tiêu chí chấp nhận &amp; kết luận','Biểu đồ','Nhật ký khắc phục','Khóa kỳ báo cáo','Logo & tên phần mềm','Quản trị dữ liệu','Đồng bộ đám mây (Firebase Realtime Database)','LIS Gateway (thử nghiệm)','Firebase Rules','Biểu đồ Levey-Jennings']){
+  const escaped=title.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  assert.match(semanticPageRoutes,new RegExp(`<h2[^>]*class="[^"]*panel-title[^"]*"[^>]*>${escaped}`),`panel chính "${title}" phải dùng heading cấp 2 thật`);
+}
+assert.match(sigmaRoutes,/<summary class="sg-collapse-summary"><span role="heading" aria-level="2">Độ không đảm bảo đo \(MU\)<\/span><\/summary>/,'summary MU phải giữ heading cấp 2 mà không lồng control focus');
+
+assert.match(sigmaCss,/\.sg-mu-panel > \.sg-collapse-summary::after\{\s*position:absolute; right:14px;/,'MU collapse mark must stay at the far right, after the action button');
 assert.equal((entryCss.match(/!important/g) || []).length, 0, 'entry UI must not depend on !important');
 assert.equal((dashboardCss.match(/!important/g) || []).length, 0, 'dashboard UI must not depend on !important');
 assert.match(sigmaCss, /\.sg-eqa-table th\{[^}]*text-transform:none/);
@@ -62,22 +74,27 @@ assert.match(actionsRoutes, /aria-hidden="true"/);
 assert.match(tokens, /--panel-content-gap:14px/);
 assert.match(tokens, /--panel-header-min-height:44px/);
 assert.match(tokens, /--subpanel-header-min-height:42px/);
-assert.match(components, /h3:first-child\+\*,\.panel>\.row-flex:first-child\+\*\{margin-top:var\(--panel-content-gap\)\}/);
-assert.match(components, /h3:first-child\+:is\(\.grid2,\.grid4,\.row-flex\)>div>label:first-child\{margin-top:0\}/);
+assert.match(components, /:is\(h2\.panel-title,h3\):first-child\+\*,\.panel>\.row-flex:first-child\+\*\{margin-top:var\(--panel-content-gap\)\}/);
+assert.match(components, /:is\(h2\.panel-title,h3\):first-child\+:is\(\.grid2,\.grid4,\.row-flex\)>div>label:first-child\{margin-top:0\}/);
 assert.match(westgardCss, /\.wg-test-picker\{[^}]*margin:var\(--panel-content-gap\) 16px 0/);
 assert.match(westgardCss, /\.wg-test-picker label\{\s*margin-top:0/);
+assert.match(westgardCss,/\.wg-guide th:nth-child\(3\),\.wg-guide td:nth-child\(3\)\{width:14%; text-align:center; vertical-align:middle\}/,'cột Kết luận của hướng dẫn Westgard phải đủ rộng và căn giữa');
+assert.match(westgardCss,/\.wg-guide td:nth-child\(3\)\{white-space:nowrap\}/,'nội dung Kết luận không được xuống dòng');
 assert.match(sigmaCss, /\.sg-data-head\{[^}]*min-height:var\(--panel-header-min-height\)/);
 assert.match(sigmaCss, /\.sg-setup-heading\{[^}]*min-height:var\(--panel-header-min-height\)/);
 assert.doesNotMatch(sigmaCss, /#sgTrend,\s*#sgMDC\{[^}]*border-top/);
 assert.doesNotMatch(sigmaCss, /#sgTrend,\s*#sgMDC\{/);
 assert.match(sigmaCss, /\.sg-chart-box > \.hint\{[^}]*padding:var\(--panel-content-gap\) 12px 0/);
 assert.match(sigmaCss, /\.sg-chart-box \.chart-inner\{[^}]*padding:var\(--panel-content-gap\) 12px 12px/);
-assert.match(sigmaCss, /\.sg-chart-box \.chart-inner > \.hint\{\s*padding:0/);
+assert.match(components, /\.sg-chart-box > h3\{[^}]*min-height:var\(--subpanel-header-min-height\)[^}]*padding:9px 12px/,'tiêu đề biểu đồ Sigma phải dùng header có padding chuẩn');
+assert.match(sigmaCss, /\.sg-chart-box \.chart-inner > \.hint\{[^}]*min-height:40px[^}]*padding:0/,'trạng thái biểu đồ rỗng phải có chiều cao cân đối');
 assert.match(sigmaCss, /\.sg-simple-table-wrap\{[^}]*margin:var\(--panel-content-gap\) 16px 12px/);
 assert.match(dashboardCss, /margin:var\(--panel-content-gap\) 16px 14px/);
 assert.match(dashboardRoutes, /<div class="dash-test-filterbar"><div class="dash-test-tabs">\$\{dashStatusTabs\}<\/div><div class="dash-test-search">/);
 assert.match(dashboardCss, /\.dash-test-filterbar \.dash-test-search input\{\s*height:32px; min-height:32px;/);
 assert.equal((dashboardCss.match(/\.dash-main \.alert\{/g)||[]).length,1,'dashboard alert styles must stay consolidated');
+assert.match(reportsCss,/\.action-chipline \.action-chip\{\s*max-width:none; white-space:nowrap;/,'chip trạng thái NCE phải giữ một dòng khi hàng còn đủ rộng');
+assert.match(reportsCss,/@media\(max-width:640px\)\{[\s\S]*\.action-chipline \.action-chip\{\s*max-width:100%; white-space:normal;/,'chip trạng thái NCE chỉ xuống dòng trên màn hình nhỏ');
 assert.match(entryCss, /\.qc-cumulative-note\{margin:var\(--panel-content-gap\) 16px 0\}/);
 assert.match(entryCss, /\.lj-range\{\s*margin:var\(--panel-content-gap\) 16px 12px/);
 assert.match(entryCss, /\.entry-secondary-summary:focus-visible\{\s*outline:2px solid var\(--focus-outline\)/);
@@ -105,7 +122,7 @@ assert.match(reagentCss, /padding:var\(--panel-content-gap\) 28px 26px/);
 assert.match(reagentCss, /\.rc-toolbar\{[^}]*padding:0 16px/);
 assert.match(reagentCss, /\.rc-toolbar-selcol\{[^}]*gap:6px/);
 assert.match(reagentCss, /\.rc-toolbar-selcol label\{\s*margin:0/);
-assert.match(reagentCss, /\.rc-stats-panel > h3:first-child \+ #rcStats,\s*\.rc-chart-panel > h3:first-child \+ \.rc-charts\{[^}]*padding:var\(--panel-content-gap\)/);
+assert.match(reagentCss, /\.rc-stats-panel > \.panel-title:first-child \+ #rcStats,\s*\.rc-chart-panel > \.panel-title:first-child \+ \.rc-charts\{[^}]*padding:var\(--panel-content-gap\)/);
 assert.match(reagentCss, /\.rc-chart-panel > \.rc-charts,[^}]*\.rc-stats-panel > #rcStats\{\s*margin:0 !important/);
 assert.match(reportsCss, /padding:var\(--panel-content-gap\) 16px 16px/);
 assert.match(reportsCss, /\.action-form-body label\{\s*margin-top:0/);

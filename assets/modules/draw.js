@@ -1,6 +1,8 @@
-﻿/* ===== DRAW ===== */
+/* ===== DRAW ===== */
 function drawRuleWithin(test,rule){return typeof testRuleOnWithin==='function'?testRuleOnWithin(test,rule):testRuleOn(test,rule);}
 function drawRuleAcross(test,rule){return typeof testRuleOnAcross==='function'?testRuleOnAcross(test,rule):testRuleOn(test,rule);}
+function drawTypePx(token,fallback){if(typeof getComputedStyle==='function'&&typeof document!=='undefined'){const n=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--'+token));if(Number.isFinite(n))return n;}return fallback;}
+function drawCanvasFont(weight,token,fallback){return`${weight?weight+' ':''}${drawTypePx(token,fallback)}px Manrope, Arial, sans-serif`;}
 function qcTooltip(){let el=document.getElementById('qcTooltip');if(!el){el=document.createElement('div');el.id='qcTooltip';el.className='qc-tooltip';document.body.appendChild(el);}return el;}
 function bindLJTooltip(canvas){
   if(canvas._ljTipBound)return;canvas._ljTipBound=true;
@@ -77,9 +79,9 @@ function drawLJ(canvas,points,mean,sd){
   });
   ctx.restore();
 
-  ctx.font='800 11px Manrope, Arial, sans-serif';ctx.fillStyle='#17212b';ctx.textAlign='center';ctx.textBaseline='bottom';
+  ctx.font=drawCanvasFont(800,'type-caption',11.5);ctx.fillStyle='#17212b';ctx.textAlign='center';ctx.textBaseline='bottom';
   ctx.fillText('Levey-Jennings',padL+cw/2,padT-8);
-  ctx.font='800 12px Manrope, Arial, sans-serif';ctx.textBaseline='middle';
+  ctx.font=drawCanvasFont(800,'type-meta',12.5);ctx.textBaseline='middle';
   rows.forEach(k=>{
     const yy=y(mean+k*sd);
     ctx.fillStyle='#17212b';ctx.textAlign='right';ctx.fillText(k===3?'> +3':k===-3?'< -3':String(k),padL-9,yy);
@@ -87,7 +89,7 @@ function drawLJ(canvas,points,mean,sd){
   });
 
   if(!n){
-    ctx.fillStyle='#7b838e';ctx.font='600 14px Manrope, Arial, sans-serif';ctx.textAlign='center';ctx.fillText('Chưa có điểm QC',padL+cw/2,padT+ch/2);
+    ctx.fillStyle='#7b838e';ctx.font=drawCanvasFont(600,'type-subhead',14);ctx.textAlign='center';ctx.fillText('Chưa có điểm QC',padL+cw/2,padT+ch/2);
     canvas._ljHover=[];bindLJTooltip(canvas);
     return;
   }
@@ -117,7 +119,7 @@ function drawLJ(canvas,points,mean,sd){
   });
   ctx.restore();
   const tickTotal=Math.min(5,n),tickIndices=tickTotal===1?[0]:[...new Set(Array.from({length:tickTotal},(_,i)=>Math.round(i*(n-1)/(tickTotal-1))))];
-  ctx.fillStyle='#536772';ctx.font='700 11px Manrope, Arial, sans-serif';ctx.textAlign='center';ctx.textBaseline='top';
+  ctx.fillStyle='#536772';ctx.font=drawCanvasFont(700,'type-caption',11.5);ctx.textAlign='center';ctx.textBaseline='top';
   tickIndices.forEach(i=>{const raw=String(points[i].date||''),label=/^\d{4}-\d{2}-\d{2}$/.test(raw)?raw.slice(8,10)+'/'+raw.slice(5,7):String(vnDate(points[i].date)||'').slice(0,5);ctx.fillText(label,x(i),padT+ch+10);});
   bindLJTooltip(canvas);
 
@@ -158,12 +160,12 @@ function drawLJMultiZ(canvas,levelViews,test,opts){
   });
   ctx.restore();
 
-  ctx.font='800 11px Manrope, Arial, sans-serif';ctx.fillStyle='#17212b';ctx.textAlign='center';ctx.textBaseline='bottom';
+  ctx.font=drawCanvasFont(800,'type-caption',11.5);ctx.fillStyle='#17212b';ctx.textAlign='center';ctx.textBaseline='bottom';
   ctx.fillText('Levey-Jennings tổng hợp theo Z-score',padL+cw/2,padT-8);
-  ctx.font='800 12px Manrope, Arial, sans-serif';ctx.textBaseline='middle';
+  ctx.font=drawCanvasFont(800,'type-meta',12.5);ctx.textBaseline='middle';
   [-3,-2,-1,0,1,2,3].forEach(k=>{const yy=y(k);ctx.fillStyle='#17212b';ctx.textAlign='right';ctx.fillText(k===3?'> +3':k===-3?'< -3':String(k),padL-9,yy);ctx.textAlign='left';ctx.fillText((k>=0?'+':'')+k+'s',padL+cw+10,yy);});
   if(!all.length){
-    ctx.fillStyle='#7b838e';ctx.font='600 14px Manrope, Arial, sans-serif';ctx.textAlign='center';ctx.fillText('Chưa có điểm QC để vẽ tích hợp',padL+cw/2,padT+ch/2);
+    ctx.fillStyle='#7b838e';ctx.font=drawCanvasFont(600,'type-subhead',14);ctx.textAlign='center';ctx.fillText('Chưa có điểm QC để vẽ tích hợp',padL+cw/2,padT+ch/2);
     bindLJTooltip(canvas);return;
   }
 
@@ -203,7 +205,7 @@ function drawLJMultiZ(canvas,levelViews,test,opts){
     const runDateMap=new Map();
     all.forEach(o=>{if(!runDateMap.has(o.run))runDateMap.set(o.run,o.date);});
     const tickTotal=Math.min(5,runs.length),tickIndices=tickTotal===1?[0]:[...new Set(Array.from({length:tickTotal},(_,i)=>Math.round(i*(runs.length-1)/(tickTotal-1))))];
-    ctx.fillStyle='#536772';ctx.font='700 11px Manrope, Arial, sans-serif';ctx.textAlign='center';ctx.textBaseline='top';
+    ctx.fillStyle='#536772';ctx.font=drawCanvasFont(700,'type-caption',11.5);ctx.textAlign='center';ctx.textBaseline='top';
     tickIndices.forEach(i=>{
       const run=runs[i],raw=String(runDateMap.get(run)||'');
       const label=/^\d{4}-\d{2}-\d{2}$/.test(raw)?raw.slice(8,10)+'/'+raw.slice(5,7):String(vnDate(raw)||'').slice(0,5);
@@ -215,7 +217,7 @@ function drawLJMultiZ(canvas,levelViews,test,opts){
      (VD "M1·TDM 79979900") đè lên khối màu của mục kế tiếp, đúng lỗi người dùng
      báo 2026-08-03. */
   {
-    const y0=10;ctx.font='800 11px Manrope, Arial, sans-serif';ctx.textAlign='left';ctx.textBaseline='middle';
+    const y0=10;ctx.font=drawCanvasFont(800,'type-caption',11.5);ctx.textAlign='left';ctx.textBaseline='middle';
     let legendX=padL+8;
     levels.forEach((v,li)=>{
       const color=colors[li%colors.length],label=v.label||`Mức ${v.level}`;
@@ -257,13 +259,13 @@ function drawCUSUM(canvas,points,series){
   const y0=y(0);ctx.beginPath();ctx.moveTo(padL,y0);ctx.lineTo(padL+cw,y0);ctx.stroke();
   ctx.restore();
 
-  ctx.font='800 11px Manrope, Arial, sans-serif';ctx.fillStyle='#17212b';ctx.textAlign='center';ctx.textBaseline='bottom';
+  ctx.font=drawCanvasFont(800,'type-caption',11.5);ctx.fillStyle='#17212b';ctx.textAlign='center';ctx.textBaseline='bottom';
   ctx.fillText(`CUSUM xu hướng (k=${fmt(k,2)}, h=${fmt(h,2)})`,padL+cw/2,padT-8);
-  ctx.font='800 12px Manrope, Arial, sans-serif';ctx.textBaseline='middle';
+  ctx.font=drawCanvasFont(800,'type-meta',12.5);ctx.textBaseline='middle';
   [h,0,-h].forEach(v=>{const yy=y(v);ctx.fillStyle='#17212b';ctx.textAlign='right';ctx.fillText(fmt(v,2),padL-9,yy);});
 
   if(!n){
-    ctx.fillStyle='#7b838e';ctx.font='600 14px Manrope, Arial, sans-serif';ctx.textAlign='center';ctx.fillText('Chưa có điểm QC',padL+cw/2,padT+ch/2);
+    ctx.fillStyle='#7b838e';ctx.font=drawCanvasFont(600,'type-subhead',14);ctx.textAlign='center';ctx.fillText('Chưa có điểm QC',padL+cw/2,padT+ch/2);
     canvas._ljHover=[];bindLJTooltip(canvas);
     return;
   }

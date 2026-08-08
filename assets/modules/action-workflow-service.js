@@ -14,6 +14,10 @@
   const SOURCE_LABELS={iqc:'Nội kiểm IQC',eqa:'Ngoại kiểm EQA',instrument:'Cảnh báo thiết bị',clinical:'Phản hồi lâm sàng',audit:'Đánh giá / audit',other:'Nguồn khác'};
   const PHASE_LABELS={pre:'Trước xét nghiệm',exam:'Trong xét nghiệm',post:'Sau xét nghiệm'};
   const RISK_LABELS={low:'Thấp',medium:'Trung bình',high:'Cao',critical:'Nghiêm trọng'};
+  /* Thang S×O×D (Severity/Occurrence/Detectability) của ma trận rủi ro ISO 15189 —
+     nguồn duy nhất, dùng chung với action-form.js (đánh giá nguy cơ ban đầu và nguy cơ
+     còn lại đều cùng một thang, chỉ khác trường dữ liệu). */
+  const RISK_SCALE=[1,2,3,4,5];
   const RELEASE_LABELS={released:'Đã cho phép hoạt động/trả kết quả trở lại'};
   /* Một nguồn nhãn duy nhất cho cả service (tóm tắt/xuất file) lẫn UI trang Actions —
      trước đây actionDetailCheck()/viewActionDetail() chép lại y hệt các map này. */
@@ -83,8 +87,8 @@
     if(a.protocolVersion>=2){
       const draft=actionDraftStatus(a);
       draft.missing.forEach((label,i)=>{missing.push(label);const section=DRAFT_SECTION[draft.missingKeys[i]]||'ident';bySection[section].push(label);});
-      need(!RISK_LABELS[a.riskLevel]||![1,2,3,4,5].includes(+a.riskSeverity)||![1,2,3,4,5].includes(+a.riskOccurrence)||![1,2,3,4,5].includes(+a.riskDetectability),'đánh giá nguy cơ','risk');
-      need(+a.protocolVersion>=3&&!!RISK_LABELS[a.riskLevel]&&[a.riskSeverity,a.riskOccurrence,a.riskDetectability].every(v=>[1,2,3,4,5].includes(+v))&&String(a.riskBasis||'').trim().length<5,'căn cứ phân loại nguy cơ theo SOP','risk');
+      need(!RISK_LABELS[a.riskLevel]||!RISK_SCALE.includes(+a.riskSeverity)||!RISK_SCALE.includes(+a.riskOccurrence)||!RISK_SCALE.includes(+a.riskDetectability),'đánh giá nguy cơ','risk');
+      need(+a.protocolVersion>=3&&!!RISK_LABELS[a.riskLevel]&&[a.riskSeverity,a.riskOccurrence,a.riskDetectability].every(v=>RISK_SCALE.includes(+v))&&String(a.riskBasis||'').trim().length<5,'căn cứ phân loại nguy cơ theo SOP','risk');
       need(!!a.date&&!!a.dueDate&&a.dueDate<a.date,'hạn hoàn thành không được trước ngày ghi nhận sự cố','ident');
     }
     /* Chi ho so v1 moi can kiem rieng — v2 da kiem containment trong actionDraftStatus,
@@ -343,6 +347,6 @@
     return actionWorkflowStatus(real[real.length-1]);
   }
 
-  root.ActionWorkflowService={ACTION_LABELS,invalidateActionCaches,nextNceId,nceDueDate,actionApprovalStatus,actionRecordStatus,actionCancelled,actionApprovalLabel,actionRecorded,actionDraftStatus,actionProtocolStatus,actionProtocolSummary,actionRiskScore,actionResidualRiskScore,actionActiveFollowUp,actionEffectivenessStatus,actionOverdue,actionCanApprove,actionPoint,actionEventDate,actionNeedsRerun,actionRerunStatus,actionWorkflowStatus,pointActions,pointRealActions,pointWorkflowComplete,pointWorkflowSummary};
+  root.ActionWorkflowService={ACTION_LABELS,RISK_SCALE,invalidateActionCaches,nextNceId,nceDueDate,actionApprovalStatus,actionRecordStatus,actionCancelled,actionApprovalLabel,actionRecorded,actionDraftStatus,actionProtocolStatus,actionProtocolSummary,actionRiskScore,actionResidualRiskScore,actionActiveFollowUp,actionEffectivenessStatus,actionOverdue,actionCanApprove,actionPoint,actionEventDate,actionNeedsRerun,actionRerunStatus,actionWorkflowStatus,pointActions,pointRealActions,pointWorkflowComplete,pointWorkflowSummary};
   Object.assign(root,root.ActionWorkflowService);
 })(typeof globalThis!=='undefined'?globalThis:this);

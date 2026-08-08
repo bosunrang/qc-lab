@@ -10,7 +10,7 @@ const plain = v => JSON.parse(JSON.stringify(v));
 
 {
   const routeSource = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'entry-routes.js'), 'utf8');
-  const entryActionsSource = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'entry-tests-actions.js'), 'utf8');
+  const entryActionsSource = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'manage-tests-actions.js'), 'utf8');
   const drawSource = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'draw.js'), 'utf8');
   const rangeSource = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'range.js'), 'utf8');
   assert.match(routeSource, /EntryService\.updateDateNoteCommand\(/, 'route phải dùng date-note command');

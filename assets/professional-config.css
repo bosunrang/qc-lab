@@ -24,15 +24,15 @@
 }
 
 .config-form-section b{
-  font-size:12px; text-transform:uppercase; letter-spacing:.05em;
+  font-size:var(--type-meta); text-transform:uppercase; letter-spacing:.05em;
 }
 
 .config-form-section span{
-  color:var(--muted); font-size:11px;
+  color:var(--muted); font-size:var(--type-caption);
 }
 
 .config-shell{
-  display:grid; grid-template-columns:clamp(184px,17vw,230px) minmax(0,1fr); min-height:670px; border:1px solid #cfd9df; border-radius:9px; background:var(--panel); overflow:hidden; box-shadow:0 1px 2px rgba(19,32,42,.05),0 16px 36px rgba(19,32,42,.055);
+  display:grid; grid-template-columns:clamp(184px,17vw,230px) minmax(0,1fr); min-height:670px; border:1px solid var(--line); border-radius:var(--surface-radius); background:var(--panel); overflow:hidden; box-shadow:var(--surface-shadow);
 }
 
 .config-shell-nav{
@@ -40,7 +40,7 @@
 }
 
 .rcfg-title{
-  height:48px; padding:17px 18px 0; color:var(--teal); font-size:10px; font-weight:850; letter-spacing:.13em;
+  height:48px; padding:17px 18px 0; color:var(--teal); font-size:var(--type-overline); font-weight:850; letter-spacing:.13em;
 }
 
 .config-shell-nav button{
@@ -48,11 +48,11 @@
 }
 
 .config-shell-nav button>b{
-  overflow:hidden; font-size:12px; font-weight:760; text-overflow:ellipsis; white-space:nowrap;
+  overflow:hidden; font-size:var(--type-meta); font-weight:760; text-overflow:ellipsis; white-space:nowrap;
 }
 
 .config-shell-nav button>small{
-  min-width:20px; padding:2px 6px; border-radius:var(--radius-pill); background:#dce4e8; color:#4d6270; text-align:center; font-size:10px; font-weight:800;
+  min-width:20px; padding:2px 6px; border-radius:var(--radius-pill); background:#dce4e8; color:#4d6270; text-align:center; font-size:var(--type-overline); font-weight:800;
 }
 
 .config-shell-nav button:hover{
@@ -72,7 +72,7 @@
 }
 
 .rcfg-toolbar h2{
-  margin:0; font-size:17px;
+  margin:0; font-size:var(--type-heading-sm);
 }
 
 .rcfg-tools{
@@ -148,7 +148,7 @@
 }
 
 .lot-group-card{
-  border:1px solid #dbe5ea; border-radius:var(--radius-lg); background:var(--panel); box-shadow:0 1px 2px rgba(19,32,42,.025); overflow:hidden;
+  border:1px solid var(--line); border-radius:var(--surface-radius); background:var(--panel); box-shadow:none; overflow:hidden;
 }
 
 .lot-group-card-h{
@@ -172,15 +172,15 @@
 }
 
 .lot-group-actions .btn{
-  padding:4px 8px; font-size:11px; min-height:24px;
+  padding:4px 8px; font-size:var(--type-caption); min-height:24px;
 }
 
 .rcfg-panel-h{
-  display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:48px; padding:10px 14px; border-bottom:1px solid #dce5e9; background:#f1f5f6;
+  display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:48px; padding:10px 14px; border-bottom:1px solid var(--section-head-border); background:var(--section-head-bg);
 }
 
 .rcfg-panel-h h3{
-  margin:0; color:#35505c; font-size:11px; font-weight:850; letter-spacing:.04em; text-transform:uppercase;
+  margin:0; color:var(--card-head-ink); font-size:var(--section-head-size); font-weight:800; letter-spacing:0; text-transform:none;
 }
 
 .rcfg-list table{
@@ -204,10 +204,10 @@
 }
 
 .tea-source-card>div{display:flex; align-items:center; justify-content:space-between; gap:8px}
-.tea-source-card b{font-size:13px}
-.tea-source-card p{margin:5px 0; color:var(--muted); font-size:12px; line-height:1.4}
-.tea-source-card a{color:var(--tealink); font-size:12px; font-weight:750; text-decoration:none}
-.tea-source-card.retired{border-color:#ead6ad; background:#fffaf1}
+.tea-source-card b{font-size:var(--type-body-sm)}
+.tea-source-card p{margin:5px 0; color:var(--muted); font-size:var(--type-meta); line-height:1.4}
+.tea-source-card a{color:var(--tealink); font-size:var(--type-meta); font-weight:750; text-decoration:none}
+.tea-source-card.retired{border-color:var(--warning-border); background:var(--warning-bg); color:var(--warning-ink)}
 .tea-ref-status{display:flex; align-items:center; justify-content:center; gap:6px; min-width:0; white-space:nowrap}
 .tea-ref-status .btn{min-height:28px; padding:5px 9px}
 @media(max-width:900px){
@@ -253,7 +253,7 @@
   border-color:var(--teal); outline:none;
 }
 .tea-lab-cell{display:flex; align-items:center; justify-content:center; gap:7px; min-width:0; white-space:nowrap}
-.tea-lab-cell>b{font-size:13px; color:var(--ink)}
+.tea-lab-cell>b{font-size:var(--type-body-sm); color:var(--ink)}
 .tea-lab-cell .btn{min-height:26px; padding:3px 8px}
 .tea-lab-profile-modal{width:min(660px,calc(100vw - 24px))}
 .tea-lab-profile-modal textarea{width:100%; resize:vertical}
@@ -319,7 +319,7 @@
 }
 
 .lot-trans-target-head-row input.lot-trans-target-search{
-  flex:0 0 220px; width:220px; max-width:45%; height:32px; margin-left:auto; padding:0 10px; border:1px solid var(--line); border-radius:var(--surface-radius); font-size:12.5px; background:var(--panel);
+  flex:0 0 220px; width:220px; max-width:45%; height:32px; margin-left:auto; padding:0 10px; border:1px solid var(--line); border-radius:var(--surface-radius); font-size:var(--type-meta); background:var(--panel);
 }
 
 .lot-trans-target-table .target-head,.lot-trans-target-table .target-row{
@@ -412,15 +412,15 @@
 }
 
 .target-lot-info{
-  display:inline-flex; align-items:center; gap:6px; min-height:36px; padding:0 10px; border:1px solid #d5e1e7; border-radius:var(--surface-radius); background:var(--panel); color:#5d7180; font-size:11px; font-weight:750;
+  display:inline-flex; align-items:center; gap:6px; min-height:36px; padding:0 10px; border:1px solid #d5e1e7; border-radius:var(--surface-radius); background:var(--panel); color:#5d7180; font-size:var(--type-caption); font-weight:750;
 }
 
 .target-lot-info b{
-  color:var(--tealink); font-size:14px;
+  color:var(--tealink); font-size:var(--type-subhead);
 }
 
 .target-lot-info span{
-  font-size:11px;
+  font-size:var(--type-caption);
 }
 
 .target-summary{
@@ -428,19 +428,19 @@
 }
 
 .target-summary span{
-  display:flex; align-items:center; gap:5px; padding:6px 9px; border-radius:var(--radius-pill); background:var(--surface-neutral); font-weight:750;
+  display:flex; align-items:center; gap:5px; padding:6px 9px; border:1px solid var(--neutral-border); border-radius:var(--radius-pill); background:var(--neutral-bg); color:var(--neutral-ink); font-weight:750;
 }
 
 .target-summary b{
-  font-size:13px;
+  font-size:var(--type-body-sm);
 }
 
 .target-summary .ok{
-  background:#e2f2ef; color:var(--tealink);
+  background:var(--success-bg); color:var(--success-ink); border-color:var(--success-border);
 }
 
 .target-summary .warn{
-  background:#fff0d7; color:#a96b0b;
+  background:var(--warning-bg); color:var(--warning-ink); border:1px solid var(--warning-border);
 }
 
 .target-matrix-panel{
@@ -472,15 +472,15 @@
 }
 
 .target-row-locked{
-  background:#fbf6f5;
+  background:var(--danger-bg);
 }
 
 .target-row-locked:hover{
-  background:#faf1f0;
+  background:var(--danger-bg);
 }
 
 .target-row-locked .lot-assay-name b{
-  color:#8a5a52;
+  color:var(--danger-ink);
 }
 
 .target-head>*,.target-row>*{
@@ -541,7 +541,7 @@
 }
 
 .lot-level-title{
-  padding:3px 2px; color:#48646e; font-size:10px; font-weight:850; text-transform:none; letter-spacing:0;
+  padding:3px 2px; color:#48646e; font-size:var(--type-overline); font-weight:850; text-transform:none; letter-spacing:0;
 }
 
 .lot-level-col label{
@@ -573,7 +573,7 @@
 }
 
 .lot-level-col label.lot-opt-depleted small{
-  color:#c0392b;
+  color:var(--danger-ink);
 }
 
 .lot-level-col label.lot-opt-depleted input{
@@ -589,7 +589,7 @@
 }
 
 .assay-rule-row b{
-  font-size:11px;
+  font-size:var(--type-caption);
 }
 
 .assay-rule-row select{
@@ -654,7 +654,7 @@ aside,
 }
 
 .rcfg-toolbar p{
-  margin:3px 0 0; color:var(--muted); font-size:13px; font-weight:500;
+  margin:3px 0 0; color:var(--muted); font-size:var(--type-body-sm); font-weight:500;
 }
 
 .rcfg-toolbar > div:first-child{
@@ -794,19 +794,19 @@ aside,
 }
 
 .target-level-toolbar{
-  display:flex; align-items:center; justify-content:space-between; gap:12px; margin:10px 14px 0; padding:10px 12px; border:1px solid #d7e1e6; border-radius:var(--radius-md) 8px 0 0; background:#f7fafb;
+  display:flex; align-items:center; justify-content:space-between; gap:12px; margin:10px 14px 0; padding:10px 12px; border:1px solid #d7e1e6; border-radius:var(--radius-md) var(--radius-md) 0 0; background:#f7fafb;
 }
 
 .target-level-toolbar > div:first-child{
-  display:flex; align-items:center; gap:8px; min-width:0; color:#294653; font-size:12px;
+  display:flex; align-items:center; gap:8px; min-width:0; color:#294653; font-size:var(--type-meta);
 }
 
 .target-level-toolbar > div:first-child b{
-  font-size:14px;
+  font-size:var(--type-subhead);
 }
 
 .target-level-toolbar > div:first-child .target-level-lot{
-  overflow:hidden; color:var(--teal); font-size:14px; font-weight:700; text-overflow:ellipsis; white-space:nowrap;
+  overflow:hidden; color:var(--teal); font-size:var(--type-subhead); font-weight:700; text-overflow:ellipsis; white-space:nowrap;
 }
 
 .target-level-toolbar .dayseg{
@@ -814,15 +814,15 @@ aside,
 }
 
 .target-row input[type=number]{
-  width:116px; max-width:100%; justify-self:center; text-align:center; font-size:13px;
+  width:116px; max-width:100%; justify-self:center; text-align:center; font-size:var(--type-body-sm);
 }
 
 .target-row, .target-row .lot-assay-name b{
-  font-size:13px;
+  font-size:var(--type-body-sm);
 }
 
 .target-row .lot-assay-name small{
-  font-size:11px;
+  font-size:var(--type-caption);
 }
 
 .config-shell-main > .rcfg-list, .config-shell-main > .target-matrix-panel{
@@ -852,7 +852,7 @@ aside,
 }
 
 .lot-group-card-h b, .lot-assay-name b, .group-lot-picker b, .lot-level-col b{
-  color:var(--ink); font-size:12.5px; font-weight:800;
+  color:var(--ink); font-size:var(--type-meta); font-weight:800;
 }
 
 .target-matrix-panel{
@@ -860,15 +860,15 @@ aside,
 }
 
 .target-matrix-panel .target-lot-info{
-  min-height:40px; padding:0 14px; border:1px solid #dbe5ea; border-radius:var(--radius-md); background:var(--surface-subtle); color:var(--muted); display:flex; align-items:center; gap:8px; font-size:var(--type-micro);
+  min-height:40px; padding:0 14px; border:1px solid #dbe5ea; border-radius:var(--radius-md); background:var(--surface-subtle); color:var(--muted); display:flex; align-items:center; gap:8px; font-size:var(--type-caption);
 }
 
 .target-matrix-panel .target-lot-info b{
-  font-size:14px; color:var(--teal);
+  font-size:var(--type-subhead); color:var(--teal);
 }
 
 .target-matrix-panel .target-lot-info span{
-  color:#6e828e; font-size:12.5px;
+  color:#6e828e; font-size:var(--type-meta);
 }
 
 .lot-group-card-h small,
@@ -876,7 +876,7 @@ aside,
 .group-lot-picker small,
 .lot-level-col small,
 .target-summary span{
-  color:var(--muted); font-size:var(--type-micro);
+  color:var(--muted); font-size:var(--type-caption);
 }
 
 .target-head,
@@ -938,7 +938,7 @@ aside,
 }
 
 .config-shell-nav{
-  background:#eef2f4;
+  background:var(--panel2);
 }
 
 .lot-config-left, .lot-config-right{
@@ -950,11 +950,11 @@ aside,
 }
 
 .config-shell-main > .rcfg-list > .empty:first-child, .config-shell-main .lot-config-grid .rcfg-list > .empty:first-child, .config-shell-main .lot-config-grid .rcfg-list > .rcfg-panel-h + .empty, .config-shell-main > .panel > .empty:first-child, .config-shell-main > .panel > .rcfg-panel-h + .empty, .config-shell-main .target-matrix-panel .rcfg-list > .empty:first-child, .config-shell-main .target-matrix-panel > .empty{
-  box-sizing:border-box; width:calc(100% - 32px); min-height:118px; margin:16px; padding:24px 20px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; border:1px dashed #cbdce4; border-radius:var(--radius-md); background:var(--surface-card-soft); color:#506575; line-height:1.45;
+  box-sizing:border-box; width:calc(100% - 32px); min-height:118px; margin:16px; padding:24px 20px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; border:1px solid #cbdce4; border-radius:var(--radius-md); background:var(--surface-card-soft); color:#506575; line-height:1.45;
 }
 
 .config-shell-main .empty .empty-title{
-  margin-bottom:2px; color:#102d3d; font-size:13px; font-weight:800;
+  margin-bottom:2px; color:#102d3d; font-size:var(--type-body-sm); font-weight:800;
 }
 
 @media(max-width:640px){

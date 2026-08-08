@@ -240,7 +240,7 @@ const sigmaSrc = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules',
 const reportsSrc = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'reports.js'), 'utf8');
 const coreSrc = fs.readFileSync(path.join(__dirname, '..', 'assets', 'core.js'), 'utf8');
 
-assert.match(sigmaSrc, /<details class="panel sg-collapse-panel sg-mu-panel"><summary class="sg-collapse-summary"><span>Độ không đảm bảo đo \(MU\)<\/span><div id="sgMUAction" class="sg-data-head-actions"[^>]*><\/div><\/summary><div id="sgMU">/, 'trang Sigma phải có panel MU riêng (thu gọn được), nút nhập CoA nằm trong header');
+assert.match(sigmaSrc, /<details class="panel sg-collapse-panel sg-mu-panel"><summary class="sg-collapse-summary"><span role="heading" aria-level="2">Độ không đảm bảo đo \(MU\)<\/span><\/summary><div id="sgMUAction" class="sg-data-head-actions"><\/div><div id="sgMU">/, 'panel MU phải thu gọn được, giữ heading cấp 2 và đặt nút CoA cạnh summary thay vì lồng control focus');
 assert.match(sigmaSrc, /muBox\.innerHTML=sgMuHTML\(t,selectedRow,levels\)/, 'panel MU phải bám theo ĐÚNG kỳ đang chọn như bảng OPSpecs, không phải kỳ mới nhất');
 assert.match(sigmaSrc, /function sgMuApply\(\)[\s\S]{0,80}requireWrite\(\)/, 'ghi ngân sách MU phải qua cổng quyền ghi');
 assert.match(sigmaSrc, /logAct\('Cập nhật ngân sách MU'/, 'sửa ngân sách MU phải để lại vết trong nhật ký');

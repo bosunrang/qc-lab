@@ -65,7 +65,7 @@
 }
 
 .user-perm-grid label{
-  display:flex; align-items:center; gap:8px; min-height:38px; margin:0; padding:8px 10px; border:1px solid #d8e5ea; border-radius:var(--radius-md); background:var(--surface-card-soft); color:#183542; font-size:12.5px; font-weight:750; cursor:pointer; box-shadow:none;
+  display:flex; align-items:center; gap:8px; min-height:38px; margin:0; padding:8px 10px; border:1px solid #d8e5ea; border-radius:var(--radius-md); background:var(--surface-card-soft); color:#183542; font-size:var(--type-meta); font-weight:750; cursor:pointer; box-shadow:none;
 }
 
 .user-perm-grid label.disabled{

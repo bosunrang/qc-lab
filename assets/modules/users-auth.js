@@ -7,14 +7,14 @@ function pageUsers(){
     <td><div class="user-row-actions">${u.id===currentUser.id?'<span class="hint">(bạn)</span> '+btn('Đổi mật khẩu',"resetPass('"+u.id+"')",'ghost sm')
       :btn('Sửa quyền',"openUserPerms('"+u.id+"')",'ghost sm')+' '+btn('Đặt lại MK',"resetPass('"+u.id+"')",'ghost sm')+' '+btn(u.active===false?'Mở khóa':'Khóa',"toggleUser('"+u.id+"')",'ghost sm')+' '+btn('Xóa',"delUser('"+u.id+"')",'danger sm')}</div></td></tr>`).join('');
   return headOnly('Quản lý người dùng','Phân quyền thao tác và kiểm soát tài khoản')+
-   `<div class="panel"><h3 role="heading" aria-level="2">Thêm người dùng</h3><div class="user-create-layout">
+   `<div class="panel"><h2 class="panel-title">Thêm người dùng</h2><div class="user-create-layout">
      <div class="user-create-card">
        <div class="user-create-card-title">Thông tin tài khoản</div>
        <div class="user-create-fields">
        <div><label>Tên đăng nhập</label><input id="uUser" placeholder="vd: lan.nt"></div>
        <div><label>Họ tên</label><input id="uName" aria-label="Họ tên"></div>
        <div><label>Mã viết tắt</label><input id="uInitials" maxlength="12" placeholder="NTL"></div>
-       <div><label>Vai trò</label><select id="uRole" aria-label="Vai trò" onchange="syncUserPermChecks('newUserPerms',this.value)"><option value="admin">Quản trị</option><option value="technician" selected>KTV</option><option value="viewer">Chỉ xem</option></select></div>
+       <div><label>Vai trò</label><select id="uRole" aria-label="Vai trò" onchange="syncUserPermChecks('newUserPerms',this.value)">${roleSelectOptions('technician')}</select></div>
        <div><label>Mật khẩu tạm</label><input id="uPass" aria-label="Mật khẩu tạm" type="password" autocomplete="new-password"></div>
        <div class="user-create-actions">${btn('Thêm','addUser()','teal')}</div>
        </div>
@@ -22,7 +22,7 @@ function pageUsers(){
      <div class="user-create-card"><div class="user-create-card-title">Thẻ được phép dùng</div><div class="user-perm-block">${userPermChecks(rolePageIds('technician'),'newUserPerms','technician')}</div></div>
      </div>
      <div class="hint user-create-hint"><b>Vai trò</b> quyết định quyền sửa/quản trị trong các thẻ được tick. <b>KTV:</b> nhập/sửa dữ liệu vận hành · <b>Chỉ xem:</b> chỉ đọc. Người dùng mới sẽ phải đổi mật khẩu khi đăng nhập lần đầu.</div></div>
-   <div class="panel"><h3 role="heading" aria-level="2">Danh sách người dùng</h3>
+   <div class="panel"><h2 class="panel-title">Danh sách người dùng</h2>
      <div class="user-table-wrap"><table class="user-table"><thead><tr><th>Người dùng</th><th>Vai trò</th><th>Trạng thái</th><th>Hành động</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
 }
 let auditQ='',auditFrom='',auditTo='',auditPage=1,auditPageSize=25;
@@ -76,13 +76,13 @@ function pageAudit(){
   const resultFrom=filtered.length?offset+1:0,resultTo=Math.min(offset+auditPageSize,filtered.length);
   const pagination=filtered.length?`<div class="audit-pagination"><span class="hint">Hiển thị ${resultFrom}–${resultTo} / ${filtered.length} dòng</span><div>${btn('‹ Trước',`auditSetPage(${auditPage-1})`,'ghost sm','',{disabled:auditPage<=1})}<b>Trang ${auditPage}/${pageCount}</b>${btn('Sau ›',`auditSetPage(${auditPage+1})`,'ghost sm','',{disabled:auditPage>=pageCount})}</div></div>`:'';
   return headOnly('Nhật ký hoạt động','Lưu vết các thao tác quan trọng; chỉ quản trị viên được xem')+
-    `<div class="panel"><h3 role="heading" aria-level="2">Công cụ</h3><div class="row-flex">
+    `<div class="panel"><h2 class="panel-title">Công cụ</h2><div class="row-flex">
       ${btn('Xuất CSV nhật ký','exportActivityCSV()','teal sm')}
       ${total?btn('Lưu trữ nhật ký cũ','archiveActivityLog()','ghost sm'):''}
       ${total?btn('Xóa nhật ký','clearActivityLog()','danger sm'):''}
       <div class="hint" style="align-self:center">${total} dòng hoạt động đã ghi nhận. ${chainHtml}${oversizeWarn}</div>
     </div></div>
-    <div class="panel audit-log-panel"><div class="audit-log-head"><h3 role="heading" aria-level="2">Hoạt động gần đây</h3><input id="auditSearch" type="search" aria-label="Tìm nhật ký hoạt động" placeholder="Tìm người dùng, hành động, đối tượng..." value="${escAttr(auditQ)}" oninput="auditSetQuery(this.value)"></div>
+    <div class="panel audit-log-panel"><div class="audit-log-head"><h2 class="panel-title">Hoạt động gần đây</h2><input id="auditSearch" type="search" aria-label="Tìm nhật ký hoạt động" placeholder="Tìm người dùng, hành động, đối tượng..." value="${escAttr(auditQ)}" oninput="auditSetQuery(this.value)"></div>
       <div class="audit-filterbar"><div><label>Từ ngày</label>${dateBox('auditFromDate',auditFrom,'audit-date',`aria-label="Lọc nhật ký từ ngày" onchange="auditSetDate('from',this.value)"`)}</div><div><label>Đến ngày</label>${dateBox('auditToDate',auditTo,'audit-date',`aria-label="Lọc nhật ký đến ngày" onchange="auditSetDate('to',this.value)"`)}</div><div><label>Số dòng mỗi trang</label><select aria-label="Số dòng nhật ký mỗi trang" onchange="auditSetPageSize(this.value)">${pageSizeOptions}</select></div>${hasFilter?btn('Xóa bộ lọc','auditClearFilters()','ghost sm audit-clear-filter'):''}<div class="audit-filter-summary" role="status">${filtered.length}/${total} dòng</div></div>
       ${rows?`<div class="audit-table-wrap"><table class="audit-table"><thead><tr><th>Thời gian</th><th>Người dùng</th><th>Hành động</th><th>Đối tượng</th><th>Chi tiết</th></tr></thead><tbody>${rows}</tbody></table></div>`:emptyState(total?'Không tìm thấy nhật ký':'Chưa có hoạt động',total?'Thử từ khóa hoặc khoảng ngày khác.':'Nhật ký sẽ bắt đầu ghi từ các thao tác tiếp theo.')}
       ${pagination}</div>`;
@@ -174,7 +174,7 @@ async function openUserPerms(id){
   if(!requireAdmin())return;
   const u=state.users.find(x=>x.id===id);if(!u)return;
   if(currentUser&&currentUser.id===id){await infoDialog('Không thể tự sửa quyền của tài khoản đang đăng nhập. Hãy dùng tài khoản quản trị khác nếu cần thay đổi.');return;}
-  const roleSelect=`<select id="editUserRole" aria-label="Vai trò" onchange="syncUserPermChecks('editUserPerms',this.value)"><option value="admin" ${u.role==='admin'?'selected':''}>Quản trị</option><option value="technician" ${u.role==='technician'?'selected':''}>KTV</option><option value="viewer" ${u.role==='viewer'?'selected':''}>Chỉ xem</option></select>`;
+  const roleSelect=`<select id="editUserRole" aria-label="Vai trò" onchange="syncUserPermChecks('editUserPerms',this.value)">${roleSelectOptions(u.role)}</select>`;
   openModal(`<div class="modal"><div class="modal-h"><h3>Sửa quyền người dùng</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
     <div class="modal-b">
       <div class="hint"><b>${esc(u.name||u.username)}</b> · @${esc(u.username)}</div>
@@ -288,10 +288,11 @@ async function resetStartupData(){
   state=blankAppState([]);
   ensureShape();await ensureAdmin();showLogin();
 }
+function authBrandMark(){const logo=brandLogo();return `<div class="brand-mark">${logo?`<img src="${escAttr(logo)}" alt="">`:esc(brandMarkText())}</div>`;}
 function showStartupRecovery(){
   let ov=document.getElementById('authOverlay');if(!ov){ov=document.createElement('div');ov.id='authOverlay';document.body.appendChild(ov);}
   ov.style.display='flex';
-  ov.innerHTML=`<div class="auth-card"><div class="auth-brand">Cần phục hồi dữ liệu</div>
+  ov.innerHTML=`<div class="auth-card"><div class="auth-head">${authBrandMark()}<div class="auth-brand">Cần phục hồi dữ liệu</div></div>
     <div class="auth-sub">QC Lab phát hiện dữ liệu cục bộ không hợp lệ và đã dừng để tránh ghi đè.</div>
     <div class="auth-err">${esc(startupProblem&&startupProblem.message||'Không đọc được dữ liệu.')}</div>
     ${btn('Tải dữ liệu gốc xuống','downloadStartupData()','teal','',{attrs:{style:'width:100%;margin-top:16px'}})}
@@ -308,7 +309,7 @@ function showLogin(msg){
   const defaultHint=admin&&admin.mustChangePassword?'Tài khoản mặc định: <b>admin</b> / <b>admin</b><br>Hệ thống sẽ yêu cầu đổi mật khẩu ở lần đăng nhập đầu tiên.<br>':'';
   const trial=window.qcLicense&&window.qcLicense.trial;
   const trialLine=trial&&trial.active?`<div class="auth-hint" style="color:${trial.daysLeft<=7?'#c77a1f':'#0b747d'}">Bản dùng thử: còn ${trial.daysLeft}/${trial.totalDays} ngày</div>`:'';
-  ov.innerHTML=`<div class="auth-card"><div class="auth-brand">QC Lab</div><div class="auth-sub">Quản lý nội kiểm chất lượng xét nghiệm</div>
+  ov.innerHTML=`<div class="auth-card"><div class="auth-head">${authBrandMark()}<div class="auth-head-text"><div class="auth-brand">${esc(brandTitle())}</div><div class="auth-sub">${esc(brandSub())}</div></div></div>
     <label>Tên đăng nhập</label><input id="liUser" autocomplete="username" autofocus>
     <label>Mật khẩu</label><input id="liPass" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
     ${msg?`<div class="auth-err">${esc(msg)}</div>`:''}
@@ -356,7 +357,7 @@ async function doLogin(){
 }
 function showPasswordChange(msg){
   let ov=document.getElementById('authOverlay');if(!ov){ov=document.createElement('div');ov.id='authOverlay';document.body.appendChild(ov);}ov.style.display='flex';
-  ov.innerHTML=`<div class="auth-card"><div class="auth-brand">Đổi mật khẩu</div><div class="auth-sub">Cần cập nhật mật khẩu trước khi vào hệ thống</div>
+  ov.innerHTML=`<div class="auth-card"><div class="auth-head">${authBrandMark()}<div class="auth-brand">Đổi mật khẩu</div></div><div class="auth-sub">Cần cập nhật mật khẩu trước khi vào hệ thống</div>
     <label>Mật khẩu mới</label><input id="newPass1" type="password" autocomplete="new-password">
     <label>Nhập lại mật khẩu mới</label><input id="newPass2" type="password" autocomplete="new-password" onkeydown="if(event.key==='Enter')changeRequiredPassword()">
     ${msg?`<div class="auth-err">${esc(msg)}</div>`:''}
