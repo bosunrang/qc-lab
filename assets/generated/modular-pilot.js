@@ -577,7 +577,7 @@
 	}
 	//#endregion
 	//#region src/application/manage/manage-config-service.ts
-	function createManageConfigService({ cleanText, cleanId }) {
+	function createManageConfigService({ cleanText, cleanId, targetFromLimits, limitsFromTarget }) {
 		function textKey(value) {
 			return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLowerCase().trim();
 		}
@@ -674,6 +674,382 @@
 			state.machines = [...new Set(state.instruments.map((item) => item.name))];
 			return { record: checked.record };
 		}
+		function preparePanel(input = {}) {
+			return {
+				name: clean(input.name),
+				instrumentId: clean(input.instrumentId),
+				testIds: Array.isArray(input.testIds) ? [...new Set(input.testIds)] : [],
+				note: cleanText(input.note, 5e3),
+				active: input.active !== false
+			};
+		}
+		function validatePanel(state, { id = "", data = {} } = {}) {
+			const panels = state.qcPanels || [], cleaned = preparePanel(data);
+			if (id && !panels.some((panel) => panel.id === id)) return {
+				error: "not-found",
+				message: "Không tìm thấy Panel QC cần cập nhật."
+			};
+			if (!cleaned.name) return {
+				error: "missing-name",
+				message: "Nhập tên Panel QC."
+			};
+			if (!cleaned.instrumentId) return {
+				error: "missing-instrument",
+				message: "Chọn máy xét nghiệm."
+			};
+			if (!cleaned.testIds.length) return {
+				error: "missing-tests",
+				message: "Chọn ít nhất một xét nghiệm."
+			};
+			if (cleaned.testIds.some((testId) => (state.tests || []).find((test) => test.id === testId)?.instrumentId !== cleaned.instrumentId)) return {
+				error: "wrong-instrument",
+				message: "Panel QC chỉ được chứa xét nghiệm thuộc máy đã chọn."
+			};
+			if (panels.some((panel) => panel.id !== id && panel.instrumentId === cleaned.instrumentId && sameText(panel.name, cleaned.name))) return {
+				error: "duplicate-panel",
+				message: "Panel QC này đã tồn tại trên máy đã chọn."
+			};
+			return { data: cleaned };
+		}
+		function savePanel(state, { id = "", newId = "", data = {} } = {}) {
+			const checked = validatePanel(state, {
+				id,
+				data
+			});
+			if (checked.error) return checked;
+			const existing = (state.qcPanels || []).find((panel) => panel.id === id) || null;
+			const record = existing || { id: cleanId(newId) };
+			if (!existing && !record.id) return {
+				error: "missing-id",
+				message: "Không thể tạo mã Panel QC."
+			};
+			Object.assign(record, checked.data);
+			if (!existing) {
+				state.qcPanels = state.qcPanels || [];
+				state.qcPanels.push(record);
+			}
+			return {
+				record,
+				created: !existing
+			};
+		}
+		function panelRemoval(state, { id = "" } = {}) {
+			const record = (state.qcPanels || []).find((panel) => panel.id === id);
+			if (!record) return { error: "not-found" };
+			if ((state.lotTransitions || []).some((transition) => transition.panelId === id)) return {
+				error: "used-by-transition",
+				message: "Panel này đang có lịch sử chuyển tiếp lô. Hãy xóa/chuyển các dòng chuyển tiếp trước."
+			};
+			return { record };
+		}
+		function removePanel(state, { id = "" } = {}) {
+			const checked = panelRemoval(state, { id });
+			if (checked.error) return checked;
+			state.qcPanels = (state.qcPanels || []).filter((panel) => panel.id !== id);
+			return { record: checked.record };
+		}
+		function sameIdSet(first, second) {
+			const left = [...new Set(Array.isArray(first) ? first : [])].sort(), right = [...new Set(Array.isArray(second) ? second : [])].sort();
+			return left.length === right.length && left.every((id, index) => id === right[index]);
+		}
+		function prepareLotGroup(state, input = {}) {
+			const lotIds = [...new Set(Array.isArray(input.lotIds) ? input.lotIds : [])];
+			const fallbackName = lotIds.map((id) => (state.qcLots || []).find((lot) => lot.id === id)?.lotNo).filter(Boolean).join("/");
+			return {
+				name: clean(input.name) || fallbackName,
+				lotIds,
+				note: cleanText(input.note, 5e3),
+				active: true
+			};
+		}
+		function validateLotGroup(state, { id = "", data = {} } = {}) {
+			const groups = state.lotGroups || [], cleaned = prepareLotGroup(state, data);
+			if (id && !groups.some((group) => group.id === id)) return {
+				error: "not-found",
+				message: "Không tìm thấy nhóm lô cần cập nhật."
+			};
+			if (cleaned.lotIds.length < 2) return {
+				error: "too-few-lots",
+				message: "Một nhóm lô cần chọn ít nhất 2 lô QC."
+			};
+			if (!cleaned.name) return {
+				error: "missing-name",
+				message: "Nhập tên nhóm lô."
+			};
+			if (groups.some((group) => group.id !== id && (sameText(group.name, cleaned.name) || sameIdSet(group.lotIds, cleaned.lotIds)))) return {
+				error: "duplicate-group",
+				message: "Nhóm lô này đã tồn tại hoặc trùng danh sách lô."
+			};
+			return { data: cleaned };
+		}
+		function saveLotGroup(state, { id = "", newId = "", data = {} } = {}) {
+			const checked = validateLotGroup(state, {
+				id,
+				data
+			});
+			if (checked.error) return checked;
+			const existing = (state.lotGroups || []).find((group) => group.id === id) || null;
+			const record = existing || { id: cleanId(newId) };
+			if (!existing && !record.id) return {
+				error: "missing-id",
+				message: "Không thể tạo mã nhóm lô."
+			};
+			Object.assign(record, checked.data);
+			if (!existing) {
+				state.lotGroups = state.lotGroups || [];
+				state.lotGroups.push(record);
+			}
+			return {
+				record,
+				created: !existing
+			};
+		}
+		function lotGroupRemoval(state, { id = "" } = {}) {
+			const record = (state.lotGroups || []).find((group) => group.id === id);
+			if (!record) return { error: "not-found" };
+			if ((state.tests || []).some((test) => (test.levels || []).some((level) => level.qcLotId && (record.lotIds || []).includes(level.qcLotId)))) return {
+				error: "used-by-assay",
+				message: "Nhóm lô này đang được gán Mean/SD cho xét nghiệm. Hãy đổi nhóm/lô ở thẻ Mean/SD trước khi xóa nhóm."
+			};
+			return { record };
+		}
+		function removeLotGroup(state, { id = "" } = {}) {
+			const checked = lotGroupRemoval(state, { id });
+			if (checked.error) return checked;
+			state.lotGroups = (state.lotGroups || []).filter((group) => group.id !== id);
+			return { record: checked.record };
+		}
+		function stopLotGroup(state, { id = "", stoppedAt = "" } = {}) {
+			const record = (state.lotGroups || []).find((group) => group.id === id);
+			if (!record) return { error: "not-found" };
+			if (record.active === false || record.status === "stopped" || record.status === "planned") return {
+				error: "not-stoppable",
+				record
+			};
+			record.status = "stopped";
+			record.stoppedAt = stoppedAt;
+			return { record };
+		}
+		function validateLotTransition(state, options = {}) {
+			const { id = "", panelId = "", fromLotId = "", toLotId = "", status = "", switchesLot = () => false } = options;
+			const old = (state.lotTransitions || []).find((transition) => transition.id === id) || null;
+			if (!panelId) return {
+				error: "missing-panel",
+				message: "Chọn Panel QC."
+			};
+			if (!fromLotId || !toLotId || fromLotId === toLotId) return {
+				error: "invalid-lots",
+				message: "Chọn lô cũ và lô mới khác nhau từ danh sách."
+			};
+			const fromLot = (state.qcLots || []).find((lot) => lot.id === fromLotId), toLot = (state.qcLots || []).find((lot) => lot.id === toLotId);
+			if (!fromLot || !toLot) return {
+				error: "missing-lot",
+				message: "Không tìm thấy lô QC đã chọn."
+			};
+			if (+fromLot.level !== +toLot.level) return {
+				error: "different-levels",
+				message: "Lô cũ và lô mới phải cùng mức QC để chuyển tiếp."
+			};
+			if ((state.lotTransitions || []).some((transition) => transition.id !== id && transition.panelId === panelId && transition.fromLotId === fromLotId && transition.toLotId === toLotId)) return {
+				error: "duplicate-transition",
+				message: "Chuyển tiếp lô này đã tồn tại."
+			};
+			if (old && switchesLot(old) && status !== "accepted") return {
+				error: "accepted-immutable",
+				message: "Hồ sơ đã chấp nhận lô mới và đã áp dụng vào nhóm lô/Mean-SD, không thể đổi ngược trạng thái."
+			};
+			return {
+				old,
+				fromLot,
+				toLot,
+				finalChanged: ["accepted", "rejected"].includes(status) && (!old || old.status !== status)
+			};
+		}
+		function saveLotTransition(state, { id = "", newId = "", data = {} } = {}) {
+			const existing = (state.lotTransitions || []).find((transition) => transition.id === id) || null;
+			const record = existing || { id: cleanId(newId) };
+			if (!existing && !record.id) return {
+				error: "missing-id",
+				message: "Không thể tạo mã hồ sơ chuyển tiếp lô."
+			};
+			Object.assign(record, data);
+			if (!existing) {
+				state.lotTransitions = state.lotTransitions || [];
+				state.lotTransitions.push(record);
+			}
+			return {
+				record,
+				created: !existing
+			};
+		}
+		function prepareLotTransitionData(options = {}) {
+			const { old = null, panelId = "", fromLotId = "", toLotId = "", startDate = "", status = "", finalChanged = false, today = "", approvedBy = "", approvedAt = "" } = options;
+			return {
+				panelId,
+				fromLotId,
+				toLotId,
+				startDate: startDate || today,
+				status,
+				criteria: old?.criteria || "",
+				conclusion: old?.conclusion || "",
+				approvedBy: finalChanged ? approvedBy : old?.approvedBy || "",
+				approvedAt: finalChanged ? approvedAt : old?.approvedAt || "",
+				note: old?.note || ""
+			};
+		}
+		function inspectAcceptedLotTransition(state, transition = {}) {
+			const from = (state.qcLots || []).find((lot) => lot.id === transition.fromLotId);
+			const to = (state.qcLots || []).find((lot) => lot.id === transition.toLotId);
+			const panel = (state.qcPanels || []).find((item) => item.id === transition.panelId);
+			if (!transition.fromLotId || !transition.toLotId || transition.status !== "accepted" || !from || !to || !panel || +from.level !== +to.level) return {
+				from,
+				to,
+				panel,
+				rows: [],
+				missing: [],
+				valid: false
+			};
+			const rows = (panel.testIds || []).map((id) => (state.tests || []).find((test) => test.id === id)).filter(Boolean).map((test) => ({
+				test,
+				config: (test.levels || []).find((level) => level.qcLotId === from.id)
+			})).filter((row) => row.config).map((row) => ({
+				...row,
+				nextHistory: (row.config.meanSdHistory || []).slice().reverse().find((entry) => (entry.qcLotId === to.id || !entry.qcLotId && (entry.lot || "") === to.lotNo) && Number.isFinite(+entry.mean) && Number.isFinite(+entry.sd) && +entry.sd > 0)
+			}));
+			return {
+				from,
+				to,
+				panel,
+				rows,
+				missing: rows.filter((row) => !row.nextHistory),
+				valid: true
+			};
+		}
+		function transitionSwitchesLot(transition = {}) {
+			return !!(transition.fromLotId && transition.toLotId && transition.status === "accepted");
+		}
+		function syncLotDepletion(state) {
+			const retired = new Set((state.lotTransitions || []).filter(transitionSwitchesLot).map((transition) => transition.fromLotId));
+			(state.qcLots || []).forEach((lot) => {
+				lot.depleted = retired.has(lot.id);
+			});
+			return retired;
+		}
+		function normalizeLotGroups(state, onMergeGroup = () => {}) {
+			const seen = /* @__PURE__ */ new Map(), drop = /* @__PURE__ */ new Set();
+			state.lotGroups = state.lotGroups || [];
+			state.lotGroups.forEach((group) => {
+				group.lotIds = [...new Set(group.lotIds || [])].filter((id) => (state.qcLots || []).some((lot) => lot.id === id));
+				if (!group.lotIds.length) return;
+				const name = group.lotIds.map((id) => (state.qcLots || []).find((lot) => lot.id === id)?.lotNo).filter(Boolean).join("/");
+				if (name && group.active !== false && !group.name) group.name = name;
+				const key = (group.active === false ? "stopped" : "active") + "|" + [...group.lotIds].sort().join("|");
+				const keptGroupId = seen.get(key);
+				if (keptGroupId) {
+					onMergeGroup(group, keptGroupId);
+					drop.add(group.id);
+				} else seen.set(key, group.id);
+			});
+			if (drop.size) state.lotGroups = state.lotGroups.filter((group) => !drop.has(group.id));
+			return drop;
+		}
+		function applyAcceptedLotTransition(options) {
+			const { state, transition, uid, today, normalizeLotGroups, upsertHistory, onMergeGroup = () => {} } = options;
+			const check = inspectAcceptedLotTransition(state, transition), { rows, missing } = check;
+			const from = check.from, to = check.to;
+			if (!check.valid || !from || !to || !rows.length || missing.length) return 0;
+			state.lotGroups = state.lotGroups || [];
+			const groupKey = (ids) => [...new Set(ids || [])].filter((id) => (state.qcLots || []).some((lot) => lot.id === id)).sort().join("|");
+			const groupName = (ids) => (ids || []).map((id) => (state.qcLots || []).find((lot) => lot.id === id)?.lotNo).filter(Boolean).join("/");
+			const removeGroups = /* @__PURE__ */ new Set();
+			state.lotGroups.forEach((group) => {
+				if (group.active === false || !(group.lotIds || []).includes(from.id)) return;
+				const oldIds = [...new Set(group.lotIds || [])], nextIds = [...new Set((group.lotIds || []).map((id) => id === from.id ? to.id : id))];
+				const oldKey = groupKey(oldIds), autoNamed = !group.name || group.name === groupName(oldIds);
+				if (!(state.lotGroups.find((item) => item.id !== group.id && item.active === false && item.stoppedByTransitionId === transition.id) || state.lotGroups.find((item) => item.active === false && groupKey(item.lotIds) === oldKey))) state.lotGroups.push({
+					id: uid(),
+					name: group.name || groupName(oldIds),
+					lotIds: oldIds,
+					note: `Đã dừng khi chuyển tiếp lô ${from.lotNo} sang ${to.lotNo}`,
+					active: false,
+					status: "stopped",
+					stoppedAt: transition.startDate || today(),
+					stoppedByTransitionId: transition.id
+				});
+				const nextKey = groupKey(nextIds), existing = state.lotGroups.find((item) => item.id !== group.id && item.active !== false && groupKey(item.lotIds) === nextKey);
+				if (existing) {
+					removeGroups.add(group.id);
+					onMergeGroup(group, existing);
+				} else {
+					group.lotIds = nextIds;
+					if (autoNamed) group.name = groupName(nextIds) || group.name;
+				}
+			});
+			if (removeGroups.size) state.lotGroups = state.lotGroups.filter((group) => !removeGroups.has(group.id));
+			normalizeLotGroups();
+			(state.qcLots || []).forEach((lot) => {
+				const group = (state.lotGroups || []).find((item) => (item.lotIds || []).includes(lot.id));
+				lot.groupId = group ? group.id : "";
+			});
+			let count = 0;
+			rows.forEach((row) => {
+				const { config, nextHistory } = row;
+				if (Number.isFinite(+config.mean) && Number.isFinite(+config.sd) && +config.sd > 0) upsertHistory(config, from, {
+					mean: +config.mean,
+					sd: +config.sd,
+					low: config.low == null ? null : +config.low,
+					high: config.high == null ? null : +config.high,
+					effectiveFrom: (config.meanSdHistory || []).find((entry) => entry.qcLotId === from.id)?.effectiveFrom || "",
+					effectiveTo: transition.startDate || from.exp || "",
+					source: config.applied || "mfg",
+					planned: false,
+					note: "Trước chuyển tiếp lô"
+				});
+				const next = upsertHistory(config, to, {
+					mean: +nextHistory.mean,
+					sd: +nextHistory.sd,
+					low: nextHistory.low == null ? null : +nextHistory.low,
+					high: nextHistory.high == null ? null : +nextHistory.high,
+					effectiveFrom: transition.startDate || today(),
+					effectiveTo: to.exp || "",
+					source: nextHistory.source || "mfg",
+					planned: false,
+					note: nextHistory.note || `Chuyển tiếp từ lô ${from.lotNo}`
+				});
+				Object.assign(config, {
+					level: to.level,
+					qcLotId: to.id,
+					lot: to.lotNo,
+					exp: to.exp,
+					mean: +next.mean,
+					sd: +next.sd,
+					low: next.low == null ? null : +next.low,
+					high: next.high == null ? null : +next.high,
+					rangeK: 2,
+					mfgMean: +next.mean,
+					mfgSd: +next.sd,
+					applied: next.source || "mfg"
+				});
+				count++;
+			});
+			return count;
+		}
+		function lotTransitionRemoval(state, { id = "", switchesLot = () => false } = {}) {
+			const record = (state.lotTransitions || []).find((transition) => transition.id === id);
+			if (!record) return { error: "not-found" };
+			if (switchesLot(record)) return {
+				error: "accepted-applied",
+				record,
+				message: "Hồ sơ đã chấp nhận lô mới và đã áp dụng vào nhóm lô/Mean-SD, không nên xóa trực tiếp. Nếu nhập sai, hãy tạo hồ sơ chuyển tiếp mới hoặc chỉnh nhóm lô/Mean-SD thủ công."
+			};
+			return { record };
+		}
+		function removeLotTransition(state, options = {}) {
+			const checked = lotTransitionRemoval(state, options);
+			if (checked.error) return checked;
+			state.lotTransitions = (state.lotTransitions || []).filter((transition) => transition.id !== options.id);
+			return { record: checked.record };
+		}
 		function validateAssay(state, options = {}) {
 			const { id = "", data = {} } = options;
 			const existing = (state.tests || []).find((item) => item.id === id) || null;
@@ -762,6 +1138,366 @@
 				pointsCount: points.length
 			};
 		}
+		function lotGroupActivationCandidates(tests, lots, targetSnapshot) {
+			const candidates = [];
+			(tests || []).forEach((test) => {
+				(lots || []).forEach((lot) => {
+					const target = (test.levels || []).find((level) => +level.level === +lot.level);
+					if (!target || target.qcLotId === lot.id) return;
+					const snapshot = targetSnapshot(test, lot.level, lot.id, lot.lotNo);
+					if (!snapshot || !Number.isFinite(+snapshot.mean) || !Number.isFinite(+snapshot.sd) || +snapshot.sd <= 0) return;
+					candidates.push({
+						t: test,
+						lot,
+						pick: {
+							use: true,
+							mean: snapshot.mean,
+							low: snapshot.low,
+							high: snapshot.high,
+							sd: snapshot.sd
+						}
+					});
+				});
+			});
+			return candidates;
+		}
+		function activationReplacedGroupId(test, lot, targetGroupId, groupsForLot) {
+			const target = (test.levels || []).find((level) => +level.level === +lot.level);
+			if (!target?.qcLotId) return "";
+			const group = groupsForLot(target.qcLotId)[0];
+			return group && group.id !== targetGroupId ? group.id : "";
+		}
+		function applyLotGroupActivation(options) {
+			const stoppedGroupIds = /* @__PURE__ */ new Set();
+			let count = 0;
+			(options.candidates || []).forEach(({ t, lot, pick }) => {
+				const oldGroupId = activationReplacedGroupId(t, lot, options.group.id, options.groupsForLot);
+				if (oldGroupId) stoppedGroupIds.add(oldGroupId);
+				if (options.applyTarget(t, lot, pick, options.effectiveFrom, options.note)) count++;
+			});
+			if (!count) {
+				if (options.groupInUse(options.group)) {
+					delete options.group.status;
+					delete options.group.stoppedAt;
+					return {
+						status: "already-active",
+						count: 0,
+						stoppedGroupIds: []
+					};
+				}
+				return {
+					status: "unready",
+					count: 0,
+					stoppedGroupIds: []
+				};
+			}
+			stoppedGroupIds.forEach((id) => {
+				const group = (options.groups || []).find((item) => item.id === id);
+				if (group) {
+					group.status = "stopped";
+					group.stoppedAt = options.effectiveFrom;
+				}
+			});
+			delete options.group.status;
+			delete options.group.stoppedAt;
+			return {
+				status: "applied",
+				count,
+				stoppedGroupIds: [...stoppedGroupIds]
+			};
+		}
+		function validateLot(state, { id = "", data = {} } = {}) {
+			const lots = state.qcLots || [], record = lots.find((lot) => lot.id === id) || null, level = Number(data.level) || 1;
+			if (!clean(data.lotNo)) return {
+				error: "missing-lot-no",
+				message: "Nhập số lot."
+			};
+			if (record && +record.level !== level && (state.tests || []).some((test) => (test.levels || []).some((item) => item.qcLotId === id))) return {
+				error: "level-in-use",
+				message: "Lô QC đang gắn với xét nghiệm nên không thể đổi mức QC. Hãy bỏ gán lô trong Mean/SD trước."
+			};
+			if (lots.some((lot) => lot.id !== id && +lot.level === level && sameText(lot.lotNo, data.lotNo))) return {
+				error: "duplicate-lot",
+				message: "Số lô QC này đã tồn tại ở cùng mức QC."
+			};
+			return {
+				record,
+				level
+			};
+		}
+		function saveLot(state, { id = "", newId = "", data = {}, renamePoints = () => 0 } = {}) {
+			const checked = validateLot(state, {
+				id,
+				data
+			});
+			if (checked.error) return checked;
+			const old = checked.record, oldLotNo = old?.lotNo || "", oldLevel = old ? +old.level : checked.level;
+			const record = old || { id: cleanId(newId) };
+			if (!old && !record.id) return {
+				error: "missing-id",
+				message: "Không thể tạo mã lô QC."
+			};
+			Object.assign(record, data);
+			if (!old) {
+				state.qcLots = state.qcLots || [];
+				state.qcLots.push(record);
+			}
+			(state.tests || []).forEach((test) => (test.levels || []).filter((level) => level.qcLotId === record.id).forEach((level) => {
+				level.level = data.level;
+				level.lot = data.lotNo;
+				level.exp = data.exp;
+				(level.meanSdHistory || []).filter((entry) => entry.qcLotId === record.id).forEach((entry) => {
+					entry.lot = data.lotNo;
+				});
+			}));
+			const renamedPoints = old ? renamePoints(oldLevel, oldLotNo, data.lotNo) : 0;
+			return {
+				record,
+				created: !old,
+				oldLotNo,
+				oldLevel,
+				renamedPoints
+			};
+		}
+		function lotPointsToRename(state, oldLevel, oldLotNo) {
+			if (!oldLotNo) return [];
+			const rows = [];
+			Object.keys(state.data || {}).forEach((testId) => {
+				(state.data[testId] || []).forEach((point) => {
+					if (+point.level === +oldLevel && (point.lot || "") === oldLotNo) rows.push(point);
+				});
+			});
+			return rows;
+		}
+		function renameLotPoints(state, oldLevel, oldLotNo, newLotNo) {
+			if (!oldLotNo || oldLotNo === newLotNo) return 0;
+			const rows = lotPointsToRename(state, oldLevel, oldLotNo);
+			rows.forEach((point) => {
+				point.lot = newLotNo;
+			});
+			return rows.length;
+		}
+		function lotRemoval(state, { id = "", switchesLot } = {}) {
+			const record = (state.qcLots || []).find((lot) => lot.id === id);
+			if (!record) return { error: "not-found" };
+			if ((state.tests || []).some((test) => (test.levels || []).some((level) => level.qcLotId === id))) return {
+				error: "used-by-assay",
+				message: "Lô QC này đang được gắn với xét nghiệm. Hãy đổi lô trong xét nghiệm trước."
+			};
+			if ((state.lotTransitions || []).some((transition) => (transition.fromLotId === id || transition.toLotId === id) && switchesLot(transition))) return {
+				error: "used-by-accepted-transition",
+				message: "Lô QC này có hồ sơ chuyển tiếp đã CHẤP NHẬN (đã áp dụng vào cấu hình/Mean-SD). Không thể xóa lô trực tiếp — nếu thực sự cần, hãy xử lý hồ sơ chuyển tiếp đó trước."
+			};
+			return { record };
+		}
+		function removeLot(state, options = {}) {
+			const checked = lotRemoval(state, options);
+			if (checked.error) return checked;
+			const id = options.id;
+			state.qcLots = (state.qcLots || []).filter((lot) => lot.id !== id);
+			(state.lotGroups || []).forEach((group) => {
+				group.lotIds = (group.lotIds || []).filter((lotId) => lotId !== id);
+			});
+			state.lotTransitions = (state.lotTransitions || []).filter((transition) => transition.fromLotId !== id && transition.toLotId !== id);
+			return { record: checked.record };
+		}
+		function targetPickBackfillPoints(points, test, lot, pick) {
+			if (!pick?.use) return [];
+			const target = (test.levels || []).find((level) => level.qcLotId === lot.id) || (test.levels || []).find((level) => +level.level === +lot.level);
+			if (!target || !target.lot || target.lot === lot.lotNo) return [];
+			return (points || []).filter((point) => point.level === target.level && (point.lot == null || point.lot === target.lot));
+		}
+		function normalizeTargetPick(input = {}) {
+			const meanRaw = String(input.meanRaw || "").trim(), lowRaw = String(input.lowRaw || "").trim(), highRaw = String(input.highRaw || "").trim(), sdRaw = String(input.sdRaw || "").trim();
+			let mean = meanRaw === "" ? null : parseFloat(meanRaw), low = lowRaw === "" ? null : parseFloat(lowRaw), high = highRaw === "" ? null : parseFloat(highRaw), sd = sdRaw === "" ? null : parseFloat(sdRaw);
+			const fromLimits = targetFromLimits(low, high);
+			if (fromLimits) {
+				if (!Number.isFinite(mean)) mean = fromLimits.mean;
+				if (!Number.isFinite(sd) || sd <= 0) sd = fromLimits.sd;
+			}
+			const fromTarget = input.deriveLimits === false ? null : limitsFromTarget(mean, sd);
+			if (fromTarget && lowRaw === "" && highRaw === "") {
+				low = fromTarget.low;
+				high = fromTarget.high;
+			}
+			if (!Number.isFinite(mean)) return {
+				error: "invalid-mean",
+				message: "Các xét nghiệm được chọn phải có trung bình mục tiêu hợp lệ."
+			};
+			if (lowRaw !== "" && !Number.isFinite(low) || highRaw !== "" && !Number.isFinite(high)) return {
+				error: "invalid-limits",
+				message: "Giới hạn dưới/trên phải là số hợp lệ."
+			};
+			if ((lowRaw !== "" || highRaw !== "") && (!Number.isFinite(low) || !Number.isFinite(high) || high <= low)) return {
+				error: "invalid-range",
+				message: "Nếu nhập giới hạn, cần nhập đủ giới hạn dưới và trên; giới hạn trên phải lớn hơn giới hạn dưới."
+			};
+			if (sdRaw !== "" && (!Number.isFinite(sd) || sd <= 0)) return {
+				error: "invalid-sd",
+				message: "Độ lệch chuẩn phải là số lớn hơn 0."
+			};
+			if ((sd == null || !Number.isFinite(sd)) && Number.isFinite(low) && Number.isFinite(high)) sd = (high - low) / 4;
+			if (!Number.isFinite(sd) || sd <= 0) return {
+				error: "missing-sd",
+				message: "Các xét nghiệm được chọn cần có SD, hoặc có đủ giới hạn dưới/trên để app ước tính SD theo ±2SD."
+			};
+			return {
+				use: true,
+				mean,
+				low,
+				high,
+				sd
+			};
+		}
+		function applyTargetPick(options) {
+			const { test, lot, pick, effectiveFrom, note, lots, points, upsertHistory } = options;
+			const linked = (test.levels || []).find((level) => level.qcLotId === lot.id);
+			if (!pick.use) {
+				if (linked) {
+					linked.qcLotId = "";
+					linked.lot = "";
+					linked.exp = "";
+					return true;
+				}
+				return false;
+			}
+			const effectiveTo = lot.exp || "";
+			let target = linked || (test.levels || []).find((level) => +level.level === +lot.level);
+			if (!target) {
+				target = {
+					level: lot.level,
+					mean: pick.mean,
+					sd: pick.sd,
+					low: pick.low,
+					high: pick.high,
+					rangeK: 2,
+					mfgMean: pick.mean,
+					mfgSd: pick.sd,
+					applied: "mfg"
+				};
+				test.levels = test.levels || [];
+				test.levels.push(target);
+				test.levels.sort((first, second) => first.level - second.level);
+			}
+			target.meanSdHistory = Array.isArray(target.meanSdHistory) ? target.meanSdHistory : [];
+			if (target.qcLotId && target.qcLotId !== lot.id) {
+				const oldLot = (lots || []).find((item) => item.id === target.qcLotId) || {
+					id: target.qcLotId,
+					lotNo: target.lot || ""
+				};
+				if (Number.isFinite(+target.mean) && Number.isFinite(+target.sd) && +target.sd > 0) upsertHistory(target, oldLot, {
+					mean: +target.mean,
+					sd: +target.sd,
+					low: target.low == null ? null : +target.low,
+					high: target.high == null ? null : +target.high,
+					effectiveFrom: (target.meanSdHistory || []).find((entry) => entry.qcLotId === oldLot.id)?.effectiveFrom || "",
+					effectiveTo: effectiveFrom,
+					source: target.applied || "mfg",
+					planned: false,
+					note: "Trước khi đổi sang lô khác qua Mean/SD theo nhóm"
+				});
+			}
+			targetPickBackfillPoints(points, test, lot, pick).forEach((point) => {
+				point.lot = target.lot;
+				point.qcMean = point.qcMean == null ? target.mean : point.qcMean;
+				point.qcSd = point.qcSd == null ? target.sd : point.qcSd;
+			});
+			upsertHistory(target, lot, {
+				mean: pick.mean,
+				sd: pick.sd,
+				low: pick.low,
+				high: pick.high,
+				effectiveFrom,
+				effectiveTo,
+				source: "mfg",
+				planned: false,
+				note
+			});
+			Object.assign(target, {
+				level: lot.level,
+				qcLotId: lot.id,
+				lot: lot.lotNo,
+				exp: lot.exp,
+				mean: pick.mean,
+				sd: pick.sd,
+				low: pick.low,
+				high: pick.high,
+				rangeK: 2,
+				mfgMean: pick.mean,
+				mfgSd: pick.sd,
+				applied: "mfg"
+			});
+			return true;
+		}
+		function applyPlannedTarget(options) {
+			const { test, lot, pick, note, upsertHistory } = options;
+			if (!pick.use) return false;
+			const target = (test.levels || []).find((level) => +level.level === +lot.level);
+			if (!target) return false;
+			target.meanSdHistory = Array.isArray(target.meanSdHistory) ? target.meanSdHistory : [];
+			upsertHistory(target, lot, {
+				mean: pick.mean,
+				sd: pick.sd,
+				low: pick.low,
+				high: pick.high,
+				effectiveFrom: "",
+				effectiveTo: "",
+				source: "mfg",
+				planned: true,
+				note
+			});
+			return true;
+		}
+		function applyTargetMatrix(options) {
+			const overwriteKeys = new Set((options.overwrites || []).map((item) => item.testId + "|" + item.lot.level));
+			const stoppedGroupIds = /* @__PURE__ */ new Set();
+			let count = 0;
+			(options.picked || []).forEach((pick) => {
+				const test = (options.tests || []).find((item) => item.id === pick.testId);
+				if (!test) return;
+				const overwrite = overwriteKeys.has(pick.testId + "|" + pick.lot.level);
+				if (overwrite && options.mode === "planned") {
+					if (applyPlannedTarget({
+						test,
+						lot: pick.lot,
+						pick,
+						note: options.note + " (dự kiến)",
+						upsertHistory: options.upsertHistory
+					})) count++;
+					return;
+				}
+				if (overwrite && options.mode === "switch") {
+					const current = (test.levels || []).find((level) => +level.level === +pick.lot.level);
+					const oldGroup = current?.qcLotId ? options.groupsForLot(current.qcLotId)[0] : null;
+					if (oldGroup && oldGroup.id !== options.group.id) stoppedGroupIds.add(oldGroup.id);
+				}
+				if (applyTargetPick({
+					test,
+					lot: pick.lot,
+					pick,
+					effectiveFrom: options.effectiveFrom,
+					note: options.note,
+					lots: options.lots,
+					points: options.pointsForTest(test),
+					upsertHistory: options.upsertHistory
+				})) count++;
+			});
+			if (options.mode === "switch" && count) {
+				stoppedGroupIds.forEach((id) => {
+					const group = (options.groups || []).find((item) => item.id === id);
+					if (group) {
+						group.status = "stopped";
+						group.stoppedAt = options.effectiveFrom;
+					}
+				});
+				delete options.group.status;
+				delete options.group.stoppedAt;
+			} else if (options.mode === "planned" && overwriteKeys.size && count) options.group.status = "planned";
+			return {
+				count,
+				stoppedGroupIds: [...stoppedGroupIds]
+			};
+		}
 		return Object.freeze({
 			defaultAssayLevels,
 			prepareInstrument,
@@ -769,10 +1505,45 @@
 			saveInstrument,
 			instrumentRemoval,
 			removeInstrument,
+			preparePanel,
+			validatePanel,
+			savePanel,
+			panelRemoval,
+			removePanel,
+			prepareLotGroup,
+			validateLotGroup,
+			saveLotGroup,
+			lotGroupRemoval,
+			removeLotGroup,
+			stopLotGroup,
+			validateLotTransition,
+			saveLotTransition,
+			prepareLotTransitionData,
+			inspectAcceptedLotTransition,
+			transitionSwitchesLot,
+			syncLotDepletion,
+			normalizeLotGroups,
+			applyAcceptedLotTransition,
+			lotTransitionRemoval,
+			removeLotTransition,
 			validateAssay,
 			saveAssay,
 			assayRemoval,
-			removeAssay
+			removeAssay,
+			lotGroupActivationCandidates,
+			activationReplacedGroupId,
+			applyLotGroupActivation,
+			validateLot,
+			saveLot,
+			lotPointsToRename,
+			renameLotPoints,
+			lotRemoval,
+			removeLot,
+			targetPickBackfillPoints,
+			normalizeTargetPick,
+			applyTargetPick,
+			applyPlannedTarget,
+			applyTargetMatrix
 		});
 	}
 	//#endregion
@@ -1472,6 +2243,722 @@
 		});
 	}
 	//#endregion
+	//#region src/domain/sigma/sigma-presentation.ts
+	function sigmaZone(value) {
+		const sigma = Number(value);
+		if (sigma >= 6) return {
+			c: "#13603f",
+			label: "Đẳng cấp thế giới"
+		};
+		if (sigma >= 5) return {
+			c: "#2c7d5c",
+			label: "Xuất sắc"
+		};
+		if (sigma >= 4) return {
+			c: "#3f9a55",
+			label: "Tốt"
+		};
+		if (sigma >= 3) return {
+			c: "#dd8b1f",
+			label: "Cận biên"
+		};
+		return {
+			c: "#c0362c",
+			label: "Không đạt"
+		};
+	}
+	function sigmaRunPlan(value) {
+		const sigma = Number(value);
+		if (!Number.isFinite(sigma)) return null;
+		if (sigma >= 6) return {
+			risk: "Thấp",
+			plan: "Thiết kế QC theo đánh giá nguy cơ; không tự động giảm tần suất."
+		};
+		if (sigma >= 5) return {
+			risk: "Thấp–trung bình",
+			plan: "Xác nhận bằng dữ liệu ổn định và SOP trước khi đơn giản hóa QC."
+		};
+		if (sigma >= 4) return {
+			risk: "Trung bình",
+			plan: "Cân nhắc đa quy tắc và tăng giám sát theo nguy cơ."
+		};
+		if (sigma >= 3) return {
+			risk: "Cao",
+			plan: "Tăng cường QC và ưu tiên cải thiện phương pháp."
+		};
+		return {
+			risk: "Rất cao",
+			plan: "Không dùng Sigma để hợp thức hóa vận hành; cần khắc phục phương pháp."
+		};
+	}
+	function formatSigmaDpmo(value) {
+		const dpmo = Number(value);
+		return !Number.isFinite(dpmo) ? "—" : dpmo < 10 ? dpmo.toFixed(2) : dpmo < 1e3 ? dpmo.toFixed(0) : Math.round(dpmo).toLocaleString("en-US");
+	}
+	function sigmaReadiness(level) {
+		if (!level || !["iqc-period", "iqc-cohort"].includes(level.cvSource)) return {
+			status: "manual",
+			label: "CV nhập tay — chưa xác nhận bằng nhóm dữ liệu IQC cùng lô/mức",
+			classifiable: true,
+			qcpEligible: false
+		};
+		const status = [
+			"insufficient",
+			"provisional",
+			"eligible",
+			"unstable"
+		].includes(level.cohortStatus) ? level.cohortStatus : Number(level.n) < 20 ? "insufficient" : Number(level.n) < 30 ? "provisional" : "eligible";
+		if (status === "insufficient") return {
+			status,
+			label: "Chưa đủ 20 điểm QC",
+			classifiable: false,
+			qcpEligible: false
+		};
+		if (status === "unstable") return {
+			status,
+			label: "Nhóm dữ liệu IQC không ổn định",
+			classifiable: false,
+			qcpEligible: false
+		};
+		if (status === "provisional") return {
+			status,
+			label: "Kết quả tạm thời (20–29 điểm)",
+			classifiable: true,
+			qcpEligible: false
+		};
+		return {
+			status: "eligible",
+			label: "Đủ điều kiện dữ liệu",
+			classifiable: true,
+			qcpEligible: true
+		};
+	}
+	var sigmaPresentation = Object.freeze({
+		sigmaZone,
+		sigmaRunPlan,
+		formatSigmaDpmo,
+		sigmaReadiness
+	});
+	//#endregion
+	//#region src/domain/sigma/sigma-period-view-model.ts
+	function createSigmaPeriodViewModel(deps) {
+		const comp = (test, entry, level, refs) => {
+			const data = entry.lv && entry.lv[level] || {}, cv = Number.parseFloat(data.cv), bias = Number.parseFloat(data.biasEqa ?? data.bias);
+			const tea = deps.teaFor(test, entry, level, refs), metric = deps.sigmaMetric(tea, bias, cv);
+			if (!metric) return null;
+			const { sigma, dpmo } = metric, ready = deps.readiness(data), zone = ready.classifiable ? deps.zone(sigma) : {
+				c: "#6b756f",
+				label: ready.label
+			}, warnings = [];
+			const source = entry.teaSource || deps.teaSource(test), meta = deps.teaMeta(test, source);
+			if (Math.abs(bias) >= tea) warnings.push("|Bias| đã bằng hoặc vượt TEa");
+			if (ready.status !== "eligible") warnings.push(ready.label);
+			return {
+				cv,
+				bias,
+				biasMethod: data.biasEqaMethod || "manual",
+				biasLabel: data.biasEqaMethod === "rms" ? "Bias EQA/EQC (RMS)" : "Bias EQA/EQC",
+				tea,
+				teaTarget: Number.isFinite(Number(data.teaTarget)) ? Number(data.teaTarget) : null,
+				teaCriterionRule: data.teaCriterionRule || "",
+				teaCriterionPercent: Number.isFinite(Number(data.teaCriterionPercent)) ? Number(data.teaCriterionPercent) : null,
+				teaCriterionAbsolute: Number.isFinite(Number(data.teaCriterionAbsolute)) ? Number(data.teaCriterionAbsolute) : null,
+				teaCriterionUnit: data.teaCriterionUnit || "",
+				teaSource: source,
+				teaLabel: entry.teaLabel || deps.teaLabel(deps.teaSource(test)),
+				teaReference: entry.teaReference || deps.teaReference(test),
+				teaSourceId: entry.teaSourceId || meta.id || "",
+				teaSourceVersion: entry.teaSourceVersion || meta.version || "",
+				teaSourceUrl: entry.teaSourceUrl || meta.url || "",
+				teaEffectiveDate: entry.teaEffectiveDate || meta.effectiveDate || "",
+				teaReviewedDate: entry.teaReviewedDate || meta.reviewedDate || "",
+				teaReviewedBy: entry.teaReviewedBy || meta.reviewedBy || "",
+				cvSource: data.cvSource || "manual",
+				n: Number.isFinite(Number(data.n)) ? Number(data.n) : null,
+				sourceStart: data.sourceStart || "",
+				sourceEnd: data.sourceEnd || "",
+				sourceLot: data.sourceLot || "",
+				cohortStatus: ready.status,
+				classifiable: ready.classifiable,
+				qcpEligible: ready.qcpEligible,
+				readinessLabel: ready.label,
+				warning: warnings.join(" · ") || null,
+				mu: deps.muFor(test, entry, level, tea, refs),
+				muBiasMode: data.muBiasMode === "exclude" ? "exclude" : "include",
+				uCalBasis: data.uCalBasis || "",
+				muReviewedBy: data.muReviewedBy || "",
+				muReviewedDate: data.muReviewedDate || "",
+				sigma,
+				dpmo,
+				yld: metric.yieldPercent,
+				dse: sigma - 1.65,
+				run: ready.qcpEligible ? deps.runPlan(sigma) : null,
+				...zone
+			};
+		};
+		const rows = (test, data, levels, refs) => (data || []).map((entry) => ({
+			e: entry,
+			rs: levels.map((level) => comp(test, entry, level, refs))
+		})).sort((a, b) => String(a.e.period || "").localeCompare(String(b.e.period || "")));
+		return Object.freeze({
+			comp,
+			rows
+		});
+	}
+	//#endregion
+	//#region src/domain/sigma/sigma-bias-service.ts
+	function createSigmaBiasService(deps) {
+		const stats = (rounds) => {
+			const valid = (rounds || []).map((round) => {
+				const lab = Number.parseFloat(String(round.lab ?? "")), target = Number.parseFloat(String(round.target ?? ""));
+				return Number.isFinite(lab) && Number.isFinite(target) && target !== 0 ? {
+					lab,
+					target,
+					bias: (lab - target) / Math.abs(target) * 100
+				} : null;
+			}).filter((round) => !!round);
+			if (!valid.length) return {
+				valid,
+				signedMean: null,
+				rms: null
+			};
+			return {
+				valid,
+				signedMean: valid.reduce((sum, round) => sum + round.bias, 0) / valid.length,
+				rms: valid.length === 1 ? valid[0].bias : Math.sqrt(valid.reduce((sum, round) => sum + round.bias * round.bias, 0) / valid.length)
+			};
+		};
+		const referenceUncertainty = (rounds) => {
+			const biases = stats(rounds).valid.map((round) => round.bias);
+			if (biases.length < 2) return null;
+			const sd = deps.stats(biases).sd;
+			return Number.isFinite(sd) ? Number(sd) / Math.sqrt(biases.length) : null;
+		};
+		const applyToPeriods = (periods, periodIds, level, bias, rounds, batchId) => {
+			let applied = 0;
+			(periods || []).forEach((period) => {
+				if (!(periodIds || []).includes(period.id)) return;
+				period.lv = period.lv || {};
+				const data = period.lv[level] = period.lv[level] || {};
+				data.biasEqa = Number(bias);
+				data.biasEqaMethod = "rms";
+				data.eqaRounds = (rounds || []).map((round) => ({
+					lab: round.lab,
+					target: round.target
+				}));
+				data.eqaBatchId = batchId;
+				applied++;
+			});
+			return applied;
+		};
+		const roundsKey = (rounds) => JSON.stringify((rounds || []).map((round) => ({
+			lab: Number(round.lab),
+			target: Number(round.target)
+		})).filter((round) => Number.isFinite(round.lab) && Number.isFinite(round.target) && round.target !== 0));
+		const linkedPeriodIds = (periods, entryId, level) => {
+			const data = (periods || []).find((period) => period.id === entryId)?.lv?.[level];
+			if (!data) return [entryId];
+			if (data.eqaBatchId) return (periods || []).filter((period) => period.lv?.[level]?.eqaBatchId === data.eqaBatchId).map((period) => period.id);
+			const key = data.biasEqaMethod === "rms" ? roundsKey(data.eqaRounds) : "";
+			if (!key || key === "[]") return [entryId];
+			const linked = (periods || []).filter((period) => {
+				const item = period.lv?.[level];
+				return item && item.biasEqaMethod === "rms" && roundsKey(item.eqaRounds) === key && Number(item.biasEqa) === Number(data.biasEqa);
+			}).map((period) => period.id);
+			return linked.length ? linked : [entryId];
+		};
+		return Object.freeze({
+			stats,
+			referenceUncertainty,
+			applyToPeriods,
+			roundsKey,
+			linkedPeriodIds
+		});
+	}
+	//#endregion
+	//#region src/application/sigma/sigma-cohort-import-service.ts
+	function createSigmaCohortImportService(deps) {
+		const clearImportedCv = (level) => {
+			if (!level || !["iqc-period", "iqc-cohort"].includes(level.cvSource)) return false;
+			[
+				"cv",
+				"cvSource",
+				"n",
+				"sourceStart",
+				"sourceEnd",
+				"sourceLot",
+				"cohortStatus",
+				"cohortIssues",
+				"sourceExcludedVoided",
+				"sourceExcludedInvalid",
+				"sourceTargetMean",
+				"sourceTargetSd"
+			].forEach((key) => delete level[key]);
+			return true;
+		};
+		const importCohort = (test, entry, level, cohort) => {
+			entry.lv = entry.lv || {};
+			const existing = entry.lv[level] || {}, force = deps.isCurrentPeriod(entry.period);
+			if (!(cohort && cohort.stats?.n >= 2 && cohort.stats.cv > 0)) {
+				const cleared = clearImportedCv(existing);
+				if (cleared) deps.setTeaSnapshot(test, entry, level, force);
+				return {
+					imported: false,
+					cleared
+				};
+			}
+			const data = entry.lv[level] = existing, assessment = deps.assess(cohort);
+			[
+				"sourceTargetMean",
+				"sourceTargetSd",
+				"cohortIssues",
+				"sourceExcludedVoided",
+				"sourceExcludedInvalid"
+			].forEach((key) => delete data[key]);
+			Object.assign(data, {
+				cv: cohort.stats.cv,
+				cvSource: "iqc-cohort",
+				n: cohort.stats.n,
+				sourceStart: cohort.start,
+				sourceEnd: cohort.end,
+				sourceLot: cohort.lot,
+				cohortStatus: assessment.status,
+				cohortIssues: cohort.issues,
+				sourceExcludedVoided: cohort.excluded.voided,
+				sourceExcludedInvalid: cohort.excluded.invalidValue
+			});
+			if (cohort.targetMean != null && cohort.targetMean !== 0) data.sourceTargetMean = cohort.targetMean;
+			if (cohort.targetSd != null && cohort.targetSd > 0) data.sourceTargetSd = cohort.targetSd;
+			deps.setTeaSnapshot(test, entry, level, force);
+			return {
+				imported: true,
+				cleared: false,
+				status: assessment.status,
+				mixedTarget: cohort.issues.includes("mixed-target-mean") || cohort.issues.includes("mixed-target-sd")
+			};
+		};
+		const applyChoices = (test, entry, groups, choices) => {
+			const summary = {
+				imported: 0,
+				cleared: 0,
+				insufficient: 0,
+				unstable: 0,
+				mixedTargets: 0,
+				missingLotN: 0,
+				missingLotLevels: 0
+			};
+			(groups || []).forEach((group) => {
+				const cohort = (group.cohorts || []).find((item) => item.lot === choices?.[group.level]);
+				const result = importCohort(test, entry, group.level, cohort);
+				if (result.imported) {
+					summary.imported++;
+					if (result.status === "insufficient") summary.insufficient++;
+					if (result.status === "unstable") summary.unstable++;
+					if (result.mixedTarget) summary.mixedTargets++;
+				}
+				if (result.cleared) summary.cleared++;
+				if (group.missingLotN && !(group.cohorts || []).length) {
+					summary.missingLotN += group.missingLotN;
+					summary.missingLotLevels++;
+				}
+			});
+			return summary;
+		};
+		return Object.freeze({
+			clearImportedCv,
+			importCohort,
+			applyChoices
+		});
+	}
+	//#endregion
+	//#region src/application/sigma/sigma-period-record-service.ts
+	function createSigmaPeriodRecordService() {
+		const add = (records, period, id, teaSnapshot) => {
+			if (records.some((record) => record.period === period)) return {
+				added: false,
+				entry: null
+			};
+			const entry = {
+				id,
+				period,
+				...teaSnapshot,
+				lv: {}
+			};
+			records.push(entry);
+			return {
+				added: true,
+				entry
+			};
+		};
+		const changePeriod = (records, id, period) => {
+			const entry = records.find((record) => record.id === id);
+			if (!entry) return {
+				changed: false,
+				duplicate: false
+			};
+			if (records.some((record) => record.id !== id && record.period === period)) return {
+				changed: false,
+				duplicate: true
+			};
+			entry.period = period;
+			return {
+				changed: true,
+				duplicate: false
+			};
+		};
+		const remove = (records, id) => {
+			const index = records.findIndex((record) => record.id === id);
+			if (index < 0) return false;
+			records.splice(index, 1);
+			return true;
+		};
+		return Object.freeze({
+			add,
+			changePeriod,
+			remove
+		});
+	}
+	//#endregion
+	//#region src/application/sigma/sigma-level-edit-service.ts
+	var COHORT_FIELDS = [
+		"n",
+		"sourceStart",
+		"sourceEnd",
+		"sourceLot",
+		"cohortStatus",
+		"cohortIssues",
+		"sourceExcludedVoided",
+		"sourceExcludedInvalid",
+		"sourceTargetMean",
+		"sourceTargetSd"
+	];
+	function createSigmaLevelEditService(deps) {
+		const clean = (field, value) => {
+			if (["cv", "biasEqa"].includes(field)) {
+				const text = String(value ?? "").trim();
+				if (!text) return "";
+				const number = Number(text);
+				return Number.isFinite(number) ? number : "";
+			}
+			return deps.cleanText(value, 120);
+		};
+		const update = (level, field, value) => {
+			level[field] = clean(field, value);
+			if (field === "biasEqa") {
+				if (level.biasEqa === "") delete level.biasEqaMethod;
+				else level.biasEqaMethod = "manual";
+				delete level.eqaRounds;
+				delete level.eqaBatchId;
+			}
+			if (field === "cv") {
+				level.cvSource = "manual";
+				COHORT_FIELDS.forEach((key) => delete level[key]);
+			}
+			return level;
+		};
+		return Object.freeze({
+			clean,
+			update
+		});
+	}
+	//#endregion
+	//#region src/application/sigma/sigma-tracked-test-service.ts
+	function createSigmaTrackedTestService(deps) {
+		const select = (tests, id) => tests.find((test) => test.id === id && test.sgTracked) || null;
+		const track = (tests, id) => {
+			const test = tests.find((item) => item.id === id);
+			if (!test) return {
+				tracked: false,
+				selected: null
+			};
+			test.sgTracked = true;
+			return {
+				tracked: true,
+				selected: test.id
+			};
+		};
+		const remove = (tests, id, selectedId) => {
+			const test = tests.find((item) => item.id === id);
+			if (!test) return {
+				removed: false,
+				selected: selectedId
+			};
+			test.sgTracked = false;
+			return {
+				removed: true,
+				selected: selectedId === id ? deps.orderedTracked(tests)[0]?.id || null : selectedId
+			};
+		};
+		return Object.freeze({
+			select,
+			track,
+			remove
+		});
+	}
+	//#endregion
+	//#region src/application/sigma/sigma-bias-workflow-service.ts
+	function createSigmaBiasWorkflowService(deps) {
+		const apply = (records, periodIds, level, rounds) => {
+			const stats = deps.stats(rounds || []);
+			if (!stats.valid.length) return {
+				status: "invalid-rounds",
+				applied: 0
+			};
+			if (!(periodIds || []).length) return {
+				status: "missing-periods",
+				applied: 0
+			};
+			const validRounds = stats.valid.map((round) => ({
+				lab: round.lab,
+				target: round.target
+			}));
+			const applied = deps.apply(records, periodIds, level, stats.rms, validRounds, deps.createId());
+			return {
+				status: applied ? "applied" : "no-matching-periods",
+				applied,
+				bias: stats.rms,
+				rounds: validRounds
+			};
+		};
+		return Object.freeze({ apply });
+	}
+	//#endregion
+	//#region src/application/sigma/sigma-mu-workflow-service.ts
+	function createSigmaMuWorkflowService(deps) {
+		const apply = (records, periodIds, rows, reviewedBy, reviewedDate) => {
+			if (!(periodIds || []).length) return {
+				applied: 0,
+				status: "missing-periods"
+			};
+			const by = deps.cleanText(reviewedBy, 120), date = deps.parseDate(reviewedDate) || "";
+			let applied = 0;
+			records.forEach((record) => {
+				if (!periodIds.includes(record.id)) return;
+				record.lv = record.lv || {};
+				rows.forEach((row) => {
+					const level = record.lv[row.level] = record.lv[row.level] || {}, raw = String(row.uCal ?? "").trim(), value = Number(raw);
+					if (raw !== "" && Number.isFinite(value) && value >= 0) level.uCal = value;
+					else delete level.uCal;
+					const basis = deps.cleanText(row.uCalBasis, 500);
+					if (basis) level.uCalBasis = basis;
+					else delete level.uCalBasis;
+					level.muBiasMode = row.muBiasMode === "exclude" ? "exclude" : "include";
+					if (by) level.muReviewedBy = by;
+					else delete level.muReviewedBy;
+					if (date) level.muReviewedDate = date;
+					else delete level.muReviewedDate;
+				});
+				applied++;
+			});
+			return {
+				applied,
+				status: applied ? "applied" : "no-matching-periods"
+			};
+		};
+		return Object.freeze({ apply });
+	}
+	//#endregion
+	//#region src/application/sigma/sigma-cohort-selection-service.ts
+	function createSigmaCohortSelectionService(deps) {
+		const cutoff = (period) => {
+			const normalized = deps.normalizePeriod(period), today = deps.today();
+			if (!normalized) return "";
+			const [year, month] = normalized.split("-").map(Number), last = new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
+			return last < today ? last : today;
+		};
+		const groups = (test, entry, levels, data) => {
+			const endDate = cutoff(entry.period), periodStart = `${entry.period}-01`;
+			return levels.map((level) => {
+				const raw = deps.cohortsForLevelByLot(data, {
+					testId: test.id,
+					level,
+					endDate
+				}).filter((cohort) => cohort.n > 0 && cohort.end >= periodStart);
+				const cohorts = raw.filter((cohort) => cohort.lot), missingLotN = raw.filter((cohort) => !cohort.lot).reduce((sum, cohort) => sum + cohort.n, 0);
+				const saved = entry.lv && entry.lv[level] && entry.lv[level].sourceLot, latest = cohorts[cohorts.length - 1], config = (test.levels || []).find((item) => +item.level === +level);
+				return {
+					level,
+					configuredLot: String(saved || latest && latest.lot || config && config.lot || ""),
+					cohorts,
+					missingLotN
+				};
+			});
+		};
+		return Object.freeze({
+			cutoff,
+			groups
+		});
+	}
+	//#endregion
+	//#region src/application/sigma/sigma-tea-edit-service.ts
+	function createSigmaTeaEditService(deps) {
+		const setValue = (test, value) => {
+			const text = String(value ?? "").trim(), number = Number(text);
+			test.tea = text && Number.isFinite(number) && number > 0 ? number : 0;
+			return test.tea;
+		};
+		const setSource = (test, value, sourceIds) => {
+			test.teaSource = sourceIds.includes(String(value)) ? String(value) : "ricos";
+			if (test.teaSource === "eflm") {
+				if (!test.eflmAnalyte) test.eflmAnalyte = test.name || "";
+				if (!test.eflmAps) test.eflmAps = "desirable";
+			}
+			return test.teaSource;
+		};
+		const setMeta = (test, field, value) => {
+			if (field === "eflmLookupDate") test[field] = deps.parseDate(value) || "";
+			else if (field === "eflmAps") test[field] = [
+				"minimum",
+				"desirable",
+				"optimum"
+			].includes(String(value)) ? value : "desirable";
+			else if (["eflmAnalyte", "eflmRef"].includes(field)) test[field] = deps.cleanText(value, field === "eflmRef" ? 500 : 160);
+			return test;
+		};
+		return Object.freeze({
+			setValue,
+			setSource,
+			setMeta
+		});
+	}
+	//#endregion
+	//#region src/application/sigma/sigma-tea-snapshot-service.ts
+	var ENTRY_KEYS = [
+		"tea",
+		"teaSource",
+		"teaLabel",
+		"teaReference",
+		"teaSourceId",
+		"teaSourceVersion",
+		"teaSourceUrl",
+		"teaEffectiveDate",
+		"teaReviewedDate",
+		"teaReviewedBy"
+	];
+	var SNAPSHOT_KEYS = [
+		"tea",
+		"teaSource",
+		"teaLabel",
+		"teaReference",
+		"teaCapturedAt",
+		"teaSourceId",
+		"teaSourceVersion",
+		"teaSourceUrl",
+		"teaEffectiveDate",
+		"teaReviewedDate",
+		"teaReviewedBy"
+	];
+	function createSigmaTeaSnapshotService() {
+		const syncCurrent = (test, entries, period, snapshot, setLevelSnapshot) => {
+			const entry = test && entries.find((item) => item.period === period);
+			if (!entry) return null;
+			const next = snapshot(test);
+			let changed = ENTRY_KEYS.some((key) => String(entry[key] ?? "") !== String(next[key] ?? ""));
+			if (changed) {
+				SNAPSHOT_KEYS.forEach((key) => delete entry[key]);
+				Object.assign(entry, next);
+			}
+			Object.keys(entry.lv || {}).forEach((level) => {
+				const before = JSON.stringify(entry.lv[level]);
+				setLevelSnapshot(test, entry, level, true);
+				if (before !== JSON.stringify(entry.lv[level])) changed = true;
+			});
+			return changed ? entry : null;
+		};
+		const reconcile = (tests, entriesFor, period, snapshot, setLevelSnapshot) => {
+			let changed = false;
+			tests.forEach((test) => {
+				if (syncCurrent(test, entriesFor(test), period, snapshot, setLevelSnapshot)) changed = true;
+			});
+			return changed;
+		};
+		return Object.freeze({
+			syncCurrent,
+			reconcile
+		});
+	}
+	//#endregion
+	//#region src/domain/sigma/sigma-level-selection-service.ts
+	var sortedLevels = (values) => [...values].sort((left, right) => left - right);
+	var addLevel = (values, value) => {
+		const level = Number(value);
+		if (Number.isFinite(level) && level > 0) values.add(level);
+	};
+	function createSigmaLevelSelectionService() {
+		const historical = (test, points, entries, operational) => {
+			const levels = /* @__PURE__ */ new Set();
+			if (test) operational(test).forEach((level) => addLevel(levels, level.level));
+			(test?.levels || []).forEach((level) => {
+				if (level.qcLotId || Number.isFinite(+level.sd) && +level.sd > 0 || (level.meanSdHistory || []).length) addLevel(levels, level.level);
+			});
+			(points || []).forEach((point) => addLevel(levels, point?.level));
+			(entries || []).forEach((entry) => Object.keys(entry?.lv || {}).forEach((level) => addLevel(levels, level)));
+			return sortedLevels(levels);
+		};
+		const period = (test, entry, points, entries, operational, normalizePeriod, cutoff) => {
+			const levels = /* @__PURE__ */ new Set(), normalized = normalizePeriod(entry?.period), start = normalized ? `${normalized}-01` : "", end = normalized ? cutoff(normalized) : "";
+			Object.keys(entry?.lv || {}).forEach((level) => addLevel(levels, level));
+			(points || []).forEach((point) => {
+				const date = String(point?.date || "");
+				if ((!start || date >= start) && (!end || date <= end)) addLevel(levels, point?.level);
+			});
+			if (!levels.size) historical(test, points, entries, operational).forEach((level) => levels.add(level));
+			return sortedLevels(levels);
+		};
+		return Object.freeze({
+			historical,
+			period
+		});
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-period-selection-service.ts
+	function createSigmaPeriodSelectionService() {
+		const resolve = (selectedId, entries) => {
+			if (selectedId && entries.some((entry) => entry.id === selectedId)) return selectedId;
+			return [...entries].sort((left, right) => String(left.period || "").localeCompare(String(right.period || ""))).pop()?.id || "";
+		};
+		const select = (selectedId, entries, nextId) => {
+			if (!entries.some((entry) => entry.id === nextId) || selectedId === nextId) return {
+				changed: false,
+				selected: selectedId || ""
+			};
+			return {
+				changed: true,
+				selected: nextId
+			};
+		};
+		return Object.freeze({
+			resolve,
+			select
+		});
+	}
+	//#endregion
+	//#region src/presentation/manage/lot-transition-picker-service.ts
+	function createLotTransitionPickerService({ searchText, formatDate, transitionToNo }) {
+		function label(lot) {
+			if (!lot) return "";
+			const nextLot = lot.depleted ? transitionToNo(lot.id) : "";
+			return `${lot.lotNo} · Mức ${lot.level}${lot.exp ? " · HSD " + formatDate(lot.exp) : ""}${lot.depleted ? " · " + (nextLot ? "đã chuyển tiếp qua lô " + nextLot : "đã hết QC") : ""}`;
+		}
+		function availableLots(lots, selectedId = "") {
+			return (lots || []).filter((lot) => !lot.depleted || lot.id === selectedId);
+		}
+		function match(lots, value, selectedId = "") {
+			const query = searchText(value);
+			if (!query) return null;
+			const choices = availableLots(lots, selectedId);
+			const exact = choices.find((lot) => searchText(label(lot)) === query || searchText(lot.lotNo) === query);
+			if (exact) return exact;
+			const matches = choices.filter((lot) => searchText(label(lot)).includes(query));
+			return matches.length === 1 ? matches[0] : null;
+		}
+		return Object.freeze({
+			label,
+			availableLots,
+			match
+		});
+	}
+	//#endregion
 	//#region src/domain/westgard/westgard-view-model.ts
 	function isVerdictMap(value) {
 		return !!value && typeof value.get === "function";
@@ -1778,6 +3265,333 @@
 		});
 	}
 	//#endregion
+	//#region src/domain/nce/action-bias-service.ts
+	function createActionBiasService({ teaFor, systematicShiftCritical, sigmaBiasValue }) {
+		function numberOrNull(value) {
+			const raw = String(value == null ? "" : value).trim(), number = Number(raw);
+			return raw !== "" && Number.isFinite(number) ? number : null;
+		}
+		function info(test, level, biasBeforeRaw, biasAfterRaw) {
+			const teaValue = test && level ? teaFor(test, level) : null, hasTea = Number.isFinite(teaValue) && teaValue > 0;
+			const biasBefore = numberOrNull(biasBeforeRaw), biasAfter = numberOrNull(biasAfterRaw), threshold = hasTea ? teaValue / 4 : null;
+			const withinThreshold = threshold != null && biasAfter != null ? Math.abs(biasAfter) <= threshold : null;
+			const critical = hasTea && biasBefore != null && level && level.sd > 0 ? systematicShiftCritical(teaValue, biasBefore, level.sd) : null;
+			const observedDeviation = critical && level && level.sd > 0 ? Math.abs(biasBefore) / level.sd : null;
+			return {
+				tea: hasTea ? teaValue : null,
+				biasBefore,
+				biasAfter,
+				threshold,
+				withinThreshold,
+				crit: critical,
+				degObs: observedDeviation
+			};
+		}
+		function latestSigmaBias(test, level, sigmaData) {
+			const periods = test && sigmaData && Array.isArray(sigmaData[test.id]) ? sigmaData[test.id] : [];
+			if (!periods.length || !level) return null;
+			const latest = [...periods].sort((first, second) => String(first.period || "").localeCompare(String(second.period || ""))).pop();
+			const entry = latest?.lv?.[level], value = entry ? Number(sigmaBiasValue(entry)) : NaN;
+			return entry && Number.isFinite(value) ? {
+				value,
+				period: latest?.period || ""
+			} : null;
+		}
+		return Object.freeze({
+			info,
+			latestSigmaBias
+		});
+	}
+	//#endregion
+	//#region src/presentation/nce/action-bias-presentation.ts
+	function createActionBiasPresentation(formatNumber) {
+		function thresholdHtml(info) {
+			if (!info.tea) return "Chưa có TEa% cho xét nghiệm này — vào Cấu hình Sigma để bổ sung, hoặc để trống nếu không áp dụng.";
+			if (info.biasAfter == null) return `Ngưỡng cho phép: ≤ ${formatNumber(info.threshold)}% (TEa/4). Nhập "Bias sau khắc phục" để so sánh.`;
+			return `${info.withinThreshold ? "✔ Đạt" : "✘ Vượt"} ngưỡng: |Bias sau khắc phục| ${formatNumber(Math.abs(info.biasAfter))}% so với ${formatNumber(info.threshold)}%.`;
+		}
+		function referenceHtml(info) {
+			if (!info.crit) return info.tea ? "Nhập \"Bias trước khắc phục\" ở mục 4-6 để tính số tham khảo ΔSEcrit/ΔREcrit (mức độ sai số lúc sự cố xảy ra)." : "Chưa đủ TEa%/SD để tính số tham khảo ΔSEcrit/ΔREcrit.";
+			return `Độ lệch quan sát lúc sự cố ${formatNumber(info.degObs)} lần SD so với ΔSEcrit ${formatNumber(info.crit.dSEcrit)} · ΔREcrit ${formatNumber(info.crit.dREcrit)}. <b>Tham khảo — không phải kết luận chính thức của hồ sơ.</b>`;
+		}
+		return Object.freeze({
+			thresholdHtml,
+			referenceHtml
+		});
+	}
+	//#endregion
+	//#region src/domain/nce/action-violation-service.ts
+	function createActionViolationService(deps) {
+		const info = (action) => {
+			const rule = String(action?.rule || ""), recordedError = String(action?.errorType || ""), verdict = String(action?.qcVerdict || "");
+			if (rule === "Hủy điểm QC" || recordedError === "Quản lý dữ liệu QC") {
+				const point = action ? deps.pointForAction(action) : null;
+				const test = action ? deps.findTest(String(action.testId || "")) : null;
+				const pointMean = Number(point?.qcMean), pointSd = Number(point?.qcSd);
+				const level = test && (!pointMean || !pointSd) ? deps.levelFor(test, action?.level) : null;
+				const mean = pointMean || Number(level?.mean), sd = pointSd || Number(level?.sd);
+				const z = point && Number.isFinite(mean) && sd > 0 ? Math.abs((Number(point.val) - mean) / sd) : 0;
+				const guessedRule = z > 3 ? "1-3s" : z > 2 ? "1-2s" : "";
+				return {
+					rule: guessedRule ? `${guessedRule} (suy từ Z)` : "Không xác định (hồ sơ cũ)",
+					errorType: deps.errorType(guessedRule ? [guessedRule] : []),
+					verdict: verdict || (z > 3 ? "rej" : z > 2 ? "warn" : "invalid"),
+					derived: true
+				};
+			}
+			return {
+				rule: rule || "—",
+				errorType: recordedError || "—",
+				verdict,
+				derived: false
+			};
+		};
+		const verdictLabel = (action) => {
+			const verdict = info(action).verdict;
+			return verdict === "rej" ? "Loại bỏ" : verdict === "warn" ? "Cảnh báo" : verdict === "invalid" ? "QC không hợp lệ" : "";
+		};
+		return Object.freeze({
+			info,
+			verdictLabel
+		});
+	}
+	//#endregion
+	//#region src/presentation/nce/action-list-presentation.ts
+	function createActionListPresentation(deps) {
+		const levelShort = (test, level, lotSnapshot) => {
+			const number = parseInt(String(level), 10);
+			if (!Number.isFinite(number) || number <= 0) return "Không gắn mức QC";
+			const configured = test ? deps.levelFor(test, number) : null;
+			return `M${number} · Lô ${lotSnapshot || configured?.lot || "?"}`;
+		};
+		const groupIssuesByTestDate = (issues) => {
+			const groups = [], byKey = /* @__PURE__ */ new Map();
+			issues.forEach((issue) => {
+				const key = `${issue.t.id}|${issue.p.date}`;
+				let group = byKey.get(key);
+				if (!group) {
+					group = {
+						t: issue.t,
+						date: issue.p.date,
+						items: [],
+						worst: "warn"
+					};
+					byKey.set(key, group);
+					groups.push(group);
+				}
+				group.items.push(issue);
+				if (issue.f.level === "rej") group.worst = "rej";
+			});
+			return groups;
+		};
+		return Object.freeze({
+			levelShort,
+			groupIssuesByTestDate
+		});
+	}
+	//#endregion
+	//#region src/presentation/nce/action-evidence-presentation.ts
+	function createActionEvidencePresentation(deps) {
+		const time = (value, dateOnly = false) => {
+			if (!value) return "—";
+			return dateOnly ? deps.formatDate(value) : deps.formatDateTime(String(value)) || deps.formatDate(value);
+		};
+		const timeline = (action, rerunStatus) => {
+			const point = deps.pointForAction(action), rerun = rerunStatus?.point, eventDate = deps.eventDate(action);
+			const voidText = !point ? "Không áp dụng" : point.voided ? point.voidedAt ? time(point.voidedAt) : "Đã hủy · thiếu thời điểm" : "Chưa hủy";
+			const openedText = action.createdAt ? time(action.createdAt) : time(action.date, true);
+			return [
+				{
+					label: "Ngày xảy ra",
+					value: time(eventDate, true),
+					note: point?.runId ? `Lần ${point.runId}` : ""
+				},
+				{
+					label: "QC chạy lại",
+					value: !point ? "Không áp dụng" : rerun ? time(rerun.date, true) : "—",
+					note: !point ? "Nguồn ngoài IQC" : rerun?.runId ? `Lần ${rerun.runId}` : "Chưa có điểm phù hợp"
+				},
+				{
+					label: "Hủy điểm",
+					value: voidText,
+					note: point?.voidedBy ? `Bởi ${point.voidedBy}` : ""
+				},
+				{
+					label: "Mở hồ sơ",
+					value: openedText,
+					note: action.nceId || "NCE"
+				}
+			];
+		};
+		return Object.freeze({
+			time,
+			timeline
+		});
+	}
+	//#endregion
+	//#region src/presentation/nce/action-rerun-evidence-presentation.ts
+	function createActionRerunEvidencePresentation(deps) {
+		const model = (action, rerunStatus, test) => {
+			if (!deps.pointForAction(action) || !rerunStatus?.needed) return null;
+			if (!rerunStatus.point) return {
+				kind: "pending",
+				cls: "warn",
+				heading: "Chưa có kết quả phù hợp",
+				label: rerunStatus.label || "Đang chờ QC chạy lại được chấp nhận",
+				point: null
+			};
+			const point = rerunStatus.point;
+			return {
+				kind: "accepted",
+				cls: rerunStatus.cls === "warn" ? "warn" : "ok",
+				heading: rerunStatus.cls === "warn" ? "QC được chấp nhận kèm cảnh báo" : "QC chạy lại được chấp nhận",
+				point,
+				context: deps.levelShort(test, point.level, point.lot)
+			};
+		};
+		return Object.freeze({ model });
+	}
+	//#endregion
+	//#region src/presentation/nce/action-status-presentation.ts
+	function createActionStatusPresentation(deps) {
+		const detailCheck = (status) => ({
+			cls: ["abnormal", "checked-abnormal"].includes(status) ? "rej" : ["ok", "checked-ok"].includes(status) ? "ok" : "none",
+			label: deps.checkLabels[status] || "Chưa ghi"
+		});
+		const sideChips = (action, stage, rerun, overdue, effectiveness) => {
+			const chips = [];
+			if (rerun.needed && stage !== "rerun") chips.push({
+				cls: rerun.cls,
+				label: rerun.label
+			});
+			if (overdue.overdue) chips.push({
+				cls: "rej",
+				label: overdue.label
+			});
+			if (effectiveness.escalated) chips.push({
+				cls: "warn",
+				label: `Đã chuyển ${action.followUpNceId}`
+			});
+			if (action.parentNceId) chips.push({
+				cls: "none",
+				label: `Nối tiếp ${action.parentNceId}`
+			});
+			return chips;
+		};
+		return Object.freeze({
+			detailCheck,
+			sideChips
+		});
+	}
+	//#endregion
+	//#region src/presentation/nce/action-review-presentation.ts
+	function createActionReviewPresentation() {
+		const buttons = (action, context) => ({
+			edit: !context.cancelled && context.approval !== "approved" && context.canWrite,
+			escalate: context.canEscalate && context.canWrite,
+			approve: context.isAdmin && context.workflowStage === "approval",
+			returnForRevision: context.isAdmin && context.workflowStage === "approval",
+			reopen: context.isAdmin && context.canReopen,
+			cancel: context.isAdmin && !context.cancelled && context.approval !== "approved"
+		});
+		return Object.freeze({ buttons });
+	}
+	//#endregion
+	//#region src/presentation/nce/action-detail-presentation.ts
+	function createActionDetailPresentation(deps) {
+		const meta = (action, context) => {
+			const modern = Number(action.protocolVersion) >= 2;
+			const rows = [{
+				label: modern ? action.nceId || "Mã NCE" : "Sự cố",
+				value: `${context.testName} · ${context.levelShort}`
+			}, {
+				label: "Kết luận / luật / loại sai số",
+				value: `${context.verdict ? `${context.verdict} · ` : ""}${context.violation.rule} · ${context.violation.errorType}`
+			}];
+			if (!modern) return rows;
+			rows.push({
+				label: "Nguồn / giai đoạn",
+				value: `${deps.sourceLabels[action.eventSource] || "—"} · ${deps.phaseLabels[action.processPhase] || "—"}`
+			}, {
+				label: "Nguy cơ",
+				value: `${deps.riskLabels[action.riskLevel] || "Chưa đánh giá"} · RPN ${context.riskScore || "—"}`,
+				note: String(action.riskBasis || "")
+			}, {
+				label: "Phụ trách / hạn xử lý",
+				value: `${action.by || "—"} · ${context.dueDate}${context.overdueLabel ? ` · ${context.overdueLabel}` : ""}`
+			}, {
+				label: "Trạng thái",
+				value: context.workflowLabel
+			});
+			return rows;
+		};
+		return Object.freeze({ meta });
+	}
+	//#endregion
+	//#region src/presentation/nce/action-guide-presentation.ts
+	function createActionGuidePresentation() {
+		const steps = Object.freeze([
+			{
+				phase: "Kiểm soát",
+				title: "Ghi nhận và kiểm soát tức thời",
+				text: "Dừng hoặc giữ kết quả liên quan, mở mã NCE và phân công người phụ trách."
+			},
+			{
+				phase: "Phân tầng",
+				title: "Đánh giá nguy cơ",
+				text: "Chấm S–O–D, tính RPN và ghi căn cứ phân loại theo SOP của đơn vị."
+			},
+			{
+				phase: "Điều tra",
+				title: "Điều tra nguyên nhân",
+				text: "Kiểm tra QC, thiết bị, hóa chất/calibrator, hiệu chuẩn và lot-to-lot."
+			},
+			{
+				phase: "Phân tích",
+				title: "Xác định nguyên nhân gốc",
+				text: "Ghi bằng chứng; không đồng nhất nguyên nhân với thao tác xử lý tức thời."
+			},
+			{
+				phase: "Khắc phục",
+				title: "Thực hiện hành động khắc phục",
+				text: "Loại bỏ nguyên nhân và giảm khả năng tái diễn."
+			},
+			{
+				phase: "Xác nhận",
+				title: "Xác nhận bằng QC",
+				text: "Chỉ cho phép hoạt động/trả kết quả trở lại sau khi QC chạy lại được chấp nhận."
+			},
+			{
+				phase: "An toàn người bệnh",
+				title: "Đánh giá ảnh hưởng bệnh nhân",
+				text: "Khoanh vùng từ lần QC đạt cuối cùng và xử lý kết quả liên quan."
+			},
+			{
+				phase: "Khép vòng",
+				title: "Đánh giá hiệu lực và phê duyệt",
+				text: "Ghi bằng chứng, đánh giá RPN còn lại và phê duyệt độc lập trước khi khép vòng."
+			}
+		]);
+		return Object.freeze({ steps });
+	}
+	//#endregion
+	//#region src/presentation/report/report-period-presentation.ts
+	function createReportPeriodPresentation() {
+		const currentYearMonth = (value, fallback) => /^\d{4}-\d{2}$/.test(String(value || "")) ? String(value) : fallback;
+		const setPart = (yearMonth, part, value) => {
+			const match = /^(\d{4})-(\d{2})$/.exec(yearMonth);
+			if (!match) return yearMonth;
+			const year = part === "year" ? Number(value) : Number(match[1]), month = part === "month" ? Number(value) : Number(match[2]);
+			return `${year}-${String(month).padStart(2, "0")}`;
+		};
+		const sortedLocks = (locks) => [...locks || []].sort((a, b) => String(b.ym || "").localeCompare(String(a.ym || "")));
+		return Object.freeze({
+			currentYearMonth,
+			setPart,
+			sortedLocks
+		});
+	}
+	//#endregion
 	//#region src/domain/nce/action-rerun-policy.ts
 	function openedFromVoid(action, point) {
 		return !!(action && point && point.voided && (action.openedFromVoid === true || point.voidedAt && action.createdAt && point.voidedAt === action.createdAt));
@@ -1986,7 +3800,7 @@
 			need(!nceActionLabels.actionLabels.source[action.eventSource], "nguồn phát hiện", "eventSource");
 			need(!nceActionLabels.actionLabels.phase[action.processPhase], "giai đoạn quá trình", "processPhase");
 			need(!nceActionLabels.actionLabels.containment[action.containmentStatus], "kiểm soát tức thời (mục 1)", "containmentStatus");
-			need(String(action.correction || "").trim().length < 5, "xử lý tức thời đã thực hiện", "correction");
+			need(String(action.correction || "").trim().length < 5, "xử lý tức thời đã thực hiện — ô cuối mục 1, tối thiểu 5 ký tự", "correction");
 			need(!String(action.by || "").trim(), "người phụ trách", "by");
 			need(!String(action.dueDate || "").trim(), "hạn hoàn thành", "dueDate");
 			need(action.eventSource === "iqc" && !String(action.pointId || "").trim(), "sự cố nội kiểm IQC phải mở từ dòng vi phạm", "eventSource");
@@ -1997,6 +3811,538 @@
 				missingKeys
 			};
 		};
+	}
+	//#endregion
+	//#region src/domain/nce/action-protocol-service.ts
+	var draftSection = {
+		date: "ident",
+		eventSource: "ident",
+		processPhase: "ident",
+		by: "ident",
+		dueDate: "ident",
+		containmentStatus: "immediate",
+		correction: "immediate",
+		action: "cause",
+		actionCompletedDate: "cause"
+	};
+	function createActionProtocolService(deps) {
+		const { actionLabels, protocolChecks, riskScale } = nceActionLabels;
+		const has = (labels, value) => !!labels[String(value || "")];
+		const protocolStatus = (action) => {
+			if (!action || !action.protocolVersion) return {
+				required: false,
+				complete: true,
+				label: "Hồ sơ cũ",
+				missing: [],
+				missingBySection: {}
+			};
+			const missing = [], bySection = {
+				ident: [],
+				immediate: [],
+				risk: [],
+				check: [],
+				cause: [],
+				patient: []
+			};
+			const need = (condition, label, section) => {
+				if (condition) {
+					missing.push(label);
+					bySection[section]?.push(label);
+				}
+			};
+			if (Number(action.protocolVersion) >= 2) {
+				const draft = deps.draftStatus(action);
+				draft.missing.forEach((label, index) => {
+					missing.push(label);
+					bySection[draftSection[draft.missingKeys[index]] || "ident"].push(label);
+				});
+				need(!has(actionLabels.risk, action.riskLevel) || ![
+					action.riskSeverity,
+					action.riskOccurrence,
+					action.riskDetectability
+				].every((value) => riskScale.includes(Number(value))), "đánh giá nguy cơ", "risk");
+				need(Number(action.protocolVersion) >= 3 && has(actionLabels.risk, action.riskLevel) && [
+					action.riskSeverity,
+					action.riskOccurrence,
+					action.riskDetectability
+				].every((value) => riskScale.includes(Number(value))) && String(action.riskBasis || "").trim().length < 5, "căn cứ phân loại nguy cơ theo SOP", "risk");
+				need(!!action.date && !!action.dueDate && action.dueDate < action.date, "hạn hoàn thành không được trước ngày ghi nhận sự cố", "ident");
+			}
+			need(Number(action.protocolVersion) < 2 && !has(actionLabels.containment, action.containmentStatus), "kiểm soát tức thời", "immediate");
+			need(Number(action.protocolVersion) >= 2 && action.containmentStatus === "held" && String(action.containmentNote || "").trim().length < 3, "ghi chú phạm vi kiểm soát tức thời", "immediate");
+			protocolChecks.forEach(([key, label]) => {
+				const low = label.toLocaleLowerCase("vi");
+				const value = action[key];
+				need(!has(actionLabels.check, value), low, "check");
+				need(has(actionLabels.check, value) && [
+					"abnormal",
+					"na",
+					"checked-abnormal"
+				].includes(value) && String(action[key.replace("Status", "Note")] || "").trim().length < 3, `${low} (ghi chú)`, "check");
+			});
+			need(!has(actionLabels.cause, action.causeCategory) || String(action.cause || "").trim().length < 5, "nguyên nhân", "cause");
+			need(String(action.action || "").trim().length < 5, "hành động khắc phục", "cause");
+			need(Number(action.protocolVersion) >= 3 && String(action.action || "").trim().length >= 5 && !action.actionCompletedDate, "ngày hoàn thành hành động khắc phục", "cause");
+			need(!!action.actionCompletedDate && !!action.date && action.actionCompletedDate < action.date, "ngày hoàn thành hành động không được trước ngày ghi nhận sự cố", "cause");
+			need(!!action.actionCompletedDate && action.actionCompletedDate > deps.todayIso(), "ngày hoàn thành hành động không được ở tương lai", "cause");
+			const releaseRequired = Number(action.protocolVersion) >= 3 && action.containmentStatus === "held";
+			need(releaseRequired && !has(actionLabels.release, action.releaseStatus), "quyết định cho phép hoạt động/trả kết quả trở lại", "cause");
+			if (releaseRequired && has(actionLabels.release, action.releaseStatus)) {
+				const rerun = deps.needsRerun(action) ? deps.rerunStatus(action) : null;
+				need(!action.releaseDate, "ngày cho phép hoạt động/trả kết quả trở lại", "cause");
+				need(String(action.releaseBy || "").trim().length < 2, "người cho phép hoạt động/trả kết quả trở lại", "cause");
+				need(String(action.releaseNote || "").trim().length < 5, "căn cứ cho phép hoạt động/trả kết quả trở lại", "cause");
+				need(!!action.releaseDate && !!action.actionCompletedDate && action.releaseDate < action.actionCompletedDate, "ngày cho phép trở lại không được trước ngày hoàn thành hành động", "cause");
+				need(!!action.releaseDate && !!rerun?.point?.date && action.releaseDate < rerun.point.date, "ngày cho phép trở lại không được trước QC chạy lại được dùng làm bằng chứng", "cause");
+				need(!!action.releaseDate && action.releaseDate > deps.todayIso(), "ngày cho phép trở lại không được ở tương lai", "cause");
+				need(action.releaseStatus === "released" && deps.needsRerun(action) && !rerun?.ok, "chỉ được cho phép trở lại sau khi QC chạy lại được chấp nhận", "cause");
+			}
+			need(!has(actionLabels.patient, action.patientImpact), "đánh giá ảnh hưởng bệnh nhân", "patient");
+			need(["held", "affected"].includes(action.patientImpact) && String(action.patientAction || "").trim().length < 5, "xử lý kết quả bệnh nhân", "patient");
+			need(action.containmentStatus === "none" && ["held", "affected"].includes(action.patientImpact), "mâu thuẫn giữa mục 1 (không có kết quả liên quan) và mục 7", "patient");
+			const unique = [...new Set(missing)], missingBySection = Object.fromEntries(Object.entries(bySection).map(([key, values]) => [key, [...new Set(values)]]));
+			return {
+				required: true,
+				complete: !unique.length,
+				label: unique.length ? `Thiếu: ${unique.join(", ")}` : "Đã hoàn tất checklist điều tra",
+				missing: unique,
+				missingBySection
+			};
+		};
+		const effectivenessStatus = (action) => {
+			if (!action || !(Number(action.protocolVersion) >= 2)) return {
+				required: false,
+				complete: true,
+				effective: true,
+				label: "Không yêu cầu cho hồ sơ cũ",
+				cls: "none",
+				escalated: false
+			};
+			if (action.effectivenessStatus !== "pending" && Number(action.protocolVersion) >= 3) {
+				if (String(action.effectivenessNote || "").trim().length < 5 || !action.effectivenessDate) return {
+					required: true,
+					complete: false,
+					effective: false,
+					label: "Cần ngày và bằng chứng đánh giá hiệu lực",
+					cls: "rej",
+					escalated: false
+				};
+				if (!action.actionCompletedDate) return {
+					required: true,
+					complete: false,
+					effective: false,
+					label: "Cần ngày hoàn thành hành động trước khi đánh giá hiệu lực",
+					cls: "rej",
+					escalated: false
+				};
+				const rerun = deps.needsRerun(action) ? deps.rerunStatus(action) : null;
+				const latestPrerequisite = [
+					action.date,
+					action.actionCompletedDate,
+					action.releaseDate,
+					rerun?.point?.date
+				].filter(Boolean).sort().pop() || "";
+				if (latestPrerequisite && action.effectivenessDate < latestPrerequisite) return {
+					required: true,
+					complete: false,
+					effective: false,
+					label: "Ngày đánh giá hiệu lực không được trước hành động, quyết định cho phép hoặc QC chạy lại dùng làm bằng chứng",
+					cls: "rej",
+					escalated: false
+				};
+				if (action.effectivenessDate > deps.todayIso()) return {
+					required: true,
+					complete: false,
+					effective: false,
+					label: "Ngày đánh giá hiệu lực không được ở tương lai",
+					cls: "rej",
+					escalated: false
+				};
+			}
+			if (action.effectivenessStatus === "effective") {
+				if (Number(action.protocolVersion) >= 3) {
+					const residual = actionResidualRiskScore(action), initial = actionRiskScore(action);
+					if (!residual || !has(actionLabels.risk, action.residualRiskLevel) || String(action.residualRiskBasis || "").trim().length < 5) return {
+						required: true,
+						complete: false,
+						effective: false,
+						label: "Cần đánh giá đầy đủ nguy cơ còn lại và căn cứ SOP",
+						cls: "rej",
+						escalated: false
+					};
+					if (initial && residual > initial) return {
+						required: true,
+						complete: false,
+						effective: false,
+						label: `RPN còn lại ${residual} cao hơn RPN ban đầu ${initial} — chưa thể kết luận có hiệu lực`,
+						cls: "rej",
+						escalated: false
+					};
+				}
+				if (Number(action.protocolVersion) < 3 && (String(action.effectivenessNote || "").trim().length < 5 || !action.effectivenessDate)) return {
+					required: true,
+					complete: false,
+					effective: false,
+					label: "Chờ đánh giá hiệu lực",
+					cls: "warn",
+					escalated: false
+				};
+				return {
+					required: true,
+					complete: true,
+					effective: true,
+					label: Number(action.protocolVersion) >= 3 ? `Đã xác nhận hiệu lực · RPN còn lại ${actionResidualRiskScore(action)}` : "Đã xác nhận hiệu lực",
+					cls: "ok",
+					escalated: false
+				};
+			}
+			if (action.effectivenessStatus === "ineffective") {
+				const followUp = String(action.followUpNceId || "").trim();
+				return followUp && deps.activeFollowUp(action) ? {
+					required: true,
+					complete: true,
+					effective: false,
+					label: `Chưa hiệu lực — đã chuyển ${followUp}`,
+					cls: "warn",
+					escalated: true
+				} : {
+					required: true,
+					complete: false,
+					effective: false,
+					label: followUp ? "Hồ sơ tiếp theo đã hủy hoặc không còn tồn tại — cần mở vòng mới" : "Chưa hiệu lực — cần mở hồ sơ tiếp theo",
+					cls: "rej",
+					escalated: false
+				};
+			}
+			return {
+				required: true,
+				complete: false,
+				effective: false,
+				label: "Chờ đánh giá hiệu lực",
+				cls: "warn",
+				escalated: false
+			};
+		};
+		const protocolSummary = (action) => {
+			if (!action || !action.protocolVersion) return "";
+			const checks = protocolChecks.map(([key, label]) => `${label}: ${actionLabels.check[action[key]] || "Chưa ghi"}${action[key.replace("Status", "Note")] ? ` (${action[key.replace("Status", "Note")]})` : ""}`);
+			const residual = actionResidualRiskScore(action);
+			return [
+				...Number(action.protocolVersion) >= 2 ? [`Mã NCE: ${action.nceId || "Chưa cấp"} · Nguồn: ${actionLabels.source[action.eventSource] || "Chưa ghi"} · Giai đoạn: ${actionLabels.phase[action.processPhase] || "Chưa ghi"}`, `Nguy cơ: ${actionLabels.risk[action.riskLevel] || "Chưa đánh giá"} · S×O×D ${action.riskSeverity || 0}×${action.riskOccurrence || 0}×${action.riskDetectability || 0} = ${actionRiskScore(action)}${action.riskBasis ? ` · Căn cứ: ${action.riskBasis}` : ""}`] : [],
+				`Kiểm soát tức thời: ${actionLabels.containment[action.containmentStatus] || "Chưa ghi"}${action.containmentNote ? ` (${action.containmentNote})` : ""}`,
+				...Number(action.protocolVersion) >= 2 ? [`Xử lý tức thời: ${action.correction || "Chưa ghi"}`] : [],
+				...checks,
+				`Nguyên nhân: ${actionLabels.cause[action.causeCategory] || "Chưa phân loại"}${action.cause ? ` — ${action.cause}` : ""}`,
+				...Number(action.protocolVersion) >= 3 && action.containmentStatus === "held" ? [`Cho phép trở lại: ${actionLabels.release[action.releaseStatus] || "Chưa xác nhận"}${action.releaseDate ? ` · ${deps.formatDate(action.releaseDate)}` : ""}${action.releaseBy ? ` · ${action.releaseBy}` : ""}${action.releaseNote ? ` — ${action.releaseNote}` : ""}`] : [],
+				`Ảnh hưởng bệnh nhân: ${actionLabels.patient[action.patientImpact] || "Chưa ghi"}${action.patientAction ? ` — ${action.patientAction}` : ""}`,
+				...Number(action.protocolVersion) >= 2 ? [`Hiệu lực: ${action.effectivenessStatus === "effective" ? "Có hiệu lực" : action.effectivenessStatus === "ineffective" ? "Chưa hiệu lực" : "Chưa đánh giá"}${action.effectivenessDate ? ` · ${deps.formatDate(action.effectivenessDate)}` : ""}${action.effectivenessNote ? ` — ${action.effectivenessNote}` : ""}${action.effectivenessBy ? ` · ${action.effectivenessBy}` : ""}`] : [],
+				...Number(action.protocolVersion) >= 3 && residual ? [`Nguy cơ còn lại: ${actionLabels.risk[action.residualRiskLevel] || "Chưa phân loại"} · S×O×D ${action.residualSeverity || 0}×${action.residualOccurrence || 0}×${action.residualDetectability || 0} = ${residual}${action.residualRiskBasis ? ` · Căn cứ: ${action.residualRiskBasis}` : ""}`] : [],
+				...deps.isCancelled(action) ? [`Hồ sơ đã hủy: ${action.cancelReason || "Không ghi lý do"}${action.cancelledBy ? ` · ${action.cancelledBy}` : ""}${action.cancelledAt ? ` · ${action.cancelledAt}` : ""}`] : []
+			].join(" | ");
+		};
+		return Object.freeze({
+			protocolStatus,
+			effectivenessStatus,
+			protocolSummary
+		});
+	}
+	//#endregion
+	//#region src/application/nce/action-review-service.ts
+	function createActionReviewService(deps) {
+		const reviewToken = (action) => {
+			const current = action || {};
+			const rerun = action ? deps.rerunStatus(action) : {};
+			return [
+				current.id || "",
+				current.updatedAt || current.createdAt || "",
+				deps.workflowStatus(current).stage || "",
+				rerun.point && rerun.point.id || "",
+				deps.approvalStatus(current),
+				deps.recordStatus(current)
+			].join("|");
+		};
+		const cancelReadiness = (action) => {
+			if (!action) return {
+				ok: false,
+				reason: "missing"
+			};
+			if (deps.isCancelled(action)) return {
+				ok: false,
+				reason: "cancelled"
+			};
+			if (deps.approvalStatus(action) === "approved") return {
+				ok: false,
+				reason: "approved"
+			};
+			const followUp = deps.activeFollowUp(action);
+			if (followUp) return {
+				ok: false,
+				reason: "follow-up",
+				followUp
+			};
+			return {
+				ok: true,
+				reason: "ready"
+			};
+		};
+		const reopenReadiness = (action) => {
+			if (!action) return {
+				ok: false,
+				reason: "missing"
+			};
+			if (deps.isCancelled(action)) return {
+				ok: false,
+				reason: "cancelled"
+			};
+			if (deps.approvalStatus(action) !== "approved") return {
+				ok: false,
+				reason: "not-approved"
+			};
+			if (deps.workflowStatus(action).complete) return {
+				ok: false,
+				reason: "complete"
+			};
+			return {
+				ok: true,
+				reason: "ready"
+			};
+		};
+		const returnReadiness = (action) => {
+			if (!action) return {
+				ok: false,
+				reason: "missing"
+			};
+			if (deps.isCancelled(action)) return {
+				ok: false,
+				reason: "cancelled"
+			};
+			if (deps.approvalStatus(action) !== "pending" || deps.workflowStatus(action).stage !== "approval") return {
+				ok: false,
+				reason: "not-pending"
+			};
+			return {
+				ok: true,
+				reason: "ready"
+			};
+		};
+		const canCancel = (action) => cancelReadiness(action).ok;
+		const canReopen = (action) => reopenReadiness(action).ok;
+		const canReturn = (action) => returnReadiness(action).ok;
+		const canApprove = (action) => canReturn(action);
+		const approvalReadiness = (action, user) => {
+			if (!action) return {
+				ok: false,
+				reason: "missing"
+			};
+			if (deps.isCancelled(action)) return {
+				ok: false,
+				reason: "cancelled"
+			};
+			if (!deps.isRecorded(action)) return {
+				ok: false,
+				reason: "unrecorded"
+			};
+			const protocol = deps.protocolStatus(action);
+			if (!protocol.complete) return {
+				ok: false,
+				reason: "protocol",
+				missing: protocol.missing || []
+			};
+			const rerun = deps.rerunStatus(action);
+			if (rerun.needed && !rerun.ok) return {
+				ok: false,
+				reason: "rerun"
+			};
+			if (!deps.effectivenessStatus(action).complete) return {
+				ok: false,
+				reason: "effectiveness"
+			};
+			if (!canApprove(action)) return {
+				ok: false,
+				reason: "not-pending"
+			};
+			if (user && !deps.canApproveByUser(action, user)) return {
+				ok: false,
+				reason: "non-independent"
+			};
+			return {
+				ok: true,
+				reason: "ready"
+			};
+		};
+		const cancel = (action, reason, by) => {
+			if (!canCancel(action) || String(reason || "").trim().length < 5) return false;
+			const at = deps.now();
+			Object.assign(action, {
+				recordStatus: "cancelled",
+				cancelReason: reason,
+				cancelledAt: at,
+				cancelledBy: by,
+				updatedAt: at
+			});
+			return true;
+		};
+		const approve = (action, note, by) => {
+			if (!canApprove(action) || String(note || "").trim().length < 3) return false;
+			Object.assign(action, {
+				approvalStatus: "approved",
+				approvedAt: deps.now(),
+				approvedBy: by,
+				approvalNote: note
+			});
+			return true;
+		};
+		const returnForRevision = (action, note, by) => {
+			if (!canReturn(action) || String(note || "").trim().length < 3) return false;
+			const at = deps.now();
+			Object.assign(action, {
+				approvalStatus: "returned",
+				approvedAt: at,
+				approvedBy: by,
+				approvalNote: note,
+				returnNote: note,
+				returnBy: by,
+				returnAt: at
+			});
+			return true;
+		};
+		const reopen = (action, note) => {
+			if (!canReopen(action) || String(note || "").trim().length < 5) return false;
+			Object.assign(action, {
+				approvalStatus: "pending",
+				approvedAt: "",
+				approvedBy: "",
+				approvalNote: `Mở lại: ${note}`
+			});
+			return true;
+		};
+		return Object.freeze({
+			reviewToken,
+			canCancel,
+			canApprove,
+			canReturn,
+			canReopen,
+			cancelReadiness,
+			reopenReadiness,
+			returnReadiness,
+			approvalReadiness,
+			cancel,
+			approve,
+			returnForRevision,
+			reopen
+		});
+	}
+	//#endregion
+	//#region src/application/nce/action-escalation-service.ts
+	function createActionEscalationService(deps) {
+		const canEscalate = (actions, action) => !!action && !deps.isCancelled(action) && Number(action.protocolVersion) >= 2 && action.effectivenessStatus === "ineffective" && !deps.activeFollowUp(actions || [], action) && deps.approvalStatus(action) !== "approved";
+		const createFollowUp = (actions, parent, user) => {
+			if (!canEscalate(actions || [], parent)) return null;
+			const parentId = parent.nceId || "hồ sơ trước", now = deps.now(), nceId = deps.nextNceId(actions || [], deps.today());
+			const username = String(user.username || "").trim().toLowerCase();
+			const record = {
+				id: deps.createId(),
+				nceId,
+				parentNceId: parent.nceId || "",
+				date: deps.today(),
+				createdAt: now,
+				updatedAt: now,
+				createdByUserId: user.id || "",
+				createdByUsername: user.username || "",
+				contentEditorUserIds: [user.id || ""].filter(Boolean),
+				contentEditorUsernames: [username].filter(Boolean),
+				testId: parent.testId,
+				level: parent.level,
+				lot: parent.lot || "",
+				pointId: parent.pointId || "",
+				rule: parent.rule || "",
+				errorType: parent.errorType || "",
+				qcVerdict: parent.qcVerdict || "",
+				protocolVersion: 3,
+				eventSource: parent.eventSource || "iqc",
+				processPhase: parent.processPhase || "exam",
+				containmentStatus: parent.containmentStatus || "",
+				containmentNote: parent.containmentNote || "",
+				correction: `Hành động của ${parentId} được đánh giá chưa hiệu lực, mở vòng điều tra mới.`,
+				by: user.name || "",
+				dueDate: deps.dueDate(7),
+				effectivenessStatus: "pending",
+				approvalStatus: "pending",
+				recordStatus: "active",
+				approvedAt: "",
+				approvedBy: "",
+				approvalNote: ""
+			};
+			parent.followUpNceId = nceId;
+			(actions || []).push(record);
+			return record;
+		};
+		return Object.freeze({
+			canEscalate,
+			createFollowUp
+		});
+	}
+	//#endregion
+	//#region src/application/nce/action-record-service.ts
+	var effectivenessKeys = [
+		"effectivenessStatus",
+		"effectivenessNote",
+		"effectivenessDate",
+		"residualSeverity",
+		"residualOccurrence",
+		"residualDetectability",
+		"residualRiskLevel",
+		"residualRiskBasis"
+	];
+	function createActionRecordService(deps) {
+		const userFields = (user) => ({
+			createdByUserId: user.id || "",
+			createdByUsername: user.username || "",
+			contentEditorUserIds: [user.id || ""].filter(Boolean),
+			contentEditorUsernames: [String(user.username || "").trim().toLowerCase()].filter(Boolean)
+		});
+		const create = (actions, values, user) => {
+			const now = deps.now(), effective = values.effectivenessStatus !== "pending";
+			const record = {
+				id: deps.createId(),
+				...values,
+				createdAt: now,
+				updatedAt: now,
+				...userFields(user),
+				effectivenessBy: effective ? user.name || "" : "",
+				effectivenessAt: effective ? now : "",
+				approvalStatus: "pending",
+				recordStatus: "active",
+				approvedAt: "",
+				approvedBy: "",
+				approvalNote: ""
+			};
+			actions.push(record);
+			return record;
+		};
+		const update = (action, values, user) => {
+			if (deps.isCancelled(action) || deps.approvalStatus(action) === "approved") return null;
+			const now = deps.now(), effective = values.effectivenessStatus !== "pending";
+			const changed = effectivenessKeys.some((key) => String(values[key] ?? "") !== String(action[key] ?? (key === "effectivenessStatus" ? "pending" : "")));
+			const editorIds = [...new Set([...action.contentEditorUserIds || [], user.id || ""].filter(Boolean))];
+			const editorNames = [...new Set([...action.contentEditorUsernames || [], String(user.username || "").trim().toLowerCase()].filter(Boolean))];
+			Object.assign(action, values, {
+				updatedAt: now,
+				contentEditorUserIds: editorIds,
+				contentEditorUsernames: editorNames,
+				approvalStatus: "pending",
+				approvedAt: "",
+				approvedBy: "",
+				approvalNote: "",
+				effectivenessBy: effective ? changed ? user.name || "" : action.effectivenessBy || user.name || "" : "",
+				effectivenessAt: effective ? changed ? now : action.effectivenessAt || now : ""
+			});
+			return action;
+		};
+		return Object.freeze({
+			create,
+			update
+		});
 	}
 	//#endregion
 	//#region src/presentation/state/ui-state.ts
@@ -2096,7 +4442,7 @@
 	//#endregion
 	//#region src/compat/modular-pilot.global.ts
 	var root = globalThis;
-	if (!root.QCCore || typeof root.QCCore.stats !== "function" || typeof root.QCCore.cleanText !== "function" || typeof root.QCCore.cleanId !== "function") throw new Error("QCCore phải được nạp đủ dependency trước các module TypeScript");
+	if (!root.QCCore || typeof root.QCCore.stats !== "function" || typeof root.QCCore.cleanText !== "function" || typeof root.QCCore.cleanId !== "function" || typeof root.QCCore.targetFromLimits !== "function" || typeof root.QCCore.limitsFromTarget !== "function" || typeof root.QCCore.systematicShiftCritical !== "function") throw new Error("QCCore phải được nạp đủ dependency trước các module TypeScript");
 	var loginLockout = null;
 	try {
 		loginLockout = JSON.parse(localStorage.getItem("qclab_login_lockout") || "null");
@@ -2110,6 +4456,59 @@
 	installUiState(root, "ReagentUIState", createReagentUiState());
 	installUiState(root, "SigmaUIState", createSigmaUiState());
 	root.ChartViewModel = chartViewModel;
+	root.SigmaPresentation = sigmaPresentation;
+	root.SigmaPeriodViewModel = createSigmaPeriodViewModel({
+		sigmaMetric: (tea, bias, cv) => root.QCCore.sigmaMetric(tea, bias, cv),
+		teaFor: (test, entry, level, refs) => globalThis.sgEntryTea(test, entry, level, refs),
+		teaMeta: (test, source) => globalThis.sgTeaSourceMeta(test, source),
+		teaSource: (test) => globalThis.sgTeaSource(test),
+		teaLabel: (source) => globalThis.sgTeaLabel(source),
+		teaReference: (test) => globalThis.sgTeaRefText(test),
+		readiness: (level) => sigmaPresentation.sigmaReadiness(level),
+		muFor: (test, entry, level, tea, refs) => globalThis.sgMU(test, entry, level, tea, refs),
+		zone: (sigma) => sigmaPresentation.sigmaZone(sigma),
+		runPlan: (sigma) => sigmaPresentation.sigmaRunPlan(sigma)
+	});
+	root.SigmaBiasService = createSigmaBiasService({ stats: (values) => root.QCCore.stats(values) });
+	root.SigmaCohortImportService = createSigmaCohortImportService({
+		assess: (cohort) => root.SigmaCohortService.assess(cohort),
+		setTeaSnapshot: (test, entry, level, force) => globalThis.sgSetLevelTeaSnapshot(test, entry, level, force),
+		isCurrentPeriod: (period) => period === globalThis.isoMonth()
+	});
+	root.SigmaPeriodRecordService = createSigmaPeriodRecordService();
+	root.SigmaLevelEditService = createSigmaLevelEditService({ cleanText: (value, maximumLength) => root.QCCore.cleanText(value, maximumLength) });
+	root.SigmaTrackedTestService = createSigmaTrackedTestService({ orderedTracked: (tests) => tests.filter((test) => test.sgTracked).sort((left, right) => globalThis.operationalTestOrder(left) - globalThis.operationalTestOrder(right) || String(globalThis.testDisplayName(left)).localeCompare(String(globalThis.testDisplayName(right)), "vi")) });
+	root.SigmaBiasWorkflowService = createSigmaBiasWorkflowService({
+		stats: (rounds) => root.SigmaBiasService.stats(rounds),
+		apply: (records, periodIds, level, bias, rounds, batchId) => root.SigmaBiasService.applyToPeriods(records, periodIds, level, bias, rounds, batchId),
+		createId: () => uid()
+	});
+	root.SigmaMuWorkflowService = createSigmaMuWorkflowService({
+		cleanText: (value, maximumLength) => root.QCCore.cleanText(value, maximumLength),
+		parseDate: (value) => {
+			const parse = globalThis.parseVN;
+			if (typeof parse === "function") return parse(value);
+			const text = String(value || "").trim();
+			return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : "";
+		}
+	});
+	root.SigmaCohortSelectionService = createSigmaCohortSelectionService({
+		normalizePeriod: (period) => root.SigmaCohortService.normalizePeriod(period),
+		today: () => globalThis.isoToday(),
+		cohortsForLevelByLot: (data, options) => root.SigmaCohortService.cohortsForLevelByLot(data, options)
+	});
+	root.SigmaTeaEditService = createSigmaTeaEditService({
+		cleanText: (value, maximumLength) => root.QCCore.cleanText(value, maximumLength),
+		parseDate: (value) => {
+			const parse = globalThis.parseVN;
+			if (typeof parse === "function") return parse(value);
+			const text = String(value || "").trim();
+			return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : "";
+		}
+	});
+	root.SigmaTeaSnapshotService = createSigmaTeaSnapshotService();
+	root.SigmaLevelSelectionService = createSigmaLevelSelectionService();
+	root.SigmaPeriodSelectionService = createSigmaPeriodSelectionService();
 	root.NceActionLabels = nceActionLabels;
 	root.NceActionBasics = nceActionBasics;
 	root.NceActionIdentityService = createNceActionIdentityService({
@@ -2151,6 +4550,92 @@
 		isRecorded: (action) => nceActionBasics.actionRecorded(action),
 		pointForAction: (action) => typeof root.actionPoint === "function" ? root.actionPoint(action) : null
 	});
+	root.ActionProtocolService = createActionProtocolService({
+		todayIso: () => isoToday(),
+		draftStatus: (action) => root.ActionDraftStatusService(action),
+		needsRerun: (action) => typeof root.actionNeedsRerun === "function" && !!root.actionNeedsRerun(action),
+		rerunStatus: (action) => typeof root.actionRerunStatus === "function" ? root.actionRerunStatus(action) : {
+			needed: false,
+			ok: false,
+			point: null
+		},
+		activeFollowUp: (action) => {
+			const id = String(action.followUpNceId || "").trim();
+			return id ? (state.actions || []).find((candidate) => candidate.nceId === id && !nceActionBasics.actionCancelled(candidate)) || null : null;
+		},
+		isCancelled: (action) => nceActionBasics.actionCancelled(action),
+		formatDate: (value) => vnDate(value)
+	});
+	root.ActionReviewService = createActionReviewService({
+		now: () => (/* @__PURE__ */ new Date()).toISOString(),
+		isCancelled: (action) => nceActionBasics.actionCancelled(action),
+		approvalStatus: (action) => nceActionBasics.actionApprovalStatus(action),
+		recordStatus: (action) => nceActionBasics.actionRecordStatus(action),
+		workflowStatus: (action) => typeof root.actionWorkflowStatus === "function" ? root.actionWorkflowStatus(action) : {},
+		activeFollowUp: (action) => {
+			const id = String(action.followUpNceId || "").trim();
+			return id ? (state.actions || []).find((candidate) => candidate.nceId === id && !nceActionBasics.actionCancelled(candidate)) || null : null;
+		},
+		isRecorded: (action) => typeof root.actionRecorded === "function" && !!root.actionRecorded(action),
+		protocolStatus: (action) => typeof root.actionProtocolStatus === "function" ? root.actionProtocolStatus(action) : {
+			complete: false,
+			missing: []
+		},
+		rerunStatus: (action) => typeof root.actionRerunStatus === "function" ? root.actionRerunStatus(action) : {
+			needed: false,
+			ok: false
+		},
+		effectivenessStatus: (action) => typeof root.actionEffectivenessStatus === "function" ? root.actionEffectivenessStatus(action) : { complete: false },
+		canApproveByUser: (action, user) => typeof root.actionCanApprove === "function" && !!root.actionCanApprove(action, user)
+	});
+	root.ActionEscalationService = createActionEscalationService({
+		now: () => (/* @__PURE__ */ new Date()).toISOString(),
+		today: () => isoToday(),
+		createId: () => uid(),
+		nextNceId: (actions, today) => root.NceActionIdentityService.nextNceId(actions, today),
+		dueDate: (days) => root.NceActionIdentityService.dueDate(days),
+		isCancelled: (action) => nceActionBasics.actionCancelled(action),
+		approvalStatus: (action) => nceActionBasics.actionApprovalStatus(action),
+		activeFollowUp: (actions, action) => root.NceActionIdentityService.activeFollowUp(actions, action)
+	});
+	root.ActionRecordService = createActionRecordService({
+		now: () => (/* @__PURE__ */ new Date()).toISOString(),
+		createId: () => uid(),
+		isCancelled: (action) => nceActionBasics.actionCancelled(action),
+		approvalStatus: (action) => nceActionBasics.actionApprovalStatus(action)
+	});
+	root.ActionViolationService = createActionViolationService({
+		pointForAction: (action) => typeof root.actionPoint === "function" ? root.actionPoint(action) : null,
+		findTest: (testId) => (state.tests || []).find((test) => test.id === testId) || null,
+		levelFor: (test, level) => lvlCfg(test, level) || null,
+		errorType: (rules) => globalThis.errorType(rules)
+	});
+	root.ActionListPresentation = createActionListPresentation({ levelFor: (test, level) => lvlCfg(test, level) || null });
+	root.ActionEvidencePresentation = createActionEvidencePresentation({
+		pointForAction: (action) => typeof root.actionPoint === "function" ? root.actionPoint(action) : null,
+		eventDate: (action) => typeof root.actionEventDate === "function" ? root.actionEventDate(action) : String(action.date || ""),
+		formatDate: (value) => vnDate(value),
+		formatDateTime: (value) => formatDateTimeVN(value)
+	});
+	root.ActionRerunEvidencePresentation = createActionRerunEvidencePresentation({
+		pointForAction: (action) => typeof root.actionPoint === "function" ? root.actionPoint(action) : null,
+		levelShort: (test, level, lot) => root.ActionListPresentation.levelShort(test, level, lot)
+	});
+	root.ActionStatusPresentation = createActionStatusPresentation({ checkLabels: nceActionLabels.actionLabels.check });
+	root.ActionReviewPresentation = createActionReviewPresentation();
+	root.ActionDetailPresentation = createActionDetailPresentation({
+		sourceLabels: nceActionLabels.actionLabels.source,
+		phaseLabels: nceActionLabels.actionLabels.phase,
+		riskLabels: nceActionLabels.actionLabels.risk
+	});
+	root.ActionGuidePresentation = createActionGuidePresentation();
+	root.ReportPeriodPresentation = createReportPeriodPresentation();
+	root.ActionBiasService = createActionBiasService({
+		teaFor: (test, level) => globalThis.sgTeaBySource(test, globalThis.sgTeaSource(test), level.mean),
+		systematicShiftCritical: (tea, bias, sd) => root.QCCore.systematicShiftCritical(tea, bias, sd),
+		sigmaBiasValue: (level) => typeof globalThis.sgBiasVal === "function" ? globalThis.sgBiasVal(level) : level.biasEqa ?? level.bias
+	});
+	root.ActionBiasPresentation = createActionBiasPresentation((value) => globalThis.fmt(value));
 	var qcPointWarnings = createQcPointWarnings({
 		stats: root.QCCore.stats,
 		todayIso: () => isoToday(),
@@ -2264,7 +4749,14 @@
 	root.lisGatewayStart = lisClient.start;
 	root.ManageConfigService = createManageConfigService({
 		cleanText: root.QCCore.cleanText,
-		cleanId: root.QCCore.cleanId
+		cleanId: root.QCCore.cleanId,
+		targetFromLimits: root.QCCore.targetFromLimits,
+		limitsFromTarget: root.QCCore.limitsFromTarget
+	});
+	root.LotTransitionPickerService = createLotTransitionPickerService({
+		searchText: (value) => globalThis.searchText(value),
+		formatDate: (value) => globalThis.vnDate(value),
+		transitionToNo: (lotId) => globalThis.lotTransitionToNo(lotId)
 	});
 	root.ReagentComparisonService = createReagentComparisonService({
 		cleanText: root.QCCore.cleanText,

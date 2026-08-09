@@ -8,7 +8,7 @@ export function createActionDraftStatus(deps: { todayIso: () => string; isRecord
     need(!nceActionLabels.actionLabels.source[action.eventSource as keyof typeof nceActionLabels.actionLabels.source], 'nguồn phát hiện', 'eventSource');
     need(!nceActionLabels.actionLabels.phase[action.processPhase as keyof typeof nceActionLabels.actionLabels.phase], 'giai đoạn quá trình', 'processPhase');
     need(!nceActionLabels.actionLabels.containment[action.containmentStatus as keyof typeof nceActionLabels.actionLabels.containment], 'kiểm soát tức thời (mục 1)', 'containmentStatus');
-    need(String(action.correction || '').trim().length < 5, 'xử lý tức thời đã thực hiện', 'correction');
+    need(String(action.correction || '').trim().length < 5, 'xử lý tức thời đã thực hiện — ô cuối mục 1, tối thiểu 5 ký tự', 'correction');
     need(!String(action.by || '').trim(), 'người phụ trách', 'by'); need(!String(action.dueDate || '').trim(), 'hạn hoàn thành', 'dueDate');
     need(action.eventSource === 'iqc' && !String(action.pointId || '').trim(), 'sự cố nội kiểm IQC phải mở từ dòng vi phạm', 'eventSource');
     need(action.eventSource === 'iqc' && !!String(action.pointId || '').trim() && !deps.pointForAction(action), 'điểm QC liên kết không còn tồn tại hoặc không thuộc đúng xét nghiệm', 'eventSource');

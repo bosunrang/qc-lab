@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
-const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'modules/action-workflow-service.js']);
+const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'generated/modular-pilot.js', 'modules/action-workflow-service.js']);
 run(ctx, 'function __getState(){return state;} function __setState(s){state=s;}');
 
 function fixture(actionOverrides = {}) {
@@ -444,6 +444,162 @@ function fixture(actionOverrides = {}) {
   const action = ctx.__getState().actions[0];
   action.protocolVersion = 3; action.actionCompletedDate = '';
   assert.equal(ctx.actionRerunStatus(action).ok, false, 'đổi chính hồ sơ cũng phải làm memo trượt');
+}
+
+{
+  const review = ctx.ActionReviewService;
+  ctx.__setState({ actions: [] });
+  ctx.actionWorkflowStatus = () => ({ stage: 'approval', complete: false });
+  assert.equal(review.approvalReadiness({ id: 'review-draft', approvalStatus: 'pending' }, { id: 'u2' }).reason, 'unrecorded',
+    'cổng duyệt phải trả đúng nguyên nhân khi hồ sơ chưa có hành động thực tế');
+  ctx.actionRecorded = () => true;
+  ctx.actionProtocolStatus = () => ({ complete: true, missing: [] });
+  ctx.actionRerunStatus = () => ({ needed: true, ok: false });
+  ctx.actionEffectivenessStatus = () => ({ complete: true });
+  ctx.actionCanApprove = () => true;
+  assert.equal(review.approvalReadiness({ id: 'review-rerun', approvalStatus: 'pending' }, { id: 'u2' }).reason, 'rerun',
+    'cổng duyệt phải chặn hồ sơ cần QC chạy lại nhưng chưa đạt');
+  ctx.actionRerunStatus = () => ({ needed: false, ok: false });
+  assert.equal(review.approvalReadiness({ id: 'review-ready', approvalStatus: 'pending' }, { id: 'u2' }).reason, 'ready',
+    'cổng duyệt phải chỉ cho qua khi tất cả điều kiện nghiệp vụ đã đạt');
+  assert.equal(review.cancelReadiness({ id: 'review-approved-cancel', approvalStatus: 'approved' }).reason, 'approved',
+    'hồ sơ đã duyệt không được phép hủy');
+  ctx.__setState({ actions: [{ id: 'follow-up', nceId: 'NCE-TIẾP', approvalStatus: 'pending' }] });
+  assert.equal(review.cancelReadiness({ id: 'review-parent', approvalStatus: 'pending', followUpNceId: 'NCE-TIẾP' }).reason, 'follow-up',
+    'hồ sơ có vòng NCE nối tiếp còn hoạt động không được phép hủy');
+  ctx.actionWorkflowStatus = () => ({ stage: 'closed', complete: true });
+  assert.equal(review.reopenReadiness({ id: 'review-closed', approvalStatus: 'approved' }).reason, 'complete',
+    'hồ sơ đã khép vòng hợp lệ không được phép mở lại');
+  ctx.actionWorkflowStatus = () => ({ stage: 'approval', complete: false });
+  assert.equal(review.returnReadiness({ id: 'review-return', approvalStatus: 'pending' }).reason, 'ready',
+    'hồ sơ chờ duyệt phải đủ điều kiện trả lại để chỉnh sửa');
+  assert.equal(review.reviewToken({ id: 'review-token', createdAt: '2026-08-09T01:02:03.000Z', approvalStatus: 'pending' }),
+    'review-token|2026-08-09T01:02:03.000Z|approval||pending|active',
+    'token duyệt phải bao gồm phiên bản hồ sơ, workflow, bằng chứng QC và các trạng thái review');
+  const approved = { id: 'review-approved', approvalStatus: 'pending' };
+  assert.equal(review.approve(approved, 'Duyệt hồ sơ', 'Quản trị'), true);
+  assert.equal(approved.approvalStatus, 'approved');
+  assert.equal(approved.approvedBy, 'Quản trị');
+  const returned = { id: 'review-returned', approvalStatus: 'pending' };
+  assert.equal(review.returnForRevision(returned, 'Bổ sung bằng chứng', 'Quản trị'), true);
+  assert.equal(returned.approvalStatus, 'returned');
+  assert.equal(returned.returnNote, 'Bổ sung bằng chứng');
+  const cancelled = { id: 'review-cancelled', approvalStatus: 'pending' };
+  assert.equal(review.cancel(cancelled, 'Lập nhầm hồ sơ', 'Quản trị'), true);
+  assert.equal(cancelled.recordStatus, 'cancelled');
+  ctx.actionWorkflowStatus = () => ({ stage: 'investigating', complete: false });
+  const reopened = { id: 'review-reopened', approvalStatus: 'approved' };
+  assert.equal(review.reopen(reopened, 'Bằng chứng QC đã bị hủy'), true);
+  assert.equal(reopened.approvalStatus, 'pending');
+  assert.match(reopened.approvalNote, /^Mở lại:/);
+}
+
+{
+  ctx.__setState({ tests: [{ id: 'void-test' }] });
+  ctx.actionPoint = () => ({ val: 131, qcMean: 100, qcSd: 10 });
+  const violation = ctx.ActionViolationService.info({ testId: 'void-test', level: 1, rule: 'Hủy điểm QC', errorType: 'Quản lý dữ liệu QC' });
+  assert.equal(violation.rule, '1-3s (suy từ Z)');
+  assert.equal(violation.verdict, 'rej');
+  assert.equal(ctx.ActionViolationService.verdictLabel({ testId: 'void-test', level: 1, rule: 'Hủy điểm QC' }), 'Loại bỏ',
+    'hồ sơ hủy điểm cũ phải suy luận nhãn QC từ Z mà không ghi ngược vào hồ sơ');
+}
+
+{
+  const presentation = ctx.ActionListPresentation;
+  assert.equal(presentation.levelShort({ levels: [{ level: 2, lot: 'L2' }] }, 2), 'M2 · Lô L2');
+  assert.equal(presentation.levelShort(null, 0), 'Không gắn mức QC');
+  const grouped = presentation.groupIssuesByTestDate([
+    { t: { id: 'T1' }, p: { date: '2026-08-09' }, f: { level: 'warn' } },
+    { t: { id: 'T1' }, p: { date: '2026-08-09' }, f: { level: 'rej' } },
+  ]);
+  assert.equal(grouped.length, 1);
+  assert.equal(grouped[0].worst, 'rej');
+  assert.equal(grouped[0].items.length, 2, 'sự cố cùng xét nghiệm-ngày phải được gom một nhóm');
+}
+
+{
+  const timeline = ctx.ActionEvidencePresentation.timeline(
+    { date: '2026-08-09', createdAt: '2026-08-09T02:03:04.000Z', nceId: 'NCE-01' },
+    { point: { date: '2026-08-10', runId: 'R2' } },
+  );
+  assert.equal(timeline[0].label, 'Ngày xảy ra');
+  assert.equal(timeline[1].note, 'Lần R2');
+  assert.equal(timeline[3].note, 'NCE-01', 'timeline bằng chứng phải giữ mã hồ sơ để truy xuất');
+}
+
+{
+  const evidence = ctx.ActionRerunEvidencePresentation;
+  assert.equal(evidence.model({ id: 'rerun-pending' }, { needed: true, label: 'Chờ QC' }, null).kind, 'pending');
+  const accepted = evidence.model({ id: 'rerun-ok' }, { needed: true, cls: 'warn', point: { id: 'q2', level: 1, lot: 'L1' } }, null);
+  assert.equal(accepted.kind, 'accepted');
+  assert.equal(accepted.heading, 'QC được chấp nhận kèm cảnh báo');
+}
+
+{
+  const presentation = ctx.ActionStatusPresentation;
+  const check = presentation.detailCheck('abnormal');
+  assert.equal(check.cls, 'rej');
+  assert.equal(check.label, 'Bất thường');
+  assert.equal(JSON.stringify(presentation.sideChips({ followUpNceId: 'NCE-02', parentNceId: 'NCE-00' }, 'approval',
+    { needed: true, cls: 'warn', label: 'QC cảnh báo' }, { overdue: true, label: 'Quá hạn' }, { escalated: true })), JSON.stringify([
+    { cls: 'warn', label: 'QC cảnh báo' }, { cls: 'rej', label: 'Quá hạn' },
+    { cls: 'warn', label: 'Đã chuyển NCE-02' }, { cls: 'none', label: 'Nối tiếp NCE-00' },
+  ]));
+}
+
+{
+  const buttons = ctx.ActionReviewPresentation.buttons({}, { approval: 'pending', workflowStage: 'approval', cancelled: false, isAdmin: true, canWrite: true, canEscalate: false, canReopen: false });
+  assert.equal(buttons.edit, true);
+  assert.equal(buttons.approve, true);
+  assert.equal(buttons.returnForRevision, true);
+  assert.equal(buttons.cancel, true);
+  assert.equal(ctx.ActionReviewPresentation.buttons({}, { approval: 'approved', workflowStage: 'closed', cancelled: false, isAdmin: true, canWrite: true, canEscalate: false, canReopen: false }).cancel, false,
+    'hồ sơ đã duyệt không được hiện nút hủy');
+}
+
+{
+  const rows = ctx.ActionDetailPresentation.meta({ protocolVersion: 3, nceId: 'NCE-01', eventSource: 'iqc', processPhase: 'exam', riskLevel: 'high', riskBasis: 'SOP-01', by: 'KTV A' }, {
+    testName: 'Glucose', levelShort: 'M1 · Lô L1', verdict: 'Loại bỏ', violation: { rule: '1-3s', errorType: 'Sai số ngẫu nhiên' },
+    riskScore: 24, dueDate: '09/08/2026', overdueLabel: '', workflowLabel: 'Chờ duyệt',
+  });
+  assert.equal(rows.length, 6);
+  assert.equal(rows[0].value, 'Glucose · M1 · Lô L1');
+  assert.equal(rows[3].note, 'SOP-01');
+}
+
+{
+  const steps = ctx.ActionGuidePresentation.steps;
+  assert.equal(steps.length, 8);
+  assert.equal(steps[0].title, 'Ghi nhận và kiểm soát tức thời');
+  assert.equal(steps[7].phase, 'Khép vòng');
+}
+
+{
+  const parent = { id: 'parent', nceId: 'NCE-CŨ', testId: 'T1', level: 1, lot: 'L1', pointId: 'p1', rule: '1-3s',
+    errorType: 'Sai số ngẫu nhiên', protocolVersion: 3, eventSource: 'iqc', processPhase: 'exam', containmentStatus: 'held', effectivenessStatus: 'ineffective', approvalStatus: 'pending' };
+  const actions = [parent];
+  const followUp = ctx.ActionEscalationService.createFollowUp(actions, parent, { id: 'u1', username: 'ktv-a', name: 'KTV A' });
+  assert.ok(followUp, 'hồ sơ chưa hiệu lực hợp lệ phải mở được vòng NCE tiếp theo');
+  assert.equal(actions.length, 2);
+  assert.equal(parent.followUpNceId, followUp.nceId);
+  assert.equal(followUp.parentNceId, 'NCE-CŨ');
+  assert.equal(followUp.pointId, 'p1');
+  assert.equal(followUp.protocolVersion, 3);
+  assert.equal(ctx.ActionEscalationService.createFollowUp(actions, parent, { id: 'u1', username: 'ktv-a', name: 'KTV A' }), null,
+    'một hồ sơ không được mở vòng tiếp theo hai lần');
+}
+
+{
+  const records = [];
+  const created = ctx.ActionRecordService.create(records, { nceId: 'NCE-MỚI', protocolVersion: 3, effectivenessStatus: 'pending', action: 'Khắc phục' }, { id: 'u1', username: 'ktv-a', name: 'KTV A' });
+  assert.equal(records[0], created);
+  assert.equal(created.approvalStatus, 'pending');
+  assert.deepEqual([...created.contentEditorUserIds], ['u1']);
+  const updated = ctx.ActionRecordService.update(created, { action: 'Khắc phục đầy đủ', effectivenessStatus: 'effective', effectivenessDate: '2026-08-09', effectivenessNote: 'Theo dõi không tái diễn' }, { id: 'u2', username: 'admin', name: 'Quản trị' });
+  assert.equal(updated, created);
+  assert.equal(created.approvalStatus, 'pending');
+  assert.deepEqual([...created.contentEditorUserIds].sort(), ['u1', 'u2']);
+  assert.equal(created.effectivenessBy, 'Quản trị');
 }
 
 console.log('ActionWorkflowService tests passed');

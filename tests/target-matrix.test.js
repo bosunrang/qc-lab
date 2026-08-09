@@ -15,7 +15,7 @@
 const assert = require('node:assert/strict');
 const { loadSandbox } = require('./helpers/sandbox');
 
-const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'modules/manage-tests-actions.js']);
+const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js', 'modules/state.js', 'modules/qc-domain.js', 'modules/manage-tests-actions.js']);
 // Values crossing the vm sandbox boundary belong to a different realm (their own
 // Object prototype), which makes assert.deepEqual report false mismatches even
 // for identical-looking plain objects. Round-trip through JSON first.

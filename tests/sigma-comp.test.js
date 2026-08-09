@@ -17,6 +17,108 @@ const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js', 'modules/state
 assert.equal(ctx.sgInputDisplayValue(.721694321),'0.72','CV/Bias display is concise while stored precision remains unchanged');
 assert.equal(ctx.sgInputDisplayValue(''),'');
 
+// --- Period selection retains a valid choice and falls back to the most recent record ---
+{
+  const service=ctx.SigmaPeriodSelectionService, entries=[{id:'P1',period:'2026-07'},{id:'P2',period:'2026-08'}];
+  assert.equal(service.resolve('P1',entries),'P1');
+  assert.equal(service.resolve('missing',entries),'P2');
+  assert.deepEqual(JSON.parse(JSON.stringify(service.select('P1',entries,'P1'))),{changed:false,selected:'P1'});
+  assert.deepEqual(JSON.parse(JSON.stringify(service.select('P1',entries,'P2'))),{changed:true,selected:'P2'});
+  assert.deepEqual(JSON.parse(JSON.stringify(service.select('P1',entries,'missing'))),{changed:false,selected:'P1'});
+}
+
+// --- TEa snapshots change only the current period and propagate to existing QC levels ---
+{
+  const service=ctx.SigmaTeaSnapshotService, test={id:'T1'}, entries=[{id:'OLD',period:'2026-07',tea:2,lv:{1:{tea:2}}},{id:'CUR',period:'2026-08',tea:2,lv:{1:{tea:2}}}];
+  const changed=service.syncCurrent(test,entries,'2026-08',()=>({tea:5,teaSource:'ricos'}),(subject,entry,level)=>{entry.lv[level].tea=5;return entry.lv[level];});
+  assert.equal(changed.id,'CUR');
+  assert.equal(entries[1].tea,5);
+  assert.equal(entries[1].lv[1].tea,5);
+  assert.equal(entries[0].tea,2,'historical period snapshots are immutable during a current sync');
+}
+
+// --- TEa editing validates values and initializes the required EFLM metadata ---
+{
+  const service=ctx.SigmaTeaEditService, test={name:'Glucose'};
+  assert.equal(service.setValue(test,'5.2'),5.2);
+  assert.equal(service.setValue(test,'bad'),0);
+  assert.equal(service.setSource(test,'eflm',['ricos','eflm']),'eflm');
+  assert.equal(test.eflmAnalyte,'Glucose');
+  assert.equal(test.eflmAps,'desirable');
+  service.setMeta(test,'eflmAps','not-a-tier');
+  assert.equal(test.eflmAps,'desirable');
+  service.setMeta(test,'eflmRef','A'.repeat(520));
+  assert.equal(test.eflmRef.length,500);
+}
+
+// --- MU workflow updates selected periods only and preserves the valid zero-u(cal) conclusion ---
+{
+  const records=[{id:'P1',lv:{}},{id:'P2',lv:{1:{uCal:4}}}], rows=[{level:1,uCal:'0',uCalBasis:'CoA lot 123',muBiasMode:'exclude'},{level:2,uCal:'bad',uCalBasis:'',muBiasMode:'other'}];
+  const workflow=ctx.SigmaMuWorkflowService;
+  assert.deepEqual(JSON.parse(JSON.stringify(workflow.apply(records,[],rows,'KTV A','2026-07-30'))),{applied:0,status:'missing-periods'});
+  assert.deepEqual(JSON.parse(JSON.stringify(workflow.apply(records,['P1'],rows,'KTV A','2026-07-30'))),{applied:1,status:'applied'});
+  assert.equal(records[0].lv[1].uCal,0);
+  assert.equal(records[0].lv[1].uCalBasis,'CoA lot 123');
+  assert.equal(records[0].lv[1].muBiasMode,'exclude');
+  assert.equal(records[0].lv[1].muReviewedBy,'KTV A');
+  assert.equal(records[0].lv[2].uCal,undefined);
+  assert.equal(records[0].lv[2].muBiasMode,'include');
+  assert.equal(records[1].lv[1].uCal,4,'unselected periods must not change');
+}
+
+// --- Bias workflow rejects incomplete choices before mutating any period ---
+{
+  const workflow=ctx.SigmaBiasWorkflowService, records=[{id:'P1',lv:{}}], valid=[{lab:'101',target:'100'}];
+  assert.deepEqual(JSON.parse(JSON.stringify(workflow.apply(records,['P1'],1,[{lab:'',target:''}]))),{status:'invalid-rounds',applied:0});
+  assert.deepEqual(JSON.parse(JSON.stringify(workflow.apply(records,[],1,valid))),{status:'missing-periods',applied:0});
+  const applied=workflow.apply(records,['P1'],1,valid);
+  assert.equal(applied.status,'applied');
+  assert.equal(applied.applied,1);
+  assert.equal(records[0].lv[1].biasEqa,1);
+  assert.equal(records[0].lv[1].biasEqaMethod,'rms');
+}
+
+// --- Tracking service picks a deterministic fallback only when the active assay is removed ---
+{
+  const tracked=[{id:'T2',name:'Sodium',sgTracked:true},{id:'T1',name:'Glucose',sgTracked:true},{id:'T3',name:'Potassium',sgTracked:false}];
+  ctx.operationalTestOrder=test=>test.id==='T1'?1:2;
+  ctx.testDisplayName=test=>test.name;
+  assert.equal(ctx.SigmaTrackedTestService.track(tracked,'T3').selected,'T3');
+  assert.equal(ctx.SigmaTrackedTestService.select(tracked,'T3').id,'T3');
+  assert.deepEqual(JSON.parse(JSON.stringify(ctx.SigmaTrackedTestService.remove(tracked,'T3','T3'))),{removed:true,selected:'T1'});
+  assert.deepEqual(JSON.parse(JSON.stringify(ctx.SigmaTrackedTestService.remove(tracked,'UNKNOWN','T1'))),{removed:false,selected:'T1'});
+}
+
+// --- A manual CV/Bias edit supersedes the incompatible automatic review metadata ---
+{
+  const level={cv:2,cvSource:'iqc-cohort',n:30,sourceLot:'L1',cohortStatus:'eligible',sourceTargetMean:100,biasEqa:.5,biasEqaMethod:'rms',eqaRounds:[{lab:101,target:100}],eqaBatchId:'B1'};
+  ctx.SigmaLevelEditService.update(level,'cv','1.25');
+  assert.equal(level.cv,1.25);
+  assert.equal(level.cvSource,'manual');
+  assert.equal(level.n,undefined);
+  assert.equal(level.sourceLot,undefined);
+  ctx.SigmaLevelEditService.update(level,'biasEqa','');
+  assert.equal(level.biasEqa,'');
+  assert.equal(level.biasEqaMethod,undefined);
+  assert.equal(level.eqaRounds,undefined);
+  assert.equal(level.eqaBatchId,undefined);
+}
+
+// --- Period records keep one entry per month and never delete an unmatched record ---
+{
+  const records=[{id:'P1',period:'2026-07',lv:{}}], service=ctx.SigmaPeriodRecordService;
+  const duplicate=service.add(records,'2026-07','P2',{tea:6.9});
+  assert.deepEqual(JSON.parse(JSON.stringify(duplicate)),{added:false,entry:null});
+  assert.equal(records.length,1,'adding an existing month leaves its period record intact');
+  const added=service.add(records,'2026-08','P2',{tea:6.9});
+  assert.equal(added.added,true);
+  assert.equal(records[1].tea,6.9);
+  assert.deepEqual(JSON.parse(JSON.stringify(service.changePeriod(records,'P2','2026-07'))),{changed:false,duplicate:true});
+  assert.equal(records[1].period,'2026-08','a duplicate month cannot overwrite the selected period');
+  assert.equal(service.remove(records,'UNKNOWN'),false);
+  assert.equal(records.length,2,'deleting an unknown id must not remove a real period');
+}
+
 // A stopped lot group is no longer operational for new QC entry, but its levels,
 // lot-specific IQC cohort and target snapshots must remain available to old Sigma periods.
 {

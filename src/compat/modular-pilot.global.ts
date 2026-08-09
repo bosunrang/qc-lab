@@ -33,12 +33,38 @@ import {
   type CohortStats,
   type SigmaCohortServiceApi,
 } from '../domain/sigma/sigma-cohort-service';
+import { sigmaPresentation, type SigmaPresentation } from '../domain/sigma/sigma-presentation';
+import { createSigmaPeriodViewModel, type SigmaPeriodViewModel } from '../domain/sigma/sigma-period-view-model';
+import { createSigmaBiasService, type SigmaBiasService } from '../domain/sigma/sigma-bias-service';
+import { createSigmaCohortImportService, type SigmaCohortImportService } from '../application/sigma/sigma-cohort-import-service';
+import { createSigmaPeriodRecordService, type SigmaPeriodRecordService } from '../application/sigma/sigma-period-record-service';
+import { createSigmaLevelEditService, type SigmaLevelEditService } from '../application/sigma/sigma-level-edit-service';
+import { createSigmaTrackedTestService, type SigmaTrackedTestService } from '../application/sigma/sigma-tracked-test-service';
+import { createSigmaBiasWorkflowService, type SigmaBiasWorkflowService } from '../application/sigma/sigma-bias-workflow-service';
+import { createSigmaMuWorkflowService, type SigmaMuWorkflowService } from '../application/sigma/sigma-mu-workflow-service';
+import { createSigmaCohortSelectionService, type SigmaCohortSelectionService } from '../application/sigma/sigma-cohort-selection-service';
+import { createSigmaTeaEditService, type SigmaTeaEditService } from '../application/sigma/sigma-tea-edit-service';
+import { createSigmaTeaSnapshotService, type SigmaTeaSnapshotService } from '../application/sigma/sigma-tea-snapshot-service';
+import { createSigmaLevelSelectionService, type SigmaLevelSelectionService } from '../domain/sigma/sigma-level-selection-service';
+import { createSigmaPeriodSelectionService, type SigmaPeriodSelectionService } from '../presentation/sigma/sigma-period-selection-service';
+import { createLotTransitionPickerService, type LotTransitionPickerServiceApi } from '../presentation/manage/lot-transition-picker-service';
 import { westgardViewModel, type WestgardViewModelApi } from '../domain/westgard/westgard-view-model';
 import { nceActionLabels, type NceActionLabels } from '../domain/nce/action-labels';
 import { nceActionBasics, type NceActionBasics } from '../domain/nce/action-basics';
 import { createNceActionIdentityService, type NceActionIdentityService } from '../application/nce/action-identity-service';
 import { createActionApprovalGates, type ActionApprovalGates } from '../domain/nce/action-approval-gates';
 import { createActionQcLink, type ActionQcLink } from '../domain/nce/action-qc-link';
+import { createActionBiasService, type ActionBiasService } from '../domain/nce/action-bias-service';
+import { createActionBiasPresentation, type ActionBiasPresentation } from '../presentation/nce/action-bias-presentation';
+import { createActionViolationService, type ActionViolationService } from '../domain/nce/action-violation-service';
+import { createActionListPresentation, type ActionListPresentation } from '../presentation/nce/action-list-presentation';
+import { createActionEvidencePresentation, type ActionEvidencePresentation } from '../presentation/nce/action-evidence-presentation';
+import { createActionRerunEvidencePresentation, type ActionRerunEvidencePresentation } from '../presentation/nce/action-rerun-evidence-presentation';
+import { createActionStatusPresentation, type ActionStatusPresentation } from '../presentation/nce/action-status-presentation';
+import { createActionReviewPresentation, type ActionReviewPresentation } from '../presentation/nce/action-review-presentation';
+import { createActionDetailPresentation, type ActionDetailPresentation } from '../presentation/nce/action-detail-presentation';
+import { createActionGuidePresentation, type ActionGuidePresentation } from '../presentation/nce/action-guide-presentation';
+import { createReportPeriodPresentation, type ReportPeriodPresentation } from '../presentation/report/report-period-presentation';
 import { nceActionRerunPolicy, type NceActionRerunPolicy } from '../domain/nce/action-rerun-policy';
 import { nceActionRerunCacheKey, type NceActionRerunCacheKey } from '../domain/nce/action-rerun-cache-key';
 import { nceActionQcIndex, type NceActionQcIndex } from '../domain/nce/action-qc-index';
@@ -46,6 +72,10 @@ import { nceActionRerunEvaluator, type NceActionRerunEvaluator } from '../domain
 import { createActionWorkflowStatus, type ActionWorkflowStatus } from '../domain/nce/action-workflow-status';
 import { createPointWorkflowService } from '../application/nce/point-workflow-service';
 import { createActionDraftStatus } from '../domain/nce/action-draft-status';
+import { createActionProtocolService, type ActionProtocolService } from '../domain/nce/action-protocol-service';
+import { createActionReviewService, type ActionReviewService } from '../application/nce/action-review-service';
+import { createActionEscalationService, type ActionEscalationService } from '../application/nce/action-escalation-service';
+import { createActionRecordService, type ActionRecordService } from '../application/nce/action-record-service';
 import {
   createAnalysisUiState,
   createAuthUiState,
@@ -86,14 +116,44 @@ type QCLabGlobal = typeof globalThis & {
   ActionWorkflowStatusService?: ActionWorkflowStatus;
   PointWorkflowService?: ReturnType<typeof createPointWorkflowService>;
   ActionDraftStatusService?: ReturnType<typeof createActionDraftStatus>;
+  ActionProtocolService?: ActionProtocolService;
+  ActionReviewService?: ActionReviewService;
+  ActionEscalationService?: ActionEscalationService;
+  ActionRecordService?: ActionRecordService;
+  ActionBiasService?: ActionBiasService;
+  ActionBiasPresentation?: ActionBiasPresentation;
+  ActionViolationService?: ActionViolationService;
+  ActionListPresentation?: ActionListPresentation;
+  ActionEvidencePresentation?: ActionEvidencePresentation;
+  ActionRerunEvidencePresentation?: ActionRerunEvidencePresentation;
+  ActionStatusPresentation?: ActionStatusPresentation;
+  ActionReviewPresentation?: ActionReviewPresentation;
+  ActionDetailPresentation?: ActionDetailPresentation;
+  ActionGuidePresentation?: ActionGuidePresentation;
+  ReportPeriodPresentation?: ReportPeriodPresentation;
   ChartViewModel?: ChartViewModelApi;
   EntryService?: EntryServiceApi;
   ManageConfigService?: ManageConfigServiceApi;
+  LotTransitionPickerService?: LotTransitionPickerServiceApi;
   PeriodService?: PeriodServiceApi;
   qcPointWarnings?: (test: Record<string, any>, config: Record<string, any>, date: string,
     runId: string, value: number) => string[];
   ReagentComparisonService?: ReagentComparisonServiceApi;
   SigmaCohortService?: SigmaCohortServiceApi;
+  SigmaPresentation?: SigmaPresentation;
+  SigmaPeriodViewModel?: SigmaPeriodViewModel;
+  SigmaBiasService?: SigmaBiasService;
+  SigmaCohortImportService?: SigmaCohortImportService;
+  SigmaPeriodRecordService?: SigmaPeriodRecordService;
+  SigmaLevelEditService?: SigmaLevelEditService;
+  SigmaTrackedTestService?: SigmaTrackedTestService;
+  SigmaBiasWorkflowService?: SigmaBiasWorkflowService;
+  SigmaMuWorkflowService?: SigmaMuWorkflowService;
+  SigmaCohortSelectionService?: SigmaCohortSelectionService;
+  SigmaTeaEditService?: SigmaTeaEditService;
+  SigmaTeaSnapshotService?: SigmaTeaSnapshotService;
+  SigmaLevelSelectionService?: SigmaLevelSelectionService;
+  SigmaPeriodSelectionService?: SigmaPeriodSelectionService;
   WestgardViewModel?: WestgardViewModelApi;
   LISClientService?: LisClientApi;
   BackupService?: BackupServiceApi;
@@ -129,13 +189,18 @@ type QCLabGlobal = typeof globalThis & {
     stats: (values: number[]) => CohortStats & QcWarningStats;
     cleanText: (value: unknown, maximumLength?: number) => string;
     cleanId: (value: unknown) => string;
+    targetFromLimits: (low: number, high: number) => Record<string, any> | null;
+    limitsFromTarget: (mean: number, sd: number) => Record<string, any> | null;
+    systematicShiftCritical: (tea: number, bias: number, sd: number) => Record<string, any> | null;
   };
   qcValueDecimals?: (value: unknown) => number;
 };
 
 const root = globalThis as QCLabGlobal;
 if (!root.QCCore || typeof root.QCCore.stats !== 'function'
-  || typeof root.QCCore.cleanText !== 'function' || typeof root.QCCore.cleanId !== 'function') {
+  || typeof root.QCCore.cleanText !== 'function' || typeof root.QCCore.cleanId !== 'function'
+  || typeof root.QCCore.targetFromLimits !== 'function' || typeof root.QCCore.limitsFromTarget !== 'function'
+  || typeof root.QCCore.systematicShiftCritical !== 'function') {
   throw new Error('QCCore phải được nạp đủ dependency trước các module TypeScript');
 }
 
@@ -151,6 +216,56 @@ installUiState(root, 'SigmaUIState', createSigmaUiState());
 // Adapter tạm thời: caller cũ tiếp tục dùng global trong lúc nguồn nghiệp vụ
 // đã được chuyển sang ES Modules có kiểu dữ liệu và dependency rõ ràng.
 root.ChartViewModel = chartViewModel;
+root.SigmaPresentation = sigmaPresentation;
+root.SigmaPeriodViewModel = createSigmaPeriodViewModel({
+  sigmaMetric: (tea, bias, cv) => (root.QCCore as any).sigmaMetric(tea, bias, cv),
+  teaFor: (test, entry, level, refs) => (globalThis as any).sgEntryTea(test, entry, level, refs),
+  teaMeta: (test, source) => (globalThis as any).sgTeaSourceMeta(test, source),
+  teaSource: test => (globalThis as any).sgTeaSource(test), teaLabel: source => (globalThis as any).sgTeaLabel(source), teaReference: test => (globalThis as any).sgTeaRefText(test),
+  readiness: level => sigmaPresentation.sigmaReadiness(level), muFor: (test, entry, level, tea, refs) => (globalThis as any).sgMU(test, entry, level, tea, refs),
+  zone: sigma => sigmaPresentation.sigmaZone(sigma), runPlan: sigma => sigmaPresentation.sigmaRunPlan(sigma),
+});
+root.SigmaBiasService = createSigmaBiasService({ stats: values => root.QCCore!.stats(values) });
+root.SigmaCohortImportService = createSigmaCohortImportService({
+  assess: cohort => root.SigmaCohortService!.assess(cohort as any), setTeaSnapshot: (test, entry, level, force) => (globalThis as any).sgSetLevelTeaSnapshot(test, entry, level, force),
+  isCurrentPeriod: period => period === (globalThis as any).isoMonth(),
+});
+root.SigmaPeriodRecordService = createSigmaPeriodRecordService();
+root.SigmaLevelEditService = createSigmaLevelEditService({ cleanText: (value, maximumLength) => root.QCCore!.cleanText(value, maximumLength) });
+root.SigmaTrackedTestService = createSigmaTrackedTestService({
+  orderedTracked: tests => tests.filter(test => test.sgTracked).sort((left, right) => (globalThis as any).operationalTestOrder(left) - (globalThis as any).operationalTestOrder(right) || String((globalThis as any).testDisplayName(left)).localeCompare(String((globalThis as any).testDisplayName(right)), 'vi')),
+});
+root.SigmaBiasWorkflowService = createSigmaBiasWorkflowService({
+  stats: rounds => root.SigmaBiasService!.stats(rounds),
+  apply: (records, periodIds, level, bias, rounds, batchId) => root.SigmaBiasService!.applyToPeriods(records, periodIds, level, bias, rounds, batchId),
+  createId: () => uid(),
+});
+root.SigmaMuWorkflowService = createSigmaMuWorkflowService({
+  cleanText: (value, maximumLength) => root.QCCore!.cleanText(value, maximumLength),
+  parseDate: value => {
+    const parse = (globalThis as any).parseVN;
+    if (typeof parse === 'function') return parse(value);
+    const text = String(value || '').trim();
+    return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : '';
+  },
+});
+root.SigmaCohortSelectionService = createSigmaCohortSelectionService({
+  normalizePeriod: period => root.SigmaCohortService!.normalizePeriod(period),
+  today: () => (globalThis as any).isoToday(),
+  cohortsForLevelByLot: (data, options) => root.SigmaCohortService!.cohortsForLevelByLot(data, options),
+});
+root.SigmaTeaEditService = createSigmaTeaEditService({
+  cleanText: (value, maximumLength) => root.QCCore!.cleanText(value, maximumLength),
+  parseDate: value => {
+    const parse = (globalThis as any).parseVN;
+    if (typeof parse === 'function') return parse(value);
+    const text = String(value || '').trim();
+    return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : '';
+  },
+});
+root.SigmaTeaSnapshotService = createSigmaTeaSnapshotService();
+root.SigmaLevelSelectionService = createSigmaLevelSelectionService();
+root.SigmaPeriodSelectionService = createSigmaPeriodSelectionService();
 root.NceActionLabels = nceActionLabels;
 root.NceActionBasics = nceActionBasics;
 root.NceActionIdentityService = createNceActionIdentityService({
@@ -187,6 +302,80 @@ root.ActionDraftStatusService = createActionDraftStatus({
   todayIso: () => isoToday(), isRecorded: action => nceActionBasics.actionRecorded(action),
   pointForAction: action => typeof (root as any).actionPoint === 'function' ? (root as any).actionPoint(action) : null,
 });
+root.ActionProtocolService = createActionProtocolService({
+  todayIso: () => isoToday(),
+  draftStatus: action => root.ActionDraftStatusService!(action),
+  needsRerun: action => typeof (root as any).actionNeedsRerun === 'function' && !!(root as any).actionNeedsRerun(action),
+  rerunStatus: action => typeof (root as any).actionRerunStatus === 'function'
+    ? (root as any).actionRerunStatus(action) : { needed: false, ok: false, point: null },
+  activeFollowUp: action => {
+    const id = String(action.followUpNceId || '').trim();
+    return id ? ((state as any).actions || []).find((candidate: Record<string, any>) => candidate.nceId === id && !nceActionBasics.actionCancelled(candidate)) || null : null;
+  },
+  isCancelled: action => nceActionBasics.actionCancelled(action), formatDate: value => vnDate(value),
+});
+root.ActionReviewService = createActionReviewService({
+  now: () => new Date().toISOString(),
+  isCancelled: action => nceActionBasics.actionCancelled(action),
+  approvalStatus: action => nceActionBasics.actionApprovalStatus(action),
+  recordStatus: action => nceActionBasics.actionRecordStatus(action),
+  workflowStatus: action => typeof (root as any).actionWorkflowStatus === 'function' ? (root as any).actionWorkflowStatus(action) : {},
+  activeFollowUp: action => {
+    const id = String(action.followUpNceId || '').trim();
+    return id ? ((state as any).actions || []).find((candidate: Record<string, any>) => candidate.nceId === id && !nceActionBasics.actionCancelled(candidate)) || null : null;
+  },
+  isRecorded: action => typeof (root as any).actionRecorded === 'function' && !!(root as any).actionRecorded(action),
+  protocolStatus: action => typeof (root as any).actionProtocolStatus === 'function' ? (root as any).actionProtocolStatus(action) : { complete: false, missing: [] },
+  rerunStatus: action => typeof (root as any).actionRerunStatus === 'function' ? (root as any).actionRerunStatus(action) : { needed: false, ok: false },
+  effectivenessStatus: action => typeof (root as any).actionEffectivenessStatus === 'function' ? (root as any).actionEffectivenessStatus(action) : { complete: false },
+  canApproveByUser: (action, user) => typeof (root as any).actionCanApprove === 'function' && !!(root as any).actionCanApprove(action, user),
+});
+root.ActionEscalationService = createActionEscalationService({
+  now: () => new Date().toISOString(), today: () => isoToday(), createId: () => uid(),
+  nextNceId: (actions, today) => root.NceActionIdentityService!.nextNceId(actions, today),
+  dueDate: days => root.NceActionIdentityService!.dueDate(days),
+  isCancelled: action => nceActionBasics.actionCancelled(action),
+  approvalStatus: action => nceActionBasics.actionApprovalStatus(action),
+  activeFollowUp: (actions, action) => root.NceActionIdentityService!.activeFollowUp(actions, action),
+});
+root.ActionRecordService = createActionRecordService({
+  now: () => new Date().toISOString(), createId: () => uid(),
+  isCancelled: action => nceActionBasics.actionCancelled(action), approvalStatus: action => nceActionBasics.actionApprovalStatus(action),
+});
+root.ActionViolationService = createActionViolationService({
+  pointForAction: action => typeof (root as any).actionPoint === 'function' ? (root as any).actionPoint(action) : null,
+  findTest: testId => (state.tests || []).find(test => test.id === testId) || null,
+  levelFor: (test, level) => lvlCfg(test, level) || null,
+  errorType: rules => (globalThis as any).errorType(rules),
+});
+root.ActionListPresentation = createActionListPresentation({
+  levelFor: (test, level) => lvlCfg(test, level) || null,
+});
+root.ActionEvidencePresentation = createActionEvidencePresentation({
+  pointForAction: action => typeof (root as any).actionPoint === 'function' ? (root as any).actionPoint(action) : null,
+  eventDate: action => typeof (root as any).actionEventDate === 'function' ? (root as any).actionEventDate(action) : String(action.date || ''),
+  formatDate: value => vnDate(value), formatDateTime: value => formatDateTimeVN(value),
+});
+root.ActionRerunEvidencePresentation = createActionRerunEvidencePresentation({
+  pointForAction: action => typeof (root as any).actionPoint === 'function' ? (root as any).actionPoint(action) : null,
+  levelShort: (test, level, lot) => root.ActionListPresentation!.levelShort(test, level, lot),
+});
+root.ActionStatusPresentation = createActionStatusPresentation({
+  checkLabels: nceActionLabels.actionLabels.check,
+});
+root.ActionReviewPresentation = createActionReviewPresentation();
+root.ActionDetailPresentation = createActionDetailPresentation({
+  sourceLabels: nceActionLabels.actionLabels.source, phaseLabels: nceActionLabels.actionLabels.phase,
+  riskLabels: nceActionLabels.actionLabels.risk,
+});
+root.ActionGuidePresentation = createActionGuidePresentation();
+root.ReportPeriodPresentation = createReportPeriodPresentation();
+root.ActionBiasService = createActionBiasService({
+  teaFor: (test, level) => (globalThis as any).sgTeaBySource(test, (globalThis as any).sgTeaSource(test), level.mean),
+  systematicShiftCritical: (tea, bias, sd) => root.QCCore!.systematicShiftCritical(tea, bias, sd),
+  sigmaBiasValue: level => typeof (globalThis as any).sgBiasVal === 'function' ? (globalThis as any).sgBiasVal(level) : level.biasEqa ?? level.bias,
+});
+root.ActionBiasPresentation = createActionBiasPresentation(value => (globalThis as any).fmt(value));
 const qcPointWarnings: QcPointWarnings = createQcPointWarnings({
   stats: root.QCCore.stats,
   todayIso: () => isoToday(),
@@ -310,6 +499,12 @@ root.lisGatewayStart = lisClient.start;
 root.ManageConfigService = createManageConfigService({
   cleanText: root.QCCore.cleanText,
   cleanId: root.QCCore.cleanId,
+  targetFromLimits: root.QCCore.targetFromLimits,
+  limitsFromTarget: root.QCCore.limitsFromTarget,
+});
+root.LotTransitionPickerService = createLotTransitionPickerService({
+  searchText: value => (globalThis as any).searchText(value), formatDate: value => (globalThis as any).vnDate(value),
+  transitionToNo: lotId => (globalThis as any).lotTransitionToNo(lotId),
 });
 root.ReagentComparisonService = createReagentComparisonService({
   cleanText: root.QCCore.cleanText,

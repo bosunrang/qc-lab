@@ -4,20 +4,17 @@
    ngay trước file này. Đừng đưa ngược các hàm sgTea…, effectiveTeaRefs() hay
    sgRef() về đây: tests/ui-route-structure.test.js chốt lại ranh giới đó. */
 let sgCohortCtx=null;
-function sgZone(s){if(s>=6)return{c:'#13603f',label:'Đẳng cấp thế giới'};if(s>=5)return{c:'#2c7d5c',label:'Xuất sắc'};if(s>=4)return{c:'#3f9a55',label:'Tốt'};if(s>=3)return{c:'#dd8b1f',label:'Cận biên'};return{c:'#c0362c',label:'Không đạt'};}
-function sgRun(s){if(!isFinite(s))return null;if(s>=6)return{risk:'Thấp',plan:'Thiết kế QC theo đánh giá nguy cơ; không tự động giảm tần suất.'};if(s>=5)return{risk:'Thấp–trung bình',plan:'Xác nhận bằng dữ liệu ổn định và SOP trước khi đơn giản hóa QC.'};if(s>=4)return{risk:'Trung bình',plan:'Cân nhắc đa quy tắc và tăng giám sát theo nguy cơ.'};if(s>=3)return{risk:'Cao',plan:'Tăng cường QC và ưu tiên cải thiện phương pháp.'};return{risk:'Rất cao',plan:'Không dùng Sigma để hợp thức hóa vận hành; cần khắc phục phương pháp.'};}
-function sgFmtDPMO(n){return !isFinite(n)?'—':(n<10?n.toFixed(2):n<1000?n.toFixed(0):Math.round(n).toLocaleString('en-US'));}
+function sgZone(s){return SigmaPresentation.sigmaZone(s);}
+function sgRun(s){return SigmaPresentation.sigmaRunPlan(s);}
+function sgFmtDPMO(n){return SigmaPresentation.formatSigmaDpmo(n);}
 function sgData(tid){state.sigmaData=state.sigmaData||{};state.sigmaData[tid]=state.sigmaData[tid]||[];return state.sigmaData[tid];}
 const SG_BIAS_LABEL='Bias EQA/EQC';
 function sgInputValue(v){return escAttr(v??'');}
 function sgInputDisplayValue(v,digits=2){if(v==null||String(v).trim()==='')return'';const n=Number(v);return Number.isFinite(n)?n.toFixed(digits):'';}
-function sgCleanCell(field,val){
-  if(['cv','biasEqa'].includes(field)){const s=String(val??'').trim();if(s==='')return'';const n=Number(s);return Number.isFinite(n)?n:'';}
-  return QCCore.cleanText(val,120);
-}
+function sgCleanCell(field,val){return SigmaLevelEditService.clean(field,val);}
 function sgBiasVal(L){return L.biasEqa??L.bias;}
 function sgIsAutoCV(L){return!!L&&['iqc-period','iqc-cohort'].includes(L.cvSource);}
-function sgReadiness(L){if(!sgIsAutoCV(L))return{status:'manual',label:'CV nhập tay — chưa xác nhận bằng nhóm dữ liệu IQC cùng lô/mức',classifiable:true,qcpEligible:false};const status=['insufficient','provisional','eligible','unstable'].includes(L.cohortStatus)?L.cohortStatus:(+L.n<20?'insufficient':+L.n<30?'provisional':'eligible');if(status==='insufficient')return{status,label:'Chưa đủ 20 điểm QC',classifiable:false,qcpEligible:false};if(status==='unstable')return{status,label:'Nhóm dữ liệu IQC không ổn định',classifiable:false,qcpEligible:false};if(status==='provisional')return{status,label:'Kết quả tạm thời (20–29 điểm)',classifiable:true,qcpEligible:false};return{status:'eligible',label:'Đủ điều kiện dữ liệu',classifiable:true,qcpEligible:true};}
+function sgReadiness(L){return SigmaPresentation.sigmaReadiness(L);}
 /* ===== Độ không đảm bảo đo (MU) — ISO 15189:2022 §7.3.4 =====
    Toán nằm ở QCCore.uncertaintyBudget(); phần này chỉ nối các đầu vào ĐÃ CÓ của
    trang Sigma vào đó: CV cohort một lô → u(Rw), các vòng EQA → u(bias), CoA
@@ -25,11 +22,7 @@ function sgReadiness(L){if(!sgIsAutoCV(L))return{status:'manual',label:'CV nhậ
 /* u(Cref) của chính ước lượng Bias: sai số chuẩn của trung bình các vòng EQA
    (SD giữa các vòng / √n). Một vòng duy nhất không có độ phân tán để ước lượng
    — trả null, ngân sách khi đó chỉ còn |bias| đúng như Nordtest TR 537 cho phép. */
-function sgBiasRefU(rounds){
-  const b=sgBiasStats(rounds).valid.map(r=>r.bias);if(b.length<2)return null;
-  const sd=QCCore.stats(b).sd;
-  return Number.isFinite(sd)?sd/Math.sqrt(b.length):null;
-}
+function sgBiasRefU(rounds){return SigmaBiasService.referenceUncertainty(rounds);}
 function sgMuBiasMode(L){return L&&L.muBiasMode==='exclude'?'exclude':'include';}
 /* MU phải tính TỪ CÙNG MỘT CHỖ cho màn hình, báo cáo in và Excel: sgComp() gắn
    sẵn kết quả vào r.mu, còn panel gọi lại sgMU() cho những mức chưa ra Sigma —
@@ -42,21 +35,16 @@ function sgMU(t,e,level,tea,refs){
     tea:Number.isFinite(teaNum)&&teaNum>0?teaNum:sgEntryTea(t,e,level,refs),
     target:sgLevelTarget(t,L,level),k:2});
 }
-function sgComp(t,e,level,refs){const L=(e.lv&&e.lv[level])||{},cv=parseFloat(L.cv),b=parseFloat(sgBiasVal(L)),tea=sgEntryTea(t,e,level,refs),metric=QCCore.sigmaMetric(tea,b,cv);if(!metric)return null;const{sigma,dpmo}=metric,ready=sgReadiness(L),zone=ready.classifiable?sgZone(sigma):{c:'#6b756f',label:ready.label},warnings=[],meta=sgTeaSourceMeta(t,e.teaSource||sgTeaSource(t));if(Math.abs(b)>=tea)warnings.push('|Bias| đã bằng hoặc vượt TEa');if(ready.status!=='eligible')warnings.push(ready.label);return{cv,bias:b,biasMethod:L.biasEqaMethod||'manual',biasLabel:L.biasEqaMethod==='rms'?SG_BIAS_LABEL+' (RMS)':SG_BIAS_LABEL,tea,teaTarget:Number.isFinite(+L.teaTarget)?+L.teaTarget:null,teaCriterionRule:L.teaCriterionRule||'',teaCriterionPercent:Number.isFinite(+L.teaCriterionPercent)?+L.teaCriterionPercent:null,teaCriterionAbsolute:Number.isFinite(+L.teaCriterionAbsolute)?+L.teaCriterionAbsolute:null,teaCriterionUnit:L.teaCriterionUnit||'',teaSource:e.teaSource||sgTeaSource(t),teaLabel:e.teaLabel||sgTeaLabel(sgTeaSource(t)),teaReference:e.teaReference||sgTeaRefText(t),teaSourceId:e.teaSourceId||meta.id||'',teaSourceVersion:e.teaSourceVersion||meta.version||'',teaSourceUrl:e.teaSourceUrl||meta.url||'',teaEffectiveDate:e.teaEffectiveDate||meta.effectiveDate||'',teaReviewedDate:e.teaReviewedDate||meta.reviewedDate||'',teaReviewedBy:e.teaReviewedBy||meta.reviewedBy||'',cvSource:L.cvSource||'manual',n:Number.isFinite(+L.n)?+L.n:null,sourceStart:L.sourceStart||'',sourceEnd:L.sourceEnd||'',sourceLot:L.sourceLot||'',cohortStatus:ready.status,classifiable:ready.classifiable,qcpEligible:ready.qcpEligible,readinessLabel:ready.label,warning:warnings.join(' · ')||null,mu:sgMU(t,e,level,tea,refs),muBiasMode:sgMuBiasMode(L),uCalBasis:L.uCalBasis||'',muReviewedBy:L.muReviewedBy||'',muReviewedDate:L.muReviewedDate||'',sigma,dpmo,yld:metric.yieldPercent,dse:sigma-1.65,run:ready.qcpEligible?sgRun(sigma):null,...zone};}
+function sgComp(t,e,level,refs){return SigmaPeriodViewModel.comp(t,e,level,refs);}
 /* Dựng effectiveTeaRefs() một lần cho cả lượt (mọi kỳ × mọi mức của xét nghiệm
    đang xem) thay vì để mỗi ô tự build lại — bảng TEa hiệu lực không đổi trong
    một lượt render. sgPendingRows cache kết quả cho đúng MỘT lần sgRefresh() gọi
    ngay sau pageSigma() (qua rAF ở after-render.js); mọi lần gọi sgRows() khác
    (sửa ô, đổi kỳ, ...) luôn tính lại từ dữ liệu hiện hành. */
 let sgPendingRows=null;
-function sgRows(t,data,levels){const refs=effectiveTeaRefs();return(data||[]).map(e=>({e,rs:levels.map(l=>sgComp(t,e,l,refs))})).sort((a,b)=>String(a.e.period||'').localeCompare(String(b.e.period||'')));}
+function sgRows(t,data,levels){return SigmaPeriodViewModel.rows(t,data,levels,effectiveTeaRefs());}
 function sgSyncCurrentPeriodTea(t){
-  const e=t&&sgData(t.id).find(x=>x.period===isoMonth());if(!e)return null;
-  const next=sgTeaSnapshot(t),keys=['tea','teaSource','teaLabel','teaReference','teaSourceId','teaSourceVersion','teaSourceUrl','teaEffectiveDate','teaReviewedDate','teaReviewedBy'];
-  let changed=keys.some(k=>String(e[k]??'')!==String(next[k]??''));
-  if(changed){['tea','teaSource','teaLabel','teaReference','teaCapturedAt','teaSourceId','teaSourceVersion','teaSourceUrl','teaEffectiveDate','teaReviewedDate','teaReviewedBy'].forEach(k=>delete e[k]);Object.assign(e,next);}
-  Object.keys(e.lv||{}).forEach(level=>{const before=JSON.stringify(e.lv[level]);sgSetLevelTeaSnapshot(t,e,level,true);if(before!==JSON.stringify(e.lv[level]))changed=true;});
-  return changed?e:null;
+  return SigmaTeaSnapshotService.syncCurrent(t,sgData(t.id),isoMonth(),sgTeaSnapshot,sgSetLevelTeaSnapshot);
 }
 /* Đồng bộ TEa snapshot cho MỌI xét nghiệm đang track Sigma — gọi tại các điểm dữ
    liệu THỰC SỰ thay đổi (ensureShape() ở state.js: boot/merge Firebase/nhập
@@ -66,18 +54,14 @@ function sgSyncCurrentPeriodTea(t){
    lượt save()/rerender() ẩn ngay lúc người dùng chỉ đang xem, từng gây giật cuộn.
    pageSigma() giờ chỉ đọc, không còn side-effect khi vẽ giao diện. */
 function sgReconcileAllTeaSnapshots(){
-  let changed=false;
-  sgTrackedTests().forEach(t=>{if(sgSyncCurrentPeriodTea(t))changed=true;});
-  return changed;
+  return SigmaTeaSnapshotService.reconcile(sgTrackedTests(),t=>sgData(t.id),isoMonth(),sgTeaSnapshot,sgSetLevelTeaSnapshot);
 }
-function sgSetTea(v){if(!requireWrite())return;const t=state.tests.find(x=>x.id===sgTest);if(!t)return;const s=String(v??'').trim(),n=Number(s);t.tea=s&&Number.isFinite(n)&&n>0?n:0;sgSyncCurrentPeriodTea(t);save({clearDerived:false,sigmaTestId:sgTest});rerender();}
-function sgSetTeaSource(v){if(!requireWrite())return;const t=state.tests.find(x=>x.id===sgTest);if(!t)return;t.teaSource=SG_TEA_SOURCES.some(x=>x[0]===v)?v:'ricos';if(t.teaSource==='eflm'){if(!t.eflmAnalyte)t.eflmAnalyte=t.name||'';if(!t.eflmAps)t.eflmAps='desirable';}sgSyncCurrentPeriodTea(t);save({clearDerived:false,sigmaTestId:sgTest});rerender();}
+function sgSetTea(v){if(!requireWrite())return;const t=state.tests.find(x=>x.id===sgTest);if(!t)return;SigmaTeaEditService.setValue(t,v);sgSyncCurrentPeriodTea(t);save({clearDerived:false,sigmaTestId:sgTest});rerender();}
+function sgSetTeaSource(v){if(!requireWrite())return;const t=state.tests.find(x=>x.id===sgTest);if(!t)return;SigmaTeaEditService.setSource(t,v,SG_TEA_SOURCES.map(x=>x[0]));sgSyncCurrentPeriodTea(t);save({clearDerived:false,sigmaTestId:sgTest});rerender();}
 function sgSetTeaMeta(field,val){
   if(!requireWrite())return;
   const t=state.tests.find(x=>x.id===sgTest);if(!t)return;
-  if(field==='eflmLookupDate')t[field]=parseVN(val)||'';
-  else if(field==='eflmAps')t[field]=['minimum','desirable','optimum'].includes(val)?val:'desirable';
-  else if(['eflmAnalyte','eflmRef'].includes(field))t[field]=QCCore.cleanText(val,field==='eflmRef'?500:160);
+  SigmaTeaEditService.setMeta(t,field,val);
   sgSyncCurrentPeriodTea(t);
   save({clearDerived:false,sigmaTestId:sgTest});rerender();
 }
@@ -88,43 +72,30 @@ function sgTrackedOptions(tests,selectedId){return tests.map(x=>`<option value="
    dừng. operationalLevels() chỉ mô tả khả năng NHẬP QC hôm nay nên không thể dùng
    làm nguồn duy nhất cho màn lịch sử. */
 function sgHistoricalLevels(t){
-  const out=new Set(),add=v=>{const n=Number(v);if(Number.isFinite(n)&&n>0)out.add(n);};
-  if(typeof operationalLevels==='function')operationalLevels(t).forEach(l=>add(l.level));
-  (t&&t.levels||[]).forEach(l=>{if(l.qcLotId||Number.isFinite(+l.sd)&&+l.sd>0||(l.meanSdHistory||[]).length)add(l.level);});
-  ((state.data&&t&&state.data[t.id])||[]).forEach(p=>add(p&&p.level));
-  (t?sgData(t.id):[]).forEach(e=>Object.keys(e&&e.lv||{}).forEach(add));
-  return[...out].sort((a,b)=>a-b);
+  return SigmaLevelSelectionService.historical(t,(state.data&&t&&state.data[t.id])||[],t?sgData(t.id):[],x=>typeof operationalLevels==='function'?operationalLevels(x):[]);
 }
 function sgVisibleLevels(t){return sgHistoricalLevels(t);}
 function sgPeriodLevels(t,e){
-  const out=new Set(),add=v=>{const n=Number(v);if(Number.isFinite(n)&&n>0)out.add(n);},period=SigmaCohortService.normalizePeriod(e&&e.period),start=period?period+'-01':'',end=period?sgCohortCutoff(period):'';
-  Object.keys(e&&e.lv||{}).forEach(add);
-  ((state.data&&t&&state.data[t.id])||[]).forEach(p=>{const d=String(p&&p.date||'');if((!start||d>=start)&&(!end||d<=end))add(p&&p.level);});
-  if(!out.size)sgHistoricalLevels(t).forEach(add);
-  return[...out].sort((a,b)=>a-b);
+  return SigmaLevelSelectionService.period(t,e,(state.data&&t&&state.data[t.id])||[],t?sgData(t.id):[],x=>typeof operationalLevels==='function'?operationalLevels(x):[],period=>SigmaCohortService.normalizePeriod(period),sgCohortCutoff);
 }
 function sgPickTest(v){if(!v)return;sgTest=v;rerender();}
 function sgStatusPeriodId(tid,data){
-  const selected=sgSelectedPeriods&&sgSelectedPeriods[tid];if(selected&&(data||[]).some(e=>e.id===selected))return selected;
-  const latest=[...(data||[])].sort((a,b)=>String(a.period||'').localeCompare(String(b.period||''))).pop(),fallback=latest&&latest.id||'';
+  const selected=sgSelectedPeriods&&sgSelectedPeriods[tid],fallback=SigmaPeriodSelectionService.resolve(selected,data||[]);
   if(fallback)sgSelectedPeriods[tid]=fallback;else if(sgSelectedPeriods)delete sgSelectedPeriods[tid];return fallback;
 }
 function sgSelectPeriod(eid){
-  if(!sgTest||!sgData(sgTest).some(e=>e.id===eid))return;
-  if(sgSelectedPeriods[sgTest]===eid)return; // đã chọn sẵn → khỏi refresh thừa khi bấm vào cùng hàng
-  sgSelectedPeriods[sgTest]=eid;
+  if(!sgTest)return;const r=SigmaPeriodSelectionService.select(sgSelectedPeriods[sgTest],sgData(sgTest),eid);if(!r.changed)return;
+  sgSelectedPeriods[sgTest]=r.selected;
   document.querySelectorAll('[data-sg-period-id]').forEach(row=>{const on=row.dataset.sgPeriodId===eid;row.classList.toggle('sg-period-selected',on);row.setAttribute('aria-selected',on?'true':'false');});
   sgRefresh();
 }
 function sgRemoveTracked(id){
-  if(!requireAdmin())return;const t=state.tests.find(x=>x.id===id);if(!t)return;
-  t.sgTracked=false;
-  if(sgTest===id){const remain=sgTrackedTests();sgTest=remain.length?remain[0].id:null;}
-  save({clearDerived:false});rerender();
+  if(!requireAdmin())return;const r=SigmaTrackedTestService.remove(state.tests||[],id,sgTest);if(!r.removed)return;
+  sgTest=r.selected;save({clearDerived:false});rerender();
 }
 function sgOpenAddTest(){if(!requireAdmin())return;sgAddTestQ='';sgRenderAddTestModal();}
 function sgAddTestSearchSet(v){sgAddTestQ=v;scheduleSearchRender(sgAddTestSearchSet,sgRenderAddTestModal,'sgAddTestSearch');}
-function sgViewTrackedTest(id){const t=state.tests.find(x=>x.id===id);if(!t||!t.sgTracked)return;sgTest=t.id;closeModal();rerender();}
+function sgViewTrackedTest(id){const t=SigmaTrackedTestService.select(state.tests||[],id);if(!t)return;sgTest=t.id;closeModal();rerender();}
 function sgRenderAddTestModal(){
   const all=[...(state.tests||[])].sort((a,b)=>operationalTestOrder(a)-operationalTestOrder(b)||String(testDisplayName(a)).localeCompare(String(testDisplayName(b)),'vi')),q=searchText(sgAddTestQ);
   const matched=all.filter(t=>!q||[testDisplayName(t),t.name,t.machine,t.unit,t.section,t.method].some(v=>searchText(v).includes(q)));
@@ -136,7 +107,7 @@ function sgRenderAddTestModal(){
     <div class="modal-f">${btn('Đóng','closeModal()','ghost')}</div></div>`);
   setTimeout(()=>{const e=document.getElementById('sgAddTestSearch');if(e){e.focus();e.setSelectionRange(e.value.length,e.value.length);}},0);
 }
-function sgTrackTest(id){if(!requireAdmin())return;const t=state.tests.find(x=>x.id===id);if(!t)return;t.sgTracked=true;sgTest=t.id;save({clearDerived:false});closeModal();rerender();}
+function sgTrackTest(id){if(!requireAdmin())return;const r=SigmaTrackedTestService.track(state.tests||[],id);if(!r.tracked)return;sgTest=r.selected;save({clearDerived:false});closeModal();rerender();}
 function pageSigma(){
   const tests=sgTrackedTests();
   const addBtn=role()==='admin'?btn('+ Thêm xét nghiệm','sgOpenAddTest()','teal'):'';
@@ -363,14 +334,10 @@ function sgBiasPeriodsFromDom(){const boxes=[...document.querySelectorAll('[data
 /* RMS chỉ có tác dụng chống triệt tiêu dấu khi có ≥2 vòng; với đúng 1 vòng thì
    không có gì để triệt tiêu — dùng signedMean (cùng độ lớn, giữ đúng chiều lệch)
    thay vì sqrt(bias²) làm mất dấu một cách không cần thiết. */
-function sgBiasStats(rounds){const valid=(rounds||[]).map(r=>{const lab=parseFloat(r.lab),target=parseFloat(r.target);return isFinite(lab)&&isFinite(target)&&target!==0?{lab,target,bias:(lab-target)/Math.abs(target)*100}:null;}).filter(Boolean);if(!valid.length)return{valid:[],signedMean:null,rms:null};const signedMean=valid.reduce((s,r)=>s+r.bias,0)/valid.length,rms=valid.length===1?valid[0].bias:Math.sqrt(valid.reduce((s,r)=>s+r.bias*r.bias,0)/valid.length);return{valid,signedMean,rms};}
-function sgBiasRoundsKey(rounds){return JSON.stringify((rounds||[]).map(r=>({lab:Number(r.lab),target:Number(r.target)})).filter(r=>Number.isFinite(r.lab)&&Number.isFinite(r.target)&&r.target!==0));}
+function sgBiasStats(rounds){return SigmaBiasService.stats(rounds);}
+function sgBiasRoundsKey(rounds){return SigmaBiasService.roundsKey(rounds);}
 function sgBiasLinkedPeriodIds(data,eid,level){
-  const source=(data||[]).find(e=>e.id===eid),L=source&&source.lv&&source.lv[level];if(!L)return[eid];
-  if(L.eqaBatchId)return(data||[]).filter(e=>e.lv&&e.lv[level]&&e.lv[level].eqaBatchId===L.eqaBatchId).map(e=>e.id);
-  const key=L.biasEqaMethod==='rms'?sgBiasRoundsKey(L.eqaRounds):'';if(!key||key==='[]')return[eid];
-  const linked=(data||[]).filter(e=>{const x=e.lv&&e.lv[level];return x&&x.biasEqaMethod==='rms'&&sgBiasRoundsKey(x.eqaRounds)===key&&Number(x.biasEqa)===Number(L.biasEqa);}).map(e=>e.id);
-  return linked.length?linked:[eid];
+  return SigmaBiasService.linkedPeriodIds(data,eid,level);
 }
 function sgOpenBias(eid,level){
   const data=sgData(sgTest),e=data.find(x=>x.id===eid);if(!e)return;e.lv=e.lv||{};e.lv[level]=e.lv[level]||{};
@@ -398,12 +365,13 @@ function sgBiasUpdateSummary(){
 function sgBiasSelectPeriods(checked){document.querySelectorAll('[data-sg-bias-period]').forEach(x=>x.checked=checked);if(sgBiasCtx)sgBiasCtx.periodIds=sgBiasPeriodsFromDom();}
 function sgBiasAdd(){if(!sgBiasCtx)return;sgBiasCtx.periodIds=sgBiasPeriodsFromDom();sgBiasCtx.rounds=sgBiasRowsFromDom();sgBiasCtx.rounds.push({lab:'',target:''});sgRenderBiasModal();}
 function sgBiasDel(i){if(!sgBiasCtx)return;sgBiasCtx.periodIds=sgBiasPeriodsFromDom();sgBiasCtx.rounds=sgBiasRowsFromDom();sgBiasCtx.rounds.splice(i,1);if(!sgBiasCtx.rounds.length)sgBiasCtx.rounds.push({lab:'',target:''});sgRenderBiasModal();}
-function sgApplyBiasToPeriods(data,periodIds,level,bias,rounds,batchId=uid()){let applied=0;(data||[]).forEach(e=>{if(!(periodIds||[]).includes(e.id))return;e.lv=e.lv||{};const L=e.lv[level]=e.lv[level]||{};L.biasEqa=Number(bias);L.biasEqaMethod='rms';L.eqaRounds=(rounds||[]).map(r=>({lab:r.lab,target:r.target}));L.eqaBatchId=batchId;applied++;});return applied;}
+function sgApplyBiasToPeriods(data,periodIds,level,bias,rounds,batchId=uid()){return SigmaBiasService.applyToPeriods(data,periodIds,level,bias,rounds,batchId);}
 async function sgBiasApply(){
   if(!requireWrite())return;
-  if(!sgBiasCtx)return;sgBiasCtx.rounds=sgBiasRowsFromDom();const stats=sgBiasStats(sgBiasCtx.rounds);if(!stats.valid.length){await infoDialog('Chưa có vòng hợp lệ để tính Bias.');return;}
-  sgBiasCtx.periodIds=sgBiasPeriodsFromDom();if(!sgBiasCtx.periodIds.length){await infoDialog('Chưa chọn kỳ nào để áp dụng Bias.');return;}
-  const validRounds=stats.valid.map(r=>({lab:r.lab,target:r.target})),applied=sgApplyBiasToPeriods(sgData(sgTest),sgBiasCtx.periodIds,sgBiasCtx.level,stats.rms,validRounds);if(!applied)return;save({clearDerived:false,sigmaTestId:sgTest});closeModal();rerender();
+  if(!sgBiasCtx)return;sgBiasCtx.rounds=sgBiasRowsFromDom();sgBiasCtx.periodIds=sgBiasPeriodsFromDom();const r=SigmaBiasWorkflowService.apply(sgData(sgTest),sgBiasCtx.periodIds,sgBiasCtx.level,sgBiasCtx.rounds);
+  if(r.status==='invalid-rounds'){await infoDialog('Chưa có vòng hợp lệ để tính Bias.');return;}
+  if(r.status==='missing-periods'){await infoDialog('Chưa chọn kỳ nào để áp dụng Bias.');return;}
+  if(!r.applied)return;save({clearDerived:false,sigmaTestId:sgTest});closeModal();rerender();
 }
 /* Modal MU sửa MỘT LẦN mọi mức của kỳ đang xem rồi áp cho nhiều kỳ, giống modal
    Bias: u(cal) là thuộc tính của LÔ CALIBRATOR chứ không của tháng, nên bắt nhập
@@ -473,40 +441,26 @@ async function sgMuApply(){
   if(!requireWrite())return;
   if(!sgMuCtx)return;
   sgMuCaptureDom();
-  if(!sgMuCtx.periodIds.length){await infoDialog('Chưa chọn kỳ nào để áp dụng ngân sách MU.');return;}
   const t=state.tests.find(x=>x.id===sgTest);if(!t)return;
-  const data=sgData(sgTest),by=QCCore.cleanText(sgMuCtx.reviewedBy,120),date=parseVN(sgMuCtx.reviewedDate)||'';
-  let applied=0;
-  data.forEach(e=>{
-    if(!sgMuCtx.periodIds.includes(e.id))return;
-    e.lv=e.lv||{};
-    sgMuCtx.rows.forEach(row=>{
-      const L=e.lv[row.level]=e.lv[row.level]||{},raw=String(row.uCal??'').trim(),n=Number(raw);
-      if(raw!==''&&Number.isFinite(n)&&n>=0)L.uCal=n;else delete L.uCal;
-      const basis=QCCore.cleanText(row.uCalBasis,500);if(basis)L.uCalBasis=basis;else delete L.uCalBasis;
-      L.muBiasMode=row.muBiasMode==='exclude'?'exclude':'include';
-      if(by)L.muReviewedBy=by;else delete L.muReviewedBy;
-      if(date)L.muReviewedDate=date;else delete L.muReviewedDate;
-    });
-    applied++;
-  });
-  if(!applied)return;
-  logAct('Cập nhật ngân sách MU',`${applied} kỳ · ${sgMuCtx.rows.length} mức · u(cal) ${sgMuCtx.rows.map(r=>`M${r.level}=${String(r.uCal??'').trim()||'—'}`).join(', ')}`,testDisplayName(t));
+  const r=SigmaMuWorkflowService.apply(sgData(sgTest),sgMuCtx.periodIds,sgMuCtx.rows,sgMuCtx.reviewedBy,sgMuCtx.reviewedDate);
+  if(r.status==='missing-periods'){await infoDialog('Chưa chọn kỳ nào để áp dụng ngân sách MU.');return;}
+  if(!r.applied)return;
+  logAct('Cập nhật ngân sách MU',`${r.applied} kỳ · ${sgMuCtx.rows.length} mức · u(cal) ${sgMuCtx.rows.map(r=>`M${r.level}=${String(r.uCal??'').trim()||'—'}`).join(', ')}`,testDisplayName(t));
   save({clearDerived:false,sigmaTestId:sgTest});closeModal();rerender();
 }
-function sgCell(eid,level,field,val){if(!requireWrite())return;const t=state.tests.find(x=>x.id===sgTest),e=sgData(sgTest).find(x=>x.id===eid);if(!e||!t)return;sgEnsureTeaSnapshot(t,e);e.lv=e.lv||{};const L=e.lv[level]=e.lv[level]||{};L[field]=sgCleanCell(field,val);if(field==='biasEqa'){if(L.biasEqa==='')delete L.biasEqaMethod;else L.biasEqaMethod='manual';delete L.eqaRounds;delete L.eqaBatchId;}if(field==='cv'){L.cvSource='manual';['n','sourceStart','sourceEnd','sourceLot','cohortStatus','cohortIssues','sourceExcludedVoided','sourceExcludedInvalid','sourceTargetMean','sourceTargetSd'].forEach(k=>delete L[k]);}sgSetLevelTeaSnapshot(t,e,level);save({clearDerived:false,sigmaTestId:sgTest});sgRefreshSoon();}
+function sgCell(eid,level,field,val){if(!requireWrite())return;const t=state.tests.find(x=>x.id===sgTest),e=sgData(sgTest).find(x=>x.id===eid);if(!e||!t)return;sgEnsureTeaSnapshot(t,e);e.lv=e.lv||{};const L=e.lv[level]=e.lv[level]||{};SigmaLevelEditService.update(L,field,val);sgSetLevelTeaSnapshot(t,e,level);save({clearDerived:false,sigmaTestId:sgTest});sgRefreshSoon();}
 function sgPeriodSel(e,ro){const [y,mo]=(e.period||'').split('-'),nowYear=new Date().getFullYear();const yr=y||String(nowYear),mm=mo?+mo:new Date().getMonth()+1;
   const mOpt=Array.from({length:12},(_,i)=>i+1).map(x=>`<option value="${x}" ${x===mm?'selected':''}>${String(x).padStart(2,'0')}</option>`).join('');
   const selectedYear=parseInt(yr)||nowYear,minYear=Math.min(selectedYear,nowYear-4),maxYear=Math.max(selectedYear,nowYear+2);
   let years=[];for(let yy=minYear;yy<=maxYear;yy++)years.push(yy);
   const yOpt=years.map(x=>`<option value="${x}" ${String(x)===yr?'selected':''}>${x}</option>`).join('');
   return `<div class="sg-period-controls"><select class="sg-period-month" aria-label="Tháng của kỳ" ${ro} onchange="sgPart('${e.id}','m',this.value)">${mOpt}</select><select class="sg-period-year" aria-label="Năm của kỳ" ${ro} onchange="sgPart('${e.id}','y',this.value)">${yOpt}</select></div>`;}
-async function sgPart(eid,part,val){if(!requireWrite())return;const data=sgData(sgTest),e=data.find(x=>x.id===eid);if(!e)return;let [y,mo]=(e.period||isoMonth()).split('-');if(part==='y')y=val;else mo=String(val).padStart(2,'0');const next=y+'-'+mo;if(data.some(x=>x.id!==eid&&x.period===next)){await infoDialog('Đã có kỳ Sigma '+next+'. Mỗi xét nghiệm chỉ lưu một bản ghi cho mỗi kỳ.');rerender();return;}e.period=next;save({clearDerived:false,sigmaTestId:sgTest});sgRefreshSoon();}
-async function sgAddPeriod(){if(!requireWrite())return;const t=state.tests.find(x=>x.id===sgTest),data=sgData(sgTest),period=isoMonth();if(!t)return;if(data.some(e=>e.period===period)){await infoDialog('Đã có kỳ Sigma '+period+'. Hãy cập nhật kỳ hiện có.');return;}const entry={id:uid(),period,...sgTeaSnapshot(t),lv:{}};data.push(entry);sgSelectedPeriods[sgTest]=entry.id;save({clearDerived:false,sigmaTestId:sgTest});rerender();}
-function sgDelPeriod(eid){if(!requireAdmin())return;const d=sgData(sgTest);const i=d.findIndex(x=>x.id===eid);if(i>=0)d.splice(i,1);if(sgSelectedPeriods&&sgSelectedPeriods[sgTest]===eid)delete sgSelectedPeriods[sgTest];save({clearDerived:false,sigmaTestId:sgTest});rerender();}
-function sgClearImportedCV(L){if(!sgIsAutoCV(L))return false;['cv','cvSource','n','sourceStart','sourceEnd','sourceLot','cohortStatus','cohortIssues','sourceExcludedVoided','sourceExcludedInvalid','sourceTargetMean','sourceTargetSd'].forEach(k=>delete L[k]);return true;}
-function sgCohortCutoff(period){const ym=SigmaCohortService.normalizePeriod(period),today=isoToday();if(!ym)return'';const [y,m]=ym.split('-').map(Number),last=new Date(Date.UTC(y,m,0)).toISOString().slice(0,10);return last<today?last:today;}
-function sgCohortGroups(t,e){const cutoff=sgCohortCutoff(e.period),periodStart=e.period+'-01';return sgPeriodLevels(t,e).map(level=>{const raw=SigmaCohortService.cohortsForLevelByLot(state,{testId:t.id,level,endDate:cutoff}).filter(c=>c.n>0&&c.end>=periodStart),cohorts=raw.filter(c=>c.lot),missingLotN=raw.filter(c=>!c.lot).reduce((s,c)=>s+c.n,0),saved=e.lv&&e.lv[level]&&e.lv[level].sourceLot,latest=cohorts[cohorts.length-1],cfg=(t.levels||[]).find(l=>+l.level===+level);return{level,configuredLot:String(saved||latest&&latest.lot||cfg&&cfg.lot||''),cohorts,missingLotN};});}
+async function sgPart(eid,part,val){if(!requireWrite())return;const data=sgData(sgTest),e=data.find(x=>x.id===eid);if(!e)return;let [y,mo]=(e.period||isoMonth()).split('-');if(part==='y')y=val;else mo=String(val).padStart(2,'0');const next=y+'-'+mo,r=SigmaPeriodRecordService.changePeriod(data,eid,next);if(r.duplicate){await infoDialog('Đã có kỳ Sigma '+next+'. Mỗi xét nghiệm chỉ lưu một bản ghi cho mỗi kỳ.');rerender();return;}if(!r.changed)return;save({clearDerived:false,sigmaTestId:sgTest});sgRefreshSoon();}
+async function sgAddPeriod(){if(!requireWrite())return;const t=state.tests.find(x=>x.id===sgTest),data=sgData(sgTest),period=isoMonth();if(!t)return;const r=SigmaPeriodRecordService.add(data,period,uid(),sgTeaSnapshot(t));if(!r.added){await infoDialog('Đã có kỳ Sigma '+period+'. Hãy cập nhật kỳ hiện có.');return;}sgSelectedPeriods[sgTest]=r.entry.id;save({clearDerived:false,sigmaTestId:sgTest});rerender();}
+function sgDelPeriod(eid){if(!requireAdmin())return;const d=sgData(sgTest);SigmaPeriodRecordService.remove(d,eid);if(sgSelectedPeriods&&sgSelectedPeriods[sgTest]===eid)delete sgSelectedPeriods[sgTest];save({clearDerived:false,sigmaTestId:sgTest});rerender();}
+function sgClearImportedCV(L){return SigmaCohortImportService.clearImportedCv(L);}
+function sgCohortCutoff(period){return SigmaCohortSelectionService.cutoff(period);}
+function sgCohortGroups(t,e){return SigmaCohortSelectionService.groups(t,e,sgPeriodLevels(t,e),state);}
 function sgCohortStatusText(a){return a.status==='eligible'?'Đủ dữ liệu':a.status==='provisional'?'Tạm thời':a.status==='insufficient'?'Chưa đủ':'Không ổn định';}
 /* force=true trên sgSetLevelTeaSnapshot chỉ dùng cho ĐÚNG kỳ hiện tại (isoMonth()),
    giống hệt quy tắc của sgSyncCurrentPeriodTea() — kỳ cũ chỉ được ĐIỀN TEa nếu
@@ -514,11 +468,8 @@ function sgCohortStatusText(a){return a.status==='eligible'?'Đủ dữ liệu':
    đây luôn force=true bất kể kỳ nào, nên bấm "CV lô" cho một kỳ cũ đã chốt TEa từ
    trước sẽ âm thầm đổi TEa của kỳ đó sang giá trị tham chiếu MỚI NHẤT — phá vỡ
    tính truy xuất lịch sử mà teaEffectiveDate/teaReviewedDate của kỳ đang ghi lại. */
-function sgImportCohort(t,e,level,cohort){const st=cohort&&cohort.stats,existing=e.lv[level],forceTea=e.period===isoMonth();if(!(st&&st.n>=2&&st.cv>0)){const cleared=sgClearImportedCV(existing);if(cleared)sgSetLevelTeaSnapshot(t,e,level,forceTea);return{imported:false,cleared};}const L=e.lv[level]=existing||{},assessment=SigmaCohortService.assess(cohort);['sourceTargetMean','sourceTargetSd','cohortIssues','sourceExcludedVoided','sourceExcludedInvalid'].forEach(k=>delete L[k]);L.cv=st.cv;L.cvSource='iqc-cohort';L.n=st.n;L.sourceStart=cohort.start;L.sourceEnd=cohort.end;L.sourceLot=cohort.lot;L.cohortStatus=assessment.status;L.cohortIssues=cohort.issues;L.sourceExcludedVoided=cohort.excluded.voided;L.sourceExcludedInvalid=cohort.excluded.invalidValue;if(cohort.targetMean!=null&&cohort.targetMean!==0)L.sourceTargetMean=cohort.targetMean;if(cohort.targetSd!=null&&cohort.targetSd>0)L.sourceTargetSd=cohort.targetSd;sgSetLevelTeaSnapshot(t,e,level,forceTea);return{imported:true,cleared:false,status:assessment.status,mixedTarget:cohort.issues.includes('mixed-target-mean')||cohort.issues.includes('mixed-target-sd')};}
-function sgApplyCohortChoices(t,e,groups,choices){const summary={imported:0,cleared:0,insufficient:0,unstable:0,mixedTargets:0,missingLotN:0,missingLotLevels:0};(groups||[]).forEach(g=>{const lot=choices&&choices[g.level],cohort=g.cohorts.find(c=>c.lot===lot),r=sgImportCohort(t,e,g.level,cohort);if(r.imported){summary.imported++;if(r.status==='insufficient')summary.insufficient++;if(r.status==='unstable')summary.unstable++;if(r.mixedTarget)summary.mixedTargets++;}if(r.cleared)summary.cleared++;
-  /* Điểm IQC chưa gắn mã lô bị loại khỏi cohort (không thể tách lô) — chỉ báo khi
-     mức đó không có cohort hợp lệ nào, để không nhiễu khi đã lấy được CV từ lô đúng. */
-  if(g.missingLotN&&!g.cohorts.length){summary.missingLotN+=g.missingLotN;summary.missingLotLevels++;}});return summary;}
+function sgImportCohort(t,e,level,cohort){return SigmaCohortImportService.importCohort(t,e,level,cohort);}
+function sgApplyCohortChoices(t,e,groups,choices){return SigmaCohortImportService.applyChoices(t,e,groups,choices);}
 function sgCohortImportMessage(e,s){const notes=[];if(s.missingLotLevels)notes.push(s.missingLotN+' điểm IQC ('+s.missingLotLevels+' mức) chưa gắn mã lô QC nên không dùng được — hãy gắn mã lô cho điểm QC để lấy CV tự động');if(s.mixedTargets)notes.push(s.mixedTargets+' mức thay đổi Mean/SD mục tiêu nên nhóm dữ liệu IQC chưa ổn định');if(s.unstable)notes.push(s.unstable+' mức không được phân loại');if(s.cleared)notes.push(s.cleared+' CV tự động cũ đã được xóa');if(!s.imported)return'Kỳ '+(vnPeriod(e.period)||e.period)+' chưa có đủ dữ liệu IQC của cùng một lô để tính CV (cần ít nhất 2 kết quả hợp lệ).'+(notes.length?' '+notes.join('. ')+'.':'');return'Đã lấy CV theo lô đến '+vnDate(sgCohortCutoff(e.period))+'.'+(s.insufficient?' Có '+s.insufficient+' mức dưới 20 điểm; Sigma chỉ hiển thị ước tính.':'')+(notes.length?' '+notes.join('. ')+'.':'');}
 function sgRenderCohortModal(){const c=sgCohortCtx;if(!c)return;const sections=c.groups.map(g=>{if(!g.cohorts.length)return`<tr><td>Mức ${g.level}</td><td colspan="5" class="muted">${g.missingLotN?`Có ${g.missingLotN} điểm IQC chưa gắn mã lô QC — hãy gắn mã lô cho điểm QC để dùng làm CV.`:'Không có nhóm dữ liệu IQC đã gắn mã lô trong kỳ đánh giá.'}</td></tr>`;const preferred=g.cohorts.find(x=>x.lot===g.configuredLot)||g.cohorts[g.cohorts.length-1];return g.cohorts.map((x,i)=>{const a=SigmaCohortService.assess(x),checked=x===preferred?'checked':'';return`<tr><td>${i?'':`Mức ${g.level}`}</td><td><label><input type="radio" name="sgCohort_${g.level}" value="${escAttr(x.lot)}" ${checked}> Lô ${esc(x.lot)}</label></td><td>${vnDate(x.start)}–${vnDate(x.end)}</td><td class="num">${x.n}</td><td class="num">${x.stats&&x.stats.cv>0?fmt(x.stats.cv,2)+'%':'—'}</td><td>${esc(sgCohortStatusText(a))}</td></tr>`;}).join('');}).join('');openModal(`<div class="modal"><div class="modal-h"><h3>Chọn dữ liệu CV IQC theo lô — ${esc(testDisplayName(c.t))}</h3><button class="modal-close" onclick="sgCohortClose()">✕</button></div><div class="modal-b"><div class="hint space-after-control">Dữ liệu IQC được gom xuyên tháng nhưng luôn tách theo lô và mức QC. Nếu Mean/SD mục tiêu thay đổi, nhóm dữ liệu sẽ được đánh dấu không ổn định. Dữ liệu được tính đến ${vnDate(sgCohortCutoff(c.e.period))}.</div><table><thead><tr><th>Mức</th><th>Lô QC</th><th>Khoảng dữ liệu</th><th class="num">n</th><th class="num">CV</th><th>Trạng thái</th></tr></thead><tbody>${sections}</tbody></table></div><div class="modal-f">${btn('Hủy','sgCohortClose()','ghost')}${btn('✓ Dùng dữ liệu đã chọn','sgCohortApply()','teal')}</div></div>`);}
 function sgCohortClose(){sgCohortCtx=null;closeModal();}

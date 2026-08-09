@@ -285,25 +285,15 @@ async function addAction(){
   if(protocol.dueDate&&protocol.dueDate<date){await infoDialog('Hạn hoàn thành không được trước ngày ghi nhận sự cố.');focusActionField('dueDate');return;}
   if(protocol.actionCompletedDate&&(protocol.actionCompletedDate<date||protocol.actionCompletedDate>isoToday())){await infoDialog(protocol.actionCompletedDate<date?'Ngày hoàn thành hành động không được trước ngày ghi nhận sự cố.':'Ngày hoàn thành hành động không được ở tương lai.');focusActionField('actionCompletedDate');return;}
   if(protocol.effectivenessStatus!=='pending'){const eff=actionEffectivenessStatus(candidate);if(!eff.complete){await infoDialog(eff.label+'.');focusActionField(actionEffectivenessMissingKey(candidate));return;}}
-  const now=new Date().toISOString();
   if(editing){
     if(actionCancelled(editing)){await infoDialog('Hồ sơ đã hủy được giữ nguyên để bảo toàn dấu vết và không thể chỉnh sửa. Hãy lập hồ sơ NCE mới nếu sự cố vẫn cần xử lý.');return;}
     if(actionApprovalStatus(editing)==='approved'){await infoDialog('Hồ sơ đã khép vòng không được sửa. Nếu phát hiện vấn đề tái diễn, hãy mở một hồ sơ NCE mới.');return;}
-    /* Người đánh giá hiệu lực chỉ được đóng dấu lại khi chính kết luận hiệu lực thay
-       đổi — trước đây mỗi lần lưu bất kỳ đều ghi đè bằng người đang sửa, xoá mất ai là
-       người thật sự đã đánh giá. */
-    const effChanged=['effectivenessStatus','effectivenessNote','effectivenessDate','residualSeverity','residualOccurrence','residualDetectability','residualRiskLevel','residualRiskBasis'].some(key=>String(protocol[key]??'')!==String(editing[key]??(key==='effectivenessStatus'?'pending':'')));
-    const effBy=protocol.effectivenessStatus==='pending'?'':(effChanged?userName():(editing.effectivenessBy||userName()));
-    const effAt=protocol.effectivenessStatus==='pending'?'':(effChanged?now:(editing.effectivenessAt||now));
-    /* approvalNote bị xoá để vòng duyệt sau bắt đầu sạch, nhưng lý do TRẢ LẠI phải ở
-       lại trong hồ sơ (returnNote/By/At) — nếu không, người duyệt yêu cầu bổ sung gì
-       sẽ biến mất khỏi hồ sơ ngay khi người thực hiện nộp lại. */
-    const editorIds=[...new Set([...(editing.contentEditorUserIds||[]),currentUser&&currentUser.id||''].filter(Boolean))],editorNames=[...new Set([...(editing.contentEditorUsernames||[]),String(currentUser&&currentUser.username||'').trim().toLowerCase()].filter(Boolean))];
-    Object.assign(editing,{nceId:editing.nceId||nceId,date,rule,errorType,action,by,...protocol,updatedAt:now,contentEditorUserIds:editorIds,contentEditorUsernames:editorNames,approvalStatus:'pending',approvedAt:'',approvedBy:'',approvalNote:'',effectivenessBy:effBy,effectivenessAt:effAt});
+    const saved=ActionRecordService.update(editing,{nceId:editing.nceId||nceId,date,rule,errorType,action,by,...protocol},{id:currentUser&&currentUser.id||'',username:currentUser&&currentUser.username||'',name:userName()});
+    if(!saved)return;
     logAct('Cập nhật hồ sơ NCE',`${editing.nceId||'NCE'} · ${actionWorkflowStatus(editing).label}`,t?t.name:'');actionEditId='';
   }else{
-    const record={id:uid(),nceId,date,createdAt:now,updatedAt:now,createdByUserId:currentUser&&currentUser.id||'',createdByUsername:currentUser&&currentUser.username||'',contentEditorUserIds:[currentUser&&currentUser.id||''].filter(Boolean),contentEditorUsernames:[String(currentUser&&currentUser.username||'').trim().toLowerCase()].filter(Boolean),testId:tid,level,lot,pointId,rule,errorType,action,by,...protocol,effectivenessBy:protocol.effectivenessStatus!=='pending'?userName():'',effectivenessAt:protocol.effectivenessStatus!=='pending'?now:'',approvalStatus:'pending',recordStatus:'active',approvedAt:'',approvedBy:'',approvalNote:''};
-    state.actions.push(record);logAct('Lập hồ sơ NCE',`${record.nceId} · ${actionLevelShort(t,level,lot)} · đang điều tra`,t?t.name:'');
+    const record=ActionRecordService.create(state.actions,{nceId,date,testId:tid,level,lot,pointId,rule,errorType,action,by,...protocol},{id:currentUser&&currentUser.id||'',username:currentUser&&currentUser.username||'',name:userName()});
+    logAct('Lập hồ sơ NCE',`${record.nceId} · ${actionLevelShort(t,level,lot)} · đang điều tra`,t?t.name:'');
   }
   actionSeed=null;clearActionDraft();actionOpenSections=null;save({clearDerived:false});rerender();
 }
@@ -431,14 +421,7 @@ function focusActionField(key){
    khác hẳn "chưa đo lại" — cùng loại lỗi finiteNumber(v,0) đã sửa ở
    ReagentComparisonService.updateMetadata() trong phiên này (biasTarget/alpha). */
 function actionBiasInfo(t,l,biasBeforeRaw,biasAfterRaw){
-  const tea=t&&l?sgTeaBySource(t,sgTeaSource(t),l.mean):null,hasTea=Number.isFinite(tea)&&tea>0;
-  const parse=v=>{const raw=String(v==null?'':v).trim(),n=Number(raw);return raw!==''&&Number.isFinite(n)?n:null;};
-  const biasBefore=parse(biasBeforeRaw),biasAfter=parse(biasAfterRaw);
-  const threshold=hasTea?tea/4:null;
-  const withinThreshold=threshold!=null&&biasAfter!=null?Math.abs(biasAfter)<=threshold:null;
-  const crit=hasTea&&biasBefore!=null&&l&&l.sd>0?QCCore.systematicShiftCritical(tea,biasBefore,l.sd):null;
-  const degObs=crit&&l&&l.sd>0?Math.abs(biasBefore)/l.sd:null;
-  return{tea:hasTea?tea:null,biasBefore,biasAfter,threshold,withinThreshold,crit,degObs};
+  return ActionBiasService.info(t,l,biasBeforeRaw,biasAfterRaw);
 }
 /* t/l cho actionBiasInfo(): hồ sơ đang sửa dùng đúng testId/level đã khóa (editing),
    hồ sơ mới đọc theo ô đang chọn trên form — giống cách syncActLevels() tra levels. */
@@ -454,25 +437,17 @@ function actionBiasContext(form,editing){
    trong form này (ACT_SUGGEST). sgBiasVal (sigma.js) đã ưu tiên biasEqa rồi mới tới
    bias — lấy lại đúng logic đó, không tính RMS lần thứ hai ở đây. */
 function actionLatestSigmaBias(t,level){
-  const periods=t&&state.sigmaData&&Array.isArray(state.sigmaData[t.id])?state.sigmaData[t.id]:[];
-  if(!periods.length||!level)return null;
-  const latest=[...periods].sort((a,b)=>String(a.period||'').localeCompare(String(b.period||''))).pop();
-  const L=latest&&latest.lv&&latest.lv[level];
-  const v=L?Number(typeof sgBiasVal==='function'?sgBiasVal(L):(L.biasEqa??L.bias)):NaN;
-  return L&&Number.isFinite(v)?{value:v,period:latest.period||''}:null;
+  return ActionBiasService.latestSigmaBias(t,level,state.sigmaData);
 }
 function actionFillBias(targetId,value){
   const e=document.getElementById(targetId);if(!e)return;
   e.value=fmt(value);e.dispatchEvent(new Event('input',{bubbles:true}));e.focus();
 }
 function actionBiasThresholdHtml(info){
-  if(!info.tea)return'Chưa có TEa% cho xét nghiệm này — vào Cấu hình Sigma để bổ sung, hoặc để trống nếu không áp dụng.';
-  if(info.biasAfter==null)return`Ngưỡng cho phép: ≤ ${fmt(info.threshold)}% (TEa/4). Nhập "Bias sau khắc phục" để so sánh.`;
-  return`${info.withinThreshold?'✔ Đạt':'✘ Vượt'} ngưỡng: |Bias sau khắc phục| ${fmt(Math.abs(info.biasAfter))}% so với ${fmt(info.threshold)}%.`;
+  return ActionBiasPresentation.thresholdHtml(info);
 }
 function actionBiasReferenceHtml(info){
-  if(!info.crit)return info.tea?'Nhập "Bias trước khắc phục" ở mục 4-6 để tính số tham khảo ΔSEcrit/ΔREcrit (mức độ sai số lúc sự cố xảy ra).':'Chưa đủ TEa%/SD để tính số tham khảo ΔSEcrit/ΔREcrit.';
-  return`Độ lệch quan sát lúc sự cố ${fmt(info.degObs)} lần SD so với ΔSEcrit ${fmt(info.crit.dSEcrit)} · ΔREcrit ${fmt(info.crit.dREcrit)}. <b>Tham khảo — không phải kết luận chính thức của hồ sơ.</b>`;
+  return ActionBiasPresentation.referenceHtml(info);
 }
 /* Gọi khi gõ Bias trước/sau: cập nhật cả hint ngưỡng ở mục 4-6 lẫn thẻ tham khảo ở
    mục 7 từ CÙNG một actionBiasInfo(), tránh hai nơi tính lệch nhau. */

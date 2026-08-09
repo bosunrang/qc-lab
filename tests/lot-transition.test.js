@@ -9,7 +9,7 @@
 const assert = require('node:assert/strict');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
-const ctx = loadSandbox(['core.js', 'modules/state.js']);
+const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js', 'modules/state.js']);
 run(ctx, 'function __getState(){return state;} function __setState(s){state=s;}');
 // ensureShape() also touches searchText() (normally from router-render.js, not loaded
 // in this minimal sandbox) via a legacy state.machines->instruments migration step —

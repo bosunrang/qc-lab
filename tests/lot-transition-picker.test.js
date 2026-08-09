@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
-const ctx=loadSandbox(['core.js','modules/state.js','modules/manage-tests-actions.js']);
+const ctx=loadSandbox(['core.js','generated/modular-pilot.js','modules/state.js','modules/manage-tests-actions.js']);
 run(ctx, `function searchText(s){return String(s==null?'':s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();} function vnDate(s){return s;} function lotTransitionToNo(){return'';} function escAttr(s){return String(s==null?'':s);} function btn(label,onclick){return '<button onclick="'+onclick+'">'+label+'</button>';} state.qcLots=[
   {id:'L1',lotNo:'1101',level:1,exp:'2026-08-31'},
   {id:'L2',lotNo:'1102',level:2,exp:'2026-09-30'},

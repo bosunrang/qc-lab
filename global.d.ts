@@ -35,7 +35,7 @@ declare var AnalysisUIState: any, AuthUIState: any, EntryUIState: any, ManageUIS
 
 // --- Service / view-model namespaces (`root.Foo = {...}`) ---
 declare var EntryService: any, PeriodService: any, ReagentComparisonService: any, ChartViewModel: any,
-  SigmaCohortService: any, WestgardViewModel: any, ActionWorkflowService: any, ManageConfigService: any,
+  SigmaCohortService: any, SigmaPresentation: any, SigmaPeriodViewModel: any, SigmaBiasService: any, SigmaCohortImportService: any, SigmaPeriodRecordService: any, SigmaLevelEditService: any, SigmaTrackedTestService: any, SigmaBiasWorkflowService: any, SigmaMuWorkflowService: any, SigmaCohortSelectionService: any, SigmaTeaEditService: any, SigmaTeaSnapshotService: any, SigmaLevelSelectionService: any, SigmaPeriodSelectionService: any, WestgardViewModel: any, ActionWorkflowService: any, ActionReviewService: any, ActionEscalationService: any, ActionRecordService: any, ActionBiasService: any, ActionBiasPresentation: any, ActionViolationService: any, ActionListPresentation: any, ActionEvidencePresentation: any, ActionRerunEvidencePresentation: any, ActionStatusPresentation: any, ActionReviewPresentation: any, ActionDetailPresentation: any, ActionGuidePresentation: any, ReportPeriodPresentation: any, ManageConfigService: any, LotTransitionPickerService: any,
   qcPointWarnings: any;
 declare var LISClientService: any, lisGatewayRuntime: any, LIS_GATEWAY_STORAGE_KEY: any, LIS_POLL_MS: any,
   lisGatewayConfig: any, lisNormalizeGatewayUrl: any, lisGatewaySetStatus: any, lisGatewayStatusText: any,

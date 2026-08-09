@@ -11,12 +11,9 @@ let reportQ='',reportTest='',reportRangeStart='',reportRangeEnd='',reportLockYm=
    chọn xét nghiệm/khoảng ngày phía trên — PeriodService.lock()/unlock() đã có
    sẵn từ trước và được entry-service.js chặn sửa điểm QC khi kỳ bị khóa, chỉ
    thiếu giao diện gọi tới nên tính năng chưa dùng được trên thực tế. */
-function reportLockYmValue(){return/^\d{4}-\d{2}$/.test(reportLockYm)?reportLockYm:isoMonth();}
+function reportLockYmValue(){return ReportPeriodPresentation.currentYearMonth(reportLockYm,isoMonth());}
 function reportSetLockPart(part,value){
-  const m=/^(\d{4})-(\d{2})$/.exec(reportLockYmValue());
-  let year=+m[1],month=+m[2];
-  if(part==='year')year=+value;else month=+value;
-  reportLockYm=`${year}-${String(month).padStart(2,'0')}`;
+  reportLockYm=ReportPeriodPresentation.setPart(reportLockYmValue(),part,value);
   rerender();
 }
 async function reportLockPeriod(){
@@ -55,7 +52,7 @@ async function reportConfirmUnlockPeriod(ym){
   await infoDialog(`Đã mở khóa kỳ ${label}.`,{type:'success'});
 }
 function reportLockListHtml(){
-  const locks=[...(state.periodLocks||[])].sort((a,b)=>String(b.ym||'').localeCompare(String(a.ym||'')));
+  const locks=ReportPeriodPresentation.sortedLocks(state.periodLocks||[]);
   if(!locks.length)return '<div class="hint">Chưa có kỳ nào được khóa.</div>';
   const isAdmin=role()==='admin';
   return `<div class="period-lock-list">${locks.map(l=>`<div class="period-lock-row"><div><b>Kỳ ${esc(monthVN(l.ym))}</b><span class="hint"> · Khóa bởi ${esc(l.lockedBy||'—')}${l.lockedAt?' lúc '+formatDateTimeVN(l.lockedAt):''}</span></div>${isAdmin?btn('Mở khóa',`reportUnlockPeriod('${jsq(l.ym)}')`,'ghost sm'):''}</div>`).join('')}</div>`;

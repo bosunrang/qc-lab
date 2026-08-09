@@ -3,6 +3,11 @@ const { loadSandbox, run } = require('./helpers/sandbox');
 
 const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js']);
 
+assert.equal(ctx.ReportPeriodPresentation.currentYearMonth('2026-08', '2026-01'), '2026-08');
+assert.equal(ctx.ReportPeriodPresentation.currentYearMonth('2026-8', '2026-01'), '2026-01');
+assert.equal(ctx.ReportPeriodPresentation.setPart('2026-08', 'month', 3), '2026-03');
+assert.deepEqual([...ctx.ReportPeriodPresentation.sortedLocks([{ ym: '2026-07' }, { ym: '2026-08' }])].map(x => x.ym), ['2026-08', '2026-07']);
+
 assert.equal(ctx.PeriodService.normalizePeriod('2026-7'), '2026-07');
 assert.equal(ctx.PeriodService.normalizePeriod('2026-13'), '');
 assert.equal(ctx.PeriodService.periodForDate('2026-07-14'), '2026-07');

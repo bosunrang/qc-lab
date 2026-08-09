@@ -46,26 +46,10 @@ function targetCheckAll(on){document.querySelectorAll('.tm-use').forEach(box=>{b
    Object.assign ghi đè) vào các điểm CHƯA có lô/Mean-SD riêng — không phải đổi
    điểm cũ sang lô MỚI. Phải gọi TRƯỚC khi target bị Object.assign ghi đè lot mới. */
 function targetPickBackfillPoints(t,lot,pick){
-  if(!pick||!pick.use)return[];
-  const target=t.levels.find(x=>x.qcLotId===lot.id)||t.levels.find(x=>+x.level===+lot.level);
-  if(!target||!target.lot||target.lot===lot.lotNo)return[];
-  return(state.data[t.id]||[]).filter(p=>p.level===target.level&&(p.lot==null||p.lot===target.lot));
+  return ManageConfigService.targetPickBackfillPoints((state.data&&state.data[t.id])||[],t,lot,pick);
 }
 function applyTargetPick(t,lot,pick,effectiveFrom,note){
-  const linked=t.levels.find(x=>x.qcLotId===lot.id);
-  if(!pick.use){if(linked){linked.qcLotId='';linked.lot='';linked.exp='';return true;}return false;}
-  const effectiveTo=lot.exp||'';
-  let target=linked||t.levels.find(x=>+x.level===+lot.level);
-  if(!target){target={level:lot.level,mean:pick.mean,sd:pick.sd,low:pick.low,high:pick.high,rangeK:2,mfgMean:pick.mean,mfgSd:pick.sd,applied:'mfg'};t.levels.push(target);t.levels.sort((a,b)=>a.level-b.level);}
-  target.meanSdHistory=Array.isArray(target.meanSdHistory)?target.meanSdHistory:[];
-  if(target.qcLotId&&target.qcLotId!==lot.id){
-    const oldLot=state.qcLots.find(l=>l.id===target.qcLotId)||{id:target.qcLotId,lotNo:target.lot||''};
-    if(Number.isFinite(+target.mean)&&Number.isFinite(+target.sd)&&+target.sd>0)upsertLotTargetHistory(target,oldLot,{mean:+target.mean,sd:+target.sd,low:target.low==null?null:+target.low,high:target.high==null?null:+target.high,effectiveFrom:(target.meanSdHistory||[]).find(h=>h.qcLotId===oldLot.id)?.effectiveFrom||'',effectiveTo:effectiveFrom,source:target.applied||'mfg',planned:false,note:'Trước khi đổi sang lô khác qua Mean/SD theo nhóm'});
-  }
-  targetPickBackfillPoints(t,lot,pick).forEach(p=>{p.lot=target.lot;p.qcMean=p.qcMean==null?target.mean:p.qcMean;p.qcSd=p.qcSd==null?target.sd:p.qcSd;});
-  upsertLotTargetHistory(target,lot,{mean:pick.mean,sd:pick.sd,low:pick.low,high:pick.high,effectiveFrom,effectiveTo,source:'mfg',planned:false,note});
-  Object.assign(target,{level:lot.level,qcLotId:lot.id,lot:lot.lotNo,exp:lot.exp,mean:pick.mean,sd:pick.sd,low:pick.low,high:pick.high,rangeK:2,mfgMean:pick.mean,mfgSd:pick.sd,applied:'mfg'});
-  return true;
+  return ManageConfigService.applyTargetPick({test:t,lot,pick,effectiveFrom,note,lots:state.qcLots||[],points:(state.data&&state.data[t.id])||[],upsertHistory:upsertLotTargetHistory});
 }
 /* Lưu Mean/SD của lô mới thành "Dự kiến": KHÔNG đổi qcLotId của mức (lô đang dùng
    vẫn giữ nguyên, vẫn nhập QC bình thường) — chỉ ghi 1 mốc meanSdHistory đánh dấu
@@ -73,11 +57,7 @@ function applyTargetPick(t,lot,pick,effectiveFrom,note){
    (lotTargetSnapshot() đọc lại từ đây). Khác voidQcPoint/applyTargetPick, không
    đụng tới cấu hình đang vận hành nên không cần requireUnlockedPeriod. */
 function applyPlannedTarget(t,lot,pick,note){
-  if(!pick.use)return false;
-  const target=t.levels.find(x=>+x.level===+lot.level);if(!target)return false;
-  target.meanSdHistory=Array.isArray(target.meanSdHistory)?target.meanSdHistory:[];
-  upsertLotTargetHistory(target,lot,{mean:pick.mean,sd:pick.sd,low:pick.low,high:pick.high,effectiveFrom:'',effectiveTo:'',source:'mfg',planned:true,note});
-  return true;
+  return ManageConfigService.applyPlannedTarget({test:t,lot,pick,note,upsertHistory:upsertLotTargetHistory});
 }
 async function readTargetMatrixPicks(){
   const rows=[...document.querySelectorAll('.target-row')],picked=[];
@@ -85,18 +65,8 @@ async function readTargetMatrixPicks(){
     if(row.dataset.locked==='1')continue;
     const use=row.querySelector('.tm-use'),testId=row.dataset.test,lot=state.qcLots.find(x=>x.id===row.dataset.lot);if(!lot)continue;if(!use.checked){picked.push({testId,lot,use:false});continue;}
     const meanRaw=row.querySelector('.tm-mean').value.trim(),lowRaw=row.querySelector('.tm-low').value.trim(),highRaw=row.querySelector('.tm-high').value.trim(),sdRaw=row.querySelector('.tm-sd').value.trim();
-    let mean=meanRaw===''?null:parseFloat(meanRaw),low=lowRaw===''?null:parseFloat(lowRaw),high=highRaw===''?null:parseFloat(highRaw),sd=sdRaw===''?null:parseFloat(sdRaw);
-    const fromLimits=QCCore.targetFromLimits(low,high);
-    if(fromLimits){if(!Number.isFinite(mean))mean=fromLimits.mean;if(!Number.isFinite(sd)||sd<=0)sd=fromLimits.sd;}
-    const fromTarget=QCCore.limitsFromTarget(mean,sd);
-    if(fromTarget&&lowRaw===''&&highRaw===''){low=fromTarget.low;high=fromTarget.high;}
-    if(!Number.isFinite(mean)){await infoDialog('Các xét nghiệm được chọn phải có trung bình mục tiêu hợp lệ.');return null;}
-    if((lowRaw!==''&&!Number.isFinite(low))||(highRaw!==''&&!Number.isFinite(high))){await infoDialog('Giới hạn dưới/trên phải là số hợp lệ.');return null;}
-    if((lowRaw!==''||highRaw!=='')&&(!Number.isFinite(low)||!Number.isFinite(high)||high<=low)){await infoDialog('Nếu nhập giới hạn, cần nhập đủ giới hạn dưới và trên; giới hạn trên phải lớn hơn giới hạn dưới.');return null;}
-    if(sdRaw!==''&&(!Number.isFinite(sd)||sd<=0)){await infoDialog('Độ lệch chuẩn phải là số lớn hơn 0.');return null;}
-    if((sd==null||!Number.isFinite(sd))&&Number.isFinite(low)&&Number.isFinite(high))sd=(high-low)/4; // ±2SD only — xác nhận theo thực tế PXN, các lô QC đang dùng không ghi khoảng ±3SD
-    if(!Number.isFinite(sd)||sd<=0){await infoDialog('Các xét nghiệm được chọn cần có SD, hoặc có đủ giới hạn dưới/trên để app ước tính SD theo ±2SD.');return null;}
-    picked.push({testId,lot,use:true,mean,low,high,sd});
+    const normalized=ManageConfigService.normalizeTargetPick({meanRaw,lowRaw,highRaw,sdRaw});if(normalized.error){await infoDialog(normalized.message);return null;}
+    picked.push({testId,lot,...normalized});
   }
   return picked;
 }
@@ -144,28 +114,8 @@ async function resolveTargetSwitch(mode){
   commitTargetMatrix(ctx.picked,ctx.group,ctx.panel,mode,ctx.overwrites);
 }
 function commitTargetMatrix(picked,group,panel,mode,overwrites){
-  const effectiveFrom=isoToday(),note='Cập nhật Mean/SD',overwriteKeys=new Set((overwrites||[]).map(o=>o.testId+'|'+o.lot.level));
-  const stoppedGroupIds=new Set();
-  let count=0;
-  picked.forEach(pick=>{
-    const t=state.tests.find(x=>x.id===pick.testId);if(!t)return;
-    const isOverwrite=overwriteKeys.has(pick.testId+'|'+pick.lot.level);
-    if(isOverwrite&&mode==='planned'){if(applyPlannedTarget(t,pick.lot,pick,note+' (dự kiến)'))count++;return;}
-    if(isOverwrite&&mode==='switch'){
-      const same=t.levels.find(x=>+x.level===+pick.lot.level),oldGroup=same&&same.qcLotId?groupsOfLot(same.qcLotId)[0]:null;
-      if(oldGroup&&oldGroup.id!==group.id)stoppedGroupIds.add(oldGroup.id);
-    }
-    if(applyTargetPick(t,pick.lot,pick,effectiveFrom,note))count++;
-  });
-  if(mode==='switch'&&count){
-    stoppedGroupIds.forEach(id=>{const g=state.lotGroups.find(x=>x.id===id);if(g){g.status='stopped';g.stoppedAt=effectiveFrom;}});
-    // Không gán group.status='active': "Đang hoạt động" được tính thẳng từ dữ liệu thật
-    // (lotGroupInUse trong qc-domain.js) để không bao giờ lệch với thực tế xét nghiệm đang dùng lô nào.
-    delete group.status;delete group.stoppedAt;
-  }else if(mode==='planned'&&overwriteKeys.size&&count){
-    group.status='planned';
-  }
-  logAct('Cập nhật Mean/SD',`${targetPanelLabel()} · ${group.name} · ${count} dòng${mode==='planned'?' (dự kiến)':''}`,'Mean/SD');save();rerender();
+  const result=ManageConfigService.applyTargetMatrix({picked,group,mode,overwrites,effectiveFrom:isoToday(),note:'Cập nhật Mean/SD',tests:state.tests,lots:state.qcLots||[],groups:state.lotGroups||[],pointsForTest:t=>(state.data&&state.data[t.id])||[],groupsForLot:groupsOfLot,upsertHistory:upsertLotTargetHistory});
+  logAct('Cập nhật Mean/SD',`${targetPanelLabel()} · ${group.name} · ${result.count} dòng${mode==='planned'?' (dự kiến)':''}`,'Mean/SD');save();rerender();
 }
 function openQcHistoryDetail(tid,level,lotNo=''){
   const t=state.tests.find(x=>x.id===tid),l=t&&t.levels.find(x=>+x.level===+level);if(!t||!l)return;
@@ -198,17 +148,14 @@ function renderConfigPanelTests(){
 }
 async function saveConfigPanel(id){
   if(!requireAdmin())return;
-  const name=QCCore.cleanText(document.getElementById('cfgPanelName').value).trim(),instrumentId=document.getElementById('cfgPanelInstrument').value,testIds=[...document.querySelectorAll('.cfg-panel-test:checked')].map(x=>x.value);if(!name){await infoDialog('Nhập tên Panel QC.');return;}if(!instrumentId){await infoDialog('Chọn máy xét nghiệm.');return;}if(!testIds.length){await infoDialog('Chọn ít nhất một xét nghiệm.');return;}
-  if(testIds.some(testId=>(state.tests.find(t=>t.id===testId)||{}).instrumentId!==instrumentId)){await infoDialog('Panel QC chỉ được chứa xét nghiệm thuộc máy đã chọn.');return;}
-  if(state.qcPanels.some(x=>x.id!==id&&x.instrumentId===instrumentId&&sameText(x.name,name))){await infoDialog('Panel QC này đã tồn tại trên máy đã chọn.');return;}
-  const data={name,instrumentId,testIds,note:QCCore.cleanText(document.getElementById('cfgPanelNote').value,5000),active:document.getElementById('cfgPanelActive').checked},old=state.qcPanels.find(x=>x.id===id);if(old)Object.assign(old,data);else state.qcPanels.push({id:uid(),...data});
-  logAct(old?'Cập nhật Panel QC':'Thêm Panel QC',`${name} · ${testIds.length} xét nghiệm`,'Panel QC');closeModal();save();rerender();
+  const data={name:document.getElementById('cfgPanelName').value,instrumentId:document.getElementById('cfgPanelInstrument').value,testIds:[...document.querySelectorAll('.cfg-panel-test:checked')].map(x=>x.value),note:document.getElementById('cfgPanelNote').value,active:document.getElementById('cfgPanelActive').checked},result=ManageConfigService.savePanel(state,{id,newId:uid(),data});if(result.error){await infoDialog(result.message);return;}
+  logAct(result.created?'Thêm Panel QC':'Cập nhật Panel QC',`${result.record.name} · ${result.record.testIds.length} xét nghiệm`,'Panel QC');closeModal();save();rerender();
 }
-async function deleteConfigPanel(id){if(!requireAdmin())return;const p=state.qcPanels.find(x=>x.id===id);if(!p)return;if(state.lotTransitions.some(x=>x.panelId===id)){await infoDialog('Panel này đang có lịch sử chuyển tiếp lô. Hãy xóa/chuyển các dòng chuyển tiếp trước.');return;}if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa Panel QC',message:`Xóa Panel QC ${p.name}?`,detail:'Các xét nghiệm vẫn được giữ nguyên.',confirmLabel:'Xóa Panel QC',cancelLabel:'Hủy'}))return;state.qcPanels=state.qcPanels.filter(x=>x.id!==id);logAct('Xóa Panel QC',p.name,'Panel QC');save();rerender();}
-async function deleteLotTransition(id){if(!requireAdmin())return;const tr=state.lotTransitions.find(x=>x.id===id);if(!tr)return;if(transitionSwitchesLot(tr)){await infoDialog('Hồ sơ đã chấp nhận lô mới và đã áp dụng vào nhóm lô/Mean-SD, không nên xóa trực tiếp. Nếu nhập sai, hãy tạo hồ sơ chuyển tiếp mới hoặc chỉnh nhóm lô/Mean-SD thủ công.');return;}if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa dòng chuyển tiếp lô',message:'Xóa dòng chuyển tiếp lô này?',confirmLabel:'Xóa',cancelLabel:'Hủy'}))return;state.lotTransitions=state.lotTransitions.filter(x=>x.id!==id);syncLotDepletionFromTransitions();logAct('Xóa chuyển tiếp lô',`${lotLabel(tr.fromLotId)} → ${lotLabel(tr.toLotId)}`,'Chuyển tiếp lô');save();rerender();}
-function lotTransitionChoiceLabel(lot){if(!lot)return'';const to=lot.depleted?lotTransitionToNo(lot.id):'';return`${lot.lotNo} · Mức ${lot.level}${lot.exp?' · HSD '+vnDate(lot.exp):''}${lot.depleted?' · '+(to?'đã chuyển tiếp qua lô '+to:'đã hết QC'):''}`;}
-function lotTransitionChoiceLots(selectedId=''){return(state.qcLots||[]).filter(l=>!l.depleted||l.id===selectedId);}
-function lotTransitionChoiceMatch(value,selectedId=''){const q=searchText(value||'');if(!q)return null;const lots=lotTransitionChoiceLots(selectedId),exact=lots.find(l=>searchText(lotTransitionChoiceLabel(l))===q||searchText(l.lotNo)===q);if(exact)return exact;const matches=lots.filter(l=>searchText(lotTransitionChoiceLabel(l)).includes(q));return matches.length===1?matches[0]:null;}
+async function deleteConfigPanel(id){if(!requireAdmin())return;const checked=ManageConfigService.panelRemoval(state,{id});if(checked.error){if(checked.message)await infoDialog(checked.message);return;}if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa Panel QC',message:`Xóa Panel QC ${checked.record.name}?`,detail:'Các xét nghiệm vẫn được giữ nguyên.',confirmLabel:'Xóa Panel QC',cancelLabel:'Hủy'}))return;ManageConfigService.removePanel(state,{id});logAct('Xóa Panel QC',checked.record.name,'Panel QC');save();rerender();}
+async function deleteLotTransition(id){if(!requireAdmin())return;const checked=ManageConfigService.lotTransitionRemoval(state,{id,switchesLot:transitionSwitchesLot});if(checked.error){if(checked.message)await infoDialog(checked.message);return;}if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa dòng chuyển tiếp lô',message:'Xóa dòng chuyển tiếp lô này?',confirmLabel:'Xóa',cancelLabel:'Hủy'}))return;ManageConfigService.removeLotTransition(state,{id,switchesLot:transitionSwitchesLot});syncLotDepletionFromTransitions();logAct('Xóa chuyển tiếp lô',`${lotLabel(checked.record.fromLotId)} → ${lotLabel(checked.record.toLotId)}`,'Chuyển tiếp lô');save();rerender();}
+function lotTransitionChoiceLabel(lot){return LotTransitionPickerService.label(lot);}
+function lotTransitionChoiceLots(selectedId=''){return LotTransitionPickerService.availableLots(state.qcLots||[],selectedId);}
+function lotTransitionChoiceMatch(value,selectedId=''){return LotTransitionPickerService.match(state.qcLots||[],value,selectedId);}
 function lotTransitionSelectedId(inputId){const el=document.getElementById(inputId);if(!el)return'';const lot=lotTransitionChoiceMatch(el.value,el.dataset.lotId||'');if(lot)el.dataset.lotId=lot.id;return lot&&lot.id||'';}
 function lotTransitionChoiceInput(el,commit=false){const lot=lotTransitionChoiceMatch(el.value,el.dataset.lotId||'');el.dataset.lotId=lot&&lot.id||'';if(commit&&lot)el.value=lotTransitionChoiceLabel(lot);refreshLotTransitionTargets();}
 function lotTransitionChoiceHtml(inputId,selectedId){const lot=state.qcLots.find(l=>l.id===selectedId),options=lotTransitionChoiceLots(selectedId).map(l=>`<option value="${escAttr(lotTransitionChoiceLabel(l))}"></option>`).join('');return`<input id="${inputId}" list="${inputId}List" autocomplete="off" role="combobox" aria-autocomplete="list" placeholder="Gõ số lô hoặc chọn danh sách" value="${escAttr(lotTransitionChoiceLabel(lot))}" data-lot-id="${escAttr(selectedId||'')}" oninput="lotTransitionChoiceInput(this)" onchange="lotTransitionChoiceInput(this,true)"><datalist id="${inputId}List">${options}</datalist>`;}
@@ -273,28 +220,16 @@ async function readLotTransitionTargetPicks(rows){
     const row=document.querySelector(`#cfgTransTargets .target-row[data-test="${t.id}"]`);if(!row){picks.push({t,use:false});continue;}
     const meanRaw=row.querySelector('.tm-mean').value.trim(),lowRaw=row.querySelector('.tm-low').value.trim(),highRaw=row.querySelector('.tm-high').value.trim(),sdRaw=row.querySelector('.tm-sd').value.trim();
     if(!meanRaw&&!lowRaw&&!highRaw&&!sdRaw){picks.push({t,use:false});continue;}
-    let mean=meanRaw===''?null:parseFloat(meanRaw),low=lowRaw===''?null:parseFloat(lowRaw),high=highRaw===''?null:parseFloat(highRaw),sd=sdRaw===''?null:parseFloat(sdRaw);
-    const fromLimits=QCCore.targetFromLimits(low,high);
-    if(fromLimits){if(!Number.isFinite(mean))mean=fromLimits.mean;if(!Number.isFinite(sd)||sd<=0)sd=fromLimits.sd;}
-    if(!Number.isFinite(mean)){await infoDialog(`${testDisplayName(t)}: nhập trung bình mục tiêu hợp lệ cho lô mới.`);return null;}
-    if((lowRaw!==''&&!Number.isFinite(low))||(highRaw!==''&&!Number.isFinite(high))){await infoDialog(`${testDisplayName(t)}: giới hạn dưới/trên phải là số hợp lệ.`);return null;}
-    if((lowRaw!==''||highRaw!=='')&&(!Number.isFinite(low)||!Number.isFinite(high)||high<=low)){await infoDialog(`${testDisplayName(t)}: nếu nhập giới hạn, cần nhập đủ giới hạn dưới và trên; giới hạn trên phải lớn hơn giới hạn dưới.`);return null;}
-    if(sdRaw!==''&&(!Number.isFinite(sd)||sd<=0)){await infoDialog(`${testDisplayName(t)}: độ lệch chuẩn phải là số lớn hơn 0.`);return null;}
-    if((sd==null||!Number.isFinite(sd))&&Number.isFinite(low)&&Number.isFinite(high))sd=(high-low)/4; // ±2SD only — xem readTargetMatrixPicks()
-    if(!Number.isFinite(sd)||sd<=0){await infoDialog(`${testDisplayName(t)}: cần độ lệch chuẩn, hoặc đủ giới hạn dưới/trên để ước tính SD.`);return null;}
-    picks.push({t,use:true,mean,low,high,sd});
+    const normalized=ManageConfigService.normalizeTargetPick({meanRaw,lowRaw,highRaw,sdRaw,deriveLimits:false});if(normalized.error){const msgs={'invalid-mean':'nhập trung bình mục tiêu hợp lệ cho lô mới.','invalid-limits':'giới hạn dưới/trên phải là số hợp lệ.','invalid-range':'nếu nhập giới hạn, cần nhập đủ giới hạn dưới và trên; giới hạn trên phải lớn hơn giới hạn dưới.','invalid-sd':'độ lệch chuẩn phải là số lớn hơn 0.','missing-sd':'cần độ lệch chuẩn, hoặc đủ giới hạn dưới/trên để ước tính SD.'};await infoDialog(`${testDisplayName(t)}: ${msgs[normalized.error]||normalized.message}`);return null;}
+    picks.push({t,...normalized});
   }
   return picks;
 }
 async function saveLotTransitionV2(id){
   if(!requireAdmin())return;
-  const panelId=document.getElementById('cfgTransPanel').value,fromLotId=lotTransitionSelectedId('cfgTransFrom'),toLotId=lotTransitionSelectedId('cfgTransTo');if(!panelId){await infoDialog('Chọn Panel QC.');return;}if(!fromLotId||!toLotId||fromLotId===toLotId){await infoDialog('Chọn lô cũ và lô mới khác nhau từ danh sách.');return;}
-  const fromLot=state.qcLots.find(l=>l.id===fromLotId),toLot=state.qcLots.find(l=>l.id===toLotId);if(!fromLot||!toLot){await infoDialog('Không tìm thấy lô QC đã chọn.');return;}if(+fromLot.level!==+toLot.level){await infoDialog('Lô cũ và lô mới phải cùng mức QC để chuyển tiếp.');return;}
-  if(state.lotTransitions.some(x=>x.id!==id&&x.panelId===panelId&&x.fromLotId===fromLotId&&x.toLotId===toLotId)){await infoDialog('Chuyển tiếp lô này đã tồn tại.');return;}
-  const status=document.getElementById('cfgTransStatus').value,startRaw=document.getElementById('cfgTransStart').value.trim(),startDate=parseVN(startRaw);if(startRaw&&!startDate){await infoDialog('Ngày bắt đầu không hợp lệ. Dùng dạng dd/mm/yyyy.');return;}
-  const old=state.lotTransitions.find(x=>x.id===id),nowFinal=['accepted','rejected'].includes(status),finalChanged=nowFinal&&(!old||old.status!==status);
-  if(old&&transitionSwitchesLot(old)&&status!=='accepted'){await infoDialog('Hồ sơ đã chấp nhận lô mới và đã áp dụng vào nhóm lô/Mean-SD, không thể đổi ngược trạng thái.');return;}
-  const data={panelId,fromLotId,toLotId,startDate:startDate||isoToday(),status,criteria:old&&old.criteria||'',conclusion:old&&old.conclusion||'',approvedBy:finalChanged?userName():(old&&old.approvedBy||''),approvedAt:finalChanged?new Date().toISOString():(old&&old.approvedAt||''),note:old&&old.note||''};
+  const panelId=document.getElementById('cfgTransPanel').value,fromLotId=lotTransitionSelectedId('cfgTransFrom'),toLotId=lotTransitionSelectedId('cfgTransTo'),status=document.getElementById('cfgTransStatus').value,startRaw=document.getElementById('cfgTransStart').value.trim(),startDate=parseVN(startRaw);if(startRaw&&!startDate){await infoDialog('Ngày bắt đầu không hợp lệ. Dùng dạng dd/mm/yyyy.');return;}
+  const checked=ManageConfigService.validateLotTransition(state,{id,panelId,fromLotId,toLotId,status,switchesLot:transitionSwitchesLot});if(checked.error){await infoDialog(checked.message);return;}const {old,fromLot,toLot,finalChanged}=checked;
+  const data=ManageConfigService.prepareLotTransitionData({old,panelId,fromLotId,toLotId,startDate,status,finalChanged,today:isoToday(),approvedBy:finalChanged?userName():'',approvedAt:finalChanged?new Date().toISOString():''});
   if(finalChanged&&!await reauthenticateCurrentUser({title:'Xác thực kết luận chuyển lô',message:'Nhập lại mật khẩu trước khi chấp nhận hoặc từ chối lô QC mới.'}))return;
   const targetCheck=inspectAcceptedLotTransition({panelId,fromLotId,toLotId,status:'accepted'});
   if(targetCheck.valid&&targetCheck.rows.length){
@@ -302,7 +237,7 @@ async function saveLotTransitionV2(id){
     picks.forEach(pick=>{if(pick.use)applyPlannedTarget(pick.t,toLot,pick,'Nhập khi tạo hồ sơ chuyển lô');});
   }
   if(status==='accepted'&&finalChanged){const check=inspectAcceptedLotTransition(data);if(!check.rows.length){await infoDialog('Panel đã chọn không có xét nghiệm nào đang sử dụng lô cũ. Hãy kiểm tra lại Panel và lô chuyển tiếp.');return;}if(check.missing.length){await infoDialog(`Chưa thể chấp nhận lô mới: ${check.missing.map(x=>testDisplayName(x.t)).join(', ')} chưa có Mean/SD hợp lệ cho lô ${toLot.lotNo}. Hãy điền đủ ở bảng Mean/SD phía trên rồi lưu lại.`);return;}}
-  const tr=old?Object.assign(old,data):{id:uid(),...data};if(!old)state.lotTransitions.push(tr);
+  const saved=ManageConfigService.saveLotTransition(state,{id,newId:uid(),data});if(saved.error){await infoDialog(saved.message);return;}const tr=saved.record;
   const switched=applyAcceptedLotTransitionToConfig(tr);
   const wasDepleted=!!(state.qcLots.find(l=>l.id===fromLotId)||{}).depleted;
   syncLotDepletionFromTransitions();
@@ -310,7 +245,7 @@ async function saveLotTransitionV2(id){
   if(nowDepleted&&!wasDepleted)logAct('Khóa lô đã hết',`${lotLabel(fromLotId)} · chuyển tiếp sang ${lotLabel(toLotId)}`,'Lô QC');
   else if(!nowDepleted&&wasDepleted)logAct('Mở lại lô QC',lotLabel(fromLotId),'Lô QC');
   if(switched)logAct('Áp dụng chuyển tiếp lô',`${panelName(panelId)} · ${lotLabel(fromLotId)} → ${lotLabel(toLotId)} · ${switched} xét nghiệm`,'Chuyển tiếp lô');
-  logAct(old?'Cập nhật chuyển lô QC':'Thêm chuyển lô QC',`${panelName(panelId)}: ${lotLabel(fromLotId)} → ${lotLabel(toLotId)} · ${transitionStatusLabelV2(status).text}`,'Chuyển tiếp lô');clearDerived();closeModal();save();rerender();
+  logAct(saved.created?'Thêm chuyển lô QC':'Cập nhật chuyển lô QC',`${panelName(panelId)}: ${lotLabel(fromLotId)} → ${lotLabel(toLotId)} · ${transitionStatusLabelV2(status).text}`,'Chuyển tiếp lô');clearDerived();closeModal();save();rerender();
 }
 async function openConfigGroup(id=''){
   if(!state.qcLots.length){await infoDialog('Hãy tạo lô QC trước khi tạo nhóm lô.');setManageTab('lots');return;}
@@ -328,23 +263,18 @@ async function openConfigGroup(id=''){
 function suggestConfigGroupName(){const ids=[...document.querySelectorAll('.cfg-group-lot:checked')].map(x=>x.value),name=ids.map(id=>(state.qcLots.find(l=>l.id===id)||{}).lotNo).filter(Boolean).join('/'),el=document.getElementById('cfgGroupName');if(el)el.value=name;}
 async function saveConfigGroup(id){
   if(!requireAdmin())return;
-  const lotIds=[...document.querySelectorAll('.cfg-group-lot:checked')].map(x=>x.value);if(lotIds.length<2){await infoDialog('Một nhóm lô cần chọn ít nhất 2 lô QC.');return;}
-  const name=QCCore.cleanText(document.getElementById('cfgGroupName').value).trim()||lotIds.map(lid=>(state.qcLots.find(l=>l.id===lid)||{}).lotNo).filter(Boolean).join('/');if(!name){await infoDialog('Nhập tên nhóm lô.');return;}
-  if(state.lotGroups.some(x=>x.id!==id&&(sameText(x.name,name)||sameIdSet(x.lotIds,lotIds)))){await infoDialog('Nhóm lô này đã tồn tại hoặc trùng danh sách lô.');return;}
-  const data={name,lotIds,note:QCCore.cleanText(document.getElementById('cfgGroupNote').value,5000),active:true};
-  const old=state.lotGroups.find(x=>x.id===id);if(old)Object.assign(old,data);else state.lotGroups.push({id:uid(),...data});
+  const data={name:document.getElementById('cfgGroupName').value,lotIds:[...document.querySelectorAll('.cfg-group-lot:checked')].map(x=>x.value),note:document.getElementById('cfgGroupNote').value},result=ManageConfigService.saveLotGroup(state,{id,newId:uid(),data});if(result.error){await infoDialog(result.message);return;}
   const sigmaSync=reconcileSigmaLevelsWithLotGroups(),syncNote=sigmaSync.pruned?` · đã xóa ${sigmaSync.pruned} dữ liệu mức Sigma không còn trong nhóm`:'';
-  logAct(old?'Cập nhật nhóm lô':'Thêm nhóm lô',name+syncNote,'Nhóm lô');closeModal();save();rerender();
+  logAct(result.created?'Thêm nhóm lô':'Cập nhật nhóm lô',result.record.name+syncNote,'Nhóm lô');closeModal();save();rerender();
 }
-async function deleteConfigGroup(id){if(!requireAdmin())return;const g=state.lotGroups.find(x=>x.id===id);if(!g)return;if(state.tests.some(t=>(t.levels||[]).some(l=>l.qcLotId&&(g.lotIds||[]).includes(l.qcLotId)))){await infoDialog('Nhóm lô này đang được gán Mean/SD cho xét nghiệm. Hãy đổi nhóm/lô ở thẻ Mean/SD trước khi xóa nhóm.');return;}if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa nhóm lô',message:`Xóa nhóm lô ${g.name}?`,detail:'Các lô QC bên trong vẫn được giữ nguyên.',confirmLabel:'Xóa nhóm lô',cancelLabel:'Hủy'}))return;state.lotGroups=state.lotGroups.filter(x=>x.id!==id);logAct('Xóa nhóm lô',g.name,'Nhóm lô');save();rerender();}
+async function deleteConfigGroup(id){if(!requireAdmin())return;const checked=ManageConfigService.lotGroupRemoval(state,{id});if(checked.error){if(checked.message)await infoDialog(checked.message);return;}if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa nhóm lô',message:`Xóa nhóm lô ${checked.record.name}?`,detail:'Các lô QC bên trong vẫn được giữ nguyên.',confirmLabel:'Xóa nhóm lô',cancelLabel:'Hủy'}))return;ManageConfigService.removeLotGroup(state,{id});logAct('Xóa nhóm lô',checked.record.name,'Nhóm lô');save();rerender();}
 /* Dừng luồng vận hành của nhóm: giữ nguyên liên kết lô/Mean-SD để bảo toàn lịch sử và
    có thể kích hoạt lại, nhưng isOperationalLotGroup() sẽ loại nhóm khỏi Nhập QC cùng
    mọi luồng vận hành mới. Chiều ngược lại đi qua activateLotGroup(). */
 function toggleLotGroupStatus(id){
   if(!requireAdmin())return;
-  const g=state.lotGroups.find(x=>x.id===id);if(!g||g.active===false||g.status==='stopped'||g.status==='planned')return;
-  g.status='stopped';g.stoppedAt=isoToday();
-  logAct('Dừng nhóm lô',g.name,'Nhóm lô');
+  const result=ManageConfigService.stopLotGroup(state,{id,stoppedAt:isoToday()});if(result.error)return;
+  logAct('Dừng nhóm lô',result.record.name,'Nhóm lô');
   save();rerender();
 }
 /* Kích hoạt một nhóm lô đang "Đã dừng"/"Dự kiến"/"Chưa dùng": với mỗi xét nghiệm có mức
@@ -360,16 +290,7 @@ function toggleLotGroupStatus(id){
    chung cho cả bước hỏi trước (đếm điểm rơi vào kỳ đã khóa) lẫn vòng lặp ghi thật,
    tránh 2 nơi tự lọc điều kiện rồi lệch nhau. */
 function lotGroupActivationCandidates(g,lots){
-  const list=[];
-  state.tests.forEach(t=>{
-    lots.forEach(lot=>{
-      const target=(t.levels||[]).find(x=>+x.level===+lot.level);if(!target||target.qcLotId===lot.id)return;
-      const snap=lotTargetSnapshot(t,lot.level,lot.id,lot.lotNo);
-      if(!snap||!Number.isFinite(+snap.mean)||!Number.isFinite(+snap.sd)||+snap.sd<=0)return;
-      list.push({t,lot,pick:{use:true,mean:snap.mean,low:snap.low,high:snap.high,sd:snap.sd}});
-    });
-  });
-  return list;
+  return ManageConfigService.lotGroupActivationCandidates(state.tests,lots,(t,level,lotId,lotNo)=>lotTargetSnapshot(t,level,lotId,lotNo));
 }
 async function activateLotGroup(id){
   if(!requireAdmin())return;
@@ -381,22 +302,14 @@ async function activateLotGroup(id){
   const locked=PeriodService.lockedPoints(state,backfilled);
   const lockNote=locked.count?`${locked.count} điểm QC thuộc kỳ đã khóa (${locked.periods.map(monthVN).join(', ')}) sẽ được điền số lô/Mean-SD hiện hành (điểm trước đó chưa ghi lô riêng).`:'';
   if(!await confirmDialog({title:'Kích hoạt nhóm lô',message:`Áp dụng Mean/SD của nhóm lô ${g.name} cho các xét nghiệm liên quan và chuyển sang dùng nhóm này?`,detail:lockNote,confirmLabel:'Áp dụng',cancelLabel:'Hủy',danger:false}))return;
-  const effectiveFrom=isoToday(),note='Kích hoạt nhóm lô',stoppedGroupIds=new Set();
-  let count=0;
-  candidates.forEach(({t,lot,pick})=>{
-    const target=(t.levels||[]).find(x=>+x.level===+lot.level);
-    if(target.qcLotId){const oldGroup=groupsOfLot(target.qcLotId)[0];if(oldGroup&&oldGroup.id!==g.id)stoppedGroupIds.add(oldGroup.id);}
-    if(applyTargetPick(t,lot,pick,effectiveFrom,note))count++;
-  });
-  if(!count){
-    if(lotGroupInUse(g)){delete g.status;delete g.stoppedAt;save();rerender();await infoDialog(`Nhóm lô ${g.name} đã đang được xét nghiệm dùng thật, chỉ gỡ nhãn cũ.`,{type:'success'});return;}
+  const effectiveFrom=isoToday(),note='Kích hoạt nhóm lô',result=ManageConfigService.applyLotGroupActivation({group:g,candidates,groups:state.lotGroups,effectiveFrom,note,applyTarget:applyTargetPick,groupsForLot:groupsOfLot,groupInUse:lotGroupInUse});
+  if(result.status==='already-active'){save();rerender();await infoDialog(`Nhóm lô ${g.name} đã đang được xét nghiệm dùng thật, chỉ gỡ nhãn cũ.`,{type:'success'});return;}
+  if(result.status==='unready'){
     await infoDialog('Nhóm lô này chưa có Mean/SD (dự kiến hoặc lịch sử) cho xét nghiệm nào để áp dụng. Vào màn Mean/SD để nhập trước.');return;
   }
-  stoppedGroupIds.forEach(gid=>{const og=state.lotGroups.find(x=>x.id===gid);if(og){og.status='stopped';og.stoppedAt=effectiveFrom;}});
-  delete g.status;delete g.stoppedAt;
-  logAct('Kích hoạt nhóm lô',`${g.name} · ${count} dòng`,'Nhóm lô');
+  logAct('Kích hoạt nhóm lô',`${g.name} · ${result.count} dòng`,'Nhóm lô');
   save();rerender();
-  await infoDialog(`Đã áp dụng Mean/SD cho ${count} dòng và chuyển sang nhóm lô ${g.name}.`,{type:'success'});
+  await infoDialog(`Đã áp dụng Mean/SD cho ${result.count} dòng và chuyển sang nhóm lô ${g.name}.`,{type:'success'});
 }
 function openConfigLot(id=''){
   const l=state.qcLots.find(x=>x.id===id)||{level:1,active:true};
@@ -412,11 +325,8 @@ async function saveConfigLot(id){
   const lotNo=QCCore.cleanText(document.getElementById('cfgLotNo').value).trim();if(!lotNo){await infoDialog('Nhập số lot.');return;}
   const level=+document.getElementById('cfgLotLevel').value||1,openedRaw=document.getElementById('cfgLotOpened').value.trim(),expRaw=document.getElementById('cfgLotExp').value.trim(),opened=parseVN(openedRaw),exp=parseVN(expRaw);
   if(openedRaw&&!opened){await infoDialog('Ngày mở không hợp lệ. Dùng dạng dd/mm/yyyy.');return;}if(expRaw&&!exp){await infoDialog('Hạn sử dụng không hợp lệ. Dùng dạng dd/mm/yyyy.');return;}
-  const old=state.qcLots.find(x=>x.id===id);
-  if(old&&+old.level!==level&&state.tests.some(t=>t.levels.some(x=>x.qcLotId===id))){await infoDialog('Lô QC đang gắn với xét nghiệm nên không thể đổi mức QC. Hãy bỏ gán lô trong Mean/SD trước.');return;}
-  if(state.qcLots.some(x=>x.id!==id&&+x.level===level&&sameText(x.lotNo,lotNo))){await infoDialog('Số lô QC này đã tồn tại ở cùng mức QC.');return;}
-  const oldLotNo=old&&old.lotNo||'',oldLevel=old?+old.level:level;
-  const data={lotNo,level,description:QCCore.cleanText(document.getElementById('cfgLotDescription').value),supplier:QCCore.cleanText(document.getElementById('cfgLotSupplier').value),program:old&&old.program||'',opened,exp,note:QCCore.cleanText(document.getElementById('cfgLotNote').value,5000),active:true};
+  const existing=state.qcLots.find(x=>x.id===id),data={lotNo,level,description:QCCore.cleanText(document.getElementById('cfgLotDescription').value),supplier:QCCore.cleanText(document.getElementById('cfgLotSupplier').value),program:existing&&existing.program||'',opened,exp,note:QCCore.cleanText(document.getElementById('cfgLotNote').value,5000),active:true},check=ManageConfigService.validateLot(state,{id,data});
+  if(check.error){await infoDialog(check.message);return;}const old=check.record,oldLotNo=old&&old.lotNo||'',oldLevel=old?+old.level:level;
   /* Đổi số lô là VIẾT LẠI HÀNG LOẠT bản ghi lịch sử, không phải sửa một ô cấu
      hình: p.lot là chuỗi tĩnh nên không đổi theo thì điểm cũ biến mất khỏi mọi
      bộ lọc lô (xem chú thích ở renameLotAcrossPoints). Người dùng phải thấy con
@@ -436,10 +346,8 @@ async function saveConfigLot(id){
       }))return;
     }
   }
-  const lot=old||{id:uid()};Object.assign(lot,data);if(!old)state.qcLots.push(lot);
-  state.tests.forEach(t=>t.levels.filter(x=>x.qcLotId===lot.id).forEach(x=>{x.level=data.level;x.lot=data.lotNo;x.exp=data.exp;(x.meanSdHistory||[]).filter(h=>h.qcLotId===lot.id).forEach(h=>{h.lot=data.lotNo;});}));
-  const renamedPoints=old?renameLotAcrossPoints(oldLevel,oldLotNo,data.lotNo):0;
-  logAct(old?'Cập nhật lô QC':'Thêm lô QC',`${data.lotNo} · Mức ${data.level}`+(renamedPoints?` · Đã cập nhật ${renamedPoints} điểm QC cũ theo số lô mới`:''),'Lô QC');closeModal();save();rerender();
+  const result=ManageConfigService.saveLot(state,{id,newId:uid(),data,renamePoints:renameLotAcrossPoints});if(result.error){await infoDialog(result.message);return;}
+  logAct(result.created?'Thêm lô QC':'Cập nhật lô QC',`${data.lotNo} · Mức ${data.level}`+(result.renamedPoints?` · Đã cập nhật ${result.renamedPoints} điểm QC cũ theo số lô mới`:''),'Lô QC');closeModal();save();rerender();
 }
 /* Điểm QC lưu số lô dạng CHUỖI TĨNH chụp lúc nhập (p.lot), không tham chiếu qcLotId —
    mọi bộ lọc "điểm của lô này" (pointsForLot/operationalLotPoints/lotPointsByNo) so
@@ -453,18 +361,10 @@ async function saveConfigLot(id){
 /* Tách phần TÌM khỏi phần SỬA: saveConfigLot() cần đếm và soi kỳ đã khóa TRƯỚC
    khi động vào state, để hộp xác nhận nói đúng số điểm sắp bị viết lại. */
 function lotPointsToRename(oldLevel,oldLotNo){
-  if(!oldLotNo)return[];
-  const rows=[];
-  Object.keys(state.data||{}).forEach(testId=>{
-    (state.data[testId]||[]).forEach(p=>{if(+p.level===+oldLevel&&(p.lot||'')===oldLotNo)rows.push(p);});
-  });
-  return rows;
+  return ManageConfigService.lotPointsToRename(state,oldLevel,oldLotNo);
 }
 function renameLotAcrossPoints(oldLevel,oldLotNo,newLotNo){
-  if(!oldLotNo||oldLotNo===newLotNo)return 0;
-  const rows=lotPointsToRename(oldLevel,oldLotNo);
-  rows.forEach(p=>{p.lot=newLotNo;});
-  return rows.length;
+  return ManageConfigService.renameLotPoints(state,oldLevel,oldLotNo,newLotNo);
 }
 /* Lô đã "hết QC" qua chuyển tiếp ĐÃ CHẤP NHẬN không còn test nào trỏ qcLotId vào nó
    (đã chuyển hết sang lô mới) nên guard "đang gắn với xét nghiệm" bên dưới không chặn
@@ -473,7 +373,7 @@ function renameLotAcrossPoints(oldLevel,oldLotNo,newLotNo){
    trực tiếp (vì đã áp dụng vào cấu hình/Mean-SD, có giá trị lịch sử/audit). Chặn thêm
    ở đây cho nhất quán với bảo vệ đó — chỉ chặn hồ sơ đã chấp nhận, không chặn hồ sơ
    dự kiến/đang chạy song song/không chấp nhận (những hồ sơ đó vốn xóa trực tiếp được). */
-async function deleteConfigLot(id){if(!requireAdmin())return;const l=state.qcLots.find(x=>x.id===id);if(!l)return;if(state.tests.some(t=>t.levels.some(x=>x.qcLotId===id))){await infoDialog('Lô QC này đang được gắn với xét nghiệm. Hãy đổi lô trong xét nghiệm trước.');return;}if(state.lotTransitions.some(x=>(x.fromLotId===id||x.toLotId===id)&&transitionSwitchesLot(x))){await infoDialog('Lô QC này có hồ sơ chuyển tiếp đã CHẤP NHẬN (đã áp dụng vào cấu hình/Mean-SD). Không thể xóa lô trực tiếp — nếu thực sự cần, hãy xử lý hồ sơ chuyển tiếp đó trước.');return;}if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa lô QC',message:`Xóa lô QC ${l.lotNo}?`,confirmLabel:'Xóa lô QC',cancelLabel:'Hủy'}))return;state.qcLots=state.qcLots.filter(x=>x.id!==id);state.lotGroups.forEach(g=>g.lotIds=(g.lotIds||[]).filter(x=>x!==id));state.lotTransitions=state.lotTransitions.filter(x=>x.fromLotId!==id&&x.toLotId!==id);logAct('Xóa lô QC',l.lotNo,'Lô QC');save();rerender();}
+async function deleteConfigLot(id){if(!requireAdmin())return;const check=ManageConfigService.lotRemoval(state,{id,switchesLot:transitionSwitchesLot});if(check.error){if(check.error!=='not-found')await infoDialog(check.message);return;}if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa lô QC',message:`Xóa lô QC ${check.record.lotNo}?`,confirmLabel:'Xóa lô QC',cancelLabel:'Hủy'}))return;const result=ManageConfigService.removeLot(state,{id,switchesLot:transitionSwitchesLot});if(result.error){await infoDialog(result.message);return;}logAct('Xóa lô QC',result.record.lotNo,'Lô QC');save();rerender();}
 function openConfigInstrument(id=''){
   const i=state.instruments.find(x=>x.id===id)||{active:true};
   openModal(`<div class="modal rcfg-modal"><div class="modal-h"><div><h3>${id?'Sửa máy xét nghiệm':'Thêm máy xét nghiệm'}</h3></div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">

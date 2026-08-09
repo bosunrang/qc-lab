@@ -82,6 +82,7 @@
      tat tren muc dang thu gon khong phai tu suy doan lai dieu kien — mot nguon su that
      duy nhat cho ca viec chan khep vong lan viec hien "con thieu N muc". */
   function actionProtocolStatus(a){
+    if(root.ActionProtocolService)return root.ActionProtocolService.protocolStatus(a);
     if(!a||!a.protocolVersion)return{required:false,complete:true,label:'Hồ sơ cũ',missing:[],missingBySection:{}};
     /* Khong co nhom 'eff': danh gia hieu luc la mot CONG RIENG (actionEffectivenessStatus)
        chu khong nam trong checklist khep vong, nen de mot nhom rong o day chi khien dai
@@ -136,6 +137,7 @@
     return{required:true,complete:!unique.length,label:unique.length?'Thiếu: '+unique.join(', '):'Đã hoàn tất checklist điều tra',missing:unique,missingBySection};
   }
   function actionProtocolSummary(a){
+    if(root.ActionProtocolService)return root.ActionProtocolService.protocolSummary(a);
     if(!a||!a.protocolVersion)return'';
     const checks=PROTOCOL_CHECKS.map(([key,label])=>`${label}: ${CHECK_LABELS[a[key]]||'Chưa ghi'}${a[key.replace('Status','Note')]?' ('+a[key.replace('Status','Note')]+')':''}`),residual=actionResidualRiskScore(a);
     return[
@@ -170,6 +172,7 @@
      (followUpNceId), hồ sơ này được khép lại với kết luận "chưa hiệu lực — đã chuyển",
      nếu không thì vẫn chặn để buộc người dùng escalate. */
   function actionEffectivenessStatus(a){
+    if(root.ActionProtocolService)return root.ActionProtocolService.effectivenessStatus(a);
     if(!a||!(+a.protocolVersion>=2))return{required:false,complete:true,effective:true,label:'Không yêu cầu cho hồ sơ cũ',cls:'none',escalated:false};
     if(a.effectivenessStatus!=='pending'&&+a.protocolVersion>=3){
       if(String(a.effectivenessNote||'').trim().length<5||!a.effectivenessDate)return{required:true,complete:false,effective:false,label:'Cần ngày và bằng chứng đánh giá hiệu lực',cls:'rej',escalated:false};

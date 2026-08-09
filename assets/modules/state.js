@@ -145,10 +145,11 @@ function ensureConfigurationShape(){
 }
 /* Lô "đã hết QC" được suy ra từ hồ sơ chuyển tiếp đã "Chấp nhận lô mới".
    Các trạng thái dự kiến/chạy song song chỉ để theo dõi, chưa khóa lô cũ. */
-function transitionSwitchesLot(tr){return !!(tr&&tr.fromLotId&&tr.toLotId&&tr.status==='accepted');}
+function transitionSwitchesLot(tr){return typeof ManageConfigService!=='undefined'?ManageConfigService.transitionSwitchesLot(tr):!!(tr&&tr.fromLotId&&tr.toLotId&&tr.status==='accepted');}
 function syncLotDepletionFromTransitions(){
+  if(typeof ManageConfigService!=='undefined')return ManageConfigService.syncLotDepletion(state);
   const retired=new Set((state.lotTransitions||[]).filter(transitionSwitchesLot).map(x=>x.fromLotId));
-  (state.qcLots||[]).forEach(l=>{l.depleted=retired.has(l.id);});
+  (state.qcLots||[]).forEach(l=>{l.depleted=retired.has(l.id);});return retired;
 }
 function dedupeLotTargetHistory(target){
   const rows=Array.isArray(target&&target.meanSdHistory)?target.meanSdHistory:[],out=[],indexes=new Map();
@@ -165,70 +166,14 @@ function upsertLotTargetHistory(target,lot,values){
   target.meanSdHistory=target.meanSdHistory.filter(h=>!matches(h));target.meanSdHistory.push(entry);return entry;
 }
 function inspectAcceptedLotTransition(tr){
-  const from=state.qcLots.find(l=>l.id===tr.fromLotId),to=state.qcLots.find(l=>l.id===tr.toLotId),panel=state.qcPanels.find(p=>p.id===tr.panelId);
-  if(!transitionSwitchesLot(tr)||!from||!to||!panel||+from.level!==+to.level)return{from,to,panel,rows:[],missing:[],valid:false};
-  const rows=(panel.testIds||[]).map(id=>state.tests.find(t=>t.id===id)).filter(Boolean).map(t=>({t,cfg:(t.levels||[]).find(l=>l.qcLotId===from.id)})).filter(x=>x.cfg).map(x=>({...x,nextHist:(x.cfg.meanSdHistory||[]).slice().reverse().find(h=>(h.qcLotId===to.id||(!h.qcLotId&&(h.lot||'')===to.lotNo))&&Number.isFinite(+h.mean)&&Number.isFinite(+h.sd)&&+h.sd>0)}));
-  return{from,to,panel,rows,missing:rows.filter(x=>!x.nextHist),valid:true};
+  const check=ManageConfigService.inspectAcceptedLotTransition(state,tr);
+  return{from:check.from,to:check.to,panel:check.panel,rows:check.rows.map(x=>({t:x.test,cfg:x.config,nextHist:x.nextHistory})),missing:check.missing.map(x=>({t:x.test,cfg:x.config,nextHist:x.nextHistory})),valid:check.valid};
 }
 function applyAcceptedLotTransitionToConfig(tr){
-  const check=inspectAcceptedLotTransition(tr),{from,to,panel,rows,missing}=check;
-  /* Chuyển lô là thao tác nguyên tử: không đổi nhóm/lô và tuyệt đối không mượn
-     Mean/SD lô cũ nếu bất kỳ xét nghiệm liên quan nào chưa có target riêng lô mới. */
-  if(!check.valid||!rows.length||missing.length)return 0;
-  const groupKey=ids=>[...new Set(ids||[])].filter(id=>state.qcLots.some(l=>l.id===id)).sort().join('|');
-  const groupName=ids=>(ids||[]).map(id=>(state.qcLots.find(l=>l.id===id)||{}).lotNo).filter(Boolean).join('/');
-  const removeGroups=new Set();
-  state.lotGroups.forEach(g=>{
-    if(g.active===false)return;
-    if(!(g.lotIds||[]).includes(from.id))return;
-    const oldIds=[...new Set(g.lotIds||[])];
-    const nextIds=[...new Set((g.lotIds||[]).map(id=>id===from.id?to.id:id))];
-    const oldKey=groupKey(oldIds);
-    /* Tên nhóm chỉ được TỰ ĐỘNG đổi theo lô mới khi tên hiện tại vẫn còn khớp đúng
-       kiểu tự sinh "lô1/lô2" của chính danh sách lô CŨ — tức là chưa ai đặt tên
-       riêng cho nhóm. Nếu quản trị viên đã gõ một tên có ý nghĩa (VD "Nhóm lô Quý
-       3/2026"), tên đó phải giữ nguyên qua một lượt chuyển lô, không bị âm thầm
-       viết đè lại thành số lô thô. */
-    const autoNamed=!g.name||g.name===groupName(oldIds);
-    const archived=state.lotGroups.find(x=>x.id!==g.id&&x.active===false&&x.stoppedByTransitionId===tr.id)||state.lotGroups.find(x=>x.active===false&&groupKey(x.lotIds)===oldKey);
-    if(!archived){
-      state.lotGroups.push({
-        id:uid(),
-        name:g.name||groupName(oldIds),
-        lotIds:oldIds,
-        note:`Đã dừng khi chuyển tiếp lô ${from.lotNo} sang ${to.lotNo}`,
-        active:false,
-        status:'stopped',
-        stoppedAt:tr.startDate||isoToday(),
-        stoppedByTransitionId:tr.id
-      });
-    }
-    const nextKey=groupKey(nextIds);
-    const existing=state.lotGroups.find(x=>x.id!==g.id&&x.active!==false&&groupKey(x.lotIds)===nextKey);
-    if(existing){
-      removeGroups.add(g.id);
-      try{if(typeof manageTargetGroup!=='undefined'&&manageTargetGroup===g.id)manageTargetGroup=existing.id;}catch(e){}
-    }else{
-      g.lotIds=nextIds;
-      if(autoNamed)g.name=groupName(nextIds)||g.name;
-    }
-  });
-  if(removeGroups.size)state.lotGroups=state.lotGroups.filter(g=>!removeGroups.has(g.id));
-  normalizeLotGroups();
-  /* Đồng bộ lại lot.groupId ngay sau khi tráo nhóm: nếu để lô cũ vẫn trỏ groupId
-     về nhóm đang hoạt động, bước di trú legacy trong ensureShape() sẽ "phục hồi"
-     lô cũ vào lại nhóm ở lần tải sau (nhóm thành 1111/1102/1101). */
-  state.qcLots.forEach(l=>{const g=state.lotGroups.find(x=>(x.lotIds||[]).includes(l.id));l.groupId=g?g.id:'';});
-  let count=0;
-  rows.forEach(({cfg,nextHist})=>{
-    if(Number.isFinite(+cfg.mean)&&Number.isFinite(+cfg.sd)&&+cfg.sd>0)upsertLotTargetHistory(cfg,from,{mean:+cfg.mean,sd:+cfg.sd,low:cfg.low==null?null:+cfg.low,high:cfg.high==null?null:+cfg.high,effectiveFrom:(cfg.meanSdHistory||[]).find(h=>h.qcLotId===from.id)?.effectiveFrom||'',effectiveTo:tr.startDate||from.exp||'',source:cfg.applied||'mfg',planned:false,note:'Trước chuyển tiếp lô'});
-    const next=upsertLotTargetHistory(cfg,to,{mean:+nextHist.mean,sd:+nextHist.sd,low:nextHist.low==null?null:+nextHist.low,high:nextHist.high==null?null:+nextHist.high,effectiveFrom:tr.startDate||isoToday(),effectiveTo:to.exp||'',source:nextHist.source||'mfg',planned:false,note:nextHist.note||`Chuyển tiếp từ lô ${from.lotNo}`});
-    Object.assign(cfg,{level:to.level,qcLotId:to.id,lot:to.lotNo,exp:to.exp,mean:+next.mean,sd:+next.sd,low:next.low==null?null:+next.low,high:next.high==null?null:+next.high,rangeK:2,mfgMean:+next.mean,mfgSd:+next.sd,applied:next.source||'mfg'});
-    count++;
-  });
-  return count;
+  return ManageConfigService.applyAcceptedLotTransition({state,transition:tr,uid,today:isoToday,normalizeLotGroups,upsertHistory:upsertLotTargetHistory,onMergeGroup:(oldGroup,nextGroup)=>{try{if(typeof manageTargetGroup!=='undefined'&&manageTargetGroup===oldGroup.id)manageTargetGroup=nextGroup.id;}catch(e){}}});
 }
 function normalizeLotGroups(){
+  if(typeof ManageConfigService!=='undefined')return ManageConfigService.normalizeLotGroups(state,(removed,kept)=>{try{if(typeof manageTargetGroup!=='undefined'&&manageTargetGroup===removed.id)manageTargetGroup=kept;}catch(e){}});
   const seen=new Map(),drop=new Set();
   (state.lotGroups||[]).forEach(g=>{
     g.lotIds=[...new Set(g.lotIds||[])].filter(id=>state.qcLots.some(l=>l.id===id));
