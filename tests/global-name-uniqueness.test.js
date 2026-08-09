@@ -105,7 +105,7 @@ for (const file of FILES) {
     if (fn) add(fn[1], file, idx + 1, 'decl');
     for (const name of declaratorNames(line)) add(name, file, idx + 1, 'decl');
   });
-  for (const m of source.matchAll(/(?:root|window|globalThis)\.([A-Za-z_$][\w$]*)\s*=/g)) {
+  for (const m of source.matchAll(/(?:root|window|globalThis)\.([A-Za-z_$][\w$]*)\s*=(?!=)/g)) {
     add(m[1], file, source.slice(0, m.index).split('\n').length, 'assign');
   }
   for (const key of uiStateKeys(source)) add(key, file, 1, 'decl');
