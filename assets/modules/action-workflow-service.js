@@ -219,7 +219,7 @@
      khong duoc memo de map khong phinh vo han. */
   const rerunMemo=new Map(),pointIndexMemo=new Map(),lotIndexMemo=new Map();
   function invalidateActionCaches(testId){
-    if(testId==null){rerunMemo.clear();pointIndexMemo.clear();lotIndexMemo.clear();return;}
+    if(testId==null){rerunMemo.clear();pointIndexMemo.clear();lotIndexMemo.clear();pointActionsMemo.ref=null;pointActionsMemo.index=null;return;}
     pointIndexMemo.delete(testId);
     [...lotIndexMemo.keys()].forEach(k=>{if(String(k).startsWith(testId+'|'))lotIndexMemo.delete(k);});
     [...rerunMemo.keys()].forEach(k=>{const hit=rerunMemo.get(k);if(hit&&hit.testId===testId)rerunMemo.delete(k);});
@@ -328,8 +328,24 @@
     const complete=stage==='closed';
     return{complete,cls,label,stage,rerun,protocol,effectiveness};
   }
+  /* Index tu kiem chung nhu actionPointIndex/actionLotPoints: chu ky la tham chieu +
+     do dai cua state.actions, nen them ho so moi tu lam moi index. pointId cua mot
+     ho so da ton tai la bat bien (xem action-form.js) nen sua truong khac tai cho
+     khong lam sai index. Truoc day pointActions() quet toan bo state.actions moi lan
+     goi — trang Khac phuc su co goi lai ham nay cho tung dong trong currentIssues()
+     roi issueRowHtml(), nen voi nhat ky lon (toi 100 000 ho so) la quet lai nhieu lan
+     tren moi lan render. */
+  const pointActionsMemo={ref:null,len:-1,index:null};
+  function pointActionsIndex(){
+    const list=state.actions||[];
+    if(pointActionsMemo.ref===list&&pointActionsMemo.len===list.length)return pointActionsMemo.index;
+    const index=new Map();
+    list.forEach(a=>{const arr=index.get(a.pointId);if(arr)arr.push(a);else index.set(a.pointId,[a]);});
+    pointActionsMemo.ref=list;pointActionsMemo.len=list.length;pointActionsMemo.index=index;
+    return index;
+  }
   function pointActions(pointId){
-    return(state.actions||[]).filter(a=>a.pointId===pointId);
+    return pointActionsIndex().get(pointId)||[];
   }
   function pointRealActions(pointId){
     return pointActions(pointId).filter(a=>!actionCancelled(a)&&actionRecorded(a));

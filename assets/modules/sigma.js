@@ -27,7 +27,7 @@ function sgReadiness(L){if(!sgIsAutoCV(L))return{status:'manual',label:'CV nhậ
    — trả null, ngân sách khi đó chỉ còn |bias| đúng như Nordtest TR 537 cho phép. */
 function sgBiasRefU(rounds){
   const b=sgBiasStats(rounds).valid.map(r=>r.bias);if(b.length<2)return null;
-  const m=b.reduce((s,v)=>s+v,0)/b.length,sd=Math.sqrt(b.reduce((s,v)=>s+(v-m)*(v-m),0)/(b.length-1));
+  const sd=QCCore.stats(b).sd;
   return Number.isFinite(sd)?sd/Math.sqrt(b.length):null;
 }
 function sgMuBiasMode(L){return L&&L.muBiasMode==='exclude'?'exclude':'include';}

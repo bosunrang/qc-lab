@@ -307,11 +307,11 @@ function fmtPointValue(point,test=null){return fmtTestValue(test,point&&point.va
 function isoDate(d=new Date()){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function isoToday(){return isoDate();}
 function isoMonth(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
-function periodOfDate(date){const m=/^(\d{4})-(\d{2})-\d{2}/.exec(String(date||''));return m?m[1]+'-'+m[2]:'';}
-function periodLock(ym){return(state.periodLocks||[]).find(x=>x.ym===ym)||null;}
-function isPeriodLocked(ym){return!!periodLock(ym);}
-function periodLockText(ym){const l=periodLock(ym);return l?`Kỳ ${monthVN(ym)} đã chốt bởi ${l.lockedBy||'hệ thống'}${l.lockedAt?' lúc '+formatDateTimeVN(l.lockedAt):''}.`:'';}
-async function requireUnlockedPeriod(date,action='sửa dữ liệu QC'){const ym=periodOfDate(date);if(!ym||!isPeriodLocked(ym))return true;await infoDialog(`Không thể ${action}: ${periodLockText(ym)} Muốn thay đổi cần admin mở khóa kỳ và ghi lý do.`);return false;}
+async function requireUnlockedPeriod(date,action='sửa dữ liệu QC'){
+  const ym=PeriodService.periodForDate(date),lock=ym?PeriodService.findLock(state,ym):null;if(!lock)return true;
+  const text=`Kỳ ${monthVN(ym)} đã chốt bởi ${lock.lockedBy||'hệ thống'}${lock.lockedAt?' lúc '+formatDateTimeVN(lock.lockedAt):''}.`;
+  await infoDialog(`Không thể ${action}: ${text} Muốn thay đổi cần admin mở khóa kỳ và ghi lý do.`);return false;
+}
 function vnDate(s){if(!s)return '';s=String(s);const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(s);return m?m[3]+'/'+m[2]+'/'+m[1]:s;}
 function vnPeriod(s){if(!s)return '';s=String(s).trim();let m=/^(\d{4})-(\d{2})/.exec(s);if(m)return'Kỳ '+m[2]+'/'+m[1];m=/^(\d{1,2})\/(\d{4})$/.exec(s);return m?'Kỳ '+m[1].padStart(2,'0')+'/'+m[2]:s;}
 function monthVN(s){const m=/^(\d{4})-(\d{2})/.exec(String(s||''));return m?m[2]+'/'+m[1]:(s||'');}

@@ -38,6 +38,18 @@ function targetCheckAll(on){document.querySelectorAll('.tm-use').forEach(box=>{b
    chụp lại Mean/SD của lô cũ vào meanSdHistory trước khi ghi đè — nếu không, dữ
    liệu của lô cũ sẽ mất khi người dùng chuyển qua lại giữa các nhóm lô. Tách
    riêng khỏi saveTargetMatrix() (chỉ đọc DOM) để có thể kiểm thử độc lập. */
+/* Điểm SẼ bị applyTargetPick() ghi đè p.lot/qcMean/qcSd nếu áp dụng pick này — suy lại
+   ĐÚNG điều kiện applyTargetPick() dùng (không đọc state.data khác), để nơi gọi có
+   thể hỏi trước qua PeriodService.lockedPoints() mà không lệch với cái sẽ thực sự
+   xảy ra. LƯU Ý: đây là điền nhãn/Mean-SD của LÔ ĐANG DÙNG (target.lot, chưa bị
+   Object.assign ghi đè) vào các điểm CHƯA có lô/Mean-SD riêng — không phải đổi
+   điểm cũ sang lô MỚI. Phải gọi TRƯỚC khi target bị Object.assign ghi đè lot mới. */
+function targetPickBackfillPoints(t,lot,pick){
+  if(!pick||!pick.use)return[];
+  const target=t.levels.find(x=>x.qcLotId===lot.id)||t.levels.find(x=>+x.level===+lot.level);
+  if(!target||!target.lot||target.lot===lot.lotNo)return[];
+  return(state.data[t.id]||[]).filter(p=>p.level===target.level&&(p.lot==null||p.lot===target.lot));
+}
 function applyTargetPick(t,lot,pick,effectiveFrom,note){
   const linked=t.levels.find(x=>x.qcLotId===lot.id);
   if(!pick.use){if(linked){linked.qcLotId='';linked.lot='';linked.exp='';return true;}return false;}
@@ -49,7 +61,7 @@ function applyTargetPick(t,lot,pick,effectiveFrom,note){
     const oldLot=state.qcLots.find(l=>l.id===target.qcLotId)||{id:target.qcLotId,lotNo:target.lot||''};
     if(Number.isFinite(+target.mean)&&Number.isFinite(+target.sd)&&+target.sd>0)upsertLotTargetHistory(target,oldLot,{mean:+target.mean,sd:+target.sd,low:target.low==null?null:+target.low,high:target.high==null?null:+target.high,effectiveFrom:(target.meanSdHistory||[]).find(h=>h.qcLotId===oldLot.id)?.effectiveFrom||'',effectiveTo:effectiveFrom,source:target.applied||'mfg',planned:false,note:'Trước khi đổi sang lô khác qua Mean/SD theo nhóm'});
   }
-  if(target.lot&&target.lot!==lot.lotNo)(state.data[t.id]||[]).filter(p=>p.level===target.level&&(p.lot==null||p.lot===target.lot)).forEach(p=>{p.lot=target.lot;p.qcMean=p.qcMean==null?target.mean:p.qcMean;p.qcSd=p.qcSd==null?target.sd:p.qcSd;});
+  targetPickBackfillPoints(t,lot,pick).forEach(p=>{p.lot=target.lot;p.qcMean=p.qcMean==null?target.mean:p.qcMean;p.qcSd=p.qcSd==null?target.sd:p.qcSd;});
   upsertLotTargetHistory(target,lot,{mean:pick.mean,sd:pick.sd,low:pick.low,high:pick.high,effectiveFrom,effectiveTo,source:'mfg',planned:false,note});
   Object.assign(target,{level:lot.level,qcLotId:lot.id,lot:lot.lotNo,exp:lot.exp,mean:pick.mean,sd:pick.sd,low:pick.low,high:pick.high,rangeK:2,mfgMean:pick.mean,mfgSd:pick.sd,applied:'mfg'});
   return true;
@@ -96,18 +108,30 @@ async function saveTargetMatrix(){
     const t=state.tests.find(x=>x.id===pick.testId),same=t&&t.levels.find(x=>+x.level===+pick.lot.level);
     return same&&((same.qcLotId&&same.qcLotId!==pick.lot.id)||(!same.qcLotId&&same.lot&&same.lot!==pick.lot.lotNo));
   });
-  if(!overwrites.length){if(!await reauthenticateCurrentUser({title:'Xác thực Mean/SD',message:'Nhập lại mật khẩu trước khi lưu Mean/SD cho lô QC.'}))return;commitTargetMatrix(picked,group,panel,'switch',[]);return;}
-  targetSwitchCtx={panel,group,picked,overwrites};
+  /* applyTargetPick() điền số lô/Mean-SD của lô ĐANG DÙNG (sắp bị thay) vào các điểm QC
+     cũ ở cùng mức mà trước giờ chưa ghi lô riêng — vẫn là ghi đè hàng loạt lên
+     state.data, cùng mối lo với renameLotAcrossPoints() ở saveConfigLot() nên phải hỏi
+     trước nếu đụng kỳ đã khóa, không chỉ dừng ở bước xác thực mật khẩu như trước
+     2026-08-09. */
+  const backfilled=picked.filter(p=>p.use).flatMap(pick=>{const t=state.tests.find(x=>x.id===pick.testId);return t?targetPickBackfillPoints(t,pick.lot,pick):[];});
+  const locked=PeriodService.lockedPoints(state,backfilled);
+  if(!overwrites.length){
+    if(locked.count&&!await confirmDialog({kicker:'Cập nhật hàng loạt',title:'Điền lô/Mean-SD cho điểm QC đã khóa kỳ',message:`Lưu Mean/SD này sẽ điền số lô/Mean-SD hiện hành vào ${locked.count} điểm QC trước đó chưa ghi lô, thuộc kỳ đã khóa (${locked.periods.map(monthVN).join(', ')}).`,detail:'Giá trị đo và ngày của từng điểm không đổi — chỉ điền thêm nhãn số lô/Mean-SD còn thiếu.',confirmLabel:'Vẫn lưu',cancelLabel:'Hủy',danger:false}))return;
+    if(!await reauthenticateCurrentUser({title:'Xác thực Mean/SD',message:'Nhập lại mật khẩu trước khi lưu Mean/SD cho lô QC.'}))return;
+    commitTargetMatrix(picked,group,panel,'switch',[]);return;
+  }
+  targetSwitchCtx={panel,group,picked,overwrites,locked};
   openTargetSwitchModal();
 }
 function openTargetSwitchModal(){
-  const {group,overwrites}=targetSwitchCtx||{};if(!group)return;
+  const {group,overwrites,locked}=targetSwitchCtx||{};if(!group)return;
   const names=[...new Set(overwrites.map(pick=>{const pt=state.tests.find(t=>t.id===pick.testId);return pt&&testDisplayName(pt);}).filter(Boolean))].join(', ');
+  const lockNote=locked&&locked.count?` <b>${locked.count} điểm QC thuộc kỳ đã khóa (${locked.periods.map(monthVN).join(', ')})</b> sẽ được điền số lô/Mean-SD hiện hành (điểm trước đó chưa ghi lô riêng).`:'';
   openModal(`<div class="modal">
     <div class="modal-h"><h3>Áp dụng nhóm lô ${esc(group.name)}?</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
     <div class="modal-b">
       <div class="hint">${overwrites.length} dòng (${esc(names)}) hiện đang dùng một nhóm lô khác. Chọn cách áp dụng Mean/SD vừa nhập:</div>
-      <div class="hint" style="margin-top:10px"><b>Chuyển qua nhóm lô này</b>: áp dụng ngay cho các dòng trên, nhóm lô đang dùng trước đó sẽ được đánh dấu "Đã dừng" (vẫn xem/nhập được nếu cần, không bị khóa).</div>
+      <div class="hint" style="margin-top:10px"><b>Chuyển qua nhóm lô này</b>: áp dụng ngay cho các dòng trên, nhóm lô đang dùng trước đó sẽ được đánh dấu "Đã dừng" (vẫn xem/nhập được nếu cần, không bị khóa).${lockNote}</div>
       <div class="hint" style="margin-top:6px"><b>Dự kiến</b>: chỉ lưu lại Mean/SD đã nhập cho nhóm lô mới, chưa áp dụng — nhóm lô đang dùng vẫn tiếp tục như bình thường.</div>
     </div>
     <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn('Dự kiến',"resolveTargetSwitch('planned')",'ghost')}${btn('Chuyển qua nhóm lô này',"resolveTargetSwitch('switch')",'teal')}</div>
@@ -326,22 +350,37 @@ function toggleLotGroupStatus(id){
    này (chưa từng nhập) thì bỏ qua, không báo lỗi — chỉ áp được cho phần đã biết số liệu.
    Nếu nhóm thực ra đã đang được dùng thật rồi (chỉ còn dính nhãn "Đã dừng"/"Dự kiến" cũ,
    vd bấm nhầm hoặc dữ liệu cũ) thì không có gì để áp cả — chỉ gỡ nhãn cho khớp thực tế. */
-async function activateLotGroup(id){
-  if(!requireAdmin())return;
-  const g=state.lotGroups.find(x=>x.id===id);if(!g||g.active===false)return;
-  const lots=(g.lotIds||[]).map(lid=>state.qcLots.find(l=>l.id===lid)).filter(Boolean);
-  if(!lots.length)return;
-  if(!await confirmDialog({title:'Kích hoạt nhóm lô',message:`Áp dụng Mean/SD của nhóm lô ${g.name} cho các xét nghiệm liên quan và chuyển sang dùng nhóm này?`,confirmLabel:'Áp dụng',cancelLabel:'Hủy',danger:false}))return;
-  const effectiveFrom=isoToday(),note='Kích hoạt nhóm lô',stoppedGroupIds=new Set();
-  let count=0;
+/* Danh sách (xét nghiệm, lô, pick) mà activateLotGroup() SẼ áp — tách riêng để dùng
+   chung cho cả bước hỏi trước (đếm điểm rơi vào kỳ đã khóa) lẫn vòng lặp ghi thật,
+   tránh 2 nơi tự lọc điều kiện rồi lệch nhau. */
+function lotGroupActivationCandidates(g,lots){
+  const list=[];
   state.tests.forEach(t=>{
     lots.forEach(lot=>{
       const target=(t.levels||[]).find(x=>+x.level===+lot.level);if(!target||target.qcLotId===lot.id)return;
       const snap=lotTargetSnapshot(t,lot.level,lot.id,lot.lotNo);
       if(!snap||!Number.isFinite(+snap.mean)||!Number.isFinite(+snap.sd)||+snap.sd<=0)return;
-      if(target.qcLotId){const oldGroup=groupsOfLot(target.qcLotId)[0];if(oldGroup&&oldGroup.id!==g.id)stoppedGroupIds.add(oldGroup.id);}
-      if(applyTargetPick(t,lot,{use:true,mean:snap.mean,low:snap.low,high:snap.high,sd:snap.sd},effectiveFrom,note))count++;
+      list.push({t,lot,pick:{use:true,mean:snap.mean,low:snap.low,high:snap.high,sd:snap.sd}});
     });
+  });
+  return list;
+}
+async function activateLotGroup(id){
+  if(!requireAdmin())return;
+  const g=state.lotGroups.find(x=>x.id===id);if(!g||g.active===false)return;
+  const lots=(g.lotIds||[]).map(lid=>state.qcLots.find(l=>l.id===lid)).filter(Boolean);
+  if(!lots.length)return;
+  const candidates=lotGroupActivationCandidates(g,lots);
+  const backfilled=candidates.flatMap(c=>targetPickBackfillPoints(c.t,c.lot,c.pick));
+  const locked=PeriodService.lockedPoints(state,backfilled);
+  const lockNote=locked.count?`${locked.count} điểm QC thuộc kỳ đã khóa (${locked.periods.map(monthVN).join(', ')}) sẽ được điền số lô/Mean-SD hiện hành (điểm trước đó chưa ghi lô riêng).`:'';
+  if(!await confirmDialog({title:'Kích hoạt nhóm lô',message:`Áp dụng Mean/SD của nhóm lô ${g.name} cho các xét nghiệm liên quan và chuyển sang dùng nhóm này?`,detail:lockNote,confirmLabel:'Áp dụng',cancelLabel:'Hủy',danger:false}))return;
+  const effectiveFrom=isoToday(),note='Kích hoạt nhóm lô',stoppedGroupIds=new Set();
+  let count=0;
+  candidates.forEach(({t,lot,pick})=>{
+    const target=(t.levels||[]).find(x=>+x.level===+lot.level);
+    if(target.qcLotId){const oldGroup=groupsOfLot(target.qcLotId)[0];if(oldGroup&&oldGroup.id!==g.id)stoppedGroupIds.add(oldGroup.id);}
+    if(applyTargetPick(t,lot,pick,effectiveFrom,note))count++;
   });
   if(!count){
     if(lotGroupInUse(g)){delete g.status;delete g.stoppedAt;save();rerender();await infoDialog(`Nhóm lô ${g.name} đã đang được xét nghiệm dùng thật, chỉ gỡ nhãn cũ.`,{type:'success'});return;}
