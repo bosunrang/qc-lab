@@ -155,6 +155,7 @@ for(const label of ['Ngày xảy ra','QC chạy lại','Hủy điểm','Mở h�
 assert.match(actions,/function actionRerunEvidenceHtml\(/,'NCE phải có khung bằng chứng QC chạy lại riêng');
 assert.match(actions,/function openActionQcEvidence\(/,'khung bằng chứng phải mở được đúng điểm QC');
 assert.match(entry,/data-qc-point-id=/,'dòng dữ liệu QC phải mang ID để liên kết từ hồ sơ NCE');
+assert.match(entry,/rangeSummary=allSt\?`N=\$\{allSt\.n\}/,'thống kê toàn bộ phải dùng ký hiệu N viết hoa');
 assert.match(actions,/function openActionQcEvidence[\s\S]*entryDetailOpen\.add\('points'\)[\s\S]*go\('entry'\)/,'mở bằng chứng NCE phải bung khối điểm QC trước khi tô sáng dòng');
 
 console.log('UI route structure tests passed');

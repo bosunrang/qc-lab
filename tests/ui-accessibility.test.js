@@ -22,6 +22,7 @@ const westgardCss = read('assets/professional-westgard.css');
 const actionsRoutes = read('assets/modules/actions-routes.js');
 const actionForm = read('assets/modules/action-form.js');
 const reportRoutes = read('assets/modules/report-routes.js');
+const manageRoutes = read('assets/modules/manage-routes.js');
 const westgardRoutes = read('assets/modules/westgard-routes.js');
 const dashboardRoutes = read('assets/modules/dashboard-routes.js');
 const sigmaRoutes = read('assets/modules/sigma.js');
@@ -49,10 +50,19 @@ assert.match(modals, /event\.key!=='Tab'/);
 assert.match(modals, /modalReturnFocus/);
 assert.match(modals, /Đóng hộp thoại/);
 assert.match(components, /:focus-visible/);
+assert.match(components, /\.req\{color:var\(--danger-ink\)\}/,'dấu sao của trường bắt buộc phải dùng màu danger chung');
 assert.match(components, /outline:2px solid var\(--focus-outline\);outline-offset:1px/);
 assert.match(components, /outline:1px solid var\(--focus-outline\);outline-offset:0/);
 assert.match(indexHtml, /<nav id="nav" aria-label="Điều hướng chính">/);
 assert.match(indexHtml, /<main id="main" tabindex="-1">/);
+
+const rawRequiredLabels=[];
+for(const file of fs.readdirSync(path.join(root,'assets','modules')).filter(name=>name.endsWith('.js'))){
+  const source=read(`assets/modules/${file}`);
+  if(/<label>[^<\r\n]*\s\*<\/label>/.test(source))rawRequiredLabels.push(file);
+}
+assert.deepEqual(rawRequiredLabels,[],'dấu sao bắt buộc trong label phải bọc bằng <span class="req"> để luôn có màu đỏ');
+assert.match(manageRoutes,/TEa chuẩn hóa % <span class="req">\*<\/span>/,'hồ sơ TEa phải hiển thị dấu bắt buộc bằng marker chung');
 
 const semanticPageRoutes=[dashboardRoutes,sigmaRoutes,reagentRoutes,actionsRoutes,actionForm,reportRoutes,settingsRoutes,router].join('\n');
 for(const title of ['Cần xử lý / Theo dõi','Lô & hạn dùng','Tình trạng','Số liệu theo kỳ','Biểu đồ Sigma & MDC','Thông tin đánh giá','Dữ liệu đo bắt cặp','Kết quả thống kê','Tiêu chí chấp nhận &amp; kết luận','Biểu đồ','Nhật ký khắc phục','Khóa kỳ báo cáo','Logo & tên phần mềm','Quản trị dữ liệu','Đồng bộ đám mây (Firebase Realtime Database)','LIS Gateway (thử nghiệm)','Firebase Rules','Biểu đồ Levey-Jennings']){
@@ -76,6 +86,9 @@ assert.match(tokens, /--panel-header-min-height:44px/);
 assert.match(tokens, /--subpanel-header-min-height:42px/);
 assert.match(components, /:is\(h2\.panel-title,h3\):first-child\+\*,\.panel>\.row-flex:first-child\+\*\{margin-top:var\(--panel-content-gap\)\}/);
 assert.match(components, /:is\(h2\.panel-title,h3\):first-child\+:is\(\.grid2,\.grid4,\.row-flex\)>div>label:first-child\{margin-top:0\}/);
+assert.match(components, /\.modal-b\{padding:var\(--panel-content-gap\) 18px;overflow:auto\}/,'modal và panel phải dùng cùng token khoảng cách header–nội dung');
+assert.match(components, /\.modal-b>label:first-child,\.modal-b>:first-child>label:first-child,\.modal-b>:first-child>div>label:first-child\{margin-top:0\}/,'label hàng đầu của modal không được cộng thêm khoảng cách ngoài token chung');
+assert.match(reportsCss, /\.action-guide-intro\{\s*padding:var\(--panel-content-gap\) 0;/,'popup hướng dẫn NCE phải dùng khoảng cách nội dung chung');
 assert.match(westgardCss, /\.wg-test-picker\{[^}]*margin:var\(--panel-content-gap\) 16px 0/);
 assert.match(westgardCss, /\.wg-test-picker label\{\s*margin-top:0/);
 assert.match(westgardCss,/\.wg-guide th:nth-child\(3\),\.wg-guide td:nth-child\(3\)\{width:14%; text-align:center; vertical-align:middle\}/,'cột Kết luận của hướng dẫn Westgard phải đủ rộng và căn giữa');
@@ -117,6 +130,10 @@ assert.match(auditCss, /\.audit-log-head\{[^}]*min-height:var\(--panel-header-mi
 assert.match(auditCss, /\.audit-filterbar\{[^}]*margin:var\(--panel-content-gap\) 16px 10px/);
 assert.match(auditCss, /\.audit-table-wrap\{[^}]*overflow-x:auto/);
 assert.match(configCss, /\.tea-source-registry\{[^}]*margin:var\(--panel-content-gap\) 16px 0/);
+assert.match(configCss, /\.assay-main-grid,\.assay-detail-grid\{\s*display:grid; grid-template-columns:/,'hai hàng thông tin xét nghiệm phải dùng chung một khai báo cột để mép trường luôn thẳng hàng');
+assert.match(configCss, /\.assay-main-grid label\{\s*margin-top:0;/,'label hàng đầu của popup xét nghiệm không được cộng thêm khoảng cách sau đường phân cách');
+assert.doesNotMatch(configCss, /\.rcfg-assay-modal \.modal-b\{[^}]*padding-bottom/,'popup xét nghiệm phải dùng khoảng cách đáy modal chung, không đặt 24px riêng');
+assert.doesNotMatch(configCss, /\.assay-closed-check/,'checkbox cuối popup xét nghiệm phải dùng khoảng cách chuẩn của rcfg-check, không tạo override riêng');
 assert.match(sigmaCss, /margin:var\(--panel-content-gap\) 16px 0/);
 assert.match(reagentCss, /padding:var\(--panel-content-gap\) 28px 26px/);
 assert.match(reagentCss, /\.rc-toolbar\{[^}]*padding:0 16px/);

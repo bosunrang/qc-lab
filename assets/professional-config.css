@@ -272,7 +272,7 @@
 }
 
 .rcfg-assay-modal{
-  width:880px;
+  width:min(860px,calc(100vw - 32px));
 }
 
 .rcfg-history-detail-modal{
@@ -351,24 +351,76 @@
   min-width:900px;
 }
 
-.rcfg-assay-modal .modal-b{
-  padding-bottom:24px;
+.assay-form-heading{
+  margin-bottom:14px; padding-bottom:10px; border-bottom:1px solid var(--line);
 }
 
-.assay-main-grid{
-  display:grid; grid-template-columns:minmax(220px,1.2fr) minmax(220px,1.2fr) minmax(150px,.72fr); gap:10px; align-items:end;
+.assay-form-heading h4{
+  margin:0; color:var(--ink); font-size:var(--type-body); font-weight:800;
 }
 
-.assay-main-grid > div{
+.assay-form-heading span{
+  display:block; margin-top:2px; color:var(--muted); font-size:var(--type-meta); font-weight:600;
+}
+
+.assay-main-grid,.assay-detail-grid{
+  display:grid; grid-template-columns:minmax(240px,1.35fr) minmax(90px,.45fr) minmax(190px,1fr) minmax(140px,.72fr); gap:10px; align-items:end;
+}
+
+.assay-main-grid > div,.assay-detail-grid > div{
   min-width:0;
 }
 
-.assay-detail-grid{
-  display:grid; grid-template-columns:minmax(90px,.58fr) minmax(105px,.6fr) minmax(150px,1fr) minmax(90px,.55fr) minmax(180px,1.3fr); gap:10px; align-items:end;
+.assay-main-grid label{
+  margin-top:0;
 }
 
-.assay-detail-grid > div{
-  min-width:0;
+.assay-advanced{
+  margin-top:14px; overflow:hidden; border:1px solid var(--line); border-radius:var(--surface-radius); background:var(--panel);
+}
+
+.assay-advanced summary{
+  position:relative; display:flex; align-items:center; min-height:54px; padding:9px 44px 9px 14px; cursor:pointer; list-style:none; background:var(--section-head-bg);
+}
+
+.assay-advanced summary::-webkit-details-marker{
+  display:none;
+}
+
+.assay-advanced summary::after{
+  content:'+'; position:absolute; right:15px; top:50%; transform:translateY(-50%); color:var(--muted); font-size:var(--type-symbol-lg); font-weight:500; line-height:1;
+}
+
+.assay-advanced[open] summary::after{
+  content:'−';
+}
+
+.assay-advanced summary span{
+  display:grid; gap:1px;
+}
+
+.assay-advanced summary b{
+  color:var(--ink); font-size:var(--type-body-sm); font-weight:800;
+}
+
+.assay-advanced summary small{
+  color:var(--muted); font-size:var(--type-meta); font-weight:600;
+}
+
+.assay-advanced-body{
+  padding:12px 14px 14px; border-top:1px solid var(--line);
+}
+
+.assay-rule-head{
+  display:grid; grid-template-columns:62px minmax(150px,.8fr) minmax(190px,1.2fr); gap:8px; padding:0 0 7px; color:var(--muted); font-size:var(--type-meta); font-weight:750;
+}
+
+.assay-cusum-grid{
+  display:grid; grid-template-columns:repeat(2,minmax(0,200px)); gap:10px; justify-content:start; margin-top:10px;
+}
+
+.assay-advanced-body > .rcfg-check{
+  margin-top:0;
 }
 
 .rcfg-check{
@@ -581,11 +633,15 @@
 }
 
 .assay-rule-grid{
-  display:grid; gap:7px;
+  display:grid; gap:0;
 }
 
 .assay-rule-row{
-  display:grid; grid-template-columns:62px minmax(150px,.8fr) minmax(190px,1.2fr); gap:8px; align-items:center; padding:5px 9px; border:1px solid #dce5e9; border-radius:var(--radius-sm); background:#f8fafb;
+  display:grid; grid-template-columns:62px minmax(150px,.8fr) minmax(190px,1.2fr); gap:8px; align-items:center; padding:7px 0; border-bottom:1px solid var(--line);
+}
+
+.assay-rule-row:last-child{
+  border-bottom:0;
 }
 
 .assay-rule-row b{
@@ -958,11 +1014,7 @@ aside,
 }
 
 @media(max-width:640px){
-.assay-main-grid{
-  grid-template-columns:1fr;
-}
-
-.assay-detail-grid{
+.assay-main-grid,.assay-detail-grid{
   grid-template-columns:1fr;
 }
 
@@ -972,8 +1024,7 @@ aside,
 }
 
 @media(min-width:641px) and (max-width:900px){
-  .assay-detail-grid{grid-template-columns:minmax(100px,.7fr) minmax(180px,1.3fr) minmax(100px,.7fr)}
-  .assay-detail-grid > div:nth-child(5){grid-column:1/-1}
+  .assay-main-grid,.assay-detail-grid{grid-template-columns:minmax(220px,1fr) minmax(100px,.45fr)}
 }
 
 .lot-config-grid{
@@ -988,13 +1039,12 @@ aside,
   grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr));
 }
 
-.assay-rule-grid{
-  grid-template-columns:repeat(auto-fit,minmax(min(430px,100%),1fr));
-}
-
 @media(max-width:640px){
+  .assay-form-heading span{font-size:var(--type-caption)}
+  .assay-rule-head{display:none}
   .assay-rule-row{grid-template-columns:56px minmax(0,1fr)}
   .assay-rule-row .cfg-assay-scope{grid-column:2}
+  .assay-cusum-grid{grid-template-columns:minmax(0,1fr)}
 }
 
 .rcfg-group-modal .lot-level-picker{

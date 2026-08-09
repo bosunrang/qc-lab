@@ -707,6 +707,16 @@ or reordering selectors, not just the one file you're editing.
 aliases built on them; when a new color is needed, add a primitive and alias
 it — don't scatter one-off hex values through the page stylesheets.
 
+`--panel-content-gap` (`14px`) là nguồn duy nhất cho khoảng cách dọc từ
+viền dưới header đến nội dung đầu tiên của mọi panel/card/bảng và modal. Không
+hard-code `padding-top`/`margin-top` riêng cho quan hệ này trong stylesheet theo
+trang; label của hàng form đầu tiên cũng không được cộng thêm margin trên. Nếu
+một popup đặc biệt buộc `.modal-b` có `padding-top:0` (như hướng dẫn NCE), phần
+tử nội dung đầu tiên phải tự dùng đúng `var(--panel-content-gap)`. Quy tắc này
+chỉ áp dụng cho khoảng cách **header → nội dung đầu tiên**; khoảng cách nội bộ
+giữa các trường/nhóm vẫn dùng token phù hợp với ngữ nghĩa riêng.
+`tests/ui-accessibility.test.js` khóa cả token, modal mặc định và ngoại lệ này.
+
 ### Storage and sync model
 
 Data lives in `localStorage`, mirrored on every save to the partitioned

@@ -37,6 +37,8 @@ const plain = v => JSON.parse(JSON.stringify(v));
   assert.match(routeSource, /±2SD \$\{limits\}/, 'tooltip tiêu đề mức phải có khoảng ±2SD');
   assert.match(entryActionsSource, /id="cfgAssayDecimals"/, 'form xét nghiệm phải có ô chọn số thập phân');
   assert.match(entryActionsSource, /\[0,1,2,3,4,5,6\]/, 'form phải cho chọn đầy đủ số thập phân từ 0 đến 6');
+  assert.match(entryActionsSource, />\$\{i\}<\/option>/, 'danh sách số thập phân chỉ được hiển thị giá trị số gọn');
+  assert.doesNotMatch(entryActionsSource, /Mặc định: '\+i|i\+' chữ số'/, 'ô số thập phân không được thêm chữ mô tả vào từng lựa chọn');
   assert.match(entryActionsSource, /decimalPlaces=Number\(decimalRaw\)/, 'lựa chọn số thập phân phải được lưu tường minh bằng số');
   assert.match(entryActionsSource, /savedTeaSource=existing&&\['lab','eflm','clia','ricos'\]\.includes\(existing\.teaSource\)/, 'sửa cấu hình xét nghiệm không được âm thầm đổi nguồn TEa đang chọn ở Sigma');
   assert.match(rangeSource, /fmtTestValue\(r\.t,r\.l\.mean\)/, 'hộp dải kiểm soát phải dùng số thập phân của xét nghiệm');

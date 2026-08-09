@@ -66,7 +66,7 @@ function pageEntry(rightOnly=false){
   // thống kê toàn bộ + dải QC
   const allSt=stats(W.all.map(p=>p.val));const cand=rangeCandidate(t.id,l.level),candStats=cand&&cand.c;
   const eligible=cand&&cand.eligible;
-  const rangeSummary=allSt?`n=${allSt.n} · Mean thực=${fmtTestValue(t,allSt.m)} · SD thực=${fmtTestStat(t,allSt.sd)} · CV=${fmt(allSt.cv)}%`:'Chưa có dữ liệu';
+  const rangeSummary=allSt?`N=${allSt.n} · Mean thực=${fmtTestValue(t,allSt.m)} · SD thực=${fmtTestStat(t,allSt.sd)} · CV=${fmt(allSt.cv)}%`:'Chưa có dữ liệu';
   const rangeSource=l.applied==='lab'?'PXN tự xây dựng':'Nhà sản xuất';
   const rangeBox=`<details class="panel entry-secondary-panel range-summary-panel" ${entryDetailOpen.has('range')?'open':''} ontoggle="entryDetailToggled('range',this.open)"><summary class="entry-secondary-summary"><span>Thống kê toàn bộ &amp; Dải kiểm soát</span><small>${rangeSummary}</small></summary>
      <div class="entry-secondary-body"><div class="range-band-note"><div class="range-band-label">Dải đang dùng:</div><div class="range-band-source">${rangeSource}</div><div class="range-band-body">· Mean=${fmtTestValue(t,l.mean)} SD=${fmtTestValue(t,l.sd)}.

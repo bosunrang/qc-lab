@@ -17,6 +17,18 @@ const assert = require('node:assert/strict');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
 const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'modules/action-workflow-service.js', 'modules/range.js']);
+const fs = require('node:fs');
+const path = require('node:path');
+const rangeSource = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'range.js'), 'utf8');
+const entryCss = fs.readFileSync(path.join(__dirname, '..', 'assets', 'professional-entry.css'), 'utf8');
+assert.match(rangeSource, /class="range-workflow-checklist"/, 'popup dải QC phải dùng bảng checklist có bố cục cột riêng');
+assert.match(entryCss, /\.range-workflow-checklist th:nth-child\(2\),\.range-workflow-checklist td:nth-child\(2\),\.range-workflow-checklist th:nth-child\(4\),\.range-workflow-checklist td:nth-child\(4\)\{text-align:center\}/, 'cột Hiện tại và Kết quả phải căn giữa cả tiêu đề lẫn nội dung');
+assert.match(entryCss, /\.range-workflow-checklist th:nth-child\(3\),\.range-workflow-checklist td:nth-child\(3\)\{text-align:left\}/, 'cột Chuẩn kiểm tra phải căn trái cả tiêu đề lẫn nội dung');
+assert.match(rangeSource, /class="range-workflow-comparison"/, 'bảng so sánh dải QC phải có bố cục cột riêng');
+assert.match(entryCss, /\.range-workflow-comparison th:nth-child\(n\+2\),\.range-workflow-comparison td:nth-child\(n\+2\)\{text-align:center\}/, 'bốn cột số liệu của bảng so sánh phải căn giữa tiêu đề và nội dung');
+assert.match(entryCss, /\.range-workflow-comparison col:nth-child\(1\)\{width:24%\}/, 'cột Dải phải nhường chiều rộng cho khoảng ±2SD');
+assert.match(entryCss, /\.range-workflow-comparison col:nth-child\(5\)\{width:28%\}/, 'cột ±2SD phải đủ rộng để giữ khoảng giá trị trên một hàng');
+assert.match(entryCss, /\.range-workflow-comparison th:nth-child\(5\),\.range-workflow-comparison td:nth-child\(5\)\{white-space:nowrap\}/, 'khoảng ±2SD không được xuống hàng');
 run(ctx, 'function __setState(s){state=s;clearDerived();}');
 
 /* Chỉ bật 1-2s (cảnh báo) và 1-3s (loại): hai luật đơn điểm, không có luật chuỗi nào

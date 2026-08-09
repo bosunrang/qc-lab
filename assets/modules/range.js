@@ -26,11 +26,11 @@ function openRangeWorkflow(tid,level){
   const checklist=rows.map(x=>`<tr><td>${x[0]}</td><td class="num">${x[1]}</td><td>${x[2]}</td><td><span class="tag ${x[3]?'ok':'rej'}">${x[3]?'Đạt':'Chưa đạt'}</span></td></tr>`).join('');
   const c=r.c;
   const nceNotice=r.nce?`<div class="alert warn" style="margin-top:10px"><b>Đang có hồ sơ NCE ${esc(r.nce.nceId||'NCE')} ghi nhận vi phạm hệ thống (${esc(r.nce.rule||'')})</b><div>${esc((r.nce.cause||'').slice(0,200))||'Chưa ghi nguyên nhân trong hồ sơ.'}</div></div>`:'';
-  openModal(`<div class="modal" style="width:760px"><div class="modal-h"><h3>Workflow thiết lập dải QC mới</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
+  openModal(`<div class="modal range-workflow-modal"><div class="modal-h"><h3>Workflow thiết lập dải QC mới</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
     <div class="modal-b"><div class="hint"><b>${esc(testDisplayName(r.t))}</b> · Mức ${level} · Lô ${esc(r.l.lot||'?')} · ${esc(r.t.machine||'')}</div>${nceNotice}
-      <table style="margin-top:10px"><thead><tr><th>Điều kiện</th><th class="num">Hiện tại</th><th>Chuẩn kiểm tra</th><th>Kết quả</th></tr></thead><tbody>${checklist}</tbody></table>
+      <table class="range-workflow-checklist"><colgroup><col><col><col><col></colgroup><thead><tr><th>Điều kiện</th><th>Hiện tại</th><th>Chuẩn kiểm tra</th><th>Kết quả</th></tr></thead><tbody>${checklist}</tbody></table>
       <h3 style="margin:16px 0 8px">So sánh dải kiểm soát</h3>
-      <table><thead><tr><th>Dải</th><th class="num">Mean</th><th class="num">SD</th><th class="num">CV%</th><th class="num">±2SD</th></tr></thead><tbody>
+      <table class="range-workflow-comparison"><colgroup><col><col><col><col><col></colgroup><thead><tr><th>Dải</th><th>Mean</th><th>SD</th><th>CV%</th><th>±2SD</th></tr></thead><tbody>
         <tr><td>Đang dùng (${r.l.applied==='lab'?'PXN':'NSX'})</td><td class="num">${fmtTestValue(r.t,r.l.mean)}</td><td class="num">${fmtTestValue(r.t,r.l.sd)}</td><td class="num">${fmt(r.l.mean?r.l.sd/Math.abs(r.l.mean)*100:0)}</td><td class="num">${fmtTestValue(r.t,r.l.mean-2*r.l.sd)} – ${fmtTestValue(r.t,r.l.mean+2*r.l.sd)}</td></tr>
         ${c?`<tr><td><b>Đề xuất PXN</b></td><td class="num"><b>${fmtTestValue(r.t,c.m)}</b></td><td class="num"><b>${fmtTestValue(r.t,c.sd)}</b></td><td class="num"><b>${fmt(c.cv)}</b></td><td class="num"><b>${fmtTestValue(r.t,c.m-2*c.sd)} – ${fmtTestValue(r.t,c.m+2*c.sd)}</b></td></tr>`:''}
       </tbody></table>

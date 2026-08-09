@@ -499,7 +499,7 @@ summary.action-form-section-title:focus-visible{
 }
 
 .action-guide-intro{
-  padding:14px 0; border-bottom:1px solid var(--line);
+  padding:var(--panel-content-gap) 0; border-bottom:1px solid var(--line);
 }
 
 .action-guide-intro b{
