@@ -8,10 +8,13 @@
   "main": "electron/main.js",
   "scripts": {
     "start": "electron .",
+    "dev": "npm run build:pilot && vite",
+    "build:pilot": "vite build",
     "test": "node scripts/run-tests.js",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.modules.json",
     "visual-check": "node scripts/visual-check.js",
     "nce-check": "node scripts/nce-workflow-check.js",
+    "ui-check": "node scripts/ui-workflow-check.js",
     "a11y-audit": "node scripts/a11y-audit.js",
     "print-check": "node scripts/print-check.js",
     "coverage-map": "node scripts/coverage-map.js",
@@ -20,15 +23,16 @@
     "lis:config": "node scripts/lis-config.js",
     "verify-release": "node benchmarks/verify-release.js",
     "patch-build": "node scripts/patch-7za-symlink.js",
-    "dist": "node scripts/patch-7za-symlink.js && electron-builder --win nsis",
-    "dist:publish": "node scripts/patch-7za-symlink.js && electron-builder --win nsis --publish always"
+    "dist": "npm run build:pilot && node scripts/patch-7za-symlink.js && electron-builder --win nsis",
+    "dist:publish": "npm run build:pilot && node scripts/patch-7za-symlink.js && electron-builder --win nsis --publish always"
   },
   "devDependencies": {
     "axe-core": "^4.12.1",
     "electron": "^43.2.0",
     "electron-builder": "^26.15.3",
     "playwright": "^1.61.1",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vite": "^8.2.1"
   },
   "build": {
     "appId": "vn.qclab.desktop",

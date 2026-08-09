@@ -15,7 +15,7 @@ RPN = S × P × D. RPN ≥40 phải có hành động trước go-live.
 | R-08 | Xung đột nhiều máy | 4/3/3 | 36 | 3-way merge theo phần tử, retry, offline/merge tests |
 | R-09 | UID ngoài phòng truy cập cloud | 5/2/2 | 20 | Default deny, ACL theo labCode/UID, rules contract test |
 | R-10 | Client bị sửa để vượt quyền | 5/2/4 | 40 | Chấp nhận giới hạn client-only; dùng máy quản lý, ACL server, kiểm soát OS |
-| R-11 | Audit bị dựng lại | 4/2/4 | 32 | Công bố giới hạn; backup/hash; cân nhắc backend append-only |
+| R-11 | Audit bị dựng lại | 4/2/4 | 32 | Chuỗi hash; chặn backup/cloud có audit hỏng; không cho xóa trắng audit; cân nhắc backend append-only |
 | R-12 | Dependency desktop có CVE | 5/2/2 | 20 | Electron/builder được nâng; release gate chặn ở `npm audit --omit=dev` |
 | R-12b | CVE trong chuỗi công cụ build | 2/3/2 | 12 | Không đóng gói vào bản cài; audit dev chỉ báo cáo; xem ghi chú bên dưới |
 | R-13 | Cold calculation làm treo UI | 3/2/2 | 12 | Cache theo test, worker, performance gate |

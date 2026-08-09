@@ -82,6 +82,10 @@ jobs:
       # phải khớp giữa các mục. Không đưa vào `npm test` được vì cần DOM thật.
       - run: npm run nce-check
         if: always()
+      # Luong UI nghiep vu chay that qua DOM -> route -> state -> audit:
+      # nhap/huy QC, them/sua cau hinh, khoa ky va restore backup co re-auth.
+      - run: npm run ui-check
+        if: always()
       # print-check boots the real app in Electron (print-to-PDF pipeline), so
       # it needs a display on Linux — xvfb-run provides a virtual one. The
       # Electron binary itself comes with `npm ci` above.

@@ -10,5 +10,5 @@
     "skipLibCheck": true
   },
   "include": ["assets/**/*.js", "global.d.ts"],
-  "exclude": ["node_modules", "dist", "build", "assets/workers/**"]
+  "exclude": ["node_modules", "dist", "build", "assets/generated/**", "assets/workers/**"]
 }

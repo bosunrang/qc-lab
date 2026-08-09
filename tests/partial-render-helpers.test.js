@@ -5,8 +5,7 @@ const ctx = loadSandbox([
   'core.js',
   'modules/state.js',
   'modules/qc-domain.js', // searchText() — bộ lọc KPI dùng, phải là bản thật để đúng cách bỏ dấu tiếng Việt
-  'modules/entry-ui-state.js',
-  'modules/analysis-ui-state.js',
+  'generated/modular-pilot.js',
   'modules/router-render.js',
   'modules/dashboard-routes.js',
   'modules/entry-routes.js',

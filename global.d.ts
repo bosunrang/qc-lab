@@ -1,21 +1,20 @@
 // Ambient declarations for `tsc --checkJs` (see tsconfig.json / `npm run typecheck`).
 //
-// This app has no bundler/module system (see CLAUDE.md "Architecture"): every
-// `assets/modules/*.js` file runs in one shared global scope via plain
-// `<script defer>` tags. A handful of modules additionally *construct* their
-// globals at runtime instead of declaring them syntactically:
-//   - `*-ui-state.js` files build a local `state` object, then
-//     `Object.defineProperty(globalThis, key, {...})` one accessor per key.
+// Phần classic còn lại vẫn chạy trong shared global scope; các module đã chuyển
+// được Vite bundle thành một IIFE compatibility artifact. Một số API được tạo
+// động nên TypeScript không nhìn thấy declaration cú pháp:
+//   - `src/presentation/state/ui-state.ts` cài accessor qua
+//     `Object.defineProperty(globalThis, key, {...})`.
 //   - Some service modules (`action-workflow-service.js`, `entry-service.js`)
 //     do `root.Foo = {...}` and/or `Object.assign(root, {...})`.
 //   - `core.js` (UMD) exposes itself as `window.QCCore`.
 // TypeScript can't see any of these as declarations, so it reports every
 // (correctly spelled) reference as "Cannot find name" — this file lists them
 // so real typos still get caught instead of being drowned in that noise.
-// Keep this in sync when a `*-ui-state.js` state bag or a service's exported
+// Keep this in sync when a UI state bag or a service's exported
 // name set changes.
 
-// --- UI state accessors (Object.defineProperty(globalThis, ...) in *-ui-state.js) ---
+// --- UI state accessors (cài từ modular compatibility artifact) ---
 declare var selTest: any, statusMemo: any, wgTestQ: any, dashTestQ: any, dashTestStatus: any,
   wgPrevOpen: any, wgExpandedRows: any, wgViewMode: any, wgArchivedGroupId: any,
   wgArchivedTestId: any, wgArchivedTestQ: any, wgChartMode: any;
@@ -36,7 +35,16 @@ declare var AnalysisUIState: any, AuthUIState: any, EntryUIState: any, ManageUIS
 
 // --- Service / view-model namespaces (`root.Foo = {...}`) ---
 declare var EntryService: any, PeriodService: any, ReagentComparisonService: any, ChartViewModel: any,
-  SigmaCohortService: any, WestgardViewModel: any, ActionWorkflowService: any;
+  SigmaCohortService: any, WestgardViewModel: any, ActionWorkflowService: any, ManageConfigService: any,
+  qcPointWarnings: any;
+declare var LISClientService: any, lisGatewayRuntime: any, LIS_GATEWAY_STORAGE_KEY: any, LIS_POLL_MS: any,
+  lisGatewayConfig: any, lisNormalizeGatewayUrl: any, lisGatewaySetStatus: any, lisGatewayStatusText: any,
+  lisGatewayFetch: any, lisGatewayHealth: any, lisGatewayPull: any, lisResultToPointInput: any,
+  lisImportResult: any, lisRejectResult: any, lisGatewayStart: any;
+declare var BackupService: any, BACKUP_IMPORT_MAX_BYTES: any, BACKUP_IMPORT_WARN_BYTES: any,
+  serializeBackupData: any, backupTextBytes: any, backupSizeMB: any, backupImportSizeError: any,
+  backupSizeWarning: any, backupChecksum: any, createBackupPackage: any, parseBackupPackage: any,
+  prepareBackupState: any, prepareBackupImport: any, backupSummary: any, inspectBackupText: any;
 
 // action-workflow-service.js does Object.assign(root, root.ActionWorkflowService)
 declare var actionApprovalStatus: any, actionRecordStatus: any, actionCancelled: any, actionApprovalLabel: any, actionRecorded: any, actionCanApprove: any,

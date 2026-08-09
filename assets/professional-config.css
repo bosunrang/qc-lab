@@ -346,6 +346,7 @@
 .rcfg-history-detail-modal .modal-b{
   max-height:72vh; overflow:auto;
 }
+.history-detail-heading{margin-top:0;margin-bottom:var(--panel-content-gap)}
 
 .rcfg-history-detail-modal table{
   min-width:900px;
@@ -357,10 +358,6 @@
 
 .assay-form-heading h4{
   margin:0; color:var(--ink); font-size:var(--type-body); font-weight:800;
-}
-
-.assay-form-heading span{
-  display:block; margin-top:2px; color:var(--muted); font-size:var(--type-meta); font-weight:600;
 }
 
 .assay-main-grid,.assay-detail-grid{
@@ -567,6 +564,7 @@
 .group-lot-picker{
   display:grid; gap:7px; max-height:280px; overflow:auto; padding:8px; border:1px solid #d8e2e7; border-radius:var(--surface-radius); background:#f8fafb;
 }
+.cfg-panel-empty{padding:var(--space-section)}
 
 .group-lot-picker label{
   display:flex; align-items:center; gap:9px; margin:0; padding:9px; border:1px solid #dbe4e8; border-radius:var(--radius-sm); background:var(--panel); cursor:pointer;
@@ -1040,7 +1038,6 @@ aside,
 }
 
 @media(max-width:640px){
-  .assay-form-heading span{font-size:var(--type-caption)}
   .assay-rule-head{display:none}
   .assay-rule-row{grid-template-columns:56px minmax(0,1fr)}
   .assay-rule-row .cfg-assay-scope{grid-column:2}

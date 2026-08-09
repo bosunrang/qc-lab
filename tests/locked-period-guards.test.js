@@ -19,7 +19,7 @@ const { loadSandbox, run } = require('./helpers/sandbox');
 
 const ctx = loadSandbox([
   'core.js', 'modules/state.js', 'modules/qc-domain.js',
-  'modules/period-service.js', 'modules/manage-tests-actions.js',
+  'generated/modular-pilot.js', 'modules/manage-tests-actions.js',
 ]);
 const plain = (v) => JSON.parse(JSON.stringify(v));
 
@@ -43,10 +43,11 @@ const seed = `
     periodLocks: [], teaRefs: [], westgardRules: {}
   };
   selTest = null; entrySel = null;
-  info = []; confirms = []; audits = []; saves = 0; confirmAnswer = true; fields = {};
+  info = []; confirms = []; audits = []; saves = 0; reauths = 0; confirmAnswer = true; reauthAnswer = true; fields = {};
   requireAdmin = function(){ return true; };
   infoDialog = async function(message){ info.push(String(message)); };
   confirmDialog = async function(opts){ confirms.push(opts); return confirmAnswer; };
+  reauthenticateCurrentUser = async function(){ reauths++; return reauthAnswer; };
   logAct = function(action, detail, target){ audits.push(action + ' | ' + detail + ' | ' + target); };
   save = function(){ saves++; }; rerender = function(){}; closeModal = function(){}; clearDerived = function(){};
   sameText = function(a, b){ return String(a||'').toLowerCase() === String(b||'').toLowerCase(); };
@@ -80,14 +81,28 @@ async function main() {
     ${seed}
     await delTest('T1');
     return { testGone: !state.tests.find(function(x){return x.id==='T1';}), dataGone: !state.data.T1,
-      confirmDetail: (confirms[0] || {}).detail || '', saves: saves, audits: audits };
+      confirmDetail: (confirms[0] || {}).detail || '', saves: saves, audits: audits, reauths: reauths };
   })()`));
 
   assert.equal(allowed.testGone, true);
   assert.equal(allowed.dataGone, true);
   assert.equal(allowed.saves, 1);
+  assert.equal(allowed.reauths, 1, 'xóa xét nghiệm kèm dữ liệu phải xác thực lại danh tính');
   assert.match(allowed.confirmDetail, /3 điểm QC/, 'hộp xác nhận phải nói con số cụ thể sắp mất');
   assert.match(allowed.audits[0], /Xóa xét nghiệm và 3 điểm QC/, 'nhật ký phải ghi lại đã mất bao nhiêu điểm');
+
+  const reauthCancelled = plain(await run(ctx, `(async function(){
+    ${seed}
+    reauthAnswer = false;
+    await delTest('T1');
+    return { testStillThere: !!state.tests.find(function(x){return x.id==='T1';}), pointsLeft: state.data.T1.length,
+      saves: saves, audits: audits, reauths: reauths };
+  })()`));
+  assert.equal(reauthCancelled.reauths,1);
+  assert.equal(reauthCancelled.testStillThere,true,'xác thực thất bại không được xóa xét nghiệm');
+  assert.equal(reauthCancelled.pointsLeft,3,'xác thực thất bại không được xóa điểm QC');
+  assert.equal(reauthCancelled.saves,0);
+  assert.deepEqual(reauthCancelled.audits,[]);
 
   // ===== 3. Đổi số lô: hỏi TRƯỚC, kèm số điểm và kỳ đã khóa; bấm Hủy là không đổi gì =====
   const cancelled = plain(await run(ctx, `(async function(){

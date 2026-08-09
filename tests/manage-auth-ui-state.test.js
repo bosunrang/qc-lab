@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
 {
-  const ctx = loadSandbox(['modules/manage-ui-state.js']);
+  const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js']);
   assert.equal(ctx.ManageUIState.manageTab, 'instruments', 'Cấu hình chung mở thẳng Máy xét nghiệm, không còn thẻ Tổng quan');
   run(ctx, "manageTab='targets'; manageTargetGroup='G1'; configNavScroll=24; targetSwitchCtx={groupId:'G1'};");
   assert.equal(ctx.ManageUIState.manageTab, 'targets');
@@ -14,7 +14,11 @@ const { loadSandbox, run } = require('./helpers/sandbox');
 }
 
 {
-  const ctx = loadSandbox(['modules/auth-ui-state.js']);
+  const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js'], {
+    localStorage: { getItem: key => key === 'qclab_login_lockout' ? '{"fails":1,"until":999}' : null },
+  });
+  assert.equal(ctx.AuthUIState.loginFails, 1, 'khóa đăng nhập phải được phục hồi tại compatibility boundary');
+  assert.equal(ctx.AuthUIState.loginLockUntil, 999);
   run(ctx, "currentUser={id:'U1'}; loginFails=2; loginLockUntil=12345;");
   assert.equal(ctx.AuthUIState.currentUser.id, 'U1');
   assert.equal(ctx.AuthUIState.loginFails, 2);

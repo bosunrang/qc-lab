@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
-const ctx = loadSandbox(['core.js', 'modules/reagent-comparison-service.js']);
+const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js']);
 const service = ctx.ReagentComparisonService;
 
 function makeState() {
@@ -118,7 +118,7 @@ function makeState() {
   const appSource = fs.readFileSync(path.join(__dirname, '..', 'assets', 'app.js'), 'utf8');
   const indexSource = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   assert.doesNotMatch(appSource, /\bimport\s*\(/, 'production boot phải chạy được khi mở index.html trực tiếp qua file://');
-  const serviceAt=indexSource.indexOf('assets/modules/reagent-comparison-service.js'),appAt=indexSource.indexOf('assets/app.js');
+  const serviceAt=indexSource.indexOf('assets/generated/modular-pilot.js'),appAt=indexSource.indexOf('assets/app.js');
   assert.ok(serviceAt>=0&&appAt>serviceAt, 'classic Reagent service phải tải trước app boot');
 }
 

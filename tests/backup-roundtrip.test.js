@@ -4,7 +4,7 @@ const { loadSandbox, run } = require('./helpers/sandbox');
 const { makeState } = require('../benchmarks/performance-baseline');
 
 (async()=>{
-  const ctx = loadSandbox(['core.js', 'modules/backup-service.js'], { crypto:webcrypto });
+  const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js', 'modules/backup-ui.js'], { crypto:webcrypto });
   const result = await run(ctx, `
     (async function(){
       const note='Dữ liệu QC phục hồi '.repeat(35);

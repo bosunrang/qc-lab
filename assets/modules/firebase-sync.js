@@ -235,6 +235,14 @@ function fbSnapshotSig(v){
   for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;
   return s.length+':'+h.toString(36);
 }
+function fbAuditIntegrity(snapshot){return QCCore.verifyAuditChain(snapshot&&snapshot.activity||[],snapshot&&snapshot.activityAnchor||'');}
+function fbRejectBrokenAudit(source,result){
+  const where=result&&result.brokenIndex>=0?` dòng ${result.brokenIndex+1}`:'';
+  fbDisconnect();setCloudStatus('Đã ngắt đồng bộ để bảo vệ nhật ký',false);
+  markSaved('audit không hợp lệ',`${source}${where}: ${result&&result.reason||'chuỗi hash bị hỏng'} · dữ liệu cục bộ được giữ nguyên`);
+  return false;
+}
+function fbAuditMaySync(snapshot,source){const result=fbAuditIntegrity(snapshot);return result.ok||fbRejectBrokenAudit(source,result);}
 function fbStopPull(){if(fb.pullT)clearInterval(fb.pullT);fb.pullT=null;}
 function fbStartPull(){fbStopPull();fb.pullT=setInterval(fbPullOnce,8000);}
 /* Điểm dừng chung mỗi khi ngắt/đổi kết nối Firebase (hủy đồng bộ, đổi phòng, mất xác
@@ -285,6 +293,10 @@ async function fbHandleValue(v,opts={}){
     return;
   }
   const remote=QCCore.sanitizeBackup(v),base=fb.synced;
+  /* Xac minh TUNG chuoi goc truoc khi merge/relink. Neu relink truoc, mot payload
+     da bi sua co the duoc bam lai thanh chuoi "hop le" va mat dau vet hong ban dau. */
+  if(!fbAuditMaySync(remote,'Nhật ký trên đám mây'))return;
+  if(!fbAuditMaySync(state,'Nhật ký cục bộ'))return;
   // Bỏ qua chính bản ghi do máy này vừa đẩy lên (chống tự dội: mất focus/nháy màn hình),
   // nhưng vẫn đánh dấu snapshot đầu tiên đã tải để các lần lưu sau mới được push.
   if(v._client&&v._client===fb.clientId){
@@ -362,8 +374,13 @@ async function fbHandleValue(v,opts={}){
   if(!state.users.length)ensureAdmin();try{renderBrand();}catch(e){}
   fbSetReady();setCloudStatus(fbStatusLabel(),true);
   applyRemoteRender();
-  // Nếu vừa giữ lại thay đổi cục bộ (nhánh máy này sửa mà cloud chưa có), đẩy lên để hội tụ.
-  if(mergeFirstConnect&&fbHasLocalChanges())scheduleFbPush();
+  // Sau ensureShape(), state có thể khác remote chỉ vì app vừa chuẩn hóa/migrate dữ liệu
+  // trung tâm cũ (thêm instrumentId, giá trị mặc định...). Phải đẩy cả phần chuẩn hóa này
+  // lên cloud: nếu chỉ lưu cục bộ, lần tải trang sau local đã chuẩn hóa lại khác remote cũ
+  // và hộp thoại "Dữ liệu cục bộ khác dữ liệu trung tâm" sẽ xuất hiện mãi. fbBuildUpdate()
+  // vẫn chỉ gửi đúng các nhánh thực sự khác baseline, nên thay đổi cục bộ được merge cũng
+  // tiếp tục hội tụ qua cùng một đường này.
+  if(fbHasLocalChanges())scheduleFbPush();
 }
 async function initFirebase(){
   const cfg=getFbCfg();
@@ -420,6 +437,7 @@ function applyRemoteRender(){
    tạo bản cloud từ dữ liệu hiện tại của máy này. */
 async function syncNow(){
   if(!fbCanWrite())return false;
+  if(!fbAuditMaySync(state,'Nhật ký cục bộ'))return false;
   mem=state;state._ts=Date.now();state._client=fb.clientId;markSaved('đang đồng bộ','Firebase');
   const payload=fbClone(state),draftStamp=typeof sigmaDraftStamp==='function'?sigmaDraftStamp():0;
   try{
@@ -442,6 +460,7 @@ function scheduleFbPush(){
 async function fbFlushPush(){
   fbSaveT=null;
   if(!fbCanWrite()||!fbNetworkOnline())return;
+  if(!fbAuditMaySync(state,'Nhật ký cục bộ'))return;
   state._ts=Date.now();state._client=fb.clientId;
   const cur=fbClone(state),{payload}=fbBuildUpdate(cur),draftStamp=typeof sigmaDraftStamp==='function'?sigmaDraftStamp():0;
   if(!Object.keys(payload).length){fb.dirty=false;fbResetRetry();if(typeof clearSigmaDraftThrough==='function')clearSigmaDraftThrough(draftStamp);markSaved('đã đồng bộ','Lúc '+saveTime());return;}

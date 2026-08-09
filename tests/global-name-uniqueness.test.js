@@ -15,9 +15,8 @@
 //     (comma-splitting respects strings, template literals, and bracket depth,
 //     so `const RCC={teal:'#x',...}` yields only `RCC`)
 //   - `root.X=` / `window.X=` / `globalThis.X=` assignments (UMD + app-meta)
-//   - the *-ui-state.js IIFE pattern: `const state={k1:...,k2:...}` whose keys
-//     become globals via Object.defineProperty(root,name,...) — the keys are
-//     extracted as globals (flat literals, `new Map()`/`new Set()` values ok)
+//   - các key từ factory UI state TypeScript, vì adapter biến chúng thành global
+//     accessor qua Object.defineProperty
 'use strict';
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -27,6 +26,10 @@ const ROOT = path.join(__dirname, '..');
 const FILES = [
   'assets/core.js',
   'assets/app.js',
+  ...fs.readdirSync(path.join(ROOT, 'assets', 'generated'))
+    .filter((f) => f.endsWith('.js'))
+    .sort()
+    .map((f) => 'assets/generated/' + f),
   ...fs.readdirSync(path.join(ROOT, 'assets', 'modules'))
     .filter((f) => f.endsWith('.js'))
     .sort()
@@ -106,6 +109,29 @@ for (const file of FILES) {
     add(m[1], file, source.slice(0, m.index).split('\n').length, 'assign');
   }
   for (const key of uiStateKeys(source)) add(key, file, 1, 'decl');
+}
+
+// UI state đã chuyển sang TypeScript nhưng các key vẫn trở thành global accessor
+// cho caller cũ. Quét object trả về của từng create*UiState() để chúng tiếp tục
+// tham gia kiểm tra trùng tên với các classic script còn lại.
+{
+  const file = 'src/presentation/state/ui-state.ts';
+  const source = fs.readFileSync(path.join(ROOT, file), 'utf8');
+  for (const factory of source.matchAll(/export function create[A-Za-z]+UiState\([^)]*\)\s*\{/g)) {
+    const returnAt = source.indexOf('return {', factory.index + factory[0].length);
+    if (returnAt < 0) continue;
+    const fragment = 'const state=' + source.slice(returnAt + 'return '.length) + '\ndefineProperty(root,name)';
+    for (const key of uiStateKeys(fragment)) {
+      add(key, file, source.slice(0, returnAt).split('\n').length, 'decl');
+    }
+  }
+}
+{
+  const file = 'src/compat/modular-pilot.global.ts';
+  const source = fs.readFileSync(path.join(ROOT, file), 'utf8');
+  for (const match of source.matchAll(/installUiState\(root,\s*['"]([A-Za-z_$][\w$]*)['"]/g)) {
+    add(match[1], file, source.slice(0, match.index).split('\n').length, 'assign');
+  }
 }
 
 // Re-export `globalThis.f=f` ngay trong file khai báo f là CÙNG một binding

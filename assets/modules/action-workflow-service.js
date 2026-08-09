@@ -25,34 +25,41 @@
   /* Cấp mã NCE và hạn xử lý mặc định: dùng chung cho trang Actions (mở hồ sơ thủ công)
      và entry-routes (hủy điểm QC tự mở hồ sơ) để hai luồng không sinh mã theo hai kiểu. */
   function nextNceId(today){
+    if(root.NceActionIdentityService)return root.NceActionIdentityService.nextNceId(state.actions||[],today);
     const day=String(today||'').replace(/-/g,'');let value='';
     do{value=`NCE-${day}-${String(uid()).replace(/[^a-z0-9]/gi,'').slice(-4).toUpperCase()}`;}while((state.actions||[]).some(a=>a.nceId===value));
     return value;
   }
   /* Ngày địa phương như isoToday(): toISOString() là giờ UTC nên ở UTC+7, từ 0h–7h
      sáng hạn xử lý bị lùi 1 ngày so với mọi ngày khác trong app (2026-07-27). */
-  function nceDueDate(days=7){const d=new Date();d.setDate(d.getDate()+days);return isoDate(d);}
+  function nceDueDate(days=7){return root.NceActionIdentityService?root.NceActionIdentityService.dueDate(days):(()=>{const d=new Date();d.setDate(d.getDate()+days);return isoDate(d);})();}
   function actionApprovalStatus(a){
+    if(root.NceActionBasics)return root.NceActionBasics.actionApprovalStatus(a);
     return(a&&['pending','approved','returned'].includes(a.approvalStatus))?a.approvalStatus:'pending';
   }
   function actionRecordStatus(a){
+    if(root.NceActionBasics)return root.NceActionBasics.actionRecordStatus(a);
     return a&&a.recordStatus==='cancelled'?'cancelled':'active';
   }
   function actionCancelled(a){
+    if(root.NceActionBasics)return root.NceActionBasics.actionCancelled(a);
     return actionRecordStatus(a)==='cancelled';
   }
   function actionApprovalLabel(a){
+    if(root.NceActionBasics)return root.NceActionBasics.actionApprovalLabel(a);
     if(actionCancelled(a))return'Đã hủy hồ sơ';
     const s=actionApprovalStatus(a);
     return s==='approved'?'Đã duyệt':s==='returned'?'Trả lại':'Chờ duyệt';
   }
   function actionRecorded(a){
+    if(root.NceActionBasics)return root.NceActionBasics.actionRecorded(a);
     return !!(a&&!a.autoCreated&&String(a.by||'').trim()&&(a.protocolVersion>=2?String(a.correction||'').trim().length>=5:String(a.action||'').trim().length>=5));
   }
   /* missingKeys đi kèm missing để giao diện tìm đúng ô còn thiếu mà đưa con trỏ tới —
      nhãn tiếng Việt một mình không đủ định vị, và "xử lý tức thời" (correction, mục 1)
      rất dễ bị nhầm với "hành động khắc phục" (action, mục 4–6). */
   function actionDraftStatus(a){
+    if(root.ActionDraftStatusService)return root.ActionDraftStatusService(a);
     if(!a||!(+a.protocolVersion>=2))return{complete:actionRecorded(a),missing:actionRecorded(a)?[]:['hành động và người thực hiện'],missingKeys:actionRecorded(a)?[]:['action']};
     const missing=[],missingKeys=[];
     const need=(cond,label,key)=>{if(cond){missing.push(label);missingKeys.push(key);}};
@@ -145,13 +152,16 @@
     ].join(' | ');
   }
   function actionRiskScore(a){
+    if(root.NceActionBasics)return root.NceActionBasics.actionRiskScore(a);
     const values=[a&&a.riskSeverity,a&&a.riskOccurrence,a&&a.riskDetectability].map(Number);
     return values.every(v=>Number.isInteger(v)&&v>=1&&v<=5)?values.reduce((x,v)=>x*v,1):0;
   }
   function actionResidualRiskScore(a){
+    if(root.NceActionBasics)return root.NceActionBasics.actionResidualRiskScore(a);
     return actionRiskScore({riskSeverity:a&&a.residualSeverity,riskOccurrence:a&&a.residualOccurrence,riskDetectability:a&&a.residualDetectability});
   }
   function actionActiveFollowUp(a){
+    if(root.NceActionIdentityService)return root.NceActionIdentityService.activeFollowUp(state.actions||[],a);
     const id=String(a&&a.followUpNceId||'').trim();
     return id?(state.actions||[]).find(x=>x.nceId===id&&!actionCancelled(x))||null:null;
   }
@@ -187,6 +197,7 @@
   }
   /* Quá hạn chỉ tính cho hồ sơ còn mở — khép vòng rồi thì hạn không còn ý nghĩa. */
   function actionOverdue(a){
+    if(root.ActionApprovalGates)return root.ActionApprovalGates.overdue(a);
     const due=String(a&&a.dueDate||'').trim();
     if(!due||actionCancelled(a)||!actionRecorded(a)||actionWorkflowStatus(a).complete)return{overdue:false,days:0,label:''};
     const today=isoToday();
@@ -196,6 +207,7 @@
   }
   function identityText(value){return String(value||'').trim().toLocaleLowerCase('vi');}
   function actionCanApprove(a,user){
+    if(root.ActionApprovalGates)return root.ActionApprovalGates.canApprove(a,user);
     if(!a||!user||actionCancelled(a))return false;
     const userId=String(user.id||''),username=identityText(user.username);
     const contributorIds=new Set([a.createdByUserId,...(Array.isArray(a.contentEditorUserIds)?a.contentEditorUserIds:[])].map(x=>String(x||'')).filter(Boolean));
@@ -231,7 +243,7 @@
   function actionLotPoints(testId,level,lot){
     const points=(state.data&&state.data[testId])||null,key=testId+'|'+level+'|'+(lot||''),hit=lotIndexMemo.get(key);
     if(hit&&hit.points===points&&hit.len===(points?points.length:-1))return hit.list;
-    const list=(points||[]).filter(x=>!x.voided&&+x.level===+level&&(x.lot||'')===(lot||''))
+    const list=root.NceActionQcIndex?root.NceActionQcIndex.actionLotPoints(points,level,lot,pointRunNo):(points||[]).filter(x=>!x.voided&&+x.level===+level&&(x.lot||'')===(lot||''))
       .sort((x,y)=>String(x.date||'').localeCompare(String(y.date||''))||pointRunNo(x)-pointRunNo(y));
     lotIndexMemo.set(key,{points,len:points?points.length:-1,list});
     return list;
@@ -239,7 +251,7 @@
   function actionPointIndex(testId){
     const points=(state.data&&state.data[testId])||null,hit=pointIndexMemo.get(testId);
     if(hit&&hit.points===points&&hit.len===(points?points.length:-1))return hit.index;
-    const index=new Map((points||[]).map(p=>[p.id,p]));
+    const index=root.NceActionQcIndex?root.NceActionQcIndex.actionPointIndex(points):new Map((points||[]).map(p=>[p.id,p]));
     pointIndexMemo.set(testId,{points,len:points?points.length:-1,index});
     return index;
   }
@@ -247,13 +259,16 @@
     return a&&a.pointId?actionPointIndex(a.testId).get(a.pointId)||null:null;
   }
   function actionEventDate(a){
+    if(root.ActionQcLink)return root.ActionQcLink.eventDate(a);
     const p=actionPoint(a);
     return p&&p.date||a&&a.date||'';
   }
   function actionOpenedFromVoid(a,p){
+    if(root.NceActionRerunPolicy)return root.NceActionRerunPolicy.openedFromVoid(a,p);
     return !!(a&&p&&p.voided&&(a.openedFromVoid===true||(p.voidedAt&&a.createdAt&&p.voidedAt===a.createdAt)));
   }
   function actionNeedsRerun(a){
+    if(root.ActionQcLink)return root.ActionQcLink.needsRerun(a);
     const t=state.tests.find(x=>x.id===(a&&a.testId)),p=actionPoint(a);
     if(!t||!p)return false;
     if(p.voided)return p.voidRequiresRerun==null?p.voidKind!=='data-entry':!!p.voidRequiresRerun;
@@ -266,6 +281,7 @@
      độ phân giải theo ngày, nên cùng ngày vẫn hợp lệ nhưng với điểm sự cố cùng ngày thì
      số lần chạy phải lớn hơn như rào cũ. */
   function actionRerunGateDate(a,p){
+    if(root.NceActionRerunPolicy)return root.NceActionRerunPolicy.rerunGateDate(a,p);
     const gates=[p&&p.date||''];
     /* Hồ sơ sinh ngay lúc hủy điểm dùng cùng timestamp cho point.voidedAt và
        action.createdAt. Khi đó lượt QC hợp lệ có thể đã được chạy sau điểm sai
@@ -278,9 +294,14 @@
   }
   function actionRerunSignature(a){
     const t=state.tests.find(x=>x.id===(a&&a.testId));
+    if(root.NceActionRerunCacheKey)return root.NceActionRerunCacheKey.actionRerunCacheKey(a,t&&t.decimalPlaces);
     return[a.id,a.testId,a.pointId,+a.protocolVersion||0,a.actionCompletedDate||'',a.parentNceId||'',a.date||'',a.openedFromVoid?1:0,t&&t.decimalPlaces!=null?t.decimalPlaces:'auto'].join('|');
   }
   function computeActionRerunStatus(a){
+    if(root.NceActionRerunEvaluator){
+      const needed=actionNeedsRerun(a),t=state.tests.find(x=>x.id===a.testId),p=actionPoint(a),wg=t?activeWestgard(t):null,gateDate=p?actionRerunGateDate(a,p):'',runNo=p?pointRunNo(p):0;
+      return root.NceActionRerunEvaluator.evaluateActionRerun({action:a,needed,point:p,gateDate,incidentRunNumber:runNo,candidates:p?actionLotPoints(a.testId,p.level,p.lot||''):[],runNumber:pointRunNo,verdictFor:id=>wg&&wg.byPoint.get(id)||{level:'ok'},formatValue:point=>fmtPointValue(point,t),formatDate:value=>vnDate(value)});
+    }
     if(!actionNeedsRerun(a))return{needed:false,ok:true,label:'Không yêu cầu',cls:'none',point:null};
     const t=state.tests.find(x=>x.id===a.testId),p=actionPoint(a),wg=activeWestgard(t),runNo=pointRunNo(p);
     if(+a.protocolVersion>=3&&!a.actionCompletedDate)return{needed:true,ok:false,label:'Chờ hoàn thành hành động trước khi xác nhận QC chạy lại',cls:'warn',point:null};
@@ -316,6 +337,7 @@
     return result;
   }
   function actionWorkflowStatus(a){
+    if(root.ActionWorkflowStatusService)return root.ActionWorkflowStatusService(a);
     if(actionCancelled(a))return{complete:false,cancelled:true,cls:'none',label:'Đã hủy hồ sơ',stage:'cancelled',rerun:{needed:false,ok:false,label:'Hồ sơ đã hủy',cls:'none',point:null},protocol:actionProtocolStatus(a),effectiveness:actionEffectivenessStatus(a)};
     if(!actionRecorded(a))return{complete:false,cls:'rej',label:'Chưa ghi khắc phục',rerun:{needed:false,ok:false,label:'Chưa ghi khắc phục',cls:'rej',point:null}};
     const rerun=actionRerunStatus(a),approval=actionApprovalStatus(a),protocol=actionProtocolStatus(a),effectiveness=actionEffectivenessStatus(a);
@@ -348,12 +370,15 @@
     return pointActionsIndex().get(pointId)||[];
   }
   function pointRealActions(pointId){
+    if(root.PointWorkflowService)return root.PointWorkflowService.real(pointActions(pointId));
     return pointActions(pointId).filter(a=>!actionCancelled(a)&&actionRecorded(a));
   }
   function pointWorkflowComplete(pointId){
+    if(root.PointWorkflowService)return root.PointWorkflowService.complete(pointActions(pointId));
     return pointRealActions(pointId).some(a=>actionWorkflowStatus(a).complete);
   }
   function pointWorkflowSummary(pointId){
+    if(root.PointWorkflowService)return root.PointWorkflowService.summary(pointActions(pointId));
     const acts=pointActions(pointId);
     if(!acts.length)return{cls:'rej',label:'Chưa ghi khắc phục'};
     const real=pointRealActions(pointId);
@@ -363,6 +388,6 @@
     return actionWorkflowStatus(real[real.length-1]);
   }
 
-  root.ActionWorkflowService={ACTION_LABELS,RISK_SCALE,invalidateActionCaches,nextNceId,nceDueDate,actionApprovalStatus,actionRecordStatus,actionCancelled,actionApprovalLabel,actionRecorded,actionDraftStatus,actionProtocolStatus,actionProtocolSummary,actionRiskScore,actionResidualRiskScore,actionActiveFollowUp,actionEffectivenessStatus,actionOverdue,actionCanApprove,actionPoint,actionEventDate,actionNeedsRerun,actionRerunStatus,actionWorkflowStatus,pointActions,pointRealActions,pointWorkflowComplete,pointWorkflowSummary};
+  root.ActionWorkflowService={ACTION_LABELS:root.NceActionLabels&&root.NceActionLabels.actionLabels||ACTION_LABELS,RISK_SCALE:root.NceActionLabels&&root.NceActionLabels.riskScale||RISK_SCALE,invalidateActionCaches,nextNceId,nceDueDate,actionApprovalStatus,actionRecordStatus,actionCancelled,actionApprovalLabel,actionRecorded,actionDraftStatus,actionProtocolStatus,actionProtocolSummary,actionRiskScore,actionResidualRiskScore,actionActiveFollowUp,actionEffectivenessStatus,actionOverdue,actionCanApprove,actionPoint,actionEventDate,actionNeedsRerun,actionRerunStatus,actionWorkflowStatus,pointActions,pointRealActions,pointWorkflowComplete,pointWorkflowSummary};
   Object.assign(root,root.ActionWorkflowService);
 })(typeof globalThis!=='undefined'?globalThis:this);

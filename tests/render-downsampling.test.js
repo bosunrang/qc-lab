@@ -11,7 +11,7 @@ function context2d() {
 
 const drawnLabels = [];
 
-const ctx = loadSandbox(['core.js', 'modules/chart-view-model.js', 'modules/draw.js'], {
+const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js', 'modules/draw.js'], {
   window: { devicePixelRatio: 1 },
   document: { getElementById: () => null },
 });

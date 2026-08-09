@@ -12,7 +12,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
-const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/sigma-cohort-service.js', 'modules/sigma-ui-state.js', 'modules/sigma.js']);
+const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js', 'modules/state.js', 'modules/sigma.js']);
 
 assert.equal(ctx.sgInputDisplayValue(.721694321),'0.72','CV/Bias display is concise while stored precision remains unchanged');
 assert.equal(ctx.sgInputDisplayValue(''),'');
@@ -108,7 +108,7 @@ assert.equal(ctx.sgInputDisplayValue(''),'');
 //     Local/Firebase writers retain their own debounce, so reload can flush local state
 //     without sending one network request for every keystroke.
 {
-  const editCtx=loadSandbox(['core.js','modules/state.js','modules/sigma-cohort-service.js','modules/sigma-ui-state.js','modules/sigma.js']);
+  const editCtx=loadSandbox(['core.js','generated/modular-pilot.js','modules/state.js','modules/sigma.js']);
   const saved=run(editCtx, `(function(){
     globalThis.requireWrite=function(){return true;};
     globalThis.save=function(opts){globalThis.__manualSaveCalls=(globalThis.__manualSaveCalls||0)+1;globalThis.__manualSaveOpts=opts;};
@@ -129,7 +129,7 @@ assert.equal(ctx.sgInputDisplayValue(''),'');
 
 // --- Adding an assay to Sigma uses the existing shared assay catalog ---
 {
-  const pickerCtx=loadSandbox(['core.js','modules/state.js','modules/sigma-cohort-service.js','modules/sigma-ui-state.js','modules/sigma.js']);
+  const pickerCtx=loadSandbox(['core.js','generated/modular-pilot.js','modules/state.js','modules/sigma.js']);
   const added=run(pickerCtx, `(function(){
     state.tests=[{id:'T1',name:'Glucose',levels:[{level:1,qcLotId:'L1'},{level:2,qcLotId:'L2'},{level:3,qcLotId:''}],sgTracked:false}];
     operationalLevels=function(t){return t.levels.filter(l=>l.qcLotId);};
@@ -141,7 +141,7 @@ assert.equal(ctx.sgInputDisplayValue(''),'');
 
 // --- Already-tracked assays in the picker can be selected for inspection ---
 {
-  const pickerCtx=loadSandbox(['core.js','modules/state.js','modules/sigma-cohort-service.js','modules/sigma-ui-state.js','modules/sigma.js']);
+  const pickerCtx=loadSandbox(['core.js','generated/modular-pilot.js','modules/state.js','modules/sigma.js']);
   const selected=run(pickerCtx, `(function(){
     state.tests=[{id:'T1',name:'Glucose',sgTracked:true},{id:'T2',name:'Sodium',sgTracked:true}];sgTest='T1';
     closeModal=function(){globalThis.__closed=true;};rerender=function(){globalThis.__rendered=true;};

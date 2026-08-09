@@ -47,6 +47,7 @@
 .audit-filterbar > .audit-filter-summary{
   align-self:flex-end; min-width:0; margin-left:auto; color:var(--muted); font-size:var(--type-meta); font-weight:750; line-height:1.2; text-align:right;
 }
+.audit-summary-status{align-self:center}
 
 .audit-clear-filter{
   align-self:flex-end;

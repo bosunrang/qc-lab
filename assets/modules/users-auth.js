@@ -79,8 +79,7 @@ function pageAudit(){
     `<div class="panel"><h2 class="panel-title">Công cụ</h2><div class="row-flex">
       ${btn('Xuất CSV nhật ký','exportActivityCSV()','teal sm')}
       ${total?btn('Lưu trữ nhật ký cũ','archiveActivityLog()','ghost sm'):''}
-      ${total?btn('Xóa nhật ký','clearActivityLog()','danger sm'):''}
-      <div class="hint" style="align-self:center">${total} dòng hoạt động đã ghi nhận. ${chainHtml}${oversizeWarn}</div>
+      <div class="hint audit-summary-status">${total} dòng hoạt động đã ghi nhận. ${chainHtml}${oversizeWarn}</div>
     </div></div>
     <div class="panel audit-log-panel"><div class="audit-log-head"><h2 class="panel-title">Hoạt động gần đây</h2><input id="auditSearch" type="search" aria-label="Tìm nhật ký hoạt động" placeholder="Tìm người dùng, hành động, đối tượng..." value="${escAttr(auditQ)}" oninput="auditSetQuery(this.value)"></div>
       <div class="audit-filterbar"><div><label>Từ ngày</label>${dateBox('auditFromDate',auditFrom,'audit-date',`aria-label="Lọc nhật ký từ ngày" onchange="auditSetDate('from',this.value)"`)}</div><div><label>Đến ngày</label>${dateBox('auditToDate',auditTo,'audit-date',`aria-label="Lọc nhật ký đến ngày" onchange="auditSetDate('to',this.value)"`)}</div><div><label>Số dòng mỗi trang</label><select aria-label="Số dòng nhật ký mỗi trang" onchange="auditSetPageSize(this.value)">${pageSizeOptions}</select></div>${hasFilter?btn('Xóa bộ lọc','auditClearFilters()','ghost sm audit-clear-filter'):''}<div class="audit-filter-summary" role="status">${filtered.length}/${total} dòng</div></div>
@@ -89,21 +88,6 @@ function pageAudit(){
 }
 function activityCSVRows(items){const rows=[['Seq','Thời gian','Người dùng','Tên đăng nhập','Vai trò','Hành động','Đối tượng','Chi tiết','PrevHash','Hash']];(items||[]).forEach(a=>rows.push([a.seq||'',formatDateTimeVN(a.ts),a.user||'',a.username||'',roleLabel(a.role||'viewer'),a.type||'',a.target||'',a.detail||'',a.prevHash||'',a.hash||'']));return rows;}
 function exportActivityCSV(){downloadCSV('Nhat_ky_hoat_dong_QCLab.csv',activityCSVRows(state.activity));}
-/* Xóa vĩnh viễn toàn bộ nhật ký hoạt động — khác với "Xóa sạch dữ liệu test" (resetAllData)
-   vốn CHỦ ĐỘNG giữ lại nhật ký. Đây là ngoại lệ duy nhất cho quy tắc "chỉ ghi nối tiếp,
-   không tự cắt bớt dòng" — chỉ admin bấm được, có xác nhận, và tự ghi lại đúng 1 dòng nhật ký
-   mới ghi nhận việc đã xóa (để vẫn còn dấu vết là đã có một lần xóa, dù không phục hồi được nội dung cũ). */
-async function clearActivityLog(){
-  if(!requireAdmin())return;
-  const count=(state.activity||[]).length;if(!count)return;
-  if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa nhật ký hoạt động',message:`Xóa vĩnh viễn toàn bộ ${count} dòng nhật ký hoạt động?`,detail:'Không thể khôi phục lại được — nên xuất Excel nhật ký trước nếu cần lưu lại.',confirmLabel:'Xóa nhật ký',cancelLabel:'Hủy'}))return;
-  if(!await reauthenticateCurrentUser({title:'Xác thực xóa nhật ký',message:'Nhập lại mật khẩu trước khi xóa toàn bộ nhật ký hoạt động.'}))return;
-  state.activity=[];state.activityAnchor='';
-  logAct('Xóa nhật ký hoạt động',`Đã xóa vĩnh viễn ${count} dòng nhật ký trước đó`,'Nhật ký');
-  auditQ='';auditFrom='';auditTo='';auditPage=1;
-  save({clearDerived:false});rerender();
-  await infoDialog('Đã xóa nhật ký hoạt động.',{type:'success'});
-}
 /* Lưu trữ CÓ CHỦ ĐÍCH nhật ký cũ: xuất CSV phần bị cắt TRƯỚC, chỉ khi file đã
    tạo xong mới gỡ khỏi state — khác với xoay vòng tự động (auditRotateOverflow),
    đường này không mất dữ liệu. CSV giữ nguyên cột PrevHash/Hash để phần đã lưu
@@ -114,7 +98,7 @@ function archiveActivityLog(){
   const total=(state.activity||[]).length;if(!total)return;
   openModal(modalTemplate({title:'Lưu trữ nhật ký cũ',body:`
       <div class="hint">Nhật ký hiện có <b>${total}</b> dòng. Các dòng cũ hơn mốc chọn sẽ được <b>xuất ra file CSV</b> (kèm PrevHash/Hash), sau đó mới bị gỡ khỏi hệ thống — hash dòng cuối file trở thành điểm nối vào chuỗi còn lại nên phần lưu trữ vẫn kiểm chứng được.</div>
-      <label style="margin-top:12px">Chỉ giữ lại nhật ký trong</label>
+      <label class="flow-section">Chỉ giữ lại nhật ký trong</label>
       <select id="auditArchiveMonths" aria-label="Mốc tuổi nhật ký được giữ lại">
         <option value="12">12 tháng gần nhất</option>
         <option value="24" selected>24 tháng gần nhất</option>
@@ -179,8 +163,8 @@ async function openUserPerms(id){
     <div class="modal-b">
       <div class="hint"><b>${esc(u.name||u.username)}</b> · @${esc(u.username)}</div>
       <label>Vai trò</label>${roleSelect}
-      <label style="margin-top:12px">Thẻ được phép dùng</label>${userPermChecks(u.pagePerms,'editUserPerms',u.role)}
-      <div class="hint" style="margin-top:10px">Vai trò quyết định quyền sửa/quản trị; danh sách thẻ chỉ quyết định người dùng thấy và mở được màn hình nào.</div>
+      <label class="flow-section">Thẻ được phép dùng</label>${userPermChecks(u.pagePerms,'editUserPerms',u.role)}
+      <div class="hint flow-control">Vai trò quyết định quyền sửa/quản trị; danh sách thẻ chỉ quyết định người dùng thấy và mở được màn hình nào.</div>
     </div>
     <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn('Lưu quyền',`applyUserPerms('${id}')`,'teal')}</div></div>`);
 }
@@ -266,6 +250,7 @@ async function resetAllData(){
   if(!requireAdmin())return;
   if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa sạch dữ liệu test',message:'Xóa sạch toàn bộ dữ liệu test?',detail:'Nhật ký hoạt động sẽ được giữ lại và ghi nhận thao tác này.',confirmLabel:'Tiếp tục',cancelLabel:'Hủy'}))return;
   if(!await confirmDialog({kicker:'Xác nhận lần cuối',title:'Xóa sạch dữ liệu test',message:'Dữ liệu QC, cấu hình, lô, panel và khắc phục sẽ bị xóa.',detail:'Nhật ký audit vẫn được giữ. Nếu đang bật đám mây, trạng thái trắng cũng sẽ được đồng bộ lên Firebase.',confirmLabel:'Xóa sạch dữ liệu',cancelLabel:'Hủy'}))return;
+  if(!await reauthenticateCurrentUser({title:'Xác thực xóa sạch dữ liệu',message:'Nhập lại mật khẩu trước khi xóa toàn bộ dữ liệu QC và cấu hình.'}))return;
   if(typeof backupCurrentData==='function'&&!await backupCurrentData('truoc-xoa')){await infoDialog('Không tạo được bản backup an toàn. Dữ liệu chưa bị xóa.');return;}
   const keepUsers=(state.users||[]).length?state.users:[];
   /* Neo chuoi hash di kem nhat ky: giu nhat ky ma bo neo thi auditVerifyChain() se
@@ -295,8 +280,7 @@ function showStartupRecovery(){
   ov.innerHTML=`<div class="auth-card"><div class="auth-head">${authBrandMark()}<div class="auth-brand">Cần phục hồi dữ liệu</div></div>
     <div class="auth-sub">QC Lab phát hiện dữ liệu cục bộ không hợp lệ và đã dừng để tránh ghi đè.</div>
     <div class="auth-err">${esc(startupProblem&&startupProblem.message||'Không đọc được dữ liệu.')}</div>
-    ${btn('Tải dữ liệu gốc xuống','downloadStartupData()','teal','',{attrs:{style:'width:100%;margin-top:16px'}})}
-    ${btn('Tạo dữ liệu mới','resetStartupData()','ghost','',{attrs:{style:'width:100%;margin-top:8px'}})}
+    <div class="auth-actions">${btn('Tải dữ liệu gốc xuống','downloadStartupData()','teal')}${btn('Tạo dữ liệu mới','resetStartupData()','ghost')}</div>
     <div class="auth-hint">Ưu tiên tải dữ liệu gốc xuống trước để có thể kiểm tra và phục hồi.</div></div>`;
 }
 function showLogin(msg){
@@ -308,12 +292,12 @@ function showLogin(msg){
   const admin=(state.users||[]).find(u=>u.username==='admin');
   const defaultHint=admin&&admin.mustChangePassword?'Tài khoản mặc định: <b>admin</b> / <b>admin</b><br>Hệ thống sẽ yêu cầu đổi mật khẩu ở lần đăng nhập đầu tiên.<br>':'';
   const trial=window.qcLicense&&window.qcLicense.trial;
-  const trialLine=trial&&trial.active?`<div class="auth-hint" style="color:${trial.daysLeft<=7?'#c77a1f':'#0b747d'}">Bản dùng thử: còn ${trial.daysLeft}/${trial.totalDays} ngày</div>`:'';
+  const trialLine=trial&&trial.active?`<div class="auth-hint ${trial.daysLeft<=7?'auth-trial-warning':'auth-trial-ok'}">Bản dùng thử: còn ${trial.daysLeft}/${trial.totalDays} ngày</div>`:'';
   ov.innerHTML=`<div class="auth-card"><div class="auth-head">${authBrandMark()}<div class="auth-head-text"><div class="auth-brand">${esc(brandTitle())}</div><div class="auth-sub">${esc(brandSub())}</div></div></div>
     <label>Tên đăng nhập</label><input id="liUser" autocomplete="username" autofocus>
     <label>Mật khẩu</label><input id="liPass" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
     ${msg?`<div class="auth-err">${esc(msg)}</div>`:''}
-    ${btn('Đăng nhập','doLogin()','teal','',{attrs:{style:'width:100%;margin-top:16px'}})}
+    <div class="auth-actions">${btn('Đăng nhập','doLogin()','teal')}</div>
     ${trialLine}<div class="auth-hint">${defaultHint}Phiên bản ${esc(app.version||'dev')}</div></div>`;
   requestAnimationFrame(focusLoginField);setTimeout(focusLoginField,50);
 }
@@ -361,7 +345,7 @@ function showPasswordChange(msg){
     <label>Mật khẩu mới</label><input id="newPass1" type="password" autocomplete="new-password">
     <label>Nhập lại mật khẩu mới</label><input id="newPass2" type="password" autocomplete="new-password" onkeydown="if(event.key==='Enter')changeRequiredPassword()">
     ${msg?`<div class="auth-err">${esc(msg)}</div>`:''}
-    ${btn('Lưu mật khẩu mới','changeRequiredPassword()','teal','',{attrs:{style:'width:100%;margin-top:16px'}})}
+    <div class="auth-actions">${btn('Lưu mật khẩu mới','changeRequiredPassword()','teal')}</div>
     <div class="auth-hint">Mật khẩu cần ít nhất 8 ký tự và không nên dùng lại mật khẩu mặc định.</div></div>`;
   setTimeout(()=>{const e=document.getElementById('newPass1');if(e)e.focus();},50);
 }

@@ -22,6 +22,11 @@ const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 
 const plain = (v) => JSON.parse(JSON.stringify(v));
 const snapshot = (t, level, lotId, lotNo) => plain(ctx.lotTargetSnapshot(t, level, lotId, lotNo));
 
+assert.equal(ctx.targetNumberText(140.053846154,{decimalPlaces:2}), '140.05', 'Mean phải theo số thập phân đã cấu hình của xét nghiệm');
+assert.equal(ctx.targetNumberText(138.966265908,{decimalPlaces:2}), '138.97', 'giới hạn phải gọn theo số thập phân của xét nghiệm');
+assert.equal(ctx.targetNumberText(0.54379086239,{decimalPlaces:2},'stat'), '0.5438', 'SD chỉ giữ độ chính xác thống kê, không hiện chuỗi thập phân dài');
+assert.equal(ctx.targetNumberText(3.7000,{decimalPlaces:2}), '3.7', 'ô nhập phải bỏ số 0 thừa');
+
 function makeTest() {
   return { id: 't1', name: 'Sodium', levels: [{ level: 2, qcLotId: '', lot: '', mean: null, sd: null, low: null, high: null, rangeK: 2, applied: 'mfg', meanSdHistory: [] }] };
 }

@@ -30,6 +30,7 @@ assert.equal(ctx.auditSha256('abc'), 'ba7816bf8f01cfea414140de5dae2223b00361a396
   assert.equal(activity[1].prevHash, activity[0].hash);
   assert.equal(ctx.auditVerifyChain().ok, true);
   assert.equal(ctx.auditVerifyChain().checked, 2);
+  assert.deepEqual(JSON.parse(JSON.stringify(ctx.QCCore.verifyAuditChain(activity,''))),JSON.parse(JSON.stringify(ctx.auditVerifyChain(activity,''))),'cổng kiểm tra thuần trong core phải khớp với trang audit');
 }
 
 {

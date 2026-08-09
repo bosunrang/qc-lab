@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
-const ctx = loadSandbox(['modules/entry-ui-state.js']);
+const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js']);
 const plain = value => JSON.parse(JSON.stringify(value));
 
 run(ctx, "entrySel={testId:'T1',level:2}; entryDays=14; entryExtraRun.add('T1|2|2026-07-14|2'); entryDetailOpen.add('points');");

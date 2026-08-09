@@ -36,7 +36,7 @@ function reportUnlockPeriod(ym){
       <div class="hint">Sau khi mở khóa, điểm QC trong kỳ ${esc(label)} có thể được sửa/hủy trở lại.</div>
       <label>Lý do mở khóa (tối thiểu 5 ký tự)</label>
       <textarea id="unlockReasonInput" placeholder="VD: Bổ sung đối soát, phát hiện sai sót cần chỉnh lại..." oninput="document.getElementById('unlockReasonErr').style.display='none'"></textarea>
-      <div id="unlockReasonErr" class="hint" style="color:var(--red);display:none;margin-top:6px">Cần ghi lý do mở khóa tối thiểu 5 ký tự.</div>
+      <div id="unlockReasonErr" class="hint field-error">Cần ghi lý do mở khóa tối thiểu 5 ký tự.</div>
     `,footer:btn('Đóng','closeModal()','ghost')+btn('Xác nhận mở khóa',`reportConfirmUnlockPeriod('${jsq(ym)}')`,'danger')}));
   setTimeout(()=>{const e=document.getElementById('unlockReasonInput');if(e)e.focus();},50);
 }
@@ -128,7 +128,7 @@ function reportLockPanelHtml(){
        <div><label>Năm</label><select aria-label="Năm" ${isAdmin?'':'disabled'} onchange="reportSetLockPart('year',this.value)">${yearOptions}</select></div>
        <div style="align-self:end">${isAdmin?(already?btn('Kỳ này đã khóa','','ghost','',{disabled:true}):btn('Khóa kỳ này','reportLockPeriod()','teal')):'<span class="hint">Chỉ admin mới khóa/mở khóa được kỳ báo cáo.</span>'}</div>
      </div>
-     <div style="margin-top:16px">${reportLockListHtml()}</div>
+     <div class="flow-panel">${reportLockListHtml()}</div>
    </div>`;
 }
 function pageReportV2(){

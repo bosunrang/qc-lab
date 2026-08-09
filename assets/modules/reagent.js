@@ -224,10 +224,10 @@ function rcModalSearchSet(v){
 function renderRcModal(){
   const q=searchText(rcModalQ);
   const hit=d=>!q||[rcLabel(d),d.test.reagent,d.test.lotOld,d.test.lotNew,d.test.unit,d.test.operator].some(v=>searchText(v).includes(q));
-  const rows=state.reagentTests.filter(hit).map(d=>`<div class="mrow ${d.id===rcId?'on':''}"><span><b>${esc(rcLabel(d))}</b><div style="font-size:var(--type-meta);color:var(--muted);font-family:var(--sans);margin-top:2px">${esc(d.test.unit||'')} ${d.rows&&d.rows.length?'· '+d.rows.length+' dòng':''}</div></span><span class="acts">${btn(d.id===rcId?'Đang chọn':'Chọn',`rcPick('${d.id}')`,(d.id===rcId?'teal':'ghost')+' sm')}${canWrite()?`<button class="x" onclick="rcDeleteFromModal('${d.id}')" title="Xóa">✕</button>`:''}</span></div>`).join('')||'<div class="empty">Không có phép so sánh phù hợp.</div>';
+  const rows=state.reagentTests.filter(hit).map(d=>`<div class="mrow ${d.id===rcId?'on':''}"><span><b>${esc(rcLabel(d))}</b><div class="hint flow-tight">${esc(d.test.unit||'')} ${d.rows&&d.rows.length?'· '+d.rows.length+' dòng':''}</div></span><span class="acts">${btn(d.id===rcId?'Đang chọn':'Chọn',`rcPick('${d.id}')`,(d.id===rcId?'teal':'ghost')+' sm')}${canWrite()?`<button class="x" onclick="rcDeleteFromModal('${d.id}')" title="Xóa">✕</button>`:''}</span></div>`).join('')||'<div class="empty">Không có phép so sánh phù hợp.</div>';
   openModal(`<div class="modal"><div class="modal-h"><h3>Chọn phép so sánh</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
     <div class="modal-b"><input id="rcModalSearch" placeholder="Tìm phép so sánh..." value="${escAttr(rcModalQ)}" oninput="rcModalSearchSet(this.value)">
-      <div style="margin-top:10px">${rows}</div></div>
+      <div class="flow-control">${rows}</div></div>
     <div class="modal-f">${btn('Đóng','closeModal()','ghost')}</div></div>`);
   setTimeout(()=>{const e=document.getElementById('rcModalSearch');if(e){e.focus();e.setSelectionRange(e.value.length,e.value.length);}},0);
 }
@@ -245,7 +245,7 @@ function renderRcCreateModal(){
   const createTyped=q?`<button class="refrow" onclick="rcCreateFrom('${jsq(q)}','')">+ Tạo "${esc(q)}"</button>`:'<button class="refrow" onclick="rcCreateFrom(\'Hóa chất mới\',\'\')">+ Tạo hóa chất trống</button>';
   openModal(`<div class="modal"><div class="modal-h"><h3>Thêm hóa chất</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
     <div class="modal-b"><input id="rcCreateSearch" placeholder="Tìm xét nghiệm hoặc gõ tên hóa chất mới..." value="${escAttr(rcCreateModalQ)}" oninput="rcCreateSearchSet(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();rcCreateFrom(this.value,'')}">
-      <div style="margin-top:10px">${createTyped}</div>
+      <div class="flow-control">${createTyped}</div>
       <div class="refcat">Danh mục chuẩn</div>${refs||'<div class="empty" style="padding:18px">Không tìm thấy trong danh mục chuẩn.</div>'}</div>
     <div class="modal-f">${btn('Đóng','closeModal()','ghost')}</div></div>`);
   setTimeout(()=>{const e=document.getElementById('rcCreateSearch');if(e){e.focus();e.setSelectionRange(e.value.length,e.value.length);}},0);
@@ -275,7 +275,7 @@ function rcReportSummaryTable(items){
 function rcReportDetail(ds,i=0,pagebreak=false){
   const R=rcCalc(ds),t=ds.test;
   let h=`<div class="rpt-card" style="${pagebreak?'break-before:page;':''}"><h3>${i+1}. ${esc(t.reagent||'Hóa chất mới')} ${rcReportPill(R)}</h3><div class="body">`;
-  h+=`<div style="font-size:var(--type-meta);color:${RCC.muted};margin-bottom:10px">Lô cũ: <b>${esc(t.lotOld||'—')}</b> · Lô mới: <b>${esc(t.lotNew||'—')}</b> · Ngày: ${rcDateText(t.date)} · Người thực hiện: ${esc(t.operator||'—')} · Loại mẫu: ${esc(t.sampleType||'—')} · Giới hạn chênh lệch &lt; ${esc(t.biasTarget||6)}% · α = ${esc(t.alpha||0.05)}</div>`;
+  h+=`<div class="hint space-after-control">Lô cũ: <b>${esc(t.lotOld||'—')}</b> · Lô mới: <b>${esc(t.lotNew||'—')}</b> · Ngày: ${rcDateText(t.date)} · Người thực hiện: ${esc(t.operator||'—')} · Loại mẫu: ${esc(t.sampleType||'—')} · Giới hạn chênh lệch &lt; ${esc(t.biasTarget||6)}% · α = ${esc(t.alpha||0.05)}</div>`;
   if(!R){h+=`<p><i>Chưa đủ dữ liệu (cần tối thiểu ${RC_MIN_PAIRS} cặp).</i></p></div></div>`;return h;}
   h+='<table><thead><tr><th>Mẫu</th><th class="num">Lô cũ</th><th class="num">Lô mới</th><th class="num">Trung bình</th><th class="num">Hiệu số</th></tr></thead><tbody>';
   R.o.forEach((o,k)=>{const n=R.n[k];h+=`<tr><td>${k+1}</td><td class="num">${o}</td><td class="num">${n}</td><td class="num">${((o+n)/2).toFixed(3)}</td><td class="num">${(o-n).toFixed(3)}</td></tr>`;});

@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const { loadSandbox } = require('./helpers/sandbox');
 
-const ctx = loadSandbox(['modules/westgard-view-model.js']);
+const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js']);
 const plain = value => JSON.parse(JSON.stringify(value));
 
 const rows = plain(ctx.WestgardViewModel.buildPointRows({

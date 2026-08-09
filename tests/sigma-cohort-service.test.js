@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const { loadSandbox } = require('./helpers/sandbox');
 
-const ctx = loadSandbox(['core.js', 'modules/sigma-cohort-service.js']);
+const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js']);
 const state = {data:{T1:[
   {id:'p1',date:'2026-07-01',runId:'2026-07-01-1',level:1,lot:'L1',val:100,qcMean:100,qcSd:2},
   {id:'p2',date:'2026-07-01',runId:'2026-07-01-2',level:1,lot:'L1',val:106,qcMean:100,qcSd:2},

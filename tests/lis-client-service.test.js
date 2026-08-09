@@ -1,6 +1,6 @@
 'use strict';
 /**
- * Tests cho lis-client-service.js — phia app KEO ket qua QC tu gateway ve.
+ * Tests cho LISClientService TypeScript — phia app KEO ket qua QC tu gateway ve.
  *
  * Hai thu duoc chot o day, deu la loai loi im lang:
  *
@@ -19,7 +19,7 @@ const { loadSandbox, run } = require('./helpers/sandbox');
 (async () => {
   const storage = new Map(), requests = [];
   let pendingItems = [], failDecide = false;
-  const ctx = loadSandbox(['modules/lis-client-service.js'], {
+  const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js', 'modules/lis-queue-ui.js'], {
     URL, AbortController, setInterval, clearInterval,
     fetch: async (url, opts = {}) => {
       requests.push({ url, opts });
@@ -112,7 +112,7 @@ const { loadSandbox, run } = require('./helpers/sandbox');
    * ben duoi), stub rieng se khong bat duoc regresion that trong cac ham do.
    * ========================================================================= */
   const openCalls = [];
-  const ctx2 = loadSandbox(['modules/router-render.js', 'modules/entry-routes.js', 'modules/reports.js', 'modules/lis-client-service.js'], {
+  const ctx2 = loadSandbox(['core.js', 'generated/modular-pilot.js', 'modules/router-render.js', 'modules/entry-routes.js', 'modules/reports.js', 'modules/lis-queue-ui.js'], {
     URL, AbortController, setInterval, clearInterval,
     window: { QCLAB_APP: { name: 'QC Lab', version: 'test' } },
     document: { getElementById: () => null, addEventListener: () => {}, removeEventListener: () => {} },

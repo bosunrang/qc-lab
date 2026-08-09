@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
-const ctx = loadSandbox(['modules/analysis-ui-state.js']);
+const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js']);
 
 run(ctx, "selTest='T1'; wgTestQ='glucose'; dashTestStatus='warn'; wgPrevOpen.add('T1|1'); wgExpandedRows.add('current:T1|1|L1');");
 assert.equal(ctx.AnalysisUIState.selTest, 'T1');

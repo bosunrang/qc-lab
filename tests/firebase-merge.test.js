@@ -562,6 +562,34 @@ const plain = (v) => JSON.parse(JSON.stringify(v));
   assert.equal(reloadResult.ready,true);
 }
 
+// --- Scenario 25: chọn dữ liệu trung tâm có cấu trúc cũ phải đẩy bản đã chuẩn hóa
+// trở lại cloud. Nếu không, local sau ensureShape() luôn khác remote cũ và mỗi lần
+// refresh lại mở hộp thoại xung đột dù người dùng đã chọn trung tâm trước đó. ---
+{
+  const normalizedCentral=await run(ctx, `
+    window={QCLAB_CLOUD:null};
+    document={getElementById:function(){return null;},addEventListener:function(){}};
+    localStorage={setItem:function(){}};currentUser=null;
+    ensureLabBrandShape=function(){};ensureAdmin=function(){};renderBrand=function(){};applyRemoteRender=function(){};
+    clearTimeout=function(){};setTimeout=function(fn){fn();return 1;};
+    var __normalizationConfirmCalls=0,__normalizationUpdates=[];
+    confirmDialog=function(){__normalizationConfirmCalls++;return Promise.resolve(true);};
+    state=${JSON.stringify(baseState({tests:[{id:'LOCAL',name:'Local stale',levels:[{level:1}]}]}))};
+    fb.ready=false;fb.initialized=false;fb.dirty=false;fb.synced=null;fb.seenSig=null;
+    fb.ref={update:function(payload){__normalizationUpdates.push(payload);return Promise.resolve();}};
+    var remote25=${JSON.stringify(baseState({machines:['Legacy Analyzer'],tests:[{id:'T1',name:'Glucose',machine:'Legacy Analyzer',levels:[{level:1}]}]}))};
+    fbHandleValue(remote25,{silent:true}).then(function(){return Promise.resolve().then(function(){
+      var cloudAfter=QCCore.sanitizeBackup(Object.assign({},remote25,__normalizationUpdates[0]||{}));
+      return{confirmCalls:__normalizationConfirmCalls,updates:__normalizationUpdates.length,instrumentCount:(state.instruments||[]).length,localShape:fbSyncedShape(state),cloudShape:fbSyncedShape(cloudAfter)};
+    });});
+  `);
+  const normalized=plain(normalizedCentral);
+  assert.equal(normalized.confirmCalls,1,'lần đầu dữ liệu local khác trung tâm vẫn phải hỏi trước khi thay thế');
+  assert.ok(normalized.instrumentCount>=1,'ensureShape phải chuẩn hóa máy cũ thành instrument');
+  assert.ok(normalized.updates>=1,'bản trung tâm đã chuẩn hóa phải được đẩy lên cloud ngay');
+  assert.deepEqual(normalized.localShape,normalized.cloudShape,'sau khi đẩy chuẩn hóa, refresh kế tiếp phải thấy local và cloud giống nhau');
+}
+
 /* Luu tru nhat ky khi DANG BAT dong bo: may A cat bot dong cu va day len cloud, may B
    chua cat. Rui ro nghi ngo: mergePointArray() co ngoai le "ban sua thang lenh xoa", ma
    auditRelinkChain() chay sau moi merge va co the ghi lai hash cac dong cu -> lenh xoa

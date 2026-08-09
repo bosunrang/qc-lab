@@ -673,3 +673,9 @@
 .sg-add-test-row.is-current{
   border-color:var(--teal); background:var(--success-bg);
 }
+
+.sg-improvement-card{display:block;background:#f8fafb;border-left:3px solid var(--sg-color);color:var(--ink)}
+.sg-improvement-card>b{color:var(--sg-color)}
+.sg-improvement-lead{margin:var(--space-2xs) 0}
+.sg-improvement-target{margin-bottom:var(--space-2xs)}
+.sg-improvement-list{margin:var(--space-2xs) 0 0 var(--modal-inline-padding)}

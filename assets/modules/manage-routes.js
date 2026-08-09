@@ -53,27 +53,27 @@ function manageLots(){
   return manageToolbar('Lô & Nhóm QC','Quản lý từng lô và nhóm lô QC.')+
   `<div class="lot-config-grid">
     <div class="panel rcfg-list lot-config-left">
-      <div class="rcfg-panel-h"><h3>Lô QC</h3>${btn('Thêm lô','openConfigLot()','teal sm')}</div>
+      <div class="rcfg-panel-h"><h3>Lô QC</h3>${btn('Thêm lô QC','openConfigLot()','teal sm')}</div>
       ${rows?`<table class="lot-table"><thead><tr><th>Số lô</th><th>Mức</th><th>Hạn dùng</th><th>Trạng thái</th><th class="num">Gán</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table>`:emptyState('Chưa có lô QC','Tạo từng lô QC độc lập, sau đó nhập Mean/SD cho Panel QC.')}
     </div>
     <div class="panel rcfg-list lot-config-right">
-      <div class="rcfg-panel-h"><h3>Nhóm lô QC</h3>${btn('Tạo nhóm lô','openConfigGroup()','teal sm')}</div>
+      <div class="rcfg-panel-h"><h3>Nhóm lô QC</h3>${btn('Thêm nhóm lô','openConfigGroup()','teal sm')}</div>
       ${groupRows?`<div class="lot-group-list">${groupRows}</div>`:emptyState('Chưa có nhóm lô','Chọn các lô QC đã tạo để ghép thành một nhóm, ví dụ 1101/1102.')}
     </div>
   </div>`;
 }
 function manageInstruments(){
   const rows=state.instruments.filter(i=>manageMatch([i.name,i.manufacturer,i.model,i.serial,i.section])).map(i=>{const n=state.tests.filter(t=>t.instrumentId===i.id).length;return `<tr><td><b>${esc(i.name)}</b><div class="hint">${esc(i.section||'Chưa phân khoa')}</div></td><td>${esc(i.manufacturer||'—')}</td><td>${esc(i.serial||'—')}</td><td class="num">${n}</td><td><span class="tag ${i.active?'ok':'none'}">${i.active?'Đang hoạt động':'Ngừng hoạt động'}</span></td><td><div class="manage-actions">${btn('Sửa',`openConfigInstrument('${i.id}')`,'ghost sm')}${btn('Xóa',`deleteConfigInstrument('${i.id}')`,'danger sm')}</div></td></tr>`;}).join('');
-  return manageToolbar('Máy xét nghiệm','Quản lý máy xét nghiệm, hãng và số sê-ri.',"openConfigInstrument()",'Thêm máy')+`<div class="panel rcfg-list">${rows?`<table class="instrument-table"><thead><tr><th>Máy xét nghiệm</th><th>Nhà sản xuất</th><th>Số sê-ri</th><th class="num">Xét nghiệm</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table>`:emptyState('Chưa có máy xét nghiệm','Thêm máy trước khi cấu hình xét nghiệm.')}</div>`;
+  return manageToolbar('Máy xét nghiệm','Quản lý máy xét nghiệm, hãng và số sê-ri.',"openConfigInstrument()",'Thêm máy xét nghiệm')+`<div class="panel rcfg-list">${rows?`<table class="instrument-table"><thead><tr><th>Máy xét nghiệm</th><th>Nhà sản xuất</th><th>Số sê-ri</th><th class="num">Xét nghiệm</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table>`:emptyState('Chưa có máy xét nghiệm','Thêm máy trước khi cấu hình xét nghiệm.')}</div>`;
 }
 function managePanels(){
   const rows=state.qcPanels.filter(p=>manageMatch([p.name,p.note,instrumentName(p.instrumentId),...(p.testIds||[]).map(id=>(state.tests.find(t=>t.id===id)||{}).name)])).map(p=>{const tests=(p.testIds||[]).map(id=>state.tests.find(t=>t.id===id)).filter(Boolean);return `<tr><td><b>${esc(p.name)}</b></td><td>${esc(instrumentName(p.instrumentId))}</td><td>${tests.map(t=>`<span class="pill">${esc(testDisplayName(t))}</span>`).join('')||'—'}</td><td class="num">${tests.length}</td><td><span class="tag ${p.active!==false?'ok':'none'}">${p.active!==false?'Đang dùng':'Tạm ngưng'}</span></td><td><div class="manage-actions">${btn('Sửa',`openConfigPanel('${p.id}')`,'ghost sm')}${btn('Xóa',`deleteConfigPanel('${p.id}')`,'danger sm')}</div></td></tr>`;}).join('');
-  return manageToolbar('Panel QC','Nhóm các xét nghiệm theo từng máy để thiết lập và quản lý QC.',"openConfigPanel()",'Tạo Panel QC')+`<div class="panel rcfg-list">${rows?`<table class="panel-qc-table"><thead><tr><th>Tên panel</th><th>Máy xét nghiệm</th><th>Xét nghiệm trong panel</th><th class="num">Số vị trí</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table>`:emptyState('Chưa có Panel QC','Tạo Panel QC trước, sau đó nhập Mean/SD theo nhóm lô trong thẻ Mean/SD.')}</div>`;
+  return manageToolbar('Panel QC','Nhóm các xét nghiệm theo từng máy để thiết lập và quản lý QC.',"openConfigPanel()",'Thêm Panel QC')+`<div class="panel rcfg-list">${rows?`<table class="panel-qc-table"><thead><tr><th>Tên panel</th><th>Máy xét nghiệm</th><th>Xét nghiệm trong panel</th><th class="num">Số vị trí</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table>`:emptyState('Chưa có Panel QC','Tạo Panel QC trước, sau đó nhập Mean/SD theo nhóm lô trong thẻ Mean/SD.')}</div>`;
 }
 function targetPanelOptions(){return state.qcPanels.map(p=>`<option value="${p.id}" ${p.id===manageTargetPanel?'selected':''}>${esc(p.name)} · ${esc(instrumentName(p.instrumentId))}</option>`).join('');}
 function manageTransitionsV2(){
   const rows=state.lotTransitions.filter(tr=>manageMatch([panelName(tr.panelId),lotLabel(tr.fromLotId),lotLabel(tr.toLotId),tr.startDate,tr.status,tr.approvedBy])).map(tr=>{const s=transitionStatusLabelV2(tr.status),to=state.qcLots.find(l=>l.id===tr.toLotId),moved=transitionSwitchesLot(tr)&&to?`<div class="hint">Đã chuyển tiếp qua lô ${esc(to.lotNo)}</div>`:'',approval=tr.approvedBy?`<div class="hint">Duyệt: ${esc(tr.approvedBy)}${tr.approvedAt?' · '+formatDateTimeVN(tr.approvedAt):''}</div>`:'';return `<tr><td><b>${esc(panelName(tr.panelId))}</b></td><td><div><b>${esc(lotLabel(tr.fromLotId))}</b></div><div class="hint">→ ${esc(lotLabel(tr.toLotId))}</div></td><td>${tr.startDate?vnDate(tr.startDate):'—'}</td><td><span class="tag ${s.cls}">${s.text}</span>${moved}${approval}</td><td><div class="manage-actions">${btn('Sửa',`openLotTransitionV2('${tr.id}')`,'ghost sm')}${btn('Xóa',`deleteLotTransition('${tr.id}')`,'danger sm')}</div></td></tr>`;}).join('');
-  return manageToolbar('Chuyển tiếp lô QC','Theo dõi lô cũ, lô mới và trạng thái khi thay lô.',"openLotTransitionV2()",'Tạo hồ sơ')+`<div class="panel rcfg-list transition-list">${rows?`<table class="transition-table"><thead><tr><th>Panel QC</th><th>Chuyển lô</th><th>Bắt đầu</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table>`:emptyState('Chưa có hồ sơ chuyển lô','Tạo hồ sơ để theo dõi chuyển từ lô cũ sang lô mới.')}</div>`;
+  return manageToolbar('Chuyển tiếp lô QC','Theo dõi lô cũ, lô mới và trạng thái khi thay lô.',"openLotTransitionV2()",'Thêm hồ sơ chuyển lô')+`<div class="panel rcfg-list transition-list">${rows?`<table class="transition-table"><thead><tr><th>Panel QC</th><th>Chuyển lô</th><th>Bắt đầu</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table>`:emptyState('Chưa có hồ sơ chuyển lô','Tạo hồ sơ để theo dõi chuyển từ lô cũ sang lô mới.')}</div>`;
 }
 function targetPanelTests(){const p=state.qcPanels.find(x=>x.id===manageTargetPanel);return(p&&p.testIds||[]).map(id=>state.tests.find(t=>t.id===id)).filter(Boolean);}
 function targetPanelLabel(){const p=state.qcPanels.find(x=>x.id===manageTargetPanel);return p?p.name:'Panel QC';}
@@ -92,9 +92,9 @@ function ensureTargetSelection(){
 function manageTargets(){
   ensureTargetSelection();
   if(!state.tests.length)return manageToolbar('Mean/SD theo nhóm lô QC','Chọn Panel QC để nhập Mean/SD hàng loạt.',"setManageTab('assays')",'Thêm xét nghiệm')+`<div class="panel">${emptyState('Chưa có xét nghiệm','Tạo xét nghiệm trước, sau đó quay lại nhập Mean/SD theo nhóm lô.')}</div>`;
-  if(!state.qcPanels.length)return manageToolbar('Mean/SD theo nhóm lô QC','Chỉ dùng Panel QC để nhập Mean/SD hàng loạt.',"setManageTab('panels')",'Tạo Panel QC')+`<div class="panel">${emptyState('Chưa có Panel QC','Tạo Panel QC và chọn các xét nghiệm thành viên trước, sau đó quay lại nhập Mean/SD theo nhóm lô.')}</div>`;
-  if(!state.qcLots.length)return manageToolbar('Mean/SD theo nhóm lô QC','Chọn Panel QC và nhóm lô để nhập Mean/SD hàng loạt.',"setManageTab('lots')",'Tạo lô QC')+`<div class="panel">${emptyState('Chưa có lô QC','Tạo lô QC trước, gom vào nhóm lô rồi quay lại nhập Mean/SD theo nhóm.')}</div>`;
-  if(!state.lotGroups.length)return manageToolbar('Mean/SD theo nhóm lô QC','Chọn Panel QC và nhóm lô để nhập Mean/SD hàng loạt.',"setManageTab('lots')",'Tạo nhóm lô')+`<div class="panel">${emptyState('Chưa có nhóm lô QC','Tạo nhóm lô từ các lô QC trước, sau đó quay lại nhập Mean/SD theo nhóm.')}</div>`;
+  if(!state.qcPanels.length)return manageToolbar('Mean/SD theo nhóm lô QC','Chỉ dùng Panel QC để nhập Mean/SD hàng loạt.',"setManageTab('panels')",'Thêm Panel QC')+`<div class="panel">${emptyState('Chưa có Panel QC','Tạo Panel QC và chọn các xét nghiệm thành viên trước, sau đó quay lại nhập Mean/SD theo nhóm lô.')}</div>`;
+  if(!state.qcLots.length)return manageToolbar('Mean/SD theo nhóm lô QC','Chọn Panel QC và nhóm lô để nhập Mean/SD hàng loạt.',"setManageTab('lots')",'Thêm lô QC')+`<div class="panel">${emptyState('Chưa có lô QC','Tạo lô QC trước, gom vào nhóm lô rồi quay lại nhập Mean/SD theo nhóm.')}</div>`;
+  if(!state.lotGroups.length)return manageToolbar('Mean/SD theo nhóm lô QC','Chọn Panel QC và nhóm lô để nhập Mean/SD hàng loạt.',"setManageTab('lots')",'Thêm nhóm lô')+`<div class="panel">${emptyState('Chưa có nhóm lô QC','Tạo nhóm lô từ các lô QC trước, sau đó quay lại nhập Mean/SD theo nhóm.')}</div>`;
   const group=state.lotGroups.find(x=>x.id===manageTargetGroup),groupLots=targetGroupLots(group),targetLevels=[...new Set(groupLots.map(l=>+l.level).filter(Number.isFinite))].sort((a,b)=>a-b);
   if(!targetLevels.map(String).includes(String(manageTargetLevel)))manageTargetLevel=targetLevels[0]!=null?String(targetLevels[0]):'';
   const selectedLevel=Number(manageTargetLevel),levelLots=groupLots.filter(l=>+l.level===selectedLevel),levelDepletedLots=levelLots.filter(l=>l.depleted),q=searchText(manageQ),allTests=targetPanelTests(),tests=allTests.filter(t=>!q||[t.name,testDisplayName(t),t.unit,t.method,t.reagent,t.section,instrumentName(t.instrumentId,t.machine),group&&group.name,...levelLots.map(l=>l.lotNo)].some(v=>searchText(v).includes(q)));
@@ -113,10 +113,10 @@ function manageTargets(){
   const rows=rowItems.map(({t,lot,linked,same,assigned,planned,cfg})=>{const draft=targetRangeDraft(cfg||{}),locked=!!lot.depleted,retiredTo=locked?lotTransitionToNo(lot.id):'',checked=locked?false:(!!linked||!assigned),disabled=locked||!checked;return `<div class="target-row${locked?' target-row-locked':''}" data-test="${t.id}" data-lot="${lot.id}"${locked?' data-locked="1"':''}>
     <label class="lot-assay-check"><input class="tm-use" type="checkbox" ${checked?'checked':''} ${locked?'disabled':''} onchange="toggleTargetRow(this)"><span></span></label>
     <div class="lot-assay-name"><b>${esc(testDisplayName(t))}</b><small>${esc(t.unit||'Chưa có đơn vị')}</small></div>
-    <input class="tm-mean" type="number" step="any" value="${escAttr(targetNumberText(draft.mean))}" placeholder="Trung bình" oninput="syncTargetRange(this,'target')" ${disabled?'disabled':''}>
-    <input class="tm-low" type="number" step="any" value="${escAttr(targetNumberText(draft.low))}" placeholder="Giới hạn dưới" oninput="syncTargetRange(this,'limits')" ${disabled?'disabled':''}>
-    <input class="tm-high" type="number" step="any" value="${escAttr(targetNumberText(draft.high))}" placeholder="Giới hạn trên" oninput="syncTargetRange(this,'limits')" ${disabled?'disabled':''}>
-    <input class="tm-sd" type="number" step="any" value="${escAttr(targetNumberText(draft.sd))}" placeholder="Độ lệch chuẩn" oninput="syncTargetRange(this,'target')" ${disabled?'disabled':''}>
+    <input class="tm-mean" type="number" step="any" value="${escAttr(targetNumberText(draft.mean,t))}" placeholder="Trung bình" oninput="syncTargetRange(this,'target')" ${disabled?'disabled':''}>
+    <input class="tm-low" type="number" step="any" value="${escAttr(targetNumberText(draft.low,t))}" placeholder="Giới hạn dưới" oninput="syncTargetRange(this,'limits')" ${disabled?'disabled':''}>
+    <input class="tm-high" type="number" step="any" value="${escAttr(targetNumberText(draft.high,t))}" placeholder="Giới hạn trên" oninput="syncTargetRange(this,'limits')" ${disabled?'disabled':''}>
+    <input class="tm-sd" type="number" step="any" value="${escAttr(targetNumberText(draft.sd,t,'stat'))}" placeholder="Độ lệch chuẩn" oninput="syncTargetRange(this,'target')" ${disabled?'disabled':''}>
     <span>${locked?`<b class="tag rej">${retiredTo?'Đã chuyển tiếp qua lô '+esc(retiredTo):'Đã chuyển tiếp'}</b>`:linked?'<b class="tag ok">Đã gán</b>':planned?'<b class="tag warn">Dự kiến</b>':assigned?`<b class="tag warn">Đang dùng ${esc(same.lot||'lô khác')}</b>`:'<b class="tag none">Chưa gán</b>'}</span>
   </div>`;}).join('');
   return manageToolbar('Mean/SD theo nhóm lô QC','Chọn Panel QC và nhóm lô, app tự đưa các xét nghiệm trong panel vào bảng Mean/SD.')+
@@ -209,8 +209,8 @@ function teaRefOpenAdd(){
       <div class="grid2"><div><label>Loại mẫu (matrix)</label><input id="trAddMatrix" placeholder="VD: Serum/Plasma"></div><div></div></div>
       <div class="grid2"><div><label>Đơn vị</label><input id="trAddUnit" placeholder="U/L"></div><div><label>Nhóm</label><input id="trAddSection" placeholder="Hóa sinh"></div></div>
       <div class="grid2"><div><label>TEa CLIA %</label><input id="trAddClia" type="number" step="any"></div><div><label>TEa Ricos %</label><input id="trAddRicos" type="number" step="any"></div></div>
-      <div class="hint" style="margin-top:8px">Mỗi xét nghiệm dùng một tên quốc tế duy nhất; viết tắt được hiển thị trong ngoặc. TEa chuẩn hóa được lập thành hồ sơ riêng sau khi thêm dòng.</div></div>
-    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn('Thêm','teaRefAddSubmit()','teal')}</div></div>`);
+      <div class="hint flow-item">Mỗi xét nghiệm dùng một tên quốc tế duy nhất; viết tắt được hiển thị trong ngoặc. TEa chuẩn hóa được lập thành hồ sơ riêng sau khi thêm dòng.</div></div>
+    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn('Thêm xét nghiệm','teaRefAddSubmit()','teal')}</div></div>`);
   setTimeout(()=>{const el=document.getElementById('trAddName');if(el)el.focus();},0);
 }
 async function teaRefAddSubmit(){
@@ -236,8 +236,8 @@ function teaLabProfileOpen(refKey){
     <div><label>Lý do lựa chọn <span class="req">*</span></label><textarea id="teaLabReason" class="tea-lab-reason" aria-label="Lý do lựa chọn TEa chuẩn hóa" rows="1" placeholder="Nêu lý do chọn nguồn và mức TEa này cho mục đích sử dụng của xét nghiệm...">${esc(meta.note||'')}</textarea></div>
     <div class="tea-lab-meta-grid tea-lab-meta-primary"><div><label>Ngày hiệu lực <span class="req">*</span></label>${dateBox('teaLabEffectiveDate',effective,'manage-date','aria-label="Ngày hiệu lực TEa chuẩn hóa"')}</div><div><label>Ngày xem xét lại</label>${dateBox('teaLabNextReviewDate',nextReview,'manage-date','aria-label="Ngày xem xét lại TEa chuẩn hóa"')}</div><div><label>Người xây dựng <span class="req">*</span></label><input id="teaLabPreparedBy" aria-label="Người xây dựng TEa chuẩn hóa" value="${escAttr(prepared)}"></div></div>
     <div class="tea-lab-meta-grid tea-lab-meta-approval"><div><label>Người phê duyệt <span class="req">*</span></label><input id="teaLabApprovedBy" aria-label="Người phê duyệt TEa chuẩn hóa" value="${escAttr(approved)}"></div><div><label>Ngày phê duyệt <span class="req">*</span></label>${dateBox('teaLabApprovedDate',approvedDate,'manage-date','aria-label="Ngày phê duyệt TEa chuẩn hóa"')}</div></div>`;
-  const remove=row&&row.lab!=null?btn('Xóa TEa chuẩn hóa',`teaLabProfileRemove('${escAttr(refKey)}')`,'danger'):'';
-  openModal(modalTemplate({title:'Hồ sơ TEa chuẩn hóa',body,footer:remove+btn('Hủy','closeModal()','ghost')+btn('Lưu hồ sơ',`teaLabProfileSave('${escAttr(refKey)}')`,'teal'),cls:'tea-lab-profile-modal'}));
+  const hasProfile=row&&row.lab!=null,remove=hasProfile?btn('Xóa TEa chuẩn hóa',`teaLabProfileRemove('${escAttr(refKey)}')`,'danger'):'';
+  openModal(modalTemplate({title:hasProfile?'Sửa hồ sơ TEa chuẩn hóa':'Thêm hồ sơ TEa chuẩn hóa',body,footer:remove+btn('Hủy','closeModal()','ghost')+btn(hasProfile?'Lưu thay đổi':'Thêm hồ sơ TEa',`teaLabProfileSave('${escAttr(refKey)}')`,'teal'),cls:'tea-lab-profile-modal'}));
   setTimeout(()=>{const e=document.getElementById('teaLabValue');if(e)e.focus();},0);
 }
 async function teaLabProfileSave(refKey){
@@ -261,7 +261,7 @@ function manageTeaRefs(){
     const act=!canManage?'':r.kind==='override'?btn('Khôi phục',`teaRefRemove('${escAttr(r.analyteId)}')`,'ghost sm','Khôi phục giá trị mặc định')
       :r.kind==='custom'?`<button class="x" onclick="teaRefRemove('${escAttr(r.analyteId)}')" title="Xóa xét nghiệm tự thêm">✕</button>`:'';
     const namingTitle=[r.standardName&&`Tên chuẩn: ${r.standardName}`,r.abbreviation&&`Viết tắt: ${r.abbreviation}`,r.matrix&&`Loại mẫu: ${r.matrix}`].filter(Boolean).join(' · ');
-    const labButton=canManage?btn(r.lab==null?'Thiết lập':'Hồ sơ',`teaLabProfileOpen('${escAttr(r.analyteId)}')`,'ghost sm',r.lab==null?'Lập hồ sơ TEa chuẩn hóa':'Xem hoặc cập nhật nguồn và lý do lựa chọn'):'';
+    const labButton=canManage?btn(r.lab==null?'Thêm hồ sơ':'Xem hồ sơ',`teaLabProfileOpen('${escAttr(r.analyteId)}')`,'ghost sm',r.lab==null?'Lập hồ sơ TEa chuẩn hóa':'Xem hoặc cập nhật nguồn và lý do lựa chọn'):'';
     return `<tr><td><b title="${escAttr(namingTitle)}">${esc(r.displayName||r.name)}</b></td><td>${esc(r.unit||'—')}</td><td>${esc(r.section||'—')}</td>
       <td><input class="tea-ref-value" ${ro} type="number" step="any" value="${r.clia==null?'':r.clia}" onchange="teaRefEdit('${escAttr(r.analyteId)}','clia',this.value)"></td>
       <td><input class="tea-ref-value" ${ro} type="number" step="any" value="${r.ricos==null?'':r.ricos}" onchange="teaRefEdit('${escAttr(r.analyteId)}','ricos',this.value)"></td>

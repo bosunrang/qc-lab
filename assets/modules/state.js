@@ -38,6 +38,7 @@ function ensureShape(opts={}){const previousSchema=Number(state&&state.schemaVer
   if(!state.westgardProfileVersion){state.westgardRules={...WG_DEFAULT};state.westgardProfileVersion=2;}
   ensureLabBrandShape();
   ensureConfigurationShape();
+  repairAppliedRangeLimits();
   if(typeof ReagentComparisonService!=='undefined')ReagentComparisonService.ensureOne(state,{id:uid()});
   reconcileSigmaLevelsWithLotGroups();
   /* sigma.js load sau state.js nên chưa định nghĩa lúc parse — nhưng ensureShape()
@@ -73,6 +74,10 @@ function pruneUnusedTestLevels(){
   });
   return pruned;
 }
+/* Các bản trước chỉ đổi Mean/SD khi áp dụng dải PXN nhưng để low/high của NSX
+   trong cấu hình đang chạy. Tự chữa cả state cũ ở mọi cổng load/merge/import;
+   chỉ chạm mức `applied:lab`, không thay giới hạn NSX hoặc cấu hình thủ công khác. */
+function repairAppliedRangeLimits(){let repaired=0;(state.tests||[]).forEach(t=>(t.levels||[]).forEach(l=>{if(l.applied!=='lab')return;const next=QCCore.limitsFromTarget(l.mean,l.sd,2);if(!next)return;if(l.low!==next.low||l.high!==next.high||l.rangeK!==2){l.low=next.low;l.high=next.high;l.rangeK=2;repaired++;}}));return repaired;}
 function uid(){return Math.random().toString(36).slice(2,9);}
 /* Đồng bộ mức Sigma với quan hệ lô ↔ nhóm lô. Nhóm "Đã dừng/Dự kiến" vẫn được tính
    là còn quan hệ để giữ lịch sử; chỉ mức có lô đã bị tháo khỏi MỌI nhóm mới bị gỡ.

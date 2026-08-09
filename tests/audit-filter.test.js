@@ -62,6 +62,7 @@ assert.match(firstPage, /class="audit-table-wrap"/);
 assert.match(firstPage, /Hiển thị 1–25 \/ 30 dòng/);
 assert.match(firstPage, /Trang 1\/2/);
 assert.match(firstPage, /Lưu trữ nhật ký cũ/, 'Trang nhật ký phải có nút lưu trữ nhật ký cũ');
+assert.doesNotMatch(firstPage, /Xóa nhật ký/, 'Nhật ký chỉ được lưu trữ có kiểm chứng, không được xóa trắng trong app');
 
 run(ctx, 'auditPage=2;');
 const secondPage = run(ctx, 'pageAudit()');

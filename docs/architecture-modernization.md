@@ -139,6 +139,33 @@ trúc modular nhưng xuất thành classic script; chỉ xem xét lại ESM khi 
 có thể bundle thành tài nguyên tương thích, hoặc ứng dụng trở thành HTTP/Electron
 only.
 
+### Tiếp tục bằng artifact bundler tương thích (2026-08-09)
+
+Điều kiện của quyết định trên đã được đáp ứng: nguồn TypeScript/ES Modules được
+Vite bundle thành một IIFE classic tại `assets/generated/modular-pilot.js`.
+`index.html` không dùng native `import()` nên vẫn hoạt động qua static HTTP,
+Electron và `file://`. `ReagentComparisonService` hiện nằm trong
+`src/application/reagent/`, nhận `cleanText`/`cleanId` qua dependency injection;
+adapter compatibility là nơi duy nhất nối service với `QCCore` toàn cục.
+`EntryService` cũng đã chuyển sang `src/application/entry/`; quy tắc khóa kỳ và
+độ chính xác số được truyền vào factory qua adapter, thay vì service đọc
+`PeriodService` hoặc `qcValueDecimals` từ shared global scope.
+`ManageConfigService` đã chuyển sang `src/application/manage/`, giữ nghiệp vụ
+máy/xét nghiệm độc lập với DOM, audit và persistence; `QCCore.cleanText` cùng
+`QCCore.cleanId` chỉ được nối tại adapter compatibility.
+`PeriodService` đã chuyển sang `src/application/period/` và được adapter khởi tạo
+trước `EntryService`; các caller khóa/mở kỳ vẫn dùng API tương thích cũ trong lúc
+nguồn đã có dependency và kiểu dữ liệu rõ ràng.
+Phần cảnh báo trước khi lưu của `qc-rules.js` đã thành hàm thuần tại
+`src/domain/qc/qc-point-warnings.ts`: danh sách điểm được truyền vào rõ ràng, còn
+adapter mới đọc `state.data`. Registry và ngữ nghĩa Westgard vẫn chỉ ở `core.js`.
+Sáu file `*-ui-state.js` đã được thay bằng `src/presentation/state/ui-state.ts`.
+Một installer có kiểu dữ liệu duy trì cả namespace bag và global accessor cũ;
+`localStorage` của khóa đăng nhập chỉ được đọc tại compatibility adapter.
+`LISClientService` đã chuyển sang `src/application/lis/`: phần đồng bộ, timeout,
+polling và nhập điểm không tự đọc DOM hay storage. Modal/cấu hình LIS được giữ ở
+`assets/modules/lis-queue-ui.js` như một lớp presentation riêng.
+
 ## Điều không làm trong lộ trình này
 
 - Không viết lại React/Vue/Svelte.

@@ -195,7 +195,7 @@ function pageSettings(){
      <div class="firebase-auth-grid"><div><label>Mã phòng</label><input id="fbCode" aria-label="Mã phòng" value="${escAttr(fbcfg.labCode||'khoaXN')}" ${lockedCloud?'readonly':''}></div>
        <div><label>Email Firebase Authentication</label><input id="fbEmail" aria-label="Email Firebase Authentication" type="email" autocomplete="username" value="${escAttr(fbcfg.email||'')}"></div>
        <div><label>Mật khẩu Firebase</label><input id="fbPassword" type="password" autocomplete="current-password" placeholder="Chỉ dùng để đăng nhập, không lưu"></div></div>
-     ${lockedCloud?`<div class="hint" style="margin-top:6px">Bản deploy này khóa sẵn <code>${esc(fbDataPath())}</code>. Muốn đổi mã phòng cần sửa <code>assets/modules/app-meta.js</code>.</div>`:''}
+     ${lockedCloud?`<div class="hint flow-note">Bản deploy này khóa sẵn <code>${esc(fbDataPath())}</code>. Muốn đổi mã phòng cần sửa <code>assets/modules/app-meta.js</code>.</div>`:''}
      <label>Firebase config (dán nguyên đoạn từ tab Config của Firebase console)</label>
      <textarea id="fbConfig" class="firebase-config-input" ${lockedCloud?'readonly':''} placeholder='const firebaseConfig = {
   apiKey: "...",

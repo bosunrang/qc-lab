@@ -8,7 +8,7 @@
 const assert = require('node:assert/strict');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
-const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/reagent-ui-state.js', 'modules/reagent.js']);
+const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js', 'modules/state.js', 'modules/reagent.js']);
 // esc()/escAttr() normally come from reports.js (not loaded here) — stub a plain
 // passthrough since Case 6 below only checks for a literal template-placeholder bug,
 // not HTML-escaping behavior.

@@ -42,7 +42,7 @@ for(const label of ['Phiếu NCE NCE-20260729-DIG4','Kiểm soát và xử lý t
 for(const evidence of ['SOP-QC-07','Kim hút có bọt khí','QC chạy lại được chấp nhận','Không tái diễn trong 10 lần chạy','Đủ bằng chứng'])assert.match(detail,new RegExp(evidence));
 assert.match(detail,/Căn cứ SOP<\/span><b>SOP-QC-07[^<]*<\/b><\/div>/,'căn cứ SOP phải nằm trong một ô riêng');
 assert.equal((detail.match(/class="nce-detail-wide"/g)||[]).length,2,'hai hàng lẻ phải trải hết chiều ngang thay vì để trống nửa hàng');
-assert.match(detail,/<colgroup><col style="width:30%"><col style="width:22%"><col style="width:48%"><\/colgroup>/,'checklist phải khóa tỷ lệ ba cột');
+assert.match(detail,/<colgroup><col class="nce-check-item-col"><col class="nce-check-result-col"><col class="nce-check-note-col"><\/colgroup>/,'checklist phải dùng class khóa tỷ lệ ba cột');
 
 const appendix=run(ctx,'reportNceAppendixHtml([reportAction],reportTest)');
 assert.match(appendix,/Phụ lục - Hồ sơ NCE chi tiết/);
@@ -62,6 +62,7 @@ for(const[,statusText,noteText]of model.checks){assert.ok(detail.includes(status
 
 const routeSource=fs.readFileSync(path.join(__dirname,'..','assets','modules','report-routes.js'),'utf8');
 const reportSource=fs.readFileSync(path.join(__dirname,'..','assets','modules','reports.js'),'utf8');
+assert.match(reportSource,/\.nce-check-item-col\{width:30%\}\.nce-check-result-col\{width:22%\}\.nce-check-note-col\{width:48%\}/,'stylesheet bản in phải giữ đúng tỷ lệ ba cột checklist');
 assert.match(routeSource,/id="reportNceAppendix"[^>]*checked/,'trang báo cáo phải có tùy chọn phụ lục bật sẵn');
 assert.match(reportSource,/acts\.length&&includeNceAppendix/,'phụ lục chỉ được thêm khi có NCE và người dùng bật tùy chọn');
 assert.match(reportSource,/\.nce-detail-stack\{display:grid;gap:7px;break-inside:avoid\}/,'mục 1 và 4 phải có khoảng lưới 7px và không bị tách hai hàng qua trang');

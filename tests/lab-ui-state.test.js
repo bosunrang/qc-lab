@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
 {
-  const ctx = loadSandbox(['modules/sigma-ui-state.js']);
+  const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js']);
   run(ctx, "sgTest='T1'; sgBiasCtx={eid:'E1',level:1,rounds:[]};");
   assert.equal(ctx.SigmaUIState.sgTest, 'T1');
   assert.equal(ctx.SigmaUIState.sgBiasCtx.eid, 'E1');
@@ -11,7 +11,7 @@ const { loadSandbox, run } = require('./helpers/sandbox');
 }
 
 {
-  const ctx = loadSandbox(['modules/reagent-ui-state.js']);
+  const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js']);
   run(ctx, "rcId='R1'; rcQuickType='operator'; rcModalQ='glucose';");
   assert.equal(ctx.ReagentUIState.rcId, 'R1');
   assert.equal(ctx.ReagentUIState.rcQuickType, 'operator');

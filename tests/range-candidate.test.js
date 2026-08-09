@@ -29,6 +29,18 @@ assert.match(entryCss, /\.range-workflow-comparison th:nth-child\(n\+2\),\.range
 assert.match(entryCss, /\.range-workflow-comparison col:nth-child\(1\)\{width:24%\}/, 'cột Dải phải nhường chiều rộng cho khoảng ±2SD');
 assert.match(entryCss, /\.range-workflow-comparison col:nth-child\(5\)\{width:28%\}/, 'cột ±2SD phải đủ rộng để giữ khoảng giá trị trên một hàng');
 assert.match(entryCss, /\.range-workflow-comparison th:nth-child\(5\),\.range-workflow-comparison td:nth-child\(5\)\{white-space:nowrap\}/, 'khoảng ±2SD không được xuống hàng');
+const appliedTarget = JSON.parse(JSON.stringify(run(ctx, `(function(){const l={mean:135,sd:2.5,low:130,high:140,rangeK:2,applied:'mfg'};assignRangeTarget(l,140.053846154,0.54379086239,'lab');return l;})()`)));
+assert.equal(appliedTarget.mean,140.053846154);
+assert.equal(appliedTarget.sd,0.54379086239);
+assert.equal(appliedTarget.low,140.053846154-2*0.54379086239,'áp dụng dải PXN phải tính lại giới hạn dưới theo Mean − 2SD');
+assert.equal(appliedTarget.high,140.053846154+2*0.54379086239,'áp dụng dải PXN phải tính lại giới hạn trên theo Mean + 2SD');
+assert.equal(appliedTarget.applied,'lab');
+const restoredTarget = JSON.parse(JSON.stringify(run(ctx, `(function(){const l={mean:140.05,sd:0.54,low:138.97,high:141.13,rangeK:2,applied:'lab'};assignRangeTarget(l,140,2.5,'mfg');return l;})()`)));
+assert.deepEqual(restoredTarget,{mean:140,sd:2.5,low:135,high:145,rangeK:2,applied:'mfg'},'hoàn về NSX phải khôi phục đồng bộ cả Mean/SD và hai giới hạn');
+const repairedLegacy = JSON.parse(JSON.stringify(run(ctx, `(function(){state.tests=[{id:'T-OLD',levels:[{level:1,mean:140.053846154,sd:0.54379086239,low:135,high:145,rangeK:2,applied:'lab'}]}];const count=repairAppliedRangeLimits();return{count,level:state.tests[0].levels[0]};})()`)));
+assert.equal(repairedLegacy.count,1,'dải PXN đã áp dụng từ bản cũ phải được phát hiện');
+assert.equal(repairedLegacy.level.low,repairedLegacy.level.mean-2*repairedLegacy.level.sd,'state cũ phải tự sửa giới hạn dưới khi tải');
+assert.equal(repairedLegacy.level.high,repairedLegacy.level.mean+2*repairedLegacy.level.sd,'state cũ phải tự sửa giới hạn trên khi tải');
 run(ctx, 'function __setState(s){state=s;clearDerived();}');
 
 /* Chỉ bật 1-2s (cảnh báo) và 1-3s (loại): hai luật đơn điểm, không có luật chuỗi nào

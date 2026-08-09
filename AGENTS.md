@@ -227,6 +227,15 @@ it runs under `xvfb-run`, see the CI job):
   between "Sự cố cần xử lý" and "Hồ sơ NCE đang mở". Each area was proven
   discriminating by reintroducing the original bug and watching the matching
   checks fail.
+- `scripts/ui-workflow-check.js` (`npm run ui-check`) is the browser-level
+  record-mutation smoke gate. It crosses the real DOM, route handlers, state,
+  persistence scheduling and hash-chained audit for four workflows that vm
+  service tests cannot prove end to end: enter then void a QC point, add/edit
+  instruments and assays (including decimal/CUSUM fields), lock/unlock a report
+  period through password re-authentication, and restore a checked backup after
+  the automatic pre-change download. Keep it in the `visual-and-a11y` CI job;
+  adding a new high-impact UI mutation path means extending this script or an
+  equally real browser workflow, not merely source-scanning its button text.
 - `scripts/print-check.js` covers the DESKTOP print-to-PDF pipeline that
   nothing else in the repo can see: it boots the real app in Electron, opens
   the real print window via `printWestgard()` → `openPrint()`, drives the same
@@ -461,7 +470,7 @@ the Google Fonts link, offline labs must print with correct metrics.
   backup bookkeeping); using it after a data change leaves stale Westgard
   results on screen. `{cloud:false}` skips the Firebase push and the `_ts` bump.
 - `qc-rules.js`, `period-service.js`, `sigma-cohort-service.js`, `entry-service.js`,
-  `reagent-comparison-service.js`, `action-workflow-service.js` — smaller service-style modules (some
+  `reagent-comparison-service.js`, `manage-config-service.js`, `action-workflow-service.js` — smaller service-style modules (some
   IIFE-wrapped) layered on `state`/`qc-domain`. `PeriodService` locks/unlocks
   reporting periods (`state.periodLocks`, a synced list branch); `entry-service.js`
   enforces the lock (blocks add/edit/void once a period is locked), and the
@@ -482,6 +491,10 @@ the Google Fonts link, offline labs must print with correct metrics.
   cancelling must leave no trace. `tests/locked-period-guards.test.js` pins both,
   and was verified to fail when either guard is removed. Adding another bulk
   path over `state.data` means adding the same question.
+  `ManageConfigService` owns the DOM-free validation and state mutation for
+  instruments and assays. Keep confirmation, re-authentication, audit logging,
+  persistence and rendering in `manage-tests-actions.js`; do not move those UI
+  side effects into the service.
   `EntryService` normalizes QC-point input
   (`preparePointInput`/`addPoint`/`voidPoint`/`recordPoint`) and builds the
   entry sheet/window data; called from `router-render.js`.
@@ -516,7 +529,13 @@ the Google Fonts link, offline labs must print with correct metrics.
 - `audit.js` — tamper-evident audit log: `logAct()` appends hash-chained
   entries using a synchronous pure-JS SHA-256 (`auditSha256`) over a canonical
   JSON form; `auditVerifyChain()` validates the chain. Not for passwords —
-  those use PBKDF2 in `users-auth.js`. Retention: cutting old rows (the admin
+  those use PBKDF2 in `users-auth.js`. `core.js` also exposes the pure
+  `verifyAuditChain()` ingress gate: backup import and both directions of
+  Firebase sync MUST validate each source chain before merge/relink, otherwise
+  re-hashing the merged array can hide a broken source payload. A failed cloud
+  check disconnects sync and preserves local state; a failed backup check
+  rejects the import. The app deliberately has no "delete all audit" action;
+  admins may only use the verified archive flow below. Retention: cutting old rows (the admin
   "Lưu trữ nhật ký cũ" flow in `users-auth.js`, or `auditRotateOverflow()` past
   `ACTIVITY_HARD_CAP`) removes a **prefix** and records the removed segment's
   tip hash in `state.activityAnchor`; `auditVerifyChain()`/`auditRelinkChain()`
@@ -527,7 +546,7 @@ the Google Fonts link, offline labs must print with correct metrics.
   the live chain. The anchor keeps the cut O(1) and keeps the archive CSV
   cryptographically continuous with what remains. The anchor is only meaningful
   while the log is non-empty — `auditPushRaw()` clears it when appending to an
-  empty list, so every path that rebuilds the log (clear, backup import, reset)
+  empty list, so every path that rebuilds the log (backup import, reset)
   is covered without remembering to. `activityAnchor` is in `FB_TOP` because a
   machine that pulls a cut log without the anchor would report a false "audit
   bị sửa". `pageAudit()` no longer verifies on every render (paging/filtering
@@ -641,10 +660,11 @@ the Google Fonts link, offline labs must print with correct metrics.
   drop that upgrade path. It also exports `reauthenticateCurrentUser({title,
   message})` — a password re-prompt gating the app's *critical* operations
   (approving/returning a corrective action, locking/unlocking a reporting
-  period, writing or reverting a lot's Mean/SD, concluding a lot transition);
+  period, writing or reverting a lot's Mean/SD, concluding a lot transition,
+  replacing data from backup, resetting all data, deleting a test with QC data);
   wire any new operation of that weight the same way, `await`-ing it before
   mutating state. `backup-service.js` (split out of `data-io.js` on
-  2026-07-24) rejects imports over `BACKUP_IMPORT_MAX_BYTES` (64 MB) before
+  2026-07-24) rejects imports over `BACKUP_IMPORT_MAX_BYTES` (128 MB) before
   parsing. `reagent.js` implements its regression stats
   (Passing-Bablok, Deming/OLS, Bland-Altman, plus a from-scratch incomplete-beta
   t-distribution for CIs) by hand, no stats library — pure like `core.js` but
@@ -707,6 +727,15 @@ or reordering selectors, not just the one file you're editing.
 aliases built on them; when a new color is needed, add a primitive and alias
 it — don't scatter one-off hex values through the page stylesheets.
 
+Khoảng cách giao diện cũng dùng một thang duy nhất trong `tokens.css`
+(`--space-2xs` đến `--space-2xl`) cùng các alias theo component:
+`--panel-inline-padding`, `--modal-inline-padding`,
+`--table-cell-*-padding`. HTML dựng từ JavaScript dùng các class `flow-*`,
+`space-after-*`, `.field-error` và `.sr-only`; không thêm lại
+`style="margin-top:...px"`/`style="margin-bottom:...px"` cho bố cục tĩnh.
+`tests/spacing-tokens.test.js` khóa quy tắc này; chỉ HTML in độc lập trong
+`reports.js` được loại trừ vì cửa sổ in không tải stylesheet của ứng dụng.
+
 `--panel-content-gap` (`14px`) là nguồn duy nhất cho khoảng cách dọc từ
 viền dưới header đến nội dung đầu tiên của mọi panel/card/bảng và modal. Không
 hard-code `padding-top`/`margin-top` riêng cho quan hệ này trong stylesheet theo
@@ -715,7 +744,8 @@ một popup đặc biệt buộc `.modal-b` có `padding-top:0` (như hướng d
 tử nội dung đầu tiên phải tự dùng đúng `var(--panel-content-gap)`. Quy tắc này
 chỉ áp dụng cho khoảng cách **header → nội dung đầu tiên**; khoảng cách nội bộ
 giữa các trường/nhóm vẫn dùng token phù hợp với ngữ nghĩa riêng.
-`tests/ui-accessibility.test.js` khóa cả token, modal mặc định và ngoại lệ này.
+`tests/ui-accessibility.test.js` và `tests/spacing-tokens.test.js` khóa cả
+token, modal mặc định và ngoại lệ này.
 
 ### Storage and sync model
 

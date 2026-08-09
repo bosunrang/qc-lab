@@ -30,7 +30,7 @@ async function cancelAction(i){
       <div class="alert warn action-cancel-warning"><b>Hồ sơ sẽ không bị xóa.</b><div>Nội dung, người lập và toàn bộ bằng chứng vẫn được giữ để truy xuất. Nếu hồ sơ gắn với vi phạm QC, sự cố đó sẽ xuất hiện lại để lập hồ sơ mới.</div></div>
       <label>Lý do hủy (tối thiểu 5 ký tự)</label>
       <textarea id="actionCancelReason" placeholder="VD: Mở nhầm cho sai điểm QC; lập lại hồ sơ đúng đối tượng..." oninput="document.getElementById('actionCancelErr').style.display='none'"></textarea>
-      <div id="actionCancelErr" class="hint" style="color:var(--red);display:none;margin-top:6px">Cần nhập lý do hủy tối thiểu 5 ký tự.</div>
+      <div id="actionCancelErr" class="hint field-error">Cần nhập lý do hủy tối thiểu 5 ký tự.</div>
     `,footer:btn('Đóng','closeModal()','ghost')+btn('Hủy hồ sơ',`confirmCancelAction('${jsq(current.id)}','${jsq(token)}')`,'danger')}));
   setTimeout(()=>{const e=document.getElementById('actionCancelReason');if(e)e.focus();},50);
 }
@@ -67,7 +67,7 @@ async function approveAction(i){
   openModal(modalTemplate({title:'Duyệt hành động khắc phục',body:`
       <label>Ý kiến duyệt (tối thiểu 3 ký tự)</label>
       <textarea id="actionNoteInput" placeholder="Nhận xét về hành động khắc phục..." oninput="document.getElementById('actionNoteErr').style.display='none'"></textarea>
-      <div id="actionNoteErr" class="hint" style="color:var(--red);display:none;margin-top:6px">Cần nhập ý kiến duyệt tối thiểu 3 ký tự.</div>
+      <div id="actionNoteErr" class="hint field-error">Cần nhập ý kiến duyệt tối thiểu 3 ký tự.</div>
     `,footer:btn('Đóng','closeModal()','ghost')+btn('Duyệt',`confirmApproveAction('${jsq(current.id)}','${jsq(token)}')`,'teal')}));
   setTimeout(()=>{const e=document.getElementById('actionNoteInput');if(e)e.focus();},50);
 }
@@ -102,7 +102,7 @@ async function returnAction(i){
   openModal(modalTemplate({title:'Trả lại hành động khắc phục',body:`
       <label>Lý do trả lại (tối thiểu 3 ký tự)</label>
       <textarea id="actionNoteInput" placeholder="Vì sao trả lại hành động khắc phục này..." oninput="document.getElementById('actionNoteErr').style.display='none'"></textarea>
-      <div id="actionNoteErr" class="hint" style="color:var(--red);display:none;margin-top:6px">Cần nhập lý do tối thiểu 3 ký tự.</div>
+      <div id="actionNoteErr" class="hint field-error">Cần nhập lý do tối thiểu 3 ký tự.</div>
     `,footer:btn('Đóng','closeModal()','ghost')+btn('Trả lại',`confirmReturnAction('${jsq(current.id)}','${jsq(token)}')`,'danger')}));
   setTimeout(()=>{const e=document.getElementById('actionNoteInput');if(e)e.focus();},50);
 }
@@ -157,7 +157,7 @@ async function reopenAction(i){
       <div class="alert warn">Hồ sơ đã duyệt nhưng điều kiện khép vòng không còn đúng: ${esc(actionWorkflowStatus(a).label)}.</div>
       <label>Lý do mở lại (tối thiểu 5 ký tự)</label>
       <textarea id="actionNoteInput" placeholder="VD: Điểm QC dùng làm bằng chứng chạy lại đã bị hủy..." oninput="document.getElementById('actionNoteErr').style.display='none'"></textarea>
-      <div id="actionNoteErr" class="hint" style="color:var(--red);display:none;margin-top:6px">Cần nhập lý do tối thiểu 5 ký tự.</div>
+      <div id="actionNoteErr" class="hint field-error">Cần nhập lý do tối thiểu 5 ký tự.</div>
     `,footer:btn('Đóng','closeModal()','ghost')+btn('Mở lại hồ sơ',`confirmReopenAction(${i})`,'danger')}));
   setTimeout(()=>{const e=document.getElementById('actionNoteInput');if(e)e.focus();},50);
 }

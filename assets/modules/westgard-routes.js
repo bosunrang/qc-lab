@@ -50,7 +50,7 @@ function wgRowsControl(view,key){
   return `<div class="wg-row-window"><span>Đang hiển thị ${view.rows.length}/${view.total} điểm${view.expanded?'':' mới nhất'}</span>${btn(view.expanded?`Thu gọn còn ${WG_TABLE_INITIAL_ROWS} điểm`:`Xem toàn bộ ${view.total} điểm`,`wgToggleRows('${jsq(key)}')`,'ghost sm')}</div>`;
 }
 function wgPointRowsHtml(rows,t){return rows.map(row=>{const lv=qcVerdictLabel(row.level),err=row.rules.length?errorTypeDetailParts(row.rules):null,errHtml=err?`<div class="wg-error-type"><b>${esc(err.type)}</b>${err.desc?`<small>${esc(err.desc)}</small>`:''}</div>`:'—',support=(row.supportRules||[]).map(r=>`<span class="pill" title="Điểm lịch sử cấu thành quy tắc, không bị loại hồi tố">${icoRefArrow()} ${r}</span>`).join('');
-  return `<tr><td>${row.index}</td><td>${vnDate(row.date)}</td><td class="num">${fmtTestValue(t,row.value)}</td><td class="num">${Number.isFinite(row.z)?(row.z>=0?'+':'')+fmt(row.z)+'s':'—'}</td><td><span class="tag ${row.level}">${lv}</span></td><td>${row.rules.map(r=>`<span class="pill">${r}</span>`).join('')||support||'—'}${row.rules.length&&support?`<div class="hint" style="margin-top:4px">Bằng chứng: ${support}</div>`:''}</td><td class="hint">${errHtml}</td></tr>`;}).join('');}
+  return `<tr><td>${row.index}</td><td>${vnDate(row.date)}</td><td class="num">${fmtTestValue(t,row.value)}</td><td class="num">${Number.isFinite(row.z)?(row.z>=0?'+':'')+fmt(row.z)+'s':'—'}</td><td><span class="tag ${row.level}">${lv}</span></td><td>${row.rules.map(r=>`<span class="pill">${r}</span>`).join('')||support||'—'}${row.rules.length&&support?`<div class="hint flow-tight">Bằng chứng: ${support}</div>`:''}</td><td class="hint">${errHtml}</td></tr>`;}).join('');}
 /* Một khối Westgard cho MỘT lô (đang dùng, đã chuyển tiếp, hoặc thuộc nhóm lô đã dừng/lưu
    trữ) — dùng chung cho cả "Xem lô cũ" (theo dòng đời của 1 xét nghiệm) và màn hình duyệt
    theo nhóm lô cũ. Chỉ bảng số liệu, không vẽ biểu đồ riêng từng mức — biểu đồ tổng hợp
@@ -113,7 +113,7 @@ function pageWestgardArchived(archivedGroups){
   return headOnly('Phân tích Westgard','Xem lại Westgard theo nhóm lô đã dừng/lưu trữ')+
    `<div class="panel"><h2 class="panel-title">Thiết lập phân tích</h2>${wgViewModeTabs(archivedGroups)}
      <div class="wg-test-picker wg-test-picker-3">${searchBox}${testPicker}${groupPicker}</div>
-     <div class="hint" style="margin-top:8px">Đánh giá dưới đây dùng bộ luật Westgard đang bật hiện nay, không phải cấu hình luật tại thời điểm nhóm lô này còn hoạt động.</div></div>${multiChart}${blocks}`;
+     <div class="hint flow-item">Đánh giá dưới đây dùng bộ luật Westgard đang bật hiện nay, không phải cấu hình luật tại thời điểm nhóm lô này còn hoạt động.</div></div>${multiChart}${blocks}`;
 }
 function pageWestgard(){
   const tests=operationalTests(),archivedGroups=wgArchivedGroups();
@@ -148,7 +148,7 @@ function pageWestgard(){
   const exportActions=wgChartMode==='lj'?'<div><label>&nbsp;</label><div class="wg-export-actions">'+btn(icoDownload()+'Xuất Excel','exportWestgardXLSX()','teal wg-excel-btn','Xuất Excel biểu đồ Levey-Jennings, các vi phạm và điểm bằng chứng đang xem')+btn(icoPrint()+'In PDF','printWestgard()','teal wg-print-btn','Tạo bản in PDF/HTML biểu đồ Levey-Jennings và các vi phạm đang xem')+'</div></div>':'';
   return headOnly('Phân tích Westgard','Đối chiếu luật theo mức QC, lô và lần chạy')+
    `<div class="panel"><h2 class="panel-title">Thiết lập phân tích</h2>${wgViewModeTabs(archivedGroups)}<div class="wg-test-picker${exportActions?' wg-test-picker-3':''}"><div><label>Tìm nhanh</label><input id="wgTestSearch" type="search" placeholder="Tên xét nghiệm, LOT hoặc máy..." value="${escAttr(wgTestQ)}" oninput="wgFilterTests(this.value)"></div><div><label>Chọn xét nghiệm <span id="wgTestCount" class="hint">(${matched.length}/${tests.length})</span></label><select id="wgTestSelect" aria-label="Chọn xét nghiệm" ${matched.length?'':'disabled'} onchange="if(this.value){selTest=this.value;rerender()}">${opts}</select></div>${exportActions}</div>
-     <div class="wg-rules"><b style="font-size:var(--type-meta)">Cấu hình chung của luật</b><div style="margin-top:6px">${ruleToggles}</div></div>
+     <div class="wg-rules"><b style="font-size:var(--type-meta)">Cấu hình chung của luật</b><div class="flow-note">${ruleToggles}</div></div>
      ${ruleGuide}${wgChartModeTabs()}</div>${wgChartMode==='cusum'?pageWestgardCusum(t):multiChart+blocks}`;
 }
 function wgFilterTests(v){

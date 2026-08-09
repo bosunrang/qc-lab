@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
-const ctx = loadSandbox(['core.js', 'modules/period-service.js', 'modules/entry-service.js']);
+const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js']);
 
 assert.equal(ctx.PeriodService.normalizePeriod('2026-7'), '2026-07');
 assert.equal(ctx.PeriodService.normalizePeriod('2026-13'), '');

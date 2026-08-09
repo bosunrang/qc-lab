@@ -391,7 +391,7 @@ async function voidQcPoint(tid,pointId){
       <div class="void-nce-choice"><label><input id="voidOpenNce" type="checkbox" checked disabled> Lập hồ sơ NCE và yêu cầu chạy lại QC</label><div id="voidNceHint" class="hint">Hệ thống sẽ mở hoặc tái sử dụng hồ sơ NCE và chờ một kết quả QC chạy lại được chấp nhận.</div></div>
       <div id="voidReasonBox"><label id="voidReasonLabel">Ghi chú / bằng chứng (khuyến nghị)</label>
         <textarea id="voidReasonInput" aria-label="Ghi chú lý do hủy điểm QC" placeholder="VD: Máy báo lỗi hút mẫu lúc 08:15, đã ghi nhận trong sổ bảo trì..." oninput="document.getElementById('voidReasonErr').style.display='none'"></textarea>
-        <div id="voidReasonErr" class="hint" style="color:var(--red);display:none;margin-top:6px">Cần ghi lý do hủy tối thiểu 5 ký tự.</div>
+        <div id="voidReasonErr" class="hint field-error">Cần ghi lý do hủy tối thiểu 5 ký tự.</div>
       </div>
     </div>
     <div class="modal-f">${btn('Đóng','closeModal()','ghost')}${btn('Xác nhận hủy',`confirmVoidQcPoint('${tid}','${pointId}')`,'danger')}</div>

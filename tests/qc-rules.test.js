@@ -1,5 +1,5 @@
 /**
- * Regression test: qcPointWarnings() (assets/modules/qc-rules.js) did not warn when
+ * Regression test: qcPointWarnings() (TypeScript modular artifact) did not warn when
  * backfilling a QC value for a date that actually falls within a DIFFERENT lot's
  * effective period.
  *
@@ -20,7 +20,7 @@
 const assert = require('node:assert/strict');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
-const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'modules/qc-rules.js']);
+const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'generated/modular-pilot.js']);
 const plain = (v) => JSON.parse(JSON.stringify(v));
 
 function isoOffset(days) {

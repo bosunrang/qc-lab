@@ -11,7 +11,7 @@ function setTargetGroup(id){manageTargetGroup=id;rerender();}
 function setTargetLevel(level){manageTargetLevel=String(level||'');rerender();}
 function setHistoryTest(id){manageHistoryTest=id;rerender();}
 function openTargetMatrix(panelId='',groupId=''){if(panelId)manageTargetPanel=panelId;if(groupId)manageTargetGroup=groupId;setManageTab('targets');}
-function targetNumberText(value){return value!=null&&String(value).trim()!==''&&Number.isFinite(Number(value))?String(Number(Number(value).toPrecision(12))):'';}
+function targetNumberText(value,test=null,kind='value'){if(value==null||String(value).trim()===''||!Number.isFinite(Number(value)))return'';const digits=test?(kind==='stat'?testStatDecimals(test):testDecimalPlaces(test)):QC_DECIMALS_DEFAULT;return Number(value).toFixed(digits).replace(/(?:\.0+|(\.\d+?)0+)$/,'$1');}
 function targetConfigAssigned(cfg){
   return !!(cfg&&(cfg.qcLotId||cfg.lot||(Array.isArray(cfg.meanSdHistory)&&cfg.meanSdHistory.length)));
 }
@@ -25,11 +25,12 @@ function targetRangeDraft(cfg={}){
 }
 function syncTargetRange(el,source){
   const row=el.closest('.target-row');if(!row)return;
+  const test=state.tests.find(x=>x.id===row.dataset.test)||null;
   const get=selector=>{const value=row.querySelector(selector).value.trim();return value===''?NaN:Number(value);};
   const result=source==='limits'?QCCore.targetFromLimits(get('.tm-low'),get('.tm-high')):QCCore.limitsFromTarget(get('.tm-mean'),get('.tm-sd'));
   if(!result)return;
-  if(source==='limits'){row.querySelector('.tm-mean').value=targetNumberText(result.mean);row.querySelector('.tm-sd').value=targetNumberText(result.sd);}
-  else{row.querySelector('.tm-low').value=targetNumberText(result.low);row.querySelector('.tm-high').value=targetNumberText(result.high);}
+  if(source==='limits'){row.querySelector('.tm-mean').value=targetNumberText(result.mean,test);row.querySelector('.tm-sd').value=targetNumberText(result.sd,test,'stat');}
+  else{row.querySelector('.tm-low').value=targetNumberText(result.low,test);row.querySelector('.tm-high').value=targetNumberText(result.high,test);}
 }
 function toggleTargetRow(el){const row=el.closest('.target-row');row.querySelectorAll('.tm-mean,.tm-low,.tm-high,.tm-sd').forEach(x=>x.disabled=!el.checked);if(el.checked){const mean=row.querySelector('.tm-mean');if(!mean.value)mean.focus();}}
 function targetCheckAll(on){document.querySelectorAll('.tm-use').forEach(box=>{box.checked=!!on;toggleTargetRow(box);});}
@@ -131,8 +132,8 @@ function openTargetSwitchModal(){
     <div class="modal-h"><h3>Áp dụng nhóm lô ${esc(group.name)}?</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
     <div class="modal-b">
       <div class="hint">${overwrites.length} dòng (${esc(names)}) hiện đang dùng một nhóm lô khác. Chọn cách áp dụng Mean/SD vừa nhập:</div>
-      <div class="hint" style="margin-top:10px"><b>Chuyển qua nhóm lô này</b>: áp dụng ngay cho các dòng trên, nhóm lô đang dùng trước đó sẽ được đánh dấu "Đã dừng" (vẫn xem/nhập được nếu cần, không bị khóa).${lockNote}</div>
-      <div class="hint" style="margin-top:6px"><b>Dự kiến</b>: chỉ lưu lại Mean/SD đã nhập cho nhóm lô mới, chưa áp dụng — nhóm lô đang dùng vẫn tiếp tục như bình thường.</div>
+      <div class="hint flow-control"><b>Chuyển qua nhóm lô này</b>: áp dụng ngay cho các dòng trên, nhóm lô đang dùng trước đó sẽ được đánh dấu "Đã dừng" (vẫn xem/nhập được nếu cần, không bị khóa).${lockNote}</div>
+      <div class="hint flow-note"><b>Dự kiến</b>: chỉ lưu lại Mean/SD đã nhập cho nhóm lô mới, chưa áp dụng — nhóm lô đang dùng vẫn tiếp tục như bình thường.</div>
     </div>
     <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn('Dự kiến',"resolveTargetSwitch('planned')",'ghost')}${btn('Chuyển qua nhóm lô này',"resolveTargetSwitch('switch')",'teal')}</div>
   </div>`);
@@ -173,27 +174,27 @@ function openQcHistoryDetail(tid,level,lotNo=''){
   const pts=(state.data[tid]||[]).filter(p=>+p.level===+level&&(!lotNo||(p.lot||'')===lotNo)).sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))||String(a.runId||'').localeCompare(String(b.runId||''),'vi',{numeric:true}));
   const ptRows=pts.map(p=>{const mean=Number.isFinite(+p.qcMean)?+p.qcMean:+l.mean,sd=Number.isFinite(+p.qcSd)&&+p.qcSd>0?+p.qcSd:+l.sd,z=sd?(+p.val-mean)/sd:NaN,abs=Math.abs(z),lv=abs>3?'Loại bỏ':abs>2?'Cảnh báo':'Đạt',cls=abs>3?'rej':abs>2?'warn':'ok',staff=pointStaff(p);return `<tr><td>${vnDate(p.date)}</td><td>${esc(p.runId||'—')}</td><td class="num">${fmtPointValue(p,t)}</td><td class="num">${Number.isFinite(z)?(z>=0?'+':'')+fmt(z)+'s':'—'}</td><td class="num">${fmtTestValue(t,mean)}</td><td class="num">${fmtTestValue(t,sd)}</td><td><span class="tag ${cls}">${lv}</span></td><td>${esc(staff.code||'—')}</td></tr>`;}).join('');
   openModal(`<div class="modal rcfg-history-detail-modal"><div class="modal-h"><div><h3>${esc(testDisplayName(t))} · Mức ${level}${lotNo?' · Lô '+esc(lotNo):''}</h3></div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
-    <h4 style="margin-top:0;margin-bottom:var(--panel-content-gap)">Mean/SD đã dùng</h4>${histRows?`<table class="history-detail-table hist-meansd-table"><thead><tr><th>Lô QC</th><th class="num">Mean</th><th class="num">SD</th><th class="num">Mean tích lũy</th><th class="num">SD tích lũy</th><th class="num">CV tích lũy</th><th>Hiệu lực</th><th>Nguồn</th></tr></thead><tbody>${histRows}</tbody></table>`:emptyState('Chưa có mốc Mean/SD','Không tìm thấy lịch sử Mean/SD cho lô này.')}
-    <h4 style="margin-top:18px;margin-bottom:var(--panel-content-gap)">Điểm QC đã nhập (${pts.length})</h4>${ptRows?`<table class="history-detail-table hist-points-table"><thead><tr><th>Ngày</th><th>Lần chạy</th><th class="num">Giá trị</th><th class="num">Z</th><th class="num">Mean lúc nhập</th><th class="num">SD lúc nhập</th><th>Kết luận nhanh</th><th>NV</th></tr></thead><tbody>${ptRows}</tbody></table>`:emptyState('Chưa có điểm QC','Không có điểm QC nào khớp với lô/mức này.')}</div><div class="modal-f">${btn('Đóng','closeModal()','teal')}</div></div>`);
+    <h4 class="history-detail-heading">Mean/SD đã dùng</h4>${histRows?`<table class="history-detail-table hist-meansd-table"><thead><tr><th>Lô QC</th><th class="num">Mean</th><th class="num">SD</th><th class="num">Mean tích lũy</th><th class="num">SD tích lũy</th><th class="num">CV tích lũy</th><th>Hiệu lực</th><th>Nguồn</th></tr></thead><tbody>${histRows}</tbody></table>`:emptyState('Chưa có mốc Mean/SD','Không tìm thấy lịch sử Mean/SD cho lô này.')}
+    <h4 class="flow-panel space-after-section">Điểm QC đã nhập (${pts.length})</h4>${ptRows?`<table class="history-detail-table hist-points-table"><thead><tr><th>Ngày</th><th>Lần chạy</th><th class="num">Giá trị</th><th class="num">Z</th><th class="num">Mean lúc nhập</th><th class="num">SD lúc nhập</th><th>Kết luận nhanh</th><th>NV</th></tr></thead><tbody>${ptRows}</tbody></table>`:emptyState('Chưa có điểm QC','Không có điểm QC nào khớp với lô/mức này.')}</div><div class="modal-f">${btn('Đóng','closeModal()','teal')}</div></div>`);
 }
 async function openConfigPanel(id=''){
   if(!state.tests.length){await infoDialog('Hãy tạo xét nghiệm trước khi tạo Panel QC.');setManageTab('assays');return;}
   if(!state.instruments.length){await infoDialog('Hãy tạo máy xét nghiệm trước khi tạo Panel QC.');setManageTab('instruments');return;}
   const p=state.qcPanels.find(x=>x.id===id)||{testIds:[],instrumentId:state.instruments[0]&&state.instruments[0].id,active:true};
   const instruments=state.instruments.map(i=>`<option value="${i.id}" ${i.id===p.instrumentId?'selected':''}>${esc(i.name)}${i.model?' · '+esc(i.model):''}</option>`).join('');
-  const panelTestRows=(instrumentId,selected=[])=>state.tests.filter(t=>t.instrumentId===instrumentId).map(t=>`<label><input class="cfg-panel-test" type="checkbox" value="${t.id}" ${selected.includes(t.id)?'checked':''}><span><b>${esc(testDisplayName(t))}</b><small>${esc(instrumentName(t.instrumentId,t.machine))} · ${esc(t.unit||'Chưa có đơn vị')}</small></span></label>`).join('')||'<div class="empty" style="padding:14px">Máy này chưa có xét nghiệm.</div>';
-  openModal(`<div class="modal rcfg-modal"><div class="modal-h"><div><h3>${id?'Sửa Panel QC':'Tạo Panel QC'}</h3></div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
+  const panelTestRows=(instrumentId,selected=[])=>state.tests.filter(t=>t.instrumentId===instrumentId).map(t=>`<label><input class="cfg-panel-test" type="checkbox" value="${t.id}" ${selected.includes(t.id)?'checked':''}><span><b>${esc(testDisplayName(t))}</b><small>${esc(instrumentName(t.instrumentId,t.machine))} · ${esc(t.unit||'Chưa có đơn vị')}</small></span></label>`).join('')||'<div class="empty cfg-panel-empty">Máy này chưa có xét nghiệm.</div>';
+  openModal(`<div class="modal rcfg-modal"><div class="modal-h"><div><h3>${id?'Sửa Panel QC':'Thêm Panel QC'}</h3></div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
     <div class="grid2"><div><label>Tên Panel QC</label><input id="cfgPanelName" value="${escAttr(p.name||'')}" placeholder="VD: Sinh hóa AU5800"></div><div><label>Máy xét nghiệm</label><select id="cfgPanelInstrument" onchange="renderConfigPanelTests()">${instruments}</select></div></div>
     <label>Chọn xét nghiệm trong panel</label><div id="cfgPanelTests" class="group-lot-picker assay-group-picker">${panelTestRows(p.instrumentId,p.testIds||[])}</div>
     <label>Ghi chú</label><textarea id="cfgPanelNote">${esc(p.note||'')}</textarea>
     <label class="rcfg-check"><input id="cfgPanelActive" type="checkbox" ${p.active!==false?'checked':''}> Panel đang sử dụng</label></div>
-    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn('Lưu Panel QC',`saveConfigPanel('${id}')`,'teal')}</div></div>`);
+    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn(id?'Lưu thay đổi':'Thêm Panel QC',`saveConfigPanel('${id}')`,'teal')}</div></div>`);
 }
 function renderConfigPanelTests(){
   const root=document.getElementById('cfgPanelTests'),instrumentId=document.getElementById('cfgPanelInstrument').value;
   if(!root)return;
   const rows=state.tests.filter(t=>t.instrumentId===instrumentId).map(t=>`<label><input class="cfg-panel-test" type="checkbox" value="${t.id}"><span><b>${esc(testDisplayName(t))}</b><small>${esc(instrumentName(t.instrumentId,t.machine))} · ${esc(t.unit||'Chưa có đơn vị')}</small></span></label>`).join('');
-  root.innerHTML=rows||'<div class="empty" style="padding:14px">Máy này chưa có xét nghiệm.</div>';
+  root.innerHTML=rows||'<div class="empty cfg-panel-empty">Máy này chưa có xét nghiệm.</div>';
 }
 async function saveConfigPanel(id){
   if(!requireAdmin())return;
@@ -205,18 +206,23 @@ async function saveConfigPanel(id){
 }
 async function deleteConfigPanel(id){if(!requireAdmin())return;const p=state.qcPanels.find(x=>x.id===id);if(!p)return;if(state.lotTransitions.some(x=>x.panelId===id)){await infoDialog('Panel này đang có lịch sử chuyển tiếp lô. Hãy xóa/chuyển các dòng chuyển tiếp trước.');return;}if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa Panel QC',message:`Xóa Panel QC ${p.name}?`,detail:'Các xét nghiệm vẫn được giữ nguyên.',confirmLabel:'Xóa Panel QC',cancelLabel:'Hủy'}))return;state.qcPanels=state.qcPanels.filter(x=>x.id!==id);logAct('Xóa Panel QC',p.name,'Panel QC');save();rerender();}
 async function deleteLotTransition(id){if(!requireAdmin())return;const tr=state.lotTransitions.find(x=>x.id===id);if(!tr)return;if(transitionSwitchesLot(tr)){await infoDialog('Hồ sơ đã chấp nhận lô mới và đã áp dụng vào nhóm lô/Mean-SD, không nên xóa trực tiếp. Nếu nhập sai, hãy tạo hồ sơ chuyển tiếp mới hoặc chỉnh nhóm lô/Mean-SD thủ công.');return;}if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa dòng chuyển tiếp lô',message:'Xóa dòng chuyển tiếp lô này?',confirmLabel:'Xóa',cancelLabel:'Hủy'}))return;state.lotTransitions=state.lotTransitions.filter(x=>x.id!==id);syncLotDepletionFromTransitions();logAct('Xóa chuyển tiếp lô',`${lotLabel(tr.fromLotId)} → ${lotLabel(tr.toLotId)}`,'Chuyển tiếp lô');save();rerender();}
+function lotTransitionChoiceLabel(lot){if(!lot)return'';const to=lot.depleted?lotTransitionToNo(lot.id):'';return`${lot.lotNo} · Mức ${lot.level}${lot.exp?' · HSD '+vnDate(lot.exp):''}${lot.depleted?' · '+(to?'đã chuyển tiếp qua lô '+to:'đã hết QC'):''}`;}
+function lotTransitionChoiceLots(selectedId=''){return(state.qcLots||[]).filter(l=>!l.depleted||l.id===selectedId);}
+function lotTransitionChoiceMatch(value,selectedId=''){const q=searchText(value||'');if(!q)return null;const lots=lotTransitionChoiceLots(selectedId),exact=lots.find(l=>searchText(lotTransitionChoiceLabel(l))===q||searchText(l.lotNo)===q);if(exact)return exact;const matches=lots.filter(l=>searchText(lotTransitionChoiceLabel(l)).includes(q));return matches.length===1?matches[0]:null;}
+function lotTransitionSelectedId(inputId){const el=document.getElementById(inputId);if(!el)return'';const lot=lotTransitionChoiceMatch(el.value,el.dataset.lotId||'');if(lot)el.dataset.lotId=lot.id;return lot&&lot.id||'';}
+function lotTransitionChoiceInput(el,commit=false){const lot=lotTransitionChoiceMatch(el.value,el.dataset.lotId||'');el.dataset.lotId=lot&&lot.id||'';if(commit&&lot)el.value=lotTransitionChoiceLabel(lot);refreshLotTransitionTargets();}
+function lotTransitionChoiceHtml(inputId,selectedId){const lot=state.qcLots.find(l=>l.id===selectedId),options=lotTransitionChoiceLots(selectedId).map(l=>`<option value="${escAttr(lotTransitionChoiceLabel(l))}"></option>`).join('');return`<input id="${inputId}" list="${inputId}List" autocomplete="off" role="combobox" aria-autocomplete="list" placeholder="Gõ số lô hoặc chọn danh sách" value="${escAttr(lotTransitionChoiceLabel(lot))}" data-lot-id="${escAttr(selectedId||'')}" oninput="lotTransitionChoiceInput(this)" onchange="lotTransitionChoiceInput(this,true)"><datalist id="${inputId}List">${options}</datalist>`;}
 async function openLotTransitionV2(id=''){
   if(!state.qcPanels.length){await infoDialog('Hãy tạo Panel QC trước khi tạo chuyển tiếp lô.');setManageTab('panels');return;}
   if(state.qcLots.length<2){await infoDialog('Cần ít nhất 2 lô QC để tạo chuyển tiếp.');setManageTab('lots');return;}
   const tr=state.lotTransitions.find(x=>x.id===id)||{panelId:state.qcPanels[0]&&state.qcPanels[0].id,fromLotId:'',toLotId:'',startDate:isoToday(),status:'planned',approvedBy:'',approvedAt:''};
   const panels=`<option value="">— Chọn Panel QC —</option>`+state.qcPanels.map(p=>`<option value="${p.id}" ${p.id===tr.panelId?'selected':''}>${esc(p.name)} · ${esc(instrumentName(p.instrumentId))}</option>`).join('');
-  const lotOptions=selected=>`<option value="">— Chọn lô QC —</option>`+state.qcLots.filter(l=>!l.depleted||l.id===selected).map(l=>{const to=l.depleted?lotTransitionToNo(l.id):'';return `<option value="${l.id}" ${l.id===selected?'selected':''}>${esc(l.lotNo)} · Mức ${l.level}${l.exp?' · HSD '+vnDate(l.exp):''}${l.depleted?' · '+(to?'đã chuyển tiếp qua lô '+to:'đã hết QC'):''}</option>`;}).join('');
-  openModal(`<div class="modal rcfg-modal lot-trans-modal"><div class="modal-h"><div><h3>${id?'Sửa hồ sơ chuyển lô':'Tạo hồ sơ chuyển lô'}</h3></div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
-    <div class="lot-trans-row3"><div><label>Panel QC áp dụng</label><select id="cfgTransPanel" onchange="refreshLotTransitionTargets()">${panels}</select></div><div><label>Lô cũ</label><select id="cfgTransFrom" onchange="refreshLotTransitionTargets()">${lotOptions(tr.fromLotId)}</select></div><div><label>Lô mới</label><select id="cfgTransTo" onchange="refreshLotTransitionTargets()">${lotOptions(tr.toLotId)}</select></div></div>
+  openModal(`<div class="modal rcfg-modal lot-trans-modal"><div class="modal-h"><div><h3>${id?'Sửa hồ sơ chuyển lô':'Thêm hồ sơ chuyển lô'}</h3></div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
+    <div class="lot-trans-row3"><div><label>Panel QC áp dụng</label><select id="cfgTransPanel" onchange="refreshLotTransitionTargets()">${panels}</select></div><div><label>Lô cũ</label>${lotTransitionChoiceHtml('cfgTransFrom',tr.fromLotId)}</div><div><label>Lô mới</label>${lotTransitionChoiceHtml('cfgTransTo',tr.toLotId)}</div></div>
     <div class="lot-trans-row2"><div><label>Ngày bắt đầu (dd/mm/yyyy)</label>${dateBox('cfgTransStart',tr.startDate||'')}</div><div><label>Trạng thái</label><select id="cfgTransStatus"><option value="planned" ${tr.status==='planned'?'selected':''}>Dự kiến</option><option value="active" ${tr.status==='active'||tr.status==='completed'?'selected':''}>Đang chạy song song</option><option value="accepted" ${tr.status==='accepted'?'selected':''}>Chấp nhận lô mới</option><option value="rejected" ${tr.status==='rejected'?'selected':''}>Không chấp nhận</option></select></div></div>
     <div id="cfgTransTargets">${lotTransitionTargetsHtml(tr.panelId,tr.fromLotId,tr.toLotId)}</div>
     </div>
-    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn('Lưu hồ sơ',`saveLotTransitionV2('${id}')`,'teal')}</div></div>`);
+    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn(id?'Lưu thay đổi':'Thêm hồ sơ chuyển lô',`saveLotTransitionV2('${id}')`,'teal')}</div></div>`);
 }
 /* Bảng Mean/SD nhúng ngay trong hồ sơ chuyển lô — cùng danh sách xét nghiệm mà
    inspectAcceptedLotTransition() sẽ kiểm tra lúc chấp nhận, để không lệch tiêu
@@ -224,19 +230,19 @@ async function openLotTransitionV2(id=''){
    render lại đúng vùng này mỗi khi đổi Panel/Lô cũ/Lô mới, không đụng phần còn
    lại của modal (giữ giá trị người dùng đã gõ ở Ngày/Trạng thái). */
 function lotTransitionTargetsHtml(panelId,fromLotId,toLotId){
-  if(!panelId||!fromLotId||!toLotId||fromLotId===toLotId)return `<div class="hint" style="margin-top:12px">Chọn Panel QC, Lô cũ và Lô mới (khác nhau, cùng mức) để nhập Mean/SD cho lô mới.</div>`;
+  if(!panelId||!fromLotId||!toLotId||fromLotId===toLotId)return `<div class="hint flow-section">Chọn Panel QC, Lô cũ và Lô mới (khác nhau, cùng mức) để nhập Mean/SD cho lô mới.</div>`;
   const check=inspectAcceptedLotTransition({panelId,fromLotId,toLotId,status:'accepted'});
-  if(!check.valid)return `<div class="hint" style="margin-top:12px">Lô cũ và lô mới phải cùng mức QC.</div>`;
-  if(!check.rows.length)return `<div class="hint" style="margin-top:12px">Panel đã chọn không có xét nghiệm nào đang dùng lô cũ ${esc(check.from.lotNo)}.</div>`;
+  if(!check.valid)return `<div class="hint flow-section">Lô cũ và lô mới phải cùng mức QC.</div>`;
+  if(!check.rows.length)return `<div class="hint flow-section">Panel đã chọn không có xét nghiệm nào đang dùng lô cũ ${esc(check.from.lotNo)}.</div>`;
   const rows=check.rows.map(({t,nextHist})=>{
     const draft=targetRangeDraft(nextHist||{}),has=Number.isFinite(draft.mean)&&((Number.isFinite(draft.sd)&&draft.sd>0)||(Number.isFinite(draft.low)&&Number.isFinite(draft.high)));
     return `<div class="target-row" data-test="${t.id}">
       <label class="lot-assay-check"><input type="checkbox" checked disabled><span></span></label>
       <div class="lot-assay-name"><b>${esc(testDisplayName(t))}</b><small>${esc(t.unit||'Chưa có đơn vị')}</small></div>
-      <input class="tm-mean" type="number" step="any" value="${escAttr(targetNumberText(draft.mean))}" placeholder="Trung bình" oninput="syncTargetRange(this,'target')">
-      <input class="tm-low" type="number" step="any" value="${escAttr(targetNumberText(draft.low))}" placeholder="Giới hạn dưới" oninput="syncTargetRange(this,'limits')">
-      <input class="tm-high" type="number" step="any" value="${escAttr(targetNumberText(draft.high))}" placeholder="Giới hạn trên" oninput="syncTargetRange(this,'limits')">
-      <input class="tm-sd" type="number" step="any" value="${escAttr(targetNumberText(draft.sd))}" placeholder="Độ lệch chuẩn" oninput="syncTargetRange(this,'target')">
+      <input class="tm-mean" type="number" step="any" value="${escAttr(targetNumberText(draft.mean,t))}" placeholder="Trung bình" oninput="syncTargetRange(this,'target')">
+      <input class="tm-low" type="number" step="any" value="${escAttr(targetNumberText(draft.low,t))}" placeholder="Giới hạn dưới" oninput="syncTargetRange(this,'limits')">
+      <input class="tm-high" type="number" step="any" value="${escAttr(targetNumberText(draft.high,t))}" placeholder="Giới hạn trên" oninput="syncTargetRange(this,'limits')">
+      <input class="tm-sd" type="number" step="any" value="${escAttr(targetNumberText(draft.sd,t,'stat'))}" placeholder="Độ lệch chuẩn" oninput="syncTargetRange(this,'target')">
       <span>${has?'<b class="tag ok">Đã nhập</b>':'<b class="tag none">Chưa nhập</b>'}</span>
     </div>`;
   }).join('');
@@ -254,7 +260,7 @@ function filterLotTransitionTargets(term){
   });
 }
 function refreshLotTransitionTargets(){
-  const panelId=document.getElementById('cfgTransPanel').value,fromLotId=document.getElementById('cfgTransFrom').value,toLotId=document.getElementById('cfgTransTo').value;
+  const panelId=document.getElementById('cfgTransPanel').value,fromLotId=lotTransitionSelectedId('cfgTransFrom'),toLotId=lotTransitionSelectedId('cfgTransTo');
   const el=document.getElementById('cfgTransTargets');if(el)el.innerHTML=lotTransitionTargetsHtml(panelId,fromLotId,toLotId);
 }
 /* Đọc bảng Mean/SD nhúng trong modal chuyển lô. Dòng để trống hoàn toàn (cả 4 ô)
@@ -282,7 +288,7 @@ async function readLotTransitionTargetPicks(rows){
 }
 async function saveLotTransitionV2(id){
   if(!requireAdmin())return;
-  const panelId=document.getElementById('cfgTransPanel').value,fromLotId=document.getElementById('cfgTransFrom').value,toLotId=document.getElementById('cfgTransTo').value;if(!panelId){await infoDialog('Chọn Panel QC.');return;}if(!fromLotId||!toLotId||fromLotId===toLotId){await infoDialog('Chọn lô cũ và lô mới khác nhau.');return;}
+  const panelId=document.getElementById('cfgTransPanel').value,fromLotId=lotTransitionSelectedId('cfgTransFrom'),toLotId=lotTransitionSelectedId('cfgTransTo');if(!panelId){await infoDialog('Chọn Panel QC.');return;}if(!fromLotId||!toLotId||fromLotId===toLotId){await infoDialog('Chọn lô cũ và lô mới khác nhau từ danh sách.');return;}
   const fromLot=state.qcLots.find(l=>l.id===fromLotId),toLot=state.qcLots.find(l=>l.id===toLotId);if(!fromLot||!toLot){await infoDialog('Không tìm thấy lô QC đã chọn.');return;}if(+fromLot.level!==+toLot.level){await infoDialog('Lô cũ và lô mới phải cùng mức QC để chuyển tiếp.');return;}
   if(state.lotTransitions.some(x=>x.id!==id&&x.panelId===panelId&&x.fromLotId===fromLotId&&x.toLotId===toLotId)){await infoDialog('Chuyển tiếp lô này đã tồn tại.');return;}
   const status=document.getElementById('cfgTransStatus').value,startRaw=document.getElementById('cfgTransStart').value.trim(),startDate=parseVN(startRaw);if(startRaw&&!startDate){await infoDialog('Ngày bắt đầu không hợp lệ. Dùng dạng dd/mm/yyyy.');return;}
@@ -312,12 +318,12 @@ async function openConfigGroup(id=''){
   const levels=[...new Set(state.qcLots.map(l=>+l.level).filter(Number.isFinite))].sort((a,b)=>a-b);
   const levelLayout=levels.length>=3?'levels-3plus':levels.length===2?'levels-2':'levels-1';
   const lotColumns=levels.map(level=>`<div class="lot-level-col"><div class="lot-level-title">Mức ${level}</div>${state.qcLots.filter(l=>+l.level===level).map(l=>{const inGroup=(g.lotIds||[]).includes(l.id),lock=l.depleted&&!inGroup,to=l.depleted?lotTransitionToNo(l.id):'',depletedLabel=l.depleted?(to?'đã chuyển tiếp qua lô '+to:'đã hết QC'):'';return `<label class="${l.depleted?'lot-opt-depleted':''}"${lock?` title="Lô ${escAttr(depletedLabel)} — không thể chọn"`:''}><input class="cfg-group-lot" type="checkbox" value="${l.id}" ${inGroup?'checked':''} ${lock?'disabled':''} onchange="suggestConfigGroupName()"><span><b>${esc(l.lotNo)}</b><small>HSD ${l.exp?vnDate(l.exp):'chưa có'}${l.depleted?' · '+depletedLabel:''}</small></span></label>`;}).join('')}</div>`).join('');
-  openModal(`<div class="modal rcfg-modal rcfg-group-modal ${levelLayout}"><div class="modal-h"><div><h3>${id?'Sửa nhóm lô':'Tạo nhóm lô mới'}</h3></div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
+  openModal(`<div class="modal rcfg-modal rcfg-group-modal ${levelLayout}"><div class="modal-h"><div><h3>${id?'Sửa nhóm lô':'Thêm nhóm lô'}</h3></div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
     <label>Chọn các lô QC</label>
     <div class="lot-level-picker">${lotColumns}</div>
     <label>Tên nhóm lô</label><input id="cfgGroupName" value="${escAttr(g.name||'')}" placeholder="Tự động: 1102/1103">
     <label>Ghi chú</label><textarea id="cfgGroupNote">${esc(g.note||'')}</textarea></div>
-    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn('Lưu nhóm lô',`saveConfigGroup('${id}')`,'teal')}</div></div>`);
+    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn(id?'Lưu thay đổi':'Thêm nhóm lô',`saveConfigGroup('${id}')`,'teal')}</div></div>`);
 }
 function suggestConfigGroupName(){const ids=[...document.querySelectorAll('.cfg-group-lot:checked')].map(x=>x.value),name=ids.map(id=>(state.qcLots.find(l=>l.id===id)||{}).lotNo).filter(Boolean).join('/'),el=document.getElementById('cfgGroupName');if(el)el.value=name;}
 async function saveConfigGroup(id){
@@ -394,12 +400,12 @@ async function activateLotGroup(id){
 }
 function openConfigLot(id=''){
   const l=state.qcLots.find(x=>x.id===id)||{level:1,active:true};
-  openModal(`<div class="modal rcfg-modal"><div class="modal-h"><div><h3>${id?'Sửa thông tin lô QC':'Tạo lô QC mới'}</h3></div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
+  openModal(`<div class="modal rcfg-modal"><div class="modal-h"><div><h3>${id?'Sửa thông tin lô QC':'Thêm lô QC'}</h3></div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
     <div class="grid2"><div><label>Số lô</label><input id="cfgLotNo" value="${escAttr(l.lotNo||'')}" placeholder="VD: 1234UE"></div><div><label>Mức QC</label><select id="cfgLotLevel" aria-label="Mức QC">${[1,2,3,4,5,6].map(n=>`<option ${+l.level===n?'selected':''}>${n}</option>`).join('')}</select></div></div>
     <div class="grid2"><div><label>Mô tả</label><input id="cfgLotDescription" value="${escAttr(l.description||'')}" placeholder="VD: Acusera Assayed Chemistry Control"></div><div><label>Nhà cung cấp</label><input id="cfgLotSupplier" value="${escAttr(l.supplier||'')}" placeholder="Randox"></div></div>
     <div class="grid2"><div><label>Ngày mở (dd/mm/yyyy)</label>${dateBox('cfgLotOpened',l.opened||'')}</div><div><label>Hạn sử dụng (dd/mm/yyyy)</label>${dateBox('cfgLotExp',l.exp||'')}</div></div>
     <label>Ghi chú</label><textarea id="cfgLotNote" aria-label="Ghi chú">${esc(l.note||'')}</textarea></div>
-    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn('Lưu lô',`saveConfigLot('${id}')`,'teal')}</div></div>`);
+    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn(id?'Lưu thay đổi':'Thêm lô QC',`saveConfigLot('${id}')`,'teal')}</div></div>`);
 }
 async function saveConfigLot(id){
   if(!requireAdmin())return;
@@ -474,17 +480,15 @@ function openConfigInstrument(id=''){
     <div class="grid2"><div><label>Tên hiển thị</label><input id="cfgInstName" value="${escAttr(i.name||'')}" placeholder="VD: AU5800-01"></div><div><label>Khoa / Khu vực</label><input id="cfgInstSection" value="${escAttr(i.section||'')}" placeholder="Hóa sinh"></div></div>
     <div class="grid2"><div><label>Nhà sản xuất</label><input id="cfgInstMfr" value="${escAttr(i.manufacturer||'')}" placeholder="Beckman Coulter"></div><div><label>Số sê-ri</label><input id="cfgInstSerial" aria-label="Số sê-ri" value="${escAttr(i.serial||'')}"></div></div>
     <label class="rcfg-check"><input id="cfgInstActive" type="checkbox" ${i.active!==false?'checked':''}> Máy đang hoạt động</label></div>
-    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn('Lưu máy xét nghiệm',`saveConfigInstrument('${id}')`,'teal')}</div></div>`);
+    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn(id?'Lưu thay đổi':'Thêm máy xét nghiệm',`saveConfigInstrument('${id}')`,'teal')}</div></div>`);
 }
 async function saveConfigInstrument(id){
   if(!requireAdmin())return;
-  const name=QCCore.cleanText(document.getElementById('cfgInstName').value).trim();if(!name){await infoDialog('Nhập tên máy.');return;}
-  if(state.instruments.some(x=>x.id!==id&&sameText(x.name,name))){await infoDialog('Tên máy xét nghiệm này đã tồn tại.');return;}
-  const data={name,section:QCCore.cleanText(document.getElementById('cfgInstSection').value),manufacturer:QCCore.cleanText(document.getElementById('cfgInstMfr').value),serial:QCCore.cleanText(document.getElementById('cfgInstSerial').value),active:document.getElementById('cfgInstActive').checked};
-  const old=state.instruments.find(x=>x.id===id);if(old){Object.assign(old,data);state.tests.filter(t=>t.instrumentId===id).forEach(t=>t.machine=name);}else state.instruments.push({id:uid(),...data});
-  state.machines=[...new Set(state.instruments.map(x=>x.name))];logAct(old?'Cập nhật máy':'Thêm máy xét nghiệm',name,'Máy xét nghiệm');closeModal();save();rerender();
+  const data={name:document.getElementById('cfgInstName').value,section:document.getElementById('cfgInstSection').value,manufacturer:document.getElementById('cfgInstMfr').value,serial:document.getElementById('cfgInstSerial').value,active:document.getElementById('cfgInstActive').checked};
+  const result=ManageConfigService.saveInstrument(state,{id,newId:id?'':uid(),data});if(result.error){await infoDialog(result.message);return;}
+  logAct(result.created?'Thêm máy xét nghiệm':'Cập nhật máy',result.record.name,'Máy xét nghiệm');closeModal();save();rerender();
 }
-async function deleteConfigInstrument(id){if(!requireAdmin())return;const i=state.instruments.find(x=>x.id===id);if(!i)return;if(state.tests.some(t=>t.instrumentId===id)){await infoDialog('Máy này đang được gắn với xét nghiệm. Hãy chuyển xét nghiệm sang máy khác trước.');return;}if(state.qcPanels.some(p=>p.instrumentId===id)){await infoDialog('Máy này đang được gắn với Panel QC. Hãy chuyển hoặc xóa Panel QC trước.');return;}if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa máy xét nghiệm',message:`Xóa máy ${i.name}?`,confirmLabel:'Xóa máy',cancelLabel:'Hủy'}))return;state.instruments=state.instruments.filter(x=>x.id!==id);state.machines=state.instruments.map(x=>x.name);logAct('Xóa máy xét nghiệm',i.name,'Máy xét nghiệm');save();rerender();}
+async function deleteConfigInstrument(id){if(!requireAdmin())return;const check=ManageConfigService.instrumentRemoval(state,{id});if(check.error){if(check.error!=='not-found')await infoDialog(check.message);return;}if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa máy xét nghiệm',message:`Xóa máy ${check.record.name}?`,confirmLabel:'Xóa máy',cancelLabel:'Hủy'}))return;const result=ManageConfigService.removeInstrument(state,{id});if(result.error){await infoDialog(result.message);return;}logAct('Xóa máy xét nghiệm',result.record.name,'Máy xét nghiệm');save();rerender();}
 /* Xét nghiệm mới luôn bắt đầu với đúng 1 mức (Mức 1) — KHÔNG suy theo các mức
    lô đang có ở NƠI KHÁC trong hệ thống (từng làm vậy trước đây, khiến xét
    nghiệm mới tự dính thêm mức rỗng không liên quan chỉ vì lab có lô ở mức đó
@@ -492,7 +496,7 @@ async function deleteConfigInstrument(id){if(!requireAdmin())return;const i=stat
    xét nghiệm này qua Mean/SD theo nhóm lô (applyTargetPick tự push level mới
    nếu chưa có). */
 function defaultAssayLevels(){
-  return[{level:1,mean:null,sd:null,low:null,high:null,rangeK:2,mfgMean:null,mfgSd:null,applied:'mfg',meanSdHistory:[]}];
+  return ManageConfigService.defaultAssayLevels();
 }
 function configAssayTeaRefs(){return typeof effectiveTeaRefs==='function'?effectiveTeaRefs():REFTESTS.map(([name,unit,clia,ricos,section])=>[name,unit,clia,ricos,section,null,teaAnalyteMeta(name).analyteId]);}
 function configAssayRefRecord(name,analyteId=''){const key=teaAnalyteKey(name);return(state.teaRefs||[]).find(r=>analyteId&&r.analyteId===analyteId)||(state.teaRefs||[]).find(r=>teaAnalyteKey(r.name)===key)||null;}
@@ -524,7 +528,7 @@ function openConfigAssay(id=''){
   const initialRef=configAssayTeaRefs().find(r=>t.analyteId&&r[6]===t.analyteId)||configAssayFindRef(t.name||t.displayName||''),initialNaming=initialRef?configAssayNaming(initialRef):null,initialName=initialNaming&&initialNaming.displayName||t.displayName||t.name||'',currentTeaSource=['lab','eflm','clia','ricos'].includes(t.teaSource)?t.teaSource:'',initialSource=currentTeaSource||(initialRef?(initialRef[2]!=null?'clia':initialRef[3]!=null?'ricos':''):'');
   const teaOptions=configAssayTeaRefs().map(ref=>({ref,naming:configAssayNaming(ref)})).sort((a,b)=>String(a.ref[4]||'').localeCompare(String(b.ref[4]||''),'vi')||String(a.naming.displayName||'').localeCompare(String(b.naming.displayName||''),'vi')).map(({ref,naming})=>{const extra=[naming.standardName!==naming.displayName?naming.standardName:'',naming.abbreviation,...naming.aliases.filter(x=>x!==ref[0]&&x!==naming.displayName&&x!==naming.standardName).slice(0,3),ref[1],ref[4]].filter(Boolean).join(' · ');return`<option value="${escAttr(naming.displayName||ref[0])}" label="${escAttr(extra)}"></option>`;}).join('');
   openModal(`<div class="modal rcfg-modal rcfg-assay-modal"><div class="modal-h"><div><h3>${id?'Sửa xét nghiệm':'Thêm xét nghiệm'}</h3></div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
-    <div class="assay-form-heading"><div><h4>Thông tin xét nghiệm</h4><span>Các trường có dấu <b class="req">*</b> là bắt buộc</span></div></div>
+    <div class="assay-form-heading"><h4>Thông tin xét nghiệm</h4></div>
     <div class="assay-main-grid"><div><label>Tên xét nghiệm <span class="req">*</span></label><input id="cfgAssayName" list="cfgAssayTeaSuggestions" autocomplete="off" value="${escAttr(initialName)}" placeholder="Gõ tên, viết tắt hoặc bí danh" oninput="configAssaySuggestionInput(this.value)"><datalist id="cfgAssayTeaSuggestions">${teaOptions}</datalist><input id="cfgAssayTeaRefKey" type="hidden" value="${escAttr(initialRef&&(initialRef[6]||initialRef[0])||'')}"><input id="cfgAssayTeaSource" type="hidden" value="${escAttr(initialSource)}"></div><div><label>Đơn vị</label><input id="cfgAssayUnit" aria-label="Đơn vị" value="${escAttr(t.unit||'')}"></div><div><label>Máy xét nghiệm <span class="req">*</span></label><select id="cfgAssayInstrument" aria-label="Máy xét nghiệm" onchange="const o=this.selectedOptions[0];const e=document.getElementById('cfgAssaySection');if(e)e.value=o?o.dataset.section||'':''">${instruments}</select></div><div><label>Khoa / Khu vực</label><input id="cfgAssaySection" value="${escAttr(t.section||(defaultInst&&defaultInst.section)||'')}" placeholder="VD: Điện giải"></div></div>
     <div class="assay-detail-grid"><div><label>Phương pháp</label><input id="cfgAssayMethod" aria-label="Phương pháp" value="${escAttr(t.method||'')}"></div><div><label>Số thập phân</label><select id="cfgAssayDecimals" aria-label="Số chữ số thập phân">${[0,1,2,3,4,5,6].map(i=>`<option value="${i}" ${decimalValue===String(i)?'selected':''}>${i}</option>`).join('')}</select></div><div><label>Hóa chất</label><input id="cfgAssayReagent" aria-label="Hóa chất" value="${escAttr(t.reagent||'')}"></div><div><label>TEa %</label><input id="cfgAssayTea" aria-label="TEa %" type="number" step="any" value="${escAttr(t.tea||'')}"></div></div>
     <details class="assay-advanced" ${hasRuleOverrides?'open':''}><summary><span><b>Cấu hình Westgard nâng cao</b><small>Mặc định dùng cấu hình chung của hệ thống</small></span></summary><div class="assay-advanced-body"><div class="assay-rule-head" aria-hidden="true"><span>Luật</span><span>Hành động</span><span>Phạm vi áp dụng</span></div><div class="assay-rule-grid">${ruleRows}</div></div></details>
@@ -534,17 +538,15 @@ function openConfigAssay(id=''){
 }
 async function saveConfigAssay(id){
   if(!requireAdmin())return;
-  const existing=state.tests.find(x=>x.id===id),enteredName=QCCore.cleanText(document.getElementById('cfgAssayName').value).trim(),refKey=document.getElementById('cfgAssayTeaRefKey').value,ref=refKey?configAssayTeaRefs().find(r=>r[6]===refKey||teaAnalyteKey(r[0])===teaAnalyteKey(refKey)):null,naming=ref?configAssayNaming(ref):null,name=ref?ref[0]:enteredName,analyteId=ref?ref[6]:(existing&&existing.analyteId||'local-'+String(existing&&existing.id||uid()).replace(/[^A-Za-z0-9_-]/g,'').slice(0,73)),instrumentId=document.getElementById('cfgAssayInstrument').value,inst=state.instruments.find(x=>x.id===instrumentId);if(!name||!inst){await infoDialog('Chọn hoặc nhập tên xét nghiệm và chọn máy.');return;}
-  if(state.tests.some(x=>x.id!==id&&x.instrumentId===instrumentId&&(x.analyteId&&x.analyteId===analyteId||sameText(x.name,name)))){await infoDialog('Xét nghiệm này đã tồn tại trên máy đã chọn.');return;}
-  const oldInstrumentId=existing&&existing.instrumentId,levels=existing?[...(existing.levels||[])]:defaultAssayLevels();
-  const tea=parseFloat(document.getElementById('cfgAssayTea').value)||0;if(tea<0){await infoDialog('TEa không được âm.');return;}
-  const decimalRaw=document.getElementById('cfgAssayDecimals').value,decimalPlaces=Number(decimalRaw);if(!Number.isInteger(decimalPlaces)||decimalPlaces<0||decimalPlaces>6){await infoDialog('Số chữ số thập phân phải từ 0 đến 6.');return;}
+  const existing=state.tests.find(x=>x.id===id),enteredName=QCCore.cleanText(document.getElementById('cfgAssayName').value).trim(),refKey=document.getElementById('cfgAssayTeaRefKey').value,ref=refKey?configAssayTeaRefs().find(r=>r[6]===refKey||teaAnalyteKey(r[0])===teaAnalyteKey(refKey)):null,naming=ref?configAssayNaming(ref):null,name=ref?ref[0]:enteredName,analyteId=ref?ref[6]:(existing&&existing.analyteId||'local-'+String(existing&&existing.id||uid()).replace(/[^A-Za-z0-9_-]/g,'').slice(0,73)),instrumentId=document.getElementById('cfgAssayInstrument').value,inst=state.instruments.find(x=>x.id===instrumentId),levels=existing?[...(existing.levels||[])]:defaultAssayLevels();
+  const tea=parseFloat(document.getElementById('cfgAssayTea').value)||0,decimalRaw=document.getElementById('cfgAssayDecimals').value,decimalPlaces=Number(decimalRaw);
   const ruleActions=Object.fromEntries([...document.querySelectorAll('.cfg-assay-rule')].map(el=>[el.dataset.rule,el.value]));
   const ruleScopes=Object.fromEntries([...document.querySelectorAll('.cfg-assay-scope')].map(el=>[el.dataset.rule,el.value]));
   const cusumK=parseFloat(document.getElementById('cfgAssayCusumK').value),cusumH=parseFloat(document.getElementById('cfgAssayCusumH').value);
   const cusum={on:document.getElementById('cfgAssayCusumOn').checked,k:Number.isFinite(cusumK)&&cusumK>0?cusumK:0.5,h:Number.isFinite(cusumH)&&cusumH>0?cusumH:4};
-  const savedTeaSource=existing&&['lab','eflm','clia','ricos'].includes(existing.teaSource)?existing.teaSource:'',data={analyteId,name,displayName:naming?naming.displayName:enteredName,standardName:naming?naming.standardName:existing&&existing.standardName||enteredName,abbreviation:naming?naming.abbreviation:existing&&existing.abbreviation||'',aliases:naming?naming.aliases:existing&&existing.aliases||[enteredName],matrix:naming?naming.matrix:existing&&existing.matrix||'',instrumentId,machine:inst.name,section:QCCore.cleanText(document.getElementById('cfgAssaySection').value).trim()||inst.section||'',unit:QCCore.cleanText(document.getElementById('cfgAssayUnit').value),decimalPlaces,method:QCCore.cleanText(document.getElementById('cfgAssayMethod').value),reagent:QCCore.cleanText(document.getElementById('cfgAssayReagent').value),reagentSupplier:existing&&existing.reagentSupplier||'',temperature:existing&&existing.temperature||0,genNo:existing&&existing.genNo||'',performanceLimit:existing&&existing.performanceLimit||'',tea,teaSource:savedTeaSource||(ref?(document.getElementById('cfgAssayTeaSource').value||'ricos'):'ricos'),levels,ruleActions,ruleScopes,cusum,closed:document.getElementById('cfgAssayClosed').checked,active:true,sgTracked:existing?!!existing.sgTracked:false};
-  if(existing){Object.assign(existing,data);if(oldInstrumentId&&oldInstrumentId!==instrumentId)state.qcPanels.forEach(p=>{if(p.instrumentId!==instrumentId)p.testIds=(p.testIds||[]).filter(testId=>testId!==id);});logAct('Cập nhật xét nghiệm',`${inst.name} · ${levels.length} mức QC`,name);}else{const test={id:uid(),...data};state.tests.push(test);state.data[test.id]=[];logAct('Thêm xét nghiệm',`${inst.name} · ${levels.length} mức QC`,name);}
+  const savedTeaSource=existing&&['lab','eflm','clia','ricos'].includes(existing.teaSource)?existing.teaSource:'',data={analyteId,name,displayName:naming?naming.displayName:enteredName,standardName:naming?naming.standardName:existing&&existing.standardName||enteredName,abbreviation:naming?naming.abbreviation:existing&&existing.abbreviation||'',aliases:naming?naming.aliases:existing&&existing.aliases||[enteredName],matrix:naming?naming.matrix:existing&&existing.matrix||'',instrumentId,machine:inst&&inst.name||'',section:QCCore.cleanText(document.getElementById('cfgAssaySection').value).trim()||inst&&inst.section||'',unit:QCCore.cleanText(document.getElementById('cfgAssayUnit').value),decimalPlaces,method:QCCore.cleanText(document.getElementById('cfgAssayMethod').value),reagent:QCCore.cleanText(document.getElementById('cfgAssayReagent').value),reagentSupplier:existing&&existing.reagentSupplier||'',temperature:existing&&existing.temperature||0,genNo:existing&&existing.genNo||'',performanceLimit:existing&&existing.performanceLimit||'',tea,teaSource:savedTeaSource||(ref?(document.getElementById('cfgAssayTeaSource').value||'ricos'):'ricos'),levels,ruleActions,ruleScopes,cusum,closed:document.getElementById('cfgAssayClosed').checked,active:true,sgTracked:existing?!!existing.sgTracked:false};
+  const result=ManageConfigService.saveAssay(state,{id,newId:id?'':uid(),data});if(result.error){await infoDialog(result.message);return;}
+  logAct(result.created?'Thêm xét nghiệm':'Cập nhật xét nghiệm',`${result.inst.name} · ${levels.length} mức QC`,name);
   closeModal();save();rerender();
 }
 /* Panel "Khóa kỳ báo cáo" hứa với người dùng rằng khóa kỳ chặn sửa/hủy điểm QC của
@@ -554,12 +556,11 @@ async function saveConfigAssay(id){
    và để lại dấu vết đúng như ISO 15189 mong đợi. */
 async function delTest(id){
   if(!requireAdmin())return;
-  const t=state.tests.find(x=>x.id===id);if(!t)return;
-  const points=state.data[id]||[],locked=PeriodService.lockedPoints(state,points);
+  const context=ManageConfigService.assayRemoval(state,{id});if(context.error)return;const t=context.record,points=context.points,locked=PeriodService.lockedPoints(state,points);
   if(locked.count){await infoDialog(`Không thể xóa "${testDisplayName(t)}": còn ${locked.count} điểm QC thuộc kỳ đã khóa (${locked.periods.map(monthVN).join(', ')}). Hãy mở khóa các kỳ này ở trang Báo cáo trước — thao tác mở khóa yêu cầu lý do và được ghi vào nhật ký.`);return;}
   if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa xét nghiệm',message:`Xóa xét nghiệm ${t.name} và toàn bộ dữ liệu QC?`,detail:`${points.length} điểm QC cùng toàn bộ kết quả Westgard và Sigma của xét nghiệm này sẽ mất, không thể khôi phục.`,confirmLabel:'Xóa xét nghiệm',cancelLabel:'Hủy'}))return;
-  state.tests=state.tests.filter(x=>x.id!==id);state.qcPanels.forEach(p=>p.testIds=(p.testIds||[]).filter(testId=>testId!==id));state.assayGroups.forEach(g=>g.testIds=(g.testIds||[]).filter(testId=>testId!==id));
-  delete state.data[id];delete state.sigmaData[id];
+  if(!await reauthenticateCurrentUser({title:'Xác thực xóa xét nghiệm',message:`Nhập lại mật khẩu trước khi xóa ${t.name} và ${points.length} điểm QC.`}))return;
+  const result=ManageConfigService.removeAssay(state,{id});if(result.error){await infoDialog(result.message);return;}
   if(selTest===id)selTest=state.tests[0]&&state.tests[0].id||null;if(entrySel&&entrySel.testId===id)entrySel=null;
   logAct('Xóa test/lô',`Xóa xét nghiệm và ${points.length} điểm QC`,t.name);save();rerender();
 }
