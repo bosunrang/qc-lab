@@ -251,6 +251,7 @@ function readActionProtocolForm(version=3){
   return{protocolVersion:version,eventSource:actionFieldValue('aEventSource',40),processPhase:actionFieldValue('aProcessPhase',40),correction:actionFieldValue('aCorrection'),dueDate:parseVN(actionFieldValue('aDueDate',40))||'',riskSeverity:+actionFieldValue('aRiskSeverity',4)||0,riskOccurrence:+actionFieldValue('aRiskOccurrence',4)||0,riskDetectability:+actionFieldValue('aRiskDetectability',4)||0,riskLevel:actionFieldValue('aRiskLevel',40),riskBasis:actionFieldValue('aRiskBasis'),containmentStatus:actionFieldValue('aContainment',40),containmentNote:actionFieldValue('aContainmentNote'),qcMaterialStatus:actionFieldValue('aQcMaterial',40),qcMaterialNote:actionFieldValue('aQcMaterialNote'),instrumentStatus:actionFieldValue('aInstrument',40),instrumentNote:actionFieldValue('aInstrumentNote'),reagentStatus:actionFieldValue('aReagent',40),reagentNote:actionFieldValue('aReagentNote'),calibrationStatus:actionFieldValue('aCalibration',40),calibrationNote:actionFieldValue('aCalibrationNote'),lotToLotStatus:actionFieldValue('aLotToLot',40),lotToLotNote:actionFieldValue('aLotToLotNote'),causeCategory:actionFieldValue('aCauseCategory',40),cause:actionFieldValue('aCause'),actionCompletedDate:parseVN(actionFieldValue('aActionCompletedDate',40))||'',biasBefore:actionFieldValue('aBiasBefore',20),biasAfter:actionFieldValue('aBiasAfter',20),releaseStatus:actionFieldValue('aReleaseStatus',40),releaseDate:parseVN(actionFieldValue('aReleaseDate',40))||'',releaseBy:actionFieldValue('aReleaseBy',120),releaseNote:actionFieldValue('aReleaseNote'),patientImpact:actionFieldValue('aPatientImpact',40),patientAction:actionFieldValue('aPatientAction'),effectivenessStatus:actionFieldValue('aEffectivenessStatus',40)||'pending',effectivenessDate:parseVN(actionFieldValue('aEffectivenessDate',40))||'',effectivenessNote:actionFieldValue('aEffectivenessNote'),residualSeverity:+actionFieldValue('aResidualSeverity',4)||0,residualOccurrence:+actionFieldValue('aResidualOccurrence',4)||0,residualDetectability:+actionFieldValue('aResidualDetectability',4)||0,residualRiskLevel:actionFieldValue('aResidualRiskLevel',40),residualRiskBasis:actionFieldValue('aResidualRiskBasis')};
 }
 function actionEffectivenessMissingKey(a){
+  if(globalThis.ActionProtocolService)return globalThis.ActionProtocolService.effectivenessMissingKey(a);
   if(+a.protocolVersion>=3&&!a.actionCompletedDate)return'actionCompletedDate';
   if(!a.effectivenessDate)return'effectivenessDate';
   if(String(a.effectivenessNote||'').trim().length<5)return'effectivenessNote';
@@ -321,8 +322,8 @@ function actionInvestigationField(statusId,noteId,title,hint,form,statusKey,note
     <div class="action-investigation-choices" role="group" aria-label="${escAttr('Kết quả '+title)}">${choices.map(([v,label])=>`<button type="button" class="action-choice ${v===value?'active':''}" data-value="${escAttr(v)}" aria-pressed="${v===value?'true':'false'}" onclick="actionInvestigationChoose('${jsq(statusId)}','${jsq(v)}')">${esc(actionInvestigationChoiceLabel(v,label))}</button>`).join('')}</div>
     <div class="action-investigation-note"><input id="${noteId}" aria-label="Ghi chú ${escAttr(title)}" placeholder="Ghi chú / bằng chứng" value="${escAttr(form[noteKey]||'')}">${actionSuggestBox(noteId,ACT_SUGGEST[noteKey],'Gợi ý bằng chứng')}</div></div>`;
 }
-function actionInvestigationChoiceLabel(value,label){return value==='not-needed'?'Không cần':value==='checked-ok'?'Đạt':value==='checked-abnormal'?'Bất thường':label;}
-function actionInvestigationStateClass(value){return['ok','checked-ok'].includes(value)?'is-ok':['abnormal','checked-abnormal'].includes(value)?'is-abnormal':['na','not-needed'].includes(value)?'is-na':'is-empty';}
+function actionInvestigationChoiceLabel(value,label){return globalThis.ActionInvestigationPresentation?globalThis.ActionInvestigationPresentation.choiceLabel(value,label):value==='not-needed'?'Không cần':value==='checked-ok'?'Đạt':value==='checked-abnormal'?'Bất thường':label;}
+function actionInvestigationStateClass(value){return globalThis.ActionInvestigationPresentation?globalThis.ActionInvestigationPresentation.stateClass(value):['ok','checked-ok'].includes(value)?'is-ok':['abnormal','checked-abnormal'].includes(value)?'is-abnormal':['na','not-needed'].includes(value)?'is-na':'is-empty';}
 function actionInvestigationChoose(statusId,value){
   const select=document.getElementById(statusId);if(!select)return;
   select.value=value;select.dispatchEvent(new Event('change',{bubbles:true}));
@@ -336,23 +337,26 @@ function actionInvestigationSync(statusId){
 }
 function actionChecklistRefresh(){
   const first=document.getElementById(ACT_CHECK_FIELDS[0][0]),section=first&&first.closest('details'),chip=section&&section.querySelector(':scope > summary .action-chip');if(!chip)return;
-  const done=ACT_CHECK_FIELDS.filter(([statusId,noteId])=>{const status=(document.getElementById(statusId)||{}).value,note=String((document.getElementById(noteId)||{}).value||'').trim(),valid=!!ACTION_LABELS.check[status],needNote=['abnormal','na','checked-abnormal'].includes(status);return valid&&(!needNote||note.length>=3);}).length;
-  chip.textContent=`Đã hoàn tất ${done}/${ACT_CHECK_FIELDS.length}`;chip.classList.toggle('ok',done===ACT_CHECK_FIELDS.length);chip.classList.toggle('warn',done!==ACT_CHECK_FIELDS.length);
+  const rows=ACT_CHECK_FIELDS.map(([statusId,noteId])=>({status:(document.getElementById(statusId)||{}).value,note:(document.getElementById(noteId)||{}).value})),info=globalThis.ActionChecklistPresentation?globalThis.ActionChecklistPresentation.checklistChip(rows):(function(){const done=rows.filter(({status,note})=>{const valid=!!ACTION_LABELS.check[status],needNote=['abnormal','na','checked-abnormal'].includes(status);return valid&&(!needNote||String(note||'').trim().length>=3);}).length;return{cls:done===rows.length?'ok':'warn',label:`Đã hoàn tất ${done}/${rows.length}`};})();
+  chip.textContent=info.label;chip.classList.toggle('ok',info.cls==='ok');chip.classList.toggle('warn',info.cls==='warn');
 }
 /* Bọc một mục thành <details> thu gọn được. Dùng thẻ gốc thay vì tự dựng bằng JS:
    bàn phím, ARIA và trạng thái mở/đóng do trình duyệt lo, không phát sinh vi phạm
    a11y nào. ontoggle ghi lại trạng thái để rerender() không bung/thu lung tung. */
 function actionSectionChip(missing){
+  if(globalThis.ActionChecklistPresentation)return globalThis.ActionChecklistPresentation.sectionChip(missing);
   const n=(missing||[]).length;
   return n?{cls:'warn',label:`Còn thiếu ${n} mục`,title:`Còn thiếu: ${missing.join('; ')}`}:{cls:'ok',label:'Đã xong',title:'Không còn mục bắt buộc chưa hoàn thành'};
 }
 function actionChecklistChip(form){
+  if(globalThis.ActionChecklistPresentation)return globalThis.ActionChecklistPresentation.checklistChip(ACT_CHECK_FIELDS.map(([, ,statusKey,noteKey])=>({status:form[statusKey],note:form[noteKey]})));
   const done=ACT_CHECK_FIELDS.filter(([, ,statusKey,noteKey])=>{const status=form[statusKey],valid=!!ACTION_LABELS.check[status],needNote=['abnormal','na','checked-abnormal'].includes(status);return valid&&(!needNote||String(form[noteKey]||'').trim().length>=3);}).length;
   return{cls:done===ACT_CHECK_FIELDS.length?'ok':'warn',label:`Đã hoàn tất ${done}/${ACT_CHECK_FIELDS.length}`};
 }
 /* Mục 8 không nằm trong checklist khép vòng nên không có số "còn thiếu" — chip lấy
    thẳng từ cổng hiệu lực, nếu không sẽ luôn hiện "Đã xong" cho hồ sơ còn trắng. */
 function actionEffSectionChip(form){
+  if(globalThis.ActionChecklistPresentation)return globalThis.ActionChecklistPresentation.effectivenessChip(form);
   const eff=actionEffectivenessStatus({...form,protocolVersion:form.protocolVersion||3});
   return{cls:eff.cls==='none'?'none':eff.cls,label:eff.complete?eff.label:(form.effectivenessStatus==='ineffective'?eff.label:'Chưa đánh giá'),title:eff.label};
 }

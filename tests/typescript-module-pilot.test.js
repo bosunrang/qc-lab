@@ -17,6 +17,7 @@ const periodSource = read('src/application/period/period-service.ts');
 const warningSource = read('src/domain/qc/qc-point-warnings.ts');
 const uiStateSource = read('src/presentation/state/ui-state.ts');
 const reagentSource = read('src/application/reagent/reagent-comparison-service.ts');
+const reagentReportPresentationSource = read('src/presentation/reagent/reagent-report-presentation.ts');
 const cohortSource = read('src/domain/sigma/sigma-cohort-service.ts');
 const sigmaPresentationSource = read('src/domain/sigma/sigma-presentation.ts');
 const sigmaPeriodSource = read('src/domain/sigma/sigma-period-view-model.ts');
@@ -33,6 +34,22 @@ const sigmaTeaSnapshotSource = read('src/application/sigma/sigma-tea-snapshot-se
 const sigmaLevelSelectionSource = read('src/domain/sigma/sigma-level-selection-service.ts');
 const sigmaPeriodSelectionSource = read('src/presentation/sigma/sigma-period-selection-service.ts');
 const westgardSource = read('src/domain/westgard/westgard-view-model.ts');
+const westgardRowWindowSource = read('src/presentation/westgard/westgard-row-window.ts');
+const westgardArchivedGroupsSource = read('src/presentation/westgard/westgard-archived-groups.ts');
+const westgardArchivedMultiViewsSource = read('src/presentation/westgard/westgard-archived-multi-views.ts');
+const westgardArchivedGroupMatchSource = read('src/presentation/westgard/westgard-archived-group-match.ts');
+const reportSearchValuesSource = read('src/presentation/report/report-search-values.ts');
+const westgardArchivedTestSelectionSource = read('src/presentation/westgard/westgard-archived-test-selection.ts');
+const reagentPairsSource = read('src/domain/reagent/reagent-pairs.ts');
+const reagentStatisticsSource = read('src/domain/reagent/reagent-statistics.ts');
+const reagentTDistributionSource = read('src/domain/reagent/reagent-t-distribution.ts');
+const reagentCalculationSource = read('src/domain/reagent/reagent-comparison-calculation.ts');
+const reagentChartRangeSource = read('src/presentation/reagent/reagent-chart-range.ts');
+const reagentReportItemsSource = read('src/presentation/reagent/reagent-report-items.ts');
+const reagentComparisonLabelSource = read('src/presentation/reagent/reagent-comparison-label.ts');
+const reportActionIconSource = read('src/presentation/report/report-action-icon.ts');
+const reagentQuickLabelSource = read('src/presentation/reagent/reagent-quick-label.ts');
+const reagentToolIconSource = read('src/presentation/reagent/reagent-tool-icon.ts');
 const protocolSource = read('src/domain/nce/action-protocol-service.ts');
 const reviewSource = read('src/application/nce/action-review-service.ts');
 const escalationSource = read('src/application/nce/action-escalation-service.ts');
@@ -109,6 +126,8 @@ const actionStatusPresentationSource = read('src/presentation/nce/action-status-
 const actionReviewPresentationSource = read('src/presentation/nce/action-review-presentation.ts');
 const actionDetailPresentationSource = read('src/presentation/nce/action-detail-presentation.ts');
 const actionGuidePresentationSource = read('src/presentation/nce/action-guide-presentation.ts');
+const actionInvestigationPresentationSource = read('src/presentation/nce/action-investigation-presentation.ts');
+const actionChecklistPresentationSource = read('src/presentation/nce/action-checklist-presentation.ts');
 const reportPeriodPresentationSource = read('src/presentation/report/report-period-presentation.ts');
 const rangeCandidateSource = read('src/domain/qc/range-candidate.ts');
 const rangeSafetyGateSource = read('src/domain/qc/range-safety-gate.ts');
@@ -262,10 +281,44 @@ assert.doesNotMatch(cohortSource, /\bQCCore\b|\bglobalThis\b|\bdocument\b/,
   'domain Sigma cohort không được đọc dependency hoặc môi trường toàn cục');
 assert.match(westgardSource, /export const westgardViewModel = Object\.freeze/,
   'Westgard view-model phải xuất API ES Module bất biến');
+assert.match(westgardRowWindowSource, /export function westgardRowsWindow(?:<[^>]+>)?\(/,
+  'Westgard row window must be a pure TypeScript presentation helper');
+assert.match(westgardArchivedGroupsSource, /export function westgardArchivedGroups(?:<[^>]+>)?\(/,
+  'Westgard archived-group selection must be a pure TypeScript presentation helper');
+assert.match(westgardArchivedMultiViewsSource, /export function westgardArchivedMultiViews(?:<[^>]+>)?\(/,
+  'Westgard archived multi-chart data must be a pure TypeScript presentation helper');
+assert.match(westgardArchivedGroupMatchSource, /export function westgardArchivedGroupMatches(?:<[^>]+>)?\(/,
+  'Westgard archived-group search must be a pure TypeScript presentation helper');
+assert.match(reportSearchValuesSource, /export function reportSearchValues(?:<[^>]+>)?\(/,
+  'Report search values must be a pure TypeScript presentation helper');
+assert.match(westgardArchivedTestSelectionSource, /export function westgardArchivedTestSelection/,
+  'Westgard archived test selection must be a pure TypeScript presentation helper');
+assert.match(reagentPairsSource, /export function reagentValidPairs\(/,
+  'Reagent pair validation must be a pure TypeScript domain helper');
+assert.match(reagentStatisticsSource, /export const reagentStatistics = Object\.freeze/,
+  'Reagent descriptive statistics must be a pure TypeScript domain helper');
+assert.match(reagentTDistributionSource, /export const reagentTDistribution = Object\.freeze/,
+  'Reagent t-distribution must be a pure TypeScript domain helper');
+assert.match(reagentCalculationSource, /export function createReagentComparisonCalculator\(/,
+  'Reagent comparison calculation must be a pure TypeScript domain helper');
+assert.match(reagentChartRangeSource, /export const reagentChartPresentation = Object\.freeze/,
+  'Reagent chart range must be a pure TypeScript presentation helper');
+assert.match(reagentReportItemsSource, /export const reagentReportItemPresentation = Object\.freeze/,
+  'Reagent report items must be a pure TypeScript presentation helper');
+assert.match(reagentComparisonLabelSource, /export const reagentComparisonLabelPresentation = Object\.freeze/,
+  'Reagent comparison labels must be a pure TypeScript presentation helper');
+assert.match(reportActionIconSource, /export const reportActionIconPresentation = Object\.freeze/,
+  'Report action icons must be a pure TypeScript presentation helper');
+assert.match(reagentQuickLabelSource, /export const reagentQuickLabelPresentation = Object\.freeze/,
+  'Reagent quick labels must be a pure TypeScript presentation helper');
+assert.match(reagentToolIconSource, /export const reagentToolIconPresentation=Object\.freeze/,
+  'Reagent tool icons must be a pure TypeScript presentation helper');
 assert.doesNotMatch(westgardSource, /\bstate\b|\bglobalThis\b|\bdocument\b/,
   'Westgard view-model không được đọc state hoặc môi trường toàn cục');
 assert.match(reagentSource, /export function createReagentComparisonService\(/,
   'Reagent application service phải xuất factory nhận dependency');
+assert.match(reagentReportPresentationSource, /export const reagentReportPresentation\s*=\s*Object\.freeze/,
+  'Reagent report labels and number formatting must be a pure TypeScript presentation module');
 assert.doesNotMatch(reagentSource, /\bQCCore\b|\bglobalThis\b|\bdocument\b/,
   'Reagent application service không được đọc dependency hoặc DOM toàn cục');
 assert.match(entrySource, /export function createEntryService\(/,
@@ -294,6 +347,8 @@ assert.doesNotMatch(periodSource, /\bQCCore\b|\bglobalThis\b|\bdocument\b/,
   'Period application service không được đọc dependency hoặc DOM toàn cục');
 assert.match(protocolSource, /export function createActionProtocolService\(/,
   'NCE protocol service must expose a dependency-injected factory');
+assert.match(protocolSource, /effectivenessMissingKey\s*=\s*\(action: Action\)/,
+  'NCE protocol service must own the missing effectiveness field selection');
 assert.doesNotMatch(protocolSource, /\bstate\b|\bglobalThis\b|\bdocument\b/,
   'NCE protocol service must not read global state or DOM');
 assert.match(reviewSource, /export function createActionReviewService\(/,
@@ -608,6 +663,10 @@ assert.doesNotMatch(actionDetailPresentationSource, /\bstate\b|\bglobalThis\b|\b
   'NCE detail presentation không được đọc global state hoặc DOM');
 assert.match(actionGuidePresentationSource, /export function createActionGuidePresentation\(/,
   'NCE guide presentation phải xuất factory');
+assert.match(actionInvestigationPresentationSource, /export const actionInvestigationPresentation\s*=\s*Object\.freeze/,
+  'trạng thái thẻ điều tra NCE phải tách thành presentation TypeScript thuần');
+assert.match(actionChecklistPresentationSource, /export function createActionChecklistPresentation\(/,
+  'chip checklist NCE phải tách thành presentation TypeScript nhận dependency');
 assert.doesNotMatch(actionGuidePresentationSource, /\bstate\b|\bglobalThis\b|\bdocument\b/,
   'NCE guide presentation không được đọc global state hoặc DOM');
 assert.match(reportPeriodPresentationSource, /export function createReportPeriodPresentation\(/,
@@ -620,6 +679,8 @@ assert.doesNotMatch(rangeCandidateSource, /\bstate\b|\bglobalThis\b|\bdocument\b
   'QC range candidate must not read global state or DOM');
 assert.match(rangeSafetyGateSource, /export function rangeSafetyGate\(/,
   'QC range safety gate must export its pure clinical predicate');
+assert.match(rangeSafetyGateSource, /export function rangeBiasEvaluation\(/,
+  'QC range Bias evaluation must export its pure clinical calculation');
 assert.doesNotMatch(rangeSafetyGateSource, /\bstate\b|\bglobalThis\b|\bdocument\b/,
   'QC range safety gate must not read global state or DOM');
 assert.match(csvCellSource, /export function csvCell\(/,
@@ -916,6 +977,8 @@ assert.match(generated, /root\.qcRangeCandidateService\s*=\s*createRangeCandidat
   'artifact must publish TypeScript QC range candidate service for the legacy bridge');
 assert.match(generated, /root\.qcRangeSafetyGate\s*=\s*rangeSafetyGate/,
   'artifact must publish TypeScript QC range safety gate for the legacy bridge');
+assert.match(generated, /root\.qcRangeBiasEvaluation\s*=\s*rangeBiasEvaluation/,
+  'artifact must publish TypeScript QC range Bias evaluation for the legacy bridge');
 assert.match(generated, /root\.csvCellService\s*=\s*csvCell/,
   'artifact must publish TypeScript CSV cell encoder for the legacy bridge');
 assert.match(generated, /root\.reportExportHelpers\s*=\s*reportExportHelpers/,
@@ -1002,6 +1065,10 @@ assert.match(generated, /root\.ActionDetailPresentation\s*=\s*createActionDetail
   'artifact must publish the NCE detail presentation service for legacy route callers');
 assert.match(generated, /root\.ActionGuidePresentation\s*=\s*createActionGuidePresentation/,
   'artifact must publish the NCE guide presentation service for legacy route callers');
+assert.match(generated, /root\.ActionInvestigationPresentation\s*=\s*actionInvestigationPresentation/,
+  'artifact must publish NCE investigation presentation for legacy form callers');
+assert.match(generated, /root\.ActionChecklistPresentation\s*=\s*createActionChecklistPresentation/,
+  'artifact must publish NCE checklist presentation for legacy form callers');
 assert.match(generated, /root\.ReportPeriodPresentation\s*=\s*createReportPeriodPresentation/,
   'artifact must publish the report period presentation service for legacy route callers');
 assert.match(generated, /root\.NceActionLabels\s*=\s*nceActionLabels/,
@@ -1040,8 +1107,42 @@ assert.match(generated, /root\.SigmaCohortService\s*=\s*createSigmaCohortService
   'artifact phải công bố Sigma cohort API cho caller cũ');
 assert.match(generated, /root\.WestgardViewModel\s*=\s*westgardViewModel/,
   'artifact phải công bố Westgard view-model API cho caller cũ');
+assert.match(generated, /root\.westgardRowsWindow\s*=\s*westgardRowsWindow/,
+  'artifact must publish TypeScript Westgard row window for legacy route callers');
+assert.match(generated, /root\.westgardArchivedGroups\s*=\s*westgardArchivedGroups/,
+  'artifact must publish TypeScript Westgard archived-group selection for legacy route callers');
+assert.match(generated, /root\.westgardArchivedMultiViews\s*=\s*westgardArchivedMultiViews/,
+  'artifact must publish TypeScript Westgard archived multi-chart data for legacy route callers');
+assert.match(generated, /root\.westgardArchivedGroupMatches\s*=\s*westgardArchivedGroupMatches/,
+  'artifact must publish TypeScript Westgard archived-group search for legacy route callers');
+assert.match(generated, /root\.reportSearchValuePresentation\s*=\s*reportSearchValuePresentation/,
+  'artifact must publish TypeScript report search values for legacy route callers');
+assert.match(generated, /root\.westgardArchivedTestSelection\s*=\s*westgardArchivedTestSelection/,
+  'artifact must publish TypeScript Westgard archived test selection for legacy route callers');
+assert.match(generated, /root\.reagentPairMath\s*=\s*reagentPairMath/,
+  'artifact must publish TypeScript reagent pair math for legacy route callers');
+assert.match(generated, /root\.reagentStatistics\s*=\s*reagentStatistics/,
+  'artifact must publish TypeScript reagent statistics for legacy route callers');
+assert.match(generated, /root\.reagentTDistribution\s*=\s*reagentTDistribution/,
+  'artifact must publish TypeScript reagent t-distribution for legacy route callers');
+assert.match(generated, /root\.reagentComparisonCalculator\s*=\s*createReagentComparisonCalculator\(/,
+  'artifact must publish TypeScript reagent comparison calculation for legacy route callers');
+assert.match(generated, /root\.reagentChartPresentation\s*=\s*reagentChartPresentation/,
+  'artifact must publish TypeScript reagent chart range for legacy route callers');
+assert.match(generated, /root\.reagentReportItemPresentation\s*=\s*reagentReportItemPresentation/,
+  'artifact must publish TypeScript reagent report items for legacy route callers');
+assert.match(generated, /root\.reagentComparisonLabelPresentation\s*=\s*reagentComparisonLabelPresentation/,
+  'artifact must publish TypeScript reagent comparison labels for legacy route callers');
+assert.match(generated, /root\.reportActionIconPresentation\s*=\s*reportActionIconPresentation/,
+  'artifact must publish TypeScript report action icons for legacy route callers');
+assert.match(generated, /root\.reagentQuickLabelPresentation\s*=\s*reagentQuickLabelPresentation/,
+  'artifact must publish TypeScript reagent quick labels for legacy route callers');
+assert.match(generated, /root\.reagentToolIconPresentation\s*=\s*reagentToolIconPresentation/,
+  'artifact must publish TypeScript reagent tool icons for legacy route callers');
 assert.match(generated, /root\.ReagentComparisonService\s*=\s*createReagentComparisonService/,
   'artifact phải công bố Reagent application service cho caller cũ');
+assert.match(generated, /root\.reagentReportPresentation\s*=\s*reagentReportPresentation/,
+  'artifact must publish TypeScript reagent report presentation for legacy print callers');
 assert.match(generated, /root\.EntryService\s*=\s*createEntryService/,
   'artifact phải công bố Entry application service cho caller cũ');
 assert.match(generated, /root\.LISClientService\s*=\s*lisClient/,

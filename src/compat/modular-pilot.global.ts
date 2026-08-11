@@ -136,7 +136,7 @@ import { createCusumMemoCache } from '../domain/qc/cusum-memo-cache';
 import { createAcceptedMemoCache } from '../domain/qc/accepted-memo-cache';
 import { createWestgardRuleSettings } from '../domain/westgard/rule-settings';
 import { createRangeCandidateService } from '../domain/qc/range-candidate';
-import { rangeSafetyGate } from '../domain/qc/range-safety-gate';
+import { rangeBiasEvaluation, rangeSafetyGate } from '../domain/qc/range-safety-gate';
 import { csvCell as csvCellTs } from '../domain/export/csv-cell';
 import { reportExportHelpers } from '../presentation/report/export-helpers';
 import { createActionReportSummary } from '../presentation/nce/action-report-summary';
@@ -211,6 +211,16 @@ import {
   createReagentComparisonService,
   type ReagentComparisonServiceApi,
 } from '../application/reagent/reagent-comparison-service';
+import { reagentReportPresentation } from '../presentation/reagent/reagent-report-presentation';
+import { reagentChartPresentation } from '../presentation/reagent/reagent-chart-range';
+import { reagentReportItemPresentation } from '../presentation/reagent/reagent-report-items';
+import { reagentComparisonLabelPresentation } from '../presentation/reagent/reagent-comparison-label';
+import { reagentQuickLabelPresentation } from '../presentation/reagent/reagent-quick-label';
+import { reagentToolIconPresentation } from '../presentation/reagent/reagent-tool-icon';
+import { reagentPairMath } from '../domain/reagent/reagent-pairs';
+import { reagentStatistics } from '../domain/reagent/reagent-statistics';
+import { reagentTDistribution } from '../domain/reagent/reagent-t-distribution';
+import { createReagentComparisonCalculator } from '../domain/reagent/reagent-comparison-calculation';
 import {
   createSigmaCohortService,
   type CohortStats,
@@ -232,6 +242,11 @@ import { createSigmaLevelSelectionService, type SigmaLevelSelectionService } fro
 import { createSigmaPeriodSelectionService, type SigmaPeriodSelectionService } from '../presentation/sigma/sigma-period-selection-service';
 import { createLotTransitionPickerService, type LotTransitionPickerServiceApi } from '../presentation/manage/lot-transition-picker-service';
 import { westgardViewModel, type WestgardViewModelApi } from '../domain/westgard/westgard-view-model';
+import { westgardRowsWindow } from '../presentation/westgard/westgard-row-window';
+import { westgardArchivedGroups } from '../presentation/westgard/westgard-archived-groups';
+import { westgardArchivedMultiViews } from '../presentation/westgard/westgard-archived-multi-views';
+import { westgardArchivedGroupMatches } from '../presentation/westgard/westgard-archived-group-match';
+import { westgardArchivedTestSelection } from '../presentation/westgard/westgard-archived-test-selection';
 import { nceActionLabels, type NceActionLabels } from '../domain/nce/action-labels';
 import { nceActionBasics, type NceActionBasics } from '../domain/nce/action-basics';
 import { createNceActionIdentityService, type NceActionIdentityService } from '../application/nce/action-identity-service';
@@ -247,7 +262,11 @@ import { createActionStatusPresentation, type ActionStatusPresentation } from '.
 import { createActionReviewPresentation, type ActionReviewPresentation } from '../presentation/nce/action-review-presentation';
 import { createActionDetailPresentation, type ActionDetailPresentation } from '../presentation/nce/action-detail-presentation';
 import { createActionGuidePresentation, type ActionGuidePresentation } from '../presentation/nce/action-guide-presentation';
+import { actionInvestigationPresentation, type ActionInvestigationPresentation } from '../presentation/nce/action-investigation-presentation';
+import { createActionChecklistPresentation, type ActionChecklistPresentation } from '../presentation/nce/action-checklist-presentation';
 import { createReportPeriodPresentation, type ReportPeriodPresentation } from '../presentation/report/report-period-presentation';
+import { reportSearchValuePresentation } from '../presentation/report/report-search-values';
+import { reportActionIconPresentation } from '../presentation/report/report-action-icon';
 import { nceActionRerunPolicy, type NceActionRerunPolicy } from '../domain/nce/action-rerun-policy';
 import { nceActionRerunCacheKey, type NceActionRerunCacheKey } from '../domain/nce/action-rerun-cache-key';
 import { nceActionQcIndex, type NceActionQcIndex } from '../domain/nce/action-qc-index';
@@ -390,7 +409,11 @@ type QCLabGlobal = typeof globalThis & {
   ActionReviewPresentation?: ActionReviewPresentation;
   ActionDetailPresentation?: ActionDetailPresentation;
   ActionGuidePresentation?: ActionGuidePresentation;
+  ActionInvestigationPresentation?: ActionInvestigationPresentation;
+  ActionChecklistPresentation?: ActionChecklistPresentation;
   ReportPeriodPresentation?: ReportPeriodPresentation;
+  reportSearchValuePresentation?: typeof reportSearchValuePresentation;
+  reportActionIconPresentation?: typeof reportActionIconPresentation;
   ChartViewModel?: ChartViewModelApi;
   EntryService?: EntryServiceApi;
   ManageConfigService?: ManageConfigServiceApi;
@@ -399,6 +422,16 @@ type QCLabGlobal = typeof globalThis & {
   qcPointWarnings?: (test: Record<string, any>, config: Record<string, any>, date: string,
     runId: string, value: number) => string[];
   ReagentComparisonService?: ReagentComparisonServiceApi;
+  reagentReportPresentation?: typeof reagentReportPresentation;
+  reagentChartPresentation?: typeof reagentChartPresentation;
+  reagentReportItemPresentation?: typeof reagentReportItemPresentation;
+  reagentComparisonLabelPresentation?: typeof reagentComparisonLabelPresentation;
+  reagentQuickLabelPresentation?: typeof reagentQuickLabelPresentation;
+  reagentToolIconPresentation?: typeof reagentToolIconPresentation;
+  reagentPairMath?: typeof reagentPairMath;
+  reagentStatistics?: typeof reagentStatistics;
+  reagentTDistribution?: typeof reagentTDistribution;
+  reagentComparisonCalculator?: ReturnType<typeof createReagentComparisonCalculator>;
   SigmaCohortService?: SigmaCohortServiceApi;
   SigmaPresentation?: SigmaPresentation;
   SigmaPeriodViewModel?: SigmaPeriodViewModel;
@@ -415,6 +448,11 @@ type QCLabGlobal = typeof globalThis & {
   SigmaLevelSelectionService?: SigmaLevelSelectionService;
   SigmaPeriodSelectionService?: SigmaPeriodSelectionService;
   WestgardViewModel?: WestgardViewModelApi;
+  westgardRowsWindow?: typeof westgardRowsWindow;
+  westgardArchivedGroups?: typeof westgardArchivedGroups;
+  westgardArchivedMultiViews?: typeof westgardArchivedMultiViews;
+  westgardArchivedGroupMatches?: typeof westgardArchivedGroupMatches;
+  westgardArchivedTestSelection?: typeof westgardArchivedTestSelection;
   LISClientService?: LisClientApi;
   BackupService?: BackupServiceApi;
   AuditService?: AuditServiceApi;
@@ -594,6 +632,7 @@ type QCLabGlobal = typeof globalThis & {
   westgardRuleSettings?: ReturnType<typeof createWestgardRuleSettings>;
   qcRangeCandidateService?: ReturnType<typeof createRangeCandidateService>;
   qcRangeSafetyGate?: typeof rangeSafetyGate;
+  qcRangeBiasEvaluation?: typeof rangeBiasEvaluation;
   csvCellService?: typeof csvCellTs;
   reportExportHelpers?: typeof reportExportHelpers;
   actionReportSummary?: ReturnType<typeof createActionReportSummary>;
@@ -1001,6 +1040,7 @@ root.qcAcceptedMemoCache=createAcceptedMemoCache();
 root.westgardRuleSettings=createWestgardRuleSettings({defaults:(root.QCCore as any).WG_DEFAULT_ON?Object.fromEntries((root.QCCore as any).WG_RULES.map((rule:string)=>[rule,(root.QCCore as any).WG_DEFAULT_ON.has(rule)])): {},getState:()=>state,ruleEnabled:(rules:any,rule:string)=>(root.QCCore as any).ruleEnabled(rules,rule),requireWrite:()=>requireWrite(),save:()=>save({}),rerender:()=>rerender()});
 root.qcRangeCandidateService=createRangeCandidateService({tests:()=>state.tests||[],actions:()=>((state as any).actions||[]),levelConfig:(test:any,level:any)=>lvlCfg(test,level),points:(test:any,level:any)=>(globalThis as any).operationalLotPoints(test,level),westgard:(test:any)=>(globalThis as any).activeWestgard(test),pointZ:(point:any,mean:any,sd:any)=>(root.QCCore as any).pointZ(point,mean,sd),stats:(values:number[])=>(root.QCCore as any).stats(values),actionCancelled:(action:any)=>typeof (globalThis as any).actionCancelled==='function'&&(globalThis as any).actionCancelled(action),systematicRules:(root.QCCore as any).WG_SE_RULES,limitsFromTarget:(mean:any,sd:any,k:number)=>(root.QCCore as any).limitsFromTarget(mean,sd,k)});
 root.qcRangeSafetyGate=rangeSafetyGate;
+root.qcRangeBiasEvaluation=rangeBiasEvaluation;
 root.csvCellService=csvCellTs;
 root.reportExportHelpers=reportExportHelpers;
 root.actionReportSummary=createActionReportSummary({labels:()=>typeof (globalThis as any).ACTION_LABELS==='object'?(globalThis as any).ACTION_LABELS:{},excerpt:(value:any,max?:number)=>root.reportExportHelpers!.nceExcerpt(value,max)});
@@ -1224,7 +1264,15 @@ root.ActionDetailPresentation = createActionDetailPresentation({
   riskLabels: nceActionLabels.actionLabels.risk,
 });
 root.ActionGuidePresentation = createActionGuidePresentation();
+root.ActionInvestigationPresentation = actionInvestigationPresentation;
+root.ActionChecklistPresentation = createActionChecklistPresentation({
+  checkLabels: nceActionLabels.actionLabels.check,
+  effectivenessStatus: form => typeof (root as any).actionEffectivenessStatus === 'function'
+    ? (root as any).actionEffectivenessStatus(form) : { cls: 'none', label: 'Chưa đánh giá', complete: false },
+});
 root.ReportPeriodPresentation = createReportPeriodPresentation();
+root.reportSearchValuePresentation = reportSearchValuePresentation;
+root.reportActionIconPresentation = reportActionIconPresentation;
 root.ActionBiasService = createActionBiasService({
   teaFor: (test, level) => (globalThis as any).sgTeaBySource(test, (globalThis as any).sgTeaSource(test), level.mean),
   systematicShiftCritical: (tea, bias, sd) => root.QCCore!.systematicShiftCritical(tea, bias, sd),
@@ -1391,5 +1439,25 @@ root.ReagentComparisonService = createReagentComparisonService({
   cleanText: root.QCCore.cleanText,
   cleanId: root.QCCore.cleanId,
 });
+root.reagentReportPresentation = reagentReportPresentation;
+root.reagentChartPresentation = reagentChartPresentation;
+root.reagentReportItemPresentation = reagentReportItemPresentation;
+root.reagentComparisonLabelPresentation = reagentComparisonLabelPresentation;
+root.reagentQuickLabelPresentation = reagentQuickLabelPresentation;
+root.reagentToolIconPresentation = reagentToolIconPresentation;
+root.reagentPairMath = reagentPairMath;
+root.reagentStatistics = reagentStatistics;
+root.reagentTDistribution = reagentTDistribution;
+root.reagentComparisonCalculator = createReagentComparisonCalculator({
+  validPairs: reagentPairMath.validPairs, mean: reagentStatistics.mean, variance: reagentStatistics.variance,
+  max: reagentStatistics.max, min: reagentStatistics.min, pearson: reagentStatistics.pearson,
+  ols: reagentStatistics.ols, passingBablok: reagentStatistics.passingBablok,
+  twoSidedPValue: reagentTDistribution.twoSidedPValue, tCritical: reagentTDistribution.tCritical,
+});
 root.SigmaCohortService = createSigmaCohortService({ stats: root.QCCore.stats });
 root.WestgardViewModel = westgardViewModel;
+root.westgardRowsWindow = westgardRowsWindow;
+root.westgardArchivedGroups = westgardArchivedGroups;
+root.westgardArchivedMultiViews = westgardArchivedMultiViews;
+root.westgardArchivedGroupMatches = westgardArchivedGroupMatches;
+root.westgardArchivedTestSelection = westgardArchivedTestSelection;

@@ -58,6 +58,7 @@ function reportLockListHtml(){
   return `<div class="period-lock-list">${locks.map(l=>`<div class="period-lock-row"><div><b>Kỳ ${esc(monthVN(l.ym))}</b><span class="hint"> · Khóa bởi ${esc(l.lockedBy||'—')}${l.lockedAt?' lúc '+formatDateTimeVN(l.lockedAt):''}</span></div>${isAdmin?btn('Mở khóa',`reportUnlockPeriod('${jsq(l.ym)}')`,'ghost sm'):''}</div>`).join('')}</div>`;
 }
 function reportSearchValues(t){
+  if(globalThis.reportSearchValuePresentation)return globalThis.reportSearchValuePresentation.values(t,{testLabel:testSelectLabel,operationalLevels, panelForTest:operationalPanelForTest,lotGroupForTest:operationalLotGroupForTest});
   const levels=operationalLevels(t),panel=operationalPanelForTest(t),lotGroup=operationalLotGroupForTest(t);
   return [
     testSelectLabel(t),
@@ -113,6 +114,7 @@ const REPORT_ACTION_ICON_PATHS={
   print:'<path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/><path d="M18 12h.01"/>'
 };
 function reportActionIcon(type){
+  if(globalThis.reportActionIconPresentation)return globalThis.reportActionIconPresentation.icon(type);
   const paths=REPORT_ACTION_ICON_PATHS[type];
   return `<svg class="btn-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
 }

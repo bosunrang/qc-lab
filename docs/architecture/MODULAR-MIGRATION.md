@@ -5,12 +5,13 @@ Không viết lại toàn bộ và không thay đổi định dạng dữ liệu
 
 ## Trạng thái hiện tại
 
-- `src/domain/` là nguồn TypeScript cho nghiệp vụ thuần.
+- `src/domain/` là nguồn TypeScript cho nghiệp vụ thuần; `src/application/` và `src/presentation/` tách lần lượt điều phối use-case và chuẩn bị dữ liệu hiển thị.
 - `src/compat/` là cầu nối tạm thời để UI global hiện tại tiếp tục hoạt động.
 - `assets/generated/` là artifact được đóng gói vào Electron; không sửa tay.
-- Các module đã chuyển: `ChartViewModel`, `SigmaCohortService`, `WestgardViewModel`,
-  `ReagentComparisonService`, `EntryService`, `ManageConfigService`, `PeriodService`,
-  `qcPointWarnings`, `LISClientService`, `AuditService` và sáu UI state bags.
+- Các luồng đã có TypeScript gồm QC/Westgard, lưu trữ–Firebase, xác thực/audit,
+  Sigma, NCE, báo cáo/XLSX, backup, LIS và sáu UI state bags. UI global cũ vẫn gọi
+  các API tương thích từ bridge; NCE investigation presentation và đánh giá Bias
+  của workflow dải QC là các lát mới nhất.
 
 Luồng hiện tại:
 
@@ -64,6 +65,11 @@ factory đó với `QCCore.stats` của runtime cũ.
 `ReagentComparisonService` nằm trong `src/application/` vì nó thay đổi state do
 caller truyền vào. Service nhận `cleanText`/`cleanId` qua factory, không truy cập
 DOM, persistence hay `QCCore` trực tiếp.
+
+Lõi tính toán so sánh hóa chất hiện cũng đã ở `src/domain/reagent/`: chuẩn hóa cặp
+số liệu, thống kê mô tả/hồi quy, phân phối t và calculator nhận dependency qua
+factory. `assets/modules/reagent.js` giữ phần cập nhật state, modal và SVG, rồi gọi
+bridge tương thích cho các phép tính thuần.
 
 `EntryService` cũng nằm trong `src/application/`. Quy tắc khóa kỳ báo cáo và
 chọn số chữ số thập phân được tiêm qua adapter; service không truy cập

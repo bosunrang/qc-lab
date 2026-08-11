@@ -10,7 +10,7 @@ function wgTogglePrevLot(level){const k=selTest+'|'+level;if(wgPrevOpen.has(k))w
    "Chấp nhận lô mới" ở Chuyển tiếp lô) lẫn nhóm chỉ bị đánh dấu "Đã dừng" thủ công/qua
    Kích hoạt nhóm khác (g.status==='stopped', vẫn active:true) — cả hai đều là nhóm không
    còn xét nghiệm nào đang dùng, người dùng cần xem lại chi tiết/biểu đồ như nhóm đang hoạt động. */
-function wgArchivedGroups(){return(state.lotGroups||[]).filter(g=>g.active===false||g.status==='stopped').sort((a,b)=>String(b.stoppedAt||'').localeCompare(String(a.stoppedAt||''))||String(a.name||'').localeCompare(String(b.name||''),'vi'));}
+function wgArchivedGroups(){if(globalThis.westgardArchivedGroups)return globalThis.westgardArchivedGroups(state.lotGroups);return(state.lotGroups||[]).filter(g=>g.active===false||g.status==='stopped').sort((a,b)=>String(b.stoppedAt||'').localeCompare(String(a.stoppedAt||''))||String(a.name||'').localeCompare(String(b.name||''),'vi'));}
 function wgSetViewMode(mode){wgViewMode=mode==='archived'?'archived':'current';rerender();}
 function wgSetChartMode(mode){wgChartMode=mode==='cusum'?'cusum':'lj';rerender();}
 function wgChartModeTabs(){
@@ -41,6 +41,7 @@ function wgViewModeTabs(archivedGroups){
 }
 const WG_TABLE_INITIAL_ROWS=120;
 function wgRowsWindow(rows,key){
+  if(globalThis.westgardRowsWindow)return globalThis.westgardRowsWindow(rows,wgExpandedRows.has(key),WG_TABLE_INITIAL_ROWS);
   const all=rows||[],expanded=wgExpandedRows.has(key),visible=expanded?all:all.slice(-WG_TABLE_INITIAL_ROWS);
   return{rows:visible,total:all.length,expanded,limited:visible.length<all.length};
 }
@@ -71,11 +72,13 @@ function wgLotBlock(t,level,lotNo,mean,sd,pts,badge,titleMain,lotLabel,extraMeta
    mean,sd,pts,label} như wgMultiViews() (dùng cho xét nghiệm đang vận hành) để tái dùng chung
    drawLJMultiZ(). */
 function wgArchivedMultiViews(rows){
+  if(globalThis.westgardArchivedMultiViews)return globalThis.westgardArchivedMultiViews(rows,(t,level,lotNo)=>lotPointsByNo(t.id,level,lotNo));
   return rows.map(r=>({level:r.l.level,lot:r.lot.lotNo,mean:r.mean,sd:r.sd,pts:lotPointsByNo(r.t.id,r.l.level,r.lot.lotNo),label:`M${r.l.level}·${r.lot.lotNo}`}));
 }
 /* Nhóm lô "khớp" ô Tìm nhanh: theo tên nhóm HOẶC số lô bên trong (để gõ số lô cũng nhảy
    được sang đúng nhóm), không chỉ khớp theo tên xét nghiệm như testEntries bên dưới. */
 function wgArchivedGroupMatches(g,q){
+  if(globalThis.westgardArchivedGroupMatches)return globalThis.westgardArchivedGroupMatches(g,q,searchText,id=>(state.qcLots||[]).find(x=>x.id===id));
   if(!q)return true;
   if(searchText(g.name).includes(q))return true;
   return (g.lotIds||[]).some(id=>{const l=state.qcLots.find(x=>x.id===id);return l&&searchText(l.lotNo).includes(q);});
@@ -98,13 +101,15 @@ function pageWestgardArchived(archivedGroups){
   if(!testEntries.length)return headOnly('Phân tích Westgard','Xem lại Westgard theo nhóm lô đã dừng/lưu trữ')+
     `<div class="panel"><h2 class="panel-title">Thiết lập phân tích</h2>${wgViewModeTabs(archivedGroups)}<div class="wg-test-picker">${searchBox}${groupPicker}</div></div>
      <div class="panel">${emptyState('Không tìm thấy xét nghiệm nào','Nhóm lô này không gắn với xét nghiệm/mức nào có Mean/SD hợp lệ.')}</div>`;
-  const matchedTests=testEntries.filter(e=>!q||searchText(e.t.name).includes(q)||searchText(testDisplayName(e.t)).includes(q)||searchText(instrumentName(e.t.instrumentId,e.t.machine)).includes(q));
-  const testList=matchedTests.length?matchedTests:testEntries; // gõ số lô (không khớp tên xét nghiệm nào) thì vẫn cho chọn đủ xét nghiệm của nhóm vừa nhảy tới
-  if(matchedTests.length&&!matchedTests.some(e=>e.t.id===wgArchivedTestId))wgArchivedTestId=matchedTests[0].t.id;
+  const archiveTestSelection=globalThis.westgardArchivedTestSelection?globalThis.westgardArchivedTestSelection(testEntries,q,wgArchivedTestId,{searchText,testDisplayName,instrumentName}):null;
+  const matchedTests=archiveTestSelection?archiveTestSelection.matched:testEntries.filter(e=>!q||searchText(e.t.name).includes(q)||searchText(testDisplayName(e.t)).includes(q)||searchText(instrumentName(e.t.instrumentId,e.t.machine)).includes(q));
+  const testList=archiveTestSelection?archiveTestSelection.list:(matchedTests.length?matchedTests:testEntries); // gõ số lô (không khớp tên xét nghiệm nào) thì vẫn cho chọn đủ xét nghiệm của nhóm vừa nhảy tới
+  if(archiveTestSelection)wgArchivedTestId=archiveTestSelection.selected;
+  else if(matchedTests.length&&!matchedTests.some(e=>e.t.id===wgArchivedTestId))wgArchivedTestId=matchedTests[0].t.id;
   else if(!testEntries.some(e=>e.t.id===wgArchivedTestId))wgArchivedTestId=testEntries[0].t.id;
   const testOpts=testList.map(e=>`<option value="${e.t.id}" ${e.t.id===wgArchivedTestId?'selected':''}>${esc(testDisplayName(e.t))}</option>`).join('');
   const testPicker=`<div><label>Chọn xét nghiệm <span class="hint">(${testList.length}/${testEntries.length})</span></label><select onchange="if(this.value){wgSetArchivedTest(this.value)}">${testOpts}</select></div>`;
-  const entry=testEntries.find(e=>e.t.id===wgArchivedTestId)||testEntries[0];
+  const entry=archiveTestSelection?archiveTestSelection.entry:(testEntries.find(e=>e.t.id===wgArchivedTestId)||testEntries[0]);
   const sortedRows=entry.rows.slice().sort((a,b)=>a.l.level-b.l.level);
   const multiChart=sortedRows.length>=2?`<div class="panel"><h2 class="panel-title">Levey-Jennings tổng hợp</h2>
     <div class="hint wg-panel-intro">Biểu đồ quy đổi các mức QC về Z-score để so sánh trên cùng trục; kết luận Đạt/Cảnh báo/Loại bỏ được tính theo bộ luật Westgard đang bật cho xét nghiệm.</div>

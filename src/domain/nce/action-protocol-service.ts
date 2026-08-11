@@ -93,6 +93,26 @@ export function createActionProtocolService(deps: ActionProtocolServiceDeps) {
     return { required: true, complete: false, effective: false, label: 'Chờ đánh giá hiệu lực', cls: 'warn', escalated: false };
   };
 
+  const effectivenessMissingKey = (action: Action): string => {
+    if (Number(action.protocolVersion) >= 3 && !action.actionCompletedDate) return 'actionCompletedDate';
+    if (!action.effectivenessDate) return 'effectivenessDate';
+    if (String(action.effectivenessNote || '').trim().length < 5) return 'effectivenessNote';
+    const rerun = deps.needsRerun(action) ? deps.rerunStatus(action) : null;
+    const earliest = [action.date, action.actionCompletedDate, action.releaseDate, rerun?.ok && rerun.point?.date]
+      .filter(Boolean).sort().pop();
+    if (action.effectivenessDate > deps.todayIso() || (earliest && action.effectivenessDate < earliest)) return 'effectivenessDate';
+    if (action.effectivenessStatus === 'effective' && Number(action.protocolVersion) >= 3) {
+      if (!riskScale.includes(Number(action.residualSeverity))) return 'residualSeverity';
+      if (!riskScale.includes(Number(action.residualOccurrence))) return 'residualOccurrence';
+      if (!riskScale.includes(Number(action.residualDetectability))) return 'residualDetectability';
+      if (!has(actionLabels.risk, action.residualRiskLevel)) return 'residualRiskLevel';
+      if (String(action.residualRiskBasis || '').trim().length < 5) return 'residualRiskBasis';
+      const initial = actionRiskScore(action), residual = actionResidualRiskScore(action);
+      if (initial && residual > initial) return 'residualSeverity';
+    }
+    return 'effectivenessNote';
+  };
+
   const protocolSummary = (action: Action | null | undefined): string => {
     if (!action || !action.protocolVersion) return '';
     const checks = protocolChecks.map(([key, label]) => `${label}: ${actionLabels.check[action[key] as keyof typeof actionLabels.check] || 'Chưa ghi'}${action[key.replace('Status', 'Note')] ? ` (${action[key.replace('Status', 'Note')]})` : ''}`);
@@ -110,7 +130,7 @@ export function createActionProtocolService(deps: ActionProtocolServiceDeps) {
     ].join(' | ');
   };
 
-  return Object.freeze({ protocolStatus, effectivenessStatus, protocolSummary });
+  return Object.freeze({ protocolStatus, effectivenessStatus, effectivenessMissingKey, protocolSummary });
 }
 
 export type ActionProtocolService = ReturnType<typeof createActionProtocolService>;

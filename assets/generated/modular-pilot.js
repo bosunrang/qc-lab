@@ -4758,17 +4758,28 @@
 	}
 	//#endregion
 	//#region src/domain/qc/range-safety-gate.ts
+	function rangeBiasEvaluation(tea, bias, sd, systematicShiftCritical) {
+		const teaValue = Number(tea), biasValue = Number(bias);
+		const threshold = Number.isFinite(teaValue) && teaValue > 0 ? teaValue / 4 : null;
+		const valid = Number.isFinite(biasValue);
+		return {
+			threshold,
+			valid,
+			withinThreshold: threshold !== null && valid && Math.abs(biasValue) <= threshold,
+			critical: threshold !== null && valid && systematicShiftCritical ? systematicShiftCritical(teaValue, biasValue, sd) : null
+		};
+	}
 	function rangeSafetyGate(nce, tea, causeConfirmed, bias) {
 		if (!nce) return {
 			needed: false,
 			threshold: null,
 			passes: true
 		};
-		const teaValue = Number(tea), biasValue = Number(bias), threshold = Number.isFinite(teaValue) && teaValue > 0 ? teaValue / 4 : null;
+		const evaluation = rangeBiasEvaluation(tea, bias, null);
 		return {
 			needed: true,
-			threshold,
-			passes: !!causeConfirmed && threshold != null && Number.isFinite(biasValue) && Math.abs(biasValue) <= threshold
+			threshold: evaluation.threshold,
+			passes: !!causeConfirmed && evaluation.withinThreshold
 		};
 	}
 	//#endregion
@@ -6467,6 +6478,400 @@
 		});
 	}
 	//#endregion
+	//#region src/presentation/reagent/reagent-report-presentation.ts
+	function formatReagentNumber(value, decimals = 4) {
+		const numeric = Number(value);
+		return Number.isFinite(numeric) ? Number(numeric.toFixed(decimals)).toString() : "—";
+	}
+	function formatReagentTStatistic(value) {
+		const numeric = Number(value);
+		return Number.isFinite(numeric) ? Number(numeric.toFixed(4)).toString() : numeric > 0 ? "+∞" : "−∞";
+	}
+	function reagentReportVerdict(result, palette) {
+		if (!result) return {
+			text: "Thiếu dữ liệu",
+			cls: "mid",
+			bg: palette.midBg,
+			fg: palette.midFg
+		};
+		if (result.level === "ok") return {
+			text: "Đạt sàng lọc",
+			cls: "ok",
+			bg: palette.okBg,
+			fg: palette.okFg
+		};
+		if (result.level === "mid") return {
+			text: "Chưa đủ điều kiện",
+			cls: "mid",
+			bg: palette.midBg,
+			fg: palette.midFg
+		};
+		return {
+			text: "Có khác biệt",
+			cls: "no",
+			bg: palette.noBg,
+			fg: palette.noFg
+		};
+	}
+	function reagentReportConclusion(result) {
+		if (!result) return "";
+		if (result.level === "ok") return "Không khác biệt có ý nghĩa theo tiêu chí sàng lọc phần mềm; trình phê duyệt theo SOP trước khi dùng lô mới.";
+		if (result.level === "mid") return "Chưa đủ điều kiện sàng lọc phần mềm; cần bổ sung dữ liệu/xác nhận bao phủ hoặc ghi nhận ngoại lệ theo SOP.";
+		return "Có khác biệt vượt giới hạn; không dùng lô mới trước khi điều tra và xử lý.";
+	}
+	function reagentReportSummaryRows(items, palette) {
+		return (items || []).map((item, index) => {
+			const test = item?.ds?.test || {}, result = item?.R || null;
+			return {
+				index: index + 1,
+				reagent: String(test.reagent || "Hóa chất mới"),
+				unit: String(test.unit || ""),
+				lotOld: String(test.lotOld || "?"),
+				lotNew: String(test.lotNew || "?"),
+				result,
+				n: result ? result.N : "—",
+				r: result ? formatReagentNumber(result.r, 4) : "—",
+				bias: result ? `${formatReagentNumber(result.bias, 2)}%` : "—",
+				p2: result ? formatReagentNumber(result.p2, 4) : "—",
+				verdict: reagentReportVerdict(result, palette)
+			};
+		});
+	}
+	function reagentReportDetailModel(result, test, minPairs, dateText) {
+		const metadata = {
+			reagent: String(test?.reagent || "Hóa chất mới"),
+			lotOld: String(test?.lotOld || "—"),
+			lotNew: String(test?.lotNew || "—"),
+			dateText,
+			operator: String(test?.operator || "—"),
+			sampleType: String(test?.sampleType || "—"),
+			biasTarget: String(test?.biasTarget || 6),
+			alpha: String(test?.alpha || .05)
+		};
+		if (!result) return {
+			complete: false,
+			minPairs,
+			metadata,
+			pairs: [],
+			metrics: null,
+			conclusion: ""
+		};
+		return {
+			complete: true,
+			minPairs,
+			metadata,
+			pairs: (result.o || []).map((oldValue, index) => {
+				const newValue = result.n[index];
+				return {
+					index: index + 1,
+					oldValue,
+					newValue,
+					average: ((oldValue + newValue) / 2).toFixed(3),
+					difference: (oldValue - newValue).toFixed(3)
+				};
+			}),
+			metrics: {
+				meanOld: formatReagentNumber(result.mO, 2),
+				meanNew: formatReagentNumber(result.mN, 2),
+				correlation: formatReagentNumber(result.r, 5),
+				tStatistic: formatReagentTStatistic(result.tStat),
+				df: result.df,
+				p2: formatReagentNumber(result.p2, 5),
+				bias: formatReagentNumber(result.bias, 3),
+				olsSlope: formatReagentNumber(result.fit.b, 3),
+				olsIntercept: formatReagentNumber(Math.abs(result.fit.a), 3),
+				olsInterceptSign: result.fit.a >= 0 ? "+" : "−",
+				olsR2: formatReagentNumber(result.fit.r2, 4),
+				pbSlope: formatReagentNumber(result.pb.b, 3),
+				pbIntercept: formatReagentNumber(Math.abs(result.pb.a), 3),
+				pbInterceptSign: result.pb.a >= 0 ? "+" : "−"
+			},
+			conclusion: reagentReportConclusion(result)
+		};
+	}
+	var reagentReportPresentation = Object.freeze({
+		formatNumber: formatReagentNumber,
+		formatTStatistic: formatReagentTStatistic,
+		verdict: reagentReportVerdict,
+		conclusion: reagentReportConclusion,
+		summaryRows: reagentReportSummaryRows,
+		detailModel: reagentReportDetailModel
+	});
+	//#endregion
+	//#region src/presentation/reagent/reagent-chart-range.ts
+	function reagentChartRange(values, paddingRatio = .08) {
+		const minimum = values.reduce((current, value) => value < current ? value : current, values[0]);
+		const maximum = values.reduce((current, value) => value > current ? value : current, values[0]);
+		const padding = (maximum - minimum || Math.abs(maximum) || 1) * paddingRatio;
+		return [minimum - padding, maximum + padding];
+	}
+	var reagentChartPresentation = Object.freeze({ range: reagentChartRange });
+	//#endregion
+	//#region src/presentation/reagent/reagent-report-items.ts
+	function reagentReportItems(comparisons, calculate) {
+		return (comparisons || []).map((comparison) => ({
+			ds: comparison,
+			R: calculate(comparison)
+		}));
+	}
+	var reagentReportItemPresentation = Object.freeze({ items: reagentReportItems });
+	//#endregion
+	//#region src/presentation/reagent/reagent-comparison-label.ts
+	function reagentComparisonLabel(test, analyteLabel) {
+		let label = String(analyteLabel(test?.reagent) || test?.reagent || "Hóa chất mới");
+		if (test?.lotOld || test?.lotNew) label += ` — ${test.lotOld || "?"}→${test.lotNew || "?"}`;
+		return label;
+	}
+	var reagentComparisonLabelPresentation = Object.freeze({ label: reagentComparisonLabel });
+	//#endregion
+	//#region src/presentation/reagent/reagent-quick-label.ts
+	function reagentQuickLabel(type) {
+		return type === "sampleType" ? "loại mẫu" : "người thực hiện";
+	}
+	var reagentQuickLabelPresentation = Object.freeze({ label: reagentQuickLabel });
+	//#endregion
+	//#region src/presentation/reagent/reagent-tool-icon.ts
+	var paths = {
+		search: "<circle cx=\"11\" cy=\"11\" r=\"7\"/><line x1=\"21\" y1=\"21\" x2=\"16.65\" y2=\"16.65\"/>",
+		print: "<path d=\"M6 9V2h12v7\"/>",
+		report: "<path d=\"M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5Z\"/>",
+		trash: "<path d=\"M3 6h18\"/>"
+	};
+	function reagentToolIcon(type) {
+		return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${paths[type] || ""}</svg>`;
+	}
+	var reagentToolIconPresentation = Object.freeze({ icon: reagentToolIcon });
+	//#endregion
+	//#region src/domain/reagent/reagent-pairs.ts
+	function reagentValidPairs(rows) {
+		const o = [], n = [];
+		(rows || []).forEach((row) => {
+			const oldValue = Number.parseFloat(String(row?.[0] ?? "")), newValue = Number.parseFloat(String(row?.[1] ?? ""));
+			if (!Number.isNaN(oldValue) && !Number.isNaN(newValue)) {
+				o.push(oldValue);
+				n.push(newValue);
+			}
+		});
+		return {
+			o,
+			n
+		};
+	}
+	function reagentPairCalc(row) {
+		const oldValue = Number.parseFloat(String(row?.[0] ?? "")), newValue = Number.parseFloat(String(row?.[1] ?? ""));
+		return Number.isFinite(oldValue) && Number.isFinite(newValue) ? {
+			avg: (oldValue + newValue) / 2,
+			dif: oldValue - newValue
+		} : null;
+	}
+	var reagentPairMath = Object.freeze({
+		validPairs: reagentValidPairs,
+		pairCalc: reagentPairCalc
+	});
+	//#endregion
+	//#region src/domain/reagent/reagent-statistics.ts
+	function reagentMax(values) {
+		return values.reduce((max, value) => value > max ? value : max, values[0]);
+	}
+	function reagentMin(values) {
+		return values.reduce((min, value) => value < min ? value : min, values[0]);
+	}
+	function reagentMean(values) {
+		return values.reduce((sum, value) => sum + value, 0) / values.length;
+	}
+	function reagentVariance(values) {
+		const mean = reagentMean(values);
+		return values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (values.length - 1);
+	}
+	function reagentPearson(x, y) {
+		const count = x.length;
+		let sx = 0, sy = 0, sxy = 0, sx2 = 0, sy2 = 0;
+		for (let index = 0; index < count; index++) {
+			sx += x[index];
+			sy += y[index];
+			sxy += x[index] * y[index];
+			sx2 += x[index] * x[index];
+			sy2 += y[index] * y[index];
+		}
+		const denominator = Math.sqrt((count * sx2 - sx * sx) * (count * sy2 - sy * sy));
+		return denominator === 0 ? 0 : (count * sxy - sx * sy) / denominator;
+	}
+	function reagentOls(x, y) {
+		const count = x.length, meanX = reagentMean(x), meanY = reagentMean(y);
+		let sumXY = 0, sumXX = 0;
+		for (let index = 0; index < count; index++) {
+			sumXY += (x[index] - meanX) * (y[index] - meanY);
+			sumXX += (x[index] - meanX) ** 2;
+		}
+		const b = sumXX === 0 ? 0 : sumXY / sumXX, a = meanY - b * meanX, r = reagentPearson(x, y);
+		return {
+			a,
+			b,
+			r2: r * r
+		};
+	}
+	function reagentMedian(values) {
+		const sorted = [...values].sort((left, right) => left - right), count = sorted.length;
+		return count % 2 ? sorted[(count - 1) / 2] : (sorted[count / 2 - 1] + sorted[count / 2]) / 2;
+	}
+	function reagentPassingBablok(x, y) {
+		const slopes = [], count = x.length;
+		for (let left = 0; left < count; left++) for (let right = left + 1; right < count; right++) {
+			const dx = x[right] - x[left], dy = y[right] - y[left];
+			if (dx === 0) continue;
+			const slope = dy / dx;
+			if (slope !== -1) slopes.push(slope);
+		}
+		if (!slopes.length) return {
+			a: 0,
+			b: 1
+		};
+		slopes.sort((left, right) => left - right);
+		const k = slopes.filter((slope) => slope < -1).length, countSlopes = slopes.length;
+		const b = countSlopes % 2 ? slopes[(countSlopes + 1) / 2 - 1 + k] : (slopes[countSlopes / 2 - 1 + k] + slopes[countSlopes / 2 + k]) / 2;
+		return {
+			a: reagentMedian(x.map((value, index) => y[index] - b * value)),
+			b
+		};
+	}
+	var reagentStatistics = Object.freeze({
+		max: reagentMax,
+		min: reagentMin,
+		mean: reagentMean,
+		variance: reagentVariance,
+		pearson: reagentPearson,
+		ols: reagentOls,
+		median: reagentMedian,
+		passingBablok: reagentPassingBablok
+	});
+	//#endregion
+	//#region src/domain/reagent/reagent-t-distribution.ts
+	function reagentLogGamma(value) {
+		const coefficients = [
+			76.18009172947146,
+			-86.50532032941678,
+			24.01409824083091,
+			-1.231739572450155,
+			.001208650973866179,
+			-5395239384953e-18
+		];
+		let y = value, x = value + 5.5;
+		x -= (value + .5) * Math.log(x);
+		let sum = 1.000000000190015;
+		for (let index = 0; index < 6; index++) {
+			y++;
+			sum += coefficients[index] / y;
+		}
+		return -x + Math.log(2.5066282746310007 * sum / value);
+	}
+	function reagentBetaContinuedFraction(a, b, x) {
+		const maxIterations = 200, epsilon = 3e-12, floor = 1e-300;
+		let qab = a + b, qap = a + 1, qam = a - 1, c = 1, d = 1 - qab * x / qap;
+		if (Math.abs(d) < floor) d = floor;
+		d = 1 / d;
+		let h = d;
+		for (let iteration = 1; iteration <= maxIterations; iteration++) {
+			const twice = 2 * iteration;
+			let aa = iteration * (b - iteration) * x / ((qam + twice) * (a + twice));
+			d = 1 + aa * d;
+			if (Math.abs(d) < floor) d = floor;
+			c = 1 + aa / c;
+			if (Math.abs(c) < floor) c = floor;
+			d = 1 / d;
+			h *= d * c;
+			aa = -(a + iteration) * (qab + iteration) * x / ((a + twice) * (qap + twice));
+			d = 1 + aa * d;
+			if (Math.abs(d) < floor) d = floor;
+			c = 1 + aa / c;
+			if (Math.abs(c) < floor) c = floor;
+			d = 1 / d;
+			const delta = d * c;
+			h *= delta;
+			if (Math.abs(delta - 1) < epsilon) break;
+		}
+		return h;
+	}
+	function reagentRegularizedBeta(a, b, x) {
+		if (x <= 0) return 0;
+		if (x >= 1) return 1;
+		const factor = Math.exp(reagentLogGamma(a + b) - reagentLogGamma(a) - reagentLogGamma(b) + a * Math.log(x) + b * Math.log(1 - x));
+		return x < (a + 1) / (a + b + 2) ? factor * reagentBetaContinuedFraction(a, b, x) / a : 1 - factor * reagentBetaContinuedFraction(b, a, 1 - x) / b;
+	}
+	function reagentTwoSidedPValue(t, degreesOfFreedom) {
+		return reagentRegularizedBeta(degreesOfFreedom / 2, .5, degreesOfFreedom / (degreesOfFreedom + t * t));
+	}
+	function reagentTCritical(degreesOfFreedom, alpha) {
+		let low = 0, high = 1e3;
+		for (let iteration = 0; iteration < 200; iteration++) {
+			const middle = (low + high) / 2;
+			if (reagentTwoSidedPValue(middle, degreesOfFreedom) > alpha) low = middle;
+			else high = middle;
+		}
+		return (low + high) / 2;
+	}
+	var reagentTDistribution = Object.freeze({
+		logGamma: reagentLogGamma,
+		betaContinuedFraction: reagentBetaContinuedFraction,
+		regularizedBeta: reagentRegularizedBeta,
+		twoSidedPValue: reagentTwoSidedPValue,
+		tCritical: reagentTCritical
+	});
+	//#endregion
+	//#region src/domain/reagent/reagent-comparison-calculation.ts
+	function createReagentComparisonCalculator(deps) {
+		const calculate = (dataset, minimumPairs) => {
+			const { o, n } = deps.validPairs(dataset?.rows);
+			if (o.length < minimumPairs) return null;
+			const test = dataset?.test || {}, N = o.length, df = N - 1, d = o.map((value, index) => value - n[index]);
+			const mO = deps.mean(o), mN = deps.mean(n), vO = deps.variance(o), vN = deps.variance(n), md = deps.mean(d), sdd = Math.sqrt(deps.variance(d));
+			const tStat = deps.max(d) - deps.min(d) < 1e-9 * (Math.abs(mO) + Math.abs(mN) + 1) ? md === 0 ? 0 : md > 0 ? Infinity : -Infinity : md / (sdd / Math.sqrt(N)), r = deps.pearson(o, n);
+			const alpha = Number.parseFloat(String(test.alpha ?? "")) || .05, p2 = Number.isFinite(tStat) ? deps.twoSidedPValue(tStat, df) : 0;
+			const bias = mO ? Math.abs((mO - mN) / Math.abs(mO)) * 100 : mN ? Infinity : 0, biasT = Number.parseFloat(String(test.biasTarget ?? "")) || 6, coverage = !!test.coverageConfirmed, enoughN = N >= 20;
+			const fit = deps.ols(o, n), pb = deps.passingBablok(o, n);
+			const relPairs = o.map((value, index) => {
+				const midpoint = (value + n[index]) / 2;
+				return midpoint !== 0 ? Math.abs((value - n[index]) / midpoint) : null;
+			}).filter((value) => value != null);
+			const mard = relPairs.length ? deps.mean(relPairs) * 100 : NaN;
+			const passP = p2 > alpha, passBias = bias < biasT, passR2 = fit.r2 > .95, passSlope = fit.b >= .9 && fit.b <= 1.1;
+			const passScreen = enoughN && coverage && passBias, level = !passBias ? "no" : passScreen ? "ok" : "mid";
+			return {
+				o,
+				n,
+				N,
+				df,
+				d,
+				mO,
+				mN,
+				vO,
+				vN,
+				md,
+				sdd,
+				tStat,
+				r,
+				alpha,
+				p2,
+				p1: p2 / 2,
+				tc2: deps.tCritical(df, alpha),
+				tc1: deps.tCritical(df, 2 * alpha),
+				bias,
+				biasT,
+				fit,
+				pb,
+				mard,
+				passP,
+				passBias,
+				passR2,
+				passSlope,
+				coverage,
+				enoughN,
+				passScreen,
+				level
+			};
+		};
+		return Object.freeze({ calculate });
+	}
+	//#endregion
 	//#region src/domain/sigma/sigma-cohort-service.ts
 	function normalizePeriod(value) {
 		const match = /^(\d{4})-(\d{1,2})$/.exec(String(value || "").trim());
@@ -7439,6 +7844,60 @@
 		summarizeTestStatus,
 		buildMultiViews
 	});
+	//#endregion
+	//#region src/presentation/westgard/westgard-row-window.ts
+	function westgardRowsWindow(rows, expanded, initialRows = 120) {
+		const all = Array.isArray(rows) ? rows : [];
+		const limit = Number.isInteger(initialRows) && initialRows > 0 ? initialRows : 120;
+		const visible = expanded ? all : all.slice(-limit);
+		return {
+			rows: visible,
+			total: all.length,
+			expanded: !!expanded,
+			limited: visible.length < all.length
+		};
+	}
+	//#endregion
+	//#region src/presentation/westgard/westgard-archived-groups.ts
+	function westgardArchivedGroups(groups) {
+		return (groups || []).filter((group) => group?.active === false || group?.status === "stopped").slice().sort((left, right) => String(right.stoppedAt || "").localeCompare(String(left.stoppedAt || "")) || String(left.name || "").localeCompare(String(right.name || ""), "vi"));
+	}
+	//#endregion
+	//#region src/presentation/westgard/westgard-archived-multi-views.ts
+	function westgardArchivedMultiViews(rows, lotPoints) {
+		return (rows || []).map((row) => ({
+			level: row.l.level,
+			lot: row.lot.lotNo,
+			mean: row.mean,
+			sd: row.sd,
+			pts: lotPoints(row.t, row.l.level, row.lot.lotNo),
+			label: `M${row.l.level}·${row.lot.lotNo}`
+		}));
+	}
+	//#endregion
+	//#region src/presentation/westgard/westgard-archived-group-match.ts
+	function westgardArchivedGroupMatches(group, query, searchText, lotById) {
+		if (!query) return true;
+		if (searchText(group?.name).includes(query)) return true;
+		return (group?.lotIds || []).some((id) => {
+			const lot = lotById(id);
+			return !!lot && searchText(lot.lotNo).includes(query);
+		});
+	}
+	//#endregion
+	//#region src/presentation/westgard/westgard-archived-test-selection.ts
+	function westgardArchivedTestSelection(entries, query, selectedId, deps) {
+		const all = entries || [];
+		const matched = all.filter((entry) => !query || deps.searchText(entry.t.name).includes(query) || deps.searchText(deps.testDisplayName(entry.t)).includes(query) || deps.searchText(deps.instrumentName(entry.t.instrumentId, entry.t.machine)).includes(query));
+		const list = matched.length ? matched : all;
+		const selected = matched.length && !matched.some((entry) => entry.t.id === selectedId) ? matched[0].t.id : !all.some((entry) => entry.t.id === selectedId) ? all[0]?.t.id : selectedId;
+		return {
+			matched,
+			list,
+			selected,
+			entry: all.find((item) => item.t.id === selected) || all[0]
+		};
+	}
 	var nceActionLabels = Object.freeze({
 		protocolChecks: Object.freeze([
 			["qcMaterialStatus", "Vật liệu QC"],
@@ -7947,6 +8406,75 @@
 		return Object.freeze({ steps });
 	}
 	//#endregion
+	//#region src/presentation/nce/action-investigation-presentation.ts
+	function actionInvestigationChoiceLabel(value, label) {
+		return value === "not-needed" ? "Không cần" : value === "checked-ok" ? "Đạt" : value === "checked-abnormal" ? "Bất thường" : label;
+	}
+	function actionInvestigationStateClass(value) {
+		return ["ok", "checked-ok"].includes(String(value)) ? "is-ok" : ["abnormal", "checked-abnormal"].includes(String(value)) ? "is-abnormal" : ["na", "not-needed"].includes(String(value)) ? "is-na" : "is-empty";
+	}
+	var actionInvestigationPresentation = Object.freeze({
+		choiceLabel: actionInvestigationChoiceLabel,
+		stateClass: actionInvestigationStateClass
+	});
+	//#endregion
+	//#region src/presentation/nce/action-checklist-presentation.ts
+	function createActionChecklistPresentation(deps) {
+		const rowComplete = ({ status, note }) => {
+			const normalized = String(status || "");
+			const needsNote = [
+				"abnormal",
+				"na",
+				"checked-abnormal"
+			].includes(normalized);
+			return !!deps.checkLabels[normalized] && (!needsNote || String(note || "").trim().length >= 3);
+		};
+		const checklist = (rows) => {
+			const total = rows.length, done = rows.filter(rowComplete).length;
+			return {
+				done,
+				total,
+				complete: done === total
+			};
+		};
+		const checklistChip = (rows) => {
+			const progress = checklist(rows);
+			return {
+				cls: progress.complete ? "ok" : "warn",
+				label: `Đã hoàn tất ${progress.done}/${progress.total}`
+			};
+		};
+		const sectionChip = (missing) => {
+			const items = Array.isArray(missing) ? missing : [];
+			return items.length ? {
+				cls: "warn",
+				label: `Còn thiếu ${items.length} mục`,
+				title: `Còn thiếu: ${items.join("; ")}`
+			} : {
+				cls: "ok",
+				label: "Đã xong",
+				title: "Không còn mục bắt buộc chưa hoàn thành"
+			};
+		};
+		const effectivenessChip = (form) => {
+			const effectiveness = deps.effectivenessStatus({
+				...form,
+				protocolVersion: form.protocolVersion || 3
+			});
+			return {
+				cls: effectiveness.cls === "none" ? "none" : effectiveness.cls,
+				label: effectiveness.complete ? effectiveness.label : form.effectivenessStatus === "ineffective" ? effectiveness.label : "Chưa đánh giá",
+				title: effectiveness.label
+			};
+		};
+		return Object.freeze({
+			checklist,
+			checklistChip,
+			sectionChip,
+			effectivenessChip
+		});
+	}
+	//#endregion
 	//#region src/presentation/report/report-period-presentation.ts
 	function createReportPeriodPresentation() {
 		const currentYearMonth = (value, fallback) => /^\d{4}-\d{2}$/.test(String(value || "")) ? String(value) : fallback;
@@ -7963,6 +8491,28 @@
 			sortedLocks
 		});
 	}
+	//#endregion
+	//#region src/presentation/report/report-search-values.ts
+	function reportSearchValues(test, deps) {
+		const levels = deps.operationalLevels(test) || [], panel = deps.panelForTest(test), lotGroup = deps.lotGroupForTest(test);
+		return [
+			deps.testLabel(test),
+			test.name,
+			test.machine,
+			test.unit,
+			panel?.name,
+			lotGroup?.name,
+			...levels.map((level) => level.lot)
+		];
+	}
+	var reportSearchValuePresentation = Object.freeze({ values: reportSearchValues });
+	//#endregion
+	//#region src/presentation/report/report-action-icon.ts
+	var REPORT_ACTION_ICON_PATHS = Object.freeze({ print: "<path d=\"M6 9V3h12v6\"/><path d=\"M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2\"/><rect x=\"6\" y=\"14\" width=\"12\" height=\"8\" rx=\"1\"/><path d=\"M18 12h.01\"/>" });
+	function reportActionIcon(type) {
+		return `<svg class="btn-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${REPORT_ACTION_ICON_PATHS[type] || ""}</svg>`;
+	}
+	var reportActionIconPresentation = Object.freeze({ icon: reportActionIcon });
 	//#endregion
 	//#region src/domain/nce/action-rerun-policy.ts
 	function openedFromVoid(action, point) {
@@ -8395,6 +8945,29 @@
 				escalated: false
 			};
 		};
+		const effectivenessMissingKey = (action) => {
+			if (Number(action.protocolVersion) >= 3 && !action.actionCompletedDate) return "actionCompletedDate";
+			if (!action.effectivenessDate) return "effectivenessDate";
+			if (String(action.effectivenessNote || "").trim().length < 5) return "effectivenessNote";
+			const rerun = deps.needsRerun(action) ? deps.rerunStatus(action) : null;
+			const earliest = [
+				action.date,
+				action.actionCompletedDate,
+				action.releaseDate,
+				rerun?.ok && rerun.point?.date
+			].filter(Boolean).sort().pop();
+			if (action.effectivenessDate > deps.todayIso() || earliest && action.effectivenessDate < earliest) return "effectivenessDate";
+			if (action.effectivenessStatus === "effective" && Number(action.protocolVersion) >= 3) {
+				if (!riskScale.includes(Number(action.residualSeverity))) return "residualSeverity";
+				if (!riskScale.includes(Number(action.residualOccurrence))) return "residualOccurrence";
+				if (!riskScale.includes(Number(action.residualDetectability))) return "residualDetectability";
+				if (!has(actionLabels.risk, action.residualRiskLevel)) return "residualRiskLevel";
+				if (String(action.residualRiskBasis || "").trim().length < 5) return "residualRiskBasis";
+				const initial = actionRiskScore(action), residual = actionResidualRiskScore(action);
+				if (initial && residual > initial) return "residualSeverity";
+			}
+			return "effectivenessNote";
+		};
 		const protocolSummary = (action) => {
 			if (!action || !action.protocolVersion) return "";
 			const checks = protocolChecks.map(([key, label]) => `${label}: ${actionLabels.check[action[key]] || "Chưa ghi"}${action[key.replace("Status", "Note")] ? ` (${action[key.replace("Status", "Note")]})` : ""}`);
@@ -8415,6 +8988,7 @@
 		return Object.freeze({
 			protocolStatus,
 			effectivenessStatus,
+			effectivenessMissingKey,
 			protocolSummary
 		});
 	}
@@ -9702,6 +10276,7 @@
 		limitsFromTarget: (mean, sd, k) => root.QCCore.limitsFromTarget(mean, sd, k)
 	});
 	root.qcRangeSafetyGate = rangeSafetyGate;
+	root.qcRangeBiasEvaluation = rangeBiasEvaluation;
 	root.csvCellService = csvCell;
 	root.reportExportHelpers = reportExportHelpers;
 	root.actionReportSummary = createActionReportSummary({
@@ -10118,7 +10693,18 @@
 		riskLabels: nceActionLabels.actionLabels.risk
 	});
 	root.ActionGuidePresentation = createActionGuidePresentation();
+	root.ActionInvestigationPresentation = actionInvestigationPresentation;
+	root.ActionChecklistPresentation = createActionChecklistPresentation({
+		checkLabels: nceActionLabels.actionLabels.check,
+		effectivenessStatus: (form) => typeof root.actionEffectivenessStatus === "function" ? root.actionEffectivenessStatus(form) : {
+			cls: "none",
+			label: "Chưa đánh giá",
+			complete: false
+		}
+	});
 	root.ReportPeriodPresentation = createReportPeriodPresentation();
+	root.reportSearchValuePresentation = reportSearchValuePresentation;
+	root.reportActionIconPresentation = reportActionIconPresentation;
 	root.ActionBiasService = createActionBiasService({
 		teaFor: (test, level) => globalThis.sgTeaBySource(test, globalThis.sgTeaSource(test), level.mean),
 		systematicShiftCritical: (tea, bias, sd) => root.QCCore.systematicShiftCritical(tea, bias, sd),
@@ -10294,7 +10880,33 @@
 		cleanText: root.QCCore.cleanText,
 		cleanId: root.QCCore.cleanId
 	});
+	root.reagentReportPresentation = reagentReportPresentation;
+	root.reagentChartPresentation = reagentChartPresentation;
+	root.reagentReportItemPresentation = reagentReportItemPresentation;
+	root.reagentComparisonLabelPresentation = reagentComparisonLabelPresentation;
+	root.reagentQuickLabelPresentation = reagentQuickLabelPresentation;
+	root.reagentToolIconPresentation = reagentToolIconPresentation;
+	root.reagentPairMath = reagentPairMath;
+	root.reagentStatistics = reagentStatistics;
+	root.reagentTDistribution = reagentTDistribution;
+	root.reagentComparisonCalculator = createReagentComparisonCalculator({
+		validPairs: reagentPairMath.validPairs,
+		mean: reagentStatistics.mean,
+		variance: reagentStatistics.variance,
+		max: reagentStatistics.max,
+		min: reagentStatistics.min,
+		pearson: reagentStatistics.pearson,
+		ols: reagentStatistics.ols,
+		passingBablok: reagentStatistics.passingBablok,
+		twoSidedPValue: reagentTDistribution.twoSidedPValue,
+		tCritical: reagentTDistribution.tCritical
+	});
 	root.SigmaCohortService = createSigmaCohortService({ stats: root.QCCore.stats });
 	root.WestgardViewModel = westgardViewModel;
+	root.westgardRowsWindow = westgardRowsWindow;
+	root.westgardArchivedGroups = westgardArchivedGroups;
+	root.westgardArchivedMultiViews = westgardArchivedMultiViews;
+	root.westgardArchivedGroupMatches = westgardArchivedGroupMatches;
+	root.westgardArchivedTestSelection = westgardArchivedTestSelection;
 	//#endregion
 })();

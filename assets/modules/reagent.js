@@ -3,31 +3,31 @@ const RC_MIN_PAIRS=5;
 /* palette khớp design token trong app.css; dùng cho SVG/báo cáo (in ở document riêng, không đọc được var()) */
 const RCC={teal:'#0c6f78',tealDeep:'#0a5d65',ink:'#172833',muted:'#667b89',line:'#d4dde3',grid:'#e9eff3',red:'#a43a33',amber:'#a36f15',green:'#087044',okBg:'#e3f3f0',okFg:'#0a5e67',midBg:'#fbf0db',midFg:'#a36f15',noBg:'#f7e4e2',noFg:'#a43a33'};
 const RCPAD={l:54,r:18,t:18,b:46};
-function rcLabel(d){const t=d.test;let s=teaAnalyteDisplay(t.reagent)||t.reagent||'Hóa chất mới';if(t.lotOld||t.lotNew)s+=' — '+(t.lotOld||'?')+'→'+(t.lotNew||'?');return s;}
+function rcLabel(d){const t=d.test;if(globalThis.reagentComparisonLabelPresentation)return globalThis.reagentComparisonLabelPresentation.label(t,teaAnalyteDisplay);let s=teaAnalyteDisplay(t.reagent)||t.reagent||'Hóa chất mới';if(t.lotOld||t.lotNew)s+=' — '+(t.lotOld||'?')+'→'+(t.lotNew||'?');return s;}
 function rcAct(){return ReagentComparisonService.find(state,rcId);}
 function rcSaveSoon(){clearTimeout(rcSaveT);rcSaveT=setTimeout(save,600);}
 /* stats */
-function rcBetacf(a,b,x){const MAXIT=200,EPS=3e-12,FP=1e-300;let qab=a+b,qap=a+1,qam=a-1,c=1,d=1-qab*x/qap;if(Math.abs(d)<FP)d=FP;d=1/d;let h=d;
+function rcBetacf(a,b,x){if(globalThis.reagentTDistribution)return globalThis.reagentTDistribution.betaContinuedFraction(a,b,x);const MAXIT=200,EPS=3e-12,FP=1e-300;let qab=a+b,qap=a+1,qam=a-1,c=1,d=1-qab*x/qap;if(Math.abs(d)<FP)d=FP;d=1/d;let h=d;
   for(let mm=1;mm<=MAXIT;mm++){let m2=2*mm,aa=mm*(b-mm)*x/((qam+m2)*(a+m2));d=1+aa*d;if(Math.abs(d)<FP)d=FP;c=1+aa/c;if(Math.abs(c)<FP)c=FP;d=1/d;h*=d*c;aa=-(a+mm)*(qab+mm)*x/((a+m2)*(qap+m2));d=1+aa*d;if(Math.abs(d)<FP)d=FP;c=1+aa/c;if(Math.abs(c)<FP)c=FP;d=1/d;let del=d*c;h*=del;if(Math.abs(del-1)<EPS)break;}return h;}
-function rcLgamma(x){const c=[76.18009172947146,-86.50532032941677,24.01409824083091,-1.231739572450155,0.1208650973866179e-2,-0.5395239384953e-5];let y=x,t=x+5.5;t-=(x+0.5)*Math.log(t);let s=1.000000000190015;for(let j=0;j<6;j++){y++;s+=c[j]/y;}return -t+Math.log(2.5066282746310005*s/x);}
-function rcBetai(a,b,x){if(x<=0)return 0;if(x>=1)return 1;let bt=Math.exp(rcLgamma(a+b)-rcLgamma(a)-rcLgamma(b)+a*Math.log(x)+b*Math.log(1-x));return x<(a+1)/(a+b+2)?bt*rcBetacf(a,b,x)/a:1-bt*rcBetacf(b,a,1-x)/b;}
-function rcPTwo(t,df){return rcBetai(df/2,0.5,df/(df+t*t));}
-function rcTCrit(df,alpha){let lo=0,hi=1000;for(let i=0;i<200;i++){let mid=(lo+hi)/2;if(rcPTwo(mid,df)>alpha)lo=mid;else hi=mid;}return(lo+hi)/2;}
+function rcLgamma(x){if(globalThis.reagentTDistribution)return globalThis.reagentTDistribution.logGamma(x);const c=[76.18009172947146,-86.50532032941677,24.01409824083091,-1.231739572450155,0.1208650973866179e-2,-0.5395239384953e-5];let y=x,t=x+5.5;t-=(x+0.5)*Math.log(t);let s=1.000000000190015;for(let j=0;j<6;j++){y++;s+=c[j]/y;}return -t+Math.log(2.5066282746310005*s/x);}
+function rcBetai(a,b,x){if(globalThis.reagentTDistribution)return globalThis.reagentTDistribution.regularizedBeta(a,b,x);if(x<=0)return 0;if(x>=1)return 1;let bt=Math.exp(rcLgamma(a+b)-rcLgamma(a)-rcLgamma(b)+a*Math.log(x)+b*Math.log(1-x));return x<(a+1)/(a+b+2)?bt*rcBetacf(a,b,x)/a:1-bt*rcBetacf(b,a,1-x)/b;}
+function rcPTwo(t,df){return globalThis.reagentTDistribution?globalThis.reagentTDistribution.twoSidedPValue(t,df):rcBetai(df/2,0.5,df/(df+t*t));}
+function rcTCrit(df,alpha){if(globalThis.reagentTDistribution)return globalThis.reagentTDistribution.tCritical(df,alpha);let lo=0,hi=1000;for(let i=0;i<200;i++){let mid=(lo+hi)/2;if(rcPTwo(mid,df)>alpha)lo=mid;else hi=mid;}return(lo+hi)/2;}
 /* rcMax/rcMin thay Math.max(...a)/Math.min(...a): spread mỗi phần tử thành một tham số
    hàm riêng, nên mảng đủ lớn (nhập tay hiếm khi tới, nhưng import backup thì có thể) sẽ
    ném RangeError "Maximum call stack size exceeded" và vỡ cả trang so sánh/báo cáo thay
    vì chỉ chậm đi. reduce() không có giới hạn kiểu này. */
-function rcMax(a){return a.reduce((m,v)=>v>m?v:m,a[0]);}
-function rcMin(a){return a.reduce((m,v)=>v<m?v:m,a[0]);}
-function rcMean(a){return a.reduce((s,v)=>s+v,0)/a.length;}
-function rcVar(a){const mu=rcMean(a);return a.reduce((s,v)=>s+(v-mu)**2,0)/(a.length-1);}
-function rcPearson(x,y){const n=x.length;let sx=0,sy=0,sxy=0,sx2=0,sy2=0;for(let i=0;i<n;i++){sx+=x[i];sy+=y[i];sxy+=x[i]*y[i];sx2+=x[i]*x[i];sy2+=y[i]*y[i];}const den=Math.sqrt((n*sx2-sx*sx)*(n*sy2-sy*sy));return den===0?0:(n*sxy-sx*sy)/den;}
-function rcOls(x,y){const n=x.length,mx=rcMean(x),my=rcMean(y);let sxy=0,sxx=0;for(let i=0;i<n;i++){sxy+=(x[i]-mx)*(y[i]-my);sxx+=(x[i]-mx)**2;}const b=sxx===0?0:sxy/sxx,a=my-b*mx,r=rcPearson(x,y);return{a,b,r2:r*r};}
-function rcMedian(a){const s=[...a].sort((p,q)=>p-q),n=s.length;return n%2?s[(n-1)/2]:(s[n/2-1]+s[n/2])/2;}
-function rcPB(x,y){const sl=[],n=x.length;for(let i=0;i<n;i++)for(let j=i+1;j<n;j++){const dx=x[j]-x[i],dy=y[j]-y[i];if(dx===0)continue;const s=dy/dx;if(s===-1)continue;sl.push(s);}if(!sl.length)return{a:0,b:1};sl.sort((p,q)=>p-q);const K=sl.filter(s=>s<-1).length,N=sl.length;let b;if(N%2)b=sl[(N+1)/2-1+K];else b=(sl[N/2-1+K]+sl[N/2+K])/2;return{a:rcMedian(x.map((xi,i)=>y[i]-b*xi)),b};}
-function rcValid(ds){const o=[],n=[];ds.rows.forEach(r=>{const a=parseFloat(r[0]),b=parseFloat(r[1]);if(!isNaN(a)&&!isNaN(b)){o.push(a);n.push(b);}});return{o,n};}
-function rcPairCalc(r){const a=parseFloat(r&&r[0]),b=parseFloat(r&&r[1]);return Number.isFinite(a)&&Number.isFinite(b)?{avg:(a+b)/2,dif:a-b}:null;}
-function rcCalc(ds){const {o,n}=rcValid(ds);if(o.length<RC_MIN_PAIRS)return null;
+function rcMax(a){return globalThis.reagentStatistics?globalThis.reagentStatistics.max(a):a.reduce((m,v)=>v>m?v:m,a[0]);}
+function rcMin(a){return globalThis.reagentStatistics?globalThis.reagentStatistics.min(a):a.reduce((m,v)=>v<m?v:m,a[0]);}
+function rcMean(a){return globalThis.reagentStatistics?globalThis.reagentStatistics.mean(a):a.reduce((s,v)=>s+v,0)/a.length;}
+function rcVar(a){if(globalThis.reagentStatistics)return globalThis.reagentStatistics.variance(a);const mu=rcMean(a);return a.reduce((s,v)=>s+(v-mu)**2,0)/(a.length-1);}
+function rcPearson(x,y){if(globalThis.reagentStatistics)return globalThis.reagentStatistics.pearson(x,y);const n=x.length;let sx=0,sy=0,sxy=0,sx2=0,sy2=0;for(let i=0;i<n;i++){sx+=x[i];sy+=y[i];sxy+=x[i]*y[i];sx2+=x[i]*x[i];sy2+=y[i]*y[i];}const den=Math.sqrt((n*sx2-sx*sx)*(n*sy2-sy*sy));return den===0?0:(n*sxy-sx*sy)/den;}
+function rcOls(x,y){if(globalThis.reagentStatistics)return globalThis.reagentStatistics.ols(x,y);const n=x.length,mx=rcMean(x),my=rcMean(y);let sxy=0,sxx=0;for(let i=0;i<n;i++){sxy+=(x[i]-mx)*(y[i]-my);sxx+=(x[i]-mx)**2;}const b=sxx===0?0:sxy/sxx,a=my-b*mx,r=rcPearson(x,y);return{a,b,r2:r*r};}
+function rcMedian(a){return globalThis.reagentStatistics?globalThis.reagentStatistics.median(a):(()=>{const s=[...a].sort((p,q)=>p-q),n=s.length;return n%2?s[(n-1)/2]:(s[n/2-1]+s[n/2])/2;})();}
+function rcPB(x,y){if(globalThis.reagentStatistics)return globalThis.reagentStatistics.passingBablok(x,y);const sl=[],n=x.length;for(let i=0;i<n;i++)for(let j=i+1;j<n;j++){const dx=x[j]-x[i],dy=y[j]-y[i];if(dx===0)continue;const s=dy/dx;if(s===-1)continue;sl.push(s);}if(!sl.length)return{a:0,b:1};sl.sort((p,q)=>p-q);const K=sl.filter(s=>s<-1).length,N=sl.length;let b;if(N%2)b=sl[(N+1)/2-1+K];else b=(sl[N/2-1+K]+sl[N/2+K])/2;return{a:rcMedian(x.map((xi,i)=>y[i]-b*xi)),b};}
+function rcValid(ds){if(globalThis.reagentPairMath)return globalThis.reagentPairMath.validPairs(ds&&ds.rows);const o=[],n=[];(ds.rows||[]).forEach(r=>{const a=parseFloat(r[0]),b=parseFloat(r[1]);if(!isNaN(a)&&!isNaN(b)){o.push(a);n.push(b);}});return{o,n};}
+function rcPairCalc(r){if(globalThis.reagentPairMath)return globalThis.reagentPairMath.pairCalc(r);const a=parseFloat(r&&r[0]),b=parseFloat(r&&r[1]);return Number.isFinite(a)&&Number.isFinite(b)?{avg:(a+b)/2,dif:a-b}:null;}
+function rcCalc(ds){if(globalThis.reagentComparisonCalculator)return globalThis.reagentComparisonCalculator.calculate(ds,RC_MIN_PAIRS);const {o,n}=rcValid(ds);if(o.length<RC_MIN_PAIRS)return null;
   const N=o.length,df=N-1,d=o.map((v,i)=>v-n[i]);const mO=rcMean(o),mN=rcMean(n),vO=rcVar(o),vN=rcVar(n),md=rcMean(d),sdd=Math.sqrt(rcVar(d));
   const dRange=rcMax(d)-rcMin(d),degenerate=dRange<1e-9*(Math.abs(mO)+Math.abs(mN)+1);
   const tStat=degenerate?(md===0?0:(md>0?Infinity:-Infinity)):md/(sdd/Math.sqrt(N)),r=rcPearson(o,n);
@@ -49,8 +49,9 @@ function rcAxis(W,H,xmin,xmax,ymin,ymax,xlab,ylab){const px=v=>RCPAD.l+(v-xmin)/
   g+=`<text x="${(RCPAD.l+W-RCPAD.r)/2}" y="${H-7}" font-size="var(--type-overline)" fill="${RCC.ink}" text-anchor="middle" font-weight="600">${esc(xlab)}</text>`;
   g+=`<text transform="translate(13,${(RCPAD.t+H-RCPAD.b)/2}) rotate(-90)" font-size="var(--type-overline)" fill="${RCC.ink}" text-anchor="middle" font-weight="600">${esc(ylab)}</text>`;
   return{g,px,py};}
-function rcPadr(min,max){const r=(max-min)||Math.abs(max)||1;return[min-r*0.08,max+r*0.08];}
+function rcPadr(min,max){return globalThis.reagentChartPresentation?globalThis.reagentChartPresentation.range([min,max]):(()=>{const r=(max-min)||Math.abs(max)||1;return[min-r*0.08,max+r*0.08];})();}
 function rcToolIcon(type){
+  if(globalThis.reagentToolIconPresentation)return globalThis.reagentToolIconPresentation.icon(type);
   const p={
     search:'<circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
     print:'<path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>',
@@ -188,7 +189,7 @@ async function rcDelete(id,keepModal=false){if(!requireAdmin())return;if(state.r
   if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa phép so sánh',message:'Xóa phép so sánh này?',confirmLabel:'Xóa',cancelLabel:'Hủy'}))return;
   const result=ReagentComparisonService.remove(state,{id});if(result.error)return;if(rcId===id)rcId=result.nextId;logAct('Xóa phép so sánh hóa chất',label,label);save({clearDerived:false});if(keepModal)renderRcModal();rerender();}
 function rcDeleteCurrent(){rcDelete(rcId);}
-function rcQuickLabel(type){return type==='sampleType'?'loại mẫu':'người thực hiện';}
+function rcQuickLabel(type){return globalThis.reagentQuickLabelPresentation?globalThis.reagentQuickLabelPresentation.label(type):(type==='sampleType'?'loại mẫu':'người thực hiện');}
 function rcQuickList(type){
   const result=ReagentComparisonService.ensureQuickList(state,type);
   return result.error?[]:result.items;
@@ -251,10 +252,11 @@ function renderRcCreateModal(){
   setTimeout(()=>{const e=document.getElementById('rcCreateSearch');if(e){e.focus();e.setSelectionRange(e.value.length,e.value.length);}},0);
 }
 function rcCreateFrom(name,unit){if(!requireWrite())return;const result=ReagentComparisonService.create(state,{id:uid(),name,unit});if(result.error)return;rcId=result.comparison.id;logAct('Tạo phép so sánh hóa chất',rcLabel(result.comparison),rcLabel(result.comparison));save({clearDerived:false});closeModal();rerender();}
-function rcFmt(x,k=4){return isFinite(x)?Number(x.toFixed(k)).toString():'—';}
-function rcFmtT(x){return isFinite(x)?Number(x.toFixed(4)).toString():(x>0?'+∞':'−∞');}
+function rcFmt(x,k=4){return globalThis.reagentReportPresentation?globalThis.reagentReportPresentation.formatNumber(x,k):isFinite(x)?Number(x.toFixed(k)).toString():'—';}
+function rcFmtT(x){return globalThis.reagentReportPresentation?globalThis.reagentReportPresentation.formatTStatistic(x):isFinite(x)?Number(x.toFixed(4)).toString():(x>0?'+∞':'−∞');}
 function rcDateText(v){return v?esc(vnDate(v)):formatDateTimeVN(new Date().toISOString()).split(' ').slice(1).join(' ');}
 function rcReportVerdict(R){
+  if(globalThis.reagentReportPresentation)return globalThis.reagentReportPresentation.verdict(R,RCC);
   if(!R)return{text:'Thiếu dữ liệu',cls:'mid',bg:RCC.midBg,fg:RCC.midFg};
   if(R.level==='ok')return{text:'Đạt sàng lọc',cls:'ok',bg:RCC.okBg,fg:RCC.okFg};
   if(R.level==='mid')return{text:'Chưa đủ điều kiện',cls:'mid',bg:RCC.midBg,fg:RCC.midFg};
@@ -269,33 +271,35 @@ function rcReportHeader(title,sub){
 }
 function rcReportSummaryTable(items){
   let h='<table><thead><tr><th>STT</th><th>Hóa chất</th><th>Lô cũ → Lô mới</th><th class="num">n</th><th class="num">r</th><th class="num">%Bias</th><th class="num">P hai phía</th><th>Kết luận</th></tr></thead><tbody>';
-  items.forEach((it,i)=>{const t=it.ds.test,R=it.R;h+=`<tr><td class="num">${i+1}</td><td><b>${esc(t.reagent||'Hóa chất mới')}</b>${t.unit?` <span style="color:${RCC.muted}">(${esc(t.unit)})</span>`:''}</td><td>${esc(t.lotOld||'?')} → ${esc(t.lotNew||'?')}</td><td class="num">${R?R.N:'—'}</td><td class="num">${R?rcFmt(R.r,4):'—'}</td><td class="num">${R?rcFmt(R.bias,2)+'%':'—'}</td><td class="num">${R?rcFmt(R.p2,4):'—'}</td><td>${rcReportPill(R)}</td></tr>`;});
+  const rows=globalThis.reagentReportPresentation?globalThis.reagentReportPresentation.summaryRows(items,RCC):items.map((it,i)=>{const t=it.ds.test,R=it.R;return{index:i+1,reagent:t.reagent||'Hóa chất mới',unit:t.unit||'',lotOld:t.lotOld||'?',lotNew:t.lotNew||'?',result:R,n:R?R.N:'—',r:R?rcFmt(R.r,4):'—',bias:R?rcFmt(R.bias,2)+'%':'—',p2:R?rcFmt(R.p2,4):'—'};});
+  rows.forEach(row=>{h+=`<tr><td class="num">${row.index}</td><td><b>${esc(row.reagent)}</b>${row.unit?` <span style="color:${RCC.muted}">(${esc(row.unit)})</span>`:''}</td><td>${esc(row.lotOld)} → ${esc(row.lotNew)}</td><td class="num">${row.n}</td><td class="num">${row.r}</td><td class="num">${row.bias}</td><td class="num">${row.p2}</td><td>${rcReportPill(row.result)}</td></tr>`;});
   return h+'</tbody></table>';
 }
 function rcReportDetail(ds,i=0,pagebreak=false){
   const R=rcCalc(ds),t=ds.test;
+  const model=globalThis.reagentReportPresentation?globalThis.reagentReportPresentation.detailModel(R,t,RC_MIN_PAIRS,rcDateText(t.date)):null;
   let h=`<div class="rpt-card" style="${pagebreak?'break-before:page;':''}"><h3>${i+1}. ${esc(t.reagent||'Hóa chất mới')} ${rcReportPill(R)}</h3><div class="body">`;
-  h+=`<div class="hint space-after-control">Lô cũ: <b>${esc(t.lotOld||'—')}</b> · Lô mới: <b>${esc(t.lotNew||'—')}</b> · Ngày: ${rcDateText(t.date)} · Người thực hiện: ${esc(t.operator||'—')} · Loại mẫu: ${esc(t.sampleType||'—')} · Giới hạn chênh lệch &lt; ${esc(t.biasTarget||6)}% · α = ${esc(t.alpha||0.05)}</div>`;
+  const meta=model&&model.metadata;h+=`<div class="hint space-after-control">Lô cũ: <b>${esc(meta?meta.lotOld:t.lotOld||'—')}</b> · Lô mới: <b>${esc(meta?meta.lotNew:t.lotNew||'—')}</b> · Ngày: ${meta?meta.dateText:rcDateText(t.date)} · Người thực hiện: ${esc(meta?meta.operator:t.operator||'—')} · Loại mẫu: ${esc(meta?meta.sampleType:t.sampleType||'—')} · Giới hạn chênh lệch &lt; ${esc(meta?meta.biasTarget:t.biasTarget||6)}% · α = ${esc(meta?meta.alpha:t.alpha||0.05)}</div>`;
   if(!R){h+=`<p><i>Chưa đủ dữ liệu (cần tối thiểu ${RC_MIN_PAIRS} cặp).</i></p></div></div>`;return h;}
   h+='<table><thead><tr><th>Mẫu</th><th class="num">Lô cũ</th><th class="num">Lô mới</th><th class="num">Trung bình</th><th class="num">Hiệu số</th></tr></thead><tbody>';
-  R.o.forEach((o,k)=>{const n=R.n[k];h+=`<tr><td>${k+1}</td><td class="num">${o}</td><td class="num">${n}</td><td class="num">${((o+n)/2).toFixed(3)}</td><td class="num">${(o-n).toFixed(3)}</td></tr>`;});
+  (model?model.pairs:R.o.map((o,k)=>{const n=R.n[k];return{index:k+1,oldValue:o,newValue:n,average:((o+n)/2).toFixed(3),difference:(o-n).toFixed(3)};})).forEach(row=>{h+=`<tr><td>${row.index}</td><td class="num">${row.oldValue}</td><td class="num">${row.newValue}</td><td class="num">${row.average}</td><td class="num">${row.difference}</td></tr>`;});
   h+='</tbody></table>';
   h+=`<div style="display:flex;flex-wrap:wrap;gap:6px 24px;font-size:var(--type-meta);margin:10px 0 12px">
-    <span>Trung bình: <b>${rcFmt(R.mO,2)} / ${rcFmt(R.mN,2)}</b></span>
-    <span>Pearson r: <b>${rcFmt(R.r,5)}</b></span>
-    <span>t Stat: <b>${rcFmtT(R.tStat)}</b> (df ${R.df})</span>
-    <span>P hai phía: <b>${rcFmt(R.p2,5)}</b></span>
-    <span>%Bias: <b>${rcFmt(R.bias,3)}%</b></span>
-    <span>OLS: <b>y=${rcFmt(R.fit.b,3)}x${R.fit.a>=0?'+':'−'}${rcFmt(Math.abs(R.fit.a),3)}</b>, R²=${rcFmt(R.fit.r2,4)}</span>
-    <span>Passing-Bablok: <b>y=${rcFmt(R.pb.b,3)}x${R.pb.a>=0?'+':'−'}${rcFmt(Math.abs(R.pb.a),3)}</b></span>
+    <span>Trung bình: <b>${model.metrics.meanOld} / ${model.metrics.meanNew}</b></span>
+    <span>Pearson r: <b>${model.metrics.correlation}</b></span>
+    <span>t Stat: <b>${model.metrics.tStatistic}</b> (df ${model.metrics.df})</span>
+    <span>P hai phía: <b>${model.metrics.p2}</b></span>
+    <span>%Bias: <b>${model.metrics.bias}%</b></span>
+    <span>OLS: <b>y=${model.metrics.olsSlope}x${model.metrics.olsInterceptSign}${model.metrics.olsIntercept}</b>, R²=${model.metrics.olsR2}</span>
+    <span>Passing-Bablok: <b>y=${model.metrics.pbSlope}x${model.metrics.pbInterceptSign}${model.metrics.pbIntercept}</b></span>
   </div>`;
-  const note=R.level==='ok'?'Không khác biệt có ý nghĩa theo tiêu chí sàng lọc phần mềm; trình phê duyệt theo SOP trước khi dùng lô mới.':R.level==='mid'?'Chưa đủ điều kiện sàng lọc phần mềm; cần bổ sung dữ liệu/xác nhận bao phủ hoặc ghi nhận ngoại lệ theo SOP.':'Có khác biệt vượt giới hạn; không dùng lô mới trước khi điều tra và xử lý.';
+  const note=model?model.conclusion:globalThis.reagentReportPresentation?globalThis.reagentReportPresentation.conclusion(R):R.level==='ok'?'Không khác biệt có ý nghĩa theo tiêu chí sàng lọc phần mềm; trình phê duyệt theo SOP trước khi dùng lô mới.':R.level==='mid'?'Chưa đủ điều kiện sàng lọc phần mềm; cần bổ sung dữ liệu/xác nhận bao phủ hoặc ghi nhận ngoại lệ theo SOP.':'Có khác biệt vượt giới hạn; không dùng lô mới trước khi điều tra và xử lý.';
   h+=`<p><b>Kết luận:</b> ${esc(note)}</p><p style="color:${RCC.muted}"><i>P-value, R² và slope là thông tin mô tả; không dùng riêng các chỉ số này để tự chấp nhận lô mới.</i></p>`;
   h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">${rcScatterSVG(R,t)}${rcBlandSVG(R)}</div>`;
   h+='</div></div>';
   return h;
 }
-function rcReportItems(){return(state.reagentTests||[]).map(ds=>({ds,R:rcCalc(ds)}));}
+function rcReportItems(){return globalThis.reagentReportItemPresentation?globalThis.reagentReportItemPresentation.items(state.reagentTests,rcCalc):(state.reagentTests||[]).map(ds=>({ds,R:rcCalc(ds)}));}
 async function rcPrintSummary(){
   const items=rcReportItems();
   if(!items.length){await infoDialog('Chưa có phép so sánh hóa chất.');return;}

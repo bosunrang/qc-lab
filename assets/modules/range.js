@@ -63,8 +63,8 @@ function rangeUpdateBiasHint(tid,level){
   const bias=parseFloat(String(biasEl.value).replace(',','.')),tea=rangeTeaPercent(r.t,r.l);
   if(!tea){hint.textContent='Chưa có TEa% cho xét nghiệm này — vào Cấu hình Sigma để bổ sung.';return;}
   if(!Number.isFinite(bias)){hint.textContent='';return;}
-  const threshold=tea/4,ok=Math.abs(bias)<=threshold,crit=QCCore.systematicShiftCritical(tea,bias,r.l.sd);
-  hint.innerHTML=`${ok?'✔ Đạt':'✘ Vượt'} ngưỡng: |Bias| ${fmt(Math.abs(bias))}% so với ${fmt(threshold)}%.`+(crit?` <span style="color:var(--muted)">Tham khảo (không phải kết luận chính thức): ΔSEcrit ${fmt(crit.dSEcrit)} · ΔREcrit ${fmt(crit.dREcrit)}.</span>`:'');
+  const result=globalThis.qcRangeBiasEvaluation?globalThis.qcRangeBiasEvaluation(tea,bias,r.l.sd,QCCore.systematicShiftCritical):(function(){const threshold=tea/4;return{threshold,withinThreshold:Math.abs(bias)<=threshold,critical:QCCore.systematicShiftCritical(tea,bias,r.l.sd)};})();
+  hint.innerHTML=`${result.withinThreshold?'✔ Đạt':'✘ Vượt'} ngưỡng: |Bias| ${fmt(Math.abs(bias))}% so với ${fmt(result.threshold)}%.`+(result.critical?` <span style="color:var(--muted)">Tham khảo (không phải kết luận chính thức): ΔSEcrit ${fmt(result.critical.dSEcrit)} · ΔREcrit ${fmt(result.critical.dREcrit)}.</span>`:'');
 }
 function rangeGatePasses(r){
   if(!r.nce)return true;
