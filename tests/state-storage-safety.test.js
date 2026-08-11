@@ -6,7 +6,8 @@ const ctx = loadSandbox([
   'modules/state.js',
   'modules/qc-domain.js',
   'modules/local-store.js',
-  'modules/state-storage.js'
+  'modules/state-storage.js',
+  'generated/modular-pilot.js'
 ]);
 
 const result = run(ctx, `

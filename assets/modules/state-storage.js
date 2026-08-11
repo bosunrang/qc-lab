@@ -74,7 +74,8 @@ function adoptValidatedState(parsed){
   state=QCCore.sanitizeBackup(parsed,{owned:true});ensureShape({sanitized:true});
   const invariantErrors=QCCore.validateStateInvariants(state,{sanitized:true});if(invariantErrors.length)throw new Error(invariantErrors.join('\n'));
 }
-function load(){
+const StateStorageLegacy={};
+StateStorageLegacy.load=function(){
   let raw;
   if(typeof LocalStore!=='undefined'&&LocalStore.supported()){
     try{
@@ -97,8 +98,9 @@ function load(){
     localLoadStatus='invalid';quarantineCorruptLocal(raw,e);startupProblem={raw,message:e&&e.message?e.message:'Dữ liệu cục bộ không hợp lệ.'};
     return false;
   }
-}
-async function hydratePartitionedState(){
+};
+function load(){return globalThis.storageBootService?globalThis.storageBootService.load():(globalThis.localStorageLoadService?globalThis.localStorageLoadService.load():StateStorageLegacy.load());}
+StateStorageLegacy.hydrate=async function(){
   try{
     const record=await LocalStore.readPartitioned();if(!record||!record.state)throw new Error('Không tìm thấy các phân vùng dữ liệu QC.');
     /* recoverPendingSigmaDraft() chạy SAU adoptValidatedState (invariant đã qua) —
@@ -107,8 +109,9 @@ async function hydratePartitionedState(){
     adoptValidatedState(record.state);recoverPendingSigmaDraft();
     mem=state;partitionSlot=record.slot;localLoadStatus='partitioned';clearDerived();startupProblem=null;if(lsDirty)scheduleLocalSave();return true; /* xả ngay các lần ghi bị hoãn trong lúc hydrate */
   }catch(e){startupProblem={raw:'',message:e&&e.message?e.message:'Không thể tải các phân vùng dữ liệu QC.'};return false;}
-}
-async function restoreFromIndexedDb(){
+};
+async function hydratePartitionedState(){return globalThis.partitionHydrationService?globalThis.partitionHydrationService.hydrate():StateStorageLegacy.hydrate();}
+StateStorageLegacy.restore=async function(){
   if(typeof LocalStore==='undefined'||!LocalStore.supported())return false;
   try{
     const partitioned=typeof LocalStore.readPartitioned==='function'?await LocalStore.readPartitioned():null;
@@ -129,8 +132,10 @@ async function restoreFromIndexedDb(){
     try{localStorage.setItem('qclab',JSON.stringify(state));}catch(e){}
     return true;
   }catch(e){startupProblem={raw:JSON.stringify(parsed),message:e&&e.message?e.message:'Dữ liệu IndexedDB không hợp lệ.'};return false;}
-}
+};
+async function restoreFromIndexedDb(){return globalThis.indexedDbRecoveryService?globalThis.indexedDbRecoveryService.restore():StateStorageLegacy.restore();}
 async function loadBootState(){
+  if(globalThis.storageBootService)return globalThis.storageBootService.loadBootState();
   const localOk=load();
   /* Đường partition-shell: hydratePartitionedState() tự recover draft khi nạp
      xong — gọi lại ở đây chỉ merge lặp và bump lsRevision/lsDirty thừa. */
@@ -141,6 +146,7 @@ async function loadBootState(){
   return restored||localOk;
 }
 function mirrorIndexedDb(raw){
+  if(globalThis.indexedDbMirrorService)return globalThis.indexedDbMirrorService.mirror(raw,state);
   if(typeof LocalStore==='undefined'||!LocalStore.supported())return false;
   const write=typeof LocalStore.writeSerialized==='function'?LocalStore.writeSerialized(raw):LocalStore.write(state);
   write.catch(()=>{lsDirty=true;lsSaveFailures++;scheduleLocalRetry();});return true;
@@ -205,6 +211,7 @@ function persistLocalSnapshot(opts={}){
   cancelLocalSaveSchedule();lsDirty=false;
   const localDraftStamp=sigmaDraftStamp();
   if(typeof LocalStore!=='undefined'&&LocalStore.supported()&&typeof LocalStore.writePartitioned==='function'){
+    if(globalThis.partitionedSnapshotWriter)return globalThis.partitionedSnapshotWriter.write({state,slot:partitionSlot,localLoadStatus,fullDirty:lsFullDirty,dirtyTestIds:[...lsDirtyTestIds],streak:lsIncrementalStreak,lastFull:lsLastFullSaveAt,now:Date.now(),maxIncrementals:LS_FULL_ROTATE_MAX_INCREMENTALS,maxMs:LS_FULL_ROTATE_MAX_MS,localDraftStamp,quiet:!!opts.quiet});
     /* Boot shell chưa hydrate xong: state.data đang rỗng — ghi lúc này sẽ cắt
        manifest của slot đang hoạt động về danh sách test rỗng, mất toàn bộ
        điểm QC của slot. Hoãn ghi (giữ lsDirty, hẹn lại) tới khi hydrate xong. */
@@ -224,8 +231,10 @@ function persistLocalSnapshot(opts={}){
   }
   let raw;try{raw=serializeStateForStorage();}catch(e){lsDirty=true;if(!opts.quiet)markSaved('lỗi lưu cục bộ','Không thể tạo snapshot');return false;}
   let localSaved=false,savedAt=Date.now();
+  if(globalThis.localStorageSnapshotWriter)localSaved=globalThis.localStorageSnapshotWriter.write(raw,savedAt,!!opts.quiet);else{
   try{localStorage.setItem('qclab',raw);localStorage.setItem('qclab_saved_at',String(savedAt));localSaved=true;if(!opts.quiet)markSaved('đã lưu cục bộ','Lúc '+saveTime());}
   catch(e){try{localStorage.removeItem('qclab');localStorage.removeItem('qclab_saved_at');}catch(ignore){}if(!opts.quiet)markSaved('lỗi lưu cục bộ','Kiểm tra dung lượng trình duyệt');}
+  }
   const mirrored=mirrorIndexedDb(raw);
   if((localSaved||mirrored)&&!sigmaDraftNeedsCloud())clearSigmaDraftThrough(localDraftStamp);
   if(localSaved||mirrored)lsSaveFailures=0;
@@ -238,19 +247,21 @@ if(typeof window!=='undefined'&&window.addEventListener)window.addEventListener(
 if(typeof window!=='undefined'&&window.addEventListener)window.addEventListener('pagehide',lsFlush);
 if(typeof document!=='undefined'&&document.addEventListener)document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')lsFlush();});
 function invalidateDerivedForSave(opts={}){
-  const ids=globalThis.saveDerivedTestIds?globalThis.saveDerivedTestIds(opts):(opts.clearDerived===false?null:(Array.isArray(opts.testIds)?opts.testIds:(opts.testId?[opts.testId]:[])));
+  const ids=globalThis.saveCommandPolicy?globalThis.saveCommandPolicy(opts).derivedTestIds:(globalThis.saveDerivedTestIds?globalThis.saveDerivedTestIds(opts):(opts.clearDerived===false?null:(Array.isArray(opts.testIds)?opts.testIds:(opts.testId?[opts.testId]:[]))));
   if(ids===null)return;
   if(ids.length)[...new Set(ids.filter(Boolean))].forEach(clearDerivedForTest);else clearDerived();
 }
 function save(opts={}){
+  if(globalThis.saveService)return globalThis.saveService.save(opts);
+  const plan=globalThis.saveCommandPolicy?globalThis.saveCommandPolicy(opts):null;
   invalidateDerivedForSave(opts);
   mem=state;
-  if(opts.cloud!==false){state._ts=Date.now();state._client=fb.clientId;}
-  const storageIds=Array.isArray(opts.testIds)?opts.testIds:(opts.testId?[opts.testId]:(opts.sigmaTestId?[opts.sigmaTestId]:[]));
+  if(plan?plan.pushCloud:opts.cloud!==false){state._ts=Date.now();state._client=fb.clientId;}
+  const storageIds=plan?plan.storageTestIds:(Array.isArray(opts.testIds)?opts.testIds:(opts.testId?[opts.testId]:(opts.sigmaTestId?[opts.sigmaTestId]:[])));
   if(storageIds.length)storageIds.filter(Boolean).forEach(id=>lsDirtyTestIds.add(String(id)));
-  else if(opts.clearDerived!==false)lsFullDirty=true;
-  if(opts.sigmaTestId)persistSigmaDraft(opts.sigmaTestId);
+  else if(plan?plan.fullDirty:opts.clearDerived!==false)lsFullDirty=true;
+  if(plan?plan.persistSigmaDraft:opts.sigmaTestId)persistSigmaDraft(opts.sigmaTestId);
   lsRevision++;lsDirty=true;markSaved('đang lưu','...');
   scheduleLocalSave();
-  if(opts.cloud!==false){fb.dirty=true;scheduleFbPush();}
+  if(plan?plan.pushCloud:opts.cloud!==false){fb.dirty=true;scheduleFbPush();}
 }

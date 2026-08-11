@@ -34,6 +34,17 @@ const fakeIndexedDb = `
   }
 
   {
+    const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'modules/local-store.js', 'modules/state-storage.js', 'generated/modular-pilot.js']);
+    const result = await run(ctx, `
+      ${fakeIndexedDb}
+      localStorage={getItem:function(){return null;},setItem:function(){},removeItem:function(){}};
+      (async()=>{var captured='';LocalStore.writeSerialized=async function(raw){captured=raw;};state={lab:{name:'Mirror'}};var mirrored=mirrorIndexedDb('{"snapshot":1}');await Promise.resolve();return{mirrored,captured,service:typeof indexedDbMirrorService};})()
+    `);
+    assert.deepEqual(JSON.parse(JSON.stringify(result)), { mirrored: true, captured: '{"snapshot":1}', service: 'object' },
+      'legacy storage bridge writes fallback snapshots through the TypeScript IndexedDB mirror');
+  }
+
+  {
     const ctx = loadSandbox(['modules/local-store.js']);
     const result = await run(ctx, `
       ${fakeIndexedDb}
@@ -74,7 +85,7 @@ const fakeIndexedDb = `
   }
 
   {
-    const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'modules/local-store.js', 'modules/state-storage.js', 'modules/settings.js']);
+    const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'modules/local-store.js', 'modules/state-storage.js', 'generated/modular-pilot.js', 'modules/settings.js']);
     const result = await run(ctx, `
       ${fakeIndexedDb}
       localStorage={getItem:function(){return null;},setItem:function(){}};
@@ -88,7 +99,7 @@ const fakeIndexedDb = `
   }
 
   {
-    const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'modules/local-store.js', 'modules/state-storage.js', 'modules/settings.js']);
+    const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'modules/local-store.js', 'modules/state-storage.js', 'generated/modular-pilot.js', 'modules/settings.js']);
     const result = await run(ctx, `
       ${fakeIndexedDb}
       localStorage={getItem:function(){return null;},setItem:function(){}};
@@ -103,7 +114,7 @@ const fakeIndexedDb = `
   }
 
   {
-    const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'modules/local-store.js', 'modules/state-storage.js', 'modules/settings.js']);
+    const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'modules/local-store.js', 'modules/state-storage.js', 'generated/modular-pilot.js', 'modules/settings.js']);
     const result = await run(ctx, `
       ${fakeIndexedDb}
       var __ls=new Map();localStorage={getItem:function(k){return __ls.has(k)?__ls.get(k):null;},setItem:function(k,v){__ls.set(k,String(v));},removeItem:function(k){__ls.delete(k);}};

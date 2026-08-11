@@ -18,9 +18,9 @@ export function createAnalysisUiState() {
     wgArchivedTestId: '', wgArchivedTestQ: '', wgChartMode: 'lj' };
 }
 
-export function createAuthUiState(lockout: { fails?: unknown; until?: unknown } | null = null) {
-  return { currentUser: null, loginFails: lockout && Number(lockout.fails) || 0,
-    loginLockUntil: lockout && Number(lockout.until) || 0 };
+export function createAuthUiState(lockout: unknown = null) {
+  const normalized = normalizeLoginLockoutState(lockout);
+  return { currentUser: null, loginFails: normalized.fails, loginLockUntil: normalized.until };
 }
 
 export function createEntryUiState() {
@@ -42,3 +42,4 @@ export function createReagentUiState() {
 export function createSigmaUiState() {
   return { sgTest: null, sgRefreshT: null, sgBiasCtx: null, sgMuCtx: null, sgAddTestQ: '', sgSelectedPeriods: {} };
 }
+import { normalizeLoginLockoutState } from '../../domain/auth/login-lockout-policy';

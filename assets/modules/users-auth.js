@@ -1,10 +1,10 @@
 /* ===== USERS PAGE ===== */
 function pageUsers(){
-  const rows=state.users.map(u=>`<tr>
+  const rows=(globalThis.userListModel?globalThis.userListModel(state.users,currentUser&&currentUser.id):state.users).map(u=>`<tr>
     <td><b>${esc(u.name||u.username)}</b><div class="hint">@${esc(u.username)}${u.initials?' · '+esc(u.initials):''}</div></td>
     <td>${roleLabel(u.role)}</td>
     <td>${u.active===false?'<span class="tag rej">Khóa</span>':'<span class="tag ok">Hoạt động</span>'}</td>
-    <td><div class="user-row-actions">${u.id===currentUser.id?'<span class="hint">(bạn)</span> '+btn('Đổi mật khẩu',"resetPass('"+u.id+"')",'ghost sm')
+    <td><div class="user-row-actions">${u.current||(currentUser&&u.id===currentUser.id)?'<span class="hint">(bạn)</span> '+btn('Đổi mật khẩu',"resetPass('"+u.id+"')",'ghost sm')
       :btn('Sửa quyền',"openUserPerms('"+u.id+"')",'ghost sm')+' '+btn('Đặt lại MK',"resetPass('"+u.id+"')",'ghost sm')+' '+btn(u.active===false?'Mở khóa':'Khóa',"toggleUser('"+u.id+"')",'ghost sm')+' '+btn('Xóa',"delUser('"+u.id+"')",'danger sm')}</div></td></tr>`).join('');
   return headOnly('Quản lý người dùng','Phân quyền thao tác và kiểm soát tài khoản')+
    `<div class="panel"><h2 class="panel-title">Thêm người dùng</h2><div class="user-create-layout">
@@ -26,12 +26,14 @@ function pageUsers(){
      <div class="user-table-wrap"><table class="user-table"><thead><tr><th>Người dùng</th><th>Vai trò</th><th>Trạng thái</th><th>Hành động</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
 }
 let auditQ='',auditFrom='',auditTo='',auditPage=1,auditPageSize=25;
-const AUDIT_PAGE_SIZES=[25,50,100];
+const AUDIT_PAGE_SIZES=globalThis.activityAuditPageSizes||[25,50,100];
 function auditDateKey(a){
+  if(globalThis.activityAuditFilter)return globalThis.activityAuditFilter.dateKey(a);
   const d=new Date(a&&a.ts);
   return Number.isFinite(+d)?isoDate(d):'';
 }
 function auditFilteredActivities(items=state.activity||[]){
+  if(globalThis.activityAuditFilter)return globalThis.activityAuditFilter.filter(items,auditQ,auditFrom,auditTo);
   const q=searchText(auditQ);
   return (items||[]).filter(a=>{
     const date=auditDateKey(a);
@@ -42,23 +44,24 @@ function auditFilteredActivities(items=state.activity||[]){
   }).slice().reverse();
 }
 function auditSetQuery(value){
-  auditQ=value;auditPage=1;
+  if(globalThis.activityAuditFilterState){const next=globalThis.activityAuditFilterState.withQuery({query:auditQ,from:auditFrom,to:auditTo,page:auditPage,pageSize:auditPageSize},value);auditQ=next.query;auditPage=next.page;}else{auditQ=value;auditPage=1;}
   scheduleSearchRender(auditSetQuery,rerender,'auditSearch');
 }
 function auditSetDate(field,value){
   const iso=value?(vnPickerParse(value)||parseVN(value)||''):'';
+  if(globalThis.updateActivityAuditDateRange){const next=globalThis.updateActivityAuditDateRange({from:auditFrom,to:auditTo},field,iso);auditFrom=next.from;auditTo=next.to;auditPage=1;rerender();return;}
   if(field==='from'){auditFrom=iso;if(iso&&auditTo&&iso>auditTo)auditTo=iso;}
   else{auditTo=iso;if(iso&&auditFrom&&iso<auditFrom)auditFrom=iso;}
   auditPage=1;rerender();
 }
 function auditSetPageSize(value){
-  const size=Number(value);auditPageSize=AUDIT_PAGE_SIZES.includes(size)?size:25;auditPage=1;rerender();
+  if(globalThis.activityAuditFilterState){const next=globalThis.activityAuditFilterState.withPageSize({query:auditQ,from:auditFrom,to:auditTo,page:auditPage,pageSize:auditPageSize},value,AUDIT_PAGE_SIZES);auditPageSize=next.pageSize;auditPage=next.page;}else{const size=Number(value);auditPageSize=AUDIT_PAGE_SIZES.includes(size)?size:25;auditPage=1;}rerender();
 }
 function auditSetPage(value){
-  auditPage=Math.max(1,Number(value)||1);rerender();
+  auditPage=globalThis.activityAuditFilterState?globalThis.activityAuditFilterState.withPage({query:auditQ,from:auditFrom,to:auditTo,page:auditPage,pageSize:auditPageSize},value).page:Math.max(1,Number(value)||1);rerender();
 }
 function auditClearFilters(){
-  auditQ='';auditFrom='';auditTo='';auditPage=1;rerender();
+  if(globalThis.activityAuditFilterState){const next=globalThis.activityAuditFilterState.cleared({query:auditQ,from:auditFrom,to:auditTo,page:auditPage,pageSize:auditPageSize});auditQ=next.query;auditFrom=next.from;auditTo=next.to;auditPage=next.page;}else{auditQ='';auditFrom='';auditTo='';auditPage=1;}rerender();
 }
 function pageAudit(){
   const total=(state.activity||[]).length;
@@ -67,13 +70,13 @@ function pageAudit(){
   const chainHtml=chain.idle
     ?`<span class="tag none">Chưa kiểm chuỗi hash</span> ${btn('Kiểm tra chuỗi hash','auditVerifyChainNow()','ghost sm')} <span class="hint">Nhật ký lớn (${chain.total} dòng) nên không tự kiểm mỗi lần mở trang.</span>`
     :chain.ok?`<span class="tag ok">Chuỗi hash hợp lệ</span> <span class="hint">${chain.checked} dòng đã khóa hash${chain.legacy?` · ${chain.legacy} dòng cũ chưa có hash`:''}</span>`:`<span class="tag rej">Audit có dấu hiệu bị sửa</span> <span class="hint">Lỗi tại dòng #${(state.activity[chain.brokenIndex]||{}).seq||chain.brokenIndex+1}: ${esc(chain.reason)}</span>`;
-  const filtered=auditFilteredActivities(),pageCount=Math.max(1,Math.ceil(filtered.length/auditPageSize));
-  auditPage=Math.min(Math.max(1,auditPage),pageCount);
-  const offset=(auditPage-1)*auditPageSize,pageRows=filtered.slice(offset,offset+auditPageSize);
+  const filtered=auditFilteredActivities(),pageInfo=globalThis.activityAuditPagination?globalThis.activityAuditPagination(filtered,auditPage,auditPageSize):null,pageCount=pageInfo?pageInfo.pageCount:Math.max(1,Math.ceil(filtered.length/auditPageSize));
+  auditPage=pageInfo?pageInfo.page:Math.min(Math.max(1,auditPage),pageCount);
+  const offset=pageInfo?pageInfo.offset:(auditPage-1)*auditPageSize,pageRows=pageInfo?pageInfo.rows:filtered.slice(offset,offset+auditPageSize);
   const rows=pageRows.map(a=>`<tr><td><div class="audit-time-cell"><span class="audit-seq">${a.seq?'#'+a.seq:''}</span><span class="audit-time">${formatDateTimeVN(a.ts)}</span></div></td><td><b>${esc(a.user||'')}</b><div class="hint">${roleLabel(a.role||'viewer')}${a.username?' · @'+esc(a.username):''}</div></td><td><span class="pill">${esc(a.type||'')}</span></td><td>${esc(a.target||'')||'<span class="hint">—</span>'}</td><td class="audit-detail">${esc(a.detail||'')||'<span class="hint">—</span>'}</td></tr>`).join('');
   const hasFilter=!!(auditQ||auditFrom||auditTo);
   const pageSizeOptions=AUDIT_PAGE_SIZES.map(size=>`<option value="${size}" ${size===auditPageSize?'selected':''}>${size} dòng</option>`).join('');
-  const resultFrom=filtered.length?offset+1:0,resultTo=Math.min(offset+auditPageSize,filtered.length);
+  const resultFrom=pageInfo?pageInfo.resultFrom:(filtered.length?offset+1:0),resultTo=pageInfo?pageInfo.resultTo:Math.min(offset+auditPageSize,filtered.length);
   const pagination=filtered.length?`<div class="audit-pagination"><span class="hint">Hiển thị ${resultFrom}–${resultTo} / ${filtered.length} dòng</span><div>${btn('‹ Trước',`auditSetPage(${auditPage-1})`,'ghost sm','',{disabled:auditPage<=1})}<b>Trang ${auditPage}/${pageCount}</b>${btn('Sau ›',`auditSetPage(${auditPage+1})`,'ghost sm','',{disabled:auditPage>=pageCount})}</div></div>`:'';
   return headOnly('Nhật ký hoạt động','Lưu vết các thao tác quan trọng; chỉ quản trị viên được xem')+
     `<div class="panel"><h2 class="panel-title">Công cụ</h2><div class="row-flex">
@@ -86,7 +89,7 @@ function pageAudit(){
       ${rows?`<div class="audit-table-wrap"><table class="audit-table"><thead><tr><th>Thời gian</th><th>Người dùng</th><th>Hành động</th><th>Đối tượng</th><th>Chi tiết</th></tr></thead><tbody>${rows}</tbody></table></div>`:emptyState(total?'Không tìm thấy nhật ký':'Chưa có hoạt động',total?'Thử từ khóa hoặc khoảng ngày khác.':'Nhật ký sẽ bắt đầu ghi từ các thao tác tiếp theo.')}
       ${pagination}</div>`;
 }
-function activityCSVRows(items){const rows=[['Seq','Thời gian','Người dùng','Tên đăng nhập','Vai trò','Hành động','Đối tượng','Chi tiết','PrevHash','Hash']];(items||[]).forEach(a=>rows.push([a.seq||'',formatDateTimeVN(a.ts),a.user||'',a.username||'',roleLabel(a.role||'viewer'),a.type||'',a.target||'',a.detail||'',a.prevHash||'',a.hash||'']));return rows;}
+function activityCSVRows(items){if(globalThis.activityAuditCsv)return globalThis.activityAuditCsv(items);const rows=[['Seq','Thời gian','Người dùng','Tên đăng nhập','Vai trò','Hành động','Đối tượng','Chi tiết','PrevHash','Hash']];(items||[]).forEach(a=>rows.push([a.seq||'',formatDateTimeVN(a.ts),a.user||'',a.username||'',roleLabel(a.role||'viewer'),a.type||'',a.target||'',a.detail||'',a.prevHash||'',a.hash||'']));return rows;}
 function exportActivityCSV(){downloadCSV('Nhat_ky_hoat_dong_QCLab.csv',activityCSVRows(state.activity));}
 /* Lưu trữ CÓ CHỦ ĐÍCH nhật ký cũ: xuất CSV phần bị cắt TRƯỚC, chỉ khi file đã
    tạo xong mới gỡ khỏi state — khác với xoay vòng tự động (auditRotateOverflow),
@@ -108,8 +111,8 @@ function archiveActivityLog(){
 }
 async function confirmArchiveActivityLog(){
   if(!requireAdmin())return;
-  const months=Math.max(1,Math.floor(Number((document.getElementById('auditArchiveMonths')||{}).value)||24));
-  const cutoff=new Date();cutoff.setMonth(cutoff.getMonth()-months);
+  const rawMonths=(document.getElementById('auditArchiveMonths')||{}).value,archiveWindow=globalThis.activityAuditArchiveWindow?globalThis.activityAuditArchiveWindow(rawMonths):null,months=archiveWindow?archiveWindow.months:Math.max(1,Math.floor(Number(rawMonths)||24));
+  const cutoff=archiveWindow?new Date(archiveWindow.cutoffIso):new Date();if(!archiveWindow)cutoff.setMonth(cutoff.getMonth()-months);
   const{segment,retained,tipHash}=auditArchiveCut(state.activity,cutoff.toISOString());
   if(!segment.length){closeModal();await infoDialog('Không có dòng nhật ký nào cũ hơn mốc đã chọn.');return;}
   if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Lưu trữ nhật ký cũ',message:`Xuất CSV rồi gỡ ${segment.length} dòng nhật ký cũ hơn ${months} tháng?`,detail:`Còn lại ${retained.length} dòng trong hệ thống. File CSV giữ nguyên PrevHash/Hash từng dòng và nối tiếp được vào chuỗi còn lại.`,confirmLabel:'Lưu trữ',cancelLabel:'Hủy'}))return;
@@ -134,14 +137,12 @@ async function confirmArchiveActivityLog(){
 async function addUser(){
   if(!requireAdmin())return;
   const username=document.getElementById('uUser').value.trim().toLowerCase();const name=document.getElementById('uName').value.trim();const initials=QCCore.cleanText(document.getElementById('uInitials').value,12).trim().toUpperCase();const rolev=document.getElementById('uRole').value;const pass=document.getElementById('uPass').value;
-  if(!username||!pass){await infoDialog('Nhập tên đăng nhập và mật khẩu.');return;}
-  const passErr=passwordError(pass);if(passErr){await infoDialog(passErr);return;}
-  if(state.users.some(u=>u.username===username)){await infoDialog('Tên đăng nhập đã tồn tại.');return;}
+  const userErr=globalThis.newUserValidationError?globalThis.newUserValidationError({username,password:pass,existingUsernames:state.users.map(u=>u.username)}):(!username||!pass?'Nhập tên đăng nhập và mật khẩu.':passwordError(pass)||(state.users.some(u=>u.username===username)?'Tên đăng nhập đã tồn tại.':''));if(userErr){await infoDialog(userErr);return;}
   const pagePerms=await collectUserPerms('newUserPerms',rolev);if(!pagePerms)return;
   const passHash=await hashPass(pass);state.users.push({id:uid(),username,name,initials,role:rolev,pagePerms,passHash,active:true,mustChangePassword:true});logAct('Thêm người dùng',roleLabel(rolev)+' · '+pagePerms.length+' thẻ · yêu cầu đổi mật khẩu',username);save({clearDerived:false});rerender();
 }
 function userPermChecks(selectedIds,groupId,roleValue){
-  const base=new Set(rolePageIds(roleValue)),selected=new Set((selectedIds&&selectedIds.length?selectedIds:rolePageIds(roleValue)).filter(id=>base.has(id)));
+  const base=new Set(rolePageIds(roleValue)),initial=selectedIds&&selectedIds.length?selectedIds:rolePageIds(roleValue),selected=new Set(globalThis.selectUserPermissions?globalThis.selectUserPermissions(initial,[...base]):initial.filter(id=>base.has(id)));
   return `<div id="${groupId}" class="user-perm-grid">${PAGES.map(([id,title])=>{const allowed=base.has(id);return`<label class="${allowed?'':'disabled'}"><input type="checkbox" value="${id}" ${selected.has(id)?'checked':''} ${!allowed?'disabled':''}><span>${esc(title)}</span></label>`;}).join('')}</div>`;
 }
 function syncUserPermChecks(groupId,roleValue){
@@ -150,7 +151,7 @@ function syncUserPermChecks(groupId,roleValue){
 }
 async function collectUserPerms(groupId,roleValue){
   const box=document.getElementById(groupId),base=new Set(rolePageIds(roleValue));if(!box)return rolePageIds(roleValue);
-  const picked=[...box.querySelectorAll('input[type=checkbox]:checked')].map(i=>i.value).filter(id=>base.has(id));
+  const selected=[...box.querySelectorAll('input[type=checkbox]:checked')].map(i=>i.value),picked=globalThis.selectUserPermissions?globalThis.selectUserPermissions(selected,[...base]):selected.filter(id=>base.has(id));
   if(!picked.length){await infoDialog('Cần chọn ít nhất một thẻ được phép dùng.');return null;}
   return [...new Set(picked)];
 }
@@ -194,8 +195,8 @@ function resetPass(id){
 async function applyResetPass(id){
   if(!requireAdmin())return;
   const u=state.users.find(x=>x.id===id);if(!u)return;
-  const p1=document.getElementById('resetPass1').value,p2=document.getElementById('resetPass2').value,msg=document.getElementById('resetPassMsg'),err=passwordError(p1);
-  if(err||p1!==p2){if(msg)msg.innerHTML=`<div class="auth-err">${esc(err||'Hai mật khẩu không khớp.')}</div>`;return;}
+  const p1=document.getElementById('resetPass1').value,p2=document.getElementById('resetPass2').value,msg=document.getElementById('resetPassMsg'),err=globalThis.passwordChangeError?globalThis.passwordChangeError(p1,p2):passwordError(p1)||(p1!==p2?'Hai mật khẩu không khớp.':'');
+  if(err){if(msg)msg.innerHTML=`<div class="auth-err">${esc(err)}</div>`;return;}
   u.passHash=await hashPass(p1);
   u.mustChangePassword=!(currentUser&&currentUser.id===id);
   logAct('Đổi mật khẩu',u.mustChangePassword?'Đặt mật khẩu tạm và yêu cầu đổi lại':'Người dùng đổi mật khẩu',u.username);
@@ -208,16 +209,17 @@ async function delUser(id){if(!requireAdmin())return;if(id===currentUser.id){awa
 const PASS_ITERATIONS=600000; /* OWASP: >=600k vòng PBKDF2-SHA256. Hash cũ 210k vẫn xác thực (verifyPass đọc số vòng từ chuỗi hash) và tự nâng cấp khi đăng nhập. */
 function bytesHex(a){return [...a].map(b=>b.toString(16).padStart(2,'0')).join('');}
 function hexBytes(s){return new Uint8Array((s.match(/.{1,2}/g)||[]).map(x=>parseInt(x,16)));}
-function passwordError(p){if(!p)return'Mật khẩu không được để trống.';if(p.length<8)return'Mật khẩu phải có ít nhất 8 ký tự.';return'';}
-async function legacyHashPass(p){try{const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('qclab::'+p));return bytesHex(new Uint8Array(buf));}catch(e){let h=0;const s='qclab::'+p;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return'f'+h.toString(16);}}
+function passwordError(p){return globalThis.passwordPolicyError?globalThis.passwordPolicyError(p):(!p?'Mật khẩu không được để trống.':p.length<8?'Mật khẩu phải có ít nhất 8 ký tự.':'');}
+async function legacyHashPass(p){if(globalThis.legacyPasswordHashService)return globalThis.legacyPasswordHashService.hash(p);try{const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('qclab::'+p));return bytesHex(new Uint8Array(buf));}catch(e){let h=0;const s='qclab::'+p;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return'f'+h.toString(16);}}
 async function hashPass(p){
+  if(globalThis.pbkdf2PasswordService)return globalThis.pbkdf2PasswordService.hash(p);
   if(!crypto.subtle)throw new Error('Trình duyệt không hỗ trợ mã hóa mật khẩu an toàn.');
   const salt=crypto.getRandomValues(new Uint8Array(16)),key=await crypto.subtle.importKey('raw',new TextEncoder().encode(p),'PBKDF2',false,['deriveBits']);
   const bits=await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt,iterations:PASS_ITERATIONS},key,256);
   return`pbkdf2$${PASS_ITERATIONS}$${bytesHex(salt)}$${bytesHex(new Uint8Array(bits))}`;
 }
 async function verifyPass(p,stored){
-  if(String(stored||'').startsWith('pbkdf2$')){const [,it,saltHex,want]=stored.split('$'),key=await crypto.subtle.importKey('raw',new TextEncoder().encode(p),'PBKDF2',false,['deriveBits']),bits=await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:hexBytes(saltHex),iterations:+it},key,256);return bytesHex(new Uint8Array(bits))===want;}
+  if(globalThis.isPbkdf2PasswordHash?globalThis.isPbkdf2PasswordHash(stored):String(stored||'').startsWith('pbkdf2$')){if(globalThis.pbkdf2PasswordService)return globalThis.pbkdf2PasswordService.verify(p,stored);const [,it,saltHex,want]=stored.split('$'),key=await crypto.subtle.importKey('raw',new TextEncoder().encode(p),'PBKDF2',false,['deriveBits']),bits=await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:hexBytes(saltHex),iterations:+it},key,256);return bytesHex(new Uint8Array(bits))===want;}
   return await legacyHashPass(p)===stored;
 }
 async function confirmReauthentication(){
@@ -242,8 +244,9 @@ function reauthenticateCurrentUser({title='Xác thực lại',message='Nhập l�
     <div class="confirm-modal-actions">${btn('Hủy','closeDialogOverlay(false)','ghost')}${btn('Xác thực','confirmReauthentication()','teal')}</div>
   </div>`,resolve));
 }
-async function ensureAdmin(){if(!state.users||!state.users.length){state.users=[{id:uid(),username:'admin',name:'Quản trị viên',role:'admin',passHash:await legacyHashPass('admin'),active:true,mustChangePassword:true}];save({cloud:false,clearDerived:false});}}
+async function ensureAdmin(){if(!state.users||!state.users.length){const id=uid(),passHash=await legacyHashPass('admin');state.users=[globalThis.defaultAdminUserFactory?globalThis.defaultAdminUserFactory(id,passHash):{id,username:'admin',name:'Quản trị viên',role:'admin',passHash,active:true,mustChangePassword:true}];save({cloud:false,clearDerived:false});}}
 function blankAppState(users){
+  if(globalThis.blankAppStateFactory)return globalThis.blankAppStateFactory(users);
   return{lab:{name:'',dept:'',address:'',brandTitle:'QC Lab',brandSub:'Nội kiểm xét nghiệm',logoText:'QC',logoData:''},tests:[],machines:[],instruments:[],assayGroups:[],qcPanels:[],lotTransitions:[],lotGroups:[],qcLots:[],data:{},actions:[],activity:[],activityAnchor:'',users:Array.isArray(users)?users:[],reagentTests:[],reagentOperators:[],reagentSampleTypes:['Mẫu bệnh nhân','Mẫu nội kiểm (IQC)','Mẫu ngoại kiểm (EQA)'],sigmaData:{},periodLocks:[],teaRefs:[],teaRegistryVersion:TEA_REFERENCE_SCHEMA_VERSION,westgardRules:{...WG_DEFAULT},westgardProfileVersion:2,configMigrationVersion:1,schemaVersion:STATE_SCHEMA_VERSION};
 }
 async function resetAllData(){
@@ -323,17 +326,17 @@ async function doLogin(){
   // nếu không kẻ dò có thể dùng đó để liệt kê username hợp lệ trước khi dò mật khẩu.
   // Chi tiết thật (để phân biệt khi tra soát) chỉ ghi vào nhật ký hoạt động nội bộ.
   const genericFailMsg='Tên đăng nhập hoặc mật khẩu không đúng.';
-  if(Date.now()<loginLockUntil){showLogin('Sai mật khẩu quá nhiều lần. Thử lại sau '+Math.ceil((loginLockUntil-Date.now())/1000)+' giây.');return;}
+  if(globalThis.loginLockoutPolicy?globalThis.loginLockoutPolicy.isLocked(loginLockUntil,Date.now()):Date.now()<loginLockUntil){const now=Date.now(),seconds=globalThis.loginLockoutPolicy?globalThis.loginLockoutPolicy.remainingSeconds(loginLockUntil,now):Math.ceil((loginLockUntil-now)/1000),msg=globalThis.loginLockoutPolicy?globalThis.loginLockoutPolicy.message(loginLockUntil,now):'Sai mật khẩu quá nhiều lần. Thử lại sau '+seconds+' giây.';showLogin(msg);return;}
   if(typeof storageHydrationPromise!=='undefined'&&!await storageHydrationPromise){showStartupRecovery();return;}
   const user=state.users.find(x=>x.username===u);
-  const failOnce=(logDetail,msg)=>{loginFails++;if(loginFails>=5){loginLockUntil=Date.now()+30000;loginFails=0;}persistLoginLockout();logAct('Đăng nhập thất bại',logDetail,u);save({cloud:false,clearDerived:false});showLogin(msg);};
+  const failOnce=(logDetail,msg)=>{if(globalThis.loginLockoutPolicy){const next=globalThis.loginLockoutPolicy.recordFailure({fails:loginFails,until:loginLockUntil},Date.now());loginFails=next.fails;loginLockUntil=next.until;}else{loginFails++;if(loginFails>=5){loginLockUntil=Date.now()+30000;loginFails=0;}}persistLoginLockout();logAct('Đăng nhập thất bại',logDetail,u);save({cloud:false,clearDerived:false});showLogin(msg);};
   if(!user||user.active===false){failOnce('Tài khoản không tồn tại hoặc đã bị khóa',genericFailMsg);return;}
   let ok=false;try{ok=await verifyPass(p,user.passHash);}catch(e){showLogin('Không thể kiểm tra mật khẩu trên trình duyệt này.');return;}
   if(!ok){failOnce('Sai mật khẩu',genericFailMsg);return;}
-  loginFails=0;loginLockUntil=0;persistLoginLockout();
+  if(globalThis.loginLockoutPolicy){const next=globalThis.loginLockoutPolicy.reset();loginFails=next.fails;loginLockUntil=next.until;}else{loginFails=0;loginLockUntil=0;}persistLoginLockout();
   currentUser=user;logAct('Đăng nhập','Đăng nhập thành công','Tài khoản');
-  if(user.username==='admin'&&p==='admin'&&!String(user.passHash||'').startsWith('pbkdf2$'))user.mustChangePassword=true;
-  else if(!String(user.passHash||'').startsWith('pbkdf2$')||+(String(user.passHash).split('$')[1]||0)<PASS_ITERATIONS){
+  if(user.username==='admin'&&p==='admin'&&!(globalThis.isPbkdf2PasswordHash?globalThis.isPbkdf2PasswordHash(user.passHash):String(user.passHash||'').startsWith('pbkdf2$')))user.mustChangePassword=true;
+  else if(globalThis.passwordHashNeedsUpgrade?globalThis.passwordHashNeedsUpgrade(user.passHash):(!String(user.passHash||'').startsWith('pbkdf2$')||+(String(user.passHash).split('$')[1]||0)<PASS_ITERATIONS)){
     /* Nâng cấp hash trong suốt: dùng đúng mật khẩu vừa xác thực để băm lại theo chuẩn mới. */
     try{user.passHash=await hashPass(p);logAct('Nâng cấp mật khẩu','Tự động băm lại theo chuẩn mới khi đăng nhập','Tài khoản');}catch(e){}
   }
@@ -350,8 +353,8 @@ function showPasswordChange(msg){
   setTimeout(()=>{const e=document.getElementById('newPass1');if(e)e.focus();},50);
 }
 async function changeRequiredPassword(){
-  const p1=document.getElementById('newPass1').value,p2=document.getElementById('newPass2').value,err=passwordError(p1);
-  if(err){showPasswordChange(err);return;}if(p1!==p2){showPasswordChange('Hai mật khẩu không khớp.');return;}
+  const p1=document.getElementById('newPass1').value,p2=document.getElementById('newPass2').value,err=globalThis.passwordChangeError?globalThis.passwordChangeError(p1,p2):passwordError(p1)||(p1!==p2?'Hai mật khẩu không khớp.':'');
+  if(err){showPasswordChange(err);return;}
   currentUser.passHash=await hashPass(p1);currentUser.mustChangePassword=false;logAct('Đổi mật khẩu','Người dùng cập nhật mật khẩu','Tài khoản');save({cloud:!!(fb&&fb.initialized),clearDerived:false});showApp();
 }
 function logout(){if(currentUser){logAct('Đăng xuất','Đăng xuất khỏi phần mềm','Tài khoản');save({cloud:false,clearDerived:false});}currentUser=null;page='dash';showLogin();}

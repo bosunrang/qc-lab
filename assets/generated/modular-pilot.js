@@ -2861,6 +2861,990 @@
 		return [...new Set(ids.filter(Boolean))];
 	}
 	//#endregion
+	//#region src/application/storage/save-command-policy.ts
+	var idsFor = (options) => Array.isArray(options.testIds) ? options.testIds : options.testId ? [options.testId] : [];
+	var storageIdsFor = (options) => {
+		const ids = idsFor(options);
+		return ids.length ? ids : options.sigmaTestId ? [options.sigmaTestId] : [];
+	};
+	function saveCommandPlan(options = {}) {
+		const derivedTestIds = options.clearDerived === false ? null : [...new Set(idsFor(options).filter(Boolean))];
+		const storageTestIds = [...new Set(storageIdsFor(options).filter(Boolean).map(String))];
+		return Object.freeze({
+			derivedTestIds,
+			storageTestIds,
+			fullDirty: !storageTestIds.length && options.clearDerived !== false,
+			persistSigmaDraft: !!options.sigmaTestId,
+			pushCloud: options.cloud !== false
+		});
+	}
+	//#endregion
+	//#region src/application/storage/storage-boot-service.ts
+	function createStorageBootService(deps) {
+		const load = () => {
+			if (deps.partitionedSupported()) try {
+				const raw = deps.readBootRecord();
+				if (raw) {
+					const record = JSON.parse(raw);
+					if (!record.shell || record.slot !== "a" && record.slot !== "b") throw new Error("Partition boot record khong hop le.");
+					deps.activatePartitionShell(record.shell, record.slot);
+					return true;
+				}
+			} catch {
+				try {
+					deps.discardBootRecord();
+				} catch {}
+			}
+			return deps.loadLegacy();
+		};
+		const loadBootState = async () => {
+			const localOk = load();
+			if (localOk && deps.localLoadStatus() !== "partition-shell") deps.recoverPendingSigmaDraft();
+			const status = deps.localLoadStatus();
+			if (status === "local" || status === "partition-shell" || !deps.partitionedSupported()) return localOk;
+			const restored = await deps.restoreFromIndexedDb();
+			if (restored) deps.recoverPendingSigmaDraft();
+			return restored || localOk;
+		};
+		return Object.freeze({
+			load,
+			loadBootState
+		});
+	}
+	//#endregion
+	//#region src/application/storage/indexeddb-recovery-service.ts
+	function createIndexedDbRecoveryService(deps) {
+		const restore = async () => {
+			if (!deps.supported()) return false;
+			try {
+				const partitioned = await deps.readPartitioned();
+				if (partitioned?.state) {
+					deps.adopt(partitioned.state);
+					deps.acceptPartitioned(partitioned);
+					return true;
+				}
+			} catch (error) {
+				deps.reportFailure("partitioned", error);
+				return false;
+			}
+			let record;
+			try {
+				record = await deps.readLegacy();
+			} catch {
+				return false;
+			}
+			let parsed = record?.state;
+			if (!parsed && record?.json) try {
+				parsed = JSON.parse(String(record.json));
+			} catch (error) {
+				deps.reportFailure("legacy", error, String(record.json));
+				return false;
+			}
+			if (!parsed) return false;
+			try {
+				deps.adopt(parsed);
+				deps.acceptLegacy();
+				return true;
+			} catch (error) {
+				deps.reportFailure("legacy", error, JSON.stringify(parsed));
+				return false;
+			}
+		};
+		return Object.freeze({ restore });
+	}
+	//#endregion
+	//#region src/application/storage/partition-hydration-service.ts
+	function createPartitionHydrationService(deps) {
+		const hydrate = async () => {
+			try {
+				const record = await deps.read();
+				if (!record?.state) throw new Error("Khong tim thay cac phan vung du lieu QC.");
+				deps.adopt(record.state);
+				deps.recoverPendingSigmaDraft();
+				deps.accept(record);
+				return true;
+			} catch (error) {
+				deps.reportFailure(error);
+				return false;
+			}
+		};
+		return Object.freeze({ hydrate });
+	}
+	//#endregion
+	//#region src/application/storage/indexeddb-mirror-service.ts
+	function createIndexedDbMirrorService(deps) {
+		const mirror = (raw, state) => {
+			if (!deps.supported()) return false;
+			(deps.writeSerialized(raw) || deps.writeState(state)).catch(deps.failed);
+			return true;
+		};
+		return Object.freeze({ mirror });
+	}
+	//#endregion
+	//#region src/application/storage/local-storage-load-service.ts
+	function createLocalStorageLoadService(deps) {
+		const load = () => {
+			let raw;
+			try {
+				raw = deps.read();
+			} catch (error) {
+				deps.rejectedRead(error);
+				return false;
+			}
+			if (!raw) return deps.adoptEmpty();
+			try {
+				deps.adopt(JSON.parse(raw));
+				deps.accepted();
+				return true;
+			} catch (error) {
+				deps.rejectedInvalid(raw, error);
+				return false;
+			}
+		};
+		return Object.freeze({ load });
+	}
+	//#endregion
+	//#region src/application/storage/local-storage-snapshot-writer.ts
+	function createLocalStorageSnapshotWriter(deps) {
+		const write = (raw, savedAt, quiet) => {
+			try {
+				deps.set("qclab", raw);
+				deps.set("qclab_saved_at", String(savedAt));
+				deps.saved(quiet);
+				return true;
+			} catch {
+				try {
+					deps.remove("qclab");
+					deps.remove("qclab_saved_at");
+				} catch {}
+				deps.failed(quiet);
+				return false;
+			}
+		};
+		return Object.freeze({ write });
+	}
+	//#endregion
+	//#region src/application/storage/partitioned-snapshot-writer.ts
+	function createPartitionedSnapshotWriter(deps) {
+		const write = (input) => {
+			if (input.localLoadStatus === "partition-shell") {
+				deps.defer();
+				return false;
+			}
+			const dirtyTestIds = deps.plan(input);
+			const pending = deps.writePartitioned(input.state, input.slot, dirtyTestIds).then((result) => {
+				if (!result) throw new Error("Khong the ghi snapshot phan vung.");
+				deps.completed(result, input);
+				return true;
+			}).catch(() => {
+				deps.failed(input);
+				return false;
+			});
+			deps.setPending(pending);
+			return true;
+		};
+		return Object.freeze({ write });
+	}
+	//#endregion
+	//#region src/application/storage/save-service.ts
+	function createSaveService(deps) {
+		const save = (options = {}) => {
+			const plan = deps.plan(options);
+			deps.invalidate(plan.derivedTestIds);
+			deps.captureState();
+			if (plan.pushCloud) deps.touchCloud();
+			deps.prepareStorage(plan, options);
+			deps.beginLocalSave();
+			if (plan.pushCloud) deps.scheduleCloud();
+		};
+		return Object.freeze({ save });
+	}
+	//#endregion
+	//#region src/application/sync/firebase-local-store-service.ts
+	function createFirebaseLocalStoreService(deps) {
+		const store = (state) => {
+			if (deps.persistSnapshot()) return;
+			const raw = deps.serialize(state);
+			try {
+				deps.writeLocal(raw);
+			} catch {}
+			deps.mirror(raw);
+		};
+		return Object.freeze({ store });
+	}
+	//#endregion
+	//#region src/application/sync/firebase-disconnect-service.ts
+	function createFirebaseDisconnectService(deps) {
+		const disconnect = (clearAuthUser = false) => {
+			deps.stopPolling();
+			deps.cancelPendingPush();
+			deps.resetRetry();
+			deps.detachListener();
+			deps.resetSession(clearAuthUser);
+		};
+		return Object.freeze({ disconnect });
+	}
+	//#endregion
+	//#region src/application/sync/firebase-push-service.ts
+	function createFirebasePushService(deps) {
+		const flush = async (connection) => {
+			if (!deps.canPush(connection) || !deps.auditMaySync()) return false;
+			const prepared = deps.prepare();
+			if (!Object.keys(prepared.payload).length) {
+				deps.noChanges(prepared.draftStamp);
+				return true;
+			}
+			deps.beforeWrite();
+			try {
+				await deps.update(connection.ref, prepared.payload);
+				deps.succeeded(prepared.current, prepared.draftStamp);
+				return true;
+			} catch {
+				deps.failed();
+				return false;
+			}
+		};
+		return Object.freeze({ flush });
+	}
+	//#endregion
+	//#region src/application/sync/firebase-full-sync-service.ts
+	function createFirebaseFullSyncService(deps) {
+		const sync = async (connection) => {
+			if (!deps.canSync(connection) || !deps.auditMaySync()) return false;
+			const prepared = deps.prepare();
+			deps.beforeWrite();
+			try {
+				await deps.write(connection.ref, prepared.payload);
+				deps.succeeded(prepared.payload, prepared.draftStamp);
+				return true;
+			} catch (error) {
+				deps.failed();
+				throw error;
+			}
+		};
+		return Object.freeze({ sync });
+	}
+	//#endregion
+	//#region src/application/sync/firebase-push-scheduler.ts
+	function createFirebasePushScheduler(deps) {
+		const schedule = (connection, timer) => {
+			if (!deps.canWrite(connection)) return timer;
+			if (!deps.networkOnline()) {
+				deps.offline();
+				return timer;
+			}
+			deps.resetRetry();
+			deps.clearTimer(timer);
+			deps.queued();
+			return deps.setTimer(deps.flush, 500);
+		};
+		return Object.freeze({ schedule });
+	}
+	//#endregion
+	//#region src/domain/sync/firebase-empty-snapshot.ts
+	function firebaseEmptySnapshotPlan(initialized, dirty, hasLocalContent) {
+		const firstSnapshot = !initialized;
+		return {
+			firstSnapshot,
+			push: dirty || firstSnapshot && hasLocalContent
+		};
+	}
+	//#endregion
+	//#region src/application/sync/firebase-empty-snapshot-service.ts
+	function createFirebaseEmptySnapshotService(deps) {
+		const handle = (input) => {
+			const plan = firebaseEmptySnapshotPlan(input.initialized, input.dirty, input.hasLocalContent);
+			deps.setReady();
+			deps.clearSynced();
+			deps.connected();
+			if (plan.push) deps.schedulePush();
+			else if (!input.silent) deps.readyWithoutPush();
+		};
+		return Object.freeze({ handle });
+	}
+	//#endregion
+	//#region src/application/sync/firebase-own-snapshot-service.ts
+	function createFirebaseOwnSnapshotService(deps) {
+		const handle = (remote, silent) => {
+			deps.setReady();
+			deps.setBaseline(remote);
+			deps.clearDirty();
+			deps.resetRetry();
+			deps.connected();
+			if (!silent) deps.synchronized();
+		};
+		return Object.freeze({ handle });
+	}
+	//#endregion
+	//#region src/application/sync/firebase-invalid-snapshot-service.ts
+	function createFirebaseInvalidSnapshotService(deps) {
+		const handle = (firstError) => {
+			deps.setReady();
+			deps.report(firstError);
+		};
+		return Object.freeze({ handle });
+	}
+	//#endregion
+	//#region src/application/sync/firebase-audit-rejection-service.ts
+	function createFirebaseAuditRejectionService(deps) {
+		const reject = (source, result) => {
+			const where = result && Number(result.brokenIndex) >= 0 ? ` dòng ${Number(result.brokenIndex) + 1}` : "";
+			deps.disconnect();
+			deps.disconnected();
+			deps.report(`${source}${where}: ${result?.reason || "chuỗi hash bị hỏng"} · dữ liệu cục bộ được giữ nguyên`);
+			return false;
+		};
+		return Object.freeze({ reject });
+	}
+	//#endregion
+	//#region src/application/sync/firebase-remote-render-service.ts
+	function createFirebaseRemoteRenderService(deps) {
+		const apply = () => {
+			if (!deps.loggedIn()) {
+				deps.received();
+				deps.focusLogin();
+				return;
+			}
+			if (deps.unsafe()) {
+				deps.deferred();
+				deps.clearPending();
+				deps.defer(apply, 1500);
+				return;
+			}
+			deps.clearPending();
+			deps.received();
+			deps.rerender();
+		};
+		return Object.freeze({ apply });
+	}
+	//#endregion
+	//#region src/application/sync/firebase-session-start-service.ts
+	function createFirebaseSessionStartService(deps) {
+		const start = async (config) => {
+			try {
+				await deps.ensureApp(config.config);
+				await deps.persistAuth();
+				let user = await deps.currentAuthUser();
+				if (!user && config.anonymous) user = await deps.signInAnonymously();
+				if (!user) {
+					deps.unauthenticated();
+					return false;
+				}
+				deps.setAuthUser(user);
+				deps.disconnect();
+				const ref = deps.createRef();
+				deps.setRef(ref);
+				deps.subscribe(ref);
+				deps.startPull();
+				deps.loading();
+				return true;
+			} catch (error) {
+				deps.failed(error);
+				return false;
+			}
+		};
+		return Object.freeze({ start });
+	}
+	//#endregion
+	//#region src/application/sync/firebase-merge-commit-service.ts
+	function createFirebaseMergeCommitService(deps) {
+		const commit = (input) => {
+			const previous = deps.state();
+			const next = deps.merge(input.base, input.mergeFirstConnect, previous, input.remote);
+			deps.replaceState(next);
+			deps.relinkAudit(next);
+			deps.clearDerived();
+			deps.ensureShape();
+			const errors = deps.invariantErrors(deps.state());
+			if (errors.length) {
+				deps.replaceState(previous);
+				deps.clearDerived();
+				deps.rejected(previous, input.hadLocalChanges, errors[0]);
+				return false;
+			}
+			deps.accepted(deps.state(), input.remote);
+			return true;
+		};
+		return Object.freeze({ commit });
+	}
+	//#endregion
+	//#region src/presentation/sync/firebase-conflict-dialog-service.ts
+	function createFirebaseConflictDialogService(confirm) {
+		const ask = (labCode) => confirm({
+			kicker: "Thao tác không thể hoàn tác",
+			title: "Dữ liệu cục bộ khác dữ liệu trung tâm",
+			message: `Phòng "${labCode || "default"}" đã có một bộ dữ liệu khác trên đám mây.`,
+			detail: "Dùng dữ liệu trung tâm sẽ thay thế dữ liệu trên máy này; các mục chỉ có cục bộ (máy XN, panel, lô, điểm QC...) sẽ không được giữ lại. Chọn Giữ dữ liệu cục bộ để ngắt đồng bộ và bảo vệ dữ liệu trên máy này.",
+			confirmLabel: "Dùng dữ liệu trung tâm",
+			cancelLabel: "Giữ dữ liệu cục bộ",
+			danger: true
+		});
+		return Object.freeze({ ask });
+	}
+	//#endregion
+	//#region src/presentation/sync/firebase-cloud-status-presentation.ts
+	function createFirebaseCloudStatusPresentation(find) {
+		const set = (text, connected) => {
+			const element = find("cloudStatus");
+			if (!element) return;
+			const safe = String(text ?? "").replace(/[&<>"']/g, (character) => ({
+				"&": "&amp;",
+				"<": "&lt;",
+				">": "&gt;",
+				"\"": "&quot;",
+				"'": "&#39;"
+			})[character]);
+			element.className = `cloud ${connected ? "connected" : "offline"}`;
+			element.innerHTML = connected ? `<b>Đang kết nối</b><small>${safe}</small>` : safe;
+		};
+		return Object.freeze({ set });
+	}
+	//#endregion
+	//#region src/presentation/sync/firebase-save-status-service.ts
+	function createFirebaseSaveStatusService(find) {
+		const mark = (label, detail = "") => {
+			const element = find("saveStatus");
+			if (element) element.innerHTML = `Lưu trữ: <b>${label}</b>${detail ? `<br>${detail}` : ""}`;
+		};
+		return Object.freeze({ mark });
+	}
+	//#endregion
+	//#region src/presentation/sync/firebase-remote-render-safety-service.ts
+	function createFirebaseRemoteRenderSafetyService(deps) {
+		const unsafe = () => deps.modalOpen() || deps.editingFieldFocused();
+		return Object.freeze({ unsafe });
+	}
+	//#endregion
+	//#region src/application/sync/firebase-app-service.ts
+	function createFirebaseAppService(deps) {
+		const ensure = async (config) => {
+			const sdk = deps.sdk();
+			if (!sdk || typeof sdk.initializeApp !== "function") throw new Error("Chưa tải được Firebase.");
+			const desired = deps.signature(config), apps = sdk.apps || [];
+			if (apps.length) {
+				const app = typeof sdk.app === "function" ? sdk.app() : apps[0];
+				if (deps.signature(app?.options || {}) === desired) return app;
+				await Promise.all(apps.slice().map((item) => item && typeof item.delete === "function" ? item.delete() : Promise.resolve()));
+			}
+			return sdk.initializeApp(config);
+		};
+		return Object.freeze({ ensure });
+	}
+	//#endregion
+	//#region src/application/sync/firebase-config-source-service.ts
+	function createFirebaseConfigSourceService(deps) {
+		const deploy = () => {
+			const cloud = deps.cloud();
+			if (!cloud || !cloud.config) return null;
+			return {
+				labCode: cloud.labCode || "khoaXN",
+				email: cloud.email || (cloud.anonymous ? "anonymous" : ""),
+				anonymous: cloud.anonymous !== false,
+				config: cloud.config,
+				deploy: true,
+				locked: cloud.locked === true
+			};
+		};
+		const stored = () => {
+			try {
+				const value = JSON.parse(deps.readStored() || "null");
+				return value && typeof value === "object" ? {
+					...value,
+					anonymous: value.anonymous === true
+				} : null;
+			} catch {
+				return null;
+			}
+		};
+		return Object.freeze({
+			deploy,
+			stored
+		});
+	}
+	//#endregion
+	//#region src/domain/sync/firebase-ready-state.ts
+	function firebaseReadyState(current) {
+		return {
+			...current,
+			initialized: true,
+			ready: true
+		};
+	}
+	//#endregion
+	//#region src/application/storage/indexeddb-open-service.ts
+	function createIndexedDbOpenService(deps) {
+		const databaseName = deps.databaseName || "qclab-local", databaseVersion = deps.databaseVersion || 1, storeName = deps.storeName || "snapshots";
+		let pending = null;
+		const open = () => {
+			const indexedDb = deps.indexedDb();
+			if (!indexedDb) return Promise.resolve(null);
+			if (pending) return pending;
+			pending = new Promise((resolve, reject) => {
+				let request;
+				try {
+					request = indexedDb.open(databaseName, databaseVersion);
+				} catch (error) {
+					reject(error);
+					return;
+				}
+				request.onupgradeneeded = () => {
+					if (!request.result.objectStoreNames.contains(storeName)) request.result.createObjectStore(storeName, { keyPath: "key" });
+				};
+				request.onsuccess = () => {
+					const database = request.result;
+					database.onversionchange = () => {
+						database.close();
+						pending = null;
+					};
+					resolve(database);
+				};
+				request.onerror = () => reject(request.error || /* @__PURE__ */ new Error("IndexedDB open failed"));
+				request.onblocked = () => reject(/* @__PURE__ */ new Error("IndexedDB is blocked"));
+			}).catch((error) => {
+				pending = null;
+				throw error;
+			});
+			return pending;
+		};
+		return Object.freeze({ open });
+	}
+	//#endregion
+	//#region src/application/storage/indexeddb-record-service.ts
+	function createIndexedDbRecordService(deps) {
+		const storeName = deps.storeName || "snapshots";
+		const request = (mode, run, empty, message) => deps.open().then((database) => new Promise((resolve, reject) => {
+			if (!database) {
+				resolve(empty);
+				return;
+			}
+			const operation = run(database.transaction(storeName, mode).objectStore(storeName));
+			operation.onsuccess = () => resolve(operation.result === void 0 ? empty : operation.result);
+			operation.onerror = () => reject(operation.error || new Error(message));
+		}));
+		return Object.freeze({
+			get: (key) => request("readonly", (store) => store.get(key), null, "IndexedDB read failed"),
+			put: (record) => request("readwrite", (store) => store.put(record), false, "IndexedDB write failed").then(() => true),
+			delete: (key) => request("readwrite", (store) => store.delete(key), false, "IndexedDB clear failed").then(() => true)
+		});
+	}
+	//#endregion
+	//#region src/application/storage/partitioned-indexeddb-write-service.ts
+	function createPartitionedIndexedDbWriteService(deps) {
+		const write = async (input) => {
+			if (!deps.supported()) return false;
+			const manifest = input.currentSlot === "a" || input.currentSlot === "b" ? await input.read(deps.key(input.currentSlot, "manifest")) : null;
+			const draft = deps.draft(input.state, input.currentSlot, input.dirtyTestIds, manifest);
+			const slotManifest = draft.incremental ? manifest : await input.read(deps.key(draft.slot, "manifest"));
+			const plan = deps.finalize(input.state, manifest, slotManifest, draft);
+			await Promise.all([input.put({
+				key: deps.key(plan.slot, "shell"),
+				savedAt: plan.savedAt,
+				state: plan.shell
+			}), ...plan.partitions.map((testId) => input.put({
+				key: deps.key(plan.slot, "data", testId),
+				savedAt: plan.savedAt,
+				testId,
+				points: plan.data[testId] || []
+			}))]);
+			await input.put({
+				key: deps.key(plan.slot, "manifest"),
+				savedAt: plan.savedAt,
+				slot: plan.slot,
+				testIds: plan.testIds
+			});
+			await input.put({
+				key: "partition:latest",
+				savedAt: plan.savedAt,
+				slot: plan.slot
+			});
+			await Promise.all(plan.removedTestIds.map((testId) => input.remove(deps.key(plan.slot, "data", testId))));
+			return {
+				slot: plan.slot,
+				savedAt: plan.savedAt,
+				shell: plan.shell,
+				mode: plan.incremental ? "incremental" : "full",
+				partitionsWritten: plan.partitions.length
+			};
+		};
+		return Object.freeze({ write });
+	}
+	//#endregion
+	//#region src/application/storage/partitioned-indexeddb-read-service.ts
+	function createPartitionedIndexedDbReadService(deps) {
+		const readSlot = async (slot, get) => {
+			if (slot !== "a" && slot !== "b") return null;
+			const manifest = await get(deps.key(slot, "manifest")), shell = await get(deps.key(slot, "shell"));
+			const testIds = manifest && Array.isArray(manifest.testIds) ? manifest.testIds : [];
+			const rows = await Promise.all(testIds.map((testId) => get(deps.key(slot, "data", testId))));
+			return deps.recover(slot, manifest, shell, rows);
+		};
+		const read = async (slot, get) => {
+			if (!deps.supported()) return null;
+			if (slot) return readSlot(slot, get);
+			const latest = await get("partition:latest"), slots = deps.slots(latest && latest.slot);
+			return await readSlot(slots[0], get) || await readSlot(slots[1], get);
+		};
+		return Object.freeze({ read });
+	}
+	//#endregion
+	//#region src/application/storage/indexeddb-clear-service.ts
+	function createIndexedDbClearService(deps) {
+		const clear = async (read, remove) => {
+			if (!deps.supported()) return false;
+			const manifests = await Promise.all(["a", "b"].map((slot) => read(deps.key(slot, "manifest"))));
+			await Promise.all(deps.keys(manifests).map(remove));
+			return true;
+		};
+		return Object.freeze({ clear });
+	}
+	//#endregion
+	//#region src/domain/auth/password-policy.ts
+	function passwordPolicyError(value) {
+		const password = String(value || "");
+		if (!password) return "Mật khẩu không được để trống.";
+		if (password.length < 8) return "Mật khẩu phải có ít nhất 8 ký tự.";
+		return "";
+	}
+	function passwordChangeError(password, confirmation) {
+		const policyError = passwordPolicyError(password);
+		if (policyError) return policyError;
+		if (String(password || "") !== String(confirmation || "")) return "Hai mật khẩu không khớp.";
+		return "";
+	}
+	//#endregion
+	//#region src/domain/auth/pbkdf2-password-service.ts
+	var PASSWORD_HASH_ITERATIONS = 6e5;
+	function isPbkdf2PasswordHash(stored) {
+		return String(stored || "").startsWith("pbkdf2$");
+	}
+	function passwordHashNeedsUpgrade(stored) {
+		if (!isPbkdf2PasswordHash(stored)) return true;
+		return Number(String(stored).split("$")[1] || 0) < PASSWORD_HASH_ITERATIONS;
+	}
+	function passwordBytesHex(bytes) {
+		return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+	}
+	function passwordHexBytes(value) {
+		return new Uint8Array((String(value || "").match(/.{1,2}/g) || []).map((hex) => parseInt(hex, 16)));
+	}
+	function createPbkdf2PasswordService(dependencies) {
+		const secureCrypto = () => {
+			const value = dependencies.crypto();
+			if (!value || !value.subtle) throw new Error("Trình duyệt không hỗ trợ mã hóa mật khẩu an toàn.");
+			return value;
+		};
+		const derive = async (password, salt, iterations) => {
+			const crypto = secureCrypto();
+			const key = await crypto.subtle.importKey("raw", dependencies.textEncoder().encode(String(password || "")), "PBKDF2", false, ["deriveBits"]);
+			const bits = await crypto.subtle.deriveBits({
+				name: "PBKDF2",
+				hash: "SHA-256",
+				salt,
+				iterations
+			}, key, 256);
+			return passwordBytesHex(new Uint8Array(bits));
+		};
+		return {
+			async hash(password) {
+				const salt = secureCrypto().getRandomValues(/* @__PURE__ */ new Uint8Array(16));
+				return `pbkdf2$${PASSWORD_HASH_ITERATIONS}$${passwordBytesHex(salt)}$${await derive(password, salt, PASSWORD_HASH_ITERATIONS)}`;
+			},
+			async verify(password, stored) {
+				const [, iterationsText, saltHex, expected] = String(stored || "").split("$");
+				return await derive(password, passwordHexBytes(saltHex), Number(iterationsText)) === expected;
+			}
+		};
+	}
+	//#endregion
+	//#region src/domain/auth/legacy-password-hash-service.ts
+	function createLegacyPasswordHashService(dependencies) {
+		const fallback = (password) => {
+			let hash = 0;
+			const text = `qclab::${String(password || "")}`;
+			for (let index = 0; index < text.length; index += 1) hash = hash * 31 + text.charCodeAt(index) >>> 0;
+			return `f${hash.toString(16)}`;
+		};
+		return { async hash(password) {
+			try {
+				const crypto = dependencies.crypto();
+				if (!crypto?.subtle) return fallback(password);
+				const digest = await crypto.subtle.digest("SHA-256", dependencies.textEncoder().encode(`qclab::${String(password || "")}`));
+				return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+			} catch {
+				return fallback(password);
+			}
+		} };
+	}
+	var LOGIN_LOCKOUT_MILLISECONDS = 3e4;
+	function normalizeLoginLockoutState(value) {
+		const lockout = value;
+		return {
+			fails: lockout && Number(lockout.fails) || 0,
+			until: lockout && Number(lockout.until) || 0
+		};
+	}
+	function createLoginLockoutPolicy() {
+		const numberOrZero = (value) => Number(value) || 0;
+		return {
+			isLocked(until, now) {
+				return now < numberOrZero(until);
+			},
+			remainingSeconds(until, now) {
+				return Math.ceil((numberOrZero(until) - now) / 1e3);
+			},
+			recordFailure(current, now) {
+				const fails = numberOrZero(current.fails) + 1;
+				return fails >= 5 ? {
+					fails: 0,
+					until: now + LOGIN_LOCKOUT_MILLISECONDS
+				} : {
+					fails,
+					until: numberOrZero(current.until)
+				};
+			},
+			reset() {
+				return {
+					fails: 0,
+					until: 0
+				};
+			},
+			message(until, now) {
+				return `Sai mật khẩu quá nhiều lần. Thử lại sau ${Math.ceil((numberOrZero(until) - now) / 1e3)} giây.`;
+			}
+		};
+	}
+	//#endregion
+	//#region src/application/state/blank-app-state.ts
+	function createBlankAppState(options) {
+		return {
+			lab: {
+				name: "",
+				dept: "",
+				address: "",
+				brandTitle: "QC Lab",
+				brandSub: "Nội kiểm xét nghiệm",
+				logoText: "QC",
+				logoData: ""
+			},
+			tests: [],
+			machines: [],
+			instruments: [],
+			assayGroups: [],
+			qcPanels: [],
+			lotTransitions: [],
+			lotGroups: [],
+			qcLots: [],
+			data: {},
+			actions: [],
+			activity: [],
+			activityAnchor: "",
+			users: Array.isArray(options.users) ? options.users : [],
+			reagentTests: [],
+			reagentOperators: [],
+			reagentSampleTypes: [
+				"Mẫu bệnh nhân",
+				"Mẫu nội kiểm (IQC)",
+				"Mẫu ngoại kiểm (EQA)"
+			],
+			sigmaData: {},
+			periodLocks: [],
+			teaRefs: [],
+			teaRegistryVersion: options.teaRegistryVersion,
+			westgardRules: { ...options.westgardDefaults },
+			westgardProfileVersion: 2,
+			configMigrationVersion: 1,
+			schemaVersion: options.schemaVersion
+		};
+	}
+	function createDefaultAdminUser(input) {
+		return {
+			id: input.id,
+			username: "admin",
+			name: "Quản trị viên",
+			role: "admin",
+			passHash: input.passHash,
+			active: true,
+			mustChangePassword: true
+		};
+	}
+	//#endregion
+	//#region src/domain/auth/new-user-validation.ts
+	function newUserValidationError(input) {
+		const username = String(input.username || "").trim();
+		const password = String(input.password || "");
+		if (!username || !password) return "Nhập tên đăng nhập và mật khẩu.";
+		const passwordError = passwordPolicyError(password);
+		if (passwordError) return passwordError;
+		if ((Array.isArray(input.existingUsernames) ? input.existingUsernames : []).some((value) => String(value || "") === username)) return "Tên đăng nhập đã tồn tại.";
+		return "";
+	}
+	//#endregion
+	//#region src/domain/auth/user-permission-selection.ts
+	function selectUserPermissions(selectedIds, allowedIds) {
+		const allowed = new Set(Array.isArray(allowedIds) ? allowedIds.map((value) => String(value)) : []);
+		return [...new Set((Array.isArray(selectedIds) ? selectedIds : []).map((value) => String(value)).filter((id) => allowed.has(id)))];
+	}
+	//#endregion
+	//#region src/presentation/audit/activity-audit-filter.ts
+	function createActivityAuditFilter(dependencies) {
+		const dateKey = (activity) => {
+			const date = new Date(activity && activity.ts);
+			return Number.isFinite(+date) ? dependencies.isoDate(date) : "";
+		};
+		return {
+			dateKey,
+			filter(items, query, from, to) {
+				const text = dependencies.searchText(query);
+				const start = String(from || ""), end = String(to || "");
+				return (Array.isArray(items) ? items : []).filter((activity) => {
+					const date = dateKey(activity);
+					if (start && (!date || date < start)) return false;
+					if (end && (!date || date > end)) return false;
+					if (!text) return true;
+					return dependencies.searchText([
+						activity.seq,
+						dependencies.formatDateTime(activity.ts),
+						activity.user,
+						activity.username,
+						dependencies.roleLabel(activity.role || "viewer"),
+						activity.type,
+						activity.target,
+						activity.detail
+					].join(" ")).includes(text);
+				}).slice().reverse();
+			}
+		};
+	}
+	//#endregion
+	//#region src/presentation/audit/activity-audit-pagination.ts
+	function activityAuditPagination(items, page, pageSize) {
+		const rows = Array.isArray(items) ? items : [];
+		const size = Math.max(1, Number(pageSize) || 1);
+		const pageCount = Math.max(1, Math.ceil(rows.length / size));
+		const safePage = Math.min(Math.max(1, Number(page) || 1), pageCount);
+		const offset = (safePage - 1) * size;
+		return {
+			page: safePage,
+			pageCount,
+			offset,
+			rows: rows.slice(offset, offset + size),
+			resultFrom: rows.length ? offset + 1 : 0,
+			resultTo: Math.min(offset + size, rows.length)
+		};
+	}
+	//#endregion
+	//#region src/presentation/audit/activity-audit-csv.ts
+	function createActivityAuditCsv(dependencies) {
+		return (items) => {
+			const rows = [[
+				"Seq",
+				"Thời gian",
+				"Người dùng",
+				"Tên đăng nhập",
+				"Vai trò",
+				"Hành động",
+				"Đối tượng",
+				"Chi tiết",
+				"PrevHash",
+				"Hash"
+			]];
+			(Array.isArray(items) ? items : []).forEach((activity) => rows.push([
+				activity.seq || "",
+				dependencies.formatDateTime(activity.ts),
+				activity.user || "",
+				activity.username || "",
+				dependencies.roleLabel(activity.role || "viewer"),
+				activity.type || "",
+				activity.target || "",
+				activity.detail || "",
+				activity.prevHash || "",
+				activity.hash || ""
+			]));
+			return rows;
+		};
+	}
+	//#endregion
+	//#region src/presentation/audit/activity-audit-date-range.ts
+	function updateActivityAuditDateRange(current, field, value) {
+		let from = String(current.from || ""), to = String(current.to || ""), date = String(value || "");
+		if (field === "from") {
+			from = date;
+			if (from && to && from > to) to = from;
+		} else {
+			to = date;
+			if (to && from && to < from) from = to;
+		}
+		return {
+			from,
+			to
+		};
+	}
+	//#endregion
+	//#region src/presentation/audit/activity-audit-filter-state.ts
+	var ACTIVITY_AUDIT_PAGE_SIZES = Object.freeze([
+		25,
+		50,
+		100
+	]);
+	var activityAuditFilterState = Object.freeze({
+		withQuery(state, value) {
+			return {
+				...state,
+				query: String(value || ""),
+				page: 1
+			};
+		},
+		withPageSize(state, value, allowedSizes) {
+			const allowed = Array.isArray(allowedSizes) ? allowedSizes.map(Number) : [];
+			const size = Number(value);
+			return {
+				...state,
+				pageSize: allowed.includes(size) ? size : 25,
+				page: 1
+			};
+		},
+		withPage(state, value) {
+			return {
+				...state,
+				page: Math.max(1, Number(value) || 1)
+			};
+		},
+		cleared(state) {
+			return {
+				...state,
+				query: "",
+				from: "",
+				to: "",
+				page: 1
+			};
+		}
+	});
+	//#endregion
+	//#region src/presentation/audit/activity-audit-archive-window.ts
+	function activityAuditArchiveWindow(value, now = /* @__PURE__ */ new Date()) {
+		const months = Math.max(1, Math.floor(Number(value) || 24));
+		const cutoff = new Date(now);
+		cutoff.setMonth(cutoff.getMonth() - months);
+		return {
+			months,
+			cutoffIso: cutoff.toISOString()
+		};
+	}
+	//#endregion
+	//#region src/presentation/auth/user-list-model.ts
+	function userListModel(users, currentUserId) {
+		return (Array.isArray(users) ? users : []).map((user) => ({
+			...user,
+			id: String(user.id || ""),
+			name: String(user.name || user.username || ""),
+			username: String(user.username || ""),
+			initials: String(user.initials || ""),
+			role: String(user.role || "viewer"),
+			active: user.active !== false,
+			current: String(user.id || "") === String(currentUserId || "")
+		}));
+	}
+	//#endregion
 	//#region src/application/storage/partition-write-policy.ts
 	function planPartitionWrite(input) {
 		const full = !!input.fullDirty || input.streak >= input.maxIncrementals || input.now - input.lastFull >= input.maxMs;
@@ -5236,15 +6220,6 @@
 		return {
 			handle: !(nextSignature && nextSignature === seenSignature),
 			seenSignature: nextSignature
-		};
-	}
-	//#endregion
-	//#region src/domain/sync/firebase-empty-snapshot.ts
-	function firebaseEmptySnapshotPlan(initialized, dirty, hasLocalContent) {
-		const firstSnapshot = !initialized;
-		return {
-			firstSnapshot,
-			push: dirty || firstSnapshot && hasLocalContent
 		};
 	}
 	//#endregion
@@ -7903,10 +8878,11 @@
 		};
 	}
 	function createAuthUiState(lockout = null) {
+		const normalized = normalizeLoginLockoutState(lockout);
 		return {
 			currentUser: null,
-			loginFails: lockout && Number(lockout.fails) || 0,
-			loginLockUntil: lockout && Number(lockout.until) || 0
+			loginFails: normalized.fails,
+			loginLockUntil: normalized.until
 		};
 	}
 	function createEntryUiState() {
@@ -8086,6 +9062,540 @@
 	});
 	root.storageRetryDelay = storageRetryDelay;
 	root.saveDerivedTestIds = saveDerivedTestIds;
+	root.saveCommandPolicy = saveCommandPlan;
+	root.localStorageLoadService = createLocalStorageLoadService({
+		read: () => localStorage.getItem("qclab"),
+		adoptEmpty: () => {
+			localLoadStatus = "missing";
+			if (mem) state = mem;
+			ensureShape();
+			const errors = root.QCCore.validateStateInvariants(state);
+			if (errors.length) {
+				startupProblem = {
+					raw: "",
+					message: errors.join("\n")
+				};
+				return false;
+			}
+			return true;
+		},
+		adopt: (value) => adoptValidatedState(value),
+		accepted: () => {
+			localLoadStatus = "local";
+		},
+		rejectedRead: () => {
+			startupProblem = {
+				raw: "",
+				message: "TrÃ¬nh duyá»‡t khÃ´ng cho phÃ©p Ä‘á»c vÃ¹ng lÆ°u trá»¯ cá»¥c bá»™."
+			};
+		},
+		rejectedInvalid: (raw, error) => {
+			localLoadStatus = "invalid";
+			quarantineCorruptLocal(raw, error);
+			startupProblem = {
+				raw,
+				message: error && error.message ? error.message : "Dá»¯ liá»‡u cá»¥c bá»™ khÃ´ng há»£p lá»‡."
+			};
+		}
+	});
+	root.localStorageSnapshotWriter = createLocalStorageSnapshotWriter({
+		set: (key, value) => localStorage.setItem(key, value),
+		remove: (key) => localStorage.removeItem(key),
+		saved: (quiet) => {
+			if (!quiet) markSaved("Ä‘Ã£ lÆ°u cá»¥c bá»™", "LÃºc " + saveTime());
+		},
+		failed: (quiet) => {
+			if (!quiet) markSaved("lá»—i lÆ°u cá»¥c bá»™", "Kiá»ƒm tra dung lÆ°á»£ng trÃ¬nh duyá»‡t");
+		}
+	});
+	root.partitionedSnapshotWriter = createPartitionedSnapshotWriter({
+		plan: (input) => {
+			let plan;
+			if (root.planPartitionWrite) plan = root.planPartitionWrite({
+				fullDirty: input.fullDirty,
+				streak: input.streak,
+				lastFull: input.lastFull,
+				now: input.now,
+				maxIncrementals: input.maxIncrementals,
+				maxMs: input.maxMs,
+				dirtyTestIds: input.dirtyTestIds
+			});
+			else {
+				const full = input.fullDirty || input.streak >= input.maxIncrementals || input.now - input.lastFull >= input.maxMs;
+				plan = {
+					dirtyTestIds: full ? null : input.dirtyTestIds,
+					streak: full ? 0 : input.streak + 1,
+					lastFull: full ? input.now : input.lastFull
+				};
+			}
+			lsIncrementalStreak = plan.streak;
+			lsLastFullSaveAt = plan.lastFull;
+			lsFullDirty = false;
+			lsDirtyTestIds.clear();
+			return plan.dirtyTestIds;
+		},
+		defer: () => {
+			lsDirty = true;
+			scheduleLocalSave();
+		},
+		writePartitioned: (value, slot, dirtyTestIds) => partitionWrite.catch(() => false).then(() => LocalStore.writePartitioned(value, slot, { dirtyTestIds })),
+		setPending: (pending) => {
+			partitionWrite = pending;
+		},
+		completed: (result, input) => {
+			partitionSlot = String(result.slot || "");
+			lsSaveFailures = 0;
+			try {
+				localStorage.setItem("qclab_boot", JSON.stringify({
+					format: 1,
+					slot: result.slot,
+					savedAt: result.savedAt,
+					shell: result.shell
+				}));
+				localStorage.setItem("qclab_saved_at", String(result.savedAt));
+				localStorage.removeItem("qclab");
+			} catch {}
+			if (!sigmaDraftNeedsCloud()) clearSigmaDraftThrough(input.localDraftStamp);
+			if (!input.quiet) markSaved("Ä‘Ã£ lÆ°u cá»¥c bá»™", "IndexedDB phÃ¢n vÃ¹ng Â· LÃºc " + saveTime());
+		},
+		failed: (input) => {
+			lsDirty = true;
+			lsFullDirty = true;
+			lsSaveFailures++;
+			scheduleLocalRetry();
+			if (!input.quiet) markSaved("lá»—i lÆ°u cá»¥c bá»™", "KhÃ´ng thá»ƒ ghi IndexedDB phÃ¢n vÃ¹ng");
+		}
+	});
+	root.saveService = createSaveService({
+		plan: (options) => saveCommandPlan(options),
+		invalidate: (ids) => {
+			if (ids === null) return;
+			if (ids.length) [...new Set(ids.filter(Boolean))].forEach(clearDerivedForTest);
+			else clearDerived();
+		},
+		captureState: () => {
+			mem = state;
+		},
+		touchCloud: () => {
+			state._ts = Date.now();
+			state._client = fb.clientId;
+		},
+		prepareStorage: (plan, options) => {
+			if (plan.storageTestIds.length) plan.storageTestIds.forEach((id) => lsDirtyTestIds.add(String(id)));
+			else if (plan.fullDirty) lsFullDirty = true;
+			if (plan.persistSigmaDraft) persistSigmaDraft(options.sigmaTestId);
+		},
+		beginLocalSave: () => {
+			lsRevision++;
+			lsDirty = true;
+			markSaved("Ä‘ang lÆ°u", "...");
+			scheduleLocalSave();
+		},
+		scheduleCloud: () => {
+			fb.dirty = true;
+			scheduleFbPush();
+		}
+	});
+	root.firebaseLocalStoreService = createFirebaseLocalStoreService({
+		persistSnapshot: () => {
+			if (typeof persistLocalSnapshot !== "function") return false;
+			persistLocalSnapshot({
+				changed: true,
+				quiet: true
+			});
+			return true;
+		},
+		serialize: (value) => JSON.stringify(value),
+		writeLocal: (raw) => localStorage.setItem("qclab", raw),
+		mirror: (raw) => {
+			if (typeof mirrorIndexedDb === "function") mirrorIndexedDb(raw);
+		}
+	});
+	if (typeof root.fbDisconnect === "function") root.firebaseDisconnectService = createFirebaseDisconnectService({
+		stopPolling: () => fbStopPull(),
+		cancelPendingPush: () => {
+			if (fbSaveT) {
+				clearTimeout(fbSaveT);
+				fbSaveT = null;
+			}
+		},
+		resetRetry: () => fbResetRetry(),
+		detachListener: () => {
+			if (fb.ref) fb.ref.off();
+		},
+		resetSession: (clearAuthUser) => {
+			if (root.firebaseDisconnectedState) {
+				Object.assign(fb, root.firebaseDisconnectedState(fb, clearAuthUser));
+				return;
+			}
+			fb.ready = false;
+			fb.initialized = false;
+			fb.ref = null;
+			fb.synced = null;
+			fb.seenSig = null;
+			if (clearAuthUser) fb.authUser = null;
+		}
+	});
+	if (typeof root.fbFlushPush === "function") root.firebasePushService = createFirebasePushService({
+		canPush: () => fbCanWrite() && fbNetworkOnline(),
+		auditMaySync: () => fbAuditMaySync(state, "Nhật ký cục bộ"),
+		prepare: () => {
+			state._ts = Date.now();
+			state._client = fb.clientId;
+			const current = fbClone(state), { payload } = fbBuildUpdate(current);
+			return {
+				current,
+				payload,
+				draftStamp: typeof sigmaDraftStamp === "function" ? sigmaDraftStamp() : 0
+			};
+		},
+		noChanges: (draftStamp) => {
+			fb.dirty = false;
+			fbResetRetry();
+			if (typeof clearSigmaDraftThrough === "function") clearSigmaDraftThrough(draftStamp);
+			markSaved("đã đồng bộ", "Lúc " + saveTime());
+		},
+		beforeWrite: () => markSaved("đang đồng bộ", "Firebase"),
+		update: (ref, payload) => ref.update(payload),
+		succeeded: (current, draftStamp) => {
+			fb.synced = current;
+			fb.dirty = false;
+			fbResetRetry();
+			markSaved("đã đồng bộ", "Lúc " + saveTime());
+			if (typeof clearSigmaDraftThrough === "function") clearSigmaDraftThrough(draftStamp);
+			fbStoreLocal();
+		},
+		failed: () => {
+			fb.dirty = true;
+			markSaved("lỗi đồng bộ", "Dữ liệu cục bộ vẫn còn · sẽ tự thử lại");
+			fbScheduleRetry();
+		}
+	});
+	if (typeof root.syncNow === "function") root.firebaseFullSyncService = createFirebaseFullSyncService({
+		canSync: () => fbCanWrite(),
+		auditMaySync: () => fbAuditMaySync(state, "Nhật ký cục bộ"),
+		prepare: () => {
+			mem = state;
+			state._ts = Date.now();
+			state._client = fb.clientId;
+			return {
+				payload: fbClone(state),
+				draftStamp: typeof sigmaDraftStamp === "function" ? sigmaDraftStamp() : 0
+			};
+		},
+		beforeWrite: () => markSaved("đang đồng bộ", "Firebase"),
+		write: (ref, payload) => ref.set(payload),
+		succeeded: (payload, draftStamp) => {
+			fb.synced = payload;
+			fb.dirty = false;
+			markSaved("đã đồng bộ", "Lúc " + saveTime());
+			if (typeof clearSigmaDraftThrough === "function") clearSigmaDraftThrough(draftStamp);
+			fbStoreLocal();
+		},
+		failed: () => markSaved("lỗi đồng bộ", "Dữ liệu cục bộ vẫn còn")
+	});
+	if (typeof root.scheduleFbPush === "function") root.firebasePushScheduler = createFirebasePushScheduler({
+		canWrite: () => fbCanWrite(),
+		networkOnline: () => fbNetworkOnline(),
+		resetRetry: () => fbResetRetry(),
+		clearTimer: (timer) => clearTimeout(timer),
+		setTimer: (fn, delay) => setTimeout(fn, delay),
+		flush: () => fbFlushPush(),
+		offline: () => markSaved("cục bộ", "Mạng ngoại tuyến · sẽ tự đồng bộ khi có mạng"),
+		queued: () => markSaved("chờ đồng bộ", "Firebase")
+	});
+	if (typeof root.fbHandleValue === "function") root.firebaseEmptySnapshotService = createFirebaseEmptySnapshotService({
+		setReady: () => fbSetReady(),
+		clearSynced: () => {
+			fb.synced = null;
+		},
+		connected: () => setCloudStatus(fbStatusLabel(), true),
+		schedulePush: () => scheduleFbPush(),
+		readyWithoutPush: () => markSaved("đám mây", "Sẵn sàng đồng bộ · " + fbDataPath())
+	});
+	if (typeof root.fbHandleValue === "function") root.firebaseOwnSnapshotService = createFirebaseOwnSnapshotService({
+		setReady: () => fbSetReady(),
+		setBaseline: (remote) => {
+			fb.synced = remote;
+		},
+		clearDirty: () => {
+			fb.dirty = false;
+		},
+		resetRetry: () => fbResetRetry(),
+		connected: () => setCloudStatus(fbStatusLabel(), true),
+		synchronized: () => markSaved("đã đồng bộ", "Lúc " + saveTime())
+	});
+	if (typeof root.fbHandleValue === "function") root.firebaseInvalidSnapshotService = createFirebaseInvalidSnapshotService({
+		setReady: () => fbSetReady(),
+		report: (firstError) => markSaved("dữ liệu đám mây không hợp lệ", firstError + " · " + fbDataPath())
+	});
+	if (typeof root.fbRejectBrokenAudit === "function") root.firebaseAuditRejectionService = createFirebaseAuditRejectionService({
+		disconnect: () => fbDisconnect(),
+		disconnected: () => setCloudStatus("Đã ngắt đồng bộ để bảo vệ nhật ký", false),
+		report: (detail) => markSaved("audit không hợp lệ", detail)
+	});
+	if (typeof root.applyRemoteRender === "function") root.firebaseRemoteRenderService = createFirebaseRemoteRenderService({
+		loggedIn: () => typeof currentUser !== "undefined" && !!currentUser,
+		focusLogin: () => {
+			if (typeof focusLoginField === "function") try {
+				focusLoginField();
+			} catch {}
+		},
+		unsafe: () => remoteRenderUnsafe(),
+		clearPending: () => clearTimeout(fb.pendingRenderT),
+		defer: (fn, delay) => {
+			fb.pendingRenderT = setTimeout(fn, delay);
+		},
+		received: () => markSaved("đã nhận đồng bộ", "Lúc " + saveTime()),
+		deferred: () => markSaved("có dữ liệu mới", "Sẽ hiển thị khi bạn xong thao tác"),
+		rerender: () => rerender()
+	});
+	if (typeof root.initFirebase === "function") root.firebaseSessionStartService = createFirebaseSessionStartService({
+		ensureApp: (config) => ensureFirebaseApp(config),
+		persistAuth: () => firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL),
+		currentAuthUser: () => new Promise((resolve) => {
+			let off = null;
+			off = firebase.auth().onAuthStateChanged((user) => {
+				if (off) off();
+				resolve(user || null);
+			}, () => resolve(null));
+		}),
+		signInAnonymously: async () => {
+			const credential = await firebase.auth().signInAnonymously();
+			return credential && credential.user || firebase.auth().currentUser || null;
+		},
+		unauthenticated: () => {
+			fbDisconnect(true);
+			setCloudStatus("Cần đăng nhập Firebase", false);
+			markSaved("cục bộ", "Firebase chưa xác thực");
+		},
+		setAuthUser: (user) => {
+			fb.authUser = user;
+		},
+		disconnect: () => fbDisconnect(),
+		createRef: () => firebase.database().ref(fbDataPath()),
+		setRef: (ref) => {
+			fb.ref = ref;
+		},
+		subscribe: (ref) => ref.on("value", (snapshot) => {
+			fbHandleValue(snapshot.val());
+		}, (error) => {
+			fbDisconnect();
+			setCloudStatus(error && error.message && error.message.indexOf("permission_denied") >= 0 ? "Chưa được cấp quyền Firebase" : "Lỗi đọc Firebase", false);
+			markSaved("lỗi kết nối", error && error.message ? error.message : "Firebase");
+		}),
+		startPull: () => fbStartPull(),
+		loading: () => {
+			setCloudStatus("Đang tải dữ liệu Firebase · " + fbDataPath(), true);
+			markSaved("đang tải dữ liệu", "Firebase");
+		},
+		failed: (error) => {
+			fbDisconnect();
+			setCloudStatus("Lỗi xác thực/kết nối Firebase", false);
+			markSaved("lỗi kết nối", error && error.message ? error.message : "Firebase");
+		}
+	});
+	if (typeof root.fbHandleValue === "function") root.firebaseMergeCommitService = createFirebaseMergeCommitService({
+		state: () => state,
+		replaceState: (value) => {
+			state = value;
+		},
+		merge: (base, mergeFirstConnect, local, remote) => root.firebaseMergeApplication ? root.firebaseMergeApplication(base, mergeFirstConnect, local, remote) : base ? fbMerge(local, remote, base) : mergeFirstConnect ? fbFirstConnectMerge(local, remote) : remote,
+		relinkAudit: (value) => {
+			if (typeof auditRelinkChain === "function" && Array.isArray(value.activity)) value.activity = auditRelinkChain(value.activity, value.activityAnchor || "");
+		},
+		clearDerived: () => clearDerived(),
+		ensureShape: () => ensureShape(),
+		invariantErrors: (value) => root.QCCore.validateStateInvariants(value),
+		rejected: (previous, hadLocalChanges, error) => {
+			state = previous;
+			fb.dirty = hadLocalChanges;
+			fbSetReady();
+			markSaved("dữ liệu đồng bộ không hợp lệ", error);
+		},
+		accepted: (merged, remote) => {
+			mem = merged;
+			fb.synced = fbClone(remote);
+			fbStoreLocal();
+			if (typeof currentUser !== "undefined" && currentUser) {
+				const user = (merged.users || []).find((x) => x.id === currentUser.id) || (merged.users || []).find((x) => x.username === currentUser.username);
+				if (user) currentUser = user;
+			}
+			if (!merged.users.length) ensureAdmin();
+			try {
+				renderBrand();
+			} catch {}
+			fbSetReady();
+			setCloudStatus(fbStatusLabel(), true);
+			applyRemoteRender();
+			if (fbHasLocalChanges()) scheduleFbPush();
+		}
+	});
+	if (typeof root.fbHandleValue === "function" && typeof confirmDialog === "function") root.firebaseConflictDialogService = createFirebaseConflictDialogService(confirmDialog);
+	if (typeof root.setCloudStatus === "function") root.firebaseCloudStatusPresentation = createFirebaseCloudStatusPresentation((id) => document.getElementById(id));
+	if (typeof root.markSaved === "function") root.firebaseSaveStatusService = createFirebaseSaveStatusService((id) => document.getElementById(id));
+	if (typeof root.remoteRenderUnsafe === "function") root.firebaseRemoteRenderSafetyService = createFirebaseRemoteRenderSafetyService({
+		modalOpen: () => {
+			const modal = document.getElementById("modalRoot");
+			return !!(modal && modal.children && modal.children.length);
+		},
+		editingFieldFocused: () => {
+			const active = document.activeElement, main = document.getElementById("main");
+			return !!(active && main && main.contains(active) && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName));
+		}
+	});
+	if (typeof root.ensureFirebaseApp === "function") root.firebaseAppService = createFirebaseAppService({
+		sdk: () => firebase,
+		signature: (config) => fbConfigSig(config)
+	});
+	if (typeof root.getDeployFbCfg === "function") root.firebaseConfigSourceService = createFirebaseConfigSourceService({
+		cloud: () => window.QCLAB_CLOUD,
+		readStored: () => localStorage.getItem("qclab_fb")
+	});
+	root.firebaseReadyState = firebaseReadyState;
+	if (typeof LocalStore !== "undefined") root.indexedDbOpenService = createIndexedDbOpenService({ indexedDb: () => typeof indexedDB === "undefined" ? null : indexedDB });
+	if (root.indexedDbOpenService) root.indexedDbRecordService = createIndexedDbRecordService({ open: () => root.indexedDbOpenService.open() });
+	root.partitionedIndexedDbWriteService = createPartitionedIndexedDbWriteService({
+		supported: () => typeof indexedDB !== "undefined",
+		key: (slot, type, id) => root.localPartitionHelpers ? root.localPartitionHelpers.key(slot, type, id) : "partition:" + slot + ":" + type + (id == null ? "" : ":" + id),
+		draft: (state, currentSlot, dirtyTestIds, manifest) => root.localPartitionTransaction.draft(state, currentSlot, dirtyTestIds, manifest),
+		finalize: (state, manifest, slotManifest, draft) => root.localPartitionTransaction.finalize(state, manifest, slotManifest, draft)
+	});
+	root.partitionedIndexedDbReadService = createPartitionedIndexedDbReadService({
+		supported: () => typeof indexedDB !== "undefined",
+		key: (slot, type, id) => root.localPartitionHelpers ? root.localPartitionHelpers.key(slot, type, id) : "partition:" + slot + ":" + type + (id == null ? "" : ":" + id),
+		slots: (preferred) => root.localRecoverySlots ? root.localRecoverySlots(preferred) : [preferred, preferred === "a" ? "b" : "a"],
+		recover: (slot, manifest, shell, rows) => root.localPartitionRecovery(slot, manifest, shell, rows)
+	});
+	root.indexedDbClearService = createIndexedDbClearService({
+		supported: () => typeof indexedDB !== "undefined",
+		key: (slot, type, id) => root.localPartitionHelpers ? root.localPartitionHelpers.key(slot, type, id) : "partition:" + slot + ":" + type + (id == null ? "" : ":" + id),
+		keys: (manifests) => root.localClearKeys(manifests)
+	});
+	root.passwordPolicyError = passwordPolicyError;
+	root.passwordChangeError = passwordChangeError;
+	root.pbkdf2PasswordService = createPbkdf2PasswordService({
+		crypto: () => globalThis.crypto || null,
+		textEncoder: () => new TextEncoder()
+	});
+	root.isPbkdf2PasswordHash = isPbkdf2PasswordHash;
+	root.passwordHashNeedsUpgrade = passwordHashNeedsUpgrade;
+	root.legacyPasswordHashService = createLegacyPasswordHashService({
+		crypto: () => globalThis.crypto || null,
+		textEncoder: () => new TextEncoder()
+	});
+	root.loginLockoutPolicy = createLoginLockoutPolicy();
+	root.blankAppStateFactory = (users) => createBlankAppState({
+		users,
+		teaRegistryVersion: Number(root.teaReferenceSchemaVersion) || 3,
+		schemaVersion: root.QCCore.STATE_SCHEMA_VERSION,
+		westgardDefaults: Object.fromEntries(root.QCCore.WG_RULES.map((rule) => [rule, root.QCCore.WG_DEFAULT_ON.has(rule)]))
+	});
+	root.defaultAdminUserFactory = (id, passHash) => createDefaultAdminUser({
+		id,
+		passHash
+	});
+	root.newUserValidationError = newUserValidationError;
+	root.selectUserPermissions = selectUserPermissions;
+	root.activityAuditFilter = createActivityAuditFilter({
+		searchText: (value) => globalThis.searchText(value),
+		isoDate: (value) => globalThis.isoDate(value),
+		formatDateTime: (value) => globalThis.formatDateTimeVN(value),
+		roleLabel: (value) => globalThis.roleLabel(value)
+	});
+	root.activityAuditPagination = activityAuditPagination;
+	root.activityAuditCsv = createActivityAuditCsv({
+		formatDateTime: (value) => globalThis.formatDateTimeVN(value),
+		roleLabel: (value) => globalThis.roleLabel(value)
+	});
+	root.updateActivityAuditDateRange = updateActivityAuditDateRange;
+	root.activityAuditFilterState = activityAuditFilterState;
+	root.activityAuditPageSizes = ACTIVITY_AUDIT_PAGE_SIZES;
+	root.activityAuditArchiveWindow = activityAuditArchiveWindow;
+	root.userListModel = userListModel;
+	if (typeof StateStorageLegacy !== "undefined") root.storageBootService = createStorageBootService({
+		partitionedSupported: () => typeof LocalStore !== "undefined" && LocalStore.supported(),
+		readBootRecord: () => localStorage.getItem("qclab_boot"),
+		discardBootRecord: () => localStorage.removeItem("qclab_boot"),
+		activatePartitionShell: (shell, slot) => {
+			adoptValidatedState(shell);
+			partitionSlot = slot;
+			localLoadStatus = "partition-shell";
+			storageHydrationPromise = hydratePartitionedState();
+		},
+		loadLegacy: () => root.localStorageLoadService.load(),
+		localLoadStatus: () => localLoadStatus,
+		recoverPendingSigmaDraft,
+		restoreFromIndexedDb
+	});
+	if (typeof StateStorageLegacy !== "undefined") root.indexedDbRecoveryService = createIndexedDbRecoveryService({
+		supported: () => typeof LocalStore !== "undefined" && LocalStore.supported(),
+		readPartitioned: () => typeof LocalStore.readPartitioned === "function" ? LocalStore.readPartitioned() : Promise.resolve(null),
+		readLegacy: () => LocalStore.read(),
+		adopt: (value) => adoptValidatedState(value),
+		acceptPartitioned: (record) => {
+			mem = state;
+			partitionSlot = String(record.slot || "");
+			localLoadStatus = "partitioned";
+			startupProblem = null;
+			try {
+				localStorage.setItem("qclab_boot", JSON.stringify({
+					format: 1,
+					slot: record.slot,
+					savedAt: record.savedAt,
+					shell: {
+						...state,
+						data: {}
+					}
+				}));
+			} catch {}
+		},
+		acceptLegacy: () => {
+			mem = state;
+			localLoadStatus = "indexeddb";
+			startupProblem = null;
+			try {
+				localStorage.setItem("qclab", JSON.stringify(state));
+			} catch {}
+		},
+		reportFailure: (kind, error, raw = "") => {
+			const message = kind === "partitioned" ? "Dá»¯ liá»‡u phÃ¢n vÃ¹ng IndexedDB khÃ´ng há»£p lá»‡." : "Dá»¯ liá»‡u IndexedDB khÃ´ng há»£p lá»‡.";
+			startupProblem = {
+				raw,
+				message: error && error.message ? error.message : message
+			};
+			if (raw) startupProblem.raw = raw;
+		}
+	});
+	if (typeof StateStorageLegacy !== "undefined") root.partitionHydrationService = createPartitionHydrationService({
+		read: () => LocalStore.readPartitioned(),
+		adopt: (value) => adoptValidatedState(value),
+		recoverPendingSigmaDraft,
+		accept: (record) => {
+			mem = state;
+			partitionSlot = String(record.slot || "");
+			localLoadStatus = "partitioned";
+			clearDerived();
+			startupProblem = null;
+			if (lsDirty) scheduleLocalSave();
+		},
+		reportFailure: (error) => {
+			startupProblem = {
+				raw: "",
+				message: error && error.message ? error.message : "KhÃ´ng thá»ƒ táº£i cÃ¡c phÃ¢n vÃ¹ng dá»¯ liá»‡u QC."
+			};
+		}
+	});
+	root.indexedDbMirrorService = createIndexedDbMirrorService({
+		supported: () => typeof LocalStore !== "undefined" && LocalStore.supported(),
+		writeSerialized: (raw) => typeof LocalStore.writeSerialized === "function" ? LocalStore.writeSerialized(raw) : null,
+		writeState: (value) => LocalStore.write(value),
+		failed: () => {
+			lsDirty = true;
+			lsSaveFailures++;
+			scheduleLocalRetry();
+		}
+	});
 	root.planPartitionWrite = planPartitionWrite;
 	root.qcValueFormat = createQcValueFormat();
 	root.qcStaffIdentity = createQcStaffIdentity();

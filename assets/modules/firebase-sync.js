@@ -29,8 +29,8 @@ function fbScheduleRetry(){
   const delay=fb.retryMs;fb.retryMs=Math.min(30000,fb.retryMs*2);
   fb.retryT=setTimeout(()=>{fb.retryT=null;fbFlushPush();},delay);
 }
-function fbSetReady(){fb.initialized=true;fb.ready=true;}
-function fbStoreLocal(){if(typeof persistLocalSnapshot==='function'){persistLocalSnapshot({changed:true,quiet:true});return;}try{localStorage.setItem('qclab',JSON.stringify(state));}catch(e){}if(typeof mirrorIndexedDb==='function')mirrorIndexedDb(JSON.stringify(state));}
+function fbSetReady(){if(globalThis.firebaseReadyState){Object.assign(fb,globalThis.firebaseReadyState(fb));return;}fb.initialized=true;fb.ready=true;}
+function fbStoreLocal(){if(globalThis.firebaseLocalStoreService){globalThis.firebaseLocalStoreService.store(state);return;}if(typeof persistLocalSnapshot==='function'){persistLocalSnapshot({changed:true,quiet:true});return;}try{localStorage.setItem('qclab',JSON.stringify(state));}catch(e){}if(typeof mirrorIndexedDb==='function')mirrorIndexedDb(JSON.stringify(state));}
 /* Có dữ liệu đáng để bảo vệ trước khi để cloud ghi đè hoàn toàn (lần nhận đầu tiên sau
    khi kết nối/đổi phòng — xem initFirebase()). Cố ý tính cả các danh mục cấu hình
    (instruments/qcPanels/lotGroups/qcLots/assayGroups), không chỉ tests/data/actions —
@@ -203,14 +203,16 @@ function fbFirstConnectMerge(local,remote){
 }
 let saveLabel='Cục bộ',saveDetail='';
 function getDeployFbCfg(){
+  if(globalThis.firebaseConfigSourceService)return globalThis.firebaseConfigSourceService.deploy();
   const c=window.QCLAB_CLOUD;
   if(c&&c.config)return{labCode:c.labCode||'khoaXN',email:c.email||(c.anonymous?'anonymous':''),anonymous:c.anonymous!==false,config:c.config,deploy:true,locked:c.locked===true};
   return null;
 }
-function getStoredFbCfg(){try{const c=JSON.parse(localStorage.getItem('qclab_fb')||'null');if(!c||typeof c!=='object')return null;return{...c,anonymous:c.anonymous===true};}catch(e){return null;}}
+function getStoredFbCfg(){if(globalThis.firebaseConfigSourceService)return globalThis.firebaseConfigSourceService.stored();try{const c=JSON.parse(localStorage.getItem('qclab_fb')||'null');if(!c||typeof c!=='object')return null;return{...c,anonymous:c.anonymous===true};}catch(e){return null;}}
 function getFbCfg(){const deploy=getDeployFbCfg(),stored=getStoredFbCfg();return globalThis.firebaseConfigSelection?globalThis.firebaseConfigSelection.select(deploy,stored):deploy&&deploy.locked?deploy:stored||deploy;}
 function fbConfigSig(cfg){return globalThis.firebaseConfigSelection?globalThis.firebaseConfigSelection.signature(cfg):JSON.stringify(Object.fromEntries(['apiKey','authDomain','databaseURL','projectId','appId'].map(k=>[k,String(cfg&&cfg[k]||'')])));}
 async function ensureFirebaseApp(cfg){
+  if(globalThis.firebaseAppService)return globalThis.firebaseAppService.ensure(cfg);
   if(typeof firebase==='undefined'||typeof firebase.initializeApp!=='function')throw new Error('Chưa tải được Firebase.');
   const desired=fbConfigSig(cfg),apps=firebase.apps||[];
   if(apps.length){
@@ -221,6 +223,7 @@ async function ensureFirebaseApp(cfg){
   return firebase.initializeApp(cfg);
 }
 function setCloudStatus(t,on){
+  if(globalThis.firebaseCloudStatusPresentation){globalThis.firebaseCloudStatusPresentation.set(t,on);return;}
   const el=document.getElementById('cloudStatus');if(!el)return;
   const safe=String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   el.className='cloud '+(on?'connected':'offline');
@@ -230,7 +233,7 @@ function saveTime(){return new Date().toLocaleTimeString('vi-VN',{hour:'2-digit'
 function updateSaveStatus(){
   const el=document.getElementById('saveStatus');if(el)el.innerHTML=`Lưu trữ: <b>${saveLabel}</b>${saveDetail?`<br>${saveDetail}`:''}`;
 }
-function markSaved(label,detail){saveLabel=label;saveDetail=detail||'';updateSaveStatus();}
+function markSaved(label,detail){if(globalThis.firebaseSaveStatusService){globalThis.firebaseSaveStatusService.mark(label,detail||'');return;}saveLabel=label;saveDetail=detail||'';updateSaveStatus();}
 function fbDataPath(){
   const cfg=getFbCfg()||{};
   if(globalThis.firebaseIdentity)return globalThis.firebaseIdentity.dataPath(cfg);
@@ -250,6 +253,7 @@ function fbSnapshotSig(v){
 }
 function fbAuditIntegrity(snapshot){return globalThis.firebaseAuditGate?globalThis.firebaseAuditGate(snapshot):QCCore.verifyAuditChain(snapshot&&snapshot.activity||[],snapshot&&snapshot.activityAnchor||'');}
 function fbRejectBrokenAudit(source,result){
+  if(globalThis.firebaseAuditRejectionService)return globalThis.firebaseAuditRejectionService.reject(source,result);
   const where=result&&result.brokenIndex>=0?` dòng ${result.brokenIndex+1}`:'';
   fbDisconnect();setCloudStatus('Đã ngắt đồng bộ để bảo vệ nhật ký',false);
   markSaved('audit không hợp lệ',`${source}${where}: ${result&&result.reason||'chuỗi hash bị hỏng'} · dữ liệu cục bộ được giữ nguyên`);
@@ -263,6 +267,7 @@ function fbStartPull(){if(globalThis.firebasePollingService){fb.pullT=globalThis
    kết nối sau (nếu có) bắt đầu từ trạng thái sạch, không kế thừa fb.ref/fb.initialized
    còn sót lại từ phiên trước. */
 function fbDisconnect(clearAuthUser){
+  if(globalThis.firebaseDisconnectService){globalThis.firebaseDisconnectService.disconnect(!!clearAuthUser);return;}
   fbStopPull();
   if(fbSaveT){clearTimeout(fbSaveT);fbSaveT=null;}
   fbResetRetry();
@@ -291,6 +296,7 @@ async function fbHandleValue(v,opts={}){
   fb.seenSig=sig;
   }
   if(!v){
+    if(globalThis.firebaseEmptySnapshotService){globalThis.firebaseEmptySnapshotService.handle({initialized:fb.initialized,dirty:fb.dirty,hasLocalContent:hasLocalQcContent(state),silent:!!opts.silent});return;}
     const firstSnapshot=!fb.initialized;
     const emptyPlan=globalThis.firebaseEmptySnapshotPlan?globalThis.firebaseEmptySnapshotPlan(fb.initialized,fb.dirty,hasLocalQcContent(state)):null;
     fbSetReady();fb.synced=null;
@@ -304,6 +310,7 @@ async function fbHandleValue(v,opts={}){
   }
   const remoteSnapshot=globalThis.firebaseRemoteSnapshot?globalThis.firebaseRemoteSnapshot(v):null,cloudErrors=remoteSnapshot?remoteSnapshot.errors:QCCore.validateBackup(v);
   if(cloudErrors.length){
+    if(globalThis.firebaseInvalidSnapshotService){globalThis.firebaseInvalidSnapshotService.handle(cloudErrors[0]);return;}
     // Dữ liệu cloud hỏng không được chặn máy này tiếp tục đồng bộ mãi mãi — vẫn coi
     // như đã "khởi tạo" để các lần lưu sau còn được đẩy lên (có thể tự sửa dữ liệu hỏng).
     fbSetReady();
@@ -318,6 +325,7 @@ async function fbHandleValue(v,opts={}){
   // Bỏ qua chính bản ghi do máy này vừa đẩy lên (chống tự dội: mất focus/nháy màn hình),
   // nhưng vẫn đánh dấu snapshot đầu tiên đã tải để các lần lưu sau mới được push.
   if(globalThis.firebaseOwnSnapshotPlan?globalThis.firebaseOwnSnapshotPlan(v,fb.clientId).own:(v._client&&v._client===fb.clientId)){
+    if(globalThis.firebaseOwnSnapshotService){globalThis.firebaseOwnSnapshotService.handle(remote,!!opts.silent);return;}
     fbSetReady();fb.synced=remote;fb.dirty=false;fbResetRetry();
     setCloudStatus(fbStatusLabel(),true);if(!opts.silent)markSaved('đã đồng bộ','Lúc '+saveTime());
     return;
@@ -342,7 +350,7 @@ async function fbHandleValue(v,opts={}){
     // hộp thoại trước đang chờ người dùng trả lời thì bỏ qua, không mở chồng.
     if(fbConflictDialogOpen)return;
     fbConflictDialogOpen=true;
-    const proceed=await confirmDialog({
+    const proceed=globalThis.firebaseConflictDialogService?await globalThis.firebaseConflictDialogService.ask((getFbCfg()||{}).labCode||'default'):await confirmDialog({
       kicker:'Thao tác không thể hoàn tác',
       title:'Dữ liệu cục bộ khác dữ liệu trung tâm',
       message:`Phòng "${(getFbCfg()||{}).labCode||'default'}" đã có một bộ dữ liệu khác trên đám mây.`,
@@ -361,6 +369,7 @@ async function fbHandleValue(v,opts={}){
     if(typeof clearSigmaDraftThrough==='function')clearSigmaDraftThrough(Number.MAX_SAFE_INTEGER);
     mergeFirstConnect=false; // trung tâm thắng hoàn toàn — không gộp mục riêng của máy này
   }
+  if(globalThis.firebaseMergeCommitService){fb.dirty=false;globalThis.firebaseMergeCommitService.commit({base,mergeFirstConnect,remote,hadLocalChanges});return;}
   fb.dirty=false;
   // Lần nhận đầu tiên: nếu đang có thay đổi mới chờ đẩy (chưa qua hộp thoại xung
   // đột ở trên, vd sửa gõ dở khi snapshot đầu tiên tới) thì gộp hai bên để không
@@ -405,6 +414,7 @@ async function initFirebase(){
   const cfg=getFbCfg();
   if(!cfg||!cfg.config){setCloudStatus('Đang chạy cục bộ',false);return;}
   if(typeof firebase==='undefined'||typeof firebase.auth!=='function'){setCloudStatus('Thiếu Firebase Authentication',false);return;}
+  if(globalThis.firebaseSessionStartService)return globalThis.firebaseSessionStartService.start(cfg);
   try{
     await ensureFirebaseApp(cfg.config);
     await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
@@ -435,6 +445,7 @@ async function initFirebase(){
 /* Không vẽ lại toàn trang khi người dùng đang thao tác dở (đang mở modal hoặc đang gõ trong ô nhập),
    để dữ liệu đồng bộ từ máy khác không xóa mất nội dung đang nhập. Hoãn lại rồi tự áp dụng sau. */
 function remoteRenderUnsafe(){
+  if(globalThis.firebaseRemoteRenderSafetyService)return globalThis.firebaseRemoteRenderSafetyService.unsafe();
   const mr=document.getElementById('modalRoot');
   if(mr&&mr.children&&mr.children.length)return true;
   const a=document.activeElement,main=document.getElementById('main');
@@ -442,6 +453,7 @@ function remoteRenderUnsafe(){
   return false;
 }
 function applyRemoteRender(){
+  if(globalThis.firebaseRemoteRenderService){globalThis.firebaseRemoteRenderService.apply();return;}
   if(typeof currentUser==='undefined'||!currentUser){markSaved('đã nhận đồng bộ','Lúc '+saveTime());if(typeof focusLoginField==='function'){try{focusLoginField();}catch(e){}}return;}
   if(remoteRenderUnsafe()){
     markSaved('có dữ liệu mới','Sẽ hiển thị khi bạn xong thao tác');
@@ -455,6 +467,7 @@ function applyRemoteRender(){
 /* Đẩy TOÀN BỘ khi thiết lập lần đầu: nếu cloud chưa có dữ liệu,
    tạo bản cloud từ dữ liệu hiện tại của máy này. */
 async function syncNow(){
+  if(globalThis.firebaseFullSyncService)return globalThis.firebaseFullSyncService.sync(fb);
   if(!fbCanWrite())return false;
   if(!fbAuditMaySync(state,'Nhật ký cục bộ'))return false;
   mem=state;state._ts=Date.now();state._client=fb.clientId;markSaved('đang đồng bộ','Firebase');
@@ -470,6 +483,7 @@ async function syncNow(){
 /* Đẩy NỀN theo từng nhánh (dùng cho mọi lần lưu tự động): chỉ gửi nhánh đã đổi
    -> nhẹ hơn (không kéo lại logo/toàn bộ nhật ký) và không đè nhánh máy khác đang sửa. */
 function scheduleFbPush(){
+  if(globalThis.firebasePushScheduler){fbSaveT=globalThis.firebasePushScheduler.schedule(fb,fbSaveT);return;}
   if(!fbCanWrite())return;
   if(!fbNetworkOnline()){markSaved('cục bộ','Mạng ngoại tuyến · sẽ tự đồng bộ khi có mạng');return;}
   fbResetRetry();
@@ -477,6 +491,7 @@ function scheduleFbPush(){
   fbSaveT=setTimeout(fbFlushPush,500);
 }
 async function fbFlushPush(){
+  if(globalThis.firebasePushService){fbSaveT=null;return globalThis.firebasePushService.flush(fb);}
   fbSaveT=null;
   if(!fbCanWrite()||!fbNetworkOnline())return;
   if(!fbAuditMaySync(state,'Nhật ký cục bộ'))return;

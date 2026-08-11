@@ -53,6 +53,53 @@ const workerRevisionSource = read('src/domain/westgard/worker-revision.ts');
 const workerHydrateSource = read('src/domain/westgard/worker-hydrate.ts');
 const workerPrewarmSource = read('src/domain/westgard/worker-prewarm.ts');
 const partitionWritePolicySource = read('src/application/storage/partition-write-policy.ts');
+const saveCommandPolicySource = read('src/application/storage/save-command-policy.ts');
+const storageBootServiceSource = read('src/application/storage/storage-boot-service.ts');
+const indexedDbRecoveryServiceSource = read('src/application/storage/indexeddb-recovery-service.ts');
+const partitionHydrationServiceSource = read('src/application/storage/partition-hydration-service.ts');
+const indexedDbMirrorServiceSource = read('src/application/storage/indexeddb-mirror-service.ts');
+const localStorageLoadServiceSource = read('src/application/storage/local-storage-load-service.ts');
+const localStorageSnapshotWriterSource = read('src/application/storage/local-storage-snapshot-writer.ts');
+const partitionedSnapshotWriterSource = read('src/application/storage/partitioned-snapshot-writer.ts');
+const saveServiceSource = read('src/application/storage/save-service.ts');
+const firebaseLocalStoreServiceSource = read('src/application/sync/firebase-local-store-service.ts');
+const firebaseDisconnectServiceSource = read('src/application/sync/firebase-disconnect-service.ts');
+const firebasePushServiceSource = read('src/application/sync/firebase-push-service.ts');
+const firebaseFullSyncServiceSource = read('src/application/sync/firebase-full-sync-service.ts');
+const firebasePushSchedulerSource = read('src/application/sync/firebase-push-scheduler.ts');
+const firebaseEmptySnapshotServiceSource = read('src/application/sync/firebase-empty-snapshot-service.ts');
+const firebaseOwnSnapshotServiceSource = read('src/application/sync/firebase-own-snapshot-service.ts');
+const firebaseInvalidSnapshotServiceSource = read('src/application/sync/firebase-invalid-snapshot-service.ts');
+const firebaseAuditRejectionServiceSource = read('src/application/sync/firebase-audit-rejection-service.ts');
+const firebaseRemoteRenderServiceSource = read('src/application/sync/firebase-remote-render-service.ts');
+const firebaseSessionStartServiceSource = read('src/application/sync/firebase-session-start-service.ts');
+const firebaseMergeCommitServiceSource = read('src/application/sync/firebase-merge-commit-service.ts');
+const firebaseConflictDialogServiceSource = read('src/presentation/sync/firebase-conflict-dialog-service.ts');
+const firebaseCloudStatusPresentationSource = read('src/presentation/sync/firebase-cloud-status-presentation.ts');
+const firebaseSaveStatusServiceSource = read('src/presentation/sync/firebase-save-status-service.ts');
+const firebaseRemoteRenderSafetyServiceSource = read('src/presentation/sync/firebase-remote-render-safety-service.ts');
+const firebaseAppServiceSource = read('src/application/sync/firebase-app-service.ts');
+const firebaseConfigSourceServiceSource = read('src/application/sync/firebase-config-source-service.ts');
+const firebaseReadyStateSource = read('src/domain/sync/firebase-ready-state.ts');
+const indexedDbOpenServiceSource = read('src/application/storage/indexeddb-open-service.ts');
+const indexedDbRecordServiceSource = read('src/application/storage/indexeddb-record-service.ts');
+const partitionedIndexedDbWriteServiceSource = read('src/application/storage/partitioned-indexeddb-write-service.ts');
+const partitionedIndexedDbReadServiceSource = read('src/application/storage/partitioned-indexeddb-read-service.ts');
+const indexedDbClearServiceSource = read('src/application/storage/indexeddb-clear-service.ts');
+const passwordPolicySource = read('src/domain/auth/password-policy.ts');
+const pbkdf2PasswordServiceSource = read('src/domain/auth/pbkdf2-password-service.ts');
+const legacyPasswordHashServiceSource = read('src/domain/auth/legacy-password-hash-service.ts');
+const loginLockoutPolicySource = read('src/domain/auth/login-lockout-policy.ts');
+const blankAppStateSource = read('src/application/state/blank-app-state.ts');
+const defaultAdminUserSource = read('src/domain/auth/default-admin-user.ts');
+const newUserValidationSource = read('src/domain/auth/new-user-validation.ts');
+const userPermissionSelectionSource = read('src/domain/auth/user-permission-selection.ts');
+const activityAuditFilterSource = read('src/presentation/audit/activity-audit-filter.ts');
+const activityAuditPaginationSource = read('src/presentation/audit/activity-audit-pagination.ts');
+const activityAuditCsvSource = read('src/presentation/audit/activity-audit-csv.ts');
+const activityAuditDateRangeSource = read('src/presentation/audit/activity-audit-date-range.ts');
+const activityAuditFilterStateSource = read('src/presentation/audit/activity-audit-filter-state.ts');
+const activityAuditArchiveWindowSource = read('src/presentation/audit/activity-audit-archive-window.ts');
 const actionBiasSource = read('src/domain/nce/action-bias-service.ts');
 const actionViolationSource = read('src/domain/nce/action-violation-service.ts');
 const actionListPresentationSource = read('src/presentation/nce/action-list-presentation.ts');
@@ -325,6 +372,206 @@ assert.match(partitionWritePolicySource, /export function planPartitionWrite\(/,
   'partitioned storage policy must export a pure write planner');
 assert.doesNotMatch(partitionWritePolicySource, /\bstate\b|\bglobalThis\b|\bdocument\b/,
   'partitioned storage policy must not read shared state or DOM');
+assert.match(saveCommandPolicySource, /export function saveCommandPlan\(/,
+  'save command policy must export the persistence and cache plan');
+assert.doesNotMatch(saveCommandPolicySource, /\bstate\b|\bglobalThis\b|\bdocument\b/,
+  'save command policy must not read shared state or DOM');
+assert.match(storageBootServiceSource, /export function createStorageBootService\(/,
+  'storage boot service must export the two-phase boot orchestration');
+assert.doesNotMatch(storageBootServiceSource, /\bstate\b|\bglobalThis\b|\bdocument\b/,
+  'storage boot service must receive browser and state effects through dependencies');
+assert.match(indexedDbRecoveryServiceSource, /export function createIndexedDbRecoveryService\(/,
+  'IndexedDB recovery must export a dependency-injected service');
+assert.doesNotMatch(indexedDbRecoveryServiceSource, /\bglobalThis\b|\bdocument\b/,
+  'IndexedDB recovery must not read shared state or browser globals');
+assert.match(partitionHydrationServiceSource, /export function createPartitionHydrationService\(/,
+  'partition hydration must export a dependency-injected service');
+assert.doesNotMatch(partitionHydrationServiceSource, /\bglobalThis\b|\bdocument\b/,
+  'partition hydration must not read shared state or browser globals');
+assert.match(indexedDbMirrorServiceSource, /export function createIndexedDbMirrorService\(/,
+  'IndexedDB mirror must export a dependency-injected service');
+assert.doesNotMatch(indexedDbMirrorServiceSource, /\bglobalThis\b|\bdocument\b/,
+  'IndexedDB mirror must not read shared state or browser globals');
+assert.match(localStorageLoadServiceSource, /export function createLocalStorageLoadService\(/,
+  'localStorage load must export a dependency-injected service');
+assert.doesNotMatch(localStorageLoadServiceSource, /\bglobalThis\b|\bdocument\b/,
+  'localStorage load must not read shared state or browser globals');
+assert.match(localStorageSnapshotWriterSource, /export function createLocalStorageSnapshotWriter\(/,
+  'localStorage snapshot writer must export a dependency-injected service');
+assert.doesNotMatch(localStorageSnapshotWriterSource, /\bglobalThis\b|\bdocument\b/,
+  'localStorage snapshot writer must not read shared state or browser globals');
+assert.match(partitionedSnapshotWriterSource, /export function createPartitionedSnapshotWriter\(/,
+  'partitioned snapshot writer must export a dependency-injected service');
+assert.doesNotMatch(partitionedSnapshotWriterSource, /\bglobalThis\b|\bdocument\b/,
+  'partitioned snapshot writer must not read shared state or browser globals');
+assert.match(saveServiceSource, /export function createSaveService\(/,
+  'save gateway must export a dependency-injected application service');
+assert.doesNotMatch(saveServiceSource, /\bglobalThis\b|\bdocument\b/,
+  'save gateway must not read shared state or browser globals');
+assert.match(firebaseLocalStoreServiceSource, /export function createFirebaseLocalStoreService\(/,
+  'Firebase local persistence must export a dependency-injected service');
+assert.doesNotMatch(firebaseLocalStoreServiceSource, /\bglobalThis\b|\bdocument\b/,
+  'Firebase local persistence must not read shared state or browser globals');
+assert.match(firebaseDisconnectServiceSource, /export function createFirebaseDisconnectService\(/,
+  'Firebase disconnect lifecycle must export a dependency-injected service');
+assert.doesNotMatch(firebaseDisconnectServiceSource, /\bglobalThis\b|\bdocument\b/,
+  'Firebase disconnect lifecycle must not read shared state or browser globals');
+assert.match(firebasePushServiceSource, /export function createFirebasePushService\(/,
+  'Firebase push lifecycle must export a dependency-injected service');
+assert.doesNotMatch(firebasePushServiceSource, /\bglobalThis\b|\bdocument\b/,
+  'Firebase push lifecycle must not read shared state or browser globals');
+assert.match(firebaseFullSyncServiceSource, /export function createFirebaseFullSyncService\(/,
+  'Firebase full-sync lifecycle must export a dependency-injected service');
+assert.doesNotMatch(firebaseFullSyncServiceSource, /\bglobalThis\b|\bdocument\b/,
+  'Firebase full-sync lifecycle must not read shared state or browser globals');
+assert.match(firebasePushSchedulerSource, /export function createFirebasePushScheduler\(/,
+  'Firebase push scheduler must export a dependency-injected service');
+assert.doesNotMatch(firebasePushSchedulerSource, /\bglobalThis\b|\bdocument\b/,
+  'Firebase push scheduler must not read shared state or browser globals');
+assert.match(firebaseEmptySnapshotServiceSource, /export function createFirebaseEmptySnapshotService\(/,
+  'Firebase empty-snapshot lifecycle must export a dependency-injected service');
+assert.doesNotMatch(firebaseEmptySnapshotServiceSource, /\bglobalThis\b|\bdocument\b/,
+  'Firebase empty-snapshot lifecycle must not read shared state or browser globals');
+assert.match(firebaseOwnSnapshotServiceSource, /export function createFirebaseOwnSnapshotService\(/,
+  'Firebase own-snapshot lifecycle must export a dependency-injected service');
+assert.doesNotMatch(firebaseOwnSnapshotServiceSource, /\bglobalThis\b|\bdocument\b/,
+  'Firebase own-snapshot lifecycle must not read shared state or browser globals');
+assert.match(firebaseInvalidSnapshotServiceSource, /export function createFirebaseInvalidSnapshotService\(/,
+  'Firebase invalid-snapshot lifecycle must export a dependency-injected service');
+assert.doesNotMatch(firebaseInvalidSnapshotServiceSource, /\bglobalThis\b|\bdocument\b/,
+  'Firebase invalid-snapshot lifecycle must not read shared state or browser globals');
+assert.match(firebaseAuditRejectionServiceSource, /export function createFirebaseAuditRejectionService\(/,
+  'Firebase audit-rejection lifecycle must export a dependency-injected service');
+assert.doesNotMatch(firebaseAuditRejectionServiceSource, /\bglobalThis\b|\bdocument\b/,
+  'Firebase audit-rejection lifecycle must not read shared state or browser globals');
+assert.match(firebaseRemoteRenderServiceSource, /export function createFirebaseRemoteRenderService\(/,
+  'Firebase remote-render lifecycle must export a dependency-injected service');
+assert.doesNotMatch(firebaseRemoteRenderServiceSource, /\bglobalThis\b|\bdocument\b/,
+  'Firebase remote-render lifecycle must not read shared state or browser globals');
+assert.match(firebaseSessionStartServiceSource, /export function createFirebaseSessionStartService\(/,
+  'Firebase session-start lifecycle must export a dependency-injected service');
+assert.doesNotMatch(firebaseSessionStartServiceSource, /\bglobalThis\b|\bdocument\b/,
+  'Firebase session-start lifecycle must not read shared state or browser globals');
+assert.match(firebaseMergeCommitServiceSource, /export function createFirebaseMergeCommitService\(/,
+  'Firebase merge-commit lifecycle must export a dependency-injected service');
+assert.doesNotMatch(firebaseMergeCommitServiceSource, /\bglobalThis\b|\bdocument\b/,
+  'Firebase merge-commit lifecycle must not read shared state or browser globals');
+assert.match(firebaseConflictDialogServiceSource, /export function createFirebaseConflictDialogService\(/,
+  'Firebase conflict dialog must export a TypeScript presentation service');
+assert.doesNotMatch(firebaseConflictDialogServiceSource, /\bglobalThis\b|\bdocument\b/,
+  'Firebase conflict dialog must not read shared state or browser globals');
+assert.match(firebaseCloudStatusPresentationSource, /export function createFirebaseCloudStatusPresentation\(/,
+  'Firebase cloud-status presentation must export a TypeScript service');
+assert.doesNotMatch(firebaseCloudStatusPresentationSource, /\bglobalThis\b|\bdocument\b/,
+  'Firebase cloud-status presentation must not read shared browser globals');
+assert.match(firebaseSaveStatusServiceSource, /export function createFirebaseSaveStatusService\(/,
+  'Firebase save-status presentation must export a TypeScript service');
+assert.doesNotMatch(firebaseSaveStatusServiceSource, /\bglobalThis\b|\bdocument\b/,
+  'Firebase save-status presentation must not read shared browser globals');
+assert.match(firebaseRemoteRenderSafetyServiceSource, /export function createFirebaseRemoteRenderSafetyService\(/,
+  'Firebase remote-render safety must export a TypeScript presentation service');
+assert.doesNotMatch(firebaseRemoteRenderSafetyServiceSource, /\bglobalThis\b|\bdocument\b/,
+  'Firebase remote-render safety must not read shared browser globals');
+assert.match(firebaseAppServiceSource, /export function createFirebaseAppService\(/,
+  'Firebase SDK lifecycle must export a dependency-injected service');
+assert.doesNotMatch(firebaseAppServiceSource, /\bglobalThis\b|\bdocument\b/,
+  'Firebase SDK lifecycle must not read shared browser globals');
+assert.match(firebaseConfigSourceServiceSource, /export function createFirebaseConfigSourceService\(/,
+  'Firebase config source must export a dependency-injected service');
+assert.doesNotMatch(firebaseConfigSourceServiceSource, /\bglobalThis\b|\bdocument\b/,
+  'Firebase config source must not read shared browser globals');
+assert.match(firebaseReadyStateSource, /export function firebaseReadyState\(/,
+  'Firebase ready lifecycle must export a pure state transition');
+assert.doesNotMatch(firebaseReadyStateSource, /\bglobalThis\b|\bdocument\b/,
+  'Firebase ready lifecycle must not read shared browser globals');
+assert.match(indexedDbOpenServiceSource, /export function createIndexedDbOpenService\(/,
+  'IndexedDB open lifecycle must export a dependency-injected service');
+assert.doesNotMatch(indexedDbOpenServiceSource, /\bglobalThis\b|\bdocument\b/,
+  'IndexedDB open lifecycle must not read shared browser globals');
+assert.match(indexedDbRecordServiceSource, /export function createIndexedDbRecordService\(/,
+  'IndexedDB record operations must export a dependency-injected service');
+assert.doesNotMatch(indexedDbRecordServiceSource, /\bglobalThis\b|\bdocument\b/,
+  'IndexedDB record operations must not read shared browser globals');
+assert.match(partitionedIndexedDbWriteServiceSource, /export function createPartitionedIndexedDbWriteService\(/,
+  'partitioned IndexedDB writes must export a dependency-injected service');
+assert.doesNotMatch(partitionedIndexedDbWriteServiceSource, /\bglobalThis\b|\bdocument\b/,
+  'partitioned IndexedDB writes must not read shared browser globals');
+assert.match(partitionedIndexedDbReadServiceSource, /export function createPartitionedIndexedDbReadService\(/,
+  'partitioned IndexedDB recovery must export a dependency-injected service');
+assert.doesNotMatch(partitionedIndexedDbReadServiceSource, /\bglobalThis\b|\bdocument\b/,
+  'partitioned IndexedDB recovery must not read shared browser globals');
+assert.match(indexedDbClearServiceSource, /export function createIndexedDbClearService\(/,
+  'IndexedDB clearing must export a dependency-injected service');
+assert.doesNotMatch(indexedDbClearServiceSource, /\bglobalThis\b|\bdocument\b/,
+  'IndexedDB clearing must not read shared browser globals');
+assert.match(passwordPolicySource, /export function passwordPolicyError\(/,
+  'password policy must export a pure TypeScript validator');
+assert.match(passwordPolicySource, /export function passwordChangeError\(/,
+  'password policy must centralize password-confirmation validation');
+assert.doesNotMatch(passwordPolicySource, /\bglobalThis\b|\bdocument\b/,
+  'password policy must not read shared browser globals');
+assert.match(pbkdf2PasswordServiceSource, /export function createPbkdf2PasswordService\(/,
+  'PBKDF2 password service must export a dependency-injected factory');
+assert.match(pbkdf2PasswordServiceSource, /export function passwordHashNeedsUpgrade\(/,
+  'PBKDF2 password service must centralize hash-upgrade policy');
+assert.doesNotMatch(pbkdf2PasswordServiceSource, /\bglobalThis\b|\bdocument\b/,
+  'PBKDF2 password service must not read shared browser globals');
+assert.match(legacyPasswordHashServiceSource, /export function createLegacyPasswordHashService\(/,
+  'legacy password hash service must export a dependency-injected factory');
+assert.doesNotMatch(legacyPasswordHashServiceSource, /\bglobalThis\b|\bdocument\b/,
+  'legacy password hash service must not read shared browser globals');
+assert.match(loginLockoutPolicySource, /export function createLoginLockoutPolicy\(/,
+  'login lockout policy must export a pure TypeScript factory');
+assert.match(loginLockoutPolicySource, /export function normalizeLoginLockoutState\(/,
+  'login lockout policy must centralize persisted-state normalization');
+assert.match(loginLockoutPolicySource, /message\(until, now\)/,
+  'login lockout policy must own the lockout message');
+assert.doesNotMatch(loginLockoutPolicySource, /\bglobalThis\b|\bdocument\b/,
+  'login lockout policy must not read shared browser globals');
+assert.match(blankAppStateSource, /export function createBlankAppState\(/,
+  'blank app state must export a pure TypeScript builder');
+assert.doesNotMatch(blankAppStateSource, /\bglobalThis\b|\bdocument\b/,
+  'blank app state must not read shared browser globals');
+assert.match(defaultAdminUserSource, /export function createDefaultAdminUser\(/,
+  'default admin user must export a pure TypeScript builder');
+assert.match(defaultAdminUserSource, /DEFAULT_ADMIN_MUST_CHANGE_PASSWORD = true/,
+  'default admin policy must require a password change');
+assert.doesNotMatch(defaultAdminUserSource, /\bglobalThis\b|\bdocument\b/,
+  'default admin user must not read shared browser globals');
+assert.match(newUserValidationSource, /export function newUserValidationError\(/,
+  'new-user validation must export a pure TypeScript validator');
+assert.doesNotMatch(newUserValidationSource, /\bglobalThis\b|\bdocument\b/,
+  'new-user validation must not read shared browser globals');
+assert.match(userPermissionSelectionSource, /export function selectUserPermissions\(/,
+  'user permission selection must export a pure TypeScript selector');
+assert.doesNotMatch(userPermissionSelectionSource, /\bglobalThis\b|\bdocument\b/,
+  'user permission selection must not read shared browser globals');
+assert.match(activityAuditFilterSource, /export function createActivityAuditFilter\(/,
+  'activity audit filter must export a dependency-injected TypeScript factory');
+assert.doesNotMatch(activityAuditFilterSource, /\bglobalThis\b|\bdocument\b/,
+  'activity audit filter must not read shared browser globals');
+assert.match(activityAuditPaginationSource, /export function activityAuditPagination(?:<[^>]+>)?\(/,
+  'activity audit pagination must export a pure TypeScript model');
+assert.doesNotMatch(activityAuditPaginationSource, /\bglobalThis\b|\bdocument\b/,
+  'activity audit pagination must not read shared browser globals');
+assert.match(activityAuditCsvSource, /export function createActivityAuditCsv\(/,
+  'activity audit CSV must export a dependency-injected TypeScript factory');
+assert.doesNotMatch(activityAuditCsvSource, /\bglobalThis\b|\bdocument\b/,
+  'activity audit CSV must not read shared browser globals');
+assert.match(activityAuditDateRangeSource, /export function updateActivityAuditDateRange\(/,
+  'activity audit date range must export a pure TypeScript updater');
+assert.doesNotMatch(activityAuditDateRangeSource, /\bglobalThis\b|\bdocument\b/,
+  'activity audit date range must not read shared browser globals');
+assert.match(activityAuditFilterStateSource, /export const activityAuditFilterState = Object\.freeze/,
+  'activity audit controls must export immutable TypeScript state transitions');
+assert.match(activityAuditFilterStateSource, /export const ACTIVITY_AUDIT_PAGE_SIZES = Object\.freeze/,
+  'activity audit controls must centralize allowed page sizes');
+assert.doesNotMatch(activityAuditFilterStateSource, /\bglobalThis\b|\bdocument\b/,
+  'activity audit controls must not read shared browser globals');
+assert.match(activityAuditArchiveWindowSource, /export function activityAuditArchiveWindow\(/,
+  'activity audit archive window must export a pure TypeScript helper');
+assert.doesNotMatch(activityAuditArchiveWindowSource, /\bglobalThis\b|\bdocument\b/,
+  'activity audit archive window must not read shared browser globals');
 assert.doesNotMatch(recordSource, /\bstate\b|\bglobalThis\b|\bdocument\b/,
   'NCE record service must not read global state or DOM');
 assert.match(actionBiasSource, /export function createActionBiasService\(/,
@@ -545,6 +792,106 @@ assert.match(generated, /root\.westgardWorkerPrewarmPlanner\s*=\s*createWestgard
   'artifact must publish TypeScript Westgard Worker prewarm planning for the legacy bridge');
 assert.match(generated, /root\.planPartitionWrite\s*=\s*planPartitionWrite/,
   'artifact must publish the TypeScript partition-write policy for the legacy bridge');
+assert.match(generated, /root\.saveCommandPolicy\s*=\s*saveCommandPlan/,
+  'artifact must publish the TypeScript save command policy for the legacy bridge');
+assert.match(generated, /root\.storageBootService\s*=\s*createStorageBootService/,
+  'artifact must publish the TypeScript two-phase storage boot service for the legacy bridge');
+assert.match(generated, /root\.indexedDbRecoveryService\s*=\s*createIndexedDbRecoveryService/,
+  'artifact must publish the TypeScript IndexedDB recovery service for the legacy bridge');
+assert.match(generated, /root\.partitionHydrationService\s*=\s*createPartitionHydrationService/,
+  'artifact must publish the TypeScript partition hydration service for the legacy bridge');
+assert.match(generated, /root\.indexedDbMirrorService\s*=\s*createIndexedDbMirrorService/,
+  'artifact must publish the TypeScript IndexedDB mirror service for the legacy bridge');
+assert.match(generated, /root\.localStorageLoadService\s*=\s*createLocalStorageLoadService/,
+  'artifact must publish the TypeScript localStorage load service for the legacy bridge');
+assert.match(generated, /root\.localStorageSnapshotWriter\s*=\s*createLocalStorageSnapshotWriter/,
+  'artifact must publish the TypeScript localStorage snapshot writer for the legacy bridge');
+assert.match(generated, /root\.partitionedSnapshotWriter\s*=\s*createPartitionedSnapshotWriter/,
+  'artifact must publish the TypeScript partitioned snapshot writer for the legacy bridge');
+assert.match(generated, /root\.saveService\s*=\s*createSaveService/,
+  'artifact must publish the TypeScript save gateway for the legacy bridge');
+assert.match(generated, /root\.firebaseLocalStoreService\s*=\s*createFirebaseLocalStoreService/,
+  'artifact must publish the TypeScript Firebase local persistence bridge');
+assert.match(generated, /root\.firebaseDisconnectService\s*=\s*createFirebaseDisconnectService/,
+  'artifact must publish the TypeScript Firebase disconnect lifecycle bridge');
+assert.match(generated, /root\.firebasePushService\s*=\s*createFirebasePushService/,
+  'artifact must publish the TypeScript Firebase push lifecycle bridge');
+assert.match(generated, /root\.firebaseFullSyncService\s*=\s*createFirebaseFullSyncService/,
+  'artifact must publish the TypeScript Firebase full-sync lifecycle bridge');
+assert.match(generated, /root\.firebasePushScheduler\s*=\s*createFirebasePushScheduler/,
+  'artifact must publish the TypeScript Firebase push scheduler bridge');
+assert.match(generated, /root\.firebaseEmptySnapshotService\s*=\s*createFirebaseEmptySnapshotService/,
+  'artifact must publish the TypeScript Firebase empty-snapshot lifecycle bridge');
+assert.match(generated, /root\.firebaseOwnSnapshotService\s*=\s*createFirebaseOwnSnapshotService/,
+  'artifact must publish the TypeScript Firebase own-snapshot lifecycle bridge');
+assert.match(generated, /root\.firebaseInvalidSnapshotService\s*=\s*createFirebaseInvalidSnapshotService/,
+  'artifact must publish the TypeScript Firebase invalid-snapshot lifecycle bridge');
+assert.match(generated, /root\.firebaseAuditRejectionService\s*=\s*createFirebaseAuditRejectionService/,
+  'artifact must publish the TypeScript Firebase audit-rejection lifecycle bridge');
+assert.match(generated, /root\.firebaseRemoteRenderService\s*=\s*createFirebaseRemoteRenderService/,
+  'artifact must publish the TypeScript Firebase remote-render lifecycle bridge');
+assert.match(generated, /root\.firebaseSessionStartService\s*=\s*createFirebaseSessionStartService/,
+  'artifact must publish the TypeScript Firebase session-start lifecycle bridge');
+assert.match(generated, /root\.firebaseMergeCommitService\s*=\s*createFirebaseMergeCommitService/,
+  'artifact must publish the TypeScript Firebase merge-commit lifecycle bridge');
+assert.match(generated, /root\.firebaseConflictDialogService\s*=\s*createFirebaseConflictDialogService/,
+  'artifact must publish the TypeScript Firebase conflict dialog bridge');
+assert.match(generated, /root\.firebaseCloudStatusPresentation\s*=\s*createFirebaseCloudStatusPresentation/,
+  'artifact must publish the TypeScript Firebase cloud-status presentation bridge');
+assert.match(generated, /root\.firebaseSaveStatusService\s*=\s*createFirebaseSaveStatusService/,
+  'artifact must publish the TypeScript Firebase save-status presentation bridge');
+assert.match(generated, /root\.firebaseRemoteRenderSafetyService\s*=\s*createFirebaseRemoteRenderSafetyService/,
+  'artifact must publish the TypeScript Firebase remote-render safety bridge');
+assert.match(generated, /root\.firebaseAppService\s*=\s*createFirebaseAppService/,
+  'artifact must publish the TypeScript Firebase SDK lifecycle bridge');
+assert.match(generated, /root\.firebaseConfigSourceService\s*=\s*createFirebaseConfigSourceService/,
+  'artifact must publish the TypeScript Firebase config source bridge');
+assert.match(generated, /root\.firebaseReadyState\s*=\s*firebaseReadyState/,
+  'artifact must publish the TypeScript Firebase ready-state bridge');
+assert.match(generated, /root\.indexedDbOpenService\s*=\s*createIndexedDbOpenService/,
+  'artifact must publish the TypeScript IndexedDB open lifecycle bridge');
+assert.match(generated, /root\.indexedDbRecordService\s*=\s*createIndexedDbRecordService/,
+  'artifact must publish the TypeScript IndexedDB record operations bridge');
+assert.match(generated, /root\.partitionedIndexedDbWriteService\s*=\s*createPartitionedIndexedDbWriteService/,
+  'artifact must publish the TypeScript partitioned IndexedDB write bridge');
+assert.match(generated, /root\.partitionedIndexedDbReadService\s*=\s*createPartitionedIndexedDbReadService/,
+  'artifact must publish the TypeScript partitioned IndexedDB recovery bridge');
+assert.match(generated, /root\.indexedDbClearService\s*=\s*createIndexedDbClearService/,
+  'artifact must publish the TypeScript IndexedDB clear bridge');
+assert.match(generated, /root\.passwordPolicyError\s*=\s*passwordPolicyError/,
+  'artifact must publish the TypeScript password policy bridge');
+assert.match(generated, /root\.passwordChangeError\s*=\s*passwordChangeError/,
+  'artifact must publish the TypeScript password-change validation bridge');
+assert.match(generated, /root\.pbkdf2PasswordService\s*=\s*createPbkdf2PasswordService/,
+  'artifact must publish the TypeScript PBKDF2 password bridge');
+assert.match(generated, /root\.passwordHashNeedsUpgrade\s*=\s*passwordHashNeedsUpgrade/,
+  'artifact must publish the TypeScript password hash-upgrade bridge');
+assert.match(generated, /root\.legacyPasswordHashService\s*=\s*createLegacyPasswordHashService/,
+  'artifact must publish the TypeScript legacy password hash bridge');
+assert.match(generated, /root\.loginLockoutPolicy\s*=\s*createLoginLockoutPolicy/,
+  'artifact must publish the TypeScript login lockout bridge');
+assert.match(generated, /root\.blankAppStateFactory\s*=\s*\(?users\)?\s*=>\s*createBlankAppState/,
+  'artifact must publish the TypeScript blank-state bridge');
+assert.match(generated, /root\.defaultAdminUserFactory\s*=\s*\(id, passHash\)\s*=>\s*createDefaultAdminUser/,
+  'artifact must publish the TypeScript default-admin bridge');
+assert.match(generated, /root\.newUserValidationError\s*=\s*newUserValidationError/,
+  'artifact must publish the TypeScript new-user validation bridge');
+assert.match(generated, /root\.selectUserPermissions\s*=\s*selectUserPermissions/,
+  'artifact must publish the TypeScript user-permission selection bridge');
+assert.match(generated, /root\.activityAuditFilter\s*=\s*createActivityAuditFilter/,
+  'artifact must publish the TypeScript activity-audit filter bridge');
+assert.match(generated, /root\.activityAuditPagination\s*=\s*activityAuditPagination/,
+  'artifact must publish the TypeScript activity-audit pagination bridge');
+assert.match(generated, /root\.activityAuditCsv\s*=\s*createActivityAuditCsv/,
+  'artifact must publish the TypeScript activity-audit CSV bridge');
+assert.match(generated, /root\.updateActivityAuditDateRange\s*=\s*updateActivityAuditDateRange/,
+  'artifact must publish the TypeScript activity-audit date-range bridge');
+assert.match(generated, /root\.activityAuditFilterState\s*=\s*activityAuditFilterState/,
+  'artifact must publish the TypeScript activity-audit control-state bridge');
+assert.match(generated, /root\.activityAuditPageSizes\s*=\s*ACTIVITY_AUDIT_PAGE_SIZES/,
+  'artifact must publish the TypeScript activity-audit page-size bridge');
+assert.match(generated, /root\.activityAuditArchiveWindow\s*=\s*activityAuditArchiveWindow/,
+  'artifact must publish the TypeScript activity-audit archive-window bridge');
 assert.match(generated, /root\.qcValueFormat\s*=\s*createQcValueFormat/,
   'artifact must publish TypeScript QC value formatting for the legacy bridge');
 assert.match(generated, /root\.qcStaffIdentity\s*=\s*createQcStaffIdentity/,

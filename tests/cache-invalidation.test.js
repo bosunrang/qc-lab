@@ -52,4 +52,16 @@ assert.equal(run(ctx, 'pointsCache.size'), 0, 'default save remains fail-safe an
 assert.equal(run(ctx, 'wgMemo.size'), 0);
 assert.equal(run(ctx, 'derivedIndex'), null, 'global invalidation rebuilds the structural index');
 
+const savePlans = JSON.parse(JSON.stringify(run(ctx, `[
+  saveCommandPolicy({}),
+  saveCommandPolicy({testIds:['T1','T2','T1']}),
+  saveCommandPolicy({sigmaTestId:'T3',clearDerived:false,cloud:false})
+]`)));
+assert.deepEqual(savePlans[0], {derivedTestIds:[],storageTestIds:[],fullDirty:true,persistSigmaDraft:false,pushCloud:true},
+  'default save is a full persistence and cache-invalidating command');
+assert.deepEqual(savePlans[1], {derivedTestIds:['T1','T2'],storageTestIds:['T1','T2'],fullDirty:false,persistSigmaDraft:false,pushCloud:true},
+  'test-scoped saves keep a de-duplicated incremental persistence plan');
+assert.deepEqual(savePlans[2], {derivedTestIds:null,storageTestIds:['T3'],fullDirty:false,persistSigmaDraft:true,pushCloud:false},
+  'Sigma draft saves preserve derived caches and can remain local-only');
+
 console.log('Cache invalidation tests passed');

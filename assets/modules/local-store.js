@@ -4,6 +4,7 @@ const LocalStore=(()=>{
   let openPromise=null;
   const supported=()=>typeof indexedDB!=='undefined';
   function open(){
+    if(globalThis.indexedDbOpenService)return globalThis.indexedDbOpenService.open();
     if(!supported())return Promise.resolve(null);
     if(openPromise)return openPromise;
     openPromise=new Promise((resolve,reject)=>{
@@ -17,6 +18,7 @@ const LocalStore=(()=>{
     return openPromise;
   }
   function read(){
+    if(globalThis.indexedDbRecordService)return globalThis.indexedDbRecordService.get(KEY);
     return open().then(db=>new Promise((resolve,reject)=>{
       if(!db){resolve(null);return;}
       const request=db.transaction(STORE,'readonly').objectStore(STORE).get(KEY);
@@ -25,6 +27,7 @@ const LocalStore=(()=>{
     }));
   }
   function putRecord(record){
+    if(globalThis.indexedDbRecordService)return globalThis.indexedDbRecordService.put(record);
     return open().then(db=>new Promise((resolve,reject)=>{
       if(!db){resolve(false);return;}
       const request=db.transaction(STORE,'readwrite').objectStore(STORE).put(record);
@@ -42,6 +45,7 @@ const LocalStore=(()=>{
   function nextPartitionSlot(current){return globalThis.localPartitionHelpers?globalThis.localPartitionHelpers.nextSlot(current):current==='a'?'b':'a';}
   function partitionShell(state){return globalThis.localPartitionHelpers?globalThis.localPartitionHelpers.shell(state):{...state,data:{}};}
   async function writePartitioned(state,currentSlot,opts={}){
+    if(globalThis.partitionedIndexedDbWriteService){const dirtyTestIds=Array.isArray(opts.dirtyTestIds)?[...new Set(opts.dirtyTestIds.map(String))]:null;return globalThis.partitionedIndexedDbWriteService.write({state,currentSlot,dirtyTestIds,read:readKey,put:putRecord,remove:deleteKey});}
     if(!supported())return false;
     const data=state&&state.data||{},testIds=Object.keys(data),dirtyTestIds=Array.isArray(opts.dirtyTestIds)?[...new Set(opts.dirtyTestIds.map(String))]:null;
     const currentManifest=currentSlot==='a'||currentSlot==='b'?await readKey(partitionKey(currentSlot,'manifest')):null;
@@ -74,6 +78,7 @@ const LocalStore=(()=>{
     return{slot,savedAt:manifest.savedAt||0,state:{...shellRecord.state,data}};
   }
   async function readPartitioned(slot){
+    if(globalThis.partitionedIndexedDbReadService)return globalThis.partitionedIndexedDbReadService.read(slot,readKey);
     if(!supported())return null;
     if(slot)return readPartitionSlot(slot);
     const latest=await readKey('partition:latest'),preferred=latest&&latest.slot;
@@ -81,6 +86,7 @@ const LocalStore=(()=>{
     return await readPartitionSlot(preferred)||await readPartitionSlot(preferred==='a'?'b':'a');
   }
   function readKey(key){
+    if(globalThis.indexedDbRecordService)return globalThis.indexedDbRecordService.get(key);
     return open().then(db=>new Promise((resolve,reject)=>{
       if(!db){resolve(null);return;}
       const request=db.transaction(STORE,'readonly').objectStore(STORE).get(key);
@@ -89,6 +95,7 @@ const LocalStore=(()=>{
     }));
   }
   function deleteKey(key){
+    if(globalThis.indexedDbRecordService)return globalThis.indexedDbRecordService.delete(key);
     return open().then(db=>new Promise((resolve,reject)=>{
       if(!db){resolve(false);return;}
       const request=db.transaction(STORE,'readwrite').objectStore(STORE).delete(key);
@@ -97,6 +104,7 @@ const LocalStore=(()=>{
     }));
   }
   async function clear(){
+    if(globalThis.indexedDbClearService)return globalThis.indexedDbClearService.clear(readKey,deleteKey);
     if(!supported())return false;
     const manifests=await Promise.all(['a','b'].map(slot=>readKey(partitionKey(slot,'manifest'))));
     if(globalThis.localClearKeys){await Promise.all(globalThis.localClearKeys(manifests).map(deleteKey));return true;}
