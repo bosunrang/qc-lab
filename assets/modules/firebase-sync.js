@@ -17,13 +17,14 @@ const FB_TOP=['lab','machines','instruments','assayGroups','qcPanels','lotTransi
 const FB_LIST_KEYS=['machines','instruments','assayGroups','qcPanels','lotTransitions','lotGroups','qcLots','tests','actions','activity','users','reagentTests','reagentOperators','reagentSampleTypes','periodLocks','teaRefs'];
 const FB_LIST_SET=new Set(FB_LIST_KEYS);
 const FB_LOCAL_CONTENT_KEYS=['tests','actions','instruments','qcPanels','lotGroups','qcLots','assayGroups'];
-function fbClone(v){return v===undefined?undefined:JSON.parse(JSON.stringify(v));}
-function fbCloudValue(v){return v===undefined?null:fbClone(v);}
-function fbJson(v){return JSON.stringify(v===undefined?null:v);}
-function fbCanWrite(){return !!(fb.ready&&fb.initialized&&fb.ref);}
-function fbNetworkOnline(){return typeof navigator==='undefined'||navigator.onLine!==false;}
-function fbResetRetry(){if(fb.retryT!==null){clearTimeout(fb.retryT);fb.retryT=null;}fb.retryMs=1000;}
+function fbClone(v){return globalThis.syncValueCodec?globalThis.syncValueCodec.clone(v):v===undefined?undefined:JSON.parse(JSON.stringify(v));}
+function fbCloudValue(v){return globalThis.syncValueCodec?globalThis.syncValueCodec.cloudValue(v):v===undefined?null:fbClone(v);}
+function fbJson(v){return globalThis.syncValueCodec?globalThis.syncValueCodec.json(v):JSON.stringify(v===undefined?null:v);}
+function fbCanWrite(){return globalThis.firebaseConnectionGate?globalThis.firebaseConnectionGate.canWrite(fb):!!(fb.ready&&fb.initialized&&fb.ref);}
+function fbNetworkOnline(){return globalThis.firebaseConnectionGate?globalThis.firebaseConnectionGate.networkOnline(typeof navigator==='undefined'?undefined:navigator.onLine):typeof navigator==='undefined'||navigator.onLine!==false;}
+function fbResetRetry(){if(globalThis.syncRetryScheduler){const next=globalThis.syncRetryScheduler.reset({timer:fb.retryT,delay:fb.retryMs});fb.retryT=next.timer;fb.retryMs=next.delay;return;}if(fb.retryT!==null){clearTimeout(fb.retryT);fb.retryT=null;}fb.retryMs=1000;}
 function fbScheduleRetry(){
+  if(globalThis.syncRetryScheduler){const next=globalThis.syncRetryScheduler.schedule({dirty:fb.dirty,writable:fbCanWrite(),online:fbNetworkOnline(),retry:{timer:fb.retryT,delay:fb.retryMs},retryFn:()=>{fb.retryT=null;fbFlushPush();}});fb.retryT=next.timer;fb.retryMs=next.delay;return;}
   if(!fb.dirty||!fbCanWrite()||!fbNetworkOnline()||fb.retryT!==null)return;
   const delay=fb.retryMs;fb.retryMs=Math.min(30000,fb.retryMs*2);
   fb.retryT=setTimeout(()=>{fb.retryT=null;fbFlushPush();},delay);
@@ -36,6 +37,7 @@ function fbStoreLocal(){if(typeof persistLocalSnapshot==='function'){persistLoca
    máy mới cấu hình xong danh mục nhưng chưa kịp nhập QC vẫn có dữ liệu cần hỏi trước khi
    mất, dù mergePointArray đã hạ thấp rủi ro so với trước rất nhiều. */
 function hasLocalQcContent(s){
+  if(globalThis.syncHasContent)return globalThis.syncHasContent(s);
   if(!s)return false;
   if(Object.values(s.data||{}).some(arr=>Array.isArray(arr)&&arr.length))return true;
   return FB_LOCAL_CONTENT_KEYS.some(k=>(s[k]||[]).length);
@@ -44,6 +46,7 @@ function hasLocalQcContent(s){
    không lưu mảng/đối tượng rỗng và không giữ thứ tự khóa, nên cùng một dữ liệu vẫn ra
    hai CHUỖI JSON khác nhau sau một vòng đẩy lên - tải về. */
 function fbCanon(v){
+  if(globalThis.syncCanon)return globalThis.syncCanon(v);
   if(v===undefined||v===null)return null;
   if(Array.isArray(v)){const a=v.map(fbCanon);while(a.length&&a[a.length-1]===null)a.pop();return a.length?a:null;}
   if(typeof v!=='object')return v;
@@ -61,10 +64,11 @@ function fbCanon(v){
    "dữ liệu cục bộ khác dữ liệu trung tâm" bật lên MỖI lần đăng nhập dù hai bên đã
    đồng bộ y hệt. Đừng đổi lại thành so cả state. */
 const FB_COMPARE_KEYS=FB_TOP.filter(k=>k!=='activity'&&k!=='activityAnchor').concat(['data','sigmaData']);
-function fbSyncedShape(s){const out={};FB_COMPARE_KEYS.forEach(k=>{const c=fbCanon(s&&s[k]);if(c!==null)out[k]=c;});return out;}
+function fbSyncedShape(s){return globalThis.syncedShape?globalThis.syncedShape(s,FB_COMPARE_KEYS):(()=>{const out={};FB_COMPARE_KEYS.forEach(k=>{const c=fbCanon(s&&s[k]);if(c!==null)out[k]=c;});return out;})();}
 function statesLikelyEqual(a,b){return JSON.stringify(fbSyncedShape(a))===JSON.stringify(fbSyncedShape(b));}
-function fbMapJson(o){const out={};Object.keys(o||{}).forEach(id=>out[id]=JSON.stringify(o[id]));return out;}
+function fbMapJson(o){return globalThis.syncJsonMap?globalThis.syncJsonMap(o):(()=>{const out={};Object.keys(o||{}).forEach(id=>out[id]=JSON.stringify(o[id]));return out;})();}
 function fbSnapKeys(s){
+  if(globalThis.syncSnapshot)return globalThis.syncSnapshot(s);
   s=s||{};
   const keys={};FB_TOP.forEach(k=>keys[k]=fbJson(s[k]));
   return{keys,data:fbMapJson(s.data),sigma:fbMapJson(s.sigmaData)};
@@ -75,6 +79,7 @@ function fbSnapKeys(s){
    QC) dù nó không đổi giữa hai lần đồng bộ. */
 let fbSyncedSnapRef=null,fbSyncedSnapCache=null;
 function fbSyncedSnapKeys(s){
+  if(globalThis.syncUpdateBuilder)return globalThis.syncUpdateBuilder.baseSnapshot(s);
   if(s===fbSyncedSnapRef&&fbSyncedSnapCache)return fbSyncedSnapCache;
   const snap=fbSnapKeys(s);fbSyncedSnapRef=s;fbSyncedSnapCache=snap;return snap;
 }
@@ -86,6 +91,7 @@ function fbAddChildUpdates(payload,snapBranch,baseBranch,curBranch,path){
    thay đổi. Việc đẩy lên cloud vẫn theo cấp xét nghiệm (data/{testId} nguyên khối) —
    chỉ phần TRỘN khi nhận dữ liệu về (fbMerge) mới đi sâu tới từng điểm. */
 function fbBuildUpdate(cur){
+  if(globalThis.syncUpdateBuilder)return globalThis.syncUpdateBuilder.build(cur,fb.synced);
   const snap=fbSnapKeys(cur),base=fbSyncedSnapKeys(fb.synced),payload={};
   FB_TOP.forEach(k=>{if(snap.keys[k]!==base.keys[k])payload[k]=cur[k]===undefined?null:cur[k];});
   fbAddChildUpdates(payload,snap.data,base.data,cur.data||{},'data');
@@ -110,6 +116,7 @@ function fbPointKey(p){return p&&p.id!=null?'#'+String(p.id):'~'+JSON.stringify(
    lý như mọi thay đổi khác, không cần logic riêng; normalizePointLots() chỉ xử lý runId
    trùng do merge offline, không đánh lại runId lịch sử chỉ vì một điểm bị hủy. */
 function mergePointArray(localArr,remoteArr,baseArr,opts){
+  if(globalThis.mergeSyncArray)return globalThis.mergeSyncArray(localArr,remoteArr,baseArr,!!(opts&&opts.deletes)).map(fbClone);
   // Chế độ xóa (opts.deletes — bật cho các nhánh FB_LIST_KEYS): phần tử có trong base
   // nhưng biến mất ở một bên là BỊ XÓA THẬT (nút Xóa trong danh mục máy/panel/lô/người
   // dùng...) và phải lan sang máy khác — nếu không, máy khác đang giữ bản cũ sẽ "hồi
@@ -149,6 +156,7 @@ function mergePointArray(localArr,remoteArr,baseArr,opts){
    theo từng điểm bên trong (mergePointArray). data và sigmaData merge giống hệt nhau, chỉ
    khác tên khóa, nên dùng chung một hàm thay vì lặp lại hai lần trong fbMerge(). */
 function fbMergeDataBranch(local,remote,base,key){
+  if(globalThis.mergeSyncBranch)return globalThis.mergeSyncBranch(local,remote,base,key);
   const localBranch=local[key]||{},remoteBranch=remote[key]||{},baseBranch=(base&&base[key])||{};
   const out={};
   new Set([...Object.keys(localBranch),...Object.keys(remoteBranch),...Object.keys(baseBranch)]).forEach(id=>{
@@ -164,7 +172,9 @@ function fbMergeDataBranch(local,remote,base,key){
    Các nhánh còn lại ('lab', 'westgardRules', 'configMigrationVersion' — object đơn/dict/
    số, không phải danh sách) vẫn trộn theo kiểu "cả khối": bên nào đổi so với base thì
    lấy nguyên bên đó. */
+globalThis.fbSyncMergeConfig={clone:fbClone,snap:fbSnapKeys,snapshot:fbSnapKeys,top:FB_TOP,lists:FB_LIST_SET,contentKeys:FB_LOCAL_CONTENT_KEYS,array:(local,remote,base,deletes)=>mergePointArray(local,remote,base,{deletes}),branch:fbMergeDataBranch,cloud:fbCloudValue};
 function fbMerge(local,remote,base){
+  if(globalThis.syncStateMerge)return globalThis.syncStateMerge(local,remote,base);
   const out=fbClone(remote),lSnap=fbSnapKeys(local),bk=fbSnapKeys(base).keys;
   FB_TOP.forEach(k=>{
     if(FB_LIST_SET.has(k)){out[k]=mergePointArray(local[k],remote[k],(base||{})[k],{deletes:true});}
@@ -185,10 +195,10 @@ function fbMerge(local,remote,base){
    Phần chỉ có ở máy này sẽ được đẩy lên ngay sau đó (fbHasLocalChanges -> scheduleFbPush
    trong fbHandleValue) để các máy khác cùng nhận. */
 function fbFirstConnectMerge(local,remote){
+  if(globalThis.syncFirstConnectMerge)return globalThis.syncFirstConnectMerge(local,remote);
   const out=fbMerge(local,remote,null);
   FB_TOP.forEach(k=>{if(!FB_LIST_SET.has(k))out[k]=fbCloudValue(remote[k]);});
-  const seenUsers=new Set();
-  out.users=(out.users||[]).filter(u=>{const k=String(u&&u.username||'').toLowerCase();if(!k)return true;if(seenUsers.has(k))return false;seenUsers.add(k);return true;});
+  out.users=globalThis.uniqueSyncUsers?globalThis.uniqueSyncUsers(out.users||[]):out.users;
   return out;
 }
 let saveLabel='Cục bộ',saveDetail='';
@@ -198,8 +208,8 @@ function getDeployFbCfg(){
   return null;
 }
 function getStoredFbCfg(){try{const c=JSON.parse(localStorage.getItem('qclab_fb')||'null');if(!c||typeof c!=='object')return null;return{...c,anonymous:c.anonymous===true};}catch(e){return null;}}
-function getFbCfg(){const deploy=getDeployFbCfg(),stored=getStoredFbCfg();if(deploy&&deploy.locked)return deploy;return stored||deploy;}
-function fbConfigSig(cfg){const keys=['apiKey','authDomain','databaseURL','projectId','appId'];return JSON.stringify(Object.fromEntries(keys.map(k=>[k,String(cfg&&cfg[k]||'')])));}
+function getFbCfg(){const deploy=getDeployFbCfg(),stored=getStoredFbCfg();return globalThis.firebaseConfigSelection?globalThis.firebaseConfigSelection.select(deploy,stored):deploy&&deploy.locked?deploy:stored||deploy;}
+function fbConfigSig(cfg){return globalThis.firebaseConfigSelection?globalThis.firebaseConfigSelection.signature(cfg):JSON.stringify(Object.fromEntries(['apiKey','authDomain','databaseURL','projectId','appId'].map(k=>[k,String(cfg&&cfg[k]||'')])));}
 async function ensureFirebaseApp(cfg){
   if(typeof firebase==='undefined'||typeof firebase.initializeApp!=='function')throw new Error('Chưa tải được Firebase.');
   const desired=fbConfigSig(cfg),apps=firebase.apps||[];
@@ -223,19 +233,22 @@ function updateSaveStatus(){
 function markSaved(label,detail){saveLabel=label;saveDetail=detail||'';updateSaveStatus();}
 function fbDataPath(){
   const cfg=getFbCfg()||{};
+  if(globalThis.firebaseIdentity)return globalThis.firebaseIdentity.dataPath(cfg);
   return 'qclab-shared/'+((cfg.labCode||'default').replace(/[.#$/\[\]]/g,'_'));
 }
 function fbStatusLabel(){
   const cfg=getFbCfg()||{},u=fb.authUser||{};
+  if(globalThis.firebaseIdentity)return globalThis.firebaseIdentity.statusLabel(cfg,u);
   return (u.email||(u.isAnonymous?'ẩn danh':'đã xác thực'))+' · '+(cfg.labCode||'default')+' · '+fbDataPath();
 }
 function fbSnapshotSig(v){
+  if(globalThis.syncSnapshotSignature)return globalThis.syncSnapshotSignature(v);
   if(!v)return'empty';
   const s=JSON.stringify(v);let h=0;
   for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;
   return s.length+':'+h.toString(36);
 }
-function fbAuditIntegrity(snapshot){return QCCore.verifyAuditChain(snapshot&&snapshot.activity||[],snapshot&&snapshot.activityAnchor||'');}
+function fbAuditIntegrity(snapshot){return globalThis.firebaseAuditGate?globalThis.firebaseAuditGate(snapshot):QCCore.verifyAuditChain(snapshot&&snapshot.activity||[],snapshot&&snapshot.activityAnchor||'');}
 function fbRejectBrokenAudit(source,result){
   const where=result&&result.brokenIndex>=0?` dòng ${result.brokenIndex+1}`:'';
   fbDisconnect();setCloudStatus('Đã ngắt đồng bộ để bảo vệ nhật ký',false);
@@ -243,8 +256,8 @@ function fbRejectBrokenAudit(source,result){
   return false;
 }
 function fbAuditMaySync(snapshot,source){const result=fbAuditIntegrity(snapshot);return result.ok||fbRejectBrokenAudit(source,result);}
-function fbStopPull(){if(fb.pullT)clearInterval(fb.pullT);fb.pullT=null;}
-function fbStartPull(){fbStopPull();fb.pullT=setInterval(fbPullOnce,8000);}
+function fbStopPull(){if(globalThis.firebasePollingService){fb.pullT=globalThis.firebasePollingService.stop(fb.pullT);return;}if(fb.pullT)clearInterval(fb.pullT);fb.pullT=null;}
+function fbStartPull(){if(globalThis.firebasePollingService){fb.pullT=globalThis.firebasePollingService.start(fb.pullT,fbPullOnce,8000);return;}fbStopPull();fb.pullT=setInterval(fbPullOnce,8000);}
 /* Điểm dừng chung mỗi khi ngắt/đổi kết nối Firebase (hủy đồng bộ, đổi phòng, mất xác
    thực, lỗi đọc...): dừng poll, gỡ listener cũ, và reset toàn bộ cờ vòng đời để lần
    kết nối sau (nếu có) bắt đầu từ trạng thái sạch, không kế thừa fb.ref/fb.initialized
@@ -254,11 +267,13 @@ function fbDisconnect(clearAuthUser){
   if(fbSaveT){clearTimeout(fbSaveT);fbSaveT=null;}
   fbResetRetry();
   if(fb.ref)fb.ref.off();
+  if(globalThis.firebaseDisconnectedState){Object.assign(fb,globalThis.firebaseDisconnectedState(fb,!!clearAuthUser));return;}
   fb.ready=false;fb.initialized=false;fb.ref=null;fb.synced=null;fb.seenSig=null;
   if(clearAuthUser)fb.authUser=null;
 }
 async function fbPullOnce(){
-  if(!(fb.ref&&fb.authUser))return;
+  if(globalThis.firebasePullService)return globalThis.firebasePullService.pull(fb);
+  if(globalThis.firebaseCanPull?!globalThis.firebaseCanPull(fb):!(fb.ref&&fb.authUser))return;
   try{const snap=await fb.ref.once('value');fbHandleValue(snap.val(),{silent:true});}
   catch(e){}
 }
@@ -271,20 +286,23 @@ if(typeof document!=='undefined'&&document.addEventListener)document.addEventLis
 let fbConflictDialogOpen=false;
 async function fbHandleValue(v,opts={}){
   const sig=fbSnapshotSig(v);
+  if(globalThis.firebaseSnapshotGate){const gate=globalThis.firebaseSnapshotGate(fb.seenSig,sig);if(!gate.handle)return;fb.seenSig=gate.seenSignature;}else{
   if(sig&&sig===fb.seenSig)return;
   fb.seenSig=sig;
+  }
   if(!v){
     const firstSnapshot=!fb.initialized;
+    const emptyPlan=globalThis.firebaseEmptySnapshotPlan?globalThis.firebaseEmptySnapshotPlan(fb.initialized,fb.dirty,hasLocalQcContent(state)):null;
     fbSetReady();fb.synced=null;
     setCloudStatus(fbStatusLabel(),true);
     // Phòng trống mà máy này đang có dữ liệu (lần kết nối đầu): đẩy toàn bộ lên làm bản
     // gốc cho phòng ngay — trước đây dữ liệu cục bộ "nằm im" chờ tới lần sửa kế tiếp
     // (fb.dirty) mới được đẩy, máy khác kết nối vào thấy phòng trống, tưởng không đồng bộ.
-    if(fb.dirty||(firstSnapshot&&hasLocalQcContent(state)))scheduleFbPush();
+    if(emptyPlan?emptyPlan.push:(fb.dirty||(firstSnapshot&&hasLocalQcContent(state))))scheduleFbPush();
     else if(!opts.silent)markSaved('đám mây','Sẵn sàng đồng bộ · '+fbDataPath());
     return;
   }
-  const cloudErrors=QCCore.validateBackup(v);
+  const remoteSnapshot=globalThis.firebaseRemoteSnapshot?globalThis.firebaseRemoteSnapshot(v):null,cloudErrors=remoteSnapshot?remoteSnapshot.errors:QCCore.validateBackup(v);
   if(cloudErrors.length){
     // Dữ liệu cloud hỏng không được chặn máy này tiếp tục đồng bộ mãi mãi — vẫn coi
     // như đã "khởi tạo" để các lần lưu sau còn được đẩy lên (có thể tự sửa dữ liệu hỏng).
@@ -292,21 +310,22 @@ async function fbHandleValue(v,opts={}){
     markSaved('dữ liệu đám mây không hợp lệ',cloudErrors[0]+' · '+fbDataPath());
     return;
   }
-  const remote=QCCore.sanitizeBackup(v),base=fb.synced;
+  const remote=remoteSnapshot?remoteSnapshot.remote:QCCore.sanitizeBackup(v),base=fb.synced;
   /* Xac minh TUNG chuoi goc truoc khi merge/relink. Neu relink truoc, mot payload
      da bi sua co the duoc bam lai thanh chuoi "hop le" va mat dau vet hong ban dau. */
   if(!fbAuditMaySync(remote,'Nhật ký trên đám mây'))return;
   if(!fbAuditMaySync(state,'Nhật ký cục bộ'))return;
   // Bỏ qua chính bản ghi do máy này vừa đẩy lên (chống tự dội: mất focus/nháy màn hình),
   // nhưng vẫn đánh dấu snapshot đầu tiên đã tải để các lần lưu sau mới được push.
-  if(v._client&&v._client===fb.clientId){
+  if(globalThis.firebaseOwnSnapshotPlan?globalThis.firebaseOwnSnapshotPlan(v,fb.clientId).own:(v._client&&v._client===fb.clientId)){
     fbSetReady();fb.synced=remote;fb.dirty=false;fbResetRetry();
     setCloudStatus(fbStatusLabel(),true);if(!opts.silent)markSaved('đã đồng bộ','Lúc '+saveTime());
     return;
   }
   const hadLocalChanges=fb.dirty;
   const sameFirstConnectData=!base&&!hadLocalChanges&&hasLocalQcContent(state)&&statesLikelyEqual(state,remote);
-  let mergeFirstConnect=hadLocalChanges||sameFirstConnectData;
+  const firstConnectPlan=globalThis.firebaseFirstConnectPlan?globalThis.firebaseFirstConnectPlan(base,hadLocalChanges,hasLocalQcContent(state),statesLikelyEqual(state,remote)):null;
+  let mergeFirstConnect=firstConnectPlan?firstConnectPlan.mergeFirstConnect:hadLocalChanges||sameFirstConnectData;
   // Lần nhận đầu tiên sau khi kết nối/đổi phòng (base=null): nếu máy đang có dữ
   // liệu nghiệp vụ khác trung tâm thì hỏi trước khi thay thế, kể cả dữ liệu đó
   // đến từ localStorage sau reload chứ không phải thay đổi mới trong phiên này.
@@ -318,7 +337,7 @@ async function fbHandleValue(v,opts={}){
   // này sẽ mất); Hủy = ngắt đồng bộ, giữ nguyên dữ liệu cục bộ (dùng khi nghi kết
   // nối nhầm mã phòng). Sau khi đã đồng bộ lần đầu, các lần sau vẫn là trộn 3
   // chiều hai máy như bình thường (base != null, xem nhánh fbMerge bên dưới).
-  if(!base&&!hadLocalChanges&&hasLocalQcContent(state)&&!sameFirstConnectData){
+  if(firstConnectPlan?firstConnectPlan.confirmConflict:(!base&&!hadLocalChanges&&hasLocalQcContent(state)&&!sameFirstConnectData)){
     // Một hộp thoại xung đột tại một thời điểm: nếu snapshot mới tới trong lúc
     // hộp thoại trước đang chờ người dùng trả lời thì bỏ qua, không mở chồng.
     if(fbConflictDialogOpen)return;
@@ -349,7 +368,7 @@ async function fbHandleValue(v,opts={}){
   // nhận thay thế bằng trung tâm ở trên, thì lấy nguyên cloud làm gốc.
   // Các lần sau: trộn 3 chiều theo từng phần tử với base = bản đồng bộ gần nhất.
   const previousState=state;
-  state=base?fbMerge(state,remote,base):(mergeFirstConnect?fbFirstConnectMerge(state,remote):remote);
+  state=globalThis.firebaseMergeApplication?globalThis.firebaseMergeApplication(base,mergeFirstConnect,state,remote):(base?fbMerge(state,remote,base):(mergeFirstConnect?fbFirstConnectMerge(state,remote):remote));
   /* mergePointArray() (fbMerge/fbFirstConnectMerge) ghép activity theo từng phần tử,
      không theo đúng thứ tự chuỗi hash logic của từng máy — hai dòng liền kề trong
      chuỗi hash gốc của MỘT máy có thể bị chen dòng của máy kia vào giữa sau khi

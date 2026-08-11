@@ -1,0 +1,1 @@
+export function qcLotLineage(index:any,currentLotId:any){const chain:any[]=[],seen=new Set();let current=index.lotById.get(currentLotId);while(current&&!seen.has(current.id)){chain.unshift(current);seen.add(current.id);const transition=index.acceptedTransitionToLot.get(current.id);current=transition?index.lotById.get(transition.fromLotId):null;}return chain}

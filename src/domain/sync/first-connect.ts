@@ -1,0 +1,2 @@
+export function hasSyncContent(source:any,keys:string[]){if(!source)return false;if(Object.values(source.data||{}).some((rows:any)=>Array.isArray(rows)&&rows.length))return true;return keys.some(key=>(source[key]||[]).length)}
+export function createFirstConnectMerge(deps:any){return(local:any,remote:any)=>{const out=deps.merge(local,remote,null);deps.top.forEach((key:string)=>{if(!deps.lists.has(key))out[key]=deps.cloud(remote[key]);});out.users=deps.uniqueUsers(out.users||[]);return out}}

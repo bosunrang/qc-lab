@@ -5,7 +5,7 @@ const{loadSandbox,run}=require('./helpers/sandbox');
 
 // data-io.js giữ tầng dữ liệu dùng chung (reportNceModel/reportNceSummaryParts/
 // reportNceExcerpt) mà cả bản in lẫn bản Excel cùng đọc; nạp đúng thứ tự index.html.
-const ctx=loadSandbox(['modules/data-io.js','modules/reports.js'],{window:{QCLAB_APP:{name:'QC Lab',version:'test'}}});
+const ctx=loadSandbox(['core.js','generated/modular-pilot.js','modules/data-io.js','modules/reports.js'],{window:{QCLAB_APP:{name:'QC Lab',version:'test'}}});
 run(ctx,`
   ACTION_LABELS={
     cause:{instrument:'Thiết bị'},source:{iqc:'Nội kiểm IQC'},phase:{exam:'Xét nghiệm'},risk:{high:'Cao',low:'Thấp'},

@@ -1,0 +1,1 @@
+export function csvCell(value:unknown){if(typeof value==='number')return Number.isFinite(value)?String(value):'';let text=value==null?'':String(value);if(/^[\s]*[=+\-@]/.test(text))text="'"+text;return /[",\n\r;]/.test(text)?'"'+text.replace(/"/g,'""')+'"':text;}

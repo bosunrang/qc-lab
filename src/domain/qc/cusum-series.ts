@@ -1,0 +1,1 @@
+export function createCusumSeries(run:(points:any[],mean:number,sd:number,k:number,h:number)=>any){return(points:any[],level:any,config:any)=>points.length?run(points,level.mean,level.sd,config.k,config.h):{cPos:[],cNeg:[],flags:[],k:config.k,h:config.h,ma:[]};}

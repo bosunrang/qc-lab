@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
-const ctx = loadSandbox(['modules/data-io.js']);
+const ctx = loadSandbox(['core.js','generated/modular-pilot.js','modules/data-io.js']);
 run(ctx, `
   const __sigmaTests=[{id:'T1',name:'Glucose',levels:[{level:1},{level:2},{level:3}]}];
   const __sigmaPeriods={T1:[

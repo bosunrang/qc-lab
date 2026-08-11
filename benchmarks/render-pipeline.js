@@ -10,7 +10,7 @@ function time(fn, repeats = 3) {
   return { medianMs: Number(samples[Math.floor(samples.length / 2)].toFixed(2)), samplesMs: samples.map(n => Number(n.toFixed(2))) };
 }
 
-const ctx = loadSandbox(['modules/chart-view-model.js']);
+const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js']);
 const count = 100000,values = Array.from({ length: count }, (_, i) => Math.sin(i / 31));
 values[12345] = -20;values[87654] = 20;
 const sampling = time(() => ctx.ChartViewModel.sampleIndices({ length: count, maxPoints: 640, valueAt: i => values[i], preserve: [50000] }));

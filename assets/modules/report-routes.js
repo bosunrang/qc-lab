@@ -6,11 +6,11 @@
    chiếu chéo. Nạp ngay sau actions-routes.js; data-io.js/reports.js gọi
    reportDateRange()/reportRangeText() nhưng chỉ lúc người dùng bấm xuất/in nên
    thứ tự với hai file đó không bắt buộc — giữ liền mạch cho dễ đọc. */
-let reportQ='',reportTest='',reportRangeStart='',reportRangeEnd='',reportLockYm='';
 /* Khóa kỳ báo cáo: hành động toàn phòng lab (mọi xét nghiệm), tách khỏi phần
    chọn xét nghiệm/khoảng ngày phía trên — PeriodService.lock()/unlock() đã có
    sẵn từ trước và được entry-service.js chặn sửa điểm QC khi kỳ bị khóa, chỉ
    thiếu giao diện gọi tới nên tính năng chưa dùng được trên thực tế. */
+let reportQ='',reportTest='',reportRangeStart='',reportRangeEnd='',reportLockYm='';
 function reportLockYmValue(){return ReportPeriodPresentation.currentYearMonth(reportLockYm,isoMonth());}
 function reportSetLockPart(part,value){
   reportLockYm=ReportPeriodPresentation.setPart(reportLockYmValue(),part,value);
@@ -72,9 +72,9 @@ function reportSearchSet(v){
   scheduleSearchRender(reportSearchSet,reportApplySearch,'reportSearch');
 }
 function reportApplySearch(){
-  const tests=operationalTests(),q=searchText(reportQ),matched=tests.filter(t=>!q||reportSearchValues(t).some(v=>searchText(v).includes(q)));
-  if(matched.length&&(!reportTest||!matched.some(t=>t.id===reportTest)))reportTest=matched[0].id;
-  if(!matched.length)reportTest='';
+  const tests=operationalTests(),q=searchText(reportQ),result=globalThis.reportSearch?globalThis.reportSearch.select(tests,q,reportTest,reportSearchValues,searchText):null,matched=result?result.matched:tests.filter(t=>!q||reportSearchValues(t).some(v=>searchText(v).includes(q)));
+  if(result)reportTest=result.selected;
+  else{if(matched.length&&(!reportTest||!matched.some(t=>t.id===reportTest)))reportTest=matched[0].id;if(!matched.length)reportTest='';}
   const select=document.getElementById('rTest'),count=document.getElementById('reportTestCount');
   replaceSelectItems(select,matched.map(t=>({value:t.id,label:testSelectLabel(t,tests)})),'Không tìm thấy xét nghiệm phù hợp');
   if(select&&reportTest)select.value=reportTest;
@@ -82,11 +82,13 @@ function reportApplySearch(){
   document.querySelectorAll('[data-report-action]').forEach(button=>button.disabled=!matched.length);
 }
 function reportRangeDefaults(){
+  if(globalThis.reportSelection){const r=globalThis.reportSelection.defaults(reportRangeStart,reportRangeEnd,isoMonth(),isoToday());reportRangeStart=r.start;reportRangeEnd=r.end;return r;}
   if(!reportRangeStart&&!reportRangeEnd){reportRangeStart=isoMonth()+'-01';reportRangeEnd=isoToday();}
   return{start:reportRangeStart,end:reportRangeEnd};
 }
 function reportDateRange(){
   const s=parseVN((document.getElementById('rStartDate')||{}).value||'')||'',e=parseVN((document.getElementById('rEndDate')||{}).value||'')||'';
+  if(globalThis.reportSelection)return globalThis.reportSelection.dateRange(s,e);
   return(s&&e&&s>e)?{start:e,end:s}:{start:s,end:e};
 }
 /* Cả ba nút xuất (In / Excel / CSV) đọc cùng một bộ điều khiển trên trang Báo
@@ -94,6 +96,7 @@ function reportDateRange(){
    Excel không thể lệch nhau về xét nghiệm, khoảng ngày hay tùy chọn phụ lục. */
 function reportExportSelection(){
   const tid=(document.getElementById('rTest')||{}).value||'',{start,end}=typeof reportDateRange==='function'?reportDateRange():{start:'',end:''};
+  if(globalThis.reportSelection)return globalThis.reportSelection.exportSelection(state.tests,tid,start,end,(document.getElementById('reportNceAppendix')||{}).checked!==false);
   return{tid,t:state.tests.find(x=>x.id===tid),start,end,includeNceAppendix:(document.getElementById('reportNceAppendix')||{}).checked!==false};
 }
 function reportRangeChanged(){
@@ -101,6 +104,7 @@ function reportRangeChanged(){
   reportRangeStart=start;reportRangeEnd=end;
 }
 function reportRangeText(start,end){
+  if(globalThis.reportLabels)return globalThis.reportLabels.rangeText(start,end);
   if(!start&&!end)return'Toàn bộ dữ liệu';
   if(start&&end)return vnDate(start)+' – '+vnDate(end);
   return start?('Từ '+vnDate(start)):('Đến '+vnDate(end));

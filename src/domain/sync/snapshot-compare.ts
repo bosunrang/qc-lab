@@ -1,0 +1,3 @@
+export function syncCanon(v:any):any{if(v==null)return null;if(Array.isArray(v)){const a=v.map(syncCanon);while(a.length&&a[a.length-1]===null)a.pop();return a.length?a:null}if(typeof v!=='object')return v;const o:any={};Object.keys(v).sort().forEach(k=>{const x=syncCanon(v[k]);if(x!==null)o[k]=x});return Object.keys(o).length?o:null}
+export function syncedShape(state:any,keys:string[]){const out:any={};keys.forEach(k=>{const v=syncCanon(state?.[k]);if(v!==null)out[k]=v});return out}
+export function syncJsonMap(value:any){const out:any={};Object.keys(value||{}).forEach(key=>out[key]=JSON.stringify(value[key]));return out}

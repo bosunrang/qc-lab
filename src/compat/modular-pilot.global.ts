@@ -11,6 +11,7 @@ import {
   type ManageConfigServiceApi,
 } from '../application/manage/manage-config-service';
 import { createPeriodService, type PeriodServiceApi } from '../application/period/period-service';
+import { createAuditService, type AuditServiceApi } from '../application/audit/audit-service';
 import {
   createLisClient,
   createLisGatewayRuntime,
@@ -24,6 +25,122 @@ import {
   type QcPointWarnings,
   type QcWarningStats,
 } from '../domain/qc/qc-point-warnings';
+import { qcPointRunNumber } from '../domain/qc/qc-point-run';
+import { qcCusumConfig } from '../domain/qc/cusum-config';
+import { normalizeSearchText } from '../domain/qc/search-text';
+import { qcLevelTargetValid } from '../domain/qc/level-target';
+import { qcLotMeanSd, qcLotTargetSnapshot } from '../domain/qc/lot-target';
+import { createReportLevelStats } from '../domain/qc/report-level-stats';
+import { createQcErrorDetail } from '../domain/qc/error-detail';
+import { qcPlannedTarget } from '../domain/qc/planned-target';
+import { createQcPointVoidVerdict } from '../domain/qc/point-void-verdict';
+import { qcLotGroupOperational } from '../domain/qc/lot-group-status';
+import { createQcDerivedIndex } from '../domain/qc/derived-index';
+import { createAcceptedLotPoints } from '../domain/qc/accepted-lot-points';
+import { createActiveWestgard } from '../domain/qc/active-westgard';
+import { createCusumSeries } from '../domain/qc/cusum-series';
+import { createParallelWestgard } from '../domain/qc/parallel-westgard';
+import { createQcEntryColumns } from '../domain/qc/entry-columns';
+import { selectEntryColumnPoints } from '../domain/qc/entry-column-points';
+import { syncCanon, syncedShape, syncJsonMap } from '../domain/sync/snapshot-compare';
+import { mergeSyncArray, mergeSyncBranch } from '../domain/sync/array-merge';
+import { createSyncStateMerge, uniqueSyncUsers } from '../domain/sync/state-merge';
+import { createSyncUpdateBuilder } from '../domain/sync/update-payload';
+import { createSyncSnapshot } from '../domain/sync/snapshot-keys';
+import { createSyncRetryScheduler } from '../domain/sync/retry-scheduler';
+import { createFirstConnectMerge, hasSyncContent } from '../domain/sync/first-connect';
+import { createRunIdNormalizer } from '../domain/qc/run-id-normalizer';
+import { createPointLotNormalizer } from '../domain/qc/point-lot-normalizer';
+import { qcLotLineage } from '../domain/qc/lot-lineage';
+import { createQcOperationalAccess, qcLevelConfig } from '../domain/qc/operational-access';
+import { createParallelLotLookup } from '../domain/qc/parallel-lot-lookup';
+import { createWestgardWorkerJob } from '../domain/westgard/worker-job';
+import { createWestgardWorkerRevisionService } from '../domain/westgard/worker-revision';
+import { hydrateWestgardWorkerResult as hydrateWestgardWorkerResultTs } from '../domain/westgard/worker-hydrate';
+import { createWestgardWorkerPrewarmPlanner } from '../domain/westgard/worker-prewarm';
+import { previousLotHistory, lotGroupLevels } from '../domain/qc/lot-history-view-model';
+import { createPointCacheService } from '../application/qc/point-cache-service';
+import { createStorageSerializePolicy } from '../application/storage/storage-serialize-policy';
+import { createSaveScheduler } from '../application/storage/save-scheduler';
+import { storageRetryDelay } from '../application/storage/retry-delay';
+import { saveDerivedTestIds } from '../application/storage/derived-save-policy';
+import { planPartitionWrite } from '../application/storage/partition-write-policy';
+import { createQcValueFormat } from '../domain/qc/value-format';
+import { createQcStaffIdentity } from '../domain/qc/staff-identity';
+import { createQcDateFormat } from '../domain/qc/date-format';
+import { createLotTargetHistory } from '../domain/qc/lot-target-history';
+import { createTeaAnalyteMeta } from '../domain/tea/analyte-meta';
+import { createQcLevelReconciliation } from '../domain/qc/level-reconciliation';
+import { createRangeLimitRepair } from '../domain/qc/range-limit-repair';
+import { createDerivedCacheInvalidation } from '../application/state/derived-cache-invalidation';
+import { reconcileConfigurationRelations } from '../application/state/configuration-relations';
+import { normalizeTestConfiguration } from '../application/state/test-configuration-normalization';
+import { normalizeStateFoundation } from '../application/state/foundation-normalization';
+import { normalizeStateLifecycle } from '../application/state/state-lifecycle-normalization';
+import { createCsvDownload } from '../presentation/export/csv-download';
+import { cssTokenPixel } from '../presentation/style/css-token-pixel';
+import { createBlobDownload } from '../presentation/export/blob-download';
+import { createQcReportCsvRows } from '../presentation/report/qc-report-csv-rows';
+import { createBasicFormat } from '../presentation/format/basic-format';
+import { createWestgardRulePolicy } from '../domain/westgard/rule-policy';
+import { createWestgardMemoCache } from '../domain/westgard/memo-cache';
+import { createCusumMemoCache } from '../domain/qc/cusum-memo-cache';
+import { createAcceptedMemoCache } from '../domain/qc/accepted-memo-cache';
+import { createWestgardRuleSettings } from '../domain/westgard/rule-settings';
+import { createRangeCandidateService } from '../domain/qc/range-candidate';
+import { rangeSafetyGate } from '../domain/qc/range-safety-gate';
+import { csvCell as csvCellTs } from '../domain/export/csv-cell';
+import { reportExportHelpers } from '../presentation/report/export-helpers';
+import { createActionReportSummary } from '../presentation/nce/action-report-summary';
+import { createActionReportModel } from '../presentation/nce/action-report-model';
+import { createActionCsvRow } from '../presentation/nce/action-csv-row';
+import { createSigmaCanvas } from '../presentation/sigma/sigma-canvas';
+import { sigmaReportMetric as sigmaReportMetricTs } from '../presentation/sigma/sigma-report-metric';
+import { sigmaMdcItems as sigmaMdcItemsTs } from '../presentation/sigma/sigma-mdc-items';
+import { sigmaMdcLabelPlacements as sigmaMdcLabelPlacementsTs } from '../presentation/sigma/sigma-mdc-label-placement';
+import { sigmaExportPixelRatio as sigmaExportPixelRatioTs } from '../presentation/sigma/sigma-export-pixel-ratio';
+import { createSigmaReportRows } from '../presentation/sigma/sigma-report-rows';
+import { createQcReportRows } from '../presentation/report/qc-report-rows';
+import { createQcReportContext } from '../presentation/report/qc-report-context';
+import { dataUrlBytes } from '../presentation/sigma/data-url-bytes';
+import { createSigmaExportMeta } from '../presentation/sigma/sigma-export-meta';
+import { createExportMetaRows } from '../presentation/report/export-meta-rows';
+import { createQcExportValueFormat } from '../presentation/report/qc-export-value-format';
+import { createCanvasFont } from '../presentation/sigma/canvas-font';
+import { createReportLabels } from '../presentation/report/report-labels';
+import { createReportSelection } from '../presentation/report/report-selection';
+import { createReportSearch } from '../presentation/report/report-search';
+import { createSigmaMuTrace } from '../presentation/sigma/sigma-mu-trace';
+import { createSigmaPrintRows } from '../presentation/sigma/sigma-print-rows';
+import { createSigmaMuPrintRows } from '../presentation/sigma/sigma-mu-print-rows';
+import { createReportPointsTable } from '../presentation/report/report-points-table';
+import { createActionReportHtml } from '../presentation/nce/action-report-html';
+import { createSigmaDraftService } from '../application/storage/sigma-draft-service';
+import { createStateAdoptionService } from '../application/storage/state-adoption-service';
+import { createCorruptLocalQuarantine } from '../application/storage/corrupt-local-quarantine';
+import { createSyncValueCodec } from '../domain/sync/value-codec';
+import { createFirebaseConfigSelection } from '../domain/sync/firebase-config-selection';
+import { createFirebaseConnectionGate } from '../domain/sync/firebase-connection-gate';
+import { syncSnapshotSignature } from '../domain/sync/snapshot-signature';
+import { createFirebaseIdentity } from '../domain/sync/firebase-identity';
+import { createFirebaseAuditGate } from '../domain/sync/firebase-audit-gate';
+import { createFirebasePollingService } from '../application/sync/firebase-polling-service';
+import { firebaseDisconnectedState } from '../domain/sync/firebase-lifecycle-state';
+import { firebaseCanPull } from '../domain/sync/firebase-pull-gate';
+import { createFirebasePullService } from '../application/sync/firebase-pull-service';
+import { createFirebaseMergeApplication } from '../application/sync/firebase-merge-application';
+import { createLocalPartitionHelpers } from '../application/storage/local-partition-helpers';
+import { createLocalSnapshotRecord } from '../application/storage/local-snapshot-record';
+import { localPartitionValid } from '../application/storage/local-partition-validation';
+import { localRecoverySlots } from '../application/storage/local-recovery-slots';
+import { createLocalPartitionTransaction } from '../application/storage/local-partition-transaction';
+import { createLocalPartitionRecovery } from '../application/storage/local-partition-recovery';
+import { createLocalClearKeys } from '../application/storage/local-clear-keys';
+import { firebaseSnapshotGate } from '../domain/sync/firebase-snapshot-gate';
+import { firebaseEmptySnapshotPlan } from '../domain/sync/firebase-empty-snapshot';
+import { createFirebaseRemoteSnapshot } from '../domain/sync/firebase-remote-snapshot';
+import { firebaseOwnSnapshotPlan } from '../domain/sync/firebase-own-snapshot';
+import { firebaseFirstConnectPlan } from '../domain/sync/firebase-first-connect-plan';
 import {
   createReagentComparisonService,
   type ReagentComparisonServiceApi,
@@ -76,6 +193,8 @@ import { createActionProtocolService, type ActionProtocolService } from '../doma
 import { createActionReviewService, type ActionReviewService } from '../application/nce/action-review-service';
 import { createActionEscalationService, type ActionEscalationService } from '../application/nce/action-escalation-service';
 import { createActionRecordService, type ActionRecordService } from '../application/nce/action-record-service';
+import { createActionRerunService, type ActionRerunService } from '../application/nce/action-rerun-service';
+import { createActionPointIndexService, type ActionPointIndexService } from '../application/nce/action-point-index-service';
 import {
   createAnalysisUiState,
   createAuthUiState,
@@ -101,6 +220,13 @@ declare function infoDialog(message: string, options?: Record<string, any>): Pro
 declare function auditSha256(text: string): Promise<string>;
 declare function uid(): string;
 declare function isoDate(value: Date): string;
+declare const TEA_ANALYTE_CATALOG: any[];
+declare function role(): string;
+declare function auditActor(): { user: string; username: string; userId: string; role: string; clientId: string };
+declare function auditRuntimeConfig(): { hardCap: number; rotateTo: number; autoVerifyMax: number };
+declare function auditEntryHash(entry: Record<string, any>): string;
+declare function auditVerifyChain(activity?: Record<string, any>[], anchor?: string): Record<string, any>;
+declare function role(): string;
 
 type QCLabGlobal = typeof globalThis & {
   QCLAB_APP?: { version?: string };
@@ -120,6 +246,8 @@ type QCLabGlobal = typeof globalThis & {
   ActionReviewService?: ActionReviewService;
   ActionEscalationService?: ActionEscalationService;
   ActionRecordService?: ActionRecordService;
+  ActionRerunService?: ActionRerunService;
+  ActionPointIndexService?: ActionPointIndexService;
   ActionBiasService?: ActionBiasService;
   ActionBiasPresentation?: ActionBiasPresentation;
   ActionViolationService?: ActionViolationService;
@@ -157,6 +285,7 @@ type QCLabGlobal = typeof globalThis & {
   WestgardViewModel?: WestgardViewModelApi;
   LISClientService?: LisClientApi;
   BackupService?: BackupServiceApi;
+  AuditService?: AuditServiceApi;
   BACKUP_IMPORT_MAX_BYTES?: number;
   BACKUP_IMPORT_WARN_BYTES?: number;
   serializeBackupData?: BackupServiceApi['serializeBackupData'];
@@ -194,6 +323,125 @@ type QCLabGlobal = typeof globalThis & {
     systematicShiftCritical: (tea: number, bias: number, sd: number) => Record<string, any> | null;
   };
   qcValueDecimals?: (value: unknown) => number;
+  qcPointRunNumber?: typeof qcPointRunNumber;
+  qcCusumConfig?: typeof qcCusumConfig;
+  normalizeSearchText?: typeof normalizeSearchText;
+  qcLevelTargetValid?: typeof qcLevelTargetValid;
+  qcLotMeanSd?: typeof qcLotMeanSd; qcLotTargetSnapshot?: typeof qcLotTargetSnapshot;
+  reportLevelStatsService?: ReturnType<typeof createReportLevelStats>;
+  qcErrorDetail?: ReturnType<typeof createQcErrorDetail>;
+  qcPlannedTarget?: typeof qcPlannedTarget;
+  qcPointVoidVerdict?: ReturnType<typeof createQcPointVoidVerdict>;
+  qcLotGroupOperational?: typeof qcLotGroupOperational;
+  qcDerivedIndex?: ReturnType<typeof createQcDerivedIndex>;
+  qcAcceptedLotPoints?: ReturnType<typeof createAcceptedLotPoints>;
+  qcActiveWestgard?: ReturnType<typeof createActiveWestgard>;
+  qcCusumSeries?: ReturnType<typeof createCusumSeries>;
+  qcParallelWestgard?: ReturnType<typeof createParallelWestgard>;
+  qcEntryColumns?: ReturnType<typeof createQcEntryColumns>;
+  qcEntryColumnPoints?: typeof selectEntryColumnPoints;
+  syncCanon?: typeof syncCanon; syncedShape?: typeof syncedShape; syncJsonMap?: typeof syncJsonMap;
+  mergeSyncArray?: typeof mergeSyncArray; mergeSyncBranch?: typeof mergeSyncBranch;
+  uniqueSyncUsers?: typeof uniqueSyncUsers;
+  syncStateMerge?: ReturnType<typeof createSyncStateMerge>;
+  syncUpdateBuilder?: ReturnType<typeof createSyncUpdateBuilder>;
+  syncSnapshot?: ReturnType<typeof createSyncSnapshot>;
+  syncRetryScheduler?: ReturnType<typeof createSyncRetryScheduler>;
+  syncFirstConnectMerge?: ReturnType<typeof createFirstConnectMerge>;
+  syncHasContent?: typeof hasSyncContent;
+  qcNormalizeDuplicateRunIds?: ReturnType<typeof createRunIdNormalizer>;
+  qcNormalizePointLots?: ReturnType<typeof createPointLotNormalizer>;
+  qcLotLineage?: typeof qcLotLineage;
+  qcLevelConfig?: typeof qcLevelConfig;
+  qcOperationalAccess?: ReturnType<typeof createQcOperationalAccess>;
+  qcParallelLotLookup?: ReturnType<typeof createParallelLotLookup>;
+  westgardWorkerJobBuilder?: ReturnType<typeof createWestgardWorkerJob>;
+  westgardWorkerRevisionService?: ReturnType<typeof createWestgardWorkerRevisionService>;
+  westgardWorkerHydrate?: typeof hydrateWestgardWorkerResultTs;
+  westgardWorkerPrewarmPlanner?: ReturnType<typeof createWestgardWorkerPrewarmPlanner>;
+  qcPreviousLotHistory?: typeof previousLotHistory; qcLotGroupLevels?: typeof lotGroupLevels;
+  qcPointCache?: ReturnType<typeof createPointCacheService>;
+  storageSerializePolicy?: ReturnType<typeof createStorageSerializePolicy>;
+  localSaveScheduler?: ReturnType<typeof createSaveScheduler>;
+  storageRetryDelay?: typeof storageRetryDelay;
+  saveDerivedTestIds?: typeof saveDerivedTestIds;
+  planPartitionWrite?: typeof planPartitionWrite;
+  qcValueFormat?: ReturnType<typeof createQcValueFormat>;
+  qcStaffIdentity?: ReturnType<typeof createQcStaffIdentity>;
+  qcDateFormat?: ReturnType<typeof createQcDateFormat>;
+  qcLotTargetHistory?: ReturnType<typeof createLotTargetHistory>;
+  teaAnalyteMetaService?: ReturnType<typeof createTeaAnalyteMeta>;
+  qcLevelReconciliation?: ReturnType<typeof createQcLevelReconciliation>;
+  qcRangeLimitRepair?: ReturnType<typeof createRangeLimitRepair>;
+  derivedCacheInvalidation?: ReturnType<typeof createDerivedCacheInvalidation>;
+  qcConfigurationRelations?: typeof reconcileConfigurationRelations;
+  qcTestConfiguration?: typeof normalizeTestConfiguration;
+  qcStateFoundation?: typeof normalizeStateFoundation;
+  qcStateLifecycle?: typeof normalizeStateLifecycle;
+  csvDownload?: ReturnType<typeof createCsvDownload>;
+  cssTokenPixel?: typeof cssTokenPixel;
+  blobDownload?: ReturnType<typeof createBlobDownload>;
+  qcReportCsvRows?: ReturnType<typeof createQcReportCsvRows>;
+  nceCsvRow?: ReturnType<typeof createActionCsvRow>;
+  sigmaCanvasFactory?: ReturnType<typeof createSigmaCanvas>;
+  qcBasicFormat?: ReturnType<typeof createBasicFormat>;
+  westgardRulePolicy?: ReturnType<typeof createWestgardRulePolicy>;
+  westgardMemoCache?: ReturnType<typeof createWestgardMemoCache>;
+  qcCusumMemoCache?: ReturnType<typeof createCusumMemoCache>;
+  qcAcceptedMemoCache?: ReturnType<typeof createAcceptedMemoCache>;
+  westgardRuleSettings?: ReturnType<typeof createWestgardRuleSettings>;
+  qcRangeCandidateService?: ReturnType<typeof createRangeCandidateService>;
+  qcRangeSafetyGate?: typeof rangeSafetyGate;
+  csvCellService?: typeof csvCellTs;
+  reportExportHelpers?: typeof reportExportHelpers;
+  actionReportSummary?: ReturnType<typeof createActionReportSummary>;
+  actionReportModel?: ReturnType<typeof createActionReportModel>;
+  sigmaReportMetricService?: typeof sigmaReportMetricTs;
+  sigmaMdcItemsService?: typeof sigmaMdcItemsTs;
+  sigmaMdcLabelPlacementService?: typeof sigmaMdcLabelPlacementsTs;
+  sigmaExportPixelRatioService?: typeof sigmaExportPixelRatioTs;
+  sigmaReportRowsService?: ReturnType<typeof createSigmaReportRows>;
+  qcReportRowsService?: ReturnType<typeof createQcReportRows>;
+  qcReportContext?: ReturnType<typeof createQcReportContext>;
+  sigmaDataUrlBytes?: typeof dataUrlBytes;
+  sigmaExportMetaService?: ReturnType<typeof createSigmaExportMeta>;
+  exportMetaRowsService?: ReturnType<typeof createExportMetaRows>;
+  qcExportValueFormat?: ReturnType<typeof createQcExportValueFormat>;
+  sigmaCanvasFont?: ReturnType<typeof createCanvasFont>;
+  reportLabels?: ReturnType<typeof createReportLabels>;
+  reportSelection?: ReturnType<typeof createReportSelection>;
+  reportSearch?: ReturnType<typeof createReportSearch>;
+  sigmaMuTraceService?: ReturnType<typeof createSigmaMuTrace>;
+  sigmaPrintRowsService?: ReturnType<typeof createSigmaPrintRows>;
+  sigmaMuPrintRowsService?: ReturnType<typeof createSigmaMuPrintRows>;
+  reportPointsTableService?: ReturnType<typeof createReportPointsTable>;
+  actionReportHtml?: ReturnType<typeof createActionReportHtml>;
+  sigmaDraftService?: ReturnType<typeof createSigmaDraftService>;
+  stateAdoptionService?: ReturnType<typeof createStateAdoptionService>;
+  corruptLocalQuarantine?: ReturnType<typeof createCorruptLocalQuarantine>;
+  syncValueCodec?: ReturnType<typeof createSyncValueCodec>;
+  firebaseConfigSelection?: ReturnType<typeof createFirebaseConfigSelection>;
+  firebaseConnectionGate?: ReturnType<typeof createFirebaseConnectionGate>;
+  syncSnapshotSignature?: typeof syncSnapshotSignature;
+  firebaseIdentity?: ReturnType<typeof createFirebaseIdentity>;
+  firebaseAuditGate?: ReturnType<typeof createFirebaseAuditGate>;
+  firebasePollingService?: ReturnType<typeof createFirebasePollingService>;
+  firebaseDisconnectedState?: typeof firebaseDisconnectedState;
+  firebaseCanPull?: typeof firebaseCanPull;
+  firebasePullService?: ReturnType<typeof createFirebasePullService>;
+  firebaseMergeApplication?: ReturnType<typeof createFirebaseMergeApplication>;
+  localPartitionHelpers?: ReturnType<typeof createLocalPartitionHelpers>;
+  localSnapshotRecord?: ReturnType<typeof createLocalSnapshotRecord>;
+  localPartitionValid?: typeof localPartitionValid;
+  localRecoverySlots?: typeof localRecoverySlots;
+  localPartitionTransaction?: ReturnType<typeof createLocalPartitionTransaction>;
+  localPartitionRecovery?: ReturnType<typeof createLocalPartitionRecovery>;
+  localClearKeys?: ReturnType<typeof createLocalClearKeys>;
+  firebaseSnapshotGate?: typeof firebaseSnapshotGate;
+  firebaseEmptySnapshotPlan?: typeof firebaseEmptySnapshotPlan;
+  firebaseRemoteSnapshot?: ReturnType<typeof createFirebaseRemoteSnapshot>;
+  firebaseOwnSnapshotPlan?: typeof firebaseOwnSnapshotPlan;
+  firebaseFirstConnectPlan?: typeof firebaseFirstConnectPlan;
 };
 
 const root = globalThis as QCLabGlobal;
@@ -216,6 +464,127 @@ installUiState(root, 'SigmaUIState', createSigmaUiState());
 // Adapter tạm thời: caller cũ tiếp tục dùng global trong lúc nguồn nghiệp vụ
 // đã được chuyển sang ES Modules có kiểu dữ liệu và dependency rõ ràng.
 root.ChartViewModel = chartViewModel;
+root.qcPointRunNumber = qcPointRunNumber;
+root.qcCusumConfig = qcCusumConfig;
+root.normalizeSearchText = normalizeSearchText;
+root.qcLevelTargetValid = qcLevelTargetValid;
+root.qcLotMeanSd = qcLotMeanSd; root.qcLotTargetSnapshot = qcLotTargetSnapshot;
+root.reportLevelStatsService = createReportLevelStats(root.QCCore.stats);
+root.qcErrorDetail = createQcErrorDetail({ errorType: (rules: string[]) => (root.QCCore as any).errorType(rules), primaryRule: (rules: string[]) => (root.QCCore as any).primaryErrorRule(rules), descriptions: (root.QCCore as any).WG_RULE_DESCRIPTIONS });
+root.qcPlannedTarget = qcPlannedTarget;
+root.qcPointVoidVerdict = createQcPointVoidVerdict({
+  configuredLot: (test, level) => ((root as any).lvlCfg(test, level) || {}).lot || '',
+  activeVerdict: (test, pointId) => (root as any).activeWestgard(test).byPoint.get(pointId),
+  parallelVerdict: (test, input, pointId) => (root as any).parallelWestgard(test, input).byPoint.get(pointId),
+});
+root.qcLotGroupOperational = qcLotGroupOperational;
+root.qcDerivedIndex = createQcDerivedIndex({ operationalGroup: qcLotGroupOperational, switchesLot: transition => (root as any).transitionSwitchesLot(transition) });
+root.qcAcceptedLotPoints = createAcceptedLotPoints({ pointTarget: (root.QCCore as any).pointTarget, latestRules: (root.QCCore as any).westgardLatestRulesFromZ });
+root.qcActiveWestgard = createActiveWestgard({ single: (root.QCCore as any).westgardByPoint, multi: (root.QCCore as any).westgardMultiByPoint });
+root.qcCusumSeries = createCusumSeries((root.QCCore as any).cusumMovingAverage);
+root.qcParallelWestgard = createParallelWestgard((root.QCCore as any).westgardByPoint);
+root.qcEntryColumns = createQcEntryColumns({ levels: test => (root as any).operationalLevels(test), parallel: (test, level) => (root as any).parallelLotForLevel(test, level) });
+root.qcEntryColumnPoints = selectEntryColumnPoints;
+root.syncCanon = syncCanon; root.syncedShape = syncedShape; root.syncJsonMap = syncJsonMap;
+root.mergeSyncArray = mergeSyncArray; root.mergeSyncBranch = mergeSyncBranch;
+root.uniqueSyncUsers = uniqueSyncUsers;
+const syncConfig=(root as any).fbSyncMergeConfig;
+if(syncConfig){root.syncSnapshot = createSyncSnapshot(syncConfig.top, syncJsonMap);root.syncStateMerge = createSyncStateMerge(syncConfig);root.syncUpdateBuilder = createSyncUpdateBuilder({...syncConfig,snapshot:root.syncSnapshot});root.syncFirstConnectMerge=createFirstConnectMerge({...syncConfig,merge:root.syncStateMerge,uniqueUsers:uniqueSyncUsers});root.syncHasContent=source=>hasSyncContent(source,syncConfig.contentKeys);}
+root.syncRetryScheduler = createSyncRetryScheduler({setTimeout:(fn,delay)=>globalThis.setTimeout(fn,delay),clearTimeout:timer=>globalThis.clearTimeout(timer)});
+root.qcPreviousLotHistory = previousLotHistory; root.qcLotGroupLevels = lotGroupLevels;
+root.qcPointCache = createPointCacheService(() => state.data || {}, point => (root as any).pointRunNo(point));
+root.qcNormalizeDuplicateRunIds = createRunIdNormalizer(point => (root as any).pointRunNo(point));
+root.qcNormalizePointLots = createPointLotNormalizer({id:()=> (root as any).uid(),today:()=> (root as any).isoToday(),normalizeRuns:source=>root.qcNormalizeDuplicateRunIds?.(source)});
+root.qcLotLineage = qcLotLineage;
+root.qcLevelConfig = qcLevelConfig;
+root.qcOperationalAccess = createQcOperationalAccess({test:(test:any)=>(root as any).isOperationalTest(test),levels:(test:any)=>(root as any).operationalLevels(test),panel:(test:any)=>(root as any).operationalPanelForTest(test),group:(level:any)=>(root as any).operationalLotGroupForLevel(level),activePoints:(test:any,level:any,withIndex:any)=>(root as any).activeLotPoints(test,level,withIndex),display:(test:any)=>(root as any).testDisplayName(test)});
+root.qcParallelLotLookup = createParallelLotLookup({level:qcLevelConfig,panel:(test:any)=>(root as any).operationalPanelForTest(test),transitions:()=>((state as any).lotTransitions||[]),lots:()=>((state as any).qcLots||[]),target:(test:any,level:any,lotId:any,lotNo:any)=>(root as any).lotTargetSnapshot(test,level,lotId,lotNo)});
+root.westgardWorkerJobBuilder = createWestgardWorkerJob({globalRules:()=>((state as any).westgardRules||{}),levels:(test:any)=>(root as any).operationalLevels(test),points:(testId:any)=>(state.data?.[testId]||[])});
+root.westgardWorkerRevisionService = createWestgardWorkerRevisionService();
+root.westgardWorkerHydrate = hydrateWestgardWorkerResultTs;
+root.westgardWorkerPrewarmPlanner = createWestgardWorkerPrewarmPlanner(3000);
+root.storageSerializePolicy = createStorageSerializePolicy(() => typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
+root.localSaveScheduler = createSaveScheduler({setTimeout:(fn:()=>void,delay:number)=>globalThis.setTimeout(fn,delay),clearTimeout:(timer:any)=>globalThis.clearTimeout(timer),cancelIdle:typeof globalThis.cancelIdleCallback==='function'?(handle:any)=>globalThis.cancelIdleCallback(handle):null});
+root.storageRetryDelay = storageRetryDelay;
+root.saveDerivedTestIds = saveDerivedTestIds;
+root.planPartitionWrite = planPartitionWrite;
+root.qcValueFormat = createQcValueFormat();
+root.qcStaffIdentity = createQcStaffIdentity();
+root.qcDateFormat = createQcDateFormat();
+root.qcLotTargetHistory = createLotTargetHistory(() => uid());
+root.teaAnalyteMetaService = createTeaAnalyteMeta(()=>typeof TEA_ANALYTE_CATALOG==='undefined'?[]:TEA_ANALYTE_CATALOG);
+root.qcLevelReconciliation = createQcLevelReconciliation();
+root.qcRangeLimitRepair = createRangeLimitRepair((mean,sd,k)=>(root.QCCore as any).limitsFromTarget(mean,sd,k));
+root.qcConfigurationRelations=reconcileConfigurationRelations;
+root.qcTestConfiguration=normalizeTestConfiguration;
+root.qcStateFoundation=normalizeStateFoundation;
+root.qcStateLifecycle=normalizeStateLifecycle;
+root.csvDownload=createCsvDownload({createBlob:text=>new Blob([text],{type:'text/csv;charset=utf-8'}),createUrl:blob=>URL.createObjectURL(blob),revokeUrl:url=>URL.revokeObjectURL(url),download:(url,name)=>{const anchor=document.createElement('a');anchor.href=url;anchor.download=name;anchor.click();},schedule:(work,delay)=>globalThis.setTimeout(work,delay)});
+root.cssTokenPixel=(token,fallback)=>cssTokenPixel(token,fallback,key=>typeof getComputedStyle==='function'&&typeof document!=='undefined'?getComputedStyle(document.documentElement).getPropertyValue('--'+key):'');
+root.blobDownload=createBlobDownload({createUrl:blob=>URL.createObjectURL(blob),revokeUrl:url=>URL.revokeObjectURL(url),download:(url,name)=>{const anchor=document.createElement('a');anchor.href=url;anchor.download=name;anchor.click();},schedule:(work,delay)=>globalThis.setTimeout(work,delay)});
+root.qcReportCsvRows=createQcReportCsvRows({test:(id:any)=>(state.tests||[]).find((test:any)=>test.id===id),lab:()=>(state as any).lab||{},meta:(kind:any)=>(root as any).exportMetaRows(kind),range:(start:any,end:any)=>(root as any).reportRangeText(start,end),testName:(test:any)=>(root as any).testDisplayName(test),tea:(test:any)=>(root as any).sgTea(test),teaSource:(test:any)=>(root as any).sgTeaSource(test),teaLabel:(source:any)=>(root as any).sgTeaLabel(source),teaReference:(test:any)=>(root as any).sgTeaRefText(test),levels:(test:any)=>(root as any).operationalLevels(test),previous:(test:any,level:any)=>(root as any).previousLotSeries(test,level),rows:(root as any).qcReportRowsService,westgard:(test:any)=>(root as any).activeWestgard(test),staff:(point:any)=>(root as any).pointStaff(point),date:(value:any)=>(root as any).vnDate(value),number:(value:any,decimals?:any)=>(root as any).fmt(value,decimals),state:(value:any)=>(root as any).stateName(value),error:(rules:any)=>(root as any).errorType(rules),stats:(points:any,mean:any,tea:any)=>(root as any).reportLevelStats(points,mean,tea),levelLabel:(test:any,level:any,lot:any)=>(root as any).actionLevelShort(test,level,lot),workflow:(action:any)=>(root as any).actionWorkflowStatus(action),rerun:(action:any)=>(root as any).actionRerunStatus(action),protocol:(action:any)=>(root as any).actionProtocolSummary(action),approval:(action:any)=>(root as any).actionApprovalLabel(action)});
+const legacyDerivedCacheState=(root as any).legacyDerivedCacheState;
+if(legacyDerivedCacheState)root.derivedCacheInvalidation=createDerivedCacheInvalidation({...legacyDerivedCacheState,pointCache:()=>root.qcPointCache,westgardCache:()=>root.westgardMemoCache,acceptedCache:()=>root.qcAcceptedMemoCache,cusumCache:()=>root.qcCusumMemoCache,invalidateWestgardWorker:testId=>(root as any).invalidateWestgardWorker(testId),invalidateActionCaches:testId=>(root as any).invalidateActionCaches(testId)});
+root.qcBasicFormat = createBasicFormat();
+root.westgardRulePolicy=createWestgardRulePolicy({rules:(root.QCCore as any).WG_RULES,enabled:(rule:string)=>(root.QCCore as any).ruleEnabled((state as any).westgardRules,rule),levels:(test:any)=>(root as any).operationalLevels(test),resolveAction:(root.QCCore as any).resolveRuleAction,resolveScope:(root.QCCore as any).resolveRuleScope,onInScope:(root.QCCore as any).ruleOnInScope,verdict:(root.QCCore as any).ruleVerdictLevel});
+root.westgardMemoCache=createWestgardMemoCache();
+root.qcCusumMemoCache=createCusumMemoCache();
+root.qcAcceptedMemoCache=createAcceptedMemoCache();
+root.westgardRuleSettings=createWestgardRuleSettings({defaults:(root.QCCore as any).WG_DEFAULT_ON?Object.fromEntries((root.QCCore as any).WG_RULES.map((rule:string)=>[rule,(root.QCCore as any).WG_DEFAULT_ON.has(rule)])): {},getState:()=>state,ruleEnabled:(rules:any,rule:string)=>(root.QCCore as any).ruleEnabled(rules,rule),requireWrite:()=>requireWrite(),save:()=>save({}),rerender:()=>rerender()});
+root.qcRangeCandidateService=createRangeCandidateService({tests:()=>state.tests||[],actions:()=>((state as any).actions||[]),levelConfig:(test:any,level:any)=>lvlCfg(test,level),points:(test:any,level:any)=>(globalThis as any).operationalLotPoints(test,level),westgard:(test:any)=>(globalThis as any).activeWestgard(test),pointZ:(point:any,mean:any,sd:any)=>(root.QCCore as any).pointZ(point,mean,sd),stats:(values:number[])=>(root.QCCore as any).stats(values),actionCancelled:(action:any)=>typeof (globalThis as any).actionCancelled==='function'&&(globalThis as any).actionCancelled(action),systematicRules:(root.QCCore as any).WG_SE_RULES,limitsFromTarget:(mean:any,sd:any,k:number)=>(root.QCCore as any).limitsFromTarget(mean,sd,k)});
+root.qcRangeSafetyGate=rangeSafetyGate;
+root.csvCellService=csvCellTs;
+root.reportExportHelpers=reportExportHelpers;
+root.actionReportSummary=createActionReportSummary({labels:()=>typeof (globalThis as any).ACTION_LABELS==='object'?(globalThis as any).ACTION_LABELS:{},excerpt:(value:any,max?:number)=>root.reportExportHelpers!.nceExcerpt(value,max)});
+root.actionReportModel=createActionReportModel({labels:()=>typeof (globalThis as any).ACTION_LABELS==='object'?(globalThis as any).ACTION_LABELS:{},rerunStatus:(action:any)=>typeof (globalThis as any).actionRerunStatus==='function'?(globalThis as any).actionRerunStatus(action):{label:''},workflowStatus:(action:any)=>typeof (globalThis as any).actionWorkflowStatus==='function'?(globalThis as any).actionWorkflowStatus(action):{label:'Chưa hoàn tất'},effectivenessStatus:(action:any)=>typeof (globalThis as any).actionEffectivenessStatus==='function'?(globalThis as any).actionEffectivenessStatus(action):{label:'Chưa đánh giá'},riskScore:(action:any)=>typeof (globalThis as any).actionRiskScore==='function'?(globalThis as any).actionRiskScore(action):0,residualRiskScore:(action:any)=>typeof (globalThis as any).actionResidualRiskScore==='function'?(globalThis as any).actionResidualRiskScore(action):0,eventDate:(action:any)=>typeof (globalThis as any).actionEventDate==='function'?(globalThis as any).actionEventDate(action):action.date,approvalLabel:(action:any)=>typeof (globalThis as any).actionApprovalLabel==='function'?(globalThis as any).actionApprovalLabel(action):(action.approvalStatus||'Chờ duyệt'),pointValue:(point:any,test:any)=>(globalThis as any).dataIoQcPoint(point,test),formatDate:(value:any)=>vnDate(value),formatDateTime:(value:any)=>formatDateTimeVN(value),testName:(test:any)=>(globalThis as any).testDisplayName(test),levelShort:(test:any,level:any,lot:any)=>(globalThis as any).actionLevelShort(test,level,lot)});
+root.nceCsvRow=createActionCsvRow({test:(id:any)=>(state.tests||[]).find((test:any)=>test.id===id),workflow:(action:any)=>(root as any).actionWorkflowStatus(action),rerun:(action:any)=>(root as any).actionRerunStatus(action),labels:()=>((globalThis as any).ACTION_LABELS||{}),date:(value:any)=>(root as any).vnDate(value),dateTime:(value:any)=>(root as any).formatDateTimeVN(value),eventDate:(action:any)=>(root as any).actionEventDate(action),testName:(test:any)=>(root as any).testDisplayName(test),level:(test:any,level:any,lot:any)=>(root as any).actionLevelShort(test,level,lot),protocol:(action:any)=>(root as any).actionProtocolSummary(action),risk:(action:any)=>(root as any).actionRiskScore(action),residualRisk:(action:any)=>(root as any).actionResidualRiskScore(action),approval:(action:any)=>(root as any).actionApprovalLabel(action)});
+root.sigmaCanvasFactory=createSigmaCanvas({scale:(width,height,value)=>(root as any).sigmaExportPixelRatio(width,height,value),create:()=>document.createElement('canvas')});
+root.sigmaReportMetricService=sigmaReportMetricTs;
+root.sigmaMdcItemsService=(rows:any[])=>(sigmaMdcItemsTs(rows,(globalThis as any).sigmaLevelsOf));
+root.sigmaMdcLabelPlacementService=(items:any[],X:any,Y:any,ctx:any,bounds:any)=>sigmaMdcLabelPlacementsTs(items,X,Y,ctx,bounds,(globalThis as any).sigmaMdcPeriodLabel);
+root.sigmaExportPixelRatioService=sigmaExportPixelRatioTs;
+root.sigmaReportRowsService=createSigmaReportRows({trackedTests:()=>typeof (globalThis as any).sgTrackedTests==='function'?(globalThis as any).sgTrackedTests():[],visibleLevels:(test:any)=>typeof (globalThis as any).sgVisibleLevels==='function'?(globalThis as any).sgVisibleLevels(test):(test.levels||[]).map((level:any)=>level.level),rows:(test:any,data:any,levels:any[])=>(globalThis as any).sgRows(test,data,levels),data:(id:any)=>(globalThis as any).sgData(id),teaSource:(test:any)=>typeof (globalThis as any).sgTeaSource==='function'?(globalThis as any).sgTeaSource(test):(test.teaSource||'ricos'),entryTea:(test:any,entry:any)=>typeof (globalThis as any).sgEntryTea==='function'?(globalThis as any).sgEntryTea(test,entry):(globalThis as any).sgTea(test),testName:(test:any)=>(globalThis as any).testDisplayName(test),periodLabel:(value:any)=>(globalThis as any).vnPeriod(value),metric:(value:any)=>root.sigmaReportMetricService!(value),teaMeta:(test:any,source:any)=>typeof (globalThis as any).sgTeaSourceMeta==='function'?(globalThis as any).sgTeaSourceMeta(test,source):{},teaLabel:(source:any)=>typeof (globalThis as any).sgTeaLabel==='function'?(globalThis as any).sgTeaLabel(source):source,teaReference:(test:any)=>typeof (globalThis as any).sgTeaRefText==='function'?(globalThis as any).sgTeaRefText(test):''});
+root.qcReportRowsService=createQcReportRows({westgardByPoint:(points:any[],mean:any,sd:any,on:any)=>(root.QCCore as any).westgardByPoint(points,mean,sd,on),ruleOnWithin:(test:any,rule:any)=>(globalThis as any).testRuleOnWithin(test,rule),resultLevel:(test:any,rules:any[])=>(globalThis as any).ruleResultLevel(test,rules),points:(test:any,level:any)=>(globalThis as any).operationalLotPoints(test,level),actions:()=>((state as any).actions||[]),eventDate:(action:any)=>typeof (globalThis as any).actionEventDate==='function'?(globalThis as any).actionEventDate(action):action.date});
+root.qcReportContext=createQcReportContext({tea:(test:any)=>typeof (globalThis as any).sgTea==='function'?(globalThis as any).sgTea(test):(test.tea||0),teaSource:(test:any)=>typeof (globalThis as any).sgTeaSource==='function'?(globalThis as any).sgTeaSource(test):'',teaLabel:(source:any)=>typeof (globalThis as any).sgTeaLabel==='function'?(globalThis as any).sgTeaLabel(source):'Ricos / Westgard biological variation',levels:(test:any)=>(globalThis as any).operationalLevels(test),points:(test:any,level:any)=>(globalThis as any).operationalLotPoints(test,level)});
+root.sigmaDataUrlBytes=(value:string)=>dataUrlBytes(value,encoded=>atob(encoded));
+root.sigmaExportMetaService=createSigmaExportMeta({app:()=>typeof window!=='undefined'?(window as any).QCLAB_APP||{}:{},rules:()=>((state as any).westgardRules||{}),formatDate:(value:any)=>vnDate(value),periodLabel:(value:any)=>(globalThis as any).sigmaPeriodLabel(value)});
+root.exportMetaRowsService=createExportMetaRows({app:()=>typeof window!=='undefined'?(window as any).QCLAB_APP||{version:'dev'}:{version:'dev'},rules:()=>((state as any).westgardRules||{}),userName:()=>userName(),formatDateTime:(value:any)=>formatDateTimeVN(value),now:()=>new Date().toISOString()});
+root.qcExportValueFormat=createQcExportValueFormat({testValue:(test:any,value:any,number:any)=>typeof (globalThis as any).fmtTestValue==='function'?(globalThis as any).fmtTestValue(test,value):number(value,3),testStat:(test:any,value:any,number:any)=>typeof (globalThis as any).fmtTestStat==='function'?(globalThis as any).fmtTestStat(test,value):number(value,3),pointValue:(point:any,test:any,number:any)=>typeof (globalThis as any).fmtPointValue==='function'?(globalThis as any).fmtPointValue(point,test):number(point&&point.val,Math.max(2,Number(point&&point.valueDecimals)||0)),number:(value:any,decimals:any)=>fmt(value,decimals)});
+root.sigmaCanvasFont=createCanvasFont((token:string,fallback:number)=>{if(typeof getComputedStyle==='function'&&typeof document!=='undefined'){const value=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--'+token));if(Number.isFinite(value))return value;}return fallback;});
+root.reportLabels=createReportLabels((value:any)=>vnDate(value));
+root.reportSelection=createReportSelection();
+root.reportSearch=createReportSearch();
+root.sigmaMuTraceService=createSigmaMuTrace({escape:(value:any)=>typeof (globalThis as any).esc==='function'?(globalThis as any).esc(value):String(value??''),formatDate:(value:any)=>vnDate(value)});
+root.sigmaPrintRowsService=createSigmaPrintRows({escape:(value:any)=>typeof (globalThis as any).esc==='function'?(globalThis as any).esc(value):String(value??''),escapeAttr:(value:any)=>typeof (globalThis as any).escAttr==='function'?(globalThis as any).escAttr(value):String(value??''),format:(value:any,decimals?:number)=>fmt(value,decimals),dpmo:(value:any)=>(globalThis as any).sgFmtDPMO(value),period:(value:any)=>typeof (globalThis as any).vnPeriod==='function'?(globalThis as any).vnPeriod(value):String(value??'')});
+root.sigmaMuPrintRowsService=createSigmaMuPrintRows({mu:(test:any,entry:any,level:any)=>typeof (globalThis as any).sgMU==='function'?(globalThis as any).sgMU(test,entry,level):undefined,format:(value:any,decimals?:number)=>fmt(value,decimals),escape:(value:any)=>typeof (globalThis as any).esc==='function'?(globalThis as any).esc(value):String(value??''),period:(value:any)=>typeof (globalThis as any).vnPeriod==='function'?(globalThis as any).vnPeriod(value):String(value??'')});
+root.reportPointsTableService=createReportPointsTable({formatDate:(value:any)=>vnDate(value),escape:(value:any)=>typeof (globalThis as any).esc==='function'?(globalThis as any).esc(value):String(value??''),pointValue:(point:any,test:any)=>typeof (globalThis as any).reportQcPoint==='function'?(globalThis as any).reportQcPoint(point,test):fmt(point&&point.val,3),format:(value:any,decimals?:number)=>fmt(value,decimals),verdict:(value:any)=>typeof (globalThis as any).qcVerdictLabel==='function'?(globalThis as any).qcVerdictLabel(value):String(value??''),staff:(point:any)=>typeof (globalThis as any).pointStaff==='function'?(globalThis as any).pointStaff(point):{}});
+root.actionReportHtml=createActionReportHtml((value:any)=>typeof (globalThis as any).esc==='function'?(globalThis as any).esc(value):String(value??''));
+root.sigmaDraftService=createSigmaDraftService({get:(key:string)=>localStorage.getItem(key),set:(key:string,value:string)=>localStorage.setItem(key,value),remove:(key:string)=>localStorage.removeItem(key),now:()=>Date.now(),clone:(value:any)=>JSON.parse(JSON.stringify(value)),key:'qclab_sigma_draft',savedAtKey:'qclab_saved_at'});
+root.stateAdoptionService=createStateAdoptionService({validate:(value:any)=>(root.QCCore as any).validateBackup(value),sanitize:(value:any,options:any)=>(root.QCCore as any).sanitizeBackup(value,options),invariants:(value:any,options:any)=>(root.QCCore as any).validateStateInvariants(value,options)});
+root.corruptLocalQuarantine=createCorruptLocalQuarantine(()=>new Date().toISOString());
+root.syncValueCodec=createSyncValueCodec();
+root.firebaseConfigSelection=createFirebaseConfigSelection(['apiKey','authDomain','databaseURL','projectId','appId']);
+root.firebaseConnectionGate=createFirebaseConnectionGate();
+root.syncSnapshotSignature=syncSnapshotSignature;
+root.firebaseIdentity=createFirebaseIdentity();
+root.firebaseAuditGate=createFirebaseAuditGate((entries:any[],anchor:string)=>(root.QCCore as any).verifyAuditChain(entries,anchor));
+root.firebasePollingService=createFirebasePollingService({setInterval:(fn:()=>void,ms:number)=>globalThis.setInterval(fn,ms),clearInterval:(timer:any)=>globalThis.clearInterval(timer)});
+root.firebaseDisconnectedState=firebaseDisconnectedState;
+root.firebaseCanPull=firebaseCanPull;
+root.firebasePullService=createFirebasePullService({read:(ref:any)=>ref.once('value'),handle:(value:any,options:any)=>(globalThis as any).fbHandleValue(value,options),canPull:firebaseCanPull});
+root.firebaseMergeApplication=createFirebaseMergeApplication({merge:(local:any,remote:any,base:any)=>(globalThis as any).fbMerge(local,remote,base),firstMerge:(local:any,remote:any)=>(globalThis as any).fbFirstConnectMerge(local,remote)});
+root.localPartitionHelpers=createLocalPartitionHelpers();
+root.localSnapshotRecord=createLocalSnapshotRecord({clone:(value:any)=>typeof structuredClone==='function'?structuredClone(value):JSON.parse(JSON.stringify(value)),now:()=>Date.now(),key:'state'});
+root.localPartitionValid=localPartitionValid;
+root.localRecoverySlots=localRecoverySlots;
+root.localPartitionTransaction=createLocalPartitionTransaction({nextSlot:(value:any)=>root.localPartitionHelpers!.nextSlot(value),shell:(value:any)=>root.localPartitionHelpers!.shell(value),now:()=>Date.now()});
+root.localPartitionRecovery=createLocalPartitionRecovery(localPartitionValid);
+root.localClearKeys=createLocalClearKeys((slot:any,type:any,id?:any)=>root.localPartitionHelpers!.key(slot,type,id),'state');
+root.firebaseSnapshotGate=firebaseSnapshotGate;
+root.firebaseEmptySnapshotPlan=firebaseEmptySnapshotPlan;
+root.firebaseRemoteSnapshot=createFirebaseRemoteSnapshot((value:any)=>(root.QCCore as any).validateBackup(value),(value:any)=>(root.QCCore as any).sanitizeBackup(value));
+root.firebaseOwnSnapshotPlan=firebaseOwnSnapshotPlan;
+root.firebaseFirstConnectPlan=firebaseFirstConnectPlan;
 root.SigmaPresentation = sigmaPresentation;
 root.SigmaPeriodViewModel = createSigmaPeriodViewModel({
   sigmaMetric: (tea, bias, cv) => (root.QCCore as any).sigmaMetric(tea, bias, cv),
@@ -386,6 +755,32 @@ root.qcPointWarnings = (test, config, date, runId, value) => qcPointWarnings(
   (state.data && state.data[test.id]) || [], config, date, runId, value,
 );
 root.PeriodService = createPeriodService({ cleanText: root.QCCore.cleanText });
+root.AuditService = createAuditService({
+  getState: () => state as { activity?: Record<string, any>[]; activityAnchor?: string },
+  uid: () => typeof (root as any).uid === 'function' ? (root as any).uid() : '', nowIso: () => new Date().toISOString(),
+  actor: () => typeof (root as any).auditActor === 'function'
+    ? (root as any).auditActor() : { user: '', username: '', userId: '', role: '', clientId: '' },
+  entryHash: entry => typeof (root as any).auditEntryHash === 'function' ? (root as any).auditEntryHash(entry) : '',
+  verifyChain: (activity, anchor) => typeof (root as any).auditVerifyChain === 'function'
+    ? (root as any).auditVerifyChain(activity, anchor) : { ok: true, checked: 0, legacy: 0 },
+  limits: () => {
+    const config = typeof (root as any).auditRuntimeConfig === 'function'
+      ? (root as any).auditRuntimeConfig() : { hardCap: 50000, rotateTo: 40000 };
+    return { hardCap: config.hardCap, rotateTo: config.rotateTo };
+  },
+  autoVerifyMax: typeof (root as any).auditRuntimeConfig === 'function' ? (root as any).auditRuntimeConfig().autoVerifyMax : 5000,
+});
+root.ActionRerunService = createActionRerunService({
+  pointsFor: testId => state.data?.[testId], testFor: testId => state.tests?.find(test => test.id === testId),
+  runNumber: point => (root as any).pointRunNo(point),
+  lotPoints: (points, level, lot, runNumber) => root.NceActionQcIndex!.actionLotPoints(points, level, lot, runNumber),
+  pointIndex: points => root.NceActionQcIndex!.actionPointIndex(points),
+  needsRerun: action => (root as any).actionNeedsRerun(action), gateDate: (action, point) => (root as any).actionRerunGateDate(action, point),
+  evaluate: input => root.NceActionRerunEvaluator!.evaluateActionRerun(input),
+  verdictFor: (test, pointId) => ((root as any).activeWestgard(test).byPoint.get(pointId) || { level: 'ok' }),
+  formatValue: (point, test) => (root as any).fmtPointValue(point, test), formatDate: value => vnDate(value),
+});
+root.ActionPointIndexService = createActionPointIndexService(() => (state as any).actions || []);
 root.EntryService = createEntryService({
   cleanText: root.QCCore.cleanText,
   cleanId: root.QCCore.cleanId,

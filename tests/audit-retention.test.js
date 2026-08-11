@@ -14,6 +14,8 @@ run(ctx, `
 `);
 const auditCode = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'audit.js'), 'utf8');
 vm.runInContext(auditCode, ctx, { filename: 'modules/audit.js' });
+vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'assets', 'generated', 'modular-pilot.js'), 'utf8'), ctx, { filename: 'generated/modular-pilot.js' });
+run(ctx, `currentUser={id:'u1',username:'admin',name:'Admin',role:'admin'};`);
 
 /* auditArchiveCut: tách đúng phần cũ hơn cutoff, dòng thiếu ts được giữ lại,
    tipHash là hash cuối cùng của phần bị cắt. */

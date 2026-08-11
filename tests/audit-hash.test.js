@@ -14,6 +14,8 @@ run(ctx, `
 `);
 const auditCode = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'audit.js'), 'utf8');
 vm.runInContext(auditCode, ctx, { filename: 'modules/audit.js' });
+vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'assets', 'generated', 'modular-pilot.js'), 'utf8'), ctx, { filename: 'generated/modular-pilot.js' });
+run(ctx, `currentUser={id:'u1',username:'admin',name:'Admin',role:'admin'};`);
 
 assert.equal(ctx.auditSha256('abc'), 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
 

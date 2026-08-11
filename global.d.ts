@@ -36,7 +36,7 @@ declare var AnalysisUIState: any, AuthUIState: any, EntryUIState: any, ManageUIS
 // --- Service / view-model namespaces (`root.Foo = {...}`) ---
 declare var EntryService: any, PeriodService: any, ReagentComparisonService: any, ChartViewModel: any,
   SigmaCohortService: any, SigmaPresentation: any, SigmaPeriodViewModel: any, SigmaBiasService: any, SigmaCohortImportService: any, SigmaPeriodRecordService: any, SigmaLevelEditService: any, SigmaTrackedTestService: any, SigmaBiasWorkflowService: any, SigmaMuWorkflowService: any, SigmaCohortSelectionService: any, SigmaTeaEditService: any, SigmaTeaSnapshotService: any, SigmaLevelSelectionService: any, SigmaPeriodSelectionService: any, WestgardViewModel: any, ActionWorkflowService: any, ActionReviewService: any, ActionEscalationService: any, ActionRecordService: any, ActionBiasService: any, ActionBiasPresentation: any, ActionViolationService: any, ActionListPresentation: any, ActionEvidencePresentation: any, ActionRerunEvidencePresentation: any, ActionStatusPresentation: any, ActionReviewPresentation: any, ActionDetailPresentation: any, ActionGuidePresentation: any, ReportPeriodPresentation: any, ManageConfigService: any, LotTransitionPickerService: any,
-  qcPointWarnings: any;
+  qcPointWarnings: any, AuditService: any, ActionRerunService: any, ActionPointIndexService: any;
 declare var LISClientService: any, lisGatewayRuntime: any, LIS_GATEWAY_STORAGE_KEY: any, LIS_POLL_MS: any,
   lisGatewayConfig: any, lisNormalizeGatewayUrl: any, lisGatewaySetStatus: any, lisGatewayStatusText: any,
   lisGatewayFetch: any, lisGatewayHealth: any, lisGatewayPull: any, lisResultToPointInput: any,
@@ -51,10 +51,39 @@ declare var actionApprovalStatus: any, actionRecordStatus: any, actionCancelled:
   actionPoint: any, actionEventDate: any, actionNeedsRerun: any, actionRerunStatus: any, actionWorkflowStatus: any,
   actionDraftStatus: any, actionProtocolStatus: any, actionProtocolSummary: any, actionRiskScore: any, actionResidualRiskScore: any, actionActiveFollowUp: any, actionEffectivenessStatus: any,
   ACTION_LABELS: any, RISK_SCALE: any, invalidateActionCaches: any, nextNceId: any, nceDueDate: any, actionOverdue: any,
-  pointActions: any, pointRealActions: any, pointWorkflowComplete: any, pointWorkflowSummary: any;
+  actionRerunGateDate: any, pointActions: any, pointRealActions: any, pointWorkflowComplete: any, pointWorkflowSummary: any;
 
 // core.js (UMD) exposes itself as window.QCCore; referenced bare everywhere else
 declare var QCCore: any;
+declare var qcPointRunNumber: any;
+declare var qcCusumConfig: any;
+declare var normalizeSearchText: any;
+declare var qcLevelTargetValid: any;
+declare var qcLotMeanSd: any, qcLotTargetSnapshot: any;
+declare var reportLevelStatsService: any;
+declare var qcErrorDetail: any;
+declare var qcPlannedTarget: any;
+declare var qcPointVoidVerdict: any;
+declare var qcLotGroupOperational: any;
+declare var qcDerivedIndex: any;
+declare var qcAcceptedLotPoints: any;
+declare var qcCusumSeries: any;
+declare var qcEntryColumns: any;
+declare var syncStateMerge: any;
+declare var syncUpdateBuilder: any;
+declare var syncSnapshot: any;
+declare var syncRetryScheduler: any;
+declare var syncFirstConnectMerge: any, syncHasContent: any;
+declare var qcNormalizeDuplicateRunIds: any;
+declare var qcNormalizePointLots: any;
+declare var qcLotLineage: any;
+declare var qcLevelConfig: any, qcOperationalAccess: any;
+declare var qcParallelLotLookup: any;
+declare var westgardWorkerJobBuilder: any;
+declare var westgardWorkerRevisionService: any;
+declare var westgardWorkerHydrate: any;
+declare var westgardWorkerPrewarmPlanner: any;
+declare var planPartitionWrite: any;
 
 // Firebase compat SDK, loaded from CDN <script> tags in index.html (no @types installed)
 declare var firebase: any;

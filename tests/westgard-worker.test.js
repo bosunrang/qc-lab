@@ -93,9 +93,13 @@ const state = {
   sigmaData: {}, periodLocks: [], teaRefs: [], westgardRules: job.globalRules, configMigrationVersion: 1,
 };
 
-const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js']);
+const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'generated/modular-pilot.js']);
 ctx.__state = state;
 ctx.__message = result;
+assert.equal(run(ctx, 'typeof westgardWorkerJobBuilder'), 'function', 'payload Worker phải được tạo qua artifact TypeScript');
+assert.equal(run(ctx, 'typeof westgardWorkerRevisionService'), 'object', 'revision Worker phải được quản lý qua artifact TypeScript');
+assert.equal(run(ctx, 'typeof westgardWorkerHydrate'), 'function', 'hydrate Worker phải được xử lý qua artifact TypeScript');
+assert.equal(run(ctx, 'typeof westgardWorkerPrewarmPlanner'), 'object', 'prewarm Worker phải được lập kế hoạch qua artifact TypeScript');
 const hydrated = run(ctx, `state=__state;clearDerived();wgWorkerGeneration=7;hydrateWestgardWorkerResult(__message)`);
 assert.equal(hydrated, true);
 assert.equal(run(ctx, `activeWestgard(state.tests[0]).byPoint.get('p1').rules.includes('R4s')`), true);

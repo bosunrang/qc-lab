@@ -1,0 +1,1 @@
+export function createSaveScheduler(api:any){let timeout:any=null,idle:any=null;const cancel=()=>{api.clearTimeout(timeout);timeout=null;if(idle!==null&&api.cancelIdle)api.cancelIdle(idle);idle=null};return{cancel,schedule:(delay:number,run:()=>void)=>{cancel();timeout=api.setTimeout(run,delay)}}}

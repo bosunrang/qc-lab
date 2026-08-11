@@ -1,0 +1,1 @@
+export function dataUrlBytes(dataUrl:string,decode:(value:string)=>string){const base64=dataUrl.split(',')[1]||'',binary=decode(base64),bytes=new Uint8Array(binary.length);for(let index=0;index<binary.length;index++)bytes[index]=binary.charCodeAt(index);return bytes;}

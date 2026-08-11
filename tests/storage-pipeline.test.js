@@ -107,7 +107,7 @@ assert.deepEqual(value.removed, ['qclab', 'qclab_saved_at'], 'stale local snapsh
     };
     indexedDB={open:function(){var req={result:__db};Promise.resolve().then(function(){if(req.onupgradeneeded)req.onupgradeneeded();if(req.onsuccess)req.onsuccess();});return req;}};
   `;
-  const rotateCtx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'modules/local-store.js', 'modules/state-storage.js']);
+  const rotateCtx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'modules/local-store.js', 'modules/state-storage.js', 'generated/modular-pilot.js']);
   const rotation = await run(rotateCtx, `(async function(){
     ${fakeIndexedDb}
     localStorage={getItem:function(){return null;},setItem:function(){},removeItem:function(){}};

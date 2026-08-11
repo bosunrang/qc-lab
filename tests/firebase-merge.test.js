@@ -31,6 +31,9 @@ function baseState(overrides = {}) {
 // (in this file's realm) before doing structural asserts, otherwise deepEqual
 // fails on cross-realm Array/Object prototypes.
 const plain = (v) => JSON.parse(JSON.stringify(v));
+assert.equal(typeof ctx.syncStateMerge, 'function', 'bộ trộn state Firebase phải dùng artifact TypeScript');
+assert.equal(typeof ctx.syncFirstConnectMerge, 'function', 'bộ trộn kết nối Firebase lần đầu phải dùng artifact TypeScript');
+assert.equal(typeof ctx.syncHasContent, 'function', 'kiểm tra dữ liệu cục bộ Firebase phải dùng artifact TypeScript');
 
 // --- Scenario 1: two machines edit different top-level branches concurrently -> both survive ---
 {

@@ -1,0 +1,1 @@
+export function createWestgardMemoCache(){const cache=new Map<string,any>();return{get:(id:unknown)=>cache.get(String(id||'')),set:(id:unknown,value:any)=>cache.set(String(id||''),value),clear:(id?:unknown)=>id==null?cache.clear():cache.delete(String(id||''))};}

@@ -13,14 +13,14 @@
    action-workflow-service.js đã bỏ qua chúng khi tính có NCE thật cho một điểm QC
    hay không. rule lưu dạng chuỗi có thể ghép nhiều luật ("2-2s, 8x") nên phải
    tách theo dấu phẩy trước khi so với WG_SE_RULES. */
-function rangeSystematicNce(tid,level){
+function rangeSystematicNce(tid,level){if(globalThis.qcRangeCandidateService)return globalThis.qcRangeCandidateService.systematicNce(tid,level);
   const matches=(state.actions||[]).filter(a=>a.testId===tid&&+a.level===+level&&!actionCancelled(a)&&String(a.rule||'').split(',').map(s=>s.trim()).some(r=>QCCore.WG_SE_RULES.includes(r)));
   if(!matches.length)return null;
   return matches.slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')))[0];
 }
-function rangeCandidate(tid,level){const t=state.tests.find(x=>x.id===tid),l=t&&lvlCfg(t,level);if(!t||!l)return{t,l,pts:[],wg:{F:[],zs:[]},c:null,days:0,bad:0,warn:0,eligible:false,nce:null};
+function rangeCandidate(tid,level){if(globalThis.qcRangeCandidateService)return globalThis.qcRangeCandidateService.candidate(tid,level);const t=state.tests.find(x=>x.id===tid),l=t&&lvlCfg(t,level);if(!t||!l)return{t,l,pts:[],wg:{F:[],zs:[]},c:null,days:0,bad:0,warn:0,eligible:false,nce:null};
   const pts=operationalLotPoints(t,level),allWG=activeWestgard(t),F=pts.map(p=>allWG.byPoint.get(p.id)||{level:'ok',rules:[]}),zs=pts.map(p=>QCCore.pointZ(p,l.mean,l.sd)),wg={F,zs},c=stats(pts.map(p=>p.val)),days=new Set(pts.map(p=>p.date)).size,bad=F.filter(f=>f.level==='rej').length,warn=F.filter(f=>f.level==='warn').length,eligible=!!(c&&c.n>=20&&days>=20&&bad===0&&warn===0&&c.sd>0),nce=rangeSystematicNce(tid,level);return{t,l,pts,wg,c,days,bad,warn,eligible,nce};}
-function assignRangeTarget(levelCfg,mean,sd,source){const next=QCCore.limitsFromTarget(mean,sd,2);if(!levelCfg||!next)return false;Object.assign(levelCfg,{mean:next.mean,sd:next.sd,low:next.low,high:next.high,rangeK:2,applied:source});return true;}
+function assignRangeTarget(levelCfg,mean,sd,source){if(globalThis.qcRangeCandidateService)return globalThis.qcRangeCandidateService.assignTarget(levelCfg,mean,sd,source);const next=QCCore.limitsFromTarget(mean,sd,2);if(!levelCfg||!next)return false;Object.assign(levelCfg,{mean:next.mean,sd:next.sd,low:next.low,high:next.high,rangeK:2,applied:source});return true;}
 function openRangeWorkflow(tid,level){
   const r=rangeCandidate(tid,level);if(!r.t||!r.l)return;
   const rows=[['Tổng số kết quả',r.c?r.c.n:0,'≥20',r.c&&r.c.n>=20],['Số ngày độc lập',r.days,'≥20 ngày',r.days>=20],['Điểm bị loại Westgard',r.bad,'Phải bằng 0; không tự loại điểm để làm đẹp SD',r.bad===0],['Điểm cảnh báo',r.warn,'Phải bằng 0 trước khi phê duyệt dải',r.warn===0],['SD đề xuất hợp lệ',r.c?fmtTestValue(r.t,r.c.sd):'—','>0',r.c&&r.c.sd>0]];
@@ -69,6 +69,7 @@ function rangeUpdateBiasHint(tid,level){
 function rangeGatePasses(r){
   if(!r.nce)return true;
   const causeEl=document.getElementById('rangeCauseConfirm'),biasEl=document.getElementById('rangeBiasInput'),bias=parseFloat(String(biasEl?biasEl.value:'').replace(',','.')),tea=rangeTeaPercent(r.t,r.l);
+  if(globalThis.qcRangeSafetyGate)return globalThis.qcRangeSafetyGate(r.nce,tea,!!(causeEl&&causeEl.checked),bias).passes;
   return!!(causeEl&&causeEl.checked&&tea&&Number.isFinite(bias)&&Math.abs(bias)<=tea/4);
 }
 async function applyNewRange(tid,level){

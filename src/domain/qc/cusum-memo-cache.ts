@@ -1,0 +1,1 @@
+export function createCusumMemoCache(){const cache=new Map<string,any>();return{get:(key:string)=>cache.get(key),set:(key:string,value:any)=>cache.set(key,value),clear:(testId?:unknown)=>{if(testId==null)return cache.clear();const prefix=String(testId)+'|';[...cache.keys()].forEach(key=>{if(key.startsWith(prefix))cache.delete(key);});}};}

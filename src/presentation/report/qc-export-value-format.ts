@@ -1,0 +1,1 @@
+export function createQcExportValueFormat(deps:any){return{value:(test:any,value:any)=>deps.testValue(test,value,deps.number),stat:(test:any,value:any)=>deps.testStat(test,value,deps.number),point:(point:any,test:any)=>deps.pointValue(point,test,deps.number)};}

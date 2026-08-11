@@ -25,58 +25,31 @@
   /* Cấp mã NCE và hạn xử lý mặc định: dùng chung cho trang Actions (mở hồ sơ thủ công)
      và entry-routes (hủy điểm QC tự mở hồ sơ) để hai luồng không sinh mã theo hai kiểu. */
   function nextNceId(today){
-    if(root.NceActionIdentityService)return root.NceActionIdentityService.nextNceId(state.actions||[],today);
-    const day=String(today||'').replace(/-/g,'');let value='';
-    do{value=`NCE-${day}-${String(uid()).replace(/[^a-z0-9]/gi,'').slice(-4).toUpperCase()}`;}while((state.actions||[]).some(a=>a.nceId===value));
-    return value;
+    return root.NceActionIdentityService.nextNceId(state.actions||[],today);
   }
   /* Ngày địa phương như isoToday(): toISOString() là giờ UTC nên ở UTC+7, từ 0h–7h
      sáng hạn xử lý bị lùi 1 ngày so với mọi ngày khác trong app (2026-07-27). */
-  function nceDueDate(days=7){return root.NceActionIdentityService?root.NceActionIdentityService.dueDate(days):(()=>{const d=new Date();d.setDate(d.getDate()+days);return isoDate(d);})();}
+  function nceDueDate(days=7){return root.NceActionIdentityService.dueDate(days);}
   function actionApprovalStatus(a){
-    if(root.NceActionBasics)return root.NceActionBasics.actionApprovalStatus(a);
-    return(a&&['pending','approved','returned'].includes(a.approvalStatus))?a.approvalStatus:'pending';
+    return root.NceActionBasics.actionApprovalStatus(a);
   }
   function actionRecordStatus(a){
-    if(root.NceActionBasics)return root.NceActionBasics.actionRecordStatus(a);
-    return a&&a.recordStatus==='cancelled'?'cancelled':'active';
+    return root.NceActionBasics.actionRecordStatus(a);
   }
   function actionCancelled(a){
-    if(root.NceActionBasics)return root.NceActionBasics.actionCancelled(a);
-    return actionRecordStatus(a)==='cancelled';
+    return root.NceActionBasics.actionCancelled(a);
   }
   function actionApprovalLabel(a){
-    if(root.NceActionBasics)return root.NceActionBasics.actionApprovalLabel(a);
-    if(actionCancelled(a))return'Đã hủy hồ sơ';
-    const s=actionApprovalStatus(a);
-    return s==='approved'?'Đã duyệt':s==='returned'?'Trả lại':'Chờ duyệt';
+    return root.NceActionBasics.actionApprovalLabel(a);
   }
   function actionRecorded(a){
-    if(root.NceActionBasics)return root.NceActionBasics.actionRecorded(a);
-    return !!(a&&!a.autoCreated&&String(a.by||'').trim()&&(a.protocolVersion>=2?String(a.correction||'').trim().length>=5:String(a.action||'').trim().length>=5));
+    return root.NceActionBasics.actionRecorded(a);
   }
   /* missingKeys đi kèm missing để giao diện tìm đúng ô còn thiếu mà đưa con trỏ tới —
      nhãn tiếng Việt một mình không đủ định vị, và "xử lý tức thời" (correction, mục 1)
      rất dễ bị nhầm với "hành động khắc phục" (action, mục 4–6). */
   function actionDraftStatus(a){
-    if(root.ActionDraftStatusService)return root.ActionDraftStatusService(a);
-    if(!a||!(+a.protocolVersion>=2))return{complete:actionRecorded(a),missing:actionRecorded(a)?[]:['hành động và người thực hiện'],missingKeys:actionRecorded(a)?[]:['action']};
-    const missing=[],missingKeys=[];
-    const need=(cond,label,key)=>{if(cond){missing.push(label);missingKeys.push(key);}};
-    need(!!a.date&&a.date>isoToday(),'ngày ghi nhận sự cố không được ở tương lai','date');
-    need(!SOURCE_LABELS[a.eventSource],'nguồn phát hiện','eventSource');
-    need(!PHASE_LABELS[a.processPhase],'giai đoạn quá trình','processPhase');
-    need(!CONTAINMENT_LABELS[a.containmentStatus],'kiểm soát tức thời (mục 1)','containmentStatus');
-    need(String(a.correction||'').trim().length<5,'xử lý tức thời đã thực hiện — ô cuối mục 1, tối thiểu 5 ký tự','correction');
-    need(!String(a.by||'').trim(),'người phụ trách','by');
-    need(!String(a.dueDate||'').trim(),'hạn hoàn thành','dueDate');
-    /* Sự cố nội kiểm PHẢI gắn một điểm QC. Không gắn thì actionPoint() trả null,
-       actionNeedsRerun() trả false, và hồ sơ khép vòng được mà không cần bằng chứng QC
-       chạy lại — tức là mở hồ sơ thủ công rồi chọn nguồn "Nội kiểm IQC" là đường vòng
-       né đúng cái rào an toàn quan trọng nhất của quy trình. */
-    need(a.eventSource==='iqc'&&!String(a.pointId||'').trim(),'sự cố nội kiểm IQC phải mở từ dòng vi phạm để hệ thống theo dõi QC chạy lại','eventSource');
-    need(a.eventSource==='iqc'&&!!String(a.pointId||'').trim()&&!actionPoint(a),'điểm QC liên kết không còn tồn tại hoặc không thuộc đúng xét nghiệm; hãy hủy có lưu vết và lập hồ sơ mới từ dòng vi phạm','eventSource');
-    return{complete:!missing.length,missing,missingKeys};
+    return root.ActionDraftStatusService(a);
   }
   /* missingBySection gom cung mot danh sach thieu theo tung muc cua form, de dai tom
      tat tren muc dang thu gon khong phai tu suy doan lai dieu kien — mot nguon su that
@@ -154,18 +127,13 @@
     ].join(' | ');
   }
   function actionRiskScore(a){
-    if(root.NceActionBasics)return root.NceActionBasics.actionRiskScore(a);
-    const values=[a&&a.riskSeverity,a&&a.riskOccurrence,a&&a.riskDetectability].map(Number);
-    return values.every(v=>Number.isInteger(v)&&v>=1&&v<=5)?values.reduce((x,v)=>x*v,1):0;
+    return root.NceActionBasics.actionRiskScore(a);
   }
   function actionResidualRiskScore(a){
-    if(root.NceActionBasics)return root.NceActionBasics.actionResidualRiskScore(a);
-    return actionRiskScore({riskSeverity:a&&a.residualSeverity,riskOccurrence:a&&a.residualOccurrence,riskDetectability:a&&a.residualDetectability});
+    return root.NceActionBasics.actionResidualRiskScore(a);
   }
   function actionActiveFollowUp(a){
-    if(root.NceActionIdentityService)return root.NceActionIdentityService.activeFollowUp(state.actions||[],a);
-    const id=String(a&&a.followUpNceId||'').trim();
-    return id?(state.actions||[]).find(x=>x.nceId===id&&!actionCancelled(x))||null:null;
+    return root.NceActionIdentityService.activeFollowUp(state.actions||[],a);
   }
   /* "Chưa hiệu lực" KHÔNG được treo hồ sơ vô thời hạn: theo thực hành CAPA, hành động
      không hiệu lực phải mở một vòng điều tra mới. Khi đã chuyển sang hồ sơ tiếp theo
@@ -200,26 +168,10 @@
   }
   /* Quá hạn chỉ tính cho hồ sơ còn mở — khép vòng rồi thì hạn không còn ý nghĩa. */
   function actionOverdue(a){
-    if(root.ActionApprovalGates)return root.ActionApprovalGates.overdue(a);
-    const due=String(a&&a.dueDate||'').trim();
-    if(!due||actionCancelled(a)||!actionRecorded(a)||actionWorkflowStatus(a).complete)return{overdue:false,days:0,label:''};
-    const today=isoToday();
-    if(due>=today)return{overdue:false,days:0,label:''};
-    const days=Math.round((Date.parse(today+'T00:00:00Z')-Date.parse(due+'T00:00:00Z'))/86400000);
-    return{overdue:true,days,label:`Quá hạn ${days} ngày`};
+    return root.ActionApprovalGates.overdue(a);
   }
-  function identityText(value){return String(value||'').trim().toLocaleLowerCase('vi');}
   function actionCanApprove(a,user){
-    if(root.ActionApprovalGates)return root.ActionApprovalGates.canApprove(a,user);
-    if(!a||!user||actionCancelled(a))return false;
-    const userId=String(user.id||''),username=identityText(user.username);
-    const contributorIds=new Set([a.createdByUserId,...(Array.isArray(a.contentEditorUserIds)?a.contentEditorUserIds:[])].map(x=>String(x||'')).filter(Boolean));
-    const contributorNames=new Set([a.createdByUsername,...(Array.isArray(a.contentEditorUsernames)?a.contentEditorUsernames:[])].map(identityText).filter(Boolean));
-    if(userId&&contributorIds.has(userId))return false;
-    if(username&&contributorNames.has(username))return false;
-    if(contributorIds.size||contributorNames.size)return true;
-    const creator=identityText(a.by),identities=[user.name,user.username].map(identityText).filter(Boolean);
-    return !creator||!identities.includes(creator);
+    return root.ActionApprovalGates.canApprove(a,user);
   }
   /* actionRerunStatus() quet toan bo state.data[testId], va gio con bi goi tu
      actionProtocolStatus() (nhanh release) lan actionEffectivenessStatus() chu khong
@@ -234,6 +186,7 @@
      khong duoc memo de map khong phinh vo han. */
   const rerunMemo=new Map(),pointIndexMemo=new Map(),lotIndexMemo=new Map();
   function invalidateActionCaches(testId){
+    if(root.ActionRerunService){root.ActionRerunService.invalidate(testId);if(root.ActionPointIndexService)root.ActionPointIndexService.invalidate();else{pointActionsMemo.ref=null;pointActionsMemo.index=null;}return;}
     if(testId==null){rerunMemo.clear();pointIndexMemo.clear();lotIndexMemo.clear();pointActionsMemo.ref=null;pointActionsMemo.index=null;return;}
     pointIndexMemo.delete(testId);
     [...lotIndexMemo.keys()].forEach(k=>{if(String(k).startsWith(testId+'|'))lotIndexMemo.delete(k);});
@@ -244,6 +197,7 @@
      index o day tu kiem chung bang tham chieu + do dai mang nhu rerunMemo, nen thay
      nguyen state hay them/bot diem deu tu truot. */
   function actionLotPoints(testId,level,lot){
+    if(root.ActionRerunService)return root.ActionRerunService.lotPoints(testId,level,lot);
     const points=(state.data&&state.data[testId])||null,key=testId+'|'+level+'|'+(lot||''),hit=lotIndexMemo.get(key);
     if(hit&&hit.points===points&&hit.len===(points?points.length:-1))return hit.list;
     const list=root.NceActionQcIndex?root.NceActionQcIndex.actionLotPoints(points,level,lot,pointRunNo):(points||[]).filter(x=>!x.voided&&+x.level===+level&&(x.lot||'')===(lot||''))
@@ -252,6 +206,7 @@
     return list;
   }
   function actionPointIndex(testId){
+    if(root.ActionRerunService)return root.ActionRerunService.pointIndex(testId);
     const points=(state.data&&state.data[testId])||null,hit=pointIndexMemo.get(testId);
     if(hit&&hit.points===points&&hit.len===(points?points.length:-1))return hit.index;
     const index=root.NceActionQcIndex?root.NceActionQcIndex.actionPointIndex(points):new Map((points||[]).map(p=>[p.id,p]));
@@ -259,24 +214,17 @@
     return index;
   }
   function actionPoint(a){
+    if(root.ActionRerunService)return root.ActionRerunService.point(a);
     return a&&a.pointId?actionPointIndex(a.testId).get(a.pointId)||null:null;
   }
   function actionEventDate(a){
-    if(root.ActionQcLink)return root.ActionQcLink.eventDate(a);
-    const p=actionPoint(a);
-    return p&&p.date||a&&a.date||'';
+    return root.ActionQcLink.eventDate(a);
   }
   function actionOpenedFromVoid(a,p){
-    if(root.NceActionRerunPolicy)return root.NceActionRerunPolicy.openedFromVoid(a,p);
-    return !!(a&&p&&p.voided&&(a.openedFromVoid===true||(p.voidedAt&&a.createdAt&&p.voidedAt===a.createdAt)));
+    return root.NceActionRerunPolicy.openedFromVoid(a,p);
   }
   function actionNeedsRerun(a){
-    if(root.ActionQcLink)return root.ActionQcLink.needsRerun(a);
-    const t=state.tests.find(x=>x.id===(a&&a.testId)),p=actionPoint(a);
-    if(!t||!p)return false;
-    if(p.voided)return p.voidRequiresRerun==null?p.voidKind!=='data-entry':!!p.voidRequiresRerun;
-    const f=activeWestgard(t).byPoint.get(p.id);
-    return !!(f&&f.level==='rej');
+    return root.ActionQcLink.needsRerun(a);
   }
   /* Bằng chứng QC phải có quan hệ nhân-quả với hành động khắc phục. Hồ sơ v3 chỉ được
      dùng điểm phát sinh từ ngày hoàn thành hành động; hồ sơ nối tiếp còn phải bắt đầu
@@ -284,16 +232,7 @@
      độ phân giải theo ngày, nên cùng ngày vẫn hợp lệ nhưng với điểm sự cố cùng ngày thì
      số lần chạy phải lớn hơn như rào cũ. */
   function actionRerunGateDate(a,p){
-    if(root.NceActionRerunPolicy)return root.NceActionRerunPolicy.rerunGateDate(a,p);
-    const gates=[p&&p.date||''];
-    /* Hồ sơ sinh ngay lúc hủy điểm dùng cùng timestamp cho point.voidedAt và
-       action.createdAt. Khi đó lượt QC hợp lệ có thể đã được chạy sau điểm sai
-       nhưng trước thao tác hủy hành chính, nên không chặn nó bằng ngày hoàn
-       thành hồ sơ. Hồ sơ mở theo cách thông thường vẫn giữ rào nhân-quả này. */
-    const openedFromVoid=actionOpenedFromVoid(a,p);
-    if(+a.protocolVersion>=3&&a.actionCompletedDate&&!openedFromVoid)gates.push(a.actionCompletedDate);
-    if(a.parentNceId&&a.date)gates.push(a.date);
-    return gates.filter(Boolean).sort().pop()||'';
+    return root.NceActionRerunPolicy.rerunGateDate(a,p);
   }
   function actionRerunSignature(a){
     const t=state.tests.find(x=>x.id===(a&&a.testId));
@@ -332,6 +271,7 @@
      Sua gia tri tai cho van di qua save({testId}) -> clearDerivedForTest nhu moi memo
      khac trong app, nen invalidateActionCaches() ben duoi lo not truong hop do. */
   function actionRerunStatus(a){
+    if(root.ActionRerunService)return root.ActionRerunService.status(a);
     if(!a||!a.id)return computeActionRerunStatus(a);
     const points=(state.data&&state.data[a.testId])||null,sig=actionRerunSignature(a),hit=rerunMemo.get(a.id);
     if(hit&&hit.sig===sig&&hit.points===points&&hit.len===(points?points.length:-1))return hit.result;
@@ -370,6 +310,7 @@
     return index;
   }
   function pointActions(pointId){
+    if(root.ActionPointIndexService)return root.ActionPointIndexService.forPoint(pointId);
     return pointActionsIndex().get(pointId)||[];
   }
   function pointRealActions(pointId){
@@ -391,6 +332,6 @@
     return actionWorkflowStatus(real[real.length-1]);
   }
 
-  root.ActionWorkflowService={ACTION_LABELS:root.NceActionLabels&&root.NceActionLabels.actionLabels||ACTION_LABELS,RISK_SCALE:root.NceActionLabels&&root.NceActionLabels.riskScale||RISK_SCALE,invalidateActionCaches,nextNceId,nceDueDate,actionApprovalStatus,actionRecordStatus,actionCancelled,actionApprovalLabel,actionRecorded,actionDraftStatus,actionProtocolStatus,actionProtocolSummary,actionRiskScore,actionResidualRiskScore,actionActiveFollowUp,actionEffectivenessStatus,actionOverdue,actionCanApprove,actionPoint,actionEventDate,actionNeedsRerun,actionRerunStatus,actionWorkflowStatus,pointActions,pointRealActions,pointWorkflowComplete,pointWorkflowSummary};
+  root.ActionWorkflowService={ACTION_LABELS:root.NceActionLabels&&root.NceActionLabels.actionLabels||ACTION_LABELS,RISK_SCALE:root.NceActionLabels&&root.NceActionLabels.riskScale||RISK_SCALE,invalidateActionCaches,nextNceId,nceDueDate,actionApprovalStatus,actionRecordStatus,actionCancelled,actionApprovalLabel,actionRecorded,actionDraftStatus,actionProtocolStatus,actionProtocolSummary,actionRiskScore,actionResidualRiskScore,actionActiveFollowUp,actionEffectivenessStatus,actionOverdue,actionCanApprove,actionPoint,actionEventDate,actionNeedsRerun,actionRerunGateDate,actionRerunStatus,actionWorkflowStatus,pointActions,pointRealActions,pointWorkflowComplete,pointWorkflowSummary};
   Object.assign(root,root.ActionWorkflowService);
 })(typeof globalThis!=='undefined'?globalThis:this);

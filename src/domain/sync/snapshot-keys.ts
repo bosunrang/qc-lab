@@ -1,0 +1,1 @@
+export function createSyncSnapshot(top:string[],mapJson:(value:any)=>Record<string,string>){return(value:any)=>{const source=value||{},keys:Record<string,string>={};top.forEach(key=>keys[key]=JSON.stringify(source[key]===undefined?null:source[key]));return{keys,data:mapJson(source.data),sigma:mapJson(source.sigmaData)}}}

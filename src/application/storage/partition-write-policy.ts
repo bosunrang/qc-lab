@@ -1,0 +1,1 @@
+export function planPartitionWrite(input:any){const full=!!input.fullDirty||input.streak>=input.maxIncrementals||input.now-input.lastFull>=input.maxMs;return{dirtyTestIds:full?null:input.dirtyTestIds,streak:full?0:input.streak+1,lastFull:full?input.now:input.lastFull}}

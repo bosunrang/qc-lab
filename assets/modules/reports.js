@@ -49,9 +49,11 @@ async function openPrint(title,bodyHtml,options={}){
   w.document.close();w.focus();
 }
 function sigmaPeriodPrintRows(row,levels){
+  if(globalThis.sigmaPrintRowsService)return globalThis.sigmaPrintRowsService.periodRows(row,levels);
   return(levels||[]).map((level,i)=>{const r=row&&row.rs&&row.rs[i];if(!r)return'<tr><td>Mức '+level+'</td><td colspan="9" class="muted">Chưa đủ CV IQC và Bias EQA/EQC để tính Sigma</td></tr>';const source=r.cvSource==='iqc-period'||r.cvSource==='iqc-cohort'?((r.n||0)+' điểm'+(r.sourceLot?' · Lô '+esc(r.sourceLot):'')):'Nhập tay',sigma=(r.classifiable?'':'≈')+fmt(r.sigma,2);return'<tr><td><b>Mức '+level+'</b></td><td class="num">'+fmt(r.tea,2)+'</td><td class="num"><b style="color:'+escAttr(r.c)+'">'+sigma+'</b></td><td><span class="pill" style="color:'+escAttr(r.c)+'">'+esc(r.label)+'</span></td><td class="num">'+fmt(r.cv,2)+'</td><td class="num">'+fmt(r.bias,2)+'</td><td class="num">'+sgFmtDPMO(r.dpmo)+'</td><td class="num">'+fmt(r.yld,4)+'%</td><td>'+source+'</td><td>'+esc(r.readinessLabel||r.cohortStatus||'—')+'</td></tr>';}).join('');
 }
 function sigmaPeriodsPrintRows(rows,levels){
+  if(globalThis.sigmaPrintRowsService)return globalThis.sigmaPrintRowsService.periodsRows(rows,levels);
   return(rows||[]).flatMap(row=>{const period=vnPeriod(row.e.period)||row.e.period||'?';return(levels||[]).map((level,i)=>{const r=row.rs&&row.rs[i];if(!r)return'<tr><td><b>'+esc(period)+'</b></td><td>Mức '+level+'</td><td colspan="9" class="muted">Chưa đủ CV IQC và Bias EQA/EQC để tính Sigma</td></tr>';const source=r.cvSource==='iqc-period'||r.cvSource==='iqc-cohort'?((r.n||0)+' điểm'+(r.sourceLot?' · Lô '+esc(r.sourceLot):'')):'Nhập tay',sigma=(r.classifiable?'':'≈')+fmt(r.sigma,2);return'<tr><td><b>'+esc(period)+'</b></td><td><b>Mức '+level+'</b></td><td class="num">'+fmt(r.tea,2)+'</td><td class="num"><b style="color:'+escAttr(r.c)+'">'+sigma+'</b></td><td><span class="pill" style="color:'+escAttr(r.c)+'">'+esc(r.label)+'</span></td><td class="num">'+fmt(r.cv,2)+'</td><td class="num">'+fmt(r.bias,2)+'</td><td class="num">'+sgFmtDPMO(r.dpmo)+'</td><td class="num">'+fmt(r.yld,4)+'%</td><td>'+source+'</td><td>'+esc(r.readinessLabel||r.cohortStatus||'—')+'</td></tr>';});}).join('');
 }
 /* Bảng công bố độ không đảm bảo đo cho bản in. Số liệu lấy THẲNG r.mu mà sgComp()
@@ -66,13 +68,16 @@ function sigmaMuCells(t,row,level,i){
   return'<td class="num">'+fmt(mu.uRw,2)+'</td><td class="num">'+uBias+'</td><td class="num">'+uCal+'</td><td class="num">'+fmt(mu.uc,2)+'</td><td class="num"><b>'+fmt(mu.U,2)+'</b></td><td class="num">'+abs+'</td><td>'+(mu.complete?'<span class="pill">Đủ thành phần</span>':'Thiếu '+esc(mu.missing.join(', ')))+'</td>';
 }
 function sigmaMuPrintRows(t,row,levels){
+  if(globalThis.sigmaMuPrintRowsService)return globalThis.sigmaMuPrintRowsService.periodRows(t,row,levels);
   return(levels||[]).map((level,i)=>'<tr><td><b>Mức '+level+'</b></td>'+sigmaMuCells(t,row,level,i)+'</tr>').join('');
 }
 function sigmaMuPeriodsPrintRows(t,rows,levels){
+  if(globalThis.sigmaMuPrintRowsService)return globalThis.sigmaMuPrintRowsService.periodsRows(t,rows,levels);
   return(rows||[]).flatMap(row=>{const period=vnPeriod(row.e.period)||row.e.period||'?';
     return(levels||[]).map((level,i)=>'<tr><td><b>'+esc(period)+'</b></td><td><b>Mức '+level+'</b></td>'+sigmaMuCells(t,row,level,i)+'</tr>');}).join('');
 }
 function sigmaMuTrace(row,levels){
+  if(globalThis.sigmaMuTraceService)return globalThis.sigmaMuTraceService(row,levels);
   const trace=[];
   (levels||[]).forEach(level=>{const L=(row.e.lv&&row.e.lv[level])||{};if(L.uCalBasis)trace.push('Mức '+level+' · nguồn u(cal): '+esc(L.uCalBasis));});
   const signed=(levels||[]).map(level=>(row.e.lv&&row.e.lv[level])||{}).find(L=>L.muReviewedBy||L.muReviewedDate);
@@ -143,6 +148,7 @@ async function printWestgard(){
   body+=signBlock();await openPrint('Phân tích Westgard — '+testDisplayName(t),body);
 }
 function reportPointsTableHtml(items,t){
+  if(globalThis.reportPointsTableService)return globalThis.reportPointsTableService(items,t);
   if(!items.length)return '<p><i>Không có điểm nào trong khoảng ngày đã chọn.</i></p>';
   const rows=items.map(o=>{
     const rules=[...new Set(o.f.rules||[])],support=[...new Set(o.f.supportRules||[])].filter(rule=>!rules.includes(rule)),ruleText=rules.join(', ')||(support.length?'Bằng chứng: '+support.join(', '):'—'),lv=qcVerdictLabel(o.f.level),staff=pointStaff(o.p);
@@ -154,9 +160,10 @@ function reportPointsTableHtml(items,t){
    reportNceSummaryParts trong data-io.js — dùng chung với bản Excel. Ở đây chỉ
    còn phần trình bày HTML. */
 function reportNceSummaryHtml(a){
+  if(globalThis.actionReportHtml)return globalThis.actionReportHtml.summary(reportNceSummaryParts(a));
   return '<div class="nce-summary">'+reportNceSummaryParts(a).map(([label,text])=>'<div><b>'+esc(label)+':</b> '+esc(text)+'</div>').join('')+'</div>';
 }
-function reportNceDetailField(label,value,wide=false){return '<div'+(wide?' class="nce-detail-wide"':'')+'><span>'+esc(label)+'</span><b>'+esc(value||'—')+'</b></div>';}
+function reportNceDetailField(label,value,wide=false){return globalThis.actionReportHtml?globalThis.actionReportHtml.detailField(label,value,wide):'<div'+(wide?' class="nce-detail-wide"':'')+'><span>'+esc(label)+'</span><b>'+esc(value||'—')+'</b></div>';}
 function reportNceDetailHtml(a,t){
   const m=reportNceModel(a,t),F=reportNceDetailField;
   const checkRows=m.checks.map(([label,statusText,noteText])=>'<tr><td><b>'+esc(label)+'</b></td><td>'+esc(statusText)+'</td><td>'+esc(noteText)+'</td></tr>').join('');

@@ -37,7 +37,7 @@ const warmDomain = measure(() => run(domain, `(()=>{${domainAll}})()`), 5);
 const unrelatedChange = measure(() => run(domain, `(()=>{invalidateDerivedForSave({clearDerived:false});${domainAll}})()`), 5);
 const oneTest = measure(() => run(domain, `(()=>{invalidateDerivedForSave({testId:state.tests[0].id});${domainAll}})()`), 3);
 
-const chart = loadSandbox(['modules/chart-view-model.js']),renderValues = Array.from({ length:100000 }, (_, i) => Math.sin(i / 31));
+const chart = loadSandbox(['core.js', 'generated/modular-pilot.js']),renderValues = Array.from({ length:100000 }, (_, i) => Math.sin(i / 31));
 renderValues[12345] = -20;renderValues[87654] = 20;
 const sampling = measure(() => chart.ChartViewModel.sampleIndices({ length:renderValues.length,maxPoints:640,valueAt:i=>renderValues[i],preserve:[50000] }), 3);
 const sample = sampling.value;

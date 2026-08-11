@@ -10,7 +10,7 @@ Không viết lại toàn bộ và không thay đổi định dạng dữ liệu
 - `assets/generated/` là artifact được đóng gói vào Electron; không sửa tay.
 - Các module đã chuyển: `ChartViewModel`, `SigmaCohortService`, `WestgardViewModel`,
   `ReagentComparisonService`, `EntryService`, `ManageConfigService`, `PeriodService`,
-  `qcPointWarnings`, `LISClientService` và sáu UI state bags.
+  `qcPointWarnings`, `LISClientService`, `AuditService` và sáu UI state bags.
 
 Luồng hiện tại:
 
@@ -24,6 +24,7 @@ src/application/manage/manage-config-service.ts ──────────�
 src/application/period/period-service.ts ──────────────────┤
 src/domain/qc/qc-point-warnings.ts ────────────────────────┤
 src/application/lis/lis-client-service.ts ────────────────┤
+src/application/audit/audit-service.ts ────────────────────┤
 src/presentation/state/ui-state.ts ────────────────────────┘
                                            assets/generated/modular-pilot.js
                                                          ↓ adapter tạm thời
@@ -87,3 +88,8 @@ Sáu state bag của Analysis/Auth/Entry/Manage/Reagent/Sigma dùng chung
 `LISClientService` nhận HTTP, timeout, storage, polling, nhập điểm, audit và lưu dữ liệu
 qua dependency injection. `assets/modules/lis-queue-ui.js` chỉ còn giao diện cấu hình và
 hàng chờ; nó gọi API tương thích do adapter công bố.
+
+`AuditService` nhận state, định danh người dùng/client, clock, hàm băm/kiểm chuỗi và ngưỡng
+retention qua dependency injection. `assets/modules/audit.js` chỉ giữ API global tương thích;
+ngưỡng cũ vẫn ở bridge để UI và test legacy có thể đọc hoặc điều chỉnh mà không sao chép
+logic hash-chain, cache, relink hay xoay vòng.

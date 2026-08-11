@@ -19,6 +19,8 @@ run(ctx, `
   function rerender(){ __rerenderCalls++; }
 `);
 run(ctx, require('fs').readFileSync(require('path').join(__dirname, '..', 'assets', 'modules', 'audit.js'), 'utf8'));
+run(ctx, require('fs').readFileSync(require('path').join(__dirname, '..', 'assets', 'generated', 'modular-pilot.js'), 'utf8'));
+run(ctx, `currentUser={id:'u1',username:'admin',name:'Admin',role:'admin'};`);
 
 run(ctx, `
   state.activity = [];

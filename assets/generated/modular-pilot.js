@@ -1614,6 +1614,125 @@
 		});
 	}
 	//#endregion
+	//#region src/application/audit/audit-service.ts
+	function createAuditService(deps) {
+		let chainCache = {
+			sig: "",
+			result: null
+		};
+		const list = () => deps.getState().activity || [];
+		const lastHashOf = (activity = []) => {
+			for (let i = activity.length - 1; i >= 0; i--) {
+				const hash = activity[i] && activity[i].hash;
+				if (hash) return hash;
+			}
+			return "";
+		};
+		const lastHash = () => lastHashOf(list());
+		const nextSeq = () => list().reduce((max, entry) => Math.max(max, Number(entry.seq) || 0), 0) + 1;
+		const archiveCut = (activity = [], cutoffIso) => {
+			const cutoff = String(cutoffIso || ""), segment = [], retained = [];
+			activity.forEach((entry) => {
+				const ts = String(entry && entry.ts || "");
+				if (ts && ts < cutoff) segment.push(entry);
+				else retained.push(entry);
+			});
+			return {
+				segment,
+				retained,
+				tipHash: lastHashOf(segment)
+			};
+		};
+		const pushRaw = (type, detail, target = "") => {
+			const state = deps.getState();
+			state.activity = state.activity || [];
+			if (!state.activity.length && state.activityAnchor) state.activityAnchor = "";
+			const actor = deps.actor();
+			const entry = {
+				id: deps.uid(),
+				seq: nextSeq(),
+				ts: deps.nowIso(),
+				user: actor.user,
+				username: actor.username,
+				userId: actor.userId,
+				role: actor.role,
+				type,
+				detail,
+				target,
+				clientId: actor.clientId,
+				prevHash: lastHash()
+			};
+			entry.hash = deps.entryHash(entry);
+			state.activity.push(entry);
+		};
+		const rotateOverflow = () => {
+			const state = deps.getState(), activity = list(), limits = deps.limits();
+			if (activity.length <= limits.hardCap) return;
+			const dropped = activity.slice(0, activity.length - limits.rotateTo), tip = lastHashOf(dropped);
+			state.activity = activity.slice(-limits.rotateTo);
+			if (tip) state.activityAnchor = tip;
+			pushRaw("Xoay vòng nhật ký hoạt động", `Nhật ký vượt ${limits.hardCap} dòng: tự động loại ${dropped.length} dòng cũ nhất, giữ lại ${limits.rotateTo} dòng mới nhất (không xuất CSV). Hash đỉnh phần đã loại: ${tip || "—"}. Nên dùng "Lưu trữ nhật ký cũ" ở trang Nhật ký để có file CSV trước khi cắt.`, "Nhật ký");
+		};
+		const log = (type, detail, target = "") => {
+			pushRaw(type, detail, target);
+			rotateOverflow();
+		};
+		const chainSignature = () => {
+			const activity = list(), last = activity[activity.length - 1] || {};
+			return `${activity.length}|${last.hash || ""}|${deps.getState().activityAnchor || ""}`;
+		};
+		const chainStatus = (force = false) => {
+			const sig = chainSignature();
+			if (chainCache.sig === sig && chainCache.result) return chainCache.result;
+			const activity = list();
+			if (!force && activity.length > deps.autoVerifyMax) return {
+				idle: true,
+				total: activity.length
+			};
+			const result = {
+				...deps.verifyChain(activity, deps.getState().activityAnchor || ""),
+				idle: false
+			};
+			chainCache = {
+				sig,
+				result
+			};
+			return result;
+		};
+		const resetChainCache = () => {
+			chainCache = {
+				sig: "",
+				result: null
+			};
+		};
+		const relinkChain = (activity = [], anchor = "") => {
+			let previous = String(anchor || "");
+			return activity.map((entry) => {
+				if (!entry || !entry.hash && !entry.prevHash) return entry;
+				const relinked = {
+					...entry,
+					prevHash: previous
+				};
+				relinked.hash = deps.entryHash(relinked);
+				previous = relinked.hash;
+				return relinked;
+			});
+		};
+		return Object.freeze({
+			lastHashOf,
+			lastHash,
+			nextSeq,
+			archiveCut,
+			pushRaw,
+			rotateOverflow,
+			log,
+			chainSignature,
+			chainStatus,
+			resetChainCache,
+			relinkChain
+		});
+	}
+	//#endregion
 	//#region src/application/lis/lis-client-service.ts
 	var LIS_GATEWAY_STORAGE_KEY = "qclab_lis_gateway";
 	var LIS_POLL_MS = 3e5;
@@ -1873,6 +1992,2716 @@
 			});
 			if (otherLot) issues.push(`Ngày ${formatDate(date)} thuộc giai đoạn lô ${otherLot.lot || "khác"} đang dùng (${otherLot.effectiveFrom ? "từ " + formatDate(otherLot.effectiveFrom) : "trước đó"}${otherLot.effectiveTo ? " đến " + formatDate(otherLot.effectiveTo) : ""}), không phải lô ${config.lot || "hiện tại"}. Kiểm tra lại ngày hoặc lô trước khi lưu.`);
 			return issues;
+		};
+	}
+	//#endregion
+	//#region src/domain/qc/qc-point-run.ts
+	function qcPointRunNumber(point) {
+		const match = /-(\d+)$/.exec(String(point?.runId || ""));
+		return match ? parseInt(match[1], 10) : 1;
+	}
+	//#endregion
+	//#region src/domain/qc/cusum-config.ts
+	function qcCusumConfig(test) {
+		const config = test?.cusum;
+		return {
+			on: !!config?.on,
+			k: Number.isFinite(Number(config?.k)) && Number(config?.k) > 0 ? Number(config?.k) : .5,
+			h: Number.isFinite(Number(config?.h)) && Number(config?.h) > 0 ? Number(config?.h) : 4
+		};
+	}
+	//#endregion
+	//#region src/domain/qc/search-text.ts
+	function normalizeSearchText(value) {
+		return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLowerCase().trim();
+	}
+	//#endregion
+	//#region src/domain/qc/level-target.ts
+	function qcLevelTargetValid(level) {
+		return !!level && Number.isFinite(Number(level.mean)) && Number.isFinite(Number(level.sd)) && Number(level.sd) > 0;
+	}
+	//#endregion
+	//#region src/domain/qc/lot-target.ts
+	var finite = (value) => Number.isFinite(Number(value));
+	function qcLotMeanSd(levelConfig, lotNo, points = []) {
+		if (levelConfig && (levelConfig.lot || "") === (lotNo || "") && finite(levelConfig.mean) && finite(levelConfig.sd)) return {
+			mean: Number(levelConfig.mean),
+			sd: Number(levelConfig.sd)
+		};
+		const history = (levelConfig?.meanSdHistory || []).slice().reverse().find((entry) => (entry.lot || "") === (lotNo || "") && finite(entry.mean) && finite(entry.sd));
+		if (history) return {
+			mean: Number(history.mean),
+			sd: Number(history.sd)
+		};
+		const point = points.find((item) => (item.lot || "") === (lotNo || "") && finite(item.qcMean) && finite(item.qcSd));
+		return point ? {
+			mean: Number(point.qcMean),
+			sd: Number(point.qcSd)
+		} : null;
+	}
+	function qcLotTargetSnapshot(levelConfig, lotId, lotNo) {
+		if (!levelConfig) return null;
+		const snapshot = (value) => ({
+			mean: Number(value.mean),
+			sd: Number(value.sd),
+			low: value.low == null ? null : Number(value.low),
+			high: value.high == null ? null : Number(value.high)
+		});
+		if (levelConfig.qcLotId === lotId && finite(levelConfig.mean) && finite(levelConfig.sd)) return snapshot(levelConfig);
+		const history = (levelConfig.meanSdHistory || []).slice().reverse().find((entry) => (entry.qcLotId ? entry.qcLotId === lotId : (entry.lot || "") === (lotNo || "")) && finite(entry.mean) && finite(entry.sd));
+		return history ? snapshot(history) : null;
+	}
+	//#endregion
+	//#region src/domain/qc/report-level-stats.ts
+	function createReportLevelStats(stats) {
+		return (points, mean, teaValue) => {
+			const summary = stats(points.map((point) => point.val)), denominator = Math.abs(Number(mean));
+			const bias = denominator ? Math.abs(summary.m - mean) / denominator * 100 : 0;
+			return {
+				st: summary,
+				bias,
+				te: bias + 1.65 * summary.cv,
+				sigma: summary.cv > 0 && teaValue ? (teaValue - bias) / summary.cv : null
+			};
+		};
+	}
+	//#endregion
+	//#region src/domain/qc/error-detail.ts
+	function createQcErrorDetail(deps) {
+		return (rules) => {
+			const type = deps.errorType(rules);
+			return type === "—" ? {
+				type,
+				desc: ""
+			} : {
+				type,
+				desc: deps.descriptions[deps.primaryRule(rules)] || ""
+			};
+		};
+	}
+	//#endregion
+	//#region src/domain/qc/planned-target.ts
+	function qcPlannedTarget(levelConfig, lot) {
+		if (!levelConfig || !lot || levelConfig.qcLotId === lot.id) return null;
+		return (levelConfig.meanSdHistory || []).find((history) => history.qcLotId === lot.id && history.planned) || null;
+	}
+	//#endregion
+	//#region src/domain/qc/point-void-verdict.ts
+	function createQcPointVoidVerdict(deps) {
+		return (test, point) => {
+			if (!test || !point) return {
+				level: "ok",
+				rules: []
+			};
+			if (point.lot && String(point.lot) !== String(deps.configuredLot(test, point.level))) return deps.parallelVerdict(test, {
+				level: point.level,
+				lot: point.lot,
+				mean: Number(point.qcMean),
+				sd: Number(point.qcSd),
+				parallel: true
+			}, point.id) || {
+				level: "ok",
+				rules: []
+			};
+			return deps.activeVerdict(test, point.id) || {
+				level: "ok",
+				rules: []
+			};
+		};
+	}
+	//#endregion
+	//#region src/domain/qc/lot-group-status.ts
+	function qcLotGroupOperational(group) {
+		return !!group && group.active !== false && group.status !== "stopped" && group.status !== "planned";
+	}
+	//#endregion
+	//#region src/domain/qc/derived-index.ts
+	function createQcDerivedIndex(deps) {
+		let cached = null;
+		const stamp = (state, previous) => {
+			const panels = state.qcPanels || [], lots = state.qcLots || [], groups = state.lotGroups || [], transitions = state.lotTransitions || [], tests = state.tests || [], build = !previous, out = build ? [] : null;
+			let index = 0, ok = true;
+			const check = (value) => {
+				if (build) out.push(value);
+				else if (ok && previous[index++] !== value) ok = false;
+			};
+			check(state);
+			check(panels);
+			check(panels.length);
+			check(lots);
+			check(lots.length);
+			check(groups);
+			check(groups.length);
+			check(transitions);
+			check(transitions.length);
+			check(tests);
+			check(tests.length);
+			if (!build && !ok) return false;
+			for (let i = 0; i < panels.length; i++) {
+				const panel = panels[i], ids = panel && panel.testIds;
+				check(panel);
+				check(panel && panel.active);
+				check(ids);
+				check(ids ? ids.length : -1);
+			}
+			for (let i = 0; i < groups.length; i++) {
+				const group = groups[i], ids = group && group.lotIds;
+				check(group);
+				check(group && group.active);
+				check(group && group.status);
+				check(ids);
+				check(ids ? ids.length : -1);
+			}
+			for (let i = 0; i < transitions.length; i++) {
+				const transition = transitions[i];
+				check(transition);
+				check(transition && transition.fromLotId);
+				check(transition && transition.toLotId);
+				check(transition && transition.status);
+			}
+			for (let i = 0; i < lots.length; i++) {
+				const lot = lots[i];
+				check(lot);
+				check(lot && lot.id);
+			}
+			for (let i = 0; i < tests.length; i++) {
+				const test = tests[i], levels = test && test.levels;
+				check(test);
+				check(levels);
+				check(levels ? levels.length : -1);
+			}
+			return build ? out : ok && index === previous.length;
+		};
+		return (state) => {
+			if (cached && stamp(state, cached.stamp) === true) return cached;
+			const currentStamp = stamp(state), panels = (state.qcPanels || []).filter((panel) => panel.active !== false), testPanel = /* @__PURE__ */ new Map(), testOrder = /* @__PURE__ */ new Map(), lotGroupByLotId = /* @__PURE__ */ new Map();
+			panels.forEach((panel, panelIndex) => (panel.testIds || []).forEach((id, testIndex) => {
+				if (!testPanel.has(id)) testPanel.set(id, panel);
+				const order = panelIndex * 1e4 + testIndex;
+				if (!testOrder.has(id) || order < testOrder.get(id)) testOrder.set(id, order);
+			}));
+			(state.lotGroups || []).filter(deps.operationalGroup).forEach((group) => (group.lotIds || []).forEach((id) => {
+				if (!lotGroupByLotId.has(id)) lotGroupByLotId.set(id, group);
+			}));
+			const acceptedTransitionToLot = /* @__PURE__ */ new Map();
+			(state.lotTransitions || []).filter(deps.switchesLot).forEach((transition) => {
+				if (!acceptedTransitionToLot.has(transition.toLotId)) acceptedTransitionToLot.set(transition.toLotId, transition);
+			});
+			return cached = {
+				stamp: currentStamp,
+				panels,
+				testPanel,
+				testOrder,
+				lotById: new Map((state.qcLots || []).map((lot) => [lot.id, lot])),
+				lotGroupByLotId,
+				acceptedTransitionToLot,
+				operationalTests: null,
+				levels: /* @__PURE__ */ new Map(),
+				groups: /* @__PURE__ */ new Map()
+			};
+		};
+	}
+	//#endregion
+	//#region src/domain/qc/accepted-lot-points.ts
+	function createAcceptedLotPoints(deps) {
+		return (points, level, within, reject) => {
+			const out = [], z = [], keys = [];
+			points.forEach((p) => {
+				const x = deps.pointTarget(p, level.mean, level.sd);
+				z.push(x.z);
+				keys.push(x.key);
+				if (deps.latestRules(z, (r) => within.has(r), keys).some((r) => reject.has(r))) {
+					z.pop();
+					keys.pop();
+				} else {
+					out.push(p);
+					if (z.length > 11) {
+						z.shift();
+						keys.shift();
+					}
+				}
+			});
+			return out;
+		};
+	}
+	//#endregion
+	//#region src/domain/qc/active-westgard.ts
+	function createActiveWestgard(deps) {
+		return (views, within, across, verdict) => {
+			const rows = views.map((v) => ({
+				...v,
+				single: v.pts.length ? deps.single(v.pts, v.l.mean, v.l.sd, (r) => within.has(r)) : {
+					F: [],
+					zs: []
+				}
+			})), cross = deps.multi(rows.map((v) => ({
+				level: v.l.level,
+				pts: v.pts,
+				mean: v.l.mean,
+				sd: v.l.sd
+			})), (r) => across.has(r)), byPoint = /* @__PURE__ */ new Map();
+			rows.forEach((v) => v.pts.forEach((p, i) => {
+				const one = v.single.F[i] || {}, rules = [.../* @__PURE__ */ new Set([...one.rules || [], ...cross.get(p) || []])], supportRules = [.../* @__PURE__ */ new Set([...one.supportRules || [], ...cross.support?.get(p) || []])].filter((r) => !rules.includes(r));
+				byPoint.set(p.id, {
+					level: verdict(rules),
+					rules,
+					supportRules,
+					z: v.single.zs[i]
+				});
+			}));
+			return {
+				views: rows,
+				cross,
+				byPoint
+			};
+		};
+	}
+	//#endregion
+	//#region src/domain/qc/cusum-series.ts
+	function createCusumSeries(run) {
+		return (points, level, config) => points.length ? run(points, level.mean, level.sd, config.k, config.h) : {
+			cPos: [],
+			cNeg: [],
+			flags: [],
+			k: config.k,
+			h: config.h,
+			ma: []
+		};
+	}
+	//#endregion
+	//#region src/domain/qc/parallel-westgard.ts
+	function createParallelWestgard(run) {
+		return (points, column, on, verdict) => {
+			const byPoint = /* @__PURE__ */ new Map();
+			if (!points.length) return {
+				pts: points,
+				byPoint
+			};
+			const wg = run(points, column.mean, column.sd, on);
+			points.forEach((p, i) => {
+				const f = wg.F[i] || {}, rules = [...new Set(f.rules || [])];
+				byPoint.set(p.id, {
+					level: verdict(rules),
+					rules,
+					supportRules: [...new Set(f.supportRules || [])],
+					z: wg.zs[i]
+				});
+			});
+			return {
+				pts: points,
+				byPoint
+			};
+		};
+	}
+	//#endregion
+	//#region src/domain/qc/entry-columns.ts
+	function createQcEntryColumns(deps) {
+		return (test) => {
+			const out = [];
+			deps.levels(test).forEach((l) => {
+				out.push({
+					key: String(l.level),
+					level: l.level,
+					lot: l.lot || "",
+					mean: l.mean,
+					sd: l.sd,
+					exp: l.exp,
+					applied: l.applied,
+					parallel: false
+				});
+				const p = deps.parallel(test, l.level);
+				if (p) out.push({
+					key: l.level + "|" + p.lotNo,
+					level: l.level,
+					lot: p.lotNo,
+					mean: p.mean,
+					sd: p.sd,
+					exp: p.exp,
+					applied: "mfg",
+					parallel: true
+				});
+			});
+			return out;
+		};
+	}
+	//#endregion
+	//#region src/domain/qc/entry-column-points.ts
+	function selectEntryColumnPoints(column, operational, lot) {
+		return column?.parallel ? lot() : operational();
+	}
+	//#endregion
+	//#region src/domain/sync/snapshot-compare.ts
+	function syncCanon(v) {
+		if (v == null) return null;
+		if (Array.isArray(v)) {
+			const a = v.map(syncCanon);
+			while (a.length && a[a.length - 1] === null) a.pop();
+			return a.length ? a : null;
+		}
+		if (typeof v !== "object") return v;
+		const o = {};
+		Object.keys(v).sort().forEach((k) => {
+			const x = syncCanon(v[k]);
+			if (x !== null) o[k] = x;
+		});
+		return Object.keys(o).length ? o : null;
+	}
+	function syncedShape(state, keys) {
+		const out = {};
+		keys.forEach((k) => {
+			const v = syncCanon(state?.[k]);
+			if (v !== null) out[k] = v;
+		});
+		return out;
+	}
+	function syncJsonMap(value) {
+		const out = {};
+		Object.keys(value || {}).forEach((key) => out[key] = JSON.stringify(value[key]));
+		return out;
+	}
+	//#endregion
+	//#region src/domain/sync/array-merge.ts
+	var syncItemKey = (v) => v?.id != null ? "#" + String(v.id) : "~" + JSON.stringify(v);
+	function mergeSyncArray(local = [], remote = [], base = [], deletes = false) {
+		const map = (a) => new Map(a.map((x) => [syncItemKey(x), x])), l = map(local), r = map(remote), b = map(base);
+		return [...new Set([...remote, ...local].map(syncItemKey))].flatMap((k) => {
+			const x = l.get(k), y = r.get(k), z = b.get(k), xs = x === void 0 ? null : JSON.stringify(x), ys = y === void 0 ? null : JSON.stringify(y), zs = z === void 0 ? null : JSON.stringify(z);
+			if (deletes && zs != null) {
+				if (xs == null && ys == null) return [];
+				if (xs == null) return ys === zs ? [] : [y];
+				if (ys == null) return xs === zs ? [] : [x];
+			}
+			const win = xs != null && xs !== zs ? x : ys != null && ys !== zs ? y : y ?? x;
+			return win ? [win] : [];
+		});
+	}
+	function mergeSyncBranch(local, remote, base, key) {
+		const l = local[key] || {}, r = remote[key] || {}, b = base && base[key] || {}, out = {};
+		(/* @__PURE__ */ new Set([
+			...Object.keys(l),
+			...Object.keys(r),
+			...Object.keys(b)
+		])).forEach((id) => {
+			if (id in b && !(id in l)) return;
+			const v = mergeSyncArray(l[id], r[id], b[id]);
+			if (v.length) out[id] = v;
+		});
+		return out;
+	}
+	//#endregion
+	//#region src/domain/sync/state-merge.ts
+	function createSyncStateMerge(deps) {
+		return (local, remote, base) => {
+			const out = deps.clone(remote), ls = deps.snap(local), bs = deps.snap(base).keys;
+			deps.top.forEach((k) => {
+				if (deps.lists.has(k)) out[k] = deps.array(local[k], remote[k], (base || {})[k], true);
+				else if (ls.keys[k] !== bs[k]) out[k] = deps.cloud(local[k]);
+			});
+			out.data = deps.branch(local, remote, base, "data");
+			out.sigmaData = deps.branch(local, remote, base, "sigmaData");
+			return out;
+		};
+	}
+	function uniqueSyncUsers(users) {
+		const seen = /* @__PURE__ */ new Set();
+		return (users || []).filter((u) => {
+			const k = String(u?.username || "").toLowerCase();
+			if (!k) return true;
+			if (seen.has(k)) return false;
+			seen.add(k);
+			return true;
+		});
+	}
+	//#endregion
+	//#region src/domain/sync/update-payload.ts
+	function createSyncUpdateBuilder(deps) {
+		let baseRef, baseCache;
+		const baseSnapshot = (base) => {
+			if (base === baseRef && baseCache) return baseCache;
+			const snap = deps.snapshot(base);
+			baseRef = base;
+			baseCache = snap;
+			return snap;
+		}, add = (payload, next, base, current, path) => {
+			Object.keys(next).forEach((id) => {
+				if (next[id] !== base[id]) payload[path + "/" + id] = current[id];
+			});
+			Object.keys(base).forEach((id) => {
+				if (!(id in next)) payload[path + "/" + id] = null;
+			});
+		}, build = (current, base) => {
+			const next = deps.snapshot(current), previous = baseSnapshot(base), payload = {};
+			deps.top.forEach((key) => {
+				if (next.keys[key] !== previous.keys[key]) payload[key] = current[key] === void 0 ? null : current[key];
+			});
+			add(payload, next.data, previous.data, current.data || {}, "data");
+			add(payload, next.sigma, previous.sigma, current.sigmaData || {}, "sigmaData");
+			return { payload };
+		};
+		return {
+			baseSnapshot,
+			build
+		};
+	}
+	//#endregion
+	//#region src/domain/sync/snapshot-keys.ts
+	function createSyncSnapshot(top, mapJson) {
+		return (value) => {
+			const source = value || {}, keys = {};
+			top.forEach((key) => keys[key] = JSON.stringify(source[key] === void 0 ? null : source[key]));
+			return {
+				keys,
+				data: mapJson(source.data),
+				sigma: mapJson(source.sigmaData)
+			};
+		};
+	}
+	//#endregion
+	//#region src/domain/sync/retry-scheduler.ts
+	function createSyncRetryScheduler(clock) {
+		const reset = (retry) => {
+			if (retry.timer !== null) clock.clearTimeout(retry.timer);
+			return {
+				timer: null,
+				delay: 1e3
+			};
+		}, schedule = (input) => {
+			const retry = input.retry;
+			if (!input.dirty || !input.writable || !input.online || retry.timer !== null) return retry;
+			return {
+				timer: clock.setTimeout(input.retryFn, retry.delay),
+				delay: Math.min(3e4, retry.delay * 2)
+			};
+		};
+		return {
+			reset,
+			schedule
+		};
+	}
+	//#endregion
+	//#region src/domain/sync/first-connect.ts
+	function hasSyncContent(source, keys) {
+		if (!source) return false;
+		if (Object.values(source.data || {}).some((rows) => Array.isArray(rows) && rows.length)) return true;
+		return keys.some((key) => (source[key] || []).length);
+	}
+	function createFirstConnectMerge(deps) {
+		return (local, remote) => {
+			const out = deps.merge(local, remote, null);
+			deps.top.forEach((key) => {
+				if (!deps.lists.has(key)) out[key] = deps.cloud(remote[key]);
+			});
+			out.users = deps.uniqueUsers(out.users || []);
+			return out;
+		};
+	}
+	//#endregion
+	//#region src/domain/qc/run-id-normalizer.ts
+	function createRunIdNormalizer(run) {
+		return (source) => {
+			(source.tests || []).forEach((test) => {
+				const rows = source.data?.[test.id] || [], seen = /* @__PURE__ */ new Set(), conflicts = /* @__PURE__ */ new Set();
+				rows.forEach((point) => {
+					if (point.voided) return;
+					const key = [
+						point.date || "",
+						point.level,
+						point.lot || ""
+					].join("|"), runKey = key + "\0" + (point.runId || "");
+					if (seen.has(runKey)) conflicts.add(key);
+					else seen.add(runKey);
+				});
+				if (!conflicts.size) return;
+				const groups = new Map([...conflicts].map((key) => [key, []]));
+				rows.forEach((point, index) => {
+					if (point.voided) return;
+					const key = [
+						point.date || "",
+						point.level,
+						point.lot || ""
+					].join("|");
+					if (groups.has(key)) groups.get(key)?.push(index);
+				});
+				groups.forEach((group) => group.sort((left, right) => run(rows[left]) - run(rows[right]) || left - right).forEach((index, order) => {
+					const point = rows[index];
+					if (point.date) point.runId = `${point.date}-${order + 1}`;
+				}));
+			});
+		};
+	}
+	//#endregion
+	//#region src/domain/qc/point-lot-normalizer.ts
+	function createPointLotNormalizer(deps) {
+		return (source) => {
+			(source.tests || []).forEach((test) => (source.data?.[test.id] || []).forEach((point) => {
+				const level = (test.levels || []).find((item) => item.level === point.level);
+				if (!level) return;
+				if (!point.id) point.id = deps.id();
+				if (point.lot == null) point.lot = level.lot || "";
+				if (point.qcMean == null) point.qcMean = level.mean;
+				if (point.qcSd == null) point.qcSd = level.sd;
+				if (!point.runId) point.runId = (point.date || deps.today()) + "-1";
+			}));
+			deps.normalizeRuns(source);
+		};
+	}
+	//#endregion
+	//#region src/domain/qc/lot-lineage.ts
+	function qcLotLineage(index, currentLotId) {
+		const chain = [], seen = /* @__PURE__ */ new Set();
+		let current = index.lotById.get(currentLotId);
+		while (current && !seen.has(current.id)) {
+			chain.unshift(current);
+			seen.add(current.id);
+			const transition = index.acceptedTransitionToLot.get(current.id);
+			current = transition ? index.lotById.get(transition.fromLotId) : null;
+		}
+		return chain;
+	}
+	//#endregion
+	//#region src/domain/qc/operational-access.ts
+	var qcLevelConfig = (test, level) => (test?.levels || []).find((item) => item.level === level);
+	function createQcOperationalAccess(deps) {
+		const canEnter = (test, level) => {
+			const config = qcLevelConfig(test, +level);
+			return !!(config && deps.test(test) && deps.levels(test).includes(config));
+		}, lotPoints = (test, level, withIndex = false) => {
+			const config = qcLevelConfig(test, level);
+			if (!config || !deps.panel(test) || !deps.group(config)) return [];
+			return deps.activePoints(test, level, withIndex);
+		}, lotGroupInUse = (group, tests) => !!(group && (tests || []).some((test) => (test.levels || []).some((level) => level.qcLotId && (group.lotIds || []).includes(level.qcLotId)))), selectLabel = (test, list) => {
+			const levels = deps.test(test) ? deps.levels(test) : test.levels || [], lots = [...new Set(levels.map((level) => level.lot).filter(Boolean))], same = (list || []).filter((item) => String(item.name || "").trim().toLowerCase() === String(test.name || "").trim().toLowerCase()).length > 1;
+			return `${deps.display(test)}${lots.length ? " · LOT " + lots.join("/") : ""}${same && test.machine ? " · " + test.machine : ""}`;
+		};
+		return {
+			canEnter,
+			lotPoints,
+			lotGroupInUse,
+			selectLabel
+		};
+	}
+	//#endregion
+	//#region src/domain/qc/parallel-lot-lookup.ts
+	function createParallelLotLookup(deps) {
+		return (test, level) => {
+			const config = deps.level(test, +level);
+			if (!config || !config.qcLotId) return null;
+			const panel = deps.panel(test);
+			if (!panel) return null;
+			const transition = (deps.transitions() || []).find((item) => item && item.status === "active" && item.panelId === panel.id && item.fromLotId === config.qcLotId);
+			if (!transition) return null;
+			const lot = (deps.lots() || []).find((item) => item.id === transition.toLotId);
+			if (!lot || +lot.level !== +config.level) return null;
+			const target = deps.target(test, config.level, lot.id, lot.lotNo);
+			if (!target || !Number.isFinite(+target.mean) || !(+target.sd > 0)) return null;
+			return {
+				tr: transition,
+				lot,
+				lotNo: lot.lotNo || "",
+				mean: +target.mean,
+				sd: +target.sd,
+				low: target.low,
+				high: target.high,
+				exp: lot.exp || ""
+			};
+		};
+	}
+	//#endregion
+	//#region src/domain/westgard/worker-job.ts
+	function createWestgardWorkerJob(deps) {
+		return (test, generation, revision) => ({
+			type: "compute",
+			generation,
+			revision,
+			testId: test.id,
+			ruleActions: { ...test.ruleActions || {} },
+			ruleScopes: { ...test.ruleScopes || {} },
+			globalRules: { ...deps.globalRules() || {} },
+			levels: deps.levels(test).map((level) => ({
+				level: level.level,
+				mean: level.mean,
+				sd: level.sd,
+				lot: level.lot || ""
+			})),
+			points: (deps.points(test.id) || []).filter((point) => !point.voided).map((point) => ({
+				id: point.id,
+				val: point.val,
+				qcMean: point.qcMean,
+				qcSd: point.qcSd,
+				date: point.date,
+				runId: point.runId,
+				level: point.level,
+				lot: point.lot || ""
+			}))
+		});
+	}
+	//#endregion
+	//#region src/domain/westgard/worker-revision.ts
+	function createWestgardWorkerRevisionService() {
+		const revision = (revisions, testId) => revisions.get(String(testId || "")) || 0, invalidateTest = (revisions, pending, testId) => {
+			const id = String(testId || ""), next = revision(revisions, id) + 1;
+			revisions.set(id, next);
+			pending.delete(id);
+			return next;
+		}, invalidateAll = (revisions, pending, generation) => {
+			revisions.clear();
+			pending.clear();
+			return generation + 1;
+		}, settle = (pending, testId, revisionValue) => {
+			if (pending.get(testId) === revisionValue) pending.delete(testId);
+		}, markPending = (pending, testId, revisionValue) => {
+			if (pending.get(testId) === revisionValue) return false;
+			pending.set(testId, revisionValue);
+			return true;
+		};
+		return {
+			revision,
+			invalidateTest,
+			invalidateAll,
+			settle,
+			markPending
+		};
+	}
+	//#endregion
+	//#region src/domain/westgard/worker-hydrate.ts
+	function hydrateWestgardWorkerResult(message, deps) {
+		const test = deps.test(message.testId);
+		if (!test) return false;
+		const cross = /* @__PURE__ */ new Map(), resultLevels = new Map((message.levels || []).map((level) => [String(level.level), level])), views = [], crossSupport = /* @__PURE__ */ new Map(), byPoint = /* @__PURE__ */ new Map();
+		for (const level of deps.levels(test)) {
+			const points = deps.points(test, level.level), source = resultLevels.get(String(level.level));
+			if (!source || source.points.length !== points.length) return false;
+			const rows = new Map(source.points.map((row) => [row.id, row])), F = [], zs = [];
+			for (const point of points) {
+				const row = rows.get(point.id);
+				if (!row) return false;
+				const singleRules = row.singleRules || [], crossRules = row.crossRules || [], singleSupportRules = row.singleSupportRules || [], crossSupportRules = row.crossSupportRules || [];
+				F.push({
+					level: deps.verdict(test, singleRules),
+					rules: singleRules,
+					supportRules: singleSupportRules
+				});
+				zs.push(row.z);
+				if (crossRules.length) cross.set(point, crossRules);
+				if (crossSupportRules.length) crossSupport.set(point, crossSupportRules);
+				byPoint.set(point.id, {
+					level: row.level,
+					rules: row.rules || [],
+					supportRules: row.supportRules || [],
+					z: row.z
+				});
+			}
+			views.push({
+				l: level,
+				pts: points,
+				single: {
+					F,
+					zs
+				}
+			});
+		}
+		cross.support = crossSupport;
+		deps.setMemo(test.id, {
+			views,
+			cross,
+			byPoint
+		});
+		return true;
+	}
+	//#endregion
+	//#region src/domain/westgard/worker-prewarm.ts
+	function createWestgardWorkerPrewarmPlanner(threshold) {
+		const worthwhile = (workerAvailable, failed, tests, count) => {
+			if (!workerAvailable || failed) return false;
+			let total = 0;
+			for (const test of tests || []) {
+				total += count(test);
+				if (total >= threshold) return true;
+			}
+			return false;
+		}, missing = (tests, memo) => (tests || []).filter((test) => !memo.has(test.id));
+		return {
+			worthwhile,
+			missing
+		};
+	}
+	//#endregion
+	//#region src/domain/qc/lot-history-view-model.ts
+	function previousLotHistory(level, lineage, meanSd, points) {
+		if (!level) return [];
+		return lineage.filter((x) => (x.lotNo || "") !== (level.lot || "")).map((x) => {
+			const m = meanSd(x.lotNo), p = points(x.lotNo);
+			return m && p.length ? {
+				lot: x.lotNo,
+				mean: m.mean,
+				sd: m.sd,
+				pts: p
+			} : null;
+		}).filter(Boolean);
+	}
+	function lotGroupLevels(group, tests, lots) {
+		const ids = new Set(group?.lotIds || []), out = [];
+		tests.forEach((t) => (t.levels || []).forEach((l) => {
+			let lot, mean = NaN, sd = NaN;
+			if (ids.has(l.qcLotId)) {
+				lot = lots.get(l.qcLotId);
+				mean = +l.mean;
+				sd = +l.sd;
+			} else {
+				const h = (l.meanSdHistory || []).slice().reverse().find((x) => ids.has(x.qcLotId));
+				if (h) {
+					lot = lots.get(h.qcLotId);
+					mean = +h.mean;
+					sd = +h.sd;
+				}
+			}
+			if (lot && Number.isFinite(mean) && Number.isFinite(sd) && sd > 0) out.push({
+				t,
+				l,
+				lot,
+				mean,
+				sd
+			});
+		}));
+		return out.sort((a, b) => String(a.t.name || "").localeCompare(String(b.t.name || ""), "vi") || a.l.level - b.l.level);
+	}
+	//#endregion
+	//#region src/application/qc/point-cache-service.ts
+	function createPointCacheService(data, run) {
+		const base = /* @__PURE__ */ new Map(), indexed = /* @__PURE__ */ new Map(), lots = /* @__PURE__ */ new Map(), sort = (a, b) => String(a.date || "").localeCompare(String(b.date || "")) || run(a) - run(b), clear = (id) => {
+			if (id == null) {
+				base.clear();
+				indexed.clear();
+				lots.clear();
+				return;
+			}
+			const prefix = String(id) + "|";
+			[
+				base,
+				indexed,
+				lots
+			].forEach((cache) => [...cache.keys()].forEach((key) => {
+				if (String(key).startsWith(prefix)) cache.delete(key);
+			}));
+		}, points = (id, l, idx = false) => {
+			const k = id + "|" + l, src = data()[id] || [], m = idx ? indexed : base, h = m.get(k);
+			if (h && h.src === src && h.len === src.length) return h.a;
+			const a = src.map((p, i) => idx ? {
+				...p,
+				_idx: i
+			} : p).filter((p) => +p.level === +l && !p.voided).sort((a, b) => sort(a, b) || (idx ? a._idx - b._idx : 0));
+			m.set(k, {
+				src,
+				len: src.length,
+				a
+			});
+			return a;
+		};
+		return {
+			points,
+			lot: (id, l, lot, idx = false) => points(id, l, idx).filter((p) => (p.lot || "") === (lot || "")),
+			clear
+		};
+	}
+	//#endregion
+	//#region src/application/storage/storage-serialize-policy.ts
+	function createStorageSerializePolicy(clock) {
+		let revision = -1, raw = "", bytes = 0, ms = 0, count = 0;
+		return {
+			serialize: (state, current) => {
+				if (revision === current && raw) return raw;
+				const start = clock();
+				raw = JSON.stringify(state);
+				ms = clock() - start;
+				bytes = raw.length;
+				count++;
+				revision = current;
+				return raw;
+			},
+			delay: () => bytes > 8388608 || ms > 30 ? 1200 : bytes > 2097152 || ms > 10 ? 700 : 400,
+			stats: () => ({
+				bytes,
+				ms,
+				count
+			}),
+			invalidate: () => {
+				revision = -1;
+				raw = "";
+			}
+		};
+	}
+	//#endregion
+	//#region src/application/storage/save-scheduler.ts
+	function createSaveScheduler(api) {
+		let timeout = null, idle = null;
+		const cancel = () => {
+			api.clearTimeout(timeout);
+			timeout = null;
+			if (idle !== null && api.cancelIdle) api.cancelIdle(idle);
+			idle = null;
+		};
+		return {
+			cancel,
+			schedule: (delay, run) => {
+				cancel();
+				timeout = api.setTimeout(run, delay);
+			}
+		};
+	}
+	//#endregion
+	//#region src/application/storage/retry-delay.ts
+	function storageRetryDelay(failures) {
+		return Math.min(3e4, 1e3 * Math.pow(2, Math.min(Number(failures) || 0, 5)));
+	}
+	//#endregion
+	//#region src/application/storage/derived-save-policy.ts
+	function saveDerivedTestIds(opts = {}) {
+		if (opts.clearDerived === false) return null;
+		const ids = Array.isArray(opts.testIds) ? opts.testIds : opts.testId ? [opts.testId] : [];
+		return [...new Set(ids.filter(Boolean))];
+	}
+	//#endregion
+	//#region src/application/storage/partition-write-policy.ts
+	function planPartitionWrite(input) {
+		const full = !!input.fullDirty || input.streak >= input.maxIncrementals || input.now - input.lastFull >= input.maxMs;
+		return {
+			dirtyTestIds: full ? null : input.dirtyTestIds,
+			streak: full ? 0 : input.streak + 1,
+			lastFull: full ? input.now : input.lastFull
+		};
+	}
+	function createQcValueFormat() {
+		const qcValueDecimals = (value) => {
+			const text = String(value == null ? "" : value).trim(), match = /^[+-]?(?:\d+(?:[.,](\d+))?|[.,](\d+))(?:e([+-]?\d+))?$/i.exec(text);
+			if (!match) return 0;
+			const fraction = (match[1] || match[2] || "").length, exponent = Number(match[3] || 0);
+			return Math.max(0, Math.min(6, fraction - exponent));
+		};
+		const testDecimalPlaces = (test, point = null) => {
+			const raw = test && test.decimalPlaces, configured = Number(raw);
+			if (raw != null && raw !== "" && Number.isInteger(configured) && configured >= 0 && configured <= 6) return configured;
+			if (point) {
+				const saved = Number(point.valueDecimals), own = Number.isInteger(saved) && saved >= 0 ? saved : qcValueDecimals(point.val);
+				return Math.min(6, Math.max(2, own));
+			}
+			return 2;
+		};
+		const testStatDecimals = (test) => Math.min(6, Math.max(2, testDecimalPlaces(test) + 2));
+		const formatValue = (test, value, point = null) => {
+			const number = Number(value);
+			return Number.isFinite(number) ? number.toFixed(testDecimalPlaces(test, point)) : "—";
+		};
+		const formatStat = (test, value) => {
+			const number = Number(value);
+			return Number.isFinite(number) ? number.toFixed(testStatDecimals(test)) : "—";
+		};
+		return {
+			qcValueDecimals,
+			testDecimalPlaces,
+			testStatDecimals,
+			formatValue,
+			formatStat,
+			formatPoint: (point, test = null) => formatValue(test, point && point.val, point)
+		};
+	}
+	//#endregion
+	//#region src/domain/qc/staff-identity.ts
+	function createQcStaffIdentity() {
+		const initials = (name) => String(name || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").split(/[^A-Za-z0-9]+/).filter(Boolean).map((value) => value.charAt(0)).join("").toUpperCase().slice(0, 8) || "—";
+		return {
+			initials,
+			point: (point) => {
+				const name = String(point && point.operatorName || "").trim();
+				return {
+					name,
+					code: String(point && point.operatorCode || "").trim().toUpperCase() || (name ? initials(name) : "")
+				};
+			}
+		};
+	}
+	//#endregion
+	//#region src/domain/qc/date-format.ts
+	function createQcDateFormat(now = () => /* @__PURE__ */ new Date()) {
+		const dateObject = (value) => {
+			const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ""));
+			return match ? new Date(+match[1], +match[2] - 1, +match[3]) : new Date(value);
+		};
+		const isoDate = (value = now()) => value.getFullYear() + "-" + String(value.getMonth() + 1).padStart(2, "0") + "-" + String(value.getDate()).padStart(2, "0");
+		return {
+			dateObject,
+			daysToExpiry: (value) => !value ? null : Math.round((dateObject(value).getTime() - now().getTime()) / 864e5),
+			isoDate,
+			isoToday: () => isoDate(),
+			isoMonth: () => {
+				const value = now();
+				return value.getFullYear() + "-" + String(value.getMonth() + 1).padStart(2, "0");
+			},
+			vnDate: (value) => {
+				if (!value) return "";
+				const text = String(value), match = /^(\d{4})-(\d{2})-(\d{2})/.exec(text);
+				return match ? match[3] + "/" + match[2] + "/" + match[1] : text;
+			},
+			vnPeriod: (value) => {
+				if (!value) return "";
+				const text = String(value).trim();
+				let match = /^(\d{4})-(\d{2})/.exec(text);
+				if (match) return "Kỳ " + match[2] + "/" + match[1];
+				match = /^(\d{1,2})\/(\d{4})$/.exec(text);
+				return match ? "Kỳ " + match[1].padStart(2, "0") + "/" + match[2] : text;
+			},
+			monthVN: (value) => {
+				const match = /^(\d{4})-(\d{2})/.exec(String(value || ""));
+				return match ? match[2] + "/" + match[1] : value || "";
+			},
+			formatDateTimeVN: (value) => {
+				const date = new Date(value);
+				return isNaN(+date) ? "" : date.toLocaleTimeString("vi-VN", {
+					hour: "2-digit",
+					minute: "2-digit"
+				}) + " " + date.toLocaleDateString("vi-VN");
+			}
+		};
+	}
+	//#endregion
+	//#region src/domain/qc/lot-target-history.ts
+	function createLotTargetHistory(id) {
+		const dedupe = (target) => {
+			const rows = Array.isArray(target && target.meanSdHistory) ? target.meanSdHistory : [], out = [], indexes = /* @__PURE__ */ new Map();
+			rows.forEach((row) => {
+				const key = row && row.qcLotId ? "id:" + row.qcLotId : row && row.lot ? "lot:" + row.lot : "";
+				if (!key) {
+					out.push(row);
+					return;
+				}
+				if (indexes.has(key)) out[indexes.get(key)] = row;
+				else {
+					indexes.set(key, out.length);
+					out.push(row);
+				}
+			});
+			if (target) target.meanSdHistory = out;
+			return out;
+		};
+		const upsert = (target, lot, values) => {
+			target.meanSdHistory = Array.isArray(target.meanSdHistory) ? target.meanSdHistory : [];
+			const matches = (row) => row && (row.qcLotId ? row.qcLotId === lot.id : (row.lot || "") === (lot.lotNo || "")), existing = target.meanSdHistory.slice().reverse().find(matches), entry = {
+				...existing || {},
+				...values,
+				id: existing && existing.id || id(),
+				qcLotId: lot.id,
+				lot: lot.lotNo
+			};
+			target.meanSdHistory = target.meanSdHistory.filter((row) => !matches(row));
+			target.meanSdHistory.push(entry);
+			return entry;
+		};
+		return {
+			dedupe,
+			upsert
+		};
+	}
+	//#endregion
+	//#region src/domain/tea/analyte-meta.ts
+	function createTeaAnalyteMeta(catalogSource) {
+		const key = (value) => String(value == null ? "" : value).trim().toLowerCase();
+		let lastCatalog = null, rows = {}, byId = {};
+		const registry = () => {
+			const catalog = typeof catalogSource === "function" ? catalogSource() : catalogSource;
+			if (catalog === lastCatalog) return {
+				rows,
+				byId
+			};
+			lastCatalog = catalog;
+			rows = Object.freeze(Object.fromEntries((catalog || []).map((row) => {
+				const aliases = [row.name, row.abbreviation].filter(Boolean), displayName = row.abbreviation && key(row.abbreviation) !== key(row.name) ? `${row.name} (${row.abbreviation})` : row.name;
+				return [key(row.name), Object.freeze({
+					analyteId: row.analyteId,
+					displayName,
+					standardName: row.name,
+					abbreviation: row.abbreviation || "",
+					aliases: Object.freeze(aliases),
+					matrix: row.matrix
+				})];
+			})));
+			byId = Object.freeze(Object.fromEntries(Object.values(rows).map((row) => [row.analyteId, row])));
+			return {
+				rows,
+				byId
+			};
+		};
+		const builtIn = (value) => {
+			const current = registry(), normalized = key(value);
+			return current.rows[normalized] || Object.values(current.rows).find((row) => row.aliases.some((alias) => key(alias) === normalized)) || {};
+		};
+		const meta = (name, record) => {
+			const current = registry(), custom = record && typeof record === "object" ? record : {}, base = custom.analyteId && current.byId[custom.analyteId] || builtIn(name), aliases = [
+				name,
+				base.displayName,
+				base.standardName,
+				base.abbreviation,
+				...base.aliases || [],
+				custom.displayName,
+				custom.standardName,
+				custom.abbreviation,
+				...custom.aliases || []
+			].filter(Boolean);
+			return {
+				analyteId: custom.analyteId || base.analyteId || "",
+				displayName: custom.displayName || base.displayName || name || "",
+				standardName: custom.standardName || base.standardName || name || "",
+				abbreviation: custom.abbreviation || base.abbreviation || "",
+				aliases: [...new Set(aliases)],
+				matrix: custom.matrix || base.matrix || ""
+			};
+		};
+		return {
+			key,
+			builtIn,
+			byId: (id) => registry().byId[id] || {},
+			meta,
+			display: (name, record) => meta(name, record).displayName || name || ""
+		};
+	}
+	//#endregion
+	//#region src/domain/qc/level-reconciliation.ts
+	function createQcLevelReconciliation() {
+		const pruneUnused = (state) => {
+			let pruned = 0;
+			(state.tests || []).forEach((test) => {
+				const levels = Array.isArray(test.levels) ? test.levels : [];
+				if (levels.length <= 1) return;
+				const points = state.data && state.data[test.id] || [], isUnused = (level) => !level.qcLotId && !(Number.isFinite(+level.sd) && +level.sd > 0) && (!Array.isArray(level.meanSdHistory) || !level.meanSdHistory.length) && !points.some((point) => +point.level === +level.level);
+				let kept = levels.filter((level) => !isUnused(level));
+				if (!kept.length) kept = [levels[0]];
+				if (kept.length !== levels.length) {
+					pruned += levels.length - kept.length;
+					test.levels = kept;
+				}
+			});
+			return pruned;
+		};
+		const reconcileSigma = (state) => {
+			const lotsById = new Map((state.qcLots || []).filter(Boolean).map((lot) => [String(lot.id), lot])), groupedLotIds = /* @__PURE__ */ new Set();
+			(state.lotGroups || []).filter((group) => group && group.active !== false).forEach((group) => (group.lotIds || []).forEach((id) => {
+				const lot = lotsById.get(String(id));
+				if (lot && (!lot.groupId || String(lot.groupId) === String(group.id || ""))) groupedLotIds.add(String(id));
+			}));
+			let unlinked = 0, pruned = 0, tests = 0;
+			(state.tests || []).forEach((test) => {
+				const levels = Array.isArray(test.levels) ? test.levels : [], valid = /* @__PURE__ */ new Set(), orphaned = /* @__PURE__ */ new Set();
+				levels.forEach((level) => {
+					const key = String(+level.level);
+					if (level.qcLotId && groupedLotIds.has(level.qcLotId)) valid.add(key);
+					else if (level.qcLotId) {
+						orphaned.add(key);
+						level.qcLotId = "";
+						level.lot = "";
+						level.exp = "";
+						unlinked++;
+					}
+				});
+				const pruneAllOutsideValid = valid.size > 0;
+				if (!pruneAllOutsideValid && !orphaned.size) return;
+				let changed = false;
+				(state.sigmaData && Array.isArray(state.sigmaData[test.id]) ? state.sigmaData[test.id] : []).forEach((entry) => {
+					if (!entry || !entry.lv || typeof entry.lv !== "object") return;
+					Object.keys(entry.lv).forEach((key) => {
+						if (pruneAllOutsideValid && !valid.has(String(+key)) || orphaned.has(String(+key))) {
+							delete entry.lv[key];
+							pruned++;
+							changed = true;
+						}
+					});
+				});
+				if (changed || orphaned.size) tests++;
+			});
+			return {
+				unlinked,
+				pruned,
+				tests
+			};
+		};
+		return {
+			pruneUnused,
+			reconcileSigma
+		};
+	}
+	//#endregion
+	//#region src/domain/qc/range-limit-repair.ts
+	function createRangeLimitRepair(limitsFromTarget) {
+		return (state) => {
+			let repaired = 0;
+			(state.tests || []).forEach((test) => (test.levels || []).forEach((level) => {
+				if (level.applied !== "lab") return;
+				const next = limitsFromTarget(level.mean, level.sd, 2);
+				if (!next) return;
+				if (level.low !== next.low || level.high !== next.high || level.rangeK !== 2) {
+					level.low = next.low;
+					level.high = next.high;
+					level.rangeK = 2;
+					repaired++;
+				}
+			}));
+			return repaired;
+		};
+	}
+	//#endregion
+	//#region src/application/state/derived-cache-invalidation.ts
+	var attempt = (work) => {
+		try {
+			work();
+		} catch {}
+	};
+	var clearPrefixed = (cache, prefix) => {
+		[...cache.keys()].forEach((key) => {
+			if (String(key).startsWith(prefix)) cache.delete(key);
+		});
+	};
+	function createDerivedCacheInvalidation(deps) {
+		const clearAll = () => {
+			deps.pointCaches().forEach((cache) => cache.clear());
+			attempt(() => deps.pointCache()?.clear());
+			deps.westgardMemo().clear();
+			attempt(() => deps.westgardCache()?.clear());
+			deps.acceptedMemo().clear();
+			attempt(() => deps.acceptedCache()?.clear());
+			deps.cusumMemo().clear();
+			attempt(() => deps.cusumCache()?.clear());
+			deps.resetDerivedIndex();
+			attempt(deps.resetStatus);
+			attempt(() => deps.invalidateWestgardWorker());
+			attempt(() => deps.invalidateActionCaches());
+		};
+		const clearForTest = (testId) => {
+			const prefix = String(testId || "") + "|";
+			deps.pointCaches().forEach((cache) => clearPrefixed(cache, prefix));
+			attempt(() => deps.cusumCache()?.clear(testId));
+			attempt(() => deps.pointCache()?.clear(testId));
+			deps.westgardMemo().delete(testId);
+			attempt(() => deps.westgardCache()?.clear(testId));
+			clearPrefixed(deps.acceptedMemo(), prefix);
+			attempt(() => deps.acceptedCache()?.clear(testId));
+			attempt(() => deps.clearStatus(testId));
+			attempt(() => deps.invalidateWestgardWorker(testId));
+			attempt(() => deps.invalidateActionCaches(testId));
+		};
+		return {
+			clearAll,
+			clearForTest
+		};
+	}
+	//#endregion
+	//#region src/application/state/configuration-relations.ts
+	function reconcileConfigurationRelations(state, deps) {
+		if (!state.qcPanels.length && state.assayGroups.length) state.assayGroups.forEach((group) => {
+			const first = (state.tests || []).find((test) => (group.testIds || []).includes(test.id));
+			state.qcPanels.push({
+				id: group.id || deps.uid(),
+				name: group.name || "Panel QC",
+				instrumentId: first && first.instrumentId || state.instruments[0].id,
+				testIds: [...group.testIds || []],
+				note: group.note || "Chuyển từ nhóm xét nghiệm cũ",
+				active: group.active !== false
+			});
+		});
+		state.lotGroups.forEach((group) => {
+			group.lotIds = Array.isArray(group.lotIds) ? [...new Set(group.lotIds)].filter((id) => (state.qcLots || []).some((lot) => lot.id === id)) : [];
+		});
+		state.qcLots.forEach((lot) => {
+			if (lot.groupId) {
+				const group = state.lotGroups.find((item) => item.id === lot.groupId);
+				if (group && !group.lotIds.includes(lot.id)) group.lotIds.push(lot.id);
+			}
+		});
+		const retiredTo = new Map((state.lotTransitions || []).filter(deps.switchesLot).map((transition) => [String(transition.fromLotId), String(transition.toLotId)]));
+		state.lotGroups.forEach((group) => {
+			if (group.active === false) return;
+			group.lotIds = (group.lotIds || []).filter((id) => {
+				const replacement = retiredTo.get(String(id));
+				return !(replacement && (group.lotIds || []).some((lotId) => String(lotId) === replacement));
+			});
+		});
+		state.lotGroups.forEach((group) => {
+			group.lotIds = [...new Set(group.lotIds || [])].filter((id) => (state.qcLots || []).some((lot) => lot.id === id));
+		});
+		state.qcLots.forEach((lot) => {
+			const group = state.lotGroups.find((item) => (item.lotIds || []).includes(lot.id));
+			lot.groupId = group ? group.id : "";
+		});
+		state.assayGroups.forEach((group) => {
+			group.testIds = Array.isArray(group.testIds) ? group.testIds.filter((id) => (state.tests || []).some((test) => test.id === id)) : [];
+		});
+		state.qcPanels.forEach((panel) => {
+			if (!(state.instruments || []).some((instrument) => instrument.id === panel.instrumentId)) panel.instrumentId = state.instruments[0] && state.instruments[0].id || "";
+			panel.testIds = Array.isArray(panel.testIds) ? panel.testIds.filter((id) => (state.tests || []).some((test) => test.id === id)) : [];
+			if (panel.active == null) panel.active = true;
+		});
+		state.lotTransitions = state.lotTransitions.filter((transition) => (state.qcLots || []).some((lot) => lot.id === transition.fromLotId) && (state.qcLots || []).some((lot) => lot.id === transition.toLotId) && (!transition.panelId || (state.qcPanels || []).some((panel) => panel.id === transition.panelId)));
+		state.lotTransitions.filter(deps.switchesLot).forEach(deps.applyAcceptedTransition);
+		deps.normalizeLotGroups();
+		deps.syncLotDepletion();
+	}
+	//#endregion
+	//#region src/application/state/test-configuration-normalization.ts
+	function normalizeTestConfiguration(state, migrateLegacyLots, deps) {
+		(state.teaRefs || []).forEach((reference) => {
+			if (!reference.analyteId) reference.analyteId = deps.builtInMeta(reference.name).analyteId || "custom-" + String(reference.id || deps.uid()).replace(/[^A-Za-z0-9_-]/g, "").slice(0, 72);
+			const built = deps.metaById(reference.analyteId);
+			if (built.analyteId) {
+				reference.name = built.standardName;
+				reference.displayName = built.displayName;
+				reference.standardName = built.standardName;
+				reference.abbreviation = built.abbreviation;
+				reference.aliases = [...built.aliases];
+				reference.matrix = built.matrix;
+			}
+		});
+		(state.machines || []).forEach((name) => {
+			if (name && !state.instruments.some((instrument) => deps.searchText(instrument.name) === deps.searchText(name))) state.instruments.push({
+				id: deps.uid(),
+				name,
+				manufacturer: "",
+				model: "",
+				serial: "",
+				section: "",
+				active: true
+			});
+		});
+		if (!state.instruments.length) state.instruments.push({
+			id: deps.uid(),
+			name: "Máy A",
+			manufacturer: "",
+			model: "",
+			serial: "",
+			section: "",
+			active: true
+		});
+		state.machines = [...new Set(state.instruments.map((instrument) => instrument.name).filter(Boolean))];
+		state.tests.forEach((test) => {
+			let instrument = state.instruments.find((item) => item.id === test.instrumentId) || state.instruments.find((item) => deps.searchText(item.name) === deps.searchText(test.machine));
+			if (!instrument) {
+				instrument = {
+					id: deps.uid(),
+					name: test.machine || "Máy A",
+					manufacturer: "",
+					model: "",
+					serial: "",
+					section: "",
+					active: true
+				};
+				state.instruments.push(instrument);
+			}
+			test.instrumentId = instrument.id;
+			test.machine = instrument.name;
+			if (!test.section) test.section = instrument.section || "";
+			if (test.active == null) test.active = true;
+			test.ruleActions = test.ruleActions || {};
+			test.ruleScopes = test.ruleScopes || {};
+			test.cusum = test.cusum || {
+				on: false,
+				k: .5,
+				h: 4
+			};
+			const reference = (state.teaRefs || []).find((item) => test.analyteId && item.analyteId === test.analyteId) || (state.teaRefs || []).find((item) => deps.teaKey(item.name) === deps.teaKey(test.name)), naming = deps.meta(test.name, reference);
+			test.analyteId = test.analyteId || naming.analyteId || "local-" + String(test.id || deps.uid()).replace(/[^A-Za-z0-9_-]/g, "").slice(0, 73);
+			const built = deps.metaById(test.analyteId);
+			if (built.analyteId) {
+				test.name = built.standardName;
+				test.displayName = built.displayName;
+				test.standardName = built.standardName;
+				test.abbreviation = built.abbreviation;
+				test.aliases = [...built.aliases];
+				test.matrix = built.matrix;
+			} else if (naming.standardName) {
+				test.displayName = test.displayName || naming.displayName;
+				test.standardName = test.standardName || naming.standardName;
+				test.abbreviation = test.abbreviation || naming.abbreviation;
+				test.aliases = Array.isArray(test.aliases) && test.aliases.length ? test.aliases : naming.aliases;
+				test.matrix = test.matrix || naming.matrix;
+			}
+			test.levels.forEach((level) => {
+				let lot = state.qcLots.find((item) => item.id === level.qcLotId);
+				if (migrateLegacyLots && !lot && level.lot) {
+					let group = state.lotGroups.find((item) => deps.searchText(item.name) === deps.searchText(test.name + " QC"));
+					if (!group) {
+						group = {
+							id: deps.uid(),
+							name: test.name + " QC",
+							lotIds: [],
+							manufacturer: "",
+							material: "",
+							catalog: "",
+							note: "Tự động chuyển từ dữ liệu cũ",
+							active: true
+						};
+						state.lotGroups.push(group);
+					}
+					lot = state.qcLots.find((item) => item.groupId === group.id && item.lotNo === level.lot && +item.level === +level.level);
+					if (!lot) {
+						lot = {
+							id: deps.uid(),
+							groupId: group.id,
+							lotNo: level.lot,
+							level: level.level,
+							exp: level.exp || "",
+							opened: "",
+							active: true,
+							note: ""
+						};
+						state.qcLots.push(lot);
+					}
+					if (lot && !group.lotIds.includes(lot.id)) group.lotIds.push(lot.id);
+				}
+				if (lot) {
+					level.qcLotId = lot.id;
+					level.lot = lot.lotNo;
+					level.exp = lot.exp;
+				}
+				level.meanSdHistory = Array.isArray(level.meanSdHistory) ? level.meanSdHistory : [];
+				if (!level.meanSdHistory.length && Number.isFinite(+level.mean) && Number.isFinite(+level.sd) && +level.sd > 0) level.meanSdHistory.push({
+					id: deps.uid(),
+					qcLotId: level.qcLotId || "",
+					lot: level.lot || "",
+					mean: +level.mean,
+					sd: +level.sd,
+					low: level.low == null ? null : +level.low,
+					high: level.high == null ? null : +level.high,
+					effectiveFrom: "",
+					effectiveTo: level.exp || "",
+					source: level.applied === "lab" ? "lab" : "mfg",
+					note: "Tự động chuyển từ cấu hình hiện hành"
+				});
+				deps.dedupeHistory(level);
+			});
+		});
+	}
+	//#endregion
+	//#region src/application/state/foundation-normalization.ts
+	function normalizeStateFoundation(input, options, deps) {
+		const previousSchema = Number(input && input.schemaVersion || 1), merged = {
+			...deps.defaults(),
+			...input || {}
+		}, state = options.sanitized ? merged : deps.sanitize(merged);
+		if (previousSchema < 2) state.periodLocks = Array.isArray(state.periodLocks) ? state.periodLocks : [];
+		delete state.archiveRegistry;
+		if (state.lab && typeof state.lab === "object") delete state.lab.kpiTargets;
+		if (previousSchema < 3 || !state.teaRegistryVersion || state.teaRegistryVersion < deps.teaRegistryVersion) state.teaRegistryVersion = deps.teaRegistryVersion;
+		state.schemaVersion = deps.schemaVersion;
+		if (!state.westgardProfileVersion) {
+			state.westgardRules = { ...deps.westgardDefaults };
+			state.westgardProfileVersion = 2;
+		}
+		return {
+			state,
+			previousSchema
+		};
+	}
+	//#endregion
+	//#region src/application/state/state-lifecycle-normalization.ts
+	function normalizeStateLifecycle(state, deps) {
+		deps.ensureLab();
+		deps.ensureConfiguration();
+		deps.repairRanges();
+		deps.ensureReagent(state);
+		deps.reconcileSigma();
+		deps.reconcileTea();
+		deps.normalizePointLots();
+		deps.pruneUnusedLevels();
+		(state.tests || []).forEach((test) => (test.levels || []).forEach((level) => {
+			if (level.mfgMean == null) {
+				level.mfgMean = level.mean;
+				level.mfgSd = level.sd;
+				level.applied = "mfg";
+			}
+		}));
+	}
+	//#endregion
+	//#region src/presentation/export/csv-download.ts
+	function createCsvDownload(deps) {
+		return (name, rows, encode) => {
+			const blob = deps.createBlob("﻿" + rows.map((row) => row.map(encode).join(",")).join("\r\n")), url = deps.createUrl(blob);
+			deps.download(url, name);
+			deps.schedule(() => deps.revokeUrl(url), 1e3);
+		};
+	}
+	//#endregion
+	//#region src/presentation/style/css-token-pixel.ts
+	function cssTokenPixel(token, fallback, readToken) {
+		const value = parseFloat(String(readToken(token) || ""));
+		return Number.isFinite(value) ? value : fallback;
+	}
+	//#endregion
+	//#region src/presentation/export/blob-download.ts
+	function createBlobDownload(deps) {
+		return (name, blob) => {
+			const url = deps.createUrl(blob);
+			deps.download(url, name);
+			deps.schedule(() => deps.revokeUrl(url), 1e3);
+		};
+	}
+	//#endregion
+	//#region src/presentation/report/qc-report-csv-rows.ts
+	function createQcReportCsvRows(d) {
+		return (tid, start, end) => {
+			const test = d.test(tid);
+			if (!test) return [];
+			const inRange = (point) => (!start || point.date >= start) && (!end || point.date <= end), westgard = d.westgard(test), tea = d.tea(test), rows = [
+				...d.meta("Báo cáo nội kiểm"),
+				[],
+				[
+					"BÁO CÁO NỘI KIỂM",
+					d.lab().name || "",
+					d.lab().dept || "",
+					d.range(start, end)
+				],
+				[],
+				[
+					"Xét nghiệm",
+					d.testName(test),
+					"Máy",
+					test.machine || "",
+					"Đơn vị",
+					test.unit || "",
+					"TEa%",
+					tea || ""
+				],
+				[
+					"Nguồn TEa",
+					d.teaLabel(d.teaSource(test)),
+					"Cơ sở",
+					d.teaReference(test),
+					"Tài liệu",
+					test.teaDoc || "",
+					"Người duyệt",
+					test.teaApprovedBy || ""
+				]
+			];
+			d.levels(test).forEach((level) => {
+				d.previous(test, level.level).forEach((series) => {
+					const previous = d.rows.previousLot(test, series, inRange);
+					if (!previous.inPts.length) return;
+					rows.push([], [
+						"Mức " + level.level,
+						"Lô " + series.lot,
+						"Đã chuyển tiếp",
+						"Mean",
+						series.mean,
+						"SD",
+						series.sd
+					], [
+						"Ngày",
+						"Lần chạy",
+						"NV thực hiện",
+						"Họ tên nhân viên",
+						"Giá trị",
+						"Z",
+						"Kết luận",
+						"Luật",
+						"Loại sai số"
+					]);
+					previous.items.forEach(({ p, f, z }) => {
+						const staff = d.staff(p);
+						rows.push([
+							d.date(p.date),
+							p.runId || "",
+							staff.code,
+							staff.name,
+							p.val,
+							(z >= 0 ? "+" : "") + d.number(z) + "s",
+							d.state(f.level),
+							(f.rules || []).join(" | ") || ((f.supportRules || []).length ? "Bằng chứng: " + f.supportRules.join(" | ") : ""),
+							d.error(f.rules || [])
+						]);
+					});
+					const metric = d.stats(previous.inPts, series.mean, tea);
+					rows.push([
+						"Thống kê (lô cũ)",
+						"n",
+						metric.st.n,
+						"Mean thực",
+						d.number(metric.st.m),
+						"SD",
+						d.number(metric.st.sd, 3),
+						"CV%",
+						d.number(metric.st.cv),
+						"Bias%",
+						d.number(metric.bias),
+						"TE%",
+						d.number(metric.te),
+						"Sigma (kỳ)",
+						metric.sigma == null ? "" : d.number(metric.sigma, 2) + (metric.st.n < 20 ? " *" : "")
+					]);
+				});
+				const current = d.rows.currentLot(test, level, westgard, inRange);
+				rows.push([], [
+					"Mức " + level.level,
+					"Lô " + (level.lot || ""),
+					"Dải " + (level.applied === "lab" ? "PXN" : "NSX"),
+					"Mean",
+					level.mean,
+					"SD",
+					level.sd
+				], [
+					"Ngày",
+					"Lần chạy",
+					"NV thực hiện",
+					"Họ tên nhân viên",
+					"Giá trị",
+					"Z",
+					"Kết luận",
+					"Luật",
+					"Loại sai số"
+				]);
+				if (current.pts.length) {
+					current.items.forEach(({ p, f, z }) => {
+						const staff = d.staff(p);
+						rows.push([
+							d.date(p.date),
+							p.runId || "",
+							staff.code,
+							staff.name,
+							p.val,
+							(z >= 0 ? "+" : "") + d.number(z) + "s",
+							d.state(f.level),
+							(f.rules || []).join(" | ") || ((f.supportRules || []).length ? "Bằng chứng: " + f.supportRules.join(" | ") : ""),
+							d.error(f.rules || [])
+						]);
+					});
+					const metric = d.stats(current.pts, level.mean, tea);
+					rows.push([
+						"Thống kê",
+						"n",
+						metric.st.n,
+						"Mean thực",
+						d.number(metric.st.m),
+						"SD",
+						d.number(metric.st.sd, 3),
+						"CV%",
+						d.number(metric.st.cv),
+						"Bias%",
+						d.number(metric.bias),
+						"TE%",
+						d.number(metric.te),
+						"Sigma (kỳ)",
+						metric.sigma == null ? "" : d.number(metric.sigma, 2) + (metric.st.n < 20 ? " *" : "")
+					]);
+				} else rows.push(["Không có dữ liệu trong khoảng ngày đã chọn"]);
+			});
+			rows.push([], ["NHẬT KÝ KHẮC PHỤC"], [
+				"Ngày",
+				"Mã NCE",
+				"Mức / lô",
+				"Luật",
+				"Loại sai số",
+				"Hành động",
+				"Điều tra & ảnh hưởng",
+				"Người phụ trách",
+				"QC chạy lại",
+				"Trạng thái duyệt",
+				"Người duyệt",
+				"Ý kiến duyệt",
+				"Trạng thái hồ sơ"
+			]);
+			d.rows.actions(tid, inRange).forEach((action) => {
+				const workflow = d.workflow(action), rerun = d.rerun(action);
+				rows.push([
+					d.date(action.date),
+					action.nceId || "",
+					d.levelLabel(test, action.level, action.lot),
+					action.rule || "",
+					action.errorType || "",
+					action.action || action.correction || "",
+					d.protocol(action),
+					action.by || "",
+					rerun.label || "",
+					d.approval(action),
+					action.approvedBy || "",
+					action.approvalNote || "",
+					workflow.label || "Chưa hoàn tất"
+				]);
+			});
+			return rows;
+		};
+	}
+	//#endregion
+	//#region src/presentation/format/basic-format.ts
+	function createBasicFormat() {
+		return {
+			number: (value, digits = 2) => value == null || isNaN(value) ? "—" : Number(value).toFixed(digits),
+			safeName: (value) => String(value || "file").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\w.-]+/g, "_").replace(/^_+|_+$/g, "") || "file"
+		};
+	}
+	//#endregion
+	//#region src/domain/westgard/rule-policy.ts
+	function createWestgardRulePolicy(api) {
+		const levelCount = (test) => api.levels(test).length || (test?.levels || []).length, action = (test, rule) => api.resolveAction(rule, api.enabled(rule), test?.ruleActions?.[rule]), scope = (test, rule) => api.resolveScope(rule, levelCount(test), test?.ruleScopes?.[rule]), onIn = (test, rule, channel) => api.onInScope(rule, levelCount(test), test?.ruleScopes?.[rule], action(test, rule), channel);
+		return {
+			levelCount,
+			action,
+			scope,
+			onIn,
+			within: (test, rule) => onIn(test, rule, "within"),
+			across: (test, rule) => onIn(test, rule, "across"),
+			set: (test, channel) => new Set(api.rules.filter((rule) => onIn(test, rule, channel))),
+			verdict: (test, rules) => api.verdict(rules, (rule) => action(test, rule))
+		};
+	}
+	//#endregion
+	//#region src/domain/westgard/memo-cache.ts
+	function createWestgardMemoCache() {
+		const cache = /* @__PURE__ */ new Map();
+		return {
+			get: (id) => cache.get(String(id || "")),
+			set: (id, value) => cache.set(String(id || ""), value),
+			clear: (id) => id == null ? cache.clear() : cache.delete(String(id || ""))
+		};
+	}
+	//#endregion
+	//#region src/domain/qc/cusum-memo-cache.ts
+	function createCusumMemoCache() {
+		const cache = /* @__PURE__ */ new Map();
+		return {
+			get: (key) => cache.get(key),
+			set: (key, value) => cache.set(key, value),
+			clear: (testId) => {
+				if (testId == null) return cache.clear();
+				const prefix = String(testId) + "|";
+				[...cache.keys()].forEach((key) => {
+					if (key.startsWith(prefix)) cache.delete(key);
+				});
+			}
+		};
+	}
+	//#endregion
+	//#region src/domain/qc/accepted-memo-cache.ts
+	function createAcceptedMemoCache() {
+		const cache = /* @__PURE__ */ new Map();
+		return {
+			get: (key) => cache.get(key),
+			set: (key, value) => cache.set(key, value),
+			clear: (testId) => {
+				if (testId == null) return cache.clear();
+				const prefix = String(testId) + "|";
+				[...cache.keys()].forEach((key) => {
+					if (key.startsWith(prefix)) cache.delete(key);
+				});
+			}
+		};
+	}
+	//#endregion
+	//#region src/domain/westgard/rule-settings.ts
+	function createWestgardRuleSettings(deps) {
+		return {
+			enabled: (rule) => deps.ruleEnabled(deps.getState().westgardRules, rule),
+			set: (rule, on) => {
+				if (!deps.requireWrite()) return;
+				const state = deps.getState();
+				state.westgardRules = state.westgardRules || { ...deps.defaults };
+				state.westgardRules[rule] = !!on;
+				deps.save();
+				deps.rerender();
+			},
+			reset: () => {
+				if (!deps.requireWrite()) return;
+				deps.getState().westgardRules = { ...deps.defaults };
+				deps.save();
+				deps.rerender();
+			}
+		};
+	}
+	//#endregion
+	//#region src/domain/qc/range-candidate.ts
+	function createRangeCandidateService(deps) {
+		const systematicNce = (testId, level) => {
+			const matches = deps.actions().filter((action) => action.testId === testId && +action.level === +level && !deps.actionCancelled(action) && String(action.rule || "").split(",").map((value) => value.trim()).some((rule) => deps.systematicRules.includes(rule)));
+			return matches.length ? matches.slice().sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))[0] : null;
+		};
+		const candidate = (testId, level) => {
+			const test = deps.tests().find((value) => value.id === testId), config = test && deps.levelConfig(test, level);
+			if (!test || !config) return {
+				t: test,
+				l: config,
+				pts: [],
+				wg: {
+					F: [],
+					zs: []
+				},
+				c: null,
+				days: 0,
+				bad: 0,
+				warn: 0,
+				eligible: false,
+				nce: null
+			};
+			const points = deps.points(test, level), westgard = deps.westgard(test), F = points.map((point) => westgard.byPoint.get(point.id) || {
+				level: "ok",
+				rules: []
+			}), zs = points.map((point) => deps.pointZ(point, config.mean, config.sd)), c = deps.stats(points.map((point) => point.val)), days = new Set(points.map((point) => point.date)).size, bad = F.filter((value) => value.level === "rej").length, warn = F.filter((value) => value.level === "warn").length;
+			return {
+				t: test,
+				l: config,
+				pts: points,
+				wg: {
+					F,
+					zs
+				},
+				c,
+				days,
+				bad,
+				warn,
+				eligible: !!(c && c.n >= 20 && days >= 20 && bad === 0 && warn === 0 && c.sd > 0),
+				nce: systematicNce(testId, level)
+			};
+		};
+		const assignTarget = (config, mean, sd, source) => {
+			const next = deps.limitsFromTarget(mean, sd, 2);
+			if (!config || !next) return false;
+			Object.assign(config, {
+				mean: next.mean,
+				sd: next.sd,
+				low: next.low,
+				high: next.high,
+				rangeK: 2,
+				applied: source
+			});
+			return true;
+		};
+		return {
+			systematicNce,
+			candidate,
+			assignTarget
+		};
+	}
+	//#endregion
+	//#region src/domain/qc/range-safety-gate.ts
+	function rangeSafetyGate(nce, tea, causeConfirmed, bias) {
+		if (!nce) return {
+			needed: false,
+			threshold: null,
+			passes: true
+		};
+		const teaValue = Number(tea), biasValue = Number(bias), threshold = Number.isFinite(teaValue) && teaValue > 0 ? teaValue / 4 : null;
+		return {
+			needed: true,
+			threshold,
+			passes: !!causeConfirmed && threshold != null && Number.isFinite(biasValue) && Math.abs(biasValue) <= threshold
+		};
+	}
+	//#endregion
+	//#region src/domain/export/csv-cell.ts
+	function csvCell(value) {
+		if (typeof value === "number") return Number.isFinite(value) ? String(value) : "";
+		let text = value == null ? "" : String(value);
+		if (/^[\s]*[=+\-@]/.test(text)) text = "'" + text;
+		return /[",\n\r;]/.test(text) ? "\"" + text.replace(/"/g, "\"\"") + "\"" : text;
+	}
+	//#endregion
+	//#region src/presentation/report/export-helpers.ts
+	var periodLabel = (value) => {
+		const raw = String(value || "").trim().replace(/^Kỳ\s*/i, ""), iso = raw.match(/^(\d{4})-(\d{1,2})$/), vn = raw.match(/^(\d{1,2})\/(\d{4})$/);
+		if (iso) return String(Number(iso[2])).padStart(2, "0") + "/" + iso[1];
+		if (vn) return String(Number(vn[1])).padStart(2, "0") + "/" + vn[2];
+		return raw || "?";
+	};
+	var reportExportHelpers = Object.freeze({
+		inRange: (start, end) => (point) => (!start || point.date >= start) && (!end || point.date <= end),
+		nceExcerpt: (value, max = 150) => {
+			const text = String(value || "").replace(/\s+/g, " ").trim();
+			if (text.length <= max) return text || "—";
+			return (text.slice(0, max - 1).replace(/\s+\S*$/, "").trim() || text.slice(0, max - 1)) + "…";
+		},
+		sigmaLevels: (row) => {
+			return (Array.isArray(row && row.levels) ? row.levels : [{
+				level: 1,
+				metric: row && row.r1 || null
+			}, {
+				level: 2,
+				metric: row && row.r2 || null
+			}]).filter((value) => value && value.metric);
+		},
+		periodLabel,
+		mdcPeriodLabel: (value) => periodLabel(value).replace(/^0(?=\d\/)/, ""),
+		exportPeriods: (rows) => [...new Set((rows || []).map((row) => periodLabel(row && row.period)).filter(Boolean))].join(", ")
+	});
+	//#endregion
+	//#region src/presentation/nce/action-report-summary.ts
+	function createActionReportSummary(deps) {
+		return (action) => {
+			const labels = deps.labels() || {}, causeLabel = labels.cause && labels.cause[action.causeCategory];
+			return [
+				["Tức thời", deps.excerpt(action.correction || action.containmentNote || "Chưa ghi", 120)],
+				["Nguyên nhân", deps.excerpt([causeLabel, action.cause].filter(Boolean).join(" - ") || "Chưa xác định", 140)],
+				["Khắc phục", deps.excerpt(action.action || "Chưa ghi", 160)]
+			];
+		};
+	}
+	//#endregion
+	//#region src/presentation/nce/action-report-model.ts
+	function createActionReportModel(deps) {
+		return (action, test) => {
+			const labels = deps.labels() || {}, pick = (group, key) => labels[group] && labels[group][key], rerun = deps.rerunStatus(action), workflow = deps.workflowStatus(action), effectiveness = deps.effectivenessStatus(action), risk = deps.riskScore(action), residual = deps.residualRiskScore(action), eventDate = deps.eventDate(action), approval = deps.approvalLabel(action), rerunPoint = rerun && rerun.point, rerunText = rerunPoint ? deps.pointValue(rerunPoint, test) + " " + (test && test.unit || "") + " - " + deps.formatDate(rerunPoint.date) + (rerunPoint.runId ? " - lần " + rerunPoint.runId : "") : rerun.label || "Chưa có kết quả phù hợp";
+			return {
+				modern: +action.protocolVersion >= 2,
+				cancelled: action.recordStatus === "cancelled",
+				nceTitle: action.nceId || "chưa cấp mã",
+				wfLabel: workflow.label || "Chưa hoàn tất",
+				eventDateText: deps.formatDate(eventDate),
+				testLevelText: (test ? deps.testName(test) : "—") + " - " + deps.levelShort(test, action.level, action.lot),
+				ruleErrText: (action.rule || "—") + " - " + (action.errorType || "—"),
+				sourcePhaseText: (pick("source", action.eventSource) || "—") + " - " + (pick("phase", action.processPhase) || "—"),
+				ownerDueText: (action.by || "—") + " - " + (action.dueDate ? deps.formatDate(action.dueDate) : "—"),
+				recordStatusText: action.recordStatus === "cancelled" ? "Đã hủy" : "Đang hiệu lực",
+				containmentText: pick("containment", action.containmentStatus) || "Chưa ghi",
+				containmentNote: action.containmentNote || "—",
+				correctionText: action.correction || "Chưa ghi xử lý tức thời",
+				riskText: (pick("risk", action.riskLevel) || "Chưa đánh giá") + " / " + (risk || "—"),
+				sodText: (action.riskSeverity || "—") + " x " + (action.riskOccurrence || "—") + " x " + (action.riskDetectability || "—"),
+				riskBasis: action.riskBasis || "—",
+				checks: [
+					[
+						"Vật liệu QC",
+						action.qcMaterialStatus,
+						action.qcMaterialNote
+					],
+					[
+						"Máy phân tích",
+						action.instrumentStatus,
+						action.instrumentNote
+					],
+					[
+						"Hóa chất / calibrator",
+						action.reagentStatus,
+						action.reagentNote
+					],
+					[
+						"Hiệu chuẩn",
+						action.calibrationStatus,
+						action.calibrationNote
+					],
+					[
+						"So sánh lot-to-lot",
+						action.lotToLotStatus,
+						action.lotToLotNote
+					]
+				].map(([label, status, note]) => [
+					label,
+					pick("check", status) || "Chưa ghi",
+					note || "—"
+				]),
+				causeCategoryText: pick("cause", action.causeCategory) || "Chưa phân loại",
+				actionCompletedText: action.actionCompletedDate ? deps.formatDate(action.actionCompletedDate) : "—",
+				causeText: action.cause || "Chưa xác định",
+				actionText: action.action || "Chưa ghi",
+				legacyActionText: action.action || action.correction || "—",
+				rerunText,
+				releaseText: pick("release", action.releaseStatus) || "Không áp dụng",
+				releaseWhoText: (action.releaseDate ? deps.formatDate(action.releaseDate) : "—") + " - " + (action.releaseBy || "—"),
+				releaseNote: action.releaseNote || "—",
+				patientText: pick("patient", action.patientImpact) || "Chưa đánh giá",
+				patientAction: action.patientAction || "—",
+				effLabel: effectiveness.label || "Chưa đánh giá",
+				effWhoText: (action.effectivenessDate ? deps.formatDate(action.effectivenessDate) : "—") + " - " + (action.effectivenessBy || "—"),
+				effNote: action.effectivenessNote || "—",
+				residualText: (pick("risk", action.residualRiskLevel) || "Chưa đánh giá") + " / RPN " + (residual || "—"),
+				residualBasis: action.residualRiskBasis || "—",
+				approvalShortText: approval + (action.approvedBy ? " - " + action.approvedBy : ""),
+				approvalText: approval + (action.approvedBy ? " - " + action.approvedBy : "") + (action.approvedAt ? " - " + deps.formatDateTime(action.approvedAt) : ""),
+				approvalNote: action.approvalNote || action.returnNote || "—",
+				cancelText: (action.cancelReason || "Không ghi lý do") + (action.cancelledBy ? " - " + action.cancelledBy : "") + (action.cancelledAt ? " - " + deps.formatDateTime(action.cancelledAt) : "")
+			};
+		};
+	}
+	//#endregion
+	//#region src/presentation/nce/action-csv-row.ts
+	function createActionCsvRow(d) {
+		return (action) => {
+			const test = d.test(action.testId), workflow = d.workflow(action), rerun = d.rerun(action), labels = d.labels() || {};
+			return [
+				action.nceId || "",
+				d.date(d.eventDate(action)),
+				action.createdAt ? d.dateTime(action.createdAt) : "",
+				labels.source?.[action.eventSource] || action.eventSource || "",
+				labels.phase?.[action.processPhase] || action.processPhase || "",
+				test ? d.testName(test) : "",
+				d.level(test, action.level, action.lot),
+				action.rule || "",
+				action.errorType || "",
+				action.action || action.correction || "",
+				d.protocol(action),
+				action.biasBefore || "",
+				action.biasAfter || "",
+				action.by || "",
+				action.dueDate ? d.date(action.dueDate) : "",
+				action.riskSeverity || "",
+				action.riskOccurrence || "",
+				action.riskDetectability || "",
+				d.risk(action),
+				labels.risk?.[action.riskLevel] || action.riskLevel || "",
+				action.riskBasis || "",
+				labels.release?.[action.releaseStatus] || action.releaseStatus || "",
+				action.releaseDate ? d.date(action.releaseDate) : "",
+				action.releaseBy || "",
+				action.releaseNote || "",
+				rerun.label || "",
+				{
+					pending: "Chưa đánh giá",
+					effective: "Có hiệu lực",
+					ineffective: "Chưa hiệu lực"
+				}[action.effectivenessStatus] || action.effectivenessStatus || "",
+				action.effectivenessDate ? d.date(action.effectivenessDate) : "",
+				action.effectivenessNote || "",
+				action.effectivenessBy || "",
+				action.residualSeverity || "",
+				action.residualOccurrence || "",
+				action.residualDetectability || "",
+				d.residualRisk(action),
+				labels.risk?.[action.residualRiskLevel] || action.residualRiskLevel || "",
+				action.residualRiskBasis || "",
+				d.approval(action),
+				action.approvedBy || "",
+				action.approvedAt ? d.dateTime(action.approvedAt) : "",
+				action.approvalNote || "",
+				action.returnNote || "",
+				action.returnBy || "",
+				action.returnAt ? d.dateTime(action.returnAt) : "",
+				action.recordStatus === "cancelled" ? "Đã hủy" : "Đang hoạt động",
+				action.cancelReason || "",
+				action.cancelledBy || "",
+				action.cancelledAt ? d.dateTime(action.cancelledAt) : "",
+				action.parentNceId || "",
+				action.followUpNceId || "",
+				workflow.label || "Chưa hoàn tất"
+			];
+		};
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-canvas.ts
+	function createSigmaCanvas(deps) {
+		return (width, height, value) => {
+			const scale = deps.scale(width, height, value), canvas = deps.create();
+			canvas.width = Math.round(width * scale);
+			canvas.height = Math.round(height * scale);
+			const context = canvas.getContext("2d");
+			context.scale(scale, scale);
+			context.fillStyle = "#fff";
+			context.fillRect(0, 0, width, height);
+			return {
+				cv: canvas,
+				ctx: context
+			};
+		};
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-report-metric.ts
+	function sigmaReportMetric(metric) {
+		return metric ? {
+			cv: metric.cv,
+			bias: metric.bias,
+			biasMethod: metric.biasMethod,
+			biasLabel: metric.biasLabel,
+			tea: metric.tea,
+			teaTarget: metric.teaTarget,
+			teaCriterionRule: metric.teaCriterionRule,
+			teaCriterionPercent: metric.teaCriterionPercent,
+			teaCriterionAbsolute: metric.teaCriterionAbsolute,
+			teaCriterionUnit: metric.teaCriterionUnit,
+			sigma: metric.sigma,
+			dpmo: metric.dpmo,
+			yld: metric.yld,
+			label: metric.label,
+			n: metric.n,
+			cvSource: metric.cvSource,
+			sourceStart: metric.sourceStart,
+			sourceEnd: metric.sourceEnd,
+			sourceLot: metric.sourceLot,
+			cohortStatus: metric.cohortStatus,
+			classifiable: metric.classifiable,
+			qcpEligible: metric.qcpEligible,
+			warning: metric.warning
+		} : null;
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-mdc-items.ts
+	function sigmaMdcItems(rows, levels) {
+		const items = [];
+		(rows || []).forEach((row) => {
+			levels(row).forEach((level) => {
+				const metric = level.metric, tea = Number(metric && metric.tea) || Number(row.tea);
+				if (metric && tea > 0 && metric.classifiable !== false && Number.isFinite(metric.cv) && metric.cv >= 0 && Number.isFinite(metric.bias) && Number.isFinite(metric.sigma)) items.push({
+					name: row.period || row.name,
+					level: level.level,
+					x: metric.cv / tea * 100,
+					y: Math.abs(metric.bias) / tea * 100,
+					sigma: metric.sigma
+				});
+			});
+		});
+		return items;
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-mdc-label-placement.ts
+	function sigmaMdcLabelPlacements(items, X, Y, ctx, bounds, labelFor) {
+		const used = [], points = (items || []).map((point) => ({
+			left: X(point.x) - 9,
+			right: X(point.x) + 9,
+			top: Y(point.y) - 9,
+			bottom: Y(point.y) + 9
+		})), bound = bounds || {}, left = bound.left || 0, right = bound.right || Infinity, top = bound.top || 0, bottom = bound.bottom || Infinity, overlap = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+		return (items || []).map((point, index) => {
+			const label = labelFor(point.name), px = X(point.x), py = Y(point.y), width = Math.ceil(ctx && ctx.measureText ? ctx.measureText(label).width : label.length * 6), height = 12, raw = [
+				[px + 11, py + 3],
+				[px + 11, py - 10],
+				[px + 11, py + 16],
+				[px - width - 11, py + 3],
+				[px - width - 11, py - 10],
+				[px - width - 11, py + 16],
+				[px - width / 2, py - 13],
+				[px - width / 2, py + 20]
+			], candidates = raw.map(([x, y]) => ({
+				x,
+				y,
+				left: x - 2,
+				right: x + width + 2,
+				top: y - height,
+				bottom: y + 3
+			})).filter((candidate) => candidate.left >= left && candidate.right <= right && candidate.top >= top && candidate.bottom <= bottom), score = (candidate) => used.reduce((total, value) => total + (overlap(candidate, value) ? 10 : 0), 0) + points.reduce((total, value, i) => total + (i !== index && overlap(candidate, value) ? 3 : 0), 0), chosen = (candidates.length ? candidates : raw.map(([x, y]) => ({
+				x,
+				y,
+				left: x - 2,
+				right: x + width + 2,
+				top: y - height,
+				bottom: y + 3
+			}))).sort((a, b) => score(a) - score(b))[0];
+			used.push(chosen);
+			return {
+				label,
+				x: chosen.x,
+				y: chosen.y
+			};
+		});
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-export-pixel-ratio.ts
+	function sigmaExportPixelRatio(width, height, scale = 6, maxDimension = 16384) {
+		const W = Number(width), H = Number(height), ratio = Number(scale);
+		if (!(W > 0 && H > 0 && ratio > 0)) return 1;
+		return Math.max(.1, Math.min(ratio, maxDimension / W, maxDimension / H));
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-report-rows.ts
+	function createSigmaReportRows(deps) {
+		return (onlyTestId = "", mode = "latest", period = "", periodId = "") => deps.trackedTests().filter((test) => !onlyTestId || test.id === onlyTestId).flatMap((test) => {
+			const levels = deps.visibleLevels(test);
+			if (!levels.length) return [];
+			const rows = deps.rows(test, deps.data(test.id), levels).filter((row) => row.rs.some(Boolean));
+			if (!rows.length) return [];
+			const selected = mode === "all" ? rows : mode === "period" ? rows.filter((row) => periodId ? row.e.id === periodId : row.e.period === period) : rows.slice(-1), name = deps.testName(test) || "(chưa đặt tên)";
+			return selected.map((row) => {
+				const currentSource = deps.teaSource(test), first = row.rs.find(Boolean), tea = first ? first.tea : deps.entryTea(test, row.e), metrics = levels.map((level, index) => ({
+					level,
+					metric: deps.metric(row.rs[index])
+				})).filter((value) => value.metric), meta = deps.teaMeta(test, row.e.teaSource || currentSource) || {};
+				return {
+					name,
+					period: deps.periodLabel(row.e.period) || row.e.period || "",
+					tea,
+					teaSource: row.e.teaSource || currentSource,
+					teaLabel: row.e.teaLabel || deps.teaLabel(currentSource),
+					teaReference: row.e.teaReference || deps.teaReference(test),
+					teaSourceId: row.e.teaSourceId || meta.id || "",
+					teaSourceVersion: row.e.teaSourceVersion || meta.version || "",
+					teaSourceUrl: row.e.teaSourceUrl || meta.url || "",
+					teaEffectiveDate: row.e.teaEffectiveDate || meta.effectiveDate || "",
+					teaReviewedDate: row.e.teaReviewedDate || meta.reviewedDate || "",
+					teaReviewedBy: row.e.teaReviewedBy || meta.reviewedBy || "",
+					levels: metrics,
+					r1: metrics[0] && metrics[0].metric,
+					r2: metrics[1] && metrics[1].metric
+				};
+			});
+		});
+	}
+	//#endregion
+	//#region src/presentation/report/qc-report-rows.ts
+	function createQcReportRows(deps) {
+		const previousLot = (test, series, inRange) => {
+			const inPoints = series.pts.filter(inRange);
+			if (!inPoints.length) return {
+				inPts: inPoints,
+				items: []
+			};
+			const westgard = deps.westgardByPoint(series.pts, series.mean, series.sd, (rule) => deps.ruleOnWithin(test, rule)), index = new Map(series.pts.map((point, i) => [point.id, i]));
+			return {
+				inPts: inPoints,
+				items: inPoints.map((point) => {
+					const i = index.get(point.id), raw = westgard.F[i] || { rules: [] };
+					return {
+						p: point,
+						f: {
+							...raw,
+							level: deps.resultLevel(test, raw.rules || [])
+						},
+						z: westgard.zs[i]
+					};
+				})
+			};
+		};
+		const currentLot = (test, level, westgard, inRange) => {
+			const points = deps.points(test, level.level).filter(inRange);
+			return {
+				pts: points,
+				items: points.map((point) => {
+					const verdict = westgard.byPoint.get(point.id) || {
+						level: "ok",
+						rules: [],
+						z: (point.val - level.mean) / level.sd
+					};
+					return {
+						p: point,
+						f: verdict,
+						z: verdict.z
+					};
+				})
+			};
+		};
+		const actions = (testId, inRange) => deps.actions().filter((action) => action.testId === testId && inRange({ date: deps.eventDate(action) }));
+		return {
+			previousLot,
+			currentLot,
+			actions
+		};
+	}
+	//#endregion
+	//#region src/presentation/report/qc-report-context.ts
+	function createQcReportContext(deps) {
+		return {
+			teaInfo: (test) => ({
+				teaVal: deps.tea(test),
+				teaSourceText: deps.teaLabel(deps.teaSource(test))
+			}),
+			multiViews: (test, inRange) => deps.levels(test).map((level) => ({
+				level: level.level,
+				lot: level.lot,
+				mean: level.mean,
+				sd: level.sd,
+				pts: deps.points(test, level.level).filter(inRange),
+				label: "M" + level.level + "·" + (level.lot || "?")
+			}))
+		};
+	}
+	//#endregion
+	//#region src/presentation/sigma/data-url-bytes.ts
+	function dataUrlBytes(dataUrl, decode) {
+		const binary = decode(dataUrl.split(",")[1] || ""), bytes = new Uint8Array(binary.length);
+		for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
+		return bytes;
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-export-meta.ts
+	function createSigmaExportMeta(deps) {
+		const meta = () => ({
+			app: deps.app() || {},
+			rules: Object.entries(deps.rules() || {}).filter((entry) => entry[1] !== false).map((entry) => entry[0]).join(", ") || "Chưa cấu hình"
+		}), teaTrace = (rows) => {
+			const groups = /* @__PURE__ */ new Map();
+			(rows || []).forEach((row) => {
+				const trace = [
+					[row.teaLabel || row.teaSource || "TEa", row.teaSourceVersion || ""].filter(Boolean).join(" "),
+					row.teaReference || "",
+					row.teaEffectiveDate ? "hiệu lực " + deps.formatDate(row.teaEffectiveDate) : ""
+				].filter(Boolean).join(" · "), period = deps.periodLabel(row.period);
+				if (!groups.has(trace)) groups.set(trace, /* @__PURE__ */ new Set());
+				groups.get(trace).add(period);
+			});
+			const distinguish = groups.size > 1;
+			return [...groups.entries()].map(([trace, periods]) => trace + (distinguish ? " (kỳ " + [...periods].join(", ") + ")" : "")).join(" | ");
+		};
+		return {
+			meta,
+			teaTrace
+		};
+	}
+	//#endregion
+	//#region src/presentation/report/export-meta-rows.ts
+	function createExportMetaRows(deps) {
+		return (kind = "Báo cáo") => {
+			const app = deps.app() || { version: "dev" }, rules = Object.entries(deps.rules() || {}).filter((entry) => entry[1] !== false).map((entry) => entry[0]).join(", ");
+			return [
+				["Metadata", kind],
+				["Phiên bản app", `${app.name || "QC Lab"} ${app.version || "dev"}`],
+				["Người xuất", deps.userName()],
+				["Thời gian xuất", deps.formatDateTime(deps.now())],
+				["Bộ luật áp dụng", rules || "Chưa cấu hình"]
+			];
+		};
+	}
+	//#endregion
+	//#region src/presentation/report/qc-export-value-format.ts
+	function createQcExportValueFormat(deps) {
+		return {
+			value: (test, value) => deps.testValue(test, value, deps.number),
+			stat: (test, value) => deps.testStat(test, value, deps.number),
+			point: (point, test) => deps.pointValue(point, test, deps.number)
+		};
+	}
+	//#endregion
+	//#region src/presentation/sigma/canvas-font.ts
+	function createCanvasFont(tokenPx) {
+		return (weight, token, fallback) => `${weight ? weight + " " : ""}${tokenPx(token, fallback)}px Arial`;
+	}
+	//#endregion
+	//#region src/presentation/report/report-labels.ts
+	function createReportLabels(formatDate) {
+		return {
+			rangeText: (start, end) => !start && !end ? "Toàn bộ dữ liệu" : start && end ? formatDate(start) + " – " + formatDate(end) : start ? "Từ " + formatDate(start) : "Đến " + formatDate(end),
+			stateName: (value) => value === "rej" ? "Loại" : value === "warn" ? "Cảnh báo" : value === "ok" ? "Đạt" : "Chưa có",
+			verdictLabel: (value) => value === "ok" ? "Đạt" : value === "warn" ? "Cảnh báo" : value === "none" ? "Chưa đánh giá" : "Loại bỏ"
+		};
+	}
+	//#endregion
+	//#region src/presentation/report/report-selection.ts
+	function createReportSelection() {
+		const defaults = (start, end, monthStart, today) => ({
+			start: start || end ? start : `${monthStart}-01`,
+			end: start || end ? end : today
+		});
+		const dateRange = (start, end) => start && end && start > end ? {
+			start: end,
+			end: start
+		} : {
+			start,
+			end
+		};
+		const exportSelection = (tests, testId, start, end, includeNceAppendix) => ({
+			tid: testId,
+			t: tests.find((test) => test.id === testId),
+			start,
+			end,
+			includeNceAppendix
+		});
+		return Object.freeze({
+			defaults,
+			dateRange,
+			exportSelection
+		});
+	}
+	//#endregion
+	//#region src/presentation/report/report-search.ts
+	function createReportSearch() {
+		const select = (tests, query, currentId, values, normalize) => {
+			const needle = normalize(query);
+			const matched = tests.filter((test) => !needle || values(test).some((value) => normalize(value).includes(needle)));
+			return {
+				matched,
+				selected: matched.some((test) => test.id === currentId) ? currentId : matched[0]?.id || ""
+			};
+		};
+		return Object.freeze({ select });
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-mu-trace.ts
+	function createSigmaMuTrace(deps) {
+		return (row, levels) => {
+			const trace = [];
+			(levels || []).forEach((level) => {
+				const item = row.e.lv && row.e.lv[level] || {};
+				if (item.uCalBasis) trace.push("Má»©c " + level + " Â· nguá»“n u(cal): " + deps.escape(item.uCalBasis));
+			});
+			const signed = (levels || []).map((level) => row.e.lv && row.e.lv[level] || {}).find((item) => item.muReviewedBy || item.muReviewedDate);
+			if (signed) trace.push("NgÆ°á»i rÃ\xA0 soÃ¡t ngÃ¢n sÃ¡ch MU: " + deps.escape(signed.muReviewedBy || "â€”") + (signed.muReviewedDate ? " Â· " + deps.formatDate(signed.muReviewedDate) : ""));
+			return trace;
+		};
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-print-rows.ts
+	function createSigmaPrintRows(deps) {
+		const source = (metric) => metric.cvSource === "iqc-period" || metric.cvSource === "iqc-cohort" ? (metric.n || 0) + " Ä‘iá»ƒm" + (metric.sourceLot ? " Â· LÃ´ " + deps.escape(metric.sourceLot) : "") : "Nháº­p tay";
+		const rowCells = (metric) => {
+			const sigma = (metric.classifiable ? "" : "â‰ˆ") + deps.format(metric.sigma, 2);
+			return "<td class=\"num\">" + deps.format(metric.tea, 2) + "</td><td class=\"num\"><b style=\"color:" + deps.escapeAttr(metric.c) + "\">" + sigma + "</b></td><td><span class=\"pill\" style=\"color:" + deps.escapeAttr(metric.c) + "\">" + deps.escape(metric.label) + "</span></td><td class=\"num\">" + deps.format(metric.cv, 2) + "</td><td class=\"num\">" + deps.format(metric.bias, 2) + "</td><td class=\"num\">" + deps.dpmo(metric.dpmo) + "</td><td class=\"num\">" + deps.format(metric.yld, 4) + "%</td><td>" + source(metric) + "</td><td>" + deps.escape(metric.readinessLabel || metric.cohortStatus || "â€”") + "</td>";
+		};
+		const periodRows = (row, levels) => (levels || []).map((level, index) => {
+			const metric = row && row.rs && row.rs[index];
+			return !metric ? "<tr><td>Má»©c " + level + "</td><td colspan=\"9\" class=\"muted\">ChÆ°a Ä‘á»§ CV IQC vÃ\xA0 Bias EQA/EQC Ä‘á»ƒ tÃ­nh Sigma</td></tr>" : "<tr><td><b>Má»©c " + level + "</b></td>" + rowCells(metric) + "</tr>";
+		}).join("");
+		const periodsRows = (rows, levels) => (rows || []).flatMap((row) => {
+			const period = deps.period(row.e.period) || row.e.period || "?";
+			return (levels || []).map((level, index) => {
+				const metric = row.rs && row.rs[index];
+				return !metric ? "<tr><td><b>" + deps.escape(period) + "</b></td><td>Má»©c " + level + "</td><td colspan=\"9\" class=\"muted\">ChÆ°a Ä‘á»§ CV IQC vÃ\xA0 Bias EQA/EQC Ä‘á»ƒ tÃ­nh Sigma</td></tr>" : "<tr><td><b>" + deps.escape(period) + "</b></td><td><b>Má»©c " + level + "</b></td>" + rowCells(metric) + "</tr>";
+			});
+		}).join("");
+		return Object.freeze({
+			periodRows,
+			periodsRows
+		});
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-mu-print-rows.ts
+	function createSigmaMuPrintRows(deps) {
+		const cells = (test, row, level, index) => {
+			const metric = row && row.rs && row.rs[index], mu = metric && metric.mu || deps.mu(test, row.e, level), unit = test && test.unit || "";
+			if (!mu) return "<td colspan=\"7\" class=\"muted\">ChÆ°a cÃ³ CV IQC â€” chÆ°a láº­p Ä‘Æ°á»£c ngÃ¢n sÃ¡ch MU</td>";
+			const uBias = !mu.includeBias ? "KhÃ´ng cá»™ng" : mu.uBias == null ? "ChÆ°a cÃ³ Bias" : deps.format(mu.uBias, 2), uCal = mu.uCal == null ? "ChÆ°a cÃ³ CoA" : deps.format(mu.uCal, 2);
+			const absolute = mu.absoluteU == null ? "â€”" : deps.format(mu.absoluteU, 3) + (unit ? " " + deps.escape(unit) : "");
+			return "<td class=\"num\">" + deps.format(mu.uRw, 2) + "</td><td class=\"num\">" + uBias + "</td><td class=\"num\">" + uCal + "</td><td class=\"num\">" + deps.format(mu.uc, 2) + "</td><td class=\"num\"><b>" + deps.format(mu.U, 2) + "</b></td><td class=\"num\">" + absolute + "</td><td>" + (mu.complete ? "<span class=\"pill\">Äá»§ thÃ\xA0nh pháº§n</span>" : "Thiáº¿u " + deps.escape(mu.missing.join(", "))) + "</td>";
+		};
+		const periodRows = (test, row, levels) => (levels || []).map((level, index) => "<tr><td><b>Má»©c " + level + "</b></td>" + cells(test, row, level, index) + "</tr>").join("");
+		const periodsRows = (test, rows, levels) => (rows || []).flatMap((row) => {
+			const period = deps.period(row.e.period) || row.e.period || "?";
+			return (levels || []).map((level, index) => "<tr><td><b>" + deps.escape(period) + "</b></td><td><b>Má»©c " + level + "</b></td>" + cells(test, row, level, index) + "</tr>");
+		}).join("");
+		return Object.freeze({
+			periodRows,
+			periodsRows
+		});
+	}
+	//#endregion
+	//#region src/presentation/report/report-points-table.ts
+	function createReportPointsTable(deps) {
+		return (items, test) => {
+			if (!items.length) return "<p><i>Không có điểm nào trong khoảng ngày đã chọn.</i></p>";
+			return "<table><tr><th>Ngày</th><th>Lần chạy</th><th>NV</th><th class=\"num\">Giá trị</th><th class=\"num\">Z</th><th>Kết luận</th><th>Luật / bằng chứng</th></tr>" + items.map((item) => {
+				const rules = [...new Set(item.f.rules || [])], support = [...new Set(item.f.supportRules || [])].filter((rule) => !rules.includes(rule));
+				const ruleText = rules.join(", ") || (support.length ? "Bằng chứng: " + support.join(", ") : "—"), verdict = deps.verdict(item.f.level), staff = deps.staff(item.p);
+				return "<tr><td>" + deps.formatDate(item.p.date) + "</td><td>" + deps.escape(item.p.runId || "—") + "</td><td>" + deps.escape(staff.code || "—") + "</td><td class=\"num\">" + deps.pointValue(item.p, test) + "</td><td class=\"num\">" + (item.z >= 0 ? "+" : "") + deps.format(item.z) + "s</td><td>" + deps.escape(verdict) + "</td><td>" + deps.escape(ruleText) + "</td></tr>";
+			}).join("") + "</table>";
+		};
+	}
+	//#endregion
+	//#region src/presentation/nce/action-report-html.ts
+	function createActionReportHtml(escape) {
+		const summary = (parts) => "<div class=\"nce-summary\">" + parts.map(([label, text]) => "<div><b>" + escape(label) + ":</b> " + escape(text) + "</div>").join("") + "</div>";
+		const detailField = (label, value, wide = false) => "<div" + (wide ? " class=\"nce-detail-wide\"" : "") + "><span>" + escape(label) + "</span><b>" + escape(value || "—") + "</b></div>";
+		return Object.freeze({
+			summary,
+			detailField
+		});
+	}
+	//#endregion
+	//#region src/application/storage/sigma-draft-service.ts
+	function createSigmaDraftService(deps) {
+		const read = () => {
+			try {
+				const value = JSON.parse(deps.get(deps.key) || "null");
+				return value && typeof value === "object" && value.branches && typeof value.branches === "object" ? value : null;
+			} catch {
+				return null;
+			}
+		};
+		const stamp = () => Number(read()?.savedAt || 0);
+		const persist = (testId, sigmaData, path) => {
+			if (!testId) return false;
+			try {
+				const persistedAt = Number(deps.get(deps.savedAtKey) || 0), previous = read(), branches = previous && Number(previous.savedAt || 0) > persistedAt ? { ...previous.branches } : {};
+				branches[String(testId)] = deps.clone(sigmaData && sigmaData[testId] || []);
+				const savedAt = Math.max(deps.now(), Number(previous?.savedAt || 0) + 1);
+				deps.set(deps.key, JSON.stringify({
+					savedAt,
+					path,
+					branches
+				}));
+				return true;
+			} catch {
+				return false;
+			}
+		};
+		const clearThrough = (value) => {
+			try {
+				const current = read();
+				if (current && Number(current.savedAt || 0) <= Number(value || 0)) deps.remove(deps.key);
+			} catch {}
+		};
+		return Object.freeze({
+			read,
+			stamp,
+			persist,
+			clearThrough
+		});
+	}
+	//#endregion
+	//#region src/application/storage/state-adoption-service.ts
+	function createStateAdoptionService(deps) {
+		const sanitize = (value) => {
+			const errors = deps.validate(value);
+			if (errors.length) throw new Error(errors.join("\n"));
+			return deps.sanitize(value, { owned: true });
+		};
+		const assertInvariants = (value) => {
+			const errors = deps.invariants(value, { sanitized: true });
+			if (errors.length) throw new Error(errors.join("\n"));
+			return value;
+		};
+		return Object.freeze({
+			sanitize,
+			assertInvariants
+		});
+	}
+	//#endregion
+	//#region src/application/storage/corrupt-local-quarantine.ts
+	function createCorruptLocalQuarantine(now) {
+		return (raw, error) => ({
+			capturedAt: now(),
+			source: "localStorage:qclab",
+			message: error && error.message ? error.message : "Dá»¯ liá»‡u cá»¥c bá»™ khÃ´ng há»£p lá»‡.",
+			raw: String(raw || "")
+		});
+	}
+	//#endregion
+	//#region src/domain/sync/value-codec.ts
+	function createSyncValueCodec() {
+		const clone = (value) => value === void 0 ? void 0 : JSON.parse(JSON.stringify(value));
+		const cloudValue = (value) => value === void 0 ? null : clone(value);
+		const json = (value) => JSON.stringify(value === void 0 ? null : value);
+		return Object.freeze({
+			clone,
+			cloudValue,
+			json
+		});
+	}
+	//#endregion
+	//#region src/domain/sync/firebase-config-selection.ts
+	function createFirebaseConfigSelection(keys) {
+		const select = (deploy, stored) => deploy && deploy.locked ? deploy : stored || deploy;
+		const signature = (config) => JSON.stringify(Object.fromEntries(keys.map((key) => [key, String(config && config[key] || "")])));
+		return Object.freeze({
+			select,
+			signature
+		});
+	}
+	//#endregion
+	//#region src/domain/sync/firebase-connection-gate.ts
+	function createFirebaseConnectionGate() {
+		const canWrite = (connection) => !!(connection.ready && connection.initialized && connection.ref);
+		const networkOnline = (online) => online !== false;
+		return Object.freeze({
+			canWrite,
+			networkOnline
+		});
+	}
+	//#endregion
+	//#region src/domain/sync/snapshot-signature.ts
+	function syncSnapshotSignature(value) {
+		if (!value) return "empty";
+		const text = JSON.stringify(value);
+		let hash = 0;
+		for (let index = 0; index < text.length; index++) hash = hash * 31 + text.charCodeAt(index) >>> 0;
+		return text.length + ":" + hash.toString(36);
+	}
+	//#endregion
+	//#region src/domain/sync/firebase-identity.ts
+	function createFirebaseIdentity() {
+		const dataPath = (config) => "qclab-shared/" + String(config && config.labCode || "default").replace(/[.#$/\[\]]/g, "_");
+		const statusLabel = (config, user) => (user.email || (user.isAnonymous ? "áº©n danh" : "Ä‘Ã£ xÃ¡c thá»±c")) + " Â· " + (config.labCode || "default") + " Â· " + dataPath(config);
+		return Object.freeze({
+			dataPath,
+			statusLabel
+		});
+	}
+	//#endregion
+	//#region src/domain/sync/firebase-audit-gate.ts
+	function createFirebaseAuditGate(verify) {
+		return (snapshot) => verify(snapshot && snapshot.activity || [], snapshot && snapshot.activityAnchor || "");
+	}
+	//#endregion
+	//#region src/application/sync/firebase-polling-service.ts
+	function createFirebasePollingService(clock) {
+		const stop = (timer) => {
+			if (timer) clock.clearInterval(timer);
+			return null;
+		};
+		const start = (timer, pull, interval = 8e3) => {
+			stop(timer);
+			return clock.setInterval(pull, interval);
+		};
+		return Object.freeze({
+			stop,
+			start
+		});
+	}
+	//#endregion
+	//#region src/domain/sync/firebase-lifecycle-state.ts
+	function firebaseDisconnectedState(current, clearAuthUser) {
+		return {
+			...current,
+			ready: false,
+			initialized: false,
+			ref: null,
+			synced: null,
+			seenSig: null,
+			...clearAuthUser ? { authUser: null } : {}
+		};
+	}
+	//#endregion
+	//#region src/domain/sync/firebase-pull-gate.ts
+	function firebaseCanPull(connection) {
+		return !!(connection && connection.ref && connection.authUser);
+	}
+	//#endregion
+	//#region src/application/sync/firebase-pull-service.ts
+	function createFirebasePullService(deps) {
+		const pull = async (connection) => {
+			if (!deps.canPull(connection)) return false;
+			try {
+				const snapshot = await deps.read(connection.ref);
+				deps.handle(snapshot.val(), { silent: true });
+				return true;
+			} catch {
+				return false;
+			}
+		};
+		return Object.freeze({ pull });
+	}
+	//#endregion
+	//#region src/application/sync/firebase-merge-application.ts
+	function createFirebaseMergeApplication(deps) {
+		return (base, mergeFirstConnect, local, remote) => base ? deps.merge(local, remote, base) : mergeFirstConnect ? deps.firstMerge(local, remote) : remote;
+	}
+	//#endregion
+	//#region src/application/storage/local-partition-helpers.ts
+	function createLocalPartitionHelpers() {
+		const key = (slot, type, id) => "partition:" + slot + ":" + type + (id == null ? "" : ":" + id);
+		const nextSlot = (current) => current === "a" ? "b" : "a";
+		const shell = (state) => ({
+			...state,
+			data: {}
+		});
+		return Object.freeze({
+			key,
+			nextSlot,
+			shell
+		});
+	}
+	//#endregion
+	//#region src/application/storage/local-snapshot-record.ts
+	function createLocalSnapshotRecord(deps) {
+		const state = (value) => ({
+			key: deps.key,
+			savedAt: deps.now(),
+			state: deps.clone(value)
+		});
+		const serialized = (value) => ({
+			key: deps.key,
+			savedAt: deps.now(),
+			json: String(value)
+		});
+		return Object.freeze({
+			state,
+			serialized
+		});
+	}
+	//#endregion
+	//#region src/application/storage/local-partition-validation.ts
+	function localPartitionValid(manifest, shell, rows) {
+		if (!manifest || !shell || !shell.state || Number(shell.savedAt || 0) > Number(manifest.savedAt || 0)) return false;
+		return !(rows || []).some((row) => !row || !Array.isArray(row.points) || Number(row.savedAt || 0) > Number(manifest.savedAt || 0));
+	}
+	//#endregion
+	//#region src/application/storage/local-recovery-slots.ts
+	function localRecoverySlots(preferred) {
+		return preferred === "a" ? ["a", "b"] : preferred === "b" ? ["b", "a"] : [preferred, preferred === "a" ? "b" : "a"];
+	}
+	//#endregion
+	//#region src/application/storage/local-partition-transaction.ts
+	function createLocalPartitionTransaction(deps) {
+		const draft = (state, currentSlot, dirtyTestIds, currentManifest) => {
+			const data = state && state.data || {}, testIds = Object.keys(data), dirty = Array.isArray(dirtyTestIds) ? [...new Set(dirtyTestIds.map(String))] : null;
+			const incremental = !!(currentManifest && dirty);
+			return {
+				data,
+				testIds,
+				dirtyTestIds: dirty,
+				incremental,
+				slot: incremental ? currentSlot : deps.nextSlot(currentSlot)
+			};
+		};
+		const finalize = (state, currentManifest, slotManifest, draftPlan) => {
+			const partitions = draftPlan.incremental ? draftPlan.dirtyTestIds.filter((id) => Object.prototype.hasOwnProperty.call(draftPlan.data, id)) : draftPlan.testIds;
+			const removedTestIds = (slotManifest && Array.isArray(slotManifest.testIds) ? slotManifest.testIds : []).filter((id) => !draftPlan.testIds.includes(id));
+			return {
+				...draftPlan,
+				savedAt: Math.max(deps.now(), Number(currentManifest && currentManifest.savedAt || 0) + 1),
+				shell: deps.shell(state),
+				partitions,
+				removedTestIds
+			};
+		};
+		return Object.freeze({
+			draft,
+			finalize
+		});
+	}
+	//#endregion
+	//#region src/application/storage/local-partition-recovery.ts
+	function createLocalPartitionRecovery(valid) {
+		return (slot, manifest, shell, rows) => {
+			if (slot !== "a" && slot !== "b" || !valid(manifest, shell, rows)) return null;
+			const testIds = Array.isArray(manifest.testIds) ? manifest.testIds : [], data = {};
+			testIds.forEach((testId, index) => {
+				data[testId] = rows[index].points;
+			});
+			return {
+				slot,
+				savedAt: manifest.savedAt || 0,
+				state: {
+					...shell.state,
+					data
+				}
+			};
+		};
+	}
+	//#endregion
+	//#region src/application/storage/local-clear-keys.ts
+	function createLocalClearKeys(key, stateKey) {
+		return (manifests) => {
+			const keys = [stateKey, "partition:latest"];
+			["a", "b"].forEach((slot, index) => {
+				keys.push(key(slot, "manifest"), key(slot, "shell"));
+				(manifests[index] && Array.isArray(manifests[index].testIds) ? manifests[index].testIds : []).forEach((testId) => keys.push(key(slot, "data", testId)));
+			});
+			return keys;
+		};
+	}
+	//#endregion
+	//#region src/domain/sync/firebase-snapshot-gate.ts
+	function firebaseSnapshotGate(seenSignature, nextSignature) {
+		return {
+			handle: !(nextSignature && nextSignature === seenSignature),
+			seenSignature: nextSignature
+		};
+	}
+	//#endregion
+	//#region src/domain/sync/firebase-empty-snapshot.ts
+	function firebaseEmptySnapshotPlan(initialized, dirty, hasLocalContent) {
+		const firstSnapshot = !initialized;
+		return {
+			firstSnapshot,
+			push: dirty || firstSnapshot && hasLocalContent
+		};
+	}
+	//#endregion
+	//#region src/domain/sync/firebase-remote-snapshot.ts
+	function createFirebaseRemoteSnapshot(validate, sanitize) {
+		return (value) => {
+			const errors = validate(value);
+			return {
+				errors,
+				remote: errors.length ? null : sanitize(value)
+			};
+		};
+	}
+	//#endregion
+	//#region src/domain/sync/firebase-own-snapshot.ts
+	function firebaseOwnSnapshotPlan(snapshot, clientId) {
+		return { own: !!(snapshot && snapshot._client && snapshot._client === clientId) };
+	}
+	//#endregion
+	//#region src/domain/sync/firebase-first-connect-plan.ts
+	function firebaseFirstConnectPlan(base, dirty, localHasContent, statesEqual) {
+		const sameFirstConnectData = !base && !dirty && localHasContent && statesEqual;
+		return {
+			mergeFirstConnect: dirty || sameFirstConnectData,
+			confirmConflict: !base && !dirty && localHasContent && !sameFirstConnectData
 		};
 	}
 	//#endregion
@@ -4345,6 +7174,134 @@
 		});
 	}
 	//#endregion
+	//#region src/application/nce/action-rerun-service.ts
+	function createActionRerunService(deps) {
+		const rerunMemo = /* @__PURE__ */ new Map(), pointIndexMemo = /* @__PURE__ */ new Map(), lotIndexMemo = /* @__PURE__ */ new Map();
+		const invalidate = (testId) => {
+			if (testId == null) {
+				rerunMemo.clear();
+				pointIndexMemo.clear();
+				lotIndexMemo.clear();
+				return;
+			}
+			pointIndexMemo.delete(testId);
+			[...lotIndexMemo.keys()].forEach((key) => {
+				if (key.startsWith(testId + "|")) lotIndexMemo.delete(key);
+			});
+			[...rerunMemo.keys()].forEach((key) => {
+				if (rerunMemo.get(key)?.testId === testId) rerunMemo.delete(key);
+			});
+		};
+		const pointIndex = (testId) => {
+			const points = deps.pointsFor(testId) || null, hit = pointIndexMemo.get(testId);
+			if (hit && hit.points === points && hit.len === (points ? points.length : -1)) return hit.index;
+			const index = deps.pointIndex(points);
+			pointIndexMemo.set(testId, {
+				points,
+				len: points ? points.length : -1,
+				index
+			});
+			return index;
+		};
+		const point = (action) => action?.pointId ? pointIndex(String(action.testId || "")).get(action.pointId) || null : null;
+		const lotPoints = (testId, level, lot) => {
+			const points = deps.pointsFor(testId) || null, key = `${testId}|${level}|${lot || ""}`, hit = lotIndexMemo.get(key);
+			if (hit && hit.points === points && hit.len === (points ? points.length : -1)) return hit.list;
+			const list = deps.lotPoints(points, level, lot, deps.runNumber);
+			lotIndexMemo.set(key, {
+				points,
+				len: points ? points.length : -1,
+				list
+			});
+			return list;
+		};
+		const signature = (action, test) => [
+			action.id,
+			action.testId,
+			action.pointId,
+			Number(action.protocolVersion) || 0,
+			action.actionCompletedDate || "",
+			action.parentNceId || "",
+			action.date || "",
+			action.openedFromVoid ? 1 : 0,
+			test?.decimalPlaces ?? "auto"
+		].join("|");
+		const compute = (action) => {
+			const test = deps.testFor(action.testId), incident = point(action), needed = deps.needsRerun(action), gateDate = incident ? deps.gateDate(action, incident) : "";
+			return deps.evaluate({
+				action,
+				needed,
+				point: incident,
+				gateDate,
+				incidentRunNumber: incident ? deps.runNumber(incident) : 0,
+				candidates: incident ? lotPoints(action.testId, incident.level, incident.lot || "") : [],
+				runNumber: deps.runNumber,
+				verdictFor: (id) => deps.verdictFor(test, id),
+				formatValue: (value) => deps.formatValue(value, test),
+				formatDate: deps.formatDate
+			});
+		};
+		const status = (action) => {
+			if (!action || !action.id) return compute(action || {});
+			const points = deps.pointsFor(action.testId) || null, sig = signature(action, deps.testFor(action.testId)), hit = rerunMemo.get(action.id);
+			if (hit && hit.sig === sig && hit.points === points && hit.len === (points ? points.length : -1)) return hit.result;
+			const result = compute(action);
+			rerunMemo.set(action.id, {
+				sig,
+				testId: action.testId,
+				points,
+				len: points ? points.length : -1,
+				result
+			});
+			return result;
+		};
+		return Object.freeze({
+			invalidate,
+			pointIndex,
+			point,
+			lotPoints,
+			status
+		});
+	}
+	//#endregion
+	//#region src/application/nce/action-point-index-service.ts
+	function createActionPointIndexService(getActions) {
+		let memo = {
+			ref: null,
+			len: -1,
+			index: null
+		};
+		const index = () => {
+			const actions = getActions() || [];
+			if (memo.ref === actions && memo.len === actions.length && memo.index) return memo.index;
+			const next = /* @__PURE__ */ new Map();
+			actions.forEach((action) => {
+				const key = action.pointId, items = next.get(key);
+				if (items) items.push(action);
+				else next.set(key, [action]);
+			});
+			memo = {
+				ref: actions,
+				len: actions.length,
+				index: next
+			};
+			return next;
+		};
+		const forPoint = (pointId) => index().get(pointId) || [];
+		const invalidate = () => {
+			memo = {
+				ref: null,
+				len: -1,
+				index: null
+			};
+		};
+		return Object.freeze({
+			index,
+			forPoint,
+			invalidate
+		});
+	}
+	//#endregion
 	//#region src/presentation/state/ui-state.ts
 	function installUiState(root, namespace, initialState) {
 		const target = root;
@@ -4456,6 +7413,408 @@
 	installUiState(root, "ReagentUIState", createReagentUiState());
 	installUiState(root, "SigmaUIState", createSigmaUiState());
 	root.ChartViewModel = chartViewModel;
+	root.qcPointRunNumber = qcPointRunNumber;
+	root.qcCusumConfig = qcCusumConfig;
+	root.normalizeSearchText = normalizeSearchText;
+	root.qcLevelTargetValid = qcLevelTargetValid;
+	root.qcLotMeanSd = qcLotMeanSd;
+	root.qcLotTargetSnapshot = qcLotTargetSnapshot;
+	root.reportLevelStatsService = createReportLevelStats(root.QCCore.stats);
+	root.qcErrorDetail = createQcErrorDetail({
+		errorType: (rules) => root.QCCore.errorType(rules),
+		primaryRule: (rules) => root.QCCore.primaryErrorRule(rules),
+		descriptions: root.QCCore.WG_RULE_DESCRIPTIONS
+	});
+	root.qcPlannedTarget = qcPlannedTarget;
+	root.qcPointVoidVerdict = createQcPointVoidVerdict({
+		configuredLot: (test, level) => (root.lvlCfg(test, level) || {}).lot || "",
+		activeVerdict: (test, pointId) => root.activeWestgard(test).byPoint.get(pointId),
+		parallelVerdict: (test, input, pointId) => root.parallelWestgard(test, input).byPoint.get(pointId)
+	});
+	root.qcLotGroupOperational = qcLotGroupOperational;
+	root.qcDerivedIndex = createQcDerivedIndex({
+		operationalGroup: qcLotGroupOperational,
+		switchesLot: (transition) => root.transitionSwitchesLot(transition)
+	});
+	root.qcAcceptedLotPoints = createAcceptedLotPoints({
+		pointTarget: root.QCCore.pointTarget,
+		latestRules: root.QCCore.westgardLatestRulesFromZ
+	});
+	root.qcActiveWestgard = createActiveWestgard({
+		single: root.QCCore.westgardByPoint,
+		multi: root.QCCore.westgardMultiByPoint
+	});
+	root.qcCusumSeries = createCusumSeries(root.QCCore.cusumMovingAverage);
+	root.qcParallelWestgard = createParallelWestgard(root.QCCore.westgardByPoint);
+	root.qcEntryColumns = createQcEntryColumns({
+		levels: (test) => root.operationalLevels(test),
+		parallel: (test, level) => root.parallelLotForLevel(test, level)
+	});
+	root.qcEntryColumnPoints = selectEntryColumnPoints;
+	root.syncCanon = syncCanon;
+	root.syncedShape = syncedShape;
+	root.syncJsonMap = syncJsonMap;
+	root.mergeSyncArray = mergeSyncArray;
+	root.mergeSyncBranch = mergeSyncBranch;
+	root.uniqueSyncUsers = uniqueSyncUsers;
+	var syncConfig = root.fbSyncMergeConfig;
+	if (syncConfig) {
+		root.syncSnapshot = createSyncSnapshot(syncConfig.top, syncJsonMap);
+		root.syncStateMerge = createSyncStateMerge(syncConfig);
+		root.syncUpdateBuilder = createSyncUpdateBuilder({
+			...syncConfig,
+			snapshot: root.syncSnapshot
+		});
+		root.syncFirstConnectMerge = createFirstConnectMerge({
+			...syncConfig,
+			merge: root.syncStateMerge,
+			uniqueUsers: uniqueSyncUsers
+		});
+		root.syncHasContent = (source) => hasSyncContent(source, syncConfig.contentKeys);
+	}
+	root.syncRetryScheduler = createSyncRetryScheduler({
+		setTimeout: (fn, delay) => globalThis.setTimeout(fn, delay),
+		clearTimeout: (timer) => globalThis.clearTimeout(timer)
+	});
+	root.qcPreviousLotHistory = previousLotHistory;
+	root.qcLotGroupLevels = lotGroupLevels;
+	root.qcPointCache = createPointCacheService(() => state.data || {}, (point) => root.pointRunNo(point));
+	root.qcNormalizeDuplicateRunIds = createRunIdNormalizer((point) => root.pointRunNo(point));
+	root.qcNormalizePointLots = createPointLotNormalizer({
+		id: () => root.uid(),
+		today: () => root.isoToday(),
+		normalizeRuns: (source) => root.qcNormalizeDuplicateRunIds?.(source)
+	});
+	root.qcLotLineage = qcLotLineage;
+	root.qcLevelConfig = qcLevelConfig;
+	root.qcOperationalAccess = createQcOperationalAccess({
+		test: (test) => root.isOperationalTest(test),
+		levels: (test) => root.operationalLevels(test),
+		panel: (test) => root.operationalPanelForTest(test),
+		group: (level) => root.operationalLotGroupForLevel(level),
+		activePoints: (test, level, withIndex) => root.activeLotPoints(test, level, withIndex),
+		display: (test) => root.testDisplayName(test)
+	});
+	root.qcParallelLotLookup = createParallelLotLookup({
+		level: qcLevelConfig,
+		panel: (test) => root.operationalPanelForTest(test),
+		transitions: () => state.lotTransitions || [],
+		lots: () => state.qcLots || [],
+		target: (test, level, lotId, lotNo) => root.lotTargetSnapshot(test, level, lotId, lotNo)
+	});
+	root.westgardWorkerJobBuilder = createWestgardWorkerJob({
+		globalRules: () => state.westgardRules || {},
+		levels: (test) => root.operationalLevels(test),
+		points: (testId) => state.data?.[testId] || []
+	});
+	root.westgardWorkerRevisionService = createWestgardWorkerRevisionService();
+	root.westgardWorkerHydrate = hydrateWestgardWorkerResult;
+	root.westgardWorkerPrewarmPlanner = createWestgardWorkerPrewarmPlanner(3e3);
+	root.storageSerializePolicy = createStorageSerializePolicy(() => typeof performance !== "undefined" && performance.now ? performance.now() : Date.now());
+	root.localSaveScheduler = createSaveScheduler({
+		setTimeout: (fn, delay) => globalThis.setTimeout(fn, delay),
+		clearTimeout: (timer) => globalThis.clearTimeout(timer),
+		cancelIdle: typeof globalThis.cancelIdleCallback === "function" ? (handle) => globalThis.cancelIdleCallback(handle) : null
+	});
+	root.storageRetryDelay = storageRetryDelay;
+	root.saveDerivedTestIds = saveDerivedTestIds;
+	root.planPartitionWrite = planPartitionWrite;
+	root.qcValueFormat = createQcValueFormat();
+	root.qcStaffIdentity = createQcStaffIdentity();
+	root.qcDateFormat = createQcDateFormat();
+	root.qcLotTargetHistory = createLotTargetHistory(() => uid());
+	root.teaAnalyteMetaService = createTeaAnalyteMeta(() => typeof TEA_ANALYTE_CATALOG === "undefined" ? [] : TEA_ANALYTE_CATALOG);
+	root.qcLevelReconciliation = createQcLevelReconciliation();
+	root.qcRangeLimitRepair = createRangeLimitRepair((mean, sd, k) => root.QCCore.limitsFromTarget(mean, sd, k));
+	root.qcConfigurationRelations = reconcileConfigurationRelations;
+	root.qcTestConfiguration = normalizeTestConfiguration;
+	root.qcStateFoundation = normalizeStateFoundation;
+	root.qcStateLifecycle = normalizeStateLifecycle;
+	root.csvDownload = createCsvDownload({
+		createBlob: (text) => new Blob([text], { type: "text/csv;charset=utf-8" }),
+		createUrl: (blob) => URL.createObjectURL(blob),
+		revokeUrl: (url) => URL.revokeObjectURL(url),
+		download: (url, name) => {
+			const anchor = document.createElement("a");
+			anchor.href = url;
+			anchor.download = name;
+			anchor.click();
+		},
+		schedule: (work, delay) => globalThis.setTimeout(work, delay)
+	});
+	root.cssTokenPixel = (token, fallback) => cssTokenPixel(token, fallback, (key) => typeof getComputedStyle === "function" && typeof document !== "undefined" ? getComputedStyle(document.documentElement).getPropertyValue("--" + key) : "");
+	root.blobDownload = createBlobDownload({
+		createUrl: (blob) => URL.createObjectURL(blob),
+		revokeUrl: (url) => URL.revokeObjectURL(url),
+		download: (url, name) => {
+			const anchor = document.createElement("a");
+			anchor.href = url;
+			anchor.download = name;
+			anchor.click();
+		},
+		schedule: (work, delay) => globalThis.setTimeout(work, delay)
+	});
+	root.qcReportCsvRows = createQcReportCsvRows({
+		test: (id) => (state.tests || []).find((test) => test.id === id),
+		lab: () => state.lab || {},
+		meta: (kind) => root.exportMetaRows(kind),
+		range: (start, end) => root.reportRangeText(start, end),
+		testName: (test) => root.testDisplayName(test),
+		tea: (test) => root.sgTea(test),
+		teaSource: (test) => root.sgTeaSource(test),
+		teaLabel: (source) => root.sgTeaLabel(source),
+		teaReference: (test) => root.sgTeaRefText(test),
+		levels: (test) => root.operationalLevels(test),
+		previous: (test, level) => root.previousLotSeries(test, level),
+		rows: root.qcReportRowsService,
+		westgard: (test) => root.activeWestgard(test),
+		staff: (point) => root.pointStaff(point),
+		date: (value) => root.vnDate(value),
+		number: (value, decimals) => root.fmt(value, decimals),
+		state: (value) => root.stateName(value),
+		error: (rules) => root.errorType(rules),
+		stats: (points, mean, tea) => root.reportLevelStats(points, mean, tea),
+		levelLabel: (test, level, lot) => root.actionLevelShort(test, level, lot),
+		workflow: (action) => root.actionWorkflowStatus(action),
+		rerun: (action) => root.actionRerunStatus(action),
+		protocol: (action) => root.actionProtocolSummary(action),
+		approval: (action) => root.actionApprovalLabel(action)
+	});
+	var legacyDerivedCacheState = root.legacyDerivedCacheState;
+	if (legacyDerivedCacheState) root.derivedCacheInvalidation = createDerivedCacheInvalidation({
+		...legacyDerivedCacheState,
+		pointCache: () => root.qcPointCache,
+		westgardCache: () => root.westgardMemoCache,
+		acceptedCache: () => root.qcAcceptedMemoCache,
+		cusumCache: () => root.qcCusumMemoCache,
+		invalidateWestgardWorker: (testId) => root.invalidateWestgardWorker(testId),
+		invalidateActionCaches: (testId) => root.invalidateActionCaches(testId)
+	});
+	root.qcBasicFormat = createBasicFormat();
+	root.westgardRulePolicy = createWestgardRulePolicy({
+		rules: root.QCCore.WG_RULES,
+		enabled: (rule) => root.QCCore.ruleEnabled(state.westgardRules, rule),
+		levels: (test) => root.operationalLevels(test),
+		resolveAction: root.QCCore.resolveRuleAction,
+		resolveScope: root.QCCore.resolveRuleScope,
+		onInScope: root.QCCore.ruleOnInScope,
+		verdict: root.QCCore.ruleVerdictLevel
+	});
+	root.westgardMemoCache = createWestgardMemoCache();
+	root.qcCusumMemoCache = createCusumMemoCache();
+	root.qcAcceptedMemoCache = createAcceptedMemoCache();
+	root.westgardRuleSettings = createWestgardRuleSettings({
+		defaults: root.QCCore.WG_DEFAULT_ON ? Object.fromEntries(root.QCCore.WG_RULES.map((rule) => [rule, root.QCCore.WG_DEFAULT_ON.has(rule)])) : {},
+		getState: () => state,
+		ruleEnabled: (rules, rule) => root.QCCore.ruleEnabled(rules, rule),
+		requireWrite: () => requireWrite(),
+		save: () => save({}),
+		rerender: () => rerender()
+	});
+	root.qcRangeCandidateService = createRangeCandidateService({
+		tests: () => state.tests || [],
+		actions: () => state.actions || [],
+		levelConfig: (test, level) => lvlCfg(test, level),
+		points: (test, level) => globalThis.operationalLotPoints(test, level),
+		westgard: (test) => globalThis.activeWestgard(test),
+		pointZ: (point, mean, sd) => root.QCCore.pointZ(point, mean, sd),
+		stats: (values) => root.QCCore.stats(values),
+		actionCancelled: (action) => typeof globalThis.actionCancelled === "function" && globalThis.actionCancelled(action),
+		systematicRules: root.QCCore.WG_SE_RULES,
+		limitsFromTarget: (mean, sd, k) => root.QCCore.limitsFromTarget(mean, sd, k)
+	});
+	root.qcRangeSafetyGate = rangeSafetyGate;
+	root.csvCellService = csvCell;
+	root.reportExportHelpers = reportExportHelpers;
+	root.actionReportSummary = createActionReportSummary({
+		labels: () => typeof globalThis.ACTION_LABELS === "object" ? globalThis.ACTION_LABELS : {},
+		excerpt: (value, max) => root.reportExportHelpers.nceExcerpt(value, max)
+	});
+	root.actionReportModel = createActionReportModel({
+		labels: () => typeof globalThis.ACTION_LABELS === "object" ? globalThis.ACTION_LABELS : {},
+		rerunStatus: (action) => typeof globalThis.actionRerunStatus === "function" ? globalThis.actionRerunStatus(action) : { label: "" },
+		workflowStatus: (action) => typeof globalThis.actionWorkflowStatus === "function" ? globalThis.actionWorkflowStatus(action) : { label: "Chưa hoàn tất" },
+		effectivenessStatus: (action) => typeof globalThis.actionEffectivenessStatus === "function" ? globalThis.actionEffectivenessStatus(action) : { label: "Chưa đánh giá" },
+		riskScore: (action) => typeof globalThis.actionRiskScore === "function" ? globalThis.actionRiskScore(action) : 0,
+		residualRiskScore: (action) => typeof globalThis.actionResidualRiskScore === "function" ? globalThis.actionResidualRiskScore(action) : 0,
+		eventDate: (action) => typeof globalThis.actionEventDate === "function" ? globalThis.actionEventDate(action) : action.date,
+		approvalLabel: (action) => typeof globalThis.actionApprovalLabel === "function" ? globalThis.actionApprovalLabel(action) : action.approvalStatus || "Chờ duyệt",
+		pointValue: (point, test) => globalThis.dataIoQcPoint(point, test),
+		formatDate: (value) => vnDate(value),
+		formatDateTime: (value) => formatDateTimeVN(value),
+		testName: (test) => globalThis.testDisplayName(test),
+		levelShort: (test, level, lot) => globalThis.actionLevelShort(test, level, lot)
+	});
+	root.nceCsvRow = createActionCsvRow({
+		test: (id) => (state.tests || []).find((test) => test.id === id),
+		workflow: (action) => root.actionWorkflowStatus(action),
+		rerun: (action) => root.actionRerunStatus(action),
+		labels: () => globalThis.ACTION_LABELS || {},
+		date: (value) => root.vnDate(value),
+		dateTime: (value) => root.formatDateTimeVN(value),
+		eventDate: (action) => root.actionEventDate(action),
+		testName: (test) => root.testDisplayName(test),
+		level: (test, level, lot) => root.actionLevelShort(test, level, lot),
+		protocol: (action) => root.actionProtocolSummary(action),
+		risk: (action) => root.actionRiskScore(action),
+		residualRisk: (action) => root.actionResidualRiskScore(action),
+		approval: (action) => root.actionApprovalLabel(action)
+	});
+	root.sigmaCanvasFactory = createSigmaCanvas({
+		scale: (width, height, value) => root.sigmaExportPixelRatio(width, height, value),
+		create: () => document.createElement("canvas")
+	});
+	root.sigmaReportMetricService = sigmaReportMetric;
+	root.sigmaMdcItemsService = (rows) => sigmaMdcItems(rows, globalThis.sigmaLevelsOf);
+	root.sigmaMdcLabelPlacementService = (items, X, Y, ctx, bounds) => sigmaMdcLabelPlacements(items, X, Y, ctx, bounds, globalThis.sigmaMdcPeriodLabel);
+	root.sigmaExportPixelRatioService = sigmaExportPixelRatio;
+	root.sigmaReportRowsService = createSigmaReportRows({
+		trackedTests: () => typeof globalThis.sgTrackedTests === "function" ? globalThis.sgTrackedTests() : [],
+		visibleLevels: (test) => typeof globalThis.sgVisibleLevels === "function" ? globalThis.sgVisibleLevels(test) : (test.levels || []).map((level) => level.level),
+		rows: (test, data, levels) => globalThis.sgRows(test, data, levels),
+		data: (id) => globalThis.sgData(id),
+		teaSource: (test) => typeof globalThis.sgTeaSource === "function" ? globalThis.sgTeaSource(test) : test.teaSource || "ricos",
+		entryTea: (test, entry) => typeof globalThis.sgEntryTea === "function" ? globalThis.sgEntryTea(test, entry) : globalThis.sgTea(test),
+		testName: (test) => globalThis.testDisplayName(test),
+		periodLabel: (value) => globalThis.vnPeriod(value),
+		metric: (value) => root.sigmaReportMetricService(value),
+		teaMeta: (test, source) => typeof globalThis.sgTeaSourceMeta === "function" ? globalThis.sgTeaSourceMeta(test, source) : {},
+		teaLabel: (source) => typeof globalThis.sgTeaLabel === "function" ? globalThis.sgTeaLabel(source) : source,
+		teaReference: (test) => typeof globalThis.sgTeaRefText === "function" ? globalThis.sgTeaRefText(test) : ""
+	});
+	root.qcReportRowsService = createQcReportRows({
+		westgardByPoint: (points, mean, sd, on) => root.QCCore.westgardByPoint(points, mean, sd, on),
+		ruleOnWithin: (test, rule) => globalThis.testRuleOnWithin(test, rule),
+		resultLevel: (test, rules) => globalThis.ruleResultLevel(test, rules),
+		points: (test, level) => globalThis.operationalLotPoints(test, level),
+		actions: () => state.actions || [],
+		eventDate: (action) => typeof globalThis.actionEventDate === "function" ? globalThis.actionEventDate(action) : action.date
+	});
+	root.qcReportContext = createQcReportContext({
+		tea: (test) => typeof globalThis.sgTea === "function" ? globalThis.sgTea(test) : test.tea || 0,
+		teaSource: (test) => typeof globalThis.sgTeaSource === "function" ? globalThis.sgTeaSource(test) : "",
+		teaLabel: (source) => typeof globalThis.sgTeaLabel === "function" ? globalThis.sgTeaLabel(source) : "Ricos / Westgard biological variation",
+		levels: (test) => globalThis.operationalLevels(test),
+		points: (test, level) => globalThis.operationalLotPoints(test, level)
+	});
+	root.sigmaDataUrlBytes = (value) => dataUrlBytes(value, (encoded) => atob(encoded));
+	root.sigmaExportMetaService = createSigmaExportMeta({
+		app: () => typeof window !== "undefined" ? window.QCLAB_APP || {} : {},
+		rules: () => state.westgardRules || {},
+		formatDate: (value) => vnDate(value),
+		periodLabel: (value) => globalThis.sigmaPeriodLabel(value)
+	});
+	root.exportMetaRowsService = createExportMetaRows({
+		app: () => typeof window !== "undefined" ? window.QCLAB_APP || { version: "dev" } : { version: "dev" },
+		rules: () => state.westgardRules || {},
+		userName: () => userName(),
+		formatDateTime: (value) => formatDateTimeVN(value),
+		now: () => (/* @__PURE__ */ new Date()).toISOString()
+	});
+	root.qcExportValueFormat = createQcExportValueFormat({
+		testValue: (test, value, number) => typeof globalThis.fmtTestValue === "function" ? globalThis.fmtTestValue(test, value) : number(value, 3),
+		testStat: (test, value, number) => typeof globalThis.fmtTestStat === "function" ? globalThis.fmtTestStat(test, value) : number(value, 3),
+		pointValue: (point, test, number) => typeof globalThis.fmtPointValue === "function" ? globalThis.fmtPointValue(point, test) : number(point && point.val, Math.max(2, Number(point && point.valueDecimals) || 0)),
+		number: (value, decimals) => fmt(value, decimals)
+	});
+	root.sigmaCanvasFont = createCanvasFont((token, fallback) => {
+		if (typeof getComputedStyle === "function" && typeof document !== "undefined") {
+			const value = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--" + token));
+			if (Number.isFinite(value)) return value;
+		}
+		return fallback;
+	});
+	root.reportLabels = createReportLabels((value) => vnDate(value));
+	root.reportSelection = createReportSelection();
+	root.reportSearch = createReportSearch();
+	root.sigmaMuTraceService = createSigmaMuTrace({
+		escape: (value) => typeof globalThis.esc === "function" ? globalThis.esc(value) : String(value ?? ""),
+		formatDate: (value) => vnDate(value)
+	});
+	root.sigmaPrintRowsService = createSigmaPrintRows({
+		escape: (value) => typeof globalThis.esc === "function" ? globalThis.esc(value) : String(value ?? ""),
+		escapeAttr: (value) => typeof globalThis.escAttr === "function" ? globalThis.escAttr(value) : String(value ?? ""),
+		format: (value, decimals) => fmt(value, decimals),
+		dpmo: (value) => globalThis.sgFmtDPMO(value),
+		period: (value) => typeof globalThis.vnPeriod === "function" ? globalThis.vnPeriod(value) : String(value ?? "")
+	});
+	root.sigmaMuPrintRowsService = createSigmaMuPrintRows({
+		mu: (test, entry, level) => typeof globalThis.sgMU === "function" ? globalThis.sgMU(test, entry, level) : void 0,
+		format: (value, decimals) => fmt(value, decimals),
+		escape: (value) => typeof globalThis.esc === "function" ? globalThis.esc(value) : String(value ?? ""),
+		period: (value) => typeof globalThis.vnPeriod === "function" ? globalThis.vnPeriod(value) : String(value ?? "")
+	});
+	root.reportPointsTableService = createReportPointsTable({
+		formatDate: (value) => vnDate(value),
+		escape: (value) => typeof globalThis.esc === "function" ? globalThis.esc(value) : String(value ?? ""),
+		pointValue: (point, test) => typeof globalThis.reportQcPoint === "function" ? globalThis.reportQcPoint(point, test) : fmt(point && point.val, 3),
+		format: (value, decimals) => fmt(value, decimals),
+		verdict: (value) => typeof globalThis.qcVerdictLabel === "function" ? globalThis.qcVerdictLabel(value) : String(value ?? ""),
+		staff: (point) => typeof globalThis.pointStaff === "function" ? globalThis.pointStaff(point) : {}
+	});
+	root.actionReportHtml = createActionReportHtml((value) => typeof globalThis.esc === "function" ? globalThis.esc(value) : String(value ?? ""));
+	root.sigmaDraftService = createSigmaDraftService({
+		get: (key) => localStorage.getItem(key),
+		set: (key, value) => localStorage.setItem(key, value),
+		remove: (key) => localStorage.removeItem(key),
+		now: () => Date.now(),
+		clone: (value) => JSON.parse(JSON.stringify(value)),
+		key: "qclab_sigma_draft",
+		savedAtKey: "qclab_saved_at"
+	});
+	root.stateAdoptionService = createStateAdoptionService({
+		validate: (value) => root.QCCore.validateBackup(value),
+		sanitize: (value, options) => root.QCCore.sanitizeBackup(value, options),
+		invariants: (value, options) => root.QCCore.validateStateInvariants(value, options)
+	});
+	root.corruptLocalQuarantine = createCorruptLocalQuarantine(() => (/* @__PURE__ */ new Date()).toISOString());
+	root.syncValueCodec = createSyncValueCodec();
+	root.firebaseConfigSelection = createFirebaseConfigSelection([
+		"apiKey",
+		"authDomain",
+		"databaseURL",
+		"projectId",
+		"appId"
+	]);
+	root.firebaseConnectionGate = createFirebaseConnectionGate();
+	root.syncSnapshotSignature = syncSnapshotSignature;
+	root.firebaseIdentity = createFirebaseIdentity();
+	root.firebaseAuditGate = createFirebaseAuditGate((entries, anchor) => root.QCCore.verifyAuditChain(entries, anchor));
+	root.firebasePollingService = createFirebasePollingService({
+		setInterval: (fn, ms) => globalThis.setInterval(fn, ms),
+		clearInterval: (timer) => globalThis.clearInterval(timer)
+	});
+	root.firebaseDisconnectedState = firebaseDisconnectedState;
+	root.firebaseCanPull = firebaseCanPull;
+	root.firebasePullService = createFirebasePullService({
+		read: (ref) => ref.once("value"),
+		handle: (value, options) => globalThis.fbHandleValue(value, options),
+		canPull: firebaseCanPull
+	});
+	root.firebaseMergeApplication = createFirebaseMergeApplication({
+		merge: (local, remote, base) => globalThis.fbMerge(local, remote, base),
+		firstMerge: (local, remote) => globalThis.fbFirstConnectMerge(local, remote)
+	});
+	root.localPartitionHelpers = createLocalPartitionHelpers();
+	root.localSnapshotRecord = createLocalSnapshotRecord({
+		clone: (value) => typeof structuredClone === "function" ? structuredClone(value) : JSON.parse(JSON.stringify(value)),
+		now: () => Date.now(),
+		key: "state"
+	});
+	root.localPartitionValid = localPartitionValid;
+	root.localRecoverySlots = localRecoverySlots;
+	root.localPartitionTransaction = createLocalPartitionTransaction({
+		nextSlot: (value) => root.localPartitionHelpers.nextSlot(value),
+		shell: (value) => root.localPartitionHelpers.shell(value),
+		now: () => Date.now()
+	});
+	root.localPartitionRecovery = createLocalPartitionRecovery(localPartitionValid);
+	root.localClearKeys = createLocalClearKeys((slot, type, id) => root.localPartitionHelpers.key(slot, type, id), "state");
+	root.firebaseSnapshotGate = firebaseSnapshotGate;
+	root.firebaseEmptySnapshotPlan = firebaseEmptySnapshotPlan;
+	root.firebaseRemoteSnapshot = createFirebaseRemoteSnapshot((value) => root.QCCore.validateBackup(value), (value) => root.QCCore.sanitizeBackup(value));
+	root.firebaseOwnSnapshotPlan = firebaseOwnSnapshotPlan;
+	root.firebaseFirstConnectPlan = firebaseFirstConnectPlan;
 	root.SigmaPresentation = sigmaPresentation;
 	root.SigmaPeriodViewModel = createSigmaPeriodViewModel({
 		sigmaMetric: (tea, bias, cv) => root.QCCore.sigmaMetric(tea, bias, cv),
@@ -4644,6 +8003,49 @@
 	});
 	root.qcPointWarnings = (test, config, date, runId, value) => qcPointWarnings(state.data && state.data[test.id] || [], config, date, runId, value);
 	root.PeriodService = createPeriodService({ cleanText: root.QCCore.cleanText });
+	root.AuditService = createAuditService({
+		getState: () => state,
+		uid: () => typeof root.uid === "function" ? root.uid() : "",
+		nowIso: () => (/* @__PURE__ */ new Date()).toISOString(),
+		actor: () => typeof root.auditActor === "function" ? root.auditActor() : {
+			user: "",
+			username: "",
+			userId: "",
+			role: "",
+			clientId: ""
+		},
+		entryHash: (entry) => typeof root.auditEntryHash === "function" ? root.auditEntryHash(entry) : "",
+		verifyChain: (activity, anchor) => typeof root.auditVerifyChain === "function" ? root.auditVerifyChain(activity, anchor) : {
+			ok: true,
+			checked: 0,
+			legacy: 0
+		},
+		limits: () => {
+			const config = typeof root.auditRuntimeConfig === "function" ? root.auditRuntimeConfig() : {
+				hardCap: 5e4,
+				rotateTo: 4e4
+			};
+			return {
+				hardCap: config.hardCap,
+				rotateTo: config.rotateTo
+			};
+		},
+		autoVerifyMax: typeof root.auditRuntimeConfig === "function" ? root.auditRuntimeConfig().autoVerifyMax : 5e3
+	});
+	root.ActionRerunService = createActionRerunService({
+		pointsFor: (testId) => state.data?.[testId],
+		testFor: (testId) => state.tests?.find((test) => test.id === testId),
+		runNumber: (point) => root.pointRunNo(point),
+		lotPoints: (points, level, lot, runNumber) => root.NceActionQcIndex.actionLotPoints(points, level, lot, runNumber),
+		pointIndex: (points) => root.NceActionQcIndex.actionPointIndex(points),
+		needsRerun: (action) => root.actionNeedsRerun(action),
+		gateDate: (action, point) => root.actionRerunGateDate(action, point),
+		evaluate: (input) => root.NceActionRerunEvaluator.evaluateActionRerun(input),
+		verdictFor: (test, pointId) => root.activeWestgard(test).byPoint.get(pointId) || { level: "ok" },
+		formatValue: (point, test) => root.fmtPointValue(point, test),
+		formatDate: (value) => vnDate(value)
+	});
+	root.ActionPointIndexService = createActionPointIndexService(() => state.actions || []);
 	root.EntryService = createEntryService({
 		cleanText: root.QCCore.cleanText,
 		cleanId: root.QCCore.cleanId,

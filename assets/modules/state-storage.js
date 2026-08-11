@@ -26,9 +26,10 @@
 let localLoadStatus='missing';
 let storageHydrationPromise=Promise.resolve(true),partitionSlot='';
 const SIGMA_DRAFT_KEY='qclab_sigma_draft';
-function sigmaDraftRecord(){try{const v=JSON.parse(localStorage.getItem(SIGMA_DRAFT_KEY)||'null');return v&&typeof v==='object'&&v.branches&&typeof v.branches==='object'?v:null;}catch(e){return null;}}
-function sigmaDraftStamp(){const v=sigmaDraftRecord();return Number(v&&v.savedAt||0);}
+function sigmaDraftRecord(){return globalThis.sigmaDraftService?globalThis.sigmaDraftService.read():(()=>{try{const v=JSON.parse(localStorage.getItem(SIGMA_DRAFT_KEY)||'null');return v&&typeof v==='object'&&v.branches&&typeof v.branches==='object'?v:null;}catch(e){return null;}})();}
+function sigmaDraftStamp(){return globalThis.sigmaDraftService?globalThis.sigmaDraftService.stamp():Number((sigmaDraftRecord()||{}).savedAt||0);}
 function persistSigmaDraft(testId){
+  if(globalThis.sigmaDraftService)return globalThis.sigmaDraftService.persist(testId,state.sigmaData,typeof fbDataPath==='function'?fbDataPath():'');
   if(!testId)return false;
   try{
     const persistedAt=Number(localStorage.getItem('qclab_saved_at')||0),previous=sigmaDraftRecord(),branches=previous&&Number(previous.savedAt||0)>persistedAt?{...previous.branches}:{};
@@ -38,6 +39,7 @@ function persistSigmaDraft(testId){
   }catch(e){return false;}
 }
 function clearSigmaDraftThrough(stamp){
+  if(globalThis.sigmaDraftService)return globalThis.sigmaDraftService.clearThrough(stamp);
   try{const current=sigmaDraftRecord();if(current&&Number(current.savedAt||0)<=Number(stamp||0))localStorage.removeItem(SIGMA_DRAFT_KEY);}catch(e){}
 }
 function sigmaDraftNeedsCloud(){try{const cfg=typeof getFbCfg==='function'?getFbCfg():null;return!!(cfg&&cfg.config);}catch(e){return false;}}
@@ -54,6 +56,7 @@ function recoverPendingSigmaDraft(){
   }catch(e){return false;}
 }
 function quarantineCorruptLocal(raw,error){
+  if(globalThis.corruptLocalQuarantine){try{localStorage.setItem('qclab_corrupt',JSON.stringify(globalThis.corruptLocalQuarantine(raw,error)));}catch(e){try{localStorage.setItem('qclab_corrupt',JSON.stringify({capturedAt:new Date().toISOString(),source:'localStorage:qclab',message:'KhÃ´ng Ä‘á»§ dung lÆ°á»£ng Ä‘á»ƒ lÆ°u toÃ n bá»™ dá»¯ liá»‡u há»ng.'}));}catch(ignore){}}return;}
   try{
     const record={capturedAt:new Date().toISOString(),source:'localStorage:qclab',message:error&&error.message?error.message:'Dữ liệu cục bộ không hợp lệ.',raw:String(raw||'')};
     localStorage.setItem('qclab_corrupt',JSON.stringify(record));
@@ -66,6 +69,7 @@ function quarantineCorruptLocal(raw,error){
    Gán thẳng vào `state` toàn cục — caller tự chịu mem/partitionSlot/
    localLoadStatus/startupProblem theo ngữ cảnh của mình. */
 function adoptValidatedState(parsed){
+  if(globalThis.stateAdoptionService){state=globalThis.stateAdoptionService.sanitize(parsed);ensureShape({sanitized:true});globalThis.stateAdoptionService.assertInvariants(state);return;}
   const errors=QCCore.validateBackup(parsed);if(errors.length)throw new Error(errors.join('\n'));
   state=QCCore.sanitizeBackup(parsed,{owned:true});ensureShape({sanitized:true});
   const invariantErrors=QCCore.validateStateInvariants(state,{sanitized:true});if(invariantErrors.length)throw new Error(invariantErrors.join('\n'));
@@ -163,19 +167,22 @@ let lsIncrementalStreak=0,lsLastFullSaveAt=(typeof Date!=='undefined'?Date.now()
 let LS_FULL_ROTATE_MAX_INCREMENTALS=25,LS_FULL_ROTATE_MAX_MS=10*60*1000;
 function lsClock(){return typeof performance!=='undefined'&&performance.now?performance.now():Date.now();}
 function serializeStateForStorage(){
+  if(globalThis.storageSerializePolicy){const raw=globalThis.storageSerializePolicy.serialize(state,lsRevision),s=globalThis.storageSerializePolicy.stats();lsLastSerializeMs=s.ms;lsLastBytes=s.bytes;lsSerializeCount=s.count;lsSerialized=raw;lsSerializedRevision=lsRevision;return raw;}
   if(lsSerializedRevision===lsRevision&&lsSerialized)return lsSerialized;
   const started=lsClock(),raw=JSON.stringify(state);
   lsLastSerializeMs=lsClock()-started;lsLastBytes=raw.length;lsSerializeCount++;
   lsSerialized=raw;lsSerializedRevision=lsRevision;return raw;
 }
-function lsSaveDelay(){return lsLastBytes>8*1024*1024||lsLastSerializeMs>30?1200:lsLastBytes>2*1024*1024||lsLastSerializeMs>10?700:400;}
+function lsSaveDelay(){return globalThis.storageSerializePolicy?globalThis.storageSerializePolicy.delay():lsLastBytes>8*1024*1024||lsLastSerializeMs>30?1200:lsLastBytes>2*1024*1024||lsLastSerializeMs>10?700:400;}
 function cancelLocalSaveSchedule(){
+  if(globalThis.localSaveScheduler)globalThis.localSaveScheduler.cancel();
   clearTimeout(lsSaveT);lsSaveT=null;
   if(lsIdleHandle!==null&&typeof cancelIdleCallback==='function')cancelIdleCallback(lsIdleHandle);
   lsIdleHandle=null;
 }
 function scheduleLocalSave(){
   cancelLocalSaveSchedule();
+  if(globalThis.localSaveScheduler){globalThis.localSaveScheduler.schedule(lsSaveDelay(),()=>{if(typeof requestIdleCallback==='function')lsIdleHandle=requestIdleCallback(()=>{lsIdleHandle=null;lsFlush();},{timeout:1000});else lsFlush();});return;}
   lsSaveT=setTimeout(()=>{
     lsSaveT=null;
     if(typeof requestIdleCallback==='function')lsIdleHandle=requestIdleCallback(()=>{lsIdleHandle=null;lsFlush();},{timeout:1000});
@@ -187,7 +194,7 @@ function scheduleLocalSave(){
    thành công reset lsSaveFailures về 0. */
 function scheduleLocalRetry(){
   cancelLocalSaveSchedule();
-  const delay=Math.min(30000,1000*Math.pow(2,Math.min(lsSaveFailures,5)));
+  const delay=globalThis.storageRetryDelay?globalThis.storageRetryDelay(lsSaveFailures):Math.min(30000,1000*Math.pow(2,Math.min(lsSaveFailures,5)));
   lsSaveT=setTimeout(()=>{lsSaveT=null;lsFlush();},delay);
 }
 /* Một lần serialize dùng chung cho localStorage và IndexedDB. Snapshot lớn được
@@ -202,10 +209,9 @@ function persistLocalSnapshot(opts={}){
        manifest của slot đang hoạt động về danh sách test rỗng, mất toàn bộ
        điểm QC của slot. Hoãn ghi (giữ lsDirty, hẹn lại) tới khi hydrate xong. */
     if(localLoadStatus==='partition-shell'){lsDirty=true;scheduleLocalSave();return false;}
-    const now=Date.now();
-    if(!lsFullDirty&&(lsIncrementalStreak>=LS_FULL_ROTATE_MAX_INCREMENTALS||now-lsLastFullSaveAt>=LS_FULL_ROTATE_MAX_MS))lsFullDirty=true;
-    const dirtyTestIds=lsFullDirty?null:[...lsDirtyTestIds];
-    if(dirtyTestIds===null){lsIncrementalStreak=0;lsLastFullSaveAt=now;}else lsIncrementalStreak++;
+    const now=Date.now();let dirtyTestIds;
+    if(globalThis.planPartitionWrite){const plan=globalThis.planPartitionWrite({fullDirty:lsFullDirty,streak:lsIncrementalStreak,lastFull:lsLastFullSaveAt,now,maxIncrementals:LS_FULL_ROTATE_MAX_INCREMENTALS,maxMs:LS_FULL_ROTATE_MAX_MS,dirtyTestIds:[...lsDirtyTestIds]});dirtyTestIds=plan.dirtyTestIds;lsIncrementalStreak=plan.streak;lsLastFullSaveAt=plan.lastFull;}
+    else{if(!lsFullDirty&&(lsIncrementalStreak>=LS_FULL_ROTATE_MAX_INCREMENTALS||now-lsLastFullSaveAt>=LS_FULL_ROTATE_MAX_MS))lsFullDirty=true;dirtyTestIds=lsFullDirty?null:[...lsDirtyTestIds];if(dirtyTestIds===null){lsIncrementalStreak=0;lsLastFullSaveAt=now;}else lsIncrementalStreak++;}
     lsFullDirty=false;lsDirtyTestIds.clear();
     partitionWrite=partitionWrite.catch(()=>false).then(()=>LocalStore.writePartitioned(state,partitionSlot,{dirtyTestIds})).then(result=>{
       if(!result)throw new Error('Không thể ghi snapshot phân vùng.');
@@ -232,8 +238,8 @@ if(typeof window!=='undefined'&&window.addEventListener)window.addEventListener(
 if(typeof window!=='undefined'&&window.addEventListener)window.addEventListener('pagehide',lsFlush);
 if(typeof document!=='undefined'&&document.addEventListener)document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')lsFlush();});
 function invalidateDerivedForSave(opts={}){
-  if(opts.clearDerived===false)return;
-  const ids=Array.isArray(opts.testIds)?opts.testIds:(opts.testId?[opts.testId]:[]);
+  const ids=globalThis.saveDerivedTestIds?globalThis.saveDerivedTestIds(opts):(opts.clearDerived===false?null:(Array.isArray(opts.testIds)?opts.testIds:(opts.testId?[opts.testId]:[])));
+  if(ids===null)return;
   if(ids.length)[...new Set(ids.filter(Boolean))].forEach(clearDerivedForTest);else clearDerived();
 }
 function save(opts={}){

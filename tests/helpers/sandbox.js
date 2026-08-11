@@ -31,6 +31,12 @@ function loadSandbox(relFiles, globals = {}) {
   // ngay trước nó trong index.html) — chèn giúp để mọi test cũ khỏi phải liệt kê.
   const sigmaIndex=files.indexOf('modules/sigma.js');
   if(sigmaIndex>=0&&!files.includes('modules/sigma-tea.js'))files.splice(sigmaIndex,0,'modules/sigma-tea.js');
+  // Audit classic giờ chỉ là compatibility bridge; nạp artifact TypeScript ngay sau nó
+  // để các test sandbox vẫn phản ánh đúng thứ tự runtime trong index.html.
+  const auditIndex=files.indexOf('modules/audit.js');
+  if(auditIndex>=0&&!files.includes('generated/modular-pilot.js'))files.splice(auditIndex+1,0,'generated/modular-pilot.js');
+  const actionWorkflowIndex=files.indexOf('modules/action-workflow-service.js');
+  if(actionWorkflowIndex>=0&&!files.includes('generated/modular-pilot.js'))files.splice(actionWorkflowIndex+1,0,'generated/modular-pilot.js');
   files.forEach(relPath => {
     const code = fs.readFileSync(path.join(ASSETS_DIR, relPath), 'utf8');
     vm.runInContext(code, context, { filename: relPath });

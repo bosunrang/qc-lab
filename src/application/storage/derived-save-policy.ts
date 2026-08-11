@@ -1,0 +1,1 @@
+export function saveDerivedTestIds(opts:any={}){if(opts.clearDerived===false)return null;const ids=Array.isArray(opts.testIds)?opts.testIds:(opts.testId?[opts.testId]:[]);return[...new Set(ids.filter(Boolean))];}

@@ -1,0 +1,1 @@
+export function sigmaExportPixelRatio(width:unknown,height:unknown,scale:unknown=6,maxDimension=16384){const W=Number(width),H=Number(height),ratio=Number(scale);if(!(W>0&&H>0&&ratio>0))return 1;return Math.max(.1,Math.min(ratio,maxDimension/W,maxDimension/H));}

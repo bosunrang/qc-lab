@@ -1,13 +1,14 @@
 /* ===== STATE ===== */
-const teaAnalyteKey=v=>String(v==null?'':v).trim().toLowerCase();
+const teaAnalyteKey=v=>globalThis.teaAnalyteMetaService?globalThis.teaAnalyteMetaService.key(v):String(v==null?'':v).trim().toLowerCase();
 const REFTESTS=Object.freeze(TEA_ANALYTE_CATALOG.map(row=>Object.freeze([row.name,row.unit,row.tea.clia,row.tea.ricos,row.section])));
 const TEA_ANALYTE_META=Object.freeze(Object.fromEntries(TEA_ANALYTE_CATALOG.map(row=>{const aliases=[row.name,row.abbreviation].filter(Boolean),displayName=row.abbreviation&&teaAnalyteKey(row.abbreviation)!==teaAnalyteKey(row.name)?`${row.name} (${row.abbreviation})`:row.name;return[teaAnalyteKey(row.name),Object.freeze({analyteId:row.analyteId,displayName,standardName:row.name,abbreviation:row.abbreviation||'',aliases:Object.freeze(aliases),matrix:row.matrix})];})));
 const TEA_ANALYTE_META_BY_ID=Object.freeze(Object.fromEntries(Object.values(TEA_ANALYTE_META).map(m=>[m.analyteId,m])));
 /** @returns {any} */
-function teaAnalyteBuiltInMeta(value){const key=teaAnalyteKey(value);return TEA_ANALYTE_META[key]||Object.values(TEA_ANALYTE_META).find(m=>m.aliases.some(a=>teaAnalyteKey(a)===key))||{};}
+function teaAnalyteBuiltInMeta(value){if(globalThis.teaAnalyteMetaService)return globalThis.teaAnalyteMetaService.builtIn(value);const key=teaAnalyteKey(value);return TEA_ANALYTE_META[key]||Object.values(TEA_ANALYTE_META).find(m=>m.aliases.some(a=>teaAnalyteKey(a)===key))||{};}
+function teaAnalyteMetaById(id){return globalThis.teaAnalyteMetaService?globalThis.teaAnalyteMetaService.byId(id):TEA_ANALYTE_META_BY_ID[id]||{};}
 /** @param {any} [record] @returns {any} */
-function teaAnalyteMeta(name,record){const custom=record&&typeof record==='object'?record:{},base=custom.analyteId&&TEA_ANALYTE_META_BY_ID[custom.analyteId]||teaAnalyteBuiltInMeta(name),aliases=[name,base.displayName,base.standardName,base.abbreviation,...(base.aliases||[]),custom.displayName,custom.standardName,custom.abbreviation,...(custom.aliases||[])].filter(Boolean);return{analyteId:custom.analyteId||base.analyteId||'',displayName:custom.displayName||base.displayName||name||'',standardName:custom.standardName||base.standardName||name||'',abbreviation:custom.abbreviation||base.abbreviation||'',aliases:[...new Set(aliases)],matrix:custom.matrix||base.matrix||''};}
-function teaAnalyteDisplay(name,record){return teaAnalyteMeta(name,record).displayName||name||'';}
+function teaAnalyteMeta(name,record){return globalThis.teaAnalyteMetaService?globalThis.teaAnalyteMetaService.meta(name,record):(()=>{const custom=record&&typeof record==='object'?record:{},base=custom.analyteId&&TEA_ANALYTE_META_BY_ID[custom.analyteId]||teaAnalyteBuiltInMeta(name),aliases=[name,base.displayName,base.standardName,base.abbreviation,...(base.aliases||[]),custom.displayName,custom.standardName,custom.abbreviation,...(custom.aliases||[])].filter(Boolean);return{analyteId:custom.analyteId||base.analyteId||'',displayName:custom.displayName||base.displayName||name||'',standardName:custom.standardName||base.standardName||name||'',abbreviation:custom.abbreviation||base.abbreviation||'',aliases:[...new Set(aliases)],matrix:custom.matrix||base.matrix||''};})();}
+function teaAnalyteDisplay(name,record){return globalThis.teaAnalyteMetaService?globalThis.teaAnalyteMetaService.display(name,record):teaAnalyteMeta(name,record).displayName||name||'';}
 const TEA_REFERENCE_SCHEMA_VERSION=3;
 const TEA_SOURCE_REGISTRY=Object.freeze({
   lab:Object.freeze({id:'qclab-standardized-tea',label:'TEa chuẩn hóa của phòng xét nghiệm',version:'Danh mục nội bộ',document:'Bảng TEa chuẩn hóa của phòng xét nghiệm',url:'',effectiveDate:'',reviewedDate:'',reviewedBy:'',status:'reviewed',note:'Giá trị TEa do phòng xét nghiệm lựa chọn, phê duyệt và duy trì nhất quán cho từng xét nghiệm.'}),
@@ -21,7 +22,10 @@ const WG_DEFAULT=Object.fromEntries(WG_RULES.map(r=>[r,QCCore.WG_DEFAULT_ON.has(
 const STATE_SCHEMA_VERSION=QCCore.STATE_SCHEMA_VERSION;
 let state={lab:/** @type {any} */({name:'',dept:'',address:''}),tests:[],machines:["Máy A"],instruments:[],assayGroups:[],qcPanels:[],lotTransitions:[],lotGroups:[],qcLots:[],data:{},actions:[],activity:[],activityAnchor:'',users:[],reagentTests:[],reagentOperators:[],reagentSampleTypes:['Mẫu bệnh nhân','Mẫu nội kiểm (IQC)','Mẫu ngoại kiểm (EQA)'],sigmaData:{},periodLocks:[],teaRefs:[],teaRegistryVersion:TEA_REFERENCE_SCHEMA_VERSION,westgardRules:{...WG_DEFAULT},configMigrationVersion:1,schemaVersion:STATE_SCHEMA_VERSION};
 let mem=null,pointsCache=new Map(),pointsIndexCache=new Map(),pointsLotCache=new Map(),wgMemo=new Map(),acceptedMemo=new Map(),cusumMemo=new Map(),derivedIndex=null,startupProblem=null;
-function ensureShape(opts={}){const previousSchema=Number(state&&state.schemaVersion||1),merged={lab:/** @type {any} */({name:'',dept:'',address:''}),tests:[],machines:["Máy A"],instruments:[],assayGroups:[],qcPanels:[],lotTransitions:[],lotGroups:[],qcLots:[],data:{},actions:[],activity:[],activityAnchor:'',users:[],reagentTests:[],reagentOperators:[],reagentSampleTypes:['Mẫu bệnh nhân','Mẫu nội kiểm (IQC)','Mẫu ngoại kiểm (EQA)'],sigmaData:{},periodLocks:[],teaRefs:[],teaRegistryVersion:TEA_REFERENCE_SCHEMA_VERSION,westgardRules:{...WG_DEFAULT},...(state||{})};state=opts.sanitized?merged:QCCore.sanitizeBackup(merged);
+/* Cầu nối cho service TS: các Map này là lexical global của script cổ, không thể được
+   bundle ES module đọc trực tiếp. Chỉ cấp đúng thao tác invalidation cần thiết. */
+globalThis.legacyDerivedCacheState={pointCaches:()=>[pointsCache,pointsIndexCache,pointsLotCache,cusumMemo],westgardMemo:()=>wgMemo,acceptedMemo:()=>acceptedMemo,cusumMemo:()=>cusumMemo,resetDerivedIndex:()=>{derivedIndex=null;},resetStatus:()=>{statusMemo=new Map();},clearStatus:testId=>{if(statusMemo&&statusMemo.delete)statusMemo.delete(testId);}};
+function ensureShape(opts={}){let previousSchema;if(globalThis.qcStateFoundation){const normalized=globalThis.qcStateFoundation(state,opts,{defaults:()=>({lab:/** @type {any} */({name:'',dept:'',address:''}),tests:[],machines:["Máy A"],instruments:[],assayGroups:[],qcPanels:[],lotTransitions:[],lotGroups:[],qcLots:[],data:{},actions:[],activity:[],activityAnchor:'',users:[],reagentTests:[],reagentOperators:[],reagentSampleTypes:['Mẫu bệnh nhân','Mẫu nội kiểm (IQC)','Mẫu ngoại kiểm (EQA)'],sigmaData:{},periodLocks:[],teaRefs:[],teaRegistryVersion:TEA_REFERENCE_SCHEMA_VERSION,westgardRules:{...WG_DEFAULT}}),sanitize:value=>QCCore.sanitizeBackup(value),schemaVersion:STATE_SCHEMA_VERSION,teaRegistryVersion:TEA_REFERENCE_SCHEMA_VERSION,westgardDefaults:WG_DEFAULT});state=normalized.state;previousSchema=normalized.previousSchema;}else{previousSchema=Number(state&&state.schemaVersion||1);const merged={lab:/** @type {any} */({name:'',dept:'',address:''}),tests:[],machines:["Máy A"],instruments:[],assayGroups:[],qcPanels:[],lotTransitions:[],lotGroups:[],qcLots:[],data:{},actions:[],activity:[],activityAnchor:'',users:[],reagentTests:[],reagentOperators:[],reagentSampleTypes:['Mẫu bệnh nhân','Mẫu nội kiểm (IQC)','Mẫu ngoại kiểm (EQA)'],sigmaData:{},periodLocks:[],teaRefs:[],teaRegistryVersion:TEA_REFERENCE_SCHEMA_VERSION,westgardRules:{...WG_DEFAULT},...(state||{})};state=opts.sanitized?merged:QCCore.sanitizeBackup(merged);
   if(previousSchema<2){state.periodLocks=Array.isArray(state.periodLocks)?state.periodLocks:[];}
   /* Nhánh archiveRegistry của schema 6 đã bị gỡ (2026-08-01) cùng chức năng lưu trữ theo
      năm. Phải XÓA TƯỜNG MINH ở đây: sanitizeBackup() chỉ ghi đè các trường có trong danh
@@ -35,7 +39,8 @@ function ensureShape(opts={}){const previousSchema=Number(state&&state.schemaVer
   if(state.lab&&typeof state.lab==='object')delete state.lab.kpiTargets;
   if(previousSchema<3||!state.teaRegistryVersion||state.teaRegistryVersion<TEA_REFERENCE_SCHEMA_VERSION)state.teaRegistryVersion=TEA_REFERENCE_SCHEMA_VERSION;
   state.schemaVersion=STATE_SCHEMA_VERSION;
-  if(!state.westgardProfileVersion){state.westgardRules={...WG_DEFAULT};state.westgardProfileVersion=2;}
+  if(!state.westgardProfileVersion){state.westgardRules={...WG_DEFAULT};state.westgardProfileVersion=2;}}
+  if(globalThis.qcStateLifecycle)return globalThis.qcStateLifecycle(state,{ensureLab:ensureLabBrandShape,ensureConfiguration:ensureConfigurationShape,repairRanges:repairAppliedRangeLimits,ensureReagent:source=>{if(typeof ReagentComparisonService!=='undefined')ReagentComparisonService.ensureOne(source,{id:uid()});},reconcileSigma:reconcileSigmaLevelsWithLotGroups,reconcileTea:()=>{if(typeof sgReconcileAllTeaSnapshots==='function')sgReconcileAllTeaSnapshots();},normalizePointLots,pruneUnusedLevels:pruneUnusedTestLevels});
   ensureLabBrandShape();
   ensureConfigurationShape();
   repairAppliedRangeLimits();
@@ -58,6 +63,7 @@ function ensureShape(opts={}){const previousSchema=Number(state&&state.schemaVer
    quan. Luôn giữ lại ít nhất 1 mức trên mỗi xét nghiệm — nếu lọc còn 0, giữ
    lại mục đầu tiên thay vì để mảng rỗng. */
 function pruneUnusedTestLevels(){
+  if(globalThis.qcLevelReconciliation)return globalThis.qcLevelReconciliation.pruneUnused(state);
   let pruned=0;
   (state.tests||[]).forEach(t=>{
     const levels=Array.isArray(t.levels)?t.levels:[];
@@ -77,13 +83,14 @@ function pruneUnusedTestLevels(){
 /* Các bản trước chỉ đổi Mean/SD khi áp dụng dải PXN nhưng để low/high của NSX
    trong cấu hình đang chạy. Tự chữa cả state cũ ở mọi cổng load/merge/import;
    chỉ chạm mức `applied:lab`, không thay giới hạn NSX hoặc cấu hình thủ công khác. */
-function repairAppliedRangeLimits(){let repaired=0;(state.tests||[]).forEach(t=>(t.levels||[]).forEach(l=>{if(l.applied!=='lab')return;const next=QCCore.limitsFromTarget(l.mean,l.sd,2);if(!next)return;if(l.low!==next.low||l.high!==next.high||l.rangeK!==2){l.low=next.low;l.high=next.high;l.rangeK=2;repaired++;}}));return repaired;}
+function repairAppliedRangeLimits(){return globalThis.qcRangeLimitRepair?globalThis.qcRangeLimitRepair(state):(()=>{let repaired=0;(state.tests||[]).forEach(t=>(t.levels||[]).forEach(l=>{if(l.applied!=='lab')return;const next=QCCore.limitsFromTarget(l.mean,l.sd,2);if(!next)return;if(l.low!==next.low||l.high!==next.high||l.rangeK!==2){l.low=next.low;l.high=next.high;l.rangeK=2;repaired++;}}));return repaired;})();}
 function uid(){return Math.random().toString(36).slice(2,9);}
 /* Đồng bộ mức Sigma với quan hệ lô ↔ nhóm lô. Nhóm "Đã dừng/Dự kiến" vẫn được tính
    là còn quan hệ để giữ lịch sử; chỉ mức có lô đã bị tháo khỏi MỌI nhóm mới bị gỡ.
    Khi xét nghiệm vẫn còn mức hợp lệ trong nhóm, xóa luôn mọi khóa Sigma mồ côi khác
    (kể cả dữ liệu cũ mà qcLotId đã bị xóa từ một phiên bản trước). */
 function reconcileSigmaLevelsWithLotGroups(){
+  if(globalThis.qcLevelReconciliation)return globalThis.qcLevelReconciliation.reconcileSigma(state);
   const lotsById=new Map((state.qcLots||[]).filter(Boolean).map(l=>[String(l.id),l])),groupedLotIds=new Set();
   (state.lotGroups||[]).filter(g=>g&&g.active!==false).forEach(g=>(g.lotIds||[]).forEach(id=>{const lot=lotsById.get(String(id));if(lot&&(!lot.groupId||String(lot.groupId)===String(g.id||'')))groupedLotIds.add(String(id));}));
   let unlinked=0,pruned=0,tests=0;
@@ -99,7 +106,8 @@ function reconcileSigmaLevelsWithLotGroups(){
 function ensureConfigurationShape(){
   const migrateLegacyLots=!state.configMigrationVersion;
   state.instruments=state.instruments||[];state.assayGroups=state.assayGroups||[];state.qcPanels=state.qcPanels||[];state.lotTransitions=state.lotTransitions||[];state.lotGroups=state.lotGroups||[];state.qcLots=state.qcLots||[];
-  (state.teaRefs||[]).forEach(r=>{if(!r.analyteId){const builtIn=teaAnalyteBuiltInMeta(r.name);r.analyteId=builtIn.analyteId||('custom-'+String(r.id||uid()).replace(/[^A-Za-z0-9_-]/g,'').slice(0,72));}const built=TEA_ANALYTE_META_BY_ID[r.analyteId];if(built){r.name=built.standardName;r.displayName=built.displayName;r.standardName=built.standardName;r.abbreviation=built.abbreviation;r.aliases=[...built.aliases];r.matrix=built.matrix;}});
+  if(globalThis.qcTestConfiguration)globalThis.qcTestConfiguration(state,migrateLegacyLots,{uid,searchText,teaKey:teaAnalyteKey,builtInMeta:teaAnalyteBuiltInMeta,metaById:teaAnalyteMetaById,meta:teaAnalyteMeta,dedupeHistory:dedupeLotTargetHistory});else{
+  (state.teaRefs||[]).forEach(r=>{if(!r.analyteId){const builtIn=teaAnalyteBuiltInMeta(r.name);r.analyteId=builtIn.analyteId||('custom-'+String(r.id||uid()).replace(/[^A-Za-z0-9_-]/g,'').slice(0,72));}const built=teaAnalyteMetaById(r.analyteId);if(built.analyteId){r.name=built.standardName;r.displayName=built.displayName;r.standardName=built.standardName;r.abbreviation=built.abbreviation;r.aliases=[...built.aliases];r.matrix=built.matrix;}});
   (state.machines||[]).forEach(name=>{if(name&&!state.instruments.some(x=>searchText(x.name)===searchText(name)))state.instruments.push({id:uid(),name,manufacturer:'',model:'',serial:'',section:'',active:true});});
   if(!state.instruments.length)state.instruments.push({id:uid(),name:'Máy A',manufacturer:'',model:'',serial:'',section:'',active:true});
   state.machines=[...new Set(state.instruments.map(x=>x.name).filter(Boolean))];
@@ -107,7 +115,7 @@ function ensureConfigurationShape(){
     let inst=state.instruments.find(x=>x.id===t.instrumentId)||state.instruments.find(x=>searchText(x.name)===searchText(t.machine));
     if(!inst){inst={id:uid(),name:t.machine||'Máy A',manufacturer:'',model:'',serial:'',section:'',active:true};state.instruments.push(inst);}
       t.instrumentId=inst.id;t.machine=inst.name;if(!t.section)t.section=inst.section||'';if(t.active==null)t.active=true;t.ruleActions=t.ruleActions||{};t.ruleScopes=t.ruleScopes||{};t.cusum=t.cusum||{on:false,k:0.5,h:4};
-    const ref=(state.teaRefs||[]).find(r=>t.analyteId&&r.analyteId===t.analyteId)||(state.teaRefs||[]).find(r=>teaAnalyteKey(r.name)===teaAnalyteKey(t.name)),naming=teaAnalyteMeta(t.name,ref);t.analyteId=t.analyteId||naming.analyteId||('local-'+String(t.id||uid()).replace(/[^A-Za-z0-9_-]/g,'').slice(0,73));const built=TEA_ANALYTE_META_BY_ID[t.analyteId];if(built){t.name=built.standardName;t.displayName=built.displayName;t.standardName=built.standardName;t.abbreviation=built.abbreviation;t.aliases=[...built.aliases];t.matrix=built.matrix;}else if(naming.standardName){t.displayName=t.displayName||naming.displayName;t.standardName=t.standardName||naming.standardName;t.abbreviation=t.abbreviation||naming.abbreviation;t.aliases=Array.isArray(t.aliases)&&t.aliases.length?t.aliases:naming.aliases;t.matrix=t.matrix||naming.matrix;}
+    const ref=(state.teaRefs||[]).find(r=>t.analyteId&&r.analyteId===t.analyteId)||(state.teaRefs||[]).find(r=>teaAnalyteKey(r.name)===teaAnalyteKey(t.name)),naming=teaAnalyteMeta(t.name,ref);t.analyteId=t.analyteId||naming.analyteId||('local-'+String(t.id||uid()).replace(/[^A-Za-z0-9_-]/g,'').slice(0,73));const built=teaAnalyteMetaById(t.analyteId);if(built.analyteId){t.name=built.standardName;t.displayName=built.displayName;t.standardName=built.standardName;t.abbreviation=built.abbreviation;t.aliases=[...built.aliases];t.matrix=built.matrix;}else if(naming.standardName){t.displayName=t.displayName||naming.displayName;t.standardName=t.standardName||naming.standardName;t.abbreviation=t.abbreviation||naming.abbreviation;t.aliases=Array.isArray(t.aliases)&&t.aliases.length?t.aliases:naming.aliases;t.matrix=t.matrix||naming.matrix;}
     t.levels.forEach(l=>{
       let lot=state.qcLots.find(x=>x.id===l.qcLotId);
       if(migrateLegacyLots&&!lot&&l.lot){
@@ -122,7 +130,8 @@ function ensureConfigurationShape(){
       if(!l.meanSdHistory.length&&Number.isFinite(+l.mean)&&Number.isFinite(+l.sd)&&+l.sd>0)l.meanSdHistory.push({id:uid(),qcLotId:l.qcLotId||'',lot:l.lot||'',mean:+l.mean,sd:+l.sd,low:l.low==null?null:+l.low,high:l.high==null?null:+l.high,effectiveFrom:'',effectiveTo:l.exp||'',source:l.applied==='lab'?'lab':'mfg',note:'Tự động chuyển từ cấu hình hiện hành'});
       dedupeLotTargetHistory(l);
     });
-  });
+  });}
+  if(globalThis.qcConfigurationRelations){globalThis.qcConfigurationRelations(state,{uid,switchesLot:transitionSwitchesLot,applyAcceptedTransition:applyAcceptedLotTransitionToConfig,normalizeLotGroups,syncLotDepletion:syncLotDepletionFromTransitions});state.configMigrationVersion=1;return;}
   if(!state.qcPanels.length&&state.assayGroups.length){
     state.assayGroups.forEach(g=>{const first=state.tests.find(t=>(g.testIds||[]).includes(t.id));state.qcPanels.push({id:g.id||uid(),name:g.name||'Panel QC',instrumentId:first&&first.instrumentId||state.instruments[0].id,testIds:[...(g.testIds||[])],note:g.note||'Chuyển từ nhóm xét nghiệm cũ',active:g.active!==false});});
   }
@@ -152,6 +161,7 @@ function syncLotDepletionFromTransitions(){
   (state.qcLots||[]).forEach(l=>{l.depleted=retired.has(l.id);});return retired;
 }
 function dedupeLotTargetHistory(target){
+  if(globalThis.qcLotTargetHistory)return globalThis.qcLotTargetHistory.dedupe(target);
   const rows=Array.isArray(target&&target.meanSdHistory)?target.meanSdHistory:[],out=[],indexes=new Map();
   rows.forEach(h=>{const key=h&&h.qcLotId?'id:'+h.qcLotId:h&&h.lot?'lot:'+h.lot:'';if(!key){out.push(h);return;}if(indexes.has(key))out[indexes.get(key)]=h;else{indexes.set(key,out.length);out.push(h);}});
   if(target)target.meanSdHistory=out;return out;
@@ -160,6 +170,7 @@ function dedupeLotTargetHistory(target){
    đã tự giữ snapshot qcMean/qcSd lúc nhập, nên không cần nhân đôi cùng một lô chỉ
    để nhớ các lần sửa form; làm vậy còn khiến bảng lịch sử đếm cùng điểm QC nhiều lần. */
 function upsertLotTargetHistory(target,lot,values){
+  if(globalThis.qcLotTargetHistory)return globalThis.qcLotTargetHistory.upsert(target,lot,values);
   target.meanSdHistory=Array.isArray(target.meanSdHistory)?target.meanSdHistory:[];
   const matches=h=>h&&(h.qcLotId?h.qcLotId===lot.id:(h.lot||'')===(lot.lotNo||'')),existing=target.meanSdHistory.slice().reverse().find(matches);
   const entry={...(existing||{}),...values,id:existing&&existing.id||uid(),qcLotId:lot.id,lot:lot.lotNo};
@@ -195,29 +206,34 @@ function normalizeLotGroups(){
   });
   if(drop.size)state.lotGroups=state.lotGroups.filter(g=>!drop.has(g.id));
 }
-function clearDerived(){pointsCache.clear();pointsIndexCache.clear();pointsLotCache.clear();wgMemo.clear();acceptedMemo.clear();cusumMemo.clear();derivedIndex=null;try{statusMemo=new Map();}catch(e){}try{invalidateWestgardWorker();}catch(e){}try{invalidateActionCaches();}catch(e){}}
+function clearDerived(){if(globalThis.derivedCacheInvalidation)return globalThis.derivedCacheInvalidation.clearAll();pointsCache.clear();pointsIndexCache.clear();pointsLotCache.clear();try{if(globalThis.qcPointCache)globalThis.qcPointCache.clear();}catch(e){}wgMemo.clear();try{if(globalThis.westgardMemoCache)globalThis.westgardMemoCache.clear();}catch(e){}acceptedMemo.clear();try{if(globalThis.qcAcceptedMemoCache)globalThis.qcAcceptedMemoCache.clear();}catch(e){}cusumMemo.clear();try{if(globalThis.qcCusumMemoCache)globalThis.qcCusumMemoCache.clear();}catch(e){}derivedIndex=null;try{statusMemo=new Map();}catch(e){}try{invalidateWestgardWorker();}catch(e){}try{invalidateActionCaches();}catch(e){}}
 function clearDerivedForTest(testId){
+  if(globalThis.derivedCacheInvalidation)return globalThis.derivedCacheInvalidation.clearForTest(testId);
   const prefix=String(testId||'')+'|';
   [pointsCache,pointsIndexCache,pointsLotCache,cusumMemo].forEach(cache=>[...cache.keys()].forEach(k=>{if(String(k).startsWith(prefix))cache.delete(k);}));
+  try{if(globalThis.qcCusumMemoCache)globalThis.qcCusumMemoCache.clear(testId);}catch(e){}
+  try{if(globalThis.qcPointCache)globalThis.qcPointCache.clear(testId);}catch(e){}
   wgMemo.delete(testId);
+  try{if(globalThis.westgardMemoCache)globalThis.westgardMemoCache.clear(testId);}catch(e){}
   [...acceptedMemo.keys()].forEach(k=>{if(String(k).startsWith(prefix))acceptedMemo.delete(k);});
+  try{if(globalThis.qcAcceptedMemoCache)globalThis.qcAcceptedMemoCache.clear(testId);}catch(e){}
   try{if(statusMemo&&statusMemo.delete)statusMemo.delete(testId);}catch(e){}
   try{invalidateWestgardWorker(testId);}catch(e){}
   try{invalidateActionCaches(testId);}catch(e){}
 }
 function userName(){return currentUser?(currentUser.name||currentUser.username||'Người dùng'):'Hệ thống';}
-function staffInitials(name){return String(name||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').split(/[^A-Za-z0-9]+/).filter(Boolean).map(x=>x.charAt(0)).join('').toUpperCase().slice(0,8)||'—';}
+function staffInitials(name){return globalThis.qcStaffIdentity?globalThis.qcStaffIdentity.initials(name):String(name||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').split(/[^A-Za-z0-9]+/).filter(Boolean).map(x=>x.charAt(0)).join('').toUpperCase().slice(0,8)||'—';}
 function currentStaff(){const name=userName();return{operatorId:currentUser&&currentUser.id||'',operatorUsername:currentUser&&currentUser.username||'',operatorName:name,operatorCode:currentUser&&currentUser.initials||staffInitials(name)};}
-function pointStaff(p){const name=String(p&&p.operatorName||'').trim(),code=String(p&&p.operatorCode||'').trim().toUpperCase()||(name?staffInitials(name):'');return{name,code};}
-function dateObj(s){const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s||''));return m?new Date(+m[1],+m[2]-1,+m[3]):new Date(s);}
-function daysToExp(exp){if(!exp)return null;return Math.round((dateObj(exp).getTime()-new Date().getTime())/86400000);}
-function fmt(x,d=2){return(x==null||isNaN(x))?'—':Number(x).toFixed(d);}
+function pointStaff(p){return globalThis.qcStaffIdentity?globalThis.qcStaffIdentity.point(p):(()=>{const name=String(p&&p.operatorName||'').trim(),code=String(p&&p.operatorCode||'').trim().toUpperCase()||(name?staffInitials(name):'');return{name,code};})();}
+function dateObj(s){return globalThis.qcDateFormat?globalThis.qcDateFormat.dateObject(s):(()=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s||''));return m?new Date(+m[1],+m[2]-1,+m[3]):new Date(s);})();}
+function daysToExp(exp){return globalThis.qcDateFormat?globalThis.qcDateFormat.daysToExpiry(exp):(!exp?null:Math.round((dateObj(exp).getTime()-new Date().getTime())/86400000));}
+function fmt(x,d=2){return globalThis.qcBasicFormat?globalThis.qcBasicFormat.number(x,d):(x==null||isNaN(x))?'—':Number(x).toFixed(d);}
 const QC_DECIMALS_DEFAULT=2;             // mặc định 2 chữ số thập phân khi tạo xét nghiệm mới
 const QC_DECIMALS_MAX=6;                 // trần chung cho MỌI chỗ kẹp số lẻ
 const QC_STAT_EXTRA_DECIMALS=2;          // SD cần nhiều chữ số hơn giá trị đo
 /* `.5` cũng là số: cho phép thiếu phần nguyên, nếu không thì người nhập ".5" bị coi là 0
    chữ số thập phân. Nhận cả dấu phẩy — thói quen nhập tiếng Việt. */
-function qcValueDecimals(value){const text=String(value==null?'':value).trim(),match=/^[+-]?(?:\d+(?:[.,](\d+))?|[.,](\d+))(?:e([+-]?\d+))?$/i.exec(text);if(!match)return 0;const fraction=(match[1]||match[2]||'').length,exponent=Number(match[3]||0);return Math.max(0,Math.min(QC_DECIMALS_MAX,fraction-exponent));}
+function qcValueDecimals(value){if(globalThis.qcValueFormat)return globalThis.qcValueFormat.qcValueDecimals(value);const text=String(value==null?'':value).trim(),match=/^[+-]?(?:\d+(?:[.,](\d+))?|[.,](\d+))(?:e([+-]?\d+))?$/i.exec(text);if(!match)return 0;const fraction=(match[1]||match[2]||'').length,exponent=Number(match[3]||0);return Math.max(0,Math.min(QC_DECIMALS_MAX,fraction-exponent));}
 /* SỐ LẺ CỦA GIÁ TRỊ ĐO — mặc định 2 chữ số, KHÔNG bao giờ lấy từ SD.
    Hai bài học nằm cả trong hàm này:
 
@@ -239,6 +255,7 @@ function qcValueDecimals(value){const text=String(value==null?'':value).trim(),m
    phải kiểm raw trước khi ép kiểu, nếu không mọi xét nghiệm chưa cấu hình sẽ bị hiểu nhầm
    thành "đã chọn 0 chữ số" và mất luôn mặc định 2. */
 function testDecimalPlaces(test,point=null){
+  if(globalThis.qcValueFormat)return globalThis.qcValueFormat.testDecimalPlaces(test,point);
   const raw=test&&test.decimalPlaces,configured=Number(raw);
   if(raw!=null&&raw!==''&&Number.isInteger(configured)&&configured>=0&&configured<=QC_DECIMALS_MAX)return configured;
   if(point){const saved=Number(point.valueDecimals),own=Number.isInteger(saved)&&saved>=0?saved:qcValueDecimals(point.val);return Math.min(QC_DECIMALS_MAX,Math.max(QC_DECIMALS_DEFAULT,own));}
@@ -250,20 +267,20 @@ function testDecimalPlaces(test,point=null){
    SD 0.153 hiện thành "0.2" — mất hẳn khả năng đó. Cố tình KHÔNG suy số lẻ từ chính giá trị
    SD: SD tính ra là số thực có nhiễu dấu phẩy động (5.599999999999999), suy từ nó sẽ cho
    6 chữ số rác. */
-function testStatDecimals(test){return Math.min(QC_DECIMALS_MAX,Math.max(2,testDecimalPlaces(test)+QC_STAT_EXTRA_DECIMALS));}
-function fmtTestValue(test,value,point=null){const number=Number(value);return Number.isFinite(number)?number.toFixed(testDecimalPlaces(test,point)):'—';}
-function fmtTestStat(test,value){const number=Number(value);return Number.isFinite(number)?number.toFixed(testStatDecimals(test)):'—';}
-function fmtPointValue(point,test=null){return fmtTestValue(test,point&&point.val,point);}
-function isoDate(d=new Date()){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
-function isoToday(){return isoDate();}
-function isoMonth(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
+function testStatDecimals(test){return globalThis.qcValueFormat?globalThis.qcValueFormat.testStatDecimals(test):Math.min(QC_DECIMALS_MAX,Math.max(2,testDecimalPlaces(test)+QC_STAT_EXTRA_DECIMALS));}
+function fmtTestValue(test,value,point=null){return globalThis.qcValueFormat?globalThis.qcValueFormat.formatValue(test,value,point):(()=>{const number=Number(value);return Number.isFinite(number)?number.toFixed(testDecimalPlaces(test,point)):'—';})();}
+function fmtTestStat(test,value){return globalThis.qcValueFormat?globalThis.qcValueFormat.formatStat(test,value):(()=>{const number=Number(value);return Number.isFinite(number)?number.toFixed(testStatDecimals(test)):'—';})();}
+function fmtPointValue(point,test=null){return globalThis.qcValueFormat?globalThis.qcValueFormat.formatPoint(point,test):fmtTestValue(test,point&&point.val,point);}
+function isoDate(d=new Date()){return globalThis.qcDateFormat?globalThis.qcDateFormat.isoDate(d):d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function isoToday(){return globalThis.qcDateFormat?globalThis.qcDateFormat.isoToday():isoDate();}
+function isoMonth(){return globalThis.qcDateFormat?globalThis.qcDateFormat.isoMonth():(()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');})();}
 async function requireUnlockedPeriod(date,action='sửa dữ liệu QC'){
   const ym=PeriodService.periodForDate(date),lock=ym?PeriodService.findLock(state,ym):null;if(!lock)return true;
   const text=`Kỳ ${monthVN(ym)} đã chốt bởi ${lock.lockedBy||'hệ thống'}${lock.lockedAt?' lúc '+formatDateTimeVN(lock.lockedAt):''}.`;
   await infoDialog(`Không thể ${action}: ${text} Muốn thay đổi cần admin mở khóa kỳ và ghi lý do.`);return false;
 }
-function vnDate(s){if(!s)return '';s=String(s);const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(s);return m?m[3]+'/'+m[2]+'/'+m[1]:s;}
-function vnPeriod(s){if(!s)return '';s=String(s).trim();let m=/^(\d{4})-(\d{2})/.exec(s);if(m)return'Kỳ '+m[2]+'/'+m[1];m=/^(\d{1,2})\/(\d{4})$/.exec(s);return m?'Kỳ '+m[1].padStart(2,'0')+'/'+m[2]:s;}
-function monthVN(s){const m=/^(\d{4})-(\d{2})/.exec(String(s||''));return m?m[2]+'/'+m[1]:(s||'');}
-function formatDateTimeVN(s){const d=new Date(s);return isNaN(+d)?'':d.toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'})+' '+d.toLocaleDateString('vi-VN');}
-function safeName(s){return String(s||'file').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^\w.-]+/g,'_').replace(/^_+|_+$/g,'')||'file';}
+function vnDate(s){return globalThis.qcDateFormat?globalThis.qcDateFormat.vnDate(s):(()=>{if(!s)return '';s=String(s);const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(s);return m?m[3]+'/'+m[2]+'/'+m[1]:s;})();}
+function vnPeriod(s){return globalThis.qcDateFormat?globalThis.qcDateFormat.vnPeriod(s):(()=>{if(!s)return '';s=String(s).trim();let m=/^(\d{4})-(\d{2})/.exec(s);if(m)return'Kỳ '+m[2]+'/'+m[1];m=/^(\d{1,2})\/(\d{4})$/.exec(s);return m?'Kỳ '+m[1].padStart(2,'0')+'/'+m[2]:s;})();}
+function monthVN(s){return globalThis.qcDateFormat?globalThis.qcDateFormat.monthVN(s):(()=>{const m=/^(\d{4})-(\d{2})/.exec(String(s||''));return m?m[2]+'/'+m[1]:(s||'');})();}
+function formatDateTimeVN(s){return globalThis.qcDateFormat?globalThis.qcDateFormat.formatDateTimeVN(s):(()=>{const d=new Date(s);return isNaN(+d)?'':d.toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'})+' '+d.toLocaleDateString('vi-VN');})();}
+function safeName(s){return globalThis.qcBasicFormat?globalThis.qcBasicFormat.safeName(s):String(s||'file').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^\w.-]+/g,'_').replace(/^_+|_+$/g,'')||'file';}

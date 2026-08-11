@@ -7,6 +7,7 @@ const ctx = loadSandbox([
   'modules/qc-domain.js',
   'modules/local-store.js',
   'modules/state-storage.js',
+  'generated/modular-pilot.js',
 ]);
 
 function seed() {
@@ -20,6 +21,12 @@ function seed() {
     derivedIndex={sentinel:true};
   `);
 }
+
+seed();
+run(ctx, "state.data={T1:[{level:1,date:'2026-01-01',runId:'2026-01-01-1',val:1}],T2:[{level:1,date:'2026-01-01',runId:'2026-01-01-1',val:2}]};pointsOf('T1',1);pointsOf('T2',1)");
+run(ctx, "state.data.T1[0].voided=true;clearDerivedForTest('T1')");
+assert.equal(run(ctx, "pointsOf('T1',1).length"), 0, 'test-scoped invalidation refreshes the TypeScript point cache after an in-place edit');
+assert.equal(run(ctx, "pointsOf('T2',1).length"), 1, 'test-scoped invalidation preserves the other test point cache');
 
 seed();
 run(ctx, 'invalidateDerivedForSave({clearDerived:false})');

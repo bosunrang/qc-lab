@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
-const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/firebase-sync.js', 'modules/state-storage.js', 'modules/qc-domain.js']);
+const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/firebase-sync.js', 'modules/state-storage.js', 'modules/qc-domain.js', 'generated/modular-pilot.js']);
 
 const result = run(ctx, `
   (async()=>{
@@ -37,7 +37,7 @@ const result = run(ctx, `
   // Pushes can also start with fb.dirty=false (first-connect room seeding,
   // post-merge convergence) — a failure there must still re-mark dirty and
   // retry, otherwise that push is silently dropped until the next user edit.
-  const ctx2 = loadSandbox(['core.js', 'modules/state.js', 'modules/firebase-sync.js', 'modules/state-storage.js', 'modules/qc-domain.js']);
+  const ctx2 = loadSandbox(['core.js', 'modules/state.js', 'modules/firebase-sync.js', 'modules/state-storage.js', 'modules/qc-domain.js', 'generated/modular-pilot.js']);
   const result2 = run(ctx2, `
     (async()=>{
       window={QCLAB_CLOUD:null};
@@ -69,7 +69,7 @@ const result = run(ctx, `
   // The baseline snapshot cache keys on fb.synced identity: the same baseline
   // object must not be re-serialized on every push, and a new baseline object
   // must recompute. Guard the identity-keyed contract directly.
-  const ctx3 = loadSandbox(['core.js', 'modules/state.js', 'modules/firebase-sync.js', 'modules/state-storage.js', 'modules/qc-domain.js']);
+  const ctx3 = loadSandbox(['core.js', 'modules/state.js', 'modules/firebase-sync.js', 'modules/state-storage.js', 'modules/qc-domain.js', 'generated/modular-pilot.js']);
   const cache = run(ctx3, `(function(){
     var base={lab:{name:'Lab'},tests:[],data:{},sigmaData:{}};
     var a=fbSyncedSnapKeys(base),b=fbSyncedSnapKeys(base);
