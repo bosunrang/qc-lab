@@ -1,0 +1,20 @@
+'use strict';
+const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+const source = pathToFileURL(path.join(__dirname, '..', 'src', 'presentation', 'report', 'report-xlsx-header.ts')).href;
+const program = `
+  import { createReportXlsxHeader } from ${JSON.stringify(source)};
+  const result = createReportXlsxHeader({ styles: { TITLE: 1, SUB: 2, LABEL: 4, VAL: 5 }, appName: 'QC Lab', appVersion: '2.7.6', rules: '1-3s', labName: 'PXN', department: 'Hóa sinh', address: '', exportedAt: '11/08/2026', exportedBy: 'KTV A', testName: 'Glucose', testUnit: 'mmol/L', machine: 'AU480', range: '01/08–11/08', tea: 6.96, teaSource: 'Ricos', teaReference: 'Nguồn A', teaDocument: 'SOP-01', teaApprovedBy: 'BS B' });
+  console.log(JSON.stringify(result));
+`;
+const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=module', '--eval', program], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
+assert.equal(result.status, 0, result.stderr || 'không thể chạy mô-đun TypeScript report XLSX header');
+const output = JSON.parse(result.stdout);
+assert.equal(output.rows.length, 8);
+assert.equal(output.rows[4][2].v, 'Glucose · mmol/L');
+assert.match(output.rows[6][2].v, /Ricos · Nguồn A · SOP-01 · duyệt BS B/);
+assert.deepEqual(output.merges.slice(0, 2), ['A1:J1', 'A2:J2']);
+assert.equal(output.rowHeights[1], 24);
+console.log('Report XLSX header TypeScript tests passed');

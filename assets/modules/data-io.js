@@ -346,6 +346,8 @@ function reportXlsxDoc(tid,start,end,includeNceAppendix=true){
   const chart=durl=>{if(!durl||!imgBytes)return;const row0=R;let bytes;try{bytes=imgBytes(durl);}catch(e){return;}images.push({bytes,dispW:CHART_W,dispH:CHART_H,row0});const spacer=Math.ceil(CHART_H/ROW_PX)+1;for(let i=0;i<spacer;i++)blank();};
   // ---- Tiêu đề + thông tin đơn vị (bám theo báo cáo in: tiêu đề căn giữa, thanh app/luật, bảng meta cân đối) ----
   const appMeta=window.QCLAB_APP||{},rulesStr=Object.entries(state.westgardRules||{}).filter(x=>x[1]!==false).map(x=>x[0]).join(', ')||'Chưa cấu hình';
+  if(globalThis.reportXlsxHeader){const h=globalThis.reportXlsxHeader({styles:ST,appName:appMeta.name||'QC Lab',appVersion:appMeta.version||'dev',rules:rulesStr,labName:state.lab.name||'',department:state.lab.dept||'',address:state.lab.address||'',exportedAt:formatDateTimeVN(new Date().toISOString()),exportedBy:userName(),testName:testDisplayName(t),testUnit:t.unit||'',machine:t.machine||'',range:reportRangeText(start,end),tea:teaVal||'—',teaSource:teaSourceText,teaReference:typeof sgTeaRefText==='function'?sgTeaRefText(t):'',teaDocument:t.teaDoc||'',teaApprovedBy:t.teaApprovedBy||''});rows.push(...h.rows);merges.push(...h.merges);Object.assign(rowHeights,h.rowHeights);R=rows.length;}
+  else{
   let r=push([S('BÁO CÁO NỘI KIỂM CHẤT LƯỢNG XÉT NGHIỆM',ST.TITLE)]);fullMerge(r);rowHeights[r]=24;
   const brandLine=(state.lab.name||'BỆNH VIỆN / ĐƠN VỊ')+' · '+(state.lab.dept||'Khoa Xét nghiệm')+(state.lab.address?' · '+state.lab.address:'')+'   ·   Xuất '+formatDateTimeVN(new Date().toISOString())+' · Người xuất: '+userName();
   r=push([S(brandLine,ST.SUB)]);fullMerge(r);rowHeights[r]=brandLine.length>120?29:15;
@@ -358,7 +360,7 @@ function reportXlsxDoc(tid,start,end,includeNceAppendix=true){
   metaRow('Xét nghiệm',testDisplayName(t)+(t.unit?' · '+t.unit:''),'Máy',t.machine||'');
   metaRow('Khoảng ngày',reportRangeText(start,end),'TEa%',teaVal||'—');
   metaWide('Nguồn TEa',teaSourceText+(typeof sgTeaRefText==='function'&&sgTeaRefText(t)?' · '+sgTeaRefText(t):'')+(t.teaDoc?' · '+t.teaDoc:'')+(t.teaApprovedBy?' · duyệt '+t.teaApprovedBy:''));
-  metaWide('Ghi chú Sigma','Sigma (kỳ) tính từ Mean/CV thực tế trong đúng khoảng ngày báo cáo này, khác với Sigma đã thẩm định ở trang Six Sigma & Sai số. Dấu * nghĩa là kỳ có n < 20 kết quả, CV/Sigma chưa đủ ổn định.');
+  metaWide('Ghi chú Sigma','Sigma (kỳ) tính từ Mean/CV thực tế trong đúng khoảng ngày báo cáo này, khác với Sigma đã thẩm định ở trang Six Sigma & Sai số. Dấu * nghĩa là kỳ có n < 20 kết quả, CV/Sigma chưa đủ ổn định.');}
   // ---- Biểu đồ LJ tổng hợp (nếu có ≥2 mức có điểm) ----
   const multiViews=reportMultiViews(t,inMonth);
   if(multiViews.filter(v=>v.pts.length).length>=2){blank();section('Levey-Jennings tổng hợp theo Z-score');chart(typeof ljMultiDataURL==='function'?ljMultiDataURL(multiViews,t):null);}
@@ -439,18 +441,19 @@ function westgardXlsxDoc(tid){
   const metaWide=(l,v)=>{const r=push([S(l,ST.LABEL),S('',ST.LABEL),S(v,ST.VAL),S('',ST.VAL),S('',ST.VAL),S('',ST.VAL),S('',ST.VAL),S('',ST.VAL),S('',ST.VAL)]);merges.push('A'+r+':B'+r,'C'+r+':I'+r);rowHeights[r]=Math.min(48,18+Math.ceil(String(v).length/105)*12);};
   const chart=durl=>{if(!durl||typeof sigmaDataURLBytes!=='function')return;let bytes;try{bytes=sigmaDataURLBytes(durl);}catch(e){return;}images.push({bytes,dispW:CHART_W,dispH:CHART_H,row0:R});for(let i=0;i<Math.ceil(CHART_H/ROW_PX)+1;i++)blank();};
   const app=window.QCLAB_APP||{},machine=instrumentName(t.instrumentId,t.machine)||t.machine||'—',withinRules=WG_RULES.filter(rule=>testRuleOnWithin(t,rule)).join(', ')||'Không có',acrossRules=WG_RULES.filter(rule=>testRuleOnAcross(t,rule)).join(', ')||'Không có';
-  let r=push([S('PHÂN TÍCH WESTGARD — '+testDisplayName(t),ST.TITLE)]);fullMerge(r);rowHeights[r]=24;
+  let r;if(globalThis.westgardXlsxHeader){const h=globalThis.westgardXlsxHeader({styles:ST,title:'PHÂN TÍCH WESTGARD — '+testDisplayName(t),labName:state.lab.name||'',department:state.lab.dept||'',address:state.lab.address||'',exportedAt:formatDateTimeVN(new Date().toISOString()),exportedBy:userName(),testName:testDisplayName(t),testUnit:t.unit||'',machine,appName:app.name||'QC Lab',appVersion:app.version||'dev',withinRules,acrossRules});rows.push(...h.rows);merges.push(...h.merges);Object.assign(rowHeights,h.rowHeights);R=rows.length;}else{
+  r=push([S('PHÂN TÍCH WESTGARD — '+testDisplayName(t),ST.TITLE)]);fullMerge(r);rowHeights[r]=24;
   const brand=(state.lab.name||'BỆNH VIỆN / ĐƠN VỊ')+' · '+(state.lab.dept||'Khoa Xét nghiệm')+(state.lab.address?' · '+state.lab.address:'')+'   ·   Xuất '+formatDateTimeVN(new Date().toISOString())+' · Người xuất: '+userName();
   r=push([S(brand,ST.SUB)]);fullMerge(r);rowHeights[r]=brand.length>115?29:15;blank();
   metaRow('Xét nghiệm',testDisplayName(t)+(t.unit?' · '+t.unit:''),'Thiết bị',machine);
   metaRow('Phiên bản app',(app.name||'QC Lab')+' '+(app.version||'dev'),'Phạm vi','Lô/mức đang xem');
   metaWide('Luật theo từng mức',withinRules);
   metaWide('Luật liên mức / lần chạy',acrossRules);
-  metaWide('Dữ liệu chi tiết','Chỉ gồm điểm cảnh báo/loại và điểm lịch sử cấu thành quy tắc; các điểm QC bình thường không được xuất.');
+  metaWide('Dữ liệu chi tiết','Chỉ gồm điểm cảnh báo/loại và điểm lịch sử cấu thành quy tắc; các điểm QC bình thường không được xuất.');}
   const multiViews=typeof wgMultiViews==='function'?wgMultiViews(t):wg.views.map(v=>({level:v.l.level,lot:v.l.lot,mean:v.l.mean,sd:v.l.sd,pts:v.pts,label:'M'+v.l.level+'·'+(v.l.lot||'?')}));
   if(multiViews.filter(v=>v.pts&&v.pts.length).length>=2){blank();section('Levey-Jennings tổng hợp theo Z-score');chart(typeof ljMultiDataURL==='function'?ljMultiDataURL(multiViews,t):null);}
   const head=()=>push([S('#',ST.TH),S('Ngày',ST.TH),S('Lần chạy',ST.TH),S('NV',ST.TH),S('Giá trị',ST.TH),S('Z',ST.TH),S('Kết luận',ST.TH),S('Luật / bằng chứng',ST.TH),S('Loại sai số',ST.TH)]);
-  const detail=(o,index)=>{const rules=[...new Set(o.f.rules||[])],support=[...new Set(o.f.supportRules||[])].filter(x=>!rules.includes(x)),evidence=!rules.length&&support.length,used=rules.length?rules:support,ruleText=rules.join(', ')||(evidence?'Bằng chứng: '+support.join(', '):'—'),verdict=evidence?'Bằng chứng':qcVerdictLabel(o.f.level),vs=o.f.level==='rej'?ST.REJ:o.f.level==='warn'?ST.WARN:ST.TD;push([Nn(index,ST.TD),S(vnDate(o.p.date),ST.TD),S(o.p.runId||'—',ST.TD),S(pointStaff(o.p).code||'—',ST.TD),Nn(Number.isFinite(o.p.val)?o.p.val:'',ST.TD),S((o.z>=0?'+':'')+fmt(o.z)+'s',ST.TD),S(verdict,vs),S(ruleText,ST.TDL),S(used.length?errorType(used):'—',ST.TDL)]);};
+  const detail=(o,index)=>{const row=globalThis.westgardXlsxRows?globalThis.westgardXlsxRows.detail(o,index):(()=>{const rules=[...new Set(o.f.rules||[])],support=[...new Set(o.f.supportRules||[])].filter(x=>!rules.includes(x)),evidence=!rules.length&&support.length,used=rules.length?rules:support;return{index,date:vnDate(o.p.date),runId:o.p.runId||'—',staffCode:pointStaff(o.p).code||'—',value:Number.isFinite(o.p.val)?o.p.val:'',z:(o.z>=0?'+':'')+fmt(o.z)+'s',verdict:evidence?'Bằng chứng':qcVerdictLabel(o.f.level),style:o.f.level==='rej'?'rej':o.f.level==='warn'?'warn':'ok',ruleText:rules.join(', ')||(evidence?'Bằng chứng: '+support.join(', '):'—'),error:used.length?errorType(used):'—'};})();push([Nn(row.index,ST.TD),S(row.date,ST.TD),S(row.runId,ST.TD),S(row.staffCode,ST.TD),Nn(row.value,ST.TD),S(row.z,ST.TD),S(row.verdict,row.style==='rej'?ST.REJ:row.style==='warn'?ST.WARN:ST.TD),S(row.ruleText,ST.TDL),S(row.error,ST.TDL)]);};
   wg.views.forEach(v=>{
     const l=v.l,prev=wgPrevOpen.has(t.id+'|'+l.level)&&(typeof previousLotSeries==='function'?previousLotSeries(t,l.level):[])[0],series=prev||{lot:l.lot,mean:l.mean,sd:l.sd,pts:v.pts},isPrev=!!prev;
     let all;if(isPrev){const calc=QCCore.westgardByPoint(series.pts,series.mean,series.sd,rule=>testRuleOnWithin(t,rule));all=series.pts.map((p,i)=>{const raw=calc.F[i]||{rules:[],supportRules:[]},f={...raw,level:ruleResultLevel(t,raw.rules||[])};return{p,f,z:calc.zs[i]};});}

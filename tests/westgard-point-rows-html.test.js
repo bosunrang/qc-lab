@@ -1,0 +1,21 @@
+'use strict';
+const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+const source = pathToFileURL(path.join(__dirname, '..', 'src', 'presentation', 'westgard', 'westgard-point-rows-html.ts')).href;
+const program = `
+  import { createWestgardPointRowsHtml } from ${JSON.stringify(source)};
+  const render = createWestgardPointRowsHtml({ verdictLabel: value => ({ ok: 'Đạt', warn: 'Cảnh báo' })[value], errorParts: rules => rules[0] === '1-2s' ? { type: '<Ngẫu nhiên>', desc: 'Kiểm tra' } : null, escape: value => String(value).replaceAll('<', '&lt;').replaceAll('>', '&gt;'), date: value => 'D:' + value, testValue: (_test, value) => 'V:' + value, format: value => Number(value).toFixed(2), referenceIcon: () => '↗' });
+  console.log(render([{ index: 1, date: '01/08', value: 4.2, z: 1.25, level: 'warn', rules: ['1-2s'], supportRules: ['2_2s'] }, { index: 2, date: '02/08', value: 4.3, z: NaN, level: 'ok', rules: [], supportRules: [] }], {}));
+`;
+const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=module', '--eval', program], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
+assert.equal(result.status, 0, result.stderr || 'không thể chạy Westgard point rows HTML TypeScript');
+assert.match(result.stdout, /D:01\/08/);
+assert.match(result.stdout, /V:4.2/);
+assert.match(result.stdout, /\+1.25s/);
+assert.match(result.stdout, /&lt;Ngẫu nhiên&gt;/);
+assert.match(result.stdout, /Bằng chứng:.*↗ 2_2s/);
+assert.match(result.stdout, /<td class="num">—<\/td>/);
+assert.match(result.stdout, /<span class="tag ok">Đạt<\/span>/);
+console.log('Westgard point rows HTML TypeScript tests passed');

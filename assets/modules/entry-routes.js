@@ -1,10 +1,11 @@
 /* ===== ENTRY PAGE ROUTE ===== */
 function entryWindowFor(testId,level,endOverride,startOverride){return EntryService.buildEntryWindow({points:pointsOf(testId,level),days:entryDays,start:startOverride,end:endOverride,today:isoToday()});}
 function entryWindow(){return entryWindowFor(entrySel.testId,entrySel.level,entryEnd,entryStart);}
-function entryLotLabels(levels){const lots=(levels||[]).map(x=>String(x.lot||'').trim()).filter(Boolean);return lots.join(' / ')||'Chưa gán lô';}
+function entryLotLabels(levels){return globalThis.entryLotLabelsTs?globalThis.entryLotLabelsTs(levels):(function(){const lots=(levels||[]).map(x=>String(x.lot||'').trim()).filter(Boolean);return lots.join(' / ')||'Chưa gán lô';})();}
 const ENTRY_TABLE_INITIAL_ROWS=180;
-function entryRowsWindow(rows,key){const all=rows||[],expanded=entryExpandedTables.has(key),visible=expanded?all:all.slice(-ENTRY_TABLE_INITIAL_ROWS);return{rows:visible,total:all.length,limited:visible.length<all.length,expanded};}
+function entryRowsWindow(rows,key){const expanded=entryExpandedTables.has(key);return globalThis.entryRowsWindowTs?globalThis.entryRowsWindowTs(rows,expanded,ENTRY_TABLE_INITIAL_ROWS):(function(){const all=rows||[],visible=expanded?all:all.slice(-ENTRY_TABLE_INITIAL_ROWS);return{rows:visible,total:all.length,limited:visible.length<all.length,expanded};})();}
 function entryToggleRows(key){
+  if(globalThis.entryExpandedTablesToggle){const next=globalThis.entryExpandedTablesToggle(entryExpandedTables,key,24);entryExpandedTables.clear();next.forEach(value=>entryExpandedTables.add(value));entryRenderKeepScroll();return;}
   if(entryExpandedTables.has(key))entryExpandedTables.delete(key);
   else{
     entryExpandedTables.add(key);
@@ -13,7 +14,7 @@ function entryToggleRows(key){
   entryRenderKeepScroll();
 }
 function entryDetailToggled(key,open){if(open)entryDetailOpen.add(key);else entryDetailOpen.delete(key);}
-function entryTreeIsCollapsed(){if(entryTreeCollapsed!==null)return!!entryTreeCollapsed;try{entryTreeCollapsed=localStorage.getItem('qclab_entry_tree_collapsed')==='1';}catch(e){entryTreeCollapsed=false;}return!!entryTreeCollapsed;}
+function entryTreeIsCollapsed(){if(entryTreeCollapsed!==null)return!!entryTreeCollapsed;if(globalThis.entryTreeCollapsePreference){entryTreeCollapsed=globalThis.entryTreeCollapsePreference.read(()=>localStorage.getItem('qclab_entry_tree_collapsed'));return!!entryTreeCollapsed;}try{entryTreeCollapsed=localStorage.getItem('qclab_entry_tree_collapsed')==='1';}catch(e){entryTreeCollapsed=false;}return!!entryTreeCollapsed;}
 function pageEntry(rightOnly=false){
   const today=isoToday();
   if(!state.tests.length)return headOnly('Nhập QC','')+`<div class="panel">${emptyState('Chưa có xét nghiệm','Cần khai báo xét nghiệm và mức QC trước khi nhập kết quả.',role()==='admin'?btn('Thêm xét nghiệm',`go('manage')`,'teal'):'')}</div>`;
@@ -174,18 +175,19 @@ function jsq(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").repla
 /* Mở/thu nhánh ngay trên DOM, không vẽ lại toàn trang: khung cây có scroll riêng nên
    thay cả `.tree` sẽ đưa scrollTop về 0 và làm người dùng mất vị trí ở danh sách dài. */
 function treeToggle(k){if(treeOpen.has(k))treeOpen.delete(k);else treeOpen.add(k);const open=treeOpen.has(k),node=[...document.querySelectorAll('.tree .tnode')].find(el=>el.dataset.key===String(k));if(node){node.setAttribute('aria-expanded',String(open));node.classList.toggle('open',open);const caret=node.querySelector('.caret');if(caret)caret.textContent=open?'−':'+';}entryFilter(entryQ);}
-function toggleEntryTree(){entryTreeCollapsed=!entryTreeIsCollapsed();try{localStorage.setItem('qclab_entry_tree_collapsed',entryTreeCollapsed?'1':'0');}catch(e){}const grid=document.querySelector('.entrygrid');if(!grid){rerender();return;}grid.classList.toggle('tree-collapsed',entryTreeCollapsed);const target=grid.querySelector(entryTreeCollapsed?'.entry-tree-expand':'.entry-tree-toggle');requestAnimationFrame(()=>{if(target)target.focus({preventScroll:true});});}
+function toggleEntryTree(){entryTreeCollapsed=!entryTreeIsCollapsed();try{localStorage.setItem('qclab_entry_tree_collapsed',globalThis.entryTreeCollapsePreference?globalThis.entryTreeCollapsePreference.write(entryTreeCollapsed):(entryTreeCollapsed?'1':'0'));}catch(e){}const grid=document.querySelector('.entrygrid');if(!grid){rerender();return;}grid.classList.toggle('tree-collapsed',entryTreeCollapsed);const target=grid.querySelector(entryTreeCollapsed?'.entry-tree-expand':'.entry-tree-toggle');requestAnimationFrame(()=>{if(target)target.focus({preventScroll:true});});}
 function entryTreeKey(event){
   const item=event.currentTarget,key=event.key;
-  if(key==='Enter'||key===' '){event.preventDefault();item.click();return;}
-  if((key==='ArrowRight'&&item.getAttribute('aria-expanded')==='false')||(key==='ArrowLeft'&&item.getAttribute('aria-expanded')==='true')){event.preventDefault();item.click();return;}
-  if(key!=='ArrowDown'&&key!=='ArrowUp'&&key!=='Home'&&key!=='End')return;
+  const command=globalThis.entryTreeKeyCommand?globalThis.entryTreeKeyCommand(key,item.getAttribute('aria-expanded')):((key==='Enter'||key===' '||(key==='ArrowRight'&&item.getAttribute('aria-expanded')==='false')||(key==='ArrowLeft'&&item.getAttribute('aria-expanded')==='true'))?'toggle':(key==='ArrowDown'||key==='ArrowUp'||key==='Home'||key==='End'?'navigate':null));
+  if(command==='toggle'){event.preventDefault();item.click();return;}
+  if(command!=='navigate')return;
   const items=[...document.querySelectorAll('.tree .tnode[tabindex="0"]')].filter(el=>el.offsetParent!==null),index=items.indexOf(item);if(index<0||!items.length)return;
-  event.preventDefault();const next=key==='Home'?items[0]:key==='End'?items[items.length-1]:items[(index+(key==='ArrowDown'?1:-1)+items.length)%items.length];next.focus();
+  event.preventDefault();const next=globalThis.entryTreeNavigation?globalThis.entryTreeNavigation.target(items,item,key):(key==='Home'?items[0]:key==='End'?items[items.length-1]:items[(index+(key==='ArrowDown'?1:-1)+items.length)%items.length]);next.focus();
 }
 function entryFilter(v){
   entryQ=v;
   const q=searchText(entryQ),nodes=[...document.querySelectorAll('.tree .tnode')];
+  if(globalThis.entryTreeVisibility){const visible=globalThis.entryTreeVisibility(nodes.map(el=>({role:el.dataset.treeRole,key:el.dataset.key,search:el.dataset.search})),q,treeOpen);nodes.forEach((el,index)=>el.style.display=visible[index]?'':'none');return;}
   if(!q){
     nodes.forEach(el=>el.style.display='');
     nodes.filter(el=>el.dataset.treeRole==='group'&&!treeOpen.has(el.dataset.key)).forEach(group=>{
@@ -209,25 +211,25 @@ function entryFilter(v){
   });
 }
 function entrySetMachine(v){entryMachine=v;rerender();}
-function entryPick(tid,level){entrySel={testId:tid,level};entryStart=null;entryEnd=null;entryLastMsg='';document.querySelectorAll('.tree .tn-config').forEach(row=>{const on=row.dataset.testId===String(tid);row.classList.toggle('on',on);row.setAttribute('aria-current',String(on));});entryRenderKeepScroll();}
-function entryFocusLevel(level){if(!entrySel)return;entrySel={testId:entrySel.testId,level};entryRenderKeepScroll();}
-function entryShowPrevLot(level,lot){if(!entrySel)return;entryPrevOpen.set(entrySel.testId+'|'+level,lot);entryRenderKeepScroll();}
-function entryShowCurrentLot(level){if(!entrySel)return;entryPrevOpen.delete(entrySel.testId+'|'+level);entryRenderKeepScroll();}
+function entryPick(tid,level){const next=globalThis.entrySelectionState?globalThis.entrySelectionState.pick(tid,level):{selection:{testId:tid,level},start:null,end:null,message:''};entrySel=next.selection;entryStart=next.start;entryEnd=next.end;entryLastMsg=next.message;document.querySelectorAll('.tree .tn-config').forEach(row=>{const on=row.dataset.testId===String(tid);row.classList.toggle('on',on);row.setAttribute('aria-current',String(on));});entryRenderKeepScroll();}
+function entryFocusLevel(level){const next=globalThis.entrySelectionState?globalThis.entrySelectionState.focus(entrySel,level):(entrySel?{testId:entrySel.testId,level}:null);if(!next)return;entrySel=next;entryRenderKeepScroll();}
+function entryShowPrevLot(level,lot){const key=globalThis.entrySelectionState?globalThis.entrySelectionState.previousLotKey(entrySel,level):(entrySel?entrySel.testId+'|'+level:null);if(!key)return;entryPrevOpen.set(key,lot);entryRenderKeepScroll();}
+function entryShowCurrentLot(level){const key=globalThis.entrySelectionState?globalThis.entrySelectionState.previousLotKey(entrySel,level):(entrySel?entrySel.testId+'|'+level:null);if(!key)return;entryPrevOpen.delete(key);entryRenderKeepScroll();}
 function entryFocusPendingSheet(){
   if(!entryPendingSheetFocus)return;
   const [date,level]=entryPendingSheetFocus.split('|');
   const cands=[...document.querySelectorAll('.qc-sheet .qc-inline-input')].filter(x=>x.dataset.focusDate===date&&x.dataset.focusLevel===level);
   // Prefer the still-empty slot for this date+level (a run just saved may have
   // shifted its run-id, so match on date+level rather than the old full key).
-  const el=cands.find(x=>x.classList.contains('empty'))||cands[0];
+  const el=globalThis.entrySheetFocus?globalThis.entrySheetFocus(cands):cands.find(x=>x.classList.contains('empty'))||cands[0];
   if(el){el.focus();el.select();entryPendingSheetFocus='';}
 }
-function entrySheetInputs(){return[...document.querySelectorAll('.qc-sheet .qc-inline-input')]
-  .filter(el=>!el.disabled&&el.offsetParent!==null)
-  .sort((a,b)=>String(a.dataset.focusDate||'').localeCompare(String(b.dataset.focusDate||''),'vi',{numeric:true})||
+function entrySheetInputs(){const inputs=[...document.querySelectorAll('.qc-sheet .qc-inline-input')]
+  .filter(el=>!el.disabled&&el.offsetParent!==null);if(globalThis.entrySheetInputOrder)return globalThis.entrySheetInputOrder(inputs);return inputs.sort((a,b)=>String(a.dataset.focusDate||'').localeCompare(String(b.dataset.focusDate||''),'vi',{numeric:true})||
     (Number(a.dataset.focusRun||0)-Number(b.dataset.focusRun||0))||
     (Number(a.dataset.focusLevel||0)-Number(b.dataset.focusLevel||0)));}
 function entrySheetTarget(inputs,current,key,shiftKey=false){
+  if(globalThis.entrySheetNavigation)return globalThis.entrySheetNavigation.target(inputs,current,key,shiftKey);
   const available=inputs||[];if(!available.length||!available.includes(current))return null;
   if(key==='ArrowLeft'||key==='ArrowRight'||key==='Tab'){
     const row=available.filter(el=>el.dataset.focusDate===current.dataset.focusDate&&el.dataset.focusRun===current.dataset.focusRun),ri=row.indexOf(current),step=key==='ArrowLeft'||(key==='Tab'&&shiftKey)?-1:1;
@@ -251,6 +253,7 @@ function entrySheetKey(event){
   setTimeout(entryFocusPendingSheet,0);
 }
 function entryLatestTreeState(t){
+  if(globalThis.entryTreeState)return globalThis.entryTreeState(t);
   if(!t)return'none';
   const ord={none:-1,ok:0,warn:1,rej:2},wg=activeWestgard(t);let worst='none';
   operationalLevels(t).forEach(l=>{const pts=pointsForLot(t.id,l.level,l.lot||''),last=pts[pts.length-1],level=last&&(wg.byPoint.get(last.id)||{}).level||'none';if(ord[level]>ord[worst])worst=level;});
@@ -261,8 +264,9 @@ function entrySyncTreeState(testId){
   const apply=(el,value)=>{const badge=el&&el.querySelector('.state');if(!badge)return;badge.className='state'+(value==='none'?'':' '+value);badge.textContent=stateName(value);};
   apply(row,entryLatestTreeState(state.tests.find(t=>t.id===testId)));
   let group=row.previousElementSibling;while(group&&group.dataset.treeRole!=='group')group=group.previousElementSibling;if(!group)return;
-  const ord={none:-1,ok:0,warn:1,rej:2};let worst='none';
-  for(let item=group.nextElementSibling;item&&item.dataset.treeRole==='assay';item=item.nextElementSibling){const badge=item.querySelector('.state'),value=badge&&['ok','warn','rej'].find(x=>badge.classList.contains(x))||'none';if(ord[value]>ord[worst])worst=value;}
+  const states=[];
+  for(let item=group.nextElementSibling;item&&item.dataset.treeRole==='assay';item=item.nextElementSibling){const badge=item.querySelector('.state'),value=badge&&['ok','warn','rej'].find(x=>badge.classList.contains(x))||'none';states.push(value);}
+  const worst=globalThis.entryTreeGroupState?globalThis.entryTreeGroupState(states):states.reduce((current,value)=>({none:-1,ok:0,warn:1,rej:2}[value]>{none:-1,ok:0,warn:1,rej:2}[current]?value:current),'none');
   apply(group,worst);
 }
 function entryRenderKeepScroll(){
@@ -290,19 +294,21 @@ function entrySetLastMsg(html){
 }
 function entryUnlockExtraRun(tid,colKey,date,levelIdx,runNo){
   if(!requireWrite())return;
-  entryExtraRun.add(`${tid}|${colKey}|${date}|${runNo}`);
-  entryPendingSheetFocus=`${date}|${levelIdx}`;
+  const request=globalThis.entryExtraRunRequest?globalThis.entryExtraRunRequest(tid,colKey,date,levelIdx,runNo):{key:`${tid}|${colKey}|${date}|${runNo}`,focus:`${date}|${levelIdx}`};
+  entryExtraRun.add(request.key);
+  entryPendingSheetFocus=request.focus;
   entryRenderKeepScroll();
 }
 async function entryDateNoteSave(tid,date,value){
   if(!requireWrite())return;
   if(!await requireUnlockedPeriod(date,'ghi chú QC'))return;
   const result=EntryService.updateDateNoteCommand(state,{testId:tid,date,value,formatDate:vnDate});
-  if(!result.ok){if(result.error==='period-locked')entrySetLastMsg('<div class="alert warn">Kỳ này đã chốt, không thể sửa ghi chú.</div>');return;}
+  if(!result.ok){const message=globalThis.entryDateNoteErrorMessage?globalThis.entryDateNoteErrorMessage(result.error):(result.error==='period-locked'?'Kỳ này đã chốt, không thể sửa ghi chú.':'');if(message)entrySetLastMsg('<div class="alert warn">'+esc(message)+'</div>');return;}
   const note=result.note;
   logAct(result.effects.audit.action,result.effects.audit.detail,result.effects.audit.target);
   save(result.effects.save);
-  entrySetLastMsg(note?`<div class="alert ok">✓ Đã lưu ghi chú ngày ${vnDate(date)}.</div>`:`<div class="alert ok">✓ Đã xóa ghi chú ngày ${vnDate(date)}.</div>`);
+  const feedback=globalThis.entryDateNoteFeedback?globalThis.entryDateNoteFeedback(note,vnDate(date)):null;
+  entrySetLastMsg(feedback?`<div class="alert ${feedback.cls}">${esc(feedback.message)}</div>`:note?`<div class="alert ok">✓ Đã lưu ghi chú ngày ${vnDate(date)}.</div>`:`<div class="alert ok">✓ Đã xóa ghi chú ngày ${vnDate(date)}.</div>`);
 }
 /* cfg dùng khi ghi điểm. Mặc định là cấu hình sống của mức; nếu lotNo trỏ đúng lô
    đang chạy song song thì trả cfg tổng hợp của lô đó (Mean/SD riêng của nó).
@@ -310,6 +316,7 @@ async function entryDateNoteSave(tid,date,value){
    trong qcPointWarnings sẽ báo nhầm, vì chạy song song vốn dĩ trùng giai đoạn
    với lô đang dùng. */
 function entryColumnCfg(t,level,lotNo){
+  if(globalThis.entryColumnConfig)return globalThis.entryColumnConfig(t,level,lotNo);
   const cfg=t&&lvlCfg(t,+level);if(!cfg)return null;
   if(!lotNo||String(lotNo)===String(cfg.lot||''))return cfg;
   const par=parallelLotForLevel(t,+level);
@@ -347,29 +354,28 @@ function entryInlineSaveCommit(tid,level,date,val,runId,lotNo='',valueDecimals=q
   if(!t||!cfg||!canEnterQcForLevel(t,level)){entrySetLastMsg('<div class="alert warn">Không thể lưu: nhóm lô đã dừng hoặc không còn sẵn sàng nhập QC.</div>');entryRenderKeepScroll();return;}
   const recorded=EntryService.recordPoint(state,{tid,level,date,value:val,valueDecimals,runId,cfg,staff:currentStaff(),id:uid()});
   if(!recorded.ok){
-    if(recorded.error==='period-locked')entrySetLastMsg('<div class="alert warn">Kỳ này đã chốt, không thể nhập điểm QC.</div>');
-    else entrySetLastMsg('<div class="alert warn">Không thể lưu điểm QC không hợp lệ.</div>');
+    const message=globalThis.entryRecordErrorMessage?globalThis.entryRecordErrorMessage(recorded.error):(recorded.error==='period-locked'?'Kỳ này đã chốt, không thể nhập điểm QC.':'Không thể lưu điểm QC không hợp lệ.');
+    entrySetLastMsg('<div class="alert warn">'+message+'</div>');
     return;
   }
-  const saved=recorded.point,parallel=!!(lotNo&&String(lotNo)!==String((lvlCfg(t,level)||{}).lot||''));
+  const saved=recorded.point,pointContext=globalThis.entryPointContext?globalThis.entryPointContext(tid,level,lotNo,(lvlCfg(t,level)||{}).lot||''):{parallel:!!(lotNo&&String(lotNo)!==String((lvlCfg(t,level)||{}).lot||'')),selection:{testId:tid,level}},parallel=pointContext.parallel;
   logAct('Thêm điểm QC',`Ngày ${vnDate(date)}, M${level}${parallel?' · lô song song '+lotNo:''}, giá trị ${fmtPointValue(saved,t)}`,t.name);
   clearDerivedForTest(tid);
   // Lô song song không nằm trong activeWestgard (chỉ phủ lô đang dùng) — tra bảng
   // đánh giá riêng của chính nó để báo đúng kết luận cho điểm vừa nhập.
   const f=(parallel?parallelWestgard(t,{level:+level,lot:String(lotNo),mean:+cfg.mean,sd:+cfg.sd,parallel:true}).byPoint.get(saved.id):activeWestgard(t).byPoint.get(saved.id))||{level:'ok',rules:[]},rules=[...new Set(f.rules||[])];
   save({clearDerived:false,testId:tid});
-  const tag=`Mức ${level}${parallel?' · lô song song '+esc(lotNo):''}`;
-  entrySel={testId:tid,level};entryLastMsg=f.level==='rej'?`<div class="alert rej"><b>⚠ ${tag} vi phạm — ${rules.join(', ')}</b></div>`:f.level==='warn'?`<div class="alert warn"><b>${tag} cảnh báo — ${rules.join(', ')}</b></div>`:`<div class="alert ok">✓ Đã lưu ${tag} ngày ${vnDate(date)}.</div>`;
+  const feedback=globalThis.entrySaveFeedback?globalThis.entrySaveFeedback({level,lotNo,parallel,verdict:f.level,rules,dateText:vnDate(date)}):null,tag=`Mức ${level}${parallel?' · lô song song '+esc(lotNo):''}`;
+  entrySel=pointContext.selection;entryLastMsg=feedback?`<div class="alert ${feedback.cls}">${feedback.emphasis?'<b>'+esc(feedback.message)+'</b>':esc(feedback.message)}</div>`:f.level==='rej'?`<div class="alert rej"><b>⚠ ${tag} vi phạm — ${rules.join(', ')}</b></div>`:f.level==='warn'?`<div class="alert warn"><b>${tag} cảnh báo — ${rules.join(', ')}</b></div>`:`<div class="alert ok">✓ Đã lưu ${tag} ngày ${vnDate(date)}.</div>`;
   entryRenderKeepScroll();
 }
 function syncVoidNceChoice(){
   const kind=(document.getElementById('voidKindInput')||{}).value,box=document.getElementById('voidOpenNce'),hint=document.getElementById('voidNceHint'),reasonBox=document.getElementById('voidReasonBox'),reasonErr=document.getElementById('voidReasonErr');
   if(!box)return;
-  if(kind==='analytical'){box.checked=true;box.disabled=true;if(hint)hint.textContent='Hệ thống sẽ lập hồ sơ NCE mới, hoặc dùng lại hồ sơ đang mở của điểm này, rồi chờ một kết quả QC chạy lại được chấp nhận.';}
-  else if(kind==='data-entry'){box.checked=false;box.disabled=true;if(hint)hint.textContent='Chỉ lưu dấu vết hủy; không mở NCE và không yêu cầu chạy lại QC.';}
-  else{box.checked=false;box.disabled=false;if(hint)hint.textContent='Chọn mục này nếu sự việc cần điều tra và xác nhận QC chạy lại.';}
+  const choice=globalThis.entryVoidNceChoice?globalThis.entryVoidNceChoice(kind):(kind==='analytical'?{openNce:true,disabled:true,hint:'Hệ thống sẽ lập hồ sơ NCE mới, hoặc dùng lại hồ sơ đang mở của điểm này, rồi chờ một kết quả QC chạy lại được chấp nhận.',reasonLabel:'Ghi chú / bằng chứng (khuyến nghị)'}:kind==='data-entry'?{openNce:false,disabled:true,hint:'Chỉ lưu dấu vết hủy; không mở NCE và không yêu cầu chạy lại QC.',reasonLabel:'Ghi chú / bằng chứng (khuyến nghị)'}:{openNce:false,disabled:false,hint:'Chọn mục này nếu sự việc cần điều tra và xác nhận QC chạy lại.',reasonLabel:'Lý do hủy (bắt buộc, tối thiểu 5 ký tự)'});
+  box.checked=choice.openNce;box.disabled=choice.disabled;if(hint)hint.textContent=choice.hint;
   const label=document.getElementById('voidReasonLabel');
-  if(label)label.textContent=kind==='other'?'Lý do hủy (bắt buộc, tối thiểu 5 ký tự)':'Ghi chú / bằng chứng (khuyến nghị)';
+  if(label)label.textContent=choice.reasonLabel;
   if(reasonBox)reasonBox.hidden=false;
   if(reasonErr)reasonErr.style.display='none';
 }
@@ -402,7 +408,7 @@ async function confirmVoidQcPoint(tid,pointId){
   const t=state.tests.find(x=>x.id===tid),p=(state.data[tid]||[]).find(x=>x.id===pointId);
   if(!t||!p||p.voided){closeModal();return;}
   const input=document.getElementById('voidReasonInput'),kind=(document.getElementById('voidKindInput')||{}).value||'other',openNce=!!((document.getElementById('voidOpenNce')||{}).checked),clean=QCCore.cleanText(input?input.value:'',1000).trim(),verdict=pointVoidVerdict(t,p),rules=[...new Set(verdict.rules||[])],rule=rules.join(', ')||'Không có luật Westgard',qcVerdict=['warn','rej'].includes(verdict.level)?verdict.level:'invalid',qcErrorType=errorType(rules);
-  if(kind==='other'&&clean.length<5){
+  if(globalThis.entryVoidReasonValid?!globalThis.entryVoidReasonValid(kind,clean):(kind==='other'&&clean.length<5)){
     const err=document.getElementById('voidReasonErr');
     if(err)err.style.display='';
     if(input)input.focus();
@@ -422,9 +428,9 @@ async function confirmVoidQcPoint(tid,pointId){
   const followup=result.openNce?(result.reusedAction?' Đã giữ liên kết với hồ sơ NCE đang mở.':` Đã mở hồ sơ ${esc(result.action&&result.action.nceId||'NCE')} để tiếp tục điều tra.`):' Không yêu cầu NCE/QC chạy lại.';
   save({clearDerived:false,testId:tid});entryLastMsg=`<div class="alert warn">Đã hủy điểm QC ngày ${vnDate(result.point.date)}. Điểm không còn tham gia tính toán.${followup}</div>`;entryRenderKeepScroll();
 }
-function entrySetSheetMonth(v){if(!/^\d{4}-\d{2}$/.test(v))return;entrySheetMonth=v;entryLastMsg='';rerender();}
+function entrySetSheetMonth(v){const month=globalThis.entrySheetMonthValue?globalThis.entrySheetMonthValue(v):(/^\d{4}-(0[1-9]|1[0-2])$/.test(v)?v:null);if(!month)return;entrySheetMonth=month;entryLastMsg='';rerender();}
 function entryGoToday(){entrySheetMonth=isoMonth();entryJumpToday=true;entryLastMsg='';rerender();}
-function entrySetSheetPart(part,value){const m=/^(\d{4})-(\d{2})$/.exec(entrySheetMonth||isoMonth());let year=+m[1],month=+m[2];if(part==='year')year=+value;else month=+value;entrySetSheetMonth(`${year}-${String(month).padStart(2,'0')}`);}
-function entrySetDays(n){entryDays=Math.min(90,n);entryStart=null;entryEnd=null;rerender();}
-function entrySetStart(v){entryStart=parseVN(v)||null;rerender();}
-function entrySetEnd(v){entryEnd=parseVN(v)||null;rerender();}
+function entrySetSheetPart(part,value){if(globalThis.entrySheetMonthPart){entrySetSheetMonth(globalThis.entrySheetMonthPart(entrySheetMonth,isoMonth(),part==='year'?'year':'month',value));return;}const m=/^(\d{4})-(\d{2})$/.exec(entrySheetMonth||isoMonth());let year=+m[1],month=+m[2];if(part==='year')year=+value;else month=+value;entrySetSheetMonth(`${year}-${String(month).padStart(2,'0')}`);}
+function entrySetDays(n){const range=globalThis.entryRangePreset?globalThis.entryRangePreset(n):{days:Math.min(90,n),start:null,end:null};entryDays=range.days;entryStart=range.start;entryEnd=range.end;rerender();}
+function entrySetStart(v){const next=globalThis.entryDateRangeInput?globalThis.entryDateRangeInput({start:entryStart,end:entryEnd},'start',v):{start:parseVN(v)||null,end:entryEnd};entryStart=next.start;entryEnd=next.end;rerender();}
+function entrySetEnd(v){const next=globalThis.entryDateRangeInput?globalThis.entryDateRangeInput({start:entryStart,end:entryEnd},'end',v):{start:entryStart,end:parseVN(v)||null};entryStart=next.start;entryEnd=next.end;rerender();}

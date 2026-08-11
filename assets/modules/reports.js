@@ -1,17 +1,17 @@
 /* ===== REPORTS (printable) ===== */
 function esc(s){return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function escAttr(s){return esc(s);}
-function reportQcValue(t,value){return typeof fmtTestValue==='function'?fmtTestValue(t,value):fmt(value,3);}
+function reportQcValue(t,value){return globalThis.reportQcFormat?globalThis.reportQcFormat.value(t,value):(typeof fmtTestValue==='function'?fmtTestValue(t,value):fmt(value,3));}
 /* SD/Mean thống kê: nhiều chữ số hơn giá trị đo. Fallback fmt(value,3) giữ đúng hành vi
    trước 2026-08-02 khi state.js chưa nạp (in ở document riêng). */
-function reportQcStat(t,value){return typeof fmtTestStat==='function'?fmtTestStat(t,value):fmt(value,3);}
-function reportQcPoint(point,t){return typeof fmtPointValue==='function'?fmtPointValue(point,t):fmt(point&&point.val,Math.max(2,Number(point&&point.valueDecimals)||0));}
-function reportHeader(title,subtitle='Nội kiểm chất lượng xét nghiệm'){const L=state.lab,app=window.QCLAB_APP||{version:'dev'},rules=Object.entries(state.westgardRules||{}).filter(x=>x[1]!==false).map(x=>x[0]).join(', ');return '<div class="rpt-head">'+
+function reportQcStat(t,value){return globalThis.reportQcFormat?globalThis.reportQcFormat.stat(t,value):(typeof fmtTestStat==='function'?fmtTestStat(t,value):fmt(value,3));}
+function reportQcPoint(point,t){return globalThis.reportQcFormat?globalThis.reportQcFormat.point(point,t):(typeof fmtPointValue==='function'?fmtPointValue(point,t):fmt(point&&point.val,Math.max(2,Number(point&&point.valueDecimals)||0)));}
+function reportHeader(title,subtitle='Nội kiểm chất lượng xét nghiệm'){if(globalThis.reportHeaderPresentation)return globalThis.reportHeaderPresentation({title,subtitle,lab:state.lab,app:window.QCLAB_APP,westgardRules:state.westgardRules,exportedAt:formatDateTimeVN(new Date().toISOString()),exportedBy:userName(),escape:esc});const L=state.lab,app=window.QCLAB_APP||{version:'dev'},rules=Object.entries(state.westgardRules||{}).filter(x=>x[1]!==false).map(x=>x[0]).join(', ');return '<div class="rpt-head">'+
   '<div class="rpt-brand"><div><div class="rpt-hosp">'+esc(L.name||'BỆNH VIỆN / ĐƠN VỊ')+'</div><div class="rpt-dept">'+esc(L.dept||'Khoa Xét nghiệm')+'</div><div class="rpt-addr">'+esc(L.address||'')+'</div></div></div>'+
   '<div class="rpt-meta"><b>Thời gian xuất</b><span>'+formatDateTimeVN(new Date().toISOString())+'</span><b class="rpt-meta-label">Người xuất</b><span>'+esc(userName())+'</span></div></div>'+
   '<table class="meta-table"><tr><th>Phiên bản app</th><td>'+esc((app.name||'QC Lab')+' '+(app.version||'dev'))+'</td><th>Bộ luật áp dụng</th><td>'+esc(rules||'Chưa cấu hình')+'</td></tr></table>'+
   '<div class="rpt-title"><div>'+title+'</div><span>'+esc(subtitle)+'</span></div>';}
-function signBlock(){return '<div class="sign-grid"><div><b>Người thực hiện</b><span>(Ký, ghi rõ họ tên)</span></div><div><b>Người kiểm tra</b><span>(Ký, ghi rõ họ tên)</span></div><div><b>Phụ trách khoa</b><span>(Ký, ghi rõ họ tên)</span></div></div>';}
+function signBlock(){return globalThis.reportSignBlock?globalThis.reportSignBlock():'<div class="sign-grid"><div><b>Người thực hiện</b><span>(Ký, ghi rõ họ tên)</span></div><div><b>Người kiểm tra</b><span>(Ký, ghi rõ họ tên)</span></div><div><b>Phụ trách khoa</b><span>(Ký, ghi rõ họ tên)</span></div></div>';}
 async function openPrint(title,bodyHtml,options={}){
   const w=window.open('','_blank');if(!w){await infoDialog('Trình duyệt chặn cửa sổ. Cho phép pop-up để in báo cáo.');return;}
   /* Font Manrope tự host (assets/tokens.css @font-face → assets/fonts/*.woff2),
@@ -179,7 +179,7 @@ function reportNceDetailHtml(a,t){
   if(m.cancelled)html+='<h4>Thông tin hủy hồ sơ</h4><div class="nce-detail-text">'+esc(m.cancelText)+'</div>';
   return html+'</section>';
 }
-function reportNceAppendixHtml(actions,t){return '<div class="nce-appendix"><h3>Phụ lục - Hồ sơ NCE chi tiết</h3><p class="nce-appendix-intro">Phụ lục giữ đầy đủ nội dung điều tra, bằng chứng QC chạy lại, đánh giá hiệu lực và phê duyệt. Bảng tổng hợp phía trên chỉ trình bày thông tin trọng yếu.</p>'+actions.map(a=>reportNceDetailHtml(a,t)).join('')+'</div>';}
+function reportNceAppendixHtml(actions,t){if(globalThis.reportNceAppendixPresentation)return globalThis.reportNceAppendixPresentation(actions,t);return '<div class="nce-appendix"><h3>Phụ lục - Hồ sơ NCE chi tiết</h3><p class="nce-appendix-intro">Phụ lục giữ đầy đủ nội dung điều tra, bằng chứng QC chạy lại, đánh giá hiệu lực và phê duyệt. Bảng tổng hợp phía trên chỉ trình bày thông tin trọng yếu.</p>'+actions.map(a=>reportNceDetailHtml(a,t)).join('')+'</div>';}
 async function printReport(){
   const{tid,t,start,end,includeNceAppendix}=reportExportSelection();if(!t)return;
   const inMonth=reportInRange(start,end),wg=activeWestgard(t);

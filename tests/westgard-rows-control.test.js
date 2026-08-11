@@ -1,0 +1,21 @@
+'use strict';
+const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+const source = pathToFileURL(path.join(__dirname, '..', 'src', 'presentation', 'westgard', 'westgard-rows-control.ts')).href;
+const program = `
+  import { createWestgardRowsControl } from ${JSON.stringify(source)};
+  const render = createWestgardRowsControl({ button: (label, action, variant) => '[' + label + '|' + action + '|' + variant + ']', quote: value => String(value).replaceAll("'", "\\\\'") });
+  console.log(JSON.stringify([render({ total: 120, rows: Array(120), expanded: false }, 'a', 120), render({ total: 121, rows: Array(120), expanded: false }, "a'b", 120), render({ total: 121, rows: Array(121), expanded: true }, 'a', 120)]));
+`;
+const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=module', '--eval', program], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
+assert.equal(result.status, 0, result.stderr || 'không thể chạy Westgard rows control TypeScript');
+const [limited, newest, full] = JSON.parse(result.stdout);
+assert.equal(limited, '');
+assert.match(newest, /Đang hiển thị 120\/121 điểm mới nhất/);
+assert.match(newest, /Xem toàn bộ 121 điểm\|wgToggleRows\('a\\'b'\)\|ghost sm/);
+assert.match(full, /Đang hiển thị 121\/121 điểm/);
+assert.doesNotMatch(full, /mới nhất/);
+assert.match(full, /Thu gọn còn 120 điểm/);
+console.log('Westgard rows control TypeScript tests passed');

@@ -1,0 +1,20 @@
+'use strict';
+const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+const source = pathToFileURL(path.join(__dirname, '..', 'src', 'presentation', 'dashboard', 'dashboard-level-pill-html.ts')).href;
+const program = `
+  import { createDashboardLevelPillHtml } from ${JSON.stringify(source)};
+  const render = createDashboardLevelPillHtml({ escape: value => String(value).replaceAll('<', '&lt;'), format: value => Number(value).toFixed(2) });
+  console.log(JSON.stringify([render({ level: { level: 1, lot: '<A>' }, today: true, targetOk: true, cv: 1.2 }), render({ level: { level: 2 }, today: false, targetOk: false })]));
+`;
+const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=module', '--eval', program], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
+assert.equal(result.status, 0, result.stderr || 'không thể chạy dashboard level pill HTML TypeScript');
+const [done, missing] = JSON.parse(result.stdout);
+assert.match(done, /dash-level-pill done/);
+assert.match(done, /M1 · &lt;A> · CV 1.20%/);
+assert.match(missing, /missing-target/);
+assert.match(missing, /title="Chưa có Mean\/SD hợp lệ/);
+assert.match(missing, /M2 · thiếu Mean\/SD/);
+console.log('Dashboard level pill HTML TypeScript tests passed');

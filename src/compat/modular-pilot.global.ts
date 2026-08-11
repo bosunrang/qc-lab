@@ -10,6 +10,7 @@ import {
   createManageConfigService,
   type ManageConfigServiceApi,
 } from '../application/manage/manage-config-service';
+import { createTeaReferenceService, type TeaReferenceServiceApi } from '../application/manage/tea-reference-service';
 import { createPeriodService, type PeriodServiceApi } from '../application/period/period-service';
 import { createAuditService, type AuditServiceApi } from '../application/audit/audit-service';
 import {
@@ -155,6 +156,70 @@ import { reportXlsxStyles } from '../presentation/report/report-xlsx-styles';
 import { createReportXlsxDrawing } from '../presentation/report/report-xlsx-drawing';
 import { createReportXlsxSheet } from '../presentation/report/report-xlsx-sheet';
 import { createReportXlsxBuilder } from '../presentation/report/report-xlsx-builder';
+import { createReportXlsxHeader } from '../presentation/report/report-xlsx-header';
+import { reportHeaderPresentation } from '../presentation/report/report-header';
+import { createReportNceAppendix, type ReportNceAppendixApi } from '../presentation/report/report-nce-appendix';
+import { reportSignBlock } from '../presentation/report/report-sign-block';
+import { createReportLockListHtml } from '../presentation/report/report-lock-list-html';
+import { createReportUnlockReason } from '../presentation/report/report-unlock-reason';
+import { reportLockPicker } from '../presentation/report/report-lock-picker';
+import { createReportLockPanelHtml } from '../presentation/report/report-lock-panel-html';
+import { createReportPageHtml } from '../presentation/report/report-page-html';
+import { createReportRangePickerHtml } from '../presentation/report/report-range-picker-html';
+import { createDashboardLoading } from '../presentation/dashboard/dashboard-loading';
+import { createDashboardStatusFilter } from '../presentation/dashboard/dashboard-status-filter';
+import { dashboardExpiringLots } from '../domain/qc/dashboard-expiring-lots';
+import { dashboardShiftStatus } from '../presentation/dashboard/dashboard-shift-status';
+import { dashboardKpis } from '../domain/qc/dashboard-kpis';
+import { createDashboardStatusTabsHtml } from '../presentation/dashboard/dashboard-status-tabs-html';
+import { createDashboardExpiringLotsHtml } from '../presentation/dashboard/dashboard-expiring-lots-html';
+import { createDashboardQcFollowupItemHtml } from '../presentation/dashboard/dashboard-qc-followup-item-html';
+import { createDashboardMissingTargetItemHtml } from '../presentation/dashboard/dashboard-missing-target-item-html';
+import { createDashboardOverdueActionItemHtml } from '../presentation/dashboard/dashboard-overdue-action-item-html';
+import { dashboardTestStatusTags } from '../presentation/dashboard/dashboard-test-status-tags';
+import { createDashboardLevelPillHtml } from '../presentation/dashboard/dashboard-level-pill-html';
+import { dashboardTestRank } from '../presentation/dashboard/dashboard-test-rank';
+import { createDashboardLatestPointText } from '../presentation/dashboard/dashboard-latest-point-text';
+import { dashboardCompletion } from '../presentation/dashboard/dashboard-completion';
+import { dashboardFollowupPanelHtml } from '../presentation/dashboard/dashboard-followup-panel-html';
+import { createDashboardTestSearchText } from '../presentation/dashboard/dashboard-test-search-text';
+import { createDashboardLatestPoint } from '../presentation/dashboard/dashboard-latest-point';
+import { createReportQcFormat } from '../presentation/report/report-qc-format';
+import { createRangeTea } from '../domain/qc/range-tea';
+import { entryRowsWindow as entryRowsWindowTs, entryLotLabels as entryLotLabelsTs } from '../presentation/entry/entry-rows-window';
+import { entrySheetMonthPart, entrySheetMonthValue } from '../presentation/entry/entry-sheet-month';
+import { createEntryTreeState } from '../presentation/entry/entry-tree-state';
+import { createEntrySheetNavigation } from '../presentation/entry/entry-sheet-navigation';
+import { createEntrySheetInputOrder } from '../presentation/entry/entry-sheet-input-order';
+import { entryTreeGroupState } from '../presentation/entry/entry-tree-group-state';
+import { createEntryTreeNavigation } from '../presentation/entry/entry-tree-navigation';
+import { createEntrySheetFocus } from '../presentation/entry/entry-sheet-focus';
+import { createEntryColumnConfig } from '../presentation/entry/entry-column-config';
+import { entryRangePreset } from '../presentation/entry/entry-range-preset';
+import { readEntryTreeCollapsed, writeEntryTreeCollapsed } from '../presentation/entry/entry-tree-collapse-preference';
+import { entryTreeVisibility } from '../presentation/entry/entry-tree-visibility';
+import { entryTreeKeyCommand } from '../presentation/entry/entry-tree-key-command';
+import { entrySelectionState } from '../presentation/entry/entry-selection-state';
+import { entryExpandedTablesToggle } from '../presentation/entry/entry-expanded-tables-state';
+import { entryPointContext } from '../presentation/entry/entry-point-context';
+import { entryVoidNceChoice, entryVoidReasonValid } from '../presentation/entry/entry-void-nce-choice';
+import { entryRecordErrorMessage } from '../presentation/entry/entry-record-error-message';
+import { entrySaveFeedback } from '../presentation/entry/entry-save-feedback';
+import { entryExtraRunRequest } from '../presentation/entry/entry-extra-run-request';
+import { entryDateNoteFeedback, entryDateNoteErrorMessage } from '../presentation/entry/entry-date-note-feedback';
+import { createEntryDateRangeInput } from '../presentation/entry/entry-date-range-input';
+import { westgardUiState } from '../presentation/westgard/westgard-ui-state';
+import { westgardModeTabs } from '../presentation/westgard/westgard-mode-tabs';
+import { createWestgardTestSearch } from '../presentation/westgard/westgard-test-search';
+import { createWestgardMultiViews } from '../presentation/westgard/westgard-multi-views';
+import { createWestgardCusumLevels } from '../presentation/westgard/westgard-cusum-levels';
+import { createWestgardPointRowsHtml } from '../presentation/westgard/westgard-point-rows-html';
+import { createWestgardRowsControl } from '../presentation/westgard/westgard-rows-control';
+import { createWestgardCusumPageHtml } from '../presentation/westgard/westgard-cusum-page-html';
+import { createWestgardLotBlockHtml } from '../presentation/westgard/westgard-lot-block-html';
+import { createWestgardRuleGuideHtml } from '../presentation/westgard/westgard-rule-guide-html';
+import { createWestgardRuleTogglesHtml } from '../presentation/westgard/westgard-rule-toggles-html';
+import { createWestgardExportActionsHtml } from '../presentation/westgard/westgard-export-actions-html';
 import { xlsxEscape } from '../presentation/export/xlsx-escape';
 import { REPORT_XLSX_STYLE_IDS } from '../presentation/report/report-xlsx-style-ids';
 import { XLSX_COLUMNS } from '../presentation/export/xlsx-columns';
@@ -243,6 +308,8 @@ import { createSigmaPeriodSelectionService, type SigmaPeriodSelectionService } f
 import { createLotTransitionPickerService, type LotTransitionPickerServiceApi } from '../presentation/manage/lot-transition-picker-service';
 import { westgardViewModel, type WestgardViewModelApi } from '../domain/westgard/westgard-view-model';
 import { westgardRowsWindow } from '../presentation/westgard/westgard-row-window';
+import { createWestgardXlsxRows, type WestgardXlsxRows } from '../presentation/westgard/westgard-xlsx-rows';
+import { createWestgardXlsxHeader } from '../presentation/westgard/westgard-xlsx-header';
 import { westgardArchivedGroups } from '../presentation/westgard/westgard-archived-groups';
 import { westgardArchivedMultiViews } from '../presentation/westgard/westgard-archived-multi-views';
 import { westgardArchivedGroupMatches } from '../presentation/westgard/westgard-archived-group-match';
@@ -264,6 +331,7 @@ import { createActionDetailPresentation, type ActionDetailPresentation } from '.
 import { createActionGuidePresentation, type ActionGuidePresentation } from '../presentation/nce/action-guide-presentation';
 import { actionInvestigationPresentation, type ActionInvestigationPresentation } from '../presentation/nce/action-investigation-presentation';
 import { createActionChecklistPresentation, type ActionChecklistPresentation } from '../presentation/nce/action-checklist-presentation';
+import { createActionFormModel, type ActionFormModelApi } from '../presentation/nce/action-form-model';
 import { createReportPeriodPresentation, type ReportPeriodPresentation } from '../presentation/report/report-period-presentation';
 import { reportSearchValuePresentation } from '../presentation/report/report-search-values';
 import { reportActionIconPresentation } from '../presentation/report/report-action-icon';
@@ -276,10 +344,12 @@ import { createPointWorkflowService } from '../application/nce/point-workflow-se
 import { createActionDraftStatus } from '../domain/nce/action-draft-status';
 import { createActionProtocolService, type ActionProtocolService } from '../domain/nce/action-protocol-service';
 import { createActionReviewService, type ActionReviewService } from '../application/nce/action-review-service';
+import { actionReviewMessages } from '../presentation/nce/action-review-messages';
 import { createActionEscalationService, type ActionEscalationService } from '../application/nce/action-escalation-service';
 import { createActionRecordService, type ActionRecordService } from '../application/nce/action-record-service';
 import { createActionRerunService, type ActionRerunService } from '../application/nce/action-rerun-service';
 import { createActionPointIndexService, type ActionPointIndexService } from '../application/nce/action-point-index-service';
+import { createActionCurrentIssues, type ActionCurrentIssuesApi } from '../application/nce/action-current-issues';
 import {
   createAnalysisUiState,
   createAuthUiState,
@@ -395,10 +465,12 @@ type QCLabGlobal = typeof globalThis & {
   ActionDraftStatusService?: ReturnType<typeof createActionDraftStatus>;
   ActionProtocolService?: ActionProtocolService;
   ActionReviewService?: ActionReviewService;
+  ActionReviewMessages?: typeof actionReviewMessages;
   ActionEscalationService?: ActionEscalationService;
   ActionRecordService?: ActionRecordService;
   ActionRerunService?: ActionRerunService;
   ActionPointIndexService?: ActionPointIndexService;
+  ActionCurrentIssues?: ActionCurrentIssuesApi;
   ActionBiasService?: ActionBiasService;
   ActionBiasPresentation?: ActionBiasPresentation;
   ActionViolationService?: ActionViolationService;
@@ -411,12 +483,14 @@ type QCLabGlobal = typeof globalThis & {
   ActionGuidePresentation?: ActionGuidePresentation;
   ActionInvestigationPresentation?: ActionInvestigationPresentation;
   ActionChecklistPresentation?: ActionChecklistPresentation;
+  ActionFormModel?: ActionFormModelApi;
   ReportPeriodPresentation?: ReportPeriodPresentation;
   reportSearchValuePresentation?: typeof reportSearchValuePresentation;
   reportActionIconPresentation?: typeof reportActionIconPresentation;
   ChartViewModel?: ChartViewModelApi;
   EntryService?: EntryServiceApi;
   ManageConfigService?: ManageConfigServiceApi;
+  TeaReferenceService?: TeaReferenceServiceApi;
   LotTransitionPickerService?: LotTransitionPickerServiceApi;
   PeriodService?: PeriodServiceApi;
   qcPointWarnings?: (test: Record<string, any>, config: Record<string, any>, date: string,
@@ -449,6 +523,8 @@ type QCLabGlobal = typeof globalThis & {
   SigmaPeriodSelectionService?: SigmaPeriodSelectionService;
   WestgardViewModel?: WestgardViewModelApi;
   westgardRowsWindow?: typeof westgardRowsWindow;
+  westgardXlsxRows?: WestgardXlsxRows;
+  westgardXlsxHeader?: typeof createWestgardXlsxHeader;
   westgardArchivedGroups?: typeof westgardArchivedGroups;
   westgardArchivedMultiViews?: typeof westgardArchivedMultiViews;
   westgardArchivedGroupMatches?: typeof westgardArchivedGroupMatches;
@@ -618,6 +694,74 @@ type QCLabGlobal = typeof globalThis & {
   reportXlsxDrawing?: ReturnType<typeof createReportXlsxDrawing>;
   reportXlsxSheet?: ReturnType<typeof createReportXlsxSheet>;
   reportXlsxBuild?: ReturnType<typeof createReportXlsxBuilder>;
+  reportXlsxHeader?: typeof createReportXlsxHeader;
+  reportHeaderPresentation?: typeof reportHeaderPresentation;
+  reportNceAppendixPresentation?: ReportNceAppendixApi;
+  reportSignBlock?: typeof reportSignBlock;
+  reportLockListHtmlPresentation?: ReturnType<typeof createReportLockListHtml<any>>;
+  reportUnlockReason?: ReturnType<typeof createReportUnlockReason>;
+  reportLockPicker?: typeof reportLockPicker;
+  reportLockPanelHtmlPresentation?: ReturnType<typeof createReportLockPanelHtml>;
+  reportPageHtml?: ReturnType<typeof createReportPageHtml>;
+  reportRangePickerHtml?: ReturnType<typeof createReportRangePickerHtml>;
+  dashboardLoadingPresentation?: ReturnType<typeof createDashboardLoading>;
+  dashboardStatusFilter?: ReturnType<typeof createDashboardStatusFilter>;
+  dashboardExpiringLots?: typeof dashboardExpiringLots;
+  dashboardShiftStatus?: typeof dashboardShiftStatus;
+  dashboardKpis?: typeof dashboardKpis;
+  reportQcFormat?: ReturnType<typeof createReportQcFormat>;
+  qcRangeTea?: ReturnType<typeof createRangeTea>;
+  entryRowsWindowTs?: typeof entryRowsWindowTs;
+  entryLotLabelsTs?: typeof entryLotLabelsTs;
+  entrySheetMonthPart?: typeof entrySheetMonthPart;
+  entrySheetMonthValue?: typeof entrySheetMonthValue;
+  entryTreeState?: ReturnType<typeof createEntryTreeState>;
+  entrySheetNavigation?: ReturnType<typeof createEntrySheetNavigation<any>>;
+  entrySheetInputOrder?: ReturnType<typeof createEntrySheetInputOrder<any>>;
+  entryTreeGroupState?: typeof entryTreeGroupState;
+  entryTreeNavigation?: ReturnType<typeof createEntryTreeNavigation<any>>;
+  entrySheetFocus?: ReturnType<typeof createEntrySheetFocus<any>>;
+  entryColumnConfig?: ReturnType<typeof createEntryColumnConfig>;
+  entryRangePreset?: typeof entryRangePreset;
+  entryTreeCollapsePreference?: { read: typeof readEntryTreeCollapsed; write: typeof writeEntryTreeCollapsed };
+  entryTreeVisibility?: typeof entryTreeVisibility;
+  entryTreeKeyCommand?: typeof entryTreeKeyCommand;
+  entrySelectionState?: typeof entrySelectionState;
+  entryExpandedTablesToggle?: typeof entryExpandedTablesToggle;
+  entryPointContext?: typeof entryPointContext;
+  entryVoidNceChoice?: typeof entryVoidNceChoice;
+  entryVoidReasonValid?: typeof entryVoidReasonValid;
+  entryRecordErrorMessage?: typeof entryRecordErrorMessage;
+  entrySaveFeedback?: typeof entrySaveFeedback;
+  entryExtraRunRequest?: typeof entryExtraRunRequest;
+  entryDateNoteFeedback?: typeof entryDateNoteFeedback;
+  entryDateNoteErrorMessage?: typeof entryDateNoteErrorMessage;
+  entryDateRangeInput?: ReturnType<typeof createEntryDateRangeInput>;
+  westgardUiState?: typeof westgardUiState;
+  westgardModeTabs?: typeof westgardModeTabs;
+  westgardTestSearch?: ReturnType<typeof createWestgardTestSearch<any>>;
+  westgardMultiViews?: ReturnType<typeof createWestgardMultiViews<any, any>>;
+  westgardCusumLevels?: ReturnType<typeof createWestgardCusumLevels<any, any, any>>;
+  westgardPointRowsHtml?: ReturnType<typeof createWestgardPointRowsHtml<any>>;
+  westgardRowsControl?: ReturnType<typeof createWestgardRowsControl>;
+  westgardCusumPageHtml?: ReturnType<typeof createWestgardCusumPageHtml<any>>;
+  westgardLotBlockHtml?: ReturnType<typeof createWestgardLotBlockHtml>;
+  westgardRuleGuideHtml?: ReturnType<typeof createWestgardRuleGuideHtml>;
+  westgardRuleTogglesHtml?: ReturnType<typeof createWestgardRuleTogglesHtml>;
+  westgardExportActionsHtml?: ReturnType<typeof createWestgardExportActionsHtml>;
+  dashboardStatusTabsHtml?: ReturnType<typeof createDashboardStatusTabsHtml>;
+  dashboardExpiringLotsHtml?: ReturnType<typeof createDashboardExpiringLotsHtml>;
+  dashboardQcFollowupItemHtml?: ReturnType<typeof createDashboardQcFollowupItemHtml>;
+  dashboardMissingTargetItemHtml?: ReturnType<typeof createDashboardMissingTargetItemHtml>;
+  dashboardOverdueActionItemHtml?: ReturnType<typeof createDashboardOverdueActionItemHtml>;
+  dashboardTestStatusTags?: typeof dashboardTestStatusTags;
+  dashboardLevelPillHtml?: ReturnType<typeof createDashboardLevelPillHtml>;
+  dashboardTestRank?: typeof dashboardTestRank;
+  dashboardLatestPointText?: ReturnType<typeof createDashboardLatestPointText>;
+  dashboardCompletion?: typeof dashboardCompletion;
+  dashboardFollowupPanelHtml?: typeof dashboardFollowupPanelHtml;
+  dashboardTestSearchText?: ReturnType<typeof createDashboardTestSearchText>;
+  dashboardLatestPoint?: ReturnType<typeof createDashboardLatestPoint<any>>;
   xlsxEscape?: typeof xlsxEscape;
   reportXlsxStyleIds?: typeof REPORT_XLSX_STYLE_IDS;
   xlsxColumns?: typeof XLSX_COLUMNS;
@@ -1059,6 +1203,76 @@ root.reportXlsxStyles=reportXlsxStyles;
 root.reportXlsxDrawing=createReportXlsxDrawing(pixels=>(root as any).XlsxCore.emu(pixels));
 root.reportXlsxSheet=doc=>{const core=(root as any).XlsxCore;return createReportXlsxSheet({columns:core.COLS,text:core.cellStr,number:core.cellNum})(doc);};
 root.reportXlsxBuild=doc=>{const core=(root as any).XlsxCore;return createReportXlsxBuilder({bytes:core.u8,escape:core.escX,styles:()=>root.reportXlsxStyles!(),sheet:item=>root.reportXlsxSheet!(item),drawing:images=>root.reportXlsxDrawing!(images),zip:core.zip})(doc);};
+root.reportXlsxHeader=createReportXlsxHeader;
+root.reportHeaderPresentation=reportHeaderPresentation;
+root.reportNceAppendixPresentation=createReportNceAppendix({detail:(action,test)=>(globalThis as any).reportNceDetailHtml(action,test)});
+root.reportSignBlock=reportSignBlock;
+root.reportLockListHtmlPresentation=createReportLockListHtml<any>({sorted:(locks:any[])=>(root as any).ReportPeriodPresentation.sortedLocks(locks),month:(ym:any)=>(root as any).monthVN(ym),dateTime:(value:any)=>(root as any).formatDateTimeVN(value),escape:(value:any)=>(root as any).esc(value),button:(label,action,variant)=>(root as any).btn(label,action,variant),quote:(value:any)=>(root as any).jsq(value)});
+root.reportUnlockReason=createReportUnlockReason({clean:(value:any,maxLength:number)=>(root as any).QCCore.cleanText(value,maxLength)});
+root.reportLockPicker=reportLockPicker;
+root.reportLockPanelHtmlPresentation=createReportLockPanelHtml({button:(label,action,variant,title,options)=>(root as any).btn(label,action,variant,title,options)});
+root.reportPageHtml=createReportPageHtml({head:(title,subtitle)=>(root as any).headOnly(title,subtitle),empty:(title,message,action)=>(root as any).emptyState(title,message,action),button:(label,action,variant,title,options)=>(root as any).btn(label,action,variant,title,options),escape:(value:any)=>(root as any).esc(value),escapeAttr:(value:any)=>(root as any).escAttr(value),label:(test:any,tests:any[])=>(root as any).testSelectLabel(test,tests),rangePicker:(start,end)=>(root as any).reportRangePicker(start,end),actionIcon:(type)=>(root as any).reportActionIcon(type)});
+root.reportRangePickerHtml=createReportRangePickerHtml({dateBox:(id,value,placeholder,attrs)=>(root as any).dateBox(id,value,placeholder,attrs)});
+root.ActionCurrentIssues=createActionCurrentIssues({operationalTests:()=>typeof (globalThis as any).operationalTests==='function'?(globalThis as any).operationalTests():[],activeWestgard:test=>(globalThis as any).activeWestgard(test),pointWorkflowComplete:pointId=>typeof (globalThis as any).pointWorkflowComplete==='function'?(globalThis as any).pointWorkflowComplete(pointId):false});
+root.ActionReviewMessages=actionReviewMessages;
+root.dashboardLoadingPresentation=createDashboardLoading({escape:value=>typeof (globalThis as any).esc==='function'?(globalThis as any).esc(value):String(value??''),topUserBox:()=>typeof (globalThis as any).topUserBox==='function'?(globalThis as any).topUserBox():''});
+root.dashboardStatusFilter=createDashboardStatusFilter();
+root.dashboardExpiringLots=dashboardExpiringLots;
+root.dashboardShiftStatus=dashboardShiftStatus;
+root.dashboardKpis=dashboardKpis;
+root.reportQcFormat=createReportQcFormat({testValue:(test,value)=>typeof (globalThis as any).fmtTestValue==='function'?(globalThis as any).fmtTestValue(test,value):(globalThis as any).fmt(value,3),testStat:(test,value)=>typeof (globalThis as any).fmtTestStat==='function'?(globalThis as any).fmtTestStat(test,value):(globalThis as any).fmt(value,3),pointValue:(point,test)=>typeof (globalThis as any).fmtPointValue==='function'?(globalThis as any).fmtPointValue(point,test):(globalThis as any).fmt(point&&point.val,Math.max(2,Number(point&&point.valueDecimals)||0)),format:(value,decimals)=>(globalThis as any).fmt(value,decimals)});
+root.qcRangeTea=createRangeTea({teaBySource:(test,source,target)=>(globalThis as any).sgTeaBySource(test,source,target),teaSource:test=>(globalThis as any).sgTeaSource(test)});
+root.entryRowsWindowTs=entryRowsWindowTs;
+root.entryLotLabelsTs=entryLotLabelsTs;
+root.entrySheetMonthPart=entrySheetMonthPart;
+root.entrySheetMonthValue=entrySheetMonthValue;
+root.entryTreeState=createEntryTreeState({activeWestgard:test=>(globalThis as any).activeWestgard(test),operationalLevels:test=>(globalThis as any).operationalLevels(test),pointsForLot:(testId,level,lot)=>(globalThis as any).pointsForLot(testId,level,lot)});
+root.entrySheetNavigation=createEntrySheetNavigation<any>({date:element=>String(element.dataset.focusDate||''),run:element=>String(element.dataset.focusRun||''),level:element=>String(element.dataset.focusLevel||'')});
+root.entrySheetInputOrder=createEntrySheetInputOrder<any>({date:element=>String(element.dataset.focusDate||''),run:element=>Number(element.dataset.focusRun||0),level:element=>Number(element.dataset.focusLevel||0)});
+root.entryTreeGroupState=entryTreeGroupState;
+root.entryTreeNavigation=createEntryTreeNavigation<any>();
+root.entrySheetFocus=createEntrySheetFocus<any>(element=>!!element.classList.contains('empty'));
+root.entryColumnConfig=createEntryColumnConfig({levelConfig:qcLevelConfig,parallelLot:(test,level)=>(root as any).qcParallelLotLookup(test,level)});
+root.entryRangePreset=entryRangePreset;
+root.entryTreeCollapsePreference={read:readEntryTreeCollapsed,write:writeEntryTreeCollapsed};
+root.entryTreeVisibility=entryTreeVisibility;
+root.entryTreeKeyCommand=entryTreeKeyCommand;
+root.entrySelectionState=entrySelectionState;
+root.entryExpandedTablesToggle=entryExpandedTablesToggle;
+root.entryPointContext=entryPointContext;
+root.entryVoidNceChoice=entryVoidNceChoice;
+root.entryVoidReasonValid=entryVoidReasonValid;
+root.entryRecordErrorMessage=entryRecordErrorMessage;
+root.entrySaveFeedback=entrySaveFeedback;
+root.entryExtraRunRequest=entryExtraRunRequest;
+root.entryDateNoteFeedback=entryDateNoteFeedback;
+root.entryDateNoteErrorMessage=entryDateNoteErrorMessage;
+root.entryDateRangeInput=createEntryDateRangeInput(value=>(root as any).parseVN(value));
+root.westgardUiState=westgardUiState;
+root.westgardModeTabs=westgardModeTabs;
+root.westgardTestSearch=createWestgardTestSearch<any>({text:(value:any)=>(root as any).searchText(value),label:(test:any)=>(root as any).testSelectLabel(test),id:(test:any)=>test.id});
+root.westgardMultiViews=createWestgardMultiViews<any,any>({levels:(test:any)=>(root as any).operationalLevels(test),points:(test:any,level:any)=>(root as any).operationalLotPoints(test,level),previous:(test:any,level:any)=>(root as any).previousLotSeries(test,level),build:(input:any)=>(root as any).WestgardViewModel.buildMultiViews(input)});
+root.westgardCusumLevels=createWestgardCusumLevels<any,any,any>({levels:(test:any)=>(root as any).operationalLevels(test),points:(test:any,level:any)=>(root as any).operationalLotPoints(test,level)});
+root.westgardPointRowsHtml=createWestgardPointRowsHtml<any>({verdictLabel:(level:any)=>(root as any).qcVerdictLabel(level),errorParts:(rules:any)=>(root as any).errorTypeDetailParts(rules),escape:(value:any)=>(root as any).esc(value),date:(value:any)=>(root as any).vnDate(value),testValue:(test:any,value:any)=>(root as any).fmtTestValue(test,value),format:(value:any)=>(root as any).fmt(value),referenceIcon:()=> (root as any).icoRefArrow()});
+root.westgardRowsControl=createWestgardRowsControl({button:(label,action,variant)=>(root as any).btn(label,action,variant),quote:(value:any)=>(root as any).jsq(value)});
+root.westgardCusumPageHtml=createWestgardCusumPageHtml<any>({empty:(title,message,action)=>(root as any).emptyState(title,message,action),button:(label,action,variant)=>(root as any).btn(label,action,variant),escape:(value:any)=>(root as any).esc(value),testValue:(test:any,value:any)=>(root as any).fmtTestValue(test,value),format:(value:any,decimals?:number)=>(root as any).fmt(value,decimals),quote:(value:any)=>(root as any).jsq(value)});
+root.westgardLotBlockHtml=createWestgardLotBlockHtml({testValue:(test:any,value:any)=>(root as any).fmtTestValue(test,value),empty:(title,message)=>(root as any).emptyState(title,message),buildRows:(test:any,level:any,lotNo:any,mean:any,sd:any,points:any[])=>{const wgP=(root as any).QCCore.westgardByPoint(points,mean,sd,(rule:any)=>(root as any).testRuleOnWithin(test,rule)),rows=(root as any).WestgardViewModel.buildPointRows({points,verdicts:wgP.F.map((f:any)=>({rules:f.rules,supportRules:f.supportRules,level:(root as any).ruleResultLevel(test,f.rules)})),zs:wgP.zs,mean,sd}),key=`lot:${test.id}|${level}|${lotNo}`;return{key,view:(root as any).wgRowsWindow(rows,key)};},pointRows:(rows:any[],test:any)=>(root as any).westgardPointRowsHtml(rows,test),rowsControl:(view:any,key:string)=>(root as any).westgardRowsControl(view,key,120)});
+root.westgardRuleGuideHtml=createWestgardRuleGuideHtml({escape:(value:any)=>(root as any).esc(value),referenceIcon:()=> (root as any).icoRefArrow()});
+root.westgardRuleTogglesHtml=createWestgardRuleTogglesHtml({button:(label,action,variant)=>(root as any).btn(label,action,variant)});
+root.westgardExportActionsHtml=createWestgardExportActionsHtml({button:(label,action,variant,title)=>(root as any).btn(label,action,variant,title),downloadIcon:()=> (root as any).icoDownload(),printIcon:()=> (root as any).icoPrint()});
+root.dashboardStatusTabsHtml=createDashboardStatusTabsHtml({matches:(item:any,key:string)=>(root as any).dashboardStatusFilter.matches(item,key)});
+root.dashboardExpiringLotsHtml=createDashboardExpiringLotsHtml({escape:(value:any)=>(root as any).esc(value)});
+root.dashboardQcFollowupItemHtml=createDashboardQcFollowupItemHtml({escape:(value:any)=>(root as any).esc(value),testLabel:(test:any)=>(root as any).testDisplayName(test),date:(value:any)=>(root as any).vnDate(value),pointValue:(point:any,test:any)=>(root as any).fmtPointValue(point,test),button:(label,action,variant)=>(root as any).btn(label,action,variant),quote:(value:any)=>(root as any).jsq(value)});
+root.dashboardMissingTargetItemHtml=createDashboardMissingTargetItemHtml({escape:(value:any)=>(root as any).esc(value),testLabel:(test:any)=>(root as any).testDisplayName(test),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
+root.dashboardOverdueActionItemHtml=createDashboardOverdueActionItemHtml({escape:(value:any)=>(root as any).esc(value),testLabel:(test:any)=>(root as any).testDisplayName(test),date:(value:any)=>(root as any).vnDate(value),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
+root.dashboardTestStatusTags=dashboardTestStatusTags;
+root.dashboardLevelPillHtml=createDashboardLevelPillHtml({escape:(value:any)=>(root as any).esc(value),format:(value:any)=>(root as any).fmt(value)});
+root.dashboardTestRank=dashboardTestRank;
+root.dashboardLatestPointText=createDashboardLatestPointText({date:(value:any)=>(root as any).vnDate(value),pointValue:(point:any,test:any)=>(root as any).fmtPointValue(point,test)});
+root.dashboardCompletion=dashboardCompletion;
+root.dashboardFollowupPanelHtml=dashboardFollowupPanelHtml;
+root.dashboardTestSearchText=createDashboardTestSearchText({normalize:(value:any)=>(root as any).searchText(value),label:(test:any)=>(root as any).testDisplayName(test)});
+root.dashboardLatestPoint=createDashboardLatestPoint<any>({runNumber:(point:any)=>(root as any).pointRunNo(point)});
 root.xlsxEscape=xlsxEscape;
 root.reportXlsxStyleIds=REPORT_XLSX_STYLE_IDS;
 root.xlsxColumns=XLSX_COLUMNS;
@@ -1270,6 +1484,11 @@ root.ActionChecklistPresentation = createActionChecklistPresentation({
   effectivenessStatus: form => typeof (root as any).actionEffectivenessStatus === 'function'
     ? (root as any).actionEffectivenessStatus(form) : { cls: 'none', label: 'Chưa đánh giá', complete: false },
 });
+root.ActionFormModel = createActionFormModel({
+  todayIso: () => isoToday(), dueDate: days => root.NceActionIdentityService!.dueDate(days),
+  operationalLevels: test => (root as any).operationalLevels(test),
+  effectivenessComplete: action => typeof (root as any).actionEffectivenessStatus === 'function' && (root as any).actionEffectivenessStatus(action).complete,
+});
 root.ReportPeriodPresentation = createReportPeriodPresentation();
 root.reportSearchValuePresentation = reportSearchValuePresentation;
 root.reportActionIconPresentation = reportActionIconPresentation;
@@ -1431,6 +1650,12 @@ root.ManageConfigService = createManageConfigService({
   targetFromLimits: root.QCCore.targetFromLimits,
   limitsFromTarget: root.QCCore.limitsFromTarget,
 });
+root.TeaReferenceService = createTeaReferenceService({
+  key: value => (globalThis as any).teaRefName(value), analyteMeta: (name, record) => (globalThis as any).teaAnalyteMeta(name, record),
+  effectiveReferences: () => (globalThis as any).effectiveTeaRefs(), defaultReferences: () => (globalThis as any).REFTESTS,
+  sourceRegistry: () => (globalThis as any).TEA_SOURCE_REGISTRY, createId: () => (globalThis as any).uid(),
+  todayIso: () => (globalThis as any).isoToday(), userName: () => (globalThis as any).userName(),
+});
 root.LotTransitionPickerService = createLotTransitionPickerService({
   searchText: value => (globalThis as any).searchText(value), formatDate: value => (globalThis as any).vnDate(value),
   transitionToNo: lotId => (globalThis as any).lotTransitionToNo(lotId),
@@ -1457,6 +1682,8 @@ root.reagentComparisonCalculator = createReagentComparisonCalculator({
 root.SigmaCohortService = createSigmaCohortService({ stats: root.QCCore.stats });
 root.WestgardViewModel = westgardViewModel;
 root.westgardRowsWindow = westgardRowsWindow;
+root.westgardXlsxRows = createWestgardXlsxRows({date:value=>(root as any).vnDate(value),staffCode:point=>((root as any).pointStaff(point).code||''),verdict:level=>(root as any).qcVerdictLabel(level),error:rules=>(root as any).errorType(rules),number:value=>(root as any).fmt(value)});
+root.westgardXlsxHeader = createWestgardXlsxHeader;
 root.westgardArchivedGroups = westgardArchivedGroups;
 root.westgardArchivedMultiViews = westgardArchivedMultiViews;
 root.westgardArchivedGroupMatches = westgardArchivedGroupMatches;

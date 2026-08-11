@@ -41,13 +41,13 @@ function openRangeWorkflow(tid,level){
 /* TEa% của xét nghiệm tại đúng target=mean đang dùng, dùng chung cho ngưỡng Bias
    (điều kiện 2) và số tham khảo ΔSEcrit/ΔREcrit — lấy nguyên lớp giải TEa của
    trang Sigma (sigma-tea.js) thay vì dựng một bảng TEa riêng cho range.js. */
-function rangeTeaPercent(t,l){const v=t?sgTeaBySource(t,sgTeaSource(t),l.mean):0;return Number.isFinite(v)&&v>0?v:null;}
+function rangeTeaPercent(t,l){if(globalThis.qcRangeTea)return globalThis.qcRangeTea.percent(t,l);const v=t?sgTeaBySource(t,sgTeaSource(t),l.mean):0;return Number.isFinite(v)&&v>0?v:null;}
 /* Khối xác nhận 2 điều kiện chỉ hiện khi rangeCandidate() thấy có hồ sơ NCE hệ
    thống (r.nce) — thiết lập dải thường quy (không có NCE liên quan) giữ nguyên
    luồng cũ, không thêm ma sát. */
 function rangeGateHtml(r,tid,level){
   if(!r.nce)return'';
-  const tea=rangeTeaPercent(r.t,r.l),threshold=tea?tea/4:null;
+  const tea=rangeTeaPercent(r.t,r.l),threshold=globalThis.qcRangeTea?globalThis.qcRangeTea.quarter(tea):(tea?tea/4:null);
   return `<div class="alert warn flow-control"><b>Hồ sơ NCE ${esc(r.nce.nceId||'NCE')} đang ghi nhận vi phạm hệ thống (${esc(r.nce.rule||'')})</b><div>Xác nhận 2 điều kiện dưới đây trước khi áp dụng dải mới — tránh "đuổi theo mean" khi nguyên nhân dịch chuyển chưa được lý giải.</div></div>
     <label class="range-gate-check"><input type="checkbox" id="rangeCauseConfirm" onchange="document.getElementById('rangeGateErr').style.display='none'"><span>Xác nhận nguyên nhân dịch chuyển đã được xác định và ghi nhận trong hồ sơ NCE ${esc(r.nce.nceId||'NCE')} (không phải lỗi chưa lý giải)</span></label>
     <div class="field-row flow-item"><div><label>Bias đo lại (%)</label><input id="rangeBiasInput" type="text" inputmode="decimal" oninput="rangeUpdateBiasHint('${tid}',${level})"></div><div><label>Ngưỡng cho phép (≤ TEa/4)</label><input id="rangeBiasThreshold" readonly value="${threshold!=null?fmt(threshold)+'%':'—'}"></div></div>

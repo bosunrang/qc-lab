@@ -548,6 +548,9 @@ function fixture(actionOverrides = {}) {
 }
 
 {
+  assert.equal(ctx.ActionReviewPresentation.approvalTag('approved', false).cls, 'ok');
+  assert.equal(ctx.ActionReviewPresentation.approvalTag('returned', false).cls, 'rej');
+  assert.equal(ctx.ActionReviewPresentation.approvalTag('pending', true).cls, 'none');
   const buttons = ctx.ActionReviewPresentation.buttons({}, { approval: 'pending', workflowStage: 'approval', cancelled: false, isAdmin: true, canWrite: true, canEscalate: false, canReopen: false });
   assert.equal(buttons.edit, true);
   assert.equal(buttons.approve, true);

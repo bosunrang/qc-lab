@@ -1,0 +1,24 @@
+'use strict';
+const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+const source = pathToFileURL(path.join(__dirname, '..', 'src', 'presentation', 'report', 'report-page-html.ts')).href;
+const program = `
+  import { createReportPageHtml } from ${JSON.stringify(source)};
+  const render = createReportPageHtml({ head: (title, sub) => '<h>' + title + '|' + sub + '</h>', empty: (title, message, action) => '<e>' + title + '|' + message + '|' + action + '</e>', button: (label, action, variant, _title, options) => '[' + label + '|' + action + '|' + variant + '|' + Boolean(options && options.disabled) + ']', escape: value => String(value).replaceAll('<', '&lt;'), escapeAttr: value => String(value).replaceAll('<', '&lt;').replaceAll('"', '&quot;'), label: test => test.name, rangePicker: (start, end) => '<range>' + start + '-' + end + '</range>', actionIcon: () => '<svg></svg>' });
+  const base = { query: '<q>', start: '2026-08-01', end: '2026-08-10', selectedId: 'T2', isAdmin: true, lockPanelHtml: '<locks/>' };
+  console.log(JSON.stringify([render({ ...base, tests: [], matched: [] }), render({ ...base, tests: [{ id: 'T1', name: '<A>' }, { id: 'T2', name: 'B' }], matched: [{ id: 'T2', name: 'B' }]}), render({ ...base, isAdmin: false, tests: [{ id: 'T1', name: 'A' }], matched: [] })]));
+`;
+const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=module', '--eval', program], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
+assert.equal(result.status, 0, result.stderr || 'không thể chạy report page HTML TypeScript');
+const [empty, normal, noMatch] = JSON.parse(result.stdout);
+assert.match(empty, /Chưa có xét nghiệm đang vận hành/);
+assert.match(empty, /Cấu hình Mean\/SD/);
+assert.match(normal, /value="&lt;q>"/);
+assert.match(normal, /<option value="T2" selected>B<\/option>/);
+assert.match(normal, /Tạo báo cáo &amp; In/);
+assert.match(normal, /<locks\/>/);
+assert.match(noMatch, /select id="rTest" aria-label="Xét nghiệm" disabled/);
+assert.match(noMatch, /Xuất Excel\|exportReportXLSX\(\)\|teal\|true/);
+console.log('Report page HTML TypeScript tests passed');

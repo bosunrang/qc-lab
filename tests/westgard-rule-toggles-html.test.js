@@ -1,0 +1,21 @@
+'use strict';
+const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+const source = pathToFileURL(path.join(__dirname, '..', 'src', 'presentation', 'westgard', 'westgard-rule-toggles-html.ts')).href;
+const program = `
+  import { createWestgardRuleTogglesHtml } from ${JSON.stringify(source)};
+  const render = createWestgardRuleTogglesHtml({ button: (label, action, variant) => '[' + label + '|' + action + '|' + variant + ']' });
+  console.log(JSON.stringify([render([{ id: '1-2s' }, { id: '1_3s' }], id => id === '1-2s', true), render([{ id: '1-2s' }], () => false, false)]));
+`;
+const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=module', '--eval', program], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
+assert.equal(result.status, 0, result.stderr || 'không thể chạy Westgard rule toggles HTML TypeScript');
+const [writer, reader] = JSON.parse(result.stdout);
+assert.match(writer, /<span class="pill">1-2s<\/span>/);
+assert.match(writer, /checkbox" checked/);
+assert.match(writer, /wgSet\('1_3s',this.checked\)/);
+assert.match(writer, /Khôi phục mặc định\|wgReset\(\)\|ghost sm/);
+assert.match(reader, /checkbox"  disabled/);
+assert.doesNotMatch(reader, /wg-rule-reset/);
+console.log('Westgard rule toggles HTML TypeScript tests passed');

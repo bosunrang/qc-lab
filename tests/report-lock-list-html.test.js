@@ -1,0 +1,21 @@
+'use strict';
+const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+const source = pathToFileURL(path.join(__dirname, '..', 'src', 'presentation', 'report', 'report-lock-list-html.ts')).href;
+const program = `
+  import { createReportLockListHtml } from ${JSON.stringify(source)};
+  const render = createReportLockListHtml({ sorted: locks => locks.slice().sort((a, b) => b.ym.localeCompare(a.ym)), month: ym => 'M:' + ym, dateTime: at => 'D:' + at, escape: value => String(value).replaceAll('<', '&lt;'), button: (label, action, variant) => '[' + label + '|' + action + '|' + variant + ']', quote: value => String(value).replaceAll("'", "\\\\'") });
+  console.log(JSON.stringify([render([], true), render([{ ym: '2026-01', lockedBy: '<A>', lockedAt: 'x' }, { ym: '2026-03' }], false), render([{ ym: "2026'02" }], true)]));
+`;
+const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=module', '--eval', program], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
+assert.equal(result.status, 0, result.stderr || 'không thể chạy report lock list HTML TypeScript');
+const [empty, readOnly, admin] = JSON.parse(result.stdout);
+assert.match(empty, /Chưa có kỳ nào được khóa/);
+assert.match(readOnly, /M:2026-03/);
+assert.match(readOnly, /Khóa bởi —/);
+assert.match(readOnly, /&lt;A>/);
+assert.doesNotMatch(readOnly, /Mở khóa/);
+assert.match(admin, /reportUnlockPeriod\('2026\\'02'\)/);
+console.log('Report lock list HTML TypeScript tests passed');

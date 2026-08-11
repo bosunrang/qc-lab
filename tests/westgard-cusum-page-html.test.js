@@ -1,0 +1,21 @@
+'use strict';
+const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+const source = pathToFileURL(path.join(__dirname, '..', 'src', 'presentation', 'westgard', 'westgard-cusum-page-html.ts')).href;
+const program = `
+  import { createWestgardCusumPageHtml } from ${JSON.stringify(source)};
+  const render = createWestgardCusumPageHtml({ empty: (title, message, action = '') => '<empty>' + title + '|' + message + '|' + action + '</empty>', button: (label, action, variant) => '[' + label + '|' + action + '|' + variant + ']', escape: value => String(value).replaceAll('<', '&lt;'), testValue: (_test, value) => 'V:' + value, format: (value, decimals) => Number(value).toFixed(decimals), quote: value => String(value).replaceAll("'", "\\\\'") });
+  console.log(JSON.stringify([render({ test: { id: "T'1" }, cfg: { on: false, k: .5, h: 4 }, levels: [], canWrite: true }), render({ test: { id: 'T1' }, cfg: { on: true, k: .5, h: 4 }, levels: [], canWrite: false }), render({ test: { id: 'T1' }, cfg: { on: true, k: .5, h: 4 }, levels: [{ level: 1, lot: '<A>', mean: 2, sd: .3, pts: [] }, { level: 2, lot: 'B', mean: 3, sd: .4, pts: [1, 2] }], canWrite: true })]));
+`;
+const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=module', '--eval', program], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
+assert.equal(result.status, 0, result.stderr || 'không thể chạy Westgard CUSUM page HTML TypeScript');
+const [off, noLevels, levels] = JSON.parse(result.stdout);
+assert.match(off, /openConfigAssay\('T\\'1'\)/);
+assert.match(noLevels, /Chưa có mức QC đang vận hành/);
+assert.match(levels, /Lô &lt;A>/);
+assert.match(levels, /k=0.50 · h=4.00/);
+assert.match(levels, /LOT đang dùng chưa có điểm QC/);
+assert.match(levels, /data-test="T1" data-level="2"/);
+console.log('Westgard CUSUM page HTML TypeScript tests passed');

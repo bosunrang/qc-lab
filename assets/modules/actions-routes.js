@@ -10,6 +10,7 @@ function actionLevelShort(t,level,lotSnap){
   return ActionListPresentation.levelShort(t,level,lotSnap);
 }
 function currentIssues(){
+  if(globalThis.ActionCurrentIssues)return globalThis.ActionCurrentIssues();
   const out=[],rank={rej:2,warn:1,ok:0};
   operationalTests().forEach(t=>{const wg=activeWestgard(t);wg.views.forEach(v=>{const l=v.l;(v.pts||[]).forEach(p=>{const f=wg.byPoint.get(p.id);if(!f||f.level==='ok'||(typeof pointWorkflowComplete==='function'&&pointWorkflowComplete(p.id)))return;out.push({t,l,p,f,rules:f.rules});});});});
   return out.sort((a,b)=>(rank[b.f.level]||0)-(rank[a.f.level]||0)||String(b.p.date||'').localeCompare(String(a.p.date||'')));
@@ -42,9 +43,10 @@ function confirmCancelAction(id,token){
   if(actionEditId===a.id){actionEditId='';actionSeed=null;clearActionDraft();actionOpenSections=null;}
   save({clearDerived:false});rerender();
 }
-function actionApprovalTag(a){const s=actionApprovalStatus(a),cls=actionCancelled(a)?'none':s==='approved'?'ok':s==='returned'?'rej':'warn';return `<span class="tag ${cls}">${actionApprovalLabel(a)}</span>`;}
+function actionApprovalTag(a){const s=actionApprovalStatus(a),view=ActionReviewPresentation.approvalTag(s,actionCancelled(a));return `<span class="tag ${view.cls}">${actionApprovalLabel(a)}</span>`;}
 function actionApprovalToken(a){return ActionReviewService.reviewToken(a);}
 function actionApprovalReadinessMessage(r,afterAuth){
+  if(globalThis.ActionReviewMessages)return globalThis.ActionReviewMessages.approval(r,afterAuth);
   if(r.reason==='cancelled')return'Hồ sơ đã hủy không thể được duyệt.';
   if(r.reason==='unrecorded')return afterAuth?'Chưa có hành động khắc phục thực tế để duyệt.':'Chưa có hành động khắc phục thực tế để duyệt. Hãy ghi hành động trước.';
   if(r.reason==='protocol')return(afterAuth?'Phiếu điều tra không còn đủ điều kiện duyệt: ':'Chưa thể duyệt vì phiếu điều tra còn thiếu: ')+(r.missing||[]).join(', ')+'.';
@@ -55,6 +57,7 @@ function actionApprovalReadinessMessage(r,afterAuth){
   return'Hồ sơ không còn đủ điều kiện duyệt.';
 }
 function actionReviewReadinessMessage(kind,r,afterAuth){
+  if(globalThis.ActionReviewMessages)return globalThis.ActionReviewMessages.review(kind,r,afterAuth);
   if(kind==='cancel'){
     if(r.reason==='cancelled')return afterAuth?'':'Hồ sơ này đã được hủy và đang được giữ lại trong nhật ký.';
     if(r.reason==='approved')return afterAuth?'Không thể hủy hồ sơ đã duyệt.':'Không thể hủy hồ sơ đã duyệt. Nếu cần xử lý tiếp, hãy lập hồ sơ NCE mới.';

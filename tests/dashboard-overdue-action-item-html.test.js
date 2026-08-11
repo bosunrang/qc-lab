@@ -1,0 +1,20 @@
+'use strict';
+const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+const source = pathToFileURL(path.join(__dirname, '..', 'src', 'presentation', 'dashboard', 'dashboard-overdue-action-item-html.ts')).href;
+const program = `
+  import { createDashboardOverdueActionItemHtml } from ${JSON.stringify(source)};
+  const render = createDashboardOverdueActionItemHtml({ escape: value => String(value).replaceAll('<', '&lt;'), testLabel: test => test.name, date: value => 'D:' + value, button: (label, action, variant) => '[' + label + '|' + action + '|' + variant + ']' });
+  console.log(JSON.stringify([render({ action: { nceId: '<N1>', dueDate: '2026-08-01', by: '<A>' }, index: 3, info: { label: '<Quá hạn>' }, test: { name: '<T>' } }), render({ action: { rule: '<1_3s>', dueDate: '2026-08-02' }, index: 0, info: { label: '1 ngày' } })]));
+`;
+const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=module', '--eval', program], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
+assert.equal(result.status, 0, result.stderr || 'không thể chạy dashboard overdue action item HTML TypeScript');
+const [withTest, fallback] = JSON.parse(result.stdout);
+assert.match(withTest, /&lt;N1> · &lt;T>/);
+assert.match(withTest, /&lt;Quá hạn> · hạn D:2026-08-01 · phụ trách &lt;A>/);
+assert.match(withTest, /Tiếp tục hồ sơ\|go\('actions'\);editAction\(3\)\|ghost sm/);
+assert.match(fallback, /&lt;1_3s>/);
+assert.match(fallback, /phụ trách —/);
+console.log('Dashboard overdue action item HTML TypeScript tests passed');

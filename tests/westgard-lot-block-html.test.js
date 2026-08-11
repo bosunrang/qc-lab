@@ -1,0 +1,21 @@
+'use strict';
+const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+const source = pathToFileURL(path.join(__dirname, '..', 'src', 'presentation', 'westgard', 'westgard-lot-block-html.ts')).href;
+const program = `
+  import { createWestgardLotBlockHtml } from ${JSON.stringify(source)};
+  const render = createWestgardLotBlockHtml({ testValue: (_test, value) => 'V:' + value, empty: (title, message) => '<empty>' + title + '|' + message + '</empty>', buildRows: (_test, level, lot, mean, sd, points) => ({ key: level + '|' + lot + '|' + mean + '|' + sd + '|' + points.length, view: { rows: ['R'] } }), pointRows: rows => '<rows>' + rows.join(',') + '</rows>', rowsControl: (view, key) => '<control>' + view.rows.length + '|' + key + '</control>' });
+  console.log(JSON.stringify([render({ test: {}, level: 1, lotNo: 'L1', mean: 2, sd: .3, points: [], badge: 'Cũ', title: 'Mức 1', lotLabel: 'Lô L1' }), render({ test: {}, level: 2, lotNo: 'L2', mean: 3, sd: .4, points: [1], badge: 'Cũ', title: 'Mức 2', lotLabel: 'Lô L2', extraMeta: '<x/>' })]));
+`;
+const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=module', '--eval', program], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
+assert.equal(result.status, 0, result.stderr || 'không thể chạy Westgard lot block HTML TypeScript');
+const [empty, full] = JSON.parse(result.stdout);
+assert.match(empty, /Mean V:2/);
+assert.match(empty, /Không tìm thấy điểm QC nào cho lô này/);
+assert.doesNotMatch(empty, /<table/);
+assert.match(full, /<control>1\|2\|L2\|3\|0.4\|1<\/control>/);
+assert.match(full, /<rows>R<\/rows>/);
+assert.match(full, /<x\/>/);
+console.log('Westgard lot block HTML TypeScript tests passed');

@@ -30,6 +30,7 @@ function actionSectionToggled(key,open){
   if(open)actionOpenSections.add(key);else actionOpenSections.delete(key);
 }
 function actionDefaultOpenSections(editing,protocol){
+  if(globalThis.ActionFormModel)return globalThis.ActionFormModel.defaultOpenSections(editing,protocol);
   if(!editing)return new Set(['immediate']);
   const miss=protocol&&protocol.missingBySection||{};
   const open=new Set(['immediate','risk','check','cause','patient'].filter(k=>(miss[k]||[]).length));
@@ -97,6 +98,7 @@ const ACT_SOURCE_OPTS=[['','— Chọn nguồn —'],...Object.entries(ACTION_LA
    vi phạm, nếu không hệ thống mất đường theo dõi QC chạy lại. Hồ sơ cũ lỡ mang giá trị
    đó vẫn giữ option để hiện đúng tên — phần chặn do actionDraftStatus() lo. */
 function actionSourceOptions(qcBound,current){
+  if(globalThis.ActionFormModel)return globalThis.ActionFormModel.sourceOptions(ACT_SOURCE_OPTS,qcBound,current);
   return(qcBound||current==='iqc')?ACT_SOURCE_OPTS:ACT_SOURCE_OPTS.filter(([v])=>v!=='iqc');
 }
 const ACT_PHASE_OPTS=Object.entries(ACTION_LABELS.phase);
@@ -381,6 +383,7 @@ function actionSection(key,badge,title,hint,bodyHtml,chipInfo,openSet){
 /* Giá trị khởi tạo của form: bản ghi đang sửa > seed từ vi phạm vừa bấm "Ghi nhận" >
    mặc định cho hồ sơ mới. Trả về object phẳng để mọi ô render được value/selected. */
 function actionFormModel(editing,tests){
+  if(globalThis.ActionFormModel)return globalThis.ActionFormModel.build(editing,tests,actionSeed,currentUser,actionDraftValues());
   const base=editing?{...editing,effectivenessStatus:editing.effectivenessStatus||'pending'}:actionFormDefaults(tests);
   const draft=actionDraftValues();
   if(!draft)return base;
@@ -395,6 +398,7 @@ function actionFormModel(editing,tests){
    xét nghiệm đầu dropdown và Mức 1 của nó. Nguồn phát hiện cũng để trống thay vì mặc
    định "Nội kiểm IQC" — người dùng vừa bấm đúng nút nói rằng đây KHÔNG phải IQC. */
 function actionFormDefaults(tests){
+  if(globalThis.ActionFormModel)return globalThis.ActionFormModel.defaults(tests,actionSeed,currentUser);
   const firstTest=tests[0],seed=actionSeed||{},manual=!!seed.manual;
   const testId=manual?'':(seed.testId||(firstTest&&firstTest.id)||''),t=state.tests.find(x=>x.id===testId);
   const levels=t?operationalLevels(t):[];

@@ -1,19 +1,21 @@
 /* ===== WESTGARD PAGE ROUTE ===== */
 function wgMultiViews(t){
+  if(globalThis.westgardMultiViews)return globalThis.westgardMultiViews(t,wgPrevOpen);
   const levels=operationalLevels(t).map(l=>({...l,pts:operationalLotPoints(t,l.level)}));
   const previousByLevel=new Map(levels.map(l=>[l.level,previousLotSeries(t,l.level)]));
   const openLevels=levels.filter(l=>wgPrevOpen.has(t.id+'|'+l.level)).map(l=>l.level);
   return WestgardViewModel.buildMultiViews({levels,previousByLevel,openLevels});
 }
-function wgTogglePrevLot(level){const k=selTest+'|'+level;if(wgPrevOpen.has(k))wgPrevOpen.delete(k);else wgPrevOpen.add(k);rerender();}
+function wgTogglePrevLot(level){const k=selTest+'|'+level;if(globalThis.westgardUiState)wgPrevOpen=globalThis.westgardUiState.toggleOpen(wgPrevOpen,k);else if(wgPrevOpen.has(k))wgPrevOpen.delete(k);else wgPrevOpen.add(k);rerender();}
 /* Nhóm lô "cũ" để xem lại Westgard: gồm cả nhóm lưu trữ THẬT (g.active===false, từ
    "Chấp nhận lô mới" ở Chuyển tiếp lô) lẫn nhóm chỉ bị đánh dấu "Đã dừng" thủ công/qua
    Kích hoạt nhóm khác (g.status==='stopped', vẫn active:true) — cả hai đều là nhóm không
    còn xét nghiệm nào đang dùng, người dùng cần xem lại chi tiết/biểu đồ như nhóm đang hoạt động. */
 function wgArchivedGroups(){if(globalThis.westgardArchivedGroups)return globalThis.westgardArchivedGroups(state.lotGroups);return(state.lotGroups||[]).filter(g=>g.active===false||g.status==='stopped').sort((a,b)=>String(b.stoppedAt||'').localeCompare(String(a.stoppedAt||''))||String(a.name||'').localeCompare(String(b.name||''),'vi'));}
-function wgSetViewMode(mode){wgViewMode=mode==='archived'?'archived':'current';rerender();}
-function wgSetChartMode(mode){wgChartMode=mode==='cusum'?'cusum':'lj';rerender();}
+function wgSetViewMode(mode){wgViewMode=globalThis.westgardUiState?globalThis.westgardUiState.viewMode(mode):mode==='archived'?'archived':'current';rerender();}
+function wgSetChartMode(mode){wgChartMode=globalThis.westgardUiState?globalThis.westgardUiState.chartMode(mode):mode==='cusum'?'cusum':'lj';rerender();}
 function wgChartModeTabs(){
+  if(globalThis.westgardModeTabs)return globalThis.westgardModeTabs.chart(wgChartMode);
   return `<div class="dayseg wg-view-mode"><button class="${wgChartMode==='lj'?'on':''}" onclick="wgSetChartMode('lj')">Levey-Jennings</button><button class="${wgChartMode==='cusum'?'on':''}" onclick="wgSetChartMode('cusum')">Xu hướng CUSUM</button></div>`;
 }
 /* Biểu đồ CUSUM chỉ tham khảo xu hướng (không đổi trạng thái đạt/loại QC —
@@ -21,12 +23,13 @@ function wgChartModeTabs(){
    danh sách khối per-level của Levey-Jennings thay vì chèn xen kẽ, và chỉ vẽ
    cho các mức đã bật CUSUM riêng ở modal cấu hình xét nghiệm. */
 function pageWestgardCusum(t){
+  if(globalThis.westgardCusumPageHtml){const cfg=testCusumConfig(t),levels=globalThis.westgardCusumLevels?globalThis.westgardCusumLevels(t):operationalLevels(t).map(l=>({...l,pts:operationalLotPoints(t,l.level)}));return globalThis.westgardCusumPageHtml({test:t,cfg,levels,canWrite:canWrite()});}
   const cfg=testCusumConfig(t);
   if(!cfg.on)return `<div class="panel">${emptyState('Chưa bật CUSUM cho xét nghiệm này','Bật trong cấu hình xét nghiệm để xem biểu đồ xu hướng CUSUM.',canWrite()?btn('Mở cấu hình xét nghiệm',`openConfigAssay('${t.id}')`,'teal'):'')}</div>`;
-  const levels=operationalLevels(t);
+  const levels=globalThis.westgardCusumLevels?globalThis.westgardCusumLevels(t):operationalLevels(t).map(l=>({...l,pts:operationalLotPoints(t,l.level)}));
   if(!levels.length)return `<div class="panel">${emptyState('Chưa có mức QC đang vận hành','Cần Panel QC, Nhóm lô QC và Mean/SD hợp lệ trước khi vẽ CUSUM.')}</div>`;
   return levels.map(l=>{
-    const pts=operationalLotPoints(t,l.level);
+    const pts=l.pts;
     const title=`<h3><span class="wg-level-title"><span>Mức ${l.level}</span><span class="wg-lot-name">Lô ${esc(l.lot||'?')}</span></span><span class="wg-level-meta"><span>Mean ${fmtTestValue(t,l.mean)}</span><span>SD ${fmtTestValue(t,l.sd)}</span><span>${pts.length} điểm</span><span>k=${fmt(cfg.k,2)} · h=${fmt(cfg.h,2)}</span></span></h3>`;
     if(!pts.length)return `<div class="panel">${title}${emptyState('Chưa có dữ liệu','LOT đang dùng chưa có điểm QC.')}</div>`;
     return `<div class="panel">${title}
@@ -34,9 +37,10 @@ function pageWestgardCusum(t){
       <div class="chart-scroll" tabindex="0"><canvas class="cusumChart" data-test="${t.id}" data-level="${l.level}" width="1400" height="430"></canvas></div></div>`;
   }).join('');
 }
-function wgSetArchivedGroup(id){wgArchivedGroupId=id;wgArchivedTestId='';rerender();}
-function wgSetArchivedTest(id){wgArchivedTestId=id;rerender();}
+function wgSetArchivedGroup(id){const next=globalThis.westgardUiState?globalThis.westgardUiState.archivedGroup(id):{groupId:id,testId:''};wgArchivedGroupId=next.groupId;wgArchivedTestId=next.testId;rerender();}
+function wgSetArchivedTest(id){const next=globalThis.westgardUiState?globalThis.westgardUiState.archivedTest(id):{testId:id};wgArchivedTestId=next.testId;rerender();}
 function wgViewModeTabs(archivedGroups){
+  if(globalThis.westgardModeTabs)return globalThis.westgardModeTabs.view(wgViewMode,archivedGroups.length);
   return archivedGroups.length?`<div class="dayseg wg-view-mode"><button class="${wgViewMode==='current'?'on':''}" onclick="wgSetViewMode('current')">Xét nghiệm đang vận hành</button><button class="${wgViewMode==='archived'?'on':''}" onclick="wgSetViewMode('archived')">Nhóm lô đã dừng/lưu trữ (${archivedGroups.length})</button></div>`:'';
 }
 const WG_TABLE_INITIAL_ROWS=120;
@@ -45,8 +49,9 @@ function wgRowsWindow(rows,key){
   const all=rows||[],expanded=wgExpandedRows.has(key),visible=expanded?all:all.slice(-WG_TABLE_INITIAL_ROWS);
   return{rows:visible,total:all.length,expanded,limited:visible.length<all.length};
 }
-function wgToggleRows(key){if(wgExpandedRows.has(key))wgExpandedRows.delete(key);else wgExpandedRows.add(key);rerender();}
+function wgToggleRows(key){if(globalThis.westgardUiState)wgExpandedRows=globalThis.westgardUiState.toggleOpen(wgExpandedRows,key);else if(wgExpandedRows.has(key))wgExpandedRows.delete(key);else wgExpandedRows.add(key);rerender();}
 function wgRowsControl(view,key){
+  if(globalThis.westgardRowsControl)return globalThis.westgardRowsControl(view,key,WG_TABLE_INITIAL_ROWS);
   if(view.total<=WG_TABLE_INITIAL_ROWS)return'';
   return `<div class="wg-row-window"><span>Đang hiển thị ${view.rows.length}/${view.total} điểm${view.expanded?'':' mới nhất'}</span>${btn(view.expanded?`Thu gọn còn ${WG_TABLE_INITIAL_ROWS} điểm`:`Xem toàn bộ ${view.total} điểm`,`wgToggleRows('${jsq(key)}')`,'ghost sm')}</div>`;
 }
@@ -57,10 +62,11 @@ function wgPointRowsHtml(rows,t){return rows.map(row=>{const lv=qcVerdictLabel(r
    theo nhóm lô cũ. Chỉ bảng số liệu, không vẽ biểu đồ riêng từng mức — biểu đồ tổng hợp
    nhiều mức (Levey-Jennings) đã có riêng ở đầu trang (xem wgArchivedMultiViews()). */
 function wgLotBlock(t,level,lotNo,mean,sd,pts,badge,titleMain,lotLabel,extraMeta=''){
+  if(globalThis.westgardLotBlockHtml)return globalThis.westgardLotBlockHtml({test:t,level,lotNo,mean,sd,points:pts,badge,title:titleMain,lotLabel,extraMeta});
   const title=`<h3><span class="wg-level-title"><span>${titleMain}</span><span class="wg-lot-name">${lotLabel}</span></span><span class="wg-level-meta"><span class="tag rej">${badge}</span><span>Mean ${fmtTestValue(t,mean)}</span><span>SD ${fmtTestValue(t,sd)}</span><span>${pts.length} điểm</span>${extraMeta}</span></h3>`;
   if(!pts.length)return `<div class="panel wg-prev-lot">${title}${emptyState('Chưa có dữ liệu','Không tìm thấy điểm QC nào cho lô này.')}</div>`;
   const wgP=QCCore.westgardByPoint(pts,mean,sd,rule=>testRuleOnWithin(t,rule));
-  const rows=WestgardViewModel.buildPointRows({points:pts,verdicts:wgP.F.map(f=>({rules:f.rules,supportRules:f.supportRules,level:ruleResultLevel(t,f.rules)})),zs:wgP.zs,mean,sd}),key=`lot:${t.id}|${level}|${lotNo}`,view=wgRowsWindow(rows,key),rowsHtml=wgPointRowsHtml(view.rows,t);
+  const rows=WestgardViewModel.buildPointRows({points:pts,verdicts:wgP.F.map(f=>({rules:f.rules,supportRules:f.supportRules,level:ruleResultLevel(t,f.rules)})),zs:wgP.zs,mean,sd}),key=`lot:${t.id}|${level}|${lotNo}`,view=wgRowsWindow(rows,key),rowsHtml=globalThis.westgardPointRowsHtml?globalThis.westgardPointRowsHtml(view.rows,t):wgPointRowsHtml(view.rows,t);
   return `<div class="panel wg-prev-lot">${title}${wgRowsControl(view,key)}<table class="wg-table"><thead><tr><th>#</th><th>Ngày</th><th class="num">Giá trị</th><th class="num">Z</th><th>Kết luận</th><th>Luật / bằng chứng</th><th>Loại sai số</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`;
 }
 /* Trang xem lại nhóm lô đã dừng/lưu trữ — cùng bố cục với pageWestgard() (mode "current"):
@@ -142,26 +148,27 @@ function pageWestgard(){
     const{zs}=v.single,rows=WestgardViewModel.buildPointRows({points:pts,verdicts:wg.byPoint,zs,mean:cfg.mean,sd:cfg.sd}),key=`current:${t.id}|${l.level}|${l.lot||''}`,view=wgRowsWindow(rows,key);
     const targetOk=levelTargetOk(l),targetWarn=targetOk?'':`<div class="alert warn wg-target-warning">Mức này <b>chưa có Mean/SD hợp lệ</b> — các điểm QC không được đánh giá Westgard; bảng dưới chỉ liệt kê giá trị, không có kết luận Đạt/Cảnh báo/Loại bỏ. ${role()==='admin'?btn('Cấu hình Mean/SD',`go('manage');setManageTab('targets')`,'teal sm'):''}</div>`;
     if(!targetOk)view.rows.forEach(r=>{r.level='none';r.rules=[];r.supportRules=[];});
-    const rowsHtml=wgPointRowsHtml(view.rows,t);
+    const rowsHtml=globalThis.westgardPointRowsHtml?globalThis.westgardPointRowsHtml(view.rows,t):wgPointRowsHtml(view.rows,t);
     return `<div class="panel">${title}${targetWarn}${wgRowsControl(view,key)}<table class="wg-table"><thead><tr><th>#</th><th>Ngày</th><th class="num">Giá trị</th><th class="num">Z</th><th>Kết luận</th><th>Luật / bằng chứng</th><th>Loại sai số</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`;}).join('');
   const ruleToggles=WG_RULES.map(r=>`<span class="wg-rule-item"><label><input type="checkbox" ${wgOn(r)?'checked':''} ${!canWrite()?'disabled':''} onchange="wgSet('${r}',this.checked)"> <span class="pill">${r}</span></label></span>`).join('')+(canWrite()?`<div class="wg-rule-reset">${btn('Khôi phục mặc định','wgReset()','ghost sm')}</div>`:'');
+  const ruleTogglesTs=globalThis.westgardRuleTogglesHtml?globalThis.westgardRuleTogglesHtml(WG_RULE_REGISTRY,wgOn,canWrite()):'';
   /* Bảng hướng dẫn dựng từ WG_RULE_REGISTRY (core.js) — trước đây 13 dòng này gõ
      tay, nên mô tả và cột kết luận có thể lệch với engine mà không ai biết. Cột
      "Kết luận" là hành động MẶC ĐỊNH của luật; từng xét nghiệm vẫn ghi đè được. */
   const ruleGuideRows=WG_RULE_REGISTRY.map(r=>`<tr><td>${r.id}</td><td>${esc(r.desc)}</td><td>${r.alert?'<span class="warn">Cảnh báo</span>':'<span class="rej">Loại bỏ</span>'}</td><td>${esc(r.fix)}</td></tr>`).join('');
   const ruleGuide=`<details class="wg-guide"><summary>Hướng dẫn nhanh luật Westgard</summary><div class="alert info" style="margin:10px 12px 18px"><span>Ký hiệu ${icoRefArrow()} trong bảng là điểm lịch sử cấu thành quy tắc. Điểm này chỉ là bằng chứng; trạng thái cảnh báo/loại được gắn cho lần chạy phát hiện hiện tại, không đổi hồi tố kết luận cũ.</span></div><div class="chart-scroll" tabindex="0"><table><thead><tr><th>Luật</th><th>Điều kiện</th><th>Kết luận</th><th>Gợi ý xử lý</th></tr></thead><tbody>${ruleGuideRows}</tbody></table></div></details>`;
-  const exportActions=wgChartMode==='lj'?'<div><label>&nbsp;</label><div class="wg-export-actions">'+btn(icoDownload()+'Xuất Excel','exportWestgardXLSX()','teal wg-excel-btn','Xuất Excel biểu đồ Levey-Jennings, các vi phạm và điểm bằng chứng đang xem')+btn(icoPrint()+'In PDF','printWestgard()','teal wg-print-btn','Tạo bản in PDF/HTML biểu đồ Levey-Jennings và các vi phạm đang xem')+'</div></div>':'';
+  const exportActions=globalThis.westgardExportActionsHtml?globalThis.westgardExportActionsHtml(wgChartMode):wgChartMode==='lj'?'<div><label>&nbsp;</label><div class="wg-export-actions">'+btn(icoDownload()+'Xuất Excel','exportWestgardXLSX()','teal wg-excel-btn','Xuất Excel biểu đồ Levey-Jennings, các vi phạm và điểm bằng chứng đang xem')+btn(icoPrint()+'In PDF','printWestgard()','teal wg-print-btn','Tạo bản in PDF/HTML biểu đồ Levey-Jennings và các vi phạm đang xem')+'</div></div>':'';
   return headOnly('Phân tích Westgard','Đối chiếu luật theo mức QC, lô và lần chạy')+
    `<div class="panel"><h2 class="panel-title">Thiết lập phân tích</h2>${wgViewModeTabs(archivedGroups)}<div class="wg-test-picker${exportActions?' wg-test-picker-3':''}"><div><label>Tìm nhanh</label><input id="wgTestSearch" type="search" placeholder="Tên xét nghiệm, LOT hoặc máy..." value="${escAttr(wgTestQ)}" oninput="wgFilterTests(this.value)"></div><div><label>Chọn xét nghiệm <span id="wgTestCount" class="hint">(${matched.length}/${tests.length})</span></label><select id="wgTestSelect" aria-label="Chọn xét nghiệm" ${matched.length?'':'disabled'} onchange="if(this.value){selTest=this.value;rerender()}">${opts}</select></div>${exportActions}</div>
-     <div class="wg-rules"><b style="font-size:var(--type-meta)">Cấu hình chung của luật</b><div class="flow-note">${ruleToggles}</div></div>
-     ${ruleGuide}${wgChartModeTabs()}</div>${wgChartMode==='cusum'?pageWestgardCusum(t):multiChart+blocks}`;
+     <div class="wg-rules"><b style="font-size:var(--type-meta)">Cấu hình chung của luật</b><div class="flow-note">${ruleTogglesTs||ruleToggles}</div></div>
+     ${globalThis.westgardRuleGuideHtml?globalThis.westgardRuleGuideHtml(WG_RULE_REGISTRY):ruleGuide}${wgChartModeTabs()}</div>${wgChartMode==='cusum'?pageWestgardCusum(t):multiChart+blocks}`;
 }
 function wgFilterTests(v){
-  wgTestQ=v;
+  wgTestQ=globalThis.westgardUiState?globalThis.westgardUiState.query(v):v;
   scheduleSearchRender(wgFilterTests,()=>{
-    const q=searchText(wgTestQ),matches=operationalTests().filter(x=>!q||searchText(testSelectLabel(x)).includes(q));
-    if(matches.length&&!matches.some(x=>x.id===selTest)){selTest=matches[0].id;rerender();return;}
-    const select=document.getElementById('wgTestSelect'),count=document.getElementById('wgTestCount'),tests=operationalTests();
+    const tests=operationalTests(),result=globalThis.westgardTestSearch?globalThis.westgardTestSearch.select(tests,wgTestQ,selTest):null,q=searchText(wgTestQ),matches=result?result.matches:tests.filter(x=>!q||searchText(testSelectLabel(x)).includes(q));
+    if(result?result.changed:(matches.length&&!matches.some(x=>x.id===selTest))){selTest=result?result.selected:matches[0].id;rerender();return;}
+    const select=document.getElementById('wgTestSelect'),count=document.getElementById('wgTestCount');
     replaceSelectItems(select,matches.map(x=>({value:x.id,label:testSelectLabel(x)})),'Không tìm thấy xét nghiệm phù hợp');
     if(select&&matches.some(x=>x.id===selTest))select.value=selTest;
     if(count)count.textContent=`(${matches.length}/${tests.length})`;
@@ -170,6 +177,6 @@ function wgFilterTests(v){
 
 
 function wgFilterArchivedTests(v){
-  wgArchivedTestQ=v;
+  wgArchivedTestQ=globalThis.westgardUiState?globalThis.westgardUiState.query(v):v;
   scheduleSearchRender(wgFilterArchivedTests,()=>{rerender();},'wgArchivedTestSearch');
 }
