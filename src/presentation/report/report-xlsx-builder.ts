@@ -1,0 +1,20 @@
+export type ReportXlsxFile={name:string;data:Uint8Array};
+export type ReportXlsxImage={bytes:Uint8Array;dispW:number;dispH:number;row0:number};
+export type ReportXlsxBuildDocument={sheetName?:string;images?:ReportXlsxImage[];[key:string]:unknown};
+
+export function createReportXlsxBuilder(deps:{bytes:(value:string)=>Uint8Array;escape:(value:unknown)=>string;styles:()=>string;sheet:(doc:any)=>string;drawing:(images:ReportXlsxImage[])=>string;zip:(files:ReportXlsxFile[])=>Uint8Array}){
+  return(doc:ReportXlsxBuildDocument)=>{
+    const images=(doc.images||[]).filter(image=>image&&image.bytes&&image.bytes.length),hasDrawing=images.length>0,document={...doc,hasDrawing};
+    const types='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>'+(hasDrawing?'<Default Extension="png" ContentType="image/png"/>':'')+'<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +(hasDrawing?'<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>':'')+'</Types>';
+    const bytes=deps.bytes,files:ReportXlsxFile[]=[{name:'[Content_Types].xml',data:bytes(types)},{name:'_rels/.rels',data:bytes('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships" Target="xl/workbook.xml"/></Relationships>')},{name:'xl/workbook.xml',data:bytes('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="'+deps.escape(doc.sheetName||'Báo cáo')+'" sheetId="1" r:id="rId1"/></sheets></workbook>')},{name:'xl/_rels/workbook.xml.rels',data:bytes('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>')},{name:'xl/styles.xml',data:bytes(deps.styles())},{name:'xl/worksheets/sheet1.xml',data:bytes(deps.sheet(document))}];
+    if(hasDrawing){
+      files.push({name:'xl/worksheets/_rels/sheet1.xml.rels',data:bytes('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/></Relationships>')});
+      files.push({name:'xl/drawings/drawing1.xml',data:bytes(deps.drawing(images))});
+      let relationships='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">';
+      images.forEach((image,index)=>relationships+='<Relationship Id="rId'+(index+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image'+(index+1)+'.png"/>');
+      files.push({name:'xl/drawings/_rels/drawing1.xml.rels',data:bytes(relationships+'</Relationships>')});
+      images.forEach((image,index)=>files.push({name:'xl/media/image'+(index+1)+'.png',data:image.bytes}));
+    }
+    return deps.zip(files);
+  };
+}

@@ -95,10 +95,25 @@ async function checkBackupRestore(page){
   check('Restore UI ghi audit và giữ chuỗi hash hợp lệ',restored.audit==='Nhập backup'&&restored.chain===true,JSON.stringify(restored));
 }
 
+async function checkSigmaXlsxExport(page){
+  const result=await page.evaluate(()=>{try{const rows=[{name:'Sodium UI',period:'08/2026',tea:5,levels:[{level:1,metric:{cv:1,bias:1,sigma:4,dpmo:6210,yld:99.38,label:'Tốt',n:30}}]}],chart=drawSigmaReportChart(rows),mdc=drawSigmaReportMDC(rows);return{chartBytes:chart&&chart.bytes.length,chartWidth:chart&&chart.dispW,chartHeight:chart&&chart.dispH,mdcBytes:mdc&&mdc.bytes.length,mdcWidth:mdc&&mdc.dispW,mdcHeight:mdc&&mdc.dispH};}catch(error){return{error:String(error)}}});
+  check('Renderer Sigma TypeScript tạo PNG trên canvas browser',result.chartBytes>0&&result.chartWidth>=760&&result.chartHeight===400,JSON.stringify(result));
+  check('Renderer MDC TypeScript tạo PNG trên canvas browser',result.mdcBytes>0&&result.mdcWidth===780&&result.mdcHeight===420,JSON.stringify(result));
+  const downloadPromise=page.waitForEvent('download');
+  await page.evaluate(()=>buildSigmaXlsx([{name:'Sodium UI',period:'08/2026',tea:5,levels:[{level:1,metric:{cv:1,bias:1,sigma:4,dpmo:6210,yld:99.38,label:'Tốt',n:30}}]}],'Sigma UI smoke','Kiểm tra exporter','sigma-ui-smoke.xlsx','Kỳ 08'));
+  const download=await downloadPromise;
+  check('Xuất Sigma XLSX từ browser tải workbook',download.suggestedFilename()==='sigma-ui-smoke.xlsx',download.suggestedFilename());
+}
+
+async function checkReportXlsxBridge(page){
+  const result=await page.evaluate(()=>{try{const bytes=ReportXlsx.build({sheetName:'IQC UI smoke',cols:[18],rows:[[{v:'Kiểm tra bridge',s:1}]],merges:[],images:[]}),signature=new TextDecoder().decode(bytes.slice(0,4));return{size:bytes.length,signature};}catch(error){return{error:String(error)}}});
+  check('Report XLSX bridge khởi tạo trễ sau data-io',result.size>100&&result.signature==='PK\x03\x04',JSON.stringify(result));
+}
+
 async function main(){
   const session=await openSeededSession({headless:true}),runtimeErrors=[];
   session.page.on('pageerror',e=>runtimeErrors.push('pageerror: '+e.message));session.page.on('console',m=>{if(m.type()==='error')runtimeErrors.push('console: '+m.text());});
-  try{await installPassword(session.page);await checkEntryLifecycle(session.page);await checkManageForms(session.page);await checkRangeTargetDisplay(session.page);await checkLotTransitionPicker(session.page);await checkPeriodLock(session.page);await checkBackupRestore(session.page);check('Không có lỗi runtime/console',runtimeErrors.length===0,runtimeErrors.join(' | '));}
+  try{await installPassword(session.page);await checkEntryLifecycle(session.page);await checkManageForms(session.page);await checkRangeTargetDisplay(session.page);await checkLotTransitionPicker(session.page);await checkPeriodLock(session.page);await checkBackupRestore(session.page);await checkSigmaXlsxExport(session.page);await checkReportXlsxBridge(session.page);check('Không có lỗi runtime/console',runtimeErrors.length===0,runtimeErrors.join(' | '));}
   finally{await session.close();}
   console.log(`UI workflow check: ${passes.length} đạt, ${fails.length} lỗi`);passes.forEach(x=>console.log('  ✓ '+x));if(fails.length){fails.forEach(x=>console.error('  ✗ '+x));process.exitCode=1;}
 }

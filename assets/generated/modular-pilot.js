@@ -3992,6 +3992,574 @@
 		};
 	}
 	//#endregion
+	//#region src/presentation/sigma/sigma-chart-renderer.ts
+	function createSigmaChartRenderer(deps) {
+		return (rows) => {
+			const data = rows.map((row) => ({
+				name: row.period || row.name,
+				levels: deps.levels(row).filter((item) => item.metric.classifiable !== false && Number.isFinite(item.metric.sigma))
+			})).filter((row) => row.levels.length);
+			if (!data.length) return null;
+			const count = data.length, width = Math.max(760, 72 * count + 170), height = 400, scale = 6, left = 52, right = 22, top = 54, innerWidth = width - left - right, innerHeight = 254, all = data.flatMap((row) => row.levels.map((level) => level.metric.sigma)), maximum = Math.max(8, Math.ceil(Math.max(...all) * 1.05)), canvas = deps.canvas(width, height, scale), ctx = canvas.ctx, y = (value) => 308 - value / maximum * innerHeight;
+			[
+				[
+					0,
+					3,
+					"#f6dcd8"
+				],
+				[
+					3,
+					4,
+					"#fdeecb"
+				],
+				[
+					4,
+					6,
+					"#e4eee3"
+				],
+				[
+					6,
+					maximum,
+					"#d6e8de"
+				]
+			].forEach((band) => {
+				if (band[1] > band[0]) {
+					ctx.fillStyle = band[2];
+					const y1 = y(Math.min(band[1], maximum)), y2 = y(band[0]);
+					ctx.fillRect(left, y1, innerWidth, y2 - y1);
+				}
+			});
+			ctx.font = deps.font("", "type-meta", 12.5);
+			ctx.fillStyle = "#9a9486";
+			ctx.textAlign = "right";
+			ctx.strokeStyle = "rgba(0,0,0,.06)";
+			ctx.lineWidth = 1;
+			for (let grid = 0; grid <= maximum; grid += 2) {
+				const position = y(grid);
+				ctx.beginPath();
+				ctx.moveTo(left, position);
+				ctx.lineTo(width - right, position);
+				ctx.stroke();
+				ctx.fillText(String(grid), 46, position + 4);
+			}
+			const reference = (value, color) => {
+				ctx.save();
+				ctx.strokeStyle = color;
+				ctx.setLineDash([5, 4]);
+				ctx.lineWidth = 1.3;
+				const position = y(value);
+				ctx.beginPath();
+				ctx.moveTo(left, position);
+				ctx.lineTo(width - right, position);
+				ctx.stroke();
+				ctx.restore();
+				ctx.fillStyle = color;
+				ctx.textAlign = "left";
+				ctx.font = deps.font("bold", "type-meta", 12.5);
+				ctx.fillText(value + "σ", width - right - 26, position - 4);
+			};
+			reference(3, "#c0392b");
+			reference(6, "#13603f");
+			const slot = innerWidth / count, maxLevels = Math.max(...data.map((row) => row.levels.length)), barWidth = Math.max(5, Math.min(24, slot * .72 / maxLevels));
+			data.forEach((row, index) => {
+				const center = left + (index + .5) * slot, bar = (sigma, level, offset) => {
+					if (sigma == null) return;
+					const color = deps.zone(sigma).c, x = center + offset - barWidth / 2, position = y(sigma), barHeight = y(0) - position;
+					ctx.fillStyle = color;
+					ctx.fillRect(x, position, barWidth, barHeight);
+					ctx.strokeStyle = "rgba(0,0,0,.18)";
+					ctx.lineWidth = 1;
+					ctx.strokeRect(x, position, barWidth, barHeight);
+					ctx.fillStyle = "#16211f";
+					ctx.font = deps.font("bold", "type-caption", 11.5);
+					ctx.textAlign = "center";
+					ctx.fillText(sigma.toFixed(2), x + barWidth / 2, position - 5);
+					ctx.fillStyle = "#fff";
+					ctx.font = deps.font("bold", "type-overline", 10.5);
+					ctx.fillText(String(level), x + barWidth / 2, y(0) - 4);
+				};
+				row.levels.forEach((level, index) => bar(level.metric.sigma, level.level, (index - (row.levels.length - 1) / 2) * barWidth * 1.15));
+				ctx.save();
+				ctx.translate(center, 320);
+				ctx.rotate(-Math.PI / 4.2);
+				ctx.fillStyle = "#3a443f";
+				ctx.font = deps.font("", "type-caption", 11.5);
+				ctx.textAlign = "right";
+				ctx.fillText(row.name.length > 16 ? row.name.slice(0, 15) + "…" : row.name, 0, 0);
+				ctx.restore();
+			});
+			ctx.strokeStyle = "#16211f";
+			ctx.lineWidth = 1.3;
+			ctx.beginPath();
+			ctx.moveTo(left, top);
+			ctx.lineTo(left, 308);
+			ctx.lineTo(width - right, 308);
+			ctx.stroke();
+			ctx.fillStyle = "#16211f";
+			ctx.font = deps.font("bold", "type-heading-sm", 16);
+			ctx.textAlign = "left";
+			ctx.fillText("Sigma theo xét nghiệm", left, 22);
+			let legendX = left;
+			[
+				["#c0392b", "<3σ"],
+				["#dd8b1f", "3–4σ"],
+				["#3f9a55", "4–6σ"],
+				["#13603f", "≥6σ"]
+			].forEach((legend) => {
+				ctx.fillStyle = legend[0];
+				ctx.fillRect(legendX, 29, 14, 8);
+				ctx.fillStyle = "#16211f";
+				ctx.font = deps.font("bold", "type-caption", 11.5);
+				ctx.fillText(legend[1], legendX + 18, 37);
+				legendX += 66;
+			});
+			ctx.fillStyle = "#6b756f";
+			ctx.font = deps.font("", "type-caption", 11.5);
+			ctx.fillText("Số trong cột = mức QC", legendX + 6, 37);
+			return {
+				bytes: deps.bytes(canvas.cv.toDataURL("image/png")),
+				dispW: width,
+				dispH: height
+			};
+		};
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-mdc-renderer.ts
+	function createSigmaMdcRenderer(deps) {
+		return (rows) => {
+			const items = deps.items(rows);
+			if (!items.length) return null;
+			const width = 780, height = 420, scale = 6, left = 58, top = 50, innerWidth = 700, innerHeight = 316, maxX = Math.max(50, Math.max(...items.map((point) => point.x))) * 1.1, maxY = 100, canvas = deps.canvas(width, height, scale), ctx = canvas.ctx, x = (value) => left + Math.min(value, maxX) / maxX * innerWidth, y = (value) => 366 - Math.min(value, maxY) / maxY * innerHeight;
+			ctx.font = deps.font("", "type-caption", 11.5);
+			ctx.fillStyle = "#9a9486";
+			ctx.strokeStyle = "#eee7d8";
+			ctx.lineWidth = 1;
+			ctx.textAlign = "right";
+			for (let grid = 0; grid <= maxY; grid += 20) {
+				const position = y(grid);
+				ctx.beginPath();
+				ctx.moveTo(left, position);
+				ctx.lineTo(758, position);
+				ctx.stroke();
+				ctx.fillText(String(grid), 52, position + 4);
+			}
+			ctx.textAlign = "center";
+			for (let grid = 0; grid <= maxX; grid += 10) ctx.fillText(String(Math.round(grid)), x(grid), 382);
+			[
+				[2, "#c0392b"],
+				[3, "#dd8b1f"],
+				[4, "#b59a00"],
+				[5, "#3f9a55"],
+				[6, "#0e4d4a"]
+			].forEach((line) => {
+				const sigma = line[0], color = line[1], x2 = 100 / sigma, endX = Math.min(x2, maxX), endY = Math.max(0, 100 - sigma * endX);
+				ctx.strokeStyle = color;
+				ctx.lineWidth = 1.6;
+				ctx.beginPath();
+				ctx.moveTo(x(0), y(100));
+				ctx.lineTo(x(endX), y(endY));
+				ctx.stroke();
+				ctx.fillStyle = color;
+				ctx.font = deps.font("bold", "type-meta", 12.5);
+				ctx.textAlign = "left";
+				ctx.fillText(sigma + "σ", x2 <= maxX ? x(x2) + 2 : 736, x2 <= maxX ? y(0) - 3 : y(100 - sigma * maxX) - 2);
+			});
+			items.forEach((point) => {
+				ctx.beginPath();
+				ctx.arc(x(point.x), y(point.y), 7, 0, 2 * Math.PI);
+				ctx.fillStyle = deps.zone(point.sigma).c;
+				ctx.fill();
+				ctx.lineWidth = 1.5;
+				ctx.strokeStyle = "#fff";
+				ctx.stroke();
+				ctx.fillStyle = "#fff";
+				ctx.font = deps.font("bold", "type-overline", 10.5);
+				ctx.textAlign = "center";
+				ctx.fillText(String(point.level), x(point.x), y(point.y) + 3);
+			});
+			ctx.fillStyle = "#16211f";
+			ctx.font = deps.font("", "type-overline", 10.5);
+			ctx.textAlign = "left";
+			deps.placements(items, x, y, ctx, {
+				left,
+				right: 758,
+				top,
+				bottom: 366
+			}).forEach((point) => ctx.fillText(point.label, point.x, point.y));
+			ctx.strokeStyle = "#16211f";
+			ctx.lineWidth = 1.3;
+			ctx.beginPath();
+			ctx.moveTo(left, top);
+			ctx.lineTo(left, 366);
+			ctx.lineTo(758, 366);
+			ctx.stroke();
+			ctx.fillStyle = "#16211f";
+			ctx.font = deps.font("bold", "type-heading-sm", 16);
+			ctx.textAlign = "left";
+			ctx.fillText("Biểu đồ Quyết định Phương pháp (MDC) — các mức QC", left, 22);
+			ctx.font = deps.font("", "type-caption", 11.5);
+			ctx.fillStyle = "#6b756f";
+			ctx.fillText("Màu điểm theo xếp loại Sigma · số trong điểm là mức QC · đường 2σ–6σ", left, 40);
+			ctx.font = deps.font("", "type-meta", 12.5);
+			ctx.fillStyle = "#16211f";
+			ctx.textAlign = "center";
+			ctx.fillText("CV / TEa (%)", 408, 412);
+			ctx.save();
+			ctx.translate(16, 183);
+			ctx.rotate(-Math.PI / 2);
+			ctx.fillText("|Bias| / TEa (%)", 0, 0);
+			ctx.restore();
+			return {
+				bytes: deps.bytes(canvas.cv.toDataURL("image/png")),
+				dispW: width,
+				dispH: height
+			};
+		};
+	}
+	//#endregion
+	//#region src/presentation/sigma/rename-xlsx-sheet.ts
+	function renameXlsxSheet(bytes, sheetName, deps) {
+		const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength), decode = new TextDecoder(), files = [];
+		let offset = 0;
+		while (offset + 30 <= bytes.length && view.getUint32(offset, true) === 67324752) {
+			const nameLength = view.getUint16(offset + 26, true), extraLength = view.getUint16(offset + 28, true), size = view.getUint32(offset + 18, true), nameStart = offset + 30, dataStart = nameStart + nameLength + extraLength, name = decode.decode(bytes.slice(nameStart, nameStart + nameLength));
+			let data = bytes.slice(dataStart, dataStart + size);
+			if (name === "xl/workbook.xml") {
+				const xml = decode.decode(data).replace(/(<sheet name=")[^"]*(")/, "$1" + deps.escape(sheetName) + "$2");
+				data = deps.bytes(xml);
+			}
+			files.push({
+				name,
+				data
+			});
+			offset = dataStart + size;
+		}
+		return files.length ? deps.zip(files) : bytes;
+	}
+	//#endregion
+	//#region src/presentation/export/xlsx-cell.ts
+	function createXlsxCells(escape) {
+		const text = (ref, style, value) => "<c r=\"" + ref + "\" s=\"" + style + "\" t=\"inlineStr\"><is><t xml:space=\"preserve\">" + escape(value) + "</t></is></c>", number = (ref, style, value) => value === "" || value == null || typeof value === "number" && !Number.isFinite(value) ? text(ref, style, "") : "<c r=\"" + ref + "\" s=\"" + style + "\"><v>" + value + "</v></c>";
+		return {
+			text,
+			number
+		};
+	}
+	//#endregion
+	//#region src/presentation/export/xlsx-zip.ts
+	function createXlsxZip(bytes) {
+		const crcTable = (() => {
+			const table = [];
+			for (let value = 0; value < 256; value++) {
+				let crc = value;
+				for (let bit = 0; bit < 8; bit++) crc = crc & 1 ? 3988292384 ^ crc >>> 1 : crc >>> 1;
+				table[value] = crc >>> 0;
+			}
+			return table;
+		})(), crc32 = (buffer) => {
+			let crc = 4294967295;
+			for (let index = 0; index < buffer.length; index++) crc = crcTable[(crc ^ buffer[index]) & 255] ^ crc >>> 8;
+			return (crc ^ 4294967295) >>> 0;
+		};
+		return (files) => {
+			const parts = [], central = [];
+			let offset = 0;
+			const number = (value, length) => {
+				const out = new Uint8Array(length);
+				for (let index = 0; index < length; index++) {
+					out[index] = value & 255;
+					value >>>= 8;
+				}
+				return out;
+			}, push = (value) => {
+				parts.push(value);
+				offset += value.length;
+			};
+			files.forEach((file) => {
+				const nameB = bytes(file.name), crc = crc32(file.data), off = offset;
+				[
+					number(67324752, 4),
+					number(20, 2),
+					number(0, 2),
+					number(0, 2),
+					number(0, 2),
+					number(0, 2),
+					number(crc, 4),
+					number(file.data.length, 4),
+					number(file.data.length, 4),
+					number(nameB.length, 2),
+					number(0, 2),
+					nameB,
+					file.data
+				].forEach(push);
+				central.push({
+					nameB,
+					crc,
+					len: file.data.length,
+					off
+				});
+			});
+			const centralStart = offset;
+			central.forEach((item) => [
+				number(33639248, 4),
+				number(20, 2),
+				number(20, 2),
+				number(0, 2),
+				number(0, 2),
+				number(0, 2),
+				number(0, 2),
+				number(item.crc, 4),
+				number(item.len, 4),
+				number(item.len, 4),
+				number(item.nameB.length, 2),
+				number(0, 2),
+				number(0, 2),
+				number(0, 2),
+				number(0, 2),
+				number(0, 4),
+				number(item.off, 4),
+				item.nameB
+			].forEach(push));
+			const centralLength = offset - centralStart;
+			[
+				number(101010256, 4),
+				number(0, 2),
+				number(0, 2),
+				number(central.length, 2),
+				number(central.length, 2),
+				number(centralLength, 4),
+				number(centralStart, 4),
+				number(0, 2)
+			].forEach(push);
+			const out = new Uint8Array(parts.reduce((total, part) => total + part.length, 0));
+			let position = 0;
+			parts.forEach((part) => {
+				out.set(part, position);
+				position += part.length;
+			});
+			return out;
+		};
+	}
+	//#endregion
+	//#region src/presentation/export/xlsx-period.ts
+	function xlsxPeriodNumber(value) {
+		const match = String(value || "").match(/(?:Kỳ\s*)?(\d{1,2})\/\d{4}$/i);
+		return match ? Number(match[1]) : value;
+	}
+	//#endregion
+	//#region src/presentation/export/xlsx-drawing.ts
+	function createXlsxDrawing(toEmu) {
+		return (images, startRow) => {
+			let nextRow = startRow;
+			return "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><xdr:wsDr xmlns:xdr=\"http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing\" xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\">" + images.map((image, index) => {
+				const row = nextRow;
+				nextRow += Math.ceil(image.dispH / 15) + 1;
+				const cx = toEmu(image.dispW), cy = toEmu(image.dispH);
+				return "<xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>" + row + "</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:ext cx=\"" + cx + "\" cy=\"" + cy + "\"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id=\"" + (index + 1) + "\" name=\"Chart" + (index + 1) + "\"/><xdr:cNvPicPr/></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" r:embed=\"rId" + (index + 1) + "\"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"" + cx + "\" cy=\"" + cy + "\"/></a:xfrm><a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>";
+			}).join("") + "</xdr:wsDr>";
+		};
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-xlsx-styles.ts
+	function sigmaXlsxStyles() {
+		const fonts = [
+			"<font><sz val=\"9\"/><name val=\"Arial\"/><color rgb=\"FF000000\"/></font>",
+			"<font><b/><sz val=\"9\"/><name val=\"Arial\"/><color rgb=\"FF000000\"/></font>",
+			"<font><b/><sz val=\"9\"/><name val=\"Arial\"/><color rgb=\"FFFFFFFF\"/></font>",
+			"<font><b/><sz val=\"13\"/><name val=\"Arial\"/><color rgb=\"FFFFFFFF\"/></font>",
+			"<font><sz val=\"9\"/><name val=\"Arial\"/><color rgb=\"FF555555\"/></font>"
+		], fills = ["<fill><patternFill patternType=\"none\"/></fill>", "<fill><patternFill patternType=\"gray125\"/></fill>"];
+		[
+			"0D3D24",
+			"1F5C3A",
+			"2D8653",
+			"5AAA6B",
+			"E07B1A",
+			"C0392B",
+			"F2F7F4",
+			"FFF3E0",
+			"FFFFFF"
+		].forEach((color) => fills.push("<fill><patternFill patternType=\"solid\"><fgColor rgb=\"FF" + color + "\"/></patternFill></fill>"));
+		const borders = ["<border><left/><right/><top/><bottom/><diagonal/></border>", "<border><left style=\"thin\"><color rgb=\"FFAAAAAA\"/></left><right style=\"thin\"><color rgb=\"FFAAAAAA\"/></right><top style=\"thin\"><color rgb=\"FFAAAAAA\"/></top><bottom style=\"thin\"><color rgb=\"FFAAAAAA\"/></bottom><diagonal/></border>"], xf = (font, fill, border, horizontal, vertical, wrap) => "<xf numFmtId=\"0\" fontId=\"" + font + "\" fillId=\"" + fill + "\" borderId=\"" + border + "\" xfId=\"0\" applyFont=\"1\" applyFill=\"1\" applyBorder=\"1\" applyAlignment=\"1\"><alignment" + (horizontal ? " horizontal=\"" + horizontal + "\"" : "") + (vertical ? " vertical=\"" + vertical + "\"" : "") + (wrap ? " wrapText=\"1\"" : "") + "/></xf>", xfs = [
+			"<xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\"/>",
+			xf(3, 2, 0, "center", "center", 0),
+			xf(4, 0, 0, "center", "center", 1),
+			xf(2, 3, 1, "center", "center", 1),
+			xf(1, 8, 1, "center", "center", 1),
+			xf(1, 10, 1, "center", "center", 1),
+			xf(0, 8, 1, "center", "center", 1),
+			xf(0, 10, 1, "center", "center", 1),
+			xf(0, 9, 1, "center", "center", 1),
+			xf(2, 3, 1, "center", "center", 1),
+			xf(2, 4, 1, "center", "center", 1),
+			xf(2, 5, 1, "center", "center", 1),
+			xf(2, 6, 1, "center", "center", 1),
+			xf(2, 7, 1, "center", "center", 1),
+			xf(0, 0, 0, "left", "center", 1)
+		];
+		return "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><styleSheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><fonts count=\"" + fonts.length + "\">" + fonts.join("") + "</fonts><fills count=\"" + fills.length + "\">" + fills.join("") + "</fills><borders count=\"" + borders.length + "\">" + borders.join("") + "</borders><cellStyleXfs count=\"1\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/></cellStyleXfs><cellXfs count=\"" + xfs.length + "\">" + xfs.join("") + "</cellXfs><cellStyles count=\"1\"><cellStyle name=\"Normal\" xfId=\"0\" builtinId=\"0\"/></cellStyles></styleSheet>";
+	}
+	//#endregion
+	//#region src/presentation/report/report-xlsx-styles.ts
+	function reportXlsxStyles() {
+		const fonts = [
+			"<font><sz val=\"9\"/><name val=\"Arial\"/><color rgb=\"FF16202B\"/></font>",
+			"<font><b/><sz val=\"9\"/><name val=\"Arial\"/><color rgb=\"FF16202B\"/></font>",
+			"<font><b/><sz val=\"12\"/><name val=\"Arial\"/><color rgb=\"FFFFFFFF\"/></font>",
+			"<font><b/><sz val=\"15\"/><name val=\"Arial\"/><color rgb=\"FF16202B\"/></font>",
+			"<font><sz val=\"9\"/><name val=\"Arial\"/><color rgb=\"FF647686\"/></font>",
+			"<font><b/><sz val=\"9\"/><name val=\"Arial\"/><color rgb=\"FF244452\"/></font>",
+			"<font><i/><sz val=\"9\"/><name val=\"Arial\"/><color rgb=\"FF647686\"/></font>"
+		];
+		const fills = ["<fill><patternFill patternType=\"none\"/></fill>", "<fill><patternFill patternType=\"gray125\"/></fill>"];
+		[
+			"0E8F8F",
+			"E7F1F4",
+			"FFFFFF",
+			"FDECEA",
+			"FFF6E5"
+		].forEach((color) => fills.push("<fill><patternFill patternType=\"solid\"><fgColor rgb=\"FF" + color + "\"/></patternFill></fill>"));
+		const borders = ["<border><left/><right/><top/><bottom/><diagonal/></border>", "<border><left style=\"thin\"><color rgb=\"FFCBD8DF\"/></left><right style=\"thin\"><color rgb=\"FFCBD8DF\"/></right><top style=\"thin\"><color rgb=\"FFCBD8DF\"/></top><bottom style=\"thin\"><color rgb=\"FFCBD8DF\"/></bottom><diagonal/></border>"];
+		const xf = (font, fill, border, horizontal, vertical, wrap) => "<xf numFmtId=\"0\" fontId=\"" + font + "\" fillId=\"" + fill + "\" borderId=\"" + border + "\" xfId=\"0\" applyFont=\"1\" applyFill=\"1\" applyBorder=\"1\" applyAlignment=\"1\"><alignment" + (horizontal ? " horizontal=\"" + horizontal + "\"" : "") + (vertical ? " vertical=\"" + vertical + "\"" : "") + (wrap ? " wrapText=\"1\"" : "") + "/></xf>";
+		const xfs = [
+			"<xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\"/>",
+			xf(3, 0, 0, "center", "center", 0),
+			xf(4, 0, 0, "center", "center", 1),
+			xf(2, 2, 0, "left", "center", 0),
+			xf(5, 3, 1, "left", "center", 1),
+			xf(0, 4, 1, "left", "center", 1),
+			xf(5, 3, 1, "center", "center", 1),
+			xf(0, 4, 1, "center", "center", 1),
+			xf(0, 4, 1, "left", "center", 1),
+			xf(6, 0, 0, "left", "center", 1),
+			xf(1, 5, 1, "center", "center", 1),
+			xf(1, 6, 1, "center", "center", 1)
+		];
+		return "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><styleSheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><fonts count=\"" + fonts.length + "\">" + fonts.join("") + "</fonts><fills count=\"" + fills.length + "\">" + fills.join("") + "</fills><borders count=\"" + borders.length + "\">" + borders.join("") + "</borders><cellStyleXfs count=\"1\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/></cellStyleXfs><cellXfs count=\"" + xfs.length + "\">" + xfs.join("") + "</cellXfs><cellStyles count=\"1\"><cellStyle name=\"Normal\" xfId=\"0\" builtinId=\"0\"/></cellStyles></styleSheet>";
+	}
+	//#endregion
+	//#region src/presentation/report/report-xlsx-drawing.ts
+	function createReportXlsxDrawing(toEmu) {
+		return (images) => "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><xdr:wsDr xmlns:xdr=\"http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing\" xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\">" + images.map((image, index) => {
+			const cx = toEmu(image.dispW), cy = toEmu(image.dispH);
+			return "<xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>" + image.row0 + "</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:ext cx=\"" + cx + "\" cy=\"" + cy + "\"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id=\"" + (index + 1) + "\" name=\"Chart" + (index + 1) + "\"/><xdr:cNvPicPr/></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" r:embed=\"rId" + (index + 1) + "\"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"" + cx + "\" cy=\"" + cy + "\"/></a:xfrm><a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>";
+		}).join("") + "</xdr:wsDr>";
+	}
+	//#endregion
+	//#region src/presentation/report/report-xlsx-sheet.ts
+	function createReportXlsxSheet(deps) {
+		return (doc) => {
+			const colsXml = "<cols>" + doc.cols.map((width, index) => "<col min=\"" + (index + 1) + "\" max=\"" + (index + 1) + "\" width=\"" + width + "\" customWidth=\"1\"/>").join("") + "</cols>";
+			const body = doc.rows.map((cells, rowIndex) => {
+				const row = rowIndex + 1, height = doc.rowHeights && doc.rowHeights[row];
+				const values = (cells || []).map((cell, columnIndex) => {
+					if (!cell) return "";
+					const ref = deps.columns[columnIndex] + row;
+					return cell.num ? deps.number(ref, cell.s, cell.v) : deps.text(ref, cell.s, cell.v);
+				}).join("");
+				return "<row r=\"" + row + "\"" + (height ? " ht=\"" + height + "\" customHeight=\"1\"" : "") + ">" + values + "</row>";
+			}).join("");
+			const lastRow = doc.rows.length || 1, lastCol = deps.columns[doc.cols.length - 1], merges = doc.merges || [], mergeXml = merges.length ? "<mergeCells count=\"" + merges.length + "\">" + merges.map((merge) => "<mergeCell ref=\"" + merge + "\"/>").join("") + "</mergeCells>" : "";
+			return "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"><dimension ref=\"A1:" + lastCol + lastRow + "\"/><sheetViews><sheetView showGridLines=\"0\" workbookViewId=\"0\"/></sheetViews><sheetFormatPr defaultRowHeight=\"15\"/>" + colsXml + "<sheetData>" + body + "</sheetData>" + mergeXml + "<pageMargins left=\"0.3\" right=\"0.3\" top=\"0.4\" bottom=\"0.4\" header=\"0.2\" footer=\"0.2\"/>" + (doc.hasDrawing ? "<drawing r:id=\"rId1\"/>" : "") + "</worksheet>";
+		};
+	}
+	//#endregion
+	//#region src/presentation/report/report-xlsx-builder.ts
+	function createReportXlsxBuilder(deps) {
+		return (doc) => {
+			const images = (doc.images || []).filter((image) => image && image.bytes && image.bytes.length), hasDrawing = images.length > 0, document = {
+				...doc,
+				hasDrawing
+			};
+			const types = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/>" + (hasDrawing ? "<Default Extension=\"png\" ContentType=\"image/png\"/>" : "") + "<Override PartName=\"/xl/workbook.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/><Override PartName=\"/xl/worksheets/sheet1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/><Override PartName=\"/xl/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml\"/>" + (hasDrawing ? "<Override PartName=\"/xl/drawings/drawing1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.drawing+xml\"/>" : "") + "</Types>";
+			const bytes = deps.bytes, files = [
+				{
+					name: "[Content_Types].xml",
+					data: bytes(types)
+				},
+				{
+					name: "_rels/.rels",
+					data: bytes("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" Target=\"xl/workbook.xml\"/></Relationships>")
+				},
+				{
+					name: "xl/workbook.xml",
+					data: bytes("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"><sheets><sheet name=\"" + deps.escape(doc.sheetName || "Báo cáo") + "\" sheetId=\"1\" r:id=\"rId1\"/></sheets></workbook>")
+				},
+				{
+					name: "xl/_rels/workbook.xml.rels",
+					data: bytes("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet1.xml\"/><Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" Target=\"styles.xml\"/></Relationships>")
+				},
+				{
+					name: "xl/styles.xml",
+					data: bytes(deps.styles())
+				},
+				{
+					name: "xl/worksheets/sheet1.xml",
+					data: bytes(deps.sheet(document))
+				}
+			];
+			if (hasDrawing) {
+				files.push({
+					name: "xl/worksheets/_rels/sheet1.xml.rels",
+					data: bytes("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing\" Target=\"../drawings/drawing1.xml\"/></Relationships>")
+				});
+				files.push({
+					name: "xl/drawings/drawing1.xml",
+					data: bytes(deps.drawing(images))
+				});
+				let relationships = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">";
+				images.forEach((image, index) => relationships += "<Relationship Id=\"rId" + (index + 1) + "\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/image\" Target=\"../media/image" + (index + 1) + ".png\"/>");
+				files.push({
+					name: "xl/drawings/_rels/drawing1.xml.rels",
+					data: bytes(relationships + "</Relationships>")
+				});
+				images.forEach((image, index) => files.push({
+					name: "xl/media/image" + (index + 1) + ".png",
+					data: image.bytes
+				}));
+			}
+			return deps.zip(files);
+		};
+	}
+	//#endregion
+	//#region src/presentation/export/xlsx-escape.ts
+	function xlsxEscape(value) {
+		return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+	}
+	//#endregion
+	//#region src/presentation/report/report-xlsx-style-ids.ts
+	var REPORT_XLSX_STYLE_IDS = Object.freeze({
+		TITLE: 1,
+		SUB: 2,
+		SECTION: 3,
+		LABEL: 4,
+		VAL: 5,
+		TH: 6,
+		TD: 7,
+		TDL: 8,
+		NOTE: 9,
+		REJ: 10,
+		WARN: 11
+	});
+	//#endregion
+	//#region src/presentation/export/xlsx-columns.ts
+	var XLSX_COLUMNS = Object.freeze("ABCDEFGHIJKLMNOPQRSTUVWXYZ".split(""));
+	//#endregion
+	//#region src/presentation/export/xlsx-emu.ts
+	function xlsxEmu(pixels) {
+		return Math.round(pixels * 9525);
+	}
+	//#endregion
+	//#region src/presentation/export/xlsx-utf8.ts
+	function xlsxUtf8(value) {
+		return new TextEncoder().encode(value);
+	}
+	//#endregion
+	//#region src/presentation/export/xlsx-rounding.ts
+	function xlsxRound(value, digits) {
+		return typeof value === "number" && Number.isFinite(value) ? Number(value.toFixed(digits)) : "";
+	}
+	//#endregion
 	//#region src/presentation/sigma/sigma-report-metric.ts
 	function sigmaReportMetric(metric) {
 		return metric ? {
@@ -7664,6 +8232,58 @@
 		scale: (width, height, value) => root.sigmaExportPixelRatio(width, height, value),
 		create: () => document.createElement("canvas")
 	});
+	root.sigmaChartRenderer = createSigmaChartRenderer({
+		levels: (row) => root.sigmaLevelsOf(row),
+		canvas: (width, height, scale) => root.sigmaCanvas(width, height, scale),
+		font: (weight, token, fallback) => root.dataIoCanvasFont(weight, token, fallback),
+		zone: (sigma) => root.sgZone(sigma),
+		bytes: (url) => root.sigmaDataURLBytes(url)
+	});
+	root.sigmaMdcRenderer = createSigmaMdcRenderer({
+		items: (rows) => root.sigmaMdcItems(rows),
+		canvas: (width, height, scale) => root.sigmaCanvas(width, height, scale),
+		font: (weight, token, fallback) => root.dataIoCanvasFont(weight, token, fallback),
+		zone: (sigma) => root.sgZone(sigma),
+		placements: (items, x, y, ctx, bounds) => root.sigmaMdcLabelPlacements(items, x, y, ctx, bounds),
+		bytes: (url) => root.sigmaDataURLBytes(url)
+	});
+	root.renameSigmaXlsxSheet = (bytes, sheetName) => renameXlsxSheet(bytes, sheetName, {
+		escape: (value) => root.XlsxCore.escX(value),
+		bytes: (value) => root.XlsxCore.u8(value),
+		zip: (files) => root.XlsxCore.zip(files)
+	});
+	root.xlsxCells = createXlsxCells((value) => root.XlsxCore.escX(value));
+	root.xlsxZip = createXlsxZip((value) => new TextEncoder().encode(value));
+	root.xlsxPeriodNumber = xlsxPeriodNumber;
+	root.xlsxDrawing = createXlsxDrawing((pixels) => root.XlsxCore.emu(pixels));
+	root.sigmaXlsxStyles = sigmaXlsxStyles;
+	root.reportXlsxStyles = reportXlsxStyles;
+	root.reportXlsxDrawing = createReportXlsxDrawing((pixels) => root.XlsxCore.emu(pixels));
+	root.reportXlsxSheet = (doc) => {
+		const core = root.XlsxCore;
+		return createReportXlsxSheet({
+			columns: core.COLS,
+			text: core.cellStr,
+			number: core.cellNum
+		})(doc);
+	};
+	root.reportXlsxBuild = (doc) => {
+		const core = root.XlsxCore;
+		return createReportXlsxBuilder({
+			bytes: core.u8,
+			escape: core.escX,
+			styles: () => root.reportXlsxStyles(),
+			sheet: (item) => root.reportXlsxSheet(item),
+			drawing: (images) => root.reportXlsxDrawing(images),
+			zip: core.zip
+		})(doc);
+	};
+	root.xlsxEscape = xlsxEscape;
+	root.reportXlsxStyleIds = REPORT_XLSX_STYLE_IDS;
+	root.xlsxColumns = XLSX_COLUMNS;
+	root.xlsxEmu = xlsxEmu;
+	root.xlsxUtf8 = xlsxUtf8;
+	root.xlsxRound = xlsxRound;
 	root.sigmaReportMetricService = sigmaReportMetric;
 	root.sigmaMdcItemsService = (rows) => sigmaMdcItems(rows, globalThis.sigmaLevelsOf);
 	root.sigmaMdcLabelPlacementService = (items, X, Y, ctx, bounds) => sigmaMdcLabelPlacements(items, X, Y, ctx, bounds, globalThis.sigmaMdcPeriodLabel);

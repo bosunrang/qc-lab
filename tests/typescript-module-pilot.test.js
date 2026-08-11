@@ -104,6 +104,22 @@ const stateLifecycleNormalizationSource = read('src/application/state/state-life
 const csvDownloadSource = read('src/presentation/export/csv-download.ts');
 const cssTokenPixelSource = read('src/presentation/style/css-token-pixel.ts');
 const blobDownloadSource = read('src/presentation/export/blob-download.ts');
+const xlsxCellSource = read('src/presentation/export/xlsx-cell.ts');
+const xlsxZipSource = read('src/presentation/export/xlsx-zip.ts');
+const xlsxPeriodSource = read('src/presentation/export/xlsx-period.ts');
+const xlsxDrawingSource = read('src/presentation/export/xlsx-drawing.ts');
+const sigmaXlsxStylesSource = read('src/presentation/sigma/sigma-xlsx-styles.ts');
+const reportXlsxStylesSource = read('src/presentation/report/report-xlsx-styles.ts');
+const reportXlsxDrawingSource = read('src/presentation/report/report-xlsx-drawing.ts');
+const reportXlsxSheetSource = read('src/presentation/report/report-xlsx-sheet.ts');
+const reportXlsxBuilderSource = read('src/presentation/report/report-xlsx-builder.ts');
+const xlsxEscapeSource = read('src/presentation/export/xlsx-escape.ts');
+const reportXlsxStyleIdsSource = read('src/presentation/report/report-xlsx-style-ids.ts');
+const xlsxColumnsSource = read('src/presentation/export/xlsx-columns.ts');
+const xlsxEmuSource = read('src/presentation/export/xlsx-emu.ts');
+const sigmaChartRendererSource = read('src/presentation/sigma/sigma-chart-renderer.ts');
+const sigmaMdcRendererSource = read('src/presentation/sigma/sigma-mdc-renderer.ts');
+const xlsxRoundingSource = read('src/presentation/export/xlsx-rounding.ts');
 const adapter = read('src/compat/modular-pilot.global.ts');
 const generated = read('assets/generated/modular-pilot.js');
 
@@ -713,6 +729,38 @@ assert.match(cssTokenPixelSource, /export function cssTokenPixel\(/,
   'CSS token pixel phải tách thành TypeScript helper nhận dependency');
 assert.match(blobDownloadSource, /export function createBlobDownload\(/,
   'blob download phải tách thành TypeScript factory nhận dependency');
+assert.match(xlsxCellSource, /export function createXlsxCells\(/,
+  'XLSX cell writer phải tách thành TypeScript factory nhận dependency');
+assert.match(xlsxZipSource, /export function createXlsxZip\(/,
+  'XLSX ZIP writer phải tách thành TypeScript factory nhận dependency');
+assert.match(xlsxPeriodSource, /export function xlsxPeriodNumber\(/,
+  'XLSX period parser phải tách thành TypeScript helper độc lập');
+assert.match(xlsxDrawingSource, /export function createXlsxDrawing\(/,
+  'XLSX DrawingML writer phải tách thành TypeScript factory nhận dependency');
+assert.match(sigmaXlsxStylesSource, /export function sigmaXlsxStyles\(/,
+  'Sigma XLSX styles phải tách thành TypeScript helper độc lập');
+assert.match(reportXlsxStylesSource, /export function reportXlsxStyles\(/,
+  'Report XLSX styles phải tách thành TypeScript helper độc lập');
+assert.match(reportXlsxDrawingSource, /export function createReportXlsxDrawing\(/,
+  'Report XLSX DrawingML phải tách thành TypeScript factory nhận dependency');
+assert.match(reportXlsxSheetSource, /export function createReportXlsxSheet\(/,
+  'Report XLSX worksheet phải tách thành TypeScript factory nhận dependency');
+assert.match(reportXlsxBuilderSource, /export function createReportXlsxBuilder\(/,
+  'Report XLSX workbook phải tách thành TypeScript factory nhận dependency');
+assert.match(xlsxEscapeSource, /export function xlsxEscape\(/,
+  'XLSX XML escape phải tách thành TypeScript helper độc lập');
+assert.match(reportXlsxStyleIdsSource, /export const REPORT_XLSX_STYLE_IDS=Object\.freeze/,
+  'Report XLSX style IDs phải là danh mục TypeScript bất biến');
+assert.match(xlsxColumnsSource, /export const XLSX_COLUMNS=Object\.freeze/,
+  'XLSX column labels phải là danh mục TypeScript bất biến');
+assert.match(xlsxEmuSource, /export function xlsxEmu\(/,
+  'XLSX pixel-to-EMU conversion phải tách thành TypeScript helper độc lập');
+assert.match(sigmaChartRendererSource, /deps\.canvas\(/,
+  'Sigma chart renderer phải tự vẽ bằng dependency thay vì gọi lại legacy renderer');
+assert.match(sigmaMdcRendererSource, /deps\.placements\(/,
+  'Sigma MDC renderer phải tự đặt nhãn bằng dependency thay vì gọi lại legacy renderer');
+assert.match(xlsxRoundingSource, /export function xlsxRound\(/,
+  'XLSX rounding phải tách thành TypeScript helper độc lập');
 assert.doesNotMatch(blobDownloadSource, /\bglobalThis\b|\bdocument\b/,
   'blob download không được tự đọc global hoặc DOM');
 assert.doesNotMatch(cssTokenPixelSource, /\bglobalThis\b|\bdocument\b/,
@@ -745,6 +793,38 @@ assert.match(generated, /root\.cssTokenPixel\s*=/,
   'artifact phải công bố TypeScript CSS token pixel cho wrapper cũ');
 assert.match(generated, /root\.blobDownload\s*=\s*createBlobDownload/,
   'artifact phải công bố TypeScript blob download cho wrapper cũ');
+assert.match(generated, /root\.xlsxCells\s*=\s*createXlsxCells/,
+  'artifact phải công bố TypeScript XLSX cell writer cho wrapper cũ');
+assert.match(generated, /root\.xlsxZip\s*=\s*createXlsxZip/,
+  'artifact phải công bố TypeScript XLSX ZIP writer cho wrapper cũ');
+assert.match(generated, /root\.xlsxPeriodNumber\s*=\s*xlsxPeriodNumber/,
+  'artifact phải công bố TypeScript XLSX period parser cho wrapper cũ');
+assert.match(generated, /root\.xlsxDrawing\s*=\s*createXlsxDrawing/,
+  'artifact phải công bố TypeScript XLSX DrawingML writer cho wrapper cũ');
+assert.match(generated, /root\.sigmaXlsxStyles\s*=\s*sigmaXlsxStyles/,
+  'artifact phải công bố TypeScript Sigma XLSX styles cho wrapper cũ');
+assert.match(generated, /root\.reportXlsxStyles\s*=\s*reportXlsxStyles/,
+  'artifact phải công bố TypeScript Report XLSX styles cho wrapper cũ');
+assert.match(generated, /root\.reportXlsxDrawing\s*=\s*createReportXlsxDrawing/,
+  'artifact phải công bố TypeScript Report XLSX DrawingML cho wrapper cũ');
+assert.match(generated, /root\.reportXlsxSheet\s*=\s*\(doc\)\s*=>\s*\{[\s\S]*createReportXlsxSheet/,
+  'artifact phải khởi tạo trễ Report XLSX worksheet sau data-io');
+assert.match(generated, /root\.reportXlsxBuild\s*=\s*\(doc\)\s*=>\s*\{[\s\S]*createReportXlsxBuilder/,
+  'artifact phải khởi tạo trễ Report XLSX workbook sau data-io');
+assert.match(generated, /root\.xlsxEscape\s*=\s*xlsxEscape/,
+  'artifact phải công bố TypeScript XLSX XML escape cho wrapper cũ');
+assert.match(generated, /root\.reportXlsxStyleIds\s*=\s*REPORT_XLSX_STYLE_IDS/,
+  'artifact phải công bố TypeScript Report XLSX style IDs cho wrapper cũ');
+assert.match(generated, /root\.xlsxColumns\s*=\s*XLSX_COLUMNS/,
+  'artifact phải công bố TypeScript XLSX column labels cho wrapper cũ');
+assert.match(generated, /root\.xlsxEmu\s*=\s*xlsxEmu/,
+  'artifact phải công bố TypeScript XLSX pixel-to-EMU cho wrapper cũ');
+assert.match(generated, /root\.sigmaChartRenderer\s*=\s*createSigmaChartRenderer/,
+  'artifact phải công bố TypeScript Sigma chart renderer cho wrapper cũ');
+assert.match(generated, /root\.sigmaMdcRenderer\s*=\s*createSigmaMdcRenderer/,
+  'artifact phải công bố TypeScript Sigma MDC renderer cho wrapper cũ');
+assert.match(generated, /root\.xlsxRound\s*=\s*xlsxRound/,
+  'artifact phải công bố TypeScript XLSX rounding cho wrapper cũ');
 assert.match(pkg.scripts.dist, /build:pilot/,
   'đóng gói Electron phải build lại artifact TypeScript trước');
 
