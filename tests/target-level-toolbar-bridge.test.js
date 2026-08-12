@@ -1,0 +1,12 @@
+'use strict';
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const root = path.join(__dirname, '..');
+const read = file => fs.readFileSync(path.join(root, file), 'utf8');
+const route = read('assets/modules/manage-routes.js');
+const bridge = read('src/compat/modular-pilot.global.ts');
+assert.match(route, /targetLevelToolbarPresentation\?globalThis\.targetLevelToolbarPresentation/);
+assert.match(bridge, /import \{ targetLevelToolbarHtml \} from '\.\.\/presentation\/manage\/target-level-toolbar-html';/);
+assert.match(bridge, /root\.targetLevelToolbarPresentation=targetLevelToolbarHtml;/);
+console.log('Target level toolbar bridge tests passed');

@@ -1,0 +1,20 @@
+'use strict';
+const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+const source = pathToFileURL(path.join(__dirname, '..', 'src', 'presentation', 'nce', 'action-containment-detail-html.ts')).href;
+const program = `
+  import { createActionContainmentDetailHtml } from ${JSON.stringify(source)};
+  const render = createActionContainmentDetailHtml({ escape: value => String(value).replaceAll('<', '&lt;') });
+  console.log(JSON.stringify([render({ status: 'Đã giữ <kết quả>', correction: 'Chạy lại', note: 'Có ghi chú', modern: true }), render({ status: '', modern: false })]));
+`;
+const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=module', '--eval', program], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
+assert.equal(result.status, 0, result.stderr || 'không thể chạy action containment detail HTML TypeScript');
+const [modern, legacy] = JSON.parse(result.stdout);
+assert.match(modern, /Đã giữ &lt;kết quả>/);
+assert.match(modern, /Chạy lại/);
+assert.match(modern, /Có ghi chú/);
+assert.match(legacy, /Chưa ghi/);
+assert.doesNotMatch(legacy, /xử lý tức thời/);
+console.log('Action containment detail HTML TypeScript tests passed');

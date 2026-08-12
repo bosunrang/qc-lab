@@ -1,0 +1,21 @@
+'use strict';
+const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+const source = pathToFileURL(path.join(__dirname, '..', 'src', 'presentation', 'nce', 'action-open-issue-html.ts')).href;
+const program = `
+  import { createActionOpenIssueHtml } from ${JSON.stringify(source)};
+  const render = createActionOpenIssueHtml({ escape: value => String(value).replaceAll('<', '&lt;'), button: (label, action, variant) => '[' + label + '|' + action + '|' + variant + ']' });
+  console.log(JSON.stringify([render({ severity: 'rej', title: 'NCE <17', context: 'Glucose', date: '12/08/2026', verdict: 'Loại', rule: '1-3s', errorType: 'SE', workflowClass: 'rej', workflowLabel: 'Cần xử lý', sideChips: '<i>Quá hạn</i>', primary: 'Điều tra', owner: 'Lan', dueDate: '13/08/2026', editable: true, index: 7 }), render({ severity: 'warn', title: 'Hồ sơ', context: 'Sự cố', date: '12/08/2026', rule: 'Hủy', errorType: 'RE', workflowClass: 'warn', workflowLabel: 'Theo dõi', sideChips: '', primary: 'Chờ', owner: '', editable: false, index: 1 })]));
+`;
+const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=module', '--eval', program], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
+assert.equal(result.status, 0, result.stderr || 'không thể chạy action open issue HTML TypeScript');
+const [editable, readonly] = JSON.parse(result.stdout);
+assert.match(editable, /NCE &lt;17 · Glucose/);
+assert.match(editable, /12\/08\/2026 · Loại · 1-3s · SE/);
+assert.match(editable, /<i>Quá hạn<\/i>/);
+assert.match(editable, /Tiếp tục hồ sơ\|editAction\(7\)\|ghost sm/);
+assert.doesNotMatch(readonly, /editAction/);
+assert.match(readonly, /Phụ trách: —/);
+console.log('Action open issue HTML TypeScript tests passed');

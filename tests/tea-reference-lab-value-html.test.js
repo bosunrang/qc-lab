@@ -1,0 +1,11 @@
+'use strict';
+const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+const source = pathToFileURL(path.join(__dirname, '..', 'src', 'presentation', 'manage', 'tea-reference-lab-value-html.ts')).href;
+const program = `import { teaReferenceLabValueHtml } from ${JSON.stringify(source)}; console.log(JSON.stringify([teaReferenceLabValueHtml(5.678, (value, decimals) => Number(value).toFixed(decimals)), teaReferenceLabValueHtml(null, String)]));`;
+const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=module', '--eval', program], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
+assert.equal(result.status, 0, result.stderr || 'không thể chạy tea reference lab value HTML TypeScript');
+assert.deepEqual(JSON.parse(result.stdout), ['<b>5.68%</b>', '']);
+console.log('Tea reference lab value HTML TypeScript tests passed');

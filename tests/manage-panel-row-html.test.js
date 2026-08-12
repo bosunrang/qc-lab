@@ -1,0 +1,20 @@
+'use strict';
+const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+const source = pathToFileURL(path.join(__dirname, '..', 'src', 'presentation', 'manage', 'manage-panel-row-html.ts')).href;
+const program = `
+  import { createManagePanelRowHtml } from ${JSON.stringify(source)};
+  const render = createManagePanelRowHtml({ escape: value => String(value).replaceAll('<', '&lt;'), quote: value => String(value).replaceAll("'", "\\\\'"), button: (label, action, variant) => '[' + label + '|' + action + '|' + variant + ']' });
+  console.log(JSON.stringify([render({ id: "P'1", name: 'Điện giải <1>', instrument: 'AU', testsHtml: '<span class="pill">Na</span>', testCount: 2, active: true }), render({ id: 'P2', name: 'Khác', instrument: '', testsHtml: '', testCount: 0, active: false })]));
+`;
+const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=module', '--eval', program], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
+assert.equal(result.status, 0, result.stderr || 'không thể chạy manage panel row HTML TypeScript');
+const [active, inactive] = JSON.parse(result.stdout);
+assert.match(active, /Điện giải &lt;1>/);
+assert.match(active, /<span class="pill">Na<\/span>/);
+assert.match(active, /Sửa\|openConfigPanel\('P\\'1'\)\|ghost sm/);
+assert.match(inactive, /<td>—<\/td>/);
+assert.match(inactive, /Tạm ngưng/);
+console.log('Manage panel row HTML TypeScript tests passed');

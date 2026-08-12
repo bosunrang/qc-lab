@@ -1,0 +1,20 @@
+'use strict';
+const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+const source = pathToFileURL(path.join(__dirname, '..', 'src', 'presentation', 'nce', 'action-log-panel-html.ts')).href;
+const program = `
+  import { createActionLogPanelHtml } from ${JSON.stringify(source)};
+  const render = createActionLogPanelHtml({ button: (label, action, variant) => '[' + label + '|' + action + '|' + variant + ']', emptyState: (title, text) => '<empty>' + title + ':' + text + '</empty>' });
+  console.log(JSON.stringify([render('<tr><td>NCE-1</td></tr>'), render('')]));
+`;
+const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=module', '--eval', program], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
+assert.equal(result.status, 0, result.stderr || 'không thể chạy action log panel HTML TypeScript');
+const [full, empty] = JSON.parse(result.stdout);
+assert.match(full, /Nhật ký khắc phục/);
+assert.match(full, /Xuất CSV nhật ký\|exportActionsCSV\(\)\|teal sm/);
+assert.match(full, /<th>Thao tác<\/th>/);
+assert.match(full, /<tr><td>NCE-1<\/td><\/tr>/);
+assert.match(empty, /<empty>Chưa có nhật ký:Các hành động khắc phục/);
+console.log('Action log panel HTML TypeScript tests passed');

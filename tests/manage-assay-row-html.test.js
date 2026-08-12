@@ -1,0 +1,20 @@
+'use strict';
+const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+const source = pathToFileURL(path.join(__dirname, '..', 'src', 'presentation', 'manage', 'manage-assay-row-html.ts')).href;
+const program = `
+  import { createManageAssayRowHtml } from ${JSON.stringify(source)};
+  const render = createManageAssayRowHtml({ escape: value => String(value).replaceAll('<', '&lt;'), quote: value => String(value).replaceAll("'", "\\\\'"), button: (label, action, variant) => '[' + label + '|' + action + '|' + variant + ']' });
+  console.log(JSON.stringify([render({ index: 1, id: "A'1", name: 'Glucose <máu>', method: 'Hexokinase', unit: 'mmol/L', instrument: 'AU', section: 'Hóa sinh', reagent: 'R1', tea: 10, closed: false }), render({ index: 2, id: 'A2', name: 'CRP', instrument: '', closed: true })]));
+`;
+const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=module', '--eval', program], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
+assert.equal(result.status, 0, result.stderr || 'không thể chạy manage assay row HTML TypeScript');
+const [active, closed] = JSON.parse(result.stdout);
+assert.match(active, /Glucose &lt;máu>/);
+assert.match(active, /10%/);
+assert.match(active, /Sửa\|openConfigAssay\('A\\'1'\)\|ghost sm/);
+assert.match(closed, /Chưa nhập phương pháp/);
+assert.match(closed, /Ngưng dùng/);
+console.log('Manage assay row HTML TypeScript tests passed');

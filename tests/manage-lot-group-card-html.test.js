@@ -1,0 +1,20 @@
+'use strict';
+const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+const source = pathToFileURL(path.join(__dirname, '..', 'src', 'presentation', 'manage', 'manage-lot-group-card-html.ts')).href;
+const program = `
+  import { createManageLotGroupCardHtml } from ${JSON.stringify(source)};
+  const render = createManageLotGroupCardHtml({ escape: value => String(value).replaceAll('<', '&lt;') });
+  console.log(JSON.stringify([render({ archived: true, name: 'Nhóm <A>', note: '', status: { cls: 'rej', text: 'Đã lưu trữ' }, lotsHtml: '<span class="pill">1101 · M1</span>', actionsHtml: '<button>Sửa</button>' }), render({ archived: false, name: 'Nhóm B', status: { cls: 'ok', text: 'Đang hoạt động' }, lotsHtml: '', actionsHtml: '' })]));
+`;
+const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=module', '--eval', program], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
+assert.equal(result.status, 0, result.stderr || 'không thể chạy manage lot group card HTML TypeScript');
+const [archived, empty] = JSON.parse(result.stdout);
+assert.match(archived, /lot-opt-depleted/);
+assert.match(archived, /Nhóm &lt;A>/);
+assert.match(archived, /<span class="pill">1101 · M1<\/span>/);
+assert.match(empty, /Chưa chọn lô/);
+assert.match(empty, /Đang hoạt động/);
+console.log('Manage lot group card HTML TypeScript tests passed');

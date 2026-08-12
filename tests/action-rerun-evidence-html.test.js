@@ -1,0 +1,20 @@
+'use strict';
+const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+const source = pathToFileURL(path.join(__dirname, '..', 'src', 'presentation', 'nce', 'action-rerun-evidence-html.ts')).href;
+const program = `
+  import { createActionRerunEvidenceHtml } from ${JSON.stringify(source)};
+  const render = createActionRerunEvidenceHtml({ escape: value => String(value).replaceAll('<', '&lt;'), pointValue: point => 'V:' + point.value, date: value => 'D:' + value, button: (label, action, variant, title) => '[' + label + '|' + action + '|' + variant + '|' + title + ']', quote: value => String(value).replaceAll("'", "\\\\'") });
+  console.log(JSON.stringify([render({ kind: 'pending', cls: 'warn', heading: '<Chờ>', label: '<Nhập QC>' }, 'T1', {}), render({ kind: 'done', cls: 'ok', heading: 'Đã đạt', label: '', context: '<Ổn định>', point: { level: 2, id: "P'1", date: '2026-08-12', lot: 'L1', value: 3.2 } }, "T'1", { unit: 'mg' })]));
+`;
+const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=module', '--eval', program], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
+assert.equal(result.status, 0, result.stderr || 'không thể chạy action rerun evidence HTML TypeScript');
+const [pending, complete] = JSON.parse(result.stdout);
+assert.match(pending, /&lt;Chờ>/);
+assert.doesNotMatch(pending, /Xem điểm QC/);
+assert.match(complete, /V:3.2 mg · D:2026-08-12 · Không có mã lần chạy/);
+assert.match(complete, /&lt;Ổn định>/);
+assert.match(complete, /openActionQcEvidence\('T\\'1',2,'P\\'1','2026-08-12','L1'\)/);
+console.log('Action rerun evidence HTML TypeScript tests passed');

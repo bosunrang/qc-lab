@@ -1,0 +1,3 @@
+export function createActionLogPanelHtml(deps: { button: (label: string, action: string, variant: string) => string; emptyState: (title: string, text: string) => string }) {
+  return (rows: string) => `<div class="panel action-log-panel"><h2 class="panel-title">Nhật ký khắc phục</h2>${rows ? `<div class="action-log-tools">${deps.button('Xuất CSV nhật ký', 'exportActionsCSV()', 'teal sm')}</div><div class="action-log-wrap"><table class="action-log-table"><thead><tr><th>Thời điểm</th><th>Sự cố</th><th>Hành động</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table></div>` : deps.emptyState('Chưa có nhật ký', 'Các hành động khắc phục sẽ xuất hiện ở đây sau khi được lưu.')}</div>`;
+}

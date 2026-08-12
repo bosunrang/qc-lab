@@ -1,0 +1,5 @@
+export type ManageInstrumentRowModel = { id: string; name: string; section?: string; manufacturer?: string; serial?: string; assayCount: number; active: boolean };
+
+export function createManageInstrumentRowHtml(deps: { escape: (value: unknown) => string; button: (label: string, action: string, variant: string) => string; quote: (value: unknown) => string }) {
+  return (model: ManageInstrumentRowModel) => `<tr><td><b>${deps.escape(model.name)}</b><div class="hint">${deps.escape(model.section || 'Chưa phân khoa')}</div></td><td>${deps.escape(model.manufacturer || '—')}</td><td>${deps.escape(model.serial || '—')}</td><td class="num">${model.assayCount}</td><td><span class="tag ${model.active ? 'ok' : 'none'}">${model.active ? 'Đang hoạt động' : 'Ngừng hoạt động'}</span></td><td><div class="manage-actions">${deps.button('Sửa', `openConfigInstrument('${deps.quote(model.id)}')`, 'ghost sm')}${deps.button('Xóa', `deleteConfigInstrument('${deps.quote(model.id)}')`, 'danger sm')}</div></td></tr>`;
+}

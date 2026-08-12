@@ -1,0 +1,20 @@
+'use strict';
+const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+const source = pathToFileURL(path.join(__dirname, '..', 'src', 'presentation', 'manage', 'manage-lot-row-html.ts')).href;
+const program = `
+  import { createManageLotRowHtml } from ${JSON.stringify(source)};
+  const render = createManageLotRowHtml({ escape: value => String(value).replaceAll('<', '&lt;'), quote: value => String(value).replaceAll("'", "\\\\'"), button: (label, action, variant) => '[' + label + '|' + action + '|' + variant + ']' });
+  console.log(JSON.stringify([render({ id: "L'1", lotNo: 'Lot <1101>', description: 'QC thường quy', level: 2, expiry: '12/08/2026', status: { cls: 'warn', text: 'Còn 5 ngày' }, used: 3 }), render({ id: 'L2', lotNo: 'Lot 2', level: 1, status: { cls: 'none', text: 'Chưa có HSD' }, used: 0 })]));
+`;
+const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=module', '--eval', program], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
+assert.equal(result.status, 0, result.stderr || 'không thể chạy manage lot row HTML TypeScript');
+const [full, basic] = JSON.parse(result.stdout);
+assert.match(full, /Lot &lt;1101>/);
+assert.match(full, /M2/);
+assert.match(full, /Sửa\|openConfigLot\('L\\'1'\)\|ghost sm/);
+assert.match(basic, /<td>—<\/td>/);
+assert.match(basic, /Chưa có HSD/);
+console.log('Manage lot row HTML TypeScript tests passed');

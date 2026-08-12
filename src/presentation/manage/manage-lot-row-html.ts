@@ -1,0 +1,5 @@
+export type ManageLotRowModel = { id: string; lotNo: string; description?: string; program?: string; level: number; expiry?: string; status: { cls: string; text: string }; used: number };
+
+export function createManageLotRowHtml(deps: { escape: (value: unknown) => string; button: (label: string, action: string, variant: string) => string; quote: (value: unknown) => string }) {
+  return (model: ManageLotRowModel) => `<tr><td><b>${deps.escape(model.lotNo)}</b>${model.description || model.program ? `<div class="hint">${deps.escape(model.description || model.program || '')}</div>` : ''}</td><td><span class="pill">M${model.level}</span></td><td>${deps.escape(model.expiry || '—')}</td><td><span class="tag ${model.status.cls}">${deps.escape(model.status.text)}</span></td><td class="num">${model.used}</td><td><div class="lot-row-actions">${deps.button('Sửa', `openConfigLot('${deps.quote(model.id)}')`, 'ghost sm')}${deps.button('Xóa', `deleteConfigLot('${deps.quote(model.id)}')`, 'danger sm')}</div></td></tr>`;
+}

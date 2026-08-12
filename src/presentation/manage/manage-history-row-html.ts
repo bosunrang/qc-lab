@@ -1,0 +1,5 @@
+export type ManageHistoryRowModel = { testId: string; level: number; lot: string; group: string; mean: string; low: string; high: string; sd: string; period: string; source: 'lab' | string; pointCount: number };
+
+export function createManageHistoryRowHtml(deps: { escape: (value: unknown) => string; button: (label: string, action: string, variant: string) => string; quote: (value: unknown) => string }) {
+  return (model: ManageHistoryRowModel) => `<tr><td><span class="pill">M${model.level}</span></td><td><b>${deps.escape(model.lot || '—')}</b><div class="hint">${deps.escape(model.group)}</div></td><td class="num">${model.mean}</td><td class="num">${model.low}</td><td class="num">${model.high}</td><td class="num">${model.sd}</td><td>${deps.escape(model.period)}</td><td><span class="tag ${model.source === 'lab' ? 'warn' : 'ok'}">${model.source === 'lab' ? 'PXN' : 'NSX'}</span></td><td class="num">${model.pointCount}</td><td>${deps.button('Chi tiết', `openQcHistoryDetail('${deps.quote(model.testId)}',${model.level},'${deps.quote(model.lot || '')}')`, 'ghost sm')}</td></tr>`;
+}

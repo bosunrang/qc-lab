@@ -1,0 +1,5 @@
+type ButtonModel = { edit?: boolean; escalate?: boolean; approve?: boolean; returnForRevision?: boolean; reopen?: boolean; cancel?: boolean };
+
+export function createActionReviewButtonsHtml(deps: { button: (label: string, action: string, variant: string, title?: string) => string }) {
+  return (index: number, model: ButtonModel) => `<div class="action-row-actions">${deps.button('Chi tiết', `viewActionDetail(${index})`, 'ghost sm')}${model.edit ? deps.button('Tiếp tục', `editAction(${index})`, 'ghost sm') : ''}${model.escalate ? deps.button('Lập hồ sơ tiếp theo', `escalateAction(${index})`, 'teal sm', 'Hành động chưa hiệu lực — mở vòng điều tra mới') : ''}${model.approve ? deps.button('Duyệt', `approveAction(${index})`, 'teal sm') : ''}${model.returnForRevision ? deps.button('Trả lại', `returnAction(${index})`, 'ghost sm') : ''}${model.reopen ? deps.button('Mở lại', `reopenAction(${index})`, 'danger sm', 'Hồ sơ đã duyệt nhưng không còn đủ điều kiện khép vòng') : ''}${model.cancel ? deps.button('Hủy hồ sơ', `cancelAction(${index})`, 'danger sm', 'Hủy có lưu vết — không xóa dữ liệu') : ''}</div>`;
+}

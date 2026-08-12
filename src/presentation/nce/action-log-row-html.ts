@@ -1,0 +1,5 @@
+export type ActionLogRowModel = { date: string; openedAt?: string; identity: string; sub: string; rule: string; primary: string; owner: string; dueDate?: string; workflowClass: string; workflowLabel: string; sideChips: string; approvalTag: string; approvalMeta: string; actions: string };
+
+export function createActionLogRowHtml(deps: { escape: (value: unknown) => string }) {
+  return (model: ActionLogRowModel) => `<tr><td><div class="action-date">${deps.escape(model.date)}</div>${model.openedAt ? `<div class="action-time">Mở: ${deps.escape(model.openedAt)}</div>` : ''}</td><td><div class="action-test">${model.identity}</div><div class="action-sub">${model.sub}</div><div class="action-rule">${model.rule}</div></td><td><div class="action-text">${deps.escape(model.primary)}</div><div class="action-sub">Phụ trách: ${deps.escape(model.owner || '—')}${model.dueDate ? ' · hạn ' + deps.escape(model.dueDate) : ''}</div></td><td><div class="action-status-stack"><span class="action-chip ${model.workflowClass}">${deps.escape(model.workflowLabel)}</span>${model.sideChips}${model.approvalTag}${model.approvalMeta}</div></td><td>${model.actions}</td></tr>`;
+}

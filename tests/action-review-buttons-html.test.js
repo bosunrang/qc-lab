@@ -1,0 +1,22 @@
+'use strict';
+const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+const source = pathToFileURL(path.join(__dirname, '..', 'src', 'presentation', 'nce', 'action-review-buttons-html.ts')).href;
+const program = `
+  import { createActionReviewButtonsHtml } from ${JSON.stringify(source)};
+  const render = createActionReviewButtonsHtml({ button: (label, action, variant, title = '') => '[' + label + '|' + action + '|' + variant + '|' + title + ']' });
+  console.log(JSON.stringify([render(4, { edit: true, approve: true, reopen: true }), render(2, {})]));
+`;
+const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=module', '--eval', program], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
+assert.equal(result.status, 0, result.stderr || 'không thể chạy action review buttons HTML TypeScript');
+const [active, minimal] = JSON.parse(result.stdout);
+assert.match(active, /Chi tiết\|viewActionDetail\(4\)\|ghost sm/);
+assert.match(active, /Tiếp tục\|editAction\(4\)/);
+assert.match(active, /Duyệt\|approveAction\(4\)/);
+assert.match(active, /Mở lại\|reopenAction\(4\)\|danger sm/);
+assert.doesNotMatch(active, /Hủy hồ sơ/);
+assert.match(minimal, /Chi tiết\|viewActionDetail\(2\)/);
+assert.doesNotMatch(minimal, /Tiếp tục/);
+console.log('Action review buttons HTML TypeScript tests passed');

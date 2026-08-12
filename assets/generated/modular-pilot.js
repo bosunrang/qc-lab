@@ -6097,6 +6097,23 @@
 		};
 	}
 	//#endregion
+	//#region src/presentation/dashboard/dashboard-kpis-html.ts
+	function dashboardKpisHtml(items) {
+		return `<div class="dash-kpis">${items.map((item) => `<div class="dash-kpi"><div class="k">${item.label}</div><div class="v${item.className ? ` ${item.className}` : ""}"${item.color ? ` style="color:${item.color}"` : ""}>${item.value}</div></div>`).join("")}</div>`;
+	}
+	//#endregion
+	//#region src/presentation/dashboard/dashboard-progress-html.ts
+	function dashboardProgressHtml(completeTests, testCount, percent) {
+		const safePercent = Math.max(0, Math.min(100, Number.isFinite(percent) ? percent : 0));
+		return `<div class="dash-progress"><span style="width:${safePercent}%"></span></div><div class="hint flow-item">${completeTests}/${testCount || 0} xét nghiệm đã đủ QC hôm nay · ${safePercent}% hoàn tất</div>`;
+	}
+	//#endregion
+	//#region src/presentation/dashboard/dashboard-test-list-html.ts
+	function dashboardTestListHtml(visibleCount, rowsHtml) {
+		if (!visibleCount) return "<div class=\"dash-test-empty\">Không tìm thấy xét nghiệm phù hợp.</div>";
+		return `<div class="dash-test-list"><table><thead><tr><th>Xét nghiệm</th><th>Mức QC / lô</th><th>QC hôm nay</th><th class="num">Tổng điểm</th><th>Westgard</th><th>Gần nhất</th><th><span class="sr-only">Thao tác</span></th></tr></thead><tbody>${rowsHtml}</tbody></table></div><div id="dashTestEmpty" class="dash-test-empty" style="display:none">Không tìm thấy xét nghiệm phù hợp.</div>`;
+	}
+	//#endregion
 	//#region src/presentation/report/report-qc-format.ts
 	function createReportQcFormat(deps) {
 		const value = (test, raw) => deps.testValue ? deps.testValue(test, raw) : deps.format(raw, 3);
@@ -7022,6 +7039,722 @@
 			summary,
 			detailField
 		});
+	}
+	//#endregion
+	//#region src/presentation/nce/action-guide-content.ts
+	function createActionGuideContent(deps) {
+		return (steps) => {
+			return {
+				body: `<div class="modal-b" tabindex="0" aria-label="Nội dung quy trình 8 bước"><div class="action-guide-intro"><b>Nguyên tắc thực hiện</b><p>Lưu hồ sơ ngay sau bước 1 ở trạng thái <strong>Đang điều tra</strong>, sau đó hoàn thiện theo tiến độ xử lý.</p></div><ol class="action-guide-list">${steps.map((step, index) => `<li class="action-guide-card"><span class="action-guide-number">${index + 1}</span><div><small>${deps.escape(step.phase)}</small><b>${deps.escape(step.title)}</b><p>${deps.escape(step.text)}</p></div></li>`).join("")}</ol></div>`,
+				footer: `<div class="action-guide-footer-note"><b>Điều kiện khép vòng</b><span>Đủ bằng chứng QC, quyết định cho phép trở lại khi cần, đánh giá nguy cơ còn lại và phê duyệt độc lập.</span></div>${deps.button("Đóng", "closeModal()", "ghost")}`
+			};
+		};
+	}
+	//#endregion
+	//#region src/presentation/nce/action-side-chips-html.ts
+	function createActionSideChipsHtml(deps) {
+		return (chips) => chips.map((chip) => `<span class="action-chip ${chip.cls}">${deps.escape(chip.label)}</span>`).join("");
+	}
+	//#endregion
+	//#region src/presentation/nce/action-detail-check-html.ts
+	function createActionDetailCheckHtml(deps) {
+		return (label, view, note) => `<div class="action-detail-check"><div><b>${deps.escape(label)}</b>${note ? `<div class="hint">${deps.escape(note)}</div>` : ""}</div><span class="tag ${view.cls}">${deps.escape(view.label)}</span></div>`;
+	}
+	//#endregion
+	//#region src/presentation/nce/action-evidence-timeline-html.ts
+	function createActionEvidenceTimelineHtml(deps) {
+		return (items) => `<div class="action-evidence-timeline" aria-label="Các mốc thời gian hồ sơ">${items.map((item) => `<div><span>${deps.escape(item.label)}</span><b>${deps.escape(item.value)}</b>${item.note ? `<small>${deps.escape(item.note)}</small>` : ""}</div>`).join("")}</div>`;
+	}
+	//#endregion
+	//#region src/presentation/nce/action-review-buttons-html.ts
+	function createActionReviewButtonsHtml(deps) {
+		return (index, model) => `<div class="action-row-actions">${deps.button("Chi tiết", `viewActionDetail(${index})`, "ghost sm")}${model.edit ? deps.button("Tiếp tục", `editAction(${index})`, "ghost sm") : ""}${model.escalate ? deps.button("Lập hồ sơ tiếp theo", `escalateAction(${index})`, "teal sm", "Hành động chưa hiệu lực — mở vòng điều tra mới") : ""}${model.approve ? deps.button("Duyệt", `approveAction(${index})`, "teal sm") : ""}${model.returnForRevision ? deps.button("Trả lại", `returnAction(${index})`, "ghost sm") : ""}${model.reopen ? deps.button("Mở lại", `reopenAction(${index})`, "danger sm", "Hồ sơ đã duyệt nhưng không còn đủ điều kiện khép vòng") : ""}${model.cancel ? deps.button("Hủy hồ sơ", `cancelAction(${index})`, "danger sm", "Hủy có lưu vết — không xóa dữ liệu") : ""}</div>`;
+	}
+	//#endregion
+	//#region src/presentation/nce/action-rerun-evidence-html.ts
+	function createActionRerunEvidenceHtml(deps) {
+		return (evidence, testId, test) => {
+			if (!evidence) return "";
+			if (evidence.kind === "pending") return `<div class="action-rerun-evidence ${evidence.cls}"><div class="action-rerun-mark" aria-hidden="true">QC</div><div class="action-rerun-copy"><small>Bằng chứng QC chạy lại</small><b>${deps.escape(evidence.heading)}</b><span>${deps.escape(evidence.label)}</span></div></div>`;
+			const point = evidence.point;
+			const action = `openActionQcEvidence('${deps.quote(testId)}',${Number(point.level) || 0},'${deps.quote(point.id)}','${deps.quote(point.date || "")}','${deps.quote(point.lot || "")}')`;
+			const viewButton = deps.button("Xem điểm QC", action, "ghost sm", "Mở đúng điểm QC được dùng làm bằng chứng");
+			return `<div class="action-rerun-evidence ${evidence.cls}"><div class="action-rerun-mark" aria-hidden="true">QC</div><div class="action-rerun-copy"><small>Bằng chứng QC chạy lại</small><b>${deps.escape(evidence.heading)}</b><span>${deps.pointValue(point, test)} ${deps.escape(test?.unit || "")} · ${deps.date(point.date)} · ${deps.escape(point.runId || "Không có mã lần chạy")}</span><span>${deps.escape(evidence.context || "")}</span></div><div class="action-rerun-actions">${viewButton}</div></div>`;
+		};
+	}
+	//#endregion
+	//#region src/presentation/nce/action-issue-row-html.ts
+	function createActionIssueRowHtml(deps) {
+		return (model) => {
+			const action = !model.action ? "" : model.action.kind === "continue" ? deps.button("Tiếp tục hồ sơ", `editAction(${model.action.index})`, "ghost sm") : deps.button("Lập hồ sơ", `beginActionFromIssue('${deps.quote(model.action.testId)}',${model.action.level},'${deps.quote(model.action.rules)}','${deps.quote(model.action.error)}','${deps.quote(model.action.hint)}','${deps.quote(model.action.pointId)}','${deps.quote(model.action.date)}')`, "ghost sm");
+			return `<div class="issue-row ${model.severity}"><div class="issue-row-main"><b>${deps.escape(model.level)} · ${deps.escape(model.state)}</b><div class="meta">${model.value} ${deps.escape(model.unit || "")} · ${model.rules || "—"} · ${model.error}</div><div class="action-chipline"><span class="action-chip ${model.workflowClass}">${deps.escape(model.workflowLabel)}</span>${model.sideChips}</div><div class="hint">${model.footer}</div></div>${action}</div>`;
+		};
+	}
+	//#endregion
+	//#region src/presentation/nce/action-open-issue-html.ts
+	function createActionOpenIssueHtml(deps) {
+		return (model) => `<div class="issue-row ${model.severity}"><div class="issue-row-main"><b>${deps.escape(model.title)} · ${deps.escape(model.context)}</b><div class="meta">${model.date}${model.verdict ? " · " + deps.escape(model.verdict) : ""} · ${deps.escape(model.rule)} · ${deps.escape(model.errorType)}</div><div class="action-chipline"><span class="action-chip ${model.workflowClass}">${deps.escape(model.workflowLabel)}</span>${model.sideChips}</div><div class="hint">${deps.escape(model.primary)} · Phụ trách: ${deps.escape(model.owner || "—")}${model.dueDate ? " · hạn " + model.dueDate : ""}</div></div>${model.editable ? deps.button("Tiếp tục hồ sơ", `editAction(${model.index})`, "ghost sm") : ""}</div>`;
+	}
+	//#endregion
+	//#region src/presentation/nce/action-issue-group-html.ts
+	function createActionIssueGroupHtml(deps) {
+		return (model) => `<div class="issue-group ${model.severity}"><div class="issue-group-h"><div><b>${deps.escape(model.title)}</b><span class="issue-group-date">${deps.escape(model.date)}</span></div><span class="issue-group-count">${model.count} ${deps.escape(model.countLabel)}</span></div><div class="issue-group-body">${model.itemsHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/nce/action-log-row-html.ts
+	function createActionLogRowHtml(deps) {
+		return (model) => `<tr><td><div class="action-date">${deps.escape(model.date)}</div>${model.openedAt ? `<div class="action-time">Mở: ${deps.escape(model.openedAt)}</div>` : ""}</td><td><div class="action-test">${model.identity}</div><div class="action-sub">${model.sub}</div><div class="action-rule">${model.rule}</div></td><td><div class="action-text">${deps.escape(model.primary)}</div><div class="action-sub">Phụ trách: ${deps.escape(model.owner || "—")}${model.dueDate ? " · hạn " + deps.escape(model.dueDate) : ""}</div></td><td><div class="action-status-stack"><span class="action-chip ${model.workflowClass}">${deps.escape(model.workflowLabel)}</span>${model.sideChips}${model.approvalTag}${model.approvalMeta}</div></td><td>${model.actions}</td></tr>`;
+	}
+	//#endregion
+	//#region src/presentation/nce/action-approval-tag-html.ts
+	function createActionApprovalTagHtml(deps) {
+		return (view, label) => `<span class="tag ${view.cls}">${deps.escape(label)}</span>`;
+	}
+	//#endregion
+	//#region src/presentation/nce/action-detail-meta-html.ts
+	function createActionDetailMetaHtml(deps) {
+		return (rows) => `<div class="action-detail-meta">${rows.map((row) => `<div><span>${deps.escape(row.label)}</span><b>${deps.escape(row.value)}</b>${row.note ? `<small>${deps.escape(row.note)}</small>` : ""}</div>`).join("")}</div>`;
+	}
+	//#endregion
+	//#region src/presentation/nce/action-cancelled-alert-html.ts
+	function createActionCancelledAlertHtml(deps) {
+		return (model) => !model ? "" : `<div class="alert warn"><b>Hồ sơ đã hủy — dữ liệu được giữ để truy xuất.</b><div>${deps.escape(model.reason || "Không có lý do")}${model.by ? " · " + deps.escape(model.by) : ""}${model.at ? " · " + deps.escape(model.at) : ""}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/nce/action-legacy-detail-html.ts
+	function createActionLegacyDetailHtml(deps) {
+		return (model) => `<div class="action-detail-legacy"><b>Hành động đã ghi</b><div>${deps.escape(model.action || "—")}</div><div class="hint">${deps.escape(model.owner || "—")} · ${deps.escape(model.rerunLabel || "Chưa có dữ liệu")} · ${deps.escape(model.approvalLabel)}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/nce/action-containment-detail-html.ts
+	function createActionContainmentDetailHtml(deps) {
+		return (model) => `<li><b>Kiểm soát tức thời</b><div>${deps.escape(model.status || "Chưa ghi")}</div>${model.modern ? `<div>${deps.escape(model.correction || "Chưa ghi xử lý tức thời")}</div>` : ""}${model.note ? `<div class="hint">${deps.escape(model.note)}</div>` : ""}</li>`;
+	}
+	//#endregion
+	//#region src/presentation/nce/action-inspection-details-html.ts
+	function createActionInspectionDetailsHtml() {
+		return (items) => items.map((item) => `<li><b>${item.title}</b>${item.checksHtml}</li>`).join("");
+	}
+	//#endregion
+	//#region src/presentation/nce/action-patient-impact-html.ts
+	function createActionPatientImpactHtml(deps) {
+		return (impact, action) => `<li><b>Đánh giá ảnh hưởng bệnh nhân</b><div>${deps.escape(impact || "Chưa đánh giá")}</div>${action ? `<div class="hint">${deps.escape(action)}</div>` : ""}</li>`;
+	}
+	//#endregion
+	//#region src/presentation/nce/action-cause-detail-html.ts
+	function createActionCauseDetailHtml(deps) {
+		return (model) => `<li><b>Nguyên nhân, hành động và QC chạy lại</b><div>${deps.escape(model.cause || "Chưa xác định nguyên nhân")}</div><div>${deps.escape(model.action || "Chưa ghi hành động khắc phục")}</div>${model.completedDate ? `<div class="hint">Hoàn thành hành động: ${deps.escape(model.completedDate)}</div>` : ""}${model.release ? `<div><b>${deps.escape(model.release.status || "Chưa cho phép hoạt động/trả kết quả trở lại")}</b></div>${model.release.details ? `<div class="hint">${deps.escape(model.release.details)}</div>` : ""}` : ""}</li>`;
+	}
+	//#endregion
+	//#region src/presentation/nce/action-effectiveness-detail-html.ts
+	function createActionEffectivenessDetailHtml(deps) {
+		return (model) => `<li><b>Đánh giá hiệu lực, phê duyệt và khép vòng</b><div>${deps.escape(model.effectiveness || "—")}</div>${model.note ? `<div class="hint">${deps.escape(model.note)}</div>` : ""}${model.residual ? `<div>Nguy cơ còn lại: ${deps.escape(model.residual.risk || "Chưa phân loại")} · RPN ${model.residual.score}</div>${model.residual.basis ? `<div class="hint">${deps.escape(model.residual.basis)}</div>` : ""}` : ""}${model.returned ? `<div class="hint">Đã trả lại: ${deps.escape(model.returned)}</div>` : ""}${model.followUpNceId ? `<div class="hint">Đã chuyển sang hồ sơ ${deps.escape(model.followUpNceId)}</div>` : ""}${model.parentNceId ? `<div class="hint">Nối tiếp hồ sơ ${deps.escape(model.parentNceId)}</div>` : ""}<div class="hint">${deps.escape(model.approval)} · ${deps.escape(model.workflow)}</div></li>`;
+	}
+	//#endregion
+	//#region src/presentation/nce/action-log-panel-html.ts
+	function createActionLogPanelHtml(deps) {
+		return (rows) => `<div class="panel action-log-panel"><h2 class="panel-title">Nhật ký khắc phục</h2>${rows ? `<div class="action-log-tools">${deps.button("Xuất CSV nhật ký", "exportActionsCSV()", "teal sm")}</div><div class="action-log-wrap"><table class="action-log-table"><thead><tr><th>Thời điểm</th><th>Sự cố</th><th>Hành động</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table></div>` : deps.emptyState("Chưa có nhật ký", "Các hành động khắc phục sẽ xuất hiện ở đây sau khi được lưu.")}</div>`;
+	}
+	//#endregion
+	//#region src/presentation/nce/action-issues-panel-html.ts
+	function actionIssuesPanelHtml(issuesHtml) {
+		return `<div class="panel action-issues-panel"><h2 class="panel-title">Sự cố cần xử lý</h2><div class="dash-list">${issuesHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-toolbar-html.ts
+	function createManageToolbarHtml(deps) {
+		return (model) => {
+			const search = model.placeholder ? `<input id="manageSearch" placeholder="${deps.escapeAttr(model.placeholder)}" value="${deps.escapeAttr(model.query || "")}" oninput="manageSearchSet(this.value)">` : "";
+			return `<div class="rcfg-toolbar"><div><h2>${deps.escape(model.title)}</h2>${model.subtitle ? `<p>${deps.escape(model.subtitle)}</p>` : ""}</div><div class="rcfg-tools">${search}${model.action ? deps.button("＋ " + (model.actionLabel || ""), model.action, "teal") : ""}</div></div>`;
+		};
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-shell-html.ts
+	function createManageShellHtml(deps) {
+		return (items, selected, body) => `<div class="config-shell"><aside class="config-shell-nav" aria-label="Danh mục cấu hình"><div class="rcfg-title">CẤU HÌNH CHUNG</div>${items.map((item) => `<button class="${selected === item.id ? "on" : ""}" onclick="setManageTab('${item.id}')"><b>${deps.escape(item.label)}</b><small>${deps.escape(item.count)}</small></button>`).join("")}</aside><section class="config-shell-main">${body}</section></div>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-instrument-row-html.ts
+	function createManageInstrumentRowHtml(deps) {
+		return (model) => `<tr><td><b>${deps.escape(model.name)}</b><div class="hint">${deps.escape(model.section || "Chưa phân khoa")}</div></td><td>${deps.escape(model.manufacturer || "—")}</td><td>${deps.escape(model.serial || "—")}</td><td class="num">${model.assayCount}</td><td><span class="tag ${model.active ? "ok" : "none"}">${model.active ? "Đang hoạt động" : "Ngừng hoạt động"}</span></td><td><div class="manage-actions">${deps.button("Sửa", `openConfigInstrument('${deps.quote(model.id)}')`, "ghost sm")}${deps.button("Xóa", `deleteConfigInstrument('${deps.quote(model.id)}')`, "danger sm")}</div></td></tr>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-panel-row-html.ts
+	function createManagePanelRowHtml(deps) {
+		return (model) => `<tr><td><b>${deps.escape(model.name)}</b></td><td>${deps.escape(model.instrument)}</td><td>${model.testsHtml || "—"}</td><td class="num">${model.testCount}</td><td><span class="tag ${model.active ? "ok" : "none"}">${model.active ? "Đang dùng" : "Tạm ngưng"}</span></td><td><div class="manage-actions">${deps.button("Sửa", `openConfigPanel('${deps.quote(model.id)}')`, "ghost sm")}${deps.button("Xóa", `deleteConfigPanel('${deps.quote(model.id)}')`, "danger sm")}</div></td></tr>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-lot-row-html.ts
+	function createManageLotRowHtml(deps) {
+		return (model) => `<tr><td><b>${deps.escape(model.lotNo)}</b>${model.description || model.program ? `<div class="hint">${deps.escape(model.description || model.program || "")}</div>` : ""}</td><td><span class="pill">M${model.level}</span></td><td>${deps.escape(model.expiry || "—")}</td><td><span class="tag ${model.status.cls}">${deps.escape(model.status.text)}</span></td><td class="num">${model.used}</td><td><div class="lot-row-actions">${deps.button("Sửa", `openConfigLot('${deps.quote(model.id)}')`, "ghost sm")}${deps.button("Xóa", `deleteConfigLot('${deps.quote(model.id)}')`, "danger sm")}</div></td></tr>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-lot-group-card-html.ts
+	function createManageLotGroupCardHtml(deps) {
+		return (model) => `<div class="lot-group-card${model.archived ? " lot-opt-depleted" : ""}"><div class="lot-group-card-h"><div><b>${deps.escape(model.name)}</b><small>${deps.escape(model.note || "Nhóm lô để gán Mean/SD theo Panel")}</small></div><span class="tag ${model.status.cls}">${deps.escape(model.status.text)}</span></div><div class="lot-group-chipline">${model.lotsHtml || "<span class=\"hint\">Chưa chọn lô</span>"}</div><div class="lot-group-actions">${model.actionsHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-transition-row-html.ts
+	function createManageTransitionRowHtml(deps) {
+		return (model) => `<tr><td><b>${deps.escape(model.panel)}</b></td><td><div><b>${deps.escape(model.fromLot)}</b></div><div class="hint">→ ${deps.escape(model.toLot)}</div></td><td>${deps.escape(model.startDate || "—")}</td><td><span class="tag ${model.status.cls}">${deps.escape(model.status.text)}</span>${model.movedHtml}${model.approvalHtml}</td><td><div class="manage-actions">${deps.button("Sửa", `openLotTransitionV2('${deps.quote(model.id)}')`, "ghost sm")}${deps.button("Xóa", `deleteLotTransition('${deps.quote(model.id)}')`, "danger sm")}</div></td></tr>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/tea-source-registry-html.ts
+	function createTeaSourceRegistryHtml(deps) {
+		return (items) => `<div class="tea-source-registry">${items.map((item) => `<div class="tea-source-card ${item.status}"><div><b>${deps.escape(item.label)}</b><span class="tag ${item.tagClass}">${deps.escape(item.statusLabel)}</span></div><p>${deps.escape(item.version)}${item.effectiveDate ? " · hiệu lực " + deps.escape(item.effectiveDate) : ""} · rà soát ${deps.escape(item.reviewedDate)}</p><a href="${deps.escapeAttr(item.url)}" target="_blank" rel="noopener">Mở nguồn chính thức</a></div>`).join("")}</div>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-history-row-html.ts
+	function createManageHistoryRowHtml(deps) {
+		return (model) => `<tr><td><span class="pill">M${model.level}</span></td><td><b>${deps.escape(model.lot || "—")}</b><div class="hint">${deps.escape(model.group)}</div></td><td class="num">${model.mean}</td><td class="num">${model.low}</td><td class="num">${model.high}</td><td class="num">${model.sd}</td><td>${deps.escape(model.period)}</td><td><span class="tag ${model.source === "lab" ? "warn" : "ok"}">${model.source === "lab" ? "PXN" : "NSX"}</span></td><td class="num">${model.pointCount}</td><td>${deps.button("Chi tiết", `openQcHistoryDetail('${deps.quote(model.testId)}',${model.level},'${deps.quote(model.lot || "")}')`, "ghost sm")}</td></tr>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-search-placeholder.ts
+	var PLACEHOLDERS = Object.freeze({
+		instruments: "Tìm theo tên máy, hãng, số sê-ri...",
+		assays: "Tìm theo tên xét nghiệm, máy, đơn vị, phương pháp, hóa chất, TEa...",
+		panels: "Tìm theo tên panel QC, máy và xét nghiệm...",
+		lots: "Tìm theo số lô, nhóm lô QC...",
+		targets: "Tìm theo tên xét nghiệm...",
+		transitions: "Tìm theo panel QC, lô cũ/mới...",
+		history: "Tìm theo xét nghiệm, mức, lô QC...",
+		tearefs: "Tìm theo tên xét nghiệm, nhóm, đơn vị..."
+	});
+	function manageSearchPlaceholder(tab) {
+		return PLACEHOLDERS[tab] || "";
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-assay-row-html.ts
+	function createManageAssayRowHtml(deps) {
+		return (model) => `<tr><td class="num">${model.index}</td><td><b>${deps.escape(model.name)}</b><div class="hint">${deps.escape(model.method || "Chưa nhập phương pháp")} · ${deps.escape(model.unit || "Chưa có đơn vị")}</div></td><td>${deps.escape(model.instrument)}<div class="hint">${deps.escape(model.section || "Chưa gán khoa/khu vực")}</div></td><td>${deps.escape(model.reagent || "—")}</td><td>${model.tea ? deps.escape(model.tea) + "%" : "—"}</td><td><span class="tag ${model.closed ? "none" : "ok"}">${model.closed ? "Ngưng dùng" : "Đang dùng"}</span></td><td><div class="manage-actions">${deps.button("Sửa", `openConfigAssay('${deps.quote(model.id)}')`, "ghost sm")}${deps.button("Xóa", `delTest('${deps.quote(model.id)}')`, "danger sm")}</div></td></tr>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/tea-reference-status-html.ts
+	var STATUS = Object.freeze({
+		default: {
+			cls: "none",
+			label: "Mặc định"
+		},
+		override: {
+			cls: "warn",
+			label: "Đã sửa"
+		},
+		lab: {
+			cls: "ok",
+			label: "TEa PXN"
+		},
+		custom: {
+			cls: "ok",
+			label: "Tự thêm"
+		}
+	});
+	function teaReferenceStatusHtml(kind) {
+		const status = STATUS[kind] || STATUS.default;
+		return `<span class="tag ${status.cls}">${status.label}</span>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-transition-status.ts
+	function manageTransitionStatus(status) {
+		if (status === "active") return {
+			text: "Đang chạy song song",
+			cls: "warn"
+		};
+		if (status === "accepted") return {
+			text: "Chấp nhận lô mới",
+			cls: "ok"
+		};
+		if (status === "rejected") return {
+			text: "Không chấp nhận",
+			cls: "rej"
+		};
+		return {
+			text: "Dự kiến",
+			cls: "none"
+		};
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-lot-status.ts
+	function createManageLotStatus(deps) {
+		return (lot, nextLot) => {
+			if (lot && lot.depleted) return {
+				text: nextLot ? `Đã chuyển tiếp qua lô ${nextLot}` : "Đã chuyển tiếp",
+				cls: "rej"
+			};
+			const days = deps.daysToExpiry(lot.exp);
+			if (days == null) return {
+				text: "Chưa có HSD",
+				cls: "none"
+			};
+			if (days < 0) return {
+				text: "Hết hạn",
+				cls: "rej"
+			};
+			if (days <= 30) return {
+				text: `Còn ${days} ngày`,
+				cls: "warn"
+			};
+			return {
+				text: "Đang hoạt động",
+				cls: "ok"
+			};
+		};
+	}
+	//#endregion
+	//#region src/presentation/manage/same-id-set.ts
+	function sameIdSet(left, right) {
+		const a = [...new Set(left || [])].sort();
+		const b = [...new Set(right || [])].sort();
+		return a.length === b.length && a.every((value, index) => value === b[index]);
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-instrument-name.ts
+	function manageInstrumentName(instruments, id, fallback = "") {
+		return instruments.find((item) => item.id === id)?.name || fallback || "Chưa gán máy";
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-lot-label.ts
+	function manageLotLabel(lots, id) {
+		const lot = lots.find((item) => item.id === id);
+		return lot ? `${lot.lotNo} · Mức ${lot.level}` : "Chưa chọn lô";
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-panel-name.ts
+	function managePanelName(panels, id) {
+		return panels.find((item) => item.id === id)?.name || "Chưa chọn Panel QC";
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-lot-group-labels.ts
+	function manageLotGroupLabels(groups, lotId) {
+		const names = groups.filter((group) => (group.lotIds || []).includes(lotId)).map((group) => group.name || "");
+		return names.length ? names.join(", ") : "Chưa thuộc nhóm";
+	}
+	//#endregion
+	//#region src/presentation/manage/same-normalized-text.ts
+	function createSameNormalizedText(deps) {
+		return (left, right) => deps.normalize(left) === deps.normalize(right);
+	}
+	//#endregion
+	//#region src/presentation/manage/groups-of-lot.ts
+	function groupsOfLot(groups, lotId) {
+		return groups.filter((group) => (group.lotIds || []).includes(lotId));
+	}
+	//#endregion
+	//#region src/presentation/manage/target-group-lots.ts
+	function targetGroupLots(lots, group) {
+		return (group?.lotIds || []).map((id) => lots.find((lot) => lot.id === id)).filter((lot) => !!lot).sort((left, right) => Number(left.level || 0) - Number(right.level || 0) || String(left.lotNo || "").localeCompare(String(right.lotNo || ""), "vi", { numeric: true }));
+	}
+	//#endregion
+	//#region src/presentation/manage/target-group-label.ts
+	function targetGroupLabel(group) {
+		return group?.name || "Chưa chọn nhóm lô";
+	}
+	//#endregion
+	//#region src/presentation/manage/target-group-status-suffix.ts
+	function targetGroupStatusSuffix(group) {
+		if (group?.status === "stopped") return " · Đã dừng";
+		if (group?.status === "planned") return " · Dự kiến";
+		return "";
+	}
+	//#endregion
+	//#region src/presentation/manage/target-panel-label.ts
+	function targetPanelLabel(panels, panelId) {
+		return panels.find((panel) => panel.id === panelId)?.name || "Panel QC";
+	}
+	//#endregion
+	//#region src/presentation/manage/target-panel-tests.ts
+	function targetPanelTests(panels, tests, panelId) {
+		return (panels.find((item) => item.id === panelId)?.testIds || []).map((id) => tests.find((test) => test.id === id)).filter((test) => !!test);
+	}
+	//#endregion
+	//#region src/presentation/manage/target-panel-options-html.ts
+	function targetPanelOptionsHtml(panels, panelId, instrumentName, escape) {
+		return panels.map((panel) => `<option value="${panel.id}" ${panel.id === panelId ? "selected" : ""}>${escape(panel.name)} · ${escape(instrumentName(panel.instrumentId))}</option>`).join("");
+	}
+	//#endregion
+	//#region src/presentation/manage/target-group-options-html.ts
+	function targetGroupOptionsHtml(groups, selectedId, lotsOf, labelOf, statusSuffix, escape) {
+		const available = groups.filter((group) => lotsOf(group).length);
+		return available.length ? available.map((group) => `<option value="${group.id}" ${group.id === selectedId ? "selected" : ""}>${escape(labelOf(group) + statusSuffix(group))}</option>`).join("") : "<option value=\"\">Không tìm thấy nhóm lô QC phù hợp</option>";
+	}
+	//#endregion
+	//#region src/presentation/manage/target-selection.ts
+	function targetSelection(panels, groups, selectedPanelId, selectedGroupId, lotsOf) {
+		const panelId = panels.some((panel) => panel.id === selectedPanelId) ? selectedPanelId : panels[0]?.id || "";
+		const availableGroups = groups.filter((group) => group.active !== false && lotsOf(group).length);
+		return {
+			panelId,
+			groupId: availableGroups.some((group) => group.id === selectedGroupId) ? selectedGroupId : availableGroups[0]?.id || ""
+		};
+	}
+	//#endregion
+	//#region src/presentation/manage/target-level-selection.ts
+	function targetLevelSelection(lots, selectedLevel) {
+		const levels = [...new Set(lots.map((lot) => Number(lot.level)).filter(Number.isFinite))].sort((left, right) => left - right);
+		return {
+			levels,
+			level: levels.map(String).includes(String(selectedLevel)) ? String(selectedLevel) : levels[0] != null ? String(levels[0]) : ""
+		};
+	}
+	//#endregion
+	//#region src/presentation/manage/history-search-values.ts
+	function historySearchValues(assay, lots, displayName) {
+		const values = [assay.name, displayName(assay)];
+		(assay.levels || []).forEach((level) => {
+			(level.meanSdHistory?.length ? level.meanSdHistory : [{
+				qcLotId: level.qcLotId,
+				lot: level.lot
+			}]).forEach((item) => {
+				if (item.planned) return;
+				const lot = lots.find((candidate) => candidate.id === (item.qcLotId || level.qcLotId)) || lots.find((candidate) => candidate.lotNo === (item.lot || level.lot) && Number(candidate.level) === Number(level.level));
+				values.push(level.level, `M${level.level}`, `Mức ${level.level}`, item.lot, level.lot, lot?.lotNo);
+			});
+		});
+		return values;
+	}
+	//#endregion
+	//#region src/presentation/manage/tea-lab-basis-label.ts
+	function teaLabBasisLabel(sources, source) {
+		return sources.find((item) => item[0] === source)?.[1] || "";
+	}
+	//#endregion
+	//#region src/presentation/manage/target-level-lots.ts
+	function targetLevelLots(lots, selectedLevel) {
+		const levelLots = lots.filter((lot) => Number(lot.level) === Number(selectedLevel));
+		return {
+			levelLots,
+			depletedLots: levelLots.filter((lot) => !!lot.depleted)
+		};
+	}
+	//#endregion
+	//#region src/presentation/manage/target-search-values.ts
+	function targetSearchValues(assay, groupName, lots, displayName, instrumentName) {
+		return [
+			assay.name,
+			displayName(assay),
+			assay.unit,
+			assay.method,
+			assay.reagent,
+			assay.section,
+			instrumentName(assay.instrumentId, assay.machine),
+			groupName,
+			...lots.map((lot) => lot.lotNo)
+		];
+	}
+	//#endregion
+	//#region src/presentation/manage/history-assay-options-html.ts
+	function historyAssayOptionsHtml(assays, selectedId, displayName, escape) {
+		return assays.map((assay) => `<option value="${assay.id}" ${assay.id === selectedId ? "selected" : ""}>${escape(displayName(assay))}</option>`).join("");
+	}
+	//#endregion
+	//#region src/presentation/manage/history-assay-selection.ts
+	function historyAssaySelection(assays, selectedId) {
+		const assay = assays.find((item) => item.id === selectedId) || assays[0];
+		return {
+			selectedId: assay?.id || "",
+			assay
+		};
+	}
+	//#endregion
+	//#region src/presentation/manage/history-visible-rows.ts
+	function historyVisibleRows(rows, assayName, query, normalize) {
+		const needle = normalize(query);
+		if (!needle) return rows;
+		return rows.filter((row) => [
+			assayName,
+			row.l.level,
+			`M${row.l.level}`,
+			`Mức ${row.l.level}`,
+			row.lotNo
+		].some((value) => normalize(value).includes(needle)));
+	}
+	//#endregion
+	//#region src/presentation/manage/history-row-sort.ts
+	function sortHistoryRows(rows) {
+		return rows.sort((left, right) => Number(left.l.level) - Number(right.l.level) || (left.lotNo || "").localeCompare(right.lotNo || "", "vi") || String(left.h.effectiveFrom || "").localeCompare(String(right.h.effectiveFrom || "")));
+	}
+	//#endregion
+	//#region src/presentation/manage/history-summary.ts
+	function historySummary(rows) {
+		return {
+			rowCount: rows.length,
+			pointCount: rows.reduce((count, row) => count + (row.pts?.length || 0), 0)
+		};
+	}
+	//#endregion
+	//#region src/presentation/manage/tea-positive-number.ts
+	function teaPositiveNumber(value) {
+		const number = Number(value);
+		return String(value == null ? "" : value).trim() !== "" && Number.isFinite(number) && number > 0 ? number : null;
+	}
+	//#endregion
+	//#region src/presentation/manage/tea-reference-external-changed.ts
+	function teaReferenceExternalChanged(row, base) {
+		return !!(row && base && (row.unit !== base[1] || row.clia !== base[2] || row.ricos !== base[3] || row.section !== base[4] || [
+			"cliaRule",
+			"cliaAbsolute",
+			"cliaAbsoluteUnit"
+		].some((field) => row[field] != null && row[field] !== "")));
+	}
+	//#endregion
+	//#region src/presentation/manage/tea-source-registry-items.ts
+	function teaSourceRegistryItems(registry, formatDate) {
+		return [
+			"clia",
+			"ricos",
+			"eflm"
+		].map((key) => {
+			const source = registry[key] || {};
+			const status = source.status || "";
+			return {
+				status,
+				label: source.label || "",
+				statusLabel: status === "retired" ? "Nguồn cũ" : status === "dynamic" ? "Cập nhật liên tục" : "Hiện hành",
+				tagClass: status === "retired" ? "warn" : status === "dynamic" ? "ok" : "none",
+				version: source.version || "",
+				effectiveDate: source.effectiveDate ? formatDate(source.effectiveDate) : "",
+				reviewedDate: formatDate(source.reviewedDate || ""),
+				url: source.url || ""
+			};
+		});
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-search-match.ts
+	function manageSearchMatch(values, query, normalize) {
+		const needle = normalize(query);
+		return !needle || values.some((value) => normalize(value).includes(needle));
+	}
+	//#endregion
+	//#region src/presentation/manage/lot-transition-target-number.ts
+	function lotTransitionTargetNumber(transitions, lots, lotId, switchesLot) {
+		const transition = transitions.find((item) => item.fromLotId === lotId && switchesLot(item));
+		if (!transition) return "";
+		return lots.find((lot) => lot.id === transition.toLotId)?.lotNo || "";
+	}
+	//#endregion
+	//#region src/presentation/manage/history-period-label.ts
+	function historyPeriodLabel(from, to, formatDate) {
+		return `${from ? formatDate(from) : "Không giới hạn"} → ${to ? formatDate(to) : "Không giới hạn"}`;
+	}
+	//#endregion
+	//#region src/presentation/manage/target-row-state.ts
+	function targetRowState(linked, assigned, planned, depleted) {
+		const locked = !!depleted;
+		const checked = locked ? false : !!linked || !assigned;
+		return {
+			locked,
+			checked,
+			disabled: locked || !checked,
+			status: locked ? "retired" : linked ? "linked" : planned ? "planned" : assigned ? "other" : "empty"
+		};
+	}
+	//#endregion
+	//#region src/presentation/manage/target-matrix-stats.ts
+	function targetMatrixStats(rows) {
+		return rows.reduce((stats, row) => {
+			if (row.linked) stats.linked++;
+			else if (row.assigned) stats.other++;
+			else stats.empty++;
+			const config = row.cfg;
+			const hasMean = !!config && Number.isFinite(Number(config.mean));
+			const hasSd = !!config && Number.isFinite(Number(config.sd)) && Number(config.sd) > 0;
+			const hasRange = !!config && Number.isFinite(Number(config.low)) && Number.isFinite(Number(config.high)) && Number(config.high) > Number(config.low);
+			if (!hasMean || !hasSd && !hasRange) stats.missing++;
+			return stats;
+		}, {
+			linked: 0,
+			other: 0,
+			empty: 0,
+			missing: 0
+		});
+	}
+	//#endregion
+	//#region src/presentation/manage/target-matrix-items.ts
+	function targetMatrixItems(assays, lots, assigned, plannedTarget, snapshot) {
+		return assays.flatMap((assay) => lots.map((lot) => ({
+			assay,
+			lot
+		}))).filter(({ assay, lot }) => !lot.depleted || (assay.levels || []).some((level) => level.qcLotId === lot.id)).map(({ assay, lot }) => {
+			const linked = (assay.levels || []).find((level) => level.qcLotId === lot.id);
+			const same = (assay.levels || []).find((level) => Number(level.level) === Number(lot.level));
+			return {
+				t: assay,
+				lot,
+				linked,
+				same,
+				assigned: assigned(same),
+				planned: !linked && plannedTarget(assay, lot),
+				cfg: linked || snapshot(assay, lot.level, lot.id, lot.lotNo)
+			};
+		});
+	}
+	//#endregion
+	//#region src/presentation/manage/target-level-tabs-html.ts
+	function targetLevelTabsHtml(levels, selectedLevel, setLevelAction = "setTargetLevel") {
+		return levels.map((level) => `<button class="${String(level) === String(selectedLevel) ? "on" : ""}" onclick="${setLevelAction}(${level})">Mức ${level}</button>`).join("");
+	}
+	//#endregion
+	//#region src/presentation/manage/target-summary-html.ts
+	function targetSummaryHtml(stats) {
+		return `<div class="target-summary"><span class="ok"><b>${stats.linked}</b> đã gán mức này</span><span class="${stats.other ? "warn" : "none"}"><b>${stats.other}</b> đang dùng lô khác</span><span class="${stats.empty ? "warn" : "none"}"><b>${stats.empty}</b> chưa gán lô</span><span class="${stats.missing ? "warn" : "ok"}"><b>${stats.missing}</b> thiếu Mean/SD</span></div>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/target-matrix-row-html.ts
+	function targetMatrixRowHtml(model, escape, escapeAttribute) {
+		const statusHtml = model.status === "retired" ? `<b class="tag rej">${model.retiredTo ? `Đã chuyển tiếp qua lô ${escape(model.retiredTo)}` : "Đã chuyển tiếp"}</b>` : model.status === "linked" ? "<b class=\"tag ok\">Đã gán</b>" : model.status === "planned" ? "<b class=\"tag warn\">Dự kiến</b>" : model.status === "other" ? `<b class="tag warn">Đang dùng ${escape(model.otherLot || "lô khác")}</b>` : "<b class=\"tag none\">Chưa gán</b>";
+		return `<div class="target-row${model.locked ? " target-row-locked" : ""}" data-test="${model.testId}" data-lot="${model.lotId}"${model.locked ? " data-locked=\"1\"" : ""}>
+    <label class="lot-assay-check"><input class="tm-use" type="checkbox" ${model.checked ? "checked" : ""} ${model.locked ? "disabled" : ""} onchange="toggleTargetRow(this)"><span></span></label>
+    <div class="lot-assay-name"><b>${escape(model.name)}</b><small>${escape(model.unit || "Chưa có đơn vị")}</small></div>
+    <input class="tm-mean" type="number" step="any" value="${escapeAttribute(model.mean)}" placeholder="Trung bình" oninput="syncTargetRange(this,'target')" ${model.disabled ? "disabled" : ""}>
+    <input class="tm-low" type="number" step="any" value="${escapeAttribute(model.low)}" placeholder="Giới hạn dưới" oninput="syncTargetRange(this,'limits')" ${model.disabled ? "disabled" : ""}>
+    <input class="tm-high" type="number" step="any" value="${escapeAttribute(model.high)}" placeholder="Giới hạn trên" oninput="syncTargetRange(this,'limits')" ${model.disabled ? "disabled" : ""}>
+    <input class="tm-sd" type="number" step="any" value="${escapeAttribute(model.sd)}" placeholder="Độ lệch chuẩn" oninput="syncTargetRange(this,'target')" ${model.disabled ? "disabled" : ""}>
+    <span>${statusHtml}</span>
+  </div>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/history-rows.ts
+	function historyRows(assay, lots, points, groupLabel) {
+		const rows = [];
+		(assay.levels || []).forEach((level) => {
+			(level.meanSdHistory?.length ? level.meanSdHistory : [{
+				qcLotId: level.qcLotId,
+				lot: level.lot,
+				mean: level.mean,
+				sd: level.sd,
+				low: level.low,
+				high: level.high,
+				effectiveFrom: "",
+				effectiveTo: level.exp,
+				source: level.applied || "mfg"
+			}]).forEach((item) => {
+				if (item.planned) return;
+				const lotObj = lots.find((lot) => lot.id === (item.qcLotId || level.qcLotId)) || lots.find((lot) => lot.lotNo === (item.lot || level.lot) && Number(lot.level) === Number(level.level));
+				const lotNo = item.lot || level.lot || lotObj?.lotNo || "";
+				rows.push({
+					t: assay,
+					l: level,
+					h: item,
+					lotObj,
+					lotNo,
+					group: lotObj ? groupLabel(lotObj.id) : "Chưa thuộc nhóm",
+					pts: points.filter((point) => Number(point.level) === Number(level.level) && (point.lot || "") === (lotNo || ""))
+				});
+			});
+		});
+		return rows;
+	}
+	//#endregion
+	//#region src/presentation/manage/history-selector-html.ts
+	function historySelectorHtml(optionsHtml, rowCount, pointCount) {
+		return `<div class="target-selector history-selector">
+      <div><label>Xét nghiệm</label><select onchange="setHistoryTest(this.value)">${optionsHtml}</select></div>
+      <div class="target-lot-info"><b>${rowCount}</b><span>mốc lô/Mean-SD</span></div>
+      <div class="target-lot-info"><b>${pointCount}</b><span>điểm QC đã nhập</span></div>
+    </div>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/target-selector-html.ts
+	function targetSelectorHtml(panelOptionsHtml, groupOptionsHtml) {
+		return `<div class="target-selector">
+      <div><label>Panel QC</label><select onchange="setTargetPanel(this.value)">${panelOptionsHtml || "<option value=\"\">Chưa có panel</option>"}</select></div>
+      <div><label>Nhóm lô QC</label><select onchange="setTargetGroup(this.value)">${groupOptionsHtml}</select></div>
+    </div>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/history-table-html.ts
+	function historyTableHtml(rowsHtml, emptyHtml) {
+		return `<div class="rcfg-list">${rowsHtml ? `<table class="history-table"><thead><tr><th>Mức</th><th>Lô QC / Nhóm lô</th><th class="num">Mean</th><th class="num">Giới hạn dưới</th><th class="num">Giới hạn trên</th><th class="num">SD</th><th>Hiệu lực</th><th>Nguồn</th><th class="num">Điểm QC</th><th></th></tr></thead><tbody>${rowsHtml}</tbody></table>` : emptyHtml}</div>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/target-empty-state.ts
+	function targetEmptyState(allAssayCount, levelLotNos, depletedLotNos, level) {
+		if (!allAssayCount) return {
+			title: "Panel chưa có xét nghiệm",
+			description: "Sửa Panel QC và chọn các xét nghiệm thành viên trước."
+		};
+		if (levelLotNos.length && depletedLotNos.length === levelLotNos.length) return {
+			title: `Lô mức ${level} đã hết QC`,
+			description: `Lô ${depletedLotNos.join(", ")} (Mức ${level}) trong nhóm này đã hết QC nên không nhập Mean/SD được. Hãy chọn nhóm lô khác ở ô “Nhóm lô QC” phía trên, hoặc tạo lô mới rồi lập hồ sơ chuyển tiếp lô.`
+		};
+		return {
+			title: "Không tìm thấy xét nghiệm",
+			description: "Thử tìm theo tên xét nghiệm, máy, khoa, đơn vị hoặc lô QC."
+		};
+	}
+	//#endregion
+	//#region src/presentation/manage/target-matrix-table-html.ts
+	function targetMatrixTableHtml(rowsHtml) {
+		return `<div class="target-table"><div class="target-head"><span>Dùng</span><span>Xét nghiệm</span><span>Trung bình mục tiêu</span><span>Giới hạn dưới</span><span>Giới hạn trên</span><span>Độ lệch chuẩn</span><span>Trạng thái</span></div>${rowsHtml}</div>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/target-matrix-actions-html.ts
+	function targetMatrixActionsHtml(clearButtonHtml, selectButtonHtml, saveButtonHtml) {
+		return `<div class="modal-f target-actions">${clearButtonHtml}${selectButtonHtml}${saveButtonHtml}</div>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/target-prerequisite.ts
+	function targetPrerequisite(counts) {
+		if (!counts.tests) return "tests";
+		if (!counts.panels) return "panels";
+		if (!counts.lots) return "lots";
+		if (!counts.groups) return "groups";
+		return null;
+	}
+	//#endregion
+	//#region src/presentation/manage/target-level-toolbar-html.ts
+	function targetLevelToolbarHtml(level, lotNos, tabsHtml, escape) {
+		return `<div class="target-level-toolbar"><div><b>Mức ${escape(level)}</b><span class="target-level-lot">${lotNos.map((lotNo) => escape(lotNo)).join(" / ")}</span></div><div class="dayseg">${tabsHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/tea-reference-kind.ts
+	function teaReferenceKind(isDefault, externallyChanged, hasLabValue) {
+		if (!isDefault) return "custom";
+		if (externallyChanged) return "override";
+		if (hasLabValue) return "lab";
+		return "default";
+	}
+	//#endregion
+	//#region src/presentation/manage/tea-reference-row-actions.ts
+	function teaReferenceRowActions(kind, canManage, hasLabValue) {
+		return {
+			action: !canManage ? "none" : kind === "override" ? "restore" : kind === "custom" ? "remove" : "none",
+			labProfile: canManage ? hasLabValue ? "view" : "add" : "none"
+		};
+	}
+	//#endregion
+	//#region src/presentation/manage/tea-reference-sort.ts
+	function sortTeaReferences(rows) {
+		return rows.sort((left, right) => String(left.section || "").localeCompare(String(right.section || ""), "vi") || String(left.displayName || "").localeCompare(String(right.displayName || ""), "vi"));
+	}
+	//#endregion
+	//#region src/presentation/manage/tea-reference-naming-title.ts
+	function teaReferenceNamingTitle(values) {
+		return [
+			values.standardName && `Tên chuẩn: ${values.standardName}`,
+			values.abbreviation && `Viết tắt: ${values.abbreviation}`,
+			values.matrix && `Loại mẫu: ${values.matrix}`
+		].filter(Boolean).join(" · ");
+	}
+	//#endregion
+	//#region src/presentation/manage/tea-reference-empty-state.ts
+	function teaReferenceEmptyState(hasSearchQuery) {
+		return hasSearchQuery ? {
+			title: "Không tìm thấy",
+			description: "Thử từ khóa khác."
+		} : {
+			title: "Chưa có bảng tham chiếu",
+			description: "Không có xét nghiệm nào."
+		};
+	}
+	//#endregion
+	//#region src/presentation/manage/tea-reference-lab-value-html.ts
+	function teaReferenceLabValueHtml(value, formatNumber) {
+		return value == null ? "" : `<b>${formatNumber(value, 2)}%</b>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/tea-reference-input-value.ts
+	function teaReferenceInputValue(value) {
+		return value == null ? "" : String(value);
 	}
 	//#endregion
 	//#region src/application/storage/sigma-draft-service.ts
@@ -12113,6 +12846,147 @@
 		label: (test) => root.testDisplayName(test)
 	});
 	root.dashboardLatestPoint = createDashboardLatestPoint({ runNumber: (point) => root.pointRunNo(point) });
+	root.dashboardKpisHtml = dashboardKpisHtml;
+	root.dashboardProgressHtml = dashboardProgressHtml;
+	root.dashboardTestListHtml = dashboardTestListHtml;
+	root.actionGuideContent = createActionGuideContent({
+		escape: (value) => root.esc(value),
+		button: (label, action, variant) => root.btn(label, action, variant)
+	});
+	root.actionSideChipsHtml = createActionSideChipsHtml({ escape: (value) => root.esc(value) });
+	root.actionDetailCheckHtml = createActionDetailCheckHtml({ escape: (value) => root.esc(value) });
+	root.actionEvidenceTimelinePresentation = createActionEvidenceTimelineHtml({ escape: (value) => root.esc(value) });
+	root.actionReviewButtonsHtml = createActionReviewButtonsHtml({ button: (label, action, variant, title) => root.btn(label, action, variant, title) });
+	root.actionRerunEvidencePresentation = createActionRerunEvidenceHtml({
+		escape: (value) => root.esc(value),
+		pointValue: (point, test) => root.fmtPointValue(point, test),
+		date: (value) => root.vnDate(value),
+		button: (label, action, variant, title) => root.btn(label, action, variant, title),
+		quote: (value) => root.jsq(value)
+	});
+	root.actionIssueRowPresentation = createActionIssueRowHtml({
+		escape: (value) => root.esc(value),
+		button: (label, action, variant) => root.btn(label, action, variant),
+		quote: (value) => root.jsq(value)
+	});
+	root.actionOpenIssuePresentation = createActionOpenIssueHtml({
+		escape: (value) => root.esc(value),
+		button: (label, action, variant) => root.btn(label, action, variant)
+	});
+	root.actionIssueGroupPresentation = createActionIssueGroupHtml({ escape: (value) => root.esc(value) });
+	root.actionLogRowPresentation = createActionLogRowHtml({ escape: (value) => root.esc(value) });
+	root.actionApprovalTagPresentation = createActionApprovalTagHtml({ escape: (value) => root.esc(value) });
+	root.actionDetailMetaHtml = createActionDetailMetaHtml({ escape: (value) => root.esc(value) });
+	root.actionCancelledAlertHtml = createActionCancelledAlertHtml({ escape: (value) => root.esc(value) });
+	root.actionLegacyDetailHtml = createActionLegacyDetailHtml({ escape: (value) => root.esc(value) });
+	root.actionContainmentDetailHtml = createActionContainmentDetailHtml({ escape: (value) => root.esc(value) });
+	root.actionInspectionDetailsHtml = createActionInspectionDetailsHtml();
+	root.actionPatientImpactHtml = createActionPatientImpactHtml({ escape: (value) => root.esc(value) });
+	root.actionCauseDetailHtml = createActionCauseDetailHtml({ escape: (value) => root.esc(value) });
+	root.actionEffectivenessDetailHtml = createActionEffectivenessDetailHtml({ escape: (value) => root.esc(value) });
+	root.actionLogPanelHtml = createActionLogPanelHtml({
+		button: (label, action, variant) => root.btn(label, action, variant),
+		emptyState: (title, text) => root.emptyState(title, text)
+	});
+	root.actionIssuesPanelHtml = actionIssuesPanelHtml;
+	root.manageToolbarPresentation = createManageToolbarHtml({
+		escape: (value) => root.esc(value),
+		escapeAttr: (value) => root.escAttr(value),
+		button: (label, action, variant) => root.btn(label, action, variant)
+	});
+	root.manageShellPresentation = createManageShellHtml({ escape: (value) => root.esc(value) });
+	root.manageInstrumentRowPresentation = createManageInstrumentRowHtml({
+		escape: (value) => root.esc(value),
+		button: (label, action, variant) => root.btn(label, action, variant),
+		quote: (value) => root.jsq(value)
+	});
+	root.managePanelRowPresentation = createManagePanelRowHtml({
+		escape: (value) => root.esc(value),
+		button: (label, action, variant) => root.btn(label, action, variant),
+		quote: (value) => root.jsq(value)
+	});
+	root.manageLotRowPresentation = createManageLotRowHtml({
+		escape: (value) => root.esc(value),
+		button: (label, action, variant) => root.btn(label, action, variant),
+		quote: (value) => root.jsq(value)
+	});
+	root.manageLotGroupCardPresentation = createManageLotGroupCardHtml({ escape: (value) => root.esc(value) });
+	root.manageTransitionRowPresentation = createManageTransitionRowHtml({
+		escape: (value) => root.esc(value),
+		button: (label, action, variant) => root.btn(label, action, variant),
+		quote: (value) => root.jsq(value)
+	});
+	root.teaSourceRegistryPresentation = createTeaSourceRegistryHtml({
+		escape: (value) => root.esc(value),
+		escapeAttr: (value) => root.escAttr(value)
+	});
+	root.manageHistoryRowPresentation = createManageHistoryRowHtml({
+		escape: (value) => root.esc(value),
+		button: (label, action, variant) => root.btn(label, action, variant),
+		quote: (value) => root.jsq(value)
+	});
+	root.manageSearchPlaceholderPresentation = manageSearchPlaceholder;
+	root.manageAssayRowPresentation = createManageAssayRowHtml({
+		escape: (value) => root.esc(value),
+		button: (label, action, variant) => root.btn(label, action, variant),
+		quote: (value) => root.jsq(value)
+	});
+	root.teaReferenceStatusPresentation = teaReferenceStatusHtml;
+	root.manageTransitionStatusPresentation = manageTransitionStatus;
+	root.manageLotStatusPresentation = createManageLotStatus({ daysToExpiry: (value) => root.daysToExp(value) });
+	root.sameIdSetPresentation = sameIdSet;
+	root.manageInstrumentNamePresentation = manageInstrumentName;
+	root.manageLotLabelPresentation = manageLotLabel;
+	root.managePanelNamePresentation = managePanelName;
+	root.manageLotGroupLabelsPresentation = manageLotGroupLabels;
+	root.sameNormalizedTextPresentation = createSameNormalizedText({ normalize: (value) => root.searchText(value) });
+	root.groupsOfLotPresentation = groupsOfLot;
+	root.targetGroupLotsPresentation = targetGroupLots;
+	root.targetGroupLabelPresentation = targetGroupLabel;
+	root.targetGroupStatusSuffixPresentation = targetGroupStatusSuffix;
+	root.targetPanelLabelPresentation = targetPanelLabel;
+	root.targetPanelTestsPresentation = targetPanelTests;
+	root.targetPanelOptionsPresentation = targetPanelOptionsHtml;
+	root.targetGroupOptionsPresentation = targetGroupOptionsHtml;
+	root.targetSelectionPresentation = targetSelection;
+	root.targetLevelSelectionPresentation = targetLevelSelection;
+	root.historySearchValuesPresentation = historySearchValues;
+	root.teaLabBasisLabelPresentation = teaLabBasisLabel;
+	root.targetLevelLotsPresentation = targetLevelLots;
+	root.targetSearchValuesPresentation = targetSearchValues;
+	root.historyAssayOptionsPresentation = historyAssayOptionsHtml;
+	root.historyAssaySelectionPresentation = historyAssaySelection;
+	root.historyVisibleRowsPresentation = historyVisibleRows;
+	root.historyRowSortPresentation = sortHistoryRows;
+	root.historySummaryPresentation = historySummary;
+	root.teaPositiveNumberPresentation = teaPositiveNumber;
+	root.teaReferenceExternalChangedPresentation = teaReferenceExternalChanged;
+	root.teaSourceRegistryItemsPresentation = teaSourceRegistryItems;
+	root.manageSearchMatchPresentation = manageSearchMatch;
+	root.lotTransitionTargetNumberPresentation = lotTransitionTargetNumber;
+	root.historyPeriodLabelPresentation = historyPeriodLabel;
+	root.targetRowStatePresentation = targetRowState;
+	root.targetMatrixStatsPresentation = targetMatrixStats;
+	root.targetMatrixItemsPresentation = targetMatrixItems;
+	root.targetLevelTabsPresentation = targetLevelTabsHtml;
+	root.targetSummaryPresentation = targetSummaryHtml;
+	root.targetMatrixRowPresentation = targetMatrixRowHtml;
+	root.historyRowsPresentation = historyRows;
+	root.historySelectorPresentation = historySelectorHtml;
+	root.targetSelectorPresentation = targetSelectorHtml;
+	root.historyTablePresentation = historyTableHtml;
+	root.targetEmptyStatePresentation = targetEmptyState;
+	root.targetMatrixTablePresentation = targetMatrixTableHtml;
+	root.targetMatrixActionsPresentation = targetMatrixActionsHtml;
+	root.targetPrerequisitePresentation = targetPrerequisite;
+	root.targetLevelToolbarPresentation = targetLevelToolbarHtml;
+	root.teaReferenceKindPresentation = teaReferenceKind;
+	root.teaReferenceRowActionsPresentation = teaReferenceRowActions;
+	root.teaReferenceSortPresentation = sortTeaReferences;
+	root.teaReferenceNamingTitlePresentation = teaReferenceNamingTitle;
+	root.teaReferenceEmptyStatePresentation = teaReferenceEmptyState;
+	root.teaReferenceLabValuePresentation = teaReferenceLabValueHtml;
+	root.teaReferenceInputValuePresentation = teaReferenceInputValue;
 	root.xlsxEscape = xlsxEscape;
 	root.reportXlsxStyleIds = REPORT_XLSX_STYLE_IDS;
 	root.xlsxColumns = XLSX_COLUMNS;

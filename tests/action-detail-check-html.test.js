@@ -1,0 +1,20 @@
+'use strict';
+const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+const source = pathToFileURL(path.join(__dirname, '..', 'src', 'presentation', 'nce', 'action-detail-check-html.ts')).href;
+const program = `
+  import { createActionDetailCheckHtml } from ${JSON.stringify(source)};
+  const render = createActionDetailCheckHtml({ escape: value => String(value).replaceAll('<', '&lt;') });
+  console.log(JSON.stringify([render('<Nhãn>', { cls: 'warn', label: '<Theo dõi>' }, '<Ghi chú>'), render('OK', { cls: 'ok', label: 'Đạt' })]));
+`;
+const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=module', '--eval', program], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
+assert.equal(result.status, 0, result.stderr || 'không thể chạy action detail check HTML TypeScript');
+const [withNote, plain] = JSON.parse(result.stdout);
+assert.match(withNote, /&lt;Nhãn>/);
+assert.match(withNote, /&lt;Ghi chú>/);
+assert.match(withNote, /tag warn/);
+assert.match(plain, /tag ok/);
+assert.doesNotMatch(plain, /class="hint"/);
+console.log('Action detail check HTML TypeScript tests passed');

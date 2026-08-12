@@ -1,0 +1,20 @@
+'use strict';
+const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+const source = pathToFileURL(path.join(__dirname, '..', 'src', 'presentation', 'manage', 'manage-history-row-html.ts')).href;
+const program = `
+  import { createManageHistoryRowHtml } from ${JSON.stringify(source)};
+  const render = createManageHistoryRowHtml({ escape: value => String(value).replaceAll('<', '&lt;'), quote: value => String(value).replaceAll("'", "\\\\'"), button: (label, action, variant) => '[' + label + '|' + action + '|' + variant + ']' });
+  console.log(JSON.stringify([render({ testId: "T'1", level: 2, lot: 'Lot <A>', group: 'Nhóm A', mean: '10', low: '8', high: '12', sd: '1', period: '01/08/2026 → 31/08/2026', source: 'lab', pointCount: 9 }), render({ testId: 'T2', level: 1, lot: '', group: '—', mean: '1', low: '—', high: '—', sd: '0.1', period: 'Không giới hạn', source: 'mfg', pointCount: 0 })]));
+`;
+const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=module', '--eval', program], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
+assert.equal(result.status, 0, result.stderr || 'không thể chạy manage history row HTML TypeScript');
+const [lab, mfg] = JSON.parse(result.stdout);
+assert.match(lab, /Lot &lt;A>/);
+assert.match(lab, /tag warn">PXN/);
+assert.match(lab, /Chi tiết\|openQcHistoryDetail\('T\\'1',2,'Lot <A>'\)\|ghost sm/);
+assert.match(mfg, /tag ok">NSX/);
+assert.match(mfg, /<b>—<\/b>/);
+console.log('Manage history row HTML TypeScript tests passed');
