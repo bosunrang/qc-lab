@@ -277,6 +277,7 @@ import { createSigmaMuPrintRows } from '../presentation/sigma/sigma-mu-print-row
 import { createReportPointsTable } from '../presentation/report/report-points-table';
 import { createActionReportHtml } from '../presentation/nce/action-report-html';
 import { createActionGuideContent } from '../presentation/nce/action-guide-content';
+import { createActionPageHtml } from '../presentation/nce/action-page-html';
 import { createActionSideChipsHtml } from '../presentation/nce/action-side-chips-html';
 import { createActionDetailCheckHtml } from '../presentation/nce/action-detail-check-html';
 import { createActionEvidenceTimelineHtml } from '../presentation/nce/action-evidence-timeline-html';
@@ -913,6 +914,7 @@ type QCLabGlobal = typeof globalThis & {
   dashboardTestListHtml?: typeof dashboardTestListHtml;
   dashboardPageHtml?: ReturnType<typeof createDashboardPageHtml>;
   actionGuideContent?: ReturnType<typeof createActionGuideContent>;
+  actionPageHtml?: ReturnType<typeof createActionPageHtml>;
   actionSideChipsHtml?: ReturnType<typeof createActionSideChipsHtml>;
   actionDetailCheckHtml?: ReturnType<typeof createActionDetailCheckHtml>;
   actionEvidenceTimelinePresentation?: ReturnType<typeof createActionEvidenceTimelineHtml>;
@@ -1546,6 +1548,7 @@ root.dashboardProgressHtml=dashboardProgressHtml;
 root.dashboardTestListHtml=dashboardTestListHtml;
 root.dashboardPageHtml=createDashboardPageHtml();
 root.actionGuideContent=createActionGuideContent({escape:(value:any)=>(root as any).esc(value),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
+root.actionPageHtml=createActionPageHtml();
 root.actionSideChipsHtml=createActionSideChipsHtml({escape:(value:any)=>(root as any).esc(value)});
 root.actionDetailCheckHtml=createActionDetailCheckHtml({escape:(value:any)=>(root as any).esc(value)});
 root.actionEvidenceTimelinePresentation=createActionEvidenceTimelineHtml({escape:(value:any)=>(root as any).esc(value)});

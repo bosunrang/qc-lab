@@ -7625,6 +7625,11 @@
 		};
 	}
 	//#endregion
+	//#region src/presentation/nce/action-page-html.ts
+	function createActionPageHtml() {
+		return (input) => `${input.headHtml}${input.issuesHtml}${input.formHtml}${input.logHtml}`;
+	}
+	//#endregion
 	//#region src/presentation/nce/action-side-chips-html.ts
 	function createActionSideChipsHtml(deps) {
 		return (chips) => chips.map((chip) => `<span class="action-chip ${chip.cls}">${deps.escape(chip.label)}</span>`).join("");
@@ -13494,6 +13499,7 @@
 		escape: (value) => root.esc(value),
 		button: (label, action, variant) => root.btn(label, action, variant)
 	});
+	root.actionPageHtml = createActionPageHtml();
 	root.actionSideChipsHtml = createActionSideChipsHtml({ escape: (value) => root.esc(value) });
 	root.actionDetailCheckHtml = createActionDetailCheckHtml({ escape: (value) => root.esc(value) });
 	root.actionEvidenceTimelinePresentation = createActionEvidenceTimelineHtml({ escape: (value) => root.esc(value) });

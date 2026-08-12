@@ -1028,6 +1028,7 @@ assert.match(generated, /root\.reagentPairRowHtml\s*=\s*createReagentPairRowHtml
 assert.match(generated, /root\.reportNceDetailHtmlPresentation\s*=\s*createReportNceDetailHtml/, 'artifact must publish TypeScript NCE detail report HTML for the legacy bridge');
 assert.match(generated, /root\.dashboardPageHtml\s*=\s*createDashboardPageHtml/, 'artifact must publish TypeScript dashboard page HTML for the legacy bridge');
 assert.match(generated, /root\.managePageHtml\s*=\s*createManagePageHtml/, 'artifact must publish TypeScript manage page HTML for the legacy bridge');
+assert.match(generated, /root\.actionPageHtml\s*=\s*createActionPageHtml/, 'artifact must publish TypeScript NCE page HTML for the legacy bridge');
 assert.match(generated, /root\.csvCellService\s*=\s*csvCell/,
   'artifact must publish TypeScript CSV cell encoder for the legacy bridge');
 assert.match(generated, /root\.reportExportHelpers\s*=\s*reportExportHelpers/,
