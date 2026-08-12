@@ -289,5 +289,6 @@ function renderManageBody(){
   el.innerHTML=manageView();
 }
 function pageManage(){
-  return headOnly('Cấu hình chung','Quản lý máy, Panel QC, lô QC, Mean/SD và luật QC')+manageShell(manageView());
+  const head=headOnly('Cấu hình chung','Quản lý máy, Panel QC, lô QC, Mean/SD và luật QC'),shell=manageShell(manageView());
+  return globalThis.managePageHtml?globalThis.managePageHtml(head,shell):head+shell;
 }

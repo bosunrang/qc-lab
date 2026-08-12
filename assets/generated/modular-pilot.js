@@ -4482,6 +4482,96 @@
 		return (items, selectedId, escAttr, label) => (Array.isArray(items) ? items : []).map((item) => `<option value="${escAttr(item.id)}"${item.id === selectedId ? " selected" : ""}>${label(item)}</option>`).join("");
 	}
 	//#endregion
+	//#region src/presentation/reagent/reagent-result-html.ts
+	function resultVerdict(result, format) {
+		const calibrationWarning = !result.passR2 || !result.passSlope;
+		if (result.level === "ok") return {
+			cls: "ok",
+			icon: "✓",
+			title: "Kết luận: Đạt tiêu chí sàng lọc phần mềm",
+			desc: "Độ chệch trong giới hạn, đủ cỡ mẫu (n≥20) và đã xác nhận bao phủ khoảng đo/điểm quyết định. Lô mới đủ điều kiện trình phê duyệt theo SOP trước khi đưa vào sử dụng cho mẫu bệnh nhân." + (calibrationWarning || !result.passP ? " Lưu ý: một số chỉ số mô tả (P-value/R²/độ dốc) chưa lý tưởng, cần ghi nhận khi phê duyệt." : "")
+		};
+		if (result.level === "mid") return {
+			cls: "mid",
+			icon: "!",
+			title: "Kết luận: Chưa đủ điều kiện sàng lọc",
+			desc: "Độ chệch (%Bias) nằm trong giới hạn cho phép, song chưa đủ cỡ mẫu (n≥20) và/hoặc chưa xác nhận bao phủ khoảng đo/điểm quyết định theo SOP." + (calibrationWarning ? " Ngoài ra hệ số tương quan và/hoặc độ dốc hồi quy chưa đạt, nên kiểm tra hiệu chuẩn." : "") + " Bổ sung dữ liệu hoặc ghi nhận ngoại lệ theo SOP trước khi phê duyệt."
+		};
+		return {
+			cls: "no",
+			icon: "✕",
+			title: "Kết luận: Hai lô hóa chất có khác biệt",
+			desc: "Độ chệch (%Bias) vượt giới hạn cho phép. Không đưa lô mới vào sử dụng cho mẫu bệnh nhân; tiến hành điều tra, xử lý theo quy trình."
+		};
+	}
+	function createReagentResultHtml() {
+		return (result, minimumPairs, format, formatT) => {
+			if (!result) return {
+				statsHtml: `<div class="empty">Nhập tối thiểu ${minimumPairs} cặp giá trị hợp lệ để xem thống kê mô tả; khuyến nghị ≥20 cặp cho sàng lọc phần mềm.</div>`,
+				criteriaHtml: "",
+				verdictHtml: ""
+			};
+			const row = (label, value) => `<div class="rc-stat-row"><span>${label}</span><b>${value}</b></div>`;
+			const equation = (slope, intercept) => `y = ${format(slope, 4)}x ${intercept >= 0 ? "+" : "−"} ${format(Math.abs(intercept), 4)}`;
+			const statsHtml = `<div class="rc-stat-kpis">
+      <div class="rc-stat-card"><div class="rc-stat-label">Hệ số tương quan (Pearson r)</div><div class="rc-stat-value">${format(result.r, 4)}</div><div class="rc-stat-sub">R² = ${format(result.fit.r2, 4)}</div></div>
+      <div class="rc-stat-card"><div class="rc-stat-label">%Bias</div><div class="rc-stat-value ${result.passBias ? "ok" : "bad"}">${format(result.bias, 3)}%</div><div class="rc-stat-sub">Mong muốn &lt; ${format(result.biasT, 3)}%</div></div>
+      <div class="rc-stat-card"><div class="rc-stat-label">P (hai phía / two-tail)</div><div class="rc-stat-value">${format(result.p2, 4)}</div><div class="rc-stat-sub">α = ${format(result.alpha, 4)}</div></div>
+    </div><div class="rc-stat-section"><h4>Kiểm định t bắt cặp (t-Test: Paired Two Sample for Means)</h4><div class="rc-stat-columns"><div>${row("Trung bình (Mean) – Lô cũ / Lô mới", `${format(result.mO, 3)} / ${format(result.mN, 3)}`)}${row("Phương sai (Variance) – cũ / mới", `${format(result.vO, 3)} / ${format(result.vN, 3)}`)}${row("Số quan sát (Observations), n", result.N)}${row("Tương quan Pearson (Pearson Correlation)", format(result.r, 5))}${row("Chênh lệch TB giả định (Hypothesized Mean Diff.)", "0")}</div><div>${row("Bậc tự do (df)", result.df)}${row("Giá trị t (t Stat)", formatT(result.tStat))}${row("P(T≤t) một phía (one-tail)", format(result.p1, 5))}${row("t tới hạn một phía (t Critical one-tail)", format(result.tc1, 4))}${row("P(T≤t) hai phía (two-tail)", format(result.p2, 4))}${row("t tới hạn hai phía (t Critical two-tail)", format(result.tc2, 4))}</div></div></div><div class="rc-stat-section"><h4>Hồi quy &amp; độ chệch (Regression &amp; bias)</h4><div class="rc-stat-columns"><div>${row("Hồi quy tuyến tính (OLS)", equation(result.fit.b, result.fit.a))}${row("R² (OLS)", format(result.fit.r2, 5))}</div><div>${row("Passing-Bablok", equation(result.pb.b, result.pb.a))}${row("Chênh lệch tương đối TB theo cặp (Mean abs. rel. diff.)", `${format(result.mard, 3)}%`)}</div></div></div>`;
+			const criteriaHtml = [
+				[
+					result.passBias,
+					true,
+					"Độ chệch trong giới hạn cho phép (tiêu chí quyết định)",
+					`%Bias = ${format(result.bias, 3)}% ${result.passBias ? "<" : "≥"} ${format(result.biasT, 3)}% mong muốn`
+				],
+				[
+					result.enoughN,
+					true,
+					"Đủ cỡ mẫu sàng lọc (tiêu chí quyết định)",
+					`n = ${result.N} ${result.enoughN ? "≥" : "<"} 20 cặp hợp lệ`
+				],
+				[
+					result.coverage,
+					true,
+					"Bao phủ khoảng đo / điểm quyết định (tiêu chí quyết định)",
+					result.coverage ? "Đã xác nhận theo SOP" : "Chưa xác nhận theo SOP"
+				],
+				[
+					result.passP,
+					false,
+					"Không khác biệt có ý nghĩa thống kê (mô tả)",
+					`P(two-tail) = ${format(result.p2, 4)} ${result.passP ? ">" : "≤"} α = ${format(result.alpha, 4)}; không dùng riêng để chấp nhận lô`
+				],
+				[
+					result.passR2,
+					false,
+					"Tương quan chặt chẽ (mô tả)",
+					`R² = ${format(result.fit.r2, 4)}; cần ≥ 0,95 để xem là tương quan chặt`
+				],
+				[
+					result.passSlope,
+					false,
+					"Độ dốc hồi quy chấp nhận được (mô tả)",
+					`Slope = ${format(result.fit.b, 4)}; mục tiêu trong khoảng [0,90 - 1,10]`
+				]
+			].map(([ok, decision, title, why]) => {
+				return `<div class="rc-crit-item"><span class="rc-crit-badge ${decision ? ok ? "pass" : "fail" : ok ? "info" : "note"}">${decision ? ok ? "ĐẠT" : "KHÔNG ĐẠT" : ok ? "TỐT" : "LƯU Ý"}</span><div class="rc-crit-text">${title}<div>${why}</div></div></div>`;
+			}).join("");
+			const verdict = resultVerdict(result, format);
+			return {
+				statsHtml,
+				criteriaHtml,
+				verdictHtml: `<div class="rc-verdict ${verdict.cls}"><div class="rc-verdict-icon">${verdict.icon}</div><div><div class="rc-verdict-title">${verdict.title}</div><div class="rc-verdict-desc">${verdict.desc}</div></div></div>`
+			};
+		};
+	}
+	//#endregion
+	//#region src/presentation/reagent/reagent-pair-row-html.ts
+	function createReagentPairRowHtml() {
+		return ({ index, row, readOnly, pair, format, escAttr }) => `<div class="rc-pair-row" data-rc-row="${index}"><div class="rc-idx">${index + 1}</div><input ${readOnly ? "disabled" : ""} value="${escAttr(row?.[0])}" oninput="rcCell(${index},0,this.value)" type="number" step="any" placeholder="–"><input ${readOnly ? "disabled" : ""} value="${escAttr(row?.[1])}" oninput="rcCell(${index},1,this.value)" type="number" step="any" placeholder="–"><div class="rc-calc avg">${pair ? format(pair.avg, 3) : "–"}</div><div class="rc-calc dif ${pair && pair.dif < 0 ? "neg" : ""}">${pair ? format(pair.dif, 3) : "–"}</div>${readOnly ? "<span></span>" : `<button class="x" onclick="rcRmRow(${index})" title="Xóa dòng">✕</button>`}</div>`;
+	}
+	//#endregion
 	//#region src/application/storage/partition-write-policy.ts
 	function planPartitionWrite(input) {
 		const full = !!input.fullDirty || input.streak >= input.maxIncrementals || input.now - input.lastFull >= input.maxMs;
@@ -6245,6 +6335,24 @@
 		return (actions, test) => "<div class=\"nce-appendix\"><h3>Phụ lục - Hồ sơ NCE chi tiết</h3><p class=\"nce-appendix-intro\">Phụ lục giữ đầy đủ nội dung điều tra, bằng chứng QC chạy lại, đánh giá hiệu lực và phê duyệt. Bảng tổng hợp phía trên chỉ trình bày thông tin trọng yếu.</p>" + actions.map((action) => deps.detail(action, test)).join("") + "</div>";
 	}
 	//#endregion
+	//#region src/presentation/report/report-nce-detail-html.ts
+	function createReportNceDetailHtml(deps) {
+		return (action, test) => {
+			const model = deps.model(action, test), field = deps.field, checks = (model.checks || []).map((check) => `<tr><td><b>${deps.escape(check[0])}</b></td><td>${deps.escape(check[1])}</td><td>${deps.escape(check[2])}</td></tr>`).join("");
+			let html = `<section class="nce-detail"><div class="nce-detail-head"><h3>Phiếu NCE ${deps.escape(model.nceTitle)}</h3><div class="nce-detail-status">${deps.escape(model.wfLabel)}</div></div><div class="nce-detail-grid">${field("Ngày xảy ra", model.eventDateText)}${field("Xét nghiệm / mức / lô", model.testLevelText)}${field("Luật / loại sai số", model.ruleErrText)}${field("Nguồn / giai đoạn", model.sourcePhaseText)}${field("Người phụ trách / hạn", model.ownerDueText)}${field("Trạng thái bản ghi", model.recordStatusText)}</div>`;
+			if (!model.modern) return html + `<h4>Hành động đã ghi</h4><div class="nce-detail-text">${deps.escape(model.legacyActionText)}</div><h4>QC chạy lại / duyệt</h4><div class="nce-detail-grid">${field("QC chạy lại", model.rerunText)}${field("Phê duyệt", model.approvalShortText)}</div></section>`;
+			html += `<h4>1. Kiểm soát và xử lý tức thời</h4><div class="nce-detail-stack"><div class="nce-detail-grid">${field("Phạm vi kiểm soát", model.containmentText)}${field("Ghi chú phạm vi", model.containmentNote)}</div><div class="nce-detail-text">${deps.escape(model.correctionText)}</div></div>`;
+			html += `<h4>2. Đánh giá nguy cơ ban đầu</h4><div class="nce-detail-grid">${field("Phân loại / RPN", model.riskText)}${field("S x O x D", model.sodText)}${field("Căn cứ SOP", model.riskBasis, true)}</div>`;
+			html += `<h4>3. Checklist điều tra</h4><table class="nce-check-table"><colgroup><col class="nce-check-item-col"><col class="nce-check-result-col"><col class="nce-check-note-col"></colgroup><tr><th>Hạng mục</th><th>Kết luận</th><th>Ghi chú / bằng chứng</th></tr>${checks}</table>`;
+			html += `<h4>4. Nguyên nhân và hành động khắc phục</h4><div class="nce-detail-stack"><div class="nce-detail-grid">${field("Nhóm nguyên nhân", model.causeCategoryText)}${field("Ngày hoàn thành hành động", model.actionCompletedText)}</div><div class="nce-detail-text"><b>Nguyên nhân:</b> ${deps.escape(model.causeText)}\n<b>Hành động khắc phục:</b> ${deps.escape(model.actionText)}</div></div>`;
+			html += `<h4>5. Bằng chứng QC chạy lại và cho phép trở lại</h4><div class="nce-detail-grid">${field("QC chạy lại", model.rerunText)}${field("Quyết định", model.releaseText)}${field("Ngày / người cho phép", model.releaseWhoText)}${field("Căn cứ cho phép", model.releaseNote)}</div>`;
+			html += `<h4>6. Ảnh hưởng người bệnh</h4><div class="nce-detail-grid">${field("Kết luận", model.patientText)}${field("Xử lý kết quả liên quan", model.patientAction)}</div>`;
+			html += `<h4>7. Hiệu lực, nguy cơ còn lại và phê duyệt</h4><div class="nce-detail-grid">${field("Đánh giá hiệu lực", model.effLabel)}${field("Ngày / người đánh giá", model.effWhoText)}${field("Bằng chứng hiệu lực", model.effNote)}${field("Nguy cơ còn lại", model.residualText)}${field("Căn cứ đánh giá lại", model.residualBasis)}${field("Phê duyệt", model.approvalText)}${field("Ý kiến duyệt", model.approvalNote, true)}</div>`;
+			if (model.cancelled) html += `<h4>Thông tin hủy hồ sơ</h4><div class="nce-detail-text">${deps.escape(model.cancelText)}</div>`;
+			return html + "</section>";
+		};
+	}
+	//#endregion
 	//#region src/presentation/report/report-sign-block.ts
 	function reportSignBlock() {
 		return "<div class=\"sign-grid\"><div><b>Người thực hiện</b><span>(Ký, ghi rõ họ tên)</span></div><div><b>Người kiểm tra</b><span>(Ký, ghi rõ họ tên)</span></div><div><b>Phụ trách khoa</b><span>(Ký, ghi rõ họ tên)</span></div></div>";
@@ -6564,6 +6672,20 @@
 	function dashboardTestListHtml(visibleCount, rowsHtml) {
 		if (!visibleCount) return "<div class=\"dash-test-empty\">Không tìm thấy xét nghiệm phù hợp.</div>";
 		return `<div class="dash-test-list"><table><thead><tr><th>Xét nghiệm</th><th>Mức QC / lô</th><th>QC hôm nay</th><th class="num">Tổng điểm</th><th>Westgard</th><th>Gần nhất</th><th><span class="sr-only">Thao tác</span></th></tr></thead><tbody>${rowsHtml}</tbody></table></div><div id="dashTestEmpty" class="dash-test-empty" style="display:none">Không tìm thấy xét nghiệm phù hợp.</div>`;
+	}
+	//#endregion
+	//#region src/presentation/dashboard/dashboard-page-html.ts
+	function createDashboardPageHtml() {
+		return (input) => `${input.headHtml}
+   <div class="dash-hero">
+     <div class="dash-status"><div class="eyebrow">Trạng thái trực ca · ${input.todayText}</div><h2>${input.mood}</h2><p>${input.moodText}</p>${input.progressHtml}</div>
+     ${input.kpisHtml}
+   </div>
+   <div class="dash-main">
+     <div class="panel"><h2 class="panel-title">Cần xử lý / Theo dõi</h2>${input.followHtml}</div>
+     <div class="panel"><h2 class="panel-title">Lô & hạn dùng</h2><div class="dash-list">${input.expiringLotsHtml}</div></div>
+   </div>
+   ${input.testsPanelHtml}`;
 	}
 	//#endregion
 	//#region src/presentation/report/report-qc-format.ts
@@ -7619,6 +7741,11 @@
 			const search = model.placeholder ? `<input id="manageSearch" placeholder="${deps.escapeAttr(model.placeholder)}" value="${deps.escapeAttr(model.query || "")}" oninput="manageSearchSet(this.value)">` : "";
 			return `<div class="rcfg-toolbar"><div><h2>${deps.escape(model.title)}</h2>${model.subtitle ? `<p>${deps.escape(model.subtitle)}</p>` : ""}</div><div class="rcfg-tools">${search}${model.action ? deps.button("＋ " + (model.actionLabel || ""), model.action, "teal") : ""}</div></div>`;
 		};
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-page-html.ts
+	function createManagePageHtml() {
+		return (headHtml, shellHtml) => `${headHtml}${shellHtml}`;
 	}
 	//#endregion
 	//#region src/presentation/manage/manage-shell-html.ts
@@ -12873,6 +13000,8 @@
 	root.userRowHtml = createUserRowHtml();
 	root.usersPageHtml = createUsersPageHtml();
 	root.reagentSelectOptionsHtml = createReagentSelectOptionsHtml();
+	root.reagentResultHtml = createReagentResultHtml();
+	root.reagentPairRowHtml = createReagentPairRowHtml();
 	if (typeof StateStorageLegacy !== "undefined") root.storageBootService = createStorageBootService({
 		partitionedSupported: () => typeof LocalStore !== "undefined" && LocalStore.supported(),
 		readBootRecord: () => localStorage.getItem("qclab_boot"),
@@ -13152,6 +13281,11 @@
 	root.reportXlsxHeader = createReportXlsxHeader;
 	root.reportHeaderPresentation = reportHeaderPresentation;
 	root.reportNceAppendixPresentation = createReportNceAppendix({ detail: (action, test) => globalThis.reportNceDetailHtml(action, test) });
+	root.reportNceDetailHtmlPresentation = createReportNceDetailHtml({
+		model: (action, test) => globalThis.reportNceModel(action, test),
+		field: (label, value, wide) => globalThis.reportNceDetailField(label, value, wide),
+		escape: (value) => typeof globalThis.esc === "function" ? globalThis.esc(value) : String(value ?? "")
+	});
 	root.reportSignBlock = reportSignBlock;
 	root.reportLockListHtmlPresentation = createReportLockListHtml({
 		sorted: (locks) => root.ReportPeriodPresentation.sortedLocks(locks),
@@ -13355,6 +13489,7 @@
 	root.dashboardKpisHtml = dashboardKpisHtml;
 	root.dashboardProgressHtml = dashboardProgressHtml;
 	root.dashboardTestListHtml = dashboardTestListHtml;
+	root.dashboardPageHtml = createDashboardPageHtml();
 	root.actionGuideContent = createActionGuideContent({
 		escape: (value) => root.esc(value),
 		button: (label, action, variant) => root.btn(label, action, variant)
@@ -13400,6 +13535,7 @@
 		escapeAttr: (value) => root.escAttr(value),
 		button: (label, action, variant) => root.btn(label, action, variant)
 	});
+	root.managePageHtml = createManagePageHtml();
 	root.manageShellPresentation = createManageShellHtml({ escape: (value) => root.esc(value) });
 	root.manageInstrumentRowPresentation = createManageInstrumentRowHtml({
 		escape: (value) => root.esc(value),

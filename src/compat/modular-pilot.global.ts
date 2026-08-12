@@ -136,6 +136,8 @@ import { userListModel } from '../presentation/auth/user-list-model';
 import { createUserRowHtml } from '../presentation/auth/user-row-html';
 import { createUsersPageHtml } from '../presentation/auth/users-page-html';
 import { createReagentSelectOptionsHtml } from '../presentation/reagent/reagent-select-options-html';
+import { createReagentResultHtml } from '../presentation/reagent/reagent-result-html';
+import { createReagentPairRowHtml } from '../presentation/reagent/reagent-pair-row-html';
 import { planPartitionWrite } from '../application/storage/partition-write-policy';
 import { createQcValueFormat } from '../domain/qc/value-format';
 import { createQcStaffIdentity } from '../domain/qc/staff-identity';
@@ -182,6 +184,7 @@ import { createReportXlsxBuilder } from '../presentation/report/report-xlsx-buil
 import { createReportXlsxHeader } from '../presentation/report/report-xlsx-header';
 import { reportHeaderPresentation } from '../presentation/report/report-header';
 import { createReportNceAppendix, type ReportNceAppendixApi } from '../presentation/report/report-nce-appendix';
+import { createReportNceDetailHtml } from '../presentation/report/report-nce-detail-html';
 import { reportSignBlock } from '../presentation/report/report-sign-block';
 import { createReportLockListHtml } from '../presentation/report/report-lock-list-html';
 import { createReportUnlockReason } from '../presentation/report/report-unlock-reason';
@@ -210,6 +213,7 @@ import { createDashboardLatestPoint } from '../presentation/dashboard/dashboard-
 import { dashboardKpisHtml } from '../presentation/dashboard/dashboard-kpis-html';
 import { dashboardProgressHtml } from '../presentation/dashboard/dashboard-progress-html';
 import { dashboardTestListHtml } from '../presentation/dashboard/dashboard-test-list-html';
+import { createDashboardPageHtml } from '../presentation/dashboard/dashboard-page-html';
 import { createReportQcFormat } from '../presentation/report/report-qc-format';
 import { createRangeTea } from '../domain/qc/range-tea';
 import { entryRowsWindow as entryRowsWindowTs, entryLotLabels as entryLotLabelsTs } from '../presentation/entry/entry-rows-window';
@@ -294,6 +298,7 @@ import { createActionEffectivenessDetailHtml } from '../presentation/nce/action-
 import { createActionLogPanelHtml } from '../presentation/nce/action-log-panel-html';
 import { actionIssuesPanelHtml } from '../presentation/nce/action-issues-panel-html';
 import { createManageToolbarHtml } from '../presentation/manage/manage-toolbar-html';
+import { createManagePageHtml } from '../presentation/manage/manage-page-html';
 import { createManageShellHtml } from '../presentation/manage/manage-shell-html';
 import { createManageInstrumentRowHtml } from '../presentation/manage/manage-instrument-row-html';
 import { createManagePanelRowHtml } from '../presentation/manage/manage-panel-row-html';
@@ -802,6 +807,8 @@ type QCLabGlobal = typeof globalThis & {
   userRowHtml?: ReturnType<typeof createUserRowHtml>;
   usersPageHtml?: ReturnType<typeof createUsersPageHtml>;
   reagentSelectOptionsHtml?: ReturnType<typeof createReagentSelectOptionsHtml>;
+  reagentResultHtml?: ReturnType<typeof createReagentResultHtml>;
+  reagentPairRowHtml?: ReturnType<typeof createReagentPairRowHtml>;
   planPartitionWrite?: typeof planPartitionWrite;
   qcValueFormat?: ReturnType<typeof createQcValueFormat>;
   qcStaffIdentity?: ReturnType<typeof createQcStaffIdentity>;
@@ -904,6 +911,7 @@ type QCLabGlobal = typeof globalThis & {
   dashboardKpisHtml?: typeof dashboardKpisHtml;
   dashboardProgressHtml?: typeof dashboardProgressHtml;
   dashboardTestListHtml?: typeof dashboardTestListHtml;
+  dashboardPageHtml?: ReturnType<typeof createDashboardPageHtml>;
   actionGuideContent?: ReturnType<typeof createActionGuideContent>;
   actionSideChipsHtml?: ReturnType<typeof createActionSideChipsHtml>;
   actionDetailCheckHtml?: ReturnType<typeof createActionDetailCheckHtml>;
@@ -926,6 +934,7 @@ type QCLabGlobal = typeof globalThis & {
   actionLogPanelHtml?: ReturnType<typeof createActionLogPanelHtml>;
   actionIssuesPanelHtml?: typeof actionIssuesPanelHtml;
   manageToolbarPresentation?: ReturnType<typeof createManageToolbarHtml>;
+  managePageHtml?: ReturnType<typeof createManagePageHtml>;
   manageShellPresentation?: ReturnType<typeof createManageShellHtml>;
   manageInstrumentRowPresentation?: ReturnType<typeof createManageInstrumentRowHtml>;
   managePanelRowPresentation?: ReturnType<typeof createManagePanelRowHtml>;
@@ -1031,6 +1040,7 @@ type QCLabGlobal = typeof globalThis & {
   sigmaMuPrintRowsService?: ReturnType<typeof createSigmaMuPrintRows>;
   reportPointsTableService?: ReturnType<typeof createReportPointsTable>;
   actionReportHtml?: ReturnType<typeof createActionReportHtml>;
+  reportNceDetailHtmlPresentation?: ReturnType<typeof createReportNceDetailHtml>;
   sigmaDraftService?: ReturnType<typeof createSigmaDraftService>;
   stateAdoptionService?: ReturnType<typeof createStateAdoptionService>;
   corruptLocalQuarantine?: ReturnType<typeof createCorruptLocalQuarantine>;
@@ -1374,6 +1384,8 @@ root.userListModel = userListModel;
 root.userRowHtml = createUserRowHtml();
 root.usersPageHtml = createUsersPageHtml();
 root.reagentSelectOptionsHtml = createReagentSelectOptionsHtml();
+root.reagentResultHtml = createReagentResultHtml();
+root.reagentPairRowHtml = createReagentPairRowHtml();
 if (typeof StateStorageLegacy !== 'undefined') root.storageBootService = createStorageBootService({
   partitionedSupported: () => typeof LocalStore !== 'undefined' && LocalStore.supported(),
   readBootRecord: () => localStorage.getItem('qclab_boot'),
@@ -1461,6 +1473,7 @@ root.reportXlsxBuild=doc=>{const core=(root as any).XlsxCore;return createReport
 root.reportXlsxHeader=createReportXlsxHeader;
 root.reportHeaderPresentation=reportHeaderPresentation;
 root.reportNceAppendixPresentation=createReportNceAppendix({detail:(action,test)=>(globalThis as any).reportNceDetailHtml(action,test)});
+root.reportNceDetailHtmlPresentation=createReportNceDetailHtml({model:(action,test)=>(globalThis as any).reportNceModel(action,test),field:(label,value,wide)=>(globalThis as any).reportNceDetailField(label,value,wide),escape:(value:any)=>typeof (globalThis as any).esc==='function'?(globalThis as any).esc(value):String(value??'')});
 root.reportSignBlock=reportSignBlock;
 root.reportLockListHtmlPresentation=createReportLockListHtml<any>({sorted:(locks:any[])=>(root as any).ReportPeriodPresentation.sortedLocks(locks),month:(ym:any)=>(root as any).monthVN(ym),dateTime:(value:any)=>(root as any).formatDateTimeVN(value),escape:(value:any)=>(root as any).esc(value),button:(label,action,variant)=>(root as any).btn(label,action,variant),quote:(value:any)=>(root as any).jsq(value)});
 root.reportUnlockReason=createReportUnlockReason({clean:(value:any,maxLength:number)=>(root as any).QCCore.cleanText(value,maxLength)});
@@ -1531,6 +1544,7 @@ root.dashboardLatestPoint=createDashboardLatestPoint<any>({runNumber:(point:any)
 root.dashboardKpisHtml=dashboardKpisHtml;
 root.dashboardProgressHtml=dashboardProgressHtml;
 root.dashboardTestListHtml=dashboardTestListHtml;
+root.dashboardPageHtml=createDashboardPageHtml();
 root.actionGuideContent=createActionGuideContent({escape:(value:any)=>(root as any).esc(value),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
 root.actionSideChipsHtml=createActionSideChipsHtml({escape:(value:any)=>(root as any).esc(value)});
 root.actionDetailCheckHtml=createActionDetailCheckHtml({escape:(value:any)=>(root as any).esc(value)});
@@ -1553,6 +1567,7 @@ root.actionEffectivenessDetailHtml=createActionEffectivenessDetailHtml({escape:(
 root.actionLogPanelHtml=createActionLogPanelHtml({button:(label,action,variant)=>(root as any).btn(label,action,variant),emptyState:(title,text)=>(root as any).emptyState(title,text)});
 root.actionIssuesPanelHtml=actionIssuesPanelHtml;
 root.manageToolbarPresentation=createManageToolbarHtml({escape:(value:any)=>(root as any).esc(value),escapeAttr:(value:any)=>(root as any).escAttr(value),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
+root.managePageHtml=createManagePageHtml();
 root.manageShellPresentation=createManageShellHtml({escape:(value:any)=>(root as any).esc(value)});
 root.manageInstrumentRowPresentation=createManageInstrumentRowHtml({escape:(value:any)=>(root as any).esc(value),button:(label,action,variant)=>(root as any).btn(label,action,variant),quote:(value:any)=>(root as any).jsq(value)});
 root.managePanelRowPresentation=createManagePanelRowHtml({escape:(value:any)=>(root as any).esc(value),button:(label,action,variant)=>(root as any).btn(label,action,variant),quote:(value:any)=>(root as any).jsq(value)});

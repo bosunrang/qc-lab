@@ -85,7 +85,7 @@ function pageReagent(){
   if(!rcId||!state.reagentTests.find(d=>d.id===rcId))rcId=state.reagentTests[0].id;
   const ds=rcAct(),t=ds.test,ro=!canWrite()?'disabled':'';
   const oldLotHead='Lô cũ'+(t.lotOld?`: ${esc(t.lotOld)}`:''),newLotHead='Lô mới'+(t.lotNew?`: ${esc(t.lotNew)}`:'');
-  const rows=ds.rows.map((r,i)=>{const c=rcPairCalc(r);return `<div class="rc-pair-row" data-rc-row="${i}"><div class="rc-idx">${i+1}</div><input ${ro} value="${escAttr(r[0])}" oninput="rcCell(${i},0,this.value)" type="number" step="any" placeholder="–"><input ${ro} value="${escAttr(r[1])}" oninput="rcCell(${i},1,this.value)" type="number" step="any" placeholder="–"><div class="rc-calc avg">${c?fmt(c.avg,3):'–'}</div><div class="rc-calc dif ${c&&c.dif<0?'neg':''}">${c?fmt(c.dif,3):'–'}</div>${canWrite()?`<button class="x" onclick="rcRmRow(${i})" title="Xóa dòng">✕</button>`:'<span></span>'}</div>`;}).join('');
+  const rows=ds.rows.map((r,i)=>{const c=rcPairCalc(r);return globalThis.reagentPairRowHtml?globalThis.reagentPairRowHtml({index:i,row:r,readOnly:!canWrite(),pair:c,format:fmt,escAttr}):`<div class="rc-pair-row" data-rc-row="${i}"><div class="rc-idx">${i+1}</div><input ${ro} value="${escAttr(r[0])}" oninput="rcCell(${i},0,this.value)" type="number" step="any" placeholder="–"><input ${ro} value="${escAttr(r[1])}" oninput="rcCell(${i},1,this.value)" type="number" step="any" placeholder="–"><div class="rc-calc avg">${c?fmt(c.avg,3):'–'}</div><div class="rc-calc dif ${c&&c.dif<0?'neg':''}">${c?fmt(c.dif,3):'–'}</div>${canWrite()?`<button class="x" onclick="rcRmRow(${i})" title="Xóa dòng">✕</button>`:'<span></span>'}</div>`;}).join('');
   return headOnly('So sánh 2 lô hóa chất','Sàng lọc định lượng · hồi quy mô tả · Bland-Altman · phê duyệt theo SOP')+
    `<div class="panel rc-toolbar-panel"><h2 class="panel-title">Thiết lập so sánh</h2><div class="rc-toolbar">
      <div class="rc-toolbar-selcol"><label>Chọn hóa chất</label><select id="rcSel" aria-label="Chọn hóa chất" onchange="rcSwitch(this.value)">${rcSelectOptions()}</select></div>
@@ -116,6 +116,7 @@ function rcCompute(){
   const f=rcFmt,ft=rcFmtT;
   const st=document.getElementById('rcStats'),cr=document.getElementById('rcCrit'),vd=document.getElementById('rcVerdict'),sc=document.getElementById('rcScatter'),bl=document.getElementById('rcBland');
   if(!st)return;
+  if(globalThis.reagentResultHtml){const html=globalThis.reagentResultHtml(R,RC_MIN_PAIRS,f,ft);st.innerHTML=html.statsHtml;cr.innerHTML=html.criteriaHtml;vd.innerHTML=html.verdictHtml;if(!R){sc.innerHTML='';bl.innerHTML='';return;}sc.innerHTML=rcScatterSVG(R,ds.test);bl.innerHTML=rcBlandSVG(R);return;}
   if(!R){st.innerHTML=`<div class="empty">Nhập tối thiểu ${RC_MIN_PAIRS} cặp giá trị hợp lệ để xem thống kê mô tả; khuyến nghị ≥20 cặp cho sàng lọc phần mềm.</div>`;cr.innerHTML='';vd.innerHTML='';sc.innerHTML='';bl.innerHTML='';return;}
   const eq=(b,a)=>`y = ${f(b,4)}x ${a>=0?'+':'−'} ${f(Math.abs(a),4)}`;
   const row=(label,val)=>`<div class="rc-stat-row"><span>${label}</span><b>${val}</b></div>`;

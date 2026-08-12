@@ -1023,6 +1023,11 @@ assert.match(generated, /root\.userRowHtml\s*=\s*createUserRowHtml/, 'artifact m
 assert.match(generated, /root\.usersPageHtml\s*=\s*createUsersPageHtml/, 'artifact must publish TypeScript users page HTML for the legacy bridge');
 assert.match(generated, /root\.activityAuditPageHtml\s*=\s*createActivityAuditPageHtml/, 'artifact must publish TypeScript activity audit page HTML for the legacy bridge');
 assert.match(generated, /root\.reagentSelectOptionsHtml\s*=\s*createReagentSelectOptionsHtml/, 'artifact must publish TypeScript reagent selector options for the legacy bridge');
+assert.match(generated, /root\.reagentResultHtml\s*=\s*createReagentResultHtml/, 'artifact must publish TypeScript reagent result HTML for the legacy bridge');
+assert.match(generated, /root\.reagentPairRowHtml\s*=\s*createReagentPairRowHtml/, 'artifact must publish TypeScript reagent pair-row HTML for the legacy bridge');
+assert.match(generated, /root\.reportNceDetailHtmlPresentation\s*=\s*createReportNceDetailHtml/, 'artifact must publish TypeScript NCE detail report HTML for the legacy bridge');
+assert.match(generated, /root\.dashboardPageHtml\s*=\s*createDashboardPageHtml/, 'artifact must publish TypeScript dashboard page HTML for the legacy bridge');
+assert.match(generated, /root\.managePageHtml\s*=\s*createManagePageHtml/, 'artifact must publish TypeScript manage page HTML for the legacy bridge');
 assert.match(generated, /root\.csvCellService\s*=\s*csvCell/,
   'artifact must publish TypeScript CSV cell encoder for the legacy bridge');
 assert.match(generated, /root\.reportExportHelpers\s*=\s*reportExportHelpers/,

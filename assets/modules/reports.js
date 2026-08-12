@@ -165,6 +165,7 @@ function reportNceSummaryHtml(a){
 }
 function reportNceDetailField(label,value,wide=false){return globalThis.actionReportHtml?globalThis.actionReportHtml.detailField(label,value,wide):'<div'+(wide?' class="nce-detail-wide"':'')+'><span>'+esc(label)+'</span><b>'+esc(value||'—')+'</b></div>';}
 function reportNceDetailHtml(a,t){
+  if(globalThis.reportNceDetailHtmlPresentation)return globalThis.reportNceDetailHtmlPresentation(a,t);
   const m=reportNceModel(a,t),F=reportNceDetailField;
   const checkRows=m.checks.map(([label,statusText,noteText])=>'<tr><td><b>'+esc(label)+'</b></td><td>'+esc(statusText)+'</td><td>'+esc(noteText)+'</td></tr>').join('');
   let html='<section class="nce-detail"><div class="nce-detail-head"><h3>Phiếu NCE '+esc(m.nceTitle)+'</h3><div class="nce-detail-status">'+esc(m.wfLabel)+'</div></div><div class="nce-detail-grid">'+F('Ngày xảy ra',m.eventDateText)+F('Xét nghiệm / mức / lô',m.testLevelText)+F('Luật / loại sai số',m.ruleErrText)+F('Nguồn / giai đoạn',m.sourcePhaseText)+F('Người phụ trách / hạn',m.ownerDueText)+F('Trạng thái bản ghi',m.recordStatusText)+'</div>';
