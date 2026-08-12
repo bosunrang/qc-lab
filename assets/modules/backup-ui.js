@@ -5,7 +5,7 @@ async function confirmOversizedBackup(size,{title,detail}){
   return await confirmDialog({kicker:'Vượt giới hạn khuyến nghị',title,message:`${error} Dung lượng thực tế ${backupSizeMB(size)} MB.`,detail,confirmLabel:'Vẫn tiếp tục',cancelLabel:'Hủy'});
 }
 async function exportData(){logAct('Xuất backup','Xuất toàn bộ dữ liệu JSON có checksum','Dữ liệu');save({clearDerived:false});let pack;try{pack=await createBackupPackage(state);}catch(e){await infoDialog('Không tạo được file backup:\n'+(e&&e.message?e.message:'Lỗi không xác định.'));return;}if(!await confirmOversizedBackup(pack.bytes,{title:'Vẫn xuất backup đầy đủ?',detail:'File vẫn nhập lại được và app sẽ hỏi xác nhận khi nhập. Nên lưu ít nhất hai bản trên hai thiết bị hoặc vị trí khác nhau.'}))return;const warning=backupImportSizeError(pack.bytes)?'':backupSizeWarning(pack.bytes);if(warning&&!await confirmDialog({kicker:'Dung lượng backup lớn',title:'Vẫn xuất backup?',message:warning,detail:'File hiện tại vẫn nhập được, nhưng dung lượng dự phòng còn ít.',confirmLabel:'Xuất backup',cancelLabel:'Hủy'}))return;const ok=downloadBackupText('qclab-backup-'+vnDate(isoToday()).replaceAll('/','-')+'.json',pack.text);if(!ok){await infoDialog('Không tạo được file backup. Dữ liệu chưa được xem là đã sao lưu.');return;}markBackupDone(pack.bytes);updateBackupBanner();}
-function downloadBackupText(name,json){try{const a=document.createElement('a'),url=URL.createObjectURL(new Blob([json],{type:'application/json'}));a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);return true;}catch(e){return false;}}
+function downloadBackupText(name,json){try{if(globalThis.blobDownload){globalThis.blobDownload(name,new Blob([json],{type:'application/json'}));return true;}const a=document.createElement('a'),url=URL.createObjectURL(new Blob([json],{type:'application/json'}));a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);return true;}catch(e){return false;}}
 async function backupCurrentData(prefix='before-change'){
   const stamp=new Date().toISOString().replace(/[T:]/g,'-').replace(/\.\d{3}Z$/,'Z');
   let pack;try{pack=await createBackupPackage(state);}catch(e){return false;}
@@ -38,21 +38,24 @@ var BACKUP_REMIND_DAYS=7;
 function markBackupDone(bytes){try{localStorage.setItem('qclab_lastbackup',new Date().toISOString());if(Number(bytes)>0)localStorage.setItem('qclab_lastbackup_bytes',String(Number(bytes)));}catch(e){}}
 function lastBackupInfo(){
   var raw=null;try{raw=localStorage.getItem('qclab_lastbackup');}catch(e){}
+  if(globalThis.backupReminderService)return globalThis.backupReminderService.lastBackupInfo(raw);
   if(!raw)return{never:true,days:Infinity};
   var t=new Date(raw).getTime();if(isNaN(t))return{never:true,days:Infinity};
   return{never:false,ts:t,days:Math.floor((Date.now()-t)/86400000)};
 }
 function backupStatusText(){
-  if(typeof fb!=='undefined'&&fb&&fb.ready)return 'Đang đồng bộ đám mây — đã có bản sao từ xa.';
   var i=lastBackupInfo();
+  if(globalThis.backupReminderService)return globalThis.backupReminderService.statusText(typeof fb!=='undefined'&&fb&&fb.ready,i);
+  if(typeof fb!=='undefined'&&fb&&fb.ready)return 'Đang đồng bộ đám mây — đã có bản sao từ xa.';
   if(i.never)return 'Chưa sao lưu trên máy này.';
   if(i.days<=0)return 'Sao lưu gần nhất: hôm nay.';
   return 'Sao lưu gần nhất: '+i.days+' ngày trước.';
 }
-function backupCapacityText(){var bytes=0;try{bytes=Number(localStorage.getItem('qclab_lastbackup_bytes')||0);}catch(e){}if(!bytes)return`Khuyến nghị dưới ${BACKUP_IMPORT_MAX_BYTES/1024/1024} MB.`;return`Backup gần nhất ${backupSizeMB(bytes)} MB (khuyến nghị dưới ${BACKUP_IMPORT_MAX_BYTES/1024/1024} MB).`+(backupSizeWarning(bytes)?' Gần mức khuyến nghị.':'');}
-function backupOverdue(){if(typeof fb!=='undefined'&&fb&&fb.ready)return false;return lastBackupInfo().days>=BACKUP_REMIND_DAYS;}
+function backupCapacityText(){var bytes=0;try{bytes=Number(localStorage.getItem('qclab_lastbackup_bytes')||0);}catch(e){}if(globalThis.backupReminderService)return globalThis.backupReminderService.capacityText(bytes,BACKUP_IMPORT_MAX_BYTES,backupSizeMB,backupSizeWarning);if(!bytes)return`Khuyến nghị dưới ${BACKUP_IMPORT_MAX_BYTES/1024/1024} MB.`;return`Backup gần nhất ${backupSizeMB(bytes)} MB (khuyến nghị dưới ${BACKUP_IMPORT_MAX_BYTES/1024/1024} MB).`+(backupSizeWarning(bytes)?' Gần mức khuyến nghị.':'');}
+function backupOverdue(){var i=lastBackupInfo();if(globalThis.backupReminderService)return globalThis.backupReminderService.overdue(typeof fb!=='undefined'&&fb&&fb.ready,i,BACKUP_REMIND_DAYS);if(typeof fb!=='undefined'&&fb&&fb.ready)return false;return i.days>=BACKUP_REMIND_DAYS;}
 function updateBackupBanner(){
   var dot=document.getElementById('backupDot');if(!dot)return;
+  if(globalThis.backupReminderService){var model=globalThis.backupReminderService.banner(typeof fb!=='undefined'&&fb&&fb.ready,typeof currentUser==='undefined'?null:currentUser,lastBackupInfo(),BACKUP_REMIND_DAYS);dot.hidden=model.hidden;if(!model.hidden){dot.className=model.className;dot.textContent=model.text;dot.title=model.title;}return;}
   if(typeof currentUser==='undefined'||!currentUser||!backupOverdue()){dot.hidden=true;return;}
   var i=lastBackupInfo();dot.hidden=false;dot.className='backup-dot'+(i.never?' crit':'');
   dot.textContent=i.never?'Chưa sao lưu':'Sao lưu: '+i.days+' ngày';

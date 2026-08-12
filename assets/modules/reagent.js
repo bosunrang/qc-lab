@@ -79,7 +79,7 @@ function rcBlandSVG(R){const W=460,H=380,av=R.o.map((v,i)=>(v+R.n[i])/2),up=R.md
   av.forEach((v,i)=>g+=`<circle cx="${A.px(v)}" cy="${A.py(R.d[i])}" r="4.5" fill="${RCC.amber}" fill-opacity="0.8" stroke="#fff" stroke-width="1.2"/>`);
   return`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto" xmlns="http://www.w3.org/2000/svg">${g}</svg>`;}
 /* page */
-function rcSelectOptions(){return state.reagentTests.map(d=>`<option value="${escAttr(d.id)}"${d.id===rcId?' selected':''}>${esc(rcLabel(d))}</option>`).join('');}
+function rcSelectOptions(){return globalThis.reagentSelectOptionsHtml?globalThis.reagentSelectOptionsHtml(state.reagentTests,rcId,escAttr,d=>esc(rcLabel(d))):state.reagentTests.map(d=>`<option value="${escAttr(d.id)}"${d.id===rcId?' selected':''}>${esc(rcLabel(d))}</option>`).join('');}
 function pageReagent(){
   if(!state.reagentTests.length)return headOnly('So sánh 2 lô hóa chất','')+`<div class="panel">${emptyState('Chưa có phép so sánh','Tải lại dữ liệu hoặc tạo phép so sánh mới.','')}</div>`;
   if(!rcId||!state.reagentTests.find(d=>d.id===rcId))rcId=state.reagentTests[0].id;

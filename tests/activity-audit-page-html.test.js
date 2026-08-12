@@ -1,0 +1,20 @@
+const assert=require('node:assert');
+const {spawnSync}=require('node:child_process');
+const {pathToFileURL}=require('node:url');
+const path=require('node:path');
+
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','audit','activity-audit-page-html.ts')).href;
+const program=`import { createActivityAuditPageHtml } from ${JSON.stringify(source)};console.log(createActivityAuditPageHtml()({head:'<header>',exportButton:'<export>',archiveButton:'<archive>',total:7,chainHtml:'<chain>',oversizeWarn:'<warn>',searchValue:'lan',fromDate:'<from>',toDate:'<to>',pageSizeOptions:'<option>25</option>',clearFiltersButton:'<clear>',filteredCount:3,rowsOrEmptyState:'<rows>',pagination:'<pagination>'}));`;
+const result=spawnSync(process.execPath,['--input-type=module','--experimental-strip-types','--eval',program],{encoding:'utf8'});
+assert.equal(result.status,0,result.stderr);
+const html=result.stdout;
+assert.match(html,/^<header>/);
+assert.match(html,/<export>\s*<archive>/);
+assert.match(html,/7 dòng hoạt động đã ghi nhận\. <chain><warn>/);
+assert.match(html,/value="lan"/);
+assert.match(html,/<from>/);
+assert.match(html,/<to>/);
+assert.match(html,/<option>25<\/option>/);
+assert.match(html,/<clear>/);
+assert.match(html,/3\/7 dòng/);
+assert.match(html,/<rows>\s*<pagination>/);

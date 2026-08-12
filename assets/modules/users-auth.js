@@ -1,11 +1,13 @@
 /* ===== USERS PAGE ===== */
 function pageUsers(){
-  const rows=(globalThis.userListModel?globalThis.userListModel(state.users,currentUser&&currentUser.id):state.users).map(u=>`<tr>
+  const users=globalThis.userListModel?globalThis.userListModel(state.users,currentUser&&currentUser.id):state.users;
+  const rows=users.map(u=>globalThis.userRowHtml?globalThis.userRowHtml({user:u,currentUserId:currentUser&&currentUser.id,esc,roleLabel,btn}):`<tr>
     <td><b>${esc(u.name||u.username)}</b><div class="hint">@${esc(u.username)}${u.initials?' · '+esc(u.initials):''}</div></td>
     <td>${roleLabel(u.role)}</td>
     <td>${u.active===false?'<span class="tag rej">Khóa</span>':'<span class="tag ok">Hoạt động</span>'}</td>
     <td><div class="user-row-actions">${u.current||(currentUser&&u.id===currentUser.id)?'<span class="hint">(bạn)</span> '+btn('Đổi mật khẩu',"resetPass('"+u.id+"')",'ghost sm')
       :btn('Sửa quyền',"openUserPerms('"+u.id+"')",'ghost sm')+' '+btn('Đặt lại MK',"resetPass('"+u.id+"')",'ghost sm')+' '+btn(u.active===false?'Mở khóa':'Khóa',"toggleUser('"+u.id+"')",'ghost sm')+' '+btn('Xóa',"delUser('"+u.id+"')",'danger sm')}</div></td></tr>`).join('');
+  if(globalThis.usersPageHtml)return globalThis.usersPageHtml({head:headOnly('Quản lý người dùng','Phân quyền thao tác và kiểm soát tài khoản'),rows,roleOptions:roleSelectOptions('technician'),permissionChecks:userPermChecks(rolePageIds('technician'),'newUserPerms','technician'),addButton:btn('Thêm','addUser()','teal')});
   return headOnly('Quản lý người dùng','Phân quyền thao tác và kiểm soát tài khoản')+
    `<div class="panel"><h2 class="panel-title">Thêm người dùng</h2><div class="user-create-layout">
      <div class="user-create-card">
@@ -78,6 +80,8 @@ function pageAudit(){
   const pageSizeOptions=AUDIT_PAGE_SIZES.map(size=>`<option value="${size}" ${size===auditPageSize?'selected':''}>${size} dòng</option>`).join('');
   const resultFrom=pageInfo?pageInfo.resultFrom:(filtered.length?offset+1:0),resultTo=pageInfo?pageInfo.resultTo:Math.min(offset+auditPageSize,filtered.length);
   const pagination=filtered.length?`<div class="audit-pagination"><span class="hint">Hiển thị ${resultFrom}–${resultTo} / ${filtered.length} dòng</span><div>${btn('‹ Trước',`auditSetPage(${auditPage-1})`,'ghost sm','',{disabled:auditPage<=1})}<b>Trang ${auditPage}/${pageCount}</b>${btn('Sau ›',`auditSetPage(${auditPage+1})`,'ghost sm','',{disabled:auditPage>=pageCount})}</div></div>`:'';
+  const rowsOrEmptyState=rows?`<div class="audit-table-wrap"><table class="audit-table"><thead><tr><th>Thời gian</th><th>Người dùng</th><th>Hành động</th><th>Đối tượng</th><th>Chi tiết</th></tr></thead><tbody>${rows}</tbody></table></div>`:emptyState(total?'Không tìm thấy nhật ký':'Chưa có hoạt động',total?'Thử từ khóa hoặc khoảng ngày khác.':'Nhật ký sẽ bắt đầu ghi từ các thao tác tiếp theo.');
+  if(globalThis.activityAuditPageHtml)return globalThis.activityAuditPageHtml({head:headOnly('Nhật ký hoạt động','Lưu vết các thao tác quan trọng; chỉ quản trị viên được xem'),exportButton:btn('Xuất CSV nhật ký','exportActivityCSV()','teal sm'),archiveButton:total?btn('Lưu trữ nhật ký cũ','archiveActivityLog()','ghost sm'):'',total,chainHtml,oversizeWarn,searchValue:escAttr(auditQ),fromDate:dateBox('auditFromDate',auditFrom,'audit-date',`aria-label="Lọc nhật ký từ ngày" onchange="auditSetDate('from',this.value)"`),toDate:dateBox('auditToDate',auditTo,'audit-date',`aria-label="Lọc nhật ký đến ngày" onchange="auditSetDate('to',this.value)"`),pageSizeOptions,clearFiltersButton:hasFilter?btn('Xóa bộ lọc','auditClearFilters()','ghost sm audit-clear-filter'):'',filteredCount:filtered.length,rowsOrEmptyState,pagination});
   return headOnly('Nhật ký hoạt động','Lưu vết các thao tác quan trọng; chỉ quản trị viên được xem')+
     `<div class="panel"><h2 class="panel-title">Công cụ</h2><div class="row-flex">
       ${btn('Xuất CSV nhật ký','exportActivityCSV()','teal sm')}

@@ -93,6 +93,25 @@ import { createFirebaseRemoteRenderSafetyService } from '../presentation/sync/fi
 import { createFirebaseAppService } from '../application/sync/firebase-app-service';
 import { createFirebaseConfigSourceService } from '../application/sync/firebase-config-source-service';
 import { firebaseReadyState } from '../domain/sync/firebase-ready-state';
+import { parseFirebaseConfig as parseFirebaseConfigTs, validateFirebaseConfig as validateFirebaseConfigTs } from '../application/sync/firebase-config-parser';
+import { storageBytesText as storageBytesTextTs, storageUsageText as storageUsageTextTs } from '../presentation/settings/storage-usage';
+import { createBrandProfile } from '../presentation/settings/brand-profile';
+import { firebaseAclHelp as firebaseAclHelpTs } from '../presentation/settings/firebase-acl-help';
+import { firebaseRulesText as firebaseRulesTextTs } from '../presentation/settings/firebase-rules';
+import { firebaseGuideHtml as firebaseGuideHtmlTs } from '../presentation/settings/firebase-guide-html';
+import { createBackupReminder } from '../presentation/backup/backup-reminder';
+import { createLisQueuePresentation } from '../presentation/lis/lis-queue-presentation';
+import { createLisSettingsService } from '../application/lis/lis-settings-service';
+import { createLabProfileService } from '../application/settings/lab-profile-service';
+import { createFirebaseSettingsService } from '../application/sync/firebase-settings-service';
+import { createBrandPreviewHtml } from '../presentation/settings/brand-preview-html';
+import { createUnitProfileHtml } from '../presentation/settings/unit-profile-html';
+import { createBrandPanelHtml } from '../presentation/settings/brand-panel-html';
+import { createAdminToolsHtml } from '../presentation/settings/admin-tools-html';
+import { createFirebaseRulesPanelHtml } from '../presentation/settings/firebase-rules-panel-html';
+import { createLisGatewayPanelHtml } from '../presentation/settings/lis-gateway-panel-html';
+import { createFirebaseConnectionPanelHtml } from '../presentation/settings/firebase-connection-panel-html';
+import { createSettingsPageLayoutHtml } from '../presentation/settings/settings-page-layout-html';
 import { createIndexedDbOpenService } from '../application/storage/indexeddb-open-service';
 import { createIndexedDbRecordService } from '../application/storage/indexeddb-record-service';
 import { createPartitionedIndexedDbWriteService } from '../application/storage/partitioned-indexeddb-write-service';
@@ -107,12 +126,16 @@ import { createDefaultAdminUser } from '../domain/auth/default-admin-user';
 import { newUserValidationError } from '../domain/auth/new-user-validation';
 import { selectUserPermissions } from '../domain/auth/user-permission-selection';
 import { createActivityAuditFilter } from '../presentation/audit/activity-audit-filter';
+import { createActivityAuditPageHtml } from '../presentation/audit/activity-audit-page-html';
 import { activityAuditPagination } from '../presentation/audit/activity-audit-pagination';
 import { createActivityAuditCsv } from '../presentation/audit/activity-audit-csv';
 import { updateActivityAuditDateRange } from '../presentation/audit/activity-audit-date-range';
 import { ACTIVITY_AUDIT_PAGE_SIZES, activityAuditFilterState } from '../presentation/audit/activity-audit-filter-state';
 import { activityAuditArchiveWindow } from '../presentation/audit/activity-audit-archive-window';
 import { userListModel } from '../presentation/auth/user-list-model';
+import { createUserRowHtml } from '../presentation/auth/user-row-html';
+import { createUsersPageHtml } from '../presentation/auth/users-page-html';
+import { createReagentSelectOptionsHtml } from '../presentation/reagent/reagent-select-options-html';
 import { planPartitionWrite } from '../application/storage/partition-write-policy';
 import { createQcValueFormat } from '../domain/qc/value-format';
 import { createQcStaffIdentity } from '../domain/qc/staff-identity';
@@ -730,6 +753,27 @@ type QCLabGlobal = typeof globalThis & {
   firebaseAppService?: ReturnType<typeof createFirebaseAppService>;
   firebaseConfigSourceService?: ReturnType<typeof createFirebaseConfigSourceService>;
   firebaseReadyState?: typeof firebaseReadyState;
+  firebaseConfigParser?: typeof parseFirebaseConfigTs;
+  firebaseConfigValidator?: typeof validateFirebaseConfigTs;
+  settingsStorageBytesText?: typeof storageBytesTextTs;
+  settingsStorageUsageText?: typeof storageUsageTextTs;
+  settingsBrandProfile?: ReturnType<typeof createBrandProfile>;
+  settingsFirebaseAclHelp?: typeof firebaseAclHelpTs;
+  settingsFirebaseRulesText?: typeof firebaseRulesTextTs;
+  settingsFirebaseGuideHtml?: typeof firebaseGuideHtmlTs;
+  backupReminderService?: ReturnType<typeof createBackupReminder>;
+  lisQueuePresentation?: ReturnType<typeof createLisQueuePresentation>;
+  lisSettingsService?: ReturnType<typeof createLisSettingsService>;
+  labProfileService?: ReturnType<typeof createLabProfileService>;
+  firebaseSettingsService?: ReturnType<typeof createFirebaseSettingsService>;
+  settingsBrandPreviewHtml?: ReturnType<typeof createBrandPreviewHtml>;
+  settingsUnitProfileHtml?: ReturnType<typeof createUnitProfileHtml>;
+  settingsBrandPanelHtml?: ReturnType<typeof createBrandPanelHtml>;
+  settingsAdminToolsHtml?: ReturnType<typeof createAdminToolsHtml>;
+  settingsFirebaseRulesPanelHtml?: ReturnType<typeof createFirebaseRulesPanelHtml>;
+  settingsLisGatewayPanelHtml?: ReturnType<typeof createLisGatewayPanelHtml>;
+  settingsFirebaseConnectionPanelHtml?: ReturnType<typeof createFirebaseConnectionPanelHtml>;
+  settingsPageLayoutHtml?: ReturnType<typeof createSettingsPageLayoutHtml>;
   indexedDbOpenService?: ReturnType<typeof createIndexedDbOpenService>;
   indexedDbRecordService?: ReturnType<typeof createIndexedDbRecordService>;
   partitionedIndexedDbWriteService?: ReturnType<typeof createPartitionedIndexedDbWriteService>;
@@ -747,6 +791,7 @@ type QCLabGlobal = typeof globalThis & {
   newUserValidationError?: typeof newUserValidationError;
   selectUserPermissions?: typeof selectUserPermissions;
   activityAuditFilter?: ReturnType<typeof createActivityAuditFilter>;
+  activityAuditPageHtml?: ReturnType<typeof createActivityAuditPageHtml>;
   activityAuditPagination?: typeof activityAuditPagination;
   activityAuditCsv?: ReturnType<typeof createActivityAuditCsv>;
   updateActivityAuditDateRange?: typeof updateActivityAuditDateRange;
@@ -754,6 +799,9 @@ type QCLabGlobal = typeof globalThis & {
   activityAuditPageSizes?: typeof ACTIVITY_AUDIT_PAGE_SIZES;
   activityAuditArchiveWindow?: typeof activityAuditArchiveWindow;
   userListModel?: typeof userListModel;
+  userRowHtml?: ReturnType<typeof createUserRowHtml>;
+  usersPageHtml?: ReturnType<typeof createUsersPageHtml>;
+  reagentSelectOptionsHtml?: ReturnType<typeof createReagentSelectOptionsHtml>;
   planPartitionWrite?: typeof planPartitionWrite;
   qcValueFormat?: ReturnType<typeof createQcValueFormat>;
   qcStaffIdentity?: ReturnType<typeof createQcStaffIdentity>;
@@ -1250,6 +1298,27 @@ if (typeof (root as any).remoteRenderUnsafe === 'function') root.firebaseRemoteR
 if (typeof (root as any).ensureFirebaseApp === 'function') root.firebaseAppService = createFirebaseAppService({sdk: () => firebase,signature: config => fbConfigSig(config)});
 if (typeof (root as any).getDeployFbCfg === 'function') root.firebaseConfigSourceService = createFirebaseConfigSourceService({cloud: () => (window as any).QCLAB_CLOUD,readStored: () => localStorage.getItem('qclab_fb')});
 root.firebaseReadyState = firebaseReadyState;
+root.firebaseConfigParser = parseFirebaseConfigTs;
+root.firebaseConfigValidator = validateFirebaseConfigTs;
+root.settingsStorageBytesText = storageBytesTextTs;
+root.settingsStorageUsageText = storageUsageTextTs;
+root.settingsBrandProfile = createBrandProfile((value, limit) => (root.QCCore as any).cleanText(value, limit));
+root.settingsFirebaseAclHelp = firebaseAclHelpTs;
+root.settingsFirebaseRulesText = firebaseRulesTextTs;
+root.settingsFirebaseGuideHtml = firebaseGuideHtmlTs;
+root.backupReminderService = createBackupReminder({now: () => Date.now()});
+root.lisQueuePresentation = createLisQueuePresentation({test:id=>(state.tests||[]).find((test:any)=>test.id===id),formatTestValue:(test,value)=>(root as any).fmtTestValue(test,value),format:(value,decimals)=>(root as any).fmt(value,decimals),escape:value=>(root as any).esc(value),escapeAttribute:value=>(root as any).escAttr(value),quoteJs:value=>(root as any).jsq(value),formatDateTime:value=>(root as any).formatDateTimeVN(value),testDisplayName:test=>typeof (root as any).testDisplayName==='function'?(root as any).testDisplayName(test):'',button:(label,action,variant)=>(root as any).btn(label,action,variant),emptyState:(title,message,action)=>(root as any).emptyState(title,message,action),modalCloseButton:action=>(root as any).modalCloseButton(action)});
+root.lisSettingsService = createLisSettingsService(value => root.lisNormalizeGatewayUrl!(value));
+root.labProfileService = createLabProfileService((value, limit) => (root.QCCore as any).cleanText(value, limit), value => root.settingsBrandProfile!(value));
+root.firebaseSettingsService = createFirebaseSettingsService(value => root.firebaseConfigParser!(value));
+root.settingsBrandPreviewHtml = createBrandPreviewHtml(value => (root as any).esc(value), value => (root as any).escAttr(value));
+root.settingsUnitProfileHtml = createUnitProfileHtml({escapeAttribute:value=>(root as any).escAttr(value),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
+root.settingsBrandPanelHtml = createBrandPanelHtml({escapeAttribute:value=>(root as any).escAttr(value),button:(label,action,variant,title,options)=>(root as any).btn(label,action,variant,title,options)});
+root.settingsAdminToolsHtml = createAdminToolsHtml((label,action,variant)=>(root as any).btn(label,action,variant));
+root.settingsFirebaseRulesPanelHtml = createFirebaseRulesPanelHtml({escape:value=>(root as any).esc(value),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
+root.settingsLisGatewayPanelHtml = createLisGatewayPanelHtml({escape:value=>(root as any).esc(value),escapeAttribute:value=>(root as any).escAttr(value),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
+root.settingsFirebaseConnectionPanelHtml = createFirebaseConnectionPanelHtml({escape:value=>(root as any).esc(value),escapeAttribute:value=>(root as any).escAttr(value),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
+root.settingsPageLayoutHtml = createSettingsPageLayoutHtml((title,subtitle)=>(root as any).headOnly(title,subtitle));
 if (typeof LocalStore !== 'undefined') root.indexedDbOpenService = createIndexedDbOpenService({indexedDb: () => typeof indexedDB === 'undefined' ? null : indexedDB});
 if (root.indexedDbOpenService) root.indexedDbRecordService = createIndexedDbRecordService({open: () => root.indexedDbOpenService!.open()});
 root.partitionedIndexedDbWriteService = createPartitionedIndexedDbWriteService({
@@ -1292,6 +1361,7 @@ root.activityAuditFilter = createActivityAuditFilter({
   searchText: value => (globalThis as any).searchText(value), isoDate: value => (globalThis as any).isoDate(value),
   formatDateTime: value => (globalThis as any).formatDateTimeVN(value), roleLabel: value => (globalThis as any).roleLabel(value),
 });
+root.activityAuditPageHtml = createActivityAuditPageHtml();
 root.activityAuditPagination = activityAuditPagination;
 root.activityAuditCsv = createActivityAuditCsv({
   formatDateTime: value => (globalThis as any).formatDateTimeVN(value), roleLabel: value => (globalThis as any).roleLabel(value),
@@ -1301,6 +1371,9 @@ root.activityAuditFilterState = activityAuditFilterState;
 root.activityAuditPageSizes = ACTIVITY_AUDIT_PAGE_SIZES;
 root.activityAuditArchiveWindow = activityAuditArchiveWindow;
 root.userListModel = userListModel;
+root.userRowHtml = createUserRowHtml();
+root.usersPageHtml = createUsersPageHtml();
+root.reagentSelectOptionsHtml = createReagentSelectOptionsHtml();
 if (typeof StateStorageLegacy !== 'undefined') root.storageBootService = createStorageBootService({
   partitionedSupported: () => typeof LocalStore !== 'undefined' && LocalStore.supported(),
   readBootRecord: () => localStorage.getItem('qclab_boot'),

@@ -979,6 +979,50 @@ assert.match(generated, /root\.qcRangeSafetyGate\s*=\s*rangeSafetyGate/,
   'artifact must publish TypeScript QC range safety gate for the legacy bridge');
 assert.match(generated, /root\.qcRangeBiasEvaluation\s*=\s*rangeBiasEvaluation/,
   'artifact must publish TypeScript QC range Bias evaluation for the legacy bridge');
+assert.match(generated, /root\.firebaseConfigParser\s*=/,
+  'artifact must publish the TypeScript Firebase config parser for settings callers');
+assert.match(generated, /root\.firebaseConfigValidator\s*=/,
+  'artifact must publish the TypeScript Firebase config validator for settings callers');
+assert.match(generated, /root\.settingsStorageUsageText\s*=/,
+  'artifact must publish TypeScript storage usage formatting for settings callers');
+assert.match(generated, /root\.settingsBrandProfile\s*=/,
+  'artifact must publish TypeScript brand normalization for settings callers');
+assert.match(generated, /root\.settingsFirebaseAclHelp\s*=/,
+  'artifact must publish TypeScript Firebase ACL guidance for settings callers');
+assert.match(generated, /root\.settingsFirebaseRulesText\s*=/,
+  'artifact must publish TypeScript Firebase Rules text for settings callers');
+assert.match(generated, /root\.settingsFirebaseGuideHtml\s*=/,
+  'artifact must publish TypeScript Firebase guide HTML for settings callers');
+assert.match(generated, /root\.backupReminderService\s*=\s*createBackupReminder/,
+  'artifact must publish TypeScript backup reminder state for legacy callers');
+assert.match(generated, /root\.lisQueuePresentation\s*=\s*createLisQueuePresentation/,
+  'artifact must publish TypeScript LIS queue presentation for legacy callers');
+assert.match(generated, /root\.lisSettingsService\s*=\s*createLisSettingsService/,
+  'artifact must publish TypeScript LIS settings validation for legacy callers');
+assert.match(generated, /root\.labProfileService\s*=\s*createLabProfileService/,
+  'artifact must publish TypeScript lab profile updates for settings callers');
+assert.match(generated, /root\.firebaseSettingsService\s*=\s*createFirebaseSettingsService/,
+  'artifact must publish TypeScript Firebase settings validation for settings callers');
+assert.match(generated, /root\.settingsBrandPreviewHtml\s*=\s*createBrandPreviewHtml/,
+  'artifact must publish TypeScript brand preview HTML for settings callers');
+assert.match(generated, /root\.settingsUnitProfileHtml\s*=\s*createUnitProfileHtml/,
+  'artifact must publish TypeScript unit profile HTML for settings callers');
+assert.match(generated, /root\.settingsBrandPanelHtml\s*=\s*createBrandPanelHtml/,
+  'artifact must publish TypeScript brand panel HTML for settings callers');
+assert.match(generated, /root\.settingsAdminToolsHtml\s*=\s*createAdminToolsHtml/,
+  'artifact must publish TypeScript admin tools HTML for settings callers');
+assert.match(generated, /root\.settingsFirebaseRulesPanelHtml\s*=\s*createFirebaseRulesPanelHtml/,
+  'artifact must publish TypeScript Firebase Rules panel HTML for settings callers');
+assert.match(generated, /root\.settingsLisGatewayPanelHtml\s*=\s*createLisGatewayPanelHtml/,
+  'artifact must publish TypeScript LIS Gateway panel HTML for settings callers');
+assert.match(generated, /root\.settingsFirebaseConnectionPanelHtml\s*=\s*createFirebaseConnectionPanelHtml/,
+  'artifact must publish TypeScript Firebase connection panel HTML for settings callers');
+assert.match(generated, /root\.settingsPageLayoutHtml\s*=\s*createSettingsPageLayoutHtml/,
+  'artifact must publish TypeScript settings page layout HTML for settings callers');
+assert.match(generated, /root\.userRowHtml\s*=\s*createUserRowHtml/, 'artifact must publish TypeScript user row HTML for the legacy bridge');
+assert.match(generated, /root\.usersPageHtml\s*=\s*createUsersPageHtml/, 'artifact must publish TypeScript users page HTML for the legacy bridge');
+assert.match(generated, /root\.activityAuditPageHtml\s*=\s*createActivityAuditPageHtml/, 'artifact must publish TypeScript activity audit page HTML for the legacy bridge');
+assert.match(generated, /root\.reagentSelectOptionsHtml\s*=\s*createReagentSelectOptionsHtml/, 'artifact must publish TypeScript reagent selector options for the legacy bridge');
 assert.match(generated, /root\.csvCellService\s*=\s*csvCell/,
   'artifact must publish TypeScript CSV cell encoder for the legacy bridge');
 assert.match(generated, /root\.reportExportHelpers\s*=\s*reportExportHelpers/,

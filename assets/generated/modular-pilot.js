@@ -3556,6 +3556,405 @@
 		};
 	}
 	//#endregion
+	//#region src/application/sync/firebase-config-parser.ts
+	var requiredKeys = [
+		"apiKey",
+		"authDomain",
+		"databaseURL",
+		"projectId",
+		"appId"
+	];
+	function validateFirebaseConfig(config) {
+		if (!config || typeof config !== "object" || Array.isArray(config)) throw new Error("Firebase config phải là một object.");
+		const value = config;
+		const missing = requiredKeys.filter((key) => !String(value[key] || "").trim());
+		if (missing.length) throw new Error("Firebase config thiếu: " + missing.join(", ") + ".");
+		return value;
+	}
+	function parseFirebaseConfig(raw) {
+		const input = String(raw || "").trim();
+		if (!input) throw new Error("Dán Firebase config trước khi kết nối.");
+		try {
+			return validateFirebaseConfig(JSON.parse(input));
+		} catch {}
+		const start = input.indexOf("{");
+		const end = input.lastIndexOf("}");
+		if (start < 0 || end <= start) throw new Error("Không tìm thấy object firebaseConfig. Hãy dán đoạn Config từ Firebase console.");
+		const normalized = input.slice(start, end + 1).replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1").replace(/([{,]\s*)([A-Za-z_$][\w$]*)\s*:/g, "$1\"$2\":").replace(/,\s*([}\]])/g, "$1");
+		try {
+			return validateFirebaseConfig(JSON.parse(normalized));
+		} catch {
+			throw new Error("Firebase config không hợp lệ. Có thể dán nguyên đoạn từ tab Config của Firebase console, ví dụ: const firebaseConfig = { ... };");
+		}
+	}
+	//#endregion
+	//#region src/presentation/settings/storage-usage.ts
+	function storageBytesText(bytes) {
+		const amount = Math.max(0, Number(bytes) || 0);
+		const units = [
+			"B",
+			"KB",
+			"MB",
+			"GB",
+			"TB"
+		];
+		let value = amount;
+		let unit = 0;
+		while (value >= 1024 && unit < units.length - 1) {
+			value /= 1024;
+			unit++;
+		}
+		return (value < 10 && unit > 0 ? value.toFixed(1) : Math.round(value).toLocaleString("vi-VN")) + " " + units[unit];
+	}
+	function storageUsageText(data, estimate) {
+		const points = Object.values(data || {}).reduce((sum, list) => sum + (Array.isArray(list) ? list.length : 0), 0);
+		if (!estimate || typeof estimate !== "object") return `Số điểm QC: ${points.toLocaleString("vi-VN")}.\n\nTrình duyệt này không cung cấp thông tin hạn mức lưu trữ.`;
+		const usage = Math.max(0, Number(estimate.usage) || 0);
+		const quota = Math.max(0, Number(estimate.quota) || 0);
+		const indexed = estimate.usageDetails && Number.isFinite(Number(estimate.usageDetails.indexedDB)) ? Math.max(0, Number(estimate.usageDetails.indexedDB)) : null;
+		const ratio = quota ? Math.min(100, usage / quota * 100) : null;
+		return `Số điểm QC: ${points.toLocaleString("vi-VN")}.\nDung lượng IndexedDB: ${indexed == null ? "trình duyệt không tách riêng" : storageBytesText(indexed)}.\nTổng dung lượng app đang dùng: ${storageBytesText(usage)}${quota ? " / " + storageBytesText(quota) : ""}${ratio == null ? "" : " (" + ratio.toFixed(2) + "%)"}.`;
+	}
+	//#endregion
+	//#region src/presentation/settings/brand-profile.ts
+	function createBrandProfile(cleanText) {
+		return (lab) => {
+			const value = lab || {};
+			return {
+				brandTitle: cleanText(value.brandTitle || "QC Lab", 80),
+				brandSub: cleanText(value.brandSub || "Nội kiểm xét nghiệm", 120),
+				logoText: cleanText(value.logoText || "QC", 8).slice(0, 4),
+				logoData: cleanText(value.logoData || "", 12e4)
+			};
+		};
+	}
+	//#endregion
+	//#region src/presentation/settings/firebase-acl-help.ts
+	function firebaseAclHelp(labCode, uid) {
+		const code = String(labCode || "");
+		return `Đăng nhập Firebase đã thành công nhưng tài khoản chưa có quyền với mã phòng "${code}".\n\nVào Realtime Database → Data và tạo:\nqclab-acl/${code}/${String(uid || "UID_TAI_KHOAN_FIREBASE")} = true\n\nSau đó bấm Lưu & kết nối lại.`;
+	}
+	//#endregion
+	//#region src/presentation/settings/firebase-rules.ts
+	function firebaseRulesText() {
+		return `{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "qclab-acl": {
+      "$labCode": {
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": false
+        }
+      }
+    },
+    "qclab-shared": {
+      "$labCode": {
+        ".read":  "auth != null && root.child('qclab-acl').child($labCode).child(auth.uid).exists()",
+        ".write": "auth != null && root.child('qclab-acl').child($labCode).child(auth.uid).exists()",
+        ".validate": "newData.hasChildren(['_ts'])",
+        "_ts": { ".validate": "newData.isNumber()" },
+        "_client": { ".validate": "newData.isString()" }
+      }
+    }
+  }
+}`;
+	}
+	//#endregion
+	//#region src/presentation/settings/firebase-guide-html.ts
+	function firebaseGuideStep(number, title, body) {
+		return `<div class="fb-step"><div class="fb-num">${number}</div><div class="fb-step-body"><h4>${title}</h4>${body}</div></div>`;
+	}
+	function firebaseGuideHtml() {
+		return `<details class="firebase-guide"><summary>Hướng dẫn Firebase chi tiết</summary>
+    <div class="firebase-guide-body">
+      ${firebaseGuideStep(1, "Bật đăng nhập Email/Password", "<p>Firebase Console → Authentication → Sign-in method: tắt <b>Anonymous</b>, bật <b>Email/Password</b>.</p>")}
+      ${firebaseGuideStep(2, "Tạo tài khoản, lấy UID", "<p>Authentication → Users → Add user — mỗi máy/người 1 tài khoản, sau đó copy <b>User UID</b>.</p>")}
+      ${firebaseGuideStep(3, "Thêm UID vào danh sách được phép", "<p>Realtime Database → Data, tạo đúng cấu trúc theo mã phòng (labCode) đang dùng:</p><pre>qclab-acl\n  khoaXN\n    UID_TAI_KHOAN_1: true\n    UID_TAI_KHOAN_2: true</pre><p>Đổi labCode thành <code>labA</code> thì ACL nằm ở <code>qclab-acl/labA/{uid}</code>.</p>")}
+      ${firebaseGuideStep(4, "Dán Rules", "<p>Realtime Database → Rules → dán nguyên nội dung khung <b>Firebase Rules</b> bên dưới → Publish. Không sửa <code>$labCode</code>/<code>$uid</code>.</p>")}
+      ${firebaseGuideStep(5, "Kết nối trong app", "<p>Thẻ Đồng bộ Đám mây → nhập labCode, email/mật khẩu, dán Firebase config → bấm <b>Lưu &amp; kết nối</b>.</p>")}
+    </div>
+  </details>`;
+	}
+	//#endregion
+	//#region src/presentation/backup/backup-reminder.ts
+	function createBackupReminder(deps) {
+		const dayMs = deps.dayMs || 864e5;
+		const lastBackupInfo = (raw) => {
+			if (!raw) return {
+				never: true,
+				days: Infinity
+			};
+			const timestamp = new Date(String(raw)).getTime();
+			if (Number.isNaN(timestamp)) return {
+				never: true,
+				days: Infinity
+			};
+			return {
+				never: false,
+				ts: timestamp,
+				days: Math.floor((deps.now() - timestamp) / dayMs)
+			};
+		};
+		const statusText = (cloudReady, info) => {
+			if (cloudReady) return "Đang đồng bộ đám mây — đã có bản sao từ xa.";
+			if (info.never) return "Chưa sao lưu trên máy này.";
+			if (info.days <= 0) return "Sao lưu gần nhất: hôm nay.";
+			return "Sao lưu gần nhất: " + info.days + " ngày trước.";
+		};
+		const capacityText = (bytes, maxBytes, sizeMb, warning) => {
+			const value = Number(bytes) || 0;
+			const limit = Number(maxBytes) / 1024 / 1024;
+			if (!value) return `Khuyến nghị dưới ${limit} MB.`;
+			return `Backup gần nhất ${sizeMb(value)} MB (khuyến nghị dưới ${limit} MB).` + (warning(value) ? " Gần mức khuyến nghị." : "");
+		};
+		const overdue = (cloudReady, info, remindDays) => !cloudReady && info.days >= Number(remindDays);
+		const banner = (cloudReady, currentUser, info, remindDays) => {
+			if (!currentUser || !overdue(cloudReady, info, remindDays)) return {
+				hidden: true,
+				className: "",
+				text: "",
+				title: ""
+			};
+			const text = info.never ? "Chưa sao lưu" : "Sao lưu: " + info.days + " ngày";
+			const title = (info.never ? "Bạn chưa sao lưu dữ liệu trên máy này." : "Đã " + info.days + " ngày chưa sao lưu dữ liệu.") + " Dữ liệu lưu trong trình duyệt — nhấn để xuất backup ngay.";
+			return {
+				hidden: false,
+				className: "backup-dot" + (info.never ? " crit" : ""),
+				text,
+				title
+			};
+		};
+		return {
+			lastBackupInfo,
+			statusText,
+			capacityText,
+			overdue,
+			banner
+		};
+	}
+	//#endregion
+	//#region src/presentation/lis/lis-queue-presentation.ts
+	function createLisQueuePresentation(deps) {
+		const valueText = (record) => {
+			const message = record.message || {}, resolved = record.resolved;
+			const test = resolved && resolved.ok ? deps.test(resolved.qclabTestId) : null;
+			return (test ? deps.formatTestValue(test, message.value) : deps.format(message.value, 3)) + (message.unit ? " " + deps.escape(message.unit) : "");
+		};
+		const onclick = (functionName, messageId) => deps.escapeAttribute(`${functionName}('${deps.quoteJs(messageId)}')`);
+		const rowHtml = (record) => {
+			const message = record.message || {}, resolved = record.resolved;
+			const when = deps.formatDateTime(message.measuredAt) || message.measuredAt || "—";
+			if (resolved && resolved.ok) {
+				const test = deps.test(resolved.qclabTestId);
+				const name = deps.testDisplayName(test) || resolved.displayName || resolved.qclabTestId;
+				return `<tr><td>${deps.escape(when)}</td><td><b>${deps.escape(name)}</b><div class="hint">M${deps.escape(resolved.level)} · Lô ${deps.escape(resolved.lot || "—")}</div></td><td class="num">${valueText(record)}</td><td>${deps.escape(message.runId || "—")}${message.operator ? " · " + deps.escape(message.operator) : ""}</td><td class="acts">${deps.button("Nhận", onclick("lisQueueImport", message.messageId), "teal sm")}${deps.button("Bỏ", onclick("lisQueueReject", message.messageId), "ghost sm")}</td></tr>`;
+			}
+			return `<tr><td>${deps.escape(when)}</td><td><b>${deps.escape(message.analyzerId)}/${deps.escape(message.testCode)}</b><div class="hint">${deps.escape(resolved && resolved.reason || "Chưa khớp cấu hình")}</div></td><td class="num">${valueText(record)}</td><td>${deps.escape(message.runId || "—")}${message.operator ? " · " + deps.escape(message.operator) : ""}</td><td class="acts">${deps.button("Bỏ", onclick("lisQueueReject", message.messageId), "ghost sm")}</td></tr>`;
+		};
+		const sectionHtml = (title, records, emptyText) => {
+			if (!records.length) return `<h4>${deps.escape(title)}</h4><div class="hint">${deps.escape(emptyText)}</div>`;
+			const rows = records.map(rowHtml).join("");
+			return `<h4>${deps.escape(title)} (${records.length})</h4><div class="table-wrap"><table class="lis-queue-table"><thead><tr><th>Thời gian đo</th><th>Xét nghiệm</th><th class="num">Giá trị</th><th>Lần chạy · NV</th><th><span class="sr-only">Thao tác</span></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+		};
+		const modalHtml = (pending, unresolved) => {
+			const body = pending.length || unresolved.length ? sectionHtml("Sẵn sàng nhận", pending, "") + (unresolved.length ? `<div class="flow-panel">${sectionHtml("Chưa khớp cấu hình", unresolved, "")}</div>` : "") : deps.emptyState("Hàng chờ trống", "Không có kết quả QC nào đang chờ từ LIS Gateway.", "");
+			return `<div class="modal" style="width:820px"><div class="modal-h"><h3>QC chờ nhập từ LIS</h3>${deps.modalCloseButton("closeModal()")}</div><div class="modal-b" tabindex="0">${body}</div><div class="modal-f">${deps.button("Làm mới", "lisQueueRefresh()", "ghost")}${deps.button("Đóng", "closeModal()", "ghost")}</div></div>`;
+		};
+		return {
+			valueText,
+			onclick,
+			rowHtml,
+			sectionHtml,
+			modalHtml
+		};
+	}
+	//#endregion
+	//#region src/application/lis/lis-settings-service.ts
+	function createLisSettingsService(normalizeGatewayUrl) {
+		const prepare = (input) => {
+			const enabled = !!input.enabled;
+			const url = normalizeGatewayUrl(input.url);
+			const token = String(input.token || "").trim() || String(input.savedToken || "");
+			if (!url) return {
+				ok: false,
+				error: "invalid-url"
+			};
+			if (enabled && !token) return {
+				ok: false,
+				error: "missing-token"
+			};
+			return {
+				ok: true,
+				settings: {
+					enabled,
+					url,
+					token
+				}
+			};
+		};
+		return { prepare };
+	}
+	//#endregion
+	//#region src/application/settings/lab-profile-service.ts
+	function createLabProfileService(cleanText, brandProfile) {
+		const updateLab = (current, input) => ({
+			...current || {},
+			name: cleanText(input.name),
+			dept: cleanText(input.dept),
+			address: cleanText(input.address, 5e3)
+		});
+		const updateBrand = (current, input) => ({
+			...current || {},
+			...brandProfile({
+				brandTitle: input.brandTitle || "QC Lab",
+				brandSub: input.brandSub || "Nội kiểm xét nghiệm",
+				logoText: input.logoText || "QC",
+				logoData: current && current.logoData
+			})
+		});
+		const updateLogo = (current, logoData) => ({
+			...current || {},
+			logoData: String(logoData || "")
+		});
+		const clearLogo = (current) => updateLogo(current, "");
+		return {
+			updateLab,
+			updateBrand,
+			updateLogo,
+			clearLogo
+		};
+	}
+	//#endregion
+	//#region src/application/sync/firebase-settings-service.ts
+	function createFirebaseSettingsService(parseConfig) {
+		const prepare = (input) => {
+			const config = parseConfig(input.config);
+			const labCode = String(input.labCode || "").trim() || "default";
+			const email = String(input.email || "").trim();
+			const password = String(input.password || "");
+			if (!email || !password) return {
+				ok: false,
+				error: "missing-credentials"
+			};
+			return {
+				ok: true,
+				labCode,
+				email,
+				password,
+				config
+			};
+		};
+		return { prepare };
+	}
+	//#endregion
+	//#region src/presentation/settings/brand-preview-html.ts
+	function createBrandPreviewHtml(escape, escapeAttribute) {
+		return (input) => {
+			const logo = input.logo;
+			return `<div class="brand-preview"><div class="brand-mark">${logo ? `<img src="${escapeAttribute(logo)}" alt="">` : escape(input.markText)}</div><div><b>${escape(input.title)}</b><small>${escape(input.subtitle)}</small></div></div>`;
+		};
+	}
+	//#endregion
+	//#region src/presentation/settings/unit-profile-html.ts
+	function createUnitProfileHtml(deps) {
+		return (lab) => {
+			const value = lab || {};
+			return `<div class="panel"><h2 class="panel-title">Thông tin đơn vị</h2>
+      <div class="settings-unit-fields"><div><label>Tên bệnh viện / đơn vị</label><input id="labName" aria-label="Tên bệnh viện / đơn vị" value="${deps.escapeAttribute(value.name || "")}"></div>
+        <div><label>Khoa / phòng</label><input id="labDept" aria-label="Khoa / phòng" value="${deps.escapeAttribute(value.dept || "")}"></div>
+        <div><label>Địa chỉ</label><input id="labAddr" aria-label="Địa chỉ" value="${deps.escapeAttribute(value.address || "")}"></div></div>
+     <div class="settings-panel-actions">${deps.button("Lưu thông tin", "saveLab()", "teal")}</div>
+    </div>`;
+		};
+	}
+	//#endregion
+	//#region src/presentation/settings/brand-panel-html.ts
+	function createBrandPanelHtml(deps) {
+		return (input) => `<div class="panel"><h2 class="panel-title">Logo & tên phần mềm</h2>
+     <div class="grid2">
+       <div>
+         <label>Tên hiển thị trên thanh bên</label><input id="brandTitle" aria-label="Tên hiển thị trên thanh bên" value="${deps.escapeAttribute(input.title || "")}">
+         <label>Dòng phụ</label><input id="brandSub" aria-label="Dòng phụ" value="${deps.escapeAttribute(input.subtitle || "")}">
+         <label>Chữ trong logo khi chưa dùng ảnh</label><input id="logoText" aria-label="Chữ trong logo khi chưa dùng ảnh" maxlength="4" value="${deps.escapeAttribute(input.markText || "")}">
+       </div>
+       <div>
+         <label>Logo hiện tại</label>${input.previewHtml || ""}
+         <label>Chọn ảnh logo</label>
+         <div class="file-pick">${deps.button("Chọn tệp", "document.getElementById('logoFile').click()", "ghost sm", "", { attrs: { type: "button" } })}<span id="logoFileName" class="hint">Chưa chọn tệp</span></div>
+         <input id="logoFile" type="file" accept="image/*" style="display:none" onchange="pickLogo(event)">
+         <div class="hint settings-brand-note">Nên dùng ảnh vuông PNG/JPG, dung lượng nhỏ. Logo được lưu cùng dữ liệu phần mềm.</div>
+       </div>
+     </div>
+     <div class="settings-panel-actions">${deps.button("Lưu logo", "saveBrand()", "teal")}${deps.button("Bỏ ảnh logo", "clearLogo()", "ghost")}</div>
+    </div>`;
+	}
+	//#endregion
+	//#region src/presentation/settings/admin-tools-html.ts
+	function createAdminToolsHtml(button) {
+		return (backupStatus, backupCapacity) => `<div class="panel"><h2 class="panel-title">Quản trị dữ liệu</h2>
+     <div class="admin-tools">
+        <div class="admin-tool"><b>Xuất backup</b><span>Lưu dữ liệu hiện tại ra file. ${backupStatus} ${backupCapacity}</span>${button("Xuất backup", "exportData()", "ghost")}</div>
+        <div class="admin-tool"><b>Nhập backup</b><span>Khôi phục dữ liệu từ file backup đã xuất. Chỉ quản trị viên được nhập.</span>${button("Chọn file backup", "document.getElementById('imp').click()", "ghost")}<input id="imp" type="file" accept="application/json" style="display:none" onchange="importData(event)"></div>
+        <div class="admin-tool"><b>Kiểm tra backup</b><span>Kiểm tra checksum, cấu trúc và số điểm — không ảnh hưởng dữ liệu đang dùng.</span>${button("Chọn file để kiểm tra", "document.getElementById('verifyBackup').click()", "ghost")}<input id="verifyBackup" type="file" accept="application/json" style="display:none" onchange="verifyBackupFile(event)"></div>
+        <div class="admin-tool"><b>Dung lượng cục bộ</b><span>Xem số điểm QC và dung lượng trình duyệt đang dùng.</span>${button("Kiểm tra dung lượng", "checkStorageUsage()", "ghost")}</div>
+        <div class="admin-tool"><b>Xóa sạch dữ liệu test</b><span>Xóa toàn bộ dữ liệu, giữ lại tài khoản đang đăng nhập.</span>${button("Xóa sạch dữ liệu", "resetAllData()", "danger")}</div>
+      </div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/settings/firebase-rules-panel-html.ts
+	function createFirebaseRulesPanelHtml(deps) {
+		return (guideHtml, rulesText) => `<div class="panel"><h2 class="panel-title">Firebase Rules</h2>
+     ${guideHtml}
+     <div class="rules-tools"><span>Copy cố định vào Realtime Database → Rules. Không sửa <code>$labCode</code> hoặc <code>$uid</code>.</span>${deps.button("Copy rules", "copyFirebaseRules()", "ghost sm")}</div>
+     <pre class="rules-code" tabindex="0">${deps.escape(rulesText)}</pre></div>`;
+	}
+	//#endregion
+	//#region src/presentation/settings/lis-gateway-panel-html.ts
+	function createLisGatewayPanelHtml(deps) {
+		return (input) => {
+			const status = input.status === "ok" ? "ok" : input.status === "error" ? "rej" : "";
+			const token = String(input.token || "");
+			return `<div class="panel lis-gateway-panel"><h2 class="panel-title">LIS Gateway (thử nghiệm)</h2>
+     <div class="lis-gateway-body"><div class="lis-gateway-grid"><div><label for="lisGatewayUrl">Địa chỉ Gateway cục bộ</label><input id="lisGatewayUrl" value="${deps.escapeAttribute(input.url || "")}" placeholder="http://127.0.0.1:8787"></div><div><label for="lisGatewayToken">Bearer token${token ? " (đã lưu — để trống nếu giữ nguyên)" : ""}</label><input id="lisGatewayToken" type="password" autocomplete="off" placeholder="${token ? "••••••••" : "Dán token in ra khi chạy npm run lis:gateway"}"></div><label class="lis-gateway-toggle"><input id="lisGatewayEnabled" type="checkbox" ${input.enabled ? "checked" : ""}><span>Tự động kiểm tra hàng chờ mỗi 5 phút</span></label></div>
+       <div id="lisGatewayStatus" class="alert ${status}">${deps.escape(input.statusText || "")}</div>
+       <div class="hint">Lấy kết quả nội kiểm mà middleware LIS đã đẩy vào Gateway. Kết quả KHÔNG tự thành điểm QC — phải mở hàng chờ và xác nhận từng dòng thì mới ghi vào dữ liệu nội kiểm. Không nhận dữ liệu bệnh nhân. Prototype chỉ cho phép localhost:8787.</div></div>
+     <div class="settings-panel-actions">${deps.button("Lưu &amp; kiểm tra", "lisGatewaySaveSettings()", "teal")}${deps.button("Xem hàng chờ QC", "lisOpenQueueModal()", "ghost")}</div></div>`;
+		};
+	}
+	//#endregion
+	//#region src/presentation/settings/firebase-connection-panel-html.ts
+	function createFirebaseConnectionPanelHtml(deps) {
+		return (input) => {
+			const locked = !!input.locked;
+			const readOnly = locked ? "readonly" : "";
+			const config = input.config ? JSON.stringify(input.config, null, 2) : "";
+			const lockNote = locked ? `<div class="hint flow-note">Bản deploy này khóa sẵn <code>${deps.escape(input.dataPath || "")}</code>. Muốn đổi mã phòng cần sửa <code>assets/modules/app-meta.js</code>.</div>` : "";
+			return `<div class="panel firebase-sync-panel"><h2 class="panel-title">Đồng bộ Đám mây (Firebase Realtime Database)</h2>
+     <div class="firebase-auth-grid"><div><label>Mã phòng</label><input id="fbCode" aria-label="Mã phòng" value="${deps.escapeAttribute(input.labCode || "khoaXN")}" ${readOnly}></div>
+       <div><label>Email Firebase Authentication</label><input id="fbEmail" aria-label="Email Firebase Authentication" type="email" autocomplete="username" value="${deps.escapeAttribute(input.email || "")}"></div>
+       <div><label>Mật khẩu Firebase</label><input id="fbPassword" type="password" autocomplete="current-password" placeholder="Chỉ dùng để đăng nhập, không lưu"></div></div>
+     ${lockNote}
+     <label>Firebase config (dán nguyên đoạn từ tab Config của Firebase console)</label>
+     <textarea id="fbConfig" class="firebase-config-input" ${readOnly} placeholder='const firebaseConfig = {
+  apiKey: "...",
+  authDomain: "yourapp.firebaseapp.com",
+  databaseURL: "https://yourapp-default-rtdb.firebaseio.com",
+  projectId: "yourapp",
+  storageBucket: "yourapp.firebasestorage.app",
+  messagingSenderId: "...",
+  appId: "..."
+};'>${deps.escape(config)}</textarea>
+     <div class="firebase-actions">${deps.button("Lưu &amp; kết nối", "saveFb()", "teal")} ${deps.button("Ngắt đám mây", "clearFb()", "ghost")}</div></div>`;
+		};
+	}
+	//#endregion
+	//#region src/presentation/settings/settings-page-layout-html.ts
+	function createSettingsPageLayoutHtml(head) {
+		return (input) => head("Cài đặt & Đồng bộ", "Thông tin đơn vị, backup và kết nối Firebase") + `<div class="settings-profile-grid">${input.profileHtml}</div>${input.adminHtml}<div class="settings-cloud-grid">${input.firebaseHtml}${input.lisHtml}</div>${input.rulesHtml}`;
+	}
+	//#endregion
 	//#region src/application/storage/indexeddb-open-service.ts
 	function createIndexedDbOpenService(deps) {
 		const databaseName = deps.databaseName || "qclab-local", databaseVersion = deps.databaseVersion || 1, storeName = deps.storeName || "snapshots";
@@ -3901,6 +4300,20 @@
 		};
 	}
 	//#endregion
+	//#region src/presentation/audit/activity-audit-page-html.ts
+	function createActivityAuditPageHtml() {
+		return (input) => `${input.head}
+    <div class="panel"><h2 class="panel-title">Công cụ</h2><div class="row-flex">
+      ${input.exportButton}
+      ${input.archiveButton}
+      <div class="hint audit-summary-status">${input.total} dòng hoạt động đã ghi nhận. ${input.chainHtml}${input.oversizeWarn}</div>
+    </div></div>
+    <div class="panel audit-log-panel"><div class="audit-log-head"><h2 class="panel-title">Hoạt động gần đây</h2><input id="auditSearch" type="search" aria-label="Tìm nhật ký hoạt động" placeholder="Tìm người dùng, hành động, đối tượng..." value="${input.searchValue}" oninput="auditSetQuery(this.value)"></div>
+      <div class="audit-filterbar"><div><label>Từ ngày</label>${input.fromDate}</div><div><label>Đến ngày</label>${input.toDate}</div><div><label>Số dòng mỗi trang</label><select aria-label="Số dòng nhật ký mỗi trang" onchange="auditSetPageSize(this.value)">${input.pageSizeOptions}</select></div>${input.clearFiltersButton}<div class="audit-filter-summary" role="status">${input.filteredCount}/${input.total} dòng</div></div>
+      ${input.rowsOrEmptyState}
+      ${input.pagination}</div>`;
+	}
+	//#endregion
 	//#region src/presentation/audit/activity-audit-pagination.ts
 	function activityAuditPagination(items, page, pageSize) {
 		const rows = Array.isArray(items) ? items : [];
@@ -4028,6 +4441,45 @@
 			active: user.active !== false,
 			current: String(user.id || "") === String(currentUserId || "")
 		}));
+	}
+	//#endregion
+	//#region src/presentation/auth/user-row-html.ts
+	function createUserRowHtml() {
+		return ({ user, currentUserId, esc, roleLabel, btn }) => {
+			const actions = Boolean(user.current || currentUserId && user.id === currentUserId) ? `<span class="hint">(bạn)</span> ${btn("Đổi mật khẩu", `resetPass('${user.id}')`, "ghost sm")}` : `${btn("Sửa quyền", `openUserPerms('${user.id}')`, "ghost sm")} ${btn("Đặt lại MK", `resetPass('${user.id}')`, "ghost sm")} ${btn(user.active === false ? "Mở khóa" : "Khóa", `toggleUser('${user.id}')`, "ghost sm")} ${btn("Xóa", `delUser('${user.id}')`, "danger sm")}`;
+			return `<tr>
+    <td><b>${esc(user.name || user.username)}</b><div class="hint">@${esc(user.username)}${user.initials ? " · " + esc(user.initials) : ""}</div></td>
+    <td>${roleLabel(user.role)}</td>
+    <td>${user.active === false ? "<span class=\"tag rej\">Khóa</span>" : "<span class=\"tag ok\">Hoạt động</span>"}</td>
+    <td><div class="user-row-actions">${actions}</div></td></tr>`;
+		};
+	}
+	//#endregion
+	//#region src/presentation/auth/users-page-html.ts
+	function createUsersPageHtml() {
+		return ({ head, rows, roleOptions, permissionChecks, addButton }) => `${head}
+   <div class="panel"><h2 class="panel-title">Thêm người dùng</h2><div class="user-create-layout">
+     <div class="user-create-card">
+       <div class="user-create-card-title">Thông tin tài khoản</div>
+       <div class="user-create-fields">
+       <div><label>Tên đăng nhập</label><input id="uUser" placeholder="vd: lan.nt"></div>
+       <div><label>Họ tên</label><input id="uName" aria-label="Họ tên"></div>
+       <div><label>Mã viết tắt</label><input id="uInitials" maxlength="12" placeholder="NTL"></div>
+       <div><label>Vai trò</label><select id="uRole" aria-label="Vai trò" onchange="syncUserPermChecks('newUserPerms',this.value)">${roleOptions}</select></div>
+       <div><label>Mật khẩu tạm</label><input id="uPass" aria-label="Mật khẩu tạm" type="password" autocomplete="new-password"></div>
+       <div class="user-create-actions">${addButton}</div>
+       </div>
+     </div>
+     <div class="user-create-card"><div class="user-create-card-title">Thẻ được phép dùng</div><div class="user-perm-block">${permissionChecks}</div></div>
+     </div>
+     <div class="hint user-create-hint"><b>Vai trò</b> quyết định quyền sửa/quản trị trong các thẻ được tick. <b>KTV:</b> nhập/sửa dữ liệu vận hành · <b>Chỉ xem:</b> chỉ đọc. Người dùng mới sẽ phải đổi mật khẩu khi đăng nhập lần đầu.</div></div>
+   <div class="panel"><h2 class="panel-title">Danh sách người dùng</h2>
+     <div class="user-table-wrap"><table class="user-table"><thead><tr><th>Người dùng</th><th>Vai trò</th><th>Trạng thái</th><th>Hành động</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/reagent/reagent-select-options-html.ts
+	function createReagentSelectOptionsHtml() {
+		return (items, selectedId, escAttr, label) => (Array.isArray(items) ? items : []).map((item) => `<option value="${escAttr(item.id)}"${item.id === selectedId ? " selected" : ""}>${label(item)}</option>`).join("");
 	}
 	//#endregion
 	//#region src/application/storage/partition-write-policy.ts
@@ -12307,6 +12759,56 @@
 		readStored: () => localStorage.getItem("qclab_fb")
 	});
 	root.firebaseReadyState = firebaseReadyState;
+	root.firebaseConfigParser = parseFirebaseConfig;
+	root.firebaseConfigValidator = validateFirebaseConfig;
+	root.settingsStorageBytesText = storageBytesText;
+	root.settingsStorageUsageText = storageUsageText;
+	root.settingsBrandProfile = createBrandProfile((value, limit) => root.QCCore.cleanText(value, limit));
+	root.settingsFirebaseAclHelp = firebaseAclHelp;
+	root.settingsFirebaseRulesText = firebaseRulesText;
+	root.settingsFirebaseGuideHtml = firebaseGuideHtml;
+	root.backupReminderService = createBackupReminder({ now: () => Date.now() });
+	root.lisQueuePresentation = createLisQueuePresentation({
+		test: (id) => (state.tests || []).find((test) => test.id === id),
+		formatTestValue: (test, value) => root.fmtTestValue(test, value),
+		format: (value, decimals) => root.fmt(value, decimals),
+		escape: (value) => root.esc(value),
+		escapeAttribute: (value) => root.escAttr(value),
+		quoteJs: (value) => root.jsq(value),
+		formatDateTime: (value) => root.formatDateTimeVN(value),
+		testDisplayName: (test) => typeof root.testDisplayName === "function" ? root.testDisplayName(test) : "",
+		button: (label, action, variant) => root.btn(label, action, variant),
+		emptyState: (title, message, action) => root.emptyState(title, message, action),
+		modalCloseButton: (action) => root.modalCloseButton(action)
+	});
+	root.lisSettingsService = createLisSettingsService((value) => root.lisNormalizeGatewayUrl(value));
+	root.labProfileService = createLabProfileService((value, limit) => root.QCCore.cleanText(value, limit), (value) => root.settingsBrandProfile(value));
+	root.firebaseSettingsService = createFirebaseSettingsService((value) => root.firebaseConfigParser(value));
+	root.settingsBrandPreviewHtml = createBrandPreviewHtml((value) => root.esc(value), (value) => root.escAttr(value));
+	root.settingsUnitProfileHtml = createUnitProfileHtml({
+		escapeAttribute: (value) => root.escAttr(value),
+		button: (label, action, variant) => root.btn(label, action, variant)
+	});
+	root.settingsBrandPanelHtml = createBrandPanelHtml({
+		escapeAttribute: (value) => root.escAttr(value),
+		button: (label, action, variant, title, options) => root.btn(label, action, variant, title, options)
+	});
+	root.settingsAdminToolsHtml = createAdminToolsHtml((label, action, variant) => root.btn(label, action, variant));
+	root.settingsFirebaseRulesPanelHtml = createFirebaseRulesPanelHtml({
+		escape: (value) => root.esc(value),
+		button: (label, action, variant) => root.btn(label, action, variant)
+	});
+	root.settingsLisGatewayPanelHtml = createLisGatewayPanelHtml({
+		escape: (value) => root.esc(value),
+		escapeAttribute: (value) => root.escAttr(value),
+		button: (label, action, variant) => root.btn(label, action, variant)
+	});
+	root.settingsFirebaseConnectionPanelHtml = createFirebaseConnectionPanelHtml({
+		escape: (value) => root.esc(value),
+		escapeAttribute: (value) => root.escAttr(value),
+		button: (label, action, variant) => root.btn(label, action, variant)
+	});
+	root.settingsPageLayoutHtml = createSettingsPageLayoutHtml((title, subtitle) => root.headOnly(title, subtitle));
 	if (typeof LocalStore !== "undefined") root.indexedDbOpenService = createIndexedDbOpenService({ indexedDb: () => typeof indexedDB === "undefined" ? null : indexedDB });
 	if (root.indexedDbOpenService) root.indexedDbRecordService = createIndexedDbRecordService({ open: () => root.indexedDbOpenService.open() });
 	root.partitionedIndexedDbWriteService = createPartitionedIndexedDbWriteService({
@@ -12357,6 +12859,7 @@
 		formatDateTime: (value) => globalThis.formatDateTimeVN(value),
 		roleLabel: (value) => globalThis.roleLabel(value)
 	});
+	root.activityAuditPageHtml = createActivityAuditPageHtml();
 	root.activityAuditPagination = activityAuditPagination;
 	root.activityAuditCsv = createActivityAuditCsv({
 		formatDateTime: (value) => globalThis.formatDateTimeVN(value),
@@ -12367,6 +12870,9 @@
 	root.activityAuditPageSizes = ACTIVITY_AUDIT_PAGE_SIZES;
 	root.activityAuditArchiveWindow = activityAuditArchiveWindow;
 	root.userListModel = userListModel;
+	root.userRowHtml = createUserRowHtml();
+	root.usersPageHtml = createUsersPageHtml();
+	root.reagentSelectOptionsHtml = createReagentSelectOptionsHtml();
 	if (typeof StateStorageLegacy !== "undefined") root.storageBootService = createStorageBootService({
 		partitionedSupported: () => typeof LocalStore !== "undefined" && LocalStore.supported(),
 		readBootRecord: () => localStorage.getItem("qclab_boot"),

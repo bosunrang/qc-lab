@@ -2,10 +2,10 @@
    UI cấu hình và hàng chờ. Đồng bộ/nhập dữ liệu nằm trong LISClientService (TypeScript). */
 async function lisGatewaySaveSettings(){
   if(!requireAdmin('Chỉ quản trị mới được cấu hình LIS Gateway.'))return;
-  const enabled=!!document.getElementById('lisGatewayEnabled').checked,url=lisNormalizeGatewayUrl(document.getElementById('lisGatewayUrl').value),tokenEl=document.getElementById('lisGatewayToken'),token=String(tokenEl&&tokenEl.value||'').trim()||lisGatewayConfig().token;
-  if(!url){await infoDialog('Prototype chỉ cho phép http://127.0.0.1:8787 hoặc http://localhost:8787.');return;}
-  if(enabled&&!token){await infoDialog('Cần dán Bearer token của Gateway. Token được in ra khi chạy npm run lis:gateway.');return;}
-  try{localStorage.setItem(LIS_GATEWAY_STORAGE_KEY,JSON.stringify({enabled,url,token}));}catch(e){await infoDialog('Không lưu được cấu hình LIS Gateway trên máy này.');return;}
+  const enabled=!!document.getElementById('lisGatewayEnabled').checked,tokenEl=document.getElementById('lisGatewayToken'),current=lisGatewayConfig(),input={enabled,url:document.getElementById('lisGatewayUrl').value,token:String(tokenEl&&tokenEl.value||''),savedToken:current.token},plan=globalThis.lisSettingsService?globalThis.lisSettingsService.prepare(input):null,url=plan&&plan.ok?plan.settings.url:lisNormalizeGatewayUrl(input.url),token=plan&&plan.ok?plan.settings.token:String(input.token).trim()||current.token;
+  if((plan&&!plan.ok&&plan.error==='invalid-url')||!url){await infoDialog('Prototype chỉ cho phép http://127.0.0.1:8787 hoặc http://localhost:8787.');return;}
+  if((plan&&!plan.ok&&plan.error==='missing-token')||(enabled&&!token)){await infoDialog('Cần dán Bearer token của Gateway. Token được in ra khi chạy npm run lis:gateway.');return;}
+  try{localStorage.setItem(LIS_GATEWAY_STORAGE_KEY,JSON.stringify(plan&&plan.ok?plan.settings:{enabled,url,token}));}catch(e){await infoDialog('Không lưu được cấu hình LIS Gateway trên máy này.');return;}
   if(tokenEl)tokenEl.value='';
   if(!enabled){clearInterval(lisGatewayRuntime.pollT);lisGatewayRuntime.pollT=null;lisGatewayRuntime.pending=[];lisGatewayRuntime.unresolved=[];lisGatewaySetStatus('off','Đã tắt');await infoDialog('Đã tắt nhận kết quả QC từ LIS trên máy này.',{type:'success'});return;}
   lisGatewayStart();
@@ -14,12 +14,14 @@ async function lisGatewaySaveSettings(){
 }
 
 function lisQueueValueText(record){
+  if(globalThis.lisQueuePresentation)return globalThis.lisQueuePresentation.valueText(record);
   const m=record.message,r=record.resolved,t=r&&r.ok?state.tests.find(x=>x.id===r.qclabTestId):null;
   const text=t&&typeof fmtTestValue==='function'?fmtTestValue(t,m.value):fmt(m.value,3);
   return text+(m.unit?' '+esc(m.unit):'');
 }
-function lisOnclick(fnName,messageId){return escAttr(`${fnName}('${jsq(messageId)}')`);}
+function lisOnclick(fnName,messageId){if(globalThis.lisQueuePresentation)return globalThis.lisQueuePresentation.onclick(fnName,messageId);return escAttr(`${fnName}('${jsq(messageId)}')`);}
 function lisQueueRowHtml(record){
+  if(globalThis.lisQueuePresentation)return globalThis.lisQueuePresentation.rowHtml(record);
   const m=record.message,r=record.resolved,when=formatDateTimeVN(m.measuredAt)||m.measuredAt||'—';
   if(r&&r.ok){
     const t=state.tests.find(x=>x.id===r.qclabTestId);
@@ -28,12 +30,14 @@ function lisQueueRowHtml(record){
   return`<tr><td>${esc(when)}</td><td><b>${esc(m.analyzerId)}/${esc(m.testCode)}</b><div class="hint">${esc((r&&r.reason)||'Chưa khớp cấu hình')}</div></td><td class="num">${lisQueueValueText(record)}</td><td>${esc(m.runId||'—')}${m.operator?' · '+esc(m.operator):''}</td><td class="acts">${btn('Bỏ',lisOnclick('lisQueueReject',m.messageId),'ghost sm')}</td></tr>`;
 }
 function lisQueueSectionHtml(title,records,emptyText){
+  if(globalThis.lisQueuePresentation)return globalThis.lisQueuePresentation.sectionHtml(title,records,emptyText);
   if(!records.length)return`<h4>${esc(title)}</h4><div class="hint">${esc(emptyText)}</div>`;
   const rows=records.map(lisQueueRowHtml).join('');
   return`<h4>${esc(title)} (${records.length})</h4><div class="table-wrap"><table class="lis-queue-table"><thead><tr><th>Thời gian đo</th><th>Xét nghiệm</th><th class="num">Giá trị</th><th>Lần chạy · NV</th><th><span class="sr-only">Thao tác</span></th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 function lisRenderQueueModal(){
   const pending=lisGatewayRuntime.pending||[],unresolved=lisGatewayRuntime.unresolved||[];
+  if(globalThis.lisQueuePresentation){openModal(globalThis.lisQueuePresentation.modalHtml(pending,unresolved));return;}
   const body=(pending.length||unresolved.length)?lisQueueSectionHtml('Sẵn sàng nhận',pending,'')+(unresolved.length?`<div class="flow-panel">${lisQueueSectionHtml('Chưa khớp cấu hình',unresolved,'')}</div>`:''):emptyState('Hàng chờ trống','Không có kết quả QC nào đang chờ từ LIS Gateway.','');
   openModal(`<div class="modal" style="width:820px"><div class="modal-h"><h3>QC chờ nhập từ LIS</h3>${modalCloseButton('closeModal()')}</div><div class="modal-b" tabindex="0">${body}</div><div class="modal-f">${btn('Làm mới','lisQueueRefresh()','ghost')}${btn('Đóng','closeModal()','ghost')}</div></div>`);
 }
