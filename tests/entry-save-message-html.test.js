@@ -1,0 +1,13 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const {pathToFileURL}=require('node:url');
+const path=require('node:path');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','entry','entry-save-message-html.ts')).href;
+const program=`import { createEntrySaveMessageHtml } from ${JSON.stringify(source)};
+const render=createEntrySaveMessageHtml({escape:value=>'E:'+String(value),feedbackHtml:value=>'FEEDBACK:'+value.message});
+console.log(JSON.stringify([render({feedback:{cls:'ok',emphasis:false,message:'Đã lưu'},verdict:'ok',tag:'M1',rules:[],dateText:'13/08'}),render({feedback:null,verdict:'rej',tag:'M<1',rules:['1-3s',''],dateText:'13/08'}),render({feedback:null,verdict:'warn',tag:'M1',rules:['1-2s'],dateText:'13/08'}),render({feedback:null,verdict:'ok',tag:'M1',rules:[],dateText:'13/08'})]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--experimental-strip-types','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'Không thể chạy entry save message HTML TypeScript');
+assert.deepEqual(JSON.parse(result.stdout),['FEEDBACK:Đã lưu','<div class="alert rej"><b>⚠ E:M<1 vi phạm — E:1-3s</b></div>','<div class="alert warn"><b>E:M1 cảnh báo — E:1-2s</b></div>','<div class="alert ok">✓ Đã lưu E:M1 ngày E:13/08.</div>']);
+console.log('Entry save message HTML TypeScript tests passed');

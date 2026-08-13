@@ -1,0 +1,12 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const {pathToFileURL}=require('node:url');
+const path=require('node:path');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','entry','entry-inline-save-plan.ts')).href;
+const program=`import { entryInlineSavePlan } from ${JSON.stringify(source)};
+console.log(JSON.stringify([entryInlineSavePlan({test:null,config:{},canEnter:true,value:1}),entryInlineSavePlan({test:{},config:{},canEnter:false,value:1}),entryInlineSavePlan({test:{},config:{},canEnter:true,value:'  '}),entryInlineSavePlan({test:{},config:{},canEnter:true,value:0})]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--experimental-strip-types','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'Không thể chạy entry inline save plan TypeScript');
+assert.deepEqual(JSON.parse(result.stdout),[{state:'unavailable'},{state:'unavailable'},{state:'empty'},{state:'ready'}]);
+console.log('Entry inline save plan TypeScript tests passed');

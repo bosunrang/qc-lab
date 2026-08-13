@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const {pathToFileURL}=require('node:url');
+const path=require('node:path');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','entry','entry-sheet-key-plan.ts')).href;
+const program=`import { entrySheetKeyPlan } from ${JSON.stringify(source)};console.log(JSON.stringify([entrySheetKeyPlan({key:'Enter'}),entrySheetKeyPlan({key:'ArrowRight',ctrlKey:true}),entrySheetKeyPlan({key:'a'}),entrySheetKeyPlan({key:'Tab',isComposing:true})]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--experimental-strip-types','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'Không thể chạy entry sheet key plan TypeScript');
+assert.deepEqual(JSON.parse(result.stdout),[{handle:true},{handle:false},{handle:false},{handle:false}]);
+console.log('Entry sheet key plan TypeScript tests passed');

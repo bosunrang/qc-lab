@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const {pathToFileURL}=require('node:url');
+const path=require('node:path');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','entry','entry-save-audit-detail.ts')).href;
+const program=`import { entrySaveAuditDetail } from ${JSON.stringify(source)};console.log(JSON.stringify([entrySaveAuditDetail({dateText:'13/08',level:2,parallel:false,valueText:'5.20'}),entrySaveAuditDetail({dateText:'13/08',level:2,parallel:true,lotNo:'LOT-2',valueText:'5.20'})]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--experimental-strip-types','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'Không thể chạy entry save audit detail TypeScript');
+assert.deepEqual(JSON.parse(result.stdout),['Ngày 13/08, M2, giá trị 5.20','Ngày 13/08, M2 · lô song song LOT-2, giá trị 5.20']);
+console.log('Entry save audit detail TypeScript tests passed');

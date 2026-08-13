@@ -4,6 +4,7 @@ const path = require('node:path');
 
 const actions = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'manage-tests-actions.js'), 'utf8');
 const routes = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'manage-routes.js'), 'utf8');
+const panelForm = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'manage', 'manage-panel-form-workflow.ts'), 'utf8');
 const records = [
   ['Panel QC','Panel QC'],
   ['hồ sơ chuyển lô','hồ sơ chuyển lô'],
@@ -15,7 +16,9 @@ const records = [
 
 records.forEach(([editName,addName])=>{
   assert.ok(actions.includes(`${'${'}id?'Sửa ${editName}':'Thêm ${addName}'}`), `tiêu đề ${addName} phải phân biệt Thêm/Sửa`);
-  assert.ok(actions.includes(`btn(id?'Lưu thay đổi':'Thêm ${addName}'`), `nút ${addName} phải dùng Thêm khi tạo và Lưu thay đổi khi sửa`);
+  const buttonInLegacy = actions.includes(`btn(id?'Lưu thay đổi':'Thêm ${addName}'`);
+  const buttonInPanelFacade = addName==='Panel QC' && panelForm.includes("submitLabel:editing?'Lưu thay đổi':'Thêm Panel QC'");
+  assert.ok(buttonInLegacy||buttonInPanelFacade, `nút ${addName} phải dùng Thêm khi tạo và Lưu thay đổi khi sửa`);
 });
 ['Lưu Panel QC','Lưu hồ sơ','Lưu nhóm lô','Lưu lô','Lưu máy xét nghiệm'].forEach(label=>assert.equal(actions.includes(`btn('${label}'`),false,`không dùng nhãn tĩnh “${label}” trong popup CRUD`));
 ['Thêm lô QC','Thêm nhóm lô','Thêm máy xét nghiệm','Thêm Panel QC','Thêm hồ sơ chuyển lô','Thêm xét nghiệm'].forEach(label=>assert.ok(routes.includes(`'${label}'`),`toolbar phải dùng “${label}”`));

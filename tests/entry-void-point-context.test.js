@@ -1,0 +1,12 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const {pathToFileURL}=require('node:url');
+const path=require('node:path');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','entry','entry-void-point-context.ts')).href;
+const program=`import { createEntryVoidPointContext } from ${JSON.stringify(source)};
+const context=createEntryVoidPointContext({errorType:rules=>'TYPE:'+rules.join('|')});console.log(JSON.stringify([context({level:'rej',rules:['1-3s','1-3s','']}),context({level:'ok',rules:[]}),context(null)]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--experimental-strip-types','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'Không thể chạy entry void point context TypeScript');
+assert.deepEqual(JSON.parse(result.stdout),[{rules:['1-3s',''],rule:'1-3s, ',qcVerdict:'rej',qcErrorType:'TYPE:1-3s|'},{rules:[],rule:'Không có luật Westgard',qcVerdict:'invalid',qcErrorType:'TYPE:'},{rules:[],rule:'Không có luật Westgard',qcVerdict:'invalid',qcErrorType:'TYPE:'}]);
+console.log('Entry void point context TypeScript tests passed');

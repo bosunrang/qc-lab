@@ -1,0 +1,13 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const {pathToFileURL}=require('node:url');
+const path=require('node:path');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','entry','entry-table-interaction-workflow.ts')).href;
+const program=`import { createEntryTableInteractionWorkflow } from ${JSON.stringify(source)};
+const workflow=createEntryTableInteractionWorkflow({extraRunRequest:(t,c,d,l,r)=>({key:t+'|'+c,focus:d+'|'+l}),extraRunState:(keys,request)=>({keys:new Set([...keys,request.key]),focus:request.focus}),rangePreset:days=>({days,start:null,end:null}),rangeState:(_,range)=>({days:range.days??null,start:range.start,end:range.end}),dateRangeInput:(range,side,value)=>({...range,[side]:value}),dateNoteFeedback:note=>'F:'+note,dateNoteErrorMessage:error=>'E:'+error});
+console.log(JSON.stringify([[...workflow.unlockExtraRun([],'T','C','2026-08-13',2,1).keys],workflow.presetRange(7,30),workflow.dateRange(7,{start:null,end:null},'start','2026-08-01'),workflow.dateNoteFeedback('x',''),workflow.dateNoteErrorMessage('locked')]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--experimental-strip-types','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'Không thể chạy entry table interaction workflow TypeScript');
+assert.deepEqual(JSON.parse(result.stdout),[['T|C'],{days:30,start:null,end:null},{days:null,start:'2026-08-01',end:null},'F:x','E:locked']);
+console.log('Entry table interaction workflow TypeScript tests passed');

@@ -1,0 +1,13 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const {pathToFileURL}=require('node:url');
+const path=require('node:path');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','entry','entry-save-workflow.ts')).href;
+const program=`import { createEntrySaveWorkflow } from ${JSON.stringify(source)};
+const workflow=createEntrySaveWorkflow({inputPlan:input=>({state:input.value?'ready':'empty'}),warningPlan:issues=>({state:issues.length?'confirm':'ready',issues:[...issues]}),unavailableHtml:commit=>'UN:'+commit,invalidInputHtml:()=> 'INVALID',sdZeroWarningHtml:issues=>'ZERO:'+issues.join('|'),unusualIssuesHtml:issues=>'ISSUES:'+issues.join('|'),unusualModalHtml:input=>'MODAL:'+input.issuesHtml+'|'+input.confirmAction,auditDetail:input=>'AUDIT:'+input.level,messageHtml:input=>'MESSAGE:'+input.verdict});
+console.log(JSON.stringify([workflow.preflight({test:{},config:{},canEnter:true,value:1}),workflow.warnings(['W']),workflow.unavailableHtml(true),workflow.invalidInputHtml(),workflow.sdZeroWarningHtml(['Z']),workflow.unusualIssuesHtml(['W']),workflow.unusualModalHtml({issuesHtml:'I',confirmAction:'C'}),workflow.auditDetail({dateText:'',level:2,parallel:false,valueText:''}),workflow.messageHtml({feedback:null,verdict:'ok',tag:'',rules:[],dateText:''})]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--experimental-strip-types','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'Không thể chạy entry save workflow TypeScript');
+assert.deepEqual(JSON.parse(result.stdout),[{state:'ready'},{state:'confirm',issues:['W']},'UN:true','INVALID','ZERO:Z','ISSUES:W','MODAL:I|C','AUDIT:2','MESSAGE:ok']);
+console.log('Entry save workflow TypeScript tests passed');

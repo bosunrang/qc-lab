@@ -1,0 +1,16 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const {pathToFileURL}=require('node:url');
+const path=require('node:path');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','entry','entry-selection-recovery.ts')).href;
+const program=`import { createEntrySelectionRecovery } from ${JSON.stringify(source)};
+const recover=createEntrySelectionRecovery({id:test=>test.id,levels:test=>test.levels});const tests=[{id:'T1',levels:[{level:1},{level:2}]},{id:'T2',levels:[{level:3}]}];
+console.log(JSON.stringify([recover({testId:'T1',level:2},tests),recover({testId:'T1',level:9},tests),recover({testId:'missing',level:1},tests)]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--experimental-strip-types','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'Không thể chạy entry selection recovery TypeScript');
+const [valid,invalid,missing]=JSON.parse(result.stdout);
+assert.equal(valid.test.id,'T1');assert.deepEqual(valid.selection,{testId:'T1',level:2});assert.equal(valid.resetAutoOpenKey,false);
+assert.equal(invalid.test.id,'T1');assert.deepEqual(invalid.selection,{testId:'T1',level:1});assert.equal(invalid.resetAutoOpenKey,true);
+assert.equal(missing.test.id,'T1');assert.deepEqual(missing.selection,{testId:'T1',level:1});assert.equal(missing.resetAutoOpenKey,true);
+console.log('Entry selection recovery TypeScript tests passed');

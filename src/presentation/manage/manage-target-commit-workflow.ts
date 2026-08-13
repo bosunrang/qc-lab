@@ -1,0 +1,1 @@
+export function manageTargetCommitAudit(input: { panel: string; group: string; count: number; mode: string }) { return `${input.panel} · ${input.group} · ${input.count} dòng${input.mode==='planned'?' (dự kiến)':''}`; }

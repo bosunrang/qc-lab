@@ -1,0 +1,12 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const {pathToFileURL}=require('node:url');
+const path=require('node:path');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','entry','entry-save-feedback-html.ts')).href;
+const program=`import { createEntrySaveFeedbackHtml } from ${JSON.stringify(source)};
+const render=createEntrySaveFeedbackHtml({escape:value=>'E:'+String(value)});console.log(JSON.stringify([render({cls:'warn',emphasis:true,message:'M<1'}),render({cls:'ok',emphasis:false,message:'Đã lưu'}),render(null)]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--experimental-strip-types','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'Không thể chạy entry save feedback HTML TypeScript');
+assert.deepEqual(JSON.parse(result.stdout),['<div class="alert E:warn"><b>E:M<1</b></div>','<div class="alert E:ok">E:Đã lưu</div>','']);
+console.log('Entry save feedback HTML TypeScript tests passed');

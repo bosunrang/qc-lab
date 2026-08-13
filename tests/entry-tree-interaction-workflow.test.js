@@ -1,0 +1,13 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const {pathToFileURL}=require('node:url');
+const path=require('node:path');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','entry','entry-tree-interaction-workflow.ts')).href;
+const program=`import { createEntryTreeInteractionWorkflow } from ${JSON.stringify(source)};
+const workflow=createEntryTreeInteractionWorkflow({detailState:(_,key,open)=>new Set(open?[key]:[]),openState:(_,key)=>({keys:new Set([key]),open:true}),collapsedToggle:value=>!value,keyCommand:key=>key==='Enter'?'toggle':'navigate',navigationTarget:items=>items[0]||null,visibility:nodes=>nodes.map(node=>node.role==='assay'),machineFilter:machine=>({machine}),selection:{pick:(testId,level)=>({selection:{testId,level},start:null,end:null,message:''}),focus:(selection,level)=>({...selection,level}),previousLotKey:(selection,level)=>selection.testId+'|'+level},previousLot:(entries,key,lot)=>{const next=new Map(entries);if(lot)next.set(key,lot);else next.delete(key);return next}});
+console.log(JSON.stringify([[...workflow.detailState([], 'range', true)],[...workflow.toggleOpen([], 'm:A').keys],workflow.toggleCollapsed(false),workflow.keyCommand('Enter','false'),workflow.visibility([{role:'assay'},{role:'machine'}],'',[]),workflow.machineFilter('M'),workflow.selection.pick('T',2),workflow.selection.focus({testId:'T',level:1},2),workflow.selection.previousLotKey({testId:'T'},2),[...workflow.previousLot(new Map(),'T|2','L').entries()]]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--experimental-strip-types','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'Không thể chạy entry tree interaction workflow TypeScript');
+assert.deepEqual(JSON.parse(result.stdout),[['range'],['m:A'],true,'toggle',[true,false],{machine:'M'},{selection:{testId:'T',level:2},start:null,end:null,message:''},{testId:'T',level:2},'T|2',[['T|2','L']]]);
+console.log('Entry tree interaction workflow TypeScript tests passed');

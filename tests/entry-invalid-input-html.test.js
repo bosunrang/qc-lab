@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const {pathToFileURL}=require('node:url');
+const path=require('node:path');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','entry','entry-invalid-input-html.ts')).href;
+const program=`import { entryInvalidInputHtml } from ${JSON.stringify(source)};console.log(entryInvalidInputHtml());`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--experimental-strip-types','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'Không thể chạy entry invalid input HTML TypeScript');
+assert.equal(result.stdout.trim(),'<div class="alert warn">Nhập giá trị QC hợp lệ.</div>');
+console.log('Entry invalid input HTML TypeScript tests passed');

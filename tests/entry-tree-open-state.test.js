@@ -1,0 +1,13 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const {pathToFileURL}=require('node:url');
+const path=require('node:path');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','entry','entry-tree-open-state.ts')).href;
+const program=`import { entryTreeOpenState } from ${JSON.stringify(source)};
+const opened=entryTreeOpenState(['m:M1'],'lg:M1|G1'),closed=entryTreeOpenState(['m:M1','lg:M1|G1'],'lg:M1|G1');
+console.log(JSON.stringify([[...opened.keys],opened.open,[...closed.keys],closed.open]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--experimental-strip-types','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'Không thể chạy entry tree open state TypeScript');
+assert.deepEqual(JSON.parse(result.stdout),[['m:M1','lg:M1|G1'],true,['m:M1'],false]);
+console.log('Entry tree open state TypeScript tests passed');

@@ -1,0 +1,13 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const {pathToFileURL}=require('node:url');
+const path=require('node:path');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','entry','entry-tree-collapsed-state.ts')).href;
+const program=`import { entryTreeCollapsedState, entryTreeCollapsedToggle } from ${JSON.stringify(source)};
+let reads=0;const loaded=entryTreeCollapsedState(null,()=>{reads++;return true}),cached=entryTreeCollapsedState(false,()=>{reads++;return true});
+console.log(JSON.stringify([loaded,cached,reads,entryTreeCollapsedToggle(loaded),entryTreeCollapsedToggle(cached)]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--experimental-strip-types','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'Không thể chạy entry tree collapsed state TypeScript');
+assert.deepEqual(JSON.parse(result.stdout),[true,false,1,false,true]);
+console.log('Entry tree collapsed state TypeScript tests passed');

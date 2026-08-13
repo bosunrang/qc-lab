@@ -1,0 +1,13 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const {pathToFileURL}=require('node:url');
+const path=require('node:path');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','entry','entry-void-feedback-html.ts')).href;
+const program=`import { createEntryVoidFeedbackHtml } from ${JSON.stringify(source)};
+const render=createEntryVoidFeedbackHtml({escape:value=>'E:'+String(value)});
+console.log(JSON.stringify([render({dateText:'13/08',openNce:false,reusedAction:false,nceId:''}),render({dateText:'13/08',openNce:true,reusedAction:true,nceId:'NCE-1'}),render({dateText:'13/08',openNce:true,reusedAction:false,nceId:'NCE<2'})]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--experimental-strip-types','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'Không thể chạy entry void feedback HTML TypeScript');
+assert.deepEqual(JSON.parse(result.stdout),['<div class="alert warn">Đã hủy điểm QC ngày E:13/08. Điểm không còn tham gia tính toán. Không yêu cầu NCE/QC chạy lại.</div>','<div class="alert warn">Đã hủy điểm QC ngày E:13/08. Điểm không còn tham gia tính toán. Đã giữ liên kết với hồ sơ NCE đang mở.</div>','<div class="alert warn">Đã hủy điểm QC ngày E:13/08. Điểm không còn tham gia tính toán. Đã mở hồ sơ E:NCE<2 để tiếp tục điều tra.</div>']);
+console.log('Entry void feedback HTML TypeScript tests passed');

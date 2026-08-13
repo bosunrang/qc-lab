@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const {pathToFileURL}=require('node:url');
+const path=require('node:path');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','entry','entry-qc-unavailable-html.ts')).href;
+const program=`import { entryQcUnavailableHtml } from ${JSON.stringify(source)};console.log(JSON.stringify([entryQcUnavailableHtml(),entryQcUnavailableHtml(true)]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--experimental-strip-types','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'Không thể chạy entry QC unavailable HTML TypeScript');
+assert.deepEqual(JSON.parse(result.stdout),['<div class="alert warn">Nhóm lô đã dừng hoặc không còn sẵn sàng nhập QC.</div>','<div class="alert warn">Không thể lưu: nhóm lô đã dừng hoặc không còn sẵn sàng nhập QC.</div>']);
+console.log('Entry QC unavailable HTML TypeScript tests passed');

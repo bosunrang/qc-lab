@@ -1,0 +1,13 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const {pathToFileURL}=require('node:url');
+const path=require('node:path');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','entry','entry-screen-selection-workflow.ts')).href;
+const program=`import { createEntryScreenSelectionWorkflow } from ${JSON.stringify(source)};
+const workflow=createEntryScreenSelectionWorkflow({recoverSelection:(_,tests)=>({test:tests[0],selection:{testId:'T',level:2},resetAutoOpenKey:true}),machineSelection:value=>String(value||'all'),autoOpenState:(_,previous,machine,group,testId)=>({keys:new Set([machine,group]),autoOpenKey:String(testId),changed:previous!==testId})});
+const recovered=workflow.recoverSelection(null,[{id:'T'}]);const auto=workflow.autoOpenTree([],null,'M','G','T');console.log(JSON.stringify([recovered,workflow.selectMachine('M',[]),[...auto.keys],auto.autoOpenKey,auto.changed]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--experimental-strip-types','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'Không thể chạy entry screen selection workflow TypeScript');
+assert.deepEqual(JSON.parse(result.stdout),[{test:{id:'T'},selection:{testId:'T',level:2},resetAutoOpenKey:true},'M',['M','G'],'T',true]);
+console.log('Entry screen selection workflow TypeScript tests passed');

@@ -1,0 +1,4 @@
+'use strict';
+const assert=require('node:assert/strict'),{spawnSync}=require('node:child_process'),{pathToFileURL}=require('node:url'),path=require('node:path');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','manage','manage-panel-workflow.ts')).href,program=`import { createManagePanelWorkflow, managePanelRemovalDialog } from ${JSON.stringify(source)};const f=createManagePanelWorkflow({removal:(_,x)=>({record:{name:x.id}}),removalDialog:managePanelRemovalDialog});console.log(JSON.stringify([f.removal({}, {id:'P'}),f.removalDialog('P')]));`,r=spawnSync(process.execPath,['--no-warnings','--input-type=module','--experimental-strip-types','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(r.status,0,r.stderr);assert.equal(JSON.parse(r.stdout)[1].title,'Xóa Panel QC');console.log('Manage panel workflow TypeScript tests passed');

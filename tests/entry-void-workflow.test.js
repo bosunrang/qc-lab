@@ -1,0 +1,13 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const {pathToFileURL}=require('node:url');
+const path=require('node:path');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','entry','entry-void-workflow.ts')).href;
+const program=`import { createEntryVoidWorkflow } from ${JSON.stringify(source)};
+const workflow=createEntryVoidWorkflow({plan:(_,point)=>({state:point?'ready':'unavailable'}),modalHtml:input=>'MODAL:'+input.level,reasonValid:(kind,reason)=>kind!=='other'||reason.length>=5,reasonError:valid=>({showError:!valid,focusReason:!valid}),pointContext:()=>({rules:['1-2s'],rule:'1-2s',qcVerdict:'warn',qcErrorType:'SE'}),confirmDetail:openNce=>openNce?'NCE':'NO-NCE',confirmDialog:detail=>({kicker:'K',title:'T',message:'M',detail,confirmLabel:'Y',cancelLabel:'N'}),periodLockedHtml:()=> 'LOCKED',auditDetail:input=>'AUDIT:'+input.level,feedbackHtml:input=>'FEEDBACK:'+input.openNce});
+console.log(JSON.stringify([workflow.preflight({},{}),workflow.modalHtml({dateText:'',level:2,valueText:'',confirmAction:''}),workflow.reasonValid('other','abc'),workflow.reasonError(false),workflow.pointContext({}),workflow.confirmOptions(true),workflow.periodLockedHtml(),workflow.auditDetail({dateText:'',level:2,valueText:'',reason:''}),workflow.feedbackHtml({dateText:'',openNce:true,reusedAction:false,nceId:''})]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--experimental-strip-types','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'Không thể chạy entry void workflow TypeScript');
+assert.deepEqual(JSON.parse(result.stdout),[{state:'ready'},'MODAL:2',false,{showError:true,focusReason:true},{rules:['1-2s'],rule:'1-2s',qcVerdict:'warn',qcErrorType:'SE'},{kicker:'K',title:'T',message:'M',detail:'NCE',confirmLabel:'Y',cancelLabel:'N'},'LOCKED','AUDIT:2','FEEDBACK:true']);
+console.log('Entry void workflow TypeScript tests passed');

@@ -1,0 +1,12 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const {pathToFileURL}=require('node:url');
+const path=require('node:path');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','entry','entry-void-modal-html.ts')).href;
+const program=`import { createEntryVoidModalHtml } from ${JSON.stringify(source)};
+const render=createEntryVoidModalHtml({button:(label,action,variant)=>'BTN:'+label+'|'+action+'|'+variant,escape:value=>'E:'+value});console.log(render({dateText:'13/08',level:2,valueText:'5<0',confirmAction:'confirm()'}));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--experimental-strip-types','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'Không thể chạy entry void modal HTML TypeScript');
+assert.match(result.stdout,/<h3>Hủy điểm QC<\/h3>/);assert.match(result.stdout,/Ngày E:13\/08 · Mức 2 · Giá trị E:5<0/);assert.match(result.stdout,/id="voidKindInput"/);assert.match(result.stdout,/id="voidOpenNce"/);assert.match(result.stdout,/id="voidReasonInput"/);assert.match(result.stdout,/BTN:Xác nhận hủy\|confirm\(\)\|danger/);
+console.log('Entry void modal HTML TypeScript tests passed');

@@ -1,0 +1,13 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const {pathToFileURL}=require('node:url');
+const path=require('node:path');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','entry','entry-date-note-message-html.ts')).href;
+const program=`import { createEntryDateNoteMessageHtml } from ${JSON.stringify(source)};
+const render=createEntryDateNoteMessageHtml({escape:value=>'E:'+String(value)});
+console.log(JSON.stringify([render({feedback:{cls:'warn',message:'M<1'},note:'x',dateText:'13/08/2026'}),render({feedback:null,note:'x',dateText:'13/08/2026'}),render({feedback:null,note:'',dateText:'13/08/2026'})]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--experimental-strip-types','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'Không thể chạy entry date note message HTML TypeScript');
+assert.deepEqual(JSON.parse(result.stdout),['<div class="alert E:warn">E:M<1</div>','<div class="alert ok">E:✓ Đã lưu ghi chú ngày 13/08/2026.</div>','<div class="alert ok">E:✓ Đã xóa ghi chú ngày 13/08/2026.</div>']);
+console.log('Entry date note message HTML TypeScript tests passed');

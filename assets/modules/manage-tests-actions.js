@@ -5,12 +5,12 @@
    đã nạp ngay sau manage-routes.js trong index.html, chỉ tên file chưa khớp. */
 function validIsoDate(s){const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s||''));if(!m)return'';const y=+m[1],mo=+m[2],d=+m[3],dt=new Date(Date.UTC(y,mo-1,d));return y>=1000&&dt.getUTCFullYear()===y&&dt.getUTCMonth()===mo-1&&dt.getUTCDate()===d?s:'';}
 function parseVN(s){if(!s)return '';s=String(s).trim();const m=/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/.exec(s);if(m)return validIsoDate(m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0'));if(/^\d{4}-\d{2}-\d{2}$/.test(s))return validIsoDate(s);return '';}
-function setManageTab(tab){manageTab=['lots','panels','targets','history','transitions','assays','instruments','tearefs'].includes(tab)?tab:'instruments';manageQ='';rerender();resetMainScroll();}
-function setTargetPanel(id){manageTargetPanel=id;rerender();}
-function setTargetGroup(id){manageTargetGroup=id;rerender();}
-function setTargetLevel(level){manageTargetLevel=String(level||'');rerender();}
-function setHistoryTest(id){manageHistoryTest=id;rerender();}
-function openTargetMatrix(panelId='',groupId=''){if(panelId)manageTargetPanel=panelId;if(groupId)manageTargetGroup=groupId;setManageTab('targets');}
+function setManageTab(tab){const flow=globalThis.manageNavigationWorkflow||null;manageTab=flow?flow.tab(tab):['lots','panels','targets','history','transitions','assays','instruments','tearefs'].includes(tab)?tab:'instruments';manageQ='';rerender();resetMainScroll();}
+function setTargetPanel(id){const flow=globalThis.manageNavigationWorkflow||null;manageTargetPanel=flow?flow.targetPanel(id):id;rerender();}
+function setTargetGroup(id){const flow=globalThis.manageNavigationWorkflow||null;manageTargetGroup=flow?flow.targetGroup(id):id;rerender();}
+function setTargetLevel(level){const flow=globalThis.manageNavigationWorkflow||null;manageTargetLevel=flow?flow.targetLevel(level):String(level||'');rerender();}
+function setHistoryTest(id){const flow=globalThis.manageNavigationWorkflow||null;manageHistoryTest=flow?flow.historyTest(id):id;rerender();}
+function openTargetMatrix(panelId='',groupId=''){const flow=globalThis.manageNavigationWorkflow||null,next=flow?flow.targetMatrix({panel:manageTargetPanel,group:manageTargetGroup},panelId,groupId):{panel:panelId||manageTargetPanel,group:groupId||manageTargetGroup,tab:'targets'};manageTargetPanel=next.panel;manageTargetGroup=next.group;setManageTab(next.tab);}
 function targetNumberText(value,test=null,kind='value'){if(value==null||String(value).trim()===''||!Number.isFinite(Number(value)))return'';const digits=test?(kind==='stat'?testStatDecimals(test):testDecimalPlaces(test)):QC_DECIMALS_DEFAULT;return Number(value).toFixed(digits).replace(/(?:\.0+|(\.\d+?)0+)$/,'$1');}
 function targetConfigAssigned(cfg){
   return !!(cfg&&(cfg.qcLotId||cfg.lot||(Array.isArray(cfg.meanSdHistory)&&cfg.meanSdHistory.length)));
@@ -61,20 +61,22 @@ function applyPlannedTarget(t,lot,pick,note){
 }
 async function readTargetMatrixPicks(){
   const rows=[...document.querySelectorAll('.target-row')],picked=[];
+  const pickWorkflow=globalThis.manageTargetPickWorkflow||null;
   for(const row of rows){
     if(row.dataset.locked==='1')continue;
-    const use=row.querySelector('.tm-use'),testId=row.dataset.test,lot=state.qcLots.find(x=>x.id===row.dataset.lot);if(!lot)continue;if(!use.checked){picked.push({testId,lot,use:false});continue;}
+    const use=row.querySelector('.tm-use'),testId=row.dataset.test,lot=state.qcLots.find(x=>x.id===row.dataset.lot);if(!lot)continue;if(!use.checked){picked.push(pickWorkflow?pickWorkflow.readRow({testId,lot,use:false,values:{}}):{testId,lot,use:false});continue;}
     const meanRaw=row.querySelector('.tm-mean').value.trim(),lowRaw=row.querySelector('.tm-low').value.trim(),highRaw=row.querySelector('.tm-high').value.trim(),sdRaw=row.querySelector('.tm-sd').value.trim();
-    const normalized=ManageConfigService.normalizeTargetPick({meanRaw,lowRaw,highRaw,sdRaw});if(normalized.error){await infoDialog(normalized.message);return null;}
-    picked.push({testId,lot,...normalized});
+    const next=pickWorkflow?pickWorkflow.readRow({testId,lot,use:true,values:{meanRaw,lowRaw,highRaw,sdRaw}}):null,normalized=next||ManageConfigService.normalizeTargetPick({meanRaw,lowRaw,highRaw,sdRaw});if(normalized.error){await infoDialog(normalized.message);return null;}
+    picked.push(next||{testId,lot,...normalized});
   }
   return picked;
 }
 async function saveTargetMatrix(){
   if(!requireAdmin())return;
+  const targetWorkflow=globalThis.manageTargetMatrixWorkflow||null;
   const panel=state.qcPanels.find(x=>x.id===manageTargetPanel),group=state.lotGroups.find(x=>x.id===manageTargetGroup),groupLots=targetGroupLots(group);if(!panel){await infoDialog('Chọn Panel QC.');return;}if(!group||!groupLots.length){await infoDialog('Chọn nhóm lô QC.');return;}
   const picked=await readTargetMatrixPicks();if(!picked)return;
-  const overwrites=picked.filter(pick=>{
+  const overwriteWorkflow=globalThis.manageTargetOverwriteWorkflow||null,overwrites=overwriteWorkflow?overwriteWorkflow.find(picked,state.tests):picked.filter(pick=>{
     if(!pick.use)return false;
     const t=state.tests.find(x=>x.id===pick.testId),same=t&&t.levels.find(x=>+x.level===+pick.lot.level);
     return same&&((same.qcLotId&&same.qcLotId!==pick.lot.id)||(!same.qcLotId&&same.lot&&same.lot!==pick.lot.lotNo));
@@ -84,11 +86,11 @@ async function saveTargetMatrix(){
      state.data, cùng mối lo với renameLotAcrossPoints() ở saveConfigLot() nên phải hỏi
      trước nếu đụng kỳ đã khóa, không chỉ dừng ở bước xác thực mật khẩu như trước
      2026-08-09. */
-  const backfilled=picked.filter(p=>p.use).flatMap(pick=>{const t=state.tests.find(x=>x.id===pick.testId);return t?targetPickBackfillPoints(t,pick.lot,pick):[];});
+  const backfillWorkflow=globalThis.manageTargetBackfillWorkflow||null,backfilled=backfillWorkflow?backfillWorkflow.points(picked):picked.filter(p=>p.use).flatMap(pick=>{const t=state.tests.find(x=>x.id===pick.testId);return t?targetPickBackfillPoints(t,pick.lot,pick):[];});
   const locked=PeriodService.lockedPoints(state,backfilled);
   if(!overwrites.length){
-    if(locked.count&&!await confirmDialog({kicker:'Cập nhật hàng loạt',title:'Điền lô/Mean-SD cho điểm QC đã khóa kỳ',message:`Lưu Mean/SD này sẽ điền số lô/Mean-SD hiện hành vào ${locked.count} điểm QC trước đó chưa ghi lô, thuộc kỳ đã khóa (${locked.periods.map(monthVN).join(', ')}).`,detail:'Giá trị đo và ngày của từng điểm không đổi — chỉ điền thêm nhãn số lô/Mean-SD còn thiếu.',confirmLabel:'Vẫn lưu',cancelLabel:'Hủy',danger:false}))return;
-    if(!await reauthenticateCurrentUser({title:'Xác thực Mean/SD',message:'Nhập lại mật khẩu trước khi lưu Mean/SD cho lô QC.'}))return;
+    if(locked.count&&!await confirmDialog(targetWorkflow?targetWorkflow.lockedBackfillDialog(locked.count,locked.periods.map(monthVN).join(', ')):{kicker:'Cập nhật hàng loạt',title:'Điền lô/Mean-SD cho điểm QC đã khóa kỳ',message:`Lưu Mean/SD này sẽ điền số lô/Mean-SD hiện hành vào ${locked.count} điểm QC trước đó chưa ghi lô, thuộc kỳ đã khóa (${locked.periods.map(monthVN).join(', ')}).`,detail:'Giá trị đo và ngày của từng điểm không đổi — chỉ điền thêm nhãn số lô/Mean-SD còn thiếu.',confirmLabel:'Vẫn lưu',cancelLabel:'Hủy',danger:false}))return;
+    if(!await reauthenticateCurrentUser(targetWorkflow?targetWorkflow.reauth(false):{title:'Xác thực Mean/SD',message:'Nhập lại mật khẩu trước khi lưu Mean/SD cho lô QC.'}))return;
     commitTargetMatrix(picked,group,panel,'switch',[]);return;
   }
   targetSwitchCtx={panel,group,picked,overwrites,locked};
@@ -96,12 +98,11 @@ async function saveTargetMatrix(){
 }
 function openTargetSwitchModal(){
   const {group,overwrites,locked}=targetSwitchCtx||{};if(!group)return;
-  const names=[...new Set(overwrites.map(pick=>{const pt=state.tests.find(t=>t.id===pick.testId);return pt&&testDisplayName(pt);}).filter(Boolean))].join(', ');
-  const lockNote=locked&&locked.count?` <b>${locked.count} điểm QC thuộc kỳ đã khóa (${locked.periods.map(monthVN).join(', ')})</b> sẽ được điền số lô/Mean-SD hiện hành (điểm trước đó chưa ghi lô riêng).`:'';
+  const targetWorkflow=globalThis.manageTargetMatrixWorkflow||null,names=[...new Set(overwrites.map(pick=>{const pt=state.tests.find(t=>t.id===pick.testId);return pt&&testDisplayName(pt);}).filter(Boolean))].join(', '),summary=targetWorkflow?targetWorkflow.switchSummary(overwrites.length,names,locked&&locked.count||0,locked&&locked.periods.map(monthVN).join(', ')||''):{count:overwrites.length,names,lockNote:locked&&locked.count?`${locked.count} điểm QC thuộc kỳ đã khóa (${locked.periods.map(monthVN).join(', ')}) sẽ được điền số lô/Mean-SD hiện hành.`:''},lockNote=summary.lockNote?` <b>${summary.lockNote}</b>`:'';
   openModal(`<div class="modal">
     <div class="modal-h"><h3>Áp dụng nhóm lô ${esc(group.name)}?</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
     <div class="modal-b">
-      <div class="hint">${overwrites.length} dòng (${esc(names)}) hiện đang dùng một nhóm lô khác. Chọn cách áp dụng Mean/SD vừa nhập:</div>
+      <div class="hint">${summary.count} dòng (${esc(summary.names)}) hiện đang dùng một nhóm lô khác. Chọn cách áp dụng Mean/SD vừa nhập:</div>
       <div class="hint flow-control"><b>Chuyển qua nhóm lô này</b>: áp dụng ngay cho các dòng trên, nhóm lô đang dùng trước đó sẽ được đánh dấu "Đã dừng" (vẫn xem/nhập được nếu cần, không bị khóa).${lockNote}</div>
       <div class="hint flow-note"><b>Dự kiến</b>: chỉ lưu lại Mean/SD đã nhập cho nhóm lô mới, chưa áp dụng — nhóm lô đang dùng vẫn tiếp tục như bình thường.</div>
     </div>
@@ -110,12 +111,12 @@ function openTargetSwitchModal(){
 }
 async function resolveTargetSwitch(mode){
   const ctx=targetSwitchCtx;closeModal();targetSwitchCtx=null;if(!ctx)return;
-  if(!await reauthenticateCurrentUser({title:'Xác thực chuyển lô',message:'Nhập lại mật khẩu trước khi lưu hoặc áp dụng Mean/SD cho nhóm lô mới.'}))return;
+  const targetWorkflow=globalThis.manageTargetMatrixWorkflow||null;if(!await reauthenticateCurrentUser(targetWorkflow?targetWorkflow.reauth(true):{title:'Xác thực chuyển lô',message:'Nhập lại mật khẩu trước khi lưu hoặc áp dụng Mean/SD cho nhóm lô mới.'}))return;
   commitTargetMatrix(ctx.picked,ctx.group,ctx.panel,mode,ctx.overwrites);
 }
 function commitTargetMatrix(picked,group,panel,mode,overwrites){
   const result=ManageConfigService.applyTargetMatrix({picked,group,mode,overwrites,effectiveFrom:isoToday(),note:'Cập nhật Mean/SD',tests:state.tests,lots:state.qcLots||[],groups:state.lotGroups||[],pointsForTest:t=>(state.data&&state.data[t.id])||[],groupsForLot:groupsOfLot,upsertHistory:upsertLotTargetHistory});
-  logAct('Cập nhật Mean/SD',`${targetPanelLabel()} · ${group.name} · ${result.count} dòng${mode==='planned'?' (dự kiến)':''}`,'Mean/SD');save();rerender();
+  const auditDetail=globalThis.manageTargetCommitAudit?globalThis.manageTargetCommitAudit({panel:targetPanelLabel(),group:group.name,count:result.count,mode}):`${targetPanelLabel()} · ${group.name} · ${result.count} dòng${mode==='planned'?' (dự kiến)':''}`;logAct('Cập nhật Mean/SD',auditDetail,'Mean/SD');save();rerender();
 }
 function openQcHistoryDetail(tid,level,lotNo=''){
   const t=state.tests.find(x=>x.id===tid),l=t&&t.levels.find(x=>+x.level===+level);if(!t||!l)return;
@@ -128,6 +129,7 @@ function openQcHistoryDetail(tid,level,lotNo=''){
     <h4 class="flow-panel space-after-section">Điểm QC đã nhập (${pts.length})</h4>${ptRows?`<table class="history-detail-table hist-points-table"><thead><tr><th>Ngày</th><th>Lần chạy</th><th class="num">Giá trị</th><th class="num">Z</th><th class="num">Mean lúc nhập</th><th class="num">SD lúc nhập</th><th>Kết luận nhanh</th><th>NV</th></tr></thead><tbody>${ptRows}</tbody></table>`:emptyState('Chưa có điểm QC','Không có điểm QC nào khớp với lô/mức này.')}</div><div class="modal-f">${btn('Đóng','closeModal()','teal')}</div></div>`);
 }
 async function openConfigPanel(id=''){
+  const formState=globalThis.managePanelFormState?globalThis.managePanelFormState(id):{editing:!!id,submitLabel:id?'Lưu thay đổi':'Thêm Panel QC'};
   if(!state.tests.length){await infoDialog('Hãy tạo xét nghiệm trước khi tạo Panel QC.');setManageTab('assays');return;}
   if(!state.instruments.length){await infoDialog('Hãy tạo máy xét nghiệm trước khi tạo Panel QC.');setManageTab('instruments');return;}
   const p=state.qcPanels.find(x=>x.id===id)||{testIds:[],instrumentId:state.instruments[0]&&state.instruments[0].id,active:true};
@@ -138,7 +140,7 @@ async function openConfigPanel(id=''){
     <label>Chọn xét nghiệm trong panel</label><div id="cfgPanelTests" class="group-lot-picker assay-group-picker">${panelTestRows(p.instrumentId,p.testIds||[])}</div>
     <label>Ghi chú</label><textarea id="cfgPanelNote">${esc(p.note||'')}</textarea>
     <label class="rcfg-check"><input id="cfgPanelActive" type="checkbox" ${p.active!==false?'checked':''}> Panel đang sử dụng</label></div>
-    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn(id?'Lưu thay đổi':'Thêm Panel QC',`saveConfigPanel('${id}')`,'teal')}</div></div>`);
+    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn(formState.submitLabel,`saveConfigPanel('${id}')`,'teal')}</div></div>`);
 }
 function renderConfigPanelTests(){
   const root=document.getElementById('cfgPanelTests'),instrumentId=document.getElementById('cfgPanelInstrument').value;
@@ -151,8 +153,8 @@ async function saveConfigPanel(id){
   const data={name:document.getElementById('cfgPanelName').value,instrumentId:document.getElementById('cfgPanelInstrument').value,testIds:[...document.querySelectorAll('.cfg-panel-test:checked')].map(x=>x.value),note:document.getElementById('cfgPanelNote').value,active:document.getElementById('cfgPanelActive').checked},result=ManageConfigService.savePanel(state,{id,newId:uid(),data});if(result.error){await infoDialog(result.message);return;}
   logAct(result.created?'Thêm Panel QC':'Cập nhật Panel QC',`${result.record.name} · ${result.record.testIds.length} xét nghiệm`,'Panel QC');closeModal();save();rerender();
 }
-async function deleteConfigPanel(id){if(!requireAdmin())return;const checked=ManageConfigService.panelRemoval(state,{id});if(checked.error){if(checked.message)await infoDialog(checked.message);return;}if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa Panel QC',message:`Xóa Panel QC ${checked.record.name}?`,detail:'Các xét nghiệm vẫn được giữ nguyên.',confirmLabel:'Xóa Panel QC',cancelLabel:'Hủy'}))return;ManageConfigService.removePanel(state,{id});logAct('Xóa Panel QC',checked.record.name,'Panel QC');save();rerender();}
-async function deleteLotTransition(id){if(!requireAdmin())return;const checked=ManageConfigService.lotTransitionRemoval(state,{id,switchesLot:transitionSwitchesLot});if(checked.error){if(checked.message)await infoDialog(checked.message);return;}if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa dòng chuyển tiếp lô',message:'Xóa dòng chuyển tiếp lô này?',confirmLabel:'Xóa',cancelLabel:'Hủy'}))return;ManageConfigService.removeLotTransition(state,{id,switchesLot:transitionSwitchesLot});syncLotDepletionFromTransitions();logAct('Xóa chuyển tiếp lô',`${lotLabel(checked.record.fromLotId)} → ${lotLabel(checked.record.toLotId)}`,'Chuyển tiếp lô');save();rerender();}
+async function deleteConfigPanel(id){if(!requireAdmin())return;const flow=globalThis.managePanelWorkflow||null,checked=flow?flow.removal(state,{id}):ManageConfigService.panelRemoval(state,{id});if(checked.error){if(checked.message)await infoDialog(checked.message);return;}const dialog=flow?flow.removalDialog(checked.record.name):{kicker:'Thao tác không thể hoàn tác',title:'Xóa Panel QC',message:`Xóa Panel QC ${checked.record.name}?`,detail:'Các xét nghiệm vẫn được giữ nguyên.',confirmLabel:'Xóa Panel QC',cancelLabel:'Hủy'};if(!await confirmDialog(dialog))return;ManageConfigService.removePanel(state,{id});logAct('Xóa Panel QC',checked.record.name,'Panel QC');save();rerender();}
+async function deleteLotTransition(id){if(!requireAdmin())return;const flow=globalThis.manageTransitionWorkflow||null,checked=flow?flow.removal(state,{id,switchesLot:transitionSwitchesLot}):ManageConfigService.lotTransitionRemoval(state,{id,switchesLot:transitionSwitchesLot});if(checked.error){if(checked.message)await infoDialog(checked.message);return;}const dialog=flow?flow.removalDialog():{kicker:'Thao tác không thể hoàn tác',title:'Xóa dòng chuyển tiếp lô',message:'Xóa dòng chuyển tiếp lô này?',confirmLabel:'Xóa',cancelLabel:'Hủy'};if(!await confirmDialog(dialog))return;ManageConfigService.removeLotTransition(state,{id,switchesLot:transitionSwitchesLot});syncLotDepletionFromTransitions();logAct('Xóa chuyển tiếp lô',`${lotLabel(checked.record.fromLotId)} → ${lotLabel(checked.record.toLotId)}`,'Chuyển tiếp lô');save();rerender();}
 function lotTransitionChoiceLabel(lot){return LotTransitionPickerService.label(lot);}
 function lotTransitionChoiceLots(selectedId=''){return LotTransitionPickerService.availableLots(state.qcLots||[],selectedId);}
 function lotTransitionChoiceMatch(value,selectedId=''){return LotTransitionPickerService.match(state.qcLots||[],value,selectedId);}
@@ -267,7 +269,7 @@ async function saveConfigGroup(id){
   const sigmaSync=reconcileSigmaLevelsWithLotGroups(),syncNote=sigmaSync.pruned?` · đã xóa ${sigmaSync.pruned} dữ liệu mức Sigma không còn trong nhóm`:'';
   logAct(result.created?'Thêm nhóm lô':'Cập nhật nhóm lô',result.record.name+syncNote,'Nhóm lô');closeModal();save();rerender();
 }
-async function deleteConfigGroup(id){if(!requireAdmin())return;const checked=ManageConfigService.lotGroupRemoval(state,{id});if(checked.error){if(checked.message)await infoDialog(checked.message);return;}if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa nhóm lô',message:`Xóa nhóm lô ${checked.record.name}?`,detail:'Các lô QC bên trong vẫn được giữ nguyên.',confirmLabel:'Xóa nhóm lô',cancelLabel:'Hủy'}))return;ManageConfigService.removeLotGroup(state,{id});logAct('Xóa nhóm lô',checked.record.name,'Nhóm lô');save();rerender();}
+async function deleteConfigGroup(id){if(!requireAdmin())return;const flow=globalThis.manageLotGroupWorkflow||null,checked=flow?flow.removal(state,{id}):ManageConfigService.lotGroupRemoval(state,{id});if(checked.error){if(checked.message)await infoDialog(checked.message);return;}const dialog=flow?flow.removalDialog(checked.record.name):{kicker:'Thao tác không thể hoàn tác',title:'Xóa nhóm lô',message:`Xóa nhóm lô ${checked.record.name}?`,detail:'Các lô QC bên trong vẫn được giữ nguyên.',confirmLabel:'Xóa nhóm lô',cancelLabel:'Hủy'};if(!await confirmDialog(dialog))return;ManageConfigService.removeLotGroup(state,{id});logAct('Xóa nhóm lô',checked.record.name,'Nhóm lô');save();rerender();}
 /* Dừng luồng vận hành của nhóm: giữ nguyên liên kết lô/Mean-SD để bảo toàn lịch sử và
    có thể kích hoạt lại, nhưng isOperationalLotGroup() sẽ loại nhóm khỏi Nhập QC cùng
    mọi luồng vận hành mới. Chiều ngược lại đi qua activateLotGroup(). */
@@ -373,7 +375,7 @@ function renameLotAcrossPoints(oldLevel,oldLotNo,newLotNo){
    trực tiếp (vì đã áp dụng vào cấu hình/Mean-SD, có giá trị lịch sử/audit). Chặn thêm
    ở đây cho nhất quán với bảo vệ đó — chỉ chặn hồ sơ đã chấp nhận, không chặn hồ sơ
    dự kiến/đang chạy song song/không chấp nhận (những hồ sơ đó vốn xóa trực tiếp được). */
-async function deleteConfigLot(id){if(!requireAdmin())return;const check=ManageConfigService.lotRemoval(state,{id,switchesLot:transitionSwitchesLot});if(check.error){if(check.error!=='not-found')await infoDialog(check.message);return;}if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa lô QC',message:`Xóa lô QC ${check.record.lotNo}?`,confirmLabel:'Xóa lô QC',cancelLabel:'Hủy'}))return;const result=ManageConfigService.removeLot(state,{id,switchesLot:transitionSwitchesLot});if(result.error){await infoDialog(result.message);return;}logAct('Xóa lô QC',result.record.lotNo,'Lô QC');save();rerender();}
+async function deleteConfigLot(id){if(!requireAdmin())return;const flow=globalThis.manageLotWorkflow||null,check=flow?flow.removal(state,{id,switchesLot:transitionSwitchesLot}):ManageConfigService.lotRemoval(state,{id,switchesLot:transitionSwitchesLot});if(check.error){if(check.error!=='not-found')await infoDialog(check.message);return;}const dialog=flow?flow.removalDialog(check.record.lotNo):{kicker:'Thao tác không thể hoàn tác',title:'Xóa lô QC',message:`Xóa lô QC ${check.record.lotNo}?`,confirmLabel:'Xóa lô QC',cancelLabel:'Hủy'};if(!await confirmDialog(dialog))return;const result=ManageConfigService.removeLot(state,{id,switchesLot:transitionSwitchesLot});if(result.error){await infoDialog(result.message);return;}logAct('Xóa lô QC',result.record.lotNo,'Lô QC');save();rerender();}
 function openConfigInstrument(id=''){
   const i=state.instruments.find(x=>x.id===id)||{active:true};
   openModal(`<div class="modal rcfg-modal"><div class="modal-h"><div><h3>${id?'Sửa máy xét nghiệm':'Thêm máy xét nghiệm'}</h3></div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
@@ -388,7 +390,7 @@ async function saveConfigInstrument(id){
   const result=ManageConfigService.saveInstrument(state,{id,newId:id?'':uid(),data});if(result.error){await infoDialog(result.message);return;}
   logAct(result.created?'Thêm máy xét nghiệm':'Cập nhật máy',result.record.name,'Máy xét nghiệm');closeModal();save();rerender();
 }
-async function deleteConfigInstrument(id){if(!requireAdmin())return;const check=ManageConfigService.instrumentRemoval(state,{id});if(check.error){if(check.error!=='not-found')await infoDialog(check.message);return;}if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa máy xét nghiệm',message:`Xóa máy ${check.record.name}?`,confirmLabel:'Xóa máy',cancelLabel:'Hủy'}))return;const result=ManageConfigService.removeInstrument(state,{id});if(result.error){await infoDialog(result.message);return;}logAct('Xóa máy xét nghiệm',result.record.name,'Máy xét nghiệm');save();rerender();}
+async function deleteConfigInstrument(id){if(!requireAdmin())return;const flow=globalThis.manageInstrumentWorkflow||null,check=flow?flow.removal(state,{id}):ManageConfigService.instrumentRemoval(state,{id});if(check.error){if(check.error!=='not-found')await infoDialog(check.message);return;}const dialog=flow?flow.removalDialog(check.record.name):{kicker:'Thao tác không thể hoàn tác',title:'Xóa máy xét nghiệm',message:`Xóa máy ${check.record.name}?`,confirmLabel:'Xóa máy',cancelLabel:'Hủy'};if(!await confirmDialog(dialog))return;const result=ManageConfigService.removeInstrument(state,{id});if(result.error){await infoDialog(result.message);return;}logAct('Xóa máy xét nghiệm',result.record.name,'Máy xét nghiệm');save();rerender();}
 /* Xét nghiệm mới luôn bắt đầu với đúng 1 mức (Mức 1) — KHÔNG suy theo các mức
    lô đang có ở NƠI KHÁC trong hệ thống (từng làm vậy trước đây, khiến xét
    nghiệm mới tự dính thêm mức rỗng không liên quan chỉ vì lab có lô ở mức đó
@@ -457,9 +459,10 @@ async function saveConfigAssay(id){
 async function delTest(id){
   if(!requireAdmin())return;
   const context=ManageConfigService.assayRemoval(state,{id});if(context.error)return;const t=context.record,points=context.points,locked=PeriodService.lockedPoints(state,points);
-  if(locked.count){await infoDialog(`Không thể xóa "${testDisplayName(t)}": còn ${locked.count} điểm QC thuộc kỳ đã khóa (${locked.periods.map(monthVN).join(', ')}). Hãy mở khóa các kỳ này ở trang Báo cáo trước — thao tác mở khóa yêu cầu lý do và được ghi vào nhật ký.`);return;}
-  if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa xét nghiệm',message:`Xóa xét nghiệm ${t.name} và toàn bộ dữ liệu QC?`,detail:`${points.length} điểm QC cùng toàn bộ kết quả Westgard và Sigma của xét nghiệm này sẽ mất, không thể khôi phục.`,confirmLabel:'Xóa xét nghiệm',cancelLabel:'Hủy'}))return;
-  if(!await reauthenticateCurrentUser({title:'Xác thực xóa xét nghiệm',message:`Nhập lại mật khẩu trước khi xóa ${t.name} và ${points.length} điểm QC.`}))return;
+  const flow=globalThis.manageAssayRemovalWorkflow||null;
+  if(locked.count){await infoDialog(flow?flow.lockedMessage({name:testDisplayName(t),count:locked.count,periods:locked.periods.map(monthVN).join(', ')}):`Không thể xóa "${testDisplayName(t)}": còn ${locked.count} điểm QC thuộc kỳ đã khóa (${locked.periods.map(monthVN).join(', ')}). Hãy mở khóa các kỳ này ở trang Báo cáo trước — thao tác mở khóa yêu cầu lý do và được ghi vào nhật ký.`);return;}
+  if(!await confirmDialog(flow?flow.confirmDialog({name:t.name,pointCount:points.length}):{kicker:'Thao tác không thể hoàn tác',title:'Xóa xét nghiệm',message:`Xóa xét nghiệm ${t.name} và toàn bộ dữ liệu QC?`,detail:`${points.length} điểm QC cùng toàn bộ kết quả Westgard và Sigma của xét nghiệm này sẽ mất, không thể khôi phục.`,confirmLabel:'Xóa xét nghiệm',cancelLabel:'Hủy'}))return;
+  if(!await reauthenticateCurrentUser(flow?flow.reauthDialog({name:t.name,pointCount:points.length}):{title:'Xác thực xóa xét nghiệm',message:`Nhập lại mật khẩu trước khi xóa ${t.name} và ${points.length} điểm QC.`}))return;
   const result=ManageConfigService.removeAssay(state,{id});if(result.error){await infoDialog(result.message);return;}
   if(selTest===id)selTest=state.tests[0]&&state.tests[0].id||null;if(entrySel&&entrySel.testId===id)entrySel=null;
   logAct('Xóa test/lô',`Xóa xét nghiệm và ${points.length} điểm QC`,t.name);save();rerender();

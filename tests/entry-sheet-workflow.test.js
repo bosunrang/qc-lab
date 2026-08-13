@@ -1,0 +1,13 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const {pathToFileURL}=require('node:url');
+const path=require('node:path');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','entry','entry-sheet-workflow.ts')).href;
+const program=`import { createEntrySheetWorkflow } from ${JSON.stringify(source)};
+const workflow=createEntrySheetWorkflow({monthValue:value=>String(value).startsWith('2026-')?String(value):null,monthState:month=>month?{month,jumpToday:false,message:''}:null,todayState:month=>({month,jumpToday:true,message:''}),monthPart:(_,fallback,part,value)=>part+':'+value+':'+fallback,keyPlan:event=>({handle:event.key==='Enter'}),orderInputs:items=>[...items].reverse(),navigationTarget:items=>items?.[1]||null,pendingFocus:(_,items)=>items[0]||null,focus:items=>items?.[0]||null});
+console.log(JSON.stringify([workflow.setMonth('2026-08'),workflow.setMonth('bad'),workflow.today('2026-08'),workflow.setPart('', '2026-08','year','2027'),workflow.keyPlan({key:'Enter'}),workflow.orderInputs(['a','b']),workflow.targetInput(['a','b'],'a','Enter'),workflow.pendingFocus('', ['a']),workflow.focus(['b'])]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--experimental-strip-types','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'Không thể chạy entry sheet workflow TypeScript');
+assert.deepEqual(JSON.parse(result.stdout),[{month:'2026-08',jumpToday:false,message:''},null,{month:'2026-08',jumpToday:true,message:''},'year:2027:2026-08',{handle:true},['b','a'],'b','a','b']);
+console.log('Entry sheet workflow TypeScript tests passed');

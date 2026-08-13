@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const {pathToFileURL}=require('node:url');
+const path=require('node:path');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','entry','entry-date-note-error-html.ts')).href;
+const program=`import { createEntryDateNoteErrorHtml } from ${JSON.stringify(source)};const render=createEntryDateNoteErrorHtml({escape:value=>'E:'+String(value)});console.log(JSON.stringify([render('Kỳ <x>'),render('')]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--experimental-strip-types','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'Không thể chạy entry date note error HTML TypeScript');
+assert.deepEqual(JSON.parse(result.stdout),['<div class="alert warn">E:Kỳ <x></div>','']);
+console.log('Entry date note error HTML TypeScript tests passed');

@@ -1,0 +1,6 @@
+export function createManageAssayRemovalWorkflow(deps: { lockedMessage: (input: { name: string; count: number; periods: string }) => string; confirmDialog: (input: { name: string; pointCount: number }) => any; reauthDialog: (input: { name: string; pointCount: number }) => any }) {
+  return Object.freeze({lockedMessage:deps.lockedMessage,confirmDialog:deps.confirmDialog,reauthDialog:deps.reauthDialog});
+}
+export function manageAssayLockedMessage(input: { name: string; count: number; periods: string }) { return `Không thể xóa "${input.name}": còn ${input.count} điểm QC thuộc kỳ đã khóa (${input.periods}). Hãy mở khóa các kỳ này ở trang Báo cáo trước — thao tác mở khóa yêu cầu lý do và được ghi vào nhật ký.`; }
+export function manageAssayRemovalConfirm(input: { name: string; pointCount: number }) { return {kicker:'Thao tác không thể hoàn tác',title:'Xóa xét nghiệm',message:`Xóa xét nghiệm ${input.name} và toàn bộ dữ liệu QC?`,detail:`${input.pointCount} điểm QC cùng toàn bộ kết quả Westgard và Sigma của xét nghiệm này sẽ mất, không thể khôi phục.`,confirmLabel:'Xóa xét nghiệm',cancelLabel:'Hủy'}; }
+export function manageAssayRemovalReauth(input: { name: string; pointCount: number }) { return {title:'Xác thực xóa xét nghiệm',message:`Nhập lại mật khẩu trước khi xóa ${input.name} và ${input.pointCount} điểm QC.`}; }

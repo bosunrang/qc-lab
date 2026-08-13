@@ -1,0 +1,14 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const {pathToFileURL}=require('node:url');
+const path=require('node:path');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','entry','entry-sheet-pending-focus.ts')).href;
+const program=`import { createEntrySheetPendingFocus } from ${JSON.stringify(source)};
+const target=createEntrySheetPendingFocus({date:item=>item.date,level:item=>item.level,choose:items=>items.find(item=>item.empty)||items[0]||null});
+const rows=[{id:'old',date:'2026-08-13',level:'1',empty:false},{id:'empty',date:'2026-08-13',level:'1',empty:true},{id:'other',date:'2026-08-13',level:'2',empty:true}];
+console.log(JSON.stringify([target('2026-08-13|1',rows),target('2026-08-13|2',rows),target('',rows),target('2026-08-14|1',rows)]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--experimental-strip-types','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'Không thể chạy entry sheet pending focus TypeScript');
+assert.deepEqual(JSON.parse(result.stdout),[{id:'empty',date:'2026-08-13',level:'1',empty:true},{id:'other',date:'2026-08-13',level:'2',empty:true},null,null]);
+console.log('Entry sheet pending focus TypeScript tests passed');

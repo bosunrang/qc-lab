@@ -1,0 +1,12 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const {pathToFileURL}=require('node:url');
+const path=require('node:path');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','entry','entry-machine-selection.ts')).href;
+const program=`import { entryMachineSelection } from ${JSON.stringify(source)};
+console.log(JSON.stringify([entryMachineSelection('M1',['M1','M2']),entryMachineSelection('M3',['M1','M2']),entryMachineSelection('all',['M1']),entryMachineSelection('',new Set(['M1']))]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--experimental-strip-types','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'Không thể chạy entry machine selection TypeScript');
+assert.deepEqual(JSON.parse(result.stdout),['M1','all','all','all']);
+console.log('Entry machine selection TypeScript tests passed');

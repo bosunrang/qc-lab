@@ -6728,6 +6728,643 @@
 		return (levels || []).map((level) => String(level.lot || "").trim()).filter(Boolean).join(" / ") || "Chưa gán lô";
 	}
 	//#endregion
+	//#region src/presentation/entry/entry-detail-state.ts
+	function entryDetailState(keys, key, open) {
+		const next = new Set(keys);
+		if (open) next.add(key);
+		else next.delete(key);
+		return next;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-tree-open-state.ts
+	function entryTreeOpenState(keys, key) {
+		const next = new Set(keys);
+		if (next.has(key)) next.delete(key);
+		else next.add(key);
+		return {
+			keys: next,
+			open: next.has(key)
+		};
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-machine-selection.ts
+	function entryMachineSelection(value, machines) {
+		const selected = String(value || "all");
+		const available = new Set([...machines].map((item) => String(item)));
+		return selected === "all" || available.has(selected) ? selected : "all";
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-tree-collapsed-state.ts
+	function entryTreeCollapsedState(cached, read) {
+		return cached === null ? read() : cached;
+	}
+	function entryTreeCollapsedToggle(collapsed) {
+		return !collapsed;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-tree-auto-open-state.ts
+	function entryTreeAutoOpenState(keys, previousKey, machine, lotGroupKey, testId) {
+		const autoOpenKey = `${machine}|${lotGroupKey}|${testId}`;
+		const next = new Set(keys);
+		if (previousKey === autoOpenKey) return {
+			keys: next,
+			autoOpenKey,
+			changed: false
+		};
+		next.add(`m:${machine}`);
+		next.add(`lg:${machine}|${lotGroupKey}`);
+		return {
+			keys: next,
+			autoOpenKey,
+			changed: true
+		};
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-previous-lot-state.ts
+	function entryPreviousLotState(values, key, lot = null) {
+		const next = new Map(values);
+		if (lot == null || lot === "") next.delete(key);
+		else next.set(key, lot);
+		return next;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-sheet-pending-focus.ts
+	function createEntrySheetPendingFocus(deps) {
+		return (pending, candidates) => {
+			const [date, level] = String(pending || "").split("|");
+			if (!date || !level) return null;
+			return deps.choose(candidates.filter((item) => deps.date(item) === date && deps.level(item) === level));
+		};
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-extra-run-state.ts
+	function entryExtraRunState(keys, request) {
+		const next = new Set(keys);
+		next.add(request.key);
+		return {
+			keys: next,
+			focus: String(request.focus || "")
+		};
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-selection-recovery.ts
+	function createEntrySelectionRecovery(deps) {
+		return (selection, tests) => {
+			let test = selection ? tests.find((item) => deps.id(item) === selection.testId) : void 0;
+			if (test && deps.levels(test).some((level) => level.level === selection.level)) return {
+				test,
+				selection,
+				resetAutoOpenKey: false
+			};
+			test = tests[0];
+			const level = test && deps.levels(test)[0];
+			return {
+				test,
+				selection: test && level ? {
+					testId: deps.id(test),
+					level: level.level
+				} : null,
+				resetAutoOpenKey: true
+			};
+		};
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-unusual-data-issues-html.ts
+	function createEntryUnusualDataIssuesHtml(deps) {
+		return (issues) => issues.map((issue) => `<div class="alert warn">${deps.escape(issue)}</div>`).join("");
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-unusual-data-modal-html.ts
+	function createEntryUnusualDataModalHtml(deps) {
+		return (input) => `<div class="modal">
+      <div class="modal-h"><h3>Cảnh báo dữ liệu bất thường</h3><button class="modal-close" onclick="closeModal();entryRenderKeepScroll()">×</button></div>
+      <div class="modal-b">${input.issuesHtml}<div class="hint">Bạn vẫn muốn lưu điểm QC này?</div></div>
+      <div class="modal-f">${deps.button("Hủy", "closeModal();entryRenderKeepScroll()", "ghost")}${deps.button("Vẫn lưu", input.confirmAction, "teal")}</div>
+    </div>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-date-note-message-html.ts
+	function createEntryDateNoteMessageHtml(deps) {
+		return (input) => {
+			if (input.feedback) return `<div class="alert ${deps.escape(input.feedback.cls)}">${deps.escape(input.feedback.message)}</div>`;
+			const message = input.note ? `✓ Đã lưu ghi chú ngày ${input.dateText}.` : `✓ Đã xóa ghi chú ngày ${input.dateText}.`;
+			return `<div class="alert ok">${deps.escape(message)}</div>`;
+		};
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-save-feedback-html.ts
+	function createEntrySaveFeedbackHtml(deps) {
+		return (feedback) => {
+			if (!feedback) return "";
+			const message = deps.escape(feedback.message);
+			return `<div class="alert ${deps.escape(feedback.cls)}">${feedback.emphasis ? `<b>${message}</b>` : message}</div>`;
+		};
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-record-error-html.ts
+	function createEntryRecordErrorHtml(deps) {
+		return (message) => `<div class="alert warn">${deps.escape(message)}</div>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-inline-save-plan.ts
+	function entryInlineSavePlan(input) {
+		if (!input.test || !input.config || !input.canEnter) return { state: "unavailable" };
+		if (input.value == null || String(input.value).trim() === "") return { state: "empty" };
+		return { state: "ready" };
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-save-message-html.ts
+	function createEntrySaveMessageHtml(deps) {
+		return (input) => {
+			if (input.feedback) return deps.feedbackHtml(input.feedback);
+			if (input.verdict === "rej") return `<div class="alert rej"><b>⚠ ${deps.escape(input.tag)} vi phạm — ${deps.escape(input.rules.filter(Boolean).join(", "))}</b></div>`;
+			if (input.verdict === "warn") return `<div class="alert warn"><b>${deps.escape(input.tag)} cảnh báo — ${deps.escape(input.rules.filter(Boolean).join(", "))}</b></div>`;
+			return `<div class="alert ok">✓ Đã lưu ${deps.escape(input.tag)} ngày ${deps.escape(input.dateText)}.</div>`;
+		};
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-void-confirm-detail.ts
+	function entryVoidConfirmDetail(openNce) {
+		return openNce ? "Điểm vẫn được giữ trong nhật ký; hồ sơ NCE sẽ được lập mới hoặc dùng lại, và yêu cầu QC chạy lại." : "Điểm vẫn được giữ trong nhật ký; thao tác này không tự mở hồ sơ NCE.";
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-void-feedback-html.ts
+	function createEntryVoidFeedbackHtml(deps) {
+		return (input) => {
+			const followup = !input.openNce ? " Không yêu cầu NCE/QC chạy lại." : input.reusedAction ? " Đã giữ liên kết với hồ sơ NCE đang mở." : ` Đã mở hồ sơ ${deps.escape(input.nceId || "NCE")} để tiếp tục điều tra.`;
+			return `<div class="alert warn">Đã hủy điểm QC ngày ${deps.escape(input.dateText)}. Điểm không còn tham gia tính toán.${followup}</div>`;
+		};
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-void-modal-html.ts
+	function createEntryVoidModalHtml(deps) {
+		return (input) => `<div class="modal">
+    <div class="modal-h"><h3>Hủy điểm QC</h3><button class="modal-close" onclick="closeModal()">×</button></div>
+    <div class="modal-b">
+      <div class="hint">Ngày ${deps.escape(input.dateText)} · Mức ${input.level} · Giá trị ${deps.escape(input.valueText)}</div>
+      <label>Loại hủy</label>
+      <select id="voidKindInput" aria-label="Loại hủy điểm QC" onchange="syncVoidNceChoice()">
+        <option value="analytical">Kết quả QC thực tế không hợp lệ</option>
+        <option value="data-entry">Nhập sai dữ liệu</option>
+        <option value="other">Lý do khác</option>
+      </select>
+      <div class="void-nce-choice"><label><input id="voidOpenNce" type="checkbox" checked disabled> Lập hồ sơ NCE và yêu cầu chạy lại QC</label><div id="voidNceHint" class="hint">Hệ thống sẽ mở hoặc tái sử dụng hồ sơ NCE và chờ một kết quả QC chạy lại được chấp nhận.</div></div>
+      <div id="voidReasonBox"><label id="voidReasonLabel">Ghi chú / bằng chứng (khuyến nghị)</label>
+        <textarea id="voidReasonInput" aria-label="Ghi chú lý do hủy điểm QC" placeholder="VD: Máy báo lỗi hút mẫu lúc 08:15, đã ghi nhận trong sổ bảo trì..." oninput="document.getElementById('voidReasonErr').style.display='none'"></textarea>
+        <div id="voidReasonErr" class="hint field-error">Cần ghi lý do hủy tối thiểu 5 ký tự.</div>
+      </div>
+    </div>
+    <div class="modal-f">${deps.button("Đóng", "closeModal()", "ghost")}${deps.button("Xác nhận hủy", input.confirmAction, "danger")}</div>
+  </div>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-void-confirm-dialog.ts
+	function entryVoidConfirmDialog(detail) {
+		return {
+			kicker: "Thao tác không thể hoàn tác",
+			title: "Hủy điểm QC",
+			message: "Hủy điểm QC này khỏi tính toán Westgard/thống kê?",
+			detail,
+			confirmLabel: "Hủy điểm QC",
+			cancelLabel: "Quay lại"
+		};
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-void-plan.ts
+	function entryVoidPlan(test, point) {
+		return test && point && !point.voided ? { state: "ready" } : { state: "unavailable" };
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-sheet-month-state.ts
+	function entrySheetMonthState(month) {
+		return month ? {
+			month,
+			jumpToday: false,
+			message: ""
+		} : null;
+	}
+	function entrySheetTodayState(month) {
+		return {
+			month,
+			jumpToday: true,
+			message: ""
+		};
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-qc-warning-plan.ts
+	function entryQcWarningPlan(issues) {
+		const items = [...issues].map((item) => String(item));
+		if (items.some((item) => item.includes("SD đang bằng 0"))) return {
+			state: "blocked",
+			issues: items
+		};
+		return items.length ? {
+			state: "confirm",
+			issues: items
+		} : {
+			state: "ready",
+			issues: items
+		};
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-qc-unavailable-html.ts
+	function entryQcUnavailableHtml(commit = false) {
+		return `<div class="alert warn">${commit ? "Không thể lưu: nhóm lô đã dừng hoặc không còn sẵn sàng nhập QC." : "Nhóm lô đã dừng hoặc không còn sẵn sàng nhập QC."}</div>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-sd-zero-warning-html.ts
+	function createEntrySdZeroWarningHtml(deps) {
+		return (issues) => `<div class="alert rej"><b>Không thể lưu.</b> ${deps.escape(issues.join(" "))}</div>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-void-period-locked-html.ts
+	function entryVoidPeriodLockedHtml() {
+		return "<div class=\"alert warn\">Kỳ này đã chốt, không thể hủy điểm QC.</div>";
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-machine-filter-state.ts
+	function entryMachineFilterState(machine) {
+		return { machine: String(machine || "all") };
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-date-note-error-html.ts
+	function createEntryDateNoteErrorHtml(deps) {
+		return (message) => message ? `<div class="alert warn">${deps.escape(message)}</div>` : "";
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-invalid-input-html.ts
+	function entryInvalidInputHtml() {
+		return "<div class=\"alert warn\">Nhập giá trị QC hợp lệ.</div>";
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-void-point-context.ts
+	function createEntryVoidPointContext(deps) {
+		return (verdict) => {
+			const rules = [...new Set(Array.isArray(verdict?.rules) ? verdict.rules.map(String) : [])];
+			return {
+				rules,
+				rule: rules.join(", ") || "Không có luật Westgard",
+				qcVerdict: verdict?.level === "warn" || verdict?.level === "rej" ? verdict.level : "invalid",
+				qcErrorType: deps.errorType(rules)
+			};
+		};
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-save-audit-detail.ts
+	function entrySaveAuditDetail(input) {
+		return `Ngày ${input.dateText}, M${input.level}${input.parallel ? ` · lô song song ${input.lotNo || ""}` : ""}, giá trị ${input.valueText}`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-save-workflow.ts
+	function createEntrySaveWorkflow(deps) {
+		return Object.freeze({
+			preflight: deps.inputPlan,
+			warnings: deps.warningPlan,
+			unavailableHtml: deps.unavailableHtml,
+			invalidInputHtml: deps.invalidInputHtml,
+			sdZeroWarningHtml: deps.sdZeroWarningHtml,
+			unusualIssuesHtml: deps.unusualIssuesHtml,
+			unusualModalHtml: deps.unusualModalHtml,
+			auditDetail: deps.auditDetail,
+			messageHtml: deps.messageHtml
+		});
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-void-audit-detail.ts
+	function entryVoidAuditDetail(input) {
+		return `Ngày ${input.dateText}, M${input.level}, giá trị ${input.valueText} · ${input.reason}`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-void-workflow.ts
+	function createEntryVoidWorkflow(deps) {
+		return Object.freeze({
+			preflight: deps.plan,
+			modalHtml: deps.modalHtml,
+			reasonValid: deps.reasonValid,
+			reasonError: deps.reasonError,
+			pointContext: deps.pointContext,
+			confirmOptions: (openNce) => deps.confirmDialog(deps.confirmDetail(openNce)),
+			periodLockedHtml: deps.periodLockedHtml,
+			auditDetail: deps.auditDetail,
+			feedbackHtml: deps.feedbackHtml
+		});
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-screen-selection-workflow.ts
+	function createEntryScreenSelectionWorkflow(deps) {
+		return Object.freeze({
+			recoverSelection: deps.recoverSelection,
+			selectMachine: deps.machineSelection,
+			autoOpenTree: deps.autoOpenState
+		});
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-sheet-workflow.ts
+	function createEntrySheetWorkflow(deps) {
+		return Object.freeze({
+			setMonth: (value) => deps.monthState(deps.monthValue(value)),
+			today: deps.todayState,
+			setPart: deps.monthPart,
+			keyPlan: deps.keyPlan,
+			orderInputs: deps.orderInputs,
+			targetInput: deps.navigationTarget,
+			pendingFocus: deps.pendingFocus,
+			focus: deps.focus
+		});
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-tree-interaction-workflow.ts
+	function createEntryTreeInteractionWorkflow(deps) {
+		return Object.freeze({
+			detailState: deps.detailState,
+			toggleOpen: deps.openState,
+			toggleCollapsed: deps.collapsedToggle,
+			keyCommand: deps.keyCommand,
+			navigationTarget: deps.navigationTarget,
+			visibility: deps.visibility,
+			machineFilter: deps.machineFilter,
+			selection: deps.selection,
+			previousLot: deps.previousLot
+		});
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-table-interaction-workflow.ts
+	function createEntryTableInteractionWorkflow(deps) {
+		return Object.freeze({
+			unlockExtraRun: (keys, testId, columnKey, date, levelIndex, runNo) => deps.extraRunState(keys, deps.extraRunRequest(testId, columnKey, date, levelIndex, runNo)),
+			presetRange: (days, value) => deps.rangeState(days, deps.rangePreset(value)),
+			dateRange: (days, range, side, value) => deps.rangeState(days, deps.dateRangeInput(range, side, value)),
+			dateNoteFeedback: deps.dateNoteFeedback,
+			dateNoteErrorMessage: deps.dateNoteErrorMessage
+		});
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-void-reason-error-state.ts
+	function entryVoidReasonErrorState(valid) {
+		return valid ? {
+			showError: false,
+			focusReason: false
+		} : {
+			showError: true,
+			focusReason: true
+		};
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-range-source-label.ts
+	function entryRangeSourceLabel(applied) {
+		return applied === "lab" ? "PXN tự xây dựng" : "Nhà sản xuất";
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-range-state.ts
+	function entryRangeState(currentDays, range) {
+		return {
+			days: range.days == null ? currentDays : range.days,
+			start: range.start || null,
+			end: range.end || null
+		};
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-sheet-key-plan.ts
+	var ENTRY_SHEET_KEYS = /* @__PURE__ */ new Set([
+		"Enter",
+		"Tab",
+		"ArrowUp",
+		"ArrowDown",
+		"ArrowLeft",
+		"ArrowRight"
+	]);
+	function entrySheetKeyPlan(input) {
+		return { handle: !(!!input.isComposing || !!input.altKey || !!input.ctrlKey || !!input.metaKey) && ENTRY_SHEET_KEYS.has(String(input.key || "")) };
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-worksheet-html.ts
+	function createEntryWorksheetHtml(deps) {
+		return (input) => `<div class="panel qc-sheet-panel"><div class="qc-sheet-heading">
+      <div class="qc-sheet-title"><span>Bảng nhập QC</span><strong>${deps.escape(input.testName)}</strong><small>Lô ${deps.escape(input.lotLabel)}</small></div>
+      <div class="qc-month-area"><div class="qc-month-picker"><select aria-label="Chọn tháng" onchange="entrySetSheetPart('month',this.value)">${input.monthOptionsHtml}</select><select aria-label="Chọn năm" onchange="entrySetSheetPart('year',this.value)">${input.yearOptionsHtml}</select>${input.navigationButtonsHtml}</div></div></div>
+      <div class="qc-sheet-wrap" role="region" aria-label="Bảng nhập QC theo tháng" tabindex="0"><table class="qc-sheet"><thead><tr><th>Ngày</th>${input.levelHeadHtml}<th>NV thực hiện</th><th>Vi phạm cảnh báo</th><th>Vi phạm loại bỏ</th><th>Chấp nhận</th><th>Ghi chú</th></tr></thead>
+       <tbody>${input.rowsHtml || input.emptyRowHtml}</tbody></table></div>
+      <div id="entryMsg" role="status" aria-live="polite" style="margin:12px 16px 16px">${input.messageHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-page-html.ts
+	function createEntryPageHtml(deps) {
+		return (input) => deps.head("Nhập QC", "Ghi nhận kết quả theo ngày, mức QC và lô đang vận hành") + `<div class="entrygrid${input.treeCollapsed ? " tree-collapsed" : ""}">${input.treeToggleButtonHtml}<div class="tree" id="entryTreePanel">${input.treeHeadHtml}<div role="tree" aria-label="Danh mục nội kiểm">${input.treeHtml}</div></div><div class="entry-main">${input.rightHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-range-summary-html.ts
+	function createEntryRangeSummaryHtml(deps) {
+		return (input) => `<details class="panel entry-secondary-panel range-summary-panel" ${input.open ? "open" : ""} ontoggle="entryDetailToggled('range',this.open)"><summary class="entry-secondary-summary"><span>Thống kê toàn bộ &amp; Dải kiểm soát</span><small>${deps.escape(input.summary)}</small></summary>
+     <div class="entry-secondary-body"><div class="range-band-note"><div class="range-band-label">Dải đang dùng:</div><div class="range-band-source">${deps.escape(input.source)}</div><div class="range-band-body">· Mean=${deps.escape(input.mean)} SD=${deps.escape(input.sd)}.
+       ${input.eligible ? ` Đủ điều kiện lập dải mới (${input.candidateCount} kết quả / ${input.candidateDays} ngày độc lập). Dải đề xuất: Mean=${deps.escape(input.candidateMean)} SD=${deps.escape(input.candidateSd)} CV=${deps.escape(input.candidateCv)}%.` : ` Cần ≥20 kết quả trên ≥20 ngày độc lập, không có điểm vi phạm/cảnh báo chưa xử lý — hiện ${input.candidateCount} kết quả / ${input.candidateDays} ngày.`}</div></div>
+     ${input.actionsHtml}</div></details>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-chart-panel-html.ts
+	function createEntryChartPanelHtml(deps) {
+		return (input) => `<div class="panel"><div class="lj-toolbar">
+        <h2 class="panel-title">Biểu đồ Levey-Jennings</h2>
+        <div class="lj-filter"><label class="lj-date-field"><span class="hint">Từ ngày</span>${input.startDateInputHtml}</label><label class="lj-date-field"><span class="hint">Đến ngày</span>${input.endDateInputHtml}</label><div class="dayseg">${input.rangeButtonsHtml}</div></div></div>
+      <div class="hint lj-range">Khoảng xem: ${deps.escape(input.startText)} – ${deps.escape(input.endText)} · ${input.levelCount} mức QC</div>
+      <div class="lj-stack">${input.chartStackHtml}</div>
+      <div class="legend"><span><span class="dot" style="background:#0e8f8f"></span> Trong ±2SD</span><span><span class="dot" style="background:#dd8b1f"></span> Cảnh báo 2–3SD</span><span><span class="dot" style="background:#c5221f"></span> Loại bỏ ngoài 3SD</span></div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-points-panel-html.ts
+	function createEntryPointsPanelHtml(deps) {
+		return (input) => `<details class="panel entry-secondary-panel qc-points-panel" ${input.open ? "open" : ""} ontoggle="entryDetailToggled('points',this.open)"><summary class="entry-secondary-summary"><span>Điểm trong khoảng xem</span><small>Tra cứu chi tiết, luật vi phạm và điểm đã hủy</small></summary><div class="entry-secondary-body">
+    <div class="hint qc-cumulative-note">Thống kê tích lũy tính từ đầu LOT đến ${deps.escape(input.endText)}; bảng bên dưới hiển thị từ ${deps.escape(input.startText)} đến ${deps.escape(input.endText)}.</div>
+    <div class="qc-table-grid">${input.tableCardsHtml}</div>${input.voidedHtml}</div></details>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-point-table-card-html.ts
+	function createEntryPointTableCardHtml(deps) {
+		return (input) => `<div class="qc-table-card${input.parallel ? " qc-parallel-card" : ""}" role="region" aria-label="Điểm QC mức ${input.level}, lô ${deps.escape(input.lot || "?")}${input.parallel ? ", lô chạy song song" : ""}" tabindex="0"><h4><span>Mức ${input.level} · ${input.previousLot ? "Lô cũ" : "Lô"} ${deps.escape(input.lot || "?")}${input.parallel ? " <span class=\"qc-parallel-label\">Song song</span>" : ""}<span class="hint qc-table-count">${input.total} điểm trong khoảng</span></span></h4>${input.cumulativeHtml}${input.rowsHtml ? `<table><thead><tr><th>Ngày</th><th class="num">Giá trị</th><th class="num">Z</th><th>Kết luận</th><th>Luật</th><th>Thao tác</th></tr></thead><tbody>${input.rowsHtml}</tbody></table>${input.rowControlHtml}` : "<div class=\"empty qc-table-empty\">Chưa có điểm nào trong khoảng này.</div>"}</div>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-voided-points-html.ts
+	function createEntryVoidedPointsHtml() {
+		return (input) => !input.rowsHtml ? "" : `<div class="qc-voided-box"><h4>Điểm đã hủy trong khoảng</h4><table class="qc-voided-table"><thead><tr><th>Ngày</th><th>Mức / lô</th><th class="num">Giá trị</th><th>Lần chạy</th><th>Người hủy</th><th>Lý do</th></tr></thead><tbody>${input.rowsHtml}</tbody></table></div>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-chart-card-html.ts
+	function createEntryChartCardHtml(deps) {
+		return (input) => `<div class="lj-mini ${input.active ? "on" : ""}${input.parallel ? " lj-mini-parallel" : ""}" onclick="entryFocusLevel(${input.level})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();entryFocusLevel(${input.level})}" role="button" tabindex="0" aria-label="Chọn mức ${input.level}, lô ${deps.escape(input.lot || "?")}, ${input.pointCount} điểm${input.parallel ? ", lô chạy song song" : ""}"><div class="lj-mini-h"><b>Mức ${input.level} · ${input.previousLot ? "Lô cũ" : "Lô"} ${deps.escape(input.lot || "?")}${input.parallel ? " <span class=\"qc-parallel-label\">Song song</span>" : ""}<span class="lj-point-count">${input.pointCount} điểm</span></b>${input.headerActionHtml}</div><div class="lj-qc-strip" tabindex="0">${input.statsHtml}</div><div class="chart-scroll" tabindex="0"><canvas class="entryLJStack" data-render-scale="2" data-test="${deps.escape(input.testId)}" data-level="${input.level}" data-lot="${deps.escape(input.lot)}" data-mean="${deps.escape(input.mean)}" data-sd="${deps.escape(input.sd)}" data-start="${deps.escape(input.start)}" data-end="${deps.escape(input.end)}" width="1400" height="380"></canvas></div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-level-header-html.ts
+	function createEntryLevelHeaderHtml(deps) {
+		return (input) => `<th class="qc-level-head" tabindex="0" data-qc-tooltip="${deps.escape(input.tooltip)}" aria-label="Mức ${input.level}, lô ${deps.escape(input.lot || "?")}. ${deps.escape(input.tooltip)}">Mức ${input.level} · Lô ${deps.escape(input.lot || "?")}${input.parallel ? " <span class=\"qc-parallel-label\">Song song</span>" : ""}</th>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-table-window-note-html.ts
+	function createEntryTableWindowNoteHtml(deps) {
+		return (input) => input.limited ? `<div class="table-window-note">Đang hiển thị ${input.visible}/${input.total} điểm gần nhất. ${deps.button("Hiện toàn bộ", input.toggleAction, "ghost sm")}</div>` : input.expanded && input.total > input.initialRows ? `<div class="table-window-note">Đang hiển thị toàn bộ ${input.total} điểm. ${deps.button("Thu gọn", input.toggleAction, "ghost sm")}</div>` : "";
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-chart-stats-html.ts
+	function createEntryChartStatsHtml(deps) {
+		const metric = (label, value, control = false) => `<div class="lj-qc-stat${control ? " control" : ""}"><span class="k">${label}</span><span class="v">${deps.escape(value)}</span></div>`;
+		return (input) => metric("Mean thực", input.mean) + metric("SD thực", input.sd) + metric("CV thực", input.cv) + metric("Mean mục tiêu", input.targetMean, true) + metric("SD mục tiêu", input.targetSd, true);
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-sheet-month-options-html.ts
+	function createEntrySheetMonthOptionsHtml() {
+		return (input) => ({
+			months: Array.from({ length: 12 }, (_, index) => `<option value="${index + 1}" ${input.month === index + 1 ? "selected" : ""}>Tháng ${index + 1}</option>`).join(""),
+			years: Array.from({ length: Math.max(0, input.yearMax - input.yearMin + 1) }, (_, index) => input.yearMin + index).map((year) => `<option value="${year}" ${input.year === year ? "selected" : ""}>${year}</option>`).join("")
+		});
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-range-buttons-html.ts
+	function createEntryRangeButtonsHtml(deps) {
+		return (input) => input.days.map((days) => deps.presetButton({
+			active: !input.hasCustomStart && input.activeDays === days,
+			days,
+			action: `entrySetDays(${days})`
+		})).join("");
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-point-row-html.ts
+	function createEntryPointRowHtml(deps) {
+		return (input) => `<tr${input.rejected ? " class=\"qc-point-rej\"" : input.warned ? " class=\"qc-point-warn\"" : ""} data-qc-point-id="${deps.escape(input.pointId)}" tabindex="-1"><td>${deps.escape(input.date)}</td><td class="num"><b>${deps.escape(input.value)}</b></td><td class="num">${deps.escape(input.z)}s</td><td><span class="tag ${deps.escape(input.verdictClass)}">${deps.escape(input.verdictLabel)}</span></td><td>${input.rulesHtml}</td><td class="qc-row-actions">${input.voidButtonHtml}</td></tr>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-voided-point-row-html.ts
+	function createEntryVoidedPointRowHtml(deps) {
+		return (input) => `<tr data-qc-point-id="${deps.escape(input.pointId)}" tabindex="-1"><td>${deps.escape(input.date)}</td><td>${deps.escape(input.levelLot)}</td><td class="num">${deps.escape(input.value)}</td><td>${deps.escape(input.runId)}</td><td>${deps.escape(input.voidedBy)}</td><td>${deps.escape(input.reason)}</td></tr>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-sheet-row-html.ts
+	function createEntrySheetRowHtml(deps) {
+		return (input) => `<tr class="${deps.escape(input.rowClass)}" data-date="${deps.escape(input.date)}"><td><span>${deps.escape(input.day)}</span>${input.today ? "<b>Hôm nay</b>" : ""}</td>${input.cellsHtml}<td class="qc-staff-cell">${input.staffHtml}</td><td>${deps.escape(input.warningRules)}</td><td>${deps.escape(input.rejectionRules)}</td><td>${input.statusHtml}</td><td>${input.noteHtml}</td></tr>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-run-cell-html.ts
+	function createEntryRunCellHtml() {
+		return (input) => `<td class="num qc-run-cell${input.parallel ? " qc-parallel-cell" : ""}"><div class="qc-run-grid${input.addRunButtonHtml ? " has-add-btn" : ""}">${input.runInputsHtml}</div>${input.addRunButtonHtml}</td>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-day-status-html.ts
+	function entryDayStatusHtml(input) {
+		if (!input.hasPoint) return "—";
+		if (input.level === "rej") return "<span class=\"tag rej\">R</span>";
+		if (input.level === "warn") return "<span class=\"tag warn\">W(A)</span>";
+		return "<span class=\"tag ok\">A</span>";
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-day-note-html.ts
+	function createEntryDayNoteHtml(deps) {
+		return (input) => {
+			if (!input.hasPoint) return "—";
+			if (!input.canWrite) return input.manualNote ? deps.escape(input.manualNote) : deps.escape(input.automaticNote || "—");
+			return `<textarea class="qc-note-input" rows="1" placeholder="${deps.escape(input.automaticNote || "Nhập ghi chú...")}" onchange="entryDateNoteSave('${deps.escape(input.testId)}','${deps.escape(input.date)}',this.value)">${deps.escape(input.manualNote)}</textarea>`;
+		};
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-staff-cell-html.ts
+	function createEntryStaffCellHtml(deps) {
+		return (staff) => !staff.length ? "—" : staff.map((person) => `<span class="qc-staff" title="${deps.escape(person.name || person.code || "")}">${deps.escape(person.code || "")}</span>`).join("<span class=\"qc-staff-sep\">/</span>");
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-saved-run-html.ts
+	function createEntrySavedRunHtml(deps) {
+		return (input) => `<div class="qc-run-slot${input.previousLot ? " prev-lot-slot" : ""}"><b class="qc-value-chip ${deps.escape(input.valueClass)}" title="${deps.escape(input.valueTitle)}">${deps.escape(input.value)}</b><small>${deps.escape(input.z)}s · ${input.previousLot ? "Lô " + deps.escape(input.previousLotNo) : deps.escape(input.label)}</small></div>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-empty-run-html.ts
+	function createEntryEmptyRunHtml(deps) {
+		return (input) => !input.canWrite ? "<div class=\"qc-run-slot muted\"><b>—</b></div>" : `<div class="qc-run-slot"><input class="qc-inline-input empty" type="text" inputmode="decimal" autocomplete="off" placeholder="--" title="Dùng phím mũi tên để chuyển ô" aria-label="Nhập QC ngày ${deps.escape(input.dateLabel)}, mức ${input.level}, lô ${deps.escape(input.lot)}, lần ${input.runNumber}" aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Enter" data-focus-date="${deps.escape(input.focusDate)}" data-focus-run="${input.runNumber}" data-focus-level="${input.focusLevel}" onkeydown="entrySheetKey(event)" onchange="entryInlineSave('${deps.escape(input.testId)}',${input.level},'${deps.escape(input.focusDate)}',this.value,'${deps.escape(input.runId)}','${deps.escape(input.saveLot)}')"></div>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-add-run-button-html.ts
+	function createEntryAddRunButtonHtml(deps) {
+		return (input) => !input.action ? "" : `<button type="button" class="qc-add-run-btn" title="Thêm lần chạy bổ sung" onclick="${deps.escape(input.action)}"><span class="qc-add-run-icon">+</span><span class="qc-add-run-label">Thêm</span></button>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-range-preset-button-html.ts
+	function createEntryRangePresetButtonHtml(deps) {
+		return (input) => `<button class="${input.active ? "on" : ""}" onclick="${deps.escape(input.action)}">${input.days} ngày</button>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-cumulative-stats-html.ts
+	function createEntryCumulativeStatsHtml(deps) {
+		return (input) => `<div class="qc-cumulative" title="Tính từ đầu LOT đến ${deps.escape(input.endDate)}"><div><span>N tích lũy</span><b>${deps.escape(input.count)}</b></div><div><span>Mean tích lũy</span><b>${deps.escape(input.mean)}</b></div><div><span>SD tích lũy</span><b>${deps.escape(input.sd)}</b></div><div><span>CV tích lũy</span><b>${deps.escape(input.cv)}</b></div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-tree-empty-html.ts
+	function entryTreeEmptyHtml() {
+		return "<div class=\"tree-empty\" role=\"presentation\">Không có xét nghiệm phù hợp.</div>";
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-tree-machine-html.ts
+	function createEntryTreeMachineHtml(deps) {
+		return (input) => `<div class="tnode tn-machine" data-tree-role="machine" data-key="${deps.escape(input.key)}" role="treeitem" tabindex="0" aria-expanded="${input.open}" onclick="${deps.escape(input.toggleAction)}" onkeydown="entryTreeKey(event)"><span class="caret" aria-hidden="true">${input.open ? "−" : "+"}</span>${deps.escape(input.name)}</div>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-tree-group-html.ts
+	function createEntryTreeGroupHtml(deps) {
+		return (input) => `<div class="tnode tn-test ${input.open ? "open" : ""}" data-tree-role="group" data-key="${deps.escape(input.key)}" data-search="${deps.escape(input.search)}" role="treeitem" tabindex="0" aria-expanded="${input.open}" style="${input.visible ? "" : "display:none"}" onclick="${deps.escape(input.toggleAction)}" onkeydown="entryTreeKey(event)"><span class="caret" aria-hidden="true">${input.open ? "−" : "+"}</span>${deps.escape(input.name)}<span class="state ${deps.escape(input.state === "none" ? "" : input.state)}">${deps.escape(input.stateLabel)}</span></div>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-tree-assay-html.ts
+	function createEntryTreeAssayHtml(deps) {
+		return (input) => `<div class="tnode tn-config ${input.active ? "on" : ""}" data-tree-role="assay" data-test-id="${deps.escape(input.testId)}" data-search="${deps.escape(input.search)}" role="treeitem" tabindex="0" aria-current="${input.active}" style="${input.visible ? "" : "display:none"}" onclick="${deps.escape(input.pickAction)}" onkeydown="entryTreeKey(event)"><span class="config-name">${deps.escape(input.name)}</span><span class="state ${deps.escape(input.state === "none" ? "" : input.state)}">${deps.escape(input.stateLabel)}</span></div>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-machine-options-html.ts
+	function createEntryMachineOptionsHtml(deps) {
+		return (input) => ["<option value=\"all\">Tất cả máy</option>", ...input.machines.map((machine) => `<option value="${deps.escape(machine)}" ${input.selected === machine ? "selected" : ""}>${deps.escape(machine)}</option>`)].join("");
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-tree-header-html.ts
+	function createEntryTreeHeaderHtml(deps) {
+		return (input) => `<div class="entry-tree-head"><h4 role="heading" aria-level="2">Danh mục nội kiểm</h4>${input.toggleButtonHtml}</div><div class="tree-tools"><input id="entrySearch" aria-label="Tìm xét nghiệm, máy hoặc lô" placeholder="Tìm test, máy hoặc lô..." value="${deps.escape(input.search)}" oninput="entryFilter(this.value)"><select aria-label="Lọc theo máy xét nghiệm" onchange="entrySetMachine(this.value)">${input.machineOptionsHtml}</select></div>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-chart-lot-action-html.ts
+	function createEntryChartLotActionHtml(deps) {
+		return (input) => input.parallel ? "<span class=\"hint\">Đang đánh giá</span>" : input.hasPreviousLots ? input.showingPreviousLot ? deps.button("Xem lô mới", `event.stopPropagation();entryShowCurrentLot(${input.level})`, "teal sm") : deps.button("Xem lô cũ", `event.stopPropagation();entryShowPrevLot(${input.level},'${input.previousLot}')`, "ghost sm") : deps.rangeSource({ applied: input.applied });
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-tree-toggle-button-html.ts
+	function createEntryTreeToggleButtonHtml(deps) {
+		return (input) => {
+			const title = input.collapsed ? "Hiện danh mục nội kiểm" : "Ẩn danh mục nội kiểm";
+			const variant = input.collapsed ? "teal icon entry-tree-expand" : "ghost icon entry-tree-toggle";
+			return deps.button(input.iconHtml, "toggleEntryTree()", variant, title, { attrs: {
+				"aria-label": title,
+				"aria-controls": "entryTreePanel",
+				"aria-expanded": String(!input.collapsed)
+			} });
+		};
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-empty-page-html.ts
+	function createEntryEmptyPageHtml(deps) {
+		return (input) => deps.head("Nhập QC", "") + `<div class="panel"><div class="empty"><div class="empty-title">${input.title}</div><div>${input.description}</div>${input.actionHtml ? `<div class="empty-actions">${input.actionHtml}</div>` : ""}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-sheet-empty-row-html.ts
+	function entrySheetEmptyRowHtml(input) {
+		return `<tr><td colspan="${input.columnCount}" class="empty-cell">Chưa có điểm nào trong khoảng này.</td></tr>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-tree-panel-icon-html.ts
+	function entryTreePanelIconHtml() {
+		return "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"2\"/><line x1=\"9\" y1=\"4\" x2=\"9\" y2=\"20\"/></svg>";
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-chart-range-source-html.ts
+	function entryChartRangeSourceHtml(input) {
+		return `<span class="hint">${input.applied === "lab" ? "Dải PXN" : "Dải NSX"}</span>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-sheet-navigation-buttons-html.ts
+	function createEntrySheetNavigationButtonsHtml(deps) {
+		return () => deps.button("Tháng hiện tại", "entrySetSheetMonth(isoMonth())", "ghost sm qc-current-month") + deps.button("Tới hôm nay", "entryGoToday()", "teal sm qc-today-jump");
+	}
+	//#endregion
 	//#region src/presentation/entry/entry-sheet-month.ts
 	function entrySheetMonthValue(value) {
 		const month = String(value || "");
@@ -7745,6 +8382,215 @@
 		return (model) => {
 			const search = model.placeholder ? `<input id="manageSearch" placeholder="${deps.escapeAttr(model.placeholder)}" value="${deps.escapeAttr(model.query || "")}" oninput="manageSearchSet(this.value)">` : "";
 			return `<div class="rcfg-toolbar"><div><h2>${deps.escape(model.title)}</h2>${model.subtitle ? `<p>${deps.escape(model.subtitle)}</p>` : ""}</div><div class="rcfg-tools">${search}${model.action ? deps.button("＋ " + (model.actionLabel || ""), model.action, "teal") : ""}</div></div>`;
+		};
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-navigation-workflow.ts
+	var MANAGE_TABS = /* @__PURE__ */ new Set([
+		"lots",
+		"panels",
+		"targets",
+		"history",
+		"transitions",
+		"assays",
+		"instruments",
+		"tearefs"
+	]);
+	function createManageNavigationWorkflow() {
+		return Object.freeze({
+			tab: (tab) => MANAGE_TABS.has(String(tab)) ? String(tab) : "instruments",
+			targetPanel: (id) => id,
+			targetGroup: (id) => id,
+			targetLevel: (level) => String(level || ""),
+			historyTest: (id) => id,
+			targetMatrix: (current, panel, group) => ({
+				panel: panel || current.panel,
+				group: group || current.group,
+				tab: "targets"
+			})
+		});
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-panel-workflow.ts
+	function createManagePanelWorkflow(deps) {
+		return Object.freeze({
+			removal: deps.removal,
+			removalDialog: deps.removalDialog
+		});
+	}
+	function managePanelRemovalDialog(name) {
+		return {
+			kicker: "Thao tác không thể hoàn tác",
+			title: "Xóa Panel QC",
+			message: `Xóa Panel QC ${name}?`,
+			detail: "Các xét nghiệm vẫn được giữ nguyên.",
+			confirmLabel: "Xóa Panel QC",
+			cancelLabel: "Hủy"
+		};
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-lot-group-workflow.ts
+	function createManageLotGroupWorkflow(deps) {
+		return Object.freeze({
+			removal: deps.removal,
+			removalDialog: deps.removalDialog
+		});
+	}
+	function manageLotGroupRemovalDialog(name) {
+		return {
+			kicker: "Thao tác không thể hoàn tác",
+			title: "Xóa nhóm lô",
+			message: `Xóa nhóm lô ${name}?`,
+			detail: "Các lô QC bên trong vẫn được giữ nguyên.",
+			confirmLabel: "Xóa nhóm lô",
+			cancelLabel: "Hủy"
+		};
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-lot-workflow.ts
+	function createManageLotWorkflow(deps) {
+		return Object.freeze({
+			removal: deps.removal,
+			removalDialog: deps.removalDialog
+		});
+	}
+	function manageLotRemovalDialog(lotNo) {
+		return {
+			kicker: "Thao tác không thể hoàn tác",
+			title: "Xóa lô QC",
+			message: `Xóa lô QC ${lotNo}?`,
+			confirmLabel: "Xóa lô QC",
+			cancelLabel: "Hủy"
+		};
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-instrument-workflow.ts
+	function createManageInstrumentWorkflow(deps) {
+		return Object.freeze({
+			removal: deps.removal,
+			removalDialog: deps.removalDialog
+		});
+	}
+	function manageInstrumentRemovalDialog(name) {
+		return {
+			kicker: "Thao tác không thể hoàn tác",
+			title: "Xóa máy xét nghiệm",
+			message: `Xóa máy ${name}?`,
+			confirmLabel: "Xóa máy",
+			cancelLabel: "Hủy"
+		};
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-transition-workflow.ts
+	function createManageTransitionWorkflow(deps) {
+		return Object.freeze({
+			removal: deps.removal,
+			removalDialog: deps.removalDialog
+		});
+	}
+	function manageTransitionRemovalDialog() {
+		return {
+			kicker: "Thao tác không thể hoàn tác",
+			title: "Xóa dòng chuyển tiếp lô",
+			message: "Xóa dòng chuyển tiếp lô này?",
+			confirmLabel: "Xóa",
+			cancelLabel: "Hủy"
+		};
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-assay-removal-workflow.ts
+	function createManageAssayRemovalWorkflow(deps) {
+		return Object.freeze({
+			lockedMessage: deps.lockedMessage,
+			confirmDialog: deps.confirmDialog,
+			reauthDialog: deps.reauthDialog
+		});
+	}
+	function manageAssayLockedMessage(input) {
+		return `Không thể xóa "${input.name}": còn ${input.count} điểm QC thuộc kỳ đã khóa (${input.periods}). Hãy mở khóa các kỳ này ở trang Báo cáo trước — thao tác mở khóa yêu cầu lý do và được ghi vào nhật ký.`;
+	}
+	function manageAssayRemovalConfirm(input) {
+		return {
+			kicker: "Thao tác không thể hoàn tác",
+			title: "Xóa xét nghiệm",
+			message: `Xóa xét nghiệm ${input.name} và toàn bộ dữ liệu QC?`,
+			detail: `${input.pointCount} điểm QC cùng toàn bộ kết quả Westgard và Sigma của xét nghiệm này sẽ mất, không thể khôi phục.`,
+			confirmLabel: "Xóa xét nghiệm",
+			cancelLabel: "Hủy"
+		};
+	}
+	function manageAssayRemovalReauth(input) {
+		return {
+			title: "Xác thực xóa xét nghiệm",
+			message: `Nhập lại mật khẩu trước khi xóa ${input.name} và ${input.pointCount} điểm QC.`
+		};
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-target-matrix-workflow.ts
+	function createManageTargetMatrixWorkflow() {
+		return Object.freeze({
+			lockedBackfillDialog: (count, periods) => ({
+				kicker: "Cập nhật hàng loạt",
+				title: "Điền lô/Mean-SD cho điểm QC đã khóa kỳ",
+				message: `Lưu Mean/SD này sẽ điền số lô/Mean-SD hiện hành vào ${count} điểm QC trước đó chưa ghi lô, thuộc kỳ đã khóa (${periods}).`,
+				detail: "Giá trị đo và ngày của từng điểm không đổi — chỉ điền thêm nhãn số lô/Mean-SD còn thiếu.",
+				confirmLabel: "Vẫn lưu",
+				cancelLabel: "Hủy",
+				danger: false
+			}),
+			reauth: (switching) => switching ? {
+				title: "Xác thực chuyển lô",
+				message: "Nhập lại mật khẩu trước khi lưu hoặc áp dụng Mean/SD cho nhóm lô mới."
+			} : {
+				title: "Xác thực Mean/SD",
+				message: "Nhập lại mật khẩu trước khi lưu Mean/SD cho lô QC."
+			},
+			switchSummary: (count, names, lockedCount, periods) => ({
+				count,
+				names,
+				lockNote: lockedCount ? `${lockedCount} điểm QC thuộc kỳ đã khóa (${periods}) sẽ được điền số lô/Mean-SD hiện hành.` : ""
+			})
+		});
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-target-pick-workflow.ts
+	function createManageTargetPickWorkflow(deps) {
+		return Object.freeze({ readRow: (input) => input.use ? {
+			testId: input.testId,
+			lot: input.lot,
+			...deps.normalize(input.values)
+		} : {
+			testId: input.testId,
+			lot: input.lot,
+			use: false
+		} });
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-target-overwrite-workflow.ts
+	function createManageTargetOverwriteWorkflow() {
+		return Object.freeze({ find: (picked, tests) => picked.filter((pick) => {
+			if (!pick.use) return false;
+			const level = tests.find((item) => item.id === pick.testId)?.levels?.find((item) => +item.level === +pick.lot.level);
+			return !!(level && (level.qcLotId && level.qcLotId !== pick.lot.id || !level.qcLotId && level.lot && level.lot !== pick.lot.lotNo));
+		}) });
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-target-backfill-workflow.ts
+	function createManageTargetBackfillWorkflow(deps) {
+		return Object.freeze({ points: (picked) => picked.filter((pick) => pick.use).flatMap((pick) => deps.pointsForPick(pick)) });
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-target-commit-workflow.ts
+	function manageTargetCommitAudit(input) {
+		return `${input.panel} · ${input.group} · ${input.count} dòng${input.mode === "planned" ? " (dự kiến)" : ""}`;
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-panel-form-workflow.ts
+	function managePanelFormState(id) {
+		const editing = !!id;
+		return {
+			editing,
+			submitLabel: editing ? "Lưu thay đổi" : "Thêm Panel QC"
 		};
 	}
 	//#endregion
@@ -11282,6 +12128,42 @@
 		});
 	}
 	//#endregion
+	//#region src/presentation/nce/action-suggestions.ts
+	function createActionSuggestions(deps) {
+		let causeSuggestions = {};
+		let actionSuggestions = {};
+		const configure = (nextCauseSuggestions, nextActionSuggestions) => {
+			causeSuggestions = nextCauseSuggestions;
+			actionSuggestions = nextActionSuggestions;
+		};
+		const causePhrases = (category) => causeSuggestions[String(category || "")] || Object.values(causeSuggestions).flat().slice(0, 4);
+		const actionPhrases = (errorType) => actionSuggestions[String(errorType || "").slice(0, 2)] || actionSuggestions[""] || [];
+		const row = (targetId, phrases) => !phrases.length ? "" : `<div class="sugg-row" id="sugg-${deps.escape(targetId)}">${phrases.map((phrase) => `<button type="button" class="sugg-chip" onclick="actionInsertSuggestion('${deps.quote(targetId)}','${deps.quote(phrase)}')">${deps.escape(phrase)}</button>`).join("")}</div>`;
+		return {
+			configure,
+			causePhrases,
+			actionPhrases,
+			row
+		};
+	}
+	//#endregion
+	//#region src/presentation/nce/action-form-shell.ts
+	function createActionFormShell(deps) {
+		const closed = (issueCount, canWrite) => {
+			const manual = canWrite ? deps.button("Lập hồ sơ từ nguồn khác", "beginActionManual()", "ghost") : "";
+			return issueCount ? deps.emptyState("Chọn một sự cố để lập hồ sơ", `Có ${issueCount} sự cố ở trên — bấm "Lập hồ sơ" ngay trên dòng cần xử lý để hồ sơ được gắn đúng điểm QC và tự theo dõi QC chạy lại.`, manual) : deps.emptyState("Không có vi phạm nào cần lập hồ sơ", "Hồ sơ NCE thường bắt đầu từ một vi phạm ở trên. Nếu sự không phù hợp đến từ EQA, cảnh báo thiết bị, phản hồi lâm sàng hay đánh giá nội bộ thì mở hồ sơ thủ công.", manual);
+		};
+		const incidentBanner = (input) => {
+			if (!input.details.length) return "";
+			const title = input.editing ? `Đang tiếp tục hồ sơ ${input.nceId || "NCE"}` : "Đang lập hồ sơ cho vi phạm này";
+			return `<div class="action-incident-banner"><b>${deps.escape(title)}</b><div>${input.details.map(deps.escape).join(" · ")}</div></div>`;
+		};
+		return {
+			closed,
+			incidentBanner
+		};
+	}
+	//#endregion
 	//#region src/presentation/report/report-period-presentation.ts
 	function createReportPeriodPresentation() {
 		const currentYearMonth = (value, fallback) => /^\d{4}-\d{2}$/.test(String(value || "")) ? String(value) : fallback;
@@ -13340,6 +14222,216 @@
 	});
 	root.entryRowsWindowTs = entryRowsWindow;
 	root.entryLotLabelsTs = entryLotLabels;
+	root.entryDetailState = entryDetailState;
+	root.entryTreeOpenState = entryTreeOpenState;
+	root.entryMachineSelection = entryMachineSelection;
+	root.entryTreeCollapsedState = entryTreeCollapsedState;
+	root.entryTreeCollapsedToggle = entryTreeCollapsedToggle;
+	root.entryTreeAutoOpenState = entryTreeAutoOpenState;
+	root.entryPreviousLotState = entryPreviousLotState;
+	root.entrySheetPendingFocus = createEntrySheetPendingFocus({
+		date: (item) => String(item.dataset.focusDate || ""),
+		level: (item) => String(item.dataset.focusLevel || ""),
+		choose: (items) => root.entrySheetFocus(items)
+	});
+	root.entryExtraRunState = entryExtraRunState;
+	root.entrySelectionRecovery = createEntrySelectionRecovery({
+		id: (test) => test.id,
+		levels: (test) => root.operationalLevels(test)
+	});
+	root.entryUnusualDataIssuesHtml = createEntryUnusualDataIssuesHtml({ escape: (value) => root.esc(value) });
+	root.entryUnusualDataModalHtml = createEntryUnusualDataModalHtml({ button: (label, action, variant) => root.btn(label, action, variant) });
+	root.entryDateNoteMessageHtml = createEntryDateNoteMessageHtml({ escape: (value) => root.esc(value) });
+	root.entrySaveFeedbackHtml = createEntrySaveFeedbackHtml({ escape: (value) => root.esc(value) });
+	root.entryRecordErrorHtml = createEntryRecordErrorHtml({ escape: (value) => root.esc(value) });
+	root.entryInlineSavePlan = entryInlineSavePlan;
+	root.entrySaveMessageHtml = createEntrySaveMessageHtml({
+		escape: (value) => root.esc(value),
+		feedbackHtml: (feedback) => root.entrySaveFeedbackHtml(feedback)
+	});
+	root.entryVoidConfirmDetail = entryVoidConfirmDetail;
+	root.entryVoidFeedbackHtml = createEntryVoidFeedbackHtml({ escape: (value) => root.esc(value) });
+	root.entryVoidModalHtml = createEntryVoidModalHtml({
+		button: (label, action, variant) => root.btn(label, action, variant),
+		escape: (value) => root.esc(value)
+	});
+	root.entryVoidConfirmDialog = entryVoidConfirmDialog;
+	root.entryVoidPlan = entryVoidPlan;
+	root.entrySheetMonthState = entrySheetMonthState;
+	root.entrySheetTodayState = entrySheetTodayState;
+	root.entryQcWarningPlan = entryQcWarningPlan;
+	root.entryQcUnavailableHtml = entryQcUnavailableHtml;
+	root.entrySdZeroWarningHtml = createEntrySdZeroWarningHtml({ escape: (value) => root.esc(value) });
+	root.entryVoidPeriodLockedHtml = entryVoidPeriodLockedHtml;
+	root.entryMachineFilterState = entryMachineFilterState;
+	root.entryDateNoteErrorHtml = createEntryDateNoteErrorHtml({ escape: (value) => root.esc(value) });
+	root.entryInvalidInputHtml = entryInvalidInputHtml;
+	root.entryVoidPointContext = createEntryVoidPointContext({ errorType: (rules) => root.errorType(rules) });
+	root.entrySaveAuditDetail = entrySaveAuditDetail;
+	root.entrySaveWorkflow = createEntrySaveWorkflow({
+		inputPlan: entryInlineSavePlan,
+		warningPlan: entryQcWarningPlan,
+		unavailableHtml: entryQcUnavailableHtml,
+		invalidInputHtml: entryInvalidInputHtml,
+		sdZeroWarningHtml: createEntrySdZeroWarningHtml({ escape: (value) => root.esc(value) }),
+		unusualIssuesHtml: createEntryUnusualDataIssuesHtml({ escape: (value) => root.esc(value) }),
+		unusualModalHtml: createEntryUnusualDataModalHtml({ button: (label, action, variant) => root.btn(label, action, variant) }),
+		auditDetail: entrySaveAuditDetail,
+		messageHtml: createEntrySaveMessageHtml({
+			escape: (value) => root.esc(value),
+			feedbackHtml: (feedback) => root.entrySaveFeedbackHtml(feedback)
+		})
+	});
+	root.entryVoidAuditDetail = entryVoidAuditDetail;
+	root.entryVoidWorkflow = createEntryVoidWorkflow({
+		plan: entryVoidPlan,
+		modalHtml: createEntryVoidModalHtml({
+			button: (label, action, variant) => root.btn(label, action, variant),
+			escape: (value) => root.esc(value)
+		}),
+		reasonValid: entryVoidReasonValid,
+		reasonError: entryVoidReasonErrorState,
+		pointContext: createEntryVoidPointContext({ errorType: (rules) => root.errorType(rules) }),
+		confirmDetail: entryVoidConfirmDetail,
+		confirmDialog: entryVoidConfirmDialog,
+		periodLockedHtml: entryVoidPeriodLockedHtml,
+		auditDetail: entryVoidAuditDetail,
+		feedbackHtml: createEntryVoidFeedbackHtml({ escape: (value) => root.esc(value) })
+	});
+	root.entryScreenSelectionWorkflow = createEntryScreenSelectionWorkflow({
+		recoverSelection: createEntrySelectionRecovery({
+			id: (test) => test.id,
+			levels: (test) => root.operationalLevels(test)
+		}),
+		machineSelection: entryMachineSelection,
+		autoOpenState: entryTreeAutoOpenState
+	});
+	root.entrySheetWorkflow = createEntrySheetWorkflow({
+		monthValue: entrySheetMonthValue,
+		monthState: entrySheetMonthState,
+		todayState: entrySheetTodayState,
+		monthPart: entrySheetMonthPart,
+		keyPlan: entrySheetKeyPlan,
+		orderInputs: createEntrySheetInputOrder({
+			date: (element) => String(element.dataset.focusDate || ""),
+			run: (element) => Number(element.dataset.focusRun || 0),
+			level: (element) => Number(element.dataset.focusLevel || 0)
+		}),
+		navigationTarget: createEntrySheetNavigation({
+			date: (element) => String(element.dataset.focusDate || ""),
+			run: (element) => String(element.dataset.focusRun || ""),
+			level: (element) => String(element.dataset.focusLevel || "")
+		}).target,
+		pendingFocus: createEntrySheetPendingFocus({
+			date: (item) => String(item.dataset.focusDate || ""),
+			level: (item) => String(item.dataset.focusLevel || ""),
+			choose: (items) => root.entrySheetFocus(items)
+		}),
+		focus: createEntrySheetFocus((element) => !!element.classList.contains("empty"))
+	});
+	root.entryTreeInteractionWorkflow = createEntryTreeInteractionWorkflow({
+		detailState: entryDetailState,
+		openState: entryTreeOpenState,
+		collapsedToggle: entryTreeCollapsedToggle,
+		keyCommand: entryTreeKeyCommand,
+		navigationTarget: createEntryTreeNavigation().target,
+		visibility: entryTreeVisibility,
+		machineFilter: entryMachineFilterState,
+		selection: entrySelectionState,
+		previousLot: entryPreviousLotState
+	});
+	root.entryTableInteractionWorkflow = createEntryTableInteractionWorkflow({
+		extraRunRequest: entryExtraRunRequest,
+		extraRunState: entryExtraRunState,
+		rangePreset: entryRangePreset,
+		rangeState: entryRangeState,
+		dateRangeInput: createEntryDateRangeInput((value) => root.parseVN(value)),
+		dateNoteFeedback: entryDateNoteFeedback,
+		dateNoteErrorMessage: entryDateNoteErrorMessage
+	});
+	root.manageNavigationWorkflow = createManageNavigationWorkflow();
+	root.managePanelWorkflow = createManagePanelWorkflow({
+		removal: (state, input) => root.ManageConfigService.panelRemoval(state, input),
+		removalDialog: managePanelRemovalDialog
+	});
+	root.manageLotGroupWorkflow = createManageLotGroupWorkflow({
+		removal: (state, input) => root.ManageConfigService.lotGroupRemoval(state, input),
+		removalDialog: manageLotGroupRemovalDialog
+	});
+	root.manageLotWorkflow = createManageLotWorkflow({
+		removal: (state, input) => root.ManageConfigService.lotRemoval(state, input),
+		removalDialog: manageLotRemovalDialog
+	});
+	root.manageInstrumentWorkflow = createManageInstrumentWorkflow({
+		removal: (state, input) => root.ManageConfigService.instrumentRemoval(state, input),
+		removalDialog: manageInstrumentRemovalDialog
+	});
+	root.manageTransitionWorkflow = createManageTransitionWorkflow({
+		removal: (state, input) => root.ManageConfigService.lotTransitionRemoval(state, input),
+		removalDialog: manageTransitionRemovalDialog
+	});
+	root.manageAssayRemovalWorkflow = createManageAssayRemovalWorkflow({
+		lockedMessage: manageAssayLockedMessage,
+		confirmDialog: manageAssayRemovalConfirm,
+		reauthDialog: manageAssayRemovalReauth
+	});
+	root.manageTargetMatrixWorkflow = createManageTargetMatrixWorkflow();
+	root.manageTargetPickWorkflow = createManageTargetPickWorkflow({ normalize: (input) => root.ManageConfigService.normalizeTargetPick(input) });
+	root.manageTargetOverwriteWorkflow = createManageTargetOverwriteWorkflow();
+	root.manageTargetBackfillWorkflow = createManageTargetBackfillWorkflow({ pointsForPick: (pick) => {
+		const test = (state.tests || []).find((item) => item.id === pick.testId);
+		return test ? root.ManageConfigService.targetPickBackfillPoints(state.data && state.data[test.id] || [], test, pick.lot, pick) : [];
+	} });
+	root.manageTargetCommitAudit = manageTargetCommitAudit;
+	root.managePanelFormState = managePanelFormState;
+	root.entryVoidReasonErrorState = entryVoidReasonErrorState;
+	root.entryRangeSourceLabel = entryRangeSourceLabel;
+	root.entryRangeState = entryRangeState;
+	root.entrySheetKeyPlan = entrySheetKeyPlan;
+	root.entryWorksheetHtml = createEntryWorksheetHtml({
+		escape: (value) => root.esc(value),
+		button: (label, action, variant, title) => root.btn(label, action, variant, title)
+	});
+	root.entryPageHtml = createEntryPageHtml({ head: (title, subtitle) => root.headOnly(title, subtitle) });
+	root.entryRangeSummaryHtml = createEntryRangeSummaryHtml({ escape: (value) => root.esc(value) });
+	root.entryChartPanelHtml = createEntryChartPanelHtml({ escape: (value) => root.esc(value) });
+	root.entryPointsPanelHtml = createEntryPointsPanelHtml({ escape: (value) => root.esc(value) });
+	root.entryPointTableCardHtml = createEntryPointTableCardHtml({ escape: (value) => root.esc(value) });
+	root.entryVoidedPointsHtml = createEntryVoidedPointsHtml();
+	root.entryChartCardHtml = createEntryChartCardHtml({ escape: (value) => root.escAttr(value) });
+	root.entryLevelHeaderHtml = createEntryLevelHeaderHtml({ escape: (value) => root.escAttr(value) });
+	root.entryTableWindowNoteHtml = createEntryTableWindowNoteHtml({ button: (label, action, variant) => root.btn(label, action, variant) });
+	root.entryChartStatsHtml = createEntryChartStatsHtml({ escape: (value) => root.esc(value) });
+	root.entrySheetMonthOptionsHtml = createEntrySheetMonthOptionsHtml();
+	root.entryRangeButtonsHtml = createEntryRangeButtonsHtml({ presetButton: (input) => createEntryRangePresetButtonHtml({ escape: (value) => root.escAttr(value) })(input) });
+	root.entryPointRowHtml = createEntryPointRowHtml({ escape: (value) => root.esc(value) });
+	root.entryVoidedPointRowHtml = createEntryVoidedPointRowHtml({ escape: (value) => root.esc(value) });
+	root.entrySheetRowHtml = createEntrySheetRowHtml({ escape: (value) => root.esc(value) });
+	root.entryRunCellHtml = createEntryRunCellHtml();
+	root.entryDayStatusHtml = entryDayStatusHtml;
+	root.entryDayNoteHtml = createEntryDayNoteHtml({ escape: (value) => root.esc(value) });
+	root.entryStaffCellHtml = createEntryStaffCellHtml({ escape: (value) => root.escAttr(value) });
+	root.entrySavedRunHtml = createEntrySavedRunHtml({ escape: (value) => root.esc(value) });
+	root.entryEmptyRunHtml = createEntryEmptyRunHtml({ escape: (value) => root.escAttr(value) });
+	root.entryAddRunButtonHtml = createEntryAddRunButtonHtml({ escape: (value) => root.escAttr(value) });
+	root.entryRangePresetButtonHtml = createEntryRangePresetButtonHtml({ escape: (value) => root.escAttr(value) });
+	root.entryCumulativeStatsHtml = createEntryCumulativeStatsHtml({ escape: (value) => root.esc(value) });
+	root.entryTreeEmptyHtml = entryTreeEmptyHtml;
+	root.entryTreeMachineHtml = createEntryTreeMachineHtml({ escape: (value) => root.escAttr(value) });
+	root.entryTreeGroupHtml = createEntryTreeGroupHtml({ escape: (value) => root.escAttr(value) });
+	root.entryTreeAssayHtml = createEntryTreeAssayHtml({ escape: (value) => root.escAttr(value) });
+	root.entryMachineOptionsHtml = createEntryMachineOptionsHtml({ escape: (value) => root.escAttr(value) });
+	root.entryTreeHeaderHtml = createEntryTreeHeaderHtml({ escape: (value) => root.escAttr(value) });
+	root.entryChartLotActionHtml = createEntryChartLotActionHtml({
+		button: (label, action, variant) => root.btn(label, action, variant),
+		rangeSource: (input) => entryChartRangeSourceHtml(input)
+	});
+	root.entryTreeToggleButtonHtml = createEntryTreeToggleButtonHtml({ button: (label, action, variant, title, options) => root.btn(label, action, variant, title, options) });
+	root.entryEmptyPageHtml = createEntryEmptyPageHtml({ head: (title, subtitle) => root.headOnly(title, subtitle) });
+	root.entrySheetEmptyRowHtml = entrySheetEmptyRowHtml;
+	root.entryTreePanelIconHtml = entryTreePanelIconHtml;
+	root.entryChartRangeSourceHtml = entryChartRangeSourceHtml;
+	root.entrySheetNavigationButtonsHtml = createEntrySheetNavigationButtonsHtml({ button: (label, action, variant) => root.btn(label, action, variant) });
 	root.entrySheetMonthPart = entrySheetMonthPart;
 	root.entrySheetMonthValue = entrySheetMonthValue;
 	root.entryTreeState = createEntryTreeState({
@@ -13979,6 +15071,15 @@
 		dueDate: (days) => root.NceActionIdentityService.dueDate(days),
 		operationalLevels: (test) => root.operationalLevels(test),
 		effectivenessComplete: (action) => typeof root.actionEffectivenessStatus === "function" && root.actionEffectivenessStatus(action).complete
+	});
+	root.ActionSuggestions = createActionSuggestions({
+		escape: (value) => root.esc(value),
+		quote: (value) => root.jsq(value)
+	});
+	root.ActionFormShell = createActionFormShell({
+		emptyState: (title, description, action) => root.emptyState(title, description, action),
+		button: (label, action, variant) => root.btn(label, action, variant),
+		escape: (value) => root.esc(value)
 	});
 	root.ReportPeriodPresentation = createReportPeriodPresentation();
 	root.reportSearchValuePresentation = reportSearchValuePresentation;

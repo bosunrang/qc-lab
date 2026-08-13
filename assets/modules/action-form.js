@@ -151,11 +151,13 @@ const ACT_SUGGEST_ACTION={
   RE:['Vệ sinh kim hút, loại bọt khí','Thay lọ QC mới, trộn đều đúng cách','Đào tạo lại thao tác cho nhân viên','Kiểm tra nguồn điện và độ ổn định máy'],
   '':['Hiệu chuẩn lại và xác nhận bằng QC','Vệ sinh kim hút, loại bọt khí','Thay lọ QC mới, trộn đều đúng cách','Đào tạo lại thao tác cho nhân viên']
 };
-function actionCausePhrases(category){return ACT_SUGGEST_CAUSE[category]||[].concat(...Object.values(ACT_SUGGEST_CAUSE)).slice(0,4);}
-function actionActionPhrases(errorType){return ACT_SUGGEST_ACTION[String(errorType||'').slice(0,2)]||ACT_SUGGEST_ACTION[''];}
+if(globalThis.ActionSuggestions)globalThis.ActionSuggestions.configure(ACT_SUGGEST_CAUSE,ACT_SUGGEST_ACTION);
+function actionCausePhrases(category){return globalThis.ActionSuggestions?globalThis.ActionSuggestions.causePhrases(category):ACT_SUGGEST_CAUSE[category]||[].concat(...Object.values(ACT_SUGGEST_CAUSE)).slice(0,4);}
+function actionActionPhrases(errorType){return globalThis.ActionSuggestions?globalThis.ActionSuggestions.actionPhrases(errorType):ACT_SUGGEST_ACTION[String(errorType||'').slice(0,2)]||ACT_SUGGEST_ACTION[''];}
 /* Chip không dùng btn(): đây không phải nút hành động teal/ghost/danger mà là một
    affordance riêng, cùng kiểu với tab lọc trạng thái ở dashboard. */
 function actionSuggestRow(targetId,phrases){
+  if(globalThis.ActionSuggestions)return globalThis.ActionSuggestions.row(targetId,phrases||[]);
   if(!phrases||!phrases.length)return'';
   return `<div class="sugg-row" id="sugg-${escAttr(targetId)}">${phrases.map(p=>`<button type="button" class="sugg-chip" onclick="actionInsertSuggestion('${jsq(targetId)}','${jsq(p)}')">${esc(p)}</button>`).join('')}</div>`;
 }
@@ -222,6 +224,7 @@ function closeActionForm(){actionEditId='';actionSeed=null;clearActionDraft();ac
    hồ sơ cho sự cố nào, nên mở lên là mất phương hướng. */
 /* Trạng thái đóng: nói rõ hai đường vào thay vì để một form trống lơ lửng. */
 function actionFormClosedHtml(issueCount){
+  if(globalThis.ActionFormShell)return globalThis.ActionFormShell.closed(issueCount,canWrite());
   const manual=canWrite()?btn('Lập hồ sơ từ nguồn khác','beginActionManual()','ghost'):'';
   return issueCount
     ?emptyState('Chọn một sự cố để lập hồ sơ',`Có ${issueCount} sự cố ở trên — bấm "Lập hồ sơ" ngay trên dòng cần xử lý để hồ sơ được gắn đúng điểm QC và tự theo dõi QC chạy lại.`,manual)
@@ -236,6 +239,7 @@ function actionIncidentBanner(form,editing){
   const p=form.pointId?((state.data&&state.data[form.testId])||[]).find(x=>x.id===form.pointId):null;
   if(!p)return'';
   const t=state.tests.find(x=>x.id===form.testId);
+  if(globalThis.ActionFormShell){const details=[];if(t)details.push(`${testDisplayName(t)} · ${actionLevelContext(form.testId,form.level,form.lot)}`);details.push(`${vnDate(p.date)} · ${fmtPointValue(p,t)} ${t&&t.unit||''} · ${form.rule||'—'}`);return globalThis.ActionFormShell.incidentBanner({editing:!!editing,nceId:editing&&editing.nceId,details});}
   const title=editing?`Đang tiếp tục hồ sơ ${editing.nceId||'NCE'}`:'Đang lập hồ sơ cho vi phạm này';
   const bits=[];
   if(t)bits.push(`${testDisplayName(t)} · ${actionLevelContext(form.testId,form.level,form.lot)}`);

@@ -10,6 +10,8 @@ const plain = v => JSON.parse(JSON.stringify(v));
 
 {
   const routeSource = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'entry-routes.js'), 'utf8');
+  const pointRowSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'entry', 'entry-point-row-html.ts'), 'utf8');
+  const cumulativeStatsSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'entry', 'entry-cumulative-stats-html.ts'), 'utf8');
   const entryActionsSource = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'manage-tests-actions.js'), 'utf8');
   const drawSource = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'draw.js'), 'utf8');
   const rangeSource = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'range.js'), 'utf8');
@@ -31,8 +33,10 @@ const plain = v => JSON.parse(JSON.stringify(v));
   assert.match(routeSource, /class="lj-point-count">\$\{chartPts\.length\} điểm/, 'số điểm biểu đồ phải nằm cạnh mức và lô');
   assert.match(routeSource, /class="entryLJStack" data-render-scale="2"/, 'biểu đồ nhập QC phải yêu cầu canvas 2x để tránh mờ khi co giãn');
   assert.match(routeSource, /Lô'\} \$\{esc\(lvlLot\|\|'\?'\)\}.*qc-table-count/, 'số điểm phải nằm cùng cụm tiêu đề với số lô');
-  assert.match(routeSource, /<b>\$\{fmtPointValue\(p,t\)\}<\/b>/, 'điểm trong khoảng xem phải dùng số thập phân của xét nghiệm');
-  assert.match(routeSource, /Mean tích lũy<\/span><b>\$\{cumulativeSt\?fmtTestValue\(t,cumulativeSt\.m\)/, 'Mean tích lũy phải dùng số thập phân của xét nghiệm');
+  assert.match(routeSource, /value:fmtPointValue\(p,t\)/, 'route phải chuyển giá trị điểm theo số thập phân của xét nghiệm');
+  assert.match(pointRowSource, /<b>\$\{deps\.escape\(input\.value\)\}<\/b>/, 'điểm trong khoảng xem phải hiển thị giá trị đã định dạng của xét nghiệm');
+  assert.match(routeSource, /mean:cumulativeSt\?fmtTestValue\(t,cumulativeSt\.m\)/, 'Mean tích lũy phải dùng số thập phân của xét nghiệm');
+  assert.match(cumulativeStatsSource, /Mean tích lũy<\/span><b>\$\{deps\.escape\(input\.mean\)\}/, 'khối tích lũy phải hiển thị Mean đã định dạng');
   assert.match(routeSource, /class="qc-level-head" tabindex="0" data-qc-tooltip=/, 'tiêu đề mức phải có tooltip Mean\/SD dùng được bằng chuột và bàn phím');
   assert.match(routeSource, /±2SD \$\{limits\}/, 'tooltip tiêu đề mức phải có khoảng ±2SD');
   assert.match(entryActionsSource, /id="cfgAssayDecimals"/, 'form xét nghiệm phải có ô chọn số thập phân');

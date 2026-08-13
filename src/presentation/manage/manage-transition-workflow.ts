@@ -1,0 +1,2 @@
+export function createManageTransitionWorkflow(deps: { removal: (state: any, input: { id: unknown; switchesLot: any }) => any; removalDialog: () => any }) { return Object.freeze({removal:deps.removal,removalDialog:deps.removalDialog}); }
+export function manageTransitionRemovalDialog() { return {kicker:'Thao tác không thể hoàn tác',title:'Xóa dòng chuyển tiếp lô',message:'Xóa dòng chuyển tiếp lô này?',confirmLabel:'Xóa',cancelLabel:'Hủy'}; }

@@ -1,0 +1,12 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const {pathToFileURL}=require('node:url');
+const path=require('node:path');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','entry','entry-unusual-data-modal-html.ts')).href;
+const program=`import { createEntryUnusualDataModalHtml } from ${JSON.stringify(source)};
+const render=createEntryUnusualDataModalHtml({button:(label,action,variant)=>'BTN:'+label+'|'+action+'|'+variant});console.log(render({issuesHtml:'<issue>',confirmAction:'save()'}));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--experimental-strip-types','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'Không thể chạy entry unusual data modal HTML TypeScript');
+assert.match(result.stdout,/<h3>Cảnh báo dữ liệu bất thường<\/h3>/);assert.match(result.stdout,/<issue>/);assert.match(result.stdout,/BTN:Hủy\|closeModal\(\);entryRenderKeepScroll\(\)\|ghost/);assert.match(result.stdout,/BTN:Vẫn lưu\|save\(\)\|teal/);
+console.log('Entry unusual data modal HTML TypeScript tests passed');

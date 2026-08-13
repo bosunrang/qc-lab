@@ -1,0 +1,4 @@
+'use strict';
+const assert=require('node:assert/strict'),{spawnSync}=require('node:child_process'),{pathToFileURL}=require('node:url'),path=require('node:path');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','manage','manage-lot-group-workflow.ts')).href,program=`import { createManageLotGroupWorkflow, manageLotGroupRemovalDialog } from ${JSON.stringify(source)};const f=createManageLotGroupWorkflow({removal:(_,x)=>({record:{name:x.id}}),removalDialog:manageLotGroupRemovalDialog});console.log(JSON.stringify([f.removal({}, {id:'G'}),f.removalDialog('G')]));`,r=spawnSync(process.execPath,['--no-warnings','--input-type=module','--experimental-strip-types','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(r.status,0,r.stderr);assert.equal(JSON.parse(r.stdout)[1].title,'Xóa nhóm lô');console.log('Manage lot group workflow TypeScript tests passed');

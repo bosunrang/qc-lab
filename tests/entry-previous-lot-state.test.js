@@ -1,0 +1,13 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const {pathToFileURL}=require('node:url');
+const path=require('node:path');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','entry','entry-previous-lot-state.ts')).href;
+const program=`import { entryPreviousLotState } from ${JSON.stringify(source)};
+const shown=entryPreviousLotState([['T1|1','LOT-OLD']],'T1|2','LOT-02'),hidden=entryPreviousLotState(shown,'T1|2');
+console.log(JSON.stringify([[...shown.entries()],[...hidden.entries()]]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--experimental-strip-types','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'Không thể chạy entry previous lot state TypeScript');
+assert.deepEqual(JSON.parse(result.stdout),[[['T1|1','LOT-OLD'],['T1|2','LOT-02']],[['T1|1','LOT-OLD']]]);
+console.log('Entry previous lot state TypeScript tests passed');

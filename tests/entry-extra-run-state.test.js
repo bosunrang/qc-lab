@@ -1,0 +1,13 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const {pathToFileURL}=require('node:url');
+const path=require('node:path');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','entry','entry-extra-run-state.ts')).href;
+const program=`import { entryExtraRunState } from ${JSON.stringify(source)};
+const state=entryExtraRunState(['T1|1|2026-08-12|2'],{key:'T1|2|2026-08-13|3',focus:'2026-08-13|1'});
+console.log(JSON.stringify([[...state.keys],state.focus]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--experimental-strip-types','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'Không thể chạy entry extra run state TypeScript');
+assert.deepEqual(JSON.parse(result.stdout),[['T1|1|2026-08-12|2','T1|2|2026-08-13|3'],'2026-08-13|1']);
+console.log('Entry extra run state TypeScript tests passed');
