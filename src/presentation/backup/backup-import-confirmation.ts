@@ -1,0 +1,1 @@
+export function createBackupImportConfirmation(){return(input:{name:string;sizeWarning:string})=>({kicker:'Thao tác không thể hoàn tác',title:'Nhập backup',message:`Nhập backup "${input.name}"?`,detail:'Dữ liệu nghiệp vụ hiện tại sẽ được thay thế; nhật ký cũ được giữ lại.'+(input.sizeWarning?' '+input.sizeWarning:''),confirmLabel:'Nhập backup',cancelLabel:'Hủy'});}

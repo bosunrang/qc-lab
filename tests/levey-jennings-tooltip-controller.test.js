@@ -1,0 +1,21 @@
+'use strict';
+const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+const source = pathToFileURL(path.join(__dirname, '..', 'src', 'presentation', 'chart', 'levey-jennings-tooltip-controller.ts')).href;
+const program = `
+  import { createLeveyJenningsTooltipController } from ${JSON.stringify(source)};
+  const handlers={},tooltip={innerHTML:'',offsetWidth:40,offsetHeight:20,style:{}};
+  const canvas={_ljHover:[{x:10,y:10,hit:8,html:'<b>QC</b>'}],getBoundingClientRect:()=>({left:0,top:0,width:100,height:80})};
+  const bind=createLeveyJenningsTooltipController({tooltip:()=>tooltip,viewport:()=>({width:100,height:80}),bind:(target,event,handler)=>{handlers[event]=handler;}});
+  bind(canvas); bind(canvas); if(Object.keys(handlers).length!==2)throw new Error('listeners must bind once');
+  handlers.mousemove({clientX:10,clientY:10});
+  if(tooltip.innerHTML!=='<b>QC</b>'||tooltip.style.display!=='block'||tooltip.style.left!=='24px'||tooltip.style.top!=='24px')throw new Error('hover must show tooltip inside viewport');
+  handlers.mousemove({clientX:80,clientY:70}); if(tooltip.style.display!=='none')throw new Error('miss must hide tooltip');
+  handlers.mouseleave(); if(tooltip.style.display!=='none')throw new Error('mouseleave must hide tooltip');
+  console.log('Levey-Jennings tooltip controller TypeScript tests passed');
+`;
+const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=module', '--eval', program], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
+assert.equal(result.status, 0, result.stderr || result.stdout || 'không thể chạy Levey-Jennings tooltip controller TypeScript');
+console.log(result.stdout.trim());

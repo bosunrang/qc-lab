@@ -1,0 +1,1 @@
+export function createDashboardTestAction({button}:{button:(label:string,action:string,variant:string)=>string}){return(testId:string,level:number)=>button('Xem QC',`entrySel={testId:'${testId}',level:${level}};entryStart=null;entryEnd=null;go('entry')`,'ghost sm');}

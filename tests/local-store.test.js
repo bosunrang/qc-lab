@@ -138,7 +138,7 @@ const fakeIndexedDb = `
 
   {
     let dialog=null;
-    const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/settings.js'],{
+    const ctx = loadSandbox(['core.js', 'modules/state.js', 'generated/modular-pilot.js', 'modules/settings.js'],{
       navigator:{storage:{estimate:async()=>({usage:1572864,quota:104857600,usageDetails:{indexedDB:1048576}})}},
       infoDialog:async(message,opts)=>{dialog={message,opts};}
     });

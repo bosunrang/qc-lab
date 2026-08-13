@@ -1,0 +1,1 @@
+export function createBackupImportMessage(){return{success:'Đã nhập và kiểm tra backup.',preImportSnapshotFailure:'Không tạo được bản backup an toàn trước khi nhập. Dữ liệu hiện tại chưa bị thay thế.',invalid:(error:any)=>'Không thể nhập backup:\n'+(error&&error.message?error.message:'File không hợp lệ.')};}

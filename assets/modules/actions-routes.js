@@ -9,12 +9,7 @@
 function actionLevelShort(t,level,lotSnap){
   return ActionListPresentation.levelShort(t,level,lotSnap);
 }
-function currentIssues(){
-  if(globalThis.ActionCurrentIssues)return globalThis.ActionCurrentIssues();
-  const out=[],rank={rej:2,warn:1,ok:0};
-  operationalTests().forEach(t=>{const wg=activeWestgard(t);wg.views.forEach(v=>{const l=v.l;(v.pts||[]).forEach(p=>{const f=wg.byPoint.get(p.id);if(!f||f.level==='ok'||(typeof pointWorkflowComplete==='function'&&pointWorkflowComplete(p.id)))return;out.push({t,l,p,f,rules:f.rules});});});});
-  return out.sort((a,b)=>(rank[b.f.level]||0)-(rank[a.f.level]||0)||String(b.p.date||'').localeCompare(String(a.p.date||'')));
-}
+function currentIssues(){return globalThis.ActionCurrentIssues();}
 async function cancelAction(i){
   if(!requireAdmin())return;const a=state.actions&&state.actions[i];if(!a)return;
   const readiness=ActionReviewService.cancelReadiness(a);if(!readiness.ok){await infoDialog(actionReviewReadinessMessage('cancel',{...readiness,action:a},false));return;}
@@ -43,7 +38,7 @@ function confirmCancelAction(id,token){
   if(actionEditId===a.id){actionEditId='';actionSeed=null;clearActionDraft();actionOpenSections=null;}
   save({clearDerived:false});rerender();
 }
-function actionApprovalTag(a){const s=actionApprovalStatus(a),view=ActionReviewPresentation.approvalTag(s,actionCancelled(a)),label=actionApprovalLabel(a);return globalThis.actionApprovalTagPresentation?globalThis.actionApprovalTagPresentation(view,label):`<span class="tag ${view.cls}">${label}</span>`;}
+function actionApprovalTag(a){const s=actionApprovalStatus(a),view=ActionReviewPresentation.approvalTag(s,actionCancelled(a)),label=actionApprovalLabel(a);return globalThis.actionApprovalTagPresentation(view,label);}
 function actionApprovalToken(a){return ActionReviewService.reviewToken(a);}
 function actionApprovalReadinessMessage(r,afterAuth){
   if(globalThis.ActionReviewMessages)return globalThis.ActionReviewMessages.approval(r,afterAuth);
@@ -243,8 +238,7 @@ function issueRowHtml(o){
   const rules=o.rules.join(', '),err=errorType(o.rules),hint=fixHint(o.rules),wf=pointWorkflowSummary(o.p.id),acts=typeof pointRealActions==='function'?pointRealActions(o.p.id):[],latest=acts[acts.length-1],idx=latest?(state.actions||[]).indexOf(latest):-1;
   const sideChips=latest?actionSideChips(latest,actionWorkflowStatus(latest).stage):'';
   const foot=latest?`${latest.nceId?esc(latest.nceId)+' · ':''}Phụ trách: ${esc(latest.by||'—')}${latest.dueDate?' · hạn '+vnDate(latest.dueDate):''}`:hint;
-  if(globalThis.actionIssueRowPresentation)return globalThis.actionIssueRowPresentation({severity:o.f.level,level:actionLevelShort(o.t,o.l.level,o.l.lot),state:stateName(o.f.level),value:fmtPointValue(o.p,o.t),unit:o.t.unit||'',rules,error:err,workflowClass:wf.cls,workflowLabel:wf.label,sideChips,footer:foot,action:canWrite()?(idx>=0?{kind:'continue',index:idx}:{kind:'create',testId:o.t.id,level:o.l.level,rules,error:err,hint,pointId:o.p.id||'',date:o.p.date||''}):undefined});
-  return `<div class="issue-row ${o.f.level}"><div class="issue-row-main"><b>${esc(actionLevelShort(o.t,o.l.level,o.l.lot))} · ${stateName(o.f.level)}</b><div class="meta">${fmtPointValue(o.p,o.t)} ${esc(o.t.unit||'')} · ${rules||'—'} · ${err}</div><div class="action-chipline"><span class="action-chip ${wf.cls}">${esc(wf.label)}</span>${sideChips}</div><div class="hint">${foot}</div></div>${canWrite()?(idx>=0?btn('Tiếp tục hồ sơ',`editAction(${idx})`,'ghost sm'):btn('Lập hồ sơ',`beginActionFromIssue('${o.t.id}',${o.l.level},'${jsq(rules)}','${jsq(err)}','${jsq(hint)}','${jsq(o.p.id||'')}','${jsq(o.p.date||'')}')`,'ghost sm')):''}</div>`;
+  return globalThis.actionIssueRowPresentation({severity:o.f.level,level:actionLevelShort(o.t,o.l.level,o.l.lot),state:stateName(o.f.level),value:fmtPointValue(o.p,o.t),unit:o.t.unit||'',rules,error:err,workflowClass:wf.cls,workflowLabel:wf.label,sideChips,footer:foot,action:canWrite()?(idx>=0?{kind:'continue',index:idx}:{kind:'create',testId:o.t.id,level:o.l.level,rules,error:err,hint,pointId:o.p.id||'',date:o.p.date||''}):undefined});
 }
 /* Hồ sơ cũ tự sinh lúc hủy điểm chỉ lưu rule='Hủy điểm QC' — không phải luật Westgard.
    Suy |Z| của chính điểm đó ra ngữ cảnh đọc được, nhưng LUÔN gắn nhãn "suy từ Z" và
@@ -258,13 +252,9 @@ function actionViolationInfo(a){
 function actionQcVerdictLabel(a){return ActionViolationService.verdictLabel(a);}
 function openActionIssueHtml(a,idx){
   const t=state.tests.find(x=>x.id===a.testId),wf=actionWorkflowStatus(a),violation=actionViolationInfo(a),title=a.nceId||'Hồ sơ khắc phục',context=t?`${testDisplayName(t)} · ${actionLevelShort(t,a.level,a.lot)}`:(violation.rule||'Sự cố'),primary=a.correction||a.action||'Đang điều tra',verdict=actionQcVerdictLabel(a);
-  if(globalThis.actionOpenIssuePresentation)return globalThis.actionOpenIssuePresentation({severity:wf.cls==='rej'?'rej':'warn',title,context,date:vnDate(actionEventDate(a)),verdict,rule:violation.rule,errorType:violation.errorType,workflowClass:wf.cls,workflowLabel:wf.label,sideChips:actionSideChips(a,wf.stage),primary,owner:a.by||'',dueDate:a.dueDate?vnDate(a.dueDate):'',editable:canWrite(),index:idx});
-  return `<div class="issue-row ${wf.cls==='rej'?'rej':'warn'}"><div class="issue-row-main"><b>${esc(title)} · ${esc(context)}</b><div class="meta">${vnDate(actionEventDate(a))}${verdict?' · '+esc(verdict):''} · ${esc(violation.rule)} · ${esc(violation.errorType)}</div><div class="action-chipline"><span class="action-chip ${wf.cls}">${esc(wf.label)}</span>${actionSideChips(a,wf.stage)}</div><div class="hint">${esc(primary)} · Phụ trách: ${esc(a.by||'—')}${a.dueDate?' · hạn '+vnDate(a.dueDate):''}</div></div>${canWrite()?btn('Tiếp tục hồ sơ',`editAction(${idx})`,'ghost sm'):''}</div>`;
+  return globalThis.actionOpenIssuePresentation({severity:wf.cls==='rej'?'rej':'warn',title,context,date:vnDate(actionEventDate(a)),verdict,rule:violation.rule,errorType:violation.errorType,workflowClass:wf.cls,workflowLabel:wf.label,sideChips:actionSideChips(a,wf.stage),primary,owner:a.by||'',dueDate:a.dueDate?vnDate(a.dueDate):'',editable:canWrite(),index:idx});
 }
-function actionIssueGroupHtml(model){
-  if(globalThis.actionIssueGroupPresentation)return globalThis.actionIssueGroupPresentation(model);
-  return `<div class="issue-group ${model.severity}"><div class="issue-group-h"><div><b>${esc(model.title)}</b><span class="issue-group-date">${esc(model.date)}</span></div><span class="issue-group-count">${model.count} ${esc(model.countLabel)}</span></div><div class="issue-group-body">${model.itemsHtml}</div></div>`;
-}
+function actionIssueGroupHtml(model){return globalThis.actionIssueGroupPresentation(model);}
 function pageActionsV4(){
   const issues=currentIssues(),activePointIds=new Set(issues.map(o=>o.p.id));
   const issueGroups=groupIssuesByTestDate(issues);
@@ -276,8 +266,8 @@ function pageActionsV4(){
     const approveMeta=approval==='pending'?'':`<div class="action-note">${esc(a.approvedBy||'')} ${a.approvedAt?formatDateTimeVN(a.approvedAt):''}${a.approvalNote?' · '+esc(a.approvalNote):''}</div>`;
     const identity=`${a.nceId?esc(a.nceId)+' · ':''}${t?esc(testDisplayName(t)):esc(a.rule||'Cập nhật')}`,sub=t?esc(actionLevelShort(t,a.level,a.lot)):esc(a.lot?'Nhóm lô '+a.lot:'—'),rule=t?(actionQcVerdictLabel(a)?esc(actionQcVerdictLabel(a))+' · ':'')+esc(actionViolationInfo(a).rule)+' · '+esc(actionViolationInfo(a).errorType):esc(a.errorType||'—');
     const model={date:vnDate(actionEventDate(a)),openedAt,identity,sub,rule,primary,owner:a.by||'',dueDate:a.dueDate?vnDate(a.dueDate):'',workflowClass:wf.cls,workflowLabel:wf.label,sideChips:actionSideChips(a,wf.stage),approvalTag:!actionCancelled(a)&&approval!=='pending'?actionApprovalTag(a):'',approvalMeta:approveMeta,actions:actionReviewButtons(realIdx,a)};
-    return globalThis.actionLogRowPresentation?globalThis.actionLogRowPresentation(model):`<tr><td><div class="action-date">${model.date}</div>${openedAt?`<div class="action-time">Mở: ${esc(openedAt)}</div>`:''}</td><td><div class="action-test">${identity}</div><div class="action-sub">${sub}</div><div class="action-rule">${rule}</div></td><td><div class="action-text">${esc(primary)}</div><div class="action-sub">Phụ trách: ${esc(a.by||'—')}${a.dueDate?' · hạn '+vnDate(a.dueDate):''}</div></td><td><div class="action-status-stack"><span class="action-chip ${wf.cls}">${esc(wf.label)}</span>${model.sideChips}${model.approvalTag}${approveMeta}</div></td><td>${model.actions}</td></tr>`;}).join('');
-  const head=headOnly('Khắc phục sự cố','Điều tra nguyên nhân, ghi nhận, chạy lại QC và phê duyệt khép vòng'),issuesPanel=globalThis.actionIssuesPanelHtml?globalThis.actionIssuesPanelHtml(issueHtml):`<div class="panel action-issues-panel"><h2 class="panel-title">Sự cố cần xử lý</h2><div class="dash-list">${issueHtml}</div></div>`,formPanel=actionFormHtml(issues.length),logPanel=globalThis.actionLogPanelHtml?globalThis.actionLogPanelHtml(rows):`<div class="panel action-log-panel"><h2 class="panel-title">Nhật ký khắc phục</h2>${rows?`<div class="action-log-tools">${btn('Xuất CSV nhật ký','exportActionsCSV()','teal sm')}</div><div class="action-log-wrap"><table class="action-log-table"><thead><tr><th>Thời điểm</th><th>Sự cố</th><th>Hành động</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table></div>`:emptyState('Chưa có nhật ký','Các hành động khắc phục sẽ xuất hiện ở đây sau khi được lưu.')}</div>`;
+    return globalThis.actionLogRowPresentation(model);}).join('');
+  const head=headOnly('Khắc phục sự cố','Điều tra nguyên nhân, ghi nhận, chạy lại QC và phê duyệt khép vòng'),issuesPanel=globalThis.actionIssuesPanelHtml(issueHtml),formPanel=actionFormHtml(issues.length),logPanel=globalThis.actionLogPanelHtml(rows);
   if(globalThis.actionPageHtml)return globalThis.actionPageHtml({headHtml:head,issuesHtml:issuesPanel,formHtml:formPanel,logHtml:logPanel});
   return head+
    (globalThis.actionIssuesPanelHtml?globalThis.actionIssuesPanelHtml(issueHtml):`<div class="panel action-issues-panel"><h2 class="panel-title">Sự cố cần xử lý</h2><div class="dash-list">${issueHtml}</div></div>`)+

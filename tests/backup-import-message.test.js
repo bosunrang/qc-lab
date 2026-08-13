@@ -1,0 +1,5 @@
+'use strict';
+const assert=require('node:assert/strict');const{spawnSync}=require('node:child_process');const path=require('node:path');const{pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','backup','backup-import-message.ts')).href;
+const program=`import { createBackupImportMessage } from ${JSON.stringify(source)};const message=createBackupImportMessage();if(message.success!=='Đã nhập và kiểm tra backup.'||message.preImportSnapshotFailure!=='Không tạo được bản backup an toàn trước khi nhập. Dữ liệu hiện tại chưa bị thay thế.'||message.invalid({message:'Checksum sai'})!=='Không thể nhập backup:\\nChecksum sai'||message.invalid(null)!=='Không thể nhập backup:\\nFile không hợp lệ.')throw new Error('must preserve import messages');console.log('Backup import message TypeScript tests passed');`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});assert.equal(result.status,0,result.stderr||result.stdout||'không thể chạy backup import message TypeScript');console.log(result.stdout.trim());

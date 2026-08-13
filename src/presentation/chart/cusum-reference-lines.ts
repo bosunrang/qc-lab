@@ -1,0 +1,1 @@
+export function cusumReferenceLines(input:{h:number;y:(value:number)=>number}){const thresholdValues=[input.h,-input.h],labels=[input.h,0,-input.h];return{thresholds:thresholdValues.map(value=>({value,y:input.y(value)})),zero:{value:0,y:input.y(0)},labels:labels.map(value=>({value,y:input.y(value)}))};}

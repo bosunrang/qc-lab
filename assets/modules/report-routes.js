@@ -38,7 +38,7 @@ function reportUnlockPeriod(ym){
   setTimeout(()=>{const e=document.getElementById('unlockReasonInput');if(e)e.focus();},50);
 }
 async function reportConfirmUnlockPeriod(ym){
-  const input=document.getElementById('unlockReasonInput'),reasonCheck=globalThis.reportUnlockReason?globalThis.reportUnlockReason(input?input.value:''):{valid:QCCore.cleanText(input?input.value:'',1000).trim().length>=5,reason:QCCore.cleanText(input?input.value:'',1000).trim()},clean=reasonCheck.reason;
+  const input=document.getElementById('unlockReasonInput'),reasonCheck=globalThis.reportUnlockReason(input?input.value:''),clean=reasonCheck.reason;
   if(!reasonCheck.valid){
     const err=document.getElementById('unlockReasonErr');
     if(err)err.style.display='';
@@ -51,91 +51,43 @@ async function reportConfirmUnlockPeriod(ym){
   logAct('Mở khóa kỳ báo cáo',`${label} · Lý do: ${clean}`,'Kỳ báo cáo');save({clearDerived:false});rerender();
   await infoDialog(`Đã mở khóa kỳ ${label}.`,{type:'success'});
 }
-function reportLockListHtml(){
-  if(globalThis.reportLockListHtmlPresentation)return globalThis.reportLockListHtmlPresentation(state.periodLocks||[],role()==='admin');
-  const locks=ReportPeriodPresentation.sortedLocks(state.periodLocks||[]);
-  if(!locks.length)return '<div class="hint">Chưa có kỳ nào được khóa.</div>';
-  const isAdmin=role()==='admin';
-  return `<div class="period-lock-list">${locks.map(l=>`<div class="period-lock-row"><div><b>Kỳ ${esc(monthVN(l.ym))}</b><span class="hint"> · Khóa bởi ${esc(l.lockedBy||'—')}${l.lockedAt?' lúc '+formatDateTimeVN(l.lockedAt):''}</span></div>${isAdmin?btn('Mở khóa',`reportUnlockPeriod('${jsq(l.ym)}')`,'ghost sm'):''}</div>`).join('')}</div>`;
-}
-function reportSearchValues(t){
-  if(globalThis.reportSearchValuePresentation)return globalThis.reportSearchValuePresentation.values(t,{testLabel:testSelectLabel,operationalLevels, panelForTest:operationalPanelForTest,lotGroupForTest:operationalLotGroupForTest});
-  const levels=operationalLevels(t),panel=operationalPanelForTest(t),lotGroup=operationalLotGroupForTest(t);
-  return [
-    testSelectLabel(t),
-    t.name,t.machine,t.unit,
-    panel&&panel.name,
-    lotGroup&&lotGroup.name,
-    ...levels.map(l=>l.lot)
-  ];
-}
+function reportLockListHtml(){return globalThis.reportLockListHtmlPresentation(state.periodLocks||[],role()==='admin');}
+function reportSearchValues(t){return globalThis.reportSearchValuePresentation.values(t,{testLabel:testSelectLabel,operationalLevels,panelForTest:operationalPanelForTest,lotGroupForTest:operationalLotGroupForTest});}
 function reportSearchSet(v){
   reportQ=v;
   scheduleSearchRender(reportSearchSet,reportApplySearch,'reportSearch');
 }
 function reportApplySearch(){
-  const tests=operationalTests(),q=searchText(reportQ),result=globalThis.reportSearch?globalThis.reportSearch.select(tests,q,reportTest,reportSearchValues,searchText):null,matched=result?result.matched:tests.filter(t=>!q||reportSearchValues(t).some(v=>searchText(v).includes(q)));
-  if(result)reportTest=result.selected;
-  else{if(matched.length&&(!reportTest||!matched.some(t=>t.id===reportTest)))reportTest=matched[0].id;if(!matched.length)reportTest='';}
+  const tests=operationalTests(),q=searchText(reportQ),result=globalThis.reportSearch.select(tests,q,reportTest,reportSearchValues,searchText),matched=result.matched;
+  reportTest=result.selected;
   const select=document.getElementById('rTest'),count=document.getElementById('reportTestCount');
   replaceSelectItems(select,matched.map(t=>({value:t.id,label:testSelectLabel(t,tests)})),'Không tìm thấy xét nghiệm phù hợp');
   if(select&&reportTest)select.value=reportTest;
   if(count)count.textContent=`(${matched.length}/${tests.length})`;
   document.querySelectorAll('[data-report-action]').forEach(button=>button.disabled=!matched.length);
 }
-function reportRangeDefaults(){
-  if(globalThis.reportSelection){const r=globalThis.reportSelection.defaults(reportRangeStart,reportRangeEnd,isoMonth(),isoToday());reportRangeStart=r.start;reportRangeEnd=r.end;return r;}
-  if(!reportRangeStart&&!reportRangeEnd){reportRangeStart=isoMonth()+'-01';reportRangeEnd=isoToday();}
-  return{start:reportRangeStart,end:reportRangeEnd};
-}
+function reportRangeDefaults(){const r=globalThis.reportSelection.defaults(reportRangeStart,reportRangeEnd,isoMonth(),isoToday());reportRangeStart=r.start;reportRangeEnd=r.end;return r;}
 function reportDateRange(){
   const s=parseVN((document.getElementById('rStartDate')||{}).value||'')||'',e=parseVN((document.getElementById('rEndDate')||{}).value||'')||'';
-  if(globalThis.reportSelection)return globalThis.reportSelection.dateRange(s,e);
-  return(s&&e&&s>e)?{start:e,end:s}:{start:s,end:e};
+  return globalThis.reportSelection.dateRange(s,e);
 }
 /* Cả ba nút xuất (In / Excel / CSV) đọc cùng một bộ điều khiển trên trang Báo
    cáo. Gom về đây để đổi id ô nhập chỉ phải sửa một chỗ, và để bản in với bản
    Excel không thể lệch nhau về xét nghiệm, khoảng ngày hay tùy chọn phụ lục. */
 function reportExportSelection(){
   const tid=(document.getElementById('rTest')||{}).value||'',{start,end}=typeof reportDateRange==='function'?reportDateRange():{start:'',end:''};
-  if(globalThis.reportSelection)return globalThis.reportSelection.exportSelection(state.tests,tid,start,end,(document.getElementById('reportNceAppendix')||{}).checked!==false);
-  return{tid,t:state.tests.find(x=>x.id===tid),start,end,includeNceAppendix:(document.getElementById('reportNceAppendix')||{}).checked!==false};
+  return globalThis.reportSelection.exportSelection(state.tests,tid,start,end,(document.getElementById('reportNceAppendix')||{}).checked!==false);
 }
 function reportRangeChanged(){
   const{start,end}=reportDateRange();
   reportRangeStart=start;reportRangeEnd=end;
 }
-function reportRangeText(start,end){
-  if(globalThis.reportLabels)return globalThis.reportLabels.rangeText(start,end);
-  if(!start&&!end)return'Toàn bộ dữ liệu';
-  if(start&&end)return vnDate(start)+' – '+vnDate(end);
-  return start?('Từ '+vnDate(start)):('Đến '+vnDate(end));
-}
+function reportRangeText(start,end){return globalThis.reportLabels.rangeText(start,end);}
 const REPORT_ACTION_ICON_PATHS={
   print:'<path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/><path d="M18 12h.01"/>'
 };
-function reportActionIcon(type){
-  if(globalThis.reportActionIconPresentation)return globalThis.reportActionIconPresentation.icon(type);
-  const paths=REPORT_ACTION_ICON_PATHS[type];
-  return `<svg class="btn-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
-}
-function reportLockPanelHtml(){
-  if(globalThis.reportLockPanelHtmlPresentation){const isAdmin=role()==='admin',ym=reportLockYmValue(),nowYear=new Date().getFullYear(),picker=globalThis.reportLockPicker?globalThis.reportLockPicker(ym,nowYear):{year:+ym.slice(0,4),month:+ym.slice(5,7),months:Array.from({length:12},(_,i)=>i+1),years:Array.from({length:5},(_,i)=>nowYear-3+i)};return globalThis.reportLockPanelHtmlPresentation({isAdmin,year:picker.year,month:picker.month,months:picker.months,years:picker.years,already:!!PeriodService.findLock(state,ym),lockListHtml:reportLockListHtml()});}
-  const isAdmin=role()==='admin',ym=reportLockYmValue(),nowYear=new Date().getFullYear(),picker=globalThis.reportLockPicker?globalThis.reportLockPicker(ym,nowYear):{year:+ym.slice(0,4),month:+ym.slice(5,7)},year=picker.year,month=picker.month;
-  const yearMin=nowYear-3,yearMax=nowYear+1;
-  const monthOptions=Array.from({length:12},(_,i)=>`<option value="${i+1}" ${month===i+1?'selected':''}>Tháng ${i+1}</option>`).join('');
-  const yearOptions=Array.from({length:yearMax-yearMin+1},(_,i)=>yearMin+i).map(y=>`<option value="${y}" ${year===y?'selected':''}>${y}</option>`).join('');
-  const already=PeriodService.findLock(state,ym);
-  return `<div class="panel"><h2 class="panel-title">Khóa kỳ báo cáo</h2>
-     <div class="hint">Khóa 1 kỳ (theo tháng) sẽ chặn sửa/hủy điểm QC của kỳ đó ở <b>mọi xét nghiệm</b> — nên làm sau khi đã xuất xong báo cáo chính thức của kỳ.</div>
-     <div class="report-lock-controls">
-       <div><label>Tháng</label><select aria-label="Tháng" ${isAdmin?'':'disabled'} onchange="reportSetLockPart('month',this.value)">${monthOptions}</select></div>
-       <div><label>Năm</label><select aria-label="Năm" ${isAdmin?'':'disabled'} onchange="reportSetLockPart('year',this.value)">${yearOptions}</select></div>
-       <div style="align-self:end">${isAdmin?(already?btn('Kỳ này đã khóa','','ghost','',{disabled:true}):btn('Khóa kỳ này','reportLockPeriod()','teal')):'<span class="hint">Chỉ admin mới khóa/mở khóa được kỳ báo cáo.</span>'}</div>
-     </div>
-     <div class="flow-panel">${reportLockListHtml()}</div>
-   </div>`;
-}
+function reportActionIcon(type){return globalThis.reportActionIconPresentation.icon(type);}
+function reportLockPanelHtml(){const isAdmin=role()==='admin',ym=reportLockYmValue(),picker=globalThis.reportLockPicker(ym,new Date().getFullYear());return globalThis.reportLockPanelHtmlPresentation({isAdmin,year:picker.year,month:picker.month,months:picker.months,years:picker.years,already:!!PeriodService.findLock(state,ym),lockListHtml:reportLockListHtml()});}
 function pageReportV2(){
   const tests=operationalTests();
   if(globalThis.reportPageHtml){const q=searchText(reportQ),matched=tests.filter(t=>!q||reportSearchValues(t).some(v=>searchText(v).includes(q)));if(matched.length&&(!reportTest||!matched.some(t=>t.id===reportTest)))reportTest=matched[0].id;if(!matched.length)reportTest='';const{start,end}=reportRangeDefaults();return globalThis.reportPageHtml({tests,matched,selectedId:reportTest,query:reportQ,start,end,isAdmin:role()==='admin',lockPanelHtml:reportLockPanelHtml()});}
@@ -160,8 +112,4 @@ function pageReportV2(){
      </div>
    </div>`+reportLockPanelHtml();
 }
-function reportRangePicker(start,end){
-  if(globalThis.reportRangePickerHtml)return globalThis.reportRangePickerHtml(start,end);
-  return `<div><label>Từ ngày</label>${dateBox('rStartDate',start,'','onchange="reportRangeChanged()"')}</div>
-    <div><label>Đến ngày</label>${dateBox('rEndDate',end,'','onchange="reportRangeChanged()"')}</div>`;
-}
+function reportRangePicker(start,end){return globalThis.reportRangePickerHtml(start,end);}

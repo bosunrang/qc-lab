@@ -1,0 +1,1 @@
+export function cusumLinePoints(input:{indices:number[];values:any[];x:(index:number)=>number;clampY:(value:number)=>number}){return input.indices.filter(index=>Number.isFinite(input.values[index])).map(index=>({x:input.x(index),y:input.clampY(input.values[index])}));}

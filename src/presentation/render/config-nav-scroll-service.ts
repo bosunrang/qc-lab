@@ -1,0 +1,2 @@
+type Scrollable={scrollLeft:number;addEventListener:(name:string,listener:()=>void,options?:any)=>void};
+export function createConfigNavScrollService(deps:{find:()=>Scrollable|null,getPosition:()=>number,setPosition:(value:number)=>void}){const restore=()=>{const nav=deps.find();if(!nav)return;nav.scrollLeft=deps.getPosition();nav.addEventListener('scroll',()=>deps.setPosition(nav.scrollLeft),{passive:true});};return{restore};}

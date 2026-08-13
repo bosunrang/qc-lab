@@ -1,0 +1,1 @@
+export function createDashboardLevelPillsHtml({targetOk,render}:{targetOk:(level:any)=>boolean,render:(input:any)=>string}){return(levels:any[])=>levels.map(item=>render({level:item.l,today:item.todayLevel,targetOk:targetOk(item.l),cv:item.st?item.st.cv:null})).join('');}

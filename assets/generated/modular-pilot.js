@@ -576,6 +576,133 @@
 		});
 	}
 	//#endregion
+	//#region src/application/backup/backup-local-marker.ts
+	function createBackupLocalMarker(deps) {
+		const timestampKey = "qclab_lastbackup", bytesKey = "qclab_lastbackup_bytes";
+		return {
+			mark: (bytes) => {
+				try {
+					deps.storage.setItem(timestampKey, deps.now());
+					if (Number(bytes) > 0) deps.storage.setItem(bytesKey, String(Number(bytes)));
+				} catch (error) {}
+			},
+			lastRaw: () => {
+				try {
+					return deps.storage.getItem(timestampKey);
+				} catch (error) {
+					return null;
+				}
+			},
+			bytes: () => {
+				try {
+					return Number(deps.storage.getItem(bytesKey) || 0);
+				} catch (error) {
+					return 0;
+				}
+			}
+		};
+	}
+	//#endregion
+	//#region src/presentation/backup/backup-inspection-summary.ts
+	function createBackupInspectionSummary(deps) {
+		return (input) => {
+			const meta = input.meta || {}, summary = input.summary || {};
+			return `${meta.type === "legacy" ? "Backup JSON cũ" : "Backup đầy đủ"} hợp lệ.\n${meta.checksumStatus === "verified" ? "SHA-256 hợp lệ" : meta.checksumStatus === "legacy" ? "File cũ chưa có checksum" : "Không có checksum"}.\nDung lượng: ${deps.size(input.size)} MB.\nĐiểm QC: ${summary.points || 0}; xét nghiệm cấu hình: ${summary.configuredTests || 0}.\nKhoảng ngày: ${summary.minDate || "—"} đến ${summary.maxDate || "—"}.`;
+		};
+	}
+	//#endregion
+	//#region src/presentation/backup/backup-inspection-message.ts
+	function createBackupInspectionMessage() {
+		return { invalid: (error) => "File không đạt kiểm tra:\n" + (error && error.message ? error.message : "File không hợp lệ.") };
+	}
+	//#endregion
+	//#region src/presentation/backup/backup-file-name.ts
+	function createBackupFileName(formatDate) {
+		return (value) => "qclab-backup-" + formatDate(value).replace(/\//g, "-") + ".json";
+	}
+	//#endregion
+	//#region src/presentation/backup/backup-snapshot-file-name.ts
+	function createBackupSnapshotFileName(now) {
+		return (prefix) => `qclab-${prefix}-${now().replace(/[T:]/g, "-").replace(/\.\d{3}Z$/, "Z")}.json`;
+	}
+	//#endregion
+	//#region src/presentation/backup/backup-size-confirmation.ts
+	function createBackupSizeConfirmation(deps) {
+		return (input) => {
+			const error = deps.error(input.bytes);
+			return error ? {
+				kicker: "Vượt giới hạn khuyến nghị",
+				title: input.title,
+				message: `${error} Dung lượng thực tế ${deps.size(input.bytes)} MB.`,
+				detail: input.detail,
+				confirmLabel: "Vẫn tiếp tục",
+				cancelLabel: "Hủy"
+			} : null;
+		};
+	}
+	//#endregion
+	//#region src/presentation/backup/backup-size-warning-confirmation.ts
+	function createBackupSizeWarningConfirmation(warning) {
+		return (input) => {
+			const message = warning(input.bytes);
+			return message ? {
+				kicker: "Dung lượng backup lớn",
+				title: "Vẫn xuất backup?",
+				message,
+				detail: "File hiện tại vẫn nhập được, nhưng dung lượng dự phòng còn ít.",
+				confirmLabel: "Xuất backup",
+				cancelLabel: "Hủy"
+			} : null;
+		};
+	}
+	//#endregion
+	//#region src/presentation/backup/backup-export-message.ts
+	function createBackupExportMessage() {
+		return {
+			createError: (error) => "Không tạo được file backup:\n" + (error && error.message ? error.message : "Lỗi không xác định."),
+			downloadError: "Không tạo được file backup. Dữ liệu chưa được xem là đã sao lưu."
+		};
+	}
+	//#endregion
+	//#region src/presentation/backup/backup-import-confirmation.ts
+	function createBackupImportConfirmation() {
+		return (input) => ({
+			kicker: "Thao tác không thể hoàn tác",
+			title: "Nhập backup",
+			message: `Nhập backup "${input.name}"?`,
+			detail: "Dữ liệu nghiệp vụ hiện tại sẽ được thay thế; nhật ký cũ được giữ lại." + (input.sizeWarning ? " " + input.sizeWarning : ""),
+			confirmLabel: "Nhập backup",
+			cancelLabel: "Hủy"
+		});
+	}
+	//#endregion
+	//#region src/presentation/backup/backup-import-message.ts
+	function createBackupImportMessage() {
+		return {
+			success: "Đã nhập và kiểm tra backup.",
+			preImportSnapshotFailure: "Không tạo được bản backup an toàn trước khi nhập. Dữ liệu hiện tại chưa bị thay thế.",
+			invalid: (error) => "Không thể nhập backup:\n" + (error && error.message ? error.message : "File không hợp lệ.")
+		};
+	}
+	//#endregion
+	//#region src/presentation/backup/backup-oversize-confirmation.ts
+	function createBackupOversizeConfirmation() {
+		return {
+			exportFull: () => ({
+				title: "Vẫn xuất backup đầy đủ?",
+				detail: "File vẫn nhập lại được và app sẽ hỏi xác nhận khi nhập. Nên lưu ít nhất hai bản trên hai thiết bị hoặc vị trí khác nhau."
+			}),
+			importFile: (name) => ({
+				title: "Vẫn đọc file backup này?",
+				detail: `File "${name}" lớn hơn khuyến nghị nên có thể mất vài giây để đọc và kiểm tra. Nếu đây đúng là backup do app xuất ra thì cứ tiếp tục.`
+			}),
+			inspectFile: (name) => ({
+				title: "Vẫn kiểm tra file này?",
+				detail: `File "${name}" lớn hơn khuyến nghị nên việc tính checksum có thể mất vài giây. Thao tác này không đụng tới dữ liệu QC.`
+			})
+		};
+	}
+	//#endregion
 	//#region src/application/manage/manage-config-service.ts
 	function createManageConfigService({ cleanText, cleanId, targetFromLimits, limitsFromTarget }) {
 		function textKey(value) {
@@ -5142,6 +5269,546 @@
 		return Number.isFinite(value) ? value : fallback;
 	}
 	//#endregion
+	//#region src/presentation/chart/canvas-font.ts
+	function createCanvasFont$1(pixel) {
+		return (weight, token, fallback) => `${weight ? weight + " " : ""}${pixel(token, fallback)}px Manrope, Arial, sans-serif`;
+	}
+	//#endregion
+	//#region src/presentation/chart/chart-data-url.ts
+	function createChartDataUrl(deps) {
+		return (input) => {
+			const canvas = deps.createCanvas();
+			canvas.width = input.width;
+			canvas.height = input.height;
+			input.render(canvas);
+			return canvas.toDataURL("image/png");
+		};
+	}
+	//#endregion
+	//#region src/presentation/render/visible-canvas-service.ts
+	function createVisibleCanvasService(deps) {
+		let observers = [];
+		let queue = /* @__PURE__ */ new Set(), frame = null;
+		const queueCanvasDraw = (canvas) => {
+			if (!canvas || !canvas._ljDraw) return;
+			queue.add(canvas);
+			if (frame !== null) return;
+			frame = deps.requestFrame(() => {
+				frame = null;
+				const pending = [...queue];
+				queue.clear();
+				pending.forEach((item) => {
+					if (deps.isConnected(item) && item._ljDraw) item._ljDraw();
+				});
+			});
+		};
+		const drawVisibleCanvas = (canvas, draw) => {
+			canvas._ljDraw = draw;
+			const run = () => queueCanvasDraw(canvas);
+			if (deps.intersectionObserver) {
+				const observer = deps.intersectionObserver(run);
+				observer.observe(canvas);
+				observers.push(observer);
+			} else run();
+			if (deps.resizeObserver) {
+				let lastWidth = 0;
+				const observer = deps.resizeObserver(() => {
+					const width = Math.round(canvas.getBoundingClientRect().width);
+					if (width > 0 && width !== lastWidth) {
+						lastWidth = width;
+						run();
+					}
+				});
+				observer.observe(canvas);
+				observers.push(observer);
+			}
+		};
+		const disconnectObservers = () => {
+			observers.forEach((observer) => observer.disconnect());
+			observers = [];
+		};
+		return {
+			queueCanvasDraw,
+			drawVisibleCanvas,
+			disconnectObservers
+		};
+	}
+	//#endregion
+	//#region src/presentation/chart/chart-tooltip-service.ts
+	function createChartTooltipService(deps) {
+		return () => {
+			let element = deps.find();
+			if (!element) {
+				element = deps.create();
+				element.id = "qcTooltip";
+				element.className = "qc-tooltip";
+				deps.append(element);
+			}
+			return element;
+		};
+	}
+	//#endregion
+	//#region src/presentation/chart/levey-jennings-tooltip-controller.ts
+	function createLeveyJenningsTooltipController(deps) {
+		return (canvas) => {
+			if (canvas._ljTipBound) return;
+			canvas._ljTipBound = true;
+			const hide = () => {
+				deps.tooltip().style.display = "none";
+			};
+			deps.bind(canvas, "mouseleave", hide);
+			deps.bind(canvas, "mousemove", (event) => {
+				const points = canvas._ljHover || [];
+				if (!points.length) return hide();
+				const pointer = event;
+				const rect = canvas.getBoundingClientRect(), scaleX = (canvas._ljCssW || rect.width) / rect.width, scaleY = (canvas._ljCssH || rect.height) / rect.height, x = (pointer.clientX - rect.left) * scaleX, y = (pointer.clientY - rect.top) * scaleY;
+				const hit = points.reduce((closest, point) => {
+					const distance = Math.hypot(x - point.x, y - point.y);
+					return distance <= point.hit && (!closest || distance < Math.hypot(x - closest.x, y - closest.y)) ? point : closest;
+				}, null);
+				if (!hit) return hide();
+				const tooltip = deps.tooltip();
+				tooltip.innerHTML = hit.html;
+				tooltip.style.display = "block";
+				const pad = 12, viewport = deps.viewport(), width = tooltip.offsetWidth || 220, height = tooltip.offsetHeight || 70;
+				let left = pointer.clientX + 14, top = pointer.clientY + 14;
+				if (left + width + pad > viewport.width) left = pointer.clientX - width - 14;
+				if (top + height + pad > viewport.height) top = pointer.clientY - height - 14;
+				tooltip.style.left = Math.max(pad, left) + "px";
+				tooltip.style.top = Math.max(pad, top) + "px";
+			});
+		};
+	}
+	//#endregion
+	//#region src/presentation/chart/hi-dpi-canvas.ts
+	function createHiDpiCanvasSetup(devicePixelRatio) {
+		return (canvas) => {
+			if (!canvas.dataset.baseW) {
+				canvas.dataset.baseW = canvas.getAttribute("width") || canvas.width;
+				canvas.dataset.baseH = canvas.getAttribute("height") || canvas.height;
+			}
+			const baseWidth = parseFloat(canvas.dataset.baseW) || 1400, baseHeight = parseFloat(canvas.dataset.baseH) || 430, cssWidth = Math.max(760, Math.round(canvas.clientWidth || baseWidth)), cssHeight = Math.round(cssWidth * baseHeight / baseWidth), renderScale = Math.min(2, Math.max(1, Number(canvas.dataset.renderScale) || 1)), ratio = Math.min(3, Math.max(renderScale, devicePixelRatio() || 1)), pixelWidth = Math.round(cssWidth * ratio), pixelHeight = Math.round(cssHeight * ratio);
+			if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
+				canvas.width = pixelWidth;
+				canvas.height = pixelHeight;
+				canvas.style.height = cssHeight + "px";
+			}
+			const context = canvas.getContext("2d");
+			context.setTransform(ratio, 0, 0, ratio, 0, 0);
+			return {
+				ctx: context,
+				W: cssWidth,
+				H: cssHeight
+			};
+		};
+	}
+	//#endregion
+	//#region src/presentation/chart/levey-jennings-geometry.ts
+	function leveyJenningsGeometry(input) {
+		const padL = 56, padR = 78, padT = 34, padB = 48, cw = input.width - padL - padR, ch = input.height - padT - padB, markPad = 10, top = input.mean + 3.25 * input.sd, bottom = input.mean - 3.25 * input.sd, y = (value) => padT + (top - value) / (top - bottom) * ch, clampY = (value) => Math.max(padT, Math.min(padT + ch, y(value))), x = (index) => input.count <= 1 ? padL + cw / 2 : 66 + index / (input.count - 1) * (cw - 20);
+		return {
+			padL,
+			padT,
+			cw,
+			ch,
+			markPad,
+			y,
+			clampY,
+			x
+		};
+	}
+	//#endregion
+	//#region src/presentation/chart/westgard-rule-scope.ts
+	function createWestgardRuleScope(deps) {
+		return {
+			within: (test, rule) => deps.within ? deps.within(test, rule) : deps.default(test, rule),
+			across: (test, rule) => deps.across ? deps.across(test, rule) : deps.default(test, rule)
+		};
+	}
+	//#endregion
+	//#region src/presentation/chart/levey-jennings-colors.ts
+	var LEVEY_JENNINGS_COLORS = Object.freeze({
+		okBand: "#e8f6ef",
+		okMid: "#ffffff",
+		warnBand: "#fff3cf",
+		rejectBand: "#f9d6d5",
+		grid: "#5d6b76",
+		mean: "#17212b",
+		line: "#0e8f8f",
+		okPoint: "#0e8f8f",
+		warnPoint: "#dd8b1f",
+		rejectPoint: "#c5221f"
+	});
+	//#endregion
+	//#region src/presentation/chart/levey-jennings-ticks.ts
+	function createLeveyJenningsTicks(formatDate) {
+		return (points, maxTicks = 5) => {
+			const count = points.length, total = Math.min(maxTicks, count);
+			return (total === 1 ? [0] : [...new Set(Array.from({ length: total }, (_, index) => Math.round(index * (count - 1) / (total - 1))))]).map((index) => {
+				const raw = String(points[index].date || "");
+				return {
+					index,
+					label: /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw.slice(8, 10) + "/" + raw.slice(5, 7) : String(formatDate(points[index].date) || "").slice(0, 5)
+				};
+			});
+		};
+	}
+	//#endregion
+	//#region src/presentation/chart/levey-jennings-y-axis.ts
+	function createLeveyJenningsYAxisLabels(formatValue) {
+		return (test, mean, sd) => [
+			3,
+			2,
+			1,
+			0,
+			-1,
+			-2,
+			-3
+		].map((z) => ({
+			z,
+			label: z === 3 ? "> +3" : z === -3 ? "< -3" : String(z),
+			value: formatValue(test, mean + z * sd)
+		}));
+	}
+	//#endregion
+	//#region src/presentation/chart/levey-jennings-hover-model.ts
+	function createLeveyJenningsHoverModel(deps) {
+		return (input) => {
+			const point = input.point, zText = (input.z >= 0 ? "+" : "") + deps.number(input.z) + "s", unit = input.test && input.test.unit ? " " + deps.escape(input.test.unit) : "", rules = input.rules.length ? deps.escape(input.rules.join(", ")) : "Đạt";
+			return `<b>${deps.date(point.date)} · ${input.levelText}</b><div>Lô: <b style="display:inline">${deps.escape(point.lot || input.lot)}</b></div><div>Giá trị: ${deps.pointValue(point, input.test)}${unit}</div><div>Z: ${zText}</div><div class="muted">Luật: ${rules}</div>`;
+		};
+	}
+	//#endregion
+	//#region src/presentation/chart/levey-jennings-point-style.ts
+	function leveyJenningsPointStyle(status, colors) {
+		return {
+			color: status === "rej" ? colors.rejectPoint : status === "warn" ? colors.warnPoint : colors.okPoint,
+			radius: status === "ok" ? 4 : 5
+		};
+	}
+	//#endregion
+	//#region src/presentation/chart/levey-jennings-display-plan.ts
+	function createLeveyJenningsDisplayPlan(sampleIndices) {
+		return (points, ruleResults, width) => {
+			const preserve = [];
+			ruleResults.forEach((result, index) => {
+				if (result && result.rules && result.rules.length) preserve.push(index);
+			});
+			return sampleIndices({
+				length: points.length,
+				maxPoints: Math.max(240, Math.floor(width / 2)),
+				valueAt: (index) => points[index] && points[index].val,
+				preserve
+			});
+		};
+	}
+	//#endregion
+	//#region src/presentation/chart/levey-jennings-point-render-model.ts
+	function createLeveyJenningsPointRenderModel(deps) {
+		return (input) => deps.displayPlan(input.points, input.results, input.width).map((index) => {
+			const point = input.points[index], rawRules = Array.isArray(input.results[index] && input.results[index].rules) ? input.results[index].rules : [], rules = [...new Set(rawRules)], status = deps.verdict(input.test, rules);
+			return {
+				index,
+				point,
+				x: input.x(index),
+				y: input.y(point.val),
+				style: deps.style(status),
+				hover: deps.hover({
+					point,
+					test: input.test,
+					lot: input.lot,
+					levelText: input.levelText,
+					z: input.zs[index],
+					rules
+				})
+			};
+		});
+	}
+	//#endregion
+	//#region src/presentation/chart/levey-jennings-bands.ts
+	var BANDS = Object.freeze([
+		{
+			low: 3,
+			high: 3.25,
+			color: "rejectBand"
+		},
+		{
+			low: -3.25,
+			high: -3,
+			color: "rejectBand"
+		},
+		{
+			low: 2,
+			high: 3,
+			color: "warnBand"
+		},
+		{
+			low: -3,
+			high: -2,
+			color: "warnBand"
+		},
+		{
+			low: -2,
+			high: 2,
+			color: "okBand"
+		},
+		{
+			low: -1,
+			high: 1,
+			color: "okMid"
+		}
+	]);
+	function leveyJenningsBandRects(input) {
+		return BANDS.map((band) => {
+			const top = input.y(input.mean + band.high * input.sd);
+			return {
+				color: band.color,
+				top,
+				height: input.y(input.mean + band.low * input.sd) - top,
+				width: input.width
+			};
+		});
+	}
+	//#endregion
+	//#region src/presentation/chart/levey-jennings-grid.ts
+	function leveyJenningsGridLines(axis, mean, sd, y) {
+		return axis.map((row) => ({
+			y: y(mean + row.z * sd),
+			major: row.z === 0
+		}));
+	}
+	//#endregion
+	//#region src/presentation/chart/levey-jennings-multi-series.ts
+	function leveyJenningsMultiSeries(input) {
+		const levels = (input.views || []).filter((view) => view && view.pts && view.pts.length && Number.isFinite(+view.mean) && Number.isFinite(+view.sd) && +view.sd > 0).slice(0, 6), all = levels.flatMap((view) => view.pts.map((point, index) => ({
+			view,
+			point,
+			index,
+			z: (Number(point.val) - Number(view.mean)) / Number(view.sd),
+			run: String(point.runId || point.date || ""),
+			date: point.date || ""
+		}))), runs = [...new Set(all.map((item) => item.run || item.date))].sort((left, right) => String(left).localeCompare(String(right), "vi", { numeric: true })), runIndex = new Map(runs.map((run, index) => [run, index])), xOfRun = (run) => runs.length <= 1 ? input.padLeft + input.width / 2 : input.padLeft + input.markPad + (runIndex.get(run) || 0) / (runs.length - 1) * (input.width - input.markPad * 2);
+		return {
+			levels,
+			all,
+			runs,
+			runIndex,
+			xOfRun
+		};
+	}
+	//#endregion
+	//#region src/presentation/chart/levey-jennings-multi-run-ticks.ts
+	function createLeveyJenningsMultiRunTicks(formatDate) {
+		return (runs, items, maxTicks = 5) => {
+			const dates = /* @__PURE__ */ new Map();
+			items.forEach((item) => {
+				if (!dates.has(item.run)) dates.set(item.run, item.date);
+			});
+			const total = Math.min(maxTicks, runs.length);
+			return (total === 1 ? [0] : [...new Set(Array.from({ length: total }, (_, index) => Math.round(index * (runs.length - 1) / (total - 1))))]).map((index) => {
+				const run = runs[index], raw = String(dates.get(run) || "");
+				return {
+					run,
+					label: /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw.slice(8, 10) + "/" + raw.slice(5, 7) : String(formatDate(raw) || "").slice(0, 5)
+				};
+			}).filter((tick) => !!tick.label);
+		};
+	}
+	//#endregion
+	//#region src/presentation/chart/levey-jennings-legend-layout.ts
+	function createLeveyJenningsLegendLayout(measure) {
+		return (levels, colors, startX) => {
+			let x = startX;
+			return levels.map((level, index) => {
+				const label = level.label || `Mức ${level.level}`, item = {
+					x,
+					color: colors[index % colors.length],
+					label
+				};
+				x += 25 + measure(label) + 20;
+				return item;
+			});
+		};
+	}
+	//#endregion
+	//#region src/presentation/chart/levey-jennings-multi-display-plan.ts
+	function createLeveyJenningsMultiDisplayPlan(sampleIndices) {
+		return (input) => {
+			const preserve = [];
+			input.points.forEach((point, index) => {
+				const within = input.single.F[index];
+				if (within && within.rules && within.rules.length || (input.cross.get(point) || []).length) preserve.push(index);
+			});
+			return sampleIndices({
+				length: input.points.length,
+				maxPoints: Math.max(180, Math.floor(input.width / Math.max(2, input.levelCount))),
+				valueAt: (index) => input.single.zs[index],
+				preserve
+			});
+		};
+	}
+	//#endregion
+	//#region src/presentation/chart/levey-jennings-multi-hover-model.ts
+	function createLeveyJenningsMultiHoverModel(deps) {
+		return (input) => {
+			const point = input.point, unit = input.test && input.test.unit ? " " + deps.escape(input.test.unit) : "", zText = (input.z >= 0 ? "+" : "") + deps.number(input.z) + "s", rules = input.rules.length ? deps.escape(input.rules.join(", ")) : "Đạt";
+			return `<b>${deps.date(point.date)} · Mức ${input.view.level}</b><div>Lần chạy: <b style="display:inline">${deps.escape(point.runId || "—")}</b></div><div>Lô: <b style="display:inline">${deps.escape(point.lot || input.view.lot || "?")}</b></div><div>Giá trị: ${deps.pointValue(point, input.test)}${unit}</div><div>Z: ${zText}</div><div class="muted">Luật: ${rules}</div>`;
+		};
+	}
+	//#endregion
+	//#region src/presentation/chart/levey-jennings-multi-point-render-model.ts
+	function createLeveyJenningsMultiPointRenderModel(deps) {
+		return (input) => deps.displayPlan({
+			points: input.points,
+			single: input.single,
+			cross: input.cross,
+			width: input.width,
+			levelCount: input.levelCount
+		}).map((index) => {
+			const point = input.points[index], within = Array.isArray(input.single.F[index] && input.single.F[index].rules) ? input.single.F[index].rules : [], across = input.cross.get(point) || [], rules = [.../* @__PURE__ */ new Set([...within, ...across])], verdict = deps.verdict(input.test, rules), z = input.single.zs[index];
+			return {
+				index,
+				point,
+				x: input.x(String(point.runId || point.date || "")),
+				y: input.y(z),
+				color: verdict === "rej" ? "#c5221f" : verdict === "warn" ? "#dd8b1f" : input.color,
+				radius: verdict === "ok" ? 4.2 : 5.4,
+				hover: deps.hover({
+					point,
+					test: input.test,
+					view: input.view,
+					z,
+					rules
+				})
+			};
+		});
+	}
+	//#endregion
+	//#region src/presentation/chart/levey-jennings-multi-dividers.ts
+	function leveyJenningsMultiDividers(levels, runs, runIndex, xOfRun) {
+		const dividers = [];
+		for (let index = 1; index < levels.length; index++) {
+			const previous = (levels[index - 1].pts || []).map((point) => runIndex.get(String(point.runId || point.date || ""))).filter((value) => value != null), current = (levels[index].pts || []).map((point) => runIndex.get(String(point.runId || point.date || ""))).filter((value) => value != null);
+			if (!previous.length || !current.length) continue;
+			dividers.push((xOfRun(runs[Math.max(...previous)]) + xOfRun(runs[Math.min(...current)])) / 2);
+		}
+		return dividers;
+	}
+	//#endregion
+	//#region src/presentation/chart/cusum-chart-geometry.ts
+	function cusumChartGeometry(input) {
+		const padL = 56, padR = 78, padT = 34, padB = 32, cw = input.width - padL - padR, ch = input.height - padT - padB, markPad = 10;
+		let peak = input.h;
+		[
+			input.cPos,
+			input.cNeg,
+			input.ma
+		].forEach((series) => series.forEach((value) => {
+			if (Number.isFinite(value)) peak = Math.max(peak, Math.abs(value));
+		}));
+		const top = peak * 1.15, bottom = -top, y = (value) => padT + (top - value) / (top - bottom) * ch, clampY = (value) => Math.max(padT, Math.min(padT + ch, y(value))), x = (index) => input.count <= 1 ? padL + cw / 2 : 66 + index / (input.count - 1) * (cw - 20);
+		return {
+			padL,
+			padT,
+			cw,
+			ch,
+			markPad,
+			peak,
+			y,
+			clampY,
+			x
+		};
+	}
+	//#endregion
+	//#region src/presentation/chart/cusum-display-plan.ts
+	function createCusumDisplayPlan(sampleIndices) {
+		return (input) => {
+			const preserve = [];
+			input.flags.forEach((flag, index) => {
+				if (flag === "rej") preserve.push(index);
+			});
+			const perSeries = Math.max(80, Math.floor(Math.max(240, input.width / 2) / 3));
+			return [.../* @__PURE__ */ new Set([
+				...sampleIndices({
+					length: input.count,
+					maxPoints: perSeries,
+					valueAt: (index) => input.cPos[index],
+					preserve
+				}),
+				...sampleIndices({
+					length: input.count,
+					maxPoints: perSeries,
+					valueAt: (index) => input.cNeg[index],
+					preserve
+				}),
+				...sampleIndices({
+					length: input.count,
+					maxPoints: perSeries,
+					valueAt: (index) => input.ma[index],
+					preserve
+				})
+			])].sort((a, b) => a - b);
+		};
+	}
+	//#endregion
+	//#region src/presentation/chart/cusum-hover-model.ts
+	function createCusumHoverModel(deps) {
+		return (input) => `<b>${deps.date(input.point.date)}</b><div>CUSUM+: ${deps.number(input.cPos, 2)}</div><div>CUSUM−: ${deps.number(input.cNeg, 2)}</div><div class="muted">${input.rejected ? "Vượt ngưỡng h — nghi ngờ trôi/shift" : "Trong tầm kiểm soát"}</div>`;
+	}
+	//#endregion
+	//#region src/presentation/chart/cusum-point-render-model.ts
+	function cusumPointRenderModel(input) {
+		return input.indices.map((index) => {
+			const positive = input.cPos[index], negative = input.cNeg[index], rejected = input.flags[index] === "rej", x = input.x(index), circle = (value, color) => !Number.isFinite(value) ? null : {
+				x,
+				y: input.clampY(value),
+				radius: rejected && Math.abs(value) >= input.h - 1e-9 ? 5 : 3,
+				color: rejected && Math.abs(value) >= input.h - 1e-9 ? input.colors.reject : color
+			};
+			return {
+				index,
+				point: input.points[index],
+				positive,
+				negative,
+				rejected,
+				x,
+				hoverY: input.clampY(Number.isFinite(positive) ? positive : 0),
+				circles: [circle(positive, input.colors.cpos), circle(negative, input.colors.cneg)].filter(Boolean)
+			};
+		});
+	}
+	//#endregion
+	//#region src/presentation/chart/cusum-reference-lines.ts
+	function cusumReferenceLines(input) {
+		const thresholdValues = [input.h, -input.h], labels = [
+			input.h,
+			0,
+			-input.h
+		];
+		return {
+			thresholds: thresholdValues.map((value) => ({
+				value,
+				y: input.y(value)
+			})),
+			zero: {
+				value: 0,
+				y: input.y(0)
+			},
+			labels: labels.map((value) => ({
+				value,
+				y: input.y(value)
+			}))
+		};
+	}
+	//#endregion
+	//#region src/presentation/chart/cusum-line-points.ts
+	function cusumLinePoints(input) {
+		return input.indices.filter((index) => Number.isFinite(input.values[index])).map((index) => ({
+			x: input.x(index),
+			y: input.clampY(input.values[index])
+		}));
+	}
+	//#endregion
 	//#region src/presentation/export/blob-download.ts
 	function createBlobDownload(deps) {
 		return (name, blob) => {
@@ -6447,11 +7114,28 @@
 	function createDashboardLoading(deps) {
 		return (tests, pending, data, lab) => {
 			const points = (tests || []).reduce((sum, test) => sum + (data[test.id] || []).length, 0);
-			const department = lab.dept ? " · " + deps.escape(lab.dept) : "";
-			return `<div class="head"><div><h1>Bảng điều khiển</h1><p>${deps.escape(lab.name || "Khoa Xét nghiệm")}${department}</p></div>${deps.topUserBox()}</div>
+			return `${deps.headHtml(lab)}
     <div class="dash-hero dash-analysis-loading">
       <div class="dash-status"><div class="eyebrow">Đang chuẩn bị dữ liệu</div><h2>Phân tích Westgard chạy nền</h2><p>Bạn có thể tiếp tục sử dụng ứng dụng. Bảng điều khiển sẽ tự cập nhật khi phân tích hoàn tất.</p><div class="dash-loading-bar"><span></span></div></div>
-      <div class="dash-kpis"><div class="dash-kpi"><div class="k">Xét nghiệm</div><div class="v">${tests.length}</div></div><div class="dash-kpi"><div class="k">Điểm QC</div><div class="v">${points}</div></div><div class="dash-kpi"><div class="k">Đang xử lý</div><div class="v">${pending}</div></div><div class="dash-kpi"><div class="k">Giao diện</div><div class="v dash-ready-mark">✓</div></div></div>
+      ${deps.kpisHtml([
+				{
+					label: "Xét nghiệm",
+					value: tests.length
+				},
+				{
+					label: "Điểm QC",
+					value: points
+				},
+				{
+					label: "Đang xử lý",
+					value: pending
+				},
+				{
+					label: "Giao diện",
+					value: "✓",
+					className: "dash-ready-mark"
+				}
+			])}
     </div>
     <div class="panel dash-loading-panel"><div class="dash-spinner"></div><div><h2 class="panel-title">Đang tính trạng thái kiểm soát chất lượng</h2><p class="hint">Công việc nặng đã được chuyển khỏi luồng giao diện để thao tác không bị đóng băng.</p></div></div>`;
 		};
@@ -6666,6 +7350,306 @@
 	function dashboardProgressHtml(completeTests, testCount, percent) {
 		const safePercent = Math.max(0, Math.min(100, Number.isFinite(percent) ? percent : 0));
 		return `<div class="dash-progress"><span style="width:${safePercent}%"></span></div><div class="hint flow-item">${completeTests}/${testCount || 0} xét nghiệm đã đủ QC hôm nay · ${safePercent}% hoàn tất</div>`;
+	}
+	//#endregion
+	//#region src/presentation/dashboard/dashboard-head-html.ts
+	function createDashboardHeadHtml({ escape, topUserBox }) {
+		return (lab) => `<div class="head"><div><h1>Bảng điều khiển</h1><p>${escape(lab.name || "Khoa Xét nghiệm")}${lab.dept ? " · " + escape(lab.dept) : ""}</p></div>${topUserBox()}</div>`;
+	}
+	//#endregion
+	//#region src/presentation/dashboard/dashboard-test-panel-html.ts
+	function createDashboardTestPanelHtml({ escapeAttr }) {
+		return (input) => `<div class="panel">${input.testsCount ? `<div class="dash-test-toolbar"><h2 class="panel-title">Danh sách xét nghiệm</h2></div><div class="dash-test-filterbar"><div class="dash-test-tabs">${input.statusTabs}</div><div class="dash-test-search"><input id="dashTestSearch" type="search" placeholder="Tìm xét nghiệm, máy, lô..." value="${escapeAttr(input.query)}" oninput="dashTestFilter(this.value)"><span id="dashTestCount">${input.filteredCount}/${input.filteredCount}</span></div></div>${input.testListHtml}` : input.emptyHtml}</div>`;
+	}
+	//#endregion
+	//#region src/presentation/dashboard/dashboard-test-row-html.ts
+	function createDashboardTestRowHtml({ escape, escapeAttr }) {
+		return (input) => `<tr class="${input.status}" data-search="${escapeAttr(input.search)}"><td><div class="dash-test-name">${escape(input.name)}</div><div class="dash-test-sub">${escape(input.machine || "Chưa gán máy")}</div></td><td><div class="dash-level-list">${input.levelsHtml}</div></td><td>${input.todayTag}</td><td class="num"><b>${input.totalPoints}</b></td><td>${input.statusTag}</td><td><span class="dash-latest">${input.latestText}</span></td><td>${input.actionHtml}</td></tr>`;
+	}
+	//#endregion
+	//#region src/presentation/dashboard/dashboard-kpi-items.ts
+	function dashboardKpiItems(input) {
+		return [
+			{
+				label: "Xét nghiệm",
+				value: input.tests
+			},
+			{
+				label: "Điểm QC",
+				value: input.totalPoints
+			},
+			{
+				label: "Vi phạm",
+				value: input.rejected,
+				color: "var(--red)"
+			},
+			{
+				label: "QC hôm nay",
+				value: input.todayPoints,
+				color: "var(--teal)"
+			}
+		];
+	}
+	//#endregion
+	//#region src/presentation/dashboard/dashboard-empty-tests-html.ts
+	function createDashboardEmptyTestsHtml({ emptyState, button }) {
+		return (isAdmin) => emptyState("Chưa có xét nghiệm đang vận hành", "Cần đưa xét nghiệm vào Panel QC, ghép Nhóm lô QC và gán Mean/SD trước khi theo dõi.", isAdmin ? button("Cấu hình Mean/SD", `go('manage');setManageTab('targets')`, "teal") : "");
+	}
+	//#endregion
+	//#region src/presentation/chart/cusum-colors.ts
+	var CUSUM_COLORS = Object.freeze({
+		cpos: "#0e8f8f",
+		cneg: "#5369a6",
+		ma: "#9aa7b0",
+		threshold: "#c5221f",
+		zero: "#17212b",
+		reject: "#c5221f"
+	});
+	//#endregion
+	//#region src/presentation/chart/levey-jennings-multi-colors.ts
+	var LEVEY_JENNINGS_MULTI_COLORS = Object.freeze([
+		"#0e8f8f",
+		"#7a4f9a",
+		"#c47d12",
+		"#2f7d5b",
+		"#5369a6",
+		"#9a5b3c"
+	]);
+	//#endregion
+	//#region src/presentation/chart/cusum-chart-title.ts
+	function createCusumChartTitle({ format }) {
+		return (k, h) => `CUSUM xu hướng (k=${format(k, 2)}, h=${format(h, 2)})`;
+	}
+	//#endregion
+	//#region src/presentation/chart/levey-jennings-chart-title.ts
+	var LEVEY_JENNINGS_CHART_TITLE = Object.freeze({
+		single: "Levey-Jennings",
+		multi: "Levey-Jennings tổng hợp theo Z-score"
+	});
+	//#endregion
+	//#region src/presentation/chart/chart-empty-labels.ts
+	var CHART_EMPTY_LABELS = Object.freeze({
+		leveyJennings: "Chưa có điểm QC",
+		leveyJenningsMulti: "Chưa có điểm QC để vẽ tích hợp",
+		cusum: "Chưa có điểm QC"
+	});
+	//#endregion
+	//#region src/presentation/chart/levey-jennings-multi-y-axis.ts
+	function leveyJenningsMultiYAxis() {
+		return [
+			-3,
+			-2,
+			-1,
+			0,
+			1,
+			2,
+			3
+		].map((z) => ({
+			z,
+			left: z === 3 ? "> +3" : z === -3 ? "< -3" : String(z),
+			right: (z >= 0 ? "+" : "") + z + "s"
+		}));
+	}
+	//#endregion
+	//#region src/presentation/chart/levey-jennings-multi-geometry.ts
+	function leveyJenningsMultiGeometry({ width, height }) {
+		const padL = 56, padR = 78, padT = 44, padB = 46, markPad = 10, cw = width - padL - padR, ch = height - padT - padB, y = (z) => padT + (3.25 - z) / 6.5 * ch, clampY = (z) => Math.max(padT, Math.min(padT + ch, y(z)));
+		return {
+			padL,
+			padR,
+			padT,
+			padB,
+			markPad,
+			cw,
+			ch,
+			y,
+			clampY
+		};
+	}
+	//#endregion
+	//#region src/presentation/render/config-nav-scroll-service.ts
+	function createConfigNavScrollService(deps) {
+		const restore = () => {
+			const nav = deps.find();
+			if (!nav) return;
+			nav.scrollLeft = deps.getPosition();
+			nav.addEventListener("scroll", () => deps.setPosition(nav.scrollLeft), { passive: true });
+		};
+		return { restore };
+	}
+	//#endregion
+	//#region src/presentation/render/entry-jump-scroll-service.ts
+	function createEntryJumpScrollService(deps) {
+		const scroll = () => {
+			const wrap = deps.findWrap(), row = deps.findTodayRow();
+			if (wrap && row) wrap.scrollTo({
+				top: Math.max(0, row.offsetTop - 86),
+				behavior: "smooth"
+			});
+		};
+		return { scroll };
+	}
+	//#endregion
+	//#region src/presentation/render/default-date-fields-service.ts
+	function createDefaultDateFieldsService(deps) {
+		const fill = (ids, value) => ids.forEach((id) => {
+			const field = deps.find(id);
+			if (field && !field.value) field.value = value;
+		});
+		return { fill };
+	}
+	//#endregion
+	//#region src/presentation/render/post-render-page-actions.ts
+	function createPostRenderPageActions(deps) {
+		const run = (page, actions) => {
+			if (page === "reagent") deps.requestFrame(actions.reagent);
+			if (page === "sigma") deps.requestFrame(actions.sigma);
+		};
+		return { run };
+	}
+	//#endregion
+	//#region src/presentation/dashboard/dashboard-overdue-actions.ts
+	function createDashboardOverdueActions({ overdue }) {
+		return (actions, today) => actions.map((action, index) => ({
+			action,
+			index
+		})).filter((item) => item.action.dueDate && item.action.dueDate < today).map((item) => ({
+			...item,
+			info: overdue(item.action)
+		})).filter((item) => item.info.overdue).sort((a, b) => b.info.days - a.info.days);
+	}
+	//#endregion
+	//#region src/presentation/dashboard/dashboard-overdue-action-list-html.ts
+	function createDashboardOverdueActionListHtml({ render }) {
+		return (items, tests) => items.slice(0, 4).map((item) => render({
+			action: item.action,
+			index: item.index,
+			info: item.info,
+			test: tests.find((test) => test.id === item.action.testId)
+		})).join("");
+	}
+	//#endregion
+	//#region src/presentation/dashboard/dashboard-qc-followup-list-html.ts
+	function createDashboardQcFollowupListHtml({ render }) {
+		return (items, limit, kind) => items.slice(0, limit).map((item) => render(item, kind)).join("");
+	}
+	//#endregion
+	//#region src/presentation/dashboard/dashboard-missing-target-list-html.ts
+	function createDashboardMissingTargetListHtml({ render }) {
+		return (items) => items.slice(0, 4).map(render).join("");
+	}
+	//#endregion
+	//#region src/presentation/dashboard/dashboard-expiring-lot-items.ts
+	function dashboardExpiringLotItems(items, daysToExpiry, limit = 30) {
+		const result = [];
+		items.forEach((item) => item.levelData.forEach((level) => {
+			const days = daysToExpiry(level.l.exp);
+			if (days != null && days <= limit) result.push({
+				t: item.t,
+				l: level.l,
+				d: days
+			});
+		}));
+		return result;
+	}
+	//#endregion
+	//#region src/presentation/dashboard/dashboard-westgard-alerts.ts
+	function dashboardWestgardAlerts(views) {
+		const urgent = [], watch = [];
+		views.forEach((view) => view.alerts.forEach((alert) => {
+			const item = {
+				t: view.test,
+				l: alert.levelConfig,
+				p: alert.point,
+				rules: alert.rules
+			};
+			(alert.level === "rej" ? urgent : watch).push(item);
+		}));
+		return {
+			urgent,
+			watch
+		};
+	}
+	//#endregion
+	//#region src/presentation/dashboard/dashboard-missing-target-items.ts
+	function dashboardMissingTargetItems(items, levelsMissingTarget) {
+		const result = [];
+		items.forEach((item) => levelsMissingTarget(item.t).forEach((level) => result.push({
+			t: item.t,
+			l: level
+		})));
+		return result;
+	}
+	//#endregion
+	//#region src/presentation/dashboard/dashboard-level-data.ts
+	function createDashboardLevelData({ stats }) {
+		return (views, today) => views.map((view) => ({
+			l: view.l,
+			pts: view.pts,
+			st: stats(view.pts.map((point) => point.val)),
+			todayLevel: view.pts.some((point) => point.date === today)
+		}));
+	}
+	//#endregion
+	//#region src/presentation/dashboard/dashboard-test-action.ts
+	function createDashboardTestAction({ button }) {
+		return (testId, level) => button("Xem QC", `entrySel={testId:'${testId}',level:${level}};entryStart=null;entryEnd=null;go('entry')`, "ghost sm");
+	}
+	//#endregion
+	//#region src/presentation/dashboard/dashboard-level-pills-html.ts
+	function createDashboardLevelPillsHtml({ targetOk, render }) {
+		return (levels) => levels.map((item) => render({
+			level: item.l,
+			today: item.todayLevel,
+			targetOk: targetOk(item.l),
+			cv: item.st ? item.st.cv : null
+		})).join("");
+	}
+	//#endregion
+	//#region src/presentation/dashboard/dashboard-test-rows-html.ts
+	function createDashboardTestRowsHtml(deps) {
+		return (items) => items.map((item) => {
+			const { t, s, levelData, todayCount, totalPoints, latest, search } = item, levels = levelData.map((x) => x.l);
+			return {
+				rank: deps.rank(s, todayCount, levels.length),
+				name: t.name,
+				html: deps.rowHtml({
+					status: s,
+					search,
+					name: deps.testDisplayName(t),
+					machine: t.machine,
+					levelsHtml: deps.levelsHtml(levelData),
+					todayTag: deps.todayTag(todayCount, levels.length),
+					totalPoints,
+					statusTag: deps.statusTag(s),
+					latestText: deps.latestText(latest, t),
+					actionHtml: deps.actionHtml(t.id, levels[0].level)
+				})
+			};
+		}).sort((a, b) => a.rank - b.rank || String(a.name || "").localeCompare(String(b.name || ""), "vi")).map((item) => item.html).join("");
+	}
+	//#endregion
+	//#region src/presentation/dashboard/dashboard-test-items.ts
+	function createDashboardTestItems(deps) {
+		return (tests, today) => tests.map((t) => {
+			const wg = deps.activeWestgard(t), summary = deps.summarize({
+				views: wg.views,
+				verdicts: wg.byPoint,
+				today
+			}), s = summary.status, todayCount = summary.todayCount, totalPoints = summary.totalPoints, levelData = deps.levelData(wg.views, today), lastPoints = summary.lastPoints.slice(), latest = deps.latestPoint(lastPoints), search = deps.searchText(t, levelData);
+			deps.markStatus(t.id, s);
+			return {
+				t,
+				s,
+				levelData,
+				todayCount,
+				totalPoints,
+				latest,
+				search,
+				alerts: summary.alerts,
+				missingToday: todayCount < levelData.length
+			};
+		});
 	}
 	//#endregion
 	//#region src/presentation/dashboard/dashboard-test-list-html.ts
@@ -12900,6 +13884,26 @@
 	root.settingsFirebaseRulesText = firebaseRulesText;
 	root.settingsFirebaseGuideHtml = firebaseGuideHtml;
 	root.backupReminderService = createBackupReminder({ now: () => Date.now() });
+	root.backupLocalMarker = createBackupLocalMarker({
+		storage: typeof localStorage === "undefined" ? {
+			getItem: () => null,
+			setItem: () => {}
+		} : localStorage,
+		now: () => (/* @__PURE__ */ new Date()).toISOString()
+	});
+	root.backupInspectionSummary = createBackupInspectionSummary({ size: (value) => root.backupSizeMB(value) });
+	root.backupInspectionMessage = createBackupInspectionMessage();
+	root.backupFileName = createBackupFileName((value) => root.vnDate(value));
+	root.backupSnapshotFileName = createBackupSnapshotFileName(() => (/* @__PURE__ */ new Date()).toISOString());
+	root.backupSizeConfirmation = createBackupSizeConfirmation({
+		error: (value) => root.backupImportSizeError(value),
+		size: (value) => root.backupSizeMB(value)
+	});
+	root.backupSizeWarningConfirmation = createBackupSizeWarningConfirmation((value) => root.backupSizeWarning(value));
+	root.backupExportMessage = createBackupExportMessage();
+	root.backupImportConfirmation = createBackupImportConfirmation();
+	root.backupImportMessage = createBackupImportMessage();
+	root.backupOversizeConfirmation = createBackupOversizeConfirmation();
 	root.lisQueuePresentation = createLisQueuePresentation({
 		test: (id) => (state.tests || []).find((test) => test.id === id),
 		formatTestValue: (test, value) => root.fmtTestValue(test, value),
@@ -13115,6 +14119,85 @@
 		schedule: (work, delay) => globalThis.setTimeout(work, delay)
 	});
 	root.cssTokenPixel = (token, fallback) => cssTokenPixel(token, fallback, (key) => typeof getComputedStyle === "function" && typeof document !== "undefined" ? getComputedStyle(document.documentElement).getPropertyValue("--" + key) : "");
+	root.canvasFont = createCanvasFont$1((token, fallback) => root.cssTokenPixel(token, fallback));
+	root.chartDataUrl = createChartDataUrl({ createCanvas: () => document.createElement("canvas") });
+	root.afterRenderCanvasService = createVisibleCanvasService({
+		requestFrame: (work) => requestAnimationFrame(work),
+		intersectionObserver: typeof IntersectionObserver === "function" ? (onVisible) => new IntersectionObserver((entries) => {
+			if (entries.some((entry) => entry.isIntersecting)) onVisible();
+		}, { rootMargin: "160px" }) : void 0,
+		resizeObserver: typeof ResizeObserver === "function" ? (onResize) => new ResizeObserver(onResize) : void 0,
+		isConnected: (canvas) => canvas.isConnected !== false
+	});
+	root.chartTooltipService = createChartTooltipService({
+		find: () => document.getElementById("qcTooltip"),
+		create: () => document.createElement("div"),
+		append: (element) => document.body.appendChild(element)
+	});
+	root.qcTooltip = () => root.chartTooltipService();
+	root.leveyJenningsTooltipController = createLeveyJenningsTooltipController({
+		tooltip: () => root.chartTooltipService(),
+		viewport: () => ({
+			width: innerWidth,
+			height: innerHeight
+		}),
+		bind: (canvas, event, handler) => canvas.addEventListener(event, handler)
+	});
+	root.hiDpiCanvasSetup = createHiDpiCanvasSetup(() => window.devicePixelRatio || 1);
+	root.leveyJenningsGeometry = leveyJenningsGeometry;
+	var legacyWestgardRuleScope = globalThis;
+	root.westgardRuleScope = createWestgardRuleScope({
+		within: (test, rule) => typeof legacyWestgardRuleScope.testRuleOnWithin === "function" ? legacyWestgardRuleScope.testRuleOnWithin(test, rule) : legacyWestgardRuleScope.testRuleOn(test, rule),
+		across: (test, rule) => typeof legacyWestgardRuleScope.testRuleOnAcross === "function" ? legacyWestgardRuleScope.testRuleOnAcross(test, rule) : legacyWestgardRuleScope.testRuleOn(test, rule),
+		default: (test, rule) => legacyWestgardRuleScope.testRuleOn(test, rule)
+	});
+	root.leveyJenningsColors = LEVEY_JENNINGS_COLORS;
+	root.leveyJenningsTicks = createLeveyJenningsTicks((value) => vnDate(value));
+	var legacyLeveyJenningsAxis = globalThis;
+	root.leveyJenningsYAxisLabels = createLeveyJenningsYAxisLabels((test, value) => legacyLeveyJenningsAxis.fmtTestValue(test, value));
+	var legacyLeveyJenningsHover = globalThis;
+	root.leveyJenningsHoverModel = createLeveyJenningsHoverModel({
+		date: (value) => legacyLeveyJenningsHover.vnDate(value),
+		escape: (value) => legacyLeveyJenningsHover.esc(value),
+		pointValue: (point, test) => legacyLeveyJenningsHover.fmtPointValue(point, test),
+		number: (value) => legacyLeveyJenningsHover.fmt(value)
+	});
+	root.leveyJenningsPointStyle = leveyJenningsPointStyle;
+	root.leveyJenningsDisplayPlan = createLeveyJenningsDisplayPlan((input) => chartViewModel.sampleIndices(input));
+	root.leveyJenningsPointRenderModel = createLeveyJenningsPointRenderModel({
+		displayPlan: (points, results, width) => root.leveyJenningsDisplayPlan(points, results, width),
+		verdict: (test, rules) => globalThis.ruleResultLevel(test, rules),
+		style: (status) => leveyJenningsPointStyle(status, LEVEY_JENNINGS_COLORS),
+		hover: (input) => root.leveyJenningsHoverModel(input)
+	});
+	root.leveyJenningsBandRects = leveyJenningsBandRects;
+	root.leveyJenningsGridLines = leveyJenningsGridLines;
+	root.leveyJenningsMultiSeries = leveyJenningsMultiSeries;
+	root.leveyJenningsMultiRunTicks = createLeveyJenningsMultiRunTicks((value) => globalThis.vnDate(value));
+	root.leveyJenningsLegendLayout = (levels, colors, startX, measure) => createLeveyJenningsLegendLayout((text) => measure(text).width)(levels, colors, startX);
+	root.leveyJenningsMultiDisplayPlan = createLeveyJenningsMultiDisplayPlan((input) => chartViewModel.sampleIndices(input));
+	var legacyLeveyJenningsMultiHover = globalThis;
+	root.leveyJenningsMultiHoverModel = createLeveyJenningsMultiHoverModel({
+		date: (value) => legacyLeveyJenningsMultiHover.vnDate(value),
+		escape: (value) => legacyLeveyJenningsMultiHover.esc(value),
+		pointValue: (point, test) => legacyLeveyJenningsMultiHover.fmtPointValue(point, test),
+		number: (value) => legacyLeveyJenningsMultiHover.fmt(value)
+	});
+	root.leveyJenningsMultiPointRenderModel = createLeveyJenningsMultiPointRenderModel({
+		displayPlan: (input) => root.leveyJenningsMultiDisplayPlan(input),
+		verdict: (test, rules) => globalThis.ruleResultLevel(test, rules),
+		hover: (input) => root.leveyJenningsMultiHoverModel(input)
+	});
+	root.leveyJenningsMultiDividers = leveyJenningsMultiDividers;
+	root.cusumChartGeometry = cusumChartGeometry;
+	root.cusumDisplayPlan = createCusumDisplayPlan((input) => chartViewModel.sampleIndices(input));
+	root.cusumHoverModel = createCusumHoverModel({
+		date: (value) => globalThis.vnDate(value),
+		number: (value, decimals) => globalThis.fmt(value, decimals)
+	});
+	root.cusumPointRenderModel = cusumPointRenderModel;
+	root.cusumReferenceLines = cusumReferenceLines;
+	root.cusumLinePoints = cusumLinePoints;
 	root.blobDownload = createBlobDownload({
 		createUrl: (blob) => URL.createObjectURL(blob),
 		revokeUrl: (url) => URL.revokeObjectURL(url),
@@ -13321,8 +14404,11 @@
 	});
 	root.ActionReviewMessages = actionReviewMessages;
 	root.dashboardLoadingPresentation = createDashboardLoading({
-		escape: (value) => typeof globalThis.esc === "function" ? globalThis.esc(value) : String(value ?? ""),
-		topUserBox: () => typeof globalThis.topUserBox === "function" ? globalThis.topUserBox() : ""
+		headHtml: createDashboardHeadHtml({
+			escape: (value) => root.esc(value),
+			topUserBox: () => typeof globalThis.topUserBox === "function" ? globalThis.topUserBox() : ""
+		}),
+		kpisHtml: dashboardKpisHtml
 	});
 	root.dashboardStatusFilter = createDashboardStatusFilter();
 	root.dashboardExpiringLots = dashboardExpiringLots;
@@ -13493,6 +14579,71 @@
 	root.dashboardLatestPoint = createDashboardLatestPoint({ runNumber: (point) => root.pointRunNo(point) });
 	root.dashboardKpisHtml = dashboardKpisHtml;
 	root.dashboardProgressHtml = dashboardProgressHtml;
+	root.dashboardHeadHtml = createDashboardHeadHtml({
+		escape: (value) => root.esc(value),
+		topUserBox: () => typeof globalThis.topUserBox === "function" ? globalThis.topUserBox() : ""
+	});
+	root.dashboardTestPanelHtml = createDashboardTestPanelHtml({ escapeAttr: (value) => root.escAttr(value) });
+	root.dashboardTestRowHtml = createDashboardTestRowHtml({
+		escape: (value) => root.esc(value),
+		escapeAttr: (value) => root.escAttr(value)
+	});
+	root.dashboardKpiItems = dashboardKpiItems;
+	root.dashboardEmptyTestsHtml = createDashboardEmptyTestsHtml({
+		emptyState: (title, detail, action) => root.emptyState(title, detail, action),
+		button: (label, action, variant) => root.btn(label, action, variant)
+	});
+	root.cusumColors = CUSUM_COLORS;
+	root.leveyJenningsMultiColors = LEVEY_JENNINGS_MULTI_COLORS;
+	root.cusumChartTitle = createCusumChartTitle({ format: (value, digits) => root.fmt(value, digits) });
+	root.leveyJenningsChartTitle = LEVEY_JENNINGS_CHART_TITLE;
+	root.chartEmptyLabels = CHART_EMPTY_LABELS;
+	root.leveyJenningsMultiYAxis = leveyJenningsMultiYAxis;
+	root.leveyJenningsMultiGeometry = leveyJenningsMultiGeometry;
+	root.configNavScrollService = createConfigNavScrollService({
+		find: () => typeof document === "undefined" ? null : document.querySelector(".config-shell-nav"),
+		getPosition: () => Number(root.__configNavScrollPosition) || 0,
+		setPosition: (value) => {
+			root.__configNavScrollPosition = value;
+		}
+	});
+	root.entryJumpScrollService = createEntryJumpScrollService({
+		findWrap: () => typeof document === "undefined" ? null : document.querySelector(".qc-sheet-wrap"),
+		findTodayRow: () => typeof document === "undefined" ? null : document.querySelector(".qc-sheet tbody tr.today")
+	});
+	root.defaultDateFieldsService = createDefaultDateFieldsService({ find: (id) => typeof document === "undefined" ? null : document.getElementById(id) });
+	root.postRenderPageActions = createPostRenderPageActions({ requestFrame: (work) => requestAnimationFrame(work) });
+	root.dashboardOverdueActions = createDashboardOverdueActions({ overdue: (action) => root.actionOverdue(action) });
+	root.dashboardOverdueActionListHtml = createDashboardOverdueActionListHtml({ render: (item) => root.dashboardOverdueActionItemHtml(item) });
+	root.dashboardQcFollowupListHtml = createDashboardQcFollowupListHtml({ render: (item, kind) => root.dashboardQcFollowupItemHtml(item, kind) });
+	root.dashboardMissingTargetListHtml = createDashboardMissingTargetListHtml({ render: (item) => root.dashboardMissingTargetItemHtml(item) });
+	root.dashboardExpiringLotItems = dashboardExpiringLotItems;
+	root.dashboardWestgardAlerts = dashboardWestgardAlerts;
+	root.dashboardMissingTargetItems = dashboardMissingTargetItems;
+	root.dashboardLevelData = createDashboardLevelData({ stats: (values) => root.stats(values) });
+	root.dashboardTestAction = createDashboardTestAction({ button: (label, action, variant) => root.btn(label, action, variant) });
+	root.dashboardLevelPillsHtml = createDashboardLevelPillsHtml({
+		targetOk: (level) => root.levelTargetOk(level),
+		render: (input) => root.dashboardLevelPillHtml(input)
+	});
+	root.dashboardTestRowsHtml = createDashboardTestRowsHtml({
+		statusTag: (status) => root.dashboardTestStatusTags.westgard(status),
+		todayTag: (count, total) => root.dashboardTestStatusTags.today(count, total),
+		levelsHtml: (levels) => root.dashboardLevelPillsHtml(levels),
+		latestText: (point, test) => root.dashboardLatestPointText(point, test),
+		rank: (status, count, total) => root.dashboardTestRank(status, count, total),
+		rowHtml: (input) => root.dashboardTestRowHtml(input),
+		actionHtml: (testId, level) => root.dashboardTestAction(testId, level),
+		testDisplayName: (test) => root.testDisplayName(test)
+	});
+	root.dashboardTestItems = createDashboardTestItems({
+		activeWestgard: (test) => root.activeWestgard(test),
+		summarize: (input) => root.WestgardViewModel.summarizeTestStatus(input),
+		levelData: (views, today) => root.dashboardLevelData(views, today),
+		latestPoint: (points) => root.dashboardLatestPoint(points),
+		searchText: (test, levels) => root.dashboardTestSearchText(test, levels),
+		markStatus: (testId, status) => root.statusMemo.set(testId, status)
+	});
 	root.dashboardTestListHtml = dashboardTestListHtml;
 	root.dashboardPageHtml = createDashboardPageHtml();
 	root.actionGuideContent = createActionGuideContent({

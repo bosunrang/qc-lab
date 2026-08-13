@@ -1,0 +1,1 @@
+export function dashboardWestgardAlerts(views:any[]){const urgent:any[]=[],watch:any[]=[];views.forEach(view=>view.alerts.forEach((alert:any)=>{const item={t:view.test,l:alert.levelConfig,p:alert.point,rules:alert.rules};(alert.level==='rej'?urgent:watch).push(item);}));return{urgent,watch};}

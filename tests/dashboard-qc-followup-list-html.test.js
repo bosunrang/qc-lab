@@ -1,0 +1,5 @@
+'use strict';
+const assert=require('node:assert/strict');const{spawnSync}=require('node:child_process');const path=require('node:path');const{pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','dashboard','dashboard-qc-followup-list-html.ts')).href;
+const program=`import { createDashboardQcFollowupListHtml } from ${JSON.stringify(source)};const list=createDashboardQcFollowupListHtml({render:(item,kind)=>kind+item.id});if(list([{id:1},{id:2},{id:3}],2,'rej')!=='rej1rej2'||list([{id:1}],4,'warn')!=='warn1')throw new Error('must preserve follow-up list limit and kind');console.log('Dashboard QC followup list HTML TypeScript tests passed');`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});assert.equal(result.status,0,result.stderr||result.stdout||'không thể chạy dashboard QC followup list TypeScript');console.log(result.stdout.trim());

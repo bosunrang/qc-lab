@@ -120,3 +120,4 @@ interface Element {
 interface EventTarget {
   [key: string]: any;
 }
+declare function qcTooltip():any;

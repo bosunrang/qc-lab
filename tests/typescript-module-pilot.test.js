@@ -6,6 +6,21 @@ const path = require('node:path');
 const root = path.join(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 const index = read('index.html');
+const drawSource = read('assets/modules/draw.js');
+const dashboardRoutesSource = read('assets/modules/dashboard-routes.js');
+const actionsRoutesSource = read('assets/modules/actions-routes.js');
+const backupUiSource = read('assets/modules/backup-ui.js');
+const backupLocalMarkerSource = read('src/application/backup/backup-local-marker.ts');
+const backupInspectionSummarySource = read('src/presentation/backup/backup-inspection-summary.ts');
+const backupInspectionMessageSource = read('src/presentation/backup/backup-inspection-message.ts');
+const backupImportMessageSource = read('src/presentation/backup/backup-import-message.ts');
+const backupOversizeConfirmationSource = read('src/presentation/backup/backup-oversize-confirmation.ts');
+const backupFileNameSource = read('src/presentation/backup/backup-file-name.ts');
+const backupSnapshotFileNameSource = read('src/presentation/backup/backup-snapshot-file-name.ts');
+const backupSizeConfirmationSource = read('src/presentation/backup/backup-size-confirmation.ts');
+const backupSizeWarningConfirmationSource = read('src/presentation/backup/backup-size-warning-confirmation.ts');
+const backupExportMessageSource = read('src/presentation/backup/backup-export-message.ts');
+const backupImportConfirmationSource = read('src/presentation/backup/backup-import-confirmation.ts');
 const pkg = JSON.parse(read('package.json'));
 const chartSource = read('src/domain/charts/chart-view-model.ts');
 const entrySource = read('src/application/entry/entry-service.ts');
@@ -169,6 +184,64 @@ const foundationNormalizationSource = read('src/application/state/foundation-nor
 const stateLifecycleNormalizationSource = read('src/application/state/state-lifecycle-normalization.ts');
 const csvDownloadSource = read('src/presentation/export/csv-download.ts');
 const cssTokenPixelSource = read('src/presentation/style/css-token-pixel.ts');
+const chartCanvasFontSource = read('src/presentation/chart/canvas-font.ts');
+const chartDataUrlSource = read('src/presentation/chart/chart-data-url.ts');
+const dashboardHeadHtmlSource = read('src/presentation/dashboard/dashboard-head-html.ts');
+const dashboardTestPanelHtmlSource = read('src/presentation/dashboard/dashboard-test-panel-html.ts');
+const dashboardTestRowHtmlSource = read('src/presentation/dashboard/dashboard-test-row-html.ts');
+const dashboardKpiItemsSource = read('src/presentation/dashboard/dashboard-kpi-items.ts');
+const dashboardEmptyTestsHtmlSource = read('src/presentation/dashboard/dashboard-empty-tests-html.ts');
+const cusumColorsSource = read('src/presentation/chart/cusum-colors.ts');
+const leveyJenningsMultiColorsSource = read('src/presentation/chart/levey-jennings-multi-colors.ts');
+const cusumChartTitleSource = read('src/presentation/chart/cusum-chart-title.ts');
+const leveyJenningsChartTitleSource = read('src/presentation/chart/levey-jennings-chart-title.ts');
+const chartEmptyLabelsSource = read('src/presentation/chart/chart-empty-labels.ts');
+const leveyJenningsMultiYAxisSource = read('src/presentation/chart/levey-jennings-multi-y-axis.ts');
+const leveyJenningsMultiGeometrySource = read('src/presentation/chart/levey-jennings-multi-geometry.ts');
+const configNavScrollServiceSource = read('src/presentation/render/config-nav-scroll-service.ts');
+const entryJumpScrollServiceSource = read('src/presentation/render/entry-jump-scroll-service.ts');
+const defaultDateFieldsServiceSource = read('src/presentation/render/default-date-fields-service.ts');
+const postRenderPageActionsSource = read('src/presentation/render/post-render-page-actions.ts');
+const dashboardOverdueActionsSource = read('src/presentation/dashboard/dashboard-overdue-actions.ts');
+const dashboardOverdueActionListHtmlSource = read('src/presentation/dashboard/dashboard-overdue-action-list-html.ts');
+const dashboardQcFollowupListHtmlSource = read('src/presentation/dashboard/dashboard-qc-followup-list-html.ts');
+const dashboardMissingTargetListHtmlSource = read('src/presentation/dashboard/dashboard-missing-target-list-html.ts');
+const dashboardExpiringLotItemsSource = read('src/presentation/dashboard/dashboard-expiring-lot-items.ts');
+const dashboardWestgardAlertsSource = read('src/presentation/dashboard/dashboard-westgard-alerts.ts');
+const dashboardMissingTargetItemsSource = read('src/presentation/dashboard/dashboard-missing-target-items.ts');
+const dashboardLevelDataSource = read('src/presentation/dashboard/dashboard-level-data.ts');
+const dashboardTestActionSource = read('src/presentation/dashboard/dashboard-test-action.ts');
+const dashboardLevelPillsHtmlSource = read('src/presentation/dashboard/dashboard-level-pills-html.ts');
+const dashboardTestRowsHtmlSource = read('src/presentation/dashboard/dashboard-test-rows-html.ts');
+const dashboardTestItemsSource = read('src/presentation/dashboard/dashboard-test-items.ts');
+const visibleCanvasServiceSource = read('src/presentation/render/visible-canvas-service.ts');
+const chartTooltipServiceSource = read('src/presentation/chart/chart-tooltip-service.ts');
+const leveyJenningsTooltipControllerSource = read('src/presentation/chart/levey-jennings-tooltip-controller.ts');
+const hiDpiCanvasSource = read('src/presentation/chart/hi-dpi-canvas.ts');
+const leveyJenningsGeometrySource = read('src/presentation/chart/levey-jennings-geometry.ts');
+const westgardRuleScopeSource = read('src/presentation/chart/westgard-rule-scope.ts');
+const leveyJenningsColorsSource = read('src/presentation/chart/levey-jennings-colors.ts');
+const leveyJenningsTicksSource = read('src/presentation/chart/levey-jennings-ticks.ts');
+const leveyJenningsYAxisSource = read('src/presentation/chart/levey-jennings-y-axis.ts');
+const leveyJenningsHoverModelSource = read('src/presentation/chart/levey-jennings-hover-model.ts');
+const leveyJenningsPointStyleSource = read('src/presentation/chart/levey-jennings-point-style.ts');
+const leveyJenningsDisplayPlanSource = read('src/presentation/chart/levey-jennings-display-plan.ts');
+const leveyJenningsPointRenderModelSource = read('src/presentation/chart/levey-jennings-point-render-model.ts');
+const leveyJenningsBandsSource = read('src/presentation/chart/levey-jennings-bands.ts');
+const leveyJenningsGridSource = read('src/presentation/chart/levey-jennings-grid.ts');
+const leveyJenningsMultiSeriesSource = read('src/presentation/chart/levey-jennings-multi-series.ts');
+const leveyJenningsMultiRunTicksSource = read('src/presentation/chart/levey-jennings-multi-run-ticks.ts');
+const leveyJenningsLegendLayoutSource = read('src/presentation/chart/levey-jennings-legend-layout.ts');
+const leveyJenningsMultiDisplayPlanSource = read('src/presentation/chart/levey-jennings-multi-display-plan.ts');
+const leveyJenningsMultiHoverModelSource = read('src/presentation/chart/levey-jennings-multi-hover-model.ts');
+const leveyJenningsMultiPointRenderModelSource = read('src/presentation/chart/levey-jennings-multi-point-render-model.ts');
+const leveyJenningsMultiDividersSource = read('src/presentation/chart/levey-jennings-multi-dividers.ts');
+const cusumChartGeometrySource = read('src/presentation/chart/cusum-chart-geometry.ts');
+const cusumDisplayPlanSource = read('src/presentation/chart/cusum-display-plan.ts');
+const cusumHoverModelSource = read('src/presentation/chart/cusum-hover-model.ts');
+const cusumPointRenderModelSource = read('src/presentation/chart/cusum-point-render-model.ts');
+const cusumReferenceLinesSource = read('src/presentation/chart/cusum-reference-lines.ts');
+const cusumLinePointsSource = read('src/presentation/chart/cusum-line-points.ts');
 const blobDownloadSource = read('src/presentation/export/blob-download.ts');
 const xlsxCellSource = read('src/presentation/export/xlsx-cell.ts');
 const xlsxZipSource = read('src/presentation/export/xlsx-zip.ts');
@@ -188,6 +261,358 @@ const sigmaMdcRendererSource = read('src/presentation/sigma/sigma-mdc-renderer.t
 const xlsxRoundingSource = read('src/presentation/export/xlsx-rounding.ts');
 const adapter = read('src/compat/modular-pilot.global.ts');
 const generated = read('assets/generated/modular-pilot.js');
+assert.match(backupLocalMarkerSource, /export function createBackupLocalMarker\(/,
+  'backup local marker must be a TypeScript factory');
+assert.match(dashboardHeadHtmlSource, /export function createDashboardHeadHtml\(/,
+  'dashboard head HTML must be a TypeScript factory');
+assert.match(read('src/presentation/dashboard/dashboard-loading.ts'), /deps\.kpisHtml\(/,
+  'dashboard loading presentation must receive the TypeScript KPI renderer');
+assert.match(read('src/presentation/dashboard/dashboard-loading.ts'), /deps\.headHtml\(lab\)/,
+  'dashboard loading presentation must receive the TypeScript head renderer');
+assert.match(dashboardTestPanelHtmlSource, /export function createDashboardTestPanelHtml\(/,
+  'dashboard test panel HTML must be a TypeScript factory');
+assert.match(dashboardTestRowHtmlSource, /export function createDashboardTestRowHtml\(/,
+  'dashboard test row HTML must be a TypeScript factory');
+assert.match(dashboardKpiItemsSource, /export function dashboardKpiItems\(/,
+  'dashboard KPI items must be a TypeScript helper');
+assert.match(dashboardEmptyTestsHtmlSource, /export function createDashboardEmptyTestsHtml\(/,
+  'dashboard empty tests HTML must be a TypeScript factory');
+assert.match(cusumColorsSource, /export const CUSUM_COLORS=/,
+  'CUSUM colors must be a TypeScript presentation constant');
+assert.match(leveyJenningsMultiColorsSource, /export const LEVEY_JENNINGS_MULTI_COLORS=/,
+  'multi-level Levey-Jennings colors must be a TypeScript presentation constant');
+assert.match(cusumChartTitleSource, /export function createCusumChartTitle\(/,
+  'CUSUM chart title must be a TypeScript factory');
+assert.match(leveyJenningsChartTitleSource, /export const LEVEY_JENNINGS_CHART_TITLE=/,
+  'Levey-Jennings chart titles must be a TypeScript presentation constant');
+assert.match(chartEmptyLabelsSource, /export const CHART_EMPTY_LABELS=/,
+  'chart empty labels must be a TypeScript presentation constant');
+assert.match(leveyJenningsMultiYAxisSource, /export function leveyJenningsMultiYAxis\(/,
+  'multi-level Levey-Jennings Y axis must be a TypeScript helper');
+assert.match(leveyJenningsMultiGeometrySource, /export function leveyJenningsMultiGeometry\(/,
+  'multi-level Levey-Jennings geometry must be a TypeScript helper');
+assert.match(configNavScrollServiceSource, /export function createConfigNavScrollService\(/,
+  'config nav scroll must be a TypeScript service');
+assert.match(entryJumpScrollServiceSource, /export function createEntryJumpScrollService\(/,
+  'entry jump scroll must be a TypeScript service');
+assert.match(defaultDateFieldsServiceSource, /export function createDefaultDateFieldsService\(/,
+  'default date fields must be a TypeScript service');
+assert.match(postRenderPageActionsSource, /export function createPostRenderPageActions\(/,
+  'post-render page actions must be a TypeScript service');
+assert.match(dashboardOverdueActionsSource, /export function createDashboardOverdueActions\(/,
+  'dashboard overdue actions must be a TypeScript factory');
+assert.match(dashboardOverdueActionListHtmlSource, /export function createDashboardOverdueActionListHtml\(/,
+  'dashboard overdue action list must be a TypeScript factory');
+assert.match(dashboardQcFollowupListHtmlSource, /export function createDashboardQcFollowupListHtml\(/,
+  'dashboard QC followup list must be a TypeScript factory');
+assert.match(dashboardMissingTargetListHtmlSource, /export function createDashboardMissingTargetListHtml\(/,
+  'dashboard missing target list must be a TypeScript factory');
+assert.match(dashboardExpiringLotItemsSource, /export function dashboardExpiringLotItems\(/,
+  'dashboard expiring lot items must be a TypeScript helper');
+assert.match(dashboardWestgardAlertsSource, /export function dashboardWestgardAlerts\(/,
+  'dashboard Westgard alerts must be a TypeScript helper');
+assert.match(dashboardMissingTargetItemsSource, /export function dashboardMissingTargetItems\(/,
+  'dashboard missing target items must be a TypeScript helper');
+assert.match(dashboardLevelDataSource, /export function createDashboardLevelData\(/,
+  'dashboard level data must be a TypeScript factory');
+assert.match(dashboardTestActionSource, /export function createDashboardTestAction\(/,
+  'dashboard test action must be a TypeScript factory');
+assert.match(dashboardLevelPillsHtmlSource, /export function createDashboardLevelPillsHtml\(/,
+  'dashboard level pills must be a TypeScript factory');
+assert.match(dashboardTestRowsHtmlSource, /export function createDashboardTestRowsHtml\(/,
+  'dashboard test rows must be a TypeScript factory');
+assert.match(dashboardTestItemsSource, /export function createDashboardTestItems\(/,
+  'dashboard test items must be a TypeScript factory');
+assert.match(backupInspectionSummarySource, /export function createBackupInspectionSummary\(/,
+  'backup inspection summary must be a TypeScript factory');
+assert.match(backupInspectionMessageSource, /export function createBackupInspectionMessage\(/,
+  'backup inspection message must be a TypeScript factory');
+assert.match(backupImportMessageSource, /export function createBackupImportMessage\(/,
+  'backup import message must be a TypeScript factory');
+assert.match(backupOversizeConfirmationSource, /export function createBackupOversizeConfirmation\(/,
+  'backup oversize confirmation must be a TypeScript factory');
+assert.match(backupFileNameSource, /export function createBackupFileName\(/,
+  'backup file name must be a TypeScript factory');
+assert.match(backupSnapshotFileNameSource, /export function createBackupSnapshotFileName\(/,
+  'backup snapshot file name must be a TypeScript factory');
+assert.match(backupSizeConfirmationSource, /export function createBackupSizeConfirmation\(/,
+  'backup size confirmation must be a TypeScript factory');
+assert.match(backupSizeWarningConfirmationSource, /export function createBackupSizeWarningConfirmation\(/,
+  'backup size warning confirmation must be a TypeScript factory');
+assert.match(backupExportMessageSource, /export function createBackupExportMessage\(/,
+  'backup export message must be a TypeScript factory');
+assert.match(backupImportConfirmationSource, /export function createBackupImportConfirmation\(/,
+  'backup import confirmation must be a TypeScript factory');
+assert.doesNotMatch(backupLocalMarkerSource, /\bglobalThis\b|\bdocument\b|\blocalStorage\b/,
+  'backup local marker must receive browser storage as a dependency');
+assert.doesNotMatch(dashboardHeadHtmlSource, /\bglobalThis\b|\bdocument\b/,
+  'dashboard head HTML must receive browser helpers as dependencies');
+assert.doesNotMatch(dashboardTestPanelHtmlSource, /\bglobalThis\b|\bdocument\b/,
+  'dashboard test panel HTML must receive browser helpers as dependencies');
+assert.doesNotMatch(dashboardTestRowHtmlSource, /\bglobalThis\b|\bdocument\b/,
+  'dashboard test row HTML must receive browser helpers as dependencies');
+assert.doesNotMatch(dashboardKpiItemsSource, /\bglobalThis\b|\bdocument\b/,
+  'dashboard KPI items must not read browser globals');
+assert.doesNotMatch(dashboardEmptyTestsHtmlSource, /\bglobalThis\b|\bdocument\b/,
+  'dashboard empty tests HTML must receive UI helpers as dependencies');
+assert.doesNotMatch(cusumColorsSource, /\bglobalThis\b|\bdocument\b/,
+  'CUSUM colors must not read browser globals');
+assert.doesNotMatch(leveyJenningsMultiColorsSource, /\bglobalThis\b|\bdocument\b/,
+  'multi-level Levey-Jennings colors must not read browser globals');
+assert.doesNotMatch(cusumChartTitleSource, /\bglobalThis\b|\bdocument\b/,
+  'CUSUM chart title must receive formatting as a dependency');
+assert.doesNotMatch(leveyJenningsChartTitleSource, /\bglobalThis\b|\bdocument\b/,
+  'Levey-Jennings chart titles must not read browser globals');
+assert.doesNotMatch(chartEmptyLabelsSource, /\bglobalThis\b|\bdocument\b/,
+  'chart empty labels must not read browser globals');
+assert.doesNotMatch(leveyJenningsMultiYAxisSource, /\bglobalThis\b|\bdocument\b/,
+  'multi-level Levey-Jennings Y axis must not read browser globals');
+assert.doesNotMatch(leveyJenningsMultiGeometrySource, /\bglobalThis\b|\bdocument\b/,
+  'multi-level Levey-Jennings geometry must not read browser globals');
+assert.doesNotMatch(configNavScrollServiceSource, /\bglobalThis\b|\bdocument\b/,
+  'config nav scroll service must receive browser access as dependencies');
+assert.doesNotMatch(entryJumpScrollServiceSource, /\bglobalThis\b|\bdocument\b/,
+  'entry jump scroll service must receive browser access as dependencies');
+assert.doesNotMatch(defaultDateFieldsServiceSource, /\bglobalThis\b|\bdocument\b/,
+  'default date fields service must receive browser access as dependencies');
+assert.doesNotMatch(postRenderPageActionsSource, /\bglobalThis\b|\bdocument\b/,
+  'post-render page actions service must receive browser access as dependencies');
+assert.doesNotMatch(dashboardOverdueActionsSource, /\bglobalThis\b|\bdocument\b/,
+  'dashboard overdue actions must receive status evaluation as a dependency');
+assert.doesNotMatch(dashboardOverdueActionListHtmlSource, /\bglobalThis\b|\bdocument\b/,
+  'dashboard overdue action list must receive rendering as a dependency');
+assert.doesNotMatch(dashboardQcFollowupListHtmlSource, /\bglobalThis\b|\bdocument\b/,
+  'dashboard QC followup list must receive rendering as a dependency');
+assert.doesNotMatch(dashboardMissingTargetListHtmlSource, /\bglobalThis\b|\bdocument\b/,
+  'dashboard missing target list must receive rendering as a dependency');
+assert.doesNotMatch(dashboardExpiringLotItemsSource, /\bglobalThis\b|\bdocument\b/,
+  'dashboard expiring lot items must receive date calculation as a dependency');
+assert.doesNotMatch(dashboardWestgardAlertsSource, /\bglobalThis\b|\bdocument\b/,
+  'dashboard Westgard alerts must not read browser globals');
+assert.doesNotMatch(dashboardMissingTargetItemsSource, /\bglobalThis\b|\bdocument\b/,
+  'dashboard missing target items must receive target lookup as a dependency');
+assert.doesNotMatch(dashboardLevelDataSource, /\bglobalThis\b|\bdocument\b/,
+  'dashboard level data must receive statistics as a dependency');
+assert.doesNotMatch(dashboardTestActionSource, /\bglobalThis\b|\bdocument\b/,
+  'dashboard test action must receive button rendering as a dependency');
+assert.doesNotMatch(dashboardLevelPillsHtmlSource, /\bglobalThis\b|\bdocument\b/,
+  'dashboard level pills must receive rendering as dependencies');
+assert.doesNotMatch(dashboardTestRowsHtmlSource, /\bglobalThis\b|\bdocument\b/,
+  'dashboard test rows must receive rendering as dependencies');
+assert.doesNotMatch(dashboardTestItemsSource, /\bglobalThis\b|\bdocument\b/,
+  'dashboard test items must receive data access as dependencies');
+assert.doesNotMatch(backupInspectionSummarySource, /\bglobalThis\b|\bdocument\b/,
+  'backup inspection summary must receive formatting as a dependency');
+assert.doesNotMatch(backupInspectionMessageSource, /\bglobalThis\b|\bdocument\b/,
+  'backup inspection message must not read browser globals');
+assert.doesNotMatch(backupImportMessageSource, /\bglobalThis\b|\bdocument\b/,
+  'backup import message must not read browser globals');
+assert.doesNotMatch(backupOversizeConfirmationSource, /\bglobalThis\b|\bdocument\b/,
+  'backup oversize confirmation must not read browser globals');
+assert.doesNotMatch(backupFileNameSource, /\bglobalThis\b|\bdocument\b/,
+  'backup file name must receive date formatting as a dependency');
+assert.doesNotMatch(backupSnapshotFileNameSource, /\bglobalThis\b|\bdocument\b/,
+  'backup snapshot file name must receive clock as a dependency');
+assert.doesNotMatch(backupSizeConfirmationSource, /\bglobalThis\b|\bdocument\b/,
+  'backup size confirmation must receive sizing as dependencies');
+assert.doesNotMatch(backupSizeWarningConfirmationSource, /\bglobalThis\b|\bdocument\b/,
+  'backup size warning confirmation must receive warning as a dependency');
+assert.doesNotMatch(backupExportMessageSource, /\bglobalThis\b|\bdocument\b/,
+  'backup export message must not read browser globals');
+assert.doesNotMatch(backupImportConfirmationSource, /\bglobalThis\b|\bdocument\b/,
+  'backup import confirmation must not read browser globals');
+assert.match(backupUiSource, /return globalThis\.backupReminderService\.statusText\(/,
+  'backup status must use TypeScript reminder bridge');
+assert.match(dashboardRoutesSource, /globalThis\.dashboardHeadHtml\(state\.lab\)/,
+  'dashboard route must render header through TypeScript bridge');
+assert.match(dashboardRoutesSource, /function pageDashLoading\(tests,pending\)\{return globalThis\.dashboardLoadingPresentation\(tests,pending,state\.data,state\.lab\);\}/,
+  'dashboard loading route must use the TypeScript renderer directly');
+assert.doesNotMatch(dashboardRoutesSource, /dashStatusTabsFallback/,
+  'dashboard route must not retain a classic status-tab renderer');
+assert.doesNotMatch(dashboardRoutesSource, /let mood=rej\?/,
+  'dashboard route must not retain a duplicate classic shift-status renderer');
+assert.match(dashboardRoutesSource, /const statusItems=dashItems\.filter\(item=>globalThis\.dashboardStatusFilter\.matches\(item,dashTestStatus\)\);/,
+  'dashboard route must filter statuses through the TypeScript service directly');
+assert.match(dashboardRoutesSource, /const overdue=globalThis\.dashboardOverdueActions\(state\.actions\|\|\[\],today\);/,
+  'dashboard route must collect overdue actions through TypeScript service');
+assert.match(dashboardRoutesSource, /const overdueHtml=globalThis\.dashboardOverdueActionListHtml\(overdue,state\.tests\);/,
+  'dashboard route must render overdue actions through TypeScript service');
+assert.match(dashboardRoutesSource, /const urgentHtml=globalThis\.dashboardQcFollowupListHtml\(urgent,5,'rej'\);/,
+  'dashboard route must render urgent followup through TypeScript service');
+assert.match(dashboardRoutesSource, /const noTargetHtml=globalThis\.dashboardMissingTargetListHtml\(noTarget\);/,
+  'dashboard route must render missing targets through TypeScript service');
+assert.match(dashboardRoutesSource, /const exp=globalThis\.dashboardExpiringLotItems\(dashItems,daysToExp\);/,
+  'dashboard route must collect expiring lots through TypeScript helper');
+assert.match(dashboardRoutesSource, /const\{urgent,watch\}=globalThis\.dashboardWestgardAlerts\(dashItems\.map\(item=>\(\{test:item\.t,alerts:item\.alerts\}\)\)\);/,
+  'dashboard route must collect Westgard alerts through TypeScript helper');
+assert.match(dashboardRoutesSource, /const noTarget=globalThis\.dashboardMissingTargetItems\(dashItems,levelsMissingTarget\);/,
+  'dashboard route must collect missing targets through TypeScript helper');
+assert.match(dashboardRoutesSource, /const dashItems=globalThis\.dashboardTestItems\(tests,today\);/,
+  'dashboard route must build test items through TypeScript presentation');
+assert.match(actionsRoutesSource, /function currentIssues\(\)\{return globalThis\.ActionCurrentIssues\(\);\}/,
+  'actions route must use the TypeScript current-issues service directly');
+assert.doesNotMatch(actionsRoutesSource, /const out=\[\],rank=\{rej:2,warn:1,ok:0\}/,
+  'actions route must not retain a classic current-issues fallback');
+assert.match(actionsRoutesSource, /function actionIssueGroupHtml\(model\)\{return globalThis\.actionIssueGroupPresentation\(model\);\}/,
+  'actions route must render issue groups through TypeScript presentation');
+assert.doesNotMatch(actionsRoutesSource, /if\(globalThis\.actionIssueRowPresentation\)|if\(globalThis\.actionIssueGroupPresentation\)/,
+  'actions route must not retain classic issue-render fallbacks');
+assert.match(dashboardRoutesSource, /const testRows=globalThis\.dashboardTestRowsHtml\(statusItems\);/,
+  'dashboard route must render test rows through TypeScript presentation');
+assert.match(dashboardRoutesSource, /const dashboardKpi=globalThis\.dashboardKpis\(dashItems,tests\.length\),\{totalPoints:totalPts,todayPoints:todayPts,rejected:rej,warnings:warn,missingToday:missingTodayCount,completeTests:doneTests,completionPercent:pct\}=dashboardKpi;/,
+  'dashboard route must derive all KPIs through the TypeScript helper');
+assert.match(dashboardRoutesSource, /globalThis\.dashboardTestPanelHtml\(\{testsCount:tests\.length/,
+  'dashboard route must render test panel through TypeScript bridge');
+assert.match(dashboardRoutesSource, /globalThis\.dashboardKpiItems\(\{tests:tests\.length,totalPoints:totalPts,rejected:rej,todayPoints:done\}\)/,
+  'dashboard route must create KPI data through TypeScript bridge');
+assert.match(dashboardRoutesSource, /progressHtml=globalThis\.dashboardProgressHtml\(doneTests,tests\.length,pct\)/,
+  'dashboard route must render progress through TypeScript bridge directly');
+assert.doesNotMatch(dashboardRoutesSource, /if\(globalThis\.dashboardPageHtml\)|return globalThis\.dashboardHeadHtml\(state\.lab\)\+`/,
+  'dashboard route must not retain a classic page-render fallback');
+assert.match(dashboardRoutesSource, /emptyHtml:globalThis\.dashboardEmptyTestsHtml\(role\(\)==='admin'\)/,
+  'dashboard route must render empty test state through TypeScript bridge');
+assert.match(drawSource, /const cc=globalThis\.cusumColors;/,
+  'CUSUM renderer must use TypeScript palette bridge');
+assert.match(drawSource, /const colors=globalThis\.leveyJenningsMultiColors;/,
+  'multi-level Levey-Jennings renderer must use TypeScript palette bridge');
+assert.match(drawSource, /globalThis\.cusumChartTitle\(k,h\)/,
+  'CUSUM renderer must use TypeScript title bridge');
+assert.match(drawSource, /globalThis\.leveyJenningsChartTitle\.(single|multi)/,
+  'Levey-Jennings renderers must use TypeScript title bridge');
+assert.match(drawSource, /globalThis\.chartEmptyLabels\.(leveyJennings|leveyJenningsMulti|cusum)/,
+  'chart renderers must use TypeScript empty-label bridge');
+assert.match(drawSource, /globalThis\.leveyJenningsMultiYAxis\(\)\.forEach\(label=>/,
+  'multi-level Levey-Jennings renderer must use TypeScript Y-axis bridge');
+assert.match(drawSource, /globalThis\.leveyJenningsMultiGeometry\(\{width:W,height:H\}\)/,
+  'multi-level Levey-Jennings renderer must use TypeScript geometry bridge');
+assert.match(read('assets/modules/after-render.js'), /globalThis\.configNavScrollService\.restore\(\);/,
+  'after-render must restore config nav scroll through TypeScript service');
+assert.match(read('assets/modules/after-render.js'), /requestAnimationFrame\(\(\)=>globalThis\.entryJumpScrollService\.scroll\(\)\);/,
+  'after-render must jump to today row through TypeScript service');
+assert.match(read('assets/modules/after-render.js'), /globalThis\.defaultDateFieldsService\.fill\(\['eDate','aDate'\],vnDate\(isoToday\(\)\)\);/,
+  'after-render must fill default dates through TypeScript service');
+assert.match(read('assets/modules/after-render.js'), /globalThis\.postRenderPageActions\.run\(page,\{reagent:rcCompute,sigma:sgRefresh\}\);/,
+  'after-render must schedule page actions through TypeScript service');
+assert.match(backupUiSource, /return globalThis\.backupReminderService\.capacityText\(/,
+  'backup capacity must use TypeScript reminder bridge');
+assert.match(backupUiSource, /return globalThis\.backupReminderService\.overdue\(/,
+  'backup overdue must use TypeScript reminder bridge');
+assert.match(backupUiSource, /globalThis\.backupLocalMarker\.mark\(bytes\)/,
+  'backup UI must persist marker through TypeScript bridge');
+assert.match(backupUiSource, /backupReminderService\.lastBackupInfo\(globalThis\.backupLocalMarker\.lastRaw\(\)\)/,
+  'backup UI must derive marker info through TypeScript bridge');
+assert.match(backupUiSource, /var model=globalThis\.backupReminderService\.banner\(/,
+  'backup banner must render from TypeScript reminder bridge');
+assert.match(backupUiSource, /globalThis\.blobDownload\(name,new Blob\(\[json\],\{type:'application\/json'\}\)\)/,
+  'backup export must use TypeScript blob download bridge');
+assert.doesNotMatch(backupUiSource, /function downloadBackupText[\s\S]*URL\.createObjectURL/,
+  'backup export must not retain a classic object-URL fallback');
+assert.match(generated, /root\.backupLocalMarker\s*=\s*createBackupLocalMarker/,
+  'artifact must publish TypeScript backup local marker');
+assert.match(generated, /root\.dashboardHeadHtml\s*=\s*createDashboardHeadHtml/,
+  'artifact must publish TypeScript dashboard head HTML');
+assert.match(generated, /root\.dashboardTestPanelHtml\s*=\s*createDashboardTestPanelHtml/,
+  'artifact must publish TypeScript dashboard test panel HTML');
+assert.match(generated, /root\.dashboardTestRowHtml\s*=\s*createDashboardTestRowHtml/,
+  'artifact must publish TypeScript dashboard test row HTML');
+assert.match(generated, /root\.dashboardKpiItems\s*=\s*dashboardKpiItems/,
+  'artifact must publish TypeScript dashboard KPI items');
+assert.match(generated, /root\.dashboardEmptyTestsHtml\s*=\s*createDashboardEmptyTestsHtml/,
+  'artifact must publish TypeScript dashboard empty tests HTML');
+assert.match(generated, /root\.cusumColors\s*=\s*CUSUM_COLORS/,
+  'artifact must publish TypeScript CUSUM palette');
+assert.match(generated, /root\.leveyJenningsMultiColors\s*=\s*LEVEY_JENNINGS_MULTI_COLORS/,
+  'artifact must publish TypeScript multi-level Levey-Jennings palette');
+assert.match(generated, /root\.cusumChartTitle\s*=\s*createCusumChartTitle/,
+  'artifact must publish TypeScript CUSUM title');
+assert.match(generated, /root\.leveyJenningsChartTitle\s*=\s*LEVEY_JENNINGS_CHART_TITLE/,
+  'artifact must publish TypeScript Levey-Jennings titles');
+assert.match(generated, /root\.chartEmptyLabels\s*=\s*CHART_EMPTY_LABELS/,
+  'artifact must publish TypeScript chart empty labels');
+assert.match(generated, /root\.leveyJenningsMultiYAxis\s*=\s*leveyJenningsMultiYAxis/,
+  'artifact must publish TypeScript multi-level Levey-Jennings Y axis');
+assert.match(generated, /root\.leveyJenningsMultiGeometry\s*=\s*leveyJenningsMultiGeometry/,
+  'artifact must publish TypeScript multi-level Levey-Jennings geometry');
+assert.match(generated, /root\.configNavScrollService\s*=\s*createConfigNavScrollService/,
+  'artifact must publish TypeScript config nav scroll service');
+assert.match(generated, /root\.entryJumpScrollService\s*=\s*createEntryJumpScrollService/,
+  'artifact must publish TypeScript entry jump scroll service');
+assert.match(generated, /root\.defaultDateFieldsService\s*=\s*createDefaultDateFieldsService/,
+  'artifact must publish TypeScript default date fields service');
+assert.match(generated, /root\.postRenderPageActions\s*=\s*createPostRenderPageActions/,
+  'artifact must publish TypeScript post-render page actions service');
+assert.match(generated, /root\.dashboardOverdueActions\s*=\s*createDashboardOverdueActions/,
+  'artifact must publish TypeScript dashboard overdue actions');
+assert.match(generated, /root\.dashboardOverdueActionListHtml\s*=\s*createDashboardOverdueActionListHtml/,
+  'artifact must publish TypeScript dashboard overdue action list');
+assert.match(generated, /root\.dashboardQcFollowupListHtml\s*=\s*createDashboardQcFollowupListHtml/,
+  'artifact must publish TypeScript dashboard QC followup list');
+assert.match(generated, /root\.dashboardMissingTargetListHtml\s*=\s*createDashboardMissingTargetListHtml/,
+  'artifact must publish TypeScript dashboard missing target list');
+assert.match(generated, /root\.dashboardExpiringLotItems\s*=\s*dashboardExpiringLotItems/,
+  'artifact must publish TypeScript dashboard expiring lot items');
+assert.match(generated, /root\.dashboardWestgardAlerts\s*=\s*dashboardWestgardAlerts/,
+  'artifact must publish TypeScript dashboard Westgard alerts');
+assert.match(generated, /root\.dashboardMissingTargetItems\s*=\s*dashboardMissingTargetItems/,
+  'artifact must publish TypeScript dashboard missing target items');
+assert.match(generated, /root\.dashboardLevelData\s*=\s*createDashboardLevelData/,
+  'artifact must publish TypeScript dashboard level data');
+assert.match(generated, /root\.dashboardTestAction\s*=\s*createDashboardTestAction/,
+  'artifact must publish TypeScript dashboard test action');
+assert.match(generated, /root\.dashboardLevelPillsHtml\s*=\s*createDashboardLevelPillsHtml/,
+  'artifact must publish TypeScript dashboard level pills');
+assert.match(generated, /root\.dashboardTestRowsHtml\s*=\s*createDashboardTestRowsHtml/,
+  'artifact must publish TypeScript dashboard test rows');
+assert.match(generated, /root\.dashboardTestItems\s*=\s*createDashboardTestItems/,
+  'artifact must publish TypeScript dashboard test items');
+assert.match(generated, /root\.backupInspectionSummary\s*=\s*createBackupInspectionSummary/,
+  'artifact must publish TypeScript backup inspection summary');
+assert.match(generated, /root\.backupInspectionMessage\s*=\s*createBackupInspectionMessage/,
+  'artifact must publish TypeScript backup inspection message');
+assert.match(generated, /root\.backupImportMessage\s*=\s*createBackupImportMessage/,
+  'artifact must publish TypeScript backup import message');
+assert.match(generated, /root\.backupOversizeConfirmation\s*=\s*createBackupOversizeConfirmation/,
+  'artifact must publish TypeScript backup oversize confirmation');
+assert.match(generated, /root\.backupFileName\s*=\s*createBackupFileName/,
+  'artifact must publish TypeScript backup file name');
+assert.match(generated, /root\.backupSnapshotFileName\s*=\s*createBackupSnapshotFileName/,
+  'artifact must publish TypeScript backup snapshot file name');
+assert.match(generated, /root\.backupSizeConfirmation\s*=\s*createBackupSizeConfirmation/,
+  'artifact must publish TypeScript backup size confirmation');
+assert.match(generated, /root\.backupSizeWarningConfirmation\s*=\s*createBackupSizeWarningConfirmation/,
+  'artifact must publish TypeScript backup size warning confirmation');
+assert.match(generated, /root\.backupExportMessage\s*=\s*createBackupExportMessage/,
+  'artifact must publish TypeScript backup export message');
+assert.match(generated, /root\.backupImportConfirmation\s*=\s*createBackupImportConfirmation/,
+  'artifact must publish TypeScript backup import confirmation');
+assert.match(backupUiSource, /globalThis\.backupInspectionSummary\(report\)/,
+  'backup verification UI must use TypeScript inspection summary bridge');
+assert.match(backupUiSource, /globalThis\.backupInspectionMessage\.invalid\(err\)/,
+  'backup verification UI must use TypeScript inspection message bridge');
+assert.match(backupUiSource, /globalThis\.backupImportMessage\.success/,
+  'backup import UI must use TypeScript success message bridge');
+assert.match(backupUiSource, /globalThis\.backupImportMessage\.invalid\(err\)/,
+  'backup import UI must use TypeScript error message bridge');
+assert.match(backupUiSource, /new Error\(globalThis\.backupImportMessage\.preImportSnapshotFailure\)/,
+  'backup import UI must use TypeScript pre-import snapshot error bridge');
+assert.match(backupUiSource, /globalThis\.backupOversizeConfirmation\.exportFull\(\)/,
+  'backup export UI must use TypeScript oversize confirmation bridge');
+assert.match(backupUiSource, /globalThis\.backupOversizeConfirmation\.importFile\(f\.name\)/,
+  'backup import UI must use TypeScript oversize confirmation bridge');
+assert.match(backupUiSource, /globalThis\.backupOversizeConfirmation\.inspectFile\(f\.name\)/,
+  'backup inspect UI must use TypeScript oversize confirmation bridge');
+assert.match(backupUiSource, /downloadBackupText\(globalThis\.backupFileName\(isoToday\(\)\),pack\.text\)/,
+  'backup export UI must use TypeScript file-name bridge');
+assert.match(backupUiSource, /downloadBackupText\(globalThis\.backupSnapshotFileName\(prefix\),pack\.text\)/,
+  'backup snapshot UI must use TypeScript file-name bridge');
+assert.match(backupUiSource, /const dialog=globalThis\.backupSizeConfirmation\(\{bytes:size,title,detail\}\);/,
+  'backup UI must create size confirmation through TypeScript bridge');
+assert.match(backupUiSource, /globalThis\.backupSizeWarningConfirmation\(\{bytes:pack\.bytes\}\)/,
+  'backup UI must create size warning confirmation through TypeScript bridge');
+assert.match(backupUiSource, /globalThis\.backupExportMessage\.createError\(e\)/,
+  'backup UI must render create error through TypeScript bridge');
+assert.match(backupUiSource, /confirmDialog\(globalThis\.backupImportConfirmation\(\{name:f\.name,sizeWarning\}\)\)/,
+  'backup UI must render import confirmation through TypeScript bridge');
 
 assert.match(index, /assets\/generated\/modular-pilot\.js\?v=[a-z0-9-]+/,
   'runtime phải nạp artifact được build từ TypeScript');
@@ -743,7 +1168,7 @@ assert.match(qcExportValueFormatSource, /export function createQcExportValueForm
   'QC export value format must expose a dependency-injected factory');
 assert.doesNotMatch(qcExportValueFormatSource, /\bstate\b|\bglobalThis\b|\bdocument\b/,
   'QC export value format must not read global state or DOM');
-assert.match(canvasFontSource, /export function createCanvasFont\(/,
+assert.match(chartCanvasFontSource, /export function createCanvasFont\(/,
   'Sigma canvas font must expose a dependency-injected factory');
 assert.doesNotMatch(canvasFontSource, /\bstate\b|\bglobalThis\b|\bdocument\b/,
   'Sigma canvas font must not read global state or DOM');
@@ -1225,6 +1650,64 @@ assert.match(csvDownloadSource, /export function createCsvDownload\(/,
   'CSV download phải tách thành TypeScript factory nhận dependency');
 assert.match(cssTokenPixelSource, /export function cssTokenPixel\(/,
   'CSS token pixel phải tách thành TypeScript helper nhận dependency');
+assert.match(visibleCanvasServiceSource, /export function createVisibleCanvasService\(/,
+  'điều phối canvas sau render phải tách thành TypeScript service nhận dependency');
+assert.match(chartTooltipServiceSource, /export function createChartTooltipService\(/,
+  'tooltip biểu đồ phải tách thành TypeScript service nhận dependency');
+assert.match(leveyJenningsTooltipControllerSource, /export function createLeveyJenningsTooltipController\(/,
+  'controller tooltip Levey-Jennings phải tách thành TypeScript service nhận dependency');
+assert.match(hiDpiCanvasSource, /export function createHiDpiCanvasSetup\(/,
+  'chuẩn hóa canvas HiDPI phải tách thành TypeScript factory nhận dependency');
+assert.match(chartDataUrlSource, /export function createChartDataUrl\(/,
+  'chart data URL phải tách thành TypeScript factory');
+assert.match(leveyJenningsGeometrySource, /export function leveyJenningsGeometry\(/,
+  'tọa độ biểu đồ Levey-Jennings phải tách thành TypeScript helper thuần');
+assert.match(westgardRuleScopeSource, /export function createWestgardRuleScope\(/,
+  'phạm vi luật Westgard của biểu đồ phải tách thành TypeScript factory');
+assert.match(leveyJenningsColorsSource, /export const LEVEY_JENNINGS_COLORS=Object\.freeze/,
+  'palette Levey-Jennings phải là danh mục TypeScript bất biến');
+assert.match(leveyJenningsTicksSource, /export function createLeveyJenningsTicks\(/,
+  'tick trục thời gian Levey-Jennings phải tách thành TypeScript factory');
+assert.match(leveyJenningsYAxisSource, /export function createLeveyJenningsYAxisLabels\(/,
+  'nhãn trục Y Levey-Jennings phải tách thành TypeScript factory');
+assert.match(leveyJenningsHoverModelSource, /export function createLeveyJenningsHoverModel\(/,
+  'model hover Levey-Jennings phải tách thành TypeScript factory');
+assert.match(leveyJenningsPointStyleSource, /export function leveyJenningsPointStyle\(/,
+  'style điểm Levey-Jennings phải tách thành TypeScript helper thuần');
+assert.match(leveyJenningsDisplayPlanSource, /export function createLeveyJenningsDisplayPlan\(/,
+  'kế hoạch downsampling Levey-Jennings phải tách thành TypeScript factory');
+assert.match(leveyJenningsPointRenderModelSource, /export function createLeveyJenningsPointRenderModel\(/,
+  'model render điểm Levey-Jennings phải tách thành TypeScript factory');
+assert.match(leveyJenningsBandsSource, /export function leveyJenningsBandRects\(/,
+  'dải chuẩn Levey-Jennings phải tách thành TypeScript helper thuần');
+assert.match(leveyJenningsGridSource, /export function leveyJenningsGridLines\(/,
+  'lưới Levey-Jennings phải tách thành TypeScript helper thuần');
+assert.match(leveyJenningsMultiSeriesSource, /export function leveyJenningsMultiSeries\(/,
+  'dữ liệu biểu đồ Levey-Jennings đa mức phải tách thành TypeScript helper thuần');
+assert.match(leveyJenningsMultiRunTicksSource, /export function createLeveyJenningsMultiRunTicks\(/,
+  'tick run biểu đồ Levey-Jennings đa mức phải tách thành TypeScript factory');
+assert.match(leveyJenningsLegendLayoutSource, /export function createLeveyJenningsLegendLayout\(/,
+  'layout chú giải Levey-Jennings phải tách thành TypeScript factory');
+assert.match(leveyJenningsMultiDisplayPlanSource, /export function createLeveyJenningsMultiDisplayPlan\(/,
+  'kế hoạch downsampling Levey-Jennings đa mức phải tách thành TypeScript factory');
+assert.match(leveyJenningsMultiHoverModelSource, /export function createLeveyJenningsMultiHoverModel\(/,
+  'model hover Levey-Jennings đa mức phải tách thành TypeScript factory');
+assert.match(leveyJenningsMultiPointRenderModelSource, /export function createLeveyJenningsMultiPointRenderModel\(/,
+  'model render điểm Levey-Jennings đa mức phải tách thành TypeScript factory');
+assert.match(leveyJenningsMultiDividersSource, /export function leveyJenningsMultiDividers\(/,
+  'đường phân cách Levey-Jennings đa mức phải tách thành TypeScript helper thuần');
+assert.match(cusumChartGeometrySource, /export function cusumChartGeometry\(/,
+  'hình học CUSUM phải tách thành TypeScript helper thuần');
+assert.match(cusumDisplayPlanSource, /export function createCusumDisplayPlan\(/,
+  'CUSUM display plan phải tách thành TypeScript factory');
+assert.match(cusumHoverModelSource, /export function createCusumHoverModel\(/,
+  'CUSUM hover model phải tách thành TypeScript factory');
+assert.match(cusumPointRenderModelSource, /export function cusumPointRenderModel\(/,
+  'CUSUM point render model phải tách thành TypeScript helper');
+assert.match(cusumReferenceLinesSource, /export function cusumReferenceLines\(/,
+  'CUSUM reference lines phải tách thành TypeScript helper');
+assert.match(cusumLinePointsSource, /export function cusumLinePoints\(/,
+  'CUSUM line points phải tách thành TypeScript helper');
 assert.match(blobDownloadSource, /export function createBlobDownload\(/,
   'blob download phải tách thành TypeScript factory nhận dependency');
 assert.match(xlsxCellSource, /export function createXlsxCells\(/,
@@ -1263,6 +1746,64 @@ assert.doesNotMatch(blobDownloadSource, /\bglobalThis\b|\bdocument\b/,
   'blob download không được tự đọc global hoặc DOM');
 assert.doesNotMatch(cssTokenPixelSource, /\bglobalThis\b|\bdocument\b/,
   'CSS token pixel không được tự đọc global hoặc DOM');
+assert.doesNotMatch(visibleCanvasServiceSource, /\bglobalThis\b|\bdocument\b/,
+  'điều phối canvas sau render không được tự đọc global hoặc DOM');
+assert.doesNotMatch(chartTooltipServiceSource, /\bglobalThis\b|\bdocument\b/,
+  'tooltip biểu đồ không được tự đọc global hoặc DOM');
+assert.doesNotMatch(leveyJenningsTooltipControllerSource, /\bglobalThis\b|\bdocument\b/,
+  'controller tooltip Levey-Jennings không được tự đọc global hoặc DOM');
+assert.doesNotMatch(chartDataUrlSource, /\bglobalThis\b|\bdocument\b/,
+  'chart data URL không được tự đọc global hoặc DOM');
+assert.doesNotMatch(hiDpiCanvasSource, /\bglobalThis\b|\bdocument\b/,
+  'chuẩn hóa canvas HiDPI không được tự đọc global hoặc DOM');
+assert.doesNotMatch(leveyJenningsGeometrySource, /\bglobalThis\b|\bdocument\b/,
+  'tọa độ biểu đồ Levey-Jennings không được tự đọc global hoặc DOM');
+assert.doesNotMatch(westgardRuleScopeSource, /\bglobalThis\b|\bdocument\b/,
+  'phạm vi luật Westgard của biểu đồ không được tự đọc global hoặc DOM');
+assert.doesNotMatch(leveyJenningsColorsSource, /\bglobalThis\b|\bdocument\b/,
+  'palette Levey-Jennings không được tự đọc global hoặc DOM');
+assert.doesNotMatch(leveyJenningsTicksSource, /\bglobalThis\b|\bdocument\b/,
+  'tick trục thời gian Levey-Jennings không được tự đọc global hoặc DOM');
+assert.doesNotMatch(leveyJenningsYAxisSource, /\bglobalThis\b|\bdocument\b/,
+  'nhãn trục Y Levey-Jennings không được tự đọc global hoặc DOM');
+assert.doesNotMatch(leveyJenningsHoverModelSource, /\bglobalThis\b|\bdocument\b/,
+  'model hover Levey-Jennings không được tự đọc global hoặc DOM');
+assert.doesNotMatch(leveyJenningsPointStyleSource, /\bglobalThis\b|\bdocument\b/,
+  'style điểm Levey-Jennings không được tự đọc global hoặc DOM');
+assert.doesNotMatch(leveyJenningsDisplayPlanSource, /\bglobalThis\b|\bdocument\b/,
+  'kế hoạch downsampling Levey-Jennings không được tự đọc global hoặc DOM');
+assert.doesNotMatch(leveyJenningsPointRenderModelSource, /\bglobalThis\b|\bdocument\b/,
+  'model render điểm Levey-Jennings không được tự đọc global hoặc DOM');
+assert.doesNotMatch(leveyJenningsBandsSource, /\bglobalThis\b|\bdocument\b/,
+  'dải chuẩn Levey-Jennings không được tự đọc global hoặc DOM');
+assert.doesNotMatch(leveyJenningsGridSource, /\bglobalThis\b|\bdocument\b/,
+  'lưới Levey-Jennings không được tự đọc global hoặc DOM');
+assert.doesNotMatch(leveyJenningsMultiSeriesSource, /\bglobalThis\b|\bdocument\b/,
+  'dữ liệu biểu đồ Levey-Jennings đa mức không được tự đọc global hoặc DOM');
+assert.doesNotMatch(leveyJenningsMultiRunTicksSource, /\bglobalThis\b|\bdocument\b/,
+  'tick run biểu đồ Levey-Jennings đa mức không được tự đọc global hoặc DOM');
+assert.doesNotMatch(leveyJenningsLegendLayoutSource, /\bglobalThis\b|\bdocument\b/,
+  'layout chú giải Levey-Jennings không được tự đọc global hoặc DOM');
+assert.doesNotMatch(leveyJenningsMultiDisplayPlanSource, /\bglobalThis\b|\bdocument\b/,
+  'kế hoạch downsampling Levey-Jennings đa mức không được tự đọc global hoặc DOM');
+assert.doesNotMatch(leveyJenningsMultiHoverModelSource, /\bglobalThis\b|\bdocument\b/,
+  'model hover Levey-Jennings đa mức không được tự đọc global hoặc DOM');
+assert.doesNotMatch(leveyJenningsMultiPointRenderModelSource, /\bglobalThis\b|\bdocument\b/,
+  'model render điểm Levey-Jennings đa mức không được tự đọc global hoặc DOM');
+assert.doesNotMatch(leveyJenningsMultiDividersSource, /\bglobalThis\b|\bdocument\b/,
+  'đường phân cách Levey-Jennings đa mức không được tự đọc global hoặc DOM');
+assert.doesNotMatch(cusumChartGeometrySource, /\bglobalThis\b|\bdocument\b/,
+  'hình học CUSUM không được tự đọc global hoặc DOM');
+assert.doesNotMatch(cusumDisplayPlanSource, /\bglobalThis\b|\bdocument\b/,
+  'CUSUM display plan không được tự đọc global hoặc DOM');
+assert.doesNotMatch(cusumHoverModelSource, /\bglobalThis\b|\bdocument\b/,
+  'CUSUM hover model không được tự đọc global hoặc DOM');
+assert.doesNotMatch(cusumPointRenderModelSource, /\bglobalThis\b|\bdocument\b/,
+  'CUSUM point render model không được tự đọc global hoặc DOM');
+assert.doesNotMatch(cusumReferenceLinesSource, /\bglobalThis\b|\bdocument\b/,
+  'CUSUM reference lines không được tự đọc global hoặc DOM');
+assert.doesNotMatch(cusumLinePointsSource, /\bglobalThis\b|\bdocument\b/,
+  'CUSUM line points không được tự đọc global hoặc DOM');
 assert.doesNotMatch(csvDownloadSource, /\bglobalThis\b|\bdocument\b/,
   'CSV download không được tự đọc global hoặc DOM');
 assert.doesNotMatch(stateLifecycleNormalizationSource, /\bglobalThis\b|\bdocument\b/,
@@ -1289,6 +1830,126 @@ assert.match(generated, /root\.csvDownload\s*=\s*createCsvDownload/,
   'artifact phải công bố TypeScript CSV download cho wrapper cũ');
 assert.match(generated, /root\.cssTokenPixel\s*=/,
   'artifact phải công bố TypeScript CSS token pixel cho wrapper cũ');
+assert.match(generated, /root\.afterRenderCanvasService\s*=\s*createVisibleCanvasService/,
+  'artifact phải công bố TypeScript điều phối canvas cho wrapper cũ');
+assert.match(generated, /root\.chartTooltipService\s*=\s*createChartTooltipService/,
+  'artifact phải công bố TypeScript tooltip biểu đồ cho wrapper cũ');
+assert.match(generated, /root\.qcTooltip\s*=\s*\(\)\s*=>\s*root\.chartTooltipService/,
+  'qcTooltip bridge');
+assert.match(generated, /root\.leveyJenningsTooltipController\s*=\s*createLeveyJenningsTooltipController/,
+  'artifact phải công bố TypeScript controller tooltip Levey-Jennings cho wrapper cũ');
+assert.match(generated, /root\.chartDataUrl\s*=\s*createChartDataUrl/,
+  'artifact phải công bố TypeScript chart data URL cho wrapper cũ');
+assert.match(drawSource, /chartDataUrl\(\{width:1400,height:430,render:canvas=>drawLJ\(canvas,points,mean,sd\)\}\)/,
+  'xuất Levey-Jennings đơn phải dùng chart data URL từ TypeScript bridge');
+assert.match(drawSource, /chartDataUrl\(\{width:1400,height:430,render:canvas=>drawLJMultiZ\(canvas,levelViews,test,opts\)\}\)/,
+  'xuất Levey-Jennings đa mức phải dùng chart data URL từ TypeScript bridge');
+assert.match(generated, /root\.hiDpiCanvasSetup\s*=\s*createHiDpiCanvasSetup/,
+  'artifact phải công bố TypeScript chuẩn hóa canvas HiDPI cho wrapper cũ');
+assert.match(generated, /root\.leveyJenningsGeometry\s*=\s*leveyJenningsGeometry/,
+  'artifact phải công bố TypeScript tọa độ biểu đồ Levey-Jennings cho wrapper cũ');
+assert.match(generated, /root\.westgardRuleScope\s*=\s*createWestgardRuleScope/,
+  'artifact phải công bố TypeScript phạm vi luật Westgard cho wrapper cũ');
+assert.doesNotMatch(drawSource, /function setupHiDPICanvas\(/,
+  'renderer không được giữ wrapper HiDPI classic chỉ chuyển tiếp sang TypeScript');
+assert.match(drawSource, /globalThis\.hiDpiCanvasSetup\(canvas\)/,
+  'renderer phải gọi trực tiếp setup HiDPI từ TypeScript bridge');
+assert.doesNotMatch(drawSource, /function (drawRuleWithin|drawRuleAcross|drawCanvasFont|bindLJTooltip)\(/,
+  'renderer không được giữ các wrapper classic chỉ chuyển tiếp sang bridge TypeScript');
+assert.doesNotMatch(drawSource, /function qcTooltip\(/,
+  'qcTooltip phải thuộc compatibility bridge');
+assert.match(drawSource, /globalThis\.westgardRuleScope\.within\(test,rule\)/,
+  'renderer phải gọi trực tiếp phạm vi luật Westgard từ TypeScript bridge');
+assert.match(drawSource, /globalThis\.canvasFont\(800,'type-caption',11\.5\)/,
+  'renderer phải gọi trực tiếp canvas font từ TypeScript bridge');
+assert.match(drawSource, /globalThis\.leveyJenningsTooltipController\(canvas\)/,
+  'renderer phải gọi trực tiếp tooltip controller từ TypeScript bridge');
+assert.match(dashboardRoutesSource, /dashboardLoadingPresentation\(tests,missingWestgard\.length,state\.data,state\.lab\)/,
+  'dashboard phải gọi trực tiếp loading presentation từ TypeScript bridge');
+assert.match(dashboardRoutesSource, /dashItems\.filter\(item=>globalThis\.dashboardStatusFilter\.matches\(item,dashTestStatus\)\)/,
+  'dashboard phải gọi trực tiếp status filter TypeScript bridge');
+assert.match(dashboardRoutesSource, /dashTestStatus=globalThis\.dashboardStatusFilter\.normalize\(value\);/,
+  'dashboard phải chuẩn hóa status qua TypeScript bridge');
+assert.match(dashboardRoutesSource, /const expByLot=globalThis\.dashboardExpiringLots\(exp\);/,
+  'dashboard phải gom lô sắp hết hạn qua TypeScript bridge');
+assert.match(dashboardRoutesSource, /const expHtml=globalThis\.dashboardExpiringLotsHtml\(expByLot\.values\(\)\);/,
+  'dashboard phải render lô sắp hết hạn qua TypeScript bridge');
+assert.match(dashboardRoutesSource, /const dashItems=globalThis\.dashboardTestItems\(tests,today\);/,
+  'dashboard phải chọn điểm mới nhất qua TypeScript bridge');
+assert.match(dashboardRoutesSource, /const dashItems=globalThis\.dashboardTestItems\(tests,today\);/,
+  'dashboard phải tạo chuỗi tìm kiếm qua TypeScript bridge');
+assert.match(dashboardRoutesSource, /const dashboardKpi=globalThis\.dashboardKpis\(dashItems,tests\.length\),\{totalPoints:totalPts,todayPoints:todayPts,rejected:rej,warnings:warn,missingToday:missingTodayCount,completeTests:doneTests,completionPercent:pct\}=dashboardKpi;/,
+  'dashboard phải tính KPI qua TypeScript bridge');
+assert.match(dashboardRoutesSource, /const testRows=globalThis\.dashboardTestRowsHtml\(statusItems\);/,
+  'dashboard phải tạo tag Westgard qua TypeScript bridge');
+assert.doesNotMatch(dashboardRoutesSource, /dashboardCompletion\(/,
+  'dashboard phải tính hoàn thành QC qua TypeScript bridge');
+assert.match(dashboardRoutesSource, /const shift=globalThis\.dashboardShiftStatus\(/,
+  'dashboard phải xác định trạng thái ca trực qua TypeScript bridge');
+assert.match(dashboardRoutesSource, /const followHtml=globalThis\.dashboardFollowupPanelHtml\(urgentHtml,overdueHtml,noTargetHtml,watchHtml\);/,
+  'dashboard phải dựng bảng theo dõi qua TypeScript bridge');
+assert.match(dashboardRoutesSource, /const dashStatusTabs=globalThis\.dashboardStatusTabsHtml\(dashItems,dashTestStatus\);/,
+  'dashboard phải dựng tab trạng thái qua TypeScript bridge');
+assert.match(dashboardRoutesSource, /const testListHtml=globalThis\.dashboardTestListHtml\(statusItems\.length,testRows\);/,
+  'dashboard phải dựng danh sách xét nghiệm qua TypeScript bridge');
+assert.match(generated, /root\.leveyJenningsColors\s*=\s*LEVEY_JENNINGS_COLORS/,
+  'artifact phải công bố TypeScript palette Levey-Jennings cho wrapper cũ');
+assert.match(generated, /root\.leveyJenningsTicks\s*=\s*createLeveyJenningsTicks/,
+  'artifact phải công bố TypeScript tick trục thời gian Levey-Jennings cho wrapper cũ');
+assert.match(generated, /root\.leveyJenningsYAxisLabels\s*=\s*createLeveyJenningsYAxisLabels/,
+  'artifact phải công bố TypeScript nhãn trục Y Levey-Jennings cho wrapper cũ');
+assert.match(generated, /root\.leveyJenningsHoverModel\s*=\s*createLeveyJenningsHoverModel/,
+  'artifact phải công bố TypeScript model hover Levey-Jennings cho wrapper cũ');
+assert.match(generated, /root\.leveyJenningsPointStyle\s*=\s*leveyJenningsPointStyle/,
+  'artifact phải công bố TypeScript style điểm Levey-Jennings cho wrapper cũ');
+assert.match(generated, /root\.leveyJenningsDisplayPlan\s*=\s*createLeveyJenningsDisplayPlan/,
+  'artifact phải công bố TypeScript kế hoạch downsampling Levey-Jennings cho wrapper cũ');
+assert.match(generated, /root\.leveyJenningsPointRenderModel\s*=\s*createLeveyJenningsPointRenderModel/,
+  'artifact phải công bố TypeScript model render điểm Levey-Jennings cho wrapper cũ');
+assert.match(generated, /root\.leveyJenningsBandRects\s*=\s*leveyJenningsBandRects/,
+  'artifact phải công bố TypeScript dải chuẩn Levey-Jennings cho wrapper cũ');
+assert.match(generated, /root\.leveyJenningsGridLines\s*=\s*leveyJenningsGridLines/,
+  'artifact phải công bố TypeScript lưới Levey-Jennings cho wrapper cũ');
+assert.match(generated, /root\.leveyJenningsMultiSeries\s*=\s*leveyJenningsMultiSeries/,
+  'artifact phải công bố TypeScript dữ liệu biểu đồ Levey-Jennings đa mức cho wrapper cũ');
+assert.match(generated, /root\.leveyJenningsMultiRunTicks\s*=\s*createLeveyJenningsMultiRunTicks/,
+  'artifact phải công bố TypeScript tick run biểu đồ Levey-Jennings đa mức cho wrapper cũ');
+assert.match(generated, /root\.leveyJenningsLegendLayout\s*=\s*\(levels,\s*colors,\s*startX,\s*measure\)/,
+  'artifact phải công bố TypeScript layout chú giải Levey-Jennings cho wrapper cũ');
+assert.match(generated, /root\.leveyJenningsMultiDisplayPlan\s*=\s*createLeveyJenningsMultiDisplayPlan/,
+  'artifact phải công bố TypeScript kế hoạch downsampling Levey-Jennings đa mức cho wrapper cũ');
+assert.match(generated, /root\.leveyJenningsMultiHoverModel\s*=\s*createLeveyJenningsMultiHoverModel/,
+  'artifact phải công bố TypeScript model hover Levey-Jennings đa mức cho wrapper cũ');
+assert.match(generated, /root\.leveyJenningsMultiPointRenderModel\s*=\s*createLeveyJenningsMultiPointRenderModel/,
+  'artifact phải công bố TypeScript model render điểm Levey-Jennings đa mức cho wrapper cũ');
+assert.match(generated, /root\.leveyJenningsMultiDividers\s*=\s*leveyJenningsMultiDividers/,
+  'artifact phải công bố TypeScript đường phân cách Levey-Jennings đa mức cho wrapper cũ');
+assert.match(generated, /root\.cusumChartGeometry\s*=\s*cusumChartGeometry/,
+  'artifact phải công bố TypeScript hình học CUSUM cho wrapper cũ');
+assert.match(generated, /root\.cusumDisplayPlan\s*=\s*createCusumDisplayPlan/,
+  'artifact phải công bố TypeScript downsampling CUSUM cho wrapper cũ');
+assert.match(generated, /root\.cusumHoverModel\s*=\s*createCusumHoverModel/,
+  'artifact phải công bố TypeScript hover CUSUM cho wrapper cũ');
+assert.match(generated, /root\.cusumPointRenderModel\s*=\s*cusumPointRenderModel/,
+  'artifact phải công bố TypeScript model điểm CUSUM cho wrapper cũ');
+assert.match(generated, /root\.cusumReferenceLines\s*=\s*cusumReferenceLines/,
+  'artifact phải công bố TypeScript đường tham chiếu CUSUM cho wrapper cũ');
+assert.match(generated, /root\.cusumLinePoints\s*=\s*cusumLinePoints/,
+  'artifact phải công bố TypeScript tọa độ line CUSUM cho wrapper cũ');
+assert.match(drawSource, /cusumDisplayPlan\(\{count:n,width:cw,cPos,cNeg,ma,flags\}\)/,
+  'renderer CUSUM phải dùng downsampling từ TypeScript bridge');
+assert.match(drawSource, /cusumHoverModel\(\{point:model\.point,cPos:model\.positive,cNeg:model\.negative,rejected:model\.rejected\}\)/,
+  'renderer CUSUM phải dùng hover model từ TypeScript bridge');
+assert.match(drawSource, /cusumPointRenderModel\(\{indices:drawIndices,points,cPos,cNeg,flags,h,x,clampY,colors:cc\}\)/,
+  'renderer CUSUM phải dùng model điểm từ TypeScript bridge');
+assert.match(drawSource, /cusumReferenceLines\(\{h,y\}\)/,
+  'renderer CUSUM phải dùng đường tham chiếu từ TypeScript bridge');
+assert.match(drawSource, /cusumLinePoints\(\{indices:drawIndices,values:arr,x,clampY\}\)/,
+  'renderer CUSUM phải dùng tọa độ line từ TypeScript bridge');
+assert.match(drawSource, /leveyJenningsBandRects\(\{mean:0,sd:1,width:cw,y\}\)/,
+  'renderer đa mức phải dùng dải Levey-Jennings từ TypeScript bridge');
+assert.match(drawSource, /leveyJenningsGridLines\(\[3,2,1,0,-1,-2,-3\]/,
+  'renderer đa mức phải dùng lưới Levey-Jennings từ TypeScript bridge');
 assert.match(generated, /root\.blobDownload\s*=\s*createBlobDownload/,
   'artifact phải công bố TypeScript blob download cho wrapper cũ');
 assert.match(generated, /root\.xlsxCells\s*=\s*createXlsxCells/,
@@ -1327,3 +1988,9 @@ assert.match(pkg.scripts.dist, /build:pilot/,
   'đóng gói Electron phải build lại artifact TypeScript trước');
 
 console.log('TypeScript module pilot structure tests passed');
+assert.match(canvasFontSource, /export function createCanvasFont\(/,
+  'canvas font phải tách thành TypeScript factory');
+assert.doesNotMatch(chartCanvasFontSource, /\bglobalThis\b|\bdocument\b/,
+  'canvas font không được tự đọc global hoặc DOM');
+assert.match(generated, /root\.canvasFont\s*=\s*createCanvasFont/,
+  'artifact phải công bố TypeScript canvas font cho wrapper cũ');

@@ -1,33 +1,20 @@
 /* ===== SETTINGS / CLOUD ===== */
-function storageBytesText(bytes){if(globalThis.settingsStorageBytesText)return globalThis.settingsStorageBytesText(bytes);const n=Math.max(0,Number(bytes)||0),units=['B','KB','MB','GB','TB'];let value=n,unit=0;while(value>=1024&&unit<units.length-1){value/=1024;unit++;}return(value<10&&unit>0?value.toFixed(1):Math.round(value).toLocaleString('vi-VN'))+' '+units[unit];}
-function storageUsageText(data,estimate){if(globalThis.settingsStorageUsageText)return globalThis.settingsStorageUsageText(data,estimate);const points=Object.values(data||{}).reduce((sum,list)=>sum+(Array.isArray(list)?list.length:0),0),e=estimate&&typeof estimate==='object'?estimate:null;if(!e)return`Số điểm QC: ${points.toLocaleString('vi-VN')}.\n\nTrình duyệt này không cung cấp thông tin hạn mức lưu trữ.`;const usage=Math.max(0,Number(e.usage)||0),quota=Math.max(0,Number(e.quota)||0),indexed=e.usageDetails&&Number.isFinite(Number(e.usageDetails.indexedDB))?Math.max(0,Number(e.usageDetails.indexedDB)):null,ratio=quota?Math.min(100,usage/quota*100):null;return`Số điểm QC: ${points.toLocaleString('vi-VN')}.\nDung lượng IndexedDB: ${indexed==null?'trình duyệt không tách riêng':storageBytesText(indexed)}.\nTổng dung lượng app đang dùng: ${storageBytesText(usage)}${quota?' / '+storageBytesText(quota):''}${ratio==null?'':' ('+ratio.toFixed(2)+'%)'}.`;}
+function storageBytesText(bytes){return globalThis.settingsStorageBytesText(bytes);}
+function storageUsageText(data,estimate){return globalThis.settingsStorageUsageText(data,estimate);}
 async function checkStorageUsage(){let estimate=null;try{if(typeof navigator!=='undefined'&&navigator.storage&&typeof navigator.storage.estimate==='function')estimate=await navigator.storage.estimate();}catch(e){}await infoDialog(storageUsageText(state.data,estimate),{title:'Dung lượng cục bộ',type:'success'});}
-async function saveLab(){if(!requireAdmin())return;const input={name:document.getElementById('labName').value,dept:document.getElementById('labDept').value,address:document.getElementById('labAddr').value};state.lab=globalThis.labProfileService?globalThis.labProfileService.updateLab(state.lab,input):{...(state.lab||{}),name:QCCore.cleanText(input.name),dept:QCCore.cleanText(input.dept),address:QCCore.cleanText(input.address,5000)};save({clearDerived:false});await infoDialog('Đã lưu thông tin đơn vị.',{type:'success'});}
-function ensureLabBrandShape(){
-  state.lab=state.lab||{};
-  if(globalThis.settingsBrandProfile){Object.assign(state.lab,globalThis.settingsBrandProfile(state.lab));return;}
-  state.lab.brandTitle=QCCore.cleanText(state.lab.brandTitle||'QC Lab',80);
-  state.lab.brandSub=QCCore.cleanText(state.lab.brandSub||'Nội kiểm xét nghiệm',120);
-  state.lab.logoText=QCCore.cleanText(state.lab.logoText||'QC',8).slice(0,4);
-  state.lab.logoData=QCCore.cleanText(state.lab.logoData||'',120000);
-}
+async function saveLab(){if(!requireAdmin())return;const input={name:document.getElementById('labName').value,dept:document.getElementById('labDept').value,address:document.getElementById('labAddr').value};state.lab=globalThis.labProfileService.updateLab(state.lab,input);save({clearDerived:false});await infoDialog('Đã lưu thông tin đơn vị.',{type:'success'});}
+function ensureLabBrandShape(){state.lab=state.lab||{};Object.assign(state.lab,globalThis.settingsBrandProfile(state.lab));}
 async function saveBrand(){
   if(!requireAdmin())return;
   state.lab=state.lab||{};
   const input={brandTitle:document.getElementById('brandTitle').value,brandSub:document.getElementById('brandSub').value,logoText:document.getElementById('logoText').value};
-  if(globalThis.labProfileService){state.lab=globalThis.labProfileService.updateBrand(state.lab,input);save({clearDerived:false});renderBrand();rerender();await infoDialog('Đã lưu logo và tên hiển thị.',{type:'success'});return;}
-  state.lab.brandTitle=QCCore.cleanText(input.brandTitle||'QC Lab',80);
-  state.lab.brandSub=QCCore.cleanText(input.brandSub||'Nội kiểm xét nghiệm',120);
-  state.lab.logoText=QCCore.cleanText(input.logoText||'QC',8).slice(0,4);
+  state.lab=globalThis.labProfileService.updateBrand(state.lab,input);
   save({clearDerived:false});renderBrand();rerender();await infoDialog('Đã lưu logo và tên hiển thị.',{type:'success'});
 }
 function readBrandInputs(){
   state.lab=state.lab||{};
   const title=document.getElementById('brandTitle'),sub=document.getElementById('brandSub'),txt=document.getElementById('logoText');
-  if(globalThis.labProfileService){state.lab=globalThis.labProfileService.updateBrand(state.lab,{brandTitle:title?title.value:state.lab.brandTitle,brandSub:sub?sub.value:state.lab.brandSub,logoText:txt?txt.value:state.lab.logoText});return;}
-  if(title)state.lab.brandTitle=QCCore.cleanText(title.value||'QC Lab',80);
-  if(sub)state.lab.brandSub=QCCore.cleanText(sub.value||'Nội kiểm xét nghiệm',120);
-  if(txt)state.lab.logoText=QCCore.cleanText(txt.value||'QC',8).slice(0,4);
+  state.lab=globalThis.labProfileService.updateBrand(state.lab,{brandTitle:title?title.value:state.lab.brandTitle,brandSub:sub?sub.value:state.lab.brandSub,logoText:txt?txt.value:state.lab.logoText});
 }
 async function pickLogo(e){
   if(!requireAdmin())return;
@@ -42,18 +29,13 @@ async function pickLogo(e){
     ctx.fillStyle='#fff';ctx.fillRect(0,0,size,size);
     const scale=Math.min(size/img.width,size/img.height),w=img.width*scale,h=img.height*scale,x=(size-w)/2,y=(size-h)/2;
     ctx.drawImage(img,x,y,w,h);
-    readBrandInputs();state.lab=globalThis.labProfileService?globalThis.labProfileService.updateLogo(state.lab,c.toDataURL('image/png')):(state.lab.logoData=c.toDataURL('image/png'),state.lab);
+    readBrandInputs();state.lab=globalThis.labProfileService.updateLogo(state.lab,c.toDataURL('image/png'));
     save({clearDerived:false});renderBrand();rerender();
   };img.onerror=async()=>{await infoDialog('Không đọc được ảnh logo.');};img.src=String(r.result);};
   r.readAsDataURL(f);
 }
-function clearLogo(){if(!requireAdmin())return;state.lab=state.lab||{};state.lab=globalThis.labProfileService?globalThis.labProfileService.clearLogo(state.lab):(state.lab.logoData='',state.lab);save({clearDerived:false});renderBrand();rerender();}
-function firebaseAclHelp(code){
-  const user=(typeof firebase!=='undefined'&&firebase.auth&&firebase.auth().currentUser)||fb.authUser||null;
-  const uid=user&&user.uid||'UID_TAI_KHOAN_FIREBASE';
-  if(globalThis.settingsFirebaseAclHelp)return globalThis.settingsFirebaseAclHelp(code,uid);
-  return `Đăng nhập Firebase đã thành công nhưng tài khoản chưa có quyền với mã phòng "${code}".\n\nVào Realtime Database → Data và tạo:\nqclab-acl/${code}/${uid} = true\n\nSau đó bấm Lưu & kết nối lại.`;
-}
+function clearLogo(){if(!requireAdmin())return;state.lab=state.lab||{};state.lab=globalThis.labProfileService.clearLogo(state.lab);save({clearDerived:false});renderBrand();rerender();}
+function firebaseAclHelp(code){const user=(typeof firebase!=='undefined'&&firebase.auth&&firebase.auth().currentUser)||fb.authUser||null;return globalThis.settingsFirebaseAclHelp(code,user&&user.uid||'UID_TAI_KHOAN_FIREBASE');}
 async function saveFb(){
   if(!requireAdmin())return;
   const input={labCode:document.getElementById('fbCode').value,email:document.getElementById('fbEmail').value,password:document.getElementById('fbPassword').value,config:document.getElementById('fbConfig').value};let plan;
@@ -85,27 +67,8 @@ async function saveFb(){
     await infoDialog(msg.indexOf('permission_denied')>=0?firebaseAclHelp(code):'Không thể đăng nhập Firebase: '+msg);
   }
 }
-function parseFirebaseConfig(raw){if(globalThis.firebaseConfigParser)return globalThis.firebaseConfigParser(raw);
-  raw=String(raw||'').trim();
-  if(!raw)throw new Error('Dán Firebase config trước khi kết nối.');
-  let text=raw;
-  try{return validateFirebaseConfig(JSON.parse(text));}catch(e){}
-  const start=text.indexOf('{'),end=text.lastIndexOf('}');
-  if(start<0||end<=start)throw new Error('Không tìm thấy object firebaseConfig. Hãy dán đoạn Config từ Firebase console.');
-  text=text.slice(start,end+1)
-    .replace(/\/\*[\s\S]*?\*\//g,'')
-    .replace(/(^|[^:])\/\/.*$/gm,'$1')
-    .replace(/([{,]\s*)([A-Za-z_$][\w$]*)\s*:/g,'$1"$2":')
-    .replace(/,\s*([}\]])/g,'$1');
-  try{return validateFirebaseConfig(JSON.parse(text));}
-  catch(e){throw new Error('Firebase config không hợp lệ. Có thể dán nguyên đoạn từ tab Config của Firebase console, ví dụ: const firebaseConfig = { ... };');}
-}
-function validateFirebaseConfig(cfg){if(globalThis.firebaseConfigValidator)return globalThis.firebaseConfigValidator(cfg);
-  if(!cfg||typeof cfg!=='object'||Array.isArray(cfg))throw new Error('Firebase config phải là một object.');
-  const required=['apiKey','authDomain','databaseURL','projectId','appId'],missing=required.filter(k=>!String(cfg[k]||'').trim());
-  if(missing.length)throw new Error('Firebase config thiếu: '+missing.join(', ')+'.');
-  return cfg;
-}
+function parseFirebaseConfig(raw){return globalThis.firebaseConfigParser(raw);}
+function validateFirebaseConfig(cfg){return globalThis.firebaseConfigValidator(cfg);}
 async function clearFb(){
   if(!requireAdmin())return;
   localStorage.removeItem('qclab_fb');fbDisconnect();
@@ -165,11 +128,8 @@ function pageSettings(){
   const liscfg=typeof lisGatewayConfig==='function'?lisGatewayConfig():{enabled:false,url:'http://127.0.0.1:8787'};
   const lockedCloud=!!(fbcfg&&fbcfg.locked);
   const logo=brandLogo();
-  const brandPreview=globalThis.settingsBrandPreviewHtml?globalThis.settingsBrandPreviewHtml({logo,markText:brandMarkText(),title:brandTitle(),subtitle:brandSub()}):`<div class="brand-preview"><div class="brand-mark">${logo?`<img src="${escAttr(logo)}" alt="">`:esc(brandMarkText())}</div><div><b>${esc(brandTitle())}</b><small>${esc(brandSub())}</small></div></div>`;
-  const firebaseRulesPanel=globalThis.settingsFirebaseRulesPanelHtml?globalThis.settingsFirebaseRulesPanelHtml(firebaseGuideHtml(),firebaseRulesText()):`<div class="panel"><h2 class="panel-title">Firebase Rules</h2>
-     ${firebaseGuideHtml()}
-     <div class="rules-tools"><span>Copy cố định vào Realtime Database → Rules. Không sửa <code>$labCode</code> hoặc <code>$uid</code>.</span>${btn('Copy rules','copyFirebaseRules()','ghost sm')}</div>
-     <pre class="rules-code" tabindex="0">${esc(firebaseRulesText())}</pre></div>`;
+  const brandPreview=globalThis.settingsBrandPreviewHtml({logo,markText:brandMarkText(),title:brandTitle(),subtitle:brandSub()});
+  const firebaseRulesPanel=globalThis.settingsFirebaseRulesPanelHtml(firebaseGuideHtml(),firebaseRulesText());
   if(globalThis.settingsPageLayoutHtml&&globalThis.settingsUnitProfileHtml&&globalThis.settingsBrandPanelHtml&&globalThis.settingsAdminToolsHtml&&globalThis.settingsFirebaseConnectionPanelHtml&&globalThis.settingsLisGatewayPanelHtml)return globalThis.settingsPageLayoutHtml({profileHtml:globalThis.settingsUnitProfileHtml(state.lab)+globalThis.settingsBrandPanelHtml({title:brandTitle(),subtitle:brandSub(),markText:brandMarkText(),previewHtml:brandPreview}),adminHtml:globalThis.settingsAdminToolsHtml(backupStatusText(),backupCapacityText()),firebaseHtml:globalThis.settingsFirebaseConnectionPanelHtml({labCode:fbcfg.labCode,email:fbcfg.email,config:fbcfg.config,locked:lockedCloud,dataPath:fbDataPath()}),lisHtml:globalThis.settingsLisGatewayPanelHtml({url:liscfg.url,token:liscfg.token,enabled:liscfg.enabled,status:lisGatewayRuntime.status,statusText:lisGatewayStatusText()}),rulesHtml:firebaseRulesPanel});
   return headOnly('Cài đặt & Đồng bộ','Thông tin đơn vị, backup và kết nối Firebase')+
    `<div class="settings-profile-grid">${globalThis.settingsUnitProfileHtml?globalThis.settingsUnitProfileHtml(state.lab):`<div class="panel"><h2 class="panel-title">Thông tin đơn vị</h2>

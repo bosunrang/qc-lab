@@ -1,0 +1,5 @@
+'use strict';
+const assert=require('node:assert/strict');const{spawnSync}=require('node:child_process');const path=require('node:path');const{pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','dashboard','dashboard-expiring-lot-items.ts')).href;
+const program=`import { dashboardExpiringLotItems } from ${JSON.stringify(source)};const rows=dashboardExpiringLotItems([{t:{id:'T'},levelData:[{l:{exp:'near'}},{l:{exp:'far'}},{l:{exp:'none'}}]}],value=>value==='near'?10:value==='far'?31:null);if(rows.length!==1||rows[0].t.id!=='T'||rows[0].l.exp!=='near'||rows[0].d!==10)throw new Error('must preserve expiring lot collection');console.log('Dashboard expiring lot items TypeScript tests passed');`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});assert.equal(result.status,0,result.stderr||result.stdout||'không thể chạy dashboard expiring lot items TypeScript');console.log(result.stdout.trim());

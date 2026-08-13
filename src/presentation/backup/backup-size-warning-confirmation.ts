@@ -1,0 +1,1 @@
+export function createBackupSizeWarningConfirmation(warning:(size:any)=>string){return(input:{bytes:any})=>{const message=warning(input.bytes);return message?{kicker:'Dung lượng backup lớn',title:'Vẫn xuất backup?',message,detail:'File hiện tại vẫn nhập được, nhưng dung lượng dự phòng còn ít.',confirmLabel:'Xuất backup',cancelLabel:'Hủy'}:null;};}

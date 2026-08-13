@@ -1,0 +1,1 @@
+export function createLeveyJenningsYAxisLabels(formatValue:(test:any,value:number)=>string){return(test:any,mean:number,sd:number)=>[3,2,1,0,-1,-2,-3].map(z=>({z,label:z===3?'> +3':z===-3?'< -3':String(z),value:formatValue(test,mean+z*sd)}));}

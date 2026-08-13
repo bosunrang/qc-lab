@@ -1,0 +1,5 @@
+'use strict';
+const assert=require('node:assert/strict');const{spawnSync}=require('node:child_process');const path=require('node:path');const{pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','dashboard','dashboard-overdue-action-list-html.ts')).href;
+const program=`import { createDashboardOverdueActionListHtml } from ${JSON.stringify(source)};const render=createDashboardOverdueActionListHtml({render:item=>item.action.id+'@'+(item.test?item.test.name:'?')+'#'+item.index});const rows=[0,1,2,3,4].map(index=>({action:{id:'A'+index,testId:index===2?'T':'none'},index,info:{}}));if(render(rows,[{id:'T',name:'Glucose'}])!=='A0@?#0A1@?#1A2@Glucose#2A3@?#3')throw new Error('must preserve overdue action list rendering');console.log('Dashboard overdue action list HTML TypeScript tests passed');`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});assert.equal(result.status,0,result.stderr||result.stdout||'không thể chạy dashboard overdue action list HTML TypeScript');console.log(result.stdout.trim());

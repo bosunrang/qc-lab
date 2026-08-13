@@ -1,0 +1,1 @@
+export function createCanvasFont(pixel:(token:string,fallback:number)=>number){return(weight:number,token:string,fallback:number)=>`${weight?weight+' ':''}${pixel(token,fallback)}px Manrope, Arial, sans-serif`;}

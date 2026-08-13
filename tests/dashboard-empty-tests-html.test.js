@@ -1,0 +1,5 @@
+'use strict';
+const assert=require('node:assert/strict');const{spawnSync}=require('node:child_process');const path=require('node:path');const{pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','dashboard','dashboard-empty-tests-html.ts')).href;
+const program=`import { createDashboardEmptyTestsHtml } from ${JSON.stringify(source)};const render=createDashboardEmptyTestsHtml({emptyState:(title,detail,action)=>title+'|'+detail+'|'+action,button:(label,action,variant)=>label+'|'+action+'|'+variant}),admin=render(true),user=render(false);if(!admin.includes('Cấu hình Mean/SD')||!admin.includes('teal')||user.includes('Cấu hình Mean/SD'))throw new Error('must preserve dashboard empty-test action');console.log('Dashboard empty tests HTML TypeScript tests passed');`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});assert.equal(result.status,0,result.stderr||result.stdout||'không thể chạy dashboard empty tests HTML TypeScript');console.log(result.stdout.trim());

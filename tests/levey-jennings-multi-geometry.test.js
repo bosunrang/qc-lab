@@ -1,0 +1,5 @@
+'use strict';
+const assert=require('node:assert/strict');const{spawnSync}=require('node:child_process');const path=require('node:path');const{pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','chart','levey-jennings-multi-geometry.ts')).href;
+const program=`import { leveyJenningsMultiGeometry } from ${JSON.stringify(source)};const g=leveyJenningsMultiGeometry({width:800,height:430});if(g.padL!==56||g.padR!==78||g.padT!==44||g.padB!==46||g.cw!==666||g.ch!==340||g.y(3.25)!==44||g.clampY(8)!==44||g.clampY(-8)!==384)throw new Error('must preserve multi-level chart geometry');console.log('Levey-Jennings multi geometry TypeScript tests passed');`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});assert.equal(result.status,0,result.stderr||result.stdout||'không thể chạy Levey-Jennings multi geometry TypeScript');console.log(result.stdout.trim());

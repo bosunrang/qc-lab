@@ -6,7 +6,7 @@ const { pathToFileURL } = require('node:url');
 const source = pathToFileURL(path.join(__dirname, '..', 'src', 'presentation', 'dashboard', 'dashboard-loading.ts')).href;
 const program = `
   import { createDashboardLoading } from ${JSON.stringify(source)};
-  const render = createDashboardLoading({ escape: value => String(value).replace(/&/g, '&amp;'), topUserBox: () => '<aside>User</aside>' });
+  const render = createDashboardLoading({ headHtml: lab => '<header>'+String(lab.name).replace(/&/g, '&amp;')+'<aside>User</aside></header>', kpisHtml: items => '<div class="dash-kpis">'+items.map(item => '<div class="dash-kpi"><div class="k">'+item.label+'</div><div class="v'+(item.className?' '+item.className:'')+'">'+item.value+'</div></div>').join('')+'</div>' });
   console.log(render([{ id: 'A' }, { id: 'B' }], 2, { A: [{}, {}], B: [{}] }, { name: 'PXN & A', dept: 'Hoa sinh' }));
 `;
 const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=module', '--eval', program], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });

@@ -4,7 +4,7 @@ const path = require('node:path');
 
 const root = path.join(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
-const router = read('assets/modules/router-render.js') + read('assets/modules/entry-routes.js');
+const router = read('assets/modules/router-render.js') + read('assets/modules/entry-routes.js') + read('src/presentation/entry/entry-sheet-navigation.ts');
 const modals = read('assets/modules/modals.js');
 const appCss = read('assets/app.css');
 const auditCss = read('assets/professional-audit.css');
@@ -22,9 +22,15 @@ const westgardCss = read('assets/professional-westgard.css');
 const actionsRoutes = read('assets/modules/actions-routes.js');
 const actionForm = read('assets/modules/action-form.js');
 const reportRoutes = read('assets/modules/report-routes.js');
+const reportActionIconPresentation = read('src/presentation/report/report-action-icon.ts');
+const reportLockPanelPresentation = read('src/presentation/report/report-lock-panel-html.ts');
+const firebaseRulesPanelPresentation = read('src/presentation/settings/firebase-rules-panel-html.ts');
 const manageRoutes = read('assets/modules/manage-routes.js');
 const westgardRoutes = read('assets/modules/westgard-routes.js');
+const westgardCusumPagePresentation = read('src/presentation/westgard/westgard-cusum-page-html.ts');
 const dashboardRoutes = read('assets/modules/dashboard-routes.js');
+const dashboardPagePresentation = read('src/presentation/dashboard/dashboard-page-html.ts');
+const dashboardTestPanelPresentation = read('src/presentation/dashboard/dashboard-test-panel-html.ts');
 const sigmaRoutes = read('assets/modules/sigma.js');
 const reagentRoutes = read('assets/modules/reagent.js');
 const settingsRoutes = read('assets/modules/settings.js');
@@ -38,7 +44,7 @@ assert.ok(dialogZ>authZ, 'dialog xác nhận phải nằm trên auth/recovery ov
 assert.match(router, /role="tree" aria-label="Danh mục nội kiểm"/);
 assert.match(router, /role="treeitem" tabindex="0" aria-expanded=/);
 assert.match(router, /function entryTreeKey\(event\)/);
-assert.match(router, /key==='ArrowDown'/);
+assert.match(router, /key\s*===\s*'ArrowDown'/);
 assert.match(router, /aria-live="polite"/);
 assert.match(router, /aria-current="\$\{id===page\?'page':'false'\}"/);
 assert.match(router, /role="region" aria-label="Bảng nhập QC theo tháng" tabindex="0"/);
@@ -64,7 +70,7 @@ for(const file of fs.readdirSync(path.join(root,'assets','modules')).filter(name
 assert.deepEqual(rawRequiredLabels,[],'dấu sao bắt buộc trong label phải bọc bằng <span class="req"> để luôn có màu đỏ');
 assert.match(manageRoutes,/TEa chuẩn hóa % <span class="req">\*<\/span>/,'hồ sơ TEa phải hiển thị dấu bắt buộc bằng marker chung');
 
-const semanticPageRoutes=[dashboardRoutes,sigmaRoutes,reagentRoutes,actionsRoutes,actionForm,reportRoutes,settingsRoutes,router].join('\n');
+const semanticPageRoutes=[dashboardRoutes,dashboardPagePresentation,sigmaRoutes,reagentRoutes,actionsRoutes,actionForm,reportRoutes,reportLockPanelPresentation,settingsRoutes,firebaseRulesPanelPresentation,router].join('\n');
 for(const title of ['Cần xử lý / Theo dõi','Lô & hạn dùng','Tình trạng','Số liệu theo kỳ','Biểu đồ Sigma & MDC','Thông tin đánh giá','Dữ liệu đo bắt cặp','Kết quả thống kê','Tiêu chí chấp nhận &amp; kết luận','Biểu đồ','Nhật ký khắc phục','Khóa kỳ báo cáo','Logo & tên phần mềm','Quản trị dữ liệu','Đồng bộ đám mây (Firebase Realtime Database)','LIS Gateway (thử nghiệm)','Firebase Rules','Biểu đồ Levey-Jennings']){
   const escaped=title.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
   assert.match(semanticPageRoutes,new RegExp(`<h2[^>]*class="[^"]*panel-title[^"]*"[^>]*>${escaped}`),`panel chính "${title}" phải dùng heading cấp 2 thật`);
@@ -79,7 +85,7 @@ assert.match(sigmaCss, /\.sg-eqa-summary span\{[^}]*text-transform:none/);
 // Icon nút của trang Báo cáo đi theo trang sang report-routes.js (tách 2026-07-30).
 assert.match(reportRoutes, /function reportActionIcon\(type\)/);
 assert.match(reportRoutes, /reportActionIcon\('print'\)/);
-assert.match(reportRoutes, /aria-hidden="true"/);
+assert.match(reportActionIconPresentation, /aria-hidden="true"/);
 assert.match(actionsRoutes, /aria-hidden="true"/);
 assert.match(tokens, /--space-section:14px/);
 assert.match(tokens, /--panel-content-gap:var\(--space-section\)/);
@@ -104,7 +110,7 @@ assert.match(components, /\.sg-chart-box > h3\{[^}]*min-height:var\(--subpanel-h
 assert.match(sigmaCss, /\.sg-chart-box \.chart-inner > \.hint\{[^}]*min-height:40px[^}]*padding:0/,'trạng thái biểu đồ rỗng phải có chiều cao cân đối');
 assert.match(sigmaCss, /\.sg-simple-table-wrap\{[^}]*margin:var\(--panel-content-gap\) 16px 12px/);
 assert.match(dashboardCss, /margin:var\(--panel-content-gap\) 16px 14px/);
-assert.match(dashboardRoutes, /<div class="dash-test-filterbar"><div class="dash-test-tabs">\$\{dashStatusTabs\}<\/div><div class="dash-test-search">/);
+assert.match(dashboardTestPanelPresentation, /<div class="dash-test-filterbar"><div class="dash-test-tabs">\$\{input\.statusTabs\}<\/div><div class="dash-test-search">/);
 assert.match(dashboardCss, /\.dash-test-filterbar \.dash-test-search input\{\s*height:32px; min-height:32px;/);
 assert.equal((dashboardCss.match(/\.dash-main \.alert\{/g)||[]).length,1,'dashboard alert styles must stay consolidated');
 assert.match(reportsCss,/\.action-chipline \.action-chip\{\s*max-width:none; white-space:nowrap;/,'chip trạng thái NCE phải giữ một dòng khi hàng còn đủ rộng');
@@ -153,7 +159,7 @@ assert.match(usersCss, /\.user-perm-block\{[^}]*padding:var\(--panel-content-gap
 assert.match(usersCss, /\.user-perm-grid label\{[^}]*margin:0/);
 assert.match(westgardCss, /\.wg-panel-intro\{\s*margin:var\(--panel-content-gap\) 16px 8px/);
 assert.match(westgardCss, /\.wg-target-warning\{\s*margin:var\(--panel-content-gap\) 16px 0/);
-assert.equal((westgardRoutes.match(/wg-panel-intro/g) || []).length, 3);
+assert.equal((westgardRoutes.match(/wg-panel-intro/g) || []).length+(westgardCusumPagePresentation.match(/wg-panel-intro/g) || []).length, 3);
 assert.equal((westgardRoutes.match(/wg-target-warning/g) || []).length, 1);
 
 const canonicalWidths = new Set([640, 760, 900, 980, 1150, 1280]);

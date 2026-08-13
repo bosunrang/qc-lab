@@ -1,0 +1,1 @@
+export function createBackupExportMessage(){return{createError:(error:any)=>'Không tạo được file backup:\n'+(error&&error.message?error.message:'Lỗi không xác định.'),downloadError:'Không tạo được file backup. Dữ liệu chưa được xem là đã sao lưu.'};}
