@@ -13,14 +13,14 @@
    action-workflow-service.js đã bỏ qua chúng khi tính có NCE thật cho một điểm QC
    hay không. rule lưu dạng chuỗi có thể ghép nhiều luật ("2-2s, 8x") nên phải
    tách theo dấu phẩy trước khi so với WG_SE_RULES. */
-function rangeSystematicNce(tid,level){if(globalThis.qcRangeCandidateService)return globalThis.qcRangeCandidateService.systematicNce(tid,level);
+function rangeSystematicNce(tid,level){return globalThis.qcRangeCandidateService.systematicNce(tid,level);
   const matches=(state.actions||[]).filter(a=>a.testId===tid&&+a.level===+level&&!actionCancelled(a)&&String(a.rule||'').split(',').map(s=>s.trim()).some(r=>QCCore.WG_SE_RULES.includes(r)));
   if(!matches.length)return null;
   return matches.slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')))[0];
 }
-function rangeCandidate(tid,level){if(globalThis.qcRangeCandidateService)return globalThis.qcRangeCandidateService.candidate(tid,level);const t=state.tests.find(x=>x.id===tid),l=t&&lvlCfg(t,level);if(!t||!l)return{t,l,pts:[],wg:{F:[],zs:[]},c:null,days:0,bad:0,warn:0,eligible:false,nce:null};
+function rangeCandidate(tid,level){return globalThis.qcRangeCandidateService.candidate(tid,level);const t=state.tests.find(x=>x.id===tid),l=t&&lvlCfg(t,level);if(!t||!l)return{t,l,pts:[],wg:{F:[],zs:[]},c:null,days:0,bad:0,warn:0,eligible:false,nce:null};
   const pts=operationalLotPoints(t,level),allWG=activeWestgard(t),F=pts.map(p=>allWG.byPoint.get(p.id)||{level:'ok',rules:[]}),zs=pts.map(p=>QCCore.pointZ(p,l.mean,l.sd)),wg={F,zs},c=stats(pts.map(p=>p.val)),days=new Set(pts.map(p=>p.date)).size,bad=F.filter(f=>f.level==='rej').length,warn=F.filter(f=>f.level==='warn').length,eligible=!!(c&&c.n>=20&&days>=20&&bad===0&&warn===0&&c.sd>0),nce=rangeSystematicNce(tid,level);return{t,l,pts,wg,c,days,bad,warn,eligible,nce};}
-function assignRangeTarget(levelCfg,mean,sd,source){if(globalThis.qcRangeCandidateService)return globalThis.qcRangeCandidateService.assignTarget(levelCfg,mean,sd,source);const next=QCCore.limitsFromTarget(mean,sd,2);if(!levelCfg||!next)return false;Object.assign(levelCfg,{mean:next.mean,sd:next.sd,low:next.low,high:next.high,rangeK:2,applied:source});return true;}
+function assignRangeTarget(levelCfg,mean,sd,source){return globalThis.qcRangeCandidateService.assignTarget(levelCfg,mean,sd,source);}
 function openRangeWorkflow(tid,level){
   const r=rangeCandidate(tid,level);if(!r.t||!r.l)return;
   const rows=[['Tổng số kết quả',r.c?r.c.n:0,'≥20',r.c&&r.c.n>=20],['Số ngày độc lập',r.days,'≥20 ngày',r.days>=20],['Điểm bị loại Westgard',r.bad,'Phải bằng 0; không tự loại điểm để làm đẹp SD',r.bad===0],['Điểm cảnh báo',r.warn,'Phải bằng 0 trước khi phê duyệt dải',r.warn===0],['SD đề xuất hợp lệ',r.c?fmtTestValue(r.t,r.c.sd):'—','>0',r.c&&r.c.sd>0]];
@@ -41,13 +41,13 @@ function openRangeWorkflow(tid,level){
 /* TEa% của xét nghiệm tại đúng target=mean đang dùng, dùng chung cho ngưỡng Bias
    (điều kiện 2) và số tham khảo ΔSEcrit/ΔREcrit — lấy nguyên lớp giải TEa của
    trang Sigma (sigma-tea.js) thay vì dựng một bảng TEa riêng cho range.js. */
-function rangeTeaPercent(t,l){if(globalThis.qcRangeTea)return globalThis.qcRangeTea.percent(t,l);const v=t?sgTeaBySource(t,sgTeaSource(t),l.mean):0;return Number.isFinite(v)&&v>0?v:null;}
+function rangeTeaPercent(t,l){return globalThis.qcRangeTea.percent(t,l);}
 /* Khối xác nhận 2 điều kiện chỉ hiện khi rangeCandidate() thấy có hồ sơ NCE hệ
    thống (r.nce) — thiết lập dải thường quy (không có NCE liên quan) giữ nguyên
    luồng cũ, không thêm ma sát. */
 function rangeGateHtml(r,tid,level){
   if(!r.nce)return'';
-  const tea=rangeTeaPercent(r.t,r.l),threshold=globalThis.qcRangeTea?globalThis.qcRangeTea.quarter(tea):(tea?tea/4:null);
+  const tea=rangeTeaPercent(r.t,r.l),threshold=globalThis.qcRangeTea.quarter(tea);
   return `<div class="alert warn flow-control"><b>Hồ sơ NCE ${esc(r.nce.nceId||'NCE')} đang ghi nhận vi phạm hệ thống (${esc(r.nce.rule||'')})</b><div>Xác nhận 2 điều kiện dưới đây trước khi áp dụng dải mới — tránh "đuổi theo mean" khi nguyên nhân dịch chuyển chưa được lý giải.</div></div>
     <label class="range-gate-check"><input type="checkbox" id="rangeCauseConfirm" onchange="document.getElementById('rangeGateErr').style.display='none'"><span>Xác nhận nguyên nhân dịch chuyển đã được xác định và ghi nhận trong hồ sơ NCE ${esc(r.nce.nceId||'NCE')} (không phải lỗi chưa lý giải)</span></label>
     <div class="field-row flow-item"><div><label>Bias đo lại (%)</label><input id="rangeBiasInput" type="text" inputmode="decimal" oninput="rangeUpdateBiasHint('${tid}',${level})"></div><div><label>Ngưỡng cho phép (≤ TEa/4)</label><input id="rangeBiasThreshold" readonly value="${threshold!=null?fmt(threshold)+'%':'—'}"></div></div>
@@ -63,13 +63,13 @@ function rangeUpdateBiasHint(tid,level){
   const bias=parseFloat(String(biasEl.value).replace(',','.')),tea=rangeTeaPercent(r.t,r.l);
   if(!tea){hint.textContent='Chưa có TEa% cho xét nghiệm này — vào Cấu hình Sigma để bổ sung.';return;}
   if(!Number.isFinite(bias)){hint.textContent='';return;}
-  const result=globalThis.qcRangeBiasEvaluation?globalThis.qcRangeBiasEvaluation(tea,bias,r.l.sd,QCCore.systematicShiftCritical):(function(){const threshold=tea/4;return{threshold,withinThreshold:Math.abs(bias)<=threshold,critical:QCCore.systematicShiftCritical(tea,bias,r.l.sd)};})();
+  const result=globalThis.qcRangeBiasEvaluation(tea,bias,r.l.sd,QCCore.systematicShiftCritical);
   hint.innerHTML=`${result.withinThreshold?'✔ Đạt':'✘ Vượt'} ngưỡng: |Bias| ${fmt(Math.abs(bias))}% so với ${fmt(result.threshold)}%.`+(result.critical?` <span style="color:var(--muted)">Tham khảo (không phải kết luận chính thức): ΔSEcrit ${fmt(result.critical.dSEcrit)} · ΔREcrit ${fmt(result.critical.dREcrit)}.</span>`:'');
 }
 function rangeGatePasses(r){
   if(!r.nce)return true;
   const causeEl=document.getElementById('rangeCauseConfirm'),biasEl=document.getElementById('rangeBiasInput'),bias=parseFloat(String(biasEl?biasEl.value:'').replace(',','.')),tea=rangeTeaPercent(r.t,r.l);
-  if(globalThis.qcRangeSafetyGate)return globalThis.qcRangeSafetyGate(r.nce,tea,!!(causeEl&&causeEl.checked),bias).passes;
+  return globalThis.qcRangeSafetyGate(r.nce,tea,!!(causeEl&&causeEl.checked),bias).passes;
   return!!(causeEl&&causeEl.checked&&tea&&Number.isFinite(bias)&&Math.abs(bias)<=tea/4);
 }
 async function applyNewRange(tid,level){

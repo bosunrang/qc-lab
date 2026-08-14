@@ -21,6 +21,14 @@ Không viết lại toàn bộ và không thay đổi định dạng dữ liệu
   bảng nhập, khoảng ngày, cấu hình cột, hủy điểm QC và feedback sau lưu) sang
   bridge TypeScript trực tiếp. Các source-scan accessibility/sandbox test đã
   được cập nhật để kiểm tra implementation mới, không nới lỏng hợp đồng.
+- **Tiếp nối 2026-08-14.** Manage đã bỏ fallback classic cho Lịch sử QC và các
+  command TEa; Settings gọi trực tiếp command/layout Firebase và nội dung Rules;
+  Report gọi trực tiếp page renderer; Reagent đã chuyển nhãn, bảng nhập, thống kê,
+  calculator, biểu đồ và model báo cáo sang bridge TypeScript. Các contract bridge
+  tương ứng là bắt buộc và có source-scan test bảo vệ. `npm.cmd run build:pilot`,
+  `npm.cmd run typecheck` và các test module liên quan đều đạt. Toàn bộ `npm test`
+  hiện vẫn phụ thuộc các file benchmark đang bị xóa trong worktree, nên không dùng
+  kết quả đó để đánh giá các thay đổi migration này.
 
 ### Việc tiếp theo (buổi sau)
 

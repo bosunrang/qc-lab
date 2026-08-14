@@ -24,6 +24,14 @@ run(ctx, `
   function pointStaff(p){return {code:p.staff||'NV1'};}
   function qcVerdictLabel(v){return v==='rej'?'Loại bỏ':v==='warn'?'Cảnh báo':'Đạt';}
   function errorType(rules){return rules.includes('1-3s')?'Sai số ngẫu nhiên':'Sai số hệ thống';}
+  globalThis.westgardXlsxHeader=input=>({rows:[
+    [{v:input.title,s:input.styles.TITLE}],[{v:input.labName+' · '+input.department,s:input.styles.SUB}],[],
+    [{v:'Xét nghiệm',s:input.styles.LABEL},{v:input.testName,s:input.styles.VAL}],
+    [{v:'Phiên bản app',s:input.styles.LABEL},{v:input.appName+' '+input.appVersion,s:input.styles.VAL}],
+    [{v:'Luật theo từng mức',s:input.styles.LABEL},{v:input.withinRules,s:input.styles.VAL}],
+    [{v:'Luật liên mức / lần chạy',s:input.styles.LABEL},{v:input.acrossRules,s:input.styles.VAL}]
+  ],merges:['A4:B4','C4:E4','F4:G4','H4:I4','A6:B6','C6:I6','A7:B7','C7:I7'],rowHeights:{}});
+  globalThis.westgardXlsxRows={detail:(o,index)=>{const rules=[...new Set(o.f.rules||[])],support=[...new Set(o.f.supportRules||[])].filter(x=>!rules.includes(x)),evidence=!rules.length&&support.length,used=rules.length?rules:support;return{index,date:vnDate(o.p.date),runId:o.p.runId||'—',staffCode:pointStaff(o.p).code||'—',value:Number.isFinite(o.p.val)?o.p.val:'',z:(o.z>=0?'+':'')+fmt(o.z)+'s',verdict:evidence?'Bằng chứng':qcVerdictLabel(o.f.level),style:o.f.level==='rej'?'rej':o.f.level==='warn'?'warn':'ok',ruleText:rules.join(', ')||(evidence?'Bằng chứng: '+support.join(', '):'—'),error:used.length?errorType(used):'—'};}};
   function previousLotSeries(){return [];}
   function wgMultiViews(t){return activeWestgard(t).views.map(v=>({level:v.l.level,lot:v.l.lot,mean:v.l.mean,sd:v.l.sd,pts:v.pts,label:'M'+v.l.level}));}
   function ljDataURL(){return 'data:image/png;base64,iVBORw0KGgo=';}

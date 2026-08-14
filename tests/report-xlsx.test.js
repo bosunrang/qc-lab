@@ -172,6 +172,7 @@ function sampleDoc(overrides = {}) {
     ACTION_LABELS={source:{iqc:'Nội kiểm IQC'},phase:{exam:'Trong xét nghiệm'},risk:{high:'Cao',low:'Thấp'},containment:{held:'Đã dừng/giữ kết quả liên quan'},patient:{none:'Không ảnh hưởng'},release:{released:'Cho phép trở lại'},cause:{instrument:'Máy phân tích'},check:{ok:'Đạt',abnormal:'Bất thường'}};
     operationalLevels=()=>[];activeWestgard=()=>({});sgTea=()=>5;sgTeaSource=()=>'';sgTeaLabel=()=>'';sgTeaRefText=()=>'';formatDateTimeVN=v=>String(v);userName=()=>'Tester';reportRangeText=()=>'17/07/2026 - 29/07/2026';testDisplayName=t=>t.name;actionEventDate=a=>a.date;actionWorkflowStatus=()=>({label:'Đã khép vòng'});actionRerunStatus=()=>({label:'QC đạt lại',point:{val:140.2,date:'2026-07-17',runId:'2'}});actionLevelShort=()=> 'M1 - Lô 1101';actionApprovalLabel=()=> 'Đã duyệt';actionEffectivenessStatus=()=>({label:'Có hiệu lực'});actionRiskScore=()=>60;actionResidualRiskScore=()=>8;vnDate=v=>String(v);fmt=v=>String(v);
   `);
+  run(ctx, `globalThis.reportXlsxHeader=()=>({rows:[],merges:[],rowHeights:{}});`);
   const withAppendix = JSON.parse(run(ctx, `JSON.stringify(reportXlsxDoc('T1','','',true))`));
   const withoutAppendix = JSON.parse(run(ctx, `JSON.stringify(reportXlsxDoc('T1','','',false))`));
   const texts = doc => doc.rows.flat().filter(Boolean).map(cell => String(cell.v || ''));

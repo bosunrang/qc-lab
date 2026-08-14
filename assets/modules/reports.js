@@ -1,17 +1,17 @@
 /* ===== REPORTS (printable) ===== */
 function esc(s){return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function escAttr(s){return esc(s);}
-function reportQcValue(t,value){return globalThis.reportQcFormat?globalThis.reportQcFormat.value(t,value):(typeof fmtTestValue==='function'?fmtTestValue(t,value):fmt(value,3));}
+function reportQcValue(t,value){return globalThis.reportQcFormat.value(t,value);}
 /* SD/Mean thống kê: nhiều chữ số hơn giá trị đo. Fallback fmt(value,3) giữ đúng hành vi
    trước 2026-08-02 khi state.js chưa nạp (in ở document riêng). */
-function reportQcStat(t,value){return globalThis.reportQcFormat?globalThis.reportQcFormat.stat(t,value):(typeof fmtTestStat==='function'?fmtTestStat(t,value):fmt(value,3));}
-function reportQcPoint(point,t){return globalThis.reportQcFormat?globalThis.reportQcFormat.point(point,t):(typeof fmtPointValue==='function'?fmtPointValue(point,t):fmt(point&&point.val,Math.max(2,Number(point&&point.valueDecimals)||0)));}
-function reportHeader(title,subtitle='Nội kiểm chất lượng xét nghiệm'){if(globalThis.reportHeaderPresentation)return globalThis.reportHeaderPresentation({title,subtitle,lab:state.lab,app:window.QCLAB_APP,westgardRules:state.westgardRules,exportedAt:formatDateTimeVN(new Date().toISOString()),exportedBy:userName(),escape:esc});const L=state.lab,app=window.QCLAB_APP||{version:'dev'},rules=Object.entries(state.westgardRules||{}).filter(x=>x[1]!==false).map(x=>x[0]).join(', ');return '<div class="rpt-head">'+
+function reportQcStat(t,value){return globalThis.reportQcFormat.stat(t,value);}
+function reportQcPoint(point,t){return globalThis.reportQcFormat.point(point,t);}
+function reportHeader(title,subtitle='Nội kiểm chất lượng xét nghiệm'){return globalThis.reportHeaderPresentation({title,subtitle,lab:state.lab,app:window.QCLAB_APP,westgardRules:state.westgardRules,exportedAt:formatDateTimeVN(new Date().toISOString()),exportedBy:userName(),escape:esc});const L=state.lab,app=window.QCLAB_APP||{version:'dev'},rules=Object.entries(state.westgardRules||{}).filter(x=>x[1]!==false).map(x=>x[0]).join(', ');return '<div class="rpt-head">'+
   '<div class="rpt-brand"><div><div class="rpt-hosp">'+esc(L.name||'BỆNH VIỆN / ĐƠN VỊ')+'</div><div class="rpt-dept">'+esc(L.dept||'Khoa Xét nghiệm')+'</div><div class="rpt-addr">'+esc(L.address||'')+'</div></div></div>'+
   '<div class="rpt-meta"><b>Thời gian xuất</b><span>'+formatDateTimeVN(new Date().toISOString())+'</span><b class="rpt-meta-label">Người xuất</b><span>'+esc(userName())+'</span></div></div>'+
   '<table class="meta-table"><tr><th>Phiên bản app</th><td>'+esc((app.name||'QC Lab')+' '+(app.version||'dev'))+'</td><th>Bộ luật áp dụng</th><td>'+esc(rules||'Chưa cấu hình')+'</td></tr></table>'+
   '<div class="rpt-title"><div>'+title+'</div><span>'+esc(subtitle)+'</span></div>';}
-function signBlock(){return globalThis.reportSignBlock?globalThis.reportSignBlock():'<div class="sign-grid"><div><b>Người thực hiện</b><span>(Ký, ghi rõ họ tên)</span></div><div><b>Người kiểm tra</b><span>(Ký, ghi rõ họ tên)</span></div><div><b>Phụ trách khoa</b><span>(Ký, ghi rõ họ tên)</span></div></div>';}
+function signBlock(){return globalThis.reportSignBlock();}
 async function openPrint(title,bodyHtml,options={}){
   const w=window.open('','_blank');if(!w){await infoDialog('Trình duyệt chặn cửa sổ. Cho phép pop-up để in báo cáo.');return;}
   /* Font Manrope tự host (assets/tokens.css @font-face → assets/fonts/*.woff2),
@@ -49,40 +49,23 @@ async function openPrint(title,bodyHtml,options={}){
   w.document.close();w.focus();
 }
 function sigmaPeriodPrintRows(row,levels){
-  if(globalThis.sigmaPrintRowsService)return globalThis.sigmaPrintRowsService.periodRows(row,levels);
-  return(levels||[]).map((level,i)=>{const r=row&&row.rs&&row.rs[i];if(!r)return'<tr><td>Mức '+level+'</td><td colspan="9" class="muted">Chưa đủ CV IQC và Bias EQA/EQC để tính Sigma</td></tr>';const source=r.cvSource==='iqc-period'||r.cvSource==='iqc-cohort'?((r.n||0)+' điểm'+(r.sourceLot?' · Lô '+esc(r.sourceLot):'')):'Nhập tay',sigma=(r.classifiable?'':'≈')+fmt(r.sigma,2);return'<tr><td><b>Mức '+level+'</b></td><td class="num">'+fmt(r.tea,2)+'</td><td class="num"><b style="color:'+escAttr(r.c)+'">'+sigma+'</b></td><td><span class="pill" style="color:'+escAttr(r.c)+'">'+esc(r.label)+'</span></td><td class="num">'+fmt(r.cv,2)+'</td><td class="num">'+fmt(r.bias,2)+'</td><td class="num">'+sgFmtDPMO(r.dpmo)+'</td><td class="num">'+fmt(r.yld,4)+'%</td><td>'+source+'</td><td>'+esc(r.readinessLabel||r.cohortStatus||'—')+'</td></tr>';}).join('');
+  return globalThis.sigmaPrintRowsService.periodRows(row,levels);
 }
 function sigmaPeriodsPrintRows(rows,levels){
-  if(globalThis.sigmaPrintRowsService)return globalThis.sigmaPrintRowsService.periodsRows(rows,levels);
-  return(rows||[]).flatMap(row=>{const period=vnPeriod(row.e.period)||row.e.period||'?';return(levels||[]).map((level,i)=>{const r=row.rs&&row.rs[i];if(!r)return'<tr><td><b>'+esc(period)+'</b></td><td>Mức '+level+'</td><td colspan="9" class="muted">Chưa đủ CV IQC và Bias EQA/EQC để tính Sigma</td></tr>';const source=r.cvSource==='iqc-period'||r.cvSource==='iqc-cohort'?((r.n||0)+' điểm'+(r.sourceLot?' · Lô '+esc(r.sourceLot):'')):'Nhập tay',sigma=(r.classifiable?'':'≈')+fmt(r.sigma,2);return'<tr><td><b>'+esc(period)+'</b></td><td><b>Mức '+level+'</b></td><td class="num">'+fmt(r.tea,2)+'</td><td class="num"><b style="color:'+escAttr(r.c)+'">'+sigma+'</b></td><td><span class="pill" style="color:'+escAttr(r.c)+'">'+esc(r.label)+'</span></td><td class="num">'+fmt(r.cv,2)+'</td><td class="num">'+fmt(r.bias,2)+'</td><td class="num">'+sgFmtDPMO(r.dpmo)+'</td><td class="num">'+fmt(r.yld,4)+'%</td><td>'+source+'</td><td>'+esc(r.readinessLabel||r.cohortStatus||'—')+'</td></tr>';});}).join('');
+  return globalThis.sigmaPrintRowsService.periodsRows(rows,levels);
 }
 /* Bảng công bố độ không đảm bảo đo cho bản in. Số liệu lấy THẲNG r.mu mà sgComp()
    đã gắn — cùng một phép tính với panel MU trên trang Sigma — và chỉ rơi về sgMU()
    cho những mức chưa ra được Sigma (thiếu Bias), để bản in không bao giờ khác màn
    hình. Không tự điền 0 cho thành phần còn thiếu: cột Trạng thái phải nói ra. */
-function sigmaMuCells(t,row,level,i){
-  const r=row&&row.rs&&row.rs[i],mu=(r&&r.mu)||sgMU(t,row.e,level),unit=t&&t.unit||'';
-  if(!mu)return'<td colspan="7" class="muted">Chưa có CV IQC — chưa lập được ngân sách MU</td>';
-  const uBias=!mu.includeBias?'Không cộng':mu.uBias==null?'Chưa có Bias':fmt(mu.uBias,2),uCal=mu.uCal==null?'Chưa có CoA':fmt(mu.uCal,2);
-  const abs=mu.absoluteU==null?'—':fmt(mu.absoluteU,3)+(unit?' '+esc(unit):'');
-  return'<td class="num">'+fmt(mu.uRw,2)+'</td><td class="num">'+uBias+'</td><td class="num">'+uCal+'</td><td class="num">'+fmt(mu.uc,2)+'</td><td class="num"><b>'+fmt(mu.U,2)+'</b></td><td class="num">'+abs+'</td><td>'+(mu.complete?'<span class="pill">Đủ thành phần</span>':'Thiếu '+esc(mu.missing.join(', ')))+'</td>';
-}
 function sigmaMuPrintRows(t,row,levels){
-  if(globalThis.sigmaMuPrintRowsService)return globalThis.sigmaMuPrintRowsService.periodRows(t,row,levels);
-  return(levels||[]).map((level,i)=>'<tr><td><b>Mức '+level+'</b></td>'+sigmaMuCells(t,row,level,i)+'</tr>').join('');
+  return globalThis.sigmaMuPrintRowsService.periodRows(t,row,levels);
 }
 function sigmaMuPeriodsPrintRows(t,rows,levels){
-  if(globalThis.sigmaMuPrintRowsService)return globalThis.sigmaMuPrintRowsService.periodsRows(t,rows,levels);
-  return(rows||[]).flatMap(row=>{const period=vnPeriod(row.e.period)||row.e.period||'?';
-    return(levels||[]).map((level,i)=>'<tr><td><b>'+esc(period)+'</b></td><td><b>Mức '+level+'</b></td>'+sigmaMuCells(t,row,level,i)+'</tr>');}).join('');
+  return globalThis.sigmaMuPrintRowsService.periodsRows(t,rows,levels);
 }
 function sigmaMuTrace(row,levels){
-  if(globalThis.sigmaMuTraceService)return globalThis.sigmaMuTraceService(row,levels);
-  const trace=[];
-  (levels||[]).forEach(level=>{const L=(row.e.lv&&row.e.lv[level])||{};if(L.uCalBasis)trace.push('Mức '+level+' · nguồn u(cal): '+esc(L.uCalBasis));});
-  const signed=(levels||[]).map(level=>(row.e.lv&&row.e.lv[level])||{}).find(L=>L.muReviewedBy||L.muReviewedDate);
-  if(signed)trace.push('Người rà soát ngân sách MU: '+esc(signed.muReviewedBy||'—')+(signed.muReviewedDate?' · '+vnDate(signed.muReviewedDate):''));
-  return trace;
+  return globalThis.sigmaMuTraceService(row,levels);
 }
 const SIGMA_MU_PRINT_NOTE='<p class="soft-note">Mô hình top-down (ISO/TS 20914 · Nordtest TR 537): u(Rw) là CV% dài hạn của IQC, u(bias) = √(Bias² + u(Cref)²) từ EQA/EQC, u(cal) chép từ CoA của calibrator; u<sub>c</sub> = √(Σu²) và U = 2·u<sub>c</sub> (xấp xỉ 95%). Giới hạn MU cho phép (MAU) do SOP của đơn vị ấn định — báo cáo này không tự kết luận đạt/không đạt. Ngân sách còn thiếu thành phần không được công bố như một giá trị MU hoàn chỉnh.</p>';
 function sigmaMuPrintCard(t,row,levels){
@@ -148,39 +131,19 @@ async function printWestgard(){
   body+=signBlock();await openPrint('Phân tích Westgard — '+testDisplayName(t),body);
 }
 function reportPointsTableHtml(items,t){
-  if(globalThis.reportPointsTableService)return globalThis.reportPointsTableService(items,t);
-  if(!items.length)return '<p><i>Không có điểm nào trong khoảng ngày đã chọn.</i></p>';
-  const rows=items.map(o=>{
-    const rules=[...new Set(o.f.rules||[])],support=[...new Set(o.f.supportRules||[])].filter(rule=>!rules.includes(rule)),ruleText=rules.join(', ')||(support.length?'Bằng chứng: '+support.join(', '):'—'),lv=qcVerdictLabel(o.f.level),staff=pointStaff(o.p);
-    return '<tr><td>'+vnDate(o.p.date)+'</td><td>'+esc(o.p.runId||'—')+'</td><td>'+esc(staff.code||'—')+'</td><td class="num">'+reportQcPoint(o.p,t)+'</td><td class="num">'+(o.z>=0?'+':'')+fmt(o.z)+'s</td><td>'+esc(lv)+'</td><td>'+esc(ruleText)+'</td></tr>';
-  }).join('');
-  return '<table><tr><th>Ngày</th><th>Lần chạy</th><th>NV</th><th class="num">Giá trị</th><th class="num">Z</th><th>Kết luận</th><th>Luật / bằng chứng</th></tr>'+rows+'</table>';
+  return globalThis.reportPointsTableService(items,t);
 }
 /* Nội dung phiếu NCE (bóc nhãn, cắt đoạn, dựng checklist) nằm ở reportNceModel/
    reportNceSummaryParts trong data-io.js — dùng chung với bản Excel. Ở đây chỉ
    còn phần trình bày HTML. */
 function reportNceSummaryHtml(a){
-  if(globalThis.actionReportHtml)return globalThis.actionReportHtml.summary(reportNceSummaryParts(a));
-  return '<div class="nce-summary">'+reportNceSummaryParts(a).map(([label,text])=>'<div><b>'+esc(label)+':</b> '+esc(text)+'</div>').join('')+'</div>';
+  return globalThis.actionReportHtml.summary(reportNceSummaryParts(a));
 }
-function reportNceDetailField(label,value,wide=false){return globalThis.actionReportHtml?globalThis.actionReportHtml.detailField(label,value,wide):'<div'+(wide?' class="nce-detail-wide"':'')+'><span>'+esc(label)+'</span><b>'+esc(value||'—')+'</b></div>';}
+function reportNceDetailField(label,value,wide=false){return globalThis.actionReportHtml.detailField(label,value,wide);}
 function reportNceDetailHtml(a,t){
-  if(globalThis.reportNceDetailHtmlPresentation)return globalThis.reportNceDetailHtmlPresentation(a,t);
-  const m=reportNceModel(a,t),F=reportNceDetailField;
-  const checkRows=m.checks.map(([label,statusText,noteText])=>'<tr><td><b>'+esc(label)+'</b></td><td>'+esc(statusText)+'</td><td>'+esc(noteText)+'</td></tr>').join('');
-  let html='<section class="nce-detail"><div class="nce-detail-head"><h3>Phiếu NCE '+esc(m.nceTitle)+'</h3><div class="nce-detail-status">'+esc(m.wfLabel)+'</div></div><div class="nce-detail-grid">'+F('Ngày xảy ra',m.eventDateText)+F('Xét nghiệm / mức / lô',m.testLevelText)+F('Luật / loại sai số',m.ruleErrText)+F('Nguồn / giai đoạn',m.sourcePhaseText)+F('Người phụ trách / hạn',m.ownerDueText)+F('Trạng thái bản ghi',m.recordStatusText)+'</div>';
-  if(!m.modern)return html+'<h4>Hành động đã ghi</h4><div class="nce-detail-text">'+esc(m.legacyActionText)+'</div><h4>QC chạy lại / duyệt</h4><div class="nce-detail-grid">'+F('QC chạy lại',m.rerunText)+F('Phê duyệt',m.approvalShortText)+'</div></section>';
-  html+='<h4>1. Kiểm soát và xử lý tức thời</h4><div class="nce-detail-stack"><div class="nce-detail-grid">'+F('Phạm vi kiểm soát',m.containmentText)+F('Ghi chú phạm vi',m.containmentNote)+'</div><div class="nce-detail-text">'+esc(m.correctionText)+'</div></div>';
-  html+='<h4>2. Đánh giá nguy cơ ban đầu</h4><div class="nce-detail-grid">'+F('Phân loại / RPN',m.riskText)+F('S x O x D',m.sodText)+F('Căn cứ SOP',m.riskBasis,true)+'</div>';
-  html+='<h4>3. Checklist điều tra</h4><table class="nce-check-table"><colgroup><col class="nce-check-item-col"><col class="nce-check-result-col"><col class="nce-check-note-col"></colgroup><tr><th>Hạng mục</th><th>Kết luận</th><th>Ghi chú / bằng chứng</th></tr>'+checkRows+'</table>';
-  html+='<h4>4. Nguyên nhân và hành động khắc phục</h4><div class="nce-detail-stack"><div class="nce-detail-grid">'+F('Nhóm nguyên nhân',m.causeCategoryText)+F('Ngày hoàn thành hành động',m.actionCompletedText)+'</div><div class="nce-detail-text"><b>Nguyên nhân:</b> '+esc(m.causeText)+'\n<b>Hành động khắc phục:</b> '+esc(m.actionText)+'</div></div>';
-  html+='<h4>5. Bằng chứng QC chạy lại và cho phép trở lại</h4><div class="nce-detail-grid">'+F('QC chạy lại',m.rerunText)+F('Quyết định',m.releaseText)+F('Ngày / người cho phép',m.releaseWhoText)+F('Căn cứ cho phép',m.releaseNote)+'</div>';
-  html+='<h4>6. Ảnh hưởng người bệnh</h4><div class="nce-detail-grid">'+F('Kết luận',m.patientText)+F('Xử lý kết quả liên quan',m.patientAction)+'</div>';
-  html+='<h4>7. Hiệu lực, nguy cơ còn lại và phê duyệt</h4><div class="nce-detail-grid">'+F('Đánh giá hiệu lực',m.effLabel)+F('Ngày / người đánh giá',m.effWhoText)+F('Bằng chứng hiệu lực',m.effNote)+F('Nguy cơ còn lại',m.residualText)+F('Căn cứ đánh giá lại',m.residualBasis)+F('Phê duyệt',m.approvalText)+F('Ý kiến duyệt',m.approvalNote,true)+'</div>';
-  if(m.cancelled)html+='<h4>Thông tin hủy hồ sơ</h4><div class="nce-detail-text">'+esc(m.cancelText)+'</div>';
-  return html+'</section>';
+  return globalThis.reportNceDetailHtmlPresentation(a,t);
 }
-function reportNceAppendixHtml(actions,t){if(globalThis.reportNceAppendixPresentation)return globalThis.reportNceAppendixPresentation(actions,t);return '<div class="nce-appendix"><h3>Phụ lục - Hồ sơ NCE chi tiết</h3><p class="nce-appendix-intro">Phụ lục giữ đầy đủ nội dung điều tra, bằng chứng QC chạy lại, đánh giá hiệu lực và phê duyệt. Bảng tổng hợp phía trên chỉ trình bày thông tin trọng yếu.</p>'+actions.map(a=>reportNceDetailHtml(a,t)).join('')+'</div>';}
+function reportNceAppendixHtml(actions,t){return globalThis.reportNceAppendixPresentation(actions,t);}
 async function printReport(){
   const{tid,t,start,end,includeNceAppendix}=reportExportSelection();if(!t)return;
   const inMonth=reportInRange(start,end),wg=activeWestgard(t);

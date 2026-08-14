@@ -41,29 +41,10 @@ function confirmCancelAction(id,token){
 function actionApprovalTag(a){const s=actionApprovalStatus(a),view=ActionReviewPresentation.approvalTag(s,actionCancelled(a)),label=actionApprovalLabel(a);return globalThis.actionApprovalTagPresentation(view,label);}
 function actionApprovalToken(a){return ActionReviewService.reviewToken(a);}
 function actionApprovalReadinessMessage(r,afterAuth){
-  if(globalThis.ActionReviewMessages)return globalThis.ActionReviewMessages.approval(r,afterAuth);
-  if(r.reason==='cancelled')return'Hồ sơ đã hủy không thể được duyệt.';
-  if(r.reason==='unrecorded')return afterAuth?'Chưa có hành động khắc phục thực tế để duyệt.':'Chưa có hành động khắc phục thực tế để duyệt. Hãy ghi hành động trước.';
-  if(r.reason==='protocol')return(afterAuth?'Phiếu điều tra không còn đủ điều kiện duyệt: ':'Chưa thể duyệt vì phiếu điều tra còn thiếu: ')+(r.missing||[]).join(', ')+'.';
-  if(r.reason==='rerun')return afterAuth?'Kết quả QC chạy lại không còn hợp lệ.':'Chưa thể duyệt vì chưa có kết quả QC chạy lại được chấp nhận.';
-  if(r.reason==='effectiveness')return afterAuth?'Đánh giá hiệu lực không còn đủ điều kiện khép vòng.':'Chưa thể duyệt vì hành động chưa được đánh giá là có hiệu lực.';
-  if(r.reason==='not-pending')return'Hồ sơ không còn ở trạng thái chờ duyệt.';
-  if(r.reason==='non-independent')return afterAuth?'Không thể duyệt hồ sơ do tài khoản này đã tham gia tạo hoặc chỉnh sửa nội dung.':'Người ghi nhận hành động không được tự duyệt chính hành động đó. Hãy đăng nhập bằng tài khoản quản trị độc lập.';
-  return'Hồ sơ không còn đủ điều kiện duyệt.';
+  return globalThis.ActionReviewMessages.approval(r,afterAuth);
 }
 function actionReviewReadinessMessage(kind,r,afterAuth){
-  if(globalThis.ActionReviewMessages)return globalThis.ActionReviewMessages.review(kind,r,afterAuth);
-  if(kind==='cancel'){
-    if(r.reason==='cancelled')return afterAuth?'':'Hồ sơ này đã được hủy và đang được giữ lại trong nhật ký.';
-    if(r.reason==='approved')return afterAuth?'Không thể hủy hồ sơ đã duyệt.':'Không thể hủy hồ sơ đã duyệt. Nếu cần xử lý tiếp, hãy lập hồ sơ NCE mới.';
-    if(r.reason==='follow-up')return afterAuth?'Không thể hủy vì hồ sơ này vừa phát sinh một hồ sơ nối tiếp đang hoạt động.':`Không thể hủy ${r.action&&r.action.nceId||'hồ sơ này'} khi hồ sơ nối tiếp ${r.followUp&&r.followUp.nceId||r.action&&r.action.followUpNceId||''} vẫn đang hoạt động. Hãy xử lý hoặc hủy hồ sơ nối tiếp trước.`;
-  }
-  if(kind==='return'){
-    if(r.reason==='cancelled')return'Hồ sơ đã hủy không thể trả lại để chỉnh sửa.';
-    if(r.reason==='not-pending')return'Hồ sơ không còn ở trạng thái chờ duyệt.';
-  }
-  if(kind==='reopen')return'Chỉ mở lại được hồ sơ đã duyệt nhưng không còn đủ điều kiện khép vòng. Hồ sơ đã khép vòng hợp lệ thì mở hồ sơ NCE mới.';
-  return'Hồ sơ không còn đủ điều kiện thực hiện thao tác này.';
+  return globalThis.ActionReviewMessages.review(kind,r,afterAuth);
 }
 async function approveAction(i){
   if(!requireAdmin())return;const a=state.actions&&state.actions[i];if(!a)return;
@@ -164,31 +145,30 @@ function confirmReopenAction(i){
 }
 function actionReviewButtons(i,a){
   const s=actionApprovalStatus(a),wf=actionWorkflowStatus(a),model=ActionReviewPresentation.buttons(a,{approval:s,workflowStage:wf.stage,cancelled:actionCancelled(a),isAdmin:role()==='admin',canWrite:canWrite(),canEscalate:actionCanEscalate(a),canReopen:actionCanReopen(a)});
-  return globalThis.actionReviewButtonsHtml?globalThis.actionReviewButtonsHtml(i,model):`<div class="action-row-actions">${btn('Chi tiết',`viewActionDetail(${i})`,'ghost sm')}${model.edit?btn('Tiếp tục',`editAction(${i})`,'ghost sm'):''}${model.escalate?btn('Lập hồ sơ tiếp theo',`escalateAction(${i})`,'teal sm','Hành động chưa hiệu lực — mở vòng điều tra mới'):''}${model.approve?btn('Duyệt',`approveAction(${i})`,'teal sm'):''}${model.returnForRevision?btn('Trả lại',`returnAction(${i})`,'ghost sm'):''}${model.reopen?btn('Mở lại',`reopenAction(${i})`,'danger sm','Hồ sơ đã duyệt nhưng không còn đủ điều kiện khép vòng'):''}${model.cancel?btn('Hủy hồ sơ',`cancelAction(${i})`,'danger sm','Hủy có lưu vết — không xóa dữ liệu'):''}</div>`;
+  return globalThis.actionReviewButtonsHtml(i,model);
+  return globalThis.actionReviewButtonsHtml(i,model);
 }
 /* Chip phụ dùng chung cho dòng vi phạm, dòng NCE đang mở và bảng nhật ký, để ba chỗ
    không lệch nhau (đúng lỗi chip QC chạy lại chỉ hiện ở một chỗ trước đây). */
 function actionSideChips(a,stage){
   if(actionCancelled(a))return'';
   const chips=ActionStatusPresentation.sideChips(a,stage,actionRerunStatus(a),actionOverdue(a),actionEffectivenessStatus(a));
-  return globalThis.actionSideChipsHtml?globalThis.actionSideChipsHtml(chips):chips.map(chip=>`<span class="action-chip ${chip.cls}">${esc(chip.label)}</span>`).join('');
+  return globalThis.actionSideChipsHtml(chips);
 }
 function actionDetailCheck(label,status,note){
   const view=ActionStatusPresentation.detailCheck(status);
-  return globalThis.actionDetailCheckHtml?globalThis.actionDetailCheckHtml(label,view,note):`<div class="action-detail-check"><div><b>${esc(label)}</b>${note?`<div class="hint">${esc(note)}</div>`:''}</div><span class="tag ${view.cls}">${esc(view.label)}</span></div>`;
+  return globalThis.actionDetailCheckHtml(label,view,note);
 }
 function actionEvidenceTime(value,dateOnly=false){
   return ActionEvidencePresentation.time(value,dateOnly);
 }
 function actionEvidenceTimelineHtml(a,rr){
   const items=ActionEvidencePresentation.timeline(a,rr);
-  return globalThis.actionEvidenceTimelinePresentation?globalThis.actionEvidenceTimelinePresentation(items):`<div class="action-evidence-timeline" aria-label="Các mốc thời gian hồ sơ">${items.map(({label,value,note})=>`<div><span>${esc(label)}</span><b>${esc(value)}</b>${note?`<small>${esc(note)}</small>`:''}</div>`).join('')}</div>`;
+  return globalThis.actionEvidenceTimelinePresentation(items);
 }
 function actionRerunEvidenceHtml(a,rr,t){
-  const evidence=ActionRerunEvidencePresentation.model(a,rr,t);if(globalThis.actionRerunEvidencePresentation)return globalThis.actionRerunEvidencePresentation(evidence,a.testId,t);if(!evidence)return'';
-  if(evidence.kind==='pending')return `<div class="action-rerun-evidence ${evidence.cls}"><div class="action-rerun-mark" aria-hidden="true">QC</div><div class="action-rerun-copy"><small>Bằng chứng QC chạy lại</small><b>${esc(evidence.heading)}</b><span>${esc(evidence.label)}</span></div></div>`;
-  const q=evidence.point,viewBtn=btn('Xem điểm QC',`openActionQcEvidence('${jsq(a.testId)}',${+q.level||0},'${jsq(q.id)}','${jsq(q.date||'')}','${jsq(q.lot||'')}')`,'ghost sm','Mở đúng điểm QC được dùng làm bằng chứng');
-  return `<div class="action-rerun-evidence ${evidence.cls}"><div class="action-rerun-mark" aria-hidden="true">QC</div><div class="action-rerun-copy"><small>Bằng chứng QC chạy lại</small><b>${esc(evidence.heading)}</b><span>${fmtPointValue(q,t)} ${esc(t&&t.unit||'')} · ${vnDate(q.date)} · ${esc(q.runId||'Không có mã lần chạy')}</span><span>${esc(evidence.context)}</span></div><div class="action-rerun-actions">${viewBtn}</div></div>`;
+  const evidence=ActionRerunEvidencePresentation.model(a,rr,t);
+  return globalThis.actionRerunEvidencePresentation(evidence,a.testId,t);
 }
 function openActionQcEvidence(tid,level,pointId,date,lot){
   if(typeof captureActionDraft==='function'&&page==='actions')captureActionDraft();
@@ -206,26 +186,23 @@ function openActionQcEvidence(tid,level,pointId,date,lot){
 function viewActionDetail(i){
   const a=state.actions&&state.actions[i],t=a&&state.tests.find(x=>x.id===a.testId);if(!a)return;
   const legacy=!a.protocolVersion,modern=a.protocolVersion>=2,rr=actionRerunStatus(a),wf=actionWorkflowStatus(a),eff=actionEffectivenessStatus(a),residual=actionResidualRiskScore(a),overdue=actionOverdue(a);
-  const verdict=actionQcVerdictLabel(a),violation=actionViolationInfo(a),metaRows=ActionDetailPresentation.meta(a,{testName:t?testDisplayName(t):'—',levelShort:actionLevelShort(t,a.level,a.lot),verdict,violation,riskScore:actionRiskScore(a),dueDate:a.dueDate?vnDate(a.dueDate):'—',overdueLabel:overdue.overdue?overdue.label:'',workflowLabel:wf.label}),meta=globalThis.actionDetailMetaHtml?globalThis.actionDetailMetaHtml(metaRows):`<div class="action-detail-meta">${metaRows.map(row=>`<div><span>${esc(row.label)}</span><b>${esc(row.value)}</b>${row.note?`<small>${esc(row.note)}</small>`:''}</div>`).join('')}</div>`;
-  const cancelledAlert=globalThis.actionCancelledAlertHtml?globalThis.actionCancelledAlertHtml(actionCancelled(a)?{reason:a.cancelReason,by:a.cancelledBy,at:a.cancelledAt?formatDateTimeVN(a.cancelledAt):''}:undefined):actionCancelled(a)?`<div class="alert warn"><b>Hồ sơ đã hủy — dữ liệu được giữ để truy xuất.</b><div>${esc(a.cancelReason||'Không có lý do')}${a.cancelledBy?' · '+esc(a.cancelledBy):''}${a.cancelledAt?' · '+formatDateTimeVN(a.cancelledAt):''}</div></div>`:'';
-  const legacyDetail=globalThis.actionLegacyDetailHtml?globalThis.actionLegacyDetailHtml({action:a.action||'',owner:a.by||'',rerunLabel:rr.label||'',approvalLabel:actionApprovalLabel(a)}):`<div class="action-detail-legacy"><b>Hành động đã ghi</b><div>${esc(a.action||'—')}</div><div class="hint">${esc(a.by||'—')} · ${esc(rr.label||'Chưa có dữ liệu')} · ${esc(actionApprovalLabel(a))}</div></div>`;
+  const verdict=actionQcVerdictLabel(a),violation=actionViolationInfo(a),metaRows=ActionDetailPresentation.meta(a,{testName:t?testDisplayName(t):'—',levelShort:actionLevelShort(t,a.level,a.lot),verdict,violation,riskScore:actionRiskScore(a),dueDate:a.dueDate?vnDate(a.dueDate):'—',overdueLabel:overdue.overdue?overdue.label:'',workflowLabel:wf.label}),meta=globalThis.actionDetailMetaHtml(metaRows);
+  const cancelledAlert=globalThis.actionCancelledAlertHtml(actionCancelled(a)?{reason:a.cancelReason,by:a.cancelledBy,at:a.cancelledAt?formatDateTimeVN(a.cancelledAt):''}:undefined);
+  const legacyDetail=globalThis.actionLegacyDetailHtml({action:a.action||'',owner:a.by||'',rerunLabel:rr.label||'',approvalLabel:actionApprovalLabel(a)});
   const body=legacy?`${cancelledAlert}<div class="alert warn">Bản ghi được tạo trước khi có phiếu điều tra 8 bước. Dữ liệu hành động cũ vẫn được giữ nguyên.</div>${meta}${legacyDetail}`:`
     ${cancelledAlert}${meta}${actionEvidenceTimelineHtml(a,rr)}${actionRerunEvidenceHtml(a,rr,t)}
     <ol class="action-detail-steps">
-      ${globalThis.actionContainmentDetailHtml?globalThis.actionContainmentDetailHtml({status:ACTION_LABELS.containment[a.containmentStatus]||'',correction:a.correction||'',note:a.containmentNote||'',modern}):`<li><b>Kiểm soát tức thời</b><div>${esc(ACTION_LABELS.containment[a.containmentStatus]||'Chưa ghi')}</div>${modern?`<div>${esc(a.correction||'Chưa ghi xử lý tức thời')}</div>`:''}${a.containmentNote?`<div class="hint">${esc(a.containmentNote)}</div>`:''}</li>`}
-      ${globalThis.actionInspectionDetailsHtml?globalThis.actionInspectionDetailsHtml([{title:'Kiểm tra vật liệu QC',checksHtml:actionDetailCheck('Hạn dùng, bảo quản, hoàn nguyên và chuẩn bị',a.qcMaterialStatus,a.qcMaterialNote)},{title:'Kiểm tra máy phân tích',checksHtml:actionDetailCheck('Điện, nước, nhiệt độ, cảnh báo và bảo trì',a.instrumentStatus,a.instrumentNote)},{title:'Kiểm tra hóa chất / calibrator',checksHtml:actionDetailCheck('Hạn dùng, số lô, bảo quản và lot-to-lot',a.reagentStatus,a.reagentNote)+actionDetailCheck('So sánh lot-to-lot',a.lotToLotStatus,a.lotToLotNote)},{title:'Kiểm tra hiệu chuẩn',checksHtml:actionDetailCheck('Tình trạng hiệu chuẩn',a.calibrationStatus,a.calibrationNote)}]):`<li><b>Kiểm tra vật liệu QC</b>${actionDetailCheck('Hạn dùng, bảo quản, hoàn nguyên và chuẩn bị',a.qcMaterialStatus,a.qcMaterialNote)}</li><li><b>Kiểm tra máy phân tích</b>${actionDetailCheck('Điện, nước, nhiệt độ, cảnh báo và bảo trì',a.instrumentStatus,a.instrumentNote)}</li><li><b>Kiểm tra hóa chất / calibrator</b>${actionDetailCheck('Hạn dùng, số lô, bảo quản và lot-to-lot',a.reagentStatus,a.reagentNote)}${actionDetailCheck('So sánh lot-to-lot',a.lotToLotStatus,a.lotToLotNote)}</li><li><b>Kiểm tra hiệu chuẩn</b>${actionDetailCheck('Tình trạng hiệu chuẩn',a.calibrationStatus,a.calibrationNote)}</li>`}
-      ${globalThis.actionCauseDetailHtml?globalThis.actionCauseDetailHtml({cause:a.cause||'',action:a.action||'',completedDate:a.actionCompletedDate?vnDate(a.actionCompletedDate):'',release:a.protocolVersion>=3&&a.containmentStatus==='held'?{status:ACTION_LABELS.release[a.releaseStatus]||'',details:a.releaseDate||a.releaseBy||a.releaseNote?`${a.releaseDate?vnDate(a.releaseDate)+' · ':''}${a.releaseBy||'Chưa ghi người cho phép'}${a.releaseNote?' · '+a.releaseNote:''}`:''}:undefined}):`<li><b>Nguyên nhân, hành động và QC chạy lại</b><div>${esc(a.cause||'Chưa xác định nguyên nhân')}</div><div>${esc(a.action||'Chưa ghi hành động khắc phục')}</div>${a.actionCompletedDate?`<div class="hint">Hoàn thành hành động: ${vnDate(a.actionCompletedDate)}</div>`:''}${a.protocolVersion>=3&&a.containmentStatus==='held'?`<div><b>${esc(ACTION_LABELS.release[a.releaseStatus]||'Chưa cho phép hoạt động/trả kết quả trở lại')}</b></div>${a.releaseDate||a.releaseBy||a.releaseNote?`<div class="hint">${a.releaseDate?vnDate(a.releaseDate)+' · ':''}${esc(a.releaseBy||'Chưa ghi người cho phép')}${a.releaseNote?' · '+esc(a.releaseNote):''}</div>`:''}`:''}</li>`}
-      ${globalThis.actionPatientImpactHtml?globalThis.actionPatientImpactHtml(ACTION_LABELS.patient[a.patientImpact]||'',a.patientAction||''):`<li><b>Đánh giá ảnh hưởng bệnh nhân</b><div>${esc(ACTION_LABELS.patient[a.patientImpact]||'Chưa đánh giá')}</div>${a.patientAction?`<div class="hint">${esc(a.patientAction)}</div>`:''}</li>`}
-      ${globalThis.actionEffectivenessDetailHtml?globalThis.actionEffectivenessDetailHtml({effectiveness:modern?eff.label:a.cause||'—',note:modern&&a.effectivenessNote?`${a.effectivenessDate?vnDate(a.effectivenessDate)+' · ':''}${a.effectivenessNote}${a.effectivenessBy?' · '+a.effectivenessBy:''}`:'',residual:+a.protocolVersion>=3&&residual?{risk:ACTION_LABELS.risk[a.residualRiskLevel]||'',score:residual,basis:a.residualRiskBasis||''}:undefined,returned:a.returnNote?`${a.returnNote}${a.returnBy?' — '+a.returnBy:''}${a.returnAt?' · '+formatDateTimeVN(a.returnAt):''}`:'',followUpNceId:a.followUpNceId||'',parentNceId:a.parentNceId||'',approval:`${actionApprovalLabel(a)}${a.approvedBy?' · '+a.approvedBy:''}`,workflow:wf.label}):`<li><b>Đánh giá hiệu lực, phê duyệt và khép vòng</b><div>${modern?esc(eff.label):esc(a.cause||'—')}</div>${modern&&a.effectivenessNote?`<div class="hint">${a.effectivenessDate?vnDate(a.effectivenessDate)+' · ':''}${esc(a.effectivenessNote)}${a.effectivenessBy?' · '+esc(a.effectivenessBy):''}</div>`:''}${+a.protocolVersion>=3&&residual?`<div>Nguy cơ còn lại: ${esc(ACTION_LABELS.risk[a.residualRiskLevel]||'Chưa phân loại')} · RPN ${residual}</div>${a.residualRiskBasis?`<div class="hint">${esc(a.residualRiskBasis)}</div>`:''}`:''}${a.returnNote?`<div class="hint">Đã trả lại: ${esc(a.returnNote)}${a.returnBy?' — '+esc(a.returnBy):''}${a.returnAt?' · '+formatDateTimeVN(a.returnAt):''}</div>`:''}${a.followUpNceId?`<div class="hint">Đã chuyển sang hồ sơ ${esc(a.followUpNceId)}</div>`:''}${a.parentNceId?`<div class="hint">Nối tiếp hồ sơ ${esc(a.parentNceId)}</div>`:''}<div class="hint">${esc(actionApprovalLabel(a))}${a.approvedBy?' · '+esc(a.approvedBy):''} · ${esc(wf.label)}</div></li>`}
+      ${globalThis.actionContainmentDetailHtml({status:ACTION_LABELS.containment[a.containmentStatus]||'',correction:a.correction||'',note:a.containmentNote||'',modern})}
+      ${globalThis.actionInspectionDetailsHtml([{title:'Kiểm tra vật liệu QC',checksHtml:actionDetailCheck('Hạn dùng, bảo quản, hoàn nguyên và chuẩn bị',a.qcMaterialStatus,a.qcMaterialNote)},{title:'Kiểm tra máy phân tích',checksHtml:actionDetailCheck('Điện, nước, nhiệt độ, cảnh báo và bảo trì',a.instrumentStatus,a.instrumentNote)},{title:'Kiểm tra hóa chất / calibrator',checksHtml:actionDetailCheck('Hạn dùng, số lô, bảo quản và lot-to-lot',a.reagentStatus,a.reagentNote)+actionDetailCheck('So sánh lot-to-lot',a.lotToLotStatus,a.lotToLotNote)},{title:'Kiểm tra hiệu chuẩn',checksHtml:actionDetailCheck('Tình trạng hiệu chuẩn',a.calibrationStatus,a.calibrationNote)}])}
+      ${globalThis.actionCauseDetailHtml({cause:a.cause||'',action:a.action||'',completedDate:a.actionCompletedDate?vnDate(a.actionCompletedDate):'',release:a.protocolVersion>=3&&a.containmentStatus==='held'?{status:ACTION_LABELS.release[a.releaseStatus]||'',details:a.releaseDate||a.releaseBy||a.releaseNote?`${a.releaseDate?vnDate(a.releaseDate)+' · ':''}${a.releaseBy||'Chưa ghi người cho phép'}${a.releaseNote?' · '+a.releaseNote:''}`:''}:undefined})}
+      ${globalThis.actionPatientImpactHtml(ACTION_LABELS.patient[a.patientImpact]||'',a.patientAction||'')}
+      ${globalThis.actionEffectivenessDetailHtml({effectiveness:modern?eff.label:a.cause||'—',note:modern&&a.effectivenessNote?`${a.effectivenessDate?vnDate(a.effectivenessDate)+' · ':''}${a.effectivenessNote}${a.effectivenessBy?' · '+a.effectivenessBy:''}`:'',residual:+a.protocolVersion>=3&&residual?{risk:ACTION_LABELS.risk[a.residualRiskLevel]||'',score:residual,basis:a.residualRiskBasis||''}:undefined,returned:a.returnNote?`${a.returnNote}${a.returnBy?' — '+a.returnBy:''}${a.returnAt?' · '+formatDateTimeVN(a.returnAt):''}`:'',followUpNceId:a.followUpNceId||'',parentNceId:a.parentNceId||'',approval:`${actionApprovalLabel(a)}${a.approvedBy?' · '+a.approvedBy:''}`,workflow:wf.label})}
     </ol>`;
   openModal(modalTemplate({title:'Chi tiết phiếu xử lý sự cố',body,footer:btn('Đóng','closeModal()','teal')}));
 }
 function openActionGuide(){
-  if(globalThis.actionGuideContent){const content=globalThis.actionGuideContent(ActionGuidePresentation.steps);openModal(modalTemplate({title:'Quy trình 8 bước xử lý hồ sơ NCE',body:content.body,footer:content.footer,cls:'action-guide-modal',bodyClass:''}));return;}
-  const list=ActionGuidePresentation.steps.map(({phase,title,text},i)=>`<li class="action-guide-card"><span class="action-guide-number">${i+1}</span><div><small>${esc(phase)}</small><b>${esc(title)}</b><p>${esc(text)}</p></div></li>`).join('');
-  const body=`<div class="modal-b" tabindex="0" aria-label="Nội dung quy trình 8 bước"><div class="action-guide-intro"><b>Nguyên tắc thực hiện</b><p>Lưu hồ sơ ngay sau bước 1 ở trạng thái <strong>Đang điều tra</strong>, sau đó hoàn thiện theo tiến độ xử lý.</p></div><ol class="action-guide-list">${list}</ol></div>`;
-  const footer=`<div class="action-guide-footer-note"><b>Điều kiện khép vòng</b><span>Đủ bằng chứng QC, quyết định cho phép trở lại khi cần, đánh giá nguy cơ còn lại và phê duyệt độc lập.</span></div>${btn('Đóng','closeModal()','ghost')}`;
-  openModal(modalTemplate({title:'Quy trình 8 bước xử lý hồ sơ NCE',body,footer,cls:'action-guide-modal',bodyClass:''}));
+  const content=globalThis.actionGuideContent(ActionGuidePresentation.steps);
+  openModal(modalTemplate({title:'Quy trình 8 bước xử lý hồ sơ NCE',body:content.body,footer:content.footer,cls:'action-guide-modal',bodyClass:''}));
 }
 function groupIssuesByTestDate(issues){
   return ActionListPresentation.groupIssuesByTestDate(issues);
@@ -268,9 +245,5 @@ function pageActionsV4(){
     const model={date:vnDate(actionEventDate(a)),openedAt,identity,sub,rule,primary,owner:a.by||'',dueDate:a.dueDate?vnDate(a.dueDate):'',workflowClass:wf.cls,workflowLabel:wf.label,sideChips:actionSideChips(a,wf.stage),approvalTag:!actionCancelled(a)&&approval!=='pending'?actionApprovalTag(a):'',approvalMeta:approveMeta,actions:actionReviewButtons(realIdx,a)};
     return globalThis.actionLogRowPresentation(model);}).join('');
   const head=headOnly('Khắc phục sự cố','Điều tra nguyên nhân, ghi nhận, chạy lại QC và phê duyệt khép vòng'),issuesPanel=globalThis.actionIssuesPanelHtml(issueHtml),formPanel=actionFormHtml(issues.length),logPanel=globalThis.actionLogPanelHtml(rows);
-  if(globalThis.actionPageHtml)return globalThis.actionPageHtml({headHtml:head,issuesHtml:issuesPanel,formHtml:formPanel,logHtml:logPanel});
-  return head+
-   (globalThis.actionIssuesPanelHtml?globalThis.actionIssuesPanelHtml(issueHtml):`<div class="panel action-issues-panel"><h2 class="panel-title">Sự cố cần xử lý</h2><div class="dash-list">${issueHtml}</div></div>`)+
-   actionFormHtml(issues.length)+
-   (globalThis.actionLogPanelHtml?globalThis.actionLogPanelHtml(rows):`<div class="panel action-log-panel"><h2 class="panel-title">Nhật ký khắc phục</h2>${rows?`<div class="action-log-tools">${btn('Xuất CSV nhật ký','exportActionsCSV()','teal sm')}</div><div class="action-log-wrap"><table class="action-log-table"><thead><tr><th>Thời điểm</th><th>Sự cố</th><th>Hành động</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table></div>`:emptyState('Chưa có nhật ký','Các hành động khắc phục sẽ xuất hiện ở đây sau khi được lưu.')}</div>`);
+  return globalThis.actionPageHtml({headHtml:head,issuesHtml:issuesPanel,formHtml:formPanel,logHtml:logPanel});
 }

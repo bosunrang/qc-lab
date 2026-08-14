@@ -104,17 +104,7 @@ function manageAssays(){
   return manageToolbar('Danh mục xét nghiệm','Quản lý xét nghiệm, máy, đơn vị, phương pháp và TEa.',"openConfigAssay()",'Thêm xét nghiệm')+`<div class="panel rcfg-list">${rows?`<table class="assay-table"><thead><tr><th class="num">STT</th><th>Tên xét nghiệm</th><th>Máy xét nghiệm</th><th>Hóa chất</th><th>TEa</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table>`:emptyState('Chưa có xét nghiệm','Tạo xét nghiệm trước, sau đó gán lô và Mean/SD ở các thẻ cấu hình tương ứng.')}</div>`;
 }
 function manageHistorySearchValues(t){
-  if(globalThis.historySearchValuesPresentation)return globalThis.historySearchValuesPresentation(t,state.qcLots,testDisplayName);
-  const values=[t.name,testDisplayName(t)];
-  (t.levels||[]).forEach(l=>{
-    const hist=l.meanSdHistory&&l.meanSdHistory.length?l.meanSdHistory:[{qcLotId:l.qcLotId,lot:l.lot,effectiveFrom:'',effectiveTo:l.exp,source:l.applied||'mfg'}];
-    hist.forEach(h=>{
-      if(h.planned)return; // "Dự kiến" chưa áp dụng — không phải lịch sử thật, xem ở màn Mean/SD/Lô & Nhóm QC
-      const lotObj=state.qcLots.find(x=>x.id===(h.qcLotId||l.qcLotId))||state.qcLots.find(x=>x.lotNo===(h.lot||l.lot)&&+x.level===+l.level);
-      values.push(l.level,`M${l.level}`,`Mức ${l.level}`,h.lot,l.lot,lotObj&&lotObj.lotNo);
-    });
-  });
-  return values;
+  return globalThis.historySearchValuesPresentation(t,state.qcLots,testDisplayName);
 }
 function manageHistory(){
   const q=searchText(manageQ),matches=state.tests.filter(t=>!q||manageHistorySearchValues(t).some(v=>searchText(v).includes(q)));
@@ -124,53 +114,34 @@ function manageHistory(){
   manageHistoryTest=historyPick.selectedId;
   const t=historyPick.assay;
   const opts=globalThis.historyAssayOptionsPresentation(matches,t.id,testDisplayName,esc);
-  const rows=globalThis.historyRowsPresentation?globalThis.historyRowsPresentation(t,state.qcLots,state.data[t.id]||[],lotGroupLabels):(()=>{const rows=[];
-  (t.levels||[]).forEach(l=>{
-    const hist=(l.meanSdHistory&&l.meanSdHistory.length?l.meanSdHistory:[{qcLotId:l.qcLotId,lot:l.lot,mean:l.mean,sd:l.sd,low:l.low,high:l.high,effectiveFrom:'',effectiveTo:l.exp,source:l.applied||'mfg'}]);
-    hist.forEach(h=>{
-      if(h.planned)return; // "Dự kiến" chưa áp dụng — không hiện ở lịch sử dữ liệu thật
-      const lotObj=state.qcLots.find(x=>x.id===(h.qcLotId||l.qcLotId))||state.qcLots.find(x=>x.lotNo===(h.lot||l.lot)&&+x.level===+l.level);
-      const lotNo=h.lot||l.lot||(lotObj&&lotObj.lotNo)||'',group=lotObj?lotGroupLabels(lotObj.id):'Chưa thuộc nhóm',pts=(state.data[t.id]||[]).filter(p=>+p.level===+l.level&&(p.lot||'')===(lotNo||''));
-      rows.push({t,l,h,lotObj,lotNo,group,pts});
-  });
-  });return rows;})();
+  const rows=globalThis.historyRowsPresentation(t,state.qcLots,state.data[t.id]||[],lotGroupLabels);
   const visibleRows=globalThis.historyVisibleRowsPresentation(rows,t.name,q,searchText);
-  const html=(globalThis.historyRowSortPresentation?globalThis.historyRowSortPresentation(visibleRows):visibleRows.sort((a,b)=>(+a.l.level)-(+b.l.level)||(a.lotNo||'').localeCompare(b.lotNo||'','vi')||String(a.h.effectiveFrom||'').localeCompare(String(b.h.effectiveFrom||'')))).map(r=>{
+  const html=globalThis.historyRowSortPresentation(visibleRows).map(r=>{
     const period=globalThis.historyPeriodLabelPresentation(r.h.effectiveFrom,r.h.effectiveTo,vnDate);
     const model={testId:r.t.id,level:r.l.level,lot:r.lotNo||'',group:r.group,mean:fmtTestValue(r.t,r.h.mean),low:r.h.low!=null?fmtTestValue(r.t,r.h.low):'—',high:r.h.high!=null?fmtTestValue(r.t,r.h.high):'—',sd:fmtTestValue(r.t,r.h.sd),period,source:r.h.source,pointCount:r.pts.length};return globalThis.manageHistoryRowPresentation(model);
   }).join('');
   const historyTotals=globalThis.historySummaryPresentation(visibleRows);
   return manageToolbar('Lịch sử dữ liệu QC','Chọn một xét nghiệm để xem các lô/Mean-SD đã từng dùng.')+
   `<div class="panel target-matrix-panel">
-    ${globalThis.historySelectorPresentation?globalThis.historySelectorPresentation(opts,historyTotals.rowCount,historyTotals.pointCount):`<div class="target-selector history-selector">
-      <div><label>Xét nghiệm</label><select onchange="setHistoryTest(this.value)">${opts}</select></div>
-      <div class="target-lot-info"><b>${historyTotals.rowCount}</b><span>mốc lô/Mean-SD</span></div>
-      <div class="target-lot-info"><b>${historyTotals.pointCount}</b><span>điểm QC đã nhập</span></div>
-    </div>`}
-    ${globalThis.historyTablePresentation?globalThis.historyTablePresentation(html,q?emptyState('Không tìm thấy mốc phù hợp','Thử tìm theo tên xét nghiệm, mức hoặc lô QC.'):emptyState('Chưa có lịch sử lô','Xét nghiệm này chưa được gán lô/Mean-SD.')):`<div class="rcfg-list">${html?`<table class="history-table"><thead><tr><th>Mức</th><th>Lô QC / Nhóm lô</th><th class="num">Mean</th><th class="num">Giới hạn dưới</th><th class="num">Giới hạn trên</th><th class="num">SD</th><th>Hiệu lực</th><th>Nguồn</th><th class="num">Điểm QC</th><th></th></tr></thead><tbody>${html}</tbody></table>`:(q?emptyState('Không tìm thấy mốc phù hợp','Thử tìm theo tên xét nghiệm, mức hoặc lô QC.'):emptyState('Chưa có lịch sử lô','Xét nghiệm này chưa được gán lô/Mean-SD.'))}</div>`}
+    ${globalThis.historySelectorPresentation(opts,historyTotals.rowCount,historyTotals.pointCount)}
+    ${globalThis.historyTablePresentation(html,q?emptyState('Không tìm thấy mốc phù hợp','Thử tìm theo tên xét nghiệm, mức hoặc lô QC.'):emptyState('Chưa có lịch sử lô','Xét nghiệm này chưa được gán lô/Mean-SD.'))}
   </div>`;
 }
 /* ===== Bảng TEa tham chiếu (CLIA/Ricos/chuẩn hóa PXN) sửa được trong app ===== */
 const TEA_LAB_BASIS_SOURCES=[['regulation','Quy định pháp lý / CLIA / quốc gia'],['pt','Chương trình ngoại kiểm / PT'],['eflm','EFLM Biological Variation'],['ricos','Ricos / Westgard BV (nguồn cũ)'],['professional','Hiệp hội / ủy ban chuyên môn'],['other','Nguồn khác đã thẩm định']];
 function teaLabBasisLabel(src){return globalThis.teaLabBasisLabelPresentation(TEA_LAB_BASIS_SOURCES,src);}
-function teaRefFind(refKey){if(globalThis.TeaReferenceService)return globalThis.TeaReferenceService.find(state,refKey);const k=teaRefName(refKey);return (state.teaRefs||[]).find(r=>r.analyteId===refKey)||(state.teaRefs||[]).find(r=>teaRefName(r.name)===k);}
-function teaRefNumOrNull(v){if(globalThis.TeaReferenceService)return globalThis.TeaReferenceService.numberOrNull(v);return globalThis.teaPositiveNumberPresentation(v);}
-function teaRefExternalChanged(row,refKey){if(globalThis.TeaReferenceService)return globalThis.TeaReferenceService.externalChanged(row,refKey);const base=REFTESTS.find(r=>teaAnalyteMeta(r[0]).analyteId===refKey);return globalThis.teaReferenceExternalChangedPresentation(row,base);}
-function teaRefSourceMeta(name,src){if(globalThis.TeaReferenceService)return globalThis.TeaReferenceService.sourceMeta(state,name,src);const base=TEA_SOURCE_REGISTRY[src]||{},row=teaRefFind(name),custom=row&&row.sources&&row.sources[src]||{};return{...base,...Object.fromEntries(Object.entries(custom).filter(([,v])=>String(v??'').trim()!==''))};}
-function teaRefStampSource(row,src){if(globalThis.TeaReferenceService)return globalThis.TeaReferenceService.stampSource(state,row,src);const base=teaRefSourceMeta(row.name,src);row.sources=row.sources||{};row.sources[src]={...base,status:'reviewed',reviewedDate:isoToday(),reviewedBy:userName()};}
-function teaRefEnsure(refKey){
-  if(globalThis.TeaReferenceService)return globalThis.TeaReferenceService.ensure(state,refKey).record;
-  let e=teaRefFind(refKey);
-  if(!e){const src=effectiveTeaRefs().find(r=>r[6]===refKey||teaRefName(r[0])===teaRefName(refKey)),id=uid(),naming=teaAnalyteMeta(src?src[0]:refKey);e={id,analyteId:src&&src[6]||naming.analyteId||('custom-'+id),name:src?src[0]:refKey,displayName:naming.displayName,standardName:naming.standardName,abbreviation:naming.abbreviation,aliases:naming.aliases,matrix:naming.matrix,unit:src?src[1]:'',clia:src?src[2]:null,ricos:src?src[3]:null,lab:src?src[7]:null,section:src?src[4]:'',sources:{}};
-    state.teaRefs=state.teaRefs||[];state.teaRefs.push(e);}
-  return e;
-}
+function teaRefFind(refKey){return globalThis.TeaReferenceService.find(state,refKey);}
+function teaRefNumOrNull(v){return globalThis.TeaReferenceService.numberOrNull(v);}
+function teaRefExternalChanged(row,refKey){return globalThis.TeaReferenceService.externalChanged(row,refKey);}
+function teaRefSourceMeta(name,src){return globalThis.TeaReferenceService.sourceMeta(state,name,src);}
+function teaRefStampSource(row,src){return globalThis.TeaReferenceService.stampSource(state,row,src);}
+function teaRefEnsure(refKey){return globalThis.TeaReferenceService.ensure(state,refKey).record;}
 /* Sửa/xóa/thêm dòng TEa tham chiếu có thể ảnh hưởng TEa% của NHIỀU xét nghiệm
    đang track Sigma cùng lúc (không chỉ xét nghiệm đang mở) — đồng bộ lại snapshot
    kỳ hiện tại của tất cả trước khi lưu, để Sigma không hiển thị TEa cũ cho tới
    khi ai đó tình cờ mở lại trang đó. */
-function teaRefEdit(name,field,val){if(!requireAdmin())return;const edited=globalThis.TeaReferenceService&&globalThis.TeaReferenceService.edit(state,name,field,val),e=edited&&edited.record||teaRefEnsure(name),before=edited?edited.before:e[field];if(!edited){e[field]=teaRefNumOrNull(val);teaRefStampSource(e,field);}logAct('Cập nhật TEa tham chiếu',`${e.name} · ${field.toUpperCase()}: ${before??'—'} → ${e[field]??'—'} · ${e.sources[field].version||'không phiên bản'}`,'Bảng TEa');if(typeof sgReconcileAllTeaSnapshots==='function')sgReconcileAllTeaSnapshots();save({clearDerived:false});rerender();}
-function teaRefRemove(refKey){if(!requireAdmin())return;const row=teaRefFind(refKey),isDefault=teaRefIsDefault(refKey),removed=globalThis.TeaReferenceService&&globalThis.TeaReferenceService.restoreOrRemove(state,refKey,isDefault);if(!removed){if(isDefault&&row&&row.lab!=null){const base=REFTESTS.find(r=>teaAnalyteMeta(r[0]).analyteId===refKey);if(base){row.name=base[0];row.unit=base[1];row.clia=base[2];row.ricos=base[3];row.section=base[4];row.sources={lab:row.sources&&row.sources.lab||{}};['cliaRule','cliaAbsolute','cliaAbsoluteUnit'].forEach(k=>delete row[k]);}}else state.teaRefs=(state.teaRefs||[]).filter(r=>r.analyteId!==refKey&&teaRefName(r.name)!==teaRefName(refKey));}logAct(isDefault?'Khôi phục TEa mặc định':'Xóa TEa tự thêm',row&&row.name||refKey,'Bảng TEa');if(typeof sgReconcileAllTeaSnapshots==='function')sgReconcileAllTeaSnapshots();save({clearDerived:false});rerender();}
+function teaRefEdit(name,field,val){if(!requireAdmin())return;const {record:e,before}=globalThis.TeaReferenceService.edit(state,name,field,val);logAct('Cập nhật TEa tham chiếu',`${e.name} · ${field.toUpperCase()}: ${before??'—'} → ${e[field]??'—'} · ${e.sources[field].version||'không phiên bản'}`,'Bảng TEa');if(typeof sgReconcileAllTeaSnapshots==='function')sgReconcileAllTeaSnapshots();save({clearDerived:false});rerender();}
+function teaRefRemove(refKey){if(!requireAdmin())return;const row=teaRefFind(refKey),isDefault=teaRefIsDefault(refKey);globalThis.TeaReferenceService.restoreOrRemove(state,refKey,isDefault);logAct(isDefault?'Khôi phục TEa mặc định':'Xóa TEa tự thêm',row&&row.name||refKey,'Bảng TEa');if(typeof sgReconcileAllTeaSnapshots==='function')sgReconcileAllTeaSnapshots();save({clearDerived:false});rerender();}
 function teaSourceRegistryHtml(){const items=globalThis.teaSourceRegistryItemsPresentation(TEA_SOURCE_REGISTRY,vnDate);return globalThis.teaSourceRegistryPresentation(items);}
 function teaRefOpenAdd(){
   if(!requireAdmin())return;
@@ -188,15 +159,7 @@ async function teaRefAddSubmit(){
   if(!requireAdmin())return;
   const name=QCCore.cleanText(document.getElementById('trAddName').value,120).trim();
   if(!name){await infoDialog('Nhập tên xét nghiệm.');return;}
-  const input={name,abbreviation:QCCore.cleanText(document.getElementById('trAddAbbreviation').value,40).trim(),matrix:QCCore.cleanText(document.getElementById('trAddMatrix').value,80).trim(),unit:QCCore.cleanText(document.getElementById('trAddUnit').value,40),section:QCCore.cleanText(document.getElementById('trAddSection').value,80),clia:document.getElementById('trAddClia').value,ricos:document.getElementById('trAddRicos').value},added=globalThis.TeaReferenceService&&globalThis.TeaReferenceService.addCustomReference(state,input),e=added&&added.record||teaRefEnsure(name);if(!added){e.name=name;
-    e.abbreviation=input.abbreviation;
-    e.standardName=name;e.displayName=e.abbreviation&&teaRefName(e.abbreviation)!==teaRefName(name)?`${name} (${e.abbreviation})`:name;e.aliases=e.abbreviation?[e.abbreviation]:[];
-    e.matrix=input.matrix;
-    e.unit=input.unit;
-    e.section=input.section;
-    e.clia=teaRefNumOrNull(input.clia);
-    e.ricos=teaRefNumOrNull(input.ricos);
-    if(e.clia!=null)teaRefStampSource(e,'clia');if(e.ricos!=null)teaRefStampSource(e,'ricos');}
+  const input={name,abbreviation:QCCore.cleanText(document.getElementById('trAddAbbreviation').value,40).trim(),matrix:QCCore.cleanText(document.getElementById('trAddMatrix').value,80).trim(),unit:QCCore.cleanText(document.getElementById('trAddUnit').value,40),section:QCCore.cleanText(document.getElementById('trAddSection').value,80),clia:document.getElementById('trAddClia').value,ricos:document.getElementById('trAddRicos').value},e=globalThis.TeaReferenceService.addCustomReference(state,input).record;
   logAct('Thêm TEa tham chiếu',`${e.name} · CLIA ${e.clia??'—'} · Ricos ${e.ricos??'—'}`,'Bảng TEa');
   if(typeof sgReconcileAllTeaSnapshots==='function')sgReconcileAllTeaSnapshots();save();closeModal();rerender();
 }
@@ -214,11 +177,11 @@ function teaLabProfileOpen(refKey){
 async function teaLabProfileSave(refKey){
   if(!requireAdmin())return;const get=id=>String(document.getElementById(id)&&document.getElementById(id).value||'').trim(),value=teaRefNumOrNull(get('teaLabValue')),source=get('teaLabSource'),reference=QCCore.cleanText(get('teaLabReference'),500),reason=QCCore.cleanText(get('teaLabReason'),4000),effective=parseVN(get('teaLabEffectiveDate'))||'',nextReview=parseVN(get('teaLabNextReviewDate'))||'',prepared=QCCore.cleanText(get('teaLabPreparedBy'),120),approved=QCCore.cleanText(get('teaLabApprovedBy'),120),approvedDate=parseVN(get('teaLabApprovedDate'))||'';
   if(value==null){await infoDialog('Nhập TEa chuẩn hóa lớn hơn 0%.');return;}if(!teaLabBasisLabel(source)){await infoDialog('Chọn nguồn chính của TEa chuẩn hóa.');return;}if(reference.length<3){await infoDialog('Nhập tài liệu, phiên bản hoặc đường dẫn tham chiếu.');return;}if(reason.length<10){await infoDialog('Lý do lựa chọn cần ít nhất 10 ký tự.');return;}if(!effective||!approvedDate){await infoDialog('Nhập ngày hiệu lực và ngày phê duyệt hợp lệ.');return;}if(approvedDate>effective){await infoDialog('Ngày phê duyệt không được sau ngày hiệu lực.');return;}if(nextReview&&nextReview<effective){await infoDialog('Ngày xem xét lại không được trước ngày hiệu lực.');return;}if(!prepared||!approved){await infoDialog('Nhập người xây dựng và người phê duyệt.');return;}
-  const profile={value,source,sourceLabel:teaLabBasisLabel(source),reference,reason,effective,nextReview,prepared,approved,approvedDate},saved=globalThis.TeaReferenceService&&globalThis.TeaReferenceService.saveLabProfile(state,refKey,profile),row=saved&&saved.record||teaRefEnsure(refKey),before=saved?saved.before:row.lab;if(!saved){row.lab=value;row.labSource=source;row.labPreparedBy=prepared;row.labNextReviewDate=nextReview;row.sources=row.sources||{};row.sources.lab={...TEA_SOURCE_REGISTRY.lab,id:'lab-'+row.analyteId,version:teaLabBasisLabel(source),document:reference,effectiveDate:effective,reviewedDate:approvedDate,reviewedBy:approved,status:'reviewed',note:reason};}
+  const profile={value,source,sourceLabel:teaLabBasisLabel(source),reference,reason,effective,nextReview,prepared,approved,approvedDate},{record:row,before}=globalThis.TeaReferenceService.saveLabProfile(state,refKey,profile);
   logAct(before==null?'Thiết lập TEa chuẩn hóa':'Cập nhật TEa chuẩn hóa',`${row.name} · ${before??'—'}% → ${value}% · ${teaLabBasisLabel(source)} · ${reference} · Hiệu lực ${vnDate(effective)} · Xây dựng: ${prepared} · Phê duyệt: ${approved} (${vnDate(approvedDate)})${nextReview?' · Xem xét lại '+vnDate(nextReview):''} · Lý do: ${reason}`,'Bảng TEa');if(typeof sgReconcileAllTeaSnapshots==='function')sgReconcileAllTeaSnapshots();save({clearDerived:false});closeModal();rerender();
 }
 async function teaLabProfileRemove(refKey){
-  if(!requireAdmin())return;const row=teaRefFind(refKey);if(!row||row.lab==null)return;const ok=await confirmDialog({kicker:'TEa chuẩn hóa',title:'Xóa TEa chuẩn hóa?',message:`${teaAnalyteDisplay(row.name,row)} · ${row.lab}%`,detail:'Các kỳ Sigma cũ vẫn giữ ảnh chụp TEa đã sử dụng. Kỳ hiện tại sẽ không còn dùng nguồn TEa chuẩn hóa này.',confirmLabel:'Xóa TEa',cancelLabel:'Hủy',danger:true});if(!ok)return;const isDefault=teaRefIsDefault(refKey),removed=globalThis.TeaReferenceService&&globalThis.TeaReferenceService.removeLabProfile(state,refKey,isDefault),before=removed?removed.before:row.lab;if(!removed){['lab','labSource','labPreparedBy','labNextReviewDate'].forEach(k=>delete row[k]);if(row.sources)delete row.sources.lab;if(teaRefIsDefault(refKey)&&!teaRefExternalChanged(row,refKey))state.teaRefs=(state.teaRefs||[]).filter(r=>r!==row);}logAct('Xóa TEa chuẩn hóa',`${row.name} · ${before}%`,'Bảng TEa');if(typeof sgReconcileAllTeaSnapshots==='function')sgReconcileAllTeaSnapshots();save({clearDerived:false});closeModal();rerender();
+  if(!requireAdmin())return;const row=teaRefFind(refKey);if(!row||row.lab==null)return;const ok=await confirmDialog({kicker:'TEa chuẩn hóa',title:'Xóa TEa chuẩn hóa?',message:`${teaAnalyteDisplay(row.name,row)} · ${row.lab}%`,detail:'Các kỳ Sigma cũ vẫn giữ ảnh chụp TEa đã sử dụng. Kỳ hiện tại sẽ không còn dùng nguồn TEa chuẩn hóa này.',confirmLabel:'Xóa TEa',cancelLabel:'Hủy',danger:true});if(!ok)return;const isDefault=teaRefIsDefault(refKey),{before}=globalThis.TeaReferenceService.removeLabProfile(state,refKey,isDefault);logAct('Xóa TEa chuẩn hóa',`${row.name} · ${before}%`,'Bảng TEa');if(typeof sgReconcileAllTeaSnapshots==='function')sgReconcileAllTeaSnapshots();save({clearDerived:false});closeModal();rerender();
 }
 function manageTeaRefs(){
   const canManage=role()==='admin',ro=canManage?'':'disabled';

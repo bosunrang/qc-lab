@@ -9,6 +9,18 @@ const parseDate = value => {
   const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(value || ''));
   return match ? `${match[3]}-${match[2]}-${match[1]}` : (/^\d{4}-\d{2}-\d{2}$/.test(value) ? value : '');
 };
+const activityAuditFilter = {
+  dateKey: activity => { const date = new Date(activity && activity.ts); return Number.isFinite(+date) ? isoDate(date) : ''; },
+  filter: (items, query, from, to) => (items || []).filter(activity => {
+    const date = activityAuditFilter.dateKey(activity);
+    if (from && (!date || date < from)) return false;
+    if (to && (!date || date > to)) return false;
+    return !searchText(query) || searchText([activity.seq, formatDateTimeVN(activity.ts), activity.user, activity.username, roleLabel(activity.role || 'viewer'), activity.type, activity.target, activity.detail].join(' ')).includes(searchText(query));
+  }).slice().reverse(),
+};
+const activityAuditPagination = (items, page, pageSize) => { const size = [25, 50, 100].includes(Number(pageSize)) ? Number(pageSize) : 25, count = Math.max(1, Math.ceil((items || []).length / size)), current = Math.min(Math.max(1, Number(page) || 1), count), offset = (current - 1) * size; return { page: current, pageCount: count, offset, rows: (items || []).slice(offset, offset + size), resultFrom: (items || []).length ? offset + 1 : 0, resultTo: Math.min(offset + size, (items || []).length) }; };
+const activityAuditFilterState = { withQuery: (state, query) => ({ ...state, query, page: 1 }), withPageSize: (state, pageSize, sizes) => ({ ...state, pageSize: sizes.includes(Number(pageSize)) ? Number(pageSize) : 25, page: 1 }), withPage: (state, page) => ({ ...state, page: Math.max(1, Number(page) || 1) }), cleared: state => ({ ...state, query: '', from: '', to: '', page: 1 }) };
+const updateActivityAuditDateRange = (state, field, value) => field === 'from' ? { from: value, to: value && state.to && value > state.to ? value : state.to } : { from: value && state.from && value < state.from ? value : state.from, to: value };
 const ctx = loadSandbox(['modules/users-auth.js'], {
   searchText,
   isoDate,
@@ -27,6 +39,11 @@ const ctx = loadSandbox(['modules/users-auth.js'], {
   rerender: () => {},
   vnPickerParse: parseDate,
   parseVN: parseDate,
+  activityAuditFilter,
+  activityAuditPagination,
+  activityAuditFilterState,
+  updateActivityAuditDateRange,
+  activityAuditPageSizes: [25, 50, 100],
 });
 
 const rows = [

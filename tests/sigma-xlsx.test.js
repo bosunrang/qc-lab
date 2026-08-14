@@ -13,6 +13,16 @@ const assert = require('node:assert/strict');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
 const ctx = loadSandbox(['modules/data-io.js']);
+run(ctx, `globalThis.renameSigmaXlsxSheet=(bytes,sheetName)=>{
+  const view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength),decode=new TextDecoder(),files=[];let off=0;
+  while(off+30<=bytes.length&&view.getUint32(off,true)===0x04034b50){
+    const nameLen=view.getUint16(off+26,true),extraLen=view.getUint16(off+28,true),size=view.getUint32(off+18,true),nameStart=off+30,dataStart=nameStart+nameLen+extraLen;
+    const name=decode.decode(bytes.slice(nameStart,nameStart+nameLen));let data=bytes.slice(dataStart,dataStart+size);
+    if(name==='xl/workbook.xml')data=XlsxCore.u8(decode.decode(data).replace(/(<sheet name=")[^"]*(")/,'$1'+XlsxCore.escX(sheetName)+'$2'));
+    files.push({name,data});off=dataStart+size;
+  }
+  return XlsxCore.zip(files);
+};`);
 run(ctx, 'function __buildXlsx(rows,meta,images){return SigmaXlsx.build(rows,meta,images||[]);}');
 
 function crc32(buf) {

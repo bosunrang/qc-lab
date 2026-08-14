@@ -1,41 +1,18 @@
 /* ===== USERS PAGE ===== */
 function pageUsers(){
-  const users=globalThis.userListModel?globalThis.userListModel(state.users,currentUser&&currentUser.id):state.users;
-  const rows=users.map(u=>globalThis.userRowHtml?globalThis.userRowHtml({user:u,currentUserId:currentUser&&currentUser.id,esc,roleLabel,btn}):`<tr>
-    <td><b>${esc(u.name||u.username)}</b><div class="hint">@${esc(u.username)}${u.initials?' · '+esc(u.initials):''}</div></td>
-    <td>${roleLabel(u.role)}</td>
-    <td>${u.active===false?'<span class="tag rej">Khóa</span>':'<span class="tag ok">Hoạt động</span>'}</td>
-    <td><div class="user-row-actions">${u.current||(currentUser&&u.id===currentUser.id)?'<span class="hint">(bạn)</span> '+btn('Đổi mật khẩu',"resetPass('"+u.id+"')",'ghost sm')
-      :btn('Sửa quyền',"openUserPerms('"+u.id+"')",'ghost sm')+' '+btn('Đặt lại MK',"resetPass('"+u.id+"')",'ghost sm')+' '+btn(u.active===false?'Mở khóa':'Khóa',"toggleUser('"+u.id+"')",'ghost sm')+' '+btn('Xóa',"delUser('"+u.id+"')",'danger sm')}</div></td></tr>`).join('');
-  if(globalThis.usersPageHtml)return globalThis.usersPageHtml({head:headOnly('Quản lý người dùng','Phân quyền thao tác và kiểm soát tài khoản'),rows,roleOptions:roleSelectOptions('technician'),permissionChecks:userPermChecks(rolePageIds('technician'),'newUserPerms','technician'),addButton:btn('Thêm','addUser()','teal')});
-  return headOnly('Quản lý người dùng','Phân quyền thao tác và kiểm soát tài khoản')+
-   `<div class="panel"><h2 class="panel-title">Thêm người dùng</h2><div class="user-create-layout">
-     <div class="user-create-card">
-       <div class="user-create-card-title">Thông tin tài khoản</div>
-       <div class="user-create-fields">
-       <div><label>Tên đăng nhập</label><input id="uUser" placeholder="vd: lan.nt"></div>
-       <div><label>Họ tên</label><input id="uName" aria-label="Họ tên"></div>
-       <div><label>Mã viết tắt</label><input id="uInitials" maxlength="12" placeholder="NTL"></div>
-       <div><label>Vai trò</label><select id="uRole" aria-label="Vai trò" onchange="syncUserPermChecks('newUserPerms',this.value)">${roleSelectOptions('technician')}</select></div>
-       <div><label>Mật khẩu tạm</label><input id="uPass" aria-label="Mật khẩu tạm" type="password" autocomplete="new-password"></div>
-       <div class="user-create-actions">${btn('Thêm','addUser()','teal')}</div>
-       </div>
-     </div>
-     <div class="user-create-card"><div class="user-create-card-title">Thẻ được phép dùng</div><div class="user-perm-block">${userPermChecks(rolePageIds('technician'),'newUserPerms','technician')}</div></div>
-     </div>
-     <div class="hint user-create-hint"><b>Vai trò</b> quyết định quyền sửa/quản trị trong các thẻ được tick. <b>KTV:</b> nhập/sửa dữ liệu vận hành · <b>Chỉ xem:</b> chỉ đọc. Người dùng mới sẽ phải đổi mật khẩu khi đăng nhập lần đầu.</div></div>
-   <div class="panel"><h2 class="panel-title">Danh sách người dùng</h2>
-     <div class="user-table-wrap"><table class="user-table"><thead><tr><th>Người dùng</th><th>Vai trò</th><th>Trạng thái</th><th>Hành động</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  const users=globalThis.userListModel(state.users,currentUser&&currentUser.id);
+  const rows=users.map(u=>globalThis.userRowHtml({user:u,currentUserId:currentUser&&currentUser.id,esc,roleLabel,btn})).join('');
+  return globalThis.usersPageHtml({head:headOnly('Quản lý người dùng','Phân quyền thao tác và kiểm soát tài khoản'),rows,roleOptions:roleSelectOptions('technician'),permissionChecks:userPermChecks(rolePageIds('technician'),'newUserPerms','technician'),addButton:btn('Thêm','addUser()','teal')});
 }
 let auditQ='',auditFrom='',auditTo='',auditPage=1,auditPageSize=25;
-const AUDIT_PAGE_SIZES=globalThis.activityAuditPageSizes||[25,50,100];
+const AUDIT_PAGE_SIZES=globalThis.activityAuditPageSizes;
 function auditDateKey(a){
-  if(globalThis.activityAuditFilter)return globalThis.activityAuditFilter.dateKey(a);
+  return globalThis.activityAuditFilter.dateKey(a);
   const d=new Date(a&&a.ts);
   return Number.isFinite(+d)?isoDate(d):'';
 }
 function auditFilteredActivities(items=state.activity||[]){
-  if(globalThis.activityAuditFilter)return globalThis.activityAuditFilter.filter(items,auditQ,auditFrom,auditTo);
+  return globalThis.activityAuditFilter.filter(items,auditQ,auditFrom,auditTo);
   const q=searchText(auditQ);
   return (items||[]).filter(a=>{
     const date=auditDateKey(a);
@@ -46,23 +23,28 @@ function auditFilteredActivities(items=state.activity||[]){
   }).slice().reverse();
 }
 function auditSetQuery(value){
+  const next=globalThis.activityAuditFilterState.withQuery({query:auditQ,from:auditFrom,to:auditTo,page:auditPage,pageSize:auditPageSize},value);auditQ=next.query;auditPage=next.page;scheduleSearchRender(auditSetQuery,rerender,'auditSearch');return;
   if(globalThis.activityAuditFilterState){const next=globalThis.activityAuditFilterState.withQuery({query:auditQ,from:auditFrom,to:auditTo,page:auditPage,pageSize:auditPageSize},value);auditQ=next.query;auditPage=next.page;}else{auditQ=value;auditPage=1;}
   scheduleSearchRender(auditSetQuery,rerender,'auditSearch');
 }
 function auditSetDate(field,value){
   const iso=value?(vnPickerParse(value)||parseVN(value)||''):'';
+  const next=globalThis.updateActivityAuditDateRange({from:auditFrom,to:auditTo},field,iso);auditFrom=next.from;auditTo=next.to;auditPage=1;rerender();return;
   if(globalThis.updateActivityAuditDateRange){const next=globalThis.updateActivityAuditDateRange({from:auditFrom,to:auditTo},field,iso);auditFrom=next.from;auditTo=next.to;auditPage=1;rerender();return;}
   if(field==='from'){auditFrom=iso;if(iso&&auditTo&&iso>auditTo)auditTo=iso;}
   else{auditTo=iso;if(iso&&auditFrom&&iso<auditFrom)auditFrom=iso;}
   auditPage=1;rerender();
 }
 function auditSetPageSize(value){
+  const next=globalThis.activityAuditFilterState.withPageSize({query:auditQ,from:auditFrom,to:auditTo,page:auditPage,pageSize:auditPageSize},value,AUDIT_PAGE_SIZES);auditPageSize=next.pageSize;auditPage=next.page;rerender();return;
   if(globalThis.activityAuditFilterState){const next=globalThis.activityAuditFilterState.withPageSize({query:auditQ,from:auditFrom,to:auditTo,page:auditPage,pageSize:auditPageSize},value,AUDIT_PAGE_SIZES);auditPageSize=next.pageSize;auditPage=next.page;}else{const size=Number(value);auditPageSize=AUDIT_PAGE_SIZES.includes(size)?size:25;auditPage=1;}rerender();
 }
 function auditSetPage(value){
+  auditPage=globalThis.activityAuditFilterState.withPage({query:auditQ,from:auditFrom,to:auditTo,page:auditPage,pageSize:auditPageSize},value).page;rerender();return;
   auditPage=globalThis.activityAuditFilterState?globalThis.activityAuditFilterState.withPage({query:auditQ,from:auditFrom,to:auditTo,page:auditPage,pageSize:auditPageSize},value).page:Math.max(1,Number(value)||1);rerender();
 }
 function auditClearFilters(){
+  const next=globalThis.activityAuditFilterState.cleared({query:auditQ,from:auditFrom,to:auditTo,page:auditPage,pageSize:auditPageSize});auditQ=next.query;auditFrom=next.from;auditTo=next.to;auditPage=next.page;rerender();return;
   if(globalThis.activityAuditFilterState){const next=globalThis.activityAuditFilterState.cleared({query:auditQ,from:auditFrom,to:auditTo,page:auditPage,pageSize:auditPageSize});auditQ=next.query;auditFrom=next.from;auditTo=next.to;auditPage=next.page;}else{auditQ='';auditFrom='';auditTo='';auditPage=1;}rerender();
 }
 function pageAudit(){
@@ -72,7 +54,7 @@ function pageAudit(){
   const chainHtml=chain.idle
     ?`<span class="tag none">Chưa kiểm chuỗi hash</span> ${btn('Kiểm tra chuỗi hash','auditVerifyChainNow()','ghost sm')} <span class="hint">Nhật ký lớn (${chain.total} dòng) nên không tự kiểm mỗi lần mở trang.</span>`
     :chain.ok?`<span class="tag ok">Chuỗi hash hợp lệ</span> <span class="hint">${chain.checked} dòng đã khóa hash${chain.legacy?` · ${chain.legacy} dòng cũ chưa có hash`:''}</span>`:`<span class="tag rej">Audit có dấu hiệu bị sửa</span> <span class="hint">Lỗi tại dòng #${(state.activity[chain.brokenIndex]||{}).seq||chain.brokenIndex+1}: ${esc(chain.reason)}</span>`;
-  const filtered=auditFilteredActivities(),pageInfo=globalThis.activityAuditPagination?globalThis.activityAuditPagination(filtered,auditPage,auditPageSize):null,pageCount=pageInfo?pageInfo.pageCount:Math.max(1,Math.ceil(filtered.length/auditPageSize));
+  const filtered=auditFilteredActivities(),pageInfo=globalThis.activityAuditPagination(filtered,auditPage,auditPageSize),pageCount=pageInfo.pageCount;
   auditPage=pageInfo?pageInfo.page:Math.min(Math.max(1,auditPage),pageCount);
   const offset=pageInfo?pageInfo.offset:(auditPage-1)*auditPageSize,pageRows=pageInfo?pageInfo.rows:filtered.slice(offset,offset+auditPageSize);
   const rows=pageRows.map(a=>`<tr><td><div class="audit-time-cell"><span class="audit-seq">${a.seq?'#'+a.seq:''}</span><span class="audit-time">${formatDateTimeVN(a.ts)}</span></div></td><td><b>${esc(a.user||'')}</b><div class="hint">${roleLabel(a.role||'viewer')}${a.username?' · @'+esc(a.username):''}</div></td><td><span class="pill">${esc(a.type||'')}</span></td><td>${esc(a.target||'')||'<span class="hint">—</span>'}</td><td class="audit-detail">${esc(a.detail||'')||'<span class="hint">—</span>'}</td></tr>`).join('');
@@ -93,7 +75,7 @@ function pageAudit(){
       ${rows?`<div class="audit-table-wrap"><table class="audit-table"><thead><tr><th>Thời gian</th><th>Người dùng</th><th>Hành động</th><th>Đối tượng</th><th>Chi tiết</th></tr></thead><tbody>${rows}</tbody></table></div>`:emptyState(total?'Không tìm thấy nhật ký':'Chưa có hoạt động',total?'Thử từ khóa hoặc khoảng ngày khác.':'Nhật ký sẽ bắt đầu ghi từ các thao tác tiếp theo.')}
       ${pagination}</div>`;
 }
-function activityCSVRows(items){if(globalThis.activityAuditCsv)return globalThis.activityAuditCsv(items);const rows=[['Seq','Thời gian','Người dùng','Tên đăng nhập','Vai trò','Hành động','Đối tượng','Chi tiết','PrevHash','Hash']];(items||[]).forEach(a=>rows.push([a.seq||'',formatDateTimeVN(a.ts),a.user||'',a.username||'',roleLabel(a.role||'viewer'),a.type||'',a.target||'',a.detail||'',a.prevHash||'',a.hash||'']));return rows;}
+function activityCSVRows(items){return globalThis.activityAuditCsv(items);}
 function exportActivityCSV(){downloadCSV('Nhat_ky_hoat_dong_QCLab.csv',activityCSVRows(state.activity));}
 /* Lưu trữ CÓ CHỦ ĐÍCH nhật ký cũ: xuất CSV phần bị cắt TRƯỚC, chỉ khi file đã
    tạo xong mới gỡ khỏi state — khác với xoay vòng tự động (auditRotateOverflow),

@@ -3,10 +3,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
-const ctx = loadSandbox(['modules/reports.js'], { window: { QCLAB_APP: { name: 'QC Lab', version: 'test' } } });
+const ctx = loadSandbox(['modules/reports.js'], { window: { QCLAB_APP: { name: 'QC Lab', version: 'test' } }, reportSignBlock: () => '', reportHeaderPresentation: model => `<div>${model.app.name} ${model.app.version}</div>` });
 run(ctx, `
   state={lab:{name:'PXN',dept:'Hóa sinh'},westgardRules:{'1-3s':true},tests:[{id:'T1',name:'Sodium',unit:'mmol/L',machine:'Máy A'}]};
   sgTest='T1';
+  globalThis.sigmaPrintRowsService={periodRows:()=>'<tr><td><b>Mức 1</b></td><td>30 điểm · Lô 1101</td></tr><tr><td>Mức 2</td><td>Chưa đủ CV IQC và Bias EQA/EQC</td></tr>',periodsRows:()=>'<tr><td><b>07/2026</b></td><td><b>Mức 1</b></td></tr>'};
+  globalThis.sigmaMuPrintRowsService={periodRows:()=>'<tr><td><b>Mức 1</b></td><td><b>3.36</b></td><td>2.350 mmol/L</td></tr><tr><td><b>Mức 2</b></td><td>Thiếu u(bias), u(cal)</td></tr>',periodsRows:()=>'<tr><td><b>07/2026</b></td><td><b>Mức 1</b></td></tr>'};
+  globalThis.sigmaMuTraceService=()=>['Mức 1 · nguồn u(cal): CoA calibrator lô 9','Người rà soát ngân sách MU: KTV A · 30/07/2026'];
   const __entry={id:'P7',period:'2026-07',lv:{1:{uCalBasis:'CoA calibrator lô 9',muReviewedBy:'KTV A',muReviewedDate:'2026-07-30'}}};
   const __mu={k:2,uRw:0.77,uBias:0.9,uCal:1.2,uc:1.68,U:3.36,includeBias:true,complete:true,missing:[],absoluteU:2.35,teaRatio:0.672,withinTea:true};
   const __metric={tea:5,sigma:5.63,classifiable:true,c:'#2c7d5c',label:'Xuất sắc',cv:0.77,bias:0.67,dpmo:17,yld:99.9983,cvSource:'iqc-cohort',n:30,sourceLot:'1101',readinessLabel:'Đủ điều kiện dữ liệu',mu:__mu};

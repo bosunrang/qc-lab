@@ -1,0 +1,15 @@
+'use strict';
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const root=path.join(__dirname,'..');
+const route=fs.readFileSync(path.join(root,'assets','modules','dashboard-routes.js'),'utf8');
+const bridge=fs.readFileSync(path.join(root,'src','compat','modular-pilot.global.ts'),'utf8');
+
+assert.match(route,/function pageDashLoading\(tests,pending\)\{return globalThis\.dashboardLoadingPresentation\(tests,pending,state\.data,state\.lab\);\}/,'Dashboard đang tải phải dùng renderer TypeScript');
+assert.match(bridge,/dashboardLoadingPresentation: ReturnType<typeof createDashboardLoading>;/,'Dashboard đang tải phải là hợp đồng bridge bắt buộc');
+assert.match(bridge,/dashboardQcFollowupItemHtml: ReturnType<typeof createDashboardQcFollowupItemHtml>;/,'Dòng theo dõi Dashboard phải là hợp đồng bridge bắt buộc');
+assert.match(bridge,/dashboardTestRowHtml: ReturnType<typeof createDashboardTestRowHtml>;/,'Dòng xét nghiệm Dashboard phải là hợp đồng bridge bắt buộc');
+assert.match(bridge,/dashboardEmptyTestsHtml: ReturnType<typeof createDashboardEmptyTestsHtml>;/,'Trạng thái trống Dashboard phải là hợp đồng bridge bắt buộc');
+
+console.log('Dashboard loading TypeScript bridge tests passed');

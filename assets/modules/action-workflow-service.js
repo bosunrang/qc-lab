@@ -186,6 +186,7 @@
      khong duoc memo de map khong phinh vo han. */
   const rerunMemo=new Map(),pointIndexMemo=new Map(),lotIndexMemo=new Map();
   function invalidateActionCaches(testId){
+    root.ActionRerunService.invalidate(testId);root.ActionPointIndexService.invalidate();return;
     if(root.ActionRerunService){root.ActionRerunService.invalidate(testId);if(root.ActionPointIndexService)root.ActionPointIndexService.invalidate();else{pointActionsMemo.ref=null;pointActionsMemo.index=null;}return;}
     if(testId==null){rerunMemo.clear();pointIndexMemo.clear();lotIndexMemo.clear();pointActionsMemo.ref=null;pointActionsMemo.index=null;return;}
     pointIndexMemo.delete(testId);
@@ -310,18 +311,22 @@
     return index;
   }
   function pointActions(pointId){
+    return root.ActionPointIndexService.forPoint(pointId);
     if(root.ActionPointIndexService)return root.ActionPointIndexService.forPoint(pointId);
     return pointActionsIndex().get(pointId)||[];
   }
   function pointRealActions(pointId){
+    return root.PointWorkflowService.real(pointActions(pointId));
     if(root.PointWorkflowService)return root.PointWorkflowService.real(pointActions(pointId));
     return pointActions(pointId).filter(a=>!actionCancelled(a)&&actionRecorded(a));
   }
   function pointWorkflowComplete(pointId){
+    return root.PointWorkflowService.complete(pointActions(pointId));
     if(root.PointWorkflowService)return root.PointWorkflowService.complete(pointActions(pointId));
     return pointRealActions(pointId).some(a=>actionWorkflowStatus(a).complete);
   }
   function pointWorkflowSummary(pointId){
+    return root.PointWorkflowService.summary(pointActions(pointId));
     if(root.PointWorkflowService)return root.PointWorkflowService.summary(pointActions(pointId));
     const acts=pointActions(pointId);
     if(!acts.length)return{cls:'rej',label:'Chưa ghi khắc phục'};

@@ -30,14 +30,7 @@ function actionSectionToggled(key,open){
   if(open)actionOpenSections.add(key);else actionOpenSections.delete(key);
 }
 function actionDefaultOpenSections(editing,protocol){
-  if(globalThis.ActionFormModel)return globalThis.ActionFormModel.defaultOpenSections(editing,protocol);
-  if(!editing)return new Set(['immediate']);
-  const miss=protocol&&protocol.missingBySection||{};
-  const open=new Set(['immediate','risk','check','cause','patient'].filter(k=>(miss[k]||[]).length));
-  /* Mục 8 mở sẵn khi hồ sơ đã qua được checklist — lúc đó đánh giá hiệu lực mới là
-     việc còn lại phải làm. */
-  if(!open.size&&editing&&!actionEffectivenessStatus({...editing,protocolVersion:editing.protocolVersion||2}).complete)open.add('eff');
-  return open;
+  return globalThis.ActionFormModel.defaultOpenSections(editing,protocol);
 }
 /* Luật Westgard là bộ từ vựng đóng — không có lý do gì để gõ tay. actSel() tự thêm
    option cho giá trị lạ nên hồ sơ cũ (hoặc chuỗi nhiều luật "1-3s, 2-2s" sinh từ dòng
@@ -98,8 +91,7 @@ const ACT_SOURCE_OPTS=[['','— Chọn nguồn —'],...Object.entries(ACTION_LA
    vi phạm, nếu không hệ thống mất đường theo dõi QC chạy lại. Hồ sơ cũ lỡ mang giá trị
    đó vẫn giữ option để hiện đúng tên — phần chặn do actionDraftStatus() lo. */
 function actionSourceOptions(qcBound,current){
-  if(globalThis.ActionFormModel)return globalThis.ActionFormModel.sourceOptions(ACT_SOURCE_OPTS,qcBound,current);
-  return(qcBound||current==='iqc')?ACT_SOURCE_OPTS:ACT_SOURCE_OPTS.filter(([v])=>v!=='iqc');
+  return globalThis.ActionFormModel.sourceOptions(ACT_SOURCE_OPTS,qcBound,current);
 }
 const ACT_PHASE_OPTS=Object.entries(ACTION_LABELS.phase);
 const ACT_ERR_OPTS=[['','— Chưa xác định —'],['SE — Sai số hệ thống','SE — Sai số hệ thống'],['RE — Sai số ngẫu nhiên','RE — Sai số ngẫu nhiên']];
@@ -324,8 +316,8 @@ function actionInvestigationField(statusId,noteId,title,hint,form,statusKey,note
     <div class="action-investigation-choices" role="group" aria-label="${escAttr('Kết quả '+title)}">${choices.map(([v,label])=>`<button type="button" class="action-choice ${v===value?'active':''}" data-value="${escAttr(v)}" aria-pressed="${v===value?'true':'false'}" onclick="actionInvestigationChoose('${jsq(statusId)}','${jsq(v)}')">${esc(actionInvestigationChoiceLabel(v,label))}</button>`).join('')}</div>
     <div class="action-investigation-note"><input id="${noteId}" aria-label="Ghi chú ${escAttr(title)}" placeholder="Ghi chú / bằng chứng" value="${escAttr(form[noteKey]||'')}">${actionSuggestBox(noteId,ACT_SUGGEST[noteKey],'Gợi ý bằng chứng')}</div></div>`;
 }
-function actionInvestigationChoiceLabel(value,label){return globalThis.ActionInvestigationPresentation?globalThis.ActionInvestigationPresentation.choiceLabel(value,label):value==='not-needed'?'Không cần':value==='checked-ok'?'Đạt':value==='checked-abnormal'?'Bất thường':label;}
-function actionInvestigationStateClass(value){return globalThis.ActionInvestigationPresentation?globalThis.ActionInvestigationPresentation.stateClass(value):['ok','checked-ok'].includes(value)?'is-ok':['abnormal','checked-abnormal'].includes(value)?'is-abnormal':['na','not-needed'].includes(value)?'is-na':'is-empty';}
+function actionInvestigationChoiceLabel(value,label){return globalThis.ActionInvestigationPresentation.choiceLabel(value,label);}
+function actionInvestigationStateClass(value){return globalThis.ActionInvestigationPresentation.stateClass(value);}
 function actionInvestigationChoose(statusId,value){
   const select=document.getElementById(statusId);if(!select)return;
   select.value=value;select.dispatchEvent(new Event('change',{bubbles:true}));
@@ -339,28 +331,22 @@ function actionInvestigationSync(statusId){
 }
 function actionChecklistRefresh(){
   const first=document.getElementById(ACT_CHECK_FIELDS[0][0]),section=first&&first.closest('details'),chip=section&&section.querySelector(':scope > summary .action-chip');if(!chip)return;
-  const rows=ACT_CHECK_FIELDS.map(([statusId,noteId])=>({status:(document.getElementById(statusId)||{}).value,note:(document.getElementById(noteId)||{}).value})),info=globalThis.ActionChecklistPresentation?globalThis.ActionChecklistPresentation.checklistChip(rows):(function(){const done=rows.filter(({status,note})=>{const valid=!!ACTION_LABELS.check[status],needNote=['abnormal','na','checked-abnormal'].includes(status);return valid&&(!needNote||String(note||'').trim().length>=3);}).length;return{cls:done===rows.length?'ok':'warn',label:`Đã hoàn tất ${done}/${rows.length}`};})();
+  const rows=ACT_CHECK_FIELDS.map(([statusId,noteId])=>({status:(document.getElementById(statusId)||{}).value,note:(document.getElementById(noteId)||{}).value})),info=globalThis.ActionChecklistPresentation.checklistChip(rows);
   chip.textContent=info.label;chip.classList.toggle('ok',info.cls==='ok');chip.classList.toggle('warn',info.cls==='warn');
 }
 /* Bọc một mục thành <details> thu gọn được. Dùng thẻ gốc thay vì tự dựng bằng JS:
    bàn phím, ARIA và trạng thái mở/đóng do trình duyệt lo, không phát sinh vi phạm
    a11y nào. ontoggle ghi lại trạng thái để rerender() không bung/thu lung tung. */
 function actionSectionChip(missing){
-  if(globalThis.ActionChecklistPresentation)return globalThis.ActionChecklistPresentation.sectionChip(missing);
-  const n=(missing||[]).length;
-  return n?{cls:'warn',label:`Còn thiếu ${n} mục`,title:`Còn thiếu: ${missing.join('; ')}`}:{cls:'ok',label:'Đã xong',title:'Không còn mục bắt buộc chưa hoàn thành'};
+  return globalThis.ActionChecklistPresentation.sectionChip(missing);
 }
 function actionChecklistChip(form){
-  if(globalThis.ActionChecklistPresentation)return globalThis.ActionChecklistPresentation.checklistChip(ACT_CHECK_FIELDS.map(([, ,statusKey,noteKey])=>({status:form[statusKey],note:form[noteKey]})));
-  const done=ACT_CHECK_FIELDS.filter(([, ,statusKey,noteKey])=>{const status=form[statusKey],valid=!!ACTION_LABELS.check[status],needNote=['abnormal','na','checked-abnormal'].includes(status);return valid&&(!needNote||String(form[noteKey]||'').trim().length>=3);}).length;
-  return{cls:done===ACT_CHECK_FIELDS.length?'ok':'warn',label:`Đã hoàn tất ${done}/${ACT_CHECK_FIELDS.length}`};
+  return globalThis.ActionChecklistPresentation.checklistChip(ACT_CHECK_FIELDS.map(([, ,statusKey,noteKey])=>({status:form[statusKey],note:form[noteKey]})));
 }
 /* Mục 8 không nằm trong checklist khép vòng nên không có số "còn thiếu" — chip lấy
    thẳng từ cổng hiệu lực, nếu không sẽ luôn hiện "Đã xong" cho hồ sơ còn trắng. */
 function actionEffSectionChip(form){
-  if(globalThis.ActionChecklistPresentation)return globalThis.ActionChecklistPresentation.effectivenessChip(form);
-  const eff=actionEffectivenessStatus({...form,protocolVersion:form.protocolVersion||3});
-  return{cls:eff.cls==='none'?'none':eff.cls,label:eff.complete?eff.label:(form.effectivenessStatus==='ineffective'?eff.label:'Chưa đánh giá'),title:eff.label};
+  return globalThis.ActionChecklistPresentation.effectivenessChip(form);
 }
 function actionUpdateSectionChip(key,info){
   const section=document.querySelector(`details[data-action-section="${key}"]`),chip=section&&section.querySelector(':scope > summary .action-chip');if(!chip)return;
@@ -383,29 +369,14 @@ function actionSection(key,badge,title,hint,bodyHtml,chipInfo,openSet){
 /* Giá trị khởi tạo của form: bản ghi đang sửa > seed từ vi phạm vừa bấm "Ghi nhận" >
    mặc định cho hồ sơ mới. Trả về object phẳng để mọi ô render được value/selected. */
 function actionFormModel(editing,tests){
-  if(globalThis.ActionFormModel)return globalThis.ActionFormModel.build(editing,tests,actionSeed,currentUser,actionDraftValues());
-  const base=editing?{...editing,effectivenessStatus:editing.effectivenessStatus||'pending'}:actionFormDefaults(tests);
-  const draft=actionDraftValues();
-  if(!draft)return base;
-  /* Bản nháp chỉ đè lên các ô có trên form — lot/testId của hồ sơ đang sửa vẫn là ảnh
-     chụp lúc mở hồ sơ vì không nằm trong ACT_FIELDS hoặc vì ô đó bị khoá. */
-  const out={...base};
-  ACT_FIELDS.forEach(([id,key,kind])=>{if(id in draft)out[key]=kind==='num'?(+draft[id]||0):draft[id];});
-  return out;
+  return globalThis.ActionFormModel.build(editing,tests,actionSeed,currentUser,actionDraftValues());
 }
 /* Hồ sơ mở từ nút "Lập hồ sơ từ nguồn khác" KHÔNG được bịa ra danh tính QC: không có
    điểm QC nào thì xét nghiệm/mức/lô đều chưa xác định, mà bản trước lại lặng lẽ điền
    xét nghiệm đầu dropdown và Mức 1 của nó. Nguồn phát hiện cũng để trống thay vì mặc
    định "Nội kiểm IQC" — người dùng vừa bấm đúng nút nói rằng đây KHÔNG phải IQC. */
 function actionFormDefaults(tests){
-  if(globalThis.ActionFormModel)return globalThis.ActionFormModel.defaults(tests,actionSeed,currentUser);
-  const firstTest=tests[0],seed=actionSeed||{},manual=!!seed.manual;
-  const testId=manual?'':(seed.testId||(firstTest&&firstTest.id)||''),t=state.tests.find(x=>x.id===testId);
-  const levels=t?operationalLevels(t):[];
-  const level=manual?'':(levels.some(l=>String(l.level)===String(seed.level))?seed.level:(levels[0]&&levels[0].level)||'');
-  return{protocolVersion:3,testId,level,lot:'',date:seed.date||isoToday(),rule:seed.rule||'',errorType:seed.errorType||'',pointId:seed.pointId||'',
-    by:currentUser?(currentUser.name||currentUser.username):'',dueDate:nceDueDate(7),
-    eventSource:manual?'':'iqc',processPhase:'exam',effectivenessStatus:'pending'};
+  return globalThis.ActionFormModel.defaults(tests,actionSeed,currentUser);
 }
 /* Đưa con trỏ tới đúng ô còn thiếu thay vì chỉ hiện hộp thoại: nhãn "xử lý tức thời"
    nằm ở cuối mục 1, cách xa nút Lưu ở cuối trang. */
