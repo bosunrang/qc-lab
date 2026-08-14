@@ -1,0 +1,12 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','entry','entry-empty-page-html.ts')).href;
+const program=`import {createEntryEmptyPageHtml} from ${JSON.stringify(source)}; const page=createEntryEmptyPageHtml({head:(title,subtitle)=>'<header>'+title+'|'+subtitle+'</header>',empty:(title,message,action)=>'<section>'+title+'|'+message+'|'+action+'</section>'}); console.log(page({title:'Chưa có xét nghiệm',message:'Cần khai báo',actionHtml:'<button>Thêm</button>'}));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy trạng thái rỗng Entry TypeScript');
+assert.match(result.stdout,/<header>Nhập QC\|<\/header>/);
+assert.match(result.stdout,/<div class="panel"><section>Chưa có xét nghiệm\|Cần khai báo\|<button>Thêm<\/button><\/section><\/div>/);
+console.log('Entry empty page HTML TypeScript tests passed');

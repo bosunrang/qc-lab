@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','sigma','sigma-add-test-modal-html.ts')).href;
+const program=`import {sigmaAddTestModalHtml} from ${JSON.stringify(source)}; console.log(sigmaAddTestModalHtml({showSearch:true,searchValue:'Glu',rowsHtml:'<button>Glucose</button>',emptyHtml:'<div>Trống</div>',closeButtonHtml:'<button>Đóng</button>'}));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy popup thêm xét nghiệm Sigma TypeScript');
+const html=result.stdout;assert.match(html,/Chọn hoặc thêm xét nghiệm vào Six Sigma/);assert.match(html,/id="sgAddTestSearch"[^>]*value="Glu"/);assert.match(html,/<button>Glucose<\/button>/);
+console.log('Sigma add-test modal HTML TypeScript tests passed');

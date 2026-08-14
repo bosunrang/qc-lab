@@ -9,9 +9,9 @@ function entryDetailToggled(key,open){if(open)entryDetailOpen.add(key);else entr
 function entryTreeIsCollapsed(){if(entryTreeCollapsed!==null)return!!entryTreeCollapsed;entryTreeCollapsed=globalThis.entryTreeCollapsePreference.read(()=>localStorage.getItem('qclab_entry_tree_collapsed'));return!!entryTreeCollapsed;}
 function pageEntry(rightOnly=false){
   const today=isoToday();
-  if(!state.tests.length)return headOnly('Nhập QC','')+`<div class="panel">${emptyState('Chưa có xét nghiệm','Cần khai báo xét nghiệm và mức QC trước khi nhập kết quả.',role()==='admin'?btn('Thêm xét nghiệm',`go('manage')`,'teal'):'')}</div>`;
+  if(!state.tests.length)return globalThis.entryEmptyPageHtml({title:'Chưa có xét nghiệm',message:'Cần khai báo xét nghiệm và mức QC trước khi nhập kết quả.',actionHtml:role()==='admin'?btn('Thêm xét nghiệm',`go('manage')`,'teal'):''});
   const entryTests=operationalTests();
-  if(!entryTests.length)return headOnly('Nhập QC','')+`<div class="panel">${emptyState('Chưa có xét nghiệm sẵn sàng nhập','Cần đưa xét nghiệm vào Panel QC, ghép Nhóm lô QC và gán Mean/SD trước khi nhập kết quả.',role()==='admin'?btn('Cấu hình Mean/SD',`go('manage');setManageTab('targets')`,'teal'):'')}</div>`;
+  if(!entryTests.length)return globalThis.entryEmptyPageHtml({title:'Chưa có xét nghiệm sẵn sàng nhập',message:'Cần đưa xét nghiệm vào Panel QC, ghép Nhóm lô QC và gán Mean/SD trước khi nhập kết quả.',actionHtml:role()==='admin'?btn('Cấu hình Mean/SD',`go('manage');setManageTab('targets')`,'teal'):''});
   if(!entrySheetMonth)entrySheetMonth=isoMonth();
   let selT=entrySel&&entryTests.find(t=>t.id===entrySel.testId);
   if(!selT||!operationalLevels(selT).some(l=>l.level===entrySel.level)){selT=entryTests[0];const l0=operationalLevels(selT)[0];entrySel={testId:selT.id,level:l0.level};entryAutoOpenKey=null;}

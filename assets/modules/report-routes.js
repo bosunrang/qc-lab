@@ -29,12 +29,7 @@ async function reportLockPeriod(){
 function reportUnlockPeriod(ym){
   if(!requireAdmin())return;
   const label=monthVN(ym);
-  openModal(modalTemplate({title:`Mở khóa kỳ ${esc(label)}`,body:`
-      <div class="hint">Sau khi mở khóa, điểm QC trong kỳ ${esc(label)} có thể được sửa/hủy trở lại.</div>
-      <label>Lý do mở khóa (tối thiểu 5 ký tự)</label>
-      <textarea id="unlockReasonInput" placeholder="VD: Bổ sung đối soát, phát hiện sai sót cần chỉnh lại..." oninput="document.getElementById('unlockReasonErr').style.display='none'"></textarea>
-      <div id="unlockReasonErr" class="hint field-error">Cần ghi lý do mở khóa tối thiểu 5 ký tự.</div>
-    `,footer:btn('Đóng','closeModal()','ghost')+btn('Xác nhận mở khóa',`reportConfirmUnlockPeriod('${jsq(ym)}')`,'danger')}));
+  openModal(globalThis.reportUnlockModalHtml({titleHtml:`Mở khóa kỳ ${esc(label)}`,periodLabelHtml:esc(label),closeButtonHtml:btn('Đóng','closeModal()','ghost'),confirmButtonHtml:btn('Xác nhận mở khóa',`reportConfirmUnlockPeriod('${jsq(ym)}')`,'danger')}));
   setTimeout(()=>{const e=document.getElementById('unlockReasonInput');if(e)e.focus();},50);
 }
 async function reportConfirmUnlockPeriod(ym){

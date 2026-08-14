@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','manage','config-panel-instrument-options-html.ts')).href;
+const program=`import {configPanelInstrumentOptionsHtml} from ${JSON.stringify(source)}; console.log(configPanelInstrumentOptionsHtml([{id:'i1',selected:true,label:'AU5800 · Beckman'},{id:'i2',selected:false,label:'DXI'}]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy danh sách máy Panel QC TypeScript');
+assert.match(result.stdout,/value="i1" selected>AU5800 · Beckman/);assert.match(result.stdout,/value="i2"\s*>DXI/);
+console.log('Config-panel instrument options HTML TypeScript tests passed');

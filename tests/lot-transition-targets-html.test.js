@@ -1,0 +1,16 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','manage','lot-transition-targets-html.ts')).href;
+const program=`import {lotTransitionTargetsHtml} from ${JSON.stringify(source)}; console.log(JSON.stringify([lotTransitionTargetsHtml({kind:'hint',message:'Chọn lô'}),lotTransitionTargetsHtml({kind:'rows',lotNo:'220425',rows:[{testId:'t1',name:'Glucose',unit:'mg/dL',mean:'100',low:'90',high:'110',sd:'5',assigned:true}]})]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy bảng Mean/SD chuyển lô TypeScript');
+const [hint,table]=JSON.parse(result.stdout);
+assert.match(hint,/Chọn lô/);
+assert.match(table,/Mean\/SD cho lô mới 220425/);
+assert.match(table,/data-test="t1"/);
+assert.match(table,/class="tm-sd"[^>]*value="5"/);
+assert.match(table,/Đã nhập/);
+console.log('Lot transition targets HTML TypeScript tests passed');

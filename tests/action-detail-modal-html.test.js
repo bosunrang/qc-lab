@@ -1,0 +1,13 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','nce','action-detail-modal-html.ts')).href;
+const program=`import {actionDetailModalHtml} from ${JSON.stringify(source)}; console.log(actionDetailModalHtml({bodyHtml:'<div>evidence</div>',closeButtonHtml:'<button>Đóng</button>'}));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy popup chi tiết NCE TypeScript');
+const html=result.stdout;
+for(const fragment of ['Chi tiết phiếu xử lý sự cố','<div>evidence</div>','<button>Đóng</button>'])assert.ok(html.includes(fragment));
+assert.match(html,/class="modal-b"/);assert.match(html,/class="modal-f"/);
+console.log('Action detail modal HTML TypeScript tests passed');

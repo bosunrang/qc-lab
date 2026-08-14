@@ -1,0 +1,12 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','sigma','sigma-bias-rows-html.ts')).href;
+const program=`import {sigmaBiasRowsHtml} from ${JSON.stringify(source)}; console.log(sigmaBiasRowsHtml([{index:1,labValue:'102',targetValue:'100',biasText:'2.00%',deleteButtonHtml:'<button>delete</button>'}]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy hàng Bias Sigma TypeScript');
+const html=result.stdout;
+for(const fragment of ['sg-eqa-row','value="102"','value="100"','2.00%','data-bias','<button>delete</button>'])assert.ok(html.includes(fragment));
+console.log('Sigma Bias rows HTML TypeScript tests passed');

@@ -44,6 +44,7 @@ const ctx = loadSandbox(['modules/users-auth.js'], {
   activityAuditFilterState,
   updateActivityAuditDateRange,
   activityAuditPageSizes: [25, 50, 100],
+  activityAuditRowHtml: input => `<tr><td>${input.sequenceHtml}</td><td>${input.timeHtml}</td><td>${input.userHtml}</td><td>${input.typeHtml}</td><td>${input.targetHtml}</td><td>${input.detailHtml}</td></tr>`,
 });
 
 const rows = [

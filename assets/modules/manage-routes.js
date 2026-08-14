@@ -33,11 +33,9 @@ function manageLots(){
        biết nhóm còn được cấu hình Mean/SD tham chiếu hay không; trạng thái vận hành thật
        được isOperationalLotGroup() quyết định. */
     const inUse=lotGroupInUse(g);
-    const statusTag=archived?{cls:'rej',text:'Đã lưu trữ'}:g.status==='stopped'?{cls:'rej',text:'Đã dừng'}:g.status==='planned'?{cls:'warn',text:'Dự kiến'}:inUse?{cls:'ok',text:'Đang hoạt động'}:{cls:'none',text:'Chưa dùng'};
-    const toggleBtn=archived?'':(g.status==='stopped'||g.status==='planned'||!inUse)
-      ?btn('Kích hoạt',`activateLotGroup('${g.id}')`,'teal sm')
-      :btn('Dừng',`toggleLotGroupStatus('${g.id}')`,'ghost sm btn-stop-tint');
-    const lotsHtml=lots.map(l=>`<span class="pill">${esc(l.lotNo)} · M${l.level}</span>`).join(''),actionsHtml=btn('Sửa nhóm',`openConfigGroup('${g.id}')`,'ghost sm')+btn('Mean/SD',`openTargetMatrix('','${g.id}')`,'ghost sm')+toggleBtn+btn('Xóa',`deleteConfigGroup('${g.id}')`,'danger sm'),model={archived,name:g.name,note:g.note,status:statusTag,lotsHtml,actionsHtml};return globalThis.manageLotGroupCardPresentation(model);}).join('');
+    const statusTag=globalThis.lotGroupStatusPresentation(archived,g.status,inUse);
+    const toggle=globalThis.lotGroupToggleActionPresentation(archived,g.status,inUse),toggleBtn=toggle?btn(toggle.label,toggle.command==='activate'?`activateLotGroup('${g.id}')`:`toggleLotGroupStatus('${g.id}')`,toggle.variant):'';
+    const lotsHtml=globalThis.lotGroupLotPillsHtml(lots.map(l=>({lotNo:esc(l.lotNo),level:l.level}))),actionsHtml=btn('Sửa nhóm',`openConfigGroup('${g.id}')`,'ghost sm')+btn('Mean/SD',`openTargetMatrix('','${g.id}')`,'ghost sm')+toggleBtn+btn('Xóa',`deleteConfigGroup('${g.id}')`,'danger sm'),model={archived,name:g.name,note:g.note,status:statusTag,lotsHtml,actionsHtml};return globalThis.manageLotGroupCardPresentation(model);}).join('');
   return manageToolbar('Lô & Nhóm QC','Quản lý từng lô và nhóm lô QC.')+globalThis.manageLotConfigLayoutPresentation({lotAddButtonHtml:btn('Thêm lô QC','openConfigLot()','teal sm'),lotRowsHtml:rows,lotEmptyHtml:emptyState('Chưa có lô QC','Tạo từng lô QC độc lập, sau đó nhập Mean/SD cho Panel QC.'),groupAddButtonHtml:btn('Thêm nhóm lô','openConfigGroup()','teal sm'),groupRowsHtml:groupRows,groupEmptyHtml:emptyState('Chưa có nhóm lô','Chọn các lô QC đã tạo để ghép thành một nhóm, ví dụ 1101/1102.')});
 }
 function manageInstruments(){
@@ -142,7 +140,7 @@ function teaLabProfileOpen(refKey){
   if(!requireAdmin())return;const ref=effectiveTeaRefs().find(r=>r[6]===refKey||teaRefName(r[0])===teaRefName(refKey));if(!ref)return;const row=teaRefFind(refKey),meta=row&&row.sources&&row.sources.lab||{},source=row&&row.labSource||'',sourceOpts=['<option value="">— Chọn nguồn chính —</option>',...TEA_LAB_BASIS_SOURCES.map(([v,label])=>`<option value="${v}" ${source===v?'selected':''}>${esc(label)}</option>`)].join(''),effective=meta.effectiveDate||isoToday(),approvedDate=meta.reviewedDate||isoToday(),prepared=row&&row.labPreparedBy||userName(),approved=meta.reviewedBy||userName(),nextReview=row&&row.labNextReviewDate||'';
   const body=globalThis.teaReferenceLabProfileBodyPresentation({labValue:row&&row.lab!=null?row.lab:'',sourceOptionsHtml:sourceOpts,referenceValue:escAttr(meta.document||''),reasonHtml:esc(meta.note||''),effectiveDateHtml:dateBox('teaLabEffectiveDate',effective,'manage-date','aria-label="Ngày hiệu lực TEa chuẩn hóa"'),nextReviewDateHtml:dateBox('teaLabNextReviewDate',nextReview,'manage-date','aria-label="Ngày xem xét lại TEa chuẩn hóa"'),preparedValue:escAttr(prepared),approvedValue:escAttr(approved),approvedDateHtml:dateBox('teaLabApprovedDate',approvedDate,'manage-date','aria-label="Ngày phê duyệt TEa chuẩn hóa"')});
   const hasProfile=row&&row.lab!=null,remove=hasProfile?btn('Xóa TEa chuẩn hóa',`teaLabProfileRemove('${escAttr(refKey)}')`,'danger'):'';
-  openModal(modalTemplate({title:hasProfile?'Sửa hồ sơ TEa chuẩn hóa':'Thêm hồ sơ TEa chuẩn hóa',body,footer:remove+btn('Hủy','closeModal()','ghost')+btn(hasProfile?'Lưu thay đổi':'Thêm hồ sơ TEa',`teaLabProfileSave('${escAttr(refKey)}')`,'teal'),cls:'tea-lab-profile-modal'}));
+  openModal(globalThis.teaReferenceLabProfileModalHtml({title:hasProfile?'Sửa hồ sơ TEa chuẩn hóa':'Thêm hồ sơ TEa chuẩn hóa',bodyHtml:body,removeButtonHtml:remove,cancelButtonHtml:btn('Hủy','closeModal()','ghost'),saveButtonHtml:btn(hasProfile?'Lưu thay đổi':'Thêm hồ sơ TEa',`teaLabProfileSave('${escAttr(refKey)}')`,'teal')}));
   setTimeout(()=>{const e=document.getElementById('teaLabValue');if(e)e.focus();},0);
 }
 async function teaLabProfileSave(refKey){

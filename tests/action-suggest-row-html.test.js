@@ -1,0 +1,15 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','nce','action-suggest-row-html.ts')).href;
+const program=`import {actionSuggestRowHtml} from ${JSON.stringify(source)}; console.log(JSON.stringify([actionSuggestRowHtml('aNote','aNote',[{phraseHtml:'Kiểm tra',phraseJs:'Kiểm tra'}]),actionSuggestRowHtml('x','x',[])]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy gợi ý NCE TypeScript');
+const [row,empty]=JSON.parse(result.stdout);
+assert.match(row,/id="sugg-aNote"/);
+assert.match(row,/actionInsertSuggestion\('aNote','Kiểm tra'\)/);
+assert.match(row,/Kiểm tra/);
+assert.equal(empty,'');
+console.log('Action suggest row HTML TypeScript tests passed');

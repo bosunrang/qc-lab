@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','range','range-workflow-checklist-rows-html.ts')).href;
+const program=`import {rangeWorkflowChecklistRowsHtml} from ${JSON.stringify(source)}; console.log(rangeWorkflowChecklistRowsHtml([{condition:'n',current:20,requirement:'≥20',passed:true},{condition:'Cảnh báo',current:1,requirement:'0',passed:false}]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy hàng checklist dải QC TypeScript');
+const html=result.stdout;assert.match(html,/class="tag ok">Đạt/);assert.match(html,/class="tag rej">Chưa đạt/);assert.match(html,/≥20/);
+console.log('Range workflow checklist rows HTML TypeScript tests passed');

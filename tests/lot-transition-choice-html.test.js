@@ -1,0 +1,14 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','manage','lot-transition-choice-html.ts')).href;
+const input={inputId:'cfgTransFrom',selectedId:'L1',value:'1101 · Mức 1',optionsHtml:'<option value="1102"></option>'};
+const program=`import {lotTransitionChoiceHtml} from ${JSON.stringify(source)}; console.log(lotTransitionChoiceHtml(${JSON.stringify(input)}));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy chọn lô chuyển tiếp TypeScript');
+assert.match(result.stdout,/id="cfgTransFrom" list="cfgTransFromList"/);
+assert.match(result.stdout,/data-lot-id="L1"/);
+assert.match(result.stdout,/<option value="1102"><\/option>/);
+console.log('Lot transition choice HTML TypeScript tests passed');

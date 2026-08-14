@@ -4556,6 +4556,22 @@
 		};
 	}
 	//#endregion
+	//#region src/presentation/audit/activity-audit-archive-modal-html.ts
+	function activityAuditArchiveModalHtml(input) {
+		return `<div class="modal"><div class="modal-h"><h3>Lưu trữ nhật ký cũ</h3><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
+      <div class="hint">Nhật ký hiện có <b>${input.total}</b> dòng. Các dòng cũ hơn mốc chọn sẽ được <b>xuất ra file CSV</b> (kèm PrevHash/Hash), sau đó mới bị gỡ khỏi hệ thống — hash dòng cuối file trở thành điểm nối vào chuỗi còn lại nên phần lưu trữ vẫn kiểm chứng được.</div>
+      <label class="flow-section">Chỉ giữ lại nhật ký trong</label>
+      <select id="auditArchiveMonths" aria-label="Mốc tuổi nhật ký được giữ lại"><option value="12">12 tháng gần nhất</option><option value="24" selected>24 tháng gần nhất</option><option value="36">36 tháng gần nhất</option></select>
+    </div><div class="modal-f">${input.cancelButtonHtml}${input.archiveButtonHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/audit/activity-audit-row-html.ts
+	function activityAuditRowHtml(input) {
+		const target = input.targetHtml || "<span class=\"hint\">—</span>";
+		const detail = input.detailHtml || "<span class=\"hint\">—</span>";
+		return `<tr><td><div class="audit-time-cell"><span class="audit-seq">${input.sequenceHtml}</span><span class="audit-time">${input.timeHtml}</span></div></td><td><b>${input.userHtml}</b><div class="hint">${input.roleHtml}${input.usernameHtml}</div></td><td><span class="pill">${input.typeHtml}</span></td><td>${target}</td><td class="audit-detail">${detail}</td></tr>`;
+	}
+	//#endregion
 	//#region src/presentation/auth/user-list-model.ts
 	function userListModel(users, currentUserId) {
 		return (Array.isArray(users) ? users : []).map((user) => ({
@@ -7055,6 +7071,16 @@
 		};
 	}
 	//#endregion
+	//#region src/presentation/report/report-unlock-modal-html.ts
+	function reportUnlockModalHtml(input) {
+		return `<div class="modal"><div class="modal-h"><h3>${input.titleHtml}</h3><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
+      <div class="hint">Sau khi mở khóa, điểm QC trong kỳ ${input.periodLabelHtml} có thể được sửa/hủy trở lại.</div>
+      <label>Lý do mở khóa (tối thiểu 5 ký tự)</label>
+      <textarea id="unlockReasonInput" placeholder="VD: Bổ sung đối soát, phát hiện sai sót cần chỉnh lại..." oninput="document.getElementById('unlockReasonErr').style.display='none'"></textarea>
+      <div id="unlockReasonErr" class="hint field-error">Cần ghi lý do mở khóa tối thiểu 5 ký tự.</div>
+    </div><div class="modal-f">${input.closeButtonHtml}${input.confirmButtonHtml}</div></div>`;
+	}
+	//#endregion
 	//#region src/presentation/report/report-lock-picker.ts
 	function reportLockPicker(ym, nowYear) {
 		const match = /^(\d{4})-(\d{2})$/.exec(ym);
@@ -7852,6 +7878,737 @@
 	}
 	function entrySheetAddRunHtml(input) {
 		return input.visible ? `<button type="button" class="qc-add-run-btn" title="Thêm lần chạy bổ sung" onclick="${input.action}"><span class="qc-add-run-icon">+</span><span class="qc-add-run-label">Thêm</span></button>` : "";
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-empty-page-html.ts
+	function createEntryEmptyPageHtml(deps) {
+		return (input) => `${deps.head("Nhập QC", "")}<div class="panel">${deps.empty(input.title, input.message, input.actionHtml || "")}</div>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/target-switch-modal-html.ts
+	function targetSwitchModalHtml(input) {
+		return `<div class="modal">
+    <div class="modal-h"><h3>Áp dụng nhóm lô ${input.groupName}?</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-b">
+      <div class="hint">${input.overwriteCount} dòng (${input.assayNames}) hiện đang dùng một nhóm lô khác. Chọn cách áp dụng Mean/SD vừa nhập:</div>
+      <div class="hint flow-control"><b>Chuyển qua nhóm lô này</b>: áp dụng ngay cho các dòng trên, nhóm lô đang dùng trước đó sẽ được đánh dấu "Đã dừng" (vẫn xem/nhập được nếu cần, không bị khóa).${input.lockNote}</div>
+      <div class="hint flow-note"><b>Dự kiến</b>: chỉ lưu lại Mean/SD đã nhập cho nhóm lô mới, chưa áp dụng — nhóm lô đang dùng vẫn tiếp tục như bình thường.</div>
+    </div>
+    <div class="modal-f">${input.cancelButtonHtml}${input.plannedButtonHtml}${input.switchButtonHtml}</div>
+  </div>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/config-panel-test-rows.ts
+	function configPanelTestRows(rows) {
+		return rows.map((row) => `<label><input class="cfg-panel-test" type="checkbox" value="${row.id}" ${row.selected ? "checked" : ""}><span><b>${row.name}</b><small>${row.instrument} · ${row.unit || "Chưa có đơn vị"}</small></span></label>`).join("") || "<div class=\"empty cfg-panel-empty\">Máy này chưa có xét nghiệm.</div>";
+	}
+	//#endregion
+	//#region src/presentation/manage/config-panel-modal-html.ts
+	function configPanelModalHtml(input) {
+		return `<div class="modal rcfg-modal"><div class="modal-h"><div><h3>${input.title}</h3></div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
+    <div class="grid2"><div><label>Tên Panel QC</label><input id="cfgPanelName" value="${input.name}" placeholder="VD: Sinh hóa AU5800"></div><div><label>Máy xét nghiệm</label><select id="cfgPanelInstrument" onchange="renderConfigPanelTests()">${input.instrumentsHtml}</select></div></div>
+    <label>Chọn xét nghiệm trong panel</label><div id="cfgPanelTests" class="group-lot-picker assay-group-picker">${input.testRowsHtml}</div>
+    <label>Ghi chú</label><textarea id="cfgPanelNote">${input.note}</textarea>
+    <label class="rcfg-check"><input id="cfgPanelActive" type="checkbox" ${input.active ? "checked" : ""}> Panel đang sử dụng</label></div>
+    <div class="modal-f">${input.cancelButtonHtml}${input.saveButtonHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/lot-transition-choice-html.ts
+	function lotTransitionChoiceHtml(input) {
+		return `<input id="${input.inputId}" list="${input.inputId}List" autocomplete="off" role="combobox" aria-autocomplete="list" placeholder="Gõ số lô hoặc chọn danh sách" value="${input.value}" data-lot-id="${input.selectedId}" oninput="lotTransitionChoiceInput(this)" onchange="lotTransitionChoiceInput(this,true)"><datalist id="${input.inputId}List">${input.optionsHtml}</datalist>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/lot-transition-modal-html.ts
+	function lotTransitionModalHtml(input) {
+		return `<div class="modal rcfg-modal lot-trans-modal"><div class="modal-h"><div><h3>${input.title}</h3></div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
+    <div class="lot-trans-row3"><div><label>Panel QC áp dụng</label><select id="cfgTransPanel" onchange="refreshLotTransitionTargets()">${input.panelsHtml}</select></div><div><label>Lô cũ</label>${input.fromChoiceHtml}</div><div><label>Lô mới</label>${input.toChoiceHtml}</div></div>
+    <div class="lot-trans-row2"><div><label>Ngày bắt đầu (dd/mm/yyyy)</label>${input.startDateHtml}</div><div><label>Trạng thái</label><select id="cfgTransStatus"><option value="planned" ${input.status === "planned" ? "selected" : ""}>Dự kiến</option><option value="active" ${input.status === "active" || input.status === "completed" ? "selected" : ""}>Đang chạy song song</option><option value="accepted" ${input.status === "accepted" ? "selected" : ""}>Chấp nhận lô mới</option><option value="rejected" ${input.status === "rejected" ? "selected" : ""}>Không chấp nhận</option></select></div></div>
+    <div id="cfgTransTargets">${input.targetsHtml}</div>
+    </div>
+    <div class="modal-f">${input.cancelButtonHtml}${input.saveButtonHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/lot-transition-targets-html.ts
+	function lotTransitionTargetsHtml(input) {
+		if (input.kind === "hint") return `<div class="hint flow-section">${input.message || ""}</div>`;
+		const rows = (input.rows || []).map((row) => `<div class="target-row" data-test="${row.testId}">
+      <label class="lot-assay-check"><input type="checkbox" checked disabled><span></span></label>
+      <div class="lot-assay-name"><b>${row.name}</b><small>${row.unit || "Chưa có đơn vị"}</small></div>
+      <input class="tm-mean" type="number" step="any" value="${row.mean}" placeholder="Trung bình" oninput="syncTargetRange(this,'target')">
+      <input class="tm-low" type="number" step="any" value="${row.low}" placeholder="Giới hạn dưới" oninput="syncTargetRange(this,'limits')">
+      <input class="tm-high" type="number" step="any" value="${row.high}" placeholder="Giới hạn trên" oninput="syncTargetRange(this,'limits')">
+      <input class="tm-sd" type="number" step="any" value="${row.sd}" placeholder="Độ lệch chuẩn" oninput="syncTargetRange(this,'target')">
+      <span>${row.assigned ? "<b class=\"tag ok\">Đã nhập</b>" : "<b class=\"tag none\">Chưa nhập</b>"}</span>
+    </div>`).join("");
+		return `<div class="lot-trans-target-head-row"><label>Mean/SD cho lô mới ${input.lotNo || ""}</label><input type="search" class="lot-trans-target-search" placeholder="Tìm xét nghiệm..." oninput="filterLotTransitionTargets(this.value)"></div>
+    <div class="target-table lot-trans-target-table"><div class="target-head"><span></span><span>Xét nghiệm</span><span>Trung bình mục tiêu</span><span>Giới hạn dưới</span><span>Giới hạn trên</span><span>Độ lệch chuẩn</span><span>Trạng thái</span></div>${rows}</div>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/lot-group-columns-html.ts
+	function lotGroupColumnsHtml(columns) {
+		return columns.map((column) => `<div class="lot-level-col"><div class="lot-level-title">Mức ${column.level}</div>${column.lots.map((lot) => `<label class="${lot.depleted ? "lot-opt-depleted" : ""}"${lot.locked ? ` title="Lô ${lot.depletedLabel} — không thể chọn"` : ""}><input class="cfg-group-lot" type="checkbox" value="${lot.id}" ${lot.selected ? "checked" : ""} ${lot.locked ? "disabled" : ""} onchange="suggestConfigGroupName()"><span><b>${lot.lotNo}</b><small>HSD ${lot.expiry}${lot.depleted ? " · " + lot.depletedLabel : ""}</small></span></label>`).join("")}</div>`).join("");
+	}
+	//#endregion
+	//#region src/presentation/manage/lot-group-modal-html.ts
+	function lotGroupModalHtml(input) {
+		return `<div class="modal rcfg-modal rcfg-group-modal ${input.levelLayout}"><div class="modal-h"><div><h3>${input.title}</h3></div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
+    <label>Chọn các lô QC</label>
+    <div class="lot-level-picker">${input.lotColumnsHtml}</div>
+    <label>Tên nhóm lô</label><input id="cfgGroupName" value="${input.name}" placeholder="Tự động: 1102/1103">
+    <label>Ghi chú</label><textarea id="cfgGroupNote">${input.note}</textarea></div>
+    <div class="modal-f">${input.cancelButtonHtml}${input.saveButtonHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/config-lot-modal-html.ts
+	function configLotModalHtml(input) {
+		return `<div class="modal rcfg-modal"><div class="modal-h"><div><h3>${input.title}</h3></div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
+    <div class="grid2"><div><label>Số lô</label><input id="cfgLotNo" value="${input.lotNo}" placeholder="VD: 1234UE"></div><div><label>Mức QC</label><select id="cfgLotLevel" aria-label="Mức QC">${input.levelOptionsHtml}</select></div></div>
+    <div class="grid2"><div><label>Mô tả</label><input id="cfgLotDescription" value="${input.description}" placeholder="VD: Acusera Assayed Chemistry Control"></div><div><label>Nhà cung cấp</label><input id="cfgLotSupplier" value="${input.supplier}" placeholder="Randox"></div></div>
+    <div class="grid2"><div><label>Ngày mở (dd/mm/yyyy)</label>${input.openedDateHtml}</div><div><label>Hạn sử dụng (dd/mm/yyyy)</label>${input.expiryDateHtml}</div></div>
+    <label>Ghi chú</label><textarea id="cfgLotNote" aria-label="Ghi chú">${input.note}</textarea></div>
+    <div class="modal-f">${input.cancelButtonHtml}${input.saveButtonHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/config-instrument-modal-html.ts
+	function configInstrumentModalHtml(input) {
+		return `<div class="modal rcfg-modal"><div class="modal-h"><div><h3>${input.title}</h3></div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
+    <div class="grid2"><div><label>Tên hiển thị</label><input id="cfgInstName" value="${input.name}" placeholder="VD: AU5800-01"></div><div><label>Khoa / Khu vực</label><input id="cfgInstSection" value="${input.section}" placeholder="Hóa sinh"></div></div>
+    <div class="grid2"><div><label>Nhà sản xuất</label><input id="cfgInstMfr" value="${input.manufacturer}" placeholder="Beckman Coulter"></div><div><label>Số sê-ri</label><input id="cfgInstSerial" aria-label="Số sê-ri" value="${input.serial}"></div></div>
+    <label class="rcfg-check"><input id="cfgInstActive" type="checkbox" ${input.active ? "checked" : ""}> Máy đang hoạt động</label></div>
+    <div class="modal-f">${input.cancelButtonHtml}${input.saveButtonHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/config-assay-modal-html.ts
+	function configAssayModalHtml(input) {
+		return `<div class="modal rcfg-modal rcfg-assay-modal"><div class="modal-h"><div><h3>${input.title}</h3></div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
+    <div class="assay-form-heading"><h4>Thông tin xét nghiệm</h4></div>
+    <div class="assay-main-grid"><div><label>Tên xét nghiệm <span class="req">*</span></label><input id="cfgAssayName" list="cfgAssayTeaSuggestions" autocomplete="off" value="${input.name}" placeholder="Gõ tên, viết tắt hoặc bí danh" oninput="configAssaySuggestionInput(this.value)"><datalist id="cfgAssayTeaSuggestions">${input.teaOptionsHtml}</datalist><input id="cfgAssayTeaRefKey" type="hidden" value="${input.teaRefKey}"><input id="cfgAssayTeaSource" type="hidden" value="${input.teaSource}"></div><div><label>Đơn vị</label><input id="cfgAssayUnit" aria-label="Đơn vị" value="${input.unit}"></div><div><label>Máy xét nghiệm <span class="req">*</span></label><select id="cfgAssayInstrument" aria-label="Máy xét nghiệm" onchange="const o=this.selectedOptions[0];const e=document.getElementById('cfgAssaySection');if(e)e.value=o?o.dataset.section||'':''">${input.instrumentsHtml}</select></div><div><label>Khoa / Khu vực</label><input id="cfgAssaySection" value="${input.section}" placeholder="VD: Điện giải"></div></div>
+    <div class="assay-detail-grid"><div><label>Phương pháp</label><input id="cfgAssayMethod" aria-label="Phương pháp" value="${input.method}"></div><div><label>Số thập phân</label><select id="cfgAssayDecimals" aria-label="Số chữ số thập phân">${input.decimalOptionsHtml}</select></div><div><label>Hóa chất</label><input id="cfgAssayReagent" aria-label="Hóa chất" value="${input.reagent}"></div><div><label>TEa %</label><input id="cfgAssayTea" aria-label="TEa %" type="number" step="any" value="${input.tea}"></div></div>
+    <details class="assay-advanced" ${input.hasRuleOverrides ? "open" : ""}><summary><span><b>Cấu hình Westgard nâng cao</b><small>Mặc định dùng cấu hình chung của hệ thống</small></span></summary><div class="assay-advanced-body"><div class="assay-rule-head" aria-hidden="true"><span>Luật</span><span>Hành động</span><span>Phạm vi áp dụng</span></div><div class="assay-rule-grid">${input.ruleRowsHtml}</div></div></details>
+    <details class="assay-advanced" ${input.cusumOn ? "open" : ""}><summary><span><b>Giám sát xu hướng CUSUM</b><small>Tùy chọn hỗ trợ phát hiện trôi hoặc dịch chuyển kéo dài</small></span></summary><div class="assay-advanced-body"><label class="rcfg-check"><input id="cfgAssayCusumOn" type="checkbox" ${input.cusumOn ? "checked" : ""}> Bật biểu đồ CUSUM cho xét nghiệm này</label><div class="assay-cusum-grid"><div><label>Ngưỡng tích lũy k (SD)</label><input id="cfgAssayCusumK" aria-label="Ngưỡng tích lũy k (SD)" type="number" step="0.1" min="0.1" value="${input.cusumK}"></div><div><label>Ngưỡng cảnh báo h (SD)</label><input id="cfgAssayCusumH" aria-label="Ngưỡng cảnh báo h (SD)" type="number" step="0.5" min="0.5" value="${input.cusumH}"></div></div></div></details>
+    <label class="rcfg-check"><input id="cfgAssayClosed" type="checkbox" ${input.closed ? "checked" : ""}> Ngừng sử dụng xét nghiệm này cho cấu hình QC mới</label></div>
+    <div class="modal-f">${input.cancelButtonHtml}${input.saveButtonHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/qc-history-detail-modal-html.ts
+	function qcHistoryDetailModalHtml(input) {
+		const history = input.historyRowsHtml ? `<table class="history-detail-table hist-meansd-table"><thead><tr><th>Lô QC</th><th class="num">Mean</th><th class="num">SD</th><th class="num">Mean tích lũy</th><th class="num">SD tích lũy</th><th class="num">CV tích lũy</th><th>Hiệu lực</th><th>Nguồn</th></tr></thead><tbody>${input.historyRowsHtml}</tbody></table>` : input.historyEmptyHtml;
+		const points = input.pointRowsHtml ? `<table class="history-detail-table hist-points-table"><thead><tr><th>Ngày</th><th>Lần chạy</th><th class="num">Giá trị</th><th class="num">Z</th><th class="num">Mean lúc nhập</th><th class="num">SD lúc nhập</th><th>Kết luận nhanh</th><th>NV</th></tr></thead><tbody>${input.pointRowsHtml}</tbody></table>` : input.pointsEmptyHtml;
+		return `<div class="modal rcfg-history-detail-modal"><div class="modal-h"><div><h3>${input.title}</h3></div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
+    <h4 class="history-detail-heading">Mean/SD đã dùng</h4>${history}
+    <h4 class="flow-panel space-after-section">Điểm QC đã nhập (${input.pointCount})</h4>${points}</div><div class="modal-f">${input.closeButtonHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/config-assay-rule-rows-html.ts
+	function configAssayRuleRowsHtml(rows) {
+		return rows.map((row) => `<div class="assay-rule-row"><b>${row.id}</b><select class="cfg-assay-rule" data-rule="${row.id}" aria-label="Hành động ${row.id}"><option value="" ${row.action === "" ? "selected" : ""}>Theo cấu hình chung</option><option value="inactive" ${row.action === "inactive" ? "selected" : ""}>Không dùng</option><option value="alert" ${row.action === "alert" ? "selected" : ""}>Cảnh báo</option><option value="reject" ${row.action === "reject" ? "selected" : ""}>Loại bỏ</option></select><select class="cfg-assay-scope" data-rule="${row.id}" aria-label="Phạm vi ${row.id}"><option value="" ${row.scope === "" ? "selected" : ""}>Phạm vi SOP khuyến nghị</option><option value="within" ${row.scope === "within" ? "selected" : ""}>Chỉ trong từng mức</option><option value="across" ${row.scope === "across" ? "selected" : ""}>Chỉ chéo mức/lần chạy</option><option value="both" ${row.scope === "both" ? "selected" : ""}>Cả hai phạm vi</option></select></div>`).join("");
+	}
+	//#endregion
+	//#region src/presentation/manage/config-assay-tea-options-html.ts
+	function configAssayTeaOptionsHtml(options) {
+		return options.map((option) => `<option value="${option.value}" label="${option.label}"></option>`).join("");
+	}
+	//#endregion
+	//#region src/presentation/manage/config-assay-instrument-options-html.ts
+	function configAssayInstrumentOptionsHtml(options) {
+		return options.map((option) => `<option value="${option.id}" ${option.selected ? "selected" : ""} data-section="${option.section}">${option.label}</option>`).join("");
+	}
+	//#endregion
+	//#region src/presentation/manage/config-assay-decimal-options-html.ts
+	function configAssayDecimalOptionsHtml(selected) {
+		return [
+			0,
+			1,
+			2,
+			3,
+			4,
+			5,
+			6
+		].map((value) => `<option value="${value}" ${selected === String(value) ? "selected" : ""}>${value}</option>`).join("");
+	}
+	//#endregion
+	//#region src/presentation/manage/config-panel-instrument-options-html.ts
+	function configPanelInstrumentOptionsHtml(options) {
+		return options.map((option) => `<option value="${option.id}" ${option.selected ? "selected" : ""}>${option.label}</option>`).join("");
+	}
+	//#endregion
+	//#region src/presentation/manage/config-lot-level-options-html.ts
+	function configLotLevelOptionsHtml(selected) {
+		return [
+			1,
+			2,
+			3,
+			4,
+			5,
+			6
+		].map((level) => `<option${selected === level ? " selected" : ""}>${level}</option>`).join("");
+	}
+	//#endregion
+	//#region src/presentation/manage/qc-history-detail-rows-html.ts
+	function qcHistoryMeanSdRowsHtml(rows) {
+		return rows.map((row) => `<tr><td><b>${row.lot}</b></td><td class="num">${row.mean}</td><td class="num">${row.sd}</td><td class="num">${row.cumulativeMean}</td><td class="num">${row.cumulativeSd}</td><td class="num">${row.cumulativeCv}</td><td>${row.period}</td><td>${row.source}</td></tr>`).join("");
+	}
+	function qcHistoryPointRowsHtml(rows) {
+		return rows.map((row) => `<tr><td>${row.date}</td><td>${row.run}</td><td class="num">${row.value}</td><td class="num">${row.z}</td><td class="num">${row.mean}</td><td class="num">${row.sd}</td><td><span class="tag ${row.verdictClass}">${row.verdict}</span></td><td>${row.staffCode}</td></tr>`).join("");
+	}
+	//#endregion
+	//#region src/presentation/manage/target-number-text.ts
+	function createTargetNumberText(deps) {
+		return (value, test = null, kind = "value") => {
+			if (value == null || String(value).trim() === "" || !Number.isFinite(Number(value))) return "";
+			const digits = test ? kind === "stat" ? deps.statDecimals(test) : deps.valueDecimals(test) : deps.defaultDecimals;
+			return Number(value).toFixed(digits).replace(/(?:\.0+|(\.\d+?)0+)$/, "$1");
+		};
+	}
+	//#endregion
+	//#region src/presentation/shared/parse-vn-date.ts
+	function validIsoDate(value) {
+		const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ""));
+		if (!match) return "";
+		const year = +match[1], month = +match[2], day = +match[3], date = new Date(Date.UTC(year, month - 1, day));
+		return year >= 1e3 && date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day ? String(value) : "";
+	}
+	function parseVnDate(value) {
+		if (!value) return "";
+		const text = String(value).trim(), match = /^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/.exec(text);
+		if (match) return validIsoDate(`${match[3]}-${match[2].padStart(2, "0")}-${match[1].padStart(2, "0")}`);
+		return /^\d{4}-\d{2}-\d{2}$/.test(text) ? validIsoDate(text) : "";
+	}
+	//#endregion
+	//#region src/presentation/manage/target-range-sync.ts
+	function createTargetRangeSync(deps) {
+		return (source, values) => source === "limits" ? deps.targetFromLimits(values.low, values.high) : deps.limitsFromTarget(values.mean, values.sd);
+	}
+	//#endregion
+	//#region src/presentation/manage/target-overwrite-picks.ts
+	function targetOverwritePicks(picks, tests) {
+		return picks.filter((pick) => {
+			if (!pick.use) return false;
+			const test = tests.find((item) => item.id === pick.testId), same = test && test.levels.find((level) => +level.level === +pick.lot.level);
+			return !!(same && (same.qcLotId && same.qcLotId !== pick.lot.id || !same.qcLotId && same.lot && same.lot !== pick.lot.lotNo));
+		});
+	}
+	//#endregion
+	//#region src/presentation/manage/lot-group-lot-pills-html.ts
+	function lotGroupLotPillsHtml(lots) {
+		return lots.map((lot) => `<span class="pill">${lot.lotNo} · M${lot.level}</span>`).join("");
+	}
+	//#endregion
+	//#region src/presentation/manage/lot-group-status.ts
+	function lotGroupStatus(archived, status, inUse) {
+		if (archived) return {
+			cls: "rej",
+			text: "Đã lưu trữ"
+		};
+		if (status === "stopped") return {
+			cls: "rej",
+			text: "Đã dừng"
+		};
+		if (status === "planned") return {
+			cls: "warn",
+			text: "Dự kiến"
+		};
+		return inUse ? {
+			cls: "ok",
+			text: "Đang hoạt động"
+		} : {
+			cls: "none",
+			text: "Chưa dùng"
+		};
+	}
+	//#endregion
+	//#region src/presentation/manage/lot-group-toggle-action.ts
+	function lotGroupToggleAction(archived, status, inUse) {
+		if (archived) return null;
+		return status === "stopped" || status === "planned" || !inUse ? {
+			label: "Kích hoạt",
+			command: "activate",
+			variant: "teal sm"
+		} : {
+			label: "Dừng",
+			command: "stop",
+			variant: "ghost sm btn-stop-tint"
+		};
+	}
+	//#endregion
+	//#region src/presentation/manage/target-switch-assay-names.ts
+	function targetSwitchAssayNames(names) {
+		return [...new Set(names.filter(Boolean))].join(", ");
+	}
+	//#endregion
+	//#region src/presentation/manage/target-locked-backfill-note.ts
+	function targetLockedBackfillNote(input) {
+		if (!input.count) return "";
+		const count = input.emphasize ? `<b>${input.count} điểm QC thuộc kỳ đã khóa (${input.periods.join(", ")})</b>` : `${input.count} điểm QC thuộc kỳ đã khóa (${input.periods.join(", ")})`;
+		return `${input.emphasize ? " " : ""}${count} sẽ được điền số lô/Mean-SD hiện hành (điểm trước đó chưa ghi lô riêng).`;
+	}
+	//#endregion
+	//#region src/presentation/range/range-workflow-modal-html.ts
+	function rangeWorkflowModalHtml(input) {
+		return `<div class="modal range-workflow-modal"><div class="modal-h"><h3>Workflow thiết lập dải QC mới</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-b"><div class="hint">${input.contextHtml}</div>${input.nceNoticeHtml}
+      <table class="range-workflow-checklist"><colgroup><col><col><col><col></colgroup><thead><tr><th>Điều kiện</th><th>Hiện tại</th><th>Chuẩn kiểm tra</th><th>Kết quả</th></tr></thead><tbody>${input.checklistRowsHtml}</tbody></table>
+      <h3 style="margin:16px 0 8px">So sánh dải kiểm soát</h3>
+      <table class="range-workflow-comparison"><colgroup><col><col><col><col><col></colgroup><thead><tr><th>Dải</th><th>Mean</th><th>SD</th><th>CV%</th><th>±2SD</th></tr></thead><tbody>${input.currentRangeRowHtml}${input.proposedRangeRowHtml}</tbody></table>
+      <div class="alert info flow-section">Mean/SD được tính từ toàn bộ tập dữ liệu đã chọn. Không tự loại điểm vi phạm để làm giảm SD. Chỉ áp dụng khi cùng lô QC, tối thiểu 20 ngày độc lập, quá trình ổn định và có phê duyệt theo SOP.</div></div>
+    <div class="modal-f">${input.printButtonHtml}${input.applyButtonHtml}${input.closeButtonHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/range/range-apply-confirmation-modal-html.ts
+	function rangeApplyConfirmationModalHtml(input) {
+		return `<div class="modal"><div class="modal-h"><h3>Áp dụng dải PXN mới?</h3><button class="modal-close" onclick="closeModal()">×</button></div>
+    <div class="modal-b">
+      <div class="hint">${input.changeSummaryHtml}</div>
+      ${input.gateHtml}
+      <label class="flow-control">Căn cứ/phê duyệt (SOP, người duyệt hoặc biên bản — tối thiểu 10 ký tự)</label>
+      <textarea id="rangeReasonInput" placeholder="VD: Theo SOP-XXX, phê duyệt bởi..." oninput="document.getElementById('rangeReasonErr').style.display='none'"></textarea>
+      <div id="rangeReasonErr" class="hint field-error">Cần ghi căn cứ phê duyệt tối thiểu 10 ký tự.</div>
+    </div>
+    <div class="modal-f">${input.cancelButtonHtml}${input.applyButtonHtml}</div>
+  </div>`;
+	}
+	//#endregion
+	//#region src/presentation/range/range-revert-confirmation-modal-html.ts
+	function rangeRevertConfirmationModalHtml(input) {
+		return `<div class="modal">
+    <div class="modal-h"><h3>Hoàn về dải nhà sản xuất?</h3><button class="modal-close" onclick="closeModal()">×</button></div>
+    <div class="modal-b">
+      <label>Lý do/căn cứ hoàn về dải nhà sản xuất (tối thiểu 5 ký tự)</label>
+      <textarea id="rangeReasonInput" placeholder="VD: Dải PXN không còn phù hợp, hoàn theo yêu cầu..." oninput="document.getElementById('rangeReasonErr').style.display='none'"></textarea>
+      <div id="rangeReasonErr" class="hint field-error">Cần ghi lý do tối thiểu 5 ký tự.</div>
+    </div>
+    <div class="modal-f">${input.cancelButtonHtml}${input.revertButtonHtml}</div>
+  </div>`;
+	}
+	//#endregion
+	//#region src/presentation/range/range-safety-gate-html.ts
+	function rangeSafetyGateHtml(input) {
+		return `<div class="alert warn flow-control"><b>Hồ sơ NCE ${input.nceId} đang ghi nhận vi phạm hệ thống (${input.rule})</b><div>Xác nhận 2 điều kiện dưới đây trước khi áp dụng dải mới — tránh "đuổi theo mean" khi nguyên nhân dịch chuyển chưa được lý giải.</div></div>
+    <label class="range-gate-check"><input type="checkbox" id="rangeCauseConfirm" onchange="document.getElementById('rangeGateErr').style.display='none'"><span>Xác nhận nguyên nhân dịch chuyển đã được xác định và ghi nhận trong hồ sơ NCE ${input.nceId} (không phải lỗi chưa lý giải)</span></label>
+    <div class="field-row flow-item"><div><label>Bias đo lại (%)</label><input id="rangeBiasInput" type="text" inputmode="decimal" oninput="${input.biasInputAction}"></div><div><label>Ngưỡng cho phép (≤ TEa/4)</label><input id="rangeBiasThreshold" readonly value="${input.thresholdText}"></div></div>
+    <div id="rangeBiasHint" class="hint flow-tight">${input.noTeaHint}</div>
+    <div id="rangeGateErr" class="hint field-error">Cần xác nhận nguyên nhân dịch chuyển và nhập Bias trong ngưỡng cho phép trước khi áp dụng.</div>`;
+	}
+	//#endregion
+	//#region src/presentation/range/range-workflow-checklist-rows-html.ts
+	function rangeWorkflowChecklistRowsHtml(rows) {
+		return rows.map((row) => `<tr><td>${row.condition}</td><td class="num">${row.current}</td><td>${row.requirement}</td><td><span class="tag ${row.passed ? "ok" : "rej"}">${row.passed ? "Đạt" : "Chưa đạt"}</span></td></tr>`).join("");
+	}
+	//#endregion
+	//#region src/presentation/range/range-nce-notice-html.ts
+	function rangeNceNoticeHtml(input) {
+		return `<div class="alert warn flow-control"><b>Đang có hồ sơ NCE ${input.nceId} ghi nhận vi phạm hệ thống (${input.rule})</b><div>${input.cause || "Chưa ghi nguyên nhân trong hồ sơ."}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/range/range-workflow-comparison-rows-html.ts
+	function rangeWorkflowComparisonRowsHtml(current, proposed) {
+		const row = (value) => `<tr><td>${value.proposed ? `<b>${value.label}</b>` : value.label}</td><td class="num">${value.proposed ? `<b>${value.mean}</b>` : value.mean}</td><td class="num">${value.proposed ? `<b>${value.sd}</b>` : value.sd}</td><td class="num">${value.proposed ? `<b>${value.cv}</b>` : value.cv}</td><td class="num">${value.proposed ? `<b>${value.limits}</b>` : value.limits}</td></tr>`;
+		return row(current) + (proposed ? row(proposed) : "");
+	}
+	//#endregion
+	//#region src/presentation/auth/user-permissions-modal-html.ts
+	function userPermissionsModalHtml(input) {
+		return `<div class="modal"><div class="modal-h"><h3>Sửa quyền người dùng</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-b">
+      <div class="hint"><b>${input.userName}</b> · @${input.username}</div>
+      <label>Vai trò</label>${input.roleSelectHtml}
+      <label class="flow-section">Thẻ được phép dùng</label>${input.permissionChecksHtml}
+      <div class="hint flow-control">Vai trò quyết định quyền sửa/quản trị; danh sách thẻ chỉ quyết định người dùng thấy và mở được màn hình nào.</div>
+    </div>
+    <div class="modal-f">${input.cancelButtonHtml}${input.saveButtonHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/auth/reset-password-modal-html.ts
+	function resetPasswordModalHtml(input) {
+		return `<div class="modal"><div class="modal-h"><h3>${input.title}</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-b">
+      <div class="hint">${input.message}</div>
+      <label>Mật khẩu mới</label><input id="resetPass1" type="password" autocomplete="new-password">
+      <label>Nhập lại mật khẩu</label><input id="resetPass2" type="password" autocomplete="new-password" onkeydown="${input.enterAction}">
+      <div id="resetPassMsg"></div>
+    </div>
+    <div class="modal-f">${input.cancelButtonHtml}${input.saveButtonHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-add-test-modal-html.ts
+	function sigmaAddTestModalHtml(input) {
+		return `<div class="modal"><div class="modal-h"><h3>Chọn hoặc thêm xét nghiệm vào Six Sigma</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-b">${input.showSearch ? `<input id="sgAddTestSearch" type="search" placeholder="Tìm tên xét nghiệm, máy hoặc đơn vị..." value="${input.searchValue}" oninput="sgAddTestSearchSet(this.value)">` : ""}
+      <div class="sg-add-test-list">${input.rowsHtml || input.emptyHtml}</div></div>
+    <div class="modal-f">${input.closeButtonHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-add-test-rows-html.ts
+	function sigmaAddTestRowsHtml(rows) {
+		return rows.map((row) => `<button class="refrow sg-add-test-row${row.tracked ? " is-tracked" : ""}${row.current ? " is-current" : ""}" ${row.current ? "aria-current=\"true\"" : ""} onclick="${row.action}"><span><b>${row.name}</b><span class="meta">${row.meta}</span></span><span class="tag ${row.tracked ? "ok" : "none"}">${row.label}</span></button>`).join("");
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-bias-modal-html.ts
+	function sigmaBiasModalHtml(input) {
+		return `<div class="modal sg-eqa-modal"><div class="modal-h"><h3>Tính Bias% từ EQA/EQC — Mức ${input.level}</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-b"><div class="sg-eqa-table-wrap"><table class="sg-eqa-table"><thead><tr><th>#</th><th>KQ PXN</th><th>Target EQA</th><th>Bias%</th><th><span class="sr-only">Thao tác</span></th></tr></thead><tbody>${input.rowsHtml}</tbody></table></div>
+      ${input.addRoundButtonHtml}<div id="sgBiasSummary" class="sg-eqa-summary alert info"></div>
+      <div class="sg-eqa-period-wrap"><div class="sg-eqa-period-head"><b>Áp dụng cho kỳ nào?</b><div>${input.selectAllButtonHtml}${input.clearSelectionButtonHtml}</div></div><div class="sg-eqa-period-list">${input.periodRowsHtml}</div></div></div>
+    <div class="modal-f">${input.cancelButtonHtml}${input.applyButtonHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-mu-modal-html.ts
+	function sigmaMuModalHtml(input) {
+		return `<div class="modal sg-eqa-modal sg-mu-modal"><div class="modal-h"><h3>Ngân sách độ không đảm bảo đo (MU)</h3><button class="modal-close" onclick="closeModal()" aria-label="Đóng">✕</button></div>
+    <div class="modal-b"><div class="sg-mu-intro"><div><b>Nhập thông tin theo từng mức QC</b></div><span class="tag none">Kỳ gốc: ${input.sourceLabel}</span></div>
+      <div class="sg-eqa-table-wrap"><table class="sg-eqa-table sg-mu-table"><thead><tr><th>Mức QC</th><th>u(cal) từ CoA</th><th>Nguồn / mã CoA</th><th>Xử lý u(bias)</th><th>MU dự kiến</th></tr></thead><tbody>${input.rowsHtml}</tbody></table></div>
+      <div class="alert info" style="display:block">${input.modelNoteHtml}</div>
+      <div class="sg-mu-section-title"><b>Thông tin rà soát</b></div>
+      <div class="sg-setup-fields"><div><label for="sgMuBy">Người rà soát</label><input id="sgMuBy" value="${input.reviewedByValue}" placeholder="Họ tên người rà soát ngân sách MU"></div><div><label for="sgMuDate">Ngày rà soát</label>${input.reviewedDateHtml}</div></div>
+      <div class="sg-eqa-period-wrap sg-mu-period-wrap"><div class="sg-eqa-period-head"><div><b>Kỳ áp dụng</b></div><div>${input.selectAllButtonHtml}${input.clearSelectionButtonHtml}</div></div><div class="sg-eqa-period-list">${input.periodRowsHtml}</div></div></div>
+    <div class="modal-f">${input.cancelButtonHtml}${input.applyButtonHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-cohort-modal-html.ts
+	function sigmaCohortModalHtml(input) {
+		return `<div class="modal"><div class="modal-h"><h3>Chọn dữ liệu CV IQC theo lô — ${input.testName}</h3><button class="modal-close" onclick="sgCohortClose()">✕</button></div><div class="modal-b"><div class="hint space-after-control">Dữ liệu IQC được gom xuyên tháng nhưng luôn tách theo lô và mức QC. Nếu Mean/SD mục tiêu thay đổi, nhóm dữ liệu sẽ được đánh dấu không ổn định. Dữ liệu được tính đến ${input.cutoffDate}.</div><table><thead><tr><th>Mức</th><th>Lô QC</th><th>Khoảng dữ liệu</th><th class="num">n</th><th class="num">CV</th><th>Trạng thái</th></tr></thead><tbody>${input.sectionsHtml}</tbody></table></div><div class="modal-f">${input.cancelButtonHtml}${input.applyButtonHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-frequency-panel-html.ts
+	function sigmaFrequencyPanelHtml(input) {
+		return `<div class="hint sg-selected-period-hint">Kỳ đang xem: <b>${input.periodLabel}</b></div><table><thead><tr><th>Mức</th><th class="num">Sigma</th><th>Bộ quy tắc QC gợi ý (OPSpecs)</th><th>Mức nguy cơ tham khảo</th><th>Hành động</th></tr></thead><tbody>${input.rowsHtml}</tbody></table>${input.governingBlockHtml}
+    <div class="alert alert-block info flow-item">Gợi ý theo <b>Westgard Sigma Rules</b> chỉ là điểm khởi đầu. Phần mềm <b>không tự đổi</b> bộ quy tắc của xét nghiệm — người phụ trách rà soát rồi tự cấu hình trong Cài đặt Westgard theo đánh giá nguy cơ, độ ổn định hệ thống, khối lượng mẫu và hậu quả lâm sàng.</div>`;
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-mu-summary-html.ts
+	function sigmaMuSummaryHtml(input) {
+		return `<div class="hint sg-selected-period-hint">Kỳ đang xem: <b>${input.periodLabel}</b></div>
+    <div class="sg-mu-table-wrap"><table class="sg-mu-summary-table"><colgroup><col><col><col><col><col><col><col><col><col></colgroup><thead><tr><th>Mức</th><th class="num">u(Rw) %</th><th class="num">u(bias) %</th><th class="num">u(cal) %</th><th class="num">u<sub>c</sub> %</th><th class="num">U (k=2) %</th><th class="num">U tại Mean</th><th class="num">U / TEa</th><th>Trạng thái</th></tr></thead><tbody>${input.cellsHtml}</tbody></table></div>
+    ${input.traceHtml}${input.excludedNoteHtml}
+    <div class="alert alert-block info flow-item">Giới hạn MU cho phép (MAU) <b>phải do SOP của đơn vị ấn định</b> — phần mềm chỉ đặt U cạnh TEa để so sánh, không tự kết luận đạt/không đạt. Ngân sách còn thiếu thành phần thì <b>không được công bố</b> như một giá trị MU hoàn chỉnh.</div>`;
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-status-card-html.ts
+	function sigmaStatusCardHtml(input) {
+		const heading = `Mức ${input.level}${input.provisional ? " — Sigma tạm tính" : " — Sigma"}`;
+		return `<div class="sgbig" style="background:${input.color}"><div class="lab">${heading}</div><div class="v">${input.sigmaText}</div>${input.label ? `<div class="grade">${input.label}</div>` : ""}<div class="sub">${input.detailHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-status-panel-html.ts
+	function sigmaStatusPanelHtml(input) {
+		return `<div class="hint space-after-item">Kỳ đang xem: <b>${input.periodLabel}</b> · ${input.testName} · TEa ${input.teaText}%</div><div class="sgcards">${input.cardsHtml}</div>${input.tipsHtml}`;
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-opspec-cell-html.ts
+	function sigmaOpSpecCellHtml(spec) {
+		if (!spec) return "<span class=\"muted\">—</span>";
+		if (!spec.capable) return "<span style=\"color:var(--red);font-weight:700\">Phương pháp chưa đủ năng lực (&lt;3σ)</span>";
+		const run = `N=${spec.n}${(spec.r || 0) > 1 ? ` · R=${spec.r}` : ""} điểm/lần chạy`;
+		return `<b>${spec.rules.join(" / ")}</b><div style="font-size:var(--type-caption);color:var(--muted)">${run}${spec.single ? " · chỉ 1 quy tắc" : ""}${spec.marginal ? " · tối đa + cải thiện PP" : ""}</div>`;
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-mu-state-chip-html.ts
+	function sigmaMuStateChipHtml(input) {
+		if (!input.hasMu) return "<span class=\"tag none\">Chưa có CV IQC</span>";
+		if (!input.complete) return `<span class="tag warn">Thiếu ${input.missingHtml || ""}</span>`;
+		return "<span class=\"tag ok\">Đủ thành phần</span>";
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-mu-dominant-text.ts
+	var labels$1 = {
+		uRw: "u(Rw)",
+		uBias: "u(bias)",
+		uCal: "u(cal)"
+	};
+	function sigmaMuDominantText(shares, format) {
+		const entries = Object.entries(shares || {}).filter((entry) => Number.isFinite(entry[1]));
+		if (entries.length < 2) return "";
+		const top = entries.sort((a, b) => b[1] - a[1])[0];
+		return top[1] > .5 ? `${labels$1[top[0]] || top[0]} chiếm ${format(top[1] * 100, 0)}%` : "";
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-bias-summary-html.ts
+	function sigmaBiasSummaryHtml(input) {
+		if (!input.validCount) return "<span class=\"sg-eqa-empty\">Chưa có vòng hợp lệ.</span>";
+		const warning = input.mixedSigns ? "<div class=\"sg-eqa-warning\">Bias đổi dấu giữa các vòng — RMS giúp tránh triệt tiêu.</div>" : "";
+		return `<div><span>Số vòng hợp lệ</span><b>${input.validCount}</b></div><div><span>Bias có dấu TB</span><b>${input.signedMeanText}%</b></div><div><span>Bias RMS dùng tính Sigma</span><b class="sg-eqa-average">${input.rmsText}%</b></div>${warning}`;
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-cohort-rows-html.ts
+	function sigmaCohortRowsHtml(groups) {
+		return groups.map((group) => {
+			if (!group.rows.length) return `<tr><td>Mức ${group.level}</td><td colspan="5" class="muted">${group.missingLotCount ? `Có ${group.missingLotCount} điểm IQC chưa gắn mã lô QC — hãy gắn mã lô cho điểm QC để dùng làm CV.` : "Không có nhóm dữ liệu IQC đã gắn mã lô trong kỳ đánh giá."}</td></tr>`;
+			return group.rows.map((row) => `<tr><td>${row.showLevel ? `Mức ${row.level}` : ""}</td><td><label><input type="radio" name="sgCohort_${row.level}" value="${row.lotHtml}" ${row.checked ? "checked" : ""}> Lô ${row.lotHtml}</label></td><td>${row.startText}–${row.endText}</td><td class="num">${row.count}</td><td class="num">${row.cvText}</td><td>${row.statusHtml}</td></tr>`).join("");
+		}).join("");
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-bias-rows-html.ts
+	function sigmaBiasRowsHtml(rows) {
+		return rows.map((row) => `<tr class="sg-eqa-row"><td class="sg-eqa-index">${row.index}</td><td><input type="number" step="any" data-f="lab" value="${row.labValue}" placeholder="—" oninput="sgBiasUpdateSummary()"></td><td><input type="number" step="any" data-f="target" value="${row.targetValue}" placeholder="—" oninput="sgBiasUpdateSummary()"></td><td class="sg-eqa-bias" data-bias>${row.biasText}</td><td>${row.deleteButtonHtml}</td></tr>`).join("");
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-mu-rows-html.ts
+	function sigmaMuRowsHtml(rows) {
+		return rows.map((row) => `<tr class="sg-mu-row" data-level="${row.level}"><td><b>Mức ${row.level}</b></td>
+    <td><div class="sg-mu-number-field"><input type="number" step="any" min="0" data-f="uCal" aria-label="u(cal) phần trăm cho mức ${row.level}" value="${row.uCalValue}" placeholder="0,00" oninput="sgMuUpdatePreview()"><span aria-hidden="true">%</span></div></td>
+    <td><input type="text" data-f="uCalBasis" aria-label="Nguồn CoA của u(cal) cho mức ${row.level}" value="${row.basisValue}" placeholder="VD: CoA lô 1234, mục U(k=2)" oninput="sgMuUpdatePreview()"></td>
+    <td><select data-f="muBiasMode" aria-label="Cách xử lý độ chệch cho mức ${row.level}" onchange="sgMuUpdatePreview()"><option value="include" ${row.excludeBias ? "" : "selected"}>Cộng u(bias)</option><option value="exclude" ${row.excludeBias ? "selected" : ""}>Đã hiệu chỉnh — không cộng</option></select></td>
+    <td class="sg-mu-preview" data-sg-mu-preview="${row.level}"></td></tr>`).join("");
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-mu-preview-html.ts
+	function sigmaMuPreviewHtml(input) {
+		if (!input.hasMu) return "<div class=\"sg-mu-preview-empty\">Chưa có CV IQC</div>";
+		const state = input.complete ? "Đủ thành phần" : `Thiếu ${input.missingHtml || ""}`;
+		return `<div class="sg-mu-preview-values"><span><small>u<sub>c</sub></small><b>${input.ucText}%</b></span><span class="is-u"><small>U (k=2)</small><b>${input.uText}%</b></span></div><div class="sg-mu-preview-state ${input.complete ? "ok" : "warn"}">${state}</div>`;
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-tracked-options-html.ts
+	function sigmaTrackedOptionsHtml(options, selectedId) {
+		return options.map((option) => `<option value="${option.id}" ${option.id === selectedId ? "selected" : ""}>${option.labelHtml}</option>`).join("");
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-input-display-value.ts
+	function sigmaInputDisplayValue(value, digits = 2) {
+		if (value == null || String(value).trim() === "") return "";
+		const number = Number(value);
+		return Number.isFinite(number) ? number.toFixed(digits) : "";
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-governing-rule-block-html.ts
+	function sigmaGoverningRuleBlockHtml(spec, sigmaText) {
+		if (!spec) return "";
+		return `<div class="alert alert-block flow-item ${spec.capable ? spec.single ? "ok" : "info" : "warn"}">Bộ quy tắc nên áp cho xét nghiệm — theo mức Sigma thấp nhất đủ điều kiện (${sigmaText}σ): ${spec.capable ? `<b>${spec.rules.join(" / ")} · N=${spec.n}${(spec.r || 0) > 1 ? ` · R=${spec.r}` : ""}</b>. ` : ""}${spec.single ? "Sigma cao → chỉ cần 1 quy tắc <b>1-3s</b>, giảm báo động giả không cần thiết." : spec.marginal ? "Hiệu năng cận biên (3–4σ): dùng bộ đa quy tắc tối đa và <b>ưu tiên cải thiện phương pháp</b>." : spec.capable ? "Dùng bộ đa quy tắc theo Sigma đo được." : "Phương pháp <b>&lt;3σ</b>: QC không bù được sai số — phải khắc phục phương pháp trước khi tin cậy kết quả."}</div>`;
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-frequency-rows-html.ts
+	function sigmaFrequencyRowsHtml(rows) {
+		return rows.map((row) => {
+			if (!row.hasResult) return `<tr><td>Mức ${row.level}</td><td class="num">—</td><td>—</td><td>Chưa đủ CV/Bias</td><td>Chưa đánh giá</td></tr>`;
+			if (!row.eligible) return `<tr><td>Mức ${row.level}</td><td class="num">${row.sigmaText}</td><td><span class="muted">Chưa đủ dữ liệu</span></td><td>${row.readinessHtml}</td><td>Không dùng để đề xuất QC</td></tr>`;
+			return `<tr><td>Mức ${row.level}</td><td class="num" style="color:${row.color};font-weight:800">${row.sigmaText}</td><td>${row.opspecHtml}</td><td>${row.riskText || "—"}</td><td>${row.planText || "Xây dựng theo SOP"}</td></tr>`;
+		}).join("");
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-period-table-html.ts
+	function sigmaPeriodTableHtml(input) {
+		const content = input.hasData ? `<div class="sg-simple-table-wrap"><table class="sg-simple-table" style="min-width:${input.tableMinWidth}px">${input.colGroupHtml}${input.tableHeadHtml}<tbody>${input.rowsHtml}</tbody></table></div>` : "<div class=\"empty\" style=\"margin:14px 16px 10px\">Chưa có kỳ nào.</div>";
+		return `<div class="panel"><div class="sg-data-head"><h2 class="panel-title">Số liệu theo kỳ</h2><div class="sg-data-head-actions">${input.headerActionsHtml}</div></div>${content}${input.combinedExportHtml ? `<div class="sg-data-foot">${input.combinedExportHtml}</div>` : ""}</div>`;
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-analysis-setup-html.ts
+	function sigmaAnalysisSetupHtml(input) {
+		return `<div class="panel"><h2 class="sg-setup-heading panel-title">Thiết lập phân tích</h2><div class="row-flex sg-control-row">${input.testSelectHtml}</div><div class="sg-setup-fields">${input.fieldsHtml}</div>${input.eflmHtml}<div class="hint sg-sigma-input-note">${input.hintHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-period-row-html.ts
+	function sigmaPeriodRowHtml(input) {
+		const selectedClass = input.selected ? " sg-period-selected" : "";
+		const selectedValue = input.selected ? "true" : "false";
+		return `<tr data-sg-period-id="${input.id}" class="sg-period-row${selectedClass}" tabindex="0" aria-selected="${selectedValue}" aria-label="Chọn kỳ ${input.periodLabelHtml} để xem tình trạng" onclick="sgSelectPeriod('${input.id}')" onkeydown="if((event.key==='Enter'||event.key===' ')&&event.target===event.currentTarget){event.preventDefault();sgSelectPeriod('${input.id}')}"><td class="sg-period-cell"><div class="sg-period-select-wrap">${input.periodSelectHtml}</div></td>${input.levelCellsHtml}<td class="sg-row-action sg-action-col"><div class="sg-row-action-buttons">${input.actionHtml}</div></td></tr>`;
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-charts-panel-html.ts
+	function sigmaChartsPanelHtml() {
+		return `<div class="panel"><h2 class="panel-title">Biểu đồ Sigma & MDC</h2><div class="sg-chart-grid"><div class="sg-chart-box"><h3>Xu hướng Sigma theo kỳ</h3><div class="chart-inner" id="sgTrend"></div></div><div class="sg-chart-box"><h3>Biểu đồ Quyết định Phương pháp (MDC)</h3><div class="hint">X = CV/TEA, Y = |BIAS|/TEA. Điểm to nhất là kỳ gần nhất.</div><div class="chart-inner" id="sgMDC"></div></div></div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-period-table-head-html.ts
+	function sigmaPeriodTableHeadHtml(levels) {
+		return `<thead><tr><th rowspan="2">Kỳ / Năm</th>${levels.map((level) => `<th colspan="3" class="sg-group-start">Mức ${level}</th>`).join("")}<th rowspan="2" class="sg-action-col">Thao tác</th></tr><tr>${levels.map(() => "<th class=\"sg-group-start\">CV IQC%</th><th>Bias EQA%</th><th>Sigma</th>").join("")}</tr></thead>`;
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-no-levels-panel-html.ts
+	function sigmaNoLevelsPanelHtml(input) {
+		return `<div class="panel"><div class="row-flex sg-control-row">${input.testSelectHtml}</div><div class="alert warn flow-control">${input.messageHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/nce/action-form-closed-html.ts
+	function actionFormClosedHtml(input) {
+		return `<div class="empty"><b>${input.title}</b><p>${input.message}</p>${input.actionHtml}</div>`;
+	}
+	//#endregion
+	//#region src/presentation/nce/action-incident-banner-html.ts
+	function actionIncidentBannerHtml(input) {
+		return `<div class="action-incident-banner"><b>${input.titleHtml}</b><div>${input.detailsHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/nce/action-form-section-html.ts
+	function actionFormSectionHtml(input) {
+		return `<details class="action-form-section" data-action-section="${input.keyHtml}" ${input.open ? "open" : ""} ontoggle="actionSectionToggled('${input.keyJs}',this.open)"><summary class="action-form-section-title"><span>${input.badgeHtml}</span><div><b>${input.titleHtml}</b><small>${input.hintHtml}</small></div>${input.chipHtml}</summary>${input.bodyHtml}</details>`;
+	}
+	//#endregion
+	//#region src/presentation/nce/action-investigation-field-html.ts
+	function actionInvestigationFieldHtml(input) {
+		const choices = input.choices.map((choice) => `<button type="button" class="action-choice ${choice.active ? "active" : ""}" data-value="${choice.valueHtml}" aria-pressed="${choice.active ? "true" : "false"}" onclick="actionInvestigationChoose('${input.statusIdJs}','${choice.jsValue}')">${choice.labelHtml}</button>`).join("");
+		return `<div class="action-investigation-item ${input.stateClass}" id="check-${input.statusIdHtml}"><div class="action-investigation-head"><div><b>${input.titleHtml}</b><small>${input.hintHtml}</small></div><span class="action-investigation-state">${input.stateLabelHtml}</span></div><select id="${input.statusIdHtml}" class="action-investigation-select" aria-hidden="true" tabindex="-1" onchange="actionInvestigationSync('${input.statusIdJs}')">${input.selectOptionsHtml}</select><div class="action-investigation-choices" role="group" aria-label="Kết quả ${input.titleHtml}">${choices}</div><div class="action-investigation-note"><input id="${input.noteIdHtml}" aria-label="Ghi chú ${input.titleHtml}" placeholder="Ghi chú / bằng chứng" value="${input.noteValueHtml}">${input.suggestHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/nce/action-bias-context.ts
+	function actionBiasContext(form, editing, tests, levelConfig) {
+		const testId = editing ? editing.testId : form.testId;
+		const level = editing ? editing.level : form.level;
+		const test = tests.find((item) => item.id === testId);
+		return {
+			t: test,
+			l: test && level ? levelConfig(test, +level) : null
+		};
+	}
+	//#endregion
+	//#region src/presentation/nce/action-level-context.ts
+	function actionLevelContext(testId, level, lot, tests, levelConfig, levelLabel) {
+		const test = tests.find((item) => item.id === testId);
+		const config = test && levelConfig(test, +level);
+		if (lot) return `Mức ${level} · Lô ${lot} (đã ghi nhận)`;
+		return config ? levelLabel(config, test) : `Mức ${level || "?"} · Chưa có lô`;
+	}
+	//#endregion
+	//#region src/presentation/nce/action-level-label.ts
+	function actionLevelLabel(input, formatValue, formatStat) {
+		if (!input) return "Mức ?";
+		const lot = input.lot ? ` · Lô ${input.lot}` : " · Chưa có lô";
+		const range = ` · Mean ${formatValue(input.mean)} · SD ${formatStat(input.sd)}`;
+		const band = input.applied ? ` · ${input.applied === "lab" ? "PXN" : "NSX"}` : "";
+		return `Mức ${input.level}${lot}${range}${band}`;
+	}
+	//#endregion
+	//#region src/presentation/nce/action-select-html.ts
+	function escapeAttribute$1(value) {
+		return String(value ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+	}
+	function escapeHtml(value) {
+		return escapeAttribute$1(value).replace(/'/g, "&#39;");
+	}
+	function actionSelectHtml(input) {
+		const current = input.current == null ? "" : String(input.current);
+		const optionsHtml = (input.options.some((option) => option[0] === current) || !current ? input.options : [...input.options, [current, current]]).map(([value, text]) => `<option value="${escapeAttribute$1(value)}" ${value === current ? "selected" : ""}>${escapeHtml(text)}</option>`).join("");
+		return `<select id="${escapeAttribute$1(input.id)}" aria-label="${escapeAttribute$1(input.label)}" ${input.extra || ""}>${optionsHtml}</select>`;
+	}
+	//#endregion
+	//#region src/presentation/nce/action-suggest-row-html.ts
+	function actionSuggestRowHtml(targetIdHtml, targetIdJs, phrases) {
+		if (!phrases.length) return "";
+		return `<div class="sugg-row" id="sugg-${targetIdHtml}">${phrases.map((phrase) => `<button type="button" class="sugg-chip" onclick="actionInsertSuggestion('${targetIdJs}','${phrase.phraseJs}')">${phrase.phraseHtml}</button>`).join("")}</div>`;
+	}
+	//#endregion
+	//#region src/presentation/nce/action-suggest-box-html.ts
+	function actionSuggestBoxHtml(labelHtml, rowHtml) {
+		return `<details class="action-suggestions"><summary>+ ${labelHtml}</summary>${rowHtml}</details>`;
+	}
+	//#endregion
+	//#region src/presentation/nce/action-staff-options-html.ts
+	function escapeAttribute(value) {
+		return String(value ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+	}
+	function actionStaffOptionsHtml(names) {
+		return names.map((name) => `<option value="${escapeAttribute(name)}"></option>`).join("");
+	}
+	//#endregion
+	//#region src/presentation/nce/action-rule-options.ts
+	function actionRuleOptions(rules) {
+		return [["", "Không có luật Westgard"], ...rules.map((rule) => [rule, rule])];
+	}
+	//#endregion
+	//#region src/presentation/nce/action-suggest-phrases.ts
+	function actionCausePhrases(category, phrases) {
+		return phrases[category] || Object.values(phrases).flat().slice(0, 4);
+	}
+	function actionPhrases(errorType, phrases) {
+		return phrases[String(errorType || "").slice(0, 2)] || phrases[""] || [];
+	}
+	//#endregion
+	//#region src/presentation/auth/user-permission-checks-html.ts
+	function userPermissionChecksHtml(groupIdHtml, pages) {
+		return `<div id="${groupIdHtml}" class="user-perm-grid">${pages.map((page) => `<label class="${page.allowed ? "" : "disabled"}"><input type="checkbox" value="${page.idHtml}" ${page.selected ? "checked" : ""} ${!page.allowed ? "disabled" : ""}><span>${page.titleHtml}</span></label>`).join("")}</div>`;
+	}
+	//#endregion
+	//#region src/presentation/auth/user-role-select-html.ts
+	function userRoleSelectHtml(optionsHtml) {
+		return `<select id="editUserRole" aria-label="Vai trò" onchange="syncUserPermChecks('editUserPerms',this.value)">${optionsHtml}</select>`;
+	}
+	//#endregion
+	//#region src/application/nce/action-form-ui-state.ts
+	var ActionFormUiState = class {
+		editId = "";
+		seed = null;
+		draft = null;
+		openSections = null;
+		toggleSection(key, open) {
+			if (!this.openSections) this.openSections = /* @__PURE__ */ new Set();
+			if (open) this.openSections.add(key);
+			else this.openSections.delete(key);
+		}
+		clearDraft() {
+			this.draft = null;
+		}
+		captureDraft(values) {
+			this.draft = {
+				id: this.editId || "",
+				values
+			};
+		}
+		draftValues() {
+			return this.draft && this.draft.id === (this.editId || "") ? this.draft.values : null;
+		}
+		reset() {
+			this.editId = "";
+			this.seed = null;
+			this.clearDraft();
+			this.openSections = null;
+		}
+		startManual() {
+			this.editId = "";
+			this.seed = { manual: true };
+			this.clearDraft();
+			this.openSections = null;
+		}
+		startIssue(seed) {
+			this.editId = "";
+			this.seed = seed;
+			this.clearDraft();
+			this.openSections = null;
+		}
+		edit(id) {
+			this.editId = id;
+			this.seed = null;
+			this.clearDraft();
+			this.openSections = null;
+		}
+	};
+	//#endregion
+	//#region src/application/nce/action-form-render-state.ts
+	function actionFormRenderState(input) {
+		const editing = input.editId ? input.actions.find((action) => input.actionId(action) === input.editId) : void 0;
+		const form = input.buildModel(editing, input.tests, input.seed, input.currentUser, input.draft) || input.defaultModel(input.tests, input.seed, input.currentUser);
+		const protocol = input.protocol(form);
+		return {
+			editing,
+			form,
+			protocol,
+			formOpen: !!(editing || input.seed),
+			openSet: input.openSections || input.defaultOpen(editing, protocol)
+		};
+	}
+	//#endregion
+	//#region src/presentation/manage/target-config-state.ts
+	function targetConfigAssigned(config) {
+		return !!(config && (config.qcLotId || config.lot || Array.isArray(config.meanSdHistory) && config.meanSdHistory.length));
+	}
+	function createTargetRangeDraft(deps) {
+		return (config = {}) => {
+			let mean = config.mean == null ? null : Number(config.mean), sd = config.sd == null ? null : Number(config.sd), low = config.low == null ? null : Number(config.low), high = config.high == null ? null : Number(config.high);
+			const fromLimits = deps.targetFromLimits(low, high);
+			if (fromLimits) {
+				if (!Number.isFinite(mean)) mean = fromLimits.mean;
+				if (sd == null || !Number.isFinite(sd) || sd <= 0) sd = fromLimits.sd;
+			}
+			const fromTarget = deps.limitsFromTarget(mean, sd);
+			if (fromTarget) {
+				if (!Number.isFinite(low)) low = fromTarget.low;
+				if (!Number.isFinite(high)) high = fromTarget.high;
+			}
+			return {
+				mean,
+				sd,
+				low,
+				high
+			};
+		};
 	}
 	//#endregion
 	//#region src/presentation/entry/entry-sheet-month.ts
@@ -8826,6 +9583,40 @@
 		return (model) => !model ? "" : `<div class="alert warn"><b>Hồ sơ đã hủy — dữ liệu được giữ để truy xuất.</b><div>${deps.escape(model.reason || "Không có lý do")}${model.by ? " · " + deps.escape(model.by) : ""}${model.at ? " · " + deps.escape(model.at) : ""}</div></div>`;
 	}
 	//#endregion
+	//#region src/presentation/nce/action-cancel-modal-html.ts
+	function actionCancelModalHtml(input) {
+		return `<div class="modal"><div class="modal-h"><h3>Hủy hồ sơ NCE</h3><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
+      <div class="alert warn action-cancel-warning"><b>Hồ sơ sẽ không bị xóa.</b><div>Nội dung, người lập và toàn bộ bằng chứng vẫn được giữ để truy xuất. Nếu hồ sơ gắn với vi phạm QC, sự cố đó sẽ xuất hiện lại để lập hồ sơ mới.</div></div>
+      <label>Lý do hủy (tối thiểu 5 ký tự)</label>
+      <textarea id="actionCancelReason" placeholder="VD: Mở nhầm cho sai điểm QC; lập lại hồ sơ đúng đối tượng..." oninput="document.getElementById('actionCancelErr').style.display='none'"></textarea>
+      <div id="actionCancelErr" class="hint field-error">Cần nhập lý do hủy tối thiểu 5 ký tự.</div>
+    </div><div class="modal-f">${input.closeButtonHtml}${input.cancelButtonHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/nce/action-review-note-modal-html.ts
+	function actionReviewNoteModalHtml(input) {
+		return `<div class="modal"><div class="modal-h"><h3>${input.title}</h3><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
+      <label>${input.label}</label>
+      <textarea id="actionNoteInput" placeholder="${input.placeholder}" oninput="document.getElementById('actionNoteErr').style.display='none'"></textarea>
+      <div id="actionNoteErr" class="hint field-error">${input.errorText}</div>
+    </div><div class="modal-f">${input.closeButtonHtml}${input.submitButtonHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/nce/action-reopen-modal-html.ts
+	function actionReopenModalHtml(input) {
+		return `<div class="modal"><div class="modal-h"><h3>Mở lại hồ sơ đã duyệt</h3><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
+      <div class="alert warn">Hồ sơ đã duyệt nhưng điều kiện khép vòng không còn đúng: ${input.workflowLabelHtml}.</div>
+      <label>Lý do mở lại (tối thiểu 5 ký tự)</label>
+      <textarea id="actionNoteInput" placeholder="VD: Điểm QC dùng làm bằng chứng chạy lại đã bị hủy..." oninput="document.getElementById('actionNoteErr').style.display='none'"></textarea>
+      <div id="actionNoteErr" class="hint field-error">Cần nhập lý do tối thiểu 5 ký tự.</div>
+    </div><div class="modal-f">${input.closeButtonHtml}${input.reopenButtonHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/nce/action-detail-modal-html.ts
+	function actionDetailModalHtml(input) {
+		return `<div class="modal"><div class="modal-h"><h3>Chi tiết phiếu xử lý sự cố</h3><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">${input.bodyHtml}</div><div class="modal-f">${input.closeButtonHtml}</div></div>`;
+	}
+	//#endregion
 	//#region src/presentation/nce/action-legacy-detail-html.ts
 	function createActionLegacyDetailHtml(deps) {
 		return (model) => `<div class="action-detail-legacy"><b>Hành động đã ghi</b><div>${deps.escape(model.action || "—")}</div><div class="hint">${deps.escape(model.owner || "—")} · ${deps.escape(model.rerunLabel || "Chưa có dữ liệu")} · ${deps.escape(model.approvalLabel)}</div></div>`;
@@ -8947,6 +9738,11 @@
 	//#region src/presentation/manage/tea-reference-lab-profile-body-html.ts
 	function teaReferenceLabProfileBodyHtml(input) {
 		return `<div class="grid2"><div><label>TEa chuẩn hóa % <span class="req">*</span></label><input id="teaLabValue" type="number" step="any" min="0" aria-label="TEa chuẩn hóa phần trăm" value="${input.labValue}"></div><div><label>Nguồn chính <span class="req">*</span></label><select id="teaLabSource" aria-label="Nguồn chính của TEa chuẩn hóa">${input.sourceOptionsHtml}</select></div></div><div><label>Tài liệu / phiên bản / đường dẫn tham chiếu <span class="req">*</span></label><input id="teaLabReference" aria-label="Tài liệu tham chiếu TEa chuẩn hóa" value="${input.referenceValue}" placeholder="VD: 42 CFR §493.931, hiệu lực 11/07/2024"></div><div><label>Lý do lựa chọn <span class="req">*</span></label><textarea id="teaLabReason" class="tea-lab-reason" aria-label="Lý do lựa chọn TEa chuẩn hóa" rows="1" placeholder="Nêu lý do chọn nguồn và mức TEa này cho mục đích sử dụng của xét nghiệm...">${input.reasonHtml}</textarea></div><div class="tea-lab-meta-grid tea-lab-meta-primary"><div><label>Ngày hiệu lực <span class="req">*</span></label>${input.effectiveDateHtml}</div><div><label>Ngày xem xét lại</label>${input.nextReviewDateHtml}</div><div><label>Người xây dựng <span class="req">*</span></label><input id="teaLabPreparedBy" aria-label="Người xây dựng TEa chuẩn hóa" value="${input.preparedValue}"></div></div><div class="tea-lab-meta-grid tea-lab-meta-approval"><div><label>Người phê duyệt <span class="req">*</span></label><input id="teaLabApprovedBy" aria-label="Người phê duyệt TEa chuẩn hóa" value="${input.approvedValue}"></div><div><label>Ngày phê duyệt <span class="req">*</span></label>${input.approvedDateHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/tea-reference-lab-profile-modal-html.ts
+	function teaReferenceLabProfileModalHtml(input) {
+		return `<div class="modal tea-lab-profile-modal"><div class="modal-h"><h3>${input.title}</h3><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">${input.bodyHtml}</div><div class="modal-f">${input.removeButtonHtml}${input.cancelButtonHtml}${input.saveButtonHtml}</div></div>`;
 	}
 	//#endregion
 	//#region src/presentation/manage/tea-reference-row-html.ts
@@ -14421,6 +15217,8 @@
 	root.activityAuditFilterState = activityAuditFilterState;
 	root.activityAuditPageSizes = ACTIVITY_AUDIT_PAGE_SIZES;
 	root.activityAuditArchiveWindow = activityAuditArchiveWindow;
+	root.activityAuditArchiveModalHtml = activityAuditArchiveModalHtml;
+	root.activityAuditRowHtml = activityAuditRowHtml;
 	root.userListModel = userListModel;
 	root.userRowHtml = createUserRowHtml();
 	root.usersPageHtml = createUsersPageHtml();
@@ -14800,6 +15598,7 @@
 		quote: (value) => root.jsq(value)
 	});
 	root.reportUnlockReason = createReportUnlockReason({ clean: (value, maxLength) => root.QCCore.cleanText(value, maxLength) });
+	root.reportUnlockModalHtml = reportUnlockModalHtml;
 	root.reportLockPicker = reportLockPicker;
 	root.reportLockPanelHtmlPresentation = createReportLockPanelHtml({ button: (label, action, variant, title, options) => root.btn(label, action, variant, title, options) });
 	root.reportPageHtml = createReportPageHtml({
@@ -14879,6 +15678,105 @@
 	root.entrySheetCellHtml = entrySheetCellHtml;
 	root.entrySheetAddRunHtml = entrySheetAddRunHtml;
 	root.entrySheetNoteHtml = entrySheetNoteHtml;
+	root.entryEmptyPageHtml = createEntryEmptyPageHtml({
+		head: (title, subtitle) => root.headOnly(title, subtitle),
+		empty: (title, message, action) => root.emptyState(title, message, action)
+	});
+	root.targetSwitchModalHtml = targetSwitchModalHtml;
+	root.configPanelTestRows = configPanelTestRows;
+	root.configPanelModalHtml = configPanelModalHtml;
+	root.lotTransitionChoiceHtmlPresentation = lotTransitionChoiceHtml;
+	root.lotTransitionModalHtml = lotTransitionModalHtml;
+	root.lotTransitionTargetsHtmlPresentation = lotTransitionTargetsHtml;
+	root.lotGroupColumnsHtml = lotGroupColumnsHtml;
+	root.lotGroupModalHtml = lotGroupModalHtml;
+	root.configLotModalHtml = configLotModalHtml;
+	root.configInstrumentModalHtml = configInstrumentModalHtml;
+	root.configAssayModalHtml = configAssayModalHtml;
+	root.qcHistoryDetailModalHtml = qcHistoryDetailModalHtml;
+	root.configAssayRuleRowsHtml = configAssayRuleRowsHtml;
+	root.configAssayTeaOptionsHtml = configAssayTeaOptionsHtml;
+	root.configAssayInstrumentOptionsHtml = configAssayInstrumentOptionsHtml;
+	root.configAssayDecimalOptionsHtml = configAssayDecimalOptionsHtml;
+	root.configPanelInstrumentOptionsHtml = configPanelInstrumentOptionsHtml;
+	root.configLotLevelOptionsHtml = configLotLevelOptionsHtml;
+	root.qcHistoryMeanSdRowsHtml = qcHistoryMeanSdRowsHtml;
+	root.qcHistoryPointRowsHtml = qcHistoryPointRowsHtml;
+	root.targetNumberTextPresentation = createTargetNumberText({
+		valueDecimals: (test) => globalThis.testDecimalPlaces(test),
+		statDecimals: (test) => globalThis.testStatDecimals(test),
+		defaultDecimals: globalThis.QC_DECIMALS_DEFAULT
+	});
+	root.targetConfigAssignedPresentation = targetConfigAssigned;
+	root.targetRangeDraftPresentation = createTargetRangeDraft({
+		targetFromLimits: (low, high) => globalThis.QCCore.targetFromLimits(low, high),
+		limitsFromTarget: (mean, sd) => globalThis.QCCore.limitsFromTarget(mean, sd)
+	});
+	root.parseVnDatePresentation = parseVnDate;
+	root.targetRangeSyncPresentation = createTargetRangeSync({
+		targetFromLimits: (low, high) => globalThis.QCCore.targetFromLimits(low, high),
+		limitsFromTarget: (mean, sd) => globalThis.QCCore.limitsFromTarget(mean, sd)
+	});
+	root.targetOverwritePicksPresentation = targetOverwritePicks;
+	root.lotGroupLotPillsHtml = lotGroupLotPillsHtml;
+	root.lotGroupStatusPresentation = lotGroupStatus;
+	root.lotGroupToggleActionPresentation = lotGroupToggleAction;
+	root.targetSwitchAssayNamesPresentation = targetSwitchAssayNames;
+	root.targetLockedBackfillNotePresentation = targetLockedBackfillNote;
+	root.rangeWorkflowModalHtml = rangeWorkflowModalHtml;
+	root.rangeApplyConfirmationModalHtml = rangeApplyConfirmationModalHtml;
+	root.rangeRevertConfirmationModalHtml = rangeRevertConfirmationModalHtml;
+	root.rangeSafetyGateHtml = rangeSafetyGateHtml;
+	root.rangeWorkflowChecklistRowsHtml = rangeWorkflowChecklistRowsHtml;
+	root.rangeNceNoticeHtml = rangeNceNoticeHtml;
+	root.rangeWorkflowComparisonRowsHtml = rangeWorkflowComparisonRowsHtml;
+	root.userPermissionsModalHtml = userPermissionsModalHtml;
+	root.resetPasswordModalHtml = resetPasswordModalHtml;
+	root.sigmaAddTestModalHtml = sigmaAddTestModalHtml;
+	root.sigmaAddTestRowsHtml = sigmaAddTestRowsHtml;
+	root.sigmaBiasModalHtml = sigmaBiasModalHtml;
+	root.sigmaMuModalHtml = sigmaMuModalHtml;
+	root.sigmaCohortModalHtml = sigmaCohortModalHtml;
+	root.sigmaFrequencyPanelHtml = sigmaFrequencyPanelHtml;
+	root.sigmaMuSummaryHtml = sigmaMuSummaryHtml;
+	root.sigmaStatusCardHtml = sigmaStatusCardHtml;
+	root.sigmaStatusPanelHtml = sigmaStatusPanelHtml;
+	root.sigmaOpSpecCellHtml = sigmaOpSpecCellHtml;
+	root.sigmaMuStateChipHtml = sigmaMuStateChipHtml;
+	root.sigmaMuDominantText = sigmaMuDominantText;
+	root.sigmaBiasSummaryHtml = sigmaBiasSummaryHtml;
+	root.sigmaCohortRowsHtml = sigmaCohortRowsHtml;
+	root.sigmaBiasRowsHtml = sigmaBiasRowsHtml;
+	root.sigmaMuRowsHtml = sigmaMuRowsHtml;
+	root.sigmaMuPreviewHtml = sigmaMuPreviewHtml;
+	root.sigmaTrackedOptionsHtml = sigmaTrackedOptionsHtml;
+	root.sigmaInputDisplayValue = sigmaInputDisplayValue;
+	root.sigmaGoverningRuleBlockHtml = sigmaGoverningRuleBlockHtml;
+	root.sigmaFrequencyRowsHtml = sigmaFrequencyRowsHtml;
+	root.sigmaPeriodTableHtml = sigmaPeriodTableHtml;
+	root.sigmaAnalysisSetupHtml = sigmaAnalysisSetupHtml;
+	root.sigmaPeriodRowHtml = sigmaPeriodRowHtml;
+	root.sigmaChartsPanelHtml = sigmaChartsPanelHtml;
+	root.sigmaPeriodTableHeadHtml = sigmaPeriodTableHeadHtml;
+	root.sigmaNoLevelsPanelHtml = sigmaNoLevelsPanelHtml;
+	root.actionFormClosedPresentation = actionFormClosedHtml;
+	root.actionIncidentBannerPresentation = actionIncidentBannerHtml;
+	root.actionFormSectionPresentation = actionFormSectionHtml;
+	root.actionInvestigationFieldPresentation = actionInvestigationFieldHtml;
+	root.actionBiasContextPresentation = actionBiasContext;
+	root.actionLevelContextPresentation = actionLevelContext;
+	root.actionLevelLabelPresentation = actionLevelLabel;
+	root.actionSelectPresentation = actionSelectHtml;
+	root.actionSuggestRowPresentation = actionSuggestRowHtml;
+	root.actionSuggestBoxPresentation = actionSuggestBoxHtml;
+	root.actionStaffOptionsPresentation = actionStaffOptionsHtml;
+	root.actionRuleOptionsPresentation = actionRuleOptions;
+	root.actionCausePhrasesPresentation = actionCausePhrases;
+	root.actionPhrasesPresentation = actionPhrases;
+	root.userPermissionChecksHtml = userPermissionChecksHtml;
+	root.userRoleSelectHtml = userRoleSelectHtml;
+	root.actionFormUiState = new ActionFormUiState();
+	root.actionFormRenderState = actionFormRenderState;
 	root.entrySheetMonthPart = entrySheetMonthPart;
 	root.entrySheetMonthValue = entrySheetMonthValue;
 	root.entryTreeState = createEntryTreeState({
@@ -15129,6 +16027,10 @@
 	root.actionApprovalTagPresentation = createActionApprovalTagHtml({ escape: (value) => root.esc(value) });
 	root.actionDetailMetaHtml = createActionDetailMetaHtml({ escape: (value) => root.esc(value) });
 	root.actionCancelledAlertHtml = createActionCancelledAlertHtml({ escape: (value) => root.esc(value) });
+	root.actionCancelModalHtml = actionCancelModalHtml;
+	root.actionReviewNoteModalHtml = actionReviewNoteModalHtml;
+	root.actionReopenModalHtml = actionReopenModalHtml;
+	root.actionDetailModalHtml = actionDetailModalHtml;
 	root.actionLegacyDetailHtml = createActionLegacyDetailHtml({ escape: (value) => root.esc(value) });
 	root.actionContainmentDetailHtml = createActionContainmentDetailHtml({ escape: (value) => root.esc(value) });
 	root.actionInspectionDetailsHtml = createActionInspectionDetailsHtml();
@@ -15175,6 +16077,7 @@
 	root.manageTransitionDetailsPresentation = manageTransitionDetailsHtml;
 	root.teaReferenceAddModalPresentation = teaReferenceAddModalHtml;
 	root.teaReferenceLabProfileBodyPresentation = teaReferenceLabProfileBodyHtml;
+	root.teaReferenceLabProfileModalHtml = teaReferenceLabProfileModalHtml;
 	root.teaReferenceRowPresentation = teaReferenceRowHtml;
 	root.teaReferenceTablePresentation = teaReferenceTableHtml;
 	root.teaSourceRegistryPresentation = createTeaSourceRegistryHtml({

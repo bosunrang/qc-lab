@@ -19,15 +19,13 @@
    lại, hay một bản đồng bộ Firebase dội về — đều xoá trắng form trong khi tiêu đề vẫn
    ghi "Tiếp tục hồ sơ", và lần lưu kế tiếp ghi rỗng đè lên checklist/nguyên nhân/hành
    động đã có. */
-let actionEditId='',actionSeed=null,actionDraft=null;
+function actionUi(){return globalThis.actionFormUiState;}
 /* Mục nào đang mở. null = chưa ai đụng tới, dùng mặc định theo giai đoạn hồ sơ: hồ sơ
    mới chỉ mở khối nhận diện + mục 1 (đúng phần tối thiểu để lưu), hồ sơ đang sửa mở
    sẵn các mục còn thiếu để bấm "Tiếp tục" là thấy ngay việc phải làm. Trước đây cả 7
    mục bung hết ngay từ đầu — 2350px, ~3 màn hình cuộn cho một thao tác chỉ cần 6 ô. */
-let actionOpenSections=null;
 function actionSectionToggled(key,open){
-  if(!actionOpenSections)actionOpenSections=new Set();
-  if(open)actionOpenSections.add(key);else actionOpenSections.delete(key);
+  actionUi().toggleSection(key,open);
 }
 function actionDefaultOpenSections(editing,protocol){
   return globalThis.ActionFormModel.defaultOpenSections(editing,protocol);
@@ -35,14 +33,14 @@ function actionDefaultOpenSections(editing,protocol){
 /* Luật Westgard là bộ từ vựng đóng — không có lý do gì để gõ tay. actSel() tự thêm
    option cho giá trị lạ nên hồ sơ cũ (hoặc chuỗi nhiều luật "1-3s, 2-2s" sinh từ dòng
    vi phạm) vẫn hiện đúng thay vì rơi im lặng về option đầu. */
-function actionRuleOptions(){return [['','Không có luật Westgard'],...QCCore.WG_RULES.map(r=>[r,r])];}
+function actionRuleOptions(){return globalThis.actionRuleOptionsPresentation(QCCore.WG_RULES);}
 /* Người phụ trách: datalist thay vì select vì vẫn phải cho gõ tên người ngoài danh
    sách (nhân viên mới, người trực thay). Chọn từ danh sách còn giúp actionCanApprove()
    đối chiếu đúng — hiện nó so theo tên, gõ sai chính tả là quy tắc "không tự duyệt hồ
    sơ của mình" bị vô hiệu. */
 function actionStaffOptions(){
   const names=[...new Set((state.users||[]).filter(u=>u.active!==false).map(u=>String(u.name||u.username||'').trim()).filter(Boolean))];
-  return names.map(n=>`<option value="${escAttr(n)}"></option>`).join('');
+  return globalThis.actionStaffOptionsPresentation(names);
 }
 /* [id ô trong DOM, khóa trong bản ghi, kiểu] — một bảng dùng cho cả ba việc: dựng giá
    trị ban đầu của form, giữ nội dung ĐANG GÕ qua rerender(), và tìm ô ứng với trường
@@ -79,13 +77,13 @@ const ACT_CHECK_FIELDS=[
 function captureActionDraft(){
   const values={};let found=false;
   ACT_FIELDS.forEach(([id])=>{const e=document.getElementById(id);if(e){found=true;values[id]=e.value;}});
-  if(found)actionDraft={id:actionEditId||'',values};
+  if(found)actionUi().captureDraft(values);
 }
 function actionFormChanged(){
   captureActionDraft();actionRefreshSectionChips();
 }
-function actionDraftValues(){return actionDraft&&actionDraft.id===(actionEditId||'')?actionDraft.values:null;}
-function clearActionDraft(){actionDraft=null;}
+function actionDraftValues(){return actionUi().draftValues();}
+function clearActionDraft(){actionUi().clearDraft();}
 const ACT_SOURCE_OPTS=[['','— Chọn nguồn —'],...Object.entries(ACTION_LABELS.source)];
 /* Hồ sơ không gắn điểm QC thì không được chọn "Nội kiểm IQC": sự cố IQC phải mở từ dòng
    vi phạm, nếu không hệ thống mất đường theo dõi QC chạy lại. Hồ sơ cũ lỡ mang giá trị
@@ -143,17 +141,17 @@ const ACT_SUGGEST_ACTION={
   RE:['Vệ sinh kim hút, loại bọt khí','Thay lọ QC mới, trộn đều đúng cách','Đào tạo lại thao tác cho nhân viên','Kiểm tra nguồn điện và độ ổn định máy'],
   '':['Hiệu chuẩn lại và xác nhận bằng QC','Vệ sinh kim hút, loại bọt khí','Thay lọ QC mới, trộn đều đúng cách','Đào tạo lại thao tác cho nhân viên']
 };
-function actionCausePhrases(category){return ACT_SUGGEST_CAUSE[category]||[].concat(...Object.values(ACT_SUGGEST_CAUSE)).slice(0,4);}
-function actionActionPhrases(errorType){return ACT_SUGGEST_ACTION[String(errorType||'').slice(0,2)]||ACT_SUGGEST_ACTION[''];}
+function actionCausePhrases(category){return globalThis.actionCausePhrasesPresentation(category,ACT_SUGGEST_CAUSE);}
+function actionActionPhrases(errorType){return globalThis.actionPhrasesPresentation(errorType,ACT_SUGGEST_ACTION);}
 /* Chip không dùng btn(): đây không phải nút hành động teal/ghost/danger mà là một
    affordance riêng, cùng kiểu với tab lọc trạng thái ở dashboard. */
 function actionSuggestRow(targetId,phrases){
   if(!phrases||!phrases.length)return'';
-  return `<div class="sugg-row" id="sugg-${escAttr(targetId)}">${phrases.map(p=>`<button type="button" class="sugg-chip" onclick="actionInsertSuggestion('${jsq(targetId)}','${jsq(p)}')">${esc(p)}</button>`).join('')}</div>`;
+  return globalThis.actionSuggestRowPresentation(escAttr(targetId),jsq(targetId),phrases.map(p=>({phraseHtml:esc(p),phraseJs:jsq(p)})));
 }
 function actionSuggestBox(targetId,phrases,label='Gợi ý nhập nhanh'){
   if(!phrases||!phrases.length)return'';
-  return `<details class="action-suggestions"><summary>+ ${esc(label)}</summary>${actionSuggestRow(targetId,phrases)}</details>`;
+  return globalThis.actionSuggestBoxPresentation(esc(label),actionSuggestRow(targetId,phrases));
 }
 function actionInsertSuggestion(targetId,phrase){
   const e=document.getElementById(targetId);if(!e)return;
@@ -172,15 +170,10 @@ function syncActionSuggestions(){
 /* Giá trị lạ (hồ sơ cũ, ví dụ errorType 'Quản lý dữ liệu QC') được thêm thành một option
    riêng thay vì rơi im lặng về option đầu tiên rồi bị ghi đè khi lưu. */
 function actSel(id,label,list,cur,extra=''){
-  const v=cur==null?'':String(cur),opts=list.some(o=>o[0]===v)||!v?list:[...list,[v,v]];
-  return `<select id="${id}" aria-label="${escAttr(label)}" ${extra}>${opts.map(([value,text])=>`<option value="${escAttr(value)}" ${value===v?'selected':''}>${esc(text)}</option>`).join('')}</select>`;
+  return globalThis.actionSelectPresentation({id,label,options:list,current:cur,extra});
 }
 function actionLevelLabel(l,t=null){
-  if(!l)return 'Mức ?';
-  const lot=l.lot?` · Lô ${l.lot}`:' · Chưa có lô';
-  const range=` · Mean ${fmtTestValue(t,l.mean)} · SD ${fmtTestStat(t,l.sd)}`;
-  const band=l.applied?` · ${l.applied==='lab'?'PXN':'NSX'}`:'';
-  return `Mức ${l.level}${lot}${range}${band}`;
+  return globalThis.actionLevelLabelPresentation(l,value=>fmtTestValue(t,value),value=>fmtTestStat(t,value));
 }
 /* Chỉ chạy cho hồ sơ MỚI — khi sửa, ô "Xét nghiệm" bị disabled và addAction() lấy
    testId/level/lot thẳng từ bản ghi nên hàm này không đụng tới được. */
@@ -196,9 +189,7 @@ function syncActLevels(){
 /* Ngữ cảnh hiển thị khi sửa: ưu tiên số lô ĐÃ GHI trong hồ sơ, không lấy lô hiện hành
    của mức (lô có thể đã chuyển tiếp từ lúc xảy ra sự cố). */
 function actionLevelContext(testId,level,lot){
-  const t=state.tests.find(x=>x.id===testId),l=t&&lvlCfg(t,+level);
-  if(lot)return `Mức ${level} · Lô ${lot} (đã ghi nhận)`;
-  return l?actionLevelLabel(l,t):`Mức ${level||'?'} · Chưa có lô`;
+  return globalThis.actionLevelContextPresentation(testId,level,lot,state.tests,lvlCfg,actionLevelLabel);
 }
 /* Nguồn ngoài IQC (EQA, cảnh báo thiết bị, phản hồi lâm sàng, đánh giá/audit) không
    bao giờ xuất hiện ở "Sự cố cần xử lý" vì không phải vi phạm Westgard — nhưng vẫn là
@@ -206,18 +197,18 @@ function actionLevelContext(testId,level,lot){
    đường chính đi từ một vi phạm cụ thể. */
 function beginActionManual(){
   if(!requireWrite())return;
-  actionEditId='';actionSeed={manual:true};clearActionDraft();actionOpenSections=null;rerender();
+  actionUi().startManual();rerender();
   const e=document.getElementById('aCorrection');if(e)e.focus();
 }
-function closeActionForm(){actionEditId='';actionSeed=null;clearActionDraft();actionOpenSections=null;rerender();}
+function closeActionForm(){actionUi().reset();rerender();}
 /* Dải nhận diện đặt ngay đầu form: trước đây form luôn bung sẵn và không nói đang lập
    hồ sơ cho sự cố nào, nên mở lên là mất phương hướng. */
 /* Trạng thái đóng: nói rõ hai đường vào thay vì để một form trống lơ lửng. */
 function actionFormClosedHtml(issueCount){
   const manual=canWrite()?btn('Lập hồ sơ từ nguồn khác','beginActionManual()','ghost'):'';
   return issueCount
-    ?emptyState('Chọn một sự cố để lập hồ sơ',`Có ${issueCount} sự cố ở trên — bấm "Lập hồ sơ" ngay trên dòng cần xử lý để hồ sơ được gắn đúng điểm QC và tự theo dõi QC chạy lại.`,manual)
-    :emptyState('Không có vi phạm nào cần lập hồ sơ','Hồ sơ NCE thường bắt đầu từ một vi phạm ở trên. Nếu sự không phù hợp đến từ EQA, cảnh báo thiết bị, phản hồi lâm sàng hay đánh giá nội bộ thì mở hồ sơ thủ công.',manual);
+    ?globalThis.actionFormClosedPresentation({title:'Chọn một sự cố để lập hồ sơ',message:`Có ${issueCount} sự cố ở trên — bấm "Lập hồ sơ" ngay trên dòng cần xử lý để hồ sơ được gắn đúng điểm QC và tự theo dõi QC chạy lại.`,actionHtml:manual})
+    :globalThis.actionFormClosedPresentation({title:'Không có vi phạm nào cần lập hồ sơ',message:'Hồ sơ NCE thường bắt đầu từ một vi phạm ở trên. Nếu sự không phù hợp đến từ EQA, cảnh báo thiết bị, phản hồi lâm sàng hay đánh giá nội bộ thì mở hồ sơ thủ công.',actionHtml:manual});
 }
 /* Dải nhận diện chỉ xuất hiện khi có ĐIỂM QC THẬT để nhận diện. Hồ sơ nguồn ngoài IQC
    chưa gắn điểm nào thì không có gì để nói: bản trước hiện "không gắn với điểm QC nào"
@@ -232,11 +223,10 @@ function actionIncidentBanner(form,editing){
   const bits=[];
   if(t)bits.push(`${testDisplayName(t)} · ${actionLevelContext(form.testId,form.level,form.lot)}`);
   bits.push(`${vnDate(p.date)} · ${fmtPointValue(p,t)} ${t&&t.unit||''} · ${form.rule||'—'}`);
-  return `<div class="action-incident-banner"><b>${esc(title)}</b><div>${bits.map(esc).join(' · ')}</div></div>`;
+  return globalThis.actionIncidentBannerPresentation({titleHtml:esc(title),detailsHtml:bits.map(esc).join(' · ')});
 }
 function beginActionFromIssue(tid,level,rule,err,act,pointId='',pointDate=''){
-  actionEditId='';
-  actionSeed={testId:tid,level,rule,errorType:err==='—'?'':err,pointId,date:pointDate||isoToday()};clearActionDraft();actionOpenSections=null;
+  actionUi().startIssue({testId:tid,level,rule,errorType:err==='—'?'':err,pointId,date:pointDate||isoToday()});
   rerender();
   const e=document.getElementById('aCorrection');if(e)e.focus();
 }
@@ -264,7 +254,7 @@ function actionEffectivenessMissingKey(a){
 }
 async function addAction(){
   if(!requireWrite())return;state.actions=state.actions||[];
-  const editing=actionEditId&&(state.actions||[]).find(a=>a.id===actionEditId);
+  const editing=actionUi().editId&&(state.actions||[]).find(a=>a.id===actionUi().editId);
   /* Danh tính sự cố (xét nghiệm / mức / lô / điểm QC) là ẢNH CHỤP lúc mở hồ sơ, không
      đọc lại từ form khi sửa: đổi ô "Xét nghiệm" từng làm actionPoint() trả null, khiến
      yêu cầu QC chạy lại biến mất và hồ sơ duyệt được mà không có bằng chứng chạy lại;
@@ -285,12 +275,12 @@ async function addAction(){
     if(actionApprovalStatus(editing)==='approved'){await infoDialog('Hồ sơ đã khép vòng không được sửa. Nếu phát hiện vấn đề tái diễn, hãy mở một hồ sơ NCE mới.');return;}
     const saved=ActionRecordService.update(editing,{nceId:editing.nceId||nceId,date,rule,errorType,action,by,...protocol},{id:currentUser&&currentUser.id||'',username:currentUser&&currentUser.username||'',name:userName()});
     if(!saved)return;
-    logAct('Cập nhật hồ sơ NCE',`${editing.nceId||'NCE'} · ${actionWorkflowStatus(editing).label}`,t?t.name:'');actionEditId='';
+    logAct('Cập nhật hồ sơ NCE',`${editing.nceId||'NCE'} · ${actionWorkflowStatus(editing).label}`,t?t.name:'');actionUi().editId='';
   }else{
     const record=ActionRecordService.create(state.actions,{nceId,date,testId:tid,level,lot,pointId,rule,errorType,action,by,...protocol},{id:currentUser&&currentUser.id||'',username:currentUser&&currentUser.username||'',name:userName()});
     logAct('Lập hồ sơ NCE',`${record.nceId} · ${actionLevelShort(t,level,lot)} · đang điều tra`,t?t.name:'');
   }
-  actionSeed=null;clearActionDraft();actionOpenSections=null;save({clearDerived:false});rerender();
+  actionUi().reset();save({clearDerived:false});rerender();
 }
 function syncActionRiskScore(){
   const a={riskSeverity:+actionFieldValue('aRiskSeverity',4)||0,riskOccurrence:+actionFieldValue('aRiskOccurrence',4)||0,riskDetectability:+actionFieldValue('aRiskDetectability',4)||0},e=document.getElementById('aRiskScore'),card=document.getElementById('aRiskScoreCard'),score=actionRiskScore(a),level=actionFieldValue('aRiskLevel',40);
@@ -306,15 +296,13 @@ async function editAction(i){
   const a=state.actions&&state.actions[i];if(!a)return;
   if(actionCancelled(a)){await infoDialog('Hồ sơ đã hủy được giữ nguyên để bảo toàn dấu vết và không thể chỉnh sửa.');return;}
   if(actionApprovalStatus(a)==='approved'){await infoDialog('Hồ sơ đã khép vòng không được sửa. Nếu vấn đề tái diễn, hãy mở hồ sơ NCE mới.');return;}
-  actionEditId=a.id;actionSeed=null;clearActionDraft();actionOpenSections=null;rerender();
+  actionUi().edit(a.id);rerender();
   const panel=document.querySelector('.action-form-panel');if(panel)panel.scrollIntoView({behavior:'smooth',block:'start'});
 }
 function actionInvestigationField(statusId,noteId,title,hint,form,statusKey,noteKey,lotToLot=false){
   const value=String(form[statusKey]||''),choices=(lotToLot?ACT_LOT2LOT_OPTS:ACT_CHECK_OPTS).filter(([v])=>v),stateCls=actionInvestigationStateClass(value),stateLabel=ACTION_LABELS.check[value]||'Chưa kết luận';
-  return `<div class="action-investigation-item ${stateCls}" id="check-${escAttr(statusId)}"><div class="action-investigation-head"><div><b>${esc(title)}</b><small>${esc(hint)}</small></div><span class="action-investigation-state">${esc(stateLabel)}</span></div>
-    <select id="${statusId}" class="action-investigation-select" aria-hidden="true" tabindex="-1" onchange="actionInvestigationSync('${jsq(statusId)}')">${(lotToLot?ACT_LOT2LOT_OPTS:ACT_CHECK_OPTS).map(([v,label])=>`<option value="${escAttr(v)}" ${v===value?'selected':''}>${esc(label)}</option>`).join('')}</select>
-    <div class="action-investigation-choices" role="group" aria-label="${escAttr('Kết quả '+title)}">${choices.map(([v,label])=>`<button type="button" class="action-choice ${v===value?'active':''}" data-value="${escAttr(v)}" aria-pressed="${v===value?'true':'false'}" onclick="actionInvestigationChoose('${jsq(statusId)}','${jsq(v)}')">${esc(actionInvestigationChoiceLabel(v,label))}</button>`).join('')}</div>
-    <div class="action-investigation-note"><input id="${noteId}" aria-label="Ghi chú ${escAttr(title)}" placeholder="Ghi chú / bằng chứng" value="${escAttr(form[noteKey]||'')}">${actionSuggestBox(noteId,ACT_SUGGEST[noteKey],'Gợi ý bằng chứng')}</div></div>`;
+  const opts=lotToLot?ACT_LOT2LOT_OPTS:ACT_CHECK_OPTS;
+  return globalThis.actionInvestigationFieldPresentation({stateClass:stateCls,statusIdHtml:escAttr(statusId),statusIdJs:jsq(statusId),noteIdHtml:escAttr(noteId),titleHtml:esc(title),hintHtml:esc(hint),stateLabelHtml:esc(stateLabel),selectOptionsHtml:opts.map(([v,label])=>`<option value="${escAttr(v)}" ${v===value?'selected':''}>${esc(label)}</option>`).join(''),choices:choices.map(([v,label])=>({valueHtml:escAttr(v),labelHtml:esc(actionInvestigationChoiceLabel(v,label)),active:v===value,jsValue:jsq(v)})),noteValueHtml:escAttr(form[noteKey]||''),suggestHtml:actionSuggestBox(noteId,ACT_SUGGEST[noteKey],'Gợi ý bằng chứng')});
 }
 function actionInvestigationChoiceLabel(value,label){return globalThis.ActionInvestigationPresentation.choiceLabel(value,label);}
 function actionInvestigationStateClass(value){return globalThis.ActionInvestigationPresentation.stateClass(value);}
@@ -354,7 +342,7 @@ function actionUpdateSectionChip(key,info){
 }
 function actionRefreshSectionChips(){
   if(!document.getElementById('aCorrection'))return;
-  const editing=actionEditId&&(state.actions||[]).find(a=>a.id===actionEditId),version=editing?Math.max(2,+editing.protocolVersion||2):3;
+  const editing=actionUi().editId&&(state.actions||[]).find(a=>a.id===actionUi().editId),version=editing?Math.max(2,+editing.protocolVersion||2):3;
   const form={...(editing||{}),...readActionProtocolForm(version),protocolVersion:version,testId:editing?editing.testId:actionFieldValue('aTest',80),date:parseVN(actionFieldValue('aDate',40))||'',action:actionFieldValue('aAct'),by:actionFieldValue('aBy'),pointId:actionFieldValue('aPointId',80)};
   const miss=actionProtocolStatus(form).missingBySection||{};
   ['immediate','risk','cause','patient'].forEach(key=>actionUpdateSectionChip(key,actionSectionChip(miss[key])));
@@ -362,21 +350,19 @@ function actionRefreshSectionChips(){
 }
 function actionSection(key,badge,title,hint,bodyHtml,chipInfo,openSet){
   const open=openSet.has(key),chip=`<span class="action-chip ${chipInfo.cls}" aria-label="${escAttr(chipInfo.title||chipInfo.label)}"${chipInfo.title?` title="${escAttr(chipInfo.title)}"`:''}>${esc(chipInfo.label)}</span>`;
-  return `<details class="action-form-section" data-action-section="${escAttr(key)}" ${open?'open':''} ontoggle="actionSectionToggled('${jsq(key)}',this.open)">
-     <summary class="action-form-section-title"><span>${esc(badge)}</span><div><b>${esc(title)}</b><small>${esc(hint)}</small></div>${chip}</summary>
-     ${bodyHtml}</details>`;
+  return globalThis.actionFormSectionPresentation({keyHtml:escAttr(key),keyJs:jsq(key),open,badgeHtml:esc(badge),titleHtml:esc(title),hintHtml:esc(hint),chipHtml:chip,bodyHtml});
 }
 /* Giá trị khởi tạo của form: bản ghi đang sửa > seed từ vi phạm vừa bấm "Ghi nhận" >
    mặc định cho hồ sơ mới. Trả về object phẳng để mọi ô render được value/selected. */
 function actionFormModel(editing,tests){
-  return globalThis.ActionFormModel.build(editing,tests,actionSeed,currentUser,actionDraftValues());
+  return globalThis.ActionFormModel.build(editing,tests,actionUi().seed,currentUser,actionDraftValues());
 }
 /* Hồ sơ mở từ nút "Lập hồ sơ từ nguồn khác" KHÔNG được bịa ra danh tính QC: không có
    điểm QC nào thì xét nghiệm/mức/lô đều chưa xác định, mà bản trước lại lặng lẽ điền
    xét nghiệm đầu dropdown và Mức 1 của nó. Nguồn phát hiện cũng để trống thay vì mặc
    định "Nội kiểm IQC" — người dùng vừa bấm đúng nút nói rằng đây KHÔNG phải IQC. */
 function actionFormDefaults(tests){
-  return globalThis.ActionFormModel.defaults(tests,actionSeed,currentUser);
+  return globalThis.ActionFormModel.defaults(tests,actionUi().seed,currentUser);
 }
 /* Đưa con trỏ tới đúng ô còn thiếu thay vì chỉ hiện hộp thoại: nhãn "xử lý tức thời"
    nằm ở cuối mục 1, cách xa nút Lưu ở cuối trang. */
@@ -405,9 +391,7 @@ function actionBiasInfo(t,l,biasBeforeRaw,biasAfterRaw){
 /* t/l cho actionBiasInfo(): hồ sơ đang sửa dùng đúng testId/level đã khóa (editing),
    hồ sơ mới đọc theo ô đang chọn trên form — giống cách syncActLevels() tra levels. */
 function actionBiasContext(form,editing){
-  const testId=editing?editing.testId:form.testId,level=editing?editing.level:form.level;
-  const t=state.tests.find(x=>x.id===testId),l=t&&level?lvlCfg(t,+level):null;
-  return{t,l};
+  return globalThis.actionBiasContextPresentation(form,editing,state.tests,lvlCfg);
 }
 /* Gợi ý Bias trước khắc phục từ kỳ Sigma gần nhất — CHÈN ĐƯỢC, không auto-fill:
    Bias EQA của Sigma là hiệu năng NỀN của xét nghiệm (kỳ gần nhất, RMS nhiều vòng),
@@ -431,7 +415,7 @@ function actionBiasReferenceHtml(info){
 /* Gọi khi gõ Bias trước/sau: cập nhật cả hint ngưỡng ở mục 4-6 lẫn thẻ tham khảo ở
    mục 7 từ CÙNG một actionBiasInfo(), tránh hai nơi tính lệch nhau. */
 function actionUpdateBiasHint(){
-  const editing=actionEditId&&(state.actions||[]).find(a=>a.id===actionEditId);
+  const editing=actionUi().editId&&(state.actions||[]).find(a=>a.id===actionUi().editId);
   const testId=editing?editing.testId:actionFieldValue('aTest',80),level=editing?editing.level:(document.getElementById('aLevel')||{}).value;
   const t=state.tests.find(x=>x.id===testId),l=t&&level?lvlCfg(t,+level):null;
   const info=actionBiasInfo(t,l,actionFieldValue('aBiasBefore',20),actionFieldValue('aBiasAfter',20));
@@ -446,16 +430,17 @@ function actionUpdateBiasHint(){
    currentIssues() lần thứ hai. */
 function actionFormHtml(issueCount){
   const tests=operationalTests();
-  const editing=actionEditId&&(state.actions||[]).find(a=>a.id===actionEditId),form=actionFormModel(editing,tests);
+  const renderState=globalThis.actionFormRenderState({actions:state.actions||[],tests,editId:actionUi().editId,seed:actionUi().seed,currentUser,draft:actionDraftValues(),buildModel:actionFormModel,defaultModel:actionFormDefaults,protocol:form=>actionProtocolStatus({...form,protocolVersion:form.protocolVersion||3}),defaultOpen:actionDefaultOpenSections,openSections:actionUi().openSections,actionId:a=>a.id});
+  const editing=renderState.editing,form=renderState.form;
   const formAction=editing?{...editing,...form,testId:editing.testId,level:editing.level,lot:editing.lot||'',pointId:editing.pointId||''}:null,formRerun=formAction?actionRerunStatus(formAction):null;
   /* Form chỉ hiện khi thật sự đang làm MỘT hồ sơ cụ thể — mở từ một vi phạm, mở lại hồ
      sơ cũ, hoặc chủ động mở cho nguồn ngoài IQC. Trước đây nó luôn bung sẵn, không gắn
      với sự cố nào, nên vừa chiếm chỗ vừa khiến người dùng mất dấu đang xử lý cái gì. */
-  const formOpen=!!(editing||actionSeed);
+  const formOpen=renderState.formOpen;
   /* Tinh tren FORM dang hien chu khong tren ban ghi da luu: dai tom tat phai phan anh
      nhung gi nguoi dung vua go, khong phai trang thai luc mo ho so. */
-  const formProtocol=actionProtocolStatus({...form,protocolVersion:form.protocolVersion||3}),miss=formProtocol.missingBySection||{};
-  const openSet=actionOpenSections||actionDefaultOpenSections(editing,formProtocol);
+  const formProtocol=renderState.protocol,miss=formProtocol.missingBySection||{};
+  const openSet=renderState.openSet;
   /* Chỉ hồ sơ gắn một điểm QC thật mới có mức/lô. Hồ sơ nguồn ngoài IQC (EQA, thiết bị,
      lâm sàng, đánh giá) thì xét nghiệm là tùy chọn và không có ngữ cảnh QC nào cả. */
   const qcBound=!!(form.pointId&&((state.data&&state.data[form.testId])||[]).some(x=>x.id===form.pointId));

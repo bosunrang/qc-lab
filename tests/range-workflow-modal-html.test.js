@@ -1,0 +1,12 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','range','range-workflow-modal-html.ts')).href;
+const input={contextHtml:'<b>Glucose</b> · Mức 1',nceNoticeHtml:'<div>NCE</div>',checklistRowsHtml:'<tr><td>n</td></tr>',currentRangeRowHtml:'<tr><td>NSX</td></tr>',proposedRangeRowHtml:'<tr><td>PXN</td></tr>',printButtonHtml:'<button>In</button>',applyButtonHtml:'<button>Áp dụng</button>',closeButtonHtml:'<button>Đóng</button>'};
+const program=`import {rangeWorkflowModalHtml} from ${JSON.stringify(source)}; console.log(rangeWorkflowModalHtml(${JSON.stringify(input)}));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy modal workflow dải QC TypeScript');
+const html=result.stdout;assert.match(html,/range-workflow-modal/);assert.match(html,/<b>Glucose<\/b>/);assert.match(html,/<tr><td>n<\/td><\/tr>/);assert.match(html,/<button>In<\/button><button>Áp dụng<\/button><button>Đóng<\/button>/);
+console.log('Range workflow modal HTML TypeScript tests passed');

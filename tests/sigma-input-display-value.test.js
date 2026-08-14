@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','sigma','sigma-input-display-value.ts')).href;
+const program=`import {sigmaInputDisplayValue} from ${JSON.stringify(source)}; console.log(JSON.stringify([sigmaInputDisplayValue(.721694321),sigmaInputDisplayValue(''),sigmaInputDisplayValue('abc'),sigmaInputDisplayValue(1,3)]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy chuẩn hóa hiển thị Sigma TypeScript');
+assert.deepEqual(JSON.parse(result.stdout),['0.72','','','1.000']);
+console.log('Sigma input display value TypeScript tests passed');

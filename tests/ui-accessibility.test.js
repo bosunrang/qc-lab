@@ -39,6 +39,8 @@ const dashboardRoutes = read('assets/modules/dashboard-routes.js');
 const dashboardPagePresentation = read('src/presentation/dashboard/dashboard-page-html.ts');
 const dashboardTestPanelPresentation = read('src/presentation/dashboard/dashboard-test-panel-html.ts');
 const sigmaRoutes = read('assets/modules/sigma.js');
+const sigmaPeriodTablePresentation = read('src/presentation/sigma/sigma-period-table-html.ts');
+const sigmaChartsPanelPresentation = read('src/presentation/sigma/sigma-charts-panel-html.ts');
 const reagentRoutes = read('assets/modules/reagent.js');
 const reagentPairPanelPresentation = read('src/presentation/reagent/reagent-pair-panel-html.ts');
 const reagentInfoPanelPresentation = read('src/presentation/reagent/reagent-info-panel-html.ts');
@@ -81,7 +83,7 @@ for(const file of fs.readdirSync(path.join(root,'assets','modules')).filter(name
 assert.deepEqual(rawRequiredLabels,[],'dấu sao bắt buộc trong label phải bọc bằng <span class="req"> để luôn có màu đỏ');
 assert.match(manageRoutes+teaReferenceLabProfileBodyPresentation,/TEa chuẩn hóa % <span class="req">\*<\/span>/,'hồ sơ TEa phải hiển thị dấu bắt buộc bằng marker chung');
 
-const semanticPageRoutes=[dashboardRoutes,dashboardPagePresentation,sigmaRoutes,reagentRoutes,reagentPairPanelPresentation,reagentInfoPanelPresentation,reagentChartsPanelPresentation,reagentResultsPanelsPresentation,actionsRoutes,actionForm,actionLogPanelPresentation,reportRoutes,reportLockPanelPresentation,settingsRoutes,firebaseRulesPanelPresentation,settingsBrandPanelPresentation,settingsAdminToolsPresentation,settingsFirebaseConnectionPresentation,settingsLisGatewayPresentation,router].join('\n');
+const semanticPageRoutes=[dashboardRoutes,dashboardPagePresentation,sigmaRoutes,sigmaPeriodTablePresentation,sigmaChartsPanelPresentation,reagentRoutes,reagentPairPanelPresentation,reagentInfoPanelPresentation,reagentChartsPanelPresentation,reagentResultsPanelsPresentation,actionsRoutes,actionForm,actionLogPanelPresentation,reportRoutes,reportLockPanelPresentation,settingsRoutes,firebaseRulesPanelPresentation,settingsBrandPanelPresentation,settingsAdminToolsPresentation,settingsFirebaseConnectionPresentation,settingsLisGatewayPresentation,router].join('\n');
 for(const title of ['Cần xử lý / Theo dõi','Lô & hạn dùng','Tình trạng','Số liệu theo kỳ','Biểu đồ Sigma & MDC','Thông tin đánh giá','Dữ liệu đo bắt cặp','Kết quả thống kê','Tiêu chí chấp nhận &amp; kết luận','Biểu đồ','Nhật ký khắc phục','Khóa kỳ báo cáo','Logo & tên phần mềm','Quản trị dữ liệu','Đồng bộ đám mây (Firebase Realtime Database)','LIS Gateway (thử nghiệm)','Firebase Rules','Biểu đồ Levey-Jennings']){
   const escaped=title.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
   assert.match(semanticPageRoutes,new RegExp(`<h2[^>]*class="[^"]*panel-title[^"]*"[^>]*>${escaped}`),`panel chính "${title}" phải dùng heading cấp 2 thật`);

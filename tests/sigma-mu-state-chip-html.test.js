@@ -1,0 +1,12 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','sigma','sigma-mu-state-chip-html.ts')).href;
+const program=`import {sigmaMuStateChipHtml} from ${JSON.stringify(source)}; console.log(JSON.stringify([sigmaMuStateChipHtml({hasMu:false}),sigmaMuStateChipHtml({hasMu:true,complete:false,missingHtml:'u(cal)'}),sigmaMuStateChipHtml({hasMu:true,complete:true})]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy nhãn trạng thái MU TypeScript');
+const [empty,missing,complete]=JSON.parse(result.stdout);
+assert.match(empty,/tag none/);assert.match(missing,/tag warn/);assert.match(missing,/Thiếu u\(cal\)/);assert.match(complete,/tag ok/);
+console.log('Sigma MU state chip HTML TypeScript tests passed');

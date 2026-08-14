@@ -12,6 +12,8 @@ const entryPointRow=read('src/presentation/entry/entry-point-table-row-html.ts')
 const westgard=read('assets/modules/westgard-routes.js');
 const modals=read('assets/modules/modals.js');
 const actions=read('assets/modules/actions-routes.js');
+const actionCancelModal=read('src/presentation/nce/action-cancel-modal-html.ts');
+const actionInvestigationField=read('src/presentation/nce/action-investigation-field-html.ts');
 const form=read('assets/modules/action-form.js');
 const actionRecordService=read('src/application/nce/action-record-service.ts');
 const actionEvidencePresentation=read('src/presentation/nce/action-evidence-presentation.ts');
@@ -123,7 +125,7 @@ assert.match(actions,/function confirmApproveAction\(id,token\)/,'xác nhận du
 assert.match(actions,/actionApprovalToken\(a\)!==token/,'phải chặn duyệt nếu hồ sơ hoặc bằng chứng QC đổi khi hộp duyệt đang mở');
 assert.doesNotMatch(actionsArea,/!tests\.length\?emptyState\('Cần có xét nghiệm trước'/,'NCE nguồn ngoài IQC phải mở được cả khi chưa có xét nghiệm vận hành');
 assert.match(form,/function actionInvestigationChoose\(/,'checklist điều tra phải dùng lựa chọn trạng thái dạng nút');
-assert.match(form,/class="action-investigation-select"/,'select dữ liệu gốc phải được giữ để tương thích state và kiểm thử');
+assert.match(actionInvestigationField,/class="action-investigation-select"/,'select dữ liệu gốc phải được giữ để tương thích state và kiểm thử');
 assert.match(form,/function actionChecklistChip\(/,'tiêu đề checklist phải hiển thị tiến độ hoàn tất');
 assert.match(form,/function actionSuggestBox\(/,'gợi ý nhập liệu NCE phải dùng cùng một khối thu gọn');
 assert.match(form,/class="action-form-panel-head".*btn\('Quy trình 8 bước'/,'nút quy trình phải nằm cạnh tiêu đề panel lập hồ sơ NCE');
@@ -132,7 +134,7 @@ assert.match(reportsCss,/\.action-form-panel-head\{[^}]*color:var\(--card-head-i
 assert.match(reportsCss,/\.action-form-panel \.action-form-panel-head > \.panel-title\{[^}]*flex:1;[^}]*color:inherit;[^}]*font:inherit/,'tiêu đề lập hồ sơ NCE phải kế thừa nguyên kiểu chữ hệ thống từ header');
 assert.doesNotMatch(actionsArea,/headOnly\([^;\n]+btn\('Quy trình 8 bước'/,'nút quy trình không được chiếm chỗ trên header trang');
 assert.match(actions,/cls:'action-guide-modal'/,'hướng dẫn 8 bước phải dùng popup NCE chuyên biệt');
-assert.match(actions,/class="alert warn action-cancel-warning"/,'cảnh báo hủy NCE phải có bố cục riêng để nội dung không bị ép thành hai cột');
+assert.match(actionCancelModal,/class="alert warn action-cancel-warning"/,'cảnh báo hủy NCE phải có bố cục riêng để nội dung không bị ép thành hai cột');
 assert.match(reportsCss,/\.action-cancel-warning\{[^}]*width:100%;[^}]*flex-direction:column/,'cảnh báo hủy NCE phải xếp câu chính và giải thích theo chiều dọc');
 assert.match(report,/class="report-export-options"[\s\S]*?Kèm phụ lục NCE[\s\S]*?\(Áp dụng cho PDF và Excel\)[\s\S]*?class="report-actions"/,'tùy chọn phụ lục NCE phải nằm ở dòng riêng phía trên các nút xuất và có chú thích trong ngoặc');
 assert.match(reportsCss,/\.report-nce-option span\{[^}]*display:inline-flex;[^}]*align-items:baseline;[^}]*white-space:nowrap/,'nhãn và chú thích phụ lục NCE phải nằm cùng hàng');

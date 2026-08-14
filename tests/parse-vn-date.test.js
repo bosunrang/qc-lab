@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','shared','parse-vn-date.ts')).href;
+const program=`import {parseVnDate,validIsoDate} from ${JSON.stringify(source)}; console.log([parseVnDate('9/8/2026'),parseVnDate('2026-02-29'),parseVnDate('31.12.2026'),validIsoDate('2026-12-31')].join('|'));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy phân tích ngày Việt Nam TypeScript');
+assert.equal(result.stdout.trim(),'2026-08-09||2026-12-31|2026-12-31');
+console.log('Parse VN date TypeScript tests passed');

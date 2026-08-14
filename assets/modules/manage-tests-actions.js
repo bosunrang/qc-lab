@@ -3,31 +3,21 @@
    trang Nhập QC, trong khi toàn bộ nội dung (setManageTab, Mean/SD theo nhóm lô,
    Panel QC, nhóm lô, chuyển tiếp lô) thuộc trang "Cấu hình chung" — file này vốn
    đã nạp ngay sau manage-routes.js trong index.html, chỉ tên file chưa khớp. */
-function validIsoDate(s){const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s||''));if(!m)return'';const y=+m[1],mo=+m[2],d=+m[3],dt=new Date(Date.UTC(y,mo-1,d));return y>=1000&&dt.getUTCFullYear()===y&&dt.getUTCMonth()===mo-1&&dt.getUTCDate()===d?s:'';}
-function parseVN(s){if(!s)return '';s=String(s).trim();const m=/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/.exec(s);if(m)return validIsoDate(m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0'));if(/^\d{4}-\d{2}-\d{2}$/.test(s))return validIsoDate(s);return '';}
+function parseVN(s){return globalThis.parseVnDatePresentation(s);}
 function setManageTab(tab){manageTab=['lots','panels','targets','history','transitions','assays','instruments','tearefs'].includes(tab)?tab:'instruments';manageQ='';rerender();resetMainScroll();}
 function setTargetPanel(id){manageTargetPanel=id;rerender();}
 function setTargetGroup(id){manageTargetGroup=id;rerender();}
 function setTargetLevel(level){manageTargetLevel=String(level||'');rerender();}
 function setHistoryTest(id){manageHistoryTest=id;rerender();}
 function openTargetMatrix(panelId='',groupId=''){if(panelId)manageTargetPanel=panelId;if(groupId)manageTargetGroup=groupId;setManageTab('targets');}
-function targetNumberText(value,test=null,kind='value'){if(value==null||String(value).trim()===''||!Number.isFinite(Number(value)))return'';const digits=test?(kind==='stat'?testStatDecimals(test):testDecimalPlaces(test)):QC_DECIMALS_DEFAULT;return Number(value).toFixed(digits).replace(/(?:\.0+|(\.\d+?)0+)$/,'$1');}
-function targetConfigAssigned(cfg){
-  return !!(cfg&&(cfg.qcLotId||cfg.lot||(Array.isArray(cfg.meanSdHistory)&&cfg.meanSdHistory.length)));
-}
-function targetRangeDraft(cfg={}){
-  let mean=cfg.mean==null?null:Number(cfg.mean),sd=cfg.sd==null?null:Number(cfg.sd),low=cfg.low==null?null:Number(cfg.low),high=cfg.high==null?null:Number(cfg.high);
-  const fromLimits=QCCore.targetFromLimits(low,high);
-  if(fromLimits){if(!Number.isFinite(mean))mean=fromLimits.mean;if(!Number.isFinite(sd)||sd<=0)sd=fromLimits.sd;}
-  const fromTarget=QCCore.limitsFromTarget(mean,sd);
-  if(fromTarget){if(!Number.isFinite(low))low=fromTarget.low;if(!Number.isFinite(high))high=fromTarget.high;}
-  return{mean,sd,low,high};
-}
+function targetNumberText(value,test=null,kind='value'){return globalThis.targetNumberTextPresentation(value,test,kind);}
+function targetConfigAssigned(cfg){return globalThis.targetConfigAssignedPresentation(cfg);}
+function targetRangeDraft(cfg={}){return globalThis.targetRangeDraftPresentation(cfg);}
 function syncTargetRange(el,source){
   const row=el.closest('.target-row');if(!row)return;
   const test=state.tests.find(x=>x.id===row.dataset.test)||null;
   const get=selector=>{const value=row.querySelector(selector).value.trim();return value===''?NaN:Number(value);};
-  const result=source==='limits'?QCCore.targetFromLimits(get('.tm-low'),get('.tm-high')):QCCore.limitsFromTarget(get('.tm-mean'),get('.tm-sd'));
+  const result=globalThis.targetRangeSyncPresentation(source,{mean:get('.tm-mean'),sd:get('.tm-sd'),low:get('.tm-low'),high:get('.tm-high')});
   if(!result)return;
   if(source==='limits'){row.querySelector('.tm-mean').value=targetNumberText(result.mean,test);row.querySelector('.tm-sd').value=targetNumberText(result.sd,test,'stat');}
   else{row.querySelector('.tm-low').value=targetNumberText(result.low,test);row.querySelector('.tm-high').value=targetNumberText(result.high,test);}
@@ -74,11 +64,7 @@ async function saveTargetMatrix(){
   if(!requireAdmin())return;
   const panel=state.qcPanels.find(x=>x.id===manageTargetPanel),group=state.lotGroups.find(x=>x.id===manageTargetGroup),groupLots=targetGroupLots(group);if(!panel){await infoDialog('Chọn Panel QC.');return;}if(!group||!groupLots.length){await infoDialog('Chọn nhóm lô QC.');return;}
   const picked=await readTargetMatrixPicks();if(!picked)return;
-  const overwrites=picked.filter(pick=>{
-    if(!pick.use)return false;
-    const t=state.tests.find(x=>x.id===pick.testId),same=t&&t.levels.find(x=>+x.level===+pick.lot.level);
-    return same&&((same.qcLotId&&same.qcLotId!==pick.lot.id)||(!same.qcLotId&&same.lot&&same.lot!==pick.lot.lotNo));
-  });
+  const overwrites=globalThis.targetOverwritePicksPresentation(picked,state.tests);
   /* applyTargetPick() điền số lô/Mean-SD của lô ĐANG DÙNG (sắp bị thay) vào các điểm QC
      cũ ở cùng mức mà trước giờ chưa ghi lô riêng — vẫn là ghi đè hàng loạt lên
      state.data, cùng mối lo với renameLotAcrossPoints() ở saveConfigLot() nên phải hỏi
@@ -96,17 +82,9 @@ async function saveTargetMatrix(){
 }
 function openTargetSwitchModal(){
   const {group,overwrites,locked}=targetSwitchCtx||{};if(!group)return;
-  const names=[...new Set(overwrites.map(pick=>{const pt=state.tests.find(t=>t.id===pick.testId);return pt&&testDisplayName(pt);}).filter(Boolean))].join(', ');
-  const lockNote=locked&&locked.count?` <b>${locked.count} điểm QC thuộc kỳ đã khóa (${locked.periods.map(monthVN).join(', ')})</b> sẽ được điền số lô/Mean-SD hiện hành (điểm trước đó chưa ghi lô riêng).`:'';
-  openModal(`<div class="modal">
-    <div class="modal-h"><h3>Áp dụng nhóm lô ${esc(group.name)}?</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
-    <div class="modal-b">
-      <div class="hint">${overwrites.length} dòng (${esc(names)}) hiện đang dùng một nhóm lô khác. Chọn cách áp dụng Mean/SD vừa nhập:</div>
-      <div class="hint flow-control"><b>Chuyển qua nhóm lô này</b>: áp dụng ngay cho các dòng trên, nhóm lô đang dùng trước đó sẽ được đánh dấu "Đã dừng" (vẫn xem/nhập được nếu cần, không bị khóa).${lockNote}</div>
-      <div class="hint flow-note"><b>Dự kiến</b>: chỉ lưu lại Mean/SD đã nhập cho nhóm lô mới, chưa áp dụng — nhóm lô đang dùng vẫn tiếp tục như bình thường.</div>
-    </div>
-    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn('Dự kiến',"resolveTargetSwitch('planned')",'ghost')}${btn('Chuyển qua nhóm lô này',"resolveTargetSwitch('switch')",'teal')}</div>
-  </div>`);
+  const names=globalThis.targetSwitchAssayNamesPresentation(overwrites.map(pick=>{const pt=state.tests.find(t=>t.id===pick.testId);return pt&&testDisplayName(pt);}));
+  const lockNote=globalThis.targetLockedBackfillNotePresentation({count:locked&&locked.count||0,periods:locked&&locked.periods.map(monthVN)||[],emphasize:true});
+  openModal(globalThis.targetSwitchModalHtml({groupName:esc(group.name),overwriteCount:overwrites.length,assayNames:esc(names),lockNote,cancelButtonHtml:btn('Hủy','closeModal()','ghost'),plannedButtonHtml:btn('Dự kiến',"resolveTargetSwitch('planned')",'ghost'),switchButtonHtml:btn('Chuyển qua nhóm lô này',"resolveTargetSwitch('switch')",'teal')}));
 }
 async function resolveTargetSwitch(mode){
   const ctx=targetSwitchCtx;closeModal();targetSwitchCtx=null;if(!ctx)return;
@@ -120,31 +98,23 @@ function commitTargetMatrix(picked,group,panel,mode,overwrites){
 function openQcHistoryDetail(tid,level,lotNo=''){
   const t=state.tests.find(x=>x.id===tid),l=t&&t.levels.find(x=>+x.level===+level);if(!t||!l)return;
   const hist=(l.meanSdHistory||[]).filter(h=>!lotNo||(h.lot||'')===lotNo||(!h.lot&&(l.lot||'')===lotNo));
-  const histRows=hist.length?hist.map(h=>{const rowLot=h.lot||lotNo||'',cumSt=stats(pointsForLot(tid,level,rowLot).filter(p=>!h.effectiveTo||p.date<=h.effectiveTo).map(p=>p.val));return `<tr><td><b>${esc(rowLot||'—')}</b></td><td class="num">${fmtTestValue(t,h.mean)}</td><td class="num">${fmtTestValue(t,h.sd)}</td><td class="num">${cumSt?fmtTestValue(t,cumSt.m):'—'}</td><td class="num">${cumSt?fmtTestValue(t,cumSt.sd):'—'}</td><td class="num">${cumSt?fmt(cumSt.cv)+'%':'—'}</td><td>${h.effectiveFrom?vnDate(h.effectiveFrom):'Không giới hạn'} → ${h.effectiveTo?vnDate(h.effectiveTo):'Không giới hạn'}</td><td>${h.source==='lab'?'PXN':'NSX'}</td></tr>`;}).join(''):'';
+  const histRows=hist.length?globalThis.qcHistoryMeanSdRowsHtml(hist.map(h=>{const rowLot=h.lot||lotNo||'',cumSt=stats(pointsForLot(tid,level,rowLot).filter(p=>!h.effectiveTo||p.date<=h.effectiveTo).map(p=>p.val));return{lot:esc(rowLot||'—'),mean:fmtTestValue(t,h.mean),sd:fmtTestValue(t,h.sd),cumulativeMean:cumSt?fmtTestValue(t,cumSt.m):'—',cumulativeSd:cumSt?fmtTestValue(t,cumSt.sd):'—',cumulativeCv:cumSt?fmt(cumSt.cv)+'%':'—',period:`${h.effectiveFrom?vnDate(h.effectiveFrom):'Không giới hạn'} → ${h.effectiveTo?vnDate(h.effectiveTo):'Không giới hạn'}`,source:h.source==='lab'?'PXN':'NSX'};})):'';
   const pts=(state.data[tid]||[]).filter(p=>+p.level===+level&&(!lotNo||(p.lot||'')===lotNo)).sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))||String(a.runId||'').localeCompare(String(b.runId||''),'vi',{numeric:true}));
-  const ptRows=pts.map(p=>{const mean=Number.isFinite(+p.qcMean)?+p.qcMean:+l.mean,sd=Number.isFinite(+p.qcSd)&&+p.qcSd>0?+p.qcSd:+l.sd,z=sd?(+p.val-mean)/sd:NaN,abs=Math.abs(z),lv=abs>3?'Loại bỏ':abs>2?'Cảnh báo':'Đạt',cls=abs>3?'rej':abs>2?'warn':'ok',staff=pointStaff(p);return `<tr><td>${vnDate(p.date)}</td><td>${esc(p.runId||'—')}</td><td class="num">${fmtPointValue(p,t)}</td><td class="num">${Number.isFinite(z)?(z>=0?'+':'')+fmt(z)+'s':'—'}</td><td class="num">${fmtTestValue(t,mean)}</td><td class="num">${fmtTestValue(t,sd)}</td><td><span class="tag ${cls}">${lv}</span></td><td>${esc(staff.code||'—')}</td></tr>`;}).join('');
-  openModal(`<div class="modal rcfg-history-detail-modal"><div class="modal-h"><div><h3>${esc(testDisplayName(t))} · Mức ${level}${lotNo?' · Lô '+esc(lotNo):''}</h3></div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
-    <h4 class="history-detail-heading">Mean/SD đã dùng</h4>${histRows?`<table class="history-detail-table hist-meansd-table"><thead><tr><th>Lô QC</th><th class="num">Mean</th><th class="num">SD</th><th class="num">Mean tích lũy</th><th class="num">SD tích lũy</th><th class="num">CV tích lũy</th><th>Hiệu lực</th><th>Nguồn</th></tr></thead><tbody>${histRows}</tbody></table>`:emptyState('Chưa có mốc Mean/SD','Không tìm thấy lịch sử Mean/SD cho lô này.')}
-    <h4 class="flow-panel space-after-section">Điểm QC đã nhập (${pts.length})</h4>${ptRows?`<table class="history-detail-table hist-points-table"><thead><tr><th>Ngày</th><th>Lần chạy</th><th class="num">Giá trị</th><th class="num">Z</th><th class="num">Mean lúc nhập</th><th class="num">SD lúc nhập</th><th>Kết luận nhanh</th><th>NV</th></tr></thead><tbody>${ptRows}</tbody></table>`:emptyState('Chưa có điểm QC','Không có điểm QC nào khớp với lô/mức này.')}</div><div class="modal-f">${btn('Đóng','closeModal()','teal')}</div></div>`);
+  const ptRows=globalThis.qcHistoryPointRowsHtml(pts.map(p=>{const mean=Number.isFinite(+p.qcMean)?+p.qcMean:+l.mean,sd=Number.isFinite(+p.qcSd)&&+p.qcSd>0?+p.qcSd:+l.sd,z=sd?(+p.val-mean)/sd:NaN,abs=Math.abs(z),verdict=abs>3?'Loại bỏ':abs>2?'Cảnh báo':'Đạt',verdictClass=abs>3?'rej':abs>2?'warn':'ok',staff=pointStaff(p);return{date:vnDate(p.date),run:esc(p.runId||'—'),value:fmtPointValue(p,t),z:Number.isFinite(z)?(z>=0?'+':'')+fmt(z)+'s':'—',mean:fmtTestValue(t,mean),sd:fmtTestValue(t,sd),verdict,verdictClass,staffCode:esc(staff.code||'—')};}));
+  openModal(globalThis.qcHistoryDetailModalHtml({title:`${esc(testDisplayName(t))} · Mức ${level}${lotNo?' · Lô '+esc(lotNo):''}`,historyRowsHtml:histRows,historyEmptyHtml:emptyState('Chưa có mốc Mean/SD','Không tìm thấy lịch sử Mean/SD cho lô này.'),pointCount:pts.length,pointRowsHtml:ptRows,pointsEmptyHtml:emptyState('Chưa có điểm QC','Không có điểm QC nào khớp với lô/mức này.'),closeButtonHtml:btn('Đóng','closeModal()','teal')}));
 }
 async function openConfigPanel(id=''){
   if(!state.tests.length){await infoDialog('Hãy tạo xét nghiệm trước khi tạo Panel QC.');setManageTab('assays');return;}
   if(!state.instruments.length){await infoDialog('Hãy tạo máy xét nghiệm trước khi tạo Panel QC.');setManageTab('instruments');return;}
   const p=state.qcPanels.find(x=>x.id===id)||{testIds:[],instrumentId:state.instruments[0]&&state.instruments[0].id,active:true};
-  const instruments=state.instruments.map(i=>`<option value="${i.id}" ${i.id===p.instrumentId?'selected':''}>${esc(i.name)}${i.model?' · '+esc(i.model):''}</option>`).join('');
-  const panelTestRows=(instrumentId,selected=[])=>state.tests.filter(t=>t.instrumentId===instrumentId).map(t=>`<label><input class="cfg-panel-test" type="checkbox" value="${t.id}" ${selected.includes(t.id)?'checked':''}><span><b>${esc(testDisplayName(t))}</b><small>${esc(instrumentName(t.instrumentId,t.machine))} · ${esc(t.unit||'Chưa có đơn vị')}</small></span></label>`).join('')||'<div class="empty cfg-panel-empty">Máy này chưa có xét nghiệm.</div>';
-  openModal(`<div class="modal rcfg-modal"><div class="modal-h"><div><h3>${id?'Sửa Panel QC':'Thêm Panel QC'}</h3></div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
-    <div class="grid2"><div><label>Tên Panel QC</label><input id="cfgPanelName" value="${escAttr(p.name||'')}" placeholder="VD: Sinh hóa AU5800"></div><div><label>Máy xét nghiệm</label><select id="cfgPanelInstrument" onchange="renderConfigPanelTests()">${instruments}</select></div></div>
-    <label>Chọn xét nghiệm trong panel</label><div id="cfgPanelTests" class="group-lot-picker assay-group-picker">${panelTestRows(p.instrumentId,p.testIds||[])}</div>
-    <label>Ghi chú</label><textarea id="cfgPanelNote">${esc(p.note||'')}</textarea>
-    <label class="rcfg-check"><input id="cfgPanelActive" type="checkbox" ${p.active!==false?'checked':''}> Panel đang sử dụng</label></div>
-    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn(id?'Lưu thay đổi':'Thêm Panel QC',`saveConfigPanel('${id}')`,'teal')}</div></div>`);
+  const instruments=globalThis.configPanelInstrumentOptionsHtml(state.instruments.map(i=>({id:i.id,selected:i.id===p.instrumentId,label:esc(i.name)+(i.model?' · '+esc(i.model):'')})));
+  const panelTestRows=(instrumentId,selected=[])=>globalThis.configPanelTestRows(state.tests.filter(t=>t.instrumentId===instrumentId).map(t=>({id:t.id,name:esc(testDisplayName(t)),instrument:esc(instrumentName(t.instrumentId,t.machine)),unit:esc(t.unit||''),selected:selected.includes(t.id)})));
+  openModal(globalThis.configPanelModalHtml({title:id?'Sửa Panel QC':'Thêm Panel QC',name:escAttr(p.name||''),instrumentsHtml:instruments,testRowsHtml:panelTestRows(p.instrumentId,p.testIds||[]),note:esc(p.note||''),active:p.active!==false,cancelButtonHtml:btn('Hủy','closeModal()','ghost'),saveButtonHtml:btn(id?'Lưu thay đổi':'Thêm Panel QC',`saveConfigPanel('${id}')`,'teal')}));
 }
 function renderConfigPanelTests(){
   const root=document.getElementById('cfgPanelTests'),instrumentId=document.getElementById('cfgPanelInstrument').value;
   if(!root)return;
-  const rows=state.tests.filter(t=>t.instrumentId===instrumentId).map(t=>`<label><input class="cfg-panel-test" type="checkbox" value="${t.id}"><span><b>${esc(testDisplayName(t))}</b><small>${esc(instrumentName(t.instrumentId,t.machine))} · ${esc(t.unit||'Chưa có đơn vị')}</small></span></label>`).join('');
-  root.innerHTML=rows||'<div class="empty cfg-panel-empty">Máy này chưa có xét nghiệm.</div>';
+  root.innerHTML=globalThis.configPanelTestRows(state.tests.filter(t=>t.instrumentId===instrumentId).map(t=>({id:t.id,name:esc(testDisplayName(t)),instrument:esc(instrumentName(t.instrumentId,t.machine)),unit:esc(t.unit||'')})));
 }
 async function saveConfigPanel(id){
   if(!requireAdmin())return;
@@ -158,18 +128,13 @@ function lotTransitionChoiceLots(selectedId=''){return LotTransitionPickerServic
 function lotTransitionChoiceMatch(value,selectedId=''){return LotTransitionPickerService.match(state.qcLots||[],value,selectedId);}
 function lotTransitionSelectedId(inputId){const el=document.getElementById(inputId);if(!el)return'';const lot=lotTransitionChoiceMatch(el.value,el.dataset.lotId||'');if(lot)el.dataset.lotId=lot.id;return lot&&lot.id||'';}
 function lotTransitionChoiceInput(el,commit=false){const lot=lotTransitionChoiceMatch(el.value,el.dataset.lotId||'');el.dataset.lotId=lot&&lot.id||'';if(commit&&lot)el.value=lotTransitionChoiceLabel(lot);refreshLotTransitionTargets();}
-function lotTransitionChoiceHtml(inputId,selectedId){const lot=state.qcLots.find(l=>l.id===selectedId),options=lotTransitionChoiceLots(selectedId).map(l=>`<option value="${escAttr(lotTransitionChoiceLabel(l))}"></option>`).join('');return`<input id="${inputId}" list="${inputId}List" autocomplete="off" role="combobox" aria-autocomplete="list" placeholder="Gõ số lô hoặc chọn danh sách" value="${escAttr(lotTransitionChoiceLabel(lot))}" data-lot-id="${escAttr(selectedId||'')}" oninput="lotTransitionChoiceInput(this)" onchange="lotTransitionChoiceInput(this,true)"><datalist id="${inputId}List">${options}</datalist>`;}
+function lotTransitionChoiceHtml(inputId,selectedId){const lot=state.qcLots.find(l=>l.id===selectedId),options=lotTransitionChoiceLots(selectedId).map(l=>`<option value="${escAttr(lotTransitionChoiceLabel(l))}"></option>`).join('');return globalThis.lotTransitionChoiceHtmlPresentation({inputId,selectedId:escAttr(selectedId||''),value:escAttr(lotTransitionChoiceLabel(lot)),optionsHtml:options});}
 async function openLotTransitionV2(id=''){
   if(!state.qcPanels.length){await infoDialog('Hãy tạo Panel QC trước khi tạo chuyển tiếp lô.');setManageTab('panels');return;}
   if(state.qcLots.length<2){await infoDialog('Cần ít nhất 2 lô QC để tạo chuyển tiếp.');setManageTab('lots');return;}
   const tr=state.lotTransitions.find(x=>x.id===id)||{panelId:state.qcPanels[0]&&state.qcPanels[0].id,fromLotId:'',toLotId:'',startDate:isoToday(),status:'planned',approvedBy:'',approvedAt:''};
   const panels=`<option value="">— Chọn Panel QC —</option>`+state.qcPanels.map(p=>`<option value="${p.id}" ${p.id===tr.panelId?'selected':''}>${esc(p.name)} · ${esc(instrumentName(p.instrumentId))}</option>`).join('');
-  openModal(`<div class="modal rcfg-modal lot-trans-modal"><div class="modal-h"><div><h3>${id?'Sửa hồ sơ chuyển lô':'Thêm hồ sơ chuyển lô'}</h3></div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
-    <div class="lot-trans-row3"><div><label>Panel QC áp dụng</label><select id="cfgTransPanel" onchange="refreshLotTransitionTargets()">${panels}</select></div><div><label>Lô cũ</label>${lotTransitionChoiceHtml('cfgTransFrom',tr.fromLotId)}</div><div><label>Lô mới</label>${lotTransitionChoiceHtml('cfgTransTo',tr.toLotId)}</div></div>
-    <div class="lot-trans-row2"><div><label>Ngày bắt đầu (dd/mm/yyyy)</label>${dateBox('cfgTransStart',tr.startDate||'')}</div><div><label>Trạng thái</label><select id="cfgTransStatus"><option value="planned" ${tr.status==='planned'?'selected':''}>Dự kiến</option><option value="active" ${tr.status==='active'||tr.status==='completed'?'selected':''}>Đang chạy song song</option><option value="accepted" ${tr.status==='accepted'?'selected':''}>Chấp nhận lô mới</option><option value="rejected" ${tr.status==='rejected'?'selected':''}>Không chấp nhận</option></select></div></div>
-    <div id="cfgTransTargets">${lotTransitionTargetsHtml(tr.panelId,tr.fromLotId,tr.toLotId)}</div>
-    </div>
-    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn(id?'Lưu thay đổi':'Thêm hồ sơ chuyển lô',`saveLotTransitionV2('${id}')`,'teal')}</div></div>`);
+  openModal(globalThis.lotTransitionModalHtml({title:id?'Sửa hồ sơ chuyển lô':'Thêm hồ sơ chuyển lô',panelsHtml:panels,fromChoiceHtml:lotTransitionChoiceHtml('cfgTransFrom',tr.fromLotId),toChoiceHtml:lotTransitionChoiceHtml('cfgTransTo',tr.toLotId),startDateHtml:dateBox('cfgTransStart',tr.startDate||''),status:tr.status,targetsHtml:lotTransitionTargetsHtml(tr.panelId,tr.fromLotId,tr.toLotId),cancelButtonHtml:btn('Hủy','closeModal()','ghost'),saveButtonHtml:btn(id?'Lưu thay đổi':'Thêm hồ sơ chuyển lô',`saveLotTransitionV2('${id}')`,'teal')}));
 }
 /* Bảng Mean/SD nhúng ngay trong hồ sơ chuyển lô — cùng danh sách xét nghiệm mà
    inspectAcceptedLotTransition() sẽ kiểm tra lúc chấp nhận, để không lệch tiêu
@@ -177,24 +142,15 @@ async function openLotTransitionV2(id=''){
    render lại đúng vùng này mỗi khi đổi Panel/Lô cũ/Lô mới, không đụng phần còn
    lại của modal (giữ giá trị người dùng đã gõ ở Ngày/Trạng thái). */
 function lotTransitionTargetsHtml(panelId,fromLotId,toLotId){
-  if(!panelId||!fromLotId||!toLotId||fromLotId===toLotId)return `<div class="hint flow-section">Chọn Panel QC, Lô cũ và Lô mới (khác nhau, cùng mức) để nhập Mean/SD cho lô mới.</div>`;
+  if(!panelId||!fromLotId||!toLotId||fromLotId===toLotId)return globalThis.lotTransitionTargetsHtmlPresentation({kind:'hint',message:'Chọn Panel QC, Lô cũ và Lô mới (khác nhau, cùng mức) để nhập Mean/SD cho lô mới.'});
   const check=inspectAcceptedLotTransition({panelId,fromLotId,toLotId,status:'accepted'});
-  if(!check.valid)return `<div class="hint flow-section">Lô cũ và lô mới phải cùng mức QC.</div>`;
-  if(!check.rows.length)return `<div class="hint flow-section">Panel đã chọn không có xét nghiệm nào đang dùng lô cũ ${esc(check.from.lotNo)}.</div>`;
+  if(!check.valid)return globalThis.lotTransitionTargetsHtmlPresentation({kind:'hint',message:'Lô cũ và lô mới phải cùng mức QC.'});
+  if(!check.rows.length)return globalThis.lotTransitionTargetsHtmlPresentation({kind:'hint',message:`Panel đã chọn không có xét nghiệm nào đang dùng lô cũ ${esc(check.from.lotNo)}.`});
   const rows=check.rows.map(({t,nextHist})=>{
     const draft=targetRangeDraft(nextHist||{}),has=Number.isFinite(draft.mean)&&((Number.isFinite(draft.sd)&&draft.sd>0)||(Number.isFinite(draft.low)&&Number.isFinite(draft.high)));
-    return `<div class="target-row" data-test="${t.id}">
-      <label class="lot-assay-check"><input type="checkbox" checked disabled><span></span></label>
-      <div class="lot-assay-name"><b>${esc(testDisplayName(t))}</b><small>${esc(t.unit||'Chưa có đơn vị')}</small></div>
-      <input class="tm-mean" type="number" step="any" value="${escAttr(targetNumberText(draft.mean,t))}" placeholder="Trung bình" oninput="syncTargetRange(this,'target')">
-      <input class="tm-low" type="number" step="any" value="${escAttr(targetNumberText(draft.low,t))}" placeholder="Giới hạn dưới" oninput="syncTargetRange(this,'limits')">
-      <input class="tm-high" type="number" step="any" value="${escAttr(targetNumberText(draft.high,t))}" placeholder="Giới hạn trên" oninput="syncTargetRange(this,'limits')">
-      <input class="tm-sd" type="number" step="any" value="${escAttr(targetNumberText(draft.sd,t,'stat'))}" placeholder="Độ lệch chuẩn" oninput="syncTargetRange(this,'target')">
-      <span>${has?'<b class="tag ok">Đã nhập</b>':'<b class="tag none">Chưa nhập</b>'}</span>
-    </div>`;
-  }).join('');
-  return `<div class="lot-trans-target-head-row"><label>Mean/SD cho lô mới ${esc(check.to.lotNo)}</label><input type="search" class="lot-trans-target-search" placeholder="Tìm xét nghiệm..." oninput="filterLotTransitionTargets(this.value)"></div>
-    <div class="target-table lot-trans-target-table"><div class="target-head"><span></span><span>Xét nghiệm</span><span>Trung bình mục tiêu</span><span>Giới hạn dưới</span><span>Giới hạn trên</span><span>Độ lệch chuẩn</span><span>Trạng thái</span></div>${rows}</div>`;
+    return{testId:t.id,name:esc(testDisplayName(t)),unit:esc(t.unit||''),mean:escAttr(targetNumberText(draft.mean,t)),low:escAttr(targetNumberText(draft.low,t)),high:escAttr(targetNumberText(draft.high,t)),sd:escAttr(targetNumberText(draft.sd,t,'stat')),assigned:has};
+  });
+  return globalThis.lotTransitionTargetsHtmlPresentation({kind:'rows',lotNo:esc(check.to.lotNo),rows});
 }
 /* Lọc thuần DOM (ẩn/hiện .target-row), không render lại — nếu gọi lại
    lotTransitionTargetsHtml() ở đây sẽ xóa mất giá trị người dùng đang gõ dở ở
@@ -252,13 +208,8 @@ async function openConfigGroup(id=''){
   const g=state.lotGroups.find(x=>x.id===id)||{lotIds:[]};
   const levels=[...new Set(state.qcLots.map(l=>+l.level).filter(Number.isFinite))].sort((a,b)=>a-b);
   const levelLayout=levels.length>=3?'levels-3plus':levels.length===2?'levels-2':'levels-1';
-  const lotColumns=levels.map(level=>`<div class="lot-level-col"><div class="lot-level-title">Mức ${level}</div>${state.qcLots.filter(l=>+l.level===level).map(l=>{const inGroup=(g.lotIds||[]).includes(l.id),lock=l.depleted&&!inGroup,to=l.depleted?lotTransitionToNo(l.id):'',depletedLabel=l.depleted?(to?'đã chuyển tiếp qua lô '+to:'đã hết QC'):'';return `<label class="${l.depleted?'lot-opt-depleted':''}"${lock?` title="Lô ${escAttr(depletedLabel)} — không thể chọn"`:''}><input class="cfg-group-lot" type="checkbox" value="${l.id}" ${inGroup?'checked':''} ${lock?'disabled':''} onchange="suggestConfigGroupName()"><span><b>${esc(l.lotNo)}</b><small>HSD ${l.exp?vnDate(l.exp):'chưa có'}${l.depleted?' · '+depletedLabel:''}</small></span></label>`;}).join('')}</div>`).join('');
-  openModal(`<div class="modal rcfg-modal rcfg-group-modal ${levelLayout}"><div class="modal-h"><div><h3>${id?'Sửa nhóm lô':'Thêm nhóm lô'}</h3></div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
-    <label>Chọn các lô QC</label>
-    <div class="lot-level-picker">${lotColumns}</div>
-    <label>Tên nhóm lô</label><input id="cfgGroupName" value="${escAttr(g.name||'')}" placeholder="Tự động: 1102/1103">
-    <label>Ghi chú</label><textarea id="cfgGroupNote">${esc(g.note||'')}</textarea></div>
-    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn(id?'Lưu thay đổi':'Thêm nhóm lô',`saveConfigGroup('${id}')`,'teal')}</div></div>`);
+  const lotColumns=globalThis.lotGroupColumnsHtml(levels.map(level=>({level,lots:state.qcLots.filter(l=>+l.level===level).map(l=>{const selected=(g.lotIds||[]).includes(l.id),locked=l.depleted&&!selected,to=l.depleted?lotTransitionToNo(l.id):'',depletedLabel=l.depleted?(to?'đã chuyển tiếp qua lô '+to:'đã hết QC'):'';return{id:l.id,lotNo:esc(l.lotNo),expiry:l.exp?vnDate(l.exp):'chưa có',selected,depleted:!!l.depleted,locked,depletedLabel:escAttr(depletedLabel)};})})));
+  openModal(globalThis.lotGroupModalHtml({title:id?'Sửa nhóm lô':'Thêm nhóm lô',levelLayout,lotColumnsHtml:lotColumns,name:escAttr(g.name||''),note:esc(g.note||''),cancelButtonHtml:btn('Hủy','closeModal()','ghost'),saveButtonHtml:btn(id?'Lưu thay đổi':'Thêm nhóm lô',`saveConfigGroup('${id}')`,'teal')}));
 }
 function suggestConfigGroupName(){const ids=[...document.querySelectorAll('.cfg-group-lot:checked')].map(x=>x.value),name=ids.map(id=>(state.qcLots.find(l=>l.id===id)||{}).lotNo).filter(Boolean).join('/'),el=document.getElementById('cfgGroupName');if(el)el.value=name;}
 async function saveConfigGroup(id){
@@ -300,7 +251,7 @@ async function activateLotGroup(id){
   const candidates=lotGroupActivationCandidates(g,lots);
   const backfilled=candidates.flatMap(c=>targetPickBackfillPoints(c.t,c.lot,c.pick));
   const locked=PeriodService.lockedPoints(state,backfilled);
-  const lockNote=locked.count?`${locked.count} điểm QC thuộc kỳ đã khóa (${locked.periods.map(monthVN).join(', ')}) sẽ được điền số lô/Mean-SD hiện hành (điểm trước đó chưa ghi lô riêng).`:'';
+  const lockNote=globalThis.targetLockedBackfillNotePresentation({count:locked.count,periods:locked.periods.map(monthVN)});
   if(!await confirmDialog({title:'Kích hoạt nhóm lô',message:`Áp dụng Mean/SD của nhóm lô ${g.name} cho các xét nghiệm liên quan và chuyển sang dùng nhóm này?`,detail:lockNote,confirmLabel:'Áp dụng',cancelLabel:'Hủy',danger:false}))return;
   const effectiveFrom=isoToday(),note='Kích hoạt nhóm lô',result=ManageConfigService.applyLotGroupActivation({group:g,candidates,groups:state.lotGroups,effectiveFrom,note,applyTarget:applyTargetPick,groupsForLot:groupsOfLot,groupInUse:lotGroupInUse});
   if(result.status==='already-active'){save();rerender();await infoDialog(`Nhóm lô ${g.name} đã đang được xét nghiệm dùng thật, chỉ gỡ nhãn cũ.`,{type:'success'});return;}
@@ -313,12 +264,7 @@ async function activateLotGroup(id){
 }
 function openConfigLot(id=''){
   const l=state.qcLots.find(x=>x.id===id)||{level:1,active:true};
-  openModal(`<div class="modal rcfg-modal"><div class="modal-h"><div><h3>${id?'Sửa thông tin lô QC':'Thêm lô QC'}</h3></div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
-    <div class="grid2"><div><label>Số lô</label><input id="cfgLotNo" value="${escAttr(l.lotNo||'')}" placeholder="VD: 1234UE"></div><div><label>Mức QC</label><select id="cfgLotLevel" aria-label="Mức QC">${[1,2,3,4,5,6].map(n=>`<option ${+l.level===n?'selected':''}>${n}</option>`).join('')}</select></div></div>
-    <div class="grid2"><div><label>Mô tả</label><input id="cfgLotDescription" value="${escAttr(l.description||'')}" placeholder="VD: Acusera Assayed Chemistry Control"></div><div><label>Nhà cung cấp</label><input id="cfgLotSupplier" value="${escAttr(l.supplier||'')}" placeholder="Randox"></div></div>
-    <div class="grid2"><div><label>Ngày mở (dd/mm/yyyy)</label>${dateBox('cfgLotOpened',l.opened||'')}</div><div><label>Hạn sử dụng (dd/mm/yyyy)</label>${dateBox('cfgLotExp',l.exp||'')}</div></div>
-    <label>Ghi chú</label><textarea id="cfgLotNote" aria-label="Ghi chú">${esc(l.note||'')}</textarea></div>
-    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn(id?'Lưu thay đổi':'Thêm lô QC',`saveConfigLot('${id}')`,'teal')}</div></div>`);
+  openModal(globalThis.configLotModalHtml({title:id?'Sửa thông tin lô QC':'Thêm lô QC',lotNo:escAttr(l.lotNo||''),levelOptionsHtml:globalThis.configLotLevelOptionsHtml(+l.level),description:escAttr(l.description||''),supplier:escAttr(l.supplier||''),openedDateHtml:dateBox('cfgLotOpened',l.opened||''),expiryDateHtml:dateBox('cfgLotExp',l.exp||''),note:esc(l.note||''),cancelButtonHtml:btn('Hủy','closeModal()','ghost'),saveButtonHtml:btn(id?'Lưu thay đổi':'Thêm lô QC',`saveConfigLot('${id}')`,'teal')}));
 }
 async function saveConfigLot(id){
   if(!requireAdmin())return;
@@ -376,11 +322,7 @@ function renameLotAcrossPoints(oldLevel,oldLotNo,newLotNo){
 async function deleteConfigLot(id){if(!requireAdmin())return;const check=ManageConfigService.lotRemoval(state,{id,switchesLot:transitionSwitchesLot});if(check.error){if(check.error!=='not-found')await infoDialog(check.message);return;}if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa lô QC',message:`Xóa lô QC ${check.record.lotNo}?`,confirmLabel:'Xóa lô QC',cancelLabel:'Hủy'}))return;const result=ManageConfigService.removeLot(state,{id,switchesLot:transitionSwitchesLot});if(result.error){await infoDialog(result.message);return;}logAct('Xóa lô QC',result.record.lotNo,'Lô QC');save();rerender();}
 function openConfigInstrument(id=''){
   const i=state.instruments.find(x=>x.id===id)||{active:true};
-  openModal(`<div class="modal rcfg-modal"><div class="modal-h"><div><h3>${id?'Sửa máy xét nghiệm':'Thêm máy xét nghiệm'}</h3></div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
-    <div class="grid2"><div><label>Tên hiển thị</label><input id="cfgInstName" value="${escAttr(i.name||'')}" placeholder="VD: AU5800-01"></div><div><label>Khoa / Khu vực</label><input id="cfgInstSection" value="${escAttr(i.section||'')}" placeholder="Hóa sinh"></div></div>
-    <div class="grid2"><div><label>Nhà sản xuất</label><input id="cfgInstMfr" value="${escAttr(i.manufacturer||'')}" placeholder="Beckman Coulter"></div><div><label>Số sê-ri</label><input id="cfgInstSerial" aria-label="Số sê-ri" value="${escAttr(i.serial||'')}"></div></div>
-    <label class="rcfg-check"><input id="cfgInstActive" type="checkbox" ${i.active!==false?'checked':''}> Máy đang hoạt động</label></div>
-    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn(id?'Lưu thay đổi':'Thêm máy xét nghiệm',`saveConfigInstrument('${id}')`,'teal')}</div></div>`);
+  openModal(globalThis.configInstrumentModalHtml({title:id?'Sửa máy xét nghiệm':'Thêm máy xét nghiệm',name:escAttr(i.name||''),section:escAttr(i.section||''),manufacturer:escAttr(i.manufacturer||''),serial:escAttr(i.serial||''),active:i.active!==false,cancelButtonHtml:btn('Hủy','closeModal()','ghost'),saveButtonHtml:btn(id?'Lưu thay đổi':'Thêm máy xét nghiệm',`saveConfigInstrument('${id}')`,'teal')}));
 }
 async function saveConfigInstrument(id){
   if(!requireAdmin())return;
@@ -416,25 +358,18 @@ function openConfigAssay(id=''){
   // chưa gán máy) — lấy đúng máy đó làm mặc định để Khoa/Khu vực điền sẵn ngay từ đầu, thay vì
   // chỉ điền khi onchange bắn ra (không bắn nếu máy đầu tiên người dùng chọn trùng máy mặc định).
   const defaultInst=state.instruments.find(i=>i.id===(t.instrumentId||''))||state.instruments[0];
-  const instruments=state.instruments.map(i=>`<option value="${i.id}" ${i.id===(t.instrumentId||'')?'selected':''} data-section="${escAttr(i.section||'')}">${esc(i.name)}${i.model?' · '+esc(i.model):''}</option>`).join('');
+  const instruments=globalThis.configAssayInstrumentOptionsHtml(state.instruments.map(i=>({id:i.id,selected:i.id===(t.instrumentId||''),section:escAttr(i.section||''),label:esc(i.name)+(i.model?' · '+esc(i.model):'')})));
   /* Chỉ coi là "đã ghi đè" khi ruleActions[rule] có giá trị hợp lệ tường minh — nếu
      chưa (rỗng/thiếu), mặc định chọn "Theo cấu hình chung" thay vì âm thầm chốt cứng
      giá trị đang áp dụng lúc mở modal. Nếu không, MỌI lần lưu xét nghiệm (kể cả chỉ
      đổi tên/đơn vị, không đụng phần luật) sẽ ghi cứng cả 13 luật theo cấu hình chung
      tại đúng thời điểm đó — làm xét nghiệm hết đồng bộ với cấu hình chung mãi mãi mà
      không có cảnh báo nào, dù người dùng chưa từng chủ ý ghi đè. */
-  const ruleRows=WG_RULES.map(rule=>{const explicit=t&&t.ruleActions&&['inactive','alert','reject'].includes(t.ruleActions[rule])?t.ruleActions[rule]:'',scope=t&&t.ruleScopes&&['within','across','both'].includes(t.ruleScopes[rule])?t.ruleScopes[rule]:'';return `<div class="assay-rule-row"><b>${rule}</b><select class="cfg-assay-rule" data-rule="${rule}" aria-label="Hành động ${rule}"><option value="" ${explicit===''?'selected':''}>Theo cấu hình chung</option><option value="inactive" ${explicit==='inactive'?'selected':''}>Không dùng</option><option value="alert" ${explicit==='alert'?'selected':''}>Cảnh báo</option><option value="reject" ${explicit==='reject'?'selected':''}>Loại bỏ</option></select><select class="cfg-assay-scope" data-rule="${rule}" aria-label="Phạm vi ${rule}"><option value="" ${scope===''?'selected':''}>Phạm vi SOP khuyến nghị</option><option value="within" ${scope==='within'?'selected':''}>Chỉ trong từng mức</option><option value="across" ${scope==='across'?'selected':''}>Chỉ chéo mức/lần chạy</option><option value="both" ${scope==='both'?'selected':''}>Cả hai phạm vi</option></select></div>`;}).join('');
+  const ruleRows=globalThis.configAssayRuleRowsHtml(WG_RULES.map(rule=>({id:rule,action:t&&t.ruleActions&&['inactive','alert','reject'].includes(t.ruleActions[rule])?t.ruleActions[rule]:'',scope:t&&t.ruleScopes&&['within','across','both'].includes(t.ruleScopes[rule])?t.ruleScopes[rule]:''})));
   const cusum=testCusumConfig(t),decimalValue=t.decimalPlaces!==null&&t.decimalPlaces!==''&&Number.isInteger(Number(t.decimalPlaces))?String(t.decimalPlaces):String(QC_DECIMALS_DEFAULT),hasRuleOverrides=WG_RULES.some(rule=>t.ruleActions&&['inactive','alert','reject'].includes(t.ruleActions[rule])||t.ruleScopes&&['within','across','both'].includes(t.ruleScopes[rule]));
   const initialRef=configAssayTeaRefs().find(r=>t.analyteId&&r[6]===t.analyteId)||configAssayFindRef(t.name||t.displayName||''),initialNaming=initialRef?configAssayNaming(initialRef):null,initialName=initialNaming&&initialNaming.displayName||t.displayName||t.name||'',currentTeaSource=['lab','eflm','clia','ricos'].includes(t.teaSource)?t.teaSource:'',initialSource=currentTeaSource||(initialRef?(initialRef[2]!=null?'clia':initialRef[3]!=null?'ricos':''):'');
-  const teaOptions=configAssayTeaRefs().map(ref=>({ref,naming:configAssayNaming(ref)})).sort((a,b)=>String(a.ref[4]||'').localeCompare(String(b.ref[4]||''),'vi')||String(a.naming.displayName||'').localeCompare(String(b.naming.displayName||''),'vi')).map(({ref,naming})=>{const extra=[naming.standardName!==naming.displayName?naming.standardName:'',naming.abbreviation,...naming.aliases.filter(x=>x!==ref[0]&&x!==naming.displayName&&x!==naming.standardName).slice(0,3),ref[1],ref[4]].filter(Boolean).join(' · ');return`<option value="${escAttr(naming.displayName||ref[0])}" label="${escAttr(extra)}"></option>`;}).join('');
-  openModal(`<div class="modal rcfg-modal rcfg-assay-modal"><div class="modal-h"><div><h3>${id?'Sửa xét nghiệm':'Thêm xét nghiệm'}</h3></div><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b">
-    <div class="assay-form-heading"><h4>Thông tin xét nghiệm</h4></div>
-    <div class="assay-main-grid"><div><label>Tên xét nghiệm <span class="req">*</span></label><input id="cfgAssayName" list="cfgAssayTeaSuggestions" autocomplete="off" value="${escAttr(initialName)}" placeholder="Gõ tên, viết tắt hoặc bí danh" oninput="configAssaySuggestionInput(this.value)"><datalist id="cfgAssayTeaSuggestions">${teaOptions}</datalist><input id="cfgAssayTeaRefKey" type="hidden" value="${escAttr(initialRef&&(initialRef[6]||initialRef[0])||'')}"><input id="cfgAssayTeaSource" type="hidden" value="${escAttr(initialSource)}"></div><div><label>Đơn vị</label><input id="cfgAssayUnit" aria-label="Đơn vị" value="${escAttr(t.unit||'')}"></div><div><label>Máy xét nghiệm <span class="req">*</span></label><select id="cfgAssayInstrument" aria-label="Máy xét nghiệm" onchange="const o=this.selectedOptions[0];const e=document.getElementById('cfgAssaySection');if(e)e.value=o?o.dataset.section||'':''">${instruments}</select></div><div><label>Khoa / Khu vực</label><input id="cfgAssaySection" value="${escAttr(t.section||(defaultInst&&defaultInst.section)||'')}" placeholder="VD: Điện giải"></div></div>
-    <div class="assay-detail-grid"><div><label>Phương pháp</label><input id="cfgAssayMethod" aria-label="Phương pháp" value="${escAttr(t.method||'')}"></div><div><label>Số thập phân</label><select id="cfgAssayDecimals" aria-label="Số chữ số thập phân">${[0,1,2,3,4,5,6].map(i=>`<option value="${i}" ${decimalValue===String(i)?'selected':''}>${i}</option>`).join('')}</select></div><div><label>Hóa chất</label><input id="cfgAssayReagent" aria-label="Hóa chất" value="${escAttr(t.reagent||'')}"></div><div><label>TEa %</label><input id="cfgAssayTea" aria-label="TEa %" type="number" step="any" value="${escAttr(t.tea||'')}"></div></div>
-    <details class="assay-advanced" ${hasRuleOverrides?'open':''}><summary><span><b>Cấu hình Westgard nâng cao</b><small>Mặc định dùng cấu hình chung của hệ thống</small></span></summary><div class="assay-advanced-body"><div class="assay-rule-head" aria-hidden="true"><span>Luật</span><span>Hành động</span><span>Phạm vi áp dụng</span></div><div class="assay-rule-grid">${ruleRows}</div></div></details>
-    <details class="assay-advanced" ${cusum.on?'open':''}><summary><span><b>Giám sát xu hướng CUSUM</b><small>Tùy chọn hỗ trợ phát hiện trôi hoặc dịch chuyển kéo dài</small></span></summary><div class="assay-advanced-body"><label class="rcfg-check"><input id="cfgAssayCusumOn" type="checkbox" ${cusum.on?'checked':''}> Bật biểu đồ CUSUM cho xét nghiệm này</label><div class="assay-cusum-grid"><div><label>Ngưỡng tích lũy k (SD)</label><input id="cfgAssayCusumK" aria-label="Ngưỡng tích lũy k (SD)" type="number" step="0.1" min="0.1" value="${escAttr(cusum.k)}"></div><div><label>Ngưỡng cảnh báo h (SD)</label><input id="cfgAssayCusumH" aria-label="Ngưỡng cảnh báo h (SD)" type="number" step="0.5" min="0.5" value="${escAttr(cusum.h)}"></div></div></div></details>
-    <label class="rcfg-check"><input id="cfgAssayClosed" type="checkbox" ${t.closed?'checked':''}> Ngừng sử dụng xét nghiệm này cho cấu hình QC mới</label></div>
-    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn(id?'Lưu thay đổi':'Thêm xét nghiệm',`saveConfigAssay('${id}')`,'teal')}</div></div>`);
+  const teaOptions=globalThis.configAssayTeaOptionsHtml(configAssayTeaRefs().map(ref=>({ref,naming:configAssayNaming(ref)})).sort((a,b)=>String(a.ref[4]||'').localeCompare(String(b.ref[4]||''),'vi')||String(a.naming.displayName||'').localeCompare(String(b.naming.displayName||''),'vi')).map(({ref,naming})=>({value:escAttr(naming.displayName||ref[0]),label:escAttr([naming.standardName!==naming.displayName?naming.standardName:'',naming.abbreviation,...naming.aliases.filter(x=>x!==ref[0]&&x!==naming.displayName&&x!==naming.standardName).slice(0,3),ref[1],ref[4]].filter(Boolean).join(' · '))})));
+  openModal(globalThis.configAssayModalHtml({title:id?'Sửa xét nghiệm':'Thêm xét nghiệm',name:escAttr(initialName),teaOptionsHtml:teaOptions,teaRefKey:escAttr(initialRef&&(initialRef[6]||initialRef[0])||''),teaSource:escAttr(initialSource),unit:escAttr(t.unit||''),instrumentsHtml:instruments,section:escAttr(t.section||(defaultInst&&defaultInst.section)||''),method:escAttr(t.method||''),decimalOptionsHtml:globalThis.configAssayDecimalOptionsHtml(decimalValue),reagent:escAttr(t.reagent||''),tea:escAttr(t.tea||''),ruleRowsHtml:ruleRows,hasRuleOverrides,cusumOn:cusum.on,cusumK:escAttr(cusum.k),cusumH:escAttr(cusum.h),closed:!!t.closed,cancelButtonHtml:btn('Hủy','closeModal()','ghost'),saveButtonHtml:btn(id?'Lưu thay đổi':'Thêm xét nghiệm',`saveConfigAssay('${id}')`,'teal')}));
 }
 async function saveConfigAssay(id){
   if(!requireAdmin())return;

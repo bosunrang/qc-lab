@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','manage','config-lot-level-options-html.ts')).href;
+const program=`import {configLotLevelOptionsHtml} from ${JSON.stringify(source)}; console.log(configLotLevelOptionsHtml(4));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy danh sách mức Lô QC TypeScript');
+assert.match(result.stdout,/<option>1<\/option>/);assert.match(result.stdout,/<option selected>4<\/option>/);assert.match(result.stdout,/<option>6<\/option>/);
+console.log('Config-lot level options HTML TypeScript tests passed');

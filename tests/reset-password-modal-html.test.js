@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','auth','reset-password-modal-html.ts')).href;
+const program=`import {resetPasswordModalHtml} from ${JSON.stringify(source)}; console.log(resetPasswordModalHtml({title:'Đổi mật khẩu',message:'Nhập mật khẩu mới',enterAction:"if(event.key==='Enter')applyResetPass('u1')",cancelButtonHtml:'<button>Hủy</button>',saveButtonHtml:'<button>Lưu</button>'}));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy popup đặt lại mật khẩu TypeScript');
+const html=result.stdout;assert.match(html,/Đổi mật khẩu/);assert.match(html,/id="resetPass1"/);assert.match(html,/applyResetPass\('u1'\)/);assert.match(html,/id="resetPassMsg"/);
+console.log('Reset password modal HTML TypeScript tests passed');

@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','manage','target-number-text.ts')).href;
+const program=`import {createTargetNumberText} from ${JSON.stringify(source)}; const f=createTargetNumberText({valueDecimals:()=>2,statDecimals:()=>4,defaultDecimals:3}); console.log([f(12.3400,{}),f(0.123456,{},'stat'),f(1.2),f('',{})].join('|'));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy định dạng số Mean/SD TypeScript');
+assert.equal(result.stdout.trim(),'12.34|0.1235|1.2|');
+console.log('Target number text TypeScript tests passed');

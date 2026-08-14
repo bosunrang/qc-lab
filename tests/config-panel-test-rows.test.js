@@ -1,0 +1,14 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','manage','config-panel-test-rows.ts')).href;
+const program=`import {configPanelTestRows} from ${JSON.stringify(source)}; console.log(JSON.stringify([configPanelTestRows([{id:'t1',name:'Glucose',instrument:'AU5800',unit:'mg/dL',selected:true}]),configPanelTestRows([])]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy dòng xét nghiệm Panel QC TypeScript');
+const [row,empty]=JSON.parse(result.stdout);
+assert.match(row,/class="cfg-panel-test" type="checkbox" value="t1" checked/);
+assert.match(row,/AU5800 · mg\/dL/);
+assert.match(empty,/Máy này chưa có xét nghiệm/);
+console.log('Config panel test rows TypeScript tests passed');

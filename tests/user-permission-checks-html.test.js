@@ -1,0 +1,14 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','auth','user-permission-checks-html.ts')).href;
+const program=`import {userPermissionChecksHtml} from ${JSON.stringify(source)}; console.log(userPermissionChecksHtml('perms',[{idHtml:'dash',titleHtml:'Tổng quan',allowed:true,selected:true},{idHtml:'users',titleHtml:'Người dùng',allowed:false,selected:false}]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy danh sách quyền TypeScript');
+assert.match(result.stdout,/id="perms"/);
+assert.match(result.stdout,/value="dash" checked/);
+assert.match(result.stdout,/<label class="disabled">/);
+assert.match(result.stdout,/value="users"  disabled/);
+console.log('User permission checks HTML TypeScript tests passed');

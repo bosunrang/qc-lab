@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','sigma','sigma-add-test-rows-html.ts')).href;
+const program=`import {sigmaAddTestRowsHtml} from ${JSON.stringify(source)}; console.log(sigmaAddTestRowsHtml([{id:'t1',tracked:true,current:true,name:'Glucose',meta:'AU · mmol/L',action:"sgViewTrackedTest('t1')",label:'Đang xem'}]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy hàng xét nghiệm Sigma TypeScript');
+const html=result.stdout;assert.match(html,/is-tracked is-current/);assert.match(html,/aria-current="true"/);assert.match(html,/Glucose/);assert.match(html,/Đang xem/);
+console.log('Sigma add-test rows HTML TypeScript tests passed');

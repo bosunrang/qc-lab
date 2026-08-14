@@ -1,0 +1,12 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','sigma','sigma-frequency-rows-html.ts')).href;
+const program=`import {sigmaFrequencyRowsHtml} from ${JSON.stringify(source)}; console.log(sigmaFrequencyRowsHtml([{level:1,hasResult:false},{level:2,hasResult:true,eligible:false,sigmaText:'3.10',readinessHtml:'Tạm thời'},{level:3,hasResult:true,eligible:true,sigmaText:'5.00',color:'#0e8f8f',opspecHtml:'<b>1-3s</b>',riskText:'Thấp',planText:'Hằng ngày'}]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy hàng OPSpecs Sigma TypeScript');
+const html=result.stdout;
+for(const fragment of ['Chưa đủ CV/Bias','Không dùng để đề xuất QC','Tạm thời','color:#0e8f8f','<b>1-3s</b>','Hằng ngày'])assert.ok(html.includes(fragment));
+console.log('Sigma frequency rows HTML TypeScript tests passed');

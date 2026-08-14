@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','manage','config-assay-decimal-options-html.ts')).href;
+const program=`import {configAssayDecimalOptionsHtml} from ${JSON.stringify(source)}; console.log(configAssayDecimalOptionsHtml('3'));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy danh sách số thập phân TypeScript');
+assert.match(result.stdout,/value="0"/);assert.match(result.stdout,/value="3" selected>3<\/option>/);assert.match(result.stdout,/value="6"/);assert.doesNotMatch(result.stdout,/Mặc định|chữ số/);
+console.log('Config-assay decimal options HTML TypeScript tests passed');

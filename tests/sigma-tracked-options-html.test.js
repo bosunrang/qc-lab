@@ -1,0 +1,12 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','sigma','sigma-tracked-options-html.ts')).href;
+const program=`import {sigmaTrackedOptionsHtml} from ${JSON.stringify(source)}; console.log(sigmaTrackedOptionsHtml([{id:'a',labelHtml:'Glucose'},{id:'b',labelHtml:'Sodium'}],'b'));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy lựa chọn xét nghiệm Sigma TypeScript');
+const html=result.stdout;
+assert.match(html,/value="a"/);assert.match(html,/Glucose/);assert.match(html,/value="b" selected/);assert.match(html,/Sodium/);
+console.log('Sigma tracked options HTML TypeScript tests passed');

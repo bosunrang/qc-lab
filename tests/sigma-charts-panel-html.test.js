@@ -1,0 +1,10 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','sigma','sigma-charts-panel-html.ts')).href;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',`import {sigmaChartsPanelHtml} from ${JSON.stringify(source)}; console.log(sigmaChartsPanelHtml());`],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy biểu đồ Sigma TypeScript');
+for(const fragment of ['Biểu đồ Sigma & MDC','sgTrend','sgMDC','Biểu đồ Quyết định Phương pháp'])assert.ok(result.stdout.includes(fragment));
+console.log('Sigma charts panel HTML TypeScript tests passed');

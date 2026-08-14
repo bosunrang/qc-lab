@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','range','range-nce-notice-html.ts')).href;
+const program=`import {rangeNceNoticeHtml} from ${JSON.stringify(source)}; console.log(rangeNceNoticeHtml({nceId:'NCE-1',rule:'2-2s',cause:''}));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy cảnh báo NCE dải QC TypeScript');
+assert.match(result.stdout,/NCE-1/);assert.match(result.stdout,/2-2s/);assert.match(result.stdout,/Chưa ghi nguyên nhân/);
+console.log('Range NCE notice HTML TypeScript tests passed');

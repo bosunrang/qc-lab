@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','nce','action-suggest-phrases.ts')).href;
+const program=`import {actionCausePhrases,actionPhrases} from ${JSON.stringify(source)}; const data={A:['a1'],B:['b1','b2'],SE:['s'],RE:['r'],'':['x']}; console.log(JSON.stringify([actionCausePhrases('B',data),actionCausePhrases('z',data),actionPhrases('SE — Sai số',data),actionPhrases('?',data)]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy gợi ý NCE TypeScript');
+assert.deepEqual(JSON.parse(result.stdout),[['b1','b2'],['a1','b1','b2','s'],['s'],['x']]);
+console.log('Action suggest phrases TypeScript tests passed');

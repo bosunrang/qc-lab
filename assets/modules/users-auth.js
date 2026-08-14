@@ -57,7 +57,7 @@ function pageAudit(){
   const filtered=auditFilteredActivities(),pageInfo=globalThis.activityAuditPagination(filtered,auditPage,auditPageSize),pageCount=pageInfo.pageCount;
   auditPage=pageInfo?pageInfo.page:Math.min(Math.max(1,auditPage),pageCount);
   const offset=pageInfo?pageInfo.offset:(auditPage-1)*auditPageSize,pageRows=pageInfo?pageInfo.rows:filtered.slice(offset,offset+auditPageSize);
-  const rows=pageRows.map(a=>`<tr><td><div class="audit-time-cell"><span class="audit-seq">${a.seq?'#'+a.seq:''}</span><span class="audit-time">${formatDateTimeVN(a.ts)}</span></div></td><td><b>${esc(a.user||'')}</b><div class="hint">${roleLabel(a.role||'viewer')}${a.username?' · @'+esc(a.username):''}</div></td><td><span class="pill">${esc(a.type||'')}</span></td><td>${esc(a.target||'')||'<span class="hint">—</span>'}</td><td class="audit-detail">${esc(a.detail||'')||'<span class="hint">—</span>'}</td></tr>`).join('');
+  const rows=pageRows.map(a=>globalThis.activityAuditRowHtml({sequenceHtml:a.seq?'#'+a.seq:'',timeHtml:formatDateTimeVN(a.ts),userHtml:esc(a.user||''),roleHtml:roleLabel(a.role||'viewer'),usernameHtml:a.username?' · @'+esc(a.username):'',typeHtml:esc(a.type||''),targetHtml:esc(a.target||''),detailHtml:esc(a.detail||'')})).join('');
   const hasFilter=!!(auditQ||auditFrom||auditTo);
   const pageSizeOptions=AUDIT_PAGE_SIZES.map(size=>`<option value="${size}" ${size===auditPageSize?'selected':''}>${size} dòng</option>`).join('');
   const resultFrom=pageInfo?pageInfo.resultFrom:(filtered.length?offset+1:0),resultTo=pageInfo?pageInfo.resultTo:Math.min(offset+auditPageSize,filtered.length);
@@ -85,15 +85,7 @@ function exportActivityCSV(){downloadCSV('Nhat_ky_hoat_dong_QCLab.csv',activityC
 function archiveActivityLog(){
   if(!requireAdmin())return;
   const total=(state.activity||[]).length;if(!total)return;
-  openModal(modalTemplate({title:'Lưu trữ nhật ký cũ',body:`
-      <div class="hint">Nhật ký hiện có <b>${total}</b> dòng. Các dòng cũ hơn mốc chọn sẽ được <b>xuất ra file CSV</b> (kèm PrevHash/Hash), sau đó mới bị gỡ khỏi hệ thống — hash dòng cuối file trở thành điểm nối vào chuỗi còn lại nên phần lưu trữ vẫn kiểm chứng được.</div>
-      <label class="flow-section">Chỉ giữ lại nhật ký trong</label>
-      <select id="auditArchiveMonths" aria-label="Mốc tuổi nhật ký được giữ lại">
-        <option value="12">12 tháng gần nhất</option>
-        <option value="24" selected>24 tháng gần nhất</option>
-        <option value="36">36 tháng gần nhất</option>
-      </select>
-    `,footer:btn('Hủy','closeModal()','ghost')+btn('Xuất CSV và lưu trữ','confirmArchiveActivityLog()','teal')}));
+  openModal(globalThis.activityAuditArchiveModalHtml({total,cancelButtonHtml:btn('Hủy','closeModal()','ghost'),archiveButtonHtml:btn('Xuất CSV và lưu trữ','confirmArchiveActivityLog()','teal')}));
 }
 async function confirmArchiveActivityLog(){
   if(!requireAdmin())return;
@@ -129,7 +121,7 @@ async function addUser(){
 }
 function userPermChecks(selectedIds,groupId,roleValue){
   const base=new Set(rolePageIds(roleValue)),initial=selectedIds&&selectedIds.length?selectedIds:rolePageIds(roleValue),selected=new Set(globalThis.selectUserPermissions?globalThis.selectUserPermissions(initial,[...base]):initial.filter(id=>base.has(id)));
-  return `<div id="${groupId}" class="user-perm-grid">${PAGES.map(([id,title])=>{const allowed=base.has(id);return`<label class="${allowed?'':'disabled'}"><input type="checkbox" value="${id}" ${selected.has(id)?'checked':''} ${!allowed?'disabled':''}><span>${esc(title)}</span></label>`;}).join('')}</div>`;
+  return globalThis.userPermissionChecksHtml(escAttr(groupId),PAGES.map(([id,title])=>({idHtml:escAttr(id),titleHtml:esc(title),allowed:base.has(id),selected:selected.has(id)})));
 }
 function syncUserPermChecks(groupId,roleValue){
   const box=document.getElementById(groupId),base=new Set(rolePageIds(roleValue));if(!box)return;
@@ -145,15 +137,8 @@ async function openUserPerms(id){
   if(!requireAdmin())return;
   const u=state.users.find(x=>x.id===id);if(!u)return;
   if(currentUser&&currentUser.id===id){await infoDialog('Không thể tự sửa quyền của tài khoản đang đăng nhập. Hãy dùng tài khoản quản trị khác nếu cần thay đổi.');return;}
-  const roleSelect=`<select id="editUserRole" aria-label="Vai trò" onchange="syncUserPermChecks('editUserPerms',this.value)">${roleSelectOptions(u.role)}</select>`;
-  openModal(`<div class="modal"><div class="modal-h"><h3>Sửa quyền người dùng</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
-    <div class="modal-b">
-      <div class="hint"><b>${esc(u.name||u.username)}</b> · @${esc(u.username)}</div>
-      <label>Vai trò</label>${roleSelect}
-      <label class="flow-section">Thẻ được phép dùng</label>${userPermChecks(u.pagePerms,'editUserPerms',u.role)}
-      <div class="hint flow-control">Vai trò quyết định quyền sửa/quản trị; danh sách thẻ chỉ quyết định người dùng thấy và mở được màn hình nào.</div>
-    </div>
-    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn('Lưu quyền',`applyUserPerms('${id}')`,'teal')}</div></div>`);
+  const roleSelect=globalThis.userRoleSelectHtml(roleSelectOptions(u.role));
+  openModal(globalThis.userPermissionsModalHtml({userName:esc(u.name||u.username),username:esc(u.username),roleSelectHtml:roleSelect,permissionChecksHtml:userPermChecks(u.pagePerms,'editUserPerms',u.role),cancelButtonHtml:btn('Hủy','closeModal()','ghost'),saveButtonHtml:btn('Lưu quyền',`applyUserPerms('${id}')`,'teal')}));
 }
 async function applyUserPerms(id){
   if(!requireAdmin())return;
@@ -168,14 +153,7 @@ function resetPass(id){
   if(!requireAdmin())return;
   const u=state.users.find(x=>x.id===id);if(!u)return;
   const self=currentUser&&currentUser.id===id;
-  openModal(`<div class="modal"><div class="modal-h"><h3>${self?'Đổi mật khẩu':'Đặt lại mật khẩu'}</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
-    <div class="modal-b">
-      <div class="hint">${self?'Nhập mật khẩu mới cho tài khoản đang đăng nhập.':'Nhập mật khẩu tạm; người dùng sẽ phải đổi lại khi đăng nhập.'}</div>
-      <label>Mật khẩu mới</label><input id="resetPass1" type="password" autocomplete="new-password">
-      <label>Nhập lại mật khẩu</label><input id="resetPass2" type="password" autocomplete="new-password" onkeydown="if(event.key==='Enter')applyResetPass('${id}')">
-      <div id="resetPassMsg"></div>
-    </div>
-    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn('Lưu mật khẩu',`applyResetPass('${id}')`,'teal')}</div></div>`);
+  openModal(globalThis.resetPasswordModalHtml({title:self?'Đổi mật khẩu':'Đặt lại mật khẩu',message:self?'Nhập mật khẩu mới cho tài khoản đang đăng nhập.':'Nhập mật khẩu tạm; người dùng sẽ phải đổi lại khi đăng nhập.',enterAction:`if(event.key==='Enter')applyResetPass('${id}')`,cancelButtonHtml:btn('Hủy','closeModal()','ghost'),saveButtonHtml:btn('Lưu mật khẩu',`applyResetPass('${id}')`,'teal')}));
   setTimeout(()=>{const e=document.getElementById('resetPass1');if(e)e.focus();},50);
 }
 async function applyResetPass(id){

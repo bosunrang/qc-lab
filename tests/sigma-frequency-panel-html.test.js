@@ -1,0 +1,13 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','sigma','sigma-frequency-panel-html.ts')).href;
+const program=`import {sigmaFrequencyPanelHtml} from ${JSON.stringify(source)}; console.log(sigmaFrequencyPanelHtml({periodLabel:'08/2026',rowsHtml:'<tr>row</tr>',governingBlockHtml:'<div>governing</div>'}));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy panel OPSpecs Sigma TypeScript');
+const html=result.stdout;
+for(const fragment of ['Kỳ đang xem: <b>08/2026</b>','<tr>row</tr>','<div>governing</div>','Westgard Sigma Rules','không tự đổi'])assert.ok(html.includes(fragment));
+assert.match(html,/<th>Bộ quy tắc QC gợi ý \(OPSpecs\)<\/th>/);
+console.log('Sigma frequency panel HTML TypeScript tests passed');

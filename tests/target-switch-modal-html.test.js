@@ -1,0 +1,15 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','manage','target-switch-modal-html.ts')).href;
+const input={groupName:'Lô mới',overwriteCount:2,assayNames:'Glucose, Urea',lockNote:' <b>1 điểm đã khóa</b>',cancelButtonHtml:'<button>Hủy</button>',plannedButtonHtml:'<button>Dự kiến</button>',switchButtonHtml:'<button>Chuyển</button>'};
+const program=`import {targetSwitchModalHtml} from ${JSON.stringify(source)}; console.log(targetSwitchModalHtml(${JSON.stringify(input)}));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy modal chuyển nhóm lô TypeScript');
+assert.match(result.stdout,/Áp dụng nhóm lô Lô mới\?/);
+assert.match(result.stdout,/2 dòng \(Glucose, Urea\)/);
+assert.match(result.stdout,/<b>1 điểm đã khóa<\/b>/);
+assert.match(result.stdout,/<button>Hủy<\/button><button>Dự kiến<\/button><button>Chuyển<\/button>/);
+console.log('Target switch modal HTML TypeScript tests passed');

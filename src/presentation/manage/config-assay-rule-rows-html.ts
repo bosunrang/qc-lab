@@ -1,0 +1,5 @@
+export type ConfigAssayRuleRow = { id: string; action: string; scope: string };
+
+export function configAssayRuleRowsHtml(rows: ConfigAssayRuleRow[]) {
+  return rows.map(row=>`<div class="assay-rule-row"><b>${row.id}</b><select class="cfg-assay-rule" data-rule="${row.id}" aria-label="Hành động ${row.id}"><option value="" ${row.action===''?'selected':''}>Theo cấu hình chung</option><option value="inactive" ${row.action==='inactive'?'selected':''}>Không dùng</option><option value="alert" ${row.action==='alert'?'selected':''}>Cảnh báo</option><option value="reject" ${row.action==='reject'?'selected':''}>Loại bỏ</option></select><select class="cfg-assay-scope" data-rule="${row.id}" aria-label="Phạm vi ${row.id}"><option value="" ${row.scope===''?'selected':''}>Phạm vi SOP khuyến nghị</option><option value="within" ${row.scope==='within'?'selected':''}>Chỉ trong từng mức</option><option value="across" ${row.scope==='across'?'selected':''}>Chỉ chéo mức/lần chạy</option><option value="both" ${row.scope==='both'?'selected':''}>Cả hai phạm vi</option></select></div>`).join('');
+}

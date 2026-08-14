@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','range','range-workflow-comparison-rows-html.ts')).href;
+const program=`import {rangeWorkflowComparisonRowsHtml} from ${JSON.stringify(source)}; console.log(rangeWorkflowComparisonRowsHtml({label:'NSX',mean:'10',sd:'1',cv:'10',limits:'8–12'},{label:'PXN',mean:'11',sd:'1.1',cv:'10',limits:'8.8–13.2',proposed:true}));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy hàng so sánh dải QC TypeScript');
+const html=result.stdout;assert.match(html,/>NSX<\/td>/);assert.match(html,/<b>PXN<\/b>/);assert.match(html,/<b>11<\/b>/);
+console.log('Range workflow comparison rows HTML TypeScript tests passed');

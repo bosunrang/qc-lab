@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','manage','config-assay-tea-options-html.ts')).href;
+const program=`import {configAssayTeaOptionsHtml} from ${JSON.stringify(source)}; console.log(configAssayTeaOptionsHtml([{value:'Glucose',label:'GLU · mmol/L'},{value:'Na+',label:'Sodium'}]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy gợi ý TEa TypeScript');
+assert.match(result.stdout,/<option value="Glucose" label="GLU · mmol\/L"><\/option>/);assert.match(result.stdout,/<option value="Na\+" label="Sodium"><\/option>/);
+console.log('Config-assay TEa options HTML TypeScript tests passed');

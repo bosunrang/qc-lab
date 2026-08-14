@@ -24,19 +24,11 @@ function assignRangeTarget(levelCfg,mean,sd,source){return globalThis.qcRangeCan
 function openRangeWorkflow(tid,level){
   const r=rangeCandidate(tid,level);if(!r.t||!r.l)return;
   const rows=[['Tổng số kết quả',r.c?r.c.n:0,'≥20',r.c&&r.c.n>=20],['Số ngày độc lập',r.days,'≥20 ngày',r.days>=20],['Điểm bị loại Westgard',r.bad,'Phải bằng 0; không tự loại điểm để làm đẹp SD',r.bad===0],['Điểm cảnh báo',r.warn,'Phải bằng 0 trước khi phê duyệt dải',r.warn===0],['SD đề xuất hợp lệ',r.c?fmtTestValue(r.t,r.c.sd):'—','>0',r.c&&r.c.sd>0]];
-  const checklist=rows.map(x=>`<tr><td>${x[0]}</td><td class="num">${x[1]}</td><td>${x[2]}</td><td><span class="tag ${x[3]?'ok':'rej'}">${x[3]?'Đạt':'Chưa đạt'}</span></td></tr>`).join('');
+  const checklist=globalThis.rangeWorkflowChecklistRowsHtml(rows.map(x=>({condition:x[0],current:x[1],requirement:x[2],passed:x[3]})));
   const c=r.c;
-  const nceNotice=r.nce?`<div class="alert warn flow-control"><b>Đang có hồ sơ NCE ${esc(r.nce.nceId||'NCE')} ghi nhận vi phạm hệ thống (${esc(r.nce.rule||'')})</b><div>${esc((r.nce.cause||'').slice(0,200))||'Chưa ghi nguyên nhân trong hồ sơ.'}</div></div>`:'';
-  openModal(`<div class="modal range-workflow-modal"><div class="modal-h"><h3>Workflow thiết lập dải QC mới</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
-    <div class="modal-b"><div class="hint"><b>${esc(testDisplayName(r.t))}</b> · Mức ${level} · Lô ${esc(r.l.lot||'?')} · ${esc(r.t.machine||'')}</div>${nceNotice}
-      <table class="range-workflow-checklist"><colgroup><col><col><col><col></colgroup><thead><tr><th>Điều kiện</th><th>Hiện tại</th><th>Chuẩn kiểm tra</th><th>Kết quả</th></tr></thead><tbody>${checklist}</tbody></table>
-      <h3 style="margin:16px 0 8px">So sánh dải kiểm soát</h3>
-      <table class="range-workflow-comparison"><colgroup><col><col><col><col><col></colgroup><thead><tr><th>Dải</th><th>Mean</th><th>SD</th><th>CV%</th><th>±2SD</th></tr></thead><tbody>
-        <tr><td>Đang dùng (${r.l.applied==='lab'?'PXN':'NSX'})</td><td class="num">${fmtTestValue(r.t,r.l.mean)}</td><td class="num">${fmtTestValue(r.t,r.l.sd)}</td><td class="num">${fmt(r.l.mean?r.l.sd/Math.abs(r.l.mean)*100:0)}</td><td class="num">${fmtTestValue(r.t,r.l.mean-2*r.l.sd)} – ${fmtTestValue(r.t,r.l.mean+2*r.l.sd)}</td></tr>
-        ${c?`<tr><td><b>Đề xuất PXN</b></td><td class="num"><b>${fmtTestValue(r.t,c.m)}</b></td><td class="num"><b>${fmtTestValue(r.t,c.sd)}</b></td><td class="num"><b>${fmt(c.cv)}</b></td><td class="num"><b>${fmtTestValue(r.t,c.m-2*c.sd)} – ${fmtTestValue(r.t,c.m+2*c.sd)}</b></td></tr>`:''}
-      </tbody></table>
-      <div class="alert info flow-section">Mean/SD được tính từ toàn bộ tập dữ liệu đã chọn. Không tự loại điểm vi phạm để làm giảm SD. Chỉ áp dụng khi cùng lô QC, tối thiểu 20 ngày độc lập, quá trình ổn định và có phê duyệt theo SOP.</div></div>
-    <div class="modal-f">${btn('In biểu mẫu',`printRangeForm('${tid}',${level})`,'ghost')}${canWrite()?btn('Áp dụng dải PXN',`closeModal();applyNewRange('${tid}',${level})`,'teal','',{disabled:!r.eligible}):''}${btn('Đóng','closeModal()','ghost')}</div></div>`);
+  const nceNotice=r.nce?globalThis.rangeNceNoticeHtml({nceId:esc(r.nce.nceId||'NCE'),rule:esc(r.nce.rule||''),cause:esc((r.nce.cause||'').slice(0,200))}):'';
+  const contextHtml=`<b>${esc(testDisplayName(r.t))}</b> · Mức ${level} · Lô ${esc(r.l.lot||'?')} · ${esc(r.t.machine||'')}`,comparisonRowsHtml=globalThis.rangeWorkflowComparisonRowsHtml({label:`Đang dùng (${r.l.applied==='lab'?'PXN':'NSX'})`,mean:fmtTestValue(r.t,r.l.mean),sd:fmtTestValue(r.t,r.l.sd),cv:fmt(r.l.mean?r.l.sd/Math.abs(r.l.mean)*100:0),limits:`${fmtTestValue(r.t,r.l.mean-2*r.l.sd)} – ${fmtTestValue(r.t,r.l.mean+2*r.l.sd)}`},c?{label:'Đề xuất PXN',mean:fmtTestValue(r.t,c.m),sd:fmtTestValue(r.t,c.sd),cv:fmt(c.cv),limits:`${fmtTestValue(r.t,c.m-2*c.sd)} – ${fmtTestValue(r.t,c.m+2*c.sd)}`,proposed:true}:null);
+  openModal(globalThis.rangeWorkflowModalHtml({contextHtml,nceNoticeHtml:nceNotice,checklistRowsHtml:checklist,currentRangeRowHtml:comparisonRowsHtml,proposedRangeRowHtml:'',printButtonHtml:btn('In biểu mẫu',`printRangeForm('${tid}',${level})`,'ghost'),applyButtonHtml:canWrite()?btn('Áp dụng dải PXN',`closeModal();applyNewRange('${tid}',${level})`,'teal','',{disabled:!r.eligible}):'',closeButtonHtml:btn('Đóng','closeModal()','ghost')}));
 }
 /* TEa% của xét nghiệm tại đúng target=mean đang dùng, dùng chung cho ngưỡng Bias
    (điều kiện 2) và số tham khảo ΔSEcrit/ΔREcrit — lấy nguyên lớp giải TEa của
@@ -48,11 +40,7 @@ function rangeTeaPercent(t,l){return globalThis.qcRangeTea.percent(t,l);}
 function rangeGateHtml(r,tid,level){
   if(!r.nce)return'';
   const tea=rangeTeaPercent(r.t,r.l),threshold=globalThis.qcRangeTea.quarter(tea);
-  return `<div class="alert warn flow-control"><b>Hồ sơ NCE ${esc(r.nce.nceId||'NCE')} đang ghi nhận vi phạm hệ thống (${esc(r.nce.rule||'')})</b><div>Xác nhận 2 điều kiện dưới đây trước khi áp dụng dải mới — tránh "đuổi theo mean" khi nguyên nhân dịch chuyển chưa được lý giải.</div></div>
-    <label class="range-gate-check"><input type="checkbox" id="rangeCauseConfirm" onchange="document.getElementById('rangeGateErr').style.display='none'"><span>Xác nhận nguyên nhân dịch chuyển đã được xác định và ghi nhận trong hồ sơ NCE ${esc(r.nce.nceId||'NCE')} (không phải lỗi chưa lý giải)</span></label>
-    <div class="field-row flow-item"><div><label>Bias đo lại (%)</label><input id="rangeBiasInput" type="text" inputmode="decimal" oninput="rangeUpdateBiasHint('${tid}',${level})"></div><div><label>Ngưỡng cho phép (≤ TEa/4)</label><input id="rangeBiasThreshold" readonly value="${threshold!=null?fmt(threshold)+'%':'—'}"></div></div>
-    <div id="rangeBiasHint" class="hint flow-tight">${tea?'':'Chưa có TEa% cho xét nghiệm này — vào Cấu hình Sigma để bổ sung, hoặc vẫn có thể xác nhận thủ công nếu ngưỡng đã biết theo cách khác.'}</div>
-    <div id="rangeGateErr" class="hint field-error">Cần xác nhận nguyên nhân dịch chuyển và nhập Bias trong ngưỡng cho phép trước khi áp dụng.</div>`;
+  return globalThis.rangeSafetyGateHtml({nceId:esc(r.nce.nceId||'NCE'),rule:esc(r.nce.rule||''),biasInputAction:`rangeUpdateBiasHint('${tid}',${level})`,thresholdText:threshold!=null?fmt(threshold)+'%':'—',noTeaHint:tea?'':'Chưa có TEa% cho xét nghiệm này — vào Cấu hình Sigma để bổ sung, hoặc vẫn có thể xác nhận thủ công nếu ngưỡng đã biết theo cách khác.'});
 }
 /* Cập nhật khi gõ Bias: kết luận đạt/vượt ngưỡng TEa/4, và số THAM KHẢO
    ΔSEcrit/ΔREcrit (systematicShiftCritical trong core.js) — không phải kết luận
@@ -76,17 +64,7 @@ async function applyNewRange(tid,level){
   if(!requireWrite())return;
   const r=rangeCandidate(tid,level),{t,l,c,days,bad,warn,eligible}=r;
   if(!eligible){await infoDialog(`Chưa đủ điều kiện: cần ≥20 kết quả trên ≥20 ngày, không có điểm vi phạm/cảnh báo chưa xử lý và SD >0.\nHiện tại: n=${c?c.n:0}, ngày=${days}, điểm loại=${bad}, điểm cảnh báo=${warn}.`);return;}
-  openModal(`<div class="modal">
-    <div class="modal-h"><h3>Áp dụng dải PXN mới?</h3><button class="modal-close" onclick="closeModal()">×</button></div>
-    <div class="modal-b">
-      <div class="hint">X̄: ${fmtTestValue(t,l.mean)} → ${fmtTestValue(t,c.m)}<br>SD: ${fmtTestStat(t,l.sd)} → ${fmtTestStat(t,c.sd)}<br>Dải nhà sản xuất vẫn được lưu để hoàn về.</div>
-      ${rangeGateHtml(r,tid,level)}
-      <label class="flow-control">Căn cứ/phê duyệt (SOP, người duyệt hoặc biên bản — tối thiểu 10 ký tự)</label>
-      <textarea id="rangeReasonInput" placeholder="VD: Theo SOP-XXX, phê duyệt bởi..." oninput="document.getElementById('rangeReasonErr').style.display='none'"></textarea>
-      <div id="rangeReasonErr" class="hint field-error">Cần ghi căn cứ phê duyệt tối thiểu 10 ký tự.</div>
-    </div>
-    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn('Áp dụng',`confirmApplyNewRange('${tid}',${level})`,'teal')}</div>
-  </div>`);
+  openModal(globalThis.rangeApplyConfirmationModalHtml({changeSummaryHtml:`X̄: ${fmtTestValue(t,l.mean)} → ${fmtTestValue(t,c.m)}<br>SD: ${fmtTestStat(t,l.sd)} → ${fmtTestStat(t,c.sd)}<br>Dải nhà sản xuất vẫn được lưu để hoàn về.`,gateHtml:rangeGateHtml(r,tid,level),cancelButtonHtml:btn('Hủy','closeModal()','ghost'),applyButtonHtml:btn('Áp dụng',`confirmApplyNewRange('${tid}',${level})`,'teal')}));
   setTimeout(()=>{const e=document.getElementById('rangeReasonInput');if(e)e.focus();},50);
 }
 async function confirmApplyNewRange(tid,level){
@@ -106,15 +84,7 @@ async function confirmApplyNewRange(tid,level){
 }
 function revertRange(tid,level){
   if(!requireWrite())return;
-  openModal(`<div class="modal">
-    <div class="modal-h"><h3>Hoàn về dải nhà sản xuất?</h3><button class="modal-close" onclick="closeModal()">×</button></div>
-    <div class="modal-b">
-      <label>Lý do/căn cứ hoàn về dải nhà sản xuất (tối thiểu 5 ký tự)</label>
-      <textarea id="rangeReasonInput" placeholder="VD: Dải PXN không còn phù hợp, hoàn theo yêu cầu..." oninput="document.getElementById('rangeReasonErr').style.display='none'"></textarea>
-      <div id="rangeReasonErr" class="hint field-error">Cần ghi lý do tối thiểu 5 ký tự.</div>
-    </div>
-    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn('Hoàn về dải NSX',`confirmRevertRange('${tid}',${level})`,'danger')}</div>
-  </div>`);
+  openModal(globalThis.rangeRevertConfirmationModalHtml({cancelButtonHtml:btn('Hủy','closeModal()','ghost'),revertButtonHtml:btn('Hoàn về dải NSX',`confirmRevertRange('${tid}',${level})`,'danger')}));
   setTimeout(()=>{const e=document.getElementById('rangeReasonInput');if(e)e.focus();},50);
 }
 async function confirmRevertRange(tid,level){

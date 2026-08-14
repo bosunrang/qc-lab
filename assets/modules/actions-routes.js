@@ -17,12 +17,7 @@ async function cancelAction(i){
   if(!await reauthenticateCurrentUser({title:'Xác thực hủy hồ sơ NCE',message:'Nhập lại mật khẩu trước khi hủy hồ sơ. Toàn bộ nội dung vẫn được giữ lại trong nhật ký.'}))return;
   const current=(state.actions||[]).find(x=>x.id===id);
   if(!current||actionApprovalToken(current)!==token){await infoDialog('Hồ sơ đã thay đổi trong lúc xác thực. Vui lòng kiểm tra lại trước khi hủy.');return;}
-  openModal(modalTemplate({title:'Hủy hồ sơ NCE',body:`
-      <div class="alert warn action-cancel-warning"><b>Hồ sơ sẽ không bị xóa.</b><div>Nội dung, người lập và toàn bộ bằng chứng vẫn được giữ để truy xuất. Nếu hồ sơ gắn với vi phạm QC, sự cố đó sẽ xuất hiện lại để lập hồ sơ mới.</div></div>
-      <label>Lý do hủy (tối thiểu 5 ký tự)</label>
-      <textarea id="actionCancelReason" placeholder="VD: Mở nhầm cho sai điểm QC; lập lại hồ sơ đúng đối tượng..." oninput="document.getElementById('actionCancelErr').style.display='none'"></textarea>
-      <div id="actionCancelErr" class="hint field-error">Cần nhập lý do hủy tối thiểu 5 ký tự.</div>
-    `,footer:btn('Đóng','closeModal()','ghost')+btn('Hủy hồ sơ',`confirmCancelAction('${jsq(current.id)}','${jsq(token)}')`,'danger')}));
+  openModal(globalThis.actionCancelModalHtml({closeButtonHtml:btn('Đóng','closeModal()','ghost'),cancelButtonHtml:btn('Hủy hồ sơ',`confirmCancelAction('${jsq(current.id)}','${jsq(token)}')`,'danger')}));
   setTimeout(()=>{const e=document.getElementById('actionCancelReason');if(e)e.focus();},50);
 }
 function confirmCancelAction(id,token){
@@ -35,7 +30,7 @@ function confirmCancelAction(id,token){
   closeModal();
   if(!ActionReviewService.cancel(a,reason,userName())){closeModal();rerender();return;}
   logAct('Hủy hồ sơ NCE',`${a.nceId||a.id||'NCE'} · ${reason}`,a.testId?(state.tests.find(t=>t.id===a.testId)||{}).name||'Khắc phục':'Khắc phục');
-  if(actionEditId===a.id){actionEditId='';actionSeed=null;clearActionDraft();actionOpenSections=null;}
+  if(globalThis.actionFormUiState.editId===a.id)globalThis.actionFormUiState.reset();
   save({clearDerived:false});rerender();
 }
 function actionApprovalTag(a){const s=actionApprovalStatus(a),view=ActionReviewPresentation.approvalTag(s,actionCancelled(a)),label=actionApprovalLabel(a);return globalThis.actionApprovalTagPresentation(view,label);}
@@ -52,11 +47,7 @@ async function approveAction(i){
   if(!await reauthenticateCurrentUser({title:'Xác thực người duyệt',message:'Nhập lại mật khẩu trước khi duyệt hành động khắc phục.'}))return;
   const current=(state.actions||[]).find(x=>x.id===approvalId);if(!current||actionApprovalToken(current)!==preAuthToken){await infoDialog('Hồ sơ đã thay đổi trong lúc xác thực. Vui lòng kiểm tra lại trước khi duyệt.');return;}
   const token=actionApprovalToken(current);
-  openModal(modalTemplate({title:'Duyệt hành động khắc phục',body:`
-      <label>Ý kiến duyệt (tối thiểu 3 ký tự)</label>
-      <textarea id="actionNoteInput" placeholder="Nhận xét về hành động khắc phục..." oninput="document.getElementById('actionNoteErr').style.display='none'"></textarea>
-      <div id="actionNoteErr" class="hint field-error">Cần nhập ý kiến duyệt tối thiểu 3 ký tự.</div>
-    `,footer:btn('Đóng','closeModal()','ghost')+btn('Duyệt',`confirmApproveAction('${jsq(current.id)}','${jsq(token)}')`,'teal')}));
+  openModal(globalThis.actionReviewNoteModalHtml({title:'Duyệt hành động khắc phục',label:'Ý kiến duyệt (tối thiểu 3 ký tự)',placeholder:'Nhận xét về hành động khắc phục...',errorText:'Cần nhập ý kiến duyệt tối thiểu 3 ký tự.',closeButtonHtml:btn('Đóng','closeModal()','ghost'),submitButtonHtml:btn('Duyệt',`confirmApproveAction('${jsq(current.id)}','${jsq(token)}')`,'teal')}));
   setTimeout(()=>{const e=document.getElementById('actionNoteInput');if(e)e.focus();},50);
 }
 function confirmApproveAction(id,token){
@@ -79,11 +70,7 @@ async function returnAction(i){
   const current=(state.actions||[]).find(x=>x.id===returnId);
   if(!current||actionApprovalToken(current)!==preAuthToken||!ActionReviewService.returnReadiness(current).ok){await infoDialog('Hồ sơ đã thay đổi trong lúc xác thực. Vui lòng kiểm tra lại trước khi trả lại.');return;}
   const token=actionApprovalToken(current);
-  openModal(modalTemplate({title:'Trả lại hành động khắc phục',body:`
-      <label>Lý do trả lại (tối thiểu 3 ký tự)</label>
-      <textarea id="actionNoteInput" placeholder="Vì sao trả lại hành động khắc phục này..." oninput="document.getElementById('actionNoteErr').style.display='none'"></textarea>
-      <div id="actionNoteErr" class="hint field-error">Cần nhập lý do tối thiểu 3 ký tự.</div>
-    `,footer:btn('Đóng','closeModal()','ghost')+btn('Trả lại',`confirmReturnAction('${jsq(current.id)}','${jsq(token)}')`,'danger')}));
+  openModal(globalThis.actionReviewNoteModalHtml({title:'Trả lại hành động khắc phục',label:'Lý do trả lại (tối thiểu 3 ký tự)',placeholder:'Vì sao trả lại hành động khắc phục này...',errorText:'Cần nhập lý do tối thiểu 3 ký tự.',closeButtonHtml:btn('Đóng','closeModal()','ghost'),submitButtonHtml:btn('Trả lại',`confirmReturnAction('${jsq(current.id)}','${jsq(token)}')`,'danger')}));
   setTimeout(()=>{const e=document.getElementById('actionNoteInput');if(e)e.focus();},50);
 }
 function confirmReturnAction(id,token){
@@ -112,7 +99,7 @@ async function escalateAction(i){
   if(!record){await infoDialog('Hồ sơ đã thay đổi và không còn đủ điều kiện mở vòng tiếp theo.');return;}
   const nceId=record.nceId;
   logAct('Lập hồ sơ NCE tiếp theo',`${nceId} · nối tiếp ${parent} (hành động chưa hiệu lực)`,t?t.name:'Khắc phục');
-  save({clearDerived:false});actionEditId=record.id;actionSeed=null;clearActionDraft();rerender();
+  save({clearDerived:false});globalThis.actionFormUiState.edit(record.id);rerender();
   const panel=document.querySelector('.action-form-panel');if(panel)panel.scrollIntoView({behavior:'smooth',block:'start'});
 }
 /* Lối thoát cho hồ sơ kẹt: actionRerunStatus() tính động, nên một hồ sơ ĐÃ DUYỆT có thể
@@ -125,12 +112,7 @@ async function reopenAction(i){
   if(!requireAdmin())return;const a=state.actions&&state.actions[i];if(!a)return;
   if(!actionCanReopen(a)){await infoDialog('Chỉ mở lại được hồ sơ đã duyệt nhưng không còn đủ điều kiện khép vòng. Hồ sơ đã khép vòng hợp lệ thì mở hồ sơ NCE mới.');return;}
   if(!await reauthenticateCurrentUser({title:'Xác thực mở lại hồ sơ',message:'Nhập lại mật khẩu trước khi mở lại hồ sơ đã duyệt.'}))return;
-  openModal(modalTemplate({title:'Mở lại hồ sơ đã duyệt',body:`
-      <div class="alert warn">Hồ sơ đã duyệt nhưng điều kiện khép vòng không còn đúng: ${esc(actionWorkflowStatus(a).label)}.</div>
-      <label>Lý do mở lại (tối thiểu 5 ký tự)</label>
-      <textarea id="actionNoteInput" placeholder="VD: Điểm QC dùng làm bằng chứng chạy lại đã bị hủy..." oninput="document.getElementById('actionNoteErr').style.display='none'"></textarea>
-      <div id="actionNoteErr" class="hint field-error">Cần nhập lý do tối thiểu 5 ký tự.</div>
-    `,footer:btn('Đóng','closeModal()','ghost')+btn('Mở lại hồ sơ',`confirmReopenAction(${i})`,'danger')}));
+  openModal(globalThis.actionReopenModalHtml({workflowLabelHtml:esc(actionWorkflowStatus(a).label),closeButtonHtml:btn('Đóng','closeModal()','ghost'),reopenButtonHtml:btn('Mở lại hồ sơ',`confirmReopenAction(${i})`,'danger')}));
   setTimeout(()=>{const e=document.getElementById('actionNoteInput');if(e)e.focus();},50);
 }
 function confirmReopenAction(i){
@@ -198,7 +180,7 @@ function viewActionDetail(i){
       ${globalThis.actionPatientImpactHtml(ACTION_LABELS.patient[a.patientImpact]||'',a.patientAction||'')}
       ${globalThis.actionEffectivenessDetailHtml({effectiveness:modern?eff.label:a.cause||'—',note:modern&&a.effectivenessNote?`${a.effectivenessDate?vnDate(a.effectivenessDate)+' · ':''}${a.effectivenessNote}${a.effectivenessBy?' · '+a.effectivenessBy:''}`:'',residual:+a.protocolVersion>=3&&residual?{risk:ACTION_LABELS.risk[a.residualRiskLevel]||'',score:residual,basis:a.residualRiskBasis||''}:undefined,returned:a.returnNote?`${a.returnNote}${a.returnBy?' — '+a.returnBy:''}${a.returnAt?' · '+formatDateTimeVN(a.returnAt):''}`:'',followUpNceId:a.followUpNceId||'',parentNceId:a.parentNceId||'',approval:`${actionApprovalLabel(a)}${a.approvedBy?' · '+a.approvedBy:''}`,workflow:wf.label})}
     </ol>`;
-  openModal(modalTemplate({title:'Chi tiết phiếu xử lý sự cố',body,footer:btn('Đóng','closeModal()','teal')}));
+  openModal(globalThis.actionDetailModalHtml({bodyHtml:body,closeButtonHtml:btn('Đóng','closeModal()','teal')}));
 }
 function openActionGuide(){
   const content=globalThis.actionGuideContent(ActionGuidePresentation.steps);

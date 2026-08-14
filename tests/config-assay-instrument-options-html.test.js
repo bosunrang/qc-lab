@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','manage','config-assay-instrument-options-html.ts')).href;
+const program=`import {configAssayInstrumentOptionsHtml} from ${JSON.stringify(source)}; console.log(configAssayInstrumentOptionsHtml([{id:'i1',selected:true,section:'Hóa sinh',label:'AU5800'},{id:'i2',selected:false,section:'Miễn dịch',label:'DXI'}]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy danh sách máy xét nghiệm TypeScript');
+assert.match(result.stdout,/value="i1" selected data-section="Hóa sinh">AU5800/);assert.match(result.stdout,/value="i2"\s+data-section="Miễn dịch">DXI/);
+console.log('Config-assay instrument options HTML TypeScript tests passed');

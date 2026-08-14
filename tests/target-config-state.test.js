@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','manage','target-config-state.ts')).href;
+const program=`import {targetConfigAssigned,createTargetRangeDraft} from ${JSON.stringify(source)}; const draft=createTargetRangeDraft({targetFromLimits:(low,high)=>low!=null&&high!=null?{mean:(low+high)/2,sd:(high-low)/4}:null,limitsFromTarget:(mean,sd)=>mean!=null&&sd!=null?{low:mean-2*sd,high:mean+2*sd}:null}); console.log(JSON.stringify([targetConfigAssigned({meanSdHistory:[{}]}),targetConfigAssigned({}),draft({low:8,high:12}),draft({mean:10,sd:1})]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy trạng thái Mean/SD TypeScript');
+assert.deepEqual(JSON.parse(result.stdout),[true,false,{mean:10,sd:1,low:8,high:12},{mean:10,sd:1,low:8,high:12}]);
+console.log('Target config state TypeScript tests passed');

@@ -1,0 +1,13 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','sigma','sigma-period-table-html.ts')).href;
+const program=`import {sigmaPeriodTableHtml} from ${JSON.stringify(source)}; console.log(JSON.stringify([sigmaPeriodTableHtml({headerActionsHtml:'<button>add</button>',hasData:true,tableMinWidth:958,colGroupHtml:'<colgroup></colgroup>',tableHeadHtml:'<thead>head</thead>',rowsHtml:'<tr>row</tr>',combinedExportHtml:'<button>export</button>'}),sigmaPeriodTableHtml({headerActionsHtml:'',hasData:false,tableMinWidth:0,colGroupHtml:'',tableHeadHtml:'',rowsHtml:'',combinedExportHtml:''})]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy bảng kỳ Sigma TypeScript');
+const [table,empty]=JSON.parse(result.stdout);
+for(const fragment of ['Số liệu theo kỳ','<button>add</button>','min-width:958px','<thead>head</thead>','<tr>row</tr>','<button>export</button>'])assert.ok(table.includes(fragment));
+assert.match(empty,/Chưa có kỳ nào/);
+console.log('Sigma period table HTML TypeScript tests passed');

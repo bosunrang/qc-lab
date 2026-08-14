@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','application','nce','action-form-render-state.ts')).href;
+const program=`import {actionFormRenderState} from ${JSON.stringify(source)}; const out=actionFormRenderState({actions:[{id:'a'}],tests:['t'],editId:'a',seed:null,currentUser:'u',draft:{x:'1'},buildModel:(e,t,s,u,d)=>({e:e.id,t,u,d}),defaultModel:()=>({}),protocol:f=>f.e,defaultOpen:(e,p)=>new Set(['risk']),openSections:null,actionId:a=>a.id}); console.log(JSON.stringify({editing:out.editing,form:out.form,protocol:out.protocol,formOpen:out.formOpen,open:[...out.openSet]}));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể dựng render-state NCE TypeScript');
+assert.deepEqual(JSON.parse(result.stdout),{editing:{id:'a'},form:{e:'a',t:['t'],u:'u',d:{x:'1'}},protocol:'a',formOpen:true,open:['risk']});
+console.log('Action form render state TypeScript tests passed');

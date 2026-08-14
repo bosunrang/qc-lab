@@ -1,0 +1,15 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','manage','lot-transition-modal-html.ts')).href;
+const input={title:'Sửa hồ sơ chuyển lô',panelsHtml:'<option>Hóa sinh</option>',fromChoiceHtml:'<input id="from">',toChoiceHtml:'<input id="to">',startDateHtml:'<input id="date">',status:'accepted',targetsHtml:'<div>Mean/SD</div>',cancelButtonHtml:'<button>Hủy</button>',saveButtonHtml:'<button>Lưu</button>'};
+const program=`import {lotTransitionModalHtml} from ${JSON.stringify(source)}; console.log(lotTransitionModalHtml(${JSON.stringify(input)}));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy modal chuyển lô TypeScript');
+assert.match(result.stdout,/id="cfgTransPanel"/);
+assert.match(result.stdout,/id="cfgTransStatus"/);
+assert.match(result.stdout,/<option value="accepted" selected>Chấp nhận lô mới<\/option>/);
+assert.match(result.stdout,/id="cfgTransTargets"><div>Mean\/SD<\/div>/);
+console.log('Lot transition modal HTML TypeScript tests passed');

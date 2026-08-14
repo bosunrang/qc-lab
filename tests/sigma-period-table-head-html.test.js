@@ -1,0 +1,13 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','sigma','sigma-period-table-head-html.ts')).href;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',`import {sigmaPeriodTableHeadHtml} from ${JSON.stringify(source)}; console.log(sigmaPeriodTableHeadHtml([1,2]));`],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy tiêu đề bảng Sigma TypeScript');
+assert.match(result.stdout,/Kỳ \/ Năm/);
+assert.equal((result.stdout.match(/colspan="3"/g)||[]).length,2);
+assert.equal((result.stdout.match(/CV IQC%/g)||[]).length,2);
+assert.match(result.stdout,/sg-action-col">Thao tác/);
+console.log('Sigma period table head HTML TypeScript tests passed');
