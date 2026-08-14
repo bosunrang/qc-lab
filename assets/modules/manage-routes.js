@@ -38,30 +38,20 @@ function manageLots(){
       ?btn('Kích hoạt',`activateLotGroup('${g.id}')`,'teal sm')
       :btn('Dừng',`toggleLotGroupStatus('${g.id}')`,'ghost sm btn-stop-tint');
     const lotsHtml=lots.map(l=>`<span class="pill">${esc(l.lotNo)} · M${l.level}</span>`).join(''),actionsHtml=btn('Sửa nhóm',`openConfigGroup('${g.id}')`,'ghost sm')+btn('Mean/SD',`openTargetMatrix('','${g.id}')`,'ghost sm')+toggleBtn+btn('Xóa',`deleteConfigGroup('${g.id}')`,'danger sm'),model={archived,name:g.name,note:g.note,status:statusTag,lotsHtml,actionsHtml};return globalThis.manageLotGroupCardPresentation(model);}).join('');
-  return manageToolbar('Lô & Nhóm QC','Quản lý từng lô và nhóm lô QC.')+
-  `<div class="lot-config-grid">
-    <div class="panel rcfg-list lot-config-left">
-      <div class="rcfg-panel-h"><h3>Lô QC</h3>${btn('Thêm lô QC','openConfigLot()','teal sm')}</div>
-      ${rows?`<table class="lot-table"><thead><tr><th>Số lô</th><th>Mức</th><th>Hạn dùng</th><th>Trạng thái</th><th class="num">Gán</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table>`:emptyState('Chưa có lô QC','Tạo từng lô QC độc lập, sau đó nhập Mean/SD cho Panel QC.')}
-    </div>
-    <div class="panel rcfg-list lot-config-right">
-      <div class="rcfg-panel-h"><h3>Nhóm lô QC</h3>${btn('Thêm nhóm lô','openConfigGroup()','teal sm')}</div>
-      ${groupRows?`<div class="lot-group-list">${groupRows}</div>`:emptyState('Chưa có nhóm lô','Chọn các lô QC đã tạo để ghép thành một nhóm, ví dụ 1101/1102.')}
-    </div>
-  </div>`;
+  return manageToolbar('Lô & Nhóm QC','Quản lý từng lô và nhóm lô QC.')+globalThis.manageLotConfigLayoutPresentation({lotAddButtonHtml:btn('Thêm lô QC','openConfigLot()','teal sm'),lotRowsHtml:rows,lotEmptyHtml:emptyState('Chưa có lô QC','Tạo từng lô QC độc lập, sau đó nhập Mean/SD cho Panel QC.'),groupAddButtonHtml:btn('Thêm nhóm lô','openConfigGroup()','teal sm'),groupRowsHtml:groupRows,groupEmptyHtml:emptyState('Chưa có nhóm lô','Chọn các lô QC đã tạo để ghép thành một nhóm, ví dụ 1101/1102.')});
 }
 function manageInstruments(){
   const rows=state.instruments.filter(i=>manageMatch([i.name,i.manufacturer,i.model,i.serial,i.section])).map(i=>{const n=state.tests.filter(t=>t.instrumentId===i.id).length;const model={id:i.id,name:i.name,section:i.section,manufacturer:i.manufacturer,serial:i.serial,assayCount:n,active:!!i.active};return globalThis.manageInstrumentRowPresentation(model);}).join('');
-  return manageToolbar('Máy xét nghiệm','Quản lý máy xét nghiệm, hãng và số sê-ri.',"openConfigInstrument()",'Thêm máy xét nghiệm')+`<div class="panel rcfg-list">${rows?`<table class="instrument-table"><thead><tr><th>Máy xét nghiệm</th><th>Nhà sản xuất</th><th>Số sê-ri</th><th class="num">Xét nghiệm</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table>`:emptyState('Chưa có máy xét nghiệm','Thêm máy trước khi cấu hình xét nghiệm.')}</div>`;
+  return manageToolbar('Máy xét nghiệm','Quản lý máy xét nghiệm, hãng và số sê-ri.',"openConfigInstrument()",'Thêm máy xét nghiệm')+globalThis.manageInstrumentTablePresentation({rowsHtml:rows,emptyHtml:emptyState('Chưa có máy xét nghiệm','Thêm máy trước khi cấu hình xét nghiệm.')});
 }
 function managePanels(){
   const rows=state.qcPanels.filter(p=>manageMatch([p.name,p.note,instrumentName(p.instrumentId),...(p.testIds||[]).map(id=>(state.tests.find(t=>t.id===id)||{}).name)])).map(p=>{const tests=(p.testIds||[]).map(id=>state.tests.find(t=>t.id===id)).filter(Boolean),testsHtml=tests.map(t=>`<span class="pill">${esc(testDisplayName(t))}</span>`).join(''),model={id:p.id,name:p.name,instrument:instrumentName(p.instrumentId),testsHtml,testCount:tests.length,active:p.active!==false};return globalThis.managePanelRowPresentation(model);}).join('');
-  return manageToolbar('Panel QC','Nhóm các xét nghiệm theo từng máy để thiết lập và quản lý QC.',"openConfigPanel()",'Thêm Panel QC')+`<div class="panel rcfg-list">${rows?`<table class="panel-qc-table"><thead><tr><th>Tên panel</th><th>Máy xét nghiệm</th><th>Xét nghiệm trong panel</th><th class="num">Số vị trí</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table>`:emptyState('Chưa có Panel QC','Tạo Panel QC trước, sau đó nhập Mean/SD theo nhóm lô trong thẻ Mean/SD.')}</div>`;
+  return manageToolbar('Panel QC','Nhóm các xét nghiệm theo từng máy để thiết lập và quản lý QC.',"openConfigPanel()",'Thêm Panel QC')+globalThis.managePanelTablePresentation({rowsHtml:rows,emptyHtml:emptyState('Chưa có Panel QC','Tạo Panel QC trước, sau đó nhập Mean/SD theo nhóm lô trong thẻ Mean/SD.')});
 }
 function targetPanelOptions(){return globalThis.targetPanelOptionsPresentation(state.qcPanels,manageTargetPanel,instrumentName,esc);}
 function manageTransitionsV2(){
-  const rows=state.lotTransitions.filter(tr=>manageMatch([panelName(tr.panelId),lotLabel(tr.fromLotId),lotLabel(tr.toLotId),tr.startDate,tr.status,tr.approvedBy])).map(tr=>{const s=transitionStatusLabelV2(tr.status),to=state.qcLots.find(l=>l.id===tr.toLotId),moved=transitionSwitchesLot(tr)&&to?`<div class="hint">Đã chuyển tiếp qua lô ${esc(to.lotNo)}</div>`:'',approval=tr.approvedBy?`<div class="hint">Duyệt: ${esc(tr.approvedBy)}${tr.approvedAt?' · '+formatDateTimeVN(tr.approvedAt):''}</div>`:'',model={id:tr.id,panel:panelName(tr.panelId),fromLot:lotLabel(tr.fromLotId),toLot:lotLabel(tr.toLotId),startDate:tr.startDate?vnDate(tr.startDate):'',status:s,movedHtml:moved,approvalHtml:approval};return globalThis.manageTransitionRowPresentation(model);}).join('');
-  return manageToolbar('Chuyển tiếp lô QC','Theo dõi lô cũ, lô mới và trạng thái khi thay lô.',"openLotTransitionV2()",'Thêm hồ sơ chuyển lô')+`<div class="panel rcfg-list transition-list">${rows?`<table class="transition-table"><thead><tr><th>Panel QC</th><th>Chuyển lô</th><th>Bắt đầu</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table>`:emptyState('Chưa có hồ sơ chuyển lô','Tạo hồ sơ để theo dõi chuyển từ lô cũ sang lô mới.')}</div>`;
+  const rows=state.lotTransitions.filter(tr=>manageMatch([panelName(tr.panelId),lotLabel(tr.fromLotId),lotLabel(tr.toLotId),tr.startDate,tr.status,tr.approvedBy])).map(tr=>{const s=transitionStatusLabelV2(tr.status),to=state.qcLots.find(l=>l.id===tr.toLotId),details=globalThis.manageTransitionDetailsPresentation({movedLotNo:transitionSwitchesLot(tr)&&to?esc(to.lotNo):'',approvalText:tr.approvedBy?esc(tr.approvedBy)+(tr.approvedAt?' · '+formatDateTimeVN(tr.approvedAt):''):''}),model={id:tr.id,panel:panelName(tr.panelId),fromLot:lotLabel(tr.fromLotId),toLot:lotLabel(tr.toLotId),startDate:tr.startDate?vnDate(tr.startDate):'',status:s,movedHtml:details.movedHtml,approvalHtml:details.approvalHtml};return globalThis.manageTransitionRowPresentation(model);}).join('');
+  return manageToolbar('Chuyển tiếp lô QC','Theo dõi lô cũ, lô mới và trạng thái khi thay lô.',"openLotTransitionV2()",'Thêm hồ sơ chuyển lô')+globalThis.manageTransitionTablePresentation({rowsHtml:rows,emptyHtml:emptyState('Chưa có hồ sơ chuyển lô','Tạo hồ sơ để theo dõi chuyển từ lô cũ sang lô mới.')});
 }
 function targetPanelTests(){return globalThis.targetPanelTestsPresentation(state.qcPanels,state.tests,manageTargetPanel);}
 function targetPanelLabel(){return globalThis.targetPanelLabelPresentation(state.qcPanels,manageTargetPanel);}
@@ -78,38 +68,33 @@ function ensureTargetSelection(){
 function manageTargets(){
   ensureTargetSelection();
   const prerequisite=globalThis.targetPrerequisitePresentation({tests:state.tests.length,panels:state.qcPanels.length,lots:state.qcLots.length,groups:state.lotGroups.length});
-  if(prerequisite==='tests')return manageToolbar('Mean/SD theo nhóm lô QC','Chọn Panel QC để nhập Mean/SD hàng loạt.',"setManageTab('assays')",'Thêm xét nghiệm')+`<div class="panel">${emptyState('Chưa có xét nghiệm','Tạo xét nghiệm trước, sau đó quay lại nhập Mean/SD theo nhóm lô.')}</div>`;
-  if(prerequisite==='panels')return manageToolbar('Mean/SD theo nhóm lô QC','Chỉ dùng Panel QC để nhập Mean/SD hàng loạt.',"setManageTab('panels')",'Thêm Panel QC')+`<div class="panel">${emptyState('Chưa có Panel QC','Tạo Panel QC và chọn các xét nghiệm thành viên trước, sau đó quay lại nhập Mean/SD theo nhóm lô.')}</div>`;
-  if(prerequisite==='lots')return manageToolbar('Mean/SD theo nhóm lô QC','Chọn Panel QC và nhóm lô để nhập Mean/SD hàng loạt.',"setManageTab('lots')",'Thêm lô QC')+`<div class="panel">${emptyState('Chưa có lô QC','Tạo lô QC trước, gom vào nhóm lô rồi quay lại nhập Mean/SD theo nhóm.')}</div>`;
-  if(prerequisite==='groups')return manageToolbar('Mean/SD theo nhóm lô QC','Chọn Panel QC và nhóm lô để nhập Mean/SD hàng loạt.',"setManageTab('lots')",'Thêm nhóm lô')+`<div class="panel">${emptyState('Chưa có nhóm lô QC','Tạo nhóm lô từ các lô QC trước, sau đó quay lại nhập Mean/SD theo nhóm.')}</div>`;
+  if(prerequisite==='tests')return manageToolbar('Mean/SD theo nhóm lô QC','Chọn Panel QC để nhập Mean/SD hàng loạt.',"setManageTab('assays')",'Thêm xét nghiệm')+globalThis.manageEmptyPanelPresentation(emptyState('Chưa có xét nghiệm','Tạo xét nghiệm trước, sau đó quay lại nhập Mean/SD theo nhóm lô.'));
+  if(prerequisite==='panels')return manageToolbar('Mean/SD theo nhóm lô QC','Chỉ dùng Panel QC để nhập Mean/SD hàng loạt.',"setManageTab('panels')",'Thêm Panel QC')+globalThis.manageEmptyPanelPresentation(emptyState('Chưa có Panel QC','Tạo Panel QC và chọn các xét nghiệm thành viên trước, sau đó quay lại nhập Mean/SD theo nhóm lô.'));
+  if(prerequisite==='lots')return manageToolbar('Mean/SD theo nhóm lô QC','Chọn Panel QC và nhóm lô để nhập Mean/SD hàng loạt.',"setManageTab('lots')",'Thêm lô QC')+globalThis.manageEmptyPanelPresentation(emptyState('Chưa có lô QC','Tạo lô QC trước, gom vào nhóm lô rồi quay lại nhập Mean/SD theo nhóm.'));
+  if(prerequisite==='groups')return manageToolbar('Mean/SD theo nhóm lô QC','Chọn Panel QC và nhóm lô để nhập Mean/SD hàng loạt.',"setManageTab('lots')",'Thêm nhóm lô')+globalThis.manageEmptyPanelPresentation(emptyState('Chưa có nhóm lô QC','Tạo nhóm lô từ các lô QC trước, sau đó quay lại nhập Mean/SD theo nhóm.'));
   const group=state.lotGroups.find(x=>x.id===manageTargetGroup),groupLots=targetGroupLots(group),targetLevelPick=globalThis.targetLevelSelectionPresentation(groupLots,manageTargetLevel),targetLevels=targetLevelPick.levels;
   manageTargetLevel=targetLevelPick.level;
   const selectedLevel=Number(manageTargetLevel),levelLotPick=globalThis.targetLevelLotsPresentation(groupLots,selectedLevel),levelLots=levelLotPick.levelLots,levelDepletedLots=levelLotPick.depletedLots,q=searchText(manageQ),allTests=targetPanelTests(),tests=allTests.filter(t=>!q||globalThis.targetSearchValuesPresentation(t,group&&group.name,levelLots,testDisplayName,instrumentName).some(v=>searchText(v).includes(q)));
-  if(!group||!groupLots.length)return manageToolbar('Mean/SD theo nhóm lô QC','Chọn Panel QC và nhóm lô để nhập Mean/SD hàng loạt.')+`<div class="panel">${emptyState('Nhóm lô chưa có lô QC','Sửa nhóm lô và chọn các lô QC cần dùng trước.')}</div>`;
+  if(!group||!groupLots.length)return manageToolbar('Mean/SD theo nhóm lô QC','Chọn Panel QC và nhóm lô để nhập Mean/SD hàng loạt.')+globalThis.manageEmptyPanelPresentation(emptyState('Nhóm lô chưa có lô QC','Sửa nhóm lô và chọn các lô QC cần dùng trước.'));
   const rowItems=globalThis.targetMatrixItemsPresentation(tests,levelLots,targetConfigAssigned,plannedTargetFor,lotTargetSnapshot);
   const targetStats=globalThis.targetMatrixStatsPresentation(rowItems);
   const rows=rowItems.map(({t,lot,linked,same,assigned,planned,cfg})=>{const draft=targetRangeDraft(cfg||{}),rowState=globalThis.targetRowStatePresentation(linked,assigned,planned,lot.depleted),locked=rowState.locked,retiredTo=locked?lotTransitionToNo(lot.id):'',checked=rowState.checked,disabled=rowState.disabled;return globalThis.targetMatrixRowPresentation({testId:t.id,lotId:lot.id,locked,checked,disabled,name:testDisplayName(t),unit:t.unit,mean:targetNumberText(draft.mean,t),low:targetNumberText(draft.low,t),high:targetNumberText(draft.high,t),sd:targetNumberText(draft.sd,t,'stat'),status:rowState.status,retiredTo,otherLot:same&&same.lot},esc,escAttr);}).join('');
-  const targetLevelTabs=globalThis.targetLevelTabsPresentation(targetLevels,manageTargetLevel),targetLevelToolbar=globalThis.targetLevelToolbarPresentation(manageTargetLevel,levelLots.map(l=>l.lotNo),targetLevelTabs,esc);
+  const targetLevelTabs=globalThis.targetLevelTabsPresentation(targetLevels,manageTargetLevel),targetLevelToolbar=globalThis.targetLevelToolbarPresentation(manageTargetLevel,levelLots.map(l=>l.lotNo),targetLevelTabs,esc),targetContent=rowItems.length?targetLevelToolbar+globalThis.targetMatrixTablePresentation(rows)+globalThis.targetMatrixActionsPresentation(btn('Bỏ chọn tất cả','targetCheckAll(false)','ghost'),btn('Chọn tất cả','targetCheckAll(true)','ghost'),btn('Lưu Mean/SD mức này','saveTargetMatrix()','teal')):(()=>{const empty=globalThis.targetEmptyStatePresentation(allTests.length,levelLots.map(l=>l.lotNo),levelDepletedLots.map(l=>l.lotNo),manageTargetLevel);return emptyState(empty.title,empty.description);})();
   return manageToolbar('Mean/SD theo nhóm lô QC','Chọn Panel QC và nhóm lô, app tự đưa các xét nghiệm trong panel vào bảng Mean/SD.')+
-  `<div class="panel target-matrix-panel">
-    ${globalThis.targetSelectorPresentation(targetPanelOptions(),targetGroupOptions())}
-    ${rowItems.length?globalThis.targetSummaryPresentation(targetStats):''}
-    ${rowItems.length?targetLevelToolbar+`
-    ${globalThis.targetMatrixTablePresentation(rows)}
-    ${globalThis.targetMatrixActionsPresentation(btn('Bỏ chọn tất cả','targetCheckAll(false)','ghost'),btn('Chọn tất cả','targetCheckAll(true)','ghost'),btn('Lưu Mean/SD mức này','saveTargetMatrix()','teal'))}`:(()=>{const empty=globalThis.targetEmptyStatePresentation(allTests.length,levelLots.map(l=>l.lotNo),levelDepletedLots.map(l=>l.lotNo),manageTargetLevel);return emptyState(empty.title,empty.description);})()}</div>`;
+  globalThis.targetMatrixPanelPresentation({selectorHtml:globalThis.targetSelectorPresentation(targetPanelOptions(),targetGroupOptions()),summaryHtml:rowItems.length?globalThis.targetSummaryPresentation(targetStats):'',contentHtml:targetContent});
 }
 function manageAssays(){
   const matched=state.tests.filter(t=>manageMatch([t.name,testDisplayName(t),t.unit,t.method,t.reagent,instrumentName(t.instrumentId,t.machine),t.section,t.tea]));
   const rows=matched.map((t,idx)=>{const model={index:idx+1,id:t.id,name:testDisplayName(t),method:t.method,unit:t.unit,instrument:instrumentName(t.instrumentId,t.machine),section:t.section,reagent:t.reagent,tea:t.tea,closed:!!t.closed};return globalThis.manageAssayRowPresentation(model);}).join('');
-  return manageToolbar('Danh mục xét nghiệm','Quản lý xét nghiệm, máy, đơn vị, phương pháp và TEa.',"openConfigAssay()",'Thêm xét nghiệm')+`<div class="panel rcfg-list">${rows?`<table class="assay-table"><thead><tr><th class="num">STT</th><th>Tên xét nghiệm</th><th>Máy xét nghiệm</th><th>Hóa chất</th><th>TEa</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table>`:emptyState('Chưa có xét nghiệm','Tạo xét nghiệm trước, sau đó gán lô và Mean/SD ở các thẻ cấu hình tương ứng.')}</div>`;
+  return manageToolbar('Danh mục xét nghiệm','Quản lý xét nghiệm, máy, đơn vị, phương pháp và TEa.',"openConfigAssay()",'Thêm xét nghiệm')+globalThis.manageAssayTablePresentation({rowsHtml:rows,emptyHtml:emptyState('Chưa có xét nghiệm','Tạo xét nghiệm trước, sau đó gán lô và Mean/SD ở các thẻ cấu hình tương ứng.')});
 }
 function manageHistorySearchValues(t){
   return globalThis.historySearchValuesPresentation(t,state.qcLots,testDisplayName);
 }
 function manageHistory(){
   const q=searchText(manageQ),matches=state.tests.filter(t=>!q||manageHistorySearchValues(t).some(v=>searchText(v).includes(q)));
-  if(!state.tests.length)return manageToolbar('Lịch sử dữ liệu QC','Chọn xét nghiệm để xem các lô, Mean/SD và thời gian hiệu lực.')+`<div class="panel">${emptyState('Chưa có xét nghiệm','Tạo xét nghiệm trước, sau đó cấu hình lô và Mean/SD.')}</div>`;
-  if(!matches.length)return manageToolbar('Lịch sử dữ liệu QC','Chọn xét nghiệm để xem các lô, Mean/SD và thời gian hiệu lực.')+`<div class="panel">${emptyState('Không tìm thấy xét nghiệm','Thử tìm theo tên xét nghiệm.')}</div>`;
+  if(!state.tests.length)return manageToolbar('Lịch sử dữ liệu QC','Chọn xét nghiệm để xem các lô, Mean/SD và thời gian hiệu lực.')+globalThis.manageEmptyPanelPresentation(emptyState('Chưa có xét nghiệm','Tạo xét nghiệm trước, sau đó cấu hình lô và Mean/SD.'));
+  if(!matches.length)return manageToolbar('Lịch sử dữ liệu QC','Chọn xét nghiệm để xem các lô, Mean/SD và thời gian hiệu lực.')+globalThis.manageEmptyPanelPresentation(emptyState('Không tìm thấy xét nghiệm','Thử tìm theo tên xét nghiệm.'));
   const historyPick=globalThis.historyAssaySelectionPresentation(matches,manageHistoryTest);
   manageHistoryTest=historyPick.selectedId;
   const t=historyPick.assay;
@@ -122,10 +107,7 @@ function manageHistory(){
   }).join('');
   const historyTotals=globalThis.historySummaryPresentation(visibleRows);
   return manageToolbar('Lịch sử dữ liệu QC','Chọn một xét nghiệm để xem các lô/Mean-SD đã từng dùng.')+
-  `<div class="panel target-matrix-panel">
-    ${globalThis.historySelectorPresentation(opts,historyTotals.rowCount,historyTotals.pointCount)}
-    ${globalThis.historyTablePresentation(html,q?emptyState('Không tìm thấy mốc phù hợp','Thử tìm theo tên xét nghiệm, mức hoặc lô QC.'):emptyState('Chưa có lịch sử lô','Xét nghiệm này chưa được gán lô/Mean-SD.'))}
-  </div>`;
+  globalThis.historyPanelPresentation({selectorHtml:globalThis.historySelectorPresentation(opts,historyTotals.rowCount,historyTotals.pointCount),tableHtml:globalThis.historyTablePresentation(html,q?emptyState('Không tìm thấy mốc phù hợp','Thử tìm theo tên xét nghiệm, mức hoặc lô QC.'):emptyState('Chưa có lịch sử lô','Xét nghiệm này chưa được gán lô/Mean-SD.'))});
 }
 /* ===== Bảng TEa tham chiếu (CLIA/Ricos/chuẩn hóa PXN) sửa được trong app ===== */
 const TEA_LAB_BASIS_SOURCES=[['regulation','Quy định pháp lý / CLIA / quốc gia'],['pt','Chương trình ngoại kiểm / PT'],['eflm','EFLM Biological Variation'],['ricos','Ricos / Westgard BV (nguồn cũ)'],['professional','Hiệp hội / ủy ban chuyên môn'],['other','Nguồn khác đã thẩm định']];
@@ -145,14 +127,7 @@ function teaRefRemove(refKey){if(!requireAdmin())return;const row=teaRefFind(ref
 function teaSourceRegistryHtml(){const items=globalThis.teaSourceRegistryItemsPresentation(TEA_SOURCE_REGISTRY,vnDate);return globalThis.teaSourceRegistryPresentation(items);}
 function teaRefOpenAdd(){
   if(!requireAdmin())return;
-  openModal(`<div class="modal"><div class="modal-h"><h3>Thêm xét nghiệm tham chiếu</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
-    <div class="modal-b">
-      <div class="grid2"><div><label>Tên quốc tế <span class="req">*</span></label><input id="trAddName" placeholder="VD: Creatine kinase-MB"></div><div><label>Viết tắt</label><input id="trAddAbbreviation" placeholder="VD: CK-MB"></div></div>
-      <div class="grid2"><div><label>Loại mẫu (matrix)</label><input id="trAddMatrix" placeholder="VD: Serum/Plasma"></div><div></div></div>
-      <div class="grid2"><div><label>Đơn vị</label><input id="trAddUnit" placeholder="U/L"></div><div><label>Nhóm</label><input id="trAddSection" placeholder="Hóa sinh"></div></div>
-      <div class="grid2"><div><label>TEa CLIA %</label><input id="trAddClia" type="number" step="any"></div><div><label>TEa Ricos %</label><input id="trAddRicos" type="number" step="any"></div></div>
-      <div class="hint flow-item">Mỗi xét nghiệm dùng một tên quốc tế duy nhất; viết tắt được hiển thị trong ngoặc. TEa chuẩn hóa được lập thành hồ sơ riêng sau khi thêm dòng.</div></div>
-    <div class="modal-f">${btn('Hủy','closeModal()','ghost')}${btn('Thêm xét nghiệm','teaRefAddSubmit()','teal')}</div></div>`);
+  openModal(globalThis.teaReferenceAddModalPresentation({cancelButtonHtml:btn('Hủy','closeModal()','ghost'),submitButtonHtml:btn('Thêm xét nghiệm','teaRefAddSubmit()','teal')}));
   setTimeout(()=>{const el=document.getElementById('trAddName');if(el)el.focus();},0);
 }
 async function teaRefAddSubmit(){
@@ -165,11 +140,7 @@ async function teaRefAddSubmit(){
 }
 function teaLabProfileOpen(refKey){
   if(!requireAdmin())return;const ref=effectiveTeaRefs().find(r=>r[6]===refKey||teaRefName(r[0])===teaRefName(refKey));if(!ref)return;const row=teaRefFind(refKey),meta=row&&row.sources&&row.sources.lab||{},source=row&&row.labSource||'',sourceOpts=['<option value="">— Chọn nguồn chính —</option>',...TEA_LAB_BASIS_SOURCES.map(([v,label])=>`<option value="${v}" ${source===v?'selected':''}>${esc(label)}</option>`)].join(''),effective=meta.effectiveDate||isoToday(),approvedDate=meta.reviewedDate||isoToday(),prepared=row&&row.labPreparedBy||userName(),approved=meta.reviewedBy||userName(),nextReview=row&&row.labNextReviewDate||'';
-  const body=`<div class="grid2"><div><label>TEa chuẩn hóa % <span class="req">*</span></label><input id="teaLabValue" type="number" step="any" min="0" aria-label="TEa chuẩn hóa phần trăm" value="${row&&row.lab!=null?row.lab:''}"></div><div><label>Nguồn chính <span class="req">*</span></label><select id="teaLabSource" aria-label="Nguồn chính của TEa chuẩn hóa">${sourceOpts}</select></div></div>
-    <div><label>Tài liệu / phiên bản / đường dẫn tham chiếu <span class="req">*</span></label><input id="teaLabReference" aria-label="Tài liệu tham chiếu TEa chuẩn hóa" value="${escAttr(meta.document||'')}" placeholder="VD: 42 CFR §493.931, hiệu lực 11/07/2024"></div>
-    <div><label>Lý do lựa chọn <span class="req">*</span></label><textarea id="teaLabReason" class="tea-lab-reason" aria-label="Lý do lựa chọn TEa chuẩn hóa" rows="1" placeholder="Nêu lý do chọn nguồn và mức TEa này cho mục đích sử dụng của xét nghiệm...">${esc(meta.note||'')}</textarea></div>
-    <div class="tea-lab-meta-grid tea-lab-meta-primary"><div><label>Ngày hiệu lực <span class="req">*</span></label>${dateBox('teaLabEffectiveDate',effective,'manage-date','aria-label="Ngày hiệu lực TEa chuẩn hóa"')}</div><div><label>Ngày xem xét lại</label>${dateBox('teaLabNextReviewDate',nextReview,'manage-date','aria-label="Ngày xem xét lại TEa chuẩn hóa"')}</div><div><label>Người xây dựng <span class="req">*</span></label><input id="teaLabPreparedBy" aria-label="Người xây dựng TEa chuẩn hóa" value="${escAttr(prepared)}"></div></div>
-    <div class="tea-lab-meta-grid tea-lab-meta-approval"><div><label>Người phê duyệt <span class="req">*</span></label><input id="teaLabApprovedBy" aria-label="Người phê duyệt TEa chuẩn hóa" value="${escAttr(approved)}"></div><div><label>Ngày phê duyệt <span class="req">*</span></label>${dateBox('teaLabApprovedDate',approvedDate,'manage-date','aria-label="Ngày phê duyệt TEa chuẩn hóa"')}</div></div>`;
+  const body=globalThis.teaReferenceLabProfileBodyPresentation({labValue:row&&row.lab!=null?row.lab:'',sourceOptionsHtml:sourceOpts,referenceValue:escAttr(meta.document||''),reasonHtml:esc(meta.note||''),effectiveDateHtml:dateBox('teaLabEffectiveDate',effective,'manage-date','aria-label="Ngày hiệu lực TEa chuẩn hóa"'),nextReviewDateHtml:dateBox('teaLabNextReviewDate',nextReview,'manage-date','aria-label="Ngày xem xét lại TEa chuẩn hóa"'),preparedValue:escAttr(prepared),approvedValue:escAttr(approved),approvedDateHtml:dateBox('teaLabApprovedDate',approvedDate,'manage-date','aria-label="Ngày phê duyệt TEa chuẩn hóa"')});
   const hasProfile=row&&row.lab!=null,remove=hasProfile?btn('Xóa TEa chuẩn hóa',`teaLabProfileRemove('${escAttr(refKey)}')`,'danger'):'';
   openModal(modalTemplate({title:hasProfile?'Sửa hồ sơ TEa chuẩn hóa':'Thêm hồ sơ TEa chuẩn hóa',body,footer:remove+btn('Hủy','closeModal()','ghost')+btn(hasProfile?'Lưu thay đổi':'Thêm hồ sơ TEa',`teaLabProfileSave('${escAttr(refKey)}')`,'teal'),cls:'tea-lab-profile-modal'}));
   setTimeout(()=>{const e=document.getElementById('teaLabValue');if(e)e.focus();},0);
@@ -195,14 +166,10 @@ function manageTeaRefs(){
     const rowActions=globalThis.teaReferenceRowActionsPresentation(r.kind,canManage,r.lab!=null),act=rowActions.action==='restore'?btn('Khôi phục',`teaRefRemove('${escAttr(r.analyteId)}')`,'ghost sm','Khôi phục giá trị mặc định'):rowActions.action==='remove'?`<button class="x" onclick="teaRefRemove('${escAttr(r.analyteId)}')" title="Xóa xét nghiệm tự thêm">✕</button>`:'';
     const namingTitle=globalThis.teaReferenceNamingTitlePresentation(r);
     const labButton=rowActions.labProfile==='none'?'':btn(rowActions.labProfile==='add'?'Thêm hồ sơ':'Xem hồ sơ',`teaLabProfileOpen('${escAttr(r.analyteId)}')`,'ghost sm',rowActions.labProfile==='add'?'Lập hồ sơ TEa chuẩn hóa':'Xem hoặc cập nhật nguồn và lý do lựa chọn');
-    return `<tr><td><b title="${escAttr(namingTitle)}">${esc(r.displayName||r.name)}</b></td><td>${esc(r.unit||'—')}</td><td>${esc(r.section||'—')}</td>
-      <td><input class="tea-ref-value" ${ro} type="number" step="any" value="${globalThis.teaReferenceInputValuePresentation(r.clia)}" onchange="teaRefEdit('${escAttr(r.analyteId)}','clia',this.value)"></td>
-      <td><input class="tea-ref-value" ${ro} type="number" step="any" value="${globalThis.teaReferenceInputValuePresentation(r.ricos)}" onchange="teaRefEdit('${escAttr(r.analyteId)}','ricos',this.value)"></td>
-      <td><div class="tea-lab-cell">${globalThis.teaReferenceLabValuePresentation(r.lab,fmt)}${labButton}</div></td>
-      <td><div class="tea-ref-status">${teaStatus(r.kind)}${act}</div></td></tr>`;
+    return globalThis.teaReferenceRowPresentation({namingTitle:escAttr(namingTitle),displayName:esc(r.displayName||r.name),unit:esc(r.unit||'—'),section:esc(r.section||'—'),disabled:ro,cliaValue:globalThis.teaReferenceInputValuePresentation(r.clia),ricosValue:globalThis.teaReferenceInputValuePresentation(r.ricos),cliaChangeAction:`teaRefEdit('${escAttr(r.analyteId)}','clia',this.value)`,ricosChangeAction:`teaRefEdit('${escAttr(r.analyteId)}','ricos',this.value)`,labCellHtml:globalThis.teaReferenceLabValuePresentation(r.lab,fmt)+labButton,statusHtml:teaStatus(r.kind),actionHtml:act});
   }).join('');
-  return manageToolbar('Bảng TEa tham chiếu','Tổng hợp TEa từ các nguồn tham chiếu, dùng thống nhất khi tính Sigma.',canManage?'teaRefOpenAdd()':'','Thêm xét nghiệm')+teaSourceRegistryHtml()+
-    `<div class="panel rcfg-list tea-ref-panel">${rows.length?`<table class="tea-ref-table"><thead><tr><th>Xét nghiệm</th><th>Đơn vị</th><th>Nhóm</th><th>TEa CLIA %</th><th>TEa Ricos %</th><th>TEa chuẩn hóa %</th><th>Trạng thái</th></tr></thead><tbody>${body}</tbody></table>`:(()=>{const empty=globalThis.teaReferenceEmptyStatePresentation(!!searchText(manageQ));return emptyState(empty.title,empty.description);})()}</div>`;
+  const empty=globalThis.teaReferenceEmptyStatePresentation(!!searchText(manageQ));
+  return manageToolbar('Bảng TEa tham chiếu','Tổng hợp TEa từ các nguồn tham chiếu, dùng thống nhất khi tính Sigma.',canManage?'teaRefOpenAdd()':'','Thêm xét nghiệm')+teaSourceRegistryHtml()+globalThis.teaReferenceTablePresentation({rowsHtml:body,emptyHtml:emptyState(empty.title,empty.description)});
 }
 function manageView(){
   const views={lots:manageLots,panels:managePanels,targets:manageTargets,history:manageHistory,transitions:manageTransitionsV2,assays:manageAssays,instruments:manageInstruments,tearefs:manageTeaRefs};

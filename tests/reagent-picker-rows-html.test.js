@@ -1,0 +1,10 @@
+'use strict';
+const assert = require('node:assert/strict');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+const { execFileSync } = require('node:child_process');
+const source = path.join(__dirname, '..', 'src', 'presentation', 'reagent', 'reagent-picker-rows-html.ts');
+const program = `import { reagentPickerRowsHtml } from ${JSON.stringify(pathToFileURL(source).href)}; console.log(JSON.stringify({rows:reagentPickerRowsHtml({items:[{id:'r1',labelHtml:'Glucose',unitHtml:'mmol/L',rowCount:5,selected:true}],canWrite:true,selectButtonHtml:(id,selected)=>'<button>'+id+' '+selected+'</button>'}),empty:reagentPickerRowsHtml({items:[],canWrite:false,selectButtonHtml:()=>''})}));`;
+const output = JSON.parse(execFileSync(process.execPath, ['--experimental-strip-types', '--input-type=module', '--eval', program], { encoding: 'utf8' }));
+assert.match(output.rows, /class="mrow on"/);assert.match(output.rows, /· 5 dòng/);assert.match(output.rows, /rcDeleteFromModal\('r1'\)/);assert.match(output.empty, /Không có phép so sánh phù hợp/);
+console.log('Reagent picker rows HTML tests passed');

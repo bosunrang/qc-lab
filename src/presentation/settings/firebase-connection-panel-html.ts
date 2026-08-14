@@ -4,7 +4,7 @@ export function createFirebaseConnectionPanelHtml(deps: { escape: (value: unknow
     const readOnly = locked ? 'readonly' : '';
     const config = input.config ? JSON.stringify(input.config, null, 2) : '';
     const lockNote = locked ? `<div class="hint flow-note">Bản deploy này khóa sẵn <code>${deps.escape(input.dataPath || '')}</code>. Muốn đổi mã phòng cần sửa <code>assets/modules/app-meta.js</code>.</div>` : '';
-    return `<div class="panel firebase-sync-panel"><h2 class="panel-title">Đồng bộ Đám mây (Firebase Realtime Database)</h2>
+    return `<div class="panel firebase-sync-panel"><h2 class="panel-title">Đồng bộ đám mây (Firebase Realtime Database)</h2>
      <div class="firebase-auth-grid"><div><label>Mã phòng</label><input id="fbCode" aria-label="Mã phòng" value="${deps.escapeAttribute(input.labCode || 'khoaXN')}" ${readOnly}></div>
        <div><label>Email Firebase Authentication</label><input id="fbEmail" aria-label="Email Firebase Authentication" type="email" autocomplete="username" value="${deps.escapeAttribute(input.email || '')}"></div>
        <div><label>Mật khẩu Firebase</label><input id="fbPassword" type="password" autocomplete="current-password" placeholder="Chỉ dùng để đăng nhập, không lưu"></div></div>

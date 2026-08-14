@@ -132,10 +132,11 @@ assert.equal(ctx.testDisplayName(null), '');
 // và xóa hồ sơ mặc định không được để lại một dòng ghi đè rỗng trong state.teaRefs.
 {
   const manageSource=fs.readFileSync(path.join(__dirname,'..','assets','modules','manage-routes.js'),'utf8');
+  const teaServiceSource=fs.readFileSync(path.join(__dirname,'..','src','application','manage','tea-reference-service.ts'),'utf8');
   assert.match(manageSource,/if\(approvedDate>effective\)/,'phải chặn hồ sơ có ngày phê duyệt sau ngày hiệu lực');
   assert.match(manageSource,/confirmLabel:'Xóa TEa'/,'hộp xác nhận phải hiện đúng nhãn thao tác xóa');
   assert.doesNotMatch(manageSource,/confirmText:'Xóa TEa'/,'confirmDialog không hỗ trợ confirmText');
-  assert.match(manageSource,/teaRefIsDefault\(refKey\)&&!teaRefExternalChanged\(row,refKey\)/,'xóa TEa PXN mặc định phải dọn dòng ghi đè không còn dữ liệu riêng');
+  assert.match(teaServiceSource,/const removedRecord = isDefault && !externalChanged\(record, refKey\);/,'xóa TEa PXN mặc định phải dọn dòng ghi đè không còn dữ liệu riêng');
 }
 
 console.log('Sigma TEa layer tests passed');

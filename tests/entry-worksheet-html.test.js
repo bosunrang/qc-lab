@@ -1,0 +1,13 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','entry','entry-worksheet-html.ts')).href;
+const program=`import {entryWorksheetHtml} from ${JSON.stringify(source)}; console.log(JSON.stringify({data:entryWorksheetHtml({testName:'Glucose',lotLabel:'L1',monthOptionsHtml:'<option>Tháng 8</option>',yearOptionsHtml:'<option>2026</option>',currentMonthButtonHtml:'<button>Tháng hiện tại</button>',todayButtonHtml:'<button>Tới hôm nay</button>',levelHeadHtml:'<th>Mức 1</th>',rowsHtml:'<tr><td>14</td></tr>',columnCount:1,messageHtml:'<div>Đã lưu</div>'}),empty:entryWorksheetHtml({testName:'A',lotLabel:'L',monthOptionsHtml:'',yearOptionsHtml:'',currentMonthButtonHtml:'',todayButtonHtml:'',levelHeadHtml:'',rowsHtml:'',columnCount:2,messageHtml:''})}));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy Entry worksheet TypeScript');
+const out=JSON.parse(result.stdout);
+assert.match(out.data,/Bảng nhập QC/) && assert.match(out.data,/aria-label="Bảng nhập QC theo tháng"/) && assert.match(out.data,/<tr><td>14<\/td><\/tr>/) && assert.match(out.data,/role="status" aria-live="polite"/);
+assert.match(out.empty,/colspan="8"/) && assert.match(out.empty,/Chưa có điểm nào trong khoảng này/);
+console.log('Entry worksheet HTML TypeScript tests passed');

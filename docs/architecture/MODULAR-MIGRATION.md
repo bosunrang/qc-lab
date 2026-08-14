@@ -30,6 +30,15 @@ Không viết lại toàn bộ và không thay đổi định dạng dữ liệu
   hiện vẫn phụ thuộc các file benchmark đang bị xóa trong worktree, nên không dùng
   kết quả đó để đánh giá các thay đổi migration này.
 
+- **Checkpoint 2026-08-14 (presentation batch).** Đã chuyển thêm các renderer HTML
+  của Entry và Manage (bảng nhập, worksheet, cây, modal, cấu hình lô/TEa/lịch sử),
+  đồng thời hoàn tất lớp presentation Reagent cho toolbar, form thông tin, modal tạo/chọn,
+  bảng báo cáo, card in, SVG Scatter/Bland–Altman và trục biểu đồ. Mọi renderer mới đi
+  qua `modular-pilot.global.ts`, có unit/bridge test và a11y source-scan vẫn kiểm tra
+  heading semantic sau khi HTML được tách khỏi classic route. Đã xác minh `npm.cmd run
+  build:pilot`, `npm.cmd run typecheck`, `npm.cmd test` (471/471) và `npm.cmd run
+  ui-check` (28/28, không lỗi runtime/console).
+
 ### Việc tiếp theo (buổi sau)
 
 1. Hoàn tất các fallback presentation nhỏ còn lại trong `assets/modules/entry-routes.js`,

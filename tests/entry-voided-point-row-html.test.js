@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','entry','entry-voided-point-row-html.ts')).href;
+const program=`import {entryVoidedPointRowHtml} from ${JSON.stringify(source)}; console.log(entryVoidedPointRowHtml({pointId:'p1',dateText:'14/08/2026',levelLotText:'Mức 1 · Lô L1',valueText:'10.25',runId:'r1',voidedBy:'KTV A',reason:'Nhập sai'}));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy Entry voided point row TypeScript');
+assert.match(result.stdout,/data-qc-point-id="p1"/) && assert.match(result.stdout,/Mức 1 · Lô L1/) && assert.match(result.stdout,/class="num">10.25/) && assert.match(result.stdout,/Nhập sai/);
+console.log('Entry voided point row HTML TypeScript tests passed');

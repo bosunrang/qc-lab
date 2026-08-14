@@ -1,0 +1,13 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','manage','manage-transition-details-html.ts')).href;
+const program=`import {manageTransitionDetailsHtml} from ${JSON.stringify(source)}; console.log(JSON.stringify([manageTransitionDetailsHtml({movedLotNo:'1102',approvalText:'Nguyễn A · 14/08/2026'}),manageTransitionDetailsHtml({movedLotNo:'',approvalText:''})]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy chi tiết chuyển lô TypeScript');
+const [filled,empty]=JSON.parse(result.stdout);
+assert.match(filled.movedHtml,/Đã chuyển tiếp qua lô 1102/) && assert.match(filled.approvalHtml,/Duyệt: Nguyễn A/);
+assert.equal(empty.movedHtml,'') && assert.equal(empty.approvalHtml,'');
+console.log('Manage transition details HTML TypeScript tests passed');

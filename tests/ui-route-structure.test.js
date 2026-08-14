@@ -8,6 +8,7 @@ const QCCore=require('../assets/core.js');
 const router=read('assets/modules/router-render.js');
 const dashboard=read('assets/modules/dashboard-routes.js');
 const entry=read('assets/modules/entry-routes.js');
+const entryPointRow=read('src/presentation/entry/entry-point-table-row-html.ts');
 const westgard=read('assets/modules/westgard-routes.js');
 const modals=read('assets/modules/modals.js');
 const actions=read('assets/modules/actions-routes.js');
@@ -157,7 +158,7 @@ assert.match(actions,/ActionEvidencePresentation\.timeline\(a,rr\)/,'route timel
 for(const label of ['Ngày xảy ra','QC chạy lại','Hủy điểm','Mở hồ sơ'])assert.match(actionEvidencePresentation,new RegExp(`label: '${label}'`),`timeline NCE phải giữ mốc ${label}`);
 assert.match(actions,/function actionRerunEvidenceHtml\(/,'NCE phải có khung bằng chứng QC chạy lại riêng');
 assert.match(actions,/function openActionQcEvidence\(/,'khung bằng chứng phải mở được đúng điểm QC');
-assert.match(entry,/data-qc-point-id=/,'dòng dữ liệu QC phải mang ID để liên kết từ hồ sơ NCE');
+assert.match(entryPointRow,/data-qc-point-id=/,'dòng dữ liệu QC phải mang ID để liên kết từ hồ sơ NCE');
 assert.match(entry,/rangeSummary=allSt\?`N=\$\{allSt\.n\}/,'thống kê toàn bộ phải dùng ký hiệu N viết hoa');
 assert.match(actions,/function openActionQcEvidence[\s\S]*entryDetailOpen\.add\('points'\)[\s\S]*go\('entry'\)/,'mở bằng chứng NCE phải bung khối điểm QC trước khi tô sáng dòng');
 

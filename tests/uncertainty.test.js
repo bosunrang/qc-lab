@@ -238,6 +238,7 @@ assert.equal(ctx.sgMuBiasMode(null), 'include');
 
 const sigmaSrc = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'sigma.js'), 'utf8');
 const reportsSrc = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'reports.js'), 'utf8');
+const muPrintRowsSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'sigma', 'sigma-mu-print-rows.ts'), 'utf8');
 const coreSrc = fs.readFileSync(path.join(__dirname, '..', 'assets', 'core.js'), 'utf8');
 
 assert.match(sigmaSrc, /<details class="panel sg-collapse-panel sg-mu-panel"><summary class="sg-collapse-summary"><span role="heading" aria-level="2">Độ không đảm bảo đo \(MU\)<\/span><\/summary><div id="sgMUAction" class="sg-data-head-actions"><\/div><div id="sgMU">/, 'panel MU phải thu gọn được, giữ heading cấp 2 và đặt nút CoA cạnh summary thay vì lồng control focus');
@@ -250,8 +251,9 @@ assert.doesNotMatch(coreSrc, /pct\(o\.uCal\)\s*\|\|\s*0/, 'core cũng không đ�
 
 assert.match(reportsSrc, /body\+=sigmaMuPrintCard\(t,row,levels\)/, 'báo cáo Sigma theo kỳ phải kèm bảng công bố MU');
 assert.match(reportsSrc, /sigmaMuPeriodsPrintRows\(t,rows,levels\)/, 'báo cáo tổng hợp nhiều kỳ cũng phải có MU');
-assert.match(reportsSrc, /\(r&&r\.mu\)\|\|sgMU\(/, 'bản in đọc lại r.mu của sgComp() và chỉ rơi về sgMU() khi mức đó chưa ra Sigma');
-assert.match(reportsSrc, /Thiếu '\+esc\(mu\.missing\.join/, 'bản in phải nói rõ thành phần còn thiếu thay vì im lặng in ra một U đẹp');
+assert.match(reportsSrc, /sigmaMuPrintRowsService\.periodRows/, 'bản in phải gọi presentation TypeScript của ngân sách MU');
+assert.match(muPrintRowsSrc, /metric && metric\.mu \|\| deps\.mu\(test, row\.e, level\)/, 'bản in đọc lại r.mu của sgComp() và chỉ rơi về sgMU() khi mức đó chưa ra Sigma');
+assert.match(muPrintRowsSrc, /mu\.missing\.join\(', '\)/, 'bản in phải nói rõ thành phần còn thiếu thay vì im lặng in ra một U đẹp');
 assert.match(reportsSrc, /MAU\) do SOP của đơn vị ấn định/, 'báo cáo không được tự kết luận đạt/không đạt MU');
 
 console.log('Measurement uncertainty (MU) tests passed');

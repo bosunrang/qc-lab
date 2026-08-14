@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
-const ctx = loadSandbox(['modules/reports.js'], { window: { QCLAB_APP: { name: 'QC Lab', version: '2.4.0' } }, reportSignBlock: () => '', reportHeaderPresentation: model => `<div>${model.app.name} ${model.app.version}</div>`, reportQcFormat: { value: (test, value) => String(value), stat: (test, value) => String(value), point: point => String(point && point.val) } });
+const ctx = loadSandbox(['modules/reports.js'], { window: { QCLAB_APP: { name: 'QC Lab', version: '2.4.0' } }, reportSignBlock: () => '', reportHeaderPresentation: model => `<div>${model.app.name} ${model.app.version}</div>`, reportQcFormat: { value: (test, value) => String(value), stat: (test, value) => String(value), point: point => String(point && point.val) }, reportPointsTableService: items => `<table>${items.map(item => `<tr><td>${item.p.date}</td><td>${item.p.runId || '—'}</td><td>${item.p.staff || '—'}</td><td>${item.p.val}</td><td>${item.z}</td><td>${item.f.level}</td><td>${(item.f.rules || []).join(', ')}</td></tr>`).join('')}</table>` });
 run(ctx, `
   state={lab:{name:'PXN',dept:'Hóa sinh'},westgardRules:{'1-3s':true,'1-2s':false},tests:[{id:'T1',name:'Sodium',unit:'mmol/L',machine:'Máy A'}]};
   selTest='T1';

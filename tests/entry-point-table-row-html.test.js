@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','entry','entry-point-table-row-html.ts')).href;
+const program=`import {entryPointTableRowHtml} from ${JSON.stringify(source)}; console.log(entryPointTableRowHtml({rejected:true,warning:false,pointId:'p1',dateText:'14/08/2026',valueText:'10.25',zText:'+2.5s',verdictLevel:'rej',verdictText:'Loại',rulesHtml:'<span class="pill">1-3s</span>',voidButtonHtml:'<button>Hủy</button>'}));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy Entry point table row TypeScript');
+assert.match(result.stdout,/class="qc-point-rej"/) && assert.match(result.stdout,/data-qc-point-id="p1"/) && assert.match(result.stdout,/<b>10.25<\/b>/) && assert.match(result.stdout,/\+2.5s/) && assert.match(result.stdout,/tag rej/) && assert.match(result.stdout,/<button>Hủy<\/button>/);
+console.log('Entry point table row HTML TypeScript tests passed');

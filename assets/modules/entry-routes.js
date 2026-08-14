@@ -28,10 +28,10 @@ function pageEntry(rightOnly=false){
        — ARIA tree chỉ được phép chứa treeitem/group, aria-required-children sẽ báo lỗi
        nếu heading/input/select nằm trực tiếp trong đó. CSS `.tree h4`/`.tree-tools ...`
        vẫn là descendant selector nên không cần đổi gì ở CSS. */
-    treeHead=`<div class="entry-tree-head"><h4 role="heading" aria-level="2">Danh mục nội kiểm</h4>${btn(treePanelIcon,'toggleEntryTree()','ghost icon entry-tree-toggle','Ẩn danh mục nội kiểm',{attrs:{'aria-label':'Ẩn danh mục nội kiểm','aria-controls':'entryTreePanel','aria-expanded':'true'}})}</div><div class="tree-tools"><input id="entrySearch" aria-label="Tìm xét nghiệm, máy hoặc lô" placeholder="Tìm test, máy hoặc lô..." value="${escAttr(entryQ)}" oninput="entryFilter(this.value)"><select aria-label="Lọc theo máy xét nghiệm" onchange="entrySetMachine(this.value)">${machineOpts}</select></div>`;
-    if(!machines.length)tree+='<div class="tree-empty" role="presentation">Không có xét nghiệm phù hợp.</div>';
+    treeHead=globalThis.entryTreeHeaderHtml({collapseButtonHtml:btn(treePanelIcon,'toggleEntryTree()','ghost icon entry-tree-toggle','Ẩn danh mục nội kiểm',{attrs:{'aria-label':'Ẩn danh mục nội kiểm','aria-controls':'entryTreePanel','aria-expanded':'true'}}),query:entryQ,machineOptionsHtml:machineOpts});
+    if(!machines.length)tree+=globalThis.entryTreeItemHtml.empty();
     machines.forEach(mc=>{const mk='m:'+mc,mo=treeOpen.has(mk);
-    tree+=`<div class="tnode tn-machine" data-tree-role="machine" data-key="${escAttr(mk)}" role="treeitem" tabindex="0" aria-expanded="${mo}" onclick="treeToggle('${jsq(mk)}')" onkeydown="entryTreeKey(event)"><span class="caret" aria-hidden="true">${mo?'−':'+'}</span>${esc(mc)}</div>`;
+    tree+=globalThis.entryTreeItemHtml.machine({key:mk,open:mo,label:mc,toggleKey:jsq(mk)});
     const groups=new Map();byM.get(mc).forEach(t=>{const g=operationalLotGroupForTest(t);if(!groups.has(g.key))groups.set(g.key,{name:g.name,tests:[],order:operationalTestOrder(t)});const grp=groups.get(g.key);grp.tests.push(t);grp.order=Math.min(grp.order,operationalTestOrder(t));});
     [...groups.entries()].sort((a,b)=>a[1].order-b[1].order||a[1].name.localeCompare(b[1].name,'vi')).forEach(([groupKey,grp])=>{
         const gk='lg:'+mc+'|'+groupKey,go=treeOpen.has(gk),ord={none:-1,ok:0,warn:1,rej:2};let groupWorst='none';
@@ -39,8 +39,8 @@ function pageEntry(rightOnly=false){
           levels.forEach(l=>{const pts=pointsForLot(t.id,l.level,l.lot||''),lastPoint=pts[pts.length-1],last=lastPoint&&wg.byPoint.get(lastPoint.id)||null,lastLevel=last?last.level:'none';if(ord[lastLevel]>ord[worst])worst=lastLevel;});
           if(ord[worst]>ord[groupWorst])groupWorst=worst;
           const s=searchText([t.name,testDisplayName(t),t.machine,grp.name,...levels.map(l=>l.lot)].join(' '));
-          return `<div class="tnode tn-config ${on?'on':''}" data-tree-role="assay" data-test-id="${escAttr(t.id)}" data-search="${escAttr(s)}" role="treeitem" tabindex="0" aria-current="${on?'true':'false'}" style="${mo&&go?'':'display:none'}" onclick="entryPick('${t.id}',${preferred?preferred.level:1})" onkeydown="entryTreeKey(event)"><span class="config-name">${esc(testDisplayName(t))}</span><span class="state ${worst==='none'?'':worst}">${stateName(worst)}</span></div>`;});
-        tree+=`<div class="tnode tn-test ${go?'open':''}" data-tree-role="group" data-key="${escAttr(gk)}" data-search="${escAttr(searchText(grp.name+' '+grp.tests.map(t=>t.name).join(' ')))}" role="treeitem" tabindex="0" aria-expanded="${go}" style="${mo?'':'display:none'}" onclick="treeToggle('${jsq(gk)}')" onkeydown="entryTreeKey(event)"><span class="caret" aria-hidden="true">${go?'−':'+'}</span>${esc(grp.name)}<span class="state ${groupWorst==='none'?'':groupWorst}">${stateName(groupWorst)}</span></div>`;
+          return globalThis.entryTreeItemHtml.assay({testId:t.id,search:s,selected:on,visible:mo&&go,level:preferred?preferred.level:1,name:testDisplayName(t),stateClass:worst==='none'?'':worst,stateText:stateName(worst)});});
+        tree+=globalThis.entryTreeItemHtml.group({key:gk,open:go,parentOpen:mo,search:searchText(grp.name+' '+grp.tests.map(t=>t.name).join(' ')),name:grp.name,stateClass:groupWorst==='none'?'':groupWorst,stateText:stateName(groupWorst),toggleKey:jsq(gk)});
         tree+=rows.join('');
       });
     });
@@ -61,33 +61,23 @@ function pageEntry(rightOnly=false){
   const eligible=cand&&cand.eligible;
   const rangeSummary=allSt?`N=${allSt.n} · Mean thực=${fmtTestValue(t,allSt.m)} · SD thực=${fmtTestStat(t,allSt.sd)} · CV=${fmt(allSt.cv)}%`:'Chưa có dữ liệu';
   const rangeSource=l.applied==='lab'?'PXN tự xây dựng':'Nhà sản xuất';
-  const rangeBox=`<details class="panel entry-secondary-panel range-summary-panel" ${entryDetailOpen.has('range')?'open':''} ontoggle="entryDetailToggled('range',this.open)"><summary class="entry-secondary-summary"><span>Thống kê toàn bộ &amp; Dải kiểm soát</span><small>${rangeSummary}</small></summary>
-     <div class="entry-secondary-body"><div class="range-band-note"><div class="range-band-label">Dải đang dùng:</div><div class="range-band-source">${rangeSource}</div><div class="range-band-body">· Mean=${fmtTestValue(t,l.mean)} SD=${fmtTestValue(t,l.sd)}.
-       ${eligible?` Đủ điều kiện lập dải mới (${candStats?candStats.n:0} kết quả / ${cand.days} ngày độc lập). Dải đề xuất: Mean=${candStats?fmtTestValue(t,candStats.m):'—'} SD=${candStats?fmtTestValue(t,candStats.sd):'—'} CV=${candStats?fmt(candStats.cv):'—'}%.`:` Cần ≥20 kết quả trên ≥20 ngày độc lập, không có điểm vi phạm/cảnh báo chưa xử lý — hiện ${candStats?candStats.n:0} kết quả / ${cand?cand.days:0} ngày.`}</div></div>
-     ${rangeActions(t.id,l.level,eligible,l.applied)}</div></details>`;
+  const rangeBox=globalThis.entryRangeSummaryHtml({open:entryDetailOpen.has('range'),summary:rangeSummary,source:rangeSource,mean:fmtTestValue(t,l.mean),sd:fmtTestValue(t,l.sd),eligible,resultCount:candStats?candStats.n:0,dayCount:cand?cand.days:0,proposedMean:candStats?fmtTestValue(t,candStats.m):'—',proposedSd:candStats?fmtTestValue(t,candStats.sd):'—',proposedCv:candStats?fmt(candStats.cv):'—',actionsHtml:rangeActions(t.id,l.level,eligible,l.applied)});
   // Lô cũ (đã chuyển tiếp) chỉ gắn với cột lô đang dùng, không áp cho cột song song.
   const levelViews=entryCols.map(x=>{if(x.parallel)return{x,prevView:null};const prevSeries=previousLotSeries(t,x.level),prevLot=entryPrevOpen.get(t.id+'|'+x.level)||'';return{x,prevView:prevSeries.find(s=>(s.lot||'')===prevLot)};});
   const tableCards=levelViews.map(({x,prevView})=>{
     const lvlMean=prevView?prevView.mean:x.mean,lvlSd=prevView?prevView.sd:x.sd,lvlLot=prevView?prevView.lot:x.lot;
     const allIdx=prevView?prevView.pts:colPointsIdx(x),allPtsIdx=prevView?allIdx:allIdx.filter(p=>p.date>=W.start&&p.date<=W.end),tableKey=`${t.id}|${x.key}|${lvlLot||''}|${W.start}|${W.end}`,rowWindow=entryRowsWindow(allPtsIdx,tableKey),ptsIdx=rowWindow.rows,cumulativePts=prevView?allIdx:allIdx.filter(p=>p.date<=W.end),cumulativeSt=stats(cumulativePts.map(p=>p.val));
     const prevWg=prevView?QCCore.westgardByPoint(ptsIdx,lvlMean,lvlSd,rule=>testRuleOnWithin(t,rule)):null;
-    const rows=ptsIdx.map((p,i)=>{const rawPrev=prevView&&prevWg.F[i],verdict=prevView?(rawPrev?{...rawPrev,level:ruleResultLevel(t,rawPrev.rules||[]),z:prevWg.zs[i]}:{level:'ok',rules:[]}):colVerdict(x,p),view=EntryService.buildPointView({point:p,verdict,mean:lvlMean,sd:lvlSd,previousLot:prevView?prevView.lot:undefined}),lv=qcVerdictLabel(view.level),rowCls=view.level==='rej'?' class="qc-point-rej"':view.level==='warn'?' class="qc-point-warn"':'',voidBtn=canWrite()?btn('Hủy',`voidQcPoint('${t.id}','${p.id}')`,'danger sm','Hủy điểm QC có ghi lý do'):'',rulesHtml=[...new Set(view.rules)].map(r=>`<span class="pill">${r}</span>`).join('')||'—';
-      return `<tr${rowCls} data-qc-point-id="${escAttr(p.id||'')}" tabindex="-1"><td>${vnDate(p.date)}</td><td class="num"><b>${fmtPointValue(p,t)}</b></td><td class="num">${view.z>=0?'+':''}${fmt(view.z)}s</td><td><span class="tag ${view.level}">${lv}</span></td><td>${rulesHtml}</td><td class="qc-row-actions">${voidBtn}</td></tr>`;}).join('');
-    const cumulative=`<div class="qc-cumulative" title="Tính từ đầu LOT đến ${vnDate(W.end)}">
-      <div><span>N tích lũy</span><b>${cumulativeSt?cumulativeSt.n:0}</b></div>
-      <div><span>Mean tích lũy</span><b>${cumulativeSt?fmtTestValue(t,cumulativeSt.m):'—'}</b></div>
-      <div><span>SD tích lũy</span><b>${cumulativeSt?fmtTestStat(t,cumulativeSt.sd):'—'}</b></div>
-      <div><span>CV tích lũy</span><b>${cumulativeSt?fmt(cumulativeSt.cv)+'%':'—'}</b></div>
-    </div>`;
-    const rowControl=rowWindow.limited?`<div class="table-window-note">Đang hiển thị ${rowWindow.rows.length}/${rowWindow.total} điểm gần nhất. ${btn('Hiện toàn bộ',`entryToggleRows('${jsq(tableKey)}')`,'ghost sm')}</div>`:rowWindow.expanded&&rowWindow.total>ENTRY_TABLE_INITIAL_ROWS?`<div class="table-window-note">Đang hiển thị toàn bộ ${rowWindow.total} điểm. ${btn('Thu gọn',`entryToggleRows('${jsq(tableKey)}')`,'ghost sm')}</div>`:'';
-    return `<div class="qc-table-card${x.parallel?' qc-parallel-card':''}" role="region" aria-label="Điểm QC mức ${x.level}, lô ${escAttr(lvlLot||'?')}${x.parallel?', lô chạy song song':''}" tabindex="0"><h4><span>Mức ${x.level} · ${prevView?'Lô cũ':'Lô'} ${esc(lvlLot||'?')}${x.parallel?' <span class="qc-parallel-label">Song song</span>':''}<span class="hint qc-table-count">${allPtsIdx.length} điểm trong khoảng</span></span></h4>${cumulative}${ptsIdx.length?`<table><thead><tr><th>Ngày</th><th class="num">Giá trị</th><th class="num">Z</th><th>Kết luận</th><th>Luật</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table>${rowControl}`:'<div class="empty qc-table-empty">Chưa có điểm nào trong khoảng này.</div>'}</div>`;}).join('');
+    const rows=ptsIdx.map((p,i)=>{const rawPrev=prevView&&prevWg.F[i],verdict=prevView?(rawPrev?{...rawPrev,level:ruleResultLevel(t,rawPrev.rules||[]),z:prevWg.zs[i]}:{level:'ok',rules:[]}):colVerdict(x,p),view=EntryService.buildPointView({point:p,verdict,mean:lvlMean,sd:lvlSd,previousLot:prevView?prevView.lot:undefined}),lv=qcVerdictLabel(view.level),voidBtn=canWrite()?btn('Hủy',`voidQcPoint('${t.id}','${p.id}')`,'danger sm','Hủy điểm QC có ghi lý do'):'',rulesHtml=[...new Set(view.rules)].map(r=>`<span class="pill">${r}</span>`).join('')||'—';
+      return globalThis.entryPointTableRowHtml({rejected:view.level==='rej',warning:view.level==='warn',pointId:escAttr(p.id||''),dateText:vnDate(p.date),valueText:fmtPointValue(p,t),zText:`${view.z>=0?'+':''}${fmt(view.z)}s`,verdictLevel:view.level,verdictText:lv,rulesHtml,voidButtonHtml:voidBtn});}).join('');
+    const cumulative=globalThis.entryCumulativeStatsHtml({endDateText:vnDate(W.end),count:cumulativeSt?cumulativeSt.n:0,mean:cumulativeSt?fmtTestValue(t,cumulativeSt.m):'—',sd:cumulativeSt?fmtTestStat(t,cumulativeSt.sd):'—',cv:cumulativeSt?fmt(cumulativeSt.cv)+'%':'—'});
+    const rowControl=globalThis.entryTableWindowNoteHtml({limited:rowWindow.limited,expanded:rowWindow.expanded&&rowWindow.total>ENTRY_TABLE_INITIAL_ROWS,shown:rowWindow.rows.length,total:rowWindow.total,actionButtonHtml:btn(rowWindow.limited?'Hiện toàn bộ':'Thu gọn',`entryToggleRows('${jsq(tableKey)}')`,'ghost sm')});
+    return globalThis.entryPointTableCardHtml({parallel:x.parallel,level:x.level,previousLot:!!prevView,lot:esc(lvlLot||'?'),pointCount:allPtsIdx.length,bodyHtml:`${cumulative}${ptsIdx.length?`<table><thead><tr><th>Ngày</th><th class="num">Giá trị</th><th class="num">Z</th><th>Kết luận</th><th>Luật</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table>${rowControl}`:'<div class="empty qc-table-empty">Chưa có điểm nào trong khoảng này.</div>'}`});}).join('');
   const prevLotByLevel=new Map(levelViews.filter(v=>v.prevView).map(v=>[v.x.level,v.prevView.lot]));
-  const voidedRows=(state.data[t.id]||[]).filter(p=>{if(!p.voided)return false;const pv=prevLotByLevel.get(p.level);return pv!=null?(p.lot||'')===pv:(p.date>=W.start&&p.date<=W.end);}).sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))||pointRunNo(a)-pointRunNo(b)).map(p=>`<tr data-qc-point-id="${escAttr(p.id||'')}" tabindex="-1"><td>${vnDate(p.date)}</td><td>Mức ${p.level} · Lô ${esc(p.lot||'?')}</td><td class="num">${fmtPointValue(p,t)}</td><td>${esc(p.runId||'—')}</td><td>${esc(p.voidedBy||'')}</td><td>${esc(p.voidReason||'')}</td></tr>`).join('');
-  const voidedBox=voidedRows?`<div class="qc-voided-box"><h4>Điểm đã hủy trong khoảng</h4><table class="qc-voided-table"><thead><tr><th>Ngày</th><th>Mức / lô</th><th class="num">Giá trị</th><th>Lần chạy</th><th>Người hủy</th><th>Lý do</th></tr></thead><tbody>${voidedRows}</tbody></table></div>`:'';
-  const pointsInView=`<details class="panel entry-secondary-panel qc-points-panel" ${entryDetailOpen.has('points')?'open':''} ontoggle="entryDetailToggled('points',this.open)"><summary class="entry-secondary-summary"><span>Điểm trong khoảng xem</span><small>Tra cứu chi tiết, luật vi phạm và điểm đã hủy</small></summary><div class="entry-secondary-body">
-    <div class="hint qc-cumulative-note">Thống kê tích lũy tính từ đầu LOT đến ${vnDate(W.end)}; bảng bên dưới hiển thị từ ${vnDate(W.start)} đến ${vnDate(W.end)}.</div>
-    <div class="qc-table-grid">${tableCards}</div>${voidedBox}</div></details>`;
-  const dayBtn=n=>`<button class="${!entryStart&&entryDays===n?'on':''}" onclick="entrySetDays(${n})">${n} ngày</button>`;
+  const voidedRows=(state.data[t.id]||[]).filter(p=>{if(!p.voided)return false;const pv=prevLotByLevel.get(p.level);return pv!=null?(p.lot||'')===pv:(p.date>=W.start&&p.date<=W.end);}).sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))||pointRunNo(a)-pointRunNo(b)).map(p=>globalThis.entryVoidedPointRowHtml({pointId:escAttr(p.id||''),dateText:vnDate(p.date),levelLotText:`Mức ${p.level} · Lô ${esc(p.lot||'?')}`,valueText:fmtPointValue(p,t),runId:esc(p.runId||'—'),voidedBy:esc(p.voidedBy||''),reason:esc(p.voidReason||'')})).join('');
+  const voidedBox=globalThis.entryVoidedPointsHtml(voidedRows);
+  const pointsInView=globalThis.entryPointsPanelHtml({open:entryDetailOpen.has('points'),endDateText:vnDate(W.end),startDateText:vnDate(W.start),tableCardsHtml:tableCards,voidedBoxHtml:voidedBox});
+  const dayBtns=globalThis.entryDayPresetButtons(entryDays,!!entryStart);
   entryLjRenderCache={testId:t.id,start:W.start,end:W.end,levels:new Map()};
   const ljStack=entryCols.map(x=>{const on=x.level===entrySel.level&&!x.parallel,
       // Lô song song dùng chính điểm của nó (không qua acceptedLotPoints — helper đó
@@ -95,11 +85,10 @@ function pageEntry(rightOnly=false){
       curPts=(x.parallel?entryColumnPoints(t,x):acceptedForLevel(x.level)).filter(p=>p.date>=W.start&&p.date<=W.end&&(p.lot||'')===(x.lot||'')),
       prevSeries=x.parallel?[]:previousLotSeries(t,x.level),prevLot=entryPrevOpen.get(t.id+'|'+x.level)||'',prevView=prevSeries.find(s=>(s.lot||'')===prevLot),targetCfg=prevView||entryColumnCfg(t,x.level,x.lot),chartPts=prevView?prevView.pts:curPts,chartLot=prevView?prevView.lot:x.lot,chartMean=targetCfg&&targetCfg.mean,chartSd=targetCfg&&targetCfg.sd,st=stats(chartPts.map(p=>p.val));
     entryLjRenderCache.levels.set(`${x.level}|${chartLot||''}`,chartPts);
-    const metric=(k,v,control=false)=>`<div class="lj-qc-stat${control?' control':''}"><span class="k">${k}</span><span class="v">${v}</span></div>`;
-    const strip=metric('Mean thực',st?fmtTestValue(t,st.m):'—')+metric('SD thực',st?fmtTestStat(t,st.sd):'—')+metric('CV thực',st?fmt(st.cv)+'%':'—')+metric('Mean mục tiêu',fmtTestValue(t,chartMean),true)+metric('SD mục tiêu',fmtTestStat(t,chartSd),true);
+    const metrics=[{label:'Mean thực',value:st?fmtTestValue(t,st.m):'—'},{label:'SD thực',value:st?fmtTestStat(t,st.sd):'—'},{label:'CV thực',value:st?fmt(st.cv)+'%':'—'},{label:'Mean mục tiêu',value:fmtTestValue(t,chartMean),control:true},{label:'SD mục tiêu',value:fmtTestStat(t,chartSd),control:true}];
     const prevBtn=x.parallel?'<span class="hint">Đang đánh giá</span>':prevSeries.length?(prevView?btn('Xem lô mới',`event.stopPropagation();entryShowCurrentLot(${x.level})`,'teal sm'):btn('Xem lô cũ',`event.stopPropagation();entryShowPrevLot(${x.level},'${jsq(prevSeries[0].lot||'')}')`,'ghost sm')):`<span class="hint">${x.applied==='lab'?'Dải PXN':'Dải NSX'}</span>`;
-    return `<div class="lj-mini ${on?'on':''}${x.parallel?' lj-mini-parallel':''}" onclick="entryFocusLevel(${x.level})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();entryFocusLevel(${x.level})}" role="button" tabindex="0" aria-label="Chọn mức ${x.level}, lô ${escAttr(chartLot||'?')}, ${chartPts.length} điểm${x.parallel?', lô chạy song song':''}"><div class="lj-mini-h"><b>Mức ${x.level} · ${prevView?'Lô cũ':'Lô'} ${esc(chartLot||'?')}${x.parallel?' <span class="qc-parallel-label">Song song</span>':''}<span class="lj-point-count">${chartPts.length} điểm</span></b>${prevBtn}</div><div class="lj-qc-strip" tabindex="0">${strip}</div><div class="chart-scroll" tabindex="0"><canvas class="entryLJStack" data-render-scale="2" data-test="${t.id}" data-level="${x.level}" data-lot="${escAttr(chartLot||'')}" data-mean="${escAttr(chartMean)}" data-sd="${escAttr(chartSd)}" data-start="${W.start}" data-end="${W.end}" width="1400" height="380"></canvas></div></div>`;}).join('');
-  const levelHead=entryCols.map(x=>{const cfg=entryColumnCfg(t,x.level,x.lot),mean=Number(cfg&&cfg.mean),sd=Number(cfg&&cfg.sd),limits=Number.isFinite(mean)&&Number.isFinite(sd)?`${fmtTestValue(t,mean-2*sd)} – ${fmtTestValue(t,mean+2*sd)}`:'—',tip=`Mean ${Number.isFinite(mean)?fmtTestValue(t,mean):'—'} · SD ${Number.isFinite(sd)?fmtTestStat(t,sd):'—'} · ±2SD ${limits}`;return`<th class="qc-level-head" tabindex="0" data-qc-tooltip="${escAttr(tip)}" aria-label="Mức ${x.level}, lô ${escAttr(x.lot||'?')}. ${escAttr(tip)}">Mức ${x.level} · Lô ${esc(x.lot||'?')}${x.parallel?' <span class="qc-parallel-label">Song song</span>':''}</th>`;}).join('');
+    return globalThis.entryLeveyJenningsMiniHtml({on,parallel:x.parallel,level:x.level,lot:chartLot||'',pointCount:chartPts.length,previousLot:!!prevView,metrics,actionHtml:prevBtn,testId:t.id,mean:chartMean,sd:chartSd,start:W.start,end:W.end});}).join('');
+  const levelHead=globalThis.entrySheetLevelHeads(entryCols.map(x=>{const cfg=entryColumnCfg(t,x.level,x.lot),mean=Number(cfg&&cfg.mean),sd=Number(cfg&&cfg.sd),limits=Number.isFinite(mean)&&Number.isFinite(sd)?`${fmtTestValue(t,mean-2*sd)} – ${fmtTestValue(t,mean+2*sd)}`:'—',tooltip=`Mean ${Number.isFinite(mean)?fmtTestValue(t,mean):'—'} · SD ${Number.isFinite(sd)?fmtTestStat(t,sd):'—'} · ±2SD ${limits}`;return{level:x.level,lot:x.lot||'',parallel:x.parallel,tooltip};}));
   const sheetCalendar=EntryService.buildSheetCalendar(entrySheetMonth,isoToday()),activeSheetMonth=sheetCalendar.activeMonth;
   entrySheetMonth=activeSheetMonth;
   const sheetYear=sheetCalendar.year,sheetMonthNo=sheetCalendar.month,sheetStart=sheetCalendar.start,sheetEnd=sheetCalendar.end;
@@ -128,40 +117,26 @@ function pageEntry(rightOnly=false){
     };
     const cells=entryCols.map((x,levelIdx)=>{let levelHasPoint=false,emptyShown=false;
       const levelRunNos=levelRuns(x).map(r=>r.runNo),nextLevelRunNo=levelRunNos.length?Math.max(...levelRunNos)+1:1,lotArg=jsq(x.parallel?x.lot||'':'');
-       const runInputs=dayGroup.runs.map(g=>{const p=g.levels[x.key],runArg=jsq(g.runId||'');if(!p){if(!shouldShowEmptyRun(x,g))return '';emptyShown=true;return canWrite()?`<div class="qc-run-slot"><input class="qc-inline-input empty" type="text" inputmode="decimal" autocomplete="off" placeholder="--" title="Dùng phím mũi tên để chuyển ô" aria-label="Nhập QC ngày ${vnDate(g.date)}, mức ${x.level}, lô ${escAttr(x.lot||'')}, lần ${g.runNo}" aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Enter" data-focus-date="${escAttr(g.date)}" data-focus-run="${g.runNo}" data-focus-level="${levelIdx}" onkeydown="entrySheetKey(event)" onchange="entryInlineSave('${t.id}',${x.level},'${g.date}',this.value,'${runArg}','${lotArg}')"></div>`:`<div class="qc-run-slot muted"><b>—</b></div>`;}levelHasPoint=true;
+       const runInputs=dayGroup.runs.map(g=>{const p=g.levels[x.key],runArg=jsq(g.runId||'');if(!p){if(!shouldShowEmptyRun(x,g))return '';emptyShown=true;return globalThis.entrySheetEmptyRunHtml({editable:canWrite(),title:'Dùng phím mũi tên để chuyển ô',ariaLabel:`Nhập QC ngày ${vnDate(g.date)}, mức ${x.level}, lô ${escAttr(x.lot||'')}, lần ${g.runNo}`,date:escAttr(g.date),runNo:g.runNo,levelIndex:levelIdx,changeAction:`entryInlineSave('${t.id}',${x.level},'${g.date}',this.value,'${runArg}','${lotArg}')`});}levelHasPoint=true;
         const isPrev=!!p._prevLot,pMean=isPrev&&Number.isFinite(+p.qcMean)?+p.qcMean:x.mean,pSd=isPrev&&Number.isFinite(+p.qcSd)?+p.qcSd:x.sd;
         const verdict=isPrev?{level:'ok',rules:[]}:colVerdict(x,p),view=EntryService.buildPointView({point:p,verdict,mean:pMean,sd:pSd,previousLot:isPrev?p._prevLot:undefined}),lv=qcVerdictLabel(view.level);
-        return `<div class="qc-run-slot${isPrev?' prev-lot-slot':''}"><b class="qc-value-chip ${view.valueClass}" title="${isPrev?'Lô cũ '+escAttr(p._prevLot)+' · đã chuyển tiếp · chỉ đọc':'Đã lưu, không sửa trực tiếp'}">${fmtPointValue(p,t)}</b><small>${view.z>=0?'+':''}${fmt(view.z)}s · ${isPrev?'Lô '+esc(p._prevLot):lv}</small></div>`;}).join('');
-      const addRunBtn=canWrite()&&levelHasPoint&&!emptyShown?`<button type="button" class="qc-add-run-btn" title="Thêm lần chạy bổ sung" onclick="entryUnlockExtraRun('${t.id}','${jsq(x.key)}','${dayGroup.date}',${levelIdx},${nextLevelRunNo})"><span class="qc-add-run-icon">+</span><span class="qc-add-run-label">Thêm</span></button>`:'';
-      return `<td class="num qc-run-cell${x.parallel?' qc-parallel-cell':''}"><div class="qc-run-grid${addRunBtn?' has-add-btn':''}">${runInputs}</div>${addRunBtn}</td>`;}).join('');
+        return globalThis.entrySheetSavedRunHtml({previousLot:isPrev,previousLotName:esc(p._prevLot||''),valueClass:view.valueClass,title:isPrev?'Lô cũ '+escAttr(p._prevLot)+' · đã chuyển tiếp · chỉ đọc':'Đã lưu, không sửa trực tiếp',valueText:fmtPointValue(p,t),zText:`${view.z>=0?'+':''}${fmt(view.z)}s`,verdictText:lv});}).join('');
+      const addRunBtn=globalThis.entrySheetAddRunHtml({visible:canWrite()&&levelHasPoint&&!emptyShown,action:`entryUnlockExtraRun('${t.id}','${jsq(x.key)}','${dayGroup.date}',${levelIdx},${nextLevelRunNo})`});
+      return globalThis.entrySheetCellHtml({parallel:x.parallel,hasAddButton:!!addRunBtn,runInputsHtml:runInputs,addRunButtonHtml:addRunBtn});}).join('');
     const staff=[...new Map(dayGroup.runs.flatMap(g=>Object.values(g.levels)).map(p=>pointStaff(p)).filter(x=>x.code).map(x=>[x.code,x])).values()];
-    const staffCell=staff.length?staff.map(x=>`<span class="qc-staff" title="${escAttr(x.name||x.code)}">${esc(x.code)}</span>`).join('<span class="qc-staff-sep">/</span>'):'—';
-    const status=!hasPoint?'—':worst==='rej'?'<span class="tag rej">R</span>':worst==='warn'?'<span class="tag warn">W(A)</span>':'<span class="tag ok">A</span>';
+    const staffCell=globalThis.entrySheetDaySummaryHtml.staff(staff);
+    const status=globalThis.entrySheetDaySummaryHtml.status(hasPoint,worst);
     const autoNote=rulesAll.length?(worst==='rej'?errorType([...new Set(rejRules.length?rejRules:rulesAll)]):'Theo dõi / cảnh báo'):'';
     const datePoints=dayGroup.runs.flatMap(g=>Object.values(g.levels)).filter(Boolean);
     const manualNote=(datePoints.find(p=>String(p.note||'').trim())||{}).note||'';
-    const note=hasPoint?(canWrite()?`<textarea class="qc-note-input" rows="1" placeholder="${escAttr(autoNote||'Nhập ghi chú...')}" onchange="entryDateNoteSave('${t.id}','${dayGroup.date}',this.value)">${esc(manualNote)}</textarea>`:(manualNote?esc(manualNote):(autoNote||'—'))):'—';
+    const note=globalThis.entrySheetNoteHtml({hasPoint,writable:canWrite(),placeholder:escAttr(autoNote||'Nhập ghi chú...'),changeAction:`entryDateNoteSave('${t.id}','${dayGroup.date}',this.value)`,manualNote:esc(manualNote),autoNote});
     const liveCols=entryCols.filter(x=>!x.parallel),doneLevels=liveCols.filter(x=>dayGroup.runs.some(g=>g.levels[x.key])).length,rowCls=[dayGroup.date===today?'today':'',dayGroup.date<=today&&doneLevels<liveCols.length?'missing':'',hasPoint?'has-data':''].filter(Boolean).join(' ');
-    return `<tr class="${rowCls}" data-date="${dayGroup.date}"><td><span>${dateObj(dayGroup.date).getDate()}</span>${dayGroup.date===today?'<b>Hôm nay</b>':''}</td>${cells}<td class="qc-staff-cell">${staffCell}</td><td>${[...new Set(warnRules)].join(', ')||'—'}</td><td>${[...new Set(rejRules)].join(', ')||'—'}</td><td>${status}</td><td>${note}</td></tr>`;}).join('');
-  const worksheet=`<div class="panel qc-sheet-panel"><div class="qc-sheet-heading">
-      <div class="qc-sheet-title"><span>Bảng nhập QC</span><strong>${esc(testDisplayName(t))}</strong><small>Lô ${esc(entryLotLabels(entryCols))}</small></div>
-      <div class="qc-month-area"><div class="qc-month-picker"><select aria-label="Chọn tháng" onchange="entrySetSheetPart('month',this.value)">${sheetMonthOptions}</select><select aria-label="Chọn năm" onchange="entrySetSheetPart('year',this.value)">${sheetYearOptions}</select>${btn('Tháng hiện tại','entrySetSheetMonth(isoMonth())','ghost sm qc-current-month')}${btn('Tới hôm nay','entryGoToday()','teal sm qc-today-jump')}</div></div></div>
-      <div class="qc-sheet-wrap" role="region" aria-label="Bảng nhập QC theo tháng" tabindex="0"><table class="qc-sheet"><thead><tr><th>Ngày</th>${levelHead}<th>NV thực hiện</th><th>Vi phạm cảnh báo</th><th>Vi phạm loại bỏ</th><th>Chấp nhận</th><th>Ghi chú</th></tr></thead>
-       <tbody>${sheetRows||`<tr><td colspan="${6+entryCols.length}" class="empty-cell">Chưa có điểm nào trong khoảng này.</td></tr>`}</tbody></table></div>
-      <div id="entryMsg" role="status" aria-live="polite" style="margin:12px 16px 16px">${entryLastMsg}</div></div>`;
-  const right=`${worksheet}
-   <div class="panel"><div class="lj-toolbar">
-        <h2 class="panel-title">Biểu đồ Levey-Jennings</h2>
-        <div class="lj-filter"><label class="lj-date-field"><span class="hint">Từ ngày</span>${dateBox('entryStartDate',W.start,'','onchange="entrySetStart(this.value)"')}</label><label class="lj-date-field"><span class="hint">Đến ngày</span>${dateBox('entryEndDate',W.end,'','onchange="entrySetEnd(this.value)"')}</label><div class="dayseg">${dayBtn(7)}${dayBtn(14)}${dayBtn(30)}${dayBtn(60)}${dayBtn(90)}</div></div></div>
-      <div class="hint lj-range">Khoảng xem: ${vnDate(W.start)} – ${vnDate(W.end)} · ${operationalLevels(t).length} mức QC</div>
-      <div class="lj-stack">${ljStack}</div>
-      <div class="legend"><span><span class="dot" style="background:#0e8f8f"></span> Trong ±2SD</span><span><span class="dot" style="background:#dd8b1f"></span> Cảnh báo 2–3SD</span><span><span class="dot" style="background:#c5221f"></span> Loại bỏ ngoài 3SD</span></div></div>
-   ${pointsInView}
-   ${rangeBox}`;
+    return globalThis.entrySheetDayRowHtml({rowClass:rowCls,date:dayGroup.date,dayOfMonth:dateObj(dayGroup.date).getDate(),today:dayGroup.date===today,cellsHtml:cells,staffHtml:staffCell,warningRules:[...new Set(warnRules)].join(', '),rejectRules:[...new Set(rejRules)].join(', '),statusHtml:status,noteHtml:note});}).join('');
+  const worksheet=globalThis.entryWorksheetHtml({testName:esc(testDisplayName(t)),lotLabel:esc(entryLotLabels(entryCols)),monthOptionsHtml:sheetMonthOptions,yearOptionsHtml:sheetYearOptions,currentMonthButtonHtml:btn('Tháng hiện tại','entrySetSheetMonth(isoMonth())','ghost sm qc-current-month'),todayButtonHtml:btn('Tới hôm nay','entryGoToday()','teal sm qc-today-jump'),levelHeadHtml:levelHead,rowsHtml:sheetRows,columnCount:entryCols.length,messageHtml:entryLastMsg});
+  const right=`${worksheet}${globalThis.entryLeveyPanelHtml({startDateHtml:dateBox('entryStartDate',W.start,'','onchange="entrySetStart(this.value)"'),endDateHtml:dateBox('entryEndDate',W.end,'','onchange="entrySetEnd(this.value)"'),dayButtonsHtml:dayBtns,rangeText:`${vnDate(W.start)} – ${vnDate(W.end)} · ${operationalLevels(t).length} mức QC`,stackHtml:ljStack})}${pointsInView}${rangeBox}`;
   entryPartialRenderCache={testId:t.id,right};
   if(rightOnly)return right;
-  return headOnly('Nhập QC','Ghi nhận kết quả theo ngày, mức QC và lô đang vận hành')+
-   `<div class="entrygrid${treeCollapsed?' tree-collapsed':''}">${btn(treePanelIcon,'toggleEntryTree()','teal icon entry-tree-expand','Hiện danh mục nội kiểm',{attrs:{'aria-label':'Hiện danh mục nội kiểm','aria-controls':'entryTreePanel','aria-expanded':'false'}})}<div class="tree" id="entryTreePanel">${treeHead}<div role="tree" aria-label="Danh mục nội kiểm">${tree}</div></div><div class="entry-main">${right}</div></div>`;
+  return globalThis.entryPageLayoutHtml({pageHeadHtml:headOnly('Nhập QC','Ghi nhận kết quả theo ngày, mức QC và lô đang vận hành'),treeCollapsed,expandButtonHtml:btn(treePanelIcon,'toggleEntryTree()','teal icon entry-tree-expand','Hiện danh mục nội kiểm',{attrs:{'aria-label':'Hiện danh mục nội kiểm','aria-controls':'entryTreePanel','aria-expanded':'false'}}),treeHeadHtml:treeHead,treeHtml:tree,rightHtml:right});
 }
 function jsq(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r/g,'\\r').replace(/\n/g,'\\n').replace(/&/g,'\\u0026').replace(/</g,'\\u003c').replace(/>/g,'\\u003e').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029');}
 /* Mở/thu nhánh ngay trên DOM, không vẽ lại toàn trang: khung cây có scroll riêng nên
@@ -274,11 +249,7 @@ async function entryInlineSave(tid,level,date,value,runIdHint='',lotNo=''){
     // Native confirm()/alert() dialogs leave the Electron renderer's input
     // unresponsive after close (until the window blurs/refocuses), so
     // unusual-data confirmation goes through the app's own modal instead.
-    openModal(`<div class="modal">
-      <div class="modal-h"><h3>Cảnh báo dữ liệu bất thường</h3><button class="modal-close" onclick="closeModal();entryRenderKeepScroll()">×</button></div>
-      <div class="modal-b">${preIssues.map(x=>`<div class="alert warn">${esc(x)}</div>`).join('')}<div class="hint">Bạn vẫn muốn lưu điểm QC này?</div></div>
-      <div class="modal-f">${btn('Hủy','closeModal();entryRenderKeepScroll()','ghost')}${btn('Vẫn lưu',`closeModal();entryInlineSaveCommit('${jsq(tid)}',${level},'${jsq(date)}',${val},'${jsq(runId)}','${jsq(lotNo)}',${valueDecimals})`,'teal')}</div>
-    </div>`);
+    openModal(globalThis.entryPreSaveWarningModalHtml({issuesHtml:preIssues.map(x=>`<div class="alert warn">${esc(x)}</div>`).join(''),cancelButtonHtml:btn('Hủy','closeModal();entryRenderKeepScroll()','ghost'),saveButtonHtml:btn('Vẫn lưu',`closeModal();entryInlineSaveCommit('${jsq(tid)}',${level},'${jsq(date)}',${val},'${jsq(runId)}','${jsq(lotNo)}',${valueDecimals})`,'teal')}));
     return;
   }
   entryInlineSaveCommit(tid,level,date,val,runId,lotNo,valueDecimals);
@@ -320,24 +291,7 @@ async function voidQcPoint(tid,pointId){
   const t=state.tests.find(x=>x.id===tid),p=(state.data[tid]||[]).find(x=>x.id===pointId);
   if(!t||!p||p.voided)return;
   if(!await requireUnlockedPeriod(p.date,'hủy điểm QC'))return;
-  openModal(`<div class="modal">
-    <div class="modal-h"><h3>Hủy điểm QC</h3><button class="modal-close" onclick="closeModal()">×</button></div>
-    <div class="modal-b">
-      <div class="hint">Ngày ${vnDate(p.date)} · Mức ${p.level} · Giá trị ${fmtPointValue(p,t)}</div>
-      <label>Loại hủy</label>
-      <select id="voidKindInput" aria-label="Loại hủy điểm QC" onchange="syncVoidNceChoice()">
-        <option value="analytical">Kết quả QC thực tế không hợp lệ</option>
-        <option value="data-entry">Nhập sai dữ liệu</option>
-        <option value="other">Lý do khác</option>
-      </select>
-      <div class="void-nce-choice"><label><input id="voidOpenNce" type="checkbox" checked disabled> Lập hồ sơ NCE và yêu cầu chạy lại QC</label><div id="voidNceHint" class="hint">Hệ thống sẽ mở hoặc tái sử dụng hồ sơ NCE và chờ một kết quả QC chạy lại được chấp nhận.</div></div>
-      <div id="voidReasonBox"><label id="voidReasonLabel">Ghi chú / bằng chứng (khuyến nghị)</label>
-        <textarea id="voidReasonInput" aria-label="Ghi chú lý do hủy điểm QC" placeholder="VD: Máy báo lỗi hút mẫu lúc 08:15, đã ghi nhận trong sổ bảo trì..." oninput="document.getElementById('voidReasonErr').style.display='none'"></textarea>
-        <div id="voidReasonErr" class="hint field-error">Cần ghi lý do hủy tối thiểu 5 ký tự.</div>
-      </div>
-    </div>
-    <div class="modal-f">${btn('Đóng','closeModal()','ghost')}${btn('Xác nhận hủy',`confirmVoidQcPoint('${tid}','${pointId}')`,'danger')}</div>
-  </div>`);
+  openModal(globalThis.entryVoidModalHtml({pointInfoHtml:`Ngày ${vnDate(p.date)} · Mức ${p.level} · Giá trị ${fmtPointValue(p,t)}`,closeButtonHtml:'<button class="modal-close" onclick="closeModal()">×</button>',closeFooterButtonHtml:btn('Đóng','closeModal()','ghost'),confirmButtonHtml:btn('Xác nhận hủy',`confirmVoidQcPoint('${tid}','${pointId}')`,'danger')}));
   setTimeout(()=>{const e=document.getElementById('voidKindInput');if(e)e.focus();},50);
 }
 async function confirmVoidQcPoint(tid,pointId){

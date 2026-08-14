@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','manage','manage-empty-panel-html.ts')).href;
+const program=`import {manageEmptyPanelHtml} from ${JSON.stringify(source)}; console.log(manageEmptyPanelHtml('<section><h3>Chưa có dữ liệu</h3></section>'));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy panel rỗng Cấu hình TypeScript');
+assert.match(result.stdout,/class="panel"/) && assert.match(result.stdout,/Chưa có dữ liệu/);
+console.log('Manage empty panel HTML TypeScript tests passed');

@@ -1,0 +1,13 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','manage','tea-reference-table-html.ts')).href;
+const program=`import {teaReferenceTableHtml} from ${JSON.stringify(source)}; console.log(JSON.stringify([teaReferenceTableHtml({rowsHtml:'<tr><td>Glucose</td></tr>',emptyHtml:'<p>Trống</p>'}),teaReferenceTableHtml({rowsHtml:'',emptyHtml:'<p>Trống</p>'})]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy bảng TEa TypeScript');
+const [table,empty]=JSON.parse(result.stdout);
+assert.match(table,/tea-ref-panel/) && assert.match(table,/TEa chuẩn hóa %/) && assert.match(table,/<td>Glucose<\/td>/);
+assert.match(empty,/tea-ref-panel/) && assert.match(empty,/<p>Trống<\/p>/) && assert.doesNotMatch(empty,/<table/);
+console.log('Tea reference table HTML TypeScript tests passed');

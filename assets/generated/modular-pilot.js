@@ -4058,7 +4058,7 @@
 			const readOnly = locked ? "readonly" : "";
 			const config = input.config ? JSON.stringify(input.config, null, 2) : "";
 			const lockNote = locked ? `<div class="hint flow-note">Bản deploy này khóa sẵn <code>${deps.escape(input.dataPath || "")}</code>. Muốn đổi mã phòng cần sửa <code>assets/modules/app-meta.js</code>.</div>` : "";
-			return `<div class="panel firebase-sync-panel"><h2 class="panel-title">Đồng bộ Đám mây (Firebase Realtime Database)</h2>
+			return `<div class="panel firebase-sync-panel"><h2 class="panel-title">Đồng bộ đám mây (Firebase Realtime Database)</h2>
      <div class="firebase-auth-grid"><div><label>Mã phòng</label><input id="fbCode" aria-label="Mã phòng" value="${deps.escapeAttribute(input.labCode || "khoaXN")}" ${readOnly}></div>
        <div><label>Email Firebase Authentication</label><input id="fbEmail" aria-label="Email Firebase Authentication" type="email" autocomplete="username" value="${deps.escapeAttribute(input.email || "")}"></div>
        <div><label>Mật khẩu Firebase</label><input id="fbPassword" type="password" autocomplete="current-password" placeholder="Chỉ dùng để đăng nhập, không lưu"></div></div>
@@ -7712,6 +7712,148 @@
 		return (levels || []).map((level) => String(level.lot || "").trim()).filter(Boolean).join(" / ") || "Chưa gán lô";
 	}
 	//#endregion
+	//#region src/presentation/entry/entry-chart-html.ts
+	function entryDayPresetButtons(days, customRange) {
+		return [
+			7,
+			14,
+			30,
+			60,
+			90
+		].map((day) => `<button class="${!customRange && days === day ? "on" : ""}" onclick="entrySetDays(${day})">${day} ngày</button>`).join("");
+	}
+	function createEntrySheetLevelHeads(deps) {
+		return (levels) => levels.map((level) => `<th class="qc-level-head" tabindex="0" data-qc-tooltip="${deps.escapeAttribute(level.tooltip)}" aria-label="Mức ${level.level}, lô ${deps.escapeAttribute(level.lot || "?")}. ${deps.escapeAttribute(level.tooltip)}">Mức ${level.level} · Lô ${deps.escape(level.lot || "?")}${level.parallel ? " <span class=\"qc-parallel-label\">Song song</span>" : ""}</th>`).join("");
+	}
+	function createEntryLeveyJenningsMiniHtml(deps) {
+		return (input) => {
+			const metrics = input.metrics.map((metric) => `<div class="lj-qc-stat${metric.control ? " control" : ""}"><span class="k">${metric.label}</span><span class="v">${metric.value}</span></div>`).join("");
+			const lot = input.lot || "?", previousLot = input.previousLot ? "Lô cũ" : "Lô";
+			return `<div class="lj-mini ${input.on ? "on" : ""}${input.parallel ? " lj-mini-parallel" : ""}" onclick="entryFocusLevel(${input.level})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();entryFocusLevel(${input.level})}" role="button" tabindex="0" aria-label="Chọn mức ${input.level}, lô ${deps.escapeAttribute(lot)}, ${input.pointCount} điểm${input.parallel ? ", lô chạy song song" : ""}"><div class="lj-mini-h"><b>Mức ${input.level} · ${previousLot} ${deps.escape(lot)}${input.parallel ? " <span class=\"qc-parallel-label\">Song song</span>" : ""}<span class="lj-point-count">${input.pointCount} điểm</span></b>${input.actionHtml}</div><div class="lj-qc-strip" tabindex="0">${metrics}</div><div class="chart-scroll" tabindex="0"><canvas class="entryLJStack" data-render-scale="2" data-test="${deps.escapeAttribute(input.testId)}" data-level="${input.level}" data-lot="${deps.escapeAttribute(input.lot)}" data-mean="${deps.escapeAttribute(input.mean)}" data-sd="${deps.escapeAttribute(input.sd)}" data-start="${input.start}" data-end="${input.end}" width="1400" height="380"></canvas></div></div>`;
+		};
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-tree-html.ts
+	function createEntryTreeHeaderHtml(deps) {
+		return (input) => `<div class="entry-tree-head"><h4 role="heading" aria-level="2">Danh mục nội kiểm</h4>${input.collapseButtonHtml}</div><div class="tree-tools"><input id="entrySearch" aria-label="Tìm xét nghiệm, máy hoặc lô" placeholder="Tìm test, máy hoặc lô..." value="${deps.escapeAttribute(input.query)}" oninput="entryFilter(this.value)"><select aria-label="Lọc theo máy xét nghiệm" onchange="entrySetMachine(this.value)">${input.machineOptionsHtml}</select></div>`;
+	}
+	function createEntryTreeItemHtml(deps) {
+		const caret = (open) => open ? "−" : "+";
+		return Object.freeze({
+			empty: () => "<div class=\"tree-empty\" role=\"presentation\">Không có xét nghiệm phù hợp.</div>",
+			machine: (input) => `<div class="tnode tn-machine" data-tree-role="machine" data-key="${deps.escapeAttribute(input.key)}" role="treeitem" tabindex="0" aria-expanded="${input.open}" onclick="treeToggle('${input.toggleKey}')" onkeydown="entryTreeKey(event)"><span class="caret" aria-hidden="true">${caret(input.open)}</span>${deps.escape(input.label)}</div>`,
+			group: (input) => `<div class="tnode tn-test ${input.open ? "open" : ""}" data-tree-role="group" data-key="${deps.escapeAttribute(input.key)}" data-search="${deps.escapeAttribute(input.search)}" role="treeitem" tabindex="0" aria-expanded="${input.open}" style="${input.parentOpen ? "" : "display:none"}" onclick="treeToggle('${input.toggleKey}')" onkeydown="entryTreeKey(event)"><span class="caret" aria-hidden="true">${caret(input.open)}</span>${deps.escape(input.name)}<span class="state ${input.stateClass}">${deps.escape(input.stateText)}</span></div>`,
+			assay: (input) => `<div class="tnode tn-config ${input.selected ? "on" : ""}" data-tree-role="assay" data-test-id="${deps.escapeAttribute(input.testId)}" data-search="${deps.escapeAttribute(input.search)}" role="treeitem" tabindex="0" aria-current="${input.selected ? "true" : "false"}" style="${input.visible ? "" : "display:none"}" onclick="entryPick('${input.testId}',${input.level})" onkeydown="entryTreeKey(event)"><span class="config-name">${deps.escape(input.name)}</span><span class="state ${input.stateClass}">${deps.escape(input.stateText)}</span></div>`
+		});
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-range-summary-html.ts
+	function entryRangeSummaryHtml(input) {
+		const detail = input.eligible ? ` Đủ điều kiện lập dải mới (${input.resultCount} kết quả / ${input.dayCount} ngày độc lập). Dải đề xuất: Mean=${input.proposedMean} SD=${input.proposedSd} CV=${input.proposedCv}%.` : ` Cần ≥20 kết quả trên ≥20 ngày độc lập, không có điểm vi phạm/cảnh báo chưa xử lý — hiện ${input.resultCount} kết quả / ${input.dayCount} ngày.`;
+		return `<details class="panel entry-secondary-panel range-summary-panel" ${input.open ? "open" : ""} ontoggle="entryDetailToggled('range',this.open)"><summary class="entry-secondary-summary"><span>Thống kê toàn bộ &amp; Dải kiểm soát</span><small>${input.summary}</small></summary><div class="entry-secondary-body"><div class="range-band-note"><div class="range-band-label">Dải đang dùng:</div><div class="range-band-source">${input.source}</div><div class="range-band-body">· Mean=${input.mean} SD=${input.sd}.${detail}</div></div>${input.actionsHtml}</div></details>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-worksheet-html.ts
+	function entryWorksheetHtml(input) {
+		const rows = input.rowsHtml || `<tr><td colspan="${6 + input.columnCount}" class="empty-cell">Chưa có điểm nào trong khoảng này.</td></tr>`;
+		return `<div class="panel qc-sheet-panel"><div class="qc-sheet-heading"><div class="qc-sheet-title"><span>Bảng nhập QC</span><strong>${input.testName}</strong><small>Lô ${input.lotLabel}</small></div><div class="qc-month-area"><div class="qc-month-picker"><select aria-label="Chọn tháng" onchange="entrySetSheetPart('month',this.value)">${input.monthOptionsHtml}</select><select aria-label="Chọn năm" onchange="entrySetSheetPart('year',this.value)">${input.yearOptionsHtml}</select>${input.currentMonthButtonHtml}${input.todayButtonHtml}</div></div></div><div class="qc-sheet-wrap" role="region" aria-label="Bảng nhập QC theo tháng" tabindex="0"><table class="qc-sheet"><thead><tr><th>Ngày</th>${input.levelHeadHtml}<th>NV thực hiện</th><th>Vi phạm cảnh báo</th><th>Vi phạm loại bỏ</th><th>Chấp nhận</th><th>Ghi chú</th></tr></thead><tbody>${rows}</tbody></table></div><div id="entryMsg" role="status" aria-live="polite" style="margin:12px 16px 16px">${input.messageHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-levey-panel-html.ts
+	function entryLeveyPanelHtml(input) {
+		return `<div class="panel"><div class="lj-toolbar"><h2 class="panel-title">Biểu đồ Levey-Jennings</h2><div class="lj-filter"><label class="lj-date-field"><span class="hint">Từ ngày</span>${input.startDateHtml}</label><label class="lj-date-field"><span class="hint">Đến ngày</span>${input.endDateHtml}</label><div class="dayseg">${input.dayButtonsHtml}</div></div></div><div class="hint lj-range">Khoảng xem: ${input.rangeText}</div><div class="lj-stack">${input.stackHtml}</div><div class="legend"><span><span class="dot" style="background:#0e8f8f"></span> Trong ±2SD</span><span><span class="dot" style="background:#dd8b1f"></span> Cảnh báo 2–3SD</span><span><span class="dot" style="background:#c5221f"></span> Loại bỏ ngoài 3SD</span></div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-page-layout-html.ts
+	function entryPageLayoutHtml(input) {
+		return `${input.pageHeadHtml}<div class="entrygrid${input.treeCollapsed ? " tree-collapsed" : ""}">${input.expandButtonHtml}<div class="tree" id="entryTreePanel">${input.treeHeadHtml}<div role="tree" aria-label="Danh mục nội kiểm">${input.treeHtml}</div></div><div class="entry-main">${input.rightHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-voided-points-html.ts
+	function entryVoidedPointsHtml(rowsHtml) {
+		if (!rowsHtml) return "";
+		return `<div class="qc-voided-box"><h4>Điểm đã hủy trong khoảng</h4><table class="qc-voided-table"><thead><tr><th>Ngày</th><th>Mức / lô</th><th class="num">Giá trị</th><th>Lần chạy</th><th>Người hủy</th><th>Lý do</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-points-panel-html.ts
+	function entryPointsPanelHtml(input) {
+		return `<details class="panel entry-secondary-panel qc-points-panel" ${input.open ? "open" : ""} ontoggle="entryDetailToggled('points',this.open)"><summary class="entry-secondary-summary"><span>Điểm trong khoảng xem</span><small>Tra cứu chi tiết, luật vi phạm và điểm đã hủy</small></summary><div class="entry-secondary-body"><div class="hint qc-cumulative-note">Thống kê tích lũy tính từ đầu LOT đến ${input.endDateText}; bảng bên dưới hiển thị từ ${input.startDateText} đến ${input.endDateText}.</div><div class="qc-table-grid">${input.tableCardsHtml}</div>${input.voidedBoxHtml}</div></details>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-cumulative-stats-html.ts
+	function entryCumulativeStatsHtml(input) {
+		return `<div class="qc-cumulative" title="Tính từ đầu LOT đến ${input.endDateText}"><div><span>N tích lũy</span><b>${input.count}</b></div><div><span>Mean tích lũy</span><b>${input.mean}</b></div><div><span>SD tích lũy</span><b>${input.sd}</b></div><div><span>CV tích lũy</span><b>${input.cv}</b></div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-table-window-note-html.ts
+	function entryTableWindowNoteHtml(input) {
+		if (input.limited) return `<div class="table-window-note">Đang hiển thị ${input.shown}/${input.total} điểm gần nhất. ${input.actionButtonHtml}</div>`;
+		if (input.expanded && input.total > 0) return `<div class="table-window-note">Đang hiển thị toàn bộ ${input.total} điểm. ${input.actionButtonHtml}</div>`;
+		return "";
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-point-table-card-html.ts
+	function entryPointTableCardHtml(input) {
+		return `<div class="qc-table-card${input.parallel ? " qc-parallel-card" : ""}" role="region" aria-label="Điểm QC mức ${input.level}, lô ${input.lot}${input.parallel ? ", lô chạy song song" : ""}" tabindex="0"><h4><span>Mức ${input.level} · ${input.previousLot ? "Lô cũ" : "Lô"} ${input.lot}${input.parallel ? " <span class=\"qc-parallel-label\">Song song</span>" : ""}<span class="hint qc-table-count">${input.pointCount} điểm trong khoảng</span></span></h4>${input.bodyHtml}</div>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-point-table-row-html.ts
+	function entryPointTableRowHtml(input) {
+		return `<tr${input.rejected ? " class=\"qc-point-rej\"" : input.warning ? " class=\"qc-point-warn\"" : ""} data-qc-point-id="${input.pointId}" tabindex="-1"><td>${input.dateText}</td><td class="num"><b>${input.valueText}</b></td><td class="num">${input.zText}</td><td><span class="tag ${input.verdictLevel}">${input.verdictText}</span></td><td>${input.rulesHtml}</td><td class="qc-row-actions">${input.voidButtonHtml}</td></tr>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-voided-point-row-html.ts
+	function entryVoidedPointRowHtml(input) {
+		return `<tr data-qc-point-id="${input.pointId}" tabindex="-1"><td>${input.dateText}</td><td>${input.levelLotText}</td><td class="num">${input.valueText}</td><td>${input.runId}</td><td>${input.voidedBy}</td><td>${input.reason}</td></tr>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-sheet-day-row-html.ts
+	function entrySheetDayRowHtml(input) {
+		return `<tr class="${input.rowClass}" data-date="${input.date}"><td><span>${input.dayOfMonth}</span>${input.today ? "<b>Hôm nay</b>" : ""}</td>${input.cellsHtml}<td class="qc-staff-cell">${input.staffHtml}</td><td>${input.warningRules || "—"}</td><td>${input.rejectRules || "—"}</td><td>${input.statusHtml}</td><td>${input.noteHtml}</td></tr>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-sheet-day-summary-html.ts
+	function createEntrySheetDaySummaryHtml(deps) {
+		return Object.freeze({
+			staff: (staff) => staff.length ? staff.map((item) => `<span class="qc-staff" title="${deps.escapeAttribute(item.name || item.code)}">${deps.escape(item.code)}</span>`).join("<span class=\"qc-staff-sep\">/</span>") : "—",
+			status: (hasPoint, worst) => !hasPoint ? "—" : worst === "rej" ? "<span class=\"tag rej\">R</span>" : worst === "warn" ? "<span class=\"tag warn\">W(A)</span>" : "<span class=\"tag ok\">A</span>"
+		});
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-void-modal-html.ts
+	function entryVoidModalHtml(input) {
+		return `<div class="modal"><div class="modal-h"><h3>Hủy điểm QC</h3>${input.closeButtonHtml}</div><div class="modal-b"><div class="hint">${input.pointInfoHtml}</div><label>Loại hủy</label><select id="voidKindInput" aria-label="Loại hủy điểm QC" onchange="syncVoidNceChoice()"><option value="analytical">Kết quả QC thực tế không hợp lệ</option><option value="data-entry">Nhập sai dữ liệu</option><option value="other">Lý do khác</option></select><div class="void-nce-choice"><label><input id="voidOpenNce" type="checkbox" checked disabled> Lập hồ sơ NCE và yêu cầu chạy lại QC</label><div id="voidNceHint" class="hint">Hệ thống sẽ mở hoặc tái sử dụng hồ sơ NCE và chờ một kết quả QC chạy lại được chấp nhận.</div></div><div id="voidReasonBox"><label id="voidReasonLabel">Ghi chú / bằng chứng (khuyến nghị)</label><textarea id="voidReasonInput" aria-label="Ghi chú lý do hủy điểm QC" placeholder="VD: Máy báo lỗi hút mẫu lúc 08:15, đã ghi nhận trong sổ bảo trì..." oninput="document.getElementById('voidReasonErr').style.display='none'"></textarea><div id="voidReasonErr" class="hint field-error">Cần ghi lý do hủy tối thiểu 5 ký tự.</div></div></div><div class="modal-f">${input.closeFooterButtonHtml}${input.confirmButtonHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-pre-save-warning-modal-html.ts
+	function entryPreSaveWarningModalHtml(input) {
+		return `<div class="modal"><div class="modal-h"><h3>Cảnh báo dữ liệu bất thường</h3><button class="modal-close" onclick="closeModal();entryRenderKeepScroll()">×</button></div><div class="modal-b">${input.issuesHtml}<div class="hint">Bạn vẫn muốn lưu điểm QC này?</div></div><div class="modal-f">${input.cancelButtonHtml}${input.saveButtonHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-sheet-run-slot-html.ts
+	function entrySheetEmptyRunHtml(input) {
+		if (!input.editable) return "<div class=\"qc-run-slot muted\"><b>—</b></div>";
+		return `<div class="qc-run-slot"><input class="qc-inline-input empty" type="text" inputmode="decimal" autocomplete="off" placeholder="--" title="${input.title}" aria-label="${input.ariaLabel}" aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Enter" data-focus-date="${input.date}" data-focus-run="${input.runNo}" data-focus-level="${input.levelIndex}" onkeydown="entrySheetKey(event)" onchange="${input.changeAction}"></div>`;
+	}
+	function entrySheetSavedRunHtml(input) {
+		return `<div class="qc-run-slot${input.previousLot ? " prev-lot-slot" : ""}"><b class="qc-value-chip ${input.valueClass}" title="${input.title}">${input.valueText}</b><small>${input.zText} · ${input.previousLot ? `Lô ${input.previousLotName}` : input.verdictText}</small></div>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-sheet-cell-html.ts
+	function entrySheetCellHtml(input) {
+		return `<td class="num qc-run-cell${input.parallel ? " qc-parallel-cell" : ""}"><div class="qc-run-grid${input.hasAddButton ? " has-add-btn" : ""}">${input.runInputsHtml}</div>${input.addRunButtonHtml}</td>`;
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-sheet-day-detail-html.ts
+	function entrySheetNoteHtml(input) {
+		if (!input.hasPoint) return "—";
+		if (input.writable) return `<textarea class="qc-note-input" rows="1" placeholder="${input.placeholder}" onchange="${input.changeAction}">${input.manualNote}</textarea>`;
+		return input.manualNote || input.autoNote || "—";
+	}
+	function entrySheetAddRunHtml(input) {
+		return input.visible ? `<button type="button" class="qc-add-run-btn" title="Thêm lần chạy bổ sung" onclick="${input.action}"><span class="qc-add-run-icon">+</span><span class="qc-add-run-label">Thêm</span></button>` : "";
+	}
+	//#endregion
 	//#region src/presentation/entry/entry-sheet-month.ts
 	function entrySheetMonthValue(value) {
 		const month = String(value || "");
@@ -8747,14 +8889,31 @@
 		return (model) => `<tr><td><b>${deps.escape(model.name)}</b><div class="hint">${deps.escape(model.section || "Chưa phân khoa")}</div></td><td>${deps.escape(model.manufacturer || "—")}</td><td>${deps.escape(model.serial || "—")}</td><td class="num">${model.assayCount}</td><td><span class="tag ${model.active ? "ok" : "none"}">${model.active ? "Đang hoạt động" : "Ngừng hoạt động"}</span></td><td><div class="manage-actions">${deps.button("Sửa", `openConfigInstrument('${deps.quote(model.id)}')`, "ghost sm")}${deps.button("Xóa", `deleteConfigInstrument('${deps.quote(model.id)}')`, "danger sm")}</div></td></tr>`;
 	}
 	//#endregion
+	//#region src/presentation/manage/manage-instrument-table-html.ts
+	function manageInstrumentTableHtml(input) {
+		return `<div class="panel rcfg-list">${input.rowsHtml ? `<table class="instrument-table"><thead><tr><th>Máy xét nghiệm</th><th>Nhà sản xuất</th><th>Số sê-ri</th><th class="num">Xét nghiệm</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${input.rowsHtml}</tbody></table>` : input.emptyHtml}</div>`;
+	}
+	//#endregion
 	//#region src/presentation/manage/manage-panel-row-html.ts
 	function createManagePanelRowHtml(deps) {
 		return (model) => `<tr><td><b>${deps.escape(model.name)}</b></td><td>${deps.escape(model.instrument)}</td><td>${model.testsHtml || "—"}</td><td class="num">${model.testCount}</td><td><span class="tag ${model.active ? "ok" : "none"}">${model.active ? "Đang dùng" : "Tạm ngưng"}</span></td><td><div class="manage-actions">${deps.button("Sửa", `openConfigPanel('${deps.quote(model.id)}')`, "ghost sm")}${deps.button("Xóa", `deleteConfigPanel('${deps.quote(model.id)}')`, "danger sm")}</div></td></tr>`;
 	}
 	//#endregion
+	//#region src/presentation/manage/manage-panel-table-html.ts
+	function managePanelTableHtml(input) {
+		return `<div class="panel rcfg-list">${input.rowsHtml ? `<table class="panel-qc-table"><thead><tr><th>Tên panel</th><th>Máy xét nghiệm</th><th>Xét nghiệm trong panel</th><th class="num">Số vị trí</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${input.rowsHtml}</tbody></table>` : input.emptyHtml}</div>`;
+	}
+	//#endregion
 	//#region src/presentation/manage/manage-lot-row-html.ts
 	function createManageLotRowHtml(deps) {
 		return (model) => `<tr><td><b>${deps.escape(model.lotNo)}</b>${model.description || model.program ? `<div class="hint">${deps.escape(model.description || model.program || "")}</div>` : ""}</td><td><span class="pill">M${model.level}</span></td><td>${deps.escape(model.expiry || "—")}</td><td><span class="tag ${model.status.cls}">${deps.escape(model.status.text)}</span></td><td class="num">${model.used}</td><td><div class="lot-row-actions">${deps.button("Sửa", `openConfigLot('${deps.quote(model.id)}')`, "ghost sm")}${deps.button("Xóa", `deleteConfigLot('${deps.quote(model.id)}')`, "danger sm")}</div></td></tr>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-lot-config-layout-html.ts
+	function manageLotConfigLayoutHtml(input) {
+		const lotContent = input.lotRowsHtml ? `<table class="lot-table"><thead><tr><th>Số lô</th><th>Mức</th><th>Hạn dùng</th><th>Trạng thái</th><th class="num">Gán</th><th>Thao tác</th></tr></thead><tbody>${input.lotRowsHtml}</tbody></table>` : input.lotEmptyHtml;
+		const groupContent = input.groupRowsHtml ? `<div class="lot-group-list">${input.groupRowsHtml}</div>` : input.groupEmptyHtml;
+		return `<div class="lot-config-grid"><div class="panel rcfg-list lot-config-left"><div class="rcfg-panel-h"><h3>Lô QC</h3>${input.lotAddButtonHtml}</div>${lotContent}</div><div class="panel rcfg-list lot-config-right"><div class="rcfg-panel-h"><h3>Nhóm lô QC</h3>${input.groupAddButtonHtml}</div>${groupContent}</div></div>`;
 	}
 	//#endregion
 	//#region src/presentation/manage/manage-lot-group-card-html.ts
@@ -8765,6 +8924,39 @@
 	//#region src/presentation/manage/manage-transition-row-html.ts
 	function createManageTransitionRowHtml(deps) {
 		return (model) => `<tr><td><b>${deps.escape(model.panel)}</b></td><td><div><b>${deps.escape(model.fromLot)}</b></div><div class="hint">→ ${deps.escape(model.toLot)}</div></td><td>${deps.escape(model.startDate || "—")}</td><td><span class="tag ${model.status.cls}">${deps.escape(model.status.text)}</span>${model.movedHtml}${model.approvalHtml}</td><td><div class="manage-actions">${deps.button("Sửa", `openLotTransitionV2('${deps.quote(model.id)}')`, "ghost sm")}${deps.button("Xóa", `deleteLotTransition('${deps.quote(model.id)}')`, "danger sm")}</div></td></tr>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-transition-table-html.ts
+	function manageTransitionTableHtml(input) {
+		return `<div class="panel rcfg-list transition-list">${input.rowsHtml ? `<table class="transition-table"><thead><tr><th>Panel QC</th><th>Chuyển lô</th><th>Bắt đầu</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${input.rowsHtml}</tbody></table>` : input.emptyHtml}</div>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-transition-details-html.ts
+	function manageTransitionDetailsHtml(input) {
+		return {
+			movedHtml: input.movedLotNo ? `<div class="hint">Đã chuyển tiếp qua lô ${input.movedLotNo}</div>` : "",
+			approvalHtml: input.approvalText ? `<div class="hint">Duyệt: ${input.approvalText}</div>` : ""
+		};
+	}
+	//#endregion
+	//#region src/presentation/manage/tea-reference-add-modal-html.ts
+	function teaReferenceAddModalHtml(input) {
+		return `<div class="modal"><div class="modal-h"><h3>Thêm xét nghiệm tham chiếu</h3><button class="modal-close" onclick="closeModal()">✕</button></div><div class="modal-b"><div class="grid2"><div><label>Tên quốc tế <span class="req">*</span></label><input id="trAddName" placeholder="VD: Creatine kinase-MB"></div><div><label>Viết tắt</label><input id="trAddAbbreviation" placeholder="VD: CK-MB"></div></div><div class="grid2"><div><label>Loại mẫu (matrix)</label><input id="trAddMatrix" placeholder="VD: Serum/Plasma"></div><div></div></div><div class="grid2"><div><label>Đơn vị</label><input id="trAddUnit" placeholder="U/L"></div><div><label>Nhóm</label><input id="trAddSection" placeholder="Hóa sinh"></div></div><div class="grid2"><div><label>TEa CLIA %</label><input id="trAddClia" type="number" step="any"></div><div><label>TEa Ricos %</label><input id="trAddRicos" type="number" step="any"></div></div><div class="hint flow-item">Mỗi xét nghiệm dùng một tên quốc tế duy nhất; viết tắt được hiển thị trong ngoặc. TEa chuẩn hóa được lập thành hồ sơ riêng sau khi thêm dòng.</div></div><div class="modal-f">${input.cancelButtonHtml}${input.submitButtonHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/tea-reference-lab-profile-body-html.ts
+	function teaReferenceLabProfileBodyHtml(input) {
+		return `<div class="grid2"><div><label>TEa chuẩn hóa % <span class="req">*</span></label><input id="teaLabValue" type="number" step="any" min="0" aria-label="TEa chuẩn hóa phần trăm" value="${input.labValue}"></div><div><label>Nguồn chính <span class="req">*</span></label><select id="teaLabSource" aria-label="Nguồn chính của TEa chuẩn hóa">${input.sourceOptionsHtml}</select></div></div><div><label>Tài liệu / phiên bản / đường dẫn tham chiếu <span class="req">*</span></label><input id="teaLabReference" aria-label="Tài liệu tham chiếu TEa chuẩn hóa" value="${input.referenceValue}" placeholder="VD: 42 CFR §493.931, hiệu lực 11/07/2024"></div><div><label>Lý do lựa chọn <span class="req">*</span></label><textarea id="teaLabReason" class="tea-lab-reason" aria-label="Lý do lựa chọn TEa chuẩn hóa" rows="1" placeholder="Nêu lý do chọn nguồn và mức TEa này cho mục đích sử dụng của xét nghiệm...">${input.reasonHtml}</textarea></div><div class="tea-lab-meta-grid tea-lab-meta-primary"><div><label>Ngày hiệu lực <span class="req">*</span></label>${input.effectiveDateHtml}</div><div><label>Ngày xem xét lại</label>${input.nextReviewDateHtml}</div><div><label>Người xây dựng <span class="req">*</span></label><input id="teaLabPreparedBy" aria-label="Người xây dựng TEa chuẩn hóa" value="${input.preparedValue}"></div></div><div class="tea-lab-meta-grid tea-lab-meta-approval"><div><label>Người phê duyệt <span class="req">*</span></label><input id="teaLabApprovedBy" aria-label="Người phê duyệt TEa chuẩn hóa" value="${input.approvedValue}"></div><div><label>Ngày phê duyệt <span class="req">*</span></label>${input.approvedDateHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/tea-reference-row-html.ts
+	function teaReferenceRowHtml(input) {
+		return `<tr><td><b title="${input.namingTitle}">${input.displayName}</b></td><td>${input.unit}</td><td>${input.section}</td><td><input class="tea-ref-value" ${input.disabled} type="number" step="any" value="${input.cliaValue}" onchange="${input.cliaChangeAction}"></td><td><input class="tea-ref-value" ${input.disabled} type="number" step="any" value="${input.ricosValue}" onchange="${input.ricosChangeAction}"></td><td><div class="tea-lab-cell">${input.labCellHtml}</div></td><td><div class="tea-ref-status">${input.statusHtml}${input.actionHtml}</div></td></tr>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/tea-reference-table-html.ts
+	function teaReferenceTableHtml(input) {
+		return `<div class="panel rcfg-list tea-ref-panel">${input.rowsHtml ? `<table class="tea-ref-table"><thead><tr><th>Xét nghiệm</th><th>Đơn vị</th><th>Nhóm</th><th>TEa CLIA %</th><th>TEa Ricos %</th><th>TEa chuẩn hóa %</th><th>Trạng thái</th></tr></thead><tbody>${input.rowsHtml}</tbody></table>` : input.emptyHtml}</div>`;
 	}
 	//#endregion
 	//#region src/presentation/manage/tea-source-registry-html.ts
@@ -8795,6 +8987,11 @@
 	//#region src/presentation/manage/manage-assay-row-html.ts
 	function createManageAssayRowHtml(deps) {
 		return (model) => `<tr><td class="num">${model.index}</td><td><b>${deps.escape(model.name)}</b><div class="hint">${deps.escape(model.method || "Chưa nhập phương pháp")} · ${deps.escape(model.unit || "Chưa có đơn vị")}</div></td><td>${deps.escape(model.instrument)}<div class="hint">${deps.escape(model.section || "Chưa gán khoa/khu vực")}</div></td><td>${deps.escape(model.reagent || "—")}</td><td>${model.tea ? deps.escape(model.tea) + "%" : "—"}</td><td><span class="tag ${model.closed ? "none" : "ok"}">${model.closed ? "Ngưng dùng" : "Đang dùng"}</span></td><td><div class="manage-actions">${deps.button("Sửa", `openConfigAssay('${deps.quote(model.id)}')`, "ghost sm")}${deps.button("Xóa", `delTest('${deps.quote(model.id)}')`, "danger sm")}</div></td></tr>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-assay-table-html.ts
+	function manageAssayTableHtml(input) {
+		return `<div class="panel rcfg-list">${input.rowsHtml ? `<table class="assay-table"><thead><tr><th class="num">STT</th><th>Tên xét nghiệm</th><th>Máy xét nghiệm</th><th>Hóa chất</th><th>TEa</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${input.rowsHtml}</tbody></table>` : input.emptyHtml}</div>`;
 	}
 	//#endregion
 	//#region src/presentation/manage/tea-reference-status-html.ts
@@ -9180,6 +9377,11 @@
   </div>`;
 	}
 	//#endregion
+	//#region src/presentation/manage/target-matrix-panel-html.ts
+	function targetMatrixPanelHtml(input) {
+		return `<div class="panel target-matrix-panel">${input.selectorHtml}${input.summaryHtml}${input.contentHtml}</div>`;
+	}
+	//#endregion
 	//#region src/presentation/manage/history-rows.ts
 	function historyRows(assay, lots, points, groupLabel) {
 		const rows = [];
@@ -9232,6 +9434,16 @@
 	//#region src/presentation/manage/history-table-html.ts
 	function historyTableHtml(rowsHtml, emptyHtml) {
 		return `<div class="rcfg-list">${rowsHtml ? `<table class="history-table"><thead><tr><th>Mức</th><th>Lô QC / Nhóm lô</th><th class="num">Mean</th><th class="num">Giới hạn dưới</th><th class="num">Giới hạn trên</th><th class="num">SD</th><th>Hiệu lực</th><th>Nguồn</th><th class="num">Điểm QC</th><th></th></tr></thead><tbody>${rowsHtml}</tbody></table>` : emptyHtml}</div>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/history-panel-html.ts
+	function historyPanelHtml(input) {
+		return `<div class="panel target-matrix-panel">${input.selectorHtml}${input.tableHtml}</div>`;
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-empty-panel-html.ts
+	function manageEmptyPanelHtml(contentHtml) {
+		return `<div class="panel">${contentHtml}</div>`;
 	}
 	//#endregion
 	//#region src/presentation/manage/target-empty-state.ts
@@ -9902,6 +10114,38 @@
 		if (result.level === "mid") return "Chưa đủ điều kiện sàng lọc phần mềm; cần bổ sung dữ liệu/xác nhận bao phủ hoặc ghi nhận ngoại lệ theo SOP.";
 		return "Có khác biệt vượt giới hạn; không dùng lô mới trước khi điều tra và xử lý.";
 	}
+	function reagentReportPillHtml(verdict, esc) {
+		return `<span style="display:inline-block;border-radius:999px;padding:3px 9px;font-weight:800;font-size:var(--type-overline);background:${verdict.bg};color:${verdict.fg}">${esc(verdict.text)}</span>`;
+	}
+	function reagentReportSubtitleHtml(subtitleHtml, muted) {
+		return `<div style="color:${muted};font-size:var(--type-meta);margin:-8px 0 14px;text-align:center">${subtitleHtml}</div>`;
+	}
+	function reagentReportDetailMetaHtml(metadata, esc) {
+		return `<div class="hint space-after-control">Lô cũ: <b>${esc(metadata.lotOld)}</b> · Lô mới: <b>${esc(metadata.lotNew)}</b> · Ngày: ${esc(metadata.dateText)} · Người thực hiện: ${esc(metadata.operator)} · Loại mẫu: ${esc(metadata.sampleType)} · Giới hạn chênh lệch &lt; ${esc(metadata.biasTarget)}% · α = ${esc(metadata.alpha)}</div>`;
+	}
+	function reagentReportMetricsHtml(metrics) {
+		return `<div style="display:flex;flex-wrap:wrap;gap:6px 24px;font-size:var(--type-meta);margin:10px 0 12px">
+    <span>Trung bình: <b>${metrics.meanOld} / ${metrics.meanNew}</b></span>
+    <span>Pearson r: <b>${metrics.correlation}</b></span>
+    <span>t Stat: <b>${metrics.tStatistic}</b> (df ${metrics.df})</span>
+    <span>P hai phía: <b>${metrics.p2}</b></span>
+    <span>%Bias: <b>${metrics.bias}%</b></span>
+    <span>OLS: <b>y=${metrics.olsSlope}x${metrics.olsInterceptSign}${metrics.olsIntercept}</b>, R²=${metrics.olsR2}</span>
+    <span>Passing-Bablok: <b>y=${metrics.pbSlope}x${metrics.pbInterceptSign}${metrics.pbIntercept}</b></span>
+  </div>`;
+	}
+	function reagentReportConclusionHtml(conclusionHtml, muted) {
+		return `<p><b>Kết luận:</b> ${conclusionHtml}</p><p style="color:${muted}"><i>P-value, R² và slope là thông tin mô tả; không dùng riêng các chỉ số này để tự chấp nhận lô mới.</i></p>`;
+	}
+	function reagentReportPairTableHtml(pairs) {
+		return "<table><thead><tr><th>Mẫu</th><th class=\"num\">Lô cũ</th><th class=\"num\">Lô mới</th><th class=\"num\">Trung bình</th><th class=\"num\">Hiệu số</th></tr></thead><tbody>" + pairs.map((row) => `<tr><td>${row.index}</td><td class="num">${row.oldValue}</td><td class="num">${row.newValue}</td><td class="num">${row.average}</td><td class="num">${row.difference}</td></tr>`).join("") + "</tbody></table>";
+	}
+	function reagentReportMissingDataHtml(minPairs) {
+		return `<p><i>Chưa đủ dữ liệu (cần tối thiểu ${minPairs} cặp).</i></p>`;
+	}
+	function reagentReportSummaryTableHtml(items, palette, esc) {
+		return "<table><thead><tr><th>STT</th><th>Hóa chất</th><th>Lô cũ → Lô mới</th><th class=\"num\">n</th><th class=\"num\">r</th><th class=\"num\">%Bias</th><th class=\"num\">P hai phía</th><th>Kết luận</th></tr></thead><tbody>" + reagentReportSummaryRows(items, palette).map((row) => `<tr><td class="num">${row.index}</td><td><b>${esc(row.reagent)}</b>${row.unit ? ` <span style="color:${palette.muted || ""}">(${esc(row.unit)})</span>` : ""}</td><td>${esc(row.lotOld)} → ${esc(row.lotNew)}</td><td class="num">${row.n}</td><td class="num">${row.r}</td><td class="num">${row.bias}</td><td class="num">${row.p2}</td><td>${reagentReportPillHtml(reagentReportVerdict(row.result, palette), esc)}</td></tr>`).join("") + "</tbody></table>";
+	}
 	function reagentReportSummaryRows(items, palette) {
 		return (items || []).map((item, index) => {
 			const test = item?.ds?.test || {}, result = item?.R || null;
@@ -9977,6 +10221,14 @@
 		formatTStatistic: formatReagentTStatistic,
 		verdict: reagentReportVerdict,
 		conclusion: reagentReportConclusion,
+		pillHtml: reagentReportPillHtml,
+		subtitleHtml: reagentReportSubtitleHtml,
+		detailMetaHtml: reagentReportDetailMetaHtml,
+		metricsHtml: reagentReportMetricsHtml,
+		conclusionHtml: reagentReportConclusionHtml,
+		pairTableHtml: reagentReportPairTableHtml,
+		missingDataHtml: reagentReportMissingDataHtml,
+		summaryTableHtml: reagentReportSummaryTableHtml,
 		summaryRows: reagentReportSummaryRows,
 		detailModel: reagentReportDetailModel
 	});
@@ -10018,12 +10270,176 @@
 		search: "<circle cx=\"11\" cy=\"11\" r=\"7\"/><line x1=\"21\" y1=\"21\" x2=\"16.65\" y2=\"16.65\"/>",
 		print: "<path d=\"M6 9V2h12v7\"/>",
 		report: "<path d=\"M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5Z\"/>",
-		trash: "<path d=\"M3 6h18\"/>"
+		trash: "<path d=\"M3 6h18\"/>",
+		sample: "<path d=\"M9 5h6\"/><path d=\"M9 3h6v4H9z\"/><rect x=\"6\" y=\"5\" width=\"12\" height=\"16\" rx=\"2\"/><path d=\"M9 11h6M9 15h6\"/>",
+		user: "<path d=\"M16 11a4 4 0 1 0-8 0\"/><path d=\"M4 21a8 8 0 0 1 16 0\"/><path d=\"M17.5 7.5a3 3 0 0 1 2.6 4.5\"/><path d=\"M20.5 21a6 6 0 0 0-3-5.2\"/>"
 	};
 	function reagentToolIcon(type) {
 		return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${paths[type] || ""}</svg>`;
 	}
 	var reagentToolIconPresentation = Object.freeze({ icon: reagentToolIcon });
+	//#endregion
+	//#region src/presentation/reagent/reagent-quick-picker-modal-html.ts
+	function reagentQuickPickerModalHtml(input) {
+		return `<div class="modal"><div class="modal-h"><h3>Chọn nhanh ${input.labelHtml}</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-b">${input.rowsHtml}<div class="rc-quick-add"><input id="rcQuickNew" placeholder="Thêm ${input.placeholderHtml} mới" onkeydown="if(event.key==='Enter'){event.preventDefault();rcAddQuick()}">${input.addButtonHtml}</div></div>
+    <div class="modal-f">${input.closeButtonHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/reagent/reagent-picker-modal-html.ts
+	function reagentPickerModalHtml(input) {
+		return `<div class="modal"><div class="modal-h"><h3>Chọn phép so sánh</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-b"><input id="rcModalSearch" placeholder="Tìm phép so sánh..." value="${input.searchValueHtml}" oninput="rcModalSearchSet(this.value)">
+      <div class="flow-control">${input.rowsHtml}</div></div>
+    <div class="modal-f">${input.closeButtonHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/reagent/reagent-create-modal-html.ts
+	function reagentCreateModalHtml(input) {
+		return `<div class="modal"><div class="modal-h"><h3>Thêm hóa chất</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-b"><input id="rcCreateSearch" placeholder="Tìm xét nghiệm hoặc gõ tên hóa chất mới..." value="${input.searchValueHtml}" oninput="rcCreateSearchSet(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();rcCreateFrom(this.value,'')}">
+      <div class="flow-control">${input.createTypedHtml}</div>
+      <div class="refcat">Danh mục chuẩn</div>${input.referenceRowsHtml || input.emptyReferenceHtml}</div>
+    <div class="modal-f">${input.closeButtonHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/reagent/reagent-empty-page-html.ts
+	function reagentEmptyPageHtml(input) {
+		return `${input.headHtml}<div class="panel">${input.emptyStateHtml}</div>`;
+	}
+	//#endregion
+	//#region src/presentation/reagent/reagent-toolbar-html.ts
+	function reagentToolbarHtml(input) {
+		return `<div class="panel rc-toolbar-panel"><h2 class="panel-title">Thiết lập so sánh</h2><div class="rc-toolbar">
+     <div class="rc-toolbar-selcol"><label>Chọn hóa chất</label><select id="rcSel" aria-label="Chọn hóa chất" onchange="rcSwitch(this.value)">${input.selectOptionsHtml}</select></div>
+     ${input.primaryActionsHtml ? `<div class="rc-toolbar-primary"><div>${input.primaryActionsHtml}</div></div>` : ""}
+     <div class="rc-toolbar-secondary">${input.secondaryActionsHtml}</div></div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/reagent/reagent-pair-panel-html.ts
+	function reagentPairPanelHtml(input) {
+		return `<div class="panel rc-pair-panel"><h2 class="panel-title">Dữ liệu đo bắt cặp</h2><div class="rc-pair-wrap"><div class="rc-pair-head"><div>Mẫu</div><div id="rcOldLotHead">${input.oldLotHeadHtml}</div><div id="rcNewLotHead">${input.newLotHeadHtml}</div><div>Trung bình</div><div>Hiệu số (cũ − mới)</div><div></div></div>${input.rowsHtml}</div>
+     ${input.actionsHtml ? `<div class="rc-pair-actions">${input.actionsHtml}</div>` : ""}
+     <div class="hint" style="margin:8px 16px 16px">Nhập tối thiểu ${input.minPairs} cặp để tính mô tả; để phần mềm đánh dấu “đạt sàng lọc” cần ≥20 cặp hợp lệ, bao phủ khoảng đo/điểm quyết định lâm sàng và %bias trong giới hạn SOP. Không dùng p-value để tự chấp nhận lô.</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/reagent/reagent-info-panel-html.ts
+	function reagentInfoPanelHtml(input) {
+		const ro = input.disabledAttr;
+		return `<div class="panel rc-info-panel"><h2 class="panel-title">Thông tin đánh giá</h2><div class="rc-info-grid">
+     <div class="rc-field"><label>Tên hóa chất</label><input ${ro} value="${input.reagentValueHtml}" oninput="rcMeta('reagent',this.value)" placeholder="Tên hóa chất / xét nghiệm"></div>
+     <div class="rc-field"><label>Đơn vị</label><input ${ro} value="${input.unitValueHtml}" oninput="rcMeta('unit',this.value)" placeholder="mmol/L..."></div>
+     <div class="rc-field"><label>Số lô cũ</label><input ${ro} aria-label="Số lô cũ" value="${input.lotOldValueHtml}" oninput="rcMeta('lotOld',this.value)" onfocus="rcMetaFocus('lotOld')" onchange="rcMetaLog('lotOld')"></div>
+     <div class="rc-field"><label>Số lô mới</label><input ${ro} aria-label="Số lô mới" value="${input.lotNewValueHtml}" oninput="rcMeta('lotNew',this.value)" onfocus="rcMetaFocus('lotNew')" onchange="rcMetaLog('lotNew')"></div>
+     <div class="rc-field rc-date-field"><label>Ngày thực hiện</label>${input.dateInputHtml}</div>
+     <div class="rc-field"><label>Người thực hiện</label><div class="rc-quick-field"><input ${ro} value="${input.operatorValueHtml}" oninput="rcMeta('operator',this.value)" placeholder="Họ tên"><button class="rc-icon-btn" ${input.canWrite ? "" : "disabled"} onclick="rcOpenQuick('operator')" title="Chọn nhanh người thực hiện" aria-label="Chọn nhanh người thực hiện">${input.userIconHtml}</button></div></div>
+     <div class="rc-field"><label>Loại mẫu</label><div class="rc-quick-field"><input ${ro} value="${input.sampleTypeValueHtml}" oninput="rcMeta('sampleType',this.value)" placeholder="Loại mẫu"><button class="rc-icon-btn" ${input.canWrite ? "" : "disabled"} onclick="rcOpenQuick('sampleType')" title="Chọn nhanh loại mẫu" aria-label="Chọn nhanh loại mẫu">${input.sampleIconHtml}</button></div></div>
+     <div class="rc-field"><label>Bias mong muốn (%)</label><input ${ro} aria-label="Bias mong muốn (%)" type="number" step="any" value="${input.biasTarget}" oninput="rcMeta('biasTarget',this.value)" onfocus="rcMetaFocus('biasTarget')" onchange="rcMetaLog('biasTarget')"></div>
+     <div class="rc-field"><label>Mức ý nghĩa (α, alpha)</label><input ${ro} aria-label="Mức ý nghĩa (alpha)" type="number" step="any" value="${input.alpha}" oninput="rcMeta('alpha',this.value)" onfocus="rcMetaFocus('alpha')" onchange="rcMetaLog('alpha')"></div>
+     <div class="rc-field rc-coverage-cell"><label class="rc-coverage-check"><input ${ro} type="checkbox" ${input.coverageChecked ? "checked" : ""} onchange="rcMeta('coverageConfirmed',this.checked)"><span>Mẫu đã bao phủ khoảng đo và/hoặc điểm quyết định lâm sàng theo SOP</span></label></div></div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/reagent/reagent-charts-panel-html.ts
+	function reagentChartsPanelHtml() {
+		return `<div class="panel rc-chart-panel"><h2 class="panel-title">Biểu đồ</h2><div class="rc-charts">
+     <div class="rc-chart-box"><h3>Biểu đồ tương quan</h3><p>Lô cũ (trục X) so với Lô mới (trục Y)</p><div id="rcScatter"></div><div class="rc-chart-legend"><span><i class="reg"></i>Đường hồi quy</span><span><i class="ideal"></i>Đường lý tưởng y = x</span></div></div>
+     <div class="rc-chart-box"><h3>Biểu đồ Bland-Altman</h3><p>Hiệu số (cũ − mới) so với giá trị trung bình</p><div id="rcBland"></div><div class="rc-chart-legend"><span><i class="bias"></i>Bias trung bình</span><span><i class="limit"></i>±1.96 SD</span></div></div></div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/reagent/reagent-results-panels-html.ts
+	function reagentResultsPanelsHtml() {
+		return `<div class="panel rc-stats-panel"><h2 class="panel-title">Kết quả thống kê</h2><div id="rcStats"></div></div>
+   <div class="panel rc-crit-panel"><h2 class="panel-title">Tiêu chí chấp nhận &amp; kết luận</h2><div id="rcCrit"></div><div id="rcVerdict"></div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/reagent/reagent-chart-axis.ts
+	function reagentChartAxis(width, height, xmin, xmax, ymin, ymax, xlab, ylab, palette, pad, esc) {
+		const px = (value) => pad.l + (value - xmin) / (xmax - xmin) * (width - pad.l - pad.r);
+		const py = (value) => height - pad.b - (value - ymin) / (ymax - ymin) * (height - pad.t - pad.b);
+		let g = "";
+		for (let i = 0; i <= 5; i++) {
+			const xv = xmin + (xmax - xmin) * i / 5, yv = ymin + (ymax - ymin) * i / 5;
+			g += `<line x1="${px(xv)}" y1="${pad.t}" x2="${px(xv)}" y2="${height - pad.b}" stroke="${palette.grid}"/><line x1="${pad.l}" y1="${py(yv)}" x2="${width - pad.r}" y2="${py(yv)}" stroke="${palette.grid}"/>`;
+			g += `<text x="${px(xv)}" y="${height - pad.b + 15}" font-size="var(--type-overline)" fill="${palette.muted}" text-anchor="middle">${+xv.toFixed(2)}</text>`;
+			g += `<text x="${pad.l - 7}" y="${py(yv) + 3}" font-size="var(--type-overline)" fill="${palette.muted}" text-anchor="end">${+yv.toFixed(2)}</text>`;
+		}
+		g += `<line x1="${pad.l}" y1="${height - pad.b}" x2="${width - pad.r}" y2="${height - pad.b}" stroke="${palette.ink}" stroke-width="1.3"/><line x1="${pad.l}" y1="${pad.t}" x2="${pad.l}" y2="${height - pad.b}" stroke="${palette.ink}" stroke-width="1.3"/>`;
+		g += `<text x="${(pad.l + width - pad.r) / 2}" y="${height - 7}" font-size="var(--type-overline)" fill="${palette.ink}" text-anchor="middle" font-weight="600">${esc(xlab)}</text>`;
+		g += `<text transform="translate(13,${(pad.t + height - pad.b) / 2}) rotate(-90)" font-size="var(--type-overline)" fill="${palette.ink}" text-anchor="middle" font-weight="600">${esc(ylab)}</text>`;
+		return {
+			g,
+			px,
+			py
+		};
+	}
+	//#endregion
+	//#region src/presentation/reagent/reagent-scatter-svg.ts
+	function reagentScatterSvg(result, test, range, axis, palette) {
+		const width = 460, height = 380, values = result.o.concat(result.n);
+		let lo = values.reduce((min, value) => value < min ? value : min, values[0]), hi = values.reduce((max, value) => value > max ? value : max, values[0]);
+		[lo, hi] = range(lo, hi);
+		const chart = axis(width, height, lo, hi, lo, hi, `Lô cũ (${test.lotOld || "cũ"})`, `Lô mới (${test.lotNew || "mới"})`);
+		let g = chart.g;
+		g += `<line x1="${chart.px(lo)}" y1="${chart.py(lo)}" x2="${chart.px(hi)}" y2="${chart.py(hi)}" stroke="${palette.muted}" stroke-width="1.4" stroke-dasharray="5 4"/>`;
+		g += `<line x1="${chart.px(lo)}" y1="${chart.py(result.pb.a + result.pb.b * lo)}" x2="${chart.px(hi)}" y2="${chart.py(result.pb.a + result.pb.b * hi)}" stroke="${palette.teal}" stroke-width="2"/>`;
+		result.o.forEach((value, index) => {
+			g += `<circle cx="${chart.px(value)}" cy="${chart.py(result.n[index])}" r="4.5" fill="${palette.teal}" fill-opacity="0.78" stroke="#fff" stroke-width="1.2"/>`;
+		});
+		return `<svg viewBox="0 0 ${width} ${height}" style="width:100%;height:auto" xmlns="http://www.w3.org/2000/svg">${g}</svg>`;
+	}
+	//#endregion
+	//#region src/presentation/reagent/reagent-bland-svg.ts
+	function minimum(values) {
+		return values.reduce((min, value) => value < min ? value : min, values[0]);
+	}
+	function maximum(values) {
+		return values.reduce((max, value) => value > max ? value : max, values[0]);
+	}
+	function reagentBlandSvg(result, range, axis, palette) {
+		const width = 460, height = 380, averages = result.o.map((value, index) => (value + result.n[index]) / 2), up = result.md + 1.96 * result.sdd, low = result.md - 1.96 * result.sdd;
+		let xlo = minimum(averages), xhi = maximum(averages), ylo = minimum(result.d.concat(low)), yhi = maximum(result.d.concat(up));
+		[xlo, xhi] = range(xlo, xhi);
+		[ylo, yhi] = range(ylo, yhi);
+		const chart = axis(width, height, xlo, xhi, ylo, yhi, "Trung bình (cũ + mới)/2", "Hiệu số (cũ − mới)");
+		const line = (value, color, dash, label) => `<line x1="${chart.px(xlo)}" y1="${chart.py(value)}" x2="${chart.px(xhi)}" y2="${chart.py(value)}" stroke="${color}" stroke-width="1.6"${dash ? " stroke-dasharray=\"5 4\"" : ""}/><text x="${chart.px(xhi)}" y="${chart.py(value) - 4}" font-size="var(--type-overline)" fill="${color}" text-anchor="end">${label} ${+value.toFixed(3)}</text>`;
+		let g = chart.g;
+		g += `<line x1="${chart.px(xlo)}" y1="${chart.py(0)}" x2="${chart.px(xhi)}" y2="${chart.py(0)}" stroke="${palette.line}"/>`;
+		g += line(result.md, palette.amber, false, "Bias") + line(up, palette.red, true, "+1.96SD") + line(low, palette.red, true, "−1.96SD");
+		averages.forEach((value, index) => {
+			g += `<circle cx="${chart.px(value)}" cy="${chart.py(result.d[index])}" r="4.5" fill="${palette.amber}" fill-opacity="0.8" stroke="#fff" stroke-width="1.2"/>`;
+		});
+		return `<svg viewBox="0 0 ${width} ${height}" style="width:100%;height:auto" xmlns="http://www.w3.org/2000/svg">${g}</svg>`;
+	}
+	//#endregion
+	//#region src/presentation/reagent/reagent-quick-picker-rows-html.ts
+	function reagentQuickPickerRowsHtml(input) {
+		if (!input.items.length) return `<div class="empty">Chưa có ${input.labelHtml} trong danh sách.</div>`;
+		return input.items.map((name, index) => `<div class="mrow"><span><b>${input.esc(name)}</b></span><span class="acts">${input.selectButtonHtml(index)}<button class="x" onclick="rcDelQuick(${index})" title="Xóa">✕</button></span></div>`).join("");
+	}
+	//#endregion
+	//#region src/presentation/reagent/reagent-picker-rows-html.ts
+	function reagentPickerRowsHtml(input) {
+		if (!input.items.length) return "<div class=\"empty\">Không có phép so sánh phù hợp.</div>";
+		return input.items.map((item) => `<div class="mrow ${item.selected ? "on" : ""}"><span><b>${item.labelHtml}</b><div class="hint flow-tight">${item.unitHtml} ${item.rowCount ? "· " + item.rowCount + " dòng" : ""}</div></span><span class="acts">${input.selectButtonHtml(item.id, item.selected)}${input.canWrite ? `<button class="x" onclick="rcDeleteFromModal('${item.id}')" title="Xóa">✕</button>` : ""}</span></div>`).join("");
+	}
+	//#endregion
+	//#region src/presentation/reagent/reagent-create-reference-rows-html.ts
+	function reagentCreateReferenceRowsHtml(categories, emptyHtml) {
+		return categories.length ? categories.map((category) => `<div class="refcat">${category.nameHtml}</div>${category.rowsHtml}`).join("") : emptyHtml;
+	}
+	//#endregion
+	//#region src/presentation/reagent/reagent-create-typed-row-html.ts
+	function reagentCreateTypedRowHtml(queryHtml, createAction) {
+		return queryHtml ? `<button class="refrow" onclick="${createAction}">+ Tạo "${queryHtml}"</button>` : `<button class="refrow" onclick="${createAction}">+ Tạo hóa chất trống</button>`;
+	}
+	//#endregion
+	//#region src/presentation/reagent/reagent-report-detail-card-html.ts
+	function reagentReportDetailCardHtml(input) {
+		return `<div class="rpt-card" style="${input.pagebreak ? "break-before:page;" : ""}"><h3>${input.index}. ${input.reagentHtml} ${input.pillHtml}</h3><div class="body">${input.bodyHtml}</div></div>`;
+	}
+	function reagentReportChartGridHtml(scatterHtml, blandHtml) {
+		return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">${scatterHtml}${blandHtml}</div>`;
+	}
 	//#endregion
 	//#region src/domain/reagent/reagent-pairs.ts
 	function reagentValidPairs(rows) {
@@ -14426,6 +14842,43 @@
 	});
 	root.entryRowsWindowTs = entryRowsWindow;
 	root.entryLotLabelsTs = entryLotLabels;
+	root.entryDayPresetButtons = entryDayPresetButtons;
+	root.entryLeveyJenningsMiniHtml = createEntryLeveyJenningsMiniHtml({
+		escape: (value) => root.esc(value),
+		escapeAttribute: (value) => root.escAttr(value)
+	});
+	root.entrySheetLevelHeads = createEntrySheetLevelHeads({
+		escape: (value) => root.esc(value),
+		escapeAttribute: (value) => root.escAttr(value)
+	});
+	root.entryTreeHeaderHtml = createEntryTreeHeaderHtml({ escapeAttribute: (value) => root.escAttr(value) });
+	root.entryTreeItemHtml = createEntryTreeItemHtml({
+		escape: (value) => root.esc(value),
+		escapeAttribute: (value) => root.escAttr(value)
+	});
+	root.entryRangeSummaryHtml = entryRangeSummaryHtml;
+	root.entryWorksheetHtml = entryWorksheetHtml;
+	root.entryLeveyPanelHtml = entryLeveyPanelHtml;
+	root.entryPageLayoutHtml = entryPageLayoutHtml;
+	root.entryVoidedPointsHtml = entryVoidedPointsHtml;
+	root.entryPointsPanelHtml = entryPointsPanelHtml;
+	root.entryCumulativeStatsHtml = entryCumulativeStatsHtml;
+	root.entryTableWindowNoteHtml = entryTableWindowNoteHtml;
+	root.entryPointTableCardHtml = entryPointTableCardHtml;
+	root.entryPointTableRowHtml = entryPointTableRowHtml;
+	root.entryVoidedPointRowHtml = entryVoidedPointRowHtml;
+	root.entrySheetDayRowHtml = entrySheetDayRowHtml;
+	root.entrySheetDaySummaryHtml = createEntrySheetDaySummaryHtml({
+		escape: (value) => root.esc(value),
+		escapeAttribute: (value) => root.escAttr(value)
+	});
+	root.entryVoidModalHtml = entryVoidModalHtml;
+	root.entryPreSaveWarningModalHtml = entryPreSaveWarningModalHtml;
+	root.entrySheetEmptyRunHtml = entrySheetEmptyRunHtml;
+	root.entrySheetSavedRunHtml = entrySheetSavedRunHtml;
+	root.entrySheetCellHtml = entrySheetCellHtml;
+	root.entrySheetAddRunHtml = entrySheetAddRunHtml;
+	root.entrySheetNoteHtml = entrySheetNoteHtml;
 	root.entrySheetMonthPart = entrySheetMonthPart;
 	root.entrySheetMonthValue = entrySheetMonthValue;
 	root.entryTreeState = createEntryTreeState({
@@ -14699,22 +15152,31 @@
 		button: (label, action, variant) => root.btn(label, action, variant),
 		quote: (value) => root.jsq(value)
 	});
+	root.manageInstrumentTablePresentation = manageInstrumentTableHtml;
 	root.managePanelRowPresentation = createManagePanelRowHtml({
 		escape: (value) => root.esc(value),
 		button: (label, action, variant) => root.btn(label, action, variant),
 		quote: (value) => root.jsq(value)
 	});
+	root.managePanelTablePresentation = managePanelTableHtml;
 	root.manageLotRowPresentation = createManageLotRowHtml({
 		escape: (value) => root.esc(value),
 		button: (label, action, variant) => root.btn(label, action, variant),
 		quote: (value) => root.jsq(value)
 	});
+	root.manageLotConfigLayoutPresentation = manageLotConfigLayoutHtml;
 	root.manageLotGroupCardPresentation = createManageLotGroupCardHtml({ escape: (value) => root.esc(value) });
 	root.manageTransitionRowPresentation = createManageTransitionRowHtml({
 		escape: (value) => root.esc(value),
 		button: (label, action, variant) => root.btn(label, action, variant),
 		quote: (value) => root.jsq(value)
 	});
+	root.manageTransitionTablePresentation = manageTransitionTableHtml;
+	root.manageTransitionDetailsPresentation = manageTransitionDetailsHtml;
+	root.teaReferenceAddModalPresentation = teaReferenceAddModalHtml;
+	root.teaReferenceLabProfileBodyPresentation = teaReferenceLabProfileBodyHtml;
+	root.teaReferenceRowPresentation = teaReferenceRowHtml;
+	root.teaReferenceTablePresentation = teaReferenceTableHtml;
 	root.teaSourceRegistryPresentation = createTeaSourceRegistryHtml({
 		escape: (value) => root.esc(value),
 		escapeAttr: (value) => root.escAttr(value)
@@ -14730,6 +15192,7 @@
 		button: (label, action, variant) => root.btn(label, action, variant),
 		quote: (value) => root.jsq(value)
 	});
+	root.manageAssayTablePresentation = manageAssayTableHtml;
 	root.teaReferenceStatusPresentation = teaReferenceStatusHtml;
 	root.manageTransitionStatusPresentation = manageTransitionStatus;
 	root.manageLotStatusPresentation = createManageLotStatus({ daysToExpiry: (value) => root.daysToExp(value) });
@@ -14770,10 +15233,13 @@
 	root.targetLevelTabsPresentation = targetLevelTabsHtml;
 	root.targetSummaryPresentation = targetSummaryHtml;
 	root.targetMatrixRowPresentation = targetMatrixRowHtml;
+	root.targetMatrixPanelPresentation = targetMatrixPanelHtml;
 	root.historyRowsPresentation = historyRows;
 	root.historySelectorPresentation = historySelectorHtml;
 	root.targetSelectorPresentation = targetSelectorHtml;
 	root.historyTablePresentation = historyTableHtml;
+	root.historyPanelPresentation = historyPanelHtml;
+	root.manageEmptyPanelPresentation = manageEmptyPanelHtml;
 	root.targetEmptyStatePresentation = targetEmptyState;
 	root.targetMatrixTablePresentation = targetMatrixTableHtml;
 	root.targetMatrixActionsPresentation = targetMatrixActionsHtml;
@@ -15325,6 +15791,24 @@
 	root.reagentComparisonLabelPresentation = reagentComparisonLabelPresentation;
 	root.reagentQuickLabelPresentation = reagentQuickLabelPresentation;
 	root.reagentToolIconPresentation = reagentToolIconPresentation;
+	root.reagentQuickPickerModalPresentation = reagentQuickPickerModalHtml;
+	root.reagentPickerModalPresentation = reagentPickerModalHtml;
+	root.reagentCreateModalPresentation = reagentCreateModalHtml;
+	root.reagentEmptyPageHtml = reagentEmptyPageHtml;
+	root.reagentToolbarHtml = reagentToolbarHtml;
+	root.reagentPairPanelHtml = reagentPairPanelHtml;
+	root.reagentInfoPanelHtml = reagentInfoPanelHtml;
+	root.reagentChartsPanelHtml = reagentChartsPanelHtml;
+	root.reagentResultsPanelsHtml = reagentResultsPanelsHtml;
+	root.reagentChartAxis = reagentChartAxis;
+	root.reagentScatterSvg = reagentScatterSvg;
+	root.reagentBlandSvg = reagentBlandSvg;
+	root.reagentQuickPickerRowsHtml = reagentQuickPickerRowsHtml;
+	root.reagentPickerRowsHtml = reagentPickerRowsHtml;
+	root.reagentCreateReferenceRowsHtml = reagentCreateReferenceRowsHtml;
+	root.reagentCreateTypedRowHtml = reagentCreateTypedRowHtml;
+	root.reagentReportDetailCardHtml = reagentReportDetailCardHtml;
+	root.reagentReportChartGridHtml = reagentReportChartGridHtml;
 	root.reagentPairMath = reagentPairMath;
 	root.reagentStatistics = reagentStatistics;
 	root.reagentTDistribution = reagentTDistribution;

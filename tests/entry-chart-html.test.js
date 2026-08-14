@@ -1,0 +1,21 @@
+'use strict';
+const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+const source = pathToFileURL(path.join(__dirname, '..', 'src', 'presentation', 'entry', 'entry-chart-html.ts')).href;
+const program = `
+  import { entryDayPresetButtons, createEntrySheetLevelHeads, createEntryLeveyJenningsMiniHtml } from ${JSON.stringify(source)};
+  const esc = value => String(value).replace(/</g, '&lt;'), attr = value => String(value).replace(/"/g, '&quot;');
+  const heads = createEntrySheetLevelHeads({escape:esc, escapeAttribute:attr});
+  const card = createEntryLeveyJenningsMiniHtml({escape:esc, escapeAttribute:attr});
+  console.log(JSON.stringify({buttons:entryDayPresetButtons(30,false),custom:entryDayPresetButtons(30,true),heads:heads([{level:1,lot:'L<1',parallel:true,tooltip:'Mean 1'}]),card:card({on:true,parallel:true,level:1,lot:'L<1',pointCount:4,previousLot:false,metrics:[{label:'Mean thực',value:'10.0'},{label:'SD mục tiêu',value:'1.0',control:true}],actionHtml:'<i>action</i>',testId:'T1',mean:10,sd:1,start:'2026-08-01',end:'2026-08-14'})}));
+`;
+const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=module', '--eval', program], { cwd:path.join(__dirname,'..'), encoding:'utf8' });
+assert.equal(result.status, 0, result.stderr || 'không thể chạy entry chart HTML TypeScript');
+const out = JSON.parse(result.stdout);
+assert.match(out.buttons, /class="on" onclick="entrySetDays\(30\)"/);
+assert.doesNotMatch(out.custom, /class="on"/);
+assert.match(out.heads, /L&lt;1/) && assert.match(out.heads, /Song song/);
+assert.match(out.card, /lj-mini on lj-mini-parallel/) && assert.match(out.card, /Mean thực/) && assert.match(out.card, /lj-qc-stat control/) && assert.match(out.card, /data-test="T1"/);
+console.log('Entry chart HTML TypeScript tests passed');

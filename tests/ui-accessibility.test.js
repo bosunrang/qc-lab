@@ -4,7 +4,7 @@ const path = require('node:path');
 
 const root = path.join(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
-const router = read('assets/modules/router-render.js') + read('assets/modules/entry-routes.js') + read('src/presentation/entry/entry-sheet-navigation.ts');
+const router = read('assets/modules/router-render.js') + read('assets/modules/entry-routes.js') + read('src/presentation/entry/entry-sheet-navigation.ts') + read('src/presentation/entry/entry-tree-html.ts') + read('src/presentation/entry/entry-worksheet-html.ts') + read('src/presentation/entry/entry-levey-panel-html.ts') + read('src/presentation/entry/entry-page-layout-html.ts');
 const modals = read('assets/modules/modals.js');
 const appCss = read('assets/app.css');
 const auditCss = read('assets/professional-audit.css');
@@ -21,11 +21,18 @@ const usersCss = read('assets/professional-users.css');
 const westgardCss = read('assets/professional-westgard.css');
 const actionsRoutes = read('assets/modules/actions-routes.js');
 const actionForm = read('assets/modules/action-form.js');
+const actionLogPanelPresentation = read('src/presentation/nce/action-log-panel-html.ts');
+const actionRerunEvidencePresentation = read('src/presentation/nce/action-rerun-evidence-html.ts');
 const reportRoutes = read('assets/modules/report-routes.js');
 const reportActionIconPresentation = read('src/presentation/report/report-action-icon.ts');
 const reportLockPanelPresentation = read('src/presentation/report/report-lock-panel-html.ts');
 const firebaseRulesPanelPresentation = read('src/presentation/settings/firebase-rules-panel-html.ts');
+const settingsBrandPanelPresentation = read('src/presentation/settings/brand-panel-html.ts');
+const settingsAdminToolsPresentation = read('src/presentation/settings/admin-tools-html.ts');
+const settingsFirebaseConnectionPresentation = read('src/presentation/settings/firebase-connection-panel-html.ts');
+const settingsLisGatewayPresentation = read('src/presentation/settings/lis-gateway-panel-html.ts');
 const manageRoutes = read('assets/modules/manage-routes.js');
+const teaReferenceLabProfileBodyPresentation = read('src/presentation/manage/tea-reference-lab-profile-body-html.ts');
 const westgardRoutes = read('assets/modules/westgard-routes.js');
 const westgardCusumPagePresentation = read('src/presentation/westgard/westgard-cusum-page-html.ts');
 const dashboardRoutes = read('assets/modules/dashboard-routes.js');
@@ -33,6 +40,10 @@ const dashboardPagePresentation = read('src/presentation/dashboard/dashboard-pag
 const dashboardTestPanelPresentation = read('src/presentation/dashboard/dashboard-test-panel-html.ts');
 const sigmaRoutes = read('assets/modules/sigma.js');
 const reagentRoutes = read('assets/modules/reagent.js');
+const reagentPairPanelPresentation = read('src/presentation/reagent/reagent-pair-panel-html.ts');
+const reagentInfoPanelPresentation = read('src/presentation/reagent/reagent-info-panel-html.ts');
+const reagentChartsPanelPresentation = read('src/presentation/reagent/reagent-charts-panel-html.ts');
+const reagentResultsPanelsPresentation = read('src/presentation/reagent/reagent-results-panels-html.ts');
 const settingsRoutes = read('assets/modules/settings.js');
 const indexHtml = read('index.html');
 const cssFiles = fs.readdirSync(path.join(root, 'assets')).filter(name => name.endsWith('.css'));
@@ -68,9 +79,9 @@ for(const file of fs.readdirSync(path.join(root,'assets','modules')).filter(name
   if(/<label>[^<\r\n]*\s\*<\/label>/.test(source))rawRequiredLabels.push(file);
 }
 assert.deepEqual(rawRequiredLabels,[],'dấu sao bắt buộc trong label phải bọc bằng <span class="req"> để luôn có màu đỏ');
-assert.match(manageRoutes,/TEa chuẩn hóa % <span class="req">\*<\/span>/,'hồ sơ TEa phải hiển thị dấu bắt buộc bằng marker chung');
+assert.match(manageRoutes+teaReferenceLabProfileBodyPresentation,/TEa chuẩn hóa % <span class="req">\*<\/span>/,'hồ sơ TEa phải hiển thị dấu bắt buộc bằng marker chung');
 
-const semanticPageRoutes=[dashboardRoutes,dashboardPagePresentation,sigmaRoutes,reagentRoutes,actionsRoutes,actionForm,reportRoutes,reportLockPanelPresentation,settingsRoutes,firebaseRulesPanelPresentation,router].join('\n');
+const semanticPageRoutes=[dashboardRoutes,dashboardPagePresentation,sigmaRoutes,reagentRoutes,reagentPairPanelPresentation,reagentInfoPanelPresentation,reagentChartsPanelPresentation,reagentResultsPanelsPresentation,actionsRoutes,actionForm,actionLogPanelPresentation,reportRoutes,reportLockPanelPresentation,settingsRoutes,firebaseRulesPanelPresentation,settingsBrandPanelPresentation,settingsAdminToolsPresentation,settingsFirebaseConnectionPresentation,settingsLisGatewayPresentation,router].join('\n');
 for(const title of ['Cần xử lý / Theo dõi','Lô & hạn dùng','Tình trạng','Số liệu theo kỳ','Biểu đồ Sigma & MDC','Thông tin đánh giá','Dữ liệu đo bắt cặp','Kết quả thống kê','Tiêu chí chấp nhận &amp; kết luận','Biểu đồ','Nhật ký khắc phục','Khóa kỳ báo cáo','Logo & tên phần mềm','Quản trị dữ liệu','Đồng bộ đám mây (Firebase Realtime Database)','LIS Gateway (thử nghiệm)','Firebase Rules','Biểu đồ Levey-Jennings']){
   const escaped=title.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
   assert.match(semanticPageRoutes,new RegExp(`<h2[^>]*class="[^"]*panel-title[^"]*"[^>]*>${escaped}`),`panel chính "${title}" phải dùng heading cấp 2 thật`);
@@ -86,7 +97,7 @@ assert.match(sigmaCss, /\.sg-eqa-summary span\{[^}]*text-transform:none/);
 assert.match(reportRoutes, /function reportActionIcon\(type\)/);
 assert.match(reportRoutes, /reportActionIcon\('print'\)/);
 assert.match(reportActionIconPresentation, /aria-hidden="true"/);
-assert.match(actionsRoutes, /aria-hidden="true"/);
+assert.match(actionRerunEvidencePresentation, /aria-hidden="true"/);
 assert.match(tokens, /--space-section:14px/);
 assert.match(tokens, /--panel-content-gap:var\(--space-section\)/);
 assert.match(tokens, /--panel-header-min-height:44px/);

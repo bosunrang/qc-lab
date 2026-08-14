@@ -1,0 +1,13 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','manage','manage-transition-table-html.ts')).href;
+const program=`import {manageTransitionTableHtml} from ${JSON.stringify(source)}; console.log(JSON.stringify([manageTransitionTableHtml({rowsHtml:'<tr><td>Panel A</td></tr>',emptyHtml:'<p>Trống</p>'}),manageTransitionTableHtml({rowsHtml:'',emptyHtml:'<p>Trống</p>'})]));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy bảng chuyển tiếp lô TypeScript');
+const [table,empty]=JSON.parse(result.stdout);
+assert.match(table,/transition-list/) && assert.match(table,/Chuyển lô/) && assert.match(table,/<td>Panel A<\/td>/);
+assert.match(empty,/transition-list/) && assert.match(empty,/<p>Trống<\/p>/) && assert.doesNotMatch(empty,/<table/);
+console.log('Manage transition table HTML TypeScript tests passed');

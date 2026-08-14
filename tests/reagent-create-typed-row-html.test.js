@@ -1,0 +1,10 @@
+'use strict';
+const assert = require('node:assert/strict');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+const { execFileSync } = require('node:child_process');
+const source = path.join(__dirname, '..', 'src', 'presentation', 'reagent', 'reagent-create-typed-row-html.ts');
+const program = `import { reagentCreateTypedRowHtml } from ${JSON.stringify(pathToFileURL(source).href)}; console.log(JSON.stringify([reagentCreateTypedRowHtml('Glucose',${JSON.stringify("rcCreateFrom('Glucose','')")}),reagentCreateTypedRowHtml('',${JSON.stringify("rcCreateFrom('Hóa chất mới','')")})]));`;
+const [typed, blank] = JSON.parse(execFileSync(process.execPath, ['--experimental-strip-types', '--input-type=module', '--eval', program], { encoding: 'utf8' }));
+assert.match(typed, /\+ Tạo "Glucose"/);assert.match(typed, /onclick="rcCreateFrom\('Glucose',''\)"/);assert.match(blank, /\+ Tạo hóa chất trống/);
+console.log('Reagent create typed row HTML tests passed');

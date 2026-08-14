@@ -4,6 +4,10 @@ const{loadSandbox,run}=require('./helpers/sandbox');
 const ctx=loadSandbox(['modules/data-io.js'],{
   window:{QCLAB_APP:{name:'QC Lab',version:'2.4.0'}},
   atob:value=>Buffer.from(value,'base64').toString('binary'),
+  reportXlsxHeader:input=>{
+    const S=(v,s)=>({v,s}),pair=(a,b,c,d)=>[S(a,input.styles.LABEL),S('',input.styles.LABEL),S(b,input.styles.VAL),S('',input.styles.VAL),S('',input.styles.VAL),S('',input.styles.VAL),S(c,input.styles.LABEL),S('',input.styles.LABEL),S(d,input.styles.VAL),S('',input.styles.VAL)],wide=(a,b)=>[S(a,input.styles.LABEL),S('',input.styles.LABEL),S(b,input.styles.VAL),S('',input.styles.VAL),S('',input.styles.VAL),S('',input.styles.VAL),S('',input.styles.VAL),S('',input.styles.VAL),S('',input.styles.VAL),S('',input.styles.VAL)];
+    return{rows:[[S('BÁO CÁO NỘI KIỂM CHẤT LƯỢNG XÉT NGHIỆM',input.styles.TITLE)],[S((input.labName||'BỆNH VIỆN / ĐƠN VỊ')+' · '+(input.department||'Khoa Xét nghiệm'),input.styles.SUB)],[],pair('Phiên bản app',(input.appName||'QC Lab')+' '+(input.appVersion||'dev'),'Bộ luật áp dụng',input.rules||'Chưa cấu hình'),pair('Xét nghiệm',input.testName+(input.testUnit?' · '+input.testUnit:''),'Máy',input.machine),pair('Khoảng ngày',input.range,'TEa%',String(input.tea||'—')),wide('Nguồn TEa',input.teaSource),wide('Ghi chú Sigma','Sigma (kỳ) tính từ Mean/CV thực tế trong đúng khoảng ngày báo cáo này.')],merges:['A1:J1','A2:J2','A4:B4','C4:F4','G4:H4','I4:J4','A5:B5','C5:F5','G5:H5','I5:J5','A6:B6','C6:F6','G6:H6','I6:J6','A7:B7','C7:J7','A8:B8','C8:J8'],rowHeights:{1:24,2:15,4:21,5:21,6:21,7:21,8:21}};
+  },
 });
 
 run(ctx,`

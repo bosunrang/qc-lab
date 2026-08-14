@@ -1,0 +1,12 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','manage','tea-reference-row-html.ts')).href;
+const input={namingTitle:'Glucose',displayName:'Glucose',unit:'mg/dL',section:'Hóa sinh',disabled:'',cliaValue:'10',ricosValue:'7',cliaChangeAction:"teaRefEdit('glu','clia',this.value)",ricosChangeAction:"teaRefEdit('glu','ricos',this.value)",labCellHtml:'<b>8%</b><button>Xem</button>',statusHtml:'<span>Chuẩn</span>',actionHtml:'<button>Xóa</button>'};
+const program=`import {teaReferenceRowHtml} from ${JSON.stringify(source)}; console.log(teaReferenceRowHtml(${JSON.stringify(input)}));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy dòng TEa TypeScript');
+assert.match(result.stdout,/title="Glucose"/) && assert.match(result.stdout,/value="10"/) && assert.match(result.stdout,/teaRefEdit\('glu','clia',this\.value\)/) && assert.match(result.stdout,/tea-lab-cell/) && assert.match(result.stdout,/tea-ref-status/) && assert.match(result.stdout,/<button>Xóa<\/button>/);
+console.log('Tea reference row HTML TypeScript tests passed');

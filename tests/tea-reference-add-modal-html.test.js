@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','manage','tea-reference-add-modal-html.ts')).href;
+const program=`import {teaReferenceAddModalHtml} from ${JSON.stringify(source)}; console.log(teaReferenceAddModalHtml({cancelButtonHtml:'<button>Hủy</button>',submitButtonHtml:'<button>Thêm</button>'}));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy modal thêm TEa TypeScript');
+assert.match(result.stdout,/Thêm xét nghiệm tham chiếu/) && assert.match(result.stdout,/id="trAddName"/) && assert.match(result.stdout,/id="trAddClia"/) && assert.match(result.stdout,/TEa chuẩn hóa được lập thành hồ sơ riêng/) && assert.match(result.stdout,/<button>Thêm<\/button>/);
+console.log('Tea reference add modal HTML TypeScript tests passed');

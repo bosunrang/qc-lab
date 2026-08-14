@@ -1,0 +1,21 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','entry','entry-tree-html.ts')).href;
+const program=`
+  import {createEntryTreeHeaderHtml,createEntryTreeItemHtml} from ${JSON.stringify(source)};
+  const esc=value=>String(value).replace(/</g,'&lt;'),attr=value=>String(value).replace(/[<"]/g,char=>char==='<'?'&lt;':'&quot;');
+  const header=createEntryTreeHeaderHtml({escapeAttribute:attr});
+  const item=createEntryTreeItemHtml({escape:esc,escapeAttribute:attr});
+  console.log(JSON.stringify({header:header({collapseButtonHtml:'<button>Thu</button>',query:'A"<',machineOptionsHtml:'<option>Máy 1</option>'}),machine:item.machine({key:'m:A',open:true,label:'Máy <A',toggleKey:'m:A'}),group:item.group({key:'lg:A',open:false,parentOpen:false,search:'Nhóm <A',name:'Nhóm <A',stateClass:'warn',stateText:'Cảnh báo',toggleKey:'lg:A'}),assay:item.assay({testId:'T1',search:'A',selected:true,visible:false,level:2,name:'Test <1',stateClass:'rej',stateText:'Loại'})}));
+`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy Entry tree HTML TypeScript');
+const out=JSON.parse(result.stdout);
+assert.match(out.header,/value="A&quot;&lt;"/) && assert.match(out.header,/<option>Máy 1<\/option>/);
+assert.match(out.machine,/role="treeitem"/) && assert.match(out.machine,/aria-expanded="true"/) && assert.match(out.machine,/Máy &lt;A/);
+assert.match(out.group,/style="display:none"/) && assert.match(out.group,/treeToggle\('lg:A'\)/);
+assert.match(out.assay,/aria-current="true"/) && assert.match(out.assay,/entryPick\('T1',2\)/) && assert.match(out.assay,/Test &lt;1/);
+console.log('Entry tree HTML TypeScript tests passed');
