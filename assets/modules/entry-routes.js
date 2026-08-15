@@ -1,9 +1,8 @@
 /* ===== ENTRY PAGE ROUTE ===== */
 function entryWindowFor(testId,level,endOverride,startOverride){return EntryService.buildEntryWindow({points:pointsOf(testId,level),days:entryDays,start:startOverride,end:endOverride,today:isoToday()});}
 function entryWindow(){return entryWindowFor(entrySel.testId,entrySel.level,entryEnd,entryStart);}
-function entryLotLabels(levels){return globalThis.entryLotLabelsTs(levels);}
-const ENTRY_TABLE_INITIAL_ROWS=180;
 function entryRowsWindow(rows,key){return globalThis.entryRowsWindowTs(rows,entryExpandedTables.has(key),ENTRY_TABLE_INITIAL_ROWS);}
+const ENTRY_TABLE_INITIAL_ROWS=180;
 function entryToggleRows(key){const next=globalThis.entryExpandedTablesToggle(entryExpandedTables,key,24);entryExpandedTables.clear();next.forEach(value=>entryExpandedTables.add(value));entryRenderKeepScroll();}
 function entryDetailToggled(key,open){if(open)entryDetailOpen.add(key);else entryDetailOpen.delete(key);}
 function entryTreeIsCollapsed(){if(entryTreeCollapsed!==null)return!!entryTreeCollapsed;entryTreeCollapsed=globalThis.entryTreeCollapsePreference.read(()=>localStorage.getItem('qclab_entry_tree_collapsed'));return!!entryTreeCollapsed;}
@@ -132,7 +131,7 @@ function pageEntry(rightOnly=false){
     const note=globalThis.entrySheetNoteHtml({hasPoint,writable:canWrite(),placeholder:escAttr(autoNote||'Nhập ghi chú...'),changeAction:`entryDateNoteSave('${t.id}','${dayGroup.date}',this.value)`,manualNote:esc(manualNote),autoNote});
     const liveCols=entryCols.filter(x=>!x.parallel),doneLevels=liveCols.filter(x=>dayGroup.runs.some(g=>g.levels[x.key])).length,rowCls=[dayGroup.date===today?'today':'',dayGroup.date<=today&&doneLevels<liveCols.length?'missing':'',hasPoint?'has-data':''].filter(Boolean).join(' ');
     return globalThis.entrySheetDayRowHtml({rowClass:rowCls,date:dayGroup.date,dayOfMonth:dateObj(dayGroup.date).getDate(),today:dayGroup.date===today,cellsHtml:cells,staffHtml:staffCell,warningRules:[...new Set(warnRules)].join(', '),rejectRules:[...new Set(rejRules)].join(', '),statusHtml:status,noteHtml:note});}).join('');
-  const worksheet=globalThis.entryWorksheetHtml({testName:esc(testDisplayName(t)),lotLabel:esc(entryLotLabels(entryCols)),monthOptionsHtml:sheetMonthOptions,yearOptionsHtml:sheetYearOptions,currentMonthButtonHtml:btn('Tháng hiện tại','entrySetSheetMonth(isoMonth())','ghost sm qc-current-month'),todayButtonHtml:btn('Tới hôm nay','entryGoToday()','teal sm qc-today-jump'),levelHeadHtml:levelHead,rowsHtml:sheetRows,columnCount:entryCols.length,messageHtml:entryLastMsg});
+  const worksheet=globalThis.entryWorksheetHtml({testName:esc(testDisplayName(t)),lotLabel:esc(globalThis.entryLotLabelsTs(entryCols)),monthOptionsHtml:sheetMonthOptions,yearOptionsHtml:sheetYearOptions,currentMonthButtonHtml:btn('Tháng hiện tại','entrySetSheetMonth(isoMonth())','ghost sm qc-current-month'),todayButtonHtml:btn('Tới hôm nay','entryGoToday()','teal sm qc-today-jump'),levelHeadHtml:levelHead,rowsHtml:sheetRows,columnCount:entryCols.length,messageHtml:entryLastMsg});
   const right=`${worksheet}${globalThis.entryLeveyPanelHtml({startDateHtml:dateBox('entryStartDate',W.start,'','onchange="entrySetStart(this.value)"'),endDateHtml:dateBox('entryEndDate',W.end,'','onchange="entrySetEnd(this.value)"'),dayButtonsHtml:dayBtns,rangeText:`${vnDate(W.start)} – ${vnDate(W.end)} · ${operationalLevels(t).length} mức QC`,stackHtml:ljStack})}${pointsInView}${rangeBox}`;
   entryPartialRenderCache={testId:t.id,right};
   if(rightOnly)return right;
@@ -259,21 +258,21 @@ function entryInlineSaveCommit(tid,level,date,val,runId,lotNo='',valueDecimals=q
   // Kiểm tra lại tại thời điểm ghi vì nhóm lô có thể vừa bị dừng trong lúc hộp
   // thoại xác nhận dữ liệu bất thường đang mở hoặc vừa nhận đồng bộ từ máy khác.
   if(!t||!cfg||!canEnterQcForLevel(t,level)){entrySetLastMsg('<div class="alert warn">Không thể lưu: nhóm lô đã dừng hoặc không còn sẵn sàng nhập QC.</div>');entryRenderKeepScroll();return;}
-  const recorded=EntryService.recordPoint(state,{tid,level,date,value:val,valueDecimals,runId,cfg,staff:currentStaff(),id:uid()});
+  const recorded=globalThis.EntryRecordCommand.execute({state,test:t,testId:tid,level,date,value:val,valueDecimals,runId,lotNo,cfg,staff:currentStaff(),id:uid(),activeLot:(lvlCfg(t,level)||{}).lot||''});
   if(!recorded.ok){
+    if(recorded.error==='not-ready'){entrySetLastMsg('<div class="alert warn">Không thể lưu: nhóm lô đã dừng hoặc không còn sẵn sàng nhập QC.</div>');entryRenderKeepScroll();return;}
     const message=globalThis.entryRecordErrorMessage(recorded.error);
     entrySetLastMsg('<div class="alert warn">'+message+'</div>');
     return;
   }
-  const saved=recorded.point,pointContext=globalThis.entryPointContext(tid,level,lotNo,(lvlCfg(t,level)||{}).lot||''),parallel=pointContext.parallel;
+  const saved=recorded.point,parallel=recorded.parallel;
   logAct('Thêm điểm QC',`Ngày ${vnDate(date)}, M${level}${parallel?' · lô song song '+lotNo:''}, giá trị ${fmtPointValue(saved,t)}`,t.name);
-  clearDerivedForTest(tid);
   // Lô song song không nằm trong activeWestgard (chỉ phủ lô đang dùng) — tra bảng
   // đánh giá riêng của chính nó để báo đúng kết luận cho điểm vừa nhập.
-  const f=(parallel?parallelWestgard(t,{level:+level,lot:String(lotNo),mean:+cfg.mean,sd:+cfg.sd,parallel:true}).byPoint.get(saved.id):activeWestgard(t).byPoint.get(saved.id))||{level:'ok',rules:[]},rules=[...new Set(f.rules||[])];
-  save({clearDerived:false,testId:tid});
+  const f=recorded.verdict,rules=recorded.verdict.rules||[];
+  save(recorded.effects.save);
   const feedback=globalThis.entrySaveFeedback({level,lotNo,parallel,verdict:f.level,rules,dateText:vnDate(date)}),tag=`Mức ${level}${parallel?' · lô song song '+esc(lotNo):''}`;
-  entrySel=pointContext.selection;entryLastMsg=feedback?`<div class="alert ${feedback.cls}">${feedback.emphasis?'<b>'+esc(feedback.message)+'</b>':esc(feedback.message)}</div>`:f.level==='rej'?`<div class="alert rej"><b>⚠ ${tag} vi phạm — ${rules.join(', ')}</b></div>`:f.level==='warn'?`<div class="alert warn"><b>${tag} cảnh báo — ${rules.join(', ')}</b></div>`:`<div class="alert ok">✓ Đã lưu ${tag} ngày ${vnDate(date)}.</div>`;
+  entrySel=recorded.selection;entryLastMsg=feedback?`<div class="alert ${feedback.cls}">${feedback.emphasis?'<b>'+esc(feedback.message)+'</b>':esc(feedback.message)}</div>`:f.level==='rej'?`<div class="alert rej"><b>⚠ ${tag} vi phạm — ${rules.join(', ')}</b></div>`:f.level==='warn'?`<div class="alert warn"><b>${tag} cảnh báo — ${rules.join(', ')}</b></div>`:`<div class="alert ok">✓ Đã lưu ${tag} ngày ${vnDate(date)}.</div>`;
   entryRenderKeepScroll();
 }
 function syncVoidNceChoice(){
@@ -310,13 +309,12 @@ async function confirmVoidQcPoint(tid,pointId){
   const detail=openNce?'Điểm vẫn được giữ trong nhật ký; hồ sơ NCE sẽ được lập mới hoặc dùng lại, và yêu cầu QC chạy lại.':'Điểm vẫn được giữ trong nhật ký; thao tác này không tự mở hồ sơ NCE.';
   if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Hủy điểm QC',message:'Hủy điểm QC này khỏi tính toán Westgard/thống kê?',detail,confirmLabel:'Hủy điểm QC',cancelLabel:'Quay lại'}))return;
   closeModal();
-  const result=EntryService.voidPoint(state,{tid,pointId,reason:clean,kind,openNce,rule,errorType:qcErrorType,qcVerdict,staff:currentStaff(),nowIso:new Date().toISOString(),today:isoToday(),id:uid(),nceId:nextNceId(isoToday()),dueDate:nceDueDate(7),formatDate:vnDate,formatNumber:fmt});
+  const result=globalThis.EntryVoidCommand.execute({state,tid,pointId,reason:clean,kind,openNce,rule,errorType:qcErrorType,qcVerdict,staff:currentStaff(),nowIso:new Date().toISOString(),today:isoToday(),id:uid(),nceId:nextNceId(isoToday()),dueDate:nceDueDate(7),formatDate:vnDate,formatNumber:fmt});
   if(result&&result.error==='period-locked'){entrySetLastMsg('<div class="alert warn">Kỳ này đã chốt, không thể hủy điểm QC.</div>');return;}
-  if(!result||result.error)return;
-  clearDerivedForTest(tid);
+  if(!result||!result.ok)return;
   logAct('Hủy điểm QC',`Ngày ${vnDate(result.point.date)}, M${result.point.level}, giá trị ${fmtPointValue(result.point,t)} · ${result.reason}`,t.name);
   const followup=result.openNce?(result.reusedAction?' Đã giữ liên kết với hồ sơ NCE đang mở.':` Đã mở hồ sơ ${esc(result.action&&result.action.nceId||'NCE')} để tiếp tục điều tra.`):' Không yêu cầu NCE/QC chạy lại.';
-  save({clearDerived:false,testId:tid});entryLastMsg=`<div class="alert warn">Đã hủy điểm QC ngày ${vnDate(result.point.date)}. Điểm không còn tham gia tính toán.${followup}</div>`;entryRenderKeepScroll();
+  save(result.effects.save);entryLastMsg=`<div class="alert warn">Đã hủy điểm QC ngày ${vnDate(result.point.date)}. Điểm không còn tham gia tính toán.${followup}</div>`;entryRenderKeepScroll();
 }
 function entrySetSheetMonth(v){const month=globalThis.entrySheetMonthValue(v);if(!month)return;entrySheetMonth=month;entryLastMsg='';rerender();}
 function entryGoToday(){entrySheetMonth=isoMonth();entryJumpToday=true;entryLastMsg='';rerender();}

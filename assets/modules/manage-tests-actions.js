@@ -93,7 +93,7 @@ async function resolveTargetSwitch(mode){
 }
 function commitTargetMatrix(picked,group,panel,mode,overwrites){
   const result=ManageConfigService.applyTargetMatrix({picked,group,mode,overwrites,effectiveFrom:isoToday(),note:'Cập nhật Mean/SD',tests:state.tests,lots:state.qcLots||[],groups:state.lotGroups||[],pointsForTest:t=>(state.data&&state.data[t.id])||[],groupsForLot:groupsOfLot,upsertHistory:upsertLotTargetHistory});
-  logAct('Cập nhật Mean/SD',`${targetPanelLabel()} · ${group.name} · ${result.count} dòng${mode==='planned'?' (dự kiến)':''}`,'Mean/SD');save();rerender();
+  logAct('Cập nhật Mean/SD',`${globalThis.targetPanelLabelPresentation(state.qcPanels,manageTargetPanel)} · ${group.name} · ${result.count} dòng${mode==='planned'?' (dự kiến)':''}`,'Mean/SD');save();rerender();
 }
 function openQcHistoryDetail(tid,level,lotNo=''){
   const t=state.tests.find(x=>x.id===tid),l=t&&t.levels.find(x=>+x.level===+level);if(!t||!l)return;
@@ -118,10 +118,10 @@ function renderConfigPanelTests(){
 }
 async function saveConfigPanel(id){
   if(!requireAdmin())return;
-  const data={name:document.getElementById('cfgPanelName').value,instrumentId:document.getElementById('cfgPanelInstrument').value,testIds:[...document.querySelectorAll('.cfg-panel-test:checked')].map(x=>x.value),note:document.getElementById('cfgPanelNote').value,active:document.getElementById('cfgPanelActive').checked},result=ManageConfigService.savePanel(state,{id,newId:uid(),data});if(result.error){await infoDialog(result.message);return;}
-  logAct(result.created?'Thêm Panel QC':'Cập nhật Panel QC',`${result.record.name} · ${result.record.testIds.length} xét nghiệm`,'Panel QC');closeModal();save();rerender();
+  const data={name:document.getElementById('cfgPanelName').value,instrumentId:document.getElementById('cfgPanelInstrument').value,testIds:[...document.querySelectorAll('.cfg-panel-test:checked')].map(x=>x.value),note:document.getElementById('cfgPanelNote').value,active:document.getElementById('cfgPanelActive').checked},result=globalThis.ManagePanelCommand.save({state,id,newId:uid(),data});if(!result.ok){await infoDialog(result.message);return;}
+  logAct(result.effects.audit.action,result.effects.audit.detail,result.effects.audit.target);closeModal();save(result.effects.save);rerender();
 }
-async function deleteConfigPanel(id){if(!requireAdmin())return;const checked=ManageConfigService.panelRemoval(state,{id});if(checked.error){if(checked.message)await infoDialog(checked.message);return;}if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa Panel QC',message:`Xóa Panel QC ${checked.record.name}?`,detail:'Các xét nghiệm vẫn được giữ nguyên.',confirmLabel:'Xóa Panel QC',cancelLabel:'Hủy'}))return;ManageConfigService.removePanel(state,{id});logAct('Xóa Panel QC',checked.record.name,'Panel QC');save();rerender();}
+async function deleteConfigPanel(id){if(!requireAdmin())return;const checked=ManageConfigService.panelRemoval(state,{id});if(checked.error){if(checked.message)await infoDialog(checked.message);return;}if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa Panel QC',message:`Xóa Panel QC ${checked.record.name}?`,detail:'Các xét nghiệm vẫn được giữ nguyên.',confirmLabel:'Xóa Panel QC',cancelLabel:'Hủy'}))return;const result=globalThis.ManagePanelCommand.remove({state,id});if(!result.ok){await infoDialog(result.message);return;}logAct(result.effects.audit.action,result.effects.audit.detail,result.effects.audit.target);save(result.effects.save);rerender();}
 async function deleteLotTransition(id){if(!requireAdmin())return;const checked=ManageConfigService.lotTransitionRemoval(state,{id,switchesLot:transitionSwitchesLot});if(checked.error){if(checked.message)await infoDialog(checked.message);return;}if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa dòng chuyển tiếp lô',message:'Xóa dòng chuyển tiếp lô này?',confirmLabel:'Xóa',cancelLabel:'Hủy'}))return;ManageConfigService.removeLotTransition(state,{id,switchesLot:transitionSwitchesLot});syncLotDepletionFromTransitions();logAct('Xóa chuyển tiếp lô',`${lotLabel(checked.record.fromLotId)} → ${lotLabel(checked.record.toLotId)}`,'Chuyển tiếp lô');save();rerender();}
 function lotTransitionChoiceLabel(lot){return LotTransitionPickerService.label(lot);}
 function lotTransitionChoiceLots(selectedId=''){return LotTransitionPickerService.availableLots(state.qcLots||[],selectedId);}
@@ -201,7 +201,7 @@ async function saveLotTransitionV2(id){
   if(nowDepleted&&!wasDepleted)logAct('Khóa lô đã hết',`${lotLabel(fromLotId)} · chuyển tiếp sang ${lotLabel(toLotId)}`,'Lô QC');
   else if(!nowDepleted&&wasDepleted)logAct('Mở lại lô QC',lotLabel(fromLotId),'Lô QC');
   if(switched)logAct('Áp dụng chuyển tiếp lô',`${panelName(panelId)} · ${lotLabel(fromLotId)} → ${lotLabel(toLotId)} · ${switched} xét nghiệm`,'Chuyển tiếp lô');
-  logAct(saved.created?'Thêm chuyển lô QC':'Cập nhật chuyển lô QC',`${panelName(panelId)}: ${lotLabel(fromLotId)} → ${lotLabel(toLotId)} · ${transitionStatusLabelV2(status).text}`,'Chuyển tiếp lô');clearDerived();closeModal();save();rerender();
+  logAct(saved.created?'Thêm chuyển lô QC':'Cập nhật chuyển lô QC',`${panelName(panelId)}: ${lotLabel(fromLotId)} → ${lotLabel(toLotId)} · ${globalThis.manageTransitionStatusPresentation(status).text}`,'Chuyển tiếp lô');clearDerived();closeModal();save();rerender();
 }
 async function openConfigGroup(id=''){
   if(!state.qcLots.length){await infoDialog('Hãy tạo lô QC trước khi tạo nhóm lô.');setManageTab('lots');return;}
@@ -214,17 +214,17 @@ async function openConfigGroup(id=''){
 function suggestConfigGroupName(){const ids=[...document.querySelectorAll('.cfg-group-lot:checked')].map(x=>x.value),name=ids.map(id=>(state.qcLots.find(l=>l.id===id)||{}).lotNo).filter(Boolean).join('/'),el=document.getElementById('cfgGroupName');if(el)el.value=name;}
 async function saveConfigGroup(id){
   if(!requireAdmin())return;
-  const data={name:document.getElementById('cfgGroupName').value,lotIds:[...document.querySelectorAll('.cfg-group-lot:checked')].map(x=>x.value),note:document.getElementById('cfgGroupNote').value},result=ManageConfigService.saveLotGroup(state,{id,newId:uid(),data});if(result.error){await infoDialog(result.message);return;}
+  const data={name:document.getElementById('cfgGroupName').value,lotIds:[...document.querySelectorAll('.cfg-group-lot:checked')].map(x=>x.value),note:document.getElementById('cfgGroupNote').value},result=globalThis.ManageLotGroupCommand.save({state,id,newId:uid(),data});if(!result.ok){await infoDialog(result.message);return;}
   const sigmaSync=reconcileSigmaLevelsWithLotGroups(),syncNote=sigmaSync.pruned?` · đã xóa ${sigmaSync.pruned} dữ liệu mức Sigma không còn trong nhóm`:'';
   logAct(result.created?'Thêm nhóm lô':'Cập nhật nhóm lô',result.record.name+syncNote,'Nhóm lô');closeModal();save();rerender();
 }
-async function deleteConfigGroup(id){if(!requireAdmin())return;const checked=ManageConfigService.lotGroupRemoval(state,{id});if(checked.error){if(checked.message)await infoDialog(checked.message);return;}if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa nhóm lô',message:`Xóa nhóm lô ${checked.record.name}?`,detail:'Các lô QC bên trong vẫn được giữ nguyên.',confirmLabel:'Xóa nhóm lô',cancelLabel:'Hủy'}))return;ManageConfigService.removeLotGroup(state,{id});logAct('Xóa nhóm lô',checked.record.name,'Nhóm lô');save();rerender();}
+async function deleteConfigGroup(id){if(!requireAdmin())return;const checked=ManageConfigService.lotGroupRemoval(state,{id});if(checked.error){if(checked.message)await infoDialog(checked.message);return;}if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa nhóm lô',message:`Xóa nhóm lô ${checked.record.name}?`,detail:'Các lô QC bên trong vẫn được giữ nguyên.',confirmLabel:'Xóa nhóm lô',cancelLabel:'Hủy'}))return;const result=globalThis.ManageLotGroupCommand.remove({state,id});if(!result.ok){await infoDialog(result.message);return;}logAct('Xóa nhóm lô',result.record.name,'Nhóm lô');save();rerender();}
 /* Dừng luồng vận hành của nhóm: giữ nguyên liên kết lô/Mean-SD để bảo toàn lịch sử và
    có thể kích hoạt lại, nhưng isOperationalLotGroup() sẽ loại nhóm khỏi Nhập QC cùng
    mọi luồng vận hành mới. Chiều ngược lại đi qua activateLotGroup(). */
 function toggleLotGroupStatus(id){
   if(!requireAdmin())return;
-  const result=ManageConfigService.stopLotGroup(state,{id,stoppedAt:isoToday()});if(result.error)return;
+  const result=globalThis.ManageLotGroupCommand.stop({state,id,stoppedAt:isoToday()});if(!result.ok)return;
   logAct('Dừng nhóm lô',result.record.name,'Nhóm lô');
   save();rerender();
 }
@@ -327,10 +327,10 @@ function openConfigInstrument(id=''){
 async function saveConfigInstrument(id){
   if(!requireAdmin())return;
   const data={name:document.getElementById('cfgInstName').value,section:document.getElementById('cfgInstSection').value,manufacturer:document.getElementById('cfgInstMfr').value,serial:document.getElementById('cfgInstSerial').value,active:document.getElementById('cfgInstActive').checked};
-  const result=ManageConfigService.saveInstrument(state,{id,newId:id?'':uid(),data});if(result.error){await infoDialog(result.message);return;}
-  logAct(result.created?'Thêm máy xét nghiệm':'Cập nhật máy',result.record.name,'Máy xét nghiệm');closeModal();save();rerender();
+  const result=globalThis.ManageInstrumentCommand.save({state,id,newId:id?'':uid(),data});if(!result.ok){await infoDialog(result.message);return;}
+  logAct(result.effects.audit.action,result.effects.audit.detail,result.effects.audit.target);closeModal();save(result.effects.save);rerender();
 }
-async function deleteConfigInstrument(id){if(!requireAdmin())return;const check=ManageConfigService.instrumentRemoval(state,{id});if(check.error){if(check.error!=='not-found')await infoDialog(check.message);return;}if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa máy xét nghiệm',message:`Xóa máy ${check.record.name}?`,confirmLabel:'Xóa máy',cancelLabel:'Hủy'}))return;const result=ManageConfigService.removeInstrument(state,{id});if(result.error){await infoDialog(result.message);return;}logAct('Xóa máy xét nghiệm',result.record.name,'Máy xét nghiệm');save();rerender();}
+async function deleteConfigInstrument(id){if(!requireAdmin())return;const check=ManageConfigService.instrumentRemoval(state,{id});if(check.error){if(check.error!=='not-found')await infoDialog(check.message);return;}if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa máy xét nghiệm',message:`Xóa máy ${check.record.name}?`,confirmLabel:'Xóa máy',cancelLabel:'Hủy'}))return;const result=globalThis.ManageInstrumentCommand.remove({state,id});if(!result.ok){await infoDialog(result.message);return;}logAct(result.effects.audit.action,result.effects.audit.detail,result.effects.audit.target);save(result.effects.save);rerender();}
 /* Xét nghiệm mới luôn bắt đầu với đúng 1 mức (Mức 1) — KHÔNG suy theo các mức
    lô đang có ở NƠI KHÁC trong hệ thống (từng làm vậy trước đây, khiến xét
    nghiệm mới tự dính thêm mức rỗng không liên quan chỉ vì lab có lô ở mức đó
@@ -380,9 +380,9 @@ async function saveConfigAssay(id){
   const cusumK=parseFloat(document.getElementById('cfgAssayCusumK').value),cusumH=parseFloat(document.getElementById('cfgAssayCusumH').value);
   const cusum={on:document.getElementById('cfgAssayCusumOn').checked,k:Number.isFinite(cusumK)&&cusumK>0?cusumK:0.5,h:Number.isFinite(cusumH)&&cusumH>0?cusumH:4};
   const savedTeaSource=existing&&['lab','eflm','clia','ricos'].includes(existing.teaSource)?existing.teaSource:'',data={analyteId,name,displayName:naming?naming.displayName:enteredName,standardName:naming?naming.standardName:existing&&existing.standardName||enteredName,abbreviation:naming?naming.abbreviation:existing&&existing.abbreviation||'',aliases:naming?naming.aliases:existing&&existing.aliases||[enteredName],matrix:naming?naming.matrix:existing&&existing.matrix||'',instrumentId,machine:inst&&inst.name||'',section:QCCore.cleanText(document.getElementById('cfgAssaySection').value).trim()||inst&&inst.section||'',unit:QCCore.cleanText(document.getElementById('cfgAssayUnit').value),decimalPlaces,method:QCCore.cleanText(document.getElementById('cfgAssayMethod').value),reagent:QCCore.cleanText(document.getElementById('cfgAssayReagent').value),reagentSupplier:existing&&existing.reagentSupplier||'',temperature:existing&&existing.temperature||0,genNo:existing&&existing.genNo||'',performanceLimit:existing&&existing.performanceLimit||'',tea,teaSource:savedTeaSource||(ref?(document.getElementById('cfgAssayTeaSource').value||'ricos'):'ricos'),levels,ruleActions,ruleScopes,cusum,closed:document.getElementById('cfgAssayClosed').checked,active:true,sgTracked:existing?!!existing.sgTracked:false};
-  const result=ManageConfigService.saveAssay(state,{id,newId:id?'':uid(),data});if(result.error){await infoDialog(result.message);return;}
-  logAct(result.created?'Thêm xét nghiệm':'Cập nhật xét nghiệm',`${result.inst.name} · ${levels.length} mức QC`,name);
-  closeModal();save();rerender();
+  const result=globalThis.ManageAssayCommand.execute({state,id,newId:id?'':uid(),data});if(!result.ok){await infoDialog(result.message);return;}
+  logAct(result.effects.audit.action,result.effects.audit.detail,result.effects.audit.target);
+  closeModal();save(result.effects.save);rerender();
 }
 /* Panel "Khóa kỳ báo cáo" hứa với người dùng rằng khóa kỳ chặn sửa/hủy điểm QC của
    kỳ đó ở MỌI xét nghiệm. Xóa nguyên xét nghiệm mà không kiểm thì lời hứa đó sai —
@@ -395,7 +395,7 @@ async function delTest(id){
   if(locked.count){await infoDialog(`Không thể xóa "${testDisplayName(t)}": còn ${locked.count} điểm QC thuộc kỳ đã khóa (${locked.periods.map(monthVN).join(', ')}). Hãy mở khóa các kỳ này ở trang Báo cáo trước — thao tác mở khóa yêu cầu lý do và được ghi vào nhật ký.`);return;}
   if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa xét nghiệm',message:`Xóa xét nghiệm ${t.name} và toàn bộ dữ liệu QC?`,detail:`${points.length} điểm QC cùng toàn bộ kết quả Westgard và Sigma của xét nghiệm này sẽ mất, không thể khôi phục.`,confirmLabel:'Xóa xét nghiệm',cancelLabel:'Hủy'}))return;
   if(!await reauthenticateCurrentUser({title:'Xác thực xóa xét nghiệm',message:`Nhập lại mật khẩu trước khi xóa ${t.name} và ${points.length} điểm QC.`}))return;
-  const result=ManageConfigService.removeAssay(state,{id});if(result.error){await infoDialog(result.message);return;}
+  const result=globalThis.ManageAssayRemovalCommand.execute({state,id});if(!result.ok){await infoDialog(result.message);return;}
   if(selTest===id)selTest=state.tests[0]&&state.tests[0].id||null;if(entrySel&&entrySel.testId===id)entrySel=null;
-  logAct('Xóa test/lô',`Xóa xét nghiệm và ${points.length} điểm QC`,t.name);save();rerender();
+  logAct(result.effects.audit.action,result.effects.audit.detail,result.effects.audit.target);save(result.effects.save);rerender();
 }

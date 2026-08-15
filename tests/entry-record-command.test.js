@@ -1,0 +1,14 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','application','entry','entry-record-command.ts')).href;
+const program=`import {createEntryRecordCommand} from ${JSON.stringify(source)};
+const command=createEntryRecordCommand({recordPoint:(_s,input)=>({ok:true,point:{id:input.id,val:input.value}}),canEnter:()=>true,pointContext:()=>({parallel:true,selection:{testId:'t',level:2}}),verdict:()=>({level:'warn',rules:['1-2s','1-2s']})});
+const result=command.execute({state:{},test:{id:'t'},testId:'t',level:2,date:'2026-08-15',value:12.3,valueDecimals:1,runId:'2026-08-15-1',lotNo:'L2',cfg:{mean:10,sd:1},staff:{},id:'p1',activeLot:'L1'});console.log(JSON.stringify(result));`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy Entry record command TypeScript');
+const output=JSON.parse(result.stdout);
+assert.equal(output.ok,true);assert.equal(output.parallel,true);assert.deepEqual(output.verdict,{level:'warn',rules:['1-2s']});assert.deepEqual(output.effects.save,{clearDerived:false,testId:'t'});
+console.log('Entry record command TypeScript tests passed');

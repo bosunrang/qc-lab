@@ -8,7 +8,9 @@ const bridge=fs.readFileSync(path.join(root,'src','compat','modular-pilot.global
 for(const name of ['settingsStorageBytesText','settingsStorageUsageText','settingsBrandProfile','settingsFirebaseAclHelp']){
   assert.match(bridge,new RegExp(`^  ${name}:`,'m'),`${name} must be a required Settings bridge contract`);
   assert.match(bridge,new RegExp(`root\\.${name}\\s*=`),`${name} must be assigned by the TypeScript bootstrap`);
-  assert.match(route,new RegExp(`globalThis\\.${name}`),`${name} must be consumed by the Settings UI`);
 }
+assert.match(route,/globalThis\.settingsStorageUsageText/,'Settings UI must consume the composed storage-usage helper');
+assert.match(route,/globalThis\.settingsBrandProfile/,'Settings UI must consume the brand-profile helper');
+assert.match(route,/globalThis\.settingsFirebaseAclHelp/,'Settings UI must consume the Firebase ACL helper');
 
 console.log('Settings helper TypeScript bridge tests passed');

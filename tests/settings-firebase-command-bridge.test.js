@@ -10,8 +10,8 @@ const bridge = fs.readFileSync(path.join(root, 'src/compat/modular-pilot.global.
 assert.match(route, /plan=globalThis\.firebaseSettingsService\.prepare\(input\)/, 'Lưu Firebase phải dùng command TypeScript');
 assert.match(route, /if\(!plan\.ok\)/, 'Route phải xử lý lỗi xác thực do command trả về');
 assert.match(route, /const code=plan\.labCode,email=plan\.email,password=plan\.password,cfg=plan\.config;/, 'Route phải dùng dữ liệu đã chuẩn hóa từ command');
-assert.match(route, /function firebaseRulesText\(\)\{return globalThis\.settingsFirebaseRulesText\(\);\}/, 'Firebase Rules phải dùng presentation TypeScript');
-assert.match(route, /function firebaseGuideHtml\(\)\{return globalThis\.settingsFirebaseGuideHtml\(\);\}/, 'Hướng dẫn Firebase phải dùng presentation TypeScript');
+assert.match(route, /globalThis\.settingsFirebaseRulesText\(\)/, 'Firebase Rules phải dùng presentation TypeScript');
+assert.match(route, /globalThis\.settingsFirebaseGuideHtml\(\)/, 'Hướng dẫn Firebase phải dùng presentation TypeScript');
 assert.doesNotMatch(route, /firebaseSettingsService\?globalThis\.firebaseSettingsService\.prepare/, 'Không giữ fallback classic cho command Firebase');
 assert.match(bridge, /firebaseSettingsService: ReturnType<typeof createFirebaseSettingsService>;/, 'Command Firebase phải là hợp đồng bridge bắt buộc');
 assert.match(bridge, /settingsFirebaseRulesText: typeof firebaseRulesTextTs;/, 'Firebase Rules phải là hợp đồng bridge bắt buộc');

@@ -14,6 +14,7 @@ const modals=read('assets/modules/modals.js');
 const actions=read('assets/modules/actions-routes.js');
 const actionCancelModal=read('src/presentation/nce/action-cancel-modal-html.ts');
 const actionInvestigationField=read('src/presentation/nce/action-investigation-field-html.ts');
+const actionFormPanel=read('src/presentation/nce/action-form-panel-html.ts');
 const form=read('assets/modules/action-form.js');
 const actionRecordService=read('src/application/nce/action-record-service.ts');
 const actionEvidencePresentation=read('src/presentation/nce/action-evidence-presentation.ts');
@@ -103,7 +104,7 @@ assert.ok(index.indexOf('actions-routes.js')<index.indexOf('action-form.js'),'ac
 assert.match(actions,/actionFormHtml\(issues\.length\)/,'trang phải dùng lại đúng tập sự cố đã tính cho panel form');
 assert.doesNotMatch(actions,/class="action-form-body"/,'markup form không được ở lại actions-routes.js');
 assert.doesNotMatch(actionsArea,/state\.actions\.splice\(/,'hồ sơ NCE không được xóa vật lý; phải hủy có lưu vết');
-assert.match(actions,/ActionReviewService\.cancel\(/,'quy trình hủy phải gọi command hủy mềm');
+assert.match(actions,/NceLifecycleCommand\.execute\(\{kind:'cancel'/,'quy trình hủy phải gọi command hủy mềm TypeScript');
 assert.doesNotMatch(actions,/function confirmReturnAction\(i\)/,'xác nhận trả lại không được dựa vào vị trí mảng có thể thay đổi khi đồng bộ');
 assert.match(actions,/function confirmReturnAction\(id,token\)/,'xác nhận trả lại phải khóa theo ID và token phiên bản');
 assert.match(actions,/confirmReturnAction\('\$\{jsq\(current\.id\)\}','\$\{jsq\(token\)\}'\)/,'hộp thoại trả lại phải truyền đúng ID và token của hồ sơ sau xác thực');
@@ -128,7 +129,8 @@ assert.match(form,/function actionInvestigationChoose\(/,'checklist điều tra 
 assert.match(actionInvestigationField,/class="action-investigation-select"/,'select dữ liệu gốc phải được giữ để tương thích state và kiểm thử');
 assert.match(form,/function actionChecklistChip\(/,'tiêu đề checklist phải hiển thị tiến độ hoàn tất');
 assert.match(form,/function actionSuggestBox\(/,'gợi ý nhập liệu NCE phải dùng cùng một khối thu gọn');
-assert.match(form,/class="action-form-panel-head".*btn\('Quy trình 8 bước'/,'nút quy trình phải nằm cạnh tiêu đề panel lập hồ sơ NCE');
+assert.match(actionFormPanel,/class="action-form-panel-head"/,'renderer TypeScript phải giữ nút quy trình cạnh tiêu đề panel lập hồ sơ NCE');
+assert.match(form,/guideButtonHtml:btn\('Quy trình 8 bước','openActionGuide\(\)','ghost sm'\)/,'nút quy trình phải tiếp tục dùng helper btn của route legacy');
 assert.match(reportsCss,/\.action-form-panel-head\{[^}]*justify-content:space-between/,'header lập hồ sơ NCE phải tách tiêu đề trái và nút quy trình sang phải');
 assert.match(reportsCss,/\.action-form-panel-head\{[^}]*color:var\(--card-head-ink\);[^}]*font-size:var\(--section-head-size\);[^}]*font-weight:800/,'header lập hồ sơ NCE phải dùng đúng token chữ của header panel hệ thống');
 assert.match(reportsCss,/\.action-form-panel \.action-form-panel-head > \.panel-title\{[^}]*flex:1;[^}]*color:inherit;[^}]*font:inherit/,'tiêu đề lập hồ sơ NCE phải kế thừa nguyên kiểu chữ hệ thống từ header');
@@ -147,7 +149,7 @@ assert.match(reportsCss,/\.action-guide-list\{[^}]*grid-template-columns:1fr/,'q
 assert.match(reportsCss,/\.action-guide-card\{[^}]*border-bottom:1px solid var\(--line\)/,'các bước NCE chỉ phân cách bằng đường kẻ trung tính, không dùng card màu');
 for(const id of ['aContainmentNote','aCorrection','aCause','aAct','aPatientAction','aEffectivenessNote'])assert.match(form,new RegExp(`actionSuggestBox\\('${id}'`),`${id} phải dùng gợi ý thu gọn`);
 
-assert.match(form,/const candidate=\{\.\.\.\(editing\|\|\{\}\),\.\.\.protocol,testId:tid,level,lot,pointId,date,action,by\}/,'candidate khi sửa phải giữ nguồn tạo và toàn bộ danh tính IQC trước khi kiểm tra cổng chạy lại');
+assert.match(form,/NceFormCommand\.submit\(\{actions:state\.actions,editId:editing&&editing\.id,values:\{\.\.\.\(editing\|\|\{\}\),\.\.\.protocol,nceId:editing&&editing\.nceId\|\|nceId,testId:tid,level,lot,pointId,date,rule,errorType,action,by\}/,'command NCE phải nhận snapshot danh tính IQC bất biến khi sửa trước khi kiểm tra cổng chạy lại');
 for(const id of ['aReleaseStatus','aReleaseDate','aReleaseBy','aReleaseNote'])assert.match(form,new RegExp(`['"]${id}['"]`),`${id} must remain in the release-decision form`);
 assert.match(form,/actionSuggestBox\('aReleaseNote'/,'release rationale must keep the same editable suggestion pattern');
 assert.match(form,/actionSuggestBox\('aRiskBasis'/,'risk classification must keep an editable SOP-basis field');

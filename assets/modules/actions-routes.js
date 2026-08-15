@@ -10,6 +10,7 @@ function actionLevelShort(t,level,lotSnap){
   return ActionListPresentation.levelShort(t,level,lotSnap);
 }
 function currentIssues(){return globalThis.ActionCurrentIssues();}
+function nceCommandUser(){return{id:currentUser&&currentUser.id||'',username:currentUser&&currentUser.username||'',name:userName()};}
 async function cancelAction(i){
   if(!requireAdmin())return;const a=state.actions&&state.actions[i];if(!a)return;
   const readiness=ActionReviewService.cancelReadiness(a);if(!readiness.ok){await infoDialog(actionReviewReadinessMessage('cancel',{...readiness,action:a},false));return;}
@@ -28,7 +29,7 @@ function confirmCancelAction(id,token){
   const input=document.getElementById('actionCancelReason'),reason=QCCore.cleanText(input?input.value:'',1000).trim();
   if(reason.length<5){const err=document.getElementById('actionCancelErr');if(err)err.style.display='';return;}
   closeModal();
-  if(!ActionReviewService.cancel(a,reason,userName())){closeModal();rerender();return;}
+  if(!globalThis.NceLifecycleCommand.execute({kind:'cancel',actions:state.actions,id:a.id,token,note:reason,user:nceCommandUser()}).ok){closeModal();rerender();return;}
   logAct('Hủy hồ sơ NCE',`${a.nceId||a.id||'NCE'} · ${reason}`,a.testId?(state.tests.find(t=>t.id===a.testId)||{}).name||'Khắc phục':'Khắc phục');
   if(globalThis.actionFormUiState.editId===a.id)globalThis.actionFormUiState.reset();
   save({clearDerived:false});rerender();
@@ -59,7 +60,7 @@ function confirmApproveAction(id,token){
   const note=QCCore.cleanText(input?input.value:'',1000).trim();
   if(note.length<3){const err=document.getElementById('actionNoteErr');if(err)err.style.display='';return;}
   closeModal();
-  if(!ActionReviewService.approve(a,note,userName())){closeModal();rerender();return;}
+  if(!globalThis.NceLifecycleCommand.execute({kind:'approve',actions:state.actions,id:a.id,token,note,user:nceCommandUser()}).ok){closeModal();rerender();return;}
   logAct('Duyệt khắc phục',`${a.rule||'—'} · ${note}`,a.testId?(state.tests.find(t=>t.id===a.testId)||{}).name||'Khắc phục':'Khắc phục');save({clearDerived:false});rerender();
 }
 async function returnAction(i){
@@ -82,7 +83,7 @@ function confirmReturnAction(id,token){
   const note=QCCore.cleanText(input?input.value:'',1000).trim();
   if(note.length<3){const err=document.getElementById('actionNoteErr');if(err)err.style.display='';return;}
   closeModal();
-  if(!ActionReviewService.returnForRevision(a,note,userName())){closeModal();rerender();return;}
+  if(!globalThis.NceLifecycleCommand.execute({kind:'return',actions:state.actions,id:a.id,token,note,user:nceCommandUser()}).ok){closeModal();rerender();return;}
   logAct('Trả lại khắc phục',`${a.rule||'—'} · ${note}`,a.testId?(state.tests.find(t=>t.id===a.testId)||{}).name||'Khắc phục':'Khắc phục');save({clearDerived:false});rerender();
 }
 /* Hành động khắc phục không hiệu lực thì phải mở vòng điều tra mới chứ không treo hồ sơ
@@ -95,7 +96,7 @@ async function escalateAction(i){
   if(!actionCanEscalate(a)){await infoDialog('Chỉ mở hồ sơ tiếp theo cho hồ sơ đã kết luận "chưa hiệu lực" và chưa từng chuyển.');return;}
   const t=state.tests.find(x=>x.id===a.testId),parent=a.nceId||'hồ sơ trước';
   if(!await confirmDialog({kicker:'Vòng điều tra mới',title:'Lập hồ sơ NCE tiếp theo?',message:`Hành động của ${parent} được kết luận chưa hiệu lực. Mở một hồ sơ mới để điều tra lại cùng sự cố này?`,detail:'Hồ sơ cũ sẽ được khép lại với kết luận "chưa hiệu lực — đã chuyển", giữ nguyên toàn bộ nội dung điều tra.',confirmLabel:'Lập hồ sơ tiếp theo',cancelLabel:'Hủy'}))return;
-  const record=ActionEscalationService.createFollowUp(state.actions||[],a,{id:currentUser&&currentUser.id||'',username:currentUser&&currentUser.username||'',name:userName()});
+  const result=globalThis.NceLifecycleCommand.execute({kind:'escalate',actions:state.actions||[],id:a.id,user:nceCommandUser()}),record=result.ok&&result.record;
   if(!record){await infoDialog('Hồ sơ đã thay đổi và không còn đủ điều kiện mở vòng tiếp theo.');return;}
   const nceId=record.nceId;
   logAct('Lập hồ sơ NCE tiếp theo',`${nceId} · nối tiếp ${parent} (hành động chưa hiệu lực)`,t?t.name:'Khắc phục');
@@ -122,7 +123,7 @@ function confirmReopenAction(i){
   const note=QCCore.cleanText(input?input.value:'',1000).trim();
   if(note.length<5){const err=document.getElementById('actionNoteErr');if(err)err.style.display='';return;}
   closeModal();
-  if(!ActionReviewService.reopen(a,note)){closeModal();rerender();return;}
+  if(!globalThis.NceLifecycleCommand.execute({kind:'reopen',actions:state.actions,id:a.id,note,user:nceCommandUser()}).ok){closeModal();rerender();return;}
   logAct('Mở lại hồ sơ NCE',`${a.nceId||a.rule||'—'} · ${note}`,a.testId?(state.tests.find(t=>t.id===a.testId)||{}).name||'Khắc phục':'Khắc phục');save({clearDerived:false});rerender();
 }
 function actionReviewButtons(i,a){

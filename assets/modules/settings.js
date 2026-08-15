@@ -1,7 +1,5 @@
 /* ===== SETTINGS / CLOUD ===== */
-function storageBytesText(bytes){return globalThis.settingsStorageBytesText(bytes);}
-function storageUsageText(data,estimate){return globalThis.settingsStorageUsageText(data,estimate);}
-async function checkStorageUsage(){let estimate=null;try{if(typeof navigator!=='undefined'&&navigator.storage&&typeof navigator.storage.estimate==='function')estimate=await navigator.storage.estimate();}catch(e){}await infoDialog(storageUsageText(state.data,estimate),{title:'Dung lượng cục bộ',type:'success'});}
+async function checkStorageUsage(){let estimate=null;try{if(typeof navigator!=='undefined'&&navigator.storage&&typeof navigator.storage.estimate==='function')estimate=await navigator.storage.estimate();}catch(e){}await infoDialog(globalThis.settingsStorageUsageText(state.data,estimate),{title:'Dung lượng cục bộ',type:'success'});}
 async function saveLab(){if(!requireAdmin())return;const input={name:document.getElementById('labName').value,dept:document.getElementById('labDept').value,address:document.getElementById('labAddr').value};state.lab=globalThis.labProfileService.updateLab(state.lab,input);save({clearDerived:false});await infoDialog('Đã lưu thông tin đơn vị.',{type:'success'});}
 function ensureLabBrandShape(){state.lab=state.lab||{};Object.assign(state.lab,globalThis.settingsBrandProfile(state.lab));}
 async function saveBrand(){
@@ -35,7 +33,6 @@ async function pickLogo(e){
   r.readAsDataURL(f);
 }
 function clearLogo(){if(!requireAdmin())return;state.lab=state.lab||{};state.lab=globalThis.labProfileService.clearLogo(state.lab);save({clearDerived:false});renderBrand();rerender();}
-function firebaseAclHelp(code){const user=(typeof firebase!=='undefined'&&firebase.auth&&firebase.auth().currentUser)||fb.authUser||null;return globalThis.settingsFirebaseAclHelp(code,user&&user.uid||'UID_TAI_KHOAN_FIREBASE');}
 async function saveFb(){
   if(!requireAdmin())return;
   const input={labCode:document.getElementById('fbCode').value,email:document.getElementById('fbEmail').value,password:document.getElementById('fbPassword').value,config:document.getElementById('fbConfig').value};let plan;
@@ -62,21 +59,17 @@ async function saveFb(){
   }catch(e){
     const msg=e&&e.message?e.message:'Kiểm tra tài khoản và cấu hình.';
     setCloudStatus(msg.indexOf('permission_denied')>=0?'Chưa được cấp quyền Firebase':'Đăng nhập Firebase thất bại',false);
-    await infoDialog(msg.indexOf('permission_denied')>=0?firebaseAclHelp(code):'Không thể đăng nhập Firebase: '+msg);
+    const user=(typeof firebase!=='undefined'&&firebase.auth&&firebase.auth().currentUser)||fb.authUser||null;await infoDialog(msg.indexOf('permission_denied')>=0?globalThis.settingsFirebaseAclHelp(code,user&&user.uid||'UID_TAI_KHOAN_FIREBASE'):'Không thể đăng nhập Firebase: '+msg);
   }
 }
-function parseFirebaseConfig(raw){return globalThis.firebaseConfigParser(raw);}
-function validateFirebaseConfig(cfg){return globalThis.firebaseConfigValidator(cfg);}
 async function clearFb(){
   if(!requireAdmin())return;
   localStorage.removeItem('qclab_fb');fbDisconnect();
   try{if(typeof firebase!=='undefined'&&typeof firebase.auth==='function')await firebase.auth().signOut();}catch(e){}
   fb.authUser=null;setCloudStatus('Đang chạy cục bộ',false);markSaved('đã lưu cục bộ','Đã ngắt Firebase');await infoDialog('Đã ngắt đám mây. Dữ liệu vẫn lưu cục bộ.',{type:'success'});
 }
-function firebaseRulesText(){return globalThis.settingsFirebaseRulesText();}
-function firebaseGuideHtml(){return globalThis.settingsFirebaseGuideHtml();}
 async function copyFirebaseRules(){
-  const text=firebaseRulesText();
+  const text=globalThis.settingsFirebaseRulesText();
   try{
     if(navigator.clipboard&&navigator.clipboard.writeText)await navigator.clipboard.writeText(text);
     else{const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();}
@@ -90,6 +83,6 @@ function pageSettings(){
   const lockedCloud=!!(fbcfg&&fbcfg.locked);
   const logo=brandLogo();
   const brandPreview=globalThis.settingsBrandPreviewHtml({logo,markText:brandMarkText(),title:brandTitle(),subtitle:brandSub()});
-  const firebaseRulesPanel=globalThis.settingsFirebaseRulesPanelHtml(firebaseGuideHtml(),firebaseRulesText());
+  const firebaseRulesPanel=globalThis.settingsFirebaseRulesPanelHtml(globalThis.settingsFirebaseGuideHtml(),globalThis.settingsFirebaseRulesText());
   return globalThis.settingsPageLayoutHtml({profileHtml:globalThis.settingsUnitProfileHtml(state.lab)+globalThis.settingsBrandPanelHtml({title:brandTitle(),subtitle:brandSub(),markText:brandMarkText(),previewHtml:brandPreview}),adminHtml:globalThis.settingsAdminToolsHtml(backupStatusText(),backupCapacityText()),firebaseHtml:globalThis.settingsFirebaseConnectionPanelHtml({labCode:fbcfg.labCode,email:fbcfg.email,config:fbcfg.config,locked:lockedCloud,dataPath:fbDataPath()}),lisHtml:globalThis.settingsLisGatewayPanelHtml({url:liscfg.url,token:liscfg.token,enabled:liscfg.enabled,status:lisGatewayRuntime.status,statusText:lisGatewayStatusText()}),rulesHtml:firebaseRulesPanel});
 }

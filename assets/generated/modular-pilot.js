@@ -462,6 +462,70 @@
 		});
 	}
 	//#endregion
+	//#region src/application/entry/entry-record-command.ts
+	function createEntryRecordCommand(deps) {
+		const execute = (input) => {
+			const { test, cfg } = input;
+			if (!test || !cfg || !deps.canEnter(test, input.level)) return {
+				ok: false,
+				error: "not-ready"
+			};
+			const recorded = deps.recordPoint(input.state, {
+				tid: input.testId,
+				level: input.level,
+				date: input.date,
+				value: input.value,
+				valueDecimals: input.valueDecimals,
+				runId: input.runId,
+				cfg,
+				staff: input.staff,
+				id: input.id
+			});
+			if (!recorded.ok || !recorded.point) return {
+				ok: false,
+				error: recorded.error || "save-failed"
+			};
+			const context = deps.pointContext(input.testId, input.level, input.lotNo || "", input.activeLot || "");
+			const parallel = !!context.parallel, verdict = deps.verdict(test, input, recorded.point, parallel) || {};
+			return {
+				ok: true,
+				point: recorded.point,
+				parallel,
+				selection: context.selection,
+				verdict: {
+					level: verdict.level || "ok",
+					rules: [...new Set(verdict.rules || [])]
+				},
+				effects: { save: {
+					clearDerived: false,
+					testId: input.testId
+				} }
+			};
+		};
+		return Object.freeze({ execute });
+	}
+	//#endregion
+	//#region src/application/entry/entry-void-command.ts
+	function createEntryVoidCommand(deps) {
+		const execute = (input) => {
+			const result = deps.voidPoint(input.state, input);
+			if (!result || result.error) return {
+				ok: false,
+				error: result && result.error || "not-found"
+			};
+			deps.clearDerived(input.tid);
+			return {
+				ok: true,
+				...result,
+				effects: { save: {
+					clearDerived: false,
+					testId: input.tid
+				} }
+			};
+		};
+		return Object.freeze({ execute });
+	}
+	//#endregion
 	//#region src/application/backup/backup-service.ts
 	var BACKUP_IMPORT_MAX_BYTES = 134217728;
 	var BACKUP_IMPORT_WARN_BYTES = 100663296;
@@ -1671,6 +1735,205 @@
 			applyTargetPick,
 			applyPlannedTarget,
 			applyTargetMatrix
+		});
+	}
+	//#endregion
+	//#region src/application/manage/manage-assay-command.ts
+	function createManageAssayCommand(deps) {
+		const execute = (input) => {
+			const result = deps.saveAssay(input.state, {
+				id: input.id || "",
+				newId: input.newId,
+				data: input.data
+			});
+			if (result.error) return {
+				ok: false,
+				...result
+			};
+			const record = result.record;
+			return {
+				ok: true,
+				...result,
+				effects: {
+					audit: {
+						action: result.created ? "Thêm xét nghiệm" : "Cập nhật xét nghiệm",
+						detail: `${result.inst.name} · ${(record.levels || []).length} mức QC`,
+						target: record.name
+					},
+					save: {}
+				}
+			};
+		};
+		return Object.freeze({ execute });
+	}
+	//#endregion
+	//#region src/application/manage/manage-assay-removal-command.ts
+	function createManageAssayRemovalCommand(deps) {
+		const execute = (input) => {
+			const result = deps.removeAssay(input.state, { id: input.id });
+			if (result.error) return {
+				ok: false,
+				...result
+			};
+			return {
+				ok: true,
+				...result,
+				effects: {
+					save: {},
+					audit: {
+						action: "Xóa test/lô",
+						detail: `Xóa xét nghiệm và ${result.pointsCount} điểm QC`,
+						target: result.record.name
+					}
+				}
+			};
+		};
+		return Object.freeze({ execute });
+	}
+	//#endregion
+	//#region src/application/manage/manage-instrument-command.ts
+	function createManageInstrumentCommand(deps) {
+		const save = (input) => {
+			const result = deps.saveInstrument(input.state, {
+				id: input.id || "",
+				newId: input.newId,
+				data: input.data
+			});
+			if (result.error) return {
+				ok: false,
+				...result
+			};
+			return {
+				ok: true,
+				...result,
+				effects: {
+					audit: {
+						action: result.created ? "Thêm máy xét nghiệm" : "Cập nhật máy",
+						detail: result.record.name,
+						target: "Máy xét nghiệm"
+					},
+					save: { clearDerived: false }
+				}
+			};
+		};
+		const remove = (input) => {
+			const result = deps.removeInstrument(input.state, { id: input.id });
+			if (result.error) return {
+				ok: false,
+				...result
+			};
+			return {
+				ok: true,
+				...result,
+				effects: {
+					audit: {
+						action: "Xóa máy xét nghiệm",
+						detail: result.record.name,
+						target: "Máy xét nghiệm"
+					},
+					save: { clearDerived: false }
+				}
+			};
+		};
+		return Object.freeze({
+			save,
+			remove
+		});
+	}
+	//#endregion
+	//#region src/application/manage/manage-panel-command.ts
+	function createManagePanelCommand(deps) {
+		const save = (input) => {
+			const result = deps.savePanel(input.state, {
+				id: input.id || "",
+				newId: input.newId,
+				data: input.data
+			});
+			if (result.error) return {
+				ok: false,
+				...result
+			};
+			return {
+				ok: true,
+				...result,
+				effects: {
+					audit: {
+						action: result.created ? "Thêm Panel QC" : "Cập nhật Panel QC",
+						detail: `${result.record.name} · ${result.record.testIds.length} xét nghiệm`,
+						target: "Panel QC"
+					},
+					save: { clearDerived: false }
+				}
+			};
+		};
+		const remove = (input) => {
+			const result = deps.removePanel(input.state, { id: input.id });
+			if (result.error) return {
+				ok: false,
+				...result
+			};
+			return {
+				ok: true,
+				...result,
+				effects: {
+					audit: {
+						action: "Xóa Panel QC",
+						detail: result.record.name,
+						target: "Panel QC"
+					},
+					save: { clearDerived: false }
+				}
+			};
+		};
+		return Object.freeze({
+			save,
+			remove
+		});
+	}
+	//#endregion
+	//#region src/application/manage/manage-lot-group-command.ts
+	function createManageLotGroupCommand(deps) {
+		const save = (input) => {
+			const r = deps.save(input.state, {
+				id: input.id || "",
+				newId: input.newId,
+				data: input.data
+			});
+			return r.error ? {
+				ok: false,
+				...r
+			} : {
+				ok: true,
+				...r
+			};
+		};
+		const remove = (input) => {
+			const r = deps.remove(input.state, { id: input.id });
+			return r.error ? {
+				ok: false,
+				...r
+			} : {
+				ok: true,
+				...r
+			};
+		};
+		const stop = (input) => {
+			const r = deps.stop(input.state, {
+				id: input.id,
+				stoppedAt: input.stoppedAt
+			});
+			return r.error ? {
+				ok: false,
+				...r
+			} : {
+				ok: true,
+				...r
+			};
+		};
+		return Object.freeze({
+			save,
+			remove,
+			stop
 		});
 	}
 	//#endregion
@@ -8423,6 +8686,37 @@
 		return `<div class="empty"><b>${input.title}</b><p>${input.message}</p>${input.actionHtml}</div>`;
 	}
 	//#endregion
+	//#region src/presentation/nce/action-form-panel-html.ts
+	function escapeHtml$1(value) {
+		return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+	}
+	/** Khung ổn định của biểu mẫu NCE; nội dung và handler vẫn do compatibility layer cung cấp. */
+	function actionFormPanelHtml(input) {
+		const editing = input.editing;
+		return `<div class="panel action-form-panel"><div class="action-form-panel-head"><h2 class="panel-title">${editing ? `Tiếp tục hồ sơ ${escapeHtml$1(editing.nceId || "NCE")}` : "Lập hồ sơ sự không phù hợp (NCE)"}</h2>${input.guideButtonHtml}</div>${input.formOpen ? `<div class="action-form-body" oninput="actionFormChanged()" onchange="actionFormChanged()">${input.formBodyHtml}</div>` : input.closedHtml}</div>`;
+	}
+	//#endregion
+	//#region src/presentation/nce/action-form-steps-html.ts
+	function actionImmediateStepHtml(input) {
+		return `<div class="action-immediate-grid"><div><label>Phạm vi kiểm soát tức thời</label>${input.containmentSelectHtml}</div><div><label>Ghi chú phạm vi</label><input id="aContainmentNote" placeholder="VD: Giữ kết quả từ 08:00 đến khi QC đạt" value="${input.containmentNoteValueHtml}">${input.containmentNoteSuggestHtml}</div><div><label>Xử lý tức thời đã thực hiện</label><textarea id="aCorrection" rows="1" placeholder="VD: Dừng trả kết quả, cô lập lô QC và thông báo phụ trách...">${input.correctionTextHtml}</textarea>${input.correctionSuggestHtml}</div></div>`;
+	}
+	function actionRiskStepHtml(input) {
+		return `<div class="action-risk-grid"><div><label>Mức độ ảnh hưởng (S)</label>${input.severitySelectHtml}</div><div><label>Khả năng xảy ra (O)</label>${input.occurrenceSelectHtml}</div><div><label>Khả năng không phát hiện (D)</label>${input.detectabilitySelectHtml}</div><div class="action-risk-level"><label>Phân loại theo SOP</label>${input.levelSelectHtml}</div><div class="action-risk-result"><label>RPN</label><div id="aRiskScoreCard" class="action-risk-score risk-${input.scoreClassHtml}" aria-live="polite"><b id="aRiskScore">${input.scoreHtml}</b></div></div><div class="action-risk-basis"><label>Căn cứ phân loại theo SOP</label><input id="aRiskBasis" placeholder="VD: SOP-QC-07, ma trận nguy cơ bảng 3" value="${input.basisValueHtml}">${input.basisSuggestHtml}</div></div>`;
+	}
+	function actionInvestigationStepHtml(fieldsHtml) {
+		return `<div class="action-investigation-grid">${fieldsHtml.join("")}</div>`;
+	}
+	function actionCauseStepHtml(input) {
+		const releaseHint = input.containmentHeld ? "Bắt buộc sau khi QC được chấp nhận và hành động đã hoàn thành" : "Không bắt buộc vì mục 1 không ghi nhận kết quả liên quan bị giữ";
+		return `<div class="action-cause-grid"><div><label>Nhóm nguyên nhân</label>${input.causeCategory}</div><div><label>Nguyên nhân gốc hoặc nghi ngờ</label><textarea id="aCause" rows="1" placeholder="Mô tả bằng chứng và nguyên nhân...">${input.cause}</textarea>${input.causeSuggest}</div><div><label>Hành động khắc phục để ngăn tái diễn</label><textarea id="aAct" rows="1" placeholder="VD: Thay lọ QC mới, vệ sinh kim hút, cập nhật lịch bảo trì...">${input.action}</textarea>${input.actionSuggest}</div></div><div class="action-cause-second-row"><div><label>Ngày hoàn thành hành động</label>${input.completedDate}</div><div><label>Bias trước khắc phục (%) <small class="hint">tham khảo</small></label><input id="aBiasBefore" type="text" inputmode="decimal" placeholder="VD: 8.5" value="${input.biasBefore}" oninput="actionUpdateBiasHint()">${input.sigmaBias}</div><div><label>Bias sau khắc phục (%) <small class="hint">tham khảo</small></label><input id="aBiasAfter" type="text" inputmode="decimal" placeholder="VD: 1.2" value="${input.biasAfter}" oninput="actionUpdateBiasHint()"></div></div><div id="aBiasThresholdHint" class="hint flow-note">${input.threshold}</div>${input.rerun}<div class="action-release-block"><div class="action-release-title"><b>Cho phép hoạt động/trả kết quả trở lại</b><small>${releaseHint}</small></div><div class="action-release-grid"><div><label>Quyết định</label>${input.releaseStatus}</div><div><label>Ngày cho phép</label>${input.releaseDate}</div><div><label>Người cho phép</label><input id="aReleaseBy" list="aByList" autocomplete="off" placeholder="Chọn hoặc gõ tên" value="${input.releaseBy}"></div><div><label>Căn cứ cho phép</label><input id="aReleaseNote" placeholder="VD: QC chạy lại đã được chấp nhận" value="${input.releaseNote}">${input.releaseSuggest}</div></div></div>`;
+	}
+	function actionPatientStepHtml(input) {
+		return `<div id="aPatientRiskRef" class="hint space-after-control">${input.reference}</div><div class="action-patient-grid"><div><label>Kết luận ảnh hưởng</label>${input.impact}</div><div><label>Xử lý mẫu/kết quả liên quan</label><textarea id="aPatientAction" rows="1" placeholder="VD: Rà soát các mẫu từ 08:00–10:00; chạy lại 3 mẫu...">${input.action}</textarea>${input.suggest}</div></div>`;
+	}
+	function actionEffectivenessStepHtml(input) {
+		return `<div class="action-effectiveness-grid"><div><label>Kết luận hiệu lực</label>${input.status}</div><div class="action-effectiveness-date"><label>Ngày đánh giá</label>${input.date}</div><div><label>Bằng chứng/nhận xét hiệu lực</label><textarea id="aEffectivenessNote" rows="1" placeholder="VD: Theo dõi 20 lần chạy tiếp theo không tái diễn...">${input.note}</textarea>${input.noteSuggest}</div></div><div class="action-residual-block"><div class="action-release-title"><b>Nguy cơ còn lại sau khắc phục</b><small>Chỉ bắt buộc khi kết luận có hiệu lực; dùng cùng thang điểm và SOP với đánh giá ban đầu</small></div><div class="action-residual-grid"><div><label>Mức độ (S)</label>${input.severity}</div><div><label>Khả năng xảy ra (O)</label>${input.occurrence}</div><div><label>Khả năng không phát hiện (D)</label>${input.detectability}</div><div><label>Phân loại theo SOP</label>${input.level}</div><div class="action-risk-result"><label>RPN còn lại</label><div id="aResidualRiskScoreCard" class="action-risk-score risk-${input.scoreClass}" aria-live="polite"><b id="aResidualRiskScore">${input.score}</b></div></div><div class="action-residual-basis"><label>Căn cứ đánh giá lại</label><input id="aResidualRiskBasis" placeholder="VD: SOP-QC-07; dữ liệu theo dõi sau khắc phục" value="${input.basis}">${input.basisSuggest}</div></div></div>`;
+	}
+	//#endregion
 	//#region src/presentation/nce/action-incident-banner-html.ts
 	function actionIncidentBannerHtml(input) {
 		return `<div class="action-incident-banner"><b>${input.titleHtml}</b><div>${input.detailsHtml}</div></div>`;
@@ -14322,6 +14616,155 @@
 		});
 	}
 	//#endregion
+	//#region src/application/nce/nce-form-command.ts
+	function createNceFormCommand(deps) {
+		const submit = (input) => {
+			const editing = input.editId ? input.actions.find((action) => action.id === input.editId) : void 0;
+			const candidate = {
+				...editing || {},
+				...input.values
+			};
+			const draft = deps.draftStatus(candidate);
+			if (!draft.complete) return {
+				ok: false,
+				reason: "draft",
+				missingKey: draft.missingKeys?.[0],
+				message: `Còn thiếu để mở hồ sơ: ${draft.missing.join("; ")}.`
+			};
+			if (candidate.dueDate && candidate.dueDate < candidate.date) return {
+				ok: false,
+				reason: "due-date",
+				missingKey: "dueDate",
+				message: "Hạn hoàn thành không được trước ngày ghi nhận sự cố."
+			};
+			if (candidate.actionCompletedDate && (candidate.actionCompletedDate < candidate.date || candidate.actionCompletedDate > deps.todayIso())) return {
+				ok: false,
+				reason: "completed-date",
+				missingKey: "actionCompletedDate",
+				message: candidate.actionCompletedDate < candidate.date ? "Ngày hoàn thành hành động không được trước ngày ghi nhận sự cố." : "Ngày hoàn thành hành động không được ở tương lai."
+			};
+			if (candidate.effectivenessStatus !== "pending") {
+				const effectiveness = deps.effectivenessStatus(candidate);
+				if (!effectiveness.complete) return {
+					ok: false,
+					reason: "effectiveness",
+					missingKey: deps.effectivenessMissingKey(candidate),
+					message: `${effectiveness.label}.`
+				};
+			}
+			if (editing) {
+				if (deps.isCancelled(editing)) return {
+					ok: false,
+					reason: "cancelled",
+					message: "Hồ sơ đã hủy được giữ nguyên để bảo toàn dấu vết và không thể chỉnh sửa. Hãy lập hồ sơ NCE mới nếu sự cố vẫn cần xử lý."
+				};
+				if (deps.approvalStatus(editing) === "approved") return {
+					ok: false,
+					reason: "approved",
+					message: "Hồ sơ đã khép vòng không được sửa. Nếu phát hiện vấn đề tái diễn, hãy mở một hồ sơ NCE mới."
+				};
+				const record = deps.records.update(editing, candidate, input.user);
+				if (!record) return {
+					ok: false,
+					reason: "approved",
+					message: "Hồ sơ đã thay đổi và không thể cập nhật. Vui lòng mở lại để kiểm tra."
+				};
+				return {
+					ok: true,
+					mode: "update",
+					record
+				};
+			}
+			return {
+				ok: true,
+				mode: "create",
+				record: deps.records.create(input.actions, candidate, input.user)
+			};
+		};
+		return Object.freeze({ submit });
+	}
+	//#endregion
+	//#region src/application/nce/nce-lifecycle-command.ts
+	function createNceLifecycleCommand(deps) {
+		const execute = (input) => {
+			const record = (input.actions || []).find((item) => item.id === input.id);
+			if (!record) return {
+				ok: false,
+				reason: "missing"
+			};
+			if (input.token != null && deps.review.reviewToken(record) !== input.token) return {
+				ok: false,
+				reason: "stale"
+			};
+			const note = String(input.note || "").trim(), user = input.user || {};
+			if (input.kind === "cancel") {
+				if (!deps.review.cancelReadiness(record).ok) return {
+					ok: false,
+					reason: "not-ready"
+				};
+				return deps.review.cancel(record, note, user.name || "") ? {
+					ok: true,
+					record
+				} : {
+					ok: false,
+					reason: "not-ready"
+				};
+			}
+			if (input.kind === "approve") {
+				if (!deps.review.approvalReadiness(record, user).ok) return {
+					ok: false,
+					reason: "not-ready"
+				};
+				return deps.review.approve(record, note, user.name || "") ? {
+					ok: true,
+					record
+				} : {
+					ok: false,
+					reason: "not-ready"
+				};
+			}
+			if (input.kind === "return") {
+				if (!deps.review.returnReadiness(record).ok) return {
+					ok: false,
+					reason: "not-ready"
+				};
+				return deps.review.returnForRevision(record, note, user.name || "") ? {
+					ok: true,
+					record
+				} : {
+					ok: false,
+					reason: "not-ready"
+				};
+			}
+			if (input.kind === "reopen") {
+				if (!deps.review.canReopen(record)) return {
+					ok: false,
+					reason: "not-ready"
+				};
+				return deps.review.reopen(record, note) ? {
+					ok: true,
+					record
+				} : {
+					ok: false,
+					reason: "not-ready"
+				};
+			}
+			if (!deps.escalation.canEscalate(input.actions || [], record)) return {
+				ok: false,
+				reason: "not-ready"
+			};
+			const followUp = deps.escalation.createFollowUp(input.actions || [], record, user);
+			return followUp ? {
+				ok: true,
+				record: followUp
+			} : {
+				ok: false,
+				reason: "not-ready"
+			};
+		};
+		return Object.freeze({ execute });
+	}
+	//#endregion
 	//#region src/application/nce/action-rerun-service.ts
 	function createActionRerunService(deps) {
 		const rerunMemo = /* @__PURE__ */ new Map(), pointIndexMemo = /* @__PURE__ */ new Map(), lotIndexMemo = /* @__PURE__ */ new Map();
@@ -15760,6 +16203,13 @@
 	root.sigmaPeriodTableHeadHtml = sigmaPeriodTableHeadHtml;
 	root.sigmaNoLevelsPanelHtml = sigmaNoLevelsPanelHtml;
 	root.actionFormClosedPresentation = actionFormClosedHtml;
+	root.actionFormPanelPresentation = actionFormPanelHtml;
+	root.actionImmediateStepPresentation = actionImmediateStepHtml;
+	root.actionRiskStepPresentation = actionRiskStepHtml;
+	root.actionInvestigationStepPresentation = actionInvestigationStepHtml;
+	root.actionCauseStepPresentation = actionCauseStepHtml;
+	root.actionPatientStepPresentation = actionPatientStepHtml;
+	root.actionEffectivenessStepPresentation = actionEffectivenessStepHtml;
 	root.actionIncidentBannerPresentation = actionIncidentBannerHtml;
 	root.actionFormSectionPresentation = actionFormSectionHtml;
 	root.actionInvestigationFieldPresentation = actionInvestigationFieldHtml;
@@ -16460,6 +16910,22 @@
 		isCancelled: (action) => nceActionBasics.actionCancelled(action),
 		approvalStatus: (action) => nceActionBasics.actionApprovalStatus(action)
 	});
+	root.NceFormCommand = createNceFormCommand({
+		todayIso: () => isoToday(),
+		draftStatus: (action) => root.ActionDraftStatusService(action),
+		effectivenessStatus: (action) => typeof root.actionEffectivenessStatus === "function" ? root.actionEffectivenessStatus(action) : {
+			complete: false,
+			label: "Chưa thể đánh giá hiệu lực"
+		},
+		effectivenessMissingKey: (action) => typeof root.actionEffectivenessMissingKey === "function" ? root.actionEffectivenessMissingKey(action) : "effectivenessNote",
+		isCancelled: (action) => nceActionBasics.actionCancelled(action),
+		approvalStatus: (action) => nceActionBasics.actionApprovalStatus(action),
+		records: root.ActionRecordService
+	});
+	root.NceLifecycleCommand = createNceLifecycleCommand({
+		review: root.ActionReviewService,
+		escalation: root.ActionEscalationService
+	});
 	root.ActionViolationService = createActionViolationService({
 		pointForAction: (action) => typeof root.actionPoint === "function" ? root.actionPoint(action) : null,
 		findTest: (testId) => (state.tests || []).find((test) => test.id === testId) || null,
@@ -16572,6 +17038,37 @@
 			return !!(period && typeof period.findLock === "function" && typeof period.periodForDate === "function" && period.findLock(state, period.periodForDate(date)));
 		}
 	});
+	root.EntryRecordCommand = createEntryRecordCommand({
+		recordPoint: (targetState, input) => root.EntryService.recordPoint(targetState, input),
+		canEnter: (test, level) => typeof root.canEnterQcForLevel === "function" && !!root.canEnterQcForLevel(test, level),
+		pointContext: (testId, level, lot, activeLot) => typeof root.entryPointContext === "function" ? root.entryPointContext(testId, level, lot, activeLot) : {},
+		verdict: (test, input, point, parallel) => {
+			if (typeof root.clearDerivedForTest === "function") root.clearDerivedForTest(input.testId);
+			if (parallel && typeof root.parallelWestgard === "function") return root.parallelWestgard(test, {
+				level: +input.level,
+				lot: String(input.lotNo || ""),
+				mean: +input.cfg.mean,
+				sd: +input.cfg.sd,
+				parallel: true
+			}).byPoint.get(point.id) || {
+				level: "ok",
+				rules: []
+			};
+			return typeof root.activeWestgard === "function" ? root.activeWestgard(test).byPoint.get(point.id) || {
+				level: "ok",
+				rules: []
+			} : {
+				level: "ok",
+				rules: []
+			};
+		}
+	});
+	root.EntryVoidCommand = createEntryVoidCommand({
+		voidPoint: (targetState, input) => root.EntryService.voidPoint(targetState, input),
+		clearDerived: (testId) => {
+			if (typeof root.clearDerivedForTest === "function") root.clearDerivedForTest(testId);
+		}
+	});
 	var backupTextBytes = (text) => {
 		if (typeof Blob !== "undefined") return new Blob([text]).size;
 		if (typeof TextEncoder !== "undefined") return new TextEncoder().encode(text).length;
@@ -16668,6 +17165,21 @@
 		cleanId: root.QCCore.cleanId,
 		targetFromLimits: root.QCCore.targetFromLimits,
 		limitsFromTarget: root.QCCore.limitsFromTarget
+	});
+	root.ManageAssayCommand = createManageAssayCommand({ saveAssay: (targetState, input) => root.ManageConfigService.saveAssay(targetState, input) });
+	root.ManageAssayRemovalCommand = createManageAssayRemovalCommand({ removeAssay: (targetState, input) => root.ManageConfigService.removeAssay(targetState, input) });
+	root.ManageInstrumentCommand = createManageInstrumentCommand({
+		saveInstrument: (targetState, input) => root.ManageConfigService.saveInstrument(targetState, input),
+		removeInstrument: (targetState, input) => root.ManageConfigService.removeInstrument(targetState, input)
+	});
+	root.ManagePanelCommand = createManagePanelCommand({
+		savePanel: (targetState, input) => root.ManageConfigService.savePanel(targetState, input),
+		removePanel: (targetState, input) => root.ManageConfigService.removePanel(targetState, input)
+	});
+	root.ManageLotGroupCommand = createManageLotGroupCommand({
+		save: (s, i) => root.ManageConfigService.saveLotGroup(s, i),
+		remove: (s, i) => root.ManageConfigService.removeLotGroup(s, i),
+		stop: (s, i) => root.ManageConfigService.stopLotGroup(s, i)
 	});
 	root.TeaReferenceService = createTeaReferenceService({
 		key: (value) => globalThis.teaRefName(value),

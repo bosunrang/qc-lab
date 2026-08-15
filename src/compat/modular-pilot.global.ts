@@ -1,5 +1,7 @@
 import { chartViewModel, type ChartViewModelApi } from '../domain/charts/chart-view-model';
 import { createEntryService, type EntryServiceApi } from '../application/entry/entry-service';
+import { createEntryRecordCommand, type EntryRecordCommand } from '../application/entry/entry-record-command';
+import { createEntryVoidCommand, type EntryVoidCommand } from '../application/entry/entry-void-command';
 import {
   BACKUP_IMPORT_MAX_BYTES,
   BACKUP_IMPORT_WARN_BYTES,
@@ -21,6 +23,12 @@ import {
   createManageConfigService,
   type ManageConfigServiceApi,
 } from '../application/manage/manage-config-service';
+import { createManageAssayCommand, type ManageAssayCommand } from '../application/manage/manage-assay-command';
+import { createManageAssayRemovalCommand, type ManageAssayRemovalCommand } from '../application/manage/manage-assay-removal-command';
+import { createManageInstrumentCommand, type ManageInstrumentCommand } from '../application/manage/manage-instrument-command';
+import { createManagePanelCommand, type ManagePanelCommand } from '../application/manage/manage-panel-command';
+import { createManageLotGroupCommand, type ManageLotGroupCommand } from '../application/manage/manage-lot-group-command';
+import { createTargetMatrixCommand } from '../application/manage/target-matrix-command';
 import { createTeaReferenceService, type TeaReferenceServiceApi } from '../application/manage/tea-reference-service';
 import { createPeriodService, type PeriodServiceApi } from '../application/period/period-service';
 import { createAuditService, type AuditServiceApi } from '../application/audit/audit-service';
@@ -375,6 +383,8 @@ import { sigmaChartsPanelHtml } from '../presentation/sigma/sigma-charts-panel-h
 import { sigmaPeriodTableHeadHtml } from '../presentation/sigma/sigma-period-table-head-html';
 import { sigmaNoLevelsPanelHtml } from '../presentation/sigma/sigma-no-levels-panel-html';
 import { actionFormClosedHtml as actionFormClosedPresentation } from '../presentation/nce/action-form-closed-html';
+import { actionFormPanelHtml as actionFormPanelPresentation } from '../presentation/nce/action-form-panel-html';
+import { actionImmediateStepHtml as actionImmediateStepPresentation, actionRiskStepHtml as actionRiskStepPresentation, actionInvestigationStepHtml as actionInvestigationStepPresentation, actionCauseStepHtml as actionCauseStepPresentation, actionPatientStepHtml as actionPatientStepPresentation, actionEffectivenessStepHtml as actionEffectivenessStepPresentation } from '../presentation/nce/action-form-steps-html';
 import { actionIncidentBannerHtml as actionIncidentBannerPresentation } from '../presentation/nce/action-incident-banner-html';
 import { actionFormSectionHtml as actionFormSectionPresentation } from '../presentation/nce/action-form-section-html';
 import { actionInvestigationFieldHtml as actionInvestigationFieldPresentation } from '../presentation/nce/action-investigation-field-html';
@@ -677,6 +687,8 @@ import { createActionReviewService, type ActionReviewService } from '../applicat
 import { actionReviewMessages } from '../presentation/nce/action-review-messages';
 import { createActionEscalationService, type ActionEscalationService } from '../application/nce/action-escalation-service';
 import { createActionRecordService, type ActionRecordService } from '../application/nce/action-record-service';
+import { createNceFormCommand, type NceFormCommand } from '../application/nce/nce-form-command';
+import { createNceLifecycleCommand, type NceLifecycleCommand } from '../application/nce/nce-lifecycle-command';
 import { createActionRerunService, type ActionRerunService } from '../application/nce/action-rerun-service';
 import { createActionPointIndexService, type ActionPointIndexService } from '../application/nce/action-point-index-service';
 import { createActionCurrentIssues, type ActionCurrentIssuesApi } from '../application/nce/action-current-issues';
@@ -798,6 +810,8 @@ type QCLabGlobal = typeof globalThis & {
   ActionReviewMessages: typeof actionReviewMessages;
   ActionEscalationService: ActionEscalationService;
   ActionRecordService: ActionRecordService;
+  NceFormCommand: NceFormCommand;
+  NceLifecycleCommand: NceLifecycleCommand;
   ActionRerunService: ActionRerunService;
   ActionPointIndexService: ActionPointIndexService;
   ActionCurrentIssues?: ActionCurrentIssuesApi;
@@ -819,7 +833,14 @@ type QCLabGlobal = typeof globalThis & {
   reportActionIconPresentation: typeof reportActionIconPresentation;
   ChartViewModel?: ChartViewModelApi;
   EntryService: EntryServiceApi;
+  EntryRecordCommand: EntryRecordCommand;
+  EntryVoidCommand: EntryVoidCommand;
   ManageConfigService: ManageConfigServiceApi;
+  ManageAssayCommand: ManageAssayCommand;
+  ManageAssayRemovalCommand: ManageAssayRemovalCommand;
+  ManageInstrumentCommand: ManageInstrumentCommand;
+  ManagePanelCommand: ManagePanelCommand;
+  ManageLotGroupCommand: ManageLotGroupCommand;
   TeaReferenceService: TeaReferenceServiceApi;
   LotTransitionPickerService: LotTransitionPickerServiceApi;
   PeriodService: PeriodServiceApi;
@@ -1227,6 +1248,13 @@ type QCLabGlobal = typeof globalThis & {
   sigmaPeriodTableHeadHtml: typeof sigmaPeriodTableHeadHtml;
   sigmaNoLevelsPanelHtml: typeof sigmaNoLevelsPanelHtml;
   actionFormClosedPresentation: typeof actionFormClosedPresentation;
+  actionFormPanelPresentation: typeof actionFormPanelPresentation;
+  actionImmediateStepPresentation: typeof actionImmediateStepPresentation;
+  actionRiskStepPresentation: typeof actionRiskStepPresentation;
+  actionInvestigationStepPresentation: typeof actionInvestigationStepPresentation;
+  actionCauseStepPresentation: typeof actionCauseStepPresentation;
+  actionPatientStepPresentation: typeof actionPatientStepPresentation;
+  actionEffectivenessStepPresentation: typeof actionEffectivenessStepPresentation;
   actionIncidentBannerPresentation: typeof actionIncidentBannerPresentation;
   actionFormSectionPresentation: typeof actionFormSectionPresentation;
   actionInvestigationFieldPresentation: typeof actionInvestigationFieldPresentation;
@@ -2067,6 +2095,13 @@ root.sigmaChartsPanelHtml=sigmaChartsPanelHtml;
 root.sigmaPeriodTableHeadHtml=sigmaPeriodTableHeadHtml;
 root.sigmaNoLevelsPanelHtml=sigmaNoLevelsPanelHtml;
 root.actionFormClosedPresentation=actionFormClosedPresentation;
+root.actionFormPanelPresentation=actionFormPanelPresentation;
+root.actionImmediateStepPresentation=actionImmediateStepPresentation;
+root.actionRiskStepPresentation=actionRiskStepPresentation;
+root.actionInvestigationStepPresentation=actionInvestigationStepPresentation;
+root.actionCauseStepPresentation=actionCauseStepPresentation;
+root.actionPatientStepPresentation=actionPatientStepPresentation;
+root.actionEffectivenessStepPresentation=actionEffectivenessStepPresentation;
 root.actionIncidentBannerPresentation=actionIncidentBannerPresentation;
 root.actionFormSectionPresentation=actionFormSectionPresentation;
 root.actionInvestigationFieldPresentation=actionInvestigationFieldPresentation;
@@ -2451,6 +2486,16 @@ root.ActionRecordService = createActionRecordService({
   now: () => new Date().toISOString(), createId: () => uid(),
   isCancelled: action => nceActionBasics.actionCancelled(action), approvalStatus: action => nceActionBasics.actionApprovalStatus(action),
 });
+root.NceFormCommand = createNceFormCommand({
+  todayIso: () => isoToday(),
+  draftStatus: action => root.ActionDraftStatusService!(action),
+  effectivenessStatus: action => typeof (root as any).actionEffectivenessStatus === 'function' ? (root as any).actionEffectivenessStatus(action) : { complete: false, label: 'Chưa thể đánh giá hiệu lực' },
+  effectivenessMissingKey: action => typeof (root as any).actionEffectivenessMissingKey === 'function' ? (root as any).actionEffectivenessMissingKey(action) : 'effectivenessNote',
+  isCancelled: action => nceActionBasics.actionCancelled(action),
+  approvalStatus: action => nceActionBasics.actionApprovalStatus(action),
+  records: root.ActionRecordService,
+});
+root.NceLifecycleCommand = createNceLifecycleCommand({ review: root.ActionReviewService, escalation: root.ActionEscalationService });
 root.ActionViolationService = createActionViolationService({
   pointForAction: action => typeof (root as any).actionPoint === 'function' ? (root as any).actionPoint(action) : null,
   findTest: testId => (state.tests || []).find(test => test.id === testId) || null,
@@ -2546,6 +2591,20 @@ root.EntryService = createEntryService({
     return !!(period && typeof period.findLock === 'function' && typeof period.periodForDate === 'function'
       && period.findLock(state, period.periodForDate(date)));
   },
+});
+root.EntryRecordCommand = createEntryRecordCommand({
+  recordPoint: (targetState, input) => root.EntryService.recordPoint(targetState, input),
+  canEnter: (test, level) => typeof (root as any).canEnterQcForLevel === 'function' && !!(root as any).canEnterQcForLevel(test, level),
+  pointContext: (testId, level, lot, activeLot) => typeof (root as any).entryPointContext === 'function' ? (root as any).entryPointContext(testId, level, lot, activeLot) : {},
+  verdict: (test, input, point, parallel) => {
+    if (typeof (root as any).clearDerivedForTest === 'function') (root as any).clearDerivedForTest(input.testId);
+    if (parallel && typeof (root as any).parallelWestgard === 'function') return (root as any).parallelWestgard(test, { level: +input.level, lot: String(input.lotNo || ''), mean: +input.cfg.mean, sd: +input.cfg.sd, parallel: true }).byPoint.get(point.id) || { level: 'ok', rules: [] };
+    return typeof (root as any).activeWestgard === 'function' ? (root as any).activeWestgard(test).byPoint.get(point.id) || { level: 'ok', rules: [] } : { level: 'ok', rules: [] };
+  },
+});
+root.EntryVoidCommand = createEntryVoidCommand({
+  voidPoint: (targetState, input) => root.EntryService.voidPoint(targetState, input),
+  clearDerived: testId => { if (typeof (root as any).clearDerivedForTest === 'function') (root as any).clearDerivedForTest(testId); },
 });
 const backupTextBytes = (text: string): number => {
   if (typeof Blob !== 'undefined') return new Blob([text]).size;
@@ -2650,6 +2709,11 @@ root.ManageConfigService = createManageConfigService({
   targetFromLimits: root.QCCore.targetFromLimits,
   limitsFromTarget: root.QCCore.limitsFromTarget,
 });
+root.ManageAssayCommand = createManageAssayCommand({saveAssay:(targetState,input)=>root.ManageConfigService.saveAssay(targetState as any,input)});
+root.ManageAssayRemovalCommand = createManageAssayRemovalCommand({removeAssay:(targetState,input)=>root.ManageConfigService.removeAssay(targetState as any,input)});
+root.ManageInstrumentCommand = createManageInstrumentCommand({saveInstrument:(targetState,input)=>root.ManageConfigService.saveInstrument(targetState as any,input),removeInstrument:(targetState,input)=>root.ManageConfigService.removeInstrument(targetState as any,input)});
+root.ManagePanelCommand = createManagePanelCommand({savePanel:(targetState,input)=>root.ManageConfigService.savePanel(targetState as any,input),removePanel:(targetState,input)=>root.ManageConfigService.removePanel(targetState as any,input)});
+root.ManageLotGroupCommand = createManageLotGroupCommand({save:(s,i)=>root.ManageConfigService.saveLotGroup(s as any,i),remove:(s,i)=>root.ManageConfigService.removeLotGroup(s as any,i),stop:(s,i)=>root.ManageConfigService.stopLotGroup(s as any,i)});
 root.TeaReferenceService = createTeaReferenceService({
   key: value => (globalThis as any).teaRefName(value), analyteMeta: (name, record) => (globalThis as any).teaAnalyteMeta(name, record),
   effectiveReferences: () => (globalThis as any).effectiveTeaRefs(), defaultReferences: () => (globalThis as any).REFTESTS,
