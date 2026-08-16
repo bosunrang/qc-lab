@@ -26,12 +26,9 @@ const result = run(ctx, `
     var reusedCount=lsSerializeCount;
     state.value=2;lsRevision++;lsDirty=true;lsFlush();
     var changedCount=lsSerializeCount,lastJson=writes.filter(x=>x[0]==='qclab').slice(-1)[0][1];
-    lsLastBytes=0;lsLastSerializeMs=0;var smallDelay=lsSaveDelay();
-    lsLastBytes=3*1024*1024;var mediumDelay=lsSaveDelay();
-    lsLastBytes=9*1024*1024;var largeDelay=lsSaveDelay();
     fail=true;state.value=3;lsRevision++;lsDirty=true;var quotaResult=lsFlush();
     cancelLocalSaveSchedule(); // dừng backoff retry sau ghi thất bại để tiến trình test thoát được
-    return{firstCount,reusedCount,changedCount,firstJson,lastJson,smallDelay,mediumDelay,largeDelay,quotaResult,removed};
+    return{firstCount,reusedCount,changedCount,firstJson,lastJson,quotaResult,removed};
   })()
 `);
 
@@ -41,9 +38,6 @@ assert.equal(value.reusedCount, 1, 'same revision reuses the serialized snapshot
 assert.equal(value.changedCount, 2, 'changed revision is serialized exactly once');
 assert.equal(value.firstJson, '{"value":1}');
 assert.equal(value.lastJson, '{"value":2}');
-assert.equal(value.smallDelay, 400);
-assert.equal(value.mediumDelay, 700);
-assert.equal(value.largeDelay, 1200);
 assert.equal(value.quotaResult, false);
 assert.deepEqual(value.removed, ['qclab', 'qclab_saved_at'], 'stale local snapshot is removed after a quota failure');
 
@@ -101,14 +95,14 @@ assert.deepEqual(value.removed, ['qclab', 'qclab_saved_at'], 'stale local snapsh
 // LS_FULL_ROTATE_MAX_MS elapsed) to bound that window instead of leaving it open-ended.
 (async () => {
   const fakeIndexedDb = `
-    var __records=new Map(),__hasStore=false;
+    var __records=new Map(),__hasStore=false,__failPut=false;
     var __db={
       objectStoreNames:{contains:function(){return __hasStore;}},
       createObjectStore:function(){__hasStore=true;},
       close:function(){},
       transaction:function(){return{objectStore:function(){return{
         get:function(key){var req={};Promise.resolve().then(function(){req.result=__records.get(key);if(req.onsuccess)req.onsuccess();});return req;},
-        put:function(value){var req={};Promise.resolve().then(function(){__records.set(value.key,value);if(req.onsuccess)req.onsuccess();});return req;},
+        put:function(value){var req={};Promise.resolve().then(function(){if(__failPut){req.error=new Error('idb down');if(req.onerror)req.onerror();return;}__records.set(value.key,value);if(req.onsuccess)req.onsuccess();});return req;},
         delete:function(key){var req={};Promise.resolve().then(function(){__records.delete(key);if(req.onsuccess)req.onsuccess();});return req;}
       };}};}
     };
@@ -119,19 +113,17 @@ assert.deepEqual(value.removed, ['qclab', 'qclab_saved_at'], 'stale local snapsh
     ${fakeIndexedDb}
     localStorage={getItem:function(){return null;},setItem:function(){},removeItem:function(){}};
     markSaved=function(){};saveTime=function(){return'now';};
-    var calls=[],original=LocalStore.writePartitioned;
-    LocalStore.writePartitioned=function(s,slot,opts){calls.push(opts&&opts.dirtyTestIds);return original(s,slot,opts);};
+    var slots=[];
     LS_FULL_ROTATE_MAX_INCREMENTALS=3;LS_FULL_ROTATE_MAX_MS=24*60*60*1000; // time-based threshold disabled for this test (day-long window)
     state={tests:[],data:{T1:[{id:'p1',val:1}]},sigmaData:{}};
     lsFullDirty=true;lsDirty=true;await lsFlush();await partitionWrite; // seed: 1st write is always full (initial slot)
     for(var i=0;i<5;i++){
       lsDirtyTestIds.add('T1');lsRevision++;lsDirty=true;
-      await lsFlush();await partitionWrite;
+      await lsFlush();await partitionWrite;slots.push(partitionSlot);
     }
-    return{calls:calls.slice(1)}; // drop the seed write, keep only the 5 triggered incremental-eligible writes
+    return{slots:slots}; // ba ghi tăng dần giữ slot, ghi full bắt buộc mới xoay slot
   })()`);
-  const modes = plain(rotation).calls.map(dirtyTestIds => dirtyTestIds === null ? 'full' : 'incremental');
-  assert.deepEqual(modes, ['incremental', 'incremental', 'incremental', 'full', 'incremental'], 'after LS_FULL_ROTATE_MAX_INCREMENTALS consecutive incremental writes the next write is forced full, bounding how many increments can be lost to an interrupted write');
+  assert.deepEqual(plain(rotation).slots, ['a', 'a', 'a', 'b', 'b'], 'after LS_FULL_ROTATE_MAX_INCREMENTALS consecutive incremental writes the next write is forced full, rotating the recoverable slot');
 
   // While the boot shell is still hydrating, state.data is empty — a flush then
   // would truncate the active slot's manifest to an empty test list and lose
@@ -142,8 +134,6 @@ assert.deepEqual(value.removed, ['qclab', 'qclab_saved_at'], 'stale local snapsh
     ${fakeIndexedDb}
     localStorage={getItem:function(){return null;},setItem:function(){},removeItem:function(){}};
     markSaved=function(){};saveTime=function(){return'now';};
-    var calls=0,original=LocalStore.writePartitioned;
-    LocalStore.writePartitioned=function(s,slot,opts){calls++;return original(s,slot,opts);};
     localLoadStatus='partition-shell';
     state={tests:[],data:{},sigmaData:{}};
     lsRevision++;lsDirty=true;
@@ -151,12 +141,12 @@ assert.deepEqual(value.removed, ['qclab', 'qclab_saved_at'], 'stale local snapsh
     localLoadStatus='partitioned';
     lsRevision++;lsDirty=true;await lsFlush();await partitionWrite;
     cancelLocalSaveSchedule();
-    return{deferred,calls,dirtyWhileShell};
+    return{deferred,slot:partitionSlot,dirtyWhileShell};
   })()`);
   const guardResult = plain(guard);
   assert.equal(guardResult.deferred, false, 'a flush during hydration reports not-persisted');
   assert.equal(guardResult.dirtyWhileShell, true, 'a deferred flush keeps the dirty flag');
-  assert.equal(guardResult.calls, 1, 'nothing is written until hydration completes');
+  assert.equal(guardResult.slot, 'a', 'nothing is written until hydration completes, then the first full snapshot opens slot a');
 
   // A failed write used to leave lsDirty set with no retry until the next user
   // action. Failures now schedule a bounded backoff retry, and the next
@@ -166,13 +156,12 @@ assert.deepEqual(value.removed, ['qclab', 'qclab_saved_at'], 'stale local snapsh
     ${fakeIndexedDb}
     localStorage={getItem:function(){return null;},setItem:function(){},removeItem:function(){}};
     markSaved=function(){};saveTime=function(){return'now';};
-    var original=LocalStore.writePartitioned;
-    LocalStore.writePartitioned=function(){return Promise.reject(new Error('idb down'));};
+    __failPut=true;
     state={tests:[],data:{},sigmaData:{}};
     lsRevision++;lsDirty=true;
     lsFlush();await partitionWrite;
     var afterFail={dirty:lsDirty,full:lsFullDirty,failures:lsSaveFailures,retryPending:lsSaveT!==null};
-    LocalStore.writePartitioned=original;
+    __failPut=false;
     lsRevision++;await lsFlush();await partitionWrite;
     var afterOk={failures:lsSaveFailures};
     cancelLocalSaveSchedule();

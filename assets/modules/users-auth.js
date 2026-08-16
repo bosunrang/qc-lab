@@ -115,12 +115,12 @@ async function confirmArchiveActivityLog(){
 async function addUser(){
   if(!requireAdmin())return;
   const username=document.getElementById('uUser').value.trim().toLowerCase();const name=document.getElementById('uName').value.trim();const initials=QCCore.cleanText(document.getElementById('uInitials').value,12).trim().toUpperCase();const rolev=document.getElementById('uRole').value;const pass=document.getElementById('uPass').value;
-  const userErr=globalThis.newUserValidationError?globalThis.newUserValidationError({username,password:pass,existingUsernames:state.users.map(u=>u.username)}):(!username||!pass?'Nhập tên đăng nhập và mật khẩu.':passwordError(pass)||(state.users.some(u=>u.username===username)?'Tên đăng nhập đã tồn tại.':''));if(userErr){await infoDialog(userErr);return;}
+  const userErr=globalThis.newUserValidationError({username,password:pass,existingUsernames:state.users.map(u=>u.username)});if(userErr){await infoDialog(userErr);return;}
   const pagePerms=await collectUserPerms('newUserPerms',rolev);if(!pagePerms)return;
-  const passHash=await hashPass(pass);state.users.push({id:uid(),username,name,initials,role:rolev,pagePerms,passHash,active:true,mustChangePassword:true});logAct('Thêm người dùng',roleLabel(rolev)+' · '+pagePerms.length+' thẻ · yêu cầu đổi mật khẩu',username);save({clearDerived:false});rerender();
+  const passHash=await hashPass(pass);globalThis.UserManagementCommand.add(state.users,{id:uid(),username,name,initials,role:rolev,pagePerms,passHash});logAct('Thêm người dùng',roleLabel(rolev)+' · '+pagePerms.length+' thẻ · yêu cầu đổi mật khẩu',username);save({clearDerived:false});rerender();
 }
 function userPermChecks(selectedIds,groupId,roleValue){
-  const base=new Set(rolePageIds(roleValue)),initial=selectedIds&&selectedIds.length?selectedIds:rolePageIds(roleValue),selected=new Set(globalThis.selectUserPermissions?globalThis.selectUserPermissions(initial,[...base]):initial.filter(id=>base.has(id)));
+  const base=new Set(rolePageIds(roleValue)),initial=selectedIds&&selectedIds.length?selectedIds:rolePageIds(roleValue),selected=new Set(globalThis.selectUserPermissions(initial,[...base]));
   return globalThis.userPermissionChecksHtml(escAttr(groupId),PAGES.map(([id,title])=>({idHtml:escAttr(id),titleHtml:esc(title),allowed:base.has(id),selected:selected.has(id)})));
 }
 function syncUserPermChecks(groupId,roleValue){
@@ -129,7 +129,7 @@ function syncUserPermChecks(groupId,roleValue){
 }
 async function collectUserPerms(groupId,roleValue){
   const box=document.getElementById(groupId),base=new Set(rolePageIds(roleValue));if(!box)return rolePageIds(roleValue);
-  const selected=[...box.querySelectorAll('input[type=checkbox]:checked')].map(i=>i.value),picked=globalThis.selectUserPermissions?globalThis.selectUserPermissions(selected,[...base]):selected.filter(id=>base.has(id));
+  const selected=[...box.querySelectorAll('input[type=checkbox]:checked')].map(i=>i.value),picked=globalThis.selectUserPermissions(selected,[...base]);
   if(!picked.length){await infoDialog('Cần chọn ít nhất một thẻ được phép dùng.');return null;}
   return [...new Set(picked)];
 }
@@ -145,7 +145,7 @@ async function applyUserPerms(id){
   const u=state.users.find(x=>x.id===id);if(!u)return;
   if(currentUser&&currentUser.id===id){await infoDialog('Không thể tự sửa quyền của tài khoản đang đăng nhập.');return;}
   const rolev=document.getElementById('editUserRole').value,pagePerms=await collectUserPerms('editUserPerms',rolev);if(!pagePerms)return;
-  u.role=rolev;u.pagePerms=pagePerms;
+  globalThis.UserManagementCommand.updatePermissions(u,{role:rolev,pagePerms});
   logAct('Cập nhật quyền người dùng',`${roleLabel(rolev)} · ${pagePerms.length} thẻ`,u.username);
   save({clearDerived:false});closeModal();if(!canAccessPage(page))page=firstAccessPage();renderBrand();nav();rerender();
 }
@@ -159,15 +159,14 @@ function resetPass(id){
 async function applyResetPass(id){
   if(!requireAdmin())return;
   const u=state.users.find(x=>x.id===id);if(!u)return;
-  const p1=document.getElementById('resetPass1').value,p2=document.getElementById('resetPass2').value,msg=document.getElementById('resetPassMsg'),err=globalThis.passwordChangeError?globalThis.passwordChangeError(p1,p2):passwordError(p1)||(p1!==p2?'Hai mật khẩu không khớp.':'');
+  const p1=document.getElementById('resetPass1').value,p2=document.getElementById('resetPass2').value,msg=document.getElementById('resetPassMsg'),err=globalThis.passwordChangeError(p1,p2);
   if(err){if(msg)msg.innerHTML=`<div class="auth-err">${esc(err)}</div>`;return;}
-  u.passHash=await hashPass(p1);
-  u.mustChangePassword=!(currentUser&&currentUser.id===id);
+  globalThis.UserManagementCommand.resetPassword(u,await hashPass(p1),!(currentUser&&currentUser.id===id));
   logAct('Đổi mật khẩu',u.mustChangePassword?'Đặt mật khẩu tạm và yêu cầu đổi lại':'Người dùng đổi mật khẩu',u.username);
   save({clearDerived:false});closeModal();rerender();await infoDialog(u.mustChangePassword?'Đã đặt mật khẩu tạm. Người dùng sẽ phải đổi mật khẩu khi đăng nhập.':'Đã cập nhật mật khẩu.',{type:'success'});
 }
-function toggleUser(id){if(!requireAdmin())return;const u=state.users.find(x=>x.id===id);u.active=u.active===false?true:false;logAct(u.active?'Mở khóa người dùng':'Khóa người dùng','Cập nhật trạng thái tài khoản',u.username);save({clearDerived:false});rerender();}
-async function delUser(id){if(!requireAdmin())return;if(id===currentUser.id){await infoDialog('Không thể xóa chính mình.');return;}const u=state.users.find(x=>x.id===id);if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa người dùng',message:`Xóa người dùng ${u?(u.name||u.username):''}?`,confirmLabel:'Xóa người dùng',cancelLabel:'Hủy'}))return;state.users=state.users.filter(u=>u.id!==id);logAct('Xóa người dùng','Xóa tài khoản khỏi hệ thống',u?u.username:'');save({clearDerived:false});rerender();}
+function toggleUser(id){if(!requireAdmin())return;const u=state.users.find(x=>x.id===id);globalThis.UserManagementCommand.toggle(u);logAct(u.active?'Mở khóa người dùng':'Khóa người dùng','Cập nhật trạng thái tài khoản',u.username);save({clearDerived:false});rerender();}
+async function delUser(id){if(!requireAdmin())return;if(id===currentUser.id){await infoDialog('Không thể xóa chính mình.');return;}const u=state.users.find(x=>x.id===id);if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa người dùng',message:`Xóa người dùng ${u?(u.name||u.username):''}?`,confirmLabel:'Xóa người dùng',cancelLabel:'Hủy'}))return;const removed=globalThis.UserManagementCommand.remove(state.users,id);logAct('Xóa người dùng','Xóa tài khoản khỏi hệ thống',removed?removed.username:'');save({clearDerived:false});rerender();}
 
 /* ===== AUTH ===== */
 const PASS_ITERATIONS=600000; /* OWASP: >=600k vòng PBKDF2-SHA256. Hash cũ 210k vẫn xác thực (verifyPass đọc số vòng từ chuỗi hash) và tự nâng cấp khi đăng nhập. */
@@ -208,10 +207,9 @@ function reauthenticateCurrentUser({title='Xác thực lại',message='Nhập l�
     <div class="confirm-modal-actions">${btn('Hủy','closeDialogOverlay(false)','ghost')}${btn('Xác thực','confirmReauthentication()','teal')}</div>
   </div>`,resolve));
 }
-async function ensureAdmin(){if(!state.users||!state.users.length){const id=uid(),passHash=await legacyHashPass('admin');state.users=[globalThis.defaultAdminUserFactory?globalThis.defaultAdminUserFactory(id,passHash):{id,username:'admin',name:'Quản trị viên',role:'admin',passHash,active:true,mustChangePassword:true}];save({cloud:false,clearDerived:false});}}
+async function ensureAdmin(){if(!state.users||!state.users.length){const id=uid(),passHash=await legacyHashPass('admin');state.users=[globalThis.defaultAdminUserFactory(id,passHash)];save({cloud:false,clearDerived:false});}}
 function blankAppState(users){
-  if(globalThis.blankAppStateFactory)return globalThis.blankAppStateFactory(users);
-  return{lab:{name:'',dept:'',address:'',brandTitle:'QC Lab',brandSub:'Nội kiểm xét nghiệm',logoText:'QC',logoData:''},tests:[],machines:[],instruments:[],assayGroups:[],qcPanels:[],lotTransitions:[],lotGroups:[],qcLots:[],data:{},actions:[],activity:[],activityAnchor:'',users:Array.isArray(users)?users:[],reagentTests:[],reagentOperators:[],reagentSampleTypes:['Mẫu bệnh nhân','Mẫu nội kiểm (IQC)','Mẫu ngoại kiểm (EQA)'],sigmaData:{},periodLocks:[],teaRefs:[],teaRegistryVersion:TEA_REFERENCE_SCHEMA_VERSION,westgardRules:{...WG_DEFAULT},westgardProfileVersion:2,configMigrationVersion:1,schemaVersion:STATE_SCHEMA_VERSION};
+  return globalThis.blankAppStateFactory(users);
 }
 async function resetAllData(){
   if(!requireAdmin())return;
@@ -219,14 +217,7 @@ async function resetAllData(){
   if(!await confirmDialog({kicker:'Xác nhận lần cuối',title:'Xóa sạch dữ liệu test',message:'Dữ liệu QC, cấu hình, lô, panel và khắc phục sẽ bị xóa.',detail:'Nhật ký audit vẫn được giữ. Nếu đang bật đám mây, trạng thái trắng cũng sẽ được đồng bộ lên Firebase.',confirmLabel:'Xóa sạch dữ liệu',cancelLabel:'Hủy'}))return;
   if(!await reauthenticateCurrentUser({title:'Xác thực xóa sạch dữ liệu',message:'Nhập lại mật khẩu trước khi xóa toàn bộ dữ liệu QC và cấu hình.'}))return;
   if(typeof backupCurrentData==='function'&&!await backupCurrentData('truoc-xoa')){await infoDialog('Không tạo được bản backup an toàn. Dữ liệu chưa bị xóa.');return;}
-  const keepUsers=(state.users||[]).length?state.users:[];
-  /* Neo chuoi hash di kem nhat ky: giu nhat ky ma bo neo thi auditVerifyChain() se
-     bao "audit bi sua" gia ngay o dong dau tien neu lab da tung luu tru. */
-  const keepActivity=[...(state.activity||[])],keepAnchor=state.activityAnchor||'';
-  localStorage.removeItem('qclab');localStorage.removeItem('qclab_boot');if(typeof clearSigmaDraftThrough==='function')clearSigmaDraftThrough(Number.MAX_SAFE_INTEGER);if(typeof LocalStore!=='undefined')LocalStore.clear().catch(()=>{});
-  state=blankAppState(keepUsers);
-  state.activity=keepActivity;state.activityAnchor=keepAnchor;
-  ensureShape();await ensureAdmin();logAct('Xóa sạch dữ liệu test','Đưa app về trạng thái trắng, giữ người dùng và nhật ký audit','Dữ liệu');save();rerender();await infoDialog('Đã xóa sạch dữ liệu test. App đã về trạng thái trắng.',{type:'success'});
+  await globalThis.ResetOperationalDataCommand.execute();await infoDialog('Đã xóa sạch dữ liệu test. App đã về trạng thái trắng.',{type:'success'});
 }
 function downloadStartupData(){
   if(!startupProblem)return;
@@ -236,9 +227,7 @@ function downloadStartupData(){
 }
 async function resetStartupData(){
   if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Tạo dữ liệu mới',message:'Tạo dữ liệu mới?',detail:'Dữ liệu cũ sẽ không bị dùng nữa. Hãy tải bản cần phục hồi trước khi tiếp tục.',confirmLabel:'Tạo dữ liệu mới',cancelLabel:'Hủy'}))return;
-  localStorage.removeItem('qclab');localStorage.removeItem('qclab_boot');if(typeof clearSigmaDraftThrough==='function')clearSigmaDraftThrough(Number.MAX_SAFE_INTEGER);if(typeof LocalStore!=='undefined')LocalStore.clear().catch(()=>{});startupProblem=null;
-  state=blankAppState([]);
-  ensureShape();await ensureAdmin();showLogin();
+  startupProblem=null;await globalThis.ResetOperationalDataCommand.execute({keepUsers:false,keepAudit:false,log:false,save:false,render:false});showLogin();
 }
 function authBrandMark(){const logo=brandLogo();return `<div class="brand-mark">${logo?`<img src="${escAttr(logo)}" alt="">`:esc(brandMarkText())}</div>`;}
 function showStartupRecovery(){

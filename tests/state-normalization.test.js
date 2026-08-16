@@ -1,0 +1,25 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+
+const program=`import {normalizeStateFoundation} from './src/application/state/foundation-normalization.ts';
+import {normalizeStateLifecycle} from './src/application/state/state-lifecycle-normalization.ts';
+const input={schemaVersion:1,archiveRegistry:[{id:'old'}],lab:{name:'Lab',kpiTargets:{reject:2}},teaRegistryVersion:1,westgardRules:{old:true},tests:[{levels:[{mean:10,sd:2}]}]};
+const normalized=normalizeStateFoundation(input,{}, {defaults:()=>({periodLocks:[],lab:{},tests:[]}),sanitize:value=>value,schemaVersion:6,teaRegistryVersion:3,westgardDefaults:{'1-2s':true}});
+const calls=[];normalizeStateLifecycle(normalized.state,{ensureLab:()=>calls.push('lab'),ensureConfiguration:()=>calls.push('config'),repairRanges:()=>calls.push('range'),ensureReagent:()=>calls.push('reagent'),reconcileSigma:()=>calls.push('sigma'),reconcileTea:()=>calls.push('tea'),normalizePointLots:()=>calls.push('lots'),pruneUnusedLevels:()=>calls.push('prune')});
+console.log(JSON.stringify({previous:normalized.previousSchema,state:normalized.state,calls}));`;
+const result=spawnSync(process.execPath,['--experimental-strip-types','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy state normalization TypeScript');
+const value=JSON.parse(result.stdout);
+assert.equal(value.previous,1);
+assert.deepEqual(value.state.periodLocks,[]);
+assert.equal('archiveRegistry' in value.state,false);
+assert.equal('kpiTargets' in value.state.lab,false);
+assert.equal(value.state.teaRegistryVersion,3);
+assert.equal(value.state.schemaVersion,6);
+assert.deepEqual(value.state.westgardRules,{'1-2s':true});
+assert.equal(value.state.westgardProfileVersion,2);
+assert.deepEqual(value.calls,['lab','config','range','reagent','sigma','tea','lots','prune']);
+assert.deepEqual(value.state.tests[0].levels[0],{mean:10,sd:2,mfgMean:10,mfgSd:2,applied:'mfg'});
+console.log('State normalization TypeScript tests passed');

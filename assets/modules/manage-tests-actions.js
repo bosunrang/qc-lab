@@ -122,7 +122,7 @@ async function saveConfigPanel(id){
   logAct(result.effects.audit.action,result.effects.audit.detail,result.effects.audit.target);closeModal();save(result.effects.save);rerender();
 }
 async function deleteConfigPanel(id){if(!requireAdmin())return;const checked=ManageConfigService.panelRemoval(state,{id});if(checked.error){if(checked.message)await infoDialog(checked.message);return;}if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa Panel QC',message:`Xóa Panel QC ${checked.record.name}?`,detail:'Các xét nghiệm vẫn được giữ nguyên.',confirmLabel:'Xóa Panel QC',cancelLabel:'Hủy'}))return;const result=globalThis.ManagePanelCommand.remove({state,id});if(!result.ok){await infoDialog(result.message);return;}logAct(result.effects.audit.action,result.effects.audit.detail,result.effects.audit.target);save(result.effects.save);rerender();}
-async function deleteLotTransition(id){if(!requireAdmin())return;const checked=ManageConfigService.lotTransitionRemoval(state,{id,switchesLot:transitionSwitchesLot});if(checked.error){if(checked.message)await infoDialog(checked.message);return;}if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa dòng chuyển tiếp lô',message:'Xóa dòng chuyển tiếp lô này?',confirmLabel:'Xóa',cancelLabel:'Hủy'}))return;ManageConfigService.removeLotTransition(state,{id,switchesLot:transitionSwitchesLot});syncLotDepletionFromTransitions();logAct('Xóa chuyển tiếp lô',`${lotLabel(checked.record.fromLotId)} → ${lotLabel(checked.record.toLotId)}`,'Chuyển tiếp lô');save();rerender();}
+async function deleteLotTransition(id){if(!requireAdmin())return;const checked=globalThis.ManageLotTransitionCommand.checkRemoval({state,id});if(checked.error){if(checked.message)await infoDialog(checked.message);return;}if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa dòng chuyển tiếp lô',message:'Xóa dòng chuyển tiếp lô này?',confirmLabel:'Xóa',cancelLabel:'Hủy'}))return;const result=globalThis.ManageLotTransitionCommand.remove({state,id});if(!result.ok)return;result.effects.audit.forEach(a=>logAct(a.action,a.detail,a.target));save();rerender();}
 function lotTransitionChoiceLabel(lot){return LotTransitionPickerService.label(lot);}
 function lotTransitionChoiceLots(selectedId=''){return LotTransitionPickerService.availableLots(state.qcLots||[],selectedId);}
 function lotTransitionChoiceMatch(value,selectedId=''){return LotTransitionPickerService.match(state.qcLots||[],value,selectedId);}
@@ -184,24 +184,17 @@ async function readLotTransitionTargetPicks(rows){
 async function saveLotTransitionV2(id){
   if(!requireAdmin())return;
   const panelId=document.getElementById('cfgTransPanel').value,fromLotId=lotTransitionSelectedId('cfgTransFrom'),toLotId=lotTransitionSelectedId('cfgTransTo'),status=document.getElementById('cfgTransStatus').value,startRaw=document.getElementById('cfgTransStart').value.trim(),startDate=parseVN(startRaw);if(startRaw&&!startDate){await infoDialog('Ngày bắt đầu không hợp lệ. Dùng dạng dd/mm/yyyy.');return;}
-  const checked=ManageConfigService.validateLotTransition(state,{id,panelId,fromLotId,toLotId,status,switchesLot:transitionSwitchesLot});if(checked.error){await infoDialog(checked.message);return;}const {old,fromLot,toLot,finalChanged}=checked;
-  const data=ManageConfigService.prepareLotTransitionData({old,panelId,fromLotId,toLotId,startDate,status,finalChanged,today:isoToday(),approvedBy:finalChanged?userName():'',approvedAt:finalChanged?new Date().toISOString():''});
-  if(finalChanged&&!await reauthenticateCurrentUser({title:'Xác thực kết luận chuyển lô',message:'Nhập lại mật khẩu trước khi chấp nhận hoặc từ chối lô QC mới.'}))return;
+  const prep=globalThis.ManageLotTransitionCommand.prepare({state,id,panelId,fromLotId,toLotId,status,startDate,today:isoToday(),approvedBy:userName(),approvedAt:new Date().toISOString()});if(!prep.ok){await infoDialog(prep.message);return;}
+  if(prep.needsReauth&&!await reauthenticateCurrentUser({title:'Xác thực kết luận chuyển lô',message:'Nhập lại mật khẩu trước khi chấp nhận hoặc từ chối lô QC mới.'}))return;
   const targetCheck=inspectAcceptedLotTransition({panelId,fromLotId,toLotId,status:'accepted'});
   if(targetCheck.valid&&targetCheck.rows.length){
     const picks=await readLotTransitionTargetPicks(targetCheck.rows);if(picks===null)return;
-    picks.forEach(pick=>{if(pick.use)applyPlannedTarget(pick.t,toLot,pick,'Nhập khi tạo hồ sơ chuyển lô');});
+    picks.forEach(pick=>{if(pick.use)applyPlannedTarget(pick.t,prep.toLot,pick,'Nhập khi tạo hồ sơ chuyển lô');});
   }
-  if(status==='accepted'&&finalChanged){const check=inspectAcceptedLotTransition(data);if(!check.rows.length){await infoDialog('Panel đã chọn không có xét nghiệm nào đang sử dụng lô cũ. Hãy kiểm tra lại Panel và lô chuyển tiếp.');return;}if(check.missing.length){await infoDialog(`Chưa thể chấp nhận lô mới: ${check.missing.map(x=>testDisplayName(x.t)).join(', ')} chưa có Mean/SD hợp lệ cho lô ${toLot.lotNo}. Hãy điền đủ ở bảng Mean/SD phía trên rồi lưu lại.`);return;}}
-  const saved=ManageConfigService.saveLotTransition(state,{id,newId:uid(),data});if(saved.error){await infoDialog(saved.message);return;}const tr=saved.record;
-  const switched=applyAcceptedLotTransitionToConfig(tr);
-  const wasDepleted=!!(state.qcLots.find(l=>l.id===fromLotId)||{}).depleted;
-  syncLotDepletionFromTransitions();
-  const nowDepleted=!!(state.qcLots.find(l=>l.id===fromLotId)||{}).depleted;
-  if(nowDepleted&&!wasDepleted)logAct('Khóa lô đã hết',`${lotLabel(fromLotId)} · chuyển tiếp sang ${lotLabel(toLotId)}`,'Lô QC');
-  else if(!nowDepleted&&wasDepleted)logAct('Mở lại lô QC',lotLabel(fromLotId),'Lô QC');
-  if(switched)logAct('Áp dụng chuyển tiếp lô',`${panelName(panelId)} · ${lotLabel(fromLotId)} → ${lotLabel(toLotId)} · ${switched} xét nghiệm`,'Chuyển tiếp lô');
-  logAct(saved.created?'Thêm chuyển lô QC':'Cập nhật chuyển lô QC',`${panelName(panelId)}: ${lotLabel(fromLotId)} → ${lotLabel(toLotId)} · ${globalThis.manageTransitionStatusPresentation(status).text}`,'Chuyển tiếp lô');clearDerived();closeModal();save();rerender();
+  const gate=globalThis.ManageLotTransitionCommand.acceptanceGate({state,data:prep.data,finalChanged:prep.finalChanged});if(!gate.ok){await infoDialog(gate.message);return;}
+  const result=globalThis.ManageLotTransitionCommand.execute({state,id,newId:uid(),data:prep.data});if(!result.ok){await infoDialog(result.message);return;}
+  result.effects.audit.forEach(a=>logAct(a.action,a.detail,a.target));
+  clearDerived();closeModal();save();rerender();
 }
 async function openConfigGroup(id=''){
   if(!state.qcLots.length){await infoDialog('Hãy tạo lô QC trước khi tạo nhóm lô.');setManageTab('lots');return;}
@@ -237,28 +230,22 @@ function toggleLotGroupStatus(id){
    này (chưa từng nhập) thì bỏ qua, không báo lỗi — chỉ áp được cho phần đã biết số liệu.
    Nếu nhóm thực ra đã đang được dùng thật rồi (chỉ còn dính nhãn "Đã dừng"/"Dự kiến" cũ,
    vd bấm nhầm hoặc dữ liệu cũ) thì không có gì để áp cả — chỉ gỡ nhãn cho khớp thực tế. */
-/* Danh sách (xét nghiệm, lô, pick) mà activateLotGroup() SẼ áp — tách riêng để dùng
-   chung cho cả bước hỏi trước (đếm điểm rơi vào kỳ đã khóa) lẫn vòng lặp ghi thật,
-   tránh 2 nơi tự lọc điều kiện rồi lệch nhau. */
-function lotGroupActivationCandidates(g,lots){
-  return ManageConfigService.lotGroupActivationCandidates(state.tests,lots,(t,level,lotId,lotNo)=>lotTargetSnapshot(t,level,lotId,lotNo));
-}
+/* Transaction kích hoạt nhóm lô nằm ở ManageLotGroupActivationCommand (TypeScript):
+   preview() tính trước ứng viên + điểm rơi vào kỳ đã khóa cho hộp xác nhận, execute()
+   áp thật — hai pha dùng CHUNG một danh sách candidates nên hộp xác nhận không lệch
+   với những gì được áp. Adapter này chỉ giữ confirm/dialog và render. */
 async function activateLotGroup(id){
   if(!requireAdmin())return;
-  const g=state.lotGroups.find(x=>x.id===id);if(!g||g.active===false)return;
-  const lots=(g.lotIds||[]).map(lid=>state.qcLots.find(l=>l.id===lid)).filter(Boolean);
-  if(!lots.length)return;
-  const candidates=lotGroupActivationCandidates(g,lots);
-  const backfilled=candidates.flatMap(c=>targetPickBackfillPoints(c.t,c.lot,c.pick));
-  const locked=PeriodService.lockedPoints(state,backfilled);
-  const lockNote=globalThis.targetLockedBackfillNotePresentation({count:locked.count,periods:locked.periods.map(monthVN)});
+  const preview=globalThis.ManageLotGroupActivationCommand.preview({state,id});if(!preview.ok)return;
+  const g=preview.group;
+  const lockNote=globalThis.targetLockedBackfillNotePresentation({count:preview.locked.count,periods:preview.locked.periods.map(monthVN)});
   if(!await confirmDialog({title:'Kích hoạt nhóm lô',message:`Áp dụng Mean/SD của nhóm lô ${g.name} cho các xét nghiệm liên quan và chuyển sang dùng nhóm này?`,detail:lockNote,confirmLabel:'Áp dụng',cancelLabel:'Hủy',danger:false}))return;
-  const effectiveFrom=isoToday(),note='Kích hoạt nhóm lô',result=ManageConfigService.applyLotGroupActivation({group:g,candidates,groups:state.lotGroups,effectiveFrom,note,applyTarget:applyTargetPick,groupsForLot:groupsOfLot,groupInUse:lotGroupInUse});
+  const result=globalThis.ManageLotGroupActivationCommand.execute({state,group:g,candidates:preview.candidates,effectiveFrom:isoToday(),note:'Kích hoạt nhóm lô'});
   if(result.status==='already-active'){save();rerender();await infoDialog(`Nhóm lô ${g.name} đã đang được xét nghiệm dùng thật, chỉ gỡ nhãn cũ.`,{type:'success'});return;}
   if(result.status==='unready'){
     await infoDialog('Nhóm lô này chưa có Mean/SD (dự kiến hoặc lịch sử) cho xét nghiệm nào để áp dụng. Vào màn Mean/SD để nhập trước.');return;
   }
-  logAct('Kích hoạt nhóm lô',`${g.name} · ${result.count} dòng`,'Nhóm lô');
+  result.effects.audit.forEach(a=>logAct(a.action,a.detail,a.target));
   save();rerender();
   await infoDialog(`Đã áp dụng Mean/SD cho ${result.count} dòng và chuyển sang nhóm lô ${g.name}.`,{type:'success'});
 }
@@ -271,29 +258,26 @@ async function saveConfigLot(id){
   const lotNo=QCCore.cleanText(document.getElementById('cfgLotNo').value).trim();if(!lotNo){await infoDialog('Nhập số lot.');return;}
   const level=+document.getElementById('cfgLotLevel').value||1,openedRaw=document.getElementById('cfgLotOpened').value.trim(),expRaw=document.getElementById('cfgLotExp').value.trim(),opened=parseVN(openedRaw),exp=parseVN(expRaw);
   if(openedRaw&&!opened){await infoDialog('Ngày mở không hợp lệ. Dùng dạng dd/mm/yyyy.');return;}if(expRaw&&!exp){await infoDialog('Hạn sử dụng không hợp lệ. Dùng dạng dd/mm/yyyy.');return;}
-  const existing=state.qcLots.find(x=>x.id===id),data={lotNo,level,description:QCCore.cleanText(document.getElementById('cfgLotDescription').value),supplier:QCCore.cleanText(document.getElementById('cfgLotSupplier').value),program:existing&&existing.program||'',opened,exp,note:QCCore.cleanText(document.getElementById('cfgLotNote').value,5000),active:true},check=ManageConfigService.validateLot(state,{id,data});
-  if(check.error){await infoDialog(check.message);return;}const old=check.record,oldLotNo=old&&old.lotNo||'',oldLevel=old?+old.level:level;
+  const existing=state.qcLots.find(x=>x.id===id),data={lotNo,level,description:QCCore.cleanText(document.getElementById('cfgLotDescription').value),supplier:QCCore.cleanText(document.getElementById('cfgLotSupplier').value),program:existing&&existing.program||'',opened,exp,note:QCCore.cleanText(document.getElementById('cfgLotNote').value,5000),active:true};
+  const preview=globalThis.ManageLotCommand.preview({state,id,data});if(!preview.ok){await infoDialog(preview.message);return;}
   /* Đổi số lô là VIẾT LẠI HÀNG LOẠT bản ghi lịch sử, không phải sửa một ô cấu
      hình: p.lot là chuỗi tĩnh nên không đổi theo thì điểm cũ biến mất khỏi mọi
      bộ lọc lô (xem chú thích ở renameLotAcrossPoints). Người dùng phải thấy con
      số TRƯỚC khi làm, chứ không chỉ đọc được trong nhật ký SAU khi làm. Hỏi
-     trước khi chạm vào state để bấm Hủy là không còn dấu vết gì. */
-  if(old&&oldLotNo&&oldLotNo!==lotNo){
-    const affected=lotPointsToRename(oldLevel,oldLotNo);
-    if(affected.length){
-      const locked=PeriodService.lockedPoints(state,affected);
-      const lockNote=locked.count?` Trong đó ${locked.count} điểm thuộc kỳ đã khóa (${locked.periods.map(monthVN).join(', ')}).`:'';
-      if(!await confirmDialog({
-        kicker:'Cập nhật hàng loạt',
-        title:'Đổi số lô QC',
-        message:`Đổi số lô "${oldLotNo}" thành "${lotNo}" sẽ cập nhật ${affected.length} điểm QC đã ghi.`,
-        detail:`Số lô là nhãn nhận dạng — giá trị, ngày và Mean/SD của từng điểm không đổi.${lockNote}`,
-        confirmLabel:'Đổi số lô',cancelLabel:'Hủy',danger:false
-      }))return;
-    }
+     trước khi chạm vào state để bấm Hủy là không còn dấu vết gì — kế hoạch đổi
+     (số điểm + kỳ đã khóa) do ManageLotCommand.preview() tính. */
+  if(preview.rename){
+    const r=preview.rename,lockNote=r.locked.count?` Trong đó ${r.locked.count} điểm thuộc kỳ đã khóa (${r.locked.periods.map(monthVN).join(', ')}).`:'';
+    if(!await confirmDialog({
+      kicker:'Cập nhật hàng loạt',
+      title:'Đổi số lô QC',
+      message:`Đổi số lô "${r.oldLotNo}" thành "${r.newLotNo}" sẽ cập nhật ${r.affected} điểm QC đã ghi.`,
+      detail:`Số lô là nhãn nhận dạng — giá trị, ngày và Mean/SD của từng điểm không đổi.${lockNote}`,
+      confirmLabel:'Đổi số lô',cancelLabel:'Hủy',danger:false
+    }))return;
   }
-  const result=ManageConfigService.saveLot(state,{id,newId:uid(),data,renamePoints:renameLotAcrossPoints});if(result.error){await infoDialog(result.message);return;}
-  logAct(result.created?'Thêm lô QC':'Cập nhật lô QC',`${data.lotNo} · Mức ${data.level}`+(result.renamedPoints?` · Đã cập nhật ${result.renamedPoints} điểm QC cũ theo số lô mới`:''),'Lô QC');closeModal();save();rerender();
+  const result=globalThis.ManageLotCommand.execute({state,id,newId:uid(),data});if(!result.ok){await infoDialog(result.message);return;}
+  result.effects.audit.forEach(a=>logAct(a.action,a.detail,a.target));closeModal();save();rerender();
 }
 /* Điểm QC lưu số lô dạng CHUỖI TĨNH chụp lúc nhập (p.lot), không tham chiếu qcLotId —
    mọi bộ lọc "điểm của lô này" (pointsForLot/operationalLotPoints/lotPointsByNo) so
@@ -319,7 +303,7 @@ function renameLotAcrossPoints(oldLevel,oldLotNo,newLotNo){
    trực tiếp (vì đã áp dụng vào cấu hình/Mean-SD, có giá trị lịch sử/audit). Chặn thêm
    ở đây cho nhất quán với bảo vệ đó — chỉ chặn hồ sơ đã chấp nhận, không chặn hồ sơ
    dự kiến/đang chạy song song/không chấp nhận (những hồ sơ đó vốn xóa trực tiếp được). */
-async function deleteConfigLot(id){if(!requireAdmin())return;const check=ManageConfigService.lotRemoval(state,{id,switchesLot:transitionSwitchesLot});if(check.error){if(check.error!=='not-found')await infoDialog(check.message);return;}if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa lô QC',message:`Xóa lô QC ${check.record.lotNo}?`,confirmLabel:'Xóa lô QC',cancelLabel:'Hủy'}))return;const result=ManageConfigService.removeLot(state,{id,switchesLot:transitionSwitchesLot});if(result.error){await infoDialog(result.message);return;}logAct('Xóa lô QC',result.record.lotNo,'Lô QC');save();rerender();}
+async function deleteConfigLot(id){if(!requireAdmin())return;const check=globalThis.ManageLotCommand.checkRemoval({state,id});if(check.error){if(check.error!=='not-found')await infoDialog(check.message);return;}if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa lô QC',message:`Xóa lô QC ${check.record.lotNo}?`,confirmLabel:'Xóa lô QC',cancelLabel:'Hủy'}))return;const result=globalThis.ManageLotCommand.remove({state,id});if(!result.ok){await infoDialog(result.message);return;}result.effects.audit.forEach(a=>logAct(a.action,a.detail,a.target));save();rerender();}
 function openConfigInstrument(id=''){
   const i=state.instruments.find(x=>x.id===id)||{active:true};
   openModal(globalThis.configInstrumentModalHtml({title:id?'Sửa máy xét nghiệm':'Thêm máy xét nghiệm',name:escAttr(i.name||''),section:escAttr(i.section||''),manufacturer:escAttr(i.manufacturer||''),serial:escAttr(i.serial||''),active:i.active!==false,cancelButtonHtml:btn('Hủy','closeModal()','ghost'),saveButtonHtml:btn(id?'Lưu thay đổi':'Thêm máy xét nghiệm',`saveConfigInstrument('${id}')`,'teal')}));

@@ -1,0 +1,4 @@
+export const FIREBASE_SYNC_TOP=['lab','machines','instruments','assayGroups','qcPanels','lotTransitions','lotGroups','qcLots','tests','actions','activity','activityAnchor','users','reagentTests','reagentOperators','reagentSampleTypes','periodLocks','teaRefs','westgardRules','configMigrationVersion'];
+export const FIREBASE_SYNC_LISTS=['machines','instruments','assayGroups','qcPanels','lotTransitions','lotGroups','qcLots','tests','actions','activity','users','reagentTests','reagentOperators','reagentSampleTypes','periodLocks','teaRefs'];
+export const FIREBASE_SYNC_CONTENT_KEYS=['tests','actions','instruments','qcPanels','lotGroups','qcLots','assayGroups'];
+export const FIREBASE_SYNC_COMPARE_KEYS=FIREBASE_SYNC_TOP.filter(key=>key!=='activity'&&key!=='activityAnchor').concat(['data','sigmaData']);

@@ -7,7 +7,7 @@ const settings=fs.readFileSync(path.join(root,'assets','modules','settings.js'),
 const bridge=fs.readFileSync(path.join(root,'src','compat','modular-pilot.global.ts'),'utf8');
 
 assert.match(settings,/globalThis\.settingsBrandPreviewHtml\(\{logo,markText:brandMarkText\(\),title:brandTitle\(\),subtitle:brandSub\(\)\}\)/,'Preview thương hiệu phải dùng bridge TypeScript');
-assert.match(settings,/globalThis\.labProfileService\.updateLab\(state\.lab,input\)/,'Hồ sơ đơn vị phải dùng service TypeScript');
+assert.match(settings,/globalThis\.SettingsProfileCommand\.saveLab\(input\)/,'Hồ sơ đơn vị phải dùng command TypeScript');
 assert.match(settings,/globalThis\.settingsFirebaseRulesPanelHtml\(globalThis\.settingsFirebaseGuideHtml\(\),globalThis\.settingsFirebaseRulesText\(\)\)/,'Panel quy tắc Firebase phải dùng bridge TypeScript');
 assert.match(bridge,/settingsBrandPreviewHtml: ReturnType<typeof createBrandPreviewHtml>;/,'Preview thương hiệu phải là hợp đồng bridge bắt buộc');
 assert.match(bridge,/labProfileService: ReturnType<typeof createLabProfileService>;/,'Hồ sơ đơn vị phải là hợp đồng bridge bắt buộc');

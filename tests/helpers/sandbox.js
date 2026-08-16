@@ -27,6 +27,10 @@ function loadSandbox(relFiles, globals = {}) {
   const files=[...relFiles];
   const stateIndex=files.indexOf('modules/state.js');
   if(stateIndex>=0&&!files.includes('modules/analyte-catalog.js'))files.splice(stateIndex,0,'modules/analyte-catalog.js');
+  // State foundation/configuration đã đi qua façade TypeScript ở runtime. Nạp bundle
+  // sau toàn bộ module test yêu cầu để ensureShape() không âm thầm chạy fallback
+  // classic chỉ vì sandbox thiếu artifact.
+  if(stateIndex>=0&&!files.includes('generated/modular-pilot.js'))files.push('generated/modular-pilot.js');
   // sigma.js không còn tự giải TEa từ 2026-08-01 (tách sang sigma-tea.js, nạp
   // ngay trước nó trong index.html) — chèn giúp để mọi test cũ khỏi phải liệt kê.
   const sigmaIndex=files.indexOf('modules/sigma.js');
@@ -37,6 +41,11 @@ function loadSandbox(relFiles, globals = {}) {
   if(auditIndex>=0&&!files.includes('generated/modular-pilot.js'))files.splice(auditIndex+1,0,'generated/modular-pilot.js');
   const actionWorkflowIndex=files.indexOf('modules/action-workflow-service.js');
   if(actionWorkflowIndex>=0&&!files.includes('generated/modular-pilot.js'))files.splice(actionWorkflowIndex+1,0,'generated/modular-pilot.js');
+  // Storage runtime đã chuyển sang façade TypeScript. Khi test nạp state-storage,
+  // luôn nạp bundle SAU toàn bộ module test yêu cầu để không quay về fallback
+  // source-only (khác thứ tự dependency thì không phản ánh runtime thật).
+  const storageIndex=files.indexOf('modules/state-storage.js');
+  if(storageIndex>=0&&!files.includes('generated/modular-pilot.js'))files.push('generated/modular-pilot.js');
   files.forEach(relPath => {
     const code = fs.readFileSync(path.join(ASSETS_DIR, relPath), 'utf8');
     vm.runInContext(code, context, { filename: relPath });

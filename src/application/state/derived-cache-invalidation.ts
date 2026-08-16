@@ -11,6 +11,7 @@ export type DerivedCacheInvalidationDependencies={
   acceptedCache:()=>OptionalCache|undefined;
   cusumCache:()=>OptionalCache|undefined;
   resetDerivedIndex:()=>void;
+  resetQcDerivedIndex:()=>void;
   resetStatus:()=>void;
   clearStatus:(testId:unknown)=>void;
   invalidateWestgardWorker:(testId?:unknown)=>void;
@@ -27,7 +28,7 @@ export function createDerivedCacheInvalidation(deps:DerivedCacheInvalidationDepe
     deps.westgardMemo().clear();attempt(()=>deps.westgardCache()?.clear());
     deps.acceptedMemo().clear();attempt(()=>deps.acceptedCache()?.clear());
     deps.cusumMemo().clear();attempt(()=>deps.cusumCache()?.clear());
-    deps.resetDerivedIndex();attempt(deps.resetStatus);
+    deps.resetDerivedIndex();deps.resetQcDerivedIndex();attempt(deps.resetStatus);
     attempt(()=>deps.invalidateWestgardWorker());attempt(()=>deps.invalidateActionCaches());
   };
   const clearForTest=(testId:unknown)=>{

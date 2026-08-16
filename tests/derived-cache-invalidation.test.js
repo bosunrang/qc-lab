@@ -1,0 +1,21 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+
+const program=`import {createQcDerivedIndex} from './src/domain/qc/derived-index.ts';
+import {createDerivedCacheInvalidation} from './src/application/state/derived-cache-invalidation.ts';
+const state={qcPanels:[],qcLots:[],lotGroups:[],lotTransitions:[],tests:[]};
+const index=createQcDerivedIndex({operationalGroup:()=>true,switchesLot:()=>false});
+const first=index(state),warm=index(state);let legacyReset=0,workerReset=0,actionReset=0;
+const cache=()=>new Map([['T1|L1',1]]),point=cache(),westgard=cache(),accepted=cache(),cusum=cache();
+const invalidation=createDerivedCacheInvalidation({pointCaches:()=>[point],westgardMemo:()=>westgard,acceptedMemo:()=>accepted,cusumMemo:()=>cusum,pointCache:()=>undefined,westgardCache:()=>undefined,acceptedCache:()=>undefined,cusumCache:()=>undefined,resetDerivedIndex:()=>legacyReset++,resetQcDerivedIndex:()=>index.clear(),resetStatus:()=>{},clearStatus:()=>{},invalidateWestgardWorker:()=>workerReset++,invalidateActionCaches:()=>actionReset++});
+invalidation.clearAll();const after=index(state);console.log(JSON.stringify({warm:first===warm,cleared:first!==after,legacyReset,workerReset,actionReset,sizes:[point,westgard,accepted,cusum].map(item=>item.size)}));`;
+const result=spawnSync(process.execPath,['--experimental-strip-types','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(result.status,0,result.stderr||'không thể chạy cache invalidation TypeScript');
+const value=JSON.parse(result.stdout);
+assert.equal(value.warm,true,'index phải giữ cache khi state không đổi');
+assert.equal(value.cleared,true,'clearAll phải xóa cache qcDerivedIndex TypeScript');
+assert.deepEqual([value.legacyReset,value.workerReset,value.actionReset],[1,1,1]);
+assert.deepEqual(value.sizes,[0,0,0,0]);
+console.log('Derived cache invalidation TypeScript tests passed');

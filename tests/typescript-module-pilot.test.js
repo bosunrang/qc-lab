@@ -601,15 +601,17 @@ assert.match(backupUiSource, /globalThis\.backupOversizeConfirmation\.importFile
   'backup import UI must use TypeScript oversize confirmation bridge');
 assert.match(backupUiSource, /globalThis\.backupOversizeConfirmation\.inspectFile\(f\.name\)/,
   'backup inspect UI must use TypeScript oversize confirmation bridge');
-assert.match(backupUiSource, /downloadBackupText\(globalThis\.backupFileName\(isoToday\(\)\),pack\.text\)/,
-  'backup export UI must use TypeScript file-name bridge');
-assert.match(backupUiSource, /downloadBackupText\(globalThis\.backupSnapshotFileName\(prefix\),pack\.text\)/,
-  'backup snapshot UI must use TypeScript file-name bridge');
+assert.match(generated, /root\.BackupExportCommand\s*=\s*createBackupExportCommand/,
+  'artifact must publish TypeScript backup export command');
+assert.match(backupUiSource, /globalThis\.BackupExportCommand\.exportFull\(globalThis\.backupFileName\(isoToday\(\)\),/,
+  'backup export UI must delegate the named file to the TypeScript command');
+assert.match(backupUiSource, /globalThis\.BackupExportCommand\.snapshot\(globalThis\.backupSnapshotFileName\(prefix\)\)/,
+  'backup snapshot UI must delegate the named file to the TypeScript command');
 assert.match(backupUiSource, /const dialog=globalThis\.backupSizeConfirmation\(\{bytes:size,title,detail\}\);/,
   'backup UI must create size confirmation through TypeScript bridge');
-assert.match(backupUiSource, /globalThis\.backupSizeWarningConfirmation\(\{bytes:pack\.bytes\}\)/,
+assert.match(backupUiSource, /globalThis\.backupSizeWarningConfirmation\(\{bytes\}\)/,
   'backup UI must create size warning confirmation through TypeScript bridge');
-assert.match(backupUiSource, /globalThis\.backupExportMessage\.createError\(e\)/,
+assert.match(backupUiSource, /globalThis\.backupExportMessage\.createError\(result\.error\)/,
   'backup UI must render create error through TypeScript bridge');
 assert.match(backupUiSource, /confirmDialog\(globalThis\.backupImportConfirmation\(\{name:f\.name,sizeWarning\}\)\)/,
   'backup UI must render import confirmation through TypeScript bridge');
@@ -1250,10 +1252,98 @@ assert.match(generated, /root\.ActionRerunService\s*=\s*createActionRerunService
   'artifact must publish NCE rerun service for classic workflow callers');
 assert.match(generated, /root\.ActionPointIndexService\s*=\s*createActionPointIndexService/,
   'artifact must publish NCE point-action index for classic workflow callers');
-assert.match(generated, /root\.syncStateMerge\s*=\s*createSyncStateMerge/,
-  'artifact must publish the TypeScript Firebase state merger for the legacy bridge');
-assert.match(generated, /root\.syncSnapshot\s*=\s*createSyncSnapshot/,
-  'artifact must publish TypeScript snapshot keys for the Firebase bridge');
+assert.match(generated, /root\.installSyncServices\s*=\s*\(\)\s*=>[\s\S]*?createSyncStateMerge/,
+  'artifact must construct the TypeScript Firebase state merger from TypeScript metadata');
+assert.match(generated, /root\.installSyncServices\s*=\s*\(\)\s*=>[\s\S]*?createSyncSnapshot/,
+  'artifact must construct TypeScript snapshot keys from TypeScript metadata');
+const qcDomainSource = read('assets/modules/qc-domain.js');
+assert.match(qcDomainSource, /function reportLevelStats\(pts,mean,teaVal\)\{return globalThis\.reportLevelStatsService\(pts,mean,teaVal\);\}/,
+  'QC domain report statistics must call the TypeScript service directly');
+assert.match(qcDomainSource, /function errorTypeDetailParts\(rules\)\{return globalThis\.qcErrorDetail\(rules\);\}/,
+  'QC domain error-detail helper must call the TypeScript service directly');
+assert.match(qcDomainSource, /function normalizePointLots\(\)\{return globalThis\.qcNormalizePointLots\(state\);\}/,
+  'QC domain point-lot normalization must call the TypeScript service directly');
+assert.match(qcDomainSource, /function normalizeDuplicateRunIds\(\)\{return globalThis\.qcNormalizeDuplicateRunIds\(state\);\}/,
+  'QC domain runId normalization must call the TypeScript service directly');
+assert.match(qcDomainSource, /function (?:lvlCfg|isOperationalLotGroup|levelTargetOk|pointRunNo|testCusumConfig)\([^)]*\)\{return globalThis\./,
+  'QC domain pure configuration helpers must call TypeScript directly');
+assert.match(qcDomainSource, /function lotLineage\(currentLotId\)\{\s*return globalThis\.qcLotLineage\(derived\(\),currentLotId\);\s*\}/,
+  'QC lot lineage must call the TypeScript service directly');
+assert.match(qcDomainSource, /function parallelLotForLevel\(t,level\)\{\s*return globalThis\.qcParallelLotLookup\(t,level\);\s*\}/,
+  'QC parallel-lot lookup must call the TypeScript service directly');
+assert.match(qcDomainSource, /function entryColumns\(t\)\{\s*return globalThis\.qcEntryColumns\(t\);\s*\}/,
+  'QC entry columns must call the TypeScript service directly');
+assert.match(qcDomainSource, /function pointVoidVerdict\(t,p\)\{\s*return globalThis\.qcPointVoidVerdict\(t,p\);\s*\}/,
+  'QC point void verdict must call the TypeScript service directly');
+assert.match(qcDomainSource, /function plannedTargetFor\(t,lot\)\{\s*return globalThis\.qcPlannedTarget\(lvlCfg\(t,lot\.level\),lot\);\s*\}/,
+  'QC planned target lookup must call the TypeScript service directly');
+assert.match(qcDomainSource, /function levelsForLotGroup\(group\)\{\s*return globalThis\.qcLotGroupLevels\(group,state\.tests\|\|\[\],derived\(\)\.lotById\);\s*\}/,
+  'QC lot-group historical levels must call the TypeScript service directly');
+assert.match(qcDomainSource, /function derived\(\)\{return globalThis\.qcDerivedIndex\(state\);\}/,
+  'QC derived index must call the self-invalidating TypeScript service directly');
+assert.doesNotMatch(qcDomainSource, /function derivedStampWalk\(/,
+  'QC domain must not retain the legacy derived-index implementation');
+assert.match(qcDomainSource, /function pointsOf\(testId,level\)\{return globalThis\.qcPointCache\.points\(testId,level\);\}/,
+  'QC point lookup must call the TypeScript cache directly');
+assert.match(qcDomainSource, /function pointsForLot\(testId,level,lot,withIndex=false\)\{return globalThis\.qcPointCache\.lot\(testId,level,lot,withIndex\);\}/,
+  'QC lot-point lookup must call the TypeScript cache directly');
+assert.match(qcDomainSource, /function operationalLotPoints\(t,level,withIndex=false\)\{return globalThis\.qcOperationalAccess\.lotPoints\(t,level,withIndex\);\}/,
+  'QC operational lot points must call the TypeScript service directly');
+assert.match(qcDomainSource, /function testSelectLabel\(t,list=state\.tests\)\{return globalThis\.qcOperationalAccess\.selectLabel\(t,list\);\}/,
+  'QC test selection labels must call the TypeScript service directly');
+assert.doesNotMatch(qcDomainSource, /if\(globalThis\.(?:qcActiveWestgard|qcCusumSeries|qcAcceptedLotPoints)\)/,
+  'QC evaluation services must not retain JavaScript fallbacks');
+assert.doesNotMatch(qcDomainSource, /if\(globalThis\.westgardWorker(?:RevisionService|PrewarmPlanner|JobBuilder|Hydrate)\)/,
+  'Westgard worker adapter must not retain JavaScript fallbacks');
+const dataIoSource = read('assets/modules/data-io.js');
+assert.match(dataIoSource, /function csvCell\(v\)\{\s*return globalThis\.csvCellService\(v\);\s*\}/,
+  'data I/O CSV cells must call the TypeScript service directly');
+assert.match(dataIoSource, /function reportInRange\(start,end\)\{return globalThis\.reportExportHelpers\.inRange\(start,end\);\}/,
+  'report date-range filtering must call the TypeScript helper directly');
+assert.match(dataIoSource, /function reportTeaInfo\(t\)\{return globalThis\.qcReportContext\.teaInfo\(t\);\}/,
+  'report TEa context must call the TypeScript service directly');
+assert.match(dataIoSource, /function reportMultiViews\(t,inRange\)\{return globalThis\.qcReportContext\.multiViews\(t,inRange\);\}/,
+  'report multi-level context must call the TypeScript service directly');
+assert.match(dataIoSource, /function reportPrevLotRows\(t,s,inRange\)\{\s*return globalThis\.qcReportRowsService\.previousLot\(t,s,inRange\);\s*\}/,
+  'previous-lot report rows must call the TypeScript service directly');
+assert.match(dataIoSource, /function reportLevelRows\(t,l,wg,inRange\)\{return globalThis\.qcReportRowsService\.currentLot\(t,l,wg,inRange\);\}/,
+  'current-lot report rows must call the TypeScript service directly');
+assert.match(dataIoSource, /function reportActionsInRange\(tid,inRange\)\{return globalThis\.qcReportRowsService\.actions\(tid,inRange\);\}/,
+  'report action rows must call the TypeScript service directly');
+assert.match(dataIoSource, /function reportNceSummaryParts\(a\)\{return globalThis\.actionReportSummary\(a\);\}/,
+  'report NCE summary must call the TypeScript presentation service directly');
+assert.match(dataIoSource, /function reportNceModel\(a,t\)\{return globalThis\.actionReportModel\(a,t\);\}/,
+  'detailed NCE report models must call the TypeScript presentation service directly');
+assert.match(dataIoSource, /function sigmaLevelsOf\(row\)\{return globalThis\.reportExportHelpers\.sigmaLevels\(row\);\}/,
+  'Sigma export levels must call the TypeScript helper directly');
+assert.match(dataIoSource, /function sigmaPeriodLabel\(value\)\{return globalThis\.reportExportHelpers\.periodLabel\(value\);\}/,
+  'Sigma period labels must call the TypeScript helper directly');
+assert.match(dataIoSource, /function sigmaMdcPeriodLabel\(value\)\{return globalThis\.reportExportHelpers\.mdcPeriodLabel\(value\);\}/,
+  'Sigma MDC period labels must call the TypeScript helper directly');
+assert.match(dataIoSource, /function sigmaExportPeriods\(rows\)\{return globalThis\.reportExportHelpers\.exportPeriods\(rows\);\}/,
+  'Sigma export period lists must call the TypeScript helper directly');
+assert.match(dataIoSource, /function sigmaDataURLBytes\(durl\)\{return globalThis\.sigmaDataUrlBytes\(durl\);\}/,
+  'Sigma chart image decoding must call the TypeScript helper directly');
+assert.match(dataIoSource, /function sigmaReportMetric\(r\)\{return globalThis\.sigmaReportMetricService\(r\);\}/,
+  'Sigma report metrics must call the TypeScript service directly');
+assert.match(dataIoSource, /function sigmaReportRows\(onlyTestId='',mode='latest',period='',periodId=''\)\{return globalThis\.sigmaReportRowsService\(onlyTestId,mode,period,periodId\);\}/,
+  'Sigma report rows must call the TypeScript service directly');
+assert.match(dataIoSource, /function sigmaExportPixelRatio\(W,H,scale=SIGMA_EXPORT_PIXEL_RATIO\)\{return globalThis\.sigmaExportPixelRatioService\(W,H,scale,SIGMA_EXPORT_MAX_DIMENSION\);\}/,
+  'Sigma export pixel ratio must call the TypeScript service directly');
+assert.match(dataIoSource, /function sigmaCanvas\(W,H,scale\)\{return globalThis\.sigmaCanvasFactory\(W,H,scale\);\}/,
+  'Sigma canvas creation must call the TypeScript service directly');
+assert.match(dataIoSource, /function sigmaMdcLabelPlacements\(items,X,Y,ctx,bounds\)\{return globalThis\.sigmaMdcLabelPlacementService\(items,X,Y,ctx,bounds\);\}/,
+  'Sigma MDC label placement must call the TypeScript service directly');
+assert.match(dataIoSource, /function sigmaMdcItems\(rows\)\{return globalThis\.sigmaMdcItemsService\(rows\);\}/,
+  'Sigma MDC data points must call the TypeScript service directly');
+assert.match(dataIoSource, /function drawSigmaReportChart\(rows\)\{return globalThis\.sigmaChartRenderer\(rows\);\}/,
+  'Sigma chart rendering must call the TypeScript renderer directly');
+assert.match(dataIoSource, /function reportNceExcerpt\(value,max=150\)\{return globalThis\.reportExportHelpers\.nceExcerpt\(value,max\);\}/,
+  'report NCE excerpts must call the TypeScript helper directly');
+assert.doesNotMatch(dataIoSource, /function reportInRange\(start,end\)\{[^}]*\?|function reportTeaInfo\(t\)\{[^}]*\?|function reportMultiViews\(t,inRange\)\{[^}]*\?|function reportPrevLotRows[\s\S]*?if\(globalThis\.qcReportRowsService\)|function reportLevelRows\(t,l,wg,inRange\)\{[^}]*\?|function reportActionsInRange\(tid,inRange\)\{[^}]*\?|function reportNceSummaryParts\(a\)\{[^}]*if\(|function reportNceExcerpt\(value,max=150\)\{[^}]*if\(|function sigmaLevelsOf\(row\)\{[^}]*\?|function sigmaDataURLBytes\(durl\)\{[^}]*if\(|function sigmaReportMetric\(r\)\{[^}]*\?|function sigmaReportRows\(onlyTestId='',mode='latest',period='',periodId=''\)\{[^}]*if\(|function sigmaExportPixelRatio\(W,H,scale=SIGMA_EXPORT_PIXEL_RATIO\)\{[^}]*\?|function sigmaCanvas\(W,H,scale\)\{[^}]*if\(|function sigmaPeriodLabel\(value\)\{[^}]*if\(|function sigmaMdcPeriodLabel\(value\)\{[^}]*\?|function sigmaExportPeriods\(rows\)\{[^}]*\?/,
+  'retired report export helpers must not retain JavaScript fallbacks');
+assert.match(dataIoSource, /function downloadCSV\(name,rows\)\{return globalThis\.csvDownload\(name,rows,csvCell\);\}/,
+  'data I/O CSV download must call the TypeScript service directly');
 assert.match(generated, /root\.syncRetryScheduler\s*=\s*createSyncRetryScheduler/,
   'artifact must publish the TypeScript Firebase retry scheduler for the legacy bridge');
 assert.match(generated, /root\.syncFirstConnectMerge\s*=\s*createFirstConnectMerge/,
@@ -1646,6 +1736,16 @@ assert.match(foundationNormalizationSource, /export function normalizeStateFound
   'state foundation phải tách thành TypeScript service nhận dependency');
 assert.match(stateLifecycleNormalizationSource, /export function normalizeStateLifecycle\(/,
   'state lifecycle phải tách thành TypeScript service nhận dependency');
+assert.match(read('assets/modules/state.js'), /function ensureShape\(opts=\{\}\)\{const normalized=globalThis\.qcStateFoundation/,
+  'ensureShape phải gọi trực tiếp state foundation TypeScript, không quay về fallback classic');
+assert.doesNotMatch(read('assets/modules/state.js'), /if\(globalThis\.qcTestConfiguration\)|if\(globalThis\.qcConfigurationRelations\)|if\(false\)/,
+  'state adapter không được giữ implementation configuration legacy đã retire');
+assert.doesNotMatch(read('assets/modules/state.js'), /if\(globalThis\.qcLevelReconciliation\)|qcRangeLimitRepair\?/, 
+  'state adapter không được giữ fallback legacy cho reconciliation và range repair');
+assert.doesNotMatch(read('assets/modules/state.js'), /typeof ManageConfigService|if\(globalThis\.qcLotTargetHistory\)/,
+  'state adapter không được giữ fallback legacy cho helper cấu hình lô');
+assert.match(read('assets/modules/state.js'), /function clearDerived\(\)\{return globalThis\.derivedCacheInvalidation\.clearAll\(\);\}/,
+  'state adapter phải ủy quyền xóa derived cache cho TypeScript');
 assert.match(csvDownloadSource, /export function createCsvDownload\(/,
   'CSV download phải tách thành TypeScript factory nhận dependency');
 assert.match(cssTokenPixelSource, /export function cssTokenPixel\(/,

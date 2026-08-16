@@ -3,14 +3,9 @@ async function confirmOversizedBackup(size,{title,detail}){
   const dialog=globalThis.backupSizeConfirmation({bytes:size,title,detail});
   return dialog?await confirmDialog(dialog):true;
 }
-async function exportData(){logAct('Xuất backup','Xuất toàn bộ dữ liệu JSON có checksum','Dữ liệu');save({clearDerived:false});let pack;try{pack=await createBackupPackage(state);}catch(e){await infoDialog(globalThis.backupExportMessage.createError(e));return;}if(!await confirmOversizedBackup(pack.bytes,globalThis.backupOversizeConfirmation.exportFull()))return;const warningDialog=backupImportSizeError(pack.bytes)?null:globalThis.backupSizeWarningConfirmation({bytes:pack.bytes});if(warningDialog&&!await confirmDialog(warningDialog))return;const ok=downloadBackupText(globalThis.backupFileName(isoToday()),pack.text);if(!ok){await infoDialog(globalThis.backupExportMessage.downloadError);return;}markBackupDone(pack.bytes);updateBackupBanner();}
+async function exportData(){const result=await globalThis.BackupExportCommand.exportFull(globalThis.backupFileName(isoToday()),globalThis.backupOversizeConfirmation.exportFull(),bytes=>backupImportSizeError(bytes)?null:globalThis.backupSizeWarningConfirmation({bytes}));if(result.status==='create-error'){await infoDialog(globalThis.backupExportMessage.createError(result.error));return;}if(result.status==='download-error')await infoDialog(globalThis.backupExportMessage.downloadError);}
 function downloadBackupText(name,json){try{if(globalThis.blobDownload){globalThis.blobDownload(name,new Blob([json],{type:'application/json'}));return true;}return false;}catch(e){return false;}}
-async function backupCurrentData(prefix='before-change'){
-  let pack;try{pack=await createBackupPackage(state);}catch(e){return false;}
-  const ok=downloadBackupText(globalThis.backupSnapshotFileName(prefix),pack.text);
-  if(ok){markBackupDone(pack.bytes);updateBackupBanner();}
-  return ok;
-}
+async function backupCurrentData(prefix='before-change'){return globalThis.BackupExportCommand.snapshot(globalThis.backupSnapshotFileName(prefix));}
 async function importData(e){
   if(!requireAdmin('Chỉ quản trị mới được nhập backup.')){if(e&&e.target)e.target.value='';return;}
   const f=e.target.files[0];if(!f)return;try{if(!await confirmOversizedBackup(f.size,globalThis.backupOversizeConfirmation.importFile(f.name)))return;
@@ -18,15 +13,7 @@ async function importData(e){
     if(!await confirmDialog(globalThis.backupImportConfirmation({name:f.name,sizeWarning})))return;
     if(!await reauthenticateCurrentUser({title:'Xác thực nhập backup',message:'Nhập lại mật khẩu trước khi thay thế dữ liệu nghiệp vụ hiện tại.'}))return;
     if(!await backupCurrentData('truoc-nhap'))throw new Error(globalThis.backupImportMessage.preImportSnapshotFailure);
-    const previousState=state;
-    state=incoming;ensureShape({sanitized:true});
-    const invariantErrors=QCCore.validateStateInvariants(state,{sanitized:true});if(invariantErrors.length){state=previousState;throw new Error('Backup sau hoàn thiện cấu trúc không đạt kiểm tra dữ liệu:\n'+invariantErrors.join('\n'));}
-    if(typeof clearSigmaDraftThrough==='function')clearSigmaDraftThrough(Number.MAX_SAFE_INTEGER);
-    if(!state.users.length)await ensureAdmin();
-    const importedActivity=(state.activity||[]).map(a=>{const{hash,prevHash,...rest}=a;return{...rest,seq:0};});
-    state.activity=[...oldActivity,...importedActivity];
-    logAct('Nhập backup','Nhập dữ liệu đã kiểm tra từ file '+f.name,'Dữ liệu');
-    save();rerender();await infoDialog(globalThis.backupImportMessage.success,{type:'success'});
+    await globalThis.BackupRestoreCommand.restore({incoming,fileName:f.name,oldActivity});await infoDialog(globalThis.backupImportMessage.success,{type:'success'});
   }catch(err){await infoDialog(globalThis.backupImportMessage.invalid(err));}finally{if(e&&e.target)e.target.value='';}
 }
 async function verifyBackupFile(e){if(!requireAdmin('Chỉ quản trị mới được kiểm tra file backup.')){if(e&&e.target)e.target.value='';return;}const f=e&&e.target&&e.target.files&&e.target.files[0];if(!f)return;try{if(!await confirmOversizedBackup(f.size,globalThis.backupOversizeConfirmation.inspectFile(f.name)))return;const report=await inspectBackupText(await f.text(),f.size);await infoDialog(globalThis.backupInspectionSummary(report),{type:'success'});}catch(err){await infoDialog(globalThis.backupInspectionMessage.invalid(err));}finally{if(e&&e.target)e.target.value='';}}

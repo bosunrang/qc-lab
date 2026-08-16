@@ -74,9 +74,9 @@ for (const status of ['planned', 'accepted', 'rejected']) {
   const plain = makeFixture({ transitionStatus: 'planned' });
   ctx.__setState(plain);
   assert.equal(ctx.entryColumns(plain.tests[0]).length, 1, 'không chạy song song thì mỗi mức đúng 1 cột như cũ');
-  // Cột nhập chỉ được dựng từ mức đang vận hành, không phải t.levels thô
-  // (vế còn lại của guard ở partial-render-helpers.test.js).
-  assert.ok(String(ctx.entryColumns).includes('operationalLevels(t)'), 'entryColumns phải dựng từ operationalLevels');
+  // Cột nhập phải đi qua service TypeScript, nơi phụ thuộc `operationalLevels`
+  // được inject từ bridge (vế còn lại của guard ở partial-render-helpers.test.js).
+  assert.ok(String(ctx.entryColumns).includes('qcEntryColumns(t)'), 'entryColumns phải gọi service TypeScript dùng operationalLevels');
 }
 
 // --- Cách ly đánh giá: điểm lô song song không đụng tới Westgard của lô đang vận hành ---

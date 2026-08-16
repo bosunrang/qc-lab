@@ -8,6 +8,8 @@ import {
   createBackupService,
   type BackupServiceApi,
 } from '../application/backup/backup-service';
+import { createBackupRestoreCommand, type BackupRestoreCommand } from '../application/backup/backup-restore-command';
+import { createBackupExportCommand, type BackupExportCommand } from '../application/backup/backup-export-command';
 import { createBackupLocalMarker } from '../application/backup/backup-local-marker';
 import { createBackupInspectionSummary } from '../presentation/backup/backup-inspection-summary';
 import { createBackupInspectionMessage } from '../presentation/backup/backup-inspection-message';
@@ -16,6 +18,8 @@ import { createBackupSnapshotFileName } from '../presentation/backup/backup-snap
 import { createBackupSizeConfirmation } from '../presentation/backup/backup-size-confirmation';
 import { createBackupSizeWarningConfirmation } from '../presentation/backup/backup-size-warning-confirmation';
 import { createBackupExportMessage } from '../presentation/backup/backup-export-message';
+import { createResetOperationalDataCommand, type ResetOperationalDataCommand } from '../application/auth/reset-operational-data-command';
+import { createUserManagementCommand, type UserManagementCommand } from '../application/auth/user-management-command';
 import { createBackupImportConfirmation } from '../presentation/backup/backup-import-confirmation';
 import { createBackupImportMessage } from '../presentation/backup/backup-import-message';
 import { createBackupOversizeConfirmation } from '../presentation/backup/backup-oversize-confirmation';
@@ -28,9 +32,13 @@ import { createManageAssayRemovalCommand, type ManageAssayRemovalCommand } from 
 import { createManageInstrumentCommand, type ManageInstrumentCommand } from '../application/manage/manage-instrument-command';
 import { createManagePanelCommand, type ManagePanelCommand } from '../application/manage/manage-panel-command';
 import { createManageLotGroupCommand, type ManageLotGroupCommand } from '../application/manage/manage-lot-group-command';
+import { createManageLotGroupActivationCommand, type ManageLotGroupActivationCommand } from '../application/manage/manage-lot-group-activation-command';
+import { createManageLotTransitionCommand, type ManageLotTransitionCommand } from '../application/manage/manage-lot-transition-command';
+import { createManageLotCommand, type ManageLotCommand } from '../application/manage/manage-lot-command';
 import { createTargetMatrixCommand } from '../application/manage/target-matrix-command';
 import { createTeaReferenceService, type TeaReferenceServiceApi } from '../application/manage/tea-reference-service';
 import { createPeriodService, type PeriodServiceApi } from '../application/period/period-service';
+import { createReportPeriodCommand, type ReportPeriodCommand } from '../application/period/report-period-command';
 import { createAuditService, type AuditServiceApi } from '../application/audit/audit-service';
 import {
   createLisClient,
@@ -62,13 +70,14 @@ import { createCusumSeries } from '../domain/qc/cusum-series';
 import { createParallelWestgard } from '../domain/qc/parallel-westgard';
 import { createQcEntryColumns } from '../domain/qc/entry-columns';
 import { selectEntryColumnPoints } from '../domain/qc/entry-column-points';
-import { syncCanon, syncedShape, syncJsonMap } from '../domain/sync/snapshot-compare';
+import { syncCanon, syncedShape, syncedStatesEqual, syncJsonMap } from '../domain/sync/snapshot-compare';
 import { mergeSyncArray, mergeSyncBranch } from '../domain/sync/array-merge';
 import { createSyncStateMerge, uniqueSyncUsers } from '../domain/sync/state-merge';
 import { createSyncUpdateBuilder } from '../domain/sync/update-payload';
 import { createSyncSnapshot } from '../domain/sync/snapshot-keys';
 import { createSyncRetryScheduler } from '../domain/sync/retry-scheduler';
 import { createFirstConnectMerge, hasSyncContent } from '../domain/sync/first-connect';
+import { FIREBASE_SYNC_TOP, FIREBASE_SYNC_LISTS, FIREBASE_SYNC_CONTENT_KEYS, FIREBASE_SYNC_COMPARE_KEYS } from '../domain/sync/sync-config';
 import { createRunIdNormalizer } from '../domain/qc/run-id-normalizer';
 import { createPointLotNormalizer } from '../domain/qc/point-lot-normalizer';
 import { qcLotLineage } from '../domain/qc/lot-lineage';
@@ -93,6 +102,9 @@ import { createLocalStorageLoadService } from '../application/storage/local-stor
 import { createLocalStorageSnapshotWriter } from '../application/storage/local-storage-snapshot-writer';
 import { createPartitionedSnapshotWriter } from '../application/storage/partitioned-snapshot-writer';
 import { createSaveService } from '../application/storage/save-service';
+import { createLocalStoreService, type LocalStoreApi } from '../application/storage/local-store-service';
+import { createStorageSnapshotService, type StorageSnapshotService } from '../application/storage/storage-snapshot-service';
+import { createStorageLifecycleService, type StorageLifecycleApi } from '../application/storage/storage-lifecycle-service';
 import { createFirebaseLocalStoreService } from '../application/sync/firebase-local-store-service';
 import { createFirebaseDisconnectService } from '../application/sync/firebase-disconnect-service';
 import { createFirebasePushService } from '../application/sync/firebase-push-service';
@@ -121,7 +133,10 @@ import { firebaseGuideHtml as firebaseGuideHtmlTs } from '../presentation/settin
 import { createBackupReminder } from '../presentation/backup/backup-reminder';
 import { createLisQueuePresentation } from '../presentation/lis/lis-queue-presentation';
 import { createLisSettingsService } from '../application/lis/lis-settings-service';
+import { createLisGatewayCommand, type LisGatewayCommand } from '../application/lis/lis-gateway-command';
 import { createLabProfileService } from '../application/settings/lab-profile-service';
+import { createSettingsProfileCommand, type SettingsProfileCommand } from '../application/settings/settings-profile-command';
+import { createSettingsFirebaseCommand, type SettingsFirebaseCommand } from '../application/settings/settings-firebase-command';
 import { createFirebaseSettingsService } from '../application/sync/firebase-settings-service';
 import { createBrandPreviewHtml } from '../presentation/settings/brand-preview-html';
 import { createUnitProfileHtml } from '../presentation/settings/unit-profile-html';
@@ -713,7 +728,6 @@ declare function logAct(action: string, detail: string, target?: string): void;
 declare function save(options: Record<string, any>): void;
 declare function hydratePartitionedState(): Promise<boolean>;
 declare function restoreFromIndexedDb(): Promise<boolean>;
-declare const StateStorageLegacy: { load: () => boolean; hydrate: () => Promise<boolean>; restore: () => Promise<boolean> };
 declare function adoptValidatedState(value: unknown): void;
 declare function recoverPendingSigmaDraft(): boolean;
 declare function ensureShape(options?: Record<string, any>): void;
@@ -722,12 +736,15 @@ declare const LocalStore: { supported: () => boolean };
 declare let partitionSlot: string, localLoadStatus: string, storageHydrationPromise: Promise<boolean>;
 declare let mem: any, startupProblem: any;
 declare let lsDirty: boolean, lsFullDirty: boolean, lsSaveFailures: number, lsIncrementalStreak: number, lsLastFullSaveAt: number, lsRevision: number;
+declare let LS_FULL_ROTATE_MAX_INCREMENTALS: number, LS_FULL_ROTATE_MAX_MS: number;
 declare const lsDirtyTestIds: Set<string>;
 declare let partitionWrite: Promise<boolean>;
 declare function clearDerived(): void;
 declare function clearDerivedForTest(testId: unknown): void;
 declare function scheduleLocalSave(): void;
+declare function cancelLocalSaveSchedule(): void;
 declare function scheduleLocalRetry(): void;
+declare function serializeStateForStorage(): string;
 declare function markSaved(status: string, detail: string): void;
 declare function saveTime(): string;
 declare function sigmaDraftNeedsCloud(): boolean;
@@ -841,6 +858,9 @@ type QCLabGlobal = typeof globalThis & {
   ManageInstrumentCommand: ManageInstrumentCommand;
   ManagePanelCommand: ManagePanelCommand;
   ManageLotGroupCommand: ManageLotGroupCommand;
+  ManageLotGroupActivationCommand: ManageLotGroupActivationCommand;
+  ManageLotTransitionCommand: ManageLotTransitionCommand;
+  ManageLotCommand: ManageLotCommand;
   TeaReferenceService: TeaReferenceServiceApi;
   LotTransitionPickerService: LotTransitionPickerServiceApi;
   PeriodService: PeriodServiceApi;
@@ -955,7 +975,7 @@ type QCLabGlobal = typeof globalThis & {
   qcParallelWestgard?: ReturnType<typeof createParallelWestgard>;
   qcEntryColumns?: ReturnType<typeof createQcEntryColumns>;
   qcEntryColumnPoints?: typeof selectEntryColumnPoints;
-  syncCanon?: typeof syncCanon; syncedShape?: typeof syncedShape; syncJsonMap?: typeof syncJsonMap;
+  syncCanon?: typeof syncCanon; syncedShape?: typeof syncedShape; syncedStatesEqual?: typeof syncedStatesEqual; syncJsonMap?: typeof syncJsonMap;
   mergeSyncArray?: typeof mergeSyncArray; mergeSyncBranch?: typeof mergeSyncBranch;
   uniqueSyncUsers?: typeof uniqueSyncUsers;
   syncStateMerge?: ReturnType<typeof createSyncStateMerge>;
@@ -964,6 +984,8 @@ type QCLabGlobal = typeof globalThis & {
   syncRetryScheduler?: ReturnType<typeof createSyncRetryScheduler>;
   syncFirstConnectMerge?: ReturnType<typeof createFirstConnectMerge>;
   syncHasContent?: typeof hasSyncContent;
+  syncCompareKeys?: string[];
+  installSyncServices?: () => void;
   qcNormalizeDuplicateRunIds?: ReturnType<typeof createRunIdNormalizer>;
   qcNormalizePointLots?: ReturnType<typeof createPointLotNormalizer>;
   qcLotLineage?: typeof qcLotLineage;
@@ -989,6 +1011,9 @@ type QCLabGlobal = typeof globalThis & {
   localStorageSnapshotWriter?: ReturnType<typeof createLocalStorageSnapshotWriter>;
   partitionedSnapshotWriter?: ReturnType<typeof createPartitionedSnapshotWriter>;
   saveService?: ReturnType<typeof createSaveService>;
+  localStoreService?: LocalStoreApi;
+  storageSnapshotService?: StorageSnapshotService;
+  storageLifecycleService?: StorageLifecycleApi;
   firebaseLocalStoreService?: ReturnType<typeof createFirebaseLocalStoreService>;
   firebaseDisconnectService?: ReturnType<typeof createFirebaseDisconnectService>;
   firebasePushService?: ReturnType<typeof createFirebasePushService>;
@@ -1028,9 +1053,16 @@ type QCLabGlobal = typeof globalThis & {
   backupImportConfirmation: ReturnType<typeof createBackupImportConfirmation>;
   backupImportMessage: ReturnType<typeof createBackupImportMessage>;
   backupOversizeConfirmation: ReturnType<typeof createBackupOversizeConfirmation>;
+  BackupRestoreCommand: BackupRestoreCommand;
+  BackupExportCommand: BackupExportCommand;
+  ResetOperationalDataCommand: ResetOperationalDataCommand;
+  UserManagementCommand: UserManagementCommand;
   lisQueuePresentation: ReturnType<typeof createLisQueuePresentation>;
   lisSettingsService: ReturnType<typeof createLisSettingsService>;
+  LisGatewayCommand: LisGatewayCommand;
   labProfileService: ReturnType<typeof createLabProfileService>;
+  SettingsProfileCommand: SettingsProfileCommand;
+  SettingsFirebaseCommand: SettingsFirebaseCommand;
   firebaseSettingsService: ReturnType<typeof createFirebaseSettingsService>;
   settingsBrandPreviewHtml: ReturnType<typeof createBrandPreviewHtml>;
   settingsUnitProfileHtml: ReturnType<typeof createUnitProfileHtml>;
@@ -1081,6 +1113,7 @@ type QCLabGlobal = typeof globalThis & {
   qcLevelReconciliation?: ReturnType<typeof createQcLevelReconciliation>;
   qcRangeLimitRepair?: ReturnType<typeof createRangeLimitRepair>;
   derivedCacheInvalidation?: ReturnType<typeof createDerivedCacheInvalidation>;
+  installDerivedCacheInvalidation?: (legacy: Record<string, unknown>) => ReturnType<typeof createDerivedCacheInvalidation>;
   qcConfigurationRelations?: typeof reconcileConfigurationRelations;
   qcTestConfiguration?: typeof normalizeTestConfiguration;
   qcStateFoundation?: typeof normalizeStateFoundation;
@@ -1145,6 +1178,7 @@ type QCLabGlobal = typeof globalThis & {
   reportLockPanelHtmlPresentation: ReturnType<typeof createReportLockPanelHtml>;
   reportPageHtml: ReturnType<typeof createReportPageHtml>;
   reportRangePickerHtml: ReturnType<typeof createReportRangePickerHtml>;
+  ReportPeriodCommand: ReportPeriodCommand;
   dashboardLoadingPresentation: ReturnType<typeof createDashboardLoading>;
   dashboardStatusFilter: ReturnType<typeof createDashboardStatusFilter>;
   dashboardExpiringLots: typeof dashboardExpiringLots;
@@ -1570,11 +1604,11 @@ root.qcCusumSeries = createCusumSeries((root.QCCore as any).cusumMovingAverage);
 root.qcParallelWestgard = createParallelWestgard((root.QCCore as any).westgardByPoint);
 root.qcEntryColumns = createQcEntryColumns({ levels: test => (root as any).operationalLevels(test), parallel: (test, level) => (root as any).parallelLotForLevel(test, level) });
 root.qcEntryColumnPoints = selectEntryColumnPoints;
-root.syncCanon = syncCanon; root.syncedShape = syncedShape; root.syncJsonMap = syncJsonMap;
+root.syncCanon = syncCanon; root.syncedShape = syncedShape; root.syncedStatesEqual = syncedStatesEqual; root.syncJsonMap = syncJsonMap;
 root.mergeSyncArray = mergeSyncArray; root.mergeSyncBranch = mergeSyncBranch;
 root.uniqueSyncUsers = uniqueSyncUsers;
-const syncConfig=(root as any).fbSyncMergeConfig;
-if(syncConfig){root.syncSnapshot = createSyncSnapshot(syncConfig.top, syncJsonMap);root.syncStateMerge = createSyncStateMerge(syncConfig);root.syncUpdateBuilder = createSyncUpdateBuilder({...syncConfig,snapshot:root.syncSnapshot});root.syncFirstConnectMerge=createFirstConnectMerge({...syncConfig,merge:root.syncStateMerge,uniqueUsers:uniqueSyncUsers});root.syncHasContent=source=>hasSyncContent(source,syncConfig.contentKeys);}
+root.installSyncServices=()=>{const codec=root.syncValueCodec||createSyncValueCodec(),lists=new Set(FIREBASE_SYNC_LISTS),snapshot=createSyncSnapshot(FIREBASE_SYNC_TOP,syncJsonMap),merge=createSyncStateMerge({clone:codec.clone,snap:snapshot,top:FIREBASE_SYNC_TOP,lists,array:(local:any,remote:any,base:any,deletes:boolean)=>mergeSyncArray(local,remote,base,deletes).map(codec.clone),branch:mergeSyncBranch,cloud:codec.cloudValue});root.syncSnapshot=snapshot;root.syncStateMerge=merge;root.syncUpdateBuilder=createSyncUpdateBuilder({top:FIREBASE_SYNC_TOP,snapshot});root.syncFirstConnectMerge=createFirstConnectMerge({top:FIREBASE_SYNC_TOP,lists,cloud:codec.cloudValue,merge,uniqueUsers:uniqueSyncUsers});root.syncHasContent=source=>hasSyncContent(source,FIREBASE_SYNC_CONTENT_KEYS);root.syncCompareKeys=FIREBASE_SYNC_COMPARE_KEYS;};
+root.installSyncServices();
 root.syncRetryScheduler = createSyncRetryScheduler({setTimeout:(fn,delay)=>globalThis.setTimeout(fn,delay),clearTimeout:timer=>globalThis.clearTimeout(timer)});
 root.qcPreviousLotHistory = previousLotHistory; root.qcLotGroupLevels = lotGroupLevels;
 root.qcPointCache = createPointCacheService(() => state.data || {}, point => (root as any).pointRunNo(point));
@@ -1630,6 +1664,26 @@ root.partitionedSnapshotWriter = createPartitionedSnapshotWriter({
     if (!input.quiet) markSaved('Ä‘Ã£ lÆ°u cá»¥c bá»™','IndexedDB phÃ¢n vÃ¹ng Â· LÃºc '+saveTime());
   },
   failed: input => { lsDirty = true; lsFullDirty = true; lsSaveFailures++; scheduleLocalRetry(); if (!input.quiet) markSaved('lá»—i lÆ°u cá»¥c bá»™','KhÃ´ng thá»ƒ ghi IndexedDB phÃ¢n vÃ¹ng'); },
+});
+root.storageSnapshotService = createStorageSnapshotService({
+  markChanged: () => { lsRevision++; lsDirty = true; lsFullDirty = true; },
+  dirty: () => lsDirty,
+  cancelScheduled: () => cancelLocalSaveSchedule(),
+  clearDirty: () => { lsDirty = false; },
+  draftStamp: () => sigmaDraftStamp(),
+  usePartitioned: () => typeof LocalStore !== 'undefined' && LocalStore.supported() && typeof (LocalStore as any).writePartitioned === 'function',
+  writePartitioned: input => root.partitionedSnapshotWriter!.write({state,slot:partitionSlot,localLoadStatus,fullDirty:lsFullDirty,dirtyTestIds:[...lsDirtyTestIds],streak:lsIncrementalStreak,lastFull:lsLastFullSaveAt,now:Date.now(),maxIncrementals:LS_FULL_ROTATE_MAX_INCREMENTALS,maxMs:LS_FULL_ROTATE_MAX_MS,localDraftStamp:input.draftStamp,quiet:input.quiet}),
+  serialize: () => serializeStateForStorage(),
+  writeLocal: (raw,savedAt,quiet) => root.localStorageSnapshotWriter!.write(raw,savedAt,quiet),
+  mirror: raw => mirrorIndexedDb(raw),
+  needsCloud: () => sigmaDraftNeedsCloud(),
+  clearDraftThrough: stamp => clearSigmaDraftThrough(stamp),
+  resetFailures: () => { lsSaveFailures = 0; },
+  markDirty: () => { lsDirty = true; },
+  incrementFailures: () => { lsSaveFailures++; },
+  retry: () => scheduleLocalRetry(),
+  markSaved: (label,detail) => markSaved(label,detail),
+  now: () => Date.now(),
 });
 root.saveService = createSaveService({
   plan: options => saveCommandPlan(options),
@@ -1758,7 +1812,7 @@ if (typeof (root as any).fbHandleValue === 'function') root.firebaseMergeCommitS
     fbSetReady();setCloudStatus(fbStatusLabel(),true);applyRemoteRender();if(fbHasLocalChanges())scheduleFbPush();
   },
 });
-if (typeof (root as any).fbHandleValue === 'function' && typeof confirmDialog === 'function') root.firebaseConflictDialogService = createFirebaseConflictDialogService(confirmDialog);
+if (typeof (root as any).fbHandleValue === 'function') root.firebaseConflictDialogService = createFirebaseConflictDialogService(options => (globalThis as any).confirmDialog(options));
 if (typeof (root as any).setCloudStatus === 'function') root.firebaseCloudStatusPresentation = createFirebaseCloudStatusPresentation(id => document.getElementById(id));
 if (typeof (root as any).markSaved === 'function') root.firebaseSaveStatusService = createFirebaseSaveStatusService(id => document.getElementById(id));
 if (typeof (root as any).remoteRenderUnsafe === 'function') root.firebaseRemoteRenderSafetyService = createFirebaseRemoteRenderSafetyService({
@@ -1790,7 +1844,10 @@ root.backupImportMessage=createBackupImportMessage();
 root.backupOversizeConfirmation=createBackupOversizeConfirmation();
 root.lisQueuePresentation = createLisQueuePresentation({test:id=>(state.tests||[]).find((test:any)=>test.id===id),formatTestValue:(test,value)=>(root as any).fmtTestValue(test,value),format:(value,decimals)=>(root as any).fmt(value,decimals),escape:value=>(root as any).esc(value),escapeAttribute:value=>(root as any).escAttr(value),quoteJs:value=>(root as any).jsq(value),formatDateTime:value=>(root as any).formatDateTimeVN(value),testDisplayName:test=>typeof (root as any).testDisplayName==='function'?(root as any).testDisplayName(test):'',button:(label,action,variant)=>(root as any).btn(label,action,variant),emptyState:(title,message,action)=>(root as any).emptyState(title,message,action),modalCloseButton:action=>(root as any).modalCloseButton(action)});
 root.lisSettingsService = createLisSettingsService(value => root.lisNormalizeGatewayUrl!(value));
+root.LisGatewayCommand=createLisGatewayCommand({store:settings=>localStorage.setItem(LIS_GATEWAY_STORAGE_KEY,JSON.stringify(settings)),clearToken:()=>{const input=document.getElementById('lisGatewayToken') as any;if(input)input.value='';},disable:()=>{const runtime=(root as any).lisGatewayRuntime;clearInterval(runtime.pollT);runtime.pollT=null;runtime.pending=[];runtime.unresolved=[];(root as any).lisGatewaySetStatus('off','Đã tắt');},start:()=>(root as any).lisGatewayStart(),pull:()=>(root as any).lisGatewayPull({manual:true})});
 root.labProfileService = createLabProfileService((value, limit) => (root.QCCore as any).cleanText(value, limit), value => root.settingsBrandProfile!(value));
+root.SettingsProfileCommand=createSettingsProfileCommand({current:()=>state.lab||{},set:lab=>{state.lab=lab;},profile:root.labProfileService,save:()=>save({clearDerived:false}),renderBrand:()=>renderBrand(),render:()=>rerender()});
+root.SettingsFirebaseCommand=createSettingsFirebaseCommand({available:()=>typeof firebase!=='undefined'&&typeof firebase.auth==='function',ensureApp:cfg=>ensureFirebaseApp(cfg),persist:()=>firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL),signIn:(email,password)=>firebase.auth().signInWithEmailAndPassword(email,password),store:plan=>localStorage.setItem('qclab_fb',JSON.stringify({labCode:plan.labCode,email:plan.email,anonymous:false,config:plan.config})),disconnect:()=>fbDisconnect(),connected:plan=>{setCloudStatus(plan.email+' · '+plan.labCode,true);},clearPassword:()=>{const input=document.getElementById('fbPassword') as any;if(input)input.value='';},init:()=>initFirebase(),hasRemote:()=>!!fb.ref,remoteExists:async()=>{const snap=await fb.ref.once('value');if(snap.exists()){markSaved('đã kết nối','Đã tải dữ liệu từ Firebase');return true;}return false;},remoteReady:()=>{fb.ready=true;fb.initialized=true;},sync:()=>(root as any).syncNow(),clearStore:()=>localStorage.removeItem('qclab_fb'),signOut:()=>typeof firebase!=='undefined'&&typeof firebase.auth==='function'?firebase.auth().signOut():Promise.resolve(),local:()=>{fb.authUser=null;setCloudStatus('Đang chạy cục bộ',false);markSaved('đã lưu cục bộ','Đã ngắt Firebase');}});
 root.firebaseSettingsService = createFirebaseSettingsService(value => root.firebaseConfigParser!(value));
 root.settingsBrandPreviewHtml = createBrandPreviewHtml(value => (root as any).esc(value), value => (root as any).escAttr(value));
 root.settingsUnitProfileHtml = createUnitProfileHtml({escapeAttribute:value=>(root as any).escAttr(value),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
@@ -1818,6 +1875,17 @@ root.indexedDbClearService = createIndexedDbClearService({
   supported: () => typeof indexedDB !== 'undefined',
   key: (slot,type,id) => root.localPartitionHelpers ? root.localPartitionHelpers.key(slot,type,id) : 'partition:'+slot+':'+type+(id==null?'':':'+id),
   keys: manifests => root.localClearKeys!(manifests),
+});
+root.localStoreService = createLocalStoreService({
+  indexedDbAvailable: () => typeof indexedDB !== 'undefined',
+  get: key => root.indexedDbRecordService ? root.indexedDbRecordService.get(key) : Promise.resolve(null),
+  put: record => root.indexedDbRecordService ? root.indexedDbRecordService.put(record) : Promise.resolve(false),
+  remove: key => root.indexedDbRecordService ? root.indexedDbRecordService.delete(key) : Promise.resolve(false),
+  stateRecord: value => root.localSnapshotRecord!.state(value),
+  serializedRecord: value => root.localSnapshotRecord!.serialized(value),
+  writePartitioned: input => root.partitionedIndexedDbWriteService!.write(input),
+  readPartitioned: (slot, get) => root.partitionedIndexedDbReadService!.read(slot,get),
+  clear: (get, remove) => root.indexedDbClearService!.clear(get,remove),
 });
 root.passwordPolicyError = passwordPolicyError;
 root.passwordChangeError = passwordChangeError;
@@ -1859,21 +1927,21 @@ root.usersPageHtml = createUsersPageHtml();
 root.reagentSelectOptionsHtml = createReagentSelectOptionsHtml();
 root.reagentResultHtml = createReagentResultHtml();
 root.reagentPairRowHtml = createReagentPairRowHtml();
-if (typeof StateStorageLegacy !== 'undefined') root.storageBootService = createStorageBootService({
+root.storageBootService = createStorageBootService({
   partitionedSupported: () => typeof LocalStore !== 'undefined' && LocalStore.supported(),
   readBootRecord: () => localStorage.getItem('qclab_boot'),
   discardBootRecord: () => localStorage.removeItem('qclab_boot'),
-  activatePartitionShell: (shell, slot) => { adoptValidatedState(shell); partitionSlot = slot; localLoadStatus = 'partition-shell'; storageHydrationPromise = hydratePartitionedState(); },
+  activatePartitionShell: (shell, slot) => { (globalThis as any).adoptValidatedState(shell); partitionSlot = slot; localLoadStatus = 'partition-shell'; storageHydrationPromise = (globalThis as any).hydratePartitionedState(); },
   loadLegacy: () => root.localStorageLoadService!.load(),
   localLoadStatus: () => localLoadStatus,
-  recoverPendingSigmaDraft,
-  restoreFromIndexedDb,
+  recoverPendingSigmaDraft: () => (globalThis as any).recoverPendingSigmaDraft(),
+  restoreFromIndexedDb: () => (globalThis as any).restoreFromIndexedDb(),
 });
-if (typeof StateStorageLegacy !== 'undefined') root.indexedDbRecoveryService = createIndexedDbRecoveryService({
+root.indexedDbRecoveryService = createIndexedDbRecoveryService({
   supported: () => typeof LocalStore !== 'undefined' && LocalStore.supported(),
   readPartitioned: () => typeof (LocalStore as any).readPartitioned === 'function' ? (LocalStore as any).readPartitioned() : Promise.resolve(null),
   readLegacy: () => (LocalStore as any).read(),
-  adopt: value => adoptValidatedState(value),
+  adopt: value => (globalThis as any).adoptValidatedState(value),
   acceptPartitioned: record => {
     mem = state; partitionSlot = String(record.slot || ''); localLoadStatus = 'partitioned'; startupProblem = null;
     try { localStorage.setItem('qclab_boot', JSON.stringify({format:1,slot:record.slot,savedAt:record.savedAt,shell:{...state,data:{}}})); } catch {}
@@ -1885,12 +1953,20 @@ if (typeof StateStorageLegacy !== 'undefined') root.indexedDbRecoveryService = c
     if (raw) startupProblem.raw = raw;
   },
 });
-if (typeof StateStorageLegacy !== 'undefined') root.partitionHydrationService = createPartitionHydrationService({
+root.partitionHydrationService = createPartitionHydrationService({
   read: () => (LocalStore as any).readPartitioned(),
-  adopt: value => adoptValidatedState(value),
-  recoverPendingSigmaDraft,
+  adopt: value => (globalThis as any).adoptValidatedState(value),
+  recoverPendingSigmaDraft: () => (globalThis as any).recoverPendingSigmaDraft(),
   accept: record => { mem = state; partitionSlot = String(record.slot || ''); localLoadStatus = 'partitioned'; clearDerived(); startupProblem = null; if (lsDirty) scheduleLocalSave(); },
   reportFailure: error => { startupProblem = {raw:'',message:error && (error as Error).message ? (error as Error).message : 'KhÃ´ng thá»ƒ táº£i cÃ¡c phÃ¢n vÃ¹ng dá»¯ liá»‡u QC.'}; },
+});
+root.storageLifecycleService = createStorageLifecycleService({
+  sanitize: value => root.stateAdoptionService!.sanitize(value),
+  normalize: value => { state = value; ensureShape({sanitized:true}); return state; },
+  assertInvariants: value => root.stateAdoptionService!.assertInvariants(value),
+  boot: root.storageBootService!,
+  hydrate: () => root.partitionHydrationService!.hydrate(),
+  restore: () => root.indexedDbRecoveryService!.restore(),
 });
 root.indexedDbMirrorService = createIndexedDbMirrorService({
   supported: () => typeof LocalStore !== 'undefined' && LocalStore.supported(),
@@ -1949,8 +2025,9 @@ root.cusumReferenceLines=cusumReferenceLines;
 root.cusumLinePoints=cusumLinePoints;
 root.blobDownload=createBlobDownload({createUrl:blob=>URL.createObjectURL(blob),revokeUrl:url=>URL.revokeObjectURL(url),download:(url,name)=>{const anchor=document.createElement('a');anchor.href=url;anchor.download=name;anchor.click();},schedule:(work,delay)=>globalThis.setTimeout(work,delay)});
 root.qcReportCsvRows=createQcReportCsvRows({test:(id:any)=>(state.tests||[]).find((test:any)=>test.id===id),lab:()=>(state as any).lab||{},meta:(kind:any)=>(root as any).exportMetaRows(kind),range:(start:any,end:any)=>(root as any).reportRangeText(start,end),testName:(test:any)=>(root as any).testDisplayName(test),tea:(test:any)=>(root as any).sgTea(test),teaSource:(test:any)=>(root as any).sgTeaSource(test),teaLabel:(source:any)=>(root as any).sgTeaLabel(source),teaReference:(test:any)=>(root as any).sgTeaRefText(test),levels:(test:any)=>(root as any).operationalLevels(test),previous:(test:any,level:any)=>(root as any).previousLotSeries(test,level),rows:(root as any).qcReportRowsService,westgard:(test:any)=>(root as any).activeWestgard(test),staff:(point:any)=>(root as any).pointStaff(point),date:(value:any)=>(root as any).vnDate(value),number:(value:any,decimals?:any)=>(root as any).fmt(value,decimals),state:(value:any)=>(root as any).stateName(value),error:(rules:any)=>(root as any).errorType(rules),stats:(points:any,mean:any,tea:any)=>(root as any).reportLevelStats(points,mean,tea),levelLabel:(test:any,level:any,lot:any)=>(root as any).actionLevelShort(test,level,lot),workflow:(action:any)=>(root as any).actionWorkflowStatus(action),rerun:(action:any)=>(root as any).actionRerunStatus(action),protocol:(action:any)=>(root as any).actionProtocolSummary(action),approval:(action:any)=>(root as any).actionApprovalLabel(action)});
+root.installDerivedCacheInvalidation=legacy=>root.derivedCacheInvalidation=createDerivedCacheInvalidation({...legacy,resetQcDerivedIndex:()=>root.qcDerivedIndex?.clear(),pointCache:()=>root.qcPointCache,westgardCache:()=>root.westgardMemoCache,acceptedCache:()=>root.qcAcceptedMemoCache,cusumCache:()=>root.qcCusumMemoCache,invalidateWestgardWorker:(testId:unknown)=>(root as any).invalidateWestgardWorker(testId),invalidateActionCaches:(testId:unknown)=>(root as any).invalidateActionCaches(testId)} as any);
 const legacyDerivedCacheState=(root as any).legacyDerivedCacheState;
-if(legacyDerivedCacheState)root.derivedCacheInvalidation=createDerivedCacheInvalidation({...legacyDerivedCacheState,pointCache:()=>root.qcPointCache,westgardCache:()=>root.westgardMemoCache,acceptedCache:()=>root.qcAcceptedMemoCache,cusumCache:()=>root.qcCusumMemoCache,invalidateWestgardWorker:testId=>(root as any).invalidateWestgardWorker(testId),invalidateActionCaches:testId=>(root as any).invalidateActionCaches(testId)});
+if(legacyDerivedCacheState)root.installDerivedCacheInvalidation(legacyDerivedCacheState);
 root.qcBasicFormat = createBasicFormat();
 root.westgardRulePolicy=createWestgardRulePolicy({rules:(root.QCCore as any).WG_RULES,enabled:(rule:string)=>(root.QCCore as any).ruleEnabled((state as any).westgardRules,rule),levels:(test:any)=>(root as any).operationalLevels(test),resolveAction:(root.QCCore as any).resolveRuleAction,resolveScope:(root.QCCore as any).resolveRuleScope,onInScope:(root.QCCore as any).ruleOnInScope,verdict:(root.QCCore as any).ruleVerdictLevel});
 root.westgardMemoCache=createWestgardMemoCache();
@@ -1990,6 +2067,7 @@ root.reportLockPicker=reportLockPicker;
 root.reportLockPanelHtmlPresentation=createReportLockPanelHtml({button:(label,action,variant,title,options)=>(root as any).btn(label,action,variant,title,options)});
 root.reportPageHtml=createReportPageHtml({head:(title,subtitle)=>(root as any).headOnly(title,subtitle),empty:(title,message,action)=>(root as any).emptyState(title,message,action),button:(label,action,variant,title,options)=>(root as any).btn(label,action,variant,title,options),escape:(value:any)=>(root as any).esc(value),escapeAttr:(value:any)=>(root as any).escAttr(value),label:(test:any,tests:any[])=>(root as any).testSelectLabel(test,tests),rangePicker:(start,end)=>(root as any).reportRangePicker(start,end),actionIcon:(type)=>(root as any).reportActionIcon(type)});
 root.reportRangePickerHtml=createReportRangePickerHtml({dateBox:(id,value,placeholder,attrs)=>(root as any).dateBox(id,value,placeholder,attrs)});
+root.ReportPeriodCommand=createReportPeriodCommand({lock:(s,input)=>root.PeriodService.lock(s as any,input),unlock:(s,input)=>root.PeriodService.unlock(s as any,input)});
 root.ActionCurrentIssues=createActionCurrentIssues({operationalTests:()=>typeof (globalThis as any).operationalTests==='function'?(globalThis as any).operationalTests():[],activeWestgard:test=>(globalThis as any).activeWestgard(test),pointWorkflowComplete:pointId=>typeof (globalThis as any).pointWorkflowComplete==='function'?(globalThis as any).pointWorkflowComplete(pointId):false});
 root.ActionReviewMessages=actionReviewMessages;
 root.dashboardLoadingPresentation=createDashboardLoading({headHtml:createDashboardHeadHtml({escape:(value:any)=>(root as any).esc(value),topUserBox:()=>typeof (globalThis as any).topUserBox==='function'?(globalThis as any).topUserBox():''}),kpisHtml:dashboardKpisHtml});
@@ -2652,6 +2730,10 @@ root.prepareBackupState = backupService.prepareBackupState;
 root.prepareBackupImport = backupService.prepareBackupImport;
 root.backupSummary = backupService.backupSummary;
 root.inspectBackupText = backupService.inspectBackupText;
+root.BackupRestoreCommand=createBackupRestoreCommand({current:()=>state,replace:value=>{state=value;},normalize:()=>ensureShape({sanitized:true}),invariantErrors:()=>(root.QCCore as any).validateStateInvariants(state,{sanitized:true}),clearSigmaDraft:()=>{if(typeof clearSigmaDraftThrough==='function')clearSigmaDraftThrough(Number.MAX_SAFE_INTEGER);},ensureAdmin:()=>ensureAdmin(),setActivity:activity=>{state.activity=activity;},logImported:fileName=>logAct('Nhập backup','Nhập dữ liệu đã kiểm tra từ file '+fileName,'Dữ liệu'),save:()=>save({}),render:()=>rerender()});
+root.BackupExportCommand=createBackupExportCommand({current:()=>state,log:()=>logAct('Xuất backup','Xuất toàn bộ dữ liệu JSON có checksum','Dữ liệu'),save:()=>save({clearDerived:false}),create:value=>(root as any).createBackupPackage(value),confirmOversized:(bytes,detail)=>(root as any).confirmOversizedBackup(bytes,detail),confirm:dialog=>(root as any).confirmDialog(dialog),download:(name,text)=>(root as any).downloadBackupText(name,text),mark:bytes=>(root as any).markBackupDone(bytes),update:()=>(root as any).updateBackupBanner()});
+root.ResetOperationalDataCommand=createResetOperationalDataCommand({current:()=>state,clearPersistence:()=>{localStorage.removeItem('qclab');localStorage.removeItem('qclab_boot');if(typeof clearSigmaDraftThrough==='function')clearSigmaDraftThrough(Number.MAX_SAFE_INTEGER);if(typeof LocalStore!=='undefined')(LocalStore as any).clear().catch(()=>{});},blank:users=>(root as any).blankAppStateFactory(users),replace:value=>{state=value;},normalize:()=>ensureShape(),ensureAdmin:()=>ensureAdmin(),log:()=>logAct('Xóa sạch dữ liệu test','Đưa app về trạng thái trắng, giữ người dùng và nhật ký audit','Dữ liệu'),save:()=>save({}),render:()=>rerender()});
+root.UserManagementCommand=createUserManagementCommand();
 const lisRuntime = createLisGatewayRuntime();
 let lisClient: LisClientApi;
 const lisStorage = typeof localStorage !== 'undefined' ? localStorage : { getItem: () => null };
@@ -2714,6 +2796,37 @@ root.ManageAssayRemovalCommand = createManageAssayRemovalCommand({removeAssay:(t
 root.ManageInstrumentCommand = createManageInstrumentCommand({saveInstrument:(targetState,input)=>root.ManageConfigService.saveInstrument(targetState as any,input),removeInstrument:(targetState,input)=>root.ManageConfigService.removeInstrument(targetState as any,input)});
 root.ManagePanelCommand = createManagePanelCommand({savePanel:(targetState,input)=>root.ManageConfigService.savePanel(targetState as any,input),removePanel:(targetState,input)=>root.ManageConfigService.removePanel(targetState as any,input)});
 root.ManageLotGroupCommand = createManageLotGroupCommand({save:(s,i)=>root.ManageConfigService.saveLotGroup(s as any,i),remove:(s,i)=>root.ManageConfigService.removeLotGroup(s as any,i),stop:(s,i)=>root.ManageConfigService.stopLotGroup(s as any,i)});
+root.ManageLotGroupActivationCommand = createManageLotGroupActivationCommand({
+  findGroup:(s,id)=>((s.lotGroups||[])as any[]).find(g=>g.id===id)||null,
+  lotsOfGroup:(s,g)=>((g.lotIds||[])as string[]).map(lotId=>((s.qcLots||[])as any[]).find(lot=>lot.id===lotId)).filter(Boolean),
+  candidatesFor:(s,_g,lots)=>root.ManageConfigService.lotGroupActivationCandidates((s.tests||[])as any[],lots,(test:any,level:number,lotId:string,lotNo:string)=>(globalThis as any).lotTargetSnapshot(test,level,lotId,lotNo)),
+  backfillPoints:(s,candidate)=>root.ManageConfigService.targetPickBackfillPoints((((s.data||{})as any)[candidate.t.id])||[],candidate.t,candidate.lot,candidate.pick),
+  lockedPoints:(s,points)=>root.PeriodService.lockedPoints(s as any,points),
+  applyActivation:input=>root.ManageConfigService.applyLotGroupActivation({...input,applyTarget:(test:any,lot:any,pick:any,effectiveFrom:string,note:string)=>(globalThis as any).applyTargetPick(test,lot,pick,effectiveFrom,note),groupsForLot:(lotId:string)=>(globalThis as any).groupsOfLot(lotId),groupInUse:(group:any)=>(globalThis as any).lotGroupInUse(group)} as any),
+});
+root.ManageLotTransitionCommand = createManageLotTransitionCommand({
+  validate:(s,i)=>root.ManageConfigService.validateLotTransition(s as any,{...i,switchesLot:root.ManageConfigService.transitionSwitchesLot}),
+  prepareData:i=>root.ManageConfigService.prepareLotTransitionData(i),
+  inspect:(s,tr)=>root.ManageConfigService.inspectAcceptedLotTransition(s as any,tr),
+  save:(s,i)=>root.ManageConfigService.saveLotTransition(s as any,i),
+  applyAccepted:tr=>(globalThis as any).applyAcceptedLotTransitionToConfig(tr),
+  syncDepletion:s=>root.ManageConfigService.syncLotDepletion(s as any),
+  removal:(s,i)=>root.ManageConfigService.lotTransitionRemoval(s as any,{...i,switchesLot:root.ManageConfigService.transitionSwitchesLot}),
+  removeRecord:(s,i)=>root.ManageConfigService.removeLotTransition(s as any,{...i,switchesLot:root.ManageConfigService.transitionSwitchesLot}),
+  findLot:(s,id)=>((s.qcLots||[])as any[]).find(lot=>lot.id===id),
+  lotLabel:id=>(globalThis as any).lotLabel(id),
+  panelName:id=>(globalThis as any).panelName(id),
+  statusText:status=>(globalThis as any).manageTransitionStatusPresentation(status).text,
+  testName:test=>(globalThis as any).testDisplayName(test),
+});
+root.ManageLotCommand = createManageLotCommand({
+  validate:(s,i)=>root.ManageConfigService.validateLot(s as any,i),
+  pointsToRename:(s,level,lotNo)=>root.ManageConfigService.lotPointsToRename(s as any,level,lotNo),
+  lockedPoints:(s,points)=>root.PeriodService.lockedPoints(s as any,points),
+  save:(s,i)=>root.ManageConfigService.saveLot(s as any,{...i,renamePoints:(level:number,oldLotNo:string,newLotNo:string)=>root.ManageConfigService.renameLotPoints(s as any,level,oldLotNo,newLotNo)}),
+  removal:(s,i)=>root.ManageConfigService.lotRemoval(s as any,{...i,switchesLot:root.ManageConfigService.transitionSwitchesLot}),
+  removeRecord:(s,i)=>root.ManageConfigService.removeLot(s as any,{...i,switchesLot:root.ManageConfigService.transitionSwitchesLot}),
+});
 root.TeaReferenceService = createTeaReferenceService({
   key: value => (globalThis as any).teaRefName(value), analyteMeta: (name, record) => (globalThis as any).teaAnalyteMeta(name, record),
   effectiveReferences: () => (globalThis as any).effectiveTeaRefs(), defaultReferences: () => (globalThis as any).REFTESTS,

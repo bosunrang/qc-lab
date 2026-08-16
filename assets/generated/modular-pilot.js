@@ -640,6 +640,76 @@
 		});
 	}
 	//#endregion
+	//#region src/application/backup/backup-restore-command.ts
+	function createBackupRestoreCommand(deps) {
+		const restore = async (input) => {
+			const previous = deps.current();
+			deps.replace(input.incoming);
+			deps.normalize();
+			const errors = deps.invariantErrors();
+			if (errors.length) {
+				deps.replace(previous);
+				throw new Error("Backup sau hoàn thiện cấu trúc không đạt kiểm tra dữ liệu:\n" + errors.join("\n"));
+			}
+			deps.clearSigmaDraft();
+			if (!deps.current().users.length) await deps.ensureAdmin();
+			const imported = (deps.current().activity || []).map((entry) => {
+				const { hash, prevHash, ...rest } = entry;
+				return {
+					...rest,
+					seq: 0
+				};
+			});
+			deps.setActivity([...input.oldActivity, ...imported]);
+			deps.logImported(input.fileName);
+			deps.save();
+			deps.render();
+		};
+		return Object.freeze({ restore });
+	}
+	//#endregion
+	//#region src/application/backup/backup-export-command.ts
+	function createBackupExportCommand(deps) {
+		const snapshot = async (prefix) => {
+			let pack;
+			try {
+				pack = await deps.create(deps.current());
+			} catch (error) {
+				return false;
+			}
+			const ok = deps.download(prefix, pack.text);
+			if (ok) {
+				deps.mark(pack.bytes);
+				deps.update();
+			}
+			return ok;
+		};
+		const exportFull = async (name, oversizeDetail, warning) => {
+			deps.log();
+			deps.save();
+			let pack;
+			try {
+				pack = await deps.create(deps.current());
+			} catch (error) {
+				return {
+					status: "create-error",
+					error
+				};
+			}
+			if (!await deps.confirmOversized(pack.bytes, oversizeDetail)) return { status: "cancelled" };
+			const dialog = warning(pack.bytes);
+			if (dialog && !await deps.confirm(dialog)) return { status: "cancelled" };
+			if (!deps.download(name, pack.text)) return { status: "download-error" };
+			deps.mark(pack.bytes);
+			deps.update();
+			return { status: "done" };
+		};
+		return Object.freeze({
+			exportFull,
+			snapshot
+		});
+	}
+	//#endregion
 	//#region src/application/backup/backup-local-marker.ts
 	function createBackupLocalMarker(deps) {
 		const timestampKey = "qclab_lastbackup", bytesKey = "qclab_lastbackup_bytes";
@@ -726,6 +796,65 @@
 			createError: (error) => "Không tạo được file backup:\n" + (error && error.message ? error.message : "Lỗi không xác định."),
 			downloadError: "Không tạo được file backup. Dữ liệu chưa được xem là đã sao lưu."
 		};
+	}
+	//#endregion
+	//#region src/application/auth/reset-operational-data-command.ts
+	function createResetOperationalDataCommand(deps) {
+		const execute = async (options = {}) => {
+			const current = deps.current(), users = options.keepUsers === false ? [] : (current.users || []).length ? current.users : [], activity = options.keepAudit === false ? [] : [...current.activity || []], anchor = options.keepAudit === false ? "" : current.activityAnchor || "";
+			deps.clearPersistence();
+			const next = deps.blank(users);
+			next.activity = activity;
+			next.activityAnchor = anchor;
+			deps.replace(next);
+			deps.normalize();
+			await deps.ensureAdmin();
+			if (options.log !== false) deps.log();
+			if (options.save !== false) deps.save();
+			if (options.render !== false) deps.render();
+		};
+		return Object.freeze({ execute });
+	}
+	//#endregion
+	//#region src/application/auth/user-management-command.ts
+	function createUserManagementCommand() {
+		const add = (users, input) => {
+			const user = {
+				id: input.id,
+				username: input.username,
+				name: input.name,
+				initials: input.initials,
+				role: input.role,
+				pagePerms: [...input.pagePerms],
+				passHash: input.passHash,
+				active: true,
+				mustChangePassword: true
+			};
+			users.push(user);
+			return user;
+		};
+		const updatePermissions = (user, input) => Object.assign(user, {
+			role: input.role,
+			pagePerms: [...input.pagePerms]
+		});
+		const resetPassword = (user, hash, mustChange) => Object.assign(user, {
+			passHash: hash,
+			mustChangePassword: mustChange
+		});
+		const toggle = (user) => Object.assign(user, { active: user.active === false });
+		const remove = (users, id) => {
+			const user = users.find((item) => item.id === id);
+			if (!user) return void 0;
+			users.splice(users.indexOf(user), 1);
+			return user;
+		};
+		return Object.freeze({
+			add,
+			updatePermissions,
+			resetPassword,
+			toggle,
+			remove
+		});
 	}
 	//#endregion
 	//#region src/presentation/backup/backup-import-confirmation.ts
@@ -1937,6 +2066,287 @@
 		});
 	}
 	//#endregion
+	//#region src/application/manage/manage-lot-group-activation-command.ts
+	function createManageLotGroupActivationCommand(deps) {
+		const preview = (input) => {
+			const group = deps.findGroup(input.state, input.id);
+			if (!group || group.active === false) return {
+				ok: false,
+				reason: "not-found"
+			};
+			const lots = deps.lotsOfGroup(input.state, group);
+			if (!lots.length) return {
+				ok: false,
+				reason: "no-lots"
+			};
+			const candidates = deps.candidatesFor(input.state, group, lots);
+			const backfilled = candidates.flatMap((candidate) => deps.backfillPoints(input.state, candidate));
+			const locked = deps.lockedPoints(input.state, backfilled) || {};
+			return {
+				ok: true,
+				group,
+				candidates,
+				locked: {
+					count: locked.count || 0,
+					periods: locked.periods || []
+				}
+			};
+		};
+		const execute = (input) => {
+			const result = deps.applyActivation({
+				group: input.group,
+				candidates: input.candidates,
+				groups: input.state.lotGroups || [],
+				effectiveFrom: input.effectiveFrom,
+				note: input.note
+			});
+			if (result.status !== "applied") return {
+				ok: false,
+				status: String(result.status),
+				group: input.group
+			};
+			return {
+				ok: true,
+				status: "applied",
+				count: result.count,
+				group: input.group,
+				effects: {
+					audit: [{
+						action: "Kích hoạt nhóm lô",
+						detail: `${input.group.name} · ${result.count} dòng`,
+						target: "Nhóm lô"
+					}],
+					save: {}
+				}
+			};
+		};
+		return Object.freeze({
+			preview,
+			execute
+		});
+	}
+	//#endregion
+	//#region src/application/manage/manage-lot-transition-command.ts
+	function createManageLotTransitionCommand(deps) {
+		const prepare = (input) => {
+			const checked = deps.validate(input.state, {
+				id: input.id || "",
+				panelId: input.panelId,
+				fromLotId: input.fromLotId,
+				toLotId: input.toLotId,
+				status: input.status
+			});
+			if (checked.error) return {
+				ok: false,
+				...checked
+			};
+			const finalChanged = !!checked.finalChanged;
+			return {
+				ok: true,
+				data: deps.prepareData({
+					old: checked.old,
+					panelId: input.panelId,
+					fromLotId: input.fromLotId,
+					toLotId: input.toLotId,
+					startDate: input.startDate,
+					status: input.status,
+					finalChanged,
+					today: input.today,
+					approvedBy: finalChanged ? input.approvedBy : "",
+					approvedAt: finalChanged ? input.approvedAt : ""
+				}),
+				fromLot: checked.fromLot,
+				toLot: checked.toLot,
+				finalChanged,
+				needsReauth: finalChanged
+			};
+		};
+		const acceptanceGate = (input) => {
+			if (input.data.status !== "accepted" || !input.finalChanged) return { ok: true };
+			const check = deps.inspect(input.state, input.data);
+			if (!check.rows || !check.rows.length) return {
+				ok: false,
+				message: "Panel đã chọn không có xét nghiệm nào đang sử dụng lô cũ. Hãy kiểm tra lại Panel và lô chuyển tiếp."
+			};
+			if (check.missing && check.missing.length) {
+				const toLot = deps.findLot(input.state, input.data.toLotId);
+				return {
+					ok: false,
+					missing: check.missing,
+					message: `Chưa thể chấp nhận lô mới: ${check.missing.map((row) => deps.testName(row.test)).join(", ")} chưa có Mean/SD hợp lệ cho lô ${toLot && toLot.lotNo || ""}. Hãy điền đủ ở bảng Mean/SD phía trên rồi lưu lại.`
+				};
+			}
+			return { ok: true };
+		};
+		const execute = (input) => {
+			const wasDepleted = !!(deps.findLot(input.state, input.data.fromLotId) || {}).depleted;
+			const saved = deps.save(input.state, {
+				id: input.id || "",
+				newId: input.newId,
+				data: input.data
+			});
+			if (saved.error) return {
+				ok: false,
+				...saved
+			};
+			const tr = saved.record, switched = deps.applyAccepted(tr) || 0;
+			deps.syncDepletion(input.state);
+			const nowDepleted = !!(deps.findLot(input.state, tr.fromLotId) || {}).depleted;
+			const audit = [];
+			if (nowDepleted && !wasDepleted) audit.push({
+				action: "Khóa lô đã hết",
+				detail: `${deps.lotLabel(tr.fromLotId)} · chuyển tiếp sang ${deps.lotLabel(tr.toLotId)}`,
+				target: "Lô QC"
+			});
+			else if (!nowDepleted && wasDepleted) audit.push({
+				action: "Mở lại lô QC",
+				detail: deps.lotLabel(tr.fromLotId),
+				target: "Lô QC"
+			});
+			if (switched) audit.push({
+				action: "Áp dụng chuyển tiếp lô",
+				detail: `${deps.panelName(tr.panelId)} · ${deps.lotLabel(tr.fromLotId)} → ${deps.lotLabel(tr.toLotId)} · ${switched} xét nghiệm`,
+				target: "Chuyển tiếp lô"
+			});
+			audit.push({
+				action: saved.created ? "Thêm chuyển lô QC" : "Cập nhật chuyển lô QC",
+				detail: `${deps.panelName(tr.panelId)}: ${deps.lotLabel(tr.fromLotId)} → ${deps.lotLabel(tr.toLotId)} · ${deps.statusText(tr.status)}`,
+				target: "Chuyển tiếp lô"
+			});
+			return {
+				ok: true,
+				record: tr,
+				created: !!saved.created,
+				switched,
+				effects: {
+					audit,
+					save: {}
+				}
+			};
+		};
+		const checkRemoval = (input) => deps.removal(input.state, { id: input.id });
+		const remove = (input) => {
+			const checked = deps.removal(input.state, { id: input.id });
+			if (checked.error) return {
+				ok: false,
+				...checked
+			};
+			const result = deps.removeRecord(input.state, { id: input.id });
+			if (result.error) return {
+				ok: false,
+				...result
+			};
+			deps.syncDepletion(input.state);
+			return {
+				ok: true,
+				record: result.record,
+				effects: {
+					audit: [{
+						action: "Xóa chuyển tiếp lô",
+						detail: `${deps.lotLabel(result.record.fromLotId)} → ${deps.lotLabel(result.record.toLotId)}`,
+						target: "Chuyển tiếp lô"
+					}],
+					save: {}
+				}
+			};
+		};
+		return Object.freeze({
+			prepare,
+			acceptanceGate,
+			execute,
+			checkRemoval,
+			remove
+		});
+	}
+	//#endregion
+	//#region src/application/manage/manage-lot-command.ts
+	function createManageLotCommand(deps) {
+		const preview = (input) => {
+			const check = deps.validate(input.state, {
+				id: input.id || "",
+				data: input.data
+			});
+			if (check.error) return {
+				ok: false,
+				...check
+			};
+			const old = check.record || null, oldLotNo = old && old.lotNo || "", oldLevel = old ? +old.level : +input.data.level || 1;
+			let rename = null;
+			if (old && oldLotNo && oldLotNo !== input.data.lotNo) {
+				const affected = deps.pointsToRename(input.state, oldLevel, oldLotNo);
+				if (affected.length) {
+					const locked = deps.lockedPoints(input.state, affected) || {};
+					rename = {
+						oldLotNo,
+						newLotNo: input.data.lotNo,
+						affected: affected.length,
+						locked: {
+							count: locked.count || 0,
+							periods: locked.periods || []
+						}
+					};
+				}
+			}
+			return {
+				ok: true,
+				record: old,
+				rename
+			};
+		};
+		const execute = (input) => {
+			const result = deps.save(input.state, {
+				id: input.id || "",
+				newId: input.newId,
+				data: input.data
+			});
+			if (result.error) return {
+				ok: false,
+				...result
+			};
+			const renamed = result.renamedPoints || 0;
+			return {
+				ok: true,
+				record: result.record,
+				created: !!result.created,
+				renamedPoints: renamed,
+				effects: {
+					audit: [{
+						action: result.created ? "Thêm lô QC" : "Cập nhật lô QC",
+						detail: `${input.data.lotNo} · Mức ${input.data.level}` + (renamed ? ` · Đã cập nhật ${renamed} điểm QC cũ theo số lô mới` : ""),
+						target: "Lô QC"
+					}],
+					save: {}
+				}
+			};
+		};
+		const checkRemoval = (input) => deps.removal(input.state, { id: input.id });
+		const remove = (input) => {
+			const result = deps.removeRecord(input.state, { id: input.id });
+			if (result.error) return {
+				ok: false,
+				...result
+			};
+			return {
+				ok: true,
+				record: result.record,
+				effects: {
+					audit: [{
+						action: "Xóa lô QC",
+						detail: result.record.lotNo,
+						target: "Lô QC"
+					}],
+					save: {}
+				}
+			};
+		};
+		return Object.freeze({
+			preview,
+			execute,
+			checkRemoval,
+			remove
+		});
+	}
+	//#endregion
 	//#region src/application/manage/tea-reference-service.ts
 	function createTeaReferenceService(deps) {
 		const find = (state, refKey) => {
@@ -2186,6 +2596,60 @@
 			lock,
 			unlock,
 			lockedPoints
+		});
+	}
+	//#endregion
+	//#region src/application/period/report-period-command.ts
+	function createReportPeriodCommand(deps) {
+		const lock = (input) => {
+			const result = deps.lock(input.state, {
+				ym: input.ym,
+				lockedAt: input.lockedAt,
+				lockedBy: input.lockedBy,
+				id: input.id
+			});
+			if (result.error) return {
+				ok: false,
+				...result
+			};
+			return {
+				ok: true,
+				...result,
+				effects: {
+					audit: {
+						action: "Khóa kỳ báo cáo",
+						detail: input.label,
+						target: "Kỳ báo cáo"
+					},
+					save: { clearDerived: false }
+				}
+			};
+		};
+		const unlock = (input) => {
+			const result = deps.unlock(input.state, {
+				ym: input.ym,
+				reason: input.reason
+			});
+			if (result.error) return {
+				ok: false,
+				...result
+			};
+			return {
+				ok: true,
+				...result,
+				effects: {
+					audit: {
+						action: "Mở khóa kỳ báo cáo",
+						detail: `${input.label} · Lý do: ${result.reason}`,
+						target: "Kỳ báo cáo"
+					},
+					save: { clearDerived: false }
+				}
+			};
+		};
+		return Object.freeze({
+			lock,
+			unlock
 		});
 	}
 	//#endregion
@@ -2747,7 +3211,7 @@
 			}
 			return build ? out : ok && index === previous.length;
 		};
-		return (state) => {
+		const index = (state) => {
 			if (cached && stamp(state, cached.stamp) === true) return cached;
 			const currentStamp = stamp(state), panels = (state.qcPanels || []).filter((panel) => panel.active !== false), testPanel = /* @__PURE__ */ new Map(), testOrder = /* @__PURE__ */ new Map(), lotGroupByLotId = /* @__PURE__ */ new Map();
 			panels.forEach((panel, panelIndex) => (panel.testIds || []).forEach((id, testIndex) => {
@@ -2775,6 +3239,9 @@
 				groups: /* @__PURE__ */ new Map()
 			};
 		};
+		return Object.assign(index, { clear: () => {
+			cached = null;
+		} });
 	}
 	//#endregion
 	//#region src/domain/qc/accepted-lot-points.ts
@@ -2929,6 +3396,9 @@
 		});
 		return out;
 	}
+	function syncedStatesEqual(left, right, keys) {
+		return JSON.stringify(syncedShape(left, keys)) === JSON.stringify(syncedShape(right, keys));
+	}
 	function syncJsonMap(value) {
 		const out = {};
 		Object.keys(value || {}).forEach((key) => out[key] = JSON.stringify(value[key]));
@@ -3012,10 +3482,11 @@
 			add(payload, next.data, previous.data, current.data || {}, "data");
 			add(payload, next.sigma, previous.sigma, current.sigmaData || {}, "sigmaData");
 			return { payload };
-		};
+		}, hasChanges = (current, base) => Object.keys(build(current, base).payload).length > 0;
 		return {
 			baseSnapshot,
-			build
+			build,
+			hasChanges
 		};
 	}
 	//#endregion
@@ -3070,6 +3541,58 @@
 			return out;
 		};
 	}
+	//#endregion
+	//#region src/domain/sync/sync-config.ts
+	var FIREBASE_SYNC_TOP = [
+		"lab",
+		"machines",
+		"instruments",
+		"assayGroups",
+		"qcPanels",
+		"lotTransitions",
+		"lotGroups",
+		"qcLots",
+		"tests",
+		"actions",
+		"activity",
+		"activityAnchor",
+		"users",
+		"reagentTests",
+		"reagentOperators",
+		"reagentSampleTypes",
+		"periodLocks",
+		"teaRefs",
+		"westgardRules",
+		"configMigrationVersion"
+	];
+	var FIREBASE_SYNC_LISTS = [
+		"machines",
+		"instruments",
+		"assayGroups",
+		"qcPanels",
+		"lotTransitions",
+		"lotGroups",
+		"qcLots",
+		"tests",
+		"actions",
+		"activity",
+		"users",
+		"reagentTests",
+		"reagentOperators",
+		"reagentSampleTypes",
+		"periodLocks",
+		"teaRefs"
+	];
+	var FIREBASE_SYNC_CONTENT_KEYS = [
+		"tests",
+		"actions",
+		"instruments",
+		"qcPanels",
+		"lotGroups",
+		"qcLots",
+		"assayGroups"
+	];
+	var FIREBASE_SYNC_COMPARE_KEYS = FIREBASE_SYNC_TOP.filter((key) => key !== "activity" && key !== "activityAnchor").concat(["data", "sigmaData"]);
 	//#endregion
 	//#region src/domain/qc/run-id-normalizer.ts
 	function createRunIdNormalizer(run) {
@@ -3635,6 +4158,89 @@
 		return Object.freeze({ save });
 	}
 	//#endregion
+	//#region src/application/storage/local-store-service.ts
+	function createLocalStoreService(deps) {
+		const supported = () => deps.indexedDbAvailable();
+		const read = () => supported() ? deps.get("state") : Promise.resolve(null);
+		const write = (state) => supported() ? deps.put(deps.stateRecord(state)) : Promise.resolve(false);
+		const writeSerialized = (json) => supported() ? deps.put(deps.serializedRecord(json)) : Promise.resolve(false);
+		const writePartitioned = (state, currentSlot, options = {}) => {
+			const ids = Array.isArray(options.dirtyTestIds) ? [...new Set(options.dirtyTestIds.map(String))] : null;
+			return deps.writePartitioned({
+				state,
+				currentSlot,
+				dirtyTestIds: ids,
+				read: deps.get,
+				put: deps.put,
+				remove: deps.remove
+			});
+		};
+		const readPartitioned = (slot) => deps.readPartitioned(slot, deps.get);
+		const clear = () => supported() ? deps.clear(deps.get, deps.remove) : Promise.resolve(false);
+		return Object.freeze({
+			supported,
+			read,
+			write,
+			writeSerialized,
+			writePartitioned,
+			readPartitioned,
+			clear
+		});
+	}
+	//#endregion
+	//#region src/application/storage/storage-snapshot-service.ts
+	function createStorageSnapshotService(deps) {
+		const persist = (options = {}) => {
+			if (options.changed) deps.markChanged();
+			if (!deps.dirty()) return false;
+			deps.cancelScheduled();
+			deps.clearDirty();
+			const draftStamp = deps.draftStamp(), quiet = !!options.quiet;
+			if (deps.usePartitioned()) return deps.writePartitioned({
+				quiet,
+				draftStamp
+			});
+			let raw;
+			try {
+				raw = deps.serialize();
+			} catch {
+				deps.markDirty();
+				if (!quiet) deps.markSaved("lỗi lưu cục bộ", "Không thể tạo snapshot");
+				return false;
+			}
+			const localSaved = deps.writeLocal(raw, deps.now(), quiet), mirrored = deps.mirror(raw);
+			if ((localSaved || mirrored) && !deps.needsCloud()) deps.clearDraftThrough(draftStamp);
+			if (localSaved || mirrored) deps.resetFailures();
+			if (!localSaved && !mirrored) {
+				deps.markDirty();
+				deps.incrementFailures();
+				deps.retry();
+			}
+			if (!localSaved && mirrored && !quiet) deps.markSaved("đã lưu dự phòng", "IndexedDB");
+			return localSaved || mirrored;
+		};
+		return Object.freeze({ persist });
+	}
+	//#endregion
+	//#region src/application/storage/storage-lifecycle-service.ts
+	function createStorageLifecycleService(deps) {
+		const adopt = (value) => {
+			const sanitized = deps.sanitize(value), normalized = deps.normalize(sanitized);
+			deps.assertInvariants(normalized);
+		};
+		const load = () => deps.boot.load();
+		const loadBootState = () => deps.boot.loadBootState();
+		const hydratePartitioned = () => deps.hydrate();
+		const restoreFromIndexedDb = () => deps.restore();
+		return Object.freeze({
+			adopt,
+			load,
+			loadBootState,
+			hydratePartitioned,
+			restoreFromIndexedDb
+		});
+	}
+	//#endregion
 	//#region src/application/sync/firebase-local-store-service.ts
 	function createFirebaseLocalStoreService(deps) {
 		const store = (state) => {
@@ -4187,6 +4793,24 @@
 		return { prepare };
 	}
 	//#endregion
+	//#region src/application/lis/lis-gateway-command.ts
+	function createLisGatewayCommand(deps) {
+		const apply = async (settings) => {
+			deps.store(settings);
+			deps.clearToken();
+			if (!settings.enabled) {
+				deps.disable();
+				return { status: "disabled" };
+			}
+			deps.start();
+			return {
+				status: "pulled",
+				result: await deps.pull()
+			};
+		};
+		return Object.freeze({ apply });
+	}
+	//#endregion
 	//#region src/application/settings/lab-profile-service.ts
 	function createLabProfileService(cleanText, brandProfile) {
 		const updateLab = (current, input) => ({
@@ -4215,6 +4839,73 @@
 			updateLogo,
 			clearLogo
 		};
+	}
+	//#endregion
+	//#region src/application/settings/settings-profile-command.ts
+	function createSettingsProfileCommand(deps) {
+		const lab = () => deps.current() || {};
+		const persist = () => {
+			deps.save();
+			deps.renderBrand();
+			deps.render();
+		};
+		const saveLab = (input) => {
+			deps.set(deps.profile.updateLab(lab(), input));
+			deps.save();
+		};
+		const updateDraft = (input) => deps.set(deps.profile.updateBrand(lab(), input));
+		const saveBrand = (input) => {
+			updateDraft(input);
+			persist();
+		};
+		const saveLogo = (input, logoData) => {
+			updateDraft(input);
+			deps.set(deps.profile.updateLogo(lab(), logoData));
+			persist();
+		};
+		const clearLogo = () => {
+			deps.set(deps.profile.clearLogo(lab()));
+			persist();
+		};
+		return Object.freeze({
+			saveLab,
+			saveBrand,
+			saveLogo,
+			clearLogo,
+			updateDraft
+		});
+	}
+	//#endregion
+	//#region src/application/settings/settings-firebase-command.ts
+	function createSettingsFirebaseCommand(deps) {
+		const connect = async (plan) => {
+			if (!deps.available()) throw new Error("Chưa tải được Firebase Authentication.");
+			await deps.ensureApp(plan.config);
+			await deps.persist();
+			await deps.signIn(plan.email, plan.password);
+			deps.store(plan);
+			deps.disconnect();
+			deps.connected(plan);
+			deps.clearPassword();
+			await deps.init();
+			if (deps.hasRemote()) {
+				if (await deps.remoteExists()) return;
+				deps.remoteReady();
+				await deps.sync();
+			}
+		};
+		const clear = async () => {
+			deps.clearStore();
+			deps.disconnect();
+			try {
+				await deps.signOut();
+			} catch (error) {}
+			deps.local();
+		};
+		return Object.freeze({
+			connect,
+			clear
+		});
 	}
 	//#endregion
 	//#region src/application/sync/firebase-settings-service.ts
@@ -5285,6 +5976,7 @@
 			deps.cusumMemo().clear();
 			attempt(() => deps.cusumCache()?.clear());
 			deps.resetDerivedIndex();
+			deps.resetQcDerivedIndex();
 			attempt(deps.resetStatus);
 			attempt(() => deps.invalidateWestgardWorker());
 			attempt(() => deps.invalidateActionCaches());
@@ -15074,25 +15766,38 @@
 	root.qcEntryColumnPoints = selectEntryColumnPoints;
 	root.syncCanon = syncCanon;
 	root.syncedShape = syncedShape;
+	root.syncedStatesEqual = syncedStatesEqual;
 	root.syncJsonMap = syncJsonMap;
 	root.mergeSyncArray = mergeSyncArray;
 	root.mergeSyncBranch = mergeSyncBranch;
 	root.uniqueSyncUsers = uniqueSyncUsers;
-	var syncConfig = root.fbSyncMergeConfig;
-	if (syncConfig) {
-		root.syncSnapshot = createSyncSnapshot(syncConfig.top, syncJsonMap);
-		root.syncStateMerge = createSyncStateMerge(syncConfig);
+	root.installSyncServices = () => {
+		const codec = root.syncValueCodec || createSyncValueCodec(), lists = new Set(FIREBASE_SYNC_LISTS), snapshot = createSyncSnapshot(FIREBASE_SYNC_TOP, syncJsonMap), merge = createSyncStateMerge({
+			clone: codec.clone,
+			snap: snapshot,
+			top: FIREBASE_SYNC_TOP,
+			lists,
+			array: (local, remote, base, deletes) => mergeSyncArray(local, remote, base, deletes).map(codec.clone),
+			branch: mergeSyncBranch,
+			cloud: codec.cloudValue
+		});
+		root.syncSnapshot = snapshot;
+		root.syncStateMerge = merge;
 		root.syncUpdateBuilder = createSyncUpdateBuilder({
-			...syncConfig,
-			snapshot: root.syncSnapshot
+			top: FIREBASE_SYNC_TOP,
+			snapshot
 		});
 		root.syncFirstConnectMerge = createFirstConnectMerge({
-			...syncConfig,
-			merge: root.syncStateMerge,
+			top: FIREBASE_SYNC_TOP,
+			lists,
+			cloud: codec.cloudValue,
+			merge,
 			uniqueUsers: uniqueSyncUsers
 		});
-		root.syncHasContent = (source) => hasSyncContent(source, syncConfig.contentKeys);
-	}
+		root.syncHasContent = (source) => hasSyncContent(source, FIREBASE_SYNC_CONTENT_KEYS);
+		root.syncCompareKeys = FIREBASE_SYNC_COMPARE_KEYS;
+	};
+	root.installSyncServices();
 	root.syncRetryScheduler = createSyncRetryScheduler({
 		setTimeout: (fn, delay) => globalThis.setTimeout(fn, delay),
 		clearTimeout: (timer) => globalThis.clearTimeout(timer)
@@ -15242,6 +15947,51 @@
 			scheduleLocalRetry();
 			if (!input.quiet) markSaved("lá»—i lÆ°u cá»¥c bá»™", "KhÃ´ng thá»ƒ ghi IndexedDB phÃ¢n vÃ¹ng");
 		}
+	});
+	root.storageSnapshotService = createStorageSnapshotService({
+		markChanged: () => {
+			lsRevision++;
+			lsDirty = true;
+			lsFullDirty = true;
+		},
+		dirty: () => lsDirty,
+		cancelScheduled: () => cancelLocalSaveSchedule(),
+		clearDirty: () => {
+			lsDirty = false;
+		},
+		draftStamp: () => sigmaDraftStamp(),
+		usePartitioned: () => typeof LocalStore !== "undefined" && LocalStore.supported() && typeof LocalStore.writePartitioned === "function",
+		writePartitioned: (input) => root.partitionedSnapshotWriter.write({
+			state,
+			slot: partitionSlot,
+			localLoadStatus,
+			fullDirty: lsFullDirty,
+			dirtyTestIds: [...lsDirtyTestIds],
+			streak: lsIncrementalStreak,
+			lastFull: lsLastFullSaveAt,
+			now: Date.now(),
+			maxIncrementals: LS_FULL_ROTATE_MAX_INCREMENTALS,
+			maxMs: LS_FULL_ROTATE_MAX_MS,
+			localDraftStamp: input.draftStamp,
+			quiet: input.quiet
+		}),
+		serialize: () => serializeStateForStorage(),
+		writeLocal: (raw, savedAt, quiet) => root.localStorageSnapshotWriter.write(raw, savedAt, quiet),
+		mirror: (raw) => mirrorIndexedDb(raw),
+		needsCloud: () => sigmaDraftNeedsCloud(),
+		clearDraftThrough: (stamp) => clearSigmaDraftThrough(stamp),
+		resetFailures: () => {
+			lsSaveFailures = 0;
+		},
+		markDirty: () => {
+			lsDirty = true;
+		},
+		incrementFailures: () => {
+			lsSaveFailures++;
+		},
+		retry: () => scheduleLocalRetry(),
+		markSaved: (label, detail) => markSaved(label, detail),
+		now: () => Date.now()
 	});
 	root.saveService = createSaveService({
 		plan: (options) => saveCommandPlan(options),
@@ -15508,7 +16258,7 @@
 			if (fbHasLocalChanges()) scheduleFbPush();
 		}
 	});
-	if (typeof root.fbHandleValue === "function" && typeof confirmDialog === "function") root.firebaseConflictDialogService = createFirebaseConflictDialogService(confirmDialog);
+	if (typeof root.fbHandleValue === "function") root.firebaseConflictDialogService = createFirebaseConflictDialogService((options) => globalThis.confirmDialog(options));
 	if (typeof root.setCloudStatus === "function") root.firebaseCloudStatusPresentation = createFirebaseCloudStatusPresentation((id) => document.getElementById(id));
 	if (typeof root.markSaved === "function") root.firebaseSaveStatusService = createFirebaseSaveStatusService((id) => document.getElementById(id));
 	if (typeof root.remoteRenderUnsafe === "function") root.firebaseRemoteRenderSafetyService = createFirebaseRemoteRenderSafetyService({
@@ -15573,7 +16323,75 @@
 		modalCloseButton: (action) => root.modalCloseButton(action)
 	});
 	root.lisSettingsService = createLisSettingsService((value) => root.lisNormalizeGatewayUrl(value));
+	root.LisGatewayCommand = createLisGatewayCommand({
+		store: (settings) => localStorage.setItem(LIS_GATEWAY_STORAGE_KEY, JSON.stringify(settings)),
+		clearToken: () => {
+			const input = document.getElementById("lisGatewayToken");
+			if (input) input.value = "";
+		},
+		disable: () => {
+			const runtime = root.lisGatewayRuntime;
+			clearInterval(runtime.pollT);
+			runtime.pollT = null;
+			runtime.pending = [];
+			runtime.unresolved = [];
+			root.lisGatewaySetStatus("off", "Đã tắt");
+		},
+		start: () => root.lisGatewayStart(),
+		pull: () => root.lisGatewayPull({ manual: true })
+	});
 	root.labProfileService = createLabProfileService((value, limit) => root.QCCore.cleanText(value, limit), (value) => root.settingsBrandProfile(value));
+	root.SettingsProfileCommand = createSettingsProfileCommand({
+		current: () => state.lab || {},
+		set: (lab) => {
+			state.lab = lab;
+		},
+		profile: root.labProfileService,
+		save: () => save({ clearDerived: false }),
+		renderBrand: () => renderBrand(),
+		render: () => rerender()
+	});
+	root.SettingsFirebaseCommand = createSettingsFirebaseCommand({
+		available: () => typeof firebase !== "undefined" && typeof firebase.auth === "function",
+		ensureApp: (cfg) => ensureFirebaseApp(cfg),
+		persist: () => firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL),
+		signIn: (email, password) => firebase.auth().signInWithEmailAndPassword(email, password),
+		store: (plan) => localStorage.setItem("qclab_fb", JSON.stringify({
+			labCode: plan.labCode,
+			email: plan.email,
+			anonymous: false,
+			config: plan.config
+		})),
+		disconnect: () => fbDisconnect(),
+		connected: (plan) => {
+			setCloudStatus(plan.email + " · " + plan.labCode, true);
+		},
+		clearPassword: () => {
+			const input = document.getElementById("fbPassword");
+			if (input) input.value = "";
+		},
+		init: () => initFirebase(),
+		hasRemote: () => !!fb.ref,
+		remoteExists: async () => {
+			if ((await fb.ref.once("value")).exists()) {
+				markSaved("đã kết nối", "Đã tải dữ liệu từ Firebase");
+				return true;
+			}
+			return false;
+		},
+		remoteReady: () => {
+			fb.ready = true;
+			fb.initialized = true;
+		},
+		sync: () => root.syncNow(),
+		clearStore: () => localStorage.removeItem("qclab_fb"),
+		signOut: () => typeof firebase !== "undefined" && typeof firebase.auth === "function" ? firebase.auth().signOut() : Promise.resolve(),
+		local: () => {
+			fb.authUser = null;
+			setCloudStatus("Đang chạy cục bộ", false);
+			markSaved("đã lưu cục bộ", "Đã ngắt Firebase");
+		}
+	});
 	root.firebaseSettingsService = createFirebaseSettingsService((value) => root.firebaseConfigParser(value));
 	root.settingsBrandPreviewHtml = createBrandPreviewHtml((value) => root.esc(value), (value) => root.escAttr(value));
 	root.settingsUnitProfileHtml = createUnitProfileHtml({
@@ -15618,6 +16436,17 @@
 		supported: () => typeof indexedDB !== "undefined",
 		key: (slot, type, id) => root.localPartitionHelpers ? root.localPartitionHelpers.key(slot, type, id) : "partition:" + slot + ":" + type + (id == null ? "" : ":" + id),
 		keys: (manifests) => root.localClearKeys(manifests)
+	});
+	root.localStoreService = createLocalStoreService({
+		indexedDbAvailable: () => typeof indexedDB !== "undefined",
+		get: (key) => root.indexedDbRecordService ? root.indexedDbRecordService.get(key) : Promise.resolve(null),
+		put: (record) => root.indexedDbRecordService ? root.indexedDbRecordService.put(record) : Promise.resolve(false),
+		remove: (key) => root.indexedDbRecordService ? root.indexedDbRecordService.delete(key) : Promise.resolve(false),
+		stateRecord: (value) => root.localSnapshotRecord.state(value),
+		serializedRecord: (value) => root.localSnapshotRecord.serialized(value),
+		writePartitioned: (input) => root.partitionedIndexedDbWriteService.write(input),
+		readPartitioned: (slot, get) => root.partitionedIndexedDbReadService.read(slot, get),
+		clear: (get, remove) => root.indexedDbClearService.clear(get, remove)
 	});
 	root.passwordPolicyError = passwordPolicyError;
 	root.passwordChangeError = passwordChangeError;
@@ -15668,26 +16497,26 @@
 	root.reagentSelectOptionsHtml = createReagentSelectOptionsHtml();
 	root.reagentResultHtml = createReagentResultHtml();
 	root.reagentPairRowHtml = createReagentPairRowHtml();
-	if (typeof StateStorageLegacy !== "undefined") root.storageBootService = createStorageBootService({
+	root.storageBootService = createStorageBootService({
 		partitionedSupported: () => typeof LocalStore !== "undefined" && LocalStore.supported(),
 		readBootRecord: () => localStorage.getItem("qclab_boot"),
 		discardBootRecord: () => localStorage.removeItem("qclab_boot"),
 		activatePartitionShell: (shell, slot) => {
-			adoptValidatedState(shell);
+			globalThis.adoptValidatedState(shell);
 			partitionSlot = slot;
 			localLoadStatus = "partition-shell";
-			storageHydrationPromise = hydratePartitionedState();
+			storageHydrationPromise = globalThis.hydratePartitionedState();
 		},
 		loadLegacy: () => root.localStorageLoadService.load(),
 		localLoadStatus: () => localLoadStatus,
-		recoverPendingSigmaDraft,
-		restoreFromIndexedDb
+		recoverPendingSigmaDraft: () => globalThis.recoverPendingSigmaDraft(),
+		restoreFromIndexedDb: () => globalThis.restoreFromIndexedDb()
 	});
-	if (typeof StateStorageLegacy !== "undefined") root.indexedDbRecoveryService = createIndexedDbRecoveryService({
+	root.indexedDbRecoveryService = createIndexedDbRecoveryService({
 		supported: () => typeof LocalStore !== "undefined" && LocalStore.supported(),
 		readPartitioned: () => typeof LocalStore.readPartitioned === "function" ? LocalStore.readPartitioned() : Promise.resolve(null),
 		readLegacy: () => LocalStore.read(),
-		adopt: (value) => adoptValidatedState(value),
+		adopt: (value) => globalThis.adoptValidatedState(value),
 		acceptPartitioned: (record) => {
 			mem = state;
 			partitionSlot = String(record.slot || "");
@@ -15722,10 +16551,10 @@
 			if (raw) startupProblem.raw = raw;
 		}
 	});
-	if (typeof StateStorageLegacy !== "undefined") root.partitionHydrationService = createPartitionHydrationService({
+	root.partitionHydrationService = createPartitionHydrationService({
 		read: () => LocalStore.readPartitioned(),
-		adopt: (value) => adoptValidatedState(value),
-		recoverPendingSigmaDraft,
+		adopt: (value) => globalThis.adoptValidatedState(value),
+		recoverPendingSigmaDraft: () => globalThis.recoverPendingSigmaDraft(),
 		accept: (record) => {
 			mem = state;
 			partitionSlot = String(record.slot || "");
@@ -15740,6 +16569,18 @@
 				message: error && error.message ? error.message : "KhÃ´ng thá»ƒ táº£i cÃ¡c phÃ¢n vÃ¹ng dá»¯ liá»‡u QC."
 			};
 		}
+	});
+	root.storageLifecycleService = createStorageLifecycleService({
+		sanitize: (value) => root.stateAdoptionService.sanitize(value),
+		normalize: (value) => {
+			state = value;
+			ensureShape({ sanitized: true });
+			return state;
+		},
+		assertInvariants: (value) => root.stateAdoptionService.assertInvariants(value),
+		boot: root.storageBootService,
+		hydrate: () => root.partitionHydrationService.hydrate(),
+		restore: () => root.indexedDbRecoveryService.restore()
 	});
 	root.indexedDbMirrorService = createIndexedDbMirrorService({
 		supported: () => typeof LocalStore !== "undefined" && LocalStore.supported(),
@@ -15892,9 +16733,9 @@
 		protocol: (action) => root.actionProtocolSummary(action),
 		approval: (action) => root.actionApprovalLabel(action)
 	});
-	var legacyDerivedCacheState = root.legacyDerivedCacheState;
-	if (legacyDerivedCacheState) root.derivedCacheInvalidation = createDerivedCacheInvalidation({
-		...legacyDerivedCacheState,
+	root.installDerivedCacheInvalidation = (legacy) => root.derivedCacheInvalidation = createDerivedCacheInvalidation({
+		...legacy,
+		resetQcDerivedIndex: () => root.qcDerivedIndex?.clear(),
 		pointCache: () => root.qcPointCache,
 		westgardCache: () => root.westgardMemoCache,
 		acceptedCache: () => root.qcAcceptedMemoCache,
@@ -15902,6 +16743,8 @@
 		invalidateWestgardWorker: (testId) => root.invalidateWestgardWorker(testId),
 		invalidateActionCaches: (testId) => root.invalidateActionCaches(testId)
 	});
+	var legacyDerivedCacheState = root.legacyDerivedCacheState;
+	if (legacyDerivedCacheState) root.installDerivedCacheInvalidation(legacyDerivedCacheState);
 	root.qcBasicFormat = createBasicFormat();
 	root.westgardRulePolicy = createWestgardRulePolicy({
 		rules: root.QCCore.WG_RULES,
@@ -16055,6 +16898,10 @@
 		actionIcon: (type) => root.reportActionIcon(type)
 	});
 	root.reportRangePickerHtml = createReportRangePickerHtml({ dateBox: (id, value, placeholder, attrs) => root.dateBox(id, value, placeholder, attrs) });
+	root.ReportPeriodCommand = createReportPeriodCommand({
+		lock: (s, input) => root.PeriodService.lock(s, input),
+		unlock: (s, input) => root.PeriodService.unlock(s, input)
+	});
 	root.ActionCurrentIssues = createActionCurrentIssues({
 		operationalTests: () => typeof globalThis.operationalTests === "function" ? globalThis.operationalTests() : [],
 		activeWestgard: (test) => globalThis.activeWestgard(test),
@@ -17109,6 +17956,54 @@
 	root.prepareBackupImport = backupService.prepareBackupImport;
 	root.backupSummary = backupService.backupSummary;
 	root.inspectBackupText = backupService.inspectBackupText;
+	root.BackupRestoreCommand = createBackupRestoreCommand({
+		current: () => state,
+		replace: (value) => {
+			state = value;
+		},
+		normalize: () => ensureShape({ sanitized: true }),
+		invariantErrors: () => root.QCCore.validateStateInvariants(state, { sanitized: true }),
+		clearSigmaDraft: () => {
+			if (typeof clearSigmaDraftThrough === "function") clearSigmaDraftThrough(Number.MAX_SAFE_INTEGER);
+		},
+		ensureAdmin: () => ensureAdmin(),
+		setActivity: (activity) => {
+			state.activity = activity;
+		},
+		logImported: (fileName) => logAct("Nhập backup", "Nhập dữ liệu đã kiểm tra từ file " + fileName, "Dữ liệu"),
+		save: () => save({}),
+		render: () => rerender()
+	});
+	root.BackupExportCommand = createBackupExportCommand({
+		current: () => state,
+		log: () => logAct("Xuất backup", "Xuất toàn bộ dữ liệu JSON có checksum", "Dữ liệu"),
+		save: () => save({ clearDerived: false }),
+		create: (value) => root.createBackupPackage(value),
+		confirmOversized: (bytes, detail) => root.confirmOversizedBackup(bytes, detail),
+		confirm: (dialog) => root.confirmDialog(dialog),
+		download: (name, text) => root.downloadBackupText(name, text),
+		mark: (bytes) => root.markBackupDone(bytes),
+		update: () => root.updateBackupBanner()
+	});
+	root.ResetOperationalDataCommand = createResetOperationalDataCommand({
+		current: () => state,
+		clearPersistence: () => {
+			localStorage.removeItem("qclab");
+			localStorage.removeItem("qclab_boot");
+			if (typeof clearSigmaDraftThrough === "function") clearSigmaDraftThrough(Number.MAX_SAFE_INTEGER);
+			if (typeof LocalStore !== "undefined") LocalStore.clear().catch(() => {});
+		},
+		blank: (users) => root.blankAppStateFactory(users),
+		replace: (value) => {
+			state = value;
+		},
+		normalize: () => ensureShape(),
+		ensureAdmin: () => ensureAdmin(),
+		log: () => logAct("Xóa sạch dữ liệu test", "Đưa app về trạng thái trắng, giữ người dùng và nhật ký audit", "Dữ liệu"),
+		save: () => save({}),
+		render: () => rerender()
+	});
+	root.UserManagementCommand = createUserManagementCommand();
 	var lisRuntime = createLisGatewayRuntime();
 	var lisClient;
 	var lisStorage = typeof localStorage !== "undefined" ? localStorage : { getItem: () => null };
@@ -17180,6 +18075,60 @@
 		save: (s, i) => root.ManageConfigService.saveLotGroup(s, i),
 		remove: (s, i) => root.ManageConfigService.removeLotGroup(s, i),
 		stop: (s, i) => root.ManageConfigService.stopLotGroup(s, i)
+	});
+	root.ManageLotGroupActivationCommand = createManageLotGroupActivationCommand({
+		findGroup: (s, id) => (s.lotGroups || []).find((g) => g.id === id) || null,
+		lotsOfGroup: (s, g) => (g.lotIds || []).map((lotId) => (s.qcLots || []).find((lot) => lot.id === lotId)).filter(Boolean),
+		candidatesFor: (s, _g, lots) => root.ManageConfigService.lotGroupActivationCandidates(s.tests || [], lots, (test, level, lotId, lotNo) => globalThis.lotTargetSnapshot(test, level, lotId, lotNo)),
+		backfillPoints: (s, candidate) => root.ManageConfigService.targetPickBackfillPoints((s.data || {})[candidate.t.id] || [], candidate.t, candidate.lot, candidate.pick),
+		lockedPoints: (s, points) => root.PeriodService.lockedPoints(s, points),
+		applyActivation: (input) => root.ManageConfigService.applyLotGroupActivation({
+			...input,
+			applyTarget: (test, lot, pick, effectiveFrom, note) => globalThis.applyTargetPick(test, lot, pick, effectiveFrom, note),
+			groupsForLot: (lotId) => globalThis.groupsOfLot(lotId),
+			groupInUse: (group) => globalThis.lotGroupInUse(group)
+		})
+	});
+	root.ManageLotTransitionCommand = createManageLotTransitionCommand({
+		validate: (s, i) => root.ManageConfigService.validateLotTransition(s, {
+			...i,
+			switchesLot: root.ManageConfigService.transitionSwitchesLot
+		}),
+		prepareData: (i) => root.ManageConfigService.prepareLotTransitionData(i),
+		inspect: (s, tr) => root.ManageConfigService.inspectAcceptedLotTransition(s, tr),
+		save: (s, i) => root.ManageConfigService.saveLotTransition(s, i),
+		applyAccepted: (tr) => globalThis.applyAcceptedLotTransitionToConfig(tr),
+		syncDepletion: (s) => root.ManageConfigService.syncLotDepletion(s),
+		removal: (s, i) => root.ManageConfigService.lotTransitionRemoval(s, {
+			...i,
+			switchesLot: root.ManageConfigService.transitionSwitchesLot
+		}),
+		removeRecord: (s, i) => root.ManageConfigService.removeLotTransition(s, {
+			...i,
+			switchesLot: root.ManageConfigService.transitionSwitchesLot
+		}),
+		findLot: (s, id) => (s.qcLots || []).find((lot) => lot.id === id),
+		lotLabel: (id) => globalThis.lotLabel(id),
+		panelName: (id) => globalThis.panelName(id),
+		statusText: (status) => globalThis.manageTransitionStatusPresentation(status).text,
+		testName: (test) => globalThis.testDisplayName(test)
+	});
+	root.ManageLotCommand = createManageLotCommand({
+		validate: (s, i) => root.ManageConfigService.validateLot(s, i),
+		pointsToRename: (s, level, lotNo) => root.ManageConfigService.lotPointsToRename(s, level, lotNo),
+		lockedPoints: (s, points) => root.PeriodService.lockedPoints(s, points),
+		save: (s, i) => root.ManageConfigService.saveLot(s, {
+			...i,
+			renamePoints: (level, oldLotNo, newLotNo) => root.ManageConfigService.renameLotPoints(s, level, oldLotNo, newLotNo)
+		}),
+		removal: (s, i) => root.ManageConfigService.lotRemoval(s, {
+			...i,
+			switchesLot: root.ManageConfigService.transitionSwitchesLot
+		}),
+		removeRecord: (s, i) => root.ManageConfigService.removeLot(s, {
+			...i,
+			switchesLot: root.ManageConfigService.transitionSwitchesLot
+		})
 	});
 	root.TeaReferenceService = createTeaReferenceService({
 		key: (value) => globalThis.teaRefName(value),

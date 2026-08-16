@@ -18,7 +18,7 @@ const fakeIndexedDb = `
 
 (async()=>{
   {
-    const ctx = loadSandbox(['modules/local-store.js']);
+    const ctx = loadSandbox(['core.js','modules/state.js','modules/qc-domain.js','modules/local-store.js','modules/state-storage.js']);
     const result = await run(ctx, `
       ${fakeIndexedDb}
       (async()=>{const written=await LocalStore.write({version:1,name:'QC'});const saved=await LocalStore.read();const serialized=await LocalStore.writeSerialized('{"version":2,"name":"QC JSON"}');const savedJson=await LocalStore.read();__db.onversionchange();const reopened=await LocalStore.read();const cleared=await LocalStore.clear();const empty=await LocalStore.read();return{written,saved,serialized,savedJson,reopened,cleared,empty,openCount:__openCount};})()
@@ -38,14 +38,14 @@ const fakeIndexedDb = `
     const result = await run(ctx, `
       ${fakeIndexedDb}
       localStorage={getItem:function(){return null;},setItem:function(){},removeItem:function(){}};
-      (async()=>{var captured='';LocalStore.writeSerialized=async function(raw){captured=raw;};state={lab:{name:'Mirror'}};var mirrored=mirrorIndexedDb('{"snapshot":1}');await Promise.resolve();return{mirrored,captured,service:typeof indexedDbMirrorService};})()
+      (async()=>{state={lab:{name:'Mirror'}};var mirrored=mirrorIndexedDb('{"snapshot":1}');await new Promise(resolve=>setTimeout(resolve,0));var saved=await LocalStore.read();return{mirrored,captured:saved&&saved.json||'',service:typeof indexedDbMirrorService};})()
     `);
     assert.deepEqual(JSON.parse(JSON.stringify(result)), { mirrored: true, captured: '{"snapshot":1}', service: 'object' },
-      'legacy storage bridge writes fallback snapshots through the TypeScript IndexedDB mirror');
+      'storage bridge writes snapshots through the TypeScript IndexedDB mirror');
   }
 
   {
-    const ctx = loadSandbox(['modules/local-store.js']);
+    const ctx = loadSandbox(['core.js','modules/state.js','modules/qc-domain.js','modules/local-store.js','modules/state-storage.js']);
     const result = await run(ctx, `
       ${fakeIndexedDb}
       (async()=>{
@@ -131,7 +131,7 @@ const fakeIndexedDb = `
   }
 
   {
-    const ctx = loadSandbox(['modules/local-store.js']);
+    const ctx = loadSandbox(['core.js','modules/state.js','modules/qc-domain.js','modules/local-store.js','modules/state-storage.js']);
     const result = await run(ctx, `(async()=>({supported:LocalStore.supported(),read:await LocalStore.read(),write:await LocalStore.write({}),clear:await LocalStore.clear()}))()`);
     assert.deepEqual(JSON.parse(JSON.stringify(result)), { supported: false, read: null, write: false, clear: false });
   }

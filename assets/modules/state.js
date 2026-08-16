@@ -25,158 +25,40 @@ let state={lab:/** @type {any} */({name:'',dept:'',address:''}),tests:[],machine
 let mem=null,pointsCache=new Map(),pointsIndexCache=new Map(),pointsLotCache=new Map(),wgMemo=new Map(),acceptedMemo=new Map(),cusumMemo=new Map(),derivedIndex=null,startupProblem=null;
 /* Cầu nối cho service TS: các Map này là lexical global của script cổ, không thể được
    bundle ES module đọc trực tiếp. Chỉ cấp đúng thao tác invalidation cần thiết. */
-globalThis.legacyDerivedCacheState={pointCaches:()=>[pointsCache,pointsIndexCache,pointsLotCache,cusumMemo],westgardMemo:()=>wgMemo,acceptedMemo:()=>acceptedMemo,cusumMemo:()=>cusumMemo,resetDerivedIndex:()=>{derivedIndex=null;},resetStatus:()=>{statusMemo=new Map();},clearStatus:testId=>{if(statusMemo&&statusMemo.delete)statusMemo.delete(testId);}};
-function ensureShape(opts={}){let previousSchema;if(globalThis.qcStateFoundation){const normalized=globalThis.qcStateFoundation(state,opts,{defaults:()=>({lab:/** @type {any} */({name:'',dept:'',address:''}),tests:[],machines:["Máy A"],instruments:[],assayGroups:[],qcPanels:[],lotTransitions:[],lotGroups:[],qcLots:[],data:{},actions:[],activity:[],activityAnchor:'',users:[],reagentTests:[],reagentOperators:[],reagentSampleTypes:['Mẫu bệnh nhân','Mẫu nội kiểm (IQC)','Mẫu ngoại kiểm (EQA)'],sigmaData:{},periodLocks:[],teaRefs:[],teaRegistryVersion:TEA_REFERENCE_SCHEMA_VERSION,westgardRules:{...WG_DEFAULT}}),sanitize:value=>QCCore.sanitizeBackup(value),schemaVersion:STATE_SCHEMA_VERSION,teaRegistryVersion:TEA_REFERENCE_SCHEMA_VERSION,westgardDefaults:WG_DEFAULT});state=normalized.state;previousSchema=normalized.previousSchema;}else{previousSchema=Number(state&&state.schemaVersion||1);const merged={lab:/** @type {any} */({name:'',dept:'',address:''}),tests:[],machines:["Máy A"],instruments:[],assayGroups:[],qcPanels:[],lotTransitions:[],lotGroups:[],qcLots:[],data:{},actions:[],activity:[],activityAnchor:'',users:[],reagentTests:[],reagentOperators:[],reagentSampleTypes:['Mẫu bệnh nhân','Mẫu nội kiểm (IQC)','Mẫu ngoại kiểm (EQA)'],sigmaData:{},periodLocks:[],teaRefs:[],teaRegistryVersion:TEA_REFERENCE_SCHEMA_VERSION,westgardRules:{...WG_DEFAULT},...(state||{})};state=opts.sanitized?merged:QCCore.sanitizeBackup(merged);
-  if(previousSchema<2){state.periodLocks=Array.isArray(state.periodLocks)?state.periodLocks:[];}
-  /* Nhánh archiveRegistry của schema 6 đã bị gỡ (2026-08-01) cùng chức năng lưu trữ theo
-     năm. Phải XÓA TƯỜNG MINH ở đây: sanitizeBackup() chỉ ghi đè các trường có trong danh
-     sách của nó chứ không bỏ trường lạ, nên mảng cũ sẽ bám theo mọi lần lưu và mọi file
-     backup mãi mãi dù không ai đọc tới. Giữ schemaVersion ở 6, không hạ về 5 — vài state
-     dev đã đóng dấu 6, hạ xuống sẽ làm validateStateInvariants() báo "schemaVersion cao
-     hơn phiên bản app hỗ trợ" ngay trên máy người phát triển. */
-  delete state.archiveRegistry;
-  /* KPI Dashboard đã bị gỡ; xóa cấu hình mục tiêu cũ để nó không tiếp tục bám theo
-     state, Firebase và các file backup dù không còn màn hình nào sử dụng. */
-  if(state.lab&&typeof state.lab==='object')delete state.lab.kpiTargets;
-  if(previousSchema<3||!state.teaRegistryVersion||state.teaRegistryVersion<TEA_REFERENCE_SCHEMA_VERSION)state.teaRegistryVersion=TEA_REFERENCE_SCHEMA_VERSION;
-  state.schemaVersion=STATE_SCHEMA_VERSION;
-  if(!state.westgardProfileVersion){state.westgardRules={...WG_DEFAULT};state.westgardProfileVersion=2;}}
-  if(globalThis.qcStateLifecycle)return globalThis.qcStateLifecycle(state,{ensureLab:ensureLabBrandShape,ensureConfiguration:ensureConfigurationShape,repairRanges:repairAppliedRangeLimits,ensureReagent:source=>{if(typeof ReagentComparisonService!=='undefined')ReagentComparisonService.ensureOne(source,{id:uid()});},reconcileSigma:reconcileSigmaLevelsWithLotGroups,reconcileTea:()=>{if(typeof sgReconcileAllTeaSnapshots==='function')sgReconcileAllTeaSnapshots();},normalizePointLots,pruneUnusedLevels:pruneUnusedTestLevels});
-  ensureLabBrandShape();
-  ensureConfigurationShape();
-  repairAppliedRangeLimits();
-  if(typeof ReagentComparisonService!=='undefined')ReagentComparisonService.ensureOne(state,{id:uid()});
-  reconcileSigmaLevelsWithLotGroups();
-  /* sigma.js load sau state.js nên chưa định nghĩa lúc parse — nhưng ensureShape()
-     chỉ thực sự CHẠY lúc boot()/merge Firebase/nhập backup, tức sau khi mọi
-     script đã nạp xong, nên gọi an toàn. Guard typeof phòng khi sandbox test chỉ
-     nạp state.js một mình (không có sigma.js). Đồng bộ TEa Sigma tại ĐÂY (mọi
-     cổng load/merge/import) thay vì để pageSigma() tự làm lúc render — xem
-     sgReconcileAllTeaSnapshots() trong sigma.js. */
-  if(typeof sgReconcileAllTeaSnapshots==='function')sgReconcileAllTeaSnapshots();
-  normalizePointLots();
-  pruneUnusedTestLevels();
-  state.tests.forEach(t=>t.levels.forEach(l=>{if(l.mfgMean==null){l.mfgMean=l.mean;l.mfgSd=l.sd;l.applied='mfg';}}));}
+globalThis.legacyDerivedCacheState={pointCaches:()=>[pointsCache,pointsIndexCache,pointsLotCache,cusumMemo],westgardMemo:()=>wgMemo,acceptedMemo:()=>acceptedMemo,cusumMemo:()=>cusumMemo,resetDerivedIndex:()=>{derivedIndex=null;},resetStatus:()=>{statusMemo=new Map();},clearStatus:testId=>{if(statusMemo&&statusMemo.delete)statusMemo.delete(testId);}};if(globalThis.installDerivedCacheInvalidation)globalThis.installDerivedCacheInvalidation(globalThis.legacyDerivedCacheState);
+function ensureShape(opts={}){const normalized=globalThis.qcStateFoundation(state,opts,{defaults:()=>({lab:/** @type {any} */({name:'',dept:'',address:''}),tests:[],machines:["Máy A"],instruments:[],assayGroups:[],qcPanels:[],lotTransitions:[],lotGroups:[],qcLots:[],data:{},actions:[],activity:[],activityAnchor:'',users:[],reagentTests:[],reagentOperators:[],reagentSampleTypes:['Mẫu bệnh nhân','Mẫu nội kiểm (IQC)','Mẫu ngoại kiểm (EQA)'],sigmaData:{},periodLocks:[],teaRefs:[],teaRegistryVersion:TEA_REFERENCE_SCHEMA_VERSION,westgardRules:{...WG_DEFAULT}}),sanitize:value=>QCCore.sanitizeBackup(value),schemaVersion:STATE_SCHEMA_VERSION,teaRegistryVersion:TEA_REFERENCE_SCHEMA_VERSION,westgardDefaults:WG_DEFAULT});state=normalized.state;return globalThis.qcStateLifecycle(state,{ensureLab:ensureLabBrandShape,ensureConfiguration:ensureConfigurationShape,repairRanges:repairAppliedRangeLimits,ensureReagent:source=>{if(typeof ReagentComparisonService!=='undefined')ReagentComparisonService.ensureOne(source,{id:uid()});},reconcileSigma:reconcileSigmaLevelsWithLotGroups,reconcileTea:()=>{if(typeof sgReconcileAllTeaSnapshots==='function')sgReconcileAllTeaSnapshots();},normalizePointLots,pruneUnusedLevels:pruneUnusedTestLevels});}
 /* Xóa mục Mức QC "ma": chưa từng gán lô, chưa từng có Mean, chưa có lịch sử
    Mean/SD và chưa có điểm QC nào — di sản của defaultAssayLevels() từng gán
    mặc định theo TOÀN BỘ mức lô đang có trong hệ thống (đã sửa ở
    manage-tests-actions.js), để lại các mục rỗng trên xét nghiệm không liên
    quan. Luôn giữ lại ít nhất 1 mức trên mỗi xét nghiệm — nếu lọc còn 0, giữ
    lại mục đầu tiên thay vì để mảng rỗng. */
-function pruneUnusedTestLevels(){
-  if(globalThis.qcLevelReconciliation)return globalThis.qcLevelReconciliation.pruneUnused(state);
-  let pruned=0;
-  (state.tests||[]).forEach(t=>{
-    const levels=Array.isArray(t.levels)?t.levels:[];
-    if(levels.length<=1)return;
-    const dataPoints=state.data&&state.data[t.id]||[];
-    /* sanitizeBackup() (chạy đầu ensureShape(), trước khi hàm này chạy) đã ép
-       mean/sd null thành 0 — kiểm tra sd>0 thay vì mean==null để nhận diện
-       đúng "chưa từng cấu hình" ở cả dạng thô (mean:null) lẫn dạng đã qua
-       sanitize (mean:0,sd:0), khớp đúng quy tắc SD>0 mới coi là dùng được. */
-    const isUnused=l=>!l.qcLotId&&!(Number.isFinite(+l.sd)&&+l.sd>0)&&(!Array.isArray(l.meanSdHistory)||!l.meanSdHistory.length)&&!dataPoints.some(p=>+p.level===+l.level);
-    let kept=levels.filter(l=>!isUnused(l));
-    if(!kept.length)kept=[levels[0]];
-    if(kept.length!==levels.length){pruned+=levels.length-kept.length;t.levels=kept;}
-  });
-  return pruned;
-}
+function pruneUnusedTestLevels(){return globalThis.qcLevelReconciliation.pruneUnused(state);}
 /* Các bản trước chỉ đổi Mean/SD khi áp dụng dải PXN nhưng để low/high của NSX
    trong cấu hình đang chạy. Tự chữa cả state cũ ở mọi cổng load/merge/import;
    chỉ chạm mức `applied:lab`, không thay giới hạn NSX hoặc cấu hình thủ công khác. */
-function repairAppliedRangeLimits(){return globalThis.qcRangeLimitRepair?globalThis.qcRangeLimitRepair(state):(()=>{let repaired=0;(state.tests||[]).forEach(t=>(t.levels||[]).forEach(l=>{if(l.applied!=='lab')return;const next=QCCore.limitsFromTarget(l.mean,l.sd,2);if(!next)return;if(l.low!==next.low||l.high!==next.high||l.rangeK!==2){l.low=next.low;l.high=next.high;l.rangeK=2;repaired++;}}));return repaired;})();}
+function repairAppliedRangeLimits(){return globalThis.qcRangeLimitRepair(state);}
 function uid(){return Math.random().toString(36).slice(2,9);}
 /* Đồng bộ mức Sigma với quan hệ lô ↔ nhóm lô. Nhóm "Đã dừng/Dự kiến" vẫn được tính
    là còn quan hệ để giữ lịch sử; chỉ mức có lô đã bị tháo khỏi MỌI nhóm mới bị gỡ.
    Khi xét nghiệm vẫn còn mức hợp lệ trong nhóm, xóa luôn mọi khóa Sigma mồ côi khác
    (kể cả dữ liệu cũ mà qcLotId đã bị xóa từ một phiên bản trước). */
-function reconcileSigmaLevelsWithLotGroups(){
-  if(globalThis.qcLevelReconciliation)return globalThis.qcLevelReconciliation.reconcileSigma(state);
-  const lotsById=new Map((state.qcLots||[]).filter(Boolean).map(l=>[String(l.id),l])),groupedLotIds=new Set();
-  (state.lotGroups||[]).filter(g=>g&&g.active!==false).forEach(g=>(g.lotIds||[]).forEach(id=>{const lot=lotsById.get(String(id));if(lot&&(!lot.groupId||String(lot.groupId)===String(g.id||'')))groupedLotIds.add(String(id));}));
-  let unlinked=0,pruned=0,tests=0;
-  (state.tests||[]).forEach(t=>{
-    const levels=Array.isArray(t.levels)?t.levels:[],valid=new Set(),orphaned=new Set();
-    levels.forEach(l=>{const key=String(+l.level);if(l.qcLotId&&groupedLotIds.has(l.qcLotId))valid.add(key);else if(l.qcLotId){orphaned.add(key);l.qcLotId='';l.lot='';l.exp='';unlinked++;}});
-    const pruneAllOutsideValid=valid.size>0;if(!pruneAllOutsideValid&&!orphaned.size)return;let changed=false;
-    const periods=state.sigmaData&&Array.isArray(state.sigmaData[t.id])?state.sigmaData[t.id]:[];periods.forEach(e=>{if(!e||!e.lv||typeof e.lv!=='object')return;Object.keys(e.lv).forEach(key=>{if((pruneAllOutsideValid&&!valid.has(String(+key)))||orphaned.has(String(+key))){delete e.lv[key];pruned++;changed=true;}});});
-    if(changed||orphaned.size)tests++;
-  });
-  return{unlinked,pruned,tests};
-}
+function reconcileSigmaLevelsWithLotGroups(){return globalThis.qcLevelReconciliation.reconcileSigma(state);}
 function ensureConfigurationShape(){
   const migrateLegacyLots=!state.configMigrationVersion;
   state.instruments=state.instruments||[];state.assayGroups=state.assayGroups||[];state.qcPanels=state.qcPanels||[];state.lotTransitions=state.lotTransitions||[];state.lotGroups=state.lotGroups||[];state.qcLots=state.qcLots||[];
-  if(globalThis.qcTestConfiguration)globalThis.qcTestConfiguration(state,migrateLegacyLots,{uid,searchText,teaKey:teaAnalyteKey,builtInMeta:teaAnalyteBuiltInMeta,metaById:teaAnalyteMetaById,meta:teaAnalyteMeta,dedupeHistory:dedupeLotTargetHistory});else{
-  (state.teaRefs||[]).forEach(r=>{if(!r.analyteId){const builtIn=teaAnalyteBuiltInMeta(r.name);r.analyteId=builtIn.analyteId||('custom-'+String(r.id||uid()).replace(/[^A-Za-z0-9_-]/g,'').slice(0,72));}const built=teaAnalyteMetaById(r.analyteId);if(built.analyteId){r.name=built.standardName;r.displayName=built.displayName;r.standardName=built.standardName;r.abbreviation=built.abbreviation;r.aliases=[...built.aliases];r.matrix=built.matrix;}});
-  (state.machines||[]).forEach(name=>{if(name&&!state.instruments.some(x=>searchText(x.name)===searchText(name)))state.instruments.push({id:uid(),name,manufacturer:'',model:'',serial:'',section:'',active:true});});
-  if(!state.instruments.length)state.instruments.push({id:uid(),name:'Máy A',manufacturer:'',model:'',serial:'',section:'',active:true});
-  state.machines=[...new Set(state.instruments.map(x=>x.name).filter(Boolean))];
-  state.tests.forEach(t=>{
-    let inst=state.instruments.find(x=>x.id===t.instrumentId)||state.instruments.find(x=>searchText(x.name)===searchText(t.machine));
-    if(!inst){inst={id:uid(),name:t.machine||'Máy A',manufacturer:'',model:'',serial:'',section:'',active:true};state.instruments.push(inst);}
-      t.instrumentId=inst.id;t.machine=inst.name;if(!t.section)t.section=inst.section||'';if(t.active==null)t.active=true;t.ruleActions=t.ruleActions||{};t.ruleScopes=t.ruleScopes||{};t.cusum=t.cusum||{on:false,k:0.5,h:4};
-    const ref=(state.teaRefs||[]).find(r=>t.analyteId&&r.analyteId===t.analyteId)||(state.teaRefs||[]).find(r=>teaAnalyteKey(r.name)===teaAnalyteKey(t.name)),naming=teaAnalyteMeta(t.name,ref);t.analyteId=t.analyteId||naming.analyteId||('local-'+String(t.id||uid()).replace(/[^A-Za-z0-9_-]/g,'').slice(0,73));const built=teaAnalyteMetaById(t.analyteId);if(built.analyteId){t.name=built.standardName;t.displayName=built.displayName;t.standardName=built.standardName;t.abbreviation=built.abbreviation;t.aliases=[...built.aliases];t.matrix=built.matrix;}else if(naming.standardName){t.displayName=t.displayName||naming.displayName;t.standardName=t.standardName||naming.standardName;t.abbreviation=t.abbreviation||naming.abbreviation;t.aliases=Array.isArray(t.aliases)&&t.aliases.length?t.aliases:naming.aliases;t.matrix=t.matrix||naming.matrix;}
-    t.levels.forEach(l=>{
-      let lot=state.qcLots.find(x=>x.id===l.qcLotId);
-      if(migrateLegacyLots&&!lot&&l.lot){
-        let group=state.lotGroups.find(g=>searchText(g.name)===searchText(t.name+' QC'));
-        if(!group){group={id:uid(),name:t.name+' QC',lotIds:[],manufacturer:'',material:'',catalog:'',note:'Tự động chuyển từ dữ liệu cũ',active:true};state.lotGroups.push(group);}
-        lot=state.qcLots.find(x=>x.groupId===group.id&&x.lotNo===l.lot&&+x.level===+l.level);
-        if(!lot){lot={id:uid(),groupId:group.id,lotNo:l.lot,level:l.level,exp:l.exp||'',opened:'',active:true,note:''};state.qcLots.push(lot);}
-        if(lot&&!group.lotIds.includes(lot.id))group.lotIds.push(lot.id);
-      }
-      if(lot){l.qcLotId=lot.id;l.lot=lot.lotNo;l.exp=lot.exp;}
-      l.meanSdHistory=Array.isArray(l.meanSdHistory)?l.meanSdHistory:[];
-      if(!l.meanSdHistory.length&&Number.isFinite(+l.mean)&&Number.isFinite(+l.sd)&&+l.sd>0)l.meanSdHistory.push({id:uid(),qcLotId:l.qcLotId||'',lot:l.lot||'',mean:+l.mean,sd:+l.sd,low:l.low==null?null:+l.low,high:l.high==null?null:+l.high,effectiveFrom:'',effectiveTo:l.exp||'',source:l.applied==='lab'?'lab':'mfg',note:'Tự động chuyển từ cấu hình hiện hành'});
-      dedupeLotTargetHistory(l);
-    });
-  });}
-  if(globalThis.qcConfigurationRelations){globalThis.qcConfigurationRelations(state,{uid,switchesLot:transitionSwitchesLot,applyAcceptedTransition:applyAcceptedLotTransitionToConfig,normalizeLotGroups,syncLotDepletion:syncLotDepletionFromTransitions});state.configMigrationVersion=1;return;}
-  if(!state.qcPanels.length&&state.assayGroups.length){
-    state.assayGroups.forEach(g=>{const first=state.tests.find(t=>(g.testIds||[]).includes(t.id));state.qcPanels.push({id:g.id||uid(),name:g.name||'Panel QC',instrumentId:first&&first.instrumentId||state.instruments[0].id,testIds:[...(g.testIds||[])],note:g.note||'Chuyển từ nhóm xét nghiệm cũ',active:g.active!==false});});
-  }
-  state.lotGroups.forEach(g=>{g.lotIds=Array.isArray(g.lotIds)?[...new Set(g.lotIds)].filter(id=>state.qcLots.some(l=>l.id===id)):[];});
-  state.qcLots.forEach(l=>{if(l.groupId){const g=state.lotGroups.find(x=>x.id===l.groupId);if(g&&!g.lotIds.includes(l.id))g.lotIds.push(l.id);}});
-  /* Chữa dữ liệu hỏng do groupId cũ (kể cả bản đã lưu trước fix): trong nhóm ĐANG
-     hoạt động, một lô đã bị chuyển tiếp (accepted) không được đứng cạnh chính lô
-     thay thế nó — chỗ của nó là nhóm lưu trữ. Nhóm active:false giữ nguyên lịch sử. */
-  {const retiredTo=new Map((state.lotTransitions||[]).filter(transitionSwitchesLot).map(x=>[String(x.fromLotId),String(x.toLotId)]));
-   state.lotGroups.forEach(g=>{if(g.active===false)return;g.lotIds=(g.lotIds||[]).filter(id=>{const to=retiredTo.get(String(id));return !(to&&(g.lotIds||[]).some(x=>String(x)===to));});});}
-  state.lotGroups.forEach(g=>{g.lotIds=[...new Set(g.lotIds||[])].filter(id=>state.qcLots.some(l=>l.id===id));});
-  state.qcLots.forEach(l=>{const g=state.lotGroups.find(x=>(x.lotIds||[]).includes(l.id));l.groupId=g?g.id:'';});
-  state.assayGroups.forEach(g=>{g.testIds=Array.isArray(g.testIds)?g.testIds.filter(id=>state.tests.some(t=>t.id===id)):[];});
-  state.qcPanels.forEach(p=>{if(!state.instruments.some(i=>i.id===p.instrumentId))p.instrumentId=state.instruments[0]&&state.instruments[0].id||'';p.testIds=Array.isArray(p.testIds)?p.testIds.filter(id=>state.tests.some(t=>t.id===id)):[];if(p.active==null)p.active=true;});
-  state.lotTransitions=state.lotTransitions.filter(x=>state.qcLots.some(l=>l.id===x.fromLotId)&&state.qcLots.some(l=>l.id===x.toLotId)&&(!x.panelId||state.qcPanels.some(p=>p.id===x.panelId)));
-  state.lotTransitions.filter(transitionSwitchesLot).forEach(applyAcceptedLotTransitionToConfig);
-  normalizeLotGroups();
-  syncLotDepletionFromTransitions();
-  state.configMigrationVersion=1;
+  globalThis.qcTestConfiguration(state,migrateLegacyLots,{uid,searchText,teaKey:teaAnalyteKey,builtInMeta:teaAnalyteBuiltInMeta,metaById:teaAnalyteMetaById,meta:teaAnalyteMeta,dedupeHistory:dedupeLotTargetHistory});
+  globalThis.qcConfigurationRelations(state,{uid,switchesLot:transitionSwitchesLot,applyAcceptedTransition:applyAcceptedLotTransitionToConfig,normalizeLotGroups,syncLotDepletion:syncLotDepletionFromTransitions});state.configMigrationVersion=1;
 }
 /* Lô "đã hết QC" được suy ra từ hồ sơ chuyển tiếp đã "Chấp nhận lô mới".
    Các trạng thái dự kiến/chạy song song chỉ để theo dõi, chưa khóa lô cũ. */
-function transitionSwitchesLot(tr){return typeof ManageConfigService!=='undefined'?ManageConfigService.transitionSwitchesLot(tr):!!(tr&&tr.fromLotId&&tr.toLotId&&tr.status==='accepted');}
-function syncLotDepletionFromTransitions(){
-  if(typeof ManageConfigService!=='undefined')return ManageConfigService.syncLotDepletion(state);
-  const retired=new Set((state.lotTransitions||[]).filter(transitionSwitchesLot).map(x=>x.fromLotId));
-  (state.qcLots||[]).forEach(l=>{l.depleted=retired.has(l.id);});return retired;
-}
-function dedupeLotTargetHistory(target){
-  if(globalThis.qcLotTargetHistory)return globalThis.qcLotTargetHistory.dedupe(target);
-  const rows=Array.isArray(target&&target.meanSdHistory)?target.meanSdHistory:[],out=[],indexes=new Map();
-  rows.forEach(h=>{const key=h&&h.qcLotId?'id:'+h.qcLotId:h&&h.lot?'lot:'+h.lot:'';if(!key){out.push(h);return;}if(indexes.has(key))out[indexes.get(key)]=h;else{indexes.set(key,out.length);out.push(h);}});
-  if(target)target.meanSdHistory=out;return out;
-}
+function transitionSwitchesLot(tr){return ManageConfigService.transitionSwitchesLot(tr);}
+function syncLotDepletionFromTransitions(){return ManageConfigService.syncLotDepletion(state);}
+function dedupeLotTargetHistory(target){return globalThis.qcLotTargetHistory.dedupe(target);}
 /* Mỗi xét nghiệm/mức/lô chỉ có một cấu hình Mean/SD chuẩn trong lịch sử. Điểm QC
    đã tự giữ snapshot qcMean/qcSd lúc nhập, nên không cần nhân đôi cùng một lô chỉ
    để nhớ các lần sửa form; làm vậy còn khiến bảng lịch sử đếm cùng điểm QC nhiều lần. */
-function upsertLotTargetHistory(target,lot,values){
-  if(globalThis.qcLotTargetHistory)return globalThis.qcLotTargetHistory.upsert(target,lot,values);
-  target.meanSdHistory=Array.isArray(target.meanSdHistory)?target.meanSdHistory:[];
-  const matches=h=>h&&(h.qcLotId?h.qcLotId===lot.id:(h.lot||'')===(lot.lotNo||'')),existing=target.meanSdHistory.slice().reverse().find(matches);
-  const entry={...(existing||{}),...values,id:existing&&existing.id||uid(),qcLotId:lot.id,lot:lot.lotNo};
-  target.meanSdHistory=target.meanSdHistory.filter(h=>!matches(h));target.meanSdHistory.push(entry);return entry;
-}
+function upsertLotTargetHistory(target,lot,values){return globalThis.qcLotTargetHistory.upsert(target,lot,values);}
 function inspectAcceptedLotTransition(tr){
   const check=ManageConfigService.inspectAcceptedLotTransition(state,tr);
   return{from:check.from,to:check.to,panel:check.panel,rows:check.rows.map(x=>({t:x.test,cfg:x.config,nextHist:x.nextHistory})),missing:check.missing.map(x=>({t:x.test,cfg:x.config,nextHist:x.nextHistory})),valid:check.valid};
@@ -184,44 +66,9 @@ function inspectAcceptedLotTransition(tr){
 function applyAcceptedLotTransitionToConfig(tr){
   return ManageConfigService.applyAcceptedLotTransition({state,transition:tr,uid,today:isoToday,normalizeLotGroups,upsertHistory:upsertLotTargetHistory,onMergeGroup:(oldGroup,nextGroup)=>{try{if(typeof manageTargetGroup!=='undefined'&&manageTargetGroup===oldGroup.id)manageTargetGroup=nextGroup.id;}catch(e){}}});
 }
-function normalizeLotGroups(){
-  if(typeof ManageConfigService!=='undefined')return ManageConfigService.normalizeLotGroups(state,(removed,kept)=>{try{if(typeof manageTargetGroup!=='undefined'&&manageTargetGroup===removed.id)manageTargetGroup=kept;}catch(e){}});
-  const seen=new Map(),drop=new Set();
-  (state.lotGroups||[]).forEach(g=>{
-    g.lotIds=[...new Set(g.lotIds||[])].filter(id=>state.qcLots.some(l=>l.id===id));
-    if(!g.lotIds.length)return;
-    const name=g.lotIds.map(id=>(state.qcLots.find(l=>l.id===id)||{}).lotNo).filter(Boolean).join('/');
-    /* Chỉ đặt tên tự động khi nhóm CHƯA có tên — hàm này chạy ở MỌI lần tải/đồng bộ/
-       nhập backup (ensureShape()), nên nếu ghi đè bất cứ khi nào tính ra được tên thì
-       tên riêng người dùng gõ trong "Sửa nhóm lô" sẽ luôn biến mất ngay lần tải sau,
-       dù saveConfigGroup() vừa lưu đúng giá trị đó. Phát hiện 2026-08-03: gõ tên xong
-       lưu vẫn thấy đúng trong phiên đang mở, nhưng tải lại trang là mất, không có gì
-       báo hay ghi log — vì đây là chỗ duy nhất âm thầm viết đè lại g.name. */
-    if(name&&g.active!==false&&!g.name)g.name=name;
-    const key=(g.active===false?'stopped':'active')+'|'+[...g.lotIds].sort().join('|');
-    if(seen.has(key)){
-      const keep=seen.get(key);
-      try{if(typeof manageTargetGroup!=='undefined'&&manageTargetGroup===g.id)manageTargetGroup=keep;}catch(e){}
-      drop.add(g.id);
-    }else seen.set(key,g.id);
-  });
-  if(drop.size)state.lotGroups=state.lotGroups.filter(g=>!drop.has(g.id));
-}
-function clearDerived(){if(globalThis.derivedCacheInvalidation)return globalThis.derivedCacheInvalidation.clearAll();pointsCache.clear();pointsIndexCache.clear();pointsLotCache.clear();try{if(globalThis.qcPointCache)globalThis.qcPointCache.clear();}catch(e){}wgMemo.clear();try{if(globalThis.westgardMemoCache)globalThis.westgardMemoCache.clear();}catch(e){}acceptedMemo.clear();try{if(globalThis.qcAcceptedMemoCache)globalThis.qcAcceptedMemoCache.clear();}catch(e){}cusumMemo.clear();try{if(globalThis.qcCusumMemoCache)globalThis.qcCusumMemoCache.clear();}catch(e){}derivedIndex=null;try{statusMemo=new Map();}catch(e){}try{invalidateWestgardWorker();}catch(e){}try{invalidateActionCaches();}catch(e){}}
-function clearDerivedForTest(testId){
-  if(globalThis.derivedCacheInvalidation)return globalThis.derivedCacheInvalidation.clearForTest(testId);
-  const prefix=String(testId||'')+'|';
-  [pointsCache,pointsIndexCache,pointsLotCache,cusumMemo].forEach(cache=>[...cache.keys()].forEach(k=>{if(String(k).startsWith(prefix))cache.delete(k);}));
-  try{if(globalThis.qcCusumMemoCache)globalThis.qcCusumMemoCache.clear(testId);}catch(e){}
-  try{if(globalThis.qcPointCache)globalThis.qcPointCache.clear(testId);}catch(e){}
-  wgMemo.delete(testId);
-  try{if(globalThis.westgardMemoCache)globalThis.westgardMemoCache.clear(testId);}catch(e){}
-  [...acceptedMemo.keys()].forEach(k=>{if(String(k).startsWith(prefix))acceptedMemo.delete(k);});
-  try{if(globalThis.qcAcceptedMemoCache)globalThis.qcAcceptedMemoCache.clear(testId);}catch(e){}
-  try{if(statusMemo&&statusMemo.delete)statusMemo.delete(testId);}catch(e){}
-  try{invalidateWestgardWorker(testId);}catch(e){}
-  try{invalidateActionCaches(testId);}catch(e){}
-}
+function normalizeLotGroups(){return ManageConfigService.normalizeLotGroups(state,(removed,kept)=>{try{if(typeof manageTargetGroup!=='undefined'&&manageTargetGroup===removed.id)manageTargetGroup=kept;}catch(e){}});}
+function clearDerived(){return globalThis.derivedCacheInvalidation.clearAll();}
+function clearDerivedForTest(testId){return globalThis.derivedCacheInvalidation.clearForTest(testId);}
 function userName(){return currentUser?(currentUser.name||currentUser.username||'Người dùng'):'Hệ thống';}
 function staffInitials(name){return globalThis.qcStaffIdentity?globalThis.qcStaffIdentity.initials(name):String(name||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').split(/[^A-Za-z0-9]+/).filter(Boolean).map(x=>x.charAt(0)).join('').toUpperCase().slice(0,8)||'—';}
 function currentStaff(){const name=userName();return{operatorId:currentUser&&currentUser.id||'',operatorUsername:currentUser&&currentUser.username||'',operatorName:name,operatorCode:currentUser&&currentUser.initials||staffInitials(name)};}

@@ -21,6 +21,8 @@ run(ctx, `
   function userName(){return 'Quản trị viên';}
   function vnDate(v){return v;}
   function fmt(v,d=2){return Number(v).toFixed(d);}
+  globalThis.qcExportValueFormat={value:(t,v)=>fmt(v,3),stat:(t,v)=>fmt(v,3),point:(p,t)=>fmt(p&&p.val,Math.max(2,Number(p&&p.valueDecimals)||0))};
+  globalThis.sigmaDataUrlBytes=durl=>{const bin=atob(durl.split(',')[1]),bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);return bytes;};
   function pointStaff(p){return {code:p.staff||'NV1'};}
   function qcVerdictLabel(v){return v==='rej'?'Loại bỏ':v==='warn'?'Cảnh báo':'Đạt';}
   function errorType(rules){return rules.includes('1-3s')?'Sai số ngẫu nhiên':'Sai số hệ thống';}
