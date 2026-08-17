@@ -35,14 +35,14 @@ declare var AnalysisUIState: any, AuthUIState: any, EntryUIState: any, ManageUIS
 
 // --- Service / view-model namespaces (`root.Foo = {...}`) ---
 declare var EntryService: any, PeriodService: any, ReagentComparisonService: any, ChartViewModel: any,
-  SigmaCohortService: any, SigmaPresentation: any, SigmaPeriodViewModel: any, SigmaBiasService: any, SigmaCohortImportService: any, SigmaPeriodRecordService: any, SigmaLevelEditService: any, SigmaTrackedTestService: any, SigmaBiasWorkflowService: any, SigmaMuWorkflowService: any, SigmaCohortSelectionService: any, SigmaTeaEditService: any, SigmaTeaSnapshotService: any, SigmaLevelSelectionService: any, SigmaPeriodSelectionService: any, WestgardViewModel: any, ActionWorkflowService: any, ActionReviewService: any, ActionEscalationService: any, ActionRecordService: any, ActionBiasService: any, ActionBiasPresentation: any, ActionViolationService: any, ActionListPresentation: any, ActionEvidencePresentation: any, ActionRerunEvidencePresentation: any, ActionStatusPresentation: any, ActionReviewPresentation: any, ActionDetailPresentation: any, ActionGuidePresentation: any, ReportPeriodPresentation: any, ManageConfigService: any, LotTransitionPickerService: any,
+  SigmaCohortService: any, SigmaPresentation: any, SigmaPeriodViewModel: any, SigmaBiasService: any, SigmaCohortImportService: any, SigmaPeriodRecordService: any, SigmaLevelEditService: any, SigmaTrackedTestService: any, SigmaBiasWorkflowService: any, SigmaMuWorkflowService: any, SigmaCohortSelectionService: any, SigmaTeaEditService: any, SigmaTeaSnapshotService: any, SigmaLevelSelectionService: any, SigmaPeriodSelectionService: any, WestgardViewModel: any, ActionWorkflowService: any, ActionReviewService: any, ActionEscalationService: any, ActionBiasService: any, ActionBiasPresentation: any, ActionViolationService: any, ActionListPresentation: any, ActionEvidencePresentation: any, ActionRerunEvidencePresentation: any, ActionStatusPresentation: any, ActionReviewPresentation: any, ActionDetailPresentation: any, ActionGuidePresentation: any, ReportPeriodPresentation: any, ManageConfigService: any, LotTransitionPickerService: any,
   qcPointWarnings: any, AuditService: any, ActionRerunService: any, ActionPointIndexService: any,
   ManageLotGroupActivationCommand: any, ManageLotTransitionCommand: any, ManageLotCommand: any;
-declare var LISClientService: any, lisGatewayRuntime: any, LIS_GATEWAY_STORAGE_KEY: any, LIS_POLL_MS: any,
-  lisGatewayConfig: any, lisNormalizeGatewayUrl: any, lisGatewaySetStatus: any, lisGatewayStatusText: any,
-  lisGatewayFetch: any, lisGatewayHealth: any, lisGatewayPull: any, lisResultToPointInput: any,
+declare var LISClientService: any, lisGatewayRuntime: any,
+  lisGatewayConfig: any, lisNormalizeGatewayUrl: any, lisGatewayStatusText: any,
+  lisGatewayPull: any,
   lisImportResult: any, lisRejectResult: any, lisGatewayStart: any;
-declare var BackupService: any, BACKUP_IMPORT_MAX_BYTES: any, BACKUP_IMPORT_WARN_BYTES: any,
+declare var BACKUP_IMPORT_MAX_BYTES: any, BACKUP_IMPORT_WARN_BYTES: any,
   serializeBackupData: any, backupTextBytes: any, backupSizeMB: any, backupImportSizeError: any,
   backupSizeWarning: any, backupChecksum: any, createBackupPackage: any, parseBackupPackage: any,
   prepareBackupState: any, prepareBackupImport: any, backupSummary: any, inspectBackupText: any;
@@ -72,7 +72,6 @@ declare var qcCusumSeries: any;
 declare var qcEntryColumns: any;
 declare var syncStateMerge: any;
 declare var syncUpdateBuilder: any;
-declare var syncSnapshot: any;
 declare var syncRetryScheduler: any;
 declare var syncFirstConnectMerge: any, syncHasContent: any;
 declare var qcNormalizeDuplicateRunIds: any;
@@ -84,7 +83,6 @@ declare var westgardWorkerJobBuilder: any;
 declare var westgardWorkerRevisionService: any;
 declare var westgardWorkerHydrate: any;
 declare var westgardWorkerPrewarmPlanner: any;
-declare var planPartitionWrite: any;
 
 // Firebase compat SDK, loaded from CDN <script> tags in index.html (no @types installed)
 declare var firebase: any;

@@ -104,8 +104,6 @@ const TEA_LAB_BASIS_SOURCES=[['regulation','Quy định pháp lý / CLIA / quố
 function teaRefFind(refKey){return globalThis.TeaReferenceService.find(state,refKey);}
 function teaRefNumOrNull(v){return globalThis.TeaReferenceService.numberOrNull(v);}
 function teaRefExternalChanged(row,refKey){return globalThis.TeaReferenceService.externalChanged(row,refKey);}
-function teaRefSourceMeta(name,src){return globalThis.TeaReferenceService.sourceMeta(state,name,src);}
-function teaRefStampSource(row,src){return globalThis.TeaReferenceService.stampSource(state,row,src);}
 function teaRefEnsure(refKey){return globalThis.TeaReferenceService.ensure(state,refKey).record;}
 /* Sửa/xóa/thêm dòng TEa tham chiếu có thể ảnh hưởng TEa% của NHIỀU xét nghiệm
    đang track Sigma cùng lúc (không chỉ xét nghiệm đang mở) — đồng bộ lại snapshot
@@ -148,8 +146,8 @@ function manageTeaRefs(){
   const overMap=new Map((state.teaRefs||[]).map(r=>[r.analyteId||teaAnalyteMeta(r.name,r).analyteId||teaRefName(r.name),r]));
   const rows=effectiveTeaRefs()
     .map(([name,unit,clia,ricos,section,,analyteId,lab])=>{const isDef=teaRefIsDefault(analyteId),record=overMap.get(analyteId),naming=teaAnalyteMeta(name,record),externalChanged=teaRefExternalChanged(record,analyteId),kind=globalThis.teaReferenceKindPresentation(isDef,externalChanged,!!(record&&record.lab!=null));return{name,unit,clia,ricos,lab,section,analyteId,record,...naming,kind};})
-    .filter(r=>manageMatch([r.name,r.displayName,r.standardName,r.abbreviation,...r.aliases,r.matrix,r.unit,r.section]))
-    .sort(globalThis.teaReferenceSortPresentation);
+    .filter(r=>manageMatch([r.name,r.displayName,r.standardName,r.abbreviation,...r.aliases,r.matrix,r.unit,r.section]));
+  globalThis.teaReferenceSortPresentation(rows);
   const teaStatus=kind=>globalThis.teaReferenceStatusPresentation(kind);
   const body=rows.map(r=>{
     const rowActions=globalThis.teaReferenceRowActionsPresentation(r.kind,canManage,r.lab!=null),act=rowActions.action==='restore'?btn('Khôi phục',`teaRefRemove('${escAttr(r.analyteId)}')`,'ghost sm','Khôi phục giá trị mặc định'):rowActions.action==='remove'?`<button class="x" onclick="teaRefRemove('${escAttr(r.analyteId)}')" title="Xóa xét nghiệm tự thêm">✕</button>`:'';

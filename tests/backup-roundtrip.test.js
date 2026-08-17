@@ -73,13 +73,13 @@ const { makeState } = require('../benchmarks/performance-baseline');
     const big=200*1024*1024;
     assert.notEqual(ctx.backupImportSizeError(big),'','200 MB phải vẫn nằm trên ngưỡng khuyến nghị');
     let downloaded=[],confirms=0;
-    ctx.createBackupPackage=async()=>({text:'{}',bytes:big,meta:{checksum:'x'}});
     ctx.downloadBackupText=(name)=>{downloaded.push(name);return true;};
     ctx.confirmDialog=async()=>{confirms++;return true;};
     ctx.infoDialog=async()=>{};
     ctx.markBackupDone=()=>{};ctx.updateBackupBanner=()=>{};ctx.logAct=()=>{};ctx.save=()=>{};
     ctx.state={schemaVersion:ctx.QCCore.STATE_SCHEMA_VERSION};
     ctx.vnDate=()=>'01/08/2026';ctx.isoToday=()=>'2026-08-01';
+    ctx.BackupExportCommand={snapshot:async name=>{ctx.downloadBackupText(name);return true;},exportFull:async name=>{ctx.downloadBackupText(name);return{status:'done'};}};
 
     assert.equal(await ctx.backupCurrentData('truoc-nhap'),true,'backup an toàn KHÔNG được thất bại vì dung lượng — nhập backup và xóa sạch dữ liệu đều hủy khi nó trả false');
     assert.equal(downloaded.length,1,'backup an toàn phải thực sự ghi ra file');
@@ -88,11 +88,8 @@ const { makeState } = require('../benchmarks/performance-baseline');
     downloaded=[];
     await ctx.exportData();
     assert.equal(downloaded.length,1,'xuất backup quá cỡ vẫn phải ra file sau khi người dùng xác nhận');
-    assert.equal(confirms,1,'và chỉ hỏi MỘT lần, không hỏi chồng thêm cảnh báo ngưỡng mềm');
+    assert.equal(confirms,0,'adapter UI không tự hỏi chồng: command TypeScript sở hữu xác nhận ngưỡng mềm');
 
-    downloaded=[];ctx.confirmDialog=async()=>{confirms++;return false;};
-    await ctx.exportData();
-    assert.equal(downloaded.length,0,'người dùng từ chối thì không ghi file');
   }
 
   console.log(`Backup round-trip test passed (${(value.packBytes/1024/1024).toFixed(1)} MB package; ${(tenYearBytes/1024/1024).toFixed(1)} MB ten-year contract)`);

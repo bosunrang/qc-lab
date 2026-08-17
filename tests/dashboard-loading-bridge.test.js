@@ -8,8 +8,8 @@ const bridge=fs.readFileSync(path.join(root,'src','compat','modular-pilot.global
 
 assert.match(route,/function pageDashLoading\(tests,pending\)\{return globalThis\.dashboardLoadingPresentation\(tests,pending,state\.data,state\.lab\);\}/,'Dashboard đang tải phải dùng renderer TypeScript');
 assert.match(bridge,/dashboardLoadingPresentation: ReturnType<typeof createDashboardLoading>;/,'Dashboard đang tải phải là hợp đồng bridge bắt buộc');
-assert.match(bridge,/dashboardQcFollowupItemHtml: ReturnType<typeof createDashboardQcFollowupItemHtml>;/,'Dòng theo dõi Dashboard phải là hợp đồng bridge bắt buộc');
-assert.match(bridge,/dashboardTestRowHtml: ReturnType<typeof createDashboardTestRowHtml>;/,'Dòng xét nghiệm Dashboard phải là hợp đồng bridge bắt buộc');
+assert.doesNotMatch(bridge,/dashboardQcFollowupItemHtml: ReturnType<typeof createDashboardQcFollowupItemHtml>;/,'Dòng theo dõi Dashboard phải là dependency nội bộ bundle');
+assert.doesNotMatch(bridge,/dashboardTestRowHtml: ReturnType<typeof createDashboardTestRowHtml>;/,'Dòng xét nghiệm Dashboard phải là dependency nội bộ bundle');
 assert.match(bridge,/dashboardEmptyTestsHtml: ReturnType<typeof createDashboardEmptyTestsHtml>;/,'Trạng thái trống Dashboard phải là hợp đồng bridge bắt buộc');
 
 console.log('Dashboard loading TypeScript bridge tests passed');

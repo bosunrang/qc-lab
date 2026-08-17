@@ -6,22 +6,6 @@ const RCPAD={l:54,r:18,t:18,b:46};
 function rcLabel(d){return globalThis.reagentComparisonLabelPresentation.label(d.test,teaAnalyteDisplay);}
 function rcAct(){return ReagentComparisonService.find(state,rcId);}
 function rcSaveSoon(){clearTimeout(rcSaveT);rcSaveT=setTimeout(save,600);}
-/* stats */
-function rcPTwo(t,df){return globalThis.reagentTDistribution.twoSidedPValue(t,df);}
-function rcTCrit(df,alpha){return globalThis.reagentTDistribution.tCritical(df,alpha);}
-/* rcMax/rcMin thay Math.max(...a)/Math.min(...a): spread mỗi phần tử thành một tham số
-   hàm riêng, nên mảng đủ lớn (nhập tay hiếm khi tới, nhưng import backup thì có thể) sẽ
-   ném RangeError "Maximum call stack size exceeded" và vỡ cả trang so sánh/báo cáo thay
-   vì chỉ chậm đi. reduce() không có giới hạn kiểu này. */
-function rcMax(a){return globalThis.reagentStatistics.max(a);}
-function rcMin(a){return globalThis.reagentStatistics.min(a);}
-function rcMean(a){return globalThis.reagentStatistics.mean(a);}
-function rcVar(a){return globalThis.reagentStatistics.variance(a);}
-function rcPearson(x,y){return globalThis.reagentStatistics.pearson(x,y);}
-function rcOls(x,y){return globalThis.reagentStatistics.ols(x,y);}
-function rcMedian(a){return globalThis.reagentStatistics.median(a);}
-function rcPB(x,y){return globalThis.reagentStatistics.passingBablok(x,y);}
-function rcValid(ds){return globalThis.reagentPairMath.validPairs(ds&&ds.rows);}
 function rcPairCalc(r){return globalThis.reagentPairMath.pairCalc(r);}
 function rcCalc(ds){return globalThis.reagentComparisonCalculator.calculate(ds,RC_MIN_PAIRS);}
 /* charts */

@@ -29,7 +29,7 @@ state={lab:{},tests:[],actions:[{nceId:'NCE-XUAT',date:'2026-07-29',riskBasis:'S
 ACTION_LABELS={source:{},phase:{},risk:{low:'Thấp'},release:{released:'Đã cho phép trở lại'}};
 exportMetaRows=()=>[];vnDate=x=>x||'';formatDateTimeVN=x=>x||'';testDisplayName=t=>t&&t.name||'';actionLevelShort=()=>'';
 actionWorkflowStatus=()=>({label:'Đã hủy hồ sơ'});actionRerunStatus=()=>({label:''});actionProtocolSummary=()=>'';actionApprovalLabel=()=>'Đã hủy hồ sơ';actionRiskScore=()=>0;actionResidualRiskScore=()=>2;
-downloadCSV=(name,rows)=>{globalThis.__nceCsv={name,rows};};
+globalThis.csvDownload=(name,rows)=>{globalThis.__nceCsv={name,rows};};
 function __exportNceCsv(){exportActionsCSV();return __nceCsv;}
 `);
 const out=ctx.__exportNceCsv(),header=Array.from(out.rows[1]),row=Array.from(out.rows[2]),at=name=>row[header.indexOf(name)];

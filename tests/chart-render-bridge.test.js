@@ -6,7 +6,8 @@ const root=path.join(__dirname,'..');
 const draw=fs.readFileSync(path.join(root,'assets','modules','draw.js'),'utf8');
 const bridge=fs.readFileSync(path.join(root,'src','compat','modular-pilot.global.ts'),'utf8');
 
-const names=['chartTooltipService','qcTooltip','leveyJenningsTooltipController','hiDpiCanvasSetup','leveyJenningsGeometry','westgardRuleScope','leveyJenningsColors','leveyJenningsTicks','leveyJenningsYAxisLabels','leveyJenningsHoverModel','leveyJenningsPointStyle','leveyJenningsDisplayPlan','leveyJenningsPointRenderModel','leveyJenningsBandRects','leveyJenningsGridLines','leveyJenningsMultiSeries','leveyJenningsMultiRunTicks','leveyJenningsLegendLayout','leveyJenningsMultiDisplayPlan','leveyJenningsMultiHoverModel','leveyJenningsMultiPointRenderModel','leveyJenningsMultiDividers','cusumChartGeometry','cusumDisplayPlan','cusumHoverModel','cusumPointRenderModel','cusumReferenceLines','cusumLinePoints'];
+const names=['qcTooltip','leveyJenningsTooltipController','hiDpiCanvasSetup','leveyJenningsGeometry','westgardRuleScope','leveyJenningsColors','leveyJenningsTicks','leveyJenningsYAxisLabels','leveyJenningsPointRenderModel','leveyJenningsBandRects','leveyJenningsGridLines','leveyJenningsMultiSeries','leveyJenningsMultiRunTicks','leveyJenningsLegendLayout','leveyJenningsMultiPointRenderModel','leveyJenningsMultiDividers','cusumChartGeometry','cusumPointRenderModel','cusumReferenceLines','cusumLinePoints'];
+assert.doesNotMatch(bridge,/^  chartTooltipService:/m,'chart tooltip service must remain internal to the TypeScript bundle');
 for(const name of names){
   assert.match(bridge,new RegExp(`^  ${name}:`,'m'),`${name} must be a required chart bridge contract`);
   assert.match(bridge,new RegExp(`root\\.${name}=`),`${name} must be assigned by the TypeScript bootstrap`);

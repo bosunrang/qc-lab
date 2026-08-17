@@ -8,8 +8,8 @@ type TeaReferenceRow = readonly any[];
 export function createTeaReferenceService(deps: {
   key: (value: unknown) => string;
   analyteMeta: (name: unknown, record?: TeaReference) => Record<string, any>;
-  effectiveReferences: () => TeaReferenceRow[];
-  defaultReferences: () => TeaReferenceRow[];
+  effectiveReferences: () => readonly TeaReferenceRow[];
+  defaultReferences: () => readonly TeaReferenceRow[];
   sourceRegistry: () => Record<string, TeaReferenceSource>;
   createId: () => string;
   todayIso: () => string;

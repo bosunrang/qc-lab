@@ -684,7 +684,7 @@
 			}
 			return ok;
 		};
-		const exportFull = async (name, oversizeDetail, warning) => {
+		const exportFull = async (name, oversizeDetail) => {
 			deps.log();
 			deps.save();
 			let pack;
@@ -697,7 +697,7 @@
 				};
 			}
 			if (!await deps.confirmOversized(pack.bytes, oversizeDetail)) return { status: "cancelled" };
-			const dialog = warning(pack.bytes);
+			const dialog = deps.warning(pack.bytes);
 			if (dialog && !await deps.confirm(dialog)) return { status: "cancelled" };
 			if (!deps.download(name, pack.text)) return { status: "download-error" };
 			deps.mark(pack.bytes);
@@ -707,6 +707,50 @@
 		return Object.freeze({
 			exportFull,
 			snapshot
+		});
+	}
+	//#endregion
+	//#region src/application/backup/backup-import-command.ts
+	function createBackupImportCommand(deps) {
+		const importFile = async (input) => {
+			if (!await input.confirmOversized()) return { status: "cancelled" };
+			const incoming = await deps.prepare(input.text), sizeWarning = deps.sizeWarning(input.size);
+			if (!await input.confirmImport({
+				name: input.fileName,
+				sizeWarning
+			})) return { status: "cancelled" };
+			if (!await input.reauthenticate()) return { status: "cancelled" };
+			if (!await deps.snapshot("truoc-nhap")) throw new Error(input.snapshotFailureMessage);
+			await deps.restore({
+				incoming,
+				fileName: input.fileName,
+				oldActivity: input.oldActivity
+			});
+			return { status: "imported" };
+		};
+		return Object.freeze({ importFile });
+	}
+	//#endregion
+	//#region src/application/backup/backup-inspection-command.ts
+	function createBackupInspectionCommand(deps) {
+		const inspectFile = async (input) => {
+			if (!await input.confirmOversized()) return { status: "cancelled" };
+			return {
+				status: "inspected",
+				report: await deps.inspect(input.text, input.size)
+			};
+		};
+		return Object.freeze({ inspectFile });
+	}
+	//#endregion
+	//#region src/application/backup/backup-status-command.ts
+	function createBackupStatusCommand(deps) {
+		const info = () => deps.reminder.lastBackupInfo(deps.marker.lastRaw());
+		return Object.freeze({
+			status: (cloudReady) => deps.reminder.statusText(cloudReady, info()),
+			capacity: () => deps.reminder.capacityText(deps.marker.bytes(), deps.maxBytes, deps.size, deps.warning),
+			overdue: (cloudReady, days) => deps.reminder.overdue(cloudReady, info(), days),
+			banner: (input) => deps.reminder.banner(input.cloudReady, input.user, info(), input.days)
 		});
 	}
 	//#endregion
@@ -6225,10 +6269,18 @@
 		}));
 	}
 	//#endregion
+	//#region src/domain/export/csv-cell.ts
+	function csvCell(value) {
+		if (typeof value === "number") return Number.isFinite(value) ? String(value) : "";
+		let text = value == null ? "" : String(value);
+		if (/^[\s]*[=+\-@]/.test(text)) text = "'" + text;
+		return /[",\n\r;]/.test(text) ? "\"" + text.replace(/"/g, "\"\"") + "\"" : text;
+	}
+	//#endregion
 	//#region src/presentation/export/csv-download.ts
 	function createCsvDownload(deps) {
-		return (name, rows, encode) => {
-			const blob = deps.createBlob("﻿" + rows.map((row) => row.map(encode).join(",")).join("\r\n")), url = deps.createUrl(blob);
+		return (name, rows) => {
+			const blob = deps.createBlob("﻿" + rows.map((row) => row.map(csvCell).join(",")).join("\r\n")), url = deps.createUrl(blob);
 			deps.download(url, name);
 			deps.schedule(() => deps.revokeUrl(url), 1e3);
 		};
@@ -6691,42 +6743,6 @@
 		};
 	}
 	//#endregion
-	//#region src/presentation/chart/cusum-display-plan.ts
-	function createCusumDisplayPlan(sampleIndices) {
-		return (input) => {
-			const preserve = [];
-			input.flags.forEach((flag, index) => {
-				if (flag === "rej") preserve.push(index);
-			});
-			const perSeries = Math.max(80, Math.floor(Math.max(240, input.width / 2) / 3));
-			return [.../* @__PURE__ */ new Set([
-				...sampleIndices({
-					length: input.count,
-					maxPoints: perSeries,
-					valueAt: (index) => input.cPos[index],
-					preserve
-				}),
-				...sampleIndices({
-					length: input.count,
-					maxPoints: perSeries,
-					valueAt: (index) => input.cNeg[index],
-					preserve
-				}),
-				...sampleIndices({
-					length: input.count,
-					maxPoints: perSeries,
-					valueAt: (index) => input.ma[index],
-					preserve
-				})
-			])].sort((a, b) => a - b);
-		};
-	}
-	//#endregion
-	//#region src/presentation/chart/cusum-hover-model.ts
-	function createCusumHoverModel(deps) {
-		return (input) => `<b>${deps.date(input.point.date)}</b><div>CUSUM+: ${deps.number(input.cPos, 2)}</div><div>CUSUM−: ${deps.number(input.cNeg, 2)}</div><div class="muted">${input.rejected ? "Vượt ngưỡng h — nghi ngờ trôi/shift" : "Trong tầm kiểm soát"}</div>`;
-	}
-	//#endregion
 	//#region src/presentation/chart/cusum-point-render-model.ts
 	function cusumPointRenderModel(input) {
 		return input.indices.map((index) => {
@@ -7146,14 +7162,6 @@
 			threshold: evaluation.threshold,
 			passes: !!causeConfirmed && evaluation.withinThreshold
 		};
-	}
-	//#endregion
-	//#region src/domain/export/csv-cell.ts
-	function csvCell(value) {
-		if (typeof value === "number") return Number.isFinite(value) ? String(value) : "";
-		let text = value == null ? "" : String(value);
-		if (/^[\s]*[=+\-@]/.test(text)) text = "'" + text;
-		return /[",\n\r;]/.test(text) ? "\"" + text.replace(/"/g, "\"\"") + "\"" : text;
 	}
 	//#endregion
 	//#region src/presentation/report/export-helpers.ts
@@ -8284,15 +8292,6 @@
 	//#region src/presentation/dashboard/dashboard-latest-point-text.ts
 	function createDashboardLatestPointText(deps) {
 		return (point, test) => point ? `${deps.date(point.date)} · M${point._level} · ${deps.pointValue(point, test)}` : "Chưa có điểm";
-	}
-	//#endregion
-	//#region src/presentation/dashboard/dashboard-completion.ts
-	function dashboardCompletion(testCount, missingTodayCount) {
-		const completeTests = Math.max(0, testCount - missingTodayCount);
-		return {
-			completeTests,
-			percent: testCount ? Math.round(completeTests / testCount * 100) : 0
-		};
 	}
 	//#endregion
 	//#region src/presentation/dashboard/dashboard-followup-panel-html.ts
@@ -10847,13 +10846,6 @@
 		};
 	}
 	//#endregion
-	//#region src/presentation/manage/same-id-set.ts
-	function sameIdSet(left, right) {
-		const a = [...new Set(left || [])].sort();
-		const b = [...new Set(right || [])].sort();
-		return a.length === b.length && a.every((value, index) => value === b[index]);
-	}
-	//#endregion
 	//#region src/presentation/manage/manage-instrument-name.ts
 	function manageInstrumentName(instruments, id, fallback = "") {
 		return instruments.find((item) => item.id === id)?.name || fallback || "Chưa gán máy";
@@ -10874,11 +10866,6 @@
 	function manageLotGroupLabels(groups, lotId) {
 		const names = groups.filter((group) => (group.lotIds || []).includes(lotId)).map((group) => group.name || "");
 		return names.length ? names.join(", ") : "Chưa thuộc nhóm";
-	}
-	//#endregion
-	//#region src/presentation/manage/same-normalized-text.ts
-	function createSameNormalizedText(deps) {
-		return (left, right) => deps.normalize(left) === deps.normalize(right);
 	}
 	//#endregion
 	//#region src/presentation/manage/groups-of-lot.ts
@@ -11026,21 +11013,6 @@
 			rowCount: rows.length,
 			pointCount: rows.reduce((count, row) => count + (row.pts?.length || 0), 0)
 		};
-	}
-	//#endregion
-	//#region src/presentation/manage/tea-positive-number.ts
-	function teaPositiveNumber(value) {
-		const number = Number(value);
-		return String(value == null ? "" : value).trim() !== "" && Number.isFinite(number) && number > 0 ? number : null;
-	}
-	//#endregion
-	//#region src/presentation/manage/tea-reference-external-changed.ts
-	function teaReferenceExternalChanged(row, base) {
-		return !!(row && base && (row.unit !== base[1] || row.clia !== base[2] || row.ricos !== base[3] || row.section !== base[4] || [
-			"cliaRule",
-			"cliaAbsolute",
-			"cliaAbsoluteUnit"
-		].some((field) => row[field] != null && row[field] !== "")));
 	}
 	//#endregion
 	//#region src/presentation/manage/tea-source-registry-items.ts
@@ -15764,40 +15736,35 @@
 		parallel: (test, level) => root.parallelLotForLevel(test, level)
 	});
 	root.qcEntryColumnPoints = selectEntryColumnPoints;
-	root.syncCanon = syncCanon;
 	root.syncedShape = syncedShape;
 	root.syncedStatesEqual = syncedStatesEqual;
-	root.syncJsonMap = syncJsonMap;
-	root.mergeSyncArray = mergeSyncArray;
-	root.mergeSyncBranch = mergeSyncBranch;
-	root.uniqueSyncUsers = uniqueSyncUsers;
-	root.installSyncServices = () => {
-		const codec = root.syncValueCodec || createSyncValueCodec(), lists = new Set(FIREBASE_SYNC_LISTS), snapshot = createSyncSnapshot(FIREBASE_SYNC_TOP, syncJsonMap), merge = createSyncStateMerge({
-			clone: codec.clone,
-			snap: snapshot,
-			top: FIREBASE_SYNC_TOP,
-			lists,
-			array: (local, remote, base, deletes) => mergeSyncArray(local, remote, base, deletes).map(codec.clone),
-			branch: mergeSyncBranch,
-			cloud: codec.cloudValue
-		});
-		root.syncSnapshot = snapshot;
-		root.syncStateMerge = merge;
-		root.syncUpdateBuilder = createSyncUpdateBuilder({
-			top: FIREBASE_SYNC_TOP,
-			snapshot
-		});
-		root.syncFirstConnectMerge = createFirstConnectMerge({
-			top: FIREBASE_SYNC_TOP,
-			lists,
-			cloud: codec.cloudValue,
-			merge,
-			uniqueUsers: uniqueSyncUsers
-		});
-		root.syncHasContent = (source) => hasSyncContent(source, FIREBASE_SYNC_CONTENT_KEYS);
-		root.syncCompareKeys = FIREBASE_SYNC_COMPARE_KEYS;
-	};
-	root.installSyncServices();
+	var modularSyncCodec = createSyncValueCodec();
+	var modularSyncLists = new Set(FIREBASE_SYNC_LISTS);
+	var modularSyncSnapshot = createSyncSnapshot(FIREBASE_SYNC_TOP, syncJsonMap);
+	var modularSyncMerge = createSyncStateMerge({
+		clone: modularSyncCodec.clone,
+		snap: modularSyncSnapshot,
+		top: FIREBASE_SYNC_TOP,
+		lists: modularSyncLists,
+		array: (local, remote, base, deletes) => mergeSyncArray(local, remote, base, deletes).map(modularSyncCodec.clone),
+		branch: mergeSyncBranch,
+		cloud: modularSyncCodec.cloudValue
+	});
+	root.syncValueCodec = modularSyncCodec;
+	root.syncStateMerge = modularSyncMerge;
+	root.syncUpdateBuilder = createSyncUpdateBuilder({
+		top: FIREBASE_SYNC_TOP,
+		snapshot: modularSyncSnapshot
+	});
+	root.syncFirstConnectMerge = createFirstConnectMerge({
+		top: FIREBASE_SYNC_TOP,
+		lists: modularSyncLists,
+		cloud: modularSyncCodec.cloudValue,
+		merge: modularSyncMerge,
+		uniqueUsers: uniqueSyncUsers
+	});
+	root.syncHasContent = (source) => hasSyncContent(source, FIREBASE_SYNC_CONTENT_KEYS);
+	root.syncCompareKeys = FIREBASE_SYNC_COMPARE_KEYS;
 	root.syncRetryScheduler = createSyncRetryScheduler({
 		setTimeout: (fn, delay) => globalThis.setTimeout(fn, delay),
 		clearTimeout: (timer) => globalThis.clearTimeout(timer)
@@ -15845,7 +15812,7 @@
 	root.storageRetryDelay = storageRetryDelay;
 	root.saveDerivedTestIds = saveDerivedTestIds;
 	root.saveCommandPolicy = saveCommandPlan;
-	root.localStorageLoadService = createLocalStorageLoadService({
+	var modularLocalStorageLoadService = createLocalStorageLoadService({
 		read: () => localStorage.getItem("qclab"),
 		adoptEmpty: () => {
 			localLoadStatus = "missing";
@@ -15880,7 +15847,7 @@
 			};
 		}
 	});
-	root.localStorageSnapshotWriter = createLocalStorageSnapshotWriter({
+	var modularLocalStorageSnapshotWriter = createLocalStorageSnapshotWriter({
 		set: (key, value) => localStorage.setItem(key, value),
 		remove: (key) => localStorage.removeItem(key),
 		saved: (quiet) => {
@@ -15890,10 +15857,9 @@
 			if (!quiet) markSaved("lá»—i lÆ°u cá»¥c bá»™", "Kiá»ƒm tra dung lÆ°á»£ng trÃ¬nh duyá»‡t");
 		}
 	});
-	root.partitionedSnapshotWriter = createPartitionedSnapshotWriter({
+	var modularPartitionedSnapshotWriter = createPartitionedSnapshotWriter({
 		plan: (input) => {
-			let plan;
-			if (root.planPartitionWrite) plan = root.planPartitionWrite({
+			const plan = planPartitionWrite({
 				fullDirty: input.fullDirty,
 				streak: input.streak,
 				lastFull: input.lastFull,
@@ -15902,14 +15868,6 @@
 				maxMs: input.maxMs,
 				dirtyTestIds: input.dirtyTestIds
 			});
-			else {
-				const full = input.fullDirty || input.streak >= input.maxIncrementals || input.now - input.lastFull >= input.maxMs;
-				plan = {
-					dirtyTestIds: full ? null : input.dirtyTestIds,
-					streak: full ? 0 : input.streak + 1,
-					lastFull: full ? input.now : input.lastFull
-				};
-			}
 			lsIncrementalStreak = plan.streak;
 			lsLastFullSaveAt = plan.lastFull;
 			lsFullDirty = false;
@@ -15961,7 +15919,7 @@
 		},
 		draftStamp: () => sigmaDraftStamp(),
 		usePartitioned: () => typeof LocalStore !== "undefined" && LocalStore.supported() && typeof LocalStore.writePartitioned === "function",
-		writePartitioned: (input) => root.partitionedSnapshotWriter.write({
+		writePartitioned: (input) => modularPartitionedSnapshotWriter.write({
 			state,
 			slot: partitionSlot,
 			localLoadStatus,
@@ -15976,7 +15934,7 @@
 			quiet: input.quiet
 		}),
 		serialize: () => serializeStateForStorage(),
-		writeLocal: (raw, savedAt, quiet) => root.localStorageSnapshotWriter.write(raw, savedAt, quiet),
+		writeLocal: (raw, savedAt, quiet) => modularLocalStorageSnapshotWriter.write(raw, savedAt, quiet),
 		mirror: (raw) => mirrorIndexedDb(raw),
 		needsCloud: () => sigmaDraftNeedsCloud(),
 		clearDraftThrough: (stamp) => clearSigmaDraftThrough(stamp),
@@ -16051,16 +16009,7 @@
 			if (fb.ref) fb.ref.off();
 		},
 		resetSession: (clearAuthUser) => {
-			if (root.firebaseDisconnectedState) {
-				Object.assign(fb, root.firebaseDisconnectedState(fb, clearAuthUser));
-				return;
-			}
-			fb.ready = false;
-			fb.initialized = false;
-			fb.ref = null;
-			fb.synced = null;
-			fb.seenSig = null;
-			if (clearAuthUser) fb.authUser = null;
+			Object.assign(fb, firebaseDisconnectedState(fb, clearAuthUser));
 		}
 	});
 	if (typeof root.fbFlushPush === "function") root.firebasePushService = createFirebasePushService({
@@ -16222,12 +16171,16 @@
 			markSaved("lỗi kết nối", error && error.message ? error.message : "Firebase");
 		}
 	});
+	var firebaseMergeApplication = createFirebaseMergeApplication({
+		merge: (local, remote, base) => globalThis.fbMerge(local, remote, base),
+		firstMerge: (local, remote) => globalThis.fbFirstConnectMerge(local, remote)
+	});
 	if (typeof root.fbHandleValue === "function") root.firebaseMergeCommitService = createFirebaseMergeCommitService({
 		state: () => state,
 		replaceState: (value) => {
 			state = value;
 		},
-		merge: (base, mergeFirstConnect, local, remote) => root.firebaseMergeApplication ? root.firebaseMergeApplication(base, mergeFirstConnect, local, remote) : base ? fbMerge(local, remote, base) : mergeFirstConnect ? fbFirstConnectMerge(local, remote) : remote,
+		merge: (base, mergeFirstConnect, local, remote) => firebaseMergeApplication(base, mergeFirstConnect, local, remote),
 		relinkAudit: (value) => {
 			if (typeof auditRelinkChain === "function" && Array.isArray(value.activity)) value.activity = auditRelinkChain(value.activity, value.activityAnchor || "");
 		},
@@ -16280,9 +16233,6 @@
 		readStored: () => localStorage.getItem("qclab_fb")
 	});
 	root.firebaseReadyState = firebaseReadyState;
-	root.firebaseConfigParser = parseFirebaseConfig;
-	root.firebaseConfigValidator = validateFirebaseConfig;
-	root.settingsStorageBytesText = storageBytesText;
 	root.settingsStorageUsageText = storageUsageText;
 	root.settingsBrandProfile = createBrandProfile((value, limit) => root.QCCore.cleanText(value, limit));
 	root.settingsFirebaseAclHelp = firebaseAclHelp;
@@ -16335,18 +16285,17 @@
 			runtime.pollT = null;
 			runtime.pending = [];
 			runtime.unresolved = [];
-			root.lisGatewaySetStatus("off", "Đã tắt");
+			lisClient.setStatus("off", "Đã tắt");
 		},
 		start: () => root.lisGatewayStart(),
 		pull: () => root.lisGatewayPull({ manual: true })
 	});
-	root.labProfileService = createLabProfileService((value, limit) => root.QCCore.cleanText(value, limit), (value) => root.settingsBrandProfile(value));
 	root.SettingsProfileCommand = createSettingsProfileCommand({
 		current: () => state.lab || {},
 		set: (lab) => {
 			state.lab = lab;
 		},
-		profile: root.labProfileService,
+		profile: createLabProfileService((value, limit) => root.QCCore.cleanText(value, limit), (value) => root.settingsBrandProfile(value)),
 		save: () => save({ clearDerived: false }),
 		renderBrand: () => renderBrand(),
 		render: () => rerender()
@@ -16392,7 +16341,7 @@
 			markSaved("đã lưu cục bộ", "Đã ngắt Firebase");
 		}
 	});
-	root.firebaseSettingsService = createFirebaseSettingsService((value) => root.firebaseConfigParser(value));
+	root.firebaseSettingsService = createFirebaseSettingsService((value) => parseFirebaseConfig(value));
 	root.settingsBrandPreviewHtml = createBrandPreviewHtml((value) => root.esc(value), (value) => root.escAttr(value));
 	root.settingsUnitProfileHtml = createUnitProfileHtml({
 		escapeAttribute: (value) => root.escAttr(value),
@@ -16418,35 +16367,35 @@
 		button: (label, action, variant) => root.btn(label, action, variant)
 	});
 	root.settingsPageLayoutHtml = createSettingsPageLayoutHtml((title, subtitle) => root.headOnly(title, subtitle));
-	if (typeof LocalStore !== "undefined") root.indexedDbOpenService = createIndexedDbOpenService({ indexedDb: () => typeof indexedDB === "undefined" ? null : indexedDB });
-	if (root.indexedDbOpenService) root.indexedDbRecordService = createIndexedDbRecordService({ open: () => root.indexedDbOpenService.open() });
+	var modularIndexedDbOpenService = typeof LocalStore !== "undefined" ? createIndexedDbOpenService({ indexedDb: () => typeof indexedDB === "undefined" ? null : indexedDB }) : null;
+	var modularIndexedDbRecordService = modularIndexedDbOpenService ? createIndexedDbRecordService({ open: () => modularIndexedDbOpenService.open() }) : null;
 	root.partitionedIndexedDbWriteService = createPartitionedIndexedDbWriteService({
 		supported: () => typeof indexedDB !== "undefined",
-		key: (slot, type, id) => root.localPartitionHelpers ? root.localPartitionHelpers.key(slot, type, id) : "partition:" + slot + ":" + type + (id == null ? "" : ":" + id),
-		draft: (state, currentSlot, dirtyTestIds, manifest) => root.localPartitionTransaction.draft(state, currentSlot, dirtyTestIds, manifest),
-		finalize: (state, manifest, slotManifest, draft) => root.localPartitionTransaction.finalize(state, manifest, slotManifest, draft)
+		key: (slot, type, id) => modularLocalPartitionHelpers.key(slot, type, id),
+		draft: (state, currentSlot, dirtyTestIds, manifest) => modularLocalPartitionTransaction.draft(state, currentSlot, dirtyTestIds, manifest),
+		finalize: (state, manifest, slotManifest, draft) => modularLocalPartitionTransaction.finalize(state, manifest, slotManifest, draft)
 	});
 	root.partitionedIndexedDbReadService = createPartitionedIndexedDbReadService({
 		supported: () => typeof indexedDB !== "undefined",
-		key: (slot, type, id) => root.localPartitionHelpers ? root.localPartitionHelpers.key(slot, type, id) : "partition:" + slot + ":" + type + (id == null ? "" : ":" + id),
-		slots: (preferred) => root.localRecoverySlots ? root.localRecoverySlots(preferred) : [preferred, preferred === "a" ? "b" : "a"],
-		recover: (slot, manifest, shell, rows) => root.localPartitionRecovery(slot, manifest, shell, rows)
+		key: (slot, type, id) => modularLocalPartitionHelpers.key(slot, type, id),
+		slots: (preferred) => modularLocalRecoverySlots(preferred),
+		recover: (slot, manifest, shell, rows) => modularLocalPartitionRecovery(slot, manifest, shell, rows)
 	});
-	root.indexedDbClearService = createIndexedDbClearService({
+	var modularIndexedDbClearService = createIndexedDbClearService({
 		supported: () => typeof indexedDB !== "undefined",
-		key: (slot, type, id) => root.localPartitionHelpers ? root.localPartitionHelpers.key(slot, type, id) : "partition:" + slot + ":" + type + (id == null ? "" : ":" + id),
-		keys: (manifests) => root.localClearKeys(manifests)
+		key: (slot, type, id) => modularLocalPartitionHelpers.key(slot, type, id),
+		keys: (manifests) => modularLocalClearKeys(manifests)
 	});
 	root.localStoreService = createLocalStoreService({
 		indexedDbAvailable: () => typeof indexedDB !== "undefined",
-		get: (key) => root.indexedDbRecordService ? root.indexedDbRecordService.get(key) : Promise.resolve(null),
-		put: (record) => root.indexedDbRecordService ? root.indexedDbRecordService.put(record) : Promise.resolve(false),
-		remove: (key) => root.indexedDbRecordService ? root.indexedDbRecordService.delete(key) : Promise.resolve(false),
-		stateRecord: (value) => root.localSnapshotRecord.state(value),
-		serializedRecord: (value) => root.localSnapshotRecord.serialized(value),
+		get: (key) => modularIndexedDbRecordService ? modularIndexedDbRecordService.get(key) : Promise.resolve(null),
+		put: (record) => modularIndexedDbRecordService ? modularIndexedDbRecordService.put(record) : Promise.resolve(false),
+		remove: (key) => modularIndexedDbRecordService ? modularIndexedDbRecordService.delete(key) : Promise.resolve(false),
+		stateRecord: (value) => modularLocalSnapshotRecord.state(value),
+		serializedRecord: (value) => modularLocalSnapshotRecord.serialized(value),
 		writePartitioned: (input) => root.partitionedIndexedDbWriteService.write(input),
 		readPartitioned: (slot, get) => root.partitionedIndexedDbReadService.read(slot, get),
-		clear: (get, remove) => root.indexedDbClearService.clear(get, remove)
+		clear: (get, remove) => modularIndexedDbClearService.clear(get, remove)
 	});
 	root.passwordPolicyError = passwordPolicyError;
 	root.passwordChangeError = passwordChangeError;
@@ -16497,7 +16446,7 @@
 	root.reagentSelectOptionsHtml = createReagentSelectOptionsHtml();
 	root.reagentResultHtml = createReagentResultHtml();
 	root.reagentPairRowHtml = createReagentPairRowHtml();
-	root.storageBootService = createStorageBootService({
+	var modularStorageBootService = createStorageBootService({
 		partitionedSupported: () => typeof LocalStore !== "undefined" && LocalStore.supported(),
 		readBootRecord: () => localStorage.getItem("qclab_boot"),
 		discardBootRecord: () => localStorage.removeItem("qclab_boot"),
@@ -16507,12 +16456,12 @@
 			localLoadStatus = "partition-shell";
 			storageHydrationPromise = globalThis.hydratePartitionedState();
 		},
-		loadLegacy: () => root.localStorageLoadService.load(),
+		loadLegacy: () => modularLocalStorageLoadService.load(),
 		localLoadStatus: () => localLoadStatus,
 		recoverPendingSigmaDraft: () => globalThis.recoverPendingSigmaDraft(),
 		restoreFromIndexedDb: () => globalThis.restoreFromIndexedDb()
 	});
-	root.indexedDbRecoveryService = createIndexedDbRecoveryService({
+	var modularIndexedDbRecoveryService = createIndexedDbRecoveryService({
 		supported: () => typeof LocalStore !== "undefined" && LocalStore.supported(),
 		readPartitioned: () => typeof LocalStore.readPartitioned === "function" ? LocalStore.readPartitioned() : Promise.resolve(null),
 		readLegacy: () => LocalStore.read(),
@@ -16551,7 +16500,7 @@
 			if (raw) startupProblem.raw = raw;
 		}
 	});
-	root.partitionHydrationService = createPartitionHydrationService({
+	var modularPartitionHydrationService = createPartitionHydrationService({
 		read: () => LocalStore.readPartitioned(),
 		adopt: (value) => globalThis.adoptValidatedState(value),
 		recoverPendingSigmaDraft: () => globalThis.recoverPendingSigmaDraft(),
@@ -16571,16 +16520,16 @@
 		}
 	});
 	root.storageLifecycleService = createStorageLifecycleService({
-		sanitize: (value) => root.stateAdoptionService.sanitize(value),
+		sanitize: (value) => modularStateAdoptionService.sanitize(value),
 		normalize: (value) => {
 			state = value;
 			ensureShape({ sanitized: true });
 			return state;
 		},
-		assertInvariants: (value) => root.stateAdoptionService.assertInvariants(value),
-		boot: root.storageBootService,
-		hydrate: () => root.partitionHydrationService.hydrate(),
-		restore: () => root.indexedDbRecoveryService.restore()
+		assertInvariants: (value) => modularStateAdoptionService.assertInvariants(value),
+		boot: modularStorageBootService,
+		hydrate: () => modularPartitionHydrationService.hydrate(),
+		restore: () => modularIndexedDbRecoveryService.restore()
 	});
 	root.indexedDbMirrorService = createIndexedDbMirrorService({
 		supported: () => typeof LocalStore !== "undefined" && LocalStore.supported(),
@@ -16592,7 +16541,6 @@
 			scheduleLocalRetry();
 		}
 	});
-	root.planPartitionWrite = planPartitionWrite;
 	root.qcValueFormat = createQcValueFormat();
 	root.qcStaffIdentity = createQcStaffIdentity();
 	root.qcDateFormat = createQcDateFormat();
@@ -16627,14 +16575,14 @@
 		resizeObserver: typeof ResizeObserver === "function" ? (onResize) => new ResizeObserver(onResize) : void 0,
 		isConnected: (canvas) => canvas.isConnected !== false
 	});
-	root.chartTooltipService = createChartTooltipService({
+	var chartTooltip = createChartTooltipService({
 		find: () => document.getElementById("qcTooltip"),
 		create: () => document.createElement("div"),
 		append: (element) => document.body.appendChild(element)
 	});
-	root.qcTooltip = () => root.chartTooltipService();
+	root.qcTooltip = chartTooltip;
 	root.leveyJenningsTooltipController = createLeveyJenningsTooltipController({
-		tooltip: () => root.chartTooltipService(),
+		tooltip: chartTooltip,
 		viewport: () => ({
 			width: innerWidth,
 			height: innerHeight
@@ -16654,45 +16602,39 @@
 	var legacyLeveyJenningsAxis = globalThis;
 	root.leveyJenningsYAxisLabels = createLeveyJenningsYAxisLabels((test, value) => legacyLeveyJenningsAxis.fmtTestValue(test, value));
 	var legacyLeveyJenningsHover = globalThis;
-	root.leveyJenningsHoverModel = createLeveyJenningsHoverModel({
+	var leveyJenningsHoverModel = createLeveyJenningsHoverModel({
 		date: (value) => legacyLeveyJenningsHover.vnDate(value),
 		escape: (value) => legacyLeveyJenningsHover.esc(value),
 		pointValue: (point, test) => legacyLeveyJenningsHover.fmtPointValue(point, test),
 		number: (value) => legacyLeveyJenningsHover.fmt(value)
 	});
-	root.leveyJenningsPointStyle = leveyJenningsPointStyle;
-	root.leveyJenningsDisplayPlan = createLeveyJenningsDisplayPlan((input) => chartViewModel.sampleIndices(input));
+	var leveyJenningsDisplayPlan = createLeveyJenningsDisplayPlan((input) => chartViewModel.sampleIndices(input));
 	root.leveyJenningsPointRenderModel = createLeveyJenningsPointRenderModel({
-		displayPlan: (points, results, width) => root.leveyJenningsDisplayPlan(points, results, width),
+		displayPlan: (points, results, width) => leveyJenningsDisplayPlan(points, results, width),
 		verdict: (test, rules) => globalThis.ruleResultLevel(test, rules),
 		style: (status) => leveyJenningsPointStyle(status, LEVEY_JENNINGS_COLORS),
-		hover: (input) => root.leveyJenningsHoverModel(input)
+		hover: (input) => leveyJenningsHoverModel(input)
 	});
 	root.leveyJenningsBandRects = leveyJenningsBandRects;
 	root.leveyJenningsGridLines = leveyJenningsGridLines;
 	root.leveyJenningsMultiSeries = leveyJenningsMultiSeries;
 	root.leveyJenningsMultiRunTicks = createLeveyJenningsMultiRunTicks((value) => globalThis.vnDate(value));
 	root.leveyJenningsLegendLayout = (levels, colors, startX, measure) => createLeveyJenningsLegendLayout((text) => measure(text).width)(levels, colors, startX);
-	root.leveyJenningsMultiDisplayPlan = createLeveyJenningsMultiDisplayPlan((input) => chartViewModel.sampleIndices(input));
+	var leveyJenningsMultiDisplayPlan = createLeveyJenningsMultiDisplayPlan((input) => chartViewModel.sampleIndices(input));
 	var legacyLeveyJenningsMultiHover = globalThis;
-	root.leveyJenningsMultiHoverModel = createLeveyJenningsMultiHoverModel({
+	var leveyJenningsMultiHoverModel = createLeveyJenningsMultiHoverModel({
 		date: (value) => legacyLeveyJenningsMultiHover.vnDate(value),
 		escape: (value) => legacyLeveyJenningsMultiHover.esc(value),
 		pointValue: (point, test) => legacyLeveyJenningsMultiHover.fmtPointValue(point, test),
 		number: (value) => legacyLeveyJenningsMultiHover.fmt(value)
 	});
 	root.leveyJenningsMultiPointRenderModel = createLeveyJenningsMultiPointRenderModel({
-		displayPlan: (input) => root.leveyJenningsMultiDisplayPlan(input),
+		displayPlan: (input) => leveyJenningsMultiDisplayPlan(input),
 		verdict: (test, rules) => globalThis.ruleResultLevel(test, rules),
-		hover: (input) => root.leveyJenningsMultiHoverModel(input)
+		hover: (input) => leveyJenningsMultiHoverModel(input)
 	});
 	root.leveyJenningsMultiDividers = leveyJenningsMultiDividers;
 	root.cusumChartGeometry = cusumChartGeometry;
-	root.cusumDisplayPlan = createCusumDisplayPlan((input) => chartViewModel.sampleIndices(input));
-	root.cusumHoverModel = createCusumHoverModel({
-		date: (value) => globalThis.vnDate(value),
-		number: (value, decimals) => globalThis.fmt(value, decimals)
-	});
 	root.cusumPointRenderModel = cusumPointRenderModel;
 	root.cusumReferenceLines = cusumReferenceLines;
 	root.cusumLinePoints = cusumLinePoints;
@@ -16780,7 +16722,6 @@
 	});
 	root.qcRangeSafetyGate = rangeSafetyGate;
 	root.qcRangeBiasEvaluation = rangeBiasEvaluation;
-	root.csvCellService = csvCell;
 	root.reportExportHelpers = reportExportHelpers;
 	root.actionReportSummary = createActionReportSummary({
 		labels: () => typeof globalThis.ACTION_LABELS === "object" ? globalThis.ACTION_LABELS : {},
@@ -16795,7 +16736,7 @@
 		residualRiskScore: (action) => typeof globalThis.actionResidualRiskScore === "function" ? globalThis.actionResidualRiskScore(action) : 0,
 		eventDate: (action) => typeof globalThis.actionEventDate === "function" ? globalThis.actionEventDate(action) : action.date,
 		approvalLabel: (action) => typeof globalThis.actionApprovalLabel === "function" ? globalThis.actionApprovalLabel(action) : action.approvalStatus || "Chờ duyệt",
-		pointValue: (point, test) => globalThis.dataIoQcPoint(point, test),
+		pointValue: (point, test) => root.qcExportValueFormat.point(point, test),
 		formatDate: (value) => vnDate(value),
 		formatDateTime: (value) => formatDateTimeVN(value),
 		testName: (test) => globalThis.testDisplayName(test),
@@ -17107,7 +17048,6 @@
 	root.entryTreeKeyCommand = entryTreeKeyCommand;
 	root.entrySelectionState = entrySelectionState;
 	root.entryExpandedTablesToggle = entryExpandedTablesToggle;
-	root.entryPointContext = entryPointContext;
 	root.entryVoidNceChoice = entryVoidNceChoice;
 	root.entryVoidReasonValid = entryVoidReasonValid;
 	root.entryRecordErrorMessage = entryRecordErrorMessage;
@@ -17189,7 +17129,7 @@
 	});
 	root.dashboardStatusTabsHtml = createDashboardStatusTabsHtml({ matches: (item, key) => root.dashboardStatusFilter.matches(item, key) });
 	root.dashboardExpiringLotsHtml = createDashboardExpiringLotsHtml({ escape: (value) => root.esc(value) });
-	root.dashboardQcFollowupItemHtml = createDashboardQcFollowupItemHtml({
+	var dashboardQcFollowupItemHtml = createDashboardQcFollowupItemHtml({
 		escape: (value) => root.esc(value),
 		testLabel: (test) => root.testDisplayName(test),
 		date: (value) => root.vnDate(value),
@@ -17197,34 +17137,33 @@
 		button: (label, action, variant) => root.btn(label, action, variant),
 		quote: (value) => root.jsq(value)
 	});
-	root.dashboardMissingTargetItemHtml = createDashboardMissingTargetItemHtml({
+	var dashboardMissingTargetItemHtml = createDashboardMissingTargetItemHtml({
 		escape: (value) => root.esc(value),
 		testLabel: (test) => root.testDisplayName(test),
 		button: (label, action, variant) => root.btn(label, action, variant)
 	});
-	root.dashboardOverdueActionItemHtml = createDashboardOverdueActionItemHtml({
+	var dashboardOverdueActionItemHtml = createDashboardOverdueActionItemHtml({
 		escape: (value) => root.esc(value),
 		testLabel: (test) => root.testDisplayName(test),
 		date: (value) => root.vnDate(value),
 		button: (label, action, variant) => root.btn(label, action, variant)
 	});
-	root.dashboardTestStatusTags = dashboardTestStatusTags;
-	root.dashboardLevelPillHtml = createDashboardLevelPillHtml({
+	var dashboardStatusTags = dashboardTestStatusTags;
+	var dashboardLevelPillHtml = createDashboardLevelPillHtml({
 		escape: (value) => root.esc(value),
 		format: (value) => root.fmt(value)
 	});
-	root.dashboardTestRank = dashboardTestRank;
-	root.dashboardLatestPointText = createDashboardLatestPointText({
+	var dashboardRank = dashboardTestRank;
+	var dashboardLatestPointText = createDashboardLatestPointText({
 		date: (value) => root.vnDate(value),
 		pointValue: (point, test) => root.fmtPointValue(point, test)
 	});
-	root.dashboardCompletion = dashboardCompletion;
 	root.dashboardFollowupPanelHtml = dashboardFollowupPanelHtml;
-	root.dashboardTestSearchText = createDashboardTestSearchText({
+	var dashboardTestSearchText = createDashboardTestSearchText({
 		normalize: (value) => root.searchText(value),
 		label: (test) => root.testDisplayName(test)
 	});
-	root.dashboardLatestPoint = createDashboardLatestPoint({ runNumber: (point) => root.pointRunNo(point) });
+	var dashboardLatestPoint = createDashboardLatestPoint({ runNumber: (point) => root.pointRunNo(point) });
 	root.dashboardKpisHtml = dashboardKpisHtml;
 	root.dashboardProgressHtml = dashboardProgressHtml;
 	root.dashboardHeadHtml = createDashboardHeadHtml({
@@ -17232,7 +17171,7 @@
 		topUserBox: () => typeof globalThis.topUserBox === "function" ? globalThis.topUserBox() : ""
 	});
 	root.dashboardTestPanelHtml = createDashboardTestPanelHtml({ escapeAttr: (value) => root.escAttr(value) });
-	root.dashboardTestRowHtml = createDashboardTestRowHtml({
+	var dashboardTestRowHtml = createDashboardTestRowHtml({
 		escape: (value) => root.esc(value),
 		escapeAttr: (value) => root.escAttr(value)
 	});
@@ -17262,34 +17201,34 @@
 	root.defaultDateFieldsService = createDefaultDateFieldsService({ find: (id) => typeof document === "undefined" ? null : document.getElementById(id) });
 	root.postRenderPageActions = createPostRenderPageActions({ requestFrame: (work) => requestAnimationFrame(work) });
 	root.dashboardOverdueActions = createDashboardOverdueActions({ overdue: (action) => root.actionOverdue(action) });
-	root.dashboardOverdueActionListHtml = createDashboardOverdueActionListHtml({ render: (item) => root.dashboardOverdueActionItemHtml(item) });
-	root.dashboardQcFollowupListHtml = createDashboardQcFollowupListHtml({ render: (item, kind) => root.dashboardQcFollowupItemHtml(item, kind) });
-	root.dashboardMissingTargetListHtml = createDashboardMissingTargetListHtml({ render: (item) => root.dashboardMissingTargetItemHtml(item) });
+	root.dashboardOverdueActionListHtml = createDashboardOverdueActionListHtml({ render: (item) => dashboardOverdueActionItemHtml(item) });
+	root.dashboardQcFollowupListHtml = createDashboardQcFollowupListHtml({ render: (item, kind) => dashboardQcFollowupItemHtml(item, kind) });
+	root.dashboardMissingTargetListHtml = createDashboardMissingTargetListHtml({ render: (item) => dashboardMissingTargetItemHtml(item) });
 	root.dashboardExpiringLotItems = dashboardExpiringLotItems;
 	root.dashboardWestgardAlerts = dashboardWestgardAlerts;
 	root.dashboardMissingTargetItems = dashboardMissingTargetItems;
-	root.dashboardLevelData = createDashboardLevelData({ stats: (values) => root.stats(values) });
-	root.dashboardTestAction = createDashboardTestAction({ button: (label, action, variant) => root.btn(label, action, variant) });
-	root.dashboardLevelPillsHtml = createDashboardLevelPillsHtml({
+	var dashboardLevelData = createDashboardLevelData({ stats: (values) => root.stats(values) });
+	var dashboardTestAction = createDashboardTestAction({ button: (label, action, variant) => root.btn(label, action, variant) });
+	var dashboardLevelPillsHtml = createDashboardLevelPillsHtml({
 		targetOk: (level) => root.levelTargetOk(level),
-		render: (input) => root.dashboardLevelPillHtml(input)
+		render: (input) => dashboardLevelPillHtml(input)
 	});
 	root.dashboardTestRowsHtml = createDashboardTestRowsHtml({
-		statusTag: (status) => root.dashboardTestStatusTags.westgard(status),
-		todayTag: (count, total) => root.dashboardTestStatusTags.today(count, total),
-		levelsHtml: (levels) => root.dashboardLevelPillsHtml(levels),
-		latestText: (point, test) => root.dashboardLatestPointText(point, test),
-		rank: (status, count, total) => root.dashboardTestRank(status, count, total),
-		rowHtml: (input) => root.dashboardTestRowHtml(input),
-		actionHtml: (testId, level) => root.dashboardTestAction(testId, level),
+		statusTag: (status) => dashboardStatusTags.westgard(status),
+		todayTag: (count, total) => dashboardStatusTags.today(count, total),
+		levelsHtml: (levels) => dashboardLevelPillsHtml(levels),
+		latestText: (point, test) => dashboardLatestPointText(point, test),
+		rank: (status, count, total) => dashboardRank(status, count, total),
+		rowHtml: (input) => dashboardTestRowHtml(input),
+		actionHtml: (testId, level) => dashboardTestAction(testId, Number(level)),
 		testDisplayName: (test) => root.testDisplayName(test)
 	});
 	root.dashboardTestItems = createDashboardTestItems({
 		activeWestgard: (test) => root.activeWestgard(test),
 		summarize: (input) => root.WestgardViewModel.summarizeTestStatus(input),
-		levelData: (views, today) => root.dashboardLevelData(views, today),
-		latestPoint: (points) => root.dashboardLatestPoint(points),
-		searchText: (test, levels) => root.dashboardTestSearchText(test, levels),
+		levelData: (views, today) => dashboardLevelData(views, today),
+		latestPoint: (points) => dashboardLatestPoint(points),
+		searchText: (test, levels) => dashboardTestSearchText(test, levels),
 		markStatus: (testId, status) => root.statusMemo.set(testId, status)
 	});
 	root.dashboardTestListHtml = dashboardTestListHtml;
@@ -17396,12 +17335,10 @@
 	root.teaReferenceStatusPresentation = teaReferenceStatusHtml;
 	root.manageTransitionStatusPresentation = manageTransitionStatus;
 	root.manageLotStatusPresentation = createManageLotStatus({ daysToExpiry: (value) => root.daysToExp(value) });
-	root.sameIdSetPresentation = sameIdSet;
 	root.manageInstrumentNamePresentation = manageInstrumentName;
 	root.manageLotLabelPresentation = manageLotLabel;
 	root.managePanelNamePresentation = managePanelName;
 	root.manageLotGroupLabelsPresentation = manageLotGroupLabels;
-	root.sameNormalizedTextPresentation = createSameNormalizedText({ normalize: (value) => root.searchText(value) });
 	root.groupsOfLotPresentation = groupsOfLot;
 	root.targetGroupLotsPresentation = targetGroupLots;
 	root.targetGroupLabelPresentation = targetGroupLabel;
@@ -17421,8 +17358,6 @@
 	root.historyVisibleRowsPresentation = historyVisibleRows;
 	root.historyRowSortPresentation = sortHistoryRows;
 	root.historySummaryPresentation = historySummary;
-	root.teaPositiveNumberPresentation = teaPositiveNumber;
-	root.teaReferenceExternalChangedPresentation = teaReferenceExternalChanged;
 	root.teaSourceRegistryItemsPresentation = teaSourceRegistryItems;
 	root.manageSearchMatchPresentation = manageSearchMatch;
 	root.lotTransitionTargetNumberPresentation = lotTransitionTargetNumber;
@@ -17556,13 +17491,12 @@
 		key: "qclab_sigma_draft",
 		savedAtKey: "qclab_saved_at"
 	});
-	root.stateAdoptionService = createStateAdoptionService({
+	var modularStateAdoptionService = createStateAdoptionService({
 		validate: (value) => root.QCCore.validateBackup(value),
 		sanitize: (value, options) => root.QCCore.sanitizeBackup(value, options),
 		invariants: (value, options) => root.QCCore.validateStateInvariants(value, options)
 	});
 	root.corruptLocalQuarantine = createCorruptLocalQuarantine(() => (/* @__PURE__ */ new Date()).toISOString());
-	root.syncValueCodec = createSyncValueCodec();
 	root.firebaseConfigSelection = createFirebaseConfigSelection([
 		"apiKey",
 		"authDomain",
@@ -17578,34 +17512,26 @@
 		setInterval: (fn, ms) => globalThis.setInterval(fn, ms),
 		clearInterval: (timer) => globalThis.clearInterval(timer)
 	});
-	root.firebaseDisconnectedState = firebaseDisconnectedState;
-	root.firebaseCanPull = firebaseCanPull;
 	root.firebasePullService = createFirebasePullService({
 		read: (ref) => ref.once("value"),
 		handle: (value, options) => globalThis.fbHandleValue(value, options),
 		canPull: firebaseCanPull
 	});
-	root.firebaseMergeApplication = createFirebaseMergeApplication({
-		merge: (local, remote, base) => globalThis.fbMerge(local, remote, base),
-		firstMerge: (local, remote) => globalThis.fbFirstConnectMerge(local, remote)
-	});
-	root.localPartitionHelpers = createLocalPartitionHelpers();
-	root.localSnapshotRecord = createLocalSnapshotRecord({
+	var modularLocalPartitionHelpers = createLocalPartitionHelpers();
+	var modularLocalSnapshotRecord = createLocalSnapshotRecord({
 		clone: (value) => typeof structuredClone === "function" ? structuredClone(value) : JSON.parse(JSON.stringify(value)),
 		now: () => Date.now(),
 		key: "state"
 	});
-	root.localPartitionValid = localPartitionValid;
-	root.localRecoverySlots = localRecoverySlots;
-	root.localPartitionTransaction = createLocalPartitionTransaction({
-		nextSlot: (value) => root.localPartitionHelpers.nextSlot(value),
-		shell: (value) => root.localPartitionHelpers.shell(value),
+	var modularLocalRecoverySlots = localRecoverySlots;
+	var modularLocalPartitionTransaction = createLocalPartitionTransaction({
+		nextSlot: (value) => modularLocalPartitionHelpers.nextSlot(value),
+		shell: (value) => modularLocalPartitionHelpers.shell(value),
 		now: () => Date.now()
 	});
-	root.localPartitionRecovery = createLocalPartitionRecovery(localPartitionValid);
-	root.localClearKeys = createLocalClearKeys((slot, type, id) => root.localPartitionHelpers.key(slot, type, id), "state");
+	var modularLocalPartitionRecovery = createLocalPartitionRecovery(localPartitionValid);
+	var modularLocalClearKeys = createLocalClearKeys((slot, type, id) => modularLocalPartitionHelpers.key(slot, type, id), "state");
 	root.firebaseSnapshotGate = firebaseSnapshotGate;
-	root.firebaseEmptySnapshotPlan = firebaseEmptySnapshotPlan;
 	root.firebaseRemoteSnapshot = createFirebaseRemoteSnapshot((value) => root.QCCore.validateBackup(value), (value) => root.QCCore.sanitizeBackup(value));
 	root.firebaseOwnSnapshotPlan = firebaseOwnSnapshotPlan;
 	root.firebaseFirstConnectPlan = firebaseFirstConnectPlan;
@@ -17751,12 +17677,6 @@
 		approvalStatus: (action) => nceActionBasics.actionApprovalStatus(action),
 		activeFollowUp: (actions, action) => root.NceActionIdentityService.activeFollowUp(actions, action)
 	});
-	root.ActionRecordService = createActionRecordService({
-		now: () => (/* @__PURE__ */ new Date()).toISOString(),
-		createId: () => uid(),
-		isCancelled: (action) => nceActionBasics.actionCancelled(action),
-		approvalStatus: (action) => nceActionBasics.actionApprovalStatus(action)
-	});
 	root.NceFormCommand = createNceFormCommand({
 		todayIso: () => isoToday(),
 		draftStatus: (action) => root.ActionDraftStatusService(action),
@@ -17767,7 +17687,12 @@
 		effectivenessMissingKey: (action) => typeof root.actionEffectivenessMissingKey === "function" ? root.actionEffectivenessMissingKey(action) : "effectivenessNote",
 		isCancelled: (action) => nceActionBasics.actionCancelled(action),
 		approvalStatus: (action) => nceActionBasics.actionApprovalStatus(action),
-		records: root.ActionRecordService
+		records: createActionRecordService({
+			now: () => (/* @__PURE__ */ new Date()).toISOString(),
+			createId: () => uid(),
+			isCancelled: (action) => nceActionBasics.actionCancelled(action),
+			approvalStatus: (action) => nceActionBasics.actionApprovalStatus(action)
+		})
 	});
 	root.NceLifecycleCommand = createNceLifecycleCommand({
 		review: root.ActionReviewService,
@@ -17888,7 +17813,7 @@
 	root.EntryRecordCommand = createEntryRecordCommand({
 		recordPoint: (targetState, input) => root.EntryService.recordPoint(targetState, input),
 		canEnter: (test, level) => typeof root.canEnterQcForLevel === "function" && !!root.canEnterQcForLevel(test, level),
-		pointContext: (testId, level, lot, activeLot) => typeof root.entryPointContext === "function" ? root.entryPointContext(testId, level, lot, activeLot) : {},
+		pointContext: (testId, level, lot, activeLot) => entryPointContext(testId, level, lot, activeLot),
 		verdict: (test, input, point, parallel) => {
 			if (typeof root.clearDerivedForTest === "function") root.clearDerivedForTest(input.testId);
 			if (parallel && typeof root.parallelWestgard === "function") return root.parallelWestgard(test, {
@@ -17941,7 +17866,6 @@
 		nowIso: () => (/* @__PURE__ */ new Date()).toISOString(),
 		appVersion: () => root.QCLAB_APP?.version || ""
 	});
-	root.BackupService = backupService;
 	root.BACKUP_IMPORT_MAX_BYTES = BACKUP_IMPORT_MAX_BYTES;
 	root.BACKUP_IMPORT_WARN_BYTES = BACKUP_IMPORT_WARN_BYTES;
 	root.serializeBackupData = backupService.serializeBackupData;
@@ -17978,12 +17902,27 @@
 		current: () => state,
 		log: () => logAct("Xuất backup", "Xuất toàn bộ dữ liệu JSON có checksum", "Dữ liệu"),
 		save: () => save({ clearDerived: false }),
-		create: (value) => root.createBackupPackage(value),
+		create: (value) => backupService.createBackupPackage(value),
 		confirmOversized: (bytes, detail) => root.confirmOversizedBackup(bytes, detail),
+		warning: (bytes) => backupService.backupImportSizeError(bytes) ? null : root.backupSizeWarningConfirmation({ bytes }),
 		confirm: (dialog) => root.confirmDialog(dialog),
 		download: (name, text) => root.downloadBackupText(name, text),
 		mark: (bytes) => root.markBackupDone(bytes),
 		update: () => root.updateBackupBanner()
+	});
+	root.BackupImportCommand = createBackupImportCommand({
+		prepare: (text) => backupService.prepareBackupImport(text),
+		sizeWarning: (bytes) => backupService.backupSizeWarning(bytes),
+		snapshot: (prefix) => root.BackupExportCommand.snapshot(prefix),
+		restore: (input) => root.BackupRestoreCommand.restore(input)
+	});
+	root.BackupInspectionCommand = createBackupInspectionCommand({ inspect: (text, bytes) => backupService.inspectBackupText(text, bytes) });
+	root.BackupStatusCommand = createBackupStatusCommand({
+		reminder: root.backupReminderService,
+		marker: root.backupLocalMarker,
+		maxBytes: BACKUP_IMPORT_MAX_BYTES,
+		size: (bytes) => backupService.backupSizeMB(bytes),
+		warning: (bytes) => backupService.backupSizeWarning(bytes)
 	});
 	root.ResetOperationalDataCommand = createResetOperationalDataCommand({
 		current: () => state,
@@ -18042,16 +17981,10 @@
 	});
 	root.LISClientService = lisClient;
 	root.lisGatewayRuntime = lisRuntime;
-	root.LIS_GATEWAY_STORAGE_KEY = LIS_GATEWAY_STORAGE_KEY;
-	root.LIS_POLL_MS = LIS_POLL_MS;
 	root.lisGatewayConfig = lisClient.gatewayConfig;
 	root.lisNormalizeGatewayUrl = lisClient.normalizeGatewayUrl;
-	root.lisGatewaySetStatus = lisClient.setStatus;
 	root.lisGatewayStatusText = lisClient.statusText;
-	root.lisGatewayFetch = lisClient.gatewayFetch;
-	root.lisGatewayHealth = lisClient.gatewayHealth;
 	root.lisGatewayPull = lisClient.pull;
-	root.lisResultToPointInput = lisClient.resultToPointInput;
 	root.lisImportResult = lisClient.importResult;
 	root.lisRejectResult = lisClient.rejectResult;
 	root.lisGatewayStart = lisClient.start;
@@ -18134,7 +18067,7 @@
 		key: (value) => globalThis.teaRefName(value),
 		analyteMeta: (name, record) => globalThis.teaAnalyteMeta(name, record),
 		effectiveReferences: () => globalThis.effectiveTeaRefs(),
-		defaultReferences: () => globalThis.REFTESTS,
+		defaultReferences: () => REFTESTS,
 		sourceRegistry: () => globalThis.TEA_SOURCE_REGISTRY,
 		createId: () => globalThis.uid(),
 		todayIso: () => globalThis.isoToday(),
@@ -18174,8 +18107,6 @@
 	root.reagentReportDetailCardHtml = reagentReportDetailCardHtml;
 	root.reagentReportChartGridHtml = reagentReportChartGridHtml;
 	root.reagentPairMath = reagentPairMath;
-	root.reagentStatistics = reagentStatistics;
-	root.reagentTDistribution = reagentTDistribution;
 	root.reagentComparisonCalculator = createReagentComparisonCalculator({
 		validPairs: reagentPairMath.validPairs,
 		mean: reagentStatistics.mean,

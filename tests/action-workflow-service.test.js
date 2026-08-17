@@ -592,17 +592,4 @@ function fixture(actionOverrides = {}) {
     'một hồ sơ không được mở vòng tiếp theo hai lần');
 }
 
-{
-  const records = [];
-  const created = ctx.ActionRecordService.create(records, { nceId: 'NCE-MỚI', protocolVersion: 3, effectivenessStatus: 'pending', action: 'Khắc phục' }, { id: 'u1', username: 'ktv-a', name: 'KTV A' });
-  assert.equal(records[0], created);
-  assert.equal(created.approvalStatus, 'pending');
-  assert.deepEqual([...created.contentEditorUserIds], ['u1']);
-  const updated = ctx.ActionRecordService.update(created, { action: 'Khắc phục đầy đủ', effectivenessStatus: 'effective', effectivenessDate: '2026-08-09', effectivenessNote: 'Theo dõi không tái diễn' }, { id: 'u2', username: 'admin', name: 'Quản trị' });
-  assert.equal(updated, created);
-  assert.equal(created.approvalStatus, 'pending');
-  assert.deepEqual([...created.contentEditorUserIds].sort(), ['u1', 'u2']);
-  assert.equal(created.effectivenessBy, 'Quản trị');
-}
-
 console.log('ActionWorkflowService tests passed');

@@ -42,13 +42,13 @@ const { loadSandbox, run } = require('./helpers/sandbox');
 
   /* --- Ngay theo gio dia phuong, khong cat chuoi UTC --- */
   const rec = (over = {}) => ({ message: { messageId: 'M1', value: 5.6, runId: 'r1', operator: 'KTV A', measuredAt: '2026-08-01T23:05:00Z', ...(over.message || {}) }, resolved: { ok: true, qclabTestId: 'T1', level: 1, lot: 'L1', ...(over.resolved || {}) } });
-  const local = JSON.parse(JSON.stringify(run(ctx, `lisResultToPointInput(${JSON.stringify(rec())})`)));
+  const local = JSON.parse(JSON.stringify(run(ctx, `LISClientService.resultToPointInput(${JSON.stringify(rec())})`)));
   const expected = new Date('2026-08-01T23:05:00Z');
   const expectedDate = `${expected.getFullYear()}-${String(expected.getMonth() + 1).padStart(2, '0')}-${String(expected.getDate()).padStart(2, '0')}`;
   assert.equal(local.date, expectedDate, 'ngay phai theo gio dia phuong cua may chay app');
   assert.equal(local.tid, 'T1'); assert.equal(local.level, 1); assert.equal(local.lot, 'L1');
   assert.equal(local.value, 5.6); assert.equal(local.staff, 'KTV A');
-  assert.equal(run(ctx, `lisResultToPointInput(${JSON.stringify(rec({ message: { measuredAt: 'khong-phai-ngay' } }))})`), null, 'thoi gian hong phai tra null chu khong dung ngay hom nay');
+  assert.equal(run(ctx, `LISClientService.resultToPointInput(${JSON.stringify(rec({ message: { measuredAt: 'khong-phai-ngay' } }))})`), null, 'thoi gian hong phai tra null chu khong dung ngay hom nay');
 
   /* --- Keo ve: tach nhom da khop va chua khop mapping --- */
   storage.set('qclab_lis_gateway', JSON.stringify({ enabled: true, url: 'http://127.0.0.1:8787', token: 'tok-abc' }));

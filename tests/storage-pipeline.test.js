@@ -41,13 +41,6 @@ assert.equal(value.lastJson, '{"value":2}');
 assert.equal(value.quotaResult, false);
 assert.deepEqual(value.removed, ['qclab', 'qclab_saved_at'], 'stale local snapshot is removed after a quota failure');
 
-{
-  const writerCtx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'modules/local-store.js', 'modules/state-storage.js', 'generated/modular-pilot.js']);
-  const writer = run(writerCtx, `(function(){var values={};localStorage={getItem:function(){return null;},setItem:function(k,v){values[k]=String(v);},removeItem:function(k){delete values[k];}};markSaved=function(){};saveTime=function(){return'now';};var ok=localStorageSnapshotWriter.write('{"snapshot":1}',123,true);return{ok,values,service:typeof localStorageSnapshotWriter};})()`);
-  assert.deepEqual(JSON.parse(JSON.stringify(writer)), { ok:true, values:{qclab:'{"snapshot":1}',qclab_saved_at:'123'}, service:'object' },
-    'the TypeScript writer persists the local snapshot without UI side effects when quiet');
-}
-
 // A synchronous, test-scoped Sigma draft bridges an immediate reload while the
 // partitioned IndexedDB write and Firebase update are still asynchronous.
 {

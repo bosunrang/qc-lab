@@ -10,7 +10,8 @@ assert.match(settings,/globalThis\.settingsBrandPreviewHtml\(\{logo,markText:bra
 assert.match(settings,/globalThis\.SettingsProfileCommand\.saveLab\(input\)/,'Hồ sơ đơn vị phải dùng command TypeScript');
 assert.match(settings,/globalThis\.settingsFirebaseRulesPanelHtml\(globalThis\.settingsFirebaseGuideHtml\(\),globalThis\.settingsFirebaseRulesText\(\)\)/,'Panel quy tắc Firebase phải dùng bridge TypeScript');
 assert.match(bridge,/settingsBrandPreviewHtml: ReturnType<typeof createBrandPreviewHtml>;/,'Preview thương hiệu phải là hợp đồng bridge bắt buộc');
-assert.match(bridge,/labProfileService: ReturnType<typeof createLabProfileService>;/,'Hồ sơ đơn vị phải là hợp đồng bridge bắt buộc');
+assert.match(bridge,/const labProfileService=createLabProfileService\(/,'Hồ sơ đơn vị phải là dependency nội bộ của command Settings');
+assert.doesNotMatch(bridge,/root\.labProfileService\s*=/,'Hồ sơ đơn vị không được công bố facade khi không có caller classic');
 assert.match(bridge,/settingsFirebaseRulesPanelHtml: ReturnType<typeof createFirebaseRulesPanelHtml>;/,'Panel quy tắc Firebase phải là hợp đồng bridge bắt buộc');
 
 console.log('Settings presentation TypeScript bridge tests passed');

@@ -31,7 +31,7 @@ assert.match(bridge, /reagentEmptyPageHtml: typeof reagentEmptyPageHtml;/, 'Rend
 assert.match(route, /const toolbarHtml=globalThis\.reagentToolbarHtml\(\{selectOptionsHtml:rcSelectOptions\(\),primaryActionsHtml:canWrite\(\)\?btn\('\+ Thêm','openRcCreateModal\(\)','teal rc-add-btn'\)\+btn\(rcToolIcon\('trash'\)\+' Xóa','rcDeleteCurrent\(\)','danger rc-delete-btn'\):'',secondaryActionsHtml:/, 'Toolbar hóa chất phải dùng renderer TypeScript');
 assert.match(bridge, /reagentToolbarHtml: typeof reagentToolbarHtml;/, 'Renderer toolbar hóa chất phải là hợp đồng bridge bắt buộc');
 assert.match(route, /const pairPanelHtml=globalThis\.reagentPairPanelHtml\(\{oldLotHeadHtml:oldLotHead,newLotHeadHtml:newLotHead,rowsHtml:rows,actionsHtml:canWrite\(\)\?btn\('\+ Thêm mẫu','rcAddRow\(\)','ghost sm'\)\+' '\+btn\('Xóa dữ liệu','rcClearRows\(\)','ghost sm'\):'',minPairs:RC_MIN_PAIRS\}\);/, 'Panel cặp hóa chất phải dùng renderer TypeScript');
-assert.match(route, /\$\{pairPanelHtml\}<\/div>\n   \$\{resultsPanelsHtml\}/, 'Lưới nhập hóa chất phải được đóng trước panel kết quả');
+assert.match(route, /\$\{pairPanelHtml\}<\/div>\r?\n   \$\{resultsPanelsHtml\}/, 'Lưới nhập hóa chất phải được đóng trước panel kết quả');
 assert.match(bridge, /reagentPairPanelHtml: typeof reagentPairPanelHtml;/, 'Renderer panel cặp hóa chất phải là hợp đồng bridge bắt buộc');
 assert.match(route, /const infoPanelHtml=globalThis\.reagentInfoPanelHtml\(\{disabledAttr:ro,reagentValueHtml:escAttr\(t\.reagent\),unitValueHtml:escAttr\(t\.unit\),lotOldValueHtml:escAttr\(t\.lotOld\),lotNewValueHtml:escAttr\(t\.lotNew\),dateInputHtml:dateBox\('rcDate',t\.date\|\|'','',`\$\{ro\} onchange="rcMeta\('date',this\.value\)"`\),/, 'Panel thông tin hóa chất phải dùng renderer TypeScript');
 assert.match(bridge, /reagentInfoPanelHtml: typeof reagentInfoPanelHtml;/, 'Renderer panel thông tin hóa chất phải là hợp đồng bridge bắt buộc');
@@ -71,17 +71,12 @@ assert.match(bridge, /reagentReportItemPresentation: typeof reagentReportItemPre
 assert.match(route, /const model=globalThis\.reagentReportPresentation\.detailModel\(R,t,RC_MIN_PAIRS,rcDateText\(t\.date\)\);/, 'Chi tiết hóa chất phải dùng model TypeScript');
 assert.match(route, /const note=model\.conclusion;/, 'Kết luận hóa chất phải dùng model TypeScript');
 assert.match(route, /function rcReportVerdict\(R\)\{return globalThis\.reagentReportPresentation\.verdict\(R,RCC\);\}/, 'Trạng thái kết luận hóa chất phải dùng presentation TypeScript');
-assert.match(route, /function rcPTwo\(t,df\)\{return globalThis\.reagentTDistribution\.twoSidedPValue\(t,df\);\}/, 'P hai phía phải dùng domain TypeScript');
-assert.match(route, /function rcTCrit\(df,alpha\)\{return globalThis\.reagentTDistribution\.tCritical\(df,alpha\);\}/, 'Ngưỡng t phải dùng domain TypeScript');
-assert.match(bridge, /reagentTDistribution: typeof reagentTDistribution;/, 'Phân phối t phải là hợp đồng bridge bắt buộc');
-assert.match(route, /function rcValid\(ds\)\{return globalThis\.reagentPairMath\.validPairs\(ds&&ds\.rows\);\}/, 'Chuẩn hóa cặp hóa chất phải dùng domain TypeScript');
 assert.match(route, /function rcPairCalc\(r\)\{return globalThis\.reagentPairMath\.pairCalc\(r\);\}/, 'Tính từng cặp hóa chất phải dùng domain TypeScript');
 assert.match(bridge, /reagentPairMath: typeof reagentPairMath;/, 'Toán học cặp hóa chất phải là hợp đồng bridge bắt buộc');
 assert.match(route, /function rcCalc\(ds\)\{return globalThis\.reagentComparisonCalculator\.calculate\(ds,RC_MIN_PAIRS\);/, 'Calculator hóa chất phải dùng service TypeScript');
 assert.match(bridge, /reagentComparisonCalculator: ReturnType<typeof createReagentComparisonCalculator>;/, 'Calculator hóa chất phải là hợp đồng bridge bắt buộc');
-assert.match(route, /function rcMax\(a\)\{return globalThis\.reagentStatistics\.max\(a\);\}/, 'Thống kê cực đại phải dùng domain TypeScript');
-assert.match(route, /function rcPB\(x,y\)\{return globalThis\.reagentStatistics\.passingBablok\(x,y\);\}/, 'Hồi quy Passing-Bablok phải dùng domain TypeScript');
-assert.match(bridge, /reagentStatistics: typeof reagentStatistics;/, 'Thống kê hóa chất phải là hợp đồng bridge bắt buộc');
+assert.doesNotMatch(route, /function rc(?:PTwo|TCrit|Max|Min|Mean|Var|Pearson|Ols|Median|PB|Valid)\(/, 'Không giữ facade thống kê hóa chất đã retire');
+assert.doesNotMatch(bridge, /reagent(?:Statistics|TDistribution): typeof/, 'Không công bố facade thống kê hóa chất đã retire');
 assert.doesNotMatch(route, /function rcBetacf\(/, 'Không giữ xấp xỉ beta classic khi phân phối t đã dùng TypeScript');
 assert.doesNotMatch(route, /function rcLgamma\(/, 'Không giữ xấp xỉ gamma classic khi phân phối t đã dùng TypeScript');
 assert.doesNotMatch(route, /function rcBetai\(/, 'Không giữ xấp xỉ beta regularized classic khi phân phối t đã dùng TypeScript');

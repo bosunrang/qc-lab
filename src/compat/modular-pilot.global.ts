@@ -10,6 +10,9 @@ import {
 } from '../application/backup/backup-service';
 import { createBackupRestoreCommand, type BackupRestoreCommand } from '../application/backup/backup-restore-command';
 import { createBackupExportCommand, type BackupExportCommand } from '../application/backup/backup-export-command';
+import { createBackupImportCommand, type BackupImportCommand } from '../application/backup/backup-import-command';
+import { createBackupInspectionCommand, type BackupInspectionCommand } from '../application/backup/backup-inspection-command';
+import { createBackupStatusCommand, type BackupStatusCommand } from '../application/backup/backup-status-command';
 import { createBackupLocalMarker } from '../application/backup/backup-local-marker';
 import { createBackupInspectionSummary } from '../presentation/backup/backup-inspection-summary';
 import { createBackupInspectionMessage } from '../presentation/backup/backup-inspection-message';
@@ -44,7 +47,6 @@ import {
   createLisClient,
   createLisGatewayRuntime,
   LIS_GATEWAY_STORAGE_KEY,
-  LIS_POLL_MS,
   type LisClientApi,
   type LisGatewayRuntime,
 } from '../application/lis/lis-client-service';
@@ -70,7 +72,7 @@ import { createCusumSeries } from '../domain/qc/cusum-series';
 import { createParallelWestgard } from '../domain/qc/parallel-westgard';
 import { createQcEntryColumns } from '../domain/qc/entry-columns';
 import { selectEntryColumnPoints } from '../domain/qc/entry-column-points';
-import { syncCanon, syncedShape, syncedStatesEqual, syncJsonMap } from '../domain/sync/snapshot-compare';
+import { syncedShape, syncedStatesEqual, syncJsonMap } from '../domain/sync/snapshot-compare';
 import { mergeSyncArray, mergeSyncBranch } from '../domain/sync/array-merge';
 import { createSyncStateMerge, uniqueSyncUsers } from '../domain/sync/state-merge';
 import { createSyncUpdateBuilder } from '../domain/sync/update-payload';
@@ -124,8 +126,8 @@ import { createFirebaseRemoteRenderSafetyService } from '../presentation/sync/fi
 import { createFirebaseAppService } from '../application/sync/firebase-app-service';
 import { createFirebaseConfigSourceService } from '../application/sync/firebase-config-source-service';
 import { firebaseReadyState } from '../domain/sync/firebase-ready-state';
-import { parseFirebaseConfig as parseFirebaseConfigTs, validateFirebaseConfig as validateFirebaseConfigTs } from '../application/sync/firebase-config-parser';
-import { storageBytesText as storageBytesTextTs, storageUsageText as storageUsageTextTs } from '../presentation/settings/storage-usage';
+import { parseFirebaseConfig as parseFirebaseConfigTs } from '../application/sync/firebase-config-parser';
+import { storageUsageText as storageUsageTextTs } from '../presentation/settings/storage-usage';
 import { createBrandProfile } from '../presentation/settings/brand-profile';
 import { firebaseAclHelp as firebaseAclHelpTs } from '../presentation/settings/firebase-acl-help';
 import { firebaseRulesText as firebaseRulesTextTs } from '../presentation/settings/firebase-rules';
@@ -214,8 +216,6 @@ import { createLeveyJenningsMultiHoverModel } from '../presentation/chart/levey-
 import { createLeveyJenningsMultiPointRenderModel } from '../presentation/chart/levey-jennings-multi-point-render-model';
 import { leveyJenningsMultiDividers } from '../presentation/chart/levey-jennings-multi-dividers';
 import { cusumChartGeometry } from '../presentation/chart/cusum-chart-geometry';
-import { createCusumDisplayPlan } from '../presentation/chart/cusum-display-plan';
-import { createCusumHoverModel } from '../presentation/chart/cusum-hover-model';
 import { cusumPointRenderModel } from '../presentation/chart/cusum-point-render-model';
 import { cusumReferenceLines } from '../presentation/chart/cusum-reference-lines';
 import { cusumLinePoints } from '../presentation/chart/cusum-line-points';
@@ -229,7 +229,6 @@ import { createAcceptedMemoCache } from '../domain/qc/accepted-memo-cache';
 import { createWestgardRuleSettings } from '../domain/westgard/rule-settings';
 import { createRangeCandidateService } from '../domain/qc/range-candidate';
 import { rangeBiasEvaluation, rangeSafetyGate } from '../domain/qc/range-safety-gate';
-import { csvCell as csvCellTs } from '../domain/export/csv-cell';
 import { reportExportHelpers } from '../presentation/report/export-helpers';
 import { createActionReportSummary } from '../presentation/nce/action-report-summary';
 import { createActionReportModel } from '../presentation/nce/action-report-model';
@@ -273,7 +272,6 @@ import { dashboardTestStatusTags } from '../presentation/dashboard/dashboard-tes
 import { createDashboardLevelPillHtml } from '../presentation/dashboard/dashboard-level-pill-html';
 import { dashboardTestRank } from '../presentation/dashboard/dashboard-test-rank';
 import { createDashboardLatestPointText } from '../presentation/dashboard/dashboard-latest-point-text';
-import { dashboardCompletion } from '../presentation/dashboard/dashboard-completion';
 import { dashboardFollowupPanelHtml } from '../presentation/dashboard/dashboard-followup-panel-html';
 import { createDashboardTestSearchText } from '../presentation/dashboard/dashboard-test-search-text';
 import { createDashboardLatestPoint } from '../presentation/dashboard/dashboard-latest-point';
@@ -528,12 +526,10 @@ import { manageAssayTableHtml } from '../presentation/manage/manage-assay-table-
 import { teaReferenceStatusHtml } from '../presentation/manage/tea-reference-status-html';
 import { manageTransitionStatus } from '../presentation/manage/manage-transition-status';
 import { createManageLotStatus } from '../presentation/manage/manage-lot-status';
-import { sameIdSet as sameIdSetTs } from '../presentation/manage/same-id-set';
 import { manageInstrumentName } from '../presentation/manage/manage-instrument-name';
 import { manageLotLabel } from '../presentation/manage/manage-lot-label';
 import { managePanelName } from '../presentation/manage/manage-panel-name';
 import { manageLotGroupLabels } from '../presentation/manage/manage-lot-group-labels';
-import { createSameNormalizedText } from '../presentation/manage/same-normalized-text';
 import { groupsOfLot as groupsOfLotTs } from '../presentation/manage/groups-of-lot';
 import { targetGroupLots as targetGroupLotsTs } from '../presentation/manage/target-group-lots';
 import { targetGroupLabel } from '../presentation/manage/target-group-label';
@@ -553,8 +549,6 @@ import { historyAssaySelection } from '../presentation/manage/history-assay-sele
 import { historyVisibleRows } from '../presentation/manage/history-visible-rows';
 import { sortHistoryRows } from '../presentation/manage/history-row-sort';
 import { historySummary } from '../presentation/manage/history-summary';
-import { teaPositiveNumber } from '../presentation/manage/tea-positive-number';
-import { teaReferenceExternalChanged } from '../presentation/manage/tea-reference-external-changed';
 import { teaSourceRegistryItems } from '../presentation/manage/tea-source-registry-items';
 import { manageSearchMatch } from '../presentation/manage/manage-search-match';
 import { lotTransitionTargetNumber } from '../presentation/manage/lot-transition-target-number';
@@ -606,7 +600,6 @@ import { createLocalPartitionTransaction } from '../application/storage/local-pa
 import { createLocalPartitionRecovery } from '../application/storage/local-partition-recovery';
 import { createLocalClearKeys } from '../application/storage/local-clear-keys';
 import { firebaseSnapshotGate } from '../domain/sync/firebase-snapshot-gate';
-import { firebaseEmptySnapshotPlan } from '../domain/sync/firebase-empty-snapshot';
 import { createFirebaseRemoteSnapshot } from '../domain/sync/firebase-remote-snapshot';
 import { firebaseOwnSnapshotPlan } from '../domain/sync/firebase-own-snapshot';
 import { firebaseFirstConnectPlan } from '../domain/sync/firebase-first-connect-plan';
@@ -801,6 +794,9 @@ declare function auditSha256(text: string): Promise<string>;
 declare function uid(): string;
 declare function isoDate(value: Date): string;
 declare const TEA_ANALYTE_CATALOG: any[];
+// `REFTESTS` là `const` global lexical của state.js, không phải property trên
+// `window`/`globalThis`. Service TEa chạy sau state.js nên đọc binding này trực tiếp.
+declare const REFTESTS: readonly any[][];
 declare function role(): string;
 declare function auditActor(): { user: string; username: string; userId: string; role: string; clientId: string };
 declare function auditRuntimeConfig(): { hardCap: number; rotateTo: number; autoVerifyMax: number };
@@ -826,7 +822,6 @@ type QCLabGlobal = typeof globalThis & {
   ActionReviewService: ActionReviewService;
   ActionReviewMessages: typeof actionReviewMessages;
   ActionEscalationService: ActionEscalationService;
-  ActionRecordService: ActionRecordService;
   NceFormCommand: NceFormCommand;
   NceLifecycleCommand: NceLifecycleCommand;
   ActionRerunService: ActionRerunService;
@@ -892,8 +887,6 @@ type QCLabGlobal = typeof globalThis & {
   reagentReportDetailCardHtml: typeof reagentReportDetailCardHtml;
   reagentReportChartGridHtml: typeof reagentReportChartGridHtml;
   reagentPairMath: typeof reagentPairMath;
-  reagentStatistics: typeof reagentStatistics;
-  reagentTDistribution: typeof reagentTDistribution;
   reagentComparisonCalculator: ReturnType<typeof createReagentComparisonCalculator>;
   SigmaCohortService: SigmaCohortServiceApi;
   SigmaPresentation: SigmaPresentation;
@@ -919,7 +912,6 @@ type QCLabGlobal = typeof globalThis & {
   westgardArchivedGroupMatches?: typeof westgardArchivedGroupMatches;
   westgardArchivedTestSelection?: typeof westgardArchivedTestSelection;
   LISClientService?: LisClientApi;
-  BackupService?: BackupServiceApi;
   AuditService?: AuditServiceApi;
   BACKUP_IMPORT_MAX_BYTES?: number;
   BACKUP_IMPORT_WARN_BYTES?: number;
@@ -936,16 +928,10 @@ type QCLabGlobal = typeof globalThis & {
   backupSummary?: BackupServiceApi['backupSummary'];
   inspectBackupText?: BackupServiceApi['inspectBackupText'];
   lisGatewayRuntime?: LisGatewayRuntime;
-  LIS_GATEWAY_STORAGE_KEY?: string;
-  LIS_POLL_MS?: number;
   lisGatewayConfig?: LisClientApi['gatewayConfig'];
   lisNormalizeGatewayUrl?: LisClientApi['normalizeGatewayUrl'];
-  lisGatewaySetStatus?: LisClientApi['setStatus'];
   lisGatewayStatusText?: LisClientApi['statusText'];
-  lisGatewayFetch?: LisClientApi['gatewayFetch'];
-  lisGatewayHealth?: LisClientApi['gatewayHealth'];
   lisGatewayPull?: LisClientApi['pull'];
-  lisResultToPointInput?: LisClientApi['resultToPointInput'];
   lisImportResult?: LisClientApi['importResult'];
   lisRejectResult?: LisClientApi['rejectResult'];
   lisGatewayStart?: LisClientApi['start'];
@@ -975,17 +961,13 @@ type QCLabGlobal = typeof globalThis & {
   qcParallelWestgard?: ReturnType<typeof createParallelWestgard>;
   qcEntryColumns?: ReturnType<typeof createQcEntryColumns>;
   qcEntryColumnPoints?: typeof selectEntryColumnPoints;
-  syncCanon?: typeof syncCanon; syncedShape?: typeof syncedShape; syncedStatesEqual?: typeof syncedStatesEqual; syncJsonMap?: typeof syncJsonMap;
-  mergeSyncArray?: typeof mergeSyncArray; mergeSyncBranch?: typeof mergeSyncBranch;
-  uniqueSyncUsers?: typeof uniqueSyncUsers;
+  syncedShape?: typeof syncedShape; syncedStatesEqual?: typeof syncedStatesEqual;
   syncStateMerge?: ReturnType<typeof createSyncStateMerge>;
   syncUpdateBuilder?: ReturnType<typeof createSyncUpdateBuilder>;
-  syncSnapshot?: ReturnType<typeof createSyncSnapshot>;
   syncRetryScheduler?: ReturnType<typeof createSyncRetryScheduler>;
   syncFirstConnectMerge?: ReturnType<typeof createFirstConnectMerge>;
   syncHasContent?: typeof hasSyncContent;
   syncCompareKeys?: string[];
-  installSyncServices?: () => void;
   qcNormalizeDuplicateRunIds?: ReturnType<typeof createRunIdNormalizer>;
   qcNormalizePointLots?: ReturnType<typeof createPointLotNormalizer>;
   qcLotLineage?: typeof qcLotLineage;
@@ -1003,13 +985,7 @@ type QCLabGlobal = typeof globalThis & {
   storageRetryDelay?: typeof storageRetryDelay;
   saveDerivedTestIds?: typeof saveDerivedTestIds;
   saveCommandPolicy?: typeof saveCommandPlan;
-  storageBootService?: ReturnType<typeof createStorageBootService>;
-  indexedDbRecoveryService?: ReturnType<typeof createIndexedDbRecoveryService>;
-  partitionHydrationService?: ReturnType<typeof createPartitionHydrationService>;
   indexedDbMirrorService?: ReturnType<typeof createIndexedDbMirrorService>;
-  localStorageLoadService?: ReturnType<typeof createLocalStorageLoadService>;
-  localStorageSnapshotWriter?: ReturnType<typeof createLocalStorageSnapshotWriter>;
-  partitionedSnapshotWriter?: ReturnType<typeof createPartitionedSnapshotWriter>;
   saveService?: ReturnType<typeof createSaveService>;
   localStoreService?: LocalStoreApi;
   storageSnapshotService?: StorageSnapshotService;
@@ -1033,9 +1009,6 @@ type QCLabGlobal = typeof globalThis & {
   firebaseAppService?: ReturnType<typeof createFirebaseAppService>;
   firebaseConfigSourceService?: ReturnType<typeof createFirebaseConfigSourceService>;
   firebaseReadyState?: typeof firebaseReadyState;
-  firebaseConfigParser?: typeof parseFirebaseConfigTs;
-  firebaseConfigValidator?: typeof validateFirebaseConfigTs;
-  settingsStorageBytesText: typeof storageBytesTextTs;
   settingsStorageUsageText: typeof storageUsageTextTs;
   settingsBrandProfile: ReturnType<typeof createBrandProfile>;
   settingsFirebaseAclHelp: typeof firebaseAclHelpTs;
@@ -1055,12 +1028,14 @@ type QCLabGlobal = typeof globalThis & {
   backupOversizeConfirmation: ReturnType<typeof createBackupOversizeConfirmation>;
   BackupRestoreCommand: BackupRestoreCommand;
   BackupExportCommand: BackupExportCommand;
+  BackupImportCommand: BackupImportCommand;
+  BackupInspectionCommand: BackupInspectionCommand;
+  BackupStatusCommand: BackupStatusCommand;
   ResetOperationalDataCommand: ResetOperationalDataCommand;
   UserManagementCommand: UserManagementCommand;
   lisQueuePresentation: ReturnType<typeof createLisQueuePresentation>;
   lisSettingsService: ReturnType<typeof createLisSettingsService>;
   LisGatewayCommand: LisGatewayCommand;
-  labProfileService: ReturnType<typeof createLabProfileService>;
   SettingsProfileCommand: SettingsProfileCommand;
   SettingsFirebaseCommand: SettingsFirebaseCommand;
   firebaseSettingsService: ReturnType<typeof createFirebaseSettingsService>;
@@ -1072,11 +1047,8 @@ type QCLabGlobal = typeof globalThis & {
   settingsLisGatewayPanelHtml: ReturnType<typeof createLisGatewayPanelHtml>;
   settingsFirebaseConnectionPanelHtml: ReturnType<typeof createFirebaseConnectionPanelHtml>;
   settingsPageLayoutHtml: ReturnType<typeof createSettingsPageLayoutHtml>;
-  indexedDbOpenService?: ReturnType<typeof createIndexedDbOpenService>;
-  indexedDbRecordService?: ReturnType<typeof createIndexedDbRecordService>;
   partitionedIndexedDbWriteService?: ReturnType<typeof createPartitionedIndexedDbWriteService>;
   partitionedIndexedDbReadService?: ReturnType<typeof createPartitionedIndexedDbReadService>;
-  indexedDbClearService?: ReturnType<typeof createIndexedDbClearService>;
   passwordPolicyError?: typeof passwordPolicyError;
   passwordChangeError?: typeof passwordChangeError;
   pbkdf2PasswordService?: ReturnType<typeof createPbkdf2PasswordService>;
@@ -1104,7 +1076,6 @@ type QCLabGlobal = typeof globalThis & {
   reagentSelectOptionsHtml: ReturnType<typeof createReagentSelectOptionsHtml>;
   reagentResultHtml: ReturnType<typeof createReagentResultHtml>;
   reagentPairRowHtml: ReturnType<typeof createReagentPairRowHtml>;
-  planPartitionWrite?: typeof planPartitionWrite;
   qcValueFormat?: ReturnType<typeof createQcValueFormat>;
   qcStaffIdentity?: ReturnType<typeof createQcStaffIdentity>;
   qcDateFormat?: ReturnType<typeof createQcDateFormat>;
@@ -1123,7 +1094,6 @@ type QCLabGlobal = typeof globalThis & {
   canvasFont: ReturnType<typeof createChartCanvasFont>;
   chartDataUrl: ReturnType<typeof createChartDataUrl>;
   afterRenderCanvasService: ReturnType<typeof createVisibleCanvasService>;
-  chartTooltipService: ReturnType<typeof createChartTooltipService>;
   qcTooltip: ReturnType<typeof createChartTooltipService>;
   leveyJenningsTooltipController: ReturnType<typeof createLeveyJenningsTooltipController>;
   hiDpiCanvasSetup: ReturnType<typeof createHiDpiCanvasSetup>;
@@ -1132,22 +1102,15 @@ type QCLabGlobal = typeof globalThis & {
   leveyJenningsColors: typeof LEVEY_JENNINGS_COLORS;
   leveyJenningsTicks: ReturnType<typeof createLeveyJenningsTicks>;
   leveyJenningsYAxisLabels: ReturnType<typeof createLeveyJenningsYAxisLabels>;
-  leveyJenningsHoverModel: ReturnType<typeof createLeveyJenningsHoverModel>;
-  leveyJenningsPointStyle: typeof leveyJenningsPointStyle;
-  leveyJenningsDisplayPlan: ReturnType<typeof createLeveyJenningsDisplayPlan>;
   leveyJenningsPointRenderModel: ReturnType<typeof createLeveyJenningsPointRenderModel>;
   leveyJenningsBandRects: typeof leveyJenningsBandRects;
   leveyJenningsGridLines: typeof leveyJenningsGridLines;
   leveyJenningsMultiSeries: typeof leveyJenningsMultiSeries;
   leveyJenningsMultiRunTicks: ReturnType<typeof createLeveyJenningsMultiRunTicks>;
   leveyJenningsLegendLayout: (levels:any[],colors:string[],startX:number,measure:(text:string)=>{width:number})=>ReturnType<ReturnType<typeof createLeveyJenningsLegendLayout>>;
-  leveyJenningsMultiDisplayPlan: ReturnType<typeof createLeveyJenningsMultiDisplayPlan>;
-  leveyJenningsMultiHoverModel: ReturnType<typeof createLeveyJenningsMultiHoverModel>;
   leveyJenningsMultiPointRenderModel: ReturnType<typeof createLeveyJenningsMultiPointRenderModel>;
   leveyJenningsMultiDividers: typeof leveyJenningsMultiDividers;
   cusumChartGeometry: typeof cusumChartGeometry;
-  cusumDisplayPlan: ReturnType<typeof createCusumDisplayPlan>;
-  cusumHoverModel: ReturnType<typeof createCusumHoverModel>;
   cusumPointRenderModel: typeof cusumPointRenderModel;
   cusumReferenceLines: typeof cusumReferenceLines;
   cusumLinePoints: typeof cusumLinePoints;
@@ -1321,7 +1284,6 @@ type QCLabGlobal = typeof globalThis & {
   entryTreeKeyCommand: typeof entryTreeKeyCommand;
   entrySelectionState: typeof entrySelectionState;
   entryExpandedTablesToggle: typeof entryExpandedTablesToggle;
-  entryPointContext: typeof entryPointContext;
   entryVoidNceChoice: typeof entryVoidNceChoice;
   entryVoidReasonValid: typeof entryVoidReasonValid;
   entryRecordErrorMessage: typeof entryRecordErrorMessage;
@@ -1344,22 +1306,11 @@ type QCLabGlobal = typeof globalThis & {
   westgardExportActionsHtml: ReturnType<typeof createWestgardExportActionsHtml>;
   dashboardStatusTabsHtml: ReturnType<typeof createDashboardStatusTabsHtml>;
   dashboardExpiringLotsHtml: ReturnType<typeof createDashboardExpiringLotsHtml>;
-  dashboardQcFollowupItemHtml: ReturnType<typeof createDashboardQcFollowupItemHtml>;
-  dashboardMissingTargetItemHtml: ReturnType<typeof createDashboardMissingTargetItemHtml>;
-  dashboardOverdueActionItemHtml: ReturnType<typeof createDashboardOverdueActionItemHtml>;
-  dashboardTestStatusTags: typeof dashboardTestStatusTags;
-  dashboardLevelPillHtml: ReturnType<typeof createDashboardLevelPillHtml>;
-  dashboardTestRank: typeof dashboardTestRank;
-  dashboardLatestPointText: ReturnType<typeof createDashboardLatestPointText>;
-  dashboardCompletion: typeof dashboardCompletion;
   dashboardFollowupPanelHtml: typeof dashboardFollowupPanelHtml;
-  dashboardTestSearchText: ReturnType<typeof createDashboardTestSearchText>;
-  dashboardLatestPoint: ReturnType<typeof createDashboardLatestPoint<any>>;
   dashboardKpisHtml: typeof dashboardKpisHtml;
   dashboardProgressHtml: typeof dashboardProgressHtml;
   dashboardHeadHtml: ReturnType<typeof createDashboardHeadHtml>;
   dashboardTestPanelHtml: ReturnType<typeof createDashboardTestPanelHtml>;
-  dashboardTestRowHtml: ReturnType<typeof createDashboardTestRowHtml>;
   dashboardKpiItems: typeof dashboardKpiItems;
   dashboardEmptyTestsHtml: ReturnType<typeof createDashboardEmptyTestsHtml>;
   cusumColors: typeof CUSUM_COLORS;
@@ -1380,9 +1331,6 @@ type QCLabGlobal = typeof globalThis & {
   dashboardExpiringLotItems: typeof dashboardExpiringLotItems;
   dashboardWestgardAlerts: typeof dashboardWestgardAlerts;
   dashboardMissingTargetItems: typeof dashboardMissingTargetItems;
-  dashboardLevelData: ReturnType<typeof createDashboardLevelData>;
-  dashboardTestAction: ReturnType<typeof createDashboardTestAction>;
-  dashboardLevelPillsHtml: ReturnType<typeof createDashboardLevelPillsHtml>;
   dashboardTestRowsHtml: ReturnType<typeof createDashboardTestRowsHtml>;
   dashboardTestItems: ReturnType<typeof createDashboardTestItems>;
   dashboardTestListHtml: typeof dashboardTestListHtml;
@@ -1439,12 +1387,10 @@ type QCLabGlobal = typeof globalThis & {
   teaReferenceStatusPresentation: typeof teaReferenceStatusHtml;
   manageTransitionStatusPresentation: typeof manageTransitionStatus;
   manageLotStatusPresentation: ReturnType<typeof createManageLotStatus>;
-  sameIdSetPresentation: typeof sameIdSetTs;
   manageInstrumentNamePresentation: typeof manageInstrumentName;
   manageLotLabelPresentation: typeof manageLotLabel;
   managePanelNamePresentation: typeof managePanelName;
   manageLotGroupLabelsPresentation: typeof manageLotGroupLabels;
-  sameNormalizedTextPresentation: ReturnType<typeof createSameNormalizedText>;
   groupsOfLotPresentation: typeof groupsOfLotTs;
   targetGroupLotsPresentation: typeof targetGroupLotsTs;
   targetGroupLabelPresentation: typeof targetGroupLabel;
@@ -1464,8 +1410,6 @@ type QCLabGlobal = typeof globalThis & {
   historyVisibleRowsPresentation: typeof historyVisibleRows;
   historyRowSortPresentation: typeof sortHistoryRows;
   historySummaryPresentation: typeof historySummary;
-  teaPositiveNumberPresentation: typeof teaPositiveNumber;
-  teaReferenceExternalChangedPresentation: typeof teaReferenceExternalChanged;
   teaSourceRegistryItemsPresentation: typeof teaSourceRegistryItems;
   manageSearchMatchPresentation: typeof manageSearchMatch;
   lotTransitionTargetNumberPresentation: typeof lotTransitionTargetNumber;
@@ -1510,7 +1454,6 @@ type QCLabGlobal = typeof globalThis & {
   qcRangeCandidateService: ReturnType<typeof createRangeCandidateService>;
   qcRangeSafetyGate: typeof rangeSafetyGate;
   qcRangeBiasEvaluation: typeof rangeBiasEvaluation;
-  csvCellService?: typeof csvCellTs;
   reportExportHelpers?: typeof reportExportHelpers;
   actionReportSummary?: ReturnType<typeof createActionReportSummary>;
   actionReportModel?: ReturnType<typeof createActionReportModel>;
@@ -1536,7 +1479,6 @@ type QCLabGlobal = typeof globalThis & {
   actionReportHtml: ReturnType<typeof createActionReportHtml>;
   reportNceDetailHtmlPresentation: ReturnType<typeof createReportNceDetailHtml>;
   sigmaDraftService?: ReturnType<typeof createSigmaDraftService>;
-  stateAdoptionService?: ReturnType<typeof createStateAdoptionService>;
   corruptLocalQuarantine?: ReturnType<typeof createCorruptLocalQuarantine>;
   syncValueCodec?: ReturnType<typeof createSyncValueCodec>;
   firebaseConfigSelection?: ReturnType<typeof createFirebaseConfigSelection>;
@@ -1545,19 +1487,8 @@ type QCLabGlobal = typeof globalThis & {
   firebaseIdentity?: ReturnType<typeof createFirebaseIdentity>;
   firebaseAuditGate?: ReturnType<typeof createFirebaseAuditGate>;
   firebasePollingService?: ReturnType<typeof createFirebasePollingService>;
-  firebaseDisconnectedState?: typeof firebaseDisconnectedState;
-  firebaseCanPull?: typeof firebaseCanPull;
   firebasePullService?: ReturnType<typeof createFirebasePullService>;
-  firebaseMergeApplication?: ReturnType<typeof createFirebaseMergeApplication>;
-  localPartitionHelpers?: ReturnType<typeof createLocalPartitionHelpers>;
-  localSnapshotRecord?: ReturnType<typeof createLocalSnapshotRecord>;
-  localPartitionValid?: typeof localPartitionValid;
-  localRecoverySlots?: typeof localRecoverySlots;
-  localPartitionTransaction?: ReturnType<typeof createLocalPartitionTransaction>;
-  localPartitionRecovery?: ReturnType<typeof createLocalPartitionRecovery>;
-  localClearKeys?: ReturnType<typeof createLocalClearKeys>;
   firebaseSnapshotGate?: typeof firebaseSnapshotGate;
-  firebaseEmptySnapshotPlan?: typeof firebaseEmptySnapshotPlan;
   firebaseRemoteSnapshot?: ReturnType<typeof createFirebaseRemoteSnapshot>;
   firebaseOwnSnapshotPlan?: typeof firebaseOwnSnapshotPlan;
   firebaseFirstConnectPlan?: typeof firebaseFirstConnectPlan;
@@ -1604,11 +1535,13 @@ root.qcCusumSeries = createCusumSeries((root.QCCore as any).cusumMovingAverage);
 root.qcParallelWestgard = createParallelWestgard((root.QCCore as any).westgardByPoint);
 root.qcEntryColumns = createQcEntryColumns({ levels: test => (root as any).operationalLevels(test), parallel: (test, level) => (root as any).parallelLotForLevel(test, level) });
 root.qcEntryColumnPoints = selectEntryColumnPoints;
-root.syncCanon = syncCanon; root.syncedShape = syncedShape; root.syncedStatesEqual = syncedStatesEqual; root.syncJsonMap = syncJsonMap;
-root.mergeSyncArray = mergeSyncArray; root.mergeSyncBranch = mergeSyncBranch;
-root.uniqueSyncUsers = uniqueSyncUsers;
-root.installSyncServices=()=>{const codec=root.syncValueCodec||createSyncValueCodec(),lists=new Set(FIREBASE_SYNC_LISTS),snapshot=createSyncSnapshot(FIREBASE_SYNC_TOP,syncJsonMap),merge=createSyncStateMerge({clone:codec.clone,snap:snapshot,top:FIREBASE_SYNC_TOP,lists,array:(local:any,remote:any,base:any,deletes:boolean)=>mergeSyncArray(local,remote,base,deletes).map(codec.clone),branch:mergeSyncBranch,cloud:codec.cloudValue});root.syncSnapshot=snapshot;root.syncStateMerge=merge;root.syncUpdateBuilder=createSyncUpdateBuilder({top:FIREBASE_SYNC_TOP,snapshot});root.syncFirstConnectMerge=createFirstConnectMerge({top:FIREBASE_SYNC_TOP,lists,cloud:codec.cloudValue,merge,uniqueUsers:uniqueSyncUsers});root.syncHasContent=source=>hasSyncContent(source,FIREBASE_SYNC_CONTENT_KEYS);root.syncCompareKeys=FIREBASE_SYNC_COMPARE_KEYS;};
-root.installSyncServices();
+root.syncedShape = syncedShape; root.syncedStatesEqual = syncedStatesEqual;
+const modularSyncCodec=createSyncValueCodec(),modularSyncLists=new Set(FIREBASE_SYNC_LISTS),modularSyncSnapshot=createSyncSnapshot(FIREBASE_SYNC_TOP,syncJsonMap),modularSyncMerge=createSyncStateMerge({clone:modularSyncCodec.clone,snap:modularSyncSnapshot,top:FIREBASE_SYNC_TOP,lists:modularSyncLists,array:(local:any,remote:any,base:any,deletes:boolean)=>mergeSyncArray(local,remote,base,deletes).map(modularSyncCodec.clone),branch:mergeSyncBranch,cloud:modularSyncCodec.cloudValue});
+root.syncValueCodec=modularSyncCodec;
+root.syncStateMerge=modularSyncMerge;
+root.syncUpdateBuilder=createSyncUpdateBuilder({top:FIREBASE_SYNC_TOP,snapshot:modularSyncSnapshot});
+root.syncFirstConnectMerge=createFirstConnectMerge({top:FIREBASE_SYNC_TOP,lists:modularSyncLists,cloud:modularSyncCodec.cloudValue,merge:modularSyncMerge,uniqueUsers:uniqueSyncUsers});
+root.syncHasContent=source=>hasSyncContent(source,FIREBASE_SYNC_CONTENT_KEYS);root.syncCompareKeys=FIREBASE_SYNC_COMPARE_KEYS;
 root.syncRetryScheduler = createSyncRetryScheduler({setTimeout:(fn,delay)=>globalThis.setTimeout(fn,delay),clearTimeout:timer=>globalThis.clearTimeout(timer)});
 root.qcPreviousLotHistory = previousLotHistory; root.qcLotGroupLevels = lotGroupLevels;
 root.qcPointCache = createPointCacheService(() => state.data || {}, point => (root as any).pointRunNo(point));
@@ -1627,7 +1560,7 @@ root.localSaveScheduler = createSaveScheduler({setTimeout:(fn:()=>void,delay:num
 root.storageRetryDelay = storageRetryDelay;
 root.saveDerivedTestIds = saveDerivedTestIds;
 root.saveCommandPolicy = saveCommandPlan;
-root.localStorageLoadService = createLocalStorageLoadService({
+const modularLocalStorageLoadService = createLocalStorageLoadService({
   read: () => localStorage.getItem('qclab'),
   adoptEmpty: () => {
     localLoadStatus = 'missing'; if (mem) state = mem; ensureShape();
@@ -1640,17 +1573,15 @@ root.localStorageLoadService = createLocalStorageLoadService({
   rejectedRead: () => { startupProblem = {raw:'',message:'TrÃ¬nh duyá»‡t khÃ´ng cho phÃ©p Ä‘á»c vÃ¹ng lÆ°u trá»¯ cá»¥c bá»™.'}; },
   rejectedInvalid: (raw, error) => { localLoadStatus = 'invalid'; quarantineCorruptLocal(raw, error); startupProblem = {raw,message:error && (error as Error).message ? (error as Error).message : 'Dá»¯ liá»‡u cá»¥c bá»™ khÃ´ng há»£p lá»‡.'}; },
 });
-root.localStorageSnapshotWriter = createLocalStorageSnapshotWriter({
+const modularLocalStorageSnapshotWriter = createLocalStorageSnapshotWriter({
   set: (key, value) => localStorage.setItem(key, value),
   remove: key => localStorage.removeItem(key),
   saved: quiet => { if (!quiet) markSaved('Ä‘Ã£ lÆ°u cá»¥c bá»™','LÃºc '+saveTime()); },
   failed: quiet => { if (!quiet) markSaved('lá»—i lÆ°u cá»¥c bá»™','Kiá»ƒm tra dung lÆ°á»£ng trÃ¬nh duyá»‡t'); },
 });
-root.partitionedSnapshotWriter = createPartitionedSnapshotWriter({
+const modularPartitionedSnapshotWriter = createPartitionedSnapshotWriter({
   plan: input => {
-    let plan: { dirtyTestIds: string[] | null; streak: number; lastFull: number };
-    if (root.planPartitionWrite) plan = root.planPartitionWrite({fullDirty:input.fullDirty,streak:input.streak,lastFull:input.lastFull,now:input.now,maxIncrementals:input.maxIncrementals,maxMs:input.maxMs,dirtyTestIds:input.dirtyTestIds});
-    else { const full = input.fullDirty || input.streak >= input.maxIncrementals || input.now - input.lastFull >= input.maxMs; plan = {dirtyTestIds:full?null:input.dirtyTestIds,streak:full?0:input.streak+1,lastFull:full?input.now:input.lastFull}; }
+    const plan = planPartitionWrite({fullDirty:input.fullDirty,streak:input.streak,lastFull:input.lastFull,now:input.now,maxIncrementals:input.maxIncrementals,maxMs:input.maxMs,dirtyTestIds:input.dirtyTestIds});
     lsIncrementalStreak = plan.streak; lsLastFullSaveAt = plan.lastFull; lsFullDirty = false; lsDirtyTestIds.clear();
     return plan.dirtyTestIds;
   },
@@ -1672,9 +1603,9 @@ root.storageSnapshotService = createStorageSnapshotService({
   clearDirty: () => { lsDirty = false; },
   draftStamp: () => sigmaDraftStamp(),
   usePartitioned: () => typeof LocalStore !== 'undefined' && LocalStore.supported() && typeof (LocalStore as any).writePartitioned === 'function',
-  writePartitioned: input => root.partitionedSnapshotWriter!.write({state,slot:partitionSlot,localLoadStatus,fullDirty:lsFullDirty,dirtyTestIds:[...lsDirtyTestIds],streak:lsIncrementalStreak,lastFull:lsLastFullSaveAt,now:Date.now(),maxIncrementals:LS_FULL_ROTATE_MAX_INCREMENTALS,maxMs:LS_FULL_ROTATE_MAX_MS,localDraftStamp:input.draftStamp,quiet:input.quiet}),
+  writePartitioned: input => modularPartitionedSnapshotWriter.write({state,slot:partitionSlot,localLoadStatus,fullDirty:lsFullDirty,dirtyTestIds:[...lsDirtyTestIds],streak:lsIncrementalStreak,lastFull:lsLastFullSaveAt,now:Date.now(),maxIncrementals:LS_FULL_ROTATE_MAX_INCREMENTALS,maxMs:LS_FULL_ROTATE_MAX_MS,localDraftStamp:input.draftStamp,quiet:input.quiet}),
   serialize: () => serializeStateForStorage(),
-  writeLocal: (raw,savedAt,quiet) => root.localStorageSnapshotWriter!.write(raw,savedAt,quiet),
+  writeLocal: (raw,savedAt,quiet) => modularLocalStorageSnapshotWriter.write(raw,savedAt,quiet),
   mirror: raw => mirrorIndexedDb(raw),
   needsCloud: () => sigmaDraftNeedsCloud(),
   clearDraftThrough: stamp => clearSigmaDraftThrough(stamp),
@@ -1710,8 +1641,7 @@ if (typeof (root as any).fbDisconnect === 'function') root.firebaseDisconnectSer
   resetRetry: () => fbResetRetry(),
   detachListener: () => { if (fb.ref) fb.ref.off(); },
   resetSession: clearAuthUser => {
-    if (root.firebaseDisconnectedState) { Object.assign(fb,root.firebaseDisconnectedState(fb,clearAuthUser)); return; }
-    fb.ready=false;fb.initialized=false;fb.ref=null;fb.synced=null;fb.seenSig=null;if(clearAuthUser)fb.authUser=null;
+    Object.assign(fb,firebaseDisconnectedState(fb,clearAuthUser));
   },
 });
 if (typeof (root as any).fbFlushPush === 'function') root.firebasePushService = createFirebasePushService({
@@ -1796,10 +1726,11 @@ if (typeof (root as any).initFirebase === 'function') root.firebaseSessionStartS
   loading: () => { setCloudStatus('Đang tải dữ liệu Firebase · '+fbDataPath(),true);markSaved('đang tải dữ liệu','Firebase'); },
   failed: error => { fbDisconnect();setCloudStatus('Lỗi xác thực/kết nối Firebase',false);markSaved('lỗi kết nối',error&&(error as Error).message?(error as Error).message:'Firebase'); },
 });
+const firebaseMergeApplication=createFirebaseMergeApplication({merge:(local:any,remote:any,base:any)=>(globalThis as any).fbMerge(local,remote,base),firstMerge:(local:any,remote:any)=>(globalThis as any).fbFirstConnectMerge(local,remote)});
 if (typeof (root as any).fbHandleValue === 'function') root.firebaseMergeCommitService = createFirebaseMergeCommitService({
   state: () => state,
   replaceState: value => { state=value; },
-  merge: (base,mergeFirstConnect,local,remote) => root.firebaseMergeApplication ? root.firebaseMergeApplication(base,mergeFirstConnect,local,remote) : (base?fbMerge(local,remote,base):(mergeFirstConnect?fbFirstConnectMerge(local,remote):remote)),
+  merge: (base,mergeFirstConnect,local,remote) => firebaseMergeApplication(base,mergeFirstConnect,local,remote),
   relinkAudit: value => { if(typeof auditRelinkChain==='function'&&Array.isArray(value.activity))value.activity=auditRelinkChain(value.activity,value.activityAnchor||''); },
   clearDerived: () => clearDerived(),
   ensureShape: () => ensureShape(),
@@ -1822,9 +1753,6 @@ if (typeof (root as any).remoteRenderUnsafe === 'function') root.firebaseRemoteR
 if (typeof (root as any).ensureFirebaseApp === 'function') root.firebaseAppService = createFirebaseAppService({sdk: () => firebase,signature: config => fbConfigSig(config)});
 if (typeof (root as any).getDeployFbCfg === 'function') root.firebaseConfigSourceService = createFirebaseConfigSourceService({cloud: () => (window as any).QCLAB_CLOUD,readStored: () => localStorage.getItem('qclab_fb')});
 root.firebaseReadyState = firebaseReadyState;
-root.firebaseConfigParser = parseFirebaseConfigTs;
-root.firebaseConfigValidator = validateFirebaseConfigTs;
-root.settingsStorageBytesText = storageBytesTextTs;
 root.settingsStorageUsageText = storageUsageTextTs;
 root.settingsBrandProfile = createBrandProfile((value, limit) => (root.QCCore as any).cleanText(value, limit));
 root.settingsFirebaseAclHelp = firebaseAclHelpTs;
@@ -1844,11 +1772,11 @@ root.backupImportMessage=createBackupImportMessage();
 root.backupOversizeConfirmation=createBackupOversizeConfirmation();
 root.lisQueuePresentation = createLisQueuePresentation({test:id=>(state.tests||[]).find((test:any)=>test.id===id),formatTestValue:(test,value)=>(root as any).fmtTestValue(test,value),format:(value,decimals)=>(root as any).fmt(value,decimals),escape:value=>(root as any).esc(value),escapeAttribute:value=>(root as any).escAttr(value),quoteJs:value=>(root as any).jsq(value),formatDateTime:value=>(root as any).formatDateTimeVN(value),testDisplayName:test=>typeof (root as any).testDisplayName==='function'?(root as any).testDisplayName(test):'',button:(label,action,variant)=>(root as any).btn(label,action,variant),emptyState:(title,message,action)=>(root as any).emptyState(title,message,action),modalCloseButton:action=>(root as any).modalCloseButton(action)});
 root.lisSettingsService = createLisSettingsService(value => root.lisNormalizeGatewayUrl!(value));
-root.LisGatewayCommand=createLisGatewayCommand({store:settings=>localStorage.setItem(LIS_GATEWAY_STORAGE_KEY,JSON.stringify(settings)),clearToken:()=>{const input=document.getElementById('lisGatewayToken') as any;if(input)input.value='';},disable:()=>{const runtime=(root as any).lisGatewayRuntime;clearInterval(runtime.pollT);runtime.pollT=null;runtime.pending=[];runtime.unresolved=[];(root as any).lisGatewaySetStatus('off','Đã tắt');},start:()=>(root as any).lisGatewayStart(),pull:()=>(root as any).lisGatewayPull({manual:true})});
-root.labProfileService = createLabProfileService((value, limit) => (root.QCCore as any).cleanText(value, limit), value => root.settingsBrandProfile!(value));
-root.SettingsProfileCommand=createSettingsProfileCommand({current:()=>state.lab||{},set:lab=>{state.lab=lab;},profile:root.labProfileService,save:()=>save({clearDerived:false}),renderBrand:()=>renderBrand(),render:()=>rerender()});
+root.LisGatewayCommand=createLisGatewayCommand({store:settings=>localStorage.setItem(LIS_GATEWAY_STORAGE_KEY,JSON.stringify(settings)),clearToken:()=>{const input=document.getElementById('lisGatewayToken') as any;if(input)input.value='';},disable:()=>{const runtime=(root as any).lisGatewayRuntime;clearInterval(runtime.pollT);runtime.pollT=null;runtime.pending=[];runtime.unresolved=[];lisClient.setStatus('off','Đã tắt');},start:()=>(root as any).lisGatewayStart(),pull:()=>(root as any).lisGatewayPull({manual:true})});
+const labProfileService=createLabProfileService((value, limit) => (root.QCCore as any).cleanText(value, limit), value => root.settingsBrandProfile!(value));
+root.SettingsProfileCommand=createSettingsProfileCommand({current:()=>state.lab||{},set:lab=>{state.lab=lab;},profile:labProfileService,save:()=>save({clearDerived:false}),renderBrand:()=>renderBrand(),render:()=>rerender()});
 root.SettingsFirebaseCommand=createSettingsFirebaseCommand({available:()=>typeof firebase!=='undefined'&&typeof firebase.auth==='function',ensureApp:cfg=>ensureFirebaseApp(cfg),persist:()=>firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL),signIn:(email,password)=>firebase.auth().signInWithEmailAndPassword(email,password),store:plan=>localStorage.setItem('qclab_fb',JSON.stringify({labCode:plan.labCode,email:plan.email,anonymous:false,config:plan.config})),disconnect:()=>fbDisconnect(),connected:plan=>{setCloudStatus(plan.email+' · '+plan.labCode,true);},clearPassword:()=>{const input=document.getElementById('fbPassword') as any;if(input)input.value='';},init:()=>initFirebase(),hasRemote:()=>!!fb.ref,remoteExists:async()=>{const snap=await fb.ref.once('value');if(snap.exists()){markSaved('đã kết nối','Đã tải dữ liệu từ Firebase');return true;}return false;},remoteReady:()=>{fb.ready=true;fb.initialized=true;},sync:()=>(root as any).syncNow(),clearStore:()=>localStorage.removeItem('qclab_fb'),signOut:()=>typeof firebase!=='undefined'&&typeof firebase.auth==='function'?firebase.auth().signOut():Promise.resolve(),local:()=>{fb.authUser=null;setCloudStatus('Đang chạy cục bộ',false);markSaved('đã lưu cục bộ','Đã ngắt Firebase');}});
-root.firebaseSettingsService = createFirebaseSettingsService(value => root.firebaseConfigParser!(value));
+root.firebaseSettingsService = createFirebaseSettingsService(value => parseFirebaseConfigTs(value));
 root.settingsBrandPreviewHtml = createBrandPreviewHtml(value => (root as any).esc(value), value => (root as any).escAttr(value));
 root.settingsUnitProfileHtml = createUnitProfileHtml({escapeAttribute:value=>(root as any).escAttr(value),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
 root.settingsBrandPanelHtml = createBrandPanelHtml({escapeAttribute:value=>(root as any).escAttr(value),button:(label,action,variant,title,options)=>(root as any).btn(label,action,variant,title,options)});
@@ -1857,35 +1785,35 @@ root.settingsFirebaseRulesPanelHtml = createFirebaseRulesPanelHtml({escape:value
 root.settingsLisGatewayPanelHtml = createLisGatewayPanelHtml({escape:value=>(root as any).esc(value),escapeAttribute:value=>(root as any).escAttr(value),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
 root.settingsFirebaseConnectionPanelHtml = createFirebaseConnectionPanelHtml({escape:value=>(root as any).esc(value),escapeAttribute:value=>(root as any).escAttr(value),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
 root.settingsPageLayoutHtml = createSettingsPageLayoutHtml((title,subtitle)=>(root as any).headOnly(title,subtitle));
-if (typeof LocalStore !== 'undefined') root.indexedDbOpenService = createIndexedDbOpenService({indexedDb: () => typeof indexedDB === 'undefined' ? null : indexedDB});
-if (root.indexedDbOpenService) root.indexedDbRecordService = createIndexedDbRecordService({open: () => root.indexedDbOpenService!.open()});
+const modularIndexedDbOpenService=typeof LocalStore !== 'undefined'?createIndexedDbOpenService({indexedDb:()=>typeof indexedDB === 'undefined'?null:indexedDB}):null;
+const modularIndexedDbRecordService=modularIndexedDbOpenService?createIndexedDbRecordService({open:()=>modularIndexedDbOpenService.open()}):null;
 root.partitionedIndexedDbWriteService = createPartitionedIndexedDbWriteService({
   supported: () => typeof indexedDB !== 'undefined',
-  key: (slot,type,id) => root.localPartitionHelpers ? root.localPartitionHelpers.key(slot,type,id) : 'partition:'+slot+':'+type+(id==null?'':':'+id),
-  draft: (state,currentSlot,dirtyTestIds,manifest) => root.localPartitionTransaction!.draft(state,currentSlot,dirtyTestIds,manifest),
-  finalize: (state,manifest,slotManifest,draft) => root.localPartitionTransaction!.finalize(state,manifest,slotManifest,draft),
+  key: (slot,type,id) => modularLocalPartitionHelpers.key(slot,type,id),
+  draft: (state,currentSlot,dirtyTestIds,manifest) => modularLocalPartitionTransaction.draft(state,currentSlot,dirtyTestIds,manifest),
+  finalize: (state,manifest,slotManifest,draft) => modularLocalPartitionTransaction.finalize(state,manifest,slotManifest,draft),
 });
 root.partitionedIndexedDbReadService = createPartitionedIndexedDbReadService({
   supported: () => typeof indexedDB !== 'undefined',
-  key: (slot,type,id) => root.localPartitionHelpers ? root.localPartitionHelpers.key(slot,type,id) : 'partition:'+slot+':'+type+(id==null?'':':'+id),
-  slots: preferred => root.localRecoverySlots ? root.localRecoverySlots(preferred) : [preferred,preferred==='a'?'b':'a'],
-  recover: (slot,manifest,shell,rows) => root.localPartitionRecovery!(slot,manifest,shell,rows),
+  key: (slot,type,id) => modularLocalPartitionHelpers.key(slot,type,id),
+  slots: preferred => modularLocalRecoverySlots(preferred),
+  recover: (slot,manifest,shell,rows) => modularLocalPartitionRecovery(slot,manifest,shell,rows),
 });
-root.indexedDbClearService = createIndexedDbClearService({
+const modularIndexedDbClearService = createIndexedDbClearService({
   supported: () => typeof indexedDB !== 'undefined',
-  key: (slot,type,id) => root.localPartitionHelpers ? root.localPartitionHelpers.key(slot,type,id) : 'partition:'+slot+':'+type+(id==null?'':':'+id),
-  keys: manifests => root.localClearKeys!(manifests),
+  key: (slot,type,id) => modularLocalPartitionHelpers.key(slot,type,id),
+  keys: manifests => modularLocalClearKeys(manifests),
 });
 root.localStoreService = createLocalStoreService({
   indexedDbAvailable: () => typeof indexedDB !== 'undefined',
-  get: key => root.indexedDbRecordService ? root.indexedDbRecordService.get(key) : Promise.resolve(null),
-  put: record => root.indexedDbRecordService ? root.indexedDbRecordService.put(record) : Promise.resolve(false),
-  remove: key => root.indexedDbRecordService ? root.indexedDbRecordService.delete(key) : Promise.resolve(false),
-  stateRecord: value => root.localSnapshotRecord!.state(value),
-  serializedRecord: value => root.localSnapshotRecord!.serialized(value),
+  get: key => modularIndexedDbRecordService ? modularIndexedDbRecordService.get(key) : Promise.resolve(null),
+  put: record => modularIndexedDbRecordService ? modularIndexedDbRecordService.put(record) : Promise.resolve(false),
+  remove: key => modularIndexedDbRecordService ? modularIndexedDbRecordService.delete(key) : Promise.resolve(false),
+  stateRecord: value => modularLocalSnapshotRecord.state(value),
+  serializedRecord: value => modularLocalSnapshotRecord.serialized(value),
   writePartitioned: input => root.partitionedIndexedDbWriteService!.write(input),
   readPartitioned: (slot, get) => root.partitionedIndexedDbReadService!.read(slot,get),
-  clear: (get, remove) => root.indexedDbClearService!.clear(get,remove),
+  clear: (get, remove) => modularIndexedDbClearService.clear(get,remove),
 });
 root.passwordPolicyError = passwordPolicyError;
 root.passwordChangeError = passwordChangeError;
@@ -1927,17 +1855,17 @@ root.usersPageHtml = createUsersPageHtml();
 root.reagentSelectOptionsHtml = createReagentSelectOptionsHtml();
 root.reagentResultHtml = createReagentResultHtml();
 root.reagentPairRowHtml = createReagentPairRowHtml();
-root.storageBootService = createStorageBootService({
+const modularStorageBootService = createStorageBootService({
   partitionedSupported: () => typeof LocalStore !== 'undefined' && LocalStore.supported(),
   readBootRecord: () => localStorage.getItem('qclab_boot'),
   discardBootRecord: () => localStorage.removeItem('qclab_boot'),
   activatePartitionShell: (shell, slot) => { (globalThis as any).adoptValidatedState(shell); partitionSlot = slot; localLoadStatus = 'partition-shell'; storageHydrationPromise = (globalThis as any).hydratePartitionedState(); },
-  loadLegacy: () => root.localStorageLoadService!.load(),
+  loadLegacy: () => modularLocalStorageLoadService.load(),
   localLoadStatus: () => localLoadStatus,
   recoverPendingSigmaDraft: () => (globalThis as any).recoverPendingSigmaDraft(),
   restoreFromIndexedDb: () => (globalThis as any).restoreFromIndexedDb(),
 });
-root.indexedDbRecoveryService = createIndexedDbRecoveryService({
+const modularIndexedDbRecoveryService = createIndexedDbRecoveryService({
   supported: () => typeof LocalStore !== 'undefined' && LocalStore.supported(),
   readPartitioned: () => typeof (LocalStore as any).readPartitioned === 'function' ? (LocalStore as any).readPartitioned() : Promise.resolve(null),
   readLegacy: () => (LocalStore as any).read(),
@@ -1953,7 +1881,7 @@ root.indexedDbRecoveryService = createIndexedDbRecoveryService({
     if (raw) startupProblem.raw = raw;
   },
 });
-root.partitionHydrationService = createPartitionHydrationService({
+const modularPartitionHydrationService = createPartitionHydrationService({
   read: () => (LocalStore as any).readPartitioned(),
   adopt: value => (globalThis as any).adoptValidatedState(value),
   recoverPendingSigmaDraft: () => (globalThis as any).recoverPendingSigmaDraft(),
@@ -1961,12 +1889,12 @@ root.partitionHydrationService = createPartitionHydrationService({
   reportFailure: error => { startupProblem = {raw:'',message:error && (error as Error).message ? (error as Error).message : 'KhÃ´ng thá»ƒ táº£i cÃ¡c phÃ¢n vÃ¹ng dá»¯ liá»‡u QC.'}; },
 });
 root.storageLifecycleService = createStorageLifecycleService({
-  sanitize: value => root.stateAdoptionService!.sanitize(value),
+  sanitize: value => modularStateAdoptionService.sanitize(value),
   normalize: value => { state = value; ensureShape({sanitized:true}); return state; },
-  assertInvariants: value => root.stateAdoptionService!.assertInvariants(value),
-  boot: root.storageBootService!,
-  hydrate: () => root.partitionHydrationService!.hydrate(),
-  restore: () => root.indexedDbRecoveryService!.restore(),
+  assertInvariants: value => modularStateAdoptionService.assertInvariants(value),
+  boot: modularStorageBootService,
+  hydrate: () => modularPartitionHydrationService.hydrate(),
+  restore: () => modularIndexedDbRecoveryService.restore(),
 });
 root.indexedDbMirrorService = createIndexedDbMirrorService({
   supported: () => typeof LocalStore !== 'undefined' && LocalStore.supported(),
@@ -1974,7 +1902,6 @@ root.indexedDbMirrorService = createIndexedDbMirrorService({
   writeState: value => (LocalStore as any).write(value),
   failed: () => { lsDirty = true; lsSaveFailures++; scheduleLocalRetry(); },
 });
-root.planPartitionWrite = planPartitionWrite;
 root.qcValueFormat = createQcValueFormat();
 root.qcStaffIdentity = createQcStaffIdentity();
 root.qcDateFormat = createQcDateFormat();
@@ -1991,9 +1918,9 @@ root.cssTokenPixel=(token,fallback)=>cssTokenPixel(token,fallback,key=>typeof ge
 root.canvasFont=createChartCanvasFont((token,fallback)=>(root.cssTokenPixel as any)(token,fallback));
 root.chartDataUrl=createChartDataUrl({createCanvas:()=>document.createElement('canvas')});
 root.afterRenderCanvasService=createVisibleCanvasService({requestFrame:work=>requestAnimationFrame(work),intersectionObserver:typeof IntersectionObserver==='function'?onVisible=>new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting))onVisible();},{rootMargin:'160px'}):undefined,resizeObserver:typeof ResizeObserver==='function'?onResize=>new ResizeObserver(onResize):undefined,isConnected:canvas=>canvas.isConnected!==false});
-root.chartTooltipService=createChartTooltipService({find:()=>document.getElementById('qcTooltip'),create:()=>document.createElement('div'),append:element=>document.body.appendChild(element)});
-root.qcTooltip=()=>root.chartTooltipService!();
-root.leveyJenningsTooltipController=createLeveyJenningsTooltipController({tooltip:()=>root.chartTooltipService!(),viewport:()=>({width:innerWidth,height:innerHeight}),bind:(canvas,event,handler)=>(canvas as Element).addEventListener(event,handler as unknown as EventListener)});
+const chartTooltip=createChartTooltipService({find:()=>document.getElementById('qcTooltip'),create:()=>document.createElement('div'),append:element=>document.body.appendChild(element)});
+root.qcTooltip=chartTooltip;
+root.leveyJenningsTooltipController=createLeveyJenningsTooltipController({tooltip:chartTooltip,viewport:()=>({width:innerWidth,height:innerHeight}),bind:(canvas,event,handler)=>(canvas as Element).addEventListener(event,handler as unknown as EventListener)});
 root.hiDpiCanvasSetup=createHiDpiCanvasSetup(()=>window.devicePixelRatio||1);
 root.leveyJenningsGeometry=leveyJenningsGeometry;
 const legacyWestgardRuleScope=globalThis as any;
@@ -2003,23 +1930,20 @@ root.leveyJenningsTicks=createLeveyJenningsTicks(value=>vnDate(value));
 const legacyLeveyJenningsAxis=globalThis as any;
 root.leveyJenningsYAxisLabels=createLeveyJenningsYAxisLabels((test,value)=>legacyLeveyJenningsAxis.fmtTestValue(test,value));
 const legacyLeveyJenningsHover=globalThis as any;
-root.leveyJenningsHoverModel=createLeveyJenningsHoverModel({date:value=>legacyLeveyJenningsHover.vnDate(value),escape:value=>legacyLeveyJenningsHover.esc(value),pointValue:(point,test)=>legacyLeveyJenningsHover.fmtPointValue(point,test),number:value=>legacyLeveyJenningsHover.fmt(value)});
-root.leveyJenningsPointStyle=leveyJenningsPointStyle;
-root.leveyJenningsDisplayPlan=createLeveyJenningsDisplayPlan(input=>chartViewModel.sampleIndices(input));
-root.leveyJenningsPointRenderModel=createLeveyJenningsPointRenderModel({displayPlan:(points,results,width)=>root.leveyJenningsDisplayPlan!(points,results,width),verdict:(test,rules)=>(globalThis as any).ruleResultLevel(test,rules),style:status=>leveyJenningsPointStyle(status,LEVEY_JENNINGS_COLORS),hover:input=>root.leveyJenningsHoverModel!(input)});
+const leveyJenningsHoverModel=createLeveyJenningsHoverModel({date:value=>legacyLeveyJenningsHover.vnDate(value),escape:value=>legacyLeveyJenningsHover.esc(value),pointValue:(point,test)=>legacyLeveyJenningsHover.fmtPointValue(point,test),number:value=>legacyLeveyJenningsHover.fmt(value)});
+const leveyJenningsDisplayPlan=createLeveyJenningsDisplayPlan(input=>chartViewModel.sampleIndices(input));
+root.leveyJenningsPointRenderModel=createLeveyJenningsPointRenderModel({displayPlan:(points,results,width)=>leveyJenningsDisplayPlan(points,results,width),verdict:(test,rules)=>(globalThis as any).ruleResultLevel(test,rules),style:status=>leveyJenningsPointStyle(status,LEVEY_JENNINGS_COLORS),hover:input=>leveyJenningsHoverModel(input)});
 root.leveyJenningsBandRects=leveyJenningsBandRects;
 root.leveyJenningsGridLines=leveyJenningsGridLines;
 root.leveyJenningsMultiSeries=leveyJenningsMultiSeries;
 root.leveyJenningsMultiRunTicks=createLeveyJenningsMultiRunTicks(value=>(globalThis as any).vnDate(value));
 root.leveyJenningsLegendLayout=(levels,colors,startX,measure)=>createLeveyJenningsLegendLayout(text=>measure(text).width)(levels,colors,startX);
-root.leveyJenningsMultiDisplayPlan=createLeveyJenningsMultiDisplayPlan(input=>chartViewModel.sampleIndices(input));
+const leveyJenningsMultiDisplayPlan=createLeveyJenningsMultiDisplayPlan(input=>chartViewModel.sampleIndices(input));
 const legacyLeveyJenningsMultiHover=globalThis as any;
-root.leveyJenningsMultiHoverModel=createLeveyJenningsMultiHoverModel({date:value=>legacyLeveyJenningsMultiHover.vnDate(value),escape:value=>legacyLeveyJenningsMultiHover.esc(value),pointValue:(point,test)=>legacyLeveyJenningsMultiHover.fmtPointValue(point,test),number:value=>legacyLeveyJenningsMultiHover.fmt(value)});
-root.leveyJenningsMultiPointRenderModel=createLeveyJenningsMultiPointRenderModel({displayPlan:input=>root.leveyJenningsMultiDisplayPlan!(input),verdict:(test,rules)=>(globalThis as any).ruleResultLevel(test,rules),hover:input=>root.leveyJenningsMultiHoverModel!(input)});
+const leveyJenningsMultiHoverModel=createLeveyJenningsMultiHoverModel({date:value=>legacyLeveyJenningsMultiHover.vnDate(value),escape:value=>legacyLeveyJenningsMultiHover.esc(value),pointValue:(point,test)=>legacyLeveyJenningsMultiHover.fmtPointValue(point,test),number:value=>legacyLeveyJenningsMultiHover.fmt(value)});
+root.leveyJenningsMultiPointRenderModel=createLeveyJenningsMultiPointRenderModel({displayPlan:input=>leveyJenningsMultiDisplayPlan(input),verdict:(test,rules)=>(globalThis as any).ruleResultLevel(test,rules),hover:input=>leveyJenningsMultiHoverModel(input)});
 root.leveyJenningsMultiDividers=leveyJenningsMultiDividers;
 root.cusumChartGeometry=cusumChartGeometry;
-root.cusumDisplayPlan=createCusumDisplayPlan(input=>chartViewModel.sampleIndices(input));
-root.cusumHoverModel=createCusumHoverModel({date:value=>(globalThis as any).vnDate(value),number:(value,decimals)=>(globalThis as any).fmt(value,decimals)});
 root.cusumPointRenderModel=cusumPointRenderModel;
 root.cusumReferenceLines=cusumReferenceLines;
 root.cusumLinePoints=cusumLinePoints;
@@ -2037,10 +1961,9 @@ root.westgardRuleSettings=createWestgardRuleSettings({defaults:(root.QCCore as a
 root.qcRangeCandidateService=createRangeCandidateService({tests:()=>state.tests||[],actions:()=>((state as any).actions||[]),levelConfig:(test:any,level:any)=>lvlCfg(test,level),points:(test:any,level:any)=>(globalThis as any).operationalLotPoints(test,level),westgard:(test:any)=>(globalThis as any).activeWestgard(test),pointZ:(point:any,mean:any,sd:any)=>(root.QCCore as any).pointZ(point,mean,sd),stats:(values:number[])=>(root.QCCore as any).stats(values),actionCancelled:(action:any)=>typeof (globalThis as any).actionCancelled==='function'&&(globalThis as any).actionCancelled(action),systematicRules:(root.QCCore as any).WG_SE_RULES,limitsFromTarget:(mean:any,sd:any,k:number)=>(root.QCCore as any).limitsFromTarget(mean,sd,k)});
 root.qcRangeSafetyGate=rangeSafetyGate;
 root.qcRangeBiasEvaluation=rangeBiasEvaluation;
-root.csvCellService=csvCellTs;
 root.reportExportHelpers=reportExportHelpers;
 root.actionReportSummary=createActionReportSummary({labels:()=>typeof (globalThis as any).ACTION_LABELS==='object'?(globalThis as any).ACTION_LABELS:{},excerpt:(value:any,max?:number)=>root.reportExportHelpers!.nceExcerpt(value,max)});
-root.actionReportModel=createActionReportModel({labels:()=>typeof (globalThis as any).ACTION_LABELS==='object'?(globalThis as any).ACTION_LABELS:{},rerunStatus:(action:any)=>typeof (globalThis as any).actionRerunStatus==='function'?(globalThis as any).actionRerunStatus(action):{label:''},workflowStatus:(action:any)=>typeof (globalThis as any).actionWorkflowStatus==='function'?(globalThis as any).actionWorkflowStatus(action):{label:'Chưa hoàn tất'},effectivenessStatus:(action:any)=>typeof (globalThis as any).actionEffectivenessStatus==='function'?(globalThis as any).actionEffectivenessStatus(action):{label:'Chưa đánh giá'},riskScore:(action:any)=>typeof (globalThis as any).actionRiskScore==='function'?(globalThis as any).actionRiskScore(action):0,residualRiskScore:(action:any)=>typeof (globalThis as any).actionResidualRiskScore==='function'?(globalThis as any).actionResidualRiskScore(action):0,eventDate:(action:any)=>typeof (globalThis as any).actionEventDate==='function'?(globalThis as any).actionEventDate(action):action.date,approvalLabel:(action:any)=>typeof (globalThis as any).actionApprovalLabel==='function'?(globalThis as any).actionApprovalLabel(action):(action.approvalStatus||'Chờ duyệt'),pointValue:(point:any,test:any)=>(globalThis as any).dataIoQcPoint(point,test),formatDate:(value:any)=>vnDate(value),formatDateTime:(value:any)=>formatDateTimeVN(value),testName:(test:any)=>(globalThis as any).testDisplayName(test),levelShort:(test:any,level:any,lot:any)=>(globalThis as any).actionLevelShort(test,level,lot)});
+root.actionReportModel=createActionReportModel({labels:()=>typeof (globalThis as any).ACTION_LABELS==='object'?(globalThis as any).ACTION_LABELS:{},rerunStatus:(action:any)=>typeof (globalThis as any).actionRerunStatus==='function'?(globalThis as any).actionRerunStatus(action):{label:''},workflowStatus:(action:any)=>typeof (globalThis as any).actionWorkflowStatus==='function'?(globalThis as any).actionWorkflowStatus(action):{label:'Chưa hoàn tất'},effectivenessStatus:(action:any)=>typeof (globalThis as any).actionEffectivenessStatus==='function'?(globalThis as any).actionEffectivenessStatus(action):{label:'Chưa đánh giá'},riskScore:(action:any)=>typeof (globalThis as any).actionRiskScore==='function'?(globalThis as any).actionRiskScore(action):0,residualRiskScore:(action:any)=>typeof (globalThis as any).actionResidualRiskScore==='function'?(globalThis as any).actionResidualRiskScore(action):0,eventDate:(action:any)=>typeof (globalThis as any).actionEventDate==='function'?(globalThis as any).actionEventDate(action):action.date,approvalLabel:(action:any)=>typeof (globalThis as any).actionApprovalLabel==='function'?(globalThis as any).actionApprovalLabel(action):(action.approvalStatus||'Chờ duyệt'),pointValue:(point:any,test:any)=>root.qcExportValueFormat.point(point,test),formatDate:(value:any)=>vnDate(value),formatDateTime:(value:any)=>formatDateTimeVN(value),testName:(test:any)=>(globalThis as any).testDisplayName(test),levelShort:(test:any,level:any,lot:any)=>(globalThis as any).actionLevelShort(test,level,lot)});
 root.nceCsvRow=createActionCsvRow({test:(id:any)=>(state.tests||[]).find((test:any)=>test.id===id),workflow:(action:any)=>(root as any).actionWorkflowStatus(action),rerun:(action:any)=>(root as any).actionRerunStatus(action),labels:()=>((globalThis as any).ACTION_LABELS||{}),date:(value:any)=>(root as any).vnDate(value),dateTime:(value:any)=>(root as any).formatDateTimeVN(value),eventDate:(action:any)=>(root as any).actionEventDate(action),testName:(test:any)=>(root as any).testDisplayName(test),level:(test:any,level:any,lot:any)=>(root as any).actionLevelShort(test,level,lot),protocol:(action:any)=>(root as any).actionProtocolSummary(action),risk:(action:any)=>(root as any).actionRiskScore(action),residualRisk:(action:any)=>(root as any).actionResidualRiskScore(action),approval:(action:any)=>(root as any).actionApprovalLabel(action)});
 root.sigmaCanvasFactory=createSigmaCanvas({scale:(width,height,value)=>(root as any).sigmaExportPixelRatio(width,height,value),create:()=>document.createElement('canvas')});
 root.sigmaChartRenderer=createSigmaChartRenderer({levels:row=>(root as any).sigmaLevelsOf(row),canvas:(width,height,scale)=>(root as any).sigmaCanvas(width,height,scale),font:(weight,token,fallback)=>(root as any).dataIoCanvasFont(weight,token,fallback),zone:sigma=>(root as any).sgZone(sigma),bytes:url=>(root as any).sigmaDataURLBytes(url)});
@@ -2212,7 +2135,6 @@ root.entryTreeVisibility=entryTreeVisibility;
 root.entryTreeKeyCommand=entryTreeKeyCommand;
 root.entrySelectionState=entrySelectionState;
 root.entryExpandedTablesToggle=entryExpandedTablesToggle;
-root.entryPointContext=entryPointContext;
 root.entryVoidNceChoice=entryVoidNceChoice;
 root.entryVoidReasonValid=entryVoidReasonValid;
 root.entryRecordErrorMessage=entryRecordErrorMessage;
@@ -2235,22 +2157,21 @@ root.westgardRuleTogglesHtml=createWestgardRuleTogglesHtml({button:(label,action
 root.westgardExportActionsHtml=createWestgardExportActionsHtml({button:(label,action,variant,title)=>(root as any).btn(label,action,variant,title),downloadIcon:()=> (root as any).icoDownload(),printIcon:()=> (root as any).icoPrint()});
 root.dashboardStatusTabsHtml=createDashboardStatusTabsHtml({matches:(item:any,key:string)=>(root as any).dashboardStatusFilter.matches(item,key)});
 root.dashboardExpiringLotsHtml=createDashboardExpiringLotsHtml({escape:(value:any)=>(root as any).esc(value)});
-root.dashboardQcFollowupItemHtml=createDashboardQcFollowupItemHtml({escape:(value:any)=>(root as any).esc(value),testLabel:(test:any)=>(root as any).testDisplayName(test),date:(value:any)=>(root as any).vnDate(value),pointValue:(point:any,test:any)=>(root as any).fmtPointValue(point,test),button:(label,action,variant)=>(root as any).btn(label,action,variant),quote:(value:any)=>(root as any).jsq(value)});
-root.dashboardMissingTargetItemHtml=createDashboardMissingTargetItemHtml({escape:(value:any)=>(root as any).esc(value),testLabel:(test:any)=>(root as any).testDisplayName(test),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
-root.dashboardOverdueActionItemHtml=createDashboardOverdueActionItemHtml({escape:(value:any)=>(root as any).esc(value),testLabel:(test:any)=>(root as any).testDisplayName(test),date:(value:any)=>(root as any).vnDate(value),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
-root.dashboardTestStatusTags=dashboardTestStatusTags;
-root.dashboardLevelPillHtml=createDashboardLevelPillHtml({escape:(value:any)=>(root as any).esc(value),format:(value:any)=>(root as any).fmt(value)});
-root.dashboardTestRank=dashboardTestRank;
-root.dashboardLatestPointText=createDashboardLatestPointText({date:(value:any)=>(root as any).vnDate(value),pointValue:(point:any,test:any)=>(root as any).fmtPointValue(point,test)});
-root.dashboardCompletion=dashboardCompletion;
+const dashboardQcFollowupItemHtml=createDashboardQcFollowupItemHtml({escape:(value:any)=>(root as any).esc(value),testLabel:(test:any)=>(root as any).testDisplayName(test),date:(value:any)=>(root as any).vnDate(value),pointValue:(point:any,test:any)=>(root as any).fmtPointValue(point,test),button:(label,action,variant)=>(root as any).btn(label,action,variant),quote:(value:any)=>(root as any).jsq(value)});
+const dashboardMissingTargetItemHtml=createDashboardMissingTargetItemHtml({escape:(value:any)=>(root as any).esc(value),testLabel:(test:any)=>(root as any).testDisplayName(test),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
+const dashboardOverdueActionItemHtml=createDashboardOverdueActionItemHtml({escape:(value:any)=>(root as any).esc(value),testLabel:(test:any)=>(root as any).testDisplayName(test),date:(value:any)=>(root as any).vnDate(value),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
+const dashboardStatusTags=dashboardTestStatusTags;
+const dashboardLevelPillHtml=createDashboardLevelPillHtml({escape:(value:any)=>(root as any).esc(value),format:(value:any)=>(root as any).fmt(value)});
+const dashboardRank=dashboardTestRank;
+const dashboardLatestPointText=createDashboardLatestPointText({date:(value:any)=>(root as any).vnDate(value),pointValue:(point:any,test:any)=>(root as any).fmtPointValue(point,test)});
 root.dashboardFollowupPanelHtml=dashboardFollowupPanelHtml;
-root.dashboardTestSearchText=createDashboardTestSearchText({normalize:(value:any)=>(root as any).searchText(value),label:(test:any)=>(root as any).testDisplayName(test)});
-root.dashboardLatestPoint=createDashboardLatestPoint<any>({runNumber:(point:any)=>(root as any).pointRunNo(point)});
+const dashboardTestSearchText=createDashboardTestSearchText({normalize:(value:any)=>(root as any).searchText(value),label:(test:any)=>(root as any).testDisplayName(test)});
+const dashboardLatestPoint=createDashboardLatestPoint<any>({runNumber:(point:any)=>(root as any).pointRunNo(point)});
 root.dashboardKpisHtml=dashboardKpisHtml;
 root.dashboardProgressHtml=dashboardProgressHtml;
 root.dashboardHeadHtml=createDashboardHeadHtml({escape:(value:any)=>(root as any).esc(value),topUserBox:()=>typeof (globalThis as any).topUserBox==='function'?(globalThis as any).topUserBox():''});
 root.dashboardTestPanelHtml=createDashboardTestPanelHtml({escapeAttr:(value:any)=>(root as any).escAttr(value)});
-root.dashboardTestRowHtml=createDashboardTestRowHtml({escape:(value:any)=>(root as any).esc(value),escapeAttr:(value:any)=>(root as any).escAttr(value)});
+const dashboardTestRowHtml=createDashboardTestRowHtml({escape:(value:any)=>(root as any).esc(value),escapeAttr:(value:any)=>(root as any).escAttr(value)});
 root.dashboardKpiItems=dashboardKpiItems;
 root.dashboardEmptyTestsHtml=createDashboardEmptyTestsHtml({emptyState:(title,detail,action)=>(root as any).emptyState(title,detail,action),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
 root.cusumColors=CUSUM_COLORS;
@@ -2265,17 +2186,17 @@ root.entryJumpScrollService=createEntryJumpScrollService({findWrap:()=>typeof do
 root.defaultDateFieldsService=createDefaultDateFieldsService({find:id=>typeof document==='undefined'?null:document.getElementById(id) as any});
 root.postRenderPageActions=createPostRenderPageActions({requestFrame:work=>requestAnimationFrame(work)});
 root.dashboardOverdueActions=createDashboardOverdueActions({overdue:action=>(root as any).actionOverdue(action)});
-root.dashboardOverdueActionListHtml=createDashboardOverdueActionListHtml({render:item=>(root as any).dashboardOverdueActionItemHtml(item)});
-root.dashboardQcFollowupListHtml=createDashboardQcFollowupListHtml({render:(item,kind)=>(root as any).dashboardQcFollowupItemHtml(item,kind)});
-root.dashboardMissingTargetListHtml=createDashboardMissingTargetListHtml({render:item=>(root as any).dashboardMissingTargetItemHtml(item)});
+root.dashboardOverdueActionListHtml=createDashboardOverdueActionListHtml({render:item=>dashboardOverdueActionItemHtml(item)});
+root.dashboardQcFollowupListHtml=createDashboardQcFollowupListHtml({render:(item,kind)=>dashboardQcFollowupItemHtml(item,kind)});
+root.dashboardMissingTargetListHtml=createDashboardMissingTargetListHtml({render:item=>dashboardMissingTargetItemHtml(item)});
 root.dashboardExpiringLotItems=dashboardExpiringLotItems;
 root.dashboardWestgardAlerts=dashboardWestgardAlerts;
 root.dashboardMissingTargetItems=dashboardMissingTargetItems;
-root.dashboardLevelData=createDashboardLevelData({stats:(values:number[])=>(root as any).stats(values)});
-root.dashboardTestAction=createDashboardTestAction({button:(label,action,variant)=>(root as any).btn(label,action,variant)});
-root.dashboardLevelPillsHtml=createDashboardLevelPillsHtml({targetOk:level=>(root as any).levelTargetOk(level),render:input=>(root as any).dashboardLevelPillHtml(input)});
-root.dashboardTestRowsHtml=createDashboardTestRowsHtml({statusTag:status=>(root as any).dashboardTestStatusTags.westgard(status),todayTag:(count,total)=>(root as any).dashboardTestStatusTags.today(count,total),levelsHtml:levels=>(root as any).dashboardLevelPillsHtml(levels),latestText:(point,test)=>(root as any).dashboardLatestPointText(point,test),rank:(status,count,total)=>(root as any).dashboardTestRank(status,count,total),rowHtml:input=>(root as any).dashboardTestRowHtml(input),actionHtml:(testId,level)=>(root as any).dashboardTestAction(testId,level),testDisplayName:test=>(root as any).testDisplayName(test)});
-root.dashboardTestItems=createDashboardTestItems({activeWestgard:test=>(root as any).activeWestgard(test),summarize:input=>(root as any).WestgardViewModel.summarizeTestStatus(input),levelData:(views,today)=>(root as any).dashboardLevelData(views,today),latestPoint:points=>(root as any).dashboardLatestPoint(points),searchText:(test,levels)=>(root as any).dashboardTestSearchText(test,levels),markStatus:(testId,status)=>(root as any).statusMemo.set(testId,status)});
+const dashboardLevelData=createDashboardLevelData({stats:(values:number[])=>(root as any).stats(values)});
+const dashboardTestAction=createDashboardTestAction({button:(label,action,variant)=>(root as any).btn(label,action,variant)});
+const dashboardLevelPillsHtml=createDashboardLevelPillsHtml({targetOk:level=>(root as any).levelTargetOk(level),render:input=>dashboardLevelPillHtml(input)});
+root.dashboardTestRowsHtml=createDashboardTestRowsHtml({statusTag:status=>dashboardStatusTags.westgard(status),todayTag:(count,total)=>dashboardStatusTags.today(count,total),levelsHtml:levels=>dashboardLevelPillsHtml(levels),latestText:(point,test)=>dashboardLatestPointText(point,test),rank:(status,count,total)=>dashboardRank(status,count,total),rowHtml:input=>dashboardTestRowHtml(input),actionHtml:(testId,level)=>dashboardTestAction(testId,Number(level)),testDisplayName:test=>(root as any).testDisplayName(test)});
+root.dashboardTestItems=createDashboardTestItems({activeWestgard:test=>(root as any).activeWestgard(test),summarize:input=>(root as any).WestgardViewModel.summarizeTestStatus(input),levelData:(views,today)=>dashboardLevelData(views,today),latestPoint:points=>dashboardLatestPoint(points),searchText:(test,levels)=>dashboardTestSearchText(test,levels),markStatus:(testId,status)=>(root as any).statusMemo.set(testId,status)});
 root.dashboardTestListHtml=dashboardTestListHtml;
 root.dashboardPageHtml=createDashboardPageHtml();
 root.actionGuideContent=createActionGuideContent({escape:(value:any)=>(root as any).esc(value),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
@@ -2330,12 +2251,10 @@ root.manageAssayTablePresentation=manageAssayTableHtml;
 root.teaReferenceStatusPresentation=teaReferenceStatusHtml;
 root.manageTransitionStatusPresentation=manageTransitionStatus;
 root.manageLotStatusPresentation=createManageLotStatus({daysToExpiry:(value:any)=>(root as any).daysToExp(value)});
-root.sameIdSetPresentation=sameIdSetTs;
 root.manageInstrumentNamePresentation=manageInstrumentName;
 root.manageLotLabelPresentation=manageLotLabel;
 root.managePanelNamePresentation=managePanelName;
 root.manageLotGroupLabelsPresentation=manageLotGroupLabels;
-root.sameNormalizedTextPresentation=createSameNormalizedText({normalize:(value:any)=>(root as any).searchText(value)});
 root.groupsOfLotPresentation=groupsOfLotTs;
 root.targetGroupLotsPresentation=targetGroupLotsTs;
 root.targetGroupLabelPresentation=targetGroupLabel;
@@ -2355,8 +2274,6 @@ root.historyAssaySelectionPresentation=historyAssaySelection;
 root.historyVisibleRowsPresentation=historyVisibleRows;
 root.historyRowSortPresentation=sortHistoryRows;
 root.historySummaryPresentation=historySummary;
-root.teaPositiveNumberPresentation=teaPositiveNumber;
-root.teaReferenceExternalChangedPresentation=teaReferenceExternalChanged;
 root.teaSourceRegistryItemsPresentation=teaSourceRegistryItems;
 root.manageSearchMatchPresentation=manageSearchMatch;
 root.lotTransitionTargetNumberPresentation=lotTransitionTargetNumber;
@@ -2413,28 +2330,17 @@ root.sigmaMuPrintRowsService=createSigmaMuPrintRows({mu:(test:any,entry:any,leve
 root.reportPointsTableService=createReportPointsTable({formatDate:(value:any)=>vnDate(value),escape:(value:any)=>typeof (globalThis as any).esc==='function'?(globalThis as any).esc(value):String(value??''),pointValue:(point:any,test:any)=>typeof (globalThis as any).reportQcPoint==='function'?(globalThis as any).reportQcPoint(point,test):fmt(point&&point.val,3),format:(value:any,decimals?:number)=>fmt(value,decimals),verdict:(value:any)=>typeof (globalThis as any).qcVerdictLabel==='function'?(globalThis as any).qcVerdictLabel(value):String(value??''),staff:(point:any)=>typeof (globalThis as any).pointStaff==='function'?(globalThis as any).pointStaff(point):{}});
 root.actionReportHtml=createActionReportHtml((value:any)=>typeof (globalThis as any).esc==='function'?(globalThis as any).esc(value):String(value??''));
 root.sigmaDraftService=createSigmaDraftService({get:(key:string)=>localStorage.getItem(key),set:(key:string,value:string)=>localStorage.setItem(key,value),remove:(key:string)=>localStorage.removeItem(key),now:()=>Date.now(),clone:(value:any)=>JSON.parse(JSON.stringify(value)),key:'qclab_sigma_draft',savedAtKey:'qclab_saved_at'});
-root.stateAdoptionService=createStateAdoptionService({validate:(value:any)=>(root.QCCore as any).validateBackup(value),sanitize:(value:any,options:any)=>(root.QCCore as any).sanitizeBackup(value,options),invariants:(value:any,options:any)=>(root.QCCore as any).validateStateInvariants(value,options)});
+const modularStateAdoptionService=createStateAdoptionService({validate:(value:any)=>(root.QCCore as any).validateBackup(value),sanitize:(value:any,options:any)=>(root.QCCore as any).sanitizeBackup(value,options),invariants:(value:any,options:any)=>(root.QCCore as any).validateStateInvariants(value,options)});
 root.corruptLocalQuarantine=createCorruptLocalQuarantine(()=>new Date().toISOString());
-root.syncValueCodec=createSyncValueCodec();
 root.firebaseConfigSelection=createFirebaseConfigSelection(['apiKey','authDomain','databaseURL','projectId','appId']);
 root.firebaseConnectionGate=createFirebaseConnectionGate();
 root.syncSnapshotSignature=syncSnapshotSignature;
 root.firebaseIdentity=createFirebaseIdentity();
 root.firebaseAuditGate=createFirebaseAuditGate((entries:any[],anchor:string)=>(root.QCCore as any).verifyAuditChain(entries,anchor));
 root.firebasePollingService=createFirebasePollingService({setInterval:(fn:()=>void,ms:number)=>globalThis.setInterval(fn,ms),clearInterval:(timer:any)=>globalThis.clearInterval(timer)});
-root.firebaseDisconnectedState=firebaseDisconnectedState;
-root.firebaseCanPull=firebaseCanPull;
 root.firebasePullService=createFirebasePullService({read:(ref:any)=>ref.once('value'),handle:(value:any,options:any)=>(globalThis as any).fbHandleValue(value,options),canPull:firebaseCanPull});
-root.firebaseMergeApplication=createFirebaseMergeApplication({merge:(local:any,remote:any,base:any)=>(globalThis as any).fbMerge(local,remote,base),firstMerge:(local:any,remote:any)=>(globalThis as any).fbFirstConnectMerge(local,remote)});
-root.localPartitionHelpers=createLocalPartitionHelpers();
-root.localSnapshotRecord=createLocalSnapshotRecord({clone:(value:any)=>typeof structuredClone==='function'?structuredClone(value):JSON.parse(JSON.stringify(value)),now:()=>Date.now(),key:'state'});
-root.localPartitionValid=localPartitionValid;
-root.localRecoverySlots=localRecoverySlots;
-root.localPartitionTransaction=createLocalPartitionTransaction({nextSlot:(value:any)=>root.localPartitionHelpers!.nextSlot(value),shell:(value:any)=>root.localPartitionHelpers!.shell(value),now:()=>Date.now()});
-root.localPartitionRecovery=createLocalPartitionRecovery(localPartitionValid);
-root.localClearKeys=createLocalClearKeys((slot:any,type:any,id?:any)=>root.localPartitionHelpers!.key(slot,type,id),'state');
+const modularLocalPartitionHelpers=createLocalPartitionHelpers(),modularLocalSnapshotRecord=createLocalSnapshotRecord({clone:(value:any)=>typeof structuredClone==='function'?structuredClone(value):JSON.parse(JSON.stringify(value)),now:()=>Date.now(),key:'state'}),modularLocalRecoverySlots=localRecoverySlots,modularLocalPartitionTransaction=createLocalPartitionTransaction({nextSlot:(value:any)=>modularLocalPartitionHelpers.nextSlot(value),shell:(value:any)=>modularLocalPartitionHelpers.shell(value),now:()=>Date.now()}),modularLocalPartitionRecovery=createLocalPartitionRecovery(localPartitionValid),modularLocalClearKeys=createLocalClearKeys((slot:any,type:any,id?:any)=>modularLocalPartitionHelpers.key(slot,type,id),'state');
 root.firebaseSnapshotGate=firebaseSnapshotGate;
-root.firebaseEmptySnapshotPlan=firebaseEmptySnapshotPlan;
 root.firebaseRemoteSnapshot=createFirebaseRemoteSnapshot((value:any)=>(root.QCCore as any).validateBackup(value),(value:any)=>(root.QCCore as any).sanitizeBackup(value));
 root.firebaseOwnSnapshotPlan=firebaseOwnSnapshotPlan;
 root.firebaseFirstConnectPlan=firebaseFirstConnectPlan;
@@ -2560,7 +2466,7 @@ root.ActionEscalationService = createActionEscalationService({
   approvalStatus: action => nceActionBasics.actionApprovalStatus(action),
   activeFollowUp: (actions, action) => root.NceActionIdentityService!.activeFollowUp(actions, action),
 });
-root.ActionRecordService = createActionRecordService({
+const actionRecordService: ActionRecordService = createActionRecordService({
   now: () => new Date().toISOString(), createId: () => uid(),
   isCancelled: action => nceActionBasics.actionCancelled(action), approvalStatus: action => nceActionBasics.actionApprovalStatus(action),
 });
@@ -2571,7 +2477,7 @@ root.NceFormCommand = createNceFormCommand({
   effectivenessMissingKey: action => typeof (root as any).actionEffectivenessMissingKey === 'function' ? (root as any).actionEffectivenessMissingKey(action) : 'effectivenessNote',
   isCancelled: action => nceActionBasics.actionCancelled(action),
   approvalStatus: action => nceActionBasics.actionApprovalStatus(action),
-  records: root.ActionRecordService,
+  records: actionRecordService,
 });
 root.NceLifecycleCommand = createNceLifecycleCommand({ review: root.ActionReviewService, escalation: root.ActionEscalationService });
 root.ActionViolationService = createActionViolationService({
@@ -2673,7 +2579,7 @@ root.EntryService = createEntryService({
 root.EntryRecordCommand = createEntryRecordCommand({
   recordPoint: (targetState, input) => root.EntryService.recordPoint(targetState, input),
   canEnter: (test, level) => typeof (root as any).canEnterQcForLevel === 'function' && !!(root as any).canEnterQcForLevel(test, level),
-  pointContext: (testId, level, lot, activeLot) => typeof (root as any).entryPointContext === 'function' ? (root as any).entryPointContext(testId, level, lot, activeLot) : {},
+  pointContext: (testId, level, lot, activeLot) => entryPointContext(testId, level, lot, activeLot),
   verdict: (test, input, point, parallel) => {
     if (typeof (root as any).clearDerivedForTest === 'function') (root as any).clearDerivedForTest(input.testId);
     if (parallel && typeof (root as any).parallelWestgard === 'function') return (root as any).parallelWestgard(test, { level: +input.level, lot: String(input.lotNo || ''), mean: +input.cfg.mean, sd: +input.cfg.sd, parallel: true }).byPoint.get(point.id) || { level: 'ok', rules: [] };
@@ -2715,7 +2621,6 @@ const backupService = createBackupService({
   nowIso: () => new Date().toISOString(),
   appVersion: () => root.QCLAB_APP?.version || '',
 });
-root.BackupService = backupService;
 root.BACKUP_IMPORT_MAX_BYTES = BACKUP_IMPORT_MAX_BYTES;
 root.BACKUP_IMPORT_WARN_BYTES = BACKUP_IMPORT_WARN_BYTES;
 root.serializeBackupData = backupService.serializeBackupData;
@@ -2731,7 +2636,10 @@ root.prepareBackupImport = backupService.prepareBackupImport;
 root.backupSummary = backupService.backupSummary;
 root.inspectBackupText = backupService.inspectBackupText;
 root.BackupRestoreCommand=createBackupRestoreCommand({current:()=>state,replace:value=>{state=value;},normalize:()=>ensureShape({sanitized:true}),invariantErrors:()=>(root.QCCore as any).validateStateInvariants(state,{sanitized:true}),clearSigmaDraft:()=>{if(typeof clearSigmaDraftThrough==='function')clearSigmaDraftThrough(Number.MAX_SAFE_INTEGER);},ensureAdmin:()=>ensureAdmin(),setActivity:activity=>{state.activity=activity;},logImported:fileName=>logAct('Nhập backup','Nhập dữ liệu đã kiểm tra từ file '+fileName,'Dữ liệu'),save:()=>save({}),render:()=>rerender()});
-root.BackupExportCommand=createBackupExportCommand({current:()=>state,log:()=>logAct('Xuất backup','Xuất toàn bộ dữ liệu JSON có checksum','Dữ liệu'),save:()=>save({clearDerived:false}),create:value=>(root as any).createBackupPackage(value),confirmOversized:(bytes,detail)=>(root as any).confirmOversizedBackup(bytes,detail),confirm:dialog=>(root as any).confirmDialog(dialog),download:(name,text)=>(root as any).downloadBackupText(name,text),mark:bytes=>(root as any).markBackupDone(bytes),update:()=>(root as any).updateBackupBanner()});
+root.BackupExportCommand=createBackupExportCommand({current:()=>state,log:()=>logAct('Xuất backup','Xuất toàn bộ dữ liệu JSON có checksum','Dữ liệu'),save:()=>save({clearDerived:false}),create:value=>backupService.createBackupPackage(value),confirmOversized:(bytes,detail)=>(root as any).confirmOversizedBackup(bytes,detail),warning:bytes=>backupService.backupImportSizeError(bytes)?null:root.backupSizeWarningConfirmation({bytes}),confirm:dialog=>(root as any).confirmDialog(dialog),download:(name,text)=>(root as any).downloadBackupText(name,text),mark:bytes=>(root as any).markBackupDone(bytes),update:()=>(root as any).updateBackupBanner()});
+root.BackupImportCommand=createBackupImportCommand({prepare:text=>backupService.prepareBackupImport(text),sizeWarning:bytes=>backupService.backupSizeWarning(bytes),snapshot:prefix=>root.BackupExportCommand.snapshot(prefix),restore:input=>root.BackupRestoreCommand.restore(input)});
+root.BackupInspectionCommand=createBackupInspectionCommand({inspect:(text,bytes)=>backupService.inspectBackupText(text,bytes)});
+root.BackupStatusCommand=createBackupStatusCommand({reminder:root.backupReminderService,marker:root.backupLocalMarker,maxBytes:BACKUP_IMPORT_MAX_BYTES,size:bytes=>backupService.backupSizeMB(bytes),warning:bytes=>backupService.backupSizeWarning(bytes)});
 root.ResetOperationalDataCommand=createResetOperationalDataCommand({current:()=>state,clearPersistence:()=>{localStorage.removeItem('qclab');localStorage.removeItem('qclab_boot');if(typeof clearSigmaDraftThrough==='function')clearSigmaDraftThrough(Number.MAX_SAFE_INTEGER);if(typeof LocalStore!=='undefined')(LocalStore as any).clear().catch(()=>{});},blank:users=>(root as any).blankAppStateFactory(users),replace:value=>{state=value;},normalize:()=>ensureShape(),ensureAdmin:()=>ensureAdmin(),log:()=>logAct('Xóa sạch dữ liệu test','Đưa app về trạng thái trắng, giữ người dùng và nhật ký audit','Dữ liệu'),save:()=>save({}),render:()=>rerender()});
 root.UserManagementCommand=createUserManagementCommand();
 const lisRuntime = createLisGatewayRuntime();
@@ -2772,16 +2680,10 @@ lisClient = createLisClient({
 });
 root.LISClientService = lisClient;
 root.lisGatewayRuntime = lisRuntime;
-root.LIS_GATEWAY_STORAGE_KEY = LIS_GATEWAY_STORAGE_KEY;
-root.LIS_POLL_MS = LIS_POLL_MS;
 root.lisGatewayConfig = lisClient.gatewayConfig;
 root.lisNormalizeGatewayUrl = lisClient.normalizeGatewayUrl;
-root.lisGatewaySetStatus = lisClient.setStatus;
 root.lisGatewayStatusText = lisClient.statusText;
-root.lisGatewayFetch = lisClient.gatewayFetch;
-root.lisGatewayHealth = lisClient.gatewayHealth;
 root.lisGatewayPull = lisClient.pull;
-root.lisResultToPointInput = lisClient.resultToPointInput;
 root.lisImportResult = lisClient.importResult;
 root.lisRejectResult = lisClient.rejectResult;
 root.lisGatewayStart = lisClient.start;
@@ -2829,7 +2731,7 @@ root.ManageLotCommand = createManageLotCommand({
 });
 root.TeaReferenceService = createTeaReferenceService({
   key: value => (globalThis as any).teaRefName(value), analyteMeta: (name, record) => (globalThis as any).teaAnalyteMeta(name, record),
-  effectiveReferences: () => (globalThis as any).effectiveTeaRefs(), defaultReferences: () => (globalThis as any).REFTESTS,
+  effectiveReferences: () => (globalThis as any).effectiveTeaRefs(), defaultReferences: () => REFTESTS,
   sourceRegistry: () => (globalThis as any).TEA_SOURCE_REGISTRY, createId: () => (globalThis as any).uid(),
   todayIso: () => (globalThis as any).isoToday(), userName: () => (globalThis as any).userName(),
 });
@@ -2866,8 +2768,6 @@ root.reagentCreateTypedRowHtml = reagentCreateTypedRowHtml;
 root.reagentReportDetailCardHtml = reagentReportDetailCardHtml;
 root.reagentReportChartGridHtml = reagentReportChartGridHtml;
 root.reagentPairMath = reagentPairMath;
-root.reagentStatistics = reagentStatistics;
-root.reagentTDistribution = reagentTDistribution;
 root.reagentComparisonCalculator = createReagentComparisonCalculator({
   validPairs: reagentPairMath.validPairs, mean: reagentStatistics.mean, variance: reagentStatistics.variance,
   max: reagentStatistics.max, min: reagentStatistics.min, pearson: reagentStatistics.pearson,

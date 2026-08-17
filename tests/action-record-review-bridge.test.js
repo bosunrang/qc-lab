@@ -10,7 +10,8 @@ const bridge=fs.readFileSync(path.join(root,'src','compat','modular-pilot.global
 assert.match(form,/globalThis\.NceFormCommand\.submit\(\{actions:state\.actions,/,'Tạo/cập nhật hồ sơ NCE phải đi qua command TypeScript duy nhất');
 assert.match(route,/ActionReviewService\.approvalReadiness\(a,currentUser\)/,'Duyệt hồ sơ NCE phải dùng service TypeScript');
 assert.match(bridge,/ActionReviewService: ActionReviewService;/,'Review NCE phải là hợp đồng bridge bắt buộc');
-assert.match(bridge,/ActionRecordService: ActionRecordService;/,'Hồ sơ NCE phải là hợp đồng bridge bắt buộc');
+assert.match(bridge,/const actionRecordService: ActionRecordService = createActionRecordService\(/,'Hồ sơ NCE phải là dependency nội bộ của command TypeScript');
+assert.doesNotMatch(bridge,/root\.ActionRecordService\s*=/,'Không công bố facade hồ sơ NCE không có caller classic');
 assert.match(bridge,/NceFormCommand: NceFormCommand;/,'Command form NCE phải là hợp đồng bridge bắt buộc');
 assert.match(route,/globalThis\.NceLifecycleCommand\.execute\(/,'Các mutation lifecycle NCE phải đi qua command TypeScript duy nhất');
 assert.match(bridge,/NceLifecycleCommand: NceLifecycleCommand;/,'Command lifecycle NCE phải là hợp đồng bridge bắt buộc');

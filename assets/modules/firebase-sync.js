@@ -16,7 +16,6 @@ function hasLocalQcContent(s){return globalThis.syncHasContent(s);}
 /* Dạng chuẩn để so khớp cục bộ với cloud: sắp xếp khóa, coi rỗng/null ≡ thiếu. RTDB
    không lưu mảng/đối tượng rỗng và không giữ thứ tự khóa, nên cùng một dữ liệu vẫn ra
    hai CHUỖI JSON khác nhau sau một vòng đẩy lên - tải về. */
-function fbCanon(v){return globalThis.syncCanon(v);}
 /* So sánh cục bộ với cloud để biết có THẬT SỰ khác nhau hay chỉ là bản đã đồng bộ tải
    lại. Chỉ so các nhánh nghiệp vụ được đồng bộ: activity/activityAnchor không dùng để
    bật hộp thoại phá hủy vì đăng nhập/đăng xuất luôn thêm audit cục bộ trước khi snapshot
@@ -71,12 +70,10 @@ function updateSaveStatus(){
 function markSaved(label,detail){globalThis.firebaseSaveStatusService.mark(label,detail||'');}
 function fbDataPath(){return globalThis.firebaseIdentity.dataPath(getFbCfg()||{});}
 function fbStatusLabel(){return globalThis.firebaseIdentity.statusLabel(getFbCfg()||{},fb.authUser||{});}
-function fbSnapshotSig(v){return globalThis.syncSnapshotSignature(v);}
-function fbAuditIntegrity(snapshot){return globalThis.firebaseAuditGate(snapshot);}
 function fbRejectBrokenAudit(source,result){
   return globalThis.firebaseAuditRejectionService.reject(source,result);
 }
-function fbAuditMaySync(snapshot,source){const result=fbAuditIntegrity(snapshot);return result.ok||fbRejectBrokenAudit(source,result);}
+function fbAuditMaySync(snapshot,source){const result=globalThis.firebaseAuditGate(snapshot);return result.ok||fbRejectBrokenAudit(source,result);}
 function fbStopPull(){fb.pullT=globalThis.firebasePollingService.stop(fb.pullT);}
 function fbStartPull(){fb.pullT=globalThis.firebasePollingService.start(fb.pullT,fbPullOnce,8000);}
 /* Điểm dừng chung mỗi khi ngắt/đổi kết nối Firebase (hủy đồng bộ, đổi phòng, mất xác
@@ -95,7 +92,7 @@ if(typeof window!=='undefined'&&window.addEventListener){
 if(typeof document!=='undefined'&&document.addEventListener)document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')fbPullOnce();});
 let fbConflictDialogOpen=false;
 async function fbHandleValue(v,opts={}){
-  const sig=fbSnapshotSig(v);
+  const sig=globalThis.syncSnapshotSignature(v);
   const gate=globalThis.firebaseSnapshotGate(fb.seenSig,sig);if(!gate.handle)return;fb.seenSig=gate.seenSignature;
   if(!v){
     return globalThis.firebaseEmptySnapshotService.handle({initialized:fb.initialized,dirty:fb.dirty,hasLocalContent:hasLocalQcContent(state),silent:!!opts.silent});

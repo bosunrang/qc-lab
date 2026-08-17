@@ -8,6 +8,8 @@ const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 const index = read('index.html');
 const drawSource = read('assets/modules/draw.js');
 const dashboardRoutesSource = read('assets/modules/dashboard-routes.js');
+const manageRoutesSource = read('assets/modules/manage-routes.js');
+const reagentClassicSource = read('assets/modules/reagent.js');
 const actionsRoutesSource = read('assets/modules/actions-routes.js');
 const backupUiSource = read('assets/modules/backup-ui.js');
 const backupLocalMarkerSource = read('src/application/backup/backup-local-marker.ts');
@@ -177,6 +179,7 @@ const syncValueCodecSource = read('src/domain/sync/value-codec.ts');
 const firebaseConfigSelectionSource = read('src/domain/sync/firebase-config-selection.ts');
 const firebaseConnectionGateSource = read('src/domain/sync/firebase-connection-gate.ts');
 const snapshotSignatureSource = read('src/domain/sync/snapshot-signature.ts');
+const firebaseSyncSource = read('assets/modules/firebase-sync.js');
 const derivedCacheInvalidationSource = read('src/application/state/derived-cache-invalidation.ts');
 const configurationRelationsSource = read('src/application/state/configuration-relations.ts');
 const testConfigurationSource = read('src/application/state/test-configuration-normalization.ts');
@@ -421,8 +424,8 @@ assert.doesNotMatch(backupExportMessageSource, /\bglobalThis\b|\bdocument\b/,
   'backup export message must not read browser globals');
 assert.doesNotMatch(backupImportConfirmationSource, /\bglobalThis\b|\bdocument\b/,
   'backup import confirmation must not read browser globals');
-assert.match(backupUiSource, /return globalThis\.backupReminderService\.statusText\(/,
-  'backup status must use TypeScript reminder bridge');
+assert.match(backupUiSource, /return globalThis\.BackupStatusCommand\.status\(/,
+  'backup status must use the TypeScript status command');
 assert.match(dashboardRoutesSource, /globalThis\.dashboardHeadHtml\(state\.lab\)/,
   'dashboard route must render header through TypeScript bridge');
 assert.match(dashboardRoutesSource, /function pageDashLoading\(tests,pending\)\{return globalThis\.dashboardLoadingPresentation\(tests,pending,state\.data,state\.lab\);\}/,
@@ -493,16 +496,16 @@ assert.match(read('assets/modules/after-render.js'), /globalThis\.defaultDateFie
   'after-render must fill default dates through TypeScript service');
 assert.match(read('assets/modules/after-render.js'), /globalThis\.postRenderPageActions\.run\(page,\{reagent:rcCompute,sigma:sgRefresh\}\);/,
   'after-render must schedule page actions through TypeScript service');
-assert.match(backupUiSource, /return globalThis\.backupReminderService\.capacityText\(/,
-  'backup capacity must use TypeScript reminder bridge');
-assert.match(backupUiSource, /return globalThis\.backupReminderService\.overdue\(/,
-  'backup overdue must use TypeScript reminder bridge');
+assert.match(backupUiSource, /return globalThis\.BackupStatusCommand\.capacity\(\)/,
+  'backup capacity must use the TypeScript status command');
+assert.match(backupUiSource, /return globalThis\.BackupStatusCommand\.overdue\(/,
+  'backup overdue must use the TypeScript status command');
 assert.match(backupUiSource, /globalThis\.backupLocalMarker\.mark\(bytes\)/,
   'backup UI must persist marker through TypeScript bridge');
-assert.match(backupUiSource, /backupReminderService\.lastBackupInfo\(globalThis\.backupLocalMarker\.lastRaw\(\)\)/,
-  'backup UI must derive marker info through TypeScript bridge');
-assert.match(backupUiSource, /var model=globalThis\.backupReminderService\.banner\(/,
-  'backup banner must render from TypeScript reminder bridge');
+assert.doesNotMatch(backupUiSource, /backupReminderService\.lastBackupInfo/,
+  'backup UI must keep marker interpretation inside the TypeScript status command');
+assert.match(backupUiSource, /var model=globalThis\.BackupStatusCommand\.banner\(/,
+  'backup banner must render from the TypeScript status command');
 assert.match(backupUiSource, /globalThis\.blobDownload\(name,new Blob\(\[json\],\{type:'application\/json'\}\)\)/,
   'backup export must use TypeScript blob download bridge');
 assert.doesNotMatch(backupUiSource, /function downloadBackupText[\s\S]*URL\.createObjectURL/,
@@ -513,8 +516,8 @@ assert.match(generated, /root\.dashboardHeadHtml\s*=\s*createDashboardHeadHtml/,
   'artifact must publish TypeScript dashboard head HTML');
 assert.match(generated, /root\.dashboardTestPanelHtml\s*=\s*createDashboardTestPanelHtml/,
   'artifact must publish TypeScript dashboard test panel HTML');
-assert.match(generated, /root\.dashboardTestRowHtml\s*=\s*createDashboardTestRowHtml/,
-  'artifact must publish TypeScript dashboard test row HTML');
+assert.doesNotMatch(generated, /root\.dashboardTestRowHtml\s*=/,
+  'artifact must keep dashboard test-row HTML internal to the TypeScript bundle');
 assert.match(generated, /root\.dashboardKpiItems\s*=\s*dashboardKpiItems/,
   'artifact must publish TypeScript dashboard KPI items');
 assert.match(generated, /root\.dashboardEmptyTestsHtml\s*=\s*createDashboardEmptyTestsHtml/,
@@ -555,12 +558,8 @@ assert.match(generated, /root\.dashboardWestgardAlerts\s*=\s*dashboardWestgardAl
   'artifact must publish TypeScript dashboard Westgard alerts');
 assert.match(generated, /root\.dashboardMissingTargetItems\s*=\s*dashboardMissingTargetItems/,
   'artifact must publish TypeScript dashboard missing target items');
-assert.match(generated, /root\.dashboardLevelData\s*=\s*createDashboardLevelData/,
-  'artifact must publish TypeScript dashboard level data');
-assert.match(generated, /root\.dashboardTestAction\s*=\s*createDashboardTestAction/,
-  'artifact must publish TypeScript dashboard test action');
-assert.match(generated, /root\.dashboardLevelPillsHtml\s*=\s*createDashboardLevelPillsHtml/,
-  'artifact must publish TypeScript dashboard level pills');
+assert.doesNotMatch(generated, /root\.dashboardLevelData\s*=|root\.dashboardTestAction\s*=|root\.dashboardLevelPillsHtml\s*=|root\.dashboardLatestPoint\s*=/,
+  'artifact must keep dashboard-only dependencies internal to the TypeScript bundle');
 assert.match(generated, /root\.dashboardTestRowsHtml\s*=\s*createDashboardTestRowsHtml/,
   'artifact must publish TypeScript dashboard test rows');
 assert.match(generated, /root\.dashboardTestItems\s*=\s*createDashboardTestItems/,
@@ -585,7 +584,7 @@ assert.match(generated, /root\.backupExportMessage\s*=\s*createBackupExportMessa
   'artifact must publish TypeScript backup export message');
 assert.match(generated, /root\.backupImportConfirmation\s*=\s*createBackupImportConfirmation/,
   'artifact must publish TypeScript backup import confirmation');
-assert.match(backupUiSource, /globalThis\.backupInspectionSummary\(report\)/,
+assert.match(backupUiSource, /globalThis\.backupInspectionSummary\(result\.report\)/,
   'backup verification UI must use TypeScript inspection summary bridge');
 assert.match(backupUiSource, /globalThis\.backupInspectionMessage\.invalid\(err\)/,
   'backup verification UI must use TypeScript inspection message bridge');
@@ -593,8 +592,8 @@ assert.match(backupUiSource, /globalThis\.backupImportMessage\.success/,
   'backup import UI must use TypeScript success message bridge');
 assert.match(backupUiSource, /globalThis\.backupImportMessage\.invalid\(err\)/,
   'backup import UI must use TypeScript error message bridge');
-assert.match(backupUiSource, /new Error\(globalThis\.backupImportMessage\.preImportSnapshotFailure\)/,
-  'backup import UI must use TypeScript pre-import snapshot error bridge');
+assert.match(backupUiSource, /snapshotFailureMessage:globalThis\.backupImportMessage\.preImportSnapshotFailure/,
+  'backup import UI must pass the TypeScript pre-import snapshot error bridge into its command');
 assert.match(backupUiSource, /globalThis\.backupOversizeConfirmation\.exportFull\(\)/,
   'backup export UI must use TypeScript oversize confirmation bridge');
 assert.match(backupUiSource, /globalThis\.backupOversizeConfirmation\.importFile\(f\.name\)/,
@@ -603,17 +602,23 @@ assert.match(backupUiSource, /globalThis\.backupOversizeConfirmation\.inspectFil
   'backup inspect UI must use TypeScript oversize confirmation bridge');
 assert.match(generated, /root\.BackupExportCommand\s*=\s*createBackupExportCommand/,
   'artifact must publish TypeScript backup export command');
-assert.match(backupUiSource, /globalThis\.BackupExportCommand\.exportFull\(globalThis\.backupFileName\(isoToday\(\)\),/,
+assert.match(generated, /root\.BackupImportCommand\s*=\s*createBackupImportCommand/,
+  'artifact must publish TypeScript backup import command');
+assert.match(generated, /root\.BackupInspectionCommand\s*=\s*createBackupInspectionCommand/,
+  'artifact must publish TypeScript backup inspection command');
+assert.match(generated, /root\.BackupStatusCommand\s*=\s*createBackupStatusCommand/,
+  'artifact must publish TypeScript backup status command');
+assert.match(backupUiSource, /globalThis\.BackupExportCommand\.exportFull\(globalThis\.backupFileName\(isoToday\(\)\),globalThis\.backupOversizeConfirmation\.exportFull\(\)\)/,
   'backup export UI must delegate the named file to the TypeScript command');
 assert.match(backupUiSource, /globalThis\.BackupExportCommand\.snapshot\(globalThis\.backupSnapshotFileName\(prefix\)\)/,
   'backup snapshot UI must delegate the named file to the TypeScript command');
 assert.match(backupUiSource, /const dialog=globalThis\.backupSizeConfirmation\(\{bytes:size,title,detail\}\);/,
   'backup UI must create size confirmation through TypeScript bridge');
-assert.match(backupUiSource, /globalThis\.backupSizeWarningConfirmation\(\{bytes\}\)/,
-  'backup UI must create size warning confirmation through TypeScript bridge');
+assert.doesNotMatch(backupUiSource, /backupSizeWarningConfirmation/,
+  'backup UI must leave size-warning selection to the TypeScript export command');
 assert.match(backupUiSource, /globalThis\.backupExportMessage\.createError\(result\.error\)/,
   'backup UI must render create error through TypeScript bridge');
-assert.match(backupUiSource, /confirmDialog\(globalThis\.backupImportConfirmation\(\{name:f\.name,sizeWarning\}\)\)/,
+assert.match(backupUiSource, /confirmDialog\(globalThis\.backupImportConfirmation\(input\)\)/,
   'backup UI must render import confirmation through TypeScript bridge');
 
 assert.match(index, /assets\/generated\/modular-pilot\.js\?v=[a-z0-9-]+/,
@@ -1252,10 +1257,8 @@ assert.match(generated, /root\.ActionRerunService\s*=\s*createActionRerunService
   'artifact must publish NCE rerun service for classic workflow callers');
 assert.match(generated, /root\.ActionPointIndexService\s*=\s*createActionPointIndexService/,
   'artifact must publish NCE point-action index for classic workflow callers');
-assert.match(generated, /root\.installSyncServices\s*=\s*\(\)\s*=>[\s\S]*?createSyncStateMerge/,
-  'artifact must construct the TypeScript Firebase state merger from TypeScript metadata');
-assert.match(generated, /root\.installSyncServices\s*=\s*\(\)\s*=>[\s\S]*?createSyncSnapshot/,
-  'artifact must construct TypeScript snapshot keys from TypeScript metadata');
+assert.match(generated, /var modularSyncCodec\s*=\s*createSyncValueCodec\(\);[\s\S]*?var modularSyncSnapshot\s*=\s*createSyncSnapshot\(FIREBASE_SYNC_TOP,\s*syncJsonMap\);[\s\S]*?createSyncStateMerge\(/,
+  'artifact phải dựng merger và snapshot Firebase từ metadata TypeScript, không qua global installer');
 const qcDomainSource = read('assets/modules/qc-domain.js');
 assert.match(qcDomainSource, /function reportLevelStats\(pts,mean,teaVal\)\{return globalThis\.reportLevelStatsService\(pts,mean,teaVal\);\}/,
   'QC domain report statistics must call the TypeScript service directly');
@@ -1296,8 +1299,12 @@ assert.doesNotMatch(qcDomainSource, /if\(globalThis\.(?:qcActiveWestgard|qcCusum
 assert.doesNotMatch(qcDomainSource, /if\(globalThis\.westgardWorker(?:RevisionService|PrewarmPlanner|JobBuilder|Hydrate)\)/,
   'Westgard worker adapter must not retain JavaScript fallbacks');
 const dataIoSource = read('assets/modules/data-io.js');
-assert.match(dataIoSource, /function csvCell\(v\)\{\s*return globalThis\.csvCellService\(v\);\s*\}/,
-  'data I/O CSV cells must call the TypeScript service directly');
+assert.doesNotMatch(dataIoSource, /function dataIoQcPoint\(/,
+  'data I/O must not retain the retired point-format facade');
+assert.doesNotMatch(dataIoSource, /function dataIoQcValue\(|function dataIoQcStat\(/,
+  'data I/O must not retain classic Mean/SD wrappers around the TypeScript formatter');
+assert.doesNotMatch(dataIoSource, /function csvCell\(|function downloadCSV\(/,
+  'data I/O must not retain retired CSV encoding/download facades');
 assert.match(dataIoSource, /function reportInRange\(start,end\)\{return globalThis\.reportExportHelpers\.inRange\(start,end\);\}/,
   'report date-range filtering must call the TypeScript helper directly');
 assert.match(dataIoSource, /function reportTeaInfo\(t\)\{return globalThis\.qcReportContext\.teaInfo\(t\);\}/,
@@ -1342,8 +1349,12 @@ assert.match(dataIoSource, /function reportNceExcerpt\(value,max=150\)\{return g
   'report NCE excerpts must call the TypeScript helper directly');
 assert.doesNotMatch(dataIoSource, /function reportInRange\(start,end\)\{[^}]*\?|function reportTeaInfo\(t\)\{[^}]*\?|function reportMultiViews\(t,inRange\)\{[^}]*\?|function reportPrevLotRows[\s\S]*?if\(globalThis\.qcReportRowsService\)|function reportLevelRows\(t,l,wg,inRange\)\{[^}]*\?|function reportActionsInRange\(tid,inRange\)\{[^}]*\?|function reportNceSummaryParts\(a\)\{[^}]*if\(|function reportNceExcerpt\(value,max=150\)\{[^}]*if\(|function sigmaLevelsOf\(row\)\{[^}]*\?|function sigmaDataURLBytes\(durl\)\{[^}]*if\(|function sigmaReportMetric\(r\)\{[^}]*\?|function sigmaReportRows\(onlyTestId='',mode='latest',period='',periodId=''\)\{[^}]*if\(|function sigmaExportPixelRatio\(W,H,scale=SIGMA_EXPORT_PIXEL_RATIO\)\{[^}]*\?|function sigmaCanvas\(W,H,scale\)\{[^}]*if\(|function sigmaPeriodLabel\(value\)\{[^}]*if\(|function sigmaMdcPeriodLabel\(value\)\{[^}]*\?|function sigmaExportPeriods\(rows\)\{[^}]*\?/,
   'retired report export helpers must not retain JavaScript fallbacks');
-assert.match(dataIoSource, /function downloadCSV\(name,rows\)\{return globalThis\.csvDownload\(name,rows,csvCell\);\}/,
-  'data I/O CSV download must call the TypeScript service directly');
+assert.match(dataIoSource, /function exportReportCSV\(\)[\s\S]*?globalThis\.csvDownload\(/,
+  'report CSV export must call the TypeScript download service directly');
+assert.match(dataIoSource, /function exportActionsCSV\(\)[\s\S]*?globalThis\.csvDownload\('Nhat_ky_khac_phuc_QC\.csv',rows\);/,
+  'NCE CSV export must call the TypeScript download service directly');
+assert.match(read('assets/modules/users-auth.js'), /function exportActivityCSV\(\)\{globalThis\.csvDownload\(/,
+  'activity CSV export must call the TypeScript download service directly');
 assert.match(generated, /root\.syncRetryScheduler\s*=\s*createSyncRetryScheduler/,
   'artifact must publish the TypeScript Firebase retry scheduler for the legacy bridge');
 assert.match(generated, /root\.syncFirstConnectMerge\s*=\s*createFirstConnectMerge/,
@@ -1366,24 +1377,16 @@ assert.match(generated, /root\.westgardWorkerHydrate\s*=\s*hydrateWestgardWorker
   'artifact must publish TypeScript Westgard Worker hydration for the legacy bridge');
 assert.match(generated, /root\.westgardWorkerPrewarmPlanner\s*=\s*createWestgardWorkerPrewarmPlanner/,
   'artifact must publish TypeScript Westgard Worker prewarm planning for the legacy bridge');
-assert.match(generated, /root\.planPartitionWrite\s*=\s*planPartitionWrite/,
-  'artifact must publish the TypeScript partition-write policy for the legacy bridge');
+assert.doesNotMatch(generated, /root\.planPartitionWrite\s*=/,
+  'artifact must keep the partition-write policy internal to the TypeScript storage flow');
 assert.match(generated, /root\.saveCommandPolicy\s*=\s*saveCommandPlan/,
   'artifact must publish the TypeScript save command policy for the legacy bridge');
-assert.match(generated, /root\.storageBootService\s*=\s*createStorageBootService/,
-  'artifact must publish the TypeScript two-phase storage boot service for the legacy bridge');
-assert.match(generated, /root\.indexedDbRecoveryService\s*=\s*createIndexedDbRecoveryService/,
-  'artifact must publish the TypeScript IndexedDB recovery service for the legacy bridge');
-assert.match(generated, /root\.partitionHydrationService\s*=\s*createPartitionHydrationService/,
-  'artifact must publish the TypeScript partition hydration service for the legacy bridge');
+assert.doesNotMatch(generated, /root\.(?:storageBootService|indexedDbRecoveryService|partitionHydrationService)\s*=/,
+  'artifact must keep the storage boot, recovery and hydration services internal to the TypeScript lifecycle');
 assert.match(generated, /root\.indexedDbMirrorService\s*=\s*createIndexedDbMirrorService/,
   'artifact must publish the TypeScript IndexedDB mirror service for the legacy bridge');
-assert.match(generated, /root\.localStorageLoadService\s*=\s*createLocalStorageLoadService/,
-  'artifact must publish the TypeScript localStorage load service for the legacy bridge');
-assert.match(generated, /root\.localStorageSnapshotWriter\s*=\s*createLocalStorageSnapshotWriter/,
-  'artifact must publish the TypeScript localStorage snapshot writer for the legacy bridge');
-assert.match(generated, /root\.partitionedSnapshotWriter\s*=\s*createPartitionedSnapshotWriter/,
-  'artifact must publish the TypeScript partitioned snapshot writer for the legacy bridge');
+assert.doesNotMatch(generated, /root\.(?:localStorageLoadService|localStorageSnapshotWriter|partitionedSnapshotWriter)\s*=/,
+  'artifact must keep local and partitioned snapshot primitives internal to the TypeScript storage flow');
 assert.match(generated, /root\.saveService\s*=\s*createSaveService/,
   'artifact must publish the TypeScript save gateway for the legacy bridge');
 assert.match(generated, /root\.firebaseLocalStoreService\s*=\s*createFirebaseLocalStoreService/,
@@ -1424,16 +1427,12 @@ assert.match(generated, /root\.firebaseConfigSourceService\s*=\s*createFirebaseC
   'artifact must publish the TypeScript Firebase config source bridge');
 assert.match(generated, /root\.firebaseReadyState\s*=\s*firebaseReadyState/,
   'artifact must publish the TypeScript Firebase ready-state bridge');
-assert.match(generated, /root\.indexedDbOpenService\s*=\s*createIndexedDbOpenService/,
-  'artifact must publish the TypeScript IndexedDB open lifecycle bridge');
-assert.match(generated, /root\.indexedDbRecordService\s*=\s*createIndexedDbRecordService/,
-  'artifact must publish the TypeScript IndexedDB record operations bridge');
+assert.doesNotMatch(generated, /root\.indexedDb(?:OpenService|RecordService|ClearService)\s*=/,
+  'artifact must keep internal IndexedDB lifecycle helpers out of the legacy global bridge');
 assert.match(generated, /root\.partitionedIndexedDbWriteService\s*=\s*createPartitionedIndexedDbWriteService/,
   'artifact must publish the TypeScript partitioned IndexedDB write bridge');
 assert.match(generated, /root\.partitionedIndexedDbReadService\s*=\s*createPartitionedIndexedDbReadService/,
   'artifact must publish the TypeScript partitioned IndexedDB recovery bridge');
-assert.match(generated, /root\.indexedDbClearService\s*=\s*createIndexedDbClearService/,
-  'artifact must publish the TypeScript IndexedDB clear bridge');
 assert.match(generated, /root\.passwordPolicyError\s*=\s*passwordPolicyError/,
   'artifact must publish the TypeScript password policy bridge');
 assert.match(generated, /root\.passwordChangeError\s*=\s*passwordChangeError/,
@@ -1494,10 +1493,10 @@ assert.match(generated, /root\.qcRangeSafetyGate\s*=\s*rangeSafetyGate/,
   'artifact must publish TypeScript QC range safety gate for the legacy bridge');
 assert.match(generated, /root\.qcRangeBiasEvaluation\s*=\s*rangeBiasEvaluation/,
   'artifact must publish TypeScript QC range Bias evaluation for the legacy bridge');
-assert.match(generated, /root\.firebaseConfigParser\s*=/,
-  'artifact must publish the TypeScript Firebase config parser for settings callers');
-assert.match(generated, /root\.firebaseConfigValidator\s*=/,
-  'artifact must publish the TypeScript Firebase config validator for settings callers');
+assert.doesNotMatch(generated, /root\.firebaseConfigParser\s*=|root\.firebaseConfigValidator\s*=/,
+  'artifact must not publish Firebase parser/validator facades with no classic caller');
+assert.match(generated, /createFirebaseSettingsService\(\(value\)\s*=>\s*parseFirebaseConfig\(value\)\)/,
+  'Firebase settings service must call the TypeScript parser directly');
 assert.match(generated, /root\.settingsStorageUsageText\s*=/,
   'artifact must publish TypeScript storage usage formatting for settings callers');
 assert.match(generated, /root\.settingsBrandProfile\s*=/,
@@ -1514,8 +1513,8 @@ assert.match(generated, /root\.lisQueuePresentation\s*=\s*createLisQueuePresenta
   'artifact must publish TypeScript LIS queue presentation for legacy callers');
 assert.match(generated, /root\.lisSettingsService\s*=\s*createLisSettingsService/,
   'artifact must publish TypeScript LIS settings validation for legacy callers');
-assert.match(generated, /root\.labProfileService\s*=\s*createLabProfileService/,
-  'artifact must publish TypeScript lab profile updates for settings callers');
+assert.doesNotMatch(generated, /root\.labProfileService\s*=/,
+  'artifact must not publish the lab-profile facade used only by the settings command');
 assert.match(generated, /root\.firebaseSettingsService\s*=\s*createFirebaseSettingsService/,
   'artifact must publish TypeScript Firebase settings validation for settings callers');
 assert.match(generated, /root\.settingsBrandPreviewHtml\s*=\s*createBrandPreviewHtml/,
@@ -1544,8 +1543,8 @@ assert.match(generated, /root\.reportNceDetailHtmlPresentation\s*=\s*createRepor
 assert.match(generated, /root\.dashboardPageHtml\s*=\s*createDashboardPageHtml/, 'artifact must publish TypeScript dashboard page HTML for the legacy bridge');
 assert.match(generated, /root\.managePageHtml\s*=\s*createManagePageHtml/, 'artifact must publish TypeScript manage page HTML for the legacy bridge');
 assert.match(generated, /root\.actionPageHtml\s*=\s*createActionPageHtml/, 'artifact must publish TypeScript NCE page HTML for the legacy bridge');
-assert.match(generated, /root\.csvCellService\s*=\s*csvCell/,
-  'artifact must publish TypeScript CSV cell encoder for the legacy bridge');
+assert.doesNotMatch(generated, /root\.csvCellService\s*=/,
+  'artifact must not publish the retired CSV cell facade');
 assert.match(generated, /root\.reportExportHelpers\s*=\s*reportExportHelpers/,
   'artifact must publish TypeScript report export helpers for the legacy bridge');
 assert.match(generated, /root\.actionReportSummary\s*=\s*createActionReportSummary/,
@@ -1594,11 +1593,11 @@ assert.match(generated, /root\.actionReportHtml\s*=\s*createActionReportHtml/,
   'artifact must publish TypeScript NCE report HTML for the legacy bridge');
 assert.match(generated, /root\.sigmaDraftService\s*=\s*createSigmaDraftService/,
   'artifact must publish TypeScript Sigma draft persistence for the legacy bridge');
-assert.match(generated, /root\.stateAdoptionService\s*=\s*createStateAdoptionService/,
-  'artifact must publish TypeScript state adoption for the legacy bridge');
+assert.doesNotMatch(generated, /root\.stateAdoptionService\s*=/,
+  'artifact must not publish state adoption used only by the storage lifecycle');
 assert.match(generated, /root\.corruptLocalQuarantine\s*=\s*createCorruptLocalQuarantine/,
   'artifact must publish TypeScript corrupt-local quarantine for the legacy bridge');
-assert.match(generated, /root\.syncValueCodec\s*=\s*createSyncValueCodec/,
+assert.match(generated, /root\.syncValueCodec\s*=\s*modularSyncCodec/,
   'artifact must publish TypeScript sync value codec for the legacy bridge');
 assert.match(generated, /root\.firebaseConfigSelection\s*=\s*createFirebaseConfigSelection/,
   'artifact must publish TypeScript Firebase config selection for the legacy bridge');
@@ -1606,12 +1605,22 @@ assert.match(generated, /root\.firebaseConnectionGate\s*=\s*createFirebaseConnec
   'artifact must publish TypeScript Firebase connection gate for the legacy bridge');
 assert.match(generated, /root\.syncSnapshotSignature\s*=\s*syncSnapshotSignature/,
   'artifact must publish TypeScript sync snapshot signature for the legacy bridge');
+assert.doesNotMatch(firebaseSyncSource, /function fbCanon\(/,
+  'Firebase adapter must not retain the retired canonical-snapshot facade');
+assert.doesNotMatch(firebaseSyncSource, /function fbSnapshotSig\(|function fbAuditIntegrity\(/,
+  'Firebase adapter must not retain retired single-call snapshot/audit facades');
+assert.doesNotMatch(manageRoutesSource, /function teaRef(?:SourceMeta|StampSource)\(/,
+  'Manage adapter must not retain retired TEa metadata facades');
+assert.doesNotMatch(reagentClassicSource, /function rc(?:PTwo|TCrit|Max|Min|Mean|Var|Pearson|Ols|Median|PB|Valid)\(/,
+  'Reagent adapter must not retain unused statistics facades');
+assert.doesNotMatch(generated, /root\.syncCanon\s*=/,
+  'artifact must not publish the retired canonical-snapshot facade');
 assert.match(generated, /root\.ActionReviewService\s*=\s*createActionReviewService/,
   'artifact must publish the NCE review service for legacy workflow callers');
 assert.match(generated, /root\.ActionEscalationService\s*=\s*createActionEscalationService/,
   'artifact must publish the NCE escalation service for legacy workflow callers');
-assert.match(generated, /root\.ActionRecordService\s*=\s*createActionRecordService/,
-  'artifact must publish the NCE record service for legacy form callers');
+assert.doesNotMatch(generated, /root\.ActionRecordService\s*=/,
+  'artifact must not publish the NCE record facade used only inside the bundle');
 assert.match(generated, /root\.ActionBiasService\s*=\s*createActionBiasService/,
   'artifact must publish the NCE Bias service for legacy form callers');
 assert.match(generated, /root\.ActionViolationService\s*=\s*createActionViolationService/,
@@ -1686,10 +1695,10 @@ assert.match(generated, /root\.westgardArchivedTestSelection\s*=\s*westgardArchi
   'artifact must publish TypeScript Westgard archived test selection for legacy route callers');
 assert.match(generated, /root\.reagentPairMath\s*=\s*reagentPairMath/,
   'artifact must publish TypeScript reagent pair math for legacy route callers');
-assert.match(generated, /root\.reagentStatistics\s*=\s*reagentStatistics/,
-  'artifact must publish TypeScript reagent statistics for legacy route callers');
-assert.match(generated, /root\.reagentTDistribution\s*=\s*reagentTDistribution/,
-  'artifact must publish TypeScript reagent t-distribution for legacy route callers');
+assert.doesNotMatch(generated, /root\.reagentStatistics\s*=/,
+  'artifact must not publish the retired reagent-statistics facade');
+assert.doesNotMatch(generated, /root\.reagentTDistribution\s*=/,
+  'artifact must not publish the retired t-distribution facade');
 assert.match(generated, /root\.reagentComparisonCalculator\s*=\s*createReagentComparisonCalculator\(/,
   'artifact must publish TypeScript reagent comparison calculation for legacy route callers');
 assert.match(generated, /root\.reagentChartPresentation\s*=\s*reagentChartPresentation/,
@@ -1712,8 +1721,6 @@ assert.match(generated, /root\.EntryService\s*=\s*createEntryService/,
   'artifact phải công bố Entry application service cho caller cũ');
 assert.match(generated, /root\.LISClientService\s*=\s*lisClient/,
   'artifact phải công bố LIS application service cho UI cũ');
-assert.match(generated, /root\.BackupService\s*=\s*backupService/,
-  'artifact phai cong bo Backup application service cho UI cu');
 assert.match(generated, /root\.ManageConfigService\s*=\s*createManageConfigService/,
   'artifact phải công bố Manage config application service cho caller cũ');
 assert.match(generated, /root\.PeriodService\s*=\s*createPeriodService/,
@@ -1932,10 +1939,14 @@ assert.match(generated, /root\.cssTokenPixel\s*=/,
   'artifact phải công bố TypeScript CSS token pixel cho wrapper cũ');
 assert.match(generated, /root\.afterRenderCanvasService\s*=\s*createVisibleCanvasService/,
   'artifact phải công bố TypeScript điều phối canvas cho wrapper cũ');
-assert.match(generated, /root\.chartTooltipService\s*=\s*createChartTooltipService/,
-  'artifact phải công bố TypeScript tooltip biểu đồ cho wrapper cũ');
-assert.match(generated, /root\.qcTooltip\s*=\s*\(\)\s*=>\s*root\.chartTooltipService/,
-  'qcTooltip bridge');
+assert.doesNotMatch(generated, /root\.chartTooltipService\s*=/,
+  'artifact không được công bố facade tooltip chỉ dùng nội bộ bundle');
+assert.doesNotMatch(generated, /root\.dashboard(?:TestStatusTags|TestRank|Completion)\s*=/,
+  'artifact không được công bố helper dashboard chỉ dùng nội bộ bundle');
+assert.doesNotMatch(generated, /root\.BackupService\s*=/,
+  'artifact không được công bố namespace backup chỉ dùng nội bộ bundle');
+assert.match(generated, /root\.qcTooltip\s*=\s*chartTooltip/,
+  'qcTooltip bridge tại ranh giới canvas/SVG classic');
 assert.match(generated, /root\.leveyJenningsTooltipController\s*=\s*createLeveyJenningsTooltipController/,
   'artifact phải công bố TypeScript controller tooltip Levey-Jennings cho wrapper cũ');
 assert.match(generated, /root\.chartDataUrl\s*=\s*createChartDataUrl/,
@@ -1998,12 +2009,8 @@ assert.match(generated, /root\.leveyJenningsTicks\s*=\s*createLeveyJenningsTicks
   'artifact phải công bố TypeScript tick trục thời gian Levey-Jennings cho wrapper cũ');
 assert.match(generated, /root\.leveyJenningsYAxisLabels\s*=\s*createLeveyJenningsYAxisLabels/,
   'artifact phải công bố TypeScript nhãn trục Y Levey-Jennings cho wrapper cũ');
-assert.match(generated, /root\.leveyJenningsHoverModel\s*=\s*createLeveyJenningsHoverModel/,
-  'artifact phải công bố TypeScript model hover Levey-Jennings cho wrapper cũ');
-assert.match(generated, /root\.leveyJenningsPointStyle\s*=\s*leveyJenningsPointStyle/,
-  'artifact phải công bố TypeScript style điểm Levey-Jennings cho wrapper cũ');
-assert.match(generated, /root\.leveyJenningsDisplayPlan\s*=\s*createLeveyJenningsDisplayPlan/,
-  'artifact phải công bố TypeScript kế hoạch downsampling Levey-Jennings cho wrapper cũ');
+assert.doesNotMatch(generated, /root\.leveyJennings(?:HoverModel|PointStyle|DisplayPlan)\s*=/,
+  'artifact không được công bố helper Levey-Jennings chỉ dùng nội bộ renderer');
 assert.match(generated, /root\.leveyJenningsPointRenderModel\s*=\s*createLeveyJenningsPointRenderModel/,
   'artifact phải công bố TypeScript model render điểm Levey-Jennings cho wrapper cũ');
 assert.match(generated, /root\.leveyJenningsBandRects\s*=\s*leveyJenningsBandRects/,
@@ -2016,20 +2023,30 @@ assert.match(generated, /root\.leveyJenningsMultiRunTicks\s*=\s*createLeveyJenni
   'artifact phải công bố TypeScript tick run biểu đồ Levey-Jennings đa mức cho wrapper cũ');
 assert.match(generated, /root\.leveyJenningsLegendLayout\s*=\s*\(levels,\s*colors,\s*startX,\s*measure\)/,
   'artifact phải công bố TypeScript layout chú giải Levey-Jennings cho wrapper cũ');
-assert.match(generated, /root\.leveyJenningsMultiDisplayPlan\s*=\s*createLeveyJenningsMultiDisplayPlan/,
-  'artifact phải công bố TypeScript kế hoạch downsampling Levey-Jennings đa mức cho wrapper cũ');
-assert.match(generated, /root\.leveyJenningsMultiHoverModel\s*=\s*createLeveyJenningsMultiHoverModel/,
-  'artifact phải công bố TypeScript model hover Levey-Jennings đa mức cho wrapper cũ');
+assert.doesNotMatch(generated, /root\.leveyJenningsMulti(?:DisplayPlan|HoverModel)\s*=/,
+  'artifact không được công bố helper đa mức chỉ dùng nội bộ renderer');
 assert.match(generated, /root\.leveyJenningsMultiPointRenderModel\s*=\s*createLeveyJenningsMultiPointRenderModel/,
   'artifact phải công bố TypeScript model render điểm Levey-Jennings đa mức cho wrapper cũ');
 assert.match(generated, /root\.leveyJenningsMultiDividers\s*=\s*leveyJenningsMultiDividers/,
   'artifact phải công bố TypeScript đường phân cách Levey-Jennings đa mức cho wrapper cũ');
 assert.match(generated, /root\.cusumChartGeometry\s*=\s*cusumChartGeometry/,
   'artifact phải công bố TypeScript hình học CUSUM cho wrapper cũ');
-assert.match(generated, /root\.cusumDisplayPlan\s*=\s*createCusumDisplayPlan/,
-  'artifact phải công bố TypeScript downsampling CUSUM cho wrapper cũ');
-assert.match(generated, /root\.cusumHoverModel\s*=\s*createCusumHoverModel/,
-  'artifact phải công bố TypeScript hover CUSUM cho wrapper cũ');
+assert.doesNotMatch(generated, /root\.cusum(?:DisplayPlan|HoverModel)\s*=/,
+  'artifact không được công bố helper CUSUM không có caller classic');
+assert.doesNotMatch(generated, /root\.(?:entryPointContext|settingsStorageBytesText)\s*=/,
+  'artifact không được công bố helper chỉ dùng nội bộ command/presentation');
+assert.doesNotMatch(generated, /root\.(?:sameIdSetPresentation|sameNormalizedTextPresentation|teaPositiveNumberPresentation|teaReferenceExternalChangedPresentation)\s*=/,
+  'artifact không được công bố formatter Manage/TEa không có caller classic');
+assert.doesNotMatch(generated, /root\.(?:syncJsonMap|mergeSyncArray|mergeSyncBranch|uniqueSyncUsers|syncSnapshot|installSyncServices)\s*=/,
+  'artifact không được công bố primitive Firebase chỉ dùng nội bộ bundle');
+assert.doesNotMatch(generated, /root\.local(?:PartitionHelpers|SnapshotRecord|PartitionValid|RecoverySlots|PartitionTransaction|PartitionRecovery|ClearKeys)\s*=/,
+  'artifact không được công bố primitive IndexedDB chỉ dùng nội bộ bundle');
+assert.doesNotMatch(generated, /root\.LIS_(?:GATEWAY_STORAGE_KEY|POLL_MS)\s*=/,
+  'artifact không được công bố hằng LIS chỉ dùng nội bộ command/service');
+assert.doesNotMatch(generated, /root\.lis(?:GatewayFetch|GatewayHealth|ResultToPointInput)\s*=/,
+  'artifact không được công bố alias LIS khi LISClientService đã là API duy nhất');
+assert.doesNotMatch(generated, /root\.lisGatewaySetStatus\s*=/,
+  'artifact không được công bố alias LIS chỉ dùng nội bộ command');
 assert.match(generated, /root\.cusumPointRenderModel\s*=\s*cusumPointRenderModel/,
   'artifact phải công bố TypeScript model điểm CUSUM cho wrapper cũ');
 assert.match(generated, /root\.cusumReferenceLines\s*=\s*cusumReferenceLines/,

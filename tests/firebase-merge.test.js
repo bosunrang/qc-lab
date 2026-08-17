@@ -17,6 +17,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { loadSandbox, run } = require('./helpers/sandbox');
 const firebaseSource=fs.readFileSync(path.join(__dirname,'..','assets','modules','firebase-sync.js'),'utf8');
+const bridgeSource=fs.readFileSync(path.join(__dirname,'..','src','compat','modular-pilot.global.ts'),'utf8');
 
 const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/firebase-sync.js', 'modules/state-storage.js', 'modules/qc-domain.js', 'modules/audit.js', 'generated/modular-pilot.js']);
 run(ctx, 'function __getState(){return state;} function __setState(s){state=s;} function __getUpdateCalls(){return __updateCalls||0;}');
@@ -46,6 +47,10 @@ assert.match(firebaseSource,/function fbMerge\(local,remote,base\)\{\s*return gl
 assert.match(firebaseSource,/function fbFirstConnectMerge\(local,remote\)\{\s*return globalThis\.syncFirstConnectMerge\(local,remote\);\s*\}/,'merge lần kết nối đầu Firebase phải gọi TypeScript trực tiếp');
 assert.doesNotMatch(firebaseSource,/function (?:mergePointArray|fbMergeDataBranch|fbPointKey)\(/,'Firebase adapter không được giữ implementation merge JavaScript');
 assert.match(firebaseSource,/function statesLikelyEqual\(a,b\)\{return globalThis\.syncedStatesEqual\(a,b,globalThis\.syncCompareKeys\);\}/,'so sánh xung đột Firebase phải gọi TypeScript trực tiếp');
+assert.doesNotMatch(bridgeSource,/root\.firebaseMergeApplication\s*=/,'chọn chiến lược merge phải là dependency nội bộ bundle, không phải facade global');
+assert.doesNotMatch(bridgeSource,/root\.firebase(?:DisconnectedState|CanPull)\s*=/,'lifecycle và pull gate nội bộ không được công bố global facade');
+assert.doesNotMatch(bridgeSource,/root\.firebaseEmptySnapshotPlan\s*=/,'empty-snapshot plan không được công bố khi adapter gọi service trực tiếp');
+assert.doesNotMatch(bridgeSource,/root\.(?:syncJsonMap|mergeSyncArray|mergeSyncBranch|uniqueSyncUsers|syncSnapshot|installSyncServices)\s*=/,'primitive merge/snapshot nội bộ không được công bố global facade');
 
 // --- Scenario 1: two machines edit different top-level branches concurrently -> both survive ---
 {

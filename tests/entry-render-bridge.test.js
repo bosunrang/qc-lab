@@ -13,5 +13,6 @@ for(const name of names){
   assert.match(route,new RegExp(`globalThis\\.${name}`),`${name} must be consumed by the Entry route`);
 }
 assert.match(bridge,/pointContext: \(testId, level, lot, activeLot\).*entryPointContext/s,'EntryRecordCommand must retain the shared point-context presentation contract');
+assert.doesNotMatch(bridge,/root\.entryPointContext\s*=/,'Entry point context phải là dependency nội bộ của command TypeScript');
 
 console.log('Entry renderer TypeScript bridge tests passed');

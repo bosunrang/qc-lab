@@ -5,7 +5,7 @@ const path=require('node:path');
 const root=path.join(__dirname,'..');
 const route=fs.readFileSync(path.join(root,'assets','modules','settings.js'),'utf8');
 const bridge=fs.readFileSync(path.join(root,'src','compat','modular-pilot.global.ts'),'utf8');
-for(const name of ['settingsStorageBytesText','settingsStorageUsageText','settingsBrandProfile','settingsFirebaseAclHelp']){
+for(const name of ['settingsStorageUsageText','settingsBrandProfile','settingsFirebaseAclHelp']){
   assert.match(bridge,new RegExp(`^  ${name}:`,'m'),`${name} must be a required Settings bridge contract`);
   assert.match(bridge,new RegExp(`root\\.${name}\\s*=`),`${name} must be assigned by the TypeScript bootstrap`);
 }

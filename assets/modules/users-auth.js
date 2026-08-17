@@ -76,7 +76,7 @@ function pageAudit(){
       ${pagination}</div>`;
 }
 function activityCSVRows(items){return globalThis.activityAuditCsv(items);}
-function exportActivityCSV(){downloadCSV('Nhat_ky_hoat_dong_QCLab.csv',activityCSVRows(state.activity));}
+function exportActivityCSV(){globalThis.csvDownload('Nhat_ky_hoat_dong_QCLab.csv',activityCSVRows(state.activity));}
 /* Lưu trữ CÓ CHỦ ĐÍCH nhật ký cũ: xuất CSV phần bị cắt TRƯỚC, chỉ khi file đã
    tạo xong mới gỡ khỏi state — khác với xoay vòng tự động (auditRotateOverflow),
    đường này không mất dữ liệu. CSV giữ nguyên cột PrevHash/Hash để phần đã lưu
@@ -97,9 +97,9 @@ async function confirmArchiveActivityLog(){
   /* Gỡ vĩnh viễn hàng chục nghìn dòng audit nặng ngang các thao tác trọng yếu khác
      (duyệt hành động, khóa kỳ, ghi Mean/SD) nên đi cùng một cổng xác thực. */
   if(!await reauthenticateCurrentUser({title:'Xác thực lưu trữ nhật ký',message:'Nhập lại mật khẩu trước khi gỡ nhật ký cũ khỏi hệ thống.'}))return;
-  try{downloadCSV('Luu_tru_nhat_ky_QCLab_'+cutoff.toISOString().slice(0,10)+'.csv',activityCSVRows(segment));}
+  try{globalThis.csvDownload('Luu_tru_nhat_ky_QCLab_'+cutoff.toISOString().slice(0,10)+'.csv',activityCSVRows(segment));}
   catch(e){await infoDialog('Không tạo được file CSV lưu trữ. Nhật ký chưa bị thay đổi.');return;}
-  /* downloadCSV() chỉ tạo blob rồi a.click(): trình duyệt chặn tải, người dùng bấm Hủy
+  /* csvDownload() chỉ tạo blob rồi a.click(): trình duyệt chặn tải, người dùng bấm Hủy
      ở hộp lưu file hay đĩa đầy đều KHÔNG ném lỗi. Vì vậy phải để người dùng tự xác nhận
      đã thấy file — try/catch ở trên một mình không đảm bảo được điều đó. */
   if(!await confirmDialog({kicker:'Kiểm tra trước khi gỡ',title:'Đã có file CSV lưu trữ chưa?',message:'Mở thư mục Tải xuống và kiểm tra file vừa tải có mở được và đủ dòng.',detail:'Chỉ bấm "Đã kiểm tra" khi bạn thực sự thấy file — sau bước này các dòng cũ bị gỡ khỏi hệ thống.',confirmLabel:'Đã kiểm tra, gỡ khỏi hệ thống',cancelLabel:'Chưa, giữ nguyên'}))return;
