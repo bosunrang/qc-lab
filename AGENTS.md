@@ -517,7 +517,7 @@ the Google Fonts link, offline labs must print with correct metrics.
   because that display/operational helper selects one acceptable rerun per day.
 - `westgard-view-model.js`, `chart-view-model.js` — pure (DOM-free)
   view-model builders: `WestgardViewModel` for the Westgard page (used by
-  `westgard-routes.js`), `ChartViewModel` for charts (used by
+  `westgard-page-controller.ts`), `ChartViewModel` for charts (used by
   `after-render-controller.ts`; controller được bundle và nạp
   sau `draw.js`).
 - `entry-ui-state.js`, `analysis-ui-state.js`, `sigma-ui-state.js`,
@@ -608,8 +608,14 @@ the Google Fonts link, offline labs must print with correct metrics.
   in the classic file but had zero callers anywhere in the app — confirmed
   dead and dropped rather than carried forward as a bridge global.
   Since 2026-07-24 the three biggest pages live in their own files:
-  `pageEntry()` lives in `entry-routes.js` and `pageWestgard()` in
-  `westgard-routes.js`. `pageDash()` retired to
+  `pageEntry()` lives in `entry-routes.js` (still classic). `pageWestgard()`
+  retired to `src/presentation/westgard/westgard-page-controller.ts`
+  (`createWestgardPageController(deps)`) on 2026-08-18 (Pha G route slice 3) —
+  a faithful port of the whole page including the archived-lot-group and CUSUM
+  branches; its UI state (`selTest`/`wgViewMode`/`wgChartMode`/`wgPrevOpen`/…)
+  stays in the `AnalysisUIState` bag (written directly from onclick handlers
+  like `selTest=this.value`, so it must remain accessor globals, unlike the
+  Report page's closure state). `pageDash()` retired to
   `src/presentation/dashboard/dashboard-page-controller.ts` on 2026-08-18
   (Pha G slice 2) and `router-dispatch-controller.ts`'s dispatch table calls
   it as `root.pageDash` through the compat bridge like any other bundle-owned
@@ -657,7 +663,7 @@ the Google Fonts link, offline labs must print with correct metrics.
   never expand past it. Page-level UI state lives in the `*-ui-state.js`
   modules above. `sigma.js` renders the Six Sigma page (see "Confirmed
   business-logic decisions" below for how its numbers relate to reports.js).
-- `draw.js`, `entry-routes.js`, `westgard-routes.js`, `sigma.js`,
+- `draw.js`, `entry-routes.js`, `sigma.js`,
   `actions-routes.js`, `action-form.js`, `manage-routes.js`,
   `after-render-controller.ts`, `manage-tests-actions.js` — UI/rendering and
   routing for the pages not yet ported to TypeScript.

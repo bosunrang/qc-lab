@@ -7,7 +7,7 @@ const QCCore = require('../assets/core.js');
 // cho danh sách luật. Trước 2026-08-01 danh sách này nằm rải ở 8 file: core.js
 // giữ 5 mảng riêng (WG_RULES, WG_DEFAULT_ON, WG_ALERT_RULES, WG_SE/RE_RULES,
 // WG_RULE_DESCRIPTIONS, thứ tự ưu tiên của primaryErrorRule, họ WG_RUN_RULES) và
-// westgard-routes.js gõ tay lại cả 13 dòng bảng hướng dẫn kèm cột kết luận —
+// (trước đây) westgard-routes.js gõ tay lại cả 13 dòng bảng hướng dẫn kèm cột kết luận —
 // nghĩa là mô tả/kết luận hiện cho người dùng có thể lệch với engine mà không
 // test nào thấy. Test này chốt hai nửa:
 //   (1) mọi mảng dẫn xuất phải khớp bảng đăng ký (nửa hành vi);

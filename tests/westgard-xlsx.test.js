@@ -89,9 +89,9 @@ assert.match(text, /OLD/);
 assert.doesNotMatch(text, /R3/, 'when old lot is open, its detail table replaces the current lot table');
 assert.match(text, /không gồm luật liên mức/);
 
-const source = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'westgard-routes.js'), 'utf8');
+const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'westgard', 'westgard-page-controller.ts'), 'utf8');
 const presentation = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'westgard', 'westgard-export-actions-html.ts'), 'utf8');
-assert.match(source, /westgardExportActionsHtml\(wgChartMode\)/);
+assert.match(source, /deps\.westgardExportActionsHtml\(ui\.wgChartMode\)/);
 assert.match(presentation, /'exportWestgardXLSX\(\)'/);
 assert.match(presentation, /chartMode === 'lj'/, 'Excel/PDF actions only show in Levey-Jennings mode');
 

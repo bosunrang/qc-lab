@@ -13,7 +13,7 @@ const vnDatePicker=read('src/presentation/router/vn-date-picker-controller.ts');
 const dashboard=read('src/presentation/dashboard/dashboard-page-controller.ts');
 const entry=read('assets/modules/entry-routes.js');
 const entryPointRow=read('src/presentation/entry/entry-point-table-row-html.ts');
-const westgard=read('assets/modules/westgard-routes.js');
+const westgard=read('src/presentation/westgard/westgard-page-controller.ts');
 const modals=read('src/presentation/modal/modal-focus-trap.ts')+read('src/presentation/modal/modal-template.ts')+read('src/presentation/modal/modal-controller.ts')+read('src/presentation/modal/dialog-overlay-controller.ts');
 const actions=read('assets/modules/actions-routes.js');
 const actionCancelModal=read('src/presentation/nce/action-cancel-modal-html.ts');
@@ -45,10 +45,10 @@ assert.doesNotMatch(index,/http-equi\?+/,'thuộc tính http-equiv không đư�
 assert.doesNotMatch(router,/function page(?:Dash|Entry|Westgard)\(/,'router-render chỉ giữ điều phối và UI primitives');
 assert.match(dashboard,/const pageDash = \(\) => \{/);
 assert.match(entry,/function pageEntry\(/);
-assert.match(westgard,/function pageWestgard\(/);
+assert.match(westgard,/const pageWestgard = \(\) => \{/);
 
-const loadOrder=['entry-routes.js','westgard-routes.js'];
-for(let i=1;i<loadOrder.length;i++)assert.ok(index.indexOf(loadOrder[i-1])<index.indexOf(loadOrder[i]),`${loadOrder[i]} phải tải sau ${loadOrder[i-1]}`);
+// entry-routes.js vẫn là classic, tải sau bundle (nơi có pageWestgard TS).
+assert.ok(index.indexOf('modular-pilot.js')<index.indexOf('entry-routes.js'),'bundle phải tải trước entry-routes.js');
 
 /* core.js phải tiếp tục độc lập với bundle presentation, nên PAGE_SET/ROLE_SET ở core.js
    và router policy TypeScript vẫn là hai khai báo tách rời. Test này là lưới an toàn: nếu

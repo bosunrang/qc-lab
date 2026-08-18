@@ -12038,6 +12038,215 @@
 		};
 	}
 	//#endregion
+	//#region src/presentation/westgard/westgard-page-controller.ts
+	var WG_TABLE_INITIAL_ROWS = 120;
+	function createWestgardPageController(deps) {
+		const wgMultiViews = (t) => deps.westgardMultiViews(t, deps.ui().wgPrevOpen);
+		const wgTogglePrevLot = (level) => {
+			deps.ui().wgPrevOpen = deps.westgardUiState.toggleOpen(deps.ui().wgPrevOpen, deps.ui().selTest + "|" + level);
+			deps.rerender();
+		};
+		const wgArchivedGroups = () => deps.westgardArchivedGroups(deps.getState().lotGroups);
+		const wgSetViewMode = (mode) => {
+			deps.ui().wgViewMode = deps.westgardUiState.viewMode(mode);
+			deps.rerender();
+		};
+		const wgSetChartMode = (mode) => {
+			deps.ui().wgChartMode = deps.westgardUiState.chartMode(mode);
+			deps.rerender();
+		};
+		const wgChartModeTabs = () => deps.westgardModeTabs.chart(deps.ui().wgChartMode);
+		const pageWestgardCusum = (t) => {
+			const cfg = deps.testCusumConfig(t), levels = deps.westgardCusumLevels(t);
+			return deps.westgardCusumPageHtml({
+				test: t,
+				cfg,
+				levels,
+				canWrite: deps.canWrite()
+			});
+		};
+		const wgSetArchivedGroup = (id) => {
+			const next = deps.westgardUiState.archivedGroup(id);
+			deps.ui().wgArchivedGroupId = next.groupId;
+			deps.ui().wgArchivedTestId = next.testId;
+			deps.rerender();
+		};
+		const wgSetArchivedTest = (id) => {
+			const next = deps.westgardUiState.archivedTest(id);
+			deps.ui().wgArchivedTestId = next.testId;
+			deps.rerender();
+		};
+		const wgViewModeTabs = (archivedGroups) => deps.westgardModeTabs.view(deps.ui().wgViewMode, archivedGroups.length);
+		const wgRowsWindow = (rows, key) => deps.westgardRowsWindow(rows, deps.ui().wgExpandedRows.has(key), WG_TABLE_INITIAL_ROWS);
+		const wgToggleRows = (key) => {
+			deps.ui().wgExpandedRows = deps.westgardUiState.toggleOpen(deps.ui().wgExpandedRows, key);
+			deps.rerender();
+		};
+		const wgRowsControl = (view, key) => deps.westgardRowsControl(view, key, WG_TABLE_INITIAL_ROWS);
+		const wgLotBlock = (t, level, lotNo, mean, sd, pts, badge, titleMain, lotLabel, extraMeta = "") => deps.westgardLotBlockHtml({
+			test: t,
+			level,
+			lotNo,
+			mean,
+			sd,
+			points: pts,
+			badge,
+			title: titleMain,
+			lotLabel,
+			extraMeta
+		});
+		const wgArchivedMultiViews = (rows) => deps.westgardArchivedMultiViews(rows, (t, level, lotNo) => deps.lotPointsByNo(t.id, level, lotNo));
+		const wgArchivedGroupMatches = (g, q) => deps.westgardArchivedGroupMatches(g, q, deps.searchText, (id) => deps.qcLotById(id));
+		const pageWestgardArchived = (archivedGroups) => {
+			const ui = deps.ui();
+			const q = deps.searchText(ui.wgArchivedTestQ);
+			const matchedGroups = archivedGroups.filter((g) => wgArchivedGroupMatches(g, q));
+			const groupList = matchedGroups.length ? matchedGroups : archivedGroups;
+			if (matchedGroups.length && !matchedGroups.some((g) => g.id === ui.wgArchivedGroupId)) {
+				ui.wgArchivedGroupId = matchedGroups[0].id;
+				ui.wgArchivedTestId = "";
+			} else if (!ui.wgArchivedGroupId || !archivedGroups.some((g) => g.id === ui.wgArchivedGroupId)) ui.wgArchivedGroupId = archivedGroups[0].id;
+			const group = archivedGroups.find((g) => g.id === ui.wgArchivedGroupId);
+			const groupOpts = groupList.map((g) => `<option value="${g.id}" ${g.id === ui.wgArchivedGroupId ? "selected" : ""}>${deps.esc(g.name)}${g.active === false ? " · đã lưu trữ" : " · đã dừng"}${g.stoppedAt ? " " + deps.vnDate(g.stoppedAt) : ""}</option>`).join("");
+			const badge = group.active === false ? "Đã lưu trữ" : "Đã dừng";
+			const groupPicker = `<div><label>Nhóm lô đã dừng/lưu trữ <span class="hint">(${groupList.length}/${archivedGroups.length})</span></label><select onchange="wgSetArchivedGroup(this.value)">${groupOpts}</select></div>`;
+			const searchBox = `<div><label>Tìm nhanh</label><input id="wgArchivedTestSearch" type="search" placeholder="Tên xét nghiệm, máy hoặc số lô..." value="${deps.escapeAttr(ui.wgArchivedTestQ)}" oninput="wgFilterArchivedTests(this.value)"></div>`;
+			const rows = deps.levelsForLotGroup(group);
+			const byTest = /* @__PURE__ */ new Map();
+			rows.forEach((r) => {
+				if (!byTest.has(r.t.id)) byTest.set(r.t.id, {
+					t: r.t,
+					rows: []
+				});
+				byTest.get(r.t.id).rows.push(r);
+			});
+			const testEntries = [...byTest.values()].sort((a, b) => deps.operationalTestOrder(a.t) - deps.operationalTestOrder(b.t) || String(a.t.name || "").localeCompare(String(b.t.name || ""), "vi"));
+			if (!testEntries.length) return deps.headOnly("Phân tích Westgard", "Xem lại Westgard theo nhóm lô đã dừng/lưu trữ") + `<div class="panel"><h2 class="panel-title">Thiết lập phân tích</h2>${wgViewModeTabs(archivedGroups)}<div class="wg-test-picker">${searchBox}${groupPicker}</div></div>
+     <div class="panel">${deps.emptyState("Không tìm thấy xét nghiệm nào", "Nhóm lô này không gắn với xét nghiệm/mức nào có Mean/SD hợp lệ.")}</div>`;
+			const archiveTestSelection = deps.westgardArchivedTestSelection(testEntries, q, ui.wgArchivedTestId, {
+				searchText: deps.searchText,
+				testDisplayName: deps.testDisplayName,
+				instrumentName: deps.instrumentName
+			});
+			const matchedTests = archiveTestSelection.matched;
+			const testList = archiveTestSelection ? archiveTestSelection.list : matchedTests.length ? matchedTests : testEntries;
+			ui.wgArchivedTestId = archiveTestSelection.selected;
+			const testOpts = testList.map((e) => `<option value="${e.t.id}" ${e.t.id === ui.wgArchivedTestId ? "selected" : ""}>${deps.esc(deps.testDisplayName(e.t))}</option>`).join("");
+			const testPicker = `<div><label>Chọn xét nghiệm <span class="hint">(${testList.length}/${testEntries.length})</span></label><select onchange="if(this.value){wgSetArchivedTest(this.value)}">${testOpts}</select></div>`;
+			const entry = archiveTestSelection.entry;
+			const sortedRows = entry.rows.slice().sort((a, b) => a.l.level - b.l.level);
+			const multiChart = sortedRows.length >= 2 ? `<div class="panel"><h2 class="panel-title">Levey-Jennings tổng hợp</h2>
+    <div class="hint wg-panel-intro">Biểu đồ quy đổi các mức QC về Z-score để so sánh trên cùng trục; kết luận Đạt/Cảnh báo/Loại bỏ được tính theo bộ luật Westgard đang bật cho xét nghiệm.</div>
+    <div class="chart-scroll" tabindex="0"><canvas class="wgLJMultiArchived" data-group="${group.id}" data-test="${entry.t.id}" width="1400" height="430"></canvas></div></div>` : "";
+			const blocks = sortedRows.map(({ t, l, lot, mean, sd }) => wgLotBlock(t, l.level, lot.lotNo, mean, sd, deps.lotPointsByNo(t.id, l.level, lot.lotNo), badge, `Mức ${l.level}`, `Lô ${deps.esc(lot.lotNo)}`)).join("");
+			return deps.headOnly("Phân tích Westgard", "Xem lại Westgard theo nhóm lô đã dừng/lưu trữ") + `<div class="panel"><h2 class="panel-title">Thiết lập phân tích</h2>${wgViewModeTabs(archivedGroups)}
+     <div class="wg-test-picker wg-test-picker-3">${searchBox}${testPicker}${groupPicker}</div>
+     <div class="hint flow-item">Đánh giá dưới đây dùng bộ luật Westgard đang bật hiện nay, không phải cấu hình luật tại thời điểm nhóm lô này còn hoạt động.</div></div>${multiChart}${blocks}`;
+		};
+		const pageWestgard = () => {
+			const ui = deps.ui();
+			const tests = deps.operationalTests(), archivedGroups = wgArchivedGroups();
+			if (!tests.length && !archivedGroups.length) return deps.headOnly("Phân tích Westgard", "") + `<div class="panel">${deps.emptyState("Chưa có xét nghiệm đang vận hành", "Cần đưa xét nghiệm vào Panel QC, ghép Nhóm lô QC và gán Mean/SD trước khi phân tích Westgard.", deps.role() === "admin" ? deps.button("Cấu hình Mean/SD", `go('manage');setManageTab('targets')`, "teal") : "")}</div>`;
+			if (ui.wgViewMode === "archived" && !archivedGroups.length) ui.wgViewMode = "current";
+			if (ui.wgViewMode === "current" && !tests.length && archivedGroups.length) ui.wgViewMode = "archived";
+			if (ui.wgViewMode === "archived") return pageWestgardArchived(archivedGroups);
+			if (!ui.selTest || !tests.find((t) => t.id === ui.selTest)) ui.selTest = tests[0].id;
+			const t = tests.find((t) => t.id === ui.selTest);
+			const q = deps.searchText(ui.wgTestQ), matched = tests.filter((x) => !q || deps.searchText(deps.testSelectLabel(x)).includes(q)), opts = matched.length ? matched.map((x) => `<option value="${x.id}" ${x.id === ui.selTest ? "selected" : ""}>${deps.esc(deps.testSelectLabel(x))}</option>`).join("") : "<option value=\"\">Không tìm thấy xét nghiệm phù hợp</option>";
+			const wg = deps.activeWestgard(t), levelViews = wg.views.map((v) => ({
+				l: v.l,
+				pts: v.pts,
+				cfg: {
+					mean: v.l.mean,
+					sd: v.l.sd
+				},
+				single: v.single,
+				lotPicker: `<span class="wg-lot-name">Lô ${deps.esc(v.l.lot || "?")}</span>`
+			}));
+			const multiChart = wgMultiViews(t).length >= 2 ? `<div class="panel"><h2 class="panel-title">Levey-Jennings tổng hợp</h2>
+    <div class="hint wg-panel-intro">Biểu đồ quy đổi các mức QC về Z-score để so sánh trên cùng trục; kết luận Đạt/Cảnh báo/Loại bỏ được tính theo bộ luật Westgard đang bật cho xét nghiệm. Bật "Xem lô cũ" ở mức tương ứng để thêm đường của lô đã chuyển tiếp.</div>
+    <div class="chart-scroll" tabindex="0"><canvas class="wgLJMulti" data-test="${t.id}" width="1400" height="430"></canvas></div></div>` : "";
+			const blocks = levelViews.map((v) => {
+				const { l, pts, cfg, lotPicker } = v;
+				const prevSeries = deps.previousLotSeries(t, l.level), hasPrev = prevSeries.length > 0, prevOpen = ui.wgPrevOpen.has(t.id + "|" + l.level);
+				const prevBtn = hasPrev ? deps.button(prevOpen ? "Xem lô mới" : "Xem lô cũ", `wgTogglePrevLot(${l.level})`, "ghost sm wg-prev-toggle") : "";
+				if (prevOpen && hasPrev) {
+					const s = prevSeries[0];
+					return wgLotBlock(t, l.level, s.lot, s.mean, s.sd, s.pts, "Đã chuyển tiếp", `Mức ${l.level}`, `Lô cũ ${deps.esc(s.lot)}`, prevBtn);
+				}
+				const title = `<h3><span class="wg-level-title"><span>Mức ${l.level}</span>${lotPicker}</span><span class="wg-level-meta"><span>Mean ${deps.fmtTestValue(t, cfg.mean)}</span><span>SD ${deps.fmtTestValue(t, cfg.sd)}</span><span>${pts.length} điểm</span>${prevBtn}</span></h3>`;
+				if (!pts.length) return `<div class="panel">${title}${deps.emptyState("Chưa có dữ liệu", "LOT đang dùng chưa có điểm QC. Bạn có thể chọn LOT cũ hoặc nhập điểm mới.", deps.button("Nhập QC", `entrySel={testId:'${t.id}',level:${l.level}};entryStart=null;entryEnd=null;go('entry')`, "teal"))}</div>`;
+				const { zs } = v.single, rows = deps.westgardViewModel.buildPointRows({
+					points: pts,
+					verdicts: wg.byPoint,
+					zs,
+					mean: cfg.mean,
+					sd: cfg.sd
+				}), key = `current:${t.id}|${l.level}|${l.lot || ""}`, view = wgRowsWindow(rows, key);
+				const targetOk = deps.levelTargetOk(l), targetWarn = targetOk ? "" : `<div class="alert warn wg-target-warning">Mức này <b>chưa có Mean/SD hợp lệ</b> — các điểm QC không được đánh giá Westgard; bảng dưới chỉ liệt kê giá trị, không có kết luận Đạt/Cảnh báo/Loại bỏ. ${deps.role() === "admin" ? deps.button("Cấu hình Mean/SD", `go('manage');setManageTab('targets')`, "teal sm") : ""}</div>`;
+				if (!targetOk) view.rows.forEach((r) => {
+					r.level = "none";
+					r.rules = [];
+					r.supportRules = [];
+				});
+				const rowsHtml = deps.westgardPointRowsHtml(view.rows, t);
+				return `<div class="panel">${title}${targetWarn}${wgRowsControl(view, key)}<table class="wg-table"><thead><tr><th>#</th><th>Ngày</th><th class="num">Giá trị</th><th class="num">Z</th><th>Kết luận</th><th>Luật / bằng chứng</th><th>Loại sai số</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`;
+			}).join("");
+			const ruleToggles = deps.westgardRuleTogglesHtml(deps.ruleRegistry(), deps.wgOn, deps.canWrite());
+			const exportActions = deps.westgardExportActionsHtml(ui.wgChartMode);
+			return deps.headOnly("Phân tích Westgard", "Đối chiếu luật theo mức QC, lô và lần chạy") + `<div class="panel"><h2 class="panel-title">Thiết lập phân tích</h2>${wgViewModeTabs(archivedGroups)}<div class="wg-test-picker${exportActions ? " wg-test-picker-3" : ""}"><div><label>Tìm nhanh</label><input id="wgTestSearch" type="search" placeholder="Tên xét nghiệm, LOT hoặc máy..." value="${deps.escapeAttr(ui.wgTestQ)}" oninput="wgFilterTests(this.value)"></div><div><label>Chọn xét nghiệm <span id="wgTestCount" class="hint">(${matched.length}/${tests.length})</span></label><select id="wgTestSelect" aria-label="Chọn xét nghiệm" ${matched.length ? "" : "disabled"} onchange="if(this.value){selTest=this.value;rerender()}">${opts}</select></div>${exportActions}</div>
+     <div class="wg-rules"><b style="font-size:var(--type-meta)">Cấu hình chung của luật</b><div class="flow-note">${ruleToggles}</div></div>
+     ${deps.westgardRuleGuideHtml(deps.ruleRegistry())}${wgChartModeTabs()}</div>${ui.wgChartMode === "cusum" ? pageWestgardCusum(t) : multiChart + blocks}`;
+		};
+		const wgFilterTests = (v) => {
+			deps.ui().wgTestQ = deps.westgardUiState.query(v);
+			deps.scheduleSearchRender(wgFilterTests, () => {
+				const ui = deps.ui();
+				const tests = deps.operationalTests(), result = deps.westgardTestSearch.select(tests, ui.wgTestQ, ui.selTest), matches = result.matches;
+				if (result.changed) {
+					ui.selTest = result.selected;
+					deps.rerender();
+					return;
+				}
+				const select = deps.document.getElementById("wgTestSelect"), count = deps.document.getElementById("wgTestCount");
+				deps.replaceSelectItems(select, matches.map((x) => ({
+					value: x.id,
+					label: deps.testSelectLabel(x)
+				})), "Không tìm thấy xét nghiệm phù hợp");
+				if (select && matches.some((x) => x.id === ui.selTest)) select.value = ui.selTest;
+				if (count) count.textContent = `(${matches.length}/${tests.length})`;
+			}, "wgTestSearch");
+		};
+		const wgFilterArchivedTests = (v) => {
+			deps.ui().wgArchivedTestQ = deps.westgardUiState.query(v);
+			deps.scheduleSearchRender(wgFilterArchivedTests, () => {
+				deps.rerender();
+			}, "wgArchivedTestSearch");
+		};
+		return {
+			wgMultiViews,
+			wgTogglePrevLot,
+			wgArchivedGroups,
+			wgSetViewMode,
+			wgSetChartMode,
+			wgChartModeTabs,
+			pageWestgardCusum,
+			wgSetArchivedGroup,
+			wgSetArchivedTest,
+			wgViewModeTabs,
+			wgRowsWindow,
+			wgToggleRows,
+			wgRowsControl,
+			wgLotBlock,
+			wgArchivedMultiViews,
+			wgArchivedGroupMatches,
+			pageWestgardArchived,
+			pageWestgard,
+			wgFilterTests,
+			wgFilterArchivedTests
+		};
+	}
+	//#endregion
 	//#region src/presentation/westgard/westgard-rule-guide-html.ts
 	function createWestgardRuleGuideHtml(deps) {
 		return (rules) => {
@@ -19387,6 +19596,79 @@
 		downloadIcon: () => root.icoDownload(),
 		printIcon: () => root.icoPrint()
 	});
+	var westgardPageController = createWestgardPageController({
+		document: typeof document !== "undefined" ? document : { getElementById: () => null },
+		getState: () => state,
+		ui: () => root.AnalysisUIState,
+		rerender: () => rerender(),
+		ruleRegistry: () => root.QCCore.WG_RULE_REGISTRY,
+		wgOn: (rule) => root.wgOn(rule),
+		searchText: (value) => root.normalizeSearchText(value),
+		esc: (value) => root.esc(value),
+		escapeAttr: (value) => root.escAttr(value),
+		vnDate: (value) => vnDate(value),
+		headOnly: (title, subtitle, actions) => root.headOnly(title, subtitle, actions),
+		emptyState: (title, body, actions) => root.emptyState(title, body, actions),
+		button: (label, action, cls, title, options) => root.btn(label, action, cls, title, options),
+		role: () => root.role(),
+		canWrite: () => root.canWrite(),
+		fmtTestValue: (test, value) => root.fmtTestValue(test, value),
+		operationalTests: () => root.operationalTests(),
+		operationalTestOrder: (test) => root.operationalTestOrder(test),
+		levelsForLotGroup: (group) => root.levelsForLotGroup(group),
+		lotPointsByNo: (testId, level, lotNo) => root.lotPointsByNo(testId, level, lotNo),
+		testDisplayName: (test) => root.testDisplayName(test),
+		instrumentName: (test) => root.instrumentName(test),
+		activeWestgard: (test) => root.activeWestgard(test),
+		testSelectLabel: (test) => root.testSelectLabel(test),
+		previousLotSeries: (test, level) => root.previousLotSeries(test, level),
+		levelTargetOk: (level) => root.levelTargetOk(level),
+		testCusumConfig: (test) => root.testCusumConfig(test),
+		scheduleSearchRender: (owner, apply, focusId) => root.scheduleSearchRender(owner, apply, focusId),
+		replaceSelectItems: (select, items, emptyText) => root.replaceSelectItems(select, items, emptyText),
+		westgardViewModel: { buildPointRows: (input) => root.WestgardViewModel.buildPointRows(input) },
+		qcLotById: (id) => (state.qcLots || []).find((x) => x.id === id),
+		westgardMultiViews: (test, prevOpen) => root.westgardMultiViews(test, prevOpen),
+		westgardUiState: root.westgardUiState,
+		westgardArchivedGroups: (groups) => root.westgardArchivedGroups(groups),
+		westgardModeTabs: {
+			chart: (mode) => root.westgardModeTabs.chart(mode),
+			view: (mode, count) => root.westgardModeTabs.view(mode, count)
+		},
+		westgardCusumLevels: (test) => root.westgardCusumLevels(test),
+		westgardCusumPageHtml: (input) => root.westgardCusumPageHtml(input),
+		westgardRowsWindow: (rows, expanded, initial) => root.westgardRowsWindow(rows, expanded, initial),
+		westgardRowsControl: (view, key, initial) => root.westgardRowsControl(view, key, initial),
+		westgardLotBlockHtml: (input) => root.westgardLotBlockHtml(input),
+		westgardArchivedMultiViews: (rows, points) => root.westgardArchivedMultiViews(rows, points),
+		westgardArchivedGroupMatches: (group, q, st, lotById) => root.westgardArchivedGroupMatches(group, q, st, lotById),
+		westgardArchivedTestSelection: (entries, q, selected, d) => root.westgardArchivedTestSelection(entries, q, selected, d),
+		westgardPointRowsHtml: (rows, test) => root.westgardPointRowsHtml(rows, test),
+		westgardRuleTogglesHtml: (registry, wgOn, canWrite) => root.westgardRuleTogglesHtml(registry, wgOn, canWrite),
+		westgardExportActionsHtml: (chartMode) => root.westgardExportActionsHtml(chartMode),
+		westgardRuleGuideHtml: (registry) => root.westgardRuleGuideHtml(registry),
+		westgardTestSearch: { select: (tests, q, selected) => root.westgardTestSearch.select(tests, q, selected) }
+	});
+	root.wgMultiViews = westgardPageController.wgMultiViews;
+	root.wgTogglePrevLot = westgardPageController.wgTogglePrevLot;
+	root.wgArchivedGroups = westgardPageController.wgArchivedGroups;
+	root.wgSetViewMode = westgardPageController.wgSetViewMode;
+	root.wgSetChartMode = westgardPageController.wgSetChartMode;
+	root.wgChartModeTabs = westgardPageController.wgChartModeTabs;
+	root.pageWestgardCusum = westgardPageController.pageWestgardCusum;
+	root.wgSetArchivedGroup = westgardPageController.wgSetArchivedGroup;
+	root.wgSetArchivedTest = westgardPageController.wgSetArchivedTest;
+	root.wgViewModeTabs = westgardPageController.wgViewModeTabs;
+	root.wgRowsWindow = westgardPageController.wgRowsWindow;
+	root.wgToggleRows = westgardPageController.wgToggleRows;
+	root.wgRowsControl = westgardPageController.wgRowsControl;
+	root.wgLotBlock = westgardPageController.wgLotBlock;
+	root.wgArchivedMultiViews = westgardPageController.wgArchivedMultiViews;
+	root.wgArchivedGroupMatches = westgardPageController.wgArchivedGroupMatches;
+	root.pageWestgardArchived = westgardPageController.pageWestgardArchived;
+	root.pageWestgard = westgardPageController.pageWestgard;
+	root.wgFilterTests = westgardPageController.wgFilterTests;
+	root.wgFilterArchivedTests = westgardPageController.wgFilterArchivedTests;
 	root.dashboardStatusTabsHtml = createDashboardStatusTabsHtml({ matches: (item, key) => root.dashboardStatusFilter.matches(item, key) });
 	root.dashboardExpiringLotsHtml = createDashboardExpiringLotsHtml({ escape: (value) => root.esc(value) });
 	var dashboardQcFollowupItemHtml = createDashboardQcFollowupItemHtml({

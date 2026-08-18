@@ -484,6 +484,7 @@ import { createWestgardPointRowsHtml } from '../presentation/westgard/westgard-p
 import { createWestgardRowsControl } from '../presentation/westgard/westgard-rows-control';
 import { createWestgardCusumPageHtml } from '../presentation/westgard/westgard-cusum-page-html';
 import { createWestgardLotBlockHtml } from '../presentation/westgard/westgard-lot-block-html';
+import { createWestgardPageController } from '../presentation/westgard/westgard-page-controller';
 import { createWestgardRuleGuideHtml } from '../presentation/westgard/westgard-rule-guide-html';
 import { createWestgardRuleTogglesHtml } from '../presentation/westgard/westgard-rule-toggles-html';
 import { createWestgardExportActionsHtml } from '../presentation/westgard/westgard-export-actions-html';
@@ -2453,6 +2454,76 @@ root.westgardLotBlockHtml=createWestgardLotBlockHtml({testValue:(test:any,value:
 root.westgardRuleGuideHtml=createWestgardRuleGuideHtml({escape:(value:any)=>(root as any).esc(value),referenceIcon:()=> (root as any).icoRefArrow()});
 root.westgardRuleTogglesHtml=createWestgardRuleTogglesHtml({button:(label,action,variant)=>(root as any).btn(label,action,variant)});
 root.westgardExportActionsHtml=createWestgardExportActionsHtml({button:(label,action,variant,title)=>(root as any).btn(label,action,variant,title),downloadIcon:()=> (root as any).icoDownload(),printIcon:()=> (root as any).icoPrint()});
+const westgardPageController=createWestgardPageController({
+  document:typeof document!=='undefined'?document:({getElementById:()=>null} as unknown as Document),
+  getState:()=>state,
+  ui:()=>(root as any).AnalysisUIState,
+  rerender:()=>rerender(),
+  ruleRegistry:()=>(root.QCCore as any).WG_RULE_REGISTRY,
+  wgOn:rule=>(root as any).wgOn(rule),
+  searchText:value=>root.normalizeSearchText!(value),
+  esc:value=>(root as any).esc(value),
+  escapeAttr:value=>(root as any).escAttr(value),
+  vnDate:value=>vnDate(value),
+  headOnly:(title,subtitle,actions)=>(root as any).headOnly(title,subtitle,actions),
+  emptyState:(title,body,actions)=>(root as any).emptyState(title,body,actions),
+  button:(label,action,cls,title,options)=>(root as any).btn(label,action,cls,title,options),
+  role:()=>root.role(),
+  canWrite:()=>root.canWrite(),
+  fmtTestValue:(test,value)=>(root as any).fmtTestValue(test,value),
+  operationalTests:()=>(root as any).operationalTests(),
+  operationalTestOrder:test=>(root as any).operationalTestOrder(test),
+  levelsForLotGroup:group=>(root as any).levelsForLotGroup(group),
+  lotPointsByNo:(testId,level,lotNo)=>(root as any).lotPointsByNo(testId,level,lotNo),
+  testDisplayName:test=>(root as any).testDisplayName(test),
+  instrumentName:test=>(root as any).instrumentName(test),
+  activeWestgard:test=>(root as any).activeWestgard(test),
+  testSelectLabel:test=>(root as any).testSelectLabel(test),
+  previousLotSeries:(test,level)=>(root as any).previousLotSeries(test,level),
+  levelTargetOk:level=>(root as any).levelTargetOk(level),
+  testCusumConfig:test=>(root as any).testCusumConfig(test),
+  scheduleSearchRender:(owner,apply,focusId)=>root.scheduleSearchRender(owner,apply,focusId),
+  replaceSelectItems:(select,items,emptyText)=>root.replaceSelectItems(select,items,emptyText),
+  westgardViewModel:{buildPointRows:input=>(root as any).WestgardViewModel.buildPointRows(input)},
+  qcLotById:id=>((state as any).qcLots||[]).find((x:any)=>x.id===id),
+  westgardMultiViews:(test,prevOpen)=>(root as any).westgardMultiViews(test,prevOpen),
+  westgardUiState:(root as any).westgardUiState,
+  westgardArchivedGroups:groups=>root.westgardArchivedGroups!(groups),
+  westgardModeTabs:{chart:mode=>(root as any).westgardModeTabs.chart(mode),view:(mode,count)=>(root as any).westgardModeTabs.view(mode,count)},
+  westgardCusumLevels:test=>(root as any).westgardCusumLevels(test),
+  westgardCusumPageHtml:input=>(root as any).westgardCusumPageHtml(input),
+  westgardRowsWindow:(rows,expanded,initial)=>(root as any).westgardRowsWindow(rows,expanded,initial),
+  westgardRowsControl:(view,key,initial)=>(root as any).westgardRowsControl(view,key,initial),
+  westgardLotBlockHtml:input=>root.westgardLotBlockHtml(input),
+  westgardArchivedMultiViews:(rows,points)=>root.westgardArchivedMultiViews!(rows,points),
+  westgardArchivedGroupMatches:(group,q,st,lotById)=>root.westgardArchivedGroupMatches!(group,q,st,lotById),
+  westgardArchivedTestSelection:(entries,q,selected,d)=>root.westgardArchivedTestSelection!(entries,q,selected,d),
+  westgardPointRowsHtml:(rows,test)=>(root as any).westgardPointRowsHtml(rows,test),
+  westgardRuleTogglesHtml:(registry,wgOn,canWrite)=>(root as any).westgardRuleTogglesHtml(registry,wgOn,canWrite),
+  westgardExportActionsHtml:chartMode=>(root as any).westgardExportActionsHtml(chartMode),
+  westgardRuleGuideHtml:registry=>(root as any).westgardRuleGuideHtml(registry),
+  westgardTestSearch:{select:(tests,q,selected)=>(root as any).westgardTestSearch.select(tests,q,selected)},
+});
+(root as any).wgMultiViews=westgardPageController.wgMultiViews;
+(root as any).wgTogglePrevLot=westgardPageController.wgTogglePrevLot;
+(root as any).wgArchivedGroups=westgardPageController.wgArchivedGroups;
+(root as any).wgSetViewMode=westgardPageController.wgSetViewMode;
+(root as any).wgSetChartMode=westgardPageController.wgSetChartMode;
+(root as any).wgChartModeTabs=westgardPageController.wgChartModeTabs;
+(root as any).pageWestgardCusum=westgardPageController.pageWestgardCusum;
+(root as any).wgSetArchivedGroup=westgardPageController.wgSetArchivedGroup;
+(root as any).wgSetArchivedTest=westgardPageController.wgSetArchivedTest;
+(root as any).wgViewModeTabs=westgardPageController.wgViewModeTabs;
+(root as any).wgRowsWindow=westgardPageController.wgRowsWindow;
+(root as any).wgToggleRows=westgardPageController.wgToggleRows;
+(root as any).wgRowsControl=westgardPageController.wgRowsControl;
+(root as any).wgLotBlock=westgardPageController.wgLotBlock;
+(root as any).wgArchivedMultiViews=westgardPageController.wgArchivedMultiViews;
+(root as any).wgArchivedGroupMatches=westgardPageController.wgArchivedGroupMatches;
+(root as any).pageWestgardArchived=westgardPageController.pageWestgardArchived;
+(root as any).pageWestgard=westgardPageController.pageWestgard;
+(root as any).wgFilterTests=westgardPageController.wgFilterTests;
+(root as any).wgFilterArchivedTests=westgardPageController.wgFilterArchivedTests;
 root.dashboardStatusTabsHtml=createDashboardStatusTabsHtml({matches:(item:any,key:string)=>(root as any).dashboardStatusFilter.matches(item,key)});
 root.dashboardExpiringLotsHtml=createDashboardExpiringLotsHtml({escape:(value:any)=>(root as any).esc(value)});
 const dashboardQcFollowupItemHtml=createDashboardQcFollowupItemHtml({escape:(value:any)=>(root as any).esc(value),testLabel:(test:any)=>(root as any).testDisplayName(test),date:(value:any)=>(root as any).vnDate(value),pointValue:(point:any,test:any)=>(root as any).fmtPointValue(point,test),button:(label,action,variant)=>(root as any).btn(label,action,variant),quote:(value:any)=>(root as any).jsq(value)});
