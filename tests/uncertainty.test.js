@@ -240,11 +240,13 @@ const sigmaSrc = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules',
 const reportsSrc = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'reports.js'), 'utf8');
 const muPrintRowsSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'sigma', 'sigma-mu-print-rows.ts'), 'utf8');
 const coreSrc = fs.readFileSync(path.join(__dirname, '..', 'assets', 'core.js'), 'utf8');
+const sigmaMuWorkflowSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'application', 'sigma', 'sigma-mu-workflow-command.ts'), 'utf8');
 
 assert.match(sigmaSrc, /<details class="panel sg-collapse-panel sg-mu-panel"><summary class="sg-collapse-summary"><span role="heading" aria-level="2">Độ không đảm bảo đo \(MU\)<\/span><\/summary><div id="sgMUAction" class="sg-data-head-actions"><\/div><div id="sgMU">/, 'panel MU phải thu gọn được, giữ heading cấp 2 và đặt nút CoA cạnh summary thay vì lồng control focus');
 assert.match(sigmaSrc, /muBox\.innerHTML=sgMuHTML\(t,selectedRow,levels\)/, 'panel MU phải bám theo ĐÚNG kỳ đang chọn như bảng OPSpecs, không phải kỳ mới nhất');
 assert.match(sigmaSrc, /function sgMuApply\(\)[\s\S]{0,80}requireWrite\(\)/, 'ghi ngân sách MU phải qua cổng quyền ghi');
-assert.match(sigmaSrc, /logAct\('Cập nhật ngân sách MU'/, 'sửa ngân sách MU phải để lại vết trong nhật ký');
+assert.match(sigmaSrc, /globalThis\.SigmaMuWorkflowCommand\.apply\(/, 'áp dụng ngân sách MU phải đi qua workflow command TypeScript');
+assert.match(sigmaMuWorkflowSrc, /deps\.log\('Cập nhật ngân sách MU'/, 'sửa ngân sách MU phải để lại vết trong nhật ký');
 assert.match(sigmaSrc, /function sgMuPreview\([\s\S]{0,400}QCCore\.uncertaintyBudget\(/, 'xem trước trong modal phải gọi lại đúng hàm ngân sách, không tự nhân chia lại');
 assert.doesNotMatch(sigmaSrc, /uCal:\s*[^,)]*\|\|\s*0/, 'u(cal) chưa nhập không được ngầm hoá thành 0 trước khi vào ngân sách');
 assert.doesNotMatch(coreSrc, /pct\(o\.uCal\)\s*\|\|\s*0/, 'core cũng không được thay u(cal) thiếu bằng 0');

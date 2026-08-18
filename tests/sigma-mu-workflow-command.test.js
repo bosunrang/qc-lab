@@ -1,0 +1,22 @@
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+
+const program=`import {createSigmaMuWorkflowCommand} from './src/application/sigma/sigma-mu-workflow-command.ts';
+let logs=[],saves=[],closed=0,renders=0;
+const applied=createSigmaMuWorkflowCommand({service:{apply:()=>({applied:2,status:'applied'})},log:(...item)=>logs.push(item),saveState:value=>saves.push(value),close:()=>closed++,render:()=>renders++});
+const resultApplied=applied.apply({records:[],periodIds:['p1','p2'],rows:[{level:1,uCal:'0.1'},{level:2,uCal:''}],reviewedBy:'KTV A',reviewedDate:'2026-08-19',testName:'Glucose',sigmaTestId:'t1'});
+const missing=createSigmaMuWorkflowCommand({service:{apply:()=>({applied:0,status:'missing-periods'})},log:(...item)=>logs.push(item),saveState:value=>saves.push(value),close:()=>closed++,render:()=>renders++});
+const resultMissing=missing.apply({records:[],periodIds:[],rows:[],reviewedBy:'',reviewedDate:'',testName:'Glucose',sigmaTestId:'t1'});
+const noMatch=createSigmaMuWorkflowCommand({service:{apply:()=>({applied:0,status:'no-matching-periods'})},log:(...item)=>logs.push(item),saveState:value=>saves.push(value),close:()=>closed++,render:()=>renders++});
+const resultNoMatch=noMatch.apply({records:[],periodIds:['x'],rows:[],reviewedBy:'',reviewedDate:'',testName:'Glucose',sigmaTestId:'t1'});
+console.log(JSON.stringify({resultApplied,resultMissing,resultNoMatch,logs,saves,closed,renders}));`;
+const output=spawnSync(process.execPath,['--experimental-strip-types','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(output.status,0,output.stderr);const value=JSON.parse(output.stdout);
+assert.equal(value.resultApplied.status,'applied');
+assert.equal(value.resultMissing.status,'missing-periods');
+assert.equal(value.resultNoMatch.status,'no-matching-periods');
+assert.deepEqual(value.logs,[['Cập nhật ngân sách MU','2 kỳ · 2 mức · u(cal) M1=0.1, M2=—','Glucose']]);
+assert.equal(value.closed,1,'chỉ trường hợp applied>0 mới đóng modal');
+assert.equal(value.renders,1);assert.equal(value.saves.length,1);
+console.log('Sigma MU workflow command TypeScript tests passed');

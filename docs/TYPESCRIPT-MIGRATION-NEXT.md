@@ -2,15 +2,15 @@
 
 ## Checkpoint hiện tại — 2026-08-19
 
-- Tiến độ ước tính: **84% tổng thể** (kiểm chứng độc lập trước đó: 80–88%).
+- Tiến độ ước tính: **85% tổng thể** (kiểm chứng độc lập trước đó: 80–88%).
 - Xác minh gần nhất: `npm.cmd run build:pilot`, `npm.cmd run typecheck` và
-  `npm.cmd test` đều đạt; test suite **612/612 pass**.
+  `npm.cmd test` đều đạt; test suite **613/613 pass**.
 - Wave F validation đã đạt: `ui-check` 28/28, `nce-check` 91/91,
   `visual-check`, `a11y-audit` (0 vi phạm), `print-check` và
   `verify-release` (dependency audit + performance regression) đều pass.
 - `assets/generated/modular-pilot.js`: bundle sinh từ Vite, không sửa trực tiếp.
 - Bundle runtime hiện dùng tag
-  `ts-phase2-tea-transition-20260819-1`; phải tăng tag tương ứng nếu sửa
+  `ts-sigma-mu-workflow-20260819-1`; phải tăng tag tương ứng nếu sửa
   artifact runtime.
 - **Ghi chú tài liệu (2026-08-18):** `reagent.js` (Passing-Bablok/Deming/
   Bland-Altman) đã có đủ `src/domain/reagent/`, `reagent-comparison-service.ts`
@@ -158,17 +158,34 @@
       riêng — không cần gộp cả luồng như lo ngại ban đầu.
     2 scanner test bridge cũ (`manage-history-bridge.test.js`,
     `manage-config-service-bridge.test.js`) pin call-site cũ, đã cập nhật.
+25. **Wave F — Phase 3 khảo sát + MU Sigma:** đọc toàn bộ `sigma.js` (417
+    dòng, ~19 hàm `sgXxx` có `save()`/`rerender()`) phát hiện bản chất khác hẳn
+    Manage/Auth/Range: **chỉ 1 hàm ghi audit log** (`sgMuApply`) — mọi thao
+    tác Sigma khác (sửa TEa, track/untrack test, sửa ô CV/Bias, thêm/xóa kỳ,
+    áp Bias%, nhập CV theo lô) chỉ `save()+rerender()`, không `logAct`, vì đó
+    là điều chỉnh phép tính phái sinh từ dữ liệu IQC/EQA đã audit ở nơi khác,
+    không phải bản ghi QC gốc — chủ ý thiết kế, không phải nợ kỹ thuật cần
+    gộp. Đã hỏi và được xác nhận: chỉ gộp `sgMuApply` (mục có audit thật, hợp
+    lý với pattern các phase trước); 9 hàm còn lại giữ nguyên.
+    `sgMuApply()` gộp vào `SigmaMuWorkflowCommand` (file mới) bọc
+    `SigmaMuWorkflowService.apply()` sẵn có. Khác các lần trước:
+    `SigmaMuWorkflowService` KHÔNG bị hạ xuống dependency nội bộ dù mất hết
+    caller JS trực tiếp trong `sigma.js` — `tests/sigma-comp.test.js` test
+    logic thuần của nó qua `ctx.SigmaMuWorkflowService` (sandbox nạp thẳng
+    bundle), một kiểu tiêu thụ global hợp lệ mà các lần demote trước không có
+    (đã kiểm tra: không command nào từng bị demote có test kiểu này). Giữ
+    nguyên `root.SigmaMuWorkflowService` để không vỡ test, chỉ thêm
+    `root.SigmaMuWorkflowCommand` bọc bên ngoài.
+    3 scanner test cũ (`sigma-mu-workflow-bridge.test.js`,
+    `uncertainty.test.js` dòng "sửa ngân sách MU phải để lại vết trong nhật
+    ký") pin call-site cũ, đã cập nhật; `sigma-comp.test.js` không đổi vì vẫn
+    test đúng service cấp thấp.
 
 ## Việc tiếp theo (ưu tiên)
 
-1. **Phase 3 (lớn, rủi ro, nên hoãn):** `sigma.js` — trang lớn nhất app, ~10
-   hàm `sgXxx` (TEa, track/untrack test, bias, MU, cohort import…) đều tự
-   orchestrate, không có tầng command nào bọc sẵn; state (cohort, TEa
-   snapshot, kỳ bias/MU) đan xen phức tạp — cần chia nhỏ thành nhiều workflow
-   command riêng qua vài phiên, không làm gọn trong 1 lần.
-2. **Wave F — strictness:** tiếp tục giảm ambient global chỉ còn dùng nội bộ;
+1. **Wave F — strictness:** tiếp tục giảm ambient global chỉ còn dùng nội bộ;
    ưu tiên service/command có adapter JS mỏng và caller runtime rõ ràng.
-3. **Wave F — release hardening:** sau mỗi lát runtime, chạy cổng phù hợp; trước
+2. **Wave F — release hardening:** sau mỗi lát runtime, chạy cổng phù hợp; trước
    phát hành chạy lại `verify-release` cùng UI/visual/a11y/print/Electron.
 
 ## Quy tắc làm việc

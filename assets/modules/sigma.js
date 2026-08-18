@@ -382,11 +382,8 @@ async function sgMuApply(){
   if(!sgMuCtx)return;
   sgMuCaptureDom();
   const t=state.tests.find(x=>x.id===sgTest);if(!t)return;
-  const r=SigmaMuWorkflowService.apply(sgData(sgTest),sgMuCtx.periodIds,sgMuCtx.rows,sgMuCtx.reviewedBy,sgMuCtx.reviewedDate);
-  if(r.status==='missing-periods'){await infoDialog('Chưa chọn kỳ nào để áp dụng ngân sách MU.');return;}
-  if(!r.applied)return;
-  logAct('Cập nhật ngân sách MU',`${r.applied} kỳ · ${sgMuCtx.rows.length} mức · u(cal) ${sgMuCtx.rows.map(r=>`M${r.level}=${String(r.uCal??'').trim()||'—'}`).join(', ')}`,testDisplayName(t));
-  save({clearDerived:false,sigmaTestId:sgTest});closeModal();rerender();
+  const result=globalThis.SigmaMuWorkflowCommand.apply({records:sgData(sgTest),periodIds:sgMuCtx.periodIds,rows:sgMuCtx.rows,reviewedBy:sgMuCtx.reviewedBy,reviewedDate:sgMuCtx.reviewedDate,testName:testDisplayName(t),sigmaTestId:sgTest});
+  if(result.status==='missing-periods'){await infoDialog('Chưa chọn kỳ nào để áp dụng ngân sách MU.');return;}
 }
 function sgCell(eid,level,field,val){if(!requireWrite())return;const t=state.tests.find(x=>x.id===sgTest),e=sgData(sgTest).find(x=>x.id===eid);if(!e||!t)return;sgEnsureTeaSnapshot(t,e);e.lv=e.lv||{};const L=e.lv[level]=e.lv[level]||{};SigmaLevelEditService.update(L,field,val);sgSetLevelTeaSnapshot(t,e,level);save({clearDerived:false,sigmaTestId:sgTest});sgRefreshSoon();}
 function sgPeriodSel(e,ro){const [y,mo]=(e.period||'').split('-'),nowYear=new Date().getFullYear();const yr=y||String(nowYear),mm=mo?+mo:new Date().getMonth()+1;

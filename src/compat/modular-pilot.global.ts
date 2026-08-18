@@ -670,6 +670,7 @@ import { createSigmaLevelEditService, type SigmaLevelEditService } from '../appl
 import { createSigmaTrackedTestService, type SigmaTrackedTestService } from '../application/sigma/sigma-tracked-test-service';
 import { createSigmaBiasWorkflowService, type SigmaBiasWorkflowService } from '../application/sigma/sigma-bias-workflow-service';
 import { createSigmaMuWorkflowService, type SigmaMuWorkflowService } from '../application/sigma/sigma-mu-workflow-service';
+import { createSigmaMuWorkflowCommand, type SigmaMuWorkflowCommand } from '../application/sigma/sigma-mu-workflow-command';
 import { createSigmaCohortSelectionService, type SigmaCohortSelectionService } from '../application/sigma/sigma-cohort-selection-service';
 import { createSigmaTeaEditService, type SigmaTeaEditService } from '../application/sigma/sigma-tea-edit-service';
 import { createSigmaTeaSnapshotService, type SigmaTeaSnapshotService } from '../application/sigma/sigma-tea-snapshot-service';
@@ -926,6 +927,7 @@ type QCLabGlobal = typeof globalThis & {
   SigmaTrackedTestService: SigmaTrackedTestService;
   SigmaBiasWorkflowService: SigmaBiasWorkflowService;
   SigmaMuWorkflowService: SigmaMuWorkflowService;
+  SigmaMuWorkflowCommand: SigmaMuWorkflowCommand;
   SigmaCohortSelectionService: SigmaCohortSelectionService;
   SigmaTeaEditService: SigmaTeaEditService;
   SigmaTeaSnapshotService: SigmaTeaSnapshotService;
@@ -2410,6 +2412,7 @@ root.SigmaMuWorkflowService = createSigmaMuWorkflowService({
     return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : '';
   },
 });
+root.SigmaMuWorkflowCommand=createSigmaMuWorkflowCommand({service:root.SigmaMuWorkflowService,log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),close:()=>(root as any).closeModal(),render:()=>rerender()});
 root.SigmaCohortSelectionService = createSigmaCohortSelectionService({
   normalizePeriod: period => root.SigmaCohortService!.normalizePeriod(period),
   today: () => (globalThis as any).isoToday(),

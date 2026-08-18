@@ -13843,6 +13843,24 @@
 		return Object.freeze({ apply });
 	}
 	//#endregion
+	//#region src/application/sigma/sigma-mu-workflow-command.ts
+	function createSigmaMuWorkflowCommand(deps) {
+		const apply = (input) => {
+			const result = deps.service.apply(input.records, input.periodIds, input.rows, input.reviewedBy, input.reviewedDate);
+			if (result.status === "missing-periods" || !result.applied) return result;
+			const detail = `${result.applied} kỳ · ${input.rows.length} mức · u(cal) ${input.rows.map((r) => `M${r.level}=${String(r.uCal ?? "").trim() || "—"}`).join(", ")}`;
+			deps.log("Cập nhật ngân sách MU", detail, input.testName);
+			deps.close();
+			deps.saveState({
+				clearDerived: false,
+				sigmaTestId: input.sigmaTestId
+			});
+			deps.render();
+			return result;
+		};
+		return Object.freeze({ apply });
+	}
+	//#endregion
 	//#region src/application/sigma/sigma-cohort-selection-service.ts
 	function createSigmaCohortSelectionService(deps) {
 		const cutoff = (period) => {
@@ -18366,6 +18384,13 @@
 			const text = String(value || "").trim();
 			return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : "";
 		}
+	});
+	root.SigmaMuWorkflowCommand = createSigmaMuWorkflowCommand({
+		service: root.SigmaMuWorkflowService,
+		log: (action, detail, target) => logAct(action, detail, target),
+		saveState: (options) => save(options),
+		close: () => root.closeModal(),
+		render: () => rerender()
 	});
 	root.SigmaCohortSelectionService = createSigmaCohortSelectionService({
 		normalizePeriod: (period) => root.SigmaCohortService.normalizePeriod(period),
