@@ -284,6 +284,7 @@ import { reportSignBlock } from '../presentation/report/report-sign-block';
 import { createReportLockListHtml } from '../presentation/report/report-lock-list-html';
 import { createReportUnlockReason } from '../presentation/report/report-unlock-reason';
 import { reportUnlockModalHtml } from '../presentation/report/report-unlock-modal-html';
+import { createReportPageController } from '../presentation/report/report-page-controller';
 import { reportLockPicker } from '../presentation/report/report-lock-picker';
 import { createReportLockPanelHtml } from '../presentation/report/report-lock-panel-html';
 import { createReportPageHtml } from '../presentation/report/report-page-html';
@@ -1288,6 +1289,24 @@ type QCLabGlobal = typeof globalThis & {
   reportLockPanelHtmlPresentation: ReturnType<typeof createReportLockPanelHtml>;
   reportPageHtml: ReturnType<typeof createReportPageHtml>;
   reportRangePickerHtml: ReturnType<typeof createReportRangePickerHtml>;
+  reportLockYmValue: ReturnType<typeof createReportPageController>['reportLockYmValue'];
+  reportSetLockPart: ReturnType<typeof createReportPageController>['reportSetLockPart'];
+  reportLockPeriod: ReturnType<typeof createReportPageController>['reportLockPeriod'];
+  reportUnlockPeriod: ReturnType<typeof createReportPageController>['reportUnlockPeriod'];
+  reportConfirmUnlockPeriod: ReturnType<typeof createReportPageController>['reportConfirmUnlockPeriod'];
+  reportLockListHtml: ReturnType<typeof createReportPageController>['reportLockListHtml'];
+  reportSearchValues: ReturnType<typeof createReportPageController>['reportSearchValues'];
+  reportSearchSet: ReturnType<typeof createReportPageController>['reportSearchSet'];
+  reportApplySearch: ReturnType<typeof createReportPageController>['reportApplySearch'];
+  reportRangeDefaults: ReturnType<typeof createReportPageController>['reportRangeDefaults'];
+  reportDateRange: ReturnType<typeof createReportPageController>['reportDateRange'];
+  reportExportSelection: ReturnType<typeof createReportPageController>['reportExportSelection'];
+  reportRangeChanged: ReturnType<typeof createReportPageController>['reportRangeChanged'];
+  reportRangeText: ReturnType<typeof createReportPageController>['reportRangeText'];
+  reportActionIcon: ReturnType<typeof createReportPageController>['reportActionIcon'];
+  reportLockPanelHtml: ReturnType<typeof createReportPageController>['reportLockPanelHtml'];
+  pageReportV2: ReturnType<typeof createReportPageController>['pageReportV2'];
+  reportRangePicker: ReturnType<typeof createReportPageController>['reportRangePicker'];
   ReportPeriodWorkflowCommand: ReportPeriodWorkflowCommand;
   dashboardLoadingPresentation: ReturnType<typeof createDashboardLoading>;
   dashboardStatusFilter: ReturnType<typeof createDashboardStatusFilter>;
@@ -2205,6 +2224,69 @@ root.reportLockPicker=reportLockPicker;
 root.reportLockPanelHtmlPresentation=createReportLockPanelHtml({button:(label,action,variant,title,options)=>(root as any).btn(label,action,variant,title,options)});
 root.reportPageHtml=createReportPageHtml({head:(title,subtitle)=>(root as any).headOnly(title,subtitle),empty:(title,message,action)=>(root as any).emptyState(title,message,action),button:(label,action,variant,title,options)=>(root as any).btn(label,action,variant,title,options),escape:(value:any)=>(root as any).esc(value),escapeAttr:(value:any)=>(root as any).escAttr(value),label:(test:any,tests:any[])=>(root as any).testSelectLabel(test,tests),rangePicker:(start,end)=>(root as any).reportRangePicker(start,end),actionIcon:(type)=>(root as any).reportActionIcon(type)});
 root.reportRangePickerHtml=createReportRangePickerHtml({dateBox:(id,value,placeholder,attrs)=>(root as any).dateBox(id,value,placeholder,attrs)});
+const reportPageController=createReportPageController({
+  document:typeof document!=='undefined'?document:({getElementById:()=>null,querySelectorAll:()=>[]} as unknown as Document),
+  getState:()=>state,
+  infoDialog:(message,opts)=>root.infoDialog(message,opts),
+  confirmDialog:opts=>root.confirmDialog(opts),
+  requireAdmin:()=>root.requireAdmin(),
+  openModal:html=>root.openModal(html),
+  closeModal:()=>root.closeModal(),
+  reauthenticate:opts=>(root as any).reauthenticateCurrentUser(opts),
+  rerender:()=>rerender(),
+  requestFrame:(work,delay)=>setTimeout(work,delay),
+  esc:value=>(root as any).esc(value),
+  jsq:value=>(root as any).jsq(value),
+  button:(label,action,variant,title,options)=>(root as any).btn(label,action,variant,title,options),
+  isoMonth:()=>(root as any).isoMonth(),
+  isoToday:()=>isoToday(),
+  monthVN:ym=>(root as any).monthVN(ym),
+  parseVN:value=>(root as any).parseVN(value),
+  userName:()=>userName(),
+  uid:()=>uid(),
+  searchText:value=>root.normalizeSearchText!(value),
+  operationalTests:()=>(root as any).operationalTests(),
+  testSelectLabel:(test,tests)=>(root as any).testSelectLabel(test,tests),
+  operationalLevels:test=>(root as any).operationalLevels(test),
+  operationalPanelForTest:test=>(root as any).operationalPanelForTest(test),
+  operationalLotGroupForTest:test=>(root as any).operationalLotGroupForTest(test),
+  replaceSelectItems:(select,items,emptyText)=>root.replaceSelectItems(select,items,emptyText),
+  scheduleSearchRender:(owner,apply,focusId)=>root.scheduleSearchRender(owner,apply,focusId),
+  periodPresentation:{currentYearMonth:(value,fallback)=>root.ReportPeriodPresentation.currentYearMonth(value,fallback),setPart:(ym,part,value)=>root.ReportPeriodPresentation.setPart(ym,part as any,value)},
+  periodWorkflow:{lock:input=>root.ReportPeriodWorkflowCommand.lock(input),unlock:input=>root.ReportPeriodWorkflowCommand.unlock(input)},
+  findLock:(s,ym)=>root.PeriodService.findLock(s,ym),
+  unlockModalHtml:input=>root.reportUnlockModalHtml(input),
+  unlockReason:value=>root.reportUnlockReason!(value),
+  lockListHtml:(locks,isAdmin)=>root.reportLockListHtmlPresentation(locks,isAdmin),
+  lockPanelHtml:input=>root.reportLockPanelHtmlPresentation(input),
+  lockPicker:(ym,year)=>root.reportLockPicker(ym,year),
+  searchValuePresentation:{values:(test,d)=>root.reportSearchValuePresentation.values(test,d) as string[]},
+  reportSearch:{select:(tests,q,selected,values,st)=>(root as any).reportSearch.select(tests,q,selected,values,st)},
+  reportSelection:{defaults:(start,end,im,it)=>(root as any).reportSelection.defaults(start,end,im,it),dateRange:(start,end)=>(root as any).reportSelection.dateRange(start,end),exportSelection:(tests,tid,start,end,includeNce)=>(root as any).reportSelection.exportSelection(tests,tid,start,end,includeNce)},
+  rangeText:(start,end)=>root.reportLabels.rangeText(start,end),
+  actionIconPresentation:{icon:type=>root.reportActionIconPresentation.icon(type)},
+  role:()=>root.role(),
+  pageHtml:input=>root.reportPageHtml(input),
+  rangePickerHtml:(start,end)=>root.reportRangePickerHtml(start,end),
+});
+root.reportLockYmValue=reportPageController.reportLockYmValue;
+root.reportSetLockPart=reportPageController.reportSetLockPart;
+root.reportLockPeriod=reportPageController.reportLockPeriod;
+root.reportUnlockPeriod=reportPageController.reportUnlockPeriod;
+root.reportConfirmUnlockPeriod=reportPageController.reportConfirmUnlockPeriod;
+root.reportLockListHtml=reportPageController.reportLockListHtml;
+root.reportSearchValues=reportPageController.reportSearchValues;
+root.reportSearchSet=reportPageController.reportSearchSet;
+root.reportApplySearch=reportPageController.reportApplySearch;
+root.reportRangeDefaults=reportPageController.reportRangeDefaults;
+root.reportDateRange=reportPageController.reportDateRange;
+root.reportExportSelection=reportPageController.reportExportSelection;
+root.reportRangeChanged=reportPageController.reportRangeChanged;
+root.reportRangeText=reportPageController.reportRangeText;
+root.reportActionIcon=reportPageController.reportActionIcon;
+root.reportLockPanelHtml=reportPageController.reportLockPanelHtml;
+root.pageReportV2=reportPageController.pageReportV2;
+root.reportRangePicker=reportPageController.reportRangePicker;
 const reportPeriodCommand=createReportPeriodCommand({lock:(s,input)=>root.PeriodService.lock(s as any,input),unlock:(s,input)=>root.PeriodService.unlock(s as any,input)});
 root.ReportPeriodWorkflowCommand=createReportPeriodWorkflowCommand({current:()=>state,period:reportPeriodCommand,log:(type,detail,target)=>logAct(type,detail,target),save:options=>save(options),render:()=>rerender()});
 root.ActionCurrentIssues=createActionCurrentIssues({operationalTests:()=>typeof (globalThis as any).operationalTests==='function'?(globalThis as any).operationalTests():[],activeWestgard:test=>(globalThis as any).activeWestgard(test),pointWorkflowComplete:pointId=>typeof (globalThis as any).pointWorkflowComplete==='function'?(globalThis as any).pointWorkflowComplete(pointId):false});

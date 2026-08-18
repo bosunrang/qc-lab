@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 const root=path.join(__dirname,'..');
-const route=fs.readFileSync(path.join(root,'assets','modules','report-routes.js'),'utf8');
+const route=fs.readFileSync(path.join(root,'src','presentation','report','report-page-controller.ts'),'utf8');
 const reports=fs.readFileSync(path.join(root,'assets','modules','reports.js'),'utf8');
 const bridge=fs.readFileSync(path.join(root,'src','compat','modular-pilot.global.ts'),'utf8');
 
@@ -19,9 +19,9 @@ for(const [name,type] of [
   assert.match(bridge,new RegExp(`${name}: ${escaped};`),`${name} must be a required report UI bridge contract`);
   assert.match(bridge,new RegExp(`root\\.${name}=`),`${name} must be assigned by the TypeScript bootstrap`);
 }
-assert.match(route,/globalThis\.reportSearch\.select\(/,'Bộ tìm kiếm báo cáo phải dùng bridge TypeScript');
-assert.match(route,/globalThis\.reportSelection\.exportSelection\(/,'Lựa chọn báo cáo phải dùng bridge TypeScript');
-assert.match(route,/globalThis\.reportLabels\.rangeText\(/,'Nhãn phạm vi báo cáo phải dùng bridge TypeScript');
+assert.match(route,/deps\.reportSearch\.select\(/,'Bộ tìm kiếm báo cáo phải dùng bridge TypeScript');
+assert.match(route,/deps\.reportSelection\.exportSelection\(/,'Lựa chọn báo cáo phải dùng bridge TypeScript');
+assert.match(route,/deps\.rangeText\(start, end\)/,'Nhãn phạm vi báo cáo phải dùng bridge TypeScript');
 assert.match(reports,/globalThis\.reportPointsTableService\(items,t\)/,'Bảng điểm QC báo cáo phải dùng bridge TypeScript');
 assert.match(reports,/globalThis\.reportNceDetailHtmlPresentation\(a,t\)/,'Chi tiết NCE báo cáo phải dùng bridge TypeScript');
 assert.match(reports,/globalThis\.reportNceAppendixPresentation\(actions,t\)/,'Phụ lục NCE phải dùng bridge TypeScript');

@@ -9585,6 +9585,178 @@
     </div><div class="modal-f">${input.closeButtonHtml}${input.confirmButtonHtml}</div></div>`;
 	}
 	//#endregion
+	//#region src/presentation/report/report-page-controller.ts
+	function createReportPageController(deps) {
+		let reportQ = "", reportTest = "", reportRangeStart = "", reportRangeEnd = "", reportLockYm = "";
+		const field = (id) => deps.document.getElementById(id);
+		const reportLockYmValue = () => deps.periodPresentation.currentYearMonth(reportLockYm, deps.isoMonth());
+		const reportSetLockPart = (part, value) => {
+			reportLockYm = deps.periodPresentation.setPart(reportLockYmValue(), part, value);
+			deps.rerender();
+		};
+		const reportLockPeriod = async () => {
+			if (!deps.requireAdmin()) return;
+			const ym = reportLockYmValue(), label = deps.monthVN(ym);
+			if (!await deps.confirmDialog({
+				kicker: "Khóa kỳ báo cáo",
+				title: `Khóa kỳ ${label}?`,
+				message: "Sau khi khóa, không ai (kể cả admin) sửa/hủy được điểm QC trong kỳ này ở bất kỳ xét nghiệm nào cho tới khi mở khóa.",
+				detail: "Chỉ nên khóa sau khi đã xuất xong báo cáo chính thức của kỳ.",
+				confirmLabel: "Khóa kỳ",
+				cancelLabel: "Hủy"
+			})) return;
+			if (!await deps.reauthenticate({
+				title: "Xác thực khóa kỳ",
+				message: `Nhập lại mật khẩu để khóa kỳ ${label}.`
+			})) return;
+			const result = deps.periodWorkflow.lock({
+				ym,
+				lockedAt: (/* @__PURE__ */ new Date()).toISOString(),
+				lockedBy: deps.userName(),
+				id: deps.uid(),
+				label
+			});
+			if (result.error) {
+				await deps.infoDialog(result.error === "already-locked" ? `Kỳ ${label} đã được khóa từ trước.` : "Không khóa được kỳ này.");
+				return;
+			}
+			await deps.infoDialog(`Đã khóa kỳ ${label}.`, { type: "success" });
+		};
+		const reportUnlockPeriod = (ym) => {
+			if (!deps.requireAdmin()) return;
+			const label = deps.monthVN(ym);
+			deps.openModal(deps.unlockModalHtml({
+				titleHtml: `Mở khóa kỳ ${deps.esc(label)}`,
+				periodLabelHtml: deps.esc(label),
+				closeButtonHtml: deps.button("Đóng", "closeModal()", "ghost"),
+				confirmButtonHtml: deps.button("Xác nhận mở khóa", `reportConfirmUnlockPeriod('${deps.jsq(ym)}')`, "danger")
+			}));
+			deps.requestFrame(() => {
+				const e = field("unlockReasonInput");
+				if (e) e.focus();
+			}, 50);
+		};
+		const reportConfirmUnlockPeriod = async (ym) => {
+			const input = field("unlockReasonInput"), reasonCheck = deps.unlockReason(input ? input.value : ""), clean = reasonCheck.reason;
+			if (!reasonCheck.valid) {
+				const err = field("unlockReasonErr");
+				if (err) err.style.display = "";
+				if (input) input.focus();
+				return;
+			}
+			deps.closeModal();
+			if (!await deps.reauthenticate({
+				title: "Xác thực mở khóa kỳ",
+				message: `Nhập lại mật khẩu để mở khóa kỳ ${deps.monthVN(ym)}.`
+			})) return;
+			const label = deps.monthVN(ym);
+			if (deps.periodWorkflow.unlock({
+				ym,
+				reason: clean,
+				label
+			}).error) {
+				await deps.infoDialog("Kỳ này hiện không bị khóa.");
+				deps.rerender();
+				return;
+			}
+			await deps.infoDialog(`Đã mở khóa kỳ ${label}.`, { type: "success" });
+		};
+		const reportLockListHtml = () => deps.lockListHtml(deps.getState().periodLocks || [], deps.role() === "admin");
+		const reportSearchValues = (t) => deps.searchValuePresentation.values(t, {
+			testLabel: deps.testSelectLabel,
+			operationalLevels: deps.operationalLevels,
+			panelForTest: deps.operationalPanelForTest,
+			lotGroupForTest: deps.operationalLotGroupForTest
+		});
+		const reportApplySearch = () => {
+			const tests = deps.operationalTests(), q = deps.searchText(reportQ), result = deps.reportSearch.select(tests, q, reportTest, reportSearchValues, deps.searchText), matched = result.matched;
+			reportTest = result.selected;
+			const select = field("rTest"), count = field("reportTestCount");
+			deps.replaceSelectItems(select, matched.map((t) => ({
+				value: t.id,
+				label: deps.testSelectLabel(t, tests)
+			})), "Không tìm thấy xét nghiệm phù hợp");
+			if (select && reportTest) select.value = reportTest;
+			if (count) count.textContent = `(${matched.length}/${tests.length})`;
+			deps.document.querySelectorAll("[data-report-action]").forEach((button) => button.disabled = !matched.length);
+		};
+		const reportSearchSet = (v) => {
+			reportQ = v;
+			deps.scheduleSearchRender(reportSearchSet, reportApplySearch, "reportSearch");
+		};
+		const reportRangeDefaults = () => {
+			const r = deps.reportSelection.defaults(reportRangeStart, reportRangeEnd, deps.isoMonth(), deps.isoToday());
+			reportRangeStart = r.start;
+			reportRangeEnd = r.end;
+			return r;
+		};
+		const reportDateRange = () => {
+			const s = deps.parseVN((field("rStartDate") || {}).value || "") || "", e = deps.parseVN((field("rEndDate") || {}).value || "") || "";
+			return deps.reportSelection.dateRange(s, e);
+		};
+		const reportExportSelection = () => {
+			const tid = (field("rTest") || {}).value || "", { start, end } = reportDateRange();
+			return deps.reportSelection.exportSelection(deps.getState().tests, tid, start, end, (field("reportNceAppendix") || {}).checked !== false);
+		};
+		const reportRangeChanged = () => {
+			const { start, end } = reportDateRange();
+			reportRangeStart = start;
+			reportRangeEnd = end;
+		};
+		const reportRangeText = (start, end) => deps.rangeText(start, end);
+		const reportActionIcon = (type) => deps.actionIconPresentation.icon(type);
+		const reportLockPanelHtml = () => {
+			const state = deps.getState(), isAdmin = deps.role() === "admin", ym = reportLockYmValue(), picker = deps.lockPicker(ym, (/* @__PURE__ */ new Date()).getFullYear());
+			return deps.lockPanelHtml({
+				isAdmin,
+				year: picker.year,
+				month: picker.month,
+				months: picker.months,
+				years: picker.years,
+				already: !!deps.findLock(state, ym),
+				lockListHtml: reportLockListHtml()
+			});
+		};
+		const pageReportV2 = () => {
+			const tests = deps.operationalTests();
+			const q = deps.searchText(reportQ), matched = tests.filter((t) => !q || reportSearchValues(t).some((v) => deps.searchText(v).includes(q)));
+			if (matched.length && (!reportTest || !matched.some((t) => t.id === reportTest))) reportTest = matched[0].id;
+			if (!matched.length) reportTest = "";
+			const { start, end } = reportRangeDefaults();
+			return deps.pageHtml({
+				tests,
+				matched,
+				selectedId: reportTest,
+				query: reportQ,
+				start,
+				end,
+				isAdmin: deps.role() === "admin",
+				lockPanelHtml: reportLockPanelHtml()
+			});
+		};
+		const reportRangePicker = (start, end) => deps.rangePickerHtml(start, end);
+		return {
+			reportLockYmValue,
+			reportSetLockPart,
+			reportLockPeriod,
+			reportUnlockPeriod,
+			reportConfirmUnlockPeriod,
+			reportLockListHtml,
+			reportSearchValues,
+			reportSearchSet,
+			reportApplySearch,
+			reportRangeDefaults,
+			reportDateRange,
+			reportExportSelection,
+			reportRangeChanged,
+			reportRangeText,
+			reportActionIcon,
+			reportLockPanelHtml,
+			pageReportV2,
+			reportRangePicker
+		};
+	}
+	//#endregion
 	//#region src/presentation/report/report-lock-picker.ts
 	function reportLockPicker(ym, nowYear) {
 		const match = /^(\d{4})-(\d{2})$/.exec(ym);
@@ -18845,6 +19017,82 @@
 		actionIcon: (type) => root.reportActionIcon(type)
 	});
 	root.reportRangePickerHtml = createReportRangePickerHtml({ dateBox: (id, value, placeholder, attrs) => root.dateBox(id, value, placeholder, attrs) });
+	var reportPageController = createReportPageController({
+		document: typeof document !== "undefined" ? document : {
+			getElementById: () => null,
+			querySelectorAll: () => []
+		},
+		getState: () => state,
+		infoDialog: (message, opts) => root.infoDialog(message, opts),
+		confirmDialog: (opts) => root.confirmDialog(opts),
+		requireAdmin: () => root.requireAdmin(),
+		openModal: (html) => root.openModal(html),
+		closeModal: () => root.closeModal(),
+		reauthenticate: (opts) => root.reauthenticateCurrentUser(opts),
+		rerender: () => rerender(),
+		requestFrame: (work, delay) => setTimeout(work, delay),
+		esc: (value) => root.esc(value),
+		jsq: (value) => root.jsq(value),
+		button: (label, action, variant, title, options) => root.btn(label, action, variant, title, options),
+		isoMonth: () => root.isoMonth(),
+		isoToday: () => isoToday(),
+		monthVN: (ym) => root.monthVN(ym),
+		parseVN: (value) => root.parseVN(value),
+		userName: () => userName(),
+		uid: () => uid(),
+		searchText: (value) => root.normalizeSearchText(value),
+		operationalTests: () => root.operationalTests(),
+		testSelectLabel: (test, tests) => root.testSelectLabel(test, tests),
+		operationalLevels: (test) => root.operationalLevels(test),
+		operationalPanelForTest: (test) => root.operationalPanelForTest(test),
+		operationalLotGroupForTest: (test) => root.operationalLotGroupForTest(test),
+		replaceSelectItems: (select, items, emptyText) => root.replaceSelectItems(select, items, emptyText),
+		scheduleSearchRender: (owner, apply, focusId) => root.scheduleSearchRender(owner, apply, focusId),
+		periodPresentation: {
+			currentYearMonth: (value, fallback) => root.ReportPeriodPresentation.currentYearMonth(value, fallback),
+			setPart: (ym, part, value) => root.ReportPeriodPresentation.setPart(ym, part, value)
+		},
+		periodWorkflow: {
+			lock: (input) => root.ReportPeriodWorkflowCommand.lock(input),
+			unlock: (input) => root.ReportPeriodWorkflowCommand.unlock(input)
+		},
+		findLock: (s, ym) => root.PeriodService.findLock(s, ym),
+		unlockModalHtml: (input) => root.reportUnlockModalHtml(input),
+		unlockReason: (value) => root.reportUnlockReason(value),
+		lockListHtml: (locks, isAdmin) => root.reportLockListHtmlPresentation(locks, isAdmin),
+		lockPanelHtml: (input) => root.reportLockPanelHtmlPresentation(input),
+		lockPicker: (ym, year) => root.reportLockPicker(ym, year),
+		searchValuePresentation: { values: (test, d) => root.reportSearchValuePresentation.values(test, d) },
+		reportSearch: { select: (tests, q, selected, values, st) => root.reportSearch.select(tests, q, selected, values, st) },
+		reportSelection: {
+			defaults: (start, end, im, it) => root.reportSelection.defaults(start, end, im, it),
+			dateRange: (start, end) => root.reportSelection.dateRange(start, end),
+			exportSelection: (tests, tid, start, end, includeNce) => root.reportSelection.exportSelection(tests, tid, start, end, includeNce)
+		},
+		rangeText: (start, end) => root.reportLabels.rangeText(start, end),
+		actionIconPresentation: { icon: (type) => root.reportActionIconPresentation.icon(type) },
+		role: () => root.role(),
+		pageHtml: (input) => root.reportPageHtml(input),
+		rangePickerHtml: (start, end) => root.reportRangePickerHtml(start, end)
+	});
+	root.reportLockYmValue = reportPageController.reportLockYmValue;
+	root.reportSetLockPart = reportPageController.reportSetLockPart;
+	root.reportLockPeriod = reportPageController.reportLockPeriod;
+	root.reportUnlockPeriod = reportPageController.reportUnlockPeriod;
+	root.reportConfirmUnlockPeriod = reportPageController.reportConfirmUnlockPeriod;
+	root.reportLockListHtml = reportPageController.reportLockListHtml;
+	root.reportSearchValues = reportPageController.reportSearchValues;
+	root.reportSearchSet = reportPageController.reportSearchSet;
+	root.reportApplySearch = reportPageController.reportApplySearch;
+	root.reportRangeDefaults = reportPageController.reportRangeDefaults;
+	root.reportDateRange = reportPageController.reportDateRange;
+	root.reportExportSelection = reportPageController.reportExportSelection;
+	root.reportRangeChanged = reportPageController.reportRangeChanged;
+	root.reportRangeText = reportPageController.reportRangeText;
+	root.reportActionIcon = reportPageController.reportActionIcon;
+	root.reportLockPanelHtml = reportPageController.reportLockPanelHtml;
+	root.pageReportV2 = reportPageController.pageReportV2;
+	root.reportRangePicker = reportPageController.reportRangePicker;
 	root.ReportPeriodWorkflowCommand = createReportPeriodWorkflowCommand({
 		current: () => state,
 		period: createReportPeriodCommand({

@@ -23,7 +23,7 @@ const actionsRoutes = read('assets/modules/actions-routes.js');
 const actionForm = read('assets/modules/action-form.js');
 const actionLogPanelPresentation = read('src/presentation/nce/action-log-panel-html.ts');
 const actionRerunEvidencePresentation = read('src/presentation/nce/action-rerun-evidence-html.ts');
-const reportRoutes = read('assets/modules/report-routes.js');
+const reportRoutes = read('src/presentation/report/report-page-controller.ts');
 const reportPageHtml = read('src/presentation/report/report-page-html.ts');
 const reportActionIconPresentation = read('src/presentation/report/report-action-icon.ts');
 const reportLockPanelPresentation = read('src/presentation/report/report-lock-panel-html.ts');
@@ -99,7 +99,7 @@ assert.match(sigmaCss, /\.sg-eqa-summary span\{[^}]*text-transform:none/);
 // Icon nút của trang Báo cáo đi theo trang sang report-routes.js (tách 2026-07-30);
 // nút "Tạo báo cáo & In" tự nó đã chuyển sang createReportPageHtml() (TypeScript)
 // khi pageReportV2() không còn tự dựng HTML — xem report-page-html.ts.
-assert.match(reportRoutes, /function reportActionIcon\(type\)/);
+assert.match(reportRoutes, /const reportActionIcon = \(type: string\) =>/);
 assert.match(reportPageHtml, /deps\.actionIcon\('print'\)/);
 assert.match(reportActionIconPresentation, /aria-hidden="true"/);
 assert.match(actionRerunEvidencePresentation, /aria-hidden="true"/);

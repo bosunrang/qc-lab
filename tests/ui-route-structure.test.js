@@ -22,7 +22,7 @@ const actionFormPanel=read('src/presentation/nce/action-form-panel-html.ts');
 const form=read('assets/modules/action-form.js');
 const actionRecordService=read('src/application/nce/action-record-service.ts');
 const actionEvidencePresentation=read('src/presentation/nce/action-evidence-presentation.ts');
-const report=read('assets/modules/report-routes.js');
+const report=read('src/presentation/report/report-page-controller.ts');
 const reportPageHtml=read('src/presentation/report/report-page-html.ts');
 const sigma=read('assets/modules/sigma.js');
 const sigmaTea=read('assets/modules/sigma-tea.js');
@@ -72,13 +72,12 @@ assert.match(compat,/root\.vnDatePickerController\.parse/,'router bridge phải 
    trang và phình lên 105 KB — cùng lý do đã tách dash/entry/westgard khỏi
    router-render.js. Chốt cả hai chiều: mỗi trang nằm đúng file của nó VÀ không có
    tham chiếu chéo nào lẻn ngược lại, nếu không lần gộp sau sẽ âm thầm tái diễn. */
-assert.match(report,/function pageReportV2\(/,'trang Báo cáo phải nằm ở report-routes.js');
+assert.match(report,/const pageReportV2 = \(\) => \{/,'trang Báo cáo phải nằm ở report-page-controller.ts');
 assert.doesNotMatch(actions,/function pageReportV2\(/,'actions-routes.js không được giữ lại trang Báo cáo');
-assert.ok(index.indexOf('actions-routes.js')<index.indexOf('report-routes.js'),'report-routes.js phải tải sau actions-routes.js');
-for(const name of ['reportLockPanelHtml','reportRangePicker','reportDateRange','reportRangeText','reportApplySearch'])assert.match(report,new RegExp(`function ${name}\\(`),`${name} thuộc trang Báo cáo`);
-assert.match(report,/^let reportQ=/m,'state của trang Báo cáo đi cùng trang, không bỏ lại actions-routes.js');
+for(const name of ['reportLockPanelHtml','reportRangePicker','reportDateRange','reportRangeText','reportApplySearch'])assert.match(report,new RegExp(`const ${name} = `),`${name} thuộc controller trang Báo cáo`);
+assert.match(report,/let reportQ = ''/,'state của trang Báo cáo đi cùng controller (closure), không bỏ lại actions-routes.js');
 assert.doesNotMatch(actions,/\breport[A-Z_]/,'actions-routes.js không còn tham chiếu nào tới trang Báo cáo');
-assert.doesNotMatch(report,/\bpageActionsV4\b|\bACT_[A-Z]/,'report-routes.js không được kéo theo logic trang Khắc phục sự cố');
+assert.doesNotMatch(report,/\bpageActionsV4\b|\bACT_[A-Z]/,'report-page-controller.ts không được kéo theo logic trang Khắc phục sự cố');
 assert.doesNotMatch(actions,/===== ACTIONS & REPORT PAGE ROUTES =====/,'tiêu đề file phải theo kịp việc tách trang');
 
 /* Lớp giải TEa tách khỏi sigma.js (2026-08-01) sau khi bản đồ độ phủ

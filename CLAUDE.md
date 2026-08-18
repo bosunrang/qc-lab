@@ -474,7 +474,8 @@ the Google Fonts link, offline labs must print with correct metrics.
   IIFE-wrapped) layered on `state`/`qc-domain`. `PeriodService` locks/unlocks
   reporting periods (`state.periodLocks`, a synced list branch); `entry-service.js`
   enforces the lock (blocks add/edit/void once a period is locked), and the
-  "Khóa kỳ báo cáo" panel on the Reports page (`report-routes.js`) is the only
+  "Khóa kỳ báo cáo" panel on the Reports page
+  (`src/presentation/report/report-page-controller.ts`) is the only
   UI that actually calls `PeriodService.lock()`/`.unlock()` — until 2026-07-22
   this service had no caller at all, so locks could never actually be created.
   The lock panel promises users it blocks editing/voiding QC points of that
@@ -617,9 +618,16 @@ the Google Fonts link, offline labs must print with correct metrics.
   reached `actions-routes.js`, which had been holding **two** whole pages and
   had grown to 105 KB, in two steps:
   - `pageReportV2()` and every `report*` helper (period lock/unlock, test
-    search, date range, print icons) moved to `report-routes.js`. Those two
-    pages share no function — only `professional-reports.css`, see "CSS
-    structure" — so that cut left **no** cross-reference in either direction.
+    search, date range, print icons) moved to `report-routes.js` — and then on
+    2026-08-18 (Pha G route slice 2) the whole page moved again to
+    `src/presentation/report/report-page-controller.ts`
+    (`createReportPageController(deps)`), retiring the classic file. Its page
+    state (`reportQ`/`reportTest`/`reportRangeStart`/`reportRangeEnd`/
+    `reportLockYm`) now lives as **controller closure `let`** (persists across
+    `rerender()` because the factory runs once) — it is set only through
+    `reportSetLockPart()`/`reportSearchSet()` handlers, never by direct global
+    assignment, so nothing outside may write it. Those two pages share no
+    function — only `professional-reports.css`, see "CSS structure".
   - The NCE form then moved to `action-form.js`: the `ACT_*` option/suggestion
     constants, `actSel()`, the `<details>` section machinery, the investigation
     checklist, the draft that survives `rerender()`, `actionFormModel()`,
@@ -639,10 +647,9 @@ the Google Fonts link, offline labs must print with correct metrics.
   In one shared global scope that is harmless — what is being pinned is the
   **split of responsibility**, not an acyclic dependency graph, and
   `tests/ui-route-structure.test.js` asserts it that way (which function lives in
-  which file, plus load order). Both files must load right after the bundle
-  and the classic page files, in the order `actions-routes.js` →
-  `action-form.js` → `report-routes.js`. That test also fails if a `page*()`
-  function or an Actions-page helper migrates back.
+  which file — the Report page now in `report-page-controller.ts`, the Actions
+  page still in `actions-routes.js`/`action-form.js`, in that load order). That
+  test also fails if a `page*()` function or an Actions-page helper migrates back.
   `router-page-policy.ts` owns the page list
   (`PAGES`, bridged as `root.PAGES`) and per-role page permissions:
   `rolePageIds(role)` gives each role's default page set, and a user's own
@@ -651,7 +658,7 @@ the Google Fonts link, offline labs must print with correct metrics.
   modules above. `sigma.js` renders the Six Sigma page (see "Confirmed
   business-logic decisions" below for how its numbers relate to reports.js).
 - `draw.js`, `entry-routes.js`, `westgard-routes.js`, `sigma.js`,
-  `actions-routes.js`, `action-form.js`, `report-routes.js`, `manage-routes.js`,
+  `actions-routes.js`, `action-form.js`, `manage-routes.js`,
   `after-render-controller.ts`, `manage-tests-actions.js` — UI/rendering and
   routing for the pages not yet ported to TypeScript.
 - `sigma-tea.js` — the Six Sigma page's **TEa resolution layer**, split out of
@@ -766,8 +773,9 @@ Settings page, which is `professional-settings.css`),
 cáo page and the `actions` page (Khắc phục sự cố) — despite the filename,
 that's where `.action-chip`/`.action-log-*`/`.issue-group`/`.issue-row`
 live; the `actions` page has no separate file of its own — so the two pages
-stay coupled in CSS even though their JS was split apart on 2026-07-30
-(`actions-routes.js` / `report-routes.js`). These files have
+stay coupled in CSS even though their logic was split apart (Actions in
+`actions-routes.js` / Report in `src/presentation/report/report-page-controller.ts`).
+These files have
 overlapping `@media` breakpoints and
 height queries and rely on cascade/shorthand ordering between files — check
 neighboring `professional-*.css` files for conflicting rules before adding

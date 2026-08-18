@@ -82,7 +82,10 @@ async function checkLotTransitionPicker(page){
 }
 
 async function checkPeriodLock(page){
-  await page.evaluate(()=>{go('report');reportLockYm='2026-06';reportLockPeriod();});await dialogClick(page,'Khóa kỳ');await reauthenticate(page);await closeInfo(page);
+  // Đặt kỳ khóa qua đúng đường người dùng (picker tháng/năm → reportSetLockPart),
+  // không gán thẳng biến reportLockYm nữa — state trang Báo cáo nay là closure của
+  // report-page-controller.ts (TS), không còn là global classic ghi được từ ngoài.
+  await page.evaluate(()=>{go('report');reportSetLockPart('year','2026');reportSetLockPart('month','6');reportLockPeriod();});await dialogClick(page,'Khóa kỳ');await reauthenticate(page);await closeInfo(page);
   let status=await page.evaluate(()=>({locked:(state.periodLocks||[]).some(x=>x.ym==='2026-06'),audit:state.activity.at(-1)&&state.activity.at(-1).type}));
   check('Khóa kỳ qua UI + re-auth tạo period lock',status.locked&&status.audit==='Khóa kỳ báo cáo',JSON.stringify(status));
   await page.evaluate(()=>reportUnlockPeriod('2026-06'));await page.fill('#unlockReasonInput','Bổ sung đối soát theo biên bản');await page.locator('#modalRoot').getByRole('button',{name:'Xác nhận mở khóa',exact:true}).click();await reauthenticate(page);await closeInfo(page);

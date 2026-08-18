@@ -32,6 +32,8 @@ declare function closeDialogOverlay(result?: any): void;
 declare function pageDash(): string;
 declare function dashTestFilter(value: string): void;
 declare function ensureLabBrandShape(): void;
+declare function reportExportSelection(): { tid: string; t: any; start: string; end: string; includeNceAppendix: boolean };
+declare function reportRangeText(start: string, end: string): string;
 declare function role(): string;
 declare function canWrite(): boolean;
 declare function requireWrite(message?: string): boolean;
