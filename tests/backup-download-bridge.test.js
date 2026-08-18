@@ -1,9 +1,18 @@
 'use strict';
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
+const { loadSandbox, run } = require('./helpers/sandbox');
 
-const source = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'backup-ui.js'), 'utf8');
-assert.match(source, /function downloadBackupText\(name,json\)\{try\{if\(globalThis\.blobDownload\)\{globalThis\.blobDownload\(name,new Blob\(\[json\],\{type:'application\/json'\}\)\);return true;\}/,
-  'xuất backup phải dùng blobDownload TypeScript khi artifact đã nạp');
+const calls = [];
+const ctx = loadSandbox(['modules/backup-ui.js'], {
+  Blob,
+  blobDownload: (name, blob) => { calls.push({ name, blob }); },
+});
+
+const ok = run(ctx, `downloadBackupText('backup.json','{"a":1}')`);
+assert.equal(ok, true, 'downloadBackupText phải báo thành công khi blobDownload có sẵn');
+assert.equal(calls.length, 1, 'phải gọi blobDownload đúng 1 lần');
+assert.equal(calls[0].name, 'backup.json');
+assert.ok(calls[0].blob instanceof Blob, 'phải truyền một Blob thật');
+assert.equal(calls[0].blob.type, 'application/json');
+
 console.log('Backup download TypeScript bridge tests passed');

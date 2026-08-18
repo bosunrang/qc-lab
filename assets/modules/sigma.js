@@ -39,7 +39,7 @@ function sgComp(t,e,level,refs){return SigmaPeriodViewModel.comp(t,e,level,refs)
 /* Dựng effectiveTeaRefs() một lần cho cả lượt (mọi kỳ × mọi mức của xét nghiệm
    đang xem) thay vì để mỗi ô tự build lại — bảng TEa hiệu lực không đổi trong
    một lượt render. sgPendingRows cache kết quả cho đúng MỘT lần sgRefresh() gọi
-   ngay sau pageSigma() (qua rAF ở after-render.js); mọi lần gọi sgRows() khác
+   ngay sau pageSigma() (qua rAF ở after-render controller TypeScript); mọi lần gọi sgRows() khác
    (sửa ô, đổi kỳ, ...) luôn tính lại từ dữ liệu hiện hành. */
 let sgPendingRows=null;
 function sgRows(t,data,levels){return SigmaPeriodViewModel.rows(t,data,levels,effectiveTeaRefs());}

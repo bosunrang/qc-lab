@@ -6,11 +6,7 @@ function reportQcValue(t,value){return globalThis.reportQcFormat.value(t,value);
    trước 2026-08-02 khi state.js chưa nạp (in ở document riêng). */
 function reportQcStat(t,value){return globalThis.reportQcFormat.stat(t,value);}
 function reportQcPoint(point,t){return globalThis.reportQcFormat.point(point,t);}
-function reportHeader(title,subtitle='Nội kiểm chất lượng xét nghiệm'){return globalThis.reportHeaderPresentation({title,subtitle,lab:state.lab,app:window.QCLAB_APP,westgardRules:state.westgardRules,exportedAt:formatDateTimeVN(new Date().toISOString()),exportedBy:userName(),escape:esc});const L=state.lab,app=window.QCLAB_APP||{version:'dev'},rules=Object.entries(state.westgardRules||{}).filter(x=>x[1]!==false).map(x=>x[0]).join(', ');return '<div class="rpt-head">'+
-  '<div class="rpt-brand"><div><div class="rpt-hosp">'+esc(L.name||'BỆNH VIỆN / ĐƠN VỊ')+'</div><div class="rpt-dept">'+esc(L.dept||'Khoa Xét nghiệm')+'</div><div class="rpt-addr">'+esc(L.address||'')+'</div></div></div>'+
-  '<div class="rpt-meta"><b>Thời gian xuất</b><span>'+formatDateTimeVN(new Date().toISOString())+'</span><b class="rpt-meta-label">Người xuất</b><span>'+esc(userName())+'</span></div></div>'+
-  '<table class="meta-table"><tr><th>Phiên bản app</th><td>'+esc((app.name||'QC Lab')+' '+(app.version||'dev'))+'</td><th>Bộ luật áp dụng</th><td>'+esc(rules||'Chưa cấu hình')+'</td></tr></table>'+
-  '<div class="rpt-title"><div>'+title+'</div><span>'+esc(subtitle)+'</span></div>';}
+function reportHeader(title,subtitle='Nội kiểm chất lượng xét nghiệm'){return globalThis.reportHeaderPresentation({title,subtitle,lab:state.lab,app:window.QCLAB_APP,westgardRules:state.westgardRules,exportedAt:formatDateTimeVN(new Date().toISOString()),exportedBy:userName(),escape:esc});}
 function signBlock(){return globalThis.reportSignBlock();}
 async function openPrint(title,bodyHtml,options={}){
   const w=window.open('','_blank');if(!w){await infoDialog('Trình duyệt chặn cửa sổ. Cho phép pop-up để in báo cáo.');return;}

@@ -517,7 +517,8 @@ the Google Fonts link, offline labs must print with correct metrics.
 - `westgard-view-model.js`, `chart-view-model.js` — pure (DOM-free)
   view-model builders: `WestgardViewModel` for the Westgard page (used by
   `router-render.js`), `ChartViewModel` for charts (used by
-  `after-render.js`/`router-render.js`; loads later, after `draw.js`).
+  `after-render-controller.ts`/`router-render.js`; controller được bundle và nạp
+  sau `draw.js`).
 - `entry-ui-state.js`, `analysis-ui-state.js`, `sigma-ui-state.js`,
   `reagent-ui-state.js`, `manage-ui-state.js`, `auth-ui-state.js` —
   page-level UI state gathered into named objects (`EntryUIState`, …); each
@@ -578,7 +579,7 @@ the Google Fonts link, offline labs must print with correct metrics.
     either way.
 - `draw.js`, `router-render.js`, `dashboard-routes.js`, `entry-routes.js`,
   `westgard-routes.js`, `sigma.js`, `actions-routes.js`, `action-form.js`,
-  `report-routes.js`, `manage-routes.js`, `after-render.js`,
+  `report-routes.js`, `manage-routes.js`, `after-render-controller.ts`,
   `manage-tests-actions.js`, `modals.js` —
   UI/rendering and routing. Since 2026-07-24 the three biggest pages live in
   their own files:
@@ -653,11 +654,14 @@ the Google Fonts link, offline labs must print with correct metrics.
   `reagent.js` — feature-specific logic (target-range calc, settings page,
   backup/restore service + XLSX generation, printed reports, auth/user
   management, reagent lot comparison stats). `users-auth.js` hashes passwords
-  with PBKDF2-SHA256 at `PASS_ITERATIONS=600000` (OWASP minimum); the stored
-  `pbkdf2$<iterations>$<salt>$<hash>` string carries its own iteration count,
-  so legacy 210k-iteration hashes still verify and silently re-hash at the
-  current count on next successful login — don't lower `PASS_ITERATIONS` or
-  drop that upgrade path. It also exports `reauthenticateCurrentUser({title,
+  with PBKDF2-SHA256 via the TypeScript `pbkdf2PasswordService` bridge, whose
+  `PASSWORD_HASH_ITERATIONS=600000` (OWASP minimum) lives in
+  `src/domain/auth/pbkdf2-password-service.ts` — the single source now, not a
+  classic-JS constant. The stored `pbkdf2$<iterations>$<salt>$<hash>` string
+  carries its own iteration count, so legacy 210k-iteration hashes still
+  verify (via `legacyPasswordHashService`) and silently re-hash at the current
+  count on next successful login — don't lower `PASSWORD_HASH_ITERATIONS` or
+  drop that upgrade path. `users-auth.js` also exports `reauthenticateCurrentUser({title,
   message})` — a password re-prompt gating the app's *critical* operations
   (approving/returning a corrective action, locking/unlocking a reporting
   period, writing or reverting a lot's Mean/SD, concluding a lot transition,

@@ -205,6 +205,7 @@ const configNavScrollServiceSource = read('src/presentation/render/config-nav-sc
 const entryJumpScrollServiceSource = read('src/presentation/render/entry-jump-scroll-service.ts');
 const defaultDateFieldsServiceSource = read('src/presentation/render/default-date-fields-service.ts');
 const postRenderPageActionsSource = read('src/presentation/render/post-render-page-actions.ts');
+const afterRenderControllerSource = read('src/presentation/render/after-render-controller.ts');
 const dashboardOverdueActionsSource = read('src/presentation/dashboard/dashboard-overdue-actions.ts');
 const dashboardOverdueActionListHtmlSource = read('src/presentation/dashboard/dashboard-overdue-action-list-html.ts');
 const dashboardQcFollowupListHtmlSource = read('src/presentation/dashboard/dashboard-qc-followup-list-html.ts');
@@ -488,14 +489,16 @@ assert.match(drawSource, /globalThis\.leveyJenningsMultiYAxis\(\)\.forEach\(labe
   'multi-level Levey-Jennings renderer must use TypeScript Y-axis bridge');
 assert.match(drawSource, /globalThis\.leveyJenningsMultiGeometry\(\{width:W,height:H\}\)/,
   'multi-level Levey-Jennings renderer must use TypeScript geometry bridge');
-assert.match(read('assets/modules/after-render.js'), /globalThis\.configNavScrollService\.restore\(\);/,
-  'after-render must restore config nav scroll through TypeScript service');
-assert.match(read('assets/modules/after-render.js'), /requestAnimationFrame\(\(\)=>globalThis\.entryJumpScrollService\.scroll\(\)\);/,
-  'after-render must jump to today row through TypeScript service');
-assert.match(read('assets/modules/after-render.js'), /globalThis\.defaultDateFieldsService\.fill\(\['eDate','aDate'\],vnDate\(isoToday\(\)\)\);/,
-  'after-render must fill default dates through TypeScript service');
-assert.match(read('assets/modules/after-render.js'), /globalThis\.postRenderPageActions\.run\(page,\{reagent:rcCompute,sigma:sgRefresh\}\);/,
-  'after-render must schedule page actions through TypeScript service');
+assert.match(afterRenderControllerSource, /export function createAfterRenderController\(/,
+  'after-render controller must be TypeScript source');
+assert.match(afterRenderControllerSource, /deps\.restoreConfigNavScroll\(\);/,
+  'after-render must restore config nav scroll through injected dependency');
+assert.match(afterRenderControllerSource, /deps\.requestFrame\(\(\)=>deps\.scrollEntryJump\(\)\)/,
+  'after-render must jump to today row through injected dependency');
+assert.match(afterRenderControllerSource, /deps\.fillDefaultDates\(\);/,
+  'after-render must fill default dates through injected dependency');
+assert.match(afterRenderControllerSource, /deps\.runPageActions\(\);/,
+  'after-render must schedule page actions through injected dependency');
 assert.match(backupUiSource, /return globalThis\.BackupStatusCommand\.capacity\(\)/,
   'backup capacity must use the TypeScript status command');
 assert.match(backupUiSource, /return globalThis\.BackupStatusCommand\.overdue\(/,
@@ -1939,6 +1942,8 @@ assert.match(generated, /root\.cssTokenPixel\s*=/,
   'artifact phải công bố TypeScript CSS token pixel cho wrapper cũ');
 assert.match(generated, /root\.afterRenderCanvasService\s*=\s*createVisibleCanvasService/,
   'artifact phải công bố TypeScript điều phối canvas cho wrapper cũ');
+assert.match(generated, /root\.afterRender\s*=\s*createAfterRenderController/,
+  'artifact phải công bố after-render controller TypeScript cho caller route legacy');
 assert.doesNotMatch(generated, /root\.chartTooltipService\s*=/,
   'artifact không được công bố facade tooltip chỉ dùng nội bộ bundle');
 assert.doesNotMatch(generated, /root\.dashboard(?:TestStatusTags|TestRank|Completion)\s*=/,

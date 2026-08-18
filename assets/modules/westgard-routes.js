@@ -33,7 +33,7 @@ function wgLotBlock(t,level,lotNo,mean,sd,pts,badge,titleMain,lotLabel,extraMeta
    chọn (biểu đồ Levey-Jennings tổng hợp nếu có từ 2 mức trở lên, rồi từng khối wgLotBlock
    chỉ có bảng số liệu), thay vì dồn hết mọi xét nghiệm/mức của cả nhóm ra một lượt. */
 /* Dữ liệu cho biểu đồ Levey-Jennings tổng hợp (nhiều mức quy về Z-score, canvas.wgLJMultiArchived
-   ở after-render.js) của MỘT xét nghiệm trong nhóm lô đã dừng/lưu trữ — cùng dạng {level,lot,
+   ở after-render controller TypeScript) của MỘT xét nghiệm trong nhóm lô đã dừng/lưu trữ — cùng dạng {level,lot,
    mean,sd,pts,label} như wgMultiViews() (dùng cho xét nghiệm đang vận hành) để tái dùng chung
    drawLJMultiZ(). */
 function wgArchivedMultiViews(rows){return globalThis.westgardArchivedMultiViews(rows,(t,level,lotNo)=>lotPointsByNo(t.id,level,lotNo));}

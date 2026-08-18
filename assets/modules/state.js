@@ -4,11 +4,11 @@ const REFTESTS=Object.freeze(TEA_ANALYTE_CATALOG.map(row=>Object.freeze([row.nam
 const TEA_ANALYTE_META=Object.freeze(Object.fromEntries(TEA_ANALYTE_CATALOG.map(row=>{const aliases=[row.name,row.abbreviation].filter(Boolean),displayName=row.abbreviation&&teaAnalyteKey(row.abbreviation)!==teaAnalyteKey(row.name)?`${row.name} (${row.abbreviation})`:row.name;return[teaAnalyteKey(row.name),Object.freeze({analyteId:row.analyteId,displayName,standardName:row.name,abbreviation:row.abbreviation||'',aliases:Object.freeze(aliases),matrix:row.matrix})];})));
 const TEA_ANALYTE_META_BY_ID=Object.freeze(Object.fromEntries(Object.values(TEA_ANALYTE_META).map(m=>[m.analyteId,m])));
 /** @returns {any} */
-function teaAnalyteBuiltInMeta(value){if(globalThis.teaAnalyteMetaService)return globalThis.teaAnalyteMetaService.builtIn(value);const key=teaAnalyteKey(value);return TEA_ANALYTE_META[key]||Object.values(TEA_ANALYTE_META).find(m=>m.aliases.some(a=>teaAnalyteKey(a)===key))||{};}
-function teaAnalyteMetaById(id){return globalThis.teaAnalyteMetaService?globalThis.teaAnalyteMetaService.byId(id):TEA_ANALYTE_META_BY_ID[id]||{};}
+function teaAnalyteBuiltInMeta(value){return globalThis.teaAnalyteMetaService.builtIn(value);}
+function teaAnalyteMetaById(id){return globalThis.teaAnalyteMetaService.byId(id);}
 /** @param {any} [record] @returns {any} */
-function teaAnalyteMeta(name,record){return globalThis.teaAnalyteMetaService?globalThis.teaAnalyteMetaService.meta(name,record):(()=>{const custom=record&&typeof record==='object'?record:{},base=custom.analyteId&&TEA_ANALYTE_META_BY_ID[custom.analyteId]||teaAnalyteBuiltInMeta(name),aliases=[name,base.displayName,base.standardName,base.abbreviation,...(base.aliases||[]),custom.displayName,custom.standardName,custom.abbreviation,...(custom.aliases||[])].filter(Boolean);return{analyteId:custom.analyteId||base.analyteId||'',displayName:custom.displayName||base.displayName||name||'',standardName:custom.standardName||base.standardName||name||'',abbreviation:custom.abbreviation||base.abbreviation||'',aliases:[...new Set(aliases)],matrix:custom.matrix||base.matrix||''};})();}
-function teaAnalyteDisplay(name,record){return globalThis.teaAnalyteMetaService?globalThis.teaAnalyteMetaService.display(name,record):teaAnalyteMeta(name,record).displayName||name||'';}
+function teaAnalyteMeta(name,record){return globalThis.teaAnalyteMetaService.meta(name,record);}
+function teaAnalyteDisplay(name,record){return globalThis.teaAnalyteMetaService.display(name,record);}
 const TEA_REFERENCE_SCHEMA_VERSION=3;
 globalThis.teaReferenceSchemaVersion=TEA_REFERENCE_SCHEMA_VERSION;
 const TEA_SOURCE_REGISTRY=Object.freeze({
@@ -70,18 +70,18 @@ function normalizeLotGroups(){return ManageConfigService.normalizeLotGroups(stat
 function clearDerived(){return globalThis.derivedCacheInvalidation.clearAll();}
 function clearDerivedForTest(testId){return globalThis.derivedCacheInvalidation.clearForTest(testId);}
 function userName(){return currentUser?(currentUser.name||currentUser.username||'Người dùng'):'Hệ thống';}
-function staffInitials(name){return globalThis.qcStaffIdentity?globalThis.qcStaffIdentity.initials(name):String(name||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').split(/[^A-Za-z0-9]+/).filter(Boolean).map(x=>x.charAt(0)).join('').toUpperCase().slice(0,8)||'—';}
+function staffInitials(name){return globalThis.qcStaffIdentity.initials(name);}
 function currentStaff(){const name=userName();return{operatorId:currentUser&&currentUser.id||'',operatorUsername:currentUser&&currentUser.username||'',operatorName:name,operatorCode:currentUser&&currentUser.initials||staffInitials(name)};}
-function pointStaff(p){return globalThis.qcStaffIdentity?globalThis.qcStaffIdentity.point(p):(()=>{const name=String(p&&p.operatorName||'').trim(),code=String(p&&p.operatorCode||'').trim().toUpperCase()||(name?staffInitials(name):'');return{name,code};})();}
-function dateObj(s){return globalThis.qcDateFormat?globalThis.qcDateFormat.dateObject(s):(()=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s||''));return m?new Date(+m[1],+m[2]-1,+m[3]):new Date(s);})();}
-function daysToExp(exp){return globalThis.qcDateFormat?globalThis.qcDateFormat.daysToExpiry(exp):(!exp?null:Math.round((dateObj(exp).getTime()-new Date().getTime())/86400000));}
-function fmt(x,d=2){return globalThis.qcBasicFormat?globalThis.qcBasicFormat.number(x,d):(x==null||isNaN(x))?'—':Number(x).toFixed(d);}
+function pointStaff(p){return globalThis.qcStaffIdentity.point(p);}
+function dateObj(s){return globalThis.qcDateFormat.dateObject(s);}
+function daysToExp(exp){return globalThis.qcDateFormat.daysToExpiry(exp);}
+function fmt(x,d=2){return globalThis.qcBasicFormat.number(x,d);}
 const QC_DECIMALS_DEFAULT=2;             // mặc định 2 chữ số thập phân khi tạo xét nghiệm mới
 const QC_DECIMALS_MAX=6;                 // trần chung cho MỌI chỗ kẹp số lẻ
 const QC_STAT_EXTRA_DECIMALS=2;          // SD cần nhiều chữ số hơn giá trị đo
 /* `.5` cũng là số: cho phép thiếu phần nguyên, nếu không thì người nhập ".5" bị coi là 0
    chữ số thập phân. Nhận cả dấu phẩy — thói quen nhập tiếng Việt. */
-function qcValueDecimals(value){if(globalThis.qcValueFormat)return globalThis.qcValueFormat.qcValueDecimals(value);const text=String(value==null?'':value).trim(),match=/^[+-]?(?:\d+(?:[.,](\d+))?|[.,](\d+))(?:e([+-]?\d+))?$/i.exec(text);if(!match)return 0;const fraction=(match[1]||match[2]||'').length,exponent=Number(match[3]||0);return Math.max(0,Math.min(QC_DECIMALS_MAX,fraction-exponent));}
+function qcValueDecimals(value){return globalThis.qcValueFormat.qcValueDecimals(value);}
 /* SỐ LẺ CỦA GIÁ TRỊ ĐO — mặc định 2 chữ số, KHÔNG bao giờ lấy từ SD.
    Hai bài học nằm cả trong hàm này:
 
@@ -102,33 +102,27 @@ function qcValueDecimals(value){if(globalThis.qcValueFormat)return globalThis.qc
    === 0, nên `Number(test.decimalPlaces)` một mình không phân biệt được hai trường hợp —
    phải kiểm raw trước khi ép kiểu, nếu không mọi xét nghiệm chưa cấu hình sẽ bị hiểu nhầm
    thành "đã chọn 0 chữ số" và mất luôn mặc định 2. */
-function testDecimalPlaces(test,point=null){
-  if(globalThis.qcValueFormat)return globalThis.qcValueFormat.testDecimalPlaces(test,point);
-  const raw=test&&test.decimalPlaces,configured=Number(raw);
-  if(raw!=null&&raw!==''&&Number.isInteger(configured)&&configured>=0&&configured<=QC_DECIMALS_MAX)return configured;
-  if(point){const saved=Number(point.valueDecimals),own=Number.isInteger(saved)&&saved>=0?saved:qcValueDecimals(point.val);return Math.min(QC_DECIMALS_MAX,Math.max(QC_DECIMALS_DEFAULT,own));}
-  return QC_DECIMALS_DEFAULT;
-}
+function testDecimalPlaces(test,point=null){return globalThis.qcValueFormat.testDecimalPlaces(test,point);}
 /* SỐ LẺ CỦA SD — nhiều hơn giá trị 2 chữ số, KHÔNG dùng chung với giá trị.
    Trước 2026-08-02 SD luôn là fmt(sd,3) và đó là chủ ý: người đọc báo cáo phải tự kiểm
    chứng được z-score và CV. Khi decimalPlaces được đặt tay là 1 mà SD dùng chung số lẻ thì
    SD 0.153 hiện thành "0.2" — mất hẳn khả năng đó. Cố tình KHÔNG suy số lẻ từ chính giá trị
    SD: SD tính ra là số thực có nhiễu dấu phẩy động (5.599999999999999), suy từ nó sẽ cho
    6 chữ số rác. */
-function testStatDecimals(test){return globalThis.qcValueFormat?globalThis.qcValueFormat.testStatDecimals(test):Math.min(QC_DECIMALS_MAX,Math.max(2,testDecimalPlaces(test)+QC_STAT_EXTRA_DECIMALS));}
-function fmtTestValue(test,value,point=null){return globalThis.qcValueFormat?globalThis.qcValueFormat.formatValue(test,value,point):(()=>{const number=Number(value);return Number.isFinite(number)?number.toFixed(testDecimalPlaces(test,point)):'—';})();}
-function fmtTestStat(test,value){return globalThis.qcValueFormat?globalThis.qcValueFormat.formatStat(test,value):(()=>{const number=Number(value);return Number.isFinite(number)?number.toFixed(testStatDecimals(test)):'—';})();}
-function fmtPointValue(point,test=null){return globalThis.qcValueFormat?globalThis.qcValueFormat.formatPoint(point,test):fmtTestValue(test,point&&point.val,point);}
-function isoDate(d=new Date()){return globalThis.qcDateFormat?globalThis.qcDateFormat.isoDate(d):d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
-function isoToday(){return globalThis.qcDateFormat?globalThis.qcDateFormat.isoToday():isoDate();}
-function isoMonth(){return globalThis.qcDateFormat?globalThis.qcDateFormat.isoMonth():(()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');})();}
+function testStatDecimals(test){return globalThis.qcValueFormat.testStatDecimals(test);}
+function fmtTestValue(test,value,point=null){return globalThis.qcValueFormat.formatValue(test,value,point);}
+function fmtTestStat(test,value){return globalThis.qcValueFormat.formatStat(test,value);}
+function fmtPointValue(point,test=null){return globalThis.qcValueFormat.formatPoint(point,test);}
+function isoDate(d=new Date()){return globalThis.qcDateFormat.isoDate(d);}
+function isoToday(){return globalThis.qcDateFormat.isoToday();}
+function isoMonth(){return globalThis.qcDateFormat.isoMonth();}
 async function requireUnlockedPeriod(date,action='sửa dữ liệu QC'){
   const ym=PeriodService.periodForDate(date),lock=ym?PeriodService.findLock(state,ym):null;if(!lock)return true;
   const text=`Kỳ ${monthVN(ym)} đã chốt bởi ${lock.lockedBy||'hệ thống'}${lock.lockedAt?' lúc '+formatDateTimeVN(lock.lockedAt):''}.`;
   await infoDialog(`Không thể ${action}: ${text} Muốn thay đổi cần admin mở khóa kỳ và ghi lý do.`);return false;
 }
-function vnDate(s){return globalThis.qcDateFormat?globalThis.qcDateFormat.vnDate(s):(()=>{if(!s)return '';s=String(s);const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(s);return m?m[3]+'/'+m[2]+'/'+m[1]:s;})();}
-function vnPeriod(s){return globalThis.qcDateFormat?globalThis.qcDateFormat.vnPeriod(s):(()=>{if(!s)return '';s=String(s).trim();let m=/^(\d{4})-(\d{2})/.exec(s);if(m)return'Kỳ '+m[2]+'/'+m[1];m=/^(\d{1,2})\/(\d{4})$/.exec(s);return m?'Kỳ '+m[1].padStart(2,'0')+'/'+m[2]:s;})();}
-function monthVN(s){return globalThis.qcDateFormat?globalThis.qcDateFormat.monthVN(s):(()=>{const m=/^(\d{4})-(\d{2})/.exec(String(s||''));return m?m[2]+'/'+m[1]:(s||'');})();}
-function formatDateTimeVN(s){return globalThis.qcDateFormat?globalThis.qcDateFormat.formatDateTimeVN(s):(()=>{const d=new Date(s);return isNaN(+d)?'':d.toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'})+' '+d.toLocaleDateString('vi-VN');})();}
-function safeName(s){return globalThis.qcBasicFormat?globalThis.qcBasicFormat.safeName(s):String(s||'file').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^\w.-]+/g,'_').replace(/^_+|_+$/g,'')||'file';}
+function vnDate(s){return globalThis.qcDateFormat.vnDate(s);}
+function vnPeriod(s){return globalThis.qcDateFormat.vnPeriod(s);}
+function monthVN(s){return globalThis.qcDateFormat.monthVN(s);}
+function formatDateTimeVN(s){return globalThis.qcDateFormat.formatDateTimeVN(s);}
+function safeName(s){return globalThis.qcBasicFormat.safeName(s);}

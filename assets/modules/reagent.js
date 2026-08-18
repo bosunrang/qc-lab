@@ -39,54 +39,7 @@ function rcCompute(){
   const f=rcFmt,ft=rcFmtT;
   const st=document.getElementById('rcStats'),cr=document.getElementById('rcCrit'),vd=document.getElementById('rcVerdict'),sc=document.getElementById('rcScatter'),bl=document.getElementById('rcBland');
   if(!st)return;
-  {const html=globalThis.reagentResultHtml(R,RC_MIN_PAIRS,f,ft);st.innerHTML=html.statsHtml;cr.innerHTML=html.criteriaHtml;vd.innerHTML=html.verdictHtml;if(!R){sc.innerHTML='';bl.innerHTML='';return;}sc.innerHTML=rcScatterSVG(R,ds.test);bl.innerHTML=rcBlandSVG(R);return;}
-  if(!R){st.innerHTML=`<div class="empty">Nhập tối thiểu ${RC_MIN_PAIRS} cặp giá trị hợp lệ để xem thống kê mô tả; khuyến nghị ≥20 cặp cho sàng lọc phần mềm.</div>`;cr.innerHTML='';vd.innerHTML='';sc.innerHTML='';bl.innerHTML='';return;}
-  const eq=(b,a)=>`y = ${f(b,4)}x ${a>=0?'+':'−'} ${f(Math.abs(a),4)}`;
-  const row=(label,val)=>`<div class="rc-stat-row"><span>${label}</span><b>${val}</b></div>`;
-  st.innerHTML=`<div class="rc-stat-kpis">
-      <div class="rc-stat-card"><div class="rc-stat-label">Hệ số tương quan (Pearson r)</div><div class="rc-stat-value">${f(R.r,4)}</div><div class="rc-stat-sub">R² = ${f(R.fit.r2,4)}</div></div>
-      <div class="rc-stat-card"><div class="rc-stat-label">%Bias</div><div class="rc-stat-value ${R.passBias?'ok':'bad'}">${f(R.bias,3)}%</div><div class="rc-stat-sub">Mong muốn &lt; ${f(R.biasT,3)}%</div></div>
-      <div class="rc-stat-card"><div class="rc-stat-label">P (hai phía / two-tail)</div><div class="rc-stat-value">${f(R.p2,4)}</div><div class="rc-stat-sub">α = ${f(R.alpha,4)}</div></div>
-    </div>
-    <div class="rc-stat-section">
-      <h4>Kiểm định t bắt cặp (t-Test: Paired Two Sample for Means)</h4>
-      <div class="rc-stat-columns">
-        <div>${row('Trung bình (Mean) – Lô cũ / Lô mới',`${f(R.mO,3)} / ${f(R.mN,3)}`)}
-          ${row('Phương sai (Variance) – cũ / mới',`${f(R.vO,3)} / ${f(R.vN,3)}`)}
-          ${row('Số quan sát (Observations), n',R.N)}
-          ${row('Tương quan Pearson (Pearson Correlation)',f(R.r,5))}
-          ${row('Chênh lệch TB giả định (Hypothesized Mean Diff.)','0')}</div>
-        <div>${row('Bậc tự do (df)',R.df)}
-          ${row('Giá trị t (t Stat)',ft(R.tStat))}
-          ${row('P(T≤t) một phía (one-tail)',f(R.p1,5))}
-          ${row('t tới hạn một phía (t Critical one-tail)',f(R.tc1,4))}
-          ${row('P(T≤t) hai phía (two-tail)',f(R.p2,4))}
-          ${row('t tới hạn hai phía (t Critical two-tail)',f(R.tc2,4))}</div>
-      </div>
-    </div>
-    <div class="rc-stat-section">
-      <h4>Hồi quy &amp; độ chệch (Regression &amp; bias)</h4>
-      <div class="rc-stat-columns">
-        <div>${row('Hồi quy tuyến tính (OLS)',eq(R.fit.b,R.fit.a))}
-          ${row('R² (OLS)',f(R.fit.r2,5))}</div>
-        <div>${row('Passing-Bablok',eq(R.pb.b,R.pb.a))}
-          ${row('Chênh lệch tương đối TB theo cặp (Mean abs. rel. diff.)',`${f(R.mard,3)}%`)}</div>
-      </div>
-    </div>`;
-  const C=[
-    {ok:R.passBias,decision:true,t:'Độ chệch trong giới hạn cho phép (tiêu chí quyết định)',why:`%Bias = ${f(R.bias,3)}% ${R.passBias?'<':'≥'} ${f(R.biasT,3)}% mong muốn`},
-    {ok:R.enoughN,decision:true,t:'Đủ cỡ mẫu sàng lọc (tiêu chí quyết định)',why:`n = ${R.N} ${R.enoughN?'≥':'<'} 20 cặp hợp lệ`},
-    {ok:R.coverage,decision:true,t:'Bao phủ khoảng đo / điểm quyết định (tiêu chí quyết định)',why:R.coverage?'Đã xác nhận theo SOP':'Chưa xác nhận theo SOP'},
-    {ok:R.passP,t:'Không khác biệt có ý nghĩa thống kê (mô tả)',why:`P(two-tail) = ${f(R.p2,4)} ${R.passP?'>':'≤'} α = ${f(R.alpha,4)}; không dùng riêng để chấp nhận lô`},
-    {ok:R.passR2,t:'Tương quan chặt chẽ (mô tả)',why:`R² = ${f(R.fit.r2,4)}; cần ≥ 0,95 để xem là tương quan chặt`},
-    {ok:R.passSlope,t:'Độ dốc hồi quy chấp nhận được (mô tả)',why:`Slope = ${f(R.fit.b,4)}; mục tiêu trong khoảng [0,90 - 1,10]`}];
-  cr.innerHTML=C.map(c=>{const cls=c.decision?(c.ok?'pass':'fail'):(c.ok?'info':'note'),txt=c.decision?(c.ok?'ĐẠT':'KHÔNG ĐẠT'):(c.ok?'TỐT':'LƯU Ý');return`<div class="rc-crit-item"><span class="rc-crit-badge ${cls}">${txt}</span><div class="rc-crit-text">${c.t}<div>${c.why}</div></div></div>`;}).join('');
-  let vcls,vicon,vtitle,vdesc;const calib=!R.passR2||!R.passSlope;
-  if(R.level==='ok'){vcls='ok';vicon='✓';vtitle='Kết luận: Đạt tiêu chí sàng lọc phần mềm';vdesc='Độ chệch trong giới hạn, đủ cỡ mẫu (n≥20) và đã xác nhận bao phủ khoảng đo/điểm quyết định. Lô mới đủ điều kiện trình phê duyệt theo SOP trước khi đưa vào sử dụng cho mẫu bệnh nhân.'+(calib||!R.passP?' Lưu ý: một số chỉ số mô tả (P-value/R²/độ dốc) chưa lý tưởng, cần ghi nhận khi phê duyệt.':'');}
-  else if(R.level==='mid'){vcls='mid';vicon='!';vtitle='Kết luận: Chưa đủ điều kiện sàng lọc';vdesc='Độ chệch (%Bias) nằm trong giới hạn cho phép, song chưa đủ cỡ mẫu (n≥20) và/hoặc chưa xác nhận bao phủ khoảng đo/điểm quyết định theo SOP.'+(calib?' Ngoài ra hệ số tương quan và/hoặc độ dốc hồi quy chưa đạt, nên kiểm tra hiệu chuẩn.':'')+' Bổ sung dữ liệu hoặc ghi nhận ngoại lệ theo SOP trước khi phê duyệt.';}
-  else{vcls='no';vicon='✕';vtitle='Kết luận: Hai lô hóa chất có khác biệt';vdesc='Độ chệch (%Bias) vượt giới hạn cho phép. Không đưa lô mới vào sử dụng cho mẫu bệnh nhân; tiến hành điều tra, xử lý theo quy trình.';}
-  vd.innerHTML=`<div class="rc-verdict ${vcls}"><div class="rc-verdict-icon">${vicon}</div><div><div class="rc-verdict-title">${vtitle}</div><div class="rc-verdict-desc">${vdesc}</div></div></div>`;
-  sc.innerHTML=rcScatterSVG(R,ds.test);bl.innerHTML=rcBlandSVG(R);
+  const html=globalThis.reagentResultHtml(R,RC_MIN_PAIRS,f,ft);st.innerHTML=html.statsHtml;cr.innerHTML=html.criteriaHtml;vd.innerHTML=html.verdictHtml;if(!R){sc.innerHTML='';bl.innerHTML='';return;}sc.innerHTML=rcScatterSVG(R,ds.test);bl.innerHTML=rcBlandSVG(R);
 }
 const RC_META_LOG_LABEL={lotOld:'Số lô cũ',lotNew:'Số lô mới',biasTarget:'Bias mong muốn (%)',alpha:'Mức ý nghĩa (α)'};
 function rcMetaFocus(k){rcMetaBefore=rcMetaBefore||{};const ds=rcAct();rcMetaBefore[k]=ds?ds.test[k]:undefined;}

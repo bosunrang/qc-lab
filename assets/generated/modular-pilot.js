@@ -7112,6 +7112,421 @@
 		};
 	}
 	//#endregion
+	//#region src/presentation/render/after-render-controller.ts
+	function createAfterRenderController(deps) {
+		const testFor = (canvas) => deps.tests().find((test) => test.id === canvas.dataset.test);
+		const canvases = (selector) => Array.from(deps.document.querySelectorAll(selector));
+		const afterRender = (page) => {
+			deps.canvas.disconnectObservers();
+			canvases("canvas.ljc").forEach((canvas) => deps.canvas.drawVisibleCanvas(canvas, () => {
+				const test = testFor(canvas);
+				if (!test) return;
+				const level = deps.levelConfig(test, parseInt(canvas.dataset.level || "", 10));
+				if (!level) return;
+				const chart = deps.buildLeveyJennings({
+					points: deps.acceptedLotPoints(test, level.level),
+					mean: level.mean,
+					sd: level.sd
+				});
+				deps.drawLeveyJennings(canvas, chart.points, chart.mean, chart.sd);
+			}));
+			canvases("canvas.entryLJStack").forEach((canvas) => deps.canvas.drawVisibleCanvas(canvas, () => {
+				const test = testFor(canvas);
+				if (!test) return;
+				const level = deps.levelConfig(test, parseInt(canvas.dataset.level || "", 10));
+				if (!level) return;
+				const lot = canvas.dataset.lot || level.lot || "", key = `${level.level}|${lot}`, cache = deps.entryCache(), points = (cache && cache.testId === canvas.dataset.test && cache.start === canvas.dataset.start && cache.end === canvas.dataset.end ? cache.levels.get(key) : null) || deps.acceptedLotPoints(test, level.level), mean = Number.isFinite(+canvas.dataset.mean) ? +canvas.dataset.mean : level.mean, sd = Number.isFinite(+canvas.dataset.sd) ? +canvas.dataset.sd : level.sd, chart = deps.buildLeveyJennings({
+					points,
+					start: canvas.dataset.start,
+					end: canvas.dataset.end,
+					lot,
+					mean,
+					sd
+				});
+				deps.drawLeveyJennings(canvas, chart.points, chart.mean, chart.sd);
+			}));
+			canvases("canvas.wgLJMulti").forEach((canvas) => deps.canvas.drawVisibleCanvas(canvas, () => {
+				const test = testFor(canvas);
+				if (test) deps.drawMultiLevel(canvas, deps.buildMultiLevel({ views: deps.multiViews(test) }), test);
+			}));
+			canvases("canvas.wgLJMultiArchived").forEach((canvas) => deps.canvas.drawVisibleCanvas(canvas, () => {
+				const test = testFor(canvas), group = deps.lotGroups().find((item) => item.id === canvas.dataset.group);
+				if (test && group) deps.drawMultiLevel(canvas, deps.buildMultiLevel({ views: deps.archivedMultiViews(deps.levelsForLotGroup(group).filter((item) => item.t.id === test.id)) }), test);
+			}));
+			canvases("canvas.cusumChart").forEach((canvas) => deps.canvas.drawVisibleCanvas(canvas, () => {
+				const test = testFor(canvas);
+				if (!test) return;
+				const level = deps.levelConfig(test, parseInt(canvas.dataset.level || "", 10));
+				if (!level) return;
+				const chart = deps.buildCusum({
+					points: deps.operationalLotPoints(test, level.level),
+					series: deps.cusumSeries(test, level)
+				});
+				deps.drawCusum(canvas, chart.points, chart.series);
+			}));
+			deps.fillDefaultDates();
+			deps.runPageActions();
+			if (page === "entry" && deps.consumeEntryJump()) deps.requestFrame(() => deps.scrollEntryJump());
+			deps.updateSaveStatus();
+			deps.updateBackupBanner();
+			deps.restoreConfigNavScroll();
+		};
+		return { afterRender };
+	}
+	//#endregion
+	//#region src/presentation/router/router-page-policy.ts
+	var ROUTER_PAGE_DEFS = [
+		[
+			"dash",
+			"Bảng điều khiển",
+			[
+				"admin",
+				"technician",
+				"viewer"
+			]
+		],
+		[
+			"entry",
+			"Nhập QC & Biểu đồ",
+			[
+				"admin",
+				"technician",
+				"viewer"
+			]
+		],
+		[
+			"westgard",
+			"Phân tích Westgard",
+			[
+				"admin",
+				"technician",
+				"viewer"
+			]
+		],
+		[
+			"sigma",
+			"Six Sigma & Sai số",
+			[
+				"admin",
+				"technician",
+				"viewer"
+			]
+		],
+		[
+			"reagent",
+			"So sánh hóa chất",
+			[
+				"admin",
+				"technician",
+				"viewer"
+			]
+		],
+		[
+			"actions",
+			"Khắc phục sự cố",
+			["admin", "technician"]
+		],
+		[
+			"report",
+			"Báo cáo & Biểu mẫu",
+			[
+				"admin",
+				"technician",
+				"viewer"
+			]
+		],
+		[
+			"manage",
+			"Cấu hình chung",
+			["admin"]
+		],
+		[
+			"users",
+			"Người dùng",
+			["admin"]
+		],
+		[
+			"audit",
+			"Nhật ký hoạt động",
+			["admin"]
+		],
+		[
+			"settings",
+			"Cài đặt & Đám mây",
+			["admin"]
+		]
+	];
+	var ROUTER_ROLE_LIST = [
+		"admin",
+		"technician",
+		"viewer"
+	];
+	function createRouterPagePolicy() {
+		const pages = ROUTER_PAGE_DEFS.map(([id, label]) => [id, label]), permissions = Object.fromEntries(ROUTER_PAGE_DEFS.map(([id, , roles]) => [id, [...roles]])), rolePageIds = (role) => pages.map(([id]) => id).filter((id) => permissions[id]?.includes(role)), userPageIds = (user) => {
+			if (!user) return rolePageIds("viewer");
+			const base = rolePageIds(user.role), picked = Array.isArray(user.pagePerms) ? [...new Set(user.pagePerms.map((value) => String(value)))].filter((id) => base.includes(id)) : base;
+			return picked.length ? picked : base.slice(0, 1);
+		}, canAccessPage = (id, user) => !!(permissions[id] && userPageIds(user).includes(id)), firstAccessPage = (user) => (pages.find(([id]) => canAccessPage(id, user)) || ["dash"])[0];
+		return {
+			pages,
+			permissions,
+			roles: ROUTER_ROLE_LIST,
+			rolePageIds,
+			userPageIds,
+			canAccessPage,
+			firstAccessPage
+		};
+	}
+	//#endregion
+	//#region src/presentation/router/router-shell-controller.ts
+	function createRouterShellController(deps) {
+		const brandTitle = () => deps.lab().brandTitle || "QC Lab", brandSub = () => deps.lab().brandSub || "Nội kiểm xét nghiệm", brandMarkText = () => String(deps.lab().logoText || "QC").slice(0, 4), brandLogo = () => deps.lab().logoData || "";
+		const renderBrand = () => {
+			const element = deps.find("brandBox");
+			if (!element) return;
+			const logo = brandLogo();
+			element.innerHTML = `<div class="brand-mark">${logo ? `<img src="${deps.escapeAttr(logo)}" alt="">` : deps.escape(brandMarkText())}</div><div>${deps.escape(brandTitle())}<small>${deps.escape(brandSub())}</small></div>`;
+		};
+		const nav = ({ page, user, icon }) => {
+			const element = deps.find("nav");
+			if (!element) return;
+			const scrollTop = element.scrollTop;
+			element.innerHTML = [
+				["Theo dõi", [
+					"dash",
+					"entry",
+					"westgard",
+					"sigma"
+				]],
+				["Vận hành", [
+					"reagent",
+					"actions",
+					"report"
+				]],
+				["Quản trị", [
+					"manage",
+					"users",
+					"audit",
+					"settings"
+				]]
+			].map(([label, ids]) => {
+				const items = deps.pages().filter(([id]) => ids.includes(id) && deps.canAccess(id, user));
+				return items.length ? `<div class="nav-group">${label}</div>` + items.map(([id, title]) => `<button class="${id === page ? "active" : ""}" aria-current="${id === page ? "page" : "false"}" onclick="go('${id}')"><span class="ic" aria-hidden="true">${icon(id)}</span>${title}</button>`).join("") : "";
+			}).join("");
+			element.scrollTop = scrollTop;
+		};
+		const licensedLabName = () => {
+			const license = deps.license();
+			return license && license.lab ? String(license.lab) : "";
+		}, trialInfo = () => {
+			const trial = deps.license()?.trial;
+			return trial && trial.active ? trial : null;
+		};
+		const sideFoot = () => {
+			const element = deps.find("sideFoot");
+			if (!element) return;
+			const app = deps.app() || { version: "dev" }, lab = licensedLabName(), licensed = lab ? `<div class="hint" style="color:#8ea3b2">Cấp phép: <b style="color:#c3d3dd">${deps.escape(lab)}</b></div>` : "", trial = trialInfo(), trialLine = trial ? `<div class="hint" style="color:${trial.daysLeft <= 7 ? "#e2a33d" : "#8ea3b2"}">Dùng thử: còn <b style="color:${trial.daysLeft <= 7 ? "#e2a33d" : "#c3d3dd"}">${trial.daysLeft} ngày</b></div>` : "";
+			element.innerHTML = `<div class="foot-panel"><div class="hint">Ver: ${deps.escape(app.version || "dev")}</div>${licensed}${trialLine}</div>`;
+		};
+		const toggleSidebarNav = () => {
+			const shell = deps.findShell();
+			if (!shell) return;
+			const collapsed = shell.classList.toggle("nav-collapsed");
+			try {
+				deps.storage.setItem("qclab_nav_collapsed", collapsed ? "1" : "0");
+			} catch {}
+		};
+		return {
+			brandTitle,
+			brandSub,
+			brandMarkText,
+			brandLogo,
+			renderBrand,
+			nav,
+			licensedLabName,
+			trialInfo,
+			sideFoot,
+			toggleSidebarNav
+		};
+	}
+	//#endregion
+	//#region src/presentation/router/vn-date-picker-controller.ts
+	var MONTHS = [
+		"Tháng 1",
+		"Tháng 2",
+		"Tháng 3",
+		"Tháng 4",
+		"Tháng 5",
+		"Tháng 6",
+		"Tháng 7",
+		"Tháng 8",
+		"Tháng 9",
+		"Tháng 10",
+		"Tháng 11",
+		"Tháng 12"
+	];
+	var DAYS = [
+		"T2",
+		"T3",
+		"T4",
+		"T5",
+		"T6",
+		"T7",
+		"CN"
+	];
+	function createVnDatePickerController(deps) {
+		let state = {
+			box: null,
+			input: null,
+			native: null,
+			view: null,
+			mode: "day"
+		}, bound = false;
+		const valid = (year, month, day) => {
+			const date = new Date(year, month - 1, day);
+			return year >= 1e3 && date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day ? `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}` : "";
+		}, parse = (value) => {
+			const text = String(value || "").trim();
+			let match = /^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/.exec(text);
+			if (match) return valid(+match[3], +match[2], +match[1]);
+			match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+			return match ? valid(+match[1], +match[2], +match[3]) : "";
+		}, text = (iso) => {
+			const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ""));
+			return match ? `${match[3]}/${match[2]}/${match[1]}` : "";
+		};
+		const close = () => {
+			const element = deps.document.getElementById("vnDatePicker");
+			if (element) element.remove();
+			state = {
+				box: null,
+				input: null,
+				native: null,
+				view: null,
+				mode: "day"
+			};
+		}, position = (popup) => {
+			const rect = state.box.getBoundingClientRect(), left = Math.min(Math.max(8, rect.left), deps.window.innerWidth - 258 - 8), top = Math.min(rect.bottom + 6, deps.window.innerHeight - popup.offsetHeight - 8);
+			popup.style.left = left + "px";
+			popup.style.top = Math.max(8, top) + "px";
+		};
+		const render = () => {
+			if (!state.box || !state.input) return;
+			let popup = deps.document.getElementById("vnDatePicker");
+			if (!popup) {
+				popup = deps.document.createElement("div");
+				popup.id = "vnDatePicker";
+				popup.className = "vn-date-picker";
+				deps.document.body.appendChild(popup);
+			}
+			const view = state.view, year = view.getFullYear(), month = view.getMonth(), selected = parse(state.input.value), today = deps.today();
+			if (state.mode === "month") {
+				popup.innerHTML = `<div class="vn-date-head"><button type="button" data-year-step="-1" title="Năm trước">‹</button><button type="button" class="vn-date-title" data-mode="day" title="Quay lại chọn ngày">Chọn tháng/năm</button><button type="button" data-year-step="1" title="Năm sau">›</button></div><div class="vn-year-row"><button type="button" data-year-step="-1">-</button><input id="vnPickerYear" type="number" min="1000" max="9999" value="${year}" inputmode="numeric"><button type="button" data-year-step="1">+</button></div><div class="vn-month-grid">${MONTHS.map((name, index) => `<button type="button" class="${index === month ? "selected" : ""}" data-month="${index}">${name}</button>`).join("")}</div><div class="vn-date-foot"><button type="button" data-today="1">Hôm nay</button><button type="button" data-close="1">Đóng</button></div>`;
+				position(popup);
+				return;
+			}
+			const first = new Date(year, month, 1), days = new Date(year, month + 1, 0).getDate(), offset = (first.getDay() + 6) % 7, cells = [];
+			for (let index = 0; index < offset; index++) cells.push("<button type=\"button\" class=\"blank\" tabindex=\"-1\"></button>");
+			for (let day = 1; day <= days; day++) {
+				const iso = valid(year, month + 1, day), classes = [iso === selected ? "selected" : "", iso === today ? "today" : ""].filter(Boolean).join(" ");
+				cells.push(`<button type="button" class="${classes}" data-date="${iso}">${day}</button>`);
+			}
+			popup.innerHTML = `<div class="vn-date-head"><button type="button" data-move="-1" title="Tháng trước">‹</button><button type="button" class="vn-date-title" data-mode="month" title="Chọn nhanh tháng/năm">${MONTHS[month]} ${year}</button><button type="button" data-move="1" title="Tháng sau">›</button></div><div class="vn-date-days">${DAYS.map((day) => `<span>${day}</span>`).join("")}</div><div class="vn-date-grid">${cells.join("")}</div><div class="vn-date-foot"><button type="button" data-today="1">Hôm nay</button><button type="button" data-close="1">Đóng</button></div>`;
+			position(popup);
+		};
+		const open = (box) => {
+			const input = box?.querySelector(".date-text"), native = box?.querySelector(".native-date");
+			if (!input || input.disabled || input.readOnly) return;
+			const iso = parse(input.value) || native && native.value || deps.today(), match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+			if (!match) return;
+			state = {
+				box,
+				input,
+				native,
+				view: new Date(+match[1], +match[2] - 1, 1),
+				mode: "day"
+			};
+			render();
+		}, move = (months) => {
+			if (state.view) {
+				state.view = new Date(state.view.getFullYear(), state.view.getMonth() + months, 1);
+				render();
+			}
+		}, mode = (value) => {
+			state.mode = value === "month" ? "month" : "day";
+			render();
+		}, setYear = (value) => {
+			if (state.view) {
+				state.view = new Date(Math.min(9999, Math.max(1e3, parseInt(value) || (/* @__PURE__ */ new Date()).getFullYear())), state.view.getMonth(), 1);
+				render();
+			}
+		}, setMonth = (value) => {
+			if (state.view) {
+				state.view = new Date(state.view.getFullYear(), value, 1);
+				state.mode = "day";
+				render();
+			}
+		}, pick = (iso) => {
+			if (!state.input) return;
+			state.input.value = text(iso);
+			if (state.native) state.native.value = iso;
+			state.input.dispatchEvent(new Event("input", { bubbles: true }));
+			state.input.dispatchEvent(new Event("change", { bubbles: true }));
+			close();
+		};
+		const bind = () => {
+			if (bound || !deps.document) return;
+			bound = true;
+			deps.document.addEventListener("click", (event) => {
+				const button = event.target?.closest?.("#vnDatePicker button");
+				if (button) {
+					event.preventDefault();
+					event.stopPropagation();
+					if (button.dataset.mode) mode(button.dataset.mode);
+					else if (button.dataset.move) move(+button.dataset.move);
+					else if (button.dataset.yearStep) setYear(state.view.getFullYear() + +button.dataset.yearStep);
+					else if (button.dataset.month != null) setMonth(+button.dataset.month);
+					else if (button.dataset.date) pick(button.dataset.date);
+					else if (button.dataset.today) pick(deps.today());
+					else if (button.dataset.close) close();
+					return;
+				}
+				const trigger = event.target?.closest?.(".datepick");
+				if (trigger) {
+					event.preventDefault();
+					event.stopPropagation();
+					open(trigger.closest(".datebox"));
+					return;
+				}
+				if (!event.target?.closest || !event.target.closest("#vnDatePicker") && !event.target.closest(".datebox")) close();
+			});
+			deps.document.addEventListener("keydown", (event) => {
+				if (event.key === "Escape") close();
+				if (event.key === "Enter" && event.target?.id === "vnPickerYear") {
+					event.preventDefault();
+					setYear(event.target.value);
+				}
+			});
+			deps.document.addEventListener("change", (event) => {
+				if (event.target?.id === "vnPickerYear") setYear(event.target.value);
+			});
+		};
+		return {
+			parse,
+			valid,
+			text,
+			open,
+			close,
+			move,
+			mode,
+			setYear,
+			setMonth,
+			pick,
+			render,
+			bind
+		};
+	}
+	//#endregion
 	//#region src/presentation/chart/chart-tooltip-service.ts
 	function createChartTooltipService(deps) {
 		return () => {
@@ -17383,6 +17798,27 @@
 		resizeObserver: typeof ResizeObserver === "function" ? (onResize) => new ResizeObserver(onResize) : void 0,
 		isConnected: (canvas) => canvas.isConnected !== false
 	});
+	root.routerPagePolicy = createRouterPagePolicy();
+	root.routerShell = createRouterShellController({
+		find: (id) => typeof document === "undefined" ? null : document.getElementById(id),
+		findShell: () => typeof document === "undefined" ? null : document.getElementById("appShell"),
+		lab: () => state.lab || {},
+		pages: () => root.routerPagePolicy.pages,
+		canAccess: (id, user) => root.routerPagePolicy.canAccessPage(id, user),
+		escape: (value) => root.esc(value),
+		escapeAttr: (value) => root.escAttr(value),
+		app: () => typeof window === "undefined" ? { version: "dev" } : window.QCLAB_APP || { version: "dev" },
+		license: () => typeof window === "undefined" ? null : window.qcLicense,
+		storage: typeof localStorage === "undefined" ? { setItem: () => {} } : localStorage
+	});
+	root.vnDatePickerController = createVnDatePickerController({
+		document: typeof document === "undefined" ? null : document,
+		window: typeof window === "undefined" ? {
+			innerWidth: 0,
+			innerHeight: 0
+		} : window,
+		today: () => isoToday()
+	});
 	var chartTooltip = createChartTooltipService({
 		find: () => document.getElementById("qcTooltip"),
 		create: () => document.createElement("div"),
@@ -18014,6 +18450,41 @@
 	});
 	root.defaultDateFieldsService = createDefaultDateFieldsService({ find: (id) => typeof document === "undefined" ? null : document.getElementById(id) });
 	root.postRenderPageActions = createPostRenderPageActions({ requestFrame: (work) => requestAnimationFrame(work) });
+	root.afterRender = createAfterRenderController({
+		document: typeof document !== "undefined" ? document : { querySelectorAll: () => [] },
+		canvas: root.afterRenderCanvasService,
+		tests: () => state.tests || [],
+		levelConfig: (test, level) => lvlCfg(test, level),
+		buildLeveyJennings: (input) => ChartViewModel.buildLeveyJennings(input),
+		acceptedLotPoints: (test, level) => acceptedLotPoints(test, level),
+		drawLeveyJennings: (canvas, points, mean, sd) => drawLJ(canvas, points, mean, sd),
+		entryCache: () => entryLjRenderCache,
+		multiViews: (test) => wgMultiViews(test),
+		buildMultiLevel: (input) => ChartViewModel.buildMultiLevel(input),
+		drawMultiLevel: (canvas, chart, test) => drawLJMultiZ(canvas, chart, test),
+		lotGroups: () => state.lotGroups || [],
+		levelsForLotGroup: (group) => levelsForLotGroup(group),
+		archivedMultiViews: (levels) => wgArchivedMultiViews(levels),
+		operationalLotPoints: (test, level) => operationalLotPoints(test, level),
+		cusumSeries: (test, level) => cusumSeries(test, level),
+		buildCusum: (input) => ChartViewModel.buildCusum(input),
+		drawCusum: (canvas, points, series) => drawCUSUM(canvas, points, series),
+		fillDefaultDates: () => root.defaultDateFieldsService.fill(["eDate", "aDate"], vnDate(isoToday())),
+		runPageActions: () => root.postRenderPageActions.run(page, {
+			reagent: rcCompute,
+			sigma: sgRefresh
+		}),
+		consumeEntryJump: () => {
+			if (!entryJumpToday) return false;
+			entryJumpToday = false;
+			return true;
+		},
+		requestFrame: (work) => requestAnimationFrame(work),
+		scrollEntryJump: () => root.entryJumpScrollService.scroll(),
+		updateSaveStatus: () => updateSaveStatus(),
+		updateBackupBanner: () => updateBackupBanner(),
+		restoreConfigNavScroll: () => root.configNavScrollService.restore()
+	}).afterRender;
 	root.dashboardOverdueActions = createDashboardOverdueActions({ overdue: (action) => root.actionOverdue(action) });
 	root.dashboardOverdueActionListHtml = createDashboardOverdueActionListHtml({ render: (item) => dashboardOverdueActionItemHtml(item) });
 	root.dashboardQcFollowupListHtml = createDashboardQcFollowupListHtml({ render: (item, kind) => dashboardQcFollowupItemHtml(item, kind) });

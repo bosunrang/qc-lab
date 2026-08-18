@@ -1,6 +1,6 @@
 /* ===== DATA IO ===== */
-function dataIoTypePx(token,fallback){if(globalThis.cssTokenPixel)return globalThis.cssTokenPixel(token,fallback);if(typeof getComputedStyle==='function'&&typeof document!=='undefined'){const n=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--'+token));if(Number.isFinite(n))return n;}return fallback;}
-function dataIoCanvasFont(weight,token,fallback){return globalThis.sigmaCanvasFont?globalThis.sigmaCanvasFont(weight,token,fallback):`${weight?weight+' ':''}${dataIoTypePx(token,fallback)}px Arial`;}
+function dataIoTypePx(token,fallback){return globalThis.cssTokenPixel(token,fallback);}
+function dataIoCanvasFont(weight,token,fallback){return globalThis.sigmaCanvasFont(weight,token,fallback);}
 function exportMetaRows(kind='Báo cáo'){return globalThis.exportMetaRowsService(kind);}
 /* ===== TẦNG DỮ LIỆU DÙNG CHUNG CHO BÁO CÁO NỘI KIỂM =====
    Bản in (printReport trong reports.js) và bản Excel (reportXlsxDoc bên dưới)
@@ -31,15 +31,10 @@ function reportNceModel(a,t){return globalThis.actionReportModel(a,t);}
 function exportReportCSV(){const{tid,t,start,end}=reportExportSelection();if(!t)return;const label=start||end?(start||'batdau')+'_'+(end||'hientai'):'toanbo',rows=globalThis.qcReportCsvRows(tid,start,end);globalThis.csvDownload('Bao_cao_IQC_'+safeName(t.name)+'_'+safeName(label)+'.csv',rows);}
 function exportActionsCSV(){
   const rows=[...exportMetaRows('Nhật ký khắc phục'),[],['Mã NCE','Ngày xảy ra','Thời điểm mở hồ sơ','Nguồn phát hiện','Giai đoạn','Xét nghiệm','Mức / lô','Luật','Loại sai số','Hành động','Điều tra & ảnh hưởng','Bias trước khắc phục (%)','Bias sau khắc phục (%)','Người phụ trách','Hạn hoàn thành','S ban đầu','O ban đầu','D ban đầu','RPN ban đầu','Phân loại nguy cơ','Căn cứ SOP','Quyết định cho phép trở lại','Ngày cho phép','Người cho phép','Căn cứ cho phép','QC chạy lại','Kết luận hiệu lực','Ngày đánh giá hiệu lực','Bằng chứng hiệu lực','Người đánh giá','S còn lại','O còn lại','D còn lại','RPN còn lại','Phân loại nguy cơ còn lại','Căn cứ đánh giá lại','Trạng thái duyệt','Người duyệt','Thời điểm duyệt','Ý kiến duyệt','Lý do trả lại','Người trả lại','Thời điểm trả lại','Trạng thái bản ghi','Lý do hủy','Người hủy','Thời điểm hủy','Hồ sơ trước','Hồ sơ tiếp theo','Trạng thái hồ sơ']];
-  const effLabels={pending:'Chưa đánh giá',effective:'Có hiệu lực',ineffective:'Chưa hiệu lực'};
-  (state.actions||[]).forEach(a=>{
-    if(globalThis.nceCsvRow){rows.push(globalThis.nceCsvRow(a));return;}
-    const t=state.tests.find(x=>x.id===a.testId),wf=typeof actionWorkflowStatus==='function'?actionWorkflowStatus(a):{complete:false,label:'Chưa hoàn tất'},rr=typeof actionRerunStatus==='function'?actionRerunStatus(a):{label:''},labels=typeof ACTION_LABELS==='object'?ACTION_LABELS:{source:{},phase:{},risk:{},release:{}};
-    rows.push([a.nceId||'',vnDate(typeof actionEventDate==='function'?actionEventDate(a):a.date),a.createdAt?formatDateTimeVN(a.createdAt):'',labels.source[a.eventSource]||a.eventSource||'',labels.phase[a.processPhase]||a.processPhase||'',t?testDisplayName(t):'',actionLevelShort(t,a.level,a.lot),a.rule||'',a.errorType||'',a.action||a.correction||'',typeof actionProtocolSummary==='function'?actionProtocolSummary(a):'',a.biasBefore||'',a.biasAfter||'',a.by||'',a.dueDate?vnDate(a.dueDate):'',a.riskSeverity||'',a.riskOccurrence||'',a.riskDetectability||'',typeof actionRiskScore==='function'?actionRiskScore(a):'',labels.risk[a.riskLevel]||a.riskLevel||'',a.riskBasis||'',labels.release[a.releaseStatus]||a.releaseStatus||'',a.releaseDate?vnDate(a.releaseDate):'',a.releaseBy||'',a.releaseNote||'',rr.label||'',effLabels[a.effectivenessStatus]||a.effectivenessStatus||'',a.effectivenessDate?vnDate(a.effectivenessDate):'',a.effectivenessNote||'',a.effectivenessBy||'',a.residualSeverity||'',a.residualOccurrence||'',a.residualDetectability||'',typeof actionResidualRiskScore==='function'?actionResidualRiskScore(a):'',labels.risk[a.residualRiskLevel]||a.residualRiskLevel||'',a.residualRiskBasis||'',typeof actionApprovalLabel==='function'?actionApprovalLabel(a):(a.approvalStatus||'pending'),a.approvedBy||'',a.approvedAt?formatDateTimeVN(a.approvedAt):'',a.approvalNote||'',a.returnNote||'',a.returnBy||'',a.returnAt?formatDateTimeVN(a.returnAt):'',a.recordStatus==='cancelled'?'Đã hủy':'Đang hoạt động',a.cancelReason||'',a.cancelledBy||'',a.cancelledAt?formatDateTimeVN(a.cancelledAt):'',a.parentNceId||'',a.followUpNceId||'',wf.label||'Chưa hoàn tất']);
-  });
+  (state.actions||[]).forEach(a=>{rows.push(globalThis.nceCsvRow(a));});
   globalThis.csvDownload('Nhat_ky_khac_phuc_QC.csv',rows);
 }
-function downloadBlob(name,blob){if(globalThis.blobDownload)return globalThis.blobDownload(name,blob);const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
+function downloadBlob(name,blob){return globalThis.blobDownload(name,blob);}
 function sigmaReportMetric(r){return globalThis.sigmaReportMetricService(r);}
 function sigmaReportRows(onlyTestId='',mode='latest',period='',periodId=''){return globalThis.sigmaReportRowsService(onlyTestId,mode,period,periodId);}
 function sigmaLevelsOf(row){return globalThis.reportExportHelpers.sigmaLevels(row);}
@@ -59,21 +54,19 @@ function sigmaMdcLabelPlacements(items,X,Y,ctx,bounds){return globalThis.sigmaMd
    hỏng mà không báo lỗi lúc xuất, nên phần này được kiểm bằng tests/sigma-xlsx.test.js
    và tests/report-xlsx.test.js (đều tự parse lại bytes, không tin code của app). */
 const XlsxCore=(()=>{
-  const crcT=(()=>{const t=[];for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);t[n]=c>>>0;}return t;})();
-  const enc=new TextEncoder(),u8=globalThis.xlsxUtf8||(s=>enc.encode(s)),escX=globalThis.xlsxEscape||((s)=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'));
-  const crc32=buf=>{let c=0xFFFFFFFF;for(let i=0;i<buf.length;i++)c=crcT[(c^buf[i])&255]^(c>>>8);return(c^0xFFFFFFFF)>>>0;};
-  const localZip=files=>{const parts=[],central=[];let offset=0;const num=(v,len)=>{const a=new Uint8Array(len);for(let i=0;i<len;i++){a[i]=v&255;v>>>=8;}return a;},push=a=>{parts.push(a);offset+=a.length;};files.forEach(f=>{const nameB=u8(f.name),data=f.data,crc=crc32(data),off=offset;[num(0x04034b50,4),num(20,2),num(0,2),num(0,2),num(0,2),num(0,2),num(crc,4),num(data.length,4),num(data.length,4),num(nameB.length,2),num(0,2),nameB,data].forEach(push);central.push({nameB,crc,len:data.length,off});});const cdStart=offset;central.forEach(c=>[num(0x02014b50,4),num(20,2),num(20,2),num(0,2),num(0,2),num(0,2),num(0,2),num(c.crc,4),num(c.len,4),num(c.len,4),num(c.nameB.length,2),num(0,2),num(0,2),num(0,2),num(0,2),num(0,4),num(c.off,4),c.nameB].forEach(push));const cdLen=offset-cdStart;[num(0x06054b50,4),num(0,2),num(0,2),num(central.length,2),num(central.length,2),num(cdLen,4),num(cdStart,4),num(0,2)].forEach(push);const total=parts.reduce((n,p)=>n+p.length,0),out=new Uint8Array(total);let pos=0;parts.forEach(p=>{out.set(p,pos);pos+=p.length;});return out;},zip=globalThis.xlsxZip||localZip;
-  const emu=globalThis.xlsxEmu||((px)=>Math.round(px*9525)),COLS=globalThis.xlsxColumns||'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-  const cells=globalThis.xlsxCells||null,cellStr=cells?cells.text:(ref,s,v)=>'<c r="'+ref+'" s="'+s+'" t="inlineStr"><is><t xml:space="preserve">'+escX(v)+'</t></is></c>',cellNum=cells?cells.number:(ref,s,v)=>v===''||v==null||(typeof v==='number'&&!Number.isFinite(v))?cellStr(ref,s,''):('<c r="'+ref+'" s="'+s+'"><v>'+v+'</v></c>');
-  const r2=x=>globalThis.xlsxRound?globalThis.xlsxRound(x,2):(x==null||!Number.isFinite(x))?'':Number(Number(x).toFixed(2)),r4=x=>globalThis.xlsxRound?globalThis.xlsxRound(x,4):(x==null||!Number.isFinite(x))?'':Number(Number(x).toFixed(4));
-  return{u8,escX,crc32,zip,emu,COLS,cellStr,cellNum,r2,r4};
+  const u8=globalThis.xlsxUtf8,escX=globalThis.xlsxEscape;
+  const zip=globalThis.xlsxZip;
+  const emu=globalThis.xlsxEmu,COLS=globalThis.xlsxColumns;
+  const cells=globalThis.xlsxCells,cellStr=cells.text,cellNum=cells.number;
+  const r2=x=>globalThis.xlsxRound(x,2),r4=x=>globalThis.xlsxRound(x,4);
+  return{u8,escX,zip,emu,COLS,cellStr,cellNum,r2,r4};
 })();
 Object.assign(globalThis,{XlsxCore});
 const DEFAULT_SIGMA_SHEET='Tổng hợp Six Sigma';
 const SigmaXlsx=(()=>{
   const {u8,escX,zip,emu,COLS,cellStr,cellNum,r2,r4}=XlsxCore;
-  const styles=globalThis.sigmaXlsxStyles||(()=>{const fonts=['<font><sz val="9"/><name val="Arial"/><color rgb="FF000000"/></font>','<font><b/><sz val="9"/><name val="Arial"/><color rgb="FF000000"/></font>','<font><b/><sz val="9"/><name val="Arial"/><color rgb="FFFFFFFF"/></font>','<font><b/><sz val="13"/><name val="Arial"/><color rgb="FFFFFFFF"/></font>','<font><sz val="9"/><name val="Arial"/><color rgb="FF555555"/></font>'],fills=['<fill><patternFill patternType="none"/></fill>','<fill><patternFill patternType="gray125"/></fill>'];['0D3D24','1F5C3A','2D8653','5AAA6B','E07B1A','C0392B','F2F7F4','FFF3E0','FFFFFF'].forEach(c=>fills.push('<fill><patternFill patternType="solid"><fgColor rgb="FF'+c+'"/></patternFill></fill>'));const borders=['<border><left/><right/><top/><bottom/><diagonal/></border>','<border><left style="thin"><color rgb="FFAAAAAA"/></left><right style="thin"><color rgb="FFAAAAAA"/></right><top style="thin"><color rgb="FFAAAAAA"/></top><bottom style="thin"><color rgb="FFAAAAAA"/></bottom><diagonal/></border>'],xf=(f,fl,b,ha,va,wrap)=>'<xf numFmtId="0" fontId="'+f+'" fillId="'+fl+'" borderId="'+b+'" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment'+(ha?' horizontal="'+ha+'"':'')+(va?' vertical="'+va+'"':'')+(wrap?' wrapText="1"':'')+'/></xf>';const xfs=['<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>',xf(3,2,0,'center','center',0),xf(4,0,0,'center','center',1),xf(2,3,1,'center','center',1),xf(1,8,1,'center','center',1),xf(1,10,1,'center','center',1),xf(0,8,1,'center','center',1),xf(0,10,1,'center','center',1),xf(0,9,1,'center','center',1),xf(2,3,1,'center','center',1),xf(2,4,1,'center','center',1),xf(2,5,1,'center','center',1),xf(2,6,1,'center','center',1),xf(2,7,1,'center','center',1),xf(0,0,0,'left','center',1)];return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="'+fonts.length+'">'+fonts.join('')+'</fonts><fills count="'+fills.length+'">'+fills.join('')+'</fills><borders count="'+borders.length+'">'+borders.join('')+'</borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="'+xfs.length+'">'+xfs.join('')+'</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';});
-  const periodNo=v=>globalThis.xlsxPeriodNumber?globalThis.xlsxPeriodNumber(v):(()=>{const m=String(v||'').match(/(?:Kỳ\s*)?(\d{1,2})\/\d{4}$/i);return m?Number(m[1]):v;})(),periodCell=(ref,style,v)=>{const n=periodNo(v);return typeof n==='number'&&Number.isFinite(n)?cellNum(ref,style,n):cellStr(ref,style,n);};
+  const styles=globalThis.sigmaXlsxStyles;
+  const periodNo=v=>globalThis.xlsxPeriodNumber(v),periodCell=(ref,style,v)=>{const n=periodNo(v);return typeof n==='number'&&Number.isFinite(n)?cellNum(ref,style,n):cellStr(ref,style,n);};
   const sheet=(rows,meta,hasDrawing)=>{
     const zoneXf={'Đẳng cấp thế giới':9,'Xuất sắc':10,'Tốt':11,'Cận biên':12,'Không đạt':13},levels=[],periodMerges=[],assayMerges=[];
     (rows||[]).forEach((d,pIdx)=>{
@@ -103,7 +96,7 @@ const SigmaXlsx=(()=>{
     const merges=['A1:K1','A2:K2','A'+noteRow+':K'+noteRow,...assayMerges,...periodMerges],cols='<cols><col min="1" max="1" width="25" customWidth="1"/><col min="2" max="3" width="11" customWidth="1"/><col min="4" max="4" width="8" customWidth="1"/><col min="5" max="5" width="9" customWidth="1"/><col min="6" max="6" width="20" customWidth="1"/><col min="7" max="11" width="11" customWidth="1"/></cols>';
     return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:K'+noteRow+'"/><sheetViews><sheetView showGridLines="0" workbookViewId="0"><pane ySplit="3" topLeftCell="A4" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="11.4"/>'+cols+'<sheetData>'+out.join('')+'</sheetData><mergeCells count="'+merges.length+'">'+merges.map(m=>'<mergeCell ref="'+m+'"/>').join('')+'</mergeCells><pageMargins left="0.3" right="0.3" top="0.4" bottom="0.4" header="0.2" footer="0.2"/>'+(hasDrawing?'<drawing r:id="rId1"/>':'')+'</worksheet>';
   };
-  const drawing=globalThis.xlsxDrawing||((images,startRow0)=>{let nextRow=startRow0;return'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">'+images.map((img,i)=>{const row=nextRow;nextRow+=Math.ceil(img.dispH/15)+1;const cx=emu(img.dispW),cy=emu(img.dispH);return '<xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>'+row+'</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:ext cx="'+cx+'" cy="'+cy+'"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="'+(i+1)+'" name="Chart'+(i+1)+'"/><xdr:cNvPicPr/></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId'+(i+1)+'"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="'+cx+'" cy="'+cy+'"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>';}).join('')+'</xdr:wsDr>';});
+  const drawing=globalThis.xlsxDrawing;
   const build=(rows,meta,images=[])=>{images=images.filter(im=>im&&im.bytes&&im.bytes.length);const hasDraw=images.length>0,levelCount=(rows||[]).reduce((n,d)=>n+Math.max(1,sigmaLevelsOf(d).length),0),noteRow=4+levelCount,chartStartRow0=noteRow+1,ct='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>'+(hasDraw?'<Default Extension="png" ContentType="image/png"/>':'')+'<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'+(hasDraw?'<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>':'')+'</Types>';const files=[{name:'[Content_Types].xml',data:u8(ct)},{name:'_rels/.rels',data:u8('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>')},{name:'xl/workbook.xml',data:u8('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="'+escX('Tổng hợp Six Sigma')+'" sheetId="1" r:id="rId1"/></sheets></workbook>')},{name:'xl/_rels/workbook.xml.rels',data:u8('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>')},{name:'xl/styles.xml',data:u8(styles())},{name:'xl/worksheets/sheet1.xml',data:u8(sheet(rows,meta,hasDraw))}];if(hasDraw){files.push({name:'xl/worksheets/_rels/sheet1.xml.rels',data:u8('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/></Relationships>')});files.push({name:'xl/drawings/drawing1.xml',data:u8(drawing(images,chartStartRow0))});let rels='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">';images.forEach((im,i)=>rels+='<Relationship Id="rId'+(i+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image'+(i+1)+'.png"/>');files.push({name:'xl/drawings/_rels/drawing1.xml.rels',data:u8(rels+'</Relationships>')});images.forEach((im,i)=>files.push({name:'xl/media/image'+(i+1)+'.png',data:im.bytes}));}return zip(files);};
   return{build};
 })();
@@ -112,68 +105,16 @@ function renameSigmaSheet(bytes,sheetName){return globalThis.renameSigmaXlsxShee
 const sigmaXlsxBuild=SigmaXlsx.build;
 SigmaXlsx.build=(rows,meta,images)=>renameSigmaSheet(sigmaXlsxBuild(rows,meta,images),(meta&&meta.sheetName)||DEFAULT_SIGMA_SHEET);
 /* Chỉ số style (thứ tự phải khớp với mảng xfs trong ReportXlsx.styles bên dưới). */
-const RXST=globalThis.reportXlsxStyleIds||{TITLE:1,SUB:2,SECTION:3,LABEL:4,VAL:5,TH:6,TD:7,TDL:8,NOTE:9,REJ:10,WARN:11};
+const RXST=globalThis.reportXlsxStyleIds;
 /* Bộ ghi .xlsx TỔNG QUÁT (khác SigmaXlsx vốn cứng theo layout Sigma): nhận một "doc"
    gồm cols (độ rộng cột), rows (mảng các hàng, mỗi hàng là mảng ô {v,s[,num]} hoặc
    null=ô trống), merges, rowHeights và images (ảnh PNG neo theo hàng row0 0-based).
    Dùng cho báo cáo nội kiểm theo ngày (giống bảng của báo cáo in) kèm biểu đồ LJ. */
 const ReportXlsx=(()=>{
-  const {u8,escX,zip,emu,COLS,cellStr,cellNum}=XlsxCore;
-  const styles=globalThis.reportXlsxStyles||(()=>{
-    const fonts=[
-      '<font><sz val="9"/><name val="Arial"/><color rgb="FF16202B"/></font>',                 /*0 thường*/
-      '<font><b/><sz val="9"/><name val="Arial"/><color rgb="FF16202B"/></font>',              /*1 đậm*/
-      '<font><b/><sz val="12"/><name val="Arial"/><color rgb="FFFFFFFF"/></font>',             /*2 tiêu đề mục (trắng)*/
-      '<font><b/><sz val="15"/><name val="Arial"/><color rgb="FF16202B"/></font>',             /*3 tiêu đề lớn*/
-      '<font><sz val="9"/><name val="Arial"/><color rgb="FF647686"/></font>',                  /*4 phụ đề xám*/
-      '<font><b/><sz val="9"/><name val="Arial"/><color rgb="FF244452"/></font>',              /*5 nhãn/th*/
-      '<font><i/><sz val="9"/><name val="Arial"/><color rgb="FF647686"/></font>'];             /*6 ghi chú nghiêng*/
-    const fills=['<fill><patternFill patternType="none"/></fill>','<fill><patternFill patternType="gray125"/></fill>'];
-    ['0E8F8F','E7F1F4','FFFFFF','FDECEA','FFF6E5'].forEach(c=>fills.push('<fill><patternFill patternType="solid"><fgColor rgb="FF'+c+'"/></patternFill></fill>'));
-    /* fillId: 2=teal 3=E7F1F4 4=trắng 5=đỏ nhạt 6=vàng nhạt */
-    const borders=['<border><left/><right/><top/><bottom/><diagonal/></border>','<border><left style="thin"><color rgb="FFCBD8DF"/></left><right style="thin"><color rgb="FFCBD8DF"/></right><top style="thin"><color rgb="FFCBD8DF"/></top><bottom style="thin"><color rgb="FFCBD8DF"/></bottom><diagonal/></border>'];
-    const xf=(f,fl,b,ha,va,wrap)=>'<xf numFmtId="0" fontId="'+f+'" fillId="'+fl+'" borderId="'+b+'" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment'+(ha?' horizontal="'+ha+'"':'')+(va?' vertical="'+va+'"':'')+(wrap?' wrapText="1"':'')+'/></xf>';
-    const xfs=['<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>',
-      xf(3,0,0,'center','center',0), /*1 TITLE*/
-      xf(4,0,0,'center','center',1), /*2 SUB*/
-      xf(2,2,0,'left','center',0),   /*3 SECTION*/
-      xf(5,3,1,'left','center',1),   /*4 LABEL*/
-      xf(0,4,1,'left','center',1),   /*5 VAL*/
-      xf(5,3,1,'center','center',1), /*6 TH*/
-      xf(0,4,1,'center','center',1), /*7 TD*/
-      xf(0,4,1,'left','center',1),   /*8 TDL*/
-      xf(6,0,0,'left','center',1),   /*9 NOTE*/
-      xf(1,5,1,'center','center',1), /*10 REJ*/
-      xf(1,6,1,'center','center',1)];/*11 WARN*/
-    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="'+fonts.length+'">'+fonts.join('')+'</fonts><fills count="'+fills.length+'">'+fills.join('')+'</fills><borders count="'+borders.length+'">'+borders.join('')+'</borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="'+xfs.length+'">'+xfs.join('')+'</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
-  });
-  const sheetXml=globalThis.reportXlsxSheet||((doc)=>{
-    const colsXml='<cols>'+doc.cols.map((w,i)=>'<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+w+'" customWidth="1"/>').join('')+'</cols>';
-    const body=doc.rows.map((cells,ri)=>{
-      const rn=ri+1,ht=doc.rowHeights&&doc.rowHeights[rn];
-      const cs=(cells||[]).map((cell,ci)=>{if(!cell)return '';const ref=COLS[ci]+rn;return cell.num?cellNum(ref,cell.s,cell.v):cellStr(ref,cell.s,cell.v);}).join('');
-      return '<row r="'+rn+'"'+(ht?' ht="'+ht+'" customHeight="1"':'')+'>'+cs+'</row>';
-    }).join('');
-    const lastRow=doc.rows.length||1,lastCol=COLS[doc.cols.length-1],merges=doc.merges||[];
-    const mergeXml=merges.length?'<mergeCells count="'+merges.length+'">'+merges.map(m=>'<mergeCell ref="'+m+'"/>').join('')+'</mergeCells>':'';
-    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:'+lastCol+lastRow+'"/><sheetViews><sheetView showGridLines="0" workbookViewId="0"/></sheetViews><sheetFormatPr defaultRowHeight="15"/>'+colsXml+'<sheetData>'+body+'</sheetData>'+mergeXml+'<pageMargins left="0.3" right="0.3" top="0.4" bottom="0.4" header="0.2" footer="0.2"/>'+(doc.hasDrawing?'<drawing r:id="rId1"/>':'')+'</worksheet>';
-  });
-  const drawingXml=globalThis.reportXlsxDrawing||((images)=>'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">'+images.map((img,i)=>{const cx=emu(img.dispW),cy=emu(img.dispH);return '<xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>'+img.row0+'</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:ext cx="'+cx+'" cy="'+cy+'"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="'+(i+1)+'" name="Chart'+(i+1)+'"/><xdr:cNvPicPr/></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId'+(i+1)+'"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="'+cx+'" cy="'+cy+'"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>';}).join('')+'</xdr:wsDr>');
-  const build=globalThis.reportXlsxBuild||((doc)=>{
-    const images=(doc.images||[]).filter(im=>im&&im.bytes&&im.bytes.length);
-    const hasDraw=images.length>0;doc={...doc,hasDrawing:hasDraw};
-    const ct='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>'+(hasDraw?'<Default Extension="png" ContentType="image/png"/>':'')+'<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'+(hasDraw?'<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>':'')+'</Types>';
-    const files=[{name:'[Content_Types].xml',data:u8(ct)},{name:'_rels/.rels',data:u8('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>')},{name:'xl/workbook.xml',data:u8('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="'+escX(doc.sheetName||'Báo cáo')+'" sheetId="1" r:id="rId1"/></sheets></workbook>')},{name:'xl/_rels/workbook.xml.rels',data:u8('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>')},{name:'xl/styles.xml',data:u8(styles())},{name:'xl/worksheets/sheet1.xml',data:u8(sheetXml(doc))}];
-    if(hasDraw){
-      files.push({name:'xl/worksheets/_rels/sheet1.xml.rels',data:u8('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/></Relationships>')});
-      files.push({name:'xl/drawings/drawing1.xml',data:u8(drawingXml(images))});
-      let rels='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">';
-      images.forEach((im,i)=>rels+='<Relationship Id="rId'+(i+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image'+(i+1)+'.png"/>');
-      files.push({name:'xl/drawings/_rels/drawing1.xml.rels',data:u8(rels+'</Relationships>')});
-      images.forEach((im,i)=>files.push({name:'xl/media/image'+(i+1)+'.png',data:im.bytes}));
-    }
-    return zip(files);
-  });
+  const styles=globalThis.reportXlsxStyles;
+  const sheetXml=globalThis.reportXlsxSheet;
+  const drawingXml=globalThis.reportXlsxDrawing;
+  const build=globalThis.reportXlsxBuild;
   return{build};
 })();
 /* Dựng "doc" cho ReportXlsx từ đúng dữ liệu của báo cáo in (printReport trong reports.js):

@@ -53,11 +53,19 @@ async function checkManageForms(page){
 }
 
 async function checkRangeTargetDisplay(page){
-  const target=await page.evaluate(()=>{const t=state.tests[0],l=t.levels[0];t.decimalPlaces=2;l.mfgMean=140;l.mfgSd=2.5;l.low=135;l.high=145;assignRangeTarget(l,140.053846154,0.54379086239,'lab');go('manage');manageTab='targets';manageTargetPanel='P1';manageTargetGroup='G1';manageTargetLevel='1';rerender();return{mean:l.mean,sd:l.sd,low:l.low,high:l.high};});
+  const target=await page.evaluate(()=>{const t=state.tests[0],l=t.levels[0];t.decimalPlaces=2;l.mfgMean=140;l.mfgSd=2.5;l.low=135;l.high=145;qcRangeCandidateService.assignTarget(l,140.053846154,0.54379086239,'lab');go('manage');manageTab='targets';manageTargetPanel='P1';manageTargetGroup='G1';manageTargetLevel='1';rerender();return{mean:l.mean,sd:l.sd,low:l.low,high:l.high};});
   await page.locator('.target-row[data-test="T-NA"][data-lot="L1101"]').waitFor();
   const values=await page.locator('.target-row[data-test="T-NA"][data-lot="L1101"]').evaluate(row=>({mean:row.querySelector('.tm-mean').value,low:row.querySelector('.tm-low').value,high:row.querySelector('.tm-high').value,sd:row.querySelector('.tm-sd').value}));
   check('Áp dụng dải PXN cập nhật đủ Mean/SD và hai giới hạn',target.low===target.mean-2*target.sd&&target.high===target.mean+2*target.sd,JSON.stringify(target));
   check('Màn Mean/SD rút gọn số theo độ chính xác xét nghiệm',values.mean==='140.05'&&values.low==='138.97'&&values.high==='141.14'&&values.sd==='0.5438',JSON.stringify(values));
+}
+
+async function checkVnDatePicker(page){
+  await page.evaluate(()=>go('entry'));await page.waitForSelector('.datebox .datepick');
+  const box=page.locator('.datebox').first();await box.locator('.datepick').click();await page.locator('#vnDatePicker').waitFor();
+  await page.locator('#vnDatePicker').getByRole('button',{name:'Hôm nay',exact:true}).click();
+  const values=await box.evaluate(element=>({text:element.querySelector('.date-text').value,native:element.querySelector('.native-date').value}));
+  check('Date picker TypeScript đồng bộ ngày text và native',/^\d{2}\/\d{2}\/\d{4}$/.test(values.text)&&/^\d{4}-\d{2}-\d{2}$/.test(values.native),JSON.stringify(values));
 }
 
 async function checkLotTransitionPicker(page){
@@ -113,7 +121,7 @@ async function checkReportXlsxBridge(page){
 async function main(){
   const session=await openSeededSession({headless:true}),runtimeErrors=[];
   session.page.on('pageerror',e=>runtimeErrors.push('pageerror: '+e.message));session.page.on('console',m=>{if(m.type()==='error')runtimeErrors.push('console: '+m.text());});
-  try{await installPassword(session.page);await checkEntryLifecycle(session.page);await checkManageForms(session.page);await checkRangeTargetDisplay(session.page);await checkLotTransitionPicker(session.page);await checkPeriodLock(session.page);await checkBackupRestore(session.page);await checkSigmaXlsxExport(session.page);await checkReportXlsxBridge(session.page);check('Không có lỗi runtime/console',runtimeErrors.length===0,runtimeErrors.join(' | '));}
+  try{await installPassword(session.page);await checkEntryLifecycle(session.page);await checkManageForms(session.page);await checkRangeTargetDisplay(session.page);await checkVnDatePicker(session.page);await checkLotTransitionPicker(session.page);await checkPeriodLock(session.page);await checkBackupRestore(session.page);await checkSigmaXlsxExport(session.page);await checkReportXlsxBridge(session.page);check('Không có lỗi runtime/console',runtimeErrors.length===0,runtimeErrors.join(' | '));}
   finally{await session.close();}
   console.log(`UI workflow check: ${passes.length} đạt, ${fails.length} lỗi`);passes.forEach(x=>console.log('  ✓ '+x));if(fails.length){fails.forEach(x=>console.error('  ✗ '+x));process.exitCode=1;}
 }

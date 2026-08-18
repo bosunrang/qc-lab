@@ -4,24 +4,24 @@ function stats(vals){return QCCore.stats(vals);}
    với Mean mục tiêu và TEa) — dùng chung cho lô hiện hành lẫn lô cũ trong
    reports.js/data-io.js để công thức chỉ cần sửa một chỗ. */
 function reportLevelStats(pts,mean,teaVal){return globalThis.reportLevelStatsService(pts,mean,teaVal);}
-function wgOn(rule){return globalThis.westgardRuleSettings?globalThis.westgardRuleSettings.enabled(rule):QCCore.ruleEnabled(state.westgardRules,rule);}
-function wgSet(rule,on){if(globalThis.westgardRuleSettings)return globalThis.westgardRuleSettings.set(rule,on);if(!requireWrite())return;state.westgardRules=state.westgardRules||{...WG_DEFAULT};state.westgardRules[rule]=!!on;save();rerender();}
-function wgReset(){if(globalThis.westgardRuleSettings)return globalThis.westgardRuleSettings.reset();if(!requireWrite())return;state.westgardRules={...WG_DEFAULT};save();rerender();}
+function wgOn(rule){return globalThis.westgardRuleSettings.enabled(rule);}
+function wgSet(rule,on){return globalThis.westgardRuleSettings.set(rule,on);}
+function wgReset(){return globalThis.westgardRuleSettings.reset();}
 /* Bảng hành động + phạm vi nằm ở core.js (NGUỒN DUY NHẤT, dùng chung với
    workers/westgard-worker.js — xem chú thích ở đó). Ở đây chỉ nối state vào:
    bật/tắt toàn cục, ghi đè theo từng xét nghiệm và số mức đang vận hành. */
-function testLevelCount(t){return globalThis.westgardRulePolicy?globalThis.westgardRulePolicy.levelCount(t):operationalLevels(t).length||(t&&t.levels||[]).length;}
+function testLevelCount(t){return globalThis.westgardRulePolicy.levelCount(t);}
 function defaultRuleAction(rule){return QCCore.defaultRuleAction(rule,wgOn(rule));}
-function testRuleAction(t,rule){return globalThis.westgardRulePolicy?globalThis.westgardRulePolicy.action(t,rule):QCCore.resolveRuleAction(rule,wgOn(rule),t&&t.ruleActions&&t.ruleActions[rule]);}
+function testRuleAction(t,rule){return globalThis.westgardRulePolicy.action(t,rule);}
 /* Alias cũ dùng cho các báo cáo một mức; mặc định phải tôn trọng phạm vi within. */
 function testRuleOn(t,rule){return testRuleOnWithin(t,rule);}
 function defaultRuleScope(t,rule){return QCCore.defaultRuleScope(rule,testLevelCount(t));}
-function testRuleScope(t,rule){return globalThis.westgardRulePolicy?globalThis.westgardRulePolicy.scope(t,rule):QCCore.resolveRuleScope(rule,testLevelCount(t),t&&t.ruleScopes&&t.ruleScopes[rule]);}
-function testRuleOnIn(t,rule,channel){return globalThis.westgardRulePolicy?globalThis.westgardRulePolicy.onIn(t,rule,channel):QCCore.ruleOnInScope(rule,testLevelCount(t),t&&t.ruleScopes&&t.ruleScopes[rule],testRuleAction(t,rule),channel);}
+function testRuleScope(t,rule){return globalThis.westgardRulePolicy.scope(t,rule);}
+function testRuleOnIn(t,rule,channel){return globalThis.westgardRulePolicy.onIn(t,rule,channel);}
 function testRuleOnWithin(t,rule){return testRuleOnIn(t,rule,'within');}
 function testRuleOnAcross(t,rule){return testRuleOnIn(t,rule,'across');}
-function testRuleSet(t,channel){return globalThis.westgardRulePolicy?globalThis.westgardRulePolicy.set(t,channel):new Set(WG_RULES.filter(rule=>testRuleOnIn(t,rule,channel)));}
-function ruleResultLevel(t,rules){return globalThis.westgardRulePolicy?globalThis.westgardRulePolicy.verdict(t,rules):QCCore.ruleVerdictLevel(rules,r=>testRuleAction(t,r));}
+function testRuleSet(t,channel){return globalThis.westgardRulePolicy.set(t,channel);}
+function ruleResultLevel(t,rules){return globalThis.westgardRulePolicy.verdict(t,rules);}
 function westgard(points,mean,sd){return QCCore.westgard(points,mean,sd,wgOn);}
 function westgardMulti(levelSets){return QCCore.westgardMulti(levelSets,wgOn);}
 function westgardByPoint(points,mean,sd){return QCCore.westgardByPoint(points,mean,sd,wgOn);}
@@ -226,9 +226,9 @@ function pointRunNo(p){return globalThis.qcPointRunNumber(p);}
    hơn so với đánh giá thuần theo N mức. */
 function activeWestgard(t){
   const memoKey=t&&t.id;
-  if(memoKey&&globalThis.westgardMemoCache){const cached=globalThis.westgardMemoCache.get(memoKey);if(cached)return cached;}if(memoKey&&wgMemo.has(memoKey))return wgMemo.get(memoKey);
+  if(memoKey){const cached=globalThis.westgardMemoCache.get(memoKey);if(cached)return cached;}if(memoKey&&wgMemo.has(memoKey))return wgMemo.get(memoKey);
   const withinRules=testRuleSet(t,'within'),acrossRules=testRuleSet(t,'across'),result=globalThis.qcActiveWestgard(operationalLevels(t).map(l=>({l,pts:operationalLotPoints(t,l.level)})),withinRules,acrossRules,rules=>ruleResultLevel(t,rules));
-  if(memoKey){wgMemo.set(memoKey,result);if(globalThis.westgardMemoCache)globalThis.westgardMemoCache.set(memoKey,result);}
+  if(memoKey){wgMemo.set(memoKey,result);globalThis.westgardMemoCache.set(memoKey,result);}
   return result;
 }
 function testCusumConfig(t){return globalThis.qcCusumConfig(t);}
@@ -238,18 +238,18 @@ function testCusumConfig(t){return globalThis.qcCusumConfig(t);}
 function cusumSeries(t,l){
   if(!t||!l)return{cPos:[],cNeg:[],flags:[],ma:[],k:0.5,h:4};
   const memoKey=t.id+'|'+l.level;
-  if(globalThis.qcCusumMemoCache){const cached=globalThis.qcCusumMemoCache.get(memoKey);if(cached)return cached;}if(cusumMemo.has(memoKey))return cusumMemo.get(memoKey);
+  {const cached=globalThis.qcCusumMemoCache.get(memoKey);if(cached)return cached;}if(cusumMemo.has(memoKey))return cusumMemo.get(memoKey);
   const cfg=testCusumConfig(t),pts=operationalLotPoints(t,l.level),result=globalThis.qcCusumSeries(pts,l,cfg);
-  cusumMemo.set(memoKey,result);if(globalThis.qcCusumMemoCache)globalThis.qcCusumMemoCache.set(memoKey,result);
+  cusumMemo.set(memoKey,result);globalThis.qcCusumMemoCache.set(memoKey,result);
   return result;
 }
 function acceptedLotPoints(t,level,withIndex=false){
   const memoKey=t&&t.id?t.id+'|'+level+'|'+(withIndex?1:0):'';
-  try{if(memoKey&&globalThis.qcAcceptedMemoCache){const cached=globalThis.qcAcceptedMemoCache.get(memoKey);if(cached!==undefined)return cached;}}catch(e){}
+  try{if(memoKey){const cached=globalThis.qcAcceptedMemoCache.get(memoKey);if(cached!==undefined)return cached;}}catch(e){}
   if(memoKey&&acceptedMemo.has(memoKey))return acceptedMemo.get(memoKey);
   const l=lvlCfg(t,level),pts=operationalLotPoints(t,level,withIndex),withinRules=testRuleSet(t,'within'),rejectRules=new Set(WG_RULES.filter(rule=>testRuleAction(t,rule)==='reject')),out=globalThis.qcAcceptedLotPoints(pts,l,withinRules,rejectRules);
-  if(memoKey){acceptedMemo.set(memoKey,out);try{if(globalThis.qcAcceptedMemoCache)globalThis.qcAcceptedMemoCache.set(memoKey,out);}catch(e){}}
+  if(memoKey){acceptedMemo.set(memoKey,out);try{globalThis.qcAcceptedMemoCache.set(memoKey,out);}catch(e){}}
   return out;
 }
 function testSelectLabel(t,list=state.tests){return globalThis.qcOperationalAccess.selectLabel(t,list);}
-function searchText(s){if(globalThis.normalizeSearchText)return globalThis.normalizeSearchText(s);return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').toLowerCase().trim();}
+function searchText(s){return globalThis.normalizeSearchText(s);}

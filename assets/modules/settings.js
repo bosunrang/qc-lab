@@ -60,7 +60,7 @@ async function copyFirebaseRules(){
 /* ===== SETTINGS PAGE ROUTE ===== */
 function pageSettings(){
   const fbcfg=getFbCfg()||{};
-  const liscfg=typeof lisGatewayConfig==='function'?lisGatewayConfig():{enabled:false,url:'http://127.0.0.1:8787'};
+  const liscfg=lisGatewayConfig();
   const lockedCloud=!!(fbcfg&&fbcfg.locked);
   const logo=brandLogo();
   const brandPreview=globalThis.settingsBrandPreviewHtml({logo,markText:brandMarkText(),title:brandTitle(),subtitle:brandSub()});

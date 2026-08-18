@@ -1,19 +1,5 @@
-const assert=require('node:assert/strict');
-const fs=require('node:fs');
-const path=require('node:path');
-const vm=require('node:vm');
-
-const source=fs.readFileSync(path.join(__dirname,'..','assets','modules','router-render.js'),'utf8');
-const navEl={scrollTop:318,_html:''};
-Object.defineProperty(navEl,'innerHTML',{get(){return this._html;},set(value){this._html=value;this.scrollTop=0;}});
-const context={
-  document:{getElementById:id=>id==='nav'?navEl:null,addEventListener(){}},
-  window:{},currentUser:{role:'admin'},page:'settings',
-  console,setTimeout,clearTimeout
-};
-vm.createContext(context);
-vm.runInContext(source,context);
-vm.runInContext('nav()',context);
-
-assert.equal(navEl.scrollTop,318,'dựng lại điều hướng phải giữ nguyên vị trí cuộn');
-assert.match(navEl.innerHTML,/aria-current="page"/,'mục đang chọn vẫn phải được cập nhật sau khi dựng lại');
+'use strict';
+const assert=require('node:assert/strict');const{spawnSync}=require('node:child_process');const path=require('node:path');const{pathToFileURL}=require('node:url');
+const source=pathToFileURL(path.join(__dirname,'..','src','presentation','router','router-shell-controller.ts')).href;
+const program=`import { createRouterShellController } from ${JSON.stringify(source)};const nav={scrollTop:318,_html:''};Object.defineProperty(nav,'innerHTML',{get(){return this._html;},set(value){this._html=value;this.scrollTop=0;}});const shell=createRouterShellController({find:id=>id==='nav'?nav:null,findShell:()=>null,lab:()=>({}),pages:()=>[['dash','Bảng điều khiển'],['settings','Cài đặt']],canAccess:()=>true,escape:value=>String(value),escapeAttr:value=>String(value),app:()=>({version:'test'}),license:()=>null,storage:{setItem(){}}});shell.nav({page:'settings',user:{role:'admin'},icon:()=>''});if(nav.scrollTop!==318)throw new Error('dựng lại điều hướng phải giữ nguyên vị trí cuộn');if(!/aria-current="page"/.test(nav.innerHTML))throw new Error('mục đang chọn phải được cập nhật sau khi dựng lại');console.log('Router shell navigation TypeScript tests passed');`;
+const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});assert.equal(result.status,0,result.stderr||result.stdout||'không thể chạy router shell controller');console.log(result.stdout.trim());

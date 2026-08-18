@@ -194,7 +194,7 @@ function entryRenderKeepScroll(){
     if(entryPartialRenderCache&&entryPartialRenderCache.testId===entrySel.testId){
       current.innerHTML=entryPartialRenderCache.right;
       entrySyncTreeState(entrySel.testId);
-      afterRender();
+      afterRender(page);
     }else rerender();
   }else rerender();
   requestAnimationFrame(()=>{

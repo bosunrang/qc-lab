@@ -4,7 +4,7 @@ async function confirmOversizedBackup(size,{title,detail}){
   return dialog?await confirmDialog(dialog):true;
 }
 async function exportData(){const result=await globalThis.BackupExportCommand.exportFull(globalThis.backupFileName(isoToday()),globalThis.backupOversizeConfirmation.exportFull());if(result.status==='create-error'){await infoDialog(globalThis.backupExportMessage.createError(result.error));return;}if(result.status==='download-error')await infoDialog(globalThis.backupExportMessage.downloadError);}
-function downloadBackupText(name,json){try{if(globalThis.blobDownload){globalThis.blobDownload(name,new Blob([json],{type:'application/json'}));return true;}return false;}catch(e){return false;}}
+function downloadBackupText(name,json){try{globalThis.blobDownload(name,new Blob([json],{type:'application/json'}));return true;}catch(e){return false;}}
 async function backupCurrentData(prefix='before-change'){return globalThis.BackupExportCommand.snapshot(globalThis.backupSnapshotFileName(prefix));}
 async function importData(e){
   if(!requireAdmin('Chỉ quản trị mới được nhập backup.')){if(e&&e.target)e.target.value='';return;}

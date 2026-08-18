@@ -8,44 +8,25 @@ let auditQ='',auditFrom='',auditTo='',auditPage=1,auditPageSize=25;
 const AUDIT_PAGE_SIZES=globalThis.activityAuditPageSizes;
 function auditDateKey(a){
   return globalThis.activityAuditFilter.dateKey(a);
-  const d=new Date(a&&a.ts);
-  return Number.isFinite(+d)?isoDate(d):'';
 }
 function auditFilteredActivities(items=state.activity||[]){
   return globalThis.activityAuditFilter.filter(items,auditQ,auditFrom,auditTo);
-  const q=searchText(auditQ);
-  return (items||[]).filter(a=>{
-    const date=auditDateKey(a);
-    if(auditFrom&&(!date||date<auditFrom))return false;
-    if(auditTo&&(!date||date>auditTo))return false;
-    if(!q)return true;
-    return searchText([a.seq,formatDateTimeVN(a.ts),a.user,a.username,roleLabel(a.role||'viewer'),a.type,a.target,a.detail].join(' ')).includes(q);
-  }).slice().reverse();
 }
 function auditSetQuery(value){
-  const next=globalThis.activityAuditFilterState.withQuery({query:auditQ,from:auditFrom,to:auditTo,page:auditPage,pageSize:auditPageSize},value);auditQ=next.query;auditPage=next.page;scheduleSearchRender(auditSetQuery,rerender,'auditSearch');return;
-  if(globalThis.activityAuditFilterState){const next=globalThis.activityAuditFilterState.withQuery({query:auditQ,from:auditFrom,to:auditTo,page:auditPage,pageSize:auditPageSize},value);auditQ=next.query;auditPage=next.page;}else{auditQ=value;auditPage=1;}
-  scheduleSearchRender(auditSetQuery,rerender,'auditSearch');
+  const next=globalThis.activityAuditFilterState.withQuery({query:auditQ,from:auditFrom,to:auditTo,page:auditPage,pageSize:auditPageSize},value);auditQ=next.query;auditPage=next.page;scheduleSearchRender(auditSetQuery,rerender,'auditSearch');
 }
 function auditSetDate(field,value){
   const iso=value?(vnPickerParse(value)||parseVN(value)||''):'';
-  const next=globalThis.updateActivityAuditDateRange({from:auditFrom,to:auditTo},field,iso);auditFrom=next.from;auditTo=next.to;auditPage=1;rerender();return;
-  if(globalThis.updateActivityAuditDateRange){const next=globalThis.updateActivityAuditDateRange({from:auditFrom,to:auditTo},field,iso);auditFrom=next.from;auditTo=next.to;auditPage=1;rerender();return;}
-  if(field==='from'){auditFrom=iso;if(iso&&auditTo&&iso>auditTo)auditTo=iso;}
-  else{auditTo=iso;if(iso&&auditFrom&&iso<auditFrom)auditFrom=iso;}
-  auditPage=1;rerender();
+  const next=globalThis.updateActivityAuditDateRange({from:auditFrom,to:auditTo},field,iso);auditFrom=next.from;auditTo=next.to;auditPage=1;rerender();
 }
 function auditSetPageSize(value){
-  const next=globalThis.activityAuditFilterState.withPageSize({query:auditQ,from:auditFrom,to:auditTo,page:auditPage,pageSize:auditPageSize},value,AUDIT_PAGE_SIZES);auditPageSize=next.pageSize;auditPage=next.page;rerender();return;
-  if(globalThis.activityAuditFilterState){const next=globalThis.activityAuditFilterState.withPageSize({query:auditQ,from:auditFrom,to:auditTo,page:auditPage,pageSize:auditPageSize},value,AUDIT_PAGE_SIZES);auditPageSize=next.pageSize;auditPage=next.page;}else{const size=Number(value);auditPageSize=AUDIT_PAGE_SIZES.includes(size)?size:25;auditPage=1;}rerender();
+  const next=globalThis.activityAuditFilterState.withPageSize({query:auditQ,from:auditFrom,to:auditTo,page:auditPage,pageSize:auditPageSize},value,AUDIT_PAGE_SIZES);auditPageSize=next.pageSize;auditPage=next.page;rerender();
 }
 function auditSetPage(value){
-  auditPage=globalThis.activityAuditFilterState.withPage({query:auditQ,from:auditFrom,to:auditTo,page:auditPage,pageSize:auditPageSize},value).page;rerender();return;
-  auditPage=globalThis.activityAuditFilterState?globalThis.activityAuditFilterState.withPage({query:auditQ,from:auditFrom,to:auditTo,page:auditPage,pageSize:auditPageSize},value).page:Math.max(1,Number(value)||1);rerender();
+  auditPage=globalThis.activityAuditFilterState.withPage({query:auditQ,from:auditFrom,to:auditTo,page:auditPage,pageSize:auditPageSize},value).page;rerender();
 }
 function auditClearFilters(){
-  const next=globalThis.activityAuditFilterState.cleared({query:auditQ,from:auditFrom,to:auditTo,page:auditPage,pageSize:auditPageSize});auditQ=next.query;auditFrom=next.from;auditTo=next.to;auditPage=next.page;rerender();return;
-  if(globalThis.activityAuditFilterState){const next=globalThis.activityAuditFilterState.cleared({query:auditQ,from:auditFrom,to:auditTo,page:auditPage,pageSize:auditPageSize});auditQ=next.query;auditFrom=next.from;auditTo=next.to;auditPage=next.page;}else{auditQ='';auditFrom='';auditTo='';auditPage=1;}rerender();
+  const next=globalThis.activityAuditFilterState.cleared({query:auditQ,from:auditFrom,to:auditTo,page:auditPage,pageSize:auditPageSize});auditQ=next.query;auditFrom=next.from;auditTo=next.to;auditPage=next.page;rerender();
 }
 function pageAudit(){
   const total=(state.activity||[]).length;
@@ -63,17 +44,7 @@ function pageAudit(){
   const resultFrom=pageInfo?pageInfo.resultFrom:(filtered.length?offset+1:0),resultTo=pageInfo?pageInfo.resultTo:Math.min(offset+auditPageSize,filtered.length);
   const pagination=filtered.length?`<div class="audit-pagination"><span class="hint">Hiển thị ${resultFrom}–${resultTo} / ${filtered.length} dòng</span><div>${btn('‹ Trước',`auditSetPage(${auditPage-1})`,'ghost sm','',{disabled:auditPage<=1})}<b>Trang ${auditPage}/${pageCount}</b>${btn('Sau ›',`auditSetPage(${auditPage+1})`,'ghost sm','',{disabled:auditPage>=pageCount})}</div></div>`:'';
   const rowsOrEmptyState=rows?`<div class="audit-table-wrap"><table class="audit-table"><thead><tr><th>Thời gian</th><th>Người dùng</th><th>Hành động</th><th>Đối tượng</th><th>Chi tiết</th></tr></thead><tbody>${rows}</tbody></table></div>`:emptyState(total?'Không tìm thấy nhật ký':'Chưa có hoạt động',total?'Thử từ khóa hoặc khoảng ngày khác.':'Nhật ký sẽ bắt đầu ghi từ các thao tác tiếp theo.');
-  if(globalThis.activityAuditPageHtml)return globalThis.activityAuditPageHtml({head:headOnly('Nhật ký hoạt động','Lưu vết các thao tác quan trọng; chỉ quản trị viên được xem'),exportButton:btn('Xuất CSV nhật ký','exportActivityCSV()','teal sm'),archiveButton:total?btn('Lưu trữ nhật ký cũ','archiveActivityLog()','ghost sm'):'',total,chainHtml,oversizeWarn,searchValue:escAttr(auditQ),fromDate:dateBox('auditFromDate',auditFrom,'audit-date',`aria-label="Lọc nhật ký từ ngày" onchange="auditSetDate('from',this.value)"`),toDate:dateBox('auditToDate',auditTo,'audit-date',`aria-label="Lọc nhật ký đến ngày" onchange="auditSetDate('to',this.value)"`),pageSizeOptions,clearFiltersButton:hasFilter?btn('Xóa bộ lọc','auditClearFilters()','ghost sm audit-clear-filter'):'',filteredCount:filtered.length,rowsOrEmptyState,pagination});
-  return headOnly('Nhật ký hoạt động','Lưu vết các thao tác quan trọng; chỉ quản trị viên được xem')+
-    `<div class="panel"><h2 class="panel-title">Công cụ</h2><div class="row-flex">
-      ${btn('Xuất CSV nhật ký','exportActivityCSV()','teal sm')}
-      ${total?btn('Lưu trữ nhật ký cũ','archiveActivityLog()','ghost sm'):''}
-      <div class="hint audit-summary-status">${total} dòng hoạt động đã ghi nhận. ${chainHtml}${oversizeWarn}</div>
-    </div></div>
-    <div class="panel audit-log-panel"><div class="audit-log-head"><h2 class="panel-title">Hoạt động gần đây</h2><input id="auditSearch" type="search" aria-label="Tìm nhật ký hoạt động" placeholder="Tìm người dùng, hành động, đối tượng..." value="${escAttr(auditQ)}" oninput="auditSetQuery(this.value)"></div>
-      <div class="audit-filterbar"><div><label>Từ ngày</label>${dateBox('auditFromDate',auditFrom,'audit-date',`aria-label="Lọc nhật ký từ ngày" onchange="auditSetDate('from',this.value)"`)}</div><div><label>Đến ngày</label>${dateBox('auditToDate',auditTo,'audit-date',`aria-label="Lọc nhật ký đến ngày" onchange="auditSetDate('to',this.value)"`)}</div><div><label>Số dòng mỗi trang</label><select aria-label="Số dòng nhật ký mỗi trang" onchange="auditSetPageSize(this.value)">${pageSizeOptions}</select></div>${hasFilter?btn('Xóa bộ lọc','auditClearFilters()','ghost sm audit-clear-filter'):''}<div class="audit-filter-summary" role="status">${filtered.length}/${total} dòng</div></div>
-      ${rows?`<div class="audit-table-wrap"><table class="audit-table"><thead><tr><th>Thời gian</th><th>Người dùng</th><th>Hành động</th><th>Đối tượng</th><th>Chi tiết</th></tr></thead><tbody>${rows}</tbody></table></div>`:emptyState(total?'Không tìm thấy nhật ký':'Chưa có hoạt động',total?'Thử từ khóa hoặc khoảng ngày khác.':'Nhật ký sẽ bắt đầu ghi từ các thao tác tiếp theo.')}
-      ${pagination}</div>`;
+  return globalThis.activityAuditPageHtml({head:headOnly('Nhật ký hoạt động','Lưu vết các thao tác quan trọng; chỉ quản trị viên được xem'),exportButton:btn('Xuất CSV nhật ký','exportActivityCSV()','teal sm'),archiveButton:total?btn('Lưu trữ nhật ký cũ','archiveActivityLog()','ghost sm'):'',total,chainHtml,oversizeWarn,searchValue:escAttr(auditQ),fromDate:dateBox('auditFromDate',auditFrom,'audit-date',`aria-label="Lọc nhật ký từ ngày" onchange="auditSetDate('from',this.value)"`),toDate:dateBox('auditToDate',auditTo,'audit-date',`aria-label="Lọc nhật ký đến ngày" onchange="auditSetDate('to',this.value)"`),pageSizeOptions,clearFiltersButton:hasFilter?btn('Xóa bộ lọc','auditClearFilters()','ghost sm audit-clear-filter'):'',filteredCount:filtered.length,rowsOrEmptyState,pagination});
 }
 function activityCSVRows(items){return globalThis.activityAuditCsv(items);}
 function exportActivityCSV(){globalThis.csvDownload('Nhat_ky_hoat_dong_QCLab.csv',activityCSVRows(state.activity));}
@@ -145,21 +116,17 @@ async function applyResetPass(id){
 function toggleUser(id){if(!requireAdmin())return;const u=state.users.find(x=>x.id===id);globalThis.UserLifecycleCommand.toggle(u);rerender();}
 async function delUser(id){if(!requireAdmin())return;if(id===currentUser.id){await infoDialog('Không thể xóa chính mình.');return;}const u=state.users.find(x=>x.id===id);if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa người dùng',message:`Xóa người dùng ${u?(u.name||u.username):''}?`,confirmLabel:'Xóa người dùng',cancelLabel:'Hủy'}))return;globalThis.UserLifecycleCommand.remove(id);rerender();}
 
-/* ===== AUTH ===== */
-const PASS_ITERATIONS=600000; /* OWASP: >=600k vòng PBKDF2-SHA256. Hash cũ 210k vẫn xác thực (verifyPass đọc số vòng từ chuỗi hash) và tự nâng cấp khi đăng nhập. */
-function bytesHex(a){return [...a].map(b=>b.toString(16).padStart(2,'0')).join('');}
-function hexBytes(s){return new Uint8Array((s.match(/.{1,2}/g)||[]).map(x=>parseInt(x,16)));}
-function passwordError(p){return globalThis.passwordPolicyError?globalThis.passwordPolicyError(p):(!p?'Mật khẩu không được để trống.':p.length<8?'Mật khẩu phải có ít nhất 8 ký tự.':'');}
-async function legacyHashPass(p){if(globalThis.legacyPasswordHashService)return globalThis.legacyPasswordHashService.hash(p);try{const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('qclab::'+p));return bytesHex(new Uint8Array(buf));}catch(e){let h=0;const s='qclab::'+p;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return'f'+h.toString(16);}}
-async function hashPass(p){
-  if(globalThis.pbkdf2PasswordService)return globalThis.pbkdf2PasswordService.hash(p);
-  if(!crypto.subtle)throw new Error('Trình duyệt không hỗ trợ mã hóa mật khẩu an toàn.');
-  const salt=crypto.getRandomValues(new Uint8Array(16)),key=await crypto.subtle.importKey('raw',new TextEncoder().encode(p),'PBKDF2',false,['deriveBits']);
-  const bits=await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt,iterations:PASS_ITERATIONS},key,256);
-  return`pbkdf2$${PASS_ITERATIONS}$${bytesHex(salt)}$${bytesHex(new Uint8Array(bits))}`;
-}
+/* ===== AUTH =====
+   Hash PBKDF2-SHA256 (OWASP: >=600k vòng — hằng số PASSWORD_HASH_ITERATIONS
+   sống ở src/domain/auth/pbkdf2-password-service.ts, NGUỒN DUY NHẤT) và hash
+   SHA-256 legacy (hash cũ vẫn xác thực được, tự nâng cấp lên PBKDF2 khi đăng
+   nhập) đều đã chuyển sang TypeScript qua pbkdf2PasswordService/
+   legacyPasswordHashService — xem tests/auth-security.test.js. */
+function passwordError(p){return globalThis.passwordPolicyError(p);}
+async function legacyHashPass(p){return globalThis.legacyPasswordHashService.hash(p);}
+async function hashPass(p){return globalThis.pbkdf2PasswordService.hash(p);}
 async function verifyPass(p,stored){
-  if(globalThis.isPbkdf2PasswordHash?globalThis.isPbkdf2PasswordHash(stored):String(stored||'').startsWith('pbkdf2$')){if(globalThis.pbkdf2PasswordService)return globalThis.pbkdf2PasswordService.verify(p,stored);const [,it,saltHex,want]=stored.split('$'),key=await crypto.subtle.importKey('raw',new TextEncoder().encode(p),'PBKDF2',false,['deriveBits']),bits=await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:hexBytes(saltHex),iterations:+it},key,256);return bytesHex(new Uint8Array(bits))===want;}
+  if(globalThis.isPbkdf2PasswordHash(stored))return globalThis.pbkdf2PasswordService.verify(p,stored);
   return await legacyHashPass(p)===stored;
 }
 async function confirmReauthentication(){

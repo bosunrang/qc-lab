@@ -235,24 +235,7 @@ function actionFieldValue(id,max=5000){return QCCore.cleanText((document.getElem
 function readActionProtocolForm(version=3){
   return{protocolVersion:version,eventSource:actionFieldValue('aEventSource',40),processPhase:actionFieldValue('aProcessPhase',40),correction:actionFieldValue('aCorrection'),dueDate:parseVN(actionFieldValue('aDueDate',40))||'',riskSeverity:+actionFieldValue('aRiskSeverity',4)||0,riskOccurrence:+actionFieldValue('aRiskOccurrence',4)||0,riskDetectability:+actionFieldValue('aRiskDetectability',4)||0,riskLevel:actionFieldValue('aRiskLevel',40),riskBasis:actionFieldValue('aRiskBasis'),containmentStatus:actionFieldValue('aContainment',40),containmentNote:actionFieldValue('aContainmentNote'),qcMaterialStatus:actionFieldValue('aQcMaterial',40),qcMaterialNote:actionFieldValue('aQcMaterialNote'),instrumentStatus:actionFieldValue('aInstrument',40),instrumentNote:actionFieldValue('aInstrumentNote'),reagentStatus:actionFieldValue('aReagent',40),reagentNote:actionFieldValue('aReagentNote'),calibrationStatus:actionFieldValue('aCalibration',40),calibrationNote:actionFieldValue('aCalibrationNote'),lotToLotStatus:actionFieldValue('aLotToLot',40),lotToLotNote:actionFieldValue('aLotToLotNote'),causeCategory:actionFieldValue('aCauseCategory',40),cause:actionFieldValue('aCause'),actionCompletedDate:parseVN(actionFieldValue('aActionCompletedDate',40))||'',biasBefore:actionFieldValue('aBiasBefore',20),biasAfter:actionFieldValue('aBiasAfter',20),releaseStatus:actionFieldValue('aReleaseStatus',40),releaseDate:parseVN(actionFieldValue('aReleaseDate',40))||'',releaseBy:actionFieldValue('aReleaseBy',120),releaseNote:actionFieldValue('aReleaseNote'),patientImpact:actionFieldValue('aPatientImpact',40),patientAction:actionFieldValue('aPatientAction'),effectivenessStatus:actionFieldValue('aEffectivenessStatus',40)||'pending',effectivenessDate:parseVN(actionFieldValue('aEffectivenessDate',40))||'',effectivenessNote:actionFieldValue('aEffectivenessNote'),residualSeverity:+actionFieldValue('aResidualSeverity',4)||0,residualOccurrence:+actionFieldValue('aResidualOccurrence',4)||0,residualDetectability:+actionFieldValue('aResidualDetectability',4)||0,residualRiskLevel:actionFieldValue('aResidualRiskLevel',40),residualRiskBasis:actionFieldValue('aResidualRiskBasis')};
 }
-function actionEffectivenessMissingKey(a){
-  if(globalThis.ActionProtocolService)return globalThis.ActionProtocolService.effectivenessMissingKey(a);
-  if(+a.protocolVersion>=3&&!a.actionCompletedDate)return'actionCompletedDate';
-  if(!a.effectivenessDate)return'effectivenessDate';
-  if(String(a.effectivenessNote||'').trim().length<5)return'effectivenessNote';
-  const rerun=actionNeedsRerun(a)?actionRerunStatus(a):null,earliest=[a.date,a.actionCompletedDate,a.releaseDate,rerun&&rerun.ok&&rerun.point&&rerun.point.date].filter(Boolean).sort().pop();
-  if(a.effectivenessDate>isoToday()||(earliest&&a.effectivenessDate<earliest))return'effectivenessDate';
-  if(a.effectivenessStatus==='effective'&&+a.protocolVersion>=3){
-    if(!RISK_SCALE.includes(+a.residualSeverity))return'residualSeverity';
-    if(!RISK_SCALE.includes(+a.residualOccurrence))return'residualOccurrence';
-    if(!RISK_SCALE.includes(+a.residualDetectability))return'residualDetectability';
-    if(!ACTION_LABELS.risk[a.residualRiskLevel])return'residualRiskLevel';
-    if(String(a.residualRiskBasis||'').trim().length<5)return'residualRiskBasis';
-    const initial=actionRiskScore(a),residual=actionResidualRiskScore(a);
-    if(initial&&residual>initial)return'residualSeverity';
-  }
-  return'effectivenessNote';
-}
+function actionEffectivenessMissingKey(a){return globalThis.ActionProtocolService.effectivenessMissingKey(a);}
 async function addAction(){
   if(!requireWrite())return;
   const editing=actionUi().editId&&(state.actions||[]).find(a=>a.id===actionUi().editId);

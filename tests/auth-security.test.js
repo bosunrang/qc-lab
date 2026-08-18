@@ -5,7 +5,7 @@ const { webcrypto } = require('node:crypto');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
 (async()=>{
-  const ctx=loadSandbox(['modules/users-auth.js'],{crypto:webcrypto});
+  const ctx=loadSandbox(['core.js','generated/modular-pilot.js','modules/users-auth.js'],{crypto:webcrypto});
   assert.equal(run(ctx, `passwordError('')`), 'Mật khẩu không được để trống.');
   assert.match(run(ctx, `passwordError('1234567')`), /8 ký tự/);
   assert.equal(run(ctx, `passwordError('mat-khau-hop-le')`), '');

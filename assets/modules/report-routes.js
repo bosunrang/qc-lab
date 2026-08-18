@@ -83,26 +83,10 @@ function reportActionIcon(type){return globalThis.reportActionIconPresentation.i
 function reportLockPanelHtml(){const isAdmin=role()==='admin',ym=reportLockYmValue(),picker=globalThis.reportLockPicker(ym,new Date().getFullYear());return globalThis.reportLockPanelHtmlPresentation({isAdmin,year:picker.year,month:picker.month,months:picker.months,years:picker.years,already:!!PeriodService.findLock(state,ym),lockListHtml:reportLockListHtml()});}
 function pageReportV2(){
   const tests=operationalTests();
-  {const q=searchText(reportQ),matched=tests.filter(t=>!q||reportSearchValues(t).some(v=>searchText(v).includes(q)));if(matched.length&&(!reportTest||!matched.some(t=>t.id===reportTest)))reportTest=matched[0].id;if(!matched.length)reportTest='';const{start,end}=reportRangeDefaults();return globalThis.reportPageHtml({tests,matched,selectedId:reportTest,query:reportQ,start,end,isAdmin:role()==='admin',lockPanelHtml:reportLockPanelHtml()});}
-  if(!tests.length)return headOnly('Báo cáo & Biểu mẫu','')+`<div class="panel">${emptyState('Chưa có xét nghiệm đang vận hành','Cần có Panel QC, Nhóm lô QC, Mean/SD và dữ liệu QC trước khi tạo báo cáo.',role()==='admin'?btn('Cấu hình Mean/SD',`go('manage');setManageTab('targets')`,'teal'):'')}</div>`+reportLockPanelHtml();
   const q=searchText(reportQ),matched=tests.filter(t=>!q||reportSearchValues(t).some(v=>searchText(v).includes(q)));
   if(matched.length&&(!reportTest||!matched.some(t=>t.id===reportTest)))reportTest=matched[0].id;
   if(!matched.length)reportTest='';
-  const opts=matched.length?matched.map(t=>`<option value="${escAttr(t.id)}" ${t.id===reportTest?'selected':''}>${esc(testSelectLabel(t,tests))}</option>`).join(''):'<option value="">Không tìm thấy xét nghiệm phù hợp</option>';
   const{start,end}=reportRangeDefaults();
-  return headOnly('Báo cáo & Biểu mẫu','Tổng hợp hồ sơ nội kiểm theo khoảng ngày lựa chọn')+
-   `<div class="panel"><h2 class="panel-title">Báo cáo nội kiểm theo ngày</h2>
-     <div class="grid4"><div><label>Tìm xét nghiệm</label><input id="reportSearch" type="search" placeholder="Tìm tên xét nghiệm" value="${escAttr(reportQ)}" oninput="reportSearchSet(this.value)"></div>
-       <div><label>Xét nghiệm <span id="reportTestCount" class="hint">(${matched.length}/${tests.length})</span></label><select id="rTest" aria-label="Xét nghiệm" ${matched.length?'':'disabled'} onchange="reportTest=this.value">${opts}</select></div>
-       ${reportRangePicker(start,end)}</div>
-     <div class="report-export-options">
-       <label class="report-nce-option"><input id="reportNceAppendix" type="checkbox" checked><span><b>Kèm phụ lục NCE</b><small>(Áp dụng cho PDF và Excel)</small></span></label>
-     </div>
-     <div class="report-actions">
-       ${btn(reportActionIcon('print')+'Tạo báo cáo &amp; In','printReport()','teal','',{disabled:!matched.length,attrs:{'data-report-action':''}})}
-       ${btn('Xuất Excel','exportReportXLSX()','teal','',{disabled:!matched.length,attrs:{'data-report-action':''}})}
-       ${btn('Xuất CSV','exportReportCSV()','teal','',{disabled:!matched.length,attrs:{'data-report-action':''}})}
-     </div>
-   </div>`+reportLockPanelHtml();
+  return globalThis.reportPageHtml({tests,matched,selectedId:reportTest,query:reportQ,start,end,isAdmin:role()==='admin',lockPanelHtml:reportLockPanelHtml()});
 }
 function reportRangePicker(start,end){return globalThis.reportRangePickerHtml(start,end);}

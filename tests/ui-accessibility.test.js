@@ -4,7 +4,7 @@ const path = require('node:path');
 
 const root = path.join(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
-const router = read('assets/modules/router-render.js') + read('assets/modules/entry-routes.js') + read('src/presentation/entry/entry-sheet-navigation.ts') + read('src/presentation/entry/entry-tree-html.ts') + read('src/presentation/entry/entry-worksheet-html.ts') + read('src/presentation/entry/entry-levey-panel-html.ts') + read('src/presentation/entry/entry-page-layout-html.ts');
+const router = read('assets/modules/router-render.js') + read('assets/modules/entry-routes.js') + read('src/presentation/entry/entry-sheet-navigation.ts') + read('src/presentation/entry/entry-tree-html.ts') + read('src/presentation/entry/entry-worksheet-html.ts') + read('src/presentation/entry/entry-levey-panel-html.ts') + read('src/presentation/entry/entry-page-layout-html.ts') + read('src/presentation/router/router-shell-controller.ts');
 const modals = read('assets/modules/modals.js');
 const appCss = read('assets/app.css');
 const auditCss = read('assets/professional-audit.css');
@@ -24,6 +24,7 @@ const actionForm = read('assets/modules/action-form.js');
 const actionLogPanelPresentation = read('src/presentation/nce/action-log-panel-html.ts');
 const actionRerunEvidencePresentation = read('src/presentation/nce/action-rerun-evidence-html.ts');
 const reportRoutes = read('assets/modules/report-routes.js');
+const reportPageHtml = read('src/presentation/report/report-page-html.ts');
 const reportActionIconPresentation = read('src/presentation/report/report-action-icon.ts');
 const reportLockPanelPresentation = read('src/presentation/report/report-lock-panel-html.ts');
 const firebaseRulesPanelPresentation = read('src/presentation/settings/firebase-rules-panel-html.ts');
@@ -95,9 +96,11 @@ assert.equal((entryCss.match(/!important/g) || []).length, 0, 'entry UI must not
 assert.equal((dashboardCss.match(/!important/g) || []).length, 0, 'dashboard UI must not depend on !important');
 assert.match(sigmaCss, /\.sg-eqa-table th\{[^}]*text-transform:none/);
 assert.match(sigmaCss, /\.sg-eqa-summary span\{[^}]*text-transform:none/);
-// Icon nút của trang Báo cáo đi theo trang sang report-routes.js (tách 2026-07-30).
+// Icon nút của trang Báo cáo đi theo trang sang report-routes.js (tách 2026-07-30);
+// nút "Tạo báo cáo & In" tự nó đã chuyển sang createReportPageHtml() (TypeScript)
+// khi pageReportV2() không còn tự dựng HTML — xem report-page-html.ts.
 assert.match(reportRoutes, /function reportActionIcon\(type\)/);
-assert.match(reportRoutes, /reportActionIcon\('print'\)/);
+assert.match(reportPageHtml, /deps\.actionIcon\('print'\)/);
 assert.match(reportActionIconPresentation, /aria-hidden="true"/);
 assert.match(actionRerunEvidencePresentation, /aria-hidden="true"/);
 assert.match(tokens, /--space-section:14px/);

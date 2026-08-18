@@ -6,6 +6,9 @@ const read=file=>fs.readFileSync(path.join(root,file),'utf8');
 const QCCore=require('../assets/core.js');
 
 const router=read('assets/modules/router-render.js');
+const routerPolicy=read('src/presentation/router/router-page-policy.ts');
+const routerShell=read('src/presentation/router/router-shell-controller.ts');
+const vnDatePicker=read('src/presentation/router/vn-date-picker-controller.ts');
 const dashboard=read('assets/modules/dashboard-routes.js');
 const entry=read('assets/modules/entry-routes.js');
 const entryPointRow=read('src/presentation/entry/entry-point-table-row-html.ts');
@@ -19,6 +22,7 @@ const form=read('assets/modules/action-form.js');
 const actionRecordService=read('src/application/nce/action-record-service.ts');
 const actionEvidencePresentation=read('src/presentation/nce/action-evidence-presentation.ts');
 const report=read('assets/modules/report-routes.js');
+const reportPageHtml=read('src/presentation/report/report-page-html.ts');
 const sigma=read('assets/modules/sigma.js');
 const sigmaTea=read('assets/modules/sigma-tea.js');
 const reportsCss=read('assets/professional-reports.css');
@@ -45,20 +49,24 @@ assert.match(westgard,/function pageWestgard\(/);
 const loadOrder=['router-render.js','dashboard-routes.js','entry-routes.js','westgard-routes.js'];
 for(let i=1;i<loadOrder.length;i++)assert.ok(index.indexOf(loadOrder[i-1])<index.indexOf(loadOrder[i]),`${loadOrder[i]} phải tải sau ${loadOrder[i-1]}`);
 
-/* core.js không thể require router-render.js (nó phải chạy độc lập trong Node/test, và
-   tải trước mọi module khác trong trang), nên PAGE_SET/ROLE_SET ở đó và PAGE_DEFS/ROLE_LIST
-   ở router-render.js buộc phải là hai khai báo tách rời — không thể gộp thành một nguồn thật
-   như WG_RULE_REGISTRY. Test này là lưới an toàn thay thế: nếu ai thêm/xoá một trang hoặc một
-   vai trò mà chỉ sửa một bên, test đối chiếu tập hợp sẽ trượt ngay thay vì âm thầm lệch (đúng
-   kiểu lỗi từng xảy ra với bảng luật Westgard trong worker trước 2026-08-01). */
-const pageDefsMatch=router.match(/const PAGE_DEFS=\[([\s\S]*?)\];/);
-assert.ok(pageDefsMatch,'router-render.js phải khai báo PAGE_DEFS');
+/* core.js phải tiếp tục độc lập với bundle presentation, nên PAGE_SET/ROLE_SET ở core.js
+   và router policy TypeScript vẫn là hai khai báo tách rời. Test này là lưới an toàn: nếu
+   thêm/xóa trang hoặc vai trò ở một bên, import backup có thể mất quyền âm thầm. */
+const pageDefsMatch=routerPolicy.match(/const ROUTER_PAGE_DEFS=\[([\s\S]*?)\] as const;/);
+assert.ok(pageDefsMatch,'router page policy TypeScript phải khai báo ROUTER_PAGE_DEFS');
 const routerPageIds=[...pageDefsMatch[1].matchAll(/\['([a-z]+)','[^']*',\[/g)].map(m=>m[1]);
-assert.deepStrictEqual(new Set(routerPageIds),QCCore.PAGE_SET,'Tập id trang ở PAGE_DEFS (router-render.js) phải khớp PAGE_SET (core.js) — sanitizeBackup() lọc pagePerms theo PAGE_SET, lệch tập là mất quyền âm thầm khi nhập backup');
-const roleListMatch=router.match(/const ROLE_LIST=\[([\s\S]*?)\];/);
-assert.ok(roleListMatch,'router-render.js phải khai báo ROLE_LIST');
+assert.deepStrictEqual(new Set(routerPageIds),QCCore.PAGE_SET,'Tập id trang ở router policy TypeScript phải khớp PAGE_SET (core.js) — sanitizeBackup() lọc pagePerms theo PAGE_SET, lệch tập là mất quyền âm thầm khi nhập backup');
+const roleListMatch=routerPolicy.match(/const ROUTER_ROLE_LIST=\[([\s\S]*?)\] as const;/);
+assert.ok(roleListMatch,'router page policy TypeScript phải khai báo ROUTER_ROLE_LIST');
 const routerRoles=[...roleListMatch[1].matchAll(/'([a-z]+)'/g)].map(m=>m[1]);
-assert.deepStrictEqual(new Set(routerRoles),QCCore.ROLE_SET,'ROLE_LIST (router-render.js) phải khớp ROLE_SET (core.js)');
+assert.deepStrictEqual(new Set(routerRoles),QCCore.ROLE_SET,'ROUTER_ROLE_LIST TypeScript phải khớp ROLE_SET (core.js)');
+assert.doesNotMatch(router,/const PAGE_DEFS=/,'router-render.js không giữ registry trang classic');
+assert.match(router,/globalThis\.routerPagePolicy\.canAccessPage/,'router legacy phải tiêu thụ policy TypeScript');
+assert.ok(index.indexOf('modular-pilot.js')<index.indexOf('router-render.js'),'bundle policy phải tải trước router-render.js');
+assert.match(routerShell,/export function createRouterShellController\(/,'navigation shell phải do TypeScript sở hữu');
+assert.match(router,/globalThis\.routerShell\.nav/,'router legacy phải ủy quyền navigation shell cho TypeScript');
+assert.match(vnDatePicker,/export function createVnDatePickerController\(/,'VN date picker controller phải nằm trong TypeScript');
+assert.match(router,/globalThis\.vnDatePickerController\.parse/,'router legacy phải dùng parser ngày TypeScript');
 
 /* Trang Báo cáo tách khỏi actions-routes.js (2026-07-30) vì file đó từng giữ CẢ hai
    trang và phình lên 105 KB — cùng lý do đã tách dash/entry/westgard khỏi
@@ -138,12 +146,12 @@ assert.doesNotMatch(actionsArea,/headOnly\([^;\n]+btn\('Quy trình 8 bước'/,'
 assert.match(actions,/cls:'action-guide-modal'/,'hướng dẫn 8 bước phải dùng popup NCE chuyên biệt');
 assert.match(actionCancelModal,/class="alert warn action-cancel-warning"/,'cảnh báo hủy NCE phải có bố cục riêng để nội dung không bị ép thành hai cột');
 assert.match(reportsCss,/\.action-cancel-warning\{[^}]*width:100%;[^}]*flex-direction:column/,'cảnh báo hủy NCE phải xếp câu chính và giải thích theo chiều dọc');
-assert.match(report,/class="report-export-options"[\s\S]*?Kèm phụ lục NCE[\s\S]*?\(Áp dụng cho PDF và Excel\)[\s\S]*?class="report-actions"/,'tùy chọn phụ lục NCE phải nằm ở dòng riêng phía trên các nút xuất và có chú thích trong ngoặc');
+assert.match(reportPageHtml,/class="report-export-options"[\s\S]*?Kèm phụ lục NCE[\s\S]*?\(Áp dụng cho PDF và Excel\)[\s\S]*?class="report-actions"/,'tùy chọn phụ lục NCE phải nằm ở dòng riêng phía trên các nút xuất và có chú thích trong ngoặc');
 assert.match(reportsCss,/\.report-nce-option span\{[^}]*display:inline-flex;[^}]*align-items:baseline;[^}]*white-space:nowrap/,'nhãn và chú thích phụ lục NCE phải nằm cùng hàng');
 assert.match(reportsCss,/\.report-nce-option\{[^}]*align-items:center/,'ô tick phải căn giữa theo chiều dọc với nhãn phụ lục NCE');
 assert.match(reportsCss,/\.report-nce-option input\{[^}]*margin:0/,'ô tick phụ lục NCE không được giữ độ lệch thủ công');
 assert.match(reportsCss,/@media\(max-width:760px\)\{[\s\S]*?\.report-nce-option span\{[^}]*white-space:normal;[^}]*flex-wrap:wrap/,'nhãn phụ lục NCE được phép xuống hàng trên màn hình hẹp');
-assert.doesNotMatch(report,/class="report-actions"[\s\S]*?report-nce-option/,'checkbox phụ lục NCE không được trộn cùng hàng nút hành động');
+assert.doesNotMatch(reportPageHtml,/class="report-actions"[\s\S]*?report-nce-option/,'checkbox phụ lục NCE không được trộn cùng hàng nút hành động');
 assert.doesNotMatch(actions,/action-guide-(?:mark|legend)/,'hướng dẫn NCE không được dùng logo phụ hoặc dải màu phân nhóm');
 assert.match(reportsCss,/\.action-guide-list\{[^}]*grid-template-columns:1fr/,'quy trình NCE phải là một danh sách tuyến tính dễ đọc');
 assert.match(reportsCss,/\.action-guide-card\{[^}]*border-bottom:1px solid var\(--line\)/,'các bước NCE chỉ phân cách bằng đường kẻ trung tính, không dùng card màu');

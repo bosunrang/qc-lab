@@ -1,13 +1,8 @@
 /* ===== ROUTER ===== */
-/* Nguồn duy nhất cho danh sách trang (id/nhãn/vai trò được phép) — trước đây PAGES và
-   PERM là hai mảng/đối tượng tách rời cùng liệt kê tay 11 id giống hệt nhau, dễ lệch
-   như bảng luật Westgard từng lệch giữa nhiều file (xem WG_RULE_REGISTRY ở core.js).
-   PAGES/PERM bên dưới chỉ là hai lát cắt DẪN XUẤT từ PAGE_DEFS, không tự liệt kê id nữa.
-   tests/ui-route-structure.test.js đối chiếu tập id này với PAGE_SET của core.js. */
-/** @type {[string,string,string[]][]} */
-const PAGE_DEFS=[['dash','Bảng điều khiển',['admin','technician','viewer']],['entry','Nhập QC & Biểu đồ',['admin','technician','viewer']],['westgard','Phân tích Westgard',['admin','technician','viewer']],['sigma','Six Sigma & Sai số',['admin','technician','viewer']],['reagent','So sánh hóa chất',['admin','technician','viewer']],['actions','Khắc phục sự cố',['admin','technician']],['report','Báo cáo & Biểu mẫu',['admin','technician','viewer']],['manage','Cấu hình chung',['admin']],['users','Người dùng',['admin']],['audit','Nhật ký hoạt động',['admin']],['settings','Cài đặt & Đám mây',['admin']]];
-const PAGES=PAGE_DEFS.map(([id,label])=>[id,label]);
-const PERM=Object.fromEntries(PAGE_DEFS.map(([id,,roles])=>[id,roles]));
+/* Danh sách trang và chính sách quyền do TypeScript sở hữu. Bundle được nạp trước
+   file này, nên route classic chỉ giữ các API global tương thích. */
+const PAGES=globalThis.routerPagePolicy.pages;
+const PERM=globalThis.routerPagePolicy.permissions;
 let page='dash';
 function role(){return currentUser?currentUser.role:'viewer';}
 function canWrite(){return role()==='admin'||role()==='technician';}
@@ -19,15 +14,11 @@ function canWrite(){return role()==='admin'||role()==='technician';}
    same tick either way. */
 function requireWrite(message='Bạn không có quyền sửa dữ liệu.'){if(canWrite())return true;infoDialog(message);return false;}
 function requireAdmin(message='Chỉ quản trị mới được thực hiện thao tác này.'){if(role()==='admin')return true;infoDialog(message);return false;}
-const ROLE_LIST=['admin','technician','viewer'];
+const ROLE_LIST=globalThis.routerPagePolicy.roles;
 function roleLabel(r){return r==='admin'?'Quản trị':r==='technician'?'KTV':'Chỉ xem';}
 function roleSelectOptions(selected){return ROLE_LIST.map(r=>`<option value="${r}" ${r===selected?'selected':''}>${roleLabel(r)}</option>`).join('');}
-function rolePageIds(r=role()){return PAGES.map(x=>x[0]).filter(id=>PERM[id]&&PERM[id].includes(r));}
-function userPageIds(u=currentUser){
-  if(!u)return rolePageIds('viewer');
-  const base=rolePageIds(u.role),picked=Array.isArray(u.pagePerms)?[...new Set(u.pagePerms)].filter(id=>base.includes(id)):base;
-  return picked.length?picked:base.slice(0,1);
-}
+function rolePageIds(r=role()){return globalThis.routerPagePolicy.rolePageIds(r);}
+function userPageIds(u=currentUser){return globalThis.routerPagePolicy.userPageIds(u);}
 function setSearchCount(id,visible,total){const el=document.getElementById(id);if(el)el.textContent=visible+'/'+total;}
 function showSearchEmpty(id,on){const el=document.getElementById(id);if(el)el.style.display=on?'':'none';}
 function replaceSelectItems(select,items,emptyText){
@@ -60,8 +51,8 @@ function scheduleSearchRender(owner,apply,focusId,delay=180){
     }
   },delay);
 }
-function canAccessPage(id,u=currentUser){return !!(PERM[id]&&userPageIds(u).includes(id));}
-function firstAccessPage(u=currentUser){return(PAGES.find(([id])=>canAccessPage(id,u))||['dash'])[0];}
+function canAccessPage(id,u=currentUser){return globalThis.routerPagePolicy.canAccessPage(id,u);}
+function firstAccessPage(u=currentUser){return globalThis.routerPagePolicy.firstAccessPage(u);}
 function icon(id){const p={
  dash:'<rect x="3.5" y="3.5" width="7" height="7" rx="1.3"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.3"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.3"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.3"/>',
  entry:'<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
@@ -91,28 +82,16 @@ function dateBox(id,value='',cls='manage-date',attrs=''){
 const VN_DATE_MONTHS=['Tháng 1','Tháng 2','Tháng 3','Tháng 4','Tháng 5','Tháng 6','Tháng 7','Tháng 8','Tháng 9','Tháng 10','Tháng 11','Tháng 12'];
 const VN_DATE_DAYS=['T2','T3','T4','T5','T6','T7','CN'];
 let vnDatePicker={box:null,input:null,native:null,view:null,mode:'day'};
-function vnPickerParse(s){s=String(s||'').trim();let m=/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/.exec(s);if(m)return vnPickerValid(+m[3],+m[2],+m[1]);m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(s);return m?vnPickerValid(+m[1],+m[2],+m[3]):'';}
-function vnPickerValid(y,m,d){const dt=new Date(y,m-1,d);return y>=1000&&dt.getFullYear()===y&&dt.getMonth()===m-1&&dt.getDate()===d?`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`:'';}
-function vnPickerText(iso){const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso||''));return m?`${m[3]}/${m[2]}/${m[1]}`:'';}
-function vnPickerOpen(datebox){
-  const input=datebox.querySelector('.date-text'),native=datebox.querySelector('.native-date');if(!input)return;
-  if(input.disabled||input.readOnly)return;
-  const iso=vnPickerParse(input.value)||(native&&native.value)||isoToday(),m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(iso),view=new Date(+m[1],+m[2]-1,1);
-  vnDatePicker={box:datebox,input,native,view,mode:'day'};vnPickerRender();
-}
-function vnPickerClose(){const el=document.getElementById('vnDatePicker');if(el)el.remove();vnDatePicker={box:null,input:null,native:null,view:null,mode:'day'};}
-function vnPickerMove(months){if(!vnDatePicker.view)return;vnDatePicker.view=new Date(vnDatePicker.view.getFullYear(),vnDatePicker.view.getMonth()+months,1);vnPickerRender();}
-function vnPickerMode(mode){vnDatePicker.mode=mode==='month'?'month':'day';vnPickerRender();}
-function vnPickerSetYear(year){year=Math.min(9999,Math.max(1000,parseInt(year)||new Date().getFullYear()));vnDatePicker.view=new Date(year,vnDatePicker.view.getMonth(),1);vnPickerRender();}
-function vnPickerSetMonth(month){vnDatePicker.view=new Date(vnDatePicker.view.getFullYear(),month,1);vnDatePicker.mode='day';vnPickerRender();}
-function vnPickerPick(iso){
-  if(!vnDatePicker.input)return;
-  vnDatePicker.input.value=vnPickerText(iso);
-  if(vnDatePicker.native)vnDatePicker.native.value=iso;
-  vnDatePicker.input.dispatchEvent(new Event('input',{bubbles:true}));
-  vnDatePicker.input.dispatchEvent(new Event('change',{bubbles:true}));
-  vnPickerClose();
-}
+function vnPickerParse(s){return globalThis.vnDatePickerController.parse(s);}
+function vnPickerValid(y,m,d){return globalThis.vnDatePickerController.valid(y,m,d);}
+function vnPickerText(iso){return globalThis.vnDatePickerController.text(iso);}
+function vnPickerOpen(datebox){return globalThis.vnDatePickerController.open(datebox);}
+function vnPickerClose(){return globalThis.vnDatePickerController.close();}
+function vnPickerMove(months){return globalThis.vnDatePickerController.move(months);}
+function vnPickerMode(mode){return globalThis.vnDatePickerController.mode(mode);}
+function vnPickerSetYear(year){return globalThis.vnDatePickerController.setYear(year);}
+function vnPickerSetMonth(month){return globalThis.vnDatePickerController.setMonth(month);}
+function vnPickerPick(iso){return globalThis.vnDatePickerController.pick(iso);}
 function vnPickerRender(){
   if(!vnDatePicker.box||!vnDatePicker.input)return;
   let pop=document.getElementById('vnDatePicker');if(!pop){pop=document.createElement('div');pop.id='vnDatePicker';pop.className='vn-date-picker';document.body.appendChild(pop);}
@@ -129,59 +108,25 @@ function vnPickerRender(){
   const r=vnDatePicker.box.getBoundingClientRect(),w=258,left=Math.min(Math.max(8,r.left),window.innerWidth-w-8),top=Math.min(r.bottom+6,window.innerHeight-pop.offsetHeight-8);
   pop.style.left=left+'px';pop.style.top=Math.max(8,top)+'px';
 }
-document.addEventListener('click',e=>{
-  const pickerBtn=e.target.closest&&e.target.closest('#vnDatePicker button');
-  if(pickerBtn){
-    e.preventDefault();e.stopPropagation();
-    if(pickerBtn.dataset.mode)vnPickerMode(pickerBtn.dataset.mode);
-    else if(pickerBtn.dataset.move)vnPickerMove(+pickerBtn.dataset.move);
-    else if(pickerBtn.dataset.yearStep)vnPickerSetYear(vnDatePicker.view.getFullYear()+(+pickerBtn.dataset.yearStep));
-    else if(pickerBtn.dataset.month!=null)vnPickerSetMonth(+pickerBtn.dataset.month);
-    else if(pickerBtn.dataset.date)vnPickerPick(pickerBtn.dataset.date);
-    else if(pickerBtn.dataset.today)vnPickerPick(isoToday());
-    else if(pickerBtn.dataset.close)vnPickerClose();
-    return;
-  }
-  const btn=e.target.closest&&e.target.closest('.datepick');
-  if(btn){e.preventDefault();e.stopPropagation();vnPickerOpen(btn.closest('.datebox'));return;}
-  if(!e.target.closest||(!e.target.closest('#vnDatePicker')&&!e.target.closest('.datebox')))vnPickerClose();
-});
-document.addEventListener('keydown',e=>{
-  if(e.key==='Escape')vnPickerClose();
-  if(e.key==='Enter'&&e.target&&e.target.id==='vnPickerYear'){e.preventDefault();vnPickerSetYear(e.target.value);}
-});
-document.addEventListener('change',e=>{if(e.target&&e.target.id==='vnPickerYear')vnPickerSetYear(e.target.value);});
-function brandTitle(){return (state.lab&&state.lab.brandTitle)||'QC Lab';}
-function brandSub(){return (state.lab&&state.lab.brandSub)||'Nội kiểm xét nghiệm';}
-function brandMarkText(){return ((state.lab&&state.lab.logoText)||'QC').slice(0,4);}
-function brandLogo(){return state.lab&&state.lab.logoData||'';}
-function renderBrand(){
-  const el=document.getElementById('brandBox');if(!el)return;
-  const logo=brandLogo();
-  el.innerHTML=`<div class="brand-mark">${logo?`<img src="${escAttr(logo)}" alt="">`:esc(brandMarkText())}</div><div>${esc(brandTitle())}<small>${esc(brandSub())}</small></div>`;
-}
-function nav(){const groups=[['Theo dõi',['dash','entry','westgard','sigma']],['Vận hành',['reagent','actions','report']],['Quản trị',['manage','users','audit','settings']]];
-  const el=document.getElementById('nav');if(!el)return;
-  const scrollTop=el.scrollTop;
-  el.innerHTML=groups.map(([g,ids])=>{const items=PAGES.filter(([id])=>ids.includes(id)&&canAccessPage(id));return items.length?`<div class="nav-group">${g}</div>`+items.map(([id,t])=>`<button class="${id===page?'active':''}" aria-current="${id===page?'page':'false'}" onclick="go('${id}')"><span class="ic" aria-hidden="true">${icon(id)}</span>${t}</button>`).join(''):'';}).join('');
-  el.scrollTop=scrollTop;
-}
+globalThis.vnDatePickerController.bind();
+function brandTitle(){return globalThis.routerShell.brandTitle();}
+function brandSub(){return globalThis.routerShell.brandSub();}
+function brandMarkText(){return globalThis.routerShell.brandMarkText();}
+function brandLogo(){return globalThis.routerShell.brandLogo();}
+function renderBrand(){return globalThis.routerShell.renderBrand();}
+function nav(){return globalThis.routerShell.nav({page,user:currentUser,icon});}
 /* Watermark tên lab được cấp phép (bản Electron có license). Chạy trong trình
    duyệt thường thì window.qcLicense không tồn tại nên bỏ qua — không ảnh hưởng. */
-function licensedLabName(){const lic=window.qcLicense;return lic&&lic.lab?String(lic.lab):'';}
+function licensedLabName(){return globalThis.routerShell.licensedLabName();}
 /* Bản Electron chưa kích hoạt license nhưng còn hạn dùng thử 14 ngày (xem
    electron/license.js) truyền trạng thái này qua window.qcLicense.trial. Chạy
    trong trình duyệt thường hoặc bản đã có license thì trial luôn {active:false}. */
-function trialInfo(){return window.qcLicense&&window.qcLicense.trial&&window.qcLicense.trial.active?window.qcLicense.trial:null;}
-function sideFoot(){const el=document.getElementById('sideFoot');if(!el)return;const app=window.QCLAB_APP||{version:'dev'};const lab=licensedLabName();const licLine=lab?`<div class="hint" style="color:#8ea3b2">Cấp phép: <b style="color:#c3d3dd">${esc(lab)}</b></div>`:'';const trial=trialInfo(),trialLine=trial?`<div class="hint" style="color:${trial.daysLeft<=7?'#e2a33d':'#8ea3b2'}">Dùng thử: còn <b style="color:${trial.daysLeft<=7?'#e2a33d':'#c3d3dd'}">${trial.daysLeft} ngày</b></div>`:'';el.innerHTML=`<div class="foot-panel"><div class="hint">Ver: ${esc(app.version||'dev')}</div>${licLine}${trialLine}</div>`;}
+function trialInfo(){return globalThis.routerShell.trialInfo();}
+function sideFoot(){return globalThis.routerShell.sideFoot();}
 /* Ẩn/hiện thanh điều hướng bên trái: sở thích hiển thị riêng của máy này, không
    phải dữ liệu nghiệp vụ nên lưu localStorage thay vì state/sync. Script đồng bộ
    trong index.html đọc cùng khóa để áp trạng thái ngay khi tải trang, tránh nháy. */
-function toggleSidebarNav(){
-  const app=document.getElementById('appShell');if(!app)return;
-  const collapsed=app.classList.toggle('nav-collapsed');
-  try{localStorage.setItem('qclab_nav_collapsed',collapsed?'1':'0');}catch(e){}
-}
+function toggleSidebarNav(){return globalThis.routerShell.toggleSidebarNav();}
 function go(p){if(!canAccessPage(p))return;page=p;nav();rerender();resetMainScroll();requestAnimationFrame(()=>{const main=document.getElementById('main');if(main)main.focus({preventScroll:true});});}
 function resetMainScroll(){const m=document.querySelector('main');if(m)m.scrollTop=0;window.scrollTo(0,0);}
 function topUserBox(){if(!currentUser)return '';const name=currentUser.name||currentUser.username;const initial=esc(String(name||'U').trim().charAt(0).toUpperCase()||'U');return `<div class="top-user"><div class="avatar">${initial}</div><div class="meta"><div class="name">${esc(name)}</div><div class="role">${roleLabel(currentUser.role)}</div></div><button onclick="logout()" title="Đăng xuất"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M21 5v14"/></svg>Đăng xuất</button></div>`;}
@@ -201,4 +146,4 @@ function restoreRouteFilters(){if(page==='dash'&&dashTestQ)dashTestFilter(dashTe
    thao tác sửa dữ liệu), giữ nguyên vị trí cuộn để trang không "nhảy" về đầu —
    trước đây trang Sigma bị giật do save() lúc render kéo theo rerender. Đổi trang
    đi qua go(), vốn tự gọi resetMainScroll() SAU rerender() nên vẫn reset đúng. */
-function rerender(){const m=document.getElementById('main'),keepScroll=m?m.scrollTop:0;render();afterRender();restoreRouteFilters();if(m&&keepScroll)m.scrollTop=keepScroll;}
+function rerender(){const m=document.getElementById('main'),keepScroll=m?m.scrollTop:0;render();afterRender(page);restoreRouteFilters();if(m&&keepScroll)m.scrollTop=keepScroll;}

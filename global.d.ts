@@ -19,6 +19,7 @@ declare var selTest: any, statusMemo: any, wgTestQ: any, dashTestQ: any, dashTes
   wgPrevOpen: any, wgExpandedRows: any, wgViewMode: any, wgArchivedGroupId: any,
   wgArchivedTestId: any, wgArchivedTestQ: any, wgChartMode: any;
 declare var currentUser: any, loginFails: any, loginLockUntil: any;
+declare function afterRender(page: string): void;
 declare var entrySel: any, entryDays: any, entryStart: any, entryEnd: any, entrySheetMonth: any,
   entryQ: any, entryMachine: any, entryLastMsg: any, entryAutoOpenKey: any,
   entryPendingSheetFocus: any, entryJumpToday: any, entryLjRenderCache: any,
