@@ -85,8 +85,9 @@ assert.deepEqual(plain(run(ctx, 'state.tests[0].levels.map(l=>l.level)')), [1], 
 // which coerces a raw mean:null/sd:null level to mean:0/sd:0 — the prune check must
 // still recognize it as unused after that coercion (this is the exact scenario from
 // the reported bug: a phantom level showing "Mean 0.00" on Lịch sử dữ liệu, not
-// "Mean —"). ensureShape() itself needs settings.js (ensureLabBrandShape), which this
-// sandbox doesn't load, so reproduce just the two relevant steps in order instead.
+// "Mean —"). ensureShape() itself needs ensureLabBrandShape (nay ở bundle TS,
+// trước ở settings.js), which this sandbox doesn't load, so reproduce just the two
+// relevant steps in order instead.
 run(ctx, `
   const merged={lab:{},tests:[{id:'T1',name:'Glucose',levels:[
     {level:1,qcLotId:'L1',lot:'AU2121',mean:111.1,sd:10.44,meanSdHistory:[{qcLotId:'L1',lot:'AU2121',mean:111.1,sd:10.44}]},

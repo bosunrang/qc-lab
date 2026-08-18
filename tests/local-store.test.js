@@ -85,7 +85,7 @@ const fakeIndexedDb = `
   }
 
   {
-    const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'modules/local-store.js', 'modules/state-storage.js', 'generated/modular-pilot.js', 'modules/settings.js']);
+    const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'modules/local-store.js', 'modules/state-storage.js', 'generated/modular-pilot.js']);
     const result = await run(ctx, `
       ${fakeIndexedDb}
       localStorage={getItem:function(){return null;},setItem:function(){}};
@@ -99,7 +99,7 @@ const fakeIndexedDb = `
   }
 
   {
-    const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'modules/local-store.js', 'modules/state-storage.js', 'generated/modular-pilot.js', 'modules/settings.js']);
+    const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'modules/local-store.js', 'modules/state-storage.js', 'generated/modular-pilot.js']);
     const result = await run(ctx, `
       ${fakeIndexedDb}
       localStorage={getItem:function(){return null;},setItem:function(){}};
@@ -114,7 +114,7 @@ const fakeIndexedDb = `
   }
 
   {
-    const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'modules/local-store.js', 'modules/state-storage.js', 'generated/modular-pilot.js', 'modules/settings.js']);
+    const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'modules/local-store.js', 'modules/state-storage.js', 'generated/modular-pilot.js']);
     const result = await run(ctx, `
       ${fakeIndexedDb}
       var __ls=new Map();localStorage={getItem:function(k){return __ls.has(k)?__ls.get(k):null;},setItem:function(k,v){__ls.set(k,String(v));},removeItem:function(k){__ls.delete(k);}};
@@ -138,7 +138,7 @@ const fakeIndexedDb = `
 
   {
     let dialog=null;
-    const ctx = loadSandbox(['core.js', 'modules/state.js', 'generated/modular-pilot.js', 'modules/settings.js'],{
+    const ctx = loadSandbox(['core.js', 'modules/state.js', 'generated/modular-pilot.js'],{
       navigator:{storage:{estimate:async()=>({usage:1572864,quota:104857600,usageDetails:{indexedDB:1048576}})}}
     });
     // infoDialog giờ là thật (TS, xem src/presentation/modal/) chứ không còn undefined

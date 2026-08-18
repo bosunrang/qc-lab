@@ -31,6 +31,7 @@ declare function openDialogOverlay(html: string, resolve: (result?: any) => void
 declare function closeDialogOverlay(result?: any): void;
 declare function pageDash(): string;
 declare function dashTestFilter(value: string): void;
+declare function ensureLabBrandShape(): void;
 declare function role(): string;
 declare function canWrite(): boolean;
 declare function requireWrite(message?: string): boolean;

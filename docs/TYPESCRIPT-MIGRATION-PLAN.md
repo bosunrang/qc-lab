@@ -57,8 +57,8 @@ scope**, không phải không còn file `.js` trong gói phát hành.
 
 | Hạng mục | Trạng thái |
 | --- | --- |
-| Nguồn TypeScript | 729 tệp: 99 domain, 137 application, 492 presentation, 1 compatibility bridge |
-| Nguồn classic còn lại | 27 tệp `assets/modules/*.js`, thêm `assets/core.js` và `assets/app.js` |
+| Nguồn TypeScript | 730 tệp: 99 domain, 137 application, 493 presentation, 1 compatibility bridge |
+| Nguồn classic còn lại | 26 tệp `assets/modules/*.js`, thêm `assets/core.js` và `assets/app.js` |
 | Bundle hiện tại | `assets/generated/modular-pilot.js`, Vite sinh ra và nạp bằng `<script defer>` |
 | Kiểm tra kiểu | `npm.cmd run typecheck` đạt: checkJs legacy + strict TypeScript modules |
 | Test Node | `npm.cmd test` đạt ngày 2026-08-18 |
@@ -366,8 +366,9 @@ Thứ tự ưu tiên, theo rủi ro tăng dần:
 1. **UI thuần:** ~~`modals`~~ (xong 2026-08-18), `after-render` (đã retire ở
    Pha F), ~~`dashboard-routes`~~ (xong 2026-08-18), ~~`router-render`~~ (xong
    2026-08-18) — nhóm này đã **hoàn tất**.
-2. **Route/presentation:** Entry, Manage, Report, Settings, Reagent, Sigma,
-   Actions và Audit; chuyển mỗi trang như một lát dọc hoàn chỉnh.
+2. **Route/presentation:** Entry, Manage, Report, ~~Settings~~ (xong
+   2026-08-18), Reagent, Sigma, Actions và Audit; chuyển mỗi trang như một lát
+   dọc hoàn chỉnh.
 3. **Canvas và browser adapter:** `draw`, `reports`, export/print, File API;
    giữ visual/print/Electron gate cho từng lát.
 4. **Hạ tầng và bootstrap:** state storage, local store, Firebase sync, LIS,
@@ -656,6 +657,51 @@ nào khác lẩn trong luồng dispatch trang. Bài học quy trình: bước 7 
 những lát đụng tới `render()`/dispatch trang — phải chạy TRƯỚC khi coi lát là
 xong, không chỉ sau khi `npm test` xanh.
 
+#### Lát route 1 — `settings.js` (2026-08-18, mở nhóm "Route/presentation")
+
+Retire `assets/modules/settings.js` (69 dòng) sang
+`src/presentation/settings/settings-page-controller.ts`
+(`createSettingsPageController(deps)`), sở hữu `pageSettings()` + 9 form handler
+(`saveLab`/`saveBrand`/`pickLogo`/`clearLogo`/`saveFb`/`clearFb`/
+`copyFirebaseRules`/`readBrandInputs`/`checkStorageUsage`) + callback chuẩn hóa
+state `ensureLabBrandShape()`. Đây là file **DOM/browser adapter** thuần: mọi
+phép tính đã nằm ở command/service TS (`SettingsProfileCommand`,
+`SettingsFirebaseCommand`, `firebaseSettingsService`) hoặc HTML builder
+(`settingsXxxHtml`) từ các đợt trước; controller chỉ đọc form, chạy
+FileReader/canvas cho logo, mở dialog, và ủy quyền. Các browser API
+(`FileReader`/`Image`/canvas/clipboard/`navigator`) được tiêm qua `deps` để
+controller vẫn test được ngoài trình duyệt.
+
+Lát này **nhẹ hơn hẳn** ba lát "UI thuần" trước vì đã rút được bài học:
+
+- Áp dụng sẵn quy tắc "lazy delegation" cho MỌI dep (`infoDialog:(m,o)=>root.infoDialog(m,o)`,
+  `requireAdmin:()=>root.requireAdmin()`, `getState:()=>state`, …) ngay từ đầu —
+  không tái diễn bẫy bare-identifier.
+- Phân biệt đúng `function` global (an toàn qua `(root as any).backupStatusText()`)
+  với `let`/`const` global (`state`, `fb` — tham chiếu trần) ngay từ đầu, không
+  tái diễn bẫy `wgMemo`.
+- Chỉ MỘT hàm được classic khác gọi trần (`ensureLabBrandShape`, do `state.js`'s
+  `ensureShape()` gọi qua callback `ensureLab:ensureLabBrandShape`) nên chỉ cần
+  thêm đúng một `declare function ensureLabBrandShape(): void;` vào `global.d.ts`.
+  9 handler còn lại là onclick trong HTML builder (chuỗi, không phải caller
+  classic) + `pageSettings` (chỉ dispatch table trong compat gọi) nên không cần
+  ambient declare.
+
+Test: ba source-scanner (`settings-presentation-bridge`, `settings-firebase-command-bridge`,
+`settings-helper-bridge`) trỏ từ `assets/modules/settings.js` sang
+`settings-page-controller.ts` với regex đổi theo cú pháp `deps.X` (giữ nguyên
+các assertion "phải là hợp đồng bridge bắt buộc" quét `modular-pilot.global.ts`,
+và bổ sung assertion mới quét đúng dòng wiring `deps→root.settingsXxx` trong
+compat để không mất lớp bảo vệ khi logic rời file classic). `local-store.test.js`
+bỏ `'modules/settings.js'` khỏi 4 danh sách nạp — `checkStorageUsage` và
+`ensureLabBrandShape` nay do bundle cung cấp (không tái diễn bẫy stub vì bài test
+`checkStorageUsage` đã sửa cách stub `infoDialog` từ Lát 1). `ui-accessibility.test.js`
+trỏ `settingsRoutes` sang controller (không còn HTML thô để quét — HTML thật nằm
+ở các builder TS đã đọc riêng). Gate đầy đủ (đã rút kinh nghiệm Lát 3, chạy
+browser TRƯỚC khi chốt): `build:pilot`/`typecheck`/`test` (613/613) +
+`a11y-audit` (trang settings + 18/18 modal, 0 vi phạm — xác nhận `pageSettings()`
+render sạch trong Chromium) + `ui-check` (29/29, không lỗi runtime/console).
+
 ### Pha H — bỏ global bridge và nhiều script tags
 
 Chỉ bắt đầu khi Pha G hoàn thành.
@@ -732,3 +778,4 @@ npm.cmd test
 | 2026-08-18 | Lát 2 của Pha G: chuyển `dashboard-routes.js` (43 dòng, đã gần thuần bridge từ trước) sang `src/presentation/dashboard/dashboard-page-controller.ts` — factory nhận `deps`, không đụng phép tính (mọi `dashboardXxx` builder đã là TS từ trước). Ba bẫy runtime phát hiện sau khi build/typecheck xanh nhưng 24 file test đỏ: (1) tham chiếu bare `isoToday,`/`role,`/`vnDate,`/`rerender,` trong object deps ném `ReferenceError` ngay lúc NẠP bundle ở mọi sandbox thiếu `modules/state.js`/`router-render.js` — phải bọc lazy `()=>isoToday()` như quy ước đã có sẵn khắp `modular-pilot.global.ts`; (2) `root.dashTestQ=value` (gọi setter của accessor `Object.defineProperty` có sẵn) bị `tests/global-name-uniqueness.test.js` hiểu nhầm là khai báo global mới, trùng với khai báo thật ở `ui-state.ts` — sửa bằng cách ghi qua namespace object `(root as any).AnalysisUIState.dashTestQ=value` thay vì gán thẳng `root.dashTestQ=`; (3) lỗi contravariance tham số hàm khi gán 24 hàm `dashboardXxx` có chữ ký cụ thể vào một kiểu `deps` chung — giải quyết bằng `type AnyRec=any` (any thật, không phải `Record<string,any>`). Bài học: sau build/typecheck xanh vẫn phải chạy TOÀN BỘ `npm test`, không chỉ test của route đang chuyển. ~30 assertion source-scanner ở 6 file test (typescript-module-pilot, dashboard-loading-bridge, dashboard-model-bridge, dashboard-page-bridge, ui-accessibility, ui-route-structure) được trỏ sang đọc `dashboard-page-controller.ts` với regex cập nhật theo cú pháp TS. `build:pilot`/`typecheck`/`test` xanh (613/613). |
 | 2026-08-18 | Lát 3 của Pha G (kết thúc nhóm "UI thuần"): chuyển `router-render.js` (149 dòng, ~50 tên global) sang `src/presentation/router/` (5 file) + `src/presentation/shared/ui-primitives.ts` + `src/presentation/range/range-actions-html.ts`. Xóa kèm 2 chỗ chết hẳn (`PERM` — 0 caller; `VN_DATE_MONTHS`/`VN_DATE_DAYS`/`vnDatePicker`/`vnPickerRender()` — bị `vn-date-picker-controller.ts` thay thế từ trước nhưng chưa ai xóa bản classic). `page` chuyển vào `RouterUIState` (cùng cơ chế accessor `dashTestQ` đã dùng). Tái hiện cả 2 bẫy đã biết từ Lát 2 (bare identifier chưa bọc lazy; ghi thẳng `root.page=`/`root.statusMemo=` thay vì qua namespace object) — xác nhận đây là rủi ro lặp lại của MỌI lát Pha G, không phải riêng dashboard. Phát hiện bẫy MỚI: di chuyển `vnDatePickerController.bind()` (side-effect chạy ngay lúc nạp, không phải lazy closure) từ "chạy khi router-render.js nạp" sang "chạy ngay khi bundle nạp" biến nó thành yêu cầu ngầm cho cả 49 file test tải bundle, làm vỡ 2 test có `document` stub tối giản dù chúng không đụng date picker. Bốn phát hiện phụ, mỗi cái một biến thể khác của "bundle ghi đè stub": stub qua `run()` (không chỉ qua tham số `globals`) cũng bị ghi đè nếu đặt trước lệnh nạp bundle; và một dạng MỚI hẳn — test gán lại biến `document=...` giữa chừng để đổi DOM giả lập không còn tác dụng vì hàm đã chuyển sang TS đóng gói (capture) `document` thành closure tại lúc nạp, phải mutate object đã capture (`document.createElement=...`) thay vì gán lại biến. `build:pilot`/`typecheck`/`test` xanh (613/613). Nhóm "UI thuần" của Pha G coi như hoàn tất; lát kế tiếp chuyển sang nhóm "Route/presentation". |
 | 2026-08-18 | Sửa lỗi thật phát hiện qua `npm run ui-check` sau Lát 3 (app thật vỡ ngay khi mở, `pageDash()` ném lỗi ở `isWestgardMemoized`) — bắt nguồn từ Lát 2, không phải Lát 3: wiring `(root as any).wgMemo.has(testId)` luôn `undefined` vì `wgMemo` là biến `let` top-level của `state.js`, KHÔNG phải `function` — chỉ `function` top-level mới tự thành property của `globalThis` trong classic script, `let`/`const` chỉ sống trong lexical scope dùng chung giữa các script, phải tham chiếu bằng tên biến trần. Sửa lại `wgMemo.has(testId)` (bare) + `declare let wgMemo: Map<string, any>;`. Đã quét toàn bộ 111 tên `let`/`const` top-level còn lại trong `assets/modules/*.js` xem có chỗ nào khác bị tham chiếu qua `root.X` sai kiểu này — chỉ có đúng 1 chỗ, đã sửa. Không có test Node nào (kể cả 613 test hiện có) bắt được lỗi này; chỉ `ui-check` (Chromium thật) lộ ra. Sau khi sửa: `ui-check` 29/29 đạt (kể cả "không lỗi runtime/console"), `a11y-audit` 11 trang + 18/18 modal 0 vi phạm, `nce-check` 91/91 đạt. Cập nhật quy trình lát: bước "chạy ui-check/nce-check theo phạm vi" ở mục 6.7 không phải tùy chọn cho lát đụng `render()`/dispatch — phải chạy trước khi coi lát là xong, không chỉ dựa vào `npm test` xanh. |
+| 2026-08-18 | Lát route 1 của Pha G (mở nhóm "Route/presentation"): chuyển `settings.js` (69 dòng) sang `src/presentation/settings/settings-page-controller.ts` — DOM/browser adapter thuần, mọi phép tính đã ở command/service/HTML-builder TS từ trước. Áp dụng sẵn cả hai bài học từ nhóm "UI thuần" (lazy delegation cho mọi dep; phân biệt `function` global qua `root.X` với `let`/`const` global tham chiếu trần) nên KHÔNG tái diễn bẫy nào — lát trôi mượt, chỉ cần 1 ambient declare (`ensureLabBrandShape`, do `state.js` gọi trần). Browser API (FileReader/Image/canvas/clipboard/navigator) tiêm qua deps để test được ngoài trình duyệt. 3 source-scanner test trỏ sang controller + thêm assertion quét wiring `deps→root.settingsXxx` trong compat. Chạy browser gate TRƯỚC khi chốt (kinh nghiệm Lát 3): `build:pilot`/`typecheck`/`test` 613/613 + `a11y-audit` (settings + 18/18 modal, 0 vi phạm) + `ui-check` (29/29). Xác nhận cách làm lát route đã ổn định: file route mỏng dần vì phần nặng đã sang TS ở các đợt trước, nên các lát Route/presentation còn lại chủ yếu là chuyển vỏ điều phối + form handler. |

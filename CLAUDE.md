@@ -88,7 +88,7 @@ node tests/qccore.test.js
 which nearly every module satisfies: existing tests sandbox everything from
 `core.js`/`state.js`/`qc-domain.js`/`qc-rules.js`/the services, view-models and
 `*-ui-state.js` files up to render modules (`draw.js`, `sigma.js`,
-`reports.js`, `settings.js`), passing stub globals for whatever the function
+`reports.js`), passing stub globals for whatever the function
 under test touches. What can't run in the sandbox is *calling* the
 DOM-rendering functions themselves — tests against render modules exercise
 only their pure helpers.
@@ -681,8 +681,23 @@ the Google Fonts link, offline labs must print with correct metrics.
   dashboard KPI/CAPA panel (`dashboardKpiSnapshot()`) existed briefly
   (`5673eb49`) and was removed again before release (`890604eb`, "tinh gon
   dashboard") — the dashboard page has no such panel today.
-- `range.js`, `settings.js`, `backup-service.js`, `data-io.js`, `reports.js`, `users-auth.js`,
-  `reagent.js` — feature-specific logic (target-range calc, settings page,
+- `src/presentation/settings/settings-page-controller.ts` —
+  `createSettingsPageController(deps)` owns `pageSettings()` plus the Settings
+  page's form handlers (`saveLab`/`saveBrand`/`pickLogo`/`clearLogo`/`saveFb`/
+  `clearFb`/`copyFirebaseRules`/`readBrandInputs`/`checkStorageUsage`) and the
+  `ensureLabBrandShape()` state-normalization callback `state.js`'s
+  `ensureShape()` invokes. Retired classic `settings.js` on 2026-08-18 (Pha G
+  route slice 1). It is a DOM/browser adapter — every computation is already a
+  TypeScript command/service (`SettingsProfileCommand`, `SettingsFirebaseCommand`,
+  `firebaseSettingsService`) or HTML builder (`settingsXxxHtml`); the controller
+  reads the form, drives FileReader/canvas for the logo, opens dialogs, and
+  delegates. Browser APIs (`FileReader`/`Image`/canvas/clipboard/`navigator`)
+  are injected as deps so it stays testable. Wired via
+  `src/compat/modular-pilot.global.ts` (`root.pageSettings`, `root.saveLab`,
+  `root.ensureLabBrandShape`, …) so the onclick handlers in the TS HTML builders
+  and `ensureShape()`'s bare `ensureLabBrandShape` call keep working unchanged.
+- `range.js`, `backup-service.js`, `data-io.js`, `reports.js`, `users-auth.js`,
+  `reagent.js` — feature-specific logic (target-range calc,
   backup/restore service + XLSX generation, printed reports, auth/user
   management, reagent lot comparison stats). `users-auth.js` hashes passwords
   with PBKDF2-SHA256 via the TypeScript `pbkdf2PasswordService` bridge, whose
@@ -798,7 +813,8 @@ Those Rules are a versioned artifact, not something to hand-edit in the
 Firebase console: `firebase/database.rules.json` is the single source of truth
 (deployment steps and the five post-deploy checks are in
 `firebase/HUONG-DAN-FIREBASE-RULES.md`), and the Settings page renders the same
-text via `firebaseRulesText()` in `settings.js` — `tests/firebase-rules.test.js`
+text via `firebaseRulesText()` (`src/presentation/settings/firebase-rules.ts`,
+bridged as `settingsFirebaseRulesText`) — `tests/firebase-rules.test.js`
 fails if the two diverge, so change both together. The model: a room is
 readable/writable only by UIDs listed under `qclab-acl/{labCode}/{uid}`, which
 clients can read for themselves but never write; every snapshot must carry a

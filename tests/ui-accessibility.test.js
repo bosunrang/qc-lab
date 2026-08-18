@@ -47,7 +47,7 @@ const reagentPairPanelPresentation = read('src/presentation/reagent/reagent-pair
 const reagentInfoPanelPresentation = read('src/presentation/reagent/reagent-info-panel-html.ts');
 const reagentChartsPanelPresentation = read('src/presentation/reagent/reagent-charts-panel-html.ts');
 const reagentResultsPanelsPresentation = read('src/presentation/reagent/reagent-results-panels-html.ts');
-const settingsRoutes = read('assets/modules/settings.js');
+const settingsRoutes = read('src/presentation/settings/settings-page-controller.ts');
 const indexHtml = read('index.html');
 const cssFiles = fs.readdirSync(path.join(root, 'assets')).filter(name => name.endsWith('.css'));
 

@@ -161,6 +161,7 @@ import { createLisGatewayCommand, type LisGatewayCommand } from '../application/
 import { createLabProfileService } from '../application/settings/lab-profile-service';
 import { createSettingsProfileCommand, type SettingsProfileCommand } from '../application/settings/settings-profile-command';
 import { createSettingsFirebaseCommand, type SettingsFirebaseCommand } from '../application/settings/settings-firebase-command';
+import { createSettingsPageController } from '../presentation/settings/settings-page-controller';
 import { createFirebaseSettingsService } from '../application/sync/firebase-settings-service';
 import { createBrandPreviewHtml } from '../presentation/settings/brand-preview-html';
 import { createUnitProfileHtml } from '../presentation/settings/unit-profile-html';
@@ -1111,6 +1112,17 @@ type QCLabGlobal = typeof globalThis & {
   settingsLisGatewayPanelHtml: ReturnType<typeof createLisGatewayPanelHtml>;
   settingsFirebaseConnectionPanelHtml: ReturnType<typeof createFirebaseConnectionPanelHtml>;
   settingsPageLayoutHtml: ReturnType<typeof createSettingsPageLayoutHtml>;
+  checkStorageUsage: ReturnType<typeof createSettingsPageController>['checkStorageUsage'];
+  saveLab: ReturnType<typeof createSettingsPageController>['saveLab'];
+  ensureLabBrandShape: ReturnType<typeof createSettingsPageController>['ensureLabBrandShape'];
+  saveBrand: ReturnType<typeof createSettingsPageController>['saveBrand'];
+  readBrandInputs: ReturnType<typeof createSettingsPageController>['readBrandInputs'];
+  pickLogo: ReturnType<typeof createSettingsPageController>['pickLogo'];
+  clearLogo: ReturnType<typeof createSettingsPageController>['clearLogo'];
+  saveFb: ReturnType<typeof createSettingsPageController>['saveFb'];
+  clearFb: ReturnType<typeof createSettingsPageController>['clearFb'];
+  copyFirebaseRules: ReturnType<typeof createSettingsPageController>['copyFirebaseRules'];
+  pageSettings: ReturnType<typeof createSettingsPageController>['pageSettings'];
   partitionedIndexedDbWriteService?: ReturnType<typeof createPartitionedIndexedDbWriteService>;
   partitionedIndexedDbReadService?: ReturnType<typeof createPartitionedIndexedDbReadService>;
   passwordPolicyError?: typeof passwordPolicyError;
@@ -1925,6 +1937,59 @@ root.settingsFirebaseRulesPanelHtml = createFirebaseRulesPanelHtml({escape:value
 root.settingsLisGatewayPanelHtml = createLisGatewayPanelHtml({escape:value=>(root as any).esc(value),escapeAttribute:value=>(root as any).escAttr(value),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
 root.settingsFirebaseConnectionPanelHtml = createFirebaseConnectionPanelHtml({escape:value=>(root as any).esc(value),escapeAttribute:value=>(root as any).escAttr(value),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
 root.settingsPageLayoutHtml = createSettingsPageLayoutHtml((title,subtitle)=>(root as any).headOnly(title,subtitle));
+const settingsPageController=createSettingsPageController({
+  document:typeof document!=='undefined'?document:({getElementById:()=>null,createElement:()=>({}),body:{appendChild:()=>{}},execCommand:()=>{}} as unknown as Document),
+  navigator:()=>typeof navigator!=='undefined'?navigator:null,
+  createImage:()=>new Image(),
+  createFileReader:()=>new FileReader(),
+  getState:()=>state,
+  infoDialog:(message,opts)=>root.infoDialog(message,opts),
+  requireAdmin:()=>root.requireAdmin(),
+  cloud:{
+    setStatus:(text,connected)=>setCloudStatus(text,connected),
+    markSaved:(status,detail)=>markSaved(status,detail),
+    dataPath:()=>fbDataPath(),
+    getConfig:()=>getFbCfg(),
+    authUser:()=>(typeof firebase!=='undefined'&&firebase.auth&&firebase.auth().currentUser)||fb.authUser||null,
+  },
+  profileCommand:{
+    saveLab:input=>root.SettingsProfileCommand.saveLab(input),
+    saveBrand:input=>root.SettingsProfileCommand.saveBrand(input),
+    updateDraft:input=>root.SettingsProfileCommand.updateDraft(input),
+    saveLogo:(input,dataUrl)=>root.SettingsProfileCommand.saveLogo(input,dataUrl),
+    clearLogo:()=>root.SettingsProfileCommand.clearLogo(),
+  },
+  firebaseCommand:{connect:input=>root.SettingsFirebaseCommand.connect(input),clear:()=>root.SettingsFirebaseCommand.clear()},
+  firebaseSettingsService:{prepare:input=>root.firebaseSettingsService.prepare(input)},
+  brand:{logo:()=>root.brandLogo(),markText:()=>root.brandMarkText(),title:()=>root.brandTitle(),subtitle:()=>root.brandSub(),profile:lab=>root.settingsBrandProfile!(lab)},
+  html:{
+    storageUsageText:(data,estimate)=>root.settingsStorageUsageText!(data,estimate),
+    brandPreviewHtml:input=>root.settingsBrandPreviewHtml(input),
+    firebaseRulesPanelHtml:(guideHtml,rulesText)=>root.settingsFirebaseRulesPanelHtml(guideHtml,rulesText),
+    firebaseGuideHtml:()=>root.settingsFirebaseGuideHtml!(),
+    firebaseRulesText:()=>root.settingsFirebaseRulesText!(),
+    pageLayoutHtml:input=>root.settingsPageLayoutHtml(input),
+    unitProfileHtml:lab=>root.settingsUnitProfileHtml(lab),
+    brandPanelHtml:input=>root.settingsBrandPanelHtml(input),
+    adminToolsHtml:(statusText,capacityText)=>root.settingsAdminToolsHtml(statusText,capacityText),
+    firebaseConnectionPanelHtml:input=>root.settingsFirebaseConnectionPanelHtml(input),
+    lisGatewayPanelHtml:input=>root.settingsLisGatewayPanelHtml(input),
+    firebaseAclHelp:(labCode,uid)=>root.settingsFirebaseAclHelp!(labCode,uid),
+  },
+  lis:{config:()=>root.lisGatewayConfig!(),runtime:()=>(root as any).lisGatewayRuntime,statusText:()=>root.lisGatewayStatusText!()},
+  backup:{statusText:()=>(root as any).backupStatusText(),capacityText:()=>(root as any).backupCapacityText()},
+});
+root.checkStorageUsage=settingsPageController.checkStorageUsage;
+root.saveLab=settingsPageController.saveLab;
+root.ensureLabBrandShape=settingsPageController.ensureLabBrandShape;
+root.saveBrand=settingsPageController.saveBrand;
+root.readBrandInputs=settingsPageController.readBrandInputs;
+root.pickLogo=settingsPageController.pickLogo;
+root.clearLogo=settingsPageController.clearLogo;
+root.saveFb=settingsPageController.saveFb;
+root.clearFb=settingsPageController.clearFb;
+root.copyFirebaseRules=settingsPageController.copyFirebaseRules;
+root.pageSettings=settingsPageController.pageSettings;
 const modularIndexedDbOpenService=typeof LocalStore !== 'undefined'?createIndexedDbOpenService({indexedDb:()=>typeof indexedDB === 'undefined'?null:indexedDB}):null;
 const modularIndexedDbRecordService=modularIndexedDbOpenService?createIndexedDbRecordService({open:()=>modularIndexedDbOpenService.open()}):null;
 root.partitionedIndexedDbWriteService = createPartitionedIndexedDbWriteService({
