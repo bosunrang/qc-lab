@@ -620,6 +620,42 @@ từng đóng góp (thuộc `routerShell.nav()`) đã có sẵn trong
 `router-shell-controller.ts`, cũng nằm trong chuỗi nối đó. Gate cuối:
 `build:pilot`/`typecheck`/`test` xanh (613/613).
 
+**Lỗi thật phát hiện sau khi chạy `npm run ui-check` (browser thật) — KHÔNG
+lỗi Node nào bắt được:** `pageDash()` ném lỗi ngay khi mở app thật
+(`Cannot read properties of undefined (reading 'has')` tại
+`isWestgardMemoized`). Nguyên nhân: `wgMemo` là một biến `let` khai báo ở top
+level của `state.js` (`let mem=null,...,wgMemo=new Map(),...`), KHÔNG phải
+`function` — trong một classic `<script>` (không phải module), `function`
+top-level tự động trở thành property của `globalThis`/`window`, nhưng
+`let`/`const` thì KHÔNG — chúng chỉ tồn tại trong "lexical environment" dùng
+chung giữa các classic script, chỉ truy cập được bằng tên biến trần (bare
+identifier), không truy cập được qua `globalThis.wgMemo`/`root.wgMemo`. Dòng
+`isWestgardMemoized:testId=>(root as any).wgMemo.has(testId)` do đó luôn nhận
+`undefined`. Lỗi này thực ra sinh ra từ **Lát 2** (dòng y hệt đã có trong
+`dashboard-page-controller.ts`'s wiring từ khi tạo) nhưng không có test Node
+nào chạm tới nhánh đó theo cách phơi ra lỗi — chỉ lộ ra khi chạy thật trong
+Chromium qua `ui-check`. Sửa bằng cách đổi lại thành bare `wgMemo.has(testId)`
+kèm `declare let wgMemo: Map<string, any>;` trong khối ambient của
+`modular-pilot.global.ts`, khớp đúng cách bản classic cũ từng viết
+(`wgMemo.has(t.id)`, không phải `globalThis.wgMemo`). Đã quét toàn bộ 111 tên
+`let`/`const` top-level còn lại trong `assets/modules/*.js` xem có bị tham
+chiếu qua `root.X`/`(root as any).X` ở đâu khác trong `modular-pilot.global.ts`
+không — chỉ có đúng 1 chỗ (`wgMemo`), đã sửa. **Quy tắc rút ra, áp dụng cho
+mọi lát Pha G còn lại:** khi wiring code trong `modular-pilot.global.ts` cần
+đọc một biến TỪ FILE CLASSIC, phải phân biệt hai loại — `function` top-level
+(an toàn qua `root.X`/`(root as any).X`, vì nó thật sự là property của
+`globalThis`) và `let`/`const` top-level (KHÔNG an toàn qua `root.X`, PHẢI
+tham chiếu bằng tên biến trần và thêm `declare let X` nếu cần qua strict
+typecheck) — nhầm giữa hai loại không bị `typecheck` lẫn `npm test` (Node vm
+sandbox) bắt được, chỉ lộ ra khi chạy thật trong trình duyệt. Sau phát hiện
+này, chạy thêm `npm run a11y-audit` (11 trang + 18/18 modal, 0 vi phạm) và
+`npm run nce-check` (91 đạt, bao gồm cả các kịch bản Dashboard/NCE quá hạn đi
+qua đúng `pageDash()`/`rerender()` vừa sửa) để xác nhận không còn lỗi runtime
+nào khác lẩn trong luồng dispatch trang. Bài học quy trình: bước 7 của mục 6
+("theo phạm vi, chạy thêm ui-check/nce-check/...") không phải tùy chọn cho
+những lát đụng tới `render()`/dispatch trang — phải chạy TRƯỚC khi coi lát là
+xong, không chỉ sau khi `npm test` xanh.
+
 ### Pha H — bỏ global bridge và nhiều script tags
 
 Chỉ bắt đầu khi Pha G hoàn thành.
@@ -695,3 +731,4 @@ npm.cmd test
 | 2026-08-18 | Bắt đầu Pha G: chuyển `modals.js` (lát đầu tiên, nhóm "UI thuần") sang `src/presentation/modal/` (4 file TS). Hợp nhất phần focus-trap trùng lặp giữa hai lớp modal/dialog vào một helper dùng chung, giữ nguyên hai lớp `#modalRoot`/`#dialogRoot` tách biệt. Gỡ ~13 chỗ ép kiểu `(root as any)`/`(globalThis as any)` quanh các hàm này trong `modular-pilot.global.ts`. Phát hiện phụ: `tests/local-store.test.js` stub `infoDialog` qua tham số `globals` của `loadSandbox()` — tham số này set TRƯỚC khi file chạy nên bị `generated/modular-pilot.js` (nạp sau) ghi đè ngay khi `infoDialog` chuyển thành thật; sửa bằng cách gán stub sau khi `loadSandbox()` trả về. Bài học cho các lát Pha G kế tiếp: rà `tests/` tìm stub cùng tên qua tham số `globals` trước khi retire một file classic, không chỉ tìm lời gọi trần của hàm sắp xóa. `build:pilot`/`typecheck`/`test` xanh (613/613). |
 | 2026-08-18 | Lát 2 của Pha G: chuyển `dashboard-routes.js` (43 dòng, đã gần thuần bridge từ trước) sang `src/presentation/dashboard/dashboard-page-controller.ts` — factory nhận `deps`, không đụng phép tính (mọi `dashboardXxx` builder đã là TS từ trước). Ba bẫy runtime phát hiện sau khi build/typecheck xanh nhưng 24 file test đỏ: (1) tham chiếu bare `isoToday,`/`role,`/`vnDate,`/`rerender,` trong object deps ném `ReferenceError` ngay lúc NẠP bundle ở mọi sandbox thiếu `modules/state.js`/`router-render.js` — phải bọc lazy `()=>isoToday()` như quy ước đã có sẵn khắp `modular-pilot.global.ts`; (2) `root.dashTestQ=value` (gọi setter của accessor `Object.defineProperty` có sẵn) bị `tests/global-name-uniqueness.test.js` hiểu nhầm là khai báo global mới, trùng với khai báo thật ở `ui-state.ts` — sửa bằng cách ghi qua namespace object `(root as any).AnalysisUIState.dashTestQ=value` thay vì gán thẳng `root.dashTestQ=`; (3) lỗi contravariance tham số hàm khi gán 24 hàm `dashboardXxx` có chữ ký cụ thể vào một kiểu `deps` chung — giải quyết bằng `type AnyRec=any` (any thật, không phải `Record<string,any>`). Bài học: sau build/typecheck xanh vẫn phải chạy TOÀN BỘ `npm test`, không chỉ test của route đang chuyển. ~30 assertion source-scanner ở 6 file test (typescript-module-pilot, dashboard-loading-bridge, dashboard-model-bridge, dashboard-page-bridge, ui-accessibility, ui-route-structure) được trỏ sang đọc `dashboard-page-controller.ts` với regex cập nhật theo cú pháp TS. `build:pilot`/`typecheck`/`test` xanh (613/613). |
 | 2026-08-18 | Lát 3 của Pha G (kết thúc nhóm "UI thuần"): chuyển `router-render.js` (149 dòng, ~50 tên global) sang `src/presentation/router/` (5 file) + `src/presentation/shared/ui-primitives.ts` + `src/presentation/range/range-actions-html.ts`. Xóa kèm 2 chỗ chết hẳn (`PERM` — 0 caller; `VN_DATE_MONTHS`/`VN_DATE_DAYS`/`vnDatePicker`/`vnPickerRender()` — bị `vn-date-picker-controller.ts` thay thế từ trước nhưng chưa ai xóa bản classic). `page` chuyển vào `RouterUIState` (cùng cơ chế accessor `dashTestQ` đã dùng). Tái hiện cả 2 bẫy đã biết từ Lát 2 (bare identifier chưa bọc lazy; ghi thẳng `root.page=`/`root.statusMemo=` thay vì qua namespace object) — xác nhận đây là rủi ro lặp lại của MỌI lát Pha G, không phải riêng dashboard. Phát hiện bẫy MỚI: di chuyển `vnDatePickerController.bind()` (side-effect chạy ngay lúc nạp, không phải lazy closure) từ "chạy khi router-render.js nạp" sang "chạy ngay khi bundle nạp" biến nó thành yêu cầu ngầm cho cả 49 file test tải bundle, làm vỡ 2 test có `document` stub tối giản dù chúng không đụng date picker. Bốn phát hiện phụ, mỗi cái một biến thể khác của "bundle ghi đè stub": stub qua `run()` (không chỉ qua tham số `globals`) cũng bị ghi đè nếu đặt trước lệnh nạp bundle; và một dạng MỚI hẳn — test gán lại biến `document=...` giữa chừng để đổi DOM giả lập không còn tác dụng vì hàm đã chuyển sang TS đóng gói (capture) `document` thành closure tại lúc nạp, phải mutate object đã capture (`document.createElement=...`) thay vì gán lại biến. `build:pilot`/`typecheck`/`test` xanh (613/613). Nhóm "UI thuần" của Pha G coi như hoàn tất; lát kế tiếp chuyển sang nhóm "Route/presentation". |
+| 2026-08-18 | Sửa lỗi thật phát hiện qua `npm run ui-check` sau Lát 3 (app thật vỡ ngay khi mở, `pageDash()` ném lỗi ở `isWestgardMemoized`) — bắt nguồn từ Lát 2, không phải Lát 3: wiring `(root as any).wgMemo.has(testId)` luôn `undefined` vì `wgMemo` là biến `let` top-level của `state.js`, KHÔNG phải `function` — chỉ `function` top-level mới tự thành property của `globalThis` trong classic script, `let`/`const` chỉ sống trong lexical scope dùng chung giữa các script, phải tham chiếu bằng tên biến trần. Sửa lại `wgMemo.has(testId)` (bare) + `declare let wgMemo: Map<string, any>;`. Đã quét toàn bộ 111 tên `let`/`const` top-level còn lại trong `assets/modules/*.js` xem có chỗ nào khác bị tham chiếu qua `root.X` sai kiểu này — chỉ có đúng 1 chỗ, đã sửa. Không có test Node nào (kể cả 613 test hiện có) bắt được lỗi này; chỉ `ui-check` (Chromium thật) lộ ra. Sau khi sửa: `ui-check` 29/29 đạt (kể cả "không lỗi runtime/console"), `a11y-audit` 11 trang + 18/18 modal 0 vi phạm, `nce-check` 91/91 đạt. Cập nhật quy trình lát: bước "chạy ui-check/nce-check theo phạm vi" ở mục 6.7 không phải tùy chọn cho lát đụng `render()`/dispatch — phải chạy trước khi coi lát là xong, không chỉ dựa vào `npm test` xanh. |

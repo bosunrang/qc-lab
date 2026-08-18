@@ -784,6 +784,7 @@ declare function quarantineCorruptLocal(raw: string, error: unknown): void;
 declare const LocalStore: { supported: () => boolean };
 declare let partitionSlot: string, localLoadStatus: string, storageHydrationPromise: Promise<boolean>;
 declare let mem: any, startupProblem: any;
+declare let wgMemo: Map<string, any>;
 declare let lsDirty: boolean, lsFullDirty: boolean, lsSaveFailures: number, lsIncrementalStreak: number, lsLastFullSaveAt: number, lsRevision: number;
 declare let LS_FULL_ROTATE_MAX_INCREMENTALS: number, LS_FULL_ROTATE_MAX_MS: number;
 declare const lsDirtyTestIds: Set<string>;
@@ -2352,7 +2353,7 @@ root.dashboardTestListHtml=dashboardTestListHtml;
 root.dashboardPageHtml=createDashboardPageHtml();
 const dashboardPageController=createDashboardPageController({
   operationalTests:()=>(root as any).operationalTests(),
-  isWestgardMemoized:testId=>(root as any).wgMemo.has(testId),
+  isWestgardMemoized:testId=>wgMemo.has(testId),
   scheduleWestgardPrewarm:tests=>(root as any).scheduleWestgardPrewarm(tests),
   isoToday:()=>isoToday(),
   stateData:()=>state.data||{},

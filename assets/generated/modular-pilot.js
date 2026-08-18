@@ -19011,7 +19011,7 @@
 	root.dashboardPageHtml = createDashboardPageHtml();
 	var dashboardPageController = createDashboardPageController({
 		operationalTests: () => root.operationalTests(),
-		isWestgardMemoized: (testId) => root.wgMemo.has(testId),
+		isWestgardMemoized: (testId) => wgMemo.has(testId),
 		scheduleWestgardPrewarm: (tests) => root.scheduleWestgardPrewarm(tests),
 		isoToday: () => isoToday(),
 		stateData: () => state.data || {},
