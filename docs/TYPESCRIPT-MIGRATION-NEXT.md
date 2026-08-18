@@ -2,15 +2,15 @@
 
 ## Checkpoint hiện tại — 2026-08-19
 
-- Tiến độ ước tính: **83% tổng thể** (kiểm chứng độc lập trước đó: 80–88%).
+- Tiến độ ước tính: **84% tổng thể** (kiểm chứng độc lập trước đó: 80–88%).
 - Xác minh gần nhất: `npm.cmd run build:pilot`, `npm.cmd run typecheck` và
-  `npm.cmd test` đều đạt; test suite **611/611 pass**.
+  `npm.cmd test` đều đạt; test suite **612/612 pass**.
 - Wave F validation đã đạt: `ui-check` 28/28, `nce-check` 91/91,
   `visual-check`, `a11y-audit` (0 vi phạm), `print-check` và
   `verify-release` (dependency audit + performance regression) đều pass.
 - `assets/generated/modular-pilot.js`: bundle sinh từ Vite, không sửa trực tiếp.
 - Bundle runtime hiện dùng tag
-  `ts-phase1-quickwins-20260819-1`; phải tăng tag tương ứng nếu sửa
+  `ts-phase2-tea-transition-20260819-1`; phải tăng tag tương ứng nếu sửa
   artifact runtime.
 - **Ghi chú tài liệu (2026-08-18):** `reagent.js` (Passing-Bablok/Deming/
   Bland-Altman) đã có đủ `src/domain/reagent/`, `reagent-comparison-service.ts`
@@ -137,24 +137,38 @@
     2 scanner test bridge cũ (`entry-service.test.js`,
     `reagent-service-bridge.test.js`) pin call-site cũ, đã cập nhật để pin
     đúng workflow command mới thay vì revert code.
+24. **Wave F — Phase 2 (bảng TEa tham chiếu + chuyển tiếp lô):**
+    - `manage-routes.js`: `teaRefEdit`/`teaRefRemove`/`teaRefAddSubmit`/
+      `teaLabProfileSave`/`teaLabProfileRemove` gộp vào
+      `TeaReferenceWorkflowCommand` (file mới) — cả 5 thao tác đều gọi lại
+      `sgReconcileAllTeaSnapshots()` (đồng bộ TEa% cho MỌI xét nghiệm đang
+      track Sigma, không chỉ xét nghiệm đang mở) trước khi save/render. Chuỗi
+      audit dựng từ KẾT QUẢ service trả về (before/record đã cập nhật), không
+      phải input, vì `TeaReferenceService` tự tính version/nguồn stamp; định
+      dạng ngày (`vnDate`) được tiêm vào command qua `formatDate` thay vì tính
+      cứng trong TS. `teaRefRemove` giữ đúng hành vi cũ: nhãn audit
+      ("Khôi phục"/"Xóa") theo tham số `isDefault` đầu vào, KHÔNG theo
+      `result.restored` trả về — hai giá trị này có thể khác nhau khi
+      `isDefault=true` nhưng record chưa từng có TEa chuẩn hóa (`lab==null`),
+      giữ nguyên hành vi gốc chứ không "sửa" thành theo `restored`.
+    - `manage-tests-actions.js`: `saveLotTransitionV2()` — chỉ gộp phần
+      commit cuối (`ManageLotTransitionWorkflowCommand.execute`, mới thêm),
+      giữ nguyên `prepare()`/`acceptanceGate()`/đọc DOM Mean-SD/
+      `applyPlannedTarget()` ở JS như cũ vì các bước đó không tự audit/save
+      riêng — không cần gộp cả luồng như lo ngại ban đầu.
+    2 scanner test bridge cũ (`manage-history-bridge.test.js`,
+    `manage-config-service-bridge.test.js`) pin call-site cũ, đã cập nhật.
 
 ## Việc tiếp theo (ưu tiên)
 
-1. **Phase 2 (trung bình, cần đọc kỹ trước khi gộp):**
-   - `manage-routes.js`: `teaRefEdit`, `teaRefRemove`, `teaRefAddSubmit`,
-     `teaLabProfileSave`, `teaLabProfileRemove` (bảng TEa tham chiếu) — 5 hàm,
-     chưa có `TeaReferenceWorkflowCommand` nào, cần thiết kế mới.
-   - `manage-tests-actions.js`: `saveLotTransitionV2()` — có bước
-     `applyPlannedTarget` xen giữa gate và commit, khó gộp gọn như
-     `deleteLotTransition` đã làm.
-2. **Phase 3 (lớn, rủi ro, nên hoãn):** `sigma.js` — trang lớn nhất app, ~10
+1. **Phase 3 (lớn, rủi ro, nên hoãn):** `sigma.js` — trang lớn nhất app, ~10
    hàm `sgXxx` (TEa, track/untrack test, bias, MU, cohort import…) đều tự
    orchestrate, không có tầng command nào bọc sẵn; state (cohort, TEa
    snapshot, kỳ bias/MU) đan xen phức tạp — cần chia nhỏ thành nhiều workflow
    command riêng qua vài phiên, không làm gọn trong 1 lần.
-3. **Wave F — strictness:** tiếp tục giảm ambient global chỉ còn dùng nội bộ;
+2. **Wave F — strictness:** tiếp tục giảm ambient global chỉ còn dùng nội bộ;
    ưu tiên service/command có adapter JS mỏng và caller runtime rõ ràng.
-4. **Wave F — release hardening:** sau mỗi lát runtime, chạy cổng phù hợp; trước
+3. **Wave F — release hardening:** sau mỗi lát runtime, chạy cổng phù hợp; trước
    phát hành chạy lại `verify-release` cùng UI/visual/a11y/print/Electron.
 
 ## Quy tắc làm việc

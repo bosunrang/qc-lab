@@ -109,8 +109,8 @@ function teaRefEnsure(refKey){return globalThis.TeaReferenceService.ensure(state
    đang track Sigma cùng lúc (không chỉ xét nghiệm đang mở) — đồng bộ lại snapshot
    kỳ hiện tại của tất cả trước khi lưu, để Sigma không hiển thị TEa cũ cho tới
    khi ai đó tình cờ mở lại trang đó. */
-function teaRefEdit(name,field,val){if(!requireAdmin())return;const {record:e,before}=globalThis.TeaReferenceService.edit(state,name,field,val);logAct('Cập nhật TEa tham chiếu',`${e.name} · ${field.toUpperCase()}: ${before??'—'} → ${e[field]??'—'} · ${e.sources[field].version||'không phiên bản'}`,'Bảng TEa');if(typeof sgReconcileAllTeaSnapshots==='function')sgReconcileAllTeaSnapshots();save({clearDerived:false});rerender();}
-function teaRefRemove(refKey){if(!requireAdmin())return;const row=teaRefFind(refKey),isDefault=teaRefIsDefault(refKey);globalThis.TeaReferenceService.restoreOrRemove(state,refKey,isDefault);logAct(isDefault?'Khôi phục TEa mặc định':'Xóa TEa tự thêm',row&&row.name||refKey,'Bảng TEa');if(typeof sgReconcileAllTeaSnapshots==='function')sgReconcileAllTeaSnapshots();save({clearDerived:false});rerender();}
+function teaRefEdit(name,field,val){if(!requireAdmin())return;globalThis.TeaReferenceWorkflowCommand.edit({name,field,val});}
+function teaRefRemove(refKey){if(!requireAdmin())return;const isDefault=teaRefIsDefault(refKey);globalThis.TeaReferenceWorkflowCommand.remove({refKey,isDefault});}
 function teaSourceRegistryHtml(){const items=globalThis.teaSourceRegistryItemsPresentation(TEA_SOURCE_REGISTRY,vnDate);return globalThis.teaSourceRegistryPresentation(items);}
 function teaRefOpenAdd(){
   if(!requireAdmin())return;
@@ -121,9 +121,8 @@ async function teaRefAddSubmit(){
   if(!requireAdmin())return;
   const name=QCCore.cleanText(document.getElementById('trAddName').value,120).trim();
   if(!name){await infoDialog('Nhập tên xét nghiệm.');return;}
-  const input={name,abbreviation:QCCore.cleanText(document.getElementById('trAddAbbreviation').value,40).trim(),matrix:QCCore.cleanText(document.getElementById('trAddMatrix').value,80).trim(),unit:QCCore.cleanText(document.getElementById('trAddUnit').value,40),section:QCCore.cleanText(document.getElementById('trAddSection').value,80),clia:document.getElementById('trAddClia').value,ricos:document.getElementById('trAddRicos').value},e=globalThis.TeaReferenceService.addCustomReference(state,input).record;
-  logAct('Thêm TEa tham chiếu',`${e.name} · CLIA ${e.clia??'—'} · Ricos ${e.ricos??'—'}`,'Bảng TEa');
-  if(typeof sgReconcileAllTeaSnapshots==='function')sgReconcileAllTeaSnapshots();save();closeModal();rerender();
+  const data={name,abbreviation:QCCore.cleanText(document.getElementById('trAddAbbreviation').value,40).trim(),matrix:QCCore.cleanText(document.getElementById('trAddMatrix').value,80).trim(),unit:QCCore.cleanText(document.getElementById('trAddUnit').value,40),section:QCCore.cleanText(document.getElementById('trAddSection').value,80),clia:document.getElementById('trAddClia').value,ricos:document.getElementById('trAddRicos').value};
+  globalThis.TeaReferenceWorkflowCommand.addCustom({data});
 }
 function teaLabProfileOpen(refKey){
   if(!requireAdmin())return;const ref=effectiveTeaRefs().find(r=>r[6]===refKey||teaRefName(r[0])===teaRefName(refKey));if(!ref)return;const row=teaRefFind(refKey),meta=row&&row.sources&&row.sources.lab||{},source=row&&row.labSource||'',sourceOpts=['<option value="">— Chọn nguồn chính —</option>',...TEA_LAB_BASIS_SOURCES.map(([v,label])=>`<option value="${v}" ${source===v?'selected':''}>${esc(label)}</option>`)].join(''),effective=meta.effectiveDate||isoToday(),approvedDate=meta.reviewedDate||isoToday(),prepared=row&&row.labPreparedBy||userName(),approved=meta.reviewedBy||userName(),nextReview=row&&row.labNextReviewDate||'';
@@ -135,11 +134,13 @@ function teaLabProfileOpen(refKey){
 async function teaLabProfileSave(refKey){
   if(!requireAdmin())return;const get=id=>String(document.getElementById(id)&&document.getElementById(id).value||'').trim(),value=teaRefNumOrNull(get('teaLabValue')),source=get('teaLabSource'),reference=QCCore.cleanText(get('teaLabReference'),500),reason=QCCore.cleanText(get('teaLabReason'),4000),effective=parseVN(get('teaLabEffectiveDate'))||'',nextReview=parseVN(get('teaLabNextReviewDate'))||'',prepared=QCCore.cleanText(get('teaLabPreparedBy'),120),approved=QCCore.cleanText(get('teaLabApprovedBy'),120),approvedDate=parseVN(get('teaLabApprovedDate'))||'';
   const basisLabel=globalThis.teaLabBasisLabelPresentation(TEA_LAB_BASIS_SOURCES,source);if(value==null){await infoDialog('Nhập TEa chuẩn hóa lớn hơn 0%.');return;}if(!basisLabel){await infoDialog('Chọn nguồn chính của TEa chuẩn hóa.');return;}if(reference.length<3){await infoDialog('Nhập tài liệu, phiên bản hoặc đường dẫn tham chiếu.');return;}if(reason.length<10){await infoDialog('Lý do lựa chọn cần ít nhất 10 ký tự.');return;}if(!effective||!approvedDate){await infoDialog('Nhập ngày hiệu lực và ngày phê duyệt hợp lệ.');return;}if(approvedDate>effective){await infoDialog('Ngày phê duyệt không được sau ngày hiệu lực.');return;}if(nextReview&&nextReview<effective){await infoDialog('Ngày xem xét lại không được trước ngày hiệu lực.');return;}if(!prepared||!approved){await infoDialog('Nhập người xây dựng và người phê duyệt.');return;}
-  const profile={value,source,sourceLabel:basisLabel,reference,reason,effective,nextReview,prepared,approved,approvedDate},{record:row,before}=globalThis.TeaReferenceService.saveLabProfile(state,refKey,profile);
-  logAct(before==null?'Thiết lập TEa chuẩn hóa':'Cập nhật TEa chuẩn hóa',`${row.name} · ${before??'—'}% → ${value}% · ${basisLabel} · ${reference} · Hiệu lực ${vnDate(effective)} · Xây dựng: ${prepared} · Phê duyệt: ${approved} (${vnDate(approvedDate)})${nextReview?' · Xem xét lại '+vnDate(nextReview):''} · Lý do: ${reason}`,'Bảng TEa');if(typeof sgReconcileAllTeaSnapshots==='function')sgReconcileAllTeaSnapshots();save({clearDerived:false});closeModal();rerender();
+  const profile={value,source,sourceLabel:basisLabel,reference,reason,effective,nextReview,prepared,approved,approvedDate};
+  globalThis.TeaReferenceWorkflowCommand.saveLabProfile({refKey,profile});
 }
 async function teaLabProfileRemove(refKey){
-  if(!requireAdmin())return;const row=teaRefFind(refKey);if(!row||row.lab==null)return;const ok=await confirmDialog({kicker:'TEa chuẩn hóa',title:'Xóa TEa chuẩn hóa?',message:`${teaAnalyteDisplay(row.name,row)} · ${row.lab}%`,detail:'Các kỳ Sigma cũ vẫn giữ ảnh chụp TEa đã sử dụng. Kỳ hiện tại sẽ không còn dùng nguồn TEa chuẩn hóa này.',confirmLabel:'Xóa TEa',cancelLabel:'Hủy',danger:true});if(!ok)return;const isDefault=teaRefIsDefault(refKey),{before}=globalThis.TeaReferenceService.removeLabProfile(state,refKey,isDefault);logAct('Xóa TEa chuẩn hóa',`${row.name} · ${before}%`,'Bảng TEa');if(typeof sgReconcileAllTeaSnapshots==='function')sgReconcileAllTeaSnapshots();save({clearDerived:false});closeModal();rerender();
+  if(!requireAdmin())return;const row=teaRefFind(refKey);if(!row||row.lab==null)return;const ok=await confirmDialog({kicker:'TEa chuẩn hóa',title:'Xóa TEa chuẩn hóa?',message:`${teaAnalyteDisplay(row.name,row)} · ${row.lab}%`,detail:'Các kỳ Sigma cũ vẫn giữ ảnh chụp TEa đã sử dụng. Kỳ hiện tại sẽ không còn dùng nguồn TEa chuẩn hóa này.',confirmLabel:'Xóa TEa',cancelLabel:'Hủy',danger:true});if(!ok)return;
+  const isDefault=teaRefIsDefault(refKey);
+  globalThis.TeaReferenceWorkflowCommand.removeLabProfile({refKey,isDefault});
 }
 function manageTeaRefs(){
   const canManage=role()==='admin',ro=canManage?'':'disabled';

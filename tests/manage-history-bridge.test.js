@@ -20,11 +20,12 @@ assert.match(bridge, /historyTablePresentation: typeof historyTableHtml;/, 'Brid
 assert.match(bridge, /historyPanelPresentation: typeof historyPanelHtml;/, 'Bridge phải coi presentation panel lịch sử là hợp đồng bắt buộc');
 assert.match(route, /function teaRefFind\(refKey\)\{return globalThis\.TeaReferenceService\.find\(state,refKey\);\}/, 'Tra cứu TEa phải dùng service TypeScript');
 assert.match(route, /function teaRefEnsure\(refKey\)\{return globalThis\.TeaReferenceService\.ensure\(state,refKey\)\.record;\}/, 'Tạo TEa phải dùng service TypeScript');
-assert.match(route, /const \{record:e,before\}=globalThis\.TeaReferenceService\.edit\(state,name,field,val\);/, 'Sửa TEa phải dùng command TypeScript');
-assert.match(route, /globalThis\.TeaReferenceService\.restoreOrRemove\(state,refKey,isDefault\);/, 'Khôi phục hoặc xóa TEa phải dùng command TypeScript');
-assert.match(route, /e=globalThis\.TeaReferenceService\.addCustomReference\(state,input\)\.record;/, 'Thêm TEa phải dùng command TypeScript');
-assert.match(route, /\{record:row,before\}=globalThis\.TeaReferenceService\.saveLabProfile\(state,refKey,profile\);/, 'Lưu hồ sơ TEa chuẩn hóa phải dùng command TypeScript');
-assert.match(route, /\{before\}=globalThis\.TeaReferenceService\.removeLabProfile\(state,refKey,isDefault\);/, 'Xóa hồ sơ TEa chuẩn hóa phải dùng command TypeScript');
+assert.match(route, /globalThis\.TeaReferenceWorkflowCommand\.edit\(\{name,field,val\}\);/, 'Sửa TEa phải đi qua workflow command TypeScript');
+assert.match(route, /globalThis\.TeaReferenceWorkflowCommand\.remove\(\{refKey,isDefault\}\);/, 'Khôi phục hoặc xóa TEa phải đi qua workflow command TypeScript');
+assert.match(route, /globalThis\.TeaReferenceWorkflowCommand\.addCustom\(\{data\}\);/, 'Thêm TEa phải đi qua workflow command TypeScript');
+assert.match(route, /globalThis\.TeaReferenceWorkflowCommand\.saveLabProfile\(\{refKey,profile\}\);/, 'Lưu hồ sơ TEa chuẩn hóa phải đi qua workflow command TypeScript');
+assert.match(route, /globalThis\.TeaReferenceWorkflowCommand\.removeLabProfile\(\{refKey,isDefault\}\);/, 'Xóa hồ sơ TEa chuẩn hóa phải đi qua workflow command TypeScript');
+assert.match(bridge, /service:root\.TeaReferenceService/, 'Workflow command TEa phải bọc service TypeScript');
 assert.doesNotMatch(route, /TeaReferenceService&&/, 'Không giữ fallback classic cho command TEa');
 assert.doesNotMatch(route, /function teaRefFind\(refKey\)\{if\(globalThis\.TeaReferenceService\)/, 'Không giữ fallback classic khi tra cứu TEa');
 assert.match(bridge, /TeaReferenceService: TeaReferenceServiceApi;/, 'Service TEa phải là hợp đồng bridge bắt buộc');

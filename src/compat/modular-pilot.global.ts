@@ -59,6 +59,7 @@ import { createManageLotGroupWorkflowCommand, type ManageLotGroupWorkflowCommand
 import { createManageTargetMatrixWorkflowCommand, type ManageTargetMatrixWorkflowCommand } from '../application/manage/manage-target-matrix-workflow-command';
 import { createTargetMatrixCommand } from '../application/manage/target-matrix-command';
 import { createTeaReferenceService, type TeaReferenceServiceApi } from '../application/manage/tea-reference-service';
+import { createTeaReferenceWorkflowCommand, type TeaReferenceWorkflowCommand } from '../application/manage/tea-reference-workflow-command';
 import { createPeriodService, type PeriodServiceApi } from '../application/period/period-service';
 import { createReportPeriodCommand, type ReportPeriodCommand } from '../application/period/report-period-command';
 import { createReportPeriodWorkflowCommand, type ReportPeriodWorkflowCommand } from '../application/period/report-period-workflow-command';
@@ -883,6 +884,7 @@ type QCLabGlobal = typeof globalThis & {
   ManageLotGroupWorkflowCommand: ManageLotGroupWorkflowCommand;
   ManageTargetMatrixWorkflowCommand: ManageTargetMatrixWorkflowCommand;
   TeaReferenceService: TeaReferenceServiceApi;
+  TeaReferenceWorkflowCommand: TeaReferenceWorkflowCommand;
   LotTransitionPickerService: LotTransitionPickerServiceApi;
   PeriodService: PeriodServiceApi;
   qcPointWarnings?: (test: Record<string, any>, config: Record<string, any>, date: string,
@@ -2778,7 +2780,7 @@ const manageLotCommand = createManageLotCommand({
 });
 root.ManageLotWorkflowCommand=createManageLotWorkflowCommand({current:()=>state,lot:manageLotCommand,log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),close:()=>(root as any).closeModal(),render:()=>rerender()});
 root.ManageAssayWorkflowCommand=createManageAssayWorkflowCommand({current:()=>state,assay:manageAssayCommand,removal:manageAssayRemovalCommand,log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),close:()=>(root as any).closeModal(),render:()=>rerender()});
-root.ManageLotTransitionWorkflowCommand=createManageLotTransitionWorkflowCommand({current:()=>state,transition:root.ManageLotTransitionCommand,log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),render:()=>rerender()});
+root.ManageLotTransitionWorkflowCommand=createManageLotTransitionWorkflowCommand({current:()=>state,transition:root.ManageLotTransitionCommand,clearDerived:()=>(globalThis as any).clearDerived(),log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),close:()=>(root as any).closeModal(),render:()=>rerender()});
 root.ManageLotGroupWorkflowCommand=createManageLotGroupWorkflowCommand({current:()=>state,group:manageLotGroupCommand,activation:manageLotGroupActivationCommand,reconcileSigma:()=>(globalThis as any).reconcileSigmaLevelsWithLotGroups(),log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),close:()=>(root as any).closeModal(),render:()=>rerender()});
 const targetMatrixCommand=createTargetMatrixCommand({
   apply:input=>root.ManageConfigService.applyTargetMatrix({...input,note:'Cập nhật Mean/SD',tests:state.tests,lots:state.qcLots||[],groups:state.lotGroups||[],
@@ -2795,6 +2797,7 @@ root.TeaReferenceService = createTeaReferenceService({
   sourceRegistry: () => (globalThis as any).TEA_SOURCE_REGISTRY, createId: () => (globalThis as any).uid(),
   todayIso: () => (globalThis as any).isoToday(), userName: () => (globalThis as any).userName(),
 });
+root.TeaReferenceWorkflowCommand=createTeaReferenceWorkflowCommand({current:()=>state,service:root.TeaReferenceService,reconcileSigmaTea:()=>{if(typeof (globalThis as any).sgReconcileAllTeaSnapshots==='function')(globalThis as any).sgReconcileAllTeaSnapshots();},formatDate:iso=>(globalThis as any).vnDate(iso),log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),close:()=>(root as any).closeModal(),render:()=>rerender()});
 root.LotTransitionPickerService = createLotTransitionPickerService({
   searchText: value => (globalThis as any).searchText(value), formatDate: value => (globalThis as any).vnDate(value),
   transitionToNo: lotId => (globalThis as any).lotTransitionToNo(lotId),

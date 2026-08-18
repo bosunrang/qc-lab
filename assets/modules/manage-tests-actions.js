@@ -190,9 +190,7 @@ async function saveLotTransitionV2(id){
     picks.forEach(pick=>{if(pick.use)applyPlannedTarget(pick.t,prep.toLot,pick,'Nhập khi tạo hồ sơ chuyển lô');});
   }
   const gate=globalThis.ManageLotTransitionCommand.acceptanceGate({state,data:prep.data,finalChanged:prep.finalChanged});if(!gate.ok){await infoDialog(gate.message);return;}
-  const result=globalThis.ManageLotTransitionCommand.execute({state,id,newId:uid(),data:prep.data});if(!result.ok){await infoDialog(result.message);return;}
-  result.effects.audit.forEach(a=>logAct(a.action,a.detail,a.target));
-  clearDerived();closeModal();save();rerender();
+  const result=globalThis.ManageLotTransitionWorkflowCommand.execute({id,newId:uid(),data:prep.data});if(!result.ok){await infoDialog(result.message);return;}
 }
 async function openConfigGroup(id=''){
   if(!state.qcLots.length){await infoDialog('Hãy tạo lô QC trước khi tạo nhóm lô.');setManageTab('lots');return;}

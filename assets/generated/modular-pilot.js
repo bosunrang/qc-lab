@@ -2913,9 +2913,23 @@
 			deps.render();
 			return result;
 		};
+		const execute = (input) => {
+			const result = deps.transition.execute({
+				state: deps.current(),
+				...input
+			});
+			if (!result.ok) return result;
+			result.effects.audit.forEach((a) => deps.log(a.action, a.detail, a.target));
+			deps.clearDerived();
+			deps.close();
+			deps.saveState(result.effects.save);
+			deps.render();
+			return result;
+		};
 		return Object.freeze({
 			checkRemoval,
-			remove
+			remove,
+			execute
 		});
 	}
 	//#endregion
@@ -3192,6 +3206,57 @@
 			externalChanged,
 			removeLabProfile,
 			restoreOrRemove
+		});
+	}
+	//#endregion
+	//#region src/application/manage/tea-reference-workflow-command.ts
+	function createTeaReferenceWorkflowCommand(deps) {
+		const commit = (save, close = false) => {
+			deps.reconcileSigmaTea();
+			if (close) deps.close();
+			deps.saveState(save);
+			deps.render();
+		};
+		const edit = (input) => {
+			const result = deps.service.edit(deps.current(), input.name, input.field, input.val);
+			const e = result.record;
+			deps.log("Cập nhật TEa tham chiếu", `${e.name} · ${input.field.toUpperCase()}: ${result.before ?? "—"} → ${e[input.field] ?? "—"} · ${result.source.version || "không phiên bản"}`, "Bảng TEa");
+			commit({ clearDerived: false });
+			return result;
+		};
+		const remove = (input) => {
+			const result = deps.service.restoreOrRemove(deps.current(), input.refKey, input.isDefault);
+			const label = result.record && result.record.name || input.refKey;
+			deps.log(input.isDefault ? "Khôi phục TEa mặc định" : "Xóa TEa tự thêm", label, "Bảng TEa");
+			commit({ clearDerived: false });
+			return result;
+		};
+		const addCustom = (input) => {
+			const result = deps.service.addCustomReference(deps.current(), input.data);
+			const e = result.record;
+			deps.log("Thêm TEa tham chiếu", `${e.name} · CLIA ${e.clia ?? "—"} · Ricos ${e.ricos ?? "—"}`, "Bảng TEa");
+			commit({}, true);
+			return result;
+		};
+		const saveLabProfile = (input) => {
+			const result = deps.service.saveLabProfile(deps.current(), input.refKey, input.profile);
+			const before = result.before, row = result.record, p = input.profile;
+			deps.log(before == null ? "Thiết lập TEa chuẩn hóa" : "Cập nhật TEa chuẩn hóa", `${row.name} · ${before ?? "—"}% → ${p.value}% · ${p.sourceLabel} · ${p.reference} · Hiệu lực ${deps.formatDate(p.effective)} · Xây dựng: ${p.prepared} · Phê duyệt: ${p.approved} (${deps.formatDate(p.approvedDate)})${p.nextReview ? " · Xem xét lại " + deps.formatDate(p.nextReview) : ""} · Lý do: ${p.reason}`, "Bảng TEa");
+			commit({ clearDerived: false }, true);
+			return result;
+		};
+		const removeLabProfile = (input) => {
+			const result = deps.service.removeLabProfile(deps.current(), input.refKey, input.isDefault);
+			deps.log("Xóa TEa chuẩn hóa", `${result.record.name} · ${result.before}%`, "Bảng TEa");
+			commit({ clearDerived: false }, true);
+			return result;
+		};
+		return Object.freeze({
+			edit,
+			remove,
+			addCustom,
+			saveLabProfile,
+			removeLabProfile
 		});
 	}
 	//#endregion
@@ -18923,8 +18988,10 @@
 	root.ManageLotTransitionWorkflowCommand = createManageLotTransitionWorkflowCommand({
 		current: () => state,
 		transition: root.ManageLotTransitionCommand,
+		clearDerived: () => globalThis.clearDerived(),
 		log: (action, detail, target) => logAct(action, detail, target),
 		saveState: (options) => save(options),
+		close: () => root.closeModal(),
 		render: () => rerender()
 	});
 	root.ManageLotGroupWorkflowCommand = createManageLotGroupWorkflowCommand({
@@ -18965,6 +19032,18 @@
 		createId: () => globalThis.uid(),
 		todayIso: () => globalThis.isoToday(),
 		userName: () => globalThis.userName()
+	});
+	root.TeaReferenceWorkflowCommand = createTeaReferenceWorkflowCommand({
+		current: () => state,
+		service: root.TeaReferenceService,
+		reconcileSigmaTea: () => {
+			if (typeof globalThis.sgReconcileAllTeaSnapshots === "function") globalThis.sgReconcileAllTeaSnapshots();
+		},
+		formatDate: (iso) => globalThis.vnDate(iso),
+		log: (action, detail, target) => logAct(action, detail, target),
+		saveState: (options) => save(options),
+		close: () => root.closeModal(),
+		render: () => rerender()
 	});
 	root.LotTransitionPickerService = createLotTransitionPickerService({
 		searchText: (value) => globalThis.searchText(value),
