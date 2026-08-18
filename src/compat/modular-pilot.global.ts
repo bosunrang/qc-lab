@@ -4,6 +4,10 @@ import { createEntryRecordCommand } from '../application/entry/entry-record-comm
 import { createEntryRecordWorkflowCommand, type EntryRecordWorkflowCommand } from '../application/entry/entry-record-workflow-command';
 import { createEntryVoidCommand } from '../application/entry/entry-void-command';
 import { createEntryVoidWorkflowCommand, type EntryVoidWorkflowCommand } from '../application/entry/entry-void-workflow-command';
+import { createEntryDateNoteWorkflowCommand, type EntryDateNoteWorkflowCommand } from '../application/entry/entry-date-note-workflow-command';
+import { createRangeTargetCommand } from '../application/range/range-target-command';
+import { createRangeWorkflowCommand, type RangeWorkflowCommand } from '../application/range/range-workflow-command';
+import { createReagentComparisonWorkflowCommand, type ReagentComparisonWorkflowCommand } from '../application/reagent/reagent-comparison-workflow-command';
 import {
   BACKUP_IMPORT_MAX_BYTES,
   BACKUP_IMPORT_WARN_BYTES,
@@ -39,7 +43,7 @@ import {
   type ManageConfigServiceApi,
 } from '../application/manage/manage-config-service';
 import { createManageAssayCommand } from '../application/manage/manage-assay-command';
-import { createManageAssayRemovalCommand, type ManageAssayRemovalCommand } from '../application/manage/manage-assay-removal-command';
+import { createManageAssayRemovalCommand } from '../application/manage/manage-assay-removal-command';
 import { createManageInstrumentCommand } from '../application/manage/manage-instrument-command';
 import { createManageInstrumentWorkflowCommand, type ManageInstrumentWorkflowCommand } from '../application/manage/manage-instrument-workflow-command';
 import { createManagePanelCommand } from '../application/manage/manage-panel-command';
@@ -866,8 +870,10 @@ type QCLabGlobal = typeof globalThis & {
   EntryService: EntryServiceApi;
   EntryRecordWorkflowCommand: EntryRecordWorkflowCommand;
   EntryVoidWorkflowCommand: EntryVoidWorkflowCommand;
+  EntryDateNoteWorkflowCommand: EntryDateNoteWorkflowCommand;
+  RangeWorkflowCommand: RangeWorkflowCommand;
+  ReagentComparisonWorkflowCommand: ReagentComparisonWorkflowCommand;
   ManageConfigService: ManageConfigServiceApi;
-  ManageAssayRemovalCommand: ManageAssayRemovalCommand;
   ManageInstrumentWorkflowCommand: ManageInstrumentWorkflowCommand;
   ManagePanelWorkflowCommand: ManagePanelWorkflowCommand;
   ManageLotTransitionCommand: ManageLotTransitionCommand;
@@ -2620,6 +2626,9 @@ const entryVoidCommand = createEntryVoidCommand({
 });
 root.EntryRecordWorkflowCommand=createEntryRecordWorkflowCommand({current:()=>state,record:entryRecordCommand,log:(action,detail,target)=>logAct(action,detail,target),save:options=>save(options)});
 root.EntryVoidWorkflowCommand=createEntryVoidWorkflowCommand({current:()=>state,voidCommand:entryVoidCommand,log:(action,detail,target)=>logAct(action,detail,target),save:options=>save(options)});
+root.EntryDateNoteWorkflowCommand=createEntryDateNoteWorkflowCommand({current:()=>state,entry:root.EntryService,formatDate:date=>(globalThis as any).vnDate(date),log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options)});
+const rangeTargetCommand=createRangeTargetCommand({assignTarget:(config,mean,sd,source)=>root.qcRangeCandidateService!.assignTarget(config,mean,sd,source)});
+root.RangeWorkflowCommand=createRangeWorkflowCommand({current:()=>state,target:rangeTargetCommand,log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),render:()=>rerender()});
 const backupTextBytes = (text: string): number => {
   if (typeof Blob !== 'undefined') return new Blob([text]).size;
   if (typeof TextEncoder !== 'undefined') return new TextEncoder().encode(text).length;
@@ -2730,7 +2739,7 @@ root.ManageConfigService = createManageConfigService({
   limitsFromTarget: root.QCCore.limitsFromTarget,
 });
 const manageAssayCommand = createManageAssayCommand({saveAssay:(targetState,input)=>root.ManageConfigService.saveAssay(targetState as any,input)});
-root.ManageAssayRemovalCommand = createManageAssayRemovalCommand({removeAssay:(targetState,input)=>root.ManageConfigService.removeAssay(targetState as any,input)});
+const manageAssayRemovalCommand = createManageAssayRemovalCommand({removeAssay:(targetState,input)=>root.ManageConfigService.removeAssay(targetState as any,input)});
 const manageInstrumentCommand = createManageInstrumentCommand({saveInstrument:(targetState,input)=>root.ManageConfigService.saveInstrument(targetState as any,input),removeInstrument:(targetState,input)=>root.ManageConfigService.removeInstrument(targetState as any,input)});
 root.ManageInstrumentWorkflowCommand=createManageInstrumentWorkflowCommand({current:()=>state,instrument:manageInstrumentCommand,log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),close:()=>(root as any).closeModal(),render:()=>rerender()});
 const managePanelCommand = createManagePanelCommand({savePanel:(targetState,input)=>root.ManageConfigService.savePanel(targetState as any,input),removePanel:(targetState,input)=>root.ManageConfigService.removePanel(targetState as any,input)});
@@ -2768,7 +2777,7 @@ const manageLotCommand = createManageLotCommand({
   removeRecord:(s,i)=>root.ManageConfigService.removeLot(s as any,{...i,switchesLot:root.ManageConfigService.transitionSwitchesLot}),
 });
 root.ManageLotWorkflowCommand=createManageLotWorkflowCommand({current:()=>state,lot:manageLotCommand,log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),close:()=>(root as any).closeModal(),render:()=>rerender()});
-root.ManageAssayWorkflowCommand=createManageAssayWorkflowCommand({current:()=>state,assay:manageAssayCommand,log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),close:()=>(root as any).closeModal(),render:()=>rerender()});
+root.ManageAssayWorkflowCommand=createManageAssayWorkflowCommand({current:()=>state,assay:manageAssayCommand,removal:manageAssayRemovalCommand,log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),close:()=>(root as any).closeModal(),render:()=>rerender()});
 root.ManageLotTransitionWorkflowCommand=createManageLotTransitionWorkflowCommand({current:()=>state,transition:root.ManageLotTransitionCommand,log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),render:()=>rerender()});
 root.ManageLotGroupWorkflowCommand=createManageLotGroupWorkflowCommand({current:()=>state,group:manageLotGroupCommand,activation:manageLotGroupActivationCommand,reconcileSigma:()=>(globalThis as any).reconcileSigmaLevelsWithLotGroups(),log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),close:()=>(root as any).closeModal(),render:()=>rerender()});
 const targetMatrixCommand=createTargetMatrixCommand({
@@ -2794,6 +2803,7 @@ root.ReagentComparisonService = createReagentComparisonService({
   cleanText: root.QCCore.cleanText,
   cleanId: root.QCCore.cleanId,
 });
+root.ReagentComparisonWorkflowCommand=createReagentComparisonWorkflowCommand({current:()=>state,comparison:root.ReagentComparisonService,label:comparison=>(globalThis as any).rcLabel(comparison),log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options)});
 root.reagentReportPresentation = reagentReportPresentation;
 root.reagentChartPresentation = reagentChartPresentation;
 root.reagentReportItemPresentation = reagentReportItemPresentation;

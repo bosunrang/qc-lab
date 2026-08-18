@@ -1,18 +1,16 @@
 # Bàn giao chuyển đổi TypeScript
 
-## Checkpoint hiện tại — 2026-08-18
+## Checkpoint hiện tại — 2026-08-19
 
-- Tiến độ ước tính: **82% tổng thể** (kiểm chứng độc lập: 80–88%, xem ghi chú
-  bên dưới) — con số 80% ở checkpoint trước là chính xác, nếu có lệch thì hơi
-  bảo thủ.
+- Tiến độ ước tính: **83% tổng thể** (kiểm chứng độc lập trước đó: 80–88%).
 - Xác minh gần nhất: `npm.cmd run build:pilot`, `npm.cmd run typecheck` và
-  `npm.cmd test` đều đạt; test suite **607/607 pass**.
+  `npm.cmd test` đều đạt; test suite **611/611 pass**.
 - Wave F validation đã đạt: `ui-check` 28/28, `nce-check` 91/91,
   `visual-check`, `a11y-audit` (0 vi phạm), `print-check` và
   `verify-release` (dependency audit + performance regression) đều pass.
 - `assets/generated/modular-pilot.js`: bundle sinh từ Vite, không sửa trực tiếp.
 - Bundle runtime hiện dùng tag
-  `ts-auth-workflow-20260818-1`; phải tăng tag tương ứng nếu sửa
+  `ts-phase1-quickwins-20260819-1`; phải tăng tag tương ứng nếu sửa
   artifact runtime.
 - **Ghi chú tài liệu (2026-08-18):** `reagent.js` (Passing-Bablok/Deming/
   Bland-Altman) đã có đủ `src/domain/reagent/`, `reagent-comparison-service.ts`
@@ -114,12 +112,49 @@
     và điều hướng màn hình (`showLogin`/`showPasswordChange`/`showApp`).
     `LoginCommand`/`RequiredPasswordCommand` mất hết caller JS trực tiếp nên
     cũng được thu về dependency nội bộ.
+23. **Wave F — Phase 1 "quick wins" (rà soát toàn bộ assets/modules/*.js):**
+    khảo sát hệ thống tìm nốt các hàm còn tự `logAct`/`save`/`rerender` quanh
+    command/service TypeScript đã có. 4 mục nhỏ, độc lập, đã gộp xong:
+    - `range.js`: `confirmApplyNewRange`/`confirmRevertRange` tự ghi
+      `meanSdHistory` và đẩy một hồ sơ "action" chờ duyệt vào `state.actions`
+      (cùng shape hồ sơ NCE — approvalStatus/rule/errorType) — chưa từng có
+      command nào bọc, phải viết mới `range-target-command.ts` (mutation thuần)
+      + `range-workflow-command.ts` (audit/save/render). Hàm `assignRangeTarget()`
+      (wrapper 1 dòng quanh `qcRangeCandidateService.assignTarget`) hết người
+      gọi nên bị xóa; `tests/range-candidate.test.js` gọi thẳng
+      `qcRangeCandidateService.assignTarget` thay vì qua wrapper đã xóa.
+    - `entry-routes.js`: `entryDateNoteSave()` — mảnh cuối chưa qua workflow
+      command của trang Nhập QC (record/void đã xong từ trước) — gộp vào
+      `EntryDateNoteWorkflowCommand` (mới).
+    - `manage-tests-actions.js`: `delTest()` — mở rộng
+      `ManageAssayWorkflowCommand` (đã có `save`) thêm `remove`, bọc
+      `ManageAssayRemovalCommand` (mất hết caller, thu về dependency nội bộ).
+    - `reagent.js`: `rcDelete()`/`rcCreateFrom()` — CRUD so sánh lô hóa chất
+      chưa migrate dù phần thống kê hồi quy (Passing-Bablok/Deming/Bland-Altman)
+      đã xong từ trước; gộp vào `ReagentComparisonWorkflowCommand` (mới, bọc
+      `ReagentComparisonService.create`/`.remove` — service này còn nhiều
+      caller trực tiếp khác nên KHÔNG bị hạ xuống dependency nội bộ).
+    2 scanner test bridge cũ (`entry-service.test.js`,
+    `reagent-service-bridge.test.js`) pin call-site cũ, đã cập nhật để pin
+    đúng workflow command mới thay vì revert code.
 
 ## Việc tiếp theo (ưu tiên)
 
-1. **Wave F — strictness:** tiếp tục giảm ambient global chỉ còn dùng nội bộ;
+1. **Phase 2 (trung bình, cần đọc kỹ trước khi gộp):**
+   - `manage-routes.js`: `teaRefEdit`, `teaRefRemove`, `teaRefAddSubmit`,
+     `teaLabProfileSave`, `teaLabProfileRemove` (bảng TEa tham chiếu) — 5 hàm,
+     chưa có `TeaReferenceWorkflowCommand` nào, cần thiết kế mới.
+   - `manage-tests-actions.js`: `saveLotTransitionV2()` — có bước
+     `applyPlannedTarget` xen giữa gate và commit, khó gộp gọn như
+     `deleteLotTransition` đã làm.
+2. **Phase 3 (lớn, rủi ro, nên hoãn):** `sigma.js` — trang lớn nhất app, ~10
+   hàm `sgXxx` (TEa, track/untrack test, bias, MU, cohort import…) đều tự
+   orchestrate, không có tầng command nào bọc sẵn; state (cohort, TEa
+   snapshot, kỳ bias/MU) đan xen phức tạp — cần chia nhỏ thành nhiều workflow
+   command riêng qua vài phiên, không làm gọn trong 1 lần.
+3. **Wave F — strictness:** tiếp tục giảm ambient global chỉ còn dùng nội bộ;
    ưu tiên service/command có adapter JS mỏng và caller runtime rõ ràng.
-2. **Wave F — release hardening:** sau mỗi lát runtime, chạy cổng phù hợp; trước
+4. **Wave F — release hardening:** sau mỗi lát runtime, chạy cổng phù hợp; trước
    phát hành chạy lại `verify-release` cùng UI/visual/a11y/print/Electron.
 
 ## Quy tắc làm việc

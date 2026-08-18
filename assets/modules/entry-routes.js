@@ -219,11 +219,9 @@ function entryUnlockExtraRun(tid,colKey,date,levelIdx,runNo){
 async function entryDateNoteSave(tid,date,value){
   if(!requireWrite())return;
   if(!await requireUnlockedPeriod(date,'ghi chú QC'))return;
-  const result=EntryService.updateDateNoteCommand(state,{testId:tid,date,value,formatDate:vnDate});
+  const result=globalThis.EntryDateNoteWorkflowCommand.save({testId:tid,date,value});
   if(!result.ok){const message=globalThis.entryDateNoteErrorMessage(result.error);if(message)entrySetLastMsg('<div class="alert warn">'+esc(message)+'</div>');return;}
   const note=result.note;
-  logAct(result.effects.audit.action,result.effects.audit.detail,result.effects.audit.target);
-  save(result.effects.save);
   const feedback=globalThis.entryDateNoteFeedback(note,vnDate(date));
   entrySetLastMsg(feedback?`<div class="alert ${feedback.cls}">${esc(feedback.message)}</div>`:note?`<div class="alert ok">✓ Đã lưu ghi chú ngày ${vnDate(date)}.</div>`:`<div class="alert ok">✓ Đã xóa ghi chú ngày ${vnDate(date)}.</div>`);
 }

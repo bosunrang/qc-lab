@@ -109,9 +109,8 @@ function rcRmRow(i){if(!requireWrite())return;if(ReagentComparisonService.remove
 function rcClearRows(){if(!requireWrite())return;if(ReagentComparisonService.clearRows(state,{id:rcId}).error)return;save({clearDerived:false});rerender();}
 function rcSwitch(id){rcId=id;rerender();}
 async function rcDelete(id,keepModal=false){if(!requireAdmin())return;if(state.reagentTests.length<=1){await infoDialog('Phải còn ít nhất 1 phép so sánh.');return;}
-  const label=rcLabel(ReagentComparisonService.find(state,id)||{test:{}});
   if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa phép so sánh',message:'Xóa phép so sánh này?',confirmLabel:'Xóa',cancelLabel:'Hủy'}))return;
-  const result=ReagentComparisonService.remove(state,{id});if(result.error)return;if(rcId===id)rcId=result.nextId;logAct('Xóa phép so sánh hóa chất',label,label);save({clearDerived:false});if(keepModal)renderRcModal();rerender();}
+  const result=globalThis.ReagentComparisonWorkflowCommand.remove({id});if(result.error)return;if(rcId===id)rcId=result.nextId;if(keepModal)renderRcModal();rerender();}
 function rcDeleteCurrent(){rcDelete(rcId);}
 function rcQuickLabel(type){return globalThis.reagentQuickLabelPresentation.label(type);}
 function rcQuickList(type){
@@ -166,7 +165,7 @@ function renderRcCreateModal(){
   openModal(globalThis.reagentCreateModalPresentation({searchValueHtml:escAttr(rcCreateModalQ),createTypedHtml:createTyped,referenceRowsHtml:refs,emptyReferenceHtml:'<div class="empty" style="padding:18px">Không tìm thấy trong danh mục chuẩn.</div>',closeButtonHtml:btn('Đóng','closeModal()','ghost')}));
   setTimeout(()=>{const e=document.getElementById('rcCreateSearch');if(e){e.focus();e.setSelectionRange(e.value.length,e.value.length);}},0);
 }
-function rcCreateFrom(name,unit){if(!requireWrite())return;const result=ReagentComparisonService.create(state,{id:uid(),name,unit});if(result.error)return;rcId=result.comparison.id;logAct('Tạo phép so sánh hóa chất',rcLabel(result.comparison),rcLabel(result.comparison));save({clearDerived:false});closeModal();rerender();}
+function rcCreateFrom(name,unit){if(!requireWrite())return;const result=globalThis.ReagentComparisonWorkflowCommand.create({id:uid(),name,unit});if(result.error)return;rcId=result.comparison.id;closeModal();rerender();}
 function rcFmt(x,k=4){return globalThis.reagentReportPresentation.formatNumber(x,k);}
 function rcFmtT(x){return globalThis.reagentReportPresentation.formatTStatistic(x);}
 function rcDateText(v){return v?esc(vnDate(v)):formatDateTimeVN(new Date().toISOString()).split(' ').slice(1).join(' ');}

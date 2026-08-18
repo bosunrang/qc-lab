@@ -558,6 +558,182 @@
 		return Object.freeze({ execute });
 	}
 	//#endregion
+	//#region src/application/entry/entry-date-note-workflow-command.ts
+	function createEntryDateNoteWorkflowCommand(deps) {
+		const save = (input) => {
+			const result = deps.entry.updateDateNoteCommand(deps.current(), {
+				testId: input.testId,
+				date: input.date,
+				value: input.value,
+				formatDate: deps.formatDate
+			});
+			if (!result.ok) return result;
+			deps.log(result.effects.audit.action, result.effects.audit.detail, result.effects.audit.target);
+			deps.saveState(result.effects.save);
+			return result;
+		};
+		return Object.freeze({ save });
+	}
+	//#endregion
+	//#region src/application/range/range-target-command.ts
+	function createRangeTargetCommand(deps) {
+		const applyLab = (input) => {
+			const l = input.level;
+			if (!deps.assignTarget(l, input.mean, input.sd, "lab")) return {
+				ok: false,
+				message: "Không áp dụng được dải mới."
+			};
+			l.cvRef = input.cv;
+			l.rangeDate = input.today;
+			l.meanSdHistory = Array.isArray(l.meanSdHistory) ? l.meanSdHistory : [];
+			l.meanSdHistory.push({
+				id: input.historyId,
+				qcLotId: l.qcLotId || "",
+				lot: l.lot || "",
+				mean: l.mean,
+				sd: l.sd,
+				low: l.low,
+				high: l.high,
+				effectiveFrom: input.today,
+				effectiveTo: l.exp || "",
+				source: "lab",
+				note: input.reason + input.gateNote
+			});
+			input.state.actions = input.state.actions || [];
+			input.state.actions.push({
+				id: input.actionId,
+				date: input.today,
+				createdAt: input.createdAt,
+				createdByUserId: input.userId,
+				createdByUsername: input.username,
+				testId: input.testId,
+				level: input.levelNo,
+				lot: input.lot,
+				rule: "Thiết lập dải QC mới",
+				errorType: "Quản lý dải kiểm soát",
+				action: input.actionText,
+				by: input.userName,
+				approvalStatus: "pending",
+				approvedAt: "",
+				approvedBy: "",
+				approvalNote: ""
+			});
+			return {
+				ok: true,
+				effects: {
+					audit: {
+						action: "Áp dụng dải QC",
+						detail: input.detail,
+						target: input.testName
+					},
+					save: { testId: input.testId }
+				}
+			};
+		};
+		const revertMfg = (input) => {
+			const l = input.level;
+			if (!deps.assignTarget(l, l.mfgMean, l.mfgSd, "mfg")) return {
+				ok: false,
+				message: "Không tìm thấy Mean/SD nhà sản xuất hợp lệ để hoàn về."
+			};
+			l.meanSdHistory = Array.isArray(l.meanSdHistory) ? l.meanSdHistory : [];
+			l.meanSdHistory.push({
+				id: input.historyId,
+				qcLotId: l.qcLotId || "",
+				lot: l.lot || "",
+				mean: l.mean,
+				sd: l.sd,
+				low: l.low,
+				high: l.high,
+				effectiveFrom: input.today,
+				effectiveTo: l.exp || "",
+				source: "mfg",
+				note: input.reason
+			});
+			input.state.actions = input.state.actions || [];
+			input.state.actions.push({
+				id: input.actionId,
+				date: input.today,
+				createdAt: input.createdAt,
+				createdByUserId: input.userId,
+				createdByUsername: input.username,
+				testId: input.testId,
+				level: input.levelNo,
+				lot: input.lot,
+				rule: "Hoàn dải QC",
+				errorType: "Quản lý dải kiểm soát",
+				action: input.actionText,
+				by: input.userName,
+				approvalStatus: "pending",
+				approvedAt: "",
+				approvedBy: "",
+				approvalNote: ""
+			});
+			return {
+				ok: true,
+				effects: {
+					audit: {
+						action: "Hoàn dải QC",
+						detail: input.detail,
+						target: input.testName
+					},
+					save: { testId: input.testId }
+				}
+			};
+		};
+		return Object.freeze({
+			applyLab,
+			revertMfg
+		});
+	}
+	//#endregion
+	//#region src/application/range/range-workflow-command.ts
+	function createRangeWorkflowCommand(deps) {
+		const commit = (result) => {
+			if (!result.ok) return result;
+			deps.log(result.effects.audit.action, result.effects.audit.detail, result.effects.audit.target);
+			deps.saveState(result.effects.save);
+			deps.render();
+			return result;
+		};
+		const applyLab = (input) => commit(deps.target.applyLab({
+			state: deps.current(),
+			...input
+		}));
+		const revertMfg = (input) => commit(deps.target.revertMfg({
+			state: deps.current(),
+			...input
+		}));
+		return Object.freeze({
+			applyLab,
+			revertMfg
+		});
+	}
+	//#endregion
+	//#region src/application/reagent/reagent-comparison-workflow-command.ts
+	function createReagentComparisonWorkflowCommand(deps) {
+		const create = (input) => {
+			const result = deps.comparison.create(deps.current(), input);
+			if (result.error) return result;
+			const label = deps.label(result.comparison);
+			deps.log("Tạo phép so sánh hóa chất", label, label);
+			deps.saveState({ clearDerived: false });
+			return result;
+		};
+		const remove = (input) => {
+			const result = deps.comparison.remove(deps.current(), input);
+			if (result.error) return result;
+			const label = deps.label(result.removed);
+			deps.log("Xóa phép so sánh hóa chất", label, label);
+			deps.saveState({ clearDerived: false });
+			return result;
+		};
+		return Object.freeze({
+			create,
+			remove
+		});
+	}
+	//#endregion
 	//#region src/application/backup/backup-service.ts
 	var BACKUP_IMPORT_MAX_BYTES = 134217728;
 	var BACKUP_IMPORT_WARN_BYTES = 100663296;
@@ -2702,7 +2878,22 @@
 			deps.render();
 			return result;
 		};
-		return Object.freeze({ save });
+		const remove = (input) => {
+			const result = deps.removal.execute({
+				state: deps.current(),
+				...input
+			});
+			if (!result.ok) return result;
+			const a = result.effects.audit;
+			deps.log(a.action, a.detail, a.target);
+			deps.saveState(result.effects.save);
+			deps.render();
+			return result;
+		};
+		return Object.freeze({
+			save,
+			remove
+		});
 	}
 	//#endregion
 	//#region src/application/manage/manage-lot-transition-workflow-command.ts
@@ -18424,6 +18615,20 @@
 		log: (action, detail, target) => logAct(action, detail, target),
 		save: (options) => save(options)
 	});
+	root.EntryDateNoteWorkflowCommand = createEntryDateNoteWorkflowCommand({
+		current: () => state,
+		entry: root.EntryService,
+		formatDate: (date) => globalThis.vnDate(date),
+		log: (action, detail, target) => logAct(action, detail, target),
+		saveState: (options) => save(options)
+	});
+	root.RangeWorkflowCommand = createRangeWorkflowCommand({
+		current: () => state,
+		target: createRangeTargetCommand({ assignTarget: (config, mean, sd, source) => root.qcRangeCandidateService.assignTarget(config, mean, sd, source) }),
+		log: (action, detail, target) => logAct(action, detail, target),
+		saveState: (options) => save(options),
+		render: () => rerender()
+	});
 	var backupTextBytes = (text) => {
 		if (typeof Blob !== "undefined") return new Blob([text]).size;
 		if (typeof TextEncoder !== "undefined") return new TextEncoder().encode(text).length;
@@ -18617,7 +18822,7 @@
 		limitsFromTarget: root.QCCore.limitsFromTarget
 	});
 	var manageAssayCommand = createManageAssayCommand({ saveAssay: (targetState, input) => root.ManageConfigService.saveAssay(targetState, input) });
-	root.ManageAssayRemovalCommand = createManageAssayRemovalCommand({ removeAssay: (targetState, input) => root.ManageConfigService.removeAssay(targetState, input) });
+	var manageAssayRemovalCommand = createManageAssayRemovalCommand({ removeAssay: (targetState, input) => root.ManageConfigService.removeAssay(targetState, input) });
 	root.ManageInstrumentWorkflowCommand = createManageInstrumentWorkflowCommand({
 		current: () => state,
 		instrument: createManageInstrumentCommand({
@@ -18709,6 +18914,7 @@
 	root.ManageAssayWorkflowCommand = createManageAssayWorkflowCommand({
 		current: () => state,
 		assay: manageAssayCommand,
+		removal: manageAssayRemovalCommand,
 		log: (action, detail, target) => logAct(action, detail, target),
 		saveState: (options) => save(options),
 		close: () => root.closeModal(),
@@ -18768,6 +18974,13 @@
 	root.ReagentComparisonService = createReagentComparisonService({
 		cleanText: root.QCCore.cleanText,
 		cleanId: root.QCCore.cleanId
+	});
+	root.ReagentComparisonWorkflowCommand = createReagentComparisonWorkflowCommand({
+		current: () => state,
+		comparison: root.ReagentComparisonService,
+		label: (comparison) => globalThis.rcLabel(comparison),
+		log: (action, detail, target) => logAct(action, detail, target),
+		saveState: (options) => save(options)
 	});
 	root.reagentReportPresentation = reagentReportPresentation;
 	root.reagentChartPresentation = reagentChartPresentation;

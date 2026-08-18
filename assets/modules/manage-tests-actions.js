@@ -368,7 +368,6 @@ async function delTest(id){
   if(locked.count){await infoDialog(`Không thể xóa "${testDisplayName(t)}": còn ${locked.count} điểm QC thuộc kỳ đã khóa (${locked.periods.map(monthVN).join(', ')}). Hãy mở khóa các kỳ này ở trang Báo cáo trước — thao tác mở khóa yêu cầu lý do và được ghi vào nhật ký.`);return;}
   if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa xét nghiệm',message:`Xóa xét nghiệm ${t.name} và toàn bộ dữ liệu QC?`,detail:`${points.length} điểm QC cùng toàn bộ kết quả Westgard và Sigma của xét nghiệm này sẽ mất, không thể khôi phục.`,confirmLabel:'Xóa xét nghiệm',cancelLabel:'Hủy'}))return;
   if(!await reauthenticateCurrentUser({title:'Xác thực xóa xét nghiệm',message:`Nhập lại mật khẩu trước khi xóa ${t.name} và ${points.length} điểm QC.`}))return;
-  const result=globalThis.ManageAssayRemovalCommand.execute({state,id});if(!result.ok){await infoDialog(result.message);return;}
+  const result=globalThis.ManageAssayWorkflowCommand.remove({id});if(!result.ok){await infoDialog(result.message);return;}
   if(selTest===id)selTest=state.tests[0]&&state.tests[0].id||null;if(entrySel&&entrySel.testId===id)entrySel=null;
-  logAct(result.effects.audit.action,result.effects.audit.detail,result.effects.audit.target);save(result.effects.save);rerender();
 }

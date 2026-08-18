@@ -20,7 +20,6 @@ function rangeSystematicNce(tid,level){return globalThis.qcRangeCandidateService
 }
 function rangeCandidate(tid,level){return globalThis.qcRangeCandidateService.candidate(tid,level);const t=state.tests.find(x=>x.id===tid),l=t&&lvlCfg(t,level);if(!t||!l)return{t,l,pts:[],wg:{F:[],zs:[]},c:null,days:0,bad:0,warn:0,eligible:false,nce:null};
   const pts=operationalLotPoints(t,level),allWG=activeWestgard(t),F=pts.map(p=>allWG.byPoint.get(p.id)||{level:'ok',rules:[]}),zs=pts.map(p=>QCCore.pointZ(p,l.mean,l.sd)),wg={F,zs},c=stats(pts.map(p=>p.val)),days=new Set(pts.map(p=>p.date)).size,bad=F.filter(f=>f.level==='rej').length,warn=F.filter(f=>f.level==='warn').length,eligible=!!(c&&c.n>=20&&days>=20&&bad===0&&warn===0&&c.sd>0),nce=rangeSystematicNce(tid,level);return{t,l,pts,wg,c,days,bad,warn,eligible,nce};}
-function assignRangeTarget(levelCfg,mean,sd,source){return globalThis.qcRangeCandidateService.assignTarget(levelCfg,mean,sd,source);}
 function openRangeWorkflow(tid,level){
   const r=rangeCandidate(tid,level);if(!r.t||!r.l)return;
   const rows=[['Tổng số kết quả',r.c?r.c.n:0,'≥20',r.c&&r.c.n>=20],['Số ngày độc lập',r.days,'≥20 ngày',r.days>=20],['Điểm bị loại Westgard',r.bad,'Phải bằng 0; không tự loại điểm để làm đẹp SD',r.bad===0],['Điểm cảnh báo',r.warn,'Phải bằng 0 trước khi phê duyệt dải',r.warn===0],['SD đề xuất hợp lệ',r.c?fmtTestValue(r.t,r.c.sd):'—','>0',r.c&&r.c.sd>0]];
@@ -74,13 +73,12 @@ async function confirmApplyNewRange(tid,level){
   const reason=QCCore.cleanText(input?input.value:'',1000).trim();
   if(reason.length<10){const err=document.getElementById('rangeReasonErr');if(err)err.style.display='';return;}
   closeModal();if(!await reauthenticateCurrentUser({title:'Xác thực thay đổi dải QC',message:'Nhập lại mật khẩu trước khi áp dụng Mean/SD của phòng xét nghiệm.'}))return;
-  const oldM=l.mean,oldSd=l.sd;assignRangeTarget(l,c.m,c.sd,'lab');l.cvRef=c.cv;l.rangeDate=isoToday();
-  l.meanSdHistory=Array.isArray(l.meanSdHistory)?l.meanSdHistory:[];
+  const oldM=l.mean,oldSd=l.sd;
   const gateNote=nce?` Điều kiện dịch chuyển hệ thống: đã xác nhận nguyên nhân theo hồ sơ NCE ${nce.nceId||nce.id}, Bias đo lại trong ngưỡng cho phép (≤ TEa/4).`:'';
-  l.meanSdHistory.push({id:uid(),qcLotId:l.qcLotId||'',lot:l.lot||'',mean:l.mean,sd:l.sd,low:l.low,high:l.high,effectiveFrom:isoToday(),effectiveTo:l.exp||'',source:'lab',note:reason+gateNote});
-  state.actions.push({id:uid(),date:isoToday(),createdAt:new Date().toISOString(),createdByUserId:currentUser&&currentUser.id||'',createdByUsername:currentUser&&currentUser.username||'',testId:tid,level,lot:l.lot||'',rule:'Thiết lập dải QC mới',errorType:'Quản lý dải kiểm soát',action:`Áp dụng dải PXN: Mean ${fmtTestValue(t,oldM)}→${fmtTestValue(t,c.m)}, SD ${fmtTestStat(t,oldSd)}→${fmtTestStat(t,c.sd)}, n=${c.n}, ${days} ngày. Phê duyệt: ${reason}${gateNote}`,by:currentUser?(currentUser.name||currentUser.username):'',approvalStatus:'pending',approvedAt:'',approvedBy:'',approvalNote:''});
-  logAct('Áp dụng dải QC',`M${level}: Mean ${fmtTestValue(t,oldM)}→${fmtTestValue(t,c.m)}, SD ${fmtTestStat(t,oldSd)}→${fmtTestStat(t,c.sd)}`,t?t.name:'');
-  save({testId:tid});rerender();
+  const detail=`M${level}: Mean ${fmtTestValue(t,oldM)}→${fmtTestValue(t,c.m)}, SD ${fmtTestStat(t,oldSd)}→${fmtTestStat(t,c.sd)}`;
+  const actionText=`Áp dụng dải PXN: Mean ${fmtTestValue(t,oldM)}→${fmtTestValue(t,c.m)}, SD ${fmtTestStat(t,oldSd)}→${fmtTestStat(t,c.sd)}, n=${c.n}, ${days} ngày. Phê duyệt: ${reason}${gateNote}`;
+  const result=globalThis.RangeWorkflowCommand.applyLab({level:l,testId:tid,levelNo:level,lot:l.lot||'',testName:t?t.name:'',mean:c.m,sd:c.sd,cv:c.cv,reason,gateNote,detail,actionText,historyId:uid(),actionId:uid(),today:isoToday(),createdAt:new Date().toISOString(),userId:currentUser&&currentUser.id||'',username:currentUser&&currentUser.username||'',userName:currentUser?(currentUser.name||currentUser.username):''});
+  if(!result.ok){await infoDialog(result.message);return;}
 }
 function revertRange(tid,level){
   if(!requireWrite())return;
@@ -93,7 +91,11 @@ async function confirmRevertRange(tid,level){
   const reason=QCCore.cleanText(input?input.value:'',1000).trim();
   if(reason.length<5){const err=document.getElementById('rangeReasonErr');if(err)err.style.display='';return;}
   closeModal();if(!await reauthenticateCurrentUser({title:'Xác thực hoàn dải QC',message:'Nhập lại mật khẩu trước khi hoàn về Mean/SD nhà sản xuất.'}))return;
-  const oldM=l.mean,oldSd=l.sd;if(!assignRangeTarget(l,l.mfgMean,l.mfgSd,'mfg')){await infoDialog('Không tìm thấy Mean/SD nhà sản xuất hợp lệ để hoàn về.');return;}l.meanSdHistory=Array.isArray(l.meanSdHistory)?l.meanSdHistory:[];l.meanSdHistory.push({id:uid(),qcLotId:l.qcLotId||'',lot:l.lot||'',mean:l.mean,sd:l.sd,low:l.low,high:l.high,effectiveFrom:isoToday(),effectiveTo:l.exp||'',source:'mfg',note:reason});state.actions.push({id:uid(),date:isoToday(),createdAt:new Date().toISOString(),createdByUserId:currentUser&&currentUser.id||'',createdByUsername:currentUser&&currentUser.username||'',testId:tid,level,lot:l.lot||'',rule:'Hoàn dải QC',errorType:'Quản lý dải kiểm soát',action:`Hoàn về dải NSX: Mean ${fmtTestValue(t,oldM)}→${fmtTestValue(t,l.mean)}, SD ${fmtTestValue(t,oldSd)}→${fmtTestValue(t,l.sd)}. Lý do: ${reason}`,by:currentUser?(currentUser.name||currentUser.username):'',approvalStatus:'pending',approvedAt:'',approvedBy:'',approvalNote:''});logAct('Hoàn dải QC',`M${level}: Mean ${fmtTestValue(t,oldM)}→${fmtTestValue(t,l.mean)}, SD ${fmtTestValue(t,oldSd)}→${fmtTestValue(t,l.sd)} · ${reason}`,t?t.name:'');save({testId:tid});rerender();
+  const oldM=l.mean,oldSd=l.sd;
+  const detail=`M${level}: Mean ${fmtTestValue(t,oldM)}→${fmtTestValue(t,l.mfgMean)}, SD ${fmtTestValue(t,oldSd)}→${fmtTestValue(t,l.mfgSd)} · ${reason}`;
+  const actionText=`Hoàn về dải NSX: Mean ${fmtTestValue(t,oldM)}→${fmtTestValue(t,l.mfgMean)}, SD ${fmtTestValue(t,oldSd)}→${fmtTestValue(t,l.mfgSd)}. Lý do: ${reason}`;
+  const result=globalThis.RangeWorkflowCommand.revertMfg({level:l,testId:tid,levelNo:level,lot:l.lot||'',testName:t?t.name:'',reason,detail,actionText,historyId:uid(),actionId:uid(),today:isoToday(),createdAt:new Date().toISOString(),userId:currentUser&&currentUser.id||'',username:currentUser&&currentUser.username||'',userName:currentUser?(currentUser.name||currentUser.username):''});
+  if(!result.ok){await infoDialog(result.message);return;}
 }
 
 
