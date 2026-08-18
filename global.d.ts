@@ -25,28 +25,18 @@ declare var entrySel: any, entryDays: any, entryStart: any, entryEnd: any, entry
   entryPartialRenderCache: any, entryPrevOpen: any, entryExpandedTables: any, entryDetailOpen: any, treeOpen: any,
   entryExtraRun: any, entryTreeCollapsed: any;
 declare var manageQ: any, manageTab: any, manageTargetPanel: any, manageTargetGroup: any,
-  manageTargetLevel: any, manageHistoryTest: any, targetSwitchCtx: any, configNavScroll: any;
+  manageTargetLevel: any, manageHistoryTest: any, targetSwitchCtx: any;
 declare var rcId: any, rcSaveT: any, rcModalQ: any, rcCreateModalQ: any, rcQuickType: any, rcMetaBefore: any;
 declare var sgTest: any, sgRefreshT: any, sgBiasCtx: any, sgMuCtx: any, sgAddTestQ: any, sgSelectedPeriods: any;
 
-// --- UI state namespace bags (`root.XxxUIState = state`) ---
-declare var AnalysisUIState: any, AuthUIState: any, EntryUIState: any, ManageUIState: any,
-  ReagentUIState: any, SigmaUIState: any;
-
 // --- Service / view-model namespaces (`root.Foo = {...}`) ---
 declare var EntryService: any, PeriodService: any, ReagentComparisonService: any, ChartViewModel: any,
-  SigmaCohortService: any, SigmaPresentation: any, SigmaPeriodViewModel: any, SigmaBiasService: any, SigmaCohortImportService: any, SigmaPeriodRecordService: any, SigmaLevelEditService: any, SigmaTrackedTestService: any, SigmaBiasWorkflowService: any, SigmaCohortSelectionService: any, SigmaTeaEditService: any, SigmaTeaSnapshotService: any, SigmaLevelSelectionService: any, SigmaPeriodSelectionService: any, WestgardViewModel: any, ActionWorkflowService: any, ActionReviewService: any, ActionEscalationService: any, ActionBiasService: any, ActionBiasPresentation: any, ActionViolationService: any, ActionListPresentation: any, ActionEvidencePresentation: any, ActionRerunEvidencePresentation: any, ActionStatusPresentation: any, ActionReviewPresentation: any, ActionDetailPresentation: any, ActionGuidePresentation: any, ReportPeriodPresentation: any, ManageConfigService: any, LotTransitionPickerService: any,
-  qcPointWarnings: any, AuditService: any, ActionRerunService: any, ActionPointIndexService: any,
-  ManageLotTransitionCommand: any;
+  SigmaCohortService: any, SigmaPresentation: any, SigmaPeriodViewModel: any, SigmaBiasService: any, SigmaCohortImportService: any, SigmaPeriodRecordService: any, SigmaLevelEditService: any, SigmaTrackedTestService: any, SigmaBiasWorkflowService: any, SigmaCohortSelectionService: any, SigmaTeaEditService: any, SigmaTeaSnapshotService: any, SigmaLevelSelectionService: any, SigmaPeriodSelectionService: any, WestgardViewModel: any, ActionReviewService: any, ActionEscalationService: any, ActionBiasService: any, ActionBiasPresentation: any, ActionViolationService: any, ActionListPresentation: any, ActionEvidencePresentation: any, ActionRerunEvidencePresentation: any, ActionStatusPresentation: any, ActionReviewPresentation: any, ActionDetailPresentation: any, ActionGuidePresentation: any, ReportPeriodPresentation: any, ManageConfigService: any, LotTransitionPickerService: any,
+  qcPointWarnings: any, AuditService: any;
 declare var LISClientService: any, lisGatewayRuntime: any,
   lisGatewayConfig: any, lisNormalizeGatewayUrl: any, lisGatewayStatusText: any,
   lisGatewayPull: any,
   lisImportResult: any, lisRejectResult: any, lisGatewayStart: any;
-declare var BACKUP_IMPORT_MAX_BYTES: any, BACKUP_IMPORT_WARN_BYTES: any,
-  serializeBackupData: any, backupTextBytes: any, backupSizeMB: any, backupImportSizeError: any,
-  backupSizeWarning: any, backupChecksum: any, createBackupPackage: any, parseBackupPackage: any,
-  prepareBackupState: any, prepareBackupImport: any, backupSummary: any, inspectBackupText: any;
-
 // action-workflow-service.js does Object.assign(root, root.ActionWorkflowService)
 declare var actionApprovalStatus: any, actionRecordStatus: any, actionCancelled: any, actionApprovalLabel: any, actionRecorded: any, actionCanApprove: any,
   actionPoint: any, actionEventDate: any, actionNeedsRerun: any, actionRerunStatus: any, actionWorkflowStatus: any,
@@ -56,39 +46,9 @@ declare var actionApprovalStatus: any, actionRecordStatus: any, actionCancelled:
 
 // core.js (UMD) exposes itself as window.QCCore; referenced bare everywhere else
 declare var QCCore: any;
-declare var qcPointRunNumber: any;
-declare var qcCusumConfig: any;
-declare var normalizeSearchText: any;
-declare var qcLevelTargetValid: any;
-declare var qcLotMeanSd: any, qcLotTargetSnapshot: any;
-declare var reportLevelStatsService: any;
-declare var qcErrorDetail: any;
-declare var qcPlannedTarget: any;
-declare var qcPointVoidVerdict: any;
-declare var qcLotGroupOperational: any;
-declare var qcDerivedIndex: any;
-declare var qcAcceptedLotPoints: any;
-declare var qcCusumSeries: any;
-declare var qcEntryColumns: any;
-declare var syncStateMerge: any;
-declare var syncUpdateBuilder: any;
-declare var syncRetryScheduler: any;
-declare var syncFirstConnectMerge: any, syncHasContent: any;
-declare var qcNormalizeDuplicateRunIds: any;
-declare var qcNormalizePointLots: any;
-declare var qcLotLineage: any;
-declare var qcLevelConfig: any, qcOperationalAccess: any;
-declare var qcParallelLotLookup: any;
-declare var westgardWorkerJobBuilder: any;
-declare var westgardWorkerRevisionService: any;
-declare var westgardWorkerHydrate: any;
-declare var westgardWorkerPrewarmPlanner: any;
 
 // Firebase compat SDK, loaded from CDN <script> tags in index.html (no @types installed)
 declare var firebase: any;
-
-// Electron preload bridge / license check, only present under electron/preload.js
-declare var qcDialog: any;
 
 interface Window {
   QCLAB_APP: any;
