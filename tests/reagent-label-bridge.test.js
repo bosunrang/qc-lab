@@ -4,83 +4,79 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.join(__dirname, '..');
-const route = fs.readFileSync(path.join(root, 'assets/modules/reagent.js'), 'utf8');
+// Trang So sánh hóa chất đã chuyển hẳn sang TypeScript (Pha G route slice 4):
+// src/presentation/reagent/reagent-page-controller.ts. Controller tiêu thụ mọi
+// presentation/service/domain qua `deps.*`; các hợp đồng bridge (QCLabGlobal +
+// root.X=) vẫn nằm ở compat và được chốt bên dưới.
+const route = fs.readFileSync(path.join(root, 'src/presentation/reagent/reagent-page-controller.ts'), 'utf8');
 const bridge = fs.readFileSync(path.join(root, 'src/compat/modular-pilot.global.ts'), 'utf8');
 
-assert.match(route, /function rcLabel\(d\)\{return globalThis\.reagentComparisonLabelPresentation\.label\(d\.test,teaAnalyteDisplay\);\}/, 'Nhãn so sánh hóa chất phải dùng presentation TypeScript');
-assert.doesNotMatch(route, /function rcLabel\(d\)\{const t=d\.test;if\(globalThis\.reagentComparisonLabelPresentation\)/, 'Không giữ fallback classic cho nhãn so sánh hóa chất');
-assert.match(bridge, /reagentComparisonLabelPresentation: typeof reagentComparisonLabelPresentation;/, 'Presentation nhãn hóa chất phải là hợp đồng bridge bắt buộc');
-assert.match(route, /function rcPadr\(min,max\)\{return globalThis\.reagentChartPresentation\.range\(\[min,max\]\);\}/, 'Dải biểu đồ hóa chất phải dùng presentation TypeScript');
-assert.match(route, /function rcQuickLabel\(type\)\{return globalThis\.reagentQuickLabelPresentation\.label\(type\);\}/, 'Nhãn thao tác nhanh phải dùng presentation TypeScript');
-assert.match(route, /openModal\(globalThis\.reagentQuickPickerModalPresentation\(\{labelHtml:esc\(label\),rowsHtml:rows,placeholderHtml:escAttr\(label\),addButtonHtml:btn\('Thêm','rcAddQuick\(\)','teal sm'\),closeButtonHtml:btn\('Đóng','closeModal\(\)','ghost'\)\}\)\);/, 'Modal chọn nhanh hóa chất phải dùng renderer TypeScript');
-assert.match(bridge, /reagentQuickPickerModalPresentation: typeof reagentQuickPickerModalHtml;/, 'Renderer modal chọn nhanh hóa chất phải là hợp đồng bridge bắt buộc');
-assert.match(route, /const rows=globalThis\.reagentQuickPickerRowsHtml\(\{items,labelHtml:esc\(label\),esc,selectButtonHtml:i=>btn\('Chọn',`rcPickQuick\(\$\{i\}\)`,'teal sm'\)\}\);/, 'Dòng modal chọn nhanh hóa chất phải dùng renderer TypeScript');
-assert.match(bridge, /reagentQuickPickerRowsHtml: typeof reagentQuickPickerRowsHtml;/, 'Renderer dòng chọn nhanh hóa chất phải là hợp đồng bridge bắt buộc');
-assert.match(route, /openModal\(globalThis\.reagentPickerModalPresentation\(\{searchValueHtml:escAttr\(rcModalQ\),rowsHtml:rows,closeButtonHtml:btn\('Đóng','closeModal\(\)','ghost'\)\}\)\);/, 'Modal chọn phép so sánh phải dùng renderer TypeScript');
-assert.match(bridge, /reagentPickerModalPresentation: typeof reagentPickerModalHtml;/, 'Renderer modal chọn phép so sánh phải là hợp đồng bridge bắt buộc');
-assert.match(route, /const rows=globalThis\.reagentPickerRowsHtml\(\{items:state\.reagentTests\.filter\(hit\)\.map\(d=>\(\{id:d\.id,labelHtml:esc\(rcLabel\(d\)\),unitHtml:esc\(d\.test\.unit\|\|''\),rowCount:d\.rows&&d\.rows\.length\|\|0,selected:d\.id===rcId\}\)\),canWrite:canWrite\(\),selectButtonHtml:/, 'Dòng modal chọn phép so sánh phải dùng renderer TypeScript');
-assert.match(bridge, /reagentPickerRowsHtml: typeof reagentPickerRowsHtml;/, 'Renderer dòng chọn phép so sánh phải là hợp đồng bridge bắt buộc');
-assert.match(route, /openModal\(globalThis\.reagentCreateModalPresentation\(\{searchValueHtml:escAttr\(rcCreateModalQ\),createTypedHtml:createTyped,referenceRowsHtml:refs,emptyReferenceHtml:'<div class="empty" style="padding:18px">Không tìm thấy trong danh mục chuẩn.<\/div>',closeButtonHtml:btn\('Đóng','closeModal\(\)','ghost'\)\}\)\);/, 'Modal thêm hóa chất phải dùng renderer TypeScript');
-assert.match(bridge, /reagentCreateModalPresentation: typeof reagentCreateModalHtml;/, 'Renderer modal thêm hóa chất phải là hợp đồng bridge bắt buộc');
-assert.match(route, /const refs=globalThis\.reagentCreateReferenceRowsHtml\(/, 'Danh mục modal thêm hóa chất phải dùng renderer TypeScript');
-assert.match(bridge, /reagentCreateReferenceRowsHtml: typeof reagentCreateReferenceRowsHtml;/, 'Renderer danh mục thêm hóa chất phải là hợp đồng bridge bắt buộc');
-assert.match(route, /const createTyped=globalThis\.reagentCreateTypedRowHtml\(/, 'Nút tạo hóa chất theo truy vấn phải dùng renderer TypeScript');
-assert.match(bridge, /reagentCreateTypedRowHtml: typeof reagentCreateTypedRowHtml;/, 'Renderer nút tạo hóa chất phải là hợp đồng bridge bắt buộc');
-assert.match(route, /if\(!state\.reagentTests\.length\)return globalThis\.reagentEmptyPageHtml\(\{headHtml:headOnly\('So sánh 2 lô hóa chất',''\),emptyStateHtml:emptyState\('Chưa có phép so sánh','Tải lại dữ liệu hoặc tạo phép so sánh mới\.',''\)\}\);/, 'Empty state hóa chất phải dùng renderer TypeScript');
-assert.match(bridge, /reagentEmptyPageHtml: typeof reagentEmptyPageHtml;/, 'Renderer empty state hóa chất phải là hợp đồng bridge bắt buộc');
-assert.match(route, /const toolbarHtml=globalThis\.reagentToolbarHtml\(\{selectOptionsHtml:rcSelectOptions\(\),primaryActionsHtml:canWrite\(\)\?btn\('\+ Thêm','openRcCreateModal\(\)','teal rc-add-btn'\)\+btn\(rcToolIcon\('trash'\)\+' Xóa','rcDeleteCurrent\(\)','danger rc-delete-btn'\):'',secondaryActionsHtml:/, 'Toolbar hóa chất phải dùng renderer TypeScript');
-assert.match(bridge, /reagentToolbarHtml: typeof reagentToolbarHtml;/, 'Renderer toolbar hóa chất phải là hợp đồng bridge bắt buộc');
-assert.match(route, /const pairPanelHtml=globalThis\.reagentPairPanelHtml\(\{oldLotHeadHtml:oldLotHead,newLotHeadHtml:newLotHead,rowsHtml:rows,actionsHtml:canWrite\(\)\?btn\('\+ Thêm mẫu','rcAddRow\(\)','ghost sm'\)\+' '\+btn\('Xóa dữ liệu','rcClearRows\(\)','ghost sm'\):'',minPairs:RC_MIN_PAIRS\}\);/, 'Panel cặp hóa chất phải dùng renderer TypeScript');
-assert.match(route, /\$\{pairPanelHtml\}<\/div>\r?\n   \$\{resultsPanelsHtml\}/, 'Lưới nhập hóa chất phải được đóng trước panel kết quả');
-assert.match(bridge, /reagentPairPanelHtml: typeof reagentPairPanelHtml;/, 'Renderer panel cặp hóa chất phải là hợp đồng bridge bắt buộc');
-assert.match(route, /const infoPanelHtml=globalThis\.reagentInfoPanelHtml\(\{disabledAttr:ro,reagentValueHtml:escAttr\(t\.reagent\),unitValueHtml:escAttr\(t\.unit\),lotOldValueHtml:escAttr\(t\.lotOld\),lotNewValueHtml:escAttr\(t\.lotNew\),dateInputHtml:dateBox\('rcDate',t\.date\|\|'','',`\$\{ro\} onchange="rcMeta\('date',this\.value\)"`\),/, 'Panel thông tin hóa chất phải dùng renderer TypeScript');
-assert.match(bridge, /reagentInfoPanelHtml: typeof reagentInfoPanelHtml;/, 'Renderer panel thông tin hóa chất phải là hợp đồng bridge bắt buộc');
-assert.match(route, /const chartsPanelHtml=globalThis\.reagentChartsPanelHtml\(\);/, 'Panel biểu đồ hóa chất phải dùng renderer TypeScript');
-assert.match(bridge, /reagentChartsPanelHtml: typeof reagentChartsPanelHtml;/, 'Renderer panel biểu đồ hóa chất phải là hợp đồng bridge bắt buộc');
-assert.match(route, /const resultsPanelsHtml=globalThis\.reagentResultsPanelsHtml\(\);/, 'Panel kết quả hóa chất phải dùng renderer TypeScript');
-assert.match(bridge, /reagentResultsPanelsHtml: typeof reagentResultsPanelsHtml;/, 'Renderer panel kết quả hóa chất phải là hợp đồng bridge bắt buộc');
-assert.match(route, /if\(!R\)return globalThis\.reagentReportDetailCardHtml\(\{index:i\+1,reagentHtml:esc\(t\.reagent\|\|'Hóa chất mới'\),pillHtml:rcReportPill\(R\),bodyHtml:body\+globalThis\.reagentReportPresentation\.missingDataHtml\(RC_MIN_PAIRS\),pagebreak\}\);/, 'Card báo cáo thiếu dữ liệu phải dùng renderer TypeScript');
-assert.match(route, /return globalThis\.reagentReportDetailCardHtml\(\{index:i\+1,reagentHtml:esc\(t\.reagent\|\|'Hóa chất mới'\),pillHtml:rcReportPill\(R\),bodyHtml:body,pagebreak\}\);/, 'Card báo cáo chi tiết phải dùng renderer TypeScript');
-assert.match(bridge, /reagentReportDetailCardHtml: typeof reagentReportDetailCardHtml;/, 'Renderer card báo cáo hóa chất phải là hợp đồng bridge bắt buộc');
-assert.match(route, /body\+=globalThis\.reagentReportChartGridHtml\(rcScatterSVG\(R,t\),rcBlandSVG\(R\)\);/, 'Lưới biểu đồ báo cáo phải dùng renderer TypeScript');
-assert.match(bridge, /reagentReportChartGridHtml: typeof reagentReportChartGridHtml;/, 'Renderer lưới biểu đồ báo cáo phải là hợp đồng bridge bắt buộc');
-assert.match(route, /function rcFmt\(x,k=4\)\{return globalThis\.reagentReportPresentation\.formatNumber\(x,k\);\}/, 'Định dạng số báo cáo phải dùng presentation TypeScript');
-assert.match(route, /function rcReportPill\(R\)\{\s*return globalThis\.reagentReportPresentation\.pillHtml\(rcReportVerdict\(R\),esc\);\s*\}/, 'Nhãn kết luận báo cáo phải dùng presentation TypeScript');
-assert.match(route, /function rcReportSummaryTable\(items\)\{\s*return globalThis\.reagentReportPresentation\.summaryTableHtml\(items,RCC,esc\);\s*\}/, 'Bảng tổng hợp báo cáo phải dùng presentation TypeScript');
-assert.match(route, /function rcReportHeader\(title,sub\)\{\s*return reportHeader\(title\)\+globalThis\.reagentReportPresentation\.subtitleHtml\(esc\(sub\|\|''\),RCC\.muted\);\s*\}/, 'Phụ đề báo cáo phải dùng presentation TypeScript');
-assert.match(route, /let body=globalThis\.reagentReportPresentation\.detailMetaHtml\(model\.metadata,esc\);/, 'Metadata chi tiết báo cáo phải dùng presentation TypeScript');
-assert.match(route, /body\+=globalThis\.reagentReportPresentation\.metricsHtml\(model\.metrics\);/, 'Chỉ số chi tiết báo cáo phải dùng presentation TypeScript');
-assert.match(route, /body\+=globalThis\.reagentReportPresentation\.conclusionHtml\(esc\(note\),RCC\.muted\);/, 'Kết luận chi tiết báo cáo phải dùng presentation TypeScript');
-assert.match(route, /body\+=globalThis\.reagentReportPresentation\.pairTableHtml\(model\.pairs\);/, 'Bảng cặp chi tiết báo cáo phải dùng presentation TypeScript');
-assert.match(route, /bodyHtml:body\+globalThis\.reagentReportPresentation\.missingDataHtml\(RC_MIN_PAIRS\)/, 'Trạng thái thiếu dữ liệu báo cáo phải dùng presentation TypeScript');
-assert.match(bridge, /reagentReportPresentation: typeof reagentReportPresentation;/, 'Presentation báo cáo hóa chất phải là hợp đồng bridge bắt buộc');
-assert.match(route, /function rcToolIcon\(type\)\{return globalThis\.reagentToolIconPresentation\.icon\(type\);\}/, 'Biểu tượng hóa chất phải dùng presentation TypeScript');
-assert.match(route, /function rcAxis\(W,H,xmin,xmax,ymin,ymax,xlab,ylab\)\{return globalThis\.reagentChartAxis\(W,H,xmin,xmax,ymin,ymax,xlab,ylab,RCC,RCPAD,esc\);\}/, 'Trục biểu đồ hóa chất phải dùng renderer TypeScript');
-assert.match(bridge, /reagentChartAxis: typeof reagentChartAxis;/, 'Renderer trục biểu đồ hóa chất phải là hợp đồng bridge bắt buộc');
-assert.match(route, /function rcScatterSVG\(R,t\)\{return globalThis\.reagentScatterSvg\(R,t,rcPadr,rcAxis,RCC\);\}/, 'Biểu đồ Scatter hóa chất phải dùng renderer TypeScript');
-assert.match(bridge, /reagentScatterSvg: typeof reagentScatterSvg;/, 'Renderer Scatter hóa chất phải là hợp đồng bridge bắt buộc');
-assert.match(route, /function rcBlandSVG\(R\)\{return globalThis\.reagentBlandSvg\(R,rcPadr,rcAxis,RCC\);\}/, 'Biểu đồ Bland-Altman hóa chất phải dùng renderer TypeScript');
-assert.match(bridge, /reagentBlandSvg: typeof reagentBlandSvg;/, 'Renderer Bland-Altman hóa chất phải là hợp đồng bridge bắt buộc');
-assert.match(route, /function rcMiniIcon\(type\)\{return globalThis\.reagentToolIconPresentation\.icon\(type\);\}/, 'Biểu tượng chọn nhanh hóa chất phải dùng presentation TypeScript');
-assert.match(route, /function rcSelectOptions\(\)\{return globalThis\.reagentSelectOptionsHtml\(state\.reagentTests,rcId,escAttr,d=>esc\(rcLabel\(d\)\)\);\}/, 'Danh sách so sánh hóa chất phải dùng presentation TypeScript');
-assert.match(route, /const html=globalThis\.reagentResultHtml\(R,RC_MIN_PAIRS,f,ft\);/, 'Kết quả so sánh hóa chất phải dùng renderer TypeScript');
-assert.doesNotMatch(route, /if\(globalThis\.reagentResultHtml\)/, 'Không giữ fallback runtime cho kết quả so sánh hóa chất');
-assert.match(bridge, /reagentResultHtml: ReturnType<typeof createReagentResultHtml>;/, 'Renderer kết quả hóa chất phải là hợp đồng bridge bắt buộc');
-assert.match(route, /function rcReportItems\(\)\{return globalThis\.reagentReportItemPresentation\.items\(state\.reagentTests,rcCalc\);\}/, 'Mục báo cáo hóa chất phải dùng presentation TypeScript');
-assert.match(bridge, /reagentReportItemPresentation: typeof reagentReportItemPresentation;/, 'Presentation mục báo cáo hóa chất phải là hợp đồng bridge bắt buộc');
-assert.match(route, /const model=globalThis\.reagentReportPresentation\.detailModel\(R,t,RC_MIN_PAIRS,rcDateText\(t\.date\)\);/, 'Chi tiết hóa chất phải dùng model TypeScript');
-assert.match(route, /const note=model\.conclusion;/, 'Kết luận hóa chất phải dùng model TypeScript');
-assert.match(route, /function rcReportVerdict\(R\)\{return globalThis\.reagentReportPresentation\.verdict\(R,RCC\);\}/, 'Trạng thái kết luận hóa chất phải dùng presentation TypeScript');
-assert.match(route, /function rcPairCalc\(r\)\{return globalThis\.reagentPairMath\.pairCalc\(r\);\}/, 'Tính từng cặp hóa chất phải dùng domain TypeScript');
-assert.match(bridge, /reagentPairMath: typeof reagentPairMath;/, 'Toán học cặp hóa chất phải là hợp đồng bridge bắt buộc');
-assert.match(route, /function rcCalc\(ds\)\{return globalThis\.reagentComparisonCalculator\.calculate\(ds,RC_MIN_PAIRS\);/, 'Calculator hóa chất phải dùng service TypeScript');
-assert.match(bridge, /reagentComparisonCalculator: ReturnType<typeof createReagentComparisonCalculator>;/, 'Calculator hóa chất phải là hợp đồng bridge bắt buộc');
-assert.doesNotMatch(route, /function rc(?:PTwo|TCrit|Max|Min|Mean|Var|Pearson|Ols|Median|PB|Valid)\(/, 'Không giữ facade thống kê hóa chất đã retire');
+// Controller phải tiêu thụ presentation/service/domain TypeScript qua deps, không tự dựng logic.
+for (const [needle, message] of [
+  [/deps\.pres\.comparisonLabel\.label\(/, 'Nhãn so sánh hóa chất phải dùng presentation TypeScript'],
+  [/deps\.pres\.chart\.range\(/, 'Dải biểu đồ hóa chất phải dùng presentation TypeScript'],
+  [/deps\.pres\.quickLabel\.label\(/, 'Nhãn thao tác nhanh phải dùng presentation TypeScript'],
+  [/deps\.pres\.quickPickerModal\(/, 'Modal chọn nhanh hóa chất phải dùng renderer TypeScript'],
+  [/deps\.pres\.quickPickerRows\(/, 'Dòng modal chọn nhanh hóa chất phải dùng renderer TypeScript'],
+  [/deps\.pres\.pickerModal\(/, 'Modal chọn phép so sánh phải dùng renderer TypeScript'],
+  [/deps\.pres\.pickerRows\(/, 'Dòng modal chọn phép so sánh phải dùng renderer TypeScript'],
+  [/deps\.pres\.createModal\(/, 'Modal thêm hóa chất phải dùng renderer TypeScript'],
+  [/deps\.pres\.createReferenceRows\(/, 'Danh mục modal thêm hóa chất phải dùng renderer TypeScript'],
+  [/deps\.pres\.createTypedRow\(/, 'Nút tạo hóa chất theo truy vấn phải dùng renderer TypeScript'],
+  [/deps\.pres\.emptyPage\(/, 'Empty state hóa chất phải dùng renderer TypeScript'],
+  [/deps\.pres\.toolbar\(/, 'Toolbar hóa chất phải dùng renderer TypeScript'],
+  [/deps\.pres\.pairPanel\(/, 'Panel cặp hóa chất phải dùng renderer TypeScript'],
+  [/deps\.pres\.infoPanel\(/, 'Panel thông tin hóa chất phải dùng renderer TypeScript'],
+  [/deps\.pres\.chartsPanel\(/, 'Panel biểu đồ hóa chất phải dùng renderer TypeScript'],
+  [/deps\.pres\.resultsPanels\(/, 'Panel kết quả hóa chất phải dùng renderer TypeScript'],
+  [/deps\.pres\.resultHtml\(/, 'Kết quả so sánh hóa chất phải dùng renderer TypeScript'],
+  [/deps\.pres\.reportDetailCard\(/, 'Card báo cáo hóa chất phải dùng renderer TypeScript'],
+  [/deps\.pres\.reportChartGrid\(/, 'Lưới biểu đồ báo cáo phải dùng renderer TypeScript'],
+  [/deps\.pres\.report\.summaryTableHtml\(/, 'Bảng tổng hợp báo cáo phải dùng presentation TypeScript'],
+  [/deps\.pres\.report\.detailModel\(/, 'Chi tiết hóa chất phải dùng model TypeScript'],
+  [/deps\.pres\.report\.formatNumber\(/, 'Định dạng số báo cáo phải dùng presentation TypeScript'],
+  [/deps\.pres\.toolIcon\.icon\(/, 'Biểu tượng hóa chất phải dùng presentation TypeScript'],
+  [/deps\.pres\.chartAxis\(/, 'Trục biểu đồ hóa chất phải dùng renderer TypeScript'],
+  [/deps\.pres\.scatterSvg\(/, 'Biểu đồ Scatter hóa chất phải dùng renderer TypeScript'],
+  [/deps\.pres\.blandSvg\(/, 'Biểu đồ Bland-Altman hóa chất phải dùng renderer TypeScript'],
+  [/deps\.pres\.selectOptions\(/, 'Danh sách so sánh hóa chất phải dùng presentation TypeScript'],
+  [/deps\.pres\.reportItem\.items\(/, 'Mục báo cáo hóa chất phải dùng presentation TypeScript'],
+  [/deps\.pres\.pairMath\.pairCalc\(/, 'Tính từng cặp hóa chất phải dùng domain TypeScript'],
+  [/deps\.pres\.calculator\.calculate\(ds, RC_MIN_PAIRS\)/, 'Calculator hóa chất phải dùng service TypeScript'],
+  [/deps\.pres\.pairRow\(/, 'Dòng cặp số liệu phải dùng renderer TypeScript'],
+]) assert.match(route, needle, message);
+// Không giữ facade thống kê / xấp xỉ phân phối classic đã retire.
+assert.doesNotMatch(route, /function rc(?:PTwo|TCrit|Betacf|Lgamma|Betai)\(/, 'Không giữ facade thống kê/beta classic đã retire');
+assert.doesNotMatch(route, /globalThis\.reagent/, 'Controller không được gọi globalThis.reagent* trực tiếp — mọi thứ đi qua deps');
+
+// Hợp đồng bridge (QCLabGlobal) vẫn bắt buộc — kiểm tại compat.
+for (const contract of [
+  /reagentComparisonLabelPresentation: typeof reagentComparisonLabelPresentation;/,
+  /reagentQuickPickerModalPresentation: typeof reagentQuickPickerModalHtml;/,
+  /reagentQuickPickerRowsHtml: typeof reagentQuickPickerRowsHtml;/,
+  /reagentPickerModalPresentation: typeof reagentPickerModalHtml;/,
+  /reagentPickerRowsHtml: typeof reagentPickerRowsHtml;/,
+  /reagentCreateModalPresentation: typeof reagentCreateModalHtml;/,
+  /reagentCreateReferenceRowsHtml: typeof reagentCreateReferenceRowsHtml;/,
+  /reagentCreateTypedRowHtml: typeof reagentCreateTypedRowHtml;/,
+  /reagentEmptyPageHtml: typeof reagentEmptyPageHtml;/,
+  /reagentToolbarHtml: typeof reagentToolbarHtml;/,
+  /reagentPairPanelHtml: typeof reagentPairPanelHtml;/,
+  /reagentInfoPanelHtml: typeof reagentInfoPanelHtml;/,
+  /reagentChartsPanelHtml: typeof reagentChartsPanelHtml;/,
+  /reagentResultsPanelsHtml: typeof reagentResultsPanelsHtml;/,
+  /reagentReportDetailCardHtml: typeof reagentReportDetailCardHtml;/,
+  /reagentReportChartGridHtml: typeof reagentReportChartGridHtml;/,
+  /reagentReportPresentation: typeof reagentReportPresentation;/,
+  /reagentChartAxis: typeof reagentChartAxis;/,
+  /reagentScatterSvg: typeof reagentScatterSvg;/,
+  /reagentBlandSvg: typeof reagentBlandSvg;/,
+  /reagentResultHtml: ReturnType<typeof createReagentResultHtml>;/,
+  /reagentReportItemPresentation: typeof reagentReportItemPresentation;/,
+  /reagentPairMath: typeof reagentPairMath;/,
+  /reagentComparisonCalculator: ReturnType<typeof createReagentComparisonCalculator>;/,
+  /reagentPairRowHtml: ReturnType<typeof createReagentPairRowHtml>;/,
+]) assert.match(bridge, contract, `bridge contract thiếu: ${contract}`);
 assert.doesNotMatch(bridge, /reagent(?:Statistics|TDistribution): typeof/, 'Không công bố facade thống kê hóa chất đã retire');
-assert.doesNotMatch(route, /function rcBetacf\(/, 'Không giữ xấp xỉ beta classic khi phân phối t đã dùng TypeScript');
-assert.doesNotMatch(route, /function rcLgamma\(/, 'Không giữ xấp xỉ gamma classic khi phân phối t đã dùng TypeScript');
-assert.doesNotMatch(route, /function rcBetai\(/, 'Không giữ xấp xỉ beta regularized classic khi phân phối t đã dùng TypeScript');
-assert.match(route, /return globalThis\.reagentPairRowHtml\(\{index:i,row:r,readOnly:!canWrite\(\),pair:c,format:fmt,escAttr\}\);/, 'Dòng cặp số liệu phải dùng renderer TypeScript');
-assert.match(bridge, /reagentPairRowHtml: ReturnType<typeof createReagentPairRowHtml>;/, 'Renderer dòng cặp số liệu phải là hợp đồng bridge bắt buộc');
 
 console.log('Reagent label TypeScript bridge tests passed');

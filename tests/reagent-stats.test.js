@@ -8,7 +8,7 @@
 const assert = require('node:assert/strict');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
-const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js', 'modules/state.js', 'modules/reagent.js']);
+const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js', 'modules/state.js']);
 // esc()/escAttr() normally come from reports.js (not loaded here) — stub a plain
 // passthrough since Case 6 below only checks for a literal template-placeholder bug,
 // not HTML-escaping behavior.
@@ -94,7 +94,9 @@ const close = (actual, expected, epsilon = 1e-9, message = '') =>
   const R = ctx.rcCalc(makeDs([[10, 10], [20, 20], [30, 30], [40, 40], [50, 50]]));
   const html = ctx.rcReportSummaryTable([{ ds: makeDs([], { reagent: 'Glucose', unit: 'mmol/L' }), R }]);
   assert.ok(!html.includes('${RCC.muted}'), 'unit color must be interpolated, not left as a literal template placeholder');
-  const mutedColor = run(ctx, 'RCC.muted'); // top-level const in reagent.js isn't exposed as ctx.RCC
+  // RCC palette giờ là const nội bộ của reagent-page-controller.ts (RCC.muted='#667b89');
+  // không còn là global nên assert thẳng giá trị thật thay vì đọc qua run(ctx,'RCC.muted').
+  const mutedColor = '#667b89';
   assert.ok(html.includes(`color:${mutedColor}`), 'unit span must carry the real muted color value');
   assert.ok(html.includes('(mmol/L)'), 'unit text itself must still render');
 }

@@ -709,10 +709,22 @@ the Google Fonts link, offline labs must print with correct metrics.
   `src/compat/modular-pilot.global.ts` (`root.pageSettings`, `root.saveLab`,
   `root.ensureLabBrandShape`, …) so the onclick handlers in the TS HTML builders
   and `ensureShape()`'s bare `ensureLabBrandShape` call keep working unchanged.
-- `range.js`, `backup-service.js`, `data-io.js`, `reports.js`, `users-auth.js`,
-  `reagent.js` — feature-specific logic (target-range calc,
+- `src/presentation/reagent/reagent-page-controller.ts` —
+  `createReagentPageController(deps)` owns the reagent lot-comparison page
+  (`pageReagent`/`rcCompute`/`rcMeta`/`rcCell`/row+quick-list+picker+create
+  modals/`rcPrint`/`rcPrintSummary`/…), retired classic `reagent.js` on
+  2026-08-18 (Pha G route slice 4). Page state (`rcId`/`rcModalQ`/`rcQuickType`/…)
+  is written directly from handlers into the `ReagentUIState` bag (accessor
+  globals), like the Westgard page. Every stat/render is a TS domain/service/
+  presentation reached through `deps` (`ReagentComparisonService`,
+  `ReagentComparisonWorkflowCommand`, `reagentComparisonCalculator`, the
+  `reagentXxx` HTML builders); the palette consts `RCC`/`RCPAD`/`RC_MIN_PAIRS`
+  live in the controller. `tests/reagent-stats.test.js` drives `rcCalc`/
+  `rcReportSummaryTable` (bridged as globals) directly.
+- `range.js`, `backup-service.js`, `data-io.js`, `reports.js`, `users-auth.js` —
+  feature-specific logic (target-range calc,
   backup/restore service + XLSX generation, printed reports, auth/user
-  management, reagent lot comparison stats). `users-auth.js` hashes passwords
+  management). `users-auth.js` hashes passwords
   with PBKDF2-SHA256 via the TypeScript `pbkdf2PasswordService` bridge, whose
   `PASSWORD_HASH_ITERATIONS=600000` (OWASP minimum) lives in
   `src/domain/auth/pbkdf2-password-service.ts` — the single source now, not a
@@ -728,10 +740,11 @@ the Google Fonts link, offline labs must print with correct metrics.
   wire any new operation of that weight the same way, `await`-ing it before
   mutating state. `backup-service.js` (split out of `data-io.js` on
   2026-07-24) rejects imports over `BACKUP_IMPORT_MAX_BYTES` (128 MB) before
-  parsing. `reagent.js` implements its regression stats
+  parsing. The reagent regression stats
   (Passing-Bablok, Deming/OLS, Bland-Altman, plus a from-scratch incomplete-beta
-  t-distribution for CIs) by hand, no stats library — pure like `core.js` but
-  page-scoped, covered by `tests/reagent-stats.test.js`.
+  t-distribution for CIs) are pure TypeScript in `src/domain/reagent/`
+  (`reagentComparisonCalculator` etc.), no stats library, covered by
+  `tests/reagent-stats.test.js`.
 - `lis-client-service.js` — browser-side client for the LIS Gateway prototype;
   see "LIS Gateway" below.
 - `app.js` — small async boot entry point at the bottom of `index.html`

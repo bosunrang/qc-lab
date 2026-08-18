@@ -734,6 +734,503 @@
 		});
 	}
 	//#endregion
+	//#region src/presentation/reagent/reagent-page-controller.ts
+	var RC_MIN_PAIRS = 5;
+	var RCC = {
+		teal: "#0c6f78",
+		tealDeep: "#0a5d65",
+		ink: "#172833",
+		muted: "#667b89",
+		line: "#d4dde3",
+		grid: "#e9eff3",
+		red: "#a43a33",
+		amber: "#a36f15",
+		green: "#087044",
+		okBg: "#e3f3f0",
+		okFg: "#0a5e67",
+		midBg: "#fbf0db",
+		midFg: "#a36f15",
+		noBg: "#f7e4e2",
+		noFg: "#a43a33"
+	};
+	var RCPAD = {
+		l: 54,
+		r: 18,
+		t: 18,
+		b: 46
+	};
+	var RC_META_LOG_LABEL = {
+		lotOld: "Số lô cũ",
+		lotNew: "Số lô mới",
+		biasTarget: "Bias mong muốn (%)",
+		alpha: "Mức ý nghĩa (α)"
+	};
+	function createReagentPageController(deps) {
+		const rcLabel = (d) => deps.pres.comparisonLabel.label(d.test, deps.teaAnalyteDisplay);
+		const rcAct = () => deps.service.find(deps.getState(), deps.ui().rcId);
+		const rcSaveSoon = () => {
+			const ui = deps.ui();
+			clearTimeout(ui.rcSaveT);
+			ui.rcSaveT = setTimeout(() => deps.save(), 600);
+		};
+		const rcPairCalc = (r) => deps.pres.pairMath.pairCalc(r);
+		const rcCalc = (ds) => deps.pres.calculator.calculate(ds, RC_MIN_PAIRS);
+		const rcAxis = (W, H, xmin, xmax, ymin, ymax, xlab, ylab) => deps.pres.chartAxis(W, H, xmin, xmax, ymin, ymax, xlab, ylab, RCC, RCPAD, deps.esc);
+		const rcPadr = (min, max) => deps.pres.chart.range([min, max]);
+		const rcToolIcon = (type) => deps.pres.toolIcon.icon(type);
+		const rcMiniIcon = (type) => deps.pres.toolIcon.icon(type);
+		const rcScatterSVG = (R, t) => deps.pres.scatterSvg(R, t, rcPadr, rcAxis, RCC);
+		const rcBlandSVG = (R) => deps.pres.blandSvg(R, rcPadr, rcAxis, RCC);
+		const rcSelectOptions = () => deps.pres.selectOptions(deps.getState().reagentTests, deps.ui().rcId, deps.escapeAttr, (d) => deps.esc(rcLabel(d)));
+		const pageReagent = () => {
+			const state = deps.getState(), ui = deps.ui();
+			if (!state.reagentTests.length) return deps.pres.emptyPage({
+				headHtml: deps.headOnly("So sánh 2 lô hóa chất", ""),
+				emptyStateHtml: deps.emptyState("Chưa có phép so sánh", "Tải lại dữ liệu hoặc tạo phép so sánh mới.", "")
+			});
+			if (!ui.rcId || !state.reagentTests.find((d) => d.id === ui.rcId)) ui.rcId = state.reagentTests[0].id;
+			const ds = rcAct(), t = ds.test, ro = !deps.canWrite() ? "disabled" : "";
+			const oldLotHead = "Lô cũ" + (t.lotOld ? `: ${deps.esc(t.lotOld)}` : ""), newLotHead = "Lô mới" + (t.lotNew ? `: ${deps.esc(t.lotNew)}` : "");
+			const rows = ds.rows.map((r, i) => {
+				const c = rcPairCalc(r);
+				return deps.pres.pairRow({
+					index: i,
+					row: r,
+					readOnly: !deps.canWrite(),
+					pair: c,
+					format: deps.fmt,
+					escAttr: deps.escapeAttr
+				});
+			}).join("");
+			const toolbarHtml = deps.pres.toolbar({
+				selectOptionsHtml: rcSelectOptions(),
+				primaryActionsHtml: deps.canWrite() ? deps.button("+ Thêm", "openRcCreateModal()", "teal rc-add-btn") + deps.button(rcToolIcon("trash") + " Xóa", "rcDeleteCurrent()", "danger rc-delete-btn") : "",
+				secondaryActionsHtml: (deps.canWrite() ? deps.button(rcToolIcon("search") + " Tìm", "openRcModal()", "ghost rc-find-btn") : "") + deps.button(rcToolIcon("print") + " In hóa chất này", "rcPrint()", "teal rc-report-btn") + deps.button(rcToolIcon("report") + " Báo cáo tổng hợp", "rcPrintSummary()", "teal rc-report-main")
+			});
+			const pairPanelHtml = deps.pres.pairPanel({
+				oldLotHeadHtml: oldLotHead,
+				newLotHeadHtml: newLotHead,
+				rowsHtml: rows,
+				actionsHtml: deps.canWrite() ? deps.button("+ Thêm mẫu", "rcAddRow()", "ghost sm") + " " + deps.button("Xóa dữ liệu", "rcClearRows()", "ghost sm") : "",
+				minPairs: RC_MIN_PAIRS
+			});
+			const infoPanelHtml = deps.pres.infoPanel({
+				disabledAttr: ro,
+				reagentValueHtml: deps.escapeAttr(t.reagent),
+				unitValueHtml: deps.escapeAttr(t.unit),
+				lotOldValueHtml: deps.escapeAttr(t.lotOld),
+				lotNewValueHtml: deps.escapeAttr(t.lotNew),
+				dateInputHtml: deps.dateBox("rcDate", t.date || "", "", `${ro} onchange="rcMeta('date',this.value)"`),
+				operatorValueHtml: deps.escapeAttr(t.operator),
+				sampleTypeValueHtml: deps.escapeAttr(t.sampleType),
+				biasTarget: t.biasTarget,
+				alpha: t.alpha,
+				coverageChecked: !!t.coverageConfirmed,
+				canWrite: deps.canWrite(),
+				userIconHtml: rcMiniIcon("user"),
+				sampleIconHtml: rcMiniIcon("sample")
+			});
+			const chartsPanelHtml = deps.pres.chartsPanel();
+			const resultsPanelsHtml = deps.pres.resultsPanels();
+			return deps.headOnly("So sánh 2 lô hóa chất", "Sàng lọc định lượng · hồi quy mô tả · Bland-Altman · phê duyệt theo SOP") + toolbarHtml + `<div class="rc-entry-grid">${infoPanelHtml}
+   ${pairPanelHtml}</div>
+   ${resultsPanelsHtml}
+   ${chartsPanelHtml}`;
+		};
+		const rcCompute = () => {
+			const ds = rcAct();
+			if (!ds) return;
+			const R = rcCalc(ds);
+			const f = rcFmt, ft = rcFmtT;
+			const st = deps.document.getElementById("rcStats"), cr = deps.document.getElementById("rcCrit"), vd = deps.document.getElementById("rcVerdict"), sc = deps.document.getElementById("rcScatter"), bl = deps.document.getElementById("rcBland");
+			if (!st) return;
+			const html = deps.pres.resultHtml(R, RC_MIN_PAIRS, f, ft);
+			st.innerHTML = html.statsHtml;
+			cr.innerHTML = html.criteriaHtml;
+			vd.innerHTML = html.verdictHtml;
+			if (!R) {
+				sc.innerHTML = "";
+				bl.innerHTML = "";
+				return;
+			}
+			sc.innerHTML = rcScatterSVG(R, ds.test);
+			bl.innerHTML = rcBlandSVG(R);
+		};
+		const rcMetaFocus = (k) => {
+			const ui = deps.ui();
+			ui.rcMetaBefore = ui.rcMetaBefore || {};
+			const ds = rcAct();
+			ui.rcMetaBefore[k] = ds ? ds.test[k] : void 0;
+		};
+		const rcMetaLog = (k) => {
+			const ui = deps.ui(), ds = rcAct();
+			if (!ds || !ui.rcMetaBefore || !(k in ui.rcMetaBefore)) return;
+			const before = ui.rcMetaBefore[k], after = ds.test[k];
+			delete ui.rcMetaBefore[k];
+			if (before === after) return;
+			deps.logAct("Cập nhật so sánh hóa chất", `${RC_META_LOG_LABEL[k] || k}: ${before ?? "—"} → ${after ?? "—"}`, rcLabel(ds));
+		};
+		const rcMeta = (k, v) => {
+			if (!deps.requireWrite()) return;
+			const before = rcAct() && rcAct().test[k];
+			const result = deps.service.updateMetadata(deps.getState(), {
+				id: deps.ui().rcId,
+				key: k,
+				value: k === "date" ? deps.parseVN(v) || deps.cleanText(v, 20) : v
+			});
+			if (result.error) return;
+			const ds = result.comparison;
+			rcSaveSoon();
+			rcCompute();
+			if (k === "coverageConfirmed" && before !== result.value) deps.logAct("Xác nhận bao phủ SOP", `${result.value ? "Đã xác nhận" : "Chưa xác nhận"} bao phủ khoảng đo/điểm quyết định lâm sàng`, rcLabel(ds));
+			if (k === "reagent" || k === "lotOld" || k === "lotNew") {
+				const d = deps.document.getElementById("rcCmpDisp");
+				if (d) d.textContent = rcLabel(rcAct());
+				const s = deps.document.getElementById("rcSel");
+				if (s) {
+					const o = [...s.options].find((o) => o.value === deps.ui().rcId);
+					if (o) o.textContent = rcLabel(rcAct());
+				}
+				const oh = deps.document.getElementById("rcOldLotHead"), nh = deps.document.getElementById("rcNewLotHead");
+				if (oh) oh.textContent = "Lô cũ" + (ds.test.lotOld ? ": " + ds.test.lotOld : "");
+				if (nh) nh.textContent = "Lô mới" + (ds.test.lotNew ? ": " + ds.test.lotNew : "");
+			}
+		};
+		const rcUpdateRowCalc = (i) => {
+			const row = deps.document.querySelector(`[data-rc-row="${i}"]`), ds = rcAct();
+			if (!row || !ds || !ds.rows[i]) return;
+			const c = rcPairCalc(ds.rows[i]), avg = row.querySelector(".rc-calc.avg"), dif = row.querySelector(".rc-calc.dif");
+			if (avg) avg.textContent = c ? deps.fmt(c.avg, 3) : "–";
+			if (dif) {
+				dif.textContent = c ? deps.fmt(c.dif, 3) : "–";
+				dif.classList.toggle("neg", !!(c && c.dif < 0));
+			}
+		};
+		const rcCell = (i, w, v) => {
+			if (!deps.requireWrite()) return;
+			if (deps.service.updateCell(deps.getState(), {
+				id: deps.ui().rcId,
+				rowIndex: i,
+				column: w,
+				value: v
+			}).error) return;
+			rcSaveSoon();
+			rcUpdateRowCalc(i);
+			rcCompute();
+		};
+		const rcAddRow = () => {
+			if (!deps.requireWrite()) return;
+			if (deps.service.addRow(deps.getState(), { id: deps.ui().rcId }).error) return;
+			deps.save({ clearDerived: false });
+			deps.rerender();
+		};
+		const rcRmRow = (i) => {
+			if (!deps.requireWrite()) return;
+			if (deps.service.removeRow(deps.getState(), {
+				id: deps.ui().rcId,
+				rowIndex: i
+			}).error) return;
+			deps.save({ clearDerived: false });
+			deps.rerender();
+		};
+		const rcClearRows = () => {
+			if (!deps.requireWrite()) return;
+			if (deps.service.clearRows(deps.getState(), { id: deps.ui().rcId }).error) return;
+			deps.save({ clearDerived: false });
+			deps.rerender();
+		};
+		const rcSwitch = (id) => {
+			deps.ui().rcId = id;
+			deps.rerender();
+		};
+		const rcDelete = async (id, keepModal = false) => {
+			if (!deps.requireAdmin()) return;
+			if (deps.getState().reagentTests.length <= 1) {
+				await deps.infoDialog("Phải còn ít nhất 1 phép so sánh.");
+				return;
+			}
+			if (!await deps.confirmDialog({
+				kicker: "Thao tác không thể hoàn tác",
+				title: "Xóa phép so sánh",
+				message: "Xóa phép so sánh này?",
+				confirmLabel: "Xóa",
+				cancelLabel: "Hủy"
+			})) return;
+			const result = deps.workflow.remove({ id });
+			if (result.error) return;
+			if (deps.ui().rcId === id) deps.ui().rcId = result.nextId;
+			if (keepModal) renderRcModal();
+			deps.rerender();
+		};
+		const rcDeleteCurrent = () => rcDelete(deps.ui().rcId);
+		const rcQuickLabel = (type) => deps.pres.quickLabel.label(type);
+		const rcQuickList = (type) => {
+			const result = deps.service.ensureQuickList(deps.getState(), type);
+			return result.error ? [] : result.items;
+		};
+		const rcOpenQuick = (type) => {
+			if (!deps.requireWrite()) return;
+			deps.ui().rcQuickType = type;
+			rcRenderQuickModal();
+		};
+		const rcRenderQuickModal = () => {
+			const type = deps.ui().rcQuickType || "operator", items = rcQuickList(type), label = rcQuickLabel(type);
+			const rows = deps.pres.quickPickerRows({
+				items,
+				labelHtml: deps.esc(label),
+				esc: deps.esc,
+				selectButtonHtml: (i) => deps.button("Chọn", `rcPickQuick(${i})`, "teal sm")
+			});
+			deps.openModal(deps.pres.quickPickerModal({
+				labelHtml: deps.esc(label),
+				rowsHtml: rows,
+				placeholderHtml: deps.escapeAttr(label),
+				addButtonHtml: deps.button("Thêm", "rcAddQuick()", "teal sm"),
+				closeButtonHtml: deps.button("Đóng", "closeModal()", "ghost")
+			}));
+			deps.requestFrame(() => {
+				const e = deps.document.getElementById("rcQuickNew");
+				if (e) e.focus();
+			}, 0);
+		};
+		const rcPickQuick = (i) => {
+			if (deps.service.pickQuick(deps.getState(), {
+				id: deps.ui().rcId,
+				type: deps.ui().rcQuickType,
+				index: i
+			}).error) return;
+			deps.save({ clearDerived: false });
+			deps.closeModal();
+			deps.rerender();
+		};
+		const rcAddQuick = () => {
+			const input = deps.document.getElementById("rcQuickNew"), v = deps.cleanText(input && input.value, 120).trim();
+			if (!v) return;
+			if (deps.service.addQuick(deps.getState(), {
+				type: deps.ui().rcQuickType,
+				value: v
+			}).error) return;
+			deps.save({ clearDerived: false });
+			rcRenderQuickModal();
+		};
+		const rcDelQuick = async (i) => {
+			const v = rcQuickList(deps.ui().rcQuickType)[i];
+			if (!v) return;
+			if (!await deps.confirmDialog({
+				kicker: "Thao tác không thể hoàn tác",
+				title: "Xóa khỏi danh sách",
+				message: `Xóa "${v}" khỏi danh sách?`,
+				confirmLabel: "Xóa",
+				cancelLabel: "Hủy"
+			})) return;
+			if (deps.service.removeQuick(deps.getState(), {
+				type: deps.ui().rcQuickType,
+				index: i
+			}).error) return;
+			deps.save({ clearDerived: false });
+			rcRenderQuickModal();
+		};
+		const openRcModal = () => {
+			deps.ui().rcModalQ = "";
+			renderRcModal();
+		};
+		const rcModalSearchSet = (v) => {
+			deps.ui().rcModalQ = v;
+			deps.scheduleSearchRender(rcModalSearchSet, renderRcModal, "rcModalSearch");
+		};
+		const renderRcModal = () => {
+			const q = deps.searchText(deps.ui().rcModalQ);
+			const hit = (d) => !q || [
+				rcLabel(d),
+				d.test.reagent,
+				d.test.lotOld,
+				d.test.lotNew,
+				d.test.unit,
+				d.test.operator
+			].some((v) => deps.searchText(v).includes(q));
+			const rows = deps.pres.pickerRows({
+				items: deps.getState().reagentTests.filter(hit).map((d) => ({
+					id: d.id,
+					labelHtml: deps.esc(rcLabel(d)),
+					unitHtml: deps.esc(d.test.unit || ""),
+					rowCount: d.rows && d.rows.length || 0,
+					selected: d.id === deps.ui().rcId
+				})),
+				canWrite: deps.canWrite(),
+				selectButtonHtml: (id, selected) => deps.button(selected ? "Đang chọn" : "Chọn", `rcPick('${id}')`, (selected ? "teal" : "ghost") + " sm")
+			});
+			deps.openModal(deps.pres.pickerModal({
+				searchValueHtml: deps.escapeAttr(deps.ui().rcModalQ),
+				rowsHtml: rows,
+				closeButtonHtml: deps.button("Đóng", "closeModal()", "ghost")
+			}));
+			deps.requestFrame(() => {
+				const e = deps.document.getElementById("rcModalSearch");
+				if (e) {
+					e.focus();
+					e.setSelectionRange(e.value.length, e.value.length);
+				}
+			}, 0);
+		};
+		const rcPick = (id) => {
+			deps.ui().rcId = id;
+			deps.closeModal();
+			deps.rerender();
+		};
+		const rcDeleteFromModal = (id) => rcDelete(id, true);
+		const openRcCreateModal = () => {
+			deps.ui().rcCreateModalQ = "";
+			renderRcCreateModal();
+		};
+		const rcCreateSearchSet = (v) => {
+			deps.ui().rcCreateModalQ = v;
+			deps.scheduleSearchRender(rcCreateSearchSet, renderRcCreateModal, "rcCreateSearch");
+		};
+		const renderRcCreateModal = () => {
+			const q = deps.ui().rcCreateModalQ.trim(), ql = deps.searchText(q);
+			const cats = {};
+			deps.refTests().forEach((r) => {
+				if (ql && ![
+					r[0],
+					r[1],
+					r[4],
+					deps.teaAnalyteDisplay(r[0])
+				].some((v) => deps.searchText(v).includes(ql))) return;
+				(cats[r[4]] = cats[r[4]] || []).push(r);
+			});
+			const refs = deps.pres.createReferenceRows(Object.keys(cats).map((cat) => ({
+				nameHtml: deps.esc(cat),
+				rowsHtml: cats[cat].map((r) => `<button class="refrow" onclick="rcCreateFrom('${deps.jsq(r[0])}','${deps.jsq(r[1] || "")}')">${deps.esc(deps.teaAnalyteDisplay(r[0]))}</button>`).join("")
+			})), "");
+			const createTyped = deps.pres.createTypedRow(q ? deps.esc(q) : "", q ? `rcCreateFrom('${deps.jsq(q)}','')` : "rcCreateFrom('Hóa chất mới','')");
+			deps.openModal(deps.pres.createModal({
+				searchValueHtml: deps.escapeAttr(deps.ui().rcCreateModalQ),
+				createTypedHtml: createTyped,
+				referenceRowsHtml: refs,
+				emptyReferenceHtml: "<div class=\"empty\" style=\"padding:18px\">Không tìm thấy trong danh mục chuẩn.</div>",
+				closeButtonHtml: deps.button("Đóng", "closeModal()", "ghost")
+			}));
+			deps.requestFrame(() => {
+				const e = deps.document.getElementById("rcCreateSearch");
+				if (e) {
+					e.focus();
+					e.setSelectionRange(e.value.length, e.value.length);
+				}
+			}, 0);
+		};
+		const rcCreateFrom = (name, unit) => {
+			if (!deps.requireWrite()) return;
+			const result = deps.workflow.create({
+				id: deps.uid(),
+				name,
+				unit
+			});
+			if (result.error) return;
+			deps.ui().rcId = result.comparison.id;
+			deps.closeModal();
+			deps.rerender();
+		};
+		const rcFmt = (x, k = 4) => deps.pres.report.formatNumber(x, k);
+		const rcFmtT = (x) => deps.pres.report.formatTStatistic(x);
+		const rcDateText = (v) => v ? deps.esc(deps.vnDate(v)) : deps.formatDateTimeVN((/* @__PURE__ */ new Date()).toISOString()).split(" ").slice(1).join(" ");
+		const rcReportVerdict = (R) => deps.pres.report.verdict(R, RCC);
+		const rcReportPill = (R) => deps.pres.report.pillHtml(rcReportVerdict(R), deps.esc);
+		const rcReportHeader = (title, sub) => deps.reportHeader(title) + deps.pres.report.subtitleHtml(deps.esc(sub || ""), RCC.muted);
+		const rcReportSummaryTable = (items) => deps.pres.report.summaryTableHtml(items, RCC, deps.esc);
+		const rcReportDetail = (ds, i = 0, pagebreak = false) => {
+			const R = rcCalc(ds), t = ds.test;
+			const model = deps.pres.report.detailModel(R, t, RC_MIN_PAIRS, rcDateText(t.date));
+			let body = deps.pres.report.detailMetaHtml(model.metadata, deps.esc);
+			if (!R) return deps.pres.reportDetailCard({
+				index: i + 1,
+				reagentHtml: deps.esc(t.reagent || "Hóa chất mới"),
+				pillHtml: rcReportPill(R),
+				bodyHtml: body + deps.pres.report.missingDataHtml(RC_MIN_PAIRS),
+				pagebreak
+			});
+			body += deps.pres.report.pairTableHtml(model.pairs);
+			body += deps.pres.report.metricsHtml(model.metrics);
+			body += deps.pres.report.conclusionHtml(deps.esc(model.conclusion), RCC.muted);
+			body += deps.pres.reportChartGrid(rcScatterSVG(R, t), rcBlandSVG(R));
+			return deps.pres.reportDetailCard({
+				index: i + 1,
+				reagentHtml: deps.esc(t.reagent || "Hóa chất mới"),
+				pillHtml: rcReportPill(R),
+				bodyHtml: body,
+				pagebreak
+			});
+		};
+		const rcReportItems = () => deps.pres.reportItem.items(deps.getState().reagentTests, rcCalc);
+		const rcPrintSummary = async () => {
+			const items = rcReportItems();
+			if (!items.length) {
+				await deps.infoDialog("Chưa có phép so sánh hóa chất.");
+				return;
+			}
+			const valid = items.filter((x) => x.R).length;
+			if (!valid) {
+				await deps.infoDialog(`Chưa đủ dữ liệu để tạo báo cáo tổng hợp (mỗi hóa chất cần tối thiểu ${RC_MIN_PAIRS} cặp giá trị hợp lệ).`);
+				return;
+			}
+			let body = rcReportHeader("BÁO CÁO SO SÁNH 2 LÔ HÓA CHẤT", `Tổng hợp ${items.length} hóa chất · ${valid} phép đủ dữ liệu · Ngày xuất: ${deps.formatDateTimeVN((/* @__PURE__ */ new Date()).toISOString())}`);
+			body += rcReportSummaryTable(items);
+			items.forEach((it, i) => body += rcReportDetail(it.ds, i, i > 0));
+			body += deps.signBlock();
+			await deps.openPrint("Báo cáo so sánh hóa chất tổng hợp", body);
+		};
+		const rcPrint = async () => {
+			const ds = rcAct(), R = rcCalc(ds);
+			if (!R) {
+				await deps.infoDialog(`Chưa đủ dữ liệu (tối thiểu ${RC_MIN_PAIRS} cặp).`);
+				return;
+			}
+			let body = rcReportHeader("BÁO CÁO SO SÁNH 2 LÔ HÓA CHẤT", "Tổng hợp 1 hóa chất · Ngày xuất: " + deps.formatDateTimeVN((/* @__PURE__ */ new Date()).toISOString()));
+			body += rcReportSummaryTable([{
+				ds,
+				R
+			}]);
+			body += rcReportDetail(ds, 0, false);
+			body += deps.signBlock();
+			await deps.openPrint("So sánh lô — " + (ds.test.reagent || ""), body);
+		};
+		return {
+			rcLabel,
+			rcAct,
+			rcCalc,
+			rcCompute,
+			pageReagent,
+			rcMeta,
+			rcMetaFocus,
+			rcMetaLog,
+			rcCell,
+			rcUpdateRowCalc,
+			rcAddRow,
+			rcRmRow,
+			rcClearRows,
+			rcSwitch,
+			rcDelete,
+			rcDeleteCurrent,
+			rcOpenQuick,
+			rcPickQuick,
+			rcAddQuick,
+			rcDelQuick,
+			openRcModal,
+			rcModalSearchSet,
+			renderRcModal,
+			rcPick,
+			rcDeleteFromModal,
+			openRcCreateModal,
+			rcCreateSearchSet,
+			renderRcCreateModal,
+			rcCreateFrom,
+			rcPrint,
+			rcPrintSummary,
+			rcReportDetail,
+			rcReportItems,
+			rcReportSummaryTable
+		};
+	}
+	//#endregion
 	//#region src/application/backup/backup-service.ts
 	var BACKUP_IMPORT_MAX_BYTES = 134217728;
 	var BACKUP_IMPORT_WARN_BYTES = 100663296;
@@ -21062,6 +21559,82 @@
 		twoSidedPValue: reagentTDistribution.twoSidedPValue,
 		tCritical: reagentTDistribution.tCritical
 	});
+	var reagentPageController = createReagentPageController({
+		document: typeof document !== "undefined" ? document : {
+			getElementById: () => null,
+			querySelector: () => null
+		},
+		getState: () => state,
+		ui: () => root.ReagentUIState,
+		save: (opts) => save(opts),
+		rerender: () => rerender(),
+		requestFrame: (work, delay) => setTimeout(work, delay),
+		logAct: (action, detail, target) => logAct(action, detail, target),
+		esc: (value) => root.esc(value),
+		escapeAttr: (value) => root.escAttr(value),
+		fmt: (value, decimals) => fmt(value, decimals),
+		jsq: (value) => root.jsq(value),
+		vnDate: (value) => vnDate(value),
+		formatDateTimeVN: (value) => formatDateTimeVN(value),
+		parseVN: (value) => root.parseVN(value),
+		cleanText: (value, max) => root.QCCore.cleanText(value, max),
+		uid: () => uid(),
+		canWrite: () => root.canWrite(),
+		requireWrite: () => root.requireWrite(),
+		requireAdmin: () => root.requireAdmin(),
+		dateBox: (id, value, cls, attrs) => root.dateBox(id, value, cls, attrs),
+		button: (label, action, cls, title, options) => root.btn(label, action, cls, title, options),
+		headOnly: (title, subtitle, actions) => root.headOnly(title, subtitle, actions),
+		emptyState: (title, body, actions) => root.emptyState(title, body, actions),
+		searchText: (value) => root.normalizeSearchText(value),
+		openModal: (html) => root.openModal(html),
+		closeModal: () => root.closeModal(),
+		confirmDialog: (opts) => root.confirmDialog(opts),
+		infoDialog: (message, opts) => root.infoDialog(message, opts),
+		scheduleSearchRender: (owner, apply, focusId) => root.scheduleSearchRender(owner, apply, focusId),
+		reportHeader: (title) => root.reportHeader(title),
+		signBlock: () => root.signBlock(),
+		openPrint: (title, body) => root.openPrint(title, body),
+		teaAnalyteDisplay: (name) => root.teaAnalyteDisplay(name),
+		refTests: () => REFTESTS,
+		service: root.ReagentComparisonService,
+		workflow: root.ReagentComparisonWorkflowCommand,
+		pres: {
+			comparisonLabel: root.reagentComparisonLabelPresentation,
+			pairMath: root.reagentPairMath,
+			calculator: root.reagentComparisonCalculator,
+			chartAxis: root.reagentChartAxis,
+			chart: root.reagentChartPresentation,
+			toolIcon: root.reagentToolIconPresentation,
+			scatterSvg: root.reagentScatterSvg,
+			blandSvg: root.reagentBlandSvg,
+			selectOptions: root.reagentSelectOptionsHtml,
+			emptyPage: root.reagentEmptyPageHtml,
+			pairRow: root.reagentPairRowHtml,
+			toolbar: root.reagentToolbarHtml,
+			pairPanel: root.reagentPairPanelHtml,
+			infoPanel: root.reagentInfoPanelHtml,
+			chartsPanel: root.reagentChartsPanelHtml,
+			resultsPanels: root.reagentResultsPanelsHtml,
+			resultHtml: root.reagentResultHtml,
+			quickLabel: root.reagentQuickLabelPresentation,
+			quickPickerRows: root.reagentQuickPickerRowsHtml,
+			quickPickerModal: root.reagentQuickPickerModalPresentation,
+			pickerRows: root.reagentPickerRowsHtml,
+			pickerModal: root.reagentPickerModalPresentation,
+			createReferenceRows: root.reagentCreateReferenceRowsHtml,
+			createTypedRow: root.reagentCreateTypedRowHtml,
+			createModal: root.reagentCreateModalPresentation,
+			report: root.reagentReportPresentation,
+			reportDetailCard: root.reagentReportDetailCardHtml,
+			reportChartGrid: root.reagentReportChartGridHtml,
+			reportItem: root.reagentReportItemPresentation
+		}
+	});
+	{
+		const rc = reagentPageController;
+		for (const k of Object.keys(rc)) root[k] = rc[k];
+	}
 	root.SigmaCohortService = createSigmaCohortService({ stats: root.QCCore.stats });
 	root.WestgardViewModel = westgardViewModel;
 	root.westgardRowsWindow = westgardRowsWindow;
