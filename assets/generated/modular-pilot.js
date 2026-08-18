@@ -9996,6 +9996,85 @@
    ${input.testsPanelHtml}`;
 	}
 	//#endregion
+	//#region src/presentation/dashboard/dashboard-page-controller.ts
+	function createDashboardPageController(deps) {
+		const pageDashLoading = (tests, pending) => deps.dashboardLoadingPresentation(tests, pending, deps.stateData(), deps.stateLab());
+		const pageDash = () => {
+			const tests = deps.operationalTests(), missingWestgard = tests.filter((t) => !deps.isWestgardMemoized(t.id));
+			if (missingWestgard.length && deps.scheduleWestgardPrewarm(missingWestgard)) return pageDashLoading(tests, missingWestgard.length);
+			const today = deps.isoToday();
+			const dashItems = deps.dashboardTestItems(tests, today);
+			const { totalPoints: totalPts, todayPoints: todayPts, rejected: rej, warnings: warn, missingToday: missingTodayCount, completeTests: doneTests, completionPercent: pct } = deps.dashboardKpis(dashItems, tests.length);
+			const noTarget = deps.dashboardMissingTargetItems(dashItems, deps.levelsMissingTarget);
+			const { urgent, watch } = deps.dashboardWestgardAlerts(dashItems.map((item) => ({
+				test: item.t,
+				alerts: item.alerts
+			})));
+			const exp = deps.dashboardExpiringLotItems(dashItems, deps.daysToExp);
+			const expByLot = deps.dashboardExpiringLots(exp);
+			const urgentHtml = deps.dashboardQcFollowupListHtml(urgent, 5, "rej");
+			const watchHtml = deps.dashboardQcFollowupListHtml(watch, 4, "warn");
+			const overdue = deps.dashboardOverdueActions(deps.stateActions(), today);
+			const overdueHtml = deps.dashboardOverdueActionListHtml(overdue, deps.stateTests());
+			const noTargetHtml = deps.dashboardMissingTargetListHtml(noTarget);
+			const followHtml = deps.dashboardFollowupPanelHtml(urgentHtml, overdueHtml, noTargetHtml, watchHtml);
+			const expHtml = deps.dashboardExpiringLotsHtml(expByLot.values());
+			const dashTestStatus = deps.dashTestStatus();
+			const dashStatusTabs = deps.dashboardStatusTabsHtml(dashItems, dashTestStatus);
+			const statusItems = dashItems.filter((item) => deps.dashboardStatusFilter.matches(item, dashTestStatus));
+			const testRows = deps.dashboardTestRowsHtml(statusItems);
+			const testListHtml = deps.dashboardTestListHtml(statusItems.length, testRows);
+			const done = todayPts;
+			const shift = deps.dashboardShiftStatus({
+				rejected: rej,
+				overdueActions: overdue.length,
+				warnings: warn,
+				missingToday: missingTodayCount
+			}), mood = shift.mood, moodText = shift.text;
+			const headHtml = deps.dashboardHeadHtml(deps.stateLab()), progressHtml = deps.dashboardProgressHtml(doneTests, tests.length, pct), kpisHtml = deps.dashboardKpisHtml(deps.dashboardKpiItems({
+				tests: tests.length,
+				totalPoints: totalPts,
+				rejected: rej,
+				todayPoints: done
+			})), testsPanelHtml = deps.dashboardTestPanelHtml({
+				testsCount: tests.length,
+				statusTabs: dashStatusTabs,
+				query: deps.dashTestQ(),
+				filteredCount: statusItems.length,
+				testListHtml,
+				emptyHtml: deps.dashboardEmptyTestsHtml(deps.role() === "admin")
+			});
+			return deps.dashboardPageHtml({
+				headHtml,
+				todayText: deps.vnDate(today),
+				mood,
+				moodText,
+				progressHtml,
+				kpisHtml,
+				followHtml,
+				expiringLotsHtml: expHtml,
+				testsPanelHtml
+			});
+		};
+		const dashTestFilter = (value) => {
+			deps.setDashTestQ(value);
+			deps.liveRowFilter(".dash-test-list tbody tr", value, {
+				countId: "dashTestCount",
+				emptyId: "dashTestEmpty"
+			});
+		};
+		const dashTestSetStatus = (value) => {
+			deps.setDashTestStatus(deps.dashboardStatusFilter.normalize(value));
+			deps.rerender();
+		};
+		return {
+			pageDash,
+			pageDashLoading,
+			dashTestFilter,
+			dashTestSetStatus
+		};
+	}
+	//#endregion
 	//#region src/presentation/report/report-qc-format.ts
 	function createReportQcFormat(deps) {
 		const value = (test, raw) => deps.testValue ? deps.testValue(test, raw) : deps.format(raw, 3);
@@ -18717,6 +18796,59 @@
 	});
 	root.dashboardTestListHtml = dashboardTestListHtml;
 	root.dashboardPageHtml = createDashboardPageHtml();
+	var dashboardPageController = createDashboardPageController({
+		operationalTests: () => root.operationalTests(),
+		isWestgardMemoized: (testId) => root.wgMemo.has(testId),
+		scheduleWestgardPrewarm: (tests) => root.scheduleWestgardPrewarm(tests),
+		isoToday: () => isoToday(),
+		stateData: () => state.data || {},
+		stateLab: () => state.lab,
+		stateActions: () => state.actions || [],
+		stateTests: () => state.tests || [],
+		role: () => role(),
+		vnDate: (iso) => vnDate(iso),
+		levelsMissingTarget: (test) => root.levelsMissingTarget(test),
+		daysToExp: (value) => root.daysToExp(value),
+		dashboardTestItems: root.dashboardTestItems,
+		dashboardKpis: root.dashboardKpis,
+		dashboardMissingTargetItems: root.dashboardMissingTargetItems,
+		dashboardWestgardAlerts: root.dashboardWestgardAlerts,
+		dashboardExpiringLotItems: root.dashboardExpiringLotItems,
+		dashboardExpiringLots: root.dashboardExpiringLots,
+		dashboardQcFollowupListHtml: root.dashboardQcFollowupListHtml,
+		dashboardOverdueActions: root.dashboardOverdueActions,
+		dashboardOverdueActionListHtml: root.dashboardOverdueActionListHtml,
+		dashboardMissingTargetListHtml: root.dashboardMissingTargetListHtml,
+		dashboardFollowupPanelHtml: root.dashboardFollowupPanelHtml,
+		dashboardExpiringLotsHtml: root.dashboardExpiringLotsHtml,
+		dashboardStatusTabsHtml: root.dashboardStatusTabsHtml,
+		dashboardStatusFilter: root.dashboardStatusFilter,
+		dashboardTestRowsHtml: root.dashboardTestRowsHtml,
+		dashboardTestListHtml: root.dashboardTestListHtml,
+		dashboardShiftStatus: root.dashboardShiftStatus,
+		dashboardHeadHtml: root.dashboardHeadHtml,
+		dashboardProgressHtml: root.dashboardProgressHtml,
+		dashboardKpisHtml: root.dashboardKpisHtml,
+		dashboardKpiItems: root.dashboardKpiItems,
+		dashboardTestPanelHtml: root.dashboardTestPanelHtml,
+		dashboardEmptyTestsHtml: root.dashboardEmptyTestsHtml,
+		dashboardPageHtml: root.dashboardPageHtml,
+		dashboardLoadingPresentation: root.dashboardLoadingPresentation,
+		dashTestQ: () => root.dashTestQ,
+		dashTestStatus: () => root.dashTestStatus,
+		setDashTestQ: (value) => {
+			root.AnalysisUIState.dashTestQ = value;
+		},
+		setDashTestStatus: (value) => {
+			root.AnalysisUIState.dashTestStatus = value;
+		},
+		liveRowFilter: (selector, query, opts) => root.liveRowFilter(selector, query, opts),
+		rerender: () => rerender()
+	});
+	root.pageDash = dashboardPageController.pageDash;
+	root.pageDashLoading = dashboardPageController.pageDashLoading;
+	root.dashTestFilter = dashboardPageController.dashTestFilter;
+	root.dashTestSetStatus = dashboardPageController.dashTestSetStatus;
 	root.actionGuideContent = createActionGuideContent({
 		escape: (value) => root.esc(value),
 		button: (label, action, variant) => root.btn(label, action, variant)

@@ -9,7 +9,7 @@ const router=read('assets/modules/router-render.js');
 const routerPolicy=read('src/presentation/router/router-page-policy.ts');
 const routerShell=read('src/presentation/router/router-shell-controller.ts');
 const vnDatePicker=read('src/presentation/router/vn-date-picker-controller.ts');
-const dashboard=read('assets/modules/dashboard-routes.js');
+const dashboard=read('src/presentation/dashboard/dashboard-page-controller.ts');
 const entry=read('assets/modules/entry-routes.js');
 const entryPointRow=read('src/presentation/entry/entry-point-table-row-html.ts');
 const westgard=read('assets/modules/westgard-routes.js');
@@ -42,11 +42,11 @@ assert.match(cspTags[0],/object-src 'none'/,'CSP phải tiếp tục chặn obje
 assert.doesNotMatch(index,/http-equi\?+/,'thuộc tính http-equiv không được bị hỏng bởi chuỗi cache version');
 
 assert.doesNotMatch(router,/function page(?:Dash|Entry|Westgard)\(/,'router-render chỉ giữ điều phối và UI primitives');
-assert.match(dashboard,/function pageDash\(/);
+assert.match(dashboard,/const pageDash = \(\) => \{/);
 assert.match(entry,/function pageEntry\(/);
 assert.match(westgard,/function pageWestgard\(/);
 
-const loadOrder=['router-render.js','dashboard-routes.js','entry-routes.js','westgard-routes.js'];
+const loadOrder=['router-render.js','entry-routes.js','westgard-routes.js'];
 for(let i=1;i<loadOrder.length;i++)assert.ok(index.indexOf(loadOrder[i-1])<index.indexOf(loadOrder[i]),`${loadOrder[i]} phải tải sau ${loadOrder[i-1]}`);
 
 /* core.js phải tiếp tục độc lập với bundle presentation, nên PAGE_SET/ROLE_SET ở core.js

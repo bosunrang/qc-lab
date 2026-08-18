@@ -7,7 +7,7 @@ const root = path.join(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 const index = read('index.html');
 const drawSource = read('assets/modules/draw.js');
-const dashboardRoutesSource = read('assets/modules/dashboard-routes.js');
+const dashboardRoutesSource = read('src/presentation/dashboard/dashboard-page-controller.ts');
 const manageRoutesSource = read('assets/modules/manage-routes.js');
 const reagentClassicSource = read('assets/modules/reagent.js');
 const actionsRoutesSource = read('assets/modules/actions-routes.js');
@@ -427,31 +427,31 @@ assert.doesNotMatch(backupImportConfirmationSource, /\bglobalThis\b|\bdocument\b
   'backup import confirmation must not read browser globals');
 assert.match(backupUiSource, /return globalThis\.BackupStatusCommand\.status\(/,
   'backup status must use the TypeScript status command');
-assert.match(dashboardRoutesSource, /globalThis\.dashboardHeadHtml\(state\.lab\)/,
+assert.match(dashboardRoutesSource, /deps\.dashboardHeadHtml\(deps\.stateLab\(\)\)/,
   'dashboard route must render header through TypeScript bridge');
-assert.match(dashboardRoutesSource, /function pageDashLoading\(tests,pending\)\{return globalThis\.dashboardLoadingPresentation\(tests,pending,state\.data,state\.lab\);\}/,
+assert.match(dashboardRoutesSource, /const pageDashLoading = \(tests: AnyRec\[\], pending: number\) => deps\.dashboardLoadingPresentation\(tests, pending, deps\.stateData\(\), deps\.stateLab\(\)\);/,
   'dashboard loading route must use the TypeScript renderer directly');
 assert.doesNotMatch(dashboardRoutesSource, /dashStatusTabsFallback/,
   'dashboard route must not retain a classic status-tab renderer');
 assert.doesNotMatch(dashboardRoutesSource, /let mood=rej\?/,
   'dashboard route must not retain a duplicate classic shift-status renderer');
-assert.match(dashboardRoutesSource, /const statusItems=dashItems\.filter\(item=>globalThis\.dashboardStatusFilter\.matches\(item,dashTestStatus\)\);/,
+assert.match(dashboardRoutesSource, /const statusItems = dashItems\.filter\(item => deps\.dashboardStatusFilter\.matches\(item, dashTestStatus\)\);/,
   'dashboard route must filter statuses through the TypeScript service directly');
-assert.match(dashboardRoutesSource, /const overdue=globalThis\.dashboardOverdueActions\(state\.actions\|\|\[\],today\);/,
+assert.match(dashboardRoutesSource, /const overdue = deps\.dashboardOverdueActions\(deps\.stateActions\(\), today\);/,
   'dashboard route must collect overdue actions through TypeScript service');
-assert.match(dashboardRoutesSource, /const overdueHtml=globalThis\.dashboardOverdueActionListHtml\(overdue,state\.tests\);/,
+assert.match(dashboardRoutesSource, /const overdueHtml = deps\.dashboardOverdueActionListHtml\(overdue, deps\.stateTests\(\)\);/,
   'dashboard route must render overdue actions through TypeScript service');
-assert.match(dashboardRoutesSource, /const urgentHtml=globalThis\.dashboardQcFollowupListHtml\(urgent,5,'rej'\);/,
+assert.match(dashboardRoutesSource, /const urgentHtml = deps\.dashboardQcFollowupListHtml\(urgent, 5, 'rej'\);/,
   'dashboard route must render urgent followup through TypeScript service');
-assert.match(dashboardRoutesSource, /const noTargetHtml=globalThis\.dashboardMissingTargetListHtml\(noTarget\);/,
+assert.match(dashboardRoutesSource, /const noTargetHtml = deps\.dashboardMissingTargetListHtml\(noTarget\);/,
   'dashboard route must render missing targets through TypeScript service');
-assert.match(dashboardRoutesSource, /const exp=globalThis\.dashboardExpiringLotItems\(dashItems,daysToExp\);/,
+assert.match(dashboardRoutesSource, /const exp = deps\.dashboardExpiringLotItems\(dashItems, deps\.daysToExp\);/,
   'dashboard route must collect expiring lots through TypeScript helper');
-assert.match(dashboardRoutesSource, /const\{urgent,watch\}=globalThis\.dashboardWestgardAlerts\(dashItems\.map\(item=>\(\{test:item\.t,alerts:item\.alerts\}\)\)\);/,
+assert.match(dashboardRoutesSource, /const \{ urgent, watch \} = deps\.dashboardWestgardAlerts\(dashItems\.map\(item => \(\{ test: item\.t, alerts: item\.alerts \}\)\)\);/,
   'dashboard route must collect Westgard alerts through TypeScript helper');
-assert.match(dashboardRoutesSource, /const noTarget=globalThis\.dashboardMissingTargetItems\(dashItems,levelsMissingTarget\);/,
+assert.match(dashboardRoutesSource, /const noTarget = deps\.dashboardMissingTargetItems\(dashItems, deps\.levelsMissingTarget\);/,
   'dashboard route must collect missing targets through TypeScript helper');
-assert.match(dashboardRoutesSource, /const dashItems=globalThis\.dashboardTestItems\(tests,today\);/,
+assert.match(dashboardRoutesSource, /const dashItems = deps\.dashboardTestItems\(tests, today\);/,
   'dashboard route must build test items through TypeScript presentation');
 assert.match(actionsRoutesSource, /function currentIssues\(\)\{return globalThis\.ActionCurrentIssues\(\);\}/,
   'actions route must use the TypeScript current-issues service directly');
@@ -461,19 +461,19 @@ assert.match(actionsRoutesSource, /function actionIssueGroupHtml\(model\)\{retur
   'actions route must render issue groups through TypeScript presentation');
 assert.doesNotMatch(actionsRoutesSource, /if\(globalThis\.actionIssueRowPresentation\)|if\(globalThis\.actionIssueGroupPresentation\)/,
   'actions route must not retain classic issue-render fallbacks');
-assert.match(dashboardRoutesSource, /const testRows=globalThis\.dashboardTestRowsHtml\(statusItems\);/,
+assert.match(dashboardRoutesSource, /const testRows = deps\.dashboardTestRowsHtml\(statusItems\);/,
   'dashboard route must render test rows through TypeScript presentation');
-assert.match(dashboardRoutesSource, /const dashboardKpi=globalThis\.dashboardKpis\(dashItems,tests\.length\),\{totalPoints:totalPts,todayPoints:todayPts,rejected:rej,warnings:warn,missingToday:missingTodayCount,completeTests:doneTests,completionPercent:pct\}=dashboardKpi;/,
+assert.match(dashboardRoutesSource, /const dashboardKpi = deps\.dashboardKpis\(dashItems, tests\.length\), \{ totalPoints: totalPts, todayPoints: todayPts, rejected: rej, warnings: warn, missingToday: missingTodayCount, completeTests: doneTests, completionPercent: pct \} = dashboardKpi;/,
   'dashboard route must derive all KPIs through the TypeScript helper');
-assert.match(dashboardRoutesSource, /globalThis\.dashboardTestPanelHtml\(\{testsCount:tests\.length/,
+assert.match(dashboardRoutesSource, /deps\.dashboardTestPanelHtml\(\{ testsCount: tests\.length/,
   'dashboard route must render test panel through TypeScript bridge');
-assert.match(dashboardRoutesSource, /globalThis\.dashboardKpiItems\(\{tests:tests\.length,totalPoints:totalPts,rejected:rej,todayPoints:done\}\)/,
+assert.match(dashboardRoutesSource, /deps\.dashboardKpiItems\(\{ tests: tests\.length, totalPoints: totalPts, rejected: rej, todayPoints: done \}\)/,
   'dashboard route must create KPI data through TypeScript bridge');
-assert.match(dashboardRoutesSource, /progressHtml=globalThis\.dashboardProgressHtml\(doneTests,tests\.length,pct\)/,
+assert.match(dashboardRoutesSource, /progressHtml = deps\.dashboardProgressHtml\(doneTests, tests\.length, pct\)/,
   'dashboard route must render progress through TypeScript bridge directly');
 assert.doesNotMatch(dashboardRoutesSource, /if\(globalThis\.dashboardPageHtml\)|return globalThis\.dashboardHeadHtml\(state\.lab\)\+`/,
   'dashboard route must not retain a classic page-render fallback');
-assert.match(dashboardRoutesSource, /emptyHtml:globalThis\.dashboardEmptyTestsHtml\(role\(\)==='admin'\)/,
+assert.match(dashboardRoutesSource, /emptyHtml: deps\.dashboardEmptyTestsHtml\(deps\.role\(\) === 'admin'\)/,
   'dashboard route must render empty test state through TypeScript bridge');
 assert.match(drawSource, /const cc=globalThis\.cusumColors;/,
   'CUSUM renderer must use TypeScript palette bridge');
@@ -1980,33 +1980,33 @@ assert.match(drawSource, /globalThis\.canvasFont\(800,'type-caption',11\.5\)/,
   'renderer phải gọi trực tiếp canvas font từ TypeScript bridge');
 assert.match(drawSource, /globalThis\.leveyJenningsTooltipController\(canvas\)/,
   'renderer phải gọi trực tiếp tooltip controller từ TypeScript bridge');
-assert.match(dashboardRoutesSource, /dashboardLoadingPresentation\(tests,missingWestgard\.length,state\.data,state\.lab\)/,
+assert.match(dashboardRoutesSource, /return pageDashLoading\(tests, missingWestgard\.length\);/,
   'dashboard phải gọi trực tiếp loading presentation từ TypeScript bridge');
-assert.match(dashboardRoutesSource, /dashItems\.filter\(item=>globalThis\.dashboardStatusFilter\.matches\(item,dashTestStatus\)\)/,
+assert.match(dashboardRoutesSource, /dashItems\.filter\(item => deps\.dashboardStatusFilter\.matches\(item, dashTestStatus\)\)/,
   'dashboard phải gọi trực tiếp status filter TypeScript bridge');
-assert.match(dashboardRoutesSource, /dashTestStatus=globalThis\.dashboardStatusFilter\.normalize\(value\);/,
+assert.match(dashboardRoutesSource, /deps\.setDashTestStatus\(deps\.dashboardStatusFilter\.normalize\(value\)\);/,
   'dashboard phải chuẩn hóa status qua TypeScript bridge');
-assert.match(dashboardRoutesSource, /const expByLot=globalThis\.dashboardExpiringLots\(exp\);/,
+assert.match(dashboardRoutesSource, /const expByLot = deps\.dashboardExpiringLots\(exp\);/,
   'dashboard phải gom lô sắp hết hạn qua TypeScript bridge');
-assert.match(dashboardRoutesSource, /const expHtml=globalThis\.dashboardExpiringLotsHtml\(expByLot\.values\(\)\);/,
+assert.match(dashboardRoutesSource, /const expHtml = deps\.dashboardExpiringLotsHtml\(expByLot\.values\(\)\);/,
   'dashboard phải render lô sắp hết hạn qua TypeScript bridge');
-assert.match(dashboardRoutesSource, /const dashItems=globalThis\.dashboardTestItems\(tests,today\);/,
+assert.match(dashboardRoutesSource, /const dashItems = deps\.dashboardTestItems\(tests, today\);/,
   'dashboard phải chọn điểm mới nhất qua TypeScript bridge');
-assert.match(dashboardRoutesSource, /const dashItems=globalThis\.dashboardTestItems\(tests,today\);/,
+assert.match(dashboardRoutesSource, /const dashItems = deps\.dashboardTestItems\(tests, today\);/,
   'dashboard phải tạo chuỗi tìm kiếm qua TypeScript bridge');
-assert.match(dashboardRoutesSource, /const dashboardKpi=globalThis\.dashboardKpis\(dashItems,tests\.length\),\{totalPoints:totalPts,todayPoints:todayPts,rejected:rej,warnings:warn,missingToday:missingTodayCount,completeTests:doneTests,completionPercent:pct\}=dashboardKpi;/,
+assert.match(dashboardRoutesSource, /const dashboardKpi = deps\.dashboardKpis\(dashItems, tests\.length\), \{ totalPoints: totalPts, todayPoints: todayPts, rejected: rej, warnings: warn, missingToday: missingTodayCount, completeTests: doneTests, completionPercent: pct \} = dashboardKpi;/,
   'dashboard phải tính KPI qua TypeScript bridge');
-assert.match(dashboardRoutesSource, /const testRows=globalThis\.dashboardTestRowsHtml\(statusItems\);/,
+assert.match(dashboardRoutesSource, /const testRows = deps\.dashboardTestRowsHtml\(statusItems\);/,
   'dashboard phải tạo tag Westgard qua TypeScript bridge');
 assert.doesNotMatch(dashboardRoutesSource, /dashboardCompletion\(/,
   'dashboard phải tính hoàn thành QC qua TypeScript bridge');
-assert.match(dashboardRoutesSource, /const shift=globalThis\.dashboardShiftStatus\(/,
+assert.match(dashboardRoutesSource, /const shift = deps\.dashboardShiftStatus\(/,
   'dashboard phải xác định trạng thái ca trực qua TypeScript bridge');
-assert.match(dashboardRoutesSource, /const followHtml=globalThis\.dashboardFollowupPanelHtml\(urgentHtml,overdueHtml,noTargetHtml,watchHtml\);/,
+assert.match(dashboardRoutesSource, /const followHtml = deps\.dashboardFollowupPanelHtml\(urgentHtml, overdueHtml, noTargetHtml, watchHtml\);/,
   'dashboard phải dựng bảng theo dõi qua TypeScript bridge');
-assert.match(dashboardRoutesSource, /const dashStatusTabs=globalThis\.dashboardStatusTabsHtml\(dashItems,dashTestStatus\);/,
+assert.match(dashboardRoutesSource, /const dashStatusTabs = deps\.dashboardStatusTabsHtml\(dashItems, dashTestStatus\);/,
   'dashboard phải dựng tab trạng thái qua TypeScript bridge');
-assert.match(dashboardRoutesSource, /const testListHtml=globalThis\.dashboardTestListHtml\(statusItems\.length,testRows\);/,
+assert.match(dashboardRoutesSource, /const testListHtml = deps\.dashboardTestListHtml\(statusItems\.length, testRows\);/,
   'dashboard phải dựng danh sách xét nghiệm qua TypeScript bridge');
 assert.match(generated, /root\.leveyJenningsColors\s*=\s*LEVEY_JENNINGS_COLORS/,
   'artifact phải công bố TypeScript palette Levey-Jennings cho wrapper cũ');

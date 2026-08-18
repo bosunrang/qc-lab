@@ -336,6 +336,7 @@ import { createDashboardTestRowsHtml } from '../presentation/dashboard/dashboard
 import { createDashboardTestItems } from '../presentation/dashboard/dashboard-test-items';
 import { dashboardTestListHtml } from '../presentation/dashboard/dashboard-test-list-html';
 import { createDashboardPageHtml } from '../presentation/dashboard/dashboard-page-html';
+import { createDashboardPageController } from '../presentation/dashboard/dashboard-page-controller';
 import { createReportQcFormat } from '../presentation/report/report-qc-format';
 import { createRangeTea } from '../domain/qc/range-tea';
 import { entryRowsWindow as entryRowsWindowTs, entryLotLabels as entryLotLabelsTs } from '../presentation/entry/entry-rows-window';
@@ -1405,6 +1406,10 @@ type QCLabGlobal = typeof globalThis & {
   dashboardTestItems: ReturnType<typeof createDashboardTestItems>;
   dashboardTestListHtml: typeof dashboardTestListHtml;
   dashboardPageHtml: ReturnType<typeof createDashboardPageHtml>;
+  pageDash: ReturnType<typeof createDashboardPageController>['pageDash'];
+  pageDashLoading: ReturnType<typeof createDashboardPageController>['pageDashLoading'];
+  dashTestFilter: ReturnType<typeof createDashboardPageController>['dashTestFilter'];
+  dashTestSetStatus: ReturnType<typeof createDashboardPageController>['dashTestSetStatus'];
   actionGuideContent: ReturnType<typeof createActionGuideContent>;
   actionPageHtml: ReturnType<typeof createActionPageHtml>;
   actionSideChipsHtml: ReturnType<typeof createActionSideChipsHtml>;
@@ -2281,6 +2286,55 @@ root.dashboardTestRowsHtml=createDashboardTestRowsHtml({statusTag:status=>dashbo
 root.dashboardTestItems=createDashboardTestItems({activeWestgard:test=>(root as any).activeWestgard(test),summarize:input=>(root as any).WestgardViewModel.summarizeTestStatus(input),levelData:(views,today)=>dashboardLevelData(views,today),latestPoint:points=>dashboardLatestPoint(points),searchText:(test,levels)=>dashboardTestSearchText(test,levels),markStatus:(testId,status)=>(root as any).statusMemo.set(testId,status)});
 root.dashboardTestListHtml=dashboardTestListHtml;
 root.dashboardPageHtml=createDashboardPageHtml();
+const dashboardPageController=createDashboardPageController({
+  operationalTests:()=>(root as any).operationalTests(),
+  isWestgardMemoized:testId=>(root as any).wgMemo.has(testId),
+  scheduleWestgardPrewarm:tests=>(root as any).scheduleWestgardPrewarm(tests),
+  isoToday:()=>isoToday(),
+  stateData:()=>state.data||{},
+  stateLab:()=>state.lab,
+  stateActions:()=>state.actions||[],
+  stateTests:()=>state.tests||[],
+  role:()=>role(),
+  vnDate:iso=>vnDate(iso),
+  levelsMissingTarget:test=>(root as any).levelsMissingTarget(test),
+  daysToExp:value=>(root as any).daysToExp(value),
+  dashboardTestItems:root.dashboardTestItems,
+  dashboardKpis:root.dashboardKpis,
+  dashboardMissingTargetItems:root.dashboardMissingTargetItems,
+  dashboardWestgardAlerts:root.dashboardWestgardAlerts,
+  dashboardExpiringLotItems:root.dashboardExpiringLotItems,
+  dashboardExpiringLots:root.dashboardExpiringLots,
+  dashboardQcFollowupListHtml:root.dashboardQcFollowupListHtml,
+  dashboardOverdueActions:root.dashboardOverdueActions,
+  dashboardOverdueActionListHtml:root.dashboardOverdueActionListHtml,
+  dashboardMissingTargetListHtml:root.dashboardMissingTargetListHtml,
+  dashboardFollowupPanelHtml:root.dashboardFollowupPanelHtml,
+  dashboardExpiringLotsHtml:root.dashboardExpiringLotsHtml,
+  dashboardStatusTabsHtml:root.dashboardStatusTabsHtml,
+  dashboardStatusFilter:root.dashboardStatusFilter,
+  dashboardTestRowsHtml:root.dashboardTestRowsHtml,
+  dashboardTestListHtml:root.dashboardTestListHtml,
+  dashboardShiftStatus:root.dashboardShiftStatus,
+  dashboardHeadHtml:root.dashboardHeadHtml,
+  dashboardProgressHtml:root.dashboardProgressHtml,
+  dashboardKpisHtml:root.dashboardKpisHtml,
+  dashboardKpiItems:root.dashboardKpiItems,
+  dashboardTestPanelHtml:root.dashboardTestPanelHtml,
+  dashboardEmptyTestsHtml:root.dashboardEmptyTestsHtml,
+  dashboardPageHtml:root.dashboardPageHtml,
+  dashboardLoadingPresentation:root.dashboardLoadingPresentation,
+  dashTestQ:()=>(root as any).dashTestQ,
+  dashTestStatus:()=>(root as any).dashTestStatus,
+  setDashTestQ:value=>{(root as any).AnalysisUIState.dashTestQ=value;},
+  setDashTestStatus:value=>{(root as any).AnalysisUIState.dashTestStatus=value;},
+  liveRowFilter:(selector,query,opts)=>(root as any).liveRowFilter(selector,query,opts),
+  rerender:()=>rerender(),
+});
+root.pageDash=dashboardPageController.pageDash;
+root.pageDashLoading=dashboardPageController.pageDashLoading;
+root.dashTestFilter=dashboardPageController.dashTestFilter;
+root.dashTestSetStatus=dashboardPageController.dashTestSetStatus;
 root.actionGuideContent=createActionGuideContent({escape:(value:any)=>(root as any).esc(value),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
 root.actionPageHtml=createActionPageHtml();
 root.actionSideChipsHtml=createActionSideChipsHtml({escape:(value:any)=>(root as any).esc(value)});

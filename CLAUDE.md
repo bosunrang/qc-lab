@@ -587,7 +587,7 @@ the Google Fonts link, offline labs must print with correct metrics.
     awaiting is safe because the dialog's own DOM write happens synchronously
     before the returned Promise settles — the caller's boolean is unaffected
     either way.
-- `draw.js`, `router-render.js`, `dashboard-routes.js`, `entry-routes.js`,
+- `draw.js`, `router-render.js`, `entry-routes.js`,
   `westgard-routes.js`, `sigma.js`, `actions-routes.js`, `action-form.js`,
   `report-routes.js`, `manage-routes.js`, `after-render-controller.ts`,
   `manage-tests-actions.js` —
@@ -595,10 +595,15 @@ the Google Fonts link, offline labs must print with correct metrics.
   their own files:
   `router-render.js` keeps only dispatch plus cross-page UI primitives (the
   `btn()` builder, the `requireWrite()`/`requireAdmin()` guards, search/filter
-  helpers, the VN date picker, icon SVGs), while `pageDash()` lives in
-  `dashboard-routes.js`, `pageEntry()` in `entry-routes.js` and
+  helpers, the VN date picker, icon SVGs), while `pageEntry()` lives in
+  `entry-routes.js` and
   `pageWestgard()` in `westgard-routes.js` — `router-render.js` must never
-  redefine those three, and the files must load right after it in that order.
+  redefine those, and the files must load right after it in that order.
+  `pageDash()` was the third of that original trio; it retired to
+  `src/presentation/dashboard/dashboard-page-controller.ts` on 2026-08-18
+  (`docs/TYPESCRIPT-MIGRATION-PLAN.md` Pha G slice 2) — `router-render.js`
+  calls it as `root.pageDash` through the compat bridge like any other
+  bundle-owned global.
   On 2026-07-30 the same treatment
   reached `actions-routes.js`, which had been holding **two** whole pages and
   had grown to 105 KB, in two steps:
@@ -648,17 +653,20 @@ the Google Fonts link, offline labs must print with correct metrics.
   testable in Node (`tests/sigma-tea.test.js` loads it with only `core.js` +
   `state.js`). `tests/helpers/sandbox.js` auto-inserts it before `modules/sigma.js`,
   like it does `analyte-catalog.js` before `state.js`.
-- `dashboard-routes.js` còn dựng bảng KPI chất lượng & CAPA (`dashboardKpiSnapshot()`):
-  tỷ lệ QC được chấp nhận/bị loại, số NCE đang mở, tỷ lệ CAPA có hiệu lực, xu hướng 6
-  tháng, luồng giai đoạn CAPA và nhóm nguyên nhân. Kỳ và phạm vi (thiết bị/xét nghiệm)
-  nằm ở `dashKpi*` trong `analysis-ui-state.js`; ngưỡng đạt/không đạt lấy từ
-  `state.lab.kpiTargets`, sửa ở panel `#kpiTargets` trang Cài đặt và được
-  `sanitizeBackup()` kẹp lại theo min/max nên bản backup hỏng không đặt được ngưỡng vô
-  lý. Bốn ô KPI là nút bấm mở modal liệt kê đúng tập dữ liệu đã tính (`dashKpiLast`),
-  nên KHÔNG được tính lại tập đó trong modal — chỉ số hiện trên ô và danh sách người
-  dùng bấm vào xem phải là cùng một phép tính. Thống kê điểm QC chỉ gồm xét nghiệm đang
-  vận hành, còn thống kê CAPA lấy mọi hồ sơ khi không lọc phạm vi — hồ sơ nguồn ngoài
-  IQC không có `testId` nên sẽ biến mất nếu lọc theo thiết bị/xét nghiệm.
+- `src/presentation/dashboard/dashboard-page-controller.ts` —
+  `createDashboardPageController(deps)` owns `pageDash()`/`pageDashLoading()`/
+  `dashTestFilter()`/`dashTestSetStatus()`, retired from classic
+  `dashboard-routes.js` on 2026-08-18 (Pha G slice 2). It is pure orchestration
+  — every actual computation (KPIs, Westgard alerts, expiring-lot grouping,
+  status filter, row/panel HTML) is one of the `dashboardXxx` builders under
+  `src/presentation/dashboard/`/`src/domain/qc/` that this controller was
+  already calling through the bridge before the route itself moved; this slice
+  only moved the calling code, not the math. Wired via
+  `src/compat/modular-pilot.global.ts` (`root.pageDash`, etc.) so
+  `router-render.js`'s page dispatch table keeps working unchanged. A
+  dashboard KPI/CAPA panel (`dashboardKpiSnapshot()`) existed briefly
+  (`5673eb49`) and was removed again before release (`890604eb`, "tinh gon
+  dashboard") — the dashboard page has no such panel today.
 - `range.js`, `settings.js`, `backup-service.js`, `data-io.js`, `reports.js`, `users-auth.js`,
   `reagent.js` — feature-specific logic (target-range calc, settings page,
   backup/restore service + XLSX generation, printed reports, auth/user

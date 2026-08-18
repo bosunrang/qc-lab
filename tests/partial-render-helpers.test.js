@@ -7,7 +7,6 @@ const ctx = loadSandbox([
   'modules/qc-domain.js', // searchText() — bộ lọc KPI dùng, phải là bản thật để đúng cách bỏ dấu tiếng Việt
   'generated/modular-pilot.js',
   'modules/router-render.js',
-  'modules/dashboard-routes.js',
   'modules/entry-routes.js',
   'modules/westgard-routes.js',
 ], { document: { addEventListener() {} } });

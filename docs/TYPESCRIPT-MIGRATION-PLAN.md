@@ -57,8 +57,8 @@ scope**, không phải không còn file `.js` trong gói phát hành.
 
 | Hạng mục | Trạng thái |
 | --- | --- |
-| Nguồn TypeScript | 721 tệp: 99 domain, 137 application, 484 presentation, 1 compatibility bridge |
-| Nguồn classic còn lại | 29 tệp `assets/modules/*.js`, thêm `assets/core.js` và `assets/app.js` |
+| Nguồn TypeScript | 722 tệp: 99 domain, 137 application, 485 presentation, 1 compatibility bridge |
+| Nguồn classic còn lại | 28 tệp `assets/modules/*.js`, thêm `assets/core.js` và `assets/app.js` |
 | Bundle hiện tại | `assets/generated/modular-pilot.js`, Vite sinh ra và nạp bằng `<script defer>` |
 | Kiểm tra kiểu | `npm.cmd run typecheck` đạt: checkJs legacy + strict TypeScript modules |
 | Test Node | `npm.cmd test` đạt ngày 2026-08-18 |
@@ -364,7 +364,7 @@ bằng TypeScript, sau build trở thành JavaScript trong bundle.
 Thứ tự ưu tiên, theo rủi ro tăng dần:
 
 1. **UI thuần:** ~~`modals`~~ (xong 2026-08-18), `after-render` (đã retire ở
-   Pha F), `dashboard-routes`, `router-render`.
+   Pha F), ~~`dashboard-routes`~~ (xong 2026-08-18), `router-render`.
 2. **Route/presentation:** Entry, Manage, Report, Settings, Reagent, Sigma,
    Actions và Audit; chuyển mỗi trang như một lát dọc hoàn chỉnh.
 3. **Canvas và browser adapter:** `draw`, `reports`, export/print, File API;
@@ -424,6 +424,86 @@ toàn" trong sandbox) mà chuyển vào bundle TypeScript sẽ bắt đầu **c�
 trong mọi sandbox nạp `generated/modular-pilot.js` — rà `tests/` tìm test nào
 stub cùng tên qua tham số `globals` của `loadSandbox()` trước khi xóa file
 classic, không chỉ tìm lời gọi trần.
+
+#### Lát 2 — `dashboard-routes.js` (2026-08-18)
+
+Retire hoàn toàn `assets/modules/dashboard-routes.js` (43 dòng: `pageDash()`,
+`dashTestFilter()`, `dashTestSetStatus()`, `pageDashLoading()`). File này đã
+gần như thuần bridge từ các lát trước — mọi phép tính thật (KPI, cảnh báo
+Westgard, gộp lô sắp hết hạn, lọc trạng thái, render hàng/panel) đã là một
+trong các hàm `dashboardXxx` ở `src/presentation/dashboard/`/
+`src/domain/qc/`; lát này chỉ chuyển phần LẮP RÁP (orchestration) — không
+đụng tới bất kỳ phép tính nào. Chuyển sang một file duy nhất
+`src/presentation/dashboard/dashboard-page-controller.ts`
+(`createDashboardPageController(deps)`), theo đúng mẫu factory-nhận-deps của
+`after-render-controller.ts`/`router-shell-controller.ts` — không đọc
+`globalThis`/DOM trực tiếp, mọi phụ thuộc (kể cả các hàm `dashboardXxx` đã có
+kiểu thật trên `QCLabGlobal`, và các global classic còn lại như
+`operationalTests`/`wgMemo`/`levelsMissingTarget`/`daysToExp`/`liveRowFilter`/
+`role`/`vnDate`/`isoToday`/`rerender`) truyền qua `deps`. `modular-pilot.global.ts`
+gán `root.pageDash`/`pageDashLoading`/`dashTestFilter`/`dashTestSetStatus` —
+không đổi `router-render.js` (dispatch table `{dash:pageDash,...}` và
+`restoreRouteFilters()`'s `dashTestFilter(dashTestQ)` vẫn gọi các tên này như
+global trần, không cần sửa).
+
+**Ba bẫy runtime phát hiện được sau khi build/typecheck xanh nhưng test đỏ
+diện rộng (24 file thất bại, không chỉ các test dashboard) — bài học quan
+trọng nhất của lát này:**
+
+1. **Bare identifier reference ≠ lazy call.** Viết `isoToday,`/`role,`/
+   `vnDate,`/`rerender,` (object shorthand) trong object deps LÀM BẤT KỲ
+   sandbox nào build/tải `generated/modular-pilot.js` mà không tải kèm
+   `modules/state.js`/`modules/router-render.js` ném `ReferenceError` NGAY LÚC
+   NẠP BUNDLE (không phải lúc gọi) — vì đây là tham chiếu giá trị tức thời,
+   không phải closure trì hoãn. Toàn bộ phần còn lại của
+   `modular-pilot.global.ts` luôn viết dạng `()=>isoToday()`/`()=>rerender()`
+   cho đúng lý do này; đây là quy ước bắt buộc, không phải phong cách. Any
+   dependency mà lời gọi thật có thể vắng mặt trong một số sandbox PHẢI bọc
+   lazy, dù có `declare function` ambient hay không — ambient declare chỉ
+   thỏa mãn kiểu, không đảm bảo hàm tồn tại lúc chạy.
+2. **`root.dashTestQ=value` (setter ghi qua accessor) trông giống một khai báo
+   global MỚI với `tests/global-name-uniqueness.test.js`** — scanner của test
+   này coi mọi `root.X=`/`window.X=`/`globalThis.X=` là một "điểm khai báo"
+   cho tên X, không phân biệt được "gán giá trị mới" với "gọi setter của một
+   accessor `Object.defineProperty` đã có sẵn" (ở đây là `dashTestQ`/
+   `dashTestStatus`, cài bởi `installUiState(root,'AnalysisUIState',...)` ở
+   `src/presentation/state/ui-state.ts`). Không có tiền lệ nào trong
+   `modular-pilot.global.ts` từng ghi trực tiếp vào một trường ui-state theo
+   kiểu này trước lát này (mọi nơi khác chỉ ĐỌC). Sửa bằng cách ghi qua object
+   namespace mà `installUiState()` đã công bố sẵn cho đúng mục đích này —
+   `(root as any).AnalysisUIState.dashTestQ=value` — vì `AnalysisUIState` và
+   trạng thái đứng sau getter/setter của `dashTestQ` là CÙNG một object tham
+   chiếu; ghi vào namespace object thay đổi giá trị mà getter đọc, nhưng không
+   khớp pattern `root\.dashTestQ=` nên scanner không báo trùng.
+3. Hai lỗi `Type 'undefined' is not assignable` từ `strict` TypeScript vì
+   `state.data`/`state.tests` là optional trong kiểu `state` — thêm `||{}`/
+   `||[]` khi đọc (khớp cách `stateActions:()=>state.actions||[]` đã làm).
+   Riêng lỗi contravariance tham số hàm (gán `(items:Kpi[])=>string` vào chỗ
+   khai `(items:AnyRec[])=>string`) được giải quyết bằng cách định nghĩa
+   `type AnyRec=any` (không phải `Record<string,any>`) — dùng `any` thật để
+   tắt kiểm tra cấu trúc tham số hàm thay vì cố ép các chữ ký cụ thể của 24
+   hàm `dashboardXxx` khớp một kiểu chung.
+
+Cả ba đều xuất phát từ MỘT nguyên nhân gốc: lát này là lát ĐẦU TIÊN của Pha G
+mà một hàm route classic (không phải modal/dialog như Lát 1) di chuyển
+nguyên khối sang TS trong khi vẫn phải tương thích với hàng chục cấu hình
+sandbox khác nhau trong `tests/` — mỗi cấu hình tải một tập file khác nhau.
+**Bài học cho các lát kế tiếp:** sau khi build/typecheck xanh, luôn chạy
+TOÀN BỘ `npm test` (không chỉ file test của route đang chuyển) trước khi kết
+luận lát đã xong — một thay đổi nhỏ ở cách viết deps có thể làm vỡ hàng chục
+test không liên quan trực tiếp.
+
+Ngoài runtime, ~30 assertion source-scanner trong `tests/typescript-module-
+pilot.test.js`, `tests/dashboard-loading-bridge.test.js`,
+`tests/dashboard-model-bridge.test.js`, `tests/dashboard-page-bridge.test.js`,
+`tests/ui-accessibility.test.js`, `tests/ui-route-structure.test.js` pin
+nguyên văn cú pháp classic (`globalThis.dashboardXxx(...)`, `function
+pageDashLoading(tests,pending){...}`) của `dashboard-routes.js` cũ — tất cả
+được trỏ sang đọc `dashboard-page-controller.ts` với regex cập nhật theo cú
+pháp TS (`deps.dashboardXxx(...)`, arrow function). `tests/partial-render-
+helpers.test.js` chỉ cần bỏ `'modules/dashboard-routes.js'` khỏi danh sách
+nạp (file không còn tồn tại). Gate cuối: `build:pilot`/`typecheck`/`test`
+xanh (613/613).
 
 ### Pha H — bỏ global bridge và nhiều script tags
 
@@ -498,3 +578,4 @@ npm.cmd test
 | 2026-08-18 | Audit + dọn nốt 14 file classic còn lại — 30/30 file classic đã được audit bridge. Chỉ `range.js` (3 điểm), `reagent.js` (1 khối lớn) và `action-workflow-service.js` (14 điểm, dây chuyền mồ côi kéo theo `computeActionRerunStatus`/`actionRerunSignature`/3 memo Map) thật sự cần dọn; 11 file còn lại đã sạch từ trước, kể cả 3 file đang bị phiên khác đụng vào (audit không sửa, không xung đột). Phát hiện thêm một ngoại lệ giữ nguyên vì thứ tự nạp (như `teaAnalyteKey`): `action-workflow-service.js` nạp trước bundle TS trong `index.html`, nên dòng `root.ActionWorkflowService={ACTION_LABELS:root.NceActionLabels&&...||ACTION_LABELS,...}` chạy khi `root.NceActionLabels` chưa tồn tại — suýt xóa nhầm lần hai sau bài học `state.js`. |
 | 2026-08-18 | Xem lại `invalidateDerivedForSave()` (mục còn lại cuối cùng của đợt audit bridge) — kết luận đây KHÔNG phải code chết, quyết định giữ nguyên. Nó không tái hiện logic JS lỗi thời (đã gọi thẳng bridge sống); vấn đề thật là `saveService` (TS) có bản sao logic invalidation riêng thay vì gọi lại hàm này, dù thứ tự nạp cho phép. Hợp nhất đúng cách đụng tới `src/application/storage/save-service.ts`/`src/compat/modular-pilot.global.ts` (đường nóng `save()`, có tài liệu benchmark riêng) — ngoài phạm vi dọn bridge, để lại làm việc riêng khi cần. Với quyết định này, toàn bộ audit bridge JS→TS của Pha F (30/30 file classic) coi như hoàn tất. |
 | 2026-08-18 | Bắt đầu Pha G: chuyển `modals.js` (lát đầu tiên, nhóm "UI thuần") sang `src/presentation/modal/` (4 file TS). Hợp nhất phần focus-trap trùng lặp giữa hai lớp modal/dialog vào một helper dùng chung, giữ nguyên hai lớp `#modalRoot`/`#dialogRoot` tách biệt. Gỡ ~13 chỗ ép kiểu `(root as any)`/`(globalThis as any)` quanh các hàm này trong `modular-pilot.global.ts`. Phát hiện phụ: `tests/local-store.test.js` stub `infoDialog` qua tham số `globals` của `loadSandbox()` — tham số này set TRƯỚC khi file chạy nên bị `generated/modular-pilot.js` (nạp sau) ghi đè ngay khi `infoDialog` chuyển thành thật; sửa bằng cách gán stub sau khi `loadSandbox()` trả về. Bài học cho các lát Pha G kế tiếp: rà `tests/` tìm stub cùng tên qua tham số `globals` trước khi retire một file classic, không chỉ tìm lời gọi trần của hàm sắp xóa. `build:pilot`/`typecheck`/`test` xanh (613/613). |
+| 2026-08-18 | Lát 2 của Pha G: chuyển `dashboard-routes.js` (43 dòng, đã gần thuần bridge từ trước) sang `src/presentation/dashboard/dashboard-page-controller.ts` — factory nhận `deps`, không đụng phép tính (mọi `dashboardXxx` builder đã là TS từ trước). Ba bẫy runtime phát hiện sau khi build/typecheck xanh nhưng 24 file test đỏ: (1) tham chiếu bare `isoToday,`/`role,`/`vnDate,`/`rerender,` trong object deps ném `ReferenceError` ngay lúc NẠP bundle ở mọi sandbox thiếu `modules/state.js`/`router-render.js` — phải bọc lazy `()=>isoToday()` như quy ước đã có sẵn khắp `modular-pilot.global.ts`; (2) `root.dashTestQ=value` (gọi setter của accessor `Object.defineProperty` có sẵn) bị `tests/global-name-uniqueness.test.js` hiểu nhầm là khai báo global mới, trùng với khai báo thật ở `ui-state.ts` — sửa bằng cách ghi qua namespace object `(root as any).AnalysisUIState.dashTestQ=value` thay vì gán thẳng `root.dashTestQ=`; (3) lỗi contravariance tham số hàm khi gán 24 hàm `dashboardXxx` có chữ ký cụ thể vào một kiểu `deps` chung — giải quyết bằng `type AnyRec=any` (any thật, không phải `Record<string,any>`). Bài học: sau build/typecheck xanh vẫn phải chạy TOÀN BỘ `npm test`, không chỉ test của route đang chuyển. ~30 assertion source-scanner ở 6 file test (typescript-module-pilot, dashboard-loading-bridge, dashboard-model-bridge, dashboard-page-bridge, ui-accessibility, ui-route-structure) được trỏ sang đọc `dashboard-page-controller.ts` với regex cập nhật theo cú pháp TS. `build:pilot`/`typecheck`/`test` xanh (613/613). |

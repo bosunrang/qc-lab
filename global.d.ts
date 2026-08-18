@@ -28,6 +28,8 @@ declare function confirmDialog(options?: Record<string, any>): Promise<boolean>;
 declare function infoDialog(message: string, options?: Record<string, any>): Promise<unknown>;
 declare function openDialogOverlay(html: string, resolve: (result?: any) => void): void;
 declare function closeDialogOverlay(result?: any): void;
+declare function pageDash(): string;
+declare function dashTestFilter(value: string): void;
 declare var entrySel: any, entryDays: any, entryStart: any, entryEnd: any, entrySheetMonth: any,
   entryQ: any, entryMachine: any, entryLastMsg: any, entryAutoOpenKey: any,
   entryPendingSheetFocus: any, entryJumpToday: any, entryLjRenderCache: any,

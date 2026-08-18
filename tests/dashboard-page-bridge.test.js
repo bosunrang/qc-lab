@@ -4,10 +4,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.join(__dirname, '..');
-const route = fs.readFileSync(path.join(root, 'assets/modules/dashboard-routes.js'), 'utf8');
+const route = fs.readFileSync(path.join(root, 'src/presentation/dashboard/dashboard-page-controller.ts'), 'utf8');
 const bridge = fs.readFileSync(path.join(root, 'src/compat/modular-pilot.global.ts'), 'utf8');
 
-assert.match(route, /return globalThis\.dashboardPageHtml\(\{headHtml,todayText:vnDate\(today\),mood,moodText,progressHtml,kpisHtml,followHtml,expiringLotsHtml:expHtml,testsPanelHtml\}\);/, 'Dashboard phải dùng page renderer TypeScript');
+assert.match(route, /return deps\.dashboardPageHtml\(\{ headHtml, todayText: deps\.vnDate\(today\), mood, moodText, progressHtml, kpisHtml, followHtml, expiringLotsHtml: expHtml, testsPanelHtml \}\);/, 'Dashboard phải dùng page renderer TypeScript');
 assert.match(bridge, /dashboardPageHtml: ReturnType<typeof createDashboardPageHtml>;/, 'Dashboard renderer phải là hợp đồng bridge bắt buộc');
 assert.match(bridge, /dashboardHeadHtml: ReturnType<typeof createDashboardHeadHtml>;/, 'Header Dashboard phải là hợp đồng bridge bắt buộc');
 assert.match(bridge, /dashboardTestPanelHtml: ReturnType<typeof createDashboardTestPanelHtml>;/, 'Panel xét nghiệm Dashboard phải là hợp đồng bridge bắt buộc');
