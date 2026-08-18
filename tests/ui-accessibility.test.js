@@ -4,7 +4,7 @@ const path = require('node:path');
 
 const root = path.join(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
-const router = read('assets/modules/router-render.js') + read('assets/modules/entry-routes.js') + read('src/presentation/entry/entry-sheet-navigation.ts') + read('src/presentation/entry/entry-tree-html.ts') + read('src/presentation/entry/entry-worksheet-html.ts') + read('src/presentation/entry/entry-levey-panel-html.ts') + read('src/presentation/entry/entry-page-layout-html.ts') + read('src/presentation/router/router-shell-controller.ts');
+const router = read('assets/modules/entry-routes.js') + read('src/presentation/entry/entry-sheet-navigation.ts') + read('src/presentation/entry/entry-tree-html.ts') + read('src/presentation/entry/entry-worksheet-html.ts') + read('src/presentation/entry/entry-levey-panel-html.ts') + read('src/presentation/entry/entry-page-layout-html.ts') + read('src/presentation/router/router-shell-controller.ts');
 const modals = read('src/presentation/modal/modal-focus-trap.ts') + read('src/presentation/modal/modal-template.ts') + read('src/presentation/modal/modal-controller.ts') + read('src/presentation/modal/dialog-overlay-controller.ts');
 const appCss = read('assets/app.css');
 const auditCss = read('assets/professional-audit.css');

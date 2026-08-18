@@ -57,8 +57,8 @@ scope**, không phải không còn file `.js` trong gói phát hành.
 
 | Hạng mục | Trạng thái |
 | --- | --- |
-| Nguồn TypeScript | 722 tệp: 99 domain, 137 application, 485 presentation, 1 compatibility bridge |
-| Nguồn classic còn lại | 28 tệp `assets/modules/*.js`, thêm `assets/core.js` và `assets/app.js` |
+| Nguồn TypeScript | 729 tệp: 99 domain, 137 application, 492 presentation, 1 compatibility bridge |
+| Nguồn classic còn lại | 27 tệp `assets/modules/*.js`, thêm `assets/core.js` và `assets/app.js` |
 | Bundle hiện tại | `assets/generated/modular-pilot.js`, Vite sinh ra và nạp bằng `<script defer>` |
 | Kiểm tra kiểu | `npm.cmd run typecheck` đạt: checkJs legacy + strict TypeScript modules |
 | Test Node | `npm.cmd test` đạt ngày 2026-08-18 |
@@ -364,7 +364,8 @@ bằng TypeScript, sau build trở thành JavaScript trong bundle.
 Thứ tự ưu tiên, theo rủi ro tăng dần:
 
 1. **UI thuần:** ~~`modals`~~ (xong 2026-08-18), `after-render` (đã retire ở
-   Pha F), ~~`dashboard-routes`~~ (xong 2026-08-18), `router-render`.
+   Pha F), ~~`dashboard-routes`~~ (xong 2026-08-18), ~~`router-render`~~ (xong
+   2026-08-18) — nhóm này đã **hoàn tất**.
 2. **Route/presentation:** Entry, Manage, Report, Settings, Reagent, Sigma,
    Actions và Audit; chuyển mỗi trang như một lát dọc hoàn chỉnh.
 3. **Canvas và browser adapter:** `draw`, `reports`, export/print, File API;
@@ -505,6 +506,120 @@ helpers.test.js` chỉ cần bỏ `'modules/dashboard-routes.js'` khỏi danh s�
 nạp (file không còn tồn tại). Gate cuối: `build:pilot`/`typecheck`/`test`
 xanh (613/613).
 
+#### Lát 3 — `router-render.js` (2026-08-18)
+
+Retire hoàn toàn `assets/modules/router-render.js` (149 dòng, ~50 tên global)
+— file lớn và trung tâm nhất trong nhóm "UI thuần" vì nó là bảng điều phối
+trang của toàn app. Phần lớn nội dung đã rơi vào một trong ba nhóm trước khi
+viết code mới:
+
+1. **Chết hẳn, xóa không cần bridge:** `PERM` (const, 0 caller ở bất kỳ đâu
+   trong repo kể cả test); `VN_DATE_MONTHS`/`VN_DATE_DAYS`/biến `vnDatePicker`/
+   hàm `vnPickerRender()` (~30 dòng) — bị `vn-date-picker-controller.ts` (đã
+   có `render()`/state/`bind()` riêng từ trước) thay thế hoàn toàn nhưng chưa
+   ai xóa bản classic; xác nhận bằng `rg` không có caller nào kể cả trong
+   chính file.
+2. **Bí danh thuần (không có logic mới), nối thẳng trong `modular-pilot.global.ts`:**
+   ~20 hàm một dòng kiểu `function X(){return globalThis.Y.method();}` —
+   `brandTitle`/`brandSub`/`brandMarkText`/`brandLogo`/`renderBrand`/`nav`/
+   `licensedLabName`/`trialInfo`/`sideFoot`/`toggleSidebarNav` (→
+   `routerShell`), `vnPickerParse`/`Valid`/`Text`/`Open`/`Close`/`Move`/`Mode`/
+   `SetYear`/`SetMonth`/`Pick` (→ `vnDatePickerController`), `stateName`/
+   `qcVerdictLabel` (→ `reportLabels`), `rolePageIds`/`userPageIds`/
+   `canAccessPage`/`firstAccessPage`/`PAGES` (→ `routerPagePolicy`). Đây đúng
+   vai trò "export contract cho caller chưa migrate" của lớp compat theo mục
+   4 — không phải "facade chỉ đổi tên hàm" vì không tạo file TS mới nào cho
+   riêng chúng.
+3. **Logic thật, cần file TS mới** — `src/presentation/router/`
+   (`router-icons.ts`: `icon`/`icoCal`/`icoDownload`/`icoPrint`/`icoRefArrow`,
+   thuần không phụ thuộc; `router-permission.ts`: `role`/`canWrite`/
+   `requireWrite`/`requireAdmin`/`roleLabel`/`roleSelectOptions`;
+   `live-row-filter.ts`: `setSearchCount`/`showSearchEmpty`/
+   `replaceSelectItems`/`liveRowFilter`/`scheduleSearchRender`;
+   `date-box-html.ts`: `dateBox`; `router-dispatch-controller.ts`: `go`/
+   `resetMainScroll`/`render`/`restoreRouteFilters`/`rerender`), cộng
+   `src/presentation/shared/ui-primitives.ts` (`btn`/`emptyState`/
+   `topUserBox`/`headOnly`) và `src/presentation/range/range-actions-html.ts`
+   (`rangeActions`). `page` (biến trang hiện tại, đọc/ghi từ ~8 file classic
+   khác) chuyển vào `createRouterUiState()` trong `ui-state.ts` — cùng cơ chế
+   accessor `Object.defineProperty` như `dashTestQ`/`currentUser`/…, không
+   phải state mới.
+
+**Ba lớp bẫy runtime phát hiện được (build/typecheck xanh nhưng 24 test đỏ
+diện rộng, đúng quy mô lần trước ở `dashboard-routes.js` — dấu hiệu đây là
+loại rủi ro lặp lại của MỌI lát Pha G, không phải riêng file nào):**
+
+1. **Bare identifier thay vì lazy call, lại tái diễn** — dù đã biết từ Lát 2,
+   vẫn phải quét kỹ: `isoToday`/`vnDate`/`role`/`rerender` viết dạng
+   `isoToday,` (object shorthand) trong deps ném `ReferenceError` ngay lúc nạp
+   bundle ở sandbox thiếu `state.js`. Sửa lại `()=>isoToday()` như quy ước.
+2. **Ghi trực tiếp `root.page=`/`root.statusMemo=` (không qua namespace
+   object) tái tạo đúng lỗi global-name-uniqueness của Lát 2** — `page` giờ
+   là accessor thật (`RouterUIState`), `statusMemo` thuộc `AnalysisUIState`;
+   `router-dispatch-controller.ts`'s `setPage`/`resetStatusMemo` phải ghi qua
+   `(root as any).RouterUIState.page=...`/`(root as any).AnalysisUIState.statusMemo=...`,
+   không phải `root.page=`/`root.statusMemo=` trực tiếp.
+3. **`vnDatePickerController.bind()` chuyển từ "chạy khi router-render.js nạp"
+   (tùy chọn theo từng sandbox test) sang "chạy ngay khi bundle nạp" (bắt
+   buộc với MỌI sandbox tải `generated/modular-pilot.js`, hiện có 49 file
+   test)** — `bind()` gọi `deps.document.addEventListener(...)` không có
+   guard nào ngoài `!deps.document`; 2 trong 49 file test đó stub `document`
+   tối giản (`{getElementById:...}`, thiếu `addEventListener`) nên vỡ ngay
+   lúc nạp dù test không hề đụng tới date picker
+   (`lis-client-service.test.js`, `render-downsampling.test.js`) — thêm
+   `addEventListener:()=>{}` vào hai stub đó. Đây là bài học riêng cho lát
+   này: **di chuyển một lời gọi side-effect-ngay-khi-nạp (không phải lazy
+   closure) vào bundle mở rộng yêu cầu ngầm cho TOÀN BỘ sandbox tải bundle đó,
+   không chỉ những sandbox trước đây từng nạp file classic sở hữu lời gọi
+   ấy** — phải chạy hết `npm test` để tìm hết, không đoán trước được từ việc
+   đọc code.
+
+**Bốn phát hiện phụ khác, mỗi cái là một dạng "stub bị bundle ghi đè" khác
+nhau, không lặp y hệt bài học `infoDialog` của Lát 1:**
+
+- `tests/audit-chain-cache.test.js` stub `function rerender(){__rerenderCalls++;}`
+  qua `run()` (không phải tham số `globals`) NHƯNG vẫn chạy TRƯỚC khi nạp
+  bundle trong chuỗi lệnh — bundle nạp sau vẫn ghi đè. Sửa bằng cách thêm một
+  lệnh `run()` đặt lại `rerender=...` NGAY SAU khi nạp bundle, không đổi cách
+  stub (qua `run()`, không qua `globals`).
+- `tests/audit-filter.test.js` stub SÁU global cùng lúc qua tham số `globals`
+  (`headOnly`/`btn`/`emptyState`/`dateBox`/`rerender`/`vnPickerParse`) — tất cả
+  giờ đều là thật. Sửa bằng `Object.assign(ctx,{...})` sau `loadSandbox()`,
+  giữ nguyên các stub không liên quan (`esc`/`escAttr`/`parseVN`/…) ở tham số
+  `globals` như cũ vì chúng không bị bundle chạm tới.
+- `tests/partial-render-helpers.test.js` gán lại `document={createElement:...}`
+  NGAY TRONG một lệnh `run()` để giả lập DOM cho lệnh gọi `replaceSelectItems()`
+  kế tiếp — nhưng `replaceSelectItems` giờ đóng gói (capture) giá trị
+  `document` tại thời điểm bundle nạp (một closure, giống mọi controller khác
+  trong `modular-pilot.global.ts`), nên gán lại BIẾN `document` sau đó không
+  hề ảnh hưởng tới closure đã đóng gói — phép gán chỉ đổi tên biến trỏ tới
+  object mới, không đổi object cũ mà closure đang giữ. Sửa bằng cách GẮN THÊM
+  method lên CÙNG object đã capture (`document.createElement=...`) thay vì
+  gán lại biến `document=...`. Bài học chung: mọi kỹ thuật test "đổi document
+  giữa chừng bằng gán lại biến toàn cục" chỉ còn tác dụng với code CHƯA
+  chuyển sang TS (đọc `document` trần mỗi lần gọi); code đã chuyển phải được
+  test bằng cách mutate object đã capture.
+- `tests/lis-client-service.test.js` có 2 sandbox riêng: sandbox đầu thiếu
+  `addEventListener` trên `document` (giống mục 3 ở trên); sandbox thứ hai
+  vẫn nạp `'modules/router-render.js'` trong danh sách file (giờ không tồn
+  tại, ném `ENOENT`) — bỏ khỏi danh sách, các global nó từng cung cấp
+  (`btn`, `dateBox`, …) nay tới từ bundle đã nạp trước đó trong cùng danh
+  sách.
+
+Xóa thêm `assets/modules/router-render.js` khỏi `index.html`; 6 assertion
+trong `tests/ui-route-structure.test.js` từng đọc `assets/modules/router-render.js`
+bằng `fs.readFileSync` được chuyển sang đọc `src/presentation/router/*.ts` nối
+lại (cho các kiểm tra "không giữ registry/trang trần") hoặc sang đọc
+`src/compat/modular-pilot.global.ts` (cho các kiểm tra "phải gọi qua
+TypeScript bridge", vì phần logic ĐÓ giờ nằm ở lớp compat chứ không phải một
+file presentation riêng); assertion so sánh thứ tự nạp script với
+`router-render.js` bị xóa hẳn vì tiền đề (một thẻ `<script>` riêng cho file
+đó) không còn tồn tại. `tests/ui-accessibility.test.js` chỉ cần bỏ
+`read('assets/modules/router-render.js')` khỏi chuỗi nối — nội dung ARIA nó
+từng đóng góp (thuộc `routerShell.nav()`) đã có sẵn trong
+`router-shell-controller.ts`, cũng nằm trong chuỗi nối đó. Gate cuối:
+`build:pilot`/`typecheck`/`test` xanh (613/613).
+
 ### Pha H — bỏ global bridge và nhiều script tags
 
 Chỉ bắt đầu khi Pha G hoàn thành.
@@ -579,3 +694,4 @@ npm.cmd test
 | 2026-08-18 | Xem lại `invalidateDerivedForSave()` (mục còn lại cuối cùng của đợt audit bridge) — kết luận đây KHÔNG phải code chết, quyết định giữ nguyên. Nó không tái hiện logic JS lỗi thời (đã gọi thẳng bridge sống); vấn đề thật là `saveService` (TS) có bản sao logic invalidation riêng thay vì gọi lại hàm này, dù thứ tự nạp cho phép. Hợp nhất đúng cách đụng tới `src/application/storage/save-service.ts`/`src/compat/modular-pilot.global.ts` (đường nóng `save()`, có tài liệu benchmark riêng) — ngoài phạm vi dọn bridge, để lại làm việc riêng khi cần. Với quyết định này, toàn bộ audit bridge JS→TS của Pha F (30/30 file classic) coi như hoàn tất. |
 | 2026-08-18 | Bắt đầu Pha G: chuyển `modals.js` (lát đầu tiên, nhóm "UI thuần") sang `src/presentation/modal/` (4 file TS). Hợp nhất phần focus-trap trùng lặp giữa hai lớp modal/dialog vào một helper dùng chung, giữ nguyên hai lớp `#modalRoot`/`#dialogRoot` tách biệt. Gỡ ~13 chỗ ép kiểu `(root as any)`/`(globalThis as any)` quanh các hàm này trong `modular-pilot.global.ts`. Phát hiện phụ: `tests/local-store.test.js` stub `infoDialog` qua tham số `globals` của `loadSandbox()` — tham số này set TRƯỚC khi file chạy nên bị `generated/modular-pilot.js` (nạp sau) ghi đè ngay khi `infoDialog` chuyển thành thật; sửa bằng cách gán stub sau khi `loadSandbox()` trả về. Bài học cho các lát Pha G kế tiếp: rà `tests/` tìm stub cùng tên qua tham số `globals` trước khi retire một file classic, không chỉ tìm lời gọi trần của hàm sắp xóa. `build:pilot`/`typecheck`/`test` xanh (613/613). |
 | 2026-08-18 | Lát 2 của Pha G: chuyển `dashboard-routes.js` (43 dòng, đã gần thuần bridge từ trước) sang `src/presentation/dashboard/dashboard-page-controller.ts` — factory nhận `deps`, không đụng phép tính (mọi `dashboardXxx` builder đã là TS từ trước). Ba bẫy runtime phát hiện sau khi build/typecheck xanh nhưng 24 file test đỏ: (1) tham chiếu bare `isoToday,`/`role,`/`vnDate,`/`rerender,` trong object deps ném `ReferenceError` ngay lúc NẠP bundle ở mọi sandbox thiếu `modules/state.js`/`router-render.js` — phải bọc lazy `()=>isoToday()` như quy ước đã có sẵn khắp `modular-pilot.global.ts`; (2) `root.dashTestQ=value` (gọi setter của accessor `Object.defineProperty` có sẵn) bị `tests/global-name-uniqueness.test.js` hiểu nhầm là khai báo global mới, trùng với khai báo thật ở `ui-state.ts` — sửa bằng cách ghi qua namespace object `(root as any).AnalysisUIState.dashTestQ=value` thay vì gán thẳng `root.dashTestQ=`; (3) lỗi contravariance tham số hàm khi gán 24 hàm `dashboardXxx` có chữ ký cụ thể vào một kiểu `deps` chung — giải quyết bằng `type AnyRec=any` (any thật, không phải `Record<string,any>`). Bài học: sau build/typecheck xanh vẫn phải chạy TOÀN BỘ `npm test`, không chỉ test của route đang chuyển. ~30 assertion source-scanner ở 6 file test (typescript-module-pilot, dashboard-loading-bridge, dashboard-model-bridge, dashboard-page-bridge, ui-accessibility, ui-route-structure) được trỏ sang đọc `dashboard-page-controller.ts` với regex cập nhật theo cú pháp TS. `build:pilot`/`typecheck`/`test` xanh (613/613). |
+| 2026-08-18 | Lát 3 của Pha G (kết thúc nhóm "UI thuần"): chuyển `router-render.js` (149 dòng, ~50 tên global) sang `src/presentation/router/` (5 file) + `src/presentation/shared/ui-primitives.ts` + `src/presentation/range/range-actions-html.ts`. Xóa kèm 2 chỗ chết hẳn (`PERM` — 0 caller; `VN_DATE_MONTHS`/`VN_DATE_DAYS`/`vnDatePicker`/`vnPickerRender()` — bị `vn-date-picker-controller.ts` thay thế từ trước nhưng chưa ai xóa bản classic). `page` chuyển vào `RouterUIState` (cùng cơ chế accessor `dashTestQ` đã dùng). Tái hiện cả 2 bẫy đã biết từ Lát 2 (bare identifier chưa bọc lazy; ghi thẳng `root.page=`/`root.statusMemo=` thay vì qua namespace object) — xác nhận đây là rủi ro lặp lại của MỌI lát Pha G, không phải riêng dashboard. Phát hiện bẫy MỚI: di chuyển `vnDatePickerController.bind()` (side-effect chạy ngay lúc nạp, không phải lazy closure) từ "chạy khi router-render.js nạp" sang "chạy ngay khi bundle nạp" biến nó thành yêu cầu ngầm cho cả 49 file test tải bundle, làm vỡ 2 test có `document` stub tối giản dù chúng không đụng date picker. Bốn phát hiện phụ, mỗi cái một biến thể khác của "bundle ghi đè stub": stub qua `run()` (không chỉ qua tham số `globals`) cũng bị ghi đè nếu đặt trước lệnh nạp bundle; và một dạng MỚI hẳn — test gán lại biến `document=...` giữa chừng để đổi DOM giả lập không còn tác dụng vì hàm đã chuyển sang TS đóng gói (capture) `document` thành closure tại lúc nạp, phải mutate object đã capture (`document.createElement=...`) thay vì gán lại biến. `build:pilot`/`typecheck`/`test` xanh (613/613). Nhóm "UI thuần" của Pha G coi như hoàn tất; lát kế tiếp chuyển sang nhóm "Route/presentation". |

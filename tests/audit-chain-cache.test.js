@@ -20,6 +20,10 @@ run(ctx, `
 `);
 run(ctx, require('fs').readFileSync(require('path').join(__dirname, '..', 'assets', 'modules', 'audit.js'), 'utf8'));
 run(ctx, require('fs').readFileSync(require('path').join(__dirname, '..', 'assets', 'generated', 'modular-pilot.js'), 'utf8'));
+// rerender() giờ cũng được bundle TypeScript gán (root.rerender=...) khi nạp — ghi đè
+// mất stub đếm lời gọi ở trên; đặt lại SAU khi bundle chạy xong để tiếp tục đếm thay vì
+// chạy pipeline render thật (thứ sandbox này không nạp modules/router-render.js cho).
+run(ctx, `rerender=function(){__rerenderCalls++;};`);
 run(ctx, `currentUser={id:'u1',username:'admin',name:'Admin',role:'admin'};`);
 
 run(ctx, `

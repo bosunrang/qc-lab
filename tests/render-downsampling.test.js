@@ -13,7 +13,9 @@ const drawnLabels = [];
 
 const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js', 'modules/draw.js'], {
   window: { devicePixelRatio: 1 },
-  document: { getElementById: () => null },
+  // addEventListener: vnDatePickerController.bind() chạy ngay khi generated/modular-pilot.js
+  // nạp (trước đây chỉ chạy nếu sandbox nạp router-render.js, thứ file này chưa từng nạp).
+  document: { getElementById: () => null, addEventListener: () => {} },
 });
 ctx.state = { tests: [{ id:'T1', unit:'U', westgardRules:{} }] };
 ctx.lvlCfg = () => ({ lot:'L1' });

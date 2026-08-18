@@ -6,7 +6,6 @@ const ctx = loadSandbox([
   'modules/state.js',
   'modules/qc-domain.js', // searchText() — bộ lọc KPI dùng, phải là bản thật để đúng cách bỏ dấu tiếng Việt
   'generated/modular-pilot.js',
-  'modules/router-render.js',
   'modules/entry-routes.js',
   'modules/westgard-routes.js',
 ], { document: { addEventListener() {} } });
@@ -15,7 +14,10 @@ const result = run(ctx, `
   (function(){
     function option(){return{value:'',textContent:''};}
     var select={value:'B',disabled:false,children:[],replaceChildren:function(){this.children=[].slice.call(arguments);}};
-    document={createElement:function(tag){if(tag!=='option')throw new Error('unexpected tag');return option();}};
+    // replaceSelectItems() giờ đóng gói document tại thời điểm nạp bundle (xem
+    // live-row-filter.ts) nên gán lại toàn bộ biến document=... ở đây sẽ không
+    // được closure đó thấy — phải gắn thêm method lên CÙNG object đã capture.
+    document.createElement=function(tag){if(tag!=='option')throw new Error('unexpected tag');return option();};
     replaceSelectItems(select,[{value:'A',label:'Assay A'},{value:'B',label:'Assay B'}],'Empty');
     var kept={value:select.value,disabled:select.disabled,labels:select.children.map(x=>x.textContent)};
     replaceSelectItems(select,[],'Không tìm thấy');

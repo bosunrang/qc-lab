@@ -103,7 +103,7 @@ structural change and fix the structure, not the test:
   sit at column 0 and stay one logical declaration per line, or it can't see
   them. Workers are excluded (own global scope).
 - `ui-route-structure.test.js` — pins the router/page split and the
-  `index.html` load order of `router-render.js` → `*-routes.js`.
+  `index.html` load order of the bundle → `*-routes.js`.
 - `button-conventions.test.js` — the `btn()` ban on hand-written buttons (see
   "Button convention").
 - `firebase-rules.test.js` — the rules text the Settings page shows
@@ -166,7 +166,7 @@ it runs under `xvfb-run`, see the CI job):
   review only — not pixel-diffed, since font rendering varies across
   machines.
 - `scripts/a11y-audit.js` runs axe-core against every page in `PAGES`
-  (`router-render.js`), the primary "add new X" modal on each page that has
+  (`router-page-policy.ts`, bridged as `root.PAGES`), the primary "add new X" modal on each page that has
   one (`MODALS` in the script — manage's lot/instrument/assay modals, Sigma's
   add-test/EQA-bias/MU-budget modals, reagent's create-comparison modal, users'
   edit-permissions modal), and a keyboard-Tab smoke pass on `dash`/`entry`, writing
@@ -497,7 +497,7 @@ the Google Fonts link, offline labs must print with correct metrics.
   side effects into the service.
   `EntryService` normalizes QC-point input
   (`preparePointInput`/`addPoint`/`voidPoint`/`recordPoint`) and builds the
-  entry sheet/window data; called from `router-render.js`.
+  entry sheet/window data; called from `entry-routes.js`.
   (`action-workflow-service.js` actually loads a bit later, after the
   `*-ui-state.js` files.)
   `action-workflow-service.js` owns the corrective-action lifecycle:
@@ -516,8 +516,8 @@ the Google Fonts link, offline labs must print with correct metrics.
   because that display/operational helper selects one acceptable rerun per day.
 - `westgard-view-model.js`, `chart-view-model.js` — pure (DOM-free)
   view-model builders: `WestgardViewModel` for the Westgard page (used by
-  `router-render.js`), `ChartViewModel` for charts (used by
-  `after-render-controller.ts`/`router-render.js`; controller được bundle và nạp
+  `westgard-routes.js`), `ChartViewModel` for charts (used by
+  `after-render-controller.ts`; controller được bundle và nạp
   sau `draw.js`).
 - `entry-ui-state.js`, `analysis-ui-state.js`, `sigma-ui-state.js`,
   `reagent-ui-state.js`, `manage-ui-state.js`, `auth-ui-state.js` —
@@ -581,29 +581,38 @@ the Google Fonts link, offline labs must print with correct metrics.
     shared via `modal-focus-trap.ts`'s `createFocusTrapKeydown()` — the only
     consolidation done during the TS port; each layer still keeps its own
     return-focus state and resolver, per the reasoning above.
-  - `requireWrite()`/`requireAdmin()` (`router-render.js`) call `infoDialog()`
+  - `requireWrite()`/`requireAdmin()` (`src/presentation/router/router-permission.ts`) call `infoDialog()`
     without `await`-ing it on purpose: ~68 call sites across the app do
     `if(!requireWrite())return;`, so the guard has to stay synchronous. Not
     awaiting is safe because the dialog's own DOM write happens synchronously
     before the returned Promise settles — the caller's boolean is unaffected
     either way.
-- `draw.js`, `router-render.js`, `entry-routes.js`,
-  `westgard-routes.js`, `sigma.js`, `actions-routes.js`, `action-form.js`,
-  `report-routes.js`, `manage-routes.js`, `after-render-controller.ts`,
-  `manage-tests-actions.js` —
-  UI/rendering and routing. Since 2026-07-24 the three biggest pages live in
-  their own files:
-  `router-render.js` keeps only dispatch plus cross-page UI primitives (the
-  `btn()` builder, the `requireWrite()`/`requireAdmin()` guards, search/filter
-  helpers, the VN date picker, icon SVGs), while `pageEntry()` lives in
-  `entry-routes.js` and
-  `pageWestgard()` in `westgard-routes.js` — `router-render.js` must never
-  redefine those, and the files must load right after it in that order.
-  `pageDash()` was the third of that original trio; it retired to
+- `src/presentation/router/` (`router-dispatch-controller.ts`,
+  `router-permission.ts`, `router-icons.ts`, `live-row-filter.ts`,
+  `date-box-html.ts`) plus `src/presentation/shared/ui-primitives.ts`
+  (`btn`/`emptyState`/`headOnly`/`topUserBox`) and
+  `src/presentation/range/range-actions-html.ts` — retired the classic
+  `router-render.js` on 2026-08-18 (Pha G slice 3, ~50 bridged globals; see
+  `docs/TYPESCRIPT-MIGRATION-PLAN.md`). `router-dispatch-controller.ts` owns
+  `go()`/`resetMainScroll()`/`render()`/`restoreRouteFilters()`/`rerender()`
+  and the current-page dispatch table; the current page id itself moved into
+  `RouterUIState` (`src/presentation/state/ui-state.ts`'s `createRouterUiState()`,
+  the `page` field) so `page` stays a bare classic-compatible global the same
+  way `dashTestQ`/`currentUser`/etc. already do. `router-permission.ts` owns
+  `role()`/`canWrite()`/`requireWrite()`/`requireAdmin()`/`roleLabel()`/
+  `roleSelectOptions()`. All of this is wired in
+  `src/compat/modular-pilot.global.ts`, which every classic route file still
+  calls as bare globals unchanged (`btn`, `emptyState`, `headOnly`, `dateBox`,
+  `liveRowFilter`, `icon`, `go`, `rerender`, `page`, …). A `PERM` const existed
+  in the classic file but had zero callers anywhere in the app — confirmed
+  dead and dropped rather than carried forward as a bridge global.
+  Since 2026-07-24 the three biggest pages live in their own files:
+  `pageEntry()` lives in `entry-routes.js` and `pageWestgard()` in
+  `westgard-routes.js`. `pageDash()` retired to
   `src/presentation/dashboard/dashboard-page-controller.ts` on 2026-08-18
-  (`docs/TYPESCRIPT-MIGRATION-PLAN.md` Pha G slice 2) — `router-render.js`
-  calls it as `root.pageDash` through the compat bridge like any other
-  bundle-owned global.
+  (Pha G slice 2) and `router-dispatch-controller.ts`'s dispatch table calls
+  it as `root.pageDash` through the compat bridge like any other bundle-owned
+  global, same as the still-classic `pageEntry`/`pageWestgard`/etc.
   On 2026-07-30 the same treatment
   reached `actions-routes.js`, which had been holding **two** whole pages and
   had grown to 105 KB, in two steps:
@@ -630,17 +639,21 @@ the Google Fonts link, offline labs must print with correct metrics.
   In one shared global scope that is harmless — what is being pinned is the
   **split of responsibility**, not an acyclic dependency graph, and
   `tests/ui-route-structure.test.js` asserts it that way (which function lives in
-  which file, plus load order). Both files must load right after
-  `router-render.js`'s page trio, in the order `actions-routes.js` →
+  which file, plus load order). Both files must load right after the bundle
+  and the classic page files, in the order `actions-routes.js` →
   `action-form.js` → `report-routes.js`. That test also fails if a `page*()`
   function or an Actions-page helper migrates back.
-  `router-render.js` owns the page list
-  (`PAGES`) and per-role page permissions (`PERM`): `rolePageIds(role)` gives
-  each role's default page set, and a user's own `pagePerms` (edited in
-  `users-auth.js`) can only narrow that set further, never expand past it.
-  Page-level UI state lives in the `*-ui-state.js` modules above. `sigma.js`
-  renders the Six Sigma page (see "Confirmed business-logic decisions" below
-  for how its numbers relate to reports.js).
+  `router-page-policy.ts` owns the page list
+  (`PAGES`, bridged as `root.PAGES`) and per-role page permissions:
+  `rolePageIds(role)` gives each role's default page set, and a user's own
+  `pagePerms` (edited in `users-auth.js`) can only narrow that set further,
+  never expand past it. Page-level UI state lives in the `*-ui-state.js`
+  modules above. `sigma.js` renders the Six Sigma page (see "Confirmed
+  business-logic decisions" below for how its numbers relate to reports.js).
+- `draw.js`, `entry-routes.js`, `westgard-routes.js`, `sigma.js`,
+  `actions-routes.js`, `action-form.js`, `report-routes.js`, `manage-routes.js`,
+  `after-render-controller.ts`, `manage-tests-actions.js` — UI/rendering and
+  routing for the pages not yet ported to TypeScript.
 - `sigma-tea.js` — the Six Sigma page's **TEa resolution layer**, split out of
   `sigma.js` on 2026-08-01 (loads immediately before it; `SG_TEA_DEFAULT_REF` and
   `SG_CLIA_FIXED` read `TEA_SOURCE_REGISTRY`/`TEA_ANALYTE_CATALOG` at load time).
@@ -663,7 +676,8 @@ the Google Fonts link, offline labs must print with correct metrics.
   already calling through the bridge before the route itself moved; this slice
   only moved the calling code, not the math. Wired via
   `src/compat/modular-pilot.global.ts` (`root.pageDash`, etc.) so
-  `router-render.js`'s page dispatch table keeps working unchanged. A
+  `router-dispatch-controller.ts`'s page dispatch table keeps working
+  unchanged. A
   dashboard KPI/CAPA panel (`dashboardKpiSnapshot()`) existed briefly
   (`5673eb49`) and was removed again before release (`890604eb`, "tinh gon
   dashboard") — the dashboard page has no such panel today.
@@ -700,7 +714,7 @@ the Google Fonts link, offline labs must print with correct metrics.
 Three color variants, always in this order right after `btn`: `teal`
 (primary action), `ghost` (secondary/cancel), `danger` (destructive). Append
 `sm` for compact/table-row buttons. `btn(label,onclick,cls='ghost sm',title='',opts={})`
-in `router-render.js` is the shared builder — **always use it**, never
+in `src/presentation/shared/ui-primitives.ts` (bridged as `root.btn`) is the shared builder — **always use it**, never
 hand-write `<button class="btn ...">`; `opts` supports `{disabled, attrs}` for
 disabled state, `style`, `data-*`, or any other extra attribute a button
 needs. As of 2026-07-23 every hand-written button in `assets/modules/*.js`

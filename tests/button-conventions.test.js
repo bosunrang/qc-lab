@@ -4,8 +4,9 @@ const path = require('node:path');
 
 // Enforces the button color convention documented in CLAUDE.md/AGENTS.md:
 // teal = primary action, ghost = secondary/cancel, danger = destructive.
-// router-render.js:178 has a shared btn() helper that always picks a valid
-// variant; as of 2026-07-23 every hand-written `<button class="btn ...">`
+// src/presentation/shared/ui-primitives.ts has a shared btn() helper (bridged
+// as root.btn since router-render.js retired, 2026-08-18) that always picks a
+// valid variant; as of 2026-07-23 every hand-written `<button class="btn ...">`
 // in assets/modules/*.js (previously ~140 of them, across 10 files) has been
 // converted to call it, including the ones that needed `disabled`/data-*/
 // style attributes — btn()'s `opts.{disabled,attrs}` covers those, so there's

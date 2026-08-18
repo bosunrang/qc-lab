@@ -31,7 +31,10 @@ const { loadSandbox, run } = require('./helpers/sandbox');
       return { ok: true, status: 200, json: async () => ({ items: pendingItems }) };
     },
     localStorage: { getItem: k => storage.get(k) || null, setItem: (k, v) => storage.set(k, v) },
-    document: { getElementById: () => null },
+    // addEventListener/removeEventListener: vnDatePickerController.bind() giờ chạy ngay khi
+    // generated/modular-pilot.js nạp (trước đây chỉ chạy nếu sandbox nạp router-render.js,
+    // thứ ctx này chưa từng nạp) nên document stub cần đủ hai hàm này dù test không dùng tới.
+    document: { getElementById: () => null, addEventListener: () => {}, removeEventListener: () => {} },
   });
 
   /* --- Chi cho phep dung hai origin, khop voi CSP connect-src --- */
@@ -107,12 +110,13 @@ const { loadSandbox, run } = require('./helpers/sandbox');
    * lisImportResult()/lisRejectResult() ma khong co UI nao goi toi, nen cach duy
    * nhat de nhan mot ban ghi la go tay vao DevTools console. Cac ham duoi day
    * (lisQueueRowHtml/lisQueueSectionHtml/lisRenderQueueModal/lisOpenQueueModal)
-   * dung THAT esc/escAttr/jsq/btn tu reports.js/entry-routes.js/router-render.js
-   * — khong stub — vi day chinh la lop thoat HTML can chot lai (xem hoi quy XSS
+   * dung THAT esc/escAttr/jsq tu reports.js/entry-routes.js va btn tu bundle
+   * TypeScript (root.btn, xem router-icons.ts/ui-primitives.ts) — khong stub —
+   * vi day chinh la lop thoat HTML can chot lai (xem hoi quy XSS
    * ben duoi), stub rieng se khong bat duoc regresion that trong cac ham do.
    * ========================================================================= */
   const openCalls = [];
-  const ctx2 = loadSandbox(['core.js', 'generated/modular-pilot.js', 'modules/router-render.js', 'modules/entry-routes.js', 'modules/reports.js', 'modules/lis-queue-ui.js'], {
+  const ctx2 = loadSandbox(['core.js', 'generated/modular-pilot.js', 'modules/entry-routes.js', 'modules/reports.js', 'modules/lis-queue-ui.js'], {
     URL, AbortController, setInterval, clearInterval,
     window: { QCLAB_APP: { name: 'QC Lab', version: 'test' } },
     document: { getElementById: () => null, addEventListener: () => {}, removeEventListener: () => {} },

@@ -10075,6 +10075,215 @@
 		};
 	}
 	//#endregion
+	//#region src/presentation/router/router-icons.ts
+	var NAV_ICON_PATHS = {
+		dash: "<rect x=\"3.5\" y=\"3.5\" width=\"7\" height=\"7\" rx=\"1.3\"/><rect x=\"13.5\" y=\"3.5\" width=\"7\" height=\"7\" rx=\"1.3\"/><rect x=\"3.5\" y=\"13.5\" width=\"7\" height=\"7\" rx=\"1.3\"/><rect x=\"13.5\" y=\"13.5\" width=\"7\" height=\"7\" rx=\"1.3\"/>",
+		entry: "<path d=\"M12 20h9\"/><path d=\"M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z\"/>",
+		westgard: "<path d=\"M4 3v18h17\"/><path d=\"M7 7h13M7 12h13M7 17h13\" opacity=\".55\"/><path d=\"m7 15 3-5 3 3 3-7 4 4\"/><circle cx=\"7\" cy=\"15\" r=\".8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"10\" cy=\"10\" r=\".8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"13\" cy=\"13\" r=\".8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"16\" cy=\"6\" r=\".8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"20\" cy=\"10\" r=\".8\" fill=\"currentColor\" stroke=\"none\"/>",
+		sigma: "<path d=\"M16.5 5H8l5.2 7-5.2 7h8.5\"/>",
+		reagent: "<path d=\"m17 2 4 4-4 4\"/><path d=\"M3 11v-1a4 4 0 0 1 4-4h14\"/><path d=\"m7 22-4-4 4-4\"/><path d=\"M21 13v1a4 4 0 0 1-4 4H3\"/>",
+		actions: "<path d=\"M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94Z\"/>",
+		report: "<path d=\"M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5Z\"/><path d=\"M14 2v4a2 2 0 0 0 2 2h4\"/><path d=\"M8.5 13h7\"/><path d=\"M8.5 17h7\"/>",
+		manage: "<line x1=\"4.5\" x2=\"4.5\" y1=\"21\" y2=\"14\"/><line x1=\"4.5\" x2=\"4.5\" y1=\"10\" y2=\"3\"/><line x1=\"12\" x2=\"12\" y1=\"21\" y2=\"12\"/><line x1=\"12\" x2=\"12\" y1=\"8\" y2=\"3\"/><line x1=\"19.5\" x2=\"19.5\" y1=\"21\" y2=\"16\"/><line x1=\"19.5\" x2=\"19.5\" y1=\"12\" y2=\"3\"/><line x1=\"2.5\" x2=\"6.5\" y1=\"14\" y2=\"14\"/><line x1=\"10\" x2=\"14\" y1=\"8\" y2=\"8\"/><line x1=\"17.5\" x2=\"21.5\" y1=\"16\" y2=\"16\"/>",
+		users: "<path d=\"M16.5 21v-2a4 4 0 0 0-4-4h-5a4 4 0 0 0-4 4v2\"/><circle cx=\"9.5\" cy=\"7.5\" r=\"3.8\"/><path d=\"M21.5 21v-2a4 4 0 0 0-3-3.87\"/><path d=\"M15.5 3.13a4 4 0 0 1 0 7.75\"/>",
+		audit: "<rect x=\"8\" y=\"2.5\" width=\"8\" height=\"3.7\" rx=\"1\"/><path d=\"M16 4.3h1.5a2 2 0 0 1 2 2V19a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2V6.3a2 2 0 0 1 2-2H8\"/><path d=\"M9 12.5h6\"/><path d=\"M9 16.5h6\"/>",
+		settings: "<path d=\"M17.6 18.5H8.8a6.3 6.3 0 1 1 6-8.1h.7a4 4 0 1 1 0 8.1Z\"/>"
+	};
+	function icon(id) {
+		return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${NAV_ICON_PATHS[id] || ""}</svg>`;
+	}
+	function icoCal() {
+		return "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"4\" y=\"5\" width=\"16\" height=\"16\" rx=\"2\"/><path d=\"M8 3v4M16 3v4M4 10h16\"/></svg>";
+	}
+	function icoDownload() {
+		return "<svg class=\"btn-ico\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/><polyline points=\"7 10 12 15 17 10\"/><line x1=\"12\" y1=\"15\" x2=\"12\" y2=\"3\"/></svg>";
+	}
+	function icoPrint() {
+		return "<svg class=\"btn-ico\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M6 9V3h12v6\"/><path d=\"M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2\"/><path d=\"M6 14h12v7H6z\"/></svg>";
+	}
+	function icoRefArrow() {
+		return "<svg viewBox=\"0 0 24 24\" width=\"11\" height=\"11\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" style=\"vertical-align:middle;flex-shrink:0\"><path d=\"M4 4v7a4 4 0 0 0 4 4h12\"/><path d=\"M15 10l5 5-5 5\"/></svg>";
+	}
+	//#endregion
+	//#region src/presentation/router/router-permission.ts
+	function createRouterPermission(deps) {
+		const role = () => deps.currentUser() ? deps.currentUser().role : "viewer";
+		const canWrite = () => role() === "admin" || role() === "technician";
+		const requireWrite = (message = "Bạn không có quyền sửa dữ liệu.") => {
+			if (canWrite()) return true;
+			deps.infoDialog(message);
+			return false;
+		};
+		const requireAdmin = (message = "Chỉ quản trị mới được thực hiện thao tác này.") => {
+			if (role() === "admin") return true;
+			deps.infoDialog(message);
+			return false;
+		};
+		const roleLabel = (r) => r === "admin" ? "Quản trị" : r === "technician" ? "KTV" : "Chỉ xem";
+		const roleSelectOptions = (selected) => deps.roles().map((r) => `<option value="${r}" ${r === selected ? "selected" : ""}>${roleLabel(r)}</option>`).join("");
+		return {
+			role,
+			canWrite,
+			requireWrite,
+			requireAdmin,
+			roleLabel,
+			roleSelectOptions
+		};
+	}
+	//#endregion
+	//#region src/presentation/router/live-row-filter.ts
+	function createLiveRowFilter(deps) {
+		const setSearchCount = (id, visible, total) => {
+			const el = deps.document.getElementById(id);
+			if (el) el.textContent = visible + "/" + total;
+		};
+		const showSearchEmpty = (id, on) => {
+			const el = deps.document.getElementById(id);
+			if (el) el.style.display = on ? "" : "none";
+		};
+		const replaceSelectItems = (select, items, emptyText) => {
+			if (!select) return;
+			const selected = select.value, options = (items || []).map((item) => {
+				const o = deps.document.createElement("option");
+				o.value = String(item.value ?? "");
+				o.textContent = String(item.label ?? "");
+				return o;
+			});
+			if (!options.length) {
+				const o = deps.document.createElement("option");
+				o.value = "";
+				o.textContent = emptyText || "Không có dữ liệu";
+				options.push(o);
+			}
+			select.replaceChildren(...options);
+			select.disabled = !(items && items.length);
+			if ((items || []).some((item) => String(item.value) === String(selected))) select.value = selected;
+		};
+		const liveRowFilter = (selector, q, opts = {}) => {
+			const query = deps.searchText(q);
+			let visible = 0, total = 0;
+			deps.document.querySelectorAll(selector).forEach((el) => {
+				total++;
+				const ok = !query || String(el.dataset.search || "").includes(query);
+				el.style.display = ok ? "" : "none";
+				if (ok) visible++;
+			});
+			if (opts.countId) setSearchCount(opts.countId, visible, total);
+			if (opts.emptyId) showSearchEmpty(opts.emptyId, visible === 0);
+			return {
+				visible,
+				total
+			};
+		};
+		const scheduleSearchRender = (owner, apply, focusId, delay = 180) => {
+			clearTimeout(owner.searchTimer);
+			owner.searchTimer = setTimeout(() => {
+				apply();
+				if (focusId) {
+					const e = deps.document.getElementById(focusId);
+					if (e) {
+						e.focus({ preventScroll: true });
+						try {
+							e.setSelectionRange(e.value.length, e.value.length);
+						} catch {}
+					}
+				}
+			}, delay);
+		};
+		return {
+			setSearchCount,
+			showSearchEmpty,
+			replaceSelectItems,
+			liveRowFilter,
+			scheduleSearchRender
+		};
+	}
+	//#endregion
+	//#region src/presentation/router/date-box-html.ts
+	function createDateBoxHtml(deps) {
+		return (id, value = "", cls = "manage-date", attrs = "") => {
+			const iso = deps.vnPickerParse(value) || deps.parseVN(value) || "";
+			return `<span class="datebox ${cls}"><input id="${id}" class="date-text" inputmode="numeric" value="${deps.escapeAttr(deps.formatVnDate(value || ""))}" placeholder="dd/mm/yyyy" ${attrs}><span class="datepick" title="Chọn ngày">${icoCal()}</span><input class="native-date" type="date" lang="vi" value="${deps.escapeAttr(iso)}" title="Chọn ngày"></span>`;
+		};
+	}
+	//#endregion
+	//#region src/presentation/range/range-actions-html.ts
+	function createRangeActionsHtml(deps) {
+		return (tid, level, eligible, applied) => {
+			let h = "";
+			if (eligible) h += deps.button("Workflow dải QC", `openRangeWorkflow('${tid}',${level})`, "teal sm", "Xem điều kiện, dải đề xuất và phê duyệt");
+			if (applied === "lab" && deps.canWrite()) h += deps.button("↶", `revertRange('${tid}',${level})`, "ghost icon", "Về dải nhà sản xuất");
+			return h ? `<div style="margin:8px 14px 0;display:flex;gap:6px;flex-wrap:wrap">${h}</div>` : "";
+		};
+	}
+	//#endregion
+	//#region src/presentation/shared/ui-primitives.ts
+	function createUiPrimitives(deps) {
+		const btn = (label, onclick, cls = "ghost sm", title = "", opts = {}) => {
+			const { disabled = false, attrs = {} } = opts, attrStr = Object.entries(attrs).map(([k, v]) => ` ${k}="${deps.escapeAttr(v)}"`).join("");
+			return `<button class="btn ${cls}"${disabled ? " disabled" : ""} onclick="${onclick}"${title ? ` title="${deps.escapeAttr(title)}"` : ""}${attrStr}>${label}</button>`;
+		};
+		const emptyState = (title, body, actions = "") => `<div class="empty"><div class="empty-title">${title}</div><div>${body}</div>${actions ? `<div class="empty-actions">${actions}</div>` : ""}</div>`;
+		const topUserBox = () => {
+			const currentUser = deps.currentUser();
+			if (!currentUser) return "";
+			const name = currentUser.name || currentUser.username;
+			return `<div class="top-user"><div class="avatar">${deps.escape(String(name || "U").trim().charAt(0).toUpperCase() || "U")}</div><div class="meta"><div class="name">${deps.escape(name)}</div><div class="role">${deps.roleLabel(currentUser.role)}</div></div><button onclick="logout()" title="Đăng xuất"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M21 5v14"/></svg>Đăng xuất</button></div>`;
+		};
+		const headOnly = (t, p, actions = "") => `<div class="head"><div><h1>${t}</h1>${p ? `<p>${p}</p>` : ""}</div><div class="head-actions">${actions}${topUserBox()}</div></div>`;
+		return {
+			btn,
+			emptyState,
+			topUserBox,
+			headOnly
+		};
+	}
+	//#endregion
+	//#region src/presentation/router/router-dispatch-controller.ts
+	function createRouterDispatchController(deps) {
+		const resetMainScroll = () => {
+			const m = deps.document.querySelector("main");
+			if (m) m.scrollTop = 0;
+			deps.window.scrollTo(0, 0);
+		};
+		const render = () => {
+			deps.resetStatusMemo();
+			if (!deps.canAccessPage(deps.page())) deps.setPage(deps.firstAccessPage());
+			const m = deps.document.getElementById("main");
+			const map = deps.pageMap();
+			if (m) m.innerHTML = (map[deps.page()] || map.dash)();
+		};
+		const restoreRouteFilters = () => {
+			if (deps.page() === "dash" && deps.dashTestQ()) deps.dashTestFilter(deps.dashTestQ());
+			else if (deps.page() === "entry" && deps.entryQ()) deps.entryFilter(deps.entryQ());
+		};
+		const rerender = () => {
+			const m = deps.document.getElementById("main"), keepScroll = m ? m.scrollTop : 0;
+			render();
+			deps.afterRender(deps.page());
+			restoreRouteFilters();
+			if (m && keepScroll) m.scrollTop = keepScroll;
+		};
+		const go = (p) => {
+			if (!deps.canAccessPage(p)) return;
+			deps.setPage(p);
+			deps.nav();
+			rerender();
+			resetMainScroll();
+			deps.requestFrame(() => {
+				const main = deps.document.getElementById("main");
+				if (main) main.focus({ preventScroll: true });
+			});
+		};
+		return {
+			go,
+			resetMainScroll,
+			render,
+			restoreRouteFilters,
+			rerender
+		};
+	}
+	//#endregion
 	//#region src/presentation/report/report-qc-format.ts
 	function createReportQcFormat(deps) {
 		const value = (test, raw) => deps.testValue ? deps.testValue(test, raw) : deps.format(raw, 3);
@@ -17157,6 +17366,9 @@
 			sgSelectedPeriods: {}
 		};
 	}
+	function createRouterUiState() {
+		return { page: "dash" };
+	}
 	//#endregion
 	//#region src/compat/modular-pilot.global.ts
 	var root = globalThis;
@@ -17173,6 +17385,7 @@
 	installUiState(root, "ManageUIState", createManageUiState());
 	installUiState(root, "ReagentUIState", createReagentUiState());
 	installUiState(root, "SigmaUIState", createSigmaUiState());
+	installUiState(root, "RouterUIState", createRouterUiState());
 	root.ChartViewModel = chartViewModel;
 	root.qcPointRunNumber = qcPointRunNumber;
 	root.qcCusumConfig = qcCusumConfig;
@@ -18849,6 +19062,129 @@
 	root.pageDashLoading = dashboardPageController.pageDashLoading;
 	root.dashTestFilter = dashboardPageController.dashTestFilter;
 	root.dashTestSetStatus = dashboardPageController.dashTestSetStatus;
+	root.icon = icon;
+	root.icoCal = icoCal;
+	root.icoDownload = icoDownload;
+	root.icoPrint = icoPrint;
+	root.icoRefArrow = icoRefArrow;
+	var routerPermission = createRouterPermission({
+		currentUser: () => currentUser,
+		infoDialog: (message) => root.infoDialog(message),
+		roles: () => root.routerPagePolicy.roles
+	});
+	root.role = routerPermission.role;
+	root.canWrite = routerPermission.canWrite;
+	root.requireWrite = routerPermission.requireWrite;
+	root.requireAdmin = routerPermission.requireAdmin;
+	root.roleLabel = routerPermission.roleLabel;
+	root.roleSelectOptions = routerPermission.roleSelectOptions;
+	root.PAGES = root.routerPagePolicy.pages;
+	root.rolePageIds = (r = routerPermission.role()) => root.routerPagePolicy.rolePageIds(r);
+	root.userPageIds = (u = currentUser) => root.routerPagePolicy.userPageIds(u);
+	root.canAccessPage = (id, u = currentUser) => root.routerPagePolicy.canAccessPage(id, u);
+	root.firstAccessPage = (u = currentUser) => root.routerPagePolicy.firstAccessPage(u);
+	var liveRowFilterService = createLiveRowFilter({
+		document: typeof document !== "undefined" ? document : {
+			querySelectorAll: () => [],
+			getElementById: () => null,
+			createElement: () => ({})
+		},
+		searchText: (value) => root.normalizeSearchText(value)
+	});
+	root.setSearchCount = liveRowFilterService.setSearchCount;
+	root.showSearchEmpty = liveRowFilterService.showSearchEmpty;
+	root.replaceSelectItems = liveRowFilterService.replaceSelectItems;
+	root.liveRowFilter = liveRowFilterService.liveRowFilter;
+	root.scheduleSearchRender = liveRowFilterService.scheduleSearchRender;
+	root.dateBox = createDateBoxHtml({
+		vnPickerParse: (value) => root.vnDatePickerController.parse(value),
+		parseVN: (value) => root.parseVnDatePresentation(value),
+		escapeAttr: (value) => root.escAttr(value),
+		formatVnDate: (value) => vnDate(value)
+	});
+	var uiPrimitives = createUiPrimitives({
+		currentUser: () => currentUser,
+		escape: (value) => root.esc(value),
+		escapeAttr: (value) => root.escAttr(value),
+		roleLabel: (r) => routerPermission.roleLabel(r)
+	});
+	root.btn = uiPrimitives.btn;
+	root.emptyState = uiPrimitives.emptyState;
+	root.topUserBox = uiPrimitives.topUserBox;
+	root.headOnly = uiPrimitives.headOnly;
+	root.rangeActions = createRangeActionsHtml({
+		button: (label, action, cls, title) => root.btn(label, action, cls, title),
+		canWrite: () => routerPermission.canWrite()
+	});
+	root.brandTitle = () => root.routerShell.brandTitle();
+	root.brandSub = () => root.routerShell.brandSub();
+	root.brandMarkText = () => root.routerShell.brandMarkText();
+	root.brandLogo = () => root.routerShell.brandLogo();
+	root.renderBrand = () => root.routerShell.renderBrand();
+	root.nav = () => root.routerShell.nav({
+		page: root.page,
+		user: currentUser,
+		icon: (id) => root.icon(id)
+	});
+	root.licensedLabName = () => root.routerShell.licensedLabName();
+	root.trialInfo = () => root.routerShell.trialInfo();
+	root.sideFoot = () => root.routerShell.sideFoot();
+	root.toggleSidebarNav = () => root.routerShell.toggleSidebarNav();
+	root.vnPickerParse = (value) => root.vnDatePickerController.parse(value);
+	root.vnPickerValid = (y, m, d) => root.vnDatePickerController.valid(y, m, d);
+	root.vnPickerText = (iso) => root.vnDatePickerController.text(iso);
+	root.vnPickerOpen = (datebox) => root.vnDatePickerController.open(datebox);
+	root.vnPickerClose = () => root.vnDatePickerController.close();
+	root.vnPickerMove = (months) => root.vnDatePickerController.move(months);
+	root.vnPickerMode = (mode) => root.vnDatePickerController.mode(mode);
+	root.vnPickerSetYear = (year) => root.vnDatePickerController.setYear(year);
+	root.vnPickerSetMonth = (month) => root.vnDatePickerController.setMonth(month);
+	root.vnPickerPick = (iso) => root.vnDatePickerController.pick(iso);
+	root.vnDatePickerController.bind();
+	root.stateName = (s) => root.reportLabels.stateName(s);
+	root.qcVerdictLabel = (level) => root.reportLabels.verdictLabel(level);
+	var routerDispatch = createRouterDispatchController({
+		document: typeof document !== "undefined" ? document : {
+			querySelectorAll: () => [],
+			getElementById: () => null,
+			querySelector: () => null
+		},
+		window: typeof window !== "undefined" ? window : { scrollTo: () => {} },
+		canAccessPage: (id) => root.canAccessPage(id),
+		firstAccessPage: () => root.firstAccessPage(),
+		page: () => root.page,
+		setPage: (id) => {
+			root.RouterUIState.page = id;
+		},
+		nav: () => root.nav(),
+		requestFrame: (work) => requestAnimationFrame(work),
+		resetStatusMemo: () => {
+			root.AnalysisUIState.statusMemo = /* @__PURE__ */ new Map();
+		},
+		pageMap: () => ({
+			dash: root.pageDash,
+			entry: root.pageEntry,
+			westgard: root.pageWestgard,
+			sigma: root.pageSigma,
+			reagent: root.pageReagent,
+			actions: root.pageActionsV4,
+			report: root.pageReportV2,
+			manage: root.pageManage,
+			users: root.pageUsers,
+			audit: root.pageAudit,
+			settings: root.pageSettings
+		}),
+		afterRender: (p) => root.afterRender(p),
+		dashTestQ: () => root.dashTestQ,
+		entryQ: () => root.entryQ,
+		dashTestFilter: (v) => root.dashTestFilter(v),
+		entryFilter: (v) => root.entryFilter(v)
+	});
+	root.go = routerDispatch.go;
+	root.resetMainScroll = routerDispatch.resetMainScroll;
+	root.render = routerDispatch.render;
+	root.restoreRouteFilters = routerDispatch.restoreRouteFilters;
+	root.rerender = routerDispatch.rerender;
 	root.actionGuideContent = createActionGuideContent({
 		escape: (value) => root.esc(value),
 		button: (label, action, variant) => root.btn(label, action, variant)

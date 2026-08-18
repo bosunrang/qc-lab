@@ -337,6 +337,13 @@ import { createDashboardTestItems } from '../presentation/dashboard/dashboard-te
 import { dashboardTestListHtml } from '../presentation/dashboard/dashboard-test-list-html';
 import { createDashboardPageHtml } from '../presentation/dashboard/dashboard-page-html';
 import { createDashboardPageController } from '../presentation/dashboard/dashboard-page-controller';
+import { icon, icoCal, icoDownload, icoPrint, icoRefArrow } from '../presentation/router/router-icons';
+import { createRouterPermission } from '../presentation/router/router-permission';
+import { createLiveRowFilter } from '../presentation/router/live-row-filter';
+import { createDateBoxHtml } from '../presentation/router/date-box-html';
+import { createRangeActionsHtml } from '../presentation/range/range-actions-html';
+import { createUiPrimitives } from '../presentation/shared/ui-primitives';
+import { createRouterDispatchController } from '../presentation/router/router-dispatch-controller';
 import { createReportQcFormat } from '../presentation/report/report-qc-format';
 import { createRangeTea } from '../domain/qc/range-tea';
 import { entryRowsWindow as entryRowsWindowTs, entryLotLabels as entryLotLabelsTs } from '../presentation/entry/entry-rows-window';
@@ -740,6 +747,7 @@ import {
   createManageUiState,
   createReagentUiState,
   createSigmaUiState,
+  createRouterUiState,
   installUiState,
 } from '../presentation/state/ui-state';
 
@@ -760,9 +768,10 @@ declare function sgRefresh():void;
 declare function updateBackupBanner():void;
 declare function isoToday(): string;
 declare function vnDate(value: unknown): string;
+declare function requireWrite(): boolean;
+declare function rerender(): void;
 declare function fmt(value: unknown, decimals?: number): string;
 declare function formatDateTimeVN(value: string): string;
-declare function requireWrite(): boolean;
 declare function lvlCfg(test: Record<string, any>, level: unknown): Record<string, any>;
 declare function logAct(action: string, detail: string, target?: string): void;
 declare function save(options: Record<string, any>): void;
@@ -835,7 +844,6 @@ declare function getStoredFbCfg(): any;
 declare function persistLocalSnapshot(options?: Record<string, any>): boolean;
 declare function mirrorIndexedDb(raw: string): boolean;
 declare function userName(): string;
-declare function rerender(): void;
 declare function auditSha256(text: string): Promise<string>;
 declare function uid(): string;
 declare function isoDate(value: Date): string;
@@ -1152,6 +1160,61 @@ type QCLabGlobal = typeof globalThis & {
   afterRender: ReturnType<typeof createAfterRenderController>['afterRender'];
   routerPagePolicy: ReturnType<typeof createRouterPagePolicy>;
   routerShell: ReturnType<typeof createRouterShellController>;
+  PAGES: [string, string][];
+  role: ReturnType<typeof createRouterPermission>['role'];
+  canWrite: ReturnType<typeof createRouterPermission>['canWrite'];
+  requireWrite: ReturnType<typeof createRouterPermission>['requireWrite'];
+  requireAdmin: ReturnType<typeof createRouterPermission>['requireAdmin'];
+  roleLabel: ReturnType<typeof createRouterPermission>['roleLabel'];
+  roleSelectOptions: ReturnType<typeof createRouterPermission>['roleSelectOptions'];
+  rolePageIds: (role?: string) => string[];
+  userPageIds: (user?: any) => string[];
+  canAccessPage: (id: string, user?: any) => boolean;
+  firstAccessPage: (user?: any) => string;
+  icon: typeof icon;
+  icoCal: typeof icoCal;
+  icoDownload: typeof icoDownload;
+  icoPrint: typeof icoPrint;
+  icoRefArrow: typeof icoRefArrow;
+  setSearchCount: ReturnType<typeof createLiveRowFilter>['setSearchCount'];
+  showSearchEmpty: ReturnType<typeof createLiveRowFilter>['showSearchEmpty'];
+  replaceSelectItems: ReturnType<typeof createLiveRowFilter>['replaceSelectItems'];
+  liveRowFilter: ReturnType<typeof createLiveRowFilter>['liveRowFilter'];
+  scheduleSearchRender: ReturnType<typeof createLiveRowFilter>['scheduleSearchRender'];
+  dateBox: ReturnType<typeof createDateBoxHtml>;
+  rangeActions: ReturnType<typeof createRangeActionsHtml>;
+  btn: ReturnType<typeof createUiPrimitives>['btn'];
+  emptyState: ReturnType<typeof createUiPrimitives>['emptyState'];
+  topUserBox: ReturnType<typeof createUiPrimitives>['topUserBox'];
+  headOnly: ReturnType<typeof createUiPrimitives>['headOnly'];
+  brandTitle: () => string;
+  brandSub: () => string;
+  brandMarkText: () => string;
+  brandLogo: () => string;
+  renderBrand: () => void;
+  nav: () => void;
+  licensedLabName: () => string;
+  trialInfo: () => any;
+  sideFoot: () => void;
+  toggleSidebarNav: () => void;
+  vnPickerParse: (value: unknown) => string;
+  vnPickerValid: (year: any, month: any, day: any) => string;
+  vnPickerText: (iso: any) => string;
+  vnPickerOpen: (datebox: any) => void;
+  vnPickerClose: () => void;
+  vnPickerMove: (months: number) => void;
+  vnPickerMode: (mode: string) => void;
+  vnPickerSetYear: (year: any) => void;
+  vnPickerSetMonth: (month: number) => void;
+  vnPickerPick: (iso: string) => void;
+  stateName: (value: string) => string;
+  qcVerdictLabel: (value: string) => string;
+  page: string;
+  go: ReturnType<typeof createRouterDispatchController>['go'];
+  resetMainScroll: ReturnType<typeof createRouterDispatchController>['resetMainScroll'];
+  render: ReturnType<typeof createRouterDispatchController>['render'];
+  restoreRouteFilters: ReturnType<typeof createRouterDispatchController>['restoreRouteFilters'];
+  rerender: ReturnType<typeof createRouterDispatchController>['rerender'];
   modalTemplate: ReturnType<typeof createModalTemplate>['modalTemplate'];
   modalCloseButton: ReturnType<typeof createModalTemplate>['modalCloseButton'];
   openModal: ReturnType<typeof createModalController>['openModal'];
@@ -1585,6 +1648,7 @@ installUiState(root, 'EntryUIState', createEntryUiState());
 installUiState(root, 'ManageUIState', createManageUiState());
 installUiState(root, 'ReagentUIState', createReagentUiState());
 installUiState(root, 'SigmaUIState', createSigmaUiState());
+installUiState(root, 'RouterUIState', createRouterUiState());
 
 // Adapter tạm thời: caller cũ tiếp tục dùng global trong lúc nguồn nghiệp vụ
 // đã được chuyển sang ES Modules có kiểu dữ liệu và dependency rõ ràng.
@@ -2335,6 +2399,61 @@ root.pageDash=dashboardPageController.pageDash;
 root.pageDashLoading=dashboardPageController.pageDashLoading;
 root.dashTestFilter=dashboardPageController.dashTestFilter;
 root.dashTestSetStatus=dashboardPageController.dashTestSetStatus;
+root.icon=icon;root.icoCal=icoCal;root.icoDownload=icoDownload;root.icoPrint=icoPrint;root.icoRefArrow=icoRefArrow;
+const routerPermission=createRouterPermission({currentUser:()=>currentUser,infoDialog:message=>root.infoDialog(message),roles:()=>root.routerPagePolicy.roles});
+root.role=routerPermission.role;root.canWrite=routerPermission.canWrite;root.requireWrite=routerPermission.requireWrite;root.requireAdmin=routerPermission.requireAdmin;root.roleLabel=routerPermission.roleLabel;root.roleSelectOptions=routerPermission.roleSelectOptions;
+root.PAGES=root.routerPagePolicy.pages;
+root.rolePageIds=(r=routerPermission.role())=>root.routerPagePolicy.rolePageIds(r);
+root.userPageIds=(u=currentUser)=>root.routerPagePolicy.userPageIds(u);
+root.canAccessPage=(id,u=currentUser)=>root.routerPagePolicy.canAccessPage(id,u);
+root.firstAccessPage=(u=currentUser)=>root.routerPagePolicy.firstAccessPage(u);
+const liveRowFilterService=createLiveRowFilter({document:typeof document!=='undefined'?document:({querySelectorAll:()=>[],getElementById:()=>null,createElement:()=>({})} as unknown as Document),searchText:value=>root.normalizeSearchText!(value)});
+root.setSearchCount=liveRowFilterService.setSearchCount;root.showSearchEmpty=liveRowFilterService.showSearchEmpty;root.replaceSelectItems=liveRowFilterService.replaceSelectItems;root.liveRowFilter=liveRowFilterService.liveRowFilter;root.scheduleSearchRender=liveRowFilterService.scheduleSearchRender;
+root.dateBox=createDateBoxHtml({vnPickerParse:value=>root.vnDatePickerController.parse(value),parseVN:value=>root.parseVnDatePresentation!(value),escapeAttr:value=>(root as any).escAttr(value),formatVnDate:value=>vnDate(value)});
+const uiPrimitives=createUiPrimitives({currentUser:()=>currentUser,escape:value=>(root as any).esc(value),escapeAttr:value=>(root as any).escAttr(value),roleLabel:r=>routerPermission.roleLabel(r)});
+root.btn=uiPrimitives.btn;root.emptyState=uiPrimitives.emptyState;root.topUserBox=uiPrimitives.topUserBox;root.headOnly=uiPrimitives.headOnly;
+root.rangeActions=createRangeActionsHtml({button:(label,action,cls,title)=>root.btn(label,action,cls,title),canWrite:()=>routerPermission.canWrite()});
+root.brandTitle=()=>root.routerShell.brandTitle();
+root.brandSub=()=>root.routerShell.brandSub();
+root.brandMarkText=()=>root.routerShell.brandMarkText();
+root.brandLogo=()=>root.routerShell.brandLogo();
+root.renderBrand=()=>root.routerShell.renderBrand();
+root.nav=()=>root.routerShell.nav({page:root.page,user:currentUser,icon:id=>root.icon(id)});
+root.licensedLabName=()=>root.routerShell.licensedLabName();
+root.trialInfo=()=>root.routerShell.trialInfo();
+root.sideFoot=()=>root.routerShell.sideFoot();
+root.toggleSidebarNav=()=>root.routerShell.toggleSidebarNav();
+root.vnPickerParse=value=>root.vnDatePickerController.parse(value);
+root.vnPickerValid=(y,m,d)=>root.vnDatePickerController.valid(y,m,d);
+root.vnPickerText=iso=>root.vnDatePickerController.text(iso);
+root.vnPickerOpen=datebox=>root.vnDatePickerController.open(datebox);
+root.vnPickerClose=()=>root.vnDatePickerController.close();
+root.vnPickerMove=months=>root.vnDatePickerController.move(months);
+root.vnPickerMode=mode=>root.vnDatePickerController.mode(mode);
+root.vnPickerSetYear=year=>root.vnDatePickerController.setYear(year);
+root.vnPickerSetMonth=month=>root.vnDatePickerController.setMonth(month);
+root.vnPickerPick=iso=>root.vnDatePickerController.pick(iso);
+root.vnDatePickerController.bind();
+root.stateName=s=>root.reportLabels.stateName(s);
+root.qcVerdictLabel=level=>root.reportLabels.verdictLabel(level);
+const routerDispatch=createRouterDispatchController({
+  document:typeof document!=='undefined'?document:({querySelectorAll:()=>[],getElementById:()=>null,querySelector:()=>null} as unknown as Document),
+  window:typeof window!=='undefined'?window:{scrollTo:()=>{}},
+  canAccessPage:id=>root.canAccessPage(id),
+  firstAccessPage:()=>root.firstAccessPage(),
+  page:()=>root.page,
+  setPage:id=>{(root as any).RouterUIState.page=id;},
+  nav:()=>root.nav(),
+  requestFrame:work=>requestAnimationFrame(work),
+  resetStatusMemo:()=>{(root as any).AnalysisUIState.statusMemo=new Map();},
+  pageMap:()=>({dash:root.pageDash,entry:(root as any).pageEntry,westgard:(root as any).pageWestgard,sigma:(root as any).pageSigma,reagent:(root as any).pageReagent,actions:(root as any).pageActionsV4,report:(root as any).pageReportV2,manage:(root as any).pageManage,users:(root as any).pageUsers,audit:(root as any).pageAudit,settings:(root as any).pageSettings}),
+  afterRender:p=>root.afterRender(p),
+  dashTestQ:()=>(root as any).dashTestQ,
+  entryQ:()=>(root as any).entryQ,
+  dashTestFilter:v=>root.dashTestFilter(v),
+  entryFilter:v=>(root as any).entryFilter(v),
+});
+root.go=routerDispatch.go;root.resetMainScroll=routerDispatch.resetMainScroll;root.render=routerDispatch.render;root.restoreRouteFilters=routerDispatch.restoreRouteFilters;root.rerender=routerDispatch.rerender;
 root.actionGuideContent=createActionGuideContent({escape:(value:any)=>(root as any).esc(value),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
 root.actionPageHtml=createActionPageHtml();
 root.actionSideChipsHtml=createActionSideChipsHtml({escape:(value:any)=>(root as any).esc(value)});

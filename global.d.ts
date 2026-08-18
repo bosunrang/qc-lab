@@ -19,6 +19,7 @@ declare var selTest: any, statusMemo: any, wgTestQ: any, dashTestQ: any, dashTes
   wgPrevOpen: any, wgExpandedRows: any, wgViewMode: any, wgArchivedGroupId: any,
   wgArchivedTestId: any, wgArchivedTestQ: any, wgChartMode: any;
 declare var currentUser: any, loginFails: any, loginLockUntil: any;
+declare var page: string;
 declare function afterRender(page: string): void;
 declare function openModal(html: string): void;
 declare function closeModal(): void;
@@ -30,6 +31,39 @@ declare function openDialogOverlay(html: string, resolve: (result?: any) => void
 declare function closeDialogOverlay(result?: any): void;
 declare function pageDash(): string;
 declare function dashTestFilter(value: string): void;
+declare function role(): string;
+declare function canWrite(): boolean;
+declare function requireWrite(message?: string): boolean;
+declare function requireAdmin(message?: string): boolean;
+declare function roleLabel(role: string): string;
+declare function roleSelectOptions(selected: string): string;
+declare function rolePageIds(role?: string): string[];
+declare function canAccessPage(id: string, user?: any): boolean;
+declare function firstAccessPage(user?: any): string;
+declare function icon(id: string): string;
+declare function icoDownload(): string;
+declare function dateBox(id: string, value?: string, cls?: string, attrs?: string): string;
+declare function go(page: string): void;
+declare function resetMainScroll(): void;
+declare function headOnly(title: string, subtitle: string, actions?: string): string;
+declare function emptyState(title: string, body: string, actions?: string): string;
+declare function btn(label: string, onclick: string, cls?: string, title?: string, opts?: Record<string, any>): string;
+declare function rangeActions(testId: string, level: number, eligible: boolean, applied?: string): string;
+declare function stateName(value: string): string;
+declare function qcVerdictLabel(value: string): string;
+declare function render(): void;
+declare function rerender(): void;
+declare function replaceSelectItems(select: any, items: any[], emptyText?: string): void;
+declare function scheduleSearchRender(owner: any, apply: () => void, focusId?: string, delay?: number): void;
+declare function brandTitle(): string;
+declare function brandSub(): string;
+declare function brandMarkText(): string;
+declare function brandLogo(): string;
+declare function renderBrand(): void;
+declare function nav(): void;
+declare function sideFoot(): void;
+declare function vnPickerParse(value: unknown): string;
+declare const PAGES: [string, string][];
 declare var entrySel: any, entryDays: any, entryStart: any, entryEnd: any, entrySheetMonth: any,
   entryQ: any, entryMachine: any, entryLastMsg: any, entryAutoOpenKey: any,
   entryPendingSheetFocus: any, entryJumpToday: any, entryLjRenderCache: any,

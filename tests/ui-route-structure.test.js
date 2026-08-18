@@ -5,7 +5,8 @@ const root=path.join(__dirname,'..');
 const read=file=>fs.readFileSync(path.join(root,file),'utf8');
 const QCCore=require('../assets/core.js');
 
-const router=read('assets/modules/router-render.js');
+const router=read('src/presentation/router/router-dispatch-controller.ts')+read('src/presentation/router/router-permission.ts')+read('src/presentation/router/router-icons.ts')+read('src/presentation/router/live-row-filter.ts')+read('src/presentation/router/date-box-html.ts');
+const compat=read('src/compat/modular-pilot.global.ts');
 const routerPolicy=read('src/presentation/router/router-page-policy.ts');
 const routerShell=read('src/presentation/router/router-shell-controller.ts');
 const vnDatePicker=read('src/presentation/router/vn-date-picker-controller.ts');
@@ -46,7 +47,7 @@ assert.match(dashboard,/const pageDash = \(\) => \{/);
 assert.match(entry,/function pageEntry\(/);
 assert.match(westgard,/function pageWestgard\(/);
 
-const loadOrder=['router-render.js','entry-routes.js','westgard-routes.js'];
+const loadOrder=['entry-routes.js','westgard-routes.js'];
 for(let i=1;i<loadOrder.length;i++)assert.ok(index.indexOf(loadOrder[i-1])<index.indexOf(loadOrder[i]),`${loadOrder[i]} phải tải sau ${loadOrder[i-1]}`);
 
 /* core.js phải tiếp tục độc lập với bundle presentation, nên PAGE_SET/ROLE_SET ở core.js
@@ -60,13 +61,12 @@ const roleListMatch=routerPolicy.match(/const ROUTER_ROLE_LIST=\[([\s\S]*?)\] as
 assert.ok(roleListMatch,'router page policy TypeScript phải khai báo ROUTER_ROLE_LIST');
 const routerRoles=[...roleListMatch[1].matchAll(/'([a-z]+)'/g)].map(m=>m[1]);
 assert.deepStrictEqual(new Set(routerRoles),QCCore.ROLE_SET,'ROUTER_ROLE_LIST TypeScript phải khớp ROLE_SET (core.js)');
-assert.doesNotMatch(router,/const PAGE_DEFS=/,'router-render.js không giữ registry trang classic');
-assert.match(router,/globalThis\.routerPagePolicy\.canAccessPage/,'router legacy phải tiêu thụ policy TypeScript');
-assert.ok(index.indexOf('modular-pilot.js')<index.indexOf('router-render.js'),'bundle policy phải tải trước router-render.js');
+assert.doesNotMatch(router,/const PAGE_DEFS=/,'router presentation không giữ registry trang classic');
+assert.match(compat,/root\.routerPagePolicy\.canAccessPage/,'router bridge phải tiêu thụ policy TypeScript');
 assert.match(routerShell,/export function createRouterShellController\(/,'navigation shell phải do TypeScript sở hữu');
-assert.match(router,/globalThis\.routerShell\.nav/,'router legacy phải ủy quyền navigation shell cho TypeScript');
+assert.match(compat,/root\.routerShell\.nav/,'router bridge phải ủy quyền navigation shell cho TypeScript');
 assert.match(vnDatePicker,/export function createVnDatePickerController\(/,'VN date picker controller phải nằm trong TypeScript');
-assert.match(router,/globalThis\.vnDatePickerController\.parse/,'router legacy phải dùng parser ngày TypeScript');
+assert.match(compat,/root\.vnDatePickerController\.parse/,'router bridge phải dùng parser ngày TypeScript');
 
 /* Trang Báo cáo tách khỏi actions-routes.js (2026-07-30) vì file đó từng giữ CẢ hai
    trang và phình lên 105 KB — cùng lý do đã tách dash/entry/westgard khỏi
