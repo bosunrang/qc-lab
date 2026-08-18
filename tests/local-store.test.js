@@ -139,9 +139,12 @@ const fakeIndexedDb = `
   {
     let dialog=null;
     const ctx = loadSandbox(['core.js', 'modules/state.js', 'generated/modular-pilot.js', 'modules/settings.js'],{
-      navigator:{storage:{estimate:async()=>({usage:1572864,quota:104857600,usageDetails:{indexedDB:1048576}})}},
-      infoDialog:async(message,opts)=>{dialog={message,opts};}
+      navigator:{storage:{estimate:async()=>({usage:1572864,quota:104857600,usageDetails:{indexedDB:1048576}})}}
     });
+    // infoDialog giờ là thật (TS, xem src/presentation/modal/) chứ không còn undefined
+    // trong sandbox này — generated/modular-pilot.js gán root.infoDialog khi nạp, nên
+    // stub phải đặt SAU bước nạp file (trực tiếp lên context) để không bị ghi đè.
+    ctx.infoDialog=async(message,opts)=>{dialog={message,opts};};
     await run(ctx, `state.data={T1:[{id:'p1'},{id:'p2'}],T2:[{id:'p3'}]};checkStorageUsage()`);
     assert.match(dialog.message,/Số điểm QC: 3\./);
     assert.match(dialog.message,/Dung lượng IndexedDB: 1\.0 MB\./);

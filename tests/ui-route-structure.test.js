@@ -13,7 +13,7 @@ const dashboard=read('assets/modules/dashboard-routes.js');
 const entry=read('assets/modules/entry-routes.js');
 const entryPointRow=read('src/presentation/entry/entry-point-table-row-html.ts');
 const westgard=read('assets/modules/westgard-routes.js');
-const modals=read('assets/modules/modals.js');
+const modals=read('src/presentation/modal/modal-focus-trap.ts')+read('src/presentation/modal/modal-template.ts')+read('src/presentation/modal/modal-controller.ts')+read('src/presentation/modal/dialog-overlay-controller.ts');
 const actions=read('assets/modules/actions-routes.js');
 const actionCancelModal=read('src/presentation/nce/action-cancel-modal-html.ts');
 const actionInvestigationField=read('src/presentation/nce/action-investigation-field-html.ts');
@@ -93,9 +93,9 @@ assert.doesNotMatch(sigmaTea,/function (?:pageSigma|sgComp|sgMU|sgRefresh|sgOpen
 assert.doesNotMatch(sigmaTea,/document\.|openModal\(|rerender\(/,'sigma-tea.js phải thuần — chạm DOM là hết test bằng Node');
 assert.ok(index.indexOf('sigma-tea.js')<index.indexOf('sigma.js?'),'sigma-tea.js phải tải trước sigma.js');
 
-assert.match(modals,/function modalTemplate\(/);
-assert.match(modals,/function modalCloseButton\(/);
-assert.doesNotMatch(modals,/function (?:syncActLevels|currentIssues|beginActionFromIssue|addAction|cancelAction)\(/,'modals.js không chứa logic trang Actions');
+assert.match(modals,/const modalTemplate=/);
+assert.match(modals,/const modalCloseButton=/);
+assert.doesNotMatch(modals,/(?:function|const) (?:syncActLevels|currentIssues|beginActionFromIssue|addAction|cancelAction)\b/,'modal-*.ts không chứa logic trang Actions');
 /* Form NCE tách khỏi actions-routes.js (2026-07-30) sau khi trang Báo cáo ra riêng mà
    file vẫn còn 94 KB — phần lớn là form 8 mục nằm gọn trong MỘT hàm pageActionsV4() 17 KB.
    Đường cắt này cố ý KHÔNG một chiều (khác report-routes.js): form gọi ngược các khối

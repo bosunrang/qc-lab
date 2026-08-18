@@ -554,23 +554,33 @@ the Google Fonts link, offline labs must print with correct metrics.
   rerenders): `auditChainStatus()` caches by (row count, last hash, anchor) and
   skips auto-verification above `AUDIT_AUTO_VERIFY_MAX`, offering a button
   instead.
-- `modals.js` — two independent, non-nesting modal layers, each a single
-  slot (opening a second modal in the same layer replaces the first, no
-  stacking within a layer):
-  - `openModal()`/`closeModal()` render into `#modalRoot` — page/feature forms
-    (edit Panel QC, edit user, etc).
-  - `confirmDialog(opts)`/`infoDialog(message,opts)` render into a *separate*
-    `#dialogRoot` layer, on top of whatever's in `#modalRoot` (2026-07-18).
-    These replace the browser's native `confirm()`/`alert()` — both return a
-    Promise (`confirmDialog` → boolean, `infoDialog` → resolves on dismiss)
-    and neither is called natively anywhere in app code anymore. They're
-    deliberately kept off `#modalRoot`: alert()/confirm() guards fire
-    constantly from *inside* open form modals (a validation error while
-    editing), and `innerHTML` only reflects an input's original `value`
-    attribute, not what the user has since typed into the `value` property —
-    reusing `#modalRoot` would silently wipe whatever they'd typed. `infoDialog`
-    takes an optional `{type:'success'}` (teal) vs. the default `'warn'`
-    (amber) icon.
+- `src/presentation/modal/` (`modal-focus-trap.ts`, `modal-template.ts`,
+  `modal-controller.ts`, `dialog-overlay-controller.ts`) — retired the classic
+  `modals.js` on 2026-08-18 (Pha G slice 1); wired into the global scope via
+  `src/compat/modular-pilot.global.ts` (`root.openModal`/`closeModal`/
+  `modalTemplate`/`modalCloseButton`/`confirmDialog`/`infoDialog`/
+  `openDialogOverlay`/`closeDialogOverlay`) so the ~20 classic route files
+  still calling these as bare globals keep working unchanged. Two
+  independent, non-nesting modal layers, each a single slot (opening a second
+  modal in the same layer replaces the first, no stacking within a layer):
+  - `openModal()`/`closeModal()` (`modal-controller.ts`) render into
+    `#modalRoot` — page/feature forms (edit Panel QC, edit user, etc).
+  - `confirmDialog(opts)`/`infoDialog(message,opts)` (`dialog-overlay-
+    controller.ts`) render into a *separate* `#dialogRoot` layer, on top of
+    whatever's in `#modalRoot` (2026-07-18). These replace the browser's
+    native `confirm()`/`alert()` — both return a Promise (`confirmDialog` →
+    boolean, `infoDialog` → resolves on dismiss) and neither is called
+    natively anywhere in app code anymore. They're deliberately kept off
+    `#modalRoot`: alert()/confirm() guards fire constantly from *inside* open
+    form modals (a validation error while editing), and `innerHTML` only
+    reflects an input's original `value` attribute, not what the user has
+    since typed into the `value` property — reusing `#modalRoot` would
+    silently wipe whatever they'd typed. `infoDialog` takes an optional
+    `{type:'success'}` (teal) vs. the default `'warn'` (amber) icon.
+  - The two layers' focus-trap keydown handling (Escape closes, Tab wraps) is
+    shared via `modal-focus-trap.ts`'s `createFocusTrapKeydown()` — the only
+    consolidation done during the TS port; each layer still keeps its own
+    return-focus state and resolver, per the reasoning above.
   - `requireWrite()`/`requireAdmin()` (`router-render.js`) call `infoDialog()`
     without `await`-ing it on purpose: ~68 call sites across the app do
     `if(!requireWrite())return;`, so the guard has to stay synchronous. Not
@@ -580,7 +590,7 @@ the Google Fonts link, offline labs must print with correct metrics.
 - `draw.js`, `router-render.js`, `dashboard-routes.js`, `entry-routes.js`,
   `westgard-routes.js`, `sigma.js`, `actions-routes.js`, `action-form.js`,
   `report-routes.js`, `manage-routes.js`, `after-render-controller.ts`,
-  `manage-tests-actions.js`, `modals.js` —
+  `manage-tests-actions.js` —
   UI/rendering and routing. Since 2026-07-24 the three biggest pages live in
   their own files:
   `router-render.js` keeps only dispatch plus cross-page UI primitives (the
@@ -588,9 +598,8 @@ the Google Fonts link, offline labs must print with correct metrics.
   helpers, the VN date picker, icon SVGs), while `pageDash()` lives in
   `dashboard-routes.js`, `pageEntry()` in `entry-routes.js` and
   `pageWestgard()` in `westgard-routes.js` — `router-render.js` must never
-  redefine those three, and the files must load right after it in that order;
-  `modals.js` likewise keeps only the modal machinery (`modalTemplate()`,
-  `modalCloseButton()`), not page logic. On 2026-07-30 the same treatment
+  redefine those three, and the files must load right after it in that order.
+  On 2026-07-30 the same treatment
   reached `actions-routes.js`, which had been holding **two** whole pages and
   had grown to 105 KB, in two steps:
   - `pageReportV2()` and every `report*` helper (period lock/unlock, test

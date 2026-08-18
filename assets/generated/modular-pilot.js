@@ -7350,6 +7350,180 @@
 		};
 	}
 	//#endregion
+	//#region src/presentation/modal/modal-template.ts
+	function createModalTemplate(deps) {
+		const modalCloseButton = (action = "closeModal()") => `<button class="modal-close" onclick="${deps.escapeAttr(action)}" aria-label="Đóng hộp thoại">✕</button>`;
+		const modalTemplate = (options = {}) => {
+			const { title = "", body = "", footer = "", cls = "", closeAction = "closeModal()", bodyClass = "modal-b", footerClass = "modal-f" } = options;
+			const classes = ["modal", cls].filter(Boolean).join(" ");
+			return `<div class="${deps.escapeAttr(classes)}"><div class="modal-h"><h3>${title}</h3>${modalCloseButton(closeAction)}</div>${bodyClass ? `<div class="${deps.escapeAttr(bodyClass)}">${body}</div>` : body}${footer ? `<div class="${deps.escapeAttr(footerClass)}">${footer}</div>` : ""}</div>`;
+		};
+		return {
+			modalTemplate,
+			modalCloseButton
+		};
+	}
+	//#endregion
+	//#region src/presentation/modal/modal-focus-trap.ts
+	function queryFocusable(container) {
+		return [...container.querySelectorAll("button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),a[href],[tabindex]:not([tabindex=\"-1\"])")].filter((el) => el.offsetParent !== null);
+	}
+	function createFocusTrapKeydown(deps) {
+		return (event) => {
+			const container = deps.activeContainer();
+			if (!container) return;
+			if (event.key === "Escape") {
+				event.preventDefault();
+				deps.onEscape();
+				return;
+			}
+			if (event.key !== "Tab") return;
+			const items = queryFocusable(container);
+			if (!items.length) {
+				event.preventDefault();
+				container.focus();
+				return;
+			}
+			const first = items[0], last = items[items.length - 1];
+			if (event.shiftKey && deps.activeElement() === first) {
+				event.preventDefault();
+				last.focus();
+			} else if (!event.shiftKey && deps.activeElement() === last) {
+				event.preventDefault();
+				first.focus();
+			}
+		};
+	}
+	//#endregion
+	//#region src/presentation/modal/modal-controller.ts
+	function createModalController(deps) {
+		let modalReturnFocus = null;
+		const modalRoot = () => deps.document.getElementById("modalRoot");
+		const activeModal = () => deps.document.querySelector("#modalRoot .modal");
+		const closeModal = () => {
+			const r = modalRoot(), restore = modalReturnFocus;
+			deps.document.removeEventListener("keydown", modalKeydown);
+			if (r) r.innerHTML = "";
+			modalReturnFocus = null;
+			if (restore && restore.isConnected && restore.focus) deps.requestFrame(() => restore.focus({ preventScroll: true }));
+		};
+		const modalKeydown = createFocusTrapKeydown({
+			activeContainer: activeModal,
+			activeElement: () => deps.document.activeElement,
+			onEscape: closeModal
+		});
+		const openModal = (html) => {
+			const r = modalRoot();
+			if (!r) return;
+			modalReturnFocus = deps.document.activeElement && deps.document.activeElement !== deps.document.body ? deps.document.activeElement : null;
+			r.innerHTML = `<div class="modal-bg" role="presentation" onclick="if(event.target===this)closeModal()">${html}</div>`;
+			const modal = r.querySelector(".modal");
+			if (!modal) return;
+			modal.setAttribute("role", "dialog");
+			modal.setAttribute("aria-modal", "true");
+			modal.tabIndex = -1;
+			const title = modal.querySelector(".modal-h h3");
+			if (title) {
+				if (!title.id) title.id = "modalTitle";
+				modal.setAttribute("aria-labelledby", title.id);
+			}
+			modal.querySelectorAll(".modal-close").forEach((button) => {
+				if (!button.getAttribute("aria-label")) button.setAttribute("aria-label", "Đóng hộp thoại");
+			});
+			deps.document.removeEventListener("keydown", modalKeydown);
+			deps.document.addEventListener("keydown", modalKeydown);
+			deps.requestFrame(() => {
+				(modal.querySelector("[autofocus]") || queryFocusable(modal)[0] || modal).focus({ preventScroll: true });
+			});
+		};
+		return {
+			openModal,
+			closeModal,
+			modalKeydown
+		};
+	}
+	//#endregion
+	//#region src/presentation/modal/dialog-overlay-controller.ts
+	function createDialogOverlayController(deps) {
+		let dialogReturnFocus = null;
+		let pendingDialogResolve = null;
+		const dialogRoot = () => deps.document.getElementById("dialogRoot");
+		const activeDialog = () => deps.document.querySelector("#dialogRoot .modal");
+		const closeDialogOverlay = (result) => {
+			const r = dialogRoot(), restore = dialogReturnFocus, resolve = pendingDialogResolve;
+			deps.document.removeEventListener("keydown", dialogKeydown);
+			if (r) r.innerHTML = "";
+			dialogReturnFocus = null;
+			pendingDialogResolve = null;
+			if (restore && restore.isConnected && restore.focus) deps.requestFrame(() => restore.focus({ preventScroll: true }));
+			if (resolve) resolve(result);
+		};
+		const dialogKeydown = createFocusTrapKeydown({
+			activeContainer: activeDialog,
+			activeElement: () => deps.document.activeElement,
+			onEscape: () => closeDialogOverlay()
+		});
+		const openDialogOverlay = (html, resolve) => {
+			const r = dialogRoot();
+			if (!r) return;
+			dialogReturnFocus = deps.document.activeElement && deps.document.activeElement !== deps.document.body ? deps.document.activeElement : null;
+			pendingDialogResolve = resolve;
+			r.innerHTML = `<div class="modal-bg" role="presentation" onclick="if(event.target===this)closeDialogOverlay()">${html}</div>`;
+			const box = r.querySelector(".modal");
+			if (!box) return;
+			box.setAttribute("role", "dialog");
+			box.setAttribute("aria-modal", "true");
+			box.tabIndex = -1;
+			const title = box.querySelector(".confirm-modal-title, .confirm-modal-text b");
+			if (title) {
+				if (!title.id) title.id = "dialogTitle";
+				box.setAttribute("aria-labelledby", title.id);
+			}
+			box.querySelectorAll(".modal-close").forEach((button) => {
+				if (!button.getAttribute("aria-label")) button.setAttribute("aria-label", "Đóng hộp thoại");
+			});
+			deps.document.removeEventListener("keydown", dialogKeydown);
+			deps.document.addEventListener("keydown", dialogKeydown);
+			deps.requestFrame(() => {
+				(box.querySelector("[autofocus]") || queryFocusable(box)[0] || box).focus({ preventScroll: true });
+			});
+		};
+		const confirmDialogAnswer = (result) => closeDialogOverlay(result);
+		const confirmDialog = (opts = {}) => {
+			const { kicker = "", title = "", message = "", detail = "", confirmLabel = "Xác nhận", cancelLabel = "Hủy", danger = true } = opts;
+			return new Promise((resolve) => {
+				openDialogOverlay(`<div class="modal confirm-modal">
+        <div class="confirm-modal-h">${kicker ? `<div class="confirm-modal-kicker">${deps.escape(kicker)}</div>` : "<div></div>"}${deps.modalCloseButton("confirmDialogAnswer(false)")}</div>
+        <h3 class="confirm-modal-title">${deps.escape(title)}</h3>
+        <div class="confirm-modal-body"><div class="confirm-modal-icon${danger ? "" : " info"}" aria-hidden="true">!</div><div class="confirm-modal-text"><b>${deps.escape(message)}</b>${detail ? `<p>${deps.escape(detail)}</p>` : ""}</div></div>
+        <div class="confirm-modal-actions">${deps.button(deps.escape(cancelLabel), "confirmDialogAnswer(false)", "ghost")}${deps.button(deps.escape(confirmLabel), "confirmDialogAnswer(true)", danger ? "danger" : "teal")}</div>
+      </div>`, resolve);
+			});
+		};
+		const infoDialogAnswer = () => closeDialogOverlay();
+		const infoDialog = (message, opts = {}) => {
+			const { title = "", type = "warn" } = opts;
+			const glyph = type === "success" ? "✓" : "!";
+			return new Promise((resolve) => {
+				openDialogOverlay(`<div class="modal confirm-modal info-modal">
+        <div class="confirm-modal-h"><div></div>${deps.modalCloseButton("infoDialogAnswer()")}</div>
+        ${title ? `<h3 class="confirm-modal-title">${deps.escape(title)}</h3>` : ""}
+        <div class="confirm-modal-body"><div class="confirm-modal-icon info-modal-icon ${type}" aria-hidden="true">${glyph}</div><div class="confirm-modal-text"><b>${deps.escape(message)}</b></div></div>
+        <div class="confirm-modal-actions">${deps.button("Đã hiểu", "infoDialogAnswer()", "teal")}</div>
+      </div>`, resolve);
+			});
+		};
+		return {
+			openDialogOverlay,
+			closeDialogOverlay,
+			dialogKeydown,
+			confirmDialog,
+			confirmDialogAnswer,
+			infoDialog,
+			infoDialogAnswer
+		};
+	}
+	//#endregion
 	//#region src/presentation/router/vn-date-picker-controller.ts
 	var MONTHS = [
 		"Tháng 1",
@@ -17434,7 +17608,7 @@
 			if (fbHasLocalChanges()) scheduleFbPush();
 		}
 	});
-	if (typeof root.fbHandleValue === "function") root.firebaseConflictDialogService = createFirebaseConflictDialogService((options) => globalThis.confirmDialog(options));
+	if (typeof root.fbHandleValue === "function") root.firebaseConflictDialogService = createFirebaseConflictDialogService((options) => root.confirmDialog(options));
 	if (typeof root.setCloudStatus === "function") root.firebaseCloudStatusPresentation = createFirebaseCloudStatusPresentation((id) => document.getElementById(id));
 	if (typeof root.markSaved === "function") root.firebaseSaveStatusService = createFirebaseSaveStatusService((id) => document.getElementById(id));
 	if (typeof root.remoteRenderUnsafe === "function") root.firebaseRemoteRenderSafetyService = createFirebaseRemoteRenderSafetyService({
@@ -17811,6 +17985,31 @@
 		license: () => typeof window === "undefined" ? null : window.qcLicense,
 		storage: typeof localStorage === "undefined" ? { setItem: () => {} } : localStorage
 	});
+	var modalDocument = () => typeof document !== "undefined" ? document : { querySelectorAll: () => [] };
+	var modalTemplateApi = createModalTemplate({ escapeAttr: (value) => root.escAttr(value) });
+	root.modalTemplate = modalTemplateApi.modalTemplate;
+	root.modalCloseButton = modalTemplateApi.modalCloseButton;
+	var modalControllerApi = createModalController({
+		document: modalDocument(),
+		requestFrame: (work) => requestAnimationFrame(work)
+	});
+	root.openModal = modalControllerApi.openModal;
+	root.closeModal = modalControllerApi.closeModal;
+	root.modalKeydown = modalControllerApi.modalKeydown;
+	var dialogOverlayApi = createDialogOverlayController({
+		document: modalDocument(),
+		requestFrame: (work) => requestAnimationFrame(work),
+		modalCloseButton: (action) => root.modalCloseButton(action),
+		escape: (value) => root.esc(value),
+		button: (label, action, cls) => root.btn(label, action, cls)
+	});
+	root.openDialogOverlay = dialogOverlayApi.openDialogOverlay;
+	root.closeDialogOverlay = dialogOverlayApi.closeDialogOverlay;
+	root.dialogKeydown = dialogOverlayApi.dialogKeydown;
+	root.confirmDialog = dialogOverlayApi.confirmDialog;
+	root.confirmDialogAnswer = dialogOverlayApi.confirmDialogAnswer;
+	root.infoDialog = dialogOverlayApi.infoDialog;
+	root.infoDialogAnswer = dialogOverlayApi.infoDialogAnswer;
 	root.vnDatePickerController = createVnDatePickerController({
 		document: typeof document === "undefined" ? null : document,
 		window: typeof window === "undefined" ? {
@@ -19353,7 +19552,7 @@
 		nowIso: () => (/* @__PURE__ */ new Date()).toISOString(),
 		formatDateTime: (value) => formatDateTimeVN(value),
 		renderStatus: renderLisStatus,
-		notify: (message, options) => infoDialog(message, options),
+		notify: (message, options) => root.infoDialog(message, options),
 		requireWrite: () => requireWrite(),
 		getState: () => state,
 		levelConfig: (test, level) => lvlCfg(test, level),

@@ -57,8 +57,8 @@ scope**, không phải không còn file `.js` trong gói phát hành.
 
 | Hạng mục | Trạng thái |
 | --- | --- |
-| Nguồn TypeScript | 713 tệp: 99 domain, 137 application, 476 presentation, 1 compatibility bridge |
-| Nguồn classic còn lại | 30 tệp `assets/modules/*.js`, thêm `assets/core.js` và `assets/app.js` |
+| Nguồn TypeScript | 721 tệp: 99 domain, 137 application, 484 presentation, 1 compatibility bridge |
+| Nguồn classic còn lại | 29 tệp `assets/modules/*.js`, thêm `assets/core.js` và `assets/app.js` |
 | Bundle hiện tại | `assets/generated/modular-pilot.js`, Vite sinh ra và nạp bằng `<script defer>` |
 | Kiểm tra kiểu | `npm.cmd run typecheck` đạt: checkJs legacy + strict TypeScript modules |
 | Test Node | `npm.cmd test` đạt ngày 2026-08-18 |
@@ -363,7 +363,8 @@ bằng TypeScript, sau build trở thành JavaScript trong bundle.
 
 Thứ tự ưu tiên, theo rủi ro tăng dần:
 
-1. **UI thuần:** `modals`, `after-render`, `dashboard-routes`, `router-render`.
+1. **UI thuần:** ~~`modals`~~ (xong 2026-08-18), `after-render` (đã retire ở
+   Pha F), `dashboard-routes`, `router-render`.
 2. **Route/presentation:** Entry, Manage, Report, Settings, Reagent, Sigma,
    Actions và Audit; chuyển mỗi trang như một lát dọc hoàn chỉnh.
 3. **Canvas và browser adapter:** `draw`, `reports`, export/print, File API;
@@ -373,7 +374,56 @@ Thứ tự ưu tiên, theo rủi ro tăng dần:
 
 Mỗi lát phải: chuyển source → thay caller/import → build bundle → cập nhật
 `index.html` → xóa JS cũ chỉ khi không còn caller → chạy gate phù hợp. Không
-chuyển hàng loạt 32 file trong một pull request.
+chuyển hàng loạt 30 file trong một pull request.
+
+#### Lát 1 — `modals.js` (2026-08-18)
+
+Retire hoàn toàn `assets/modules/modals.js` (101 dòng, 14 hàm). Chuyển sang
+`src/presentation/modal/`: `modal-focus-trap.ts` (helper focus-trap dùng
+chung — hợp nhất `modalFocusable`/`dialogFocusable` và phần xử lý phím
+Escape/Tab vốn trước đây trùng lặp y hệt giữa hai lớp, chỗ đơn giản hóa duy
+nhất trong lát này), `modal-template.ts` (`modalTemplate`/`modalCloseButton`),
+`modal-controller.ts` (`openModal`/`closeModal`, lớp `#modalRoot`),
+`dialog-overlay-controller.ts` (`confirmDialog`/`infoDialog`/
+`openDialogOverlay`/`closeDialogOverlay`, lớp `#dialogRoot`) — vẫn giữ đúng
+hai lớp tách biệt như bản gốc (lý do: xem "Module roles" trong CLAUDE.md),
+chỉ hợp nhất phần focus-trap. `src/compat/modular-pilot.global.ts` gán
+`root.openModal`/`closeModal`/`modalTemplate`/`modalCloseButton`/
+`confirmDialog`/`confirmDialogAnswer`/`infoDialog`/`infoDialogAnswer`/
+`openDialogOverlay`/`closeDialogOverlay`/`dialogKeydown` — không đổi ~20 file
+classic vẫn gọi các tên này như global trần. Dọn kèm ~13 chỗ ép kiểu
+`(root as any)`/`(globalThis as any)` từng phải dùng để gọi các hàm này lúc
+còn thuộc classic JS, và xóa 2 `declare function confirmDialog`/`infoDialog`
+ambient (nay là property có kiểu thật trên `QCLabGlobal`). Thêm 8 ambient
+declare vào `global.d.ts` (`openModal`/`closeModal`/`modalTemplate`/
+`modalCloseButton`/`confirmDialog`/`infoDialog`/`openDialogOverlay`/
+`closeDialogOverlay`) để `checkJs` vẫn phân giải được lời gọi trần trong các
+file classic còn lại (`users-auth.js` gọi thẳng `closeDialogOverlay`/
+`openDialogOverlay`). `tests/ui-accessibility.test.js`/`ui-route-structure.test.js`
+(source-scanner, trước đọc `assets/modules/modals.js` bằng `fs.readFileSync`)
+chuyển sang đọc 4 file TS mới; hai assertion pin cú pháp `function
+modalTemplate(`/`function modalCloseButton(` phải đổi thành `const
+modalTemplate=`/`const modalCloseButton=` vì TS dùng arrow function theo quy
+ước các file presentation khác.
+
+**Phát hiện phụ:** `tests/local-store.test.js` stub `infoDialog` qua tham số
+`globals` thứ hai của `loadSandbox()` — tham số này được set lên vm context
+TRƯỚC khi các file trong danh sách chạy, nên khi `infoDialog` chỉ tồn tại ở
+`modals.js` cũ (không nạp trong test này) thì stub không bao giờ bị ghi đè.
+Từ khi `infoDialog` chuyển vào bundle TypeScript, `generated/modular-pilot.js`
+(có trong danh sách nạp của test đó) gán `root.infoDialog=...` ngay khi chạy,
+ghi đè mất stub — test vẫn "pass" theo nghĩa không throw ở bước gán, nhưng
+`checkStorageUsage()` sau đó gọi `infoDialog` thật, kéo tới `modalCloseButton`
+→ `escAttr` mà sandbox này không nạp `reports.js`, nên throw
+`TypeError: root.escAttr is not a function`. Sửa bằng cách set stub SAU khi
+`loadSandbox()` trả về (`ctx.infoDialog=...` trực tiếp lên context object,
+thay vì qua tham số `globals` của lệnh gọi) — object context của `vm` vẫn
+nhận gán trực tiếp sau khi các file đã chạy xong. Bài học cho các lát kế
+tiếp: bất kỳ hàm nào từng chỉ tồn tại trong classic JS (nên "vắng mặt an
+toàn" trong sandbox) mà chuyển vào bundle TypeScript sẽ bắt đầu **có thật**
+trong mọi sandbox nạp `generated/modular-pilot.js` — rà `tests/` tìm test nào
+stub cùng tên qua tham số `globals` của `loadSandbox()` trước khi xóa file
+classic, không chỉ tìm lời gọi trần.
 
 ### Pha H — bỏ global bridge và nhiều script tags
 
@@ -447,3 +497,4 @@ npm.cmd test
 | 2026-08-18 | Audit + dọn tiếp 6 file classic (`manage-tests-actions.js`, `report-routes.js`, `reports.js`, `settings.js`, `sigma-tea.js`, `sigma.js`) bằng cả bốn pattern — chỉ 3 điểm cần dọn (`settings.js` lisGatewayConfig; `reports.js`/`report-routes.js` hai biến thể dead-code-after-return, một trong đó là block trần không phải `if`). Rút ra bài học: xóa nhánh chết theo runtime làm vỡ 2 test source-scanner (`report-nce-print.test.js`, `ui-route-structure.test.js`) vì chúng pin chuỗi HTML trực tiếp trên file classic — đã sửa hai test trỏ sang `src/presentation/report/report-page-html.ts`. Từ nay: trước khi xóa bất kỳ đoạn "chết" nào, phải `rg` chuỗi/tên đặc trưng của nó trong toàn bộ `tests/`, không chỉ kiểm tra đường thực thi qua `loadSandbox()`. |
 | 2026-08-18 | Audit + dọn nốt 14 file classic còn lại — 30/30 file classic đã được audit bridge. Chỉ `range.js` (3 điểm), `reagent.js` (1 khối lớn) và `action-workflow-service.js` (14 điểm, dây chuyền mồ côi kéo theo `computeActionRerunStatus`/`actionRerunSignature`/3 memo Map) thật sự cần dọn; 11 file còn lại đã sạch từ trước, kể cả 3 file đang bị phiên khác đụng vào (audit không sửa, không xung đột). Phát hiện thêm một ngoại lệ giữ nguyên vì thứ tự nạp (như `teaAnalyteKey`): `action-workflow-service.js` nạp trước bundle TS trong `index.html`, nên dòng `root.ActionWorkflowService={ACTION_LABELS:root.NceActionLabels&&...||ACTION_LABELS,...}` chạy khi `root.NceActionLabels` chưa tồn tại — suýt xóa nhầm lần hai sau bài học `state.js`. |
 | 2026-08-18 | Xem lại `invalidateDerivedForSave()` (mục còn lại cuối cùng của đợt audit bridge) — kết luận đây KHÔNG phải code chết, quyết định giữ nguyên. Nó không tái hiện logic JS lỗi thời (đã gọi thẳng bridge sống); vấn đề thật là `saveService` (TS) có bản sao logic invalidation riêng thay vì gọi lại hàm này, dù thứ tự nạp cho phép. Hợp nhất đúng cách đụng tới `src/application/storage/save-service.ts`/`src/compat/modular-pilot.global.ts` (đường nóng `save()`, có tài liệu benchmark riêng) — ngoài phạm vi dọn bridge, để lại làm việc riêng khi cần. Với quyết định này, toàn bộ audit bridge JS→TS của Pha F (30/30 file classic) coi như hoàn tất. |
+| 2026-08-18 | Bắt đầu Pha G: chuyển `modals.js` (lát đầu tiên, nhóm "UI thuần") sang `src/presentation/modal/` (4 file TS). Hợp nhất phần focus-trap trùng lặp giữa hai lớp modal/dialog vào một helper dùng chung, giữ nguyên hai lớp `#modalRoot`/`#dialogRoot` tách biệt. Gỡ ~13 chỗ ép kiểu `(root as any)`/`(globalThis as any)` quanh các hàm này trong `modular-pilot.global.ts`. Phát hiện phụ: `tests/local-store.test.js` stub `infoDialog` qua tham số `globals` của `loadSandbox()` — tham số này set TRƯỚC khi file chạy nên bị `generated/modular-pilot.js` (nạp sau) ghi đè ngay khi `infoDialog` chuyển thành thật; sửa bằng cách gán stub sau khi `loadSandbox()` trả về. Bài học cho các lát Pha G kế tiếp: rà `tests/` tìm stub cùng tên qua tham số `globals` trước khi retire một file classic, không chỉ tìm lời gọi trần của hàm sắp xóa. `build:pilot`/`typecheck`/`test` xanh (613/613). |

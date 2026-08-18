@@ -20,6 +20,14 @@ declare var selTest: any, statusMemo: any, wgTestQ: any, dashTestQ: any, dashTes
   wgArchivedTestId: any, wgArchivedTestQ: any, wgChartMode: any;
 declare var currentUser: any, loginFails: any, loginLockUntil: any;
 declare function afterRender(page: string): void;
+declare function openModal(html: string): void;
+declare function closeModal(): void;
+declare function modalTemplate(options?: Record<string, any>): string;
+declare function modalCloseButton(action?: string): string;
+declare function confirmDialog(options?: Record<string, any>): Promise<boolean>;
+declare function infoDialog(message: string, options?: Record<string, any>): Promise<unknown>;
+declare function openDialogOverlay(html: string, resolve: (result?: any) => void): void;
+declare function closeDialogOverlay(result?: any): void;
 declare var entrySel: any, entryDays: any, entryStart: any, entryEnd: any, entrySheetMonth: any,
   entryQ: any, entryMachine: any, entryLastMsg: any, entryAutoOpenKey: any,
   entryPendingSheetFocus: any, entryJumpToday: any, entryLjRenderCache: any,

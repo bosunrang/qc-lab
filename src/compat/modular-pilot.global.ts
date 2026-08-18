@@ -219,6 +219,9 @@ import { createVisibleCanvasService } from '../presentation/render/visible-canva
 import { createAfterRenderController } from '../presentation/render/after-render-controller';
 import { createRouterPagePolicy } from '../presentation/router/router-page-policy';
 import { createRouterShellController } from '../presentation/router/router-shell-controller';
+import { createModalTemplate } from '../presentation/modal/modal-template';
+import { createModalController } from '../presentation/modal/modal-controller';
+import { createDialogOverlayController } from '../presentation/modal/dialog-overlay-controller';
 import { createVnDatePickerController } from '../presentation/router/vn-date-picker-controller';
 import { createChartTooltipService } from '../presentation/chart/chart-tooltip-service';
 import { createLeveyJenningsTooltipController } from '../presentation/chart/levey-jennings-tooltip-controller';
@@ -824,7 +827,6 @@ declare function renderBrand(): void;
 declare function fbMerge(local: any, remote: any, base: any): any;
 declare function fbFirstConnectMerge(local: any, remote: any): any;
 declare function applyRemoteRender(): void;
-declare function confirmDialog(options: Record<string, any>): Promise<boolean>;
 declare function getFbCfg(): Record<string, any> | null;
 declare function fbConfigSig(config: any): string;
 declare function getDeployFbCfg(): any;
@@ -833,7 +835,6 @@ declare function persistLocalSnapshot(options?: Record<string, any>): boolean;
 declare function mirrorIndexedDb(raw: string): boolean;
 declare function userName(): string;
 declare function rerender(): void;
-declare function infoDialog(message: string, options?: Record<string, any>): Promise<unknown>;
 declare function auditSha256(text: string): Promise<string>;
 declare function uid(): string;
 declare function isoDate(value: Date): string;
@@ -1150,6 +1151,18 @@ type QCLabGlobal = typeof globalThis & {
   afterRender: ReturnType<typeof createAfterRenderController>['afterRender'];
   routerPagePolicy: ReturnType<typeof createRouterPagePolicy>;
   routerShell: ReturnType<typeof createRouterShellController>;
+  modalTemplate: ReturnType<typeof createModalTemplate>['modalTemplate'];
+  modalCloseButton: ReturnType<typeof createModalTemplate>['modalCloseButton'];
+  openModal: ReturnType<typeof createModalController>['openModal'];
+  closeModal: ReturnType<typeof createModalController>['closeModal'];
+  modalKeydown: ReturnType<typeof createModalController>['modalKeydown'];
+  openDialogOverlay: ReturnType<typeof createDialogOverlayController>['openDialogOverlay'];
+  closeDialogOverlay: ReturnType<typeof createDialogOverlayController>['closeDialogOverlay'];
+  dialogKeydown: ReturnType<typeof createDialogOverlayController>['dialogKeydown'];
+  confirmDialog: ReturnType<typeof createDialogOverlayController>['confirmDialog'];
+  confirmDialogAnswer: ReturnType<typeof createDialogOverlayController>['confirmDialogAnswer'];
+  infoDialog: ReturnType<typeof createDialogOverlayController>['infoDialog'];
+  infoDialogAnswer: ReturnType<typeof createDialogOverlayController>['infoDialogAnswer'];
   vnDatePickerController: ReturnType<typeof createVnDatePickerController>;
   qcTooltip: ReturnType<typeof createChartTooltipService>;
   leveyJenningsTooltipController: ReturnType<typeof createLeveyJenningsTooltipController>;
@@ -1800,7 +1813,7 @@ if (typeof (root as any).fbHandleValue === 'function') root.firebaseMergeCommitS
     fbSetReady();setCloudStatus(fbStatusLabel(),true);applyRemoteRender();if(fbHasLocalChanges())scheduleFbPush();
   },
 });
-if (typeof (root as any).fbHandleValue === 'function') root.firebaseConflictDialogService = createFirebaseConflictDialogService(options => (globalThis as any).confirmDialog(options));
+if (typeof (root as any).fbHandleValue === 'function') root.firebaseConflictDialogService = createFirebaseConflictDialogService(options => root.confirmDialog(options));
 if (typeof (root as any).setCloudStatus === 'function') root.firebaseCloudStatusPresentation = createFirebaseCloudStatusPresentation(id => document.getElementById(id));
 if (typeof (root as any).markSaved === 'function') root.firebaseSaveStatusService = createFirebaseSaveStatusService(id => document.getElementById(id));
 if (typeof (root as any).remoteRenderUnsafe === 'function') root.firebaseRemoteRenderSafetyService = createFirebaseRemoteRenderSafetyService({
@@ -1827,7 +1840,7 @@ root.backupExportMessage=createBackupExportMessage();
 root.backupImportConfirmation=createBackupImportConfirmation();
 root.backupImportMessage=createBackupImportMessage();
 root.backupOversizeConfirmation=createBackupOversizeConfirmation();
-root.lisQueuePresentation = createLisQueuePresentation({test:id=>(state.tests||[]).find((test:any)=>test.id===id),formatTestValue:(test,value)=>(root as any).fmtTestValue(test,value),format:(value,decimals)=>(root as any).fmt(value,decimals),escape:value=>(root as any).esc(value),escapeAttribute:value=>(root as any).escAttr(value),quoteJs:value=>(root as any).jsq(value),formatDateTime:value=>(root as any).formatDateTimeVN(value),testDisplayName:test=>typeof (root as any).testDisplayName==='function'?(root as any).testDisplayName(test):'',button:(label,action,variant)=>(root as any).btn(label,action,variant),emptyState:(title,message,action)=>(root as any).emptyState(title,message,action),modalCloseButton:action=>(root as any).modalCloseButton(action)});
+root.lisQueuePresentation = createLisQueuePresentation({test:id=>(state.tests||[]).find((test:any)=>test.id===id),formatTestValue:(test,value)=>(root as any).fmtTestValue(test,value),format:(value,decimals)=>(root as any).fmt(value,decimals),escape:value=>(root as any).esc(value),escapeAttribute:value=>(root as any).escAttr(value),quoteJs:value=>(root as any).jsq(value),formatDateTime:value=>(root as any).formatDateTimeVN(value),testDisplayName:test=>typeof (root as any).testDisplayName==='function'?(root as any).testDisplayName(test):'',button:(label,action,variant)=>(root as any).btn(label,action,variant),emptyState:(title,message,action)=>(root as any).emptyState(title,message,action),modalCloseButton:action=>root.modalCloseButton(action)});
 root.lisSettingsService = createLisSettingsService(value => root.lisNormalizeGatewayUrl!(value));
 root.LisGatewayCommand=createLisGatewayCommand({store:settings=>localStorage.setItem(LIS_GATEWAY_STORAGE_KEY,JSON.stringify(settings)),clearToken:()=>{const input=document.getElementById('lisGatewayToken') as any;if(input)input.value='';},disable:()=>{const runtime=(root as any).lisGatewayRuntime;clearInterval(runtime.pollT);runtime.pollT=null;runtime.pending=[];runtime.unresolved=[];lisClient.setStatus('off','Đã tắt');},start:()=>(root as any).lisGatewayStart(),pull:()=>(root as any).lisGatewayPull({manual:true})});
 const labProfileService=createLabProfileService((value, limit) => (root.QCCore as any).cleanText(value, limit), value => root.settingsBrandProfile!(value));
@@ -1977,6 +1990,13 @@ root.chartDataUrl=createChartDataUrl({createCanvas:()=>document.createElement('c
 root.afterRenderCanvasService=createVisibleCanvasService({requestFrame:work=>requestAnimationFrame(work),intersectionObserver:typeof IntersectionObserver==='function'?onVisible=>new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting))onVisible();},{rootMargin:'160px'}):undefined,resizeObserver:typeof ResizeObserver==='function'?onResize=>new ResizeObserver(onResize):undefined,isConnected:canvas=>canvas.isConnected!==false});
 root.routerPagePolicy=createRouterPagePolicy();
 root.routerShell=createRouterShellController({find:id=>typeof document==='undefined'?null:document.getElementById(id),findShell:()=>typeof document==='undefined'?null:document.getElementById('appShell'),lab:()=>state.lab||{},pages:()=>root.routerPagePolicy.pages,canAccess:(id,user)=>root.routerPagePolicy.canAccessPage(id,user),escape:value=>(root as any).esc(value),escapeAttr:value=>(root as any).escAttr(value),app:()=>typeof window==='undefined'?{version:'dev'}:(window as any).QCLAB_APP||{version:'dev'},license:()=>typeof window==='undefined'?null:(window as any).qcLicense,storage:typeof localStorage==='undefined'?{setItem:()=>{}}:localStorage});
+const modalDocument=()=>typeof document!=='undefined'?document:({querySelectorAll:()=>[]} as unknown as Document);
+const modalTemplateApi=createModalTemplate({escapeAttr:value=>(root as any).escAttr(value)});
+root.modalTemplate=modalTemplateApi.modalTemplate;root.modalCloseButton=modalTemplateApi.modalCloseButton;
+const modalControllerApi=createModalController({document:modalDocument(),requestFrame:work=>requestAnimationFrame(work)});
+root.openModal=modalControllerApi.openModal;root.closeModal=modalControllerApi.closeModal;root.modalKeydown=modalControllerApi.modalKeydown;
+const dialogOverlayApi=createDialogOverlayController({document:modalDocument(),requestFrame:work=>requestAnimationFrame(work),modalCloseButton:action=>root.modalCloseButton(action),escape:value=>(root as any).esc(value),button:(label,action,cls)=>(root as any).btn(label,action,cls)});
+root.openDialogOverlay=dialogOverlayApi.openDialogOverlay;root.closeDialogOverlay=dialogOverlayApi.closeDialogOverlay;root.dialogKeydown=dialogOverlayApi.dialogKeydown;root.confirmDialog=dialogOverlayApi.confirmDialog;root.confirmDialogAnswer=dialogOverlayApi.confirmDialogAnswer;root.infoDialog=dialogOverlayApi.infoDialog;root.infoDialogAnswer=dialogOverlayApi.infoDialogAnswer;
 root.vnDatePickerController=createVnDatePickerController({document:typeof document==='undefined'?null:document,window:typeof window==='undefined'?{innerWidth:0,innerHeight:0}:window,today:()=>isoToday()});
 const chartTooltip=createChartTooltipService({find:()=>document.getElementById('qcTooltip'),create:()=>document.createElement('div'),append:element=>document.body.appendChild(element)});
 root.qcTooltip=chartTooltip;
@@ -2439,7 +2459,7 @@ root.SigmaMuWorkflowService = createSigmaMuWorkflowService({
     return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : '';
   },
 });
-root.SigmaMuWorkflowCommand=createSigmaMuWorkflowCommand({service:root.SigmaMuWorkflowService,log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),close:()=>(root as any).closeModal(),render:()=>rerender()});
+root.SigmaMuWorkflowCommand=createSigmaMuWorkflowCommand({service:root.SigmaMuWorkflowService,log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),close:()=>root.closeModal(),render:()=>rerender()});
 root.SigmaCohortSelectionService = createSigmaCohortSelectionService({
   normalizePeriod: period => root.SigmaCohortService!.normalizePeriod(period),
   today: () => (globalThis as any).isoToday(),
@@ -2617,7 +2637,7 @@ root.AuditService = createAuditService({
   autoVerifyMax: typeof (root as any).auditRuntimeConfig === 'function' ? (root as any).auditRuntimeConfig().autoVerifyMax : 5000,
 });
 root.NceFormWorkflowCommand=createNceFormWorkflowCommand({current:()=>state as {actions?:Record<string,any>[]},form:nceFormCommand,log:(action,detail,target)=>logAct(action,detail,target),reset:()=>{const ui=(root as any).actionFormUiState;if(ui)ui.reset();},save:()=>save({clearDerived:false}),render:()=>rerender()});
-root.ActivityArchiveCommand=createActivityArchiveCommand({current:()=>state as {activity?:Record<string,any>[];activityAnchor?:string},window:value=>root.activityAuditArchiveWindow!(value),cut:(activity,cutoff)=>root.AuditService!.archiveCut(activity,cutoff),confirm:dialog=>(root as any).confirmDialog(dialog),reauthenticate:input=>(root as any).reauthenticateCurrentUser(input),download:(name,rows)=>(root as any).csvDownload(name,(root as any).activityAuditCsv(rows)),log:(type,detail,target)=>logAct(type,detail,target),save:()=>save({clearDerived:false}),close:()=>(root as any).closeModal(),render:()=>rerender(),info:(message,options)=>(root as any).infoDialog(message,options),dateLabel:iso=>vnDate(iso)});
+root.ActivityArchiveCommand=createActivityArchiveCommand({current:()=>state as {activity?:Record<string,any>[];activityAnchor?:string},window:value=>root.activityAuditArchiveWindow!(value),cut:(activity,cutoff)=>root.AuditService!.archiveCut(activity,cutoff),confirm:dialog=>root.confirmDialog(dialog),reauthenticate:input=>(root as any).reauthenticateCurrentUser(input),download:(name,rows)=>(root as any).csvDownload(name,(root as any).activityAuditCsv(rows)),log:(type,detail,target)=>logAct(type,detail,target),save:()=>save({clearDerived:false}),close:()=>root.closeModal(),render:()=>rerender(),info:(message,options)=>root.infoDialog(message,options),dateLabel:iso=>vnDate(iso)});
 root.ActionRerunService = createActionRerunService({
   pointsFor: testId => state.data?.[testId], testFor: testId => state.tests?.find(test => test.id === testId),
   runNumber: point => (root as any).pointRunNo(point),
@@ -2707,7 +2727,7 @@ root.prepareBackupImport = backupService.prepareBackupImport;
 root.backupSummary = backupService.backupSummary;
 root.inspectBackupText = backupService.inspectBackupText;
 root.BackupRestoreCommand=createBackupRestoreCommand({current:()=>state,replace:value=>{state=value;},normalize:()=>ensureShape({sanitized:true}),invariantErrors:()=>(root.QCCore as any).validateStateInvariants(state,{sanitized:true}),clearSigmaDraft:()=>{if(typeof clearSigmaDraftThrough==='function')clearSigmaDraftThrough(Number.MAX_SAFE_INTEGER);},ensureAdmin:()=>ensureAdmin(),setActivity:activity=>{state.activity=activity;},logImported:fileName=>logAct('Nhập backup','Nhập dữ liệu đã kiểm tra từ file '+fileName,'Dữ liệu'),save:()=>save({}),render:()=>rerender()});
-root.BackupExportCommand=createBackupExportCommand({current:()=>state,log:()=>logAct('Xuất backup','Xuất toàn bộ dữ liệu JSON có checksum','Dữ liệu'),save:()=>save({clearDerived:false}),create:value=>backupService.createBackupPackage(value),confirmOversized:(bytes,detail)=>(root as any).confirmOversizedBackup(bytes,detail),warning:bytes=>backupService.backupImportSizeError(bytes)?null:root.backupSizeWarningConfirmation({bytes}),confirm:dialog=>(root as any).confirmDialog(dialog),download:(name,text)=>(root as any).downloadBackupText(name,text),mark:bytes=>(root as any).markBackupDone(bytes),update:()=>(root as any).updateBackupBanner()});
+root.BackupExportCommand=createBackupExportCommand({current:()=>state,log:()=>logAct('Xuất backup','Xuất toàn bộ dữ liệu JSON có checksum','Dữ liệu'),save:()=>save({clearDerived:false}),create:value=>backupService.createBackupPackage(value),confirmOversized:(bytes,detail)=>(root as any).confirmOversizedBackup(bytes,detail),warning:bytes=>backupService.backupImportSizeError(bytes)?null:root.backupSizeWarningConfirmation({bytes}),confirm:dialog=>root.confirmDialog(dialog),download:(name,text)=>(root as any).downloadBackupText(name,text),mark:bytes=>(root as any).markBackupDone(bytes),update:()=>(root as any).updateBackupBanner()});
 root.BackupImportCommand=createBackupImportCommand({prepare:text=>backupService.prepareBackupImport(text),sizeWarning:bytes=>backupService.backupSizeWarning(bytes),snapshot:prefix=>root.BackupExportCommand.snapshot(prefix),restore:input=>root.BackupRestoreCommand.restore(input)});
 root.BackupInspectionCommand=createBackupInspectionCommand({inspect:(text,bytes)=>backupService.inspectBackupText(text,bytes)});
 root.BackupStatusCommand=createBackupStatusCommand({reminder:root.backupReminderService,marker:root.backupLocalMarker,maxBytes:BACKUP_IMPORT_MAX_BYTES,size:bytes=>backupService.backupSizeMB(bytes),warning:bytes=>backupService.backupSizeWarning(bytes)});
@@ -2741,7 +2761,7 @@ lisClient = createLisClient({
   nowIso: () => new Date().toISOString(),
   formatDateTime: value => formatDateTimeVN(value),
   renderStatus: renderLisStatus,
-  notify: (message, options) => infoDialog(message, options),
+  notify: (message, options) => root.infoDialog(message, options),
   requireWrite: () => requireWrite(),
   getState: () => state,
   levelConfig: (test, level) => lvlCfg(test, level),
@@ -2773,9 +2793,9 @@ root.ManageConfigService = createManageConfigService({
 const manageAssayCommand = createManageAssayCommand({saveAssay:(targetState,input)=>root.ManageConfigService.saveAssay(targetState as any,input)});
 const manageAssayRemovalCommand = createManageAssayRemovalCommand({removeAssay:(targetState,input)=>root.ManageConfigService.removeAssay(targetState as any,input)});
 const manageInstrumentCommand = createManageInstrumentCommand({saveInstrument:(targetState,input)=>root.ManageConfigService.saveInstrument(targetState as any,input),removeInstrument:(targetState,input)=>root.ManageConfigService.removeInstrument(targetState as any,input)});
-root.ManageInstrumentWorkflowCommand=createManageInstrumentWorkflowCommand({current:()=>state,instrument:manageInstrumentCommand,log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),close:()=>(root as any).closeModal(),render:()=>rerender()});
+root.ManageInstrumentWorkflowCommand=createManageInstrumentWorkflowCommand({current:()=>state,instrument:manageInstrumentCommand,log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),close:()=>root.closeModal(),render:()=>rerender()});
 const managePanelCommand = createManagePanelCommand({savePanel:(targetState,input)=>root.ManageConfigService.savePanel(targetState as any,input),removePanel:(targetState,input)=>root.ManageConfigService.removePanel(targetState as any,input)});
-root.ManagePanelWorkflowCommand=createManagePanelWorkflowCommand({current:()=>state,panel:managePanelCommand,log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),close:()=>(root as any).closeModal(),render:()=>rerender()});
+root.ManagePanelWorkflowCommand=createManagePanelWorkflowCommand({current:()=>state,panel:managePanelCommand,log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),close:()=>root.closeModal(),render:()=>rerender()});
 const manageLotGroupCommand = createManageLotGroupCommand({save:(s,i)=>root.ManageConfigService.saveLotGroup(s as any,i),remove:(s,i)=>root.ManageConfigService.removeLotGroup(s as any,i),stop:(s,i)=>root.ManageConfigService.stopLotGroup(s as any,i)});
 const manageLotGroupActivationCommand = createManageLotGroupActivationCommand({
   findGroup:(s,id)=>((s.lotGroups||[])as any[]).find(g=>g.id===id)||null,
@@ -2808,10 +2828,10 @@ const manageLotCommand = createManageLotCommand({
   removal:(s,i)=>root.ManageConfigService.lotRemoval(s as any,{...i,switchesLot:root.ManageConfigService.transitionSwitchesLot}),
   removeRecord:(s,i)=>root.ManageConfigService.removeLot(s as any,{...i,switchesLot:root.ManageConfigService.transitionSwitchesLot}),
 });
-root.ManageLotWorkflowCommand=createManageLotWorkflowCommand({current:()=>state,lot:manageLotCommand,log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),close:()=>(root as any).closeModal(),render:()=>rerender()});
-root.ManageAssayWorkflowCommand=createManageAssayWorkflowCommand({current:()=>state,assay:manageAssayCommand,removal:manageAssayRemovalCommand,log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),close:()=>(root as any).closeModal(),render:()=>rerender()});
-root.ManageLotTransitionWorkflowCommand=createManageLotTransitionWorkflowCommand({current:()=>state,transition:root.ManageLotTransitionCommand,clearDerived:()=>(globalThis as any).clearDerived(),log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),close:()=>(root as any).closeModal(),render:()=>rerender()});
-root.ManageLotGroupWorkflowCommand=createManageLotGroupWorkflowCommand({current:()=>state,group:manageLotGroupCommand,activation:manageLotGroupActivationCommand,reconcileSigma:()=>(globalThis as any).reconcileSigmaLevelsWithLotGroups(),log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),close:()=>(root as any).closeModal(),render:()=>rerender()});
+root.ManageLotWorkflowCommand=createManageLotWorkflowCommand({current:()=>state,lot:manageLotCommand,log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),close:()=>root.closeModal(),render:()=>rerender()});
+root.ManageAssayWorkflowCommand=createManageAssayWorkflowCommand({current:()=>state,assay:manageAssayCommand,removal:manageAssayRemovalCommand,log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),close:()=>root.closeModal(),render:()=>rerender()});
+root.ManageLotTransitionWorkflowCommand=createManageLotTransitionWorkflowCommand({current:()=>state,transition:root.ManageLotTransitionCommand,clearDerived:()=>(globalThis as any).clearDerived(),log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),close:()=>root.closeModal(),render:()=>rerender()});
+root.ManageLotGroupWorkflowCommand=createManageLotGroupWorkflowCommand({current:()=>state,group:manageLotGroupCommand,activation:manageLotGroupActivationCommand,reconcileSigma:()=>(globalThis as any).reconcileSigmaLevelsWithLotGroups(),log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),close:()=>root.closeModal(),render:()=>rerender()});
 const targetMatrixCommand=createTargetMatrixCommand({
   apply:input=>root.ManageConfigService.applyTargetMatrix({...input,note:'Cập nhật Mean/SD',tests:state.tests,lots:state.qcLots||[],groups:state.lotGroups||[],
     pointsForTest:(t:any)=>(((state.data||{})as any)[t.id])||[],
@@ -2827,7 +2847,7 @@ root.TeaReferenceService = createTeaReferenceService({
   sourceRegistry: () => (globalThis as any).TEA_SOURCE_REGISTRY, createId: () => (globalThis as any).uid(),
   todayIso: () => (globalThis as any).isoToday(), userName: () => (globalThis as any).userName(),
 });
-root.TeaReferenceWorkflowCommand=createTeaReferenceWorkflowCommand({current:()=>state,service:root.TeaReferenceService,reconcileSigmaTea:()=>{if(typeof (globalThis as any).sgReconcileAllTeaSnapshots==='function')(globalThis as any).sgReconcileAllTeaSnapshots();},formatDate:iso=>(globalThis as any).vnDate(iso),log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),close:()=>(root as any).closeModal(),render:()=>rerender()});
+root.TeaReferenceWorkflowCommand=createTeaReferenceWorkflowCommand({current:()=>state,service:root.TeaReferenceService,reconcileSigmaTea:()=>{if(typeof (globalThis as any).sgReconcileAllTeaSnapshots==='function')(globalThis as any).sgReconcileAllTeaSnapshots();},formatDate:iso=>(globalThis as any).vnDate(iso),log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),close:()=>root.closeModal(),render:()=>rerender()});
 root.LotTransitionPickerService = createLotTransitionPickerService({
   searchText: value => (globalThis as any).searchText(value), formatDate: value => (globalThis as any).vnDate(value),
   transitionToNo: lotId => (globalThis as any).lotTransitionToNo(lotId),
