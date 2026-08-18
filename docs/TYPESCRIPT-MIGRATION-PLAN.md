@@ -61,8 +61,8 @@ scope**, không phải không còn file `.js` trong gói phát hành.
 | Nguồn classic còn lại | 23 tệp `assets/modules/*.js`, thêm `assets/core.js` và `assets/app.js` |
 | Bundle hiện tại | `assets/generated/modular-pilot.js`, Vite sinh ra và nạp bằng `<script defer>` |
 | Kiểm tra kiểu | `npm.cmd run typecheck` đạt: checkJs legacy + strict TypeScript modules |
-| Test Node | `npm.cmd test` đạt ngày 2026-08-18 |
-| Ước tính tiến độ | khoảng 85% theo lát nghiệp vụ đã có TypeScript sở hữu runtime; không đo bằng số dòng/tệp |
+| Test Node | `npm.cmd test` đạt ngày 2026-08-18 (613/613) |
+| Ước tính tiến độ | **~90%** logic ứng dụng do TypeScript sở hữu lúc chạy · **~78%** theo số dòng classic thô còn lại · **~73%** theo tiêu chí hoàn thành cuối cùng (mục 7, đã trừ toàn bộ Pha H) — xem "Ba thước đo tiến độ" bên dưới |
 
 Các phần nghiệp vụ chính đã có TypeScript: Westgard/QC, storage và Firebase,
 backup, auth/audit, NCE, Entry, Manage, Sigma, report/XLSX, Reagent, Settings,
@@ -71,6 +71,73 @@ LIS và phần lớn presentation HTML/view-model.
 Migration vẫn ở pha song song: `src/compat/modular-pilot.global.ts` còn công
 bố bridge global để các classic script tiêu thụ bundle. Bridge là cơ chế chuyển
 tiếp, không phải kiến trúc đích.
+
+### Ba thước đo tiến độ (2026-08-18, cuối phiên retire route)
+
+Ba con số khác nhau vì ba mẫu số khác nhau; đừng gộp làm một:
+
+1. **~90% — logic ứng dụng TypeScript sở hữu lúc chạy** (thước đo chính của
+   tài liệu này). Phần lớn 23 file classic còn lại đã là "vỏ cầu nối" mỏng —
+   logic thật nằm trong `src/` từ Pha F; classic chỉ còn `function
+   x(){return globalThis.Y(...)}` gọi sang service TS.
+2. **~78% — theo số dòng classic thô** (4.157 dòng `assets/modules/*.js` so với
+   14.394 dòng `src/**/*.ts`). Thấp giả tạo: nhiều dòng classic chỉ là
+   delegation một dòng, không phải logic.
+3. **~73% — theo tiêu chí hoàn thành cuối cùng (mục 7)**. Kể cả retire hết
+   classic module, vẫn còn NGUYÊN Pha H: bỏ global bridge
+   (`modular-pilot.global.ts` ~3.300 dòng), gộp về một entry bundle, xử lý
+   `core.js`+worker thành lát parity riêng.
+
+### Kiểm kê từng module classic — đã xong / chưa xong
+
+**Đã retire sang TypeScript trong Pha G (7 file, phiên 2026-08-18):**
+
+| Classic (đã xóa) | TypeScript thay thế | Lát |
+| --- | --- | --- |
+| `modals.js` | `src/presentation/modal/*` (4 file) | UI thuần 1 |
+| `dashboard-routes.js` | `src/presentation/dashboard/dashboard-page-controller.ts` | UI thuần 2 |
+| `router-render.js` | `src/presentation/router/*` + `shared/ui-primitives.ts` + `range/range-actions-html.ts` | UI thuần 3 |
+| `settings.js` | `src/presentation/settings/settings-page-controller.ts` | Route 1 |
+| `report-routes.js` | `src/presentation/report/report-page-controller.ts` | Route 2 |
+| `westgard-routes.js` | `src/presentation/westgard/westgard-page-controller.ts` | Route 3 |
+| `reagent.js` | `src/presentation/reagent/reagent-page-controller.ts` | Route 4 |
+
+(`after-render.js` đã retire ở Pha F.)
+
+**Chưa xong — 23 file classic còn lại, chia theo nhóm rủi ro:**
+
+| Nhóm | File | Dòng | Ghi chú port |
+| --- | --- | --- | --- |
+| **A. Route/presentation** (rủi ro vừa, pattern đã thành thạo) | `manage-routes.js` | 174 | trang Cấu hình chung; đi cùng `manage-tests-actions.js` |
+| | `manage-tests-actions.js` | 371 | mutation instrument/assay + re-auth/audit; nặng nhất nhóm route |
+| | `entry-routes.js` | 319 | `pageEntry`; state entry nhiều, có sheet/tree/LJ canvas |
+| | `actions-routes.js` | 226 | trang NCE (lifecycle) — cắt hai chiều với `action-form.js` |
+| | `action-form.js` | 463 | form NCE 8 mục; lớn nhất còn lại, draft-survives-rerender |
+| | `sigma.js` | 414 | trang Six Sigma; đi cùng `sigma-tea.js` |
+| | `sigma-tea.js` | 111 | lớp giải TEa (đã thuần, dễ) |
+| | `audit.js` | 25 | trang nhật ký (mỏng) |
+| | `lis-queue-ui.js` | 36 | hàng chờ LIS (mỏng) |
+| **B. Canvas/adapter** (cần visual/print gate riêng) | `draw.js` | 207 | vẽ Levey-Jennings/CUSUM lên canvas |
+| | `reports.js` | 204 | HTML in `openPrint()` — cần `print-check`/`visual-check` |
+| | `data-io.js` | 274 | xuất CSV/XLSX + `openPrint` wiring |
+| **C. Hạ tầng/bootstrap** (rủi ro cao — kế hoạch yêu cầu làm CUỐI, từng lát độc lập) | `state.js` | 128 | `ensureShape`/state gốc; lifecycle nhạy |
+| | `qc-domain.js` | 255 | wiring Westgard/worker + point derivation |
+| | `state-storage.js` | 120 | load/save + partitioned + boot shell |
+| | `local-store.js` | 13 | IndexedDB mirror (mỏng) |
+| | `firebase-sync.js` | 173 | 3-way merge + retry + online/offline |
+| | `users-auth.js` | 256 | auth/user + PBKDF2 wiring + trang audit |
+| | `action-workflow-service.js` | 149 | vòng đời NCE (self-verifying cache) |
+| | `range.js` | 95 | tính dải mục tiêu |
+| | `backup-ui.js` | 27 | nút backup (mỏng) |
+| | `app-meta.js` | 28 | config Firebase/app — coi như deploy config |
+| | `analyte-catalog.js` | 80 | dữ liệu measurand đóng băng (thuần data) |
+| **D. Lõi UMD + worker** (dự án con parity riêng, làm sau cùng Pha G) | `assets/core.js` | 637 | UMD, dùng chung Node/browser/worker |
+| | `assets/workers/westgard-worker.js` | — | contract worker, cần parity test |
+| **E. Bootstrap cuối** | `assets/app.js` | 9 | entry `boot()` — xử lý ở đầu Pha H |
+
+**Thứ tự đề xuất tiếp theo:** hết nhóm A (route/presentation) → nhóm B (canvas,
+kèm gate visual/print) → nhóm C (hạ tầng, từng lát một, chạy `ui-check` +
+benchmark storage) → nhóm D (`core.js`+worker, lát parity độc lập) → Pha H.
 
 ## 4. Phân lớp đích và trách nhiệm
 
