@@ -37,7 +37,7 @@ declare var AnalysisUIState: any, AuthUIState: any, EntryUIState: any, ManageUIS
 declare var EntryService: any, PeriodService: any, ReagentComparisonService: any, ChartViewModel: any,
   SigmaCohortService: any, SigmaPresentation: any, SigmaPeriodViewModel: any, SigmaBiasService: any, SigmaCohortImportService: any, SigmaPeriodRecordService: any, SigmaLevelEditService: any, SigmaTrackedTestService: any, SigmaBiasWorkflowService: any, SigmaMuWorkflowService: any, SigmaCohortSelectionService: any, SigmaTeaEditService: any, SigmaTeaSnapshotService: any, SigmaLevelSelectionService: any, SigmaPeriodSelectionService: any, WestgardViewModel: any, ActionWorkflowService: any, ActionReviewService: any, ActionEscalationService: any, ActionBiasService: any, ActionBiasPresentation: any, ActionViolationService: any, ActionListPresentation: any, ActionEvidencePresentation: any, ActionRerunEvidencePresentation: any, ActionStatusPresentation: any, ActionReviewPresentation: any, ActionDetailPresentation: any, ActionGuidePresentation: any, ReportPeriodPresentation: any, ManageConfigService: any, LotTransitionPickerService: any,
   qcPointWarnings: any, AuditService: any, ActionRerunService: any, ActionPointIndexService: any,
-  ManageLotGroupActivationCommand: any, ManageLotTransitionCommand: any, ManageLotCommand: any;
+  ManageLotTransitionCommand: any;
 declare var LISClientService: any, lisGatewayRuntime: any,
   lisGatewayConfig: any, lisNormalizeGatewayUrl: any, lisGatewayStatusText: any,
   lisGatewayPull: any,

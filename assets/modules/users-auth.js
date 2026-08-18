@@ -89,35 +89,14 @@ function archiveActivityLog(){
 }
 async function confirmArchiveActivityLog(){
   if(!requireAdmin())return;
-  const rawMonths=(document.getElementById('auditArchiveMonths')||{}).value,archiveWindow=globalThis.activityAuditArchiveWindow?globalThis.activityAuditArchiveWindow(rawMonths):null,months=archiveWindow?archiveWindow.months:Math.max(1,Math.floor(Number(rawMonths)||24));
-  const cutoff=archiveWindow?new Date(archiveWindow.cutoffIso):new Date();if(!archiveWindow)cutoff.setMonth(cutoff.getMonth()-months);
-  const{segment,retained,tipHash}=auditArchiveCut(state.activity,cutoff.toISOString());
-  if(!segment.length){closeModal();await infoDialog('Không có dòng nhật ký nào cũ hơn mốc đã chọn.');return;}
-  if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Lưu trữ nhật ký cũ',message:`Xuất CSV rồi gỡ ${segment.length} dòng nhật ký cũ hơn ${months} tháng?`,detail:`Còn lại ${retained.length} dòng trong hệ thống. File CSV giữ nguyên PrevHash/Hash từng dòng và nối tiếp được vào chuỗi còn lại.`,confirmLabel:'Lưu trữ',cancelLabel:'Hủy'}))return;
-  /* Gỡ vĩnh viễn hàng chục nghìn dòng audit nặng ngang các thao tác trọng yếu khác
-     (duyệt hành động, khóa kỳ, ghi Mean/SD) nên đi cùng một cổng xác thực. */
-  if(!await reauthenticateCurrentUser({title:'Xác thực lưu trữ nhật ký',message:'Nhập lại mật khẩu trước khi gỡ nhật ký cũ khỏi hệ thống.'}))return;
-  try{globalThis.csvDownload('Luu_tru_nhat_ky_QCLab_'+cutoff.toISOString().slice(0,10)+'.csv',activityCSVRows(segment));}
-  catch(e){await infoDialog('Không tạo được file CSV lưu trữ. Nhật ký chưa bị thay đổi.');return;}
-  /* csvDownload() chỉ tạo blob rồi a.click(): trình duyệt chặn tải, người dùng bấm Hủy
-     ở hộp lưu file hay đĩa đầy đều KHÔNG ném lỗi. Vì vậy phải để người dùng tự xác nhận
-     đã thấy file — try/catch ở trên một mình không đảm bảo được điều đó. */
-  if(!await confirmDialog({kicker:'Kiểm tra trước khi gỡ',title:'Đã có file CSV lưu trữ chưa?',message:'Mở thư mục Tải xuống và kiểm tra file vừa tải có mở được và đủ dòng.',detail:'Chỉ bấm "Đã kiểm tra" khi bạn thực sự thấy file — sau bước này các dòng cũ bị gỡ khỏi hệ thống.',confirmLabel:'Đã kiểm tra, gỡ khỏi hệ thống',cancelLabel:'Chưa, giữ nguyên'}))return;
-  /* Cắt prefix + đặt neo, KHÔNG relink: giữ nguyên hash gốc của phần còn lại nên file
-     CSV vừa xuất nối thẳng vào chuỗi đang sống bằng mật mã (hash dòng cuối file chính
-     là neo), và thao tác thành O(1) thay vì băm lại toàn chuỗi. */
-  state.activity=retained;
-  state.activityAnchor=tipHash||'';
-  logAct('Lưu trữ nhật ký hoạt động',`Đã xuất CSV và gỡ ${segment.length} dòng cũ hơn ${months} tháng (mốc ${vnDate(cutoff.toISOString().slice(0,10))}), còn lại ${retained.length} dòng. Hash đỉnh phần lưu trữ: ${tipHash||'—'}`,'Nhật ký');
-  auditPage=1;save({clearDerived:false});closeModal();rerender();
-  await infoDialog(`Đã lưu trữ ${segment.length} dòng nhật ký cũ — file CSV đã được tải xuống.`,{type:'success'});
+  const result=await globalThis.ActivityArchiveCommand.execute((document.getElementById('auditArchiveMonths')||{}).value);if(result.status==='done')auditPage=1;
 }
 async function addUser(){
   if(!requireAdmin())return;
   const username=document.getElementById('uUser').value.trim().toLowerCase();const name=document.getElementById('uName').value.trim();const initials=QCCore.cleanText(document.getElementById('uInitials').value,12).trim().toUpperCase();const rolev=document.getElementById('uRole').value;const pass=document.getElementById('uPass').value;
   const userErr=globalThis.newUserValidationError({username,password:pass,existingUsernames:state.users.map(u=>u.username)});if(userErr){await infoDialog(userErr);return;}
   const pagePerms=await collectUserPerms('newUserPerms',rolev);if(!pagePerms)return;
-  const passHash=await hashPass(pass);globalThis.UserManagementCommand.add(state.users,{id:uid(),username,name,initials,role:rolev,pagePerms,passHash});logAct('Thêm người dùng',roleLabel(rolev)+' · '+pagePerms.length+' thẻ · yêu cầu đổi mật khẩu',username);save({clearDerived:false});rerender();
+  await globalThis.UserLifecycleCommand.add({id:uid(),username,name,initials,role:rolev,pagePerms,password:pass,auditDetail:roleLabel(rolev)+' · '+pagePerms.length+' thẻ · yêu cầu đổi mật khẩu'});rerender();
 }
 function userPermChecks(selectedIds,groupId,roleValue){
   const base=new Set(rolePageIds(roleValue)),initial=selectedIds&&selectedIds.length?selectedIds:rolePageIds(roleValue),selected=new Set(globalThis.selectUserPermissions(initial,[...base]));
@@ -145,9 +124,8 @@ async function applyUserPerms(id){
   const u=state.users.find(x=>x.id===id);if(!u)return;
   if(currentUser&&currentUser.id===id){await infoDialog('Không thể tự sửa quyền của tài khoản đang đăng nhập.');return;}
   const rolev=document.getElementById('editUserRole').value,pagePerms=await collectUserPerms('editUserPerms',rolev);if(!pagePerms)return;
-  globalThis.UserManagementCommand.updatePermissions(u,{role:rolev,pagePerms});
-  logAct('Cập nhật quyền người dùng',`${roleLabel(rolev)} · ${pagePerms.length} thẻ`,u.username);
-  save({clearDerived:false});closeModal();if(!canAccessPage(page))page=firstAccessPage();renderBrand();nav();rerender();
+  globalThis.UserLifecycleCommand.updatePermissions(u,{role:rolev,pagePerms,auditDetail:`${roleLabel(rolev)} · ${pagePerms.length} thẻ`});
+  closeModal();if(!canAccessPage(page))page=firstAccessPage();renderBrand();nav();rerender();
 }
 function resetPass(id){
   if(!requireAdmin())return;
@@ -161,12 +139,11 @@ async function applyResetPass(id){
   const u=state.users.find(x=>x.id===id);if(!u)return;
   const p1=document.getElementById('resetPass1').value,p2=document.getElementById('resetPass2').value,msg=document.getElementById('resetPassMsg'),err=globalThis.passwordChangeError(p1,p2);
   if(err){if(msg)msg.innerHTML=`<div class="auth-err">${esc(err)}</div>`;return;}
-  globalThis.UserManagementCommand.resetPassword(u,await hashPass(p1),!(currentUser&&currentUser.id===id));
-  logAct('Đổi mật khẩu',u.mustChangePassword?'Đặt mật khẩu tạm và yêu cầu đổi lại':'Người dùng đổi mật khẩu',u.username);
-  save({clearDerived:false});closeModal();rerender();await infoDialog(u.mustChangePassword?'Đã đặt mật khẩu tạm. Người dùng sẽ phải đổi mật khẩu khi đăng nhập.':'Đã cập nhật mật khẩu.',{type:'success'});
+  const updated=await globalThis.UserLifecycleCommand.resetPassword(u,p1,!(currentUser&&currentUser.id===id));
+  closeModal();rerender();await infoDialog(updated.mustChangePassword?'Đã đặt mật khẩu tạm. Người dùng sẽ phải đổi mật khẩu khi đăng nhập.':'Đã cập nhật mật khẩu.',{type:'success'});
 }
-function toggleUser(id){if(!requireAdmin())return;const u=state.users.find(x=>x.id===id);globalThis.UserManagementCommand.toggle(u);logAct(u.active?'Mở khóa người dùng':'Khóa người dùng','Cập nhật trạng thái tài khoản',u.username);save({clearDerived:false});rerender();}
-async function delUser(id){if(!requireAdmin())return;if(id===currentUser.id){await infoDialog('Không thể xóa chính mình.');return;}const u=state.users.find(x=>x.id===id);if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa người dùng',message:`Xóa người dùng ${u?(u.name||u.username):''}?`,confirmLabel:'Xóa người dùng',cancelLabel:'Hủy'}))return;const removed=globalThis.UserManagementCommand.remove(state.users,id);logAct('Xóa người dùng','Xóa tài khoản khỏi hệ thống',removed?removed.username:'');save({clearDerived:false});rerender();}
+function toggleUser(id){if(!requireAdmin())return;const u=state.users.find(x=>x.id===id);globalThis.UserLifecycleCommand.toggle(u);rerender();}
+async function delUser(id){if(!requireAdmin())return;if(id===currentUser.id){await infoDialog('Không thể xóa chính mình.');return;}const u=state.users.find(x=>x.id===id);if(!await confirmDialog({kicker:'Thao tác không thể hoàn tác',title:'Xóa người dùng',message:`Xóa người dùng ${u?(u.name||u.username):''}?`,confirmLabel:'Xóa người dùng',cancelLabel:'Hủy'}))return;globalThis.UserLifecycleCommand.remove(id);rerender();}
 
 /* ===== AUTH ===== */
 const PASS_ITERATIONS=600000; /* OWASP: >=600k vòng PBKDF2-SHA256. Hash cũ 210k vẫn xác thực (verifyPass đọc số vòng từ chuỗi hash) và tự nâng cấp khi đăng nhập. */
@@ -207,7 +184,7 @@ function reauthenticateCurrentUser({title='Xác thực lại',message='Nhập l�
     <div class="confirm-modal-actions">${btn('Hủy','closeDialogOverlay(false)','ghost')}${btn('Xác thực','confirmReauthentication()','teal')}</div>
   </div>`,resolve));
 }
-async function ensureAdmin(){if(!state.users||!state.users.length){const id=uid(),passHash=await legacyHashPass('admin');state.users=[globalThis.defaultAdminUserFactory(id,passHash)];save({cloud:false,clearDerived:false});}}
+async function ensureAdmin(){await globalThis.AdminBootstrapCommand.ensure();}
 function blankAppState(users){
   return globalThis.blankAppStateFactory(users);
 }
@@ -279,21 +256,13 @@ async function doLogin(){
   // nếu không kẻ dò có thể dùng đó để liệt kê username hợp lệ trước khi dò mật khẩu.
   // Chi tiết thật (để phân biệt khi tra soát) chỉ ghi vào nhật ký hoạt động nội bộ.
   const genericFailMsg='Tên đăng nhập hoặc mật khẩu không đúng.';
-  if(globalThis.loginLockoutPolicy?globalThis.loginLockoutPolicy.isLocked(loginLockUntil,Date.now()):Date.now()<loginLockUntil){const now=Date.now(),seconds=globalThis.loginLockoutPolicy?globalThis.loginLockoutPolicy.remainingSeconds(loginLockUntil,now):Math.ceil((loginLockUntil-now)/1000),msg=globalThis.loginLockoutPolicy?globalThis.loginLockoutPolicy.message(loginLockUntil,now):'Sai mật khẩu quá nhiều lần. Thử lại sau '+seconds+' giây.';showLogin(msg);return;}
   if(typeof storageHydrationPromise!=='undefined'&&!await storageHydrationPromise){showStartupRecovery();return;}
-  const user=state.users.find(x=>x.username===u);
-  const failOnce=(logDetail,msg)=>{if(globalThis.loginLockoutPolicy){const next=globalThis.loginLockoutPolicy.recordFailure({fails:loginFails,until:loginLockUntil},Date.now());loginFails=next.fails;loginLockUntil=next.until;}else{loginFails++;if(loginFails>=5){loginLockUntil=Date.now()+30000;loginFails=0;}}persistLoginLockout();logAct('Đăng nhập thất bại',logDetail,u);save({cloud:false,clearDerived:false});showLogin(msg);};
-  if(!user||user.active===false){failOnce('Tài khoản không tồn tại hoặc đã bị khóa',genericFailMsg);return;}
-  let ok=false;try{ok=await verifyPass(p,user.passHash);}catch(e){showLogin('Không thể kiểm tra mật khẩu trên trình duyệt này.');return;}
-  if(!ok){failOnce('Sai mật khẩu',genericFailMsg);return;}
-  if(globalThis.loginLockoutPolicy){const next=globalThis.loginLockoutPolicy.reset();loginFails=next.fails;loginLockUntil=next.until;}else{loginFails=0;loginLockUntil=0;}persistLoginLockout();
-  currentUser=user;logAct('Đăng nhập','Đăng nhập thành công','Tài khoản');
-  if(user.username==='admin'&&p==='admin'&&!(globalThis.isPbkdf2PasswordHash?globalThis.isPbkdf2PasswordHash(user.passHash):String(user.passHash||'').startsWith('pbkdf2$')))user.mustChangePassword=true;
-  else if(globalThis.passwordHashNeedsUpgrade?globalThis.passwordHashNeedsUpgrade(user.passHash):(!String(user.passHash||'').startsWith('pbkdf2$')||+(String(user.passHash).split('$')[1]||0)<PASS_ITERATIONS)){
-    /* Nâng cấp hash trong suốt: dùng đúng mật khẩu vừa xác thực để băm lại theo chuẩn mới. */
-    try{user.passHash=await hashPass(p);logAct('Nâng cấp mật khẩu','Tự động băm lại theo chuẩn mới khi đăng nhập','Tài khoản');}catch(e){}
-  }
-  save({cloud:false,clearDerived:false});if(user.mustChangePassword)showPasswordChange();else showApp();
+  const result=await globalThis.LoginWorkflowCommand.authenticate({users:state.users,username:u,password:p,lock:{fails:loginFails,until:loginLockUntil},now:Date.now()});
+  if(result.status==='locked'){showLogin(result.message);return;}
+  if(result.status==='failed'){if(result.reason==='verification-error'){showLogin('Không thể kiểm tra mật khẩu trên trình duyệt này.');return;}loginFails=result.lock.fails;loginLockUntil=result.lock.until;persistLoginLockout();showLogin(genericFailMsg);return;}
+  loginFails=result.lock.fails;loginLockUntil=result.lock.until;persistLoginLockout();
+  currentUser=result.user;
+  if(currentUser.mustChangePassword)showPasswordChange();else showApp();
 }
 function showPasswordChange(msg){
   let ov=document.getElementById('authOverlay');if(!ov){ov=document.createElement('div');ov.id='authOverlay';document.body.appendChild(ov);}ov.style.display='flex';
@@ -306,11 +275,12 @@ function showPasswordChange(msg){
   setTimeout(()=>{const e=document.getElementById('newPass1');if(e)e.focus();},50);
 }
 async function changeRequiredPassword(){
-  const p1=document.getElementById('newPass1').value,p2=document.getElementById('newPass2').value,err=globalThis.passwordChangeError?globalThis.passwordChangeError(p1,p2):passwordError(p1)||(p1!==p2?'Hai mật khẩu không khớp.':'');
-  if(err){showPasswordChange(err);return;}
-  currentUser.passHash=await hashPass(p1);currentUser.mustChangePassword=false;logAct('Đổi mật khẩu','Người dùng cập nhật mật khẩu','Tài khoản');save({cloud:!!(fb&&fb.initialized),clearDerived:false});showApp();
+  const p1=document.getElementById('newPass1').value,p2=document.getElementById('newPass2').value;
+  const result=await globalThis.RequiredPasswordWorkflowCommand.complete({user:currentUser,password:p1,confirmation:p2,cloud:!!(fb&&fb.initialized)});
+  if(result.status==='invalid'){showPasswordChange(result.error);return;}
+  currentUser=result.user;showApp();
 }
-function logout(){if(currentUser){logAct('Đăng xuất','Đăng xuất khỏi phần mềm','Tài khoản');save({cloud:false,clearDerived:false});}currentUser=null;page='dash';showLogin();}
+function logout(){if(currentUser)globalThis.LoginWorkflowCommand.logout();currentUser=null;page='dash';showLogin();}
 function showApp(){
   const ov=document.getElementById('authOverlay');if(ov)ov.style.display='none';
   if(!canAccessPage(page))page=firstAccessPage();

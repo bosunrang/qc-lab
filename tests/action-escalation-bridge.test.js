@@ -7,7 +7,7 @@ const route=fs.readFileSync(path.join(root,'assets','modules','actions-routes.js
 const bridge=fs.readFileSync(path.join(root,'src','compat','modular-pilot.global.ts'),'utf8');
 
 assert.match(route,/return ActionEscalationService\.canEscalate\(state\.actions\|\|\[\],a\);/,'Chuyển tiếp NCE phải dùng service TypeScript');
-assert.match(route,/NceLifecycleCommand\.execute\(\{kind:'escalate'/,'Tạo hồ sơ NCE tiếp theo phải dùng command TypeScript');
+assert.match(route,/NceLifecycleWorkflowCommand\.execute\(\{kind:'escalate'/,'Tạo hồ sơ NCE tiếp theo phải dùng workflow TypeScript');
 assert.match(bridge,/ActionEscalationService: ActionEscalationService;/,'Chuyển tiếp NCE phải là hợp đồng bridge bắt buộc');
 
 console.log('Action escalation TypeScript bridge tests passed');

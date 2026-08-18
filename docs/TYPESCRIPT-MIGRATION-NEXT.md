@@ -1,18 +1,23 @@
 # Bàn giao chuyển đổi TypeScript
 
-## Checkpoint hiện tại — 2026-08-17
+## Checkpoint hiện tại — 2026-08-18
 
-- Tiến độ ước tính: **80% tổng thể**; Wave E đã hoàn thành phạm vi retire facade,
-  sau đó tiếp tục dọn các dependency nội bộ phát hiện ở strict scan.
+- Tiến độ ước tính: **82% tổng thể** (kiểm chứng độc lập: 80–88%, xem ghi chú
+  bên dưới) — con số 80% ở checkpoint trước là chính xác, nếu có lệch thì hơi
+  bảo thủ.
 - Xác minh gần nhất: `npm.cmd run build:pilot`, `npm.cmd run typecheck` và
-  `npm.cmd test` đều đạt; test suite **588/588 pass**.
+  `npm.cmd test` đều đạt; test suite **607/607 pass**.
 - Wave F validation đã đạt: `ui-check` 28/28, `nce-check` 91/91,
   `visual-check`, `a11y-audit` (0 vi phạm), `print-check` và
   `verify-release` (dependency audit + performance regression) đều pass.
 - `assets/generated/modular-pilot.js`: bundle sinh từ Vite, không sửa trực tiếp.
 - Bundle runtime hiện dùng tag
-  `ts-backup-export-command-20260817-1`; phải tăng tag tương ứng nếu sửa
+  `ts-auth-workflow-20260818-1`; phải tăng tag tương ứng nếu sửa
   artifact runtime.
+- **Ghi chú tài liệu (2026-08-18):** `reagent.js` (Passing-Bablok/Deming/
+  Bland-Altman) đã có đủ `src/domain/reagent/`, `reagent-comparison-service.ts`
+  và `src/presentation/reagent/` (26 file) từ trước, chỉ là lịch sử "Đã hoàn
+  thành" bên dưới chưa từng ghi lại — không phải phần code còn thiếu.
 
 ## Đã hoàn thành
 
@@ -37,15 +42,84 @@
    export backup đã chuyển vào `BackupImportCommand`,
    `BackupInspectionCommand`, `BackupStatusCommand` và `BackupExportCommand`.
    `backup-ui.js` chỉ còn adapter File/DOM/dialog.
+9. **Wave F — xác thực:** `LoginCommand` sở hữu quyết định khóa tạm, xác thực
+   và nâng cấp hash; `RequiredPasswordCommand` kiểm tra/xác nhận mật khẩu bắt
+   buộc đổi trước khi cập nhật tài khoản. `users-auth.js` chỉ giữ form, audit,
+   lưu trạng thái và điều hướng giao diện.
+10. **Wave F — audit:** `ActivityArchiveCommand` điều phối cắt prefix, đặt neo
+    hash, xác thực lại, xuất CSV và lưu trạng thái; adapter classic chỉ mở modal
+    và chuyển giá trị tháng từ form.
+11. **Wave F — bootstrap:** `AdminBootstrapCommand` đảm bảo tạo duy nhất tài
+    khoản admin mặc định khi state chưa có người dùng; wrapper classic không còn
+    trực tiếp gán `state.users`.
+12. **Wave F — vòng đời người dùng:** `UserLifecycleCommand` sở hữu thêm, phân
+    quyền, đặt lại mật khẩu, khóa/mở khóa và xóa tài khoản, bao gồm audit và save.
+    `UserManagementCommand` trở thành dependency nội bộ bundle, không còn ambient
+    global; `users-auth.js` chỉ giữ form, dialog và điều hướng.
+13. **Wave F — khóa kỳ:** `ReportPeriodWorkflowCommand` điều phối lock/unlock,
+    audit, save và render. `ReportPeriodCommand` được thu về dependency nội bộ;
+    `report-routes.js` chỉ xử lý confirm, re-auth, modal và phản hồi hiển thị.
+14. **Wave F — lifecycle NCE:** `NceLifecycleWorkflowCommand` sở hữu mutation,
+    audit, save và render cho hủy/duyệt/trả lại/mở lại/escalate. Command lifecycle
+    thấp hơn trở thành dependency nội bộ; `actions-routes.js` giữ cổng UI và modal.
+15. **Wave F — form NCE:** `NceFormWorkflowCommand` sở hữu tạo/cập nhật, audit,
+    reset form, save và render. `NceFormCommand` được thu về dependency nội bộ;
+    `action-form.js` chỉ đọc snapshot form và hiển thị lỗi/cổng focus.
+16. **Wave F — hủy điểm QC:** `EntryVoidWorkflowCommand` sở hữu mutation, audit
+    và save; `EntryVoidCommand` được thu về dependency nội bộ. Route giữ modal,
+    xác nhận và thông báo kết quả tại bảng nhập QC.
+17. **Wave F — ghi điểm QC:** `EntryRecordWorkflowCommand` sở hữu mutation, audit
+    và save, còn route giữ verdict/feedback và vị trí cuộn. `EntryRecordCommand`
+    được thu về dependency nội bộ bundle.
+18. **Wave F — máy xét nghiệm:** `ManageInstrumentWorkflowCommand` sở hữu thêm,
+    sửa, xóa máy cùng audit/save/render. Command thấp hơn được thu về dependency
+    nội bộ; route Manage chỉ xử lý form và xác nhận xóa.
+19. **Wave F — Panel QC:** `ManagePanelWorkflowCommand` sở hữu thêm/sửa/xóa Panel
+    cùng audit/save/render. Command thấp hơn được thu về dependency nội bộ; route
+    Manage chỉ xử lý form và xác nhận xóa.
+20. **Wave F — Lô/Xét nghiệm/Nhóm lô:** `ManageLotWorkflowCommand` (thêm/sửa/xóa
+    lô, gồm cả xác nhận đổi số lô hàng loạt), `ManageAssayWorkflowCommand` (thêm/
+    sửa xét nghiệm), `ManageLotTransitionWorkflowCommand` (xóa dòng chuyển tiếp)
+    và `ManageLotGroupWorkflowCommand` (dừng nhóm lô; kích hoạt nhóm lô với 3
+    nhánh trạng thái applied/already-active/unready) sở hữu audit/save/render.
+    `ManageLotCommand`, `ManageAssayCommand`, `ManageLotGroupActivationCommand`
+    mất hết caller JS trực tiếp nên được thu về dependency nội bộ bundle (theo
+    đúng mẫu Instrument/Panel), gỡ khỏi ambient global trong `global.d.ts`.
+    `manage-tests-actions.js` (`saveConfigLot`, `deleteConfigLot`,
+    `saveConfigAssay`, `deleteLotTransition`, `toggleLotGroupStatus`,
+    `activateLotGroup`) chỉ còn đọc DOM và chọn nội dung hộp thoại xác nhận.
+21. **Wave F — Nhóm lô + Mean/SD:** `ManageLotGroupWorkflowCommand` gộp thêm
+    `save`/`remove` (thêm/xóa nhóm lô, gồm cả đồng bộ `reconcileSigmaLevelsWithLotGroups()`
+    vào audit detail). `ManageTargetMatrixWorkflowCommand` (file mới) sở hữu
+    audit/save/render cho `commitTargetMatrix()` — dùng lại `target-matrix-command.ts`
+    vốn đã có sẵn từ trước nhưng chưa từng được wire vào bundle (import chết,
+    không ai gọi `createTargetMatrixCommand`). `ManageLotGroupCommand` mất hết
+    caller JS trực tiếp nên cũng được thu về dependency nội bộ như `ManageLotCommand`/
+    `ManageAssayCommand`/`ManageLotGroupActivationCommand`. `saveConfigGroup`,
+    `deleteConfigGroup`, `commitTargetMatrix` trong `manage-tests-actions.js` chỉ
+    còn đọc DOM; tham số `panel` không dùng tới trong `commitTargetMatrix()`
+    (bug có từ trước, đọc `manageTargetPanel` toàn cục thay vì tham số) được dọn
+    khỏi chữ ký hàm và `targetSwitchCtx` luôn.
+22. **Wave F — Auth (đăng nhập/đăng xuất/đổi mật khẩu bắt buộc):** rà soát
+    Settings/Users/Report cho thấy Settings và Report đã thin sẵn từ trước
+    (toàn bộ qua `SettingsProfileCommand`/`SettingsFirebaseCommand`/
+    `ReportPeriodWorkflowCommand`); Users page cũng đã xong qua
+    `UserLifecycleCommand`. Chỗ còn sót duy nhất là 3 hàm trong phần AUTH của
+    `users-auth.js`: `doLogin()`, `changeRequiredPassword()`, `logout()` — vẫn
+    tự gọi `logAct`/`save` sau khi `LoginCommand`/`RequiredPasswordCommand`
+    quyết định xong. `LoginWorkflowCommand` (mới, gộp cả `logout()`) và
+    `RequiredPasswordWorkflowCommand` (mới) sở hữu audit/save; JS chỉ còn giữ
+    trạng thái khóa đăng nhập (`loginFails`/`loginLockUntil`/
+    `persistLoginLockout()` — bookkeeping localStorage cục bộ, không phải audit)
+    và điều hướng màn hình (`showLogin`/`showPasswordChange`/`showApp`).
+    `LoginCommand`/`RequiredPasswordCommand` mất hết caller JS trực tiếp nên
+    cũng được thu về dependency nội bộ.
 
 ## Việc tiếp theo (ưu tiên)
 
 1. **Wave F — strictness:** tiếp tục giảm ambient global chỉ còn dùng nội bộ;
    ưu tiên service/command có adapter JS mỏng và caller runtime rõ ràng.
-2. **Wave F — adapter migration:** đưa orchestration còn nằm trong route classic
-   (Manage, Settings, Users, Report) vào command TypeScript; giữ DOM, canvas,
-   File, Firebase SDK và Electron ở JavaScript.
-3. **Wave F — release hardening:** sau mỗi lát runtime, chạy cổng phù hợp; trước
+2. **Wave F — release hardening:** sau mỗi lát runtime, chạy cổng phù hợp; trước
    phát hành chạy lại `verify-release` cùng UI/visual/a11y/print/Electron.
 
 ## Quy tắc làm việc

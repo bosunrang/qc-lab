@@ -1,0 +1,22 @@
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+
+const program=`import {createLoginCommand} from './src/application/auth/login-command.ts';
+const now=1000;let hashes=0;const command=createLoginCommand({isLocked:(until,at)=>until>at,lockedMessage:()=> 'Bị khóa',recordFailure:lock=>({fails:lock.fails+1,until:0}),resetLock:()=>({fails:0,until:0}),verify:async(password,stored)=>password===stored,hash:async password=>{hashes++;return 'new:'+password;},isPbkdf2:stored=>stored.startsWith('pbkdf2$'),hashNeedsUpgrade:stored=>stored==='old'});
+const inactive=await command.authenticate({users:[{username:'disabled',passHash:'pass',active:false}],username:'disabled',password:'pass',lock:{fails:0,until:0},now});
+const invalid=await command.authenticate({users:[{username:'user',passHash:'pass'}],username:'user',password:'bad',lock:{fails:2,until:0},now});
+const locked=await command.authenticate({users:[],username:'user',password:'pass',lock:{fails:0,until:2000},now});
+const legacyAdmin={username:'admin',passHash:'admin'};const admin=await command.authenticate({users:[legacyAdmin],username:'admin',password:'admin',lock:{fails:3,until:0},now});
+const upgradeUser={username:'user',passHash:'old'};const upgraded=await command.authenticate({users:[upgradeUser],username:'user',password:'old',lock:{fails:0,until:0},now});
+console.log(JSON.stringify({inactive,invalid,locked,admin:{status:admin.status,marked:admin.status==='authenticated'&&admin.markedDefaultPassword,mustChange:legacyAdmin.mustChangePassword},upgraded:{status:upgraded.status,upgraded:upgraded.status==='authenticated'&&upgraded.upgradedPassword,hash:upgradeUser.passHash},hashes}));`;
+const output=spawnSync(process.execPath,['--experimental-strip-types','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(output.status,0,output.stderr);
+const value=JSON.parse(output.stdout);
+assert.deepEqual(value.inactive,{status:'failed',lock:{fails:1,until:0},reason:'missing-or-inactive'});
+assert.deepEqual(value.invalid,{status:'failed',lock:{fails:3,until:0},reason:'invalid-password'});
+assert.deepEqual(value.locked,{status:'locked',lock:{fails:0,until:2000},message:'Bị khóa'});
+assert.deepEqual(value.admin,{status:'authenticated',marked:true,mustChange:true});
+assert.deepEqual(value.upgraded,{status:'authenticated',upgraded:true,hash:'new:old'});
+assert.equal(value.hashes,1);
+console.log('Login command TypeScript tests passed');

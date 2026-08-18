@@ -7,13 +7,13 @@ const form=fs.readFileSync(path.join(root,'assets','modules','action-form.js'),'
 const route=fs.readFileSync(path.join(root,'assets','modules','actions-routes.js'),'utf8');
 const bridge=fs.readFileSync(path.join(root,'src','compat','modular-pilot.global.ts'),'utf8');
 
-assert.match(form,/globalThis\.NceFormCommand\.submit\(\{actions:state\.actions,/,'Tạo/cập nhật hồ sơ NCE phải đi qua command TypeScript duy nhất');
+assert.match(form,/globalThis\.NceFormWorkflowCommand\.submit\(\{editId:editing&&editing\.id,/,'Tạo/cập nhật hồ sơ NCE phải đi qua workflow TypeScript duy nhất');
 assert.match(route,/ActionReviewService\.approvalReadiness\(a,currentUser\)/,'Duyệt hồ sơ NCE phải dùng service TypeScript');
 assert.match(bridge,/ActionReviewService: ActionReviewService;/,'Review NCE phải là hợp đồng bridge bắt buộc');
 assert.match(bridge,/const actionRecordService: ActionRecordService = createActionRecordService\(/,'Hồ sơ NCE phải là dependency nội bộ của command TypeScript');
 assert.doesNotMatch(bridge,/root\.ActionRecordService\s*=/,'Không công bố facade hồ sơ NCE không có caller classic');
-assert.match(bridge,/NceFormCommand: NceFormCommand;/,'Command form NCE phải là hợp đồng bridge bắt buộc');
-assert.match(route,/globalThis\.NceLifecycleCommand\.execute\(/,'Các mutation lifecycle NCE phải đi qua command TypeScript duy nhất');
-assert.match(bridge,/NceLifecycleCommand: NceLifecycleCommand;/,'Command lifecycle NCE phải là hợp đồng bridge bắt buộc');
+assert.match(bridge,/NceFormWorkflowCommand: NceFormWorkflowCommand;/,'Workflow form NCE phải là hợp đồng bridge bắt buộc');
+assert.match(route,/globalThis\.NceLifecycleWorkflowCommand\.execute\(/,'Các mutation lifecycle NCE phải đi qua workflow TypeScript duy nhất');
+assert.match(bridge,/NceLifecycleWorkflowCommand: NceLifecycleWorkflowCommand;/,'Workflow lifecycle NCE phải là hợp đồng bridge bắt buộc');
 
 console.log('Action record and review TypeScript bridge tests passed');

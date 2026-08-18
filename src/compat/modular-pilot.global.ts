@@ -1,7 +1,9 @@
 import { chartViewModel, type ChartViewModelApi } from '../domain/charts/chart-view-model';
 import { createEntryService, type EntryServiceApi } from '../application/entry/entry-service';
-import { createEntryRecordCommand, type EntryRecordCommand } from '../application/entry/entry-record-command';
-import { createEntryVoidCommand, type EntryVoidCommand } from '../application/entry/entry-void-command';
+import { createEntryRecordCommand } from '../application/entry/entry-record-command';
+import { createEntryRecordWorkflowCommand, type EntryRecordWorkflowCommand } from '../application/entry/entry-record-workflow-command';
+import { createEntryVoidCommand } from '../application/entry/entry-void-command';
+import { createEntryVoidWorkflowCommand, type EntryVoidWorkflowCommand } from '../application/entry/entry-void-workflow-command';
 import {
   BACKUP_IMPORT_MAX_BYTES,
   BACKUP_IMPORT_WARN_BYTES,
@@ -22,7 +24,13 @@ import { createBackupSizeConfirmation } from '../presentation/backup/backup-size
 import { createBackupSizeWarningConfirmation } from '../presentation/backup/backup-size-warning-confirmation';
 import { createBackupExportMessage } from '../presentation/backup/backup-export-message';
 import { createResetOperationalDataCommand, type ResetOperationalDataCommand } from '../application/auth/reset-operational-data-command';
-import { createUserManagementCommand, type UserManagementCommand } from '../application/auth/user-management-command';
+import { createUserManagementCommand } from '../application/auth/user-management-command';
+import { createLoginCommand } from '../application/auth/login-command';
+import { createRequiredPasswordCommand } from '../application/auth/required-password-command';
+import { createLoginWorkflowCommand, type LoginWorkflowCommand } from '../application/auth/login-workflow-command';
+import { createRequiredPasswordWorkflowCommand, type RequiredPasswordWorkflowCommand } from '../application/auth/required-password-workflow-command';
+import { createAdminBootstrapCommand, type AdminBootstrapCommand } from '../application/auth/admin-bootstrap-command';
+import { createUserLifecycleCommand, type UserLifecycleCommand } from '../application/auth/user-lifecycle-command';
 import { createBackupImportConfirmation } from '../presentation/backup/backup-import-confirmation';
 import { createBackupImportMessage } from '../presentation/backup/backup-import-message';
 import { createBackupOversizeConfirmation } from '../presentation/backup/backup-oversize-confirmation';
@@ -30,19 +38,28 @@ import {
   createManageConfigService,
   type ManageConfigServiceApi,
 } from '../application/manage/manage-config-service';
-import { createManageAssayCommand, type ManageAssayCommand } from '../application/manage/manage-assay-command';
+import { createManageAssayCommand } from '../application/manage/manage-assay-command';
 import { createManageAssayRemovalCommand, type ManageAssayRemovalCommand } from '../application/manage/manage-assay-removal-command';
-import { createManageInstrumentCommand, type ManageInstrumentCommand } from '../application/manage/manage-instrument-command';
-import { createManagePanelCommand, type ManagePanelCommand } from '../application/manage/manage-panel-command';
-import { createManageLotGroupCommand, type ManageLotGroupCommand } from '../application/manage/manage-lot-group-command';
-import { createManageLotGroupActivationCommand, type ManageLotGroupActivationCommand } from '../application/manage/manage-lot-group-activation-command';
+import { createManageInstrumentCommand } from '../application/manage/manage-instrument-command';
+import { createManageInstrumentWorkflowCommand, type ManageInstrumentWorkflowCommand } from '../application/manage/manage-instrument-workflow-command';
+import { createManagePanelCommand } from '../application/manage/manage-panel-command';
+import { createManagePanelWorkflowCommand, type ManagePanelWorkflowCommand } from '../application/manage/manage-panel-workflow-command';
+import { createManageLotGroupCommand } from '../application/manage/manage-lot-group-command';
+import { createManageLotGroupActivationCommand } from '../application/manage/manage-lot-group-activation-command';
 import { createManageLotTransitionCommand, type ManageLotTransitionCommand } from '../application/manage/manage-lot-transition-command';
-import { createManageLotCommand, type ManageLotCommand } from '../application/manage/manage-lot-command';
+import { createManageLotCommand } from '../application/manage/manage-lot-command';
+import { createManageLotWorkflowCommand, type ManageLotWorkflowCommand } from '../application/manage/manage-lot-workflow-command';
+import { createManageAssayWorkflowCommand, type ManageAssayWorkflowCommand } from '../application/manage/manage-assay-workflow-command';
+import { createManageLotTransitionWorkflowCommand, type ManageLotTransitionWorkflowCommand } from '../application/manage/manage-lot-transition-workflow-command';
+import { createManageLotGroupWorkflowCommand, type ManageLotGroupWorkflowCommand } from '../application/manage/manage-lot-group-workflow-command';
+import { createManageTargetMatrixWorkflowCommand, type ManageTargetMatrixWorkflowCommand } from '../application/manage/manage-target-matrix-workflow-command';
 import { createTargetMatrixCommand } from '../application/manage/target-matrix-command';
 import { createTeaReferenceService, type TeaReferenceServiceApi } from '../application/manage/tea-reference-service';
 import { createPeriodService, type PeriodServiceApi } from '../application/period/period-service';
 import { createReportPeriodCommand, type ReportPeriodCommand } from '../application/period/report-period-command';
+import { createReportPeriodWorkflowCommand, type ReportPeriodWorkflowCommand } from '../application/period/report-period-workflow-command';
 import { createAuditService, type AuditServiceApi } from '../application/audit/audit-service';
+import { createActivityArchiveCommand, type ActivityArchiveCommand } from '../application/audit/activity-archive-command';
 import {
   createLisClient,
   createLisGatewayRuntime,
@@ -695,8 +712,10 @@ import { createActionReviewService, type ActionReviewService } from '../applicat
 import { actionReviewMessages } from '../presentation/nce/action-review-messages';
 import { createActionEscalationService, type ActionEscalationService } from '../application/nce/action-escalation-service';
 import { createActionRecordService, type ActionRecordService } from '../application/nce/action-record-service';
-import { createNceFormCommand, type NceFormCommand } from '../application/nce/nce-form-command';
-import { createNceLifecycleCommand, type NceLifecycleCommand } from '../application/nce/nce-lifecycle-command';
+import { createNceFormCommand } from '../application/nce/nce-form-command';
+import { createNceFormWorkflowCommand, type NceFormWorkflowCommand } from '../application/nce/nce-form-workflow-command';
+import { createNceLifecycleCommand } from '../application/nce/nce-lifecycle-command';
+import { createNceLifecycleWorkflowCommand, type NceLifecycleWorkflowCommand } from '../application/nce/nce-lifecycle-workflow-command';
 import { createActionRerunService, type ActionRerunService } from '../application/nce/action-rerun-service';
 import { createActionPointIndexService, type ActionPointIndexService } from '../application/nce/action-point-index-service';
 import { createActionCurrentIssues, type ActionCurrentIssuesApi } from '../application/nce/action-current-issues';
@@ -822,8 +841,8 @@ type QCLabGlobal = typeof globalThis & {
   ActionReviewService: ActionReviewService;
   ActionReviewMessages: typeof actionReviewMessages;
   ActionEscalationService: ActionEscalationService;
-  NceFormCommand: NceFormCommand;
-  NceLifecycleCommand: NceLifecycleCommand;
+  NceFormWorkflowCommand: NceFormWorkflowCommand;
+  NceLifecycleWorkflowCommand: NceLifecycleWorkflowCommand;
   ActionRerunService: ActionRerunService;
   ActionPointIndexService: ActionPointIndexService;
   ActionCurrentIssues?: ActionCurrentIssuesApi;
@@ -845,17 +864,18 @@ type QCLabGlobal = typeof globalThis & {
   reportActionIconPresentation: typeof reportActionIconPresentation;
   ChartViewModel?: ChartViewModelApi;
   EntryService: EntryServiceApi;
-  EntryRecordCommand: EntryRecordCommand;
-  EntryVoidCommand: EntryVoidCommand;
+  EntryRecordWorkflowCommand: EntryRecordWorkflowCommand;
+  EntryVoidWorkflowCommand: EntryVoidWorkflowCommand;
   ManageConfigService: ManageConfigServiceApi;
-  ManageAssayCommand: ManageAssayCommand;
   ManageAssayRemovalCommand: ManageAssayRemovalCommand;
-  ManageInstrumentCommand: ManageInstrumentCommand;
-  ManagePanelCommand: ManagePanelCommand;
-  ManageLotGroupCommand: ManageLotGroupCommand;
-  ManageLotGroupActivationCommand: ManageLotGroupActivationCommand;
+  ManageInstrumentWorkflowCommand: ManageInstrumentWorkflowCommand;
+  ManagePanelWorkflowCommand: ManagePanelWorkflowCommand;
   ManageLotTransitionCommand: ManageLotTransitionCommand;
-  ManageLotCommand: ManageLotCommand;
+  ManageLotWorkflowCommand: ManageLotWorkflowCommand;
+  ManageAssayWorkflowCommand: ManageAssayWorkflowCommand;
+  ManageLotTransitionWorkflowCommand: ManageLotTransitionWorkflowCommand;
+  ManageLotGroupWorkflowCommand: ManageLotGroupWorkflowCommand;
+  ManageTargetMatrixWorkflowCommand: ManageTargetMatrixWorkflowCommand;
   TeaReferenceService: TeaReferenceServiceApi;
   LotTransitionPickerService: LotTransitionPickerServiceApi;
   PeriodService: PeriodServiceApi;
@@ -1032,7 +1052,11 @@ type QCLabGlobal = typeof globalThis & {
   BackupInspectionCommand: BackupInspectionCommand;
   BackupStatusCommand: BackupStatusCommand;
   ResetOperationalDataCommand: ResetOperationalDataCommand;
-  UserManagementCommand: UserManagementCommand;
+   LoginWorkflowCommand: LoginWorkflowCommand;
+   RequiredPasswordWorkflowCommand: RequiredPasswordWorkflowCommand;
+   AdminBootstrapCommand: AdminBootstrapCommand;
+   UserLifecycleCommand: UserLifecycleCommand;
+   ActivityArchiveCommand: ActivityArchiveCommand;
   lisQueuePresentation: ReturnType<typeof createLisQueuePresentation>;
   lisSettingsService: ReturnType<typeof createLisSettingsService>;
   LisGatewayCommand: LisGatewayCommand;
@@ -1141,7 +1165,7 @@ type QCLabGlobal = typeof globalThis & {
   reportLockPanelHtmlPresentation: ReturnType<typeof createReportLockPanelHtml>;
   reportPageHtml: ReturnType<typeof createReportPageHtml>;
   reportRangePickerHtml: ReturnType<typeof createReportRangePickerHtml>;
-  ReportPeriodCommand: ReportPeriodCommand;
+  ReportPeriodWorkflowCommand: ReportPeriodWorkflowCommand;
   dashboardLoadingPresentation: ReturnType<typeof createDashboardLoading>;
   dashboardStatusFilter: ReturnType<typeof createDashboardStatusFilter>;
   dashboardExpiringLots: typeof dashboardExpiringLots;
@@ -1990,7 +2014,8 @@ root.reportLockPicker=reportLockPicker;
 root.reportLockPanelHtmlPresentation=createReportLockPanelHtml({button:(label,action,variant,title,options)=>(root as any).btn(label,action,variant,title,options)});
 root.reportPageHtml=createReportPageHtml({head:(title,subtitle)=>(root as any).headOnly(title,subtitle),empty:(title,message,action)=>(root as any).emptyState(title,message,action),button:(label,action,variant,title,options)=>(root as any).btn(label,action,variant,title,options),escape:(value:any)=>(root as any).esc(value),escapeAttr:(value:any)=>(root as any).escAttr(value),label:(test:any,tests:any[])=>(root as any).testSelectLabel(test,tests),rangePicker:(start,end)=>(root as any).reportRangePicker(start,end),actionIcon:(type)=>(root as any).reportActionIcon(type)});
 root.reportRangePickerHtml=createReportRangePickerHtml({dateBox:(id,value,placeholder,attrs)=>(root as any).dateBox(id,value,placeholder,attrs)});
-root.ReportPeriodCommand=createReportPeriodCommand({lock:(s,input)=>root.PeriodService.lock(s as any,input),unlock:(s,input)=>root.PeriodService.unlock(s as any,input)});
+const reportPeriodCommand=createReportPeriodCommand({lock:(s,input)=>root.PeriodService.lock(s as any,input),unlock:(s,input)=>root.PeriodService.unlock(s as any,input)});
+root.ReportPeriodWorkflowCommand=createReportPeriodWorkflowCommand({current:()=>state,period:reportPeriodCommand,log:(type,detail,target)=>logAct(type,detail,target),save:options=>save(options),render:()=>rerender()});
 root.ActionCurrentIssues=createActionCurrentIssues({operationalTests:()=>typeof (globalThis as any).operationalTests==='function'?(globalThis as any).operationalTests():[],activeWestgard:test=>(globalThis as any).activeWestgard(test),pointWorkflowComplete:pointId=>typeof (globalThis as any).pointWorkflowComplete==='function'?(globalThis as any).pointWorkflowComplete(pointId):false});
 root.ActionReviewMessages=actionReviewMessages;
 root.dashboardLoadingPresentation=createDashboardLoading({headHtml:createDashboardHeadHtml({escape:(value:any)=>(root as any).esc(value),topUserBox:()=>typeof (globalThis as any).topUserBox==='function'?(globalThis as any).topUserBox():''}),kpisHtml:dashboardKpisHtml});
@@ -2470,7 +2495,7 @@ const actionRecordService: ActionRecordService = createActionRecordService({
   now: () => new Date().toISOString(), createId: () => uid(),
   isCancelled: action => nceActionBasics.actionCancelled(action), approvalStatus: action => nceActionBasics.actionApprovalStatus(action),
 });
-root.NceFormCommand = createNceFormCommand({
+const nceFormCommand = createNceFormCommand({
   todayIso: () => isoToday(),
   draftStatus: action => root.ActionDraftStatusService!(action),
   effectivenessStatus: action => typeof (root as any).actionEffectivenessStatus === 'function' ? (root as any).actionEffectivenessStatus(action) : { complete: false, label: 'Chưa thể đánh giá hiệu lực' },
@@ -2479,7 +2504,8 @@ root.NceFormCommand = createNceFormCommand({
   approvalStatus: action => nceActionBasics.actionApprovalStatus(action),
   records: actionRecordService,
 });
-root.NceLifecycleCommand = createNceLifecycleCommand({ review: root.ActionReviewService, escalation: root.ActionEscalationService });
+const nceLifecycleCommand = createNceLifecycleCommand({ review: root.ActionReviewService, escalation: root.ActionEscalationService });
+root.NceLifecycleWorkflowCommand=createNceLifecycleWorkflowCommand({current:()=>state as {actions?:Record<string,any>[]},lifecycle:nceLifecycleCommand,log:(action,detail,target)=>logAct(action,detail,target),save:()=>save({clearDerived:false}),render:()=>rerender()});
 root.ActionViolationService = createActionViolationService({
   pointForAction: action => typeof (root as any).actionPoint === 'function' ? (root as any).actionPoint(action) : null,
   findTest: testId => (state.tests || []).find(test => test.id === testId) || null,
@@ -2552,6 +2578,8 @@ root.AuditService = createAuditService({
   },
   autoVerifyMax: typeof (root as any).auditRuntimeConfig === 'function' ? (root as any).auditRuntimeConfig().autoVerifyMax : 5000,
 });
+root.NceFormWorkflowCommand=createNceFormWorkflowCommand({current:()=>state as {actions?:Record<string,any>[]},form:nceFormCommand,log:(action,detail,target)=>logAct(action,detail,target),reset:()=>{const ui=(root as any).actionFormUiState;if(ui)ui.reset();},save:()=>save({clearDerived:false}),render:()=>rerender()});
+root.ActivityArchiveCommand=createActivityArchiveCommand({current:()=>state as {activity?:Record<string,any>[];activityAnchor?:string},window:value=>root.activityAuditArchiveWindow!(value),cut:(activity,cutoff)=>root.AuditService!.archiveCut(activity,cutoff),confirm:dialog=>(root as any).confirmDialog(dialog),reauthenticate:input=>(root as any).reauthenticateCurrentUser(input),download:(name,rows)=>(root as any).csvDownload(name,(root as any).activityAuditCsv(rows)),log:(type,detail,target)=>logAct(type,detail,target),save:()=>save({clearDerived:false}),close:()=>(root as any).closeModal(),render:()=>rerender(),info:(message,options)=>(root as any).infoDialog(message,options),dateLabel:iso=>vnDate(iso)});
 root.ActionRerunService = createActionRerunService({
   pointsFor: testId => state.data?.[testId], testFor: testId => state.tests?.find(test => test.id === testId),
   runNumber: point => (root as any).pointRunNo(point),
@@ -2576,7 +2604,7 @@ root.EntryService = createEntryService({
       && period.findLock(state, period.periodForDate(date)));
   },
 });
-root.EntryRecordCommand = createEntryRecordCommand({
+const entryRecordCommand = createEntryRecordCommand({
   recordPoint: (targetState, input) => root.EntryService.recordPoint(targetState, input),
   canEnter: (test, level) => typeof (root as any).canEnterQcForLevel === 'function' && !!(root as any).canEnterQcForLevel(test, level),
   pointContext: (testId, level, lot, activeLot) => entryPointContext(testId, level, lot, activeLot),
@@ -2586,10 +2614,12 @@ root.EntryRecordCommand = createEntryRecordCommand({
     return typeof (root as any).activeWestgard === 'function' ? (root as any).activeWestgard(test).byPoint.get(point.id) || { level: 'ok', rules: [] } : { level: 'ok', rules: [] };
   },
 });
-root.EntryVoidCommand = createEntryVoidCommand({
+const entryVoidCommand = createEntryVoidCommand({
   voidPoint: (targetState, input) => root.EntryService.voidPoint(targetState, input),
   clearDerived: testId => { if (typeof (root as any).clearDerivedForTest === 'function') (root as any).clearDerivedForTest(testId); },
 });
+root.EntryRecordWorkflowCommand=createEntryRecordWorkflowCommand({current:()=>state,record:entryRecordCommand,log:(action,detail,target)=>logAct(action,detail,target),save:options=>save(options)});
+root.EntryVoidWorkflowCommand=createEntryVoidWorkflowCommand({current:()=>state,voidCommand:entryVoidCommand,log:(action,detail,target)=>logAct(action,detail,target),save:options=>save(options)});
 const backupTextBytes = (text: string): number => {
   if (typeof Blob !== 'undefined') return new Blob([text]).size;
   if (typeof TextEncoder !== 'undefined') return new TextEncoder().encode(text).length;
@@ -2641,7 +2671,13 @@ root.BackupImportCommand=createBackupImportCommand({prepare:text=>backupService.
 root.BackupInspectionCommand=createBackupInspectionCommand({inspect:(text,bytes)=>backupService.inspectBackupText(text,bytes)});
 root.BackupStatusCommand=createBackupStatusCommand({reminder:root.backupReminderService,marker:root.backupLocalMarker,maxBytes:BACKUP_IMPORT_MAX_BYTES,size:bytes=>backupService.backupSizeMB(bytes),warning:bytes=>backupService.backupSizeWarning(bytes)});
 root.ResetOperationalDataCommand=createResetOperationalDataCommand({current:()=>state,clearPersistence:()=>{localStorage.removeItem('qclab');localStorage.removeItem('qclab_boot');if(typeof clearSigmaDraftThrough==='function')clearSigmaDraftThrough(Number.MAX_SAFE_INTEGER);if(typeof LocalStore!=='undefined')(LocalStore as any).clear().catch(()=>{});},blank:users=>(root as any).blankAppStateFactory(users),replace:value=>{state=value;},normalize:()=>ensureShape(),ensureAdmin:()=>ensureAdmin(),log:()=>logAct('Xóa sạch dữ liệu test','Đưa app về trạng thái trắng, giữ người dùng và nhật ký audit','Dữ liệu'),save:()=>save({}),render:()=>rerender()});
-root.UserManagementCommand=createUserManagementCommand();
+const userManagementCommand=createUserManagementCommand();
+const loginCommand=createLoginCommand({isLocked:(until,now)=>root.loginLockoutPolicy!.isLocked(until,now),lockedMessage:(until,now)=>root.loginLockoutPolicy!.message(until,now),recordFailure:(lock,now)=>root.loginLockoutPolicy!.recordFailure(lock,now),resetLock:()=>root.loginLockoutPolicy!.reset(),verify:(password,stored)=>(root as any).verifyPass(password,stored),hash:password=>(root as any).hashPass(password),isPbkdf2:stored=>root.isPbkdf2PasswordHash!(stored),hashNeedsUpgrade:stored=>root.passwordHashNeedsUpgrade!(stored)});
+root.LoginWorkflowCommand=createLoginWorkflowCommand({login:loginCommand,log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options)});
+const requiredPasswordCommand=createRequiredPasswordCommand({validate:(password,confirmation)=>root.passwordChangeError!(password,confirmation),hash:password=>(root as any).hashPass(password)});
+root.RequiredPasswordWorkflowCommand=createRequiredPasswordWorkflowCommand({command:requiredPasswordCommand,log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options)});
+root.AdminBootstrapCommand=createAdminBootstrapCommand({current:()=>state as {users?:Record<string,any>[]},id:()=>(root as any).uid(),hashDefault:()=>(root as any).legacyHashPass('admin'),createDefault:(id,passHash)=>root.defaultAdminUserFactory!(id,passHash),save:()=>save({cloud:false,clearDerived:false})});
+root.UserLifecycleCommand=createUserLifecycleCommand({current:()=>state as {users?:Record<string,any>[]},manage:userManagementCommand,hash:password=>(root as any).hashPass(password),log:(type,detail,target)=>logAct(type,detail,target),save:()=>save({clearDerived:false})});
 const lisRuntime = createLisGatewayRuntime();
 let lisClient: LisClientApi;
 const lisStorage = typeof localStorage !== 'undefined' ? localStorage : { getItem: () => null };
@@ -2693,12 +2729,14 @@ root.ManageConfigService = createManageConfigService({
   targetFromLimits: root.QCCore.targetFromLimits,
   limitsFromTarget: root.QCCore.limitsFromTarget,
 });
-root.ManageAssayCommand = createManageAssayCommand({saveAssay:(targetState,input)=>root.ManageConfigService.saveAssay(targetState as any,input)});
+const manageAssayCommand = createManageAssayCommand({saveAssay:(targetState,input)=>root.ManageConfigService.saveAssay(targetState as any,input)});
 root.ManageAssayRemovalCommand = createManageAssayRemovalCommand({removeAssay:(targetState,input)=>root.ManageConfigService.removeAssay(targetState as any,input)});
-root.ManageInstrumentCommand = createManageInstrumentCommand({saveInstrument:(targetState,input)=>root.ManageConfigService.saveInstrument(targetState as any,input),removeInstrument:(targetState,input)=>root.ManageConfigService.removeInstrument(targetState as any,input)});
-root.ManagePanelCommand = createManagePanelCommand({savePanel:(targetState,input)=>root.ManageConfigService.savePanel(targetState as any,input),removePanel:(targetState,input)=>root.ManageConfigService.removePanel(targetState as any,input)});
-root.ManageLotGroupCommand = createManageLotGroupCommand({save:(s,i)=>root.ManageConfigService.saveLotGroup(s as any,i),remove:(s,i)=>root.ManageConfigService.removeLotGroup(s as any,i),stop:(s,i)=>root.ManageConfigService.stopLotGroup(s as any,i)});
-root.ManageLotGroupActivationCommand = createManageLotGroupActivationCommand({
+const manageInstrumentCommand = createManageInstrumentCommand({saveInstrument:(targetState,input)=>root.ManageConfigService.saveInstrument(targetState as any,input),removeInstrument:(targetState,input)=>root.ManageConfigService.removeInstrument(targetState as any,input)});
+root.ManageInstrumentWorkflowCommand=createManageInstrumentWorkflowCommand({current:()=>state,instrument:manageInstrumentCommand,log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),close:()=>(root as any).closeModal(),render:()=>rerender()});
+const managePanelCommand = createManagePanelCommand({savePanel:(targetState,input)=>root.ManageConfigService.savePanel(targetState as any,input),removePanel:(targetState,input)=>root.ManageConfigService.removePanel(targetState as any,input)});
+root.ManagePanelWorkflowCommand=createManagePanelWorkflowCommand({current:()=>state,panel:managePanelCommand,log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),close:()=>(root as any).closeModal(),render:()=>rerender()});
+const manageLotGroupCommand = createManageLotGroupCommand({save:(s,i)=>root.ManageConfigService.saveLotGroup(s as any,i),remove:(s,i)=>root.ManageConfigService.removeLotGroup(s as any,i),stop:(s,i)=>root.ManageConfigService.stopLotGroup(s as any,i)});
+const manageLotGroupActivationCommand = createManageLotGroupActivationCommand({
   findGroup:(s,id)=>((s.lotGroups||[])as any[]).find(g=>g.id===id)||null,
   lotsOfGroup:(s,g)=>((g.lotIds||[])as string[]).map(lotId=>((s.qcLots||[])as any[]).find(lot=>lot.id===lotId)).filter(Boolean),
   candidatesFor:(s,_g,lots)=>root.ManageConfigService.lotGroupActivationCandidates((s.tests||[])as any[],lots,(test:any,level:number,lotId:string,lotNo:string)=>(globalThis as any).lotTargetSnapshot(test,level,lotId,lotNo)),
@@ -2721,7 +2759,7 @@ root.ManageLotTransitionCommand = createManageLotTransitionCommand({
   statusText:status=>(globalThis as any).manageTransitionStatusPresentation(status).text,
   testName:test=>(globalThis as any).testDisplayName(test),
 });
-root.ManageLotCommand = createManageLotCommand({
+const manageLotCommand = createManageLotCommand({
   validate:(s,i)=>root.ManageConfigService.validateLot(s as any,i),
   pointsToRename:(s,level,lotNo)=>root.ManageConfigService.lotPointsToRename(s as any,level,lotNo),
   lockedPoints:(s,points)=>root.PeriodService.lockedPoints(s as any,points),
@@ -2729,6 +2767,19 @@ root.ManageLotCommand = createManageLotCommand({
   removal:(s,i)=>root.ManageConfigService.lotRemoval(s as any,{...i,switchesLot:root.ManageConfigService.transitionSwitchesLot}),
   removeRecord:(s,i)=>root.ManageConfigService.removeLot(s as any,{...i,switchesLot:root.ManageConfigService.transitionSwitchesLot}),
 });
+root.ManageLotWorkflowCommand=createManageLotWorkflowCommand({current:()=>state,lot:manageLotCommand,log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),close:()=>(root as any).closeModal(),render:()=>rerender()});
+root.ManageAssayWorkflowCommand=createManageAssayWorkflowCommand({current:()=>state,assay:manageAssayCommand,log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),close:()=>(root as any).closeModal(),render:()=>rerender()});
+root.ManageLotTransitionWorkflowCommand=createManageLotTransitionWorkflowCommand({current:()=>state,transition:root.ManageLotTransitionCommand,log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),render:()=>rerender()});
+root.ManageLotGroupWorkflowCommand=createManageLotGroupWorkflowCommand({current:()=>state,group:manageLotGroupCommand,activation:manageLotGroupActivationCommand,reconcileSigma:()=>(globalThis as any).reconcileSigmaLevelsWithLotGroups(),log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),close:()=>(root as any).closeModal(),render:()=>rerender()});
+const targetMatrixCommand=createTargetMatrixCommand({
+  apply:input=>root.ManageConfigService.applyTargetMatrix({...input,note:'Cập nhật Mean/SD',tests:state.tests,lots:state.qcLots||[],groups:state.lotGroups||[],
+    pointsForTest:(t:any)=>(((state.data||{})as any)[t.id])||[],
+    groupsForLot:(lotId:string)=>(globalThis as any).groupsOfLot(lotId),
+    upsertHistory:(target:any,lot:any,values:any)=>(globalThis as any).upsertLotTargetHistory(target,lot,values),
+  } as any),
+  panelLabel:(panels,panelId)=>(globalThis as any).targetPanelLabelPresentation(panels,panelId),
+});
+root.ManageTargetMatrixWorkflowCommand=createManageTargetMatrixWorkflowCommand({current:()=>state,matrix:targetMatrixCommand,log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),render:()=>rerender()});
 root.TeaReferenceService = createTeaReferenceService({
   key: value => (globalThis as any).teaRefName(value), analyteMeta: (name, record) => (globalThis as any).teaAnalyteMeta(name, record),
   effectiveReferences: () => (globalThis as any).effectiveTeaRefs(), defaultReferences: () => REFTESTS,

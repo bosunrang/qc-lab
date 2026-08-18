@@ -21,9 +21,8 @@ async function reportLockPeriod(){
   const ym=reportLockYmValue(),label=monthVN(ym);
   if(!await confirmDialog({kicker:'Khóa kỳ báo cáo',title:`Khóa kỳ ${label}?`,message:'Sau khi khóa, không ai (kể cả admin) sửa/hủy được điểm QC trong kỳ này ở bất kỳ xét nghiệm nào cho tới khi mở khóa.',detail:'Chỉ nên khóa sau khi đã xuất xong báo cáo chính thức của kỳ.',confirmLabel:'Khóa kỳ',cancelLabel:'Hủy'}))return;
   if(!await reauthenticateCurrentUser({title:'Xác thực khóa kỳ',message:`Nhập lại mật khẩu để khóa kỳ ${label}.`}))return;
-  const result=globalThis.ReportPeriodCommand.lock({state,ym,lockedAt:new Date().toISOString(),lockedBy:userName(),id:uid(),label});
+  const result=globalThis.ReportPeriodWorkflowCommand.lock({ym,lockedAt:new Date().toISOString(),lockedBy:userName(),id:uid(),label});
   if(result.error){await infoDialog(result.error==='already-locked'?`Kỳ ${label} đã được khóa từ trước.`:'Không khóa được kỳ này.');return;}
-  logAct(result.effects.audit.action,result.effects.audit.detail,result.effects.audit.target);save(result.effects.save);rerender();
   await infoDialog(`Đã khóa kỳ ${label}.`,{type:'success'});
 }
 function reportUnlockPeriod(ym){
@@ -41,9 +40,8 @@ async function reportConfirmUnlockPeriod(ym){
     return;
   }
   closeModal();if(!await reauthenticateCurrentUser({title:'Xác thực mở khóa kỳ',message:`Nhập lại mật khẩu để mở khóa kỳ ${monthVN(ym)}.`}))return;
-  const label=monthVN(ym),result=globalThis.ReportPeriodCommand.unlock({state,ym,reason:clean,label});
+  const label=monthVN(ym),result=globalThis.ReportPeriodWorkflowCommand.unlock({ym,reason:clean,label});
   if(result.error){await infoDialog('Kỳ này hiện không bị khóa.');rerender();return;}
-  logAct(result.effects.audit.action,result.effects.audit.detail,result.effects.audit.target);save(result.effects.save);rerender();
   await infoDialog(`Đã mở khóa kỳ ${label}.`,{type:'success'});
 }
 function reportLockListHtml(){return globalThis.reportLockListHtmlPresentation(state.periodLocks||[],role()==='admin');}

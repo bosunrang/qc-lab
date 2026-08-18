@@ -505,6 +505,22 @@
 		return Object.freeze({ execute });
 	}
 	//#endregion
+	//#region src/application/entry/entry-record-workflow-command.ts
+	function createEntryRecordWorkflowCommand(deps) {
+		const execute = (input) => {
+			const result = deps.record.execute({
+				...input,
+				state: deps.current()
+			});
+			if (!result.ok) return result;
+			const audit = input.audit(result);
+			deps.log(audit.action, audit.detail, audit.target);
+			deps.save(result.effects.save);
+			return result;
+		};
+		return Object.freeze({ execute });
+	}
+	//#endregion
 	//#region src/application/entry/entry-void-command.ts
 	function createEntryVoidCommand(deps) {
 		const execute = (input) => {
@@ -522,6 +538,22 @@
 					testId: input.tid
 				} }
 			};
+		};
+		return Object.freeze({ execute });
+	}
+	//#endregion
+	//#region src/application/entry/entry-void-workflow-command.ts
+	function createEntryVoidWorkflowCommand(deps) {
+		const execute = (input) => {
+			const result = deps.voidCommand.execute({
+				...input,
+				state: deps.current()
+			});
+			if (!result.ok) return result;
+			const audit = input.audit(result);
+			deps.log(audit.action, audit.detail, audit.target);
+			deps.save(result.effects.save);
+			return result;
 		};
 		return Object.freeze({ execute });
 	}
@@ -891,6 +923,190 @@
 			if (!user) return void 0;
 			users.splice(users.indexOf(user), 1);
 			return user;
+		};
+		return Object.freeze({
+			add,
+			updatePermissions,
+			resetPassword,
+			toggle,
+			remove
+		});
+	}
+	//#endregion
+	//#region src/application/auth/login-command.ts
+	function createLoginCommand(deps) {
+		const authenticate = async (input) => {
+			if (deps.isLocked(input.lock.until, input.now)) return {
+				status: "locked",
+				lock: input.lock,
+				message: deps.lockedMessage(input.lock.until, input.now)
+			};
+			const user = input.users.find((item) => item.username === input.username);
+			if (!user || user.active === false) return {
+				status: "failed",
+				lock: deps.recordFailure(input.lock, input.now),
+				reason: "missing-or-inactive"
+			};
+			let valid = false;
+			try {
+				valid = await deps.verify(input.password, String(user.passHash || ""));
+			} catch {
+				return {
+					status: "failed",
+					lock: input.lock,
+					reason: "verification-error"
+				};
+			}
+			if (!valid) return {
+				status: "failed",
+				lock: deps.recordFailure(input.lock, input.now),
+				reason: "invalid-password"
+			};
+			const lock = deps.resetLock();
+			const markedDefaultPassword = user.username === "admin" && input.password === "admin" && !deps.isPbkdf2(String(user.passHash || ""));
+			if (markedDefaultPassword) user.mustChangePassword = true;
+			let upgradedPassword = false;
+			if (!markedDefaultPassword && deps.hashNeedsUpgrade(String(user.passHash || ""))) try {
+				user.passHash = await deps.hash(input.password);
+				upgradedPassword = true;
+			} catch {}
+			return {
+				status: "authenticated",
+				lock,
+				user,
+				markedDefaultPassword,
+				upgradedPassword
+			};
+		};
+		return Object.freeze({ authenticate });
+	}
+	//#endregion
+	//#region src/application/auth/required-password-command.ts
+	function createRequiredPasswordCommand(deps) {
+		const complete = async (input) => {
+			const error = deps.validate(input.password, input.confirmation);
+			if (error) return {
+				status: "invalid",
+				error
+			};
+			if (!input.user) return {
+				status: "invalid",
+				error: "Phiên đăng nhập không còn hiệu lực. Vui lòng đăng nhập lại."
+			};
+			input.user.passHash = await deps.hash(input.password);
+			input.user.mustChangePassword = false;
+			return {
+				status: "updated",
+				user: input.user
+			};
+		};
+		return Object.freeze({ complete });
+	}
+	//#endregion
+	//#region src/application/auth/login-workflow-command.ts
+	function createLoginWorkflowCommand(deps) {
+		const authenticate = async (input) => {
+			const result = await deps.login.authenticate(input);
+			if (result.status === "failed" && result.reason !== "verification-error") {
+				deps.log("Đăng nhập thất bại", result.reason === "missing-or-inactive" ? "Tài khoản không tồn tại hoặc đã bị khóa" : "Sai mật khẩu", input.username);
+				deps.saveState({
+					cloud: false,
+					clearDerived: false
+				});
+			} else if (result.status === "authenticated") {
+				deps.log("Đăng nhập", "Đăng nhập thành công", "Tài khoản");
+				if (result.upgradedPassword) deps.log("Nâng cấp mật khẩu", "Tự động băm lại theo chuẩn mới khi đăng nhập", "Tài khoản");
+				deps.saveState({
+					cloud: false,
+					clearDerived: false
+				});
+			}
+			return result;
+		};
+		const logout = () => {
+			deps.log("Đăng xuất", "Đăng xuất khỏi phần mềm", "Tài khoản");
+			deps.saveState({
+				cloud: false,
+				clearDerived: false
+			});
+		};
+		return Object.freeze({
+			authenticate,
+			logout
+		});
+	}
+	//#endregion
+	//#region src/application/auth/required-password-workflow-command.ts
+	function createRequiredPasswordWorkflowCommand(deps) {
+		const complete = async (input) => {
+			const result = await deps.command.complete(input);
+			if (result.status === "updated") {
+				deps.log("Đổi mật khẩu", "Người dùng cập nhật mật khẩu", "Tài khoản");
+				deps.saveState({
+					cloud: input.cloud,
+					clearDerived: false
+				});
+			}
+			return result;
+		};
+		return Object.freeze({ complete });
+	}
+	//#endregion
+	//#region src/application/auth/admin-bootstrap-command.ts
+	function createAdminBootstrapCommand(deps) {
+		const ensure = async () => {
+			const state = deps.current();
+			if (state.users && state.users.length) return { created: false };
+			const user = deps.createDefault(deps.id(), await deps.hashDefault());
+			state.users = [user];
+			deps.save();
+			return {
+				created: true,
+				user
+			};
+		};
+		return Object.freeze({ ensure });
+	}
+	//#endregion
+	//#region src/application/auth/user-lifecycle-command.ts
+	function createUserLifecycleCommand(deps) {
+		const users = () => {
+			const state = deps.current();
+			return state.users || (state.users = []);
+		};
+		const add = async (input) => {
+			const user = deps.manage.add(users(), {
+				...input,
+				passHash: await deps.hash(String(input.password || ""))
+			});
+			deps.log("Thêm người dùng", input.auditDetail, user.username);
+			deps.save();
+			return user;
+		};
+		const updatePermissions = (user, input) => {
+			const updated = deps.manage.updatePermissions(user, input);
+			deps.log("Cập nhật quyền người dùng", input.auditDetail, updated.username);
+			deps.save();
+			return updated;
+		};
+		const resetPassword = async (user, password, mustChange) => {
+			const updated = deps.manage.resetPassword(user, await deps.hash(password), mustChange);
+			deps.log("Đổi mật khẩu", updated.mustChangePassword ? "Đặt mật khẩu tạm và yêu cầu đổi lại" : "Người dùng đổi mật khẩu", updated.username);
+			deps.save();
+			return updated;
+		};
+		const toggle = (user) => {
+			const updated = deps.manage.toggle(user);
+			deps.log(updated.active ? "Mở khóa người dùng" : "Khóa người dùng", "Cập nhật trạng thái tài khoản", updated.username);
+			deps.save();
+			return updated;
+		};
+		const remove = (id) => {
+			const removed = deps.manage.remove(users(), id);
+			if (!removed) return void 0;
+			deps.log("Xóa người dùng", "Xóa tài khoản khỏi hệ thống", removed.username);
+			deps.save();
+			return removed;
 		};
 		return Object.freeze({
 			add,
@@ -2014,6 +2230,30 @@
 		});
 	}
 	//#endregion
+	//#region src/application/manage/manage-instrument-workflow-command.ts
+	function createManageInstrumentWorkflowCommand(deps) {
+		const commit = (result, close = false) => {
+			if (!result.ok) return result;
+			deps.log(result.effects.audit.action, result.effects.audit.detail, result.effects.audit.target);
+			if (close) deps.close();
+			deps.saveState(result.effects.save);
+			deps.render();
+			return result;
+		};
+		const save = (input) => commit(deps.instrument.save({
+			state: deps.current(),
+			...input
+		}), true);
+		const remove = (input) => commit(deps.instrument.remove({
+			state: deps.current(),
+			...input
+		}));
+		return Object.freeze({
+			save,
+			remove
+		});
+	}
+	//#endregion
 	//#region src/application/manage/manage-panel-command.ts
 	function createManagePanelCommand(deps) {
 		const save = (input) => {
@@ -2061,6 +2301,28 @@
 		return Object.freeze({
 			save,
 			remove
+		});
+	}
+	//#endregion
+	//#region src/application/manage/manage-panel-workflow-command.ts
+	function createManagePanelWorkflowCommand(deps) {
+		const commit = (result, close = false) => {
+			if (!result.ok) return result;
+			deps.log(result.effects.audit.action, result.effects.audit.detail, result.effects.audit.target);
+			if (close) deps.close();
+			deps.saveState(result.effects.save);
+			deps.render();
+			return result;
+		};
+		return Object.freeze({
+			save: (input) => commit(deps.panel.save({
+				state: deps.current(),
+				...input
+			}), true),
+			remove: (input) => commit(deps.panel.remove({
+				state: deps.current(),
+				...input
+			}))
 		});
 	}
 	//#endregion
@@ -2391,6 +2653,172 @@
 		});
 	}
 	//#endregion
+	//#region src/application/manage/manage-lot-workflow-command.ts
+	function createManageLotWorkflowCommand(deps) {
+		const commit = (result, close = false) => {
+			if (!result.ok) return result;
+			(result.effects.audit || []).forEach((a) => deps.log(a.action, a.detail, a.target));
+			if (close) deps.close();
+			deps.saveState(result.effects.save);
+			deps.render();
+			return result;
+		};
+		const preview = (input) => deps.lot.preview({
+			state: deps.current(),
+			...input
+		});
+		const execute = (input) => commit(deps.lot.execute({
+			state: deps.current(),
+			...input
+		}), true);
+		const checkRemoval = (input) => deps.lot.checkRemoval({
+			state: deps.current(),
+			...input
+		});
+		const remove = (input) => commit(deps.lot.remove({
+			state: deps.current(),
+			...input
+		}));
+		return Object.freeze({
+			preview,
+			execute,
+			checkRemoval,
+			remove
+		});
+	}
+	//#endregion
+	//#region src/application/manage/manage-assay-workflow-command.ts
+	function createManageAssayWorkflowCommand(deps) {
+		const save = (input) => {
+			const result = deps.assay.execute({
+				state: deps.current(),
+				...input
+			});
+			if (!result.ok) return result;
+			const a = result.effects.audit;
+			deps.log(a.action, a.detail, a.target);
+			deps.close();
+			deps.saveState(result.effects.save);
+			deps.render();
+			return result;
+		};
+		return Object.freeze({ save });
+	}
+	//#endregion
+	//#region src/application/manage/manage-lot-transition-workflow-command.ts
+	function createManageLotTransitionWorkflowCommand(deps) {
+		const checkRemoval = (input) => deps.transition.checkRemoval({
+			state: deps.current(),
+			...input
+		});
+		const remove = (input) => {
+			const result = deps.transition.remove({
+				state: deps.current(),
+				...input
+			});
+			if (!result.ok) return result;
+			result.effects.audit.forEach((a) => deps.log(a.action, a.detail, a.target));
+			deps.saveState(result.effects.save);
+			deps.render();
+			return result;
+		};
+		return Object.freeze({
+			checkRemoval,
+			remove
+		});
+	}
+	//#endregion
+	//#region src/application/manage/manage-lot-group-workflow-command.ts
+	function createManageLotGroupWorkflowCommand(deps) {
+		const save = (input) => {
+			const result = deps.group.save({
+				state: deps.current(),
+				...input
+			});
+			if (!result.ok) return result;
+			const sigmaSync = deps.reconcileSigma(), syncNote = sigmaSync.pruned ? ` · đã xóa ${sigmaSync.pruned} dữ liệu mức Sigma không còn trong nhóm` : "";
+			deps.log(result.created ? "Thêm nhóm lô" : "Cập nhật nhóm lô", result.record.name + syncNote, "Nhóm lô");
+			deps.close();
+			deps.saveState({});
+			deps.render();
+			return result;
+		};
+		const remove = (input) => {
+			const result = deps.group.remove({
+				state: deps.current(),
+				...input
+			});
+			if (!result.ok) return result;
+			deps.log("Xóa nhóm lô", result.record.name, "Nhóm lô");
+			deps.saveState({});
+			deps.render();
+			return result;
+		};
+		const stop = (input) => {
+			const result = deps.group.stop({
+				state: deps.current(),
+				...input
+			});
+			if (!result.ok) return result;
+			deps.log("Dừng nhóm lô", result.record.name, "Nhóm lô");
+			deps.saveState({});
+			deps.render();
+			return result;
+		};
+		const previewActivation = (input) => deps.activation.preview({
+			state: deps.current(),
+			...input
+		});
+		const executeActivation = (input) => {
+			const result = deps.activation.execute({
+				state: deps.current(),
+				...input
+			});
+			if (result.status === "applied") {
+				result.effects.audit.forEach((a) => deps.log(a.action, a.detail, a.target));
+				deps.saveState(result.effects.save);
+				deps.render();
+			} else if (result.status === "already-active") {
+				deps.saveState({});
+				deps.render();
+			}
+			return result;
+		};
+		return Object.freeze({
+			save,
+			remove,
+			stop,
+			previewActivation,
+			executeActivation
+		});
+	}
+	//#endregion
+	//#region src/application/manage/manage-target-matrix-workflow-command.ts
+	function createManageTargetMatrixWorkflowCommand(deps) {
+		const commit = (input) => {
+			const { result, auditDetail } = deps.matrix.execute({
+				...input,
+				panels: deps.current().qcPanels || []
+			});
+			deps.log("Cập nhật Mean/SD", auditDetail, "Mean/SD");
+			deps.saveState({});
+			deps.render();
+			return result;
+		};
+		return Object.freeze({ commit });
+	}
+	//#endregion
+	//#region src/application/manage/target-matrix-command.ts
+	function createTargetMatrixCommand(deps) {
+		return Object.freeze({ execute(input) {
+			const result = deps.apply(input);
+			return {
+				result,
+				auditDetail: `${deps.panelLabel(input.panels || [], input.panelId || "")} · ${input.group.name} · ${result.count} dòng${input.mode === "planned" ? " (dự kiến)" : ""}`
+			};
+		} });
+	}
+	//#endregion
 	//#region src/application/manage/tea-reference-service.ts
 	function createTeaReferenceService(deps) {
 		const find = (state, refKey) => {
@@ -2697,6 +3125,29 @@
 		});
 	}
 	//#endregion
+	//#region src/application/period/report-period-workflow-command.ts
+	function createReportPeriodWorkflowCommand(deps) {
+		const commit = (result) => {
+			if (!result.ok) return result;
+			deps.log(result.effects.audit.action, result.effects.audit.detail, result.effects.audit.target);
+			deps.save(result.effects.save);
+			deps.render();
+			return result;
+		};
+		const lock = (input) => commit(deps.period.lock({
+			state: deps.current(),
+			...input
+		}));
+		const unlock = (input) => commit(deps.period.unlock({
+			state: deps.current(),
+			...input
+		}));
+		return Object.freeze({
+			lock,
+			unlock
+		});
+	}
+	//#endregion
 	//#region src/application/audit/audit-service.ts
 	function createAuditService(deps) {
 		let chainCache = {
@@ -2814,6 +3265,54 @@
 			resetChainCache,
 			relinkChain
 		});
+	}
+	//#endregion
+	//#region src/application/audit/activity-archive-command.ts
+	function createActivityArchiveCommand(deps) {
+		const execute = async (rawMonths) => {
+			const window = deps.window(rawMonths), cut = deps.cut(deps.current().activity || [], window.cutoffIso);
+			if (!cut.segment.length) {
+				deps.close();
+				await deps.info("Không có dòng nhật ký nào cũ hơn mốc đã chọn.");
+				return { status: "empty" };
+			}
+			if (!await deps.confirm({
+				kicker: "Thao tác không thể hoàn tác",
+				title: "Lưu trữ nhật ký cũ",
+				message: `Xuất CSV rồi gỡ ${cut.segment.length} dòng nhật ký cũ hơn ${window.months} tháng?`,
+				detail: `Còn lại ${cut.retained.length} dòng trong hệ thống. File CSV giữ nguyên PrevHash/Hash từng dòng và nối tiếp được vào chuỗi còn lại.`,
+				confirmLabel: "Lưu trữ",
+				cancelLabel: "Hủy"
+			})) return { status: "cancelled" };
+			if (!await deps.reauthenticate({
+				title: "Xác thực lưu trữ nhật ký",
+				message: "Nhập lại mật khẩu trước khi gỡ nhật ký cũ khỏi hệ thống."
+			})) return { status: "cancelled" };
+			try {
+				deps.download("Luu_tru_nhat_ky_QCLab_" + window.cutoffIso.slice(0, 10) + ".csv", cut.segment);
+			} catch {
+				await deps.info("Không tạo được file CSV lưu trữ. Nhật ký chưa bị thay đổi.");
+				return { status: "download-error" };
+			}
+			if (!await deps.confirm({
+				kicker: "Kiểm tra trước khi gỡ",
+				title: "Đã có file CSV lưu trữ chưa?",
+				message: "Mở thư mục Tải xuống và kiểm tra file vừa tải có mở được và đủ dòng.",
+				detail: "Chỉ bấm \"Đã kiểm tra\" khi bạn thực sự thấy file — sau bước này các dòng cũ bị gỡ khỏi hệ thống.",
+				confirmLabel: "Đã kiểm tra, gỡ khỏi hệ thống",
+				cancelLabel: "Chưa, giữ nguyên"
+			})) return { status: "cancelled" };
+			const state = deps.current();
+			state.activity = cut.retained;
+			state.activityAnchor = cut.tipHash || "";
+			deps.log("Lưu trữ nhật ký hoạt động", `Đã xuất CSV và gỡ ${cut.segment.length} dòng cũ hơn ${window.months} tháng (mốc ${deps.dateLabel(window.cutoffIso.slice(0, 10))}), còn lại ${cut.retained.length} dòng. Hash đỉnh phần lưu trữ: ${cut.tipHash || "—"}`, "Nhật ký");
+			deps.save();
+			deps.close();
+			deps.render();
+			await deps.info(`Đã lưu trữ ${cut.segment.length} dòng nhật ký cũ — file CSV đã được tải xuống.`, { type: "success" });
+			return { status: "done" };
+		};
+		return Object.freeze({ execute });
 	}
 	//#endregion
 	//#region src/application/lis/lis-client-service.ts
@@ -15348,6 +15847,24 @@
 		return Object.freeze({ submit });
 	}
 	//#endregion
+	//#region src/application/nce/nce-form-workflow-command.ts
+	function createNceFormWorkflowCommand(deps) {
+		const submit = (input) => {
+			const state = deps.current(), actions = state.actions || (state.actions = []), result = deps.form.submit({
+				...input,
+				actions
+			});
+			if (!result.ok) return result;
+			const audit = input.audit(result);
+			deps.log(audit.action, audit.detail, audit.target);
+			deps.reset();
+			deps.save();
+			deps.render();
+			return result;
+		};
+		return Object.freeze({ submit });
+	}
+	//#endregion
 	//#region src/application/nce/nce-lifecycle-command.ts
 	function createNceLifecycleCommand(deps) {
 		const execute = (input) => {
@@ -15425,6 +15942,23 @@
 				ok: false,
 				reason: "not-ready"
 			};
+		};
+		return Object.freeze({ execute });
+	}
+	//#endregion
+	//#region src/application/nce/nce-lifecycle-workflow-command.ts
+	function createNceLifecycleWorkflowCommand(deps) {
+		const execute = (input) => {
+			const result = deps.lifecycle.execute({
+				...input,
+				actions: deps.current().actions || []
+			});
+			if (!result.ok) return result;
+			const audit = input.audit(result.record), record = audit && audit;
+			deps.log(record.action, record.detail, record.target);
+			deps.save();
+			deps.render();
+			return result;
 		};
 		return Object.freeze({ execute });
 	}
@@ -16839,9 +17373,15 @@
 		actionIcon: (type) => root.reportActionIcon(type)
 	});
 	root.reportRangePickerHtml = createReportRangePickerHtml({ dateBox: (id, value, placeholder, attrs) => root.dateBox(id, value, placeholder, attrs) });
-	root.ReportPeriodCommand = createReportPeriodCommand({
-		lock: (s, input) => root.PeriodService.lock(s, input),
-		unlock: (s, input) => root.PeriodService.unlock(s, input)
+	root.ReportPeriodWorkflowCommand = createReportPeriodWorkflowCommand({
+		current: () => state,
+		period: createReportPeriodCommand({
+			lock: (s, input) => root.PeriodService.lock(s, input),
+			unlock: (s, input) => root.PeriodService.unlock(s, input)
+		}),
+		log: (type, detail, target) => logAct(type, detail, target),
+		save: (options) => save(options),
+		render: () => rerender()
 	});
 	root.ActionCurrentIssues = createActionCurrentIssues({
 		operationalTests: () => typeof globalThis.operationalTests === "function" ? globalThis.operationalTests() : [],
@@ -17677,7 +18217,7 @@
 		approvalStatus: (action) => nceActionBasics.actionApprovalStatus(action),
 		activeFollowUp: (actions, action) => root.NceActionIdentityService.activeFollowUp(actions, action)
 	});
-	root.NceFormCommand = createNceFormCommand({
+	var nceFormCommand = createNceFormCommand({
 		todayIso: () => isoToday(),
 		draftStatus: (action) => root.ActionDraftStatusService(action),
 		effectivenessStatus: (action) => typeof root.actionEffectivenessStatus === "function" ? root.actionEffectivenessStatus(action) : {
@@ -17694,9 +18234,15 @@
 			approvalStatus: (action) => nceActionBasics.actionApprovalStatus(action)
 		})
 	});
-	root.NceLifecycleCommand = createNceLifecycleCommand({
-		review: root.ActionReviewService,
-		escalation: root.ActionEscalationService
+	root.NceLifecycleWorkflowCommand = createNceLifecycleWorkflowCommand({
+		current: () => state,
+		lifecycle: createNceLifecycleCommand({
+			review: root.ActionReviewService,
+			escalation: root.ActionEscalationService
+		}),
+		log: (action, detail, target) => logAct(action, detail, target),
+		save: () => save({ clearDerived: false }),
+		render: () => rerender()
 	});
 	root.ActionViolationService = createActionViolationService({
 		pointForAction: (action) => typeof root.actionPoint === "function" ? root.actionPoint(action) : null,
@@ -17784,6 +18330,31 @@
 		},
 		autoVerifyMax: typeof root.auditRuntimeConfig === "function" ? root.auditRuntimeConfig().autoVerifyMax : 5e3
 	});
+	root.NceFormWorkflowCommand = createNceFormWorkflowCommand({
+		current: () => state,
+		form: nceFormCommand,
+		log: (action, detail, target) => logAct(action, detail, target),
+		reset: () => {
+			const ui = root.actionFormUiState;
+			if (ui) ui.reset();
+		},
+		save: () => save({ clearDerived: false }),
+		render: () => rerender()
+	});
+	root.ActivityArchiveCommand = createActivityArchiveCommand({
+		current: () => state,
+		window: (value) => root.activityAuditArchiveWindow(value),
+		cut: (activity, cutoff) => root.AuditService.archiveCut(activity, cutoff),
+		confirm: (dialog) => root.confirmDialog(dialog),
+		reauthenticate: (input) => root.reauthenticateCurrentUser(input),
+		download: (name, rows) => root.csvDownload(name, root.activityAuditCsv(rows)),
+		log: (type, detail, target) => logAct(type, detail, target),
+		save: () => save({ clearDerived: false }),
+		close: () => root.closeModal(),
+		render: () => rerender(),
+		info: (message, options) => root.infoDialog(message, options),
+		dateLabel: (iso) => vnDate(iso)
+	});
 	root.ActionRerunService = createActionRerunService({
 		pointsFor: (testId) => state.data?.[testId],
 		testFor: (testId) => state.tests?.find((test) => test.id === testId),
@@ -17810,7 +18381,7 @@
 			return !!(period && typeof period.findLock === "function" && typeof period.periodForDate === "function" && period.findLock(state, period.periodForDate(date)));
 		}
 	});
-	root.EntryRecordCommand = createEntryRecordCommand({
+	var entryRecordCommand = createEntryRecordCommand({
 		recordPoint: (targetState, input) => root.EntryService.recordPoint(targetState, input),
 		canEnter: (test, level) => typeof root.canEnterQcForLevel === "function" && !!root.canEnterQcForLevel(test, level),
 		pointContext: (testId, level, lot, activeLot) => entryPointContext(testId, level, lot, activeLot),
@@ -17835,11 +18406,23 @@
 			};
 		}
 	});
-	root.EntryVoidCommand = createEntryVoidCommand({
+	var entryVoidCommand = createEntryVoidCommand({
 		voidPoint: (targetState, input) => root.EntryService.voidPoint(targetState, input),
 		clearDerived: (testId) => {
 			if (typeof root.clearDerivedForTest === "function") root.clearDerivedForTest(testId);
 		}
+	});
+	root.EntryRecordWorkflowCommand = createEntryRecordWorkflowCommand({
+		current: () => state,
+		record: entryRecordCommand,
+		log: (action, detail, target) => logAct(action, detail, target),
+		save: (options) => save(options)
+	});
+	root.EntryVoidWorkflowCommand = createEntryVoidWorkflowCommand({
+		current: () => state,
+		voidCommand: entryVoidCommand,
+		log: (action, detail, target) => logAct(action, detail, target),
+		save: (options) => save(options)
 	});
 	var backupTextBytes = (text) => {
 		if (typeof Blob !== "undefined") return new Blob([text]).size;
@@ -17942,7 +18525,46 @@
 		save: () => save({}),
 		render: () => rerender()
 	});
-	root.UserManagementCommand = createUserManagementCommand();
+	var userManagementCommand = createUserManagementCommand();
+	root.LoginWorkflowCommand = createLoginWorkflowCommand({
+		login: createLoginCommand({
+			isLocked: (until, now) => root.loginLockoutPolicy.isLocked(until, now),
+			lockedMessage: (until, now) => root.loginLockoutPolicy.message(until, now),
+			recordFailure: (lock, now) => root.loginLockoutPolicy.recordFailure(lock, now),
+			resetLock: () => root.loginLockoutPolicy.reset(),
+			verify: (password, stored) => root.verifyPass(password, stored),
+			hash: (password) => root.hashPass(password),
+			isPbkdf2: (stored) => root.isPbkdf2PasswordHash(stored),
+			hashNeedsUpgrade: (stored) => root.passwordHashNeedsUpgrade(stored)
+		}),
+		log: (action, detail, target) => logAct(action, detail, target),
+		saveState: (options) => save(options)
+	});
+	root.RequiredPasswordWorkflowCommand = createRequiredPasswordWorkflowCommand({
+		command: createRequiredPasswordCommand({
+			validate: (password, confirmation) => root.passwordChangeError(password, confirmation),
+			hash: (password) => root.hashPass(password)
+		}),
+		log: (action, detail, target) => logAct(action, detail, target),
+		saveState: (options) => save(options)
+	});
+	root.AdminBootstrapCommand = createAdminBootstrapCommand({
+		current: () => state,
+		id: () => root.uid(),
+		hashDefault: () => root.legacyHashPass("admin"),
+		createDefault: (id, passHash) => root.defaultAdminUserFactory(id, passHash),
+		save: () => save({
+			cloud: false,
+			clearDerived: false
+		})
+	});
+	root.UserLifecycleCommand = createUserLifecycleCommand({
+		current: () => state,
+		manage: userManagementCommand,
+		hash: (password) => root.hashPass(password),
+		log: (type, detail, target) => logAct(type, detail, target),
+		save: () => save({ clearDerived: false })
+	});
 	var lisRuntime = createLisGatewayRuntime();
 	var lisClient;
 	var lisStorage = typeof localStorage !== "undefined" ? localStorage : { getItem: () => null };
@@ -17994,22 +18616,36 @@
 		targetFromLimits: root.QCCore.targetFromLimits,
 		limitsFromTarget: root.QCCore.limitsFromTarget
 	});
-	root.ManageAssayCommand = createManageAssayCommand({ saveAssay: (targetState, input) => root.ManageConfigService.saveAssay(targetState, input) });
+	var manageAssayCommand = createManageAssayCommand({ saveAssay: (targetState, input) => root.ManageConfigService.saveAssay(targetState, input) });
 	root.ManageAssayRemovalCommand = createManageAssayRemovalCommand({ removeAssay: (targetState, input) => root.ManageConfigService.removeAssay(targetState, input) });
-	root.ManageInstrumentCommand = createManageInstrumentCommand({
-		saveInstrument: (targetState, input) => root.ManageConfigService.saveInstrument(targetState, input),
-		removeInstrument: (targetState, input) => root.ManageConfigService.removeInstrument(targetState, input)
+	root.ManageInstrumentWorkflowCommand = createManageInstrumentWorkflowCommand({
+		current: () => state,
+		instrument: createManageInstrumentCommand({
+			saveInstrument: (targetState, input) => root.ManageConfigService.saveInstrument(targetState, input),
+			removeInstrument: (targetState, input) => root.ManageConfigService.removeInstrument(targetState, input)
+		}),
+		log: (action, detail, target) => logAct(action, detail, target),
+		saveState: (options) => save(options),
+		close: () => root.closeModal(),
+		render: () => rerender()
 	});
-	root.ManagePanelCommand = createManagePanelCommand({
-		savePanel: (targetState, input) => root.ManageConfigService.savePanel(targetState, input),
-		removePanel: (targetState, input) => root.ManageConfigService.removePanel(targetState, input)
+	root.ManagePanelWorkflowCommand = createManagePanelWorkflowCommand({
+		current: () => state,
+		panel: createManagePanelCommand({
+			savePanel: (targetState, input) => root.ManageConfigService.savePanel(targetState, input),
+			removePanel: (targetState, input) => root.ManageConfigService.removePanel(targetState, input)
+		}),
+		log: (action, detail, target) => logAct(action, detail, target),
+		saveState: (options) => save(options),
+		close: () => root.closeModal(),
+		render: () => rerender()
 	});
-	root.ManageLotGroupCommand = createManageLotGroupCommand({
+	var manageLotGroupCommand = createManageLotGroupCommand({
 		save: (s, i) => root.ManageConfigService.saveLotGroup(s, i),
 		remove: (s, i) => root.ManageConfigService.removeLotGroup(s, i),
 		stop: (s, i) => root.ManageConfigService.stopLotGroup(s, i)
 	});
-	root.ManageLotGroupActivationCommand = createManageLotGroupActivationCommand({
+	var manageLotGroupActivationCommand = createManageLotGroupActivationCommand({
 		findGroup: (s, id) => (s.lotGroups || []).find((g) => g.id === id) || null,
 		lotsOfGroup: (s, g) => (g.lotIds || []).map((lotId) => (s.qcLots || []).find((lot) => lot.id === lotId)).filter(Boolean),
 		candidatesFor: (s, _g, lots) => root.ManageConfigService.lotGroupActivationCandidates(s.tests || [], lots, (test, level, lotId, lotNo) => globalThis.lotTargetSnapshot(test, level, lotId, lotNo)),
@@ -18046,22 +18682,73 @@
 		statusText: (status) => globalThis.manageTransitionStatusPresentation(status).text,
 		testName: (test) => globalThis.testDisplayName(test)
 	});
-	root.ManageLotCommand = createManageLotCommand({
-		validate: (s, i) => root.ManageConfigService.validateLot(s, i),
-		pointsToRename: (s, level, lotNo) => root.ManageConfigService.lotPointsToRename(s, level, lotNo),
-		lockedPoints: (s, points) => root.PeriodService.lockedPoints(s, points),
-		save: (s, i) => root.ManageConfigService.saveLot(s, {
-			...i,
-			renamePoints: (level, oldLotNo, newLotNo) => root.ManageConfigService.renameLotPoints(s, level, oldLotNo, newLotNo)
+	root.ManageLotWorkflowCommand = createManageLotWorkflowCommand({
+		current: () => state,
+		lot: createManageLotCommand({
+			validate: (s, i) => root.ManageConfigService.validateLot(s, i),
+			pointsToRename: (s, level, lotNo) => root.ManageConfigService.lotPointsToRename(s, level, lotNo),
+			lockedPoints: (s, points) => root.PeriodService.lockedPoints(s, points),
+			save: (s, i) => root.ManageConfigService.saveLot(s, {
+				...i,
+				renamePoints: (level, oldLotNo, newLotNo) => root.ManageConfigService.renameLotPoints(s, level, oldLotNo, newLotNo)
+			}),
+			removal: (s, i) => root.ManageConfigService.lotRemoval(s, {
+				...i,
+				switchesLot: root.ManageConfigService.transitionSwitchesLot
+			}),
+			removeRecord: (s, i) => root.ManageConfigService.removeLot(s, {
+				...i,
+				switchesLot: root.ManageConfigService.transitionSwitchesLot
+			})
 		}),
-		removal: (s, i) => root.ManageConfigService.lotRemoval(s, {
-			...i,
-			switchesLot: root.ManageConfigService.transitionSwitchesLot
+		log: (action, detail, target) => logAct(action, detail, target),
+		saveState: (options) => save(options),
+		close: () => root.closeModal(),
+		render: () => rerender()
+	});
+	root.ManageAssayWorkflowCommand = createManageAssayWorkflowCommand({
+		current: () => state,
+		assay: manageAssayCommand,
+		log: (action, detail, target) => logAct(action, detail, target),
+		saveState: (options) => save(options),
+		close: () => root.closeModal(),
+		render: () => rerender()
+	});
+	root.ManageLotTransitionWorkflowCommand = createManageLotTransitionWorkflowCommand({
+		current: () => state,
+		transition: root.ManageLotTransitionCommand,
+		log: (action, detail, target) => logAct(action, detail, target),
+		saveState: (options) => save(options),
+		render: () => rerender()
+	});
+	root.ManageLotGroupWorkflowCommand = createManageLotGroupWorkflowCommand({
+		current: () => state,
+		group: manageLotGroupCommand,
+		activation: manageLotGroupActivationCommand,
+		reconcileSigma: () => globalThis.reconcileSigmaLevelsWithLotGroups(),
+		log: (action, detail, target) => logAct(action, detail, target),
+		saveState: (options) => save(options),
+		close: () => root.closeModal(),
+		render: () => rerender()
+	});
+	root.ManageTargetMatrixWorkflowCommand = createManageTargetMatrixWorkflowCommand({
+		current: () => state,
+		matrix: createTargetMatrixCommand({
+			apply: (input) => root.ManageConfigService.applyTargetMatrix({
+				...input,
+				note: "Cập nhật Mean/SD",
+				tests: state.tests,
+				lots: state.qcLots || [],
+				groups: state.lotGroups || [],
+				pointsForTest: (t) => (state.data || {})[t.id] || [],
+				groupsForLot: (lotId) => globalThis.groupsOfLot(lotId),
+				upsertHistory: (target, lot, values) => globalThis.upsertLotTargetHistory(target, lot, values)
+			}),
+			panelLabel: (panels, panelId) => globalThis.targetPanelLabelPresentation(panels, panelId)
 		}),
-		removeRecord: (s, i) => root.ManageConfigService.removeLot(s, {
-			...i,
-			switchesLot: root.ManageConfigService.transitionSwitchesLot
-		})
+		log: (action, detail, target) => logAct(action, detail, target),
+		saveState: (options) => save(options),
+		render: () => rerender()
 	});
 	root.TeaReferenceService = createTeaReferenceService({
 		key: (value) => globalThis.teaRefName(value),

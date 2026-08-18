@@ -254,7 +254,7 @@ function actionEffectivenessMissingKey(a){
   return'effectivenessNote';
 }
 async function addAction(){
-  if(!requireWrite())return;state.actions=state.actions||[];
+  if(!requireWrite())return;
   const editing=actionUi().editId&&(state.actions||[]).find(a=>a.id===actionUi().editId);
   /* Danh tính sự cố (xét nghiệm / mức / lô / điểm QC) là ẢNH CHỤP lúc mở hồ sơ, không
      đọc lại từ form khi sửa: đổi ô "Xét nghiệm" từng làm actionPoint() trả null, khiến
@@ -266,12 +266,8 @@ async function addAction(){
   const level=editing?editing.level:(levelEl?parseInt(levelEl.value)||0:0),l=t&&level?lvlCfg(t,level):null;
   const lot=editing?(editing.lot||''):(l&&l.lot||''),pointId=editing?(editing.pointId||''):actionFieldValue('aPointId',80);
   const rule=actionFieldValue('aRule'),action=actionFieldValue('aAct'),by=actionFieldValue('aBy'),errorType=actionFieldValue('aErr'),nceId=actionFieldValue('aNceId',80)||nextNceId(isoToday()),date=parseVN(document.getElementById('aDate').value)||isoToday(),protocol=readActionProtocolForm(editing?Math.max(2,+editing.protocolVersion||2):3);
-  const result=globalThis.NceFormCommand.submit({actions:state.actions,editId:editing&&editing.id,values:{...(editing||{}),...protocol,nceId:editing&&editing.nceId||nceId,testId:tid,level,lot,pointId,date,rule,errorType,action,by},user:{id:currentUser&&currentUser.id||'',username:currentUser&&currentUser.username||'',name:userName()}});
+  const result=globalThis.NceFormWorkflowCommand.submit({editId:editing&&editing.id,values:{...(editing||{}),...protocol,nceId:editing&&editing.nceId||nceId,testId:tid,level,lot,pointId,date,rule,errorType,action,by},user:{id:currentUser&&currentUser.id||'',username:currentUser&&currentUser.username||'',name:userName()},audit:result=>result.mode==='update'?{action:'Cập nhật hồ sơ NCE',detail:`${result.record.nceId||'NCE'} · ${actionWorkflowStatus(result.record).label}`,target:t?t.name:''}:{action:'Lập hồ sơ NCE',detail:`${result.record.nceId} · ${actionLevelShort(t,level,lot)} · đang điều tra`,target:t?t.name:''}});
   if(!result.ok){await infoDialog(result.message);if(result.missingKey)focusActionField(result.missingKey);return;}
-  if(result.mode==='update'){
-    logAct('Cập nhật hồ sơ NCE',`${result.record.nceId||'NCE'} · ${actionWorkflowStatus(result.record).label}`,t?t.name:'');actionUi().editId='';
-  }else logAct('Lập hồ sơ NCE',`${result.record.nceId} · ${actionLevelShort(t,level,lot)} · đang điều tra`,t?t.name:'');
-  actionUi().reset();save({clearDerived:false});rerender();
 }
 function syncActionRiskScore(){
   const a={riskSeverity:+actionFieldValue('aRiskSeverity',4)||0,riskOccurrence:+actionFieldValue('aRiskOccurrence',4)||0,riskDetectability:+actionFieldValue('aRiskDetectability',4)||0},e=document.getElementById('aRiskScore'),card=document.getElementById('aRiskScoreCard'),score=actionRiskScore(a),level=actionFieldValue('aRiskLevel',40);

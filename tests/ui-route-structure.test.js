@@ -104,7 +104,7 @@ assert.ok(index.indexOf('actions-routes.js')<index.indexOf('action-form.js'),'ac
 assert.match(actions,/actionFormHtml\(issues\.length\)/,'trang phải dùng lại đúng tập sự cố đã tính cho panel form');
 assert.doesNotMatch(actions,/class="action-form-body"/,'markup form không được ở lại actions-routes.js');
 assert.doesNotMatch(actionsArea,/state\.actions\.splice\(/,'hồ sơ NCE không được xóa vật lý; phải hủy có lưu vết');
-assert.match(actions,/NceLifecycleCommand\.execute\(\{kind:'cancel'/,'quy trình hủy phải gọi command hủy mềm TypeScript');
+assert.match(actions,/NceLifecycleWorkflowCommand\.execute\(\{kind:'cancel'/,'quy trình hủy phải gọi workflow hủy mềm TypeScript');
 assert.doesNotMatch(actions,/function confirmReturnAction\(i\)/,'xác nhận trả lại không được dựa vào vị trí mảng có thể thay đổi khi đồng bộ');
 assert.match(actions,/function confirmReturnAction\(id,token\)/,'xác nhận trả lại phải khóa theo ID và token phiên bản');
 assert.match(actions,/confirmReturnAction\('\$\{jsq\(current\.id\)\}','\$\{jsq\(token\)\}'\)/,'hộp thoại trả lại phải truyền đúng ID và token của hồ sơ sau xác thực');
@@ -149,7 +149,7 @@ assert.match(reportsCss,/\.action-guide-list\{[^}]*grid-template-columns:1fr/,'q
 assert.match(reportsCss,/\.action-guide-card\{[^}]*border-bottom:1px solid var\(--line\)/,'các bước NCE chỉ phân cách bằng đường kẻ trung tính, không dùng card màu');
 for(const id of ['aContainmentNote','aCorrection','aCause','aAct','aPatientAction','aEffectivenessNote'])assert.match(form,new RegExp(`actionSuggestBox\\('${id}'`),`${id} phải dùng gợi ý thu gọn`);
 
-assert.match(form,/NceFormCommand\.submit\(\{actions:state\.actions,editId:editing&&editing\.id,values:\{\.\.\.\(editing\|\|\{\}\),\.\.\.protocol,nceId:editing&&editing\.nceId\|\|nceId,testId:tid,level,lot,pointId,date,rule,errorType,action,by\}/,'command NCE phải nhận snapshot danh tính IQC bất biến khi sửa trước khi kiểm tra cổng chạy lại');
+assert.match(form,/NceFormWorkflowCommand\.submit\(\{editId:editing&&editing\.id,values:\{\.\.\.\(editing\|\|\{\}\),\.\.\.protocol,nceId:editing&&editing\.nceId\|\|nceId,testId:tid,level,lot,pointId,date,rule,errorType,action,by\}/,'workflow NCE phải nhận snapshot danh tính IQC bất biến khi sửa trước khi kiểm tra cổng chạy lại');
 for(const id of ['aReleaseStatus','aReleaseDate','aReleaseBy','aReleaseNote'])assert.match(form,new RegExp(`['"]${id}['"]`),`${id} must remain in the release-decision form`);
 assert.match(form,/actionSuggestBox\('aReleaseNote'/,'release rationale must keep the same editable suggestion pattern');
 assert.match(form,/actionSuggestBox\('aRiskBasis'/,'risk classification must keep an editable SOP-basis field');
