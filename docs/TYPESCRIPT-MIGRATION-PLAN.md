@@ -132,7 +132,7 @@ Westgard) — **toàn bộ nhóm B (Canvas/adapter) của Pha G đã hoàn tất
 
 | Nhóm | File | Dòng | Ghi chú port |
 | --- | --- | --- | --- |
-| **C. Hạ tầng/bootstrap** (rủi ro cao — kế hoạch yêu cầu làm CUỐI, từng lát độc lập) | `state.js` | 128 | `ensureShape`/state gốc; lifecycle nhạy |
+| **C. Hạ tầng/bootstrap** (rủi ro cao — kế hoạch yêu cầu làm CUỐI, từng lát độc lập) | `state.js` | 128 | `ensureShape`/state gốc; lifecycle nhạy. **Đã TÁCH NỀN 2026-08-19** (state + cache + mem/startupProblem → globalThis property, xem lát tách nền bên dưới) — chưa retire, nhưng port sau này giờ đã mang tính cơ học |
 | | `qc-domain.js` | 255 | wiring Westgard/worker + point derivation |
 | | `state-storage.js` | 120 | load/save + partitioned + boot shell |
 | | ~~`local-store.js`~~ | ~~13~~ | **xong 2026-08-19, Hạ tầng lát 1** — xem bên dưới |
@@ -1800,6 +1800,88 @@ Gate: `build:pilot`/`typecheck`/`test` xanh (611/611 — giảm 1 vì xóa
 dải PXN cập nhật đủ Mean/SD và hai giới hạn" đi qua `applyNewRange`/
 `confirmApplyNewRange` mới) + `nce-check` (91/91) + `a11y-audit` (ratchet
 PASS).
+
+#### Lát hạ tầng — TÁCH NỀN `state.js` (2026-08-19, KHÔNG retire)
+
+Đây **không** phải lát retire — `state.js` vẫn là file classic. Đây là lát
+CHUẨN BỊ (tách nền) để lát retire `state.js` sau này trở nên cơ học và an toàn.
+Sau bốn lát dễ (`local-store`/`backup-ui`/`app-meta`/`range` — đều là "vỏ cầu
+nối" thuần), phân tích cho thấy `state.js` **không thể retire đơn lẻ** vì nó là
+trung tâm của một cụm coupling lexical: `state` (biến `let` khả biến) cùng các
+cache dẫn xuất (`pointsCache`/`pointsIndexCache`/`pointsLotCache`/`wgMemo`/
+`acceptedMemo`/`cusumMemo`/`derivedIndex`) và `mem`/`startupProblem` được ĐỌC VÀ
+GHI TRẦN bởi cả 5 file classic còn lại (qc-domain 13×, state-storage 10×,
+firebase-sync 9×, users-auth 16×, action-workflow-service 2× cho riêng `state`)
+LẪN bundle (bundle vừa đọc vừa GHI `state` 6 chỗ qua scope chain).
+
+**Cơ chế nền tảng (đã kiểm chứng, không suy đoán):** một `<script>` cổ điển
+chia sẻ "global lexical environment". `let X` top-level nằm trong environment
+đó — bundle (IIFE lồng trong global scope) đọc/ghi được qua scope chain, nhưng
+KHÔNG trở thành property của `globalThis`. Chiều ngược lại là điểm chết: một
+file classic KHÔNG thấy được `let` khai báo BÊN TRONG bundle IIFE. Vì vậy ràng
+buộc thật chỉ là: **không thể chuyển file KHAI BÁO (`state.js`) vào bundle khi
+các file ĐỌC nó vẫn còn classic** — chuyển xong thì `let state` bị kẹt trong
+IIFE và cả 5 file classic vỡ với `ReferenceError`. (Chiều ngược — chuyển file
+ĐỌC vào bundle trước khi chuyển `state.js` — thì AN TOÀN, vì bundle đọc/ghi
+classic `let` qua scope chain.)
+
+**Cách tách nền đã chọn (theo hướng người dùng duyệt):** đổi `state` + 6 cache +
+`mem`/`startupProblem` từ `let` lexical sang **`globalThis.X` data property**
+ngay trong classic `state.js`. Cân nhắc ba cơ chế:
+- **accessor** (như `currentUser`/`page`/`dashTestQ` qua `installUiState`): đúng
+  tiền lệ nhưng thêm chi phí getter trên MỌI lần đọc `state` — biến nóng nhất
+  app (đọc hàng chục nghìn lần mỗi lần dựng domain lạnh). Loại.
+- **`var`**: thành global property NGAY BÂY GIỜ, nhưng khi `state.js` chuyển vào
+  bundle IIFE thì `var` thành biến cục bộ IIFE → không sống sót, phải viết lại
+  thành `root.X`. Loại (churn cosmetic).
+- **`globalThis.X = ...`** (đã chọn): data property thuần (không getter), phân
+  giải cho mọi caller qua global object, và ĐÚNG dòng `globalThis.X=` này chuyển
+  nguyên vẹn khi `state.js` port vào bundle sau này. Cache Map giữ nguyên tham
+  chiếu vì `derived-cache-invalidation.ts` chỉ gọi `.clear()`/`.delete()`, không
+  bao giờ gán lại Map (đã đọc xác nhận). Chỉ `derivedIndex`/`mem`/`startupProblem`/
+  `state` bị gán lại — ghi trần trong sloppy-mode classic (không file nào có
+  `use strict`) và ghi từ bundle (strict, phân giải tới property đã tồn tại) đều
+  hợp lệ.
+
+**Một lỗi typecheck phát sinh, gốc rễ tinh vi:** đổi kiểu ambient của `state`
+sang `Record<string,any> & {...}` khiến `state.activity` thành `any`, nên
+`total=(state.activity||[]).length` trong `pageAudit()` (users-auth.js) thành
+`any` thay vì `number` như trước (state.js cũ suy `let state={...activity:[]...}`
+ra `activity: any[]`). `any` đó lan vào object fallback của ternary `chain=... ?
+auditChainStatus() : {ok,checked,legacy:total,idle}` và **phá vỡ phép rút gọn
+union theo subtype** mà đoạn code âm thầm dựa vào: khi `legacy:number`, object
+fallback là subtype sạch của kiểu trả về `auditChainStatus` nên `chain` rút về
+một nhánh và `chain.total`/`.brokenIndex`/`.reason` hợp lệ; khi `legacy:any`, TS
+không rút gọn nữa nên các field optional đó báo lỗi trên nhánh fallback. Sửa
+bằng cách thêm nhánh `activity?: any[]` vào kiểu ambient của `state` trong
+`global.d.ts` (phản ánh đúng thực tế `state.activity` là mảng) → `total` trở lại
+`number`, union rút gọn như cũ. Đã xác nhận đây là lỗi DO lát này gây ra bằng
+`git stash` (typecheck sạch khi chưa có thay đổi). Bài học: đổi kiểu của `state`
+từ literal-inferred sang `Record<string,any>` KHÔNG trung tính về kiểu — nó biến
+mọi property thành `any` và có thể phơi ra những chỗ code cũ dựa ngầm vào kiểu
+suy luận cụ thể; khi retire các file classic đọc `state`, canh chừng lớp lỗi này.
+
+Không có test nào cần sửa (không file test nào phụ thuộc `state` là `let`
+lexical). checkJs thấy các binding mới qua `declare var` thêm vào `global.d.ts`
+(cùng cụm với `declare var selTest/currentUser/...`). Ambient `declare let state`
+trong `modular-pilot.global.ts` (pass strict `tsconfig.modules.json`, không gồm
+`global.d.ts`) không đổi và không xung đột.
+
+Gate: `typecheck` sạch (cả checkJs lẫn strict) + `test` (611/611) + `ui-check`
+(29/29 — gồm nhập/hủy QC, restore backup GHI LẠI `state`, áp dụng dải PXN, tất
+cả đọc/ghi `state`+cache nặng qua Chromium thật) + `nce-check` (91/91) +
+benchmark `performance-regression.js` PASS (coldDomainMs 1648ms/budget 12000,
+`warmDomainColdRatio` 0.00029 — xác nhận data property KHÔNG thêm chi phí đo được
+so với `let`, đúng lý do loại accessor). Không cần `build:pilot` vì lát này
+không chạm `src/`.
+
+**Bước tiếp theo giờ đã rõ:** với `state`/cache đã là globalThis property, có
+thể port từng file ĐỌC (`qc-domain.js`/`state-storage.js`/`firebase-sync.js`/
+`users-auth.js`/`action-workflow-service.js`) vào bundle độc lập, rồi retire
+`state.js` + `analyte-catalog.js` sau cùng (khi không còn file classic nào đọc
+`state`/`TEA_ANALYTE_CATALOG` trần). Cảnh báo `analyte-catalog.js` ở trên vẫn
+nguyên giá trị: `state.js` đọc `TEA_ANALYTE_CATALOG` trần ở top-level, nên hai
+file này phải retire cùng một lát.
 
 ### Pha H — bỏ global bridge và nhiều script tags
 

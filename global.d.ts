@@ -14,6 +14,13 @@
 // Keep this in sync when a UI state bag or a service's exported
 // name set changes.
 
+// --- Core mutable state + derived caches (globalThis property, khai báo tại
+// state.js: `globalThis.state = ...`; xem chú thích tách nền trong state.js). ---
+declare var state: Record<string, any> & { data?: Record<string, Record<string, any>[]>; tests?: Record<string, any>[]; activity?: any[] };
+declare var mem: any, startupProblem: any, derivedIndex: any;
+declare var pointsCache: Map<string, any>, pointsIndexCache: Map<string, any>, pointsLotCache: Map<string, any>,
+  wgMemo: Map<string, any>, acceptedMemo: Map<string, any>, cusumMemo: Map<string, any>;
+
 // --- UI state accessors (cài từ modular compatibility artifact) ---
 declare var selTest: any, statusMemo: any, wgTestQ: any, dashTestQ: any, dashTestStatus: any,
   wgPrevOpen: any, wgExpandedRows: any, wgViewMode: any, wgArchivedGroupId: any,

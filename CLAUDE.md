@@ -408,6 +408,21 @@ the Google Fonts link, offline labs must print with correct metrics.
   It also reconciles Sigma levels with lot-group membership: removing a live
   lot level from every group unlinks that level and deletes its stale
   `sigmaData[testId][].lv[level]`, while stopped/planned groups retain history.
+  **`state` and the derived caches (`pointsCache`/`pointsIndexCache`/
+  `pointsLotCache`/`wgMemo`/`acceptedMemo`/`cusumMemo`/`derivedIndex`) plus
+  `mem`/`startupProblem` are declared as `globalThis.X` data properties, NOT
+  `let` (Pha G hạ tầng, tách nền 2026-08-19).** They're read *and written* bare
+  by every remaining classic file (qc-domain/state-storage/firebase-sync/
+  users-auth/action-workflow-service) and by the bundle. A classic top-level
+  `let` is lexical-only — the bundle IIFE can reach it via the scope chain, but
+  once `state.js` itself moves into the bundle that `let` would be trapped
+  inside the IIFE and the still-classic readers would break. A `globalThis.X`
+  data property resolves for everyone via the global object and the exact
+  `globalThis.X=` line survives the eventual move into the bundle (unlike `var`,
+  which would become IIFE-local). Not an accessor — that would add getter
+  overhead on the app's hottest binding; the caches stay stable Map references
+  (invalidation only `.clear()`/`.delete()`s, never reassigns). checkJs sees
+  these via `declare var` in `global.d.ts`.
 - `analyte-catalog.js` — `TEA_ANALYTE_CATALOG`, a frozen built-in measurand
   registry (one international name + abbreviation per analyte, with CLIA/Ricos
   TEa values). Provenance lives in `docs/tea-sources.md` (CLIA 2024 final rule

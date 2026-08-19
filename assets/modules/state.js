@@ -21,8 +21,19 @@ const WG_RULE_REGISTRY=QCCore.WG_RULE_REGISTRY;   // bảng đăng ký luật, n
 const WG_RULES=QCCore.WG_RULES;
 const WG_DEFAULT=Object.fromEntries(WG_RULES.map(r=>[r,QCCore.WG_DEFAULT_ON.has(r)]));
 const STATE_SCHEMA_VERSION=QCCore.STATE_SCHEMA_VERSION;
-let state={lab:/** @type {any} */({name:'',dept:'',address:''}),tests:[],machines:["Máy A"],instruments:[],assayGroups:[],qcPanels:[],lotTransitions:[],lotGroups:[],qcLots:[],data:{},actions:[],activity:[],activityAnchor:'',users:[],reagentTests:[],reagentOperators:[],reagentSampleTypes:['Mẫu bệnh nhân','Mẫu nội kiểm (IQC)','Mẫu ngoại kiểm (EQA)'],sigmaData:{},periodLocks:[],teaRefs:[],teaRegistryVersion:TEA_REFERENCE_SCHEMA_VERSION,westgardRules:{...WG_DEFAULT},configMigrationVersion:1,schemaVersion:STATE_SCHEMA_VERSION};
-let mem=null,pointsCache=new Map(),pointsIndexCache=new Map(),pointsLotCache=new Map(),wgMemo=new Map(),acceptedMemo=new Map(),cusumMemo=new Map(),derivedIndex=null,startupProblem=null;
+/* `state` và các cache dẫn xuất là GLOBAL PROPERTY (globalThis.X), không phải
+   `let` lexical (Pha G hạ tầng, tách nền cho state.js — 2026-08-19). Lý do: chúng
+   được ĐỌC/GHI TRẦN bởi cả năm file classic còn lại (qc-domain/state-storage/
+   firebase-sync/users-auth/action-workflow-service) LẪN bundle. Với `let` lexical,
+   bundle (IIFE) đọc/ghi được qua scope chain, nhưng khi state.js chuyển vào bundle
+   sau này thì `let` sẽ nằm trong IIFE và các file classic không còn thấy → vỡ.
+   Gán globalThis.X ngay bây giờ để: (1) mọi tham chiếu trần phân giải qua global
+   object; (2) khi state.js port vào bundle, đúng dòng `globalThis.X=` này chuyển
+   nguyên vẹn (khác `var`, vốn thành biến cục bộ IIFE). KHÔNG dùng accessor để
+   tránh chi phí getter trên biến nóng nhất app; đây là data property thuần, cache
+   Map giữ nguyên tham chiếu (invalidation chỉ .clear()/.delete(), không gán lại). */
+globalThis.state={lab:/** @type {any} */({name:'',dept:'',address:''}),tests:[],machines:["Máy A"],instruments:[],assayGroups:[],qcPanels:[],lotTransitions:[],lotGroups:[],qcLots:[],data:{},actions:[],activity:[],activityAnchor:'',users:[],reagentTests:[],reagentOperators:[],reagentSampleTypes:['Mẫu bệnh nhân','Mẫu nội kiểm (IQC)','Mẫu ngoại kiểm (EQA)'],sigmaData:{},periodLocks:[],teaRefs:[],teaRegistryVersion:TEA_REFERENCE_SCHEMA_VERSION,westgardRules:{...WG_DEFAULT},configMigrationVersion:1,schemaVersion:STATE_SCHEMA_VERSION};
+globalThis.mem=null;globalThis.pointsCache=new Map();globalThis.pointsIndexCache=new Map();globalThis.pointsLotCache=new Map();globalThis.wgMemo=new Map();globalThis.acceptedMemo=new Map();globalThis.cusumMemo=new Map();globalThis.derivedIndex=null;globalThis.startupProblem=null;
 /* Cầu nối cho service TS: các Map này là lexical global của script cổ, không thể được
    bundle ES module đọc trực tiếp. Chỉ cấp đúng thao tác invalidation cần thiết. */
 globalThis.legacyDerivedCacheState={pointCaches:()=>[pointsCache,pointsIndexCache,pointsLotCache,cusumMemo],westgardMemo:()=>wgMemo,acceptedMemo:()=>acceptedMemo,cusumMemo:()=>cusumMemo,resetDerivedIndex:()=>{derivedIndex=null;},resetStatus:()=>{statusMemo=new Map();},clearStatus:testId=>{if(statusMemo&&statusMemo.delete)statusMemo.delete(testId);}};if(globalThis.installDerivedCacheInvalidation)globalThis.installDerivedCacheInvalidation(globalThis.legacyDerivedCacheState);
