@@ -1875,13 +1875,102 @@ benchmark `performance-regression.js` PASS (coldDomainMs 1648ms/budget 12000,
 so với `let`, đúng lý do loại accessor). Không cần `build:pilot` vì lát này
 không chạm `src/`.
 
-**Bước tiếp theo giờ đã rõ:** với `state`/cache đã là globalThis property, có
-thể port từng file ĐỌC (`qc-domain.js`/`state-storage.js`/`firebase-sync.js`/
-`users-auth.js`/`action-workflow-service.js`) vào bundle độc lập, rồi retire
-`state.js` + `analyte-catalog.js` sau cùng (khi không còn file classic nào đọc
-`state`/`TEA_ANALYTE_CATALOG` trần). Cảnh báo `analyte-catalog.js` ở trên vẫn
-nguyên giá trị: `state.js` đọc `TEA_ANALYTE_CATALOG` trần ở top-level, nên hai
-file này phải retire cùng một lát.
+#### Kế hoạch các lát nhóm C còn lại (sau tách nền `state`) — 2026-08-19
+
+Với `state`/cache đã là globalThis property, ràng buộc port đã đảo chiều: có thể
+port từng file **ĐỌC** (`qc-domain`/`state-storage`/`firebase-sync`/`users-auth`/
+`action-workflow-service`) vào bundle ĐỘC LẬP (bundle đọc/ghi `state`+cache qua
+global object), rồi retire `state.js` + `analyte-catalog.js` **sau cùng** khi
+không còn file classic nào đọc `state`/`TEA_ANALYTE_CATALOG` trần.
+
+**Quy tắc chung cho MỖI lát reader** (áp dụng đúng bài học tách nền): trước khi
+chuyển file F vào bundle, `grep -nE "^(let|const|var) "` các khai báo lexical
+top-level của F, rồi kiểm mỗi tên xem có file CLASSIC KHÁC (hoặc `app.js`) đọc
+trần không. Nếu có → tên đó phải tách nền sang `globalThis.X` TRƯỚC (như đã làm
+với `state`), vì khi F vào bundle thì `let`/`const` của nó kẹt trong IIFE.
+Lexical chỉ được BUNDLE đọc (không classic nào khác) thì AN TOÀN — chúng vào
+bundle cùng F. Hàm `function X(){}` luôn an toàn (thành `root.X`, caller trần rơi
+qua global object).
+
+**Bản đồ ràng buộc lexical chéo-classic đã rà (2026-08-19)** — chỉ HAI tên cần
+tách nền trước khi port chủ của chúng:
+
+| Lexical | Chủ (owner) | File classic khác đọc trần | Xử lý |
+| --- | --- | --- | --- |
+| `fb` | `firebase-sync.js` | `state-storage.js`(1), `users-auth.js`(1) | tách nền `globalThis.fb` khi/ trước khi port `firebase-sync` |
+| `storageHydrationPromise` | `state-storage.js` | `users-auth.js`(1), `app.js`(1) | tách nền `globalThis.storageHydrationPromise` khi/ trước khi port `state-storage` (`app.js` là Pha H nên chưa port kèm được) |
+
+Mọi lexical khác (`localLoadStatus`/`partitionWrite`/`partitionSlot`/`lsDirty`/
+`ls*`/`wgWorker`/`WG_RULE_DESCRIPTIONS`/`WG_WORKER_POINT_THRESHOLD`/`saveLabel`/
+`auditQ`/`AUDIT_PAGE_SIZES`/…) chỉ được chính chủ + bundle đọc → vào bundle cùng
+file, không cần tách nền riêng.
+
+**Quan trọng — chiều ràng buộc:** một CLASSIC reader đọc lexical của file khác
+KHÔNG chặn việc port chính reader đó (bundle đọc classic `let`/`const` qua scope
+chain vô tư). Ràng buộc chỉ chặn việc port file KHAI BÁO lexical đó khi vẫn còn
+CLASSIC reader. Vì vậy `users-auth` đọc `fb`/`storageHydrationPromise` KHÔNG làm
+chậm việc port `users-auth`; nó chỉ chặn port `firebase-sync`/`state-storage`.
+
+**Lát 0 (prerequisite tách nền) — `fb` + `storageHydrationPromise` → globalThis.**
+Làm một lát nhỏ (giống lát tách nền `state`) đổi `const fb=` trong `firebase-sync.js`
+và `let storageHydrationPromise` trong `state-storage.js` sang `globalThis.fb=`/
+`globalThis.storageHydrationPromise=`, thêm `declare var` vào `global.d.ts`. Sau
+lát này KHÔNG còn lexical chéo-classic nào → cả 5 reader port được theo BẤT KỲ
+thứ tự nào. (Lý do tách riêng thay vì gộp vào lát chủ: `storageHydrationPromise`
+còn bị `app.js` — Pha H, chưa port — đọc trần, nên dù port `state-storage` vẫn
+phải tách nền nó; làm sớm để gỡ mọi ràng buộc thứ tự.)
+
+**Thứ tự lát đề xuất SAU lát 0 (rủi ro/ghép nối tăng dần) — port độc lập:**
+
+1. **`action-workflow-service.js`** (149) — đọc `state`(2×), KHÔNG khai báo
+   lexical chéo-classic nào. Ghép nối nhẹ nhất. Lưu ý: giữ nguyên cache tự kiểm
+   chứng (`actionLotPoints`/memo) — hợp đồng đã khóa bởi
+   `tests/action-workflow-service.test.js` (chốt bằng tính tự trượt, không bằng
+   mốc thời gian). Gate: test + `nce-check` (vòng đời NCE) + benchmark
+   (`actionRerunStatus` không được tăng theo tổng số điểm QC).
+2. **`users-auth.js`** (256) — đọc `state`(16×)/`startupProblem`/`fb`/
+   `storageHydrationPromise` (tất cả đã là globalThis sau lát 0). Nhạy cảm bảo
+   mật (PBKDF2, re-auth) + trang audit. Gate: `auth-security.test.js`,
+   `audit-*` test, `ui-check` (khóa/mở kỳ + restore qua re-auth), `a11y-audit`
+   (trang audit + modal).
+3. **`firebase-sync.js`** (173) — đọc `state`(9×); `fb` đã tách nền ở lát 0 nên
+   giờ chỉ còn logic sync. Gate: `firebase-merge.test.js`/`firebase-offline.test.js`
+   + `ui-check` (không có đường sync thật trong gate — cẩn thận merge semantics).
+4. **`state-storage.js`** (120) — đọc `state`/`mem`/`startupProblem`;
+   `storageHydrationPromise` đã tách nền ở lát 0. Lifecycle-critical (boot shell,
+   partitioned save, quarantine). Gate: `storage-pipeline.test.js`,
+   `state-storage-safety.test.js`, `cache-invalidation.test.js`, benchmark
+   (đường lưu tăng dần), `ui-check` (restore backup).
+5. **`qc-domain.js`** (255) — đọc `state`+`wgMemo`/`acceptedMemo`/`cusumMemo`/
+   `derivedIndex`/`WG_RULES` trần (giờ đều là globalThis property nhờ lát tách
+   nền `state`, trừ `WG_RULES` là const của `state.js` — xem dưới). Chứa
+   `derived()` tự kiểm chứng + wiring worker Westgard. Đường NÓNG — benchmark
+   `coldDomainMs`/`warmDomainColdRatio` là gate bắt buộc. Gate: toàn bộ Westgard
+   test + `westgard-worker.test.js` (parity main-thread/worker) + benchmark +
+   `ui-check`.
+
+   *Lưu ý `WG_RULES`/`WG_DEFAULT`/`WG_RULE_REGISTRY`/`STATE_SCHEMA_VERSION`/
+   `TEA_*` là `const` khai báo trong `state.js`, đọc trần bởi qc-domain
+   (`WG_RULES` 1×) và các nơi khác.* Chúng là hằng, không khả biến, nên có thể
+   để `state.js` giữ tới lát cuối; khi port qc-domain, `WG_RULES` trần vẫn phân
+   giải qua scope chain tới classic `const` của `state.js` (bundle đọc classic
+   const được). Chỉ khi retire `state.js` mới cần chuyển các const này thành
+   `globalThis.X`/`root.X` hoặc đưa vào bundle.
+
+6. **Lát cuối — retire `state.js` + `analyte-catalog.js` CÙNG MỘT LÁT.** Chỉ khi
+   5 file trên đã vào bundle (không còn classic reader nào đọc `state`/caches/
+   `WG_RULES`/`TEA_ANALYTE_CATALOG` trần). Hai file phải đi cùng vì `state.js`
+   đọc `TEA_ANALYTE_CATALOG` trần Ở TOP-LEVEL (dựng `REFTESTS`/`TEA_ANALYTE_META`
+   ngay lúc nạp) — tách rời sẽ vỡ boot. Khi vào bundle: `globalThis.state=`/
+   `globalThis.wgMemo=`… chuyển nguyên vẹn (đã tách nền); các `const` data
+   (`WG_RULES`/`REFTESTS`/`TEA_*`/`STATE_SCHEMA_VERSION`) thành `root.X` hoặc để
+   bundle-internal nếu không còn caller trần; hàm delegator (`fmt`/`isoToday`/
+   `ensureShape`/`uid`/…) thành `root.X`. Gate: TOÀN BỘ (test + typecheck +
+   ui-check + nce-check + a11y + visual-check + print-check + benchmark) — đây là
+   lát đóng nhóm C.
+
+Sau nhóm C: `assets/modules/` rỗng. Còn lại `assets/core.js` (nhóm D),
+`assets/workers/westgard-worker.js` (nhóm D), `assets/app.js` (Pha H).
 
 ### Pha H — bỏ global bridge và nhiều script tags
 
