@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict');
 const{loadSandbox,run}=require('./helpers/sandbox');
 
-const ctx=loadSandbox(['core.js','generated/modular-pilot.js','modules/data-io.js'],{
+const ctx=loadSandbox(['core.js','generated/modular-pilot.js'],{
   window:{QCLAB_APP:{name:'QC Lab',version:'2.4.0'}},
   atob:value=>Buffer.from(value,'base64').toString('binary'),
   reportXlsxHeader:input=>{

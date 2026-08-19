@@ -11,7 +11,7 @@ function context2d() {
 
 const drawnLabels = [];
 
-const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js', 'modules/draw.js'], {
+const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js'], {
   window: { devicePixelRatio: 1 },
   // addEventListener: vnDatePickerController.bind() chạy ngay khi generated/modular-pilot.js
   // nạp (trước đây chỉ chạy nếu sandbox nạp router-render.js, thứ file này chưa từng nạp).

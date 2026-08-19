@@ -31,14 +31,6 @@ function loadSandbox(relFiles, globals = {}) {
   // sau toàn bộ module test yêu cầu để ensureShape() không âm thầm chạy fallback
   // classic chỉ vì sandbox thiếu artifact.
   if(stateIndex>=0&&!files.includes('generated/modular-pilot.js'))files.push('generated/modular-pilot.js');
-  // sigma.js không còn tự giải TEa từ 2026-08-01 (tách sang sigma-tea.js, nạp
-  // ngay trước nó trong index.html) — chèn giúp để mọi test cũ khỏi phải liệt kê.
-  const sigmaIndex=files.indexOf('modules/sigma.js');
-  if(sigmaIndex>=0&&!files.includes('modules/sigma-tea.js'))files.splice(sigmaIndex,0,'modules/sigma-tea.js');
-  // Audit classic giờ chỉ là compatibility bridge; nạp artifact TypeScript ngay sau nó
-  // để các test sandbox vẫn phản ánh đúng thứ tự runtime trong index.html.
-  const auditIndex=files.indexOf('modules/audit.js');
-  if(auditIndex>=0&&!files.includes('generated/modular-pilot.js'))files.splice(auditIndex+1,0,'generated/modular-pilot.js');
   const actionWorkflowIndex=files.indexOf('modules/action-workflow-service.js');
   if(actionWorkflowIndex>=0&&!files.includes('generated/modular-pilot.js'))files.splice(actionWorkflowIndex+1,0,'generated/modular-pilot.js');
   // Storage runtime đã chuyển sang façade TypeScript. Khi test nạp state-storage,

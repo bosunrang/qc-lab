@@ -19,12 +19,13 @@ const { loadSandbox, run } = require('./helpers/sandbox');
 
 const ctx = loadSandbox([
   'core.js', 'modules/state.js', 'modules/qc-domain.js',
-  'generated/modular-pilot.js', 'modules/manage-tests-actions.js',
+  'generated/modular-pilot.js',
 ]);
 const plain = (v) => JSON.parse(JSON.stringify(v));
 
-/* sameText/testDisplayName sống ở manage-routes.js/sigma.js — stub thay vì kéo cả
-   hai file render vào sandbox chỉ để lấy hai hàm một dòng. */
+/* sameText sống ở sigma.js — stub thay vì kéo cả file render vào sandbox chỉ để
+   lấy một hàm một dòng. testDisplayName giờ đến từ bundle TypeScript (sigma-tea-
+   resolution) nhưng vẫn stub lại ở đây để tránh phụ thuộc dữ liệu catalog thật. */
 const seed = `
   state = {
     lab: {}, machines: [], instruments: [{ id: 'I1', name: 'AU480', active: true }], assayGroups: [],

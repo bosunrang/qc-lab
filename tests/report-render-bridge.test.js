@@ -4,7 +4,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 const root=path.join(__dirname,'..');
 const route=fs.readFileSync(path.join(root,'src','presentation','report','report-page-controller.ts'),'utf8');
-const reports=fs.readFileSync(path.join(root,'assets','modules','reports.js'),'utf8');
+const reports=fs.readFileSync(path.join(root,'src','presentation','report','report-print-controller.ts'),'utf8');
 const bridge=fs.readFileSync(path.join(root,'src','compat','modular-pilot.global.ts'),'utf8');
 
 for(const [name,type] of [
@@ -22,8 +22,8 @@ for(const [name,type] of [
 assert.match(route,/deps\.reportSearch\.select\(/,'Bộ tìm kiếm báo cáo phải dùng bridge TypeScript');
 assert.match(route,/deps\.reportSelection\.exportSelection\(/,'Lựa chọn báo cáo phải dùng bridge TypeScript');
 assert.match(route,/deps\.rangeText\(start, end\)/,'Nhãn phạm vi báo cáo phải dùng bridge TypeScript');
-assert.match(reports,/globalThis\.reportPointsTableService\(items,t\)/,'Bảng điểm QC báo cáo phải dùng bridge TypeScript');
-assert.match(reports,/globalThis\.reportNceDetailHtmlPresentation\(a,t\)/,'Chi tiết NCE báo cáo phải dùng bridge TypeScript');
-assert.match(reports,/globalThis\.reportNceAppendixPresentation\(actions,t\)/,'Phụ lục NCE phải dùng bridge TypeScript');
+assert.match(reports,/deps\.reportPointsTableService\(items, t\)/,'Bảng điểm QC báo cáo phải dùng dependency injected');
+assert.match(reports,/deps\.reportNceDetailHtmlPresentation\(a, t\)/,'Chi tiết NCE báo cáo phải dùng dependency injected');
+assert.match(reports,/deps\.reportNceAppendixPresentation\(actions, t\)/,'Phụ lục NCE phải dùng dependency injected');
 
 console.log('Report renderer TypeScript bridge tests passed');

@@ -3,9 +3,9 @@ const fs=require('node:fs');
 const path=require('node:path');
 const{loadSandbox,run}=require('./helpers/sandbox');
 
-// data-io.js giữ tầng dữ liệu dùng chung (reportNceModel/reportNceSummaryParts/
-// reportNceExcerpt) mà cả bản in lẫn bản Excel cùng đọc; nạp đúng thứ tự index.html.
-const ctx=loadSandbox(['core.js','generated/modular-pilot.js','modules/data-io.js','modules/reports.js'],{window:{QCLAB_APP:{name:'QC Lab',version:'test'}}});
+// data-io-controller.ts giữ tầng dữ liệu dùng chung (reportNceModel/reportNceSummaryParts/
+// reportNceExcerpt) mà cả bản in lẫn bản Excel cùng đọc.
+const ctx=loadSandbox(['core.js','generated/modular-pilot.js'],{window:{QCLAB_APP:{name:'QC Lab',version:'test'}}});
 run(ctx,`
   ACTION_LABELS={
     cause:{instrument:'Thiết bị'},source:{iqc:'Nội kiểm IQC'},phase:{exam:'Xét nghiệm'},risk:{high:'Cao',low:'Thấp'},
@@ -60,13 +60,13 @@ assert.ok(rendered.length>=20,'model phải mang đủ nội dung phiếu NCE, �
 for(const[key,value]of rendered)assert.ok(detail.includes(value),`bản in bỏ sót trường "${key}" của reportNceModel: ${value}`);
 for(const[,statusText,noteText]of model.checks){assert.ok(detail.includes(statusText));assert.ok(detail.includes(noteText));}
 
-const reportSource=fs.readFileSync(path.join(__dirname,'..','assets','modules','reports.js'),'utf8');
+const reportSource=fs.readFileSync(path.join(__dirname,'..','src','presentation','report','report-print-controller.ts'),'utf8');
 // Markup ô "Kèm phụ lục NCE" đã chuyển sang createReportPageHtml() (TypeScript)
 // từ khi pageReportV2() (nay ở report-page-controller.ts) không còn tự dựng HTML.
 const reportPageHtmlSource=fs.readFileSync(path.join(__dirname,'..','src','presentation','report','report-page-html.ts'),'utf8');
 assert.match(reportSource,/\.nce-check-item-col\{width:30%\}\.nce-check-result-col\{width:22%\}\.nce-check-note-col\{width:48%\}/,'stylesheet bản in phải giữ đúng tỷ lệ ba cột checklist');
 assert.match(reportPageHtmlSource,/id="reportNceAppendix"[^>]*checked/,'trang báo cáo phải có tùy chọn phụ lục bật sẵn');
-assert.match(reportSource,/acts\.length&&includeNceAppendix/,'phụ lục chỉ được thêm khi có NCE và người dùng bật tùy chọn');
+assert.match(reportSource,/acts\.length && includeNceAppendix/,'phụ lục chỉ được thêm khi có NCE và người dùng bật tùy chọn');
 assert.match(reportSource,/\.nce-detail-stack\{display:grid;gap:7px;break-inside:avoid\}/,'mục 1 và 4 phải có khoảng lưới 7px và không bị tách hai hàng qua trang');
 assert.equal((detail.match(/class="nce-detail-stack"/g)||[]).length,2,'mục 1 và 4 phải dùng cùng cấu trúc khoảng cách');
 

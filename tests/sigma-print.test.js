@@ -3,7 +3,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
-const ctx = loadSandbox(['modules/reports.js'], { window: { QCLAB_APP: { name: 'QC Lab', version: 'test' } }, reportSignBlock: () => '', reportHeaderPresentation: model => `<div>${model.app.name} ${model.app.version}</div>` });
+const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js'], { window: { QCLAB_APP: { name: 'QC Lab', version: 'test' } }, document: { getElementById: () => null, addEventListener: () => {} } });
+run(ctx, `reportSignBlock=()=>'';reportHeaderPresentation=model=>'<div>'+model.app.name+' '+model.app.version+'</div>';`);
 run(ctx, `
   state={lab:{name:'PXN',dept:'Hóa sinh'},westgardRules:{'1-3s':true},tests:[{id:'T1',name:'Sodium',unit:'mmol/L',machine:'Máy A'}]};
   sgTest='T1';
@@ -71,9 +72,9 @@ assert.match(rowHtml, /Chưa đủ CV IQC và Bias EQA\/EQC/);
   assert.match(combined.body, /Độ không đảm bảo đo \(MU\) theo kỳ/, 'báo cáo tổng hợp cũng phải kèm MU của từng kỳ');
   assert.match(combined.body, /<td><b>07\/2026<\/b><\/td><td><b>Mức 1<\/b><\/td>/, 'bảng MU tổng hợp tách theo kỳ × mức');
 
-  const sigmaSource = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'sigma.js'), 'utf8');
+  const sigmaSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'sigma', 'sigma-page-controller.ts'), 'utf8');
   assert.match(sigmaSource, /`printSigmaPeriod\('\$\{e\.id\}'\)`/);
   assert.match(sigmaSource, /'printSigmaPeriods\(\)'/);
-  assert.match(sigmaSource, /printIcon\+'In PDF'/);
+  assert.match(sigmaSource, /printIcon \+ 'In PDF'/);
   console.log('Sigma period print tests passed');
 })().catch(error=>{console.error(error);process.exitCode=1;});

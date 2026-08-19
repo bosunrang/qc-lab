@@ -157,7 +157,7 @@ assert.equal(QCCore.uncertaintyBudget({cv: -2}), null, 'CV âm bị loại');
 
 /* ===== 3. Nối vào trang Sigma ===== */
 
-const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js', 'modules/state.js', 'modules/sigma.js']);
+const ctx = loadSandbox(['core.js', 'modules/state.js', 'generated/modular-pilot.js']);
 
 assert.equal(ctx.sgMuDominant({shares: {uRw: .1, uBias: .8, uCal: .1}}), 'u(bias) chiếm 80%', 'thành phần trội được nêu tên để biết đi sửa cái gì trước');
 assert.equal(ctx.sgMuDominant({shares: {uRw: .4, uBias: .35, uCal: .25}}), '', 'ba thành phần xấp xỉ nhau thì không gợi ý sai một "thủ phạm"');
@@ -236,23 +236,23 @@ assert.equal(ctx.sgMuBiasMode(null), 'include');
 
 /* ===== 4. Quy ước giao diện và báo cáo ===== */
 
-const sigmaSrc = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'sigma.js'), 'utf8');
-const reportsSrc = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'reports.js'), 'utf8');
+const sigmaSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'sigma', 'sigma-page-controller.ts'), 'utf8');
+const reportsSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'report', 'report-print-controller.ts'), 'utf8');
 const muPrintRowsSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'sigma', 'sigma-mu-print-rows.ts'), 'utf8');
 const coreSrc = fs.readFileSync(path.join(__dirname, '..', 'assets', 'core.js'), 'utf8');
 const sigmaMuWorkflowSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'application', 'sigma', 'sigma-mu-workflow-command.ts'), 'utf8');
 
 assert.match(sigmaSrc, /<details class="panel sg-collapse-panel sg-mu-panel"><summary class="sg-collapse-summary"><span role="heading" aria-level="2">Độ không đảm bảo đo \(MU\)<\/span><\/summary><div id="sgMUAction" class="sg-data-head-actions"><\/div><div id="sgMU">/, 'panel MU phải thu gọn được, giữ heading cấp 2 và đặt nút CoA cạnh summary thay vì lồng control focus');
-assert.match(sigmaSrc, /muBox\.innerHTML=sgMuHTML\(t,selectedRow,levels\)/, 'panel MU phải bám theo ĐÚNG kỳ đang chọn như bảng OPSpecs, không phải kỳ mới nhất');
-assert.match(sigmaSrc, /function sgMuApply\(\)[\s\S]{0,80}requireWrite\(\)/, 'ghi ngân sách MU phải qua cổng quyền ghi');
-assert.match(sigmaSrc, /globalThis\.SigmaMuWorkflowCommand\.apply\(/, 'áp dụng ngân sách MU phải đi qua workflow command TypeScript');
+assert.match(sigmaSrc, /muBox\.innerHTML = sgMuHTML\(t, selectedRow, levels\)/, 'panel MU phải bám theo ĐÚNG kỳ đang chọn như bảng OPSpecs, không phải kỳ mới nhất');
+assert.match(sigmaSrc, /const sgMuApply = async \(\) => \{[\s\S]{0,80}deps\.requireWrite\(\)/, 'ghi ngân sách MU phải qua cổng quyền ghi');
+assert.match(sigmaSrc, /deps\.SigmaMuWorkflowCommand\.apply\(/, 'áp dụng ngân sách MU phải đi qua workflow command TypeScript');
 assert.match(sigmaMuWorkflowSrc, /deps\.log\('Cập nhật ngân sách MU'/, 'sửa ngân sách MU phải để lại vết trong nhật ký');
-assert.match(sigmaSrc, /function sgMuPreview\([\s\S]{0,400}QCCore\.uncertaintyBudget\(/, 'xem trước trong modal phải gọi lại đúng hàm ngân sách, không tự nhân chia lại');
+assert.match(sigmaSrc, /const sgMuPreview = \(level: unknown\): AnyRec => \{[\s\S]{0,400}deps\.QCCore\.uncertaintyBudget\(/, 'xem trước trong modal phải gọi lại đúng hàm ngân sách, không tự nhân chia lại');
 assert.doesNotMatch(sigmaSrc, /uCal:\s*[^,)]*\|\|\s*0/, 'u(cal) chưa nhập không được ngầm hoá thành 0 trước khi vào ngân sách');
 assert.doesNotMatch(coreSrc, /pct\(o\.uCal\)\s*\|\|\s*0/, 'core cũng không được thay u(cal) thiếu bằng 0');
 
-assert.match(reportsSrc, /body\+=sigmaMuPrintCard\(t,row,levels\)/, 'báo cáo Sigma theo kỳ phải kèm bảng công bố MU');
-assert.match(reportsSrc, /sigmaMuPeriodsPrintRows\(t,rows,levels\)/, 'báo cáo tổng hợp nhiều kỳ cũng phải có MU');
+assert.match(reportsSrc, /body \+= sigmaMuPrintCard\(t, row, levels\)/, 'báo cáo Sigma theo kỳ phải kèm bảng công bố MU');
+assert.match(reportsSrc, /sigmaMuPeriodsPrintRows\(t, rows, levels\)/, 'báo cáo tổng hợp nhiều kỳ cũng phải có MU');
 assert.match(reportsSrc, /sigmaMuPrintRowsService\.periodRows/, 'bản in phải gọi presentation TypeScript của ngân sách MU');
 assert.match(muPrintRowsSrc, /metric && metric\.mu \|\| deps\.mu\(test, row\.e, level\)/, 'bản in đọc lại r.mu của sgComp() và chỉ rơi về sgMU() khi mức đó chưa ra Sigma');
 assert.match(muPrintRowsSrc, /mu\.missing\.join\(', '\)/, 'bản in phải nói rõ thành phần còn thiếu thay vì im lặng in ra một U đẹp');

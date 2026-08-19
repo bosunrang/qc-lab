@@ -2,14 +2,14 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const actions = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'manage-tests-actions.js'), 'utf8');
+const actions = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'manage', 'manage-tests-actions-controller.ts'), 'utf8');
 const panelPresentation = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'manage', 'config-panel-modal-html.ts'), 'utf8');
 const transitionPresentation = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'manage', 'lot-transition-modal-html.ts'), 'utf8');
 const groupPresentation = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'manage', 'lot-group-modal-html.ts'), 'utf8');
 const lotPresentation = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'manage', 'config-lot-modal-html.ts'), 'utf8');
 const instrumentPresentation = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'manage', 'config-instrument-modal-html.ts'), 'utf8');
 const assayPresentation = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'manage', 'config-assay-modal-html.ts'), 'utf8');
-const routes = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'manage-routes.js'), 'utf8');
+const routes = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'manage', 'manage-page-controller.ts'), 'utf8');
 const records = [
   ['Panel QC','Panel QC'],
   ['hồ sơ chuyển lô','hồ sơ chuyển lô'],
@@ -20,18 +20,18 @@ const records = [
 ];
 
 records.forEach(([editName,addName])=>{
-  if(addName==='Panel QC')assert.ok(actions.includes(`title:id?'Sửa ${editName}':'Thêm ${addName}'`)&&panelPresentation.includes('${input.title}'), `tiêu đề ${addName} phải phân biệt Thêm/Sửa`);
-  else if(addName==='hồ sơ chuyển lô')assert.ok(actions.includes(`title:id?'Sửa ${editName}':'Thêm ${addName}'`)&&transitionPresentation.includes('${input.title}'), `tiêu đề ${addName} phải phân biệt Thêm/Sửa`);
-  else if(addName==='nhóm lô')assert.ok(actions.includes(`title:id?'Sửa ${editName}':'Thêm ${addName}'`)&&groupPresentation.includes('${input.title}'), `tiêu đề ${addName} phải phân biệt Thêm/Sửa`);
-  else if(addName==='lô QC')assert.ok(actions.includes(`title:id?'Sửa ${editName}':'Thêm ${addName}'`)&&lotPresentation.includes('${input.title}'), `tiêu đề ${addName} phải phân biệt Thêm/Sửa`);
-  else if(addName==='máy xét nghiệm')assert.ok(actions.includes(`title:id?'Sửa ${editName}':'Thêm ${addName}'`)&&instrumentPresentation.includes('${input.title}'), `tiêu đề ${addName} phải phân biệt Thêm/Sửa`);
-  else if(addName==='xét nghiệm')assert.ok(actions.includes(`title:id?'Sửa ${editName}':'Thêm ${addName}'`)&&assayPresentation.includes('${input.title}'), `tiêu đề ${addName} phải phân biệt Thêm/Sửa`);
-  else assert.ok(actions.includes(`${'${'}id?'Sửa ${editName}':'Thêm ${addName}'}`), `tiêu đề ${addName} phải phân biệt Thêm/Sửa`);
-  assert.ok(actions.includes(`btn(id?'Lưu thay đổi':'Thêm ${addName}'`), `nút ${addName} phải dùng Thêm khi tạo và Lưu thay đổi khi sửa`);
+  if(addName==='Panel QC')assert.ok(actions.includes(`title: id ? 'Sửa ${editName}' : 'Thêm ${addName}'`)&&panelPresentation.includes('${input.title}'), `tiêu đề ${addName} phải phân biệt Thêm/Sửa`);
+  else if(addName==='hồ sơ chuyển lô')assert.ok(actions.includes(`title: id ? 'Sửa ${editName}' : 'Thêm ${addName}'`)&&transitionPresentation.includes('${input.title}'), `tiêu đề ${addName} phải phân biệt Thêm/Sửa`);
+  else if(addName==='nhóm lô')assert.ok(actions.includes(`title: id ? 'Sửa ${editName}' : 'Thêm ${addName}'`)&&groupPresentation.includes('${input.title}'), `tiêu đề ${addName} phải phân biệt Thêm/Sửa`);
+  else if(addName==='lô QC')assert.ok(actions.includes(`title: id ? 'Sửa ${editName}' : 'Thêm ${addName}'`)&&lotPresentation.includes('${input.title}'), `tiêu đề ${addName} phải phân biệt Thêm/Sửa`);
+  else if(addName==='máy xét nghiệm')assert.ok(actions.includes(`title: id ? 'Sửa ${editName}' : 'Thêm ${addName}'`)&&instrumentPresentation.includes('${input.title}'), `tiêu đề ${addName} phải phân biệt Thêm/Sửa`);
+  else if(addName==='xét nghiệm')assert.ok(actions.includes(`title: id ? 'Sửa ${editName}' : 'Thêm ${addName}'`)&&assayPresentation.includes('${input.title}'), `tiêu đề ${addName} phải phân biệt Thêm/Sửa`);
+  else assert.ok(actions.includes(`${'${'}id ? 'Sửa ${editName}' : 'Thêm ${addName}'}`), `tiêu đề ${addName} phải phân biệt Thêm/Sửa`);
+  assert.ok(actions.includes(`btn(id ? 'Lưu thay đổi' : 'Thêm ${addName}'`), `nút ${addName} phải dùng Thêm khi tạo và Lưu thay đổi khi sửa`);
 });
 ['Lưu Panel QC','Lưu hồ sơ','Lưu nhóm lô','Lưu lô','Lưu máy xét nghiệm'].forEach(label=>assert.equal(actions.includes(`btn('${label}'`),false,`không dùng nhãn tĩnh “${label}” trong popup CRUD`));
 ['Thêm lô QC','Thêm nhóm lô','Thêm máy xét nghiệm','Thêm Panel QC','Thêm hồ sơ chuyển lô','Thêm xét nghiệm'].forEach(label=>assert.ok(routes.includes(`'${label}'`),`toolbar phải dùng “${label}”`));
-assert.ok(routes.includes(`title:hasProfile?'Sửa hồ sơ TEa chuẩn hóa':'Thêm hồ sơ TEa chuẩn hóa'`),'hồ sơ TEa phải phân biệt Thêm/Sửa');
-assert.ok(routes.includes(`btn(hasProfile?'Lưu thay đổi':'Thêm hồ sơ TEa'`),'nút hồ sơ TEa phải phân biệt Thêm/Lưu thay đổi');
+assert.ok(routes.includes(`title: hasProfile ? 'Sửa hồ sơ TEa chuẩn hóa' : 'Thêm hồ sơ TEa chuẩn hóa'`),'hồ sơ TEa phải phân biệt Thêm/Sửa');
+assert.ok(routes.includes(`btn(hasProfile ? 'Lưu thay đổi' : 'Thêm hồ sơ TEa'`),'nút hồ sơ TEa phải phân biệt Thêm/Lưu thay đổi');
 assert.doesNotMatch(actions,/Các trường có dấu/,'popup xét nghiệm không cần lặp lại chú thích dấu sao bắt buộc');
 console.log('Manage CRUD label convention tests passed');

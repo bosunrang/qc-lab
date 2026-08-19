@@ -19,7 +19,7 @@ const { loadSandbox, run } = require('./helpers/sandbox');
 const firebaseSource=fs.readFileSync(path.join(__dirname,'..','assets','modules','firebase-sync.js'),'utf8');
 const bridgeSource=fs.readFileSync(path.join(__dirname,'..','src','compat','modular-pilot.global.ts'),'utf8');
 
-const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/firebase-sync.js', 'modules/state-storage.js', 'modules/qc-domain.js', 'modules/audit.js', 'generated/modular-pilot.js']);
+const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/firebase-sync.js', 'modules/state-storage.js', 'modules/qc-domain.js', 'generated/modular-pilot.js']);
 run(ctx, 'function __getState(){return state;} function __setState(s){state=s;} function __getUpdateCalls(){return __updateCalls||0;}');
 
 function baseState(overrides = {}) {

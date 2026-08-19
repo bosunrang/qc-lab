@@ -1,6 +1,6 @@
 ﻿/**
  * Tests for the hand-rolled ZIP/OOXML builder behind "Xuất Excel Sigma"
- * (SigmaXlsx in assets/modules/data-io.js).
+ * (SigmaXlsx in src/presentation/export/data-io-controller.ts).
  *
  * There is no library involved - the ZIP local/central-directory records and
  * the worksheet XML are built byte-by-byte. A single wrong offset or length
@@ -12,7 +12,7 @@
 const assert = require('node:assert/strict');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
-const ctx = loadSandbox(['core.js','generated/modular-pilot.js','modules/data-io.js']);
+const ctx = loadSandbox(['core.js','generated/modular-pilot.js']);
 run(ctx, `globalThis.reportExportHelpers={sigmaLevels:row=>(Array.isArray(row&&row.levels)?row.levels:[{level:1,metric:row&&row.r1||null},{level:2,metric:row&&row.r2||null}]).filter(x=>x&&x.metric),periodLabel:value=>{const raw=String(value||'').trim().replace(/^Kỳ\\s*/i,''),iso=raw.match(/^(\\d{4})-(\\d{1,2})$/),vn=raw.match(/^(\\d{1,2})\\/(\\d{4})$/);if(iso)return String(Number(iso[2])).padStart(2,'0')+'/'+iso[1];if(vn)return String(Number(vn[1])).padStart(2,'0')+'/'+vn[2];return raw||'?';},mdcPeriodLabel:value=>globalThis.reportExportHelpers.periodLabel(value).replace(/^0(?=\\d\\/)/,''),exportPeriods:rows=>[...new Set((rows||[]).map(r=>globalThis.reportExportHelpers.periodLabel(r&&r.period)).filter(Boolean))].join(', ')};`);
 run(ctx, `globalThis.renameSigmaXlsxSheet=(bytes,sheetName)=>{
   const view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength),decode=new TextDecoder(),files=[];let off=0;

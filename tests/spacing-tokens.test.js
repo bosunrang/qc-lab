@@ -16,10 +16,9 @@ assert.ok(components.includes('.sr-only{position:absolute!important;'),'Nội du
 
 assert.ok(components.includes('.auth-actions{display:grid;gap:var(--space-sm);margin-top:var(--space-panel)}'),'Nút xác thực phải dùng nhóm action và spacing token chung');
 
-const excluded=new Set(['reports.js']);
 const violations=[];
 for(const name of fs.readdirSync(path.join(assets,'modules'))){
-  if(!name.endsWith('.js')||excluded.has(name))continue;
+  if(!name.endsWith('.js'))continue;
   const source=fs.readFileSync(path.join(assets,'modules',name),'utf8');
   source.split(/\r?\n/).forEach((line,index)=>{
     if(/style="[^"]*margin-(?:top|bottom):\d+px/.test(line)||/style="[^"]*clip:rect\(0,0,0,0\)/.test(line))violations.push(`${name}:${index+1}`);
@@ -27,8 +26,8 @@ for(const name of fs.readdirSync(path.join(assets,'modules'))){
 }
 assert.deepStrictEqual(violations,[],`Spacing tĩnh và sr-only phải dùng class chung, còn inline tại:\n${violations.join('\n')}`);
 const usersAuth=fs.readFileSync(path.join(assets,'modules','users-auth.js'),'utf8');
-const manageActions=fs.readFileSync(path.join(assets,'modules','manage-tests-actions.js'),'utf8');
-const reports=fs.readFileSync(path.join(assets,'modules','reports.js'),'utf8');
+const manageActions=fs.readFileSync(path.join(root,'src','presentation','manage','manage-tests-actions-controller.ts'),'utf8');
+const reports=fs.readFileSync(path.join(root,'src','presentation','report','report-print-controller.ts'),'utf8');
 assert.doesNotMatch(usersAuth,/\bstyle\s*=/,'Màn hình xác thực/audit không được quay lại inline style');
 assert.doesNotMatch(manageActions,/\bstyle\s*=/,'Popup cấu hình không được quay lại inline style');
 assert.doesNotMatch(reports,/style="(?:margin|padding|width|align-self)|<col\s+style=/,'Báo cáo in phải dùng class cho khoảng cách và độ rộng tĩnh');

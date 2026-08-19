@@ -87,8 +87,7 @@ node tests/qccore.test.js
 *top level* is side-effect-free — no DOM/`window`/`localStorage` at load time —
 which nearly every module satisfies: existing tests sandbox everything from
 `core.js`/`state.js`/`qc-domain.js`/`qc-rules.js`/the services, view-models and
-`*-ui-state.js` files up to render modules (`draw.js`, `sigma.js`,
-`reports.js`), passing stub globals for whatever the function
+`*-ui-state.js` files, passing stub globals for whatever the function
 under test touches. What can't run in the sandbox is *calling* the
 DOM-rendering functions themselves — tests against render modules exercise
 only their pure helpers.
@@ -156,7 +155,7 @@ through), shared by visual-check/a11y-audit (print-check reuses its
 it runs under `xvfb-run`, see the CI job):
 
 - `scripts/visual-check.js` captures the actual HTML `openPrint()`
-  (`reports.js`) writes for the Westgard and Báo cáo reports, renders it
+  (`report-print-controller.ts`) writes for the Westgard and Báo cáo reports, renders it
   under `@media print`, and asserts every header box with a background color
   has `print-color-adjust:exact` — this is the property that keeps a header's
   fill printing regardless of the browser's own "print backgrounds" setting;
@@ -340,7 +339,7 @@ bumping the Firebase version, recompute each hash
 (`curl -sf <url> | openssl dgst -sha384 -binary | openssl base64 -A`) or the
 browser will refuse to load the SDK. The CSP deliberately has no `unsafe-eval`;
 dev scripts (a11y audit) call app functions directly via Playwright instead of
-`window.eval`. The print window (`openPrint()` in `reports.js`) inherits this
+`window.eval`. The print window (`openPrint()` in `report-print-controller.ts`) inherits this
 CSP and loads Manrope from self-hosted `assets/tokens.css` — do not reintroduce
 the Google Fonts link, offline labs must print with correct metrics.
 
@@ -494,11 +493,11 @@ the Google Fonts link, offline labs must print with correct metrics.
   path over `state.data` means adding the same question.
   `ManageConfigService` owns the DOM-free validation and state mutation for
   instruments and assays. Keep confirmation, re-authentication, audit logging,
-  persistence and rendering in `manage-tests-actions.js`; do not move those UI
-  side effects into the service.
+  persistence and rendering in `manage-tests-actions-controller.ts`; do not
+  move those UI side effects into the service.
   `EntryService` normalizes QC-point input
   (`preparePointInput`/`addPoint`/`voidPoint`/`recordPoint`) and builds the
-  entry sheet/window data; called from `entry-routes.js`.
+  entry sheet/window data; called from `entry-page-controller.ts`.
   (`action-workflow-service.js` actually loads a bit later, after the
   `*-ui-state.js` files.)
   `action-workflow-service.js` owns the corrective-action lifecycle:
@@ -518,8 +517,7 @@ the Google Fonts link, offline labs must print with correct metrics.
 - `westgard-view-model.js`, `chart-view-model.js` — pure (DOM-free)
   view-model builders: `WestgardViewModel` for the Westgard page (used by
   `westgard-page-controller.ts`), `ChartViewModel` for charts (used by
-  `after-render-controller.ts`; controller được bundle và nạp
-  sau `draw.js`).
+  `after-render-controller.ts` and by `qc-chart-renderer.ts`'s downsampling).
 - `entry-ui-state.js`, `analysis-ui-state.js`, `sigma-ui-state.js`,
   `reagent-ui-state.js`, `manage-ui-state.js`, `auth-ui-state.js` —
   page-level UI state gathered into named objects (`EntryUIState`, …); each
@@ -608,8 +606,15 @@ the Google Fonts link, offline labs must print with correct metrics.
   in the classic file but had zero callers anywhere in the app — confirmed
   dead and dropped rather than carried forward as a bridge global.
   Since 2026-07-24 the three biggest pages live in their own files:
-  `pageEntry()` lives in `entry-routes.js` (still classic). `pageWestgard()`
-  retired to `src/presentation/westgard/westgard-page-controller.ts`
+  `pageEntry()` retired to `src/presentation/entry/entry-page-controller.ts`
+  (`createEntryPageController(deps)`) on 2026-08-19 (Pha G route slice 10) —
+  a faithful port of the sheet/tree/Levey-Jennings page including the parallel-
+  lot columns; its UI state (`entrySel`/`entryDays`/`entryPrevOpen`/…) stays in
+  the `EntryUIState` bag (written directly from onclick handlers, so it must
+  remain accessor globals). `document`/`window`/`localStorage` are lazy
+  getters in its deps since tests reassign the bare `document` global between
+  keyboard-navigation cases. `pageWestgard()` retired to
+  `src/presentation/westgard/westgard-page-controller.ts`
   (`createWestgardPageController(deps)`) on 2026-08-18 (Pha G route slice 3) —
   a faithful port of the whole page including the archived-lot-group and CUSUM
   branches; its UI state (`selTest`/`wgViewMode`/`wgChartMode`/`wgPrevOpen`/…)
@@ -619,7 +624,7 @@ the Google Fonts link, offline labs must print with correct metrics.
   `src/presentation/dashboard/dashboard-page-controller.ts` on 2026-08-18
   (Pha G slice 2) and `router-dispatch-controller.ts`'s dispatch table calls
   it as `root.pageDash` through the compat bridge like any other bundle-owned
-  global, same as the still-classic `pageEntry`/`pageWestgard`/etc.
+  global, same as `pageEntry`/`pageWestgard`/etc.
   On 2026-07-30 the same treatment
   reached `actions-routes.js`, which had been holding **two** whole pages and
   had grown to 105 KB, in two steps:
@@ -634,51 +639,168 @@ the Google Fonts link, offline labs must print with correct metrics.
     `reportSetLockPart()`/`reportSearchSet()` handlers, never by direct global
     assignment, so nothing outside may write it. Those two pages share no
     function — only `professional-reports.css`, see "CSS structure".
-  - The NCE form then moved to `action-form.js`: the `ACT_*` option/suggestion
-    constants, `actSel()`, the `<details>` section machinery, the investigation
-    checklist, the draft that survives `rerender()`, `actionFormModel()`,
-    `addAction()`, and `actionFormHtml()` — which was extracted out of
-    `pageActionsV4()`, a single 17 KB function that had been rendering the
+  - The NCE form then moved to classic `action-form.js`: the `ACT_*` option/
+    suggestion constants, `actSel()`, the `<details>` section machinery, the
+    investigation checklist, the draft that survives `rerender()`,
+    `actionFormModel()`, `addAction()`, and `actionFormHtml()` — extracted out
+    of `pageActionsV4()`, a single 17 KB function that had been rendering the
     8-section form, the issue list and the log table together. `pageActionsV4()`
-    is now ~20 lines and passes the already-computed issue count into
+    became ~20 lines and passed the already-computed issue count into
     `actionFormHtml(issues.length)` rather than calling `currentIssues()` a
-    second time (two calls could disagree). `actions-routes.js` keeps the issue
-    list, the record lifecycle (approve/return/cancel/escalate/reopen + version
-    tokens) and the detail sheet.
+    second time (two calls could disagree). Classic `actions-routes.js` kept
+    the issue list, the record lifecycle (approve/return/cancel/escalate/reopen
+    + version tokens) and the detail sheet.
 
-  Unlike the report cut, **this one is deliberately not one-directional**: the
-  form calls back into the page's evidence builders (`actionEvidenceTimelineHtml`,
-  `actionRerunEvidenceHtml`, `actionLevelShort`) because the detail sheet renders
-  the very same blocks, and the page calls into the form to open/save a record.
-  In one shared global scope that is harmless — what is being pinned is the
-  **split of responsibility**, not an acyclic dependency graph, and
-  `tests/ui-route-structure.test.js` asserts it that way (which function lives in
-  which file — the Report page now in `report-page-controller.ts`, the Actions
-  page still in `actions-routes.js`/`action-form.js`, in that load order). That
-  test also fails if a `page*()` function or an Actions-page helper migrates back.
+  Both retired to TypeScript on 2026-08-19 (Pha G route slice 11 — the
+  **largest single slice**, 226 + 464 dense lines): `actions-routes.js` →
+  `src/presentation/actions/actions-page-controller.ts`
+  (`createActionsPageController(deps)`), `action-form.js` →
+  `src/presentation/actions/action-form-controller.ts`
+  (`createActionFormController(deps)`). Unlike the report cut, **this one is
+  deliberately not one-directional**: the form calls back into the page's
+  evidence builders (`actionEvidenceTimelineHtml`, `actionRerunEvidenceHtml`,
+  `actionLevelShort`) because the detail sheet renders the very same blocks,
+  and the page calls into the form to open/save a record.
+  `tests/ui-route-structure.test.js` still asserts the **split of
+  responsibility** (which function lives in which file — the Report page in
+  `report-page-controller.ts`, the Actions page split across
+  `actions-page-controller.ts`/`action-form-controller.ts`), not an acyclic
+  dependency graph. `modular-pilot.global.ts` resolves the two-way reference
+  with a two-phase build: `action-form-controller.ts` is constructed first,
+  its 3 dependencies into the page controller call through a `let
+  actionsPageControllerRef` set only after the page controller is built;
+  the page controller's `formHtml`/`captureFormDraft` deps then point
+  straight at the already-built form controller. No cyclic import between the
+  two TypeScript modules — the forward reference lives in the bridge, which is
+  exactly its job as a transitional mechanism.
   `router-page-policy.ts` owns the page list
   (`PAGES`, bridged as `root.PAGES`) and per-role page permissions:
   `rolePageIds(role)` gives each role's default page set, and a user's own
   `pagePerms` (edited in `users-auth.js`) can only narrow that set further,
   never expand past it. Page-level UI state lives in the `*-ui-state.js`
-  modules above. `sigma.js` renders the Six Sigma page (see "Confirmed
-  business-logic decisions" below for how its numbers relate to reports.js).
-- `draw.js`, `entry-routes.js`, `sigma.js`,
-  `actions-routes.js`, `action-form.js`, `manage-routes.js`,
-  `after-render-controller.ts`, `manage-tests-actions.js` — UI/rendering and
-  routing for the pages not yet ported to TypeScript.
-- `sigma-tea.js` — the Six Sigma page's **TEa resolution layer**, split out of
-  `sigma.js` on 2026-08-01 (loads immediately before it; `SG_TEA_DEFAULT_REF` and
-  `SG_CLIA_FIXED` read `TEA_SOURCE_REGISTRY`/`TEA_ANALYTE_CATALOG` at load time).
-  It answers "what is this assay's TEa, from which source, with what traceability":
-  the effective TEa table (`REFTESTS` defaults overlaid with `state.teaRefs`),
-  assay↔reference-row matching (`sgRef`, exact-then-longest-prefix), the CLIA
-  percent/absolute/greater-of criterion, and the per-period TEa snapshot. It knows
-  nothing about Sigma, MU, charts or modals — that boundary is one-directional and
-  pinned by `tests/ui-route-structure.test.js`, and it is what makes the layer
-  testable in Node (`tests/sigma-tea.test.js` loads it with only `core.js` +
-  `state.js`). `tests/helpers/sandbox.js` auto-inserts it before `modules/sigma.js`,
-  like it does `analyte-catalog.js` before `state.js`.
+  modules above.
+- `src/presentation/export/data-io-controller.ts`
+  (`createDataIoController(deps)`) — every CSV/XLSX export: the printable
+  report's Excel twin (`reportXlsxDoc`/`exportReportXLSX`), the Westgard
+  Excel export (`westgardXlsxDoc`/`exportWestgardXLSX`), the Six Sigma
+  exports (`buildSigmaXlsx`/`exportSigmaPeriodXLSX`/`exportSigmaPeriodsXLSX`),
+  the CSV exports (`exportReportCSV`/`exportActionsCSV`), and the hand-rolled
+  byte-precise ZIP/OOXML engines (`XlsxCore` — the shared ZIP-write/CRC32/
+  cell-building core; `SigmaXlsx` and `ReportXlsx`, the two worksheet
+  builders on top of it). Retired from classic `data-io.js` on
+  2026-08-19 (Pha G route 15, closing nhóm B). Nearly every function in the
+  classic file was a thin wrapper reading `globalThis.X` *inside its own
+  body* (re-read on every call, not once at module load) — six of those
+  wrappers forward to object-shaped services
+  (`reportExportHelpers`/`qcReportContext`/`qcReportRowsService`/
+  `sigmaExportMetaService`/`westgardXlsxRows`/`qcExportValueFormat`); wiring
+  them as a single `root.X` value captured once at construction time (the
+  same eager-construction trap as Route 12/14) broke every test that
+  overrides one of these services with `globalThis.X={...}` *after* the
+  bundle already loaded — fixed by wrapping each method in a closure that
+  re-reads `root.X` per call, matching what the classic per-call reads
+  actually did. `exportActionsCSV` hit the same self-reference trap as
+  `openPrint` in Route 14: it called `exportMetaRows` as a local closure
+  rather than a dependency, so a test's bare `exportMetaRows=()=>[]` override
+  had no effect — fixed by adding `exportMetaRows` as a self-referencing
+  dependency (`(globalThis as any).exportMetaRows(kind)`, wired back to
+  itself) and calling it via `deps.exportMetaRows(...)`. `WG_RULES` repeated
+  the exact const-vs-`globalThis` scoping bug from Route 14 (referencing the
+  bare ambient-declared identifier instead of a `globalThis` property read),
+  and `errorType` needed the same bare treatment — the classic file mixed
+  both styles (`WG_RULES`/`errorType` bare, `QCCore.westgardByPoint`
+  prefixed), and copying the wrong one for either would have silently
+  regressed the export in production without any Node test catching it (only
+  `visual-check`/`print-check` render real print/PDF output). One confirmed
+  dead-code drop: the classic `ReportXlsx` IIFE read
+  `globalThis.reportXlsxStyles`/`reportXlsxSheet`/`reportXlsxDrawing` into
+  local consts it never used again (only `build`, already fully self-
+  contained via its own closure over `root.X`, was ever called) — dropped the
+  three unused local reads; the three `root.X` bridge assignments themselves
+  stay required since `root.reportXlsxBuild` still calls them internally.
+- `src/presentation/report/report-print-controller.ts`
+  (`createReportPrintController(deps)`) — every printable report:
+  `openPrint()` (the shared print-window bootstrap), `printReport`/
+  `printWestgard`/`printSigmaPeriod`/`printSigmaPeriods`/`printRangeForm`,
+  plus the small `reportQcValue`/`reportQcStat`/`reportQcPoint`/
+  `reportHeader`/`signBlock`/`sigmaMuPrintCard`/`reportNceSummaryHtml`/
+  `reportNceDetailHtml`/`reportNceAppendixHtml` wrappers that used to forward
+  to other `globalThis.X` presentation services. Retired from classic
+  `reports.js` on 2026-08-19 (Pha G route 14). `esc()`/`escAttr()` — called
+  via `(root as any).esc(...)` by dozens of already-ported TypeScript files —
+  turned out to be defined *only* in classic `reports.js`, which loaded
+  *after* the bundle in `index.html`; safe only because every call site was a
+  lazy closure. Split out to `src/presentation/shared/html-escape.ts`
+  (`escapeHtml`/`escapeHtmlAttr`, same pattern as `jsq()` in Route 10) so
+  they're real TypeScript globals now, assigned earlier in the bundle than
+  before. This route's real find came from `visual-check`/`print-check`, not
+  from the 613 Node tests: a `WG_RULES` dependency wired as
+  `(globalThis as any).WG_RULES` read `undefined` in a real browser, because
+  `WG_RULES` in `state.js` is a top-level `const` — and per the ECMAScript
+  spec, top-level `const`/`let` in a classic script do **not** become
+  properties of the global object (`window`/`globalThis`), only `var` and
+  `function` declarations (or an explicit `root.X = value` assignment) do.
+  `printWestgard()` threw in real Chromium/Electron; the Node vm sandbox
+  tests missed it because their stubs used bare assignment (`WG_RULES=[...]`,
+  which *does* create an implicit global property in sloppy mode). Fixed by
+  referencing the bare identifier `WG_RULES` (already ambient-declared in
+  `modular-pilot.global.ts`, next to `QC_DECIMALS_DEFAULT` for the same
+  reason) instead of a `globalThis` property read — this is the first time in
+  Pha G a browser-level gate caught something all the Node tests missed,
+  confirming why nhóm B needs those two extra gates. Also hit the
+  eager-construction trap twice more: four object-shaped dependencies
+  (`reportQcFormat`/`sigmaPrintRowsService`/`sigmaMuPrintRowsService`/
+  `actionReportHtml`) were first wired by reading `root.X` once at
+  construction time, which broke `tests/sigma-print.test.js`'s strategy of
+  overriding those services *after* the bundle loads — fixed by wrapping each
+  method in a closure that re-reads `root.X` per call; and the five top-level
+  `print*` functions called the module's own `openPrint` as a local closure
+  reference, which made `tests/westgard-print.test.js`/`sigma-print.test.js`'s
+  `openPrint = async (...) => {...}` override (needed to intercept output
+  without touching a real DOM `window.open`) silently do nothing — fixed by
+  routing that one call through a self-referencing `deps.openPrint` (wired to
+  `root.openPrint`) instead of the local function.
+- `src/presentation/chart/qc-chart-renderer.ts`
+  (`createQcChartRenderer(deps)`) — canvas renderer for the Levey-Jennings
+  (single/multi-level) and CUSUM trend charts, retired from classic `draw.js`
+  on 2026-08-19 (Pha G route 13, mở đầu nhóm B). Every dependency (geometry,
+  colors, point-render models, tooltip controller) was already a TypeScript
+  factory from an earlier pilot phase — this route only stopped reading them
+  off `globalThis` and started taking them as injected `deps`. Along the way
+  it fixed a real production bug that predates this route: `cusum-display-
+  plan.ts`/`cusum-hover-model.ts` existed and were unit-tested but were never
+  wired to `root.X` anywhere, so `drawCUSUM()` (the "Xu hướng CUSUM" tab on
+  the Westgard page) threw `TypeError` for any test with CUSUM enabled — no
+  gate caught it because no browser-level check opens that tab. Fixed by
+  wiring `root.cusumDisplayPlan`/`root.cusumHoverModel` for the first time.
+- `src/presentation/sigma/sigma-page-controller.ts`
+  (`createSigmaPageController(deps)`) — renders the Six Sigma page (see
+  "Confirmed business-logic decisions" below for how its numbers relate to
+  the printed report), retired from classic `sigma.js` on 2026-08-19 (Pha G route
+  slice 12, the last file in the "Route/presentation" group). Large dependency
+  surface (~35 classic/bridged functions, 14 Sigma services, the 11-function
+  TEa layer, 26 presentation builders) but no new patterns — one dead wrapper
+  confirmed and dropped (`sgRun()`, zero callers anywhere, unlike its sibling
+  `sgZone()` which the canvas export renderers still call), and one guard in
+  `data-io-controller.ts`'s `sigmaReportRowsService` (written for the transitional period
+  when `sgVisibleLevels` might not exist) that a test alone relied on — fixed
+  by stubbing `sgVisibleLevels` in that test, not by changing the guard.
+  `sgCohortCtx` (the cohort-picker modal's transient context, read/written as
+  a bare global by a regression test) joined `sgBiasCtx`/`sgMuCtx` in
+  `SigmaUIState`.
+- `src/domain/sigma/sigma-tea-resolution.ts` (`createSigmaTeaResolution(deps)`) —
+  the Six Sigma page's **TEa resolution layer**, split out of `sigma.js` on
+  2026-08-01 as classic `sigma-tea.js` and retired to TypeScript on 2026-08-19
+  (Pha G route slice 7); wired via `src/compat/modular-pilot.global.ts` (`root.sgRef`,
+  `root.sgTea`, etc.) guarded behind `typeof TEA_SOURCE_REGISTRY!=='undefined'` since
+  some test sandboxes load the bundle without `state.js`. It answers "what is this
+  assay's TEa, from which source, with what traceability": the effective TEa table
+  (`REFTESTS` defaults overlaid with `state.teaRefs`), assay↔reference-row matching
+  (`sgRef`, exact-then-longest-prefix), the CLIA percent/absolute/greater-of
+  criterion, and the per-period TEa snapshot. It knows nothing about Sigma, MU,
+  charts or modals — that boundary is one-directional and pinned by
+  `tests/ui-route-structure.test.js`, and it is what makes the layer testable in
+  Node (`tests/sigma-tea.test.js` loads the bundle with only `core.js` + `state.js`).
 - `src/presentation/dashboard/dashboard-page-controller.ts` —
   `createDashboardPageController(deps)` owns `pageDash()`/`pageDashLoading()`/
   `dashTestFilter()`/`dashTestSetStatus()`, retired from classic
@@ -721,9 +843,9 @@ the Google Fonts link, offline labs must print with correct metrics.
   `reagentXxx` HTML builders); the palette consts `RCC`/`RCPAD`/`RC_MIN_PAIRS`
   live in the controller. `tests/reagent-stats.test.js` drives `rcCalc`/
   `rcReportSummaryTable` (bridged as globals) directly.
-- `range.js`, `backup-service.js`, `data-io.js`, `reports.js`, `users-auth.js` —
+- `range.js`, `backup-service.js`, `users-auth.js` —
   feature-specific logic (target-range calc,
-  backup/restore service + XLSX generation, printed reports, auth/user
+  backup/restore service, auth/user
   management). `users-auth.js` hashes passwords
   with PBKDF2-SHA256 via the TypeScript `pbkdf2PasswordService` bridge, whose
   `PASSWORD_HASH_ITERATIONS=600000` (OWASP minimum) lives in
@@ -793,7 +915,8 @@ cáo page and the `actions` page (Khắc phục sự cố) — despite the filen
 that's where `.action-chip`/`.action-log-*`/`.issue-group`/`.issue-row`
 live; the `actions` page has no separate file of its own — so the two pages
 stay coupled in CSS even though their logic was split apart (Actions in
-`actions-routes.js` / Report in `src/presentation/report/report-page-controller.ts`).
+`src/presentation/actions/actions-page-controller.ts`/`action-form-controller.ts`
+/ Report in `src/presentation/report/report-page-controller.ts`).
 These files have
 overlapping `@media` breakpoints and
 height queries and rely on cascade/shorthand ordering between files — check
@@ -811,7 +934,8 @@ Khoảng cách giao diện cũng dùng một thang duy nhất trong `tokens.css`
 `space-after-*`, `.field-error` và `.sr-only`; không thêm lại
 `style="margin-top:...px"`/`style="margin-bottom:...px"` cho bố cục tĩnh.
 `tests/spacing-tokens.test.js` khóa quy tắc này; chỉ HTML in độc lập trong
-`reports.js` được loại trừ vì cửa sổ in không tải stylesheet của ứng dụng.
+`report-print-controller.ts` được loại trừ (kiểm riêng bằng `doesNotMatch`) vì
+cửa sổ in không tải stylesheet của ứng dụng.
 
 `--panel-content-gap` (`14px`) là nguồn duy nhất cho khoảng cách dọc từ
 viền dưới header đến nội dung đầu tiên của mọi panel/card/bảng và modal. Không
@@ -941,9 +1065,9 @@ leaves a dossier record.
   deleted year). Backup keeps its SHA-256 package format and the read-only
   "Kiểm tra backup" verifier — those earned their place independently.
 - Two "Sigma" numbers are intentionally different: the printed/CSV report's
-  Sigma (`reportLevelStats()` in `reports.js`/`data-io.js`) is an observed,
-  period-specific value; the Six Sigma page (`sigma.js`) uses explicitly
-  reviewed/sourced CV/Bias. Keep them visually disambiguated, don't unify.
+  Sigma (`reportLevelStats()` in `report-print-controller.ts`/`data-io-controller.ts`) is an observed,
+  period-specific value; the Six Sigma page (`sigma-page-controller.ts`) uses
+  explicitly reviewed/sourced CV/Bias. Keep them visually disambiguated, don't unify.
 - The Six Sigma page's test picker lists only tests defined in "Cấu hình
   chung" — there is deliberately no in-Sigma test creation (an attempt was
   added and reverted once already).
@@ -975,15 +1099,16 @@ leaves a dossier record.
   (4-1s, 6x, 10x…) run separately via `parallelWestgard()`, and a parallel-lot
   violation never marks the day rejected.
 - CUSUM (`cusum()` in `core.js`, opt-in per test via `t.cusum{on,k,h}`,
-  configured in the assay modal in `manage-tests-actions.js`) is a reference
-  trend chart only (`drawCUSUM()` in `draw.js`, the "Xu hướng CUSUM" tab on
-  the Westgard page) — it never changes a point's accept/reject/Westgard
+  configured in the assay modal in `manage-tests-actions-controller.ts`) is a
+  reference trend chart only (`drawCUSUM()` in `qc-chart-renderer.ts`, the
+  "Xu hướng CUSUM" tab on the Westgard page) — it never changes a point's
+  accept/reject/Westgard
   status; only the Westgard rule engine does that.
 - The CLIA/Ricos TEa reference table (`REFTESTS` in `state.js`, now derived
   from `TEA_ANALYTE_CATALOG` in `analyte-catalog.js`) is a built-in default;
   users override/extend it via `state.teaRefs` (synced list branch, edited in the
-  "Bảng TEa tham chiếu" tab of the manage page). `sgRef` in `sigma.js`
-  resolves a test against `effectiveTeaRefs()` (defaults overlaid with
+  "Bảng TEa tham chiếu" tab of the manage page). `sgRef` in
+  `sigma-tea-resolution.ts` resolves a test against `effectiveTeaRefs()` (defaults overlaid with
   `state.teaRefs`), matching **exact name first** then longest-prefix — so
   e.g. "CK-MB" no longer inherits "CK". EFLM TEa stays a per-test manual value
   (`t.tea`), not part of this table.
@@ -991,7 +1116,7 @@ leaves a dossier record.
   (ISO/TS 20914 + Nordtest TR 537): `uncertaintyBudget()` in `core.js` does the
   math, `sgMU()`/`sgMuHTML()` + the MU modal (`sgOpenMU()`) surface it on the
   Sigma page, and `sigmaMuPrintCard()`/`sigmaMuPeriodsPrintRows()` in
-  `reports.js` put it on both Sigma print reports. Inputs are the ones the page
+  `report-print-controller.ts` put it on both Sigma print reports. Inputs are the ones the page
   already holds — u(Rw) is the *same* long-term IQC CV% the Sigma cohort uses,
   u(bias) = √(bias² + u(Cref)²) over the stored EQA rounds (u(Cref) = SD between
   rounds / √n, null with a single round), u(cal) is typed from the calibrator

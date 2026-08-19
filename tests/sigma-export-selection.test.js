@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
-const ctx = loadSandbox(['core.js','generated/modular-pilot.js','modules/data-io.js']);
+const ctx = loadSandbox(['core.js','generated/modular-pilot.js']);
 run(ctx, `
   const __sigmaTests=[{id:'T1',name:'Glucose',levels:[{level:1},{level:2},{level:3}]}];
   const __sigmaPeriods={T1:[
@@ -9,6 +9,7 @@ run(ctx, `
     {id:'P2',period:'2026-07',lv:{}}
   ]};
   function sgTrackedTests(){return __sigmaTests;}
+  function sgVisibleLevels(t){return t.levels.map(l=>l.level);}
   function sgData(id){return __sigmaPeriods[id]||[];}
   function sgRows(t,data){return data.map(e=>({e,rs:[{cv:2,bias:1,sigma:4,dpmo:100,yld:99,label:'Tốt',tea:6},null,{cv:3,bias:1,sigma:3,dpmo:200,yld:98,label:'Cận biên',tea:6}]}));}
   function sgTea(){return 6;}

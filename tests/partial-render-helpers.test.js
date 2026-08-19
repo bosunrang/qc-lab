@@ -1,4 +1,6 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
 const ctx = loadSandbox([
@@ -6,7 +8,6 @@ const ctx = loadSandbox([
   'modules/state.js',
   'modules/qc-domain.js', // searchText() — bộ lọc KPI dùng, phải là bản thật để đúng cách bỏ dấu tiếng Việt
   'generated/modular-pilot.js',
-  'modules/entry-routes.js',
 ], { document: { addEventListener() {} } });
 
 const result = run(ctx, `
@@ -100,7 +101,11 @@ assert.deepEqual(JSON.parse(JSON.stringify(restoredFilters)), ['dash:glucose','e
 // Tiêu đề lô đi qua entryColumns() (dựng từ operationalLevels + lô đang chạy song
 // song), không bao giờ từ t.levels thô — giữ nguyên ý ban đầu của guard này.
 // Vế "entryColumns chỉ dựng từ operationalLevels" được khoá ở parallel-lot-run.test.js,
-// vì qc-domain.js không nằm trong sandbox của file này.
-assert.ok(run(ctx,"String(pageEntry).includes('globalThis.entryLotLabelsTs(entryCols)')"),'entry lot heading must use entry columns through TypeScript bridge');
+// vì qc-domain.js không nằm trong sandbox của file này. Từ khi pageEntry() chuyển
+// sang entry-page-controller.ts (TypeScript, bị Vite biên dịch nên String(pageEntry)
+// không còn giữ nguyên tên gọi), guard đọc thẳng mã nguồn TypeScript thay vì hàm đã
+// bundle để vẫn chốt đúng ý ban đầu.
+const entryControllerSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'entry', 'entry-page-controller.ts'), 'utf8');
+assert.match(entryControllerSource, /deps\.pres\.entryLotLabelsTs\(entryCols\)/, 'entry lot heading must use entry columns through TypeScript bridge');
 
 console.log('Partial render helper tests passed');

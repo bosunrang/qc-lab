@@ -6,11 +6,11 @@ const path = require('node:path');
 const root = path.join(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 const index = read('index.html');
-const drawSource = read('assets/modules/draw.js');
+const drawSource = read('src/presentation/chart/qc-chart-renderer.ts');
 const dashboardRoutesSource = read('src/presentation/dashboard/dashboard-page-controller.ts');
-const manageRoutesSource = read('assets/modules/manage-routes.js');
+const manageRoutesSource = read('src/presentation/manage/manage-page-controller.ts');
 const reagentClassicSource = read('src/presentation/reagent/reagent-page-controller.ts');
-const actionsRoutesSource = read('assets/modules/actions-routes.js');
+const actionsRoutesSource = read('src/presentation/actions/actions-page-controller.ts');
 const backupUiSource = read('assets/modules/backup-ui.js');
 const backupLocalMarkerSource = read('src/application/backup/backup-local-marker.ts');
 const backupInspectionSummarySource = read('src/presentation/backup/backup-inspection-summary.ts');
@@ -453,11 +453,11 @@ assert.match(dashboardRoutesSource, /const noTarget = deps\.dashboardMissingTarg
   'dashboard route must collect missing targets through TypeScript helper');
 assert.match(dashboardRoutesSource, /const dashItems = deps\.dashboardTestItems\(tests, today\);/,
   'dashboard route must build test items through TypeScript presentation');
-assert.match(actionsRoutesSource, /function currentIssues\(\)\{return globalThis\.ActionCurrentIssues\(\);\}/,
+assert.match(actionsRoutesSource, /const currentIssues = \(\) => deps\.ActionCurrentIssues\(\);/,
   'actions route must use the TypeScript current-issues service directly');
 assert.doesNotMatch(actionsRoutesSource, /const out=\[\],rank=\{rej:2,warn:1,ok:0\}/,
   'actions route must not retain a classic current-issues fallback');
-assert.match(actionsRoutesSource, /function actionIssueGroupHtml\(model\)\{return globalThis\.actionIssueGroupPresentation\(model\);\}/,
+assert.match(actionsRoutesSource, /const actionIssueGroupHtml = \(model: AnyRec\) => deps\.pres\.actionIssueGroupPresentation\(model\);/,
   'actions route must render issue groups through TypeScript presentation');
 assert.doesNotMatch(actionsRoutesSource, /if\(globalThis\.actionIssueRowPresentation\)|if\(globalThis\.actionIssueGroupPresentation\)/,
   'actions route must not retain classic issue-render fallbacks');
@@ -475,20 +475,22 @@ assert.doesNotMatch(dashboardRoutesSource, /if\(globalThis\.dashboardPageHtml\)|
   'dashboard route must not retain a classic page-render fallback');
 assert.match(dashboardRoutesSource, /emptyHtml: deps\.dashboardEmptyTestsHtml\(deps\.role\(\) === 'admin'\)/,
   'dashboard route must render empty test state through TypeScript bridge');
-assert.match(drawSource, /const cc=globalThis\.cusumColors;/,
-  'CUSUM renderer must use TypeScript palette bridge');
-assert.match(drawSource, /const colors=globalThis\.leveyJenningsMultiColors;/,
-  'multi-level Levey-Jennings renderer must use TypeScript palette bridge');
-assert.match(drawSource, /globalThis\.cusumChartTitle\(k,h\)/,
-  'CUSUM renderer must use TypeScript title bridge');
-assert.match(drawSource, /globalThis\.leveyJenningsChartTitle\.(single|multi)/,
-  'Levey-Jennings renderers must use TypeScript title bridge');
-assert.match(drawSource, /globalThis\.chartEmptyLabels\.(leveyJennings|leveyJenningsMulti|cusum)/,
-  'chart renderers must use TypeScript empty-label bridge');
-assert.match(drawSource, /globalThis\.leveyJenningsMultiYAxis\(\)\.forEach\(label=>/,
-  'multi-level Levey-Jennings renderer must use TypeScript Y-axis bridge');
-assert.match(drawSource, /globalThis\.leveyJenningsMultiGeometry\(\{width:W,height:H\}\)/,
-  'multi-level Levey-Jennings renderer must use TypeScript geometry bridge');
+assert.match(drawSource, /const cc = deps\.cusumColors;/,
+  'CUSUM renderer must use injected palette dependency');
+assert.match(drawSource, /const colors = deps\.leveyJenningsMultiColors;/,
+  'multi-level Levey-Jennings renderer must use injected palette dependency');
+assert.match(drawSource, /deps\.cusumChartTitle\(k, h\)/,
+  'CUSUM renderer must use injected title dependency');
+assert.match(drawSource, /deps\.leveyJenningsChartTitle\.(single|multi)/,
+  'Levey-Jennings renderers must use injected title dependency');
+assert.match(drawSource, /deps\.chartEmptyLabels\.(leveyJennings|leveyJenningsMulti|cusum)/,
+  'chart renderers must use injected empty-label dependency');
+assert.match(drawSource, /deps\.leveyJenningsMultiYAxis\(\)\.forEach\(\(label: any\) => /,
+  'multi-level Levey-Jennings renderer must use injected Y-axis dependency');
+assert.match(drawSource, /deps\.leveyJenningsMultiGeometry\(\{ width: W, height: H \}\)/,
+  'multi-level Levey-Jennings renderer must use injected geometry dependency');
+assert.match(drawSource, /export function createQcChartRenderer\(deps: QcChartRendererDeps\)/,
+  'draw.js must be retired to a TypeScript chart-renderer factory');
 assert.match(afterRenderControllerSource, /export function createAfterRenderController\(/,
   'after-render controller must be TypeScript source');
 assert.match(afterRenderControllerSource, /deps\.restoreConfigNavScroll\(\);/,
@@ -648,8 +650,8 @@ assert.doesNotMatch(index, /assets\/modules\/backup-service\.js/,
   'Backup service legacy khong duoc runtime nap');
 assert.match(index, /assets\/modules\/backup-ui\.js/,
   'Backup UI presentation phai duoc runtime nap');
-assert.match(index, /assets\/modules\/lis-queue-ui\.js/,
-  'LIS queue UI phải là lớp presentation tách khỏi service đồng bộ');
+assert.doesNotMatch(index, /assets\/modules\/lis-queue-ui\.js/,
+  'runtime không được quay lại LIS queue UI global-scope cũ');
 for (const name of ['analysis', 'auth', 'entry', 'manage', 'reagent', 'sigma']) {
   assert.doesNotMatch(index, new RegExp(`assets/modules/${name}-ui-state\\.js`),
     `runtime không được quay lại ${name} UI state global-scope cũ`);
@@ -1301,61 +1303,61 @@ assert.doesNotMatch(qcDomainSource, /if\(globalThis\.(?:qcActiveWestgard|qcCusum
   'QC evaluation services must not retain JavaScript fallbacks');
 assert.doesNotMatch(qcDomainSource, /if\(globalThis\.westgardWorker(?:RevisionService|PrewarmPlanner|JobBuilder|Hydrate)\)/,
   'Westgard worker adapter must not retain JavaScript fallbacks');
-const dataIoSource = read('assets/modules/data-io.js');
+const dataIoSource = read('src/presentation/export/data-io-controller.ts');
 assert.doesNotMatch(dataIoSource, /function dataIoQcPoint\(/,
   'data I/O must not retain the retired point-format facade');
 assert.doesNotMatch(dataIoSource, /function dataIoQcValue\(|function dataIoQcStat\(/,
   'data I/O must not retain classic Mean/SD wrappers around the TypeScript formatter');
 assert.doesNotMatch(dataIoSource, /function csvCell\(|function downloadCSV\(/,
   'data I/O must not retain retired CSV encoding/download facades');
-assert.match(dataIoSource, /function reportInRange\(start,end\)\{return globalThis\.reportExportHelpers\.inRange\(start,end\);\}/,
-  'report date-range filtering must call the TypeScript helper directly');
-assert.match(dataIoSource, /function reportTeaInfo\(t\)\{return globalThis\.qcReportContext\.teaInfo\(t\);\}/,
-  'report TEa context must call the TypeScript service directly');
-assert.match(dataIoSource, /function reportMultiViews\(t,inRange\)\{return globalThis\.qcReportContext\.multiViews\(t,inRange\);\}/,
-  'report multi-level context must call the TypeScript service directly');
-assert.match(dataIoSource, /function reportPrevLotRows\(t,s,inRange\)\{\s*return globalThis\.qcReportRowsService\.previousLot\(t,s,inRange\);\s*\}/,
-  'previous-lot report rows must call the TypeScript service directly');
-assert.match(dataIoSource, /function reportLevelRows\(t,l,wg,inRange\)\{return globalThis\.qcReportRowsService\.currentLot\(t,l,wg,inRange\);\}/,
-  'current-lot report rows must call the TypeScript service directly');
-assert.match(dataIoSource, /function reportActionsInRange\(tid,inRange\)\{return globalThis\.qcReportRowsService\.actions\(tid,inRange\);\}/,
-  'report action rows must call the TypeScript service directly');
-assert.match(dataIoSource, /function reportNceSummaryParts\(a\)\{return globalThis\.actionReportSummary\(a\);\}/,
-  'report NCE summary must call the TypeScript presentation service directly');
-assert.match(dataIoSource, /function reportNceModel\(a,t\)\{return globalThis\.actionReportModel\(a,t\);\}/,
-  'detailed NCE report models must call the TypeScript presentation service directly');
-assert.match(dataIoSource, /function sigmaLevelsOf\(row\)\{return globalThis\.reportExportHelpers\.sigmaLevels\(row\);\}/,
-  'Sigma export levels must call the TypeScript helper directly');
-assert.match(dataIoSource, /function sigmaPeriodLabel\(value\)\{return globalThis\.reportExportHelpers\.periodLabel\(value\);\}/,
-  'Sigma period labels must call the TypeScript helper directly');
-assert.match(dataIoSource, /function sigmaMdcPeriodLabel\(value\)\{return globalThis\.reportExportHelpers\.mdcPeriodLabel\(value\);\}/,
-  'Sigma MDC period labels must call the TypeScript helper directly');
-assert.match(dataIoSource, /function sigmaExportPeriods\(rows\)\{return globalThis\.reportExportHelpers\.exportPeriods\(rows\);\}/,
-  'Sigma export period lists must call the TypeScript helper directly');
-assert.match(dataIoSource, /function sigmaDataURLBytes\(durl\)\{return globalThis\.sigmaDataUrlBytes\(durl\);\}/,
-  'Sigma chart image decoding must call the TypeScript helper directly');
-assert.match(dataIoSource, /function sigmaReportMetric\(r\)\{return globalThis\.sigmaReportMetricService\(r\);\}/,
-  'Sigma report metrics must call the TypeScript service directly');
-assert.match(dataIoSource, /function sigmaReportRows\(onlyTestId='',mode='latest',period='',periodId=''\)\{return globalThis\.sigmaReportRowsService\(onlyTestId,mode,period,periodId\);\}/,
-  'Sigma report rows must call the TypeScript service directly');
-assert.match(dataIoSource, /function sigmaExportPixelRatio\(W,H,scale=SIGMA_EXPORT_PIXEL_RATIO\)\{return globalThis\.sigmaExportPixelRatioService\(W,H,scale,SIGMA_EXPORT_MAX_DIMENSION\);\}/,
-  'Sigma export pixel ratio must call the TypeScript service directly');
-assert.match(dataIoSource, /function sigmaCanvas\(W,H,scale\)\{return globalThis\.sigmaCanvasFactory\(W,H,scale\);\}/,
-  'Sigma canvas creation must call the TypeScript service directly');
-assert.match(dataIoSource, /function sigmaMdcLabelPlacements\(items,X,Y,ctx,bounds\)\{return globalThis\.sigmaMdcLabelPlacementService\(items,X,Y,ctx,bounds\);\}/,
-  'Sigma MDC label placement must call the TypeScript service directly');
-assert.match(dataIoSource, /function sigmaMdcItems\(rows\)\{return globalThis\.sigmaMdcItemsService\(rows\);\}/,
-  'Sigma MDC data points must call the TypeScript service directly');
-assert.match(dataIoSource, /function drawSigmaReportChart\(rows\)\{return globalThis\.sigmaChartRenderer\(rows\);\}/,
-  'Sigma chart rendering must call the TypeScript renderer directly');
-assert.match(dataIoSource, /function reportNceExcerpt\(value,max=150\)\{return globalThis\.reportExportHelpers\.nceExcerpt\(value,max\);\}/,
-  'report NCE excerpts must call the TypeScript helper directly');
-assert.doesNotMatch(dataIoSource, /function reportInRange\(start,end\)\{[^}]*\?|function reportTeaInfo\(t\)\{[^}]*\?|function reportMultiViews\(t,inRange\)\{[^}]*\?|function reportPrevLotRows[\s\S]*?if\(globalThis\.qcReportRowsService\)|function reportLevelRows\(t,l,wg,inRange\)\{[^}]*\?|function reportActionsInRange\(tid,inRange\)\{[^}]*\?|function reportNceSummaryParts\(a\)\{[^}]*if\(|function reportNceExcerpt\(value,max=150\)\{[^}]*if\(|function sigmaLevelsOf\(row\)\{[^}]*\?|function sigmaDataURLBytes\(durl\)\{[^}]*if\(|function sigmaReportMetric\(r\)\{[^}]*\?|function sigmaReportRows\(onlyTestId='',mode='latest',period='',periodId=''\)\{[^}]*if\(|function sigmaExportPixelRatio\(W,H,scale=SIGMA_EXPORT_PIXEL_RATIO\)\{[^}]*\?|function sigmaCanvas\(W,H,scale\)\{[^}]*if\(|function sigmaPeriodLabel\(value\)\{[^}]*if\(|function sigmaMdcPeriodLabel\(value\)\{[^}]*\?|function sigmaExportPeriods\(rows\)\{[^}]*\?/,
+assert.match(dataIoSource, /function reportInRange\(start: string, end: string\) \{ return deps\.reportExportHelpers\.inRange\(start, end\); \}/,
+  'report date-range filtering must call the injected dependency directly');
+assert.match(dataIoSource, /function reportTeaInfo\(t: any\) \{ return deps\.qcReportContext\.teaInfo\(t\); \}/,
+  'report TEa context must call the injected dependency directly');
+assert.match(dataIoSource, /function reportMultiViews\(t: any, inRange: \(value: unknown\) => boolean\) \{ return deps\.qcReportContext\.multiViews\(t, inRange\); \}/,
+  'report multi-level context must call the injected dependency directly');
+assert.match(dataIoSource, /function reportPrevLotRows\(t: any, s: any, inRange: \(value: unknown\) => boolean\) \{ return deps\.qcReportRowsService\.previousLot\(t, s, inRange\); \}/,
+  'previous-lot report rows must call the injected dependency directly');
+assert.match(dataIoSource, /function reportLevelRows\(t: any, l: any, wg: any, inRange: \(value: unknown\) => boolean\) \{ return deps\.qcReportRowsService\.currentLot\(t, l, wg, inRange\); \}/,
+  'current-lot report rows must call the injected dependency directly');
+assert.match(dataIoSource, /function reportActionsInRange\(tid: string, inRange: \(value: unknown\) => boolean\) \{ return deps\.qcReportRowsService\.actions\(tid, inRange\); \}/,
+  'report action rows must call the injected dependency directly');
+assert.match(dataIoSource, /function reportNceSummaryParts\(a: any\) \{ return deps\.actionReportSummary\(a\); \}/,
+  'report NCE summary must call the injected presentation dependency directly');
+assert.match(dataIoSource, /function reportNceModel\(a: any, t: any\) \{ return deps\.actionReportModel\(a, t\); \}/,
+  'detailed NCE report models must call the injected presentation dependency directly');
+assert.match(dataIoSource, /function sigmaLevelsOf\(row: any\) \{ return deps\.reportExportHelpers\.sigmaLevels\(row\); \}/,
+  'Sigma export levels must call the injected dependency directly');
+assert.match(dataIoSource, /function sigmaPeriodLabel\(value: unknown\) \{ return deps\.reportExportHelpers\.periodLabel\(value\); \}/,
+  'Sigma period labels must call the injected dependency directly');
+assert.match(dataIoSource, /function sigmaMdcPeriodLabel\(value: unknown\) \{ return deps\.reportExportHelpers\.mdcPeriodLabel\(value\); \}/,
+  'Sigma MDC period labels must call the injected dependency directly');
+assert.match(dataIoSource, /function sigmaExportPeriods\(rows: any\[\]\) \{ return deps\.reportExportHelpers\.exportPeriods\(rows\); \}/,
+  'Sigma export period lists must call the injected dependency directly');
+assert.match(dataIoSource, /function sigmaDataURLBytes\(durl: string\) \{ return deps\.sigmaDataUrlBytes\(durl\); \}/,
+  'Sigma chart image decoding must call the injected dependency directly');
+assert.match(dataIoSource, /function sigmaReportMetric\(r: any\) \{ return deps\.sigmaReportMetricService\(r\); \}/,
+  'Sigma report metrics must call the injected dependency directly');
+assert.match(dataIoSource, /function sigmaReportRows\(onlyTestId = '', mode = 'latest', period = '', periodId = ''\) \{ return deps\.sigmaReportRowsService\(onlyTestId, mode, period, periodId\); \}/,
+  'Sigma report rows must call the injected dependency directly');
+assert.match(dataIoSource, /function sigmaExportPixelRatio\(W: number, H: number, scale = SIGMA_EXPORT_PIXEL_RATIO\) \{ return deps\.sigmaExportPixelRatioService\(W, H, scale, SIGMA_EXPORT_MAX_DIMENSION\); \}/,
+  'Sigma export pixel ratio must call the injected dependency directly');
+assert.match(dataIoSource, /function sigmaCanvas\(W: number, H: number, scale: number\) \{ return deps\.sigmaCanvasFactory\(W, H, scale\); \}/,
+  'Sigma canvas creation must call the injected dependency directly');
+assert.match(dataIoSource, /function sigmaMdcLabelPlacements\(items: any, X: any, Y: any, ctx: any, bounds: any\) \{ return deps\.sigmaMdcLabelPlacementService\(items, X, Y, ctx, bounds\); \}/,
+  'Sigma MDC label placement must call the injected dependency directly');
+assert.match(dataIoSource, /function sigmaMdcItems\(rows: any\[\]\) \{ return deps\.sigmaMdcItemsService\(rows\); \}/,
+  'Sigma MDC data points must call the injected dependency directly');
+assert.match(dataIoSource, /function drawSigmaReportChart\(rows: any\[\]\) \{ return deps\.sigmaChartRenderer\(rows\); \}/,
+  'Sigma chart rendering must call the injected dependency directly');
+assert.match(dataIoSource, /function reportNceExcerpt\(value: unknown, max = 150\) \{ return deps\.reportExportHelpers\.nceExcerpt\(value, max\); \}/,
+  'report NCE excerpts must call the injected dependency directly');
+assert.doesNotMatch(dataIoSource, /function reportInRange[^{]*\{ if\(|function reportTeaInfo[^{]*\{ if\(|function reportMultiViews[^{]*\{ if\(|function reportPrevLotRows[\s\S]*?if\(deps\.qcReportRowsService\)|function reportLevelRows[^{]*\{ if\(|function reportActionsInRange[^{]*\{ if\(|function reportNceSummaryParts[^{]*\{ if\(|function reportNceExcerpt[^{]*\{ if\(|function sigmaLevelsOf[^{]*\{ if\(|function sigmaDataURLBytes[^{]*\{ if\(|function sigmaReportMetric[^{]*\{ if\(|function sigmaReportRows[^{]*\{ if\(|function sigmaExportPixelRatio[^{]*\{ if\(|function sigmaCanvas[^{]*\{ if\(|function sigmaPeriodLabel[^{]*\{ if\(|function sigmaMdcPeriodLabel[^{]*\{ if\(|function sigmaExportPeriods[^{]*\{ if\(/,
   'retired report export helpers must not retain JavaScript fallbacks');
-assert.match(dataIoSource, /function exportReportCSV\(\)[\s\S]*?globalThis\.csvDownload\(/,
-  'report CSV export must call the TypeScript download service directly');
-assert.match(dataIoSource, /function exportActionsCSV\(\)[\s\S]*?globalThis\.csvDownload\('Nhat_ky_khac_phuc_QC\.csv',rows\);/,
-  'NCE CSV export must call the TypeScript download service directly');
+assert.match(dataIoSource, /function exportReportCSV\(\)[\s\S]*?deps\.csvDownload\(/,
+  'report CSV export must call the injected download dependency directly');
+assert.match(dataIoSource, /function exportActionsCSV\(\)[\s\S]*?deps\.csvDownload\('Nhat_ky_khac_phuc_QC\.csv', rows\);/,
+  'NCE CSV export must call the injected download dependency directly');
 assert.match(read('assets/modules/users-auth.js'), /function exportActivityCSV\(\)\{globalThis\.csvDownload\(/,
   'activity CSV export must call the TypeScript download service directly');
 assert.match(generated, /root\.syncRetryScheduler\s*=\s*createSyncRetryScheduler/,
@@ -1956,10 +1958,10 @@ assert.match(generated, /root\.leveyJenningsTooltipController\s*=\s*createLeveyJ
   'artifact phải công bố TypeScript controller tooltip Levey-Jennings cho wrapper cũ');
 assert.match(generated, /root\.chartDataUrl\s*=\s*createChartDataUrl/,
   'artifact phải công bố TypeScript chart data URL cho wrapper cũ');
-assert.match(drawSource, /chartDataUrl\(\{width:1400,height:430,render:canvas=>drawLJ\(canvas,points,mean,sd\)\}\)/,
-  'xuất Levey-Jennings đơn phải dùng chart data URL từ TypeScript bridge');
-assert.match(drawSource, /chartDataUrl\(\{width:1400,height:430,render:canvas=>drawLJMultiZ\(canvas,levelViews,test,opts\)\}\)/,
-  'xuất Levey-Jennings đa mức phải dùng chart data URL từ TypeScript bridge');
+assert.match(drawSource, /deps\.chartDataUrl\(\{ width: 1400, height: 430, render: canvas => drawLJ\(canvas, points, mean, sd\) \}\)/,
+  'xuất Levey-Jennings đơn phải dùng chart data URL từ dependency injected');
+assert.match(drawSource, /deps\.chartDataUrl\(\{ width: 1400, height: 430, render: canvas => drawLJMultiZ\(canvas, levelViews, test, opts\) \}\)/,
+  'xuất Levey-Jennings đa mức phải dùng chart data URL từ dependency injected');
 assert.match(generated, /root\.hiDpiCanvasSetup\s*=\s*createHiDpiCanvasSetup/,
   'artifact phải công bố TypeScript chuẩn hóa canvas HiDPI cho wrapper cũ');
 assert.match(generated, /root\.leveyJenningsGeometry\s*=\s*leveyJenningsGeometry/,
@@ -1968,18 +1970,20 @@ assert.match(generated, /root\.westgardRuleScope\s*=\s*createWestgardRuleScope/,
   'artifact phải công bố TypeScript phạm vi luật Westgard cho wrapper cũ');
 assert.doesNotMatch(drawSource, /function setupHiDPICanvas\(/,
   'renderer không được giữ wrapper HiDPI classic chỉ chuyển tiếp sang TypeScript');
-assert.match(drawSource, /globalThis\.hiDpiCanvasSetup\(canvas\)/,
-  'renderer phải gọi trực tiếp setup HiDPI từ TypeScript bridge');
+assert.match(drawSource, /deps\.hiDpiCanvasSetup\(canvas\)/,
+  'renderer phải gọi trực tiếp setup HiDPI từ dependency injected');
 assert.doesNotMatch(drawSource, /function (drawRuleWithin|drawRuleAcross|drawCanvasFont|bindLJTooltip)\(/,
   'renderer không được giữ các wrapper classic chỉ chuyển tiếp sang bridge TypeScript');
 assert.doesNotMatch(drawSource, /function qcTooltip\(/,
   'qcTooltip phải thuộc compatibility bridge');
-assert.match(drawSource, /globalThis\.westgardRuleScope\.within\(test,rule\)/,
-  'renderer phải gọi trực tiếp phạm vi luật Westgard từ TypeScript bridge');
-assert.match(drawSource, /globalThis\.canvasFont\(800,'type-caption',11\.5\)/,
-  'renderer phải gọi trực tiếp canvas font từ TypeScript bridge');
-assert.match(drawSource, /globalThis\.leveyJenningsTooltipController\(canvas\)/,
-  'renderer phải gọi trực tiếp tooltip controller từ TypeScript bridge');
+assert.doesNotMatch(drawSource, /\bglobalThis\b/,
+  'chart renderer không được tự đọc globalThis — mọi dependency phải qua deps');
+assert.match(drawSource, /deps\.westgardRuleScope\.within\(test, rule\)/,
+  'renderer phải gọi trực tiếp phạm vi luật Westgard từ dependency injected');
+assert.match(drawSource, /deps\.canvasFont\(800, 'type-caption', 11\.5\)/,
+  'renderer phải gọi trực tiếp canvas font từ dependency injected');
+assert.match(drawSource, /deps\.leveyJenningsTooltipController\(canvas\)/,
+  'renderer phải gọi trực tiếp tooltip controller từ dependency injected');
 assert.match(dashboardRoutesSource, /return pageDashLoading\(tests, missingWestgard\.length\);/,
   'dashboard phải gọi trực tiếp loading presentation từ TypeScript bridge');
 assert.match(dashboardRoutesSource, /dashItems\.filter\(item => deps\.dashboardStatusFilter\.matches\(item, dashTestStatus\)\)/,
@@ -2036,8 +2040,10 @@ assert.match(generated, /root\.leveyJenningsMultiDividers\s*=\s*leveyJenningsMul
   'artifact phải công bố TypeScript đường phân cách Levey-Jennings đa mức cho wrapper cũ');
 assert.match(generated, /root\.cusumChartGeometry\s*=\s*cusumChartGeometry/,
   'artifact phải công bố TypeScript hình học CUSUM cho wrapper cũ');
-assert.doesNotMatch(generated, /root\.cusum(?:DisplayPlan|HoverModel)\s*=/,
-  'artifact không được công bố helper CUSUM không có caller classic');
+assert.match(generated, /root\.cusumDisplayPlan\s*=\s*createCusumDisplayPlan/,
+  'artifact phải công bố TypeScript downsampling CUSUM cho renderer đã retire');
+assert.match(generated, /root\.cusumHoverModel\s*=\s*createCusumHoverModel/,
+  'artifact phải công bố TypeScript hover model CUSUM cho renderer đã retire');
 assert.doesNotMatch(generated, /root\.(?:entryPointContext|settingsStorageBytesText)\s*=/,
   'artifact không được công bố helper chỉ dùng nội bộ command/presentation');
 assert.doesNotMatch(generated, /root\.(?:sameIdSetPresentation|sameNormalizedTextPresentation|teaPositiveNumberPresentation|teaReferenceExternalChangedPresentation)\s*=/,
@@ -2058,20 +2064,30 @@ assert.match(generated, /root\.cusumReferenceLines\s*=\s*cusumReferenceLines/,
   'artifact phải công bố TypeScript đường tham chiếu CUSUM cho wrapper cũ');
 assert.match(generated, /root\.cusumLinePoints\s*=\s*cusumLinePoints/,
   'artifact phải công bố TypeScript tọa độ line CUSUM cho wrapper cũ');
-assert.match(drawSource, /cusumDisplayPlan\(\{count:n,width:cw,cPos,cNeg,ma,flags\}\)/,
-  'renderer CUSUM phải dùng downsampling từ TypeScript bridge');
-assert.match(drawSource, /cusumHoverModel\(\{point:model\.point,cPos:model\.positive,cNeg:model\.negative,rejected:model\.rejected\}\)/,
-  'renderer CUSUM phải dùng hover model từ TypeScript bridge');
-assert.match(drawSource, /cusumPointRenderModel\(\{indices:drawIndices,points,cPos,cNeg,flags,h,x,clampY,colors:cc\}\)/,
-  'renderer CUSUM phải dùng model điểm từ TypeScript bridge');
-assert.match(drawSource, /cusumReferenceLines\(\{h,y\}\)/,
-  'renderer CUSUM phải dùng đường tham chiếu từ TypeScript bridge');
-assert.match(drawSource, /cusumLinePoints\(\{indices:drawIndices,values:arr,x,clampY\}\)/,
-  'renderer CUSUM phải dùng tọa độ line từ TypeScript bridge');
-assert.match(drawSource, /leveyJenningsBandRects\(\{mean:0,sd:1,width:cw,y\}\)/,
-  'renderer đa mức phải dùng dải Levey-Jennings từ TypeScript bridge');
-assert.match(drawSource, /leveyJenningsGridLines\(\[3,2,1,0,-1,-2,-3\]/,
-  'renderer đa mức phải dùng lưới Levey-Jennings từ TypeScript bridge');
+assert.match(generated, /root\.drawLJ\s*=\s*qcChartRenderer\.drawLJ/,
+  'artifact phải công bố renderer Levey-Jennings đơn cho wrapper cũ');
+assert.match(generated, /root\.ljDataURL\s*=\s*qcChartRenderer\.ljDataURL/,
+  'artifact phải công bố xuất ảnh Levey-Jennings đơn cho wrapper cũ');
+assert.match(generated, /root\.drawLJMultiZ\s*=\s*qcChartRenderer\.drawLJMultiZ/,
+  'artifact phải công bố renderer Levey-Jennings đa mức cho wrapper cũ');
+assert.match(generated, /root\.ljMultiDataURL\s*=\s*qcChartRenderer\.ljMultiDataURL/,
+  'artifact phải công bố xuất ảnh Levey-Jennings đa mức cho wrapper cũ');
+assert.match(generated, /root\.drawCUSUM\s*=\s*qcChartRenderer\.drawCUSUM/,
+  'artifact phải công bố renderer CUSUM cho wrapper cũ');
+assert.match(drawSource, /deps\.cusumDisplayPlan\(\{ count: n, width: cw, cPos, cNeg, ma, flags \}\)/,
+  'renderer CUSUM phải dùng downsampling từ dependency injected');
+assert.match(drawSource, /deps\.cusumHoverModel\(\{ point: model\.point, cPos: model\.positive, cNeg: model\.negative, rejected: model\.rejected \}\)/,
+  'renderer CUSUM phải dùng hover model từ dependency injected');
+assert.match(drawSource, /deps\.cusumPointRenderModel\(\{ indices: drawIndices, points, cPos, cNeg, flags, h, x, clampY, colors: cc \}\)/,
+  'renderer CUSUM phải dùng model điểm từ dependency injected');
+assert.match(drawSource, /deps\.cusumReferenceLines\(\{ h, y \}\)/,
+  'renderer CUSUM phải dùng đường tham chiếu từ dependency injected');
+assert.match(drawSource, /deps\.cusumLinePoints\(\{ indices: drawIndices, values: arr, x, clampY \}\)/,
+  'renderer CUSUM phải dùng tọa độ line từ dependency injected');
+assert.match(drawSource, /deps\.leveyJenningsBandRects\(\{ mean: 0, sd: 1, width: cw, y \}\)/,
+  'renderer đa mức phải dùng dải Levey-Jennings từ dependency injected');
+assert.match(drawSource, /deps\.leveyJenningsGridLines\(\[3, 2, 1, 0, -1, -2, -3\]/,
+  'renderer đa mức phải dùng lưới Levey-Jennings từ dependency injected');
 assert.match(generated, /root\.blobDownload\s*=\s*createBlobDownload/,
   'artifact phải công bố TypeScript blob download cho wrapper cũ');
 assert.match(generated, /root\.xlsxCells\s*=\s*createXlsxCells/,

@@ -53,16 +53,16 @@ scope**, không phải không còn file `.js` trong gói phát hành.
 6. Không sửa tay `assets/generated/*.js`; source thay đổi trong `src/`, sau đó
    chạy build và commit artifact sinh ra.
 
-## 3. Trạng thái thực tế — 2026-08-18
+## 3. Trạng thái thực tế — 2026-08-19
 
 | Hạng mục | Trạng thái |
 | --- | --- |
-| Nguồn TypeScript | 733 tệp: 99 domain, 137 application, 496 presentation, 1 compatibility bridge |
-| Nguồn classic còn lại | 23 tệp `assets/modules/*.js`, thêm `assets/core.js` và `assets/app.js` |
+| Nguồn TypeScript | 739 tệp (thêm `sigma-page-controller.ts`; domain/application/bridge không đổi khác) |
+| Nguồn classic còn lại | 18 tệp `assets/modules/*.js`, thêm `assets/core.js` và `assets/app.js` |
 | Bundle hiện tại | `assets/generated/modular-pilot.js`, Vite sinh ra và nạp bằng `<script defer>` |
 | Kiểm tra kiểu | `npm.cmd run typecheck` đạt: checkJs legacy + strict TypeScript modules |
-| Test Node | `npm.cmd test` đạt ngày 2026-08-18 (613/613) |
-| Ước tính tiến độ | **~90%** logic ứng dụng do TypeScript sở hữu lúc chạy · **~78%** theo số dòng classic thô còn lại · **~73%** theo tiêu chí hoàn thành cuối cùng (mục 7, đã trừ toàn bộ Pha H) — xem "Ba thước đo tiến độ" bên dưới |
+| Test Node | `npm.cmd test` đạt ngày 2026-08-19 (613/613) |
+| Ước tính tiến độ | **~90%** logic ứng dụng do TypeScript sở hữu lúc chạy · **~78%** theo số dòng classic thô còn lại · **~73%** theo tiêu chí hoàn thành cuối cùng (mục 7, đã trừ toàn bộ Pha H) — xem "Ba thước đo tiến độ" bên dưới (chưa tính lại chi tiết sau lát Route 5, biến động nhỏ) |
 
 Các phần nghiệp vụ chính đã có TypeScript: Westgard/QC, storage và Firebase,
 backup, auth/audit, NCE, Entry, Manage, Sigma, report/XLSX, Reagent, Settings,
@@ -90,7 +90,7 @@ Ba con số khác nhau vì ba mẫu số khác nhau; đừng gộp làm một:
 
 ### Kiểm kê từng module classic — đã xong / chưa xong
 
-**Đã retire sang TypeScript trong Pha G (7 file, phiên 2026-08-18):**
+**Đã retire sang TypeScript trong Pha G (16 file, phiên 2026-08-18–19):**
 
 | Classic (đã xóa) | TypeScript thay thế | Lát |
 | --- | --- | --- |
@@ -101,25 +101,33 @@ Ba con số khác nhau vì ba mẫu số khác nhau; đừng gộp làm một:
 | `report-routes.js` | `src/presentation/report/report-page-controller.ts` | Route 2 |
 | `westgard-routes.js` | `src/presentation/westgard/westgard-page-controller.ts` | Route 3 |
 | `reagent.js` | `src/presentation/reagent/reagent-page-controller.ts` | Route 4 |
+| `lis-queue-ui.js` | `src/presentation/lis/lis-queue-controller.ts` | Route 5 |
+| `audit.js` | inline vào `src/compat/modular-pilot.global.ts` (không có logic mới, chỉ delegator) | Route 6 |
+| `sigma-tea.js` | `src/domain/sigma/sigma-tea-resolution.ts` | Route 7 |
+| `manage-routes.js` | `src/presentation/manage/manage-page-controller.ts` | Route 8 |
+| `manage-tests-actions.js` | `src/presentation/manage/manage-tests-actions-controller.ts` | Route 9 |
+| `entry-routes.js` | `src/presentation/entry/entry-page-controller.ts` | Route 10 |
+| `actions-routes.js` | `src/presentation/actions/actions-page-controller.ts` | Route 11 |
+| `action-form.js` | `src/presentation/actions/action-form-controller.ts` | Route 11 |
+| `sigma.js` | `src/presentation/sigma/sigma-page-controller.ts` | Route 12 |
+| `draw.js` | `src/presentation/chart/qc-chart-renderer.ts` | Route 13 |
+| `reports.js` | `src/presentation/report/report-print-controller.ts` (+ `src/presentation/shared/html-escape.ts`) | Route 14 |
+| `data-io.js` | `src/presentation/export/data-io-controller.ts` | Route 15 |
 
-(`after-render.js` đã retire ở Pha F.)
+(`after-render.js` đã retire ở Pha F.) Với Route 9, toàn bộ trang "Cấu hình chung"
+(Manage) đã sang TypeScript hoàn toàn. Với Route 10, trang "Nhập QC" (Entry) —
+nơi ghi/hủy điểm QC — cũng vậy. Với Route 11, trang "Khắc phục sự cố" (NCE) — kể
+cả vòng đời hồ sơ lẫn form 8 mục — cũng vậy. Với Route 12, trang "Six Sigma" —
+cũng vậy; **toàn bộ nhóm A (Route/presentation) của Pha G đã hoàn tất**. Route 13
+mở đầu nhóm B (canvas/adapter): renderer Levey-Jennings đơn/đa mức + CUSUM. Route 14
+chuyển toàn bộ bản in (`openPrint`, `printReport`/`printWestgard`/`printSigmaPeriod(s)`/
+`printRangeForm`) sang TypeScript. Route 15 chuyển nốt xuất CSV/XLSX (Sigma + Báo cáo +
+Westgard) — **toàn bộ nhóm B (Canvas/adapter) của Pha G đã hoàn tất**.
 
-**Chưa xong — 23 file classic còn lại, chia theo nhóm rủi ro:**
+**Chưa xong — 11 file classic còn lại, chia theo nhóm rủi ro:**
 
 | Nhóm | File | Dòng | Ghi chú port |
 | --- | --- | --- | --- |
-| **A. Route/presentation** (rủi ro vừa, pattern đã thành thạo) | `manage-routes.js` | 174 | trang Cấu hình chung; đi cùng `manage-tests-actions.js` |
-| | `manage-tests-actions.js` | 371 | mutation instrument/assay + re-auth/audit; nặng nhất nhóm route |
-| | `entry-routes.js` | 319 | `pageEntry`; state entry nhiều, có sheet/tree/LJ canvas |
-| | `actions-routes.js` | 226 | trang NCE (lifecycle) — cắt hai chiều với `action-form.js` |
-| | `action-form.js` | 463 | form NCE 8 mục; lớn nhất còn lại, draft-survives-rerender |
-| | `sigma.js` | 414 | trang Six Sigma; đi cùng `sigma-tea.js` |
-| | `sigma-tea.js` | 111 | lớp giải TEa (đã thuần, dễ) |
-| | `audit.js` | 25 | trang nhật ký (mỏng) |
-| | `lis-queue-ui.js` | 36 | hàng chờ LIS (mỏng) |
-| **B. Canvas/adapter** (cần visual/print gate riêng) | `draw.js` | 207 | vẽ Levey-Jennings/CUSUM lên canvas |
-| | `reports.js` | 204 | HTML in `openPrint()` — cần `print-check`/`visual-check` |
-| | `data-io.js` | 274 | xuất CSV/XLSX + `openPrint` wiring |
 | **C. Hạ tầng/bootstrap** (rủi ro cao — kế hoạch yêu cầu làm CUỐI, từng lát độc lập) | `state.js` | 128 | `ensureShape`/state gốc; lifecycle nhạy |
 | | `qc-domain.js` | 255 | wiring Westgard/worker + point derivation |
 | | `state-storage.js` | 120 | load/save + partitioned + boot shell |
@@ -135,9 +143,11 @@ Ba con số khác nhau vì ba mẫu số khác nhau; đừng gộp làm một:
 | | `assets/workers/westgard-worker.js` | — | contract worker, cần parity test |
 | **E. Bootstrap cuối** | `assets/app.js` | 9 | entry `boot()` — xử lý ở đầu Pha H |
 
-**Thứ tự đề xuất tiếp theo:** hết nhóm A (route/presentation) → nhóm B (canvas,
-kèm gate visual/print) → nhóm C (hạ tầng, từng lát một, chạy `ui-check` +
-benchmark storage) → nhóm D (`core.js`+worker, lát parity độc lập) → Pha H.
+**Thứ tự đề xuất tiếp theo:** nhóm A (route/presentation) đã xong toàn bộ →
+nhóm B (canvas/adapter) đã xong toàn bộ (`draw.js` Route 13, `reports.js`
+Route 14, `data-io.js` Route 15) → nhóm C (hạ tầng, từng lát một, chạy
+`ui-check` + benchmark storage) → nhóm D (`core.js`+worker, lát parity độc
+lập) → Pha H.
 
 ## 4. Phân lớp đích và trách nhiệm
 
@@ -813,6 +823,655 @@ reports.js gọi trần). Gate: `build:pilot`/`typecheck`/`test` 613/613 +
 `a11y-audit` (report + 18/18 modal, 0 vi phạm) + `ui-check` (29/29 sau khi sửa
 test lock).
 
+#### Lát route 5 — `lis-queue-ui.js` (2026-08-19)
+
+Retire `assets/modules/lis-queue-ui.js` (36 dòng) sang
+`src/presentation/lis/lis-queue-controller.ts`
+(`createLisQueueController(deps)`) — lát **nhẹ nhất nhóm route** vì file classic
+đã gần thuần bridge từ Pha F (mọi HTML nằm trong `lis-queue-presentation.ts`,
+mọi service đồng bộ nằm trong `LISClientService`/`LisGatewayCommand`/
+`lisSettingsService`). Controller chỉ còn phần điều phối: đọc form
+(`lisGatewaySaveSettings`), mở modal hàng chờ (`lisRenderQueueModal`,
+`lisOpenQueueModal`, `lisQueueRefresh`), và hai onclick handler
+`lisQueueImport`/`lisQueueReject` (kèm `confirmDialog` trước khi bỏ một kết
+quả). Không có state trang riêng (không giống Report/Westgard/Reagent) — mọi
+input đọc trực tiếp từ DOM mỗi lần gọi.
+
+Áp dụng đầy đủ các quy tắc đã rút ra từ 4 lát route trước, không phát sinh bẫy
+runtime mới:
+
+- Mọi dep bọc lazy (`gatewayConfig:()=>root.lisGatewayConfig!()`,
+  `requireAdmin:message=>root.requireAdmin(message)`, …) — không tái diễn bẫy
+  bare-identifier.
+- `document` tiêm qua `deps.document` (fallback stub tối giản khi không có
+  `document` thật, giống `settings-page-controller.ts`), không đọc `document`
+  toàn cục trực tiếp trong controller.
+- `gatewayCommand`/`presentation` được gán thẳng từ `root.LisGatewayCommand`/
+  `root.lisQueuePresentation` lúc wiring (không lazy) vì hai global đó đã được
+  gán ở dòng ngay phía trên trong cùng file, cùng thời điểm — an toàn vì thứ
+  tự khai báo trong `modular-pilot.global.ts` là tuyến tính.
+
+Test: viết lại toàn bộ `tests/lis-queue-bridge.test.js` (trước đọc
+`assets/modules/lis-queue-ui.js` bằng `fs.readFileSync` và pin cú pháp
+`function lisQueueValueText(record){return globalThis...}`) sang đọc
+`lis-queue-controller.ts` + wiring trong `modular-pilot.global.ts`, cộng một
+assertion mới xác nhận file classic không còn tồn tại (không được tái tạo lại
+bản cũ). `tests/lis-client-service.test.js` bỏ `'modules/lis-queue-ui.js'`
+khỏi hai danh sách `loadSandbox()` — `lisQueueRowHtml`/`lisQueueSectionHtml`/
+`lisImportResult`/… nay đến từ bundle, kể cả bài hồi quy XSS (`lisOnclick` bọc
+`escAttr()` quanh cả chuỗi onclick) vẫn xanh nguyên vẹn không cần sửa gì khác.
+`tests/typescript-module-pilot.test.js` đổi assertion từ `match` (từng đòi
+`lis-queue-ui.js` phải xuất hiện trong `index.html` như "lớp presentation tách
+khỏi service đồng bộ") sang `doesNotMatch` (giờ nó bị retire hẳn) — đúng tinh
+thần các assertion "không được quay lại global-scope cũ" của các module đã
+retire trước đó.
+
+Gate đầy đủ: `build:pilot`/`typecheck`/`test` 613/613 + `a11y-audit` (settings
++ 18/18 modal — kể cả `settings:lis-queue` mở được, 0 vi phạm, ratchet PASS) +
+`ui-check` (29/29, không lỗi runtime/console) + `nce-check` (91/91, không liên
+quan trực tiếp nhưng chạy để xác nhận không hồi quy dispatch trang). Xóa
+`assets/modules/lis-queue-ui.js` khỏi `index.html` (script tag riêng của nó
+từng nạp trước `generated/modular-pilot.js`) và khỏi đĩa; bump `?v=` của
+`generated/modular-pilot.js`. Với lát này, nhóm "Route/presentation" còn 8
+file classic (`manage-routes.js`, `manage-tests-actions.js`, `entry-routes.js`,
+`actions-routes.js`, `action-form.js`, `sigma.js`, `sigma-tea.js`, `audit.js`
+— `audit.js` mỏng nhất, `action-form.js` lớn nhất).
+
+#### Lát route 6 — `audit.js` (2026-08-19)
+
+Retire `assets/modules/audit.js` (25 dòng, 18 hàm delegator + 3 biến ngưỡng)
+**không tạo file TS mới** — toàn bộ nội dung inline thẳng vào
+`src/compat/modular-pilot.global.ts`, vì đây thuần là lớp bridge 1-dòng-1-hàm
+gọi sang `QCCore`/`AuditService` (đã là TypeScript từ trước), không có HTML hay
+DOM. Trước khi xóa, map từng trong 18 hàm ra caller thật (không chỉ chỗ định
+nghĩa) bằng `rg` trên toàn bộ `assets/`, `src/`, `tests/`: 7 hàm
+(`auditCanonical`, `auditEntryPayload`, `auditService`, `auditLastHash`,
+`auditPushRaw`, `auditRotateOverflow`, `auditNextSeq`, `auditChainSignature`)
+**không còn caller nào ở bất kỳ đâu** — xóa hẳn, không port. 11 hàm còn lại có
+caller thật (bridge nội bộ trong cùng file, `users-auth.js`, hoặc test) —
+inline thành `root.X = (...) => root.AuditService!.X(...)` (hoặc gọi thẳng
+`root.QCCore` cho `auditSha256`/`auditEntryHash`/`auditVerifyChain`).
+
+**Vấn đề khó nhất của lát này: ba biến ngưỡng `let ACTIVITY_HARD_CAP=50000,
+ACTIVITY_ROTATE_TO=40000; const AUDIT_AUTO_VERIFY_MAX=5000`** — không phải
+hàm, mà là state MUTABLE mà `users-auth.js` (chưa migrate) đọc TRẦN
+(`total>ACTIVITY_ROTATE_TO`) và hai test (`audit-retention.test.js`) GÁN LẠI
+trực tiếp bằng cú pháp trần (`ACTIVITY_HARD_CAP = 5;`, không qua `ctx.X=`) để
+mô phỏng xoay vòng mà không cần dựng hàng chục nghìn dòng thật. Theo quy tắc
+đã đúc kết ở Lát 2/3 ("function top-level thành property của globalThis,
+let/const top-level thì KHÔNG"), lo ngại ban đầu là ba biến này PHẢI ở lại một
+file classic độc lập (không thể chuyển vào bundle) vì Vite đóng gói bundle
+thành một IIFE — `let`/`const` khai báo trong đó chỉ sống trong scope của
+IIFE, không lọt ra "global lexical environment" dùng chung giữa các
+`<script>` cổ điển.
+
+Đã **xác minh bằng thực nghiệm trực tiếp trên Node `vm`** (không suy luận
+suông) rằng lo ngại này sai cho đúng trường hợp cụ thể ở đây: nếu gán bằng
+**property** (`root.ACTIVITY_HARD_CAP = 50000`, tức `globalThis.X = ...`, KHÔNG
+phải `let X = ...`) thay vì khai báo lexical, thì tham chiếu trần từ MỘT lời
+gọi `vm.runInContext` KHÁC (mô phỏng đúng một `<script>` cổ điển khác trên
+cùng trang) vẫn đọc/ghi được giá trị đó — vì resolution của một identifier
+trần, khi không tìm thấy binding `let/const` nào che trước, RƠI QUA property
+của global object làm bước cuối cùng — cả chiều đọc lẫn chiều gán trần (không
+từ khóa) đều đúng chiều này. Do đó bản chất phân biệt không phải "bundle hay
+file classic" mà là "gán bằng property hay bằng `let/const`"; miễn dùng
+property, ba ngưỡng này ở thẳng trong bundle vẫn hoạt động đúng cho
+`users-auth.js` (đọc trần) và test (gán lại trần) — **không cần giữ lại bất kỳ
+phần nào của `audit.js`**. Bài học tổng quát cho các lát Pha G còn lại:
+"function top-level" và "biến gán qua property (`root.X=`/`window.X=`)" hành
+xử GIỐNG NHAU với truy cập trần (đều rơi qua global object) — bài học `wgMemo`
+trước đây chỉ đơn thuần là "đừng khai báo mutable state bằng `let` nếu nơi
+khác cần đọc nó qua `root.X`", không phải "mutable state không thể sống trong
+bundle".
+
+**Bài học phụ khác — mở rộng quy ước ambient declare có sẵn cho `rerender`:**
+những hàm vừa được TRẦN tham chiếu Ở NHIỀU CHỖ KHÁC trong CHÍNH
+`modular-pilot.global.ts` (`logAct`, `auditSha256`, `auditRelinkChain`) cần
+CẢ HAI: (1) ambient `declare function X()` để TypeScript phân giải các tham
+chiếu trần đó (giữ nguyên, không xóa — same như `rerender`/`requireWrite` đã
+làm từ trước), VÀ (2) một entry KHÔNG optional trong `QCLabGlobal` (`logAct:
+(...) => void;`, không phải `logAct?:`) để câu lệnh gán `root.logAct = ...`
+tự nó biên dịch được — thiếu (2) thì dù có ambient declare, TypeScript vẫn báo
+`Property 'logAct' does not exist on type 'QCLabGlobal'` khi gán qua `root.`.
+Những hàm CHỈ được gọi qua `root.X`/từ bên ngoài (không tham chiếu trần ở nơi
+khác trong file) thì chỉ cần entry `X?:` trong interface, không cần ambient.
+
+**Giữ nguyên, không đơn giản hóa quá tay:** guard `uid: () => typeof (root as
+any).uid==='function'?(root as any).uid():''` trong wiring `AuditService` —
+đây là phòng vệ cho việc `state.js` (nơi định nghĩa `uid()`, KHÔNG phải
+`audit.js`) có thể chưa nạp ở một sandbox nào đó, không liên quan tới việc dọn
+`audit.js`; đổi thành gọi trần không có gì để lợi và có rủi ro thật nếu đoán
+sai một sandbox nào đó thiếu `uid`.
+
+**5 test đọc `assets/modules/audit.js` trực tiếp từ đĩa** (bỏ qua cơ chế mảng
+file của `loadSandbox()`, nên `rg "modules/audit\.js"` ban đầu bỏ sót 1 trong
+số đó — phải dò thêm bằng `'audit.js'` làm chuỗi con của lời gọi `path.join`
+tách nhiều tham số): `audit-hash.test.js`, `audit-chain-cache.test.js`,
+`audit-retention.test.js` (cả ba tự đọc file bằng `fs.readFileSync` +
+`vm.runInContext` thủ công, bỏ đoạn đó, giữ lại đúng bước nạp bundle) và
+`audit-ingress-gates.test.js`/`firebase-merge.test.js` (bỏ chuỗi
+`'modules/audit.js'` khỏi mảng `loadSandbox([...])`). `tests/helpers/sandbox.js`
+bỏ luôn rule tự chèn bundle ngay sau `modules/audit.js` (chết vì file không
+còn tồn tại để `indexOf` tìm thấy). Phát hiện phụ — TÁI DIỄN đúng lớp lỗi
+"bundle ghi đè stub" của Lát 1/2: `tests/audit-filter.test.js` stub
+`auditVerifyChain`/`ACTIVITY_HARD_CAP`/`ACTIVITY_ROTATE_TO` qua tham số
+`globals` của `loadSandbox()` (set TRƯỚC khi file chạy) — ba tên này giờ được
+bundle gán property thật NGAY KHI NẠP, ghi đè mất giá trị stub; chuyển cả ba
+sang gán SAU khi `loadSandbox()` trả về (`Object.assign(ctx,{...})`, cùng chỗ
+đã sửa `headOnly`/`btn`/… ở Lát 2/3) để khớp đúng ý định gốc của test (dù với
+dữ liệu 30 dòng hiện tại của test đó, ngưỡng 50000 mặc định của bundle không
+đủ để đổi kết quả assert — vẫn sửa cho đúng ý định, không dựa vào việc test
+hiện tại vô tình không phân biệt được).
+
+**Bẫy cuối cùng phát hiện qua `npm run typecheck` chạy TRỌN VẸN (không chỉ
+`tsc -p tsconfig.modules.json`):** `npm run typecheck` là HAI chương trình
+tsc riêng biệt — `tsc --noEmit` (checkJs legacy, quét toàn bộ `assets/**/*.js`
+làm MỘT global scope dùng chung, dựa vào `global.d.ts` cho bất kỳ tên nào tới
+từ bundle) và `tsc -p tsconfig.modules.json` (strict, chỉ quét `src/**/*.ts`,
+dựa vào `declare function` inline ngay trong `modular-pilot.global.ts`). Build
+bundle xanh + pass thứ hai xanh KHÔNG chứng minh pass thứ nhất xanh — sau khi
+xóa `audit.js`, `tsc --noEmit` báo lỗi `Cannot find name 'ACTIVITY_HARD_CAP'`/
+`'ACTIVITY_ROTATE_TO'`/`'auditChainStatus'` tại `users-auth.js`, vì
+`assets/generated/**` nằm trong `exclude` của `tsconfig.json` — checkJs không
+bao giờ thấy được `root.X=` bên trong bundle, chỉ thấy được tên nào có ambient
+declare thật trong `global.d.ts`. Trước đây `audit.js` tự thỏa mãn việc này
+(khai báo thật, checkJs thấy trực tiếp); giờ phải thêm ambient tương ứng vào
+`global.d.ts` (đặt cạnh các declare cùng loại như `wgMultiViews`/`pageDash`).
+Các hàm khác (`logAct`, `auditVerifyChainNow`, …) KHÔNG cần thêm vì đã không
+còn file classic nào gọi chúng bằng mã JS thật (chỉ còn trong chuỗi HTML
+onclick, thứ checkJs không phân tích). Quy tắc cho các lát kế tiếp: sau khi
+xóa một file classic, `rg` tên hàm/biến nó từng khai báo trên toàn bộ
+`assets/modules/*.js` CÒN LẠI (không chỉ nơi từng gọi lúc file cũ còn sống) —
+nếu vẫn có chỗ gọi trần bằng mã JS thật (không phải trong chuỗi), phải thêm
+ambient vào `global.d.ts`, không chỉ vào `modular-pilot.global.ts`.
+
+Gate: `build:pilot`/`typecheck`/`test` 613/613 (cả hai chương trình tsc) +
+`a11y-audit` (trang audit + modal `audit:archive-log`, 0 vi phạm, ratchet
+PASS) + `ui-check` (29/29, gồm cả "Audit mở khóa giữ lý do") + `nce-check`
+(91/91).
+
+#### Lát route 7 — `sigma-tea.js` (2026-08-19)
+
+Retire `assets/modules/sigma-tea.js` (111 dòng, ~22 hàm/hằng) sang
+`src/domain/sigma/sigma-tea-resolution.ts` (`createSigmaTeaResolution(deps)`)
+— lát **nặng nhất và rủi ro cao nhất tính tới nay trong nhóm route**, khác hẳn
+6 lát trước: đây là NGHIỆP VỤ THẬT (khớp tên xét nghiệm theo alias/tiền tố,
+tiêu chí CLIA phần trăm/tuyệt đối/lớn hơn, ảnh chụp truy vết TEa) chứ không
+phải lớp bridge/điều phối mỏng, và CLAUDE.md liệt nó vào "Confirmed
+business-logic decisions" — không được đổi khi migration.
+
+**Trước khi viết code:** map từng biểu tượng ra caller thật trên toàn bộ
+`assets/`, `src/`, VÀ `tests/` (cả `ctx.X()` lẫn `run(ctx,'X(...)')` bare bên
+trong test) — 5 file classic khác (`sigma.js`, `manage-routes.js`,
+`manage-tests-actions.js`, `data-io.js`, `reports.js`) gọi trần ~17 trong số
+22 biểu tượng; 5 biểu tượng (`SG_TEA_DEFAULT_REF`, `teaRefSearchKey`,
+`teaRefRecordForName`, `sgTeaStoredRef`, `sgCliaCriterion`) không có caller
+thật nào ngoài chính file — giữ PRIVATE (đóng trong closure factory, không
+`root.X=`), 17 còn lại export đầy đủ.
+
+**Hai lỗi thật tự gây ra, cả hai đều bị `npm test` bắt được (không cần
+ui-check) — khác các lát trước nơi lỗi runtime chỉ lộ qua trình duyệt thật:**
+
+1. **Khởi tạo có tác dụng phụ ngay lúc nạp bundle, không lazy.** `SG_CLIA_FIXED`
+   được dựng MỘT LẦN khi gọi `createSigmaTeaResolution(...)`, đọc
+   `TEA_SOURCE_REGISTRY`/`TEA_ANALYTE_CATALOG`/`REFTESTS` trực tiếp — y hệt
+   cách `sigma-tea.js` cũ tự làm lúc file nạp. Nhưng trước đây file classic chỉ
+   được nạp trong sandbox NÀO CHỌN nạp nó; giờ nằm trong bundle, MỌI sandbox
+   tải bundle đều trả giá, kể cả những sandbox không hề đụng TEa
+   (`uncertainty.test.js`, `westgard-view-model.test.js`,
+   `westgard-xlsx.test.js` ném `ReferenceError: TEA_SOURCE_REGISTRY is not
+   defined` ngay lúc nạp). Sửa bằng `if(typeof TEA_SOURCE_REGISTRY!=='undefined'
+   && ...)` bọc quanh toàn bộ khối khởi tạo + gán `root.X=` — bỏ qua an toàn
+   nếu `state.js`/`analyte-catalog.js` chưa nạp, khớp đúng hành vi gốc ("không
+   nạp sigma-tea.js thì các tên này vốn dĩ undefined"). Kéo theo: nhiều test
+   khác nạp CẢ bundle LẪN `modules/state.js` nhưng đặt bundle TRƯỚC state.js
+   trong mảng (`sigma-comp.test.js` 4 chỗ, `uncertainty.test.js`,
+   `action-form.test.js`) — sai thứ tự so với `index.html` thật (state.js luôn
+   trước bundle) khiến guard luôn false; đổi lại đúng thứ tự.
+2. **Bug thật trong logic port, không phải bug hạ tầng:** `sgRef({name:'Glucose',
+   teaSource:'ricos'})` trả về dòng "Albumin" thay vì "Glucose". Nguyên nhân:
+   `teaRefSearchKey` gốc là `typeof searchText==='function'?searchText(v):
+   teaRefName(v)` — kiểm tra TRẦN mỗi lần gọi. Bản port đưa việc kiểm tra này
+   vào tầng wiring dưới dạng một HÀM LUÔN TỒN TẠI (`searchText: value =>
+   typeof globalThis.searchText==='function'?...:undefined`), khiến
+   `deps.searchText` luôn truthy (nó LÀ một function) dù bên trong trả `undefined`
+   — `teaRefSearchKey`'s `deps.searchText?deps.searchText(v):teaRefName(v)` do
+   đó luôn đi nhánh `deps.searchText(v)` và luôn nhận `undefined`, làm
+   `undefined===undefined` đúng cho MỌI alias của dòng ĐẦU TIÊN trong bảng
+   (Albumin, index 0) — `Array.find` dừng ngay đó. Sửa bằng cách chuyển
+   `searchText` sang GIÁ TRỊ có điều kiện gán một lần lúc wiring (`typeof
+   globalThis.searchText==='function' ? (v)=>globalThis.searchText(v) :
+   undefined` — không phải một hàm luôn tồn tại), để `deps.searchText` thật sự
+   `undefined` khi không có, kích đúng nhánh fallback `teaRefName(v)` của domain
+   module. Bài học: khi bọc một dependency "optional, kiểm tra qua truthiness"
+   (`deps.X ? deps.X(...) : fallback`), tầng wiring phải để `deps.X` THẬT SỰ
+   `undefined` lúc không có nguồn thật — không được thay bằng một wrapper luôn
+   tồn tại mà bên trong âm thầm trả `undefined`, vì khác nhau ở TẦNG kiểm tra
+   (bên ngoài forEach kiểm tra sự tồn tại của HÀM, bên trong `searchText` gốc
+   kiểm tra `typeof` mỗi lần gọi — hai điều không tương đương khi hàm luôn tồn
+   tại nhưng có thể trả undefined). Phát hiện qua so khớp trực tiếp trên Node
+   `vm` (`sgTea({name:'Glucose',teaSource:'ricos'})` phải ra `6.96`, ra `4.07`)
+   — `tests/sigma-tea.test.js` tự nó đã đủ discriminating, không cần trình
+   duyệt thật.
+
+**Phát hiện phụ ngoài phạm vi cổng dữ liệu — một lỗi PRODUCTION THẬT, đang
+sống, không liên quan gì tới việc chuyển `sigma-tea.js`:** trong lúc thêm
+ambient cho `REFTESTS`, phát hiện dòng liền kề
+`sourceRegistry: () => (globalThis as any).TEA_SOURCE_REGISTRY` trong wiring
+của `TeaReferenceService` — `TEA_SOURCE_REGISTRY` là `const` global lexical
+của `state.js` (giống hệt `REFTESTS` ngay phía trên nó), không phải property
+trên `globalThis`, nên biểu thức này LUÔN LÀ `undefined`. Xác nhận bằng
+thực nghiệm trực tiếp trên `vm`: gọi `TeaReferenceService.edit(state,
+'qclab-glucose','clia',9)` (đúng đường sửa giá trị CLIA/Ricos trong tab
+"Bảng TEa tham chiếu" của trang Cấu hình chung) ném
+`TypeError: Cannot read properties of undefined (reading 'clia')` ngay lập
+tức — nghĩa là **sửa BẤT KỲ giá trị CLIA/Ricos nào trong tab đó đều crash**
+trên bản hiện hành. Không test nào (kể cả 15 file `tea-reference-*.test.js`)
+bắt được vì `tests/tea-reference-service.test.js` gọi
+`createTeaReferenceService` trực tiếp với `sourceRegistry` tự stub đúng, không
+đi qua wiring thật; các test khác chỉ scan chuỗi. Sửa bằng tham chiếu trần
+`TEA_SOURCE_REGISTRY` (khớp đúng `REFTESTS` ngay cạnh). Thêm bài kiểm hồi quy
+thật vào `tests/manage-history-bridge.test.js` (nạp `state.js` + bundle thật,
+gọi `TeaReferenceService.edit(...)` qua đúng dây chuyền sản xuất) — đã xác
+nhận discriminating bằng cách tạm khôi phục lỗi gốc và thấy test đỏ đúng chỗ,
+rồi phục hồi bản sửa.
+
+**Quyết định phạm vi export:** 5 hàm helper thuần nội bộ
+(`teaRefSearchKey`, `teaRefRecordForName`, `sgTeaStoredRef`, `sgCliaCriterion`,
+`SG_TEA_DEFAULT_REF`) giữ private trong closure — không có caller thật nào
+ngoài chính module (đã `rg` toàn bộ `assets/`+`src/`+`tests/`, phân biệt rõ
+"xuất hiện trong danh sách regex của source-scanner" — không tính — với "được
+gọi thực thi" — tính). `tests/ui-route-structure.test.js`'s source-scanner
+(pin ranh giới một chiều sigma.js→sigma-tea.js) trỏ sang đọc
+`sigma-tea-resolution.ts`, đổi pattern `function X(` → `const X\\s*=` (cú
+pháp arrow-in-factory), và bỏ assertion so thứ tự nạp dựa trên chuỗi
+`'sigma-tea.js'` trong `index.html` (không còn thẻ script riêng) sang so
+`generated/modular-pilot` với `sigma.js?`. `tests/helpers/sandbox.js` đổi
+rule tự chèn từ "chèn `modules/sigma-tea.js` trước `modules/sigma.js`" sang
+"chèn bundle trước `modules/sigma.js`" (cùng vị trí, cùng lý do — chỉ đổi cái
+gì được chèn). `global.d.ts` thêm 12 ambient cho checkJs (các tên 5 file
+classic còn gọi trần).
+
+Gate: `build:pilot`/`typecheck`/`test` 613/613 + `a11y-audit` (trang sigma +
+modal `manage:tea-lab-profile`, 0 vi phạm, ratchet PASS) + `ui-check` (29/29)
++ `nce-check` (91/91). Nhóm "Route/presentation" còn 6 file:
+`manage-routes.js`, `manage-tests-actions.js`, `entry-routes.js`,
+`actions-routes.js`, `action-form.js`, `sigma.js`.
+
+#### Lát route 8 — `manage-routes.js` (2026-08-19)
+
+Retire `assets/modules/manage-routes.js` (174 dòng rất dày) sang
+`src/presentation/manage/manage-page-controller.ts`
+(`createManagePageController(deps)`) — trang "Cấu hình chung" (máy/panel/
+lô/nhóm lô/Mean-SD/chuyển tiếp lô/danh mục xét nghiệm/lịch sử dữ liệu/Bảng
+TEa tham chiếu). Đây là lát **có bề mặt dependency lớn nhất tới nay**: ~76 hàm
+dựng HTML (`globalThis.manageXxxPresentation`/`targetXxxPresentation`/
+`historyXxxPresentation`/`teaReferenceXxxPresentation`) — tất cả đã là
+TypeScript từ các đợt trước, file classic chỉ còn điều phối. Áp dụng đúng mẫu
+`reagent-page-controller.ts` đã dùng cho trường hợp này: gom toàn bộ 76 hàm
+vào một dep DUY NHẤT `pres: AnyRec` (không khai kiểu riêng từng hàm), wiring
+truyền thẳng `pres: root as any` — vì mọi hàm đó vốn đã là `root.X` published
+sẵn, không cần liệt kê tay từng cái.
+
+UI state (`manageQ`/`manageTab`/`manageTargetPanel`/`manageTargetGroup`/
+`manageTargetLevel`/`manageHistoryTest`) đã có sẵn `ManageUIState` (accessor
+bag) từ trước lát này — dùng chung với `manage-tests-actions.js` (còn hai
+trường `targetSwitchCtx`/`configNavScroll` không thuộc file đang chuyển,
+xác nhận bag này vốn được chia sẻ giữa hai file). Controller đọc/ghi qua
+`deps.ui()`, không dùng closure `let` (khác quyết định của Report) vì các
+biến này được `manage-tests-actions.js` (chưa migrate) ghi trực tiếp.
+
+**Bẫy runtime lặp lại từ Route 7, đã lường trước nên không mất thời gian dò
+lại:** một dep (`teaSourceRegistry`) khai ban đầu là giá trị trực tiếp
+(`TEA_SOURCE_REGISTRY`, bare, eager) thay vì hàm — construction
+`createManagePageController({...})` chạy NGAY LÚC NẠP bundle (không lazy),
+nên bất kỳ dep nào đọc một bare classic global TRỰC TIẾP (không bọc `()=>`)
+sẽ ném `ReferenceError` cho MỌI sandbox tải bundle mà chưa nạp `state.js`.
+Sửa bằng cách đổi `teaSourceRegistry` thành `() => AnyRec` (lazy) ngay từ đầu
+— không cần vòng "build xanh, test đỏ, debug" như Route 7, vì bài học đã áp
+dụng chủ động khi viết wiring lần này.
+
+**Một lỗi kiểu dữ liệu thật do TypeScript suy luận sai, không phải lỗi
+logic:** `new Map(rows.map(r => [key, r]))` — khi phần tử mảng nguồn đã là
+`AnyRec` (`any`), TypeScript suy luận literal `[key, r]` bên trong `.map()`
+thành union-array `(K|V)[]` thay vì tuple `[K,V]` trong một số trường hợp,
+khiến `Map`'s value type suy luận sai thành `{}` thay vì `any` —
+`overMap.get(analyteId).lab` báo lỗi "Property 'lab' does not exist on type
+'{}'". Sửa bằng khai tường minh `new Map<string, AnyRec>(rows.map((r):
+[string, AnyRec] => [key, r]))` thay vì để trình biên dịch tự suy luận.
+
+**Tái diễn đúng bài học Lát route 2 (Report) ở quy mô lớn hơn nhiều:** xóa
+code chết theo runtime không đồng nghĩa an toàn xóa — 13 file test đọc
+`assets/modules/manage-routes.js` bằng `fs.readFileSync` để scan chuỗi/regex
+so khớp cú pháp classic (`globalThis.manageShellPresentation(`, object
+literal không cách,...), phải sửa TỪNG file trỏ sang
+`manage-page-controller.ts` với regex cập nhật đúng cú pháp TS (dấu cách sau
+`{`/`,`/quanh `?:`, `deps.pres.X(` thay `globalThis.X(`). Một trong số đó
+(`manage-crud-labels.test.js`) dùng `.includes()` so khớp CHUỖI THÔ (không
+phải regex) trên cú pháp dày đặc kiểu classic (`title:hasProfile?'X':'Y'`) —
+TypeScript viết theo quy ước dấu cách chuẩn của mọi file `src/presentation/`
+khác (`title: hasProfile ? 'X' : 'Y'`) nên chuỗi so khớp phải viết lại theo
+đúng định dạng mới, không phải nén lại code cho khớp test cũ. Một test khác
+(`admin-render-bridge.test.js`) dùng một VÒNG LẶP CHUNG kiểm nhiều file khác
+nhau bằng cùng một mẫu `globalThis.${name}` — vì chỉ MỘT trong các dòng đó
+(`manageHistoryRowPresentation`) chuyển sang `deps.pres.${name}`, phải thêm
+tham số thứ tư cho từng dòng vòng lặp để chỉ định mẫu so khớp khác nhau theo
+từng nguồn, thay vì sửa cả mẫu chung (sẽ làm hỏng các dòng khác vẫn đọc file
+classic thật). `tests/typescript-module-pilot.test.js`/`tests/ui-accessibility.test.js`
+chỉ cần đổi biến nguồn — nội dung hai assertion đó vốn đã không phụ thuộc
+`manage-routes.js` (một là scan tên hàm KHÔNG được có, một là ghép chuỗi với
+một file TS khác mà chuỗi thật nằm trong file TS đó, không nằm ở
+`manage-routes.js`).
+
+`global.d.ts` thêm 3 ambient cho checkJs (`instrumentName`, `lotTransitionToNo`,
+`targetGroupLots` — 3 tên duy nhất còn được `data-io.js`/`reports.js`/
+`sigma.js`/`manage-tests-actions.js` gọi trần bằng mã JS thật, sau khi phân
+biệt rõ lời gọi hàm thật với các chỗ trùng tên chỉ là property-key trong
+object literal như `lotLabel:` ở `entry-routes.js`, hoặc chỗ chỉ xuất hiện
+trong comment như `manageLots()` ở `qc-domain.js`).
+
+Gate: `build:pilot`/`typecheck`/`test` 613/613 + `a11y-audit` (trang manage +
+6/6 modal manage + `manage:tea-lab-profile`, 0 vi phạm, ratchet PASS) +
+`ui-check` (29/29) + `nce-check` (91/91). Nhóm "Route/presentation" giờ chỉ
+còn 5 file: `manage-tests-actions.js`, `entry-routes.js`, `actions-routes.js`,
+`action-form.js`, `sigma.js`.
+
+#### Lát route 9 — `manage-tests-actions.js` (2026-08-19)
+
+Retire `assets/modules/manage-tests-actions.js` (371 dòng) sang
+`src/presentation/manage/manage-tests-actions-controller.ts`
+(`createManageTestsActionsController(deps)`) — mutation instrument/máy/panel/
+lô/nhóm lô/chuyển tiếp lô/Mean-SD/xét nghiệm, kèm re-auth và audit trail. Đây
+là lát **rủi ro cao nhất tính tới nay**: không phải render thuần mà là toàn bộ
+đường ghi dữ liệu của trang Cấu hình chung, với các bảo vệ ISO 15189 (khóa kỳ
+chặn xóa xét nghiệm, xác nhận trước khi đổi số lô hàng loạt, chặn xóa lô đang
+gắn hồ sơ chuyển tiếp đã chấp nhận) — CLAUDE.md gọi đây là "nặng nhất nhóm
+route". Trước khi viết code, đọc lại toàn bộ 3 bài test hồi quy đã tồn tại
+riêng cho các bảo vệ này (`locked-period-guards.test.js`, `lot-rename.test.js`,
+`target-matrix.test.js`) để hiểu chính xác hành vi phải giữ nguyên tuyệt đối.
+
+**Quyết định thiết kế quan trọng nhất: `document` là getter LAZY
+(`() => Document`), không phải giá trị capture một lần như
+`manage-page-controller.ts` đã làm.** Phát hiện TRƯỚC khi viết code (không
+phải sau khi test đỏ): nhiều bài test đổi `document` giữa các bước — mỗi test
+case seed lại một bản `document.getElementById` khác nhau trả về giá trị form
+khác nhau (`ctx.document={getElementById:id=>fields[id]};` rồi gọi hàm ngay sau
+đó), hoặc gán `document = {...}` bên trong chuỗi `seed` chạy lại ở đầu MỖI
+test case. Nếu controller capture `document` một lần lúc factory khởi tạo
+(như manage-page-controller.ts, nơi không có test nào cần đổi `document` giữa
+chừng), các lần gán lại `document` sau đó sẽ vô tác dụng — đúng bài học
+"gán lại biến toàn cục chỉ có tác dụng với code CHƯA chuyển sang TS" đã ghi ở
+Lát 3 của nhóm UI thuần, nhưng lần này té ra hướng NGƯỢC LẠI: chọn được đúng
+kiểu capture (lazy) NGAY TỪ ĐẦU nhờ đọc test trước, không phải sửa lại sau khi
+gặp lỗi.
+
+**Hai lỗi thật phát hiện trong lúc wiring, cả hai đều nằm NGOÀI phạm vi retire
+file này nhưng nằm ngay trên đường phải chạm tới:**
+
+1. **Bug do tự tay wiring sai, bắt được bằng `npm test` trước khi coi lát là
+   xong:** `teaAnalyteKey` là hằng số `const teaAnalyteKey=v=>...` (arrow
+   function gán cho `const`) ở `state.js` — CÙNG LỚP với `REFTESTS`/
+   `TEA_SOURCE_REGISTRY`/`WG_RULES`/`QC_DECIMALS_DEFAULT` (const global lexical,
+   không phải property trên `globalThis`) nhưng dễ nhầm hơn vì cú pháp arrow
+   function trông giống hàm thường. Wiring ban đầu viết
+   `(globalThis as any).teaAnalyteKey(value)` (sai) khiến
+   `configAssayFindRef('Potassium')` ném `TypeError` ngay khi
+   `target-matrix.test.js` chạy — sửa về tham chiếu trần + thêm ambient. Đã
+   chủ động quét lại toàn bộ ~10 dependency khác đọc qua `(globalThis as
+   any).X` để xác nhận KHÔNG còn chỗ nào tái phạm (checked từng definition
+   trong `state.js`/`qc-domain.js`, chỉ đúng 1 chỗ là `const`).
+2. **Bug production thật, phát hiện tình cờ khi soi lân cận `QC_DECIMALS_DEFAULT`
+   (cùng đang chuẩn bị wiring `defaultAssayLevels`/`configAssayTeaRefs`):**
+   `createTargetNumberText({...defaultDecimals:(globalThis as any).QC_DECIMALS_DEFAULT})`
+   — cùng lỗi "const lexical đọc qua globalThis" như TEA_SOURCE_REGISTRY ở Route
+   7, nhưng hậu quả ÂM THẦM hơn nhiều vì không ném lỗi: khi gọi
+   `targetNumberText(value, null)` (không kèm xét nghiệm — nhánh mặc định của
+   tham số `test=null`), `Number(3.7).toFixed(undefined)` làm tròn về SỐ
+   NGUYÊN thay vì báo lỗi (`"3.7"` → `"4"`), vì `toFixed(undefined)` hành xử
+   như `toFixed(0)`. Xác nhận bằng thực nghiệm trực tiếp trên `vm` (gọi đúng
+   nhánh `test=null` — gọi với `test` truthy trước đó không lộ ra vì đi nhánh
+   khác trong `targetNumberText`). Sửa bằng tham chiếu trần kèm fallback bằng
+   đúng giá trị mặc định của state.js (`2`) cho sandbox chưa nạp nó — không
+   bắt buộc nhánh này phải luôn được sandbox cấp `state.js`.
+
+**Danh sách export:** map toàn bộ 58 hàm định nghĩa trong file ra caller thật
+trên `assets/`, `src/`, và `tests/` (executable, không tính chuỗi trong
+comment hay bài test trùng tên đang kiểm một module TS khác không liên quan —
+15 file `*-html.test.js` khớp tên nhưng import từ nguồn hoàn toàn khác, xác
+nhận qua đọc `const source=...` của từng file trước khi loại). Kết quả:
+`lotPointsToRename` không còn caller thật nào kể cả nội bộ (chỉ tự định nghĩa
+rồi không ai gọi) — xóa hẳn, 57 hàm còn lại port đầy đủ. `global.d.ts` thêm 2
+ambient (`parseVN`, `setManageTab` — hai tên duy nhất còn được `action-form.js`/
+`users-auth.js`/`sigma.js`/`entry-routes.js` gọi trần bằng mã JS thật).
+
+Gate: `build:pilot`/`typecheck`/`test` 613/613 (gồm cả 3 bài test hồi quy bảo
+vệ ISO 15189 nêu trên) + `a11y-audit` (0 vi phạm mọi trang + 18/18 modal,
+ratchet PASS) + `ui-check` (29/29, gồm nhiều kịch bản trực tiếp qua controller
+mới: thêm/sửa máy, thêm xét nghiệm, áp dụng dải PXN) + `nce-check` (91/91).
+Với lát này, **toàn bộ trang "Cấu hình chung" đã sang TypeScript hoàn toàn**
+(cả `manage-routes.js` lẫn `manage-tests-actions.js`). Nhóm "Route/presentation"
+còn 4 file: `entry-routes.js`, `actions-routes.js`, `action-form.js`, `sigma.js`.
+
+#### Lát route 10 — `entry-routes.js` (2026-08-19)
+
+Retire `assets/modules/entry-routes.js` (320 dòng) sang
+`src/presentation/entry/entry-page-controller.ts`
+(`createEntryPageController(deps)`) — trang "Nhập QC" (Entry), nơi ghi/hủy
+điểm QC thật, thao tác dữ liệu nhạy cảm nhất ứng dụng. Toàn bộ 51 hàm dựng
+HTML/thuật toán thuần (`entryTreeHeaderHtml`, `entryWorksheetHtml`,
+`entrySheetCellHtml`, v.v.) đã là TypeScript từ các đợt UI-thuần trước, gom
+vào một dep `pres: AnyRec` (khớp mẫu `manage-page-controller.ts`); 4 service/
+command đã có sẵn (`EntryService`, `EntryRecordWorkflowCommand`,
+`EntryVoidWorkflowCommand`, `EntryDateNoteWorkflowCommand`) nối thẳng qua deps
+đặt tên. `document`/`window`/`localStorage` là getter LAZY (không capture một
+lần) — quyết định lấy trực tiếp từ việc đọc trước `tests/partial-render-
+helpers.test.js`: một test case gán lại toàn bộ biến `document={...}` giữa
+chừng để mô phỏng điều hướng bàn phím trong cây xét nghiệm.
+
+**`jsq()` (thoát chuỗi cho literal JS trong `onclick="..."`, khác `esc()`/
+`escAttr()` vốn thoát HTML) là hàm DUY NHẤT của file này có caller thật ở
+NHIỀU file classic khác** (`action-form.js`, `actions-routes.js`, `sigma.js`,
+cộng hàng chục chỗ gọi `(root as any).jsq(...)` ngay trong
+`modular-pilot.global.ts`) — 37 hàm còn lại chỉ có caller nội bộ hoặc từ chính
+HTML do trang tự sinh ra (onclick trỏ lại chính nó). Vì `jsq` là tiện ích
+thuần không phụ thuộc gì, tách riêng thành
+`src/presentation/shared/js-string-literal.ts` (không đặt trong
+`entry-page-controller.ts`) rồi gán `root.jsq=jsq` trong bridge — độc lập với
+vòng đời trang Entry, giữ đúng tinh thần "một hàm dùng chung nhiều nơi có nhà
+riêng, không kẹt trong route sở hữu nó lúc còn classic". Bẫy tự gây trong lúc
+viết `jsq`: gõ trực tiếp escape sequence cho ký tự phân-dòng Unicode (line
+separator/paragraph separator) trong regex literal bị pipeline ghi file biến
+thành KÝ TỰ THẬT thay vì chuỗi escape hai-ký-tự — hai ký tự đó là
+LineTerminator theo đặc tả ECMAScript nên nằm trần trong một regex literal là
+lỗi cú pháp "unterminated regex". Sửa bằng `String.fromCharCode(0x2028)`/
+`String.fromCharCode(0x2029)` rồi `.split(...).join(...)` thay vì `.replace()`
+với ký tự đó viết trần trong regex, né hoàn toàn việc gõ ký tự thật vào
+source; xác nhận hành vi khớp 100% bản classic bằng cách `eval` cả hai và so
+sánh trên 8 ca kể cả có hai ký tự phân-dòng đó thật trong input.
+
+**3 lỗi type thật bắt bởi `tsc -p tsconfig.modules.json` (không phải bởi
+`build:pilot` hay checkJs)** — deps của `entry-page-controller.ts` khai
+`stateName`/`rangeActions`/`qcPointWarnings` nhận tham số `unknown` (đúng với
+chữ ký hàm generic của controller), nhưng các hàm TypeScript đã bridge sẵn ở
+`modular-pilot.global.ts` (`root.stateName`, `root.rangeActions`,
+`root.qcPointWarnings`) khai tham số cụ thể hơn (`string`/`number`/`boolean`)
+— sửa bằng ép kiểu tại điểm nối (`value as string` v.v.), không nới lỏng chữ
+ký của controller hay của hàm đã bridge.
+
+Danh sách export: map toàn bộ 38 hàm định nghĩa trong file (trừ `jsq`) ra
+caller thật; không hàm nào có caller bên ngoài `entry-routes.js` nhưng TẤT CẢ
+đều được publish làm `root.X` vì HTML do `pageEntry()` tự sinh ra tham chiếu
+chúng qua `onclick="entryPick(...)"` v.v. — một lời gọi runtime từ chuỗi HTML,
+không phải một lời gọi ở source code khác, nên grep không thấy nhưng vẫn phải
+bridge. Cập nhật `tests/entry-service.test.js` (route source giờ đọc
+`entry-page-controller.ts`, 3 hàm `treeToggle`/`entryPick`/`toggleEntryTree`
+đổi từ regex một dòng sang capture khối `[\s\S]*?` vì cú pháp TypeScript nhiều
+dòng), `tests/entry-render-bridge.test.js`/`entry-service-bridge.test.js`
+(đổi target từ file chưa tồn tại thành file thật), `tests/lis-client-
+service.test.js`/`tests/partial-render-helpers.test.js` (bỏ
+`modules/entry-routes.js` khỏi `loadSandbox()`; dòng cuối của
+`partial-render-helpers.test.js` đổi từ `String(pageEntry).includes(...)`
+— vốn chỉ hoạt động khi `pageEntry` còn là hàm classic giữ nguyên tên gọi khi
+stringify — sang đọc thẳng mã nguồn TypeScript, vì Vite biên dịch/rút gọn
+khiến `String(pageEntry)` không còn giữ lời gọi `entryLotLabelsTs`),
+`tests/ui-accessibility.test.js`/`tests/ui-route-structure.test.js` (đổi
+đường dẫn đọc + 2 pattern từ `function pageEntry(`/`function entryTreeKey(`
+sang cú pháp `const X = (...) => {`, bỏ assertion thứ tự nạp script không còn
+áp dụng khi file không còn thẻ `<script>` riêng — cùng cách đã xử lý ở Route
+7). Tiện thể sửa 4 chỗ tài liệu hoá lạc hậu phát hiện được trong lúc đọc
+CLAUDE.md (chưa cập nhật từ các lát Route 7–9 trước): danh sách "chưa port"
+vẫn liệt kê `manage-routes.js`/`manage-tests-actions.js`/`entry-routes.js` dù
+cả ba đã retire, và mục mô tả `sigma-tea.js` vẫn viết như thể còn là file
+classic có `<script>` riêng.
+
+Gate: `build:pilot`/`typecheck`/`test` 613/613 + `ui-check` (29/29, gồm kịch
+bản nhập/hủy điểm QC trực tiếp qua controller mới) + `nce-check` (91/91) +
+`a11y-audit` (0 vi phạm mọi trang kể cả `entry`, 18/18 modal, ratchet PASS).
+Nhóm "Route/presentation" còn 3 file: `actions-routes.js`, `action-form.js`,
+`sigma.js`.
+
+#### Lát route 11 — `actions-routes.js` + `action-form.js` (2026-08-19)
+
+Retire cả hai file cùng lúc (226 + 464 dòng — **lát lớn nhất tính tới nay**,
+lớn hơn cả Route 9) sang `src/presentation/actions/actions-page-controller.ts`
+(vòng đời hồ sơ NCE: duyệt/trả lại/hủy/escalate/mở lại, danh sách sự cố, phiếu
+chi tiết) và `src/presentation/actions/action-form-controller.ts` (form 8 mục,
+hằng số lựa chọn, chip gợi ý, bản nháp sống qua `rerender()`). Đây là cặp file
+duy nhất còn lại phụ thuộc **HAI CHIỀU thật sự** (form gọi ngược
+`actionEvidenceTimelineHtml`/`actionRerunEvidenceHtml`/`actionLevelShort` của
+trang; trang gọi vào `actionFormHtml` của form) — CLAUDE.md đã ghi rõ đây là
+ranh giới trách nhiệm, không phải đồ thị phụ thuộc không chu trình.
+
+**Giải quyết vòng phụ thuộc bằng dựng hai pha trong `modular-pilot.global.ts`:**
+khai `let actionsPageControllerRef` trước, dựng `action-form-controller.ts`
+với 3 dep gọi qua biến tham chiếu đó (`(a,rr)=>actionsPageControllerRef.actionEvidenceTimelineHtml(a,rr)`
+v.v. — chưa cần actions-page tồn tại lúc này), rồi dựng
+`actions-page-controller.ts` với `formHtml`/`captureFormDraft` trỏ THẲNG vào
+action-form (đã tồn tại), cuối cùng gán `actionsPageControllerRef =
+actionsPageController`. Không cần import vòng giữa hai file TypeScript — biến
+tham chiếu nằm ở lớp bridge, đúng vai trò "cơ chế chuyển tiếp" của nó.
+
+**Bẫy eager-construction tái diễn, lần này nặng hơn Route 7/8 vì phạm vi rộng
+hơn nhiều:** `action-form-controller.ts` tính các hằng số lựa chọn (`ACT_SOURCE_OPTS`
+v.v.) từ `ACTION_LABELS` ngay ở thân factory (không phải trong một hàm gọi
+sau) — hợp lý vì bản classic cũng tính một lần ở top-level lúc script nạp.
+Nhưng bundle giờ được nạp bởi HẦU HẾT sandbox test, kể cả những cái không hề
+đụng tới trang Actions và không nạp `action-workflow-service.js` (nơi định
+nghĩa `ACTION_LABELS`) — 19 file test bỗng dưng đỏ với
+`Cannot read properties of undefined (reading 'source')` ngay lúc dựng
+bundle. Sửa bằng đúng mẫu đã dùng ở Route 9 (`QC_DECIMALS_DEFAULT`): wiring
+`ACTION_LABELS: () => typeof (root as any).ACTION_LABELS !== 'undefined' ?
+(root as any).ACTION_LABELS : { check: {}, containment: {}, ... }` — trả về
+object rỗng đúng hình dạng thay vì `undefined`, để sandbox không cần trang
+Actions vẫn nạp được bundle an toàn.
+
+**`jsq` không phải hàm duy nhất có caller ở nhiều file khác — `actionLevelShort`
+cũng vậy:** `data-io.js`/`reports.js` (còn classic) gọi trần
+`actionLevelShort(t,a.level,a.lot)` để hiển thị "M{mức} · Lô {số lô}" trong
+XLSX/bản in — `npm run typecheck` bắt ngay (`Cannot find name 'actionLevelShort'`)
+sau khi xóa file classic; thêm 1 ambient vào `global.d.ts`.
+
+**Một bẫy do quy trình rà tài liệu, không phải code:** lệnh `grep -rl` ban đầu
+dùng để liệt kê 13 file test phụ thuộc bỏ sót 2 file
+(`action-form-panel-html.test.js`, `action-form-steps-html.test.js`) — cả hai
+đọc `assets/modules/action-form.js` bằng `fs.readFileSync` để so khớp regex,
+nhưng không hiện trong kết quả grep lần đầu (nguyên nhân không xác định — có
+thể do cách shell truyền pattern OR); chỉ lộ ra sau khi xóa file classic và
+chạy lại `npm test` thấy `ENOENT`. Bài học: sau khi xóa một file, chạy lại
+TOÀN BỘ `npm test` là bước bắt buộc, không thể thay bằng tự tin vào kết quả
+grep ban đầu — đúng tinh thần đã ghi ở Lát 2 của nhóm UI thuần.
+
+Map 34 hàm của `actions-routes.js` + 55 hàm của `action-form.js` (trừ hằng số
+thuần) ra caller thật; không hàm nào chết hẳn nhưng phần lớn chỉ có caller từ
+chính HTML do trang tự sinh ra (`onclick="cancelAction(...)"` v.v.) nên vẫn
+phải bridge toàn bộ, giống Route 10. Tiện thể sửa luôn một dead-code nhỏ phát
+hiện khi đọc `actionReviewButtons()`: bản classic có HAI dòng `return` giống
+hệt nhau liên tiếp (dòng thứ hai không bao giờ chạy tới) — chỉ giữ một.
+
+Cập nhật 9 file test bridge (`action-bias-bridge`, `action-checklist-bridge`,
+`action-detail-bridge`, `action-escalation-bridge`, `action-presentation-bridge`,
+`action-record-review-bridge`, `action-violation-bridge`, `action-form-panel-html`,
+`action-form-steps-html` — đổi `globalThis.X`→`deps.pres.X`/`deps.X`), 3 file
+scan chuỗi khác (`admin-render-bridge` thêm tham số `consumedAs`,
+`typescript-module-pilot`, `ui-accessibility` — chỉ đổi đường dẫn), 1 file
+sandbox (`action-form.test.js` — bỏ `modules/action-form.js` khỏi
+`loadSandbox()`), và ~40 assertion trong `ui-route-structure.test.js` (đổi
+`function X(`→`const X = `/`X=Y?A:B`→`X = Y ? A : B` theo đúng dấu cách chuẩn
+TypeScript, bỏ assertion thứ tự nạp script không còn áp dụng).
+
+Gate: `build:pilot`/`typecheck`/`test` 613/613 + `ui-check` (29/29) +
+`nce-check` (91/91, toàn bộ vòng đời NCE trên Chromium thật — bài kiểm chứng
+quan trọng nhất cho lát này) + `a11y-audit` (0 vi phạm mọi trang kể cả
+`actions` + modal `actions:nce-guide`, 18/18 modal, ratchet PASS). Nhóm
+"Route/presentation" còn 1 file: `sigma.js`.
+
+#### Lát route 12 — `sigma.js` (2026-08-19)
+
+Retire `assets/modules/sigma.js` (415 dòng, trang Six Sigma) sang
+`src/presentation/sigma/sigma-page-controller.ts`
+(`createSigmaPageController(deps)`) — lát cuối cùng của nhóm "Route/
+presentation", khép lại toàn bộ nhóm A. Bề mặt dependency lớn (~35 hàm classic/
+đã-bridge + 14 service Sigma + lớp giải TEa 11 hàm + 26 hàm presentation) nhưng
+áp dụng đúng các quy tắc đã đúc kết từ 11 lát trước nên không phát sinh cách
+làm mới, chỉ có ba phát hiện đáng chú ý:
+
+1. **Dead code xác nhận qua đối chiếu caller thật, không suy đoán:** `sgRun(s)`
+   (một wrapper một dòng gọi `SigmaPresentation.sigmaRunPlan(s)`) không có
+   caller nào — kể cả nội bộ lẫn bên ngoài — trong khi `sgZone(s)` (wrapper
+   song song, gọi `SigmaPresentation.sigmaZone(s)`) lại có caller thật ngay
+   trong `modular-pilot.global.ts` (`sigmaChartRenderer`/`sigmaMdcRenderer`,
+   dùng để tô màu canvas xuất Excel/PDF). Xác nhận bằng `grep` toàn repo trước
+   khi quyết định, không suy đoán từ tên hàm giống nhau — dropped `sgRun`,
+   giữ `sgZone`.
+2. **Bẫy eager-construction dạng mới: không phải lỗi ở CODE của lát này, mà ở
+   một GUARD Có Từ Trước bị vô hiệu hoá bởi chính việc port.**
+   `sigmaReportRowsService` (đã là TypeScript, dùng bởi `data-io.js`) có
+   wiring `visibleLevels:(test)=>typeof globalThis.sgVisibleLevels==='function'
+   ?globalThis.sgVisibleLevels(test):test.levels.map(l=>l.level)` — một guard
+   viết ra CHO ĐÚNG giai đoạn chuyển tiếp, khi `sigma.js` (và do đó
+   `sgVisibleLevels`) có thể chưa được nạp. `tests/sigma-export-selection.test.js`
+   khai thác đúng nhánh fallback này (`loadSandbox(['core.js',
+   'generated/modular-pilot.js','modules/data-io.js'])` — không nạp state.js
+   lẫn sigma.js) để test `sigmaReportRows()` cô lập khỏi toàn bộ trang Sigma.
+   Sau khi `sigma.js` retire vào bundle, `sgVisibleLevels` LUÔN LUÔN tồn tại
+   (được gán vô điều kiện lúc bundle nạp) nên guard luôn đi nhánh thật, gọi
+   vào `deps.getState()` → tham chiếu trần `state` → `ReferenceError` vì
+   sandbox đó không nạp `state.js`. Khác các bẫy "controller tự làm treo mọi
+   sandbox" ở Route 9/11 (sửa trong code): bẫy này chỉ lộ ra ở ĐÚNG một test
+   cụ thể dựa vào nhánh fallback đó, sửa bằng cách bổ sung stub
+   `sgVisibleLevels` vào chính test — không đụng gì tới controller hay
+   wiring, vì bản thân guard/fallback trong `data-io.js` vẫn đúng vai trò của
+   nó (elsewhere trong test suite, các sandbox khác đều nạp đủ `state.js`).
+3. **`sgCohortCtx` là biến đóng vòng đời modal duy nhất KHÔNG nằm sẵn trong
+   `SigmaUIState`** (khác `sgTest`/`sgBiasCtx`/`sgMuCtx`/`sgAddTestQ`/
+   `sgSelectedPeriods` đã có từ trước) nhưng có bài test hồi quy
+   (`tests/sigma-comp.test.js`) gán/đọc nó như một global trần
+   (`sgCohortCtx={test:true};sgCohortClose();assert.equal(run(ctx,'sgCohortCtx'),null)`)
+   — thêm trường này vào `createSigmaUiState()` (`src/presentation/state/
+   ui-state.ts`) trước khi viết controller, theo đúng cơ chế accessor global
+   đã dùng cho `sgBiasCtx`/`sgMuCtx`.
+
+20 file test phụ thuộc (nhiều hơn cả Route 11's 22, vì rải trên nhiều bridge
+test nhỏ): 12 bridge test một-service (`sigma-bias-service-bridge` …
+`sigma-tracked-test-bridge`, đổi `globalThis.X`→`deps.pres.X`/`function X(…){`→
+`const X = (…) =>`), `sigma-comp.test.js` (598 dòng, phần lớn hành vi test qua
+service TypeScript không đổi gì — chỉ ~10 assertion so khớp cú pháp nguồn cần
+cập nhật dấu cách chuẩn TypeScript), `sigma-print.test.js`/`uncertainty.test.js`
+(so khớp cú pháp + `loadSandbox()` bỏ `modules/sigma.js`),
+`sigma-export-selection.test.js` (bẫy #2 ở trên), `ui-accessibility.test.js`/
+`ui-route-structure.test.js` (đổi đường dẫn + bỏ assertion thứ tự nạp script
+`sigma.js?` không còn thẻ `<script>` riêng — cùng cách đã xử lý ở Route 7/10/
+11). `global.d.ts` thêm 7 ambient (`sgData`/`sgVisibleLevels`/`sgRows`/
+`sgFrequencyHTML`/`sgTrendSVG`/`sgMDCSVG`/`sgReconcileAllTeaSnapshots` — vẫn
+còn caller trần ở `data-io.js`/`reports.js`/`state.js`).
+
+Gate: `build:pilot`/`typecheck`/`test` 613/613 + `ui-check` (29/29, gồm 2 kịch
+bản render canvas Sigma/MDC qua Chromium thật) + `nce-check` (91/91) +
+`a11y-audit` (0 vi phạm mọi trang kể cả `sigma` + 3 modal Sigma, 18/18 modal,
+ratchet PASS). **Toàn bộ nhóm A (Route/presentation) của Pha G đã hoàn tất.**
+Chuyển sang nhóm B (canvas/adapter: `draw.js`, `reports.js`, `data-io.js`) —
+cần gate `visual-check`/`print-check` riêng.
+
 ### Pha H — bỏ global bridge và nhiều script tags
 
 Chỉ bắt đầu khi Pha G hoàn thành.
@@ -893,3 +1552,14 @@ npm.cmd test
 | 2026-08-18 | Lát route 2 của Pha G: chuyển `report-routes.js` (92 dòng) sang `src/presentation/report/report-page-controller.ts`. Nặng hơn settings vì có state trang (reportQ/reportTest/reportRangeStart/reportRangeEnd/reportLockYm) + modal mở khóa. Quyết định: state trang thành CLOSURE `let` trong factory (sống qua rerender vì factory chạy một lần), KHÔNG đưa vào UI-state bag — vì production chỉ ghi qua handler (reportSetLockPart/reportSearchSet), không nơi nào gán trực tiếp như global (khác `page`/`dashTestQ` vốn được nhiều file classic ghi trực tiếp nên phải là accessor global). Xóa kèm dead const REPORT_ACTION_ICON_PATHS. `ui-check` bắt lỗi thật node test bỏ sót: test khóa kỳ gán thẳng `reportLockYm='2026-06'` (shortcut dựa vào global classic cũ) nay vô hại vì là closure — sửa test đi qua `reportSetLockPart` (đường picker thật). Minh họa: state trang chỉ đổi qua handler, `ui-check` là thứ duy nhất phát hiện chỗ lách quy tắc. `build:pilot`/`typecheck`/`test` 613/613 + `a11y-audit` (report + 18/18 modal, 0 vi phạm) + `ui-check` (29/29). |
 | 2026-08-18 | Lát route 3 của Pha G: chuyển `westgard-routes.js` (126 dòng) sang `src/presentation/westgard/westgard-page-controller.ts` — nặng hơn settings/report vì `pageWestgard`/`pageWestgardArchived` DỰNG HTML inline (không chỉ delegation) và có nhánh archived-lot-group + CUSUM. Port trung thành 1:1 (chuyển HTML string thành template TS, `globalThis.X`→`deps.X`, state bare→`ui().X`). Khác quyết định state của report: UI state Westgard (selTest/wgViewMode/wgChartMode/wgPrevOpen/wgExpandedRows/wgArchived*) GIỮ trong AnalysisUIState bag (không dùng closure) vì các biến này ĐƯỢC GHI TRỰC TIẾP từ onclick handler (`selTest=this.value`, `wgViewMode=...`) — phải là accessor global. Truyền cả bag qua `ui:()=>root.AnalysisUIState` để đọc/ghi. Contravariance callback param (level/lotNo) phải nới thành AnyRec trong dep type. `global.d.ts` thêm `wgMultiViews` (data-io.js gọi trần). 7 test trỏ sang controller (`westgard-render-bridge` đổi `globalThis.X`→`deps.X`; `westgard-print`/`westgard-xlsx` đổi pattern; `ui-route-structure` đổi `function pageWestgard`→`const pageWestgard =` + bỏ load-order westgard-routes.js). Gate: `build:pilot`/`typecheck`/`test` 613/613 + `a11y-audit` (westgard render 0 vi phạm) + `ui-check` (29/29). |
 | 2026-08-18 | Lát route 4+5 của Pha G: chuyển `westgard-routes.js` (đã ghi ở trên) và `reagent.js` (166 dòng) sang controller TS. Reagent: state trang (rcId/rcModalQ/rcQuickType/...) giữ trong ReagentUIState bag (ghi trực tiếp từ handler); mọi stat/render đi qua deps (ReagentComparisonService/WorkflowCommand/calculator + reagentXxx builders); palette RCC/RCPAD/RC_MIN_PAIRS là const controller. `a11y-audit` lại bắt lỗi thật node test bỏ sót (giống wgMemo): `REFTESTS` là `const` top-level của state.js (lexical, KHÔNG phải global property) nên `(root as any).REFTESTS` = undefined → modal "Tạo so sánh" ném `Cannot read 'forEach'`; sửa thành tham chiếu trần `REFTESTS` (đã có `declare const REFTESTS` ở compat). Củng cố quy tắc: helper/const lấy từ file classic phải phân biệt function-global (qua root.X) với let/const-lexical (tham chiếu trần) — và CHẠY a11y/ui-check để bắt, vì typecheck+node test không thấy. reagent-label-bridge.test.js (40+ assertion pin cú pháp classic) viết gọn lại thành kiểm `deps.pres.*` + giữ nguyên hợp đồng bridge; reagent-stats.test.js bỏ nạp classic, lấy rcCalc/rcReportSummaryTable từ bundle, RCC.muted hardcode '#667b89'. Gate: build/typecheck/test 613/613 + a11y (reagent + 2 modal 0 vi phạm) + ui-check (29/29). |
+| 2026-08-19 | Lát route 5 của Pha G: chuyển `lis-queue-ui.js` (36 dòng) sang `src/presentation/lis/lis-queue-controller.ts` — lát nhẹ nhất nhóm route vì file classic đã gần thuần bridge từ Pha F (HTML ở `lis-queue-presentation.ts`, service đồng bộ ở `LISClientService`/`LisGatewayCommand`/`lisSettingsService`); controller chỉ còn phần điều phối (đọc form, mở modal hàng chờ, hai onclick handler Nhận/Bỏ có `confirmDialog`). Không có state trang riêng. Áp dụng đầy đủ quy tắc đã đúc kết từ 4 lát route trước (lazy delegation mọi dep, `document` tiêm qua deps, phân biệt function-global/let-const-lexical) nên không phát sinh bẫy runtime mới nào — lát trôi mượt như Lát route 1. `tests/lis-queue-bridge.test.js` viết lại hoàn toàn để đọc controller TS thay vì file classic (đã xóa) + thêm assertion xác nhận không được tái tạo bản classic; `tests/lis-client-service.test.js` bỏ `'modules/lis-queue-ui.js'` khỏi `loadSandbox()`, bài hồi quy XSS (`lisOnclick` bọc `escAttr()`) vẫn xanh nguyên vẹn từ bundle. `tests/typescript-module-pilot.test.js` đổi assertion `match`→`doesNotMatch` cho script tag đã retire. Gate: `build:pilot`/`typecheck`/`test` 613/613 + `a11y-audit` (settings + 18/18 modal — kể cả `settings:lis-queue`, 0 vi phạm, ratchet PASS) + `ui-check` (29/29) + `nce-check` (91/91). Nhóm "Route/presentation" còn 8 file: `manage-routes.js`, `manage-tests-actions.js`, `entry-routes.js`, `actions-routes.js`, `action-form.js`, `sigma.js`, `sigma-tea.js`, `audit.js`. |
+| 2026-08-19 | Lát route 6 của Pha G: chuyển `audit.js` (25 dòng, thuần delegator không HTML/DOM) — không tạo file TS mới, inline thẳng vào `modular-pilot.global.ts`. 7/18 hàm xác nhận không còn caller nào (xóa hẳn, không port). Vấn đề khó nhất: ba biến ngưỡng mutable (`ACTIVITY_HARD_CAP`/`ACTIVITY_ROTATE_TO`/`AUDIT_AUTO_VERIFY_MAX`) mà `users-auth.js` (chưa migrate) đọc trần và test gán lại trần — lo ngại ban đầu là phải giữ residual classic file vì bundle là một IIFE (let/const không lọt ra ngoài). Xác minh THỰC NGHIỆM trên Node vm (không chỉ suy luận) rằng gán bằng PROPERTY (`root.X=`, không phải `let X=`) khiến tham chiếu trần từ script khác vẫn đọc/ghi đúng — bản chất phân biệt là "property hay lexical", không phải "bundle hay classic". Kết luận: không cần giữ lại bất kỳ phần nào của audit.js. Mở rộng quy ước ambient declare (đã có cho `rerender`) sang `logAct`/`auditSha256`/`auditRelinkChain` — cần cả ambient (cho tham chiếu trần trong cùng file) và entry non-optional trong QCLabGlobal (cho phép gán `root.X=`). Tái diễn bẫy "bundle ghi đè stub" ở `tests/audit-filter.test.js` (ba tên stub qua tham số `globals` bị bundle ghi đè), sửa bằng cách chuyển sang gán sau `loadSandbox()`. Bẫy MỚI phát hiện qua chạy TRỌN VẸN `npm run typecheck` (không chỉ build bundle xanh): đây là HAI chương trình tsc riêng — `tsc --noEmit` (checkJs quét `assets/**/*.js`, loại trừ `assets/generated/**`, dựa vào `global.d.ts`) và `tsc -p tsconfig.modules.json` (strict, chỉ `src/**/*.ts`) — xóa `audit.js` làm checkJs mất khai báo thật của `ACTIVITY_HARD_CAP`/`ACTIVITY_ROTATE_TO`/`auditChainStatus` mà `users-auth.js` vẫn gọi trần bằng mã JS thật; thêm 3 dòng ambient vào `global.d.ts` (không phải `modular-pilot.global.ts` — hai nơi ambient khác nhau cho hai chương trình khác nhau). Gate: `build:pilot`/`typecheck`/`test` 613/613 (cả hai chương trình tsc) + `a11y-audit` (audit + `audit:archive-log`, 0 vi phạm) + `ui-check` (29/29) + `nce-check` (91/91). Nhóm "Route/presentation" còn 7 file: `manage-routes.js`, `manage-tests-actions.js`, `entry-routes.js`, `actions-routes.js`, `action-form.js`, `sigma.js`, `sigma-tea.js`. |
+| 2026-08-19 | Lát route 7 của Pha G: chuyển `sigma-tea.js` (111 dòng, nghiệp vụ TEa/CLIA thật — CLAUDE.md liệt vào "Confirmed business-logic decisions") sang `src/domain/sigma/sigma-tea-resolution.ts`. Nặng nhất/rủi ro cao nhất tới nay trong nhóm route: 5 file classic khác (`sigma.js`, `manage-routes.js`, `manage-tests-actions.js`, `data-io.js`, `reports.js`) gọi trần ~17/22 biểu tượng, 5 biểu tượng còn lại giữ private (không caller thật). Hai lỗi tự gây ra, cả hai `npm test` bắt được (không cần trình duyệt): (1) `SG_CLIA_FIXED` dựng eager lúc gọi factory làm MỌI sandbox tải bundle phải có `TEA_SOURCE_REGISTRY`/`TEA_ANALYTE_CATALOG`/`REFTESTS` sẵn — sửa bằng guard `typeof X!=='undefined'` bọc toàn bộ khối khởi tạo, kéo theo sửa thứ tự nạp sai (bundle trước state.js) ở 6 chỗ trong 3 test file; (2) bug thật trong port: `sgRef('Glucose')` trả về Albumin vì `deps.searchText` được wiring thành một hàm LUÔN TỒN TẠI (thay vì thật sự `undefined` khi thiếu nguồn), phá vỡ pattern `deps.X?deps.X():fallback` — `undefined===undefined` khớp alias của dòng ĐẦU BẢNG cho mọi tên. Phát hiện phụ ngoài phạm vi: lỗi PRODUCTION THẬT đang sống — `TeaReferenceService`'s `sourceRegistry` đọc `(globalThis as any).TEA_SOURCE_REGISTRY` (const lexical, luôn undefined, giống REFTESTS trước khi sửa) khiến sửa BẤT KỲ giá trị CLIA/Ricos nào trong tab "Bảng TEa tham chiếu" đều crash — không test nào bắt được vì test unit tự stub sourceRegistry, test khác chỉ scan chuỗi; sửa 1 dòng + thêm bài hồi quy thật vào `tests/manage-history-bridge.test.js` (xác nhận discriminating bằng cách tái tạo lỗi gốc). Gate: `build:pilot`/`typecheck`/`test` 613/613 + `a11y-audit` (sigma + `manage:tea-lab-profile`, 0 vi phạm) + `ui-check` (29/29) + `nce-check` (91/91). Nhóm "Route/presentation" còn 6 file: `manage-routes.js`, `manage-tests-actions.js`, `entry-routes.js`, `actions-routes.js`, `action-form.js`, `sigma.js`. |
+| 2026-08-19 | Lát route 8 của Pha G: chuyển `manage-routes.js` (174 dòng dày) sang `src/presentation/manage/manage-page-controller.ts`. Bề mặt dependency lớn nhất tới nay: ~76 hàm dựng HTML gom vào một dep duy nhất `pres: AnyRec` (khớp mẫu reagent-page-controller.ts), wiring `pres: root as any` (không liệt kê tay 76 hàm vì tất cả đã là `root.X` sẵn). UI state dùng chung `ManageUIState` (đã tồn tại từ trước, chia sẻ với `manage-tests-actions.js`). Áp dụng chủ động bài học "construction eager cần dep lazy" từ Route 7 (đổi `teaSourceRegistry` thành `()=>` ngay từ đầu, không cần vòng debug lại). Phát hiện bug TypeScript suy luận sai kiểu: `new Map(rows.map(r=>[key,r]))` với `r: any` khiến TS suy luận value type thành `{}` thay vì `any` — sửa bằng khai tường minh `new Map<string,AnyRec>(...)`. Cập nhật 13 file test đọc `manage-routes.js` bằng `fs.readFileSync` (scan chuỗi/regex) sang trỏ `manage-page-controller.ts` — một file dùng `.includes()` so khớp chuỗi thô theo cú pháp dày classic phải viết lại theo đúng dấu cách chuẩn TypeScript; một file dùng vòng lặp chung nhiều nguồn phải thêm tham số mẫu so khớp riêng cho dòng đã chuyển. `global.d.ts` thêm 3 ambient (`instrumentName`/`lotTransitionToNo`/`targetGroupLots`) sau khi phân biệt lời gọi hàm thật với property-key trùng tên và tham chiếu trong comment. Gate: `build:pilot`/`typecheck`/`test` 613/613 + `a11y-audit` (manage + 6 modal manage + `manage:tea-lab-profile`, 0 vi phạm) + `ui-check` (29/29) + `nce-check` (91/91). Nhóm "Route/presentation" còn 5 file: `manage-tests-actions.js`, `entry-routes.js`, `actions-routes.js`, `action-form.js`, `sigma.js`. |
+| 2026-08-19 | Lát route 9 của Pha G (rủi ro cao nhất tính tới nay): chuyển `manage-tests-actions.js` (371 dòng, mutation instrument/máy/panel/lô/nhóm lô/chuyển tiếp lô/Mean-SD/xét nghiệm kèm re-auth/audit/bảo vệ ISO 15189) sang `src/presentation/manage/manage-tests-actions-controller.ts`. Đọc 3 bài test hồi quy bảo vệ dữ liệu (locked-period-guards/lot-rename/target-matrix) TRƯỚC khi viết code để hiểu đúng hành vi phải giữ. Quyết định thiết kế then chốt, chọn đúng NGAY TỪ ĐẦU nhờ đọc test trước: `document` là getter lazy (`()=>Document`), không capture một lần như manage-page-controller.ts, vì nhiều test đổi `document` giữa các bước để mô phỏng form khác nhau. Hai lỗi thật phát hiện: (1) tự gây ra — `teaAnalyteKey` là `const` arrow function (cùng lớp REFTESTS/TEA_SOURCE_REGISTRY/WG_RULES/QC_DECIMALS_DEFAULT) nhưng dễ nhầm vì trông giống hàm thường, wiring sai qua `globalThis` bị `npm test` bắt ngay; (2) bug production thật phát hiện tình cờ khi soi lân cận — `QC_DECIMALS_DEFAULT` đọc qua `globalThis` trong wiring `targetNumberTextPresentation` làm `targetNumberText(value,null)` (không kèm xét nghiệm) làm tròn về số nguyên thay vì giữ số thập phân (`toFixed(undefined)` hành xử như `toFixed(0)`), sửa bằng tham chiếu trần + fallback đúng giá trị mặc định. Map 58 hàm ra caller thật, xác nhận `lotPointsToRename` chết hẳn (xóa), 57 hàm còn lại port đủ. `global.d.ts` thêm 2 ambient (`parseVN`, `setManageTab`). Gate: `build:pilot`/`typecheck`/`test` 613/613 (gồm 3 test bảo vệ ISO 15189) + `a11y-audit` (0 vi phạm, 18/18 modal) + `ui-check` (29/29) + `nce-check` (91/91). Toàn bộ trang "Cấu hình chung" giờ đã sang TypeScript hoàn toàn. Nhóm "Route/presentation" còn 4 file: `entry-routes.js`, `actions-routes.js`, `action-form.js`, `sigma.js`. |
+| 2026-08-19 | Lát route 10 của Pha G: chuyển `entry-routes.js` (320 dòng) sang `src/presentation/entry/entry-page-controller.ts` — trang "Nhập QC" (Entry), nơi ghi/hủy điểm QC thật. 51 hàm dựng HTML/thuật toán thuần gom vào `pres: AnyRec` (khớp mẫu manage-page-controller.ts); 4 service/command đã có sẵn (EntryService/EntryRecordWorkflowCommand/EntryVoidWorkflowCommand/EntryDateNoteWorkflowCommand) nối thẳng qua deps đặt tên. `document`/`window`/`localStorage` là getter lazy — quyết định lấy từ đọc `tests/partial-render-helpers.test.js` trước khi viết code (một test case gán lại toàn bộ biến `document={...}` giữa chừng). Phát hiện: `jsq()` (thoát chuỗi literal JS trong onclick, khác esc()/escAttr() thoát HTML) là hàm DUY NHẤT của file có caller thật ở nhiều file classic khác (action-form.js/actions-routes.js/sigma.js) — tách riêng thành `src/presentation/shared/js-string-literal.ts` độc lập với vòng đời trang Entry thay vì đặt trong controller, rồi gán `root.jsq=jsq`. Bẫy tự gây khi viết jsq: gõ trực tiếp escape sequence cho ký tự phân-dòng Unicode (line/paragraph separator) trong regex literal bị pipeline ghi file biến thành ký tự thật — hai ký tự đó là LineTerminator theo đặc tả ECMAScript nên nằm trần trong regex literal là lỗi cú pháp; sửa bằng String.fromCharCode() + .split().join() thay vì .replace() với ký tự viết trần, xác nhận khớp 100% bản classic qua eval trực tiếp. 3 lỗi type bắt bởi `tsc -p tsconfig.modules.json` (không phải build:pilot): deps khai tham số unknown nhưng hàm TS đã bridge sẵn (root.stateName/rangeActions/qcPointWarnings) khai kiểu cụ thể hơn — sửa bằng ép kiểu tại điểm nối. Map 38 hàm (trừ jsq) ra caller: không hàm nào có caller ngoài file nhưng TẤT CẢ phải bridge vì HTML tự sinh tham chiếu qua onclick runtime, grep không thấy. Tiện thể sửa 4 chỗ CLAUDE.md lạc hậu từ Route 7-9 (danh sách "chưa port" vẫn liệt kê 3 file đã retire; mô tả sigma-tea.js vẫn viết như còn thẻ script riêng). Gate: `build:pilot`/`typecheck`/`test` 613/613 + `ui-check` (29/29) + `nce-check` (91/91) + `a11y-audit` (0 vi phạm mọi trang kể cả entry, 18/18 modal, ratchet PASS). Nhóm "Route/presentation" còn 3 file: `actions-routes.js`, `action-form.js`, `sigma.js`. |
+| 2026-08-19 | Lát route 11 của Pha G (lớn nhất tính tới nay): chuyển cả `actions-routes.js` (226 dòng) và `action-form.js` (464 dòng) sang `src/presentation/actions/actions-page-controller.ts` và `src/presentation/actions/action-form-controller.ts`. Cặp file DUY NHẤT còn phụ thuộc hai chiều thật sự (form gọi ngược actionEvidenceTimelineHtml/actionRerunEvidenceHtml/actionLevelShort của trang; trang gọi vào actionFormHtml của form) — giải quyết bằng dựng hai pha trong modular-pilot.global.ts: khai `let actionsPageControllerRef` trước, dựng action-form với 3 dep gọi qua biến tham chiếu đó, rồi dựng actions-page với formHtml/captureFormDraft trỏ thẳng vào action-form đã tồn tại, cuối cùng gán actionsPageControllerRef = actionsPageController — không cần import vòng giữa hai file TypeScript. Bẫy eager-construction tái diễn (cùng lớp QC_DECIMALS_DEFAULT ở Route 9) nhưng phạm vi rộng hơn hẳn: action-form-controller.ts tính ACT_SOURCE_OPTS v.v. từ ACTION_LABELS ngay ở thân factory, làm 19 file test không hề đụng trang Actions cũng đỏ ngay lúc dựng bundle vì thiếu action-workflow-service.js — sửa bằng wiring ACTION_LABELS trả về object rỗng đúng hình dạng thay vì undefined khi chưa nạp. actionLevelShort có caller trần ở data-io.js/reports.js (còn classic) — thêm 1 ambient. Bài học quy trình: lệnh liệt kê file test phụ thuộc ban đầu bỏ sót 2 file (action-form-panel-html.test.js, action-form-steps-html.test.js), chỉ lộ ra sau khi xóa file classic và chạy lại toàn bộ npm test thấy ENOENT — xác nhận lại quy tắc "chạy toàn bộ test sau khi xóa, không tin kết quả liệt kê ban đầu". Nhân tiện xóa 1 dead-code nhỏ (actionReviewButtons() có hai dòng return giống hệt liên tiếp). Gate: `build:pilot`/`typecheck`/`test` 613/613 + `ui-check` (29/29) + `nce-check` (91/91, toàn bộ vòng đời NCE trên Chromium thật) + `a11y-audit` (0 vi phạm mọi trang kể cả actions, 18/18 modal, ratchet PASS). Nhóm "Route/presentation" còn 1 file: `sigma.js`. |
+| 2026-08-19 | Lát route 12 của Pha G (khép lại nhóm A): chuyển `sigma.js` (415 dòng, trang Six Sigma) sang `src/presentation/sigma/sigma-page-controller.ts`. Bề mặt dependency lớn (~35 hàm classic/đã-bridge, 14 service Sigma, lớp giải TEa 11 hàm, 26 hàm presentation) nhưng không phát sinh cách làm mới — ba phát hiện: (1) dead code xác nhận qua đối chiếu caller thật: sgRun(s) (wrapper gọi SigmaPresentation.sigmaRunPlan) không còn caller nào, trong khi sgZone(s) song song vẫn có caller thật trong modular-pilot.global.ts (sigmaChartRenderer/sigmaMdcRenderer tô màu canvas xuất Excel/PDF) — dropped sgRun, giữ sgZone; (2) bẫy eager-construction dạng mới: không phải lỗi trong code lát này mà ở một guard CÓ TỪ TRƯỚC (sigmaReportRowsService trong data-io.js: `typeof globalThis.sgVisibleLevels==='function'?real:fallback`, viết cho giai đoạn sigma.js có thể chưa nạp) bị vô hiệu hoá vì sgVisibleLevels giờ LUÔN tồn tại (gán vô điều kiện lúc bundle nạp) — chỉ lộ ra ở đúng tests/sigma-export-selection.test.js (sandbox không nạp state.js), sửa bằng thêm stub sgVisibleLevels vào TEST đó, không đụng controller/wiring; (3) sgCohortCtx là biến ngữ cảnh modal duy nhất chưa nằm sẵn trong SigmaUIState nhưng có test hồi quy đọc/ghi như global trần — thêm vào createSigmaUiState() trước khi viết controller. 20 file test phụ thuộc: 12 bridge test một-service (đổi globalThis.X→deps.pres.X, function X(){→const X = () =>), sigma-comp.test.js (598 dòng, phần lớn hành vi qua service TS không đổi, ~10 assertion cú pháp cập nhật dấu cách), sigma-print/uncertainty (cú pháp + bỏ modules/sigma.js khỏi loadSandbox), sigma-export-selection (bẫy #2), ui-accessibility/ui-route-structure (đường dẫn + bỏ assertion thứ tự nạp script không còn áp dụng). global.d.ts thêm 7 ambient (sgData/sgVisibleLevels/sgRows/sgFrequencyHTML/sgTrendSVG/sgMDCSVG/sgReconcileAllTeaSnapshots — còn caller trần ở data-io.js/reports.js/state.js). Gate: `build:pilot`/`typecheck`/`test` 613/613 + `ui-check` (29/29, gồm 2 kịch bản render canvas Sigma/MDC qua Chromium thật) + `nce-check` (91/91) + `a11y-audit` (0 vi phạm mọi trang kể cả sigma + 3 modal Sigma, 18/18 modal, ratchet PASS). Toàn bộ nhóm A (Route/presentation) của Pha G đã hoàn tất — chuyển sang nhóm B (canvas/adapter: draw.js, reports.js, data-io.js), cần gate visual-check/print-check riêng. |
+| 2026-08-19 | Lát route 13 của Pha G (mở đầu nhóm B — canvas/adapter): chuyển `draw.js` (207 dòng, renderer Levey-Jennings đơn/đa mức + CUSUM) sang `src/presentation/chart/qc-chart-renderer.ts`. Khác hẳn nhóm A: không có HTML/route, chỉ vẽ canvas thuần qua các helper hình học/màu/model điểm ĐÃ port từ trước (Route pilot Levey-Jennings trước Pha G) — mọi `globalThis.X` trong file cũ đổi thành `deps.X` trỏ thẳng vào instance đã cấu hình sẵn ở `modular-pilot.global.ts` (không dựng lại), nên deps interface gồm ~30 hàm/hằng thuần chuyển tiếp, không có logic mới nào cần viết. Phát hiện phụ quan trọng nhất của lát này: bug production ẨN có từ trước — `cusum-display-plan.ts`/`cusum-hover-model.ts` đã tồn tại (factory export đầy đủ, có test pin nguồn) nhưng KHÔNG BAO GIỜ được gọi `createCusumDisplayPlan(...)`/`createCusumHoverModel(...)` và gán `root.X` ở bất kỳ đâu — `assets/generated/modular-pilot.js` build ra hoàn toàn không chứa hai tên này, nghĩa là `drawCUSUM()` (tab "Xu hướng CUSUM" trên trang Westgard) đã throw `TypeError: globalThis.cusumDisplayPlan is not a function` ở production từ trước khi lát này bắt đầu, với bất kỳ xét nghiệm nào bật CUSUM — không gate nào bắt được vì không kịch bản browser nào (ui-check/visual-check/print-check/a11y-audit) mở tab CUSUM. Sửa bằng cách wiring `root.cusumDisplayPlan`/`root.cusumHoverModel` lần đầu tiên (dùng `chartViewModel.sampleIndices` — cùng nguồn downsampling với Levey-Jennings đơn/đa mức — và `vnDate`/`fmt` cho hover) rồi nối `qcChartRenderer` deps vào đó; xác nhận bằng smoke test tay gọi `ctx.drawCUSUM()` trực tiếp trong sandbox Node — chạy sạch, tạo đủ 30 điểm hover. Bẫy eager-construction tái diễn (cùng lớp Route 9/11): dựng `qcChartRenderer` lúc đầu bị đặt trước các gán `root.leveyJenningsChartTitle`/`chartEmptyLabels`/`cusumColors`/`leveyJenningsMultiColors`/`cusumChartTitle`/`leveyJenningsMultiYAxis`/`leveyJenningsMultiGeometry` (đọc GIÁ TRỊ, không phải hàm, nên không có `!` lazy nào cứu được) — chuyển toàn bộ khối dựng renderer xuống ngay sau dòng gán cuối cùng trong nhóm đó thay vì thêm getter. Không có bidirectional dependency, không có UI state mới, không có HTML builder — lát port nhỏ và cơ học nhất tính tới nay so với các route trước. `global.d.ts` thêm 2 ambient (`ljDataURL`/`ljMultiDataURL` — còn caller trần ở `reports.js`/`data-io.js`, cả hai vẫn classic). Sửa 6 file test (`typescript-module-pilot.test.js` — nhiều nhất, đổi toàn bộ assertion `globalThis.X` → `deps.X` và thêm assertion mới cho 2 bridge còn thiếu; `canvas-render-bridge.test.js`/`chart-labels-bridge.test.js`/`chart-render-bridge.test.js` — đường dẫn + cú pháp; `entry-service.test.js` — đường dẫn biến không dùng tới; `render-downsampling.test.js` — bỏ `modules/draw.js` khỏi `loadSandbox`). Gate: `build:pilot`/`typecheck`/`test` 613/613 + `ui-check` (29/29) + `nce-check` (91/91) + `a11y-audit` (0 vi phạm, ratchet PASS) + **`visual-check`** (westgard/report header in đúng `print-color-adjust:exact`) + **`print-check`** (PDF Westgard qua Electron thật, 0 rect nền xám, header teal đúng màu, 567 text op) — hai gate riêng của nhóm B, cả hai đều đi qua đường `ljDataURL`/`ljMultiDataURL` → `drawLJ`/`drawLJMultiZ` vừa port nên xác nhận renderer LJ hoạt động đúng qua Chromium/Electron thật, không chỉ qua sandbox Node. Nhóm B còn 2 file: `reports.js`, `data-io.js`. |
+| 2026-08-19 | Lát route 14 của Pha G (nhóm B tiếp tục): chuyển `reports.js` (204 dòng, toàn bộ bản in `openPrint`/`printReport`/`printWestgard`/`printSigmaPeriod(s)`/`printRangeForm`) sang `src/presentation/report/report-print-controller.ts`, cộng `esc`/`escAttr` tách riêng thành `src/presentation/shared/html-escape.ts` (cùng mẫu `jsq` ở Route 10). Phát hiện quan trọng nhất: `esc`/`escAttr` — hai hàm hàng chục file TypeScript đã port TRƯỚC route này gọi qua `(root as any).esc(...)` — hoá ra được định nghĩa DUY NHẤT trong `reports.js`, và file đó nạp SAU bundle trong `index.html` (dòng 78 so với bundle dòng 74); an toàn trước giờ chỉ vì mọi lời gọi đều nằm trong closure (đọc lúc gọi thật, không phải lúc dựng). Route này biến `esc`/`escAttr` thành global TypeScript thật, gán sớm hơn (ngay trong bundle) — cải thiện thứ tự nạp thay vì làm hỏng nó. Bẫy production THẬT tìm thấy qua `visual-check`/`print-check` (không phải qua 613 test Node): wiring `wgRules:()=>(globalThis as any).WG_RULES` đọc `globalThis.WG_RULES` — nhưng `WG_RULES` trong `state.js` là khai báo `const WG_RULES=QCCore.WG_RULES` ở top-level classic script, mà theo đặc tả ECMAScript, `const`/`let` top-level KHÔNG gắn vào global object (`window`/`globalThis`), chỉ vào "script scope" dùng chung giữa các thẻ `<script>` cổ điển — khác hẳn khai báo `function` hay gán `root.X=...` (cả hai đều tạo thuộc tính thật trên global object). `printWestgard()` do đó throw `Cannot read properties of undefined (reading .filter)` khi build thật chạy trong Chromium/Electron, dù test Node vm sandbox (stub bằng gán trần `WG_RULES=[...]`, vốn tạo thuộc tính global ngầm ở chế độ sloppy) không hề phát hiện ra — sửa bằng tham chiếu `WG_RULES` TRẦN (dùng đúng ambient `declare const WG_RULES` đã có sẵn từ trước, cùng lớp với `QC_DECIMALS_DEFAULT`), khớp mẫu `wgRules: () => WG_RULES` đã tồn tại ở một wiring khác trong cùng file. Đây là lần đầu trong Pha G một gate visual/print bắt được lỗi mà toàn bộ 613 test Node bỏ sót — đúng lý do nhóm B cần thêm hai gate đó. Bẫy eager-construction tái diễn dạng thứ hai: 4 dependency kiểu OBJECT (`reportQcFormat`/`sigmaPrintRowsService`/`sigmaMuPrintRowsService`/`actionReportHtml`) ban đầu được nối bằng cách đọc thẳng giá trị `root.X as any` — bắt "giá trị" tại thời điểm dựng, không phải hàm lazy — khiến `tests/sigma-print.test.js` (stub các service này bằng gán `globalThis.X={...}` SAU khi bundle đã dựng) không hề có hiệu lực; sửa bằng bọc từng phương thức trong closure đọc `root.X` lúc GỌI thay vì lúc dựng. Bẫy tương tự cho chính `openPrint`: 5 hàm in (`printSigmaPeriod(s)`/`printWestgard`/`printReport`/`printRangeForm`) gọi thẳng closure `openPrint` nội bộ cùng module — `tests/westgard-print.test.js`/`sigma-print.test.js` cần override `openPrint`/`infoDialog` bằng gán global để chặn side-effect DOM thật; đổi 5 lời gọi đó sang `deps.openPrint(...)` (một dependency mới, nối lại `root.openPrint` — tự tham chiếu vòng nhưng override được từ ngoài) để khớp lại đúng hành vi gọi-qua-global mà bản classic vốn có. Tách bạch bare-global vs QCCore-prefixed đúng theo bản gốc: `WG_RULES` và `errorType` là bare (qua re-export ở `state.js`/`qc-domain.js`), còn `QCCore.westgardByPoint` giữ nguyên tiền tố — lẫn lộn hai kiểu này chính là nguồn gốc bug ở trên. 13 file test phụ thuộc: 6 bridge test một-hàm (đường dẫn + cú pháp `deps.X`), `sigma-export-bridge`/`spacing-tokens`/`uncertainty` (đường dẫn + regex dấu cách), `report-nce-print`/`sigma-print`/`westgard-print`/`lis-client-service` (nạp lại qua `core.js`+`generated/modular-pilot.js` thay vì `modules/reports.js` trực tiếp, viết lại stub bằng gán global trần thay vì tham số `loadSandbox`). Gate: `build:pilot`/`typecheck`/`test` 613/613 + `ui-check` (29/29) + `nce-check` (91/91) + `a11y-audit` (ratchet PASS) + `visual-check` + `print-check` (cả hai đi qua đúng `printWestgard`/`openPrint` vừa port, xác nhận bằng PDF Electron thật sau khi sửa bug WG_RULES). Nhóm B còn 1 file: `data-io.js`. |
+| 2026-08-19 | Lát route 15 của Pha G (khép lại nhóm B — canvas/adapter): chuyển `data-io.js` (274 dòng, toàn bộ xuất CSV/XLSX: báo cáo nội kiểm, Westgard, Six Sigma) sang `src/presentation/export/data-io-controller.ts`. File byte-precise nặng nhất Pha G tới nay — ZIP/OOXML dựng tay từng byte (`XlsxCore`/`SigmaXlsx`/`ReportXlsx`), nên toàn bộ logic được chép gần như nguyên văn (chỉ đổi `globalThis.X` → `deps.X`), không "dọn" hay viết lại cấu trúc, để giảm rủi ro sai lệch offset/độ dài âm thầm sinh ra file .xlsx hỏng. Dọn một chỗ dead code xác nhận thật: IIFE `ReportXlsx` gốc đọc `globalThis.reportXlsxStyles`/`reportXlsxSheet`/`reportXlsxDrawing` vào ba biến cục bộ nhưng KHÔNG BAO GIỜ dùng lại (chỉ `build` được trả về và dùng) — ba biến đó bị bỏ, còn `root.reportXlsxStyles`/`Sheet`/`Drawing` vẫn là bridge bắt buộc vì `root.reportXlsxBuild` tự đóng gói (closure) gọi lại chúng qua `root.X` nội bộ, không hề chết. Ba bẫy kỹ thuật lặp lại, tất cả đều bị `npm test` (không phải gate trình duyệt) bắt trước khi build: (1) mười hàm "wrapper mỏng" (`reportInRange`/`reportTeaInfo`/.../`sigmaMdcLabelPlacements`) mà bản gốc đọc `globalThis.X` NGAY TRONG THÂN HÀM (lazy, đọc lại mỗi lần gọi) — 6 dependency dạng OBJECT của tôi (`reportExportHelpers`/`qcReportContext`/`qcReportRowsService`/`sigmaExportMetaService`/`westgardXlsxRows`/`qcExportValueFormat`) ban đầu bị nối bằng đọc thẳng giá trị `root.X as any` một lần lúc dựng — nhiều test (`report-layout`/`report-xlsx`/`sigma-xlsx`/`westgard-xlsx`) đều override các service này bằng gán `globalThis.X={...}` SAU khi bundle đã dựng, y hệt bẫy "eager construction" của Route 12/14 — sửa bằng bọc từng phương thức trong closure đọc `root.X` lúc GỌI; (2) cùng bẫy dạng tự-tham-chiếu như `openPrint` ở Route 14 nhưng ở hàm `exportMetaRows`: `exportActionsCSV` gọi thẳng closure nội bộ `exportMetaRows(...)` thay vì qua dependency, khiến `tests/nce-export.test.js`'s gán trần `exportMetaRows=()=>[]` (mô phỏng sandbox tối giản) không có tác dụng — sửa bằng thêm `exportMetaRows` làm dependency tự-tham-chiếu (`(globalThis as any).exportMetaRows(kind)`) và đổi `exportActionsCSV` sang gọi `deps.exportMetaRows(...)`; (3) `WG_RULES` lặp lại đúng bẫy const-vs-globalThis của Route 14 (đã áp dụng đúng ngay từ đầu vì đã biết — tham chiếu `WG_RULES` trần thay vì `(globalThis as any).WG_RULES`), nhưng phát hiện thêm rằng `errorType` cũng phải đọc trần (không qua `QCCore.errorType`) để khớp đúng bản gốc — bản gốc dùng CẢ HAI kiểu (bare cho `WG_RULES`/`errorType`, tiền tố `QCCore.` cho `westgardByPoint`), lẫn lộn hai kiểu này chính là nguồn gốc bug nếu chép sai. `SIGMA_EXPORT_PIXEL_RATIO` (hằng số cục bộ bản gốc) được trả về thêm từ controller và bridge `root.SIGMA_EXPORT_PIXEL_RATIO` vì `tests/sigma-export-selection.test.js` đọc trần hằng số này để chốt tỉ lệ canvas xuất Sigma. 12 file test phụ thuộc: `canvas-render-bridge`/`xlsx-bridge`/`sigma-export-bridge` (đường dẫn + cú pháp `deps.X`, `xlsx-bridge` tách riêng 3 tên chỉ-còn-là-bridge-contract không còn bị `data-io` đọc trực tiếp), `sigma-export-selection`/`nce-export`/`report-layout`/`report-xlsx`/`sigma-xlsx`/`westgard-xlsx`/`report-nce-print` (bỏ `modules/data-io.js` khỏi `loadSandbox`), `typescript-module-pilot.test.js` (28 assertion cú pháp dày → TypeScript có dấu cách). Gate: `build:pilot`/`typecheck`/`test` 613/613 + `ui-check` (29/29, gồm kịch bản xuất Sigma XLSX tải workbook thật qua Chromium) + `nce-check` (91/91) + `a11y-audit` (ratchet PASS) + `visual-check` + `print-check` (PDF Westgard qua Electron thật). **Toàn bộ nhóm B (Canvas/adapter) của Pha G đã hoàn tất** — chuyển sang nhóm C (hạ tầng/bootstrap, 11 file còn lại, kế hoạch yêu cầu làm CUỐI cùng và từng lát độc lập). |

@@ -23,12 +23,10 @@ const { loadSandbox, run } = require('./helpers/sandbox');
 
 const ctx = loadSandbox([
   'core.js',
-  'generated/modular-pilot.js',
   'modules/state.js',
   'modules/qc-domain.js',
-  'modules/sigma-tea.js',
   'modules/action-workflow-service.js',
-  'modules/action-form.js',
+  'generated/modular-pilot.js',
 ]);
 run(ctx, 'function __setState(s){state=s;clearDerived();}');
 

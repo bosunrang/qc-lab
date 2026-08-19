@@ -3,8 +3,8 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 const root=path.join(__dirname,'..');
-const draw=fs.readFileSync(path.join(root,'assets','modules','draw.js'),'utf8');
-const io=fs.readFileSync(path.join(root,'assets','modules','data-io.js'),'utf8');
+const draw=fs.readFileSync(path.join(root,'src','presentation','chart','qc-chart-renderer.ts'),'utf8');
+const io=fs.readFileSync(path.join(root,'src','presentation','export','data-io-controller.ts'),'utf8');
 const afterRender=fs.readFileSync(path.join(root,'src','presentation','render','after-render-controller.ts'),'utf8');
 const bridge=fs.readFileSync(path.join(root,'src','compat','modular-pilot.global.ts'),'utf8');
 // afterRenderCanvasService is consumed through dependency injection (passed as
@@ -13,12 +13,12 @@ const bridge=fs.readFileSync(path.join(root,'src','compat','modular-pilot.global
 // code must not read globals directly (see CLAUDE.md architecture rules), so
 // its "consumed" evidence lives in the bridge wiring, not in the controller source.
 for(const [name,source,consumed] of [
-  ['canvasFont',draw,new RegExp('globalThis\\.canvasFont')],
-  ['chartDataUrl',draw,new RegExp('globalThis\\.chartDataUrl')],
+  ['canvasFont',draw,new RegExp('deps\\.canvasFont')],
+  ['chartDataUrl',draw,new RegExp('deps\\.chartDataUrl')],
   ['afterRenderCanvasService',bridge,/canvas:root\.afterRenderCanvasService/],
-  ['sigmaCanvasFactory',io,new RegExp('globalThis\\.sigmaCanvasFactory')],
-  ['sigmaChartRenderer',io,new RegExp('globalThis\\.sigmaChartRenderer')],
-  ['sigmaMdcRenderer',io,new RegExp('globalThis\\.sigmaMdcRenderer')],
+  ['sigmaCanvasFactory',io,new RegExp('deps\\.sigmaCanvasFactory')],
+  ['sigmaChartRenderer',io,new RegExp('deps\\.sigmaChartRenderer')],
+  ['sigmaMdcRenderer',io,new RegExp('deps\\.sigmaMdcRenderer')],
 ]){
   assert.match(bridge,new RegExp(`^  ${name}:`,'m'),`${name} must be a required canvas bridge contract`);
   assert.match(bridge,new RegExp(`root\\.${name}\\s*=`),`${name} must be assigned by the TypeScript bootstrap`);

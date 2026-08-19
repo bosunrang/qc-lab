@@ -40,7 +40,7 @@ export function createReagentUiState() {
 }
 
 export function createSigmaUiState() {
-  return { sgTest: null, sgRefreshT: null, sgBiasCtx: null, sgMuCtx: null, sgAddTestQ: '', sgSelectedPeriods: {} };
+  return { sgTest: null, sgRefreshT: null, sgBiasCtx: null, sgMuCtx: null, sgCohortCtx: null, sgAddTestQ: '', sgSelectedPeriods: {} };
 }
 
 export function createRouterUiState() {

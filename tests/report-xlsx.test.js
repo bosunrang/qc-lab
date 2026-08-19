@@ -1,6 +1,6 @@
 /**
  * Tests for the general-purpose ZIP/OOXML builder behind "Xuất Excel (.xlsx)"
- * on the report page (ReportXlsx in assets/modules/data-io.js), and the shared
+ * on the report page (ReportXlsx in src/presentation/export/data-io-controller.ts), and the shared
  * low-level core (XlsxCore) it now shares with SigmaXlsx.
  *
  * Like the Sigma writer, there is no library: the ZIP records and worksheet XML
@@ -13,7 +13,7 @@
 const assert = require('node:assert/strict');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
-const ctx = loadSandbox(['core.js','generated/modular-pilot.js','modules/data-io.js']);
+const ctx = loadSandbox(['core.js','generated/modular-pilot.js']);
 run(ctx, 'function __buildReport(doc){return ReportXlsx.build(doc);} function __RXST(){return RXST;}');
 
 function crc32(buf) {

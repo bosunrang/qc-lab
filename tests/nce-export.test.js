@@ -3,7 +3,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 const{loadSandbox,run}=require('./helpers/sandbox');
 const root=path.join(__dirname,'..');
-const dataIo=fs.readFileSync(path.join(root,'assets/modules/data-io.js'),'utf8');
+const dataIo=fs.readFileSync(path.join(root,'src/presentation/export/data-io-controller.ts'),'utf8');
 // Ánh xạ trường CSV NCE đã chuyển sang createActionCsvRow() (TypeScript) từ khi
 // exportActionsCSV() trong data-io.js không còn tự dựng dòng — nhánh JS cũ (gọi
 // biến tham số `a`) là nhánh dự phòng đã xóa sau khi xác nhận không còn caller.
@@ -30,7 +30,7 @@ for(const field of [
 
 for(const text of ['Hiệu lực:','Nguy cơ còn lại:','Hồ sơ đã hủy:'])assert.ok(workflow.includes(text),`bản in/XLSX phải có "${text}" trong tóm tắt NCE`);
 
-const ctx=loadSandbox(['core.js','generated/modular-pilot.js','modules/data-io.js']);
+const ctx=loadSandbox(['core.js','generated/modular-pilot.js']);
 run(ctx,`
 state={lab:{},tests:[],actions:[{nceId:'NCE-XUAT',date:'2026-07-29',riskBasis:'SOP-QC-07',releaseStatus:'released',releaseBy:'Phụ trách khoa',residualSeverity:2,residualOccurrence:1,residualDetectability:1,residualRiskLevel:'low',residualRiskBasis:'Theo dõi sau khắc phục',recordStatus:'cancelled',cancelReason:'Mở nhầm',parentNceId:'NCE-TRUOC',followUpNceId:'NCE-SAU',biasBefore:'8.5',biasAfter:'1.2'}]};
 ACTION_LABELS={source:{},phase:{},risk:{low:'Thấp'},release:{released:'Đã cho phép trở lại'}};

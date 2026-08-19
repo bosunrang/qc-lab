@@ -4,7 +4,7 @@ const path = require('node:path');
 
 const root = path.join(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
-const router = read('assets/modules/entry-routes.js') + read('src/presentation/entry/entry-sheet-navigation.ts') + read('src/presentation/entry/entry-tree-html.ts') + read('src/presentation/entry/entry-worksheet-html.ts') + read('src/presentation/entry/entry-levey-panel-html.ts') + read('src/presentation/entry/entry-page-layout-html.ts') + read('src/presentation/router/router-shell-controller.ts');
+const router = read('src/presentation/entry/entry-page-controller.ts') + read('src/presentation/entry/entry-sheet-navigation.ts') + read('src/presentation/entry/entry-tree-html.ts') + read('src/presentation/entry/entry-worksheet-html.ts') + read('src/presentation/entry/entry-levey-panel-html.ts') + read('src/presentation/entry/entry-page-layout-html.ts') + read('src/presentation/router/router-shell-controller.ts');
 const modals = read('src/presentation/modal/modal-focus-trap.ts') + read('src/presentation/modal/modal-template.ts') + read('src/presentation/modal/modal-controller.ts') + read('src/presentation/modal/dialog-overlay-controller.ts');
 const appCss = read('assets/app.css');
 const auditCss = read('assets/professional-audit.css');
@@ -19,8 +19,8 @@ const reportsCss = read('assets/professional-reports.css');
 const settingsCss = read('assets/professional-settings.css');
 const usersCss = read('assets/professional-users.css');
 const westgardCss = read('assets/professional-westgard.css');
-const actionsRoutes = read('assets/modules/actions-routes.js');
-const actionForm = read('assets/modules/action-form.js');
+const actionsRoutes = read('src/presentation/actions/actions-page-controller.ts');
+const actionForm = read('src/presentation/actions/action-form-controller.ts');
 const actionLogPanelPresentation = read('src/presentation/nce/action-log-panel-html.ts');
 const actionRerunEvidencePresentation = read('src/presentation/nce/action-rerun-evidence-html.ts');
 const reportRoutes = read('src/presentation/report/report-page-controller.ts');
@@ -32,14 +32,14 @@ const settingsBrandPanelPresentation = read('src/presentation/settings/brand-pan
 const settingsAdminToolsPresentation = read('src/presentation/settings/admin-tools-html.ts');
 const settingsFirebaseConnectionPresentation = read('src/presentation/settings/firebase-connection-panel-html.ts');
 const settingsLisGatewayPresentation = read('src/presentation/settings/lis-gateway-panel-html.ts');
-const manageRoutes = read('assets/modules/manage-routes.js');
+const manageRoutes = read('src/presentation/manage/manage-page-controller.ts');
 const teaReferenceLabProfileBodyPresentation = read('src/presentation/manage/tea-reference-lab-profile-body-html.ts');
 const westgardRoutes = read('src/presentation/westgard/westgard-page-controller.ts');
 const westgardCusumPagePresentation = read('src/presentation/westgard/westgard-cusum-page-html.ts');
 const dashboardRoutes = read('src/presentation/dashboard/dashboard-page-controller.ts');
 const dashboardPagePresentation = read('src/presentation/dashboard/dashboard-page-html.ts');
 const dashboardTestPanelPresentation = read('src/presentation/dashboard/dashboard-test-panel-html.ts');
-const sigmaRoutes = read('assets/modules/sigma.js');
+const sigmaRoutes = read('src/presentation/sigma/sigma-page-controller.ts');
 const sigmaPeriodTablePresentation = read('src/presentation/sigma/sigma-period-table-html.ts');
 const sigmaChartsPanelPresentation = read('src/presentation/sigma/sigma-charts-panel-html.ts');
 const reagentRoutes = read('src/presentation/reagent/reagent-page-controller.ts');
@@ -57,7 +57,7 @@ assert.ok(dialogZ>authZ, 'dialog xác nhận phải nằm trên auth/recovery ov
 
 assert.match(router, /role="tree" aria-label="Danh mục nội kiểm"/);
 assert.match(router, /role="treeitem" tabindex="0" aria-expanded=/);
-assert.match(router, /function entryTreeKey\(event\)/);
+assert.match(router, /const entryTreeKey = \(event: AnyRec\) => \{/);
 assert.match(router, /key\s*===\s*'ArrowDown'/);
 assert.match(router, /aria-live="polite"/);
 assert.match(router, /aria-current="\$\{id===page\?'page':'false'\}"/);

@@ -1,12 +1,13 @@
 /**
- * Lớp giải TEa của trang Six Sigma (assets/modules/sigma-tea.js), tách khỏi
- * sigma.js ngày 2026-08-01.
+ * Lớp giải TEa của trang Six Sigma — tách khỏi sigma.js ngày 2026-08-01
+ * (assets/modules/sigma-tea.js lúc đó), retire vào
+ * src/domain/sigma/sigma-tea-resolution.ts ngày 2026-08-19 (Pha G).
  *
  * tests/sigma-comp.test.js đã phủ phần lớn hành vi TEa, nhưng nó nạp CẢ sigma.js
- * — nên nó không chứng minh được điều mà việc tách file hứa: lớp này đứng MỘT
+ * — nên nó không chứng minh được điều mà việc tách lớp hứa: lớp này đứng MỘT
  * MÌNH được, không cần trang Sigma, không cần DOM. Sandbox ở đây cố ý chỉ nạp
- * core.js + state.js + sigma-tea.js; nếu ai kéo một hàm dựng giao diện vào file
- * đó, test này sẽ đổ ngay ở bước nạp.
+ * core.js + state.js (+ bundle TypeScript, tự động chèn sau state.js) — không
+ * nạp sigma.js/action-workflow-service.js/bất kỳ route nào khác.
  *
  * Phần khẳng định tập trung vào những nhánh mà bản đồ độ phủ
  * (`npm run coverage-map`) chỉ ra là chưa ai chạm tới sau khi tách, cộng các
@@ -19,9 +20,12 @@ const path = require('node:path');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
 // fmt/vnDate là hàm định dạng của lớp UI; lớp TEa chỉ gọi chúng lúc xuất chuỗi.
-const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/sigma-tea.js'], {
+// document tối giản: vnDatePickerController.bind() chạy ngay khi bundle nạp
+// (xem bài học Lát 3 của Pha G), không liên quan gì tới lớp TEa của test này.
+const ctx = loadSandbox(['core.js', 'modules/state.js'], {
   fmt: (v, d) => Number(v).toFixed(d),
   vnDate: v => String(v),
+  document: { getElementById: () => null, addEventListener: () => {}, removeEventListener: () => {} },
 });
 
 // --- Chuẩn hóa đơn vị: đây là cái quyết định giới hạn tuyệt đối CLIA có được áp
@@ -131,10 +135,10 @@ assert.equal(ctx.testDisplayName(null), '');
 // ngày phê duyệt không thể sau hiệu lực, nút xóa phải dùng đúng API nhãn của confirmDialog,
 // và xóa hồ sơ mặc định không được để lại một dòng ghi đè rỗng trong state.teaRefs.
 {
-  const manageSource=fs.readFileSync(path.join(__dirname,'..','assets','modules','manage-routes.js'),'utf8');
+  const manageSource=fs.readFileSync(path.join(__dirname,'..','src','presentation','manage','manage-page-controller.ts'),'utf8');
   const teaServiceSource=fs.readFileSync(path.join(__dirname,'..','src','application','manage','tea-reference-service.ts'),'utf8');
-  assert.match(manageSource,/if\(approvedDate>effective\)/,'phải chặn hồ sơ có ngày phê duyệt sau ngày hiệu lực');
-  assert.match(manageSource,/confirmLabel:'Xóa TEa'/,'hộp xác nhận phải hiện đúng nhãn thao tác xóa');
+  assert.match(manageSource,/if \(approvedDate > effective\)/,'phải chặn hồ sơ có ngày phê duyệt sau ngày hiệu lực');
+  assert.match(manageSource,/confirmLabel: 'Xóa TEa'/,'hộp xác nhận phải hiện đúng nhãn thao tác xóa');
   assert.doesNotMatch(manageSource,/confirmText:'Xóa TEa'/,'confirmDialog không hỗ trợ confirmText');
   assert.match(teaServiceSource,/const removedRecord = isDefault && !externalChanged\(record, refKey\);/,'xóa TEa PXN mặc định phải dọn dòng ghi đè không còn dữ liệu riêng');
 }

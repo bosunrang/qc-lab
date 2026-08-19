@@ -29,9 +29,6 @@ const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js', 'modules/users
   state: { activity: [] },
   esc: value => String(value || ''),
   escAttr: value => String(value || ''),
-  auditVerifyChain: () => ({ ok: true, checked: 0, legacy: 0 }),
-  ACTIVITY_HARD_CAP: 120000,
-  ACTIVITY_ROTATE_TO: 100000,
   parseVN: parseDate,
   activityAuditFilter,
   activityAuditPagination,
@@ -40,10 +37,11 @@ const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js', 'modules/users
   activityAuditPageSizes: [25, 50, 100],
   activityAuditRowHtml: input => `<tr><td>${input.sequenceHtml}</td><td>${input.timeHtml}</td><td>${input.userHtml}</td><td>${input.typeHtml}</td><td>${input.targetHtml}</td><td>${input.detailHtml}</td></tr>`,
 });
-// headOnly/btn/emptyState/dateBox/rerender/vnPickerParse giờ cũng được
-// generated/modular-pilot.js gán thật (root.X=...) khi nạp — đặt stub SAU khi
-// loadSandbox() chạy xong để không bị bundle ghi đè (xem bài học Lát 1/2 của
-// Pha G trong docs/TYPESCRIPT-MIGRATION-PLAN.md).
+// headOnly/btn/emptyState/dateBox/rerender/vnPickerParse/auditVerifyChain/
+// ACTIVITY_HARD_CAP/ACTIVITY_ROTATE_TO giờ cũng được generated/modular-pilot.js
+// gán thật (root.X=...) khi nạp — đặt stub SAU khi loadSandbox() chạy xong để
+// không bị bundle ghi đè (xem bài học Lát 1/2 của Pha G trong
+// docs/TYPESCRIPT-MIGRATION-PLAN.md).
 Object.assign(ctx, {
   headOnly: () => '',
   btn: (label, onclick, cls, title, options = {}) => `<button${options.disabled ? ' disabled' : ''}>${label}</button>`,
@@ -51,6 +49,9 @@ Object.assign(ctx, {
   dateBox: (id, value, cls, attrs) => `<span class="datebox ${cls}"><input id="${id}" class="date-text" placeholder="dd/mm/yyyy" ${attrs}><input class="native-date" type="date"></span>`,
   rerender: () => {},
   vnPickerParse: parseDate,
+  auditVerifyChain: () => ({ ok: true, checked: 0, legacy: 0 }),
+  ACTIVITY_HARD_CAP: 120000,
+  ACTIVITY_ROTATE_TO: 100000,
 });
 
 const rows = [

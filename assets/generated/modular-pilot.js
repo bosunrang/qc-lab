@@ -6107,6 +6107,102 @@
 		return Object.freeze({ apply });
 	}
 	//#endregion
+	//#region src/presentation/lis/lis-queue-controller.ts
+	/**
+	* Controller UI cho hàng chờ LIS Gateway — adapter DOM/dialog thuần.
+	* Mọi đồng bộ/nhập dữ liệu nằm trong LISClientService/LisGatewayCommand (application),
+	* mọi HTML nằm trong lis-queue-presentation (presentation). Controller chỉ đọc form,
+	* mở modal/dialog và điều phối.
+	*/
+	function createLisQueueController(deps) {
+		const field = (id) => deps.document.getElementById(id);
+		const lisGatewaySaveSettings = async () => {
+			if (!deps.requireAdmin("Chỉ quản trị mới được cấu hình LIS Gateway.")) return;
+			const enabled = !!field("lisGatewayEnabled").checked;
+			const tokenEl = field("lisGatewayToken");
+			const current = deps.gatewayConfig();
+			const input = {
+				enabled,
+				url: field("lisGatewayUrl").value,
+				token: String(tokenEl && tokenEl.value || ""),
+				savedToken: current.token
+			};
+			const plan = deps.settingsService.prepare(input);
+			const url = plan.ok ? plan.settings.url : deps.normalizeGatewayUrl(input.url);
+			const token = plan.ok ? plan.settings.token : String(input.token).trim() || current.token;
+			if (!plan.ok && plan.error === "invalid-url" || !url) {
+				await deps.infoDialog("Prototype chỉ cho phép http://127.0.0.1:8787 hoặc http://localhost:8787.");
+				return;
+			}
+			if (!plan.ok && plan.error === "missing-token" || enabled && !token) {
+				await deps.infoDialog("Cần dán Bearer token của Gateway. Token được in ra khi chạy npm run lis:gateway.");
+				return;
+			}
+			let outcome;
+			try {
+				outcome = await deps.gatewayCommand.apply(plan.ok ? plan.settings : {
+					enabled,
+					url,
+					token
+				});
+			} catch {
+				await deps.infoDialog("Không lưu được cấu hình LIS Gateway trên máy này.");
+				return;
+			}
+			if (outcome.status === "disabled") {
+				await deps.infoDialog("Đã tắt nhận kết quả QC từ LIS trên máy này.", { type: "success" });
+				return;
+			}
+			const result = outcome.result;
+			if (result.ok) await deps.infoDialog(`Đã kết nối. ${result.pending} kết quả chờ nhận${result.unresolved ? `, ${result.unresolved} chưa khớp cấu hình mapping` : ""}.`, { type: "success" });
+		};
+		const lisQueueValueText = (record) => deps.presentation.valueText(record);
+		const lisOnclick = (functionName, messageId) => deps.presentation.onclick(functionName, messageId);
+		const lisQueueRowHtml = (record) => deps.presentation.rowHtml(record);
+		const lisQueueSectionHtml = (title, records, emptyText) => deps.presentation.sectionHtml(title, records, emptyText);
+		const lisRenderQueueModal = () => {
+			const runtime = deps.gatewayRuntime();
+			deps.openModal(deps.presentation.modalHtml(runtime.pending || [], runtime.unresolved || []));
+		};
+		const lisOpenQueueModal = async () => {
+			if (!deps.gatewayConfig().enabled) {
+				await deps.infoDialog("Hãy bật LIS Gateway và lưu cấu hình trước khi xem hàng chờ.", { type: "warning" });
+				return;
+			}
+			if (!(await deps.gatewayPull({ manual: true })).ok) return;
+			lisRenderQueueModal();
+		};
+		const lisQueueRefresh = async () => {
+			await deps.gatewayPull();
+			lisRenderQueueModal();
+		};
+		const lisQueueImport = async (messageId) => {
+			if ((await deps.importResult(messageId)).ok) lisRenderQueueModal();
+		};
+		const lisQueueReject = async (messageId) => {
+			if (!await deps.confirmDialog({
+				kicker: "Hàng chờ LIS",
+				title: "Bỏ kết quả QC này?",
+				message: "Kết quả sẽ được đánh dấu đã bỏ ở Gateway và biến khỏi hàng chờ. Middleware có thể gửi lại nếu cần.",
+				confirmLabel: "Bỏ",
+				cancelLabel: "Hủy"
+			})) return;
+			if ((await deps.rejectResult(messageId)).ok) lisRenderQueueModal();
+		};
+		return {
+			lisGatewaySaveSettings,
+			lisQueueValueText,
+			lisOnclick,
+			lisQueueRowHtml,
+			lisQueueSectionHtml,
+			lisRenderQueueModal,
+			lisOpenQueueModal,
+			lisQueueRefresh,
+			lisQueueImport,
+			lisQueueReject
+		};
+	}
+	//#endregion
 	//#region src/application/settings/lab-profile-service.ts
 	function createLabProfileService(cleanText, brandProfile) {
 		const updateLab = (current, input) => ({
@@ -8834,6 +8930,495 @@
 		}));
 	}
 	//#endregion
+	//#region src/presentation/chart/cusum-display-plan.ts
+	function createCusumDisplayPlan(sampleIndices) {
+		return (input) => {
+			const preserve = [];
+			input.flags.forEach((flag, index) => {
+				if (flag === "rej") preserve.push(index);
+			});
+			const perSeries = Math.max(80, Math.floor(Math.max(240, input.width / 2) / 3));
+			return [.../* @__PURE__ */ new Set([
+				...sampleIndices({
+					length: input.count,
+					maxPoints: perSeries,
+					valueAt: (index) => input.cPos[index],
+					preserve
+				}),
+				...sampleIndices({
+					length: input.count,
+					maxPoints: perSeries,
+					valueAt: (index) => input.cNeg[index],
+					preserve
+				}),
+				...sampleIndices({
+					length: input.count,
+					maxPoints: perSeries,
+					valueAt: (index) => input.ma[index],
+					preserve
+				})
+			])].sort((a, b) => a - b);
+		};
+	}
+	//#endregion
+	//#region src/presentation/chart/cusum-hover-model.ts
+	function createCusumHoverModel(deps) {
+		return (input) => `<b>${deps.date(input.point.date)}</b><div>CUSUM+: ${deps.number(input.cPos, 2)}</div><div>CUSUM−: ${deps.number(input.cNeg, 2)}</div><div class="muted">${input.rejected ? "Vượt ngưỡng h — nghi ngờ trôi/shift" : "Trong tầm kiểm soát"}</div>`;
+	}
+	//#endregion
+	//#region src/presentation/chart/qc-chart-renderer.ts
+	function createQcChartRenderer(deps) {
+		function drawLJ(canvas, points, mean, sd) {
+			const { ctx, W, H } = deps.hiDpiCanvasSetup(canvas);
+			canvas._ljCssW = W;
+			canvas._ljCssH = H;
+			const n = points.length, { padL, padT, cw, ch, markPad, y, clampY, x } = deps.leveyJenningsGeometry({
+				width: W,
+				height: H,
+				count: n,
+				mean,
+				sd
+			});
+			ctx.clearRect(0, 0, W, H);
+			const ljColors = deps.leveyJenningsColors;
+			ctx.fillStyle = "#fff";
+			ctx.fillRect(0, 0, W, H);
+			ctx.fillStyle = ljColors.okBand;
+			ctx.fillRect(padL, padT, cw, ch);
+			ctx.save();
+			ctx.beginPath();
+			ctx.rect(padL - markPad, padT, cw + markPad * 2, ch);
+			ctx.clip();
+			deps.leveyJenningsBandRects({
+				mean,
+				sd,
+				width: cw,
+				y
+			}).forEach((band) => {
+				ctx.fillStyle = ljColors[band.color];
+				ctx.fillRect(padL, band.top, band.width, band.height);
+			});
+			const test = deps.findTest(canvas.dataset.test), yAxis = deps.leveyJenningsYAxisLabels(test, mean, sd);
+			yAxis.map((row) => row.z);
+			deps.leveyJenningsGridLines(yAxis, mean, sd, y).forEach((line) => {
+				ctx.strokeStyle = line.major ? ljColors.mean : ljColors.grid;
+				ctx.lineWidth = line.major ? 1.8 : 1.15;
+				ctx.setLineDash([]);
+				ctx.beginPath();
+				ctx.moveTo(padL, line.y);
+				ctx.lineTo(padL + cw, line.y);
+				ctx.stroke();
+			});
+			ctx.restore();
+			ctx.font = deps.canvasFont(800, "type-caption", 11.5);
+			ctx.fillStyle = "#17212b";
+			ctx.textAlign = "center";
+			ctx.textBaseline = "bottom";
+			ctx.fillText(deps.leveyJenningsChartTitle.single, padL + cw / 2, padT - 8);
+			ctx.font = deps.canvasFont(800, "type-meta", 12.5);
+			ctx.textBaseline = "middle";
+			yAxis.forEach((row) => {
+				const yy = y(mean + row.z * sd);
+				ctx.fillStyle = "#17212b";
+				ctx.textAlign = "right";
+				ctx.fillText(row.label, padL - 9, yy);
+				ctx.fillStyle = "#17212b";
+				ctx.textAlign = "left";
+				ctx.fillText(row.value, padL + cw + 10, yy);
+			});
+			if (!n) {
+				ctx.fillStyle = "#7b838e";
+				ctx.font = deps.canvasFont(600, "type-subhead", 14);
+				ctx.textAlign = "center";
+				ctx.fillText(deps.chartEmptyLabels.leveyJennings, padL + cw / 2, padT + ch / 2);
+				canvas._ljHover = [];
+				deps.leveyJenningsTooltipController(canvas);
+				return;
+			}
+			const level = parseInt(canvas.dataset.level), lot = canvas.dataset.lot || (test && deps.lvlCfg(test, level) || {}).lot || "?";
+			const { F, zs } = deps.westgard(points, mean, sd, (rule) => deps.westgardRuleScope.within(test, rule));
+			const levelText = level ? `Mức ${level}` : "Mức QC";
+			const pointModels = deps.leveyJenningsPointRenderModel({
+				points,
+				results: F,
+				zs,
+				width: cw,
+				x,
+				y: clampY,
+				test,
+				lot,
+				levelText
+			});
+			canvas._ljHover = [];
+			ctx.save();
+			ctx.beginPath();
+			ctx.rect(padL, padT, cw, ch);
+			ctx.clip();
+			if (points.length > 1) {
+				ctx.strokeStyle = ljColors.line;
+				ctx.lineWidth = 2.2;
+				ctx.lineJoin = "round";
+				ctx.lineCap = "round";
+				ctx.setLineDash([]);
+				ctx.beginPath();
+				pointModels.forEach((model, j) => {
+					if (j) ctx.lineTo(model.x, model.y);
+					else ctx.moveTo(model.x, model.y);
+				});
+				ctx.stroke();
+			}
+			pointModels.forEach((model) => {
+				ctx.fillStyle = model.style.color;
+				ctx.beginPath();
+				ctx.arc(model.x, model.y, model.style.radius, 0, Math.PI * 2);
+				ctx.fill();
+				ctx.strokeStyle = "#fff";
+				ctx.lineWidth = 1.8;
+				ctx.stroke();
+				canvas._ljHover.push({
+					x: model.x,
+					y: model.y,
+					hit: 12,
+					html: model.hover
+				});
+			});
+			ctx.restore();
+			const ticks = deps.leveyJenningsTicks(points);
+			ctx.fillStyle = "#536772";
+			ctx.font = deps.canvasFont(700, "type-caption", 11.5);
+			ctx.textAlign = "center";
+			ctx.textBaseline = "top";
+			ticks.forEach((tick) => ctx.fillText(tick.label, x(tick.index), padT + ch + 10));
+			deps.leveyJenningsTooltipController(canvas);
+		}
+		function ljDataURL(points, mean, sd) {
+			return deps.chartDataUrl({
+				width: 1400,
+				height: 430,
+				render: (canvas) => drawLJ(canvas, points, mean, sd)
+			});
+		}
+		function drawLJMultiZ(canvas, levelViews, test, opts) {
+			const { ctx, W, H } = deps.hiDpiCanvasSetup(canvas);
+			canvas._ljCssW = W;
+			canvas._ljCssH = H;
+			canvas._ljHover = [];
+			const { padL, padT, cw, ch, markPad, y, clampY } = deps.leveyJenningsMultiGeometry({
+				width: W,
+				height: H
+			});
+			const { levels, all, runs, runIndex, xOfRun } = deps.leveyJenningsMultiSeries({
+				views: levelViews,
+				padLeft: padL,
+				width: cw,
+				markPad
+			});
+			const colors = deps.leveyJenningsMultiColors;
+			const ljColors = deps.leveyJenningsColors;
+			ctx.clearRect(0, 0, W, H);
+			ctx.fillStyle = "#fff";
+			ctx.fillRect(0, 0, W, H);
+			ctx.fillStyle = ljColors.okBand;
+			ctx.fillRect(padL, padT, cw, ch);
+			ctx.save();
+			ctx.beginPath();
+			ctx.rect(padL - markPad, padT, cw + markPad * 2, ch);
+			ctx.clip();
+			deps.leveyJenningsBandRects({
+				mean: 0,
+				sd: 1,
+				width: cw,
+				y
+			}).forEach((band) => {
+				ctx.fillStyle = ljColors[band.color];
+				ctx.fillRect(padL, band.top, band.width, band.height);
+			});
+			deps.leveyJenningsGridLines([
+				3,
+				2,
+				1,
+				0,
+				-1,
+				-2,
+				-3
+			].map((z) => ({ z })), 0, 1, y).forEach((line) => {
+				ctx.strokeStyle = line.major ? ljColors.mean : ljColors.grid;
+				ctx.lineWidth = line.major ? 1.8 : 1.15;
+				ctx.setLineDash([]);
+				ctx.beginPath();
+				ctx.moveTo(padL, line.y);
+				ctx.lineTo(padL + cw, line.y);
+				ctx.stroke();
+			});
+			ctx.restore();
+			ctx.font = deps.canvasFont(800, "type-caption", 11.5);
+			ctx.fillStyle = "#17212b";
+			ctx.textAlign = "center";
+			ctx.textBaseline = "bottom";
+			ctx.fillText(deps.leveyJenningsChartTitle.multi, padL + cw / 2, padT - 8);
+			ctx.font = deps.canvasFont(800, "type-meta", 12.5);
+			ctx.textBaseline = "middle";
+			deps.leveyJenningsMultiYAxis().forEach((label) => {
+				const yy = y(label.z);
+				ctx.fillStyle = "#17212b";
+				ctx.textAlign = "right";
+				ctx.fillText(label.left, padL - 9, yy);
+				ctx.textAlign = "left";
+				ctx.fillText(label.right, padL + cw + 10, yy);
+			});
+			if (!all.length) {
+				ctx.fillStyle = "#7b838e";
+				ctx.font = deps.canvasFont(600, "type-subhead", 14);
+				ctx.textAlign = "center";
+				ctx.fillText(deps.chartEmptyLabels.leveyJenningsMulti, padL + cw / 2, padT + ch / 2);
+				deps.leveyJenningsTooltipController(canvas);
+				return;
+			}
+			const cross = deps.westgardMultiByPoint(levels.map((v) => ({
+				level: v.level,
+				pts: v.pts,
+				mean: v.mean,
+				sd: v.sd
+			})), (rule) => deps.westgardRuleScope.across(test, rule));
+			if (opts && opts.divider && levels.length > 1) {
+				ctx.save();
+				ctx.beginPath();
+				ctx.rect(padL, padT, cw, ch);
+				ctx.clip();
+				ctx.strokeStyle = "#9aa7b0";
+				ctx.lineWidth = 1.4;
+				ctx.setLineDash([5, 4]);
+				deps.leveyJenningsMultiDividers(levels, runs, runIndex, xOfRun).forEach((xDiv) => {
+					ctx.beginPath();
+					ctx.moveTo(xDiv, padT);
+					ctx.lineTo(xDiv, padT + ch);
+					ctx.stroke();
+				});
+				ctx.setLineDash([]);
+				ctx.restore();
+			}
+			ctx.save();
+			ctx.beginPath();
+			ctx.rect(padL, padT, cw, ch);
+			ctx.clip();
+			levels.forEach((v, li) => {
+				const color = colors[li % colors.length], single = deps.westgardByPoint(v.pts, v.mean, v.sd, (rule) => deps.westgardRuleScope.within(test, rule));
+				const pointModels = deps.leveyJenningsMultiPointRenderModel({
+					points: v.pts,
+					single,
+					cross,
+					width: cw,
+					levelCount: levels.length,
+					x: xOfRun,
+					y: clampY,
+					test,
+					view: v,
+					color
+				});
+				if (v.pts.length > 1) {
+					ctx.strokeStyle = color;
+					ctx.lineWidth = 2.1;
+					ctx.lineJoin = "round";
+					ctx.lineCap = "round";
+					ctx.setLineDash([]);
+					ctx.beginPath();
+					pointModels.forEach((model, j) => {
+						if (j) ctx.lineTo(model.x, model.y);
+						else ctx.moveTo(model.x, model.y);
+					});
+					ctx.stroke();
+				}
+				pointModels.forEach((model) => {
+					ctx.fillStyle = model.color;
+					ctx.beginPath();
+					ctx.arc(model.x, model.y, model.radius, 0, Math.PI * 2);
+					ctx.fill();
+					ctx.strokeStyle = "#fff";
+					ctx.lineWidth = 1.8;
+					ctx.stroke();
+					canvas._ljHover.push({
+						x: model.x,
+						y: model.y,
+						hit: 13,
+						html: model.hover
+					});
+				});
+			});
+			ctx.restore();
+			if (runs.length) {
+				const ticks = deps.leveyJenningsMultiRunTicks(runs, all);
+				ctx.fillStyle = "#536772";
+				ctx.font = deps.canvasFont(700, "type-caption", 11.5);
+				ctx.textAlign = "center";
+				ctx.textBaseline = "top";
+				ticks.forEach((tick) => ctx.fillText(tick.label, xOfRun(tick.run), padT + ch + 10));
+			}
+			{
+				const y0 = 10;
+				ctx.font = deps.canvasFont(800, "type-caption", 11.5);
+				ctx.textAlign = "left";
+				ctx.textBaseline = "middle";
+				deps.leveyJenningsLegendLayout(levels, colors, padL + 8, ctx.measureText.bind(ctx)).forEach((item) => {
+					ctx.fillStyle = item.color;
+					ctx.fillRect(item.x, y0, 18, 4);
+					ctx.fillStyle = "#17212b";
+					ctx.fillText(item.label, item.x + 25, 12);
+				});
+			}
+			deps.leveyJenningsTooltipController(canvas);
+		}
+		function ljMultiDataURL(levelViews, test, opts) {
+			return deps.chartDataUrl({
+				width: 1400,
+				height: 430,
+				render: (canvas) => drawLJMultiZ(canvas, levelViews, test, opts)
+			});
+		}
+		function drawCUSUM(canvas, points, series) {
+			const { ctx, W, H } = deps.hiDpiCanvasSetup(canvas);
+			canvas._ljCssW = W;
+			canvas._ljCssH = H;
+			const n = points.length, h = series && series.h || 4, k = series && series.k || .5;
+			const cPos = series && series.cPos || [], cNeg = series && series.cNeg || [], ma = series && series.ma || [], flags = series && series.flags || [];
+			const { padL, padT, cw, ch, markPad, y, clampY, x } = deps.cusumChartGeometry({
+				width: W,
+				height: H,
+				count: n,
+				h,
+				cPos,
+				cNeg,
+				ma
+			});
+			const refs = deps.cusumReferenceLines({
+				h,
+				y
+			});
+			const cc = deps.cusumColors;
+			ctx.clearRect(0, 0, W, H);
+			ctx.fillStyle = "#fff";
+			ctx.fillRect(0, 0, W, H);
+			ctx.save();
+			ctx.beginPath();
+			ctx.rect(padL - markPad, padT, cw + markPad * 2, ch);
+			ctx.clip();
+			ctx.strokeStyle = cc.threshold;
+			ctx.lineWidth = 1.3;
+			ctx.setLineDash([6, 4]);
+			refs.thresholds.forEach((line) => {
+				ctx.beginPath();
+				ctx.moveTo(padL, line.y);
+				ctx.lineTo(padL + cw, line.y);
+				ctx.stroke();
+			});
+			ctx.setLineDash([]);
+			ctx.strokeStyle = cc.zero;
+			ctx.lineWidth = 1.6;
+			ctx.beginPath();
+			ctx.moveTo(padL, refs.zero.y);
+			ctx.lineTo(padL + cw, refs.zero.y);
+			ctx.stroke();
+			ctx.restore();
+			ctx.font = deps.canvasFont(800, "type-caption", 11.5);
+			ctx.fillStyle = "#17212b";
+			ctx.textAlign = "center";
+			ctx.textBaseline = "bottom";
+			ctx.fillText(deps.cusumChartTitle(k, h), padL + cw / 2, padT - 8);
+			ctx.font = deps.canvasFont(800, "type-meta", 12.5);
+			ctx.textBaseline = "middle";
+			refs.labels.forEach((label) => {
+				ctx.fillStyle = "#17212b";
+				ctx.textAlign = "right";
+				ctx.fillText(deps.format(label.value, 2), padL - 9, label.y);
+			});
+			if (!n) {
+				ctx.fillStyle = "#7b838e";
+				ctx.font = deps.canvasFont(600, "type-subhead", 14);
+				ctx.textAlign = "center";
+				ctx.fillText(deps.chartEmptyLabels.cusum, padL + cw / 2, padT + ch / 2);
+				canvas._ljHover = [];
+				deps.leveyJenningsTooltipController(canvas);
+				return;
+			}
+			canvas._ljHover = [];
+			const drawIndices = deps.cusumDisplayPlan({
+				count: n,
+				width: cw,
+				cPos,
+				cNeg,
+				ma,
+				flags
+			});
+			ctx.save();
+			ctx.beginPath();
+			ctx.rect(padL, padT, cw, ch);
+			ctx.clip();
+			const line = (arr, color, dash) => {
+				if (n <= 1) return;
+				ctx.strokeStyle = color;
+				ctx.lineWidth = 2;
+				ctx.lineJoin = "round";
+				ctx.lineCap = "round";
+				ctx.setLineDash(dash || []);
+				ctx.beginPath();
+				deps.cusumLinePoints({
+					indices: drawIndices,
+					values: arr,
+					x,
+					clampY
+				}).forEach((point, index) => {
+					if (index) ctx.lineTo(point.x, point.y);
+					else ctx.moveTo(point.x, point.y);
+				});
+				ctx.stroke();
+			};
+			line(ma, cc.ma, [3, 3]);
+			line(cNeg, cc.cneg);
+			line(cPos, cc.cpos);
+			ctx.setLineDash([]);
+			deps.cusumPointRenderModel({
+				indices: drawIndices,
+				points,
+				cPos,
+				cNeg,
+				flags,
+				h,
+				x,
+				clampY,
+				colors: cc
+			}).forEach((model) => {
+				model.circles.forEach((circle) => {
+					ctx.fillStyle = circle.color;
+					ctx.beginPath();
+					ctx.arc(circle.x, circle.y, circle.radius, 0, Math.PI * 2);
+					ctx.fill();
+					ctx.strokeStyle = "#fff";
+					ctx.lineWidth = 1.4;
+					ctx.stroke();
+				});
+				canvas._ljHover.push({
+					x: model.x,
+					y: model.hoverY,
+					hit: 12,
+					html: deps.cusumHoverModel({
+						point: model.point,
+						cPos: model.positive,
+						cNeg: model.negative,
+						rejected: model.rejected
+					})
+				});
+			});
+			ctx.restore();
+			deps.leveyJenningsTooltipController(canvas);
+		}
+		return {
+			drawLJ,
+			ljDataURL,
+			drawLJMultiZ,
+			ljMultiDataURL,
+			drawCUSUM
+		};
+	}
+	//#endregion
 	//#region src/presentation/export/blob-download.ts
 	function createBlobDownload(deps) {
 		return (name, blob) => {
@@ -9025,6 +9610,1318 @@
 			});
 			return rows;
 		};
+	}
+	//#endregion
+	//#region src/presentation/report/report-print-controller.ts
+	function createReportPrintController(deps) {
+		function reportQcValue(t, value) {
+			return deps.reportQcFormat.value(t, value);
+		}
+		function reportQcStat(t, value) {
+			return deps.reportQcFormat.stat(t, value);
+		}
+		function reportQcPoint(point, t) {
+			return deps.reportQcFormat.point(point, t);
+		}
+		function reportHeader(title, subtitle = "Nội kiểm chất lượng xét nghiệm") {
+			return deps.reportHeaderPresentation({
+				title,
+				subtitle,
+				lab: deps.lab(),
+				app: deps.app(),
+				westgardRules: deps.westgardRules(),
+				exportedAt: deps.formatDateTimeVN((/* @__PURE__ */ new Date()).toISOString()),
+				exportedBy: deps.userName(),
+				escape: deps.escape
+			});
+		}
+		function signBlock() {
+			return deps.reportSignBlock();
+		}
+		async function openPrintImpl(title, bodyHtml, options = {}) {
+			const w = deps.openPrintWindow();
+			if (!w) {
+				await deps.infoDialog("Trình duyệt chặn cửa sổ. Cho phép pop-up để in báo cáo.");
+				return;
+			}
+			const printFontCss = new URL("assets/tokens.css", deps.currentHref()).href;
+			const printToken = "qp" + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
+			const btns = deps.hasPdfPrinter() ? "<button class=\"print-btn\" onclick=\"qcSavePdf()\">Lưu PDF</button>" : "<button class=\"print-btn\" onclick=\"qcDoPrint()\">In / Lưu PDF</button>";
+			w.document.write("<!doctype html><html lang=\"vi\"><head><meta charset=\"utf-8\"><title>" + deps.escape(title) + "</title><link rel=\"stylesheet\" href=\"" + printFontCss + "\"><style>@page{size:" + (options.landscape ? "A4 landscape" : "A4") + ";margin:13mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:\"Manrope\",Arial,Helvetica,sans-serif;color:#14202b;margin:0;background:#eef2f5;font-size:var(--type-meta);line-height:1.42}.page{max-width:1120px;margin:18px auto;background:#fff;padding:22px 26px 28px;border:1px solid #dce3e9;box-shadow:0 10px 30px rgba(20,33,43,.08)}.rpt-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;border-bottom:2px solid #14202b;padding-bottom:12px;margin-bottom:14px}.rpt-brand{display:flex;gap:12px;align-items:center}.rpt-hosp{font-size:var(--type-heading-sm);font-weight:850}.rpt-dept{font-weight:700;margin-top:1px}.rpt-addr{font-size:var(--type-caption);color:#647686;margin-top:1px}.rpt-meta{text-align:right;color:#647686;font-size:var(--type-caption)}.rpt-meta b{display:block;color:#14202b}.rpt-meta-label{margin-top:var(--space-xs)}.rpt-section-label{margin-top:var(--space-sm)}.rpt-title{text-align:center;margin:12px 0 16px}.rpt-title div{font-size:var(--type-dialog-title);font-weight:850;text-transform:uppercase;letter-spacing:.02em}.rpt-title span{display:block;font-size:var(--type-caption);color:#647686;margin-top:3px}.rpt-card{border:1px solid #dce3e9;border-radius:8px;margin:12px 0 14px;overflow:hidden;background:#fff}.rpt-card h3{margin:0;padding:10px 12px;background:#0e8f8f;color:#fff;border-bottom:1px solid #0b7777;font-size:var(--type-subhead);font-weight:800}.rpt-card .body{padding:12px}h3{margin:16px 0 8px;padding:9px 10px;border:1px solid #0b7777;border-radius:7px;background:#0e8f8f;color:#fff;font-size:var(--type-subhead);font-weight:800}.meta-table th{width:16%;background:#e7f1f4;color:#244452}.rpt-key-15{width:15%}.rpt-key-18{width:18%}.rpt-key-20{width:20%}.rpt-key-25{width:25%}.nce-check-item-col{width:30%}.nce-check-result-col{width:22%}.nce-check-note-col{width:48%}.soft-note{color:#647686;font-style:italic;margin:8px 0 0}.chart-img,.page img{display:block;width:100%;max-height:360px;object-fit:contain;border:1px solid #dce3e9;border-radius:6px;background:#fff;margin:0 auto 10px}table{width:100%;border-collapse:separate;border-spacing:0;margin:0 0 8px;border:1px solid #dce3e9;border-radius:7px;overflow:hidden}th,td{padding:7px 9px;text-align:center;border-bottom:1px solid #eef2f5}tr:last-child td{border-bottom:none}th{background:#e7f1f4;color:#244452;font-size:var(--type-caption);font-weight:800}td.num,th.num{font-variant-numeric:tabular-nums}.pill{display:inline-block;border-radius:999px;background:#e8f3f2;color:#0a6e6e;padding:2px 8px;font-weight:800;font-size:var(--type-overline)}.hint,.muted{color:#647686}.alert{display:block;margin:8px 0;padding:9px 11px;border-left:3px solid #3f7795;background:#edf5fa;border-radius:5px}.rpt-chart-grid{display:grid;grid-template-columns:1fr;gap:12px}.rpt-chart svg{display:block;width:100%;height:auto;max-height:315px}.sign-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:36px}.sign-grid div{text-align:center;padding-top:48px;border-top:1px solid #9aa8b3}.sign-grid b{display:block}.sign-grid span{font-size:var(--type-caption);color:#647686;font-style:italic}.nce-summary-table{font-size:var(--type-overline)}.nce-summary-cell{text-align:left;min-width:240px}.nce-summary div+div{margin-top:3px}.nce-summary b{color:#244452}.nce-appendix{margin-top:18px}.nce-appendix-intro{margin:0 0 12px;color:#647686}.nce-detail{margin-top:16px}.nce-detail-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:8px}.nce-detail-head h3{flex:1;margin:0}.nce-detail-status{white-space:nowrap;font-weight:800;color:#0a6e6e;padding-top:9px}.nce-detail h4{margin:14px 0 7px;color:#244452;font-size:var(--type-meta)}.nce-detail-text{min-height:42px;padding:8px 10px;border:1px solid #dce3e9;border-radius:6px;background:#f8fafb;text-align:left;white-space:pre-wrap}.nce-detail-stack{display:grid;gap:7px;break-inside:avoid}.nce-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:1fr;gap:7px}.nce-detail-grid>div{display:flex;min-height:52px;padding:7px 9px;border:1px solid #dce3e9;border-radius:6px;background:#f8fafb;flex-direction:column;justify-content:center}.nce-detail-grid>div.nce-detail-wide{grid-column:1/-1}.nce-detail-grid span{display:block;color:#647686;font-size:var(--type-overline)}.nce-detail-grid b{display:block;margin-top:2px}.nce-check-table{table-layout:fixed}.nce-check-table th,.nce-check-table td{height:38px;padding:8px 10px;vertical-align:middle}.nce-check-table th:nth-child(1),.nce-check-table td:nth-child(1),.nce-check-table th:nth-child(3),.nce-check-table td:nth-child(3){text-align:left}.nce-check-table th:nth-child(2),.nce-check-table td:nth-child(2){text-align:center}.print-btn{position:fixed;top:12px;right:12px;border:none;border-radius:8px;background:#14202b;color:#fff;padding:9px 13px;font-weight:800;box-shadow:0 8px 22px rgba(20,33,43,.22);cursor:pointer}@media print{body{background:#fff}.page{max-width:none;margin:0;padding:0;border:none;box-shadow:none}.print-btn{display:none}.rpt-card{break-inside:avoid}.chart-img{max-height:310px}.nce-appendix{break-before:page}.nce-detail+.nce-detail{break-before:page}.nce-detail h4{break-after:avoid-page;page-break-after:avoid}.nce-detail-grid>div,.nce-detail-text,.nce-check-table tr{break-inside:avoid}}body.printing{background:#fff}body.printing .page{max-width:none;margin:0;padding:0;border:none;box-shadow:none}body.printing .print-btn{display:none}</style></head><body><div class=\"page\">" + bodyHtml + "</div>" + btns + "<script>window.__qcPrintToken=\"" + printToken + "\";function qcDoPrint(){document.body.classList.add(\"printing\");if(window.opener&&opener.qcPrintPdf){opener.qcPrintPdf.printPaper(window.__qcPrintToken)}else{window.print()}}function qcSavePdf(){document.body.classList.add(\"printing\");if(window.opener&&opener.qcPrintPdf){opener.qcPrintPdf.save(window.__qcPrintToken,document.title||\"Bao-cao\")}else{qcDoPrint()}}window.onbeforeprint=function(){document.body.classList.add(\"printing\")};window.onafterprint=function(){document.body.classList.remove(\"printing\")};<\/script></body></html>");
+			w.document.close();
+			w.focus();
+		}
+		function sigmaPeriodPrintRows(row, levels) {
+			return deps.sigmaPrintRowsService.periodRows(row, levels);
+		}
+		function sigmaPeriodsPrintRows(rows, levels) {
+			return deps.sigmaPrintRowsService.periodsRows(rows, levels);
+		}
+		function sigmaMuPrintRows(t, row, levels) {
+			return deps.sigmaMuPrintRowsService.periodRows(t, row, levels);
+		}
+		function sigmaMuPeriodsPrintRows(t, rows, levels) {
+			return deps.sigmaMuPrintRowsService.periodsRows(t, rows, levels);
+		}
+		function sigmaMuTrace(row, levels) {
+			return deps.sigmaMuTraceService(row, levels);
+		}
+		function sigmaMuPrintCard(t, row, levels) {
+			const trace = sigmaMuTrace(row, levels);
+			return "<div class=\"rpt-card\"><h3>Độ không đảm bảo đo (MU) — ISO 15189:2022 §7.3.4</h3><div class=\"body\"><table><tr><th>Mức</th><th>u(Rw) %</th><th>u(bias) %</th><th>u(cal) %</th><th>u<sub>c</sub> %</th><th>U (k=2) %</th><th>U tại Mean</th><th>Trạng thái</th></tr>" + sigmaMuPrintRows(t, row, levels) + "</table>" + (trace.length ? "<p class=\"hint\">" + trace.join("<br>") + "</p>" : "") + "<p class=\"soft-note\">Mô hình top-down (ISO/TS 20914 · Nordtest TR 537): u(Rw) là CV% dài hạn của IQC, u(bias) = √(Bias² + u(Cref)²) từ EQA/EQC, u(cal) chép từ CoA của calibrator; u<sub>c</sub> = √(Σu²) và U = 2·u<sub>c</sub> (xấp xỉ 95%). Giới hạn MU cho phép (MAU) do SOP của đơn vị ấn định — báo cáo này không tự kết luận đạt/không đạt. Ngân sách còn thiếu thành phần không được công bố như một giá trị MU hoàn chỉnh.</p></div></div>";
+		}
+		async function printSigmaPeriod(periodId) {
+			const t = deps.findTest(deps.sgTest()), entry = t && deps.sgData(t.id).find((x) => x.id === periodId);
+			if (!t || !entry) {
+				await deps.infoDialog("Chưa chọn được kỳ Sigma để in.");
+				return;
+			}
+			const levels = deps.sgVisibleLevels(t), row = deps.sgRows(t, [entry], levels)[0], exportRows = deps.sigmaReportRows(t.id, "period", entry.period, entry.id);
+			if (!row || !row.rs.some(Boolean) || !exportRows.length) {
+				await deps.infoDialog("Kỳ này chưa đủ dữ liệu Sigma để tạo báo cáo in.");
+				return;
+			}
+			const period = deps.vnPeriod(entry.period) || entry.period || "?", trace = deps.sigmaTeaTrace(exportRows), valid = row.rs.some((r) => r && r.classifiable) ? [row] : [], machine = deps.instrumentName(t.instrumentId, t.machine) || t.machine || "—";
+			let body = reportHeader("BÁO CÁO SIX SIGMA — " + deps.escape(deps.testDisplayName(t)) + " — " + deps.escape(period), "Đánh giá hiệu năng phương pháp theo kỳ");
+			body += "<table><tr><th class=\"rpt-key-18\">Xét nghiệm</th><td>" + deps.escape(deps.testDisplayName(t)) + (t.unit ? " · " + deps.escape(t.unit) : "") + "</td><th class=\"rpt-key-15\">Kỳ báo cáo</th><td>" + deps.escape(period) + "</td></tr><tr><th>Thiết bị</th><td>" + deps.escape(machine) + "</td><th>Nguồn TEa</th><td>" + deps.escape(trace || "Chưa có thông tin truy xuất") + "</td></tr></table>";
+			body += "<div class=\"rpt-card\"><h3>Kết quả Six Sigma theo mức QC</h3><div class=\"body\"><table><tr><th>Mức</th><th>TEa (%)</th><th>Sigma</th><th>Xếp loại</th><th>CV IQC (%)</th><th>Bias EQA (%)</th><th>DPMO</th><th>Yield</th><th>Nguồn CV</th><th>Trạng thái dữ liệu</th></tr>" + sigmaPeriodPrintRows(row, levels) + "</table><p class=\"soft-note\">DPMO và Yield là quy đổi tham khảo với dịch 1,5σ. CV nhập tay vẫn được tính Sigma nhưng không dùng để tự động đề xuất thiết kế QC.</p></div></div>";
+			body += "<div class=\"rpt-card\"><h3>Thiết kế QC theo Sigma (OPSpecs)</h3><div class=\"body\">" + deps.sgFrequencyHTML(t, row, levels) + "</div></div>";
+			body += sigmaMuPrintCard(t, row, levels);
+			if (valid.length) body += "<div class=\"rpt-chart-grid\"><div class=\"rpt-card rpt-chart\"><h3>Biểu đồ Sigma</h3><div class=\"body\">" + deps.sgTrendSVG(t, valid, levels) + "</div></div><div class=\"rpt-card rpt-chart\"><h3>Biểu đồ Quyết định Phương pháp (MDC)</h3><div class=\"body\">" + deps.sgMDCSVG(t, valid, levels) + "</div></div></div>";
+			else body += "<p class=\"soft-note\">Kỳ này chưa có mức đủ điều kiện phân loại để vẽ biểu đồ Sigma và MDC.</p>";
+			body += signBlock();
+			await deps.openPrint("Báo cáo Six Sigma — " + deps.testDisplayName(t) + " — " + period, body, { landscape: true });
+		}
+		async function printSigmaPeriods() {
+			const t = deps.findTest(deps.sgTest());
+			if (!t) {
+				await deps.infoDialog("Chưa chọn xét nghiệm để in.");
+				return;
+			}
+			const levels = deps.sgVisibleLevels(t), rows = deps.sgRows(t, deps.sgData(t.id), levels), exportRows = deps.sigmaReportRows(t.id, "all");
+			if (!rows.some((row) => row.rs.some(Boolean)) || !exportRows.length) {
+				await deps.infoDialog("Xét nghiệm này chưa có kỳ Sigma đủ dữ liệu để tạo báo cáo in tổng hợp.");
+				return;
+			}
+			const valid = rows.filter((row) => row.rs.some((r) => r && r.classifiable)), periods = deps.sigmaExportPeriods(exportRows), trace = deps.sigmaTeaTrace(exportRows), machine = deps.instrumentName(t.instrumentId, t.machine) || t.machine || "—";
+			let body = reportHeader("BÁO CÁO TỔNG HỢP SIX SIGMA THEO KỲ — " + deps.escape(deps.testDisplayName(t)), "So sánh hiệu năng phương pháp giữa các kỳ đánh giá");
+			body += "<table><tr><th class=\"rpt-key-18\">Xét nghiệm</th><td>" + deps.escape(deps.testDisplayName(t)) + (t.unit ? " · " + deps.escape(t.unit) : "") + "</td><th class=\"rpt-key-15\">Các kỳ báo cáo</th><td>" + deps.escape(periods || "—") + "</td></tr><tr><th>Thiết bị</th><td>" + deps.escape(machine) + "</td><th>Nguồn TEa</th><td>" + deps.escape(trace || "Chưa có thông tin truy xuất") + "</td></tr></table>";
+			body += "<div class=\"rpt-card\"><h3>So sánh kết quả Six Sigma theo kỳ</h3><div class=\"body\"><table><tr><th>Kỳ</th><th>Mức</th><th>TEa (%)</th><th>Sigma</th><th>Xếp loại</th><th>CV IQC (%)</th><th>Bias EQA (%)</th><th>DPMO</th><th>Yield</th><th>Nguồn CV</th><th>Trạng thái dữ liệu</th></tr>" + sigmaPeriodsPrintRows(rows, levels) + "</table><p class=\"soft-note\">DPMO và Yield là quy đổi tham khảo với dịch 1,5σ. CV nhập tay vẫn được tính Sigma nhưng không dùng để tự động đề xuất thiết kế QC.</p></div></div>";
+			body += "<div class=\"rpt-card\"><h3>Độ không đảm bảo đo (MU) theo kỳ — ISO 15189:2022 §7.3.4</h3><div class=\"body\"><table><tr><th>Kỳ</th><th>Mức</th><th>u(Rw) %</th><th>u(bias) %</th><th>u(cal) %</th><th>u<sub>c</sub> %</th><th>U (k=2) %</th><th>U tại Mean</th><th>Trạng thái</th></tr>" + sigmaMuPeriodsPrintRows(t, rows, levels) + "</table><p class=\"soft-note\">Mô hình top-down (ISO/TS 20914 · Nordtest TR 537): u(Rw) là CV% dài hạn của IQC, u(bias) = √(Bias² + u(Cref)²) từ EQA/EQC, u(cal) chép từ CoA của calibrator; u<sub>c</sub> = √(Σu²) và U = 2·u<sub>c</sub> (xấp xỉ 95%). Giới hạn MU cho phép (MAU) do SOP của đơn vị ấn định — báo cáo này không tự kết luận đạt/không đạt. Ngân sách còn thiếu thành phần không được công bố như một giá trị MU hoàn chỉnh.</p></div></div>";
+			if (valid.length) body += "<div class=\"rpt-chart-grid\"><div class=\"rpt-card rpt-chart\"><h3>Xu hướng Sigma theo kỳ</h3><div class=\"body\">" + deps.sgTrendSVG(t, valid, levels) + "</div></div><div class=\"rpt-card rpt-chart\"><h3>Biểu đồ Quyết định Phương pháp (MDC)</h3><div class=\"body\">" + deps.sgMDCSVG(t, valid, levels) + "</div></div></div>";
+			else body += "<p class=\"soft-note\">Các kỳ hiện có chưa đủ điều kiện phân loại để vẽ biểu đồ Sigma và MDC.</p>";
+			body += signBlock();
+			await deps.openPrint("Báo cáo tổng hợp Six Sigma theo kỳ — " + deps.testDisplayName(t), body, { landscape: true });
+		}
+		async function printWestgard() {
+			const t = deps.findTest(deps.selTest());
+			if (!t) {
+				await deps.infoDialog("Chưa chọn được xét nghiệm để in.");
+				return;
+			}
+			const wg = deps.activeWestgard(t);
+			if (!wg.views.length) {
+				await deps.infoDialog("Xét nghiệm này chưa có mức QC đang vận hành để in.");
+				return;
+			}
+			const machine = deps.instrumentName(t.instrumentId, t.machine) || t.machine || "—", withinRules = deps.wgRules().filter((r) => deps.testRuleOnWithin(t, r)).join(", ") || "Không có", acrossRules = deps.wgRules().filter((r) => deps.testRuleOnAcross(t, r)).join(", ") || "Không có";
+			let body = reportHeader("PHÂN TÍCH WESTGARD — " + deps.escape(deps.testDisplayName(t)), "Đối chiếu luật theo mức QC, lô và lần chạy");
+			body += "<table><tr><th class=\"rpt-key-20\">Xét nghiệm</th><td>" + deps.escape(deps.testDisplayName(t)) + (t.unit ? " · " + deps.escape(t.unit) : "") + "</td><th class=\"rpt-key-18\">Thiết bị</th><td>" + deps.escape(machine) + "</td></tr><tr><th>Luật theo từng mức</th><td colspan=\"3\">" + deps.escape(withinRules) + "</td></tr><tr><th>Luật liên mức / lần chạy</th><td colspan=\"3\">" + deps.escape(acrossRules) + "</td></tr></table>";
+			const multiViews = wg.views.map((v) => ({
+				level: v.l.level,
+				lot: v.l.lot,
+				mean: v.l.mean,
+				sd: v.l.sd,
+				pts: v.pts,
+				label: "M" + v.l.level + "·" + (v.l.lot || "?")
+			}));
+			if (multiViews.filter((v) => v.pts.length).length >= 2) body += "<h3>Levey-Jennings tổng hợp theo Z-score</h3><img src=\"" + deps.ljMultiDataURL(multiViews, t) + "\">";
+			wg.views.forEach((v) => {
+				const l = v.l, prevSeries = deps.previousLotSeries(t, l.level);
+				if (deps.wgPrevOpenHas(t.id + "|" + l.level) && prevSeries.length) {
+					const s = prevSeries[0], wgP = deps.westgardByPoint(s.pts, s.mean, s.sd, (rule) => deps.testRuleOnWithin(t, rule));
+					body += "<h3>Mức " + l.level + " — Lô cũ " + deps.escape(s.lot) + " · đã chuyển tiếp (Mean=" + reportQcValue(t, s.mean) + ", SD=" + reportQcStat(t, s.sd) + ")</h3>";
+					body += "<p class=\"soft-note\">Vi phạm ở lô cũ chỉ đánh giá luật Westgard theo từng mức riêng lẻ, không gồm luật liên mức (như R4s giữa các mức cùng lần chạy).</p>";
+					body += "<img src=\"" + deps.ljDataURL(s.pts, s.mean, s.sd) + "\">";
+					const viol = s.pts.map((p, i) => {
+						const raw = wgP.F[i] || { rules: [] };
+						return {
+							p,
+							f: {
+								...raw,
+								level: deps.ruleResultLevel(t, raw.rules || [])
+							},
+							z: wgP.zs[i]
+						};
+					}).filter((o) => o.f.level !== "ok");
+					body += viol.length ? "<p class=\"rpt-section-label\"><b>Điểm vi phạm/cảnh báo (lô cũ):</b></p>" + reportPointsTableHtml(viol, t) : "<p><i>Không có điểm vi phạm/cảnh báo (lô cũ).</i></p>";
+					return;
+				}
+				body += "<h3>Mức " + l.level + " — Lô " + deps.escape(l.lot || "?") + " (Mean=" + reportQcValue(t, l.mean) + ", SD=" + reportQcStat(t, l.sd) + ")</h3>";
+				if (!v.pts.length) {
+					body += "<p><i>Chưa có dữ liệu QC ở mức này.</i></p>";
+					return;
+				}
+				body += "<img src=\"" + deps.ljDataURL(v.pts, l.mean, l.sd) + "\">";
+				const viol = v.pts.map((p) => {
+					const f = wg.byPoint.get(p.id) || {
+						level: "ok",
+						rules: [],
+						z: (p.val - l.mean) / l.sd
+					};
+					return {
+						p,
+						f,
+						z: f.z
+					};
+				}).filter((o) => o.f.level !== "ok");
+				body += viol.length ? "<p class=\"rpt-section-label\"><b>Điểm vi phạm/cảnh báo:</b></p>" + reportPointsTableHtml(viol, t) : "<p><i>Không có điểm vi phạm/cảnh báo.</i></p>";
+			});
+			body += signBlock();
+			await deps.openPrint("Phân tích Westgard — " + deps.testDisplayName(t), body);
+		}
+		function reportPointsTableHtml(items, t) {
+			return deps.reportPointsTableService(items, t);
+		}
+		function reportNceSummaryHtml(a) {
+			return deps.actionReportHtml.summary(deps.reportNceSummaryParts(a));
+		}
+		function reportNceDetailField(label, value, wide = false) {
+			return deps.actionReportHtml.detailField(label, value, wide);
+		}
+		function reportNceDetailHtml(a, t) {
+			return deps.reportNceDetailHtmlPresentation(a, t);
+		}
+		function reportNceAppendixHtml(actions, t) {
+			return deps.reportNceAppendixPresentation(actions, t);
+		}
+		async function printReport() {
+			const { tid, t, start, end, includeNceAppendix } = deps.reportExportSelection();
+			if (!t) return;
+			const inMonth = deps.reportInRange(start, end), wg = deps.activeWestgard(t);
+			let body = reportHeader("BÁO CÁO NỘI KIỂM CHẤT LƯỢNG XÉT NGHIỆM");
+			const { teaVal, teaSourceText } = deps.reportTeaInfo(t);
+			body += "<table><tr><th class=\"rpt-key-25\">Xét nghiệm</th><td>" + deps.escape(deps.testDisplayName(t)) + (t.unit ? " · " + deps.escape(t.unit) : "") + "</td><th class=\"rpt-key-18\">Máy</th><td>" + deps.escape(t.machine || "") + "</td></tr><tr><th>Khoảng ngày báo cáo</th><td>" + deps.escape(deps.reportRangeText(start, end)) + "</td><th>TEa%</th><td>" + (teaVal || "—") + "</td></tr><tr><th>Nguồn TEa</th><td colspan=\"3\">" + deps.escape(teaSourceText) + (deps.sgTeaRefText(t) ? " · " + deps.escape(deps.sgTeaRefText(t)) : "") + (t.teaDoc ? " · " + deps.escape(t.teaDoc) : "") + (t.teaEffectiveDate ? " · hiệu lực " + deps.vnDate(t.teaEffectiveDate) : "") + (t.teaApprovedBy ? " · duyệt " + deps.escape(t.teaApprovedBy) : "") + "</td></tr></table>";
+			body += "<p class=\"soft-note\">Cột \"Sigma (kỳ)\" dưới đây tính từ Mean/CV thực tế trong đúng khoảng ngày báo cáo này — khác với Sigma đã thẩm định ở trang Six Sigma &amp; Sai số (dùng CV IQC và Bias EQA/EQC đã rà soát). Hai số có thể khác nhau; dấu * bên cạnh Sigma nghĩa là kỳ này có n &lt; 20 kết quả, CV/Sigma chưa đủ ổn định để tham khảo.</p>";
+			const multiViews = deps.reportMultiViews(t, inMonth);
+			if (multiViews.filter((v) => v.pts.length).length >= 2) {
+				body += "<h3>Levey-Jennings tổng hợp theo Z-score</h3>";
+				body += "<img src=\"" + deps.ljMultiDataURL(multiViews, t) + "\">";
+			}
+			deps.operationalLevels(t).forEach((l) => {
+				deps.previousLotSeries(t, l.level).forEach((s) => {
+					const { inPts, items: allS } = deps.reportPrevLotRows(t, s, inMonth);
+					if (!inPts.length) return;
+					body += "<h3>Mức " + l.level + " — Lô cũ " + deps.escape(s.lot) + " · đã chuyển tiếp (Mean=" + reportQcValue(t, s.mean) + ", SD=" + reportQcStat(t, s.sd) + ")</h3>";
+					body += "<p class=\"soft-note\">Vi phạm ở lô cũ chỉ đánh giá luật Westgard theo từng mức riêng lẻ, không gồm luật liên mức (như R4s giữa các mức cùng lần chạy) — phạm vi hẹp hơn lô đang dùng ở mục bên dưới.</p>";
+					body += "<img src=\"" + deps.ljDataURL(inPts, s.mean, s.sd) + "\">";
+					const { st: stS, bias: biasS, te: teS, sigma: sigmaS } = deps.reportLevelStats(inPts, s.mean, teaVal);
+					body += "<table><tr><th>n</th><th class=\"num\">Mean thực</th><th class=\"num\">SD</th><th class=\"num\">CV%</th><th class=\"num\">Bias%</th><th class=\"num\">TE%</th><th class=\"num\">TEa%</th><th class=\"num\">Sigma (kỳ)</th></tr><tr><td>" + stS.n + "</td><td class=\"num\">" + reportQcValue(t, stS.m) + "</td><td class=\"num\">" + reportQcStat(t, stS.sd) + "</td><td class=\"num\">" + deps.format(stS.cv) + "</td><td class=\"num\">" + deps.format(biasS) + "</td><td class=\"num\">" + deps.format(teS) + "</td><td class=\"num\">" + (teaVal || "—") + "</td><td class=\"num\">" + (sigmaS == null ? "—" : deps.format(sigmaS, 1) + (stS.n < 20 ? " *" : "")) + "</td></tr></table>";
+					body += "<p class=\"rpt-section-label\"><b>Điểm trong khoảng xem (lô cũ):</b></p>" + reportPointsTableHtml(allS, t);
+					const violS = allS.filter((o) => o.f.level !== "ok");
+					if (violS.length) body += "<p class=\"rpt-section-label\"><b>Điểm vi phạm/cảnh báo (lô cũ):</b></p><table><tr><th>Ngày</th><th>NV</th><th class=\"num\">Giá trị</th><th class=\"num\">Z</th><th>Luật</th><th>Loại sai số</th></tr>" + violS.map((o) => "<tr><td>" + deps.vnDate(o.p.date) + "</td><td>" + deps.escape(deps.pointStaff(o.p).code || "—") + "</td><td class=\"num\">" + reportQcPoint(o.p, t) + "</td><td class=\"num\">" + (o.z >= 0 ? "+" : "") + deps.format(o.z) + "s</td><td>" + [...new Set(o.f.rules)].join(", ") + "</td><td>" + deps.errorType([...new Set(o.f.rules)]) + "</td></tr>").join("") + "</table>";
+					else body += "<p><i>Không có điểm vi phạm trong khoảng ngày đã chọn (lô cũ).</i></p>";
+				});
+				const { pts, items: all } = deps.reportLevelRows(t, l, wg, inMonth);
+				body += "<h3>Mức " + l.level + " — Lô " + deps.escape(l.lot || "?") + " · Dải " + (l.applied === "lab" ? "PXN" : "NSX") + " (Mean=" + reportQcValue(t, l.mean) + ", SD=" + reportQcStat(t, l.sd) + ")</h3>";
+				if (!pts.length) {
+					body += "<p><i>Không có dữ liệu trong khoảng ngày đã chọn.</i></p>";
+					return;
+				}
+				body += "<img src=\"" + deps.ljDataURL(pts, l.mean, l.sd) + "\">";
+				const { st, bias, te, sigma } = deps.reportLevelStats(pts, l.mean, teaVal);
+				body += "<table><tr><th>n</th><th class=\"num\">Mean thực</th><th class=\"num\">SD</th><th class=\"num\">CV%</th><th class=\"num\">Bias%</th><th class=\"num\">TE%</th><th class=\"num\">TEa%</th><th class=\"num\">Sigma (kỳ)</th></tr><tr><td>" + st.n + "</td><td class=\"num\">" + reportQcValue(t, st.m) + "</td><td class=\"num\">" + reportQcStat(t, st.sd) + "</td><td class=\"num\">" + deps.format(st.cv) + "</td><td class=\"num\">" + deps.format(bias) + "</td><td class=\"num\">" + deps.format(te) + "</td><td class=\"num\">" + (teaVal || "—") + "</td><td class=\"num\">" + (sigma == null ? "—" : deps.format(sigma, 1) + (st.n < 20 ? " *" : "")) + "</td></tr></table>";
+				body += "<p class=\"rpt-section-label\"><b>Điểm trong khoảng xem:</b></p>" + reportPointsTableHtml(all, t);
+				const viol = all.filter((o) => o.f.level !== "ok");
+				if (viol.length) body += "<p class=\"rpt-section-label\"><b>Điểm vi phạm/cảnh báo:</b></p><table><tr><th>Ngày</th><th>NV</th><th class=\"num\">Giá trị</th><th class=\"num\">Z</th><th>Luật</th><th>Loại sai số</th></tr>" + viol.map((o) => "<tr><td>" + deps.vnDate(o.p.date) + "</td><td>" + deps.escape(deps.pointStaff(o.p).code || "—") + "</td><td class=\"num\">" + reportQcPoint(o.p, t) + "</td><td class=\"num\">" + (o.z >= 0 ? "+" : "") + deps.format(o.z) + "s</td><td>" + [...new Set(o.f.rules)].join(", ") + "</td><td>" + deps.errorType([...new Set(o.f.rules)]) + "</td></tr>").join("") + "</table>";
+				else body += "<p><i>Không có điểm vi phạm trong khoảng ngày đã chọn.</i></p>";
+			});
+			const acts = deps.reportActionsInRange(tid, inMonth);
+			if (acts.length) body += "<h3>Hành động khắc phục trong khoảng ngày đã chọn</h3><p class=\"soft-note\">Bảng dưới đây là bản tóm tắt. Nội dung đầy đủ nằm trong phụ lục NCE khi tùy chọn kèm phụ lục được bật.</p><table class=\"nce-summary-table\"><tr><th>Ngày / mã NCE</th><th>Mức / lô</th><th>Luật / loại SS</th><th>Tóm tắt xử lý</th><th>Người</th><th>QC chạy lại</th><th>Duyệt</th><th>Khép vòng</th></tr>" + acts.map((a) => {
+				const m = deps.reportNceModel(a, t), rr = deps.actionRerunStatus(a);
+				return "<tr><td>" + (a.nceId ? "<b>" + deps.escape(a.nceId) + "</b><br>" : "") + m.eventDateText + "</td><td>" + deps.escape(deps.actionLevelShort(t, a.level, a.lot)) + "</td><td>" + deps.escape(a.rule || "—") + "<br><span class=\"muted\">" + deps.escape(a.errorType || "—") + "</span></td><td class=\"nce-summary-cell\">" + reportNceSummaryHtml(a) + "</td><td>" + deps.escape(a.by || "—") + "</td><td>" + deps.escape(rr.label || "—") + "</td><td>" + deps.escape(deps.actionApprovalLabel(a)) + (a.approvedBy ? "<br><span class=\"muted\">" + deps.escape(a.approvedBy) + "</span>" : "") + "</td><td>" + deps.escape(m.wfLabel) + "</td></tr>";
+			}).join("") + "</table>";
+			body += signBlock();
+			if (acts.length && includeNceAppendix) body += reportNceAppendixHtml(acts, t);
+			await deps.openPrint("Báo cáo nội kiểm — " + deps.testDisplayName(t), body);
+		}
+		async function printRangeForm(tid, level) {
+			const t = deps.findTest(tid);
+			const l = deps.lvlCfg(t, level), pts = deps.operationalLotPoints(t, level);
+			const c = deps.stats(pts.map((p) => p.val)), days = new Set(pts.map((p) => p.date)).size;
+			if (!c) {
+				await deps.infoDialog("Chưa đủ dữ liệu.");
+				return;
+			}
+			let body = reportHeader("BIỂU MẪU THIẾT LẬP DẢI KIỂM SOÁT QC MỚI");
+			body += "<table><tr><th class=\"rpt-key-25\">Xét nghiệm</th><td>" + deps.escape(deps.testDisplayName(t)) + (t.unit ? " · " + deps.escape(t.unit) : "") + "</td><th class=\"rpt-key-18\">Mức / Lô</th><td>M" + level + " / " + deps.escape(l.lot || "?") + "</td></tr><tr><th>Máy</th><td>" + deps.escape(t.machine || "") + "</td><th>Số kết quả / ngày độc lập</th><td>" + c.n + " / " + days + "</td></tr></table>";
+			body += "<h3>So sánh dải kiểm soát</h3><table><tr><th></th><th class=\"num\">Mean</th><th class=\"num\">SD</th><th class=\"num\">CV%</th><th class=\"num\">±2SD</th></tr><tr><td>Dải nhà sản xuất / hiện tại</td><td class=\"num\">" + reportQcValue(t, l.mean) + "</td><td class=\"num\">" + reportQcStat(t, l.sd) + "</td><td class=\"num\">" + deps.format(l.mean ? l.sd / Math.abs(l.mean) * 100 : 0) + "</td><td class=\"num\">" + reportQcValue(t, l.mean - 2 * l.sd) + " – " + reportQcValue(t, l.mean + 2 * l.sd) + "</td></tr><tr><td><b>Dải PXN đề xuất</b></td><td class=\"num\"><b>" + reportQcValue(t, c.m) + "</b></td><td class=\"num\"><b>" + reportQcStat(t, c.sd) + "</b></td><td class=\"num\"><b>" + deps.format(c.cv) + "</b></td><td class=\"num\"><b>" + reportQcValue(t, c.m - 2 * c.sd) + " – " + reportQcValue(t, c.m + 2 * c.sd) + "</b></td></tr></table>";
+			body += "<img src=\"" + deps.ljDataURL(pts, c.m, c.sd) + "\">";
+			body += "<p class=\"rpt-section-label\"><b>Điều kiện:</b> tối thiểu 20 kết quả trên 20 ngày độc lập, cùng lô QC, không có điểm vi phạm/cảnh báo chưa xử lý; áp dụng khi hệ thống ổn định và được phê duyệt theo SOP.</p>";
+			body += "<p>Kết luận: ☐ Áp dụng dải PXN mới &nbsp;&nbsp; ☐ Giữ dải nhà sản xuất</p>";
+			body += signBlock();
+			await deps.openPrint("Biểu mẫu thiết lập dải QC — " + deps.testDisplayName(t), body);
+		}
+		return {
+			reportQcValue,
+			reportQcStat,
+			reportQcPoint,
+			reportHeader,
+			signBlock,
+			openPrint: openPrintImpl,
+			sigmaPeriodPrintRows,
+			sigmaPeriodsPrintRows,
+			sigmaMuPrintRows,
+			sigmaMuPeriodsPrintRows,
+			sigmaMuTrace,
+			sigmaMuPrintCard,
+			printSigmaPeriod,
+			printSigmaPeriods,
+			printWestgard,
+			reportPointsTableHtml,
+			reportNceSummaryHtml,
+			reportNceDetailField,
+			reportNceDetailHtml,
+			reportNceAppendixHtml,
+			printReport,
+			printRangeForm
+		};
+	}
+	//#endregion
+	//#region src/presentation/export/data-io-controller.ts
+	function createDataIoController(deps) {
+		function dataIoTypePx(token, fallback) {
+			return deps.cssTokenPixel(token, fallback);
+		}
+		function dataIoCanvasFont(weight, token, fallback) {
+			return deps.sigmaCanvasFont(weight, token, fallback);
+		}
+		function exportMetaRowsImpl(kind = "Báo cáo") {
+			return deps.exportMetaRowsService(kind);
+		}
+		function reportInRange(start, end) {
+			return deps.reportExportHelpers.inRange(start, end);
+		}
+		function reportTeaInfo(t) {
+			return deps.qcReportContext.teaInfo(t);
+		}
+		function reportMultiViews(t, inRange) {
+			return deps.qcReportContext.multiViews(t, inRange);
+		}
+		function reportPrevLotRows(t, s, inRange) {
+			return deps.qcReportRowsService.previousLot(t, s, inRange);
+		}
+		function reportLevelRows(t, l, wg, inRange) {
+			return deps.qcReportRowsService.currentLot(t, l, wg, inRange);
+		}
+		function reportActionsInRange(tid, inRange) {
+			return deps.qcReportRowsService.actions(tid, inRange);
+		}
+		function reportNceExcerpt(value, max = 150) {
+			return deps.reportExportHelpers.nceExcerpt(value, max);
+		}
+		function reportNceSummaryParts(a) {
+			return deps.actionReportSummary(a);
+		}
+		function reportNceModel(a, t) {
+			return deps.actionReportModel(a, t);
+		}
+		function exportReportCSV() {
+			const { tid, t, start, end } = deps.reportExportSelection();
+			if (!t) return;
+			const label = start || end ? (start || "batdau") + "_" + (end || "hientai") : "toanbo", rows = deps.qcReportCsvRows(tid, start, end);
+			deps.csvDownload("Bao_cao_IQC_" + deps.safeName(t.name) + "_" + deps.safeName(label) + ".csv", rows);
+		}
+		function exportActionsCSV() {
+			const rows = [
+				...deps.exportMetaRows("Nhật ký khắc phục"),
+				[],
+				[
+					"Mã NCE",
+					"Ngày xảy ra",
+					"Thời điểm mở hồ sơ",
+					"Nguồn phát hiện",
+					"Giai đoạn",
+					"Xét nghiệm",
+					"Mức / lô",
+					"Luật",
+					"Loại sai số",
+					"Hành động",
+					"Điều tra & ảnh hưởng",
+					"Bias trước khắc phục (%)",
+					"Bias sau khắc phục (%)",
+					"Người phụ trách",
+					"Hạn hoàn thành",
+					"S ban đầu",
+					"O ban đầu",
+					"D ban đầu",
+					"RPN ban đầu",
+					"Phân loại nguy cơ",
+					"Căn cứ SOP",
+					"Quyết định cho phép trở lại",
+					"Ngày cho phép",
+					"Người cho phép",
+					"Căn cứ cho phép",
+					"QC chạy lại",
+					"Kết luận hiệu lực",
+					"Ngày đánh giá hiệu lực",
+					"Bằng chứng hiệu lực",
+					"Người đánh giá",
+					"S còn lại",
+					"O còn lại",
+					"D còn lại",
+					"RPN còn lại",
+					"Phân loại nguy cơ còn lại",
+					"Căn cứ đánh giá lại",
+					"Trạng thái duyệt",
+					"Người duyệt",
+					"Thời điểm duyệt",
+					"Ý kiến duyệt",
+					"Lý do trả lại",
+					"Người trả lại",
+					"Thời điểm trả lại",
+					"Trạng thái bản ghi",
+					"Lý do hủy",
+					"Người hủy",
+					"Thời điểm hủy",
+					"Hồ sơ trước",
+					"Hồ sơ tiếp theo",
+					"Trạng thái hồ sơ"
+				]
+			];
+			(deps.actions() || []).forEach((a) => {
+				rows.push(deps.nceCsvRow(a));
+			});
+			deps.csvDownload("Nhat_ky_khac_phuc_QC.csv", rows);
+		}
+		function downloadBlob(name, blob) {
+			return deps.blobDownload(name, blob);
+		}
+		function sigmaReportMetric(r) {
+			return deps.sigmaReportMetricService(r);
+		}
+		function sigmaReportRows(onlyTestId = "", mode = "latest", period = "", periodId = "") {
+			return deps.sigmaReportRowsService(onlyTestId, mode, period, periodId);
+		}
+		function sigmaLevelsOf(row) {
+			return deps.reportExportHelpers.sigmaLevels(row);
+		}
+		function sigmaDataURLBytes(durl) {
+			return deps.sigmaDataUrlBytes(durl);
+		}
+		const SIGMA_EXPORT_PIXEL_RATIO = 6, SIGMA_EXPORT_MAX_DIMENSION = 16384;
+		function sigmaExportPixelRatio(W, H, scale = SIGMA_EXPORT_PIXEL_RATIO) {
+			return deps.sigmaExportPixelRatioService(W, H, scale, SIGMA_EXPORT_MAX_DIMENSION);
+		}
+		function sigmaCanvas(W, H, scale) {
+			return deps.sigmaCanvasFactory(W, H, scale);
+		}
+		function drawSigmaReportChart(rows) {
+			return deps.sigmaChartRenderer(rows);
+		}
+		function sigmaMdcItems(rows) {
+			return deps.sigmaMdcItemsService(rows);
+		}
+		function sigmaPeriodLabel(value) {
+			return deps.reportExportHelpers.periodLabel(value);
+		}
+		function sigmaMdcPeriodLabel(value) {
+			return deps.reportExportHelpers.mdcPeriodLabel(value);
+		}
+		function sigmaExportPeriods(rows) {
+			return deps.reportExportHelpers.exportPeriods(rows);
+		}
+		function sigmaMdcLabelPlacements(items, X, Y, ctx, bounds) {
+			return deps.sigmaMdcLabelPlacementService(items, X, Y, ctx, bounds);
+		}
+		const XlsxCore = (() => {
+			const u8 = deps.xlsxUtf8, escX = deps.xlsxEscape;
+			const zip = deps.xlsxZip;
+			const emu = deps.xlsxEmu, COLS = deps.xlsxColumns;
+			const cells = deps.xlsxCells, cellStr = cells.text, cellNum = cells.number;
+			const r2 = (x) => deps.xlsxRound(x, 2), r4 = (x) => deps.xlsxRound(x, 4);
+			return {
+				u8,
+				escX,
+				zip,
+				emu,
+				COLS,
+				cellStr,
+				cellNum,
+				r2,
+				r4
+			};
+		})();
+		const DEFAULT_SIGMA_SHEET = "Tổng hợp Six Sigma";
+		const SigmaXlsx = (() => {
+			const { u8, escX, zip, COLS, cellStr, cellNum, r2, r4 } = XlsxCore;
+			const styles = deps.sigmaXlsxStyles;
+			const periodNo = (v) => deps.xlsxPeriodNumber(v), periodCell = (ref, style, v) => {
+				const n = periodNo(v);
+				return typeof n === "number" && Number.isFinite(n) ? cellNum(ref, style, n) : cellStr(ref, style, n);
+			};
+			const sheet = (rows, meta, hasDrawing) => {
+				const zoneXf = {
+					"Đẳng cấp thế giới": 9,
+					"Xuất sắc": 10,
+					"Tốt": 11,
+					"Cận biên": 12,
+					"Không đạt": 13
+				}, levels = [], periodMerges = [], assayMerges = [];
+				(rows || []).forEach((d, pIdx) => {
+					const usable = sigmaLevelsOf(d), items = usable.length ? usable : [{
+						level: "—",
+						metric: null
+					}], start = levels.length;
+					items.forEach((item, i) => levels.push({
+						d,
+						item,
+						pIdx,
+						first: i === 0,
+						assayFirst: false
+					}));
+					if (items.length > 1) {
+						const r0 = 4 + start, r1 = r0 + items.length - 1;
+						periodMerges.push("B" + r0 + ":B" + r1, "C" + r0 + ":C" + r1);
+					}
+				});
+				for (let start = 0; start < levels.length;) {
+					let end = start + 1;
+					while (end < levels.length && levels[end].d.name === levels[start].d.name) end++;
+					levels[start].assayFirst = true;
+					if (end - start > 1) assayMerges.push("A" + (4 + start) + ":A" + (3 + end));
+					start = end;
+				}
+				const out = [], noteRow = 4 + levels.length;
+				out.push("<row r=\"1\" ht=\"27.75\" customHeight=\"1\">" + cellStr("A1", 1, meta.title) + "</row>");
+				out.push("<row r=\"2\" ht=\"36\" customHeight=\"1\">" + cellStr("A2", 2, meta.subtitle) + "</row>");
+				out.push("<row r=\"3\" ht=\"39.75\" customHeight=\"1\">" + [
+					"Xét nghiệm",
+					"Kỳ",
+					"TEa (%)",
+					"Mức",
+					"Sigma",
+					"Xếp loại",
+					"CV (%)",
+					"Bias (%)",
+					"DPMO",
+					"Yield (%)",
+					"n IQC"
+				].map((h, i) => cellStr(COLS[i] + "3", 3, h)).join("") + "</row>");
+				levels.forEach((p, idx) => {
+					const rn = 4 + idx, zebra = p.pIdx % 2 === 0, base = zebra ? 6 : 7, name = zebra ? 4 : 5, r = p.item && p.item.metric;
+					const cells = [
+						cellStr("A" + rn, name, p.assayFirst ? p.d.name : ""),
+						p.first ? periodCell("B" + rn, base, p.d.period) : cellStr("B" + rn, base, ""),
+						p.first ? cellNum("C" + rn, base, r2(p.d.tea)) : cellStr("C" + rn, base, "")
+					];
+					if (!r) [
+						"D",
+						"E",
+						"F",
+						"G",
+						"H",
+						"I",
+						"J",
+						"K"
+					].forEach((col) => cells.push(cellStr(col + rn, base, "—")));
+					else {
+						const zx = zoneXf[r.label] || base;
+						cells.push(cellStr("D" + rn, base, p.item.level), cellNum("E" + rn, zx, r2(r.sigma)), cellStr("F" + rn, zx, r.label), cellNum("G" + rn, base, r2(r.cv)), cellNum("H" + rn, base, r2(r.bias)), cellNum("I" + rn, base, Math.round(r.dpmo)), cellNum("J" + rn, base, r4(r.yld)), r.n == null ? cellStr("K" + rn, base, "—") : cellNum("K" + rn, base, r.n));
+					}
+					out.push("<row r=\"" + rn + "\" ht=\"18\" customHeight=\"1\">" + cells.join("") + "</row>");
+				});
+				out.push("<row r=\"" + noteRow + "\" ht=\"32\" customHeight=\"1\">" + cellStr("A" + noteRow, 14, "Lưu ý: Không tự quy đổi Sigma thành số bệnh nhân giữa hai lần QC. Tần suất và quy tắc QC phải được phê duyệt theo đánh giá nguy cơ, độ ổn định hệ thống, tải mẫu, hậu quả lâm sàng và SOP của đơn vị.") + "</row>");
+				const merges = [
+					"A1:K1",
+					"A2:K2",
+					"A" + noteRow + ":K" + noteRow,
+					...assayMerges,
+					...periodMerges
+				];
+				return "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"><dimension ref=\"A1:K" + noteRow + "\"/><sheetViews><sheetView showGridLines=\"0\" workbookViewId=\"0\"><pane ySplit=\"3\" topLeftCell=\"A4\" activePane=\"bottomLeft\" state=\"frozen\"/><selection pane=\"bottomLeft\"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight=\"11.4\"/><cols><col min=\"1\" max=\"1\" width=\"25\" customWidth=\"1\"/><col min=\"2\" max=\"3\" width=\"11\" customWidth=\"1\"/><col min=\"4\" max=\"4\" width=\"8\" customWidth=\"1\"/><col min=\"5\" max=\"5\" width=\"9\" customWidth=\"1\"/><col min=\"6\" max=\"6\" width=\"20\" customWidth=\"1\"/><col min=\"7\" max=\"11\" width=\"11\" customWidth=\"1\"/></cols><sheetData>" + out.join("") + "</sheetData><mergeCells count=\"" + merges.length + "\">" + merges.map((m) => "<mergeCell ref=\"" + m + "\"/>").join("") + "</mergeCells><pageMargins left=\"0.3\" right=\"0.3\" top=\"0.4\" bottom=\"0.4\" header=\"0.2\" footer=\"0.2\"/>" + (hasDrawing ? "<drawing r:id=\"rId1\"/>" : "") + "</worksheet>";
+			};
+			const drawing = deps.xlsxDrawing;
+			const build = (rows, meta, images = []) => {
+				images = images.filter((im) => im && im.bytes && im.bytes.length);
+				const hasDraw = images.length > 0, chartStartRow0 = 4 + (rows || []).reduce((n, d) => n + Math.max(1, sigmaLevelsOf(d).length), 0) + 1;
+				const files = [
+					{
+						name: "[Content_Types].xml",
+						data: u8("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/>" + (hasDraw ? "<Default Extension=\"png\" ContentType=\"image/png\"/>" : "") + "<Override PartName=\"/xl/workbook.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/><Override PartName=\"/xl/worksheets/sheet1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/><Override PartName=\"/xl/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml\"/>" + (hasDraw ? "<Override PartName=\"/xl/drawings/drawing1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.drawing+xml\"/>" : "") + "</Types>")
+					},
+					{
+						name: "_rels/.rels",
+						data: u8("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/></Relationships>")
+					},
+					{
+						name: "xl/workbook.xml",
+						data: u8("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"><sheets><sheet name=\"" + escX("Tổng hợp Six Sigma") + "\" sheetId=\"1\" r:id=\"rId1\"/></sheets></workbook>")
+					},
+					{
+						name: "xl/_rels/workbook.xml.rels",
+						data: u8("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet1.xml\"/><Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" Target=\"styles.xml\"/></Relationships>")
+					},
+					{
+						name: "xl/styles.xml",
+						data: u8(styles())
+					},
+					{
+						name: "xl/worksheets/sheet1.xml",
+						data: u8(sheet(rows, meta, hasDraw))
+					}
+				];
+				if (hasDraw) {
+					files.push({
+						name: "xl/worksheets/_rels/sheet1.xml.rels",
+						data: u8("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing\" Target=\"../drawings/drawing1.xml\"/></Relationships>")
+					});
+					files.push({
+						name: "xl/drawings/drawing1.xml",
+						data: u8(drawing(images, chartStartRow0))
+					});
+					let rels = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">";
+					images.forEach((im, i) => rels += "<Relationship Id=\"rId" + (i + 1) + "\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/image\" Target=\"../media/image" + (i + 1) + ".png\"/>");
+					files.push({
+						name: "xl/drawings/_rels/drawing1.xml.rels",
+						data: u8(rels + "</Relationships>")
+					});
+					images.forEach((im, i) => files.push({
+						name: "xl/media/image" + (i + 1) + ".png",
+						data: im.bytes
+					}));
+				}
+				return zip(files);
+			};
+			return { build };
+		})();
+		function drawSigmaReportMDC(rows) {
+			return deps.sigmaMdcRenderer(rows);
+		}
+		function renameSigmaSheet(bytes, sheetName) {
+			return deps.renameSigmaXlsxSheet(bytes, sheetName);
+		}
+		const sigmaXlsxBuild = SigmaXlsx.build;
+		SigmaXlsx.build = (rows, meta, images) => renameSigmaSheet(sigmaXlsxBuild(rows, meta, images), meta && meta.sheetName || DEFAULT_SIGMA_SHEET);
+		const RXST = deps.reportXlsxStyleIds;
+		const ReportXlsx = { build: deps.reportXlsxBuild };
+		function reportXlsxDoc(tid, start, end, includeNceAppendix = true) {
+			const t = deps.findTest(tid);
+			if (!t) return null;
+			const ST = RXST, NCOL = 10, CHART_W = 930, CHART_H = Math.round(399900 / 1400), ROW_PX = 17;
+			const inMonth = reportInRange(start, end), wg = deps.activeWestgard(t);
+			const { teaVal, teaSourceText } = reportTeaInfo(t);
+			const rows = [], merges = [], images = [], rowHeights = {};
+			let R = 0;
+			const S = (v, s) => ({
+				v,
+				s
+			}), Nn = (v, s) => ({
+				v,
+				s,
+				num: true
+			});
+			const n1 = (v) => Number.isFinite(v) ? Number(Number(v).toFixed(1)) : "", n2 = (v) => Number.isFinite(v) ? Number(Number(v).toFixed(2)) : "", n3 = (v) => Number.isFinite(v) ? Number(Number(v).toFixed(3)) : "";
+			const push = (cells) => {
+				rows.push(cells);
+				return ++R;
+			};
+			const fullMerge = (r) => merges.push("A" + r + ":J" + r);
+			const blank = () => push([]);
+			const section = (txt) => {
+				const r = push([S(txt, ST.SECTION)]);
+				fullMerge(r);
+				rowHeights[r] = 21;
+			};
+			const note = (txt) => {
+				const r = push([S(txt, ST.NOTE)]);
+				fullMerge(r);
+				rowHeights[r] = Math.min(60, 14 + Math.ceil(String(txt).length / 95) * 13);
+			};
+			const nceCells = (value, style, count) => Array.from({ length: count }, (_, i) => S(i ? "" : value, style));
+			const nceSub = (txt) => {
+				blank();
+				const r = push(nceCells(txt, ST.LABEL, NCOL));
+				fullMerge(r);
+				rowHeights[r] = 19;
+			};
+			const ncePair = (l1, v1, l2, v2) => {
+				const a = String(v1 || "—"), b = String(v2 || "—"), rr = push([
+					...nceCells(l1, ST.LABEL, 2),
+					...nceCells(a, ST.VAL, 3),
+					...nceCells(l2, ST.LABEL, 2),
+					...nceCells(b, ST.VAL, 3)
+				]);
+				merges.push("A" + rr + ":B" + rr, "C" + rr + ":E" + rr, "F" + rr + ":G" + rr, "H" + rr + ":J" + rr);
+				rowHeights[rr] = Math.min(54, 21 + Math.max(Math.ceil(a.length / 42), Math.ceil(b.length / 42) - 1) * 12);
+			};
+			const nceWide = (label, value) => {
+				const text = String(value || "—"), rr = push([...nceCells(label, ST.LABEL, 2), ...nceCells(text, ST.VAL, 8)]);
+				merges.push("A" + rr + ":B" + rr, "C" + rr + ":J" + rr);
+				rowHeights[rr] = Math.min(72, 21 + Math.max(0, Math.ceil(text.length / 105) - 1) * 12);
+			};
+			const imgBytes = sigmaDataURLBytes;
+			const chart = (durl) => {
+				if (!durl || !imgBytes) return;
+				const row0 = R;
+				let bytes;
+				try {
+					bytes = imgBytes(durl);
+				} catch (e) {
+					return;
+				}
+				images.push({
+					bytes,
+					dispW: CHART_W,
+					dispH: CHART_H,
+					row0
+				});
+				const spacer = Math.ceil(CHART_H / ROW_PX) + 1;
+				for (let i = 0; i < spacer; i++) blank();
+			};
+			const appMeta = deps.appMeta() || {}, rulesStr = Object.entries(deps.westgardRules() || {}).filter((x) => x[1] !== false).map((x) => x[0]).join(", ") || "Chưa cấu hình";
+			const h = deps.reportXlsxHeader({
+				styles: ST,
+				appName: appMeta.name || "QC Lab",
+				appVersion: appMeta.version || "dev",
+				rules: rulesStr,
+				labName: deps.lab().name || "",
+				department: deps.lab().dept || "",
+				address: deps.lab().address || "",
+				exportedAt: deps.formatDateTimeVN((/* @__PURE__ */ new Date()).toISOString()),
+				exportedBy: deps.userName(),
+				testName: deps.testDisplayName(t),
+				testUnit: t.unit || "",
+				machine: t.machine || "",
+				range: deps.reportRangeText(start, end),
+				tea: teaVal || "—",
+				teaSource: teaSourceText,
+				teaReference: deps.sgTeaRefText ? deps.sgTeaRefText(t) : "",
+				teaDocument: t.teaDoc || "",
+				teaApprovedBy: t.teaApprovedBy || ""
+			});
+			rows.push(...h.rows);
+			merges.push(...h.merges);
+			Object.assign(rowHeights, h.rowHeights);
+			R = rows.length;
+			const multiViews = reportMultiViews(t, inMonth);
+			if (multiViews.filter((v) => v.pts.length).length >= 2) {
+				blank();
+				section("Levey-Jennings tổng hợp theo Z-score");
+				chart(deps.ljMultiDataURL ? deps.ljMultiDataURL(multiViews, t) : null);
+			}
+			const mergePairs = (r, pairs) => pairs.forEach(([a, b]) => merges.push(a + r + ":" + b + r));
+			const statsHeader = () => {
+				const r = push([
+					S("n", ST.TH),
+					S("Mean thực", ST.TH),
+					S("", ST.TH),
+					S("SD", ST.TH),
+					S("CV%", ST.TH),
+					S("Bias%", ST.TH),
+					S("TE%", ST.TH),
+					S("TEa%", ST.TH),
+					S("Sigma (kỳ)", ST.TH),
+					S("", ST.TH)
+				]);
+				mergePairs(r, [["B", "C"], ["I", "J"]]);
+				rowHeights[r] = 18;
+			};
+			const statsRow = (st, bias, te, sigma) => {
+				const sg = sigma == null ? S("—", ST.TD) : st.n < 20 ? S(deps.format(sigma, 1) + " *", ST.TD) : Nn(n1(sigma), ST.TD), r = push([
+					Nn(st.n, ST.TD),
+					Nn(n2(st.m), ST.TD),
+					S("", ST.TD),
+					Nn(n3(st.sd), ST.TD),
+					Nn(n2(st.cv), ST.TD),
+					Nn(n2(bias), ST.TD),
+					Nn(n2(te), ST.TD),
+					teaVal ? Nn(n2(teaVal), ST.TD) : S("—", ST.TD),
+					sg,
+					S("", ST.TD)
+				]);
+				mergePairs(r, [["B", "C"], ["I", "J"]]);
+			};
+			const pointsHeader = () => {
+				const r = push([
+					S("Ngày", ST.TH),
+					S("", ST.TH),
+					S("Lần chạy", ST.TH),
+					S("", ST.TH),
+					S("NV", ST.TH),
+					S("Giá trị", ST.TH),
+					S("Z", ST.TH),
+					S("Kết luận", ST.TH),
+					S("Luật / bằng chứng", ST.TH),
+					S("", ST.TH)
+				]);
+				mergePairs(r, [
+					["A", "B"],
+					["C", "D"],
+					["I", "J"]
+				]);
+				rowHeights[r] = 18;
+			};
+			const pointsRow = (o) => {
+				const rules = [...new Set(o.f.rules || [])], support = [...new Set(o.f.supportRules || [])].filter((rule) => !rules.includes(rule)), ruleText = rules.join(", ") || (support.length ? "Bằng chứng: " + support.join(", ") : "—"), staff = deps.pointStaff(o.p), vs = o.f.level === "rej" ? ST.REJ : o.f.level === "warn" ? ST.WARN : ST.TD, r = push([
+					S(deps.vnDate(o.p.date), ST.TD),
+					S("", ST.TD),
+					S(o.p.runId || "—", ST.TD),
+					S("", ST.TD),
+					S(staff.code || "—", ST.TD),
+					Nn(Number.isFinite(o.p.val) ? o.p.val : "", ST.TD),
+					S((o.z >= 0 ? "+" : "") + deps.format(o.z) + "s", ST.TD),
+					S(deps.stateName(o.f.level), vs),
+					S(ruleText, ST.TD),
+					S("", ST.TD)
+				]);
+				mergePairs(r, [
+					["A", "B"],
+					["C", "D"],
+					["I", "J"]
+				]);
+			};
+			const violHeader = () => {
+				const r = push([
+					S("Ngày", ST.TH),
+					S("", ST.TH),
+					S("NV", ST.TH),
+					S("Giá trị", ST.TH),
+					S("Z", ST.TH),
+					S("Luật", ST.TH),
+					S("", ST.TH),
+					S("Loại sai số", ST.TH),
+					S("", ST.TH),
+					S("", ST.TH)
+				]);
+				mergePairs(r, [
+					["A", "B"],
+					["F", "G"],
+					["H", "J"]
+				]);
+				rowHeights[r] = 18;
+			};
+			const violRow = (o) => {
+				const rules = [...new Set(o.f.rules || [])], r = push([
+					S(deps.vnDate(o.p.date), ST.TD),
+					S("", ST.TD),
+					S(deps.pointStaff(o.p).code || "—", ST.TD),
+					Nn(Number.isFinite(o.p.val) ? o.p.val : "", ST.TD),
+					S((o.z >= 0 ? "+" : "") + deps.format(o.z) + "s", ST.TD),
+					S(rules.join(", "), ST.WARN),
+					S("", ST.WARN),
+					S(deps.errorType(rules), ST.TDL),
+					S("", ST.TDL),
+					S("", ST.TDL)
+				]);
+				mergePairs(r, [
+					["A", "B"],
+					["F", "G"],
+					["H", "J"]
+				]);
+			};
+			deps.operationalLevels(t).forEach((l) => {
+				(deps.previousLotSeries ? deps.previousLotSeries(t, l.level) : []).forEach((s) => {
+					const { inPts, items: allS } = reportPrevLotRows(t, s, inMonth);
+					if (!inPts.length) return;
+					blank();
+					section("Mức " + l.level + " — Lô cũ " + (s.lot || "?") + " · đã chuyển tiếp (Mean=" + deps.qcExportValueFormat.value(t, s.mean) + ", SD=" + deps.qcExportValueFormat.stat(t, s.sd) + ")");
+					note("Vi phạm ở lô cũ chỉ đánh giá luật Westgard theo từng mức riêng lẻ, không gồm luật liên mức (như R4s giữa các mức cùng lần chạy).");
+					chart(deps.ljDataURL ? deps.ljDataURL(inPts, s.mean, s.sd) : null);
+					const stat = deps.reportLevelStats(inPts, s.mean, teaVal);
+					statsHeader();
+					statsRow(stat.st, stat.bias, stat.te, stat.sigma);
+					blank();
+					pointsHeader();
+					allS.forEach(pointsRow);
+					const violS = allS.filter((o) => o.f.level !== "ok");
+					if (violS.length) {
+						blank();
+						violHeader();
+						violS.forEach(violRow);
+					}
+				});
+				const { pts, items: all } = reportLevelRows(t, l, wg, inMonth);
+				blank();
+				section("Mức " + l.level + " — Lô " + (l.lot || "?") + " · Dải " + (l.applied === "lab" ? "PXN" : "NSX") + " (Mean=" + deps.qcExportValueFormat.value(t, l.mean) + ", SD=" + deps.qcExportValueFormat.stat(t, l.sd) + ")");
+				if (!pts.length) {
+					note("Không có dữ liệu trong khoảng ngày đã chọn.");
+					return;
+				}
+				chart(deps.ljDataURL ? deps.ljDataURL(pts, l.mean, l.sd) : null);
+				const stat = deps.reportLevelStats(pts, l.mean, teaVal);
+				statsHeader();
+				statsRow(stat.st, stat.bias, stat.te, stat.sigma);
+				blank();
+				pointsHeader();
+				all.forEach(pointsRow);
+				const viol = all.filter((o) => o.f.level !== "ok");
+				if (viol.length) {
+					blank();
+					violHeader();
+					viol.forEach(violRow);
+				}
+			});
+			const acts = reportActionsInRange(tid, inMonth);
+			if (acts.length) {
+				blank();
+				section("Hành động khắc phục trong khoảng ngày đã chọn");
+				note("Bảng dưới đây là bản tóm tắt. Nội dung đầy đủ nằm trong phụ lục NCE khi tùy chọn kèm phụ lục được bật.");
+				let hr = push([
+					S("Ngày / mã NCE", ST.TH),
+					S("Mức / lô", ST.TH),
+					S("Luật / loại SS", ST.TH),
+					S("Tóm tắt xử lý", ST.TH),
+					S("", ST.TH),
+					S("", ST.TH),
+					S("Người", ST.TH),
+					S("QC chạy lại", ST.TH),
+					S("Duyệt", ST.TH),
+					S("Khép vòng", ST.TH)
+				]);
+				merges.push("D" + hr + ":F" + hr);
+				rowHeights[hr] = 25;
+				acts.forEach((a) => {
+					const m = reportNceModel(a, t), rr = deps.actionRerunStatus ? deps.actionRerunStatus(a) : { label: "" }, summary = reportNceSummaryParts(a).map(([label, text]) => label + ": " + text).join("\n"), ar = push([
+						S((a.nceId ? a.nceId + "\n" : "") + m.eventDateText, ST.TD),
+						S(deps.actionLevelShort(t, a.level, a.lot), ST.TD),
+						S((a.rule || "—") + "\n" + (a.errorType || "—"), ST.TD),
+						S(summary, ST.TDL),
+						S("", ST.TDL),
+						S("", ST.TDL),
+						S(a.by || "—", ST.TD),
+						S(rr.label || "—", ST.TD),
+						S((deps.actionApprovalLabel ? deps.actionApprovalLabel(a) : a.approvalStatus || "pending") + (a.approvedBy ? "\n" + a.approvedBy : ""), ST.TD),
+						S(m.wfLabel, ST.TD)
+					]);
+					merges.push("D" + ar + ":F" + ar);
+					rowHeights[ar] = 96;
+				});
+				if (includeNceAppendix) {
+					blank();
+					section("Phụ lục - Hồ sơ NCE chi tiết");
+					note("Phụ lục giữ đầy đủ nội dung điều tra, bằng chứng QC chạy lại, đánh giá hiệu lực và phê duyệt. Bảng tổng hợp phía trên chỉ trình bày thông tin trọng yếu.");
+					acts.forEach((a) => {
+						const m = reportNceModel(a, t);
+						blank();
+						section("Phiếu NCE " + m.nceTitle + " · " + m.wfLabel);
+						ncePair("Ngày xảy ra", m.eventDateText, "Xét nghiệm / mức / lô", m.testLevelText);
+						ncePair("Luật / loại sai số", m.ruleErrText, "Nguồn / giai đoạn", m.sourcePhaseText);
+						ncePair("Người phụ trách / hạn", m.ownerDueText, "Trạng thái bản ghi", m.recordStatusText);
+						if (!m.modern) {
+							nceSub("Hành động đã ghi");
+							nceWide("Nội dung", m.legacyActionText);
+							nceSub("QC chạy lại / duyệt");
+							ncePair("QC chạy lại", m.rerunText, "Phê duyệt", m.approvalShortText);
+							return;
+						}
+						nceSub("1. Kiểm soát và xử lý tức thời");
+						ncePair("Phạm vi kiểm soát", m.containmentText, "Ghi chú phạm vi", m.containmentNote);
+						nceWide("Xử lý tức thời", m.correctionText);
+						nceSub("2. Đánh giá nguy cơ ban đầu");
+						ncePair("Phân loại / RPN", m.riskText, "S x O x D", m.sodText);
+						nceWide("Căn cứ SOP", m.riskBasis);
+						nceSub("3. Checklist điều tra");
+						let cr = push([
+							S("Hạng mục", ST.TH),
+							S("", ST.TH),
+							S("", ST.TH),
+							S("", ST.TH),
+							S("Kết luận", ST.TH),
+							S("", ST.TH),
+							S("Ghi chú / bằng chứng", ST.TH),
+							S("", ST.TH),
+							S("", ST.TH),
+							S("", ST.TH)
+						]);
+						merges.push("A" + cr + ":D" + cr, "E" + cr + ":F" + cr, "G" + cr + ":J" + cr);
+						m.checks.forEach(([label, statusText, noteText]) => {
+							const rrr = push([
+								...nceCells(label, ST.TDL, 4),
+								...nceCells(statusText, ST.TD, 2),
+								...nceCells(noteText, ST.TDL, 4)
+							]);
+							merges.push("A" + rrr + ":D" + rrr, "E" + rrr + ":F" + rrr, "G" + rrr + ":J" + rrr);
+							rowHeights[rrr] = Math.min(54, 23 + Math.max(0, Math.ceil(noteText.length / 55) - 1) * 12);
+						});
+						nceSub("4. Nguyên nhân và hành động khắc phục");
+						ncePair("Nhóm nguyên nhân", m.causeCategoryText, "Ngày hoàn thành hành động", m.actionCompletedText);
+						nceWide("Nguyên nhân", m.causeText);
+						nceWide("Hành động khắc phục", m.actionText);
+						nceSub("5. Bằng chứng QC chạy lại và cho phép trở lại");
+						ncePair("QC chạy lại", m.rerunText, "Quyết định", m.releaseText);
+						ncePair("Ngày / người cho phép", m.releaseWhoText, "Căn cứ cho phép", m.releaseNote);
+						nceSub("6. Ảnh hưởng người bệnh");
+						ncePair("Kết luận", m.patientText, "Xử lý kết quả liên quan", m.patientAction);
+						nceSub("7. Hiệu lực, nguy cơ còn lại và phê duyệt");
+						ncePair("Đánh giá hiệu lực", m.effLabel, "Ngày / người đánh giá", m.effWhoText);
+						ncePair("Bằng chứng hiệu lực", m.effNote, "Nguy cơ còn lại", m.residualText);
+						ncePair("Căn cứ đánh giá lại", m.residualBasis, "Phê duyệt", m.approvalText);
+						nceWide("Ý kiến duyệt", m.approvalNote);
+						if (m.cancelled) {
+							nceSub("Thông tin hủy hồ sơ");
+							nceWide("Lý do / người / thời điểm", m.cancelText);
+						}
+					});
+				}
+			}
+			blank();
+			fullMerge(push([S("Người thực hiện — Người kiểm tra — Phụ trách khoa (ký, ghi rõ họ tên)", ST.NOTE)]));
+			return {
+				sheetName: "Báo cáo nội kiểm",
+				cols: [
+					13,
+					12,
+					14,
+					10,
+					10,
+					10,
+					12,
+					13,
+					15,
+					18
+				].slice(0, NCOL),
+				rows,
+				merges,
+				rowHeights,
+				images
+			};
+		}
+		async function exportReportXLSX() {
+			const { tid, t, start, end, includeNceAppendix } = deps.reportExportSelection();
+			if (!t) return;
+			let doc;
+			try {
+				doc = reportXlsxDoc(tid, start, end, includeNceAppendix);
+			} catch (e) {
+				await deps.infoDialog("Không thể tạo báo cáo Excel:\n" + (e && e.message ? e.message : e));
+				return;
+			}
+			if (!doc) return;
+			try {
+				const bytes = ReportXlsx.build(doc), label = start || end ? (start || "batdau") + "_" + (end || "hientai") : "toanbo";
+				downloadBlob("Bao_cao_IQC_" + deps.safeName(t.name) + "_" + deps.safeName(label) + ".xlsx", new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+			} catch (e) {
+				await deps.infoDialog("Không thể xuất Excel:\n" + (e && e.message ? e.message : e));
+			}
+		}
+		function westgardXlsxDoc(tid) {
+			const t = deps.findTest(tid);
+			if (!t) return null;
+			const wg = deps.activeWestgard(t);
+			if (!wg.views.length) return null;
+			const ST = RXST, CHART_W = 900, CHART_H = Math.round(387e3 / 1400), ROW_PX = 17, rows = [], merges = [], images = [], rowHeights = {};
+			let R = 0;
+			const S = (v, s) => ({
+				v,
+				s
+			}), Nn = (v, s) => ({
+				v,
+				s,
+				num: true
+			}), push = (cells) => {
+				rows.push(cells);
+				return ++R;
+			}, blank = () => push([]), fullMerge = (r) => merges.push("A" + r + ":I" + r);
+			const section = (txt) => {
+				const r = push([S(txt, ST.SECTION)]);
+				fullMerge(r);
+				rowHeights[r] = 21;
+			};
+			const note = (txt) => {
+				const r = push([S(txt, ST.NOTE)]);
+				fullMerge(r);
+				rowHeights[r] = Math.min(60, 14 + Math.ceil(String(txt).length / 90) * 13);
+			};
+			const chart = (durl) => {
+				if (!durl || !deps.sigmaDataUrlBytes) return;
+				let bytes;
+				try {
+					bytes = sigmaDataURLBytes(durl);
+				} catch (e) {
+					return;
+				}
+				images.push({
+					bytes,
+					dispW: CHART_W,
+					dispH: CHART_H,
+					row0: R
+				});
+				for (let i = 0; i < Math.ceil(CHART_H / ROW_PX) + 1; i++) blank();
+			};
+			const app = deps.appMeta() || {}, machine = deps.instrumentName(t.instrumentId, t.machine) || t.machine || "—", withinRules = deps.wgRules().filter((rule) => deps.testRuleOnWithin(t, rule)).join(", ") || "Không có", acrossRules = deps.wgRules().filter((rule) => deps.testRuleOnAcross(t, rule)).join(", ") || "Không có";
+			let r;
+			const h = deps.westgardXlsxHeader({
+				styles: ST,
+				title: "PHÂN TÍCH WESTGARD — " + deps.testDisplayName(t),
+				labName: deps.lab().name || "",
+				department: deps.lab().dept || "",
+				address: deps.lab().address || "",
+				exportedAt: deps.formatDateTimeVN((/* @__PURE__ */ new Date()).toISOString()),
+				exportedBy: deps.userName(),
+				testName: deps.testDisplayName(t),
+				testUnit: t.unit || "",
+				machine,
+				appName: app.name || "QC Lab",
+				appVersion: app.version || "dev",
+				withinRules,
+				acrossRules
+			});
+			rows.push(...h.rows);
+			merges.push(...h.merges);
+			Object.assign(rowHeights, h.rowHeights);
+			R = rows.length;
+			const multiViews = deps.wgMultiViews ? deps.wgMultiViews(t) : wg.views.map((v) => ({
+				level: v.l.level,
+				lot: v.l.lot,
+				mean: v.l.mean,
+				sd: v.l.sd,
+				pts: v.pts,
+				label: "M" + v.l.level + "·" + (v.l.lot || "?")
+			}));
+			if (multiViews.filter((v) => v.pts && v.pts.length).length >= 2) {
+				blank();
+				section("Levey-Jennings tổng hợp theo Z-score");
+				chart(deps.ljMultiDataURL ? deps.ljMultiDataURL(multiViews, t) : null);
+			}
+			const head = () => push([
+				S("#", ST.TH),
+				S("Ngày", ST.TH),
+				S("Lần chạy", ST.TH),
+				S("NV", ST.TH),
+				S("Giá trị", ST.TH),
+				S("Z", ST.TH),
+				S("Kết luận", ST.TH),
+				S("Luật / bằng chứng", ST.TH),
+				S("Loại sai số", ST.TH)
+			]);
+			const detail = (o, index) => {
+				const row = deps.westgardXlsxRows.detail(o, index);
+				push([
+					Nn(row.index, ST.TD),
+					S(row.date, ST.TD),
+					S(row.runId, ST.TD),
+					S(row.staffCode, ST.TD),
+					Nn(row.value, ST.TD),
+					S(row.z, ST.TD),
+					S(row.verdict, row.style === "rej" ? ST.REJ : row.style === "warn" ? ST.WARN : ST.TD),
+					S(row.ruleText, ST.TDL),
+					S(row.error, ST.TDL)
+				]);
+			};
+			wg.views.forEach((v) => {
+				const l = v.l, prev = deps.wgPrevOpenHas(t.id + "|" + l.level) && (deps.previousLotSeries ? deps.previousLotSeries(t, l.level) : [])[0], series = prev || {
+					lot: l.lot,
+					mean: l.mean,
+					sd: l.sd,
+					pts: v.pts
+				}, isPrev = !!prev;
+				let all;
+				if (isPrev) {
+					const calc = deps.westgardByPoint(series.pts, series.mean, series.sd, (rule) => deps.testRuleOnWithin(t, rule));
+					all = series.pts.map((p, i) => {
+						const raw = calc.F[i] || {
+							rules: [],
+							supportRules: []
+						};
+						return {
+							p,
+							f: {
+								...raw,
+								level: deps.ruleResultLevel(t, raw.rules || [])
+							},
+							z: calc.zs[i]
+						};
+					});
+				} else all = series.pts.map((p) => {
+					const f = wg.byPoint.get(p.id) || {
+						level: "ok",
+						rules: [],
+						supportRules: [],
+						z: (p.val - series.mean) / series.sd
+					};
+					return {
+						p,
+						f,
+						z: f.z
+					};
+				});
+				const relevant = all.filter((o) => o.f.level !== "ok" || (o.f.supportRules || []).length), pointIndex = new Map(series.pts.map((p, i) => [p.id, i + 1]));
+				blank();
+				section("Mức " + l.level + " — " + (isPrev ? "Lô cũ " : "Lô ") + (series.lot || "?") + (isPrev ? " · đã chuyển tiếp" : "") + " (Mean=" + deps.qcExportValueFormat.value(t, series.mean) + ", SD=" + deps.qcExportValueFormat.stat(t, series.sd) + ")");
+				if (isPrev) note("Lô cũ chỉ được đánh giá luật Westgard theo từng mức riêng lẻ, không gồm luật liên mức (như R4s giữa các mức cùng lần chạy).");
+				if (!series.pts.length) {
+					note("Chưa có dữ liệu QC ở mức này.");
+					return;
+				}
+				chart(deps.ljDataURL ? deps.ljDataURL(series.pts, series.mean, series.sd) : null);
+				note("Tổng " + series.pts.length + " điểm · Xuất " + relevant.length + " điểm vi phạm/bằng chứng.");
+				if (!relevant.length) {
+					note("Không có điểm vi phạm/cảnh báo hoặc điểm bằng chứng ở lô này.");
+					return;
+				}
+				head();
+				relevant.forEach((o) => detail(o, pointIndex.get(o.p.id) || 1));
+			});
+			blank();
+			r = push([S("Người thực hiện — Người kiểm tra — Phụ trách khoa (ký, ghi rõ họ tên)", ST.NOTE)]);
+			fullMerge(r);
+			return {
+				sheetName: "Phân tích Westgard",
+				cols: [
+					7,
+					12,
+					14,
+					9,
+					12,
+					9,
+					15,
+					23,
+					22
+				],
+				rows,
+				merges,
+				rowHeights,
+				images
+			};
+		}
+		async function exportWestgardXLSX() {
+			const t = deps.findTest(deps.selTest());
+			if (!t) {
+				await deps.infoDialog("Chưa chọn được xét nghiệm để xuất Excel.");
+				return;
+			}
+			let doc;
+			try {
+				doc = westgardXlsxDoc(t.id);
+			} catch (e) {
+				await deps.infoDialog("Không thể tạo báo cáo Westgard Excel:\n" + (e && e.message ? e.message : e));
+				return;
+			}
+			if (!doc) {
+				await deps.infoDialog("Xét nghiệm này chưa có mức QC đang vận hành để xuất Excel.");
+				return;
+			}
+			try {
+				const bytes = ReportXlsx.build(doc);
+				downloadBlob("Phan_tich_Westgard_" + deps.safeName(t.name) + ".xlsx", new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+			} catch (e) {
+				await deps.infoDialog("Không thể xuất Excel:\n" + (e && e.message ? e.message : e));
+			}
+		}
+		function sigmaExportMeta() {
+			return deps.sigmaExportMetaService.meta();
+		}
+		function sigmaTeaTrace(rows) {
+			return deps.sigmaExportMetaService.teaTrace(rows);
+		}
+		async function buildSigmaXlsx(rows, title, subtitle, fileName, sheetName = DEFAULT_SIGMA_SHEET) {
+			const images = [];
+			try {
+				const c = drawSigmaReportChart(rows);
+				if (c) images.push(c);
+				const m = drawSigmaReportMDC(rows);
+				if (m) images.push(m);
+			} catch (e) {}
+			try {
+				const bytes = SigmaXlsx.build(rows, {
+					title,
+					subtitle,
+					sheetName
+				}, images);
+				downloadBlob(fileName, new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+			} catch (e) {
+				await deps.infoDialog("Không thể xuất báo cáo Sigma:\n" + (e && e.message ? e.message : e));
+			}
+		}
+		async function exportSigmaPeriodXLSX(periodId) {
+			const t = deps.findTest(deps.sgTest()), entry = t && deps.sgData(t.id).find((x) => x.id === periodId);
+			if (!t || !entry) {
+				await deps.infoDialog("Chưa chọn được kỳ Sigma.");
+				return;
+			}
+			const rows = sigmaReportRows(t.id, "period", entry.period, entry.id);
+			if (!rows.length) {
+				await deps.infoDialog("Kỳ này chưa đủ dữ liệu Sigma để xuất báo cáo.");
+				return;
+			}
+			const { app, rules } = sigmaExportMeta(), period = deps.vnPeriod(entry.period) || entry.period, month = String(parseInt(String(entry.period).slice(5), 10) || "");
+			await buildSigmaXlsx(rows, `BÁO CÁO SIX SIGMA - ${deps.testDisplayName(t)} - ${period}`, `Nguồn: QC Lab · Xuất ${deps.formatDateTimeVN((/* @__PURE__ */ new Date()).toISOString())} · Kỳ xuất: ${sigmaExportPeriods(rows)} · Người xuất: ${deps.userName()} · App ${app.version || "dev"} · Bộ luật: ${rules} · Truy xuất TEa: ${sigmaTeaTrace(rows)}`, `Bao_Cao_Six_Sigma_${deps.safeName(t.name)}_${deps.safeName(entry.period)}.xlsx`, `Kỳ ${month}`);
+		}
+		async function exportSigmaPeriodsXLSX() {
+			const t = deps.findTest(deps.sgTest());
+			if (!t) {
+				await deps.infoDialog("Chưa chọn xét nghiệm.");
+				return;
+			}
+			const rows = sigmaReportRows(t.id, "all");
+			if (!rows.length) {
+				await deps.infoDialog("Xét nghiệm này chưa có kỳ Sigma đủ dữ liệu để xuất báo cáo.");
+				return;
+			}
+			const { app, rules } = sigmaExportMeta();
+			await buildSigmaXlsx(rows, `BÁO CÁO TỔNG HỢP SIX SIGMA THEO KỲ - ${deps.testDisplayName(t)}`, `Nguồn: QC Lab · Xuất ${deps.formatDateTimeVN((/* @__PURE__ */ new Date()).toISOString())} · Kỳ xuất: ${sigmaExportPeriods(rows)} · Người xuất: ${deps.userName()} · App ${app.version || "dev"} · Bộ luật: ${rules} · Truy xuất TEa: ${sigmaTeaTrace(rows)}`, `Bao_Cao_Six_Sigma_Theo_Ky_${deps.safeName(t.name)}.xlsx`);
+		}
+		return {
+			dataIoTypePx,
+			dataIoCanvasFont,
+			exportMetaRows: exportMetaRowsImpl,
+			reportInRange,
+			reportTeaInfo,
+			reportMultiViews,
+			reportPrevLotRows,
+			reportLevelRows,
+			reportActionsInRange,
+			reportNceExcerpt,
+			reportNceSummaryParts,
+			reportNceModel,
+			exportReportCSV,
+			exportActionsCSV,
+			downloadBlob,
+			sigmaReportMetric,
+			sigmaReportRows,
+			sigmaLevelsOf,
+			sigmaDataURLBytes,
+			sigmaExportPixelRatio,
+			sigmaCanvas,
+			drawSigmaReportChart,
+			sigmaMdcItems,
+			sigmaPeriodLabel,
+			sigmaMdcPeriodLabel,
+			sigmaExportPeriods,
+			sigmaMdcLabelPlacements,
+			SIGMA_EXPORT_PIXEL_RATIO,
+			XlsxCore,
+			SigmaXlsx,
+			drawSigmaReportMDC,
+			renameSigmaSheet,
+			RXST,
+			ReportXlsx,
+			reportXlsxDoc,
+			exportReportXLSX,
+			westgardXlsxDoc,
+			exportWestgardXLSX,
+			sigmaExportMeta,
+			sigmaTeaTrace,
+			buildSigmaXlsx,
+			exportSigmaPeriodXLSX,
+			exportSigmaPeriodsXLSX
+		};
+	}
+	//#endregion
+	//#region src/presentation/shared/html-escape.ts
+	var HTML_ESCAPE_MAP = {
+		"&": "&amp;",
+		"<": "&lt;",
+		">": "&gt;",
+		"\"": "&quot;",
+		"'": "&#39;"
+	};
+	function escapeHtml$2(value) {
+		return (value == null ? "" : String(value)).replace(/[&<>"']/g, (c) => HTML_ESCAPE_MAP[c]);
+	}
+	function escapeHtmlAttr(value) {
+		return escapeHtml$2(value);
 	}
 	//#endregion
 	//#region src/presentation/format/basic-format.ts
@@ -15966,6 +17863,330 @@
 		});
 	}
 	//#endregion
+	//#region src/domain/sigma/sigma-tea-resolution.ts
+	/**
+	* Lớp giải TEa của trang Six Sigma — trả lời "TEa của xét nghiệm này bằng bao
+	* nhiêu, theo nguồn nào, truy vết ra sao": bảng TEa hiệu lực (mặc định REFTESTS
+	* phủ bởi state.teaRefs), khớp xét nghiệm với dòng tham chiếu, quy tắc CLIA
+	* phần trăm/tuyệt đối/lớn hơn, và ảnh chụp truy vết TEa gắn vào từng kỳ.
+	* Không biết gì về Sigma, MU, biểu đồ hay modal — những thứ đó ở lại sigma.js.
+	*/
+	function createSigmaTeaResolution(deps) {
+		const SG_TEA_SOURCES = [
+			["lab", "TEa chuẩn hóa của phòng xét nghiệm"],
+			["eflm", "EFLM - nhập từ database"],
+			["clia", "CLIA PT (CMS-3355-F)"],
+			["ricos", "Ricos / Westgard biological variation"]
+		];
+		const SG_TEA_DEFAULT_REF = {
+			lab: deps.teaSourceRegistry.lab.document,
+			eflm: deps.teaSourceRegistry.eflm.document,
+			clia: deps.teaSourceRegistry.clia.document,
+			ricos: deps.teaSourceRegistry.ricos.document
+		};
+		const SG_CLIA_FIXED = Object.freeze(Object.fromEntries(deps.teaAnalyteCatalog.filter((row) => Number.isFinite(row.tea.cliaAbsolute) && row.tea.cliaAbsolute > 0).map((row) => [row.analyteId, {
+			absolute: row.tea.cliaAbsolute,
+			unit: row.tea.cliaAbsoluteUnit || row.unit || ""
+		}])));
+		const teaRefName = (v) => String(v == null ? "" : v).trim().toLowerCase();
+		const teaRefSearchKey = (v) => deps.searchText ? deps.searchText(v) : teaRefName(v);
+		const teaRefRecordForName = (name, analyteId = "") => {
+			const key = teaRefSearchKey(name), rows = deps.getState().teaRefs || [];
+			return analyteId && rows.find((r) => r.analyteId === analyteId) || rows.find((r) => teaRefSearchKey(r.name) === key) || rows.find((r) => deps.teaAnalyteMeta(r.name, r).aliases.some((a) => teaRefSearchKey(a) === key)) || null;
+		};
+		const testDisplayName = (t) => {
+			if (!t) return "";
+			return t.displayName || deps.teaAnalyteDisplay(t.name, teaRefRecordForName(t.name, t.analyteId)) || t.name || "";
+		};
+		const sgUnitKey = (v) => String(v == null ? "" : v).trim().toLowerCase().replace(/[μµ]/g, "u").replace(/\s+/g, "").replace(/lit(er|re)/g, "l");
+		const sgUnitsMatch = (a, b) => {
+			const x = sgUnitKey(a), y = sgUnitKey(b);
+			return !!x && !!y && x === y;
+		};
+		const teaRefIsDefault = (value) => deps.refTests.some((r) => deps.teaAnalyteMeta(r[0]).analyteId === value || teaRefName(r[0]) === teaRefName(value));
+		const sgTeaStoredRef = (t) => teaRefRecordForName(t && t.name, t && t.analyteId);
+		const sgTeaSource = (t) => SG_TEA_SOURCES.some((x) => x[0] === t.teaSource) ? t.teaSource : "ricos";
+		const sgTeaSourceMeta = (t, src = sgTeaSource(t)) => {
+			const base = deps.teaSourceRegistry[src] || {}, stored = src === "eflm" ? null : sgTeaStoredRef(t), custom = stored && stored.sources && stored.sources[src] || {};
+			const meta = {
+				...base,
+				...Object.fromEntries(Object.entries(custom).filter(([, v]) => String(v ?? "").trim() !== ""))
+			};
+			if (src === "eflm") {
+				meta.reviewedDate = t && t.eflmLookupDate || meta.reviewedDate || "";
+				meta.reviewedBy = t && t.teaApprovedBy || meta.reviewedBy || "";
+				if (t && /^https:\/\//i.test(String(t.eflmRef || ""))) meta.url = t.eflmRef;
+			}
+			return meta;
+		};
+		const sgCliaCriterion = (name, unit, percent, record) => {
+			const analyteId = record && record.analyteId || deps.teaAnalyteMeta(name, record).analyteId, fixed = SG_CLIA_FIXED[analyteId];
+			const hasCustom = record && ([
+				"percent",
+				"absolute",
+				"greater-of"
+			].includes(record.cliaRule) || Number.isFinite(+record.cliaAbsolute) && +record.cliaAbsolute > 0);
+			const p = Number(percent), a = hasCustom ? Number(record.cliaAbsolute) : fixed && fixed.absolute;
+			return {
+				rule: hasCustom ? record.cliaRule || (p > 0 && a > 0 ? "greater-of" : a > 0 ? "absolute" : "percent") : a > 0 ? p > 0 ? "greater-of" : "absolute" : "percent",
+				percent: Number.isFinite(p) && p > 0 ? p : null,
+				absolute: Number.isFinite(a) && a > 0 ? a : null,
+				unit: hasCustom ? record.cliaAbsoluteUnit || unit || "" : fixed && fixed.unit || unit || ""
+			};
+		};
+		const effectiveTeaRefs = () => {
+			const over = /* @__PURE__ */ new Map();
+			(deps.getState().teaRefs || []).forEach((r) => {
+				const key = r.analyteId || deps.teaAnalyteMeta(r.name, r).analyteId || "custom-" + String(r.id || teaRefName(r.name)).replace(/[^A-Za-z0-9_-]/g, "");
+				if (key) over.set(key, r);
+			});
+			const out = deps.refTests.map(([name, unit, clia, ricos, section]) => {
+				const analyteId = deps.teaAnalyteMeta(name).analyteId, o = over.get(analyteId);
+				return o ? [
+					o.name,
+					o.unit,
+					o.clia,
+					o.ricos,
+					o.section,
+					sgCliaCriterion(o.name, o.unit, o.clia, o),
+					analyteId,
+					o.lab
+				] : [
+					name,
+					unit,
+					clia,
+					ricos,
+					section,
+					sgCliaCriterion(name, unit, clia, null),
+					analyteId,
+					null
+				];
+			});
+			(deps.getState().teaRefs || []).forEach((r) => {
+				const analyteId = r.analyteId || deps.teaAnalyteMeta(r.name, r).analyteId || "custom-" + String(r.id || teaRefName(r.name)).replace(/[^A-Za-z0-9_-]/g, "");
+				if (analyteId && !teaRefIsDefault(analyteId)) out.push([
+					r.name,
+					r.unit,
+					r.clia,
+					r.ricos,
+					r.section,
+					sgCliaCriterion(r.name, r.unit, r.clia, r),
+					analyteId,
+					r.lab
+				]);
+			});
+			return out;
+		};
+		const sgRef = (t, refs) => {
+			const n = teaRefName(t.name);
+			if (!n && !t.analyteId) return void 0;
+			const list = refs || effectiveTeaRefs();
+			if (t.analyteId) {
+				const byId = list.find((r) => r[6] === t.analyteId);
+				if (byId) return byId;
+			}
+			const searchKey = teaRefSearchKey(t.name), aliasExact = list.find((r) => deps.teaAnalyteMeta(r[0], teaRefRecordForName(r[0])).aliases.some((a) => teaRefSearchKey(a) === searchKey));
+			if (aliasExact) return aliasExact;
+			const exact = list.find((r) => n === String(r[0]).toLowerCase());
+			if (exact) return exact;
+			let best = null, bestLen = -1;
+			list.forEach((r) => {
+				const r0 = teaRefName(r[0]), next = n.charAt(r0.length);
+				if (n.startsWith(r0) && (!next || /[\s([\]/{},;:.-]/.test(next)) && r0.length > bestLen) {
+					best = r;
+					bestLen = r0.length;
+				}
+			});
+			return best || void 0;
+		};
+		const sgTeaInfo = (t, src, target, refs) => {
+			const tea = parseFloat(t.tea);
+			if (src === "eflm") {
+				const value = (t.teaSource === "eflm" || !!(t.eflmAnalyte || t.eflmRef || t.eflmLookupDate)) && isFinite(tea) && tea > 0 ? tea : 0;
+				return {
+					tea: value,
+					criterion: {
+						rule: "percent",
+						percent: value,
+						absolute: null,
+						unit: "%"
+					}
+				};
+			}
+			if (src === "clia") {
+				const ref = sgRef(t, refs), c = ref && ref[5] || {
+					rule: "percent",
+					percent: ref && +ref[2] || null,
+					absolute: null,
+					unit: ref && ref[1] || ""
+				};
+				const den = Math.abs(Number(target)), absoluteUsable = c.absolute > 0 && sgUnitsMatch(t && t.unit, c.unit), unitMismatch = c.absolute > 0 && !absoluteUsable;
+				let allowable = null;
+				if (c.rule === "percent" && c.percent > 0) return {
+					tea: c.percent,
+					criterion: c
+				};
+				if (den > 0) {
+					const pct = c.percent > 0 ? den * c.percent / 100 : null, abs = absoluteUsable ? c.absolute : null;
+					allowable = c.rule === "absolute" ? abs : c.rule === "greater-of" ? abs != null ? Math.max(pct || 0, abs) : pct : pct;
+				}
+				return {
+					tea: allowable > 0 ? allowable / den * 100 : c.percent || 0,
+					criterion: c,
+					needsTarget: !(den > 0),
+					unitMismatch,
+					absoluteUsable
+				};
+			}
+			if (src === "ricos") {
+				const ref = sgRef(t, refs), value = ref && Number.isFinite(+ref[3]) && +ref[3] > 0 ? +ref[3] : 0;
+				return {
+					tea: value,
+					criterion: {
+						rule: "percent",
+						percent: value,
+						absolute: null,
+						unit: "%"
+					}
+				};
+			}
+			if (src === "lab") {
+				const ref = sgRef(t, refs), value = ref && Number.isFinite(+ref[7]) && +ref[7] > 0 ? +ref[7] : 0;
+				return {
+					tea: value,
+					criterion: {
+						rule: "percent",
+						percent: value,
+						absolute: null,
+						unit: "%"
+					}
+				};
+			}
+			const value = isFinite(tea) && tea > 0 ? tea : 0;
+			return {
+				tea: value,
+				criterion: {
+					rule: "percent",
+					percent: value,
+					absolute: null,
+					unit: "%"
+				}
+			};
+		};
+		const sgTeaBySource = (t, src, target, refs) => sgTeaInfo(t, src, target, refs).tea;
+		const sgTea = (t) => sgTeaBySource(t, sgTeaSource(t));
+		const sgTeaCriterionText = (t, src = sgTeaSource(t)) => {
+			const info = sgTeaInfo(t, src), c = info.criterion;
+			if (src !== "clia" || !c) return info.tea ? deps.fmt(info.tea, 2) + "%" : "chưa có";
+			if (info.unitMismatch) {
+				const note = " (không áp dụng giới hạn tuyệt đối: đơn vị phải là " + (c.unit || "đơn vị quy định") + ")";
+				return c.percent > 0 ? "±" + deps.fmt(c.percent, 2) + "%" + note : "chưa tính được" + note;
+			}
+			if (c.rule === "absolute") return "±" + deps.fmt(c.absolute, 4) + " " + (c.unit || "đơn vị");
+			if (c.rule === "greater-of") return "mức lớn hơn giữa ±" + deps.fmt(c.percent, 2) + "% và ±" + deps.fmt(c.absolute, 4) + " " + (c.unit || "đơn vị");
+			return c.percent > 0 ? "±" + deps.fmt(c.percent, 2) + "%" : "chưa có";
+		};
+		const sgTeaLabel = (src) => (SG_TEA_SOURCES.find((x) => x[0] === src) || SG_TEA_SOURCES.find((x) => x[0] === "ricos"))[1];
+		const sgTeaRefText = (t) => {
+			const src = sgTeaSource(t), meta = sgTeaSourceMeta(t, src), stored = src === "lab" ? sgTeaStoredRef(t) : null;
+			const parts = [meta.document || SG_TEA_DEFAULT_REF[src] || ""];
+			if (meta.version) parts.push((src === "lab" ? "Nguồn: " : "Phiên bản: ") + meta.version);
+			if (meta.effectiveDate) parts.push("Hiệu lực: " + deps.vnDate(meta.effectiveDate));
+			if (src === "eflm") {
+				if (t.eflmAnalyte) parts.push("Analyte: " + t.eflmAnalyte);
+				if (t.eflmAps) parts.push("APS: " + t.eflmAps);
+				if (t.eflmLookupDate) parts.push("Tra cứu: " + deps.vnDate(t.eflmLookupDate));
+				if (t.eflmRef) parts.push(t.eflmRef);
+			} else if (meta.reviewedDate) parts.push((src === "lab" ? "Phê duyệt: " : "Rà soát: ") + deps.vnDate(meta.reviewedDate));
+			if (src === "lab" && stored && stored.labPreparedBy) parts.push("Người xây dựng: " + stored.labPreparedBy);
+			if (src === "lab" && meta.reviewedBy) parts.push("Người duyệt: " + meta.reviewedBy);
+			if (src === "lab" && meta.note) parts.push("Lý do: " + meta.note);
+			if (src === "lab" && stored && stored.labNextReviewDate) parts.push("Xem xét lại: " + deps.vnDate(stored.labNextReviewDate));
+			return parts.filter(Boolean).join(" · ");
+		};
+		const sgTeaSnapshot = (t) => {
+			const src = sgTeaSource(t), info = sgTeaInfo(t, src), meta = sgTeaSourceMeta(t, src);
+			const base = {
+				teaSource: src,
+				teaLabel: sgTeaLabel(src),
+				teaReference: sgTeaRefText(t),
+				teaCapturedAt: (/* @__PURE__ */ new Date()).toISOString(),
+				teaSourceId: meta.id || "",
+				teaSourceVersion: meta.version || "",
+				teaSourceUrl: meta.url || "",
+				teaEffectiveDate: meta.effectiveDate || "",
+				teaReviewedDate: meta.reviewedDate || "",
+				teaReviewedBy: meta.reviewedBy || ""
+			};
+			return info.tea > 0 && !info.needsTarget ? {
+				tea: info.tea,
+				...base
+			} : base;
+		};
+		const sgEnsureTeaSnapshot = (t, e) => {
+			if (!e || e.teaSource) return e;
+			if (e) Object.assign(e, sgTeaSnapshot(t));
+			return e;
+		};
+		const sgLevelTarget = (t, L, level) => {
+			if (Number.isFinite(+L.sourceTargetMean) && +L.sourceTargetMean !== 0) return +L.sourceTargetMean;
+			const cfg = (t.levels || []).find((x) => +x.level === +level);
+			return cfg && Number.isFinite(+cfg.mean) && +cfg.mean !== 0 ? +cfg.mean : null;
+		};
+		const sgSetLevelTeaSnapshot = (t, e, level, force = false) => {
+			e.lv = e.lv || {};
+			const L = e.lv[level] = e.lv[level] || {};
+			if (!force && Number.isFinite(+L.tea) && +L.tea > 0) return L;
+			const src = e.teaSource || sgTeaSource(t), target = sgLevelTarget(t, L, level), info = sgTeaInfo(t, src, target), c = info.criterion || {};
+			const effectiveRule = info.unitMismatch && c.percent > 0 ? "percent" : c.rule;
+			[
+				"tea",
+				"teaTarget",
+				"teaCriterionRule",
+				"teaCriterionPercent",
+				"teaCriterionAbsolute",
+				"teaCriterionUnit"
+			].forEach((k) => delete L[k]);
+			if (info.tea > 0) L.tea = info.tea;
+			if (Number.isFinite(+target)) L.teaTarget = +target;
+			if (info.tea > 0) L.teaCriterionRule = effectiveRule || "percent";
+			if (c.percent > 0) L.teaCriterionPercent = c.percent;
+			if (c.absolute > 0 && !info.unitMismatch) L.teaCriterionAbsolute = c.absolute;
+			if (c.unit && !info.unitMismatch) L.teaCriterionUnit = c.unit;
+			return L;
+		};
+		const sgEntryTea = (t, e, level, refs) => {
+			const L = e && e.lv && e.lv[level] || {};
+			if (Number.isFinite(+L.tea) && +L.tea > 0) return +L.tea;
+			if (e && Number.isFinite(+e.tea) && +e.tea > 0) return +e.tea;
+			return sgTeaBySource(t, e && e.teaSource || sgTeaSource(t), sgLevelTarget(t, L, level), refs);
+		};
+		return Object.freeze({
+			SG_TEA_SOURCES,
+			SG_CLIA_FIXED,
+			teaRefName,
+			teaRefIsDefault,
+			testDisplayName,
+			sgUnitKey,
+			sgUnitsMatch,
+			sgTeaSourceMeta,
+			effectiveTeaRefs,
+			sgRef,
+			sgTeaSource,
+			sgTeaInfo,
+			sgTeaBySource,
+			sgTea,
+			sgTeaCriterionText,
+			sgTeaLabel,
+			sgTeaRefText,
+			sgTeaSnapshot,
+			sgEnsureTeaSnapshot,
+			sgLevelTarget,
+			sgSetLevelTeaSnapshot,
+			sgEntryTea
+		});
+	}
+	//#endregion
 	//#region src/presentation/sigma/sigma-period-selection-service.ts
 	function createSigmaPeriodSelectionService() {
 		const resolve = (selectedId, entries) => {
@@ -16012,6 +18233,5535 @@
 			availableLots,
 			match
 		});
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-page-controller.ts
+	/**
+	* Trang "Cấu hình chung" (Manage) — máy/panel/lô/nhóm lô/Mean-SD/chuyển tiếp
+	* lô/danh mục xét nghiệm/lịch sử dữ liệu/Bảng TEa tham chiếu. Toàn bộ HTML thật
+	* đã nằm trong các hàm `deps.pres.xxxPresentation()` (TypeScript) từ các đợt
+	* trước; controller này chỉ còn phần điều phối — đọc state, gọi đúng
+	* presentation, ghi UI state, mở modal/dialog.
+	*/
+	function createManagePageController(deps) {
+		const state = () => deps.getState();
+		const ui = () => deps.ui();
+		const manageSearchSet = (v) => {
+			ui().manageQ = v;
+			deps.scheduleSearchRender(manageSearchSet, renderManageBody, "manageSearch");
+		};
+		const manageMatch = (values) => deps.pres.manageSearchMatchPresentation(values, ui().manageQ, deps.searchText);
+		const manageSearchPlaceholder = () => deps.pres.manageSearchPlaceholderPresentation(ui().manageTab);
+		const groupsOfLot = (id) => deps.pres.groupsOfLotPresentation(state().lotGroups, id);
+		const lotGroupLabels = (id) => deps.pres.manageLotGroupLabelsPresentation(state().lotGroups, id);
+		const instrumentName = (id, fallback = "") => deps.pres.manageInstrumentNamePresentation(state().instruments, id, fallback);
+		const panelName = (id) => deps.pres.managePanelNamePresentation(state().qcPanels, id);
+		const lotLabel = (id) => deps.pres.manageLotLabelPresentation(state().qcLots, id);
+		const lotTransitionToNo = (lotId) => deps.pres.lotTransitionTargetNumberPresentation(state().lotTransitions || [], state().qcLots, lotId, deps.transitionSwitchesLot);
+		const lotStatus = (l) => deps.pres.manageLotStatusPresentation(l, lotTransitionToNo(l.id));
+		const manageShell = (body) => {
+			const histCount = state().tests.reduce((n, t) => n + (t.levels || []).reduce((m, l) => m + Math.max(1, (l.meanSdHistory || []).length), 0), 0);
+			const items = [
+				["instruments", "Máy xét nghiệm"],
+				["assays", "Danh mục xét nghiệm"],
+				["panels", "Panel QC"],
+				["lots", "Lô & Nhóm QC"],
+				["targets", "Mean/SD"],
+				["transitions", "Chuyển tiếp lô"],
+				["history", "Lịch sử dữ liệu"],
+				["tearefs", "Bảng TEa tham chiếu"]
+			];
+			const counts = {
+				lots: state().qcLots.length + " / " + state().lotGroups.length,
+				panels: state().qcPanels.length,
+				targets: state().tests.reduce((n, t) => n + t.levels.filter((l) => l.qcLotId).length, 0),
+				history: histCount,
+				transitions: state().lotTransitions.length,
+				assays: state().tests.length,
+				instruments: state().instruments.length,
+				tearefs: deps.effectiveTeaRefs().length
+			};
+			return deps.pres.manageShellPresentation(items.map((x) => ({
+				id: x[0],
+				label: x[1],
+				count: counts[x[0]] || ""
+			})), ui().manageTab, body);
+		};
+		const manageToolbar = (title, sub, action, label) => {
+			const ph = manageSearchPlaceholder();
+			return deps.pres.manageToolbarPresentation({
+				title,
+				subtitle: sub,
+				placeholder: ph,
+				query: ui().manageQ,
+				action,
+				actionLabel: label
+			});
+		};
+		const manageLots = () => {
+			const rows = state().qcLots.filter((l) => manageMatch([
+				l.lotNo,
+				l.description,
+				l.supplier,
+				l.program,
+				lotGroupLabels(l.id),
+				l.level,
+				l.exp
+			])).map((l) => {
+				const used = state().tests.reduce((n, t) => n + t.levels.filter((x) => x.qcLotId === l.id).length, 0), s = lotStatus(l), model = {
+					id: l.id,
+					lotNo: l.lotNo,
+					description: l.description,
+					program: l.program,
+					level: l.level,
+					expiry: l.exp ? deps.vnDate(l.exp) : "",
+					status: s,
+					used
+				};
+				return deps.pres.manageLotRowPresentation(model);
+			}).join("");
+			const groupRows = state().lotGroups.filter((g) => manageMatch([
+				g.name,
+				g.note,
+				...(g.lotIds || []).map((id) => (state().qcLots.find((l) => l.id === id) || {}).lotNo)
+			])).map((g) => {
+				const lots = (g.lotIds || []).map((id) => state().qcLots.find((l) => l.id === id)).filter(Boolean), archived = g.active === false;
+				const inUse = deps.lotGroupInUse(g);
+				const statusTag = deps.pres.lotGroupStatusPresentation(archived, g.status, inUse);
+				const toggle = deps.pres.lotGroupToggleActionPresentation(archived, g.status, inUse), toggleBtn = toggle ? deps.btn(toggle.label, toggle.command === "activate" ? `activateLotGroup('${g.id}')` : `toggleLotGroupStatus('${g.id}')`, toggle.variant) : "";
+				const lotsHtml = deps.pres.lotGroupLotPillsHtml(lots.map((l) => ({
+					lotNo: deps.esc(l.lotNo),
+					level: l.level
+				}))), actionsHtml = deps.btn("Sửa nhóm", `openConfigGroup('${g.id}')`, "ghost sm") + deps.btn("Mean/SD", `openTargetMatrix('','${g.id}')`, "ghost sm") + toggleBtn + deps.btn("Xóa", `deleteConfigGroup('${g.id}')`, "danger sm"), model = {
+					archived,
+					name: g.name,
+					note: g.note,
+					status: statusTag,
+					lotsHtml,
+					actionsHtml
+				};
+				return deps.pres.manageLotGroupCardPresentation(model);
+			}).join("");
+			return manageToolbar("Lô & Nhóm QC", "Quản lý từng lô và nhóm lô QC.") + deps.pres.manageLotConfigLayoutPresentation({
+				lotAddButtonHtml: deps.btn("Thêm lô QC", "openConfigLot()", "teal sm"),
+				lotRowsHtml: rows,
+				lotEmptyHtml: deps.emptyState("Chưa có lô QC", "Tạo từng lô QC độc lập, sau đó nhập Mean/SD cho Panel QC."),
+				groupAddButtonHtml: deps.btn("Thêm nhóm lô", "openConfigGroup()", "teal sm"),
+				groupRowsHtml: groupRows,
+				groupEmptyHtml: deps.emptyState("Chưa có nhóm lô", "Chọn các lô QC đã tạo để ghép thành một nhóm, ví dụ 1101/1102.")
+			});
+		};
+		const manageInstruments = () => {
+			const rows = state().instruments.filter((i) => manageMatch([
+				i.name,
+				i.manufacturer,
+				i.model,
+				i.serial,
+				i.section
+			])).map((i) => {
+				const n = state().tests.filter((t) => t.instrumentId === i.id).length;
+				const model = {
+					id: i.id,
+					name: i.name,
+					section: i.section,
+					manufacturer: i.manufacturer,
+					serial: i.serial,
+					assayCount: n,
+					active: !!i.active
+				};
+				return deps.pres.manageInstrumentRowPresentation(model);
+			}).join("");
+			return manageToolbar("Máy xét nghiệm", "Quản lý máy xét nghiệm, hãng và số sê-ri.", "openConfigInstrument()", "Thêm máy xét nghiệm") + deps.pres.manageInstrumentTablePresentation({
+				rowsHtml: rows,
+				emptyHtml: deps.emptyState("Chưa có máy xét nghiệm", "Thêm máy trước khi cấu hình xét nghiệm.")
+			});
+		};
+		const managePanels = () => {
+			const rows = state().qcPanels.filter((p) => manageMatch([
+				p.name,
+				p.note,
+				instrumentName(p.instrumentId),
+				...(p.testIds || []).map((id) => (state().tests.find((t) => t.id === id) || {}).name)
+			])).map((p) => {
+				const tests = (p.testIds || []).map((id) => state().tests.find((t) => t.id === id)).filter(Boolean), testsHtml = tests.map((t) => `<span class="pill">${deps.esc(deps.testDisplayName(t))}</span>`).join(""), model = {
+					id: p.id,
+					name: p.name,
+					instrument: instrumentName(p.instrumentId),
+					testsHtml,
+					testCount: tests.length,
+					active: p.active !== false
+				};
+				return deps.pres.managePanelRowPresentation(model);
+			}).join("");
+			return manageToolbar("Panel QC", "Nhóm các xét nghiệm theo từng máy để thiết lập và quản lý QC.", "openConfigPanel()", "Thêm Panel QC") + deps.pres.managePanelTablePresentation({
+				rowsHtml: rows,
+				emptyHtml: deps.emptyState("Chưa có Panel QC", "Tạo Panel QC trước, sau đó nhập Mean/SD theo nhóm lô trong thẻ Mean/SD.")
+			});
+		};
+		const manageTransitionsV2 = () => {
+			const rows = state().lotTransitions.filter((tr) => manageMatch([
+				panelName(tr.panelId),
+				lotLabel(tr.fromLotId),
+				lotLabel(tr.toLotId),
+				tr.startDate,
+				tr.status,
+				tr.approvedBy
+			])).map((tr) => {
+				const s = deps.pres.manageTransitionStatusPresentation(tr.status), to = state().qcLots.find((l) => l.id === tr.toLotId), details = deps.pres.manageTransitionDetailsPresentation({
+					movedLotNo: deps.transitionSwitchesLot(tr) && to ? deps.esc(to.lotNo) : "",
+					approvalText: tr.approvedBy ? deps.esc(tr.approvedBy) + (tr.approvedAt ? " · " + deps.formatDateTimeVN(tr.approvedAt) : "") : ""
+				}), model = {
+					id: tr.id,
+					panel: panelName(tr.panelId),
+					fromLot: lotLabel(tr.fromLotId),
+					toLot: lotLabel(tr.toLotId),
+					startDate: tr.startDate ? deps.vnDate(tr.startDate) : "",
+					status: s,
+					movedHtml: details.movedHtml,
+					approvalHtml: details.approvalHtml
+				};
+				return deps.pres.manageTransitionRowPresentation(model);
+			}).join("");
+			return manageToolbar("Chuyển tiếp lô QC", "Theo dõi lô cũ, lô mới và trạng thái khi thay lô.", "openLotTransitionV2()", "Thêm hồ sơ chuyển lô") + deps.pres.manageTransitionTablePresentation({
+				rowsHtml: rows,
+				emptyHtml: deps.emptyState("Chưa có hồ sơ chuyển lô", "Tạo hồ sơ để theo dõi chuyển từ lô cũ sang lô mới.")
+			});
+		};
+		const targetGroupLots = (group) => deps.pres.targetGroupLotsPresentation(state().qcLots, group);
+		const targetGroupOptions = () => {
+			const groups = state().lotGroups.filter((g) => g.active !== false);
+			return deps.pres.targetGroupOptionsPresentation(groups, ui().manageTargetGroup, targetGroupLots, deps.pres.targetGroupLabelPresentation, deps.pres.targetGroupStatusSuffixPresentation, deps.esc);
+		};
+		const ensureTargetSelection = () => {
+			const picked = deps.pres.targetSelectionPresentation(state().qcPanels, state().lotGroups, ui().manageTargetPanel, ui().manageTargetGroup, targetGroupLots);
+			ui().manageTargetPanel = picked.panelId;
+			ui().manageTargetGroup = picked.groupId;
+		};
+		const manageTargets = () => {
+			ensureTargetSelection();
+			const prerequisite = deps.pres.targetPrerequisitePresentation({
+				tests: state().tests.length,
+				panels: state().qcPanels.length,
+				lots: state().qcLots.length,
+				groups: state().lotGroups.length
+			});
+			if (prerequisite === "tests") return manageToolbar("Mean/SD theo nhóm lô QC", "Chọn Panel QC để nhập Mean/SD hàng loạt.", "setManageTab('assays')", "Thêm xét nghiệm") + deps.pres.manageEmptyPanelPresentation(deps.emptyState("Chưa có xét nghiệm", "Tạo xét nghiệm trước, sau đó quay lại nhập Mean/SD theo nhóm lô."));
+			if (prerequisite === "panels") return manageToolbar("Mean/SD theo nhóm lô QC", "Chỉ dùng Panel QC để nhập Mean/SD hàng loạt.", "setManageTab('panels')", "Thêm Panel QC") + deps.pres.manageEmptyPanelPresentation(deps.emptyState("Chưa có Panel QC", "Tạo Panel QC và chọn các xét nghiệm thành viên trước, sau đó quay lại nhập Mean/SD theo nhóm lô."));
+			if (prerequisite === "lots") return manageToolbar("Mean/SD theo nhóm lô QC", "Chọn Panel QC và nhóm lô để nhập Mean/SD hàng loạt.", "setManageTab('lots')", "Thêm lô QC") + deps.pres.manageEmptyPanelPresentation(deps.emptyState("Chưa có lô QC", "Tạo lô QC trước, gom vào nhóm lô rồi quay lại nhập Mean/SD theo nhóm."));
+			if (prerequisite === "groups") return manageToolbar("Mean/SD theo nhóm lô QC", "Chọn Panel QC và nhóm lô để nhập Mean/SD hàng loạt.", "setManageTab('lots')", "Thêm nhóm lô") + deps.pres.manageEmptyPanelPresentation(deps.emptyState("Chưa có nhóm lô QC", "Tạo nhóm lô từ các lô QC trước, sau đó quay lại nhập Mean/SD theo nhóm."));
+			const group = state().lotGroups.find((x) => x.id === ui().manageTargetGroup), groupLots = targetGroupLots(group), targetLevelPick = deps.pres.targetLevelSelectionPresentation(groupLots, ui().manageTargetLevel), targetLevels = targetLevelPick.levels;
+			ui().manageTargetLevel = targetLevelPick.level;
+			const selectedLevel = Number(ui().manageTargetLevel), levelLotPick = deps.pres.targetLevelLotsPresentation(groupLots, selectedLevel), levelLots = levelLotPick.levelLots, levelDepletedLots = levelLotPick.depletedLots, q = deps.searchText(ui().manageQ), allTests = deps.pres.targetPanelTestsPresentation(state().qcPanels, state().tests, ui().manageTargetPanel), tests = allTests.filter((t) => !q || deps.pres.targetSearchValuesPresentation(t, group && group.name, levelLots, deps.testDisplayName, instrumentName).some((v) => deps.searchText(v).includes(q)));
+			if (!group || !groupLots.length) return manageToolbar("Mean/SD theo nhóm lô QC", "Chọn Panel QC và nhóm lô để nhập Mean/SD hàng loạt.") + deps.pres.manageEmptyPanelPresentation(deps.emptyState("Nhóm lô chưa có lô QC", "Sửa nhóm lô và chọn các lô QC cần dùng trước."));
+			const rowItems = deps.pres.targetMatrixItemsPresentation(tests, levelLots, deps.targetConfigAssigned, deps.plannedTargetFor, deps.lotTargetSnapshot);
+			const targetStats = deps.pres.targetMatrixStatsPresentation(rowItems);
+			const rows = rowItems.map(({ t, lot, linked, same, assigned, planned, cfg }) => {
+				const draft = deps.targetRangeDraft(cfg || {}), rowState = deps.pres.targetRowStatePresentation(linked, assigned, planned, lot.depleted), locked = rowState.locked, retiredTo = locked ? lotTransitionToNo(lot.id) : "", checked = rowState.checked, disabled = rowState.disabled;
+				return deps.pres.targetMatrixRowPresentation({
+					testId: t.id,
+					lotId: lot.id,
+					locked,
+					checked,
+					disabled,
+					name: deps.testDisplayName(t),
+					unit: t.unit,
+					mean: deps.targetNumberText(draft.mean, t),
+					low: deps.targetNumberText(draft.low, t),
+					high: deps.targetNumberText(draft.high, t),
+					sd: deps.targetNumberText(draft.sd, t, "stat"),
+					status: rowState.status,
+					retiredTo,
+					otherLot: same && same.lot
+				}, deps.esc, deps.escapeAttr);
+			}).join("");
+			const targetLevelTabs = deps.pres.targetLevelTabsPresentation(targetLevels, ui().manageTargetLevel), targetLevelToolbar = deps.pres.targetLevelToolbarPresentation(ui().manageTargetLevel, levelLots.map((l) => l.lotNo), targetLevelTabs, deps.esc), targetContent = rowItems.length ? targetLevelToolbar + deps.pres.targetMatrixTablePresentation(rows) + deps.pres.targetMatrixActionsPresentation(deps.btn("Bỏ chọn tất cả", "targetCheckAll(false)", "ghost"), deps.btn("Chọn tất cả", "targetCheckAll(true)", "ghost"), deps.btn("Lưu Mean/SD mức này", "saveTargetMatrix()", "teal")) : (() => {
+				const empty = deps.pres.targetEmptyStatePresentation(allTests.length, levelLots.map((l) => l.lotNo), levelDepletedLots.map((l) => l.lotNo), ui().manageTargetLevel);
+				return deps.emptyState(empty.title, empty.description);
+			})();
+			return manageToolbar("Mean/SD theo nhóm lô QC", "Chọn Panel QC và nhóm lô, app tự đưa các xét nghiệm trong panel vào bảng Mean/SD.") + deps.pres.targetMatrixPanelPresentation({
+				selectorHtml: deps.pres.targetSelectorPresentation(deps.pres.targetPanelOptionsPresentation(state().qcPanels, ui().manageTargetPanel, instrumentName, deps.esc), targetGroupOptions()),
+				summaryHtml: rowItems.length ? deps.pres.targetSummaryPresentation(targetStats) : "",
+				contentHtml: targetContent
+			});
+		};
+		const manageAssays = () => {
+			const rows = state().tests.filter((t) => manageMatch([
+				t.name,
+				deps.testDisplayName(t),
+				t.unit,
+				t.method,
+				t.reagent,
+				instrumentName(t.instrumentId, t.machine),
+				t.section,
+				t.tea
+			])).map((t, idx) => {
+				const model = {
+					index: idx + 1,
+					id: t.id,
+					name: deps.testDisplayName(t),
+					method: t.method,
+					unit: t.unit,
+					instrument: instrumentName(t.instrumentId, t.machine),
+					section: t.section,
+					reagent: t.reagent,
+					tea: t.tea,
+					closed: !!t.closed
+				};
+				return deps.pres.manageAssayRowPresentation(model);
+			}).join("");
+			return manageToolbar("Danh mục xét nghiệm", "Quản lý xét nghiệm, máy, đơn vị, phương pháp và TEa.", "openConfigAssay()", "Thêm xét nghiệm") + deps.pres.manageAssayTablePresentation({
+				rowsHtml: rows,
+				emptyHtml: deps.emptyState("Chưa có xét nghiệm", "Tạo xét nghiệm trước, sau đó gán lô và Mean/SD ở các thẻ cấu hình tương ứng.")
+			});
+		};
+		const manageHistorySearchValues = (t) => deps.pres.historySearchValuesPresentation(t, state().qcLots, deps.testDisplayName);
+		const manageHistory = () => {
+			const q = deps.searchText(ui().manageQ), matches = state().tests.filter((t) => !q || manageHistorySearchValues(t).some((v) => deps.searchText(v).includes(q)));
+			if (!state().tests.length) return manageToolbar("Lịch sử dữ liệu QC", "Chọn xét nghiệm để xem các lô, Mean/SD và thời gian hiệu lực.") + deps.pres.manageEmptyPanelPresentation(deps.emptyState("Chưa có xét nghiệm", "Tạo xét nghiệm trước, sau đó cấu hình lô và Mean/SD."));
+			if (!matches.length) return manageToolbar("Lịch sử dữ liệu QC", "Chọn xét nghiệm để xem các lô, Mean/SD và thời gian hiệu lực.") + deps.pres.manageEmptyPanelPresentation(deps.emptyState("Không tìm thấy xét nghiệm", "Thử tìm theo tên xét nghiệm."));
+			const historyPick = deps.pres.historyAssaySelectionPresentation(matches, ui().manageHistoryTest);
+			ui().manageHistoryTest = historyPick.selectedId;
+			const t = historyPick.assay;
+			const opts = deps.pres.historyAssayOptionsPresentation(matches, t.id, deps.testDisplayName, deps.esc);
+			const rows = deps.pres.historyRowsPresentation(t, state().qcLots, state().data[t.id] || [], lotGroupLabels);
+			const visibleRows = deps.pres.historyVisibleRowsPresentation(rows, t.name, q, deps.searchText);
+			const html = deps.pres.historyRowSortPresentation(visibleRows).map((r) => {
+				const period = deps.pres.historyPeriodLabelPresentation(r.h.effectiveFrom, r.h.effectiveTo, deps.vnDate);
+				const model = {
+					testId: r.t.id,
+					level: r.l.level,
+					lot: r.lotNo || "",
+					group: r.group,
+					mean: deps.fmtTestValue(r.t, r.h.mean),
+					low: r.h.low != null ? deps.fmtTestValue(r.t, r.h.low) : "—",
+					high: r.h.high != null ? deps.fmtTestValue(r.t, r.h.high) : "—",
+					sd: deps.fmtTestValue(r.t, r.h.sd),
+					period,
+					source: r.h.source,
+					pointCount: r.pts.length
+				};
+				return deps.pres.manageHistoryRowPresentation(model);
+			}).join("");
+			const historyTotals = deps.pres.historySummaryPresentation(visibleRows);
+			return manageToolbar("Lịch sử dữ liệu QC", "Chọn một xét nghiệm để xem các lô/Mean-SD đã từng dùng.") + deps.pres.historyPanelPresentation({
+				selectorHtml: deps.pres.historySelectorPresentation(opts, historyTotals.rowCount, historyTotals.pointCount),
+				tableHtml: deps.pres.historyTablePresentation(html, q ? deps.emptyState("Không tìm thấy mốc phù hợp", "Thử tìm theo tên xét nghiệm, mức hoặc lô QC.") : deps.emptyState("Chưa có lịch sử lô", "Xét nghiệm này chưa được gán lô/Mean-SD."))
+			});
+		};
+		const TEA_LAB_BASIS_SOURCES = [
+			["regulation", "Quy định pháp lý / CLIA / quốc gia"],
+			["pt", "Chương trình ngoại kiểm / PT"],
+			["eflm", "EFLM Biological Variation"],
+			["ricos", "Ricos / Westgard BV (nguồn cũ)"],
+			["professional", "Hiệp hội / ủy ban chuyên môn"],
+			["other", "Nguồn khác đã thẩm định"]
+		];
+		const teaRefFind = (refKey) => deps.TeaReferenceService.find(state(), refKey);
+		const teaRefNumOrNull = (v) => deps.TeaReferenceService.numberOrNull(v);
+		const teaRefExternalChanged = (row, refKey) => deps.TeaReferenceService.externalChanged(row, refKey);
+		const teaRefEnsure = (refKey) => deps.TeaReferenceService.ensure(state(), refKey).record;
+		const teaRefEdit = (name, field, val) => {
+			if (!deps.requireAdmin()) return;
+			deps.TeaReferenceWorkflowCommand.edit({
+				name,
+				field,
+				val
+			});
+		};
+		const teaRefRemove = (refKey) => {
+			if (!deps.requireAdmin()) return;
+			const isDefault = deps.teaRefIsDefault(refKey);
+			deps.TeaReferenceWorkflowCommand.remove({
+				refKey,
+				isDefault
+			});
+		};
+		const teaSourceRegistryHtml = () => {
+			const items = deps.pres.teaSourceRegistryItemsPresentation(deps.teaSourceRegistry(), deps.vnDate);
+			return deps.pres.teaSourceRegistryPresentation(items);
+		};
+		const teaRefOpenAdd = () => {
+			if (!deps.requireAdmin()) return;
+			deps.openModal(deps.pres.teaReferenceAddModalPresentation({
+				cancelButtonHtml: deps.btn("Hủy", "closeModal()", "ghost"),
+				submitButtonHtml: deps.btn("Thêm xét nghiệm", "teaRefAddSubmit()", "teal")
+			}));
+			setTimeout(() => {
+				const el = deps.document.getElementById("trAddName");
+				if (el) el.focus();
+			}, 0);
+		};
+		const teaRefAddSubmit = async () => {
+			if (!deps.requireAdmin()) return;
+			const name = deps.QCCore.cleanText(deps.document.getElementById("trAddName").value, 120).trim();
+			if (!name) {
+				await deps.infoDialog("Nhập tên xét nghiệm.");
+				return;
+			}
+			const data = {
+				name,
+				abbreviation: deps.QCCore.cleanText(deps.document.getElementById("trAddAbbreviation").value, 40).trim(),
+				matrix: deps.QCCore.cleanText(deps.document.getElementById("trAddMatrix").value, 80).trim(),
+				unit: deps.QCCore.cleanText(deps.document.getElementById("trAddUnit").value, 40),
+				section: deps.QCCore.cleanText(deps.document.getElementById("trAddSection").value, 80),
+				clia: deps.document.getElementById("trAddClia").value,
+				ricos: deps.document.getElementById("trAddRicos").value
+			};
+			deps.TeaReferenceWorkflowCommand.addCustom({ data });
+		};
+		const teaLabProfileOpen = (refKey) => {
+			if (!deps.requireAdmin()) return;
+			if (!deps.effectiveTeaRefs().find((r) => r[6] === refKey || deps.teaRefName(r[0]) === deps.teaRefName(refKey))) return;
+			const row = teaRefFind(refKey), meta = row && row.sources && row.sources.lab || {}, source = row && row.labSource || "", sourceOpts = ["<option value=\"\">— Chọn nguồn chính —</option>", ...TEA_LAB_BASIS_SOURCES.map(([v, label]) => `<option value="${v}" ${source === v ? "selected" : ""}>${deps.esc(label)}</option>`)].join(""), effective = meta.effectiveDate || deps.isoToday(), approvedDate = meta.reviewedDate || deps.isoToday(), prepared = row && row.labPreparedBy || deps.userName(), approved = meta.reviewedBy || deps.userName(), nextReview = row && row.labNextReviewDate || "";
+			const body = deps.pres.teaReferenceLabProfileBodyPresentation({
+				labValue: row && row.lab != null ? row.lab : "",
+				sourceOptionsHtml: sourceOpts,
+				referenceValue: deps.escapeAttr(meta.document || ""),
+				reasonHtml: deps.esc(meta.note || ""),
+				effectiveDateHtml: deps.dateBox("teaLabEffectiveDate", effective, "manage-date", "aria-label=\"Ngày hiệu lực TEa chuẩn hóa\""),
+				nextReviewDateHtml: deps.dateBox("teaLabNextReviewDate", nextReview, "manage-date", "aria-label=\"Ngày xem xét lại TEa chuẩn hóa\""),
+				preparedValue: deps.escapeAttr(prepared),
+				approvedValue: deps.escapeAttr(approved),
+				approvedDateHtml: deps.dateBox("teaLabApprovedDate", approvedDate, "manage-date", "aria-label=\"Ngày phê duyệt TEa chuẩn hóa\"")
+			});
+			const hasProfile = row && row.lab != null, remove = hasProfile ? deps.btn("Xóa TEa chuẩn hóa", `teaLabProfileRemove('${deps.escapeAttr(refKey)}')`, "danger") : "";
+			deps.openModal(deps.pres.teaReferenceLabProfileModalHtml({
+				title: hasProfile ? "Sửa hồ sơ TEa chuẩn hóa" : "Thêm hồ sơ TEa chuẩn hóa",
+				bodyHtml: body,
+				removeButtonHtml: remove,
+				cancelButtonHtml: deps.btn("Hủy", "closeModal()", "ghost"),
+				saveButtonHtml: deps.btn(hasProfile ? "Lưu thay đổi" : "Thêm hồ sơ TEa", `teaLabProfileSave('${deps.escapeAttr(refKey)}')`, "teal")
+			}));
+			setTimeout(() => {
+				const e = deps.document.getElementById("teaLabValue");
+				if (e) e.focus();
+			}, 0);
+		};
+		const teaLabProfileSave = async (refKey) => {
+			if (!deps.requireAdmin()) return;
+			const get = (id) => String(deps.document.getElementById(id) && deps.document.getElementById(id).value || "").trim(), value = teaRefNumOrNull(get("teaLabValue")), source = get("teaLabSource"), reference = deps.QCCore.cleanText(get("teaLabReference"), 500), reason = deps.QCCore.cleanText(get("teaLabReason"), 4e3), effective = deps.parseVN(get("teaLabEffectiveDate")) || "", nextReview = deps.parseVN(get("teaLabNextReviewDate")) || "", prepared = deps.QCCore.cleanText(get("teaLabPreparedBy"), 120), approved = deps.QCCore.cleanText(get("teaLabApprovedBy"), 120), approvedDate = deps.parseVN(get("teaLabApprovedDate")) || "";
+			const basisLabel = deps.pres.teaLabBasisLabelPresentation(TEA_LAB_BASIS_SOURCES, source);
+			if (value == null) {
+				await deps.infoDialog("Nhập TEa chuẩn hóa lớn hơn 0%.");
+				return;
+			}
+			if (!basisLabel) {
+				await deps.infoDialog("Chọn nguồn chính của TEa chuẩn hóa.");
+				return;
+			}
+			if (reference.length < 3) {
+				await deps.infoDialog("Nhập tài liệu, phiên bản hoặc đường dẫn tham chiếu.");
+				return;
+			}
+			if (reason.length < 10) {
+				await deps.infoDialog("Lý do lựa chọn cần ít nhất 10 ký tự.");
+				return;
+			}
+			if (!effective || !approvedDate) {
+				await deps.infoDialog("Nhập ngày hiệu lực và ngày phê duyệt hợp lệ.");
+				return;
+			}
+			if (approvedDate > effective) {
+				await deps.infoDialog("Ngày phê duyệt không được sau ngày hiệu lực.");
+				return;
+			}
+			if (nextReview && nextReview < effective) {
+				await deps.infoDialog("Ngày xem xét lại không được trước ngày hiệu lực.");
+				return;
+			}
+			if (!prepared || !approved) {
+				await deps.infoDialog("Nhập người xây dựng và người phê duyệt.");
+				return;
+			}
+			const profile = {
+				value,
+				source,
+				sourceLabel: basisLabel,
+				reference,
+				reason,
+				effective,
+				nextReview,
+				prepared,
+				approved,
+				approvedDate
+			};
+			deps.TeaReferenceWorkflowCommand.saveLabProfile({
+				refKey,
+				profile
+			});
+		};
+		const teaLabProfileRemove = async (refKey) => {
+			if (!deps.requireAdmin()) return;
+			const row = teaRefFind(refKey);
+			if (!row || row.lab == null) return;
+			if (!await deps.confirmDialog({
+				kicker: "TEa chuẩn hóa",
+				title: "Xóa TEa chuẩn hóa?",
+				message: `${deps.teaAnalyteDisplay(row.name, row)} · ${row.lab}%`,
+				detail: "Các kỳ Sigma cũ vẫn giữ ảnh chụp TEa đã sử dụng. Kỳ hiện tại sẽ không còn dùng nguồn TEa chuẩn hóa này.",
+				confirmLabel: "Xóa TEa",
+				cancelLabel: "Hủy",
+				danger: true
+			})) return;
+			const isDefault = deps.teaRefIsDefault(refKey);
+			deps.TeaReferenceWorkflowCommand.removeLabProfile({
+				refKey,
+				isDefault
+			});
+		};
+		const manageTeaRefs = () => {
+			const canManage = deps.role() === "admin", ro = canManage ? "" : "disabled";
+			const overMap = new Map((state().teaRefs || []).map((r) => [r.analyteId || deps.teaAnalyteMeta(r.name, r).analyteId || deps.teaRefName(r.name), r]));
+			const rows = deps.effectiveTeaRefs().map(([name, unit, clia, ricos, section, , analyteId, lab]) => {
+				const isDef = deps.teaRefIsDefault(analyteId), record = overMap.get(analyteId), naming = deps.teaAnalyteMeta(name, record), externalChanged = teaRefExternalChanged(record, analyteId), kind = deps.pres.teaReferenceKindPresentation(isDef, externalChanged, !!(record && record.lab != null));
+				return {
+					name,
+					unit,
+					clia,
+					ricos,
+					lab,
+					section,
+					analyteId,
+					record,
+					...naming,
+					kind
+				};
+			}).filter((r) => manageMatch([
+				r.name,
+				r.displayName,
+				r.standardName,
+				r.abbreviation,
+				...r.aliases,
+				r.matrix,
+				r.unit,
+				r.section
+			]));
+			deps.pres.teaReferenceSortPresentation(rows);
+			const teaStatus = (kind) => deps.pres.teaReferenceStatusPresentation(kind);
+			const body = rows.map((r) => {
+				const rowActions = deps.pres.teaReferenceRowActionsPresentation(r.kind, canManage, r.lab != null), act = rowActions.action === "restore" ? deps.btn("Khôi phục", `teaRefRemove('${deps.escapeAttr(r.analyteId)}')`, "ghost sm", "Khôi phục giá trị mặc định") : rowActions.action === "remove" ? `<button class="x" onclick="teaRefRemove('${deps.escapeAttr(r.analyteId)}')" title="Xóa xét nghiệm tự thêm">✕</button>` : "";
+				const namingTitle = deps.pres.teaReferenceNamingTitlePresentation(r);
+				const labButton = rowActions.labProfile === "none" ? "" : deps.btn(rowActions.labProfile === "add" ? "Thêm hồ sơ" : "Xem hồ sơ", `teaLabProfileOpen('${deps.escapeAttr(r.analyteId)}')`, "ghost sm", rowActions.labProfile === "add" ? "Lập hồ sơ TEa chuẩn hóa" : "Xem hoặc cập nhật nguồn và lý do lựa chọn");
+				return deps.pres.teaReferenceRowPresentation({
+					namingTitle: deps.escapeAttr(namingTitle),
+					displayName: deps.esc(r.displayName || r.name),
+					unit: deps.esc(r.unit || "—"),
+					section: deps.esc(r.section || "—"),
+					disabled: ro,
+					cliaValue: deps.pres.teaReferenceInputValuePresentation(r.clia),
+					ricosValue: deps.pres.teaReferenceInputValuePresentation(r.ricos),
+					cliaChangeAction: `teaRefEdit('${deps.escapeAttr(r.analyteId)}','clia',this.value)`,
+					ricosChangeAction: `teaRefEdit('${deps.escapeAttr(r.analyteId)}','ricos',this.value)`,
+					labCellHtml: deps.pres.teaReferenceLabValuePresentation(r.lab, deps.fmt) + labButton,
+					statusHtml: teaStatus(r.kind),
+					actionHtml: act
+				});
+			}).join("");
+			const empty = deps.pres.teaReferenceEmptyStatePresentation(!!deps.searchText(ui().manageQ));
+			return manageToolbar("Bảng TEa tham chiếu", "Tổng hợp TEa từ các nguồn tham chiếu, dùng thống nhất khi tính Sigma.", canManage ? "teaRefOpenAdd()" : "", "Thêm xét nghiệm") + teaSourceRegistryHtml() + deps.pres.teaReferenceTablePresentation({
+				rowsHtml: body,
+				emptyHtml: deps.emptyState(empty.title, empty.description)
+			});
+		};
+		const manageView = () => {
+			const views = {
+				lots: manageLots,
+				panels: managePanels,
+				targets: manageTargets,
+				history: manageHistory,
+				transitions: manageTransitionsV2,
+				assays: manageAssays,
+				instruments: manageInstruments,
+				tearefs: manageTeaRefs
+			};
+			if (!views[ui().manageTab]) ui().manageTab = "instruments";
+			return views[ui().manageTab]();
+		};
+		const renderManageBody = () => {
+			const el = deps.document.querySelector(".config-shell-main");
+			if (deps.currentPage() !== "manage" || !el) {
+				deps.rerender();
+				return;
+			}
+			el.innerHTML = manageView();
+		};
+		const pageManage = () => {
+			const head = deps.headOnly("Cấu hình chung", "Quản lý máy, Panel QC, lô QC, Mean/SD và luật QC"), shell = manageShell(manageView());
+			return deps.pres.managePageHtml(head, shell);
+		};
+		return {
+			manageSearchSet,
+			manageMatch,
+			manageSearchPlaceholder,
+			groupsOfLot,
+			lotGroupLabels,
+			instrumentName,
+			panelName,
+			lotLabel,
+			lotTransitionToNo,
+			lotStatus,
+			manageShell,
+			manageToolbar,
+			manageLots,
+			manageInstruments,
+			managePanels,
+			manageTransitionsV2,
+			targetGroupLots,
+			targetGroupOptions,
+			ensureTargetSelection,
+			manageTargets,
+			manageAssays,
+			manageHistorySearchValues,
+			manageHistory,
+			teaRefFind,
+			teaRefNumOrNull,
+			teaRefExternalChanged,
+			teaRefEnsure,
+			teaRefEdit,
+			teaRefRemove,
+			teaSourceRegistryHtml,
+			teaRefOpenAdd,
+			teaRefAddSubmit,
+			teaLabProfileOpen,
+			teaLabProfileSave,
+			teaLabProfileRemove,
+			manageTeaRefs,
+			manageView,
+			renderManageBody,
+			pageManage
+		};
+	}
+	//#endregion
+	//#region src/presentation/manage/manage-tests-actions-controller.ts
+	/**
+	* Trang "Cấu hình chung" — mutation instrument/máy/panel/lô/nhóm lô/chuyển
+	* tiếp lô/Mean-SD/xét nghiệm, kèm re-auth và audit trail. Đối tác của
+	* manage-page-controller.ts (đọc/hiển thị); file này chỉ SỬA state.
+	*
+	* `document` là getter LAZY (`() => Document`), không phải giá trị capture một
+	* lần — nhiều test đổi `document` giữa các lần gọi (mỗi test case seed lại một
+	* bản `document.getElementById` khác nhau trả về giá trị form khác nhau), nên
+	* đọc `deps.document()` mỗi lần thay vì giữ một tham chiếu cũ.
+	*/
+	function createManageTestsActionsController(deps) {
+		const state = () => deps.getState();
+		const ui = () => deps.ui();
+		const doc = () => deps.document();
+		const parseVN = (s) => deps.pres.parseVnDatePresentation(s);
+		const setManageTab = (tab) => {
+			ui().manageTab = [
+				"lots",
+				"panels",
+				"targets",
+				"history",
+				"transitions",
+				"assays",
+				"instruments",
+				"tearefs"
+			].includes(tab) ? tab : "instruments";
+			ui().manageQ = "";
+			deps.rerender();
+			deps.resetMainScroll();
+		};
+		const setTargetPanel = (id) => {
+			ui().manageTargetPanel = id;
+			deps.rerender();
+		};
+		const setTargetGroup = (id) => {
+			ui().manageTargetGroup = id;
+			deps.rerender();
+		};
+		const setTargetLevel = (level) => {
+			ui().manageTargetLevel = String(level || "");
+			deps.rerender();
+		};
+		const setHistoryTest = (id) => {
+			ui().manageHistoryTest = id;
+			deps.rerender();
+		};
+		const openTargetMatrix = (panelId = "", groupId = "") => {
+			if (panelId) ui().manageTargetPanel = panelId;
+			if (groupId) ui().manageTargetGroup = groupId;
+			setManageTab("targets");
+		};
+		const targetNumberText = (value, test = null, kind = "value") => deps.pres.targetNumberTextPresentation(value, test, kind);
+		const targetConfigAssigned = (cfg) => deps.pres.targetConfigAssignedPresentation(cfg);
+		const targetRangeDraft = (cfg = {}) => deps.pres.targetRangeDraftPresentation(cfg);
+		const syncTargetRange = (el, source) => {
+			const row = el.closest(".target-row");
+			if (!row) return;
+			const test = state().tests.find((x) => x.id === row.dataset.test) || null;
+			const get = (selector) => {
+				const value = row.querySelector(selector).value.trim();
+				return value === "" ? NaN : Number(value);
+			};
+			const result = deps.pres.targetRangeSyncPresentation(source, {
+				mean: get(".tm-mean"),
+				sd: get(".tm-sd"),
+				low: get(".tm-low"),
+				high: get(".tm-high")
+			});
+			if (!result) return;
+			if (source === "limits") {
+				row.querySelector(".tm-mean").value = targetNumberText(result.mean, test);
+				row.querySelector(".tm-sd").value = targetNumberText(result.sd, test, "stat");
+			} else {
+				row.querySelector(".tm-low").value = targetNumberText(result.low, test);
+				row.querySelector(".tm-high").value = targetNumberText(result.high, test);
+			}
+		};
+		const toggleTargetRow = (el) => {
+			const row = el.closest(".target-row");
+			row.querySelectorAll(".tm-mean,.tm-low,.tm-high,.tm-sd").forEach((x) => x.disabled = !el.checked);
+			if (el.checked) {
+				const mean = row.querySelector(".tm-mean");
+				if (!mean.value) mean.focus();
+			}
+		};
+		const targetCheckAll = (on) => {
+			doc().querySelectorAll(".tm-use").forEach((box) => {
+				box.checked = !!on;
+				toggleTargetRow(box);
+			});
+		};
+		const targetPickBackfillPoints = (t, lot, pick) => deps.ManageConfigService.targetPickBackfillPoints(state().data && state().data[t.id] || [], t, lot, pick);
+		const applyTargetPick = (t, lot, pick, effectiveFrom, note) => deps.ManageConfigService.applyTargetPick({
+			test: t,
+			lot,
+			pick,
+			effectiveFrom,
+			note,
+			lots: state().qcLots || [],
+			points: state().data && state().data[t.id] || [],
+			upsertHistory: deps.upsertLotTargetHistory
+		});
+		const applyPlannedTarget = (t, lot, pick, note) => deps.ManageConfigService.applyPlannedTarget({
+			test: t,
+			lot,
+			pick,
+			note,
+			upsertHistory: deps.upsertLotTargetHistory
+		});
+		const readTargetMatrixPicks = async () => {
+			const rows = [...doc().querySelectorAll(".target-row")], picked = [];
+			for (const row of rows) {
+				if (row.dataset.locked === "1") continue;
+				const use = row.querySelector(".tm-use"), testId = row.dataset.test, lot = state().qcLots.find((x) => x.id === row.dataset.lot);
+				if (!lot) continue;
+				if (!use.checked) {
+					picked.push({
+						testId,
+						lot,
+						use: false
+					});
+					continue;
+				}
+				const meanRaw = row.querySelector(".tm-mean").value.trim(), lowRaw = row.querySelector(".tm-low").value.trim(), highRaw = row.querySelector(".tm-high").value.trim(), sdRaw = row.querySelector(".tm-sd").value.trim();
+				const normalized = deps.ManageConfigService.normalizeTargetPick({
+					meanRaw,
+					lowRaw,
+					highRaw,
+					sdRaw
+				});
+				if (normalized.error) {
+					await deps.infoDialog(normalized.message);
+					return null;
+				}
+				picked.push({
+					testId,
+					lot,
+					...normalized
+				});
+			}
+			return picked;
+		};
+		const saveTargetMatrix = async () => {
+			if (!deps.requireAdmin()) return;
+			const panel = state().qcPanels.find((x) => x.id === ui().manageTargetPanel), group = state().lotGroups.find((x) => x.id === ui().manageTargetGroup), groupLots = deps.targetGroupLots(group);
+			if (!panel) {
+				await deps.infoDialog("Chọn Panel QC.");
+				return;
+			}
+			if (!group || !groupLots.length) {
+				await deps.infoDialog("Chọn nhóm lô QC.");
+				return;
+			}
+			const picked = await readTargetMatrixPicks();
+			if (!picked) return;
+			const overwrites = deps.pres.targetOverwritePicksPresentation(picked, state().tests);
+			const backfilled = picked.filter((p) => p.use).flatMap((pick) => {
+				const t = state().tests.find((x) => x.id === pick.testId);
+				return t ? targetPickBackfillPoints(t, pick.lot, pick) : [];
+			});
+			const locked = deps.PeriodService.lockedPoints(state(), backfilled);
+			if (!overwrites.length) {
+				if (locked.count && !await deps.confirmDialog({
+					kicker: "Cập nhật hàng loạt",
+					title: "Điền lô/Mean-SD cho điểm QC đã khóa kỳ",
+					message: `Lưu Mean/SD này sẽ điền số lô/Mean-SD hiện hành vào ${locked.count} điểm QC trước đó chưa ghi lô, thuộc kỳ đã khóa (${locked.periods.map(deps.monthVN).join(", ")}).`,
+					detail: "Giá trị đo và ngày của từng điểm không đổi — chỉ điền thêm nhãn số lô/Mean-SD còn thiếu.",
+					confirmLabel: "Vẫn lưu",
+					cancelLabel: "Hủy",
+					danger: false
+				})) return;
+				if (!await deps.reauthenticateCurrentUser({
+					title: "Xác thực Mean/SD",
+					message: "Nhập lại mật khẩu trước khi lưu Mean/SD cho lô QC."
+				})) return;
+				commitTargetMatrix(picked, group, "switch", []);
+				return;
+			}
+			ui().targetSwitchCtx = {
+				group,
+				picked,
+				overwrites,
+				locked
+			};
+			openTargetSwitchModal();
+		};
+		const openTargetSwitchModal = () => {
+			const { group, overwrites, locked } = ui().targetSwitchCtx || {};
+			if (!group) return;
+			const names = deps.pres.targetSwitchAssayNamesPresentation(overwrites.map((pick) => {
+				const pt = state().tests.find((t) => t.id === pick.testId);
+				return pt && deps.testDisplayName(pt);
+			}));
+			const lockNote = deps.pres.targetLockedBackfillNotePresentation({
+				count: locked && locked.count || 0,
+				periods: locked && locked.periods.map(deps.monthVN) || [],
+				emphasize: true
+			});
+			deps.openModal(deps.pres.targetSwitchModalHtml({
+				groupName: deps.esc(group.name),
+				overwriteCount: overwrites.length,
+				assayNames: deps.esc(names),
+				lockNote,
+				cancelButtonHtml: deps.btn("Hủy", "closeModal()", "ghost"),
+				plannedButtonHtml: deps.btn("Dự kiến", "resolveTargetSwitch('planned')", "ghost"),
+				switchButtonHtml: deps.btn("Chuyển qua nhóm lô này", "resolveTargetSwitch('switch')", "teal")
+			}));
+		};
+		const resolveTargetSwitch = async (mode) => {
+			const ctx = ui().targetSwitchCtx;
+			deps.closeModal();
+			ui().targetSwitchCtx = null;
+			if (!ctx) return;
+			if (!await deps.reauthenticateCurrentUser({
+				title: "Xác thực chuyển lô",
+				message: "Nhập lại mật khẩu trước khi lưu hoặc áp dụng Mean/SD cho nhóm lô mới."
+			})) return;
+			commitTargetMatrix(ctx.picked, ctx.group, mode, ctx.overwrites);
+		};
+		const commitTargetMatrix = (picked, group, mode, overwrites) => {
+			deps.pres.ManageTargetMatrixWorkflowCommand.commit({
+				picked,
+				group,
+				mode,
+				overwrites,
+				effectiveFrom: deps.isoToday(),
+				panelId: ui().manageTargetPanel
+			});
+		};
+		const openQcHistoryDetail = (tid, level, lotNo = "") => {
+			const t = state().tests.find((x) => x.id === tid), l = t && t.levels.find((x) => +x.level === +level);
+			if (!t || !l) return;
+			const hist = (l.meanSdHistory || []).filter((h) => !lotNo || (h.lot || "") === lotNo || !h.lot && (l.lot || "") === lotNo);
+			const histRows = hist.length ? deps.pres.qcHistoryMeanSdRowsHtml(hist.map((h) => {
+				const rowLot = h.lot || lotNo || "", cumSt = deps.stats(deps.pointsForLot(tid, level, rowLot).filter((p) => !h.effectiveTo || p.date <= h.effectiveTo).map((p) => p.val));
+				return {
+					lot: deps.esc(rowLot || "—"),
+					mean: deps.fmtTestValue(t, h.mean),
+					sd: deps.fmtTestValue(t, h.sd),
+					cumulativeMean: cumSt ? deps.fmtTestValue(t, cumSt.m) : "—",
+					cumulativeSd: cumSt ? deps.fmtTestValue(t, cumSt.sd) : "—",
+					cumulativeCv: cumSt ? deps.fmt(cumSt.cv) + "%" : "—",
+					period: `${h.effectiveFrom ? deps.vnDate(h.effectiveFrom) : "Không giới hạn"} → ${h.effectiveTo ? deps.vnDate(h.effectiveTo) : "Không giới hạn"}`,
+					source: h.source === "lab" ? "PXN" : "NSX"
+				};
+			})) : "";
+			const pts = (state().data[tid] || []).filter((p) => +p.level === +level && (!lotNo || (p.lot || "") === lotNo)).sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")) || String(a.runId || "").localeCompare(String(b.runId || ""), "vi", { numeric: true }));
+			const ptRows = deps.pres.qcHistoryPointRowsHtml(pts.map((p) => {
+				const mean = Number.isFinite(+p.qcMean) ? +p.qcMean : +l.mean, sd = Number.isFinite(+p.qcSd) && +p.qcSd > 0 ? +p.qcSd : +l.sd, z = sd ? (+p.val - mean) / sd : NaN, abs = Math.abs(z), verdict = abs > 3 ? "Loại bỏ" : abs > 2 ? "Cảnh báo" : "Đạt", verdictClass = abs > 3 ? "rej" : abs > 2 ? "warn" : "ok", staff = deps.pointStaff(p);
+				return {
+					date: deps.vnDate(p.date),
+					run: deps.esc(p.runId || "—"),
+					value: deps.fmtPointValue(p, t),
+					z: Number.isFinite(z) ? (z >= 0 ? "+" : "") + deps.fmt(z) + "s" : "—",
+					mean: deps.fmtTestValue(t, mean),
+					sd: deps.fmtTestValue(t, sd),
+					verdict,
+					verdictClass,
+					staffCode: deps.esc(staff.code || "—")
+				};
+			}));
+			deps.openModal(deps.pres.qcHistoryDetailModalHtml({
+				title: `${deps.esc(deps.testDisplayName(t))} · Mức ${level}${lotNo ? " · Lô " + deps.esc(lotNo) : ""}`,
+				historyRowsHtml: histRows,
+				historyEmptyHtml: deps.emptyState("Chưa có mốc Mean/SD", "Không tìm thấy lịch sử Mean/SD cho lô này."),
+				pointCount: pts.length,
+				pointRowsHtml: ptRows,
+				pointsEmptyHtml: deps.emptyState("Chưa có điểm QC", "Không có điểm QC nào khớp với lô/mức này."),
+				closeButtonHtml: deps.btn("Đóng", "closeModal()", "teal")
+			}));
+		};
+		const openConfigPanel = async (id = "") => {
+			if (!state().tests.length) {
+				await deps.infoDialog("Hãy tạo xét nghiệm trước khi tạo Panel QC.");
+				setManageTab("assays");
+				return;
+			}
+			if (!state().instruments.length) {
+				await deps.infoDialog("Hãy tạo máy xét nghiệm trước khi tạo Panel QC.");
+				setManageTab("instruments");
+				return;
+			}
+			const p = state().qcPanels.find((x) => x.id === id) || {
+				testIds: [],
+				instrumentId: state().instruments[0] && state().instruments[0].id,
+				active: true
+			};
+			const instruments = deps.pres.configPanelInstrumentOptionsHtml(state().instruments.map((i) => ({
+				id: i.id,
+				selected: i.id === p.instrumentId,
+				label: deps.esc(i.name) + (i.model ? " · " + deps.esc(i.model) : "")
+			})));
+			const panelTestRows = (instrumentId, selected = []) => deps.pres.configPanelTestRows(state().tests.filter((t) => t.instrumentId === instrumentId).map((t) => ({
+				id: t.id,
+				name: deps.esc(deps.testDisplayName(t)),
+				instrument: deps.esc(deps.instrumentName(t.instrumentId, t.machine)),
+				unit: deps.esc(t.unit || ""),
+				selected: selected.includes(t.id)
+			})));
+			deps.openModal(deps.pres.configPanelModalHtml({
+				title: id ? "Sửa Panel QC" : "Thêm Panel QC",
+				name: deps.escapeAttr(p.name || ""),
+				instrumentsHtml: instruments,
+				testRowsHtml: panelTestRows(p.instrumentId, p.testIds || []),
+				note: deps.esc(p.note || ""),
+				active: p.active !== false,
+				cancelButtonHtml: deps.btn("Hủy", "closeModal()", "ghost"),
+				saveButtonHtml: deps.btn(id ? "Lưu thay đổi" : "Thêm Panel QC", `saveConfigPanel('${id}')`, "teal")
+			}));
+		};
+		const renderConfigPanelTests = () => {
+			const root = doc().getElementById("cfgPanelTests"), instrumentId = doc().getElementById("cfgPanelInstrument").value;
+			if (!root) return;
+			root.innerHTML = deps.pres.configPanelTestRows(state().tests.filter((t) => t.instrumentId === instrumentId).map((t) => ({
+				id: t.id,
+				name: deps.esc(deps.testDisplayName(t)),
+				instrument: deps.esc(deps.instrumentName(t.instrumentId, t.machine)),
+				unit: deps.esc(t.unit || "")
+			})));
+		};
+		const saveConfigPanel = async (id) => {
+			if (!deps.requireAdmin()) return;
+			const data = {
+				name: doc().getElementById("cfgPanelName").value,
+				instrumentId: doc().getElementById("cfgPanelInstrument").value,
+				testIds: [...doc().querySelectorAll(".cfg-panel-test:checked")].map((x) => x.value),
+				note: doc().getElementById("cfgPanelNote").value,
+				active: doc().getElementById("cfgPanelActive").checked
+			}, result = deps.pres.ManagePanelWorkflowCommand.save({
+				id,
+				newId: deps.uid(),
+				data
+			});
+			if (!result.ok) {
+				await deps.infoDialog(result.message);
+				return;
+			}
+		};
+		const deleteConfigPanel = async (id) => {
+			if (!deps.requireAdmin()) return;
+			const checked = deps.ManageConfigService.panelRemoval(state(), { id });
+			if (checked.error) {
+				if (checked.message) await deps.infoDialog(checked.message);
+				return;
+			}
+			if (!await deps.confirmDialog({
+				kicker: "Thao tác không thể hoàn tác",
+				title: "Xóa Panel QC",
+				message: `Xóa Panel QC ${checked.record.name}?`,
+				detail: "Các xét nghiệm vẫn được giữ nguyên.",
+				confirmLabel: "Xóa Panel QC",
+				cancelLabel: "Hủy"
+			})) return;
+			const result = deps.pres.ManagePanelWorkflowCommand.remove({ id });
+			if (!result.ok) {
+				await deps.infoDialog(result.message);
+				return;
+			}
+		};
+		const deleteLotTransition = async (id) => {
+			if (!deps.requireAdmin()) return;
+			const checked = deps.pres.ManageLotTransitionWorkflowCommand.checkRemoval({ id });
+			if (checked.error) {
+				if (checked.message) await deps.infoDialog(checked.message);
+				return;
+			}
+			if (!await deps.confirmDialog({
+				kicker: "Thao tác không thể hoàn tác",
+				title: "Xóa dòng chuyển tiếp lô",
+				message: "Xóa dòng chuyển tiếp lô này?",
+				confirmLabel: "Xóa",
+				cancelLabel: "Hủy"
+			})) return;
+			deps.pres.ManageLotTransitionWorkflowCommand.remove({ id });
+		};
+		const lotTransitionChoiceLabel = (lot) => deps.LotTransitionPickerService.label(lot);
+		const lotTransitionChoiceLots = (selectedId = "") => deps.LotTransitionPickerService.availableLots(state().qcLots || [], selectedId);
+		const lotTransitionChoiceMatch = (value, selectedId = "") => deps.LotTransitionPickerService.match(state().qcLots || [], value, selectedId);
+		const lotTransitionSelectedId = (inputId) => {
+			const el = doc().getElementById(inputId);
+			if (!el) return "";
+			const lot = lotTransitionChoiceMatch(el.value, el.dataset.lotId || "");
+			if (lot) el.dataset.lotId = lot.id;
+			return lot && lot.id || "";
+		};
+		const lotTransitionChoiceInput = (el, commit = false) => {
+			const lot = lotTransitionChoiceMatch(el.value, el.dataset.lotId || "");
+			el.dataset.lotId = lot && lot.id || "";
+			if (commit && lot) el.value = lotTransitionChoiceLabel(lot);
+			refreshLotTransitionTargets();
+		};
+		const lotTransitionChoiceHtml = (inputId, selectedId) => {
+			const lot = state().qcLots.find((l) => l.id === selectedId), options = lotTransitionChoiceLots(selectedId).map((l) => `<option value="${deps.escapeAttr(lotTransitionChoiceLabel(l))}"></option>`).join("");
+			return deps.pres.lotTransitionChoiceHtmlPresentation({
+				inputId,
+				selectedId: deps.escapeAttr(selectedId || ""),
+				value: deps.escapeAttr(lotTransitionChoiceLabel(lot)),
+				optionsHtml: options
+			});
+		};
+		const openLotTransitionV2 = async (id = "") => {
+			if (!state().qcPanels.length) {
+				await deps.infoDialog("Hãy tạo Panel QC trước khi tạo chuyển tiếp lô.");
+				setManageTab("panels");
+				return;
+			}
+			if (state().qcLots.length < 2) {
+				await deps.infoDialog("Cần ít nhất 2 lô QC để tạo chuyển tiếp.");
+				setManageTab("lots");
+				return;
+			}
+			const tr = state().lotTransitions.find((x) => x.id === id) || {
+				panelId: state().qcPanels[0] && state().qcPanels[0].id,
+				fromLotId: "",
+				toLotId: "",
+				startDate: deps.isoToday(),
+				status: "planned",
+				approvedBy: "",
+				approvedAt: ""
+			};
+			const panels = `<option value="">— Chọn Panel QC —</option>` + state().qcPanels.map((p) => `<option value="${p.id}" ${p.id === tr.panelId ? "selected" : ""}>${deps.esc(p.name)} · ${deps.esc(deps.instrumentName(p.instrumentId))}</option>`).join("");
+			deps.openModal(deps.pres.lotTransitionModalHtml({
+				title: id ? "Sửa hồ sơ chuyển lô" : "Thêm hồ sơ chuyển lô",
+				panelsHtml: panels,
+				fromChoiceHtml: lotTransitionChoiceHtml("cfgTransFrom", tr.fromLotId),
+				toChoiceHtml: lotTransitionChoiceHtml("cfgTransTo", tr.toLotId),
+				startDateHtml: deps.dateBox("cfgTransStart", tr.startDate || ""),
+				status: tr.status,
+				targetsHtml: lotTransitionTargetsHtml(tr.panelId, tr.fromLotId, tr.toLotId),
+				cancelButtonHtml: deps.btn("Hủy", "closeModal()", "ghost"),
+				saveButtonHtml: deps.btn(id ? "Lưu thay đổi" : "Thêm hồ sơ chuyển lô", `saveLotTransitionV2('${id}')`, "teal")
+			}));
+		};
+		const lotTransitionTargetsHtml = (panelId, fromLotId, toLotId) => {
+			if (!panelId || !fromLotId || !toLotId || fromLotId === toLotId) return deps.pres.lotTransitionTargetsHtmlPresentation({
+				kind: "hint",
+				message: "Chọn Panel QC, Lô cũ và Lô mới (khác nhau, cùng mức) để nhập Mean/SD cho lô mới."
+			});
+			const check = deps.inspectAcceptedLotTransition({
+				panelId,
+				fromLotId,
+				toLotId,
+				status: "accepted"
+			});
+			if (!check.valid) return deps.pres.lotTransitionTargetsHtmlPresentation({
+				kind: "hint",
+				message: "Lô cũ và lô mới phải cùng mức QC."
+			});
+			if (!check.rows.length) return deps.pres.lotTransitionTargetsHtmlPresentation({
+				kind: "hint",
+				message: `Panel đã chọn không có xét nghiệm nào đang dùng lô cũ ${deps.esc(check.from.lotNo)}.`
+			});
+			const rows = check.rows.map(({ t, nextHist }) => {
+				const draft = targetRangeDraft(nextHist || {}), has = Number.isFinite(draft.mean) && (Number.isFinite(draft.sd) && draft.sd > 0 || Number.isFinite(draft.low) && Number.isFinite(draft.high));
+				return {
+					testId: t.id,
+					name: deps.esc(deps.testDisplayName(t)),
+					unit: deps.esc(t.unit || ""),
+					mean: deps.escapeAttr(targetNumberText(draft.mean, t)),
+					low: deps.escapeAttr(targetNumberText(draft.low, t)),
+					high: deps.escapeAttr(targetNumberText(draft.high, t)),
+					sd: deps.escapeAttr(targetNumberText(draft.sd, t, "stat")),
+					assigned: has
+				};
+			});
+			return deps.pres.lotTransitionTargetsHtmlPresentation({
+				kind: "rows",
+				lotNo: deps.esc(check.to.lotNo),
+				rows
+			});
+		};
+		const filterLotTransitionTargets = (term) => {
+			const q = deps.searchText(term || "");
+			doc().querySelectorAll("#cfgTransTargets .target-row").forEach((row) => {
+				const name = row.querySelector(".lot-assay-name b");
+				row.style.display = !q || deps.searchText(name ? name.textContent : "").includes(q) ? "" : "none";
+			});
+		};
+		const refreshLotTransitionTargets = () => {
+			const panelId = doc().getElementById("cfgTransPanel").value, fromLotId = lotTransitionSelectedId("cfgTransFrom"), toLotId = lotTransitionSelectedId("cfgTransTo");
+			const el = doc().getElementById("cfgTransTargets");
+			if (el) el.innerHTML = lotTransitionTargetsHtml(panelId, fromLotId, toLotId);
+		};
+		const readLotTransitionTargetPicks = async (rows) => {
+			const picks = [];
+			for (const { t } of rows) {
+				const row = doc().querySelector(`#cfgTransTargets .target-row[data-test="${t.id}"]`);
+				if (!row) {
+					picks.push({
+						t,
+						use: false
+					});
+					continue;
+				}
+				const meanRaw = row.querySelector(".tm-mean").value.trim(), lowRaw = row.querySelector(".tm-low").value.trim(), highRaw = row.querySelector(".tm-high").value.trim(), sdRaw = row.querySelector(".tm-sd").value.trim();
+				if (!meanRaw && !lowRaw && !highRaw && !sdRaw) {
+					picks.push({
+						t,
+						use: false
+					});
+					continue;
+				}
+				const normalized = deps.ManageConfigService.normalizeTargetPick({
+					meanRaw,
+					lowRaw,
+					highRaw,
+					sdRaw,
+					deriveLimits: false
+				});
+				if (normalized.error) {
+					await deps.infoDialog(`${deps.testDisplayName(t)}: ${{
+						"invalid-mean": "nhập trung bình mục tiêu hợp lệ cho lô mới.",
+						"invalid-limits": "giới hạn dưới/trên phải là số hợp lệ.",
+						"invalid-range": "nếu nhập giới hạn, cần nhập đủ giới hạn dưới và trên; giới hạn trên phải lớn hơn giới hạn dưới.",
+						"invalid-sd": "độ lệch chuẩn phải là số lớn hơn 0.",
+						"missing-sd": "cần độ lệch chuẩn, hoặc đủ giới hạn dưới/trên để ước tính SD."
+					}[normalized.error] || normalized.message}`);
+					return null;
+				}
+				picks.push({
+					t,
+					...normalized
+				});
+			}
+			return picks;
+		};
+		const saveLotTransitionV2 = async (id) => {
+			if (!deps.requireAdmin()) return;
+			const panelId = doc().getElementById("cfgTransPanel").value, fromLotId = lotTransitionSelectedId("cfgTransFrom"), toLotId = lotTransitionSelectedId("cfgTransTo"), status = doc().getElementById("cfgTransStatus").value, startRaw = doc().getElementById("cfgTransStart").value.trim(), startDate = parseVN(startRaw);
+			if (startRaw && !startDate) {
+				await deps.infoDialog("Ngày bắt đầu không hợp lệ. Dùng dạng dd/mm/yyyy.");
+				return;
+			}
+			const prep = deps.pres.ManageLotTransitionCommand.prepare({
+				state: state(),
+				id,
+				panelId,
+				fromLotId,
+				toLotId,
+				status,
+				startDate,
+				today: deps.isoToday(),
+				approvedBy: deps.userName(),
+				approvedAt: (/* @__PURE__ */ new Date()).toISOString()
+			});
+			if (!prep.ok) {
+				await deps.infoDialog(prep.message);
+				return;
+			}
+			if (prep.needsReauth && !await deps.reauthenticateCurrentUser({
+				title: "Xác thực kết luận chuyển lô",
+				message: "Nhập lại mật khẩu trước khi chấp nhận hoặc từ chối lô QC mới."
+			})) return;
+			const targetCheck = deps.inspectAcceptedLotTransition({
+				panelId,
+				fromLotId,
+				toLotId,
+				status: "accepted"
+			});
+			if (targetCheck.valid && targetCheck.rows.length) {
+				const picks = await readLotTransitionTargetPicks(targetCheck.rows);
+				if (picks === null) return;
+				picks.forEach((pick) => {
+					if (pick.use) applyPlannedTarget(pick.t, prep.toLot, pick, "Nhập khi tạo hồ sơ chuyển lô");
+				});
+			}
+			const gate = deps.pres.ManageLotTransitionCommand.acceptanceGate({
+				state: state(),
+				data: prep.data,
+				finalChanged: prep.finalChanged
+			});
+			if (!gate.ok) {
+				await deps.infoDialog(gate.message);
+				return;
+			}
+			const result = deps.pres.ManageLotTransitionWorkflowCommand.execute({
+				id,
+				newId: deps.uid(),
+				data: prep.data
+			});
+			if (!result.ok) {
+				await deps.infoDialog(result.message);
+				return;
+			}
+		};
+		const openConfigGroup = async (id = "") => {
+			if (!state().qcLots.length) {
+				await deps.infoDialog("Hãy tạo lô QC trước khi tạo nhóm lô.");
+				setManageTab("lots");
+				return;
+			}
+			const g = state().lotGroups.find((x) => x.id === id) || { lotIds: [] };
+			const levels = [...new Set(state().qcLots.map((l) => +l.level).filter(Number.isFinite))].sort((a, b) => a - b);
+			const levelLayout = levels.length >= 3 ? "levels-3plus" : levels.length === 2 ? "levels-2" : "levels-1";
+			const lotColumns = deps.pres.lotGroupColumnsHtml(levels.map((level) => ({
+				level,
+				lots: state().qcLots.filter((l) => +l.level === level).map((l) => {
+					const selected = (g.lotIds || []).includes(l.id), locked = l.depleted && !selected, to = l.depleted ? deps.lotTransitionToNo(l.id) : "", depletedLabel = l.depleted ? to ? "đã chuyển tiếp qua lô " + to : "đã hết QC" : "";
+					return {
+						id: l.id,
+						lotNo: deps.esc(l.lotNo),
+						expiry: l.exp ? deps.vnDate(l.exp) : "chưa có",
+						selected,
+						depleted: !!l.depleted,
+						locked,
+						depletedLabel: deps.escapeAttr(depletedLabel)
+					};
+				})
+			})));
+			deps.openModal(deps.pres.lotGroupModalHtml({
+				title: id ? "Sửa nhóm lô" : "Thêm nhóm lô",
+				levelLayout,
+				lotColumnsHtml: lotColumns,
+				name: deps.escapeAttr(g.name || ""),
+				note: deps.esc(g.note || ""),
+				cancelButtonHtml: deps.btn("Hủy", "closeModal()", "ghost"),
+				saveButtonHtml: deps.btn(id ? "Lưu thay đổi" : "Thêm nhóm lô", `saveConfigGroup('${id}')`, "teal")
+			}));
+		};
+		const suggestConfigGroupName = () => {
+			const name = [...doc().querySelectorAll(".cfg-group-lot:checked")].map((x) => x.value).map((id) => (state().qcLots.find((l) => l.id === id) || {}).lotNo).filter(Boolean).join("/"), el = doc().getElementById("cfgGroupName");
+			if (el) el.value = name;
+		};
+		const saveConfigGroup = async (id) => {
+			if (!deps.requireAdmin()) return;
+			const data = {
+				name: doc().getElementById("cfgGroupName").value,
+				lotIds: [...doc().querySelectorAll(".cfg-group-lot:checked")].map((x) => x.value),
+				note: doc().getElementById("cfgGroupNote").value
+			};
+			const result = deps.pres.ManageLotGroupWorkflowCommand.save({
+				id,
+				newId: deps.uid(),
+				data
+			});
+			if (!result.ok) {
+				await deps.infoDialog(result.message);
+				return;
+			}
+		};
+		const deleteConfigGroup = async (id) => {
+			if (!deps.requireAdmin()) return;
+			const checked = deps.ManageConfigService.lotGroupRemoval(state(), { id });
+			if (checked.error) {
+				if (checked.message) await deps.infoDialog(checked.message);
+				return;
+			}
+			if (!await deps.confirmDialog({
+				kicker: "Thao tác không thể hoàn tác",
+				title: "Xóa nhóm lô",
+				message: `Xóa nhóm lô ${checked.record.name}?`,
+				detail: "Các lô QC bên trong vẫn được giữ nguyên.",
+				confirmLabel: "Xóa nhóm lô",
+				cancelLabel: "Hủy"
+			})) return;
+			const result = deps.pres.ManageLotGroupWorkflowCommand.remove({ id });
+			if (!result.ok) {
+				await deps.infoDialog(result.message);
+				return;
+			}
+		};
+		const toggleLotGroupStatus = (id) => {
+			if (!deps.requireAdmin()) return;
+			deps.pres.ManageLotGroupWorkflowCommand.stop({
+				id,
+				stoppedAt: deps.isoToday()
+			});
+		};
+		const activateLotGroup = async (id) => {
+			if (!deps.requireAdmin()) return;
+			const preview = deps.pres.ManageLotGroupWorkflowCommand.previewActivation({ id });
+			if (!preview.ok) return;
+			const g = preview.group;
+			const lockNote = deps.pres.targetLockedBackfillNotePresentation({
+				count: preview.locked.count,
+				periods: preview.locked.periods.map(deps.monthVN)
+			});
+			if (!await deps.confirmDialog({
+				title: "Kích hoạt nhóm lô",
+				message: `Áp dụng Mean/SD của nhóm lô ${g.name} cho các xét nghiệm liên quan và chuyển sang dùng nhóm này?`,
+				detail: lockNote,
+				confirmLabel: "Áp dụng",
+				cancelLabel: "Hủy",
+				danger: false
+			})) return;
+			const result = deps.pres.ManageLotGroupWorkflowCommand.executeActivation({
+				group: g,
+				candidates: preview.candidates,
+				effectiveFrom: deps.isoToday(),
+				note: "Kích hoạt nhóm lô"
+			});
+			if (result.status === "already-active") {
+				await deps.infoDialog(`Nhóm lô ${g.name} đã đang được xét nghiệm dùng thật, chỉ gỡ nhãn cũ.`, { type: "success" });
+				return;
+			}
+			if (result.status === "unready") {
+				await deps.infoDialog("Nhóm lô này chưa có Mean/SD (dự kiến hoặc lịch sử) cho xét nghiệm nào để áp dụng. Vào màn Mean/SD để nhập trước.");
+				return;
+			}
+			await deps.infoDialog(`Đã áp dụng Mean/SD cho ${result.count} dòng và chuyển sang nhóm lô ${g.name}.`, { type: "success" });
+		};
+		const openConfigLot = (id = "") => {
+			const l = state().qcLots.find((x) => x.id === id) || {
+				level: 1,
+				active: true
+			};
+			deps.openModal(deps.pres.configLotModalHtml({
+				title: id ? "Sửa thông tin lô QC" : "Thêm lô QC",
+				lotNo: deps.escapeAttr(l.lotNo || ""),
+				levelOptionsHtml: deps.pres.configLotLevelOptionsHtml(+l.level),
+				description: deps.escapeAttr(l.description || ""),
+				supplier: deps.escapeAttr(l.supplier || ""),
+				openedDateHtml: deps.dateBox("cfgLotOpened", l.opened || ""),
+				expiryDateHtml: deps.dateBox("cfgLotExp", l.exp || ""),
+				note: deps.esc(l.note || ""),
+				cancelButtonHtml: deps.btn("Hủy", "closeModal()", "ghost"),
+				saveButtonHtml: deps.btn(id ? "Lưu thay đổi" : "Thêm lô QC", `saveConfigLot('${id}')`, "teal")
+			}));
+		};
+		const saveConfigLot = async (id) => {
+			if (!deps.requireAdmin()) return;
+			const lotNo = deps.QCCore.cleanText(doc().getElementById("cfgLotNo").value).trim();
+			if (!lotNo) {
+				await deps.infoDialog("Nhập số lot.");
+				return;
+			}
+			const level = +doc().getElementById("cfgLotLevel").value || 1, openedRaw = doc().getElementById("cfgLotOpened").value.trim(), expRaw = doc().getElementById("cfgLotExp").value.trim(), opened = parseVN(openedRaw), exp = parseVN(expRaw);
+			if (openedRaw && !opened) {
+				await deps.infoDialog("Ngày mở không hợp lệ. Dùng dạng dd/mm/yyyy.");
+				return;
+			}
+			if (expRaw && !exp) {
+				await deps.infoDialog("Hạn sử dụng không hợp lệ. Dùng dạng dd/mm/yyyy.");
+				return;
+			}
+			const existing = state().qcLots.find((x) => x.id === id), data = {
+				lotNo,
+				level,
+				description: deps.QCCore.cleanText(doc().getElementById("cfgLotDescription").value),
+				supplier: deps.QCCore.cleanText(doc().getElementById("cfgLotSupplier").value),
+				program: existing && existing.program || "",
+				opened,
+				exp,
+				note: deps.QCCore.cleanText(doc().getElementById("cfgLotNote").value, 5e3),
+				active: true
+			};
+			const preview = deps.pres.ManageLotWorkflowCommand.preview({
+				id,
+				data
+			});
+			if (!preview.ok) {
+				await deps.infoDialog(preview.message);
+				return;
+			}
+			if (preview.rename) {
+				const r = preview.rename, lockNote = r.locked.count ? ` Trong đó ${r.locked.count} điểm thuộc kỳ đã khóa (${r.locked.periods.map(deps.monthVN).join(", ")}).` : "";
+				if (!await deps.confirmDialog({
+					kicker: "Cập nhật hàng loạt",
+					title: "Đổi số lô QC",
+					message: `Đổi số lô "${r.oldLotNo}" thành "${r.newLotNo}" sẽ cập nhật ${r.affected} điểm QC đã ghi.`,
+					detail: `Số lô là nhãn nhận dạng — giá trị, ngày và Mean/SD của từng điểm không đổi.${lockNote}`,
+					confirmLabel: "Đổi số lô",
+					cancelLabel: "Hủy",
+					danger: false
+				})) return;
+			}
+			const result = deps.pres.ManageLotWorkflowCommand.execute({
+				id,
+				newId: deps.uid(),
+				data
+			});
+			if (!result.ok) {
+				await deps.infoDialog(result.message);
+				return;
+			}
+		};
+		const renameLotAcrossPoints = (oldLevel, oldLotNo, newLotNo) => deps.ManageConfigService.renameLotPoints(state(), oldLevel, oldLotNo, newLotNo);
+		const deleteConfigLot = async (id) => {
+			if (!deps.requireAdmin()) return;
+			const check = deps.pres.ManageLotWorkflowCommand.checkRemoval({ id });
+			if (check.error) {
+				if (check.error !== "not-found") await deps.infoDialog(check.message);
+				return;
+			}
+			if (!await deps.confirmDialog({
+				kicker: "Thao tác không thể hoàn tác",
+				title: "Xóa lô QC",
+				message: `Xóa lô QC ${check.record.lotNo}?`,
+				confirmLabel: "Xóa lô QC",
+				cancelLabel: "Hủy"
+			})) return;
+			const result = deps.pres.ManageLotWorkflowCommand.remove({ id });
+			if (!result.ok) {
+				await deps.infoDialog(result.message);
+				return;
+			}
+		};
+		const openConfigInstrument = (id = "") => {
+			const i = state().instruments.find((x) => x.id === id) || { active: true };
+			deps.openModal(deps.pres.configInstrumentModalHtml({
+				title: id ? "Sửa máy xét nghiệm" : "Thêm máy xét nghiệm",
+				name: deps.escapeAttr(i.name || ""),
+				section: deps.escapeAttr(i.section || ""),
+				manufacturer: deps.escapeAttr(i.manufacturer || ""),
+				serial: deps.escapeAttr(i.serial || ""),
+				active: i.active !== false,
+				cancelButtonHtml: deps.btn("Hủy", "closeModal()", "ghost"),
+				saveButtonHtml: deps.btn(id ? "Lưu thay đổi" : "Thêm máy xét nghiệm", `saveConfigInstrument('${id}')`, "teal")
+			}));
+		};
+		const saveConfigInstrument = async (id) => {
+			if (!deps.requireAdmin()) return;
+			const data = {
+				name: doc().getElementById("cfgInstName").value,
+				section: doc().getElementById("cfgInstSection").value,
+				manufacturer: doc().getElementById("cfgInstMfr").value,
+				serial: doc().getElementById("cfgInstSerial").value,
+				active: doc().getElementById("cfgInstActive").checked
+			};
+			const result = deps.pres.ManageInstrumentWorkflowCommand.save({
+				id,
+				newId: id ? "" : deps.uid(),
+				data
+			});
+			if (!result.ok) {
+				await deps.infoDialog(result.message);
+				return;
+			}
+		};
+		const deleteConfigInstrument = async (id) => {
+			if (!deps.requireAdmin()) return;
+			const check = deps.ManageConfigService.instrumentRemoval(state(), { id });
+			if (check.error) {
+				if (check.error !== "not-found") await deps.infoDialog(check.message);
+				return;
+			}
+			if (!await deps.confirmDialog({
+				kicker: "Thao tác không thể hoàn tác",
+				title: "Xóa máy xét nghiệm",
+				message: `Xóa máy ${check.record.name}?`,
+				confirmLabel: "Xóa máy",
+				cancelLabel: "Hủy"
+			})) return;
+			const result = deps.pres.ManageInstrumentWorkflowCommand.remove({ id });
+			if (!result.ok) {
+				await deps.infoDialog(result.message);
+				return;
+			}
+		};
+		const defaultAssayLevels = () => deps.ManageConfigService.defaultAssayLevels();
+		const configAssayTeaRefs = () => typeof deps.effectiveTeaRefs === "function" ? deps.effectiveTeaRefs() : deps.refTests().map(([name, unit, clia, ricos, section]) => [
+			name,
+			unit,
+			clia,
+			ricos,
+			section,
+			null,
+			deps.teaAnalyteMeta(name).analyteId
+		]);
+		const configAssayRefRecord = (name, analyteId = "") => {
+			const key = deps.teaAnalyteKey(name);
+			return (state().teaRefs || []).find((r) => analyteId && r.analyteId === analyteId) || (state().teaRefs || []).find((r) => deps.teaAnalyteKey(r.name) === key) || null;
+		};
+		const configAssayNaming = (ref) => deps.teaAnalyteMeta(ref && ref[0], ref && configAssayRefRecord(ref[0], ref[6]));
+		const configAssayFindRef = (value) => {
+			const key = typeof deps.searchText === "function" ? deps.searchText(value) : deps.teaAnalyteKey(value);
+			if (!key) return null;
+			return configAssayTeaRefs().find((ref) => {
+				const naming = configAssayNaming(ref);
+				return [
+					ref[0],
+					naming.displayName,
+					naming.standardName,
+					naming.abbreviation,
+					...naming.aliases
+				].some((v) => (typeof deps.searchText === "function" ? deps.searchText(v) : deps.teaAnalyteKey(v)) === key);
+			}) || null;
+		};
+		const configAssaySuggestionInput = (value) => {
+			const ref = configAssayFindRef(value), keyEl = doc().getElementById("cfgAssayTeaRefKey"), sourceEl = doc().getElementById("cfgAssayTeaSource");
+			if (!ref) {
+				if (keyEl) keyEl.value = "";
+				if (sourceEl) sourceEl.value = "";
+				return;
+			}
+			const naming = configAssayNaming(ref), tea = ref[2] != null ? ref[2] : ref[3], source = ref[2] != null ? "clia" : ref[3] != null ? "ricos" : "";
+			doc().getElementById("cfgAssayName").value = naming.displayName || ref[0];
+			if (keyEl) keyEl.value = ref[6] || ref[0];
+			if (sourceEl) sourceEl.value = source;
+			doc().getElementById("cfgAssayUnit").value = ref[1] || "";
+			doc().getElementById("cfgAssayTea").value = tea == null ? "" : tea;
+		};
+		const openConfigAssay = (id = "") => {
+			if (!state().instruments.length) {
+				openConfigInstrument();
+				return;
+			}
+			const t = state().tests.find((x) => x.id === id) || {
+				levels: defaultAssayLevels(),
+				active: true
+			};
+			const defaultInst = state().instruments.find((i) => i.id === (t.instrumentId || "")) || state().instruments[0];
+			const instruments = deps.pres.configAssayInstrumentOptionsHtml(state().instruments.map((i) => ({
+				id: i.id,
+				selected: i.id === (t.instrumentId || ""),
+				section: deps.escapeAttr(i.section || ""),
+				label: deps.esc(i.name) + (i.model ? " · " + deps.esc(i.model) : "")
+			})));
+			const ruleRows = deps.pres.configAssayRuleRowsHtml(deps.wgRules().map((rule) => ({
+				id: rule,
+				action: t && t.ruleActions && [
+					"inactive",
+					"alert",
+					"reject"
+				].includes(t.ruleActions[rule]) ? t.ruleActions[rule] : "",
+				scope: t && t.ruleScopes && [
+					"within",
+					"across",
+					"both"
+				].includes(t.ruleScopes[rule]) ? t.ruleScopes[rule] : ""
+			})));
+			const cusum = deps.testCusumConfig(t), decimalValue = t.decimalPlaces !== null && t.decimalPlaces !== "" && Number.isInteger(Number(t.decimalPlaces)) ? String(t.decimalPlaces) : String(deps.qcDecimalsDefault()), hasRuleOverrides = deps.wgRules().some((rule) => t.ruleActions && [
+				"inactive",
+				"alert",
+				"reject"
+			].includes(t.ruleActions[rule]) || t.ruleScopes && [
+				"within",
+				"across",
+				"both"
+			].includes(t.ruleScopes[rule]));
+			const initialRef = configAssayTeaRefs().find((r) => t.analyteId && r[6] === t.analyteId) || configAssayFindRef(t.name || t.displayName || ""), initialNaming = initialRef ? configAssayNaming(initialRef) : null, initialName = initialNaming && initialNaming.displayName || t.displayName || t.name || "", initialSource = ([
+				"lab",
+				"eflm",
+				"clia",
+				"ricos"
+			].includes(t.teaSource) ? t.teaSource : "") || (initialRef ? initialRef[2] != null ? "clia" : initialRef[3] != null ? "ricos" : "" : "");
+			const teaOptions = deps.pres.configAssayTeaOptionsHtml(configAssayTeaRefs().map((ref) => ({
+				ref,
+				naming: configAssayNaming(ref)
+			})).sort((a, b) => String(a.ref[4] || "").localeCompare(String(b.ref[4] || ""), "vi") || String(a.naming.displayName || "").localeCompare(String(b.naming.displayName || ""), "vi")).map(({ ref, naming }) => ({
+				value: deps.escapeAttr(naming.displayName || ref[0]),
+				label: deps.escapeAttr([
+					naming.standardName !== naming.displayName ? naming.standardName : "",
+					naming.abbreviation,
+					...naming.aliases.filter((x) => x !== ref[0] && x !== naming.displayName && x !== naming.standardName).slice(0, 3),
+					ref[1],
+					ref[4]
+				].filter(Boolean).join(" · "))
+			})));
+			deps.openModal(deps.pres.configAssayModalHtml({
+				title: id ? "Sửa xét nghiệm" : "Thêm xét nghiệm",
+				name: deps.escapeAttr(initialName),
+				teaOptionsHtml: teaOptions,
+				teaRefKey: deps.escapeAttr(initialRef && (initialRef[6] || initialRef[0]) || ""),
+				teaSource: deps.escapeAttr(initialSource),
+				unit: deps.escapeAttr(t.unit || ""),
+				instrumentsHtml: instruments,
+				section: deps.escapeAttr(t.section || defaultInst && defaultInst.section || ""),
+				method: deps.escapeAttr(t.method || ""),
+				decimalOptionsHtml: deps.pres.configAssayDecimalOptionsHtml(decimalValue),
+				reagent: deps.escapeAttr(t.reagent || ""),
+				tea: deps.escapeAttr(t.tea || ""),
+				ruleRowsHtml: ruleRows,
+				hasRuleOverrides,
+				cusumOn: cusum.on,
+				cusumK: deps.escapeAttr(cusum.k),
+				cusumH: deps.escapeAttr(cusum.h),
+				closed: !!t.closed,
+				cancelButtonHtml: deps.btn("Hủy", "closeModal()", "ghost"),
+				saveButtonHtml: deps.btn(id ? "Lưu thay đổi" : "Thêm xét nghiệm", `saveConfigAssay('${id}')`, "teal")
+			}));
+		};
+		const saveConfigAssay = async (id) => {
+			if (!deps.requireAdmin()) return;
+			const existing = state().tests.find((x) => x.id === id), enteredName = deps.QCCore.cleanText(doc().getElementById("cfgAssayName").value).trim(), refKey = doc().getElementById("cfgAssayTeaRefKey").value, ref = refKey ? configAssayTeaRefs().find((r) => r[6] === refKey || deps.teaAnalyteKey(r[0]) === deps.teaAnalyteKey(refKey)) : null, naming = ref ? configAssayNaming(ref) : null, name = ref ? ref[0] : enteredName, analyteId = ref ? ref[6] : existing && existing.analyteId || "local-" + String(existing && existing.id || deps.uid()).replace(/[^A-Za-z0-9_-]/g, "").slice(0, 73), instrumentId = doc().getElementById("cfgAssayInstrument").value, inst = state().instruments.find((x) => x.id === instrumentId), levels = existing ? [...existing.levels || []] : defaultAssayLevels();
+			const tea = parseFloat(doc().getElementById("cfgAssayTea").value) || 0, decimalRaw = doc().getElementById("cfgAssayDecimals").value, decimalPlaces = Number(decimalRaw);
+			const ruleActions = Object.fromEntries([...doc().querySelectorAll(".cfg-assay-rule")].map((el) => [el.dataset.rule, el.value]));
+			const ruleScopes = Object.fromEntries([...doc().querySelectorAll(".cfg-assay-scope")].map((el) => [el.dataset.rule, el.value]));
+			const cusumK = parseFloat(doc().getElementById("cfgAssayCusumK").value), cusumH = parseFloat(doc().getElementById("cfgAssayCusumH").value);
+			const cusum = {
+				on: doc().getElementById("cfgAssayCusumOn").checked,
+				k: Number.isFinite(cusumK) && cusumK > 0 ? cusumK : .5,
+				h: Number.isFinite(cusumH) && cusumH > 0 ? cusumH : 4
+			};
+			const savedTeaSource = existing && [
+				"lab",
+				"eflm",
+				"clia",
+				"ricos"
+			].includes(existing.teaSource) ? existing.teaSource : "", data = {
+				analyteId,
+				name,
+				displayName: naming ? naming.displayName : enteredName,
+				standardName: naming ? naming.standardName : existing && existing.standardName || enteredName,
+				abbreviation: naming ? naming.abbreviation : existing && existing.abbreviation || "",
+				aliases: naming ? naming.aliases : existing && existing.aliases || [enteredName],
+				matrix: naming ? naming.matrix : existing && existing.matrix || "",
+				instrumentId,
+				machine: inst && inst.name || "",
+				section: deps.QCCore.cleanText(doc().getElementById("cfgAssaySection").value).trim() || inst && inst.section || "",
+				unit: deps.QCCore.cleanText(doc().getElementById("cfgAssayUnit").value),
+				decimalPlaces,
+				method: deps.QCCore.cleanText(doc().getElementById("cfgAssayMethod").value),
+				reagent: deps.QCCore.cleanText(doc().getElementById("cfgAssayReagent").value),
+				reagentSupplier: existing && existing.reagentSupplier || "",
+				temperature: existing && existing.temperature || 0,
+				genNo: existing && existing.genNo || "",
+				performanceLimit: existing && existing.performanceLimit || "",
+				tea,
+				teaSource: savedTeaSource || (ref ? doc().getElementById("cfgAssayTeaSource").value || "ricos" : "ricos"),
+				levels,
+				ruleActions,
+				ruleScopes,
+				cusum,
+				closed: doc().getElementById("cfgAssayClosed").checked,
+				active: true,
+				sgTracked: existing ? !!existing.sgTracked : false
+			};
+			const result = deps.pres.ManageAssayWorkflowCommand.save({
+				id,
+				newId: id ? "" : deps.uid(),
+				data
+			});
+			if (!result.ok) {
+				await deps.infoDialog(result.message);
+				return;
+			}
+		};
+		const delTest = async (id) => {
+			if (!deps.requireAdmin()) return;
+			const context = deps.ManageConfigService.assayRemoval(state(), { id });
+			if (context.error) return;
+			const t = context.record, points = context.points, locked = deps.PeriodService.lockedPoints(state(), points);
+			if (locked.count) {
+				await deps.infoDialog(`Không thể xóa "${deps.testDisplayName(t)}": còn ${locked.count} điểm QC thuộc kỳ đã khóa (${locked.periods.map(deps.monthVN).join(", ")}). Hãy mở khóa các kỳ này ở trang Báo cáo trước — thao tác mở khóa yêu cầu lý do và được ghi vào nhật ký.`);
+				return;
+			}
+			if (!await deps.confirmDialog({
+				kicker: "Thao tác không thể hoàn tác",
+				title: "Xóa xét nghiệm",
+				message: `Xóa xét nghiệm ${t.name} và toàn bộ dữ liệu QC?`,
+				detail: `${points.length} điểm QC cùng toàn bộ kết quả Westgard và Sigma của xét nghiệm này sẽ mất, không thể khôi phục.`,
+				confirmLabel: "Xóa xét nghiệm",
+				cancelLabel: "Hủy"
+			})) return;
+			if (!await deps.reauthenticateCurrentUser({
+				title: "Xác thực xóa xét nghiệm",
+				message: `Nhập lại mật khẩu trước khi xóa ${t.name} và ${points.length} điểm QC.`
+			})) return;
+			const result = deps.pres.ManageAssayWorkflowCommand.remove({ id });
+			if (!result.ok) {
+				await deps.infoDialog(result.message);
+				return;
+			}
+			if (deps.analysisUi().selTest === id) deps.analysisUi().selTest = state().tests[0] && state().tests[0].id || null;
+			if (deps.entryUi().entrySel && deps.entryUi().entrySel.testId === id) deps.entryUi().entrySel = null;
+		};
+		return {
+			parseVN,
+			setManageTab,
+			setTargetPanel,
+			setTargetGroup,
+			setTargetLevel,
+			setHistoryTest,
+			openTargetMatrix,
+			targetNumberText,
+			targetConfigAssigned,
+			targetRangeDraft,
+			syncTargetRange,
+			toggleTargetRow,
+			targetCheckAll,
+			targetPickBackfillPoints,
+			applyTargetPick,
+			applyPlannedTarget,
+			readTargetMatrixPicks,
+			saveTargetMatrix,
+			openTargetSwitchModal,
+			resolveTargetSwitch,
+			commitTargetMatrix,
+			openQcHistoryDetail,
+			openConfigPanel,
+			renderConfigPanelTests,
+			saveConfigPanel,
+			deleteConfigPanel,
+			deleteLotTransition,
+			lotTransitionChoiceLabel,
+			lotTransitionChoiceLots,
+			lotTransitionChoiceMatch,
+			lotTransitionSelectedId,
+			lotTransitionChoiceInput,
+			lotTransitionChoiceHtml,
+			openLotTransitionV2,
+			lotTransitionTargetsHtml,
+			filterLotTransitionTargets,
+			refreshLotTransitionTargets,
+			readLotTransitionTargetPicks,
+			saveLotTransitionV2,
+			openConfigGroup,
+			suggestConfigGroupName,
+			saveConfigGroup,
+			deleteConfigGroup,
+			toggleLotGroupStatus,
+			activateLotGroup,
+			openConfigLot,
+			saveConfigLot,
+			renameLotAcrossPoints,
+			deleteConfigLot,
+			openConfigInstrument,
+			saveConfigInstrument,
+			deleteConfigInstrument,
+			defaultAssayLevels,
+			configAssayTeaRefs,
+			configAssayRefRecord,
+			configAssayNaming,
+			configAssayFindRef,
+			configAssaySuggestionInput,
+			openConfigAssay,
+			saveConfigAssay,
+			delTest
+		};
+	}
+	//#endregion
+	//#region src/presentation/entry/entry-page-controller.ts
+	/**
+	* Trang "Nhập QC" (Entry) — nhập/hủy điểm QC theo ngày, mức QC và lô đang vận
+	* hành, trang thao tác dữ liệu nhạy cảm nhất của ứng dụng. Toàn bộ HTML thật
+	* nằm trong các hàm `deps.pres.entryXxxHtml()` (TypeScript, đã bridge từ các
+	* đợt UI-thuần trước); controller này chỉ còn phần điều phối — đọc state,
+	* dựng cây xét nghiệm/bảng nhập/biểu đồ Levey-Jennings, ghi UI state, và gọi
+	* đúng workflow command TypeScript khi ghi/hủy điểm QC hay ghi chú ngày.
+	*
+	* `document`/`window`/`localStorage` là getter LAZY — không phải giá trị
+	* capture một lần — vì test (`tests/partial-render-helpers.test.js`) gán lại
+	* toàn bộ biến `document=...` giữa các lần gọi để mô phỏng cây điều hướng
+	* bàn phím; đọc `deps.document()` mỗi lần thay vì giữ tham chiếu cũ.
+	*/
+	function createEntryPageController(deps) {
+		const state = () => deps.getState();
+		const ui = () => deps.ui();
+		const doc = () => deps.document();
+		const win = () => deps.window();
+		const ENTRY_TABLE_INITIAL_ROWS = 180;
+		const entryWindowFor = (testId, level, endOverride, startOverride) => deps.EntryService.buildEntryWindow({
+			points: deps.pointsOf(testId, level),
+			days: ui().entryDays,
+			start: startOverride,
+			end: endOverride,
+			today: deps.isoToday()
+		});
+		const entryWindow = () => entryWindowFor(ui().entrySel.testId, ui().entrySel.level, ui().entryEnd, ui().entryStart);
+		const entryRowsWindow = (rows, key) => deps.pres.entryRowsWindowTs(rows, ui().entryExpandedTables.has(key), ENTRY_TABLE_INITIAL_ROWS);
+		const entryToggleRows = (key) => {
+			const next = deps.pres.entryExpandedTablesToggle(ui().entryExpandedTables, key, 24);
+			ui().entryExpandedTables.clear();
+			next.forEach((value) => ui().entryExpandedTables.add(value));
+			entryRenderKeepScroll();
+		};
+		const entryDetailToggled = (key, open) => {
+			if (open) ui().entryDetailOpen.add(key);
+			else ui().entryDetailOpen.delete(key);
+		};
+		const entryTreeIsCollapsed = () => {
+			if (ui().entryTreeCollapsed !== null) return !!ui().entryTreeCollapsed;
+			ui().entryTreeCollapsed = deps.pres.entryTreeCollapsePreference.read(() => deps.localStorage().getItem("qclab_entry_tree_collapsed"));
+			return !!ui().entryTreeCollapsed;
+		};
+		const pageEntry = (rightOnly = false) => {
+			const s = state();
+			const today = deps.isoToday();
+			if (!s.tests.length) return deps.pres.entryEmptyPageHtml({
+				title: "Chưa có xét nghiệm",
+				message: "Cần khai báo xét nghiệm và mức QC trước khi nhập kết quả.",
+				actionHtml: deps.role() === "admin" ? deps.btn("Thêm xét nghiệm", `go('manage')`, "teal") : ""
+			});
+			const entryTests = deps.operationalTests();
+			if (!entryTests.length) return deps.pres.entryEmptyPageHtml({
+				title: "Chưa có xét nghiệm sẵn sàng nhập",
+				message: "Cần đưa xét nghiệm vào Panel QC, ghép Nhóm lô QC và gán Mean/SD trước khi nhập kết quả.",
+				actionHtml: deps.role() === "admin" ? deps.btn("Cấu hình Mean/SD", `go('manage');setManageTab('targets')`, "teal") : ""
+			});
+			if (!ui().entrySheetMonth) ui().entrySheetMonth = deps.isoMonth();
+			let selT = ui().entrySel && entryTests.find((t) => t.id === ui().entrySel.testId);
+			if (!selT || !deps.operationalLevels(selT).some((l) => l.level === ui().entrySel.level)) {
+				selT = entryTests[0];
+				const l0 = deps.operationalLevels(selT)[0];
+				ui().entrySel = {
+					testId: selT.id,
+					level: l0.level
+				};
+				ui().entryAutoOpenKey = null;
+			}
+			const treeCollapsed = entryTreeIsCollapsed();
+			const treePanelIcon = "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"2\"/><line x1=\"9\" y1=\"4\" x2=\"9\" y2=\"20\"/></svg>";
+			let tree = "", treeHead = "";
+			if (!rightOnly) {
+				const machinesAll = [...deps.EntryService.groupByMachine(entryTests).keys()];
+				const selM = selT.machine || "(Chưa gán máy)";
+				if (ui().entryMachine !== "all" && !machinesAll.includes(ui().entryMachine)) ui().entryMachine = "all";
+				const selGroup = deps.operationalLotGroupForTest(selT);
+				const autoKey = selM + "|" + selGroup.key + "|" + ui().entrySel.testId;
+				if (ui().entryAutoOpenKey !== autoKey) {
+					ui().treeOpen.add("m:" + selM);
+					ui().treeOpen.add("lg:" + selM + "|" + selGroup.key);
+					ui().entryAutoOpenKey = autoKey;
+				}
+				const byM = deps.EntryService.groupByMachine(entryTests.filter((t) => ui().entryMachine === "all" || (t.machine || "(Chưa gán máy)") === ui().entryMachine));
+				const machines = [...byM.keys()];
+				const machineOpts = ["<option value=\"all\">Tất cả máy</option>"].concat(machinesAll.map((m) => `<option value="${deps.escapeAttr(m)}" ${ui().entryMachine === m ? "selected" : ""}>${deps.esc(m)}</option>`)).join("");
+				treeHead = deps.pres.entryTreeHeaderHtml({
+					collapseButtonHtml: deps.btn(treePanelIcon, "toggleEntryTree()", "ghost icon entry-tree-toggle", "Ẩn danh mục nội kiểm", { attrs: {
+						"aria-label": "Ẩn danh mục nội kiểm",
+						"aria-controls": "entryTreePanel",
+						"aria-expanded": "true"
+					} }),
+					query: ui().entryQ,
+					machineOptionsHtml: machineOpts
+				});
+				if (!machines.length) tree += deps.pres.entryTreeItemHtml.empty();
+				machines.forEach((mc) => {
+					const mk = "m:" + mc, mo = ui().treeOpen.has(mk);
+					tree += deps.pres.entryTreeItemHtml.machine({
+						key: mk,
+						open: mo,
+						label: mc,
+						toggleKey: deps.jsq(mk)
+					});
+					const groups = /* @__PURE__ */ new Map();
+					byM.get(mc).forEach((t) => {
+						const g = deps.operationalLotGroupForTest(t);
+						if (!groups.has(g.key)) groups.set(g.key, {
+							name: g.name,
+							tests: [],
+							order: deps.operationalTestOrder(t)
+						});
+						const grp = groups.get(g.key);
+						grp.tests.push(t);
+						grp.order = Math.min(grp.order, deps.operationalTestOrder(t));
+					});
+					[...groups.entries()].sort((a, b) => a[1].order - b[1].order || a[1].name.localeCompare(b[1].name, "vi")).forEach(([groupKey, grp]) => {
+						const gk = "lg:" + mc + "|" + groupKey, go = ui().treeOpen.has(gk), ord = {
+							none: -1,
+							ok: 0,
+							warn: 1,
+							rej: 2
+						};
+						let groupWorst = "none";
+						const rows = grp.tests.sort((a, b) => deps.operationalTestOrder(a) - deps.operationalTestOrder(b)).map((t) => {
+							const levels = deps.operationalLevels(t), on = ui().entrySel.testId === t.id, preferred = levels.find((x) => ui().entrySel.level === x.level) || levels[0], wg = deps.activeWestgard(t);
+							let worst = "none";
+							levels.forEach((l) => {
+								const pts = deps.pointsForLot(t.id, l.level, l.lot || ""), lastPoint = pts[pts.length - 1], last = lastPoint && wg.byPoint.get(lastPoint.id) || null, lastLevel = last ? last.level : "none";
+								if (ord[lastLevel] > ord[worst]) worst = lastLevel;
+							});
+							if (ord[worst] > ord[groupWorst]) groupWorst = worst;
+							const search = deps.searchText([
+								t.name,
+								deps.testDisplayName(t),
+								t.machine,
+								grp.name,
+								...levels.map((l) => l.lot)
+							].join(" "));
+							return deps.pres.entryTreeItemHtml.assay({
+								testId: t.id,
+								search,
+								selected: on,
+								visible: mo && go,
+								level: preferred ? preferred.level : 1,
+								name: deps.testDisplayName(t),
+								stateClass: worst === "none" ? "" : worst,
+								stateText: deps.stateName(worst)
+							});
+						});
+						tree += deps.pres.entryTreeItemHtml.group({
+							key: gk,
+							open: go,
+							parentOpen: mo,
+							search: deps.searchText(grp.name + " " + grp.tests.map((t) => t.name).join(" ")),
+							name: grp.name,
+							stateClass: groupWorst === "none" ? "" : groupWorst,
+							stateText: deps.stateName(groupWorst),
+							toggleKey: deps.jsq(gk)
+						});
+						tree += rows.join("");
+					});
+				});
+			}
+			const t = selT, l = deps.lvlCfg(t, ui().entrySel.level), entryWG = deps.activeWestgard(t), acceptedCache = /* @__PURE__ */ new Map();
+			const entryCols = deps.entryColumns(t), parWGByKey = /* @__PURE__ */ new Map();
+			entryCols.filter((c) => c.parallel).forEach((c) => parWGByKey.set(c.key, deps.parallelWestgard(t, c)));
+			const colVerdict = (col, p) => (col && col.parallel ? (parWGByKey.get(col.key) || { byPoint: /* @__PURE__ */ new Map() }).byPoint.get(p.id) : entryWG.byPoint.get(p.id)) || {
+				level: "ok",
+				rules: []
+			};
+			const colPointsIdx = (col) => deps.entryColumnPoints(t, col, true);
+			const acceptedForLevel = (level) => {
+				const key = String(level);
+				if (!acceptedCache.has(key)) acceptedCache.set(key, deps.acceptedLotPoints(t, level));
+				return acceptedCache.get(key);
+			};
+			const W0 = entryWindow(), acceptedSelected = acceptedForLevel(ui().entrySel.level);
+			const W = {
+				...W0,
+				all: acceptedSelected.filter((p) => (p.lot || "") === (l.lot || "")),
+				pts: acceptedSelected.filter((p) => p.date >= W0.start && p.date <= W0.end && (p.lot || "") === (l.lot || ""))
+			};
+			const allSt = deps.stats(W.all.map((p) => p.val));
+			const cand = deps.rangeCandidate(t.id, l.level), candStats = cand && cand.c;
+			const eligible = cand && cand.eligible;
+			const rangeSummary = allSt ? `N=${allSt.n} · Mean thực=${deps.fmtTestValue(t, allSt.m)} · SD thực=${deps.fmtTestStat(t, allSt.sd)} · CV=${deps.fmt(allSt.cv)}%` : "Chưa có dữ liệu";
+			const rangeSource = l.applied === "lab" ? "PXN tự xây dựng" : "Nhà sản xuất";
+			const rangeBox = deps.pres.entryRangeSummaryHtml({
+				open: ui().entryDetailOpen.has("range"),
+				summary: rangeSummary,
+				source: rangeSource,
+				mean: deps.fmtTestValue(t, l.mean),
+				sd: deps.fmtTestValue(t, l.sd),
+				eligible,
+				resultCount: candStats ? candStats.n : 0,
+				dayCount: cand ? cand.days : 0,
+				proposedMean: candStats ? deps.fmtTestValue(t, candStats.m) : "—",
+				proposedSd: candStats ? deps.fmtTestValue(t, candStats.sd) : "—",
+				proposedCv: candStats ? deps.fmt(candStats.cv) : "—",
+				actionsHtml: deps.rangeActions(t.id, l.level, eligible, l.applied)
+			});
+			const levelViews = entryCols.map((x) => {
+				if (x.parallel) return {
+					x,
+					prevView: null
+				};
+				const prevSeries = deps.previousLotSeries(t, x.level), prevLot = ui().entryPrevOpen.get(t.id + "|" + x.level) || "";
+				return {
+					x,
+					prevView: prevSeries.find((s) => (s.lot || "") === prevLot)
+				};
+			});
+			const tableCards = levelViews.map(({ x, prevView }) => {
+				const lvlMean = prevView ? prevView.mean : x.mean, lvlSd = prevView ? prevView.sd : x.sd, lvlLot = prevView ? prevView.lot : x.lot;
+				const allIdx = prevView ? prevView.pts : colPointsIdx(x), allPtsIdx = prevView ? allIdx : allIdx.filter((p) => p.date >= W.start && p.date <= W.end), tableKey = `${t.id}|${x.key}|${lvlLot || ""}|${W.start}|${W.end}`, rowWindow = entryRowsWindow(allPtsIdx, tableKey), ptsIdx = rowWindow.rows, cumulativePts = prevView ? allIdx : allIdx.filter((p) => p.date <= W.end), cumulativeSt = deps.stats(cumulativePts.map((p) => p.val));
+				const prevWg = prevView ? deps.QCCore.westgardByPoint(ptsIdx, lvlMean, lvlSd, (rule) => deps.testRuleOnWithin(t, rule)) : null;
+				const rows = ptsIdx.map((p, i) => {
+					const rawPrev = prevView && prevWg.F[i], verdict = prevView ? rawPrev ? {
+						...rawPrev,
+						level: deps.ruleResultLevel(t, rawPrev.rules || []),
+						z: prevWg.zs[i]
+					} : {
+						level: "ok",
+						rules: []
+					} : colVerdict(x, p), view = deps.EntryService.buildPointView({
+						point: p,
+						verdict,
+						mean: lvlMean,
+						sd: lvlSd,
+						previousLot: prevView ? prevView.lot : void 0
+					}), lv = deps.qcVerdictLabel(view.level), voidBtn = deps.canWrite() ? deps.btn("Hủy", `voidQcPoint('${t.id}','${p.id}')`, "danger sm", "Hủy điểm QC có ghi lý do") : "", rulesHtml = [...new Set(view.rules)].map((r) => `<span class="pill">${r}</span>`).join("") || "—";
+					return deps.pres.entryPointTableRowHtml({
+						rejected: view.level === "rej",
+						warning: view.level === "warn",
+						pointId: deps.escapeAttr(p.id || ""),
+						dateText: deps.vnDate(p.date),
+						valueText: deps.fmtPointValue(p, t),
+						zText: `${view.z >= 0 ? "+" : ""}${deps.fmt(view.z)}s`,
+						verdictLevel: view.level,
+						verdictText: lv,
+						rulesHtml,
+						voidButtonHtml: voidBtn
+					});
+				}).join("");
+				const cumulative = deps.pres.entryCumulativeStatsHtml({
+					endDateText: deps.vnDate(W.end),
+					count: cumulativeSt ? cumulativeSt.n : 0,
+					mean: cumulativeSt ? deps.fmtTestValue(t, cumulativeSt.m) : "—",
+					sd: cumulativeSt ? deps.fmtTestStat(t, cumulativeSt.sd) : "—",
+					cv: cumulativeSt ? deps.fmt(cumulativeSt.cv) + "%" : "—"
+				});
+				const rowControl = deps.pres.entryTableWindowNoteHtml({
+					limited: rowWindow.limited,
+					expanded: rowWindow.expanded && rowWindow.total > ENTRY_TABLE_INITIAL_ROWS,
+					shown: rowWindow.rows.length,
+					total: rowWindow.total,
+					actionButtonHtml: deps.btn(rowWindow.limited ? "Hiện toàn bộ" : "Thu gọn", `entryToggleRows('${deps.jsq(tableKey)}')`, "ghost sm")
+				});
+				return deps.pres.entryPointTableCardHtml({
+					parallel: x.parallel,
+					level: x.level,
+					previousLot: !!prevView,
+					lot: deps.esc(lvlLot || "?"),
+					pointCount: allPtsIdx.length,
+					bodyHtml: `${cumulative}${ptsIdx.length ? `<table><thead><tr><th>Ngày</th><th class="num">Giá trị</th><th class="num">Z</th><th>Kết luận</th><th>Luật</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table>${rowControl}` : "<div class=\"empty qc-table-empty\">Chưa có điểm nào trong khoảng này.</div>"}`
+				});
+			}).join("");
+			const prevLotByLevel = new Map(levelViews.filter((v) => v.prevView).map((v) => [v.x.level, v.prevView.lot]));
+			const voidedRows = (s.data[t.id] || []).filter((p) => {
+				if (!p.voided) return false;
+				const pv = prevLotByLevel.get(p.level);
+				return pv != null ? (p.lot || "") === pv : p.date >= W.start && p.date <= W.end;
+			}).sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")) || deps.pointRunNo(a) - deps.pointRunNo(b)).map((p) => deps.pres.entryVoidedPointRowHtml({
+				pointId: deps.escapeAttr(p.id || ""),
+				dateText: deps.vnDate(p.date),
+				levelLotText: `Mức ${p.level} · Lô ${deps.esc(p.lot || "?")}`,
+				valueText: deps.fmtPointValue(p, t),
+				runId: deps.esc(p.runId || "—"),
+				voidedBy: deps.esc(p.voidedBy || ""),
+				reason: deps.esc(p.voidReason || "")
+			})).join("");
+			const voidedBox = deps.pres.entryVoidedPointsHtml(voidedRows);
+			const pointsInView = deps.pres.entryPointsPanelHtml({
+				open: ui().entryDetailOpen.has("points"),
+				endDateText: deps.vnDate(W.end),
+				startDateText: deps.vnDate(W.start),
+				tableCardsHtml: tableCards,
+				voidedBoxHtml: voidedBox
+			});
+			const dayBtns = deps.pres.entryDayPresetButtons(ui().entryDays, !!ui().entryStart);
+			ui().entryLjRenderCache = {
+				testId: t.id,
+				start: W.start,
+				end: W.end,
+				levels: /* @__PURE__ */ new Map()
+			};
+			const ljStack = entryCols.map((x) => {
+				const on = x.level === ui().entrySel.level && !x.parallel, curPts = (x.parallel ? deps.entryColumnPoints(t, x) : acceptedForLevel(x.level)).filter((p) => p.date >= W.start && p.date <= W.end && (p.lot || "") === (x.lot || "")), prevSeries = x.parallel ? [] : deps.previousLotSeries(t, x.level), prevLot = ui().entryPrevOpen.get(t.id + "|" + x.level) || "", prevView = prevSeries.find((s2) => (s2.lot || "") === prevLot), targetCfg = prevView || deps.pres.entryColumnConfig(t, x.level, x.lot), chartPts = prevView ? prevView.pts : curPts, chartLot = prevView ? prevView.lot : x.lot, chartMean = targetCfg && targetCfg.mean, chartSd = targetCfg && targetCfg.sd, st = deps.stats(chartPts.map((p) => p.val));
+				ui().entryLjRenderCache.levels.set(`${x.level}|${chartLot || ""}`, chartPts);
+				const metrics = [
+					{
+						label: "Mean thực",
+						value: st ? deps.fmtTestValue(t, st.m) : "—"
+					},
+					{
+						label: "SD thực",
+						value: st ? deps.fmtTestStat(t, st.sd) : "—"
+					},
+					{
+						label: "CV thực",
+						value: st ? deps.fmt(st.cv) + "%" : "—"
+					},
+					{
+						label: "Mean mục tiêu",
+						value: deps.fmtTestValue(t, chartMean),
+						control: true
+					},
+					{
+						label: "SD mục tiêu",
+						value: deps.fmtTestStat(t, chartSd),
+						control: true
+					}
+				];
+				const prevBtn = x.parallel ? "<span class=\"hint\">Đang đánh giá</span>" : prevSeries.length ? prevView ? deps.btn("Xem lô mới", `event.stopPropagation();entryShowCurrentLot(${x.level})`, "teal sm") : deps.btn("Xem lô cũ", `event.stopPropagation();entryShowPrevLot(${x.level},'${deps.jsq(prevSeries[0].lot || "")}')`, "ghost sm") : `<span class="hint">${x.applied === "lab" ? "Dải PXN" : "Dải NSX"}</span>`;
+				return deps.pres.entryLeveyJenningsMiniHtml({
+					on,
+					parallel: x.parallel,
+					level: x.level,
+					lot: chartLot || "",
+					pointCount: chartPts.length,
+					previousLot: !!prevView,
+					metrics,
+					actionHtml: prevBtn,
+					testId: t.id,
+					mean: chartMean,
+					sd: chartSd,
+					start: W.start,
+					end: W.end
+				});
+			}).join("");
+			const levelHead = deps.pres.entrySheetLevelHeads(entryCols.map((x) => {
+				const cfg = deps.pres.entryColumnConfig(t, x.level, x.lot), mean = Number(cfg && cfg.mean), sd = Number(cfg && cfg.sd), limits = Number.isFinite(mean) && Number.isFinite(sd) ? `${deps.fmtTestValue(t, mean - 2 * sd)} – ${deps.fmtTestValue(t, mean + 2 * sd)}` : "—", tooltip = `Mean ${Number.isFinite(mean) ? deps.fmtTestValue(t, mean) : "—"} · SD ${Number.isFinite(sd) ? deps.fmtTestStat(t, sd) : "—"} · ±2SD ${limits}`;
+				return {
+					level: x.level,
+					lot: x.lot || "",
+					parallel: x.parallel,
+					tooltip
+				};
+			}));
+			const sheetCalendar = deps.EntryService.buildSheetCalendar(ui().entrySheetMonth, deps.isoToday()), activeSheetMonth = sheetCalendar.activeMonth;
+			ui().entrySheetMonth = activeSheetMonth;
+			const sheetYear = sheetCalendar.year, sheetMonthNo = sheetCalendar.month, sheetStart = sheetCalendar.start, sheetEnd = sheetCalendar.end;
+			const sheetMonthOptions = Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}" ${sheetMonthNo === i + 1 ? "selected" : ""}>Tháng ${i + 1}</option>`).join("");
+			const sheetYearOptions = Array.from({ length: sheetCalendar.yearMax - sheetCalendar.yearMin + 1 }, (_, i) => sheetCalendar.yearMin + i).map((y) => `<option value="${y}" ${sheetYear === y ? "selected" : ""}>${y}</option>`).join("");
+			const prevPtsByLevel = {}, pointsByLevel = {};
+			entryCols.forEach((x) => {
+				prevPtsByLevel[x.key] = x.parallel ? [] : deps.previousLotSeries(t, x.level).flatMap((s2) => s2.pts.map((p) => ({
+					...p,
+					_prevLot: s2.lot
+				})));
+				pointsByLevel[x.key] = colPointsIdx(x);
+			});
+			const sheetDays = sheetCalendar.days;
+			const sheetRows = deps.EntryService.buildSheetRowsData({
+				levels: entryCols,
+				sheetStart,
+				sheetEnd,
+				sheetDays,
+				pointsByLevel,
+				previousPointsByLevel: prevPtsByLevel,
+				pointRunNo: deps.pointRunNo
+			}).map((dayGroup) => {
+				const firstRunNo = () => deps.EntryService.sheetFirstRunNo(dayGroup);
+				const levelRuns = (x) => deps.EntryService.sheetLevelRuns(dayGroup, x.key);
+				const { worst, rulesAll, warnRules, rejRules, hasPoint } = deps.EntryService.summarizeRunStatus(entryCols.filter((x) => !x.parallel).map((x) => dayGroup.runs.map((g) => g.levels[x.key]).filter(Boolean).sort((a, b) => deps.pointRunNo(a) - deps.pointRunNo(b) || (a._idx || 0) - (b._idx || 0))), entryWG.byPoint);
+				const shouldShowEmptyRun = (x, g) => {
+					const runs = levelRuns(x);
+					if (!runs.length) return g.runNo === firstRunNo();
+					const prev = [...runs].reverse().find((r) => r.runNo < g.runNo);
+					if (!prev) return false;
+					if (g.runNo !== prev.runNo + 1) return false;
+					if (ui().entryExtraRun.has(`${t.id}|${x.key}|${g.date}|${g.runNo}`)) return true;
+					return colVerdict(x, prev.levels[x.key]).level === "rej";
+				};
+				const cells = entryCols.map((x, levelIdx) => {
+					let levelHasPoint = false, emptyShown = false;
+					const levelRunNos = levelRuns(x).map((r) => r.runNo), nextLevelRunNo = levelRunNos.length ? Math.max(...levelRunNos) + 1 : 1, lotArg = deps.jsq(x.parallel ? x.lot || "" : "");
+					const runInputs = dayGroup.runs.map((g) => {
+						const p = g.levels[x.key], runArg = deps.jsq(g.runId || "");
+						if (!p) {
+							if (!shouldShowEmptyRun(x, g)) return "";
+							emptyShown = true;
+							return deps.pres.entrySheetEmptyRunHtml({
+								editable: deps.canWrite(),
+								title: "Dùng phím mũi tên để chuyển ô",
+								ariaLabel: `Nhập QC ngày ${deps.vnDate(g.date)}, mức ${x.level}, lô ${deps.escapeAttr(x.lot || "")}, lần ${g.runNo}`,
+								date: deps.escapeAttr(g.date),
+								runNo: g.runNo,
+								levelIndex: levelIdx,
+								changeAction: `entryInlineSave('${t.id}',${x.level},'${g.date}',this.value,'${runArg}','${lotArg}')`
+							});
+						}
+						levelHasPoint = true;
+						const isPrev = !!p._prevLot, pMean = isPrev && Number.isFinite(+p.qcMean) ? +p.qcMean : x.mean, pSd = isPrev && Number.isFinite(+p.qcSd) ? +p.qcSd : x.sd;
+						const verdict = isPrev ? {
+							level: "ok",
+							rules: []
+						} : colVerdict(x, p), view = deps.EntryService.buildPointView({
+							point: p,
+							verdict,
+							mean: pMean,
+							sd: pSd,
+							previousLot: isPrev ? p._prevLot : void 0
+						}), lv = deps.qcVerdictLabel(view.level);
+						return deps.pres.entrySheetSavedRunHtml({
+							previousLot: isPrev,
+							previousLotName: deps.esc(p._prevLot || ""),
+							valueClass: view.valueClass,
+							title: isPrev ? "Lô cũ " + deps.escapeAttr(p._prevLot) + " · đã chuyển tiếp · chỉ đọc" : "Đã lưu, không sửa trực tiếp",
+							valueText: deps.fmtPointValue(p, t),
+							zText: `${view.z >= 0 ? "+" : ""}${deps.fmt(view.z)}s`,
+							verdictText: lv
+						});
+					}).join("");
+					const addRunBtn = deps.pres.entrySheetAddRunHtml({
+						visible: deps.canWrite() && levelHasPoint && !emptyShown,
+						action: `entryUnlockExtraRun('${t.id}','${deps.jsq(x.key)}','${dayGroup.date}',${levelIdx},${nextLevelRunNo})`
+					});
+					return deps.pres.entrySheetCellHtml({
+						parallel: x.parallel,
+						hasAddButton: !!addRunBtn,
+						runInputsHtml: runInputs,
+						addRunButtonHtml: addRunBtn
+					});
+				}).join("");
+				const staff = [...new Map(dayGroup.runs.flatMap((g) => Object.values(g.levels)).map((p) => deps.pointStaff(p)).filter((x) => x.code).map((x) => [x.code, x])).values()];
+				const staffCell = deps.pres.entrySheetDaySummaryHtml.staff(staff);
+				const status = deps.pres.entrySheetDaySummaryHtml.status(hasPoint, worst);
+				const autoNote = rulesAll.length ? worst === "rej" ? deps.errorType([...new Set(rejRules.length ? rejRules : rulesAll)]) : "Theo dõi / cảnh báo" : "";
+				const manualNote = (dayGroup.runs.flatMap((g) => Object.values(g.levels)).filter(Boolean).find((p) => String(p.note || "").trim()) || {}).note || "";
+				const note = deps.pres.entrySheetNoteHtml({
+					hasPoint,
+					writable: deps.canWrite(),
+					placeholder: deps.escapeAttr(autoNote || "Nhập ghi chú..."),
+					changeAction: `entryDateNoteSave('${t.id}','${dayGroup.date}',this.value)`,
+					manualNote: deps.esc(manualNote),
+					autoNote
+				});
+				const liveCols = entryCols.filter((x) => !x.parallel), doneLevels = liveCols.filter((x) => dayGroup.runs.some((g) => g.levels[x.key])).length, rowCls = [
+					dayGroup.date === today ? "today" : "",
+					dayGroup.date <= today && doneLevels < liveCols.length ? "missing" : "",
+					hasPoint ? "has-data" : ""
+				].filter(Boolean).join(" ");
+				return deps.pres.entrySheetDayRowHtml({
+					rowClass: rowCls,
+					date: dayGroup.date,
+					dayOfMonth: deps.dateObj(dayGroup.date).getDate(),
+					today: dayGroup.date === today,
+					cellsHtml: cells,
+					staffHtml: staffCell,
+					warningRules: [...new Set(warnRules)].join(", "),
+					rejectRules: [...new Set(rejRules)].join(", "),
+					statusHtml: status,
+					noteHtml: note
+				});
+			}).join("");
+			const right = `${deps.pres.entryWorksheetHtml({
+				testName: deps.esc(deps.testDisplayName(t)),
+				lotLabel: deps.esc(deps.pres.entryLotLabelsTs(entryCols)),
+				monthOptionsHtml: sheetMonthOptions,
+				yearOptionsHtml: sheetYearOptions,
+				currentMonthButtonHtml: deps.btn("Tháng hiện tại", "entrySetSheetMonth(isoMonth())", "ghost sm qc-current-month"),
+				todayButtonHtml: deps.btn("Tới hôm nay", "entryGoToday()", "teal sm qc-today-jump"),
+				levelHeadHtml: levelHead,
+				rowsHtml: sheetRows,
+				columnCount: entryCols.length,
+				messageHtml: ui().entryLastMsg
+			})}${deps.pres.entryLeveyPanelHtml({
+				startDateHtml: deps.dateBox("entryStartDate", W.start, "", "onchange=\"entrySetStart(this.value)\""),
+				endDateHtml: deps.dateBox("entryEndDate", W.end, "", "onchange=\"entrySetEnd(this.value)\""),
+				dayButtonsHtml: dayBtns,
+				rangeText: `${deps.vnDate(W.start)} – ${deps.vnDate(W.end)} · ${deps.operationalLevels(t).length} mức QC`,
+				stackHtml: ljStack
+			})}${pointsInView}${rangeBox}`;
+			ui().entryPartialRenderCache = {
+				testId: t.id,
+				right
+			};
+			if (rightOnly) return right;
+			return deps.pres.entryPageLayoutHtml({
+				pageHeadHtml: deps.headOnly("Nhập QC", "Ghi nhận kết quả theo ngày, mức QC và lô đang vận hành"),
+				treeCollapsed,
+				expandButtonHtml: deps.btn(treePanelIcon, "toggleEntryTree()", "teal icon entry-tree-expand", "Hiện danh mục nội kiểm", { attrs: {
+					"aria-label": "Hiện danh mục nội kiểm",
+					"aria-controls": "entryTreePanel",
+					"aria-expanded": "false"
+				} }),
+				treeHeadHtml: treeHead,
+				treeHtml: tree,
+				rightHtml: right
+			});
+		};
+		const treeToggle = (k) => {
+			if (ui().treeOpen.has(k)) ui().treeOpen.delete(k);
+			else ui().treeOpen.add(k);
+			const open = ui().treeOpen.has(k), node = [...doc().querySelectorAll(".tree .tnode")].find((el) => el.dataset.key === String(k));
+			if (node) {
+				node.setAttribute("aria-expanded", String(open));
+				node.classList.toggle("open", open);
+				const caret = node.querySelector(".caret");
+				if (caret) caret.textContent = open ? "−" : "+";
+			}
+			entryFilter(ui().entryQ);
+		};
+		const toggleEntryTree = () => {
+			ui().entryTreeCollapsed = !entryTreeIsCollapsed();
+			try {
+				deps.localStorage().setItem("qclab_entry_tree_collapsed", deps.pres.entryTreeCollapsePreference.write(ui().entryTreeCollapsed));
+			} catch (e) {}
+			const grid = doc().querySelector(".entrygrid");
+			if (!grid) {
+				deps.rerender();
+				return;
+			}
+			grid.classList.toggle("tree-collapsed", ui().entryTreeCollapsed);
+			const target = grid.querySelector(ui().entryTreeCollapsed ? ".entry-tree-expand" : ".entry-tree-toggle");
+			requestAnimationFrame(() => {
+				if (target) target.focus({ preventScroll: true });
+			});
+		};
+		const entryTreeKey = (event) => {
+			const item = event.currentTarget, key = event.key;
+			const command = deps.pres.entryTreeKeyCommand(key, item.getAttribute("aria-expanded"));
+			if (command === "toggle") {
+				event.preventDefault();
+				item.click();
+				return;
+			}
+			if (command !== "navigate") return;
+			const items = [...doc().querySelectorAll(".tree .tnode[tabindex=\"0\"]")].filter((el) => el.offsetParent !== null);
+			if (items.indexOf(item) < 0 || !items.length) return;
+			event.preventDefault();
+			deps.pres.entryTreeNavigation.target(items, item, key).focus();
+		};
+		const entryFilter = (v) => {
+			ui().entryQ = v;
+			const q = deps.searchText(ui().entryQ), nodes = [...doc().querySelectorAll(".tree .tnode")], visible = deps.pres.entryTreeVisibility(nodes.map((el) => ({
+				role: el.dataset.treeRole,
+				key: el.dataset.key,
+				search: el.dataset.search
+			})), q, ui().treeOpen);
+			nodes.forEach((el, index) => {
+				el.style.display = visible[index] ? "" : "none";
+			});
+		};
+		const entryPick = (tid, level) => {
+			const next = deps.pres.entrySelectionState.pick(tid, level);
+			ui().entrySel = next.selection;
+			ui().entryStart = next.start;
+			ui().entryEnd = next.end;
+			ui().entryLastMsg = next.message;
+			doc().querySelectorAll(".tree .tn-config").forEach((row) => {
+				const on = row.dataset.testId === String(tid);
+				row.classList.toggle("on", on);
+				row.setAttribute("aria-current", String(on));
+			});
+			entryRenderKeepScroll();
+		};
+		const entryFocusLevel = (level) => {
+			const next = deps.pres.entrySelectionState.focus(ui().entrySel, level);
+			if (!next) return;
+			ui().entrySel = next;
+			entryRenderKeepScroll();
+		};
+		const entryShowPrevLot = (level, lot) => {
+			const key = deps.pres.entrySelectionState.previousLotKey(ui().entrySel, level);
+			if (!key) return;
+			ui().entryPrevOpen.set(key, lot);
+			entryRenderKeepScroll();
+		};
+		const entryShowCurrentLot = (level) => {
+			const key = deps.pres.entrySelectionState.previousLotKey(ui().entrySel, level);
+			if (!key) return;
+			ui().entryPrevOpen.delete(key);
+			entryRenderKeepScroll();
+		};
+		const entryFocusPendingSheet = () => {
+			if (!ui().entryPendingSheetFocus) return;
+			const [date, level] = ui().entryPendingSheetFocus.split("|");
+			const cands = [...doc().querySelectorAll(".qc-sheet .qc-inline-input")].filter((x) => x.dataset.focusDate === date && x.dataset.focusLevel === level);
+			const el = deps.pres.entrySheetFocus(cands);
+			if (el) {
+				el.focus();
+				el.select();
+				ui().entryPendingSheetFocus = "";
+			}
+		};
+		const entrySheetInputs = () => deps.pres.entrySheetInputOrder([...doc().querySelectorAll(".qc-sheet .qc-inline-input")].filter((el) => !el.disabled && el.offsetParent !== null));
+		const entrySheetTarget = (inputs, current, key, shiftKey = false) => deps.pres.entrySheetNavigation.target(inputs, current, key, shiftKey);
+		const entrySheetKey = (event) => {
+			if (event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return;
+			if (![
+				"Enter",
+				"Tab",
+				"ArrowUp",
+				"ArrowDown",
+				"ArrowLeft",
+				"ArrowRight"
+			].includes(event.key)) return;
+			const cur = event.currentTarget, next = entrySheetTarget(entrySheetInputs(), cur, event.key, event.shiftKey);
+			if (!next) return;
+			event.preventDefault();
+			ui().entryPendingSheetFocus = `${next.dataset.focusDate}|${next.dataset.focusLevel}`;
+			cur.blur();
+			setTimeout(entryFocusPendingSheet, 0);
+		};
+		const entryLatestTreeState = (t) => deps.pres.entryTreeState(t);
+		const entrySyncTreeState = (testId) => {
+			const row = [...doc().querySelectorAll(".tree .tn-config[data-test-id]")].find((el) => el.dataset.testId === String(testId || ""));
+			if (!row) return;
+			const apply = (el, value) => {
+				const badge = el && el.querySelector(".state");
+				if (!badge) return;
+				badge.className = "state" + (value === "none" ? "" : " " + value);
+				badge.textContent = deps.stateName(value);
+			};
+			apply(row, entryLatestTreeState(state().tests.find((t) => t.id === testId)));
+			let group = row.previousElementSibling;
+			while (group && group.dataset.treeRole !== "group") group = group.previousElementSibling;
+			if (!group) return;
+			const states = [];
+			for (let item = group.nextElementSibling; item && item.dataset.treeRole === "assay"; item = item.nextElementSibling) {
+				const badge = item.querySelector(".state"), value = badge && [
+					"ok",
+					"warn",
+					"rej"
+				].find((x) => badge.classList.contains(x)) || "none";
+				states.push(value);
+			}
+			const worst = deps.pres.entryTreeGroupState(states);
+			apply(group, worst);
+		};
+		const entryRenderKeepScroll = () => {
+			const w = win();
+			const pageX = w.scrollX, pageY = w.scrollY, wrap = doc().querySelector(".qc-sheet-wrap"), sheetTop = wrap ? wrap.scrollTop : 0, sheetLeft = wrap ? wrap.scrollLeft : 0;
+			const current = doc().querySelector(".entry-main");
+			if (deps.currentPage() === "entry" && current) {
+				deps.analysisUi().statusMemo = /* @__PURE__ */ new Map();
+				pageEntry(true);
+				const cache = ui().entryPartialRenderCache;
+				if (cache && cache.testId === ui().entrySel.testId) {
+					current.innerHTML = cache.right;
+					entrySyncTreeState(ui().entrySel.testId);
+					deps.afterRender(deps.currentPage());
+				} else deps.rerender();
+			} else deps.rerender();
+			requestAnimationFrame(() => {
+				w.scrollTo(pageX, pageY);
+				const nextWrap = doc().querySelector(".qc-sheet-wrap");
+				if (nextWrap) {
+					nextWrap.scrollTop = sheetTop;
+					nextWrap.scrollLeft = sheetLeft;
+				}
+				entryFocusPendingSheet();
+			});
+		};
+		const entrySetLastMsg = (html) => {
+			ui().entryLastMsg = html || "";
+			const el = doc().getElementById("entryMsg");
+			if (el) el.innerHTML = ui().entryLastMsg;
+		};
+		const entryUnlockExtraRun = (tid, colKey, date, levelIdx, runNo) => {
+			if (!deps.requireWrite()) return;
+			const request = deps.pres.entryExtraRunRequest(tid, colKey, date, levelIdx, runNo);
+			ui().entryExtraRun.add(request.key);
+			ui().entryPendingSheetFocus = request.focus;
+			entryRenderKeepScroll();
+		};
+		const entryDateNoteSave = async (tid, date, value) => {
+			if (!deps.requireWrite()) return;
+			if (!await deps.requireUnlockedPeriod(date, "ghi chú QC")) return;
+			const result = deps.EntryDateNoteWorkflowCommand.save({
+				testId: tid,
+				date,
+				value
+			});
+			if (!result.ok) {
+				const message = deps.pres.entryDateNoteErrorMessage(result.error);
+				if (message) entrySetLastMsg("<div class=\"alert warn\">" + deps.esc(message) + "</div>");
+				return;
+			}
+			const note = result.note;
+			const feedback = deps.pres.entryDateNoteFeedback(note, deps.vnDate(date));
+			entrySetLastMsg(feedback ? `<div class="alert ${feedback.cls}">${deps.esc(feedback.message)}</div>` : note ? `<div class="alert ok">✓ Đã lưu ghi chú ngày ${deps.vnDate(date)}.</div>` : `<div class="alert ok">✓ Đã xóa ghi chú ngày ${deps.vnDate(date)}.</div>`);
+		};
+		const entryColumnCfg = (t, level, lotNo) => deps.pres.entryColumnConfig(t, level, lotNo);
+		const entryInlineSave = async (tid, level, date, value, runIdHint = "", lotNo = "") => {
+			if (!deps.requireWrite()) return;
+			const t = state().tests.find((x) => x.id === tid), cfg = entryColumnCfg(t, level, lotNo);
+			if (!t || !cfg || !deps.canEnterQcForLevel(t, level)) {
+				entrySetLastMsg("<div class=\"alert warn\">Nhóm lô đã dừng hoặc không còn sẵn sàng nhập QC.</div>");
+				return;
+			}
+			if (value == null || String(value).trim() === "") return;
+			if (!await deps.requireUnlockedPeriod(date, "nhập điểm QC")) return;
+			const prepared = deps.EntryService.preparePointInput({
+				tid,
+				level,
+				date,
+				value,
+				runId: runIdHint,
+				cfg
+			});
+			if (!prepared.ok) {
+				entrySetLastMsg("<div class=\"alert warn\">Nhập giá trị QC hợp lệ.</div>");
+				return;
+			}
+			const { val, valueDecimals, runId } = prepared.point;
+			const preIssues = deps.qcPointWarnings(t, cfg, date, runId, val);
+			if (preIssues.some((x) => x.includes("SD đang bằng 0"))) {
+				entrySetLastMsg("<div class=\"alert rej\"><b>Không thể lưu.</b> " + deps.esc(preIssues.join(" ")) + "</div>");
+				return;
+			}
+			if (preIssues.length) {
+				deps.openModal(deps.pres.entryPreSaveWarningModalHtml({
+					issuesHtml: preIssues.map((x) => `<div class="alert warn">${deps.esc(x)}</div>`).join(""),
+					cancelButtonHtml: deps.btn("Hủy", "closeModal();entryRenderKeepScroll()", "ghost"),
+					saveButtonHtml: deps.btn("Vẫn lưu", `closeModal();entryInlineSaveCommit('${deps.jsq(tid)}',${level},'${deps.jsq(date)}',${val},'${deps.jsq(runId)}','${deps.jsq(lotNo)}',${valueDecimals})`, "teal")
+				}));
+				return;
+			}
+			entryInlineSaveCommit(tid, level, date, val, runId, lotNo, valueDecimals);
+		};
+		const entryInlineSaveCommit = (tid, level, date, val, runId, lotNo = "", valueDecimals = deps.qcValueDecimals(val)) => {
+			const t = state().tests.find((x) => x.id === tid), cfg = entryColumnCfg(t, level, lotNo);
+			if (!t || !cfg || !deps.canEnterQcForLevel(t, level)) {
+				entrySetLastMsg("<div class=\"alert warn\">Không thể lưu: nhóm lô đã dừng hoặc không còn sẵn sàng nhập QC.</div>");
+				entryRenderKeepScroll();
+				return;
+			}
+			const recorded = deps.EntryRecordWorkflowCommand.execute({
+				test: t,
+				testId: tid,
+				level,
+				date,
+				value: val,
+				valueDecimals,
+				runId,
+				lotNo,
+				cfg,
+				staff: deps.currentStaff(),
+				id: deps.uid(),
+				activeLot: (deps.lvlCfg(t, level) || {}).lot || "",
+				audit: (result) => ({
+					action: "Thêm điểm QC",
+					detail: `Ngày ${deps.vnDate(date)}, M${level}${result.parallel ? " · lô song song " + lotNo : ""}, giá trị ${deps.fmtPointValue(result.point, t)}`,
+					target: t.name
+				})
+			});
+			if (!recorded.ok) {
+				if (recorded.error === "not-ready") {
+					entrySetLastMsg("<div class=\"alert warn\">Không thể lưu: nhóm lô đã dừng hoặc không còn sẵn sàng nhập QC.</div>");
+					entryRenderKeepScroll();
+					return;
+				}
+				const message = deps.pres.entryRecordErrorMessage(recorded.error);
+				entrySetLastMsg("<div class=\"alert warn\">" + message + "</div>");
+				return;
+			}
+			const f = recorded.verdict, rules = recorded.verdict.rules || [];
+			const feedback = deps.pres.entrySaveFeedback({
+				level,
+				lotNo,
+				parallel: recorded.parallel,
+				verdict: f.level,
+				rules,
+				dateText: deps.vnDate(date)
+			}), tag = `Mức ${level}${recorded.parallel ? " · lô song song " + deps.esc(lotNo) : ""}`;
+			ui().entrySel = recorded.selection;
+			ui().entryLastMsg = feedback ? `<div class="alert ${feedback.cls}">${feedback.emphasis ? "<b>" + deps.esc(feedback.message) + "</b>" : deps.esc(feedback.message)}</div>` : f.level === "rej" ? `<div class="alert rej"><b>⚠ ${tag} vi phạm — ${rules.join(", ")}</b></div>` : f.level === "warn" ? `<div class="alert warn"><b>${tag} cảnh báo — ${rules.join(", ")}</b></div>` : `<div class="alert ok">✓ Đã lưu ${tag} ngày ${deps.vnDate(date)}.</div>`;
+			entryRenderKeepScroll();
+		};
+		const syncVoidNceChoice = () => {
+			const kind = (doc().getElementById("voidKindInput") || {}).value, box = doc().getElementById("voidOpenNce"), hint = doc().getElementById("voidNceHint"), reasonBox = doc().getElementById("voidReasonBox"), reasonErr = doc().getElementById("voidReasonErr");
+			if (!box) return;
+			const choice = deps.pres.entryVoidNceChoice(kind);
+			box.checked = choice.openNce;
+			box.disabled = choice.disabled;
+			if (hint) hint.textContent = choice.hint;
+			const label = doc().getElementById("voidReasonLabel");
+			if (label) label.textContent = choice.reasonLabel;
+			if (reasonBox) reasonBox.hidden = false;
+			if (reasonErr) reasonErr.style.display = "none";
+		};
+		const voidQcPoint = async (tid, pointId) => {
+			if (!deps.requireWrite()) return;
+			const t = state().tests.find((x) => x.id === tid), p = (state().data[tid] || []).find((x) => x.id === pointId);
+			if (!t || !p || p.voided) return;
+			if (!await deps.requireUnlockedPeriod(p.date, "hủy điểm QC")) return;
+			deps.openModal(deps.pres.entryVoidModalHtml({
+				pointInfoHtml: `Ngày ${deps.vnDate(p.date)} · Mức ${p.level} · Giá trị ${deps.fmtPointValue(p, t)}`,
+				closeButtonHtml: "<button class=\"modal-close\" onclick=\"closeModal()\">×</button>",
+				closeFooterButtonHtml: deps.btn("Đóng", "closeModal()", "ghost"),
+				confirmButtonHtml: deps.btn("Xác nhận hủy", `confirmVoidQcPoint('${tid}','${pointId}')`, "danger")
+			}));
+			setTimeout(() => {
+				const e = doc().getElementById("voidKindInput");
+				if (e) e.focus();
+			}, 50);
+		};
+		const confirmVoidQcPoint = async (tid, pointId) => {
+			const t = state().tests.find((x) => x.id === tid), p = (state().data[tid] || []).find((x) => x.id === pointId);
+			if (!t || !p || p.voided) {
+				deps.closeModal();
+				return;
+			}
+			const input = doc().getElementById("voidReasonInput"), kind = (doc().getElementById("voidKindInput") || {}).value || "other", openNce = !!(doc().getElementById("voidOpenNce") || {}).checked, clean = deps.QCCore.cleanText(input ? input.value : "", 1e3).trim(), verdict = deps.pointVoidVerdict(t, p), rules = [...new Set(verdict.rules || [])], rule = rules.join(", ") || "Không có luật Westgard", qcVerdict = ["warn", "rej"].includes(verdict.level) ? verdict.level : "invalid", qcErrorType = deps.errorType(rules);
+			if (!deps.pres.entryVoidReasonValid(kind, clean)) {
+				const err = doc().getElementById("voidReasonErr");
+				if (err) err.style.display = "";
+				if (input) input.focus();
+				return;
+			}
+			const detail = openNce ? "Điểm vẫn được giữ trong nhật ký; hồ sơ NCE sẽ được lập mới hoặc dùng lại, và yêu cầu QC chạy lại." : "Điểm vẫn được giữ trong nhật ký; thao tác này không tự mở hồ sơ NCE.";
+			if (!await deps.confirmDialog({
+				kicker: "Thao tác không thể hoàn tác",
+				title: "Hủy điểm QC",
+				message: "Hủy điểm QC này khỏi tính toán Westgard/thống kê?",
+				detail,
+				confirmLabel: "Hủy điểm QC",
+				cancelLabel: "Quay lại"
+			})) return;
+			deps.closeModal();
+			const result = deps.EntryVoidWorkflowCommand.execute({
+				tid,
+				pointId,
+				reason: clean,
+				kind,
+				openNce,
+				rule,
+				errorType: qcErrorType,
+				qcVerdict,
+				staff: deps.currentStaff(),
+				nowIso: (/* @__PURE__ */ new Date()).toISOString(),
+				today: deps.isoToday(),
+				id: deps.uid(),
+				nceId: deps.nextNceId(deps.isoToday()),
+				dueDate: deps.nceDueDate(7),
+				formatDate: deps.vnDate,
+				formatNumber: deps.fmt,
+				audit: (result) => ({
+					action: "Hủy điểm QC",
+					detail: `Ngày ${deps.vnDate(result.point.date)}, M${result.point.level}, giá trị ${deps.fmtPointValue(result.point, t)} · ${result.reason}`,
+					target: t.name
+				})
+			});
+			if (result && result.error === "period-locked") {
+				entrySetLastMsg("<div class=\"alert warn\">Kỳ này đã chốt, không thể hủy điểm QC.</div>");
+				return;
+			}
+			if (!result || !result.ok) return;
+			const followup = result.openNce ? result.reusedAction ? " Đã giữ liên kết với hồ sơ NCE đang mở." : ` Đã mở hồ sơ ${deps.esc(result.action && result.action.nceId || "NCE")} để tiếp tục điều tra.` : " Không yêu cầu NCE/QC chạy lại.";
+			ui().entryLastMsg = `<div class="alert warn">Đã hủy điểm QC ngày ${deps.vnDate(result.point.date)}. Điểm không còn tham gia tính toán.${followup}</div>`;
+			entryRenderKeepScroll();
+		};
+		const entrySetSheetMonth = (v) => {
+			const month = deps.pres.entrySheetMonthValue(v);
+			if (!month) return;
+			ui().entrySheetMonth = month;
+			ui().entryLastMsg = "";
+			deps.rerender();
+		};
+		const entryGoToday = () => {
+			ui().entrySheetMonth = deps.isoMonth();
+			ui().entryJumpToday = true;
+			ui().entryLastMsg = "";
+			deps.rerender();
+		};
+		const entrySetSheetPart = (part, value) => entrySetSheetMonth(deps.pres.entrySheetMonthPart(ui().entrySheetMonth, deps.isoMonth(), part === "year" ? "year" : "month", value));
+		const entrySetDays = (n) => {
+			const range = deps.pres.entryRangePreset(n);
+			ui().entryDays = range.days;
+			ui().entryStart = range.start;
+			ui().entryEnd = range.end;
+			deps.rerender();
+		};
+		const entrySetStart = (v) => {
+			const next = deps.pres.entryDateRangeInput({
+				start: ui().entryStart,
+				end: ui().entryEnd
+			}, "start", v);
+			ui().entryStart = next.start;
+			ui().entryEnd = next.end;
+			deps.rerender();
+		};
+		const entrySetEnd = (v) => {
+			const next = deps.pres.entryDateRangeInput({
+				start: ui().entryStart,
+				end: ui().entryEnd
+			}, "end", v);
+			ui().entryStart = next.start;
+			ui().entryEnd = next.end;
+			deps.rerender();
+		};
+		return {
+			pageEntry,
+			entryWindow,
+			entryWindowFor,
+			entryRowsWindow,
+			entryToggleRows,
+			entryDetailToggled,
+			entryTreeIsCollapsed,
+			treeToggle,
+			toggleEntryTree,
+			entryTreeKey,
+			entryFilter,
+			entryPick,
+			entryFocusLevel,
+			entryShowPrevLot,
+			entryShowCurrentLot,
+			entryFocusPendingSheet,
+			entrySheetInputs,
+			entrySheetTarget,
+			entrySheetKey,
+			entryLatestTreeState,
+			entrySyncTreeState,
+			entryRenderKeepScroll,
+			entrySetLastMsg,
+			entryUnlockExtraRun,
+			entryDateNoteSave,
+			entryColumnCfg,
+			entryInlineSave,
+			entryInlineSaveCommit,
+			syncVoidNceChoice,
+			voidQcPoint,
+			confirmVoidQcPoint,
+			entrySetSheetMonth,
+			entryGoToday,
+			entrySetSheetPart,
+			entrySetDays,
+			entrySetStart,
+			entrySetEnd
+		};
+	}
+	//#endregion
+	//#region src/presentation/actions/action-form-controller.ts
+	/**
+	* Form hồ sơ NCE (trang "Khắc phục sự cố"): hằng số lựa chọn (ACT_*), chip gợi ý, khối
+	* <details> 8 mục, checklist điều tra, bản nháp giữ qua rerender(), model render-từ-state
+	* và addAction(). actions-page-controller.ts giữ phần còn lại của trang: danh sách sự
+	* cố, vòng đời hồ sơ (duyệt/trả lại/hủy/escalate/mở lại) và phiếu chi tiết.
+	*
+	* Đường cắt này KHÔNG một chiều: form gọi ngược vài hàm dựng bằng chứng của trang
+	* (deps.evidenceTimelineHtml/deps.rerunEvidenceHtml/deps.levelShort) vì phiếu chi tiết
+	* dùng chung đúng các khối đó, và trang gọi vào deps.formHtml (từ phía bên kia) để
+	* mở/đóng/lưu hồ sơ. modular-pilot.global.ts nối hai chiều này bằng cách dựng controller
+	* này TRƯỚC (không cần actions-page-controller.ts tồn tại — ba dep trên trỏ qua một biến
+	* tham chiếu được gán sau khi actions-page-controller.ts dựng xong), rồi dựng
+	* actions-page-controller.ts với `formHtml` trỏ thẳng vào `pageActionsV4`... của controller
+	* này vì lúc đó nó đã tồn tại.
+	*
+	* Form hồ sơ NCE được render THẲNG TỪ STATE (bản ghi đang sửa qua actionUi().editId, hoặc
+	* seed khi mở từ một vi phạm) chứ không đổ giá trị vào DOM sau render — mọi rerender() sau
+	* đó (đổi trang rồi quay lại, hay một bản đồng bộ Firebase dội về) không được xoá trắng
+	* form đang gõ dở.
+	*/
+	function createActionFormController(deps) {
+		const state = () => deps.getState();
+		const doc = () => deps.document();
+		const actionUi = () => deps.actionUi();
+		const LABELS = deps.ACTION_LABELS();
+		const ACT_FIELDS = [
+			[
+				"aNceId",
+				"nceId",
+				"text"
+			],
+			[
+				"aTest",
+				"testId",
+				"text"
+			],
+			[
+				"aLevel",
+				"level",
+				"text"
+			],
+			[
+				"aPointId",
+				"pointId",
+				"text"
+			],
+			[
+				"aDate",
+				"date",
+				"date"
+			],
+			[
+				"aRule",
+				"rule",
+				"text"
+			],
+			[
+				"aEventSource",
+				"eventSource",
+				"text"
+			],
+			[
+				"aProcessPhase",
+				"processPhase",
+				"text"
+			],
+			[
+				"aErr",
+				"errorType",
+				"text"
+			],
+			[
+				"aBy",
+				"by",
+				"text"
+			],
+			[
+				"aDueDate",
+				"dueDate",
+				"date"
+			],
+			[
+				"aContainment",
+				"containmentStatus",
+				"text"
+			],
+			[
+				"aContainmentNote",
+				"containmentNote",
+				"text"
+			],
+			[
+				"aCorrection",
+				"correction",
+				"text"
+			],
+			[
+				"aRiskSeverity",
+				"riskSeverity",
+				"num"
+			],
+			[
+				"aRiskOccurrence",
+				"riskOccurrence",
+				"num"
+			],
+			[
+				"aRiskDetectability",
+				"riskDetectability",
+				"num"
+			],
+			[
+				"aRiskLevel",
+				"riskLevel",
+				"text"
+			],
+			[
+				"aRiskBasis",
+				"riskBasis",
+				"text"
+			],
+			[
+				"aQcMaterial",
+				"qcMaterialStatus",
+				"text"
+			],
+			[
+				"aQcMaterialNote",
+				"qcMaterialNote",
+				"text"
+			],
+			[
+				"aInstrument",
+				"instrumentStatus",
+				"text"
+			],
+			[
+				"aInstrumentNote",
+				"instrumentNote",
+				"text"
+			],
+			[
+				"aReagent",
+				"reagentStatus",
+				"text"
+			],
+			[
+				"aReagentNote",
+				"reagentNote",
+				"text"
+			],
+			[
+				"aCalibration",
+				"calibrationStatus",
+				"text"
+			],
+			[
+				"aCalibrationNote",
+				"calibrationNote",
+				"text"
+			],
+			[
+				"aLotToLot",
+				"lotToLotStatus",
+				"text"
+			],
+			[
+				"aLotToLotNote",
+				"lotToLotNote",
+				"text"
+			],
+			[
+				"aCauseCategory",
+				"causeCategory",
+				"text"
+			],
+			[
+				"aCause",
+				"cause",
+				"text"
+			],
+			[
+				"aAct",
+				"action",
+				"text"
+			],
+			[
+				"aActionCompletedDate",
+				"actionCompletedDate",
+				"date"
+			],
+			[
+				"aBiasBefore",
+				"biasBefore",
+				"text"
+			],
+			[
+				"aBiasAfter",
+				"biasAfter",
+				"text"
+			],
+			[
+				"aReleaseStatus",
+				"releaseStatus",
+				"text"
+			],
+			[
+				"aReleaseDate",
+				"releaseDate",
+				"date"
+			],
+			[
+				"aReleaseBy",
+				"releaseBy",
+				"text"
+			],
+			[
+				"aReleaseNote",
+				"releaseNote",
+				"text"
+			],
+			[
+				"aPatientImpact",
+				"patientImpact",
+				"text"
+			],
+			[
+				"aPatientAction",
+				"patientAction",
+				"text"
+			],
+			[
+				"aEffectivenessStatus",
+				"effectivenessStatus",
+				"text"
+			],
+			[
+				"aEffectivenessDate",
+				"effectivenessDate",
+				"date"
+			],
+			[
+				"aEffectivenessNote",
+				"effectivenessNote",
+				"text"
+			],
+			[
+				"aResidualSeverity",
+				"residualSeverity",
+				"num"
+			],
+			[
+				"aResidualOccurrence",
+				"residualOccurrence",
+				"num"
+			],
+			[
+				"aResidualDetectability",
+				"residualDetectability",
+				"num"
+			],
+			[
+				"aResidualRiskLevel",
+				"residualRiskLevel",
+				"text"
+			],
+			[
+				"aResidualRiskBasis",
+				"residualRiskBasis",
+				"text"
+			]
+		];
+		const ACT_CHECK_FIELDS = [
+			[
+				"aQcMaterial",
+				"aQcMaterialNote",
+				"qcMaterialStatus",
+				"qcMaterialNote"
+			],
+			[
+				"aInstrument",
+				"aInstrumentNote",
+				"instrumentStatus",
+				"instrumentNote"
+			],
+			[
+				"aReagent",
+				"aReagentNote",
+				"reagentStatus",
+				"reagentNote"
+			],
+			[
+				"aCalibration",
+				"aCalibrationNote",
+				"calibrationStatus",
+				"calibrationNote"
+			],
+			[
+				"aLotToLot",
+				"aLotToLotNote",
+				"lotToLotStatus",
+				"lotToLotNote"
+			]
+		];
+		const labelEntries = (obj) => Object.entries(obj);
+		const ACT_SOURCE_OPTS = [["", "— Chọn nguồn —"], ...labelEntries(LABELS.source)];
+		const ACT_PHASE_OPTS = labelEntries(LABELS.phase);
+		const ACT_ERR_OPTS = [
+			["", "— Chưa xác định —"],
+			["SE — Sai số hệ thống", "SE — Sai số hệ thống"],
+			["RE — Sai số ngẫu nhiên", "RE — Sai số ngẫu nhiên"]
+		];
+		const ACT_CONTAIN_OPTS = [["", "— Chọn —"], ...labelEntries(LABELS.containment)];
+		const ACT_RISK_LEVEL_OPTS = [["", "— Chọn —"], ...labelEntries(LABELS.risk)];
+		const ACT_CAUSE_OPTS = [["", "— Chọn —"], ...labelEntries(LABELS.cause)];
+		const ACT_RELEASE_OPTS = [["", "Chưa cho phép trở lại"], ...labelEntries(LABELS.release)];
+		const ACT_PATIENT_OPTS = [["", "— Chọn —"], ...labelEntries(LABELS.patient)];
+		const ACT_EFF_OPTS = [
+			["pending", "Chưa đánh giá"],
+			["effective", "Có hiệu lực"],
+			["ineffective", "Chưa hiệu lực — cần xử lý tiếp"]
+		];
+		const ACT_CHECK_OPTS = [
+			["", "— Chọn —"],
+			["ok", "Đạt"],
+			["abnormal", "Bất thường"],
+			["na", "Không áp dụng"]
+		];
+		const ACT_LOT2LOT_OPTS = [
+			["", "— Chọn —"],
+			["not-needed", "Không cần — không đổi lô gần đây"],
+			["checked-ok", "Đã kiểm tra — đạt"],
+			["checked-abnormal", "Đã kiểm tra — bất thường"]
+		];
+		const ACT_SEVERITY_OPTS = [
+			["", "—"],
+			["1", "1 — Không đáng kể"],
+			["2", "2 — Nhẹ"],
+			["3", "3 — Trung bình"],
+			["4", "4 — Nặng"],
+			["5", "5 — Rất nghiêm trọng"]
+		];
+		const ACT_OCCURRENCE_OPTS = [
+			["", "—"],
+			["1", "1 — Hiếm"],
+			["2", "2 — Ít gặp"],
+			["3", "3 — Có thể"],
+			["4", "4 — Thường gặp"],
+			["5", "5 — Rất thường gặp"]
+		];
+		const ACT_DETECT_OPTS = [
+			["", "—"],
+			["1", "1 — Gần như chắc chắn phát hiện"],
+			["2", "2 — Dễ phát hiện"],
+			["3", "3 — Trung bình"],
+			["4", "4 — Khó phát hiện"],
+			["5", "5 — Rất khó phát hiện"]
+		];
+		const ACT_SUGGEST = {
+			correction: [
+				"Dừng trả kết quả liên quan",
+				"Cô lập lô QC đang dùng",
+				"Thông báo phụ trách khoa",
+				"Chạy lại QC với lọ mới",
+				"Tạm dừng máy chờ kiểm tra"
+			],
+			containmentNote: [
+				"Giữ kết quả từ đầu ca",
+				"Chỉ ảnh hưởng mức QC này",
+				"Chưa trả kết quả nào ra ngoài"
+			],
+			riskBasis: [
+				"Theo ma trận nguy cơ trong SOP quản lý sự không phù hợp",
+				"Theo SOP đánh giá nguy cơ của phòng xét nghiệm",
+				"Theo mức ảnh hưởng lâm sàng và khả năng phát hiện"
+			],
+			releaseNote: [
+				"QC chạy lại đã được chấp nhận",
+				"Đã xác nhận máy và hóa chất hoạt động ổn định",
+				"Phụ trách khoa đã rà soát và cho phép vận hành"
+			],
+			patientAction: [
+				"Không có kết quả nào đã trả ra",
+				"Rà soát kết quả từ lần QC đạt cuối",
+				"Chạy lại và trả kết quả đính chính",
+				"Đã thông báo lâm sàng"
+			],
+			effectivenessNote: [
+				"Theo dõi 20 lần chạy sau không tái diễn",
+				"QC ổn định trong 2 tuần tiếp theo",
+				"Vấn đề tái diễn, cần xử lý tiếp"
+			],
+			residualRiskBasis: [
+				"Đánh giá lại theo cùng ma trận nguy cơ ban đầu",
+				"Theo SOP-QC-07 sau thời gian theo dõi",
+				"Dựa trên dữ liệu QC sau khắc phục và khả năng phát hiện hiện tại"
+			],
+			qcMaterialNote: [
+				"Còn hạn, bảo quản đúng 2–8°C",
+				"Lọ QC đã mở quá số ngày cho phép",
+				"Hoàn nguyên chưa đủ thời gian",
+				"Lọ QC bị đục hoặc kết tủa"
+			],
+			instrumentNote: [
+				"Máy không có cảnh báo",
+				"Kim hút có cặn hoặc tắc",
+				"Nhiệt độ buồng ủ lệch",
+				"Đã tới hạn bảo trì định kỳ"
+			],
+			reagentNote: [
+				"Hóa chất còn hạn, đúng điều kiện",
+				"Vừa đổi lô hóa chất",
+				"Hóa chất đã mở quá hạn ổn định",
+				"Có bọt khí trong đường hút"
+			],
+			calibrationNote: [
+				"Hiệu chuẩn còn hiệu lực",
+				"Đã quá hạn hiệu chuẩn",
+				"Đã hiệu chuẩn lại sau sự cố"
+			],
+			lotToLotNote: [
+				"Không đổi lô trong kỳ này",
+				"Đã so sánh, kết quả tương đương",
+				"Lệch giữa hai lô vượt giới hạn"
+			]
+		};
+		const ACT_SUGGEST_CAUSE = {
+			qc: [
+				"Lọ QC hỏng hoặc quá hạn ổn định",
+				"Hoàn nguyên hoặc pha chưa đúng",
+				"Bảo quản QC không đúng nhiệt độ"
+			],
+			operator: [
+				"Thao tác hút mẫu chưa đúng",
+				"Nhầm mức hoặc nhầm lọ QC",
+				"Chưa trộn đều trước khi chạy"
+			],
+			instrument: [
+				"Kim hút bẩn làm sai thể tích hút",
+				"Bộ phận quang/điện cực suy giảm",
+				"Nhiệt độ buồng ủ không ổn định"
+			],
+			reagent: [
+				"Lô hóa chất mới lệch so với lô cũ",
+				"Hóa chất suy giảm do bảo quản",
+				"Calibrator hết hạn"
+			],
+			calibration: [
+				"Hiệu chuẩn trôi theo thời gian",
+				"Chưa hiệu chuẩn sau khi thay lô",
+				"Hiệu chuẩn lỗi do calibrator"
+			],
+			environment: ["Nhiệt độ hoặc độ ẩm phòng vượt ngưỡng", "Nguồn điện không ổn định"],
+			unknown: ["Chưa xác định được nguyên nhân, tiếp tục theo dõi"]
+		};
+		const ACT_SUGGEST_ACTION = {
+			SE: [
+				"Hiệu chuẩn lại và xác nhận bằng QC",
+				"Thay lô hóa chất hoặc calibrator",
+				"Vệ sinh và bảo trì bộ phận liên quan",
+				"Cập nhật Mean/SD sau khi ổn định"
+			],
+			RE: [
+				"Vệ sinh kim hút, loại bọt khí",
+				"Thay lọ QC mới, trộn đều đúng cách",
+				"Đào tạo lại thao tác cho nhân viên",
+				"Kiểm tra nguồn điện và độ ổn định máy"
+			],
+			"": [
+				"Hiệu chuẩn lại và xác nhận bằng QC",
+				"Vệ sinh kim hút, loại bọt khí",
+				"Thay lọ QC mới, trộn đều đúng cách",
+				"Đào tạo lại thao tác cho nhân viên"
+			]
+		};
+		let actionStepRenderInputs = null;
+		const actionSectionToggled = (key, open) => {
+			actionUi().toggleSection(key, open);
+		};
+		const actionDefaultOpenSections = (editing, protocol) => deps.ActionFormModel.defaultOpenSections(editing, protocol);
+		const actionRuleOptions = () => deps.pres.actionRuleOptionsPresentation(deps.QCCore.WG_RULES);
+		const actionStaffOptions = () => {
+			const names = [...new Set((state().users || []).filter((u) => u.active !== false).map((u) => String(u.name || u.username || "").trim()).filter(Boolean))];
+			return deps.pres.actionStaffOptionsPresentation(names);
+		};
+		const captureActionDraft = () => {
+			const values = {};
+			let found = false;
+			ACT_FIELDS.forEach(([id]) => {
+				const e = doc().getElementById(id);
+				if (e) {
+					found = true;
+					values[id] = e.value;
+				}
+			});
+			if (found) actionUi().captureDraft(values);
+		};
+		const actionFormChanged = () => {
+			captureActionDraft();
+			actionRefreshSectionChips();
+		};
+		const actionDraftValues = () => actionUi().draftValues();
+		const clearActionDraft = () => {
+			actionUi().clearDraft();
+		};
+		const actionSourceOptions = (qcBound, current) => deps.ActionFormModel.sourceOptions(ACT_SOURCE_OPTS, qcBound, current);
+		const actionCausePhrases = (category) => deps.pres.actionCausePhrasesPresentation(category, ACT_SUGGEST_CAUSE);
+		const actionActionPhrases = (errorType) => deps.pres.actionPhrasesPresentation(errorType, ACT_SUGGEST_ACTION);
+		const actionSuggestRow = (targetId, phrases) => {
+			if (!phrases || !phrases.length) return "";
+			return deps.pres.actionSuggestRowPresentation(deps.escapeAttr(targetId), deps.jsq(targetId), phrases.map((p) => ({
+				phraseHtml: deps.esc(p),
+				phraseJs: deps.jsq(p)
+			})));
+		};
+		const actionSuggestBox = (targetId, phrases, label = "Gợi ý nhập nhanh") => {
+			if (!phrases || !phrases.length) return "";
+			return deps.pres.actionSuggestBoxPresentation(deps.esc(label), actionSuggestRow(targetId, phrases));
+		};
+		const actionInsertSuggestion = (targetId, phrase) => {
+			const e = doc().getElementById(targetId);
+			if (!e) return;
+			const cur = String(e.value || "").trim();
+			e.value = cur ? cur.endsWith(".") || cur.endsWith(";") ? cur + " " + phrase : cur + "; " + phrase : phrase;
+			e.dispatchEvent(new Event("input", { bubbles: true }));
+			e.focus();
+			e.setSelectionRange(e.value.length, e.value.length);
+		};
+		const syncActionSuggestions = () => {
+			const cause = doc().getElementById("sugg-aCause"), act = doc().getElementById("sugg-aAct");
+			if (cause) cause.outerHTML = actionSuggestRow("aCause", actionCausePhrases(actionFieldValue("aCauseCategory", 40)));
+			if (act) act.outerHTML = actionSuggestRow("aAct", actionActionPhrases(actionFieldValue("aErr", 80)));
+		};
+		const actSel = (id, label, list, cur, extra = "") => deps.pres.actionSelectPresentation({
+			id,
+			label,
+			options: list,
+			current: cur,
+			extra
+		});
+		const actionLevelLabel = (l, t = null) => deps.pres.actionLevelLabelPresentation(l, (value) => deps.fmtTestValue(t, value), (value) => deps.fmtTestStat(t, value));
+		const syncActLevels = () => {
+			const testEl = doc().getElementById("aTest"), levelEl = doc().getElementById("aLevel"), labelEl = doc().getElementById("aLevelLabel");
+			if (!testEl || !levelEl) return;
+			const t = state().tests.find((x) => x.id === testEl.value);
+			if (!t) return;
+			const levels = deps.operationalLevels(t), l = levels.find((x) => String(x.level) === String(levelEl.value)) || levels[0];
+			if (l) levelEl.value = l.level;
+			if (labelEl) labelEl.value = l ? actionLevelLabel(l, t) : "";
+		};
+		const actionLevelContext = (testId, level, lot) => deps.pres.actionLevelContextPresentation(testId, level, lot, state().tests, deps.lvlCfg, actionLevelLabel);
+		const beginActionManual = () => {
+			if (!deps.requireWrite()) return;
+			actionUi().startManual();
+			deps.rerender();
+			const e = doc().getElementById("aCorrection");
+			if (e) e.focus();
+		};
+		const closeActionForm = () => {
+			actionUi().reset();
+			deps.rerender();
+		};
+		const actionFormClosedHtml = (issueCount) => {
+			const manual = deps.canWrite() ? deps.btn("Lập hồ sơ từ nguồn khác", "beginActionManual()", "ghost") : "";
+			return issueCount ? deps.pres.actionFormClosedPresentation({
+				title: "Chọn một sự cố để lập hồ sơ",
+				message: `Có ${issueCount} sự cố ở trên — bấm "Lập hồ sơ" ngay trên dòng cần xử lý để hồ sơ được gắn đúng điểm QC và tự theo dõi QC chạy lại.`,
+				actionHtml: manual
+			}) : deps.pres.actionFormClosedPresentation({
+				title: "Không có vi phạm nào cần lập hồ sơ",
+				message: "Hồ sơ NCE thường bắt đầu từ một vi phạm ở trên. Nếu sự không phù hợp đến từ EQA, cảnh báo thiết bị, phản hồi lâm sàng hay đánh giá nội bộ thì mở hồ sơ thủ công.",
+				actionHtml: manual
+			});
+		};
+		const actionIncidentBanner = (form, editing) => {
+			const p = form.pointId ? (state().data && state().data[form.testId] || []).find((x) => x.id === form.pointId) : null;
+			if (!p) return "";
+			const t = state().tests.find((x) => x.id === form.testId);
+			const title = editing ? `Đang tiếp tục hồ sơ ${editing.nceId || "NCE"}` : "Đang lập hồ sơ cho vi phạm này";
+			const bits = [];
+			if (t) bits.push(`${deps.testDisplayName(t)} · ${actionLevelContext(form.testId, form.level, form.lot)}`);
+			bits.push(`${deps.vnDate(p.date)} · ${deps.fmtPointValue(p, t)} ${t && t.unit || ""} · ${form.rule || "—"}`);
+			return deps.pres.actionIncidentBannerPresentation({
+				titleHtml: deps.esc(title),
+				detailsHtml: bits.map(deps.esc).join(" · ")
+			});
+		};
+		const beginActionFromIssue = (tid, level, rule, err, act, pointId = "", pointDate = "") => {
+			actionUi().startIssue({
+				testId: tid,
+				level,
+				rule,
+				errorType: err === "—" ? "" : err,
+				pointId,
+				date: pointDate || deps.isoToday()
+			});
+			deps.rerender();
+			const e = doc().getElementById("aCorrection");
+			if (e) e.focus();
+		};
+		const actionFieldValue = (id, max = 5e3) => deps.QCCore.cleanText((doc().getElementById(id) || {}).value, max).trim();
+		const readActionProtocolForm = (version = 3) => ({
+			protocolVersion: version,
+			eventSource: actionFieldValue("aEventSource", 40),
+			processPhase: actionFieldValue("aProcessPhase", 40),
+			correction: actionFieldValue("aCorrection"),
+			dueDate: deps.parseVN(actionFieldValue("aDueDate", 40)) || "",
+			riskSeverity: +actionFieldValue("aRiskSeverity", 4) || 0,
+			riskOccurrence: +actionFieldValue("aRiskOccurrence", 4) || 0,
+			riskDetectability: +actionFieldValue("aRiskDetectability", 4) || 0,
+			riskLevel: actionFieldValue("aRiskLevel", 40),
+			riskBasis: actionFieldValue("aRiskBasis"),
+			containmentStatus: actionFieldValue("aContainment", 40),
+			containmentNote: actionFieldValue("aContainmentNote"),
+			qcMaterialStatus: actionFieldValue("aQcMaterial", 40),
+			qcMaterialNote: actionFieldValue("aQcMaterialNote"),
+			instrumentStatus: actionFieldValue("aInstrument", 40),
+			instrumentNote: actionFieldValue("aInstrumentNote"),
+			reagentStatus: actionFieldValue("aReagent", 40),
+			reagentNote: actionFieldValue("aReagentNote"),
+			calibrationStatus: actionFieldValue("aCalibration", 40),
+			calibrationNote: actionFieldValue("aCalibrationNote"),
+			lotToLotStatus: actionFieldValue("aLotToLot", 40),
+			lotToLotNote: actionFieldValue("aLotToLotNote"),
+			causeCategory: actionFieldValue("aCauseCategory", 40),
+			cause: actionFieldValue("aCause"),
+			actionCompletedDate: deps.parseVN(actionFieldValue("aActionCompletedDate", 40)) || "",
+			biasBefore: actionFieldValue("aBiasBefore", 20),
+			biasAfter: actionFieldValue("aBiasAfter", 20),
+			releaseStatus: actionFieldValue("aReleaseStatus", 40),
+			releaseDate: deps.parseVN(actionFieldValue("aReleaseDate", 40)) || "",
+			releaseBy: actionFieldValue("aReleaseBy", 120),
+			releaseNote: actionFieldValue("aReleaseNote"),
+			patientImpact: actionFieldValue("aPatientImpact", 40),
+			patientAction: actionFieldValue("aPatientAction"),
+			effectivenessStatus: actionFieldValue("aEffectivenessStatus", 40) || "pending",
+			effectivenessDate: deps.parseVN(actionFieldValue("aEffectivenessDate", 40)) || "",
+			effectivenessNote: actionFieldValue("aEffectivenessNote"),
+			residualSeverity: +actionFieldValue("aResidualSeverity", 4) || 0,
+			residualOccurrence: +actionFieldValue("aResidualOccurrence", 4) || 0,
+			residualDetectability: +actionFieldValue("aResidualDetectability", 4) || 0,
+			residualRiskLevel: actionFieldValue("aResidualRiskLevel", 40),
+			residualRiskBasis: actionFieldValue("aResidualRiskBasis")
+		});
+		const actionEffectivenessMissingKey = (a) => deps.ActionProtocolService.effectivenessMissingKey(a);
+		const addAction = async () => {
+			if (!deps.requireWrite()) return;
+			const editing = actionUi().editId && (state().actions || []).find((a) => a.id === actionUi().editId);
+			const tid = editing ? editing.testId : doc().getElementById("aTest").value, t = state().tests.find((x) => x.id === tid);
+			const levelEl = doc().getElementById("aLevel");
+			const level = editing ? editing.level : levelEl ? parseInt(levelEl.value) || 0 : 0, l = t && level ? deps.lvlCfg(t, level) : null;
+			const lot = editing ? editing.lot || "" : l && l.lot || "", pointId = editing ? editing.pointId || "" : actionFieldValue("aPointId", 80);
+			const rule = actionFieldValue("aRule"), action = actionFieldValue("aAct"), by = actionFieldValue("aBy"), errorType = actionFieldValue("aErr"), nceId = actionFieldValue("aNceId", 80) || deps.nextNceId(deps.isoToday()), date = deps.parseVN(doc().getElementById("aDate").value) || deps.isoToday(), protocol = readActionProtocolForm(editing ? Math.max(2, +editing.protocolVersion || 2) : 3);
+			const user = deps.currentUser();
+			const result = deps.NceFormWorkflowCommand.submit({
+				editId: editing && editing.id,
+				values: {
+					...editing || {},
+					...protocol,
+					nceId: editing && editing.nceId || nceId,
+					testId: tid,
+					level,
+					lot,
+					pointId,
+					date,
+					rule,
+					errorType,
+					action,
+					by
+				},
+				user: {
+					id: user && user.id || "",
+					username: user && user.username || "",
+					name: deps.userName()
+				},
+				audit: (result) => result.mode === "update" ? {
+					action: "Cập nhật hồ sơ NCE",
+					detail: `${result.record.nceId || "NCE"} · ${deps.actionWorkflowStatus(result.record).label}`,
+					target: t ? t.name : ""
+				} : {
+					action: "Lập hồ sơ NCE",
+					detail: `${result.record.nceId} · ${deps.levelShort(t, level, lot)} · đang điều tra`,
+					target: t ? t.name : ""
+				}
+			});
+			if (!result.ok) {
+				await deps.infoDialog(result.message);
+				if (result.missingKey) focusActionField(result.missingKey);
+				return;
+			}
+		};
+		const syncActionRiskScore = () => {
+			const a = {
+				riskSeverity: +actionFieldValue("aRiskSeverity", 4) || 0,
+				riskOccurrence: +actionFieldValue("aRiskOccurrence", 4) || 0,
+				riskDetectability: +actionFieldValue("aRiskDetectability", 4) || 0
+			}, e = doc().getElementById("aRiskScore"), card = doc().getElementById("aRiskScoreCard"), score = deps.actionRiskScore(a), level = actionFieldValue("aRiskLevel", 40);
+			if (e) e.textContent = score ? String(score) : "—";
+			if (card) card.className = `action-risk-score risk-${[
+				"low",
+				"medium",
+				"high",
+				"critical"
+			].includes(level) ? level : "none"}`;
+		};
+		const syncActionResidualRiskScore = () => {
+			const a = {
+				residualSeverity: +actionFieldValue("aResidualSeverity", 4) || 0,
+				residualOccurrence: +actionFieldValue("aResidualOccurrence", 4) || 0,
+				residualDetectability: +actionFieldValue("aResidualDetectability", 4) || 0
+			}, e = doc().getElementById("aResidualRiskScore"), card = doc().getElementById("aResidualRiskScoreCard"), score = deps.actionResidualRiskScore(a), level = actionFieldValue("aResidualRiskLevel", 40);
+			if (e) e.textContent = score ? String(score) : "—";
+			if (card) card.className = `action-risk-score risk-${[
+				"low",
+				"medium",
+				"high",
+				"critical"
+			].includes(level) ? level : "none"}`;
+		};
+		const editAction = async (i) => {
+			const a = state().actions && state().actions[i];
+			if (!a) return;
+			if (deps.actionCancelled(a)) {
+				await deps.infoDialog("Hồ sơ đã hủy được giữ nguyên để bảo toàn dấu vết và không thể chỉnh sửa.");
+				return;
+			}
+			if (deps.actionApprovalStatus(a) === "approved") {
+				await deps.infoDialog("Hồ sơ đã khép vòng không được sửa. Nếu vấn đề tái diễn, hãy mở hồ sơ NCE mới.");
+				return;
+			}
+			actionUi().edit(a.id);
+			deps.rerender();
+			const panel = doc().querySelector(".action-form-panel");
+			if (panel) panel.scrollIntoView({
+				behavior: "smooth",
+				block: "start"
+			});
+		};
+		const actionInvestigationField = (statusId, noteId, title, hint, form, statusKey, noteKey, lotToLot = false) => {
+			const value = String(form[statusKey] || ""), choices = (lotToLot ? ACT_LOT2LOT_OPTS : ACT_CHECK_OPTS).filter(([v]) => v), stateCls = actionInvestigationStateClass(value), stateLabel = LABELS.check[value] || "Chưa kết luận";
+			const opts = lotToLot ? ACT_LOT2LOT_OPTS : ACT_CHECK_OPTS;
+			return deps.pres.actionInvestigationFieldPresentation({
+				stateClass: stateCls,
+				statusIdHtml: deps.escapeAttr(statusId),
+				statusIdJs: deps.jsq(statusId),
+				noteIdHtml: deps.escapeAttr(noteId),
+				titleHtml: deps.esc(title),
+				hintHtml: deps.esc(hint),
+				stateLabelHtml: deps.esc(stateLabel),
+				selectOptionsHtml: opts.map(([v, label]) => `<option value="${deps.escapeAttr(v)}" ${v === value ? "selected" : ""}>${deps.esc(label)}</option>`).join(""),
+				choices: choices.map(([v, label]) => ({
+					valueHtml: deps.escapeAttr(v),
+					labelHtml: deps.esc(actionInvestigationChoiceLabel(v, label)),
+					active: v === value,
+					jsValue: deps.jsq(v)
+				})),
+				noteValueHtml: deps.escapeAttr(form[noteKey] || ""),
+				suggestHtml: actionSuggestBox(noteId, ACT_SUGGEST[noteKey], "Gợi ý bằng chứng")
+			});
+		};
+		const actionInvestigationChoiceLabel = (value, label) => deps.ActionInvestigationPresentation.choiceLabel(value, label);
+		const actionInvestigationStateClass = (value) => deps.ActionInvestigationPresentation.stateClass(value);
+		const actionInvestigationChoose = (statusId, value) => {
+			const select = doc().getElementById(statusId);
+			if (!select) return;
+			select.value = value;
+			select.dispatchEvent(new Event("change", { bubbles: true }));
+			if ([
+				"abnormal",
+				"checked-abnormal",
+				"na"
+			].includes(value)) {
+				const card = select.closest(".action-investigation-item"), note = card && card.querySelector(".action-investigation-note input");
+				if (note) note.focus();
+			}
+		};
+		const actionInvestigationSync = (statusId) => {
+			const select = doc().getElementById(statusId), card = select && select.closest(".action-investigation-item");
+			if (!select || !card) return;
+			card.classList.remove("is-empty", "is-ok", "is-abnormal", "is-na");
+			card.classList.add(actionInvestigationStateClass(select.value));
+			card.querySelectorAll(".action-choice").forEach((button) => {
+				const active = button.dataset.value === select.value;
+				button.classList.toggle("active", active);
+				button.setAttribute("aria-pressed", active ? "true" : "false");
+			});
+			const label = card.querySelector(".action-investigation-state");
+			if (label) label.textContent = LABELS.check[select.value] || "Chưa kết luận";
+		};
+		const actionChecklistRefresh = () => {
+			const first = doc().getElementById(ACT_CHECK_FIELDS[0][0]), section = first && first.closest("details"), chip = section && section.querySelector(":scope > summary .action-chip");
+			if (!chip) return;
+			const rows = ACT_CHECK_FIELDS.map(([statusId, noteId]) => ({
+				status: (doc().getElementById(statusId) || {}).value,
+				note: (doc().getElementById(noteId) || {}).value
+			})), info = deps.ActionChecklistPresentation.checklistChip(rows);
+			chip.textContent = info.label;
+			chip.classList.toggle("ok", info.cls === "ok");
+			chip.classList.toggle("warn", info.cls === "warn");
+		};
+		const actionSectionChip = (missing) => deps.ActionChecklistPresentation.sectionChip(missing);
+		const actionChecklistChip = (form) => deps.ActionChecklistPresentation.checklistChip(ACT_CHECK_FIELDS.map(([, , statusKey, noteKey]) => ({
+			status: form[statusKey],
+			note: form[noteKey]
+		})));
+		const actionEffSectionChip = (form) => deps.ActionChecklistPresentation.effectivenessChip(form);
+		const actionUpdateSectionChip = (key, info) => {
+			const section = doc().querySelector(`details[data-action-section="${key}"]`), chip = section && section.querySelector(":scope > summary .action-chip");
+			if (!chip) return;
+			chip.className = `action-chip ${info.cls}`;
+			chip.textContent = info.label;
+			chip.title = info.title || "";
+			chip.setAttribute("aria-label", info.title || info.label);
+		};
+		const actionRefreshSectionChips = () => {
+			if (!doc().getElementById("aCorrection")) return;
+			const editing = actionUi().editId && (state().actions || []).find((a) => a.id === actionUi().editId), version = editing ? Math.max(2, +editing.protocolVersion || 2) : 3;
+			const form = {
+				...editing || {},
+				...readActionProtocolForm(version),
+				protocolVersion: version,
+				testId: editing ? editing.testId : actionFieldValue("aTest", 80),
+				date: deps.parseVN(actionFieldValue("aDate", 40)) || "",
+				action: actionFieldValue("aAct"),
+				by: actionFieldValue("aBy"),
+				pointId: actionFieldValue("aPointId", 80)
+			};
+			const miss = deps.actionProtocolStatus(form).missingBySection || {};
+			[
+				"immediate",
+				"risk",
+				"cause",
+				"patient"
+			].forEach((key) => actionUpdateSectionChip(key, actionSectionChip(miss[key])));
+			actionUpdateSectionChip("eff", actionEffSectionChip(form));
+			actionChecklistRefresh();
+		};
+		const actionSection = (key, badge, title, hint, bodyHtml, chipInfo, openSet) => {
+			if (key === "cause" && actionStepRenderInputs) bodyHtml = deps.pres.actionCauseStepPresentation(actionStepRenderInputs.cause);
+			if (key === "patient" && actionStepRenderInputs) bodyHtml = deps.pres.actionPatientStepPresentation(actionStepRenderInputs.patient);
+			if (key === "eff" && actionStepRenderInputs) bodyHtml = deps.pres.actionEffectivenessStepPresentation(actionStepRenderInputs.eff);
+			const open = openSet.has(key), chip = `<span class="action-chip ${chipInfo.cls}" aria-label="${deps.escapeAttr(chipInfo.title || chipInfo.label)}"${chipInfo.title ? ` title="${deps.escapeAttr(chipInfo.title)}"` : ""}>${deps.esc(chipInfo.label)}</span>`;
+			return deps.pres.actionFormSectionPresentation({
+				keyHtml: deps.escapeAttr(key),
+				keyJs: deps.jsq(key),
+				open,
+				badgeHtml: deps.esc(badge),
+				titleHtml: deps.esc(title),
+				hintHtml: deps.esc(hint),
+				chipHtml: chip,
+				bodyHtml
+			});
+		};
+		const actionFormModel = (editing, tests) => deps.ActionFormModel.build(editing, tests, actionUi().seed, deps.currentUser(), actionDraftValues());
+		const actionFormDefaults = (tests) => deps.ActionFormModel.defaults(tests, actionUi().seed, deps.currentUser());
+		const focusActionField = (key) => {
+			const entry = ACT_FIELDS.find((f) => f[1] === key), e = entry && doc().getElementById(entry[0]);
+			if (!e) return;
+			const box = e.closest("details");
+			if (box && !box.open) box.open = true;
+			const target = e.classList.contains("action-investigation-select") ? e.closest(".action-investigation-item") : e, focusTarget = e.classList.contains("action-investigation-select") && target ? target.querySelector(".action-choice") : e;
+			target.scrollIntoView({
+				behavior: "smooth",
+				block: "center"
+			});
+			if (focusTarget) focusTarget.focus({ preventScroll: true });
+			target.classList.add("field-invalid");
+			const drop = () => {
+				target.classList.remove("field-invalid");
+				e.removeEventListener("input", drop);
+				e.removeEventListener("change", drop);
+			};
+			e.addEventListener("input", drop);
+			e.addEventListener("change", drop);
+		};
+		const actionBiasInfo = (t, l, biasBeforeRaw, biasAfterRaw) => deps.ActionBiasService.info(t, l, biasBeforeRaw, biasAfterRaw);
+		const actionBiasContext = (form, editing) => deps.pres.actionBiasContextPresentation(form, editing, state().tests, deps.lvlCfg);
+		const actionLatestSigmaBias = (t, level) => deps.ActionBiasService.latestSigmaBias(t, level, state().sigmaData);
+		const actionFillBias = (targetId, value) => {
+			const e = doc().getElementById(targetId);
+			if (!e) return;
+			e.value = deps.fmt(value);
+			e.dispatchEvent(new Event("input", { bubbles: true }));
+			e.focus();
+		};
+		const actionBiasThresholdHtml = (info) => deps.ActionBiasPresentation.thresholdHtml(info);
+		const actionBiasReferenceHtml = (info) => deps.ActionBiasPresentation.referenceHtml(info);
+		const actionUpdateBiasHint = () => {
+			const editing = actionUi().editId && (state().actions || []).find((a) => a.id === actionUi().editId);
+			const testId = editing ? editing.testId : actionFieldValue("aTest", 80), level = editing ? editing.level : (doc().getElementById("aLevel") || {}).value;
+			const t = state().tests.find((x) => x.id === testId), l = t && level ? deps.lvlCfg(t, +level) : null;
+			const info = actionBiasInfo(t, l, actionFieldValue("aBiasBefore", 20), actionFieldValue("aBiasAfter", 20));
+			const thr = doc().getElementById("aBiasThresholdHint");
+			if (thr) thr.innerHTML = actionBiasThresholdHtml(info);
+			const ref = doc().getElementById("aPatientRiskRef");
+			if (ref) ref.innerHTML = actionBiasReferenceHtml(info);
+		};
+		const actionFormHtml = (issueCount) => {
+			const tests = deps.operationalTests();
+			const renderState = deps.pres.actionFormRenderState({
+				actions: state().actions || [],
+				tests,
+				editId: actionUi().editId,
+				seed: actionUi().seed,
+				currentUser: deps.currentUser(),
+				draft: actionDraftValues(),
+				buildModel: actionFormModel,
+				defaultModel: actionFormDefaults,
+				protocol: (form) => deps.actionProtocolStatus({
+					...form,
+					protocolVersion: form.protocolVersion || 3
+				}),
+				defaultOpen: actionDefaultOpenSections,
+				openSections: actionUi().openSections,
+				actionId: (a) => a.id
+			});
+			const editing = renderState.editing, form = renderState.form;
+			const formAction = editing ? {
+				...editing,
+				...form,
+				testId: editing.testId,
+				level: editing.level,
+				lot: editing.lot || "",
+				pointId: editing.pointId || ""
+			} : null, formRerun = formAction ? deps.actionRerunStatus(formAction) : null;
+			const formOpen = renderState.formOpen;
+			const miss = renderState.protocol.missingBySection || {};
+			const openSet = renderState.openSet;
+			const qcBound = !!(form.pointId && (state().data && state().data[form.testId] || []).some((x) => x.id === form.pointId));
+			const knownTest = tests.some((t) => t.id === form.testId), missingTest = !knownTest && form.testId ? state().tests.find((t) => t.id === form.testId) : null;
+			const opts = (qcBound ? "" : `<option value="" ${form.testId ? "" : "selected"}>— Không gắn xét nghiệm —</option>`) + (missingTest || !knownTest && form.testId ? `<option value="${deps.escapeAttr(form.testId)}" selected>${deps.esc(missingTest ? deps.testDisplayName(missingTest) : "Xét nghiệm không còn vận hành")}</option>` : "") + tests.map((t) => `<option value="${deps.escapeAttr(t.id)}" ${t.id === form.testId ? "selected" : ""}>${deps.esc(deps.testDisplayName(t))}</option>`).join("");
+			const { t: biasT, l: biasL } = actionBiasContext(form, editing), biasInfo = actionBiasInfo(biasT, biasL, form.biasBefore, form.biasAfter);
+			const sigmaBias = actionLatestSigmaBias(biasT, editing ? editing.level : form.level);
+			const sigmaBiasChip = sigmaBias ? `<div class="sugg-row"><button type="button" class="sugg-chip" onclick="actionFillBias('aBiasBefore',${sigmaBias.value})" title="Lấy từ Bias EQA/EQC kỳ ${deps.escapeAttr(sigmaBias.period)} ở trang Six Sigma">Dùng Bias EQA gần nhất (kỳ ${deps.esc(sigmaBias.period)}): ${deps.fmt(sigmaBias.value)}%</button></div>` : "";
+			actionStepRenderInputs = {
+				cause: {
+					causeCategory: actSel("aCauseCategory", "Nhóm nguyên nhân", ACT_CAUSE_OPTS, form.causeCategory, "onchange=\"syncActionSuggestions()\""),
+					cause: deps.esc(form.cause || ""),
+					causeSuggest: actionSuggestBox("aCause", actionCausePhrases(form.causeCategory)),
+					action: deps.esc(form.action || ""),
+					actionSuggest: actionSuggestBox("aAct", actionActionPhrases(form.errorType)),
+					completedDate: deps.dateBox("aActionCompletedDate", form.actionCompletedDate || "", "action-date"),
+					biasBefore: deps.escapeAttr(form.biasBefore || ""),
+					sigmaBias: sigmaBiasChip,
+					biasAfter: deps.escapeAttr(form.biasAfter || ""),
+					threshold: actionBiasThresholdHtml(biasInfo),
+					rerun: formAction ? deps.rerunEvidenceHtml(formAction, formRerun, state().tests.find((x) => x.id === formAction.testId)) : "",
+					containmentHeld: form.containmentStatus === "held",
+					releaseStatus: actSel("aReleaseStatus", "Quyết định cho phép trở lại", ACT_RELEASE_OPTS, form.releaseStatus),
+					releaseDate: deps.dateBox("aReleaseDate", form.releaseDate || "", "action-date"),
+					releaseBy: deps.escapeAttr(form.releaseBy || ""),
+					releaseNote: deps.escapeAttr(form.releaseNote || ""),
+					releaseSuggest: actionSuggestBox("aReleaseNote", ACT_SUGGEST.releaseNote)
+				},
+				patient: {
+					reference: actionBiasReferenceHtml(biasInfo),
+					impact: actSel("aPatientImpact", "Kết luận ảnh hưởng", ACT_PATIENT_OPTS, form.patientImpact),
+					action: deps.esc(form.patientAction || ""),
+					suggest: actionSuggestBox("aPatientAction", ACT_SUGGEST.patientAction)
+				},
+				eff: {
+					status: actSel("aEffectivenessStatus", "Kết luận hiệu lực", ACT_EFF_OPTS, form.effectivenessStatus || "pending"),
+					date: deps.dateBox("aEffectivenessDate", form.effectivenessDate || "", "action-date"),
+					note: deps.esc(form.effectivenessNote || ""),
+					noteSuggest: actionSuggestBox("aEffectivenessNote", ACT_SUGGEST.effectivenessNote),
+					severity: actSel("aResidualSeverity", "Mức độ còn lại", ACT_SEVERITY_OPTS, form.residualSeverity, "onchange=\"syncActionResidualRiskScore()\""),
+					occurrence: actSel("aResidualOccurrence", "Khả năng xảy ra còn lại", ACT_OCCURRENCE_OPTS, form.residualOccurrence, "onchange=\"syncActionResidualRiskScore()\""),
+					detectability: actSel("aResidualDetectability", "Khả năng không phát hiện còn lại", ACT_DETECT_OPTS, form.residualDetectability, "onchange=\"syncActionResidualRiskScore()\""),
+					level: actSel("aResidualRiskLevel", "Phân loại nguy cơ còn lại", ACT_RISK_LEVEL_OPTS, form.residualRiskLevel, "onchange=\"syncActionResidualRiskScore()\""),
+					scoreClass: deps.escapeAttr([
+						"low",
+						"medium",
+						"high",
+						"critical"
+					].includes(form.residualRiskLevel) ? form.residualRiskLevel : "none"),
+					score: deps.actionResidualRiskScore(form) || "—",
+					basis: deps.escapeAttr(form.residualRiskBasis || ""),
+					basisSuggest: actionSuggestBox("aResidualRiskBasis", ACT_SUGGEST.residualRiskBasis)
+				}
+			};
+			const formBodyHtml = `${actionIncidentBanner(form, editing)}<div class="action-form-section"><div class="action-form-section-title"><span>Hồ sơ</span><div><b>Nhận diện sự cố</b><small>Có thể lưu ngay sau khi kiểm soát tức thời; không cần chờ điều tra xong</small></div></div>
+     <input id="aPointId" type="hidden" value="${deps.escapeAttr(form.pointId || "")}">
+     ${qcBound ? `<input id="aLevel" type="hidden" value="${deps.escapeAttr(form.level == null ? "" : form.level)}">` : ""}
+     <div class="action-ident-groups">
+       <div class="action-ident-group"><div class="action-ident-group-title"><b>Đối tượng QC</b><small>${editing ? "Khóa theo hồ sơ đã mở — sai đối tượng thì hủy có lưu vết và mở hồ sơ mới" : "Hồ sơ và cấu hình QC đang xảy ra sự cố"}</small></div><div class="action-form-main">
+         <div><label>Mã hồ sơ</label><input id="aNceId" aria-label="Mã hồ sơ NCE" readonly value="${deps.escapeAttr(editing ? editing.nceId || deps.nextNceId(deps.isoToday()) : deps.nextNceId(deps.isoToday()))}"></div>
+         <div><label>Xét nghiệm${qcBound ? "" : " <span class=\"hint\">(nếu có)</span>"}</label><select id="aTest" aria-label="Xét nghiệm" ${editing ? "disabled" : "onchange=\"syncActLevels()\""}>${opts}</select></div>
+         ${qcBound ? `<div><label>Ngữ cảnh QC</label><input id="aLevelLabel" aria-label="Ngữ cảnh QC" readonly value="${deps.escapeAttr(actionLevelContext(form.testId, form.level, form.lot))}"></div>` : ""}
+       </div></div>
+       <div class="action-ident-group"><div class="action-ident-group-title"><b>Phân loại sự cố</b><small>Thời điểm, dấu hiệu phát hiện và loại sai số</small></div><div class="action-form-meta">
+         <div><label>Ngày ghi nhận</label>${deps.dateBox("aDate", form.date || deps.isoToday(), "action-date")}</div>
+         <div><label>Luật vi phạm</label>${actSel("aRule", "Luật vi phạm", actionRuleOptions(), form.rule)}</div>
+         <div><label>Nguồn phát hiện</label>${actSel("aEventSource", "Nguồn phát hiện", actionSourceOptions(qcBound, form.eventSource), form.eventSource || "")}</div>
+         <div><label>Giai đoạn</label>${actSel("aProcessPhase", "Giai đoạn quá trình", ACT_PHASE_OPTS, form.processPhase || "exam")}</div>
+         <div><label>Loại sai số</label>${actSel("aErr", "Loại sai số", ACT_ERR_OPTS, form.errorType, "onchange=\"syncActionSuggestions()\"")}</div>
+       </div></div>
+       <div class="action-ident-group"><div class="action-ident-group-title"><b>Phân công xử lý</b><small>Người chịu trách nhiệm và thời hạn dự kiến</small></div><div class="action-form-owner">
+         <div><label>Người phụ trách</label><input id="aBy" aria-label="Người phụ trách" list="aByList" autocomplete="off" placeholder="Chọn hoặc gõ tên" value="${deps.escapeAttr(form.by || "")}"><datalist id="aByList">${actionStaffOptions()}</datalist></div>
+         <div><label>Hạn hoàn thành</label>${deps.dateBox("aDueDate", form.dueDate || "", "action-date")}</div>
+       </div></div>
+     </div>${formAction ? deps.evidenceTimelineHtml(formAction, formRerun) : ""}</div>
+     ${actionSection("immediate", "1", "Kiểm soát và xử lý tức thời", "Phần tối thiểu bắt buộc để mở hồ sơ NCE; kết luận ảnh hưởng bệnh nhân ghi ở mục 7", deps.pres.actionImmediateStepPresentation({
+				containmentSelectHtml: actSel("aContainment", "Phạm vi kiểm soát tức thời", ACT_CONTAIN_OPTS, form.containmentStatus),
+				containmentNoteValueHtml: deps.escapeAttr(form.containmentNote || ""),
+				containmentNoteSuggestHtml: actionSuggestBox("aContainmentNote", ACT_SUGGEST.containmentNote),
+				correctionTextHtml: deps.esc(form.correction || ""),
+				correctionSuggestHtml: actionSuggestBox("aCorrection", ACT_SUGGEST.correction)
+			}), actionSectionChip(miss.immediate), openSet)}
+     ${actionSection("risk", "2", "Đánh giá nguy cơ", "RPN được tính tự động; mức phân loại phải truy xuất được về SOP của đơn vị", deps.pres.actionRiskStepPresentation({
+				severitySelectHtml: actSel("aRiskSeverity", "Mức độ ảnh hưởng", ACT_SEVERITY_OPTS, form.riskSeverity, "onchange=\"syncActionRiskScore()\""),
+				occurrenceSelectHtml: actSel("aRiskOccurrence", "Khả năng xảy ra", ACT_OCCURRENCE_OPTS, form.riskOccurrence, "onchange=\"syncActionRiskScore()\""),
+				detectabilitySelectHtml: actSel("aRiskDetectability", "Khả năng không phát hiện", ACT_DETECT_OPTS, form.riskDetectability, "onchange=\"syncActionRiskScore()\""),
+				levelSelectHtml: actSel("aRiskLevel", "Phân loại nguy cơ", ACT_RISK_LEVEL_OPTS, form.riskLevel, "onchange=\"syncActionRiskScore()\""),
+				scoreClassHtml: deps.escapeAttr([
+					"low",
+					"medium",
+					"high",
+					"critical"
+				].includes(form.riskLevel) ? form.riskLevel : "none"),
+				scoreHtml: deps.actionRiskScore(form) || "—",
+				basisValueHtml: deps.escapeAttr(form.riskBasis || ""),
+				basisSuggestHtml: actionSuggestBox("aRiskBasis", ACT_SUGGEST.riskBasis)
+			}), actionSectionChip(miss.risk), openSet)}
+     ${actionSection("check", "3", "Checklist điều tra", "Ghi rõ khi bất thường hoặc không áp dụng", deps.pres.actionInvestigationStepPresentation([
+				actionInvestigationField("aQcMaterial", "aQcMaterialNote", "Vật liệu QC", "Hạn dùng, bảo quản, hoàn nguyên", form, "qcMaterialStatus", "qcMaterialNote"),
+				actionInvestigationField("aInstrument", "aInstrumentNote", "Máy phân tích", "Điện, nước, nhiệt độ, cảnh báo, bảo trì", form, "instrumentStatus", "instrumentNote"),
+				actionInvestigationField("aReagent", "aReagentNote", "Hóa chất / calibrator", "Hạn dùng, số lô và điều kiện bảo quản", form, "reagentStatus", "reagentNote"),
+				actionInvestigationField("aCalibration", "aCalibrationNote", "Hiệu chuẩn", "Tình trạng và chỉ định tái hiệu chuẩn", form, "calibrationStatus", "calibrationNote"),
+				actionInvestigationField("aLotToLot", "aLotToLotNote", "So sánh lot-to-lot", "Dùng khi có thay đổi lô gần đây", form, "lotToLotStatus", "lotToLotNote", true)
+			]), actionChecklistChip(form), openSet)}
+      ${actionSection("cause", "4–6", "Nguyên nhân gốc và hành động khắc phục", "Tách khỏi xử lý tức thời; QC chạy lại được tự liên kết", `<div class="action-cause-grid"><div><label>Nhóm nguyên nhân</label>${actSel("aCauseCategory", "Nhóm nguyên nhân", ACT_CAUSE_OPTS, form.causeCategory, "onchange=\"syncActionSuggestions()\"")}</div><div><label>Nguyên nhân gốc hoặc nghi ngờ</label><textarea id="aCause" rows="1" placeholder="Mô tả bằng chứng và nguyên nhân...">${deps.esc(form.cause || "")}</textarea>${actionSuggestBox("aCause", actionCausePhrases(form.causeCategory))}</div><div><label>Hành động khắc phục để ngăn tái diễn</label><textarea id="aAct" rows="1" placeholder="VD: Thay lọ QC mới, vệ sinh kim hút, cập nhật lịch bảo trì...">${deps.esc(form.action || "")}</textarea>${actionSuggestBox("aAct", actionActionPhrases(form.errorType))}</div></div><div class="action-cause-second-row"><div><label>Ngày hoàn thành hành động</label>${deps.dateBox("aActionCompletedDate", form.actionCompletedDate || "", "action-date")}</div><div><label>Bias trước khắc phục (%) <small class="hint">tham khảo</small></label><input id="aBiasBefore" type="text" inputmode="decimal" placeholder="VD: 8.5" value="${deps.escapeAttr(form.biasBefore || "")}" oninput="actionUpdateBiasHint()">${sigmaBiasChip}</div><div><label>Bias sau khắc phục (%) <small class="hint">tham khảo</small></label><input id="aBiasAfter" type="text" inputmode="decimal" placeholder="VD: 1.2" value="${deps.escapeAttr(form.biasAfter || "")}" oninput="actionUpdateBiasHint()"></div></div><div id="aBiasThresholdHint" class="hint flow-note">${actionBiasThresholdHtml(biasInfo)}</div>${formAction ? deps.rerunEvidenceHtml(formAction, formRerun, state().tests.find((x) => x.id === formAction.testId)) : ""}<div class="action-release-block"><div class="action-release-title"><b>Cho phép hoạt động/trả kết quả trở lại</b><small>${form.containmentStatus === "held" ? "Bắt buộc sau khi QC được chấp nhận và hành động đã hoàn thành" : "Không bắt buộc vì mục 1 không ghi nhận kết quả liên quan bị giữ"}</small></div><div class="action-release-grid"><div><label>Quyết định</label>${actSel("aReleaseStatus", "Quyết định cho phép trở lại", ACT_RELEASE_OPTS, form.releaseStatus)}</div><div><label>Ngày cho phép</label>${deps.dateBox("aReleaseDate", form.releaseDate || "", "action-date")}</div><div><label>Người cho phép</label><input id="aReleaseBy" list="aByList" autocomplete="off" placeholder="Chọn hoặc gõ tên" value="${deps.escapeAttr(form.releaseBy || "")}"></div><div><label>Căn cứ cho phép</label><input id="aReleaseNote" placeholder="VD: QC chạy lại đã được chấp nhận" value="${deps.escapeAttr(form.releaseNote || "")}">${actionSuggestBox("aReleaseNote", ACT_SUGGEST.releaseNote)}</div></div></div>`, actionSectionChip(miss.cause), openSet)}
+     ${actionSection("patient", "7", "Đánh giá ảnh hưởng bệnh nhân", "Ghi rõ phạm vi và cách xử lý nếu có liên quan", `<div id="aPatientRiskRef" class="hint space-after-control">${actionBiasReferenceHtml(biasInfo)}</div><div class="action-patient-grid"><div><label>Kết luận ảnh hưởng</label>${actSel("aPatientImpact", "Kết luận ảnh hưởng", ACT_PATIENT_OPTS, form.patientImpact)}</div><div><label>Xử lý mẫu/kết quả liên quan</label><textarea id="aPatientAction" rows="1" placeholder="VD: Rà soát các mẫu từ 08:00–10:00; chạy lại 3 mẫu...">${deps.esc(form.patientAction || "")}</textarea>${actionSuggestBox("aPatientAction", ACT_SUGGEST.patientAction)}</div></div>`, actionSectionChip(miss.patient), openSet)}
+     ${actionSection("eff", "8", "Đánh giá hiệu lực", "Làm sau thời gian theo dõi; kết luận \"có hiệu lực\" cần đánh giá nguy cơ còn lại", `<div class="action-effectiveness-grid"><div><label>Kết luận hiệu lực</label>${actSel("aEffectivenessStatus", "Kết luận hiệu lực", ACT_EFF_OPTS, form.effectivenessStatus || "pending")}</div><div class="action-effectiveness-date"><label>Ngày đánh giá</label>${deps.dateBox("aEffectivenessDate", form.effectivenessDate || "", "action-date")}</div><div><label>Bằng chứng/nhận xét hiệu lực</label><textarea id="aEffectivenessNote" rows="1" placeholder="VD: Theo dõi 20 lần chạy tiếp theo không tái diễn...">${deps.esc(form.effectivenessNote || "")}</textarea>${actionSuggestBox("aEffectivenessNote", ACT_SUGGEST.effectivenessNote)}</div></div><div class="action-residual-block"><div class="action-release-title"><b>Nguy cơ còn lại sau khắc phục</b><small>Chỉ bắt buộc khi kết luận có hiệu lực; dùng cùng thang điểm và SOP với đánh giá ban đầu</small></div><div class="action-residual-grid"><div><label>Mức độ (S)</label>${actSel("aResidualSeverity", "Mức độ còn lại", ACT_SEVERITY_OPTS, form.residualSeverity, "onchange=\"syncActionResidualRiskScore()\"")}</div><div><label>Khả năng xảy ra (O)</label>${actSel("aResidualOccurrence", "Khả năng xảy ra còn lại", ACT_OCCURRENCE_OPTS, form.residualOccurrence, "onchange=\"syncActionResidualRiskScore()\"")}</div><div><label>Khả năng không phát hiện (D)</label>${actSel("aResidualDetectability", "Khả năng không phát hiện còn lại", ACT_DETECT_OPTS, form.residualDetectability, "onchange=\"syncActionResidualRiskScore()\"")}</div><div><label>Phân loại theo SOP</label>${actSel("aResidualRiskLevel", "Phân loại nguy cơ còn lại", ACT_RISK_LEVEL_OPTS, form.residualRiskLevel, "onchange=\"syncActionResidualRiskScore()\"")}</div><div class="action-risk-result"><label>RPN còn lại</label><div id="aResidualRiskScoreCard" class="action-risk-score risk-${deps.escapeAttr([
+				"low",
+				"medium",
+				"high",
+				"critical"
+			].includes(form.residualRiskLevel) ? form.residualRiskLevel : "none")}" aria-live="polite"><b id="aResidualRiskScore">${deps.actionResidualRiskScore(form) || "—"}</b></div></div><div class="action-residual-basis"><label>Căn cứ đánh giá lại</label><input id="aResidualRiskBasis" placeholder="VD: SOP-QC-07; dữ liệu theo dõi sau khắc phục" value="${deps.escapeAttr(form.residualRiskBasis || "")}">${actionSuggestBox("aResidualRiskBasis", ACT_SUGGEST.residualRiskBasis)}</div></div></div>`, actionEffSectionChip(form), openSet)}
+     <div class="action-form-submit"><div><b>${editing ? "Cập nhật tiến độ hồ sơ" : "Lưu ngay ở trạng thái đang điều tra"}</b><span>Chỉ cần hoàn tất phần nhận diện và kiểm soát tức thời để lưu; phê duyệt chỉ xuất hiện khi hồ sơ đủ điều kiện khép vòng.</span></div><div class="action-submit-buttons">${deps.btn(editing ? "Hủy chỉnh sửa" : "Đóng", "closeActionForm()", "ghost")}${deps.btn(editing ? "Lưu thay đổi" : "Lập hồ sơ NCE", "addAction()", "teal")}</div></div>`;
+			return deps.pres.actionFormPanelPresentation({
+				editing,
+				formOpen,
+				guideButtonHtml: deps.btn("Quy trình 8 bước", "openActionGuide()", "ghost sm"),
+				closedHtml: actionFormClosedHtml(issueCount),
+				formBodyHtml
+			});
+		};
+		return {
+			actionUi,
+			actionSectionToggled,
+			actionDefaultOpenSections,
+			actionRuleOptions,
+			actionStaffOptions,
+			captureActionDraft,
+			actionFormChanged,
+			actionDraftValues,
+			clearActionDraft,
+			actionSourceOptions,
+			actionCausePhrases,
+			actionActionPhrases,
+			actionSuggestRow,
+			actionSuggestBox,
+			actionInsertSuggestion,
+			syncActionSuggestions,
+			actSel,
+			actionLevelLabel,
+			syncActLevels,
+			actionLevelContext,
+			beginActionManual,
+			closeActionForm,
+			actionFormClosedHtml,
+			actionIncidentBanner,
+			beginActionFromIssue,
+			actionFieldValue,
+			readActionProtocolForm,
+			actionEffectivenessMissingKey,
+			addAction,
+			syncActionRiskScore,
+			syncActionResidualRiskScore,
+			editAction,
+			actionInvestigationField,
+			actionInvestigationChoiceLabel,
+			actionInvestigationStateClass,
+			actionInvestigationChoose,
+			actionInvestigationSync,
+			actionChecklistRefresh,
+			actionSectionChip,
+			actionChecklistChip,
+			actionEffSectionChip,
+			actionUpdateSectionChip,
+			actionRefreshSectionChips,
+			actionSection,
+			actionFormModel,
+			actionFormDefaults,
+			focusActionField,
+			actionBiasInfo,
+			actionBiasContext,
+			actionLatestSigmaBias,
+			actionFillBias,
+			actionBiasThresholdHtml,
+			actionBiasReferenceHtml,
+			actionUpdateBiasHint,
+			actionFormHtml
+		};
+	}
+	//#endregion
+	//#region src/presentation/actions/actions-page-controller.ts
+	/**
+	* Trang "Khắc phục sự cố" trừ phần form: danh sách sự cố cần xử lý, vòng đời hồ sơ
+	* NCE (duyệt/trả lại/hủy có lưu vết/escalate/mở lại) cùng token khóa phiên bản,
+	* phiếu chi tiết và các khối dựng bằng chứng. Phần DỰNG VÀ ĐỌC LẠI form 8 mục nằm ở
+	* action-form-controller.ts — pageActionsV4() gọi sang deps.formHtml() (không import
+	* trực tiếp file kia, vì đường cắt cố ý KHÔNG một chiều: form cũng gọi ngược
+	* actionEvidenceTimelineHtml/actionRerunEvidenceHtml/actionLevelShort của trang này).
+	* Việc nối hai chiều này do modular-pilot.global.ts lo (dựng controller này trước với
+	* deps.formHtml trỏ qua một biến tham chiếu được gán sau khi action-form-controller.ts
+	* dựng xong).
+	*
+	* `document` là getter LAZY, cùng lý do với entry/manage: một số test đổi `document`
+	* giữa các bước.
+	*/
+	function createActionsPageController(deps) {
+		const state = () => deps.getState();
+		const doc = () => deps.document();
+		const actionLevelShort = (t, level, lotSnap) => deps.ActionListPresentation.levelShort(t, level, lotSnap);
+		const currentIssues = () => deps.ActionCurrentIssues();
+		const nceCommandUser = () => {
+			const user = deps.currentUser();
+			return {
+				id: user && user.id || "",
+				username: user && user.username || "",
+				name: deps.userName()
+			};
+		};
+		const cancelAction = async (i) => {
+			if (!deps.requireAdmin()) return;
+			const a = state().actions && state().actions[i];
+			if (!a) return;
+			const readiness = deps.ActionReviewService.cancelReadiness(a);
+			if (!readiness.ok) {
+				await deps.infoDialog(actionReviewReadinessMessage("cancel", {
+					...readiness,
+					action: a
+				}, false));
+				return;
+			}
+			const id = a.id, token = actionApprovalToken(a);
+			if (!await deps.reauthenticateCurrentUser({
+				title: "Xác thực hủy hồ sơ NCE",
+				message: "Nhập lại mật khẩu trước khi hủy hồ sơ. Toàn bộ nội dung vẫn được giữ lại trong nhật ký."
+			})) return;
+			const current = (state().actions || []).find((x) => x.id === id);
+			if (!current || actionApprovalToken(current) !== token) {
+				await deps.infoDialog("Hồ sơ đã thay đổi trong lúc xác thực. Vui lòng kiểm tra lại trước khi hủy.");
+				return;
+			}
+			deps.openModal(deps.pres.actionCancelModalHtml({
+				closeButtonHtml: deps.btn("Đóng", "closeModal()", "ghost"),
+				cancelButtonHtml: deps.btn("Hủy hồ sơ", `confirmCancelAction('${deps.jsq(current.id)}','${deps.jsq(token)}')`, "danger")
+			}));
+			setTimeout(() => {
+				const e = doc().getElementById("actionCancelReason");
+				if (e) e.focus();
+			}, 50);
+		};
+		const confirmCancelAction = (id, token) => {
+			const a = (state().actions || []).find((x) => x.id === id);
+			if (!a) {
+				deps.closeModal();
+				return;
+			}
+			if (deps.role() !== "admin") {
+				deps.closeModal();
+				deps.infoDialog("Chỉ quản trị viên mới được hủy hồ sơ NCE.");
+				return;
+			}
+			if (actionApprovalToken(a) !== token) {
+				deps.closeModal();
+				deps.infoDialog("Hồ sơ đã thay đổi. Vui lòng mở lại và kiểm tra trước khi hủy.");
+				return;
+			}
+			const readiness = deps.ActionReviewService.cancelReadiness(a);
+			if (!readiness.ok) {
+				deps.closeModal();
+				if (readiness.reason === "cancelled") {
+					deps.rerender();
+					return;
+				}
+				deps.infoDialog(actionReviewReadinessMessage("cancel", {
+					...readiness,
+					action: a
+				}, true));
+				return;
+			}
+			const input = doc().getElementById("actionCancelReason"), reason = deps.QCCore.cleanText(input ? input.value : "", 1e3).trim();
+			if (reason.length < 5) {
+				const err = doc().getElementById("actionCancelErr");
+				if (err) err.style.display = "";
+				return;
+			}
+			deps.closeModal();
+			if (!deps.NceLifecycleWorkflowCommand.execute({
+				kind: "cancel",
+				id: a.id,
+				token,
+				note: reason,
+				user: nceCommandUser(),
+				audit: () => ({
+					action: "Hủy hồ sơ NCE",
+					detail: `${a.nceId || a.id || "NCE"} · ${reason}`,
+					target: a.testId ? (state().tests.find((t) => t.id === a.testId) || {}).name || "Khắc phục" : "Khắc phục"
+				})
+			}).ok) {
+				deps.closeModal();
+				deps.rerender();
+				return;
+			}
+			if (deps.actionFormUiState.editId === a.id) deps.actionFormUiState.reset();
+			deps.rerender();
+		};
+		const actionApprovalTag = (a) => {
+			const s = deps.actionApprovalStatus(a), view = deps.ActionReviewPresentation.approvalTag(s, deps.actionCancelled(a)), label = deps.actionApprovalLabel(a);
+			return deps.pres.actionApprovalTagPresentation(view, label);
+		};
+		const actionApprovalToken = (a) => deps.ActionReviewService.reviewToken(a);
+		const actionApprovalReadinessMessage = (r, afterAuth) => deps.ActionReviewMessages.approval(r, afterAuth);
+		const actionReviewReadinessMessage = (kind, r, afterAuth) => deps.ActionReviewMessages.review(kind, r, afterAuth);
+		const approveAction = async (i) => {
+			if (!deps.requireAdmin()) return;
+			const a = state().actions && state().actions[i];
+			if (!a) return;
+			const approvalId = a.id, preAuthToken = actionApprovalToken(a), readiness = deps.ActionReviewService.approvalReadiness(a, deps.currentUser());
+			if (!readiness.ok) {
+				await deps.infoDialog(actionApprovalReadinessMessage(readiness, false));
+				return;
+			}
+			if (!await deps.reauthenticateCurrentUser({
+				title: "Xác thực người duyệt",
+				message: "Nhập lại mật khẩu trước khi duyệt hành động khắc phục."
+			})) return;
+			const current = (state().actions || []).find((x) => x.id === approvalId);
+			if (!current || actionApprovalToken(current) !== preAuthToken) {
+				await deps.infoDialog("Hồ sơ đã thay đổi trong lúc xác thực. Vui lòng kiểm tra lại trước khi duyệt.");
+				return;
+			}
+			const token = actionApprovalToken(current);
+			deps.openModal(deps.pres.actionReviewNoteModalHtml({
+				title: "Duyệt hành động khắc phục",
+				label: "Ý kiến duyệt (tối thiểu 3 ký tự)",
+				placeholder: "Nhận xét về hành động khắc phục...",
+				errorText: "Cần nhập ý kiến duyệt tối thiểu 3 ký tự.",
+				closeButtonHtml: deps.btn("Đóng", "closeModal()", "ghost"),
+				submitButtonHtml: deps.btn("Duyệt", `confirmApproveAction('${deps.jsq(current.id)}','${deps.jsq(token)}')`, "teal")
+			}));
+			setTimeout(() => {
+				const e = doc().getElementById("actionNoteInput");
+				if (e) e.focus();
+			}, 50);
+		};
+		const confirmApproveAction = (id, token) => {
+			const a = (state().actions || []).find((x) => x.id === id);
+			if (!a) {
+				deps.closeModal();
+				return;
+			}
+			if (deps.role() !== "admin") {
+				deps.closeModal();
+				deps.infoDialog("Chỉ quản trị viên mới được duyệt hồ sơ.");
+				return;
+			}
+			if (actionApprovalToken(a) !== token) {
+				deps.closeModal();
+				deps.infoDialog("Hồ sơ hoặc bằng chứng QC đã thay đổi. Vui lòng mở lại và kiểm tra trước khi duyệt.");
+				return;
+			}
+			const readiness = deps.ActionReviewService.approvalReadiness(a, deps.currentUser());
+			if (!readiness.ok) {
+				deps.closeModal();
+				deps.infoDialog(actionApprovalReadinessMessage(readiness, true));
+				return;
+			}
+			const input = doc().getElementById("actionNoteInput");
+			const note = deps.QCCore.cleanText(input ? input.value : "", 1e3).trim();
+			if (note.length < 3) {
+				const err = doc().getElementById("actionNoteErr");
+				if (err) err.style.display = "";
+				return;
+			}
+			deps.closeModal();
+			if (!deps.NceLifecycleWorkflowCommand.execute({
+				kind: "approve",
+				id: a.id,
+				token,
+				note,
+				user: nceCommandUser(),
+				audit: () => ({
+					action: "Duyệt khắc phục",
+					detail: `${a.rule || "—"} · ${note}`,
+					target: a.testId ? (state().tests.find((t) => t.id === a.testId) || {}).name || "Khắc phục" : "Khắc phục"
+				})
+			}).ok) {
+				deps.closeModal();
+				deps.rerender();
+				return;
+			}
+		};
+		const returnAction = async (i) => {
+			if (!deps.requireAdmin()) return;
+			const a = state().actions && state().actions[i];
+			if (!a) return;
+			const readiness = deps.ActionReviewService.returnReadiness(a);
+			if (!readiness.ok) {
+				await deps.infoDialog(actionReviewReadinessMessage("return", readiness, false));
+				return;
+			}
+			const returnId = a.id, preAuthToken = actionApprovalToken(a);
+			if (!await deps.reauthenticateCurrentUser({
+				title: "Xác thực người trả lại",
+				message: "Nhập lại mật khẩu trước khi trả lại hành động khắc phục."
+			})) return;
+			const current = (state().actions || []).find((x) => x.id === returnId);
+			if (!current || actionApprovalToken(current) !== preAuthToken || !deps.ActionReviewService.returnReadiness(current).ok) {
+				await deps.infoDialog("Hồ sơ đã thay đổi trong lúc xác thực. Vui lòng kiểm tra lại trước khi trả lại.");
+				return;
+			}
+			const token = actionApprovalToken(current);
+			deps.openModal(deps.pres.actionReviewNoteModalHtml({
+				title: "Trả lại hành động khắc phục",
+				label: "Lý do trả lại (tối thiểu 3 ký tự)",
+				placeholder: "Vì sao trả lại hành động khắc phục này...",
+				errorText: "Cần nhập lý do tối thiểu 3 ký tự.",
+				closeButtonHtml: deps.btn("Đóng", "closeModal()", "ghost"),
+				submitButtonHtml: deps.btn("Trả lại", `confirmReturnAction('${deps.jsq(current.id)}','${deps.jsq(token)}')`, "danger")
+			}));
+			setTimeout(() => {
+				const e = doc().getElementById("actionNoteInput");
+				if (e) e.focus();
+			}, 50);
+		};
+		const confirmReturnAction = (id, token) => {
+			const a = (state().actions || []).find((x) => x.id === id);
+			if (!a) {
+				deps.closeModal();
+				return;
+			}
+			if (deps.role() !== "admin") {
+				deps.closeModal();
+				deps.infoDialog("Chỉ quản trị viên mới được trả lại hồ sơ.");
+				return;
+			}
+			if (actionApprovalToken(a) !== token) {
+				deps.closeModal();
+				deps.infoDialog("Hồ sơ hoặc bằng chứng QC đã thay đổi. Vui lòng mở lại và kiểm tra trước khi trả lại.");
+				return;
+			}
+			const readiness = deps.ActionReviewService.returnReadiness(a);
+			if (!readiness.ok) {
+				deps.closeModal();
+				deps.infoDialog(actionReviewReadinessMessage("return", readiness, true));
+				return;
+			}
+			const input = doc().getElementById("actionNoteInput");
+			const note = deps.QCCore.cleanText(input ? input.value : "", 1e3).trim();
+			if (note.length < 3) {
+				const err = doc().getElementById("actionNoteErr");
+				if (err) err.style.display = "";
+				return;
+			}
+			deps.closeModal();
+			if (!deps.NceLifecycleWorkflowCommand.execute({
+				kind: "return",
+				id: a.id,
+				token,
+				note,
+				user: nceCommandUser(),
+				audit: () => ({
+					action: "Trả lại khắc phục",
+					detail: `${a.rule || "—"} · ${note}`,
+					target: a.testId ? (state().tests.find((t) => t.id === a.testId) || {}).name || "Khắc phục" : "Khắc phục"
+				})
+			}).ok) {
+				deps.closeModal();
+				deps.rerender();
+				return;
+			}
+		};
+		const actionCanEscalate = (a) => deps.ActionEscalationService.canEscalate(state().actions || [], a);
+		const escalateAction = async (i) => {
+			if (!deps.requireWrite()) return;
+			const a = state().actions && state().actions[i];
+			if (!a) return;
+			if (!actionCanEscalate(a)) {
+				await deps.infoDialog("Chỉ mở hồ sơ tiếp theo cho hồ sơ đã kết luận \"chưa hiệu lực\" và chưa từng chuyển.");
+				return;
+			}
+			const t = state().tests.find((x) => x.id === a.testId), parent = a.nceId || "hồ sơ trước";
+			if (!await deps.confirmDialog({
+				kicker: "Vòng điều tra mới",
+				title: "Lập hồ sơ NCE tiếp theo?",
+				message: `Hành động của ${parent} được kết luận chưa hiệu lực. Mở một hồ sơ mới để điều tra lại cùng sự cố này?`,
+				detail: "Hồ sơ cũ sẽ được khép lại với kết luận \"chưa hiệu lực — đã chuyển\", giữ nguyên toàn bộ nội dung điều tra.",
+				confirmLabel: "Lập hồ sơ tiếp theo",
+				cancelLabel: "Hủy"
+			})) return;
+			const result = deps.NceLifecycleWorkflowCommand.execute({
+				kind: "escalate",
+				id: a.id,
+				user: nceCommandUser(),
+				audit: (record) => ({
+					action: "Lập hồ sơ NCE tiếp theo",
+					detail: `${record.nceId} · nối tiếp ${parent} (hành động chưa hiệu lực)`,
+					target: t ? t.name : "Khắc phục"
+				})
+			}), record = result.ok && result.record;
+			if (!record) {
+				await deps.infoDialog("Hồ sơ đã thay đổi và không còn đủ điều kiện mở vòng tiếp theo.");
+				return;
+			}
+			deps.actionFormUiState.edit(record.id);
+			deps.rerender();
+			const panel = doc().querySelector(".action-form-panel");
+			if (panel) panel.scrollIntoView({
+				behavior: "smooth",
+				block: "start"
+			});
+		};
+		const actionCanReopen = (a) => deps.ActionReviewService.canReopen(a);
+		const reopenAction = async (i) => {
+			if (!deps.requireAdmin()) return;
+			const a = state().actions && state().actions[i];
+			if (!a) return;
+			if (!actionCanReopen(a)) {
+				await deps.infoDialog("Chỉ mở lại được hồ sơ đã duyệt nhưng không còn đủ điều kiện khép vòng. Hồ sơ đã khép vòng hợp lệ thì mở hồ sơ NCE mới.");
+				return;
+			}
+			if (!await deps.reauthenticateCurrentUser({
+				title: "Xác thực mở lại hồ sơ",
+				message: "Nhập lại mật khẩu trước khi mở lại hồ sơ đã duyệt."
+			})) return;
+			deps.openModal(deps.pres.actionReopenModalHtml({
+				workflowLabelHtml: deps.esc(deps.actionWorkflowStatus(a).label),
+				closeButtonHtml: deps.btn("Đóng", "closeModal()", "ghost"),
+				reopenButtonHtml: deps.btn("Mở lại hồ sơ", `confirmReopenAction(${i})`, "danger")
+			}));
+			setTimeout(() => {
+				const e = doc().getElementById("actionNoteInput");
+				if (e) e.focus();
+			}, 50);
+		};
+		const confirmReopenAction = (i) => {
+			const a = state().actions && state().actions[i];
+			if (!a) {
+				deps.closeModal();
+				return;
+			}
+			if (!actionCanReopen(a)) {
+				deps.closeModal();
+				deps.rerender();
+				return;
+			}
+			const input = doc().getElementById("actionNoteInput");
+			const note = deps.QCCore.cleanText(input ? input.value : "", 1e3).trim();
+			if (note.length < 5) {
+				const err = doc().getElementById("actionNoteErr");
+				if (err) err.style.display = "";
+				return;
+			}
+			deps.closeModal();
+			if (!deps.NceLifecycleWorkflowCommand.execute({
+				kind: "reopen",
+				id: a.id,
+				note,
+				user: nceCommandUser(),
+				audit: () => ({
+					action: "Mở lại hồ sơ NCE",
+					detail: `${a.nceId || a.rule || "—"} · ${note}`,
+					target: a.testId ? (state().tests.find((t) => t.id === a.testId) || {}).name || "Khắc phục" : "Khắc phục"
+				})
+			}).ok) {
+				deps.closeModal();
+				deps.rerender();
+				return;
+			}
+		};
+		const actionReviewButtons = (i, a) => {
+			const s = deps.actionApprovalStatus(a), wf = deps.actionWorkflowStatus(a);
+			const model = deps.ActionReviewPresentation.buttons(a, {
+				approval: s,
+				workflowStage: wf.stage,
+				cancelled: deps.actionCancelled(a),
+				isAdmin: deps.role() === "admin",
+				canWrite: deps.canWrite(),
+				canEscalate: actionCanEscalate(a),
+				canReopen: actionCanReopen(a)
+			});
+			return deps.pres.actionReviewButtonsHtml(i, model);
+		};
+		const actionSideChips = (a, stage) => {
+			if (deps.actionCancelled(a)) return "";
+			const chips = deps.ActionStatusPresentation.sideChips(a, stage, deps.actionRerunStatus(a), deps.actionOverdue(a), deps.actionEffectivenessStatus(a));
+			return deps.pres.actionSideChipsHtml(chips);
+		};
+		const actionDetailCheck = (label, status, note) => {
+			const view = deps.ActionStatusPresentation.detailCheck(status);
+			return deps.pres.actionDetailCheckHtml(label, view, note);
+		};
+		const actionEvidenceTimelineHtml = (a, rr) => {
+			const items = deps.ActionEvidencePresentation.timeline(a, rr);
+			return deps.pres.actionEvidenceTimelinePresentation(items);
+		};
+		const actionRerunEvidenceHtml = (a, rr, t) => {
+			const evidence = deps.ActionRerunEvidencePresentation.model(a, rr, t);
+			return deps.pres.actionRerunEvidencePresentation(evidence, a.testId, t);
+		};
+		const openActionQcEvidence = (tid, level, pointId, date, lot) => {
+			if (deps.currentPage() === "actions") deps.captureFormDraft();
+			deps.closeModal();
+			const entryUi = deps.entryUi();
+			entryUi.entrySel = {
+				testId: tid,
+				level: +level
+			};
+			entryUi.entryStart = date || null;
+			entryUi.entryEnd = date || null;
+			entryUi.entryLastMsg = `<div class="alert ok">Đang hiển thị điểm QC được dùng làm bằng chứng ngày ${deps.esc(deps.vnDate(date))}.</div>`;
+			entryUi.entryDetailOpen.add("points");
+			const t = state().tests.find((x) => x.id === tid), l = t && deps.lvlCfg(t, +level);
+			if (l && lot && String(lot) !== String(l.lot || "")) entryUi.entryPrevOpen.set(tid + "|" + level, lot);
+			deps.go("entry");
+			requestAnimationFrame(() => requestAnimationFrame(() => {
+				const row = [...doc().querySelectorAll("[data-qc-point-id]")].find((x) => x.dataset.qcPointId === String(pointId));
+				if (!row) return;
+				row.classList.add("qc-point-evidence-focus");
+				row.scrollIntoView({
+					behavior: "smooth",
+					block: "center"
+				});
+				row.focus({ preventScroll: true });
+			}));
+		};
+		const viewActionDetail = (i) => {
+			const a = state().actions && state().actions[i], t = a && state().tests.find((x) => x.id === a.testId);
+			if (!a) return;
+			const LABELS = deps.ACTION_LABELS();
+			const legacy = !a.protocolVersion, modern = a.protocolVersion >= 2, rr = deps.actionRerunStatus(a), wf = deps.actionWorkflowStatus(a), eff = deps.actionEffectivenessStatus(a), residual = deps.actionResidualRiskScore(a), overdue = deps.actionOverdue(a);
+			const verdict = actionQcVerdictLabel(a), violation = actionViolationInfo(a), metaRows = deps.ActionDetailPresentation.meta(a, {
+				testName: t ? deps.testDisplayName(t) : "—",
+				levelShort: actionLevelShort(t, a.level, a.lot),
+				verdict,
+				violation,
+				riskScore: deps.actionRiskScore(a),
+				dueDate: a.dueDate ? deps.vnDate(a.dueDate) : "—",
+				overdueLabel: overdue.overdue ? overdue.label : "",
+				workflowLabel: wf.label
+			}), meta = deps.pres.actionDetailMetaHtml(metaRows);
+			const cancelledAlert = deps.pres.actionCancelledAlertHtml(deps.actionCancelled(a) ? {
+				reason: a.cancelReason,
+				by: a.cancelledBy,
+				at: a.cancelledAt ? deps.formatDateTimeVN(a.cancelledAt) : ""
+			} : void 0);
+			const legacyDetail = deps.pres.actionLegacyDetailHtml({
+				action: a.action || "",
+				owner: a.by || "",
+				rerunLabel: rr.label || "",
+				approvalLabel: deps.actionApprovalLabel(a)
+			});
+			const body = legacy ? `${cancelledAlert}<div class="alert warn">Bản ghi được tạo trước khi có phiếu điều tra 8 bước. Dữ liệu hành động cũ vẫn được giữ nguyên.</div>${meta}${legacyDetail}` : `
+    ${cancelledAlert}${meta}${actionEvidenceTimelineHtml(a, rr)}${actionRerunEvidenceHtml(a, rr, t)}
+    <ol class="action-detail-steps">
+      ${deps.pres.actionContainmentDetailHtml({
+				status: LABELS.containment[a.containmentStatus] || "",
+				correction: a.correction || "",
+				note: a.containmentNote || "",
+				modern
+			})}
+      ${deps.pres.actionInspectionDetailsHtml([
+				{
+					title: "Kiểm tra vật liệu QC",
+					checksHtml: actionDetailCheck("Hạn dùng, bảo quản, hoàn nguyên và chuẩn bị", a.qcMaterialStatus, a.qcMaterialNote)
+				},
+				{
+					title: "Kiểm tra máy phân tích",
+					checksHtml: actionDetailCheck("Điện, nước, nhiệt độ, cảnh báo và bảo trì", a.instrumentStatus, a.instrumentNote)
+				},
+				{
+					title: "Kiểm tra hóa chất / calibrator",
+					checksHtml: actionDetailCheck("Hạn dùng, số lô, bảo quản và lot-to-lot", a.reagentStatus, a.reagentNote) + actionDetailCheck("So sánh lot-to-lot", a.lotToLotStatus, a.lotToLotNote)
+				},
+				{
+					title: "Kiểm tra hiệu chuẩn",
+					checksHtml: actionDetailCheck("Tình trạng hiệu chuẩn", a.calibrationStatus, a.calibrationNote)
+				}
+			])}
+      ${deps.pres.actionCauseDetailHtml({
+				cause: a.cause || "",
+				action: a.action || "",
+				completedDate: a.actionCompletedDate ? deps.vnDate(a.actionCompletedDate) : "",
+				release: a.protocolVersion >= 3 && a.containmentStatus === "held" ? {
+					status: LABELS.release[a.releaseStatus] || "",
+					details: a.releaseDate || a.releaseBy || a.releaseNote ? `${a.releaseDate ? deps.vnDate(a.releaseDate) + " · " : ""}${a.releaseBy || "Chưa ghi người cho phép"}${a.releaseNote ? " · " + a.releaseNote : ""}` : ""
+				} : void 0
+			})}
+      ${deps.pres.actionPatientImpactHtml(LABELS.patient[a.patientImpact] || "", a.patientAction || "")}
+      ${deps.pres.actionEffectivenessDetailHtml({
+				effectiveness: modern ? eff.label : a.cause || "—",
+				note: modern && a.effectivenessNote ? `${a.effectivenessDate ? deps.vnDate(a.effectivenessDate) + " · " : ""}${a.effectivenessNote}${a.effectivenessBy ? " · " + a.effectivenessBy : ""}` : "",
+				residual: +a.protocolVersion >= 3 && residual ? {
+					risk: LABELS.risk[a.residualRiskLevel] || "",
+					score: residual,
+					basis: a.residualRiskBasis || ""
+				} : void 0,
+				returned: a.returnNote ? `${a.returnNote}${a.returnBy ? " — " + a.returnBy : ""}${a.returnAt ? " · " + deps.formatDateTimeVN(a.returnAt) : ""}` : "",
+				followUpNceId: a.followUpNceId || "",
+				parentNceId: a.parentNceId || "",
+				approval: `${deps.actionApprovalLabel(a)}${a.approvedBy ? " · " + a.approvedBy : ""}`,
+				workflow: wf.label
+			})}
+    </ol>`;
+			deps.openModal(deps.pres.actionDetailModalHtml({
+				bodyHtml: body,
+				closeButtonHtml: deps.btn("Đóng", "closeModal()", "teal")
+			}));
+		};
+		const openActionGuide = () => {
+			const content = deps.pres.actionGuideContent(deps.ActionGuidePresentation.steps);
+			deps.openModal(deps.modalTemplate({
+				title: "Quy trình 8 bước xử lý hồ sơ NCE",
+				body: content.body,
+				footer: content.footer,
+				cls: "action-guide-modal",
+				bodyClass: ""
+			}));
+		};
+		const groupIssuesByTestDate = (issues) => deps.ActionListPresentation.groupIssuesByTestDate(issues);
+		const issueRowHtml = (o) => {
+			const rules = o.rules.join(", "), err = deps.errorType(o.rules), hint = deps.fixHint(o.rules), wf = deps.pointWorkflowSummary(o.p.id), acts = deps.pointRealActions(o.p.id) || [], latest = acts[acts.length - 1], idx = latest ? (state().actions || []).indexOf(latest) : -1;
+			const sideChips = latest ? actionSideChips(latest, deps.actionWorkflowStatus(latest).stage) : "";
+			const foot = latest ? `${latest.nceId ? deps.esc(latest.nceId) + " · " : ""}Phụ trách: ${deps.esc(latest.by || "—")}${latest.dueDate ? " · hạn " + deps.vnDate(latest.dueDate) : ""}` : hint;
+			return deps.pres.actionIssueRowPresentation({
+				severity: o.f.level,
+				level: actionLevelShort(o.t, o.l.level, o.l.lot),
+				state: deps.stateName(o.f.level),
+				value: deps.fmtPointValue(o.p, o.t),
+				unit: o.t.unit || "",
+				rules,
+				error: err,
+				workflowClass: wf.cls,
+				workflowLabel: wf.label,
+				sideChips,
+				footer: foot,
+				action: deps.canWrite() ? idx >= 0 ? {
+					kind: "continue",
+					index: idx
+				} : {
+					kind: "create",
+					testId: o.t.id,
+					level: o.l.level,
+					rules,
+					error: err,
+					hint,
+					pointId: o.p.id || "",
+					date: o.p.date || ""
+				} : void 0
+			});
+		};
+		const actionViolationInfo = (a) => deps.ActionViolationService.info(a);
+		const actionQcVerdictLabel = (a) => deps.ActionViolationService.verdictLabel(a);
+		const openActionIssueHtml = (a, idx) => {
+			const t = state().tests.find((x) => x.id === a.testId), wf = deps.actionWorkflowStatus(a), violation = actionViolationInfo(a), title = a.nceId || "Hồ sơ khắc phục", context = t ? `${deps.testDisplayName(t)} · ${actionLevelShort(t, a.level, a.lot)}` : violation.rule || "Sự cố", primary = a.correction || a.action || "Đang điều tra", verdict = actionQcVerdictLabel(a);
+			return deps.pres.actionOpenIssuePresentation({
+				severity: wf.cls === "rej" ? "rej" : "warn",
+				title,
+				context,
+				date: deps.vnDate(deps.actionEventDate(a)),
+				verdict,
+				rule: violation.rule,
+				errorType: violation.errorType,
+				workflowClass: wf.cls,
+				workflowLabel: wf.label,
+				sideChips: actionSideChips(a, wf.stage),
+				primary,
+				owner: a.by || "",
+				dueDate: a.dueDate ? deps.vnDate(a.dueDate) : "",
+				editable: deps.canWrite(),
+				index: idx
+			});
+		};
+		const actionIssueGroupHtml = (model) => deps.pres.actionIssueGroupPresentation(model);
+		const pageActionsV4 = () => {
+			const issues = currentIssues(), activePointIds = new Set(issues.map((o) => o.p.id));
+			const violationHtml = groupIssuesByTestDate(issues).map((g) => actionIssueGroupHtml({
+				severity: g.worst,
+				title: deps.testDisplayName(g.t),
+				date: deps.vnDate(g.date),
+				count: g.items.length,
+				countLabel: "vi phạm",
+				itemsHtml: g.items.map(issueRowHtml).join("")
+			})).join("");
+			const openActions = (state().actions || []).map((a, idx) => ({
+				a,
+				idx
+			})).filter(({ a }) => !deps.actionCancelled(a) && deps.actionRecorded(a) && !deps.actionWorkflowStatus(a).complete && (!a.pointId || !activePointIds.has(a.pointId)));
+			const issueHtml = violationHtml + (openActions.length ? actionIssueGroupHtml({
+				severity: "warn",
+				title: "Hồ sơ NCE đang mở",
+				date: "Cần tiếp tục xử lý",
+				count: openActions.length,
+				countLabel: "hồ sơ",
+				itemsHtml: openActions.map(({ a, idx }) => openActionIssueHtml(a, idx)).join("")
+			}) : "") || "<div class=\"alert ok\">Không có vi phạm/cảnh báo hoặc hồ sơ NCE đang mở.</div>";
+			const rows = (state().actions || []).slice().reverse().map((a, idx) => {
+				const realIdx = state().actions.length - 1 - idx, t = state().tests.find((x) => x.id === a.testId), wf = deps.actionWorkflowStatus(a), approval = deps.actionApprovalStatus(a), openedAt = a.createdAt ? deps.formatDateTimeVN(a.createdAt) : "", primary = a.action || a.correction || "Đang điều tra";
+				const approveMeta = approval === "pending" ? "" : `<div class="action-note">${deps.esc(a.approvedBy || "")} ${a.approvedAt ? deps.formatDateTimeVN(a.approvedAt) : ""}${a.approvalNote ? " · " + deps.esc(a.approvalNote) : ""}</div>`;
+				const identity = `${a.nceId ? deps.esc(a.nceId) + " · " : ""}${t ? deps.esc(deps.testDisplayName(t)) : deps.esc(a.rule || "Cập nhật")}`, sub = t ? deps.esc(actionLevelShort(t, a.level, a.lot)) : deps.esc(a.lot ? "Nhóm lô " + a.lot : "—"), rule = t ? (actionQcVerdictLabel(a) ? deps.esc(actionQcVerdictLabel(a)) + " · " : "") + deps.esc(actionViolationInfo(a).rule) + " · " + deps.esc(actionViolationInfo(a).errorType) : deps.esc(a.errorType || "—");
+				const model = {
+					date: deps.vnDate(deps.actionEventDate(a)),
+					openedAt,
+					identity,
+					sub,
+					rule,
+					primary,
+					owner: a.by || "",
+					dueDate: a.dueDate ? deps.vnDate(a.dueDate) : "",
+					workflowClass: wf.cls,
+					workflowLabel: wf.label,
+					sideChips: actionSideChips(a, wf.stage),
+					approvalTag: !deps.actionCancelled(a) && approval !== "pending" ? actionApprovalTag(a) : "",
+					approvalMeta: approveMeta,
+					actions: actionReviewButtons(realIdx, a)
+				};
+				return deps.pres.actionLogRowPresentation(model);
+			}).join("");
+			const head = deps.headOnly("Khắc phục sự cố", "Điều tra nguyên nhân, ghi nhận, chạy lại QC và phê duyệt khép vòng"), issuesPanel = deps.pres.actionIssuesPanelHtml(issueHtml), formPanel = deps.formHtml(issues.length), logPanel = deps.pres.actionLogPanelHtml(rows);
+			return deps.pres.actionPageHtml({
+				headHtml: head,
+				issuesHtml: issuesPanel,
+				formHtml: formPanel,
+				logHtml: logPanel
+			});
+		};
+		return {
+			actionLevelShort,
+			currentIssues,
+			cancelAction,
+			confirmCancelAction,
+			actionApprovalTag,
+			actionApprovalToken,
+			approveAction,
+			confirmApproveAction,
+			returnAction,
+			confirmReturnAction,
+			actionCanEscalate,
+			escalateAction,
+			actionCanReopen,
+			reopenAction,
+			confirmReopenAction,
+			actionReviewButtons,
+			actionSideChips,
+			actionDetailCheck,
+			actionEvidenceTimelineHtml,
+			actionRerunEvidenceHtml,
+			openActionQcEvidence,
+			viewActionDetail,
+			openActionGuide,
+			groupIssuesByTestDate,
+			issueRowHtml,
+			actionViolationInfo,
+			actionQcVerdictLabel,
+			openActionIssueHtml,
+			actionIssueGroupHtml,
+			pageActionsV4
+		};
+	}
+	//#endregion
+	//#region src/presentation/sigma/sigma-page-controller.ts
+	/**
+	* Trang Six Sigma (chuẩn EQC: Sigma=(TEa-|Bias EQC|)/CV IQC). Lớp giải TEa
+	* (bảng TEa hiệu lực, khớp xét nghiệm ↔ dòng tham chiếu, quy tắc CLIA, ảnh
+	* chụp truy vết TEa) sống ở `src/domain/sigma/sigma-tea-resolution.ts` —
+	* KHÔNG đưa các hàm sgTea…/effectiveTeaRefs() về đây, ranh giới đó được
+	* `tests/ui-route-structure.test.js` chốt lại.
+	*
+	* `document`/`window` là getter LAZY, cùng lý do với các controller trước.
+	*/
+	function createSigmaPageController(deps) {
+		const state = () => deps.getState();
+		const ui = () => deps.ui();
+		const doc = () => deps.document();
+		const SG_MU_MODEL_NOTE = "Mô hình <b>top-down</b> (ISO/TS 20914 · Nordtest TR 537): <b>u(Rw)</b> là CV% dài hạn của IQC (cùng cohort một lô đang dùng cho Sigma), <b>u(bias)</b> = √(Bias² + u(Cref)²) từ các vòng EQA/EQC, <b>u(cal)</b> chép từ CoA của calibrator. u<sub>c</sub> = √(Σu²) và <b>U = 2·u<sub>c</sub></b> (xấp xỉ 95%).";
+		const sgZone = (s) => deps.SigmaPresentation.sigmaZone(s);
+		const sgFmtDPMO = (n) => deps.SigmaPresentation.formatSigmaDpmo(n);
+		const sgData = (tid) => {
+			const s = state();
+			s.sigmaData = s.sigmaData || {};
+			s.sigmaData[tid] = s.sigmaData[tid] || [];
+			return s.sigmaData[tid];
+		};
+		const sgInputValue = (v) => deps.escapeAttr(v ?? "");
+		const sgInputDisplayValue = (v, digits = 2) => deps.pres.sigmaInputDisplayValue(v, digits);
+		const sgCleanCell = (field, val) => deps.SigmaLevelEditService.clean(field, val);
+		const sgBiasVal = (L) => L.biasEqa ?? L.bias;
+		const sgIsAutoCV = (L) => !!L && ["iqc-period", "iqc-cohort"].includes(L.cvSource);
+		const sgReadiness = (L) => deps.SigmaPresentation.sigmaReadiness(L);
+		const sgBiasRefU = (rounds) => deps.SigmaBiasService.referenceUncertainty(rounds);
+		const sgMuBiasMode = (L) => L && L.muBiasMode === "exclude" ? "exclude" : "include";
+		const sgMU = (t, e, level, tea, refs) => {
+			const L = e && e.lv && e.lv[level] || {}, teaNum = Number(tea);
+			return deps.QCCore.uncertaintyBudget({
+				cv: L.cv,
+				bias: sgBiasVal(L),
+				biasRefU: sgBiasRefU(L.eqaRounds),
+				uCal: L.uCal,
+				includeBias: sgMuBiasMode(L) === "include",
+				tea: Number.isFinite(teaNum) && teaNum > 0 ? teaNum : deps.sgEntryTea(t, e, level, refs),
+				target: deps.sgLevelTarget(t, L, level),
+				k: 2
+			});
+		};
+		const sgComp = (t, e, level, refs) => deps.SigmaPeriodViewModel.comp(t, e, level, refs);
+		let sgPendingRows = null;
+		const sgRows = (t, data, levels) => deps.SigmaPeriodViewModel.rows(t, data, levels, deps.effectiveTeaRefs());
+		const sgSyncCurrentPeriodTea = (t) => deps.SigmaTeaSnapshotService.syncCurrent(t, sgData(t.id), deps.isoMonth(), deps.sgTeaSnapshot, deps.sgSetLevelTeaSnapshot);
+		const sgReconcileAllTeaSnapshots = () => deps.SigmaTeaSnapshotService.reconcile(sgTrackedTests(), (t) => sgData(t.id), deps.isoMonth(), deps.sgTeaSnapshot, deps.sgSetLevelTeaSnapshot);
+		const sgSetTea = (v) => {
+			if (!deps.requireWrite()) return;
+			const t = state().tests.find((x) => x.id === ui().sgTest);
+			if (!t) return;
+			deps.SigmaTeaEditService.setValue(t, v);
+			sgSyncCurrentPeriodTea(t);
+			deps.save({
+				clearDerived: false,
+				sigmaTestId: ui().sgTest
+			});
+			deps.rerender();
+		};
+		const sgSetTeaSource = (v) => {
+			if (!deps.requireWrite()) return;
+			const t = state().tests.find((x) => x.id === ui().sgTest);
+			if (!t) return;
+			deps.SigmaTeaEditService.setSource(t, v, deps.pres.SG_TEA_SOURCES.map((x) => x[0]));
+			sgSyncCurrentPeriodTea(t);
+			deps.save({
+				clearDerived: false,
+				sigmaTestId: ui().sgTest
+			});
+			deps.rerender();
+		};
+		const sgSetTeaMeta = (field, val) => {
+			if (!deps.requireWrite()) return;
+			const t = state().tests.find((x) => x.id === ui().sgTest);
+			if (!t) return;
+			deps.SigmaTeaEditService.setMeta(t, field, val);
+			sgSyncCurrentPeriodTea(t);
+			deps.save({
+				clearDerived: false,
+				sigmaTestId: ui().sgTest
+			});
+			deps.rerender();
+		};
+		const sgRefreshSoon = () => {
+			clearTimeout(ui().sgRefreshT);
+			ui().sgRefreshT = setTimeout(() => {
+				if (deps.currentPage() === "sigma") sgRefresh();
+			}, 80);
+		};
+		const sgTrackedTests = () => (state().tests || []).filter((t) => t.sgTracked).sort((a, b) => deps.operationalTestOrder(a) - deps.operationalTestOrder(b) || String(a.name || "").localeCompare(String(b.name || "")));
+		const sgTrackedOptions = (tests, selectedId) => deps.pres.sigmaTrackedOptionsHtml(tests.map((x) => ({
+			id: x.id,
+			labelHtml: deps.esc(deps.testDisplayName(x))
+		})), selectedId);
+		const sgHistoricalLevels = (t) => deps.SigmaLevelSelectionService.historical(t, state().data && t && state().data[t.id] || [], t ? sgData(t.id) : [], (x) => typeof deps.operationalLevels === "function" ? deps.operationalLevels(x) : []);
+		const sgVisibleLevels = (t) => sgHistoricalLevels(t);
+		const sgPeriodLevels = (t, e) => deps.SigmaLevelSelectionService.period(t, e, state().data && t && state().data[t.id] || [], t ? sgData(t.id) : [], (x) => typeof deps.operationalLevels === "function" ? deps.operationalLevels(x) : [], (period) => deps.SigmaCohortService.normalizePeriod(period), sgCohortCutoff);
+		const sgPickTest = (v) => {
+			if (!v) return;
+			ui().sgTest = v;
+			deps.rerender();
+		};
+		const sgStatusPeriodId = (tid, data) => {
+			const selected = ui().sgSelectedPeriods && ui().sgSelectedPeriods[tid], fallback = deps.SigmaPeriodSelectionService.resolve(selected, data || []);
+			if (fallback) ui().sgSelectedPeriods[tid] = fallback;
+			else if (ui().sgSelectedPeriods) delete ui().sgSelectedPeriods[tid];
+			return fallback;
+		};
+		const sgSelectPeriod = (eid) => {
+			if (!ui().sgTest) return;
+			const r = deps.SigmaPeriodSelectionService.select(ui().sgSelectedPeriods[ui().sgTest], sgData(ui().sgTest), eid);
+			if (!r.changed) return;
+			ui().sgSelectedPeriods[ui().sgTest] = r.selected;
+			doc().querySelectorAll("[data-sg-period-id]").forEach((row) => {
+				const on = row.dataset.sgPeriodId === eid;
+				row.classList.toggle("sg-period-selected", on);
+				row.setAttribute("aria-selected", on ? "true" : "false");
+			});
+			sgRefresh();
+		};
+		const sgRemoveTracked = (id) => {
+			if (!deps.requireAdmin()) return;
+			const r = deps.SigmaTrackedTestService.remove(state().tests || [], id, ui().sgTest);
+			if (!r.removed) return;
+			ui().sgTest = r.selected;
+			deps.save({ clearDerived: false });
+			deps.rerender();
+		};
+		const sgOpenAddTest = () => {
+			if (!deps.requireAdmin()) return;
+			ui().sgAddTestQ = "";
+			sgRenderAddTestModal();
+		};
+		const sgAddTestSearchSet = (v) => {
+			ui().sgAddTestQ = v;
+			deps.scheduleSearchRender(sgAddTestSearchSet, sgRenderAddTestModal, "sgAddTestSearch");
+		};
+		const sgViewTrackedTest = (id) => {
+			const t = deps.SigmaTrackedTestService.select(state().tests || [], id);
+			if (!t) return;
+			ui().sgTest = t.id;
+			deps.closeModal();
+			deps.rerender();
+		};
+		const sgRenderAddTestModal = () => {
+			const all = [...state().tests || []].sort((a, b) => deps.operationalTestOrder(a) - deps.operationalTestOrder(b) || String(deps.testDisplayName(a)).localeCompare(String(deps.testDisplayName(b)), "vi")), q = deps.searchText(ui().sgAddTestQ);
+			const matched = all.filter((t) => !q || [
+				deps.testDisplayName(t),
+				t.name,
+				t.machine,
+				t.unit,
+				t.section,
+				t.method
+			].some((v) => deps.searchText(v).includes(q)));
+			const rows = deps.pres.sigmaAddTestRowsHtml(matched.map((t) => {
+				const tracked = !!t.sgTracked, current = tracked && t.id === ui().sgTest, meta = [
+					t.machine,
+					t.unit,
+					t.section
+				].filter(Boolean).map(deps.esc).join(" · ") || "Chưa có thông tin máy/đơn vị", action = tracked ? `sgViewTrackedTest('${deps.jsq(t.id)}')` : `sgTrackTest('${deps.jsq(t.id)}')`, label = current ? "Đang xem" : tracked ? "Xem" : "Thêm";
+				return {
+					id: t.id,
+					tracked,
+					current,
+					name: deps.esc(deps.testDisplayName(t)),
+					meta,
+					action,
+					label
+				};
+			}));
+			const empty = !all.length ? "<div class=\"empty\"><div class=\"empty-title\">Chưa có xét nghiệm trong Cấu hình chung</div><div>Hãy nhập xét nghiệm tại Cấu hình chung › Danh mục xét nghiệm trước khi thêm vào Six Sigma.</div></div>" : `<div class="empty">${q ? "Không tìm thấy xét nghiệm phù hợp." : "Không có xét nghiệm để hiển thị."}</div>`;
+			deps.openModal(deps.pres.sigmaAddTestModalHtml({
+				showSearch: !!all.length,
+				searchValue: deps.escapeAttr(ui().sgAddTestQ),
+				rowsHtml: rows,
+				emptyHtml: empty,
+				closeButtonHtml: deps.btn("Đóng", "closeModal()", "ghost")
+			}));
+			setTimeout(() => {
+				const e = doc().getElementById("sgAddTestSearch");
+				if (e) {
+					e.focus();
+					e.setSelectionRange(e.value.length, e.value.length);
+				}
+			}, 0);
+		};
+		const sgTrackTest = (id) => {
+			if (!deps.requireAdmin()) return;
+			const r = deps.SigmaTrackedTestService.track(state().tests || [], id);
+			if (!r.tracked) return;
+			ui().sgTest = r.selected;
+			deps.save({ clearDerived: false });
+			deps.closeModal();
+			deps.rerender();
+		};
+		const pageSigma = () => {
+			const s = state();
+			const tests = sgTrackedTests();
+			const addBtn = deps.role() === "admin" ? deps.btn("+ Thêm xét nghiệm", "sgOpenAddTest()", "teal") : "";
+			if (!tests.length) return deps.headOnly("Six Sigma & Sai số", "") + `<div class="panel">${deps.emptyState("Chưa có xét nghiệm nào trong Sigma", deps.role() === "admin" ? (s.tests || []).length ? "Bấm \"+ Thêm xét nghiệm\" để chọn từ danh mục đã khai báo trong Cấu hình chung." : "Chưa có xét nghiệm trong Cấu hình chung. Hãy khai báo xét nghiệm trước rồi quay lại Six Sigma." : "Liên hệ quản trị viên để thêm xét nghiệm từ Cấu hình chung.", addBtn)}</div>`;
+			if (!ui().sgTest || !tests.find((t) => t.id === ui().sgTest)) ui().sgTest = tests[0].id;
+			const t = tests.find((t) => t.id === ui().sgTest), calcIcon = "<svg class=\"btn-ico\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"4\" y=\"2\" width=\"16\" height=\"20\" rx=\"2\"/><line x1=\"8\" y1=\"6\" x2=\"16\" y2=\"6\"/><circle cx=\"8\" cy=\"12\" r=\".6\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"12\" cy=\"12\" r=\".6\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"16\" cy=\"12\" r=\".6\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"8\" cy=\"16\" r=\".6\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"12\" cy=\"16\" r=\".6\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"16\" cy=\"16\" r=\".6\" fill=\"currentColor\" stroke=\"none\"/></svg>";
+			const combinedExport = sgData(t.id).length ? deps.btn(deps.icoDownload() + "Xuất Excel", "exportSigmaPeriodsXLSX()", "teal sg-combined-export", "Xuất báo cáo Excel tổng hợp để so sánh Sigma giữa các kỳ") + deps.btn("<svg class=\"btn-ico\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M6 9V3h12v6\"/><path d=\"M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2\"/><path d=\"M6 14h12v7H6z\"/></svg>Xuất PDF", "printSigmaPeriods()", "teal sg-combined-print", "Tạo bản in PDF/HTML tổng hợp để so sánh Sigma giữa các kỳ") : "";
+			const testActions = `${deps.role() === "admin" ? deps.btn("+ Thêm", "sgOpenAddTest()", "teal") : ""}${deps.role() === "admin" ? deps.btn("<svg class=\"btn-ico\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 6h18\"/><path d=\"M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2\"/><path d=\"M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6\"/><path d=\"M10 11v6M14 11v6\"/></svg>Xóa", `sgRemoveTracked('${t.id}')`, "danger") : ""}`;
+			const testSelectFields = `<div class="sg-test-picker"><label>Chọn xét nghiệm</label><select id="sgTestSelect" aria-label="Chọn xét nghiệm" onchange="sgPickTest(this.value)">${sgTrackedOptions(tests, ui().sgTest)}</select></div><div class="sg-inline-btns"><label>&nbsp;</label><div class="sg-inline-btns-row">${testActions}</div></div>`;
+			const levels = sgVisibleLevels(t);
+			if (!levels.length) return deps.headOnly("Six Sigma & Sai số", "Đánh giá hiệu năng phương pháp theo TEa, CV IQC và Bias EQA/EQC") + deps.pres.sigmaNoLevelsPanelHtml({
+				testSelectHtml: testSelectFields,
+				messageHtml: `Xét nghiệm này chưa có mức QC hoặc dữ liệu IQC lịch sử để tính Sigma. Hãy kiểm tra Panel QC, Nhóm lô QC, Mean/SD và dữ liệu QC trong Cấu hình chung.${deps.role() === "admin" ? " " + deps.btn("Cấu hình Mean/SD", `go('manage');setManageTab('targets')`, "teal") : ""}`
+			});
+			const isOperational = deps.operationalLevels(t).length > 0;
+			const data = sgData(t.id);
+			const ro = !deps.canWrite() ? "disabled" : "";
+			const teaSrc = deps.sgTeaSource(t), teaVal = deps.sgTea(t);
+			const teaHint = teaSrc === "clia" ? `Tiêu chí CLIA đang dùng: ${deps.sgTeaCriterionText(t, "clia")}. TEa% được tính riêng tại Mean mục tiêu của từng mức QC.` : teaVal ? `TEa đang dùng: ${deps.fmt(teaVal, 2)}% · nguồn ${deps.sgTeaLabel(teaSrc)}.` : teaSrc === "eflm" ? "Chọn EFLM thì cần tra database EFLM và nhập TEa% cùng thông tin truy xuất." : teaSrc === "lab" ? "Xét nghiệm này chưa có TEa chuẩn hóa. Hãy cập nhật tại Cấu hình chung › Bảng TEa tham chiếu." : "Chưa có TEa% cho nguồn đang chọn. Hãy chọn nguồn khác hoặc cập nhật danh mục tham chiếu.";
+			const teaOpts = deps.pres.SG_TEA_SOURCES.map(([v, txt]) => {
+				const val = deps.sgTeaBySource(t, v), extra = v === "clia" ? ` · ${deps.sgTeaCriterionText(t, v)}` : val ? ` · ${deps.fmt(val, 2)}%` : " · chưa có";
+				return `<option value="${v}" ${teaSrc === v ? "selected" : ""}>${txt}${extra}</option>`;
+			}).join("");
+			const teaControl = teaSrc === "eflm" ? `<label>TEa% EFLM</label><input type="number" step="any" aria-label="TEa% EFLM" title="Nhập TEa% đã tra từ EFLM Database" value="${teaVal || ""}" ${deps.canWrite() ? "" : "disabled"} onchange="sgSetTea(this.value)">` : `<label>${teaSrc === "clia" ? "Tiêu chí CLIA" : "TEa% tham chiếu"}</label><input type="text" aria-label="${teaSrc === "clia" ? "Tiêu chí CLIA" : "TEa% tham chiếu"}" value="${deps.escapeAttr(teaSrc === "clia" ? deps.sgTeaCriterionText(t, "clia") : teaVal ? deps.fmt(teaVal, 2) + "%" : "")}" disabled>`;
+			const eflmApsOpts = [
+				"minimum",
+				"desirable",
+				"optimum"
+			].map((v) => `<option value="${v}" ${(t.eflmAps || "desirable") === v ? "selected" : ""}>${v}</option>`).join("");
+			const eflmBox = teaSrc === "eflm" ? `<div class="sg-eflm-box">
+       <div><label>Analyte trên EFLM</label><input ${ro} value="${deps.escapeAttr(t.eflmAnalyte || t.name || "")}" placeholder="VD: Glucose" onchange="sgSetTeaMeta('eflmAnalyte',this.value)"></div>
+       <div><label>Mức APS</label><select ${ro} onchange="sgSetTeaMeta('eflmAps',this.value)">${eflmApsOpts}</select></div>
+       <div><label>Ngày tra cứu</label>${deps.dateBox("sgEflmLookupDate", t.eflmLookupDate || "", "manage-date", `${ro} onchange="sgSetTeaMeta('eflmLookupDate',this.value)"`)}</div>
+       <div><label>Link/tài liệu EFLM</label><input ${ro} value="${deps.escapeAttr(t.eflmRef || "")}" placeholder="biologicalvariation.eu / bản in PDF" onchange="sgSetTeaMeta('eflmRef',this.value)"></div>
+     </div>` : "";
+			const selectedPeriodId = sgStatusPeriodId(t.id, data), levelIndex = new Map(levels.map((level, i) => [level, i])), pageRows = sgRows(t, data, levels), pageRowMap = new Map(pageRows.map((row) => [row.e.id, row]));
+			sgPendingRows = {
+				tid: t.id,
+				data,
+				rows: pageRows
+			};
+			const cvMeta = (L) => sgIsAutoCV(L) ? `<div class="sg-cell-meta sg-cv-meta" title="${deps.escapeAttr(`Số điểm IQC: ${L.n || 0}${L.sourceLot ? " · Lô: " + L.sourceLot : ""}${L.sourceStart && L.sourceEnd ? " · " + deps.vnDate(L.sourceStart) + "–" + deps.vnDate(L.sourceEnd) : ""}`)}">${L.n || 0} điểm${L.sourceLot ? " · Lô " + deps.esc(L.sourceLot) : ""}</div>` : "";
+			const levelCells = (e, l) => {
+				const L = e.lv && e.lv[l] || {}, bias = sgBiasVal(L), row = pageRowMap.get(e.id), r = row ? row.rs[levelIndex.get(l)] : sgComp(t, e, l);
+				return `<td class="sg-group-start"><div class="sg-cell-stack"><input class="sg-number" ${ro} type="number" step="any" value="${sgInputValue(sgInputDisplayValue(L.cv))}" placeholder="CV%" oninput="sgCell('${e.id}',${l},'cv',this.value)">${cvMeta(L)}</div></td>
+      <td><div class="sg-cell-stack"><input class="sg-number" ${ro} type="number" step="any" value="${sgInputValue(sgInputDisplayValue(bias))}" placeholder="Bias%" oninput="sgCell('${e.id}',${l},'biasEqa',this.value)"><div class="sg-cell-meta sg-cell-meta-empty" aria-hidden="true">&nbsp;</div></div></td>
+      <td class="sg-result-cell" title="${r ? deps.escapeAttr((r.biasLabel || "") + " " + deps.fmt(r.bias, 2) + "%" + (r.warning ? " · " + r.warning : "")) : "Nhập CV và Bias"}"><div class="sg-cell-stack"><span id="sg_${e.id}_${l}" class="tag ${r ? "sg-zone " + (r.classifiable ? r.sigma >= 3 ? "ok" : "rej" : "none") : ""}" style="${r ? "--sg-color:" + r.c + ";color:" + r.c : ""}">${r ? (r.classifiable ? "" : "≈") + deps.fmt(r.sigma, 2) : "—"}</span><div class="sg-cell-meta" style="${r ? "color:" + r.c : ""}">${r ? deps.esc(r.label) : "Chưa đủ dữ liệu"}</div></div></td>`;
+			};
+			const rows = data.map((e) => {
+				const periodLabel = deps.vnPeriod(e.period) || e.period || "", selected = e.id === selectedPeriodId, periodLabelHtml = deps.escapeAttr(periodLabel), actionHtml = `${deps.canWrite() ? deps.btn("Nạp CV lô", `sgPullCV('${e.id}')`, "ghost sm sg-row-cv", `Chọn CV IQC theo lô lịch sử cho kỳ ${periodLabelHtml}`) : ""}${deps.btn(deps.icoDownload() + "Excel", `exportSigmaPeriodXLSX('${e.id}')`, "ghost sm sg-row-export", `Xuất Excel riêng kỳ ${periodLabelHtml}`)}${deps.btn("<svg class=\"btn-ico\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M6 9V3h12v6\"/><path d=\"M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2\"/><path d=\"M6 14h12v7H6z\"/></svg>In PDF", `printSigmaPeriod('${e.id}')`, "ghost sm sg-row-print", `Tạo bản in PDF/HTML riêng kỳ ${periodLabelHtml}`)}${deps.role() === "admin" ? deps.btn("Xóa", `sgDelPeriod('${e.id}')`, "danger sm sg-row-delete", `Xóa kỳ ${periodLabelHtml}`) : ""}`;
+				return deps.pres.sigmaPeriodRowHtml({
+					id: deps.escapeAttr(e.id),
+					selected,
+					periodLabelHtml,
+					periodSelectHtml: sgPeriodSel(e, ro),
+					levelCellsHtml: levels.map((l) => levelCells(e, l)).join(""),
+					actionHtml
+				});
+			}).join("");
+			const tableHead = deps.pres.sigmaPeriodTableHeadHtml(levels);
+			const colGroup = `<colgroup><col style="width:140px">${levels.flatMap(() => [
+				"<col style=\"width:100px\">",
+				"<col style=\"width:100px\">",
+				"<col style=\"width:95px\">"
+			]).join("")}<col style="width:228px"></colgroup>`, tableMin = 368 + levels.length * 295, latestEntry = [...data].sort((a, b) => String(a.period || "").localeCompare(String(b.period || ""))).pop();
+			const headerActions = (deps.canWrite() ? levels.map((l) => deps.btn(`${calcIcon}Bias EQA% Mức ${l}`, latestEntry ? `sgOpenBias('${latestEntry.id}',${l})` : "", "ghost sm", latestEntry ? `Tính Bias EQA/EQC Mức ${l} cho kỳ ${deps.escapeAttr(latestEntry.period || "mới nhất")}` : "Hãy thêm kỳ trước khi tính Bias", { disabled: !latestEntry })).join("") : "") + (deps.canWrite() ? deps.btn("+ Thêm kỳ", "sgAddPeriod()", "teal sm") : "");
+			return deps.headOnly("Six Sigma & Sai số", "Đánh giá hiệu năng phương pháp theo TEa, CV IQC và Bias EQA/EQC") + `<div class="sg-top-grid">${deps.pres.sigmaAnalysisSetupHtml({
+				testSelectHtml: testSelectFields,
+				fieldsHtml: `<div><label>Tên xét nghiệm</label><input value="${deps.escapeAttr(deps.testDisplayName(t))}" aria-label="Tên xét nghiệm" readonly></div><div><label>Đơn vị</label><input value="${deps.escapeAttr(t.unit || "")}" aria-label="Đơn vị" readonly></div><div><label>Thiết bị</label><input value="${deps.escapeAttr(deps.instrumentName(t.instrumentId, t.machine) || "Chưa gán thiết bị")}" readonly placeholder="Bấm để chọn / quản lý thiết bị"></div><div class="sg-tea-source"><label>Nguồn TEa</label><select aria-label="Nguồn TEa" ${!deps.canWrite() ? "disabled" : ""} onchange="sgSetTeaSource(this.value)">${teaOpts}</select></div><div class="sg-tea-input">${teaControl}</div>`,
+				eflmHtml: eflmBox,
+				hintHtml: `${deps.esc(teaHint)} Mỗi mức dùng <b>CV từ IQC</b> và <b>Bias từ EQA/EQC</b>; nhiều vòng EQA được tổng hợp bằng <b>RMS</b> để tránh triệt tiêu dấu. Dữ liệu IQC không được dùng để tính Bias. Quy tắc thận trọng của phần mềm: &lt;20 điểm chỉ hiển thị ước tính, 20–29 điểm là tạm thời, ≥30 điểm mới dùng để gợi ý QC. DPMO/Yield chỉ là quy đổi tham khảo với dịch 1,5σ.${isOperational ? "" : " Nhóm lô hiện không vận hành; các kỳ cũ vẫn lấy CV theo đúng lô và Mean/SD đã lưu trong lịch sử IQC."}`
+			})}
+   <div class="panel"><h2 class="sg-setup-heading panel-title">Tình trạng</h2><div id="sgStatus"></div></div></div>
+   ${deps.pres.sigmaPeriodTableHtml({
+				headerActionsHtml: headerActions,
+				hasData: !!data.length,
+				tableMinWidth: tableMin,
+				colGroupHtml: colGroup,
+				tableHeadHtml: tableHead,
+				rowsHtml: rows,
+				combinedExportHtml: combinedExport
+			})}
+   <details class="panel sg-collapse-panel"><summary class="sg-collapse-summary"><span role="heading" aria-level="2">Thiết kế QC theo Sigma (OPSpecs)</span></summary><div class="sg-collapse-body" id="sgFreq"></div></details>
+   <details class="panel sg-collapse-panel sg-mu-panel"><summary class="sg-collapse-summary"><span role="heading" aria-level="2">Độ không đảm bảo đo (MU)</span></summary><div id="sgMUAction" class="sg-data-head-actions"></div><div id="sgMU"></div></details>
+   ${deps.pres.sigmaChartsPanelHtml()}`;
+		};
+		const sgOpSpecCell = (spec) => deps.pres.sigmaOpSpecCellHtml(spec);
+		const sgFrequencyHTML = (t, selectedRow, levels) => {
+			if (!selectedRow) return "<div class=\"hint\">Chưa có kỳ Sigma để đánh giá đầu vào QC.</div>";
+			const last = selectedRow;
+			let govSigma = Infinity;
+			const rows = deps.pres.sigmaFrequencyRowsHtml(levels.map((l, i) => {
+				const r = last.rs[i];
+				if (!r) return {
+					level: l,
+					hasResult: false
+				};
+				if (!r.qcpEligible) return {
+					level: l,
+					hasResult: true,
+					eligible: false,
+					sigmaText: deps.fmt(r.sigma, 2),
+					readinessHtml: deps.esc(r.readinessLabel)
+				};
+				if (r.sigma < govSigma) govSigma = r.sigma;
+				const run = r.run || {}, spec = deps.QCCore.westgardSigmaRules(r.sigma);
+				return {
+					level: l,
+					hasResult: true,
+					eligible: true,
+					sigmaText: deps.fmt(r.sigma, 2),
+					color: r.c,
+					opspecHtml: sgOpSpecCell(spec),
+					riskText: run.risk,
+					planText: run.plan
+				};
+			}));
+			const govSpec = Number.isFinite(govSigma) ? deps.QCCore.westgardSigmaRules(govSigma) : null;
+			const govBlock = deps.pres.sigmaGoverningRuleBlockHtml(govSpec, deps.fmt(govSigma, 2));
+			return deps.pres.sigmaFrequencyPanelHtml({
+				periodLabel: deps.vnPeriod(last.e.period) || "?",
+				rowsHtml: rows,
+				governingBlockHtml: govBlock
+			});
+		};
+		const sgMuDominant = (mu) => deps.pres.sigmaMuDominantText(mu && mu.shares, (value, decimals) => deps.fmt(value, decimals));
+		const sgMuStateChip = (mu) => deps.pres.sigmaMuStateChipHtml({
+			hasMu: !!mu,
+			complete: !!(mu && mu.complete),
+			missingHtml: mu ? deps.esc(mu.missing.join(", ")) : ""
+		});
+		const sgMuHTML = (t, row, levels) => {
+			if (!row) return "<div class=\"hint\">Chưa có kỳ Sigma nào để lập ngân sách độ không đảm bảo đo.</div>";
+			const unit = t.unit || "", e = row.e, trace = [];
+			const cells = levels.map((l, i) => {
+				const r = row.rs[i], mu = r && r.mu || sgMU(t, e, l), L = e.lv && e.lv[l] || {};
+				if (L.uCalBasis) trace.push(`Mức ${l} · nguồn u(cal): ${deps.esc(L.uCalBasis)}`);
+				if (!mu) return `<tr><td><b>Mức ${l}</b></td><td colspan="8" class="muted">Chưa có CV IQC — chưa tính được MU</td></tr>`;
+				const uBias = !mu.includeBias ? "<span class=\"muted\">không cộng</span>" : mu.uBias == null ? "<span class=\"muted\">chưa có Bias</span>" : deps.fmt(mu.uBias, 2) + (mu.biasRefU != null ? `<div class="sg-cell-meta">gồm u(Cref) ${deps.fmt(mu.biasRefU, 2)}</div>` : "");
+				const uCal = mu.uCal == null ? "<span class=\"muted\">chưa nhập CoA</span>" : deps.fmt(mu.uCal, 2);
+				const abs = mu.absoluteU == null ? "<span class=\"muted\">chưa có Mean</span>" : deps.fmt(mu.absoluteU, 3) + (unit ? " " + deps.esc(unit) : "");
+				const ratio = mu.teaRatio == null ? "<span class=\"muted\">—</span>" : `<b style="color:${mu.withinTea ? "var(--teal)" : "var(--red)"}">${deps.fmt(mu.teaRatio * 100, 0)}%</b>`;
+				const dominant = sgMuDominant(mu);
+				return `<tr><td><b>Mức ${l}</b></td><td class="num">${deps.fmt(mu.uRw, 2)}</td><td class="num">${uBias}</td><td class="num">${uCal}</td><td class="num">${deps.fmt(mu.uc, 2)}${dominant ? `<div class="sg-cell-meta">${deps.esc(dominant)}</div>` : ""}</td><td class="num"><b>${deps.fmt(mu.U, 2)}</b></td><td class="num">${abs}</td><td class="num">${ratio}</td><td>${sgMuStateChip(mu)}</td></tr>`;
+			}).join("");
+			const reviewer = levels.map((l) => e.lv && e.lv[l] || {}).find((L) => L.muReviewedBy || L.muReviewedDate);
+			if (reviewer) trace.push(`Người rà soát: ${deps.esc(reviewer.muReviewedBy || "—")}${reviewer.muReviewedDate ? " · " + deps.vnDate(reviewer.muReviewedDate) : ""}`);
+			const excluded = levels.filter((l) => sgMuBiasMode(e.lv && e.lv[l] || {}) === "exclude");
+			const exclNote = excluded.length ? `<div class="alert alert-block warn flow-item">Mức ${excluded.join(", ")} đang <b>không cộng u(bias)</b> vào ngân sách. ISO/TS 20914 chỉ chấp nhận điều này khi độ chệch đã được điều tra và hiệu chỉnh — hãy lưu bằng chứng hiệu chỉnh trong SOP/hồ sơ tương ứng.</div>` : "";
+			return deps.pres.sigmaMuSummaryHtml({
+				periodLabel: deps.esc(deps.vnPeriod(e.period) || e.period || "?"),
+				cellsHtml: cells,
+				traceHtml: trace.length ? `<div class="hint flow-note">${trace.join("<br>")}</div>` : "",
+				excludedNoteHtml: exclNote
+			});
+		};
+		const sgRefresh = () => {
+			const t = state().tests.find((x) => x.id === ui().sgTest);
+			if (!t) return;
+			const data = sgData(t.id);
+			const levels = sgVisibleLevels(t);
+			const cached = sgPendingRows && sgPendingRows.tid === t.id && sgPendingRows.data === data ? sgPendingRows.rows : null;
+			sgPendingRows = null;
+			const rows = cached || sgRows(t, data, levels);
+			rows.forEach((row) => levels.forEach((l, i) => {
+				const cell = doc().getElementById("sg_" + row.e.id + "_" + l);
+				if (!cell) return;
+				const r = row.rs[i], meta = cell.parentElement && cell.parentElement.querySelector(".sg-cell-meta");
+				if (!r) {
+					cell.textContent = "—";
+					cell.style.color = "var(--muted)";
+					cell.style.removeProperty("--sg-color");
+					if (meta) meta.style.color = "var(--muted)";
+				} else {
+					cell.textContent = (r.classifiable ? "" : "≈") + deps.fmt(r.sigma, 2);
+					cell.style.color = r.c;
+					cell.style.setProperty("--sg-color", r.c);
+					if (meta) meta.style.color = r.c;
+					cell.style.fontWeight = "700";
+					cell.title = r.classifiable ? r.biasLabel + " " + deps.fmt(r.bias, 2) + "% · DPMO " + sgFmtDPMO(r.dpmo) + " · Yield " + deps.fmt(r.yld, 4) + "% · ΔSE_crit " + deps.fmt(r.dse, 2) : r.readinessLabel;
+				}
+			}));
+			const classifiable = rows.filter((x) => x.rs.some((r) => r && r.classifiable)), selectedId = sgStatusPeriodId(t.id, data), selectedRow = rows.find((x) => x.e.id === selectedId) || rows[rows.length - 1];
+			const stt = doc().getElementById("sgStatus");
+			if (stt) {
+				if (!selectedRow) stt.innerHTML = deps.sgTea(t) ? "<div class=\"hint\">Chưa có kỳ Sigma. Hãy thêm kỳ để bắt đầu.</div>" : "<div class=\"alert warn\">Chưa có TEa% hợp lệ cho nguồn đang chọn. Hãy chọn nguồn TEa khác có giá trị tham chiếu.</div>";
+				else {
+					const last = selectedRow;
+					const card = (l, r) => {
+						if (!r) return deps.pres.sigmaStatusCardHtml({
+							level: l,
+							color: "var(--muted)",
+							sigmaText: "—",
+							provisional: false,
+							detailHtml: "Chưa nhập CV hoặc Bias được chọn"
+						});
+						const run = r.run;
+						return deps.pres.sigmaStatusCardHtml({
+							level: l,
+							color: r.c,
+							sigmaText: deps.fmt(r.sigma, 2),
+							label: r.label,
+							provisional: !r.classifiable,
+							detailHtml: `CV IQC ${deps.fmt(r.cv, 2)}% · ${r.biasLabel} ${deps.fmt(r.bias, 2)}%<br>${r.classifiable ? "DPMO " + sgFmtDPMO(r.dpmo) + " · Yield " + deps.fmt(r.yld, 4) + "%" : deps.esc(r.readinessLabel)}<br>${run ? run.risk + " · " + run.plan : ""}`
+						});
+					};
+					const lastTea = (last.rs.find(Boolean) || {}).tea || deps.sgEntryTea(t, last.e, levels[0]) || deps.sgTea(t), cards = levels.map((l, i) => card(l, last.rs[i])).join(""), tips = levels.map((l, i) => sgTips(t, last.rs[i], l)).join("");
+					stt.innerHTML = deps.pres.sigmaStatusPanelHtml({
+						periodLabel: deps.vnPeriod(last.e.period) || "?",
+						testName: deps.esc(deps.testDisplayName(t)),
+						teaText: lastTea || "—",
+						cardsHtml: cards,
+						tipsHtml: tips
+					});
+				}
+			}
+			const tr = doc().getElementById("sgTrend");
+			if (tr) tr.innerHTML = sgTrendSVG(t, classifiable, levels);
+			const md = doc().getElementById("sgMDC");
+			if (md) md.innerHTML = sgMDCSVG(t, classifiable, levels);
+			const fq = doc().getElementById("sgFreq");
+			if (fq) fq.innerHTML = sgFrequencyHTML(t, selectedRow, levels);
+			const muAction = doc().getElementById("sgMUAction");
+			if (muAction) muAction.innerHTML = selectedRow && deps.canWrite() ? deps.btn("Nhập u(Cal)", `sgOpenMU('${deps.jsq(selectedRow.e.id)}')`, "teal sm", "Nhập độ không đảm bảo của calibrator từ CoA, chọn cách xử lý độ chệch và ghi người rà soát") : "";
+			const muBox = doc().getElementById("sgMU");
+			if (muBox) muBox.innerHTML = sgMuHTML(t, selectedRow, levels);
+		};
+		const sgTips = (t, r, lvl) => {
+			if (!r || !r.classifiable || r.sigma >= 4) return "";
+			const tea = Number(r.tea) || deps.sgTea(t), cv = +r.cv, b = Math.abs(r.bias), fail = r.sigma < 3;
+			const cvNeed = (tea - b) / 4, biasNeed = tea - 4 * cv, share = b / (b + 1.65 * cv);
+			const biasActs = [
+				"Hiệu chuẩn lại; kiểm tra lô/hạn dùng của calibrator.",
+				"Kiểm tra giá trị đích EQA (nhóm peer cùng phương pháp/máy).",
+				"Thử lô thuốc thử mới và chạy lại sau hiệu chuẩn.",
+				"Bảo trì/vệ sinh hệ quang, kiểm tra carryover và đường ống."
+			];
+			const cvActs = [
+				"Bảo trì định kỳ thiết bị (đèn, bơm, hệ quang).",
+				"Kiểm tra lô thuốc thử & vật liệu QC (bảo quản, hạn dùng, độ đồng nhất).",
+				"Ổn định nhiệt độ phòng/điện áp; tránh rung động.",
+				"Chuẩn hóa thao tác (pipet, thời gian ủ); giảm khác biệt giữa người làm."
+			];
+			let driver, acts;
+			if (share > .6) {
+				driver = "chủ yếu do <b>độ chệch (bias) lớn</b>";
+				acts = biasActs;
+			} else if (share < .4) {
+				driver = "chủ yếu do <b>độ chụm (CV) lớn</b>";
+				acts = cvActs;
+			} else {
+				driver = "do <b>cả độ chệch lẫn độ chụm</b>";
+				acts = [
+					biasActs[0],
+					cvActs[0],
+					biasActs[1],
+					cvActs[1]
+				];
+			}
+			const tparts = [];
+			if (cvNeed > 0) tparts.push(`giảm CV ≤ <b>${deps.fmt(cvNeed, 2)}%</b> (hiện ${deps.fmt(cv, 2)}%)`);
+			if (biasNeed > 0) tparts.push(`giảm |Bias| ≤ <b>${deps.fmt(biasNeed, 2)}%</b> (hiện ${deps.fmt(b, 2)}%)`);
+			const tgt = tparts.length ? `Để đạt ≥ 4σ: ${tparts.join(" <i>hoặc</i> ")}.` : "Độ chệch đã vượt mức cho phép — phải giảm bias trước.";
+			const head = fail ? "Phương pháp <b>chưa đạt năng lực</b> — cần khắc phục trước khi tin cậy kết quả." : "Hiệu năng <b>cận biên</b> — nên cải thiện để vượt 4σ.";
+			const extra = fail ? "<li>Tạm thời tăng QC tối đa; nếu không cải thiện, cân nhắc đổi thuốc thử/phương pháp/thiết bị.</li>" : "";
+			return `<div class="alert sg-improvement-card" style="--sg-color:${r.c}"><b>Khuyến nghị cải thiện — Mức ${lvl}</b><div class="sg-improvement-lead">${head} Nguyên nhân ${driver}.</div><div class="sg-improvement-target">${tgt}</div><ul class="sg-improvement-list">${acts.map((a) => `<li>${a}</li>`).join("")}${extra}</ul></div>`;
+		};
+		const sgPointTipShow = (event, html) => {
+			const w = deps.window();
+			const tip = deps.qcTooltip();
+			tip.innerHTML = html;
+			tip.style.display = "block";
+			const pad = 12, tw = tip.offsetWidth || 220, th = tip.offsetHeight || 70;
+			let left = event.clientX + 14, top = event.clientY + 14;
+			if (left + tw + pad > w.innerWidth) left = event.clientX - tw - 14;
+			if (top + th + pad > w.innerHeight) top = event.clientY - th - 14;
+			tip.style.left = Math.max(pad, left) + "px";
+			tip.style.top = Math.max(pad, top) + "px";
+		};
+		const sgPointTipHide = () => {
+			const tip = doc().getElementById("qcTooltip");
+			if (tip) tip.style.display = "none";
+		};
+		const sgTrendSVG = (t, valid, levels) => {
+			const W = 1e3, H = 245, L = 42, T = 23, maxS = 8, px = (i) => valid.length <= 1 ? 513 : 76 + i / (valid.length - 1) * 874;
+			const py = (s) => T + (maxS - s) / maxS * 188;
+			let g = "";
+			const band = (s1, s2, c) => `<rect x="${L}" y="${py(s2)}" width="942" height="${py(s1) - py(s2)}" fill="${c}"/>`;
+			g += `<rect x="${L}" y="${T}" width="942" height="188" fill="#fff" stroke="#dce3e9"/>`;
+			g += band(6, 8, "#edf5ef") + band(4, 6, "#f6faf6") + band(3, 4, "#fff6df") + band(0, 3, "#fdebea");
+			for (let s = 0; s <= 8; s += 2) g += `<line x1="${L}" y1="${py(s)}" x2="984" y2="${py(s)}" stroke="#dde5e9" stroke-width=".7"/><text x="35" y="${py(s) + 3}" font-size="var(--type-overline)" fill="#70818d" text-anchor="end">${s}</text>`;
+			g += `<line x1="${L}" y1="${py(3)}" x2="984" y2="${py(3)}" stroke="#cf5a52" stroke-width=".85" stroke-dasharray="4 4"/><text x="980" y="${py(3) - 4}" font-size="var(--type-overline)" fill="#b83b33" text-anchor="end" font-weight="750">3σ</text>`;
+			g += `<line x1="${L}" y1="${py(6)}" x2="984" y2="${py(6)}" stroke="#2f7d5b" stroke-width=".85" stroke-dasharray="4 4"/><text x="980" y="${py(6) - 4}" font-size="var(--type-overline)" fill="#216b4a" text-anchor="end" font-weight="750">6σ</text>`;
+			const cols = [
+				"#0e4d4a",
+				"#7a4f9a",
+				"#c47d12"
+			];
+			levels.forEach((l, li) => {
+				const col = cols[li % 3];
+				const pts = [];
+				valid.forEach((v, i) => {
+					const r = v.rs[li];
+					if (r && isFinite(r.sigma)) pts.push([px(i), py(Math.max(0, Math.min(8, r.sigma)))]);
+				});
+				if (pts.length > 1) g += `<polyline points="${pts.map((p) => p.join(",")).join(" ")}" fill="none" stroke="${col}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+				pts.forEach((p, pi) => g += `<circle cx="${p[0]}" cy="${p[1]}" r="${pi === pts.length - 1 ? 3.7 : 3}" fill="${col}" stroke="#fff" stroke-width="1.2"/>`);
+				g += `<rect x="${48 + li * 72}" y="9" width="12" height="3" rx="1.5" fill="${col}"/><text x="${65 + li * 72}" y="13" font-size="var(--type-overline)" fill="${col}" font-weight="750">Mức ${l}</text>`;
+			});
+			valid.forEach((v, i) => {
+				if (valid.length <= 6 || i === 0 || i === valid.length - 1) g += `<text x="${px(i)}" y="225" font-size="var(--type-overline)" fill="#70818d" text-anchor="middle">${(v.e.period || "").split("-").reverse().join("/")}</text>`;
+			});
+			g += `<line x1="${L}" y1="211" x2="984" y2="211" stroke="#42515b" stroke-width=".9"/><line x1="${L}" y1="${T}" x2="${L}" y2="211" stroke="#42515b" stroke-width=".9"/>`;
+			g += `<text transform="translate(13,117) rotate(-90)" font-size="var(--type-overline)" fill="#40515c" text-anchor="middle" font-weight="700">Sigma</text>`;
+			return valid.length ? `<div style="width:100%;margin:4px auto 0"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;display:block" xmlns="http://www.w3.org/2000/svg">${g}</svg></div>` : "<div class=\"hint\">Chưa có dữ liệu.</div>";
+		};
+		const sgMDCSVG = (t, valid, levels) => {
+			const W = 1e3, H = 275, L = 45, T = 23, xmax = 60, ymax = 100;
+			const px = (x) => L + x / xmax * 939, py = (y) => 233 - y / ymax * 210;
+			let g = "";
+			g += `<rect x="${L}" y="${T}" width="939" height="210" fill="#fff" stroke="#dce3e9"/>`;
+			for (let y = 0; y <= 100; y += 20) g += `<line x1="${L}" y1="${py(y)}" x2="984" y2="${py(y)}" stroke="#e5ecef" stroke-width=".7"/><text x="38" y="${py(y) + 3}" font-size="var(--type-overline)" fill="#70818d" text-anchor="end">${y}</text>`;
+			for (let x = 0; x <= 60; x += 10) g += `<text x="${px(x)}" y="248" font-size="var(--type-overline)" fill="#70818d" text-anchor="middle">${x}</text>`;
+			[
+				[2, "#c0362c"],
+				[3, "#dd8b1f"],
+				[4, "#b59a00"],
+				[5, "#3f9a55"],
+				[6, "#0e8f8f"]
+			].forEach(([s, c]) => {
+				const x2 = Math.min(xmax, 100 / s), y2 = 100 - s * x2, lx = px(x2) + 3, ly = py(y2) - 6;
+				g += `<line x1="${px(0)}" y1="${py(100)}" x2="${px(x2)}" y2="${py(y2)}" stroke="${c}" stroke-width="1" stroke-linecap="round" opacity=".88"/><text x="${lx}" y="${ly}" font-size="var(--type-overline)" fill="#fff" stroke="#fff" stroke-width="3" stroke-linejoin="round" font-weight="800">${s}σ</text><text x="${lx}" y="${ly}" font-size="var(--type-overline)" fill="${c}" font-weight="800">${s}σ</text>`;
+			});
+			const cols = [
+				"#0e4d4a",
+				"#7a4f9a",
+				"#c47d12"
+			];
+			levels.forEach((l, li) => {
+				const col = cols[li % 3], pts = [];
+				valid.forEach((v, i) => {
+					const r = v.rs[li];
+					if (!r) return;
+					const tea = Number(r.tea) || deps.sgTea(t) || 1, X = r.cv / tea * 100, Y = Math.abs(r.bias) / tea * 100;
+					pts.push({
+						x: px(Math.min(xmax, X)),
+						y: py(Math.min(ymax, Y)),
+						i,
+						r,
+						X,
+						Y,
+						period: v.e.period
+					});
+				});
+				if (pts.length > 1) g += `<polyline points="${pts.map((p) => p.x + "," + p.y).join(" ")}" fill="none" stroke="${col}" stroke-opacity=".3" stroke-width=".9" stroke-dasharray="3 3"/>`;
+				pts.forEach((p) => {
+					const big = p.i === valid.length - 1, r = p.r, periodLabel = deps.esc(deps.vnPeriod(p.period) || p.period || "?"), sigmaTxt = r.classifiable ? deps.fmt(r.sigma, 2) : "≈" + deps.fmt(r.sigma, 2);
+					const tip = `<b>${periodLabel} · Mức ${l}</b><div>Sigma: <b style='color:${r.c}'>${sigmaTxt}</b> · ${deps.esc(r.label)}</div><div>CV/TEa: ${deps.fmt(p.X, 1)}% · |Bias|/TEa: ${deps.fmt(p.Y, 1)}%</div><div class='muted'>CV ${deps.fmt(r.cv, 2)}% · Bias ${deps.fmt(r.bias, 2)}%</div>`;
+					g += `<circle cx="${p.x}" cy="${p.y}" r="${big ? 4.8 : 3.2}" fill="${col}" fill-opacity="${big ? .95 : .62}" stroke="#fff" stroke-width="1.2" style="cursor:pointer" onmousemove="sgPointTipShow(event,'${deps.jsq(tip)}')" onmouseleave="sgPointTipHide()"/>`;
+				});
+				g += `<rect x="${50 + li * 72}" y="9" width="12" height="3" rx="1.5" fill="${col}"/><text x="${67 + li * 72}" y="13" font-size="var(--type-overline)" fill="${col}" font-weight="750">Mức ${l}</text>`;
+			});
+			g += `<line x1="${L}" y1="233" x2="984" y2="233" stroke="#42515b" stroke-width=".9"/><line x1="${L}" y1="${T}" x2="${L}" y2="233" stroke="#42515b" stroke-width=".9"/>`;
+			g += `<text x="${1029 / 2}" y="268" font-size="var(--type-overline)" fill="#40515c" text-anchor="middle" font-weight="750">CV / TEA (%)</text>`;
+			g += `<text transform="translate(13,128) rotate(-90)" font-size="var(--type-overline)" fill="#40515c" text-anchor="middle" font-weight="750">|BIAS| / TEA (%)</text>`;
+			return valid.length ? `<div style="width:100%;margin:4px auto 0"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;display:block" xmlns="http://www.w3.org/2000/svg">${g}</svg></div>` : "<div class=\"hint\">Chưa có dữ liệu.</div>";
+		};
+		const sgBiasRowsFromDom = () => [...doc().querySelectorAll(".sg-eqa-row")].map((r) => ({
+			lab: r.querySelector("[data-f=\"lab\"]").value,
+			target: r.querySelector("[data-f=\"target\"]").value
+		}));
+		const sgBiasPeriodsFromDom = () => {
+			const boxes = [...doc().querySelectorAll("[data-sg-bias-period]")];
+			return boxes.length ? boxes.filter((x) => x.checked).map((x) => x.value) : ui().sgBiasCtx && ui().sgBiasCtx.periodIds || [];
+		};
+		const sgBiasStats = (rounds) => deps.SigmaBiasService.stats(rounds);
+		const sgBiasRoundsKey = (rounds) => deps.SigmaBiasService.roundsKey(rounds);
+		const sgBiasLinkedPeriodIds = (data, eid, level) => deps.SigmaBiasService.linkedPeriodIds(data, eid, level);
+		const sgOpenBias = (eid, level) => {
+			const data = sgData(ui().sgTest), e = data.find((x) => x.id === eid);
+			if (!e) return;
+			e.lv = e.lv || {};
+			e.lv[level] = e.lv[level] || {};
+			const saved = e.lv[level].eqaRounds, rounds = (Array.isArray(saved) && saved.length ? saved : []).map((r) => ({ ...r }));
+			while (rounds.length < 3) rounds.push({
+				lab: "",
+				target: ""
+			});
+			ui().sgBiasCtx = {
+				eid,
+				level,
+				periodIds: sgBiasLinkedPeriodIds(data, eid, level),
+				rounds
+			};
+			sgRenderBiasModal();
+		};
+		const sgRenderBiasModal = () => {
+			const c = ui().sgBiasCtx;
+			if (!c) return;
+			const rounds = c.rounds.length ? c.rounds : [{
+				lab: "",
+				target: ""
+			}], periods = [...sgData(ui().sgTest)].sort((a, b) => String(a.period || "").localeCompare(String(b.period || "")));
+			const rows = deps.pres.sigmaBiasRowsHtml(rounds.map((r, i) => {
+				const lab = parseFloat(r.lab), target = parseFloat(r.target), bias = isFinite(lab) && isFinite(target) && target !== 0 ? (lab - target) / Math.abs(target) * 100 : null;
+				return {
+					index: i + 1,
+					labValue: deps.escapeAttr(r.lab ?? ""),
+					targetValue: deps.escapeAttr(r.target ?? ""),
+					biasText: bias == null ? "—" : deps.fmt(bias, 2) + "%",
+					deleteButtonHtml: deps.btn("Xóa", `sgBiasDel(${i})`, "danger sm sg-eqa-del", "Xóa vòng")
+				};
+			}));
+			const periodRows = periods.map((e) => `<label class="sg-eqa-period"><input type="checkbox" data-sg-bias-period value="${deps.escapeAttr(e.id)}" ${(c.periodIds || []).includes(e.id) ? "checked" : ""}><span>${deps.esc(deps.vnPeriod(e.period) || "Chưa chọn kỳ")}</span></label>`).join("");
+			deps.openModal(deps.pres.sigmaBiasModalHtml({
+				level: c.level,
+				rowsHtml: rows,
+				periodRowsHtml: periodRows,
+				addRoundButtonHtml: deps.btn("+ Thêm vòng", "sgBiasAdd()", "ghost sm sg-eqa-add"),
+				selectAllButtonHtml: deps.btn("Chọn tất cả", "sgBiasSelectPeriods(true)", "ghost sm"),
+				clearSelectionButtonHtml: deps.btn("Bỏ chọn", "sgBiasSelectPeriods(false)", "ghost sm"),
+				cancelButtonHtml: deps.btn("Hủy", "closeModal()", "ghost"),
+				applyButtonHtml: deps.btn("Áp dụng Bias%", "sgBiasApply()", "teal")
+			}));
+			sgBiasUpdateSummary();
+		};
+		const sgBiasUpdateSummary = () => {
+			if (!ui().sgBiasCtx) return;
+			const rounds = sgBiasRowsFromDom();
+			ui().sgBiasCtx.rounds = rounds;
+			const stats = sgBiasStats(rounds);
+			doc().querySelectorAll("[data-bias]").forEach((el, i) => {
+				const r = rounds[i], lab = parseFloat(r.lab), target = parseFloat(r.target), b = isFinite(lab) && isFinite(target) && target !== 0 ? (lab - target) / Math.abs(target) * 100 : null;
+				el.textContent = b == null ? "—" : deps.fmt(b, 2) + "%";
+				el.style.color = b != null && Math.abs(b) > 10 ? "var(--red)" : "var(--teal)";
+			});
+			const el = doc().getElementById("sgBiasSummary");
+			if (!el) return;
+			const mixed = stats.valid.some((r) => r.bias < 0) && stats.valid.some((r) => r.bias > 0);
+			el.classList.toggle("is-empty", !stats.valid.length);
+			el.innerHTML = deps.pres.sigmaBiasSummaryHtml({
+				validCount: stats.valid.length,
+				signedMeanText: deps.fmt(stats.signedMean, 2),
+				rmsText: deps.fmt(stats.rms, 2),
+				mixedSigns: mixed
+			});
+		};
+		const sgBiasSelectPeriods = (checked) => {
+			doc().querySelectorAll("[data-sg-bias-period]").forEach((x) => x.checked = checked);
+			if (ui().sgBiasCtx) ui().sgBiasCtx.periodIds = sgBiasPeriodsFromDom();
+		};
+		const sgBiasAdd = () => {
+			if (!ui().sgBiasCtx) return;
+			ui().sgBiasCtx.periodIds = sgBiasPeriodsFromDom();
+			ui().sgBiasCtx.rounds = sgBiasRowsFromDom();
+			ui().sgBiasCtx.rounds.push({
+				lab: "",
+				target: ""
+			});
+			sgRenderBiasModal();
+		};
+		const sgBiasDel = (i) => {
+			if (!ui().sgBiasCtx) return;
+			ui().sgBiasCtx.periodIds = sgBiasPeriodsFromDom();
+			ui().sgBiasCtx.rounds = sgBiasRowsFromDom();
+			ui().sgBiasCtx.rounds.splice(i, 1);
+			if (!ui().sgBiasCtx.rounds.length) ui().sgBiasCtx.rounds.push({
+				lab: "",
+				target: ""
+			});
+			sgRenderBiasModal();
+		};
+		const sgApplyBiasToPeriods = (data, periodIds, level, bias, rounds, batchId = deps.uid()) => deps.SigmaBiasService.applyToPeriods(data, periodIds, level, bias, rounds, batchId);
+		const sgBiasApply = async () => {
+			if (!deps.requireWrite()) return;
+			if (!ui().sgBiasCtx) return;
+			ui().sgBiasCtx.rounds = sgBiasRowsFromDom();
+			ui().sgBiasCtx.periodIds = sgBiasPeriodsFromDom();
+			const r = deps.SigmaBiasWorkflowService.apply(sgData(ui().sgTest), ui().sgBiasCtx.periodIds, ui().sgBiasCtx.level, ui().sgBiasCtx.rounds);
+			if (r.status === "invalid-rounds") {
+				await deps.infoDialog("Chưa có vòng hợp lệ để tính Bias.");
+				return;
+			}
+			if (r.status === "missing-periods") {
+				await deps.infoDialog("Chưa chọn kỳ nào để áp dụng Bias.");
+				return;
+			}
+			if (!r.applied) return;
+			deps.save({
+				clearDerived: false,
+				sigmaTestId: ui().sgTest
+			});
+			deps.closeModal();
+			deps.rerender();
+		};
+		const sgMuRowsFromDom = () => [...doc().querySelectorAll(".sg-mu-row")].map((tr) => ({
+			level: Number(tr.dataset.level),
+			uCal: tr.querySelector("[data-f=\"uCal\"]").value,
+			uCalBasis: tr.querySelector("[data-f=\"uCalBasis\"]").value,
+			muBiasMode: tr.querySelector("[data-f=\"muBiasMode\"]").value
+		}));
+		const sgMuPeriodsFromDom = () => {
+			const boxes = [...doc().querySelectorAll("[data-sg-mu-period]")];
+			return boxes.length ? boxes.filter((x) => x.checked).map((x) => x.value) : ui().sgMuCtx && ui().sgMuCtx.periodIds || [];
+		};
+		const sgMuCaptureDom = () => {
+			if (!ui().sgMuCtx) return;
+			if (doc().querySelector(".sg-mu-row")) ui().sgMuCtx.rows = sgMuRowsFromDom();
+			ui().sgMuCtx.periodIds = sgMuPeriodsFromDom();
+			const by = doc().getElementById("sgMuBy"), dt = doc().getElementById("sgMuDate");
+			if (by) ui().sgMuCtx.reviewedBy = by.value;
+			if (dt) ui().sgMuCtx.reviewedDate = dt.value;
+		};
+		const sgMuPreview = (level) => {
+			if (!ui().sgMuCtx) return null;
+			const t = state().tests.find((x) => x.id === ui().sgTest), e = sgData(ui().sgTest).find((x) => x.id === ui().sgMuCtx.eid);
+			if (!t || !e) return null;
+			const row = (ui().sgMuCtx.rows || []).find((r) => r.level === level) || {}, L = e.lv && e.lv[level] || {};
+			return deps.QCCore.uncertaintyBudget({
+				cv: L.cv,
+				bias: sgBiasVal(L),
+				biasRefU: sgBiasRefU(L.eqaRounds),
+				uCal: row.uCal,
+				includeBias: row.muBiasMode !== "exclude",
+				tea: deps.sgEntryTea(t, e, level),
+				target: deps.sgLevelTarget(t, L, level),
+				k: 2
+			});
+		};
+		const sgMuUpdatePreview = () => {
+			sgMuCaptureDom();
+			doc().querySelectorAll("[data-sg-mu-preview]").forEach((cell) => {
+				const mu = sgMuPreview(Number(cell.dataset.sgMuPreview));
+				cell.innerHTML = deps.pres.sigmaMuPreviewHtml({
+					hasMu: !!mu,
+					ucText: mu ? deps.fmt(mu.uc, 2) : "",
+					uText: mu ? deps.fmt(mu.U, 2) : "",
+					complete: !!(mu && mu.complete),
+					missingHtml: mu ? deps.esc(mu.missing.join(", ")) : ""
+				});
+			});
+		};
+		const sgOpenMU = (eid) => {
+			if (!deps.requireWrite()) return;
+			const t = state().tests.find((x) => x.id === ui().sgTest), e = sgData(ui().sgTest).find((x) => x.id === eid);
+			if (!t || !e) return;
+			e.lv = e.lv || {};
+			const levels = sgVisibleLevels(t), signed = levels.map((l) => e.lv[l] || {}).find((L) => L.muReviewedBy || L.muReviewedDate) || {};
+			ui().sgMuCtx = {
+				eid,
+				levels,
+				periodIds: [eid],
+				rows: levels.map((l) => {
+					const L = e.lv[l] || {};
+					return {
+						level: l,
+						uCal: L.uCal ?? "",
+						uCalBasis: L.uCalBasis || "",
+						muBiasMode: sgMuBiasMode(L)
+					};
+				}),
+				reviewedBy: signed.muReviewedBy || deps.userName(),
+				reviewedDate: deps.vnDate(signed.muReviewedDate || deps.isoDate())
+			};
+			sgRenderMuModal();
+		};
+		const sgRenderMuModal = () => {
+			const c = ui().sgMuCtx;
+			if (!c) return;
+			const periods = [...sgData(ui().sgTest)].sort((a, b) => String(a.period || "").localeCompare(String(b.period || "")));
+			const sourcePeriod = periods.find((e) => e.id === c.eid), sourceLabel = sourcePeriod ? deps.vnPeriod(sourcePeriod.period) || sourcePeriod.period || "—" : "—";
+			const rows = deps.pres.sigmaMuRowsHtml(c.rows.map((r) => ({
+				level: r.level,
+				uCalValue: deps.escapeAttr(r.uCal ?? ""),
+				basisValue: deps.escapeAttr(r.uCalBasis || ""),
+				excludeBias: r.muBiasMode === "exclude"
+			})));
+			const periodRows = periods.map((e) => `<label class="sg-eqa-period"><input type="checkbox" data-sg-mu-period value="${deps.escapeAttr(e.id)}" ${(c.periodIds || []).includes(e.id) ? "checked" : ""}><span>${deps.esc(deps.vnPeriod(e.period) || "Chưa chọn kỳ")}</span></label>`).join("");
+			deps.openModal(deps.pres.sigmaMuModalHtml({
+				sourceLabel: deps.esc(sourceLabel),
+				rowsHtml: rows,
+				modelNoteHtml: SG_MU_MODEL_NOTE,
+				reviewedByValue: deps.escapeAttr(c.reviewedBy || ""),
+				reviewedDateHtml: deps.dateBox("sgMuDate", c.reviewedDate || "", "manage-date"),
+				periodRowsHtml: periodRows,
+				selectAllButtonHtml: deps.btn("Chọn tất cả", "sgMuSelectPeriods(true)", "ghost sm"),
+				clearSelectionButtonHtml: deps.btn("Bỏ chọn", "sgMuSelectPeriods(false)", "ghost sm"),
+				cancelButtonHtml: deps.btn("Hủy", "closeModal()", "ghost"),
+				applyButtonHtml: deps.btn("Áp dụng ngân sách MU", "sgMuApply()", "teal")
+			}));
+			sgMuUpdatePreview();
+		};
+		const sgMuSelectPeriods = (checked) => {
+			doc().querySelectorAll("[data-sg-mu-period]").forEach((x) => x.checked = checked);
+			sgMuCaptureDom();
+		};
+		const sgMuApply = async () => {
+			if (!deps.requireWrite()) return;
+			if (!ui().sgMuCtx) return;
+			sgMuCaptureDom();
+			const t = state().tests.find((x) => x.id === ui().sgTest);
+			if (!t) return;
+			if (deps.SigmaMuWorkflowCommand.apply({
+				records: sgData(ui().sgTest),
+				periodIds: ui().sgMuCtx.periodIds,
+				rows: ui().sgMuCtx.rows,
+				reviewedBy: ui().sgMuCtx.reviewedBy,
+				reviewedDate: ui().sgMuCtx.reviewedDate,
+				testName: deps.testDisplayName(t),
+				sigmaTestId: ui().sgTest
+			}).status === "missing-periods") {
+				await deps.infoDialog("Chưa chọn kỳ nào để áp dụng ngân sách MU.");
+				return;
+			}
+		};
+		const sgCell = (eid, level, field, val) => {
+			if (!deps.requireWrite()) return;
+			const t = state().tests.find((x) => x.id === ui().sgTest), e = sgData(ui().sgTest).find((x) => x.id === eid);
+			if (!e || !t) return;
+			deps.sgEnsureTeaSnapshot(t, e);
+			e.lv = e.lv || {};
+			const L = e.lv[level] = e.lv[level] || {};
+			deps.SigmaLevelEditService.update(L, field, val);
+			deps.sgSetLevelTeaSnapshot(t, e, level);
+			deps.save({
+				clearDerived: false,
+				sigmaTestId: ui().sgTest
+			});
+			sgRefreshSoon();
+		};
+		const sgPeriodSel = (e, ro) => {
+			const [y, mo] = (e.period || "").split("-"), nowYear = (/* @__PURE__ */ new Date()).getFullYear();
+			const yr = y || String(nowYear), mm = mo ? +mo : (/* @__PURE__ */ new Date()).getMonth() + 1;
+			const mOpt = Array.from({ length: 12 }, (_, i) => i + 1).map((x) => `<option value="${x}" ${x === mm ? "selected" : ""}>${String(x).padStart(2, "0")}</option>`).join("");
+			const selectedYear = parseInt(yr) || nowYear, minYear = Math.min(selectedYear, nowYear - 4), maxYear = Math.max(selectedYear, nowYear + 2);
+			const years = [];
+			for (let yy = minYear; yy <= maxYear; yy++) years.push(yy);
+			const yOpt = years.map((x) => `<option value="${x}" ${String(x) === yr ? "selected" : ""}>${x}</option>`).join("");
+			return `<div class="sg-period-controls"><select class="sg-period-month" aria-label="Tháng của kỳ" ${ro} onchange="sgPart('${e.id}','m',this.value)">${mOpt}</select><select class="sg-period-year" aria-label="Năm của kỳ" ${ro} onchange="sgPart('${e.id}','y',this.value)">${yOpt}</select></div>`;
+		};
+		const sgPart = async (eid, part, val) => {
+			if (!deps.requireWrite()) return;
+			const data = sgData(ui().sgTest), e = data.find((x) => x.id === eid);
+			if (!e) return;
+			let [y, mo] = (e.period || deps.isoMonth()).split("-");
+			if (part === "y") y = val;
+			else mo = String(val).padStart(2, "0");
+			const next = y + "-" + mo, r = deps.SigmaPeriodRecordService.changePeriod(data, eid, next);
+			if (r.duplicate) {
+				await deps.infoDialog("Đã có kỳ Sigma " + next + ". Mỗi xét nghiệm chỉ lưu một bản ghi cho mỗi kỳ.");
+				deps.rerender();
+				return;
+			}
+			if (!r.changed) return;
+			deps.save({
+				clearDerived: false,
+				sigmaTestId: ui().sgTest
+			});
+			sgRefreshSoon();
+		};
+		const sgAddPeriod = async () => {
+			if (!deps.requireWrite()) return;
+			const t = state().tests.find((x) => x.id === ui().sgTest), data = sgData(ui().sgTest), period = deps.isoMonth();
+			if (!t) return;
+			const r = deps.SigmaPeriodRecordService.add(data, period, deps.uid(), deps.sgTeaSnapshot(t));
+			if (!r.added) {
+				await deps.infoDialog("Đã có kỳ Sigma " + period + ". Hãy cập nhật kỳ hiện có.");
+				return;
+			}
+			ui().sgSelectedPeriods[ui().sgTest] = r.entry.id;
+			deps.save({
+				clearDerived: false,
+				sigmaTestId: ui().sgTest
+			});
+			deps.rerender();
+		};
+		const sgDelPeriod = (eid) => {
+			if (!deps.requireAdmin()) return;
+			const d = sgData(ui().sgTest);
+			deps.SigmaPeriodRecordService.remove(d, eid);
+			if (ui().sgSelectedPeriods && ui().sgSelectedPeriods[ui().sgTest] === eid) delete ui().sgSelectedPeriods[ui().sgTest];
+			deps.save({
+				clearDerived: false,
+				sigmaTestId: ui().sgTest
+			});
+			deps.rerender();
+		};
+		const sgClearImportedCV = (L) => deps.SigmaCohortImportService.clearImportedCv(L);
+		const sgCohortCutoff = (period) => deps.SigmaCohortSelectionService.cutoff(period);
+		const sgCohortGroups = (t, e) => deps.SigmaCohortSelectionService.groups(t, e, sgPeriodLevels(t, e), state());
+		const sgCohortStatusText = (a) => a.status === "eligible" ? "Đủ dữ liệu" : a.status === "provisional" ? "Tạm thời" : a.status === "insufficient" ? "Chưa đủ" : "Không ổn định";
+		const sgImportCohort = (t, e, level, cohort) => deps.SigmaCohortImportService.importCohort(t, e, level, cohort);
+		const sgApplyCohortChoices = (t, e, groups, choices) => deps.SigmaCohortImportService.applyChoices(t, e, groups, choices);
+		const sgCohortImportMessage = (e, s) => {
+			const notes = [];
+			if (s.missingLotLevels) notes.push(s.missingLotN + " điểm IQC (" + s.missingLotLevels + " mức) chưa gắn mã lô QC nên không dùng được — hãy gắn mã lô cho điểm QC để lấy CV tự động");
+			if (s.mixedTargets) notes.push(s.mixedTargets + " mức thay đổi Mean/SD mục tiêu nên nhóm dữ liệu IQC chưa ổn định");
+			if (s.unstable) notes.push(s.unstable + " mức không được phân loại");
+			if (s.cleared) notes.push(s.cleared + " CV tự động cũ đã được xóa");
+			if (!s.imported) return "Kỳ " + (deps.vnPeriod(e.period) || e.period) + " chưa có đủ dữ liệu IQC của cùng một lô để tính CV (cần ít nhất 2 kết quả hợp lệ)." + (notes.length ? " " + notes.join(". ") + "." : "");
+			return "Đã lấy CV theo lô đến " + deps.vnDate(sgCohortCutoff(e.period)) + "." + (s.insufficient ? " Có " + s.insufficient + " mức dưới 20 điểm; Sigma chỉ hiển thị ước tính." : "") + (notes.length ? " " + notes.join(". ") + "." : "");
+		};
+		const sgRenderCohortModal = () => {
+			const c = ui().sgCohortCtx;
+			if (!c) return;
+			const sections = deps.pres.sigmaCohortRowsHtml(c.groups.map((g) => {
+				const preferred = g.cohorts.find((x) => x.lot === g.configuredLot) || g.cohorts[g.cohorts.length - 1];
+				return {
+					level: g.level,
+					missingLotCount: g.missingLotN || 0,
+					rows: g.cohorts.map((x, i) => {
+						const a = deps.SigmaCohortService.assess(x);
+						return {
+							level: g.level,
+							showLevel: !i,
+							lotHtml: deps.escapeAttr(x.lot),
+							startText: deps.vnDate(x.start),
+							endText: deps.vnDate(x.end),
+							count: x.n,
+							cvText: x.stats && x.stats.cv > 0 ? deps.fmt(x.stats.cv, 2) + "%" : "—",
+							statusHtml: deps.esc(sgCohortStatusText(a)),
+							checked: x === preferred
+						};
+					})
+				};
+			}));
+			deps.openModal(deps.pres.sigmaCohortModalHtml({
+				testName: deps.esc(deps.testDisplayName(c.t)),
+				cutoffDate: deps.vnDate(sgCohortCutoff(c.e.period)),
+				sectionsHtml: sections,
+				cancelButtonHtml: deps.btn("Hủy", "sgCohortClose()", "ghost"),
+				applyButtonHtml: deps.btn("✓ Dùng dữ liệu đã chọn", "sgCohortApply()", "teal")
+			}));
+		};
+		const sgCohortClose = () => {
+			ui().sgCohortCtx = null;
+			deps.closeModal();
+		};
+		const sgCohortApply = async () => {
+			if (!deps.requireWrite() || !ui().sgCohortCtx) return;
+			const c = ui().sgCohortCtx, choices = {};
+			c.groups.forEach((g) => {
+				const el = doc().querySelector(`input[name="sgCohort_${g.level}"]:checked`);
+				if (el) choices[g.level] = el.value;
+			});
+			const summary = sgApplyCohortChoices(c.t, c.e, c.groups, choices);
+			ui().sgCohortCtx = null;
+			deps.save({
+				clearDerived: false,
+				sigmaTestId: ui().sgTest
+			});
+			deps.closeModal();
+			deps.rerender();
+			await deps.infoDialog(sgCohortImportMessage(c.e, summary));
+		};
+		const sgPullCV = async (eid) => {
+			if (!deps.requireWrite()) return;
+			ui().sgCohortCtx = null;
+			const t = state().tests.find((x) => x.id === ui().sgTest);
+			if (!t) return;
+			const d = sgData(ui().sgTest);
+			if (!d.length) {
+				await deps.infoDialog("Chưa có kỳ nào. Bấm \"+ Thêm kỳ\" trước.");
+				return;
+			}
+			const sorted = [...d].sort((a, b) => String(a.period || "").localeCompare(String(b.period || ""))), e = eid && d.find((x) => x.id === eid) || sorted[sorted.length - 1];
+			e.lv = e.lv || {};
+			deps.sgEnsureTeaSnapshot(t, e);
+			const groups = sgCohortGroups(t, e);
+			if (groups.some((g) => g.cohorts.length > 1)) {
+				ui().sgCohortCtx = {
+					t,
+					e,
+					groups
+				};
+				sgRenderCohortModal();
+				return;
+			}
+			const choices = {};
+			groups.forEach((g) => {
+				if (g.cohorts[0]) choices[g.level] = g.cohorts[0].lot;
+			});
+			const summary = sgApplyCohortChoices(t, e, groups, choices);
+			deps.save({
+				clearDerived: false,
+				sigmaTestId: ui().sgTest
+			});
+			deps.rerender();
+			await deps.infoDialog(sgCohortImportMessage(e, summary));
+		};
+		return {
+			sgZone,
+			sgFmtDPMO,
+			sgData,
+			sgInputValue,
+			sgInputDisplayValue,
+			sgCleanCell,
+			sgBiasVal,
+			sgIsAutoCV,
+			sgReadiness,
+			sgBiasRefU,
+			sgMuBiasMode,
+			sgMU,
+			sgComp,
+			sgRows,
+			sgSyncCurrentPeriodTea,
+			sgReconcileAllTeaSnapshots,
+			sgSetTea,
+			sgSetTeaSource,
+			sgSetTeaMeta,
+			sgRefreshSoon,
+			sgTrackedTests,
+			sgTrackedOptions,
+			sgHistoricalLevels,
+			sgVisibleLevels,
+			sgPeriodLevels,
+			sgPickTest,
+			sgStatusPeriodId,
+			sgSelectPeriod,
+			sgRemoveTracked,
+			sgOpenAddTest,
+			sgAddTestSearchSet,
+			sgViewTrackedTest,
+			sgRenderAddTestModal,
+			sgTrackTest,
+			pageSigma,
+			sgOpSpecCell,
+			sgFrequencyHTML,
+			sgMuDominant,
+			sgMuStateChip,
+			sgMuHTML,
+			sgRefresh,
+			sgTips,
+			sgPointTipShow,
+			sgPointTipHide,
+			sgTrendSVG,
+			sgMDCSVG,
+			sgBiasRowsFromDom,
+			sgBiasPeriodsFromDom,
+			sgBiasStats,
+			sgBiasRoundsKey,
+			sgBiasLinkedPeriodIds,
+			sgOpenBias,
+			sgRenderBiasModal,
+			sgBiasUpdateSummary,
+			sgBiasSelectPeriods,
+			sgBiasAdd,
+			sgBiasDel,
+			sgApplyBiasToPeriods,
+			sgBiasApply,
+			sgMuRowsFromDom,
+			sgMuPeriodsFromDom,
+			sgMuCaptureDom,
+			sgMuPreview,
+			sgMuUpdatePreview,
+			sgOpenMU,
+			sgRenderMuModal,
+			sgMuSelectPeriods,
+			sgMuApply,
+			sgCell,
+			sgPeriodSel,
+			sgPart,
+			sgAddPeriod,
+			sgDelPeriod,
+			sgClearImportedCV,
+			sgCohortCutoff,
+			sgCohortGroups,
+			sgCohortStatusText,
+			sgImportCohort,
+			sgApplyCohortChoices,
+			sgCohortImportMessage,
+			sgRenderCohortModal,
+			sgCohortClose,
+			sgCohortApply,
+			sgPullCV
+		};
+	}
+	//#endregion
+	//#region src/presentation/shared/js-string-literal.ts
+	var LINE_SEPARATOR = String.fromCharCode(8232);
+	var PARAGRAPH_SEPARATOR = String.fromCharCode(8233);
+	/**
+	* Thoát chuỗi để nhúng an toàn vào một literal JavaScript trong thuộc tính
+	* onclick="..." (khác `esc()`/`escAttr()` — hai hàm đó thoát HTML, không phải
+	* cú pháp chuỗi JS). Được nhiều trang gọi làm global bridge (`root.jsq`).
+	*/
+	function jsq(value) {
+		return String(value).replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/\r/g, "\\r").replace(/\n/g, "\\n").replace(/&/g, "\\u0026").replace(/</g, "\\u003c").replace(/>/g, "\\u003e").split(LINE_SEPARATOR).join("\\u2028").split(PARAGRAPH_SEPARATOR).join("\\u2029");
 	}
 	//#endregion
 	//#region src/domain/westgard/westgard-view-model.ts
@@ -18437,6 +26187,7 @@
 			sgRefreshT: null,
 			sgBiasCtx: null,
 			sgMuCtx: null,
+			sgCohortCtx: null,
 			sgAddTestQ: "",
 			sgSelectedPeriods: {}
 		};
@@ -18946,7 +26697,7 @@
 		},
 		merge: (base, mergeFirstConnect, local, remote) => firebaseMergeApplication(base, mergeFirstConnect, local, remote),
 		relinkAudit: (value) => {
-			if (typeof auditRelinkChain === "function" && Array.isArray(value.activity)) value.activity = auditRelinkChain(value.activity, value.activityAnchor || "");
+			if (Array.isArray(value.activity)) value.activity = auditRelinkChain(value.activity, value.activityAnchor || "");
 		},
 		clearDerived: () => clearDerived(),
 		ensureShape: () => ensureShape(),
@@ -19054,6 +26805,32 @@
 		start: () => root.lisGatewayStart(),
 		pull: () => root.lisGatewayPull({ manual: true })
 	});
+	var lisQueueController = createLisQueueController({
+		document: typeof document !== "undefined" ? document : { getElementById: () => null },
+		presentation: root.lisQueuePresentation,
+		settingsService: { prepare: (input) => root.lisSettingsService.prepare(input) },
+		gatewayCommand: root.LisGatewayCommand,
+		normalizeGatewayUrl: (value) => root.lisNormalizeGatewayUrl(value),
+		gatewayConfig: () => root.lisGatewayConfig(),
+		gatewayRuntime: () => root.lisGatewayRuntime,
+		gatewayPull: (opts) => root.lisGatewayPull(opts),
+		importResult: (messageId) => root.lisImportResult(messageId),
+		rejectResult: (messageId) => root.lisRejectResult(messageId),
+		requireAdmin: (message) => root.requireAdmin(message),
+		infoDialog: (message, opts) => root.infoDialog(message, opts),
+		confirmDialog: (opts) => root.confirmDialog(opts),
+		openModal: (html) => root.openModal(html)
+	});
+	root.lisGatewaySaveSettings = lisQueueController.lisGatewaySaveSettings;
+	root.lisQueueValueText = lisQueueController.lisQueueValueText;
+	root.lisOnclick = lisQueueController.lisOnclick;
+	root.lisQueueRowHtml = lisQueueController.lisQueueRowHtml;
+	root.lisQueueSectionHtml = lisQueueController.lisQueueSectionHtml;
+	root.lisRenderQueueModal = lisQueueController.lisRenderQueueModal;
+	root.lisOpenQueueModal = lisQueueController.lisOpenQueueModal;
+	root.lisQueueRefresh = lisQueueController.lisQueueRefresh;
+	root.lisQueueImport = lisQueueController.lisQueueImport;
+	root.lisQueueReject = lisQueueController.lisQueueReject;
 	root.SettingsProfileCommand = createSettingsProfileCommand({
 		current: () => state.lab || {},
 		set: (lab) => {
@@ -19902,7 +27679,7 @@
 	root.targetNumberTextPresentation = createTargetNumberText({
 		valueDecimals: (test) => globalThis.testDecimalPlaces(test),
 		statDecimals: (test) => globalThis.testStatDecimals(test),
-		defaultDecimals: globalThis.QC_DECIMALS_DEFAULT
+		defaultDecimals: typeof QC_DECIMALS_DEFAULT !== "undefined" ? QC_DECIMALS_DEFAULT : 2
 	});
 	root.targetConfigAssignedPresentation = targetConfigAssigned;
 	root.targetRangeDraftPresentation = createTargetRangeDraft({
@@ -20226,6 +28003,54 @@
 	root.chartEmptyLabels = CHART_EMPTY_LABELS;
 	root.leveyJenningsMultiYAxis = leveyJenningsMultiYAxis;
 	root.leveyJenningsMultiGeometry = leveyJenningsMultiGeometry;
+	root.cusumDisplayPlan = createCusumDisplayPlan((input) => chartViewModel.sampleIndices(input));
+	root.cusumHoverModel = createCusumHoverModel({
+		date: (value) => vnDate(value),
+		number: (value, decimals) => root.fmt(value, decimals)
+	});
+	var qcChartRenderer = createQcChartRenderer({
+		hiDpiCanvasSetup: (canvas) => root.hiDpiCanvasSetup(canvas),
+		leveyJenningsGeometry: (input) => root.leveyJenningsGeometry(input),
+		leveyJenningsColors: root.leveyJenningsColors,
+		leveyJenningsBandRects: (input) => root.leveyJenningsBandRects(input),
+		findTest: (id) => (state.tests || []).find((test) => test.id === id),
+		leveyJenningsYAxisLabels: (test, mean, sd) => root.leveyJenningsYAxisLabels(test, mean, sd),
+		leveyJenningsGridLines: (axis, mean, sd, y) => root.leveyJenningsGridLines(axis, mean, sd, y),
+		canvasFont: (weight, token, fallback) => root.canvasFont(weight, token, fallback),
+		leveyJenningsChartTitle: root.leveyJenningsChartTitle,
+		chartEmptyLabels: root.chartEmptyLabels,
+		leveyJenningsTooltipController: (canvas) => root.leveyJenningsTooltipController(canvas),
+		lvlCfg: (test, level) => lvlCfg(test, level),
+		westgard: (points, mean, sd, scope) => root.QCCore.westgard(points, mean, sd, scope),
+		westgardRuleScope: root.westgardRuleScope,
+		leveyJenningsPointRenderModel: (input) => root.leveyJenningsPointRenderModel(input),
+		leveyJenningsTicks: (points) => root.leveyJenningsTicks(points),
+		chartDataUrl: (input) => root.chartDataUrl(input),
+		leveyJenningsMultiGeometry: (input) => root.leveyJenningsMultiGeometry(input),
+		leveyJenningsMultiSeries: (input) => root.leveyJenningsMultiSeries(input),
+		leveyJenningsMultiColors: root.leveyJenningsMultiColors,
+		westgardMultiByPoint: (levels, scope) => root.QCCore.westgardMultiByPoint(levels, scope),
+		westgardByPoint: (points, mean, sd, scope) => root.QCCore.westgardByPoint(points, mean, sd, scope),
+		leveyJenningsMultiPointRenderModel: (input) => root.leveyJenningsMultiPointRenderModel(input),
+		leveyJenningsMultiDividers: (levels, runs, runIndex, xOfRun) => root.leveyJenningsMultiDividers(levels, runs, runIndex, xOfRun),
+		leveyJenningsMultiRunTicks: (runs, all) => root.leveyJenningsMultiRunTicks(runs, all),
+		leveyJenningsLegendLayout: (levels, colors, startX, measure) => root.leveyJenningsLegendLayout(levels, colors, startX, measure),
+		leveyJenningsMultiYAxis: () => root.leveyJenningsMultiYAxis(),
+		cusumChartGeometry: (input) => root.cusumChartGeometry(input),
+		cusumReferenceLines: (input) => root.cusumReferenceLines(input),
+		cusumColors: root.cusumColors,
+		cusumChartTitle: (k, h) => root.cusumChartTitle(k, h),
+		format: (value, decimals) => fmt(value, decimals),
+		cusumDisplayPlan: (input) => root.cusumDisplayPlan(input),
+		cusumLinePoints: (input) => root.cusumLinePoints(input),
+		cusumPointRenderModel: (input) => root.cusumPointRenderModel(input),
+		cusumHoverModel: (input) => root.cusumHoverModel(input)
+	});
+	root.drawLJ = qcChartRenderer.drawLJ;
+	root.ljDataURL = qcChartRenderer.ljDataURL;
+	root.drawLJMultiZ = qcChartRenderer.drawLJMultiZ;
+	root.ljMultiDataURL = qcChartRenderer.ljMultiDataURL;
+	root.drawCUSUM = qcChartRenderer.drawCUSUM;
 	root.configNavScrollService = createConfigNavScrollService({
 		find: () => typeof document === "undefined" ? null : document.querySelector(".config-shell-nav"),
 		getPosition: () => Number(root.__configNavScrollPosition) || 0,
@@ -20246,18 +28071,18 @@
 		levelConfig: (test, level) => lvlCfg(test, level),
 		buildLeveyJennings: (input) => ChartViewModel.buildLeveyJennings(input),
 		acceptedLotPoints: (test, level) => acceptedLotPoints(test, level),
-		drawLeveyJennings: (canvas, points, mean, sd) => drawLJ(canvas, points, mean, sd),
+		drawLeveyJennings: (canvas, points, mean, sd) => qcChartRenderer.drawLJ(canvas, points, mean, sd),
 		entryCache: () => entryLjRenderCache,
 		multiViews: (test) => wgMultiViews(test),
 		buildMultiLevel: (input) => ChartViewModel.buildMultiLevel(input),
-		drawMultiLevel: (canvas, chart, test) => drawLJMultiZ(canvas, chart, test),
+		drawMultiLevel: (canvas, chart, test) => qcChartRenderer.drawLJMultiZ(canvas, chart, test),
 		lotGroups: () => state.lotGroups || [],
 		levelsForLotGroup: (group) => levelsForLotGroup(group),
 		archivedMultiViews: (levels) => wgArchivedMultiViews(levels),
 		operationalLotPoints: (test, level) => operationalLotPoints(test, level),
 		cusumSeries: (test, level) => cusumSeries(test, level),
 		buildCusum: (input) => ChartViewModel.buildCusum(input),
-		drawCusum: (canvas, points, series) => drawCUSUM(canvas, points, series),
+		drawCusum: (canvas, points, series) => qcChartRenderer.drawCUSUM(canvas, points, series),
 		fillDefaultDates: () => root.defaultDateFieldsService.fill(["eDate", "aDate"], vnDate(isoToday())),
 		runPageActions: () => root.postRenderPageActions.run(page, {
 			reagent: rcCompute,
@@ -20785,6 +28610,41 @@
 	root.firebaseRemoteSnapshot = createFirebaseRemoteSnapshot((value) => root.QCCore.validateBackup(value), (value) => root.QCCore.sanitizeBackup(value));
 	root.firebaseOwnSnapshotPlan = firebaseOwnSnapshotPlan;
 	root.firebaseFirstConnectPlan = firebaseFirstConnectPlan;
+	if (typeof TEA_SOURCE_REGISTRY !== "undefined" && typeof TEA_ANALYTE_CATALOG !== "undefined" && typeof REFTESTS !== "undefined") {
+		root.SigmaTeaResolution = createSigmaTeaResolution({
+			teaSourceRegistry: TEA_SOURCE_REGISTRY,
+			teaAnalyteCatalog: TEA_ANALYTE_CATALOG,
+			refTests: REFTESTS,
+			getState: () => state,
+			teaAnalyteMeta: (name, record) => globalThis.teaAnalyteMeta(name, record),
+			teaAnalyteDisplay: (name, record) => globalThis.teaAnalyteDisplay(name, record),
+			searchText: typeof globalThis.searchText === "function" ? (value) => globalThis.searchText(value) : void 0,
+			fmt: (value, decimals) => fmt(value, decimals),
+			vnDate: (value) => vnDate(value)
+		});
+		root.SG_TEA_SOURCES = root.SigmaTeaResolution.SG_TEA_SOURCES;
+		root.SG_CLIA_FIXED = root.SigmaTeaResolution.SG_CLIA_FIXED;
+		root.teaRefName = root.SigmaTeaResolution.teaRefName;
+		root.teaRefIsDefault = root.SigmaTeaResolution.teaRefIsDefault;
+		root.testDisplayName = root.SigmaTeaResolution.testDisplayName;
+		root.sgUnitKey = root.SigmaTeaResolution.sgUnitKey;
+		root.sgUnitsMatch = root.SigmaTeaResolution.sgUnitsMatch;
+		root.sgTeaSourceMeta = root.SigmaTeaResolution.sgTeaSourceMeta;
+		root.effectiveTeaRefs = root.SigmaTeaResolution.effectiveTeaRefs;
+		root.sgRef = root.SigmaTeaResolution.sgRef;
+		root.sgTeaSource = root.SigmaTeaResolution.sgTeaSource;
+		root.sgTeaInfo = root.SigmaTeaResolution.sgTeaInfo;
+		root.sgTeaBySource = root.SigmaTeaResolution.sgTeaBySource;
+		root.sgTea = root.SigmaTeaResolution.sgTea;
+		root.sgTeaCriterionText = root.SigmaTeaResolution.sgTeaCriterionText;
+		root.sgTeaLabel = root.SigmaTeaResolution.sgTeaLabel;
+		root.sgTeaRefText = root.SigmaTeaResolution.sgTeaRefText;
+		root.sgTeaSnapshot = root.SigmaTeaResolution.sgTeaSnapshot;
+		root.sgEnsureTeaSnapshot = root.SigmaTeaResolution.sgEnsureTeaSnapshot;
+		root.sgLevelTarget = root.SigmaTeaResolution.sgLevelTarget;
+		root.sgSetLevelTeaSnapshot = root.SigmaTeaResolution.sgSetLevelTeaSnapshot;
+		root.sgEntryTea = root.SigmaTeaResolution.sgEntryTea;
+	}
 	root.SigmaPresentation = sigmaPresentation;
 	root.SigmaPeriodViewModel = createSigmaPeriodViewModel({
 		sigmaMetric: (tea, bias, cv) => root.QCCore.sigmaMetric(tea, bias, cv),
@@ -21018,35 +28878,44 @@
 	});
 	root.qcPointWarnings = (test, config, date, runId, value) => qcPointWarnings(state.data && state.data[test.id] || [], config, date, runId, value);
 	root.PeriodService = createPeriodService({ cleanText: root.QCCore.cleanText });
+	root.ACTIVITY_HARD_CAP = 5e4;
+	root.ACTIVITY_ROTATE_TO = 4e4;
+	root.AUDIT_AUTO_VERIFY_MAX = 5e3;
+	root.auditActor = () => ({
+		user: userName(),
+		username: currentUser && currentUser.username || "",
+		userId: currentUser && currentUser.id || "",
+		role: role(),
+		clientId: fb && fb.clientId || ""
+	});
+	root.auditEntryHash = (entry) => root.QCCore.auditEntryHash(entry);
+	root.auditVerifyChain = (activity = state.activity || [], anchor = state.activityAnchor || "") => root.QCCore.verifyAuditChain(activity, anchor);
 	root.AuditService = createAuditService({
 		getState: () => state,
 		uid: () => typeof root.uid === "function" ? root.uid() : "",
 		nowIso: () => (/* @__PURE__ */ new Date()).toISOString(),
-		actor: () => typeof root.auditActor === "function" ? root.auditActor() : {
-			user: "",
-			username: "",
-			userId: "",
-			role: "",
-			clientId: ""
-		},
-		entryHash: (entry) => typeof root.auditEntryHash === "function" ? root.auditEntryHash(entry) : "",
-		verifyChain: (activity, anchor) => typeof root.auditVerifyChain === "function" ? root.auditVerifyChain(activity, anchor) : {
-			ok: true,
-			checked: 0,
-			legacy: 0
-		},
-		limits: () => {
-			const config = typeof root.auditRuntimeConfig === "function" ? root.auditRuntimeConfig() : {
-				hardCap: 5e4,
-				rotateTo: 4e4
-			};
-			return {
-				hardCap: config.hardCap,
-				rotateTo: config.rotateTo
-			};
-		},
-		autoVerifyMax: typeof root.auditRuntimeConfig === "function" ? root.auditRuntimeConfig().autoVerifyMax : 5e3
+		actor: () => root.auditActor(),
+		entryHash: (entry) => root.auditEntryHash(entry),
+		verifyChain: (activity, anchor) => root.auditVerifyChain(activity, anchor),
+		limits: () => ({
+			hardCap: root.ACTIVITY_HARD_CAP,
+			rotateTo: root.ACTIVITY_ROTATE_TO
+		}),
+		autoVerifyMax: root.AUDIT_AUTO_VERIFY_MAX
 	});
+	root.logAct = (action, detail, target = "") => {
+		root.AuditService.log(action, detail, target);
+	};
+	root.auditSha256 = (text) => root.QCCore.auditSha256(text);
+	root.auditRelinkChain = (entries, anchor = "") => root.AuditService.relinkChain(entries, anchor);
+	root.auditChainStatus = (force = false) => root.AuditService.chainStatus(force);
+	root.auditVerifyChainNow = () => {
+		root.AuditService.resetChainCache();
+		root.auditChainStatus(true);
+		rerender();
+	};
+	root.auditLastHashOf = (activity) => root.AuditService.lastHashOf(activity);
+	root.auditArchiveCut = (activity, cutoffIso) => root.AuditService.archiveCut(activity, cutoffIso);
 	root.NceFormWorkflowCommand = createNceFormWorkflowCommand({
 		current: () => state,
 		form: nceFormCommand,
@@ -21165,7 +29034,7 @@
 			const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
 			return [...new Uint8Array(bytes)].map((value) => value.toString(16).padStart(2, "0")).join("");
 		}
-		if (typeof auditSha256 === "function" && backupTextBytes(text) <= 16777216) return auditSha256(text);
+		if (backupTextBytes(text) <= 16777216) return auditSha256(text);
 		return "";
 	};
 	var backupCore = root.QCCore;
@@ -21489,7 +29358,7 @@
 		analyteMeta: (name, record) => globalThis.teaAnalyteMeta(name, record),
 		effectiveReferences: () => globalThis.effectiveTeaRefs(),
 		defaultReferences: () => REFTESTS,
-		sourceRegistry: () => globalThis.TEA_SOURCE_REGISTRY,
+		sourceRegistry: () => TEA_SOURCE_REGISTRY,
 		createId: () => globalThis.uid(),
 		todayIso: () => globalThis.isoToday(),
 		userName: () => globalThis.userName()
@@ -21511,6 +29380,562 @@
 		formatDate: (value) => globalThis.vnDate(value),
 		transitionToNo: (lotId) => globalThis.lotTransitionToNo(lotId)
 	});
+	var managePageController = createManagePageController({
+		document: typeof document !== "undefined" ? document : {
+			getElementById: () => null,
+			querySelector: () => null
+		},
+		getState: () => state,
+		ui: () => root.ManageUIState,
+		currentPage: () => root.RouterUIState.page,
+		rerender: () => rerender(),
+		role: () => role(),
+		userName: () => userName(),
+		requireAdmin: (message) => root.requireAdmin(message),
+		esc: (value) => root.esc(value),
+		escapeAttr: (value) => root.escAttr(value),
+		btn: (label, action, cls, title, options) => root.btn(label, action, cls, title, options),
+		emptyState: (title, body, actions) => root.emptyState(title, body, actions),
+		dateBox: (id, value, cls, attrs) => root.dateBox(id, value, cls, attrs),
+		headOnly: (title, subtitle, actions) => root.headOnly(title, subtitle, actions),
+		openModal: (html) => root.openModal(html),
+		closeModal: () => root.closeModal(),
+		confirmDialog: (opts) => root.confirmDialog(opts),
+		infoDialog: (message, opts) => root.infoDialog(message, opts),
+		searchText: (value) => globalThis.searchText(value),
+		vnDate: (value) => vnDate(value),
+		fmt: (value, decimals) => fmt(value, decimals),
+		fmtTestValue: (test, value) => root.fmtTestValue(test, value),
+		formatDateTimeVN: (value) => root.formatDateTimeVN(value),
+		isoToday: () => root.isoToday(),
+		parseVN: (value) => root.parseVN(value),
+		QCCore: { cleanText: (value, maximumLength) => root.QCCore.cleanText(value, maximumLength) },
+		scheduleSearchRender: (owner, apply, focusId) => root.scheduleSearchRender(owner, apply, focusId),
+		teaSourceRegistry: () => TEA_SOURCE_REGISTRY,
+		effectiveTeaRefs: () => root.effectiveTeaRefs(),
+		teaRefIsDefault: (value) => root.teaRefIsDefault(value),
+		teaRefName: (value) => root.teaRefName(value),
+		teaAnalyteMeta: (name, record) => globalThis.teaAnalyteMeta(name, record),
+		teaAnalyteDisplay: (name, record) => globalThis.teaAnalyteDisplay(name, record),
+		testDisplayName: (test) => root.testDisplayName(test),
+		transitionSwitchesLot: (transition) => globalThis.transitionSwitchesLot(transition),
+		lotGroupInUse: (group) => globalThis.lotGroupInUse(group),
+		targetConfigAssigned: (test, level, lotId) => globalThis.targetConfigAssigned(test, level, lotId),
+		plannedTargetFor: (test, level, lotId) => globalThis.plannedTargetFor(test, level, lotId),
+		lotTargetSnapshot: (test, level, lotId) => globalThis.lotTargetSnapshot(test, level, lotId),
+		targetRangeDraft: (cfg) => globalThis.targetRangeDraft(cfg),
+		targetNumberText: (value, test, kind) => globalThis.targetNumberText(value, test, kind),
+		TeaReferenceService: root.TeaReferenceService,
+		TeaReferenceWorkflowCommand: root.TeaReferenceWorkflowCommand,
+		pres: root
+	});
+	root.manageSearchSet = managePageController.manageSearchSet;
+	root.manageMatch = managePageController.manageMatch;
+	root.manageSearchPlaceholder = managePageController.manageSearchPlaceholder;
+	root.groupsOfLot = managePageController.groupsOfLot;
+	root.lotGroupLabels = managePageController.lotGroupLabels;
+	root.instrumentName = managePageController.instrumentName;
+	root.panelName = managePageController.panelName;
+	root.lotLabel = managePageController.lotLabel;
+	root.lotTransitionToNo = managePageController.lotTransitionToNo;
+	root.lotStatus = managePageController.lotStatus;
+	root.manageShell = managePageController.manageShell;
+	root.manageToolbar = managePageController.manageToolbar;
+	root.manageLots = managePageController.manageLots;
+	root.manageInstruments = managePageController.manageInstruments;
+	root.managePanels = managePageController.managePanels;
+	root.manageTransitionsV2 = managePageController.manageTransitionsV2;
+	root.targetGroupLots = managePageController.targetGroupLots;
+	root.targetGroupOptions = managePageController.targetGroupOptions;
+	root.ensureTargetSelection = managePageController.ensureTargetSelection;
+	root.manageTargets = managePageController.manageTargets;
+	root.manageAssays = managePageController.manageAssays;
+	root.manageHistorySearchValues = managePageController.manageHistorySearchValues;
+	root.manageHistory = managePageController.manageHistory;
+	root.teaRefFind = managePageController.teaRefFind;
+	root.teaRefNumOrNull = managePageController.teaRefNumOrNull;
+	root.teaRefExternalChanged = managePageController.teaRefExternalChanged;
+	root.teaRefEnsure = managePageController.teaRefEnsure;
+	root.teaRefEdit = managePageController.teaRefEdit;
+	root.teaRefRemove = managePageController.teaRefRemove;
+	root.teaSourceRegistryHtml = managePageController.teaSourceRegistryHtml;
+	root.teaRefOpenAdd = managePageController.teaRefOpenAdd;
+	root.teaRefAddSubmit = managePageController.teaRefAddSubmit;
+	root.teaLabProfileOpen = managePageController.teaLabProfileOpen;
+	root.teaLabProfileSave = managePageController.teaLabProfileSave;
+	root.teaLabProfileRemove = managePageController.teaLabProfileRemove;
+	root.manageTeaRefs = managePageController.manageTeaRefs;
+	root.manageView = managePageController.manageView;
+	root.renderManageBody = managePageController.renderManageBody;
+	root.pageManage = managePageController.pageManage;
+	var manageTestsActionsController = createManageTestsActionsController({
+		document: () => typeof document !== "undefined" ? document : {
+			getElementById: () => null,
+			querySelector: () => null,
+			querySelectorAll: () => []
+		},
+		getState: () => state,
+		ui: () => root.ManageUIState,
+		analysisUi: () => root.AnalysisUIState,
+		entryUi: () => root.EntryUIState,
+		rerender: () => rerender(),
+		resetMainScroll: () => root.resetMainScroll(),
+		role: () => role(),
+		userName: () => userName(),
+		requireAdmin: (message) => root.requireAdmin(message),
+		reauthenticateCurrentUser: (opts) => root.reauthenticateCurrentUser(opts),
+		esc: (value) => root.esc(value),
+		escapeAttr: (value) => root.escAttr(value),
+		btn: (label, action, cls, title, options) => root.btn(label, action, cls, title, options),
+		emptyState: (title, body, actions) => root.emptyState(title, body, actions),
+		dateBox: (id, value, cls, attrs) => root.dateBox(id, value, cls, attrs),
+		openModal: (html) => root.openModal(html),
+		closeModal: () => root.closeModal(),
+		confirmDialog: (opts) => root.confirmDialog(opts),
+		infoDialog: (message, opts) => root.infoDialog(message, opts),
+		searchText: (value) => globalThis.searchText(value),
+		vnDate: (value) => vnDate(value),
+		fmt: (value, decimals) => fmt(value, decimals),
+		fmtTestValue: (test, value) => root.fmtTestValue(test, value),
+		fmtPointValue: (point, test) => globalThis.fmtPointValue(point, test),
+		isoToday: () => root.isoToday(),
+		parseVN: (value) => root.parseVN(value),
+		QCCore: { cleanText: (value, maximumLength) => root.QCCore.cleanText(value, maximumLength) },
+		uid: () => root.uid(),
+		effectiveTeaRefs: () => root.effectiveTeaRefs(),
+		teaAnalyteMeta: (name, record) => globalThis.teaAnalyteMeta(name, record),
+		teaAnalyteKey: (value) => teaAnalyteKey(value),
+		testDisplayName: (test) => root.testDisplayName(test),
+		instrumentName: (id, fallback) => root.instrumentName(id, fallback),
+		lotTransitionToNo: (lotId) => root.lotTransitionToNo(lotId),
+		targetGroupLots: (group) => root.targetGroupLots(group),
+		inspectAcceptedLotTransition: (input) => globalThis.inspectAcceptedLotTransition(input),
+		monthVN: (value) => globalThis.monthVN(value),
+		upsertLotTargetHistory: (target, lot, values) => globalThis.upsertLotTargetHistory(target, lot, values),
+		stats: (values) => root.QCCore.stats(values),
+		pointsForLot: (testId, level, lotNo) => globalThis.pointsForLot(testId, level, lotNo),
+		pointStaff: (point) => globalThis.pointStaff(point),
+		testCusumConfig: (test) => globalThis.testCusumConfig(test),
+		wgRules: () => WG_RULES,
+		qcDecimalsDefault: () => QC_DECIMALS_DEFAULT,
+		refTests: () => REFTESTS,
+		ManageConfigService: root.ManageConfigService,
+		PeriodService: root.PeriodService,
+		LotTransitionPickerService: root.LotTransitionPickerService,
+		pres: root
+	});
+	root.parseVN = manageTestsActionsController.parseVN;
+	root.setManageTab = manageTestsActionsController.setManageTab;
+	root.setTargetPanel = manageTestsActionsController.setTargetPanel;
+	root.setTargetGroup = manageTestsActionsController.setTargetGroup;
+	root.setTargetLevel = manageTestsActionsController.setTargetLevel;
+	root.setHistoryTest = manageTestsActionsController.setHistoryTest;
+	root.openTargetMatrix = manageTestsActionsController.openTargetMatrix;
+	root.targetNumberText = manageTestsActionsController.targetNumberText;
+	root.targetConfigAssigned = manageTestsActionsController.targetConfigAssigned;
+	root.targetRangeDraft = manageTestsActionsController.targetRangeDraft;
+	root.syncTargetRange = manageTestsActionsController.syncTargetRange;
+	root.toggleTargetRow = manageTestsActionsController.toggleTargetRow;
+	root.targetCheckAll = manageTestsActionsController.targetCheckAll;
+	root.targetPickBackfillPoints = manageTestsActionsController.targetPickBackfillPoints;
+	root.applyTargetPick = manageTestsActionsController.applyTargetPick;
+	root.applyPlannedTarget = manageTestsActionsController.applyPlannedTarget;
+	root.readTargetMatrixPicks = manageTestsActionsController.readTargetMatrixPicks;
+	root.saveTargetMatrix = manageTestsActionsController.saveTargetMatrix;
+	root.openTargetSwitchModal = manageTestsActionsController.openTargetSwitchModal;
+	root.resolveTargetSwitch = manageTestsActionsController.resolveTargetSwitch;
+	root.commitTargetMatrix = manageTestsActionsController.commitTargetMatrix;
+	root.openQcHistoryDetail = manageTestsActionsController.openQcHistoryDetail;
+	root.openConfigPanel = manageTestsActionsController.openConfigPanel;
+	root.renderConfigPanelTests = manageTestsActionsController.renderConfigPanelTests;
+	root.saveConfigPanel = manageTestsActionsController.saveConfigPanel;
+	root.deleteConfigPanel = manageTestsActionsController.deleteConfigPanel;
+	root.deleteLotTransition = manageTestsActionsController.deleteLotTransition;
+	root.lotTransitionChoiceLabel = manageTestsActionsController.lotTransitionChoiceLabel;
+	root.lotTransitionChoiceLots = manageTestsActionsController.lotTransitionChoiceLots;
+	root.lotTransitionChoiceMatch = manageTestsActionsController.lotTransitionChoiceMatch;
+	root.lotTransitionSelectedId = manageTestsActionsController.lotTransitionSelectedId;
+	root.lotTransitionChoiceInput = manageTestsActionsController.lotTransitionChoiceInput;
+	root.lotTransitionChoiceHtml = manageTestsActionsController.lotTransitionChoiceHtml;
+	root.openLotTransitionV2 = manageTestsActionsController.openLotTransitionV2;
+	root.lotTransitionTargetsHtml = manageTestsActionsController.lotTransitionTargetsHtml;
+	root.filterLotTransitionTargets = manageTestsActionsController.filterLotTransitionTargets;
+	root.refreshLotTransitionTargets = manageTestsActionsController.refreshLotTransitionTargets;
+	root.readLotTransitionTargetPicks = manageTestsActionsController.readLotTransitionTargetPicks;
+	root.saveLotTransitionV2 = manageTestsActionsController.saveLotTransitionV2;
+	root.openConfigGroup = manageTestsActionsController.openConfigGroup;
+	root.suggestConfigGroupName = manageTestsActionsController.suggestConfigGroupName;
+	root.saveConfigGroup = manageTestsActionsController.saveConfigGroup;
+	root.deleteConfigGroup = manageTestsActionsController.deleteConfigGroup;
+	root.toggleLotGroupStatus = manageTestsActionsController.toggleLotGroupStatus;
+	root.activateLotGroup = manageTestsActionsController.activateLotGroup;
+	root.openConfigLot = manageTestsActionsController.openConfigLot;
+	root.saveConfigLot = manageTestsActionsController.saveConfigLot;
+	root.renameLotAcrossPoints = manageTestsActionsController.renameLotAcrossPoints;
+	root.deleteConfigLot = manageTestsActionsController.deleteConfigLot;
+	root.openConfigInstrument = manageTestsActionsController.openConfigInstrument;
+	root.saveConfigInstrument = manageTestsActionsController.saveConfigInstrument;
+	root.deleteConfigInstrument = manageTestsActionsController.deleteConfigInstrument;
+	root.defaultAssayLevels = manageTestsActionsController.defaultAssayLevels;
+	root.configAssayTeaRefs = manageTestsActionsController.configAssayTeaRefs;
+	root.configAssayRefRecord = manageTestsActionsController.configAssayRefRecord;
+	root.configAssayNaming = manageTestsActionsController.configAssayNaming;
+	root.configAssayFindRef = manageTestsActionsController.configAssayFindRef;
+	root.configAssaySuggestionInput = manageTestsActionsController.configAssaySuggestionInput;
+	root.openConfigAssay = manageTestsActionsController.openConfigAssay;
+	root.saveConfigAssay = manageTestsActionsController.saveConfigAssay;
+	root.delTest = manageTestsActionsController.delTest;
+	root.jsq = jsq;
+	var entryPageController = createEntryPageController({
+		document: () => typeof document !== "undefined" ? document : {
+			getElementById: () => null,
+			querySelector: () => null,
+			querySelectorAll: () => []
+		},
+		window: () => typeof window !== "undefined" ? window : {
+			scrollX: 0,
+			scrollY: 0,
+			scrollTo: () => {}
+		},
+		localStorage: () => typeof localStorage !== "undefined" ? localStorage : {
+			getItem: () => null,
+			setItem: () => {}
+		},
+		getState: () => state,
+		ui: () => root.EntryUIState,
+		analysisUi: () => root.AnalysisUIState,
+		currentPage: () => root.RouterUIState.page,
+		rerender: () => rerender(),
+		afterRender: (page) => root.afterRender(page),
+		role: () => role(),
+		canWrite: () => root.canWrite(),
+		requireWrite: () => requireWrite(),
+		requireUnlockedPeriod: (date, action) => root.requireUnlockedPeriod(date, action),
+		esc: (value) => root.esc(value),
+		escapeAttr: (value) => root.escAttr(value),
+		jsq: (value) => jsq(value),
+		btn: (label, action, cls, title, options) => root.btn(label, action, cls, title, options),
+		headOnly: (title, subtitle, actions) => root.headOnly(title, subtitle, actions),
+		dateBox: (id, value, cls, attrs) => root.dateBox(id, value, cls, attrs),
+		openModal: (html) => root.openModal(html),
+		closeModal: () => root.closeModal(),
+		confirmDialog: (opts) => root.confirmDialog(opts),
+		searchText: (value) => root.searchText(value),
+		vnDate: (value) => vnDate(value),
+		fmt: (value, decimals) => fmt(value, decimals),
+		fmtTestValue: (test, value) => root.fmtTestValue(test, value),
+		fmtTestStat: (test, value) => root.fmtTestStat(test, value),
+		fmtPointValue: (point, test) => root.fmtPointValue(point, test),
+		isoToday: () => root.isoToday(),
+		isoMonth: () => root.isoMonth(),
+		dateObj: (value) => root.dateObj(value),
+		testDisplayName: (test) => root.testDisplayName(test),
+		stateName: (value) => root.stateName(value),
+		operationalTests: () => root.operationalTests(),
+		operationalLevels: (test) => root.operationalLevels(test),
+		operationalLotGroupForTest: (test) => root.operationalLotGroupForTest(test),
+		operationalTestOrder: (test) => root.operationalTestOrder(test),
+		activeWestgard: (test) => root.activeWestgard(test),
+		parallelWestgard: (test, column) => root.parallelWestgard(test, column),
+		entryColumns: (test) => root.entryColumns(test),
+		entryColumnPoints: (test, column, includeVoided) => root.entryColumnPoints(test, column, includeVoided),
+		pointsForLot: (testId, level, lotNo) => root.pointsForLot(testId, level, lotNo),
+		pointsOf: (testId, level) => root.pointsOf(testId, level),
+		acceptedLotPoints: (test, level) => root.acceptedLotPoints(test, level),
+		previousLotSeries: (test, level) => root.previousLotSeries(test, level),
+		testRuleOnWithin: (test, rule) => root.testRuleOnWithin(test, rule),
+		ruleResultLevel: (test, rules) => root.ruleResultLevel(test, rules),
+		qcVerdictLabel: (level) => root.qcVerdictLabel(level),
+		canEnterQcForLevel: (test, level) => root.canEnterQcForLevel(test, level),
+		rangeCandidate: (testId, level) => root.rangeCandidate(testId, level),
+		rangeActions: (testId, level, eligible, applied) => root.rangeActions(testId, level, eligible, applied),
+		errorType: (rules) => root.errorType(rules),
+		qcPointWarnings: (test, cfg, date, runId, value) => root.qcPointWarnings(test, cfg, date, runId, value),
+		qcValueDecimals: (value) => root.qcValueDecimals(value),
+		currentStaff: () => root.currentStaff(),
+		uid: () => root.uid(),
+		nextNceId: (today) => root.nextNceId(today),
+		nceDueDate: (days) => root.nceDueDate(days),
+		pointVoidVerdict: (test, point) => root.pointVoidVerdict(test, point),
+		pointRunNo: (point) => root.pointRunNo(point),
+		pointStaff: (point) => root.pointStaff(point),
+		stats: (values) => root.QCCore.stats(values),
+		lvlCfg: (test, level) => lvlCfg(test, level),
+		QCCore: {
+			westgardByPoint: (points, mean, sd, ruleOn) => root.QCCore.westgardByPoint(points, mean, sd, ruleOn),
+			cleanText: (value, maxLength) => root.QCCore.cleanText(value, maxLength)
+		},
+		EntryService: root.EntryService,
+		EntryRecordWorkflowCommand: root.EntryRecordWorkflowCommand,
+		EntryVoidWorkflowCommand: root.EntryVoidWorkflowCommand,
+		EntryDateNoteWorkflowCommand: root.EntryDateNoteWorkflowCommand,
+		pres: root
+	});
+	root.pageEntry = entryPageController.pageEntry;
+	root.entryWindow = entryPageController.entryWindow;
+	root.entryWindowFor = entryPageController.entryWindowFor;
+	root.entryRowsWindow = entryPageController.entryRowsWindow;
+	root.entryToggleRows = entryPageController.entryToggleRows;
+	root.entryDetailToggled = entryPageController.entryDetailToggled;
+	root.entryTreeIsCollapsed = entryPageController.entryTreeIsCollapsed;
+	root.treeToggle = entryPageController.treeToggle;
+	root.toggleEntryTree = entryPageController.toggleEntryTree;
+	root.entryTreeKey = entryPageController.entryTreeKey;
+	root.entryFilter = entryPageController.entryFilter;
+	root.entryPick = entryPageController.entryPick;
+	root.entryFocusLevel = entryPageController.entryFocusLevel;
+	root.entryShowPrevLot = entryPageController.entryShowPrevLot;
+	root.entryShowCurrentLot = entryPageController.entryShowCurrentLot;
+	root.entryFocusPendingSheet = entryPageController.entryFocusPendingSheet;
+	root.entrySheetInputs = entryPageController.entrySheetInputs;
+	root.entrySheetTarget = entryPageController.entrySheetTarget;
+	root.entrySheetKey = entryPageController.entrySheetKey;
+	root.entryLatestTreeState = entryPageController.entryLatestTreeState;
+	root.entrySyncTreeState = entryPageController.entrySyncTreeState;
+	root.entryRenderKeepScroll = entryPageController.entryRenderKeepScroll;
+	root.entrySetLastMsg = entryPageController.entrySetLastMsg;
+	root.entryUnlockExtraRun = entryPageController.entryUnlockExtraRun;
+	root.entryDateNoteSave = entryPageController.entryDateNoteSave;
+	root.entryColumnCfg = entryPageController.entryColumnCfg;
+	root.entryInlineSave = entryPageController.entryInlineSave;
+	root.entryInlineSaveCommit = entryPageController.entryInlineSaveCommit;
+	root.syncVoidNceChoice = entryPageController.syncVoidNceChoice;
+	root.voidQcPoint = entryPageController.voidQcPoint;
+	root.confirmVoidQcPoint = entryPageController.confirmVoidQcPoint;
+	root.entrySetSheetMonth = entryPageController.entrySetSheetMonth;
+	root.entryGoToday = entryPageController.entryGoToday;
+	root.entrySetSheetPart = entryPageController.entrySetSheetPart;
+	root.entrySetDays = entryPageController.entrySetDays;
+	root.entrySetStart = entryPageController.entrySetStart;
+	root.entrySetEnd = entryPageController.entrySetEnd;
+	var actionsPageControllerRef = null;
+	var actionFormController = createActionFormController({
+		getState: () => state,
+		document: () => typeof document !== "undefined" ? document : {
+			getElementById: () => null,
+			querySelector: () => null,
+			querySelectorAll: () => []
+		},
+		actionUi: () => root.actionFormUiState,
+		currentUser: () => currentUser,
+		rerender: () => rerender(),
+		requireWrite: () => requireWrite(),
+		canWrite: () => root.canWrite(),
+		infoDialog: (message, opts) => root.infoDialog(message, opts),
+		esc: (value) => root.esc(value),
+		escapeAttr: (value) => root.escAttr(value),
+		jsq: (value) => jsq(value),
+		btn: (label, action, cls, title, options) => root.btn(label, action, cls, title, options),
+		dateBox: (id, value, cls, attrs) => root.dateBox(id, value, cls, attrs),
+		vnDate: (value) => vnDate(value),
+		fmt: (value, decimals) => fmt(value, decimals),
+		fmtPointValue: (point, test) => root.fmtPointValue(point, test),
+		fmtTestValue: (test, value) => root.fmtTestValue(test, value),
+		fmtTestStat: (test, value) => root.fmtTestStat(test, value),
+		testDisplayName: (test) => root.testDisplayName(test),
+		userName: () => userName(),
+		parseVN: (value) => root.parseVN(value),
+		isoToday: () => root.isoToday(),
+		operationalLevels: (test) => root.operationalLevels(test),
+		operationalTests: () => root.operationalTests(),
+		lvlCfg: (test, level) => lvlCfg(test, level),
+		nextNceId: (today) => root.nextNceId(today),
+		QCCore: {
+			cleanText: (value, maximumLength) => root.QCCore.cleanText(value, maximumLength),
+			WG_RULES: root.QCCore.WG_RULES
+		},
+		ACTION_LABELS: () => typeof root.ACTION_LABELS !== "undefined" ? root.ACTION_LABELS : {
+			check: {},
+			containment: {},
+			patient: {},
+			cause: {},
+			source: {},
+			phase: {},
+			risk: {},
+			release: {}
+		},
+		actionApprovalStatus: (a) => root.actionApprovalStatus(a),
+		actionCancelled: (a) => root.actionCancelled(a),
+		actionWorkflowStatus: (a) => root.actionWorkflowStatus(a),
+		actionRerunStatus: (a) => root.actionRerunStatus(a),
+		actionRiskScore: (a) => root.actionRiskScore(a),
+		actionResidualRiskScore: (a) => root.actionResidualRiskScore(a),
+		actionProtocolStatus: (form) => root.actionProtocolStatus(form),
+		ActionProtocolService: root.ActionProtocolService,
+		ActionBiasService: root.ActionBiasService,
+		ActionBiasPresentation: root.ActionBiasPresentation,
+		ActionChecklistPresentation: root.ActionChecklistPresentation,
+		ActionInvestigationPresentation: root.ActionInvestigationPresentation,
+		ActionFormModel: root.ActionFormModel,
+		NceFormWorkflowCommand: root.NceFormWorkflowCommand,
+		levelShort: (t, level, lotSnap) => actionsPageControllerRef.actionLevelShort(t, level, lotSnap),
+		evidenceTimelineHtml: (a, rr) => actionsPageControllerRef.actionEvidenceTimelineHtml(a, rr),
+		rerunEvidenceHtml: (a, rr, t) => actionsPageControllerRef.actionRerunEvidenceHtml(a, rr, t),
+		pres: root
+	});
+	root.actionUi = actionFormController.actionUi;
+	root.actionSectionToggled = actionFormController.actionSectionToggled;
+	root.actionDefaultOpenSections = actionFormController.actionDefaultOpenSections;
+	root.actionRuleOptions = actionFormController.actionRuleOptions;
+	root.actionStaffOptions = actionFormController.actionStaffOptions;
+	root.captureActionDraft = actionFormController.captureActionDraft;
+	root.actionFormChanged = actionFormController.actionFormChanged;
+	root.actionDraftValues = actionFormController.actionDraftValues;
+	root.clearActionDraft = actionFormController.clearActionDraft;
+	root.actionSourceOptions = actionFormController.actionSourceOptions;
+	root.actionCausePhrases = actionFormController.actionCausePhrases;
+	root.actionActionPhrases = actionFormController.actionActionPhrases;
+	root.actionSuggestRow = actionFormController.actionSuggestRow;
+	root.actionSuggestBox = actionFormController.actionSuggestBox;
+	root.actionInsertSuggestion = actionFormController.actionInsertSuggestion;
+	root.syncActionSuggestions = actionFormController.syncActionSuggestions;
+	root.actSel = actionFormController.actSel;
+	root.actionLevelLabel = actionFormController.actionLevelLabel;
+	root.syncActLevels = actionFormController.syncActLevels;
+	root.actionLevelContext = actionFormController.actionLevelContext;
+	root.beginActionManual = actionFormController.beginActionManual;
+	root.closeActionForm = actionFormController.closeActionForm;
+	root.actionFormClosedHtml = actionFormController.actionFormClosedHtml;
+	root.actionIncidentBanner = actionFormController.actionIncidentBanner;
+	root.beginActionFromIssue = actionFormController.beginActionFromIssue;
+	root.actionFieldValue = actionFormController.actionFieldValue;
+	root.readActionProtocolForm = actionFormController.readActionProtocolForm;
+	root.actionEffectivenessMissingKey = actionFormController.actionEffectivenessMissingKey;
+	root.addAction = actionFormController.addAction;
+	root.syncActionRiskScore = actionFormController.syncActionRiskScore;
+	root.syncActionResidualRiskScore = actionFormController.syncActionResidualRiskScore;
+	root.editAction = actionFormController.editAction;
+	root.actionInvestigationField = actionFormController.actionInvestigationField;
+	root.actionInvestigationChoiceLabel = actionFormController.actionInvestigationChoiceLabel;
+	root.actionInvestigationStateClass = actionFormController.actionInvestigationStateClass;
+	root.actionInvestigationChoose = actionFormController.actionInvestigationChoose;
+	root.actionInvestigationSync = actionFormController.actionInvestigationSync;
+	root.actionChecklistRefresh = actionFormController.actionChecklistRefresh;
+	root.actionSectionChip = actionFormController.actionSectionChip;
+	root.actionChecklistChip = actionFormController.actionChecklistChip;
+	root.actionEffSectionChip = actionFormController.actionEffSectionChip;
+	root.actionUpdateSectionChip = actionFormController.actionUpdateSectionChip;
+	root.actionRefreshSectionChips = actionFormController.actionRefreshSectionChips;
+	root.actionSection = actionFormController.actionSection;
+	root.actionFormModel = actionFormController.actionFormModel;
+	root.actionFormDefaults = actionFormController.actionFormDefaults;
+	root.focusActionField = actionFormController.focusActionField;
+	root.actionBiasInfo = actionFormController.actionBiasInfo;
+	root.actionBiasContext = actionFormController.actionBiasContext;
+	root.actionLatestSigmaBias = actionFormController.actionLatestSigmaBias;
+	root.actionFillBias = actionFormController.actionFillBias;
+	root.actionBiasThresholdHtml = actionFormController.actionBiasThresholdHtml;
+	root.actionBiasReferenceHtml = actionFormController.actionBiasReferenceHtml;
+	root.actionUpdateBiasHint = actionFormController.actionUpdateBiasHint;
+	root.actionFormHtml = actionFormController.actionFormHtml;
+	var actionsPageController = createActionsPageController({
+		getState: () => state,
+		document: () => typeof document !== "undefined" ? document : {
+			getElementById: () => null,
+			querySelector: () => null,
+			querySelectorAll: () => []
+		},
+		entryUi: () => root.EntryUIState,
+		currentPage: () => root.RouterUIState.page,
+		currentUser: () => currentUser,
+		rerender: () => rerender(),
+		role: () => role(),
+		userName: () => userName(),
+		canWrite: () => root.canWrite(),
+		requireWrite: () => requireWrite(),
+		requireAdmin: (message) => root.requireAdmin(message),
+		reauthenticateCurrentUser: (opts) => root.reauthenticateCurrentUser(opts),
+		openModal: (html) => root.openModal(html),
+		closeModal: () => root.closeModal(),
+		confirmDialog: (opts) => root.confirmDialog(opts),
+		infoDialog: (message, opts) => root.infoDialog(message, opts),
+		esc: (value) => root.esc(value),
+		jsq: (value) => jsq(value),
+		btn: (label, action, cls, title, options) => root.btn(label, action, cls, title, options),
+		headOnly: (title, subtitle, actions) => root.headOnly(title, subtitle, actions),
+		vnDate: (value) => vnDate(value),
+		formatDateTimeVN: (value) => formatDateTimeVN(value),
+		fmtPointValue: (point, test) => root.fmtPointValue(point, test),
+		testDisplayName: (test) => root.testDisplayName(test),
+		stateName: (value) => root.stateName(value),
+		errorType: (rules) => root.errorType(rules),
+		fixHint: (rules) => root.fixHint(rules),
+		lvlCfg: (test, level) => lvlCfg(test, level),
+		pointWorkflowSummary: (pointId) => root.pointWorkflowSummary(pointId),
+		pointRealActions: (pointId) => typeof root.pointRealActions === "function" ? root.pointRealActions(pointId) : [],
+		go: (page) => root.go(page),
+		ACTION_LABELS: () => typeof root.ACTION_LABELS !== "undefined" ? root.ACTION_LABELS : {
+			check: {},
+			containment: {},
+			patient: {},
+			cause: {},
+			source: {},
+			phase: {},
+			risk: {},
+			release: {}
+		},
+		actionApprovalStatus: (a) => root.actionApprovalStatus(a),
+		actionApprovalLabel: (a) => root.actionApprovalLabel(a),
+		actionCancelled: (a) => root.actionCancelled(a),
+		actionRecorded: (a) => root.actionRecorded(a),
+		actionWorkflowStatus: (a) => root.actionWorkflowStatus(a),
+		actionOverdue: (a) => root.actionOverdue(a),
+		actionEffectivenessStatus: (a) => root.actionEffectivenessStatus(a),
+		actionResidualRiskScore: (a) => root.actionResidualRiskScore(a),
+		actionRiskScore: (a) => root.actionRiskScore(a),
+		actionRerunStatus: (a) => root.actionRerunStatus(a),
+		actionEventDate: (a) => root.actionEventDate(a),
+		ActionReviewService: root.ActionReviewService,
+		ActionReviewMessages: root.ActionReviewMessages,
+		ActionEscalationService: root.ActionEscalationService,
+		ActionListPresentation: root.ActionListPresentation,
+		ActionStatusPresentation: root.ActionStatusPresentation,
+		ActionReviewPresentation: root.ActionReviewPresentation,
+		ActionDetailPresentation: root.ActionDetailPresentation,
+		ActionEvidencePresentation: root.ActionEvidencePresentation,
+		ActionRerunEvidencePresentation: root.ActionRerunEvidencePresentation,
+		ActionViolationService: root.ActionViolationService,
+		ActionGuidePresentation: root.ActionGuidePresentation,
+		ActionCurrentIssues: () => root.ActionCurrentIssues(),
+		NceLifecycleWorkflowCommand: root.NceLifecycleWorkflowCommand,
+		actionFormUiState: root.actionFormUiState,
+		modalTemplate: (opts) => root.modalTemplate(opts),
+		QCCore: { cleanText: (value, maximumLength) => root.QCCore.cleanText(value, maximumLength) },
+		formHtml: (issueCount) => actionFormController.actionFormHtml(issueCount),
+		captureFormDraft: () => actionFormController.captureActionDraft(),
+		pres: root
+	});
+	actionsPageControllerRef = actionsPageController;
+	root.actionLevelShort = actionsPageController.actionLevelShort;
+	root.currentIssues = actionsPageController.currentIssues;
+	root.cancelAction = actionsPageController.cancelAction;
+	root.confirmCancelAction = actionsPageController.confirmCancelAction;
+	root.actionApprovalTag = actionsPageController.actionApprovalTag;
+	root.actionApprovalToken = actionsPageController.actionApprovalToken;
+	root.approveAction = actionsPageController.approveAction;
+	root.confirmApproveAction = actionsPageController.confirmApproveAction;
+	root.returnAction = actionsPageController.returnAction;
+	root.confirmReturnAction = actionsPageController.confirmReturnAction;
+	root.actionCanEscalate = actionsPageController.actionCanEscalate;
+	root.escalateAction = actionsPageController.escalateAction;
+	root.actionCanReopen = actionsPageController.actionCanReopen;
+	root.reopenAction = actionsPageController.reopenAction;
+	root.confirmReopenAction = actionsPageController.confirmReopenAction;
+	root.actionReviewButtons = actionsPageController.actionReviewButtons;
+	root.actionSideChips = actionsPageController.actionSideChips;
+	root.actionDetailCheck = actionsPageController.actionDetailCheck;
+	root.actionEvidenceTimelineHtml = actionsPageController.actionEvidenceTimelineHtml;
+	root.actionRerunEvidenceHtml = actionsPageController.actionRerunEvidenceHtml;
+	root.openActionQcEvidence = actionsPageController.openActionQcEvidence;
+	root.viewActionDetail = actionsPageController.viewActionDetail;
+	root.openActionGuide = actionsPageController.openActionGuide;
+	root.groupIssuesByTestDate = actionsPageController.groupIssuesByTestDate;
+	root.issueRowHtml = actionsPageController.issueRowHtml;
+	root.actionViolationInfo = actionsPageController.actionViolationInfo;
+	root.actionQcVerdictLabel = actionsPageController.actionQcVerdictLabel;
+	root.openActionIssueHtml = actionsPageController.openActionIssueHtml;
+	root.actionIssueGroupHtml = actionsPageController.actionIssueGroupHtml;
+	root.pageActionsV4 = actionsPageController.pageActionsV4;
 	root.ReagentComparisonService = createReagentComparisonService({
 		cleanText: root.QCCore.cleanText,
 		cleanId: root.QCCore.cleanId
@@ -21636,6 +30061,275 @@
 		for (const k of Object.keys(rc)) root[k] = rc[k];
 	}
 	root.SigmaCohortService = createSigmaCohortService({ stats: root.QCCore.stats });
+	var sigmaPageController = createSigmaPageController({
+		getState: () => state,
+		document: () => typeof document !== "undefined" ? document : {
+			getElementById: () => null,
+			querySelector: () => null,
+			querySelectorAll: () => []
+		},
+		window: () => typeof window !== "undefined" ? window : {
+			innerWidth: 1024,
+			innerHeight: 768
+		},
+		ui: () => root.SigmaUIState,
+		currentPage: () => root.RouterUIState.page,
+		rerender: () => rerender(),
+		role: () => role(),
+		userName: () => userName(),
+		canWrite: () => root.canWrite(),
+		requireWrite: () => requireWrite(),
+		requireAdmin: (message) => root.requireAdmin(message),
+		openModal: (html) => root.openModal(html),
+		closeModal: () => root.closeModal(),
+		infoDialog: (message, opts) => root.infoDialog(message, opts),
+		esc: (value) => root.esc(value),
+		escapeAttr: (value) => root.escAttr(value),
+		jsq: (value) => jsq(value),
+		btn: (label, action, cls, title, options) => root.btn(label, action, cls, title, options),
+		headOnly: (title, subtitle, actions) => root.headOnly(title, subtitle, actions),
+		emptyState: (title, body, actions) => root.emptyState(title, body, actions),
+		dateBox: (id, value, cls, attrs) => root.dateBox(id, value, cls, attrs),
+		vnDate: (value) => vnDate(value),
+		vnPeriod: (value) => root.vnPeriod(value),
+		fmt: (value, decimals) => fmt(value, decimals),
+		isoMonth: () => root.isoMonth(),
+		isoDate: (value) => root.isoDate(value),
+		uid: () => root.uid(),
+		icoDownload: () => root.icoDownload(),
+		testDisplayName: (test) => root.testDisplayName(test),
+		instrumentName: (id, fallback) => root.instrumentName(id, fallback),
+		operationalLevels: (test) => root.operationalLevels(test),
+		operationalTestOrder: (test) => root.operationalTestOrder(test),
+		searchText: (value) => root.searchText(value),
+		scheduleSearchRender: (owner, apply, focusId) => root.scheduleSearchRender(owner, apply, focusId),
+		qcTooltip: () => root.qcTooltip(),
+		save: (options) => save(options),
+		QCCore: {
+			westgardSigmaRules: (sigma) => root.QCCore.westgardSigmaRules(sigma),
+			stats: (values) => root.QCCore.stats(values),
+			uncertaintyBudget: (input) => root.QCCore.uncertaintyBudget(input)
+		},
+		effectiveTeaRefs: () => root.effectiveTeaRefs(),
+		sgTea: (t) => root.sgTea(t),
+		sgTeaSource: (t) => root.sgTeaSource(t),
+		sgTeaBySource: (t, source, target) => root.sgTeaBySource(t, source, target),
+		sgTeaCriterionText: (t, source) => root.sgTeaCriterionText(t, source),
+		sgTeaLabel: (source) => root.sgTeaLabel(source),
+		sgTeaSnapshot: (t) => root.sgTeaSnapshot(t),
+		sgSetLevelTeaSnapshot: (t, e, level, force) => root.sgSetLevelTeaSnapshot(t, e, level, force),
+		sgLevelTarget: (t, L, level) => root.sgLevelTarget(t, L, level),
+		sgEntryTea: (t, e, level, refs) => root.sgEntryTea(t, e, level, refs),
+		sgEnsureTeaSnapshot: (t, e) => root.sgEnsureTeaSnapshot(t, e),
+		SigmaPresentation: root.SigmaPresentation,
+		SigmaLevelEditService: root.SigmaLevelEditService,
+		SigmaBiasService: root.SigmaBiasService,
+		SigmaBiasWorkflowService: root.SigmaBiasWorkflowService,
+		SigmaPeriodViewModel: root.SigmaPeriodViewModel,
+		SigmaTeaSnapshotService: root.SigmaTeaSnapshotService,
+		SigmaTeaEditService: root.SigmaTeaEditService,
+		SigmaLevelSelectionService: root.SigmaLevelSelectionService,
+		SigmaPeriodSelectionService: root.SigmaPeriodSelectionService,
+		SigmaTrackedTestService: root.SigmaTrackedTestService,
+		SigmaCohortService: root.SigmaCohortService,
+		SigmaCohortSelectionService: root.SigmaCohortSelectionService,
+		SigmaCohortImportService: root.SigmaCohortImportService,
+		SigmaPeriodRecordService: root.SigmaPeriodRecordService,
+		SigmaMuWorkflowCommand: root.SigmaMuWorkflowCommand,
+		pres: root
+	});
+	root.sgZone = sigmaPageController.sgZone;
+	root.sgFmtDPMO = sigmaPageController.sgFmtDPMO;
+	root.sgData = sigmaPageController.sgData;
+	root.sgInputValue = sigmaPageController.sgInputValue;
+	root.sgInputDisplayValue = sigmaPageController.sgInputDisplayValue;
+	root.sgCleanCell = sigmaPageController.sgCleanCell;
+	root.sgBiasVal = sigmaPageController.sgBiasVal;
+	root.sgIsAutoCV = sigmaPageController.sgIsAutoCV;
+	root.sgReadiness = sigmaPageController.sgReadiness;
+	root.sgBiasRefU = sigmaPageController.sgBiasRefU;
+	root.sgMuBiasMode = sigmaPageController.sgMuBiasMode;
+	root.sgMU = sigmaPageController.sgMU;
+	root.sgComp = sigmaPageController.sgComp;
+	root.sgRows = sigmaPageController.sgRows;
+	root.sgSyncCurrentPeriodTea = sigmaPageController.sgSyncCurrentPeriodTea;
+	root.sgReconcileAllTeaSnapshots = sigmaPageController.sgReconcileAllTeaSnapshots;
+	root.sgSetTea = sigmaPageController.sgSetTea;
+	root.sgSetTeaSource = sigmaPageController.sgSetTeaSource;
+	root.sgSetTeaMeta = sigmaPageController.sgSetTeaMeta;
+	root.sgRefreshSoon = sigmaPageController.sgRefreshSoon;
+	root.sgTrackedTests = sigmaPageController.sgTrackedTests;
+	root.sgTrackedOptions = sigmaPageController.sgTrackedOptions;
+	root.sgHistoricalLevels = sigmaPageController.sgHistoricalLevels;
+	root.sgVisibleLevels = sigmaPageController.sgVisibleLevels;
+	root.sgPeriodLevels = sigmaPageController.sgPeriodLevels;
+	root.sgPickTest = sigmaPageController.sgPickTest;
+	root.sgStatusPeriodId = sigmaPageController.sgStatusPeriodId;
+	root.sgSelectPeriod = sigmaPageController.sgSelectPeriod;
+	root.sgRemoveTracked = sigmaPageController.sgRemoveTracked;
+	root.sgOpenAddTest = sigmaPageController.sgOpenAddTest;
+	root.sgAddTestSearchSet = sigmaPageController.sgAddTestSearchSet;
+	root.sgViewTrackedTest = sigmaPageController.sgViewTrackedTest;
+	root.sgRenderAddTestModal = sigmaPageController.sgRenderAddTestModal;
+	root.sgTrackTest = sigmaPageController.sgTrackTest;
+	root.pageSigma = sigmaPageController.pageSigma;
+	root.sgOpSpecCell = sigmaPageController.sgOpSpecCell;
+	root.sgFrequencyHTML = sigmaPageController.sgFrequencyHTML;
+	root.sgMuDominant = sigmaPageController.sgMuDominant;
+	root.sgMuStateChip = sigmaPageController.sgMuStateChip;
+	root.sgMuHTML = sigmaPageController.sgMuHTML;
+	root.sgRefresh = sigmaPageController.sgRefresh;
+	root.sgTips = sigmaPageController.sgTips;
+	root.sgPointTipShow = sigmaPageController.sgPointTipShow;
+	root.sgPointTipHide = sigmaPageController.sgPointTipHide;
+	root.sgTrendSVG = sigmaPageController.sgTrendSVG;
+	root.sgMDCSVG = sigmaPageController.sgMDCSVG;
+	root.sgBiasRowsFromDom = sigmaPageController.sgBiasRowsFromDom;
+	root.sgBiasPeriodsFromDom = sigmaPageController.sgBiasPeriodsFromDom;
+	root.sgBiasStats = sigmaPageController.sgBiasStats;
+	root.sgBiasRoundsKey = sigmaPageController.sgBiasRoundsKey;
+	root.sgBiasLinkedPeriodIds = sigmaPageController.sgBiasLinkedPeriodIds;
+	root.sgOpenBias = sigmaPageController.sgOpenBias;
+	root.sgRenderBiasModal = sigmaPageController.sgRenderBiasModal;
+	root.sgBiasUpdateSummary = sigmaPageController.sgBiasUpdateSummary;
+	root.sgBiasSelectPeriods = sigmaPageController.sgBiasSelectPeriods;
+	root.sgBiasAdd = sigmaPageController.sgBiasAdd;
+	root.sgBiasDel = sigmaPageController.sgBiasDel;
+	root.sgApplyBiasToPeriods = sigmaPageController.sgApplyBiasToPeriods;
+	root.sgBiasApply = sigmaPageController.sgBiasApply;
+	root.sgMuRowsFromDom = sigmaPageController.sgMuRowsFromDom;
+	root.sgMuPeriodsFromDom = sigmaPageController.sgMuPeriodsFromDom;
+	root.sgMuCaptureDom = sigmaPageController.sgMuCaptureDom;
+	root.sgMuPreview = sigmaPageController.sgMuPreview;
+	root.sgMuUpdatePreview = sigmaPageController.sgMuUpdatePreview;
+	root.sgOpenMU = sigmaPageController.sgOpenMU;
+	root.sgRenderMuModal = sigmaPageController.sgRenderMuModal;
+	root.sgMuSelectPeriods = sigmaPageController.sgMuSelectPeriods;
+	root.sgMuApply = sigmaPageController.sgMuApply;
+	root.sgCell = sigmaPageController.sgCell;
+	root.sgPeriodSel = sigmaPageController.sgPeriodSel;
+	root.sgPart = sigmaPageController.sgPart;
+	root.sgAddPeriod = sigmaPageController.sgAddPeriod;
+	root.sgDelPeriod = sigmaPageController.sgDelPeriod;
+	root.sgClearImportedCV = sigmaPageController.sgClearImportedCV;
+	root.sgCohortCutoff = sigmaPageController.sgCohortCutoff;
+	root.sgCohortGroups = sigmaPageController.sgCohortGroups;
+	root.sgCohortStatusText = sigmaPageController.sgCohortStatusText;
+	root.sgImportCohort = sigmaPageController.sgImportCohort;
+	root.sgApplyCohortChoices = sigmaPageController.sgApplyCohortChoices;
+	root.sgCohortImportMessage = sigmaPageController.sgCohortImportMessage;
+	root.sgRenderCohortModal = sigmaPageController.sgRenderCohortModal;
+	root.sgCohortClose = sigmaPageController.sgCohortClose;
+	root.sgCohortApply = sigmaPageController.sgCohortApply;
+	root.sgPullCV = sigmaPageController.sgPullCV;
+	root.esc = escapeHtml$2;
+	root.escAttr = escapeHtmlAttr;
+	var reportPrintController = createReportPrintController({
+		reportQcFormat: {
+			value: (t, v) => root.reportQcFormat.value(t, v),
+			stat: (t, v) => root.reportQcFormat.stat(t, v),
+			point: (p, t) => root.reportQcFormat.point(p, t)
+		},
+		reportHeaderPresentation: (input) => root.reportHeaderPresentation(input),
+		lab: () => state.lab,
+		app: () => typeof window === "undefined" ? { version: "dev" } : window.QCLAB_APP || { version: "dev" },
+		westgardRules: () => state.westgardRules,
+		formatDateTimeVN: (value) => globalThis.formatDateTimeVN(value),
+		userName: () => globalThis.userName(),
+		reportSignBlock: () => root.reportSignBlock(),
+		openPrintWindow: () => window.open("", "_blank"),
+		infoDialog: (message) => root.infoDialog(message),
+		openPrint: (title, body, options) => root.openPrint(title, body, options),
+		currentHref: () => location.href,
+		hasPdfPrinter: () => !!window.qcPrintPdf,
+		sigmaPrintRowsService: {
+			periodRows: (row, levels) => root.sigmaPrintRowsService.periodRows(row, levels),
+			periodsRows: (rows, levels) => root.sigmaPrintRowsService.periodsRows(rows, levels)
+		},
+		sigmaMuPrintRowsService: {
+			periodRows: (t, row, levels) => root.sigmaMuPrintRowsService.periodRows(t, row, levels),
+			periodsRows: (t, rows, levels) => root.sigmaMuPrintRowsService.periodsRows(t, rows, levels)
+		},
+		sigmaMuTraceService: (row, levels) => root.sigmaMuTraceService(row, levels),
+		findTest: (id) => (state.tests || []).find((test) => test.id === id),
+		sgTest: () => globalThis.sgTest,
+		selTest: () => globalThis.selTest,
+		sgData: (tid) => root.sgData(tid),
+		sgVisibleLevels: (t) => root.sgVisibleLevels(t),
+		sgRows: (t, data, levels) => root.sgRows(t, data, levels),
+		sigmaReportRows: (tid, mode, period, entryId) => globalThis.sigmaReportRows(tid, mode, period, entryId),
+		vnPeriod: (value) => globalThis.vnPeriod(value),
+		sigmaTeaTrace: (exportRows) => globalThis.sigmaTeaTrace(exportRows),
+		instrumentName: (instrumentId, machine) => globalThis.instrumentName(instrumentId, machine),
+		testDisplayName: (t) => globalThis.testDisplayName(t),
+		sgFrequencyHTML: (t, row, levels) => root.sgFrequencyHTML(t, row, levels),
+		sgTrendSVG: (t, valid, levels) => root.sgTrendSVG(t, valid, levels),
+		sgMDCSVG: (t, valid, levels) => root.sgMDCSVG(t, valid, levels),
+		sigmaExportPeriods: (exportRows) => globalThis.sigmaExportPeriods(exportRows),
+		activeWestgard: (t) => globalThis.activeWestgard(t),
+		westgardByPoint: (points, mean, sd, scope) => root.QCCore.westgardByPoint(points, mean, sd, scope),
+		wgRules: () => WG_RULES,
+		testRuleOnWithin: (t, rule) => globalThis.testRuleOnWithin(t, rule),
+		testRuleOnAcross: (t, rule) => globalThis.testRuleOnAcross(t, rule),
+		previousLotSeries: (t, level) => globalThis.previousLotSeries(t, level),
+		wgPrevOpenHas: (key) => globalThis.wgPrevOpen.has(key),
+		ruleResultLevel: (t, rules) => globalThis.ruleResultLevel(t, rules),
+		reportPointsTableService: (items, t) => root.reportPointsTableService(items, t),
+		actionReportHtml: {
+			summary: (parts) => root.actionReportHtml.summary(parts),
+			detailField: (label, value, wide) => root.actionReportHtml.detailField(label, value, wide)
+		},
+		reportNceDetailHtmlPresentation: (a, t) => root.reportNceDetailHtmlPresentation(a, t),
+		reportNceAppendixPresentation: (actions, t) => root.reportNceAppendixPresentation(actions, t),
+		reportNceModel: (a, t) => globalThis.reportNceModel(a, t),
+		reportNceSummaryParts: (a) => globalThis.reportNceSummaryParts(a),
+		reportExportSelection: () => globalThis.reportExportSelection(),
+		reportInRange: (start, end) => globalThis.reportInRange(start, end),
+		reportRangeText: (start, end) => globalThis.reportRangeText(start, end),
+		reportTeaInfo: (t) => globalThis.reportTeaInfo(t),
+		reportMultiViews: (t, inMonth) => globalThis.reportMultiViews(t, inMonth),
+		operationalLevels: (t) => globalThis.operationalLevels(t),
+		reportPrevLotRows: (t, s, inMonth) => globalThis.reportPrevLotRows(t, s, inMonth),
+		reportLevelStats: (pts, mean, teaVal) => globalThis.reportLevelStats(pts, mean, teaVal),
+		pointStaff: (p) => globalThis.pointStaff(p),
+		errorType: (rules) => globalThis.errorType(rules),
+		reportLevelRows: (t, l, wg, inMonth) => globalThis.reportLevelRows(t, l, wg, inMonth),
+		reportActionsInRange: (tid, inMonth) => globalThis.reportActionsInRange(tid, inMonth),
+		actionRerunStatus: (a) => globalThis.actionRerunStatus(a),
+		actionLevelShort: (t, level, lot) => globalThis.actionLevelShort(t, level, lot),
+		actionApprovalLabel: (a) => globalThis.actionApprovalLabel(a),
+		sgTeaRefText: (t) => globalThis.sgTeaRefText(t),
+		lvlCfg: (t, level) => lvlCfg(t, level),
+		operationalLotPoints: (t, level) => operationalLotPoints(t, level),
+		stats: (values) => globalThis.stats(values),
+		ljDataURL: (points, mean, sd) => root.ljDataURL(points, mean, sd),
+		ljMultiDataURL: (levelViews, test, opts) => root.ljMultiDataURL(levelViews, test, opts),
+		format: (value, decimals) => fmt(value, decimals),
+		vnDate: (value) => vnDate(value),
+		escape: (value) => root.esc(value)
+	});
+	root.reportQcValue = reportPrintController.reportQcValue;
+	root.reportQcStat = reportPrintController.reportQcStat;
+	root.reportQcPoint = reportPrintController.reportQcPoint;
+	root.reportHeader = reportPrintController.reportHeader;
+	root.signBlock = reportPrintController.signBlock;
+	root.openPrint = reportPrintController.openPrint;
+	root.sigmaPeriodPrintRows = reportPrintController.sigmaPeriodPrintRows;
+	root.sigmaPeriodsPrintRows = reportPrintController.sigmaPeriodsPrintRows;
+	root.sigmaMuPrintRows = reportPrintController.sigmaMuPrintRows;
+	root.sigmaMuPeriodsPrintRows = reportPrintController.sigmaMuPeriodsPrintRows;
+	root.sigmaMuTrace = reportPrintController.sigmaMuTrace;
+	root.sigmaMuPrintCard = reportPrintController.sigmaMuPrintCard;
+	root.printSigmaPeriod = reportPrintController.printSigmaPeriod;
+	root.printSigmaPeriods = reportPrintController.printSigmaPeriods;
+	root.printWestgard = reportPrintController.printWestgard;
+	root.reportPointsTableHtml = reportPrintController.reportPointsTableHtml;
+	root.reportNceSummaryHtml = reportPrintController.reportNceSummaryHtml;
+	root.reportNceDetailField = reportPrintController.reportNceDetailField;
+	root.reportNceDetailHtml = reportPrintController.reportNceDetailHtml;
+	root.reportNceAppendixHtml = reportPrintController.reportNceAppendixHtml;
+	root.printReport = reportPrintController.printReport;
+	root.printRangeForm = reportPrintController.printRangeForm;
 	root.WestgardViewModel = westgardViewModel;
 	root.westgardRowsWindow = westgardRowsWindow;
 	root.westgardXlsxRows = createWestgardXlsxRows({
@@ -21650,5 +30344,149 @@
 	root.westgardArchivedMultiViews = westgardArchivedMultiViews;
 	root.westgardArchivedGroupMatches = westgardArchivedGroupMatches;
 	root.westgardArchivedTestSelection = westgardArchivedTestSelection;
+	var dataIoController = createDataIoController({
+		cssTokenPixel: (token, fallback) => root.cssTokenPixel(token, fallback),
+		sigmaCanvasFont: (weight, token, fallback) => root.sigmaCanvasFont(weight, token, fallback),
+		exportMetaRowsService: (kind) => root.exportMetaRowsService(kind),
+		exportMetaRows: (kind) => globalThis.exportMetaRows(kind),
+		reportExportHelpers: {
+			inRange: (start, end) => root.reportExportHelpers.inRange(start, end),
+			nceExcerpt: (value, max) => root.reportExportHelpers.nceExcerpt(value, max),
+			sigmaLevels: (row) => root.reportExportHelpers.sigmaLevels(row),
+			periodLabel: (value) => root.reportExportHelpers.periodLabel(value),
+			mdcPeriodLabel: (value) => root.reportExportHelpers.mdcPeriodLabel(value),
+			exportPeriods: (rows) => root.reportExportHelpers.exportPeriods(rows)
+		},
+		qcReportContext: {
+			teaInfo: (t) => root.qcReportContext.teaInfo(t),
+			multiViews: (t, inRange) => root.qcReportContext.multiViews(t, inRange)
+		},
+		qcReportRowsService: {
+			previousLot: (t, s, inRange) => root.qcReportRowsService.previousLot(t, s, inRange),
+			currentLot: (t, l, wg, inRange) => root.qcReportRowsService.currentLot(t, l, wg, inRange),
+			actions: (tid, inRange) => root.qcReportRowsService.actions(tid, inRange)
+		},
+		actionReportSummary: (a) => root.actionReportSummary(a),
+		actionReportModel: (a, t) => root.actionReportModel(a, t),
+		qcReportCsvRows: (tid, start, end) => root.qcReportCsvRows(tid, start, end),
+		csvDownload: (name, rows) => root.csvDownload(name, rows),
+		nceCsvRow: (a) => root.nceCsvRow(a),
+		blobDownload: (name, blob) => root.blobDownload(name, blob),
+		sigmaReportMetricService: (r) => root.sigmaReportMetricService(r),
+		sigmaReportRowsService: (onlyTestId, mode, period, periodId) => root.sigmaReportRowsService(onlyTestId, mode, period, periodId),
+		sigmaDataUrlBytes: (durl) => root.sigmaDataUrlBytes(durl),
+		sigmaExportPixelRatioService: (W, H, scale, maxDimension) => root.sigmaExportPixelRatioService(W, H, scale, maxDimension),
+		sigmaCanvasFactory: (W, H, scale) => root.sigmaCanvasFactory(W, H, scale),
+		sigmaChartRenderer: (rows) => root.sigmaChartRenderer(rows),
+		sigmaMdcItemsService: (rows) => root.sigmaMdcItemsService(rows),
+		sigmaMdcLabelPlacementService: (items, X, Y, ctx, bounds) => root.sigmaMdcLabelPlacementService(items, X, Y, ctx, bounds),
+		sigmaMdcRenderer: (rows) => root.sigmaMdcRenderer(rows),
+		xlsxUtf8: (text) => root.xlsxUtf8(text),
+		xlsxEscape: (text) => root.xlsxEscape(text),
+		xlsxZip: (files) => root.xlsxZip(files),
+		xlsxEmu: (px) => root.xlsxEmu(px),
+		xlsxColumns: root.xlsxColumns,
+		xlsxCells: root.xlsxCells,
+		xlsxRound: (value, digits) => root.xlsxRound(value, digits),
+		xlsxPeriodNumber: (value) => root.xlsxPeriodNumber(value),
+		xlsxDrawing: (images, chartStartRow0) => root.xlsxDrawing(images, chartStartRow0),
+		sigmaXlsxStyles: () => root.sigmaXlsxStyles(),
+		renameSigmaXlsxSheet: (bytes, sheetName) => root.renameSigmaXlsxSheet(bytes, sheetName),
+		reportXlsxStyleIds: root.reportXlsxStyleIds,
+		reportXlsxBuild: (doc) => root.reportXlsxBuild(doc),
+		reportXlsxHeader: (opts) => root.reportXlsxHeader(opts),
+		westgardXlsxHeader: (opts) => root.westgardXlsxHeader(opts),
+		westgardXlsxRows: { detail: (o, index) => root.westgardXlsxRows.detail(o, index) },
+		sigmaExportMetaService: {
+			meta: () => root.sigmaExportMetaService.meta(),
+			teaTrace: (rows) => root.sigmaExportMetaService.teaTrace(rows)
+		},
+		qcExportValueFormat: {
+			value: (t, value) => root.qcExportValueFormat.value(t, value),
+			stat: (t, value) => root.qcExportValueFormat.stat(t, value)
+		},
+		errorType: (rules) => globalThis.errorType(rules),
+		activeWestgard: (t) => globalThis.activeWestgard(t),
+		operationalLevels: (t) => globalThis.operationalLevels(t),
+		previousLotSeries: (t, level) => globalThis.previousLotSeries(t, level),
+		reportLevelStats: (pts, mean, teaVal) => globalThis.reportLevelStats(pts, mean, teaVal),
+		pointStaff: (p) => globalThis.pointStaff(p),
+		ruleResultLevel: (t, rules) => globalThis.ruleResultLevel(t, rules),
+		testRuleOnWithin: (t, rule) => globalThis.testRuleOnWithin(t, rule),
+		testRuleOnAcross: (t, rule) => globalThis.testRuleOnAcross(t, rule),
+		instrumentName: (instrumentId, machine) => globalThis.instrumentName(instrumentId, machine),
+		testDisplayName: (t) => globalThis.testDisplayName(t),
+		formatDateTimeVN: (value) => globalThis.formatDateTimeVN(value),
+		userName: () => globalThis.userName(),
+		vnDate: (value) => vnDate(value),
+		vnPeriod: (value) => globalThis.vnPeriod(value),
+		stateName: (value) => globalThis.stateName(value),
+		safeName: (value) => globalThis.safeName(value),
+		format: (value, decimals) => fmt(value, decimals),
+		infoDialog: (message) => root.infoDialog(message),
+		actionLevelShort: (t, level, lot) => globalThis.actionLevelShort(t, level, lot),
+		actionRerunStatus: (a) => globalThis.actionRerunStatus(a),
+		actionApprovalLabel: (a) => globalThis.actionApprovalLabel(a),
+		ljDataURL: (points, mean, sd) => root.ljDataURL(points, mean, sd),
+		ljMultiDataURL: (levelViews, test, opts) => root.ljMultiDataURL(levelViews, test, opts),
+		wgMultiViews: (t) => globalThis.wgMultiViews(t),
+		wgPrevOpenHas: (key) => globalThis.wgPrevOpen.has(key),
+		sgTeaRefText: (t) => globalThis.sgTeaRefText(t),
+		sgData: (tid) => root.sgData(tid),
+		reportExportSelection: () => globalThis.reportExportSelection(),
+		reportRangeText: (start, end) => globalThis.reportRangeText(start, end),
+		westgardByPoint: (points, mean, sd, scope) => root.QCCore.westgardByPoint(points, mean, sd, scope),
+		wgRules: () => WG_RULES,
+		findTest: (id) => (state.tests || []).find((test) => test.id === id),
+		lab: () => state.lab,
+		westgardRules: () => state.westgardRules,
+		actions: () => state.actions || [],
+		appMeta: () => typeof window === "undefined" ? { version: "dev" } : window.QCLAB_APP || { version: "dev" },
+		selTest: () => globalThis.selTest,
+		sgTest: () => globalThis.sgTest
+	});
+	root.dataIoTypePx = dataIoController.dataIoTypePx;
+	root.dataIoCanvasFont = dataIoController.dataIoCanvasFont;
+	root.exportMetaRows = dataIoController.exportMetaRows;
+	root.reportInRange = dataIoController.reportInRange;
+	root.reportTeaInfo = dataIoController.reportTeaInfo;
+	root.reportMultiViews = dataIoController.reportMultiViews;
+	root.reportPrevLotRows = dataIoController.reportPrevLotRows;
+	root.reportLevelRows = dataIoController.reportLevelRows;
+	root.reportActionsInRange = dataIoController.reportActionsInRange;
+	root.reportNceExcerpt = dataIoController.reportNceExcerpt;
+	root.reportNceSummaryParts = dataIoController.reportNceSummaryParts;
+	root.reportNceModel = dataIoController.reportNceModel;
+	root.exportReportCSV = dataIoController.exportReportCSV;
+	root.exportActionsCSV = dataIoController.exportActionsCSV;
+	root.downloadBlob = dataIoController.downloadBlob;
+	root.sigmaReportMetric = dataIoController.sigmaReportMetric;
+	root.sigmaReportRows = dataIoController.sigmaReportRows;
+	root.sigmaLevelsOf = dataIoController.sigmaLevelsOf;
+	root.sigmaDataURLBytes = dataIoController.sigmaDataURLBytes;
+	root.sigmaExportPixelRatio = dataIoController.sigmaExportPixelRatio;
+	root.sigmaCanvas = dataIoController.sigmaCanvas;
+	root.drawSigmaReportChart = dataIoController.drawSigmaReportChart;
+	root.sigmaMdcItems = dataIoController.sigmaMdcItems;
+	root.sigmaPeriodLabel = dataIoController.sigmaPeriodLabel;
+	root.sigmaMdcPeriodLabel = dataIoController.sigmaMdcPeriodLabel;
+	root.sigmaExportPeriods = dataIoController.sigmaExportPeriods;
+	root.sigmaMdcLabelPlacements = dataIoController.sigmaMdcLabelPlacements;
+	root.SIGMA_EXPORT_PIXEL_RATIO = dataIoController.SIGMA_EXPORT_PIXEL_RATIO;
+	root.XlsxCore = dataIoController.XlsxCore;
+	root.SigmaXlsx = dataIoController.SigmaXlsx;
+	root.drawSigmaReportMDC = dataIoController.drawSigmaReportMDC;
+	root.renameSigmaSheet = dataIoController.renameSigmaSheet;
+	root.RXST = dataIoController.RXST;
+	root.ReportXlsx = dataIoController.ReportXlsx;
+	root.reportXlsxDoc = dataIoController.reportXlsxDoc;
+	root.exportReportXLSX = dataIoController.exportReportXLSX;
+	root.westgardXlsxDoc = dataIoController.westgardXlsxDoc;
+	root.exportWestgardXLSX = dataIoController.exportWestgardXLSX;
+	root.sigmaExportMeta = dataIoController.sigmaExportMeta;
+	root.sigmaTeaTrace = dataIoController.sigmaTeaTrace;
+	root.buildSigmaXlsx = dataIoController.buildSigmaXlsx;
+	root.exportSigmaPeriodXLSX = dataIoController.exportSigmaPeriodXLSX;
+	root.exportSigmaPeriodsXLSX = dataIoController.exportSigmaPeriodsXLSX;
 	//#endregion
 })();

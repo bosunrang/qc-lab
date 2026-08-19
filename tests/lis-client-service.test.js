@@ -19,7 +19,7 @@ const { loadSandbox, run } = require('./helpers/sandbox');
 (async () => {
   const storage = new Map(), requests = [];
   let pendingItems = [], failDecide = false;
-  const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js', 'modules/lis-queue-ui.js'], {
+  const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js'], {
     URL, AbortController, setInterval, clearInterval,
     fetch: async (url, opts = {}) => {
       requests.push({ url, opts });
@@ -110,13 +110,14 @@ const { loadSandbox, run } = require('./helpers/sandbox');
    * lisImportResult()/lisRejectResult() ma khong co UI nao goi toi, nen cach duy
    * nhat de nhan mot ban ghi la go tay vao DevTools console. Cac ham duoi day
    * (lisQueueRowHtml/lisQueueSectionHtml/lisRenderQueueModal/lisOpenQueueModal)
-   * dung THAT esc/escAttr/jsq tu reports.js/entry-routes.js va btn tu bundle
-   * TypeScript (root.btn, xem router-icons.ts/ui-primitives.ts) — khong stub —
-   * vi day chinh la lop thoat HTML can chot lai (xem hoi quy XSS
-   * ben duoi), stub rieng se khong bat duoc regresion that trong cac ham do.
+   * dung THAT esc/escAttr, jsq/btn tu bundle TypeScript (root.esc/root.escAttr tu
+   * html-escape.ts, root.jsq, root.btn, xem js-string-literal.ts/router-icons.ts/
+   * ui-primitives.ts) — khong stub — vi day chinh la lop thoat HTML can chot lai
+   * (xem hoi quy XSS ben duoi), stub rieng se khong bat duoc regresion that trong
+   * cac ham do.
    * ========================================================================= */
   const openCalls = [];
-  const ctx2 = loadSandbox(['core.js', 'generated/modular-pilot.js', 'modules/entry-routes.js', 'modules/reports.js', 'modules/lis-queue-ui.js'], {
+  const ctx2 = loadSandbox(['core.js', 'generated/modular-pilot.js'], {
     URL, AbortController, setInterval, clearInterval,
     window: { QCLAB_APP: { name: 'QC Lab', version: 'test' } },
     document: { getElementById: () => null, addEventListener: () => {}, removeEventListener: () => {} },

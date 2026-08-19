@@ -1,8 +1,9 @@
 const assert = require('node:assert/strict');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
-/* auditChainStatus() ghi de len auditVerifyChain() (O(n) SHA-256, xem comment trong
- * audit.js) bang cache theo chu ky auditChainSignature() = so dong + hash cuoi + neo.
+/* auditChainStatus() ghi de len auditVerifyChain() (O(n) SHA-256, xem
+ * src/application/audit/audit-service.ts) bang cache theo chu ky chainSignature()
+ * = so dong + hash cuoi + neo.
  * auditVerifyChain() da co test rieng (audit-hash.test.js) nhung lop cache/nguong idle
  * bao quanh no thi chua — day la dung loai loi im lang ma cache tu kiem chung o
  * action-workflow-service.js/qc-domain.js dang bat: nguong AUDIT_AUTO_VERIFY_MAX sai,
@@ -18,7 +19,6 @@ run(ctx, `
   function role(){ return currentUser.role; }
   function rerender(){ __rerenderCalls++; }
 `);
-run(ctx, require('fs').readFileSync(require('path').join(__dirname, '..', 'assets', 'modules', 'audit.js'), 'utf8'));
 run(ctx, require('fs').readFileSync(require('path').join(__dirname, '..', 'assets', 'generated', 'modular-pilot.js'), 'utf8'));
 // rerender() giờ cũng được bundle TypeScript gán (root.rerender=...) khi nạp — ghi đè
 // mất stub đếm lời gọi ở trên; đặt lại SAU khi bundle chạy xong để tiếp tục đếm thay vì

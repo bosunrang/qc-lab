@@ -159,6 +159,7 @@ import { createBackupReminder } from '../presentation/backup/backup-reminder';
 import { createLisQueuePresentation } from '../presentation/lis/lis-queue-presentation';
 import { createLisSettingsService } from '../application/lis/lis-settings-service';
 import { createLisGatewayCommand, type LisGatewayCommand } from '../application/lis/lis-gateway-command';
+import { createLisQueueController } from '../presentation/lis/lis-queue-controller';
 import { createLabProfileService } from '../application/settings/lab-profile-service';
 import { createSettingsProfileCommand, type SettingsProfileCommand } from '../application/settings/settings-profile-command';
 import { createSettingsFirebaseCommand, type SettingsFirebaseCommand } from '../application/settings/settings-firebase-command';
@@ -250,8 +251,14 @@ import { cusumChartGeometry } from '../presentation/chart/cusum-chart-geometry';
 import { cusumPointRenderModel } from '../presentation/chart/cusum-point-render-model';
 import { cusumReferenceLines } from '../presentation/chart/cusum-reference-lines';
 import { cusumLinePoints } from '../presentation/chart/cusum-line-points';
+import { createCusumDisplayPlan } from '../presentation/chart/cusum-display-plan';
+import { createCusumHoverModel } from '../presentation/chart/cusum-hover-model';
+import { createQcChartRenderer } from '../presentation/chart/qc-chart-renderer';
 import { createBlobDownload } from '../presentation/export/blob-download';
 import { createQcReportCsvRows } from '../presentation/report/qc-report-csv-rows';
+import { createReportPrintController } from '../presentation/report/report-print-controller';
+import { createDataIoController } from '../presentation/export/data-io-controller';
+import { escapeHtml, escapeHtmlAttr } from '../presentation/shared/html-escape';
 import { createBasicFormat } from '../presentation/format/basic-format';
 import { createWestgardRulePolicy } from '../domain/westgard/rule-policy';
 import { createWestgardMemoCache } from '../domain/westgard/memo-cache';
@@ -694,8 +701,16 @@ import { createSigmaCohortSelectionService, type SigmaCohortSelectionService } f
 import { createSigmaTeaEditService, type SigmaTeaEditService } from '../application/sigma/sigma-tea-edit-service';
 import { createSigmaTeaSnapshotService, type SigmaTeaSnapshotService } from '../application/sigma/sigma-tea-snapshot-service';
 import { createSigmaLevelSelectionService, type SigmaLevelSelectionService } from '../domain/sigma/sigma-level-selection-service';
+import { createSigmaTeaResolution, type SigmaTeaResolution } from '../domain/sigma/sigma-tea-resolution';
 import { createSigmaPeriodSelectionService, type SigmaPeriodSelectionService } from '../presentation/sigma/sigma-period-selection-service';
 import { createLotTransitionPickerService, type LotTransitionPickerServiceApi } from '../presentation/manage/lot-transition-picker-service';
+import { createManagePageController } from '../presentation/manage/manage-page-controller';
+import { createManageTestsActionsController } from '../presentation/manage/manage-tests-actions-controller';
+import { createEntryPageController } from '../presentation/entry/entry-page-controller';
+import { createActionFormController } from '../presentation/actions/action-form-controller';
+import { createActionsPageController } from '../presentation/actions/actions-page-controller';
+import { createSigmaPageController } from '../presentation/sigma/sigma-page-controller';
+import { jsq } from '../presentation/shared/js-string-literal';
 import { westgardViewModel, type WestgardViewModelApi } from '../domain/westgard/westgard-view-model';
 import { westgardRowsWindow } from '../presentation/westgard/westgard-row-window';
 import { createWestgardXlsxRows, type WestgardXlsxRows } from '../presentation/westgard/westgard-xlsx-rows';
@@ -759,14 +774,11 @@ declare let state: Record<string, any> & { data?: Record<string, Record<string, 
 declare let entryLjRenderCache:any,entryJumpToday:any;
 declare const ChartViewModel:any;
 declare function acceptedLotPoints(test:any,level:number):any[];
-declare function drawLJ(canvas:any,points:any[],mean:number,sd:number):void;
 declare function wgMultiViews(test:any):any[];
-declare function drawLJMultiZ(canvas:any,chart:any,test:any):void;
 declare function levelsForLotGroup(group:any):any[];
 declare function wgArchivedMultiViews(levels:any[]):any[];
 declare function operationalLotPoints(test:any,level:number):any[];
 declare function cusumSeries(test:any,level:any):any;
-declare function drawCUSUM(canvas:any,points:any[],series:any):void;
 declare function rcCompute():void;
 declare function sgRefresh():void;
 declare function updateBackupBanner():void;
@@ -835,7 +847,7 @@ declare function initFirebase(): Promise<unknown>;
 declare function ensureFirebaseApp(config: any): Promise<unknown>;
 declare function fbHandleValue(value: any, options?: Record<string, any>): Promise<unknown>;
 declare function fbStartPull(): void;
-declare function auditRelinkChain(entries: any[], anchor: string): any[];
+declare function auditRelinkChain(entries: any[], anchor?: string): any[];
 declare function fbHasLocalChanges(): boolean;
 declare function ensureAdmin(): void;
 declare function renderBrand(): void;
@@ -849,18 +861,24 @@ declare function getStoredFbCfg(): any;
 declare function persistLocalSnapshot(options?: Record<string, any>): boolean;
 declare function mirrorIndexedDb(raw: string): boolean;
 declare function userName(): string;
-declare function auditSha256(text: string): Promise<string>;
+declare function auditSha256(text: string): string;
 declare function uid(): string;
 declare function isoDate(value: Date): string;
 declare const TEA_ANALYTE_CATALOG: any[];
-// `REFTESTS` là `const` global lexical của state.js, không phải property trên
-// `window`/`globalThis`. Service TEa chạy sau state.js nên đọc binding này trực tiếp.
+// `REFTESTS`/`TEA_SOURCE_REGISTRY` là `const` global lexical của state.js, không
+// phải property trên `window`/`globalThis`. Service TEa chạy sau state.js nên đọc
+// hai binding này trực tiếp — (globalThis as any).TEA_SOURCE_REGISTRY từng bị dùng
+// nhầm ở TeaReferenceService's wiring (luôn undefined, làm sửa CLIA/Ricos trong tab
+// "Bảng TEa tham chiếu" ném lỗi), đã sửa về tham chiếu trần đúng quy tắc này.
 declare const REFTESTS: readonly any[][];
-declare function role(): string;
-declare function auditActor(): { user: string; username: string; userId: string; role: string; clientId: string };
-declare function auditRuntimeConfig(): { hardCap: number; rotateTo: number; autoVerifyMax: number };
-declare function auditEntryHash(entry: Record<string, any>): string;
-declare function auditVerifyChain(activity?: Record<string, any>[], anchor?: string): Record<string, any>;
+declare const TEA_SOURCE_REGISTRY: Record<string, any>;
+// Cùng lớp với hai binding trên — `WG_RULES`/`QC_DECIMALS_DEFAULT` cũng là `const`
+// global lexical của state.js.
+declare const WG_RULES: readonly string[];
+declare const QC_DECIMALS_DEFAULT: number;
+// `teaAnalyteKey` là `const` arrow function của state.js (const, không phải
+// `function`) — cũng KHÔNG phải property trên globalThis, phải tham chiếu trần.
+declare function teaAnalyteKey(value: unknown): string;
 declare function role(): string;
 
 type QCLabGlobal = typeof globalThis & {
@@ -921,6 +939,313 @@ type QCLabGlobal = typeof globalThis & {
   TeaReferenceService: TeaReferenceServiceApi;
   TeaReferenceWorkflowCommand: TeaReferenceWorkflowCommand;
   LotTransitionPickerService: LotTransitionPickerServiceApi;
+  manageSearchSet?: (v: unknown) => void;
+  manageMatch?: (values: unknown[]) => boolean;
+  manageSearchPlaceholder?: () => string;
+  groupsOfLot?: (id: unknown) => Record<string, any>[];
+  lotGroupLabels?: (id: unknown) => string;
+  instrumentName?: (id: unknown, fallback?: string) => string;
+  panelName?: (id: unknown) => string;
+  lotLabel?: (id: unknown) => string;
+  lotTransitionToNo?: (lotId: unknown) => unknown;
+  lotStatus?: (l: Record<string, any>) => unknown;
+  manageShell?: (body: string) => string;
+  manageToolbar?: (title: string, sub: string, action?: string, label?: string) => string;
+  manageLots?: () => string;
+  manageInstruments?: () => string;
+  managePanels?: () => string;
+  manageTransitionsV2?: () => string;
+  targetGroupLots?: (group: Record<string, any>) => Record<string, any>[];
+  targetGroupOptions?: () => string;
+  ensureTargetSelection?: () => void;
+  manageTargets?: () => string;
+  manageAssays?: () => string;
+  manageHistorySearchValues?: (t: Record<string, any>) => unknown[];
+  manageHistory?: () => string;
+  teaRefFind?: (refKey: unknown) => Record<string, any>;
+  teaRefNumOrNull?: (v: unknown) => number | null;
+  teaRefExternalChanged?: (row: Record<string, any>, refKey: unknown) => boolean;
+  teaRefEnsure?: (refKey: unknown) => Record<string, any>;
+  teaRefEdit?: (name: unknown, field: string, val: unknown) => void;
+  teaRefRemove?: (refKey: unknown) => void;
+  teaSourceRegistryHtml?: () => string;
+  teaRefOpenAdd?: () => void;
+  teaRefAddSubmit?: () => Promise<void>;
+  teaLabProfileOpen?: (refKey: unknown) => void;
+  teaLabProfileSave?: (refKey: unknown) => Promise<void>;
+  teaLabProfileRemove?: (refKey: unknown) => Promise<void>;
+  manageTeaRefs?: () => string;
+  manageView?: () => string;
+  renderManageBody?: () => void;
+  pageManage?: () => string;
+  parseVN?: (value: unknown) => string;
+  setManageTab?: (tab: unknown) => void;
+  setTargetPanel?: (id: unknown) => void;
+  setTargetGroup?: (id: unknown) => void;
+  setTargetLevel?: (level: unknown) => void;
+  setHistoryTest?: (id: unknown) => void;
+  openTargetMatrix?: (panelId?: string, groupId?: string) => void;
+  targetNumberText?: (value: unknown, test?: Record<string, any> | null, kind?: string) => string;
+  targetConfigAssigned?: (cfg: Record<string, any>) => Record<string, any>;
+  targetRangeDraft?: (cfg?: Record<string, any>) => Record<string, any>;
+  syncTargetRange?: (el: Record<string, any>, source: unknown) => void;
+  toggleTargetRow?: (el: Record<string, any>) => void;
+  targetCheckAll?: (on: unknown) => void;
+  targetPickBackfillPoints?: (t: Record<string, any>, lot: Record<string, any>, pick: Record<string, any>) => Record<string, any>[];
+  applyTargetPick?: (t: Record<string, any>, lot: Record<string, any>, pick: Record<string, any>, effectiveFrom: unknown, note: unknown) => unknown;
+  applyPlannedTarget?: (t: Record<string, any>, lot: Record<string, any>, pick: Record<string, any>, note: unknown) => unknown;
+  readTargetMatrixPicks?: () => Promise<Record<string, any>[] | null>;
+  saveTargetMatrix?: () => Promise<void>;
+  openTargetSwitchModal?: () => void;
+  resolveTargetSwitch?: (mode: unknown) => Promise<void>;
+  commitTargetMatrix?: (picked: Record<string, any>, group: Record<string, any>, mode: unknown, overwrites: Record<string, any>) => void;
+  openQcHistoryDetail?: (tid: unknown, level: unknown, lotNo?: string) => void;
+  openConfigPanel?: (id?: string) => Promise<void>;
+  renderConfigPanelTests?: () => void;
+  saveConfigPanel?: (id: unknown) => Promise<void>;
+  deleteConfigPanel?: (id: unknown) => Promise<void>;
+  deleteLotTransition?: (id: unknown) => Promise<void>;
+  lotTransitionChoiceLabel?: (lot: Record<string, any>) => string;
+  lotTransitionChoiceLots?: (selectedId?: string) => Record<string, any>[];
+  lotTransitionChoiceMatch?: (value: unknown, selectedId?: string) => Record<string, any>;
+  lotTransitionSelectedId?: (inputId: string) => string;
+  lotTransitionChoiceInput?: (el: Record<string, any>, commit?: boolean) => void;
+  lotTransitionChoiceHtml?: (inputId: string, selectedId: unknown) => string;
+  openLotTransitionV2?: (id?: string) => Promise<void>;
+  lotTransitionTargetsHtml?: (panelId: unknown, fromLotId: unknown, toLotId: unknown) => string;
+  filterLotTransitionTargets?: (term: unknown) => void;
+  refreshLotTransitionTargets?: () => void;
+  readLotTransitionTargetPicks?: (rows: Record<string, any>[]) => Promise<Record<string, any>[] | null>;
+  saveLotTransitionV2?: (id: unknown) => Promise<void>;
+  openConfigGroup?: (id?: string) => Promise<void>;
+  suggestConfigGroupName?: () => void;
+  saveConfigGroup?: (id: unknown) => Promise<void>;
+  deleteConfigGroup?: (id: unknown) => Promise<void>;
+  toggleLotGroupStatus?: (id: unknown) => void;
+  activateLotGroup?: (id: unknown) => Promise<void>;
+  openConfigLot?: (id?: string) => void;
+  saveConfigLot?: (id: unknown) => Promise<void>;
+  renameLotAcrossPoints?: (oldLevel: unknown, oldLotNo: unknown, newLotNo: unknown) => unknown;
+  deleteConfigLot?: (id: unknown) => Promise<void>;
+  openConfigInstrument?: (id?: string) => void;
+  saveConfigInstrument?: (id: unknown) => Promise<void>;
+  deleteConfigInstrument?: (id: unknown) => Promise<void>;
+  defaultAssayLevels?: () => Record<string, any>[];
+  configAssayTeaRefs?: () => Record<string, any>[];
+  configAssayRefRecord?: (name: unknown, analyteId?: string) => Record<string, any>;
+  configAssayNaming?: (ref: Record<string, any>) => Record<string, any>;
+  configAssayFindRef?: (value: unknown) => Record<string, any>;
+  configAssaySuggestionInput?: (value: unknown) => void;
+  openConfigAssay?: (id?: string) => void;
+  saveConfigAssay?: (id: unknown) => Promise<void>;
+  delTest?: (id: unknown) => Promise<void>;
+  jsq?: (value: unknown) => string;
+  pageEntry?: (rightOnly?: boolean) => string;
+  entryWindow?: () => Record<string, any>;
+  entryWindowFor?: (testId: unknown, level: unknown, endOverride?: string, startOverride?: string) => Record<string, any>;
+  entryRowsWindow?: (rows: Record<string, any>[], key: string) => Record<string, any>;
+  entryToggleRows?: (key: string) => void;
+  entryDetailToggled?: (key: string, open: boolean) => void;
+  entryTreeIsCollapsed?: () => boolean;
+  treeToggle?: (key: unknown) => void;
+  toggleEntryTree?: () => void;
+  entryTreeKey?: (event: Record<string, any>) => void;
+  entryFilter?: (value: unknown) => void;
+  entryPick?: (testId: unknown, level: unknown) => void;
+  entryFocusLevel?: (level: unknown) => void;
+  entryShowPrevLot?: (level: unknown, lot: unknown) => void;
+  entryShowCurrentLot?: (level: unknown) => void;
+  entryFocusPendingSheet?: () => void;
+  entrySheetInputs?: () => Record<string, any>[];
+  entrySheetTarget?: (inputs: Record<string, any>[], current: Record<string, any>, key: string, shiftKey?: boolean) => Record<string, any>;
+  entrySheetKey?: (event: Record<string, any>) => void;
+  entryLatestTreeState?: (test: Record<string, any>) => string;
+  entrySyncTreeState?: (testId: unknown) => void;
+  entryRenderKeepScroll?: () => void;
+  entrySetLastMsg?: (html: string) => void;
+  entryUnlockExtraRun?: (tid: unknown, colKey: unknown, date: unknown, levelIdx: unknown, runNo: unknown) => void;
+  entryDateNoteSave?: (tid: unknown, date: string, value: unknown) => Promise<void>;
+  entryColumnCfg?: (test: Record<string, any>, level: unknown, lotNo: unknown) => Record<string, any>;
+  entryInlineSave?: (tid: unknown, level: unknown, date: string, value: unknown, runIdHint?: string, lotNo?: string) => Promise<void>;
+  entryInlineSaveCommit?: (tid: unknown, level: unknown, date: string, val: unknown, runId: unknown, lotNo?: unknown, valueDecimals?: number) => void;
+  syncVoidNceChoice?: () => void;
+  voidQcPoint?: (tid: unknown, pointId: unknown) => Promise<void>;
+  confirmVoidQcPoint?: (tid: unknown, pointId: unknown) => Promise<void>;
+  entrySetSheetMonth?: (value: unknown) => void;
+  entryGoToday?: () => void;
+  entrySetSheetPart?: (part: string, value: unknown) => void;
+  entrySetDays?: (n: unknown) => void;
+  entrySetStart?: (value: unknown) => void;
+  entrySetEnd?: (value: unknown) => void;
+  actionUi?: () => Record<string, any>;
+  actionSectionToggled?: (key: string, open: boolean) => void;
+  actionDefaultOpenSections?: (editing: unknown, protocol: unknown) => Record<string, any>;
+  actionRuleOptions?: () => [string, string][];
+  actionStaffOptions?: () => string;
+  captureActionDraft?: () => void;
+  actionFormChanged?: () => void;
+  actionDraftValues?: () => Record<string, any>;
+  clearActionDraft?: () => void;
+  actionSourceOptions?: (qcBound: boolean, current: unknown) => [string, string][];
+  actionCausePhrases?: (category: unknown) => string[];
+  actionActionPhrases?: (errorType: unknown) => string[];
+  actionSuggestRow?: (targetId: string, phrases: string[]) => string;
+  actionSuggestBox?: (targetId: string, phrases: string[], label?: string) => string;
+  actionInsertSuggestion?: (targetId: string, phrase: string) => void;
+  syncActionSuggestions?: () => void;
+  actSel?: (id: string, label: string, list: unknown, cur: unknown, extra?: string) => string;
+  actionLevelLabel?: (l: Record<string, any>, t?: Record<string, any> | null) => string;
+  syncActLevels?: () => void;
+  actionLevelContext?: (testId: unknown, level: unknown, lot: unknown) => string;
+  beginActionManual?: () => void;
+  closeActionForm?: () => void;
+  actionFormClosedHtml?: (issueCount: number) => string;
+  actionIncidentBanner?: (form: Record<string, any>, editing: unknown) => string;
+  beginActionFromIssue?: (tid: unknown, level: unknown, rule: unknown, err: unknown, act: unknown, pointId?: string, pointDate?: string) => void;
+  actionFieldValue?: (id: string, max?: number) => string;
+  readActionProtocolForm?: (version?: number) => Record<string, any>;
+  actionEffectivenessMissingKey?: (a: Record<string, any>) => string;
+  addAction?: () => Promise<void>;
+  syncActionRiskScore?: () => void;
+  syncActionResidualRiskScore?: () => void;
+  editAction?: (i: number) => Promise<void>;
+  actionInvestigationField?: (statusId: string, noteId: string, title: string, hint: string, form: Record<string, any>, statusKey: string, noteKey: string, lotToLot?: boolean) => string;
+  actionInvestigationChoiceLabel?: (value: unknown, label: unknown) => string;
+  actionInvestigationStateClass?: (value: unknown) => string;
+  actionInvestigationChoose?: (statusId: string, value: string) => void;
+  actionInvestigationSync?: (statusId: string) => void;
+  actionChecklistRefresh?: () => void;
+  actionSectionChip?: (missing: unknown) => Record<string, any>;
+  actionChecklistChip?: (form: Record<string, any>) => Record<string, any>;
+  actionEffSectionChip?: (form: Record<string, any>) => Record<string, any>;
+  actionUpdateSectionChip?: (key: string, info: Record<string, any>) => void;
+  actionRefreshSectionChips?: () => void;
+  actionSection?: (key: string, badge: string, title: string, hint: string, bodyHtml: string, chipInfo: Record<string, any>, openSet: Set<string>) => string;
+  actionFormModel?: (editing: unknown, tests: Record<string, any>[]) => Record<string, any>;
+  actionFormDefaults?: (tests: Record<string, any>[]) => Record<string, any>;
+  focusActionField?: (key: string) => void;
+  actionBiasInfo?: (t: unknown, l: unknown, biasBeforeRaw: unknown, biasAfterRaw: unknown) => Record<string, any>;
+  actionBiasContext?: (form: Record<string, any>, editing: unknown) => Record<string, any>;
+  actionLatestSigmaBias?: (t: unknown, level: unknown) => Record<string, any> | null;
+  actionFillBias?: (targetId: string, value: unknown) => void;
+  actionBiasThresholdHtml?: (info: Record<string, any>) => string;
+  actionBiasReferenceHtml?: (info: Record<string, any>) => string;
+  actionUpdateBiasHint?: () => void;
+  actionFormHtml?: (issueCount: number) => string;
+  actionLevelShort?: (t: unknown, level: unknown, lotSnap: unknown) => string;
+  currentIssues?: () => Record<string, any>[];
+  cancelAction?: (i: number) => Promise<void>;
+  confirmCancelAction?: (id: unknown, token: unknown) => void;
+  actionApprovalTag?: (a: Record<string, any>) => string;
+  actionApprovalToken?: (a: Record<string, any>) => string;
+  approveAction?: (i: number) => Promise<void>;
+  confirmApproveAction?: (id: unknown, token: unknown) => void;
+  returnAction?: (i: number) => Promise<void>;
+  confirmReturnAction?: (id: unknown, token: unknown) => void;
+  actionCanEscalate?: (a: Record<string, any>) => boolean;
+  escalateAction?: (i: number) => Promise<void>;
+  actionCanReopen?: (a: Record<string, any>) => boolean;
+  reopenAction?: (i: number) => Promise<void>;
+  confirmReopenAction?: (i: number) => void;
+  actionReviewButtons?: (i: number, a: Record<string, any>) => string;
+  actionSideChips?: (a: Record<string, any>, stage: string) => string;
+  actionDetailCheck?: (label: string, status: unknown, note: unknown) => string;
+  actionEvidenceTimelineHtml?: (a: Record<string, any>, rr: unknown) => string;
+  actionRerunEvidenceHtml?: (a: Record<string, any>, rr: unknown, t: unknown) => string;
+  openActionQcEvidence?: (tid: unknown, level: unknown, pointId: unknown, date: unknown, lot: unknown) => void;
+  viewActionDetail?: (i: number) => void;
+  openActionGuide?: () => void;
+  groupIssuesByTestDate?: (issues: Record<string, any>[]) => Record<string, any>[];
+  issueRowHtml?: (o: Record<string, any>) => string;
+  actionViolationInfo?: (a: Record<string, any>) => Record<string, any>;
+  actionQcVerdictLabel?: (a: Record<string, any>) => string;
+  openActionIssueHtml?: (a: Record<string, any>, idx: number) => string;
+  actionIssueGroupHtml?: (model: Record<string, any>) => string;
+  pageActionsV4?: () => string;
+  sgZone?: (s: unknown) => string;
+  sgFmtDPMO?: (n: unknown) => string;
+  sgData?: (tid: string) => Record<string, any>[];
+  sgInputValue?: (v: unknown) => string;
+  sgInputDisplayValue?: (v: unknown, digits?: number) => string;
+  sgCleanCell?: (field: string, val: unknown) => unknown;
+  sgBiasVal?: (L: Record<string, any>) => number | undefined;
+  sgIsAutoCV?: (L: Record<string, any>) => boolean;
+  sgReadiness?: (L: Record<string, any>) => Record<string, any>;
+  sgBiasRefU?: (rounds: Record<string, any>[]) => number | null;
+  sgMuBiasMode?: (L: Record<string, any>) => string;
+  sgMU?: (t: unknown, e: unknown, level: unknown, tea?: unknown, refs?: Record<string, any>[]) => Record<string, any>;
+  sgComp?: (t: unknown, e: unknown, level: unknown, refs?: Record<string, any>[]) => Record<string, any> | null;
+  sgRows?: (t: unknown, data: Record<string, any>[], levels: unknown[]) => Record<string, any>[];
+  sgSyncCurrentPeriodTea?: (t: Record<string, any>) => Record<string, any>;
+  sgReconcileAllTeaSnapshots?: () => void;
+  sgSetTea?: (v: unknown) => void;
+  sgSetTeaSource?: (v: unknown) => void;
+  sgSetTeaMeta?: (field: string, val: unknown) => void;
+  sgRefreshSoon?: () => void;
+  sgTrackedTests?: () => Record<string, any>[];
+  sgTrackedOptions?: (tests: Record<string, any>[], selectedId: unknown) => string;
+  sgHistoricalLevels?: (t: Record<string, any>) => unknown[];
+  sgVisibleLevels?: (t: Record<string, any>) => unknown[];
+  sgPeriodLevels?: (t: Record<string, any>, e: Record<string, any>) => unknown[];
+  sgPickTest?: (v: unknown) => void;
+  sgStatusPeriodId?: (tid: string, data: Record<string, any>[]) => string | undefined;
+  sgSelectPeriod?: (eid: string) => void;
+  sgRemoveTracked?: (id: unknown) => void;
+  sgOpenAddTest?: () => void;
+  sgAddTestSearchSet?: (v: unknown) => void;
+  sgViewTrackedTest?: (id: unknown) => void;
+  sgRenderAddTestModal?: () => void;
+  sgTrackTest?: (id: unknown) => void;
+  pageSigma?: () => string;
+  sgOpSpecCell?: (spec: Record<string, any>) => string;
+  sgFrequencyHTML?: (t: unknown, selectedRow: unknown, levels: unknown[]) => string;
+  sgMuDominant?: (mu: Record<string, any>) => string;
+  sgMuStateChip?: (mu: Record<string, any>) => string;
+  sgMuHTML?: (t: unknown, row: unknown, levels: unknown[]) => string;
+  sgRefresh?: () => void;
+  sgTips?: (t: unknown, r: unknown, lvl: unknown) => string;
+  sgPointTipShow?: (event: Record<string, any>, html: string) => void;
+  sgPointTipHide?: () => void;
+  sgTrendSVG?: (t: unknown, valid: Record<string, any>[], levels: unknown[]) => string;
+  sgMDCSVG?: (t: unknown, valid: Record<string, any>[], levels: unknown[]) => string;
+  sgBiasRowsFromDom?: () => Record<string, any>[];
+  sgBiasPeriodsFromDom?: () => string[];
+  sgBiasStats?: (rounds: Record<string, any>[]) => Record<string, any>;
+  sgBiasRoundsKey?: (rounds: Record<string, any>[]) => string;
+  sgBiasLinkedPeriodIds?: (data: Record<string, any>[], eid: string, level: unknown) => string[];
+  sgOpenBias?: (eid: string, level: unknown) => void;
+  sgRenderBiasModal?: () => void;
+  sgBiasUpdateSummary?: () => void;
+  sgBiasSelectPeriods?: (checked: boolean) => void;
+  sgBiasAdd?: () => void;
+  sgBiasDel?: (i: number) => void;
+  sgApplyBiasToPeriods?: (data: Record<string, any>[], periodIds: string[], level: unknown, bias: number, rounds: Record<string, any>[], batchId?: string) => number;
+  sgBiasApply?: () => Promise<void>;
+  sgMuRowsFromDom?: () => Record<string, any>[];
+  sgMuPeriodsFromDom?: () => string[];
+  sgMuCaptureDom?: () => void;
+  sgMuPreview?: (level: unknown) => Record<string, any> | null;
+  sgMuUpdatePreview?: () => void;
+  sgOpenMU?: (eid: string) => void;
+  sgRenderMuModal?: () => void;
+  sgMuSelectPeriods?: (checked: boolean) => void;
+  sgMuApply?: () => Promise<void>;
+  sgCell?: (eid: string, level: unknown, field: string, val: unknown) => void;
+  sgPeriodSel?: (e: Record<string, any>, ro: string) => string;
+  sgPart?: (eid: string, part: string, val: unknown) => Promise<void>;
+  sgAddPeriod?: () => Promise<void>;
+  sgDelPeriod?: (eid: string) => void;
+  sgClearImportedCV?: (L: Record<string, any>) => unknown;
+  sgCohortCutoff?: (period: unknown) => unknown;
+  sgCohortGroups?: (t: unknown, e: unknown) => Record<string, any>[];
+  sgCohortStatusText?: (a: Record<string, any>) => string;
+  sgImportCohort?: (t: unknown, e: unknown, level: unknown, cohort: Record<string, any>) => unknown;
+  sgApplyCohortChoices?: (t: unknown, e: unknown, groups: Record<string, any>[], choices: Record<string, any>) => Record<string, any>;
+  sgCohortImportMessage?: (e: Record<string, any>, s: Record<string, any>) => string;
+  sgRenderCohortModal?: () => void;
+  sgCohortClose?: () => void;
+  sgCohortApply?: () => Promise<void>;
+  sgPullCV?: (eid?: string) => Promise<void>;
   PeriodService: PeriodServiceApi;
   qcPointWarnings?: (test: Record<string, any>, config: Record<string, any>, date: string,
     runId: string, value: number) => string[];
@@ -967,6 +1292,29 @@ type QCLabGlobal = typeof globalThis & {
   SigmaTeaSnapshotService: SigmaTeaSnapshotService;
   SigmaLevelSelectionService: SigmaLevelSelectionService;
   SigmaPeriodSelectionService: SigmaPeriodSelectionService;
+  SigmaTeaResolution?: SigmaTeaResolution;
+  SG_TEA_SOURCES?: [string, string][];
+  SG_CLIA_FIXED?: Record<string, { absolute: number; unit: string }>;
+  teaRefName?: (v: unknown) => string;
+  teaRefIsDefault?: (value: unknown) => boolean;
+  testDisplayName?: (t: Record<string, any>) => string;
+  sgUnitKey?: (v: unknown) => string;
+  sgUnitsMatch?: (a: unknown, b: unknown) => boolean;
+  sgTeaSourceMeta?: (t: Record<string, any>, src?: string) => Record<string, any>;
+  effectiveTeaRefs?: () => Record<string, any>[];
+  sgRef?: (t: Record<string, any>, refs?: Record<string, any>[]) => Record<string, any>;
+  sgTeaSource?: (t: Record<string, any>) => string;
+  sgTeaInfo?: (t: Record<string, any>, src: string, target?: unknown, refs?: Record<string, any>[]) => Record<string, any>;
+  sgTeaBySource?: (t: Record<string, any>, src: string, target?: unknown, refs?: Record<string, any>[]) => number;
+  sgTea?: (t: Record<string, any>) => number;
+  sgTeaCriterionText?: (t: Record<string, any>, src?: string) => string;
+  sgTeaLabel?: (src: string) => string;
+  sgTeaRefText?: (t: Record<string, any>) => string;
+  sgTeaSnapshot?: (t: Record<string, any>) => Record<string, any>;
+  sgEnsureTeaSnapshot?: (t: Record<string, any>, e: Record<string, any>) => Record<string, any>;
+  sgLevelTarget?: (t: Record<string, any>, L: Record<string, any>, level: unknown) => number | null;
+  sgSetLevelTeaSnapshot?: (t: Record<string, any>, e: Record<string, any>, level: unknown, force?: boolean) => Record<string, any>;
+  sgEntryTea?: (t: Record<string, any>, e: Record<string, any>, level: unknown, refs?: Record<string, any>[]) => number;
   WestgardViewModel?: WestgardViewModelApi;
   westgardRowsWindow?: typeof westgardRowsWindow;
   westgardXlsxRows: WestgardXlsxRows;
@@ -977,6 +1325,19 @@ type QCLabGlobal = typeof globalThis & {
   westgardArchivedTestSelection?: typeof westgardArchivedTestSelection;
   LISClientService?: LisClientApi;
   AuditService?: AuditServiceApi;
+  ACTIVITY_HARD_CAP?: number;
+  ACTIVITY_ROTATE_TO?: number;
+  AUDIT_AUTO_VERIFY_MAX?: number;
+  auditEntryHash?: (entry: Record<string, any>) => string;
+  auditVerifyChain?: (activity?: Record<string, any>[], anchor?: string) => Record<string, any>;
+  auditActor?: () => { user: string; username: string; userId: string; role: string; clientId: string };
+  auditChainStatus?: (force?: boolean) => Record<string, any>;
+  logAct: (action: string, detail: string, target?: string) => void;
+  auditSha256: (text: string) => string;
+  auditRelinkChain: (entries: Record<string, any>[], anchor?: string) => Record<string, any>[];
+  auditVerifyChainNow?: () => void;
+  auditLastHashOf?: (activity?: Record<string, any>[]) => string;
+  auditArchiveCut?: (activity: Record<string, any>[], cutoffIso: unknown) => { segment: Record<string, any>[]; retained: Record<string, any>[]; tipHash: string };
   BACKUP_IMPORT_MAX_BYTES?: number;
   BACKUP_IMPORT_WARN_BYTES?: number;
   serializeBackupData?: BackupServiceApi['serializeBackupData'];
@@ -1104,6 +1465,16 @@ type QCLabGlobal = typeof globalThis & {
   lisQueuePresentation: ReturnType<typeof createLisQueuePresentation>;
   lisSettingsService: ReturnType<typeof createLisSettingsService>;
   LisGatewayCommand: LisGatewayCommand;
+  lisGatewaySaveSettings: ReturnType<typeof createLisQueueController>['lisGatewaySaveSettings'];
+  lisQueueValueText: ReturnType<typeof createLisQueueController>['lisQueueValueText'];
+  lisOnclick: ReturnType<typeof createLisQueueController>['lisOnclick'];
+  lisQueueRowHtml: ReturnType<typeof createLisQueueController>['lisQueueRowHtml'];
+  lisQueueSectionHtml: ReturnType<typeof createLisQueueController>['lisQueueSectionHtml'];
+  lisRenderQueueModal: ReturnType<typeof createLisQueueController>['lisRenderQueueModal'];
+  lisOpenQueueModal: ReturnType<typeof createLisQueueController>['lisOpenQueueModal'];
+  lisQueueRefresh: ReturnType<typeof createLisQueueController>['lisQueueRefresh'];
+  lisQueueImport: ReturnType<typeof createLisQueueController>['lisQueueImport'];
+  lisQueueReject: ReturnType<typeof createLisQueueController>['lisQueueReject'];
   SettingsProfileCommand: SettingsProfileCommand;
   SettingsFirebaseCommand: SettingsFirebaseCommand;
   firebaseSettingsService: ReturnType<typeof createFirebaseSettingsService>;
@@ -1264,6 +1635,13 @@ type QCLabGlobal = typeof globalThis & {
   cusumPointRenderModel: typeof cusumPointRenderModel;
   cusumReferenceLines: typeof cusumReferenceLines;
   cusumLinePoints: typeof cusumLinePoints;
+  cusumDisplayPlan: ReturnType<typeof createCusumDisplayPlan>;
+  cusumHoverModel: ReturnType<typeof createCusumHoverModel>;
+  drawLJ: ReturnType<typeof createQcChartRenderer>['drawLJ'];
+  ljDataURL: ReturnType<typeof createQcChartRenderer>['ljDataURL'];
+  drawLJMultiZ: ReturnType<typeof createQcChartRenderer>['drawLJMultiZ'];
+  ljMultiDataURL: ReturnType<typeof createQcChartRenderer>['ljMultiDataURL'];
+  drawCUSUM: ReturnType<typeof createQcChartRenderer>['drawCUSUM'];
   blobDownload?: ReturnType<typeof createBlobDownload>;
   qcReportCsvRows?: ReturnType<typeof createQcReportCsvRows>;
   nceCsvRow?: ReturnType<typeof createActionCsvRow>;
@@ -1650,6 +2028,73 @@ type QCLabGlobal = typeof globalThis & {
   reportPointsTableService: ReturnType<typeof createReportPointsTable>;
   actionReportHtml: ReturnType<typeof createActionReportHtml>;
   reportNceDetailHtmlPresentation: ReturnType<typeof createReportNceDetailHtml>;
+  esc: typeof escapeHtml;
+  escAttr: typeof escapeHtmlAttr;
+  reportQcValue: ReturnType<typeof createReportPrintController>['reportQcValue'];
+  reportQcStat: ReturnType<typeof createReportPrintController>['reportQcStat'];
+  reportQcPoint: ReturnType<typeof createReportPrintController>['reportQcPoint'];
+  reportHeader: ReturnType<typeof createReportPrintController>['reportHeader'];
+  signBlock: ReturnType<typeof createReportPrintController>['signBlock'];
+  openPrint: ReturnType<typeof createReportPrintController>['openPrint'];
+  sigmaPeriodPrintRows: ReturnType<typeof createReportPrintController>['sigmaPeriodPrintRows'];
+  sigmaPeriodsPrintRows: ReturnType<typeof createReportPrintController>['sigmaPeriodsPrintRows'];
+  sigmaMuPrintRows: ReturnType<typeof createReportPrintController>['sigmaMuPrintRows'];
+  sigmaMuPeriodsPrintRows: ReturnType<typeof createReportPrintController>['sigmaMuPeriodsPrintRows'];
+  sigmaMuTrace: ReturnType<typeof createReportPrintController>['sigmaMuTrace'];
+  sigmaMuPrintCard: ReturnType<typeof createReportPrintController>['sigmaMuPrintCard'];
+  printSigmaPeriod: ReturnType<typeof createReportPrintController>['printSigmaPeriod'];
+  printSigmaPeriods: ReturnType<typeof createReportPrintController>['printSigmaPeriods'];
+  printWestgard: ReturnType<typeof createReportPrintController>['printWestgard'];
+  reportPointsTableHtml: ReturnType<typeof createReportPrintController>['reportPointsTableHtml'];
+  reportNceSummaryHtml: ReturnType<typeof createReportPrintController>['reportNceSummaryHtml'];
+  reportNceDetailField: ReturnType<typeof createReportPrintController>['reportNceDetailField'];
+  reportNceDetailHtml: ReturnType<typeof createReportPrintController>['reportNceDetailHtml'];
+  reportNceAppendixHtml: ReturnType<typeof createReportPrintController>['reportNceAppendixHtml'];
+  printReport: ReturnType<typeof createReportPrintController>['printReport'];
+  printRangeForm: ReturnType<typeof createReportPrintController>['printRangeForm'];
+  dataIoTypePx: ReturnType<typeof createDataIoController>['dataIoTypePx'];
+  dataIoCanvasFont: ReturnType<typeof createDataIoController>['dataIoCanvasFont'];
+  exportMetaRows: ReturnType<typeof createDataIoController>['exportMetaRows'];
+  reportInRange: ReturnType<typeof createDataIoController>['reportInRange'];
+  reportTeaInfo: ReturnType<typeof createDataIoController>['reportTeaInfo'];
+  reportMultiViews: ReturnType<typeof createDataIoController>['reportMultiViews'];
+  reportPrevLotRows: ReturnType<typeof createDataIoController>['reportPrevLotRows'];
+  reportLevelRows: ReturnType<typeof createDataIoController>['reportLevelRows'];
+  reportActionsInRange: ReturnType<typeof createDataIoController>['reportActionsInRange'];
+  reportNceExcerpt: ReturnType<typeof createDataIoController>['reportNceExcerpt'];
+  reportNceSummaryParts: ReturnType<typeof createDataIoController>['reportNceSummaryParts'];
+  reportNceModel: ReturnType<typeof createDataIoController>['reportNceModel'];
+  exportReportCSV: ReturnType<typeof createDataIoController>['exportReportCSV'];
+  exportActionsCSV: ReturnType<typeof createDataIoController>['exportActionsCSV'];
+  downloadBlob: ReturnType<typeof createDataIoController>['downloadBlob'];
+  sigmaReportMetric: ReturnType<typeof createDataIoController>['sigmaReportMetric'];
+  sigmaReportRows: ReturnType<typeof createDataIoController>['sigmaReportRows'];
+  sigmaLevelsOf: ReturnType<typeof createDataIoController>['sigmaLevelsOf'];
+  sigmaDataURLBytes: ReturnType<typeof createDataIoController>['sigmaDataURLBytes'];
+  sigmaExportPixelRatio: ReturnType<typeof createDataIoController>['sigmaExportPixelRatio'];
+  sigmaCanvas: ReturnType<typeof createDataIoController>['sigmaCanvas'];
+  drawSigmaReportChart: ReturnType<typeof createDataIoController>['drawSigmaReportChart'];
+  sigmaMdcItems: ReturnType<typeof createDataIoController>['sigmaMdcItems'];
+  sigmaPeriodLabel: ReturnType<typeof createDataIoController>['sigmaPeriodLabel'];
+  sigmaMdcPeriodLabel: ReturnType<typeof createDataIoController>['sigmaMdcPeriodLabel'];
+  sigmaExportPeriods: ReturnType<typeof createDataIoController>['sigmaExportPeriods'];
+  sigmaMdcLabelPlacements: ReturnType<typeof createDataIoController>['sigmaMdcLabelPlacements'];
+  SIGMA_EXPORT_PIXEL_RATIO: ReturnType<typeof createDataIoController>['SIGMA_EXPORT_PIXEL_RATIO'];
+  XlsxCore: ReturnType<typeof createDataIoController>['XlsxCore'];
+  SigmaXlsx: ReturnType<typeof createDataIoController>['SigmaXlsx'];
+  drawSigmaReportMDC: ReturnType<typeof createDataIoController>['drawSigmaReportMDC'];
+  renameSigmaSheet: ReturnType<typeof createDataIoController>['renameSigmaSheet'];
+  RXST: ReturnType<typeof createDataIoController>['RXST'];
+  ReportXlsx: ReturnType<typeof createDataIoController>['ReportXlsx'];
+  reportXlsxDoc: ReturnType<typeof createDataIoController>['reportXlsxDoc'];
+  exportReportXLSX: ReturnType<typeof createDataIoController>['exportReportXLSX'];
+  westgardXlsxDoc: ReturnType<typeof createDataIoController>['westgardXlsxDoc'];
+  exportWestgardXLSX: ReturnType<typeof createDataIoController>['exportWestgardXLSX'];
+  sigmaExportMeta: ReturnType<typeof createDataIoController>['sigmaExportMeta'];
+  sigmaTeaTrace: ReturnType<typeof createDataIoController>['sigmaTeaTrace'];
+  buildSigmaXlsx: ReturnType<typeof createDataIoController>['buildSigmaXlsx'];
+  exportSigmaPeriodXLSX: ReturnType<typeof createDataIoController>['exportSigmaPeriodXLSX'];
+  exportSigmaPeriodsXLSX: ReturnType<typeof createDataIoController>['exportSigmaPeriodsXLSX'];
   sigmaDraftService?: ReturnType<typeof createSigmaDraftService>;
   corruptLocalQuarantine?: ReturnType<typeof createCorruptLocalQuarantine>;
   syncValueCodec?: ReturnType<typeof createSyncValueCodec>;
@@ -1904,7 +2349,7 @@ if (typeof (root as any).fbHandleValue === 'function') root.firebaseMergeCommitS
   state: () => state,
   replaceState: value => { state=value; },
   merge: (base,mergeFirstConnect,local,remote) => firebaseMergeApplication(base,mergeFirstConnect,local,remote),
-  relinkAudit: value => { if(typeof auditRelinkChain==='function'&&Array.isArray(value.activity))value.activity=auditRelinkChain(value.activity,value.activityAnchor||''); },
+  relinkAudit: value => { if(Array.isArray(value.activity))value.activity=auditRelinkChain(value.activity,value.activityAnchor||''); },
   clearDerived: () => clearDerived(),
   ensureShape: () => ensureShape(),
   invariantErrors: value => (root.QCCore as any).validateStateInvariants(value),
@@ -1946,6 +2391,32 @@ root.backupOversizeConfirmation=createBackupOversizeConfirmation();
 root.lisQueuePresentation = createLisQueuePresentation({test:id=>(state.tests||[]).find((test:any)=>test.id===id),formatTestValue:(test,value)=>(root as any).fmtTestValue(test,value),format:(value,decimals)=>(root as any).fmt(value,decimals),escape:value=>(root as any).esc(value),escapeAttribute:value=>(root as any).escAttr(value),quoteJs:value=>(root as any).jsq(value),formatDateTime:value=>(root as any).formatDateTimeVN(value),testDisplayName:test=>typeof (root as any).testDisplayName==='function'?(root as any).testDisplayName(test):'',button:(label,action,variant)=>(root as any).btn(label,action,variant),emptyState:(title,message,action)=>(root as any).emptyState(title,message,action),modalCloseButton:action=>root.modalCloseButton(action)});
 root.lisSettingsService = createLisSettingsService(value => root.lisNormalizeGatewayUrl!(value));
 root.LisGatewayCommand=createLisGatewayCommand({store:settings=>localStorage.setItem(LIS_GATEWAY_STORAGE_KEY,JSON.stringify(settings)),clearToken:()=>{const input=document.getElementById('lisGatewayToken') as any;if(input)input.value='';},disable:()=>{const runtime=(root as any).lisGatewayRuntime;clearInterval(runtime.pollT);runtime.pollT=null;runtime.pending=[];runtime.unresolved=[];lisClient.setStatus('off','Đã tắt');},start:()=>(root as any).lisGatewayStart(),pull:()=>(root as any).lisGatewayPull({manual:true})});
+const lisQueueController=createLisQueueController({
+  document:typeof document!=='undefined'?document:({getElementById:()=>null} as unknown as Document),
+  presentation:root.lisQueuePresentation,
+  settingsService:{prepare:input=>root.lisSettingsService.prepare(input)},
+  gatewayCommand:root.LisGatewayCommand,
+  normalizeGatewayUrl:value=>root.lisNormalizeGatewayUrl!(value),
+  gatewayConfig:()=>root.lisGatewayConfig!(),
+  gatewayRuntime:()=>(root as any).lisGatewayRuntime,
+  gatewayPull:opts=>root.lisGatewayPull!(opts as any),
+  importResult:messageId=>root.lisImportResult!(messageId as any),
+  rejectResult:messageId=>root.lisRejectResult!(messageId as any),
+  requireAdmin:message=>root.requireAdmin(message),
+  infoDialog:(message,opts)=>root.infoDialog(message,opts),
+  confirmDialog:opts=>root.confirmDialog(opts),
+  openModal:html=>root.openModal(html),
+});
+root.lisGatewaySaveSettings=lisQueueController.lisGatewaySaveSettings;
+root.lisQueueValueText=lisQueueController.lisQueueValueText;
+root.lisOnclick=lisQueueController.lisOnclick;
+root.lisQueueRowHtml=lisQueueController.lisQueueRowHtml;
+root.lisQueueSectionHtml=lisQueueController.lisQueueSectionHtml;
+root.lisRenderQueueModal=lisQueueController.lisRenderQueueModal;
+root.lisOpenQueueModal=lisQueueController.lisOpenQueueModal;
+root.lisQueueRefresh=lisQueueController.lisQueueRefresh;
+root.lisQueueImport=lisQueueController.lisQueueImport;
+root.lisQueueReject=lisQueueController.lisQueueReject;
 const labProfileService=createLabProfileService((value, limit) => (root.QCCore as any).cleanText(value, limit), value => root.settingsBrandProfile!(value));
 root.SettingsProfileCommand=createSettingsProfileCommand({current:()=>state.lab||{},set:lab=>{state.lab=lab;},profile:labProfileService,save:()=>save({clearDerived:false}),renderBrand:()=>renderBrand(),render:()=>rerender()});
 root.SettingsFirebaseCommand=createSettingsFirebaseCommand({available:()=>typeof firebase!=='undefined'&&typeof firebase.auth==='function',ensureApp:cfg=>ensureFirebaseApp(cfg),persist:()=>firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL),signIn:(email,password)=>firebase.auth().signInWithEmailAndPassword(email,password),store:plan=>localStorage.setItem('qclab_fb',JSON.stringify({labCode:plan.labCode,email:plan.email,anonymous:false,config:plan.config})),disconnect:()=>fbDisconnect(),connected:plan=>{setCloudStatus(plan.email+' · '+plan.labCode,true);},clearPassword:()=>{const input=document.getElementById('fbPassword') as any;if(input)input.value='';},init:()=>initFirebase(),hasRemote:()=>!!fb.ref,remoteExists:async()=>{const snap=await fb.ref.once('value');if(snap.exists()){markSaved('đã kết nối','Đã tải dữ liệu từ Firebase');return true;}return false;},remoteReady:()=>{fb.ready=true;fb.initialized=true;},sync:()=>(root as any).syncNow(),clearStore:()=>localStorage.removeItem('qclab_fb'),signOut:()=>typeof firebase!=='undefined'&&typeof firebase.auth==='function'?firebase.auth().signOut():Promise.resolve(),local:()=>{fb.authUser=null;setCloudStatus('Đang chạy cục bộ',false);markSaved('đã lưu cục bộ','Đã ngắt Firebase');}});
@@ -2348,7 +2819,13 @@ root.configPanelInstrumentOptionsHtml=configPanelInstrumentOptionsHtml;
 root.configLotLevelOptionsHtml=configLotLevelOptionsHtml;
 root.qcHistoryMeanSdRowsHtml=qcHistoryMeanSdRowsHtml;
 root.qcHistoryPointRowsHtml=qcHistoryPointRowsHtml;
-root.targetNumberTextPresentation=createTargetNumberText({valueDecimals:test=>(globalThis as any).testDecimalPlaces(test),statDecimals:test=>(globalThis as any).testStatDecimals(test),defaultDecimals:(globalThis as any).QC_DECIMALS_DEFAULT});
+/* QC_DECIMALS_DEFAULT là `const` global lexical của state.js (như REFTESTS/
+   TEA_SOURCE_REGISTRY), không phải property trên globalThis — (globalThis as
+   any).QC_DECIMALS_DEFAULT từng luôn undefined, làm targetNumberText(value,null)
+   gọi Number(value).toFixed(undefined) (làm tròn về số nguyên, vd "3.7"→"4")
+   bất cứ khi nào gọi không kèm xét nghiệm. Tham chiếu trần đúng quy tắc, kèm
+   fallback bằng đúng giá trị mặc định của state.js cho sandbox chưa nạp nó. */
+root.targetNumberTextPresentation=createTargetNumberText({valueDecimals:test=>(globalThis as any).testDecimalPlaces(test),statDecimals:test=>(globalThis as any).testStatDecimals(test),defaultDecimals:typeof QC_DECIMALS_DEFAULT!=='undefined'?QC_DECIMALS_DEFAULT:2});
 root.targetConfigAssignedPresentation=targetConfigAssignedPresentation;
 root.targetRangeDraftPresentation=createTargetRangeDraft({targetFromLimits:(low,high)=>(globalThis as any).QCCore.targetFromLimits(low,high),limitsFromTarget:(mean,sd)=>(globalThis as any).QCCore.limitsFromTarget(mean,sd)});
 root.parseVnDatePresentation=parseVnDate;
@@ -2551,11 +3028,56 @@ root.leveyJenningsChartTitle=LEVEY_JENNINGS_CHART_TITLE;
 root.chartEmptyLabels=CHART_EMPTY_LABELS;
 root.leveyJenningsMultiYAxis=leveyJenningsMultiYAxis;
 root.leveyJenningsMultiGeometry=leveyJenningsMultiGeometry;
+root.cusumDisplayPlan=createCusumDisplayPlan(input=>chartViewModel.sampleIndices(input));
+root.cusumHoverModel=createCusumHoverModel({date:value=>vnDate(value),number:(value,decimals)=>(root as any).fmt(value,decimals)});
+const qcChartRenderer=createQcChartRenderer({
+  hiDpiCanvasSetup:canvas=>root.hiDpiCanvasSetup!(canvas),
+  leveyJenningsGeometry:input=>root.leveyJenningsGeometry!(input),
+  leveyJenningsColors:root.leveyJenningsColors as any,
+  leveyJenningsBandRects:input=>root.leveyJenningsBandRects!(input),
+  findTest:id=>(state.tests||[]).find((test:any)=>test.id===id),
+  leveyJenningsYAxisLabels:(test,mean,sd)=>root.leveyJenningsYAxisLabels!(test,mean,sd),
+  leveyJenningsGridLines:(axis,mean,sd,y)=>root.leveyJenningsGridLines!(axis,mean,sd,y),
+  canvasFont:(weight,token,fallback)=>root.canvasFont!(weight,token,fallback),
+  leveyJenningsChartTitle:root.leveyJenningsChartTitle as any,
+  chartEmptyLabels:root.chartEmptyLabels as any,
+  leveyJenningsTooltipController:canvas=>root.leveyJenningsTooltipController!(canvas),
+  lvlCfg:(test,level)=>lvlCfg(test,level),
+  westgard:(points,mean,sd,scope)=>(root.QCCore as any).westgard(points,mean,sd,scope),
+  westgardRuleScope:root.westgardRuleScope as any,
+  leveyJenningsPointRenderModel:input=>root.leveyJenningsPointRenderModel!(input),
+  leveyJenningsTicks:points=>root.leveyJenningsTicks!(points),
+  chartDataUrl:input=>root.chartDataUrl!(input),
+  leveyJenningsMultiGeometry:input=>root.leveyJenningsMultiGeometry!(input),
+  leveyJenningsMultiSeries:input=>root.leveyJenningsMultiSeries!(input),
+  leveyJenningsMultiColors:root.leveyJenningsMultiColors as any,
+  westgardMultiByPoint:(levels,scope)=>(root.QCCore as any).westgardMultiByPoint(levels,scope),
+  westgardByPoint:(points,mean,sd,scope)=>(root.QCCore as any).westgardByPoint(points,mean,sd,scope),
+  leveyJenningsMultiPointRenderModel:input=>root.leveyJenningsMultiPointRenderModel!(input),
+  leveyJenningsMultiDividers:(levels,runs,runIndex,xOfRun)=>root.leveyJenningsMultiDividers!(levels,runs,runIndex,xOfRun),
+  leveyJenningsMultiRunTicks:(runs,all)=>root.leveyJenningsMultiRunTicks!(runs,all),
+  leveyJenningsLegendLayout:(levels,colors,startX,measure)=>root.leveyJenningsLegendLayout!(levels,colors,startX,measure),
+  leveyJenningsMultiYAxis:()=>root.leveyJenningsMultiYAxis!(),
+  cusumChartGeometry:input=>root.cusumChartGeometry!(input),
+  cusumReferenceLines:input=>root.cusumReferenceLines!(input),
+  cusumColors:root.cusumColors as any,
+  cusumChartTitle:(k,h)=>root.cusumChartTitle!(k,h),
+  format:(value,decimals)=>fmt(value,decimals),
+  cusumDisplayPlan:input=>root.cusumDisplayPlan!(input),
+  cusumLinePoints:input=>root.cusumLinePoints!(input),
+  cusumPointRenderModel:input=>root.cusumPointRenderModel!(input),
+  cusumHoverModel:input=>root.cusumHoverModel!(input),
+});
+root.drawLJ=qcChartRenderer.drawLJ;
+root.ljDataURL=qcChartRenderer.ljDataURL;
+root.drawLJMultiZ=qcChartRenderer.drawLJMultiZ;
+root.ljMultiDataURL=qcChartRenderer.ljMultiDataURL;
+root.drawCUSUM=qcChartRenderer.drawCUSUM;
 root.configNavScrollService=createConfigNavScrollService({find:()=>typeof document==='undefined'?null:document.querySelector('.config-shell-nav') as any,getPosition:()=>Number((root as any).__configNavScrollPosition)||0,setPosition:value=>{(root as any).__configNavScrollPosition=value;}});
 root.entryJumpScrollService=createEntryJumpScrollService({findWrap:()=>typeof document==='undefined'?null:document.querySelector('.qc-sheet-wrap') as any,findTodayRow:()=>typeof document==='undefined'?null:document.querySelector('.qc-sheet tbody tr.today') as any});
 root.defaultDateFieldsService=createDefaultDateFieldsService({find:id=>typeof document==='undefined'?null:document.getElementById(id) as any});
 root.postRenderPageActions=createPostRenderPageActions({requestFrame:work=>requestAnimationFrame(work)});
-root.afterRender=createAfterRenderController({document:typeof document!=='undefined'?document:({querySelectorAll:()=>[]} as unknown as Document),canvas:root.afterRenderCanvasService,tests:()=>state.tests||[],levelConfig:(test,level)=>lvlCfg(test,level),buildLeveyJennings:input=>ChartViewModel.buildLeveyJennings(input),acceptedLotPoints:(test,level)=>acceptedLotPoints(test,level),drawLeveyJennings:(canvas,points,mean,sd)=>drawLJ(canvas,points,mean,sd),entryCache:()=>entryLjRenderCache,multiViews:test=>wgMultiViews(test),buildMultiLevel:input=>ChartViewModel.buildMultiLevel(input),drawMultiLevel:(canvas,chart,test)=>drawLJMultiZ(canvas,chart,test),lotGroups:()=>((state as any).lotGroups||[]),levelsForLotGroup:group=>levelsForLotGroup(group),archivedMultiViews:levels=>wgArchivedMultiViews(levels),operationalLotPoints:(test,level)=>operationalLotPoints(test,level),cusumSeries:(test,level)=>cusumSeries(test,level),buildCusum:input=>ChartViewModel.buildCusum(input),drawCusum:(canvas,points,series)=>drawCUSUM(canvas,points,series),fillDefaultDates:()=>root.defaultDateFieldsService.fill(['eDate','aDate'],vnDate(isoToday())),runPageActions:()=>root.postRenderPageActions.run(page,{reagent:rcCompute,sigma:sgRefresh}),consumeEntryJump:()=>{if(!entryJumpToday)return false;entryJumpToday=false;return true;},requestFrame:work=>requestAnimationFrame(work),scrollEntryJump:()=>root.entryJumpScrollService.scroll(),updateSaveStatus:()=>updateSaveStatus(),updateBackupBanner:()=>updateBackupBanner(),restoreConfigNavScroll:()=>root.configNavScrollService.restore()}).afterRender;
+root.afterRender=createAfterRenderController({document:typeof document!=='undefined'?document:({querySelectorAll:()=>[]} as unknown as Document),canvas:root.afterRenderCanvasService,tests:()=>state.tests||[],levelConfig:(test,level)=>lvlCfg(test,level),buildLeveyJennings:input=>ChartViewModel.buildLeveyJennings(input),acceptedLotPoints:(test,level)=>acceptedLotPoints(test,level),drawLeveyJennings:(canvas,points,mean,sd)=>qcChartRenderer.drawLJ(canvas,points,mean,sd),entryCache:()=>entryLjRenderCache,multiViews:test=>wgMultiViews(test),buildMultiLevel:input=>ChartViewModel.buildMultiLevel(input),drawMultiLevel:(canvas,chart,test)=>qcChartRenderer.drawLJMultiZ(canvas,chart,test),lotGroups:()=>((state as any).lotGroups||[]),levelsForLotGroup:group=>levelsForLotGroup(group),archivedMultiViews:levels=>wgArchivedMultiViews(levels),operationalLotPoints:(test,level)=>operationalLotPoints(test,level),cusumSeries:(test,level)=>cusumSeries(test,level),buildCusum:input=>ChartViewModel.buildCusum(input),drawCusum:(canvas,points,series)=>qcChartRenderer.drawCUSUM(canvas,points,series),fillDefaultDates:()=>root.defaultDateFieldsService.fill(['eDate','aDate'],vnDate(isoToday())),runPageActions:()=>root.postRenderPageActions.run(page,{reagent:rcCompute,sigma:sgRefresh}),consumeEntryJump:()=>{if(!entryJumpToday)return false;entryJumpToday=false;return true;},requestFrame:work=>requestAnimationFrame(work),scrollEntryJump:()=>root.entryJumpScrollService.scroll(),updateSaveStatus:()=>updateSaveStatus(),updateBackupBanner:()=>updateBackupBanner(),restoreConfigNavScroll:()=>root.configNavScrollService.restore()}).afterRender;
 root.dashboardOverdueActions=createDashboardOverdueActions({overdue:action=>(root as any).actionOverdue(action)});
 root.dashboardOverdueActionListHtml=createDashboardOverdueActionListHtml({render:item=>dashboardOverdueActionItemHtml(item)});
 root.dashboardQcFollowupListHtml=createDashboardQcFollowupListHtml({render:(item,kind)=>dashboardQcFollowupItemHtml(item,kind)});
@@ -2819,6 +3341,43 @@ root.firebaseSnapshotGate=firebaseSnapshotGate;
 root.firebaseRemoteSnapshot=createFirebaseRemoteSnapshot((value:any)=>(root.QCCore as any).validateBackup(value),(value:any)=>(root.QCCore as any).sanitizeBackup(value));
 root.firebaseOwnSnapshotPlan=firebaseOwnSnapshotPlan;
 root.firebaseFirstConnectPlan=firebaseFirstConnectPlan;
+/* Khởi tạo có điều kiện: SG_CLIA_FIXED được dựng MỘT LẦN ngay lúc gọi factory (đọc
+   TEA_SOURCE_REGISTRY/TEA_ANALYTE_CATALOG/REFTESTS trực tiếp, không lazy) — y hệt
+   cách sigma-tea.js cũ tự thực hiện lúc file nạp. Một số sandbox test tải bundle mà
+   không nạp (hoặc nạp SAU) state.js/analyte-catalog.js — không guard sẽ ném
+   ReferenceError ngay khi nạp bundle dù sandbox đó không hề gọi tới sgTea/... */
+if (typeof TEA_SOURCE_REGISTRY !== 'undefined' && typeof TEA_ANALYTE_CATALOG !== 'undefined' && typeof REFTESTS !== 'undefined') {
+  root.SigmaTeaResolution = createSigmaTeaResolution({
+    teaSourceRegistry: TEA_SOURCE_REGISTRY, teaAnalyteCatalog: TEA_ANALYTE_CATALOG, refTests: REFTESTS as any,
+    getState: () => state as { teaRefs?: any[] },
+    teaAnalyteMeta: (name, record) => (globalThis as any).teaAnalyteMeta(name, record),
+    teaAnalyteDisplay: (name, record) => (globalThis as any).teaAnalyteDisplay(name, record),
+    searchText: typeof (globalThis as any).searchText === 'function' ? (value: unknown) => (globalThis as any).searchText(value) : undefined,
+    fmt: (value, decimals) => fmt(value, decimals), vnDate: value => vnDate(value),
+  });
+  root.SG_TEA_SOURCES = root.SigmaTeaResolution.SG_TEA_SOURCES;
+  root.SG_CLIA_FIXED = root.SigmaTeaResolution.SG_CLIA_FIXED;
+  root.teaRefName = root.SigmaTeaResolution.teaRefName;
+  root.teaRefIsDefault = root.SigmaTeaResolution.teaRefIsDefault;
+  root.testDisplayName = root.SigmaTeaResolution.testDisplayName;
+  root.sgUnitKey = root.SigmaTeaResolution.sgUnitKey;
+  root.sgUnitsMatch = root.SigmaTeaResolution.sgUnitsMatch;
+  root.sgTeaSourceMeta = root.SigmaTeaResolution.sgTeaSourceMeta;
+  root.effectiveTeaRefs = root.SigmaTeaResolution.effectiveTeaRefs;
+  root.sgRef = root.SigmaTeaResolution.sgRef;
+  root.sgTeaSource = root.SigmaTeaResolution.sgTeaSource;
+  root.sgTeaInfo = root.SigmaTeaResolution.sgTeaInfo;
+  root.sgTeaBySource = root.SigmaTeaResolution.sgTeaBySource;
+  root.sgTea = root.SigmaTeaResolution.sgTea;
+  root.sgTeaCriterionText = root.SigmaTeaResolution.sgTeaCriterionText;
+  root.sgTeaLabel = root.SigmaTeaResolution.sgTeaLabel;
+  root.sgTeaRefText = root.SigmaTeaResolution.sgTeaRefText;
+  root.sgTeaSnapshot = root.SigmaTeaResolution.sgTeaSnapshot;
+  root.sgEnsureTeaSnapshot = root.SigmaTeaResolution.sgEnsureTeaSnapshot;
+  root.sgLevelTarget = root.SigmaTeaResolution.sgLevelTarget;
+  root.sgSetLevelTeaSnapshot = root.SigmaTeaResolution.sgSetLevelTeaSnapshot;
+  root.sgEntryTea = root.SigmaTeaResolution.sgEntryTea;
+}
 root.SigmaPresentation = sigmaPresentation;
 root.SigmaPeriodViewModel = createSigmaPeriodViewModel({
   sigmaMetric: (tea, bias, cv) => (root.QCCore as any).sigmaMetric(tea, bias, cv),
@@ -3014,21 +3573,36 @@ root.qcPointWarnings = (test, config, date, runId, value) => qcPointWarnings(
   (state.data && state.data[test.id]) || [], config, date, runId, value,
 );
 root.PeriodService = createPeriodService({ cleanText: root.QCCore.cleanText });
+/* Ngưỡng xoay vòng/tự-kiểm-chuỗi nhật ký hoạt động. Cố tình giữ dạng property có thể
+   ghi trực tiếp (không phải hằng số đóng gói) — test và (nếu cần) UI cũ chỉnh trực
+   tiếp các ngưỡng này để mô phỏng nhật ký lớn mà không phải chờ hàng chục nghìn dòng
+   thật; xem tests/audit-retention.test.js. */
+root.ACTIVITY_HARD_CAP = 50000;
+root.ACTIVITY_ROTATE_TO = 40000;
+root.AUDIT_AUTO_VERIFY_MAX = 5000;
+root.auditActor = () => ({ user: userName(), username: currentUser && currentUser.username || '', userId: currentUser && currentUser.id || '', role: role(), clientId: fb && fb.clientId || '' });
+root.auditEntryHash = entry => (root.QCCore as any).auditEntryHash(entry);
+root.auditVerifyChain = (activity = state.activity || [], anchor = state.activityAnchor || '') => (root.QCCore as any).verifyAuditChain(activity, anchor);
 root.AuditService = createAuditService({
   getState: () => state as { activity?: Record<string, any>[]; activityAnchor?: string },
   uid: () => typeof (root as any).uid === 'function' ? (root as any).uid() : '', nowIso: () => new Date().toISOString(),
-  actor: () => typeof (root as any).auditActor === 'function'
-    ? (root as any).auditActor() : { user: '', username: '', userId: '', role: '', clientId: '' },
-  entryHash: entry => typeof (root as any).auditEntryHash === 'function' ? (root as any).auditEntryHash(entry) : '',
-  verifyChain: (activity, anchor) => typeof (root as any).auditVerifyChain === 'function'
-    ? (root as any).auditVerifyChain(activity, anchor) : { ok: true, checked: 0, legacy: 0 },
-  limits: () => {
-    const config = typeof (root as any).auditRuntimeConfig === 'function'
-      ? (root as any).auditRuntimeConfig() : { hardCap: 50000, rotateTo: 40000 };
-    return { hardCap: config.hardCap, rotateTo: config.rotateTo };
-  },
-  autoVerifyMax: typeof (root as any).auditRuntimeConfig === 'function' ? (root as any).auditRuntimeConfig().autoVerifyMax : 5000,
+  actor: () => root.auditActor!(),
+  entryHash: entry => root.auditEntryHash!(entry),
+  verifyChain: (activity, anchor) => root.auditVerifyChain!(activity, anchor),
+  limits: () => ({ hardCap: root.ACTIVITY_HARD_CAP!, rotateTo: root.ACTIVITY_ROTATE_TO! }),
+  autoVerifyMax: root.AUDIT_AUTO_VERIFY_MAX!,
 });
+/* logAct/auditSha256/auditRelinkChain còn được tham chiếu TRẦN (không qua root.) ở
+   nhiều chỗ khác trong file này — xem ambient declare cùng tên phía trên, cùng cơ chế
+   với rerender/requireWrite. Gán qua root.X= vẫn đủ vì bare reference rơi qua property
+   của globalThis khi không có let/const cùng tên nào che trước nó. */
+root.logAct = (action, detail, target = '') => { root.AuditService!.log(action, detail, target); };
+root.auditSha256 = text => (root.QCCore as any).auditSha256(text);
+root.auditRelinkChain = (entries, anchor = '') => root.AuditService!.relinkChain(entries, anchor);
+root.auditChainStatus = (force = false) => root.AuditService!.chainStatus(force);
+root.auditVerifyChainNow = () => { root.AuditService!.resetChainCache(); root.auditChainStatus!(true); rerender(); };
+root.auditLastHashOf = activity => root.AuditService!.lastHashOf(activity);
+root.auditArchiveCut = (activity, cutoffIso) => root.AuditService!.archiveCut(activity, cutoffIso);
 root.NceFormWorkflowCommand=createNceFormWorkflowCommand({current:()=>state as {actions?:Record<string,any>[]},form:nceFormCommand,log:(action,detail,target)=>logAct(action,detail,target),reset:()=>{const ui=(root as any).actionFormUiState;if(ui)ui.reset();},save:()=>save({clearDerived:false}),render:()=>rerender()});
 root.ActivityArchiveCommand=createActivityArchiveCommand({current:()=>state as {activity?:Record<string,any>[];activityAnchor?:string},window:value=>root.activityAuditArchiveWindow!(value),cut:(activity,cutoff)=>root.AuditService!.archiveCut(activity,cutoff),confirm:dialog=>root.confirmDialog(dialog),reauthenticate:input=>(root as any).reauthenticateCurrentUser(input),download:(name,rows)=>(root as any).csvDownload(name,(root as any).activityAuditCsv(rows)),log:(type,detail,target)=>logAct(type,detail,target),save:()=>save({clearDerived:false}),close:()=>root.closeModal(),render:()=>rerender(),info:(message,options)=>root.infoDialog(message,options),dateLabel:iso=>vnDate(iso)});
 root.ActionRerunService = createActionRerunService({
@@ -3084,7 +3658,7 @@ const backupHash = async (text: string): Promise<string> => {
     const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
     return [...new Uint8Array(bytes)].map(value => value.toString(16).padStart(2, '0')).join('');
   }
-  if (typeof auditSha256 === 'function' && backupTextBytes(text) <= 16 * 1024 * 1024) return auditSha256(text);
+  if (backupTextBytes(text) <= 16 * 1024 * 1024) return auditSha256(text);
   return '';
 };
 const backupCore = root.QCCore as QCLabGlobal['QCCore'] & {
@@ -3237,7 +3811,7 @@ root.ManageTargetMatrixWorkflowCommand=createManageTargetMatrixWorkflowCommand({
 root.TeaReferenceService = createTeaReferenceService({
   key: value => (globalThis as any).teaRefName(value), analyteMeta: (name, record) => (globalThis as any).teaAnalyteMeta(name, record),
   effectiveReferences: () => (globalThis as any).effectiveTeaRefs(), defaultReferences: () => REFTESTS,
-  sourceRegistry: () => (globalThis as any).TEA_SOURCE_REGISTRY, createId: () => (globalThis as any).uid(),
+  sourceRegistry: () => TEA_SOURCE_REGISTRY, createId: () => (globalThis as any).uid(),
   todayIso: () => (globalThis as any).isoToday(), userName: () => (globalThis as any).userName(),
 });
 root.TeaReferenceWorkflowCommand=createTeaReferenceWorkflowCommand({current:()=>state,service:root.TeaReferenceService,reconcileSigmaTea:()=>{if(typeof (globalThis as any).sgReconcileAllTeaSnapshots==='function')(globalThis as any).sgReconcileAllTeaSnapshots();},formatDate:iso=>(globalThis as any).vnDate(iso),log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),close:()=>root.closeModal(),render:()=>rerender()});
@@ -3245,6 +3819,394 @@ root.LotTransitionPickerService = createLotTransitionPickerService({
   searchText: value => (globalThis as any).searchText(value), formatDate: value => (globalThis as any).vnDate(value),
   transitionToNo: lotId => (globalThis as any).lotTransitionToNo(lotId),
 });
+const managePageController = createManagePageController({
+  document: typeof document !== 'undefined' ? document : ({ getElementById: () => null, querySelector: () => null } as unknown as Document),
+  getState: () => state, ui: () => (root as any).ManageUIState, currentPage: () => (root as any).RouterUIState.page,
+  rerender: () => rerender(), role: () => role(), userName: () => userName(), requireAdmin: message => root.requireAdmin(message),
+  esc: value => (root as any).esc(value), escapeAttr: value => (root as any).escAttr(value),
+  btn: (label, action, cls, title, options) => (root as any).btn(label, action, cls, title, options),
+  emptyState: (title, body, actions) => (root as any).emptyState(title, body, actions),
+  dateBox: (id, value, cls, attrs) => (root as any).dateBox(id, value, cls, attrs),
+  headOnly: (title, subtitle, actions) => (root as any).headOnly(title, subtitle, actions),
+  openModal: html => root.openModal(html), closeModal: () => root.closeModal(),
+  confirmDialog: opts => root.confirmDialog(opts), infoDialog: (message, opts) => root.infoDialog(message, opts),
+  searchText: value => (globalThis as any).searchText(value), vnDate: value => vnDate(value),
+  fmt: (value, decimals) => fmt(value, decimals), fmtTestValue: (test, value) => (root as any).fmtTestValue(test, value),
+  formatDateTimeVN: value => (root as any).formatDateTimeVN(value), isoToday: () => (root as any).isoToday(),
+  parseVN: value => (root as any).parseVN(value), QCCore: { cleanText: (value, maximumLength) => root.QCCore!.cleanText(value, maximumLength) },
+  scheduleSearchRender: (owner, apply, focusId) => root.scheduleSearchRender(owner, apply, focusId),
+  teaSourceRegistry: () => TEA_SOURCE_REGISTRY, effectiveTeaRefs: () => root.effectiveTeaRefs!(), teaRefIsDefault: value => root.teaRefIsDefault!(value),
+  teaRefName: value => root.teaRefName!(value), teaAnalyteMeta: (name, record) => (globalThis as any).teaAnalyteMeta(name, record),
+  teaAnalyteDisplay: (name, record) => (globalThis as any).teaAnalyteDisplay(name, record), testDisplayName: test => root.testDisplayName!(test),
+  transitionSwitchesLot: transition => (globalThis as any).transitionSwitchesLot(transition), lotGroupInUse: group => (globalThis as any).lotGroupInUse(group),
+  targetConfigAssigned: (test, level, lotId) => (globalThis as any).targetConfigAssigned(test, level, lotId),
+  plannedTargetFor: (test, level, lotId) => (globalThis as any).plannedTargetFor(test, level, lotId),
+  lotTargetSnapshot: (test, level, lotId) => (globalThis as any).lotTargetSnapshot(test, level, lotId),
+  targetRangeDraft: cfg => (globalThis as any).targetRangeDraft(cfg), targetNumberText: (value, test, kind) => (globalThis as any).targetNumberText(value, test, kind),
+  TeaReferenceService: root.TeaReferenceService, TeaReferenceWorkflowCommand: root.TeaReferenceWorkflowCommand,
+  pres: root as any,
+});
+root.manageSearchSet = managePageController.manageSearchSet;
+root.manageMatch = managePageController.manageMatch;
+root.manageSearchPlaceholder = managePageController.manageSearchPlaceholder;
+root.groupsOfLot = managePageController.groupsOfLot;
+root.lotGroupLabels = managePageController.lotGroupLabels;
+root.instrumentName = managePageController.instrumentName;
+root.panelName = managePageController.panelName;
+root.lotLabel = managePageController.lotLabel;
+root.lotTransitionToNo = managePageController.lotTransitionToNo;
+root.lotStatus = managePageController.lotStatus;
+root.manageShell = managePageController.manageShell;
+root.manageToolbar = managePageController.manageToolbar;
+root.manageLots = managePageController.manageLots;
+root.manageInstruments = managePageController.manageInstruments;
+root.managePanels = managePageController.managePanels;
+root.manageTransitionsV2 = managePageController.manageTransitionsV2;
+root.targetGroupLots = managePageController.targetGroupLots;
+root.targetGroupOptions = managePageController.targetGroupOptions;
+root.ensureTargetSelection = managePageController.ensureTargetSelection;
+root.manageTargets = managePageController.manageTargets;
+root.manageAssays = managePageController.manageAssays;
+root.manageHistorySearchValues = managePageController.manageHistorySearchValues;
+root.manageHistory = managePageController.manageHistory;
+root.teaRefFind = managePageController.teaRefFind;
+root.teaRefNumOrNull = managePageController.teaRefNumOrNull;
+root.teaRefExternalChanged = managePageController.teaRefExternalChanged;
+root.teaRefEnsure = managePageController.teaRefEnsure;
+root.teaRefEdit = managePageController.teaRefEdit;
+root.teaRefRemove = managePageController.teaRefRemove;
+root.teaSourceRegistryHtml = managePageController.teaSourceRegistryHtml;
+root.teaRefOpenAdd = managePageController.teaRefOpenAdd;
+root.teaRefAddSubmit = managePageController.teaRefAddSubmit;
+root.teaLabProfileOpen = managePageController.teaLabProfileOpen;
+root.teaLabProfileSave = managePageController.teaLabProfileSave;
+root.teaLabProfileRemove = managePageController.teaLabProfileRemove;
+root.manageTeaRefs = managePageController.manageTeaRefs;
+root.manageView = managePageController.manageView;
+root.renderManageBody = managePageController.renderManageBody;
+root.pageManage = managePageController.pageManage;
+/* document là getter LAZY (không capture một lần) — nhiều test đổi document
+   giữa các lần gọi để mô phỏng form khác nhau; đọc lại mỗi lần qua deps.document()
+   để phản ánh đúng bản mới nhất, khớp cách các dep khác (requireAdmin, rerender,
+   ...) đã lazy từ đầu trong toàn bộ file này. */
+const manageTestsActionsController = createManageTestsActionsController({
+  document: () => typeof document !== 'undefined' ? document : ({ getElementById: () => null, querySelector: () => null, querySelectorAll: () => [] } as unknown as Document),
+  getState: () => state, ui: () => (root as any).ManageUIState, analysisUi: () => (root as any).AnalysisUIState, entryUi: () => (root as any).EntryUIState,
+  rerender: () => rerender(), resetMainScroll: () => (root as any).resetMainScroll(),
+  role: () => role(), userName: () => userName(), requireAdmin: message => root.requireAdmin(message),
+  reauthenticateCurrentUser: opts => (root as any).reauthenticateCurrentUser(opts),
+  esc: value => (root as any).esc(value), escapeAttr: value => (root as any).escAttr(value),
+  btn: (label, action, cls, title, options) => (root as any).btn(label, action, cls, title, options),
+  emptyState: (title, body, actions) => (root as any).emptyState(title, body, actions),
+  dateBox: (id, value, cls, attrs) => (root as any).dateBox(id, value, cls, attrs),
+  openModal: html => root.openModal(html), closeModal: () => root.closeModal(),
+  confirmDialog: opts => root.confirmDialog(opts), infoDialog: (message, opts) => root.infoDialog(message, opts),
+  searchText: value => (globalThis as any).searchText(value), vnDate: value => vnDate(value),
+  fmt: (value, decimals) => fmt(value, decimals), fmtTestValue: (test, value) => (root as any).fmtTestValue(test, value),
+  fmtPointValue: (point, test) => (globalThis as any).fmtPointValue(point, test),
+  isoToday: () => (root as any).isoToday(), parseVN: value => (root as any).parseVN(value),
+  QCCore: { cleanText: (value, maximumLength) => root.QCCore!.cleanText(value, maximumLength) },
+  uid: () => (root as any).uid(),
+  effectiveTeaRefs: () => root.effectiveTeaRefs!(), teaAnalyteMeta: (name, record) => (globalThis as any).teaAnalyteMeta(name, record),
+  teaAnalyteKey: value => teaAnalyteKey(value), testDisplayName: test => root.testDisplayName!(test),
+  instrumentName: (id, fallback) => root.instrumentName!(id, fallback), lotTransitionToNo: lotId => root.lotTransitionToNo!(lotId),
+  targetGroupLots: group => root.targetGroupLots!(group),
+  inspectAcceptedLotTransition: input => (globalThis as any).inspectAcceptedLotTransition(input),
+  monthVN: value => (globalThis as any).monthVN(value), upsertLotTargetHistory: (target, lot, values) => (globalThis as any).upsertLotTargetHistory(target, lot, values),
+  stats: values => root.QCCore!.stats(values), pointsForLot: (testId, level, lotNo) => (globalThis as any).pointsForLot(testId, level, lotNo),
+  pointStaff: point => (globalThis as any).pointStaff(point), testCusumConfig: test => (globalThis as any).testCusumConfig(test),
+  wgRules: () => WG_RULES, qcDecimalsDefault: () => QC_DECIMALS_DEFAULT, refTests: () => REFTESTS as any,
+  ManageConfigService: root.ManageConfigService, PeriodService: root.PeriodService, LotTransitionPickerService: root.LotTransitionPickerService,
+  pres: root as any,
+});
+root.parseVN = manageTestsActionsController.parseVN;
+root.setManageTab = manageTestsActionsController.setManageTab;
+root.setTargetPanel = manageTestsActionsController.setTargetPanel;
+root.setTargetGroup = manageTestsActionsController.setTargetGroup;
+root.setTargetLevel = manageTestsActionsController.setTargetLevel;
+root.setHistoryTest = manageTestsActionsController.setHistoryTest;
+root.openTargetMatrix = manageTestsActionsController.openTargetMatrix;
+root.targetNumberText = manageTestsActionsController.targetNumberText;
+root.targetConfigAssigned = manageTestsActionsController.targetConfigAssigned;
+root.targetRangeDraft = manageTestsActionsController.targetRangeDraft;
+root.syncTargetRange = manageTestsActionsController.syncTargetRange;
+root.toggleTargetRow = manageTestsActionsController.toggleTargetRow;
+root.targetCheckAll = manageTestsActionsController.targetCheckAll;
+root.targetPickBackfillPoints = manageTestsActionsController.targetPickBackfillPoints;
+root.applyTargetPick = manageTestsActionsController.applyTargetPick;
+root.applyPlannedTarget = manageTestsActionsController.applyPlannedTarget;
+root.readTargetMatrixPicks = manageTestsActionsController.readTargetMatrixPicks;
+root.saveTargetMatrix = manageTestsActionsController.saveTargetMatrix;
+root.openTargetSwitchModal = manageTestsActionsController.openTargetSwitchModal;
+root.resolveTargetSwitch = manageTestsActionsController.resolveTargetSwitch;
+root.commitTargetMatrix = manageTestsActionsController.commitTargetMatrix;
+root.openQcHistoryDetail = manageTestsActionsController.openQcHistoryDetail;
+root.openConfigPanel = manageTestsActionsController.openConfigPanel;
+root.renderConfigPanelTests = manageTestsActionsController.renderConfigPanelTests;
+root.saveConfigPanel = manageTestsActionsController.saveConfigPanel;
+root.deleteConfigPanel = manageTestsActionsController.deleteConfigPanel;
+root.deleteLotTransition = manageTestsActionsController.deleteLotTransition;
+root.lotTransitionChoiceLabel = manageTestsActionsController.lotTransitionChoiceLabel;
+root.lotTransitionChoiceLots = manageTestsActionsController.lotTransitionChoiceLots;
+root.lotTransitionChoiceMatch = manageTestsActionsController.lotTransitionChoiceMatch;
+root.lotTransitionSelectedId = manageTestsActionsController.lotTransitionSelectedId;
+root.lotTransitionChoiceInput = manageTestsActionsController.lotTransitionChoiceInput;
+root.lotTransitionChoiceHtml = manageTestsActionsController.lotTransitionChoiceHtml;
+root.openLotTransitionV2 = manageTestsActionsController.openLotTransitionV2;
+root.lotTransitionTargetsHtml = manageTestsActionsController.lotTransitionTargetsHtml;
+root.filterLotTransitionTargets = manageTestsActionsController.filterLotTransitionTargets;
+root.refreshLotTransitionTargets = manageTestsActionsController.refreshLotTransitionTargets;
+root.readLotTransitionTargetPicks = manageTestsActionsController.readLotTransitionTargetPicks;
+root.saveLotTransitionV2 = manageTestsActionsController.saveLotTransitionV2;
+root.openConfigGroup = manageTestsActionsController.openConfigGroup;
+root.suggestConfigGroupName = manageTestsActionsController.suggestConfigGroupName;
+root.saveConfigGroup = manageTestsActionsController.saveConfigGroup;
+root.deleteConfigGroup = manageTestsActionsController.deleteConfigGroup;
+root.toggleLotGroupStatus = manageTestsActionsController.toggleLotGroupStatus;
+root.activateLotGroup = manageTestsActionsController.activateLotGroup;
+root.openConfigLot = manageTestsActionsController.openConfigLot;
+root.saveConfigLot = manageTestsActionsController.saveConfigLot;
+root.renameLotAcrossPoints = manageTestsActionsController.renameLotAcrossPoints;
+root.deleteConfigLot = manageTestsActionsController.deleteConfigLot;
+root.openConfigInstrument = manageTestsActionsController.openConfigInstrument;
+root.saveConfigInstrument = manageTestsActionsController.saveConfigInstrument;
+root.deleteConfigInstrument = manageTestsActionsController.deleteConfigInstrument;
+root.defaultAssayLevels = manageTestsActionsController.defaultAssayLevels;
+root.configAssayTeaRefs = manageTestsActionsController.configAssayTeaRefs;
+root.configAssayRefRecord = manageTestsActionsController.configAssayRefRecord;
+root.configAssayNaming = manageTestsActionsController.configAssayNaming;
+root.configAssayFindRef = manageTestsActionsController.configAssayFindRef;
+root.configAssaySuggestionInput = manageTestsActionsController.configAssaySuggestionInput;
+root.openConfigAssay = manageTestsActionsController.openConfigAssay;
+root.saveConfigAssay = manageTestsActionsController.saveConfigAssay;
+root.delTest = manageTestsActionsController.delTest;
+root.jsq = jsq;
+const entryPageController = createEntryPageController({
+  document: () => typeof document !== 'undefined' ? document : ({ getElementById: () => null, querySelector: () => null, querySelectorAll: () => [] } as unknown as Document),
+  window: () => typeof window !== 'undefined' ? window : ({ scrollX: 0, scrollY: 0, scrollTo: () => {} } as unknown as Window),
+  localStorage: () => typeof localStorage !== 'undefined' ? localStorage : ({ getItem: () => null, setItem: () => {} } as unknown as Storage),
+  getState: () => state, ui: () => (root as any).EntryUIState, analysisUi: () => (root as any).AnalysisUIState,
+  currentPage: () => (root as any).RouterUIState.page,
+  rerender: () => rerender(), afterRender: page => (root as any).afterRender(page),
+  role: () => role(), canWrite: () => root.canWrite(), requireWrite: () => requireWrite(),
+  requireUnlockedPeriod: (date, action) => (root as any).requireUnlockedPeriod(date, action),
+  esc: value => (root as any).esc(value), escapeAttr: value => (root as any).escAttr(value), jsq: value => jsq(value),
+  btn: (label, action, cls, title, options) => (root as any).btn(label, action, cls, title, options),
+  headOnly: (title, subtitle, actions) => (root as any).headOnly(title, subtitle, actions),
+  dateBox: (id, value, cls, attrs) => (root as any).dateBox(id, value, cls, attrs),
+  openModal: html => root.openModal(html), closeModal: () => root.closeModal(), confirmDialog: opts => root.confirmDialog(opts),
+  searchText: value => (root as any).searchText(value), vnDate: value => vnDate(value),
+  fmt: (value, decimals) => fmt(value, decimals), fmtTestValue: (test, value) => (root as any).fmtTestValue(test, value),
+  fmtTestStat: (test, value) => (root as any).fmtTestStat(test, value), fmtPointValue: (point, test) => (root as any).fmtPointValue(point, test),
+  isoToday: () => (root as any).isoToday(), isoMonth: () => (root as any).isoMonth(), dateObj: value => (root as any).dateObj(value),
+  testDisplayName: test => root.testDisplayName!(test), stateName: value => root.stateName!(value as string),
+  operationalTests: () => (root as any).operationalTests(), operationalLevels: test => (root as any).operationalLevels(test),
+  operationalLotGroupForTest: test => (root as any).operationalLotGroupForTest(test), operationalTestOrder: test => (root as any).operationalTestOrder(test),
+  activeWestgard: test => (root as any).activeWestgard(test), parallelWestgard: (test, column) => (root as any).parallelWestgard(test, column),
+  entryColumns: test => (root as any).entryColumns(test), entryColumnPoints: (test, column, includeVoided) => (root as any).entryColumnPoints(test, column, includeVoided),
+  pointsForLot: (testId, level, lotNo) => (root as any).pointsForLot(testId, level, lotNo), pointsOf: (testId, level) => (root as any).pointsOf(testId, level),
+  acceptedLotPoints: (test, level) => (root as any).acceptedLotPoints(test, level), previousLotSeries: (test, level) => (root as any).previousLotSeries(test, level),
+  testRuleOnWithin: (test, rule) => (root as any).testRuleOnWithin(test, rule), ruleResultLevel: (test, rules) => (root as any).ruleResultLevel(test, rules),
+  qcVerdictLabel: level => root.qcVerdictLabel!(level), canEnterQcForLevel: (test, level) => (root as any).canEnterQcForLevel(test, level),
+  rangeCandidate: (testId, level) => (root as any).rangeCandidate(testId, level), rangeActions: (testId, level, eligible, applied) => root.rangeActions!(testId, level as number, eligible as boolean, applied as string),
+  errorType: rules => (root as any).errorType(rules), qcPointWarnings: (test, cfg, date, runId, value) => root.qcPointWarnings!(test, cfg, date, runId, value as number),
+  qcValueDecimals: value => (root as any).qcValueDecimals(value), currentStaff: () => (root as any).currentStaff(), uid: () => (root as any).uid(),
+  nextNceId: today => (root as any).nextNceId(today), nceDueDate: days => (root as any).nceDueDate(days),
+  pointVoidVerdict: (test, point) => (root as any).pointVoidVerdict(test, point), pointRunNo: point => (root as any).pointRunNo(point),
+  pointStaff: point => (root as any).pointStaff(point), stats: values => root.QCCore!.stats(values), lvlCfg: (test, level) => lvlCfg(test, level),
+  QCCore: { westgardByPoint: (points, mean, sd, ruleOn) => (root.QCCore as any).westgardByPoint(points, mean, sd, ruleOn), cleanText: (value, maxLength) => root.QCCore!.cleanText(value, maxLength) },
+  EntryService: root.EntryService, EntryRecordWorkflowCommand: root.EntryRecordWorkflowCommand,
+  EntryVoidWorkflowCommand: root.EntryVoidWorkflowCommand, EntryDateNoteWorkflowCommand: root.EntryDateNoteWorkflowCommand,
+  pres: root as any,
+});
+root.pageEntry = entryPageController.pageEntry;
+root.entryWindow = entryPageController.entryWindow;
+root.entryWindowFor = entryPageController.entryWindowFor;
+root.entryRowsWindow = entryPageController.entryRowsWindow;
+root.entryToggleRows = entryPageController.entryToggleRows;
+root.entryDetailToggled = entryPageController.entryDetailToggled;
+root.entryTreeIsCollapsed = entryPageController.entryTreeIsCollapsed;
+root.treeToggle = entryPageController.treeToggle;
+root.toggleEntryTree = entryPageController.toggleEntryTree;
+root.entryTreeKey = entryPageController.entryTreeKey;
+root.entryFilter = entryPageController.entryFilter;
+root.entryPick = entryPageController.entryPick;
+root.entryFocusLevel = entryPageController.entryFocusLevel;
+root.entryShowPrevLot = entryPageController.entryShowPrevLot;
+root.entryShowCurrentLot = entryPageController.entryShowCurrentLot;
+root.entryFocusPendingSheet = entryPageController.entryFocusPendingSheet;
+root.entrySheetInputs = entryPageController.entrySheetInputs;
+root.entrySheetTarget = entryPageController.entrySheetTarget;
+root.entrySheetKey = entryPageController.entrySheetKey;
+root.entryLatestTreeState = entryPageController.entryLatestTreeState;
+root.entrySyncTreeState = entryPageController.entrySyncTreeState;
+root.entryRenderKeepScroll = entryPageController.entryRenderKeepScroll;
+root.entrySetLastMsg = entryPageController.entrySetLastMsg;
+root.entryUnlockExtraRun = entryPageController.entryUnlockExtraRun;
+root.entryDateNoteSave = entryPageController.entryDateNoteSave;
+root.entryColumnCfg = entryPageController.entryColumnCfg;
+root.entryInlineSave = entryPageController.entryInlineSave;
+root.entryInlineSaveCommit = entryPageController.entryInlineSaveCommit;
+root.syncVoidNceChoice = entryPageController.syncVoidNceChoice;
+root.voidQcPoint = entryPageController.voidQcPoint;
+root.confirmVoidQcPoint = entryPageController.confirmVoidQcPoint;
+root.entrySetSheetMonth = entryPageController.entrySetSheetMonth;
+root.entryGoToday = entryPageController.entryGoToday;
+root.entrySetSheetPart = entryPageController.entrySetSheetPart;
+root.entrySetDays = entryPageController.entrySetDays;
+root.entrySetStart = entryPageController.entrySetStart;
+root.entrySetEnd = entryPageController.entrySetEnd;
+/* actions-page-controller.ts <-> action-form-controller.ts phụ thuộc HAI CHIỀU thật sự
+   (xem ghi chú đầu mỗi file): dựng action-form trước với 3 dep trỏ qua biến tham chiếu
+   `actionsPageControllerRef` (gán sau khi actions-page-controller.ts dựng xong), rồi
+   dựng actions-page với `formHtml`/`captureFormDraft` trỏ thẳng vào action-form vì lúc
+   đó nó đã tồn tại. */
+let actionsPageControllerRef: any = null;
+const actionFormController = createActionFormController({
+  getState: () => state, document: () => typeof document !== 'undefined' ? document : ({ getElementById: () => null, querySelector: () => null, querySelectorAll: () => [] } as unknown as Document),
+  actionUi: () => (root as any).actionFormUiState, currentUser: () => currentUser,
+  rerender: () => rerender(), requireWrite: () => requireWrite(), canWrite: () => root.canWrite(),
+  infoDialog: (message, opts) => root.infoDialog(message, opts),
+  esc: value => (root as any).esc(value), escapeAttr: value => (root as any).escAttr(value), jsq: value => jsq(value),
+  btn: (label, action, cls, title, options) => (root as any).btn(label, action, cls, title, options),
+  dateBox: (id, value, cls, attrs) => (root as any).dateBox(id, value, cls, attrs),
+  vnDate: value => vnDate(value), fmt: (value, decimals) => fmt(value, decimals),
+  fmtPointValue: (point, test) => (root as any).fmtPointValue(point, test),
+  fmtTestValue: (test, value) => (root as any).fmtTestValue(test, value), fmtTestStat: (test, value) => (root as any).fmtTestStat(test, value),
+  testDisplayName: test => root.testDisplayName!(test), userName: () => userName(),
+  parseVN: value => (root as any).parseVN(value), isoToday: () => (root as any).isoToday(),
+  operationalLevels: test => (root as any).operationalLevels(test), operationalTests: () => (root as any).operationalTests(),
+  lvlCfg: (test, level) => lvlCfg(test, level), nextNceId: today => (root as any).nextNceId(today),
+  QCCore: { cleanText: (value, maximumLength) => root.QCCore!.cleanText(value, maximumLength), WG_RULES: (root.QCCore as any).WG_RULES },
+  ACTION_LABELS: () => typeof (root as any).ACTION_LABELS !== 'undefined' ? (root as any).ACTION_LABELS : { check: {}, containment: {}, patient: {}, cause: {}, source: {}, phase: {}, risk: {}, release: {} },
+  actionApprovalStatus: a => (root as any).actionApprovalStatus(a), actionCancelled: a => (root as any).actionCancelled(a),
+  actionWorkflowStatus: a => (root as any).actionWorkflowStatus(a), actionRerunStatus: a => (root as any).actionRerunStatus(a),
+  actionRiskScore: a => (root as any).actionRiskScore(a), actionResidualRiskScore: a => (root as any).actionResidualRiskScore(a),
+  actionProtocolStatus: form => (root as any).actionProtocolStatus(form),
+  ActionProtocolService: root.ActionProtocolService, ActionBiasService: root.ActionBiasService, ActionBiasPresentation: root.ActionBiasPresentation,
+  ActionChecklistPresentation: root.ActionChecklistPresentation, ActionInvestigationPresentation: root.ActionInvestigationPresentation,
+  ActionFormModel: root.ActionFormModel, NceFormWorkflowCommand: root.NceFormWorkflowCommand,
+  levelShort: (t, level, lotSnap) => actionsPageControllerRef.actionLevelShort(t, level, lotSnap),
+  evidenceTimelineHtml: (a, rr) => actionsPageControllerRef.actionEvidenceTimelineHtml(a, rr),
+  rerunEvidenceHtml: (a, rr, t) => actionsPageControllerRef.actionRerunEvidenceHtml(a, rr, t),
+  pres: root as any,
+});
+root.actionUi = actionFormController.actionUi;
+root.actionSectionToggled = actionFormController.actionSectionToggled;
+root.actionDefaultOpenSections = actionFormController.actionDefaultOpenSections;
+root.actionRuleOptions = actionFormController.actionRuleOptions;
+root.actionStaffOptions = actionFormController.actionStaffOptions;
+root.captureActionDraft = actionFormController.captureActionDraft;
+root.actionFormChanged = actionFormController.actionFormChanged;
+root.actionDraftValues = actionFormController.actionDraftValues;
+root.clearActionDraft = actionFormController.clearActionDraft;
+root.actionSourceOptions = actionFormController.actionSourceOptions;
+root.actionCausePhrases = actionFormController.actionCausePhrases;
+root.actionActionPhrases = actionFormController.actionActionPhrases;
+root.actionSuggestRow = actionFormController.actionSuggestRow;
+root.actionSuggestBox = actionFormController.actionSuggestBox;
+root.actionInsertSuggestion = actionFormController.actionInsertSuggestion;
+root.syncActionSuggestions = actionFormController.syncActionSuggestions;
+root.actSel = actionFormController.actSel;
+root.actionLevelLabel = actionFormController.actionLevelLabel;
+root.syncActLevels = actionFormController.syncActLevels;
+root.actionLevelContext = actionFormController.actionLevelContext;
+root.beginActionManual = actionFormController.beginActionManual;
+root.closeActionForm = actionFormController.closeActionForm;
+root.actionFormClosedHtml = actionFormController.actionFormClosedHtml;
+root.actionIncidentBanner = actionFormController.actionIncidentBanner;
+root.beginActionFromIssue = actionFormController.beginActionFromIssue;
+root.actionFieldValue = actionFormController.actionFieldValue;
+root.readActionProtocolForm = actionFormController.readActionProtocolForm;
+root.actionEffectivenessMissingKey = actionFormController.actionEffectivenessMissingKey;
+root.addAction = actionFormController.addAction;
+root.syncActionRiskScore = actionFormController.syncActionRiskScore;
+root.syncActionResidualRiskScore = actionFormController.syncActionResidualRiskScore;
+root.editAction = actionFormController.editAction;
+root.actionInvestigationField = actionFormController.actionInvestigationField;
+root.actionInvestigationChoiceLabel = actionFormController.actionInvestigationChoiceLabel;
+root.actionInvestigationStateClass = actionFormController.actionInvestigationStateClass;
+root.actionInvestigationChoose = actionFormController.actionInvestigationChoose;
+root.actionInvestigationSync = actionFormController.actionInvestigationSync;
+root.actionChecklistRefresh = actionFormController.actionChecklistRefresh;
+root.actionSectionChip = actionFormController.actionSectionChip;
+root.actionChecklistChip = actionFormController.actionChecklistChip;
+root.actionEffSectionChip = actionFormController.actionEffSectionChip;
+root.actionUpdateSectionChip = actionFormController.actionUpdateSectionChip;
+root.actionRefreshSectionChips = actionFormController.actionRefreshSectionChips;
+root.actionSection = actionFormController.actionSection;
+root.actionFormModel = actionFormController.actionFormModel;
+root.actionFormDefaults = actionFormController.actionFormDefaults;
+root.focusActionField = actionFormController.focusActionField;
+root.actionBiasInfo = actionFormController.actionBiasInfo;
+root.actionBiasContext = actionFormController.actionBiasContext;
+root.actionLatestSigmaBias = actionFormController.actionLatestSigmaBias;
+root.actionFillBias = actionFormController.actionFillBias;
+root.actionBiasThresholdHtml = actionFormController.actionBiasThresholdHtml;
+root.actionBiasReferenceHtml = actionFormController.actionBiasReferenceHtml;
+root.actionUpdateBiasHint = actionFormController.actionUpdateBiasHint;
+root.actionFormHtml = actionFormController.actionFormHtml;
+const actionsPageController = createActionsPageController({
+  getState: () => state, document: () => typeof document !== 'undefined' ? document : ({ getElementById: () => null, querySelector: () => null, querySelectorAll: () => [] } as unknown as Document),
+  entryUi: () => (root as any).EntryUIState, currentPage: () => (root as any).RouterUIState.page, currentUser: () => currentUser,
+  rerender: () => rerender(), role: () => role(), userName: () => userName(), canWrite: () => root.canWrite(), requireWrite: () => requireWrite(),
+  requireAdmin: message => root.requireAdmin(message), reauthenticateCurrentUser: opts => (root as any).reauthenticateCurrentUser(opts),
+  openModal: html => root.openModal(html), closeModal: () => root.closeModal(), confirmDialog: opts => root.confirmDialog(opts), infoDialog: (message, opts) => root.infoDialog(message, opts),
+  esc: value => (root as any).esc(value), jsq: value => jsq(value),
+  btn: (label, action, cls, title, options) => (root as any).btn(label, action, cls, title, options),
+  headOnly: (title, subtitle, actions) => (root as any).headOnly(title, subtitle, actions),
+  vnDate: value => vnDate(value), formatDateTimeVN: value => formatDateTimeVN(value as string),
+  fmtPointValue: (point, test) => (root as any).fmtPointValue(point, test), testDisplayName: test => root.testDisplayName!(test), stateName: value => root.stateName!(value as string),
+  errorType: rules => (root as any).errorType(rules), fixHint: rules => (root as any).fixHint(rules), lvlCfg: (test, level) => lvlCfg(test, level),
+  pointWorkflowSummary: pointId => (root as any).pointWorkflowSummary(pointId), pointRealActions: pointId => typeof (root as any).pointRealActions === 'function' ? (root as any).pointRealActions(pointId) : [],
+  go: page => (root as any).go(page),
+  ACTION_LABELS: () => typeof (root as any).ACTION_LABELS !== 'undefined' ? (root as any).ACTION_LABELS : { check: {}, containment: {}, patient: {}, cause: {}, source: {}, phase: {}, risk: {}, release: {} },
+  actionApprovalStatus: a => (root as any).actionApprovalStatus(a), actionApprovalLabel: a => (root as any).actionApprovalLabel(a),
+  actionCancelled: a => (root as any).actionCancelled(a), actionRecorded: a => (root as any).actionRecorded(a),
+  actionWorkflowStatus: a => (root as any).actionWorkflowStatus(a), actionOverdue: a => (root as any).actionOverdue(a),
+  actionEffectivenessStatus: a => (root as any).actionEffectivenessStatus(a), actionResidualRiskScore: a => (root as any).actionResidualRiskScore(a),
+  actionRiskScore: a => (root as any).actionRiskScore(a), actionRerunStatus: a => (root as any).actionRerunStatus(a), actionEventDate: a => (root as any).actionEventDate(a),
+  ActionReviewService: root.ActionReviewService, ActionReviewMessages: root.ActionReviewMessages, ActionEscalationService: root.ActionEscalationService,
+  ActionListPresentation: root.ActionListPresentation, ActionStatusPresentation: root.ActionStatusPresentation, ActionReviewPresentation: root.ActionReviewPresentation,
+  ActionDetailPresentation: root.ActionDetailPresentation, ActionEvidencePresentation: root.ActionEvidencePresentation, ActionRerunEvidencePresentation: root.ActionRerunEvidencePresentation,
+  ActionViolationService: root.ActionViolationService, ActionGuidePresentation: root.ActionGuidePresentation, ActionCurrentIssues: () => root.ActionCurrentIssues!(),
+  NceLifecycleWorkflowCommand: root.NceLifecycleWorkflowCommand, actionFormUiState: (root as any).actionFormUiState, modalTemplate: opts => root.modalTemplate(opts),
+  QCCore: { cleanText: (value, maximumLength) => root.QCCore!.cleanText(value, maximumLength) },
+  formHtml: issueCount => actionFormController.actionFormHtml(issueCount),
+  captureFormDraft: () => actionFormController.captureActionDraft(),
+  pres: root as any,
+});
+actionsPageControllerRef = actionsPageController;
+root.actionLevelShort = actionsPageController.actionLevelShort;
+root.currentIssues = actionsPageController.currentIssues;
+root.cancelAction = actionsPageController.cancelAction;
+root.confirmCancelAction = actionsPageController.confirmCancelAction;
+root.actionApprovalTag = actionsPageController.actionApprovalTag;
+root.actionApprovalToken = actionsPageController.actionApprovalToken;
+root.approveAction = actionsPageController.approveAction;
+root.confirmApproveAction = actionsPageController.confirmApproveAction;
+root.returnAction = actionsPageController.returnAction;
+root.confirmReturnAction = actionsPageController.confirmReturnAction;
+root.actionCanEscalate = actionsPageController.actionCanEscalate;
+root.escalateAction = actionsPageController.escalateAction;
+root.actionCanReopen = actionsPageController.actionCanReopen;
+root.reopenAction = actionsPageController.reopenAction;
+root.confirmReopenAction = actionsPageController.confirmReopenAction;
+root.actionReviewButtons = actionsPageController.actionReviewButtons;
+root.actionSideChips = actionsPageController.actionSideChips;
+root.actionDetailCheck = actionsPageController.actionDetailCheck;
+root.actionEvidenceTimelineHtml = actionsPageController.actionEvidenceTimelineHtml;
+root.actionRerunEvidenceHtml = actionsPageController.actionRerunEvidenceHtml;
+root.openActionQcEvidence = actionsPageController.openActionQcEvidence;
+root.viewActionDetail = actionsPageController.viewActionDetail;
+root.openActionGuide = actionsPageController.openActionGuide;
+root.groupIssuesByTestDate = actionsPageController.groupIssuesByTestDate;
+root.issueRowHtml = actionsPageController.issueRowHtml;
+root.actionViolationInfo = actionsPageController.actionViolationInfo;
+root.actionQcVerdictLabel = actionsPageController.actionQcVerdictLabel;
+root.openActionIssueHtml = actionsPageController.openActionIssueHtml;
+root.actionIssueGroupHtml = actionsPageController.actionIssueGroupHtml;
+root.pageActionsV4 = actionsPageController.pageActionsV4;
 root.ReagentComparisonService = createReagentComparisonService({
   cleanText: root.QCCore.cleanText,
   cleanId: root.QCCore.cleanId,
@@ -3352,6 +4314,217 @@ const reagentPageController=createReagentPageController({
 });
 {const rc:any=reagentPageController;for(const k of Object.keys(rc))(root as any)[k]=rc[k];}
 root.SigmaCohortService = createSigmaCohortService({ stats: root.QCCore.stats });
+const sigmaPageController = createSigmaPageController({
+  getState: () => state, document: () => typeof document !== 'undefined' ? document : ({ getElementById: () => null, querySelector: () => null, querySelectorAll: () => [] } as unknown as Document),
+  window: () => typeof window !== 'undefined' ? window : ({ innerWidth: 1024, innerHeight: 768 } as unknown as Window),
+  ui: () => (root as any).SigmaUIState, currentPage: () => (root as any).RouterUIState.page,
+  rerender: () => rerender(), role: () => role(), userName: () => userName(), canWrite: () => root.canWrite(),
+  requireWrite: () => requireWrite(), requireAdmin: message => root.requireAdmin(message),
+  openModal: html => root.openModal(html), closeModal: () => root.closeModal(), infoDialog: (message, opts) => root.infoDialog(message, opts),
+  esc: value => (root as any).esc(value), escapeAttr: value => (root as any).escAttr(value), jsq: value => jsq(value),
+  btn: (label, action, cls, title, options) => (root as any).btn(label, action, cls, title, options),
+  headOnly: (title, subtitle, actions) => (root as any).headOnly(title, subtitle, actions),
+  emptyState: (title, body, actions) => (root as any).emptyState(title, body, actions),
+  dateBox: (id, value, cls, attrs) => (root as any).dateBox(id, value, cls, attrs),
+  vnDate: value => vnDate(value), vnPeriod: value => (root as any).vnPeriod(value),
+  fmt: (value, decimals) => fmt(value, decimals), isoMonth: () => (root as any).isoMonth(), isoDate: value => (root as any).isoDate(value),
+  uid: () => (root as any).uid(), icoDownload: () => (root as any).icoDownload(),
+  testDisplayName: test => root.testDisplayName!(test), instrumentName: (id, fallback) => root.instrumentName!(id, fallback),
+  operationalLevels: test => (root as any).operationalLevels(test), operationalTestOrder: test => (root as any).operationalTestOrder(test),
+  searchText: value => (root as any).searchText(value), scheduleSearchRender: (owner, apply, focusId) => root.scheduleSearchRender(owner, apply, focusId),
+  qcTooltip: () => (root as any).qcTooltip(), save: options => save(options),
+  QCCore: { westgardSigmaRules: sigma => (root.QCCore as any).westgardSigmaRules(sigma), stats: values => root.QCCore!.stats(values), uncertaintyBudget: input => (root.QCCore as any).uncertaintyBudget(input) },
+  effectiveTeaRefs: () => root.effectiveTeaRefs!(), sgTea: t => (root as any).sgTea(t), sgTeaSource: t => (root as any).sgTeaSource(t),
+  sgTeaBySource: (t, source, target) => (root as any).sgTeaBySource(t, source, target), sgTeaCriterionText: (t, source) => (root as any).sgTeaCriterionText(t, source),
+  sgTeaLabel: source => (root as any).sgTeaLabel(source), sgTeaSnapshot: t => (root as any).sgTeaSnapshot(t),
+  sgSetLevelTeaSnapshot: (t, e, level, force) => (root as any).sgSetLevelTeaSnapshot(t, e, level, force), sgLevelTarget: (t, L, level) => (root as any).sgLevelTarget(t, L, level),
+  sgEntryTea: (t, e, level, refs) => (root as any).sgEntryTea(t, e, level, refs), sgEnsureTeaSnapshot: (t, e) => (root as any).sgEnsureTeaSnapshot(t, e),
+  SigmaPresentation: root.SigmaPresentation, SigmaLevelEditService: root.SigmaLevelEditService, SigmaBiasService: root.SigmaBiasService,
+  SigmaBiasWorkflowService: root.SigmaBiasWorkflowService, SigmaPeriodViewModel: root.SigmaPeriodViewModel, SigmaTeaSnapshotService: root.SigmaTeaSnapshotService,
+  SigmaTeaEditService: root.SigmaTeaEditService, SigmaLevelSelectionService: root.SigmaLevelSelectionService, SigmaPeriodSelectionService: root.SigmaPeriodSelectionService,
+  SigmaTrackedTestService: root.SigmaTrackedTestService, SigmaCohortService: root.SigmaCohortService, SigmaCohortSelectionService: root.SigmaCohortSelectionService,
+  SigmaCohortImportService: root.SigmaCohortImportService, SigmaPeriodRecordService: root.SigmaPeriodRecordService, SigmaMuWorkflowCommand: root.SigmaMuWorkflowCommand,
+  pres: root as any,
+});
+root.sgZone = sigmaPageController.sgZone;
+root.sgFmtDPMO = sigmaPageController.sgFmtDPMO;
+root.sgData = sigmaPageController.sgData;
+root.sgInputValue = sigmaPageController.sgInputValue;
+root.sgInputDisplayValue = sigmaPageController.sgInputDisplayValue;
+root.sgCleanCell = sigmaPageController.sgCleanCell;
+root.sgBiasVal = sigmaPageController.sgBiasVal;
+root.sgIsAutoCV = sigmaPageController.sgIsAutoCV;
+root.sgReadiness = sigmaPageController.sgReadiness;
+root.sgBiasRefU = sigmaPageController.sgBiasRefU;
+root.sgMuBiasMode = sigmaPageController.sgMuBiasMode;
+root.sgMU = sigmaPageController.sgMU;
+root.sgComp = sigmaPageController.sgComp;
+root.sgRows = sigmaPageController.sgRows;
+root.sgSyncCurrentPeriodTea = sigmaPageController.sgSyncCurrentPeriodTea;
+root.sgReconcileAllTeaSnapshots = sigmaPageController.sgReconcileAllTeaSnapshots;
+root.sgSetTea = sigmaPageController.sgSetTea;
+root.sgSetTeaSource = sigmaPageController.sgSetTeaSource;
+root.sgSetTeaMeta = sigmaPageController.sgSetTeaMeta;
+root.sgRefreshSoon = sigmaPageController.sgRefreshSoon;
+root.sgTrackedTests = sigmaPageController.sgTrackedTests;
+root.sgTrackedOptions = sigmaPageController.sgTrackedOptions;
+root.sgHistoricalLevels = sigmaPageController.sgHistoricalLevels;
+root.sgVisibleLevels = sigmaPageController.sgVisibleLevels;
+root.sgPeriodLevels = sigmaPageController.sgPeriodLevels;
+root.sgPickTest = sigmaPageController.sgPickTest;
+root.sgStatusPeriodId = sigmaPageController.sgStatusPeriodId;
+root.sgSelectPeriod = sigmaPageController.sgSelectPeriod;
+root.sgRemoveTracked = sigmaPageController.sgRemoveTracked;
+root.sgOpenAddTest = sigmaPageController.sgOpenAddTest;
+root.sgAddTestSearchSet = sigmaPageController.sgAddTestSearchSet;
+root.sgViewTrackedTest = sigmaPageController.sgViewTrackedTest;
+root.sgRenderAddTestModal = sigmaPageController.sgRenderAddTestModal;
+root.sgTrackTest = sigmaPageController.sgTrackTest;
+root.pageSigma = sigmaPageController.pageSigma;
+root.sgOpSpecCell = sigmaPageController.sgOpSpecCell;
+root.sgFrequencyHTML = sigmaPageController.sgFrequencyHTML;
+root.sgMuDominant = sigmaPageController.sgMuDominant;
+root.sgMuStateChip = sigmaPageController.sgMuStateChip;
+root.sgMuHTML = sigmaPageController.sgMuHTML;
+root.sgRefresh = sigmaPageController.sgRefresh;
+root.sgTips = sigmaPageController.sgTips;
+root.sgPointTipShow = sigmaPageController.sgPointTipShow;
+root.sgPointTipHide = sigmaPageController.sgPointTipHide;
+root.sgTrendSVG = sigmaPageController.sgTrendSVG;
+root.sgMDCSVG = sigmaPageController.sgMDCSVG;
+root.sgBiasRowsFromDom = sigmaPageController.sgBiasRowsFromDom;
+root.sgBiasPeriodsFromDom = sigmaPageController.sgBiasPeriodsFromDom;
+root.sgBiasStats = sigmaPageController.sgBiasStats;
+root.sgBiasRoundsKey = sigmaPageController.sgBiasRoundsKey;
+root.sgBiasLinkedPeriodIds = sigmaPageController.sgBiasLinkedPeriodIds;
+root.sgOpenBias = sigmaPageController.sgOpenBias;
+root.sgRenderBiasModal = sigmaPageController.sgRenderBiasModal;
+root.sgBiasUpdateSummary = sigmaPageController.sgBiasUpdateSummary;
+root.sgBiasSelectPeriods = sigmaPageController.sgBiasSelectPeriods;
+root.sgBiasAdd = sigmaPageController.sgBiasAdd;
+root.sgBiasDel = sigmaPageController.sgBiasDel;
+root.sgApplyBiasToPeriods = sigmaPageController.sgApplyBiasToPeriods;
+root.sgBiasApply = sigmaPageController.sgBiasApply;
+root.sgMuRowsFromDom = sigmaPageController.sgMuRowsFromDom;
+root.sgMuPeriodsFromDom = sigmaPageController.sgMuPeriodsFromDom;
+root.sgMuCaptureDom = sigmaPageController.sgMuCaptureDom;
+root.sgMuPreview = sigmaPageController.sgMuPreview;
+root.sgMuUpdatePreview = sigmaPageController.sgMuUpdatePreview;
+root.sgOpenMU = sigmaPageController.sgOpenMU;
+root.sgRenderMuModal = sigmaPageController.sgRenderMuModal;
+root.sgMuSelectPeriods = sigmaPageController.sgMuSelectPeriods;
+root.sgMuApply = sigmaPageController.sgMuApply;
+root.sgCell = sigmaPageController.sgCell;
+root.sgPeriodSel = sigmaPageController.sgPeriodSel;
+root.sgPart = sigmaPageController.sgPart;
+root.sgAddPeriod = sigmaPageController.sgAddPeriod;
+root.sgDelPeriod = sigmaPageController.sgDelPeriod;
+root.sgClearImportedCV = sigmaPageController.sgClearImportedCV;
+root.sgCohortCutoff = sigmaPageController.sgCohortCutoff;
+root.sgCohortGroups = sigmaPageController.sgCohortGroups;
+root.sgCohortStatusText = sigmaPageController.sgCohortStatusText;
+root.sgImportCohort = sigmaPageController.sgImportCohort;
+root.sgApplyCohortChoices = sigmaPageController.sgApplyCohortChoices;
+root.sgCohortImportMessage = sigmaPageController.sgCohortImportMessage;
+root.sgRenderCohortModal = sigmaPageController.sgRenderCohortModal;
+root.sgCohortClose = sigmaPageController.sgCohortClose;
+root.sgCohortApply = sigmaPageController.sgCohortApply;
+root.sgPullCV = sigmaPageController.sgPullCV;
+root.esc=escapeHtml;
+root.escAttr=escapeHtmlAttr;
+const reportPrintController=createReportPrintController({
+  reportQcFormat:{value:(t:any,v:any)=>(root.reportQcFormat as any).value(t,v),stat:(t:any,v:any)=>(root.reportQcFormat as any).stat(t,v),point:(p:any,t:any)=>(root.reportQcFormat as any).point(p,t)},
+  reportHeaderPresentation:input=>root.reportHeaderPresentation!(input),
+  lab:()=>state.lab,
+  app:()=>typeof window==='undefined'?{version:'dev'}:(window as any).QCLAB_APP||{version:'dev'},
+  westgardRules:()=>state.westgardRules,
+  formatDateTimeVN:value=>(globalThis as any).formatDateTimeVN(value),
+  userName:()=>(globalThis as any).userName(),
+  reportSignBlock:()=>root.reportSignBlock!(),
+  openPrintWindow:()=>window.open('','_blank'),
+  infoDialog:message=>root.infoDialog!(message),
+  openPrint:(title,body,options)=>(root as any).openPrint(title,body,options),
+  currentHref:()=>location.href,
+  hasPdfPrinter:()=>!!(window as any).qcPrintPdf,
+  sigmaPrintRowsService:{periodRows:(row:any,levels:any)=>(root.sigmaPrintRowsService as any).periodRows(row,levels),periodsRows:(rows:any,levels:any)=>(root.sigmaPrintRowsService as any).periodsRows(rows,levels)},
+  sigmaMuPrintRowsService:{periodRows:(t:any,row:any,levels:any)=>(root.sigmaMuPrintRowsService as any).periodRows(t,row,levels),periodsRows:(t:any,rows:any,levels:any)=>(root.sigmaMuPrintRowsService as any).periodsRows(t,rows,levels)},
+  sigmaMuTraceService:(row,levels)=>root.sigmaMuTraceService!(row,levels),
+  findTest:id=>(state.tests||[]).find((test:any)=>test.id===id),
+  sgTest:()=>(globalThis as any).sgTest,
+  selTest:()=>(globalThis as any).selTest,
+  sgData:tid=>root.sgData!(tid),
+  sgVisibleLevels:t=>root.sgVisibleLevels!(t),
+  sgRows:(t,data,levels)=>root.sgRows!(t,data,levels),
+  sigmaReportRows:(tid,mode,period,entryId)=>(globalThis as any).sigmaReportRows(tid,mode,period,entryId),
+  vnPeriod:value=>(globalThis as any).vnPeriod(value),
+  sigmaTeaTrace:exportRows=>(globalThis as any).sigmaTeaTrace(exportRows),
+  instrumentName:(instrumentId,machine)=>(globalThis as any).instrumentName(instrumentId,machine),
+  testDisplayName:t=>(globalThis as any).testDisplayName(t),
+  sgFrequencyHTML:(t,row,levels)=>root.sgFrequencyHTML!(t,row,levels),
+  sgTrendSVG:(t,valid,levels)=>root.sgTrendSVG!(t,valid,levels),
+  sgMDCSVG:(t,valid,levels)=>root.sgMDCSVG!(t,valid,levels),
+  sigmaExportPeriods:exportRows=>(globalThis as any).sigmaExportPeriods(exportRows),
+  activeWestgard:t=>(globalThis as any).activeWestgard(t),
+  westgardByPoint:(points,mean,sd,scope)=>(root.QCCore as any).westgardByPoint(points,mean,sd,scope),
+  wgRules:()=>WG_RULES,
+  testRuleOnWithin:(t,rule)=>(globalThis as any).testRuleOnWithin(t,rule),
+  testRuleOnAcross:(t,rule)=>(globalThis as any).testRuleOnAcross(t,rule),
+  previousLotSeries:(t,level)=>(globalThis as any).previousLotSeries(t,level),
+  wgPrevOpenHas:key=>(globalThis as any).wgPrevOpen.has(key),
+  ruleResultLevel:(t,rules)=>(globalThis as any).ruleResultLevel(t,rules),
+  reportPointsTableService:(items,t)=>root.reportPointsTableService!(items,t),
+  actionReportHtml:{summary:(parts:any)=>(root.actionReportHtml as any).summary(parts),detailField:(label:any,value:any,wide:any)=>(root.actionReportHtml as any).detailField(label,value,wide)},
+  reportNceDetailHtmlPresentation:(a,t)=>root.reportNceDetailHtmlPresentation!(a,t),
+  reportNceAppendixPresentation:(actions,t)=>root.reportNceAppendixPresentation!(actions,t),
+  reportNceModel:(a,t)=>(globalThis as any).reportNceModel(a,t),
+  reportNceSummaryParts:a=>(globalThis as any).reportNceSummaryParts(a),
+  reportExportSelection:()=>(globalThis as any).reportExportSelection(),
+  reportInRange:(start,end)=>(globalThis as any).reportInRange(start,end),
+  reportRangeText:(start,end)=>(globalThis as any).reportRangeText(start,end),
+  reportTeaInfo:t=>(globalThis as any).reportTeaInfo(t),
+  reportMultiViews:(t,inMonth)=>(globalThis as any).reportMultiViews(t,inMonth),
+  operationalLevels:t=>(globalThis as any).operationalLevels(t),
+  reportPrevLotRows:(t,s,inMonth)=>(globalThis as any).reportPrevLotRows(t,s,inMonth),
+  reportLevelStats:(pts,mean,teaVal)=>(globalThis as any).reportLevelStats(pts,mean,teaVal),
+  pointStaff:p=>(globalThis as any).pointStaff(p),
+  errorType:rules=>(globalThis as any).errorType(rules),
+  reportLevelRows:(t,l,wg,inMonth)=>(globalThis as any).reportLevelRows(t,l,wg,inMonth),
+  reportActionsInRange:(tid,inMonth)=>(globalThis as any).reportActionsInRange(tid,inMonth),
+  actionRerunStatus:a=>(globalThis as any).actionRerunStatus(a),
+  actionLevelShort:(t,level,lot)=>(globalThis as any).actionLevelShort(t,level,lot),
+  actionApprovalLabel:a=>(globalThis as any).actionApprovalLabel(a),
+  sgTeaRefText:t=>(globalThis as any).sgTeaRefText(t),
+  lvlCfg:(t,level)=>lvlCfg(t,level),
+  operationalLotPoints:(t,level)=>operationalLotPoints(t,level),
+  stats:values=>(globalThis as any).stats(values),
+  ljDataURL:(points,mean,sd)=>root.ljDataURL!(points,mean,sd),
+  ljMultiDataURL:(levelViews,test,opts)=>root.ljMultiDataURL!(levelViews,test,opts),
+  format:(value,decimals)=>fmt(value,decimals),
+  vnDate:value=>vnDate(value),
+  escape:value=>root.esc!(value),
+});
+root.reportQcValue=reportPrintController.reportQcValue;
+root.reportQcStat=reportPrintController.reportQcStat;
+root.reportQcPoint=reportPrintController.reportQcPoint;
+root.reportHeader=reportPrintController.reportHeader;
+root.signBlock=reportPrintController.signBlock;
+root.openPrint=reportPrintController.openPrint;
+root.sigmaPeriodPrintRows=reportPrintController.sigmaPeriodPrintRows;
+root.sigmaPeriodsPrintRows=reportPrintController.sigmaPeriodsPrintRows;
+root.sigmaMuPrintRows=reportPrintController.sigmaMuPrintRows;
+root.sigmaMuPeriodsPrintRows=reportPrintController.sigmaMuPeriodsPrintRows;
+root.sigmaMuTrace=reportPrintController.sigmaMuTrace;
+root.sigmaMuPrintCard=reportPrintController.sigmaMuPrintCard;
+root.printSigmaPeriod=reportPrintController.printSigmaPeriod;
+root.printSigmaPeriods=reportPrintController.printSigmaPeriods;
+root.printWestgard=reportPrintController.printWestgard;
+root.reportPointsTableHtml=reportPrintController.reportPointsTableHtml;
+root.reportNceSummaryHtml=reportPrintController.reportNceSummaryHtml;
+root.reportNceDetailField=reportPrintController.reportNceDetailField;
+root.reportNceDetailHtml=reportPrintController.reportNceDetailHtml;
+root.reportNceAppendixHtml=reportPrintController.reportNceAppendixHtml;
+root.printReport=reportPrintController.printReport;
+root.printRangeForm=reportPrintController.printRangeForm;
 root.WestgardViewModel = westgardViewModel;
 root.westgardRowsWindow = westgardRowsWindow;
 root.westgardXlsxRows = createWestgardXlsxRows({date:value=>(root as any).vnDate(value),staffCode:point=>((root as any).pointStaff(point).code||''),verdict:level=>(root as any).qcVerdictLabel(level),error:rules=>(root as any).errorType(rules),number:value=>(root as any).fmt(value)});
@@ -3360,3 +4533,127 @@ root.westgardArchivedGroups = westgardArchivedGroups;
 root.westgardArchivedMultiViews = westgardArchivedMultiViews;
 root.westgardArchivedGroupMatches = westgardArchivedGroupMatches;
 root.westgardArchivedTestSelection = westgardArchivedTestSelection;
+const dataIoController=createDataIoController({
+  cssTokenPixel:(token,fallback)=>(root.cssTokenPixel as any)(token,fallback),
+  sigmaCanvasFont:(weight,token,fallback)=>(root.sigmaCanvasFont as any)(weight,token,fallback),
+  exportMetaRowsService:kind=>root.exportMetaRowsService!(kind),
+  exportMetaRows:kind=>(globalThis as any).exportMetaRows(kind),
+  reportExportHelpers:{inRange:(start:any,end:any)=>(root.reportExportHelpers as any).inRange(start,end),nceExcerpt:(value:any,max?:number)=>(root.reportExportHelpers as any).nceExcerpt(value,max),sigmaLevels:(row:any)=>(root.reportExportHelpers as any).sigmaLevels(row),periodLabel:(value:any)=>(root.reportExportHelpers as any).periodLabel(value),mdcPeriodLabel:(value:any)=>(root.reportExportHelpers as any).mdcPeriodLabel(value),exportPeriods:(rows:any)=>(root.reportExportHelpers as any).exportPeriods(rows)},
+  qcReportContext:{teaInfo:(t:any)=>(root.qcReportContext as any).teaInfo(t),multiViews:(t:any,inRange:any)=>(root.qcReportContext as any).multiViews(t,inRange)},
+  qcReportRowsService:{previousLot:(t:any,s:any,inRange:any)=>(root.qcReportRowsService as any).previousLot(t,s,inRange),currentLot:(t:any,l:any,wg:any,inRange:any)=>(root.qcReportRowsService as any).currentLot(t,l,wg,inRange),actions:(tid:any,inRange:any)=>(root.qcReportRowsService as any).actions(tid,inRange)},
+  actionReportSummary:a=>root.actionReportSummary!(a),
+  actionReportModel:(a,t)=>root.actionReportModel!(a,t),
+  qcReportCsvRows:(tid,start,end)=>root.qcReportCsvRows!(tid,start,end),
+  csvDownload:(name,rows)=>root.csvDownload!(name,rows),
+  nceCsvRow:a=>root.nceCsvRow!(a),
+  blobDownload:(name,blob)=>root.blobDownload!(name,blob),
+  sigmaReportMetricService:r=>root.sigmaReportMetricService!(r),
+  sigmaReportRowsService:(onlyTestId,mode,period,periodId)=>root.sigmaReportRowsService!(onlyTestId,mode,period,periodId),
+  sigmaDataUrlBytes:durl=>(root.sigmaDataUrlBytes as any)(durl),
+  sigmaExportPixelRatioService:(W,H,scale,maxDimension)=>root.sigmaExportPixelRatioService!(W,H,scale,maxDimension),
+  sigmaCanvasFactory:(W,H,scale)=>root.sigmaCanvasFactory!(W,H,scale),
+  sigmaChartRenderer:rows=>root.sigmaChartRenderer!(rows),
+  sigmaMdcItemsService:rows=>(root.sigmaMdcItemsService as any)(rows),
+  sigmaMdcLabelPlacementService:(items,X,Y,ctx,bounds)=>(root.sigmaMdcLabelPlacementService as any)(items,X,Y,ctx,bounds),
+  sigmaMdcRenderer:rows=>root.sigmaMdcRenderer!(rows),
+  xlsxUtf8:text=>root.xlsxUtf8!(text),
+  xlsxEscape:text=>root.xlsxEscape!(text),
+  xlsxZip:files=>root.xlsxZip!(files),
+  xlsxEmu:px=>root.xlsxEmu!(px),
+  xlsxColumns:root.xlsxColumns as any,
+  xlsxCells:root.xlsxCells as any,
+  xlsxRound:(value,digits)=>(root.xlsxRound as any)(value,digits),
+  xlsxPeriodNumber:value=>(root.xlsxPeriodNumber as any)(value),
+  xlsxDrawing:(images,chartStartRow0)=>root.xlsxDrawing!(images,chartStartRow0),
+  sigmaXlsxStyles:()=>root.sigmaXlsxStyles!(),
+  renameSigmaXlsxSheet:(bytes,sheetName)=>(root.renameSigmaXlsxSheet as any)(bytes,sheetName),
+  reportXlsxStyleIds:root.reportXlsxStyleIds as any,
+  reportXlsxBuild:doc=>root.reportXlsxBuild!(doc),
+  reportXlsxHeader:opts=>root.reportXlsxHeader!(opts),
+  westgardXlsxHeader:opts=>root.westgardXlsxHeader!(opts),
+  westgardXlsxRows:{detail:(o:any,index:number)=>(root.westgardXlsxRows as any).detail(o,index)},
+  sigmaExportMetaService:{meta:()=>(root.sigmaExportMetaService as any).meta(),teaTrace:(rows:any)=>(root.sigmaExportMetaService as any).teaTrace(rows)},
+  qcExportValueFormat:{value:(t:any,value:any)=>(root.qcExportValueFormat as any).value(t,value),stat:(t:any,value:any)=>(root.qcExportValueFormat as any).stat(t,value)},
+  errorType:rules=>(globalThis as any).errorType(rules),
+  activeWestgard:t=>(globalThis as any).activeWestgard(t),
+  operationalLevels:t=>(globalThis as any).operationalLevels(t),
+  previousLotSeries:(t,level)=>(globalThis as any).previousLotSeries(t,level),
+  reportLevelStats:(pts,mean,teaVal)=>(globalThis as any).reportLevelStats(pts,mean,teaVal),
+  pointStaff:p=>(globalThis as any).pointStaff(p),
+  ruleResultLevel:(t,rules)=>(globalThis as any).ruleResultLevel(t,rules),
+  testRuleOnWithin:(t,rule)=>(globalThis as any).testRuleOnWithin(t,rule),
+  testRuleOnAcross:(t,rule)=>(globalThis as any).testRuleOnAcross(t,rule),
+  instrumentName:(instrumentId,machine)=>(globalThis as any).instrumentName(instrumentId,machine),
+  testDisplayName:t=>(globalThis as any).testDisplayName(t),
+  formatDateTimeVN:value=>(globalThis as any).formatDateTimeVN(value),
+  userName:()=>(globalThis as any).userName(),
+  vnDate:value=>vnDate(value),
+  vnPeriod:value=>(globalThis as any).vnPeriod(value),
+  stateName:value=>(globalThis as any).stateName(value),
+  safeName:value=>(globalThis as any).safeName(value),
+  format:(value,decimals)=>fmt(value,decimals),
+  infoDialog:message=>root.infoDialog!(message),
+  actionLevelShort:(t,level,lot)=>(globalThis as any).actionLevelShort(t,level,lot),
+  actionRerunStatus:a=>(globalThis as any).actionRerunStatus(a),
+  actionApprovalLabel:a=>(globalThis as any).actionApprovalLabel(a),
+  ljDataURL:(points,mean,sd)=>root.ljDataURL!(points,mean,sd),
+  ljMultiDataURL:(levelViews,test,opts)=>root.ljMultiDataURL!(levelViews,test,opts),
+  wgMultiViews:t=>(globalThis as any).wgMultiViews(t),
+  wgPrevOpenHas:key=>(globalThis as any).wgPrevOpen.has(key),
+  sgTeaRefText:t=>(globalThis as any).sgTeaRefText(t),
+  sgData:tid=>root.sgData!(tid),
+  reportExportSelection:()=>(globalThis as any).reportExportSelection(),
+  reportRangeText:(start,end)=>(globalThis as any).reportRangeText(start,end),
+  westgardByPoint:(points,mean,sd,scope)=>(root.QCCore as any).westgardByPoint(points,mean,sd,scope),
+  wgRules:()=>WG_RULES,
+  findTest:id=>(state.tests||[]).find((test:any)=>test.id===id),
+  lab:()=>state.lab,
+  westgardRules:()=>state.westgardRules,
+  actions:()=>(state as any).actions||[],
+  appMeta:()=>typeof window==='undefined'?{version:'dev'}:(window as any).QCLAB_APP||{version:'dev'},
+  selTest:()=>(globalThis as any).selTest,
+  sgTest:()=>(globalThis as any).sgTest,
+});
+root.dataIoTypePx=dataIoController.dataIoTypePx;
+root.dataIoCanvasFont=dataIoController.dataIoCanvasFont;
+root.exportMetaRows=dataIoController.exportMetaRows;
+root.reportInRange=dataIoController.reportInRange;
+root.reportTeaInfo=dataIoController.reportTeaInfo;
+root.reportMultiViews=dataIoController.reportMultiViews;
+root.reportPrevLotRows=dataIoController.reportPrevLotRows;
+root.reportLevelRows=dataIoController.reportLevelRows;
+root.reportActionsInRange=dataIoController.reportActionsInRange;
+root.reportNceExcerpt=dataIoController.reportNceExcerpt;
+root.reportNceSummaryParts=dataIoController.reportNceSummaryParts;
+root.reportNceModel=dataIoController.reportNceModel;
+root.exportReportCSV=dataIoController.exportReportCSV;
+root.exportActionsCSV=dataIoController.exportActionsCSV;
+root.downloadBlob=dataIoController.downloadBlob;
+root.sigmaReportMetric=dataIoController.sigmaReportMetric;
+root.sigmaReportRows=dataIoController.sigmaReportRows;
+root.sigmaLevelsOf=dataIoController.sigmaLevelsOf;
+root.sigmaDataURLBytes=dataIoController.sigmaDataURLBytes;
+root.sigmaExportPixelRatio=dataIoController.sigmaExportPixelRatio;
+root.sigmaCanvas=dataIoController.sigmaCanvas;
+root.drawSigmaReportChart=dataIoController.drawSigmaReportChart;
+root.sigmaMdcItems=dataIoController.sigmaMdcItems;
+root.sigmaPeriodLabel=dataIoController.sigmaPeriodLabel;
+root.sigmaMdcPeriodLabel=dataIoController.sigmaMdcPeriodLabel;
+root.sigmaExportPeriods=dataIoController.sigmaExportPeriods;
+root.sigmaMdcLabelPlacements=dataIoController.sigmaMdcLabelPlacements;
+root.SIGMA_EXPORT_PIXEL_RATIO=dataIoController.SIGMA_EXPORT_PIXEL_RATIO;
+root.XlsxCore=dataIoController.XlsxCore;
+root.SigmaXlsx=dataIoController.SigmaXlsx;
+root.drawSigmaReportMDC=dataIoController.drawSigmaReportMDC;
+root.renameSigmaSheet=dataIoController.renameSigmaSheet;
+root.RXST=dataIoController.RXST;
+root.ReportXlsx=dataIoController.ReportXlsx;
+root.reportXlsxDoc=dataIoController.reportXlsxDoc;
+root.exportReportXLSX=dataIoController.exportReportXLSX;
+root.westgardXlsxDoc=dataIoController.westgardXlsxDoc;
+root.exportWestgardXLSX=dataIoController.exportWestgardXLSX;
+root.sigmaExportMeta=dataIoController.sigmaExportMeta;
+root.sigmaTeaTrace=dataIoController.sigmaTeaTrace;
+root.buildSigmaXlsx=dataIoController.buildSigmaXlsx;
+root.exportSigmaPeriodXLSX=dataIoController.exportSigmaPeriodXLSX;
+root.exportSigmaPeriodsXLSX=dataIoController.exportSigmaPeriodsXLSX;

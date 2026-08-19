@@ -12,8 +12,6 @@ run(ctx, `
   function role(){ return currentUser.role; }
   function __getState(){ return state; }
 `);
-const auditCode = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'audit.js'), 'utf8');
-vm.runInContext(auditCode, ctx, { filename: 'modules/audit.js' });
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'assets', 'generated', 'modular-pilot.js'), 'utf8'), ctx, { filename: 'generated/modular-pilot.js' });
 run(ctx, `currentUser={id:'u1',username:'admin',name:'Admin',role:'admin'};`);
 

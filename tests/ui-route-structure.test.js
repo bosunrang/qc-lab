@@ -11,21 +11,21 @@ const routerPolicy=read('src/presentation/router/router-page-policy.ts');
 const routerShell=read('src/presentation/router/router-shell-controller.ts');
 const vnDatePicker=read('src/presentation/router/vn-date-picker-controller.ts');
 const dashboard=read('src/presentation/dashboard/dashboard-page-controller.ts');
-const entry=read('assets/modules/entry-routes.js');
+const entry=read('src/presentation/entry/entry-page-controller.ts');
 const entryPointRow=read('src/presentation/entry/entry-point-table-row-html.ts');
 const westgard=read('src/presentation/westgard/westgard-page-controller.ts');
 const modals=read('src/presentation/modal/modal-focus-trap.ts')+read('src/presentation/modal/modal-template.ts')+read('src/presentation/modal/modal-controller.ts')+read('src/presentation/modal/dialog-overlay-controller.ts');
-const actions=read('assets/modules/actions-routes.js');
+const actions=read('src/presentation/actions/actions-page-controller.ts');
 const actionCancelModal=read('src/presentation/nce/action-cancel-modal-html.ts');
 const actionInvestigationField=read('src/presentation/nce/action-investigation-field-html.ts');
 const actionFormPanel=read('src/presentation/nce/action-form-panel-html.ts');
-const form=read('assets/modules/action-form.js');
+const form=read('src/presentation/actions/action-form-controller.ts');
 const actionRecordService=read('src/application/nce/action-record-service.ts');
 const actionEvidencePresentation=read('src/presentation/nce/action-evidence-presentation.ts');
 const report=read('src/presentation/report/report-page-controller.ts');
 const reportPageHtml=read('src/presentation/report/report-page-html.ts');
-const sigma=read('assets/modules/sigma.js');
-const sigmaTea=read('assets/modules/sigma-tea.js');
+const sigma=read('src/presentation/sigma/sigma-page-controller.ts');
+const sigmaTea=read('src/domain/sigma/sigma-tea-resolution.ts');
 const reportsCss=read('assets/professional-reports.css');
 const index=read('index.html');
 /* Vài quy ước là "không được xuất hiện Ở BẤT KỲ ĐÂU trong trang Khắc phục sự cố"
@@ -44,11 +44,8 @@ assert.doesNotMatch(index,/http-equi\?+/,'thuộc tính http-equiv không đư�
 
 assert.doesNotMatch(router,/function page(?:Dash|Entry|Westgard)\(/,'router-render chỉ giữ điều phối và UI primitives');
 assert.match(dashboard,/const pageDash = \(\) => \{/);
-assert.match(entry,/function pageEntry\(/);
+assert.match(entry,/const pageEntry = \(rightOnly = false\)/);
 assert.match(westgard,/const pageWestgard = \(\) => \{/);
-
-// entry-routes.js vẫn là classic, tải sau bundle (nơi có pageWestgard TS).
-assert.ok(index.indexOf('modular-pilot.js')<index.indexOf('entry-routes.js'),'bundle phải tải trước entry-routes.js');
 
 /* core.js phải tiếp tục độc lập với bundle presentation, nên PAGE_SET/ROLE_SET ở core.js
    và router policy TypeScript vẫn là hai khai báo tách rời. Test này là lưới an toàn: nếu
@@ -85,12 +82,11 @@ assert.doesNotMatch(actions,/===== ACTIONS & REPORT PAGE ROUTES =====/,'tiêu đ
    test nào chạm tới — phần lớn điểm mù nằm ở đúng lớp THUẦN này. Cắt một chiều:
    sigma.js gọi sang sigma-tea.js, chiều ngược lại phải TRỐNG, nếu không lớp này
    hết test được bằng Node. Test riêng: tests/sigma-tea.test.js. */
-for(const name of ['effectiveTeaRefs','sgRef','sgTeaInfo','sgTeaSource','sgTeaSnapshot','sgSetLevelTeaSnapshot','sgEntryTea','sgCliaCriterion','sgUnitsMatch','teaRefRecordForName'])assert.match(sigmaTea,new RegExp(`function ${name}\\(`),`${name} thuộc lớp giải TEa`);
-assert.match(sigmaTea,/^const SG_TEA_SOURCES=/m,'danh mục nguồn TEa đi cùng lớp giải TEa');
-assert.doesNotMatch(sigma,/function (?:effectiveTeaRefs|sgRef|sgTeaInfo|sgTeaSnapshot|sgCliaCriterion)\(/,'sigma.js không được giữ lại lớp giải TEa');
-assert.doesNotMatch(sigmaTea,/function (?:pageSigma|sgComp|sgMU|sgRefresh|sgOpenMU|sgOpenBias)\(/,'sigma-tea.js không được kéo theo trang Sigma, MU hay modal');
-assert.doesNotMatch(sigmaTea,/document\.|openModal\(|rerender\(/,'sigma-tea.js phải thuần — chạm DOM là hết test bằng Node');
-assert.ok(index.indexOf('sigma-tea.js')<index.indexOf('sigma.js?'),'sigma-tea.js phải tải trước sigma.js');
+for(const name of ['effectiveTeaRefs','sgRef','sgTeaInfo','sgTeaSource','sgTeaSnapshot','sgSetLevelTeaSnapshot','sgEntryTea','sgCliaCriterion','sgUnitsMatch','teaRefRecordForName'])assert.match(sigmaTea,new RegExp(`const ${name}\\s*=`),`${name} thuộc lớp giải TEa`);
+assert.match(sigmaTea,/^\s*const SG_TEA_SOURCES/m,'danh mục nguồn TEa đi cùng lớp giải TEa');
+assert.doesNotMatch(sigma,/const (?:effectiveTeaRefs|sgRef|sgTeaInfo|sgTeaSnapshot|sgCliaCriterion) = /,'sigma-page-controller.ts không được giữ lại lớp giải TEa (chỉ được gọi qua deps, không định nghĩa lại)');
+assert.doesNotMatch(sigmaTea,/function (?:pageSigma|sgComp|sgMU|sgRefresh|sgOpenMU|sgOpenBias)\(/,'lớp giải TEa không được kéo theo trang Sigma, MU hay modal');
+assert.doesNotMatch(sigmaTea,/document\.|openModal\(|rerender\(/,'lớp giải TEa phải thuần — chạm DOM là hết test bằng Node');
 
 assert.match(modals,/const modalTemplate=/);
 assert.match(modals,/const modalCloseButton=/);
@@ -100,49 +96,48 @@ assert.doesNotMatch(modals,/(?:function|const) (?:syncActLevels|currentIssues|be
    Đường cắt này cố ý KHÔNG một chiều (khác report-routes.js): form gọi ngược các khối
    dựng bằng chứng của trang, trang gọi vào form để mở/lưu hồ sơ. Vì vậy test chốt theo
    TRÁCH NHIỆM — hàm nào ở file nào — chứ không đòi đồ thị phụ thuộc không chu trình. */
-for(const name of ['currentIssues','cancelAction','viewActionDetail','openActionGuide'])assert.match(actions,new RegExp(`function ${name}\\(`),`${name} thuộc phần trang/vòng đời`);
-for(const name of ['syncActLevels','beginActionFromIssue','addAction','actionFormHtml','actionFormModel','actionSection','actionSuggestBox','actionInvestigationField','readActionProtocolForm'])assert.match(form,new RegExp(`function ${name}\\(`),`${name} thuộc form NCE`);
-assert.doesNotMatch(actions,/function actionFormModel\(|\bACT_SUGGEST\b\s*=/,'actions-routes.js không được giữ lại phần dựng form');
-assert.doesNotMatch(form,/function (?:pageActionsV4|currentIssues|approveAction|viewActionDetail)\(/,'action-form.js không được kéo theo trang và vòng đời hồ sơ');
-assert.ok(index.indexOf('actions-routes.js')<index.indexOf('action-form.js'),'action-form.js phải tải sau actions-routes.js');
+for(const name of ['currentIssues','cancelAction','viewActionDetail','openActionGuide'])assert.match(actions,new RegExp(`const ${name} = `),`${name} thuộc phần trang/vòng đời`);
+for(const name of ['syncActLevels','beginActionFromIssue','addAction','actionFormHtml','actionFormModel','actionSection','actionSuggestBox','actionInvestigationField','readActionProtocolForm'])assert.match(form,new RegExp(`const ${name} = `),`${name} thuộc form NCE`);
+assert.doesNotMatch(actions,/const actionFormModel = |\bACT_SUGGEST\b\s*=/,'actions-routes.js không được giữ lại phần dựng form');
+assert.doesNotMatch(form,/const (?:pageActionsV4|currentIssues|approveAction|viewActionDetail) = /,'action-form.js không được kéo theo trang và vòng đời hồ sơ');
 /* pageActionsV4() từng dựng cả form 8 mục trong chính nó; giờ phải gọi sang actionFormHtml()
    và chỉ truyền số sự cố — nếu nó tự currentIssues() lần nữa thì danh sách trên màn hình và
    con số trong khung "chưa chọn sự cố" có thể lệch nhau. */
-assert.match(actions,/actionFormHtml\(issues\.length\)/,'trang phải dùng lại đúng tập sự cố đã tính cho panel form');
+assert.match(actions,/deps\.formHtml\(issues\.length\)/,'trang phải dùng lại đúng tập sự cố đã tính cho panel form');
 assert.doesNotMatch(actions,/class="action-form-body"/,'markup form không được ở lại actions-routes.js');
-assert.doesNotMatch(actionsArea,/state\.actions\.splice\(/,'hồ sơ NCE không được xóa vật lý; phải hủy có lưu vết');
-assert.match(actions,/NceLifecycleWorkflowCommand\.execute\(\{kind:'cancel'/,'quy trình hủy phải gọi workflow hủy mềm TypeScript');
-assert.doesNotMatch(actions,/function confirmReturnAction\(i\)/,'xác nhận trả lại không được dựa vào vị trí mảng có thể thay đổi khi đồng bộ');
-assert.match(actions,/function confirmReturnAction\(id,token\)/,'xác nhận trả lại phải khóa theo ID và token phiên bản');
-assert.match(actions,/confirmReturnAction\('\$\{jsq\(current\.id\)\}','\$\{jsq\(token\)\}'\)/,'hộp thoại trả lại phải truyền đúng ID và token của hồ sơ sau xác thực');
+assert.doesNotMatch(actionsArea,/state\(\)\.actions\.splice\(/,'hồ sơ NCE không được xóa vật lý; phải hủy có lưu vết');
+assert.match(actions,/deps\.NceLifecycleWorkflowCommand\.execute\(\{\s*kind: 'cancel'/,'quy trình hủy phải gọi workflow hủy mềm TypeScript');
+assert.doesNotMatch(actions,/const confirmReturnAction = \(i:/,'xác nhận trả lại không được dựa vào vị trí mảng có thể thay đổi khi đồng bộ');
+assert.match(actions,/const confirmReturnAction = \(id: unknown, token: unknown\) => \{/,'xác nhận trả lại phải khóa theo ID và token phiên bản');
+assert.match(actions,/confirmReturnAction\('\$\{deps\.jsq\(current\.id\)\}','\$\{deps\.jsq\(token\)\}'\)/,'hộp thoại trả lại phải truyền đúng ID và token của hồ sơ sau xác thực');
 
 /* Form hồ sơ NCE phải render THẲNG từ state qua actionFormModel(): bản cũ đổ giá trị
    vào DOM sau render (populateActionForm trong setTimeout) nên mọi rerender() — đổi
    trang rồi quay lại, hay một bản đồng bộ Firebase dội về — xoá trắng form đang sửa. */
-assert.match(form,/function actionFormModel\(/,'form NCE phải có model render từ state');
-assert.doesNotMatch(actionsArea,/function (?:populateActionForm|actionSetField|fillAction)\(/,'không đổ giá trị vào form sau render');
+assert.match(form,/const actionFormModel = \(editing: AnyRec, tests: AnyRec\[\]\) => /,'form NCE phải có model render từ state');
+assert.doesNotMatch(actionsArea,/const (?:populateActionForm|actionSetField|fillAction) = /,'không đổ giá trị vào form sau render');
 /* Danh tính sự cố bất biến khi sửa: đổi ô "Xét nghiệm" từng làm actionPoint() trả null
    và bỏ luôn yêu cầu QC chạy lại, còn lot bị ghi đè theo lô hiện hành sau mỗi lần chuyển lô. */
-assert.match(form,/editing\?'disabled':'onchange="syncActLevels\(\)"'/,'ô Xét nghiệm phải khoá khi sửa hồ sơ');
-assert.match(form,/const tid=editing\?editing\.testId:/,'addAction\\(\\) không lấy testId từ form khi sửa');
-assert.match(form,/const lot=editing\?\(editing\.lot\|\|''\):/,'lot phải giữ snapshot lúc mở hồ sơ');
+assert.match(form,/editing \? 'disabled' : 'onchange="syncActLevels\(\)"'/,'ô Xét nghiệm phải khoá khi sửa hồ sơ');
+assert.match(form,/const tid = editing \? editing\.testId : /,'addAction\\(\\) không lấy testId từ form khi sửa');
+assert.match(form,/const lot = editing \? \(editing\.lot \|\| ''\) : /,'lot phải giữ snapshot lúc mở hồ sơ');
 /* Lối thoát cho hồ sơ đã duyệt nhưng không còn đủ điều kiện khép vòng (sửa/xóa/duyệt
-   đều bị chặn) — xem actionCanReopen() trong actions-routes.js. */
-assert.match(actions,/function actionCanReopen\(/,'phải có đường mở lại hồ sơ duyệt-nhưng-hở');
-assert.match(actions,/function confirmApproveAction\(id,token\)/,'xác nhận duyệt phải tìm hồ sơ theo id và khóa phiên bản đã xem');
-assert.match(actions,/actionApprovalToken\(a\)!==token/,'phải chặn duyệt nếu hồ sơ hoặc bằng chứng QC đổi khi hộp duyệt đang mở');
+   đều bị chặn) — xem actionCanReopen() trong actions-page-controller.ts. */
+assert.match(actions,/const actionCanReopen = \(a: AnyRec\) => /,'phải có đường mở lại hồ sơ duyệt-nhưng-hở');
+assert.match(actions,/const confirmApproveAction = \(id: unknown, token: unknown\) => \{/,'xác nhận duyệt phải tìm hồ sơ theo id và khóa phiên bản đã xem');
+assert.match(actions,/actionApprovalToken\(a\) !== token/,'phải chặn duyệt nếu hồ sơ hoặc bằng chứng QC đổi khi hộp duyệt đang mở');
 assert.doesNotMatch(actionsArea,/!tests\.length\?emptyState\('Cần có xét nghiệm trước'/,'NCE nguồn ngoài IQC phải mở được cả khi chưa có xét nghiệm vận hành');
-assert.match(form,/function actionInvestigationChoose\(/,'checklist điều tra phải dùng lựa chọn trạng thái dạng nút');
+assert.match(form,/const actionInvestigationChoose = \(statusId: string, value: string\) => \{/,'checklist điều tra phải dùng lựa chọn trạng thái dạng nút');
 assert.match(actionInvestigationField,/class="action-investigation-select"/,'select dữ liệu gốc phải được giữ để tương thích state và kiểm thử');
-assert.match(form,/function actionChecklistChip\(/,'tiêu đề checklist phải hiển thị tiến độ hoàn tất');
-assert.match(form,/function actionSuggestBox\(/,'gợi ý nhập liệu NCE phải dùng cùng một khối thu gọn');
+assert.match(form,/const actionChecklistChip = \(form: AnyRec\) => /,'tiêu đề checklist phải hiển thị tiến độ hoàn tất');
+assert.match(form,/const actionSuggestBox = \(targetId: string, phrases: string\[\], label = 'Gợi ý nhập nhanh'\): string => \{/,'gợi ý nhập liệu NCE phải dùng cùng một khối thu gọn');
 assert.match(actionFormPanel,/class="action-form-panel-head"/,'renderer TypeScript phải giữ nút quy trình cạnh tiêu đề panel lập hồ sơ NCE');
-assert.match(form,/guideButtonHtml:btn\('Quy trình 8 bước','openActionGuide\(\)','ghost sm'\)/,'nút quy trình phải tiếp tục dùng helper btn của route legacy');
+assert.match(form,/guideButtonHtml: deps\.btn\('Quy trình 8 bước', 'openActionGuide\(\)', 'ghost sm'\)/,'nút quy trình phải tiếp tục dùng helper btn của route legacy');
 assert.match(reportsCss,/\.action-form-panel-head\{[^}]*justify-content:space-between/,'header lập hồ sơ NCE phải tách tiêu đề trái và nút quy trình sang phải');
 assert.match(reportsCss,/\.action-form-panel-head\{[^}]*color:var\(--card-head-ink\);[^}]*font-size:var\(--section-head-size\);[^}]*font-weight:800/,'header lập hồ sơ NCE phải dùng đúng token chữ của header panel hệ thống');
 assert.match(reportsCss,/\.action-form-panel \.action-form-panel-head > \.panel-title\{[^}]*flex:1;[^}]*color:inherit;[^}]*font:inherit/,'tiêu đề lập hồ sơ NCE phải kế thừa nguyên kiểu chữ hệ thống từ header');
 assert.doesNotMatch(actionsArea,/headOnly\([^;\n]+btn\('Quy trình 8 bước'/,'nút quy trình không được chiếm chỗ trên header trang');
-assert.match(actions,/cls:'action-guide-modal'/,'hướng dẫn 8 bước phải dùng popup NCE chuyên biệt');
+assert.match(actions,/cls: 'action-guide-modal'/,'hướng dẫn 8 bước phải dùng popup NCE chuyên biệt');
 assert.match(actionCancelModal,/class="alert warn action-cancel-warning"/,'cảnh báo hủy NCE phải có bố cục riêng để nội dung không bị ép thành hai cột');
 assert.match(reportsCss,/\.action-cancel-warning\{[^}]*width:100%;[^}]*flex-direction:column/,'cảnh báo hủy NCE phải xếp câu chính và giải thích theo chiều dọc');
 assert.match(reportPageHtml,/class="report-export-options"[\s\S]*?Kèm phụ lục NCE[\s\S]*?\(Áp dụng cho PDF và Excel\)[\s\S]*?class="report-actions"/,'tùy chọn phụ lục NCE phải nằm ở dòng riêng phía trên các nút xuất và có chú thích trong ngoặc');
@@ -156,21 +151,21 @@ assert.match(reportsCss,/\.action-guide-list\{[^}]*grid-template-columns:1fr/,'q
 assert.match(reportsCss,/\.action-guide-card\{[^}]*border-bottom:1px solid var\(--line\)/,'các bước NCE chỉ phân cách bằng đường kẻ trung tính, không dùng card màu');
 for(const id of ['aContainmentNote','aCorrection','aCause','aAct','aPatientAction','aEffectivenessNote'])assert.match(form,new RegExp(`actionSuggestBox\\('${id}'`),`${id} phải dùng gợi ý thu gọn`);
 
-assert.match(form,/NceFormWorkflowCommand\.submit\(\{editId:editing&&editing\.id,values:\{\.\.\.\(editing\|\|\{\}\),\.\.\.protocol,nceId:editing&&editing\.nceId\|\|nceId,testId:tid,level,lot,pointId,date,rule,errorType,action,by\}/,'workflow NCE phải nhận snapshot danh tính IQC bất biến khi sửa trước khi kiểm tra cổng chạy lại');
+assert.match(form,/deps\.NceFormWorkflowCommand\.submit\(\{\s*editId: editing && editing\.id, values: \{ \.\.\.\(editing \|\| \{\}\), \.\.\.protocol, nceId: \(editing && editing\.nceId\) \|\| nceId, testId: tid, level, lot, pointId, date, rule, errorType, action, by \}/,'workflow NCE phải nhận snapshot danh tính IQC bất biến khi sửa trước khi kiểm tra cổng chạy lại');
 for(const id of ['aReleaseStatus','aReleaseDate','aReleaseBy','aReleaseNote'])assert.match(form,new RegExp(`['"]${id}['"]`),`${id} must remain in the release-decision form`);
 assert.match(form,/actionSuggestBox\('aReleaseNote'/,'release rationale must keep the same editable suggestion pattern');
 assert.match(form,/actionSuggestBox\('aRiskBasis'/,'risk classification must keep an editable SOP-basis field');
 assert.match(form,/actionSuggestBox\('aResidualRiskBasis'/,'residual-risk reassessment must keep an editable evidence field');
 for(const id of ['aResidualSeverity','aResidualOccurrence','aResidualDetectability','aResidualRiskLevel','aResidualRiskBasis'])assert.match(form,new RegExp(`['"]${id}['"]`),`${id} must remain in the effectiveness section`);
-assert.match(form,/function actionEffectivenessMissingKey\(/,'effectiveness validation must focus the exact missing residual-risk field');
+assert.match(form,/const actionEffectivenessMissingKey = \(a: AnyRec\) => /,'effectiveness validation must focus the exact missing residual-risk field');
 assert.match(actionRecordService,/const effectivenessKeys = \['effectivenessStatus', 'effectivenessNote', 'effectivenessDate', 'residualSeverity', 'residualOccurrence', 'residualDetectability', 'residualRiskLevel', 'residualRiskBasis'\]/,'changing residual risk must refresh effectiveness reviewer attribution');
-assert.match(actions,/function actionEvidenceTimelineHtml\(/,'chi tiết NCE phải tách các mốc xảy ra, chạy lại, hủy điểm và mở hồ sơ');
-assert.match(actions,/ActionEvidencePresentation\.timeline\(a,rr\)/,'route timeline NCE phải dùng model TS thay vì tự suy luận mốc');
+assert.match(actions,/const actionEvidenceTimelineHtml = \(a: AnyRec, rr: AnyRec\) => \{/,'chi tiết NCE phải tách các mốc xảy ra, chạy lại, hủy điểm và mở hồ sơ');
+assert.match(actions,/deps\.ActionEvidencePresentation\.timeline\(a, rr\)/,'route timeline NCE phải dùng model TS thay vì tự suy luận mốc');
 for(const label of ['Ngày xảy ra','QC chạy lại','Hủy điểm','Mở hồ sơ'])assert.match(actionEvidencePresentation,new RegExp(`label: '${label}'`),`timeline NCE phải giữ mốc ${label}`);
-assert.match(actions,/function actionRerunEvidenceHtml\(/,'NCE phải có khung bằng chứng QC chạy lại riêng');
-assert.match(actions,/function openActionQcEvidence\(/,'khung bằng chứng phải mở được đúng điểm QC');
+assert.match(actions,/const actionRerunEvidenceHtml = \(a: AnyRec, rr: AnyRec, t: AnyRec\) => \{/,'NCE phải có khung bằng chứng QC chạy lại riêng');
+assert.match(actions,/const openActionQcEvidence = \(tid: unknown, level: unknown, pointId: unknown, date: unknown, lot: unknown\) => \{/,'khung bằng chứng phải mở được đúng điểm QC');
 assert.match(entryPointRow,/data-qc-point-id=/,'dòng dữ liệu QC phải mang ID để liên kết từ hồ sơ NCE');
-assert.match(entry,/rangeSummary=allSt\?`N=\$\{allSt\.n\}/,'thống kê toàn bộ phải dùng ký hiệu N viết hoa');
-assert.match(actions,/function openActionQcEvidence[\s\S]*entryDetailOpen\.add\('points'\)[\s\S]*go\('entry'\)/,'mở bằng chứng NCE phải bung khối điểm QC trước khi tô sáng dòng');
+assert.match(entry,/const rangeSummary = allSt \? `N=\$\{allSt\.n\}/,'thống kê toàn bộ phải dùng ký hiệu N viết hoa');
+assert.match(actions,/const openActionQcEvidence = \([^)]*\) => \{[\s\S]*?entryDetailOpen\.add\('points'\)[\s\S]*?deps\.go\('entry'\)/,'mở bằng chứng NCE phải bung khối điểm QC trước khi tô sáng dòng');
 
 console.log('UI route structure tests passed');

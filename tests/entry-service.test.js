@@ -9,41 +9,53 @@ run(ctx, 'function __getState(){return state;} function __setState(s){state=s;}'
 const plain = v => JSON.parse(JSON.stringify(v));
 
 {
-  const routeSource = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'entry-routes.js'), 'utf8');
+  const routeSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'entry', 'entry-page-controller.ts'), 'utf8');
   const chartSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'entry', 'entry-chart-html.ts'), 'utf8');
   const pointsPanelSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'entry', 'entry-points-panel-html.ts'), 'utf8');
   const cumulativeStatsSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'entry', 'entry-cumulative-stats-html.ts'), 'utf8');
   const pointTableCardSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'entry', 'entry-point-table-card-html.ts'), 'utf8');
   const pointTableRowSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'entry', 'entry-point-table-row-html.ts'), 'utf8');
-  const entryActionsSource = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'manage-tests-actions.js'), 'utf8');
+  const entryActionsSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'manage', 'manage-tests-actions-controller.ts'), 'utf8');
   const assayModalSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'manage', 'config-assay-modal-html.ts'), 'utf8');
   const assayDecimalOptionsSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'manage', 'config-assay-decimal-options-html.ts'), 'utf8');
-  const drawSource = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'draw.js'), 'utf8');
+  const drawSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'chart', 'qc-chart-renderer.ts'), 'utf8');
   const rangeSource = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'range.js'), 'utf8');
   const bridgeSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'compat', 'modular-pilot.global.ts'), 'utf8');
-  assert.match(routeSource, /EntryDateNoteWorkflowCommand\.save\(/, 'route phải dùng date-note workflow command');
-  assert.doesNotMatch(routeSource, /EntryService\.saveDateNote\(/, 'route không được gọi mutation primitive trực tiếp');
-  assert.doesNotMatch(routeSource, /EntryService\.updateDateNoteCommand\(/, 'route không được gọi thẳng command cấp thấp, phải qua workflow command');
+  assert.match(routeSource, /deps\.EntryDateNoteWorkflowCommand\.save\(/, 'route phải dùng date-note workflow command');
+  assert.doesNotMatch(routeSource, /deps\.EntryService\.saveDateNote\(/, 'route không được gọi mutation primitive trực tiếp');
+  assert.doesNotMatch(routeSource, /deps\.EntryService\.updateDateNoteCommand\(/, 'route không được gọi thẳng command cấp thấp, phải qua workflow command');
   assert.match(bridgeSource, /entry:root\.EntryService,formatDate:date=>\(globalThis as any\)\.vnDate\(date\)/, 'workflow command ghi chú ngày phải nối vào EntryService TypeScript');
   assert.match(bridgeSource, /createEntryDateNoteWorkflowCommand\(\{current:\(\)=>state,entry:root\.EntryService,formatDate:date=>\(globalThis as any\)\.vnDate\(date\),log:\(action,detail,target\)=>logAct\(action,detail,target\),saveState:options=>save\(options\)\}\)/, 'workflow command ghi chú ngày phải dùng save policy do command trả về');
-  assert.match(routeSource, /label:'Mean thực',value:st\?fmtTestValue\(t,st\.m\)/, 'Mean thực phải dùng số thập phân của xét nghiệm');
-  assert.match(routeSource, /label:'SD thực',value:st\?fmtTestStat\(t,st\.sd\)/, 'SD thực phải dùng số thập phân thống kê của xét nghiệm');
-  assert.match(routeSource, /label:'Mean mục tiêu',value:fmtTestValue\(t,chartMean\)/, 'Mean mục tiêu phải dùng số thập phân của xét nghiệm');
-  assert.match(routeSource, /targetCfg=prevView\|\|entryColumnCfg\(t,x\.level,x\.lot\)/, 'Mean/SD mục tiêu phải đọc cấu hình chung đang áp dụng cho đúng mức và lô');
-  assert.match(routeSource, /label:'SD mục tiêu',value:fmtTestStat\(t,chartSd\)/, 'SD mục tiêu phải giữ độ chính xác thống kê, không được làm tròn thành 0 theo số lẻ của kết quả');
-  assert.match(routeSource, /function treeToggle\(k\).*entryFilter\(entryQ\);\}/, 'mở nhóm trong cây phải cập nhật tại chỗ để giữ nguyên vị trí cuộn');
-  assert.doesNotMatch(routeSource, /function treeToggle\(k\)[^\n]*rerender\(/, 'mở nhóm trong cây không được vẽ lại toàn trang');
-  assert.match(routeSource, /function entryPick\(tid,level\).*entryRenderKeepScroll\(\);\}/, 'chọn xét nghiệm chỉ được vẽ lại nội dung bên phải để cây không nhảy lên đầu');
-  assert.match(routeSource, /function toggleEntryTree\(\).*classList\.toggle\('tree-collapsed'/, 'ẩn/hiện danh mục nội kiểm phải cập nhật tại chỗ để giữ vị trí cuộn và nhóm đang mở');
+  assert.match(routeSource, /label: 'Mean thực', value: st \? deps\.fmtTestValue\(t, st\.m\)/, 'Mean thực phải dùng số thập phân của xét nghiệm');
+  assert.match(routeSource, /label: 'SD thực', value: st \? deps\.fmtTestStat\(t, st\.sd\)/, 'SD thực phải dùng số thập phân thống kê của xét nghiệm');
+  assert.match(routeSource, /label: 'Mean mục tiêu', value: deps\.fmtTestValue\(t, chartMean\)/, 'Mean mục tiêu phải dùng số thập phân của xét nghiệm');
+  assert.match(routeSource, /targetCfg = prevView \|\| deps\.pres\.entryColumnConfig\(t, x\.level, x\.lot\)/, 'Mean/SD mục tiêu phải đọc cấu hình chung đang áp dụng cho đúng mức và lô');
+  assert.match(routeSource, /label: 'SD mục tiêu', value: deps\.fmtTestStat\(t, chartSd\)/, 'SD mục tiêu phải giữ độ chính xác thống kê, không được làm tròn thành 0 theo số lẻ của kết quả');
+  {
+    const treeToggleMatch = /const treeToggle = \(k: unknown\) => \{[\s\S]*?\n  \};/.exec(routeSource);
+    assert.ok(treeToggleMatch, 'phải tìm thấy hàm treeToggle');
+    assert.match(treeToggleMatch[0], /entryFilter\(ui\(\)\.entryQ\);/, 'mở nhóm trong cây phải cập nhật tại chỗ để giữ nguyên vị trí cuộn');
+    assert.doesNotMatch(treeToggleMatch[0], /deps\.rerender\(/, 'mở nhóm trong cây không được vẽ lại toàn trang');
+  }
+  {
+    const entryPickMatch = /const entryPick = \(tid: unknown, level: unknown\) => \{[\s\S]*?\n  \};/.exec(routeSource);
+    assert.ok(entryPickMatch, 'phải tìm thấy hàm entryPick');
+    assert.match(entryPickMatch[0], /entryRenderKeepScroll\(\);/, 'chọn xét nghiệm chỉ được vẽ lại nội dung bên phải để cây không nhảy lên đầu');
+  }
+  {
+    const toggleEntryTreeMatch = /const toggleEntryTree = \(\) => \{[\s\S]*?\n  \};/.exec(routeSource);
+    assert.ok(toggleEntryTreeMatch, 'phải tìm thấy hàm toggleEntryTree');
+    assert.match(toggleEntryTreeMatch[0], /classList\.toggle\('tree-collapsed'/, 'ẩn/hiện danh mục nội kiểm phải cập nhật tại chỗ để giữ vị trí cuộn và nhóm đang mở');
+  }
   assert.match(routeSource, /qclab_entry_tree_collapsed/, 'tùy chọn ẩn danh mục nội kiểm phải được ghi nhớ riêng trên máy');
   assert.match(pointsPanelSource, /<details class="panel entry-secondary-panel qc-points-panel"/, 'bảng điểm tra cứu phải thu gọn mặc định');
   assert.doesNotMatch(routeSource, /metric\('LOT \/ Hạn dùng'/, 'dải thông số biểu đồ không lặp lại lô và hạn dùng');
   assert.match(chartSource, /class="lj-point-count">\$\{input\.pointCount\} điểm/, 'số điểm biểu đồ phải nằm cạnh mức và lô');
   assert.match(chartSource, /class="entryLJStack" data-render-scale="2"/, 'biểu đồ nhập QC phải yêu cầu canvas 2x để tránh mờ khi co giãn');
   assert.match(pointTableCardSource, /input\.previousLot \? 'Lô cũ' : 'Lô'\} \$\{input\.lot\}.*qc-table-count/, 'số điểm phải nằm cùng cụm tiêu đề với số lô');
-  assert.match(routeSource, /valueText:fmtPointValue\(p,t\)/, 'điểm trong khoảng xem phải dùng số thập phân của xét nghiệm');
+  assert.match(routeSource, /valueText: deps\.fmtPointValue\(p, t\)/, 'điểm trong khoảng xem phải dùng số thập phân của xét nghiệm');
   assert.match(pointTableRowSource, /<b>\$\{input\.valueText\}<\/b>/, 'renderer hàng điểm phải hiển thị giá trị đã định dạng');
-  assert.match(routeSource, /mean:cumulativeSt\?fmtTestValue\(t,cumulativeSt\.m\)/, 'Mean tích lũy phải dùng số thập phân của xét nghiệm');
+  assert.match(routeSource, /mean: cumulativeSt \? deps\.fmtTestValue\(t, cumulativeSt\.m\)/, 'Mean tích lũy phải dùng số thập phân của xét nghiệm');
   assert.match(cumulativeStatsSource, /Mean tích lũy<\/span><b>\$\{input\.mean\}/, 'renderer thống kê tích lũy phải hiển thị giá trị Mean đã định dạng');
   assert.match(chartSource, /class="qc-level-head" tabindex="0" data-qc-tooltip=/, 'tiêu đề mức phải có tooltip Mean\/SD dùng được bằng chuột và bàn phím');
   assert.match(routeSource, /±2SD \$\{limits\}/, 'tooltip tiêu đề mức phải có khoảng ±2SD');
@@ -51,8 +63,8 @@ const plain = v => JSON.parse(JSON.stringify(v));
   assert.match(assayDecimalOptionsSource, /\[0,1,2,3,4,5,6\]/, 'form phải cho chọn đầy đủ số thập phân từ 0 đến 6');
   assert.match(assayDecimalOptionsSource, />\$\{value\}<\/option>/, 'danh sách số thập phân chỉ được hiển thị giá trị số gọn');
   assert.doesNotMatch(assayModalSource, /Mặc định: '\+i|i\+' chữ số'/, 'ô số thập phân không được thêm chữ mô tả vào từng lựa chọn');
-  assert.match(entryActionsSource, /decimalPlaces=Number\(decimalRaw\)/, 'lựa chọn số thập phân phải được lưu tường minh bằng số');
-  assert.match(entryActionsSource, /savedTeaSource=existing&&\['lab','eflm','clia','ricos'\]\.includes\(existing\.teaSource\)/, 'sửa cấu hình xét nghiệm không được âm thầm đổi nguồn TEa đang chọn ở Sigma');
+  assert.match(entryActionsSource, /decimalPlaces = Number\(decimalRaw\)/, 'lựa chọn số thập phân phải được lưu tường minh bằng số');
+  assert.match(entryActionsSource, /savedTeaSource = existing && \['lab', 'eflm', 'clia', 'ricos'\]\.includes\(existing\.teaSource\)/, 'sửa cấu hình xét nghiệm không được âm thầm đổi nguồn TEa đang chọn ở Sigma');
   assert.match(rangeSource, /fmtTestValue\(r\.t,r\.l\.mean\)/, 'hộp dải kiểm soát phải dùng số thập phân của xét nghiệm');
   assert.match(rangeSource, /fmtTestValue\(r\.t,r\.l\.mean-2\*r\.l\.sd\)/, 'giới hạn kiểm soát phải dùng số thập phân của xét nghiệm');
 }

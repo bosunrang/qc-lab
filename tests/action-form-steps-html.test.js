@@ -4,7 +4,7 @@ const path=require('path');
 const root=path.join(__dirname,'..');
 const source=fs.readFileSync(path.join(root,'src','presentation','nce','action-form-steps-html.ts'),'utf8');
 const bridge=fs.readFileSync(path.join(root,'src','compat','modular-pilot.global.ts'),'utf8');
-const form=fs.readFileSync(path.join(root,'assets','modules','action-form.js'),'utf8');
+const form=fs.readFileSync(path.join(root,'src','presentation','actions','action-form-controller.ts'),'utf8');
 
 assert.match(source,/export function actionImmediateStepHtml/,'bước kiểm soát tức thời phải ở TypeScript');
 assert.match(source,/export function actionRiskStepHtml/,'bước đánh giá nguy cơ phải ở TypeScript');
@@ -19,9 +19,9 @@ assert.match(bridge,/actionInvestigationStepPresentation=actionInvestigationStep
 assert.match(bridge,/actionCauseStepPresentation=actionCauseStepPresentation/,'bridge phải công bố cụm khắc phục');
 assert.match(bridge,/actionPatientStepPresentation=actionPatientStepPresentation/,'bridge phải công bố bước bệnh nhân');
 assert.match(bridge,/actionEffectivenessStepPresentation=actionEffectivenessStepPresentation/,'bridge phải công bố bước hiệu lực');
-assert.match(form,/globalThis\.actionImmediateStepPresentation\(/,'form NCE phải dùng renderer kiểm soát TypeScript');
-assert.match(form,/globalThis\.actionRiskStepPresentation\(/,'form NCE phải dùng renderer nguy cơ TypeScript');
-assert.match(form,/globalThis\.actionInvestigationStepPresentation\(/,'form NCE phải dùng renderer điều tra TypeScript');
-assert.match(form,/globalThis\.actionCauseStepPresentation\(/,'form NCE phải dùng renderer khắc phục TypeScript');
-assert.match(form,/globalThis\.actionPatientStepPresentation\(/,'form NCE phải dùng renderer bệnh nhân TypeScript');
-assert.match(form,/globalThis\.actionEffectivenessStepPresentation\(/,'form NCE phải dùng renderer hiệu lực TypeScript');
+assert.match(form,/deps\.pres\.actionImmediateStepPresentation\(/,'form NCE phải dùng renderer kiểm soát TypeScript');
+assert.match(form,/deps\.pres\.actionRiskStepPresentation\(/,'form NCE phải dùng renderer nguy cơ TypeScript');
+assert.match(form,/deps\.pres\.actionInvestigationStepPresentation\(/,'form NCE phải dùng renderer điều tra TypeScript');
+assert.match(form,/deps\.pres\.actionCauseStepPresentation\(/,'form NCE phải dùng renderer khắc phục TypeScript');
+assert.match(form,/deps\.pres\.actionPatientStepPresentation\(/,'form NCE phải dùng renderer bệnh nhân TypeScript');
+assert.match(form,/deps\.pres\.actionEffectivenessStepPresentation\(/,'form NCE phải dùng renderer hiệu lực TypeScript');
