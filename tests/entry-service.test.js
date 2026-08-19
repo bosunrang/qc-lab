@@ -19,7 +19,7 @@ const plain = v => JSON.parse(JSON.stringify(v));
   const assayModalSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'manage', 'config-assay-modal-html.ts'), 'utf8');
   const assayDecimalOptionsSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'manage', 'config-assay-decimal-options-html.ts'), 'utf8');
   const drawSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'chart', 'qc-chart-renderer.ts'), 'utf8');
-  const rangeSource = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'range.js'), 'utf8');
+  const rangeSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'compat', 'modular-pilot.global.ts'), 'utf8');
   const bridgeSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'compat', 'modular-pilot.global.ts'), 'utf8');
   assert.match(routeSource, /deps\.EntryDateNoteWorkflowCommand\.save\(/, 'route phải dùng date-note workflow command');
   assert.doesNotMatch(routeSource, /deps\.EntryService\.saveDateNote\(/, 'route không được gọi mutation primitive trực tiếp');

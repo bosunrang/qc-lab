@@ -20,7 +20,7 @@ function measure(fn, repeats = 1) {
 const source = makeState(config.scenario),raw = JSON.stringify(source),shell = { ...source, data:{} },shellRaw = JSON.stringify({ format:1, slot:'a', shell });
 
 (async () => {
-const startup = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'modules/settings.js']);
+const startup = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js']);
 startup.__shellCopies = Array.from({ length:3 }, () => JSON.parse(shellRaw));
 const shellInit = measure(i => {
   startup.__candidate = startup.__shellCopies[i];
@@ -48,7 +48,7 @@ const mapLookup = measure(() => queries.forEach(value => runIndex.get(value)), 3
    gate này khóa cả tín hiệu cấu trúc (chỉ 1 partition được ghi lại, byte ghi
    nhỏ hơn nhiều ghi đầy đủ) lẫn thời gian. IndexedDB giả đếm byte qua put() để
    xấp xỉ chi phí structured-clone thật của trình duyệt. */
-const saveCtx = loadSandbox(['modules/local-store.js'], { performance });
+const saveCtx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js'], { performance });
 saveCtx.__state = source;
 const saveBench = await run(saveCtx, `
   var __records=new Map(),__hasStore=false,__putBytes=0;

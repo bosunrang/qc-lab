@@ -11,7 +11,7 @@ const dashboardRoutesSource = read('src/presentation/dashboard/dashboard-page-co
 const manageRoutesSource = read('src/presentation/manage/manage-page-controller.ts');
 const reagentClassicSource = read('src/presentation/reagent/reagent-page-controller.ts');
 const actionsRoutesSource = read('src/presentation/actions/actions-page-controller.ts');
-const backupUiSource = read('assets/modules/backup-ui.js');
+const backupUiSource = read('src/compat/modular-pilot.global.ts');
 const backupLocalMarkerSource = read('src/application/backup/backup-local-marker.ts');
 const backupInspectionSummarySource = read('src/presentation/backup/backup-inspection-summary.ts');
 const backupInspectionMessageSource = read('src/presentation/backup/backup-inspection-message.ts');
@@ -425,7 +425,7 @@ assert.doesNotMatch(backupExportMessageSource, /\bglobalThis\b|\bdocument\b/,
   'backup export message must not read browser globals');
 assert.doesNotMatch(backupImportConfirmationSource, /\bglobalThis\b|\bdocument\b/,
   'backup import confirmation must not read browser globals');
-assert.match(backupUiSource, /return globalThis\.BackupStatusCommand\.status\(/,
+assert.match(backupUiSource, /root\.backupStatusText=\(\)=>root\.BackupStatusCommand\.status\(/,
   'backup status must use the TypeScript status command');
 assert.match(dashboardRoutesSource, /deps\.dashboardHeadHtml\(deps\.stateLab\(\)\)/,
   'dashboard route must render header through TypeScript bridge');
@@ -501,19 +501,19 @@ assert.match(afterRenderControllerSource, /deps\.fillDefaultDates\(\);/,
   'after-render must fill default dates through injected dependency');
 assert.match(afterRenderControllerSource, /deps\.runPageActions\(\);/,
   'after-render must schedule page actions through injected dependency');
-assert.match(backupUiSource, /return globalThis\.BackupStatusCommand\.capacity\(\)/,
+assert.match(backupUiSource, /root\.backupCapacityText=\(\)=>root\.BackupStatusCommand\.capacity\(\)/,
   'backup capacity must use the TypeScript status command');
-assert.match(backupUiSource, /return globalThis\.BackupStatusCommand\.overdue\(/,
-  'backup overdue must use the TypeScript status command');
-assert.match(backupUiSource, /globalThis\.backupLocalMarker\.mark\(bytes\)/,
+assert.doesNotMatch(backupUiSource, /backupOverdue/,
+  'the dead backupOverdue wrapper must not be reintroduced (confirmed zero callers when backup-ui.js retired)');
+assert.match(backupUiSource, /root\.backupLocalMarker\.mark\(bytes\)/,
   'backup UI must persist marker through TypeScript bridge');
 assert.doesNotMatch(backupUiSource, /backupReminderService\.lastBackupInfo/,
   'backup UI must keep marker interpretation inside the TypeScript status command');
-assert.match(backupUiSource, /var model=globalThis\.BackupStatusCommand\.banner\(/,
+assert.match(backupUiSource, /const model=root\.BackupStatusCommand\.banner\(/,
   'backup banner must render from the TypeScript status command');
-assert.match(backupUiSource, /globalThis\.blobDownload\(name,new Blob\(\[json\],\{type:'application\/json'\}\)\)/,
+assert.match(backupUiSource, /root\.blobDownload!\(name,new Blob\(\[json\],\{type:'application\/json'\}\)\)/,
   'backup export must use TypeScript blob download bridge');
-assert.doesNotMatch(backupUiSource, /function downloadBackupText[\s\S]*URL\.createObjectURL/,
+assert.doesNotMatch(backupUiSource, /downloadBackupText=\(name,json\)=>\{[^}]*URL\.createObjectURL/,
   'backup export must not retain a classic object-URL fallback');
 assert.match(generated, /root\.backupLocalMarker\s*=\s*createBackupLocalMarker/,
   'artifact must publish TypeScript backup local marker');
@@ -589,21 +589,21 @@ assert.match(generated, /root\.backupExportMessage\s*=\s*createBackupExportMessa
   'artifact must publish TypeScript backup export message');
 assert.match(generated, /root\.backupImportConfirmation\s*=\s*createBackupImportConfirmation/,
   'artifact must publish TypeScript backup import confirmation');
-assert.match(backupUiSource, /globalThis\.backupInspectionSummary\(result\.report\)/,
+assert.match(backupUiSource, /root\.backupInspectionSummary\(result\.report\)/,
   'backup verification UI must use TypeScript inspection summary bridge');
-assert.match(backupUiSource, /globalThis\.backupInspectionMessage\.invalid\(err\)/,
+assert.match(backupUiSource, /root\.backupInspectionMessage\.invalid\(err\)/,
   'backup verification UI must use TypeScript inspection message bridge');
-assert.match(backupUiSource, /globalThis\.backupImportMessage\.success/,
+assert.match(backupUiSource, /root\.backupImportMessage\.success/,
   'backup import UI must use TypeScript success message bridge');
-assert.match(backupUiSource, /globalThis\.backupImportMessage\.invalid\(err\)/,
+assert.match(backupUiSource, /root\.backupImportMessage\.invalid\(err\)/,
   'backup import UI must use TypeScript error message bridge');
-assert.match(backupUiSource, /snapshotFailureMessage:globalThis\.backupImportMessage\.preImportSnapshotFailure/,
+assert.match(backupUiSource, /snapshotFailureMessage:root\.backupImportMessage\.preImportSnapshotFailure/,
   'backup import UI must pass the TypeScript pre-import snapshot error bridge into its command');
-assert.match(backupUiSource, /globalThis\.backupOversizeConfirmation\.exportFull\(\)/,
+assert.match(backupUiSource, /root\.backupOversizeConfirmation\.exportFull\(\)/,
   'backup export UI must use TypeScript oversize confirmation bridge');
-assert.match(backupUiSource, /globalThis\.backupOversizeConfirmation\.importFile\(f\.name\)/,
+assert.match(backupUiSource, /root\.backupOversizeConfirmation\.importFile\(f\.name\)/,
   'backup import UI must use TypeScript oversize confirmation bridge');
-assert.match(backupUiSource, /globalThis\.backupOversizeConfirmation\.inspectFile\(f\.name\)/,
+assert.match(backupUiSource, /root\.backupOversizeConfirmation\.inspectFile\(f\.name\)/,
   'backup inspect UI must use TypeScript oversize confirmation bridge');
 assert.match(generated, /root\.BackupExportCommand\s*=\s*createBackupExportCommand/,
   'artifact must publish TypeScript backup export command');
@@ -613,17 +613,15 @@ assert.match(generated, /root\.BackupInspectionCommand\s*=\s*createBackupInspect
   'artifact must publish TypeScript backup inspection command');
 assert.match(generated, /root\.BackupStatusCommand\s*=\s*createBackupStatusCommand/,
   'artifact must publish TypeScript backup status command');
-assert.match(backupUiSource, /globalThis\.BackupExportCommand\.exportFull\(globalThis\.backupFileName\(isoToday\(\)\),globalThis\.backupOversizeConfirmation\.exportFull\(\)\)/,
+assert.match(backupUiSource, /root\.BackupExportCommand\.exportFull\(root\.backupFileName\(isoToday\(\)\),root\.backupOversizeConfirmation\.exportFull\(\)\)/,
   'backup export UI must delegate the named file to the TypeScript command');
-assert.match(backupUiSource, /globalThis\.BackupExportCommand\.snapshot\(globalThis\.backupSnapshotFileName\(prefix\)\)/,
+assert.match(backupUiSource, /root\.BackupExportCommand\.snapshot\(root\.backupSnapshotFileName\(prefix\)\)/,
   'backup snapshot UI must delegate the named file to the TypeScript command');
-assert.match(backupUiSource, /const dialog=globalThis\.backupSizeConfirmation\(\{bytes:size,title,detail\}\);/,
-  'backup UI must create size confirmation through TypeScript bridge');
-assert.doesNotMatch(backupUiSource, /backupSizeWarningConfirmation/,
-  'backup UI must leave size-warning selection to the TypeScript export command');
-assert.match(backupUiSource, /globalThis\.backupExportMessage\.createError\(result\.error\)/,
+assert.match(backupUiSource, /root\.confirmOversizedBackup=async\(size,\{title,detail\}\)=>\{const dialog=root\.backupSizeConfirmation\(\{bytes:size,title,detail\}\);return dialog\?await root\.confirmDialog\(dialog\):true;\};/,
+  'backup UI must create size confirmation through TypeScript bridge, and must leave size-warning selection entirely to the TypeScript export command (this pins the whole statement, so no extra call can hide inside)');
+assert.match(backupUiSource, /root\.backupExportMessage\.createError\(result\.error\)/,
   'backup UI must render create error through TypeScript bridge');
-assert.match(backupUiSource, /confirmDialog\(globalThis\.backupImportConfirmation\(input\)\)/,
+assert.match(backupUiSource, /root\.confirmDialog\(root\.backupImportConfirmation\(input\)\)/,
   'backup UI must render import confirmation through TypeScript bridge');
 
 assert.match(index, /assets\/generated\/modular-pilot\.js\?v=[a-z0-9-]+/,
@@ -648,8 +646,8 @@ assert.doesNotMatch(index, /assets\/modules\/lis-client-service\.js/,
   'runtime không được quay lại LIS client global-scope cũ');
 assert.doesNotMatch(index, /assets\/modules\/backup-service\.js/,
   'Backup service legacy khong duoc runtime nap');
-assert.match(index, /assets\/modules\/backup-ui\.js/,
-  'Backup UI presentation phai duoc runtime nap');
+assert.doesNotMatch(index, /assets\/modules\/backup-ui\.js/,
+  'runtime không được quay lại Backup UI global-scope cũ');
 assert.doesNotMatch(index, /assets\/modules\/lis-queue-ui\.js/,
   'runtime không được quay lại LIS queue UI global-scope cũ');
 for (const name of ['analysis', 'auth', 'entry', 'manage', 'reagent', 'sigma']) {

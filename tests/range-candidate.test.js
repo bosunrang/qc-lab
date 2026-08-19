@@ -1,11 +1,12 @@
 /**
- * Tests for rangeCandidate() (assets/modules/range.js).
+ * Tests for rangeCandidate() (root.rangeCandidate in src/compat/modular-pilot.global.ts,
+ * retired from classic assets/modules/range.js on 2026-08-19).
  *
  * Đây là phép tính LÂM SÀNG đứng sau nút "Áp dụng dải PXN": nó chốt các cổng chấp
  * nhận (≥20 kết quả, ≥20 ngày độc lập, 0 điểm bị loại, 0 điểm cảnh báo, SD>0) và
  * tính Mean/SD đề xuất sẽ được ghi đè lên dải kiểm soát của lô. Từ lúc dải mới được
  * áp dụng, MỌI đánh giá Westgard về sau đo theo Mean/SD này — sai ở đây là sai toàn
- * bộ nội kiểm của lô đó, nên nó phải có test riêng dù phần còn lại của range.js là
+ * bộ nội kiểm của lô đó, nên nó phải có test riêng dù phần còn lại của luồng dải QC là
  * DOM thuần không chạy được trong sandbox.
  *
  * Hợp đồng quan trọng nhất: Mean/SD tính từ TOÀN BỘ điểm của lô đang vận hành,
@@ -16,19 +17,19 @@
 const assert = require('node:assert/strict');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
-const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js', 'modules/state.js', 'modules/qc-domain.js', 'modules/action-workflow-service.js', 'modules/range.js']);
+const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js', 'modules/state.js', 'modules/qc-domain.js', 'modules/action-workflow-service.js']);
 const fs = require('node:fs');
 const path = require('node:path');
-const rangeSource = fs.readFileSync(path.join(__dirname, '..', 'assets', 'modules', 'range.js'), 'utf8');
+const rangeSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'compat', 'modular-pilot.global.ts'), 'utf8');
 const rangeWorkflowSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'range', 'range-workflow-modal-html.ts'), 'utf8');
 const entryCss = fs.readFileSync(path.join(__dirname, '..', 'assets', 'professional-entry.css'), 'utf8');
-assert.match(rangeSource, /globalThis\.rangeWorkflowModalHtml\(/, 'popup dải QC phải dùng renderer TypeScript');
-assert.match(rangeSource, /globalThis\.rangeApplyConfirmationModalHtml\(/, 'xác nhận áp dụng dải QC phải dùng renderer TypeScript');
-assert.match(rangeSource, /globalThis\.rangeRevertConfirmationModalHtml\(/, 'xác nhận hoàn dải QC phải dùng renderer TypeScript');
-assert.match(rangeSource, /globalThis\.rangeSafetyGateHtml\(/, 'cổng an toàn dải QC phải dùng renderer TypeScript');
-assert.match(rangeSource, /globalThis\.rangeWorkflowChecklistRowsHtml\(/, 'hàng checklist dải QC phải dùng renderer TypeScript');
-assert.match(rangeSource, /globalThis\.rangeNceNoticeHtml\(/, 'cảnh báo NCE dải QC phải dùng renderer TypeScript');
-assert.match(rangeSource, /globalThis\.rangeWorkflowComparisonRowsHtml\(/, 'hàng so sánh dải QC phải dùng renderer TypeScript');
+assert.match(rangeSource, /root\.rangeWorkflowModalHtml\(/, 'popup dải QC phải dùng renderer TypeScript');
+assert.match(rangeSource, /root\.rangeApplyConfirmationModalHtml\(/, 'xác nhận áp dụng dải QC phải dùng renderer TypeScript');
+assert.match(rangeSource, /root\.rangeRevertConfirmationModalHtml\(/, 'xác nhận hoàn dải QC phải dùng renderer TypeScript');
+assert.match(rangeSource, /root\.rangeSafetyGateHtml\(/, 'cổng an toàn dải QC phải dùng renderer TypeScript');
+assert.match(rangeSource, /root\.rangeWorkflowChecklistRowsHtml\(/, 'hàng checklist dải QC phải dùng renderer TypeScript');
+assert.match(rangeSource, /root\.rangeNceNoticeHtml\(/, 'cảnh báo NCE dải QC phải dùng renderer TypeScript');
+assert.match(rangeSource, /root\.rangeWorkflowComparisonRowsHtml\(/, 'hàng so sánh dải QC phải dùng renderer TypeScript');
 assert.match(rangeWorkflowSource, /class="range-workflow-checklist"/, 'popup dải QC phải dùng bảng checklist có bố cục cột riêng');
 assert.match(entryCss, /\.range-workflow-checklist th:nth-child\(2\),\.range-workflow-checklist td:nth-child\(2\),\.range-workflow-checklist th:nth-child\(4\),\.range-workflow-checklist td:nth-child\(4\)\{text-align:center\}/, 'cột Hiện tại và Kết quả phải căn giữa cả tiêu đề lẫn nội dung');
 assert.match(entryCss, /\.range-workflow-checklist th:nth-child\(3\),\.range-workflow-checklist td:nth-child\(3\)\{text-align:left\}/, 'cột Chuẩn kiểm tra phải căn trái cả tiêu đề lẫn nội dung');
@@ -178,8 +179,8 @@ function candidate(points) {
 }
 
 /* --- r.nce: dấu hiệu "đang có hồ sơ NCE hệ thống" cho đúng test/mức, dùng để bật
-   khối xác nhận 2 điều kiện trước khi áp dụng dải mới (range.js: rangeGateHtml/
-   rangeGatePasses). Không ảnh hưởng tới các cổng eligible đã có ở trên. */
+   khối xác nhận 2 điều kiện trước khi áp dụng dải mới (root.rangeGateHtml/
+   root.rangeGatePasses). Không ảnh hưởng tới các cổng eligible đã có ở trên. */
 {
   const s = baseState(cleanPoints(20));
   s.actions = [{ id: 'a1', nceId: 'NCE-001', date: '2026-01-05', testId: 'T1', level: 1, rule: '8x', recordStatus: 'active', cause: 'Đổi lô hóa chất' }];

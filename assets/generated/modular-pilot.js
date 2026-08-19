@@ -26198,6 +26198,25 @@
 	//#endregion
 	//#region src/compat/modular-pilot.global.ts
 	var root = globalThis;
+	root.QCLAB_APP = {
+		name: "QC Lab",
+		version: "2.7.6",
+		releaseDate: "2026-08-06"
+	};
+	root.QCLAB_CLOUD = root.QCLAB_CLOUD || {
+		labCode: "khoaXN",
+		anonymous: false,
+		locked: false,
+		config: {
+			apiKey: "AIzaSyBJvYHn1h8smBgP0WUXO2ZNppgFmt2Blus",
+			authDomain: "qclab1102.firebaseapp.com",
+			databaseURL: "https://qclab1102-default-rtdb.asia-southeast1.firebasedatabase.app",
+			projectId: "qclab1102",
+			storageBucket: "qclab1102.firebasestorage.app",
+			messagingSenderId: "389167813426",
+			appId: "1:389167813426:web:ebaea398d7b5d547477d2b"
+		}
+	};
 	if (!root.QCCore || typeof root.QCCore.stats !== "function" || typeof root.QCCore.cleanText !== "function" || typeof root.QCCore.cleanId !== "function" || typeof root.QCCore.targetFromLimits !== "function" || typeof root.QCCore.limitsFromTarget !== "function" || typeof root.QCCore.systematicShiftCritical !== "function") throw new Error("QCCore phải được nạp đủ dependency trước các module TypeScript");
 	var loginLockout = null;
 	try {
@@ -26393,7 +26412,7 @@
 			lsDirty = true;
 			scheduleLocalSave();
 		},
-		writePartitioned: (value, slot, dirtyTestIds) => partitionWrite.catch(() => false).then(() => LocalStore.writePartitioned(value, slot, { dirtyTestIds })),
+		writePartitioned: (value, slot, dirtyTestIds) => partitionWrite.catch(() => false).then(() => root.localStoreService.writePartitioned(value, slot, { dirtyTestIds })),
 		setPending: (pending) => {
 			partitionWrite = pending;
 		},
@@ -26433,7 +26452,7 @@
 			lsDirty = false;
 		},
 		draftStamp: () => sigmaDraftStamp(),
-		usePartitioned: () => typeof LocalStore !== "undefined" && LocalStore.supported() && typeof LocalStore.writePartitioned === "function",
+		usePartitioned: () => typeof root.localStoreService !== "undefined" && root.localStoreService.supported() && typeof root.localStoreService.writePartitioned === "function",
 		writePartitioned: (input) => modularPartitionedSnapshotWriter.write({
 			state,
 			slot: partitionSlot,
@@ -26982,8 +27001,8 @@
 	root.clearFb = settingsPageController.clearFb;
 	root.copyFirebaseRules = settingsPageController.copyFirebaseRules;
 	root.pageSettings = settingsPageController.pageSettings;
-	var modularIndexedDbOpenService = typeof LocalStore !== "undefined" ? createIndexedDbOpenService({ indexedDb: () => typeof indexedDB === "undefined" ? null : indexedDB }) : null;
-	var modularIndexedDbRecordService = modularIndexedDbOpenService ? createIndexedDbRecordService({ open: () => modularIndexedDbOpenService.open() }) : null;
+	var modularIndexedDbOpenService = createIndexedDbOpenService({ indexedDb: () => typeof indexedDB === "undefined" ? null : indexedDB });
+	var modularIndexedDbRecordService = createIndexedDbRecordService({ open: () => modularIndexedDbOpenService.open() });
 	root.partitionedIndexedDbWriteService = createPartitionedIndexedDbWriteService({
 		supported: () => typeof indexedDB !== "undefined",
 		key: (slot, type, id) => modularLocalPartitionHelpers.key(slot, type, id),
@@ -27003,14 +27022,23 @@
 	});
 	root.localStoreService = createLocalStoreService({
 		indexedDbAvailable: () => typeof indexedDB !== "undefined",
-		get: (key) => modularIndexedDbRecordService ? modularIndexedDbRecordService.get(key) : Promise.resolve(null),
-		put: (record) => modularIndexedDbRecordService ? modularIndexedDbRecordService.put(record) : Promise.resolve(false),
-		remove: (key) => modularIndexedDbRecordService ? modularIndexedDbRecordService.delete(key) : Promise.resolve(false),
+		get: (key) => modularIndexedDbRecordService.get(key),
+		put: (record) => modularIndexedDbRecordService.put(record),
+		remove: (key) => modularIndexedDbRecordService.delete(key),
 		stateRecord: (value) => modularLocalSnapshotRecord.state(value),
 		serializedRecord: (value) => modularLocalSnapshotRecord.serialized(value),
 		writePartitioned: (input) => root.partitionedIndexedDbWriteService.write(input),
 		readPartitioned: (slot, get) => root.partitionedIndexedDbReadService.read(slot, get),
 		clear: (get, remove) => modularIndexedDbClearService.clear(get, remove)
+	});
+	root.LocalStore = Object.freeze({
+		supported: () => root.localStoreService.supported(),
+		read: () => root.localStoreService.read(),
+		write: (value) => root.localStoreService.write(value),
+		writeSerialized: (value) => root.localStoreService.writeSerialized(value),
+		writePartitioned: (value, slot, options) => root.localStoreService.writePartitioned(value, slot, options),
+		readPartitioned: (slot) => root.localStoreService.readPartitioned(slot),
+		clear: () => root.localStoreService.clear()
 	});
 	root.passwordPolicyError = passwordPolicyError;
 	root.passwordChangeError = passwordChangeError;
@@ -27062,7 +27090,7 @@
 	root.reagentResultHtml = createReagentResultHtml();
 	root.reagentPairRowHtml = createReagentPairRowHtml();
 	var modularStorageBootService = createStorageBootService({
-		partitionedSupported: () => typeof LocalStore !== "undefined" && LocalStore.supported(),
+		partitionedSupported: () => typeof root.localStoreService !== "undefined" && root.localStoreService.supported(),
 		readBootRecord: () => localStorage.getItem("qclab_boot"),
 		discardBootRecord: () => localStorage.removeItem("qclab_boot"),
 		activatePartitionShell: (shell, slot) => {
@@ -27077,9 +27105,9 @@
 		restoreFromIndexedDb: () => globalThis.restoreFromIndexedDb()
 	});
 	var modularIndexedDbRecoveryService = createIndexedDbRecoveryService({
-		supported: () => typeof LocalStore !== "undefined" && LocalStore.supported(),
-		readPartitioned: () => typeof LocalStore.readPartitioned === "function" ? LocalStore.readPartitioned() : Promise.resolve(null),
-		readLegacy: () => LocalStore.read(),
+		supported: () => typeof root.localStoreService !== "undefined" && root.localStoreService.supported(),
+		readPartitioned: () => typeof root.localStoreService.readPartitioned === "function" ? root.localStoreService.readPartitioned() : Promise.resolve(null),
+		readLegacy: () => root.localStoreService.read(),
 		adopt: (value) => globalThis.adoptValidatedState(value),
 		acceptPartitioned: (record) => {
 			mem = state;
@@ -27116,7 +27144,7 @@
 		}
 	});
 	var modularPartitionHydrationService = createPartitionHydrationService({
-		read: () => LocalStore.readPartitioned(),
+		read: () => root.localStoreService.readPartitioned(),
 		adopt: (value) => globalThis.adoptValidatedState(value),
 		recoverPendingSigmaDraft: () => globalThis.recoverPendingSigmaDraft(),
 		accept: (record) => {
@@ -27147,9 +27175,9 @@
 		restore: () => modularIndexedDbRecoveryService.restore()
 	});
 	root.indexedDbMirrorService = createIndexedDbMirrorService({
-		supported: () => typeof LocalStore !== "undefined" && LocalStore.supported(),
-		writeSerialized: (raw) => typeof LocalStore.writeSerialized === "function" ? LocalStore.writeSerialized(raw) : null,
-		writeState: (value) => LocalStore.write(value),
+		supported: () => typeof root.localStoreService !== "undefined" && root.localStoreService.supported(),
+		writeSerialized: (raw) => typeof root.localStoreService.writeSerialized === "function" ? root.localStoreService.writeSerialized(raw) : null,
+		writeState: (value) => root.localStoreService.write(value),
 		failed: () => {
 			lsDirty = true;
 			lsSaveFailures++;
@@ -29024,6 +29052,230 @@
 		saveState: (options) => save(options),
 		render: () => rerender()
 	});
+	root.rangeSystematicNce = (tid, level) => root.qcRangeCandidateService.systematicNce(tid, level);
+	root.rangeCandidate = (tid, level) => root.qcRangeCandidateService.candidate(tid, level);
+	root.openRangeWorkflow = (tid, level) => {
+		const r = root.rangeCandidate(tid, level);
+		if (!r.t || !r.l) return;
+		const rows = [
+			[
+				"Tổng số kết quả",
+				r.c ? r.c.n : 0,
+				"≥20",
+				r.c && r.c.n >= 20
+			],
+			[
+				"Số ngày độc lập",
+				r.days,
+				"≥20 ngày",
+				r.days >= 20
+			],
+			[
+				"Điểm bị loại Westgard",
+				r.bad,
+				"Phải bằng 0; không tự loại điểm để làm đẹp SD",
+				r.bad === 0
+			],
+			[
+				"Điểm cảnh báo",
+				r.warn,
+				"Phải bằng 0 trước khi phê duyệt dải",
+				r.warn === 0
+			],
+			[
+				"SD đề xuất hợp lệ",
+				r.c ? root.fmtTestValue(r.t, r.c.sd) : "—",
+				">0",
+				r.c && r.c.sd > 0
+			]
+		];
+		const checklist = root.rangeWorkflowChecklistRowsHtml(rows.map((x) => ({
+			condition: x[0],
+			current: x[1],
+			requirement: x[2],
+			passed: x[3]
+		})));
+		const c = r.c;
+		const nceNotice = r.nce ? root.rangeNceNoticeHtml({
+			nceId: root.esc(r.nce.nceId || "NCE"),
+			rule: root.esc(r.nce.rule || ""),
+			cause: root.esc((r.nce.cause || "").slice(0, 200))
+		}) : "";
+		const contextHtml = `<b>${root.esc(root.testDisplayName(r.t))}</b> · Mức ${level} · Lô ${root.esc(r.l.lot || "?")} · ${root.esc(r.t.machine || "")}`, comparisonRowsHtml = root.rangeWorkflowComparisonRowsHtml({
+			label: `Đang dùng (${r.l.applied === "lab" ? "PXN" : "NSX"})`,
+			mean: root.fmtTestValue(r.t, r.l.mean),
+			sd: root.fmtTestValue(r.t, r.l.sd),
+			cv: fmt(r.l.mean ? r.l.sd / Math.abs(r.l.mean) * 100 : 0),
+			limits: `${root.fmtTestValue(r.t, r.l.mean - 2 * r.l.sd)} – ${root.fmtTestValue(r.t, r.l.mean + 2 * r.l.sd)}`
+		}, c ? {
+			label: "Đề xuất PXN",
+			mean: root.fmtTestValue(r.t, c.m),
+			sd: root.fmtTestValue(r.t, c.sd),
+			cv: fmt(c.cv),
+			limits: `${root.fmtTestValue(r.t, c.m - 2 * c.sd)} – ${root.fmtTestValue(r.t, c.m + 2 * c.sd)}`,
+			proposed: true
+		} : null);
+		root.openModal(root.rangeWorkflowModalHtml({
+			contextHtml,
+			nceNoticeHtml: nceNotice,
+			checklistRowsHtml: checklist,
+			currentRangeRowHtml: comparisonRowsHtml,
+			proposedRangeRowHtml: "",
+			printButtonHtml: root.btn("In biểu mẫu", `printRangeForm('${tid}',${level})`, "ghost"),
+			applyButtonHtml: root.canWrite() ? root.btn("Áp dụng dải PXN", `closeModal();applyNewRange('${tid}',${level})`, "teal", "", { disabled: !r.eligible }) : "",
+			closeButtonHtml: root.btn("Đóng", "closeModal()", "ghost")
+		}));
+	};
+	root.rangeTeaPercent = (t, l) => root.qcRangeTea.percent(t, l);
+	root.rangeGateHtml = (r, tid, level) => {
+		if (!r.nce) return "";
+		const tea = root.rangeTeaPercent(r.t, r.l), threshold = root.qcRangeTea.quarter(tea);
+		return root.rangeSafetyGateHtml({
+			nceId: root.esc(r.nce.nceId || "NCE"),
+			rule: root.esc(r.nce.rule || ""),
+			biasInputAction: `rangeUpdateBiasHint('${tid}',${level})`,
+			thresholdText: threshold != null ? fmt(threshold) + "%" : "—",
+			noTeaHint: tea ? "" : "Chưa có TEa% cho xét nghiệm này — vào Cấu hình Sigma để bổ sung, hoặc vẫn có thể xác nhận thủ công nếu ngưỡng đã biết theo cách khác."
+		});
+	};
+	root.rangeUpdateBiasHint = (tid, level) => {
+		const r = root.rangeCandidate(tid, level), biasEl = document.getElementById("rangeBiasInput"), hint = document.getElementById("rangeBiasHint");
+		if (!r.nce || !biasEl || !hint) return;
+		const bias = parseFloat(String(biasEl.value).replace(",", ".")), tea = root.rangeTeaPercent(r.t, r.l);
+		if (!tea) {
+			hint.textContent = "Chưa có TEa% cho xét nghiệm này — vào Cấu hình Sigma để bổ sung.";
+			return;
+		}
+		if (!Number.isFinite(bias)) {
+			hint.textContent = "";
+			return;
+		}
+		const result = root.qcRangeBiasEvaluation(tea, bias, r.l.sd, root.QCCore.systematicShiftCritical);
+		hint.innerHTML = `${result.withinThreshold ? "✔ Đạt" : "✘ Vượt"} ngưỡng: |Bias| ${fmt(Math.abs(bias))}% so với ${fmt(result.threshold)}%.` + (result.critical ? ` <span style="color:var(--muted)">Tham khảo (không phải kết luận chính thức): ΔSEcrit ${fmt(result.critical.dSEcrit)} · ΔREcrit ${fmt(result.critical.dREcrit)}.</span>` : "");
+	};
+	root.rangeGatePasses = (r) => {
+		if (!r.nce) return true;
+		const causeEl = document.getElementById("rangeCauseConfirm"), biasEl = document.getElementById("rangeBiasInput"), bias = parseFloat(String(biasEl ? biasEl.value : "").replace(",", ".")), tea = root.rangeTeaPercent(r.t, r.l);
+		return root.qcRangeSafetyGate(r.nce, tea, !!(causeEl && causeEl.checked), bias).passes;
+	};
+	root.applyNewRange = async (tid, level) => {
+		if (!requireWrite()) return;
+		const r = root.rangeCandidate(tid, level), { t, l, c, days, bad, warn, eligible } = r;
+		if (!eligible) {
+			await root.infoDialog(`Chưa đủ điều kiện: cần ≥20 kết quả trên ≥20 ngày, không có điểm vi phạm/cảnh báo chưa xử lý và SD >0.\nHiện tại: n=${c ? c.n : 0}, ngày=${days}, điểm loại=${bad}, điểm cảnh báo=${warn}.`);
+			return;
+		}
+		root.openModal(root.rangeApplyConfirmationModalHtml({
+			changeSummaryHtml: `X̄: ${root.fmtTestValue(t, l.mean)} → ${root.fmtTestValue(t, c.m)}<br>SD: ${root.fmtTestStat(t, l.sd)} → ${root.fmtTestStat(t, c.sd)}<br>Dải nhà sản xuất vẫn được lưu để hoàn về.`,
+			gateHtml: root.rangeGateHtml(r, tid, level),
+			cancelButtonHtml: root.btn("Hủy", "closeModal()", "ghost"),
+			applyButtonHtml: root.btn("Áp dụng", `confirmApplyNewRange('${tid}',${level})`, "teal")
+		}));
+		setTimeout(() => {
+			const e = document.getElementById("rangeReasonInput");
+			if (e) e.focus();
+		}, 50);
+	};
+	root.confirmApplyNewRange = async (tid, level) => {
+		const r = root.rangeCandidate(tid, level), { t, l, c, days, nce } = r;
+		if (!root.rangeGatePasses(r)) {
+			const err = document.getElementById("rangeGateErr");
+			if (err) err.style.display = "";
+			return;
+		}
+		const input = document.getElementById("rangeReasonInput");
+		const reason = root.QCCore.cleanText(input ? input.value : "", 1e3).trim();
+		if (reason.length < 10) {
+			const err = document.getElementById("rangeReasonErr");
+			if (err) err.style.display = "";
+			return;
+		}
+		root.closeModal();
+		if (!await root.reauthenticateCurrentUser({
+			title: "Xác thực thay đổi dải QC",
+			message: "Nhập lại mật khẩu trước khi áp dụng Mean/SD của phòng xét nghiệm."
+		})) return;
+		const oldM = l.mean, oldSd = l.sd;
+		const gateNote = nce ? ` Điều kiện dịch chuyển hệ thống: đã xác nhận nguyên nhân theo hồ sơ NCE ${nce.nceId || nce.id}, Bias đo lại trong ngưỡng cho phép (≤ TEa/4).` : "";
+		const detail = `M${level}: Mean ${root.fmtTestValue(t, oldM)}→${root.fmtTestValue(t, c.m)}, SD ${root.fmtTestStat(t, oldSd)}→${root.fmtTestStat(t, c.sd)}`;
+		const actionText = `Áp dụng dải PXN: Mean ${root.fmtTestValue(t, oldM)}→${root.fmtTestValue(t, c.m)}, SD ${root.fmtTestStat(t, oldSd)}→${root.fmtTestStat(t, c.sd)}, n=${c.n}, ${days} ngày. Phê duyệt: ${reason}${gateNote}`;
+		const result = root.RangeWorkflowCommand.applyLab({
+			level: l,
+			testId: tid,
+			levelNo: level,
+			lot: l.lot || "",
+			testName: t ? t.name : "",
+			mean: c.m,
+			sd: c.sd,
+			cv: c.cv,
+			reason,
+			gateNote,
+			detail,
+			actionText,
+			historyId: uid(),
+			actionId: uid(),
+			today: isoToday(),
+			createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+			userId: currentUser && currentUser.id || "",
+			username: currentUser && currentUser.username || "",
+			userName: currentUser ? currentUser.name || currentUser.username : ""
+		});
+		if (!result.ok) {
+			await root.infoDialog(result.message);
+			return;
+		}
+	};
+	root.revertRange = (tid, level) => {
+		if (!requireWrite()) return;
+		root.openModal(root.rangeRevertConfirmationModalHtml({
+			cancelButtonHtml: root.btn("Hủy", "closeModal()", "ghost"),
+			revertButtonHtml: root.btn("Hoàn về dải NSX", `confirmRevertRange('${tid}',${level})`, "danger")
+		}));
+		setTimeout(() => {
+			const e = document.getElementById("rangeReasonInput");
+			if (e) e.focus();
+		}, 50);
+	};
+	root.confirmRevertRange = async (tid, level) => {
+		const t = state.tests.find((x) => x.id === tid);
+		const l = lvlCfg(t, level);
+		const input = document.getElementById("rangeReasonInput");
+		const reason = root.QCCore.cleanText(input ? input.value : "", 1e3).trim();
+		if (reason.length < 5) {
+			const err = document.getElementById("rangeReasonErr");
+			if (err) err.style.display = "";
+			return;
+		}
+		root.closeModal();
+		if (!await root.reauthenticateCurrentUser({
+			title: "Xác thực hoàn dải QC",
+			message: "Nhập lại mật khẩu trước khi hoàn về Mean/SD nhà sản xuất."
+		})) return;
+		const oldM = l.mean, oldSd = l.sd;
+		const detail = `M${level}: Mean ${root.fmtTestValue(t, oldM)}→${root.fmtTestValue(t, l.mfgMean)}, SD ${root.fmtTestValue(t, oldSd)}→${root.fmtTestValue(t, l.mfgSd)} · ${reason}`;
+		const actionText = `Hoàn về dải NSX: Mean ${root.fmtTestValue(t, oldM)}→${root.fmtTestValue(t, l.mfgMean)}, SD ${root.fmtTestValue(t, oldSd)}→${root.fmtTestValue(t, l.mfgSd)}. Lý do: ${reason}`;
+		const result = root.RangeWorkflowCommand.revertMfg({
+			level: l,
+			testId: tid,
+			levelNo: level,
+			lot: l.lot || "",
+			testName: t ? t.name : "",
+			reason,
+			detail,
+			actionText,
+			historyId: uid(),
+			actionId: uid(),
+			today: isoToday(),
+			createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+			userId: currentUser && currentUser.id || "",
+			username: currentUser && currentUser.username || "",
+			userName: currentUser ? currentUser.name || currentUser.username : ""
+		});
+		if (!result.ok) {
+			await root.infoDialog(result.message);
+			return;
+		}
+	};
 	var backupTextBytes = (text) => {
 		if (typeof Blob !== "undefined") return new Blob([text]).size;
 		if (typeof TextEncoder !== "undefined") return new TextEncoder().encode(text).length;
@@ -29107,13 +29359,106 @@
 		size: (bytes) => backupService.backupSizeMB(bytes),
 		warning: (bytes) => backupService.backupSizeWarning(bytes)
 	});
+	root.confirmOversizedBackup = async (size, { title, detail }) => {
+		const dialog = root.backupSizeConfirmation({
+			bytes: size,
+			title,
+			detail
+		});
+		return dialog ? await root.confirmDialog(dialog) : true;
+	};
+	root.exportData = async () => {
+		const result = await root.BackupExportCommand.exportFull(root.backupFileName(isoToday()), root.backupOversizeConfirmation.exportFull());
+		if (result.status === "create-error") {
+			await root.infoDialog(root.backupExportMessage.createError(result.error));
+			return;
+		}
+		if (result.status === "download-error") await root.infoDialog(root.backupExportMessage.downloadError);
+	};
+	root.downloadBackupText = (name, json) => {
+		try {
+			root.blobDownload(name, new Blob([json], { type: "application/json" }));
+			return true;
+		} catch (e) {
+			return false;
+		}
+	};
+	root.backupCurrentData = (prefix = "before-change") => root.BackupExportCommand.snapshot(root.backupSnapshotFileName(prefix));
+	root.importData = async (e) => {
+		if (!root.requireAdmin("Chỉ quản trị mới được nhập backup.")) {
+			if (e && e.target) e.target.value = "";
+			return;
+		}
+		const f = e.target.files[0];
+		if (!f) return;
+		try {
+			if ((await root.BackupImportCommand.importFile({
+				fileName: f.name,
+				size: f.size,
+				text: await f.text(),
+				oldActivity: [...state.activity || []],
+				confirmOversized: () => root.confirmOversizedBackup(f.size, root.backupOversizeConfirmation.importFile(f.name)),
+				confirmImport: (input) => root.confirmDialog(root.backupImportConfirmation(input)),
+				reauthenticate: () => root.reauthenticateCurrentUser({
+					title: "Xác thực nhập backup",
+					message: "Nhập lại mật khẩu trước khi thay thế dữ liệu nghiệp vụ hiện tại."
+				}),
+				snapshotFailureMessage: root.backupImportMessage.preImportSnapshotFailure
+			})).status === "imported") await root.infoDialog(root.backupImportMessage.success, { type: "success" });
+		} catch (err) {
+			await root.infoDialog(root.backupImportMessage.invalid(err));
+		} finally {
+			if (e && e.target) e.target.value = "";
+		}
+	};
+	root.verifyBackupFile = async (e) => {
+		if (!root.requireAdmin("Chỉ quản trị mới được kiểm tra file backup.")) {
+			if (e && e.target) e.target.value = "";
+			return;
+		}
+		const f = e && e.target && e.target.files && e.target.files[0];
+		if (!f) return;
+		try {
+			const result = await root.BackupInspectionCommand.inspectFile({
+				text: await f.text(),
+				size: f.size,
+				confirmOversized: () => root.confirmOversizedBackup(f.size, root.backupOversizeConfirmation.inspectFile(f.name))
+			});
+			if (result.status === "inspected") await root.infoDialog(root.backupInspectionSummary(result.report), { type: "success" });
+		} catch (err) {
+			await root.infoDialog(root.backupInspectionMessage.invalid(err));
+		} finally {
+			if (e && e.target) e.target.value = "";
+		}
+	};
+	var BACKUP_REMIND_DAYS = 7;
+	root.markBackupDone = (bytes) => {
+		root.backupLocalMarker.mark(bytes);
+	};
+	root.backupStatusText = () => root.BackupStatusCommand.status(typeof fb !== "undefined" && fb && fb.ready);
+	root.backupCapacityText = () => root.BackupStatusCommand.capacity();
+	root.updateBackupBanner = () => {
+		const dot = document.getElementById("backupDot");
+		if (!dot) return;
+		const model = root.BackupStatusCommand.banner({
+			cloudReady: typeof fb !== "undefined" && fb && fb.ready,
+			user: typeof currentUser === "undefined" ? null : currentUser,
+			days: BACKUP_REMIND_DAYS
+		});
+		dot.hidden = model.hidden;
+		if (!model.hidden) {
+			dot.className = model.className;
+			dot.textContent = model.text;
+			dot.title = model.title;
+		}
+	};
 	root.ResetOperationalDataCommand = createResetOperationalDataCommand({
 		current: () => state,
 		clearPersistence: () => {
 			localStorage.removeItem("qclab");
 			localStorage.removeItem("qclab_boot");
 			if (typeof clearSigmaDraftThrough === "function") clearSigmaDraftThrough(Number.MAX_SAFE_INTEGER);
-			if (typeof LocalStore !== "undefined") LocalStore.clear().catch(() => {});
+			if (typeof root.localStoreService !== "undefined") root.localStoreService.clear().catch(() => {});
 		},
 		blank: (users) => root.blankAppStateFactory(users),
 		replace: (value) => {

@@ -32,6 +32,7 @@ declare function closeDialogOverlay(result?: any): void;
 declare function pageDash(): string;
 declare function dashTestFilter(value: string): void;
 declare function ensureLabBrandShape(): void;
+declare function backupCurrentData(prefix?: string): Promise<boolean>;
 declare function reportExportSelection(): { tid: string; t: any; start: string; end: string; includeNceAppendix: boolean };
 declare function reportRangeText(start: string, end: string): string;
 declare function wgMultiViews(test: any): any[];

@@ -797,7 +797,6 @@ declare function adoptValidatedState(value: unknown): void;
 declare function recoverPendingSigmaDraft(): boolean;
 declare function ensureShape(options?: Record<string, any>): void;
 declare function quarantineCorruptLocal(raw: string, error: unknown): void;
-declare const LocalStore: { supported: () => boolean };
 declare let partitionSlot: string, localLoadStatus: string, storageHydrationPromise: Promise<boolean>;
 declare let mem: any, startupProblem: any;
 declare let wgMemo: Map<string, any>;
@@ -882,7 +881,8 @@ declare function teaAnalyteKey(value: unknown): string;
 declare function role(): string;
 
 type QCLabGlobal = typeof globalThis & {
-  QCLAB_APP?: { version?: string };
+  QCLAB_APP: { name: string; version: string; releaseDate: string };
+  QCLAB_CLOUD: { labCode: string; anonymous: boolean; locked: boolean; config: Record<string, string> };
   NceActionLabels?: NceActionLabels;
   NceActionBasics?: NceActionBasics;
   NceActionIdentityService?: NceActionIdentityService;
@@ -926,6 +926,17 @@ type QCLabGlobal = typeof globalThis & {
   EntryVoidWorkflowCommand: EntryVoidWorkflowCommand;
   EntryDateNoteWorkflowCommand: EntryDateNoteWorkflowCommand;
   RangeWorkflowCommand: RangeWorkflowCommand;
+  rangeSystematicNce: (tid: string, level: unknown) => any;
+  rangeCandidate: (tid: string, level: unknown) => any;
+  openRangeWorkflow: (tid: string, level: unknown) => void;
+  rangeTeaPercent: (t: any, l: any) => number | null;
+  rangeGateHtml: (r: any, tid: string, level: unknown) => string;
+  rangeUpdateBiasHint: (tid: string, level: unknown) => void;
+  rangeGatePasses: (r: any) => boolean;
+  applyNewRange: (tid: string, level: unknown) => Promise<void>;
+  confirmApplyNewRange: (tid: string, level: unknown) => Promise<void>;
+  revertRange: (tid: string, level: unknown) => void;
+  confirmRevertRange: (tid: string, level: unknown) => Promise<void>;
   ReagentComparisonWorkflowCommand: ReagentComparisonWorkflowCommand;
   ManageConfigService: ManageConfigServiceApi;
   ManageInstrumentWorkflowCommand: ManageInstrumentWorkflowCommand;
@@ -1413,6 +1424,7 @@ type QCLabGlobal = typeof globalThis & {
   indexedDbMirrorService?: ReturnType<typeof createIndexedDbMirrorService>;
   saveService?: ReturnType<typeof createSaveService>;
   localStoreService?: LocalStoreApi;
+  LocalStore?: LocalStoreApi;
   storageSnapshotService?: StorageSnapshotService;
   storageLifecycleService?: StorageLifecycleApi;
   firebaseLocalStoreService?: ReturnType<typeof createFirebaseLocalStoreService>;
@@ -1456,6 +1468,16 @@ type QCLabGlobal = typeof globalThis & {
   BackupImportCommand: BackupImportCommand;
   BackupInspectionCommand: BackupInspectionCommand;
   BackupStatusCommand: BackupStatusCommand;
+  confirmOversizedBackup: (size: number, opts: {title: string; detail: any}) => Promise<boolean>;
+  exportData: () => Promise<void>;
+  downloadBackupText: (name: string, json: string) => boolean;
+  backupCurrentData: (prefix?: string) => Promise<boolean>;
+  importData: (e: any) => Promise<void>;
+  verifyBackupFile: (e: any) => Promise<void>;
+  markBackupDone: (bytes: number) => void;
+  backupStatusText: () => string;
+  backupCapacityText: () => string;
+  updateBackupBanner: () => void;
   ResetOperationalDataCommand: ResetOperationalDataCommand;
    LoginWorkflowCommand: LoginWorkflowCommand;
    RequiredPasswordWorkflowCommand: RequiredPasswordWorkflowCommand;
@@ -2112,6 +2134,29 @@ type QCLabGlobal = typeof globalThis & {
 };
 
 const root = globalThis as QCLabGlobal;
+root.QCLAB_APP = { name: 'QC Lab', version: '2.7.6', releaseDate: '2026-08-06' };
+/* Cấu hình đám mây khi deploy (tùy chọn). BẢO MẬT: KHÔNG bật anonymous cho dữ
+   liệu thật. Với anonymous:false, mỗi máy chỉ tự nạp sẵn config; người dùng vẫn
+   phải đăng nhập email/mật khẩu Firebase một lần trong "Cài đặt & Đám mây"
+   (phiên được nhớ trên máy đó). locked:false nghĩa là người dùng có thể thay
+   config/labCode ngay trong Cài đặt mà không sửa code. Đặt locked:true nếu
+   muốn bản deploy cố định một kho Firebase. Đồng thời Firebase Rules phải giới
+   hạn theo UID qua nhánh qclab-acl — xem firebase/database.rules.json và
+   firebase/HUONG-DAN-FIREBASE-RULES.md. */
+root.QCLAB_CLOUD = root.QCLAB_CLOUD || {
+  labCode: 'khoaXN',
+  anonymous: false,
+  locked: false,
+  config: {
+    apiKey: 'AIzaSyBJvYHn1h8smBgP0WUXO2ZNppgFmt2Blus',
+    authDomain: 'qclab1102.firebaseapp.com',
+    databaseURL: 'https://qclab1102-default-rtdb.asia-southeast1.firebasedatabase.app',
+    projectId: 'qclab1102',
+    storageBucket: 'qclab1102.firebasestorage.app',
+    messagingSenderId: '389167813426',
+    appId: '1:389167813426:web:ebaea398d7b5d547477d2b',
+  },
+};
 if (!root.QCCore || typeof root.QCCore.stats !== 'function'
   || typeof root.QCCore.cleanText !== 'function' || typeof root.QCCore.cleanId !== 'function'
   || typeof root.QCCore.targetFromLimits !== 'function' || typeof root.QCCore.limitsFromTarget !== 'function'
@@ -2204,7 +2249,7 @@ const modularPartitionedSnapshotWriter = createPartitionedSnapshotWriter({
     return plan.dirtyTestIds;
   },
   defer: () => { lsDirty = true; scheduleLocalSave(); },
-  writePartitioned: (value, slot, dirtyTestIds) => partitionWrite.catch(() => false).then(() => (LocalStore as any).writePartitioned(value, slot, {dirtyTestIds})),
+  writePartitioned: (value, slot, dirtyTestIds) => partitionWrite.catch(() => false).then(() => root.localStoreService!.writePartitioned(value, slot, {dirtyTestIds})),
   setPending: pending => { partitionWrite = pending; },
   completed: (result, input) => {
     partitionSlot = String(result.slot || ''); lsSaveFailures = 0;
@@ -2220,7 +2265,7 @@ root.storageSnapshotService = createStorageSnapshotService({
   cancelScheduled: () => cancelLocalSaveSchedule(),
   clearDirty: () => { lsDirty = false; },
   draftStamp: () => sigmaDraftStamp(),
-  usePartitioned: () => typeof LocalStore !== 'undefined' && LocalStore.supported() && typeof (LocalStore as any).writePartitioned === 'function',
+  usePartitioned: () => typeof root.localStoreService !== 'undefined' && root.localStoreService!.supported() && typeof root.localStoreService!.writePartitioned === 'function',
   writePartitioned: input => modularPartitionedSnapshotWriter.write({state,slot:partitionSlot,localLoadStatus,fullDirty:lsFullDirty,dirtyTestIds:[...lsDirtyTestIds],streak:lsIncrementalStreak,lastFull:lsLastFullSaveAt,now:Date.now(),maxIncrementals:LS_FULL_ROTATE_MAX_INCREMENTALS,maxMs:LS_FULL_ROTATE_MAX_MS,localDraftStamp:input.draftStamp,quiet:input.quiet}),
   serialize: () => serializeStateForStorage(),
   writeLocal: (raw,savedAt,quiet) => modularLocalStorageSnapshotWriter.write(raw,savedAt,quiet),
@@ -2482,8 +2527,8 @@ root.saveFb=settingsPageController.saveFb;
 root.clearFb=settingsPageController.clearFb;
 root.copyFirebaseRules=settingsPageController.copyFirebaseRules;
 root.pageSettings=settingsPageController.pageSettings;
-const modularIndexedDbOpenService=typeof LocalStore !== 'undefined'?createIndexedDbOpenService({indexedDb:()=>typeof indexedDB === 'undefined'?null:indexedDB}):null;
-const modularIndexedDbRecordService=modularIndexedDbOpenService?createIndexedDbRecordService({open:()=>modularIndexedDbOpenService.open()}):null;
+const modularIndexedDbOpenService=createIndexedDbOpenService({indexedDb:()=>typeof indexedDB === 'undefined'?null:indexedDB});
+const modularIndexedDbRecordService=createIndexedDbRecordService({open:()=>modularIndexedDbOpenService.open()});
 root.partitionedIndexedDbWriteService = createPartitionedIndexedDbWriteService({
   supported: () => typeof indexedDB !== 'undefined',
   key: (slot,type,id) => modularLocalPartitionHelpers.key(slot,type,id),
@@ -2503,14 +2548,23 @@ const modularIndexedDbClearService = createIndexedDbClearService({
 });
 root.localStoreService = createLocalStoreService({
   indexedDbAvailable: () => typeof indexedDB !== 'undefined',
-  get: key => modularIndexedDbRecordService ? modularIndexedDbRecordService.get(key) : Promise.resolve(null),
-  put: record => modularIndexedDbRecordService ? modularIndexedDbRecordService.put(record) : Promise.resolve(false),
-  remove: key => modularIndexedDbRecordService ? modularIndexedDbRecordService.delete(key) : Promise.resolve(false),
+  get: key => modularIndexedDbRecordService.get(key),
+  put: record => modularIndexedDbRecordService.put(record),
+  remove: key => modularIndexedDbRecordService.delete(key),
   stateRecord: value => modularLocalSnapshotRecord.state(value),
   serializedRecord: value => modularLocalSnapshotRecord.serialized(value),
   writePartitioned: input => root.partitionedIndexedDbWriteService!.write(input),
   readPartitioned: (slot, get) => root.partitionedIndexedDbReadService!.read(slot,get),
   clear: (get, remove) => modularIndexedDbClearService.clear(get,remove),
+});
+root.LocalStore = Object.freeze({
+  supported: () => root.localStoreService!.supported(),
+  read: () => root.localStoreService!.read(),
+  write: (value: any) => root.localStoreService!.write(value),
+  writeSerialized: (value: string) => root.localStoreService!.writeSerialized(value),
+  writePartitioned: (value: any, slot: string, options?: {dirtyTestIds?: string[] | null}) => root.localStoreService!.writePartitioned(value, slot, options),
+  readPartitioned: (slot?: string) => root.localStoreService!.readPartitioned(slot),
+  clear: () => root.localStoreService!.clear(),
 });
 root.passwordPolicyError = passwordPolicyError;
 root.passwordChangeError = passwordChangeError;
@@ -2553,7 +2607,7 @@ root.reagentSelectOptionsHtml = createReagentSelectOptionsHtml();
 root.reagentResultHtml = createReagentResultHtml();
 root.reagentPairRowHtml = createReagentPairRowHtml();
 const modularStorageBootService = createStorageBootService({
-  partitionedSupported: () => typeof LocalStore !== 'undefined' && LocalStore.supported(),
+  partitionedSupported: () => typeof root.localStoreService !== 'undefined' && root.localStoreService!.supported(),
   readBootRecord: () => localStorage.getItem('qclab_boot'),
   discardBootRecord: () => localStorage.removeItem('qclab_boot'),
   activatePartitionShell: (shell, slot) => { (globalThis as any).adoptValidatedState(shell); partitionSlot = slot; localLoadStatus = 'partition-shell'; storageHydrationPromise = (globalThis as any).hydratePartitionedState(); },
@@ -2563,9 +2617,9 @@ const modularStorageBootService = createStorageBootService({
   restoreFromIndexedDb: () => (globalThis as any).restoreFromIndexedDb(),
 });
 const modularIndexedDbRecoveryService = createIndexedDbRecoveryService({
-  supported: () => typeof LocalStore !== 'undefined' && LocalStore.supported(),
-  readPartitioned: () => typeof (LocalStore as any).readPartitioned === 'function' ? (LocalStore as any).readPartitioned() : Promise.resolve(null),
-  readLegacy: () => (LocalStore as any).read(),
+  supported: () => typeof root.localStoreService !== 'undefined' && root.localStoreService!.supported(),
+  readPartitioned: () => typeof root.localStoreService!.readPartitioned === 'function' ? root.localStoreService!.readPartitioned() : Promise.resolve(null),
+  readLegacy: () => root.localStoreService!.read(),
   adopt: value => (globalThis as any).adoptValidatedState(value),
   acceptPartitioned: record => {
     mem = state; partitionSlot = String(record.slot || ''); localLoadStatus = 'partitioned'; startupProblem = null;
@@ -2579,7 +2633,7 @@ const modularIndexedDbRecoveryService = createIndexedDbRecoveryService({
   },
 });
 const modularPartitionHydrationService = createPartitionHydrationService({
-  read: () => (LocalStore as any).readPartitioned(),
+  read: () => root.localStoreService!.readPartitioned(),
   adopt: value => (globalThis as any).adoptValidatedState(value),
   recoverPendingSigmaDraft: () => (globalThis as any).recoverPendingSigmaDraft(),
   accept: record => { mem = state; partitionSlot = String(record.slot || ''); localLoadStatus = 'partitioned'; clearDerived(); startupProblem = null; if (lsDirty) scheduleLocalSave(); },
@@ -2594,9 +2648,9 @@ root.storageLifecycleService = createStorageLifecycleService({
   restore: () => modularIndexedDbRecoveryService.restore(),
 });
 root.indexedDbMirrorService = createIndexedDbMirrorService({
-  supported: () => typeof LocalStore !== 'undefined' && LocalStore.supported(),
-  writeSerialized: raw => typeof (LocalStore as any).writeSerialized === 'function' ? (LocalStore as any).writeSerialized(raw) : null,
-  writeState: value => (LocalStore as any).write(value),
+  supported: () => typeof root.localStoreService !== 'undefined' && root.localStoreService!.supported(),
+  writeSerialized: raw => typeof root.localStoreService!.writeSerialized === 'function' ? root.localStoreService!.writeSerialized(raw) : null,
+  writeState: value => root.localStoreService!.write(value),
   failed: () => { lsDirty = true; lsSaveFailures++; scheduleLocalRetry(); },
 });
 root.qcValueFormat = createQcValueFormat();
@@ -3648,6 +3702,78 @@ root.EntryVoidWorkflowCommand=createEntryVoidWorkflowCommand({current:()=>state,
 root.EntryDateNoteWorkflowCommand=createEntryDateNoteWorkflowCommand({current:()=>state,entry:root.EntryService,formatDate:date=>(globalThis as any).vnDate(date),log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options)});
 const rangeTargetCommand=createRangeTargetCommand({assignTarget:(config,mean,sd,source)=>root.qcRangeCandidateService!.assignTarget(config,mean,sd,source)});
 root.RangeWorkflowCommand=createRangeWorkflowCommand({current:()=>state,target:rangeTargetCommand,log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options),render:()=>rerender()});
+/* ===== NEW QC RANGE ===== Retire classic range.js (2026-08-19, Pha G hạ tầng lát 4) —
+   glue quanh qcRangeCandidateService/qcRangeTea/qcRangeSafetyGate/qcRangeBiasEvaluation/
+   RangeWorkflowCommand đã có sẵn, không có logic mới. */
+root.rangeSystematicNce=(tid,level)=>root.qcRangeCandidateService!.systematicNce(tid,level);
+root.rangeCandidate=(tid,level)=>root.qcRangeCandidateService!.candidate(tid,level);
+root.openRangeWorkflow=(tid,level)=>{
+  const r=root.rangeCandidate(tid,level);if(!r.t||!r.l)return;
+  const rows=[['Tổng số kết quả',r.c?r.c.n:0,'≥20',r.c&&r.c.n>=20],['Số ngày độc lập',r.days,'≥20 ngày',r.days>=20],['Điểm bị loại Westgard',r.bad,'Phải bằng 0; không tự loại điểm để làm đẹp SD',r.bad===0],['Điểm cảnh báo',r.warn,'Phải bằng 0 trước khi phê duyệt dải',r.warn===0],['SD đề xuất hợp lệ',r.c?(root as any).fmtTestValue(r.t,r.c.sd):'—','>0',r.c&&r.c.sd>0]];
+  const checklist=root.rangeWorkflowChecklistRowsHtml(rows.map(x=>({condition:x[0],current:x[1],requirement:x[2],passed:x[3]})));
+  const c=r.c;
+  const nceNotice=r.nce?root.rangeNceNoticeHtml({nceId:(root as any).esc(r.nce.nceId||'NCE'),rule:(root as any).esc(r.nce.rule||''),cause:(root as any).esc((r.nce.cause||'').slice(0,200))}):'';
+  const contextHtml=`<b>${(root as any).esc((root as any).testDisplayName(r.t))}</b> · Mức ${level} · Lô ${(root as any).esc(r.l.lot||'?')} · ${(root as any).esc(r.t.machine||'')}`,comparisonRowsHtml=root.rangeWorkflowComparisonRowsHtml({label:`Đang dùng (${r.l.applied==='lab'?'PXN':'NSX'})`,mean:(root as any).fmtTestValue(r.t,r.l.mean),sd:(root as any).fmtTestValue(r.t,r.l.sd),cv:fmt(r.l.mean?r.l.sd/Math.abs(r.l.mean)*100:0),limits:`${(root as any).fmtTestValue(r.t,r.l.mean-2*r.l.sd)} – ${(root as any).fmtTestValue(r.t,r.l.mean+2*r.l.sd)}`},c?{label:'Đề xuất PXN',mean:(root as any).fmtTestValue(r.t,c.m),sd:(root as any).fmtTestValue(r.t,c.sd),cv:fmt(c.cv),limits:`${(root as any).fmtTestValue(r.t,c.m-2*c.sd)} – ${(root as any).fmtTestValue(r.t,c.m+2*c.sd)}`,proposed:true}:null);
+  root.openModal(root.rangeWorkflowModalHtml({contextHtml,nceNoticeHtml:nceNotice,checklistRowsHtml:checklist,currentRangeRowHtml:comparisonRowsHtml,proposedRangeRowHtml:'',printButtonHtml:(root as any).btn('In biểu mẫu',`printRangeForm('${tid}',${level})`,'ghost'),applyButtonHtml:root.canWrite()?(root as any).btn('Áp dụng dải PXN',`closeModal();applyNewRange('${tid}',${level})`,'teal','',{disabled:!r.eligible}):'',closeButtonHtml:(root as any).btn('Đóng','closeModal()','ghost')}));
+};
+root.rangeTeaPercent=(t,l)=>root.qcRangeTea!.percent(t,l);
+root.rangeGateHtml=(r,tid,level)=>{
+  if(!r.nce)return'';
+  const tea=root.rangeTeaPercent(r.t,r.l),threshold=root.qcRangeTea!.quarter(tea);
+  return root.rangeSafetyGateHtml({nceId:(root as any).esc(r.nce.nceId||'NCE'),rule:(root as any).esc(r.nce.rule||''),biasInputAction:`rangeUpdateBiasHint('${tid}',${level})`,thresholdText:threshold!=null?fmt(threshold)+'%':'—',noTeaHint:tea?'':'Chưa có TEa% cho xét nghiệm này — vào Cấu hình Sigma để bổ sung, hoặc vẫn có thể xác nhận thủ công nếu ngưỡng đã biết theo cách khác.'});
+};
+root.rangeUpdateBiasHint=(tid,level)=>{
+  const r=root.rangeCandidate(tid,level),biasEl=document.getElementById('rangeBiasInput') as HTMLInputElement|null,hint=document.getElementById('rangeBiasHint');
+  if(!r.nce||!biasEl||!hint)return;
+  const bias=parseFloat(String(biasEl.value).replace(',','.')),tea=root.rangeTeaPercent(r.t,r.l);
+  if(!tea){hint.textContent='Chưa có TEa% cho xét nghiệm này — vào Cấu hình Sigma để bổ sung.';return;}
+  if(!Number.isFinite(bias)){hint.textContent='';return;}
+  const result=root.qcRangeBiasEvaluation(tea,bias,r.l.sd,(root.QCCore as any).systematicShiftCritical);
+  hint.innerHTML=`${result.withinThreshold?'✔ Đạt':'✘ Vượt'} ngưỡng: |Bias| ${fmt(Math.abs(bias))}% so với ${fmt(result.threshold)}%.`+(result.critical?` <span style="color:var(--muted)">Tham khảo (không phải kết luận chính thức): ΔSEcrit ${fmt(result.critical.dSEcrit)} · ΔREcrit ${fmt(result.critical.dREcrit)}.</span>`:'');
+};
+root.rangeGatePasses=r=>{
+  if(!r.nce)return true;
+  const causeEl=document.getElementById('rangeCauseConfirm') as HTMLInputElement|null,biasEl=document.getElementById('rangeBiasInput') as HTMLInputElement|null,bias=parseFloat(String(biasEl?biasEl.value:'').replace(',','.')),tea=root.rangeTeaPercent(r.t,r.l);
+  return root.qcRangeSafetyGate(r.nce,tea,!!(causeEl&&causeEl.checked),bias).passes;
+};
+root.applyNewRange=async(tid,level)=>{
+  if(!requireWrite())return;
+  const r=root.rangeCandidate(tid,level),{t,l,c,days,bad,warn,eligible}=r;
+  if(!eligible){await root.infoDialog(`Chưa đủ điều kiện: cần ≥20 kết quả trên ≥20 ngày, không có điểm vi phạm/cảnh báo chưa xử lý và SD >0.\nHiện tại: n=${c?c.n:0}, ngày=${days}, điểm loại=${bad}, điểm cảnh báo=${warn}.`);return;}
+  root.openModal(root.rangeApplyConfirmationModalHtml({changeSummaryHtml:`X̄: ${(root as any).fmtTestValue(t,l.mean)} → ${(root as any).fmtTestValue(t,c.m)}<br>SD: ${(root as any).fmtTestStat(t,l.sd)} → ${(root as any).fmtTestStat(t,c.sd)}<br>Dải nhà sản xuất vẫn được lưu để hoàn về.`,gateHtml:root.rangeGateHtml(r,tid,level),cancelButtonHtml:(root as any).btn('Hủy','closeModal()','ghost'),applyButtonHtml:(root as any).btn('Áp dụng',`confirmApplyNewRange('${tid}',${level})`,'teal')}));
+  setTimeout(()=>{const e=document.getElementById('rangeReasonInput');if(e)e.focus();},50);
+};
+root.confirmApplyNewRange=async(tid,level)=>{
+  const r=root.rangeCandidate(tid,level),{t,l,c,days,nce}=r;
+  if(!root.rangeGatePasses(r)){const err=document.getElementById('rangeGateErr');if(err)(err as HTMLElement).style.display='';return;}
+  const input=document.getElementById('rangeReasonInput') as HTMLInputElement|null;
+  const reason=(root.QCCore as any).cleanText(input?input.value:'',1000).trim();
+  if(reason.length<10){const err=document.getElementById('rangeReasonErr');if(err)(err as HTMLElement).style.display='';return;}
+  root.closeModal();if(!await (root as any).reauthenticateCurrentUser({title:'Xác thực thay đổi dải QC',message:'Nhập lại mật khẩu trước khi áp dụng Mean/SD của phòng xét nghiệm.'}))return;
+  const oldM=l.mean,oldSd=l.sd;
+  const gateNote=nce?` Điều kiện dịch chuyển hệ thống: đã xác nhận nguyên nhân theo hồ sơ NCE ${nce.nceId||nce.id}, Bias đo lại trong ngưỡng cho phép (≤ TEa/4).`:'';
+  const detail=`M${level}: Mean ${(root as any).fmtTestValue(t,oldM)}→${(root as any).fmtTestValue(t,c.m)}, SD ${(root as any).fmtTestStat(t,oldSd)}→${(root as any).fmtTestStat(t,c.sd)}`;
+  const actionText=`Áp dụng dải PXN: Mean ${(root as any).fmtTestValue(t,oldM)}→${(root as any).fmtTestValue(t,c.m)}, SD ${(root as any).fmtTestStat(t,oldSd)}→${(root as any).fmtTestStat(t,c.sd)}, n=${c.n}, ${days} ngày. Phê duyệt: ${reason}${gateNote}`;
+  const result=root.RangeWorkflowCommand.applyLab({level:l,testId:tid,levelNo:level,lot:l.lot||'',testName:t?t.name:'',mean:c.m,sd:c.sd,cv:c.cv,reason,gateNote,detail,actionText,historyId:uid(),actionId:uid(),today:isoToday(),createdAt:new Date().toISOString(),userId:currentUser&&currentUser.id||'',username:currentUser&&currentUser.username||'',userName:currentUser?(currentUser.name||currentUser.username):''});
+  if(!result.ok){await root.infoDialog(result.message);return;}
+};
+root.revertRange=(tid,level)=>{
+  if(!requireWrite())return;
+  root.openModal(root.rangeRevertConfirmationModalHtml({cancelButtonHtml:(root as any).btn('Hủy','closeModal()','ghost'),revertButtonHtml:(root as any).btn('Hoàn về dải NSX',`confirmRevertRange('${tid}',${level})`,'danger')}));
+  setTimeout(()=>{const e=document.getElementById('rangeReasonInput');if(e)e.focus();},50);
+};
+root.confirmRevertRange=async(tid,level)=>{
+  const t=state.tests!.find(x=>x.id===tid) as any;const l=lvlCfg(t,level);
+  const input=document.getElementById('rangeReasonInput') as HTMLInputElement|null;
+  const reason=(root.QCCore as any).cleanText(input?input.value:'',1000).trim();
+  if(reason.length<5){const err=document.getElementById('rangeReasonErr');if(err)(err as HTMLElement).style.display='';return;}
+  root.closeModal();if(!await (root as any).reauthenticateCurrentUser({title:'Xác thực hoàn dải QC',message:'Nhập lại mật khẩu trước khi hoàn về Mean/SD nhà sản xuất.'}))return;
+  const oldM=l.mean,oldSd=l.sd;
+  const detail=`M${level}: Mean ${(root as any).fmtTestValue(t,oldM)}→${(root as any).fmtTestValue(t,l.mfgMean)}, SD ${(root as any).fmtTestValue(t,oldSd)}→${(root as any).fmtTestValue(t,l.mfgSd)} · ${reason}`;
+  const actionText=`Hoàn về dải NSX: Mean ${(root as any).fmtTestValue(t,oldM)}→${(root as any).fmtTestValue(t,l.mfgMean)}, SD ${(root as any).fmtTestValue(t,oldSd)}→${(root as any).fmtTestValue(t,l.mfgSd)}. Lý do: ${reason}`;
+  const result=root.RangeWorkflowCommand.revertMfg({level:l,testId:tid,levelNo:level,lot:l.lot||'',testName:t?t.name:'',reason,detail,actionText,historyId:uid(),actionId:uid(),today:isoToday(),createdAt:new Date().toISOString(),userId:currentUser&&currentUser.id||'',username:currentUser&&currentUser.username||'',userName:currentUser?(currentUser.name||currentUser.username):''});
+  if(!result.ok){await root.infoDialog(result.message);return;}
+};
 const backupTextBytes = (text: string): number => {
   if (typeof Blob !== 'undefined') return new Blob([text]).size;
   if (typeof TextEncoder !== 'undefined') return new TextEncoder().encode(text).length;
@@ -3694,11 +3820,33 @@ root.prepareBackupImport = backupService.prepareBackupImport;
 root.backupSummary = backupService.backupSummary;
 root.inspectBackupText = backupService.inspectBackupText;
 root.BackupRestoreCommand=createBackupRestoreCommand({current:()=>state,replace:value=>{state=value;},normalize:()=>ensureShape({sanitized:true}),invariantErrors:()=>(root.QCCore as any).validateStateInvariants(state,{sanitized:true}),clearSigmaDraft:()=>{if(typeof clearSigmaDraftThrough==='function')clearSigmaDraftThrough(Number.MAX_SAFE_INTEGER);},ensureAdmin:()=>ensureAdmin(),setActivity:activity=>{state.activity=activity;},logImported:fileName=>logAct('Nhập backup','Nhập dữ liệu đã kiểm tra từ file '+fileName,'Dữ liệu'),save:()=>save({}),render:()=>rerender()});
-root.BackupExportCommand=createBackupExportCommand({current:()=>state,log:()=>logAct('Xuất backup','Xuất toàn bộ dữ liệu JSON có checksum','Dữ liệu'),save:()=>save({clearDerived:false}),create:value=>backupService.createBackupPackage(value),confirmOversized:(bytes,detail)=>(root as any).confirmOversizedBackup(bytes,detail),warning:bytes=>backupService.backupImportSizeError(bytes)?null:root.backupSizeWarningConfirmation({bytes}),confirm:dialog=>root.confirmDialog(dialog),download:(name,text)=>(root as any).downloadBackupText(name,text),mark:bytes=>(root as any).markBackupDone(bytes),update:()=>(root as any).updateBackupBanner()});
+root.BackupExportCommand=createBackupExportCommand({current:()=>state,log:()=>logAct('Xuất backup','Xuất toàn bộ dữ liệu JSON có checksum','Dữ liệu'),save:()=>save({clearDerived:false}),create:value=>backupService.createBackupPackage(value),confirmOversized:(bytes,detail)=>root.confirmOversizedBackup(bytes,detail),warning:bytes=>backupService.backupImportSizeError(bytes)?null:root.backupSizeWarningConfirmation({bytes}),confirm:dialog=>root.confirmDialog(dialog),download:(name,text)=>root.downloadBackupText(name,text),mark:bytes=>root.markBackupDone(bytes),update:()=>root.updateBackupBanner()});
 root.BackupImportCommand=createBackupImportCommand({prepare:text=>backupService.prepareBackupImport(text),sizeWarning:bytes=>backupService.backupSizeWarning(bytes),snapshot:prefix=>root.BackupExportCommand.snapshot(prefix),restore:input=>root.BackupRestoreCommand.restore(input)});
 root.BackupInspectionCommand=createBackupInspectionCommand({inspect:(text,bytes)=>backupService.inspectBackupText(text,bytes)});
 root.BackupStatusCommand=createBackupStatusCommand({reminder:root.backupReminderService,marker:root.backupLocalMarker,maxBytes:BACKUP_IMPORT_MAX_BYTES,size:bytes=>backupService.backupSizeMB(bytes),warning:bytes=>backupService.backupSizeWarning(bytes)});
-root.ResetOperationalDataCommand=createResetOperationalDataCommand({current:()=>state,clearPersistence:()=>{localStorage.removeItem('qclab');localStorage.removeItem('qclab_boot');if(typeof clearSigmaDraftThrough==='function')clearSigmaDraftThrough(Number.MAX_SAFE_INTEGER);if(typeof LocalStore!=='undefined')(LocalStore as any).clear().catch(()=>{});},blank:users=>(root as any).blankAppStateFactory(users),replace:value=>{state=value;},normalize:()=>ensureShape(),ensureAdmin:()=>ensureAdmin(),log:()=>logAct('Xóa sạch dữ liệu test','Đưa app về trạng thái trắng, giữ người dùng và nhật ký audit','Dữ liệu'),save:()=>save({}),render:()=>rerender()});
+/* ===== BACKUP / RESTORE UI ===== Retire classic backup-ui.js (2026-08-19, Pha G hạ tầng
+   lát 2) — thuần glue quanh các command TypeScript ở trên, không có logic mới. */
+root.confirmOversizedBackup=async(size,{title,detail})=>{const dialog=root.backupSizeConfirmation({bytes:size,title,detail});return dialog?await root.confirmDialog(dialog):true;};
+root.exportData=async()=>{const result=await root.BackupExportCommand.exportFull(root.backupFileName(isoToday()),root.backupOversizeConfirmation.exportFull());if(result.status==='create-error'){await root.infoDialog(root.backupExportMessage.createError(result.error));return;}if(result.status==='download-error')await root.infoDialog(root.backupExportMessage.downloadError);};
+root.downloadBackupText=(name,json)=>{try{root.blobDownload!(name,new Blob([json],{type:'application/json'}));return true;}catch(e){return false;}};
+root.backupCurrentData=(prefix='before-change')=>root.BackupExportCommand.snapshot(root.backupSnapshotFileName(prefix));
+root.importData=async e=>{
+  if(!root.requireAdmin('Chỉ quản trị mới được nhập backup.')){if(e&&e.target)e.target.value='';return;}
+  const f=e.target.files[0];if(!f)return;try{
+    const result=await root.BackupImportCommand.importFile({fileName:f.name,size:f.size,text:await f.text(),oldActivity:[...(state.activity||[])],confirmOversized:()=>root.confirmOversizedBackup(f.size,root.backupOversizeConfirmation.importFile(f.name)),confirmImport:input=>root.confirmDialog(root.backupImportConfirmation(input)),reauthenticate:()=>(root as any).reauthenticateCurrentUser({title:'Xác thực nhập backup',message:'Nhập lại mật khẩu trước khi thay thế dữ liệu nghiệp vụ hiện tại.'}),snapshotFailureMessage:root.backupImportMessage.preImportSnapshotFailure});
+    if(result.status==='imported')await root.infoDialog(root.backupImportMessage.success,{type:'success'});
+  }catch(err){await root.infoDialog(root.backupImportMessage.invalid(err));}finally{if(e&&e.target)e.target.value='';}
+};
+root.verifyBackupFile=async e=>{if(!root.requireAdmin('Chỉ quản trị mới được kiểm tra file backup.')){if(e&&e.target)e.target.value='';return;}const f=e&&e.target&&e.target.files&&e.target.files[0];if(!f)return;try{const result=await root.BackupInspectionCommand.inspectFile({text:await f.text(),size:f.size,confirmOversized:()=>root.confirmOversizedBackup(f.size,root.backupOversizeConfirmation.inspectFile(f.name))});if(result.status==='inspected')await root.infoDialog(root.backupInspectionSummary(result.report),{type:'success'});}catch(err){await root.infoDialog(root.backupInspectionMessage.invalid(err));}finally{if(e&&e.target)e.target.value='';}};
+const BACKUP_REMIND_DAYS=7;
+root.markBackupDone=bytes=>{root.backupLocalMarker.mark(bytes);};
+root.backupStatusText=()=>root.BackupStatusCommand.status(typeof fb!=='undefined'&&fb&&fb.ready);
+root.backupCapacityText=()=>root.BackupStatusCommand.capacity();
+root.updateBackupBanner=()=>{
+  const dot=document.getElementById('backupDot');if(!dot)return;
+  const model=root.BackupStatusCommand.banner({cloudReady:typeof fb!=='undefined'&&fb&&fb.ready,user:typeof currentUser==='undefined'?null:currentUser,days:BACKUP_REMIND_DAYS});(dot as HTMLElement).hidden=model.hidden;if(!model.hidden){(dot as HTMLElement).className=model.className;dot.textContent=model.text;(dot as HTMLElement).title=model.title;}
+};
+root.ResetOperationalDataCommand=createResetOperationalDataCommand({current:()=>state,clearPersistence:()=>{localStorage.removeItem('qclab');localStorage.removeItem('qclab_boot');if(typeof clearSigmaDraftThrough==='function')clearSigmaDraftThrough(Number.MAX_SAFE_INTEGER);if(typeof root.localStoreService!=='undefined')root.localStoreService!.clear().catch(()=>{});},blank:users=>(root as any).blankAppStateFactory(users),replace:value=>{state=value;},normalize:()=>ensureShape(),ensureAdmin:()=>ensureAdmin(),log:()=>logAct('Xóa sạch dữ liệu test','Đưa app về trạng thái trắng, giữ người dùng và nhật ký audit','Dữ liệu'),save:()=>save({}),render:()=>rerender()});
 const userManagementCommand=createUserManagementCommand();
 const loginCommand=createLoginCommand({isLocked:(until,now)=>root.loginLockoutPolicy!.isLocked(until,now),lockedMessage:(until,now)=>root.loginLockoutPolicy!.message(until,now),recordFailure:(lock,now)=>root.loginLockoutPolicy!.recordFailure(lock,now),resetLock:()=>root.loginLockoutPolicy!.reset(),verify:(password,stored)=>(root as any).verifyPass(password,stored),hash:password=>(root as any).hashPass(password),isPbkdf2:stored=>root.isPbkdf2PasswordHash!(stored),hashNeedsUpgrade:stored=>root.passwordHashNeedsUpgrade!(stored)});
 root.LoginWorkflowCommand=createLoginWorkflowCommand({login:loginCommand,log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options)});

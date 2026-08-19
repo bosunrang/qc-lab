@@ -386,12 +386,21 @@ the Google Fonts link, offline labs must print with correct metrics.
   match the registry, and **no source file outside `core.js` may spell out three or
   more rule ids** (a text scan, like `button-conventions.test.js`; 1–2 ids is
   legitimate single-rule logic).
-- `app-meta.js` — loads right after `core.js`, before `state.js`. Sets
-  `window.QCLAB_APP` (name/version/releaseDate — bump both per
-  `docs/validation/RELEASE-PUBLISH.md`) and `window.QCLAB_CLOUD` (Firebase
-  config, `labCode`, `anonymous`/`locked` flags). Contains the live Firebase
-  project keys — treat edits here as deploy/config changes, not routine code
-  changes.
+- `QCLAB_APP`/`QCLAB_CLOUD` — sets `window.QCLAB_APP` (name/version/releaseDate
+  — bump both per `docs/validation/RELEASE-PUBLISH.md`) and `window.QCLAB_CLOUD`
+  (Firebase config, `labCode`, `anonymous`/`locked` flags). Contains the live
+  Firebase project keys — treat edits here as deploy/config changes, not
+  routine code changes. Retired from classic `app-meta.js` on 2026-08-19 (Pha G
+  hạ tầng, lát 3): pure data with zero functions, so it moved as-is into
+  `src/compat/modular-pilot.global.ts` as `root.QCLAB_APP = {...}` /
+  `root.QCLAB_CLOUD = root.QCLAB_CLOUD || {...}`, right after `const root =
+  globalThis as QCLabGlobal`. Every consumer (`users-auth.js`'s login screen,
+  the Firebase config source service, the router shell's version display, the
+  Sigma/report export metadata) already read `window.QCLAB_APP`/`QCLAB_CLOUD`
+  through a lazy closure, so moving the assignment later in script load order
+  (the bundle now loads after `state.js`/`qc-domain.js`/`firebase-sync.js`
+  instead of right after `core.js`) changed nothing observable — confirmed
+  with a live browser boot showing the correct version on the login screen.
 - `state.js` — the single in-memory `state` object (tests, instruments, QC
   lots/panels, QC data points, actions, users, etc.) plus `ensureShape()`
   migration/normalization logic run after every load/merge. `ensureShape()`
@@ -436,12 +445,30 @@ the Google Fonts link, offline labs must print with correct metrics.
   `derived()` đọc thì phải dựng lại, đổi thứ nó không đọc (điểm QC, Mean/SD, NCE,
   khóa kỳ) thì phải giữ nguyên — thiếu nửa sau, một chữ ký hỏng kiểu "luôn khác
   nhau" vẫn qua sạch. Chốt bằng tính tự trượt, không bằng mốc thời gian.
-- `local-store.js` — IIFE `LocalStore`: an IndexedDB snapshot mirror used as a
-  recovery fallback for `localStorage`. Writes are partitioned (boot shell +
-  per-test records) and rotate between slots A/B with a manifest — the active
-  marker flips only after all records are written, so an interrupted save
-  leaves the previous slot recoverable; legacy single-record snapshots migrate
-  on the next save.
+- `LocalStore` — an IndexedDB snapshot mirror used as a recovery fallback for
+  `localStorage`. Writes are partitioned (boot shell + per-test records) and
+  rotate between slots A/B with a manifest — the active marker flips only
+  after all records are written, so an interrupted save leaves the previous
+  slot recoverable; legacy single-record snapshots migrate on the next save.
+  Retired from classic `local-store.js` on 2026-08-19 (Pha G hạ tầng, lát 1):
+  the classic file was already a pure bridge to `localStoreService`
+  (`src/application/storage/local-store-service.ts`, the real IndexedDB
+  read/write/partition logic), so this slice just folded that thin facade
+  into `src/compat/modular-pilot.global.ts` as `root.LocalStore =
+  Object.freeze({...})` right after `root.localStoreService` is constructed —
+  no new logic. `LocalStore` stays a genuine global (assignment, not a
+  classic `let`/`const` declaration) so it's still reachable as a bare
+  identifier from `tests/local-store.test.js` and the storage benchmark. The
+  one real fix: `modularIndexedDbOpenService`/`modularIndexedDbRecordService`
+  used to be gated on `typeof LocalStore !== 'undefined'` — an eager,
+  construction-time check that only worked because classic `local-store.js`
+  loaded before the bundle. Folding `LocalStore` into the bundle itself would
+  have made that guard permanently false (evaluated before `root.LocalStore`
+  is even assigned later in the same script). Fixed by constructing both
+  services unconditionally — `createIndexedDbOpenService`'s `open()` and
+  `createIndexedDbRecordService`'s `get`/`put`/`delete` already resolve to a
+  safe empty value when `indexedDB` itself is undefined, so the outer
+  existence guard was redundant leftover, not load-bearing.
 - `firebase-sync.js` — optional Firebase Realtime Database sync. Per-branch,
   per-element 3-way merge (list branches merge by `id`/content key; scalar
   branches like `lab`/`westgardRules` replace wholesale). Failed pushes retry
@@ -843,9 +870,22 @@ the Google Fonts link, offline labs must print with correct metrics.
   `reagentXxx` HTML builders); the palette consts `RCC`/`RCPAD`/`RC_MIN_PAIRS`
   live in the controller. `tests/reagent-stats.test.js` drives `rcCalc`/
   `rcReportSummaryTable` (bridged as globals) directly.
-- `range.js`, `backup-service.js`, `users-auth.js` —
-  feature-specific logic (target-range calc,
-  backup/restore service, auth/user
+- QC target-range workflow (`rangeCandidate`/`openRangeWorkflow`/`applyNewRange`/
+  `confirmApplyNewRange`/`revertRange`/`confirmRevertRange`/`rangeGateHtml`/
+  `rangeGatePasses`/`rangeUpdateBiasHint`/`rangeTeaPercent`/`rangeSystematicNce`)
+  — the "Áp dụng dải PXN"/"Hoàn về dải NSX" modals on the Entry page. Retired
+  from classic `range.js` on 2026-08-19 (Pha G hạ tầng, lát 4): thin glue
+  around `qcRangeCandidateService`/`qcRangeTea`/`qcRangeSafetyGate`/
+  `qcRangeBiasEvaluation`/`RangeWorkflowCommand`, all already TypeScript, so
+  it moved as-is into `src/compat/modular-pilot.global.ts` right after
+  `root.RangeWorkflowCommand` is constructed. `rangeCandidate()` is the one
+  function with a dedicated behavior test (`tests/range-candidate.test.js`) —
+  it's the clinical gate behind "Áp dụng dải PXN" (≥20 results, ≥20
+  independent days, 0 rejected/warning points, SD>0), computed from the
+  *entire* operating lot including Westgard-violating points (excluding them
+  would shrink SD artificially and falsely narrow the new range).
+- `backup-service.js`, `users-auth.js` —
+  feature-specific logic (backup/restore service, auth/user
   management). `users-auth.js` hashes passwords
   with PBKDF2-SHA256 via the TypeScript `pbkdf2PasswordService` bridge, whose
   `PASSWORD_HASH_ITERATIONS=600000` (OWASP minimum) lives in
@@ -951,9 +991,9 @@ token, modal mặc định và ngoại lệ này.
 ### Storage and sync model
 
 Data lives in `localStorage`, mirrored on every save to the partitioned
-IndexedDB store (`LocalStore` in `local-store.js`) used only as a recovery
+IndexedDB store (`LocalStore`, see "Module roles") used only as a recovery
 fallback at boot, and optionally to a per-lab Firebase Realtime Database room
-(`labCode`, configured in `app-meta.js`). There is no backend beyond that.
+(`labCode`, configured via `QCLAB_CLOUD`, see "Module roles"). There is no backend beyond that.
 This is an **accepted tradeoff of a client-only app**, not an open bug: login
 state is a JS variable, not a server-verified token/session, and Firebase
 Rules by UID are the only real write boundary when sync is enabled. Don't

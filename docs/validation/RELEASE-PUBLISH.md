@@ -28,8 +28,11 @@ dùng, chỉ thấy trong console.
 ## 0. Điều kiện trước khi phát hành
 
 - Cây làm việc sạch, đang ở đúng commit muốn phát hành.
-- Phiên bản trùng khớp ở cả ba chỗ: `package.json`, `assets/modules/app-meta.js`
-  (`version` + `releaseDate`), và tag `?v=` của `app-meta.js` trong `index.html`.
+- Phiên bản trùng khớp ở cả ba chỗ: `package.json`, `root.QCLAB_APP` trong
+  `src/compat/modular-pilot.global.ts` (`version` + `releaseDate` — chuyển từ
+  classic `assets/modules/app-meta.js` sang đây ngày 2026-08-19, Pha G hạ tầng
+  lát 3; nhớ `npm run build:pilot` lại sau khi sửa), và tag `?v=` của
+  `assets/generated/modular-pilot.js` trong `index.html`.
 - Đã chạy và lưu stdout đủ bộ bằng chứng (xem `TRACEABILITY.md`):
   `npm test`, `npm run typecheck`, `npm run verify-release`, `npm run visual-check`,
   `npm run a11y-audit`, `npm run print-check`, `npm run nce-check`.
@@ -38,8 +41,8 @@ dùng, chỉ thấy trong console.
 ```powershell
 git status --short          # phải trống
 node -e "console.log(require('./package.json').version)"
-Select-String -Path assets\modules\app-meta.js -Pattern "version:|releaseDate:"
-Select-String -Path index.html -Pattern "app-meta\.js\?v="
+Select-String -Path src\compat\modular-pilot.global.ts -Pattern "QCLAB_APP = \{"
+Select-String -Path index.html -Pattern "modular-pilot\.js\?v="
 ```
 
 ## 1. Cách A — để electron-builder tự upload (khuyến nghị)

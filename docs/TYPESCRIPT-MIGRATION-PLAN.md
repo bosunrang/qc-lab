@@ -58,7 +58,7 @@ scope**, không phải không còn file `.js` trong gói phát hành.
 | Hạng mục | Trạng thái |
 | --- | --- |
 | Nguồn TypeScript | 739 tệp (thêm `sigma-page-controller.ts`; domain/application/bridge không đổi khác) |
-| Nguồn classic còn lại | 18 tệp `assets/modules/*.js`, thêm `assets/core.js` và `assets/app.js` |
+| Nguồn classic còn lại | 7 tệp `assets/modules/*.js` (nhóm C hạ tầng), thêm `assets/core.js` và `assets/app.js` |
 | Bundle hiện tại | `assets/generated/modular-pilot.js`, Vite sinh ra và nạp bằng `<script defer>` |
 | Kiểm tra kiểu | `npm.cmd run typecheck` đạt: checkJs legacy + strict TypeScript modules |
 | Test Node | `npm.cmd test` đạt ngày 2026-08-19 (613/613) |
@@ -90,7 +90,7 @@ Ba con số khác nhau vì ba mẫu số khác nhau; đừng gộp làm một:
 
 ### Kiểm kê từng module classic — đã xong / chưa xong
 
-**Đã retire sang TypeScript trong Pha G (16 file, phiên 2026-08-18–19):**
+**Đã retire sang TypeScript trong Pha G (20 file, phiên 2026-08-18–19):**
 
 | Classic (đã xóa) | TypeScript thay thế | Lát |
 | --- | --- | --- |
@@ -113,6 +113,10 @@ Ba con số khác nhau vì ba mẫu số khác nhau; đừng gộp làm một:
 | `draw.js` | `src/presentation/chart/qc-chart-renderer.ts` | Route 13 |
 | `reports.js` | `src/presentation/report/report-print-controller.ts` (+ `src/presentation/shared/html-escape.ts`) | Route 14 |
 | `data-io.js` | `src/presentation/export/data-io-controller.ts` | Route 15 |
+| `local-store.js` | inline vào `src/compat/modular-pilot.global.ts` (không có logic mới, chỉ delegator sang `local-store-service.ts` đã có sẵn) | Hạ tầng 1 |
+| `backup-ui.js` | inline vào `src/compat/modular-pilot.global.ts` (không có logic mới, glue quanh các Backup*Command đã có sẵn) | Hạ tầng 2 |
+| `app-meta.js` | inline vào `src/compat/modular-pilot.global.ts` (dữ liệu thuần, không có hàm nào) | Hạ tầng 3 |
+| `range.js` | inline vào `src/compat/modular-pilot.global.ts` (không có logic mới, glue quanh qcRangeCandidateService/qcRangeTea/qcRangeSafetyGate/qcRangeBiasEvaluation/RangeWorkflowCommand đã có sẵn) | Hạ tầng 4 |
 
 (`after-render.js` đã retire ở Pha F.) Với Route 9, toàn bộ trang "Cấu hình chung"
 (Manage) đã sang TypeScript hoàn toàn. Với Route 10, trang "Nhập QC" (Entry) —
@@ -124,30 +128,50 @@ chuyển toàn bộ bản in (`openPrint`, `printReport`/`printWestgard`/`printS
 `printRangeForm`) sang TypeScript. Route 15 chuyển nốt xuất CSV/XLSX (Sigma + Báo cáo +
 Westgard) — **toàn bộ nhóm B (Canvas/adapter) của Pha G đã hoàn tất**.
 
-**Chưa xong — 11 file classic còn lại, chia theo nhóm rủi ro:**
+**Chưa xong — 7 file classic còn lại, chia theo nhóm rủi ro:**
 
 | Nhóm | File | Dòng | Ghi chú port |
 | --- | --- | --- | --- |
 | **C. Hạ tầng/bootstrap** (rủi ro cao — kế hoạch yêu cầu làm CUỐI, từng lát độc lập) | `state.js` | 128 | `ensureShape`/state gốc; lifecycle nhạy |
 | | `qc-domain.js` | 255 | wiring Westgard/worker + point derivation |
 | | `state-storage.js` | 120 | load/save + partitioned + boot shell |
-| | `local-store.js` | 13 | IndexedDB mirror (mỏng) |
+| | ~~`local-store.js`~~ | ~~13~~ | **xong 2026-08-19, Hạ tầng lát 1** — xem bên dưới |
 | | `firebase-sync.js` | 173 | 3-way merge + retry + online/offline |
 | | `users-auth.js` | 256 | auth/user + PBKDF2 wiring + trang audit |
 | | `action-workflow-service.js` | 149 | vòng đời NCE (self-verifying cache) |
-| | `range.js` | 95 | tính dải mục tiêu |
-| | `backup-ui.js` | 27 | nút backup (mỏng) |
-| | `app-meta.js` | 28 | config Firebase/app — coi như deploy config |
-| | `analyte-catalog.js` | 80 | dữ liệu measurand đóng băng (thuần data) |
+| | ~~`range.js`~~ | ~~95~~ | **xong 2026-08-19, Hạ tầng lát 4** — xem bên dưới |
+| | ~~`backup-ui.js`~~ | ~~27~~ | **xong 2026-08-19, Hạ tầng lát 2** — xem bên dưới |
+| | ~~`app-meta.js`~~ | ~~28~~ | **xong 2026-08-19, Hạ tầng lát 3** — xem bên dưới |
+| | `analyte-catalog.js` | 80 | dữ liệu measurand đóng băng (thuần data) — `state.js` đọc TRẦN ở top-level, xem cảnh báo bên dưới |
 | **D. Lõi UMD + worker** (dự án con parity riêng, làm sau cùng Pha G) | `assets/core.js` | 637 | UMD, dùng chung Node/browser/worker |
 | | `assets/workers/westgard-worker.js` | — | contract worker, cần parity test |
 | **E. Bootstrap cuối** | `assets/app.js` | 9 | entry `boot()` — xử lý ở đầu Pha H |
 
+**Cảnh báo cho lát kế tiếp — `analyte-catalog.js` KHÔNG đơn giản như vẻ ngoài:**
+khác `local-store.js`/`backup-ui.js`/`app-meta.js`/`range.js` (chỉ có closure
+trì hoãn), `state.js` đọc `TEA_ANALYTE_CATALOG` TRẦN Ở TOP LEVEL, ngay khi nạp
+(`const REFTESTS=Object.freeze(TEA_ANALYTE_CATALOG.map(...))`,
+`const TEA_ANALYTE_META=...`) — không phải trong thân hàm. Gộp
+`analyte-catalog.js` vào bundle (nạp SAU `state.js` trong `index.html` hiện
+tại) sẽ làm `state.js` ném `ReferenceError` ngay lúc boot, vì `TEA_ANALYTE_CATALOG`
+chưa tồn tại (không phải property của `globalThis`, không phải binding lexical
+dùng chung) tại thời điểm đó. Lát này phải giải quyết được sự phụ thuộc thứ tự
+nạp này trước — hoặc bằng cách chuyển luôn phần đọc `TEA_ANALYTE_CATALOG` của
+`state.js` sang lazy (nằm ngoài phạm vi "chỉ port analyte-catalog.js"), hoặc để
+dành file này cho ĐÚNG lát chuyển `state.js` — không chuyển riêng lẻ như đã làm
+với 4 file trước.
+
 **Thứ tự đề xuất tiếp theo:** nhóm A (route/presentation) đã xong toàn bộ →
 nhóm B (canvas/adapter) đã xong toàn bộ (`draw.js` Route 13, `reports.js`
 Route 14, `data-io.js` Route 15) → nhóm C (hạ tầng, từng lát một, chạy
-`ui-check` + benchmark storage) → nhóm D (`core.js`+worker, lát parity độc
-lập) → Pha H.
+`ui-check` + benchmark storage) — **lát 1 (`local-store.js`), lát 2
+(`backup-ui.js`), lát 3 (`app-meta.js`) và lát 4 (`range.js`) xong
+2026-08-19**, còn 5 file. `analyte-catalog.js` cần xử lý cùng `state.js` (xem
+cảnh báo trên) chứ không tách riêng; để dành
+`state.js`/`qc-domain.js`/`state-storage.js`/`firebase-sync.js`/`users-auth.js`/
+`action-workflow-service.js` — có nhiều caller chéo và lifecycle nhạy — cho các
+lát sau khi đã quen bẫy "eager vs lazy global" trong nhóm này) → nhóm D
+(`core.js`+worker, lát parity độc lập) → Pha H.
 
 ## 4. Phân lớp đích và trách nhiệm
 
@@ -1471,6 +1495,311 @@ bản render canvas Sigma/MDC qua Chromium thật) + `nce-check` (91/91) +
 ratchet PASS). **Toàn bộ nhóm A (Route/presentation) của Pha G đã hoàn tất.**
 Chuyển sang nhóm B (canvas/adapter: `draw.js`, `reports.js`, `data-io.js`) —
 cần gate `visual-check`/`print-check` riêng.
+
+#### Lát hạ tầng 1 — `local-store.js` (2026-08-19, mở nhóm C)
+
+Retire hoàn toàn `assets/modules/local-store.js` (13 dòng) — file nhỏ nhất
+trong nhóm C, chọn mở đầu vì nó đã là "vỏ cầu nối" thuần từ đợt dọn bridge Pha
+F (mục "Đã dọn nhóm A" ở trên): mỗi hàm của `LocalStore` chỉ
+`return globalThis.localStoreService.X(...)`, và `localStoreService`
+(`src/application/storage/local-store-service.ts`) đã là implementation
+TypeScript thật từ trước. Không có logic mới nào cần viết — chỉ chuyển đúng
+cái facade đó vào `src/compat/modular-pilot.global.ts`:
+`root.LocalStore = Object.freeze({supported,read,write,writeSerialized,
+writePartitioned,readPartitioned,clear})`, đặt ngay sau
+`root.localStoreService = createLocalStoreService({...})`. Vì đây là một
+PHÉP GÁN (`root.LocalStore =`), không phải khai báo `const LocalStore=` như
+bản classic, `LocalStore` vẫn là global thật truy cập được bằng tên trần —
+đúng cách các "bí danh thuần" trước đó (`pageDash`, `brandTitle`, …) đã làm —
+nên hai bài test gọi thẳng `LocalStore.write(...)`/`LocalStore.supported()`
+làm bare identifier (`tests/local-store.test.js`,
+`benchmarks/performance-regression.js`) không cần viết lại, chỉ cần đảm bảo
+bundle được nạp trong sandbox của chúng.
+
+**Một bẫy thật, khác hẳn kiểu "bare identifier vs lazy call" đã biết từ Lát 2/3:**
+`modularIndexedDbOpenService`/`modularIndexedDbRecordService` (hai service nội
+bộ nuôi `localStoreService`) trước đó được dựng có điều kiện —
+`typeof LocalStore!=='undefined'?createIndexedDbOpenService(...):null` — một
+guard TÍNH NGAY LÚC NẠP SCRIPT (không phải closure trì hoãn), chỉ đúng vì
+classic `local-store.js` load TRƯỚC bundle trong `index.html` nên `LocalStore`
+đã tồn tại khi dòng này chạy. Gộp `LocalStore` vào chính bundle làm bẫy này
+tự cắn đuôi: dòng guard chạy TRƯỚC dòng `root.LocalStore=...` bên dưới trong
+CÙNG một lượt thực thi script, nên `typeof LocalStore` mãi mãi `'undefined'`
+→ `modularIndexedDbOpenService` cố định `null` → mọi ghi/đọc IndexedDB câm
+lặng thành no-op ngay cả khi trình duyệt thật có `indexedDB`. Test Node không
+bắt được vì hầu hết sandbox stub `indexedDB` sau khi bundle đã nạp (đúng thời
+điểm bẫy này cần), giống hệt kiểu lỗi "chỉ lộ khi chạy Chromium thật" của Lát
+3. Sửa bằng cách bỏ hẳn guard điều kiện — dựng cả hai service vô điều kiện —
+vì lớp trong (`createIndexedDbOpenService`'s `open()`,
+`createIndexedDbRecordService`'s `get`/`put`/`delete`) đã tự trả về giá trị
+rỗng an toàn khi `indexedDB` thật sự không tồn tại; guard ngoài chưa bao giờ
+cần thiết cho hành vi, chỉ từng đúng ngẫu nhiên nhờ thứ tự nạp classic. Quét
+lại toàn bộ 7 điểm dùng `LocalStore` còn lại trong `modular-pilot.global.ts`
+(2 điểm dạng "eager guard" như trên đã sửa; 5 điểm còn lại đều là closure trì
+hoãn bên trong service khác, được đổi thẳng sang gọi `root.localStoreService!`
+thay vì đi vòng qua `LocalStore` — không đổi hành vi, chỉ bỏ một lớp gián
+tiếp thừa) — không còn tham chiếu `LocalStore` nào bên trong
+`modular-pilot.global.ts` ngoài chính dòng gán `root.LocalStore=`.
+
+Xóa ambient `declare const LocalStore` (không còn cần vì mọi tham chiếu nội
+bộ giờ đi qua `root.localStoreService`), thêm `LocalStore?: LocalStoreApi;`
+vào interface global bridge cạnh `localStoreService?: LocalStoreApi;`. Xóa
+thẻ `<script>` của `local-store.js` khỏi `index.html`. 5 file test
+(`tests/cache-invalidation.test.js`, `tests/firebase-config.test.js`,
+`tests/local-store.test.js`, `tests/state-storage-safety.test.js`,
+`tests/storage-pipeline.test.js`) chỉ cần bỏ mục
+`'modules/local-store.js'` khỏi danh sách nạp — mọi list đều đã có
+`modules/state.js` hoặc `modules/state-storage.js` nên `loadSandbox()` tự
+chèn bundle.
+
+**Phát hiện phụ ngoài phạm vi lát này, tiện tay sửa vì cùng file:**
+`benchmarks/performance-regression.js` đã hỏng từ trước (không liên quan
+`local-store.js`) — dòng `loadSandbox(['core.js','modules/state.js',
+'modules/qc-domain.js','modules/settings.js'])` tham chiếu `modules/settings.js`,
+bị xóa từ Route route 1 (2026-08-18) mà benchmark chưa bao giờ được cập nhật
+theo, nên `node benchmarks/performance-regression.js` ném `ENOENT` ngay từ
+lệnh gọi `loadSandbox` đầu tiên — nghĩa là gate benchmark này đã không chạy
+được ít nhất từ Route 1. Xác nhận bằng cách chạy trực tiếp trước khi sửa bất
+cứ gì (không suy đoán). Sửa bằng cách bỏ `'modules/settings.js'` khỏi list đó
+(không hàm nào benchmark này gọi — `QCCore.validateBackup`/`sanitizeBackup`/
+`ensureShape`/`validateStateInvariants` — cần `settings.js`; `ensureShape()`
+gọi `ensureLabBrandShape` qua bundle tự động nhờ `modules/state.js` đã có
+trong list) và đổi dòng đo IndexedDB
+(`loadSandbox(['modules/local-store.js'],{performance})`, giờ mất file) sang
+`loadSandbox(['core.js','modules/state.js','modules/qc-domain.js'],{performance})`
+để `LocalStore` tới từ bundle tự chèn. Chạy lại benchmark xác nhận gate pass
+(`saveIncrementalPartitions:1`, đúng tín hiệu ghi tăng dần đã chốt trong
+CLAUDE.md) — bài học: một benchmark không nằm trong `npm test`/pre-commit
+hook có thể âm thầm gãy nhiều lát mà không ai biết cho tới khi có người chạy
+tay hoặc release gate (`verify-release.js`) chạm tới nó.
+
+Gate: `build:pilot`/`typecheck`/`test` xanh (613/613) + `ui-check` (29/29, gồm
+kịch bản restore backup đi qua đúng đường ghi/đọc IndexedDB) + `nce-check`
+(91/91) + `node benchmarks/performance-regression.js` pass (xác nhận lại
+sau khi sửa cả hai chỗ hỏng).
+
+#### Lát hạ tầng 2 — `backup-ui.js` (2026-08-19)
+
+Retire `assets/modules/backup-ui.js` (27 dòng, 9 hàm + 1 hằng ngưỡng) —
+**không tạo file TS mới**, inline thẳng vào `src/compat/modular-pilot.global.ts`
+ngay sau khối dựng bốn `Backup*Command` (`BackupExportCommand`/
+`BackupImportCommand`/`BackupInspectionCommand`/`BackupStatusCommand`), theo
+đúng tiền lệ `audit.js` (Route 6) chứ không theo tiền lệ `settings.js`/
+`local-store.js`-kiểu-lát-1: file này CÓ nhánh/try-catch thật (khác
+`local-store.js`'s 1-dòng thuần túy) nhưng vẫn thuần là glue quanh các
+command TypeScript đã có sẵn, không có HTML, nên không đáng một controller
+factory riêng.
+
+Trước khi xóa, map cả 9 hàm ra caller thật bằng `rg` trên toàn `assets/`,
+`src/`, `tests/` (đúng quy tắc audit.js để lại): 8 hàm có caller thật
+(`confirmOversizedBackup`/`exportData`/`downloadBackupText`/
+`backupCurrentData`/`importData`/`verifyBackupFile`/`markBackupDone`/
+`backupStatusText`/`backupCapacityText`/`updateBackupBanner` — `importData`/
+`verifyBackupFile`/`exportData` được gọi từ chuỗi HTML onclick dựng ở
+`admin-tools-html.ts`, không đổi gì ở đó). **1 hàm chết hẳn:**
+`backupOverdue()` — 0 caller ở bất kỳ đâu kể cả `BackupStatusCommand.overdue`
+(phương thức TS bên dưới cũng mồ côi luôn, nhưng để nguyên trong
+`backup-status-command.ts` vì nằm ngoài phạm vi "dọn file classic" của lát
+này) — xóa hẳn, không port.
+
+**Bẫy duy nhất, khác cả `local-store.js` lẫn `audit.js`:** `backupCurrentData`
+được `users-auth.js` (chưa migrate) đọc TRẦN qua
+`typeof backupCurrentData==='function'` — đúng dạng cảnh báo cuối của lát
+`audit.js` ("hàm nào vẫn còn nơi khác gọi trần bằng mã JS thật thì phải thêm
+ambient vào `global.d.ts`, không chỉ vào `modular-pilot.global.ts`"). Thêm
+`declare function backupCurrentData(prefix?: string): Promise<boolean>;` vào
+`global.d.ts` — thiếu dòng này thì `tsc --noEmit` (nhánh checkJs quét
+`users-auth.js`) báo `Cannot find name 'backupCurrentData'` dù
+`tsc -p tsconfig.modules.json` và `build:pilot` đều xanh, đúng kiểu lỗi hai
+chương trình tsc không đồng bộ mà lát `audit.js` đã cảnh báo trước.
+
+**8 test phụ thuộc, ba kiểu khác nhau:**
+
+1. `tests/backup-ui-bridge.test.js` — xóa hẳn (không sửa). Test này vốn đối
+   chiếu HAI file độc lập (bridge công bố tên gì, route classic tiêu thụ tên
+   đó thế nào); sau khi gộp cả hai vào MỘT file, phép đối chiếu trở nên vô
+   nghĩa — TypeScript strict compilation đã tự đảm bảo `root.X=` khớp interface
+   bắt buộc, không cần một test riêng lặp lại việc đó.
+2. `tests/typescript-module-pilot.test.js` — 19 assertion source-scanner pin
+   nguyên văn cú pháp classic (`globalThis.X`, `function name(){`, `var
+   model=`) của `backup-ui.js` cũ. Đổi biến `backupUiSource` sang đọc
+   `src/compat/modular-pilot.global.ts` (giống `dashboardRoutesSource`/
+   `manageRoutesSource`/… đã trỏ sang file TS thay thế từ các lát trước) và
+   viết lại từng regex sang cú pháp mới (`root.X`, arrow function, không có từ
+   khóa `return` ở thân biểu thức). Một assertion đổi Ý NGHĨA thay vì chỉ đổi
+   cú pháp: `return globalThis.BackupStatusCommand.overdue(` (khẳng định
+   `backupOverdue` tồn tại) đổi thành `doesNotMatch(/backupOverdue/)` (khẳng
+   định hàm chết không bị đưa trở lại). Một assertion khác
+   (`doesNotMatch(backupSizeWarningConfirmation)`, ý định gốc: "hàm
+   `confirmOversizedBackup` không được tự quyết định size-warning, việc đó
+   thuộc về `BackupExportCommand`") suýt sai nếu chỉ đổi tiền tố —
+   `backupSizeWarningConfirmation` xuất hiện HỢP LỆ ở nơi khác trong CÙNG file
+   khổng lồ này (khai báo interface, construction, và trong wiring `warning:`
+   của chính `BackupExportCommand` — đúng dòng cạnh nơi gọi
+   `confirmOversizedBackup`). Một `doesNotMatch` quét toàn file sẽ báo lỗi giả.
+   Sửa bằng cách thay hai assertion rời (match phần đầu + doesNotMatch phần
+   đuôi) bằng MỘT assertion `match` ghim TOÀN VĂN câu lệnh
+   `root.confirmOversizedBackup=async(size,{title,detail})=>{...}` — ghim
+   trọn nội dung tự nó chứng minh không có lời gọi nào khác chen vào, không
+   cần một `doesNotMatch` tách rời dễ vỡ theo ngữ cảnh xung quanh. Cũng lật
+   ngược assertion `index.html` phải TẢI `backup-ui.js`
+   (`assert.match`) thành PHẢI KHÔNG tải (`assert.doesNotMatch`), khớp mẫu đã
+   dùng cho `lis-queue-ui.js` ngay dòng kế bên.
+3. 6 test hành vi (`tests/backup-download-bridge.test.js`,
+   `tests/backup-roundtrip.test.js`, `tests/audit-ingress-gates.test.js`,
+   `tests/auth-security.test.js`) chỉ cần bỏ `'modules/backup-ui.js'` khỏi
+   danh sách nạp (đã có `state.js`/bundle explicit sẵn) — riêng
+   `backup-download-bridge.test.js` tái diễn đúng bài học "stub bị bundle ghi
+   đè" của Lát 1: trước đây nạp CHỈ `['modules/backup-ui.js']` với
+   `blobDownload` stub qua tham số `globals`; giờ `blobDownload` là property
+   thật do bundle gán ngay khi nạp (`root.blobDownload=createBlobDownload(...)`),
+   ghi đè mất stub — sửa bằng cách nạp `['core.js','modules/state.js',
+   'modules/qc-domain.js']` (bundle tự chèn) rồi gán `ctx.blobDownload=...`
+   TRỰC TIẾP SAU khi `loadSandbox()` trả về, không qua tham số `globals`.
+   `auth-security.test.js` đọc thẳng `backup-ui.js` bằng `fs.readFileSync` để
+   pin `async function importData(...)`  — trỏ sang
+   `src/compat/modular-pilot.global.ts`, regex đổi thành
+   `root.importData=async e=>\{[\s\S]*?reauthenticateCurrentUser\(\{title:...`.
+
+`tests/admin-tools-html.test.js` không đổi gì — nó chỉ kiểm HTML onclick
+(`exportData()`, `importData(event)`, …) do `admin-tools-html.ts` dựng, không
+quan tâm các hàm đó cài đặt ở đâu.
+
+Gate: `build:pilot`/`typecheck`/`test` xanh (612/612 — giảm 1 vì xóa
+`backup-ui-bridge.test.js`) + `ui-check` (29/29, gồm 3 kịch bản backup/restore
+đi qua đúng `confirmOversizedBackup`/`importData`/`verifyBackupFile` mới) +
+`nce-check` (91/91) + `a11y-audit` (ratchet PASS, trang Settings có panel
+"Quản trị dữ liệu" vẫn 0 vi phạm).
+
+#### Lát hạ tầng 3 — `app-meta.js` (2026-08-19)
+
+Retire `assets/modules/app-meta.js` (28 dòng) — file **dữ liệu thuần, không có
+hàm nào**: chỉ hai object literal gán `window.QCLAB_APP`/`window.QCLAB_CLOUD`
+(tên app/phiên bản, và cấu hình Firebase deploy mặc định gồm cả API key
+thật). Lát dễ nhất trong nhóm C tính tới nay — không có nhánh, không có
+caller nào cần map lại hành vi, chỉ cần chuyển nguyên hai object đó vào
+`src/compat/modular-pilot.global.ts` làm `root.QCLAB_APP = {...}` /
+`root.QCLAB_CLOUD = root.QCLAB_CLOUD || {...}`, đặt ngay sau dòng
+`const root = globalThis as QCLabGlobal` (trước cả guard `QCCore` — vị trí
+này khớp vai trò "cái nạp đầu tiên" của bản classic, dù về mặt hành vi không
+bắt buộc phải đặt ở đây vì mọi nơi đọc đều là closure trì hoãn — xem bên
+dưới).
+
+**Rủi ro thật duy nhất đã kiểm tra trước khi làm, không phải bẫy phát hiện
+sau:** `app-meta.js` trước đây nạp NGAY SAU `core.js` (dòng 66, trước cả
+`state.js`/`qc-domain.js`/`firebase-sync.js`/`state-storage.js`/
+`action-workflow-service.js`), còn bundle nạp SAU TẤT CẢ các file đó (dòng
+~73). Gộp vào bundle nghĩa là `QCLAB_APP`/`QCLAB_CLOUD` chỉ thật sự tồn tại
+MUỘN HƠN nhiều so với trước — nếu bất kỳ file classic nào đọc chúng ở TOP
+LEVEL (ngay khi nạp, không phải trong thân hàm) thì sẽ vỡ. Xác nhận bằng `rg`
+"QCLAB_APP\|QCLAB_CLOUD" trên toàn `assets/`, `src/`: cả 8 điểm đọc hiện có
+đều là closure trì hoãn (`() => window.QCLAB_APP||{...}`, gọi lúc
+`showLogin()`/`initFirebase()`/xuất báo cáo chạy, không phải lúc script nạp)
+— không điểm nào đọc trần ở top level. Do đó việc dời vị trí nạp không đổi
+hành vi nào, khác hẳn bẫy `wgMemo` (Lát 3, `router-render.js`) nơi một `let`
+top-level bị đọc qua `root.X` — ở đây không có biến `let`/`const` nào cả, chỉ
+có function closures.
+
+Kiểu hai object trong interface `QCLabGlobal` mở rộng từ `{ version?: string }`
+tối giản (chỉ đủ cho một chỗ gọi `.version`) thành đầy đủ
+`{ name: string; version: string; releaseDate: string }` và thêm mới
+`QCLAB_CLOUD: { labCode: string; anonymous: boolean; locked: boolean; config:
+Record<string, string> }` — cả hai giờ là trường bắt buộc (không có `?`) vì
+được gán vô điều kiện ngay trong file này. `interface Window` trong
+`global.d.ts` (dùng cho nhánh checkJs quét `users-auth.js`, nơi vẫn đọc
+`window.QCLAB_APP` trần trong `showLogin()`) đã có sẵn `QCLAB_APP: any`/
+`QCLAB_CLOUD: any` từ trước — không cần sửa.
+
+Không có test nào load `'modules/app-meta.js'` tường minh (xác nhận bằng
+`rg`), nên không có file test nào cần sửa — chỉ xóa file, xóa thẻ `<script>`,
+bump `?v=` của bundle. Kèm dọn hai chỗ tài liệu tham chiếu đường dẫn cũ:
+`tests/global-name-uniqueness.test.js`'s comment (không sửa, chỉ là ví dụ
+minh họa, không phải dependency thật) và `docs/validation/RELEASE-PUBLISH.md`
+— checklist phát hành trỏ thẳng `assets/modules/app-meta.js` để lấy
+`version`/`releaseDate` khi bump bản release; đổi sang trỏ
+`root.QCLAB_APP` trong `src/compat/modular-pilot.global.ts` (và tag `?v=` cần
+bump giờ là của `assets/generated/modular-pilot.js`, không phải một file
+riêng của `app-meta.js` nữa) — bỏ sót chỗ này sẽ làm quy trình release tương
+lai kiểm tra nhầm một file đã không còn tồn tại.
+
+Vì đây là cấu hình Firebase thật (API key production), xác nhận thêm bằng
+trình duyệt thật thay vì chỉ tin `npm test`: mở `qc-lab-static` (cổng 8080),
+đọc `window.QCLAB_APP`/`window.QCLAB_CLOUD` qua console — đúng giá trị — và
+xác nhận màn hình đăng nhập hiện đúng "Phiên bản 2.7.6" (chuỗi
+`showLogin()` dựng từ `window.QCLAB_APP.version`).
+
+Gate: `build:pilot`/`typecheck`/`test` xanh (612/612, không đổi số lượng) +
+`ui-check` (29/29) + xác nhận trực tiếp trên trình duyệt (`window.QCLAB_APP`/
+`QCLAB_CLOUD` đúng giá trị, màn đăng nhập hiện đúng phiên bản).
+
+#### Lát hạ tầng 4 — `range.js` (2026-08-19)
+
+Retire `assets/modules/range.js` (95 dòng, 10 hàm) — file lớn nhất và duy nhất
+có DOM/modal thật trong ba lát nhóm C đã làm tới nay, nhưng vẫn **không tạo
+file TS mới**: mọi phụ thuộc (`qcRangeCandidateService`, `qcRangeTea`,
+`qcRangeSafetyGate`, `qcRangeBiasEvaluation`, `RangeWorkflowCommand`, 6 HTML
+builder `range*Html`) đã là TypeScript có sẵn — `range.js` chỉ còn vai trò
+orchestration/DOM-adapter (đọc form, mở modal, gọi service, không chứa phép
+tính lâm sàng nào) — đúng vai trò "chỉ inline, không logic mới" như
+`audit.js`/`backup-ui.js`, dù độ dài/số nhánh lớn hơn hẳn hai file đó. Toàn bộ
+10 hàm chuyển thẳng vào `src/compat/modular-pilot.global.ts`, đặt ngay sau
+`root.RangeWorkflowCommand=createRangeWorkflowCommand({...})`.
+
+Trước khi xóa, `rg` xác nhận cả 10 hàm: 2 hàm (`openRangeWorkflow`,
+`revertRange`) được gọi từ chuỗi HTML onclick dựng ở
+`src/presentation/range/range-actions-html.ts` (đã là TypeScript từ trước,
+không đổi gì — chuỗi `openRangeWorkflow('${tid}',${level})` vẫn đúng vì tên
+global không đổi); `rangeCandidate` còn được `entry-page-controller.ts` (Route
+10) và chính `modular-pilot.global.ts` tiêu thụ qua closure trì hoãn
+(`(root as any).rangeCandidate(testId, level)` tại dòng dựng deps cho
+`EntryUIState`); 7 hàm còn lại chỉ gọi lẫn nhau nội bộ hoặc từ chuỗi onclick tự
+sinh trong chính HTML mà `openRangeWorkflow`/`applyNewRange`/`revertRange`
+dựng ra (`applyNewRange`, `confirmApplyNewRange`, `confirmRevertRange`,
+`rangeUpdateBiasHint`). Không có hàm nào chết — khác `local-store.js`/
+`backup-ui.js`/`app-meta.js`, lát này không phát hiện dead code.
+
+**Không có bẫy thứ tự nạp** (khác cảnh báo đã ghi cho `analyte-catalog.js`
+bên trên): xác nhận bằng `rg` toàn `assets/`, `src/` rằng cả 10 tên đều chỉ
+được đọc qua closure trì hoãn — không nơi nào đọc trần ở top-level của một
+classic script khác. `range.js` trước đây nạp SAU bundle (giữa
+`generated/modular-pilot.js` và `users-auth.js`); gộp vào bundle chỉ khiến các
+hàm này có sẵn SỚM HƠN, không muộn hơn — an toàn theo đúng chiều.
+
+Thêm 11 trường bắt buộc (`rangeSystematicNce`/`rangeCandidate`/
+`openRangeWorkflow`/`rangeTeaPercent`/`rangeGateHtml`/`rangeUpdateBiasHint`/
+`rangeGatePasses`/`applyNewRange`/`confirmApplyNewRange`/`revertRange`/
+`confirmRevertRange`) vào interface bridge — trước lát này, `rangeCandidate`
+chỉ được gọi qua `(root as any).rangeCandidate(...)` (chưa có kiểu thật) dù đã
+có hai caller TypeScript. Một lỗi kiểu duy nhất khi typecheck: `lvlCfg(test:
+Record<string,any>, ...)` không nhận `Record<string,any>|undefined` mà
+`state.tests!.find(...)` trả về trong `confirmRevertRange` — sửa bằng ép kiểu
+`as any` tại điểm gọi, khớp phong cách lỏng đã dùng cho toàn bộ lớp adapter
+DOM này (không đáng thắt chặt kiểu `lvlCfg` chỉ vì một lát port).
+
+**3 test cần sửa, một kiểu bẫy y hệt đã gặp ở `audit.js`:** `rg
+"modules/range"` ban đầu chỉ thấy `tests/range-candidate.test.js` (đọc qua
+`loadSandbox([...,'modules/range.js'])`), bỏ sót
+`tests/entry-service.test.js` vì nó dựng đường dẫn bằng
+`path.join(__dirname,'..','assets','modules','range.js')` — bốn tham số
+tách rời nên chuỗi con `'modules/range.js'` không xuất hiện liền trong mã
+nguồn. Phải dò lại bằng `rg "'range\.js'"` (đúng bài học đã ghi ở Route 6) mới
+tìm ra. Sửa: `range-candidate.test.js` bỏ `'modules/range.js'` khỏi danh sách
+nạp (đã có `state.js` nên bundle tự chèn), trỏ lại 7 assertion
+`globalThis.rangeXxxHtml(` sang `root.rangeXxxHtml(` và đọc từ
+`src/compat/modular-pilot.global.ts` thay vì `assets/modules/range.js`;
+`entry-service.test.js` đổi tương tự cho 2 assertion `fmtTestValue(r.t,r.l...`
+(không cần đổi tiền tố vì assertion không neo `globalThis.`/`root.`, chỉ neo
+đúng chuỗi con `fmtTestValue(r.t,r.l.mean...` — vẫn khớp vì
+`(root as any).fmtTestValue(...)` chứa nguyên chuỗi con đó).
+`tests/range-tea-bridge.test.js` xóa hẳn (không sửa) — cùng lý do
+`backup-ui-bridge.test.js` ở Lát 2: đối chiếu hai file độc lập, giờ chỉ còn
+một.
+
+Gate: `build:pilot`/`typecheck`/`test` xanh (611/611 — giảm 1 vì xóa
+`range-tea-bridge.test.js`) + `ui-check` (29/29, gồm đúng kịch bản "Áp dụng
+dải PXN cập nhật đủ Mean/SD và hai giới hạn" đi qua `applyNewRange`/
+`confirmApplyNewRange` mới) + `nce-check` (91/91) + `a11y-audit` (ratchet
+PASS).
 
 ### Pha H — bỏ global bridge và nhiều script tags
 
