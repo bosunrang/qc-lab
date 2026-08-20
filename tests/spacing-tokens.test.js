@@ -25,7 +25,14 @@ for(const name of fs.readdirSync(path.join(assets,'modules'))){
   });
 }
 assert.deepStrictEqual(violations,[],`Spacing tĩnh và sr-only phải dùng class chung, còn inline tại:\n${violations.join('\n')}`);
-const usersAuth=fs.readFileSync(path.join(assets,'modules','users-auth.js'),'utf8');
+// users-auth.js retired 2026-08-20 (Pha G nhóm C lát 2) vào src/compat/modular-pilot.global.ts —
+// quét đúng đoạn Users/Audit/Auth đã port (giữa hai mốc comment), không quét nguyên file bridge
+// (file đó có các đoạn port khác — vd range.js — đã có `style=` hợp lệ từ trước, ngoài phạm vi kiểm tra này).
+const bridge=fs.readFileSync(path.join(root,'src','compat','modular-pilot.global.ts'),'utf8');
+const usersAuthStart=bridge.indexOf('===== USERS / AUDIT / AUTH =====');
+const usersAuthEnd=bridge.indexOf('const lisRuntime = createLisGatewayRuntime();',usersAuthStart);
+assert.ok(usersAuthStart>=0&&usersAuthEnd>usersAuthStart,'Không tìm thấy đoạn port Users/Audit/Auth trong modular-pilot.global.ts');
+const usersAuth=bridge.slice(usersAuthStart,usersAuthEnd);
 const manageActions=fs.readFileSync(path.join(root,'src','presentation','manage','manage-tests-actions-controller.ts'),'utf8');
 const reports=fs.readFileSync(path.join(root,'src','presentation','report','report-print-controller.ts'),'utf8');
 assert.doesNotMatch(usersAuth,/\bstyle\s*=/,'Màn hình xác thực/audit không được quay lại inline style');

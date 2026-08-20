@@ -5,8 +5,9 @@
 // động nên TypeScript không nhìn thấy declaration cú pháp:
 //   - `src/presentation/state/ui-state.ts` cài accessor qua
 //     `Object.defineProperty(globalThis, key, {...})`.
-//   - Some service modules (`action-workflow-service.js`, `entry-service.js`)
-//     do `root.Foo = {...}` and/or `Object.assign(root, {...})`.
+//   - Retired classic service modules used to do `root.Foo = {...}` and/or
+//     `Object.assign(root, {...})`; the resulting globals are still declared
+//     here for whatever classic reader (or test) references them bare.
 //   - `core.js` (UMD) exposes itself as `window.QCCore`.
 // TypeScript can't see any of these as declarations, so it reports every
 // (correctly spelled) reference as "Cannot find name" — this file lists them
@@ -21,12 +22,25 @@ declare var mem: any, startupProblem: any, derivedIndex: any;
 declare var pointsCache: Map<string, any>, pointsIndexCache: Map<string, any>, pointsLotCache: Map<string, any>,
   wgMemo: Map<string, any>, acceptedMemo: Map<string, any>, cusumMemo: Map<string, any>;
 
+// --- Firebase sync state + storage hydration gate (globalThis property,
+// khai báo tại firebase-sync.js/state-storage.js — cùng lý do tách nền như
+// `state`/`mem` ở trên: state-storage.js/app.js đọc chúng TRẦN, cùng bundle
+// src/compat/modular-pilot.global.ts từ khi users-auth.js retire vào đó). ---
+declare var fb: { ready: boolean; initialized: boolean; ref: any; dirty: boolean; clientId: string;
+  authUser: any; pendingRenderT: any; pullT: any; seenSig: any; synced: any; retryT: any; retryMs: number };
+declare var storageHydrationPromise: Promise<boolean>;
+
 // --- UI state accessors (cài từ modular compatibility artifact) ---
 declare var selTest: any, statusMemo: any, wgTestQ: any, dashTestQ: any, dashTestStatus: any,
   wgPrevOpen: any, wgExpandedRows: any, wgViewMode: any, wgArchivedGroupId: any,
   wgArchivedTestId: any, wgArchivedTestQ: any, wgChartMode: any;
-declare var currentUser: any, loginFails: any, loginLockUntil: any;
+declare var currentUser: any;
 declare var page: string;
+// Users/Audit/Auth glue (users-auth.js retired 2026-08-20 into
+// src/compat/modular-pilot.global.ts) — assets/app.js still calls these bare.
+declare function ensureAdmin(): Promise<void>;
+declare function showLogin(msg?: string): void;
+declare function showStartupRecovery(): void;
 declare function afterRender(page: string): void;
 declare function openModal(html: string): void;
 declare function closeModal(): void;
@@ -131,12 +145,9 @@ declare var LISClientService: any, lisGatewayRuntime: any,
   lisGatewayConfig: any, lisNormalizeGatewayUrl: any, lisGatewayStatusText: any,
   lisGatewayPull: any,
   lisImportResult: any, lisRejectResult: any, lisGatewayStart: any;
-// action-workflow-service.js does Object.assign(root, root.ActionWorkflowService)
-declare var actionApprovalStatus: any, actionRecordStatus: any, actionCancelled: any, actionApprovalLabel: any, actionRecorded: any, actionCanApprove: any,
-  actionPoint: any, actionEventDate: any, actionNeedsRerun: any, actionRerunStatus: any, actionWorkflowStatus: any,
-  actionDraftStatus: any, actionProtocolStatus: any, actionProtocolSummary: any, actionRiskScore: any, actionResidualRiskScore: any, actionActiveFollowUp: any, actionEffectivenessStatus: any,
-  ACTION_LABELS: any, RISK_SCALE: any, invalidateActionCaches: any, nextNceId: any, nceDueDate: any, actionOverdue: any,
-  actionRerunGateDate: any, pointActions: any, pointRealActions: any, pointWorkflowComplete: any, pointWorkflowSummary: any;
+// action-workflow-service.js retired 2026-08-20 (Pha G nhóm C lát 1) — glue functions now
+// live only in src/compat/modular-pilot.global.ts (typed there via QCLabGlobal), and no
+// remaining classic .js file references them bare, so no ambient `declare var` needed here.
 
 // core.js (UMD) exposes itself as window.QCCore; referenced bare everywhere else
 declare var QCCore: any;

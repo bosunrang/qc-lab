@@ -25,7 +25,6 @@ const ctx = loadSandbox([
   'core.js',
   'modules/state.js',
   'modules/qc-domain.js',
-  'modules/action-workflow-service.js',
   'generated/modular-pilot.js',
 ]);
 run(ctx, 'function __setState(s){state=s;clearDerived();}');

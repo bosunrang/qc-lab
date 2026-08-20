@@ -1356,7 +1356,7 @@ assert.match(dataIoSource, /function exportReportCSV\(\)[\s\S]*?deps\.csvDownloa
   'report CSV export must call the injected download dependency directly');
 assert.match(dataIoSource, /function exportActionsCSV\(\)[\s\S]*?deps\.csvDownload\('Nhat_ky_khac_phuc_QC\.csv', rows\);/,
   'NCE CSV export must call the injected download dependency directly');
-assert.match(read('assets/modules/users-auth.js'), /function exportActivityCSV\(\)\{globalThis\.csvDownload\(/,
+assert.match(adapter, /root\.exportActivityCSV\s*=\s*\(\)\s*=>\s*\{\s*root\.csvDownload!\('Nhat_ky_hoat_dong_QCLab\.csv'/,
   'activity CSV export must call the TypeScript download service directly');
 assert.match(generated, /root\.syncRetryScheduler\s*=\s*createSyncRetryScheduler/,
   'artifact must publish the TypeScript Firebase retry scheduler for the legacy bridge');

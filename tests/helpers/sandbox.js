@@ -31,8 +31,6 @@ function loadSandbox(relFiles, globals = {}) {
   // sau toàn bộ module test yêu cầu để ensureShape() không âm thầm chạy fallback
   // classic chỉ vì sandbox thiếu artifact.
   if(stateIndex>=0&&!files.includes('generated/modular-pilot.js'))files.push('generated/modular-pilot.js');
-  const actionWorkflowIndex=files.indexOf('modules/action-workflow-service.js');
-  if(actionWorkflowIndex>=0&&!files.includes('generated/modular-pilot.js'))files.splice(actionWorkflowIndex+1,0,'generated/modular-pilot.js');
   // Storage runtime đã chuyển sang façade TypeScript. Khi test nạp state-storage,
   // luôn nạp bundle SAU toàn bộ module test yêu cầu để không quay về fallback
   // source-only (khác thứ tự dependency thì không phản ánh runtime thật).

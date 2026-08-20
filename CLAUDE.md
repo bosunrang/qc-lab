@@ -199,8 +199,10 @@ it runs under `xvfb-run`, see the CI job):
   an explicit release-to-service decision after held results, and a residual-risk
   reassessment before an "effective" conclusion; these fields are retained by
   backup sanitization and the full NCE audit CSV.
-- `action-workflow-service.js` phải giữ chi phí `actionRerunStatus()` không tăng theo
-  tổng số điểm QC: nó bị gọi 5 lần cho CÙNG một hồ sơ trong một lần vẽ
+- `ActionRerunService` (`src/application/nce/action-rerun-service.ts`, bridged as
+  `root.actionRerunStatus`/`root.actionPoint`/… — retired from classic
+  `action-workflow-service.js` on 2026-08-20, xem "Module roles") phải giữ chi phí
+  `actionRerunStatus()` không tăng theo tổng số điểm QC: nó bị gọi 5 lần cho CÙNG một hồ sơ trong một lần vẽ
   (`actionWorkflowStatus()` → `actionProtocolStatus()` nhánh release →
   `actionEffectivenessStatus()`), và bản đầu mỗi lần quét lại toàn bộ
   `state.data[testId]` — đo được 5 894ms mỗi lần vẽ bảng nhật ký với 40 000 điểm × 600
@@ -446,7 +448,7 @@ the Google Fonts link, offline labs must print with correct metrics.
   defaults in `state.westgardRules`.
   `derived()` (index cấu hình: panel/thứ tự test/lô/nhóm lô/chuyển tiếp đã duyệt)
   TỰ KIỂM CHỨNG từ 2026-08-01, cùng kỹ thuật với cache của
-  `action-workflow-service.js`: `derivedStampWalk()` so tham chiếu + độ dài của
+  `ActionRerunService`: `derivedStampWalk()` so tham chiếu + độ dài của
   đúng những lát state mà nó đọc, cộng các trường vô hướng nó lọc theo
   (`active`/`status`/`fromLotId`/`toLotId`). Trước đó nó là memo thuần nên chỉ
   đúng khi MỌI đường ghi cấu hình nhớ gọi `clearDerived()` — quên một chỗ thì màn
@@ -511,7 +513,7 @@ the Google Fonts link, offline labs must print with correct metrics.
   backup bookkeeping); using it after a data change leaves stale Westgard
   results on screen. `{cloud:false}` skips the Firebase push and the `_ts` bump.
 - `qc-rules.js`, `period-service.js`, `sigma-cohort-service.js`, `entry-service.js`,
-  `reagent-comparison-service.js`, `manage-config-service.js`, `action-workflow-service.js` — smaller service-style modules (some
+  `reagent-comparison-service.js`, `manage-config-service.js` — smaller service-style modules (some
   IIFE-wrapped) layered on `state`/`qc-domain`. `PeriodService` locks/unlocks
   reporting periods (`state.periodLocks`, a synced list branch); `entry-service.js`
   enforces the lock (blocks add/edit/void once a period is locked), and the
@@ -540,19 +542,6 @@ the Google Fonts link, offline labs must print with correct metrics.
   `EntryService` normalizes QC-point input
   (`preparePointInput`/`addPoint`/`voidPoint`/`recordPoint`) and builds the
   entry sheet/window data; called from `entry-page-controller.ts`.
-  (`action-workflow-service.js` actually loads a bit later, after the
-  `*-ui-state.js` files.)
-  `action-workflow-service.js` owns the corrective-action lifecycle:
-  `approvalStatus` is `pending`/`approved`/`returned`; physical deletion has been
-  replaced by `recordStatus='cancelled'` plus a reason/actor/timestamp. The service
-  ignores cancelled records when deciding whether a QC point has a real NCE, and
-  `actionWorkflowStatus()` only reports an action complete when its rerun
-  requirement, release-to-service gate, effectiveness/residual-risk review and
-  independent approval are all met. Approval is deliberately
-  independent — `actionCanApprove()` refuses the action's own author, matching
-  both the creator and later content editors by stable user ID/username, with the
-  free-text `by` field as the legacy fallback — and approved actions cannot be
-  cancelled or edited.
   `SigmaCohortService` builds period/level cohorts directly from raw QC data,
   split by lot; Sigma precision imports must not reuse `acceptedLotPoints()`
   because that display/operational helper selects one acceptable rerun per day.
@@ -578,7 +567,9 @@ the Google Fonts link, offline labs must print with correct metrics.
   check disconnects sync and preserves local state; a failed backup check
   rejects the import. The app deliberately has no "delete all audit" action;
   admins may only use the verified archive flow below. Retention: cutting old rows (the admin
-  "Lưu trữ nhật ký cũ" flow in `users-auth.js`, or `auditRotateOverflow()` past
+  "Lưu trữ nhật ký cũ" flow, `archiveActivityLog`/`ActivityArchiveCommand` — see
+  "Module roles" for where users-auth.js's Users/Audit/Auth retired to, or
+  `auditRotateOverflow()` past
   `ACTIVITY_HARD_CAP`) removes a **prefix** and records the removed segment's
   tip hash in `state.activityAnchor`; `auditVerifyChain()`/`auditRelinkChain()`
   seed from that anchor instead of `''`. Do not go back to re-hashing the
@@ -899,17 +890,63 @@ the Google Fonts link, offline labs must print with correct metrics.
   independent days, 0 rejected/warning points, SD>0), computed from the
   *entire* operating lot including Westgard-violating points (excluding them
   would shrink SD artificially and falsely narrow the new range).
-- `backup-service.js`, `users-auth.js` —
-  feature-specific logic (backup/restore service, auth/user
-  management). `users-auth.js` hashes passwords
-  with PBKDF2-SHA256 via the TypeScript `pbkdf2PasswordService` bridge, whose
+- Corrective-action (NCE) workflow (`actionApprovalStatus`/`actionRecordStatus`/
+  `actionCancelled`/`actionWorkflowStatus`/`actionRerunStatus`/`actionCanApprove`/
+  `nextNceId`/`pointWorkflowSummary`/…) — retired from classic
+  `action-workflow-service.js` on 2026-08-20 (Pha G nhóm C, lát 1): every
+  function there already only forwarded to an existing TypeScript service
+  (`NceActionIdentityService`, `NceActionBasics`, `ActionProtocolService`,
+  `ActionApprovalGates`, `ActionRerunService`, `ActionPointIndexService`,
+  `ActionQcLink`, `NceActionRerunPolicy`, `PointWorkflowService`), so it moved
+  as-is into `src/compat/modular-pilot.global.ts` right after
+  `root.ActionPointIndexService` is constructed. Two classic-only workarounds
+  were dropped, not carried over: `actionWorkflowStatus()`'s JS fallback branch
+  (dead — `root.ActionWorkflowStatusService` always exists in this bundle,
+  confirmed identical logic to `src/domain/nce/action-workflow-status.ts`), and
+  the `root.NceActionLabels&&...||ACTION_LABELS` load-order guard on
+  `ACTION_LABELS`/`RISK_SCALE` (moot once the assignment lives in the same
+  script as `root.NceActionLabels`, after it). Three classic functions
+  (`actionLotPoints(testId,level,lot)`, `actionPointIndex(testId)`,
+  `actionOpenedFromVoid(a,p)`) were confirmed dead — never exported, never
+  called — and dropped rather than moved; do not confuse them with the
+  differently-shaped, still-live `NceActionQcIndex.actionLotPoints(points,…)`/
+  `.actionPointIndex(points)`. This module owns the corrective-action
+  lifecycle: `approvalStatus` is `pending`/`approved`/`returned`; physical
+  deletion has been replaced by `recordStatus='cancelled'` plus a
+  reason/actor/timestamp. It ignores cancelled records when deciding whether a
+  QC point has a real NCE, and `actionWorkflowStatus()` only reports an action
+  complete when its rerun requirement, release-to-service gate,
+  effectiveness/residual-risk review and independent approval are all met.
+  Approval is deliberately independent — `actionCanApprove()` refuses the
+  action's own author, matching both the creator and later content editors by
+  stable user ID/username, with the free-text `by` field as the legacy
+  fallback — and approved actions cannot be cancelled or edited.
+- `backup-service.js` —
+  feature-specific logic (backup/restore service). Users/Audit/Auth
+  (Người dùng, Nhật ký hoạt động, đăng nhập/đổi mật khẩu/khóa đăng nhập) —
+  retired from classic `users-auth.js` on 2026-08-20 (Pha G nhóm C, lát 2):
+  every DOM-adapter function there already only forwarded to an existing
+  TypeScript command/service (`pbkdf2PasswordService`/`legacyPasswordHashService`/
+  `isPbkdf2PasswordHash`, `LoginWorkflowCommand`/`RequiredPasswordWorkflowCommand`/
+  `AdminBootstrapCommand`/`UserLifecycleCommand`/`ResetOperationalDataCommand`/
+  `ActivityArchiveCommand`, `activityAuditFilter`/`activityAuditPagination`/
+  `activityAuditCsv`, `userListModel`/`userRowHtml`/`usersPageHtml`/
+  `userPermissionsModalHtml`/`resetPasswordModalHtml`), so it moved as-is into
+  `src/compat/modular-pilot.global.ts` right after `root.UserLifecycleCommand`
+  is constructed. `auditQ`/`auditFrom`/`auditTo`/`auditPage`/`auditPageSize`
+  joined `currentUser`/`loginFails`/`loginLockUntil` in `AuthUIState`
+  (`src/presentation/state/ui-state.ts`) rather than staying classic `let`s,
+  for the same reason those three already were — a vm-sandbox test assigning
+  bare `auditQ='...'` must hit the real accessor property on `globalThis`, not
+  a `let` trapped inside the bundle's IIFE. Hashes passwords with PBKDF2-SHA256
+  via the TypeScript `pbkdf2PasswordService` bridge, whose
   `PASSWORD_HASH_ITERATIONS=600000` (OWASP minimum) lives in
   `src/domain/auth/pbkdf2-password-service.ts` — the single source now, not a
   classic-JS constant. The stored `pbkdf2$<iterations>$<salt>$<hash>` string
   carries its own iteration count, so legacy 210k-iteration hashes still
   verify (via `legacyPasswordHashService`) and silently re-hash at the current
   count on next successful login — don't lower `PASSWORD_HASH_ITERATIONS` or
-  drop that upgrade path. `users-auth.js` also exports `reauthenticateCurrentUser({title,
+  drop that upgrade path. Also exports `reauthenticateCurrentUser({title,
   message})` — a password re-prompt gating the app's *critical* operations
   (approving/returning a corrective action, locking/unlocking a reporting
   period, writing or reverting a lot's Mean/SD, concluding a lot transition,

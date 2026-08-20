@@ -20,7 +20,8 @@ export function createAnalysisUiState() {
 
 export function createAuthUiState(lockout: unknown = null) {
   const normalized = normalizeLoginLockoutState(lockout);
-  return { currentUser: null, loginFails: normalized.fails, loginLockUntil: normalized.until };
+  return { currentUser: null, loginFails: normalized.fails, loginLockUntil: normalized.until,
+    auditQ: '', auditFrom: '', auditTo: '', auditPage: 1, auditPageSize: 25 };
 }
 
 export function createEntryUiState() {

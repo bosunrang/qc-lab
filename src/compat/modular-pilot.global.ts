@@ -841,6 +841,8 @@ declare function remoteRenderUnsafe(): boolean;
 declare function focusLoginField(): void;
 declare let currentUser: any;
 declare let page: string;
+declare let loginFails: number, loginLockUntil: number;
+declare let auditQ: string, auditFrom: string, auditTo: string, auditPage: number, auditPageSize: number;
 declare const firebase: any;
 declare function initFirebase(): Promise<unknown>;
 declare function ensureFirebaseApp(config: any): Promise<unknown>;
@@ -903,6 +905,37 @@ type QCLabGlobal = typeof globalThis & {
   NceLifecycleWorkflowCommand: NceLifecycleWorkflowCommand;
   ActionRerunService: ActionRerunService;
   ActionPointIndexService: ActionPointIndexService;
+  // Retire classic action-workflow-service.js (2026-08-20, Pha G nhóm C lát 1) — glue thuần
+  // quanh các service NCE phía trên, không có logic mới.
+  nextNceId: (today: string) => string;
+  nceDueDate: (days?: number) => string;
+  actionApprovalStatus: (action: Record<string, any> | null | undefined) => string;
+  actionRecordStatus: (action: Record<string, any> | null | undefined) => string;
+  actionCancelled: (action: Record<string, any> | null | undefined) => boolean;
+  actionApprovalLabel: (action: Record<string, any> | null | undefined) => string;
+  actionRecorded: (action: Record<string, any> | null | undefined) => boolean;
+  actionDraftStatus: (action: Record<string, any> | null | undefined) => Record<string, any>;
+  actionProtocolStatus: (action: Record<string, any> | null | undefined) => Record<string, any>;
+  actionProtocolSummary: (action: Record<string, any> | null | undefined) => string;
+  actionRiskScore: (action: Record<string, any> | null | undefined) => number;
+  actionResidualRiskScore: (action: Record<string, any> | null | undefined) => number;
+  actionActiveFollowUp: (action: Record<string, any> | null | undefined) => Record<string, any> | null;
+  actionEffectivenessStatus: (action: Record<string, any> | null | undefined) => Record<string, any>;
+  actionOverdue: (action: Record<string, any> | null | undefined) => Record<string, any>;
+  actionCanApprove: (action: Record<string, any> | null | undefined, user: Record<string, any> | null | undefined) => boolean;
+  invalidateActionCaches: (testId?: string) => void;
+  actionPoint: (action: Record<string, any> | null | undefined) => Record<string, any> | null;
+  actionEventDate: (action: Record<string, any> | null | undefined) => string;
+  actionNeedsRerun: (action: Record<string, any> | null | undefined) => boolean;
+  actionRerunGateDate: (action: Record<string, any> | null | undefined, point: Record<string, any> | null | undefined) => string;
+  actionRerunStatus: (action: Record<string, any> | null | undefined) => Record<string, any>;
+  actionWorkflowStatus: (action: Record<string, any> | null | undefined) => Record<string, any>;
+  pointActions: (pointId: string) => Record<string, any>[];
+  pointRealActions: (pointId: string) => Record<string, any>[];
+  pointWorkflowComplete: (pointId: string) => boolean;
+  pointWorkflowSummary: (pointId: string) => Record<string, any>;
+  ACTION_LABELS: NceActionLabels['actionLabels'];
+  RISK_SCALE: NceActionLabels['riskScale'];
   ActionCurrentIssues?: ActionCurrentIssuesApi;
   ActionBiasService: ActionBiasService;
   ActionBiasPresentation: ActionBiasPresentation;
@@ -1545,6 +1578,52 @@ type QCLabGlobal = typeof globalThis & {
   userListModel: typeof userListModel;
   userRowHtml: ReturnType<typeof createUserRowHtml>;
   usersPageHtml: ReturnType<typeof createUsersPageHtml>;
+  // Retire classic users-auth.js (2026-08-20, Pha G nhóm C lát 2) — Users/Audit/Auth pages.
+  AUDIT_PAGE_SIZES: typeof ACTIVITY_AUDIT_PAGE_SIZES;
+  pageUsers: () => string;
+  auditDateKey: (activity: Record<string, any>) => string;
+  auditFilteredActivities: (items?: Record<string, any>[]) => Record<string, any>[];
+  auditSetQuery: (value: string) => void;
+  auditSetDate: (field: string, value: string) => void;
+  auditSetPageSize: (value: unknown) => void;
+  auditSetPage: (value: unknown) => void;
+  auditClearFilters: () => void;
+  pageAudit: () => string;
+  activityCSVRows: (items: Record<string, any>[]) => unknown[][];
+  exportActivityCSV: () => void;
+  archiveActivityLog: () => void;
+  confirmArchiveActivityLog: () => Promise<void>;
+  addUser: () => Promise<void>;
+  userPermChecks: (selectedIds: string[] | null | undefined, groupId: string, roleValue: string) => string;
+  syncUserPermChecks: (groupId: string, roleValue: string) => void;
+  collectUserPerms: (groupId: string, roleValue: string) => Promise<string[] | null>;
+  openUserPerms: (id: string) => Promise<void>;
+  applyUserPerms: (id: string) => Promise<void>;
+  resetPass: (id: string) => void;
+  applyResetPass: (id: string) => Promise<void>;
+  toggleUser: (id: string) => void;
+  delUser: (id: string) => Promise<void>;
+  passwordError: (password: string) => string;
+  legacyHashPass: (password: string) => Promise<string>;
+  hashPass: (password: string) => Promise<string>;
+  verifyPass: (password: string, stored: string) => Promise<boolean>;
+  confirmReauthentication: () => Promise<void>;
+  reauthenticateCurrentUser: (options?: { title?: string; message?: string }) => Promise<boolean>;
+  ensureAdmin: () => Promise<void>;
+  blankAppState: (users: unknown) => Record<string, any>;
+  resetAllData: () => Promise<void>;
+  downloadStartupData: () => void;
+  resetStartupData: () => Promise<void>;
+  authBrandMark: () => string;
+  showStartupRecovery: () => void;
+  showLogin: (msg?: string) => void;
+  focusLoginField: () => void;
+  persistLoginLockout: () => void;
+  doLogin: () => Promise<void>;
+  showPasswordChange: (msg?: string) => void;
+  changeRequiredPassword: () => Promise<void>;
+  logout: () => void;
+  showApp: () => void;
   reagentSelectOptionsHtml: ReturnType<typeof createReagentSelectOptionsHtml>;
   reagentResultHtml: ReturnType<typeof createReagentResultHtml>;
   reagentPairRowHtml: ReturnType<typeof createReagentPairRowHtml>;
@@ -3670,6 +3749,45 @@ root.ActionRerunService = createActionRerunService({
   formatValue: (point, test) => (root as any).fmtPointValue(point, test), formatDate: value => vnDate(value),
 });
 root.ActionPointIndexService = createActionPointIndexService(() => (state as any).actions || []);
+/* ===== ACTION WORKFLOW SERVICE ===== Retire classic action-workflow-service.js (2026-08-20,
+   Pha G nhóm C lát 1) — mọi hàm bên dưới vốn đã chỉ `return root.X.Y(...)` trong bản classic,
+   không có logic mới. Ba hàm classic `actionLotPoints(testId,level,lot)`/`actionPointIndex(testId)`/
+   `actionOpenedFromVoid(a,p)` KHÔNG mang sang: xác nhận bằng rg không còn caller nào (kể cả
+   trong chính file cũ) — tên trùng với `NceActionQcIndex.actionLotPoints/actionPointIndex`
+   (nhận `points[]` thay vì `testId`) chỉ là trùng tên, không phải cùng hàm. `actionWorkflowStatus`
+   bỏ nhánh fallback JS cũ (dead từ khi `ActionWorkflowStatusService` có mặt — xem gán phía trên,
+   luôn tồn tại trong cùng bundle này); `ACTION_LABELS`/`RISK_SCALE` không cần kiểu
+   `root.NceActionLabels&&...||...` nữa vì `NceActionLabels` đã được gán TRƯỚC ở dòng phía trên
+   trong CÙNG một script — khác bản classic phải chờ file khác nạp sau. */
+root.nextNceId = today => root.NceActionIdentityService!.nextNceId((state as any).actions || [], today);
+root.nceDueDate = (days = 7) => root.NceActionIdentityService!.dueDate(days);
+root.actionApprovalStatus = action => root.NceActionBasics!.actionApprovalStatus(action);
+root.actionRecordStatus = action => root.NceActionBasics!.actionRecordStatus(action);
+root.actionCancelled = action => root.NceActionBasics!.actionCancelled(action);
+root.actionApprovalLabel = action => root.NceActionBasics!.actionApprovalLabel(action);
+root.actionRecorded = action => root.NceActionBasics!.actionRecorded(action);
+root.actionDraftStatus = action => root.ActionDraftStatusService!(action);
+root.actionProtocolStatus = action => root.ActionProtocolService!.protocolStatus(action);
+root.actionProtocolSummary = action => root.ActionProtocolService!.protocolSummary(action);
+root.actionRiskScore = action => root.NceActionBasics!.actionRiskScore(action);
+root.actionResidualRiskScore = action => root.NceActionBasics!.actionResidualRiskScore(action);
+root.actionActiveFollowUp = action => root.NceActionIdentityService!.activeFollowUp((state as any).actions || [], action);
+root.actionEffectivenessStatus = action => root.ActionProtocolService!.effectivenessStatus(action);
+root.actionOverdue = action => root.ActionApprovalGates!.overdue(action);
+root.actionCanApprove = (action, user) => root.ActionApprovalGates!.canApprove(action, user);
+root.invalidateActionCaches = testId => { root.ActionRerunService!.invalidate(testId); root.ActionPointIndexService!.invalidate(); };
+root.actionPoint = action => root.ActionRerunService!.point(action);
+root.actionEventDate = action => root.ActionQcLink!.eventDate(action);
+root.actionNeedsRerun = action => root.ActionQcLink!.needsRerun(action);
+root.actionRerunGateDate = (action, point) => root.NceActionRerunPolicy!.rerunGateDate(action, point);
+root.actionRerunStatus = action => root.ActionRerunService!.status(action);
+root.actionWorkflowStatus = action => root.ActionWorkflowStatusService!(action);
+root.pointActions = pointId => root.ActionPointIndexService!.forPoint(pointId);
+root.pointRealActions = pointId => root.PointWorkflowService!.real(root.pointActions(pointId));
+root.pointWorkflowComplete = pointId => root.PointWorkflowService!.complete(root.pointActions(pointId));
+root.pointWorkflowSummary = pointId => root.PointWorkflowService!.summary(root.pointActions(pointId));
+root.ACTION_LABELS = root.NceActionLabels!.actionLabels;
+root.RISK_SCALE = root.NceActionLabels!.riskScale;
 root.EntryService = createEntryService({
   cleanText: root.QCCore.cleanText,
   cleanId: root.QCCore.cleanId,
@@ -3854,6 +3972,266 @@ const requiredPasswordCommand=createRequiredPasswordCommand({validate:(password,
 root.RequiredPasswordWorkflowCommand=createRequiredPasswordWorkflowCommand({command:requiredPasswordCommand,log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options)});
 root.AdminBootstrapCommand=createAdminBootstrapCommand({current:()=>state as {users?:Record<string,any>[]},id:()=>(root as any).uid(),hashDefault:()=>(root as any).legacyHashPass('admin'),createDefault:(id,passHash)=>root.defaultAdminUserFactory!(id,passHash),save:()=>save({cloud:false,clearDerived:false})});
 root.UserLifecycleCommand=createUserLifecycleCommand({current:()=>state as {users?:Record<string,any>[]},manage:userManagementCommand,hash:password=>(root as any).hashPass(password),log:(type,detail,target)=>logAct(type,detail,target),save:()=>save({clearDerived:false})});
+/* ===== USERS / AUDIT / AUTH ===== Retire classic users-auth.js (2026-08-20, Pha G nhóm C
+   lát 2) — mọi hàm bên dưới vốn đã chỉ gọi thẳng service/command TypeScript đã có sẵn ở
+   trên (password/PBKDF2, login/reset/admin/user-lifecycle command, activity audit filter/
+   pagination/csv, user list/row/permission HTML); không có logic mới. `auditQ`/`auditFrom`/
+   `auditTo`/`auditPage`/`auditPageSize` chuyển vào `AuthUIState` (xem createAuthUiState() ở
+   ui-state.ts) thay vì `let` cục bộ, cùng lý do `currentUser`/`loginFails`/`loginLockUntil`
+   đã ở đó từ trước — test vm sandbox gán bare `auditQ='...'` phải trúng đúng accessor
+   property của globalThis, một `let` bên trong IIFE của bundle sẽ không thấy được. */
+root.AUDIT_PAGE_SIZES = ACTIVITY_AUDIT_PAGE_SIZES;
+root.pageUsers = () => {
+  const users = root.userListModel(state.users, currentUser && currentUser.id);
+  const rows = users.map((u: Record<string, any>) => root.userRowHtml({ user: u, currentUserId: currentUser && currentUser.id, esc: escapeHtml, roleLabel: (r: unknown) => root.roleLabel(r as string), btn: root.btn })).join('');
+  return root.usersPageHtml({ head: root.headOnly('Quản lý người dùng', 'Phân quyền thao tác và kiểm soát tài khoản'), rows, roleOptions: root.roleSelectOptions('technician'), permissionChecks: root.userPermChecks(root.rolePageIds('technician'), 'newUserPerms', 'technician'), addButton: root.btn('Thêm', 'addUser()', 'teal') });
+};
+root.auditDateKey = activity => root.activityAuditFilter.dateKey(activity);
+root.auditFilteredActivities = (items = state.activity || []) => root.activityAuditFilter.filter(items, auditQ, auditFrom, auditTo);
+root.auditSetQuery = value => {
+  const next = root.activityAuditFilterState.withQuery({ query: auditQ, from: auditFrom, to: auditTo, page: auditPage, pageSize: auditPageSize }, value);
+  auditQ = next.query; auditPage = next.page; root.scheduleSearchRender(root.auditSetQuery, rerender, 'auditSearch');
+};
+root.auditSetDate = (field, value) => {
+  const iso = value ? (root.vnPickerParse(value) || root.parseVN!(value) || '') : '';
+  const next = root.updateActivityAuditDateRange({ from: auditFrom, to: auditTo }, field, iso);
+  auditFrom = next.from; auditTo = next.to; auditPage = 1; rerender();
+};
+root.auditSetPageSize = value => {
+  const next = root.activityAuditFilterState.withPageSize({ query: auditQ, from: auditFrom, to: auditTo, page: auditPage, pageSize: auditPageSize }, value, root.AUDIT_PAGE_SIZES as unknown as number[]);
+  auditPageSize = next.pageSize; auditPage = next.page; rerender();
+};
+root.auditSetPage = value => {
+  auditPage = root.activityAuditFilterState.withPage({ query: auditQ, from: auditFrom, to: auditTo, page: auditPage, pageSize: auditPageSize }, value).page; rerender();
+};
+root.auditClearFilters = () => {
+  const next = root.activityAuditFilterState.cleared({ query: auditQ, from: auditFrom, to: auditTo, page: auditPage, pageSize: auditPageSize });
+  auditQ = next.query; auditFrom = next.from; auditTo = next.to; auditPage = next.page; rerender();
+};
+root.pageAudit = () => {
+  const total = (state.activity || []).length;
+  const oversizeWarn = total > root.ACTIVITY_ROTATE_TO! ? ` <span class="tag warn">Nhật ký đang rất lớn</span> <span class="hint">Nên lưu trữ bớt dòng cũ — hệ thống sẽ tự xoay vòng ở ${root.ACTIVITY_HARD_CAP} dòng (không xuất CSV).</span>` : '';
+  const chain = typeof root.auditChainStatus === 'function' ? root.auditChainStatus() : { ok: true, checked: 0, legacy: total, idle: false } as Record<string, any>;
+  const chainHtml = chain.idle
+    ? `<span class="tag none">Chưa kiểm chuỗi hash</span> ${root.btn('Kiểm tra chuỗi hash', 'auditVerifyChainNow()', 'ghost sm')} <span class="hint">Nhật ký lớn (${chain.total} dòng) nên không tự kiểm mỗi lần mở trang.</span>`
+    : chain.ok ? `<span class="tag ok">Chuỗi hash hợp lệ</span> <span class="hint">${chain.checked} dòng đã khóa hash${chain.legacy ? ` · ${chain.legacy} dòng cũ chưa có hash` : ''}</span>` : `<span class="tag rej">Audit có dấu hiệu bị sửa</span> <span class="hint">Lỗi tại dòng #${((state.activity as any)[chain.brokenIndex] || {}).seq || chain.brokenIndex + 1}: ${escapeHtml(chain.reason)}</span>`;
+  const filtered = root.auditFilteredActivities(), pageInfo = root.activityAuditPagination(filtered, auditPage, auditPageSize), pageCount = pageInfo.pageCount;
+  auditPage = pageInfo ? pageInfo.page : Math.min(Math.max(1, auditPage), pageCount);
+  const offset = pageInfo ? pageInfo.offset : (auditPage - 1) * auditPageSize, pageRows = pageInfo ? pageInfo.rows : filtered.slice(offset, offset + auditPageSize);
+  const rows = pageRows.map((a: any) => root.activityAuditRowHtml({ sequenceHtml: a.seq ? '#' + a.seq : '', timeHtml: formatDateTimeVN(a.ts), userHtml: escapeHtml(a.user || ''), roleHtml: root.roleLabel(a.role || 'viewer'), usernameHtml: a.username ? ' · @' + escapeHtml(a.username) : '', typeHtml: escapeHtml(a.type || ''), targetHtml: escapeHtml(a.target || ''), detailHtml: escapeHtml(a.detail || '') })).join('');
+  const hasFilter = !!(auditQ || auditFrom || auditTo);
+  const pageSizeOptions = (root.AUDIT_PAGE_SIZES as unknown as number[]).map(size => `<option value="${size}" ${size === auditPageSize ? 'selected' : ''}>${size} dòng</option>`).join('');
+  const resultFrom = pageInfo ? pageInfo.resultFrom : (filtered.length ? offset + 1 : 0), resultTo = pageInfo ? pageInfo.resultTo : Math.min(offset + auditPageSize, filtered.length);
+  const pagination = filtered.length ? `<div class="audit-pagination"><span class="hint">Hiển thị ${resultFrom}–${resultTo} / ${filtered.length} dòng</span><div>${root.btn('‹ Trước', `auditSetPage(${auditPage - 1})`, 'ghost sm', '', { disabled: auditPage <= 1 })}<b>Trang ${auditPage}/${pageCount}</b>${root.btn('Sau ›', `auditSetPage(${auditPage + 1})`, 'ghost sm', '', { disabled: auditPage >= pageCount })}</div></div>` : '';
+  const rowsOrEmptyState = rows ? `<div class="audit-table-wrap"><table class="audit-table"><thead><tr><th>Thời gian</th><th>Người dùng</th><th>Hành động</th><th>Đối tượng</th><th>Chi tiết</th></tr></thead><tbody>${rows}</tbody></table></div>` : root.emptyState(total ? 'Không tìm thấy nhật ký' : 'Chưa có hoạt động', total ? 'Thử từ khóa hoặc khoảng ngày khác.' : 'Nhật ký sẽ bắt đầu ghi từ các thao tác tiếp theo.');
+  return root.activityAuditPageHtml({ head: root.headOnly('Nhật ký hoạt động', 'Lưu vết các thao tác quan trọng; chỉ quản trị viên được xem'), exportButton: root.btn('Xuất CSV nhật ký', 'exportActivityCSV()', 'teal sm'), archiveButton: total ? root.btn('Lưu trữ nhật ký cũ', 'archiveActivityLog()', 'ghost sm') : '', total, chainHtml, oversizeWarn, searchValue: escapeHtmlAttr(auditQ), fromDate: root.dateBox('auditFromDate', auditFrom, 'audit-date', `aria-label="Lọc nhật ký từ ngày" onchange="auditSetDate('from',this.value)"`), toDate: root.dateBox('auditToDate', auditTo, 'audit-date', `aria-label="Lọc nhật ký đến ngày" onchange="auditSetDate('to',this.value)"`), pageSizeOptions, clearFiltersButton: hasFilter ? root.btn('Xóa bộ lọc', 'auditClearFilters()', 'ghost sm audit-clear-filter') : '', filteredCount: filtered.length, rowsOrEmptyState, pagination });
+};
+root.activityCSVRows = items => root.activityAuditCsv(items);
+root.exportActivityCSV = () => { root.csvDownload!('Nhat_ky_hoat_dong_QCLab.csv', root.activityCSVRows(state.activity || [])); };
+/* Lưu trữ CÓ CHỦ ĐÍCH nhật ký cũ: xuất CSV phần bị cắt TRƯỚC, chỉ khi file đã
+   tạo xong mới gỡ khỏi state — khác với xoay vòng tự động (auditRotateOverflow),
+   đường này không mất dữ liệu. CSV giữ nguyên cột PrevHash/Hash để phần đã lưu
+   trữ kiểm chứng độc lập được: hash dòng cuối file phải khớp tipHash trong dòng
+   checkpoint ghi lại sau khi cắt. */
+root.archiveActivityLog = () => {
+  if (!root.requireAdmin()) return;
+  const total = (state.activity || []).length; if (!total) return;
+  root.openModal(root.activityAuditArchiveModalHtml({ total, cancelButtonHtml: root.btn('Hủy', 'closeModal()', 'ghost'), archiveButtonHtml: root.btn('Xuất CSV và lưu trữ', 'confirmArchiveActivityLog()', 'teal') }));
+};
+root.confirmArchiveActivityLog = async () => {
+  if (!root.requireAdmin()) return;
+  const result = await root.ActivityArchiveCommand.execute((document.getElementById('auditArchiveMonths') as HTMLInputElement | null)?.value);
+  if (result.status === 'done') auditPage = 1;
+};
+root.addUser = async () => {
+  if (!root.requireAdmin()) return;
+  const username = (document.getElementById('uUser') as HTMLInputElement).value.trim().toLowerCase(); const name = (document.getElementById('uName') as HTMLInputElement).value.trim(); const initials = root.QCCore!.cleanText((document.getElementById('uInitials') as HTMLInputElement).value, 12).trim().toUpperCase(); const rolev = (document.getElementById('uRole') as HTMLInputElement).value; const pass = (document.getElementById('uPass') as HTMLInputElement).value;
+  const userErr = root.newUserValidationError!({ username, password: pass, existingUsernames: (state.users || []).map((u: Record<string, any>) => u.username) }); if (userErr) { await root.infoDialog(userErr); return; }
+  const pagePerms = await root.collectUserPerms('newUserPerms', rolev); if (!pagePerms) return;
+  await root.UserLifecycleCommand.add({ id: uid(), username, name, initials, role: rolev, pagePerms, password: pass, auditDetail: root.roleLabel(rolev) + ' · ' + pagePerms.length + ' thẻ · yêu cầu đổi mật khẩu' }); rerender();
+};
+root.userPermChecks = (selectedIds, groupId, roleValue) => {
+  const base = new Set(root.rolePageIds(roleValue)), initial = selectedIds && selectedIds.length ? selectedIds : root.rolePageIds(roleValue), selected = new Set(root.selectUserPermissions!(initial, [...base]));
+  return root.userPermissionChecksHtml(escapeHtmlAttr(groupId), root.PAGES.map(([id, title]) => ({ idHtml: escapeHtmlAttr(id), titleHtml: escapeHtml(title), allowed: base.has(id), selected: selected.has(id) })));
+};
+root.syncUserPermChecks = (groupId, roleValue) => {
+  const box = document.getElementById(groupId), base = new Set(root.rolePageIds(roleValue)); if (!box) return;
+  box.querySelectorAll('input[type=checkbox]').forEach(i => { const input = i as HTMLInputElement; const allowed = base.has(input.value); input.disabled = !allowed; input.closest('label')!.classList.toggle('disabled', !allowed); if (!allowed) input.checked = false; });
+};
+root.collectUserPerms = async (groupId, roleValue) => {
+  const box = document.getElementById(groupId), base = new Set(root.rolePageIds(roleValue)); if (!box) return root.rolePageIds(roleValue);
+  const selected = [...box.querySelectorAll('input[type=checkbox]:checked')].map(i => (i as HTMLInputElement).value), picked = root.selectUserPermissions!(selected, [...base]);
+  if (!picked.length) { await root.infoDialog('Cần chọn ít nhất một thẻ được phép dùng.'); return null; }
+  return [...new Set(picked)];
+};
+root.openUserPerms = async id => {
+  if (!root.requireAdmin()) return;
+  const u = (state.users || []).find((x: Record<string, any>) => x.id === id); if (!u) return;
+  if (currentUser && currentUser.id === id) { await root.infoDialog('Không thể tự sửa quyền của tài khoản đang đăng nhập. Hãy dùng tài khoản quản trị khác nếu cần thay đổi.'); return; }
+  const roleSelect = root.userRoleSelectHtml(root.roleSelectOptions(u.role));
+  root.openModal(root.userPermissionsModalHtml({ userName: escapeHtml(u.name || u.username), username: escapeHtml(u.username), roleSelectHtml: roleSelect, permissionChecksHtml: root.userPermChecks(u.pagePerms, 'editUserPerms', u.role), cancelButtonHtml: root.btn('Hủy', 'closeModal()', 'ghost'), saveButtonHtml: root.btn('Lưu quyền', `applyUserPerms('${id}')`, 'teal') }));
+};
+root.applyUserPerms = async id => {
+  if (!root.requireAdmin()) return;
+  const u = (state.users || []).find((x: Record<string, any>) => x.id === id); if (!u) return;
+  if (currentUser && currentUser.id === id) { await root.infoDialog('Không thể tự sửa quyền của tài khoản đang đăng nhập.'); return; }
+  const rolev = (document.getElementById('editUserRole') as HTMLInputElement).value, pagePerms = await root.collectUserPerms('editUserPerms', rolev); if (!pagePerms) return;
+  root.UserLifecycleCommand.updatePermissions(u, { role: rolev, pagePerms, auditDetail: `${root.roleLabel(rolev)} · ${pagePerms.length} thẻ` });
+  root.closeModal(); if (!root.canAccessPage(root.page)) page = root.firstAccessPage(); renderBrand(); root.nav(); rerender();
+};
+root.resetPass = id => {
+  if (!root.requireAdmin()) return;
+  const u = (state.users || []).find((x: Record<string, any>) => x.id === id); if (!u) return;
+  const self = currentUser && currentUser.id === id;
+  root.openModal(root.resetPasswordModalHtml({ title: self ? 'Đổi mật khẩu' : 'Đặt lại mật khẩu', message: self ? 'Nhập mật khẩu mới cho tài khoản đang đăng nhập.' : 'Nhập mật khẩu tạm; người dùng sẽ phải đổi lại khi đăng nhập.', enterAction: `if(event.key==='Enter')applyResetPass('${id}')`, cancelButtonHtml: root.btn('Hủy', 'closeModal()', 'ghost'), saveButtonHtml: root.btn('Lưu mật khẩu', `applyResetPass('${id}')`, 'teal') }));
+  setTimeout(() => { const e = document.getElementById('resetPass1'); if (e) e.focus(); }, 50);
+};
+root.applyResetPass = async id => {
+  if (!root.requireAdmin()) return;
+  const u = (state.users || []).find((x: Record<string, any>) => x.id === id); if (!u) return;
+  const p1 = (document.getElementById('resetPass1') as HTMLInputElement).value, p2 = (document.getElementById('resetPass2') as HTMLInputElement).value, msg = document.getElementById('resetPassMsg'), err = root.passwordChangeError!(p1, p2);
+  if (err) { if (msg) msg.innerHTML = `<div class="auth-err">${escapeHtml(err)}</div>`; return; }
+  const updated = await root.UserLifecycleCommand.resetPassword(u, p1, !(currentUser && currentUser.id === id));
+  root.closeModal(); rerender(); await root.infoDialog(updated.mustChangePassword ? 'Đã đặt mật khẩu tạm. Người dùng sẽ phải đổi mật khẩu khi đăng nhập.' : 'Đã cập nhật mật khẩu.', { type: 'success' });
+};
+root.toggleUser = id => { if (!root.requireAdmin()) return; const u = (state.users || []).find((x: Record<string, any>) => x.id === id); root.UserLifecycleCommand.toggle(u); rerender(); };
+root.delUser = async id => { if (!root.requireAdmin()) return; if (id === currentUser.id) { await root.infoDialog('Không thể xóa chính mình.'); return; } const u = (state.users || []).find((x: Record<string, any>) => x.id === id); if (!await root.confirmDialog({ kicker: 'Thao tác không thể hoàn tác', title: 'Xóa người dùng', message: `Xóa người dùng ${u ? (u.name || u.username) : ''}?`, confirmLabel: 'Xóa người dùng', cancelLabel: 'Hủy' })) return; root.UserLifecycleCommand.remove(id); rerender(); };
+
+/* ===== AUTH =====
+   Hash PBKDF2-SHA256 (OWASP: >=600k vòng — hằng số PASSWORD_HASH_ITERATIONS
+   sống ở src/domain/auth/pbkdf2-password-service.ts, NGUỒN DUY NHẤT) và hash
+   SHA-256 legacy (hash cũ vẫn xác thực được, tự nâng cấp lên PBKDF2 khi đăng
+   nhập) đều đã là TypeScript qua pbkdf2PasswordService/legacyPasswordHashService
+   — xem tests/auth-security.test.js. */
+root.passwordError = p => root.passwordPolicyError!(p);
+root.legacyHashPass = async p => root.legacyPasswordHashService!.hash(p);
+root.hashPass = async p => root.pbkdf2PasswordService!.hash(p);
+root.verifyPass = async (p, stored) => {
+  if (root.isPbkdf2PasswordHash!(stored)) return root.pbkdf2PasswordService!.verify(p, stored);
+  return await root.legacyHashPass(p) === stored;
+};
+root.confirmReauthentication = async () => {
+  const input = document.getElementById('reauthPassword') as HTMLInputElement | null, err = document.getElementById('reauthError') as HTMLElement | null;
+  if (!currentUser || !input) { root.closeDialogOverlay(false); return; }
+  let ok = false; try { ok = await root.verifyPass(input.value, currentUser.passHash); } catch (e) { /* mật khẩu không xác thực được coi như sai */ }
+  input.value = '';
+  if (!ok) { if (err) err.hidden = false; input.focus(); return; }
+  root.closeDialogOverlay(true);
+};
+root.reauthenticateCurrentUser = ({ title = 'Xác thực lại', message = 'Nhập lại mật khẩu để tiếp tục.' } = {}) => {
+  if (!currentUser) return Promise.resolve(false);
+  return new Promise<boolean>(resolve => root.openDialogOverlay(`<div class="modal confirm-modal">
+    <div class="confirm-modal-h"><div class="confirm-modal-kicker">Thao tác được kiểm soát</div>${root.modalCloseButton('closeDialogOverlay(false)')}</div>
+    <h3 class="confirm-modal-title">${escapeHtml(title)}</h3>
+    <div class="confirm-modal-body"><div class="confirm-modal-icon info" aria-hidden="true">✓</div><div class="confirm-modal-text"><b>${escapeHtml(message)}</b><p>Tài khoản: ${escapeHtml(currentUser.name || currentUser.username || '')}</p></div></div>
+    <div class="reauth-modal-field">
+      <label for="reauthPassword">Mật khẩu hiện tại</label>
+      <input id="reauthPassword" type="password" autocomplete="current-password" autofocus onkeydown="if(event.key==='Enter'){event.preventDefault();confirmReauthentication()}">
+      <div id="reauthError" class="auth-err" hidden>Mật khẩu không đúng.</div>
+    </div>
+    <div class="confirm-modal-actions">${root.btn('Hủy', 'closeDialogOverlay(false)', 'ghost')}${root.btn('Xác thực', 'confirmReauthentication()', 'teal')}</div>
+  </div>`, resolve as (result?: unknown) => void));
+};
+root.ensureAdmin = async () => { await root.AdminBootstrapCommand.ensure(); };
+root.blankAppState = users => root.blankAppStateFactory!(users);
+root.resetAllData = async () => {
+  if (!root.requireAdmin()) return;
+  if (!await root.confirmDialog({ kicker: 'Thao tác không thể hoàn tác', title: 'Xóa sạch dữ liệu test', message: 'Xóa sạch toàn bộ dữ liệu test?', detail: 'Nhật ký hoạt động sẽ được giữ lại và ghi nhận thao tác này.', confirmLabel: 'Tiếp tục', cancelLabel: 'Hủy' })) return;
+  if (!await root.confirmDialog({ kicker: 'Xác nhận lần cuối', title: 'Xóa sạch dữ liệu test', message: 'Dữ liệu QC, cấu hình, lô, panel và khắc phục sẽ bị xóa.', detail: 'Nhật ký audit vẫn được giữ. Nếu đang bật đám mây, trạng thái trắng cũng sẽ được đồng bộ lên Firebase.', confirmLabel: 'Xóa sạch dữ liệu', cancelLabel: 'Hủy' })) return;
+  if (!await root.reauthenticateCurrentUser({ title: 'Xác thực xóa sạch dữ liệu', message: 'Nhập lại mật khẩu trước khi xóa toàn bộ dữ liệu QC và cấu hình.' })) return;
+  if (!await root.backupCurrentData('truoc-xoa')) { await root.infoDialog('Không tạo được bản backup an toàn. Dữ liệu chưa bị xóa.'); return; }
+  await root.ResetOperationalDataCommand.execute(); await root.infoDialog('Đã xóa sạch dữ liệu test. App đã về trạng thái trắng.', { type: 'success' });
+};
+root.downloadStartupData = () => {
+  if (!startupProblem) return;
+  const blob = new Blob([startupProblem.raw], { type: 'application/json' }), a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'qclab-du-lieu-can-phuc-hoi-' + Date.now() + '.json'; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+root.resetStartupData = async () => {
+  if (!await root.confirmDialog({ kicker: 'Thao tác không thể hoàn tác', title: 'Tạo dữ liệu mới', message: 'Tạo dữ liệu mới?', detail: 'Dữ liệu cũ sẽ không bị dùng nữa. Hãy tải bản cần phục hồi trước khi tiếp tục.', confirmLabel: 'Tạo dữ liệu mới', cancelLabel: 'Hủy' })) return;
+  startupProblem = null; await root.ResetOperationalDataCommand.execute({ keepUsers: false, keepAudit: false, log: false, save: false, render: false }); root.showLogin();
+};
+root.authBrandMark = () => { const logo = root.brandLogo(); return `<div class="brand-mark">${logo ? `<img src="${escapeHtmlAttr(logo)}" alt="">` : escapeHtml(root.brandMarkText())}</div>`; };
+root.showStartupRecovery = () => {
+  let ov = document.getElementById('authOverlay'); if (!ov) { ov = document.createElement('div'); ov.id = 'authOverlay'; document.body.appendChild(ov); }
+  (ov as HTMLElement).style.display = 'flex';
+  ov.innerHTML = `<div class="auth-card"><div class="auth-head">${root.authBrandMark()}<div class="auth-brand">Cần phục hồi dữ liệu</div></div>
+    <div class="auth-sub">QC Lab phát hiện dữ liệu cục bộ không hợp lệ và đã dừng để tránh ghi đè.</div>
+    <div class="auth-err">${escapeHtml(startupProblem && startupProblem.message || 'Không đọc được dữ liệu.')}</div>
+    <div class="auth-actions">${root.btn('Tải dữ liệu gốc xuống', 'downloadStartupData()', 'teal')}${root.btn('Tạo dữ liệu mới', 'resetStartupData()', 'ghost')}</div>
+    <div class="auth-hint">Ưu tiên tải dữ liệu gốc xuống trước để có thể kiểm tra và phục hồi.</div></div>`;
+};
+root.showLogin = msg => {
+  document.getElementById('nav')!.innerHTML = ''; document.getElementById('main')!.innerHTML = ''; document.getElementById('userBox')!.innerHTML = '';
+  const sf = document.getElementById('sideFoot'); if (sf) sf.innerHTML = '';
+  let ov = document.getElementById('authOverlay'); if (!ov) { ov = document.createElement('div'); ov.id = 'authOverlay'; document.body.appendChild(ov); }
+  (ov as HTMLElement).style.display = 'flex';
+  const app = root.QCLAB_APP || { version: 'dev' };
+  const admin = (state.users || []).find((u: Record<string, any>) => u.username === 'admin');
+  const defaultHint = admin && admin.mustChangePassword ? 'Tài khoản mặc định: <b>admin</b> / <b>admin</b><br>Hệ thống sẽ yêu cầu đổi mật khẩu ở lần đăng nhập đầu tiên.<br>' : '';
+  const trial = (window as any).qcLicense && (window as any).qcLicense.trial;
+  const trialLine = trial && trial.active ? `<div class="auth-hint ${trial.daysLeft <= 7 ? 'auth-trial-warning' : 'auth-trial-ok'}">Bản dùng thử: còn ${trial.daysLeft}/${trial.totalDays} ngày</div>` : '';
+  ov.innerHTML = `<div class="auth-card"><div class="auth-head">${root.authBrandMark()}<div class="auth-head-text"><div class="auth-brand">${escapeHtml(root.brandTitle())}</div><div class="auth-sub">${escapeHtml(root.brandSub())}</div></div></div>
+    <label>Tên đăng nhập</label><input id="liUser" autocomplete="username" autofocus>
+    <label>Mật khẩu</label><input id="liPass" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+    ${msg ? `<div class="auth-err">${escapeHtml(msg)}</div>` : ''}
+    <div class="auth-actions">${root.btn('Đăng nhập', 'doLogin()', 'teal')}</div>
+    ${trialLine}<div class="auth-hint">${defaultHint}Phiên bản ${escapeHtml(app.version || 'dev')}</div></div>`;
+  requestAnimationFrame(root.focusLoginField); setTimeout(root.focusLoginField, 50);
+};
+/* Đưa focus về ô đăng nhập theo kiểu "nhường": chỉ focus khi lớp đăng nhập đang
+   hiển thị và CHƯA có ô/nút nào trong lớp đó được focus. Nhờ vậy đợt xử lý snapshot
+   Firebase đầu tiên (chạy ensureShape đồng bộ, có thể làm khựng luồng chính) không
+   cướp mất ô người dùng đã Tab sang, nhưng vẫn khôi phục được focus nếu nó bị mất
+   (vd cửa sổ chưa được OS focus lúc mở nguội) để Tab dùng được ngay. */
+root.focusLoginField = () => {
+  const ov = document.getElementById('authOverlay');
+  if (!ov || (ov as HTMLElement).style.display === 'none') return;
+  const active = document.activeElement;
+  if (active && active !== document.body && ov.contains(active)) return;
+  const user = document.getElementById('liUser'); if (user) (user as HTMLElement).focus();
+};
+/* Lưu số lần sai/thời điểm hết khóa vào localStorage — chỉ giữ trong biến JS thì tải
+   lại trang (F5) là reset về 0, vô hiệu hoá cơ chế chống dò mật khẩu ngay lập tức. */
+root.persistLoginLockout = () => { try { localStorage.setItem('qclab_login_lockout', JSON.stringify({ fails: loginFails, until: loginLockUntil })); } catch (e) { /* localStorage có thể bị chặn (chế độ riêng tư) — bỏ qua */ } };
+root.doLogin = async () => {
+  const u = (document.getElementById('liUser') as HTMLInputElement).value.trim().toLowerCase(); const p = (document.getElementById('liPass') as HTMLInputElement).value;
+  // Thông báo lỗi KHÔNG được phân biệt "tài khoản không tồn tại" với "sai mật khẩu" —
+  // nếu không kẻ dò có thể dùng đó để liệt kê username hợp lệ trước khi dò mật khẩu.
+  // Chi tiết thật (để phân biệt khi tra soát) chỉ ghi vào nhật ký hoạt động nội bộ.
+  const genericFailMsg = 'Tên đăng nhập hoặc mật khẩu không đúng.';
+  if (!await storageHydrationPromise) { root.showStartupRecovery(); return; }
+  const result = await root.LoginWorkflowCommand.authenticate({ users: state.users, username: u, password: p, lock: { fails: loginFails, until: loginLockUntil }, now: Date.now() });
+  if (result.status === 'locked') { root.showLogin(result.message); return; }
+  if (result.status === 'failed') { if (result.reason === 'verification-error') { root.showLogin('Không thể kiểm tra mật khẩu trên trình duyệt này.'); return; } loginFails = result.lock.fails; loginLockUntil = result.lock.until; root.persistLoginLockout(); root.showLogin(genericFailMsg); return; }
+  loginFails = result.lock.fails; loginLockUntil = result.lock.until; root.persistLoginLockout();
+  currentUser = result.user;
+  if (currentUser.mustChangePassword) root.showPasswordChange(); else root.showApp();
+};
+root.showPasswordChange = msg => {
+  let ov = document.getElementById('authOverlay'); if (!ov) { ov = document.createElement('div'); ov.id = 'authOverlay'; document.body.appendChild(ov); } (ov as HTMLElement).style.display = 'flex';
+  ov.innerHTML = `<div class="auth-card"><div class="auth-head">${root.authBrandMark()}<div class="auth-brand">Đổi mật khẩu</div></div><div class="auth-sub">Cần cập nhật mật khẩu trước khi vào hệ thống</div>
+    <label>Mật khẩu mới</label><input id="newPass1" type="password" autocomplete="new-password">
+    <label>Nhập lại mật khẩu mới</label><input id="newPass2" type="password" autocomplete="new-password" onkeydown="if(event.key==='Enter')changeRequiredPassword()">
+    ${msg ? `<div class="auth-err">${escapeHtml(msg)}</div>` : ''}
+    <div class="auth-actions">${root.btn('Lưu mật khẩu mới', 'changeRequiredPassword()', 'teal')}</div>
+    <div class="auth-hint">Mật khẩu cần ít nhất 8 ký tự và không nên dùng lại mật khẩu mặc định.</div></div>`;
+  setTimeout(() => { const e = document.getElementById('newPass1'); if (e) (e as HTMLElement).focus(); }, 50);
+};
+root.changeRequiredPassword = async () => {
+  const p1 = (document.getElementById('newPass1') as HTMLInputElement).value, p2 = (document.getElementById('newPass2') as HTMLInputElement).value;
+  const result = await root.RequiredPasswordWorkflowCommand.complete({ user: currentUser, password: p1, confirmation: p2, cloud: !!(fb && fb.initialized) });
+  if (result.status === 'invalid') { root.showPasswordChange(result.error); return; }
+  currentUser = result.user; root.showApp();
+};
+root.logout = () => { if (currentUser) root.LoginWorkflowCommand.logout(); currentUser = null; page = 'dash'; root.showLogin(); };
+root.showApp = () => {
+  const ov = document.getElementById('authOverlay'); if (ov) (ov as HTMLElement).style.display = 'none';
+  if (!root.canAccessPage(root.page)) page = root.firstAccessPage();
+  document.getElementById('userBox')!.innerHTML = '';
+  renderBrand(); root.nav(); root.sideFoot(); rerender(); if (typeof root.lisGatewayStart === 'function') setTimeout(root.lisGatewayStart, 0);
+};
 const lisRuntime = createLisGatewayRuntime();
 let lisClient: LisClientApi;
 const lisStorage = typeof localStorage !== 'undefined' ? localStorage : { getItem: () => null };

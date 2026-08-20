@@ -1,5 +1,11 @@
 /* ===== FIREBASE ===== */
-let fb={ready:false,initialized:false,ref:null,dirty:false,clientId:'c_'+uid(),authUser:null,pendingRenderT:null,pullT:null,seenSig:null,synced:null,retryT:null,retryMs:1000},fbSaveT=null;
+/* `fb` là globalThis property (không phải `let`) vì `state-storage.js` (còn
+   classic) và `src/compat/modular-pilot.global.ts` (users-auth.js retire vào
+   đây 2026-08-20) đọc nó TRẦN — khi firebase-sync.js vào bundle TypeScript,
+   một `let` sẽ kẹt trong IIFE và file classic kia không còn thấy được (cùng
+   kỹ thuật tách nền đã áp dụng cho `state`/`mem` trong state.js). */
+globalThis.fb={ready:false,initialized:false,ref:null,dirty:false,clientId:'c_'+uid(),authUser:null,pendingRenderT:null,pullT:null,seenSig:null,synced:null,retryT:null,retryMs:1000};
+let fbSaveT=null;
 function fbClone(v){return globalThis.syncValueCodec.clone(v);}
 function fbCanWrite(){return globalThis.firebaseConnectionGate.canWrite(fb);}
 function fbNetworkOnline(){return globalThis.firebaseConnectionGate.networkOnline(typeof navigator==='undefined'?undefined:navigator.onLine);}

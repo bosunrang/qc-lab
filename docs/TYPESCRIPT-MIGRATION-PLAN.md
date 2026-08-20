@@ -53,15 +53,15 @@ scope**, không phải không còn file `.js` trong gói phát hành.
 6. Không sửa tay `assets/generated/*.js`; source thay đổi trong `src/`, sau đó
    chạy build và commit artifact sinh ra.
 
-## 3. Trạng thái thực tế — 2026-08-19
+## 3. Trạng thái thực tế — 2026-08-20
 
 | Hạng mục | Trạng thái |
 | --- | --- |
-| Nguồn TypeScript | 739 tệp (thêm `sigma-page-controller.ts`; domain/application/bridge không đổi khác) |
-| Nguồn classic còn lại | 7 tệp `assets/modules/*.js` (nhóm C hạ tầng), thêm `assets/core.js` và `assets/app.js` |
+| Nguồn TypeScript | 739 tệp (thêm `sigma-page-controller.ts`; domain/application/bridge không đổi khác — lát nhóm C chỉ chuyển glue vào `modular-pilot.global.ts` đã có sẵn) |
+| Nguồn classic còn lại | 5 tệp `assets/modules/*.js` (nhóm C hạ tầng — `action-workflow-service.js`+`users-auth.js` retire 2026-08-20), thêm `assets/core.js` và `assets/app.js` |
 | Bundle hiện tại | `assets/generated/modular-pilot.js`, Vite sinh ra và nạp bằng `<script defer>` |
 | Kiểm tra kiểu | `npm.cmd run typecheck` đạt: checkJs legacy + strict TypeScript modules |
-| Test Node | `npm.cmd test` đạt ngày 2026-08-19 (613/613) |
+| Test Node | `npm.cmd test` đạt ngày 2026-08-20 (611/611) |
 | Ước tính tiến độ | **~90%** logic ứng dụng do TypeScript sở hữu lúc chạy · **~78%** theo số dòng classic thô còn lại · **~73%** theo tiêu chí hoàn thành cuối cùng (mục 7, đã trừ toàn bộ Pha H) — xem "Ba thước đo tiến độ" bên dưới (chưa tính lại chi tiết sau lát Route 5, biến động nhỏ) |
 
 Các phần nghiệp vụ chính đã có TypeScript: Westgard/QC, storage và Firebase,
@@ -134,11 +134,11 @@ Westgard) — **toàn bộ nhóm B (Canvas/adapter) của Pha G đã hoàn tất
 | --- | --- | --- | --- |
 | **C. Hạ tầng/bootstrap** (rủi ro cao — kế hoạch yêu cầu làm CUỐI, từng lát độc lập) | `state.js` | 128 | `ensureShape`/state gốc; lifecycle nhạy. **Đã TÁCH NỀN 2026-08-19** (state + cache + mem/startupProblem → globalThis property, xem lát tách nền bên dưới) — chưa retire, nhưng port sau này giờ đã mang tính cơ học |
 | | `qc-domain.js` | 255 | wiring Westgard/worker + point derivation |
-| | `state-storage.js` | 120 | load/save + partitioned + boot shell |
+| | `state-storage.js` | 120 | load/save + partitioned + boot shell. **`storageHydrationPromise` đã TÁCH NỀN 2026-08-20** (Lát 0) — chưa retire |
 | | ~~`local-store.js`~~ | ~~13~~ | **xong 2026-08-19, Hạ tầng lát 1** — xem bên dưới |
-| | `firebase-sync.js` | 173 | 3-way merge + retry + online/offline |
+| | `firebase-sync.js` | 173 | 3-way merge + retry + online/offline. **`fb` đã TÁCH NỀN 2026-08-20** (Lát 0, xem "Kế hoạch các lát nhóm C còn lại") — chưa retire |
 | | `users-auth.js` | 256 | auth/user + PBKDF2 wiring + trang audit |
-| | `action-workflow-service.js` | 149 | vòng đời NCE (self-verifying cache) |
+| | ~~`action-workflow-service.js`~~ | ~~149~~ | **xong 2026-08-20, Lát nhóm C — 1** — xem "Kế hoạch các lát nhóm C còn lại" |
 | | ~~`range.js`~~ | ~~95~~ | **xong 2026-08-19, Hạ tầng lát 4** — xem bên dưới |
 | | ~~`backup-ui.js`~~ | ~~27~~ | **xong 2026-08-19, Hạ tầng lát 2** — xem bên dưới |
 | | ~~`app-meta.js`~~ | ~~28~~ | **xong 2026-08-19, Hạ tầng lát 3** — xem bên dưới |
@@ -1922,17 +1922,9 @@ phải tách nền nó; làm sớm để gỡ mọi ràng buộc thứ tự.)
 
 **Thứ tự lát đề xuất SAU lát 0 (rủi ro/ghép nối tăng dần) — port độc lập:**
 
-1. **`action-workflow-service.js`** (149) — đọc `state`(2×), KHÔNG khai báo
-   lexical chéo-classic nào. Ghép nối nhẹ nhất. Lưu ý: giữ nguyên cache tự kiểm
-   chứng (`actionLotPoints`/memo) — hợp đồng đã khóa bởi
-   `tests/action-workflow-service.test.js` (chốt bằng tính tự trượt, không bằng
-   mốc thời gian). Gate: test + `nce-check` (vòng đời NCE) + benchmark
-   (`actionRerunStatus` không được tăng theo tổng số điểm QC).
-2. **`users-auth.js`** (256) — đọc `state`(16×)/`startupProblem`/`fb`/
-   `storageHydrationPromise` (tất cả đã là globalThis sau lát 0). Nhạy cảm bảo
-   mật (PBKDF2, re-auth) + trang audit. Gate: `auth-security.test.js`,
-   `audit-*` test, `ui-check` (khóa/mở kỳ + restore qua re-auth), `a11y-audit`
-   (trang audit + modal).
+1. ~~**`action-workflow-service.js`** (149)~~ — **xong 2026-08-20, xem "Lát nhóm C
+   — 1" bên dưới.**
+2. ~~**`users-auth.js`** (256)~~ — **xong 2026-08-20, xem "Lát nhóm C — 2" bên dưới.**
 3. **`firebase-sync.js`** (173) — đọc `state`(9×); `fb` đã tách nền ở lát 0 nên
    giờ chỉ còn logic sync. Gate: `firebase-merge.test.js`/`firebase-offline.test.js`
    + `ui-check` (không có đường sync thật trong gate — cẩn thận merge semantics).
@@ -1971,6 +1963,211 @@ phải tách nền nó; làm sớm để gỡ mọi ràng buộc thứ tự.)
 
 Sau nhóm C: `assets/modules/` rỗng. Còn lại `assets/core.js` (nhóm D),
 `assets/workers/westgard-worker.js` (nhóm D), `assets/app.js` (Pha H).
+
+#### Lát 0 — tách nền `fb` + `storageHydrationPromise` (2026-08-20, xong)
+
+Đổi `let fb={...}` trong `firebase-sync.js` và `let storageHydrationPromise=
+Promise.resolve(true)` trong `state-storage.js` sang `globalThis.fb=`/
+`globalThis.storageHydrationPromise=`, đúng kỹ thuật đã dùng cho `state`/`mem`/
+`startupProblem`. Không đổi hành vi: mọi tham chiếu trần còn lại (`fb.dirty`,
+`fb.synced=...`, `await storageHydrationPromise`, kể cả phép gán bare
+`storageHydrationPromise=globalThis.hydratePartitionedState()` bên trong bundle
+ở `modular-pilot.global.ts:2613`) vẫn phân giải đúng qua global object — `fb`
+chỉ từng bị MUTATE qua property (`fb.x=`, `Object.assign(fb,...)`), chưa bao
+giờ bị gán lại toàn bộ, nên một data property thường (không cần accessor) là đủ,
+giống lý do `pointsCache`/`wgMemo` không cần accessor. `fbSaveT`, `partitionSlot`,
+`saveLabel`/`saveDetail`/`fbConflictDialogOpen` giữ nguyên `let` — không file
+classic nào khác đọc trần các tên này (đã `rg` xác nhận), nên chúng an toàn nằm
+lexical cho tới khi chính file chủ được port.
+
+Thêm `declare var fb`/`declare var storageHydrationPromise` vào `global.d.ts`
+(nhóm cùng `state`/`mem` ở đầu file); `declare let ... storageHydrationPromise`/
+`declare const fb` cục bộ trong `modular-pilot.global.ts` giữ nguyên không đổi
+— đó là khai báo kiểu phạm vi module (file có import/export), không tạo binding
+runtime, không xung đột với `declare var` toàn cục, đúng mẫu `mem`/`startupProblem`
+đã có sẵn ở đó từ trước. Bump `?v=` của hai file trong `index.html`. Gate:
+`npm run typecheck` xanh, `npm test` 611/611 xanh (gồm cả
+`firebase-merge.test.js`/`firebase-offline.test.js`/`storage-pipeline.test.js`
+chạy lại riêng), khởi động app thật trong preview — không có lỗi console.
+
+Sau lát này, không còn ràng buộc thứ tự port giữa 5 reader nhóm C
+(`action-workflow-service.js`/`users-auth.js`/`firebase-sync.js`/
+`state-storage.js`/`qc-domain.js`) — port theo bất kỳ thứ tự nào trong danh
+sách đề xuất ở trên.
+
+#### Lát nhóm C — 1: `action-workflow-service.js` (2026-08-20, xong)
+
+Retire hoàn toàn `assets/modules/action-workflow-service.js` (149 dòng — file
+nhỏ nhất trong 5 reader còn lại, chọn mở đầu vì ghép nối nhẹ nhất). Đúng như
+kiểm kê bridge Pha F đã ghi nhận, mọi hàm trong file đã là "vỏ cầu nối" thuần —
+mỗi hàm chỉ `return root.X.Y(...)` gọi sang service TypeScript đã có sẵn
+(`NceActionIdentityService`, `NceActionBasics`, `ActionDraftStatusService`,
+`ActionProtocolService`, `ActionApprovalGates`, `ActionRerunService`,
+`ActionPointIndexService`, `ActionQcLink`, `NceActionRerunPolicy`,
+`PointWorkflowService`) — không có logic mới nào cần viết. Chuyển nguyên các
+dòng gán đó vào `src/compat/modular-pilot.global.ts` dưới dạng
+`root.actionApprovalStatus = action => root.NceActionBasics!.actionApprovalStatus(action)`
+… (28 hàm/const), đặt ngay sau `root.ActionPointIndexService =
+createActionPointIndexService(...)` — điểm chèn phải nằm SAU tất cả các service
+phụ thuộc được construct (dòng 3486–3672) nhưng cụ thể nằm ở đâu trong khoảng
+đó không quan trọng, vì mọi dependency injection quanh chúng vốn đã là closure
+trì hoãn (`action => (root as any).actionWorkflowStatus(action)`), không gọi
+ngay lúc construct — đúng "bẫy eager vs lazy" mà các lát trước đã học, ở đây
+không rơi vào bẫy vì toàn bộ chỗ dùng đều đã lazy sẵn.
+
+Hai đơn giản hóa thật (không chỉ chuyển nguyên):
+
+1. **`actionWorkflowStatus()` bỏ nhánh fallback JS cũ.** Bản classic có
+   `if(root.ActionWorkflowStatusService)return root.ActionWorkflowStatusService(a);`
+   rồi mới tới ~10 dòng logic JS thủ công y hệt — nhánh dự phòng cho trường hợp
+   file bị nạp mà KHÔNG có bundle. Xác nhận nhánh đó chưa từng chạy: production
+   nạp bundle ngay sau file này (`index.html`), và sandbox test tự động chèn
+   bundle ngay sau `modules/action-workflow-service.js` (`tests/helpers/sandbox.js`,
+   xem bên dưới) — nên `root.ActionWorkflowStatusService` luôn tồn tại ở cả hai
+   nơi. Đối chiếu logic JS cũ với `src/domain/nce/action-workflow-status.ts` xác
+   nhận **giống hệt từng nhánh if/else** — xóa an toàn, không mang sang.
+2. **`ACTION_LABELS`/`RISK_SCALE` bỏ toán tử `||` dự phòng.** Bản classic phải
+   viết `root.NceActionLabels&&root.NceActionLabels.actionLabels||ACTION_LABELS`
+   vì file nạp TRƯỚC bundle trong `index.html` (nên `NceActionLabels` chưa tồn
+   tại tại thời điểm đó) — lý do y hệt bẫy `ACTION_LABELS`/`RISK_SCALE` đã ghi ở
+   "Ngoại lệ giữ nguyên vì thứ tự nạp" (mục "Đã audit và dọn 14 file classic còn
+   lại"). Khi logic này chuyển hẳn vào TRONG bundle, ràng buộc đó biến mất:
+   `root.NceActionLabels = nceActionLabels` (dòng 3486) chạy TRƯỚC điểm chèn
+   (dòng 3672+) trong CÙNG một script, nên đọc thẳng
+   `root.NceActionLabels!.actionLabels`/`.riskScale` là đủ, không cần fallback.
+
+**Ba hàm classic KHÔNG mang sang — xác nhận chết thật, không phải do audit
+đợt này bỏ sót:** `actionLotPoints(testId,level,lot)`, `actionPointIndex(testId)`,
+`actionOpenedFromVoid(a,p)`. Cả ba định nghĩa trong file nhưng KHÔNG nằm trong
+object `root.ActionWorkflowService={...}` (không được `Object.assign(root,...)`
+xuất ra ngoài), và `rg` xác nhận không chỗ nào trong repo (kể cả trong chính
+file, test, hay `src/`) gọi chúng như global trần. Tên trùng dễ gây nhầm với
+`NceActionQcIndex.actionLotPoints(points,level,lot,runNumber)`/`.actionPointIndex(points)`
+— đây là HAI hàm khác, chữ ký khác (nhận mảng `points` đã resolve, không phải
+`testId`), vẫn sống và được `ActionRerunService` dùng nội bộ. Không đụng gì
+tới `ActionRerunService`/`NceActionQcIndex` — cache tự kiểm chứng của chúng
+(khóa CLAUDE.md ghi ở mục `action-workflow-service.js`) giữ nguyên vẹn.
+
+**Cập nhật test đi kèm** (mọi test đọc/nạp file classic này phải sửa vì file
+đã xóa hẳn, không phải vì hành vi đổi):
+
+- `tests/action-workflow-service.test.js`, `tests/action-form.test.js`,
+  `tests/range-candidate.test.js` — bỏ `'modules/action-workflow-service.js'`
+  khỏi danh sách `loadSandbox([...])` (bundle đã cấp mọi hàm này qua globalThis).
+- `tests/helpers/sandbox.js` — xóa nhánh đặc cách `actionWorkflowIndex` (tự chèn
+  bundle ngay sau `modules/action-workflow-service.js` nếu thiếu) — dead code
+  vì không còn danh sách test nào chứa tên file đó nữa.
+- `tests/action-protocol-rerun-bridge.test.js`, `tests/action-point-index-bridge.test.js`,
+  `tests/point-workflow-bridge.test.js` — ba test này KHÔNG chạy hành vi, chỉ
+  `rg`/regex nguyên văn source của file classic để khóa "hàm X phải gọi thẳng
+  service TS, không tự dựng lại logic". Sửa để đọc regex tương ứng trên chính
+  `src/compat/modular-pilot.global.ts` (nơi logic đó giờ thật sự sống), đổi từ
+  cú pháp `function foo(a){return root.X.Y(a);}` sang cú pháp arrow đúng phong
+  cách file đó (`root.foo = a => root.X!.Y(a)`) — không giữ nguyên cú pháp
+  `function` cũ chỉ để test khỏi phải sửa, vì toàn bộ các lát port trước
+  (`local-store`/`backup-ui`/`range`) đều đã dùng arrow style nhất quán.
+
+Gate: `typecheck` xanh, `npm test` 611/611 xanh, `npm run nce-check` (vòng đời
+NCE thật trong Chromium) 91/91 xanh, `npm run ui-check` 29/29 xanh — không cần
+sửa benchmark nào vì không benchmark nào tham chiếu tên file/hàm này trực
+tiếp, và cache tự kiểm chứng của `ActionRerunService` không bị đụng tới.
+
+**Lát tiếp theo: `users-auth.js`** (256 dòng, xem mục 2 trong danh sách thứ tự
+đề xuất — nhạy cảm bảo mật, cần kiểm cẩn thận PBKDF2/re-auth/trang audit).
+
+#### Lát nhóm C — 2: `users-auth.js` (2026-08-20, xong)
+
+Retire hoàn toàn `assets/modules/users-auth.js` (256 dòng — trang Người dùng,
+trang Nhật ký hoạt động, và toàn bộ luồng Auth/login). Khác `action-workflow-
+service.js` (thuần delegator), file này CÓ logic DOM/adapter thật (dựng
+`innerHTML` màn đăng nhập/đổi mật khẩu/phục hồi dữ liệu, đọc form, focus quản
+lý) — nhưng mọi PHÉP TÍNH nghiệp vụ đã là TypeScript từ trước
+(`pbkdf2PasswordService`/`legacyPasswordHashService`/`isPbkdf2PasswordHash`,
+`LoginWorkflowCommand`/`RequiredPasswordWorkflowCommand`/`AdminBootstrapCommand`/
+`UserLifecycleCommand`/`ResetOperationalDataCommand`/`ActivityArchiveCommand`,
+`activityAuditFilter`/`activityAuditPagination`/`activityAuditCsv`/
+`userListModel`/`userRowHtml`/`usersPageHtml`/`userPermissionsModalHtml`/
+`resetPasswordModalHtml`) — nên đây vẫn là port cơ học đúng tinh thần nhóm C,
+chỉ là bề mặt DOM/adapter lớn hơn `action-workflow-service.js` nhiều. Chuyển
+nguyên vào `src/compat/modular-pilot.global.ts`, đặt ngay sau
+`root.UserLifecycleCommand = createUserLifecycleCommand(...)` (điểm cuối cùng
+trong chuỗi construct mà các hàm port phụ thuộc).
+
+**`auditQ`/`auditFrom`/`auditTo`/`auditPage`/`auditPageSize` chuyển vào
+`AuthUIState`** (`createAuthUiState()` ở `src/presentation/state/ui-state.ts`),
+cùng lý do `currentUser`/`loginFails`/`loginLockUntil` đã ở đó từ trước: đây là
+UI state ĐỘT BIẾN mà test vm sandbox gán bare (`auditQ='sodium'`) phải trúng
+đúng accessor property của `globalThis` — một `let` bên trong IIFE của bundle
+sẽ không thấy được từ ngoài. `AUDIT_PAGE_SIZES` (hằng số, không đột biến) chỉ
+cần `root.AUDIT_PAGE_SIZES = ACTIVITY_AUDIT_PAGE_SIZES` — không cần accessor.
+
+**Một bẫy mới, khác nhóm "bare identifier vs lazy call" đã biết:** viết
+`root.page = ...` (thay vì bare `page = ...`) ở ba chỗ (`applyUserPerms`,
+`logout`, `showApp`) làm `tests/global-name-uniqueness.test.js` báo trùng tên
+— scanner của test đó coi MỌI `root.X=`/`window.X=`/`globalThis.X=` là một
+"khai báo" cạnh tranh với field `page` mà `createRouterUiState()` đã khai báo
+trong `ui-state.ts`, dù đây chỉ là GHI qua accessor đã tồn tại (setter), không
+phải khai báo mới. `root.page` (đọc) không sao — chỉ phép GÁN `root.page=`
+mới bị bắt, vì trước lát này không chỗ nào trong bundle từng gán qua đường đó
+(chỉ đọc). Sửa bằng cách gán bare `page = ...` (giống hệt cách `currentUser`
+luôn được gán bare, chưa từng qua `root.currentUser=`) — khớp quy ước đã có,
+không phải thêm ngoại lệ vào `KNOWN` của test.
+
+**Hai đơn giản hóa thật khi port** (không chỉ chuyển nguyên, giống lát 1):
+`actionWorkflowStatus`-style fallback không có ở đây, nhưng
+`typeof backupCurrentData==='function'` guard trong `resetAllData()` bị bỏ —
+`root.backupCurrentData` là field BẮT BUỘC (không `?`) đã được gán từ trước
+trong cùng bundle (Hạ tầng lát 2, `backup-ui.js`), guard đó chỉ có ý nghĩa khi
+hai file tải độc lập, không còn cần khi cả hai cùng một script.
+
+**Dọn ambient declare ăn theo (`global.d.ts`):** `loginFails`/`loginLockUntil`
+xóa khỏi `declare var` (không còn file classic nào đọc trần — chỉ `currentUser`
+còn cần, do `state.js`'s `userName()`/`currentStaff()` vẫn đọc trần); thêm
+`declare function ensureAdmin()`/`showLogin()`/`showStartupRecovery()` vì
+`assets/app.js` (chưa port, Pha H) gọi các tên này trần và trước đây chúng
+được thỏa mãn nhờ `users-auth.js` cũng nằm trong cùng chương trình checkJs —
+mất file đó thì `tsc --noEmit` báo "Cannot find name" cho tới khi thêm ambient.
+
+**Cập nhật test đi kèm** (đọc/nạp file classic đã xóa, hoặc quét nguyên văn
+source của nó — không phải vì hành vi đổi):
+
+- `tests/audit-filter.test.js`, `tests/auth-security.test.js` — bỏ
+  `'modules/users-auth.js'` khỏi `loadSandbox([...])`.
+- `tests/users-page-bridge.test.js`, `tests/activity-audit-csv-bridge.test.js`,
+  `tests/admin-render-bridge.test.js`, `tests/lis-client-service.test.js`,
+  `tests/typescript-module-pilot.test.js` — năm test "bridge"/source-scanner
+  đọc nguyên văn `assets/modules/users-auth.js`; sửa để đọc
+  `src/compat/modular-pilot.global.ts` và khớp đúng cú pháp arrow-assignment
+  mới (`root.foo = x => ...`) thay vì `function foo(x){return globalThis...}`
+  cũ. `admin-render-bridge.test.js` đặc biệt: ba HTML builder
+  (`activityAuditPageHtml`/`userRowHtml`/`usersPageHtml`) trước đây được
+  "tiêu thụ" bởi `users-auth.js` như `globalThis.X(...)` (route/consumer
+  khác file khai báo); giờ tự tiêu thụ NGAY TRONG bundle như `root.X(...)`
+  (cùng file khai báo VÀ tiêu thụ) — assertion `consumedAs` phải đổi theo.
+- `tests/spacing-tokens.test.js` — quét "không còn inline `style=`" trên màn
+  auth/audit trước đây đọc nguyên file `users-auth.js`; giờ phải cắt đúng
+  ĐOẠN port (giữa hai mốc comment `===== USERS / AUDIT / AUTH =====` và
+  `const lisRuntime = createLisGatewayRuntime();`) trong bridge, KHÔNG được
+  quét nguyên văn cả file bridge — file đó có `style="color:var(--muted)"`
+  hợp lệ từ lát port `range.js` trước đó, ngoài phạm vi kiểm tra này.
+- `tests/action-workflow-service.test.js` KHÔNG động (không đọc/nạp
+  `users-auth.js`); giữ nguyên.
+
+Gate: `typecheck` xanh (module strict + checkJs), `npm test` 611/611 xanh,
+`npm run ui-check` 29/29 xanh (gồm "Khóa kỳ qua UI + re-auth", "Restore UI...
+qua re-auth" — trực tiếp chạy `reauthenticateCurrentUser()` mới port), `npm
+run a11y-audit` — cả hai trang `users`/`audit` VÀ ba modal
+`users:edit-permissions`/`audit:archive-log`/`shared:reauth-dialog` đều 0 vi
+phạm. Kiểm thêm bằng tay trong Chromium thật (ui-check/a11y-audit đều boot
+với phiên đã đăng nhập sẵn, không chạm màn login): sai mật khẩu → thông báo
+chung đúng; đúng `admin`/`admin` → bắt buộc đổi mật khẩu; đổi mật khẩu xong →
+vào thẳng dashboard; `logout()` → xóa `currentUser`, hiện lại màn đăng nhập —
+không có lỗi console ở bất kỳ bước nào.
+
+Sau lát này: còn 3 file nhóm C (`firebase-sync.js`/`state-storage.js`/
+`qc-domain.js`) trước khi tới lát cuối (retire `state.js` + `analyte-catalog.js`
+cùng lúc). **Lát tiếp theo: `firebase-sync.js`** (xem mục 3 trong danh sách
+thứ tự đề xuất).
 
 ### Pha H — bỏ global bridge và nhiều script tags
 

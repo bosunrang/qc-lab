@@ -21,7 +21,7 @@ const activityAuditFilter = {
 const activityAuditPagination = (items, page, pageSize) => { const size = [25, 50, 100].includes(Number(pageSize)) ? Number(pageSize) : 25, count = Math.max(1, Math.ceil((items || []).length / size)), current = Math.min(Math.max(1, Number(page) || 1), count), offset = (current - 1) * size; return { page: current, pageCount: count, offset, rows: (items || []).slice(offset, offset + size), resultFrom: (items || []).length ? offset + 1 : 0, resultTo: Math.min(offset + size, (items || []).length) }; };
 const activityAuditFilterState = { withQuery: (state, query) => ({ ...state, query, page: 1 }), withPageSize: (state, pageSize, sizes) => ({ ...state, pageSize: sizes.includes(Number(pageSize)) ? Number(pageSize) : 25, page: 1 }), withPage: (state, page) => ({ ...state, page: Math.max(1, Number(page) || 1) }), cleared: state => ({ ...state, query: '', from: '', to: '', page: 1 }) };
 const updateActivityAuditDateRange = (state, field, value) => field === 'from' ? { from: value, to: value && state.to && value > state.to ? value : state.to } : { from: value && state.from && value < state.from ? value : state.from, to: value };
-const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js', 'modules/users-auth.js'], {
+const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js'], {
   searchText,
   isoDate,
   formatDateTimeVN,

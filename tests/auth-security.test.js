@@ -5,7 +5,7 @@ const { webcrypto } = require('node:crypto');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
 (async()=>{
-  const ctx=loadSandbox(['core.js','generated/modular-pilot.js','modules/users-auth.js'],{crypto:webcrypto});
+  const ctx=loadSandbox(['core.js','generated/modular-pilot.js'],{crypto:webcrypto});
   assert.equal(run(ctx, `passwordError('')`), 'Mật khẩu không được để trống.');
   assert.match(run(ctx, `passwordError('1234567')`), /8 ký tự/);
   assert.equal(run(ctx, `passwordError('mat-khau-hop-le')`), '');
@@ -17,10 +17,9 @@ const { loadSandbox, run } = require('./helpers/sandbox');
 
   const legacy=await run(ctx, `legacyHashPass('legacy-pass')`);
   assert.equal(await run(ctx, `verifyPass('legacy-pass',${JSON.stringify(legacy)})`),true,'legacy hash remains upgradeable at login');
-  const usersSource=fs.readFileSync(path.join(__dirname,'..','assets','modules','users-auth.js'),'utf8');
   const backupSource=fs.readFileSync(path.join(__dirname,'..','src','compat','modular-pilot.global.ts'),'utf8');
-  assert.doesNotMatch(usersSource,/function clearActivityLog\b/,'không được có đường xóa trắng audit trong app');
-  assert.match(usersSource,/async function resetAllData\([\s\S]*?reauthenticateCurrentUser\(\{title:'Xác thực xóa sạch dữ liệu'/,'reset toàn bộ phải xác thực lại');
+  assert.doesNotMatch(backupSource,/function clearActivityLog\b/,'không được có đường xóa trắng audit trong app');
+  assert.match(backupSource,/root\.resetAllData\s*=\s*async\s*\(\)\s*=>\s*\{[\s\S]*?reauthenticateCurrentUser\(\{\s*title:\s*'Xác thực xóa sạch dữ liệu'/,'reset toàn bộ phải xác thực lại');
   assert.match(backupSource,/root\.importData=async e=>\{[\s\S]*?reauthenticateCurrentUser\(\{title:'Xác thực nhập backup'/,'thay toàn bộ dữ liệu bằng backup phải xác thực lại');
   console.log('Authentication hashing and verification tests passed');
 })().catch(error=>{console.error(error);process.exitCode=1;});

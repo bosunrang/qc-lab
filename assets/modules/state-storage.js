@@ -2,7 +2,8 @@
    HỢP ĐỒNG BỀ MẶT (ai được gọi gì):
    - app.js (boot): await loadBootState() trước khi ensureAdmin/showLogin, SAU ĐÓ
      phải await storageHydrationPromise rồi mới initFirebase/showStartupRecovery.
-   - users-auth.js: await storageHydrationPromise trước khi cho người dùng vào app.
+   - doLogin() (users-auth.js retire vào src/compat/modular-pilot.global.ts,
+     2026-08-20): await storageHydrationPromise trước khi cho người dùng vào app.
    - Mọi module nghiệp vụ: save(opts) sau mỗi thay đổi state — opts:
      {testId|testIds} ghi tăng dần đúng các test đó; {sigmaTestId} kèm nháp Sigma
      đồng bộ bắc cầu reload; {clearDerived:false} giữ cache dẫn xuất; {cloud:false}
@@ -24,7 +25,13 @@
    partitionWrite, localLoadStatus cố ý là global để test sandbox kiểm soát trực
    tiếp — không gói vào namespace. */
 let localLoadStatus='missing';
-let storageHydrationPromise=Promise.resolve(true),partitionSlot='';
+/* `storageHydrationPromise` là globalThis property (không phải `let`) vì
+   `assets/app.js` và `src/compat/modular-pilot.global.ts` (users-auth.js
+   retire vào đây 2026-08-20) đọc nó TRẦN — khi state-storage.js vào bundle
+   TypeScript, một `let` sẽ kẹt trong IIFE và file classic kia không còn thấy
+   được (cùng kỹ thuật tách nền đã áp dụng cho `state`/`mem`/`fb`). */
+globalThis.storageHydrationPromise=Promise.resolve(true);
+let partitionSlot='';
 const SIGMA_DRAFT_KEY='qclab_sigma_draft';
 function sigmaDraftRecord(){return globalThis.sigmaDraftService.read();}
 function sigmaDraftStamp(){return globalThis.sigmaDraftService.stamp();}

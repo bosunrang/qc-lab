@@ -26133,7 +26133,12 @@
 		return {
 			currentUser: null,
 			loginFails: normalized.fails,
-			loginLockUntil: normalized.until
+			loginLockUntil: normalized.until,
+			auditQ: "",
+			auditFrom: "",
+			auditTo: "",
+			auditPage: 1,
+			auditPageSize: 25
 		};
 	}
 	function createEntryUiState() {
@@ -28983,6 +28988,38 @@
 		formatDate: (value) => vnDate(value)
 	});
 	root.ActionPointIndexService = createActionPointIndexService(() => state.actions || []);
+	root.nextNceId = (today) => root.NceActionIdentityService.nextNceId(state.actions || [], today);
+	root.nceDueDate = (days = 7) => root.NceActionIdentityService.dueDate(days);
+	root.actionApprovalStatus = (action) => root.NceActionBasics.actionApprovalStatus(action);
+	root.actionRecordStatus = (action) => root.NceActionBasics.actionRecordStatus(action);
+	root.actionCancelled = (action) => root.NceActionBasics.actionCancelled(action);
+	root.actionApprovalLabel = (action) => root.NceActionBasics.actionApprovalLabel(action);
+	root.actionRecorded = (action) => root.NceActionBasics.actionRecorded(action);
+	root.actionDraftStatus = (action) => root.ActionDraftStatusService(action);
+	root.actionProtocolStatus = (action) => root.ActionProtocolService.protocolStatus(action);
+	root.actionProtocolSummary = (action) => root.ActionProtocolService.protocolSummary(action);
+	root.actionRiskScore = (action) => root.NceActionBasics.actionRiskScore(action);
+	root.actionResidualRiskScore = (action) => root.NceActionBasics.actionResidualRiskScore(action);
+	root.actionActiveFollowUp = (action) => root.NceActionIdentityService.activeFollowUp(state.actions || [], action);
+	root.actionEffectivenessStatus = (action) => root.ActionProtocolService.effectivenessStatus(action);
+	root.actionOverdue = (action) => root.ActionApprovalGates.overdue(action);
+	root.actionCanApprove = (action, user) => root.ActionApprovalGates.canApprove(action, user);
+	root.invalidateActionCaches = (testId) => {
+		root.ActionRerunService.invalidate(testId);
+		root.ActionPointIndexService.invalidate();
+	};
+	root.actionPoint = (action) => root.ActionRerunService.point(action);
+	root.actionEventDate = (action) => root.ActionQcLink.eventDate(action);
+	root.actionNeedsRerun = (action) => root.ActionQcLink.needsRerun(action);
+	root.actionRerunGateDate = (action, point) => root.NceActionRerunPolicy.rerunGateDate(action, point);
+	root.actionRerunStatus = (action) => root.ActionRerunService.status(action);
+	root.actionWorkflowStatus = (action) => root.ActionWorkflowStatusService(action);
+	root.pointActions = (pointId) => root.ActionPointIndexService.forPoint(pointId);
+	root.pointRealActions = (pointId) => root.PointWorkflowService.real(root.pointActions(pointId));
+	root.pointWorkflowComplete = (pointId) => root.PointWorkflowService.complete(root.pointActions(pointId));
+	root.pointWorkflowSummary = (pointId) => root.PointWorkflowService.summary(root.pointActions(pointId));
+	root.ACTION_LABELS = root.NceActionLabels.actionLabels;
+	root.RISK_SCALE = root.NceActionLabels.riskScale;
 	root.EntryService = createEntryService({
 		cleanText: root.QCCore.cleanText,
 		cleanId: root.QCCore.cleanId,
@@ -29510,6 +29547,550 @@
 		log: (type, detail, target) => logAct(type, detail, target),
 		save: () => save({ clearDerived: false })
 	});
+	root.AUDIT_PAGE_SIZES = ACTIVITY_AUDIT_PAGE_SIZES;
+	root.pageUsers = () => {
+		const rows = root.userListModel(state.users, currentUser && currentUser.id).map((u) => root.userRowHtml({
+			user: u,
+			currentUserId: currentUser && currentUser.id,
+			esc: escapeHtml$2,
+			roleLabel: (r) => root.roleLabel(r),
+			btn: root.btn
+		})).join("");
+		return root.usersPageHtml({
+			head: root.headOnly("Quản lý người dùng", "Phân quyền thao tác và kiểm soát tài khoản"),
+			rows,
+			roleOptions: root.roleSelectOptions("technician"),
+			permissionChecks: root.userPermChecks(root.rolePageIds("technician"), "newUserPerms", "technician"),
+			addButton: root.btn("Thêm", "addUser()", "teal")
+		});
+	};
+	root.auditDateKey = (activity) => root.activityAuditFilter.dateKey(activity);
+	root.auditFilteredActivities = (items = state.activity || []) => root.activityAuditFilter.filter(items, auditQ, auditFrom, auditTo);
+	root.auditSetQuery = (value) => {
+		const next = root.activityAuditFilterState.withQuery({
+			query: auditQ,
+			from: auditFrom,
+			to: auditTo,
+			page: auditPage,
+			pageSize: auditPageSize
+		}, value);
+		auditQ = next.query;
+		auditPage = next.page;
+		root.scheduleSearchRender(root.auditSetQuery, rerender, "auditSearch");
+	};
+	root.auditSetDate = (field, value) => {
+		const iso = value ? root.vnPickerParse(value) || root.parseVN(value) || "" : "";
+		const next = root.updateActivityAuditDateRange({
+			from: auditFrom,
+			to: auditTo
+		}, field, iso);
+		auditFrom = next.from;
+		auditTo = next.to;
+		auditPage = 1;
+		rerender();
+	};
+	root.auditSetPageSize = (value) => {
+		const next = root.activityAuditFilterState.withPageSize({
+			query: auditQ,
+			from: auditFrom,
+			to: auditTo,
+			page: auditPage,
+			pageSize: auditPageSize
+		}, value, root.AUDIT_PAGE_SIZES);
+		auditPageSize = next.pageSize;
+		auditPage = next.page;
+		rerender();
+	};
+	root.auditSetPage = (value) => {
+		auditPage = root.activityAuditFilterState.withPage({
+			query: auditQ,
+			from: auditFrom,
+			to: auditTo,
+			page: auditPage,
+			pageSize: auditPageSize
+		}, value).page;
+		rerender();
+	};
+	root.auditClearFilters = () => {
+		const next = root.activityAuditFilterState.cleared({
+			query: auditQ,
+			from: auditFrom,
+			to: auditTo,
+			page: auditPage,
+			pageSize: auditPageSize
+		});
+		auditQ = next.query;
+		auditFrom = next.from;
+		auditTo = next.to;
+		auditPage = next.page;
+		rerender();
+	};
+	root.pageAudit = () => {
+		const total = (state.activity || []).length;
+		const oversizeWarn = total > root.ACTIVITY_ROTATE_TO ? ` <span class="tag warn">Nhật ký đang rất lớn</span> <span class="hint">Nên lưu trữ bớt dòng cũ — hệ thống sẽ tự xoay vòng ở ${root.ACTIVITY_HARD_CAP} dòng (không xuất CSV).</span>` : "";
+		const chain = typeof root.auditChainStatus === "function" ? root.auditChainStatus() : {
+			ok: true,
+			checked: 0,
+			legacy: total,
+			idle: false
+		};
+		const chainHtml = chain.idle ? `<span class="tag none">Chưa kiểm chuỗi hash</span> ${root.btn("Kiểm tra chuỗi hash", "auditVerifyChainNow()", "ghost sm")} <span class="hint">Nhật ký lớn (${chain.total} dòng) nên không tự kiểm mỗi lần mở trang.</span>` : chain.ok ? `<span class="tag ok">Chuỗi hash hợp lệ</span> <span class="hint">${chain.checked} dòng đã khóa hash${chain.legacy ? ` · ${chain.legacy} dòng cũ chưa có hash` : ""}</span>` : `<span class="tag rej">Audit có dấu hiệu bị sửa</span> <span class="hint">Lỗi tại dòng #${(state.activity[chain.brokenIndex] || {}).seq || chain.brokenIndex + 1}: ${escapeHtml$2(chain.reason)}</span>`;
+		const filtered = root.auditFilteredActivities(), pageInfo = root.activityAuditPagination(filtered, auditPage, auditPageSize), pageCount = pageInfo.pageCount;
+		auditPage = pageInfo ? pageInfo.page : Math.min(Math.max(1, auditPage), pageCount);
+		const offset = pageInfo ? pageInfo.offset : (auditPage - 1) * auditPageSize;
+		const rows = (pageInfo ? pageInfo.rows : filtered.slice(offset, offset + auditPageSize)).map((a) => root.activityAuditRowHtml({
+			sequenceHtml: a.seq ? "#" + a.seq : "",
+			timeHtml: formatDateTimeVN(a.ts),
+			userHtml: escapeHtml$2(a.user || ""),
+			roleHtml: root.roleLabel(a.role || "viewer"),
+			usernameHtml: a.username ? " · @" + escapeHtml$2(a.username) : "",
+			typeHtml: escapeHtml$2(a.type || ""),
+			targetHtml: escapeHtml$2(a.target || ""),
+			detailHtml: escapeHtml$2(a.detail || "")
+		})).join("");
+		const hasFilter = !!(auditQ || auditFrom || auditTo);
+		const pageSizeOptions = root.AUDIT_PAGE_SIZES.map((size) => `<option value="${size}" ${size === auditPageSize ? "selected" : ""}>${size} dòng</option>`).join("");
+		const resultFrom = pageInfo ? pageInfo.resultFrom : filtered.length ? offset + 1 : 0, resultTo = pageInfo ? pageInfo.resultTo : Math.min(offset + auditPageSize, filtered.length);
+		const pagination = filtered.length ? `<div class="audit-pagination"><span class="hint">Hiển thị ${resultFrom}–${resultTo} / ${filtered.length} dòng</span><div>${root.btn("‹ Trước", `auditSetPage(${auditPage - 1})`, "ghost sm", "", { disabled: auditPage <= 1 })}<b>Trang ${auditPage}/${pageCount}</b>${root.btn("Sau ›", `auditSetPage(${auditPage + 1})`, "ghost sm", "", { disabled: auditPage >= pageCount })}</div></div>` : "";
+		const rowsOrEmptyState = rows ? `<div class="audit-table-wrap"><table class="audit-table"><thead><tr><th>Thời gian</th><th>Người dùng</th><th>Hành động</th><th>Đối tượng</th><th>Chi tiết</th></tr></thead><tbody>${rows}</tbody></table></div>` : root.emptyState(total ? "Không tìm thấy nhật ký" : "Chưa có hoạt động", total ? "Thử từ khóa hoặc khoảng ngày khác." : "Nhật ký sẽ bắt đầu ghi từ các thao tác tiếp theo.");
+		return root.activityAuditPageHtml({
+			head: root.headOnly("Nhật ký hoạt động", "Lưu vết các thao tác quan trọng; chỉ quản trị viên được xem"),
+			exportButton: root.btn("Xuất CSV nhật ký", "exportActivityCSV()", "teal sm"),
+			archiveButton: total ? root.btn("Lưu trữ nhật ký cũ", "archiveActivityLog()", "ghost sm") : "",
+			total,
+			chainHtml,
+			oversizeWarn,
+			searchValue: escapeHtmlAttr(auditQ),
+			fromDate: root.dateBox("auditFromDate", auditFrom, "audit-date", `aria-label="Lọc nhật ký từ ngày" onchange="auditSetDate('from',this.value)"`),
+			toDate: root.dateBox("auditToDate", auditTo, "audit-date", `aria-label="Lọc nhật ký đến ngày" onchange="auditSetDate('to',this.value)"`),
+			pageSizeOptions,
+			clearFiltersButton: hasFilter ? root.btn("Xóa bộ lọc", "auditClearFilters()", "ghost sm audit-clear-filter") : "",
+			filteredCount: filtered.length,
+			rowsOrEmptyState,
+			pagination
+		});
+	};
+	root.activityCSVRows = (items) => root.activityAuditCsv(items);
+	root.exportActivityCSV = () => {
+		root.csvDownload("Nhat_ky_hoat_dong_QCLab.csv", root.activityCSVRows(state.activity || []));
+	};
+	root.archiveActivityLog = () => {
+		if (!root.requireAdmin()) return;
+		const total = (state.activity || []).length;
+		if (!total) return;
+		root.openModal(root.activityAuditArchiveModalHtml({
+			total,
+			cancelButtonHtml: root.btn("Hủy", "closeModal()", "ghost"),
+			archiveButtonHtml: root.btn("Xuất CSV và lưu trữ", "confirmArchiveActivityLog()", "teal")
+		}));
+	};
+	root.confirmArchiveActivityLog = async () => {
+		if (!root.requireAdmin()) return;
+		if ((await root.ActivityArchiveCommand.execute(document.getElementById("auditArchiveMonths")?.value)).status === "done") auditPage = 1;
+	};
+	root.addUser = async () => {
+		if (!root.requireAdmin()) return;
+		const username = document.getElementById("uUser").value.trim().toLowerCase();
+		const name = document.getElementById("uName").value.trim();
+		const initials = root.QCCore.cleanText(document.getElementById("uInitials").value, 12).trim().toUpperCase();
+		const rolev = document.getElementById("uRole").value;
+		const pass = document.getElementById("uPass").value;
+		const userErr = root.newUserValidationError({
+			username,
+			password: pass,
+			existingUsernames: (state.users || []).map((u) => u.username)
+		});
+		if (userErr) {
+			await root.infoDialog(userErr);
+			return;
+		}
+		const pagePerms = await root.collectUserPerms("newUserPerms", rolev);
+		if (!pagePerms) return;
+		await root.UserLifecycleCommand.add({
+			id: uid(),
+			username,
+			name,
+			initials,
+			role: rolev,
+			pagePerms,
+			password: pass,
+			auditDetail: root.roleLabel(rolev) + " · " + pagePerms.length + " thẻ · yêu cầu đổi mật khẩu"
+		});
+		rerender();
+	};
+	root.userPermChecks = (selectedIds, groupId, roleValue) => {
+		const base = new Set(root.rolePageIds(roleValue)), initial = selectedIds && selectedIds.length ? selectedIds : root.rolePageIds(roleValue), selected = new Set(root.selectUserPermissions(initial, [...base]));
+		return root.userPermissionChecksHtml(escapeHtmlAttr(groupId), root.PAGES.map(([id, title]) => ({
+			idHtml: escapeHtmlAttr(id),
+			titleHtml: escapeHtml$2(title),
+			allowed: base.has(id),
+			selected: selected.has(id)
+		})));
+	};
+	root.syncUserPermChecks = (groupId, roleValue) => {
+		const box = document.getElementById(groupId), base = new Set(root.rolePageIds(roleValue));
+		if (!box) return;
+		box.querySelectorAll("input[type=checkbox]").forEach((i) => {
+			const input = i;
+			const allowed = base.has(input.value);
+			input.disabled = !allowed;
+			input.closest("label").classList.toggle("disabled", !allowed);
+			if (!allowed) input.checked = false;
+		});
+	};
+	root.collectUserPerms = async (groupId, roleValue) => {
+		const box = document.getElementById(groupId), base = new Set(root.rolePageIds(roleValue));
+		if (!box) return root.rolePageIds(roleValue);
+		const selected = [...box.querySelectorAll("input[type=checkbox]:checked")].map((i) => i.value), picked = root.selectUserPermissions(selected, [...base]);
+		if (!picked.length) {
+			await root.infoDialog("Cần chọn ít nhất một thẻ được phép dùng.");
+			return null;
+		}
+		return [...new Set(picked)];
+	};
+	root.openUserPerms = async (id) => {
+		if (!root.requireAdmin()) return;
+		const u = (state.users || []).find((x) => x.id === id);
+		if (!u) return;
+		if (currentUser && currentUser.id === id) {
+			await root.infoDialog("Không thể tự sửa quyền của tài khoản đang đăng nhập. Hãy dùng tài khoản quản trị khác nếu cần thay đổi.");
+			return;
+		}
+		const roleSelect = root.userRoleSelectHtml(root.roleSelectOptions(u.role));
+		root.openModal(root.userPermissionsModalHtml({
+			userName: escapeHtml$2(u.name || u.username),
+			username: escapeHtml$2(u.username),
+			roleSelectHtml: roleSelect,
+			permissionChecksHtml: root.userPermChecks(u.pagePerms, "editUserPerms", u.role),
+			cancelButtonHtml: root.btn("Hủy", "closeModal()", "ghost"),
+			saveButtonHtml: root.btn("Lưu quyền", `applyUserPerms('${id}')`, "teal")
+		}));
+	};
+	root.applyUserPerms = async (id) => {
+		if (!root.requireAdmin()) return;
+		const u = (state.users || []).find((x) => x.id === id);
+		if (!u) return;
+		if (currentUser && currentUser.id === id) {
+			await root.infoDialog("Không thể tự sửa quyền của tài khoản đang đăng nhập.");
+			return;
+		}
+		const rolev = document.getElementById("editUserRole").value, pagePerms = await root.collectUserPerms("editUserPerms", rolev);
+		if (!pagePerms) return;
+		root.UserLifecycleCommand.updatePermissions(u, {
+			role: rolev,
+			pagePerms,
+			auditDetail: `${root.roleLabel(rolev)} · ${pagePerms.length} thẻ`
+		});
+		root.closeModal();
+		if (!root.canAccessPage(root.page)) page = root.firstAccessPage();
+		renderBrand();
+		root.nav();
+		rerender();
+	};
+	root.resetPass = (id) => {
+		if (!root.requireAdmin()) return;
+		if (!(state.users || []).find((x) => x.id === id)) return;
+		const self = currentUser && currentUser.id === id;
+		root.openModal(root.resetPasswordModalHtml({
+			title: self ? "Đổi mật khẩu" : "Đặt lại mật khẩu",
+			message: self ? "Nhập mật khẩu mới cho tài khoản đang đăng nhập." : "Nhập mật khẩu tạm; người dùng sẽ phải đổi lại khi đăng nhập.",
+			enterAction: `if(event.key==='Enter')applyResetPass('${id}')`,
+			cancelButtonHtml: root.btn("Hủy", "closeModal()", "ghost"),
+			saveButtonHtml: root.btn("Lưu mật khẩu", `applyResetPass('${id}')`, "teal")
+		}));
+		setTimeout(() => {
+			const e = document.getElementById("resetPass1");
+			if (e) e.focus();
+		}, 50);
+	};
+	root.applyResetPass = async (id) => {
+		if (!root.requireAdmin()) return;
+		const u = (state.users || []).find((x) => x.id === id);
+		if (!u) return;
+		const p1 = document.getElementById("resetPass1").value, p2 = document.getElementById("resetPass2").value, msg = document.getElementById("resetPassMsg"), err = root.passwordChangeError(p1, p2);
+		if (err) {
+			if (msg) msg.innerHTML = `<div class="auth-err">${escapeHtml$2(err)}</div>`;
+			return;
+		}
+		const updated = await root.UserLifecycleCommand.resetPassword(u, p1, !(currentUser && currentUser.id === id));
+		root.closeModal();
+		rerender();
+		await root.infoDialog(updated.mustChangePassword ? "Đã đặt mật khẩu tạm. Người dùng sẽ phải đổi mật khẩu khi đăng nhập." : "Đã cập nhật mật khẩu.", { type: "success" });
+	};
+	root.toggleUser = (id) => {
+		if (!root.requireAdmin()) return;
+		const u = (state.users || []).find((x) => x.id === id);
+		root.UserLifecycleCommand.toggle(u);
+		rerender();
+	};
+	root.delUser = async (id) => {
+		if (!root.requireAdmin()) return;
+		if (id === currentUser.id) {
+			await root.infoDialog("Không thể xóa chính mình.");
+			return;
+		}
+		const u = (state.users || []).find((x) => x.id === id);
+		if (!await root.confirmDialog({
+			kicker: "Thao tác không thể hoàn tác",
+			title: "Xóa người dùng",
+			message: `Xóa người dùng ${u ? u.name || u.username : ""}?`,
+			confirmLabel: "Xóa người dùng",
+			cancelLabel: "Hủy"
+		})) return;
+		root.UserLifecycleCommand.remove(id);
+		rerender();
+	};
+	root.passwordError = (p) => root.passwordPolicyError(p);
+	root.legacyHashPass = async (p) => root.legacyPasswordHashService.hash(p);
+	root.hashPass = async (p) => root.pbkdf2PasswordService.hash(p);
+	root.verifyPass = async (p, stored) => {
+		if (root.isPbkdf2PasswordHash(stored)) return root.pbkdf2PasswordService.verify(p, stored);
+		return await root.legacyHashPass(p) === stored;
+	};
+	root.confirmReauthentication = async () => {
+		const input = document.getElementById("reauthPassword"), err = document.getElementById("reauthError");
+		if (!currentUser || !input) {
+			root.closeDialogOverlay(false);
+			return;
+		}
+		let ok = false;
+		try {
+			ok = await root.verifyPass(input.value, currentUser.passHash);
+		} catch (e) {}
+		input.value = "";
+		if (!ok) {
+			if (err) err.hidden = false;
+			input.focus();
+			return;
+		}
+		root.closeDialogOverlay(true);
+	};
+	root.reauthenticateCurrentUser = ({ title = "Xác thực lại", message = "Nhập lại mật khẩu để tiếp tục." } = {}) => {
+		if (!currentUser) return Promise.resolve(false);
+		return new Promise((resolve) => root.openDialogOverlay(`<div class="modal confirm-modal">
+    <div class="confirm-modal-h"><div class="confirm-modal-kicker">Thao tác được kiểm soát</div>${root.modalCloseButton("closeDialogOverlay(false)")}</div>
+    <h3 class="confirm-modal-title">${escapeHtml$2(title)}</h3>
+    <div class="confirm-modal-body"><div class="confirm-modal-icon info" aria-hidden="true">✓</div><div class="confirm-modal-text"><b>${escapeHtml$2(message)}</b><p>Tài khoản: ${escapeHtml$2(currentUser.name || currentUser.username || "")}</p></div></div>
+    <div class="reauth-modal-field">
+      <label for="reauthPassword">Mật khẩu hiện tại</label>
+      <input id="reauthPassword" type="password" autocomplete="current-password" autofocus onkeydown="if(event.key==='Enter'){event.preventDefault();confirmReauthentication()}">
+      <div id="reauthError" class="auth-err" hidden>Mật khẩu không đúng.</div>
+    </div>
+    <div class="confirm-modal-actions">${root.btn("Hủy", "closeDialogOverlay(false)", "ghost")}${root.btn("Xác thực", "confirmReauthentication()", "teal")}</div>
+  </div>`, resolve));
+	};
+	root.ensureAdmin = async () => {
+		await root.AdminBootstrapCommand.ensure();
+	};
+	root.blankAppState = (users) => root.blankAppStateFactory(users);
+	root.resetAllData = async () => {
+		if (!root.requireAdmin()) return;
+		if (!await root.confirmDialog({
+			kicker: "Thao tác không thể hoàn tác",
+			title: "Xóa sạch dữ liệu test",
+			message: "Xóa sạch toàn bộ dữ liệu test?",
+			detail: "Nhật ký hoạt động sẽ được giữ lại và ghi nhận thao tác này.",
+			confirmLabel: "Tiếp tục",
+			cancelLabel: "Hủy"
+		})) return;
+		if (!await root.confirmDialog({
+			kicker: "Xác nhận lần cuối",
+			title: "Xóa sạch dữ liệu test",
+			message: "Dữ liệu QC, cấu hình, lô, panel và khắc phục sẽ bị xóa.",
+			detail: "Nhật ký audit vẫn được giữ. Nếu đang bật đám mây, trạng thái trắng cũng sẽ được đồng bộ lên Firebase.",
+			confirmLabel: "Xóa sạch dữ liệu",
+			cancelLabel: "Hủy"
+		})) return;
+		if (!await root.reauthenticateCurrentUser({
+			title: "Xác thực xóa sạch dữ liệu",
+			message: "Nhập lại mật khẩu trước khi xóa toàn bộ dữ liệu QC và cấu hình."
+		})) return;
+		if (!await root.backupCurrentData("truoc-xoa")) {
+			await root.infoDialog("Không tạo được bản backup an toàn. Dữ liệu chưa bị xóa.");
+			return;
+		}
+		await root.ResetOperationalDataCommand.execute();
+		await root.infoDialog("Đã xóa sạch dữ liệu test. App đã về trạng thái trắng.", { type: "success" });
+	};
+	root.downloadStartupData = () => {
+		if (!startupProblem) return;
+		const blob = new Blob([startupProblem.raw], { type: "application/json" }), a = document.createElement("a");
+		a.href = URL.createObjectURL(blob);
+		a.download = "qclab-du-lieu-can-phuc-hoi-" + Date.now() + ".json";
+		a.click();
+		setTimeout(() => URL.revokeObjectURL(a.href), 1e3);
+	};
+	root.resetStartupData = async () => {
+		if (!await root.confirmDialog({
+			kicker: "Thao tác không thể hoàn tác",
+			title: "Tạo dữ liệu mới",
+			message: "Tạo dữ liệu mới?",
+			detail: "Dữ liệu cũ sẽ không bị dùng nữa. Hãy tải bản cần phục hồi trước khi tiếp tục.",
+			confirmLabel: "Tạo dữ liệu mới",
+			cancelLabel: "Hủy"
+		})) return;
+		startupProblem = null;
+		await root.ResetOperationalDataCommand.execute({
+			keepUsers: false,
+			keepAudit: false,
+			log: false,
+			save: false,
+			render: false
+		});
+		root.showLogin();
+	};
+	root.authBrandMark = () => {
+		const logo = root.brandLogo();
+		return `<div class="brand-mark">${logo ? `<img src="${escapeHtmlAttr(logo)}" alt="">` : escapeHtml$2(root.brandMarkText())}</div>`;
+	};
+	root.showStartupRecovery = () => {
+		let ov = document.getElementById("authOverlay");
+		if (!ov) {
+			ov = document.createElement("div");
+			ov.id = "authOverlay";
+			document.body.appendChild(ov);
+		}
+		ov.style.display = "flex";
+		ov.innerHTML = `<div class="auth-card"><div class="auth-head">${root.authBrandMark()}<div class="auth-brand">Cần phục hồi dữ liệu</div></div>
+    <div class="auth-sub">QC Lab phát hiện dữ liệu cục bộ không hợp lệ và đã dừng để tránh ghi đè.</div>
+    <div class="auth-err">${escapeHtml$2(startupProblem && startupProblem.message || "Không đọc được dữ liệu.")}</div>
+    <div class="auth-actions">${root.btn("Tải dữ liệu gốc xuống", "downloadStartupData()", "teal")}${root.btn("Tạo dữ liệu mới", "resetStartupData()", "ghost")}</div>
+    <div class="auth-hint">Ưu tiên tải dữ liệu gốc xuống trước để có thể kiểm tra và phục hồi.</div></div>`;
+	};
+	root.showLogin = (msg) => {
+		document.getElementById("nav").innerHTML = "";
+		document.getElementById("main").innerHTML = "";
+		document.getElementById("userBox").innerHTML = "";
+		const sf = document.getElementById("sideFoot");
+		if (sf) sf.innerHTML = "";
+		let ov = document.getElementById("authOverlay");
+		if (!ov) {
+			ov = document.createElement("div");
+			ov.id = "authOverlay";
+			document.body.appendChild(ov);
+		}
+		ov.style.display = "flex";
+		const app = root.QCLAB_APP || { version: "dev" };
+		const admin = (state.users || []).find((u) => u.username === "admin");
+		const defaultHint = admin && admin.mustChangePassword ? "Tài khoản mặc định: <b>admin</b> / <b>admin</b><br>Hệ thống sẽ yêu cầu đổi mật khẩu ở lần đăng nhập đầu tiên.<br>" : "";
+		const trial = window.qcLicense && window.qcLicense.trial;
+		const trialLine = trial && trial.active ? `<div class="auth-hint ${trial.daysLeft <= 7 ? "auth-trial-warning" : "auth-trial-ok"}">Bản dùng thử: còn ${trial.daysLeft}/${trial.totalDays} ngày</div>` : "";
+		ov.innerHTML = `<div class="auth-card"><div class="auth-head">${root.authBrandMark()}<div class="auth-head-text"><div class="auth-brand">${escapeHtml$2(root.brandTitle())}</div><div class="auth-sub">${escapeHtml$2(root.brandSub())}</div></div></div>
+    <label>Tên đăng nhập</label><input id="liUser" autocomplete="username" autofocus>
+    <label>Mật khẩu</label><input id="liPass" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+    ${msg ? `<div class="auth-err">${escapeHtml$2(msg)}</div>` : ""}
+    <div class="auth-actions">${root.btn("Đăng nhập", "doLogin()", "teal")}</div>
+    ${trialLine}<div class="auth-hint">${defaultHint}Phiên bản ${escapeHtml$2(app.version || "dev")}</div></div>`;
+		requestAnimationFrame(root.focusLoginField);
+		setTimeout(root.focusLoginField, 50);
+	};
+	root.focusLoginField = () => {
+		const ov = document.getElementById("authOverlay");
+		if (!ov || ov.style.display === "none") return;
+		const active = document.activeElement;
+		if (active && active !== document.body && ov.contains(active)) return;
+		const user = document.getElementById("liUser");
+		if (user) user.focus();
+	};
+	root.persistLoginLockout = () => {
+		try {
+			localStorage.setItem("qclab_login_lockout", JSON.stringify({
+				fails: loginFails,
+				until: loginLockUntil
+			}));
+		} catch (e) {}
+	};
+	root.doLogin = async () => {
+		const u = document.getElementById("liUser").value.trim().toLowerCase();
+		const p = document.getElementById("liPass").value;
+		const genericFailMsg = "Tên đăng nhập hoặc mật khẩu không đúng.";
+		if (!await storageHydrationPromise) {
+			root.showStartupRecovery();
+			return;
+		}
+		const result = await root.LoginWorkflowCommand.authenticate({
+			users: state.users,
+			username: u,
+			password: p,
+			lock: {
+				fails: loginFails,
+				until: loginLockUntil
+			},
+			now: Date.now()
+		});
+		if (result.status === "locked") {
+			root.showLogin(result.message);
+			return;
+		}
+		if (result.status === "failed") {
+			if (result.reason === "verification-error") {
+				root.showLogin("Không thể kiểm tra mật khẩu trên trình duyệt này.");
+				return;
+			}
+			loginFails = result.lock.fails;
+			loginLockUntil = result.lock.until;
+			root.persistLoginLockout();
+			root.showLogin(genericFailMsg);
+			return;
+		}
+		loginFails = result.lock.fails;
+		loginLockUntil = result.lock.until;
+		root.persistLoginLockout();
+		currentUser = result.user;
+		if (currentUser.mustChangePassword) root.showPasswordChange();
+		else root.showApp();
+	};
+	root.showPasswordChange = (msg) => {
+		let ov = document.getElementById("authOverlay");
+		if (!ov) {
+			ov = document.createElement("div");
+			ov.id = "authOverlay";
+			document.body.appendChild(ov);
+		}
+		ov.style.display = "flex";
+		ov.innerHTML = `<div class="auth-card"><div class="auth-head">${root.authBrandMark()}<div class="auth-brand">Đổi mật khẩu</div></div><div class="auth-sub">Cần cập nhật mật khẩu trước khi vào hệ thống</div>
+    <label>Mật khẩu mới</label><input id="newPass1" type="password" autocomplete="new-password">
+    <label>Nhập lại mật khẩu mới</label><input id="newPass2" type="password" autocomplete="new-password" onkeydown="if(event.key==='Enter')changeRequiredPassword()">
+    ${msg ? `<div class="auth-err">${escapeHtml$2(msg)}</div>` : ""}
+    <div class="auth-actions">${root.btn("Lưu mật khẩu mới", "changeRequiredPassword()", "teal")}</div>
+    <div class="auth-hint">Mật khẩu cần ít nhất 8 ký tự và không nên dùng lại mật khẩu mặc định.</div></div>`;
+		setTimeout(() => {
+			const e = document.getElementById("newPass1");
+			if (e) e.focus();
+		}, 50);
+	};
+	root.changeRequiredPassword = async () => {
+		const p1 = document.getElementById("newPass1").value, p2 = document.getElementById("newPass2").value;
+		const result = await root.RequiredPasswordWorkflowCommand.complete({
+			user: currentUser,
+			password: p1,
+			confirmation: p2,
+			cloud: !!(fb && fb.initialized)
+		});
+		if (result.status === "invalid") {
+			root.showPasswordChange(result.error);
+			return;
+		}
+		currentUser = result.user;
+		root.showApp();
+	};
+	root.logout = () => {
+		if (currentUser) root.LoginWorkflowCommand.logout();
+		currentUser = null;
+		page = "dash";
+		root.showLogin();
+	};
+	root.showApp = () => {
+		const ov = document.getElementById("authOverlay");
+		if (ov) ov.style.display = "none";
+		if (!root.canAccessPage(root.page)) page = root.firstAccessPage();
+		document.getElementById("userBox").innerHTML = "";
+		renderBrand();
+		root.nav();
+		root.sideFoot();
+		rerender();
+		if (typeof root.lisGatewayStart === "function") setTimeout(root.lisGatewayStart, 0);
+	};
 	var lisRuntime = createLisGatewayRuntime();
 	var lisClient;
 	var lisStorage = typeof localStorage !== "undefined" ? localStorage : { getItem: () => null };

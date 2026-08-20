@@ -99,9 +99,9 @@ const { loadSandbox, run } = require('./helpers/sandbox');
   failDecide = false;
 
   /* --- Dang nhap thi bat dau hoi dinh ky; save() KHONG con day gi di --- */
-  const users = fs.readFileSync(path.join(__dirname, '../assets/modules/users-auth.js'), 'utf8');
+  const bridge = fs.readFileSync(path.join(__dirname, '../src/compat/modular-pilot.global.ts'), 'utf8');
   const stateStorage = fs.readFileSync(path.join(__dirname, '../assets/modules/state-storage.js'), 'utf8');
-  assert.match(users, /setTimeout\(lisGatewayStart,0\)/, 'dang nhap phai bat dau kiem tra hang cho');
+  assert.match(bridge, /setTimeout\(root\.lisGatewayStart,\s*0\)/, 'dang nhap phai bat dau kiem tra hang cho');
   assert.doesNotMatch(stateStorage, /scheduleLisQcSync/, 'save() khong con day trang thai QC ra ngoai — chieu do da bi bo');
   run(ctx, 'clearInterval(lisGatewayRuntime.pollT);');
 
