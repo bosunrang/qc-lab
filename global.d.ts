@@ -22,12 +22,11 @@ declare var mem: any, startupProblem: any, derivedIndex: any;
 declare var pointsCache: Map<string, any>, pointsIndexCache: Map<string, any>, pointsLotCache: Map<string, any>,
   wgMemo: Map<string, any>, acceptedMemo: Map<string, any>, cusumMemo: Map<string, any>;
 
-// --- Firebase sync state + storage hydration gate (globalThis property,
-// khai báo tại src/compat/modular-pilot.global.ts từ khi firebase-sync.js retire
-// vào đó 2026-08-20 — cùng lý do tách nền như `state`/`mem` ở trên:
-// state-storage.js (còn classic) và assets/app.js đọc chúng TRẦN). ---
-declare var fb: { ready: boolean; initialized: boolean; ref: any; dirty: boolean; clientId: string;
-  authUser: any; pendingRenderT: any; pullT: any; seenSig: any; synced: any; retryT: any; retryMs: number };
+// --- Storage hydration gate (globalThis property, khai báo tại
+// src/compat/modular-pilot.global.ts từ khi state-storage.js retire vào đó
+// 2026-08-20 — cùng lý do tách nền như `state`/`mem` ở trên: assets/app.js đọc
+// nó TRẦN. `fb` (firebase-sync.js retire 2026-08-20) không còn khai báo ở đây —
+// không còn file classic nào trong assets/**/*.js đọc nó trần nữa. ---
 declare var storageHydrationPromise: Promise<boolean>;
 
 // --- UI state accessors (cài từ modular compatibility artifact) ---
@@ -42,11 +41,13 @@ declare function ensureAdmin(): Promise<void>;
 declare function showLogin(msg?: string): void;
 declare function showStartupRecovery(): void;
 // Firebase sync glue (firebase-sync.js retired 2026-08-20 into
-// src/compat/modular-pilot.global.ts) — assets/app.js and state-storage.js
-// (still classic) call these bare.
+// src/compat/modular-pilot.global.ts) — assets/app.js still calls this bare.
+// `fbDataPath`/`getFbCfg` không còn khai báo ở đây — chỉ state-storage.js (đã
+// retire 2026-08-20) từng đọc chúng trần.
 declare function initFirebase(): Promise<unknown>;
-declare function fbDataPath(): string;
-declare function getFbCfg(): Record<string, any> | null;
+// Local storage glue (state-storage.js retired 2026-08-20 into
+// src/compat/modular-pilot.global.ts) — assets/app.js still calls this bare.
+declare function loadBootState(): Promise<boolean>;
 declare function afterRender(page: string): void;
 declare function openModal(html: string): void;
 declare function closeModal(): void;

@@ -523,13 +523,33 @@ the Google Fonts link, offline labs must print with correct metrics.
   always exists, that guard stopped skipping the real call. Both fixed with
   defensive `typeof`-checks, the same idiom already used elsewhere in this file
   for optional `window` access.
-- `state-storage.js` — `localStorage` load/save. `loadBootState()` tries
-  `localStorage` first, then the `LocalStore` IndexedDB mirror; boot loads a
-  small shell first and hydrates the full QC data in the background — login
-  and Firebase sync wait for full hydration. Corrupt/invalid `localStorage`
-  payloads are quarantined (`quarantineCorruptLocal()`) rather than silently
-  dropped. Saves are debounced via `lsSaveDelay()` — 400ms normally, backing
-  off to 700ms/1200ms as payload size or serialize time grows — flushed on
+- `localStorage`/IndexedDB persistence pipeline (`loadBootState`/`save`/
+  `persistLocalSnapshot`/`lsFlush`/…) — retired from classic `state-storage.js`
+  on 2026-08-20 (Pha G nhóm C, lát 4): every function there already only
+  forwarded to an existing TypeScript service (`storageLifecycleService`,
+  `indexedDbMirrorService`, `storageSerializePolicy`, `localSaveScheduler`,
+  `storageSnapshotService`, `saveService`, `sigmaDraftService`,
+  `corruptLocalQuarantine`), so it moved as-is into
+  `src/compat/modular-pilot.global.ts` right before
+  `root.storageSerializePolicy` is constructed. Unlike the `firebase-sync.js`
+  retirement, no eager-construction guard was hiding behind this one — every
+  dependency closure in those services was already lazy — but this file had a
+  much larger set of mutable module-level variables (14 of them: `lsDirty`,
+  `lsRevision`, `partitionSlot`, `LS_FULL_ROTATE_MAX_INCREMENTALS`, etc.) that
+  the *existing* bundle code and several tests already read/wrote as bare
+  globals. Since Vite wraps the whole compat bundle in one IIFE
+  (`(function(){...})();`), any of those declared as a plain `let` inside it
+  would be invisible both to a test's separate `vm.runInContext` call and to
+  any classic script — so all of them became `root.X` data properties instead
+  (same fix as `state`/`mem`/`fb` before them), verified by grepping bare
+  references to each name across both `modular-pilot.global.ts` and `tests/*.js`
+  before deciding. `loadBootState()` tries `localStorage` first, then the
+  `LocalStore` IndexedDB mirror; boot loads a small shell first and hydrates
+  the full QC data in the background — login and Firebase sync wait for full
+  hydration. Corrupt/invalid `localStorage` payloads are quarantined
+  (`quarantineCorruptLocal()`) rather than silently dropped. Saves are
+  debounced via `lsSaveDelay()` — 400ms normally, backing off to 700ms/1200ms
+  as payload size or serialize time grows — flushed on
   `beforeunload`/`pagehide`/`visibilitychange`, and mirrored to `LocalStore`.
   It also owns `save(opts)`, the app's single write gateway, whose `opts` do
   three separate jobs at once — pass them deliberately
@@ -1140,9 +1160,8 @@ generates/validates the mapping skeleton from a Settings-page backup export;
 `--check` reuses the gateway's own `buildMappingIndex()` (`core.js`) rather
 than reimplementing validation, so the two can't drift.
 
-`assets/modules/lis-client-service.js` is the browser side — follows this
-codebase's plain global-scope convention (no IIFE), loaded after
-`state-storage.js`. It polls the gateway over HTTP (`LIS_POLL_MS`, 5 min), not
+The browser-side LIS client (`src/application/lis/lis-client-service.ts`,
+bridged as `LISClientService`) polls the gateway over HTTP (`LIS_POLL_MS`, 5 min), not
 a websocket. The gateway origin (`http://127.0.0.1:8787` by default) is
 hard-pinned in three places that must stay in sync: `index.html`'s CSP
 `connect-src`, `lisNormalizeGatewayUrl()`, and the gateway's own default

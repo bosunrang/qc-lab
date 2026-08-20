@@ -804,6 +804,8 @@ declare let lsDirty: boolean, lsFullDirty: boolean, lsSaveFailures: number, lsIn
 declare let LS_FULL_ROTATE_MAX_INCREMENTALS: number, LS_FULL_ROTATE_MAX_MS: number;
 declare const lsDirtyTestIds: Set<string>;
 declare let partitionWrite: Promise<boolean>;
+declare let lsSaveT: any, lsSerializeCount: number, lsIdleHandle: any;
+declare let lsSerializedRevision: number, lsSerialized: string, lsLastBytes: number, lsLastSerializeMs: number;
 declare function clearDerived(): void;
 declare function clearDerivedForTest(testId: unknown): void;
 declare function scheduleLocalSave(): void;
@@ -815,6 +817,12 @@ declare function saveTime(): string;
 declare function sigmaDraftNeedsCloud(): boolean;
 declare function clearSigmaDraftThrough(stamp: number): void;
 declare function persistSigmaDraft(testId: unknown): boolean;
+declare function sigmaDraftRecord(): any;
+declare function load(): boolean;
+declare function loadBootState(): Promise<boolean>;
+declare function lsSaveDelay(): number;
+declare function lsFlush(): boolean;
+declare function invalidateDerivedForSave(options?: Record<string, any>): void;
 declare function scheduleFbPush(): void;
 declare const fb: any;
 declare let fbSaveT: any;
@@ -2256,6 +2264,50 @@ type QCLabGlobal = typeof globalThis & {
   syncNow: () => Promise<unknown>;
   scheduleFbPush: () => void;
   fbFlushPush: () => Promise<unknown>;
+  // Retire classic state-storage.js (2026-08-20, Pha G nhóm C lát 4) — thuần glue
+  // quanh các service storage/save đã có sẵn, không có logic mới.
+  localLoadStatus: string;
+  storageHydrationPromise: Promise<boolean>;
+  partitionSlot: string;
+  lsSaveT: any;
+  lsIdleHandle: any;
+  lsDirty: boolean;
+  lsFullDirty: boolean;
+  lsDirtyTestIds: Set<string>;
+  lsRevision: number;
+  lsSerializedRevision: number;
+  lsSerialized: string;
+  lsLastBytes: number;
+  lsLastSerializeMs: number;
+  lsSerializeCount: number;
+  lsSaveFailures: number;
+  partitionWrite: Promise<any>;
+  lsIncrementalStreak: number;
+  lsLastFullSaveAt: number;
+  LS_FULL_ROTATE_MAX_INCREMENTALS: number;
+  LS_FULL_ROTATE_MAX_MS: number;
+  sigmaDraftRecord: () => any;
+  sigmaDraftStamp: () => number;
+  persistSigmaDraft: (testId: unknown) => boolean;
+  clearSigmaDraftThrough: (stamp: number) => void;
+  sigmaDraftNeedsCloud: () => boolean;
+  recoverPendingSigmaDraft: () => boolean;
+  quarantineCorruptLocal: (raw: string, error: unknown) => void;
+  adoptValidatedState: (parsed: unknown) => any;
+  load: () => boolean;
+  hydratePartitionedState: () => Promise<boolean>;
+  restoreFromIndexedDb: () => Promise<boolean>;
+  loadBootState: () => Promise<boolean>;
+  mirrorIndexedDb: (raw: string) => void;
+  lsSaveDelay: () => number;
+  cancelLocalSaveSchedule: () => void;
+  scheduleLocalSave: () => void;
+  scheduleLocalRetry: () => void;
+  serializeStateForStorage: () => string;
+  persistLocalSnapshot: (opts?: Record<string, any>) => boolean;
+  lsFlush: () => boolean;
+  invalidateDerivedForSave: (opts?: Record<string, any>) => void;
+  save: (opts?: Record<string, any>) => void;
 };
 
 const root = globalThis as QCLabGlobal;
@@ -2343,6 +2395,138 @@ root.westgardWorkerJobBuilder = createWestgardWorkerJob({globalRules:()=>((state
 root.westgardWorkerRevisionService = createWestgardWorkerRevisionService();
 root.westgardWorkerHydrate = hydrateWestgardWorkerResultTs;
 root.westgardWorkerPrewarmPlanner = createWestgardWorkerPrewarmPlanner(3000);
+/* ===== LOCAL STORAGE — pipeline bền vững dữ liệu cục bộ ===== Retire classic
+   state-storage.js (2026-08-20, Pha G nhóm C lát 4) — mọi hàm bên dưới vốn đã
+   chỉ gọi thẳng service TypeScript đã có sẵn (storageLifecycleService/
+   indexedDbMirrorService/storageSerializePolicy/localSaveScheduler/
+   storageSnapshotService/saveService/sigmaDraftService/corruptLocalQuarantine —
+   construct ngay bên dưới/gần đây), không có logic mới. `SIGMA_DRAFT_KEY` và
+   `lsClock()` của bản classic KHÔNG mang sang — xác nhận bằng rg không còn
+   caller nào (kể cả trong chính file cũ): `SIGMA_DRAFT_KEY` là hằng số không ai
+   dùng (khóa localStorage thật nằm trong `sigmaDraftService`), `lsClock()`
+   không được gọi ở đâu.
+   HỢP ĐỒNG BỀ MẶT (ai được gọi gì):
+   - app.js (boot): await loadBootState() trước khi ensureAdmin/showLogin, SAU ĐÓ
+     phải await storageHydrationPromise rồi mới initFirebase/showStartupRecovery.
+   - doLogin(): await storageHydrationPromise trước khi cho người dùng vào app.
+   - Mọi module nghiệp vụ: save(opts) sau mỗi thay đổi state — opts:
+     {testId|testIds} ghi tăng dần đúng các test đó; {sigmaTestId} kèm nháp Sigma
+     đồng bộ bắc cầu reload; {clearDerived:false} giữ cache dẫn xuất; {cloud:false}
+     chỉ lưu cục bộ, không đẩy Firebase.
+   - firebaseLocalStoreService: persistLocalSnapshot({changed:true,quiet:true})
+     sau khi merge từ cloud; clearSigmaDraftThrough(stamp) khi cloud đã ack;
+     mirrorIndexedDb(raw) ở đường legacy.
+   - Trang tự gọi: lsFlush() qua beforeunload/pagehide/visibilitychange.
+   BOOT HAI PHA (hợp đồng quan trọng): loadBootState() có thể trả true khi mới
+   đọc được boot shell — state.data đang RỖNG, localLoadStatus='partition-shell',
+   dữ liệu thật nạp nền qua storageHydrationPromise. Trong cửa sổ đó mọi lần ghi
+   bị HOÃN (persistLocalSnapshot tự giữ lsDirty và hẹn lại) để không cắt manifest
+   của slot đang hoạt động; hydrate xong tự xả các lần ghi dồn. Người gọi chỉ cần
+   await storageHydrationPromise, không cần xử lý gì thêm.
+   BẢO ĐẢM: mọi state nạp từ ngoài đều qua adoptValidatedState() (validate →
+   sanitize → ensureShape → invariant); ghi thất bại luôn tự retry backoff mũ
+   (chặn 30s) tới khi thành công; ghi tăng dần bị gián đoạn bị readPartitionSlot()
+   loại bỏ nhờ lệch savedAt manifest, quay về slot an toàn.
+   `localLoadStatus`/`partitionSlot`/`lsSaveT`/`lsDirty`/`lsFullDirty`/
+   `lsDirtyTestIds`/`lsRevision`/`lsSerializeCount`/`lsSaveFailures`/
+   `partitionWrite`/`lsIncrementalStreak`/`lsLastFullSaveAt`/
+   `LS_FULL_ROTATE_MAX_INCREMENTALS`/`LS_FULL_ROTATE_MAX_MS` là `root.X` (data
+   property), KHÔNG phải `let` — không chỉ vì test vm sandbox gán bare các tên
+   này từ NGOÀI (giống lý do currentUser/auditQ/fb đã tách nền), mà vì
+   storageSnapshotService/saveService/storageLifecycleService/
+   indexedDbMirrorService NGAY BÊN DƯỚI/TRƯỚC đã đọc/ghi các tên này TRẦN từ
+   TRƯỚC LÁT NÀY, dựa vào `let` cũ của classic state-storage.js chia sẻ qua
+   global lexical scope giữa các classic script — những dòng đó GIỮ NGUYÊN
+   không đổi, vì bare read/write vẫn phân giải đúng qua thuộc tính global, y hệt
+   cơ chế đã dùng cho `state`/`mem`/`fb`. `lsIdleHandle`/`lsSerializedRevision`/
+   `lsSerialized`/`lsLastBytes`/`lsLastSerializeMs` giữ `let` cục bộ — chỉ dùng
+   nội bộ trong các hàm port ở đây, không nơi nào khác đọc trần. */
+root.localLoadStatus = 'missing';
+root.storageHydrationPromise = Promise.resolve(true);
+root.partitionSlot = '';
+root.sigmaDraftRecord = () => root.sigmaDraftService!.read();
+root.sigmaDraftStamp = () => root.sigmaDraftService!.stamp();
+root.persistSigmaDraft = testId => root.sigmaDraftService!.persist(testId, state.sigmaData, typeof fbDataPath === 'function' ? fbDataPath() : '');
+root.clearSigmaDraftThrough = stamp => root.sigmaDraftService!.clearThrough(stamp);
+root.sigmaDraftNeedsCloud = () => { try { const cfg = typeof getFbCfg === 'function' ? getFbCfg() : null; return !!(cfg && cfg.config); } catch (e) { return false; } };
+root.recoverPendingSigmaDraft = () => {
+  const draft = sigmaDraftRecord(); if (!draft) return false;
+  const savedAt = Number(draft.savedAt || 0);
+  if (!savedAt) return false;
+  try {
+    const merged = { ...(state.sigmaData || {}), ...draft.branches }, clean = (root.QCCore as any).sanitizeBackup({ tests: state.tests || [], data: {}, sigmaData: merged }, { owned: true });
+    state.sigmaData = clean.sigmaData || {}; (globalThis as any).reconcileSigmaLevelsWithLotGroups();
+    lsRevision++; lsDirty = true; lsFullDirty = true;
+    if (typeof fb !== 'undefined' && (!draft.path || typeof fbDataPath !== 'function' || draft.path === fbDataPath())) fb.dirty = true;
+    return true;
+  } catch (e) { return false; }
+};
+root.quarantineCorruptLocal = (raw, error) => { try { localStorage.setItem('qclab_corrupt', JSON.stringify(root.corruptLocalQuarantine!(raw, error))); } catch (e) { /* mất khả năng ghi localStorage thì bỏ qua, không chặn boot */ } };
+/* Phễu chuẩn hóa MỌI state nạp từ ngoài (localStorage/IndexedDB/boot shell):
+   validate → sanitize → ensureShape → kiểm invariant, ném Error khi không qua.
+   Gán thẳng vào `state` toàn cục — caller tự chịu mem/partitionSlot/
+   localLoadStatus/startupProblem theo ngữ cảnh của mình. */
+root.adoptValidatedState = parsed => root.storageLifecycleService!.adopt(parsed);
+root.load = () => root.storageLifecycleService!.load();
+root.hydratePartitionedState = async () => root.storageLifecycleService!.hydratePartitioned();
+root.restoreFromIndexedDb = async () => root.storageLifecycleService!.restoreFromIndexedDb();
+root.loadBootState = async () => root.storageLifecycleService!.loadBootState();
+root.mirrorIndexedDb = raw => root.indexedDbMirrorService!.mirror(raw, state);
+root.lsSaveT = null; root.lsIdleHandle = null; root.lsDirty = false; root.lsFullDirty = false; root.lsDirtyTestIds = new Set();
+root.lsRevision = 0; root.lsSerializedRevision = -1; root.lsSerialized = ''; root.lsLastBytes = 0; root.lsLastSerializeMs = 0; root.lsSerializeCount = 0; root.lsSaveFailures = 0;
+root.partitionWrite = Promise.resolve();
+/* Ghi tăng dần (incremental) chỉ đè shell + các test đổi NGAY TRÊN slot đang hoạt
+   động — khác với ghi đầy đủ (xoay sang slot còn lại, slot cũ giữ nguyên làm lưới
+   an toàn). Nếu một lần ghi tăng dần bị gián đoạn giữa lúc ghi xong dữ liệu và lúc
+   cập nhật manifest, readPartitionSlot() phát hiện lệch savedAt và bỏ NGUYÊN CẢ
+   SLOT — quay về slot kia từ lần xoay vòng đầy đủ gần nhất, tức mất luôn MỌI lần
+   ghi tăng dần đã thành công kể từ đó (không chỉ lần đang dở), vì bản thân việc
+   ghi tăng dần đã ghi đè mất nội dung shell/partition cũ. Một ngày làm việc bình
+   thường (lưu theo từng xét nghiệm) có thể toàn ghi tăng dần nhiều ngày liền không
+   có lần xoay vòng đầy đủ nào — nếu đúng lúc đó app tắt đột ngột, cửa sổ mất dữ
+   liệu không còn là "1 lần lưu" mà là "từ lần xoay vòng đầy đủ gần nhất tới giờ".
+   Giảm nhẹ: ép một lần ghi ĐẦY ĐỦ định kỳ (xoay slot) sau một số lần ghi tăng dần
+   liên tiếp hoặc sau một khoảng thời gian, để giới hạn cửa sổ rủi ro thay vì để
+   không giới hạn. Không xóa được rủi ro (ghi tăng dần vẫn có thể bị gián đoạn),
+   chỉ giới hạn thiệt hại tối đa. */
+root.lsIncrementalStreak = 0; root.lsLastFullSaveAt = typeof Date !== 'undefined' ? Date.now() : 0;
+root.LS_FULL_ROTATE_MAX_INCREMENTALS = 25; root.LS_FULL_ROTATE_MAX_MS = 10 * 60 * 1000;
+root.serializeStateForStorage = () => {
+  const raw = root.storageSerializePolicy!.serialize(state, lsRevision), s = root.storageSerializePolicy!.stats();
+  lsLastSerializeMs = s.ms; lsLastBytes = s.bytes; lsSerializeCount = s.count; lsSerialized = raw; lsSerializedRevision = lsRevision; return raw;
+};
+root.lsSaveDelay = () => root.storageSerializePolicy!.delay();
+root.cancelLocalSaveSchedule = () => {
+  root.localSaveScheduler!.cancel();
+  clearTimeout(lsSaveT); lsSaveT = null;
+  if (lsIdleHandle !== null && typeof cancelIdleCallback === 'function') cancelIdleCallback(lsIdleHandle);
+  lsIdleHandle = null;
+};
+root.scheduleLocalSave = () => {
+  cancelLocalSaveSchedule();
+  root.localSaveScheduler!.schedule(lsSaveDelay(), () => { if (typeof requestIdleCallback === 'function') lsIdleHandle = requestIdleCallback(() => { lsIdleHandle = null; lsFlush(); }, { timeout: 1000 }); else lsFlush(); });
+};
+/* Ghi thất bại (IDB tạm lỗi, hết quota...) được hẹn thử lại với backoff mũ chặn
+   ở 30s, thay vì treo lsDirty tới tận thao tác kế tiếp của người dùng. Ghi
+   thành công reset lsSaveFailures về 0. */
+root.scheduleLocalRetry = () => {
+  cancelLocalSaveSchedule();
+  const delay = root.storageRetryDelay!(lsSaveFailures);
+  lsSaveT = setTimeout(() => { lsSaveT = null; lsFlush(); }, delay);
+};
+/* Một lần serialize dùng chung cho localStorage và IndexedDB. Snapshot lớn được
+   debounce lâu hơn và ưu tiên idle time; pagehide/beforeunload vẫn xả ngay. */
+root.persistLocalSnapshot = (opts = {}) => root.storageSnapshotService!.persist(opts);
+root.lsFlush = () => persistLocalSnapshot();
+if (typeof window !== 'undefined' && window.addEventListener) window.addEventListener('beforeunload', root.lsFlush);
+if (typeof window !== 'undefined' && window.addEventListener) window.addEventListener('pagehide', root.lsFlush);
+if (typeof document !== 'undefined' && document.addEventListener) document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') lsFlush(); });
+root.invalidateDerivedForSave = (opts = {}) => {
+  const ids = root.saveCommandPolicy!(opts).derivedTestIds;
+  if (ids === null) return;
+  if (ids.length) [...new Set(ids.filter(Boolean))].forEach(clearDerivedForTest); else clearDerived();
+};
+root.save = (opts = {}) => { root.saveService!.save(opts); };
 root.storageSerializePolicy = createStorageSerializePolicy(() => typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
 root.localSaveScheduler = createSaveScheduler({setTimeout:(fn:()=>void,delay:number)=>globalThis.setTimeout(fn,delay),clearTimeout:(timer:any)=>globalThis.clearTimeout(timer),cancelIdle:typeof globalThis.cancelIdleCallback==='function'?(handle:any)=>globalThis.cancelIdleCallback(handle):null});
 root.storageRetryDelay = storageRetryDelay;

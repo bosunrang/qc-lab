@@ -58,7 +58,7 @@ scope**, không phải không còn file `.js` trong gói phát hành.
 | Hạng mục | Trạng thái |
 | --- | --- |
 | Nguồn TypeScript | 739 tệp (thêm `sigma-page-controller.ts`; domain/application/bridge không đổi khác — lát nhóm C chỉ chuyển glue vào `modular-pilot.global.ts` đã có sẵn) |
-| Nguồn classic còn lại | 4 tệp `assets/modules/*.js` (nhóm C hạ tầng — `action-workflow-service.js`+`users-auth.js`+`firebase-sync.js` retire 2026-08-20), thêm `assets/core.js` và `assets/app.js` |
+| Nguồn classic còn lại | 3 tệp `assets/modules/*.js` (nhóm C hạ tầng — `action-workflow-service.js`+`users-auth.js`+`firebase-sync.js`+`state-storage.js` retire 2026-08-20), thêm `assets/core.js` và `assets/app.js` |
 | Bundle hiện tại | `assets/generated/modular-pilot.js`, Vite sinh ra và nạp bằng `<script defer>` |
 | Kiểm tra kiểu | `npm.cmd run typecheck` đạt: checkJs legacy + strict TypeScript modules |
 | Test Node | `npm.cmd test` đạt ngày 2026-08-20 (611/611) |
@@ -134,7 +134,7 @@ Westgard) — **toàn bộ nhóm B (Canvas/adapter) của Pha G đã hoàn tất
 | --- | --- | --- | --- |
 | **C. Hạ tầng/bootstrap** (rủi ro cao — kế hoạch yêu cầu làm CUỐI, từng lát độc lập) | `state.js` | 128 | `ensureShape`/state gốc; lifecycle nhạy. **Đã TÁCH NỀN 2026-08-19** (state + cache + mem/startupProblem → globalThis property, xem lát tách nền bên dưới) — chưa retire, nhưng port sau này giờ đã mang tính cơ học |
 | | `qc-domain.js` | 255 | wiring Westgard/worker + point derivation |
-| | `state-storage.js` | 120 | load/save + partitioned + boot shell. **`storageHydrationPromise` đã TÁCH NỀN 2026-08-20** (Lát 0) — chưa retire |
+| | ~~`state-storage.js`~~ | ~~120~~ | **xong 2026-08-20, Lát nhóm C — 4** — xem "Kế hoạch các lát nhóm C còn lại" |
 | | ~~`local-store.js`~~ | ~~13~~ | **xong 2026-08-19, Hạ tầng lát 1** — xem bên dưới |
 | | ~~`firebase-sync.js`~~ | ~~173~~ | **xong 2026-08-20, Lát nhóm C — 3** — xem "Kế hoạch các lát nhóm C còn lại" |
 | | `users-auth.js` | 256 | auth/user + PBKDF2 wiring + trang audit |
@@ -1926,11 +1926,7 @@ phải tách nền nó; làm sớm để gỡ mọi ràng buộc thứ tự.)
    — 1" bên dưới.**
 2. ~~**`users-auth.js`** (256)~~ — **xong 2026-08-20, xem "Lát nhóm C — 2" bên dưới.**
 3. ~~**`firebase-sync.js`** (173)~~ — **xong 2026-08-20, xem "Lát nhóm C — 3" bên dưới.**
-4. **`state-storage.js`** (120) — đọc `state`/`mem`/`startupProblem`;
-   `storageHydrationPromise` đã tách nền ở lát 0. Lifecycle-critical (boot shell,
-   partitioned save, quarantine). Gate: `storage-pipeline.test.js`,
-   `state-storage-safety.test.js`, `cache-invalidation.test.js`, benchmark
-   (đường lưu tăng dần), `ui-check` (restore backup).
+4. ~~**`state-storage.js`** (120)~~ — **xong 2026-08-20, xem "Lát nhóm C — 4" bên dưới.**
 5. **`qc-domain.js`** (255) — đọc `state`+`wgMemo`/`acceptedMemo`/`cusumMemo`/
    `derivedIndex`/`WG_RULES` trần (giờ đều là globalThis property nhờ lát tách
    nền `state`, trừ `WG_RULES` là const của `state.js` — xem dưới). Chứa
@@ -2258,6 +2254,102 @@ mới port); không có lỗi console ở bất kỳ bước nào.
 **Lát tiếp theo: `state-storage.js`** (120 dòng — lifecycle-critical: boot
 shell, partitioned save, quarantine; xem mục 4 trong danh sách thứ tự đề
 xuất, và LƯU Ý bài học "eager guard ở file khác" bên trên trước khi port).
+
+#### Lát nhóm C — 4: `state-storage.js` (2026-08-20, xong)
+
+Retire hoàn toàn `assets/modules/state-storage.js` (120 dòng — pipeline bền
+vững dữ liệu cục bộ: boot shell hai pha, ghi phân vùng IndexedDB, retry
+backoff, nháp Sigma, `save()` — cổng ghi duy nhất của toàn app). Đúng như
+`action-workflow-service.js`/`firebase-sync.js`, mọi hàm ở đây vốn chỉ gọi
+thẳng service TypeScript đã có sẵn (`storageLifecycleService`/
+`indexedDbMirrorService`/`storageSerializePolicy`/`localSaveScheduler`/
+`storageSnapshotService`/`saveService`/`sigmaDraftService`/
+`corruptLocalQuarantine`). Chuyển nguyên vào
+`src/compat/modular-pilot.global.ts`, đặt ngay trước
+`root.storageSerializePolicy = createStorageSerializePolicy(...)`. `SIGMA_DRAFT_KEY`
+và `lsClock()` KHÔNG mang sang — xác nhận bằng `rg` không còn caller nào (kể
+cả trong chính file cũ): `SIGMA_DRAFT_KEY` là hằng số không ai dùng (khóa
+localStorage thật nằm trong `sigmaDraftService`), `lsClock()` không được gọi
+ở đâu.
+
+**Không gặp bẫy "eager guard" của lát 3** — đã kiểm tra kỹ trước khi port:
+không có `if (typeof (root as any).X === 'function') root.Y = create...`
+nào phụ thuộc tên của `state-storage.js`; mọi dependency closure trong
+`storageSnapshotService`/`saveService`/`storageLifecycleService`/
+`indexedDbMirrorService` đã lazy sẵn từ trước.
+
+**Nhưng gặp một lớp ràng buộc MỚI, rộng hơn "Lát 0" đã lường trước:** file
+này có ĐẾN 14 biến khả biến (`localLoadStatus`/`partitionSlot`/`lsSaveT`/
+`lsDirty`/`lsFullDirty`/`lsDirtyTestIds`/`lsRevision`/`lsSerializeCount`/
+`lsSaveFailures`/`partitionWrite`/`lsIncrementalStreak`/`lsLastFullSaveAt`/
+`LS_FULL_ROTATE_MAX_INCREMENTALS`/`LS_FULL_ROTATE_MAX_MS`), so với chỉ 1-2
+biến ở các lát trước. Rà bằng cách đếm tham chiếu trần trong CHÍNH
+`modular-pilot.global.ts` (`grep -oE "[^.a-zA-Z_$]${name}\b"`) VÀ trong
+`tests/*.js`: bất kỳ tên nào có tham chiếu trần ở MỘT trong hai nơi đó đều
+phải là `root.X` (data property), không được là `let` cục bộ — vì `root.X`
+là lựa chọn AN TOÀN CHO CẢ HAI trường hợp (nội bộ cùng IIFE lẫn từ ngoài qua
+`vm.runInContext` riêng), còn `let` cục bộ chỉ đúng cho trường hợp đầu. Xác
+nhận `assets/generated/modular-pilot.js` được Vite bọc trong MỘT IIFE
+(`(function(){...})();`) — nghĩa là TẤT CẢ `let` khai báo bên trong đều
+function-scope, không thấy được từ `vm.runInContext` riêng của test (dù cùng
+context/global object) hay từ file classic khác. Kết quả: 14/19 biến thành
+`root.X`; 5 biến còn lại (`lsIdleHandle`/`lsSerializedRevision`/`lsSerialized`/
+`lsLastBytes`/`lsLastSerializeMs`) không có tham chiếu trần nào ở cả hai nơi
+— nhưng để đơn giản hóa và giảm rủi ro nhầm lẫn, CŨNG chuyển thành `root.X`
+(một lựa chọn luôn an toàn hơn `let`, dù không bắt buộc cho 5 biến này) thay
+vì cố phân loại chính xác từng biến — chấp nhận đánh đổi nhỏ về "độ sạch" để
+đổi lấy ít khả năng sai sót hơn trong một lát đã đủ phức tạp.
+
+**Bổ sung ambient declare còn thiếu** trong khối `declare` cục bộ của
+`modular-pilot.global.ts` (không phải `global.d.ts`) cho các tên chưa từng
+được tham chiếu trần trước lát này: `lsSaveT`/`lsSerializeCount`/
+`lsIdleHandle`/`lsSerializedRevision`/`lsSerialized`/`lsLastBytes`/
+`lsLastSerializeMs` (biến) và `sigmaDraftRecord`/`load`/`loadBootState`/
+`lsSaveDelay`/`lsFlush`/`invalidateDerivedForSave` (hàm) — cho phép các hàm
+port ở đây gọi nhau bằng tên trần giống hệt bản classic, thay vì phải đổi
+sang `root.X` khắp nơi. `reconcileSigmaLevelsWithLotGroups()` (hàm thật của
+`state.js`, còn classic) tham chiếu qua `(globalThis as any).X()` — đúng
+kiểu cast đã dùng sẵn ở chỗ khác trong file cho hàm CHƯA có ambient declare,
+không thêm ambient mới cho nó.
+
+**Dọn `global.d.ts` (chương trình checkJs riêng cho `assets/**/*.js`, khác
+hẳn ambient declare nội bộ ở trên):** xóa `declare var fb`/`declare function
+fbDataPath`/`declare function getFbCfg` — xác nhận không còn file classic nào
+trong `assets/**/*.js` đọc chúng trần (chỉ `state-storage.js`, giờ đã xóa,
+từng đọc `fb`; chỉ `state-storage.js` từng đọc `fbDataPath`/`getFbCfg`).
+Thêm `declare function loadBootState()` vì `assets/app.js` (chưa port, Pha H)
+gọi tên này trần và trước đây được thỏa mãn nhờ `state-storage.js` cùng nằm
+trong chương trình checkJs.
+
+**Cập nhật test đi kèm** (đọc/nạp file classic đã xóa — không phải vì hành
+vi đổi): 9 test bị ảnh hưởng
+(`audit-ingress-gates`/`cache-invalidation`/`firebase-config`/`firebase-merge`/
+`firebase-offline`/`lis-client-service`/`local-store`/`state-storage-safety`/
+`storage-pipeline`). Điểm cần chú ý: nhiều `loadSandbox([...])` trong
+`local-store.test.js`/`storage-pipeline.test.js` KHÔNG có `generated/
+modular-pilot.js` tường minh — chúng dựa vào nhánh tự chèn bundle của
+`tests/helpers/sandbox.js` (kích hoạt khi danh sách có `modules/state-storage.js`).
+Chỉ xóa `'modules/state-storage.js'` khỏi các danh sách đó mà KHÔNG thêm
+`'generated/modular-pilot.js'` tường minh sẽ làm mất bundle hoàn toàn (vì
+nhánh tự chèn không còn gì để kích hoạt) — đã thêm tường minh vào cả 5 chỗ
+bị ảnh hưởng. Dọn luôn nhánh `storageIndex` (tự chèn) trong `sandbox.js` vì
+nay không còn danh sách test nào chứa tên file đó để kích hoạt.
+
+Gate: `typecheck` xanh, `npm test` 611/611 xanh (không phát sinh lỗi ẩn nào
+như lát 3 — đã rà bẫy "eager guard" kỹ trước khi viết code), `npm run
+ui-check` 29/29 xanh (gồm "Restore UI... qua re-auth", phụ thuộc trực tiếp
+`storageLifecycleService`). Kiểm thêm bằng tay trong Chromium thật: đăng
+nhập → sửa `state.lab.name` → `save({clearDerived:false})` → đợi debounce →
+`lsDirty` về `false` → **reload trang thật** → đăng nhập lại → tên đã sửa
+vẫn còn nguyên (`localLoadStatus:'partitioned'`, `storageHydrationPromise`
+resolve `true`) — xác nhận toàn bộ chu trình boot-shell hai pha/ghi phân
+vùng/hydrate hoạt động đúng qua một lần tải lại trang thật, không chỉ qua
+test giả lập.
+
+Sau lát này: chỉ còn `qc-domain.js` trước khi tới lát cuối (retire `state.js`
++ `analyte-catalog.js` cùng lúc). **Lát tiếp theo: `qc-domain.js`** (255
+dòng — đường NÓNG nhất app, xem mục 5 trong danh sách thứ tự đề xuất; benchmark
+`coldDomainMs`/`warmDomainColdRatio` là gate bắt buộc, không chỉ `npm test`).
 
 ### Pha H — bỏ global bridge và nhiều script tags
 

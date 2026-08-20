@@ -9,12 +9,13 @@ const ASSETS_DIR = path.join(__dirname, '..', '..', 'assets');
  * into one shared vm context and returns that context.
  *
  * Only usable for files whose top-level code has no DOM/window/localStorage
- * side effects (core.js, state.js, firebase-sync.js, data-io.js qualify - the
- * app's page-rendering modules do not, since they touch `document` at call
- * time from module-level UI state that we don't set up here).
+ * side effects (core.js, state.js, qc-domain.js qualify - the app's
+ * page-rendering modules do not, since they touch `document` at call time
+ * from module-level UI state that we don't set up here).
  *
  * Seeds a couple of standard Web APIs that vm contexts don't get for free
- * (TextEncoder is used by the hand-rolled xlsx/zip builder in data-io.js).
+ * (TextEncoder is used by the hand-rolled xlsx/zip builder ported to
+ * src/presentation/export/data-io-controller.ts).
  */
 function loadSandbox(relFiles, globals = {}) {
   const context = vm.createContext({
@@ -31,11 +32,6 @@ function loadSandbox(relFiles, globals = {}) {
   // sau toàn bộ module test yêu cầu để ensureShape() không âm thầm chạy fallback
   // classic chỉ vì sandbox thiếu artifact.
   if(stateIndex>=0&&!files.includes('generated/modular-pilot.js'))files.push('generated/modular-pilot.js');
-  // Storage runtime đã chuyển sang façade TypeScript. Khi test nạp state-storage,
-  // luôn nạp bundle SAU toàn bộ module test yêu cầu để không quay về fallback
-  // source-only (khác thứ tự dependency thì không phản ánh runtime thật).
-  const storageIndex=files.indexOf('modules/state-storage.js');
-  if(storageIndex>=0&&!files.includes('generated/modular-pilot.js'))files.push('generated/modular-pilot.js');
   files.forEach(relPath => {
     const code = fs.readFileSync(path.join(ASSETS_DIR, relPath), 'utf8');
     vm.runInContext(code, context, { filename: relPath });

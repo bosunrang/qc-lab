@@ -26342,6 +26342,124 @@
 	root.westgardWorkerRevisionService = createWestgardWorkerRevisionService();
 	root.westgardWorkerHydrate = hydrateWestgardWorkerResult;
 	root.westgardWorkerPrewarmPlanner = createWestgardWorkerPrewarmPlanner(3e3);
+	root.localLoadStatus = "missing";
+	root.storageHydrationPromise = Promise.resolve(true);
+	root.partitionSlot = "";
+	root.sigmaDraftRecord = () => root.sigmaDraftService.read();
+	root.sigmaDraftStamp = () => root.sigmaDraftService.stamp();
+	root.persistSigmaDraft = (testId) => root.sigmaDraftService.persist(testId, state.sigmaData, typeof fbDataPath === "function" ? fbDataPath() : "");
+	root.clearSigmaDraftThrough = (stamp) => root.sigmaDraftService.clearThrough(stamp);
+	root.sigmaDraftNeedsCloud = () => {
+		try {
+			const cfg = typeof getFbCfg === "function" ? getFbCfg() : null;
+			return !!(cfg && cfg.config);
+		} catch (e) {
+			return false;
+		}
+	};
+	root.recoverPendingSigmaDraft = () => {
+		const draft = sigmaDraftRecord();
+		if (!draft) return false;
+		if (!Number(draft.savedAt || 0)) return false;
+		try {
+			const merged = {
+				...state.sigmaData || {},
+				...draft.branches
+			}, clean = root.QCCore.sanitizeBackup({
+				tests: state.tests || [],
+				data: {},
+				sigmaData: merged
+			}, { owned: true });
+			state.sigmaData = clean.sigmaData || {};
+			globalThis.reconcileSigmaLevelsWithLotGroups();
+			lsRevision++;
+			lsDirty = true;
+			lsFullDirty = true;
+			if (typeof fb !== "undefined" && (!draft.path || typeof fbDataPath !== "function" || draft.path === fbDataPath())) fb.dirty = true;
+			return true;
+		} catch (e) {
+			return false;
+		}
+	};
+	root.quarantineCorruptLocal = (raw, error) => {
+		try {
+			localStorage.setItem("qclab_corrupt", JSON.stringify(root.corruptLocalQuarantine(raw, error)));
+		} catch (e) {}
+	};
+	root.adoptValidatedState = (parsed) => root.storageLifecycleService.adopt(parsed);
+	root.load = () => root.storageLifecycleService.load();
+	root.hydratePartitionedState = async () => root.storageLifecycleService.hydratePartitioned();
+	root.restoreFromIndexedDb = async () => root.storageLifecycleService.restoreFromIndexedDb();
+	root.loadBootState = async () => root.storageLifecycleService.loadBootState();
+	root.mirrorIndexedDb = (raw) => root.indexedDbMirrorService.mirror(raw, state);
+	root.lsSaveT = null;
+	root.lsIdleHandle = null;
+	root.lsDirty = false;
+	root.lsFullDirty = false;
+	root.lsDirtyTestIds = /* @__PURE__ */ new Set();
+	root.lsRevision = 0;
+	root.lsSerializedRevision = -1;
+	root.lsSerialized = "";
+	root.lsLastBytes = 0;
+	root.lsLastSerializeMs = 0;
+	root.lsSerializeCount = 0;
+	root.lsSaveFailures = 0;
+	root.partitionWrite = Promise.resolve();
+	root.lsIncrementalStreak = 0;
+	root.lsLastFullSaveAt = typeof Date !== "undefined" ? Date.now() : 0;
+	root.LS_FULL_ROTATE_MAX_INCREMENTALS = 25;
+	root.LS_FULL_ROTATE_MAX_MS = 6e5;
+	root.serializeStateForStorage = () => {
+		const raw = root.storageSerializePolicy.serialize(state, lsRevision), s = root.storageSerializePolicy.stats();
+		lsLastSerializeMs = s.ms;
+		lsLastBytes = s.bytes;
+		lsSerializeCount = s.count;
+		lsSerialized = raw;
+		lsSerializedRevision = lsRevision;
+		return raw;
+	};
+	root.lsSaveDelay = () => root.storageSerializePolicy.delay();
+	root.cancelLocalSaveSchedule = () => {
+		root.localSaveScheduler.cancel();
+		clearTimeout(lsSaveT);
+		lsSaveT = null;
+		if (lsIdleHandle !== null && typeof cancelIdleCallback === "function") cancelIdleCallback(lsIdleHandle);
+		lsIdleHandle = null;
+	};
+	root.scheduleLocalSave = () => {
+		cancelLocalSaveSchedule();
+		root.localSaveScheduler.schedule(lsSaveDelay(), () => {
+			if (typeof requestIdleCallback === "function") lsIdleHandle = requestIdleCallback(() => {
+				lsIdleHandle = null;
+				lsFlush();
+			}, { timeout: 1e3 });
+			else lsFlush();
+		});
+	};
+	root.scheduleLocalRetry = () => {
+		cancelLocalSaveSchedule();
+		const delay = root.storageRetryDelay(lsSaveFailures);
+		lsSaveT = setTimeout(() => {
+			lsSaveT = null;
+			lsFlush();
+		}, delay);
+	};
+	root.persistLocalSnapshot = (opts = {}) => root.storageSnapshotService.persist(opts);
+	root.lsFlush = () => persistLocalSnapshot();
+	if (typeof window !== "undefined" && window.addEventListener) window.addEventListener("beforeunload", root.lsFlush);
+	if (typeof window !== "undefined" && window.addEventListener) window.addEventListener("pagehide", root.lsFlush);
+	if (typeof document !== "undefined" && document.addEventListener) document.addEventListener("visibilitychange", () => {
+		if (document.visibilityState === "hidden") lsFlush();
+	});
+	root.invalidateDerivedForSave = (opts = {}) => {
+		const ids = root.saveCommandPolicy(opts).derivedTestIds;
+		if (ids === null) return;
+		if (ids.length) [...new Set(ids.filter(Boolean))].forEach(clearDerivedForTest);
+		else clearDerived();
+	};
+	root.save = (opts = {}) => {
+		root.saveService.save(opts);
+	};
 	root.storageSerializePolicy = createStorageSerializePolicy(() => typeof performance !== "undefined" && performance.now ? performance.now() : Date.now());
 	root.localSaveScheduler = createSaveScheduler({
 		setTimeout: (fn, delay) => globalThis.setTimeout(fn, delay),
