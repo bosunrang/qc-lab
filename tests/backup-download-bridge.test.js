@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
 const calls = [];
-const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js'], { Blob });
+const ctx = loadSandbox(['core.js', 'modules/state.js'], { Blob });
 // downloadBackupText giờ ở trong generated/modular-pilot.js, được loadSandbox() tự chèn
 // vì danh sách có modules/state.js — bundle gán root.blobDownload khi nạp nên stub phải
 // đặt SAU bước nạp (trực tiếp lên context), không qua tham số globals (bị bundle ghi đè).

@@ -91,7 +91,7 @@ function makeState() {
 }
 
 {
-  const integration = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js'], { ensureLabBrandShape() {}, ReagentComparisonService: service });
+  const integration = loadSandbox(['core.js', 'modules/state.js'], { ensureLabBrandShape() {}, ReagentComparisonService: service });
   run(integration, 'state.reagentTests=[];ensureShape();globalThis.__reagentShape=state.reagentTests;');
   assert.equal(integration.__reagentShape.length, 1, 'ensureShape phải tạo dữ liệu mặc định ngoài render');
   assert.equal(integration.__reagentShape[0].rows.length, 5);

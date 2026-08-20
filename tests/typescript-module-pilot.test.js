@@ -1261,45 +1261,6 @@ assert.match(generated, /root\.ActionPointIndexService\s*=\s*createActionPointIn
   'artifact must publish NCE point-action index for classic workflow callers');
 assert.match(generated, /var modularSyncCodec\s*=\s*createSyncValueCodec\(\);[\s\S]*?var modularSyncSnapshot\s*=\s*createSyncSnapshot\(FIREBASE_SYNC_TOP,\s*syncJsonMap\);[\s\S]*?createSyncStateMerge\(/,
   'artifact phải dựng merger và snapshot Firebase từ metadata TypeScript, không qua global installer');
-const qcDomainSource = read('assets/modules/qc-domain.js');
-assert.match(qcDomainSource, /function reportLevelStats\(pts,mean,teaVal\)\{return globalThis\.reportLevelStatsService\(pts,mean,teaVal\);\}/,
-  'QC domain report statistics must call the TypeScript service directly');
-assert.match(qcDomainSource, /function errorTypeDetailParts\(rules\)\{return globalThis\.qcErrorDetail\(rules\);\}/,
-  'QC domain error-detail helper must call the TypeScript service directly');
-assert.match(qcDomainSource, /function normalizePointLots\(\)\{return globalThis\.qcNormalizePointLots\(state\);\}/,
-  'QC domain point-lot normalization must call the TypeScript service directly');
-assert.match(qcDomainSource, /function normalizeDuplicateRunIds\(\)\{return globalThis\.qcNormalizeDuplicateRunIds\(state\);\}/,
-  'QC domain runId normalization must call the TypeScript service directly');
-assert.match(qcDomainSource, /function (?:lvlCfg|isOperationalLotGroup|levelTargetOk|pointRunNo|testCusumConfig)\([^)]*\)\{return globalThis\./,
-  'QC domain pure configuration helpers must call TypeScript directly');
-assert.match(qcDomainSource, /function lotLineage\(currentLotId\)\{\s*return globalThis\.qcLotLineage\(derived\(\),currentLotId\);\s*\}/,
-  'QC lot lineage must call the TypeScript service directly');
-assert.match(qcDomainSource, /function parallelLotForLevel\(t,level\)\{\s*return globalThis\.qcParallelLotLookup\(t,level\);\s*\}/,
-  'QC parallel-lot lookup must call the TypeScript service directly');
-assert.match(qcDomainSource, /function entryColumns\(t\)\{\s*return globalThis\.qcEntryColumns\(t\);\s*\}/,
-  'QC entry columns must call the TypeScript service directly');
-assert.match(qcDomainSource, /function pointVoidVerdict\(t,p\)\{\s*return globalThis\.qcPointVoidVerdict\(t,p\);\s*\}/,
-  'QC point void verdict must call the TypeScript service directly');
-assert.match(qcDomainSource, /function plannedTargetFor\(t,lot\)\{\s*return globalThis\.qcPlannedTarget\(lvlCfg\(t,lot\.level\),lot\);\s*\}/,
-  'QC planned target lookup must call the TypeScript service directly');
-assert.match(qcDomainSource, /function levelsForLotGroup\(group\)\{\s*return globalThis\.qcLotGroupLevels\(group,state\.tests\|\|\[\],derived\(\)\.lotById\);\s*\}/,
-  'QC lot-group historical levels must call the TypeScript service directly');
-assert.match(qcDomainSource, /function derived\(\)\{return globalThis\.qcDerivedIndex\(state\);\}/,
-  'QC derived index must call the self-invalidating TypeScript service directly');
-assert.doesNotMatch(qcDomainSource, /function derivedStampWalk\(/,
-  'QC domain must not retain the legacy derived-index implementation');
-assert.match(qcDomainSource, /function pointsOf\(testId,level\)\{return globalThis\.qcPointCache\.points\(testId,level\);\}/,
-  'QC point lookup must call the TypeScript cache directly');
-assert.match(qcDomainSource, /function pointsForLot\(testId,level,lot,withIndex=false\)\{return globalThis\.qcPointCache\.lot\(testId,level,lot,withIndex\);\}/,
-  'QC lot-point lookup must call the TypeScript cache directly');
-assert.match(qcDomainSource, /function operationalLotPoints\(t,level,withIndex=false\)\{return globalThis\.qcOperationalAccess\.lotPoints\(t,level,withIndex\);\}/,
-  'QC operational lot points must call the TypeScript service directly');
-assert.match(qcDomainSource, /function testSelectLabel\(t,list=state\.tests\)\{return globalThis\.qcOperationalAccess\.selectLabel\(t,list\);\}/,
-  'QC test selection labels must call the TypeScript service directly');
-assert.doesNotMatch(qcDomainSource, /if\(globalThis\.(?:qcActiveWestgard|qcCusumSeries|qcAcceptedLotPoints)\)/,
-  'QC evaluation services must not retain JavaScript fallbacks');
-assert.doesNotMatch(qcDomainSource, /if\(globalThis\.westgardWorker(?:RevisionService|PrewarmPlanner|JobBuilder|Hydrate)\)/,
-  'Westgard worker adapter must not retain JavaScript fallbacks');
 const dataIoSource = read('src/presentation/export/data-io-controller.ts');
 assert.doesNotMatch(dataIoSource, /function dataIoQcPoint\(/,
   'data I/O must not retain the retired point-format facade');

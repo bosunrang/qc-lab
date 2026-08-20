@@ -5058,7 +5058,7 @@
 	}
 	//#endregion
 	//#region src/domain/westgard/worker-hydrate.ts
-	function hydrateWestgardWorkerResult(message, deps) {
+	function hydrateWestgardWorkerResult$1(message, deps) {
 		const test = deps.test(message.testId);
 		if (!test) return false;
 		const cross = /* @__PURE__ */ new Map(), resultLevels = new Map((message.levels || []).map((level) => [String(level.level), level])), views = [], crossSupport = /* @__PURE__ */ new Map(), byPoint = /* @__PURE__ */ new Map();
@@ -26340,7 +26340,7 @@
 		points: (testId) => state.data?.[testId] || []
 	});
 	root.westgardWorkerRevisionService = createWestgardWorkerRevisionService();
-	root.westgardWorkerHydrate = hydrateWestgardWorkerResult;
+	root.westgardWorkerHydrate = hydrateWestgardWorkerResult$1;
 	root.westgardWorkerPrewarmPlanner = createWestgardWorkerPrewarmPlanner(3e3);
 	root.localLoadStatus = "missing";
 	root.storageHydrationPromise = Promise.resolve(true);
@@ -27693,6 +27693,255 @@
 		save: () => save({}),
 		rerender: () => rerender()
 	});
+	root.stats = (vals) => root.QCCore.stats(vals);
+	root.reportLevelStats = (pts, mean, teaVal) => root.reportLevelStatsService(pts, mean, teaVal);
+	root.wgOn = (rule) => root.westgardRuleSettings.enabled(rule);
+	root.wgSet = (rule, on) => root.westgardRuleSettings.set(rule, on);
+	root.wgReset = () => root.westgardRuleSettings.reset();
+	root.testLevelCount = (t) => root.westgardRulePolicy.levelCount(t);
+	root.defaultRuleAction = (rule) => root.QCCore.defaultRuleAction(rule, wgOn(rule));
+	root.testRuleAction = (t, rule) => root.westgardRulePolicy.action(t, rule);
+	root.testRuleOn = (t, rule) => testRuleOnWithin(t, rule);
+	root.defaultRuleScope = (t, rule) => root.QCCore.defaultRuleScope(rule, testLevelCount(t));
+	root.testRuleScope = (t, rule) => root.westgardRulePolicy.scope(t, rule);
+	root.testRuleOnIn = (t, rule, channel) => root.westgardRulePolicy.onIn(t, rule, channel);
+	root.testRuleOnWithin = (t, rule) => testRuleOnIn(t, rule, "within");
+	root.testRuleOnAcross = (t, rule) => testRuleOnIn(t, rule, "across");
+	root.testRuleSet = (t, channel) => root.westgardRulePolicy.set(t, channel);
+	root.ruleResultLevel = (t, rules) => root.westgardRulePolicy.verdict(t, rules);
+	root.westgard = (points, mean, sd) => root.QCCore.westgard(points, mean, sd, wgOn);
+	root.westgardMulti = (levelSets) => root.QCCore.westgardMulti(levelSets, wgOn);
+	root.westgardByPoint = (points, mean, sd) => root.QCCore.westgardByPoint(points, mean, sd, wgOn);
+	root.westgardMultiByPoint = (levelSets) => root.QCCore.westgardMultiByPoint(levelSets, wgOn);
+	root.WG_RULE_DESCRIPTIONS = root.QCCore.WG_RULE_DESCRIPTIONS;
+	root.primaryErrorRule = (rules) => root.QCCore.primaryErrorRule(rules);
+	root.errorType = (rules) => root.QCCore.errorType(rules);
+	root.fixHint = (rules) => root.QCCore.fixHint(rules);
+	root.errorTypeDetailParts = (rules) => root.qcErrorDetail(rules);
+	root.wgWorker = null;
+	root.wgWorkerGeneration = 0;
+	root.wgWorkerRevisions = /* @__PURE__ */ new Map();
+	root.wgWorkerPending = /* @__PURE__ */ new Map();
+	root.wgWorkerFailed = false;
+	root.wgWorkerRenderT = null;
+	root.westgardWorkerRevision = (testId) => root.westgardWorkerRevisionService.revision(wgWorkerRevisions, testId);
+	root.invalidateWestgardWorker = (testId) => {
+		if (testId) {
+			root.westgardWorkerRevisionService.invalidateTest(wgWorkerRevisions, wgWorkerPending, testId);
+			return;
+		}
+		wgWorkerGeneration = root.westgardWorkerRevisionService.invalidateAll(wgWorkerRevisions, wgWorkerPending, wgWorkerGeneration);
+		clearTimeout(wgWorkerRenderT);
+		wgWorkerRenderT = null;
+		if (wgWorker) {
+			try {
+				wgWorker.terminate();
+			} catch (e) {}
+			wgWorker = null;
+		}
+	};
+	root.westgardWorkerWorthwhile = (tests) => root.westgardWorkerPrewarmPlanner.worthwhile(typeof Worker === "function", wgWorkerFailed, tests, (t) => (state.data?.[t.id] || []).length);
+	root.westgardWorkerJob = (t, generation, revision = westgardWorkerRevision(t && t.id)) => root.westgardWorkerJobBuilder(t, generation, revision);
+	root.hydrateWestgardWorkerResult = (message) => {
+		if (!message || message.generation !== wgWorkerGeneration || (message.revision || 0) !== westgardWorkerRevision(message.testId)) return false;
+		return root.westgardWorkerHydrate(message, {
+			test: (id) => (state.tests || []).find((test) => test.id === id),
+			levels: (test) => operationalLevels(test),
+			points: (test, level) => operationalLotPoints(test, level),
+			verdict: (test, rules) => ruleResultLevel(test, rules),
+			setMemo: (id, value) => wgMemo.set(id, value)
+		});
+	};
+	root.westgardWorkerReadyToRender = () => operationalTests().every((t) => wgMemo.has(t.id));
+	root.westgardWorkerMessage = (event) => {
+		const message = event && event.data;
+		if (!message || message.generation !== wgWorkerGeneration) return;
+		const revision = message.revision || 0;
+		if (revision !== westgardWorkerRevision(message.testId)) return;
+		root.westgardWorkerRevisionService.settle(wgWorkerPending, message.testId, revision);
+		if (message.type === "result") hydrateWestgardWorkerResult(message);
+		else if (message.type === "error") wgWorkerFailed = true;
+		if (typeof page !== "undefined" && page === "dash" && (wgWorkerFailed || westgardWorkerReadyToRender())) {
+			clearTimeout(wgWorkerRenderT);
+			wgWorkerRenderT = setTimeout(() => {
+				wgWorkerRenderT = null;
+				rerender();
+			}, 0);
+		}
+	};
+	root.ensureWestgardWorker = () => {
+		if (wgWorker) return wgWorker;
+		if (typeof Worker !== "function" || wgWorkerFailed) return null;
+		try {
+			wgWorker = new Worker("assets/workers/westgard-worker.js?v=rule-table-single-source-20260801-1");
+			wgWorker.onmessage = westgardWorkerMessage;
+			wgWorker.onerror = () => {
+				wgWorkerFailed = true;
+				wgWorkerPending.clear();
+				if (wgWorker) {
+					try {
+						wgWorker.terminate();
+					} catch (e) {}
+					wgWorker = null;
+				}
+				if (typeof page !== "undefined" && page === "dash") setTimeout(() => rerender(), 0);
+			};
+			return wgWorker;
+		} catch (e) {
+			wgWorkerFailed = true;
+			wgWorker = null;
+			return null;
+		}
+	};
+	root.scheduleWestgardPrewarm = (tests) => {
+		const missing = root.westgardWorkerPrewarmPlanner.missing(tests, wgMemo);
+		if (!missing.length || !westgardWorkerWorthwhile(missing)) return false;
+		const worker = ensureWestgardWorker();
+		if (!worker) return false;
+		const generation = wgWorkerGeneration;
+		missing.forEach((t) => {
+			const revision = westgardWorkerRevision(t.id);
+			if (!root.westgardWorkerRevisionService.markPending(wgWorkerPending, t.id, revision)) return;
+			worker.postMessage(westgardWorkerJob(t, generation, revision));
+		});
+		return true;
+	};
+	root.normalizePointLots = () => root.qcNormalizePointLots(state);
+	root.normalizeDuplicateRunIds = () => root.qcNormalizeDuplicateRunIds(state);
+	root.derived = () => root.qcDerivedIndex(state);
+	root.pointsOf = (testId, level) => root.qcPointCache.points(testId, level);
+	root.pointsWithIndex = (testId, level) => root.qcPointCache.points(testId, level, true);
+	root.lvlCfg = (t, level) => root.qcLevelConfig(t, level);
+	root.pointsForLot = (testId, level, lot, withIndex = false) => root.qcPointCache.lot(testId, level, lot, withIndex);
+	root.activeLotPoints = (t, level, withIndex = false) => {
+		const l = lvlCfg(t, level);
+		return l ? pointsForLot(t.id, level, l.lot || "", withIndex) : [];
+	};
+	root.operationalPanelForTest = (t) => t ? derived().testPanel.get(t.id) : null;
+	root.operationalTestOrder = (t) => t && derived().testOrder.has(t.id) ? derived().testOrder.get(t.id) : 999999;
+	root.isOperationalLotGroup = (g) => root.qcLotGroupOperational(g);
+	root.operationalLotGroupForLevel = (l) => l && l.qcLotId ? derived().lotGroupByLotId.get(l.qcLotId) || null : null;
+	root.lotGroupInUse = (g) => root.qcOperationalAccess.lotGroupInUse(g, state.tests || []);
+	root.operationalLotGroupForTest = (t) => {
+		if (!t) return null;
+		const idx = derived(), cached = idx.groups.get(t.id);
+		if (cached !== void 0) return cached;
+		const groups = (t.levels || []).filter((l) => l.qcLotId).map(operationalLotGroupForLevel).filter(Boolean);
+		if (groups.length) {
+			const g = groups[0], out = {
+				key: "grp:" + g.id,
+				name: g.name,
+				lotIds: [...g.lotIds || []]
+			};
+			idx.groups.set(t.id, out);
+			return out;
+		}
+		idx.groups.set(t.id, null);
+		return null;
+	};
+	root.operationalLevels = (t) => {
+		if (!t) return [];
+		const idx = derived(), cached = idx.levels.get(t.id);
+		if (cached) return cached;
+		const levels = (t.levels || []).filter((l) => l.qcLotId && operationalLotGroupForLevel(l));
+		idx.levels.set(t.id, levels);
+		return levels;
+	};
+	root.levelTargetOk = (l) => root.qcLevelTargetValid(l);
+	root.levelsMissingTarget = (t) => operationalLevels(t).filter((l) => !levelTargetOk(l));
+	root.isOperationalTest = (t) => !!(t && t.active !== false && operationalPanelForTest(t) && operationalLotGroupForTest(t) && operationalLevels(t).length);
+	root.canEnterQcForLevel = (t, level) => root.qcOperationalAccess.canEnter(t, level);
+	root.operationalTests = () => {
+		const idx = derived();
+		if (idx.operationalTests) return idx.operationalTests;
+		idx.operationalTests = (state.tests || []).filter(isOperationalTest).sort((a, b) => operationalTestOrder(a) - operationalTestOrder(b));
+		return idx.operationalTests;
+	};
+	root.operationalLotPoints = (t, level, withIndex = false) => root.qcOperationalAccess.lotPoints(t, level, withIndex);
+	root.lotLineage = (currentLotId) => root.qcLotLineage(derived(), currentLotId);
+	root.lotPointsByNo = (testId, level, lotNo) => pointsForLot(testId, level, lotNo || "");
+	root.lotMeanSdFor = (t, level, lotNo) => {
+		const l = lvlCfg(t, level), pts = (state.data?.[t.id] || []).filter((p) => +p.level === +level);
+		return root.qcLotMeanSd(l, lotNo, pts);
+	};
+	root.lotTargetSnapshot = (t, level, lotId, lotNo) => root.qcLotTargetSnapshot(lvlCfg(t, level), lotId, lotNo);
+	root.parallelLotForLevel = (t, level) => root.qcParallelLotLookup(t, level);
+	root.entryColumns = (t) => root.qcEntryColumns(t);
+	root.entryColumnPoints = (t, col, withIndex = false) => {
+		if (!t || !col) return [];
+		return root.qcEntryColumnPoints(col, () => operationalLotPoints(t, col.level, withIndex), () => pointsForLot(t.id, col.level, col.lot || "", withIndex));
+	};
+	root.parallelWestgard = (t, col) => {
+		const pts = entryColumnPoints(t, col, true);
+		return root.qcParallelWestgard(pts, col, (rule) => testRuleOnWithin(t, rule), (rules) => ruleResultLevel(t, rules));
+	};
+	root.pointVoidVerdict = (t, p) => root.qcPointVoidVerdict(t, p);
+	root.plannedTargetFor = (t, lot) => root.qcPlannedTarget(lvlCfg(t, lot.level), lot);
+	root.previousLotSeries = (t, level) => {
+		const l = lvlCfg(t, level);
+		if (!l) return [];
+		return root.qcPreviousLotHistory(l, lotLineage(l.qcLotId), (no) => lotMeanSdFor(t, level, no), (no) => lotPointsByNo(t.id, level, no));
+	};
+	root.levelsForLotGroup = (group) => root.qcLotGroupLevels(group, state.tests || [], derived().lotById);
+	root.pointRunNo = (p) => root.qcPointRunNumber(p);
+	root.activeWestgard = (t) => {
+		const memoKey = t && t.id;
+		if (memoKey) {
+			const cached = root.westgardMemoCache.get(memoKey);
+			if (cached) return cached;
+		}
+		if (memoKey && wgMemo.has(memoKey)) return wgMemo.get(memoKey);
+		const withinRules = testRuleSet(t, "within"), acrossRules = testRuleSet(t, "across"), result = root.qcActiveWestgard(operationalLevels(t).map((l) => ({
+			l,
+			pts: operationalLotPoints(t, l.level)
+		})), withinRules, acrossRules, (rules) => ruleResultLevel(t, rules));
+		if (memoKey) {
+			wgMemo.set(memoKey, result);
+			root.westgardMemoCache.set(memoKey, result);
+		}
+		return result;
+	};
+	root.testCusumConfig = (t) => root.qcCusumConfig(t);
+	root.cusumSeries = (t, l) => {
+		if (!t || !l) return {
+			cPos: [],
+			cNeg: [],
+			flags: [],
+			ma: [],
+			k: .5,
+			h: 4
+		};
+		const memoKey = t.id + "|" + l.level;
+		{
+			const cached = root.qcCusumMemoCache.get(memoKey);
+			if (cached) return cached;
+		}
+		if (cusumMemo.has(memoKey)) return cusumMemo.get(memoKey);
+		const cfg = testCusumConfig(t), pts = operationalLotPoints(t, l.level), result = root.qcCusumSeries(pts, l, cfg);
+		cusumMemo.set(memoKey, result);
+		root.qcCusumMemoCache.set(memoKey, result);
+		return result;
+	};
+	root.acceptedLotPoints = (t, level, withIndex = false) => {
+		const memoKey = t && t.id ? t.id + "|" + level + "|" + (withIndex ? 1 : 0) : "";
+		try {
+			if (memoKey) {
+				const cached = root.qcAcceptedMemoCache.get(memoKey);
+				if (cached !== void 0) return cached;
+			}
+		} catch (e) {}
+		if (memoKey && acceptedMemo.has(memoKey)) return acceptedMemo.get(memoKey);
+		const l = lvlCfg(t, level), pts = operationalLotPoints(t, level, withIndex), withinRules = testRuleSet(t, "within"), rejectRules = new Set(WG_RULES.filter((rule) => testRuleAction(t, rule) === "reject")), out = root.qcAcceptedLotPoints(pts, l, withinRules, rejectRules);
+		if (memoKey) {
+			acceptedMemo.set(memoKey, out);
+			try {
+				root.qcAcceptedMemoCache.set(memoKey, out);
+			} catch (e) {}
+		}
+		return out;
+	};
+	root.testSelectLabel = (t, list = state.tests || []) => root.qcOperationalAccess.selectLabel(t, list);
+	root.searchText = (s) => root.normalizeSearchText(s);
 	root.qcRangeCandidateService = createRangeCandidateService({
 		tests: () => state.tests || [],
 		actions: () => state.actions || [],

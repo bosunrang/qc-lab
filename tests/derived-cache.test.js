@@ -19,7 +19,7 @@
 const assert = require('node:assert/strict');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
-const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js']);
+const ctx = loadSandbox(['core.js', 'modules/state.js']);
 
 const seed = `
   state = {

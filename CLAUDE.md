@@ -86,7 +86,7 @@ node tests/qccore.test.js
 `state.js`) to test them without a browser. The requirement is that the file's
 *top level* is side-effect-free — no DOM/`window`/`localStorage` at load time —
 which nearly every module satisfies: existing tests sandbox everything from
-`core.js`/`state.js`/`qc-domain.js`/`qc-rules.js`/the services, view-models and
+`core.js`/`state.js`/`qc-rules.js`/the services, view-models and
 `*-ui-state.js` files, passing stub globals for whatever the function
 under test touches. What can't run in the sandbox is *calling* the
 DOM-rendering functions themselves — tests against render modules exercise
@@ -330,8 +330,11 @@ review harder and pollutes the `?v=` cache-busting query strings (see below).
 **Cache-busting via query strings.** Every `<script>`/`<link>` tag in
 `index.html` has a `?v=<tag>-<date>-<n>` suffix. Bump the version suffix on
 any file you edit so browsers pick up the change (there's no build hash). The
-Westgard worker URL in `qc-domain.js` (`new Worker('assets/workers/...')`)
-carries its own `?v=` — bump it there when editing the worker.
+Westgard worker URL, wired in `src/compat/modular-pilot.global.ts`
+(`new Worker('assets/workers/...')`) since the classic `qc-domain.js` that
+used to hold it retired into the bundle on 2026-08-20, carries its own `?v=`
+— bump it there (and rebuild via `npm run build:pilot`) when editing the
+worker.
 
 **CSP + SRI (2026-07-24).** `index.html` sets a `<meta>` Content-Security-Policy:
 scripts limited to self + inline + `www.gstatic.com`, connections limited to the
@@ -359,13 +362,14 @@ the Google Fonts link, offline labs must print with correct metrics.
   that is the pattern to copy whenever a state branch is retired.
   Holds the pure error-classification
   helpers too (`errorType`, `primaryErrorRule`, `fixHint`,
-  `WG_RULE_DESCRIPTIONS`); `qc-domain.js` re-exports them under the same global
-  names for the UI. Since 2026-08-01 it also owns the **rule-semantics tables**
+  `WG_RULE_DESCRIPTIONS`); the Westgard wiring (see "Module roles" below,
+  retired into the TS bundle 2026-08-20) re-exports them under the same
+  global names for the UI. Since 2026-08-01 it also owns the **rule-semantics tables**
   — `defaultRuleAction`/`resolveRuleAction` (which rules only warn:
   `WG_ALERT_RULES` = 1-2s/6x/7T) and `defaultRuleScope`/`resolveRuleScope`
   (within/across/both by rule and QC level count), plus `ruleEnabled`,
   `ruleOnInScope`, `ruleVerdictLevel`. These are the SINGLE SOURCE for both
-  Westgard engines: `qc-domain.js` feeds them state (global toggles, per-test
+  Westgard engines: the Westgard wiring feeds them state (global toggles, per-test
   `ruleActions`/`ruleScopes`, `operationalLevels().length`) and
   `workers/westgard-worker.js` feeds them the job payload. Do not re-inline
   either table into a caller — until 2026-08-01 both files carried their own
@@ -413,9 +417,12 @@ the Google Fonts link, offline labs must print with correct metrics.
   **`state` and the derived caches (`pointsCache`/`pointsIndexCache`/
   `pointsLotCache`/`wgMemo`/`acceptedMemo`/`cusumMemo`/`derivedIndex`) plus
   `mem`/`startupProblem` are declared as `globalThis.X` data properties, NOT
-  `let` (Pha G hạ tầng, tách nền 2026-08-19).** They're read *and written* bare
-  by every remaining classic file (qc-domain/state-storage/firebase-sync/
-  users-auth/action-workflow-service) and by the bundle. A classic top-level
+  `let` (Pha G hạ tầng, tách nền 2026-08-19).** At the time, they were read
+  *and written* bare by five other classic files (qc-domain/state-storage/
+  firebase-sync/users-auth/action-workflow-service) as well as the bundle;
+  all five have since retired into the bundle too (Pha G nhóm C,
+  2026-08-20), leaving `state.js` itself as the only remaining bare-classic
+  reader/writer. A classic top-level
   `let` is lexical-only — the bundle IIFE can reach it via the scope chain, but
   once `state.js` itself moves into the bundle that `let` would be trapped
   inside the IIFE and the still-classic readers would break. A `globalThis.X`
@@ -432,21 +439,49 @@ the Google Fonts link, offline labs must print with correct metrics.
   treat any edit to a `clia`/`ricos`/`cliaAbsolute` figure as a data change
   needing its own justification recorded there, not a routine code edit.
   `tests/tea-sources.test.js` fails if any measurand loses its source row.
-- `qc-domain.js` — Westgard rule wiring, error-type classification (thin
-  re-exports of the pure helpers in `core.js`), point derivation helpers
-  (`pointsOf`, `derived()`, lot/panel lookups) built on top of `state`, and
-  the Westgard background worker plumbing: at ≥3000 points
-  (`WG_WORKER_POINT_THRESHOLD`) the dashboard offloads Westgard evaluation to
-  `assets/workers/westgard-worker.js`, hydrating results only when the
-  generation/revision still matches current state, and falls back to the
-  synchronous engine if Workers are unavailable or error out. Also owns the
-  parallel-lot machinery for lot transitions (`parallelLotForLevel()`,
+- Westgard rule wiring, error-type classification (thin re-exports of the
+  pure helpers in `core.js`), point derivation helpers (`pointsOf`,
+  `derived()`, lot/panel lookups) built on top of `state`, and the Westgard
+  background worker plumbing: at ≥3000 points the dashboard offloads Westgard
+  evaluation to `assets/workers/westgard-worker.js`, hydrating results only
+  when the generation/revision still matches current state, and falls back to
+  the synchronous engine if Workers are unavailable or error out. Also owns
+  the parallel-lot machinery for lot transitions (`parallelLotForLevel()`,
   `parallelWestgard()` — see the parallel-run decision below). Each rule's
   action (`inactive`/`alert`/`reject`) and scope (`within`/`across`/`both`
   run) can be overridden per test via `t.ruleActions`/`t.ruleScopes`
   (`testRuleAction()`/`testRuleScope()`), layered on top of the global
-  defaults in `state.westgardRules`.
-  `derived()` (index cấu hình: panel/thứ tự test/lô/nhóm lô/chuyển tiếp đã duyệt)
+  defaults in `state.westgardRules`. Retired from classic `qc-domain.js` on
+  2026-08-20 (Pha G nhóm C, lát 5): every function there already only
+  forwarded to an existing TypeScript service (`westgardRulePolicy`/
+  `westgardRuleSettings`/`westgardMemoCache`/`qcCusumMemoCache`/
+  `qcAcceptedMemoCache`/`qcDerivedIndex`/`qcPointCache`/`qcOperationalAccess`/
+  `qcActiveWestgard`/`qcParallelWestgard`/`qcPointVoidVerdict`/`qcLotLineage`/
+  `qcLotGroupLevels`/`qcErrorDetail`/`westgardWorkerRevisionService`/
+  `westgardWorkerPrewarmPlanner`/`westgardWorkerJobBuilder`/
+  `westgardWorkerHydrate`/…), so it moved as-is into
+  `src/compat/modular-pilot.global.ts` right after `root.westgardRuleSettings`
+  is constructed (the last of its dependencies to come online). No
+  eager-construction guard was hiding behind this one — every dependency
+  closure was already lazy — but the classic constant
+  `WG_WORKER_POINT_THRESHOLD` was confirmed dead (only a comment reference
+  remained; the real value `3000` had already migrated to
+  `createWestgardWorkerPrewarmPlanner(3000)`) and was dropped rather than
+  moved. The 6 worker-state variables (`wgWorker`/`wgWorkerGeneration`/
+  `wgWorkerRevisions`/`wgWorkerPending`/`wgWorkerFailed`/`wgWorkerRenderT`)
+  became `root.X` data properties, not `let` — `tests/westgard-worker.test.js`
+  reads/writes several of them bare through a separate `vm.runInContext` call,
+  which a `let` trapped inside the bundle's IIFE would not see (same trap as
+  `state-storage.js`'s lát). Removing the classic file exposed one test-only
+  gap, not a port bug: `tests/render-downsampling.test.js` stubs
+  `testRuleOn` to disable all Westgard rules for a synthetic 20,000-point
+  dataset, but never stubbed `testRuleOnWithin`/`testRuleOnAcross` — those two
+  used to be `undefined` (so `legacyWestgardRuleScope` always fell through to
+  the `testRuleOn` stub) and are now real functions the scope-resolution
+  fallback calls directly instead, re-enabling real rule evaluation and
+  flooding the chart's display-sample "preserve" set with flagged points.
+  Fixed by stubbing both alongside `testRuleOn`, matching the test's original
+  intent. `derived()` (index cấu hình: panel/thứ tự test/lô/nhóm lô/chuyển tiếp đã duyệt)
   TỰ KIỂM CHỨNG từ 2026-08-01, cùng kỹ thuật với cache của
   `ActionRerunService`: `derivedStampWalk()` so tham chiếu + độ dài của
   đúng những lát state mà nó đọc, cộng các trường vô hướng nó lọc theo

@@ -18,7 +18,7 @@ const fakeIndexedDb = `
 
 (async()=>{
   {
-    const ctx = loadSandbox(['core.js','modules/state.js','modules/qc-domain.js','generated/modular-pilot.js']);
+    const ctx = loadSandbox(['core.js','modules/state.js','generated/modular-pilot.js']);
     const result = await run(ctx, `
       ${fakeIndexedDb}
       (async()=>{const written=await LocalStore.write({version:1,name:'QC'});const saved=await LocalStore.read();const serialized=await LocalStore.writeSerialized('{"version":2,"name":"QC JSON"}');const savedJson=await LocalStore.read();__db.onversionchange();const reopened=await LocalStore.read();const cleared=await LocalStore.clear();const empty=await LocalStore.read();return{written,saved,serialized,savedJson,reopened,cleared,empty,openCount:__openCount};})()
@@ -34,7 +34,7 @@ const fakeIndexedDb = `
   }
 
   {
-    const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'generated/modular-pilot.js']);
+    const ctx = loadSandbox(['core.js', 'modules/state.js', 'generated/modular-pilot.js']);
     const result = await run(ctx, `
       ${fakeIndexedDb}
       localStorage={getItem:function(){return null;},setItem:function(){},removeItem:function(){}};
@@ -45,7 +45,7 @@ const fakeIndexedDb = `
   }
 
   {
-    const ctx = loadSandbox(['core.js','modules/state.js','modules/qc-domain.js','generated/modular-pilot.js']);
+    const ctx = loadSandbox(['core.js','modules/state.js','generated/modular-pilot.js']);
     const result = await run(ctx, `
       ${fakeIndexedDb}
       (async()=>{
@@ -85,7 +85,7 @@ const fakeIndexedDb = `
   }
 
   {
-    const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'generated/modular-pilot.js']);
+    const ctx = loadSandbox(['core.js', 'modules/state.js', 'generated/modular-pilot.js']);
     const result = await run(ctx, `
       ${fakeIndexedDb}
       localStorage={getItem:function(){return null;},setItem:function(){}};
@@ -99,7 +99,7 @@ const fakeIndexedDb = `
   }
 
   {
-    const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'generated/modular-pilot.js']);
+    const ctx = loadSandbox(['core.js', 'modules/state.js', 'generated/modular-pilot.js']);
     const result = await run(ctx, `
       ${fakeIndexedDb}
       localStorage={getItem:function(){return null;},setItem:function(){}};
@@ -114,7 +114,7 @@ const fakeIndexedDb = `
   }
 
   {
-    const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'generated/modular-pilot.js']);
+    const ctx = loadSandbox(['core.js', 'modules/state.js', 'generated/modular-pilot.js']);
     const result = await run(ctx, `
       ${fakeIndexedDb}
       var __ls=new Map();localStorage={getItem:function(k){return __ls.has(k)?__ls.get(k):null;},setItem:function(k,v){__ls.set(k,String(v));},removeItem:function(k){__ls.delete(k);}};
@@ -131,7 +131,7 @@ const fakeIndexedDb = `
   }
 
   {
-    const ctx = loadSandbox(['core.js','modules/state.js','modules/qc-domain.js','generated/modular-pilot.js']);
+    const ctx = loadSandbox(['core.js','modules/state.js','generated/modular-pilot.js']);
     const result = await run(ctx, `(async()=>({supported:LocalStore.supported(),read:await LocalStore.read(),write:await LocalStore.write({}),clear:await LocalStore.clear()}))()`);
     assert.deepEqual(JSON.parse(JSON.stringify(result)), { supported: false, read: null, write: false, clear: false });
   }

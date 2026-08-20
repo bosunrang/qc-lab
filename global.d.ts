@@ -192,3 +192,8 @@ interface EventTarget {
   [key: string]: any;
 }
 declare function qcTooltip():any;
+// qc-domain.js retired into the TS bundle (2026-08-20, Pha G nhóm C lát 5);
+// state.js's ensureShape()/migrateLegacyLots() still reference these two by
+// shorthand property name, so classic-file checkJs needs them declared here.
+declare function normalizePointLots(): void;
+declare function searchText(value: unknown): string;

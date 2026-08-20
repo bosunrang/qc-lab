@@ -9,7 +9,7 @@ const ASSETS_DIR = path.join(__dirname, '..', '..', 'assets');
  * into one shared vm context and returns that context.
  *
  * Only usable for files whose top-level code has no DOM/window/localStorage
- * side effects (core.js, state.js, qc-domain.js qualify - the app's
+ * side effects (core.js, state.js qualify - the app's
  * page-rendering modules do not, since they touch `document` at call time
  * from module-level UI state that we don't set up here).
  *

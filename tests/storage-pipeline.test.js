@@ -6,7 +6,6 @@ const plain = v => JSON.parse(JSON.stringify(v));
 const ctx = loadSandbox([
   'core.js',
   'modules/state.js',
-  'modules/qc-domain.js',
   'generated/modular-pilot.js',
 ]);
 
@@ -46,7 +45,6 @@ assert.deepEqual(value.removed, ['qclab', 'qclab_saved_at'], 'stale local snapsh
   const draftCtx = loadSandbox([
     'core.js',
     'modules/state.js',
-    'modules/qc-domain.js',
     'generated/modular-pilot.js',
   ]);
   const recovered = run(draftCtx, `(function(){
@@ -99,7 +97,7 @@ assert.deepEqual(value.removed, ['qclab', 'qclab_saved_at'], 'stale local snapsh
     };
     indexedDB={open:function(){var req={result:__db};Promise.resolve().then(function(){if(req.onupgradeneeded)req.onupgradeneeded();if(req.onsuccess)req.onsuccess();});return req;}};
   `;
-  const rotateCtx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'generated/modular-pilot.js']);
+  const rotateCtx = loadSandbox(['core.js', 'modules/state.js', 'generated/modular-pilot.js']);
   const rotation = await run(rotateCtx, `(async function(){
     ${fakeIndexedDb}
     localStorage={getItem:function(){return null;},setItem:function(){},removeItem:function(){}};
@@ -120,7 +118,7 @@ assert.deepEqual(value.removed, ['qclab', 'qclab_saved_at'], 'stale local snapsh
   // would truncate the active slot's manifest to an empty test list and lose
   // every QC point in the slot. persistLocalSnapshot() must defer (stay dirty,
   // reschedule) until hydration flips localLoadStatus off 'partition-shell'.
-  const guardCtx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'generated/modular-pilot.js']);
+  const guardCtx = loadSandbox(['core.js', 'modules/state.js', 'generated/modular-pilot.js']);
   const guard = await run(guardCtx, `(async function(){
     ${fakeIndexedDb}
     localStorage={getItem:function(){return null;},setItem:function(){},removeItem:function(){}};
@@ -142,7 +140,7 @@ assert.deepEqual(value.removed, ['qclab', 'qclab_saved_at'], 'stale local snapsh
   // A failed write used to leave lsDirty set with no retry until the next user
   // action. Failures now schedule a bounded backoff retry, and the next
   // successful write resets the backoff counter.
-  const retryCtx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'generated/modular-pilot.js']);
+  const retryCtx = loadSandbox(['core.js', 'modules/state.js', 'generated/modular-pilot.js']);
   const retry = await run(retryCtx, `(async function(){
     ${fakeIndexedDb}
     localStorage={getItem:function(){return null;},setItem:function(){},removeItem:function(){}};
@@ -169,7 +167,7 @@ assert.deepEqual(value.removed, ['qclab', 'qclab_saved_at'], 'stale local snapsh
   // (empty data, status 'partition-shell'), then hydration reconstructs the
   // full state from the partitions. This is the only reader of qclab_boot and
   // the only caller of adoptValidatedState's shell path — cover it explicitly.
-  const bootCtx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'generated/modular-pilot.js']);
+  const bootCtx = loadSandbox(['core.js', 'modules/state.js', 'generated/modular-pilot.js']);
   const boot = await run(bootCtx, `(async function(){
     ${fakeIndexedDb}
     var store={};

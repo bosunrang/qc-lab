@@ -20,6 +20,12 @@ const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js'], {
 ctx.state = { tests: [{ id:'T1', unit:'U', westgardRules:{} }] };
 ctx.lvlCfg = () => ({ lot:'L1' });
 ctx.testRuleOn = () => false;
+// qc-domain.js retiré vào bundle (Pha G nhóm C lát 5): testRuleOnWithin/testRuleOnAcross giờ
+// là hàm thật (gọi westgardRulePolicy), không còn undefined như khi testRuleOn là stub DUY NHẤT
+// legacyWestgardRuleScope rơi vào — phải chặn luôn hai hàm within/across để bộ dữ liệu hình sin
+// 20 000 điểm không bị Westgard đánh dấu vi phạm hàng loạt, làm hỏng phép lấy mẫu hiển thị.
+ctx.testRuleOnWithin = () => false;
+ctx.testRuleOnAcross = () => false;
 ctx.ruleResultLevel = () => 'ok';
 ctx.vnDate = value => value;
 ctx.esc = value => String(value);

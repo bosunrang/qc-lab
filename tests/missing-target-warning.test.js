@@ -4,7 +4,7 @@ const { loadSandbox, run } = require('./helpers/sandbox');
 // Mức đang vận hành nhưng thiếu Mean/SD hợp lệ: engine Westgard trả "ok" cho mọi
 // điểm (guard sd<=0 trong core) nên dashboard/trang Westgard phải nhận diện được
 // tình trạng này để cảnh báo thay vì hiển thị "Đạt" giả.
-const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js']);
+const ctx = loadSandbox(['core.js', 'modules/state.js']);
 run(ctx, 'function __getState(){return state;} function __setState(s){state=s;clearDerived();}');
 
 function baseState(levels) {

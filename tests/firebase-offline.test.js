@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
-const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'generated/modular-pilot.js']);
+const ctx = loadSandbox(['core.js', 'modules/state.js', 'generated/modular-pilot.js']);
 
 const result = run(ctx, `
   (async()=>{
@@ -37,7 +37,7 @@ const result = run(ctx, `
   // Pushes can also start with fb.dirty=false (first-connect room seeding,
   // post-merge convergence) — a failure there must still re-mark dirty and
   // retry, otherwise that push is silently dropped until the next user edit.
-  const ctx2 = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'generated/modular-pilot.js']);
+  const ctx2 = loadSandbox(['core.js', 'modules/state.js', 'generated/modular-pilot.js']);
   const result2 = run(ctx2, `
     (async()=>{
       window={QCLAB_CLOUD:null};
@@ -69,7 +69,7 @@ const result = run(ctx, `
   // The baseline snapshot cache keys on fb.synced identity: the same baseline
   // object must not be re-serialized on every push, and a new baseline object
   // must recompute. Guard the identity-keyed contract directly.
-  const ctx3 = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'generated/modular-pilot.js']);
+  const ctx3 = loadSandbox(['core.js', 'modules/state.js', 'generated/modular-pilot.js']);
   const cache = run(ctx3, `(function(){
     var base={lab:{name:'Lab'},tests:[],data:{},sigmaData:{}};
     var a=fbSyncedSnapKeys(base),b=fbSyncedSnapKeys(base);
@@ -85,7 +85,7 @@ const result = run(ctx, `
   // The generated TypeScript lifecycle service must retain the legacy
   // disconnect ordering: stop polling, cancel pending writes, reset retries,
   // detach the listener, then clear the Firebase session.
-  const ctx4 = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'generated/modular-pilot.js']);
+  const ctx4 = loadSandbox(['core.js', 'modules/state.js', 'generated/modular-pilot.js']);
   const disconnected = run(ctx4, `(function(){
     var detached=0,cleared=0;
     clearTimeout=function(){cleared++;};clearInterval=function(){};
@@ -99,7 +99,7 @@ const result = run(ctx, `
     seenSig:null, authUser:null, retryT:null, retryMs:1000, saveT:null, pullT:null,
   }, 'TypeScript Firebase disconnect bridge keeps the complete cleanup lifecycle');
 
-  const ctx5 = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'generated/modular-pilot.js']);
+  const ctx5 = loadSandbox(['core.js', 'modules/state.js', 'generated/modular-pilot.js']);
   const fullSync = await run(ctx5, `(async()=>{
     document={getElementById:function(){return null;}};
     localStorage={setItem:function(){},removeItem:function(){},getItem:function(){return null;}};
@@ -115,7 +115,7 @@ const result = run(ctx, `
     ok:true, savedClient:'C1', clean:false, synced:true, threw:true,
   }, 'TypeScript full-sync bridge writes the full snapshot and preserves legacy error propagation');
 
-  const ctx6 = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'generated/modular-pilot.js']);
+  const ctx6 = loadSandbox(['core.js', 'modules/state.js', 'generated/modular-pilot.js']);
   const scheduled = run(ctx6, `(function(){
     document={getElementById:function(){return null;}};navigator={onLine:true};
     var timers=[],cleared=[];setTimeout=function(fn,delay){timers.push({fn:fn,delay:delay});return timers.length;};clearTimeout=function(timer){cleared.push(timer);};
@@ -129,7 +129,7 @@ const result = run(ctx, `
     queued:{timer:1,delay:500,cleared:9}, afterOffline:1, timerCount:1,
   }, 'TypeScript push scheduler keeps the legacy debounce and offline behavior');
 
-  const ctx7 = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'generated/modular-pilot.js']);
+  const ctx7 = loadSandbox(['core.js', 'modules/state.js', 'generated/modular-pilot.js']);
   const emptySnapshot = await run(ctx7, `(async()=>{
     window={QCLAB_CLOUD:null};
     document={getElementById:function(){return null;}};navigator={onLine:true};
@@ -143,7 +143,7 @@ const result = run(ctx, `
     ready:true, initialized:true, synced:null, timer:1, delay:500,
   }, 'TypeScript empty-snapshot bridge seeds a blank room from first-connect local QC data');
 
-  const ctx8 = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'generated/modular-pilot.js']);
+  const ctx8 = loadSandbox(['core.js', 'modules/state.js', 'generated/modular-pilot.js']);
   const invalidSnapshot = await run(ctx8, `(async()=>{
     window={QCLAB_CLOUD:null};document={getElementById:function(){return null;}};
     state={lab:{name:'Lab'},activity:[],data:{},sigmaData:{}};
@@ -154,7 +154,7 @@ const result = run(ctx, `
   assert.deepEqual(JSON.parse(JSON.stringify(invalidSnapshot)), {ready:true,initialized:true},
     'TypeScript invalid-snapshot bridge leaves Firebase ready so a later valid cloud write can recover');
 
-  const ctx9 = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'generated/modular-pilot.js']);
+  const ctx9 = loadSandbox(['core.js', 'modules/state.js', 'generated/modular-pilot.js']);
   const rejectedAudit = run(ctx9, `(function(){
     window={QCLAB_CLOUD:null};document={getElementById:function(){return null;}};clearTimeout=function(){};clearInterval=function(){};
     fb.ready=true;fb.initialized=true;fb.ref={off:function(){}};fb.retryT=null;fb.retryMs=1000;
@@ -163,7 +163,7 @@ const result = run(ctx, `
   assert.deepEqual(JSON.parse(JSON.stringify(rejectedAudit)), {result:false,ready:false,ref:null,retryMs:1000},
     'TypeScript audit-rejection bridge disconnects Firebase while retaining the local state');
 
-  const ctx10 = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'generated/modular-pilot.js']);
+  const ctx10 = loadSandbox(['core.js', 'modules/state.js', 'generated/modular-pilot.js']);
   const remoteRender = run(ctx10, `(function(){
     var modalOpen=true,timers=[],renders=0;
     document={getElementById:function(id){return id==='modalRoot'?{children:{length:modalOpen?1:0}}:id==='main'?{}:null;},activeElement:null};
@@ -175,7 +175,7 @@ const result = run(ctx, `
   assert.deepEqual(JSON.parse(JSON.stringify(remoteRender)), {deferredDelay:1500,renders:1,pending:1},
     'TypeScript remote-render bridge defers redraw while a modal is open, then renders once safe');
 
-  const ctx11 = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'generated/modular-pilot.js']);
+  const ctx11 = loadSandbox(['core.js', 'modules/state.js', 'generated/modular-pilot.js']);
   const startedSession = await run(ctx11, `(async()=>{
     var user={uid:'U1',email:'u@example.test'},listener=0,intervals=[];
     window={QCLAB_CLOUD:{config:{apiKey:'key',authDomain:'auth',databaseURL:'https://db',projectId:'project',appId:'app'},labCode:'lab-a',anonymous:true}};
@@ -190,7 +190,7 @@ const result = run(ctx, `
     ok:true, uid:'U1', path:'qclab-shared/lab-a', listener:1, pullDelay:8000,
   }, 'TypeScript Firebase session-start bridge initializes auth, listener and pull lifecycle');
 
-  const ctx12 = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'generated/modular-pilot.js']);
+  const ctx12 = loadSandbox(['core.js', 'modules/state.js', 'generated/modular-pilot.js']);
   const cloudStatus = run(ctx12, `(function(){
     var element={className:'',innerHTML:''};document={getElementById:function(){return element;}};
     setCloudStatus('<img src=x>',true);
@@ -200,7 +200,7 @@ const result = run(ctx, `
     className:'cloud connected', html:'<b>Đang kết nối</b><small>&lt;img src=x&gt;</small>',
   }, 'TypeScript cloud-status presentation retains HTML escaping');
 
-  const ctx13 = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'generated/modular-pilot.js']);
+  const ctx13 = loadSandbox(['core.js', 'modules/state.js', 'generated/modular-pilot.js']);
   const saveStatus = run(ctx13, `(function(){
     var element={innerHTML:''};document={getElementById:function(){return element;}};
     markSaved('đã lưu','vừa xong');

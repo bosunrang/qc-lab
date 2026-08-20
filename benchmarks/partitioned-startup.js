@@ -22,7 +22,7 @@ const source = makeState(shape);
 const shell = { ...source, data: {} };
 const fullRaw = JSON.stringify(source);
 const bootRaw = JSON.stringify({ format: 1, slot: 'a', shell });
-const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'modules/settings.js']);
+const ctx = loadSandbox(['core.js', 'modules/state.js']);
 ctx.__bootRaw = bootRaw;
 
 const perceivedBoot = measure(() => run(ctx, `(()=>{

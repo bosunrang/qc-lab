@@ -18,7 +18,7 @@ const path = require('node:path');
 const { loadSandbox, run } = require('./helpers/sandbox');
 const bridgeSource=fs.readFileSync(path.join(__dirname,'..','src','compat','modular-pilot.global.ts'),'utf8');
 
-const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'generated/modular-pilot.js']);
+const ctx = loadSandbox(['core.js', 'modules/state.js', 'generated/modular-pilot.js']);
 run(ctx, 'function __getState(){return state;} function __setState(s){state=s;} function __getUpdateCalls(){return __updateCalls||0;}');
 
 function baseState(overrides = {}) {

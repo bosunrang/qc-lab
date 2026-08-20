@@ -133,11 +133,11 @@ Westgard) — **toàn bộ nhóm B (Canvas/adapter) của Pha G đã hoàn tất
 | Nhóm | File | Dòng | Ghi chú port |
 | --- | --- | --- | --- |
 | **C. Hạ tầng/bootstrap** (rủi ro cao — kế hoạch yêu cầu làm CUỐI, từng lát độc lập) | `state.js` | 128 | `ensureShape`/state gốc; lifecycle nhạy. **Đã TÁCH NỀN 2026-08-19** (state + cache + mem/startupProblem → globalThis property, xem lát tách nền bên dưới) — chưa retire, nhưng port sau này giờ đã mang tính cơ học |
-| | `qc-domain.js` | 255 | wiring Westgard/worker + point derivation |
+| | ~~`qc-domain.js`~~ | ~~255~~ | **xong 2026-08-20, Lát nhóm C — 5** — xem "Kế hoạch các lát nhóm C còn lại" |
 | | ~~`state-storage.js`~~ | ~~120~~ | **xong 2026-08-20, Lát nhóm C — 4** — xem "Kế hoạch các lát nhóm C còn lại" |
 | | ~~`local-store.js`~~ | ~~13~~ | **xong 2026-08-19, Hạ tầng lát 1** — xem bên dưới |
 | | ~~`firebase-sync.js`~~ | ~~173~~ | **xong 2026-08-20, Lát nhóm C — 3** — xem "Kế hoạch các lát nhóm C còn lại" |
-| | `users-auth.js` | 256 | auth/user + PBKDF2 wiring + trang audit |
+| | ~~`users-auth.js`~~ | ~~256~~ | **xong 2026-08-20, Lát nhóm C — 2** — xem "Kế hoạch các lát nhóm C còn lại" |
 | | ~~`action-workflow-service.js`~~ | ~~149~~ | **xong 2026-08-20, Lát nhóm C — 1** — xem "Kế hoạch các lát nhóm C còn lại" |
 | | ~~`range.js`~~ | ~~95~~ | **xong 2026-08-19, Hạ tầng lát 4** — xem bên dưới |
 | | ~~`backup-ui.js`~~ | ~~27~~ | **xong 2026-08-19, Hạ tầng lát 2** — xem bên dưới |
@@ -1927,20 +1927,15 @@ phải tách nền nó; làm sớm để gỡ mọi ràng buộc thứ tự.)
 2. ~~**`users-auth.js`** (256)~~ — **xong 2026-08-20, xem "Lát nhóm C — 2" bên dưới.**
 3. ~~**`firebase-sync.js`** (173)~~ — **xong 2026-08-20, xem "Lát nhóm C — 3" bên dưới.**
 4. ~~**`state-storage.js`** (120)~~ — **xong 2026-08-20, xem "Lát nhóm C — 4" bên dưới.**
-5. **`qc-domain.js`** (255) — đọc `state`+`wgMemo`/`acceptedMemo`/`cusumMemo`/
-   `derivedIndex`/`WG_RULES` trần (giờ đều là globalThis property nhờ lát tách
-   nền `state`, trừ `WG_RULES` là const của `state.js` — xem dưới). Chứa
-   `derived()` tự kiểm chứng + wiring worker Westgard. Đường NÓNG — benchmark
-   `coldDomainMs`/`warmDomainColdRatio` là gate bắt buộc. Gate: toàn bộ Westgard
-   test + `westgard-worker.test.js` (parity main-thread/worker) + benchmark +
-   `ui-check`.
+5. ~~**`qc-domain.js`** (255)~~ — **xong 2026-08-20, xem "Lát nhóm C — 5" bên dưới.**
 
    *Lưu ý `WG_RULES`/`WG_DEFAULT`/`WG_RULE_REGISTRY`/`STATE_SCHEMA_VERSION`/
-   `TEA_*` là `const` khai báo trong `state.js`, đọc trần bởi qc-domain
-   (`WG_RULES` 1×) và các nơi khác.* Chúng là hằng, không khả biến, nên có thể
-   để `state.js` giữ tới lát cuối; khi port qc-domain, `WG_RULES` trần vẫn phân
-   giải qua scope chain tới classic `const` của `state.js` (bundle đọc classic
-   const được). Chỉ khi retire `state.js` mới cần chuyển các const này thành
+   `TEA_*` là `const` khai báo trong `state.js`, đọc trần bởi code port của
+   `qc-domain.js` (`WG_RULES` 1×) và các nơi khác.* Chúng là hằng, không khả
+   biến, nên có thể để `state.js` giữ tới lát cuối; đã xác nhận qua lát 5:
+   `WG_RULES` trần trong bundle vẫn phân giải đúng qua scope chain tới classic
+   `const` của `state.js` (bundle đọc classic const được, `npm test` 611/611
+   xanh). Chỉ khi retire `state.js` mới cần chuyển các const này thành
    `globalThis.X`/`root.X` hoặc đưa vào bundle.
 
 6. **Lát cuối — retire `state.js` + `analyte-catalog.js` CÙNG MỘT LÁT.** Chỉ khi
@@ -2350,6 +2345,116 @@ Sau lát này: chỉ còn `qc-domain.js` trước khi tới lát cuối (retire 
 + `analyte-catalog.js` cùng lúc). **Lát tiếp theo: `qc-domain.js`** (255
 dòng — đường NÓNG nhất app, xem mục 5 trong danh sách thứ tự đề xuất; benchmark
 `coldDomainMs`/`warmDomainColdRatio` là gate bắt buộc, không chỉ `npm test`).
+
+#### Lát nhóm C — 5: `qc-domain.js` (2026-08-20, xong)
+
+Retire hoàn toàn `assets/modules/qc-domain.js` (255 dòng — đường NÓNG nhất
+app: wiring Westgard/worker offload + toàn bộ point-derivation/lot-lineage
+đọc trên `state`). Đúng mẫu 4 lát trước, mọi hàm ở đây vốn chỉ gọi thẳng
+service TypeScript đã dựng sẵn từ các route/hạ tầng trước
+(`westgardRulePolicy`/`westgardRuleSettings`/`westgardMemoCache`/
+`qcCusumMemoCache`/`qcAcceptedMemoCache`/`qcDerivedIndex`/`qcPointCache`/
+`qcOperationalAccess`/`qcActiveWestgard`/`qcParallelWestgard`/
+`qcPointVoidVerdict`/`qcLotLineage`/`qcLotGroupLevels`/`qcErrorDetail`/
+`westgardWorkerRevisionService`/`westgardWorkerPrewarmPlanner`/
+`westgardWorkerJobBuilder`/`westgardWorkerHydrate`/…) — không có logic mới.
+Chuyển nguyên ~68 hàm + 6 biến trạng thái worker vào
+`src/compat/modular-pilot.global.ts`, đặt ngay sau
+`root.westgardRuleSettings = createWestgardRuleSettings(...)` (điểm construct
+CUỐI CÙNG trong số các dependency của file này, gồm cả `westgardMemoCache`/
+`qcCusumMemoCache`/`qcAcceptedMemoCache` chỉ dựng muộn hơn ở dòng ~3158-3160).
+`WG_WORKER_POINT_THRESHOLD` KHÔNG mang sang — xác nhận bằng `rg` chỉ còn xuất
+hiện trong một dòng comment của `core.js` và một dòng comment test, giá trị
+`3000` đã do `createWestgardWorkerPrewarmPlanner(3000)` (dựng từ lát trước)
+nắm giữ.
+
+**Không gặp bẫy "eager guard"** — đã rà trước khi viết: không có
+`if (typeof (root as any).X === 'function') root.Y = create...` nào phụ
+thuộc tên của `qc-domain.js`; mọi dependency closure đã lazy sẵn.
+
+**6 biến trạng thái worker (`wgWorker`/`wgWorkerGeneration`/
+`wgWorkerRevisions`/`wgWorkerPending`/`wgWorkerFailed`/`wgWorkerRenderT`)
+chuyển thành `root.X`** (giống mẫu 14 biến của lát 4), xác nhận bằng cách
+tìm tham chiếu trần bên ngoài chính file: chỉ `tests/westgard-worker.test.js`
+đọc/ghi trần qua `run(ctx, ...)` — tức một lần `vm.runInContext` RIÊNG trong
+cùng context — nên một `let` cục bộ trong IIFE của bundle sẽ không thấy được
+từ test đó (cùng bẫy "IIFE scope" đã ghi ở lát 4).
+
+**2 hàm cần thêm ambient declare ở `global.d.ts` gốc** (chương trình checkJs
+riêng cho `assets/**/*.js`, khác ambient nội bộ của
+`modular-pilot.global.ts`): `normalizePointLots`/`searchText` — `state.js`
+(còn classic) gọi hai tên này qua cú pháp rút gọn thuộc tính object
+(`{normalizePointLots}`/`{...,searchText,...}`) ở `ensureShape()`/
+`migrateLegacyLots()`; trước lát này được thỏa mãn nhờ `qc-domain.js` cùng
+nằm trong chương trình checkJs, giờ phải khai báo trần.
+
+**4 lỗi kiểu dữ liệu khi typecheck** (không phải bẫy hành vi, thuần TypeScript
+quá chặt so với glue code lỏng lẻo cố ý của các lát trước): tham số
+`testId`/`level`/`lot`/… khai báo `unknown` thay vì `any` gây lỗi truyền vào
+service đã có kiểu cụ thể (`qcPointCache.points`/`.lot`) — sửa bằng đổi toàn
+bộ khối `unknown` mới thêm sang `any`, khớp độ lỏng đã dùng cho glue code
+tương tự ở các lát trước; `testRuleSet` trả `Set<unknown>` thực tế (do
+`westgardRulePolicy.set()` nhận `rules:any`) nhưng khai kiểu `Set<string>` —
+nới thành `Set<any>`; ambient `declare function operationalLotPoints(test,
+level)` có TỪ TRƯỚC (do lát khác forward-reference đoán chỉ 2 tham số) thiếu
+tham số thứ ba `withIndex` mà code port ở đây cần — bổ sung tham số tùy chọn
+thay vì khai lại; `testSelectLabel`'s default `list=state.tests` có thể
+`undefined` — đổi thành `state.tests||[]`.
+
+**1 hồi quy hành vi tìm thấy qua chạy lại toàn bộ `npm test`** (không phải
+lỗi port, mà một lỗ hổng giả lập trong chính test có từ trước):
+`tests/render-downsampling.test.js` stub `ctx.testRuleOn=()=>false` để tắt
+toàn bộ luật Westgard cho bộ dữ liệu hình sin 20 000 điểm tổng hợp — trước
+lát này, `testRuleOnWithin`/`testRuleOnAcross` (hai hàm `legacyWestgardRuleScope`
+thử gọi TRƯỚC khi rơi về `testRuleOn`) chưa từng tồn tại (`typeof
+X==='function'` luôn `false`) nên mọi luật coi như tắt qua đúng nhánh dự
+phòng `testRuleOn`. Sau khi port, hai hàm đó là thật (`root.westgardRulePolicy`
+thật), khớp `typeof===  'function'` nên ĐƯỢC GỌI THẲNG thay vì rơi về stub —
+luật Westgard mặc định bật lại đánh giá dữ liệu hình sin và cờ vi phạm hàng
+loạt, khiến tập chỉ số cần giữ (`preserve`) trong
+`createLeveyJenningsDisplayPlan` phình to gần bằng toàn bộ 20 000 điểm, phá
+phép lấy mẫu hiển thị. Sửa bằng thêm `ctx.testRuleOnWithin=()=>false` và
+`ctx.testRuleOnAcross=()=>false` cạnh stub cũ — đúng ý định ban đầu của test
+(tắt hẳn Westgard cho phép đo lấy-mẫu), không phải một hành vi mới cần chấp
+nhận.
+
+**Dọn 4 script benchmark tham chiếu 3 file classic ĐÃ XÓA TỪ CÁC LÁT/PHA
+TRƯỚC mà chưa ai cập nhật** (`modules/qc-domain.js`, `modules/state-storage.js`
+từ lát 4, `modules/settings.js` từ Pha G route slice 1) — phát hiện vì gate
+benchmark bắt buộc của lát này (mục dưới) không chạy nổi
+(`ENOENT: assets/modules/qc-domain.js`) cho tới khi dọn:
+`benchmarks/performance-regression.js`/`partitioned-startup.js`/
+`performance-baseline.js`/`startup-pipeline.js`. Chỉ xóa tên file khỏi mảng
+`loadSandbox([...])`, giữ nguyên `modules/state.js` nên nhánh tự chèn bundle
+của `sandbox.js` vẫn kích hoạt bình thường.
+
+**Cập nhật 24 test đi kèm** (đọc/nạp file classic đã xóa, không phải đổi hành
+vi — trừ `render-downsampling.test.js` ở trên):
+`accepted-lot-points`/`action-form`/`action-workflow-service`/
+`backup-download-bridge`/`cache-invalidation`/`derived-cache`/
+`entry-service`/`firebase-config`/`firebase-merge`/`firebase-offline`/
+`local-store`/`locked-period-guards`/`lot-rename`/`missing-target-warning`/
+`parallel-lot-run`/`partial-render-helpers`/`qc-rules`/`range-candidate`/
+`reagent-comparison-service`/`state-storage-safety`/`storage-pipeline`/
+`target-matrix`/`westgard-rule-action`/`westgard-worker`. Tất cả đã có
+`modules/state.js` trong cùng danh sách nên nhánh tự chèn bundle của
+`sandbox.js` vẫn kích hoạt sau khi bỏ tên `qc-domain.js` — không cần thêm
+`generated/modular-pilot.js` tường minh ở bất kỳ chỗ nào. Riêng
+`typescript-module-pilot.test.js`: xóa nguyên khối scanner cũ dò cấu trúc
+`qcDomainSource` (24 assertion, đúng cách đã làm với `firebase-sync.js` ở
+lát 3 — xóa hẳn, không viết assertion thay thế, vì không còn file classic
+nào để scan).
+
+Gate: `typecheck` xanh, `npm test` 611/611 xanh (bao gồm toàn bộ test có tiền
+tố `westgard-*` và `westgard-worker.test.js` — khóa song song main-thread/
+worker), `node benchmarks/performance-regression.js` **pass** (`coldDomainMs`
+2375,62 ms ≤ 12 000; `warmDomainColdRatio` 0,00027 ≤ 0,02 — cả hai xa dưới
+ngân sách, kịch bản 50 xét nghiệm × 3 mức × 730 ngày = 109 500 điểm), `npm run
+ui-check` 29/29 xanh.
+
+Sau lát này: nhóm C chỉ còn ĐÚNG MỘT lát cuối — retire `state.js` +
+`analyte-catalog.js` CÙNG LÚC (bắt buộc cùng lúc vì `state.js` đọc
+`TEA_ANALYTE_CATALOG` đồng bộ ở top-level).
 
 ### Pha H — bỏ global bridge và nhiều script tags
 

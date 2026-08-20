@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
-const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'generated/modular-pilot.js']);
+const ctx = loadSandbox(['core.js', 'modules/state.js', 'generated/modular-pilot.js']);
 run(ctx, 'function __getState(){return state;} function __setState(s){state=s;}');
 
 function fixture(actionOverrides = {}) {

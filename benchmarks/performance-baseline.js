@@ -204,7 +204,7 @@ function runScenario(ctx, scenario) {
 
 function main() {
   const scenarios = parseScenarios(process.argv.slice(2));
-  const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'modules/state-storage.js']);
+  const ctx = loadSandbox(['core.js', 'modules/state.js']);
   const startedAt = new Date().toISOString();
   const results = scenarios.map(scenario => runScenario(ctx, scenario));
   const output = {

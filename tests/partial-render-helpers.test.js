@@ -6,7 +6,6 @@ const { loadSandbox, run } = require('./helpers/sandbox');
 const ctx = loadSandbox([
   'core.js',
   'modules/state.js',
-  'modules/qc-domain.js', // searchText() — bộ lọc KPI dùng, phải là bản thật để đúng cách bỏ dấu tiếng Việt
   'generated/modular-pilot.js',
 ], { document: { addEventListener() {} } });
 

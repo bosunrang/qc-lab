@@ -93,7 +93,7 @@ const state = {
   sigmaData: {}, periodLocks: [], teaRefs: [], westgardRules: job.globalRules, configMigrationVersion: 1,
 };
 
-const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/qc-domain.js', 'generated/modular-pilot.js']);
+const ctx = loadSandbox(['core.js', 'modules/state.js', 'generated/modular-pilot.js']);
 ctx.__state = state;
 ctx.__message = result;
 assert.equal(run(ctx, 'typeof westgardWorkerJobBuilder'), 'function', 'payload Worker phải được tạo qua artifact TypeScript');

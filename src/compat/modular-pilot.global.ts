@@ -777,7 +777,7 @@ declare function acceptedLotPoints(test:any,level:number):any[];
 declare function wgMultiViews(test:any):any[];
 declare function levelsForLotGroup(group:any):any[];
 declare function wgArchivedMultiViews(levels:any[]):any[];
-declare function operationalLotPoints(test:any,level:number):any[];
+declare function operationalLotPoints(test:any,level:number,withIndex?:boolean):any[];
 declare function cusumSeries(test:any,level:any):any;
 declare function rcCompute():void;
 declare function sgRefresh():void;
@@ -889,6 +889,80 @@ declare const QC_DECIMALS_DEFAULT: number;
 // `function`) — cũng KHÔNG phải property trên globalThis, phải tham chiếu trần.
 declare function teaAnalyteKey(value: unknown): string;
 declare function role(): string;
+// Retire classic qc-domain.js (2026-08-20, Pha G nhóm C lát 5) — bare ambient cho
+// các hàm domain gọi chéo nhau, cùng cách acceptedLotPoints/operationalLotPoints/
+// cusumSeries/levelsForLotGroup/lvlCfg ở trên đã được khai báo.
+declare function stats(vals: number[]): any;
+declare function reportLevelStats(pts: any[], mean: number, teaVal?: any): any;
+declare function wgOn(rule: string): boolean;
+declare function wgSet(rule: string, on: boolean): void;
+declare function wgReset(): void;
+declare function testLevelCount(t: any): number;
+declare function defaultRuleAction(rule: string): string;
+declare function testRuleAction(t: any, rule: string): string;
+declare function testRuleOn(t: any, rule: string): boolean;
+declare function defaultRuleScope(t: any, rule: string): string;
+declare function testRuleScope(t: any, rule: string): string;
+declare function testRuleOnIn(t: any, rule: string, channel: string): boolean;
+declare function testRuleOnWithin(t: any, rule: string): boolean;
+declare function testRuleOnAcross(t: any, rule: string): boolean;
+declare function testRuleSet(t: any, channel: string): Set<any>;
+declare function ruleResultLevel(t: any, rules: string[]): string;
+declare function westgard(points: any[], mean: number, sd: number): any;
+declare function westgardMulti(levelSets: any[]): any;
+declare function westgardByPoint(points: any[], mean: number, sd: number): any;
+declare function westgardMultiByPoint(levelSets: any[]): any;
+declare function primaryErrorRule(rules: string[]): string;
+declare function errorType(rules: string[]): string;
+declare function fixHint(rules: string[]): string;
+declare function errorTypeDetailParts(rules: string[]): any;
+declare let wgWorker: any, wgWorkerGeneration: number, wgWorkerFailed: boolean, wgWorkerRenderT: any;
+declare const wgWorkerRevisions: Map<string, number>, wgWorkerPending: Map<string, any>;
+declare function westgardWorkerRevision(testId: any): number;
+declare function invalidateWestgardWorker(testId?: any): void;
+declare function westgardWorkerWorthwhile(tests: any[]): boolean;
+declare function westgardWorkerJob(t: any, generation: number, revision?: number): any;
+declare function hydrateWestgardWorkerResult(message: any): boolean;
+declare function westgardWorkerReadyToRender(): boolean;
+declare function westgardWorkerMessage(event: any): void;
+declare function ensureWestgardWorker(): any;
+declare function scheduleWestgardPrewarm(tests: any[]): boolean;
+declare function normalizePointLots(): void;
+declare function normalizeDuplicateRunIds(): void;
+declare function derived(): any;
+declare function pointsOf(testId: any, level: any): any[];
+declare function pointsWithIndex(testId: any, level: any): any[];
+declare function pointsForLot(testId: any, level: any, lot: any, withIndex?: boolean): any[];
+declare function activeLotPoints(t: any, level: any, withIndex?: boolean): any[];
+declare function operationalPanelForTest(t: any): any;
+declare function operationalTestOrder(t: any): number;
+declare function isOperationalLotGroup(g: any): boolean;
+declare function operationalLotGroupForLevel(l: any): any;
+declare function lotGroupInUse(g: any): boolean;
+declare function operationalLotGroupForTest(t: any): any;
+declare function operationalLevels(t: any): any[];
+declare function levelTargetOk(l: any): boolean;
+declare function levelsMissingTarget(t: any): any[];
+declare function isOperationalTest(t: any): boolean;
+declare function canEnterQcForLevel(t: any, level: any): boolean;
+declare function operationalTests(): any[];
+declare function lotLineage(currentLotId: any): any[];
+declare function lotPointsByNo(testId: any, level: any, lotNo: any): any[];
+declare function lotMeanSdFor(t: any, level: any, lotNo: any): any;
+declare function lotTargetSnapshot(t: any, level: any, lotId: any, lotNo: any): any;
+declare function parallelLotForLevel(t: any, level: any): any;
+declare function entryColumns(t: any): any[];
+declare function entryColumnPoints(t: any, col: any, withIndex?: boolean): any[];
+declare function parallelWestgard(t: any, col: any): any;
+declare function pointVoidVerdict(t: any, p: any): any;
+declare function plannedTargetFor(t: any, lot: any): any;
+declare function previousLotSeries(t: any, level: any): any[];
+declare function pointRunNo(p: any): number;
+declare function activeWestgard(t: any): any;
+declare function testCusumConfig(t: any): any;
+declare function testSelectLabel(t: any, list?: any[]): string;
+declare function searchText(s: any): string;
+declare let cusumMemo: Map<string, any>, acceptedMemo: Map<string, any>;
 
 type QCLabGlobal = typeof globalThis & {
   QCLAB_APP: { name: string; version: string; releaseDate: string };
@@ -2308,6 +2382,88 @@ type QCLabGlobal = typeof globalThis & {
   lsFlush: () => boolean;
   invalidateDerivedForSave: (opts?: Record<string, any>) => void;
   save: (opts?: Record<string, any>) => void;
+  // Retire classic qc-domain.js (2026-08-20, Pha G nhóm C lát 5) — glue thuần
+  // quanh các service Westgard/QC domain đã có sẵn, không có logic mới.
+  stats: (vals: number[]) => any;
+  reportLevelStats: (pts: any[], mean: number, teaVal?: any) => any;
+  wgOn: (rule: string) => boolean;
+  wgSet: (rule: string, on: boolean) => void;
+  wgReset: () => void;
+  testLevelCount: (t: any) => number;
+  defaultRuleAction: (rule: string) => string;
+  testRuleAction: (t: any, rule: string) => string;
+  testRuleOn: (t: any, rule: string) => boolean;
+  defaultRuleScope: (t: any, rule: string) => string;
+  testRuleScope: (t: any, rule: string) => string;
+  testRuleOnIn: (t: any, rule: string, channel: string) => boolean;
+  testRuleOnWithin: (t: any, rule: string) => boolean;
+  testRuleOnAcross: (t: any, rule: string) => boolean;
+  testRuleSet: (t: any, channel: string) => Set<any>;
+  ruleResultLevel: (t: any, rules: string[]) => string;
+  westgard: (points: any[], mean: number, sd: number) => any;
+  westgardMulti: (levelSets: any[]) => any;
+  westgardByPoint: (points: any[], mean: number, sd: number) => any;
+  westgardMultiByPoint: (levelSets: any[]) => any;
+  WG_RULE_DESCRIPTIONS: Record<string, string>;
+  primaryErrorRule: (rules: string[]) => string;
+  errorType: (rules: string[]) => string;
+  fixHint: (rules: string[]) => string;
+  errorTypeDetailParts: (rules: string[]) => any;
+  wgWorker: any;
+  wgWorkerGeneration: number;
+  wgWorkerRevisions: Map<string, number>;
+  wgWorkerPending: Map<string, any>;
+  wgWorkerFailed: boolean;
+  wgWorkerRenderT: any;
+  westgardWorkerRevision: (testId: any) => number;
+  invalidateWestgardWorker: (testId?: any) => void;
+  westgardWorkerWorthwhile: (tests: any[]) => boolean;
+  westgardWorkerJob: (t: any, generation: number, revision?: number) => any;
+  hydrateWestgardWorkerResult: (message: any) => boolean;
+  westgardWorkerReadyToRender: () => boolean;
+  westgardWorkerMessage: (event: any) => void;
+  ensureWestgardWorker: () => any;
+  scheduleWestgardPrewarm: (tests: any[]) => boolean;
+  normalizePointLots: () => void;
+  normalizeDuplicateRunIds: () => void;
+  derived: () => any;
+  pointsOf: (testId: any, level: any) => any[];
+  pointsWithIndex: (testId: any, level: any) => any[];
+  lvlCfg: (t: any, level: any) => any;
+  pointsForLot: (testId: any, level: any, lot: any, withIndex?: boolean) => any[];
+  activeLotPoints: (t: any, level: any, withIndex?: boolean) => any[];
+  operationalPanelForTest: (t: any) => any;
+  operationalTestOrder: (t: any) => number;
+  isOperationalLotGroup: (g: any) => boolean;
+  operationalLotGroupForLevel: (l: any) => any;
+  lotGroupInUse: (g: any) => boolean;
+  operationalLotGroupForTest: (t: any) => any;
+  operationalLevels: (t: any) => any[];
+  levelTargetOk: (l: any) => boolean;
+  levelsMissingTarget: (t: any) => any[];
+  isOperationalTest: (t: any) => boolean;
+  canEnterQcForLevel: (t: any, level: any) => boolean;
+  operationalTests: () => any[];
+  operationalLotPoints: (t: any, level: any, withIndex?: boolean) => any[];
+  lotLineage: (currentLotId: any) => any[];
+  lotPointsByNo: (testId: any, level: any, lotNo: any) => any[];
+  lotMeanSdFor: (t: any, level: any, lotNo: any) => any;
+  lotTargetSnapshot: (t: any, level: any, lotId: any, lotNo: any) => any;
+  parallelLotForLevel: (t: any, level: any) => any;
+  entryColumns: (t: any) => any[];
+  entryColumnPoints: (t: any, col: any, withIndex?: boolean) => any[];
+  parallelWestgard: (t: any, col: any) => any;
+  pointVoidVerdict: (t: any, p: any) => any;
+  plannedTargetFor: (t: any, lot: any) => any;
+  previousLotSeries: (t: any, level: any) => any[];
+  levelsForLotGroup: (group: any) => any[];
+  pointRunNo: (p: any) => number;
+  activeWestgard: (t: any) => any;
+  testCusumConfig: (t: any) => any;
+  cusumSeries: (t: any, l: any) => any;
+  acceptedLotPoints: (t: any, level: any, withIndex?: boolean) => any[];
+  testSelectLabel: (t: any, list?: any[]) => string;
+  searchText: (s: any) => string;
 };
 
 const root = globalThis as QCLabGlobal;
@@ -3159,6 +3315,171 @@ root.westgardMemoCache=createWestgardMemoCache();
 root.qcCusumMemoCache=createCusumMemoCache();
 root.qcAcceptedMemoCache=createAcceptedMemoCache();
 root.westgardRuleSettings=createWestgardRuleSettings({defaults:(root.QCCore as any).WG_DEFAULT_ON?Object.fromEntries((root.QCCore as any).WG_RULES.map((rule:string)=>[rule,(root.QCCore as any).WG_DEFAULT_ON.has(rule)])): {},getState:()=>state,ruleEnabled:(rules:any,rule:string)=>(root.QCCore as any).ruleEnabled(rules,rule),requireWrite:()=>requireWrite(),save:()=>save({}),rerender:()=>rerender()});
+
+// Retire classic qc-domain.js (2026-08-20, Pha G nhóm C lát 5) — glue thuần quanh
+// các service Westgard/QC domain đã construct ở trên (westgardRulePolicy/
+// westgardRuleSettings/qcDerivedIndex/qcPointCache/qcActiveWestgard/…), không có
+// logic mới. WG_WORKER_POINT_THRESHOLD của bản classic đã CHẾT (giá trị 3000 do
+// createWestgardWorkerPrewarmPlanner(3000) ở trên nắm giữ) nên không port.
+root.stats=vals=>root.QCCore!.stats(vals);
+root.reportLevelStats=(pts,mean,teaVal)=>root.reportLevelStatsService!(pts,mean,teaVal);
+root.wgOn=rule=>root.westgardRuleSettings!.enabled(rule);
+root.wgSet=(rule,on)=>root.westgardRuleSettings!.set(rule,on);
+root.wgReset=()=>root.westgardRuleSettings!.reset();
+root.testLevelCount=t=>root.westgardRulePolicy!.levelCount(t);
+root.defaultRuleAction=rule=>(root.QCCore as any).defaultRuleAction(rule,wgOn(rule));
+root.testRuleAction=(t,rule)=>root.westgardRulePolicy!.action(t,rule);
+root.testRuleOn=(t,rule)=>testRuleOnWithin(t,rule);
+root.defaultRuleScope=(t,rule)=>(root.QCCore as any).defaultRuleScope(rule,testLevelCount(t));
+root.testRuleScope=(t,rule)=>root.westgardRulePolicy!.scope(t,rule);
+root.testRuleOnIn=(t,rule,channel)=>root.westgardRulePolicy!.onIn(t,rule,channel);
+root.testRuleOnWithin=(t,rule)=>testRuleOnIn(t,rule,'within');
+root.testRuleOnAcross=(t,rule)=>testRuleOnIn(t,rule,'across');
+root.testRuleSet=(t,channel)=>root.westgardRulePolicy!.set(t,channel);
+root.ruleResultLevel=(t,rules)=>root.westgardRulePolicy!.verdict(t,rules);
+root.westgard=(points,mean,sd)=>(root.QCCore as any).westgard(points,mean,sd,wgOn);
+root.westgardMulti=levelSets=>(root.QCCore as any).westgardMulti(levelSets,wgOn);
+root.westgardByPoint=(points,mean,sd)=>(root.QCCore as any).westgardByPoint(points,mean,sd,wgOn);
+root.westgardMultiByPoint=levelSets=>(root.QCCore as any).westgardMultiByPoint(levelSets,wgOn);
+root.WG_RULE_DESCRIPTIONS=(root.QCCore as any).WG_RULE_DESCRIPTIONS;
+root.primaryErrorRule=rules=>(root.QCCore as any).primaryErrorRule(rules);
+root.errorType=rules=>(root.QCCore as any).errorType(rules);
+root.fixHint=rules=>(root.QCCore as any).fixHint(rules);
+root.errorTypeDetailParts=rules=>root.qcErrorDetail!(rules);
+
+root.wgWorker=null;root.wgWorkerGeneration=0;root.wgWorkerRevisions=new Map();root.wgWorkerPending=new Map();root.wgWorkerFailed=false;root.wgWorkerRenderT=null;
+root.westgardWorkerRevision=testId=>root.westgardWorkerRevisionService!.revision(wgWorkerRevisions,testId);
+root.invalidateWestgardWorker=testId=>{
+  if(testId){root.westgardWorkerRevisionService!.invalidateTest(wgWorkerRevisions,wgWorkerPending,testId);return;}
+  wgWorkerGeneration=root.westgardWorkerRevisionService!.invalidateAll(wgWorkerRevisions,wgWorkerPending,wgWorkerGeneration);clearTimeout(wgWorkerRenderT);wgWorkerRenderT=null;
+  if(wgWorker){try{wgWorker.terminate();}catch(e){/* worker đã chết hoặc chưa từng khởi tạo — bỏ qua */}wgWorker=null;}
+};
+root.westgardWorkerWorthwhile=tests=>root.westgardWorkerPrewarmPlanner!.worthwhile(typeof Worker==='function',wgWorkerFailed,tests,(t:any)=>(state.data?.[t.id]||[]).length);
+root.westgardWorkerJob=(t,generation,revision=westgardWorkerRevision(t&&t.id))=>root.westgardWorkerJobBuilder!(t,generation,revision);
+root.hydrateWestgardWorkerResult=message=>{
+  if(!message||message.generation!==wgWorkerGeneration||(message.revision||0)!==westgardWorkerRevision(message.testId))return false;
+  return root.westgardWorkerHydrate!(message,{test:(id:any)=>(state.tests||[]).find((test:any)=>test.id===id),levels:(test:any)=>operationalLevels(test),points:(test:any,level:any)=>operationalLotPoints(test,level),verdict:(test:any,rules:any)=>ruleResultLevel(test,rules),setMemo:(id:any,value:any)=>wgMemo.set(id,value)});
+};
+root.westgardWorkerReadyToRender=()=>operationalTests().every(t=>wgMemo.has(t.id));
+root.westgardWorkerMessage=event=>{
+  const message=event&&event.data;if(!message||message.generation!==wgWorkerGeneration)return;
+  const revision=message.revision||0;if(revision!==westgardWorkerRevision(message.testId))return;
+  root.westgardWorkerRevisionService!.settle(wgWorkerPending,message.testId,revision);
+  if(message.type==='result')hydrateWestgardWorkerResult(message);
+  else if(message.type==='error')wgWorkerFailed=true;
+  if(typeof page!=='undefined'&&page==='dash'&&(wgWorkerFailed||westgardWorkerReadyToRender())){
+    clearTimeout(wgWorkerRenderT);wgWorkerRenderT=setTimeout(()=>{wgWorkerRenderT=null;rerender();},0);
+  }
+};
+root.ensureWestgardWorker=()=>{
+  if(wgWorker)return wgWorker;if(typeof Worker!=='function'||wgWorkerFailed)return null;
+  try{
+    wgWorker=new Worker('assets/workers/westgard-worker.js?v=rule-table-single-source-20260801-1');
+    wgWorker.onmessage=westgardWorkerMessage;
+    wgWorker.onerror=()=>{wgWorkerFailed=true;wgWorkerPending.clear();if(wgWorker){try{wgWorker.terminate();}catch(e){/* worker đã chết */}wgWorker=null;}if(typeof page!=='undefined'&&page==='dash')setTimeout(()=>rerender(),0);};
+    return wgWorker;
+  }catch(e){wgWorkerFailed=true;wgWorker=null;return null;}
+};
+root.scheduleWestgardPrewarm=tests=>{
+  const missing=root.westgardWorkerPrewarmPlanner!.missing(tests,wgMemo);
+  if(!missing.length||!westgardWorkerWorthwhile(missing))return false;
+  const worker=ensureWestgardWorker();if(!worker)return false;
+  const generation=wgWorkerGeneration;
+  missing.forEach((t:any)=>{const revision=westgardWorkerRevision(t.id);if(!root.westgardWorkerRevisionService!.markPending(wgWorkerPending,t.id,revision))return;worker.postMessage(westgardWorkerJob(t,generation,revision));});
+  return true;
+};
+
+root.normalizePointLots=()=>root.qcNormalizePointLots!(state);
+root.normalizeDuplicateRunIds=()=>root.qcNormalizeDuplicateRunIds!(state);
+root.derived=()=>root.qcDerivedIndex!(state);
+root.pointsOf=(testId,level)=>root.qcPointCache!.points(testId,level);
+root.pointsWithIndex=(testId,level)=>root.qcPointCache!.points(testId,level,true);
+root.lvlCfg=(t,level)=>root.qcLevelConfig!(t,level);
+root.pointsForLot=(testId,level,lot,withIndex=false)=>root.qcPointCache!.lot(testId,level,lot,withIndex);
+root.activeLotPoints=(t,level,withIndex=false)=>{const l=lvlCfg(t,level);return l?pointsForLot(t.id,level,l.lot||'',withIndex):[];};
+root.operationalPanelForTest=t=>t?derived().testPanel.get(t.id):null;
+root.operationalTestOrder=t=>t&&derived().testOrder.has(t.id)?derived().testOrder.get(t.id):999999;
+root.isOperationalLotGroup=g=>root.qcLotGroupOperational!(g);
+root.operationalLotGroupForLevel=l=>l&&l.qcLotId?derived().lotGroupByLotId.get(l.qcLotId)||null:null;
+root.lotGroupInUse=g=>root.qcOperationalAccess!.lotGroupInUse(g,state.tests||[]);
+root.operationalLotGroupForTest=t=>{
+  if(!t)return null;
+  const idx=derived(),cached=idx.groups.get(t.id);
+  if(cached!==undefined)return cached;
+  const levels=(t.levels||[]).filter((l:any)=>l.qcLotId),groups=levels.map(operationalLotGroupForLevel).filter(Boolean);
+  if(groups.length){const g=groups[0],out={key:'grp:'+g.id,name:g.name,lotIds:[...(g.lotIds||[])]};idx.groups.set(t.id,out);return out;}
+  idx.groups.set(t.id,null);
+  return null;
+};
+root.operationalLevels=t=>{
+  if(!t)return[];
+  const idx=derived(),cached=idx.levels.get(t.id);
+  if(cached)return cached;
+  const levels=(t.levels||[]).filter((l:any)=>l.qcLotId&&operationalLotGroupForLevel(l));
+  idx.levels.set(t.id,levels);
+  return levels;
+};
+root.levelTargetOk=l=>root.qcLevelTargetValid!(l);
+root.levelsMissingTarget=t=>operationalLevels(t).filter((l:any)=>!levelTargetOk(l));
+root.isOperationalTest=t=>!!(t&&t.active!==false&&operationalPanelForTest(t)&&operationalLotGroupForTest(t)&&operationalLevels(t).length);
+root.canEnterQcForLevel=(t,level)=>root.qcOperationalAccess!.canEnter(t,level);
+root.operationalTests=()=>{
+  const idx=derived();
+  if(idx.operationalTests)return idx.operationalTests;
+  idx.operationalTests=(state.tests||[]).filter(isOperationalTest).sort((a:any,b:any)=>operationalTestOrder(a)-operationalTestOrder(b));
+  return idx.operationalTests;
+};
+root.operationalLotPoints=(t,level,withIndex=false)=>root.qcOperationalAccess!.lotPoints(t,level,withIndex);
+root.lotLineage=currentLotId=>root.qcLotLineage!(derived(),currentLotId);
+root.lotPointsByNo=(testId,level,lotNo)=>pointsForLot(testId,level,lotNo||'');
+root.lotMeanSdFor=(t,level,lotNo)=>{
+  const l=lvlCfg(t,level),pts=(state.data?.[t.id]||[]).filter((p:any)=>+p.level===+level);return root.qcLotMeanSd!(l,lotNo,pts);
+};
+root.lotTargetSnapshot=(t,level,lotId,lotNo)=>root.qcLotTargetSnapshot!(lvlCfg(t,level),lotId,lotNo);
+root.parallelLotForLevel=(t,level)=>root.qcParallelLotLookup!(t,level);
+root.entryColumns=t=>root.qcEntryColumns!(t);
+root.entryColumnPoints=(t,col,withIndex=false)=>{
+  if(!t||!col)return[];
+  return root.qcEntryColumnPoints!(col,()=>operationalLotPoints(t,col.level,withIndex),()=>pointsForLot(t.id,col.level,col.lot||'',withIndex));
+};
+root.parallelWestgard=(t,col)=>{
+  const pts=entryColumnPoints(t,col,true);return root.qcParallelWestgard!(pts,col,(rule:any)=>testRuleOnWithin(t,rule),(rules:any)=>ruleResultLevel(t,rules));
+};
+root.pointVoidVerdict=(t,p)=>root.qcPointVoidVerdict!(t,p);
+root.plannedTargetFor=(t,lot)=>root.qcPlannedTarget!(lvlCfg(t,lot.level),lot);
+root.previousLotSeries=(t,level)=>{
+  const l=lvlCfg(t,level);if(!l)return[];
+  return root.qcPreviousLotHistory!(l,lotLineage(l.qcLotId),(no:any)=>lotMeanSdFor(t,level,no),(no:any)=>lotPointsByNo(t.id,level,no));
+};
+root.levelsForLotGroup=group=>root.qcLotGroupLevels!(group,state.tests||[],derived().lotById);
+root.pointRunNo=p=>root.qcPointRunNumber!(p);
+root.activeWestgard=t=>{
+  const memoKey=t&&t.id;
+  if(memoKey){const cached=root.westgardMemoCache!.get(memoKey);if(cached)return cached;}if(memoKey&&wgMemo.has(memoKey))return wgMemo.get(memoKey);
+  const withinRules=testRuleSet(t,'within'),acrossRules=testRuleSet(t,'across'),result=root.qcActiveWestgard!(operationalLevels(t).map((l:any)=>({l,pts:operationalLotPoints(t,l.level)})),withinRules,acrossRules,(rules:any)=>ruleResultLevel(t,rules));
+  if(memoKey){wgMemo.set(memoKey,result);root.westgardMemoCache!.set(memoKey,result);}
+  return result;
+};
+root.testCusumConfig=t=>root.qcCusumConfig!(t);
+root.cusumSeries=(t,l)=>{
+  if(!t||!l)return{cPos:[],cNeg:[],flags:[],ma:[],k:0.5,h:4};
+  const memoKey=t.id+'|'+l.level;
+  {const cached=root.qcCusumMemoCache!.get(memoKey);if(cached)return cached;}if(cusumMemo.has(memoKey))return cusumMemo.get(memoKey);
+  const cfg=testCusumConfig(t),pts=operationalLotPoints(t,l.level),result=root.qcCusumSeries!(pts,l,cfg);
+  cusumMemo.set(memoKey,result);root.qcCusumMemoCache!.set(memoKey,result);
+  return result;
+};
+root.acceptedLotPoints=(t,level,withIndex=false)=>{
+  const memoKey=t&&t.id?t.id+'|'+level+'|'+(withIndex?1:0):'';
+  try{if(memoKey){const cached=root.qcAcceptedMemoCache!.get(memoKey);if(cached!==undefined)return cached;}}catch(e){/* cache lỗi — tính lại trực tiếp */}
+  if(memoKey&&acceptedMemo.has(memoKey))return acceptedMemo.get(memoKey);
+  const l=lvlCfg(t,level),pts=operationalLotPoints(t,level,withIndex),withinRules=testRuleSet(t,'within'),rejectRules=new Set(WG_RULES.filter((rule:any)=>testRuleAction(t,rule)==='reject')),out=root.qcAcceptedLotPoints!(pts,l,withinRules,rejectRules);
+  if(memoKey){acceptedMemo.set(memoKey,out);try{root.qcAcceptedMemoCache!.set(memoKey,out);}catch(e){/* cache lỗi — bỏ qua, giá trị vẫn trả đúng */}}
+  return out;
+};
+root.testSelectLabel=(t,list=state.tests||[])=>root.qcOperationalAccess!.selectLabel(t,list);
+root.searchText=s=>root.normalizeSearchText!(s);
+
 root.qcRangeCandidateService=createRangeCandidateService({tests:()=>state.tests||[],actions:()=>((state as any).actions||[]),levelConfig:(test:any,level:any)=>lvlCfg(test,level),points:(test:any,level:any)=>(globalThis as any).operationalLotPoints(test,level),westgard:(test:any)=>(globalThis as any).activeWestgard(test),pointZ:(point:any,mean:any,sd:any)=>(root.QCCore as any).pointZ(point,mean,sd),stats:(values:number[])=>(root.QCCore as any).stats(values),actionCancelled:(action:any)=>typeof (globalThis as any).actionCancelled==='function'&&(globalThis as any).actionCancelled(action),systematicRules:(root.QCCore as any).WG_SE_RULES,limitsFromTarget:(mean:any,sd:any,k:number)=>(root.QCCore as any).limitsFromTarget(mean,sd,k)});
 root.qcRangeSafetyGate=rangeSafetyGate;
 root.qcRangeBiasEvaluation=rangeBiasEvaluation;
