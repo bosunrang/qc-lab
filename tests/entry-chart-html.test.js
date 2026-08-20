@@ -14,7 +14,7 @@ const program = `
 const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=module', '--eval', program], { cwd:path.join(__dirname,'..'), encoding:'utf8' });
 assert.equal(result.status, 0, result.stderr || 'không thể chạy entry chart HTML TypeScript');
 const out = JSON.parse(result.stdout);
-assert.match(out.buttons, /class="on" onclick="entrySetDays\(30\)"/);
+assert.match(out.buttons, /class="on" data-action="entrySetDays" data-args="\[30\]"/);
 assert.doesNotMatch(out.custom, /class="on"/);
 assert.match(out.heads, /L&lt;1/) && assert.match(out.heads, /Song song/);
 assert.match(out.card, /lj-mini on lj-mini-parallel/) && assert.match(out.card, /Mean thực/) && assert.match(out.card, /lj-qc-stat control/) && assert.match(out.card, /data-test="T1"/);

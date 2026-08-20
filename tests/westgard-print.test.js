@@ -92,7 +92,7 @@ run(ctx, `
   const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'westgard', 'westgard-page-controller.ts'), 'utf8');
   const presentation = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'westgard', 'westgard-export-actions-html.ts'), 'utf8');
   assert.match(source, /deps\.westgardExportActionsHtml\(ui\.wgChartMode\)/, 'the Westgard page wires up the TypeScript export actions');
-  assert.match(presentation, /'printWestgard\(\)'/, 'the Westgard export presentation wires up a print action');
+  assert.match(presentation, /action: 'printWestgard'/, 'the Westgard export presentation wires up a print action');
   assert.match(presentation, /chartMode === 'lj'/, 'the export actions only show in the default Levey-Jennings view, not CUSUM');
 
   console.log('Westgard print tests passed');

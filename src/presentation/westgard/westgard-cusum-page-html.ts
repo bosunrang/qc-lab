@@ -2,7 +2,7 @@ type Level = Record<string, any>;
 
 export function createWestgardCusumPageHtml<T extends Record<string, any>>(deps: {
   empty: (title: string, message: string, action?: string) => string;
-  button: (label: string, action: string, variant: string) => string;
+  button: (label: string, action: string | { action: string; args?: unknown[] } | null, variant: string) => string;
   escape: (value: unknown) => string;
   testValue: (test: T, value: unknown) => string;
   format: (value: unknown, decimals?: number) => string;
@@ -10,7 +10,7 @@ export function createWestgardCusumPageHtml<T extends Record<string, any>>(deps:
 }) {
   return (input: { test: T; cfg: { on: boolean; k: number; h: number }; levels: Array<Level & { pts: unknown[] }>; canWrite: boolean }) => {
     if (!input.cfg.on) {
-      const action = input.canWrite ? deps.button('Mở cấu hình xét nghiệm', `openConfigAssay('${deps.quote(input.test.id)}')`, 'teal') : '';
+      const action = input.canWrite ? deps.button('Mở cấu hình xét nghiệm', { action: 'openConfigAssay', args: [input.test.id] }, 'teal') : '';
       return `<div class="panel">${deps.empty('Chưa bật CUSUM cho xét nghiệm này', 'Bật trong cấu hình xét nghiệm để xem biểu đồ xu hướng CUSUM.', action)}</div>`;
     }
     if (!input.levels.length) return `<div class="panel">${deps.empty('Chưa có mức QC đang vận hành', 'Cần Panel QC, Nhóm lô QC và Mean/SD hợp lệ trước khi vẽ CUSUM.')}</div>`;

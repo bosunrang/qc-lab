@@ -45,8 +45,24 @@ async function capturePrintHtml(page, prepare, triggerExpr) {
   await prepare(page);
   await page.evaluate(() => {
     window.__captured = null;
+    /* Pha H2 lat cuoi (2026-08-20): openPrintImpl() giờ chạm vào window/document
+       của cửa sổ in (getElementById, document.body, addEventListener,
+       onbeforeprint/onafterprint) TỪ PHÍA OPENER sau document.write() — trước đó
+       nó chỉ write()+close(), không đọc gì lại. Mock window.open() phải mô phỏng
+       đủ bề mặt đó, không chỉ ghi lại HTML. */
     window.open = function () {
-      return { document: { write(html) { window.__captured = html; }, close() {} }, focus() {} };
+      const fakeButton = { addEventListener() {} };
+      return {
+        document: {
+          write(html) { window.__captured = html; },
+          close() {},
+          getElementById() { return fakeButton; },
+          body: { classList: { add() {}, remove() {} } },
+          title: '',
+        },
+        focus() {},
+        print() {},
+      };
     };
   });
   await page.evaluate((expr) => window.eval(expr), triggerExpr);

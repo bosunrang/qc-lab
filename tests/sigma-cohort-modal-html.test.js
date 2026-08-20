@@ -9,5 +9,5 @@ const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','
 assert.equal(result.status,0,result.stderr||'không thể chạy modal cohort Sigma TypeScript');
 const html=result.stdout;
 for(const fragment of ['Glucose','31/08/2026','<tr>row</tr>','<button>cancel</button>','<button>apply</button>'])assert.ok(html.includes(fragment));
-assert.match(html,/onclick="sgCohortClose\(\)"/);assert.match(html,/<th>Lô QC<\/th>/);
+assert.match(html,/data-action="sgCohortClose"/);assert.match(html,/<th>Lô QC<\/th>/);
 console.log('Sigma cohort modal HTML TypeScript tests passed');

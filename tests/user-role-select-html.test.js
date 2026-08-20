@@ -7,6 +7,6 @@ const source=pathToFileURL(path.join(__dirname,'..','src','presentation','auth',
 const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',`import {userRoleSelectHtml} from ${JSON.stringify(source)}; console.log(userRoleSelectHtml('<option>Admin</option>'));`],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
 assert.equal(result.status,0,result.stderr||'không thể chạy dropdown vai trò TypeScript');
 assert.match(result.stdout,/id="editUserRole"/);
-assert.match(result.stdout,/syncUserPermChecks\('editUserPerms',this.value\)/);
+assert.match(result.stdout,/data-action="syncUserPermChecks" data-args='\["editUserPerms"\]' data-action-on="change"/);
 assert.match(result.stdout,/<option>Admin<\/option>/);
 console.log('User role select HTML TypeScript tests passed');

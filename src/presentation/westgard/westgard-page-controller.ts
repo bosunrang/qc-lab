@@ -15,7 +15,7 @@ export function createWestgardPageController(deps: {
   vnDate: (value: unknown) => string;
   headOnly: (title: string, subtitle: string, actions?: string) => string;
   emptyState: (title: string, body: string, actions?: string) => string;
-  button: (label: string, action: string, cls?: string, title?: string, options?: AnyRec) => string;
+  button: (label: string, action: string | { action: string; args?: unknown[] } | null, cls?: string, title?: string, options?: AnyRec) => string;
   role: () => string;
   canWrite: () => boolean;
   fmtTestValue: (test: AnyRec, value: unknown) => string;
@@ -60,7 +60,7 @@ export function createWestgardPageController(deps: {
   const wgChartModeTabs = () => deps.westgardModeTabs.chart(deps.ui().wgChartMode);
   const pageWestgardCusum = (t: AnyRec) => { const cfg = deps.testCusumConfig(t), levels = deps.westgardCusumLevels(t); return deps.westgardCusumPageHtml({ test: t, cfg, levels, canWrite: deps.canWrite() }); };
   const wgSetArchivedGroup = (id: string) => { const next = deps.westgardUiState.archivedGroup(id); deps.ui().wgArchivedGroupId = next.groupId; deps.ui().wgArchivedTestId = next.testId; deps.rerender(); };
-  const wgSetArchivedTest = (id: string) => { const next = deps.westgardUiState.archivedTest(id); deps.ui().wgArchivedTestId = next.testId; deps.rerender(); };
+  const wgSetArchivedTest = (id: string) => { if (!id) return; const next = deps.westgardUiState.archivedTest(id); deps.ui().wgArchivedTestId = next.testId; deps.rerender(); };
   const wgViewModeTabs = (archivedGroups: AnyRec[]) => deps.westgardModeTabs.view(deps.ui().wgViewMode, archivedGroups.length);
   const wgRowsWindow = (rows: AnyRec[], key: string) => deps.westgardRowsWindow(rows, deps.ui().wgExpandedRows.has(key), WG_TABLE_INITIAL_ROWS);
   const wgToggleRows = (key: string) => { deps.ui().wgExpandedRows = deps.westgardUiState.toggleOpen(deps.ui().wgExpandedRows, key); deps.rerender(); };
@@ -80,8 +80,8 @@ export function createWestgardPageController(deps: {
     const group = archivedGroups.find((g: AnyRec) => g.id === ui.wgArchivedGroupId);
     const groupOpts = groupList.map((g: AnyRec) => `<option value="${g.id}" ${g.id === ui.wgArchivedGroupId ? 'selected' : ''}>${deps.esc(g.name)}${g.active === false ? ' · đã lưu trữ' : ' · đã dừng'}${g.stoppedAt ? ' ' + deps.vnDate(g.stoppedAt) : ''}</option>`).join('');
     const badge = group.active === false ? 'Đã lưu trữ' : 'Đã dừng';
-    const groupPicker = `<div><label>Nhóm lô đã dừng/lưu trữ <span class="hint">(${groupList.length}/${archivedGroups.length})</span></label><select onchange="wgSetArchivedGroup(this.value)">${groupOpts}</select></div>`;
-    const searchBox = `<div><label>Tìm nhanh</label><input id="wgArchivedTestSearch" type="search" placeholder="Tên xét nghiệm, máy hoặc số lô..." value="${deps.escapeAttr(ui.wgArchivedTestQ)}" oninput="wgFilterArchivedTests(this.value)"></div>`;
+    const groupPicker = `<div><label>Nhóm lô đã dừng/lưu trữ <span class="hint">(${groupList.length}/${archivedGroups.length})</span></label><select data-action="wgSetArchivedGroup" data-action-on="change">${groupOpts}</select></div>`;
+    const searchBox = `<div><label>Tìm nhanh</label><input id="wgArchivedTestSearch" type="search" placeholder="Tên xét nghiệm, máy hoặc số lô..." value="${deps.escapeAttr(ui.wgArchivedTestQ)}" data-action="wgFilterArchivedTests" data-action-on="input"></div>`;
     const rows = deps.levelsForLotGroup(group);
     const byTest = new Map<string, AnyRec>();
     rows.forEach((r: AnyRec) => { if (!byTest.has(r.t.id)) byTest.set(r.t.id, { t: r.t, rows: [] }); byTest.get(r.t.id).rows.push(r); });
@@ -94,7 +94,7 @@ export function createWestgardPageController(deps: {
     const testList = archiveTestSelection ? archiveTestSelection.list : (matchedTests.length ? matchedTests : testEntries);
     ui.wgArchivedTestId = archiveTestSelection.selected;
     const testOpts = testList.map((e: AnyRec) => `<option value="${e.t.id}" ${e.t.id === ui.wgArchivedTestId ? 'selected' : ''}>${deps.esc(deps.testDisplayName(e.t))}</option>`).join('');
-    const testPicker = `<div><label>Chọn xét nghiệm <span class="hint">(${testList.length}/${testEntries.length})</span></label><select onchange="if(this.value){wgSetArchivedTest(this.value)}">${testOpts}</select></div>`;
+    const testPicker = `<div><label>Chọn xét nghiệm <span class="hint">(${testList.length}/${testEntries.length})</span></label><select data-action="wgSetArchivedTest" data-action-on="change">${testOpts}</select></div>`;
     const entry = archiveTestSelection.entry;
     const sortedRows = entry.rows.slice().sort((a: AnyRec, b: AnyRec) => a.l.level - b.l.level);
     const multiChart = sortedRows.length >= 2 ? `<div class="panel"><h2 class="panel-title">Levey-Jennings tổng hợp</h2>
@@ -110,7 +110,7 @@ export function createWestgardPageController(deps: {
   const pageWestgard = () => {
     const ui = deps.ui();
     const tests = deps.operationalTests(), archivedGroups = wgArchivedGroups();
-    if (!tests.length && !archivedGroups.length) return deps.headOnly('Phân tích Westgard', '') + `<div class="panel">${deps.emptyState('Chưa có xét nghiệm đang vận hành', 'Cần đưa xét nghiệm vào Panel QC, ghép Nhóm lô QC và gán Mean/SD trước khi phân tích Westgard.', deps.role() === 'admin' ? deps.button('Cấu hình Mean/SD', `go('manage');setManageTab('targets')`, 'teal') : '')}</div>`;
+    if (!tests.length && !archivedGroups.length) return deps.headOnly('Phân tích Westgard', '') + `<div class="panel">${deps.emptyState('Chưa có xét nghiệm đang vận hành', 'Cần đưa xét nghiệm vào Panel QC, ghép Nhóm lô QC và gán Mean/SD trước khi phân tích Westgard.', deps.role() === 'admin' ? deps.button('Cấu hình Mean/SD', { action: 'goManageTargets' }, 'teal') : '')}</div>`;
     if (ui.wgViewMode === 'archived' && !archivedGroups.length) ui.wgViewMode = 'current';
     if (ui.wgViewMode === 'current' && !tests.length && archivedGroups.length) ui.wgViewMode = 'archived';
     if (ui.wgViewMode === 'archived') return pageWestgardArchived(archivedGroups);
@@ -124,12 +124,12 @@ export function createWestgardPageController(deps: {
     const blocks = levelViews.map((v: AnyRec) => {
       const { l, pts, cfg, lotPicker } = v;
       const prevSeries = deps.previousLotSeries(t, l.level), hasPrev = prevSeries.length > 0, prevOpen = ui.wgPrevOpen.has(t.id + '|' + l.level);
-      const prevBtn = hasPrev ? deps.button(prevOpen ? 'Xem lô mới' : 'Xem lô cũ', `wgTogglePrevLot(${l.level})`, 'ghost sm wg-prev-toggle') : '';
+      const prevBtn = hasPrev ? deps.button(prevOpen ? 'Xem lô mới' : 'Xem lô cũ', { action: 'wgTogglePrevLot', args: [l.level] }, 'ghost sm wg-prev-toggle') : '';
       if (prevOpen && hasPrev) { const s = prevSeries[0]; return wgLotBlock(t, l.level, s.lot, s.mean, s.sd, s.pts, 'Đã chuyển tiếp', `Mức ${l.level}`, `Lô cũ ${deps.esc(s.lot)}`, prevBtn); }
       const title = `<h3><span class="wg-level-title"><span>Mức ${l.level}</span>${lotPicker}</span><span class="wg-level-meta"><span>Mean ${deps.fmtTestValue(t, cfg.mean)}</span><span>SD ${deps.fmtTestValue(t, cfg.sd)}</span><span>${pts.length} điểm</span>${prevBtn}</span></h3>`;
-      if (!pts.length) return `<div class="panel">${title}${deps.emptyState('Chưa có dữ liệu', 'LOT đang dùng chưa có điểm QC. Bạn có thể chọn LOT cũ hoặc nhập điểm mới.', deps.button('Nhập QC', `entrySel={testId:'${t.id}',level:${l.level}};entryStart=null;entryEnd=null;go('entry')`, 'teal'))}</div>`;
+      if (!pts.length) return `<div class="panel">${title}${deps.emptyState('Chưa có dữ liệu', 'LOT đang dùng chưa có điểm QC. Bạn có thể chọn LOT cũ hoặc nhập điểm mới.', deps.button('Nhập QC', { action: 'dashboardGoEntryFollowup', args: [t.id, l.level] }, 'teal'))}</div>`;
       const { zs } = v.single, rows = deps.westgardViewModel.buildPointRows({ points: pts, verdicts: wg.byPoint, zs, mean: cfg.mean, sd: cfg.sd }), key = `current:${t.id}|${l.level}|${l.lot || ''}`, view = wgRowsWindow(rows, key);
-      const targetOk = deps.levelTargetOk(l), targetWarn = targetOk ? '' : `<div class="alert warn wg-target-warning">Mức này <b>chưa có Mean/SD hợp lệ</b> — các điểm QC không được đánh giá Westgard; bảng dưới chỉ liệt kê giá trị, không có kết luận Đạt/Cảnh báo/Loại bỏ. ${deps.role() === 'admin' ? deps.button('Cấu hình Mean/SD', `go('manage');setManageTab('targets')`, 'teal sm') : ''}</div>`;
+      const targetOk = deps.levelTargetOk(l), targetWarn = targetOk ? '' : `<div class="alert warn wg-target-warning">Mức này <b>chưa có Mean/SD hợp lệ</b> — các điểm QC không được đánh giá Westgard; bảng dưới chỉ liệt kê giá trị, không có kết luận Đạt/Cảnh báo/Loại bỏ. ${deps.role() === 'admin' ? deps.button('Cấu hình Mean/SD', { action: 'goManageTargets' }, 'teal sm') : ''}</div>`;
       if (!targetOk) view.rows.forEach((r: AnyRec) => { r.level = 'none'; r.rules = []; r.supportRules = []; });
       const rowsHtml = deps.westgardPointRowsHtml(view.rows, t);
       return `<div class="panel">${title}${targetWarn}${wgRowsControl(view, key)}<table class="wg-table"><thead><tr><th>#</th><th>Ngày</th><th class="num">Giá trị</th><th class="num">Z</th><th>Kết luận</th><th>Luật / bằng chứng</th><th>Loại sai số</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`;
@@ -137,7 +137,7 @@ export function createWestgardPageController(deps: {
     const ruleToggles = deps.westgardRuleTogglesHtml(deps.ruleRegistry(), deps.wgOn, deps.canWrite());
     const exportActions = deps.westgardExportActionsHtml(ui.wgChartMode);
     return deps.headOnly('Phân tích Westgard', 'Đối chiếu luật theo mức QC, lô và lần chạy') +
-     `<div class="panel"><h2 class="panel-title">Thiết lập phân tích</h2>${wgViewModeTabs(archivedGroups)}<div class="wg-test-picker${exportActions ? ' wg-test-picker-3' : ''}"><div><label>Tìm nhanh</label><input id="wgTestSearch" type="search" placeholder="Tên xét nghiệm, LOT hoặc máy..." value="${deps.escapeAttr(ui.wgTestQ)}" oninput="wgFilterTests(this.value)"></div><div><label>Chọn xét nghiệm <span id="wgTestCount" class="hint">(${matched.length}/${tests.length})</span></label><select id="wgTestSelect" aria-label="Chọn xét nghiệm" ${matched.length ? '' : 'disabled'} onchange="if(this.value){selTest=this.value;rerender()}">${opts}</select></div>${exportActions}</div>
+     `<div class="panel"><h2 class="panel-title">Thiết lập phân tích</h2>${wgViewModeTabs(archivedGroups)}<div class="wg-test-picker${exportActions ? ' wg-test-picker-3' : ''}"><div><label>Tìm nhanh</label><input id="wgTestSearch" type="search" placeholder="Tên xét nghiệm, LOT hoặc máy..." value="${deps.escapeAttr(ui.wgTestQ)}" data-action="wgFilterTests" data-action-on="input"></div><div><label>Chọn xét nghiệm <span id="wgTestCount" class="hint">(${matched.length}/${tests.length})</span></label><select id="wgTestSelect" aria-label="Chọn xét nghiệm" ${matched.length ? '' : 'disabled'} data-action="wgSelectTest" data-action-on="change">${opts}</select></div>${exportActions}</div>
      <div class="wg-rules"><b style="font-size:var(--type-meta)">Cấu hình chung của luật</b><div class="flow-note">${ruleToggles}</div></div>
      ${deps.westgardRuleGuideHtml(deps.ruleRegistry())}${wgChartModeTabs()}</div>${ui.wgChartMode === 'cusum' ? pageWestgardCusum(t) : multiChart + blocks}`;
   };

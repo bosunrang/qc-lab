@@ -3,7 +3,6 @@ const { loadSandbox, run } = require('./helpers/sandbox');
 
 const ctx = loadSandbox([
   'core.js',
-  'modules/state.js',
   'generated/modular-pilot.js',
 ]);
 

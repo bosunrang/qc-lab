@@ -11,8 +11,8 @@ const program = `
 `;
 const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=module', '--eval', program], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
 assert.equal(result.status, 0, result.stderr || 'không thể chạy dashboard status tabs HTML TypeScript');
-assert.match(result.stdout, /dashTestSetStatus\('all'\).*Tất cả<b>3<\/b>/);
-assert.match(result.stdout, /class="on" onclick="dashTestSetStatus\('missing'\)">Chưa QC<b>2<\/b>/);
+assert.match(result.stdout, /data-args='\["all"\]'.*Tất cả<b>3<\/b>/);
+assert.match(result.stdout, /class="on" data-action="dashTestSetStatus" data-args='\["missing"\]'>Chưa QC<b>2<\/b>/);
 assert.match(result.stdout, /Loại bỏ<b>1<\/b>/);
 assert.match(result.stdout, /Đạt<b>1<\/b>/);
 console.log('Dashboard status tabs HTML TypeScript tests passed');

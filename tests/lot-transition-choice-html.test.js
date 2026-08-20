@@ -11,4 +11,7 @@ assert.equal(result.status,0,result.stderr||'không thể chạy chọn lô chuy
 assert.match(result.stdout,/id="cfgTransFrom" list="cfgTransFromList"/);
 assert.match(result.stdout,/data-lot-id="L1"/);
 assert.match(result.stdout,/<option value="1102"><\/option>/);
+assert.match(result.stdout,/data-input-action="lotTransitionChoiceInput"/);
+assert.match(result.stdout,/data-change-action="lotTransitionChoiceInput" data-change-args="\[true\]"/);
+assert.doesNotMatch(result.stdout,/oninput=|onchange=/);
 console.log('Lot transition choice HTML TypeScript tests passed');

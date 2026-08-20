@@ -6,7 +6,7 @@ const { pathToFileURL } = require('node:url');
 const source = pathToFileURL(path.join(__dirname, '..', 'src', 'presentation', 'report', 'report-page-html.ts')).href;
 const program = `
   import { createReportPageHtml } from ${JSON.stringify(source)};
-  const render = createReportPageHtml({ head: (title, sub) => '<h>' + title + '|' + sub + '</h>', empty: (title, message, action) => '<e>' + title + '|' + message + '|' + action + '</e>', button: (label, action, variant, _title, options) => '[' + label + '|' + action + '|' + variant + '|' + Boolean(options && options.disabled) + ']', escape: value => String(value).replaceAll('<', '&lt;'), escapeAttr: value => String(value).replaceAll('<', '&lt;').replaceAll('"', '&quot;'), label: test => test.name, rangePicker: (start, end) => '<range>' + start + '-' + end + '</range>', actionIcon: () => '<svg></svg>' });
+  const render = createReportPageHtml({ head: (title, sub) => '<h>' + title + '|' + sub + '</h>', empty: (title, message, action) => '<e>' + title + '|' + message + '|' + action + '</e>', button: (label, action, variant, _title, options) => '[' + label + '|' + (typeof action === 'string' ? action : JSON.stringify(action)) + '|' + variant + '|' + Boolean(options && options.disabled) + ']', escape: value => String(value).replaceAll('<', '&lt;'), escapeAttr: value => String(value).replaceAll('<', '&lt;').replaceAll('"', '&quot;'), label: test => test.name, rangePicker: (start, end) => '<range>' + start + '-' + end + '</range>', actionIcon: () => '<svg></svg>' });
   const base = { query: '<q>', start: '2026-08-01', end: '2026-08-10', selectedId: 'T2', isAdmin: true, lockPanelHtml: '<locks/>' };
   console.log(JSON.stringify([render({ ...base, tests: [], matched: [] }), render({ ...base, tests: [{ id: 'T1', name: '<A>' }, { id: 'T2', name: 'B' }], matched: [{ id: 'T2', name: 'B' }]}), render({ ...base, isAdmin: false, tests: [{ id: 'T1', name: 'A' }], matched: [] })]));
 `;
@@ -20,5 +20,5 @@ assert.match(normal, /<option value="T2" selected>B<\/option>/);
 assert.match(normal, /Tạo báo cáo &amp; In/);
 assert.match(normal, /<locks\/>/);
 assert.match(noMatch, /select id="rTest" aria-label="Xét nghiệm" disabled/);
-assert.match(noMatch, /Xuất Excel\|exportReportXLSX\(\)\|teal\|true/);
+assert.match(noMatch, /Xuất Excel\|\{"action":"exportReportXLSX"\}\|teal\|true/);
 console.log('Report page HTML TypeScript tests passed');

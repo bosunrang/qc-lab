@@ -22,7 +22,7 @@ const { loadSandbox, run } = require('./helpers/sandbox');
 // fmt/vnDate là hàm định dạng của lớp UI; lớp TEa chỉ gọi chúng lúc xuất chuỗi.
 // document tối giản: vnDatePickerController.bind() chạy ngay khi bundle nạp
 // (xem bài học Lát 3 của Pha G), không liên quan gì tới lớp TEa của test này.
-const ctx = loadSandbox(['core.js', 'modules/state.js'], {
+const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js'], {
   fmt: (v, d) => Number(v).toFixed(d),
   vnDate: v => String(v),
   document: { getElementById: () => null, addEventListener: () => {}, removeEventListener: () => {} },

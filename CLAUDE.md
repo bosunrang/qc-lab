@@ -82,15 +82,20 @@ node tests/qccore.test.js
 ```
 
 `tests/helpers/sandbox.js` loads real `assets/*.js` files into a `vm` context
-(in `index.html` load order; it auto-inserts `analyte-catalog.js` before
-`state.js`) to test them without a browser. The requirement is that the file's
-*top level* is side-effect-free — no DOM/`window`/`localStorage` at load time —
-which nearly every module satisfies: existing tests sandbox everything from
-`core.js`/`state.js`/`qc-rules.js`/the services, view-models and
-`*-ui-state.js` files, passing stub globals for whatever the function
-under test touches. What can't run in the sandbox is *calling* the
+(in `index.html` load order) to test them without a browser. The requirement
+is that the file's *top level* is side-effect-free — no DOM/`window`/
+`localStorage` at load time — which nearly every module satisfies: existing
+tests sandbox everything from `core.js`/`qc-rules.js`/the services,
+view-models and `*-ui-state.js` files, passing stub globals for whatever the
+function under test touches. What can't run in the sandbox is *calling* the
 DOM-rendering functions themselves — tests against render modules exercise
-only their pure helpers.
+only their pure helpers. `assets/modules/` is empty as of 2026-08-20 (Pha G
+nhóm C done, `state.js`/`analyte-catalog.js` retired last) — any sandbox
+needing state/domain logic must list `'generated/modular-pilot.js'`
+explicitly; `sandbox.js` used to auto-insert `analyte-catalog.js` before
+`modules/state.js` and push the bundle when that filename was present, but
+that trigger can never fire again now that the file is gone, so the
+auto-append branch was deleted rather than left dead.
 
 Several tests are **source scanners, not behaviour tests** — they read the repo
 as text and enforce conventions no compiler here can. Expect them to fail on a
@@ -302,16 +307,28 @@ it before touching startup, storage, Westgard, or chart-render hot paths.
 ## Architecture
 
 **No modules, no bundler — one shared global scope.** `index.html` loads
-`assets/core.js` then every file in `assets/modules/` via plain
-`<script defer>` tags, in a fixed, load-bearing order. Every file (except
-`core.js`) declares top-level `function`/`const`/`let` directly into global
-scope; later files freely call functions and read state defined by earlier
-ones. There is no namespacing — when adding a function, check the existing
-global name isn't already taken by another module; a collision silently
-replaces the other module's binding and only surfaces weeks later, so
-`tests/global-name-uniqueness.test.js` scans every file and fails on
-duplicates. If you reorder or split `<script>` tags in `index.html`, you can
-break forward references.
+`assets/core.js`, then the compiled TypeScript bundle
+(`assets/generated/modular-pilot.js`, built by `npm run build:pilot` from
+`src/compat/modular-pilot.global.ts`) — two `<script defer>` tags, in a
+fixed, load-bearing order. `assets/modules/` is empty as of 2026-08-20 (Pha G
+nhóm C complete): it used to hold every classic-JS page/route/service file,
+each declaring top-level `function`/`const`/`let` directly into global scope
+so later files could freely call functions and read state defined by earlier
+ones; all of that logic has since retired into the bundle (assigned as
+`root.X=` properties, see "Module roles" below for the retirement history of
+each former file) or into `src/presentation`/`src/application`/`src/domain`
+TypeScript modules the bundle imports. `assets/app.js` (the boot entry point)
+retired the same way on 2026-08-20 (Pha H1, lát 1) — `root.boot` is now
+registered via `document.addEventListener('DOMContentLoaded', ...)` at the
+end of the bundle rather than a classic script that just calls `boot()` at
+load time; see "Module roles" below. There is still no namespacing at the
+global-scope boundary — when adding a global (a bare `root.X=` in the
+bundle, or a `function` in the one remaining classic file, `core.js`) check
+the name isn't already taken; a collision silently replaces the other
+binding and only surfaces weeks later, so
+`tests/global-name-uniqueness.test.js` scans `core.js` AND the generated
+bundle and fails on duplicates. If you reorder the 2 remaining `<script>`
+tags in `index.html`, you can still break forward references.
 
 `assets/core.js` is the one exception: it's wrapped in a UMD shim
 (`(function(root, factory){...})`) so it also works via `require()` — that's
@@ -319,7 +336,8 @@ what makes it usable from both the browser (as `window.QCCore`) and Node test
 files (`require('../assets/core.js')`). It holds pure, side-effect-free domain
 math (stats, Westgard rule evaluation, Sigma metric, measurement uncertainty,
 CUSUM, backup validation/sanitization) with no DOM or state dependency — new pure
-calculations belong here, not in `state.js`/`qc-domain.js`.
+calculations belong here, not in the bundle's `state`/Westgard wiring (former
+classic `state.js`/`qc-domain.js`, retired 2026-08-20 — see "Module roles").
 
 **Code style is dense/minified-looking by convention, not generated.** Most
 `assets/*.js` files are hand-written with minimal whitespace (multiple
@@ -336,17 +354,30 @@ used to hold it retired into the bundle on 2026-08-20, carries its own `?v=`
 — bump it there (and rebuild via `npm run build:pilot`) when editing the
 worker.
 
-**CSP + SRI (2026-07-24).** `index.html` sets a `<meta>` Content-Security-Policy:
-scripts limited to self + inline + `www.gstatic.com`, connections limited to the
-Firebase Auth/RTDB endpoints, fonts/images/workers to self. The three Firebase
-CDN tags carry `integrity="sha384-..."` + `crossorigin="anonymous"` — when
-bumping the Firebase version, recompute each hash
+**CSP + SRI (2026-07-24, `script-src` tightened further 2026-08-20).**
+`index.html` sets a `<meta>` Content-Security-Policy: scripts limited to self
++ `www.gstatic.com` (no `'unsafe-inline'` since Pha H2's last lát — see
+`action-dispatcher.ts` above for the event-delegation work that made this
+possible), connections limited to the Firebase Auth/RTDB endpoints,
+fonts/images/workers to self. `style-src` keeps `'unsafe-inline'` — a
+separate directive, unrelated to the script-src change, since this codebase
+still assigns `style="..."` directly from JS in hundreds of places (changing
+that is a separate, much larger project). The three Firebase CDN tags carry
+`integrity="sha384-..."` + `crossorigin="anonymous"` — when bumping the
+Firebase version, recompute each hash
 (`curl -sf <url> | openssl dgst -sha384 -binary | openssl base64 -A`) or the
 browser will refuse to load the SDK. The CSP deliberately has no `unsafe-eval`;
 dev scripts (a11y audit) call app functions directly via Playwright instead of
-`window.eval`. The print window (`openPrint()` in `report-print-controller.ts`) inherits this
-CSP and loads Manrope from self-hosted `assets/tokens.css` — do not reintroduce
-the Google Fonts link, offline labs must print with correct metrics.
+`window.eval`, and load axe-core itself via `page.evaluate(AXE_SOURCE)` (a
+bare string, run through the DevTools Protocol, not a page `<script>` tag)
+rather than `page.addScriptTag()`, which the tightened `script-src` now
+blocks. The print window (`openPrint()` in `report-print-controller.ts`)
+inherits this CSP (same-origin `document.write()`) — its former inline
+`<script>` (defining `qcSavePdf`/`qcDoPrint`) is gone; the click listener and
+`window.__qcPrintToken` property are now set from the OPENER side after
+`document.write()`, plain property assignment being unaffected by CSP. It
+loads Manrope from self-hosted `assets/tokens.css` — do not reintroduce the
+Google Fonts link, offline labs must print with correct metrics.
 
 ### Module roles (load order matters — see `index.html`)
 
@@ -407,38 +438,70 @@ the Google Fonts link, offline labs must print with correct metrics.
   (the bundle now loads after `state.js`/`qc-domain.js`/`firebase-sync.js`
   instead of right after `core.js`) changed nothing observable — confirmed
   with a live browser boot showing the correct version on the login screen.
-- `state.js` — the single in-memory `state` object (tests, instruments, QC
-  lots/panels, QC data points, actions, users, etc.) plus `ensureShape()`
-  migration/normalization logic run after every load/merge. `ensureShape()`
-  stamps `STATE_SCHEMA_VERSION` (from `core.js`) onto `state.schemaVersion`.
-  It also reconciles Sigma levels with lot-group membership: removing a live
-  lot level from every group unlinks that level and deletes its stale
-  `sigmaData[testId][].lv[level]`, while stopped/planned groups retain history.
-  **`state` and the derived caches (`pointsCache`/`pointsIndexCache`/
+- The single in-memory `state` object (tests, instruments, QC lots/panels, QC
+  data points, actions, users, etc.) plus `ensureShape()` migration/
+  normalization logic run after every load/merge. `ensureShape()` stamps
+  `STATE_SCHEMA_VERSION` (from `core.js`) onto `state.schemaVersion`. It also
+  reconciles Sigma levels with lot-group membership: removing a live lot
+  level from every group unlinks that level and deletes its stale
+  `sigmaData[testId][].lv[level]`, while stopped/planned groups retain
+  history. **`state` and the derived caches (`pointsCache`/`pointsIndexCache`/
   `pointsLotCache`/`wgMemo`/`acceptedMemo`/`cusumMemo`/`derivedIndex`) plus
-  `mem`/`startupProblem` are declared as `globalThis.X` data properties, NOT
-  `let` (Pha G hạ tầng, tách nền 2026-08-19).** At the time, they were read
-  *and written* bare by five other classic files (qc-domain/state-storage/
-  firebase-sync/users-auth/action-workflow-service) as well as the bundle;
-  all five have since retired into the bundle too (Pha G nhóm C,
-  2026-08-20), leaving `state.js` itself as the only remaining bare-classic
-  reader/writer. A classic top-level
-  `let` is lexical-only — the bundle IIFE can reach it via the scope chain, but
-  once `state.js` itself moves into the bundle that `let` would be trapped
-  inside the IIFE and the still-classic readers would break. A `globalThis.X`
-  data property resolves for everyone via the global object and the exact
-  `globalThis.X=` line survives the eventual move into the bundle (unlike `var`,
-  which would become IIFE-local). Not an accessor — that would add getter
-  overhead on the app's hottest binding; the caches stay stable Map references
-  (invalidation only `.clear()`/`.delete()`s, never reassigns). checkJs sees
-  these via `declare var` in `global.d.ts`.
-- `analyte-catalog.js` — `TEA_ANALYTE_CATALOG`, a frozen built-in measurand
-  registry (one international name + abbreviation per analyte, with CLIA/Ricos
-  TEa values). Provenance lives in `docs/tea-sources.md` (CLIA 2024 final rule
-  + EFLM BV database references, per-measurand trace table, review log) —
-  treat any edit to a `clia`/`ricos`/`cliaAbsolute` figure as a data change
-  needing its own justification recorded there, not a routine code edit.
-  `tests/tea-sources.test.js` fails if any measurand loses its source row.
+  `mem`/`startupProblem` are `root.X` data properties, NOT `let` (Pha G hạ
+  tầng, tách nền 2026-08-19, folded into the bundle at lát 6 below).** Not an
+  accessor — that would add getter overhead on the app's hottest binding; the
+  caches stay stable Map references (invalidation only `.clear()`/
+  `.delete()`s, never reassigns). checkJs sees these via `declare var` in
+  `global.d.ts` (for the 3 remaining classic files) and via a module-local
+  `declare let` inside `modular-pilot.global.ts` itself. Retired from classic
+  `state.js` (140 lines) TOGETHER with `analyte-catalog.js` (below) on
+  2026-08-20 (Pha G nhóm C, lát 6 — the slice that closes nhóm C,
+  `assets/modules/` is empty after it): every function there already only
+  forwarded to an existing TypeScript service (`qcStateFoundation`/
+  `qcStateLifecycle`/`qcLevelReconciliation`/`qcRangeLimitRepair`/
+  `ManageConfigService`/`qcLotTargetHistory`/`derivedCacheInvalidation`/
+  `qcStaffIdentity`/`qcDateFormat`/`qcBasicFormat`/`qcValueFormat`/
+  `qcTestConfiguration`/`qcConfigurationRelations`/`PeriodService`/
+  `ReagentComparisonService`), so it moved as-is into
+  `src/compat/modular-pilot.global.ts` — but unlike every prior lát, placed at
+  the very TOP of the bundle's runtime code (right after the guard that
+  validates `root.QCCore`), not next to its own dependency cluster. Reason:
+  `SigmaTeaResolution`'s factory reads `TEA_SOURCE_REGISTRY`/
+  `TEA_ANALYTE_CATALOG`/`REFTESTS` eagerly (not through a lazy closure) much
+  later in the same file, mirroring how classic `sigma-tea.js` used to; this
+  port had to land before that read, matching the classic load order
+  (`analyte-catalog.js` → `state.js` → every other module). Confirmed by a
+  two-line `vm.runInContext` experiment: a `const` declared inside a function
+  in one script execution throws `ReferenceError` when referenced bare from a
+  *separate* later script execution on the same context, while a `root.X=`
+  (or `globalThis.X=`) assignment from the first resolves fine in the second
+  — the same "IIFE-scope trap" documented for `state-storage.js`'s lát, this
+  time hitting DATA consts (`WG_RULES`/`REFTESTS`/`TEA_SOURCE_REGISTRY`/
+  `QC_DECIMALS_DEFAULT`/`teaAnalyteKey`/…), not just mutable variables — these
+  used to be readable bare purely because `state.js` was still a separate
+  classic `<script>` loaded before the bundle (V8's shared top-level lexical
+  scope across sequential script evaluations in one realm), a mechanism that
+  stops working the moment they're declared inside the bundle's own IIFE.
+  Fixed the same way as every mutable binding before them: `root.X=`
+  assignment instead of a bundle-local `const`. No dead code to drop this
+  time — every function/const in `state.js` still had a real caller. One
+  test (`tests/tea-reference-service-bridge.test.js`) pins the literal
+  ambient-declare text `declare const REFTESTS: readonly any[][];`, so the
+  `Object.freeze(array.map(row=>Object.freeze([...])))` construction (whose
+  real type is `readonly (readonly any[])[]`) got a local `as readonly
+  any[][]` cast at the assignment instead of a type change.
+- `TEA_ANALYTE_CATALOG`, a frozen built-in measurand registry (one
+  international name + abbreviation per analyte, with CLIA/Ricos TEa values).
+  Provenance lives in `docs/tea-sources.md` (CLIA 2024 final rule + EFLM BV
+  database references, per-measurand trace table, review log) — treat any
+  edit to a `clia`/`ricos`/`cliaAbsolute` figure as a data change needing its
+  own justification recorded there, not a routine code edit.
+  `tests/tea-sources.test.js` fails if any measurand loses its source row;
+  since classic `analyte-catalog.js` retired together with `state.js` above
+  (2026-08-20), that test now loads the catalog from the bundle
+  (`loadSandbox(['core.js','generated/modular-pilot.js'])` +
+  `run(ctx,'TEA_ANALYTE_CATALOG')`) instead of `vm`-evaluating the deleted
+  classic file's source text directly.
 - Westgard rule wiring, error-type classification (thin re-exports of the
   pure helpers in `core.js`), point derivation helpers (`pointsOf`,
   `derived()`, lot/panel lookups) built on top of `state`, and the Westgard
@@ -910,15 +973,18 @@ the Google Fonts link, offline labs must print with correct metrics.
   the Six Sigma page's **TEa resolution layer**, split out of `sigma.js` on
   2026-08-01 as classic `sigma-tea.js` and retired to TypeScript on 2026-08-19
   (Pha G route slice 7); wired via `src/compat/modular-pilot.global.ts` (`root.sgRef`,
-  `root.sgTea`, etc.) guarded behind `typeof TEA_SOURCE_REGISTRY!=='undefined'` since
-  some test sandboxes load the bundle without `state.js`. It answers "what is this
+  `root.sgTea`, etc.) guarded behind `typeof TEA_SOURCE_REGISTRY!=='undefined'` — a
+  guard that predates classic `state.js`'s retirement (Pha G nhóm C lát 6,
+  2026-08-20) and is now always true since the bundle constructs
+  `TEA_SOURCE_REGISTRY` itself at load time, kept as a cheap safety net rather
+  than removed. It answers "what is this
   assay's TEa, from which source, with what traceability": the effective TEa table
   (`REFTESTS` defaults overlaid with `state.teaRefs`), assay↔reference-row matching
   (`sgRef`, exact-then-longest-prefix), the CLIA percent/absolute/greater-of
   criterion, and the per-period TEa snapshot. It knows nothing about Sigma, MU,
   charts or modals — that boundary is one-directional and pinned by
   `tests/ui-route-structure.test.js`, and it is what makes the layer testable in
-  Node (`tests/sigma-tea.test.js` loads the bundle with only `core.js` + `state.js`).
+  Node (`tests/sigma-tea.test.js` loads the bundle with only `core.js`).
 - `src/presentation/dashboard/dashboard-page-controller.ts` —
   `createDashboardPageController(deps)` owns `pageDash()`/`pageDashLoading()`/
   `dashTestFilter()`/`dashTestSetStatus()`, retired from classic
@@ -1046,8 +1112,180 @@ the Google Fonts link, offline labs must print with correct metrics.
   `tests/reagent-stats.test.js`.
 - `lis-client-service.js` — browser-side client for the LIS Gateway prototype;
   see "LIS Gateway" below.
-- `app.js` — small async boot entry point at the bottom of `index.html`
-  (`boot()` awaits `loadBootState()` before login/Firebase init).
+- Boot entry point (`boot()` awaits `loadBootState()` before login/Firebase
+  init). Retired from classic `app.js` (9 lines) on 2026-08-20 (Pha H1, lát
+  1): `root.boot = async () => {...}` moved as-is to the very end of
+  `src/compat/modular-pilot.global.ts`, but unlike its classic form — which
+  called `boot()` immediately, safe only because `app.js` was its own
+  `<script defer>` loaded dead last — the port does **not** self-invoke.
+  Doing so would run before `#main`/the rest of the DOM exists (still true
+  even though this bundle is itself a deferred script) and would crash every
+  sandbox test that loads this bundle without a `document`/`window` (most
+  don't, since `app.js` was never part of any test's `loadSandbox([...])`
+  list before). Fixed by registering
+  `document.addEventListener('DOMContentLoaded', () => { root.boot(); })` at
+  the bottom of the file instead — per the HTML spec, `DOMContentLoaded`
+  always fires after every `<script defer>` has finished running, so
+  `root.boot()` still fires at the same real-world moment as before, with no
+  race. `index.html` dropped from 3 app `<script>` tags to 2
+  (`core.js` + the bundle). A second, unrelated bug surfaced by this port:
+  the classic-era `boot()` did `await ensureAdmin().then(...)`, but this
+  file's own internal ambient declare said `declare function ensureAdmin():
+  void;` (wrong since its creation in the `users-auth.js` retirement,
+  Pha G nhóm C lát 2 — nothing had chained off its result until now) —
+  fixed to `Promise<void>`.
+  `src/presentation/app/app-bootstrap.ts` (`createAppBootstrap(deps)`) is a
+  sibling lát-2 change: the 6 top-level `window`/`document.addEventListener`
+  registrations that used to sit inline at two unrelated spots in the bundle
+  (local-save flush on `beforeunload`/`pagehide`/hidden-tab
+  `visibilitychange`; Firebase pull/push on `focus`/`online`/`offline`/
+  visible-tab `visibilitychange`) are now one named, dependency-injected
+  factory called once. `window`/`document` are passed in only after the
+  adapter checks `typeof window.addEventListener === 'function'` itself (not
+  `!== 'undefined'` truthiness — TypeScript's `strict` mode flags a plain
+  truthy check on a DOM method as "always true" since `Window`/`Document`
+  declare it as a required, non-optional member; a `typeof ... ===
+  'function'` comparison sidesteps that diagnostic while still being the
+  right runtime check for a duck-typed test stub that has `window` but not a
+  working `addEventListener`). That distinction is exactly the regression
+  this lát hit first: an initial version wrote `typeof window !== 'undefined'
+  ? window : undefined` (dropping the second half of the classic double
+  guard, `&& window.addEventListener`), which crashed 7 tests whose `window`
+  stub exists but has no `addEventListener` method (e.g.
+  `westgard-xlsx.test.js`'s `window:{QCLAB_APP:{...}}`) — caught by running
+  the full `npm test`, not typecheck.
+- `src/presentation/app/action-dispatcher.ts` (`createActionDispatcher(deps)`)
+  — Pha H2 (2026-08-20, DONE): the event-delegation replacement for
+  hand-written `onclick="fn(...)"`/`oninput=`/`onchange=`/`onkeydown=`/
+  `onmousemove=`/`onfocus=`/`onmouseleave=`/`ontoggle=` strings, which is
+  what let the CSP's `script-src` drop `'unsafe-inline'` (see "CSP + SRI"
+  below). A single `click` listener bound once to `document` (idempotent
+  `bind()`, same pattern as `vn-date-picker-controller.ts`/
+  `modal-focus-trap.ts`) matches `event.target.closest('[data-action]')`,
+  decodes `dataset.args` as JSON, and calls the named global with `this`
+  bound to the clicked element — preserving classic `onclick` semantics for
+  free. `router-dispatch-controller.ts`'s `render()` only ever replaces
+  `#main`'s `innerHTML`, never the node itself, so this one listener
+  survives every `rerender()` permanently. `btn()` (`ui-primitives.ts`)
+  accepts `{action, args?}` — every real call site across the app now uses
+  this object form (confirmed by an exhaustive scan of every `btn(`/
+  `button(` call in `src/`, not just a text grep for `onclick=`, since a
+  caller building the onclick STRING dynamically at runtime — e.g.
+  `` `confirmReturnAction('${jsq(id)}')` `` — leaves no literal `onclick=`
+  text in the TypeScript source for a grep to find); the raw-string branch
+  in `btn()`/`modalCloseButton()` is dead code at this point but kept rather
+  than removed, since deleting it would mean re-touching every caller's
+  `action: string | {...} | null` type signature for a purely cosmetic win.
+  Also binds `input`/`change`/`focusin` listeners: `data-action-on="input"|
+  "change"` auto-appends the element's live value (`.checked` for
+  checkbox/radio, else `.value` — or the real `event` for
+  `<input type="file">`, whose `.value` is just a filename) as the final
+  arg, matching every classic `this.value`/`this.checked` handler's calling
+  convention without touching the target function's signature;
+  `data-action-on="focus"` listens via `focusin` (bare `focus` doesn't
+  bubble) with no value appended, and `data-action-on="mouseout"`
+  substitutes for `onmouseleave=` (also non-bubbling) via its bubbling
+  equivalent, safe only for a leaf element (SVG point tooltip). `data-action-
+  self-only` (present/absent, no value) fires only when the event target IS
+  the data-action element itself, not a descendant — replaces the modal
+  backdrop's `onclick="if(event.target===this)closeModal()"`.
+  `data-keydown-action`+`data-keydown-args`+`data-keydown-keys` (JSON — Space
+  is the literal `" "` character) filters by key, always `preventDefault()`s,
+  and appends the live value like input/change ("Enter creates"/"Enter
+  selects the row"); the same attributes WITHOUT `data-keydown-keys` fire on
+  every keydown unfiltered with the real event prepended
+  (`fn.apply(el,[event,...args])`) for real keyboard navigation (arrow keys
+  in the entry tree/sheet) — those target functions read `this` instead of
+  `event.currentTarget`, since a delegated listener's `currentTarget` is
+  always `document`. `data-keydown-self-only` is a SEPARATE flag from
+  `data-action-self-only` — one row can need `closest()` dedup (no
+  self-only) for its click action and self-only for its Enter/Space action
+  at the same time. `data-mousemove-action`+`data-mousemove-args` prepends
+  the real event the same way, for a point tooltip that follows the cursor.
+  `data-notify-changed="tenHam"` is a SEPARATE mechanism from `data-action`:
+  it fires a zero-arg function on every bubbled 'input'/'change', even when
+  a nested descendant already has its own `data-action` for that same event
+  — the one case where a single event legitimately needs to invoke two
+  handlers (the NCE form's "any field changed → save draft, refresh section
+  chips" catch-all, layered on top of each field's own specific action).
+  Three more mechanisms closed the last real gap — one element needing
+  MULTIPLE INDEPENDENT events with different target functions/args, which
+  `data-action-on` (one event per element) can't express: `data-input-
+  action`+`data-input-args` (bound to `input`), `data-focus-action`+
+  `data-focus-args` (bound to `focusin`), `data-change-action`+
+  `data-change-args` (bound to `change`) — all three call `fn.apply(el,args)`
+  with NO live-value append (unlike `data-action-on`), so an element can
+  carry `data-action` for one event (needs the live value) and
+  `data-focus-action`/`data-change-action` for others (don't) at the same
+  time — used by the reagent info panel's lô cũ/mới/Bias/alpha fields
+  (`data-action` on input for `rcMeta`, `data-focus-action` for
+  `rcMetaFocus`, `data-change-action` for `rcMetaLog`) and the lot-transition
+  combobox (`data-input-action`+`data-change-action`, both calling
+  `lotTransitionChoiceInput`, `commit` argument differing by event — the
+  function itself now reads `this` instead of an explicit `el` param,
+  matching every other function converted this way). Finally,
+  `data-toggle-action`+`data-toggle-args` covers `<details>`'s `ontoggle=`
+  (3 sites: the NCE form's collapsible sections, the entry page's two
+  secondary panels) — `toggle` does NOT bubble, so unlike every mechanism
+  above it's bound via the CAPTURE phase
+  (`addEventListener('toggle',fn,true)`, which reaches every element
+  regardless of bubbling) and reads `event.target` directly rather than
+  `closest()`; appends `el.open` after the static args, matching the old
+  `this.open` argument. Missing this one specific attribute name in the
+  original grep sweep (which only checked 5 common event names) is exactly
+  why the browser-level gates (`nce-check` here) matter: a `<details>` whose
+  open/closed state silently stopped surviving `rerender()` produced no
+  TypeScript or Node-test failure at all, only a real-Chromium one.
+  `report-print-controller.ts`'s print popup (a genuinely separate
+  `document`, built via `w.document.write(...)`) is now driven from the
+  OPENER side instead of via its own inline `<script>` — the popup inherits
+  the main app's CSP (same-origin `document.write()`), so it would have been
+  blocked too; `openPrintImpl()` now attaches the click listener directly
+  from the main bundle after `w.document.close()`, using
+  `(window as any).qcPrintPdf` (the Electron preload bridge, no longer
+  reached via `opener.qcPrintPdf` since this code already runs in the
+  opener) instead of a `qcSavePdf`/`qcDoPrint` pair defined inline. Plain
+  property assignment (`w.__qcPrintToken = printToken`) is unaffected by CSP
+  (only inline SCRIPT EXECUTION is restricted, not property writes), so
+  `electron/main.js`/`scripts/print-check.js`'s
+  `executeJavaScript('window.__qcPrintToken')` lookup keeps working
+  unchanged. `index.html`'s last 2 inline `<script>` blocks moved out the
+  same lát: the nav-collapsed pre-render check became
+  `assets/nav-collapse-init.js` (loaded via a plain non-deferred
+  `<script src=...>` at the exact same DOM position, so it still runs
+  synchronously before `<aside>` paints — no flash of an uncollapsed
+  sidebar); the Electron-only `window.qcDialog` → `window.alert` override
+  moved into the bundle itself (`modular-pilot.global.ts`, right after
+  `appBootstrap.run()`), guarded by `(window as any).qcDialog` since
+  `global.d.ts`'s `Window.qcDialog` ambient type isn't visible under
+  `tsconfig.modules.json` (which only includes `src/**/*.ts`, not the
+  repo-root `.d.ts` files). Finding every real site took more than a text
+  grep for `onclick=`/etc.: a `btn()`/`button()` call whose action argument
+  is built as a runtime template-literal string (` `fn('${id}')` `) leaves
+  no literal `onXXX=` text in the source, so it silently survived every
+  earlier grep-based sweep and only showed up as an actual CSP violation in
+  a real browser (`ui-check`'s void-point/period-lock flows, both of which
+  go through a confirm button built this way in
+  `entry-page-controller.ts`/`report-page-controller.ts`) — the fix was a
+  small Node script that parses every `btn(`/`button(` call's real argument
+  list (balanced parens/quotes, not a single regex) and flags any whose
+  second argument doesn't start with `{`. Two dev scripts needed their own
+  fix once real inline execution was gone: `a11y-audit.js` loaded axe-core
+  via `page.addScriptTag({content: AXE_SOURCE})`, which inserts a real
+  `<script>` into the page (blocked); switched to
+  `page.evaluate(AXE_SOURCE)` (a bare string, not a function) instead, which
+  Playwright sends through the browser's DevTools Protocol
+  (`Runtime.evaluate`) rather than a page-owned `<script>` element, so it
+  runs regardless of the page's own CSP — confirmed with a two-line
+  before/after test against a real minimal-CSP page.
+  `visual-check.js`'s `window.open` stub (used to capture the print window's
+  HTML without actually opening one) only ever implemented
+  `document.write`/`close`/`focus`, since the old inline-script version
+  never touched the opener-side `document`/`window` after writing it; the
+  refactored `openPrintImpl()` now calls `getElementById`/reads
+  `document.body`/sets `onbeforeprint`/`onafterprint` from the opener side,
+  so the stub needed those added (as harmless no-ops — this script only
+  checks the CSS of the captured HTML, not click behavior).
 
 ### Button convention
 
@@ -1280,8 +1518,10 @@ leaves a dossier record.
   "Xu hướng CUSUM" tab on the Westgard page) — it never changes a point's
   accept/reject/Westgard
   status; only the Westgard rule engine does that.
-- The CLIA/Ricos TEa reference table (`REFTESTS` in `state.js`, now derived
-  from `TEA_ANALYTE_CATALOG` in `analyte-catalog.js`) is a built-in default;
+- The CLIA/Ricos TEa reference table (`REFTESTS`, derived from
+  `TEA_ANALYTE_CATALOG` — both `root.X` properties in the bundle since the
+  classic files that defined them retired on 2026-08-20, see "Module roles")
+  is a built-in default;
   users override/extend it via `state.teaRefs` (synced list branch, edited in the
   "Bảng TEa tham chiếu" tab of the manage page). `sgRef` in
   `sigma-tea-resolution.ts` resolves a test against `effectiveTeaRefs()` (defaults overlaid with

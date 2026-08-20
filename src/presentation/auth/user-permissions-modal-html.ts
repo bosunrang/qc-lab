@@ -1,7 +1,7 @@
 export type UserPermissionsModalInput = { userName: string; username: string; roleSelectHtml: string; permissionChecksHtml: string; cancelButtonHtml: string; saveButtonHtml: string };
 
 export function userPermissionsModalHtml(input: UserPermissionsModalInput) {
-  return `<div class="modal"><div class="modal-h"><h3>Sửa quyền người dùng</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
+  return `<div class="modal"><div class="modal-h"><h3>Sửa quyền người dùng</h3><button class="modal-close" data-action="closeModal">✕</button></div>
     <div class="modal-b">
       <div class="hint"><b>${input.userName}</b> · @${input.username}</div>
       <label>Vai trò</label>${input.roleSelectHtml}

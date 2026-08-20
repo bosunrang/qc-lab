@@ -16,7 +16,7 @@ function time(label, fn, repeats = 1) {
 const shape = { name: 'deployment', tests: 50, levels: 3, days: 730 };
 const source = makeState(shape);
 const raw = JSON.stringify(source);
-const ctx = loadSandbox(['core.js', 'modules/state.js']);
+const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js']);
 ctx.__raw = raw;
 
 const measurements = [];

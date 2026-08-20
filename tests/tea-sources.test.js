@@ -12,11 +12,11 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const vm = require('node:vm');
+const { loadSandbox, run } = require('./helpers/sandbox');
 
 const ROOT = path.join(__dirname, '..');
-const catalogSrc = fs.readFileSync(path.join(ROOT, 'assets', 'modules', 'analyte-catalog.js'), 'utf8');
-const catalog = vm.runInNewContext(catalogSrc + ';TEA_ANALYTE_CATALOG', {});
+const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js']);
+const catalog = JSON.parse(JSON.stringify(run(ctx, 'TEA_ANALYTE_CATALOG')));
 assert.ok(catalog.length > 50, `catalog quá ít measurand (${catalog.length}) — có thể parse hỏng`);
 
 const docPath = path.join(ROOT, 'docs', 'tea-sources.md');

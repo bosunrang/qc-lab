@@ -11,7 +11,7 @@ const html = execFileSync(process.execPath, ['--experimental-strip-types', '--in
 assert.match(html, /<h3>Chọn phép so sánh<\/h3>/, 'Modal phải giữ tiêu đề chọn hồ sơ');
 assert.match(html, /id="rcModalSearch"/, 'Ô tìm kiếm phải giữ ID để focus');
 assert.match(html, /value="Glucose &amp; 1"/, 'Giá trị tìm kiếm đã escape phải được giữ nguyên');
-assert.match(html, /oninput="rcModalSearchSet\(this\.value\)"/, 'Tìm kiếm phải gọi đúng handler');
+assert.match(html, /data-action="rcModalSearchSet" data-action-on="input"/, 'Tìm kiếm phải gọi đúng handler');
 assert.match(html, /<div class="mrow on">Glucose<\/div>/, 'Danh sách hồ sơ phải được ghép vào modal');
 assert.match(html, /<button>Đóng<\/button>/, 'Nút đóng phải được ghép vào modal');
 

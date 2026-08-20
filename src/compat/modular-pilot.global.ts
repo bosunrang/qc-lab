@@ -226,6 +226,7 @@ import { createModalTemplate } from '../presentation/modal/modal-template';
 import { createModalController } from '../presentation/modal/modal-controller';
 import { createDialogOverlayController } from '../presentation/modal/dialog-overlay-controller';
 import { createVnDatePickerController } from '../presentation/router/vn-date-picker-controller';
+import { createActionDispatcher } from '../presentation/app/action-dispatcher';
 import { createChartTooltipService } from '../presentation/chart/chart-tooltip-service';
 import { createLeveyJenningsTooltipController } from '../presentation/chart/levey-jennings-tooltip-controller';
 import { createHiDpiCanvasSetup } from '../presentation/chart/hi-dpi-canvas';
@@ -769,9 +770,11 @@ import {
   createRouterUiState,
   installUiState,
 } from '../presentation/state/ui-state';
+import { createAppBootstrap } from '../presentation/app/app-bootstrap';
 
 declare let state: Record<string, any> & { data?: Record<string, Record<string, any>[]>; tests?: Record<string, any>[] };
 declare let entryLjRenderCache:any,entryJumpToday:any;
+declare let entrySel:any,entryStart:any,entryEnd:any;
 declare const ChartViewModel:any;
 declare function acceptedLotPoints(test:any,level:number):any[];
 declare function wgMultiViews(test:any):any[];
@@ -849,8 +852,10 @@ declare function remoteRenderUnsafe(): boolean;
 declare function focusLoginField(): void;
 declare let currentUser: any;
 declare let page: string;
+declare let selTest: any;
 declare let loginFails: number, loginLockUntil: number;
 declare let auditQ: string, auditFrom: string, auditTo: string, auditPage: number, auditPageSize: number;
+declare let manageTargetGroup: any;
 declare const firebase: any;
 declare function initFirebase(): Promise<unknown>;
 declare function ensureFirebaseApp(config: any): Promise<unknown>;
@@ -858,7 +863,9 @@ declare function fbHandleValue(value: any, options?: Record<string, any>): Promi
 declare function fbStartPull(): void;
 declare function auditRelinkChain(entries: any[], anchor?: string): any[];
 declare function fbHasLocalChanges(): boolean;
-declare function ensureAdmin(): void;
+declare function ensureAdmin(): Promise<void>;
+declare function showLogin(msg?: string): void;
+declare function showStartupRecovery(): void;
 declare function renderBrand(): void;
 declare function fbMerge(local: any, remote: any, base: any): any;
 declare function fbFirstConnectMerge(local: any, remote: any): any;
@@ -874,19 +881,28 @@ declare function auditSha256(text: string): string;
 declare function uid(): string;
 declare function isoDate(value: Date): string;
 declare const TEA_ANALYTE_CATALOG: any[];
-// `REFTESTS`/`TEA_SOURCE_REGISTRY` là `const` global lexical của state.js, không
-// phải property trên `window`/`globalThis`. Service TEa chạy sau state.js nên đọc
-// hai binding này trực tiếp — (globalThis as any).TEA_SOURCE_REGISTRY từng bị dùng
-// nhầm ở TeaReferenceService's wiring (luôn undefined, làm sửa CLIA/Ricos trong tab
-// "Bảng TEa tham chiếu" ném lỗi), đã sửa về tham chiếu trần đúng quy tắc này.
+// `REFTESTS`/`TEA_SOURCE_REGISTRY` từng chỉ là `const` global lexical của classic
+// state.js (không phải property trên `window`/`globalThis`) — service TEa chạy
+// sau state.js nên đọc hai binding này TRẦN; (globalThis as any).TEA_SOURCE_REGISTRY
+// từng bị dùng nhầm ở TeaReferenceService's wiring (luôn undefined, làm sửa
+// CLIA/Ricos trong tab "Bảng TEa tham chiếu" ném lỗi), đã sửa về tham chiếu trần
+// đúng quy tắc này. Từ lát 6 (2026-08-20, retire state.js) cả hai ĐỀU là
+// `root.X=` property thật — đọc trần vẫn đúng và vẫn là quy ước ở đây, nhưng lý
+// do "không phải property" không còn áp dụng; ambient declare vẫn cần vì file
+// này là module (có import), nên `declare const` ở đây chỉ có hiệu lực NỘI BỘ
+// file, không tự động thành global thật — property thật do `root.REFTESTS=`/
+// `root.TEA_SOURCE_REGISTRY=` (xem khối port state.js) đảm nhiệm.
 declare const REFTESTS: readonly any[][];
 declare const TEA_SOURCE_REGISTRY: Record<string, any>;
-// Cùng lớp với hai binding trên — `WG_RULES`/`QC_DECIMALS_DEFAULT` cũng là `const`
-// global lexical của state.js.
+// Cùng lớp với hai binding trên — `WG_RULES`/`QC_DECIMALS_DEFAULT` cũng port
+// thành `root.X=` property thật từ lát 6, ambient declare ở đây vẫn chỉ phục vụ
+// tham chiếu trần nội bộ file.
 declare const WG_RULES: readonly string[];
 declare const QC_DECIMALS_DEFAULT: number;
-// `teaAnalyteKey` là `const` arrow function của state.js (const, không phải
-// `function`) — cũng KHÔNG phải property trên globalThis, phải tham chiếu trần.
+// `teaAnalyteKey` từng là `const` arrow function của classic state.js (const,
+// không phải `function`, nên không tự thành property trên globalThis) — từ lát 6
+// đã là `root.teaAnalyteKey=` property thật, nhưng vẫn tham chiếu trần ở đây
+// theo đúng quy ước chung của file.
 declare function teaAnalyteKey(value: unknown): string;
 declare function role(): string;
 // Retire classic qc-domain.js (2026-08-20, Pha G nhóm C lát 5) — bare ambient cho
@@ -963,6 +979,51 @@ declare function testCusumConfig(t: any): any;
 declare function testSelectLabel(t: any, list?: any[]): string;
 declare function searchText(s: any): string;
 declare let cusumMemo: Map<string, any>, acceptedMemo: Map<string, any>;
+// Retire classic state.js + analyte-catalog.js (2026-08-20, Pha G nhóm C lát 6 —
+// lát cuối, đóng nhóm C) — bare ambient cho các tên chưa từng cần khai báo vì
+// state.js luôn còn là classic script tách biệt cho tới lát này.
+declare function teaAnalyteBuiltInMeta(value: any): any;
+declare function teaAnalyteMetaById(id: any): any;
+declare function teaAnalyteMeta(name: any, record?: any): any;
+declare function teaAnalyteDisplay(name: any, record?: any): any;
+declare const TEA_ANALYTE_META: Record<string, any>;
+declare const TEA_ANALYTE_META_BY_ID: Record<string, any>;
+declare const TEA_REFERENCE_SCHEMA_VERSION: number;
+declare let teaReferenceSchemaVersion: number;
+declare const WG_RULE_REGISTRY: Record<string, any>;
+declare const WG_DEFAULT: Record<string, boolean>;
+declare const STATE_SCHEMA_VERSION: number;
+declare const QC_DECIMALS_MAX: number;
+declare const QC_STAT_EXTRA_DECIMALS: number;
+declare let pointsCache: Map<string, any>, pointsIndexCache: Map<string, any>, pointsLotCache: Map<string, any>;
+declare let derivedIndex: any;
+declare function pruneUnusedTestLevels(): void;
+declare function repairAppliedRangeLimits(): void;
+declare function reconcileSigmaLevelsWithLotGroups(): void;
+declare function ensureConfigurationShape(): void;
+declare function transitionSwitchesLot(tr: any): boolean;
+declare function syncLotDepletionFromTransitions(): void;
+declare function dedupeLotTargetHistory(target: any): any;
+declare function upsertLotTargetHistory(target: any, lot: any, values: any): any;
+declare function inspectAcceptedLotTransition(tr: any): any;
+declare function applyAcceptedLotTransitionToConfig(tr: any): any;
+declare function normalizeLotGroups(): void;
+declare function staffInitials(name: any): string;
+declare function currentStaff(): any;
+declare function pointStaff(p: any): any;
+declare function dateObj(s: any): any;
+declare function daysToExp(exp: any): any;
+declare function qcValueDecimals(value: any): number;
+declare function testDecimalPlaces(test: any, point?: any): number;
+declare function testStatDecimals(test: any): number;
+declare function fmtTestValue(test: any, value: any, point?: any): string;
+declare function fmtTestStat(test: any, value: any): string;
+declare function fmtPointValue(point: any, test?: any): string;
+declare function isoMonth(): string;
+declare function requireUnlockedPeriod(date: any, action?: string): Promise<boolean>;
+declare function vnPeriod(s: any): string;
+declare function monthVN(s: any): string;
+declare function safeName(s: any): string;
 
 type QCLabGlobal = typeof globalThis & {
   QCLAB_APP: { name: string; version: string; releaseDate: string };
@@ -1049,6 +1110,7 @@ type QCLabGlobal = typeof globalThis & {
   rangeUpdateBiasHint: (tid: string, level: unknown) => void;
   rangeGatePasses: (r: any) => boolean;
   applyNewRange: (tid: string, level: unknown) => Promise<void>;
+  rangeApplyFromWorkflow: (tid: string, level: unknown) => void;
   confirmApplyNewRange: (tid: string, level: unknown) => Promise<void>;
   revertRange: (tid: string, level: unknown) => void;
   confirmRevertRange: (tid: string, level: unknown) => Promise<void>;
@@ -1135,7 +1197,7 @@ type QCLabGlobal = typeof globalThis & {
   lotTransitionChoiceLots?: (selectedId?: string) => Record<string, any>[];
   lotTransitionChoiceMatch?: (value: unknown, selectedId?: string) => Record<string, any>;
   lotTransitionSelectedId?: (inputId: string) => string;
-  lotTransitionChoiceInput?: (el: Record<string, any>, commit?: boolean) => void;
+  lotTransitionChoiceInput?: (this: Record<string, any>, commit?: boolean) => void;
   lotTransitionChoiceHtml?: (inputId: string, selectedId: unknown) => string;
   openLotTransitionV2?: (id?: string) => Promise<void>;
   lotTransitionTargetsHtml?: (panelId: unknown, fromLotId: unknown, toLotId: unknown) => string;
@@ -1162,6 +1224,7 @@ type QCLabGlobal = typeof globalThis & {
   configAssayNaming?: (ref: Record<string, any>) => Record<string, any>;
   configAssayFindRef?: (value: unknown) => Record<string, any>;
   configAssaySuggestionInput?: (value: unknown) => void;
+  configAssayInstrumentChanged?: (this: any) => void;
   openConfigAssay?: (id?: string) => void;
   saveConfigAssay?: (id: unknown) => Promise<void>;
   delTest?: (id: unknown) => Promise<void>;
@@ -1193,6 +1256,7 @@ type QCLabGlobal = typeof globalThis & {
   entryDateNoteSave?: (tid: unknown, date: string, value: unknown) => Promise<void>;
   entryColumnCfg?: (test: Record<string, any>, level: unknown, lotNo: unknown) => Record<string, any>;
   entryInlineSave?: (tid: unknown, level: unknown, date: string, value: unknown, runIdHint?: string, lotNo?: string) => Promise<void>;
+  entrySheetRunChanged?: (tid: unknown, level: unknown, date: string, runIdHint: string, lotNo: string, value: unknown) => Promise<void>;
   entryInlineSaveCommit?: (tid: unknown, level: unknown, date: string, val: unknown, runId: unknown, lotNo?: unknown, valueDecimals?: number) => void;
   syncVoidNceChoice?: () => void;
   voidQcPoint?: (tid: unknown, pointId: unknown) => Promise<void>;
@@ -1767,6 +1831,7 @@ type QCLabGlobal = typeof globalThis & {
   trialInfo: () => any;
   sideFoot: () => void;
   toggleSidebarNav: () => void;
+  dashViewTestInEntry: (testId: string, level: number) => void;
   vnPickerParse: (value: unknown) => string;
   vnPickerValid: (year: any, month: any, day: any) => string;
   vnPickerText: (iso: any) => string;
@@ -1798,6 +1863,7 @@ type QCLabGlobal = typeof globalThis & {
   infoDialog: ReturnType<typeof createDialogOverlayController>['infoDialog'];
   infoDialogAnswer: ReturnType<typeof createDialogOverlayController>['infoDialogAnswer'];
   vnDatePickerController: ReturnType<typeof createVnDatePickerController>;
+  actionDispatcher: ReturnType<typeof createActionDispatcher>;
   qcTooltip: ReturnType<typeof createChartTooltipService>;
   leveyJenningsTooltipController: ReturnType<typeof createLeveyJenningsTooltipController>;
   hiDpiCanvasSetup: ReturnType<typeof createHiDpiCanvasSetup>;
@@ -2464,6 +2530,87 @@ type QCLabGlobal = typeof globalThis & {
   acceptedLotPoints: (t: any, level: any, withIndex?: boolean) => any[];
   testSelectLabel: (t: any, list?: any[]) => string;
   searchText: (s: any) => string;
+  // Retire classic state.js + analyte-catalog.js (2026-08-20, Pha G nhóm C lát 6
+  // — lát cuối, đóng nhóm C) — glue thuần quanh các service TypeScript đã có
+  // sẵn, không có logic mới.
+  TEA_ANALYTE_CATALOG: any[];
+  teaAnalyteKey: (value: any) => string;
+  REFTESTS: readonly any[][];
+  TEA_ANALYTE_META: Record<string, any>;
+  TEA_ANALYTE_META_BY_ID: Record<string, any>;
+  teaAnalyteBuiltInMeta: (value: any) => any;
+  teaAnalyteMetaById: (id: any) => any;
+  teaAnalyteMeta: (name: any, record?: any) => any;
+  teaAnalyteDisplay: (name: any, record?: any) => any;
+  TEA_REFERENCE_SCHEMA_VERSION: number;
+  teaReferenceSchemaVersion: number;
+  TEA_SOURCE_REGISTRY: Record<string, any>;
+  WG_RULE_REGISTRY: Record<string, any>;
+  WG_RULES: readonly string[];
+  WG_DEFAULT: Record<string, boolean>;
+  STATE_SCHEMA_VERSION: number;
+  state: Record<string, any> & { data?: Record<string, Record<string, any>[]>; tests?: Record<string, any>[] };
+  mem: any;
+  pointsCache: Map<string, any>;
+  pointsIndexCache: Map<string, any>;
+  pointsLotCache: Map<string, any>;
+  wgMemo: Map<string, any>;
+  acceptedMemo: Map<string, any>;
+  cusumMemo: Map<string, any>;
+  derivedIndex: any;
+  startupProblem: any;
+  legacyDerivedCacheState: Record<string, any>;
+  ensureShape: (opts?: Record<string, any>) => any;
+  pruneUnusedTestLevels: () => void;
+  repairAppliedRangeLimits: () => void;
+  uid: () => string;
+  reconcileSigmaLevelsWithLotGroups: () => void;
+  ensureConfigurationShape: () => void;
+  transitionSwitchesLot: (tr: any) => boolean;
+  syncLotDepletionFromTransitions: () => void;
+  dedupeLotTargetHistory: (target: any) => any;
+  upsertLotTargetHistory: (target: any, lot: any, values: any) => any;
+  inspectAcceptedLotTransition: (tr: any) => any;
+  applyAcceptedLotTransitionToConfig: (tr: any) => any;
+  normalizeLotGroups: () => void;
+  clearDerived: () => void;
+  clearDerivedForTest: (testId: any) => void;
+  userName: () => string;
+  staffInitials: (name: any) => string;
+  currentStaff: () => any;
+  pointStaff: (p: any) => any;
+  dateObj: (s: any) => any;
+  daysToExp: (exp: any) => any;
+  fmt: (x: any, d?: number) => string;
+  QC_DECIMALS_DEFAULT: number;
+  QC_DECIMALS_MAX: number;
+  QC_STAT_EXTRA_DECIMALS: number;
+  testDecimalPlaces: (test: any, point?: any) => number;
+  testStatDecimals: (test: any) => number;
+  fmtTestValue: (test: any, value: any, point?: any) => string;
+  fmtTestStat: (test: any, value: any) => string;
+  fmtPointValue: (point: any, test?: any) => string;
+  isoDate: (d?: Date) => string;
+  isoToday: () => string;
+  isoMonth: () => string;
+  requireUnlockedPeriod: (date: any, action?: string) => Promise<boolean>;
+  vnDate: (s: any) => string;
+  vnPeriod: (s: any) => string;
+  monthVN: (s: any) => string;
+  formatDateTimeVN: (s: any) => string;
+  safeName: (s: any) => string;
+  // Retire assets/app.js (2026-08-20, Pha H lát 1) — boot entry point, giờ gọi
+  // qua DOMContentLoaded thay vì tự chạy lúc classic script nạp (xem cuối file).
+  boot: () => Promise<void>;
+  goManageTargets: () => void;
+  entryCloseKeepScroll: () => void;
+  entryConfirmInlineSave: (tid: unknown, level: unknown, date: string, val: unknown, runId: unknown, lotNo: unknown, valueDecimals: number) => void;
+  dashboardGoEntryFollowup: (testId: unknown, level: unknown) => void;
+  dashboardContinueAction: (index: number) => void;
+  brandPickLogo: () => void;
+  hideFieldError: (id: string) => void;
+  clickElementById: (id: string) => void;
+  wgSelectTest: (value: unknown) => void;
 };
 
 const root = globalThis as QCLabGlobal;
@@ -2496,6 +2643,180 @@ if (!root.QCCore || typeof root.QCCore.stats !== 'function'
   || typeof root.QCCore.systematicShiftCritical !== 'function') {
   throw new Error('QCCore phải được nạp đủ dependency trước các module TypeScript');
 }
+
+// Retire classic analyte-catalog.js + state.js (2026-08-20, Pha G nhóm C lát 6 —
+// LÁT CUỐI, đóng nhóm C) — glue thuần quanh các service TypeScript đã có sẵn
+// (qcStateFoundation/qcStateLifecycle/qcLevelReconciliation/qcRangeLimitRepair/
+// ManageConfigService/qcLotTargetHistory/derivedCacheInvalidation/
+// qcStaffIdentity/qcDateFormat/qcBasicFormat/qcValueFormat/qcTestConfiguration/
+// qcConfigurationRelations/PeriodService/ReagentComparisonService/…), không có
+// logic mới. Đặt NGAY SAU guard kiểm tra QCCore ở trên, TRƯỚC MỌI thứ khác
+// trong bundle — đúng thứ tự nạp classic cũ (analyte-catalog.js → state.js →
+// mọi module khác), vì phía dưới có chỗ đọc TEA_SOURCE_REGISTRY/
+// TEA_ANALYTE_CATALOG/REFTESTS trực tiếp không qua lazy closure (xem
+// SigmaTeaResolution).
+root.TEA_ANALYTE_CATALOG=Object.freeze([
+  {analyteId:'qclab-albumin',name:'Albumin',abbreviation:'ALB',unit:'g/L',section:'Hóa sinh',tea:{clia:8,ricos:4.07}},
+  {analyteId:'qclab-alp',name:'Alkaline phosphatase',abbreviation:'ALP',unit:'U/L',section:'Hóa sinh',tea:{clia:20,ricos:12.04}},
+  {analyteId:'qclab-alt',name:'Alanine aminotransferase',abbreviation:'ALT',unit:'U/L',section:'Hóa sinh',tea:{clia:15,ricos:27.48,cliaAbsolute:6,cliaAbsoluteUnit:'U/L'}},
+  {analyteId:'qclab-ast',name:'Aspartate aminotransferase',abbreviation:'AST',unit:'U/L',section:'Hóa sinh',tea:{clia:15,ricos:16.69,cliaAbsolute:6,cliaAbsoluteUnit:'U/L'}},
+  {analyteId:'qclab-amylase',name:'Amylase',abbreviation:'AMY',unit:'U/L',section:'Hóa sinh',tea:{clia:20,ricos:14.6}},
+  {analyteId:'qclab-bilirubin-total',name:'Total bilirubin',abbreviation:'TBIL',unit:'µmol/L',section:'Hóa sinh',tea:{clia:20,ricos:26.94,cliaAbsolute:6.84,cliaAbsoluteUnit:'µmol/L'}},
+  {analyteId:'qclab-bilirubin-direct',name:'Direct bilirubin',abbreviation:'DBIL',unit:'µmol/L',section:'Hóa sinh',tea:{clia:null,ricos:44.5}},
+  {analyteId:'qclab-calcium',name:'Calcium',abbreviation:'Ca',unit:'mmol/L',section:'Hóa sinh',tea:{clia:null,ricos:2.55,cliaAbsolute:.2495,cliaAbsoluteUnit:'mmol/L'}},
+  {analyteId:'qclab-chloride',name:'Chloride',abbreviation:'Cl',unit:'mmol/L',section:'Hóa sinh',tea:{clia:5,ricos:1.5}},
+  {analyteId:'qclab-cholesterol-total',name:'Total cholesterol',abbreviation:'TC',unit:'mmol/L',section:'Hóa sinh',tea:{clia:10,ricos:9.01}},
+  {analyteId:'qclab-ck',name:'Creatine kinase',abbreviation:'CK',unit:'U/L',section:'Hóa sinh',tea:{clia:20,ricos:30.3}},
+  {analyteId:'qclab-ck-mb',name:'Creatine kinase-MB',abbreviation:'CK-MB',unit:'U/L',section:'Hóa sinh',tea:{clia:25,ricos:30.06}},
+  {analyteId:'qclab-creatinine',name:'Creatinine',abbreviation:'CREA',unit:'µmol/L',section:'Hóa sinh',tea:{clia:10,ricos:8.87,cliaAbsolute:17.68,cliaAbsoluteUnit:'µmol/L'}},
+  {analyteId:'qclab-ggt',name:'Gamma-glutamyl transferase',abbreviation:'GGT',unit:'U/L',section:'Hóa sinh',tea:{clia:15,ricos:22.11,cliaAbsolute:5,cliaAbsoluteUnit:'U/L'}},
+  {analyteId:'qclab-glucose',name:'Glucose',abbreviation:'GLU',unit:'mmol/L',section:'Hóa sinh',tea:{clia:8,ricos:6.96,cliaAbsolute:.3331,cliaAbsoluteUnit:'mmol/L'}},
+  {analyteId:'qclab-hdl-c',name:'HDL cholesterol',abbreviation:'HDL-C',unit:'mmol/L',section:'Hóa sinh',tea:{clia:20,ricos:11.63,cliaAbsolute:.1552,cliaAbsoluteUnit:'mmol/L'}},
+  {analyteId:'qclab-ldh',name:'Lactate dehydrogenase',abbreviation:'LDH',unit:'U/L',section:'Hóa sinh',tea:{clia:15,ricos:11.4}},
+  {analyteId:'qclab-ldl-c',name:'LDL cholesterol',abbreviation:'LDL-C',unit:'mmol/L',section:'Hóa sinh',tea:{clia:20,ricos:11.9}},
+  {analyteId:'qclab-lipase',name:'Lipase',abbreviation:'LIP',unit:'U/L',section:'Hóa sinh',tea:{clia:null,ricos:37.88}},
+  {analyteId:'qclab-magnesium',name:'Magnesium',abbreviation:'Mg',unit:'mmol/L',section:'Hóa sinh',tea:{clia:15,ricos:4.8}},
+  {analyteId:'qclab-phosphate',name:'Phosphate',abbreviation:'PHOS',unit:'mmol/L',section:'Hóa sinh',tea:{clia:10,ricos:10.11,cliaAbsolute:.0969,cliaAbsoluteUnit:'mmol/L'}},
+  {analyteId:'qclab-potassium',name:'Potassium',abbreviation:'K',unit:'mmol/L',section:'Hóa sinh',tea:{clia:null,ricos:5.61,cliaAbsolute:.3,cliaAbsoluteUnit:'mmol/L'}},
+  {analyteId:'qclab-protein-total',name:'Total protein',abbreviation:'TP',unit:'g/L',section:'Hóa sinh',tea:{clia:8,ricos:3.63}},
+  {analyteId:'qclab-sodium',name:'Sodium',abbreviation:'Na',unit:'mmol/L',section:'Hóa sinh',tea:{clia:null,ricos:.73,cliaAbsolute:4,cliaAbsoluteUnit:'mmol/L'}},
+  {analyteId:'qclab-iron',name:'Iron',abbreviation:'Fe',unit:'µmol/L',section:'Hóa sinh',tea:{clia:15,ricos:30.7}},
+  {analyteId:'qclab-triglycerides',name:'Triglycerides',abbreviation:'TG',unit:'mmol/L',section:'Hóa sinh',tea:{clia:15,ricos:25.99}},
+  {analyteId:'qclab-troponin-i',name:'Cardiac troponin I',abbreviation:'cTnI',unit:'ng/mL',section:'Hóa sinh',tea:{clia:30,ricos:27.91,cliaAbsolute:.9,cliaAbsoluteUnit:'ng/mL'}},
+  {analyteId:'qclab-troponin-t',name:'Cardiac troponin T',abbreviation:'cTnT',unit:'ng/mL',section:'Hóa sinh',tea:{clia:30,ricos:48.9,cliaAbsolute:.2,cliaAbsoluteUnit:'ng/mL'}},
+  {analyteId:'qclab-urea',name:'Urea',abbreviation:'UREA',unit:'mmol/L',section:'Hóa sinh',tea:{clia:9,ricos:15.55}},
+  {analyteId:'qclab-uric-acid',name:'Uric acid',abbreviation:'UA',unit:'µmol/L',section:'Hóa sinh',tea:{clia:10,ricos:11.97}},
+  {analyteId:'qclab-afp',name:'Alpha-fetoprotein',abbreviation:'AFP',unit:'ng/mL',section:'Miễn dịch',tea:{clia:20,ricos:21.9}},
+  {analyteId:'qclab-anti-hbs',name:'Hepatitis B surface antibody',abbreviation:'Anti-HBs',unit:'IU/L',section:'Miễn dịch',tea:{clia:null,ricos:null}},
+  {analyteId:'qclab-ca-125',name:'Cancer antigen 125',abbreviation:'CA 125',unit:'U/mL',section:'Miễn dịch',tea:{clia:20,ricos:35.4}},
+  {analyteId:'qclab-ca-19-9',name:'Carbohydrate antigen 19-9',abbreviation:'CA 19-9',unit:'U/mL',section:'Miễn dịch',tea:{clia:null,ricos:46.03}},
+  {analyteId:'qclab-cea',name:'Carcinoembryonic antigen',abbreviation:'CEA',unit:'ng/mL',section:'Miễn dịch',tea:{clia:15,ricos:24.7,cliaAbsolute:1,cliaAbsoluteUnit:'ng/mL'}},
+  {analyteId:'qclab-cortisol',name:'Cortisol',abbreviation:'COR',unit:'nmol/L',section:'Miễn dịch',tea:{clia:20,ricos:22.8}},
+  {analyteId:'qclab-ferritin',name:'Ferritin',abbreviation:'FER',unit:'ng/mL',section:'Miễn dịch',tea:{clia:20,ricos:16.9}},
+  {analyteId:'qclab-folate',name:'Folate',abbreviation:'FOL',unit:'ng/mL',section:'Miễn dịch',tea:{clia:30,ricos:39,cliaAbsolute:1,cliaAbsoluteUnit:'ng/mL'}},
+  {analyteId:'qclab-fsh',name:'Follicle-stimulating hormone',abbreviation:'FSH',unit:'IU/L',section:'Miễn dịch',tea:{clia:18,ricos:21.19,cliaAbsolute:2,cliaAbsoluteUnit:'IU/L'}},
+  {analyteId:'qclab-hba1c',name:'Hemoglobin A1c',abbreviation:'HbA1c',matrix:'Whole blood',unit:'%',section:'Miễn dịch',tea:{clia:8,ricos:3}},
+  {analyteId:'qclab-hcg',name:'Human chorionic gonadotropin',abbreviation:'hCG',unit:'mIU/mL',section:'Miễn dịch',tea:{clia:18,ricos:null,cliaAbsolute:3,cliaAbsoluteUnit:'mIU/mL'}},
+  {analyteId:'qclab-insulin',name:'Insulin',abbreviation:'INS',unit:'µIU/mL',section:'Miễn dịch',tea:{clia:null,ricos:32.9}},
+  {analyteId:'qclab-lh',name:'Luteinizing hormone',abbreviation:'LH',unit:'IU/L',section:'Miễn dịch',tea:{clia:20,ricos:27.92}},
+  {analyteId:'qclab-myoglobin',name:'Myoglobin',abbreviation:'MYO',unit:'ng/mL',section:'Miễn dịch',tea:{clia:null,ricos:19.6}},
+  {analyteId:'qclab-nt-probnp',name:'N-terminal pro-B-type natriuretic peptide',abbreviation:'NT-proBNP',unit:'pg/mL',section:'Miễn dịch',tea:{clia:30,ricos:13}},
+  {analyteId:'qclab-prolactin',name:'Prolactin',abbreviation:'PRL',unit:'ng/mL',section:'Miễn dịch',tea:{clia:20,ricos:29.4}},
+  {analyteId:'qclab-psa',name:'Prostate-specific antigen',abbreviation:'PSA',unit:'ng/mL',section:'Miễn dịch',tea:{clia:20,ricos:33.6,cliaAbsolute:.2,cliaAbsoluteUnit:'ng/mL'}},
+  {analyteId:'qclab-t3-total',name:'Total triiodothyronine',abbreviation:'TT3',unit:'nmol/L',section:'Miễn dịch',tea:{clia:30,ricos:9.22}},
+  {analyteId:'qclab-ft3',name:'Free triiodothyronine',abbreviation:'FT3',unit:'pmol/L',section:'Miễn dịch',tea:{clia:null,ricos:11.3}},
+  {analyteId:'qclab-ft4',name:'Free thyroxine',abbreviation:'FT4',unit:'pmol/L',section:'Miễn dịch',tea:{clia:15,ricos:8,cliaAbsolute:3.861,cliaAbsoluteUnit:'pmol/L'}},
+  {analyteId:'qclab-t4-total',name:'Total thyroxine',abbreviation:'TT4',unit:'nmol/L',section:'Miễn dịch',tea:{clia:20,ricos:7,cliaAbsolute:12.87,cliaAbsoluteUnit:'nmol/L'}},
+  {analyteId:'qclab-testosterone',name:'Testosterone',abbreviation:'TESTO',unit:'nmol/L',section:'Miễn dịch',tea:{clia:30,ricos:13.61,cliaAbsolute:.694,cliaAbsoluteUnit:'nmol/L'}},
+  {analyteId:'qclab-tsh',name:'Thyroid-stimulating hormone',abbreviation:'TSH',unit:'mIU/L',section:'Miễn dịch',tea:{clia:20,ricos:23.7,cliaAbsolute:.2,cliaAbsoluteUnit:'mIU/L'}},
+  {analyteId:'qclab-vitamin-b12',name:'Vitamin B12',abbreviation:'B12',unit:'pg/mL',section:'Miễn dịch',tea:{clia:25,ricos:null,cliaAbsolute:30,cliaAbsoluteUnit:'pg/mL'}},
+  {analyteId:'qclab-vitamin-d-25-oh',name:'25-hydroxyvitamin D',abbreviation:'25-OH-D',unit:'ng/mL',section:'Miễn dịch',tea:{clia:null,ricos:null}},
+  {analyteId:'qclab-blood-gas-ph',name:'pH',abbreviation:'pH',unit:'',section:'Khí máu',tea:{clia:null,ricos:null,cliaAbsolute:.04,cliaAbsoluteUnit:''}},
+  {analyteId:'qclab-blood-gas-pco2',name:'Carbon dioxide partial pressure',abbreviation:'pCO2',unit:'mmHg',section:'Khí máu',tea:{clia:8,ricos:5.7,cliaAbsolute:5,cliaAbsoluteUnit:'mmHg'}},
+  {analyteId:'qclab-blood-gas-po2',name:'Oxygen partial pressure',abbreviation:'pO2',unit:'mmHg',section:'Khí máu',tea:{clia:15,ricos:null,cliaAbsolute:15,cliaAbsoluteUnit:'mmHg'}},
+  {analyteId:'qclab-blood-gas-hco3',name:'Bicarbonate',abbreviation:'HCO3-',unit:'mmol/L',section:'Khí máu',tea:{clia:null,ricos:5.6}},
+  {analyteId:'qclab-blood-gas-base-excess',name:'Base excess',abbreviation:'BE',unit:'mmol/L',section:'Khí máu',tea:{clia:null,ricos:null}},
+  {analyteId:'qclab-blood-gas-sao2',name:'Arterial oxygen saturation',abbreviation:'SaO2',unit:'%',section:'Khí máu',tea:{clia:null,ricos:null}},
+  {analyteId:'qclab-blood-gas-fio2',name:'Fraction of inspired oxygen',abbreviation:'FiO2',unit:'%',section:'Khí máu',tea:{clia:null,ricos:null}},
+  {analyteId:'qclab-blood-gas-lactate',name:'Lactate',abbreviation:'Lac',unit:'mmol/L',section:'Khí máu',tea:{clia:null,ricos:30.4}},
+  {analyteId:'qclab-blood-gas-hemoglobin',name:'Hemoglobin',abbreviation:'HGB',matrix:'Whole blood',unit:'g/dL',section:'Huyết học',tea:{clia:4,ricos:4.19}},
+  {analyteId:'qclab-blood-gas-hematocrit',name:'Hematocrit',abbreviation:'HCT',matrix:'Whole blood',unit:'%',section:'Huyết học',tea:{clia:4,ricos:3.97}},
+  {analyteId:'qclab-leukocyte-count',name:'Leukocyte count',abbreviation:'WBC',matrix:'Whole blood',unit:'10^3/µL',section:'Huyết học',tea:{clia:10,ricos:null}},
+  {analyteId:'qclab-erythrocyte-count',name:'Erythrocyte count',abbreviation:'RBC',matrix:'Whole blood',unit:'10^6/µL',section:'Huyết học',tea:{clia:4,ricos:null}},
+  {analyteId:'qclab-platelet-count',name:'Platelet count',abbreviation:'PLT',matrix:'Whole blood',unit:'10^3/µL',section:'Huyết học',tea:{clia:25,ricos:null}},
+  {analyteId:'qclab-mcv',name:'Mean corpuscular volume',abbreviation:'MCV',matrix:'Whole blood',unit:'fL',section:'Huyết học',tea:{clia:null,ricos:null}},
+  {analyteId:'qclab-mch',name:'Mean corpuscular hemoglobin',abbreviation:'MCH',matrix:'Whole blood',unit:'pg',section:'Huyết học',tea:{clia:null,ricos:null}},
+  {analyteId:'qclab-mchc',name:'Mean corpuscular hemoglobin concentration',abbreviation:'MCHC',matrix:'Whole blood',unit:'g/dL',section:'Huyết học',tea:{clia:null,ricos:null}},
+  {analyteId:'qclab-rdw',name:'Red cell distribution width',abbreviation:'RDW',matrix:'Whole blood',unit:'%',section:'Huyết học',tea:{clia:null,ricos:null}},
+  {analyteId:'qclab-prothrombin-time',name:'Prothrombin time',abbreviation:'PT',matrix:'Platelet-poor plasma',unit:'s',section:'Đông máu',tea:{clia:15,ricos:null}},
+  {analyteId:'qclab-inr',name:'International normalized ratio',abbreviation:'INR',matrix:'Platelet-poor plasma',unit:'ratio',section:'Đông máu',tea:{clia:15,ricos:null}},
+  {analyteId:'qclab-aptt',name:'Activated partial thromboplastin time',abbreviation:'aPTT',matrix:'Platelet-poor plasma',unit:'s',section:'Đông máu',tea:{clia:15,ricos:null}},
+  {analyteId:'qclab-fibrinogen',name:'Fibrinogen',abbreviation:'FIB',matrix:'Platelet-poor plasma',unit:'mg/dL',section:'Đông máu',tea:{clia:20,ricos:null}},
+  {analyteId:'qclab-d-dimer',name:'D-dimer',abbreviation:'D-Dimer',matrix:'Platelet-poor plasma',unit:'mg/L FEU',section:'Đông máu',tea:{clia:null,ricos:null}},
+] as any[]).map((row:any)=>Object.freeze({...row,matrix:row.matrix||(row.section==='Khí máu'?'Whole blood':'Serum/Plasma'),aliases:Object.freeze(row.abbreviation?[row.abbreviation]:[]),tea:Object.freeze({...row.tea})})) as any;
+
+root.teaAnalyteKey=v=>root.teaAnalyteMetaService?root.teaAnalyteMetaService.key(v):String(v==null?'':v).trim().toLowerCase();
+root.REFTESTS=Object.freeze(TEA_ANALYTE_CATALOG.map((row:any)=>Object.freeze([row.name,row.unit,row.tea.clia,row.tea.ricos,row.section]))) as readonly any[][];
+root.TEA_ANALYTE_META=Object.freeze(Object.fromEntries(TEA_ANALYTE_CATALOG.map((row:any)=>{const aliases=[row.name,row.abbreviation].filter(Boolean),displayName=row.abbreviation&&teaAnalyteKey(row.abbreviation)!==teaAnalyteKey(row.name)?`${row.name} (${row.abbreviation})`:row.name;return[teaAnalyteKey(row.name),Object.freeze({analyteId:row.analyteId,displayName,standardName:row.name,abbreviation:row.abbreviation||'',aliases:Object.freeze(aliases),matrix:row.matrix})];})));
+root.TEA_ANALYTE_META_BY_ID=Object.freeze(Object.fromEntries(Object.values(TEA_ANALYTE_META).map((m:any)=>[m.analyteId,m])));
+root.teaAnalyteBuiltInMeta=value=>root.teaAnalyteMetaService!.builtIn(value);
+root.teaAnalyteMetaById=id=>root.teaAnalyteMetaService!.byId(id);
+root.teaAnalyteMeta=(name,record)=>root.teaAnalyteMetaService!.meta(name,record);
+root.teaAnalyteDisplay=(name,record)=>root.teaAnalyteMetaService!.display(name,record);
+root.TEA_REFERENCE_SCHEMA_VERSION=3;
+root.teaReferenceSchemaVersion=TEA_REFERENCE_SCHEMA_VERSION;
+root.TEA_SOURCE_REGISTRY=Object.freeze({
+  lab:Object.freeze({id:'qclab-standardized-tea',label:'TEa chuẩn hóa của phòng xét nghiệm',version:'Danh mục nội bộ',document:'Bảng TEa chuẩn hóa của phòng xét nghiệm',url:'',effectiveDate:'',reviewedDate:'',reviewedBy:'',status:'reviewed',note:'Giá trị TEa do phòng xét nghiệm lựa chọn, phê duyệt và duy trì nhất quán cho từng xét nghiệm.'}),
+  clia:Object.freeze({id:'clia-cms-3355-f-2024',label:'CLIA PT (CMS-3355-F)',version:'CMS-3355-F / 42 CFR §§493.931, 493.941',document:'CLIA Proficiency Testing — Analytes and Acceptable Performance Criteria',url:'https://www.ecfr.gov/current/title-42/chapter-IV/subchapter-G/part-493/subpart-I',effectiveDate:'2024-07-11',reviewedDate:'2026-07-16',reviewedBy:'QC Lab built-in registry',status:'reference',note:'Tiêu chí chấp nhận PT được dùng làm mục tiêu TEa tham khảo; không phải tuyên bố tuân thủ CLIA của đơn vị.'}),
+  ricos:Object.freeze({id:'ricos-bv-2014',label:'Ricos / Westgard BV',version:'2014',document:'Desirable Specifications for Total Error derived from Biological Variation — Ricos et al.',url:'https://westgard.com/clia-and-quality-regulation-requirements/quality-requirements/biodatabase1.html',effectiveDate:'',reviewedDate:'2026-07-16',reviewedBy:'QC Lab built-in registry',status:'retired',note:'Bộ dữ liệu legacy, cập nhật lần cuối năm 2014; EFLM hiện quản lý cơ sở dữ liệu biological variation mới.'}),
+  eflm:Object.freeze({id:'eflm-bv-live',label:'EFLM Biological Variation Database',version:'Live database',document:'EFLM Biological Variation Database',url:'https://biologicalvariation.eu/',effectiveDate:'',reviewedDate:'2026-07-16',reviewedBy:'QC Lab built-in registry',status:'dynamic',note:'Giá trị thay đổi theo database; phải lưu analyte, mức APS, ngày tra cứu và tài liệu/link tại thời điểm áp dụng.'})
+});
+root.WG_RULE_REGISTRY=(root.QCCore as any).WG_RULE_REGISTRY;
+root.WG_RULES=(root.QCCore as any).WG_RULES;
+root.WG_DEFAULT=Object.fromEntries(WG_RULES.map((r:string)=>[r,(root.QCCore as any).WG_DEFAULT_ON.has(r)]));
+root.STATE_SCHEMA_VERSION=(root.QCCore as any).STATE_SCHEMA_VERSION;
+root.state={lab:{name:'',dept:'',address:''} as any,tests:[],machines:["Máy A"],instruments:[],assayGroups:[],qcPanels:[],lotTransitions:[],lotGroups:[],qcLots:[],data:{},actions:[],activity:[],activityAnchor:'',users:[],reagentTests:[],reagentOperators:[],reagentSampleTypes:['Mẫu bệnh nhân','Mẫu nội kiểm (IQC)','Mẫu ngoại kiểm (EQA)'],sigmaData:{},periodLocks:[],teaRefs:[],teaRegistryVersion:TEA_REFERENCE_SCHEMA_VERSION,westgardRules:{...WG_DEFAULT},configMigrationVersion:1,schemaVersion:STATE_SCHEMA_VERSION};
+root.mem=null;root.pointsCache=new Map();root.pointsIndexCache=new Map();root.pointsLotCache=new Map();root.wgMemo=new Map();root.acceptedMemo=new Map();root.cusumMemo=new Map();root.derivedIndex=null;root.startupProblem=null;
+root.legacyDerivedCacheState={pointCaches:()=>[pointsCache,pointsIndexCache,pointsLotCache,cusumMemo],westgardMemo:()=>wgMemo,acceptedMemo:()=>acceptedMemo,cusumMemo:()=>cusumMemo,resetDerivedIndex:()=>{derivedIndex=null;},resetStatus:()=>{},clearStatus:(_testId:any)=>{}};
+root.ensureShape=(opts:Record<string,any>={})=>{
+  const normalized=root.qcStateFoundation!(state,opts,{defaults:()=>({lab:{name:'',dept:'',address:''} as any,tests:[],machines:["Máy A"],instruments:[],assayGroups:[],qcPanels:[],lotTransitions:[],lotGroups:[],qcLots:[],data:{},actions:[],activity:[],activityAnchor:'',users:[],reagentTests:[],reagentOperators:[],reagentSampleTypes:['Mẫu bệnh nhân','Mẫu nội kiểm (IQC)','Mẫu ngoại kiểm (EQA)'],sigmaData:{},periodLocks:[],teaRefs:[],teaRegistryVersion:TEA_REFERENCE_SCHEMA_VERSION,westgardRules:{...WG_DEFAULT}}),sanitize:(value:any)=>(root.QCCore as any).sanitizeBackup(value),schemaVersion:STATE_SCHEMA_VERSION,teaRegistryVersion:TEA_REFERENCE_SCHEMA_VERSION,westgardDefaults:WG_DEFAULT});
+  state=normalized.state;
+  return root.qcStateLifecycle!(state,{ensureLab:root.ensureLabBrandShape,ensureConfiguration:ensureConfigurationShape,repairRanges:repairAppliedRangeLimits,ensureReagent:(source:any)=>{root.ReagentComparisonService.ensureOne(source,{id:uid()});},reconcileSigma:reconcileSigmaLevelsWithLotGroups,reconcileTea:()=>{if(typeof (root as any).sgReconcileAllTeaSnapshots==='function')(root as any).sgReconcileAllTeaSnapshots();},normalizePointLots,pruneUnusedLevels:pruneUnusedTestLevels});
+};
+root.pruneUnusedTestLevels=()=>root.qcLevelReconciliation!.pruneUnused(state);
+root.repairAppliedRangeLimits=()=>root.qcRangeLimitRepair!(state);
+root.uid=()=>Math.random().toString(36).slice(2,9);
+root.reconcileSigmaLevelsWithLotGroups=()=>root.qcLevelReconciliation!.reconcileSigma(state);
+root.ensureConfigurationShape=()=>{
+  const migrateLegacyLots=!state.configMigrationVersion;
+  state.instruments=state.instruments||[];state.assayGroups=state.assayGroups||[];state.qcPanels=state.qcPanels||[];state.lotTransitions=state.lotTransitions||[];state.lotGroups=state.lotGroups||[];state.qcLots=state.qcLots||[];
+  root.qcTestConfiguration!(state,migrateLegacyLots,{uid,searchText,teaKey:teaAnalyteKey,builtInMeta:teaAnalyteBuiltInMeta,metaById:teaAnalyteMetaById,meta:teaAnalyteMeta,dedupeHistory:dedupeLotTargetHistory});
+  root.qcConfigurationRelations!(state,{uid,switchesLot:transitionSwitchesLot,applyAcceptedTransition:applyAcceptedLotTransitionToConfig,normalizeLotGroups,syncLotDepletion:syncLotDepletionFromTransitions});
+  state.configMigrationVersion=1;
+};
+root.transitionSwitchesLot=tr=>root.ManageConfigService.transitionSwitchesLot(tr);
+root.syncLotDepletionFromTransitions=()=>root.ManageConfigService.syncLotDepletion(state as any);
+root.dedupeLotTargetHistory=target=>root.qcLotTargetHistory!.dedupe(target);
+root.upsertLotTargetHistory=(target,lot,values)=>root.qcLotTargetHistory!.upsert(target,lot,values);
+root.inspectAcceptedLotTransition=tr=>{
+  const check=root.ManageConfigService.inspectAcceptedLotTransition(state as any,tr);
+  return{from:check.from,to:check.to,panel:check.panel,rows:check.rows.map((x:any)=>({t:x.test,cfg:x.config,nextHist:x.nextHistory})),missing:check.missing.map((x:any)=>({t:x.test,cfg:x.config,nextHist:x.nextHistory})),valid:check.valid};
+};
+root.applyAcceptedLotTransitionToConfig=tr=>{
+  return root.ManageConfigService.applyAcceptedLotTransition({state:state as any,transition:tr,uid,today:isoToday,normalizeLotGroups,upsertHistory:upsertLotTargetHistory,onMergeGroup:(oldGroup:any,nextGroup:any)=>{try{if(typeof manageTargetGroup!=='undefined'&&manageTargetGroup===oldGroup.id)manageTargetGroup=nextGroup.id;}catch(e){/* biến UI tùy chọn — trang Cấu hình chung có thể chưa render */}}});
+};
+root.normalizeLotGroups=()=>root.ManageConfigService.normalizeLotGroups(state as any,(removed:any,kept:any)=>{try{if(typeof manageTargetGroup!=='undefined'&&manageTargetGroup===removed.id)manageTargetGroup=kept;}catch(e){/* biến UI tùy chọn — trang Cấu hình chung có thể chưa render */}});
+root.clearDerived=()=>root.derivedCacheInvalidation!.clearAll();
+root.clearDerivedForTest=testId=>root.derivedCacheInvalidation!.clearForTest(testId);
+root.userName=()=>currentUser?(currentUser.name||currentUser.username||'Người dùng'):'Hệ thống';
+root.staffInitials=name=>root.qcStaffIdentity!.initials(name);
+root.currentStaff=()=>{const name=userName();return{operatorId:currentUser&&currentUser.id||'',operatorUsername:currentUser&&currentUser.username||'',operatorName:name,operatorCode:currentUser&&currentUser.initials||staffInitials(name)};};
+root.pointStaff=p=>root.qcStaffIdentity!.point(p);
+root.dateObj=s=>root.qcDateFormat!.dateObject(s);
+root.daysToExp=exp=>root.qcDateFormat!.daysToExpiry(exp);
+root.fmt=(x,d=2)=>root.qcBasicFormat!.number(x,d);
+root.QC_DECIMALS_DEFAULT=2;
+root.QC_DECIMALS_MAX=6;
+root.QC_STAT_EXTRA_DECIMALS=2;
+root.qcValueDecimals=value=>root.qcValueFormat!.qcValueDecimals(value);
+root.testDecimalPlaces=(test,point=null)=>root.qcValueFormat!.testDecimalPlaces(test,point);
+root.testStatDecimals=test=>root.qcValueFormat!.testStatDecimals(test);
+root.fmtTestValue=(test,value,point=null)=>root.qcValueFormat!.formatValue(test,value,point);
+root.fmtTestStat=(test,value)=>root.qcValueFormat!.formatStat(test,value);
+root.fmtPointValue=(point,test=null)=>root.qcValueFormat!.formatPoint(point,test);
+root.isoDate=(d=new Date())=>root.qcDateFormat!.isoDate(d);
+root.isoToday=()=>root.qcDateFormat!.isoToday();
+root.isoMonth=()=>root.qcDateFormat!.isoMonth();
+root.requireUnlockedPeriod=async(date,action='sửa dữ liệu QC')=>{
+  const ym=root.PeriodService.periodForDate(date),lock=ym?root.PeriodService.findLock(state as any,ym):null;if(!lock)return true;
+  const text=`Kỳ ${monthVN(ym)} đã chốt bởi ${lock.lockedBy||'hệ thống'}${lock.lockedAt?' lúc '+formatDateTimeVN(lock.lockedAt):''}.`;
+  await root.infoDialog(`Không thể ${action}: ${text} Muốn thay đổi cần admin mở khóa kỳ và ghi lý do.`);return false;
+};
+root.vnDate=s=>root.qcDateFormat!.vnDate(s);
+root.vnPeriod=s=>root.qcDateFormat!.vnPeriod(s);
+root.monthVN=s=>root.qcDateFormat!.monthVN(s);
+root.formatDateTimeVN=s=>root.qcDateFormat!.formatDateTimeVN(s);
+root.safeName=s=>root.qcBasicFormat!.safeName(s);
 
 let loginLockout: { fails?: unknown; until?: unknown } | null = null;
 try { loginLockout = JSON.parse(localStorage.getItem('qclab_login_lockout') || 'null'); } catch { loginLockout = null; }
@@ -2674,9 +2995,6 @@ root.scheduleLocalRetry = () => {
    debounce lâu hơn và ưu tiên idle time; pagehide/beforeunload vẫn xả ngay. */
 root.persistLocalSnapshot = (opts = {}) => root.storageSnapshotService!.persist(opts);
 root.lsFlush = () => persistLocalSnapshot();
-if (typeof window !== 'undefined' && window.addEventListener) window.addEventListener('beforeunload', root.lsFlush);
-if (typeof window !== 'undefined' && window.addEventListener) window.addEventListener('pagehide', root.lsFlush);
-if (typeof document !== 'undefined' && document.addEventListener) document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') lsFlush(); });
 root.invalidateDerivedForSave = (opts = {}) => {
   const ids = root.saveCommandPolicy!(opts).derivedTestIds;
   if (ids === null) return;
@@ -2828,12 +3146,38 @@ root.fbStartPull = () => { fb.pullT = root.firebasePollingService!.start(fb.pull
    còn sót lại từ phiên trước. */
 root.fbDisconnect = clearAuthUser => root.firebaseDisconnectService!.disconnect(!!clearAuthUser);
 root.fbPullOnce = async () => root.firebasePullService!.pull(fb);
-if (typeof window !== 'undefined' && window.addEventListener) {
-  window.addEventListener('focus', root.fbPullOnce);
-  window.addEventListener('online', () => { if (fb.dirty) root.scheduleFbPush(); else root.fbPullOnce(); });
-  window.addEventListener('offline', () => { if (fb.dirty) root.markSaved('cục bộ', 'Mạng ngoại tuyến · sẽ tự đồng bộ khi có mạng'); });
+/* Pha H lát 2 (2026-08-20): gom cả 6 đăng ký window/document listener top-level
+   (flush lưu cục bộ khi thoát trang ở trên, Firebase khi mạng/tiêu điểm đổi ở
+   đây) vào createAppBootstrap() — src/presentation/app/app-bootstrap.ts — một
+   lần duy nhất, thay vì hai khối `if(typeof window...)` rải cách nhau ~150
+   dòng. Dependency bọc lazy vì `scheduleFbPush` chỉ construct muộn hơn (dưới
+   ~60 dòng nữa) — closure đọc root.X lúc SỰ KIỆN THẬT nổ ra, không phải lúc
+   dòng này chạy, nên thứ tự construct không quan trọng (giống mọi service
+   khác trong file này). */
+let bootstrapWindow: Window | undefined;
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') bootstrapWindow = window;
+let bootstrapDocument: Document | undefined;
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') bootstrapDocument = document;
+const appBootstrap = createAppBootstrap({
+  window: bootstrapWindow,
+  document: bootstrapDocument,
+  lsFlush: () => root.lsFlush!(),
+  fbPullOnce: () => root.fbPullOnce!(),
+  scheduleFbPush: () => root.scheduleFbPush!(),
+  markSaved: (label, detail) => root.markSaved!(label, detail),
+  isDirty: () => fb.dirty,
+});
+appBootstrap.run();
+/* Pha H2 lát cuối (2026-08-20): chuyển khối <script> nội tuyến trong
+   index.html (Electron only — window.qcDialog do electron/preload.js cấp)
+   vào đây, để bỏ được script-src 'unsafe-inline'. Không đổi hành vi: no-op
+   trong trình duyệt thường (python -m http.server), nơi window.qcDialog
+   không tồn tại. confirm() không có ai gọi trực tiếp nữa (xem modals.js cũ,
+   nay là dialog-overlay-controller.ts's confirmDialog()) nên không override
+   ở đây. */
+if (typeof window !== 'undefined' && (window as any).qcDialog) {
+  window.alert = (message?: any) => (window as any).qcDialog.alert(message);
 }
-if (typeof document !== 'undefined' && document.addEventListener) document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') root.fbPullOnce(); });
 let fbConflictDialogOpen = false;
 root.fbHandleValue = async (v, opts: Record<string, any> = {}) => {
   const sig = root.syncSnapshotSignature!(v);
@@ -3029,7 +3373,7 @@ root.backupExportMessage=createBackupExportMessage();
 root.backupImportConfirmation=createBackupImportConfirmation();
 root.backupImportMessage=createBackupImportMessage();
 root.backupOversizeConfirmation=createBackupOversizeConfirmation();
-root.lisQueuePresentation = createLisQueuePresentation({test:id=>(state.tests||[]).find((test:any)=>test.id===id),formatTestValue:(test,value)=>(root as any).fmtTestValue(test,value),format:(value,decimals)=>(root as any).fmt(value,decimals),escape:value=>(root as any).esc(value),escapeAttribute:value=>(root as any).escAttr(value),quoteJs:value=>(root as any).jsq(value),formatDateTime:value=>(root as any).formatDateTimeVN(value),testDisplayName:test=>typeof (root as any).testDisplayName==='function'?(root as any).testDisplayName(test):'',button:(label,action,variant)=>(root as any).btn(label,action,variant),emptyState:(title,message,action)=>(root as any).emptyState(title,message,action),modalCloseButton:action=>root.modalCloseButton(action)});
+root.lisQueuePresentation = createLisQueuePresentation({test:id=>(state.tests||[]).find((test:any)=>test.id===id),formatTestValue:(test,value)=>(root as any).fmtTestValue(test,value),format:(value,decimals)=>(root as any).fmt(value,decimals),escape:value=>(root as any).esc(value),formatDateTime:value=>(root as any).formatDateTimeVN(value),testDisplayName:test=>typeof (root as any).testDisplayName==='function'?(root as any).testDisplayName(test):'',button:(label,action,variant)=>(root as any).btn(label,action,variant),emptyState:(title,message,action)=>(root as any).emptyState(title,message,action),modalCloseButton:action=>root.modalCloseButton(action)});
 root.lisSettingsService = createLisSettingsService(value => root.lisNormalizeGatewayUrl!(value));
 root.LisGatewayCommand=createLisGatewayCommand({store:settings=>localStorage.setItem(LIS_GATEWAY_STORAGE_KEY,JSON.stringify(settings)),clearToken:()=>{const input=document.getElementById('lisGatewayToken') as any;if(input)input.value='';},disable:()=>{const runtime=(root as any).lisGatewayRuntime;clearInterval(runtime.pollT);runtime.pollT=null;runtime.pending=[];runtime.unresolved=[];lisClient.setStatus('off','Đã tắt');},start:()=>(root as any).lisGatewayStart(),pull:()=>(root as any).lisGatewayPull({manual:true})});
 const lisQueueController=createLisQueueController({
@@ -3119,6 +3463,17 @@ root.saveBrand=settingsPageController.saveBrand;
 root.readBrandInputs=settingsPageController.readBrandInputs;
 root.pickLogo=settingsPageController.pickLogo;
 root.clearLogo=settingsPageController.clearLogo;
+/* Pha H2 (2026-08-20): gộp document.getElementById('logoFile').click() —
+   trước là onclick nội tuyến gọi thẳng DOM, giờ chuyển qua action-dispatcher. */
+root.brandPickLogo = () => { if (typeof document !== 'undefined' && typeof document.getElementById === 'function') (document.getElementById('logoFile') as HTMLElement | null)?.click(); };
+/* Pha H2 nhóm (d) lát 4: thay mẫu lặp lại nhiều nơi
+   onclick="document.getElementById('xxxErr').style.display='none'" — một
+   wrapper chung cho mọi ô lý do/ghi chú tự ẩn thông báo lỗi field khi gõ lại. */
+root.hideFieldError = (id: string) => { if (typeof document !== 'undefined' && typeof document.getElementById === 'function') { const e = document.getElementById(id) as HTMLElement | null; if (e) e.style.display = 'none'; } };
+/* Cùng mẫu brandPickLogo ở trên nhưng tổng quát cho MỌI id — thay
+   onclick="document.getElementById('xxx').click()" (nút "Chọn file..." kích
+   hoạt input file ẩn) rải ở nhiều nơi khác nhau. */
+root.clickElementById = (id: string) => { if (typeof document !== 'undefined' && typeof document.getElementById === 'function') (document.getElementById(id) as HTMLElement | null)?.click(); };
 root.saveFb=settingsPageController.saveFb;
 root.clearFb=settingsPageController.clearFb;
 root.copyFirebaseRules=settingsPageController.copyFirebaseRules;
@@ -3524,7 +3879,6 @@ const reportPageController=createReportPageController({
   rerender:()=>rerender(),
   requestFrame:(work,delay)=>setTimeout(work,delay),
   esc:value=>(root as any).esc(value),
-  jsq:value=>(root as any).jsq(value),
   button:(label,action,variant,title,options)=>(root as any).btn(label,action,variant,title,options),
   isoMonth:()=>(root as any).isoMonth(),
   isoToday:()=>isoToday(),
@@ -3634,12 +3988,14 @@ root.configPanelInstrumentOptionsHtml=configPanelInstrumentOptionsHtml;
 root.configLotLevelOptionsHtml=configLotLevelOptionsHtml;
 root.qcHistoryMeanSdRowsHtml=qcHistoryMeanSdRowsHtml;
 root.qcHistoryPointRowsHtml=qcHistoryPointRowsHtml;
-/* QC_DECIMALS_DEFAULT là `const` global lexical của state.js (như REFTESTS/
-   TEA_SOURCE_REGISTRY), không phải property trên globalThis — (globalThis as
-   any).QC_DECIMALS_DEFAULT từng luôn undefined, làm targetNumberText(value,null)
-   gọi Number(value).toFixed(undefined) (làm tròn về số nguyên, vd "3.7"→"4")
-   bất cứ khi nào gọi không kèm xét nghiệm. Tham chiếu trần đúng quy tắc, kèm
-   fallback bằng đúng giá trị mặc định của state.js cho sandbox chưa nạp nó. */
+/* QC_DECIMALS_DEFAULT từng chỉ là `const` global lexical của classic state.js
+   (như REFTESTS/TEA_SOURCE_REGISTRY trước lát 6), không phải property trên
+   globalThis — (globalThis as any).QC_DECIMALS_DEFAULT từng luôn undefined, làm
+   targetNumberText(value,null) gọi Number(value).toFixed(undefined) (làm tròn về
+   số nguyên, vd "3.7"→"4") bất cứ khi nào gọi không kèm xét nghiệm. Tham chiếu
+   trần đúng quy tắc; từ lát 6 nó là `root.QC_DECIMALS_DEFAULT=` property thật,
+   luôn có sẵn (khối port state.js đặt ngay đầu bundle) — fallback `:2` chỉ còn
+   cần cho sandbox test tải bundle không qua toàn bộ dây chuyền construct. */
 root.targetNumberTextPresentation=createTargetNumberText({valueDecimals:test=>(globalThis as any).testDecimalPlaces(test),statDecimals:test=>(globalThis as any).testStatDecimals(test),defaultDecimals:typeof QC_DECIMALS_DEFAULT!=='undefined'?QC_DECIMALS_DEFAULT:2});
 root.targetConfigAssignedPresentation=targetConfigAssignedPresentation;
 root.targetRangeDraftPresentation=createTargetRangeDraft({targetFromLimits:(low,high)=>(globalThis as any).QCCore.targetFromLimits(low,high),limitsFromTarget:(mean,sd)=>(globalThis as any).QCCore.limitsFromTarget(mean,sd)});
@@ -3815,11 +4171,16 @@ const westgardPageController=createWestgardPageController({
 (root as any).wgArchivedGroupMatches=westgardPageController.wgArchivedGroupMatches;
 (root as any).pageWestgardArchived=westgardPageController.pageWestgardArchived;
 (root as any).pageWestgard=westgardPageController.pageWestgard;
+/* Pha H2 nhóm (d): thay onchange="if(this.value){selTest=this.value;rerender()}"
+   — `selTest=...` là gán trần vào global accessor (AnalysisUIState, xem
+   CLAUDE.md "Module roles"), không phải gọi hàm, nên cần một wrapper tên
+   riêng để data-action tra được. */
+root.wgSelectTest = (value: unknown) => { if (!value) return; selTest = value; root.rerender(); };
 (root as any).wgFilterTests=westgardPageController.wgFilterTests;
 (root as any).wgFilterArchivedTests=westgardPageController.wgFilterArchivedTests;
 root.dashboardStatusTabsHtml=createDashboardStatusTabsHtml({matches:(item:any,key:string)=>(root as any).dashboardStatusFilter.matches(item,key)});
 root.dashboardExpiringLotsHtml=createDashboardExpiringLotsHtml({escape:(value:any)=>(root as any).esc(value)});
-const dashboardQcFollowupItemHtml=createDashboardQcFollowupItemHtml({escape:(value:any)=>(root as any).esc(value),testLabel:(test:any)=>(root as any).testDisplayName(test),date:(value:any)=>(root as any).vnDate(value),pointValue:(point:any,test:any)=>(root as any).fmtPointValue(point,test),button:(label,action,variant)=>(root as any).btn(label,action,variant),quote:(value:any)=>(root as any).jsq(value)});
+const dashboardQcFollowupItemHtml=createDashboardQcFollowupItemHtml({escape:(value:any)=>(root as any).esc(value),testLabel:(test:any)=>(root as any).testDisplayName(test),date:(value:any)=>(root as any).vnDate(value),pointValue:(point:any,test:any)=>(root as any).fmtPointValue(point,test),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
 const dashboardMissingTargetItemHtml=createDashboardMissingTargetItemHtml({escape:(value:any)=>(root as any).esc(value),testLabel:(test:any)=>(root as any).testDisplayName(test),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
 const dashboardOverdueActionItemHtml=createDashboardOverdueActionItemHtml({escape:(value:any)=>(root as any).esc(value),testLabel:(test:any)=>(root as any).testDisplayName(test),date:(value:any)=>(root as any).vnDate(value),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
 const dashboardStatusTags=dashboardTestStatusTags;
@@ -3902,6 +4263,10 @@ root.dashboardWestgardAlerts=dashboardWestgardAlerts;
 root.dashboardMissingTargetItems=dashboardMissingTargetItems;
 const dashboardLevelData=createDashboardLevelData({stats:(values:number[])=>(root as any).stats(values)});
 const dashboardTestAction=createDashboardTestAction({button:(label,action,variant)=>(root as any).btn(label,action,variant)});
+/* Pha H2 lát cuối: thay onclick="entrySel={...};entryStart=null;entryEnd=null;go('entry')"
+   (3 lệnh liền) — gọn thành một hàm đặt tên, cùng mẫu openActionQcEvidence() trong
+   actions-page-controller.ts. */
+root.dashViewTestInEntry=(testId:string,level:number)=>{const entryUi=(root as any).EntryUIState;entryUi.entrySel={testId,level:Number(level)};entryUi.entryStart=null;entryUi.entryEnd=null;(root as any).go('entry');};
 const dashboardLevelPillsHtml=createDashboardLevelPillsHtml({targetOk:level=>(root as any).levelTargetOk(level),render:input=>dashboardLevelPillHtml(input)});
 root.dashboardTestRowsHtml=createDashboardTestRowsHtml({statusTag:status=>dashboardStatusTags.westgard(status),todayTag:(count,total)=>dashboardStatusTags.today(count,total),levelsHtml:levels=>dashboardLevelPillsHtml(levels),latestText:(point,test)=>dashboardLatestPointText(point,test),rank:(status,count,total)=>dashboardRank(status,count,total),rowHtml:input=>dashboardTestRowHtml(input),actionHtml:(testId,level)=>dashboardTestAction(testId,Number(level)),testDisplayName:test=>(root as any).testDisplayName(test)});
 root.dashboardTestItems=createDashboardTestItems({activeWestgard:test=>(root as any).activeWestgard(test),summarize:input=>(root as any).WestgardViewModel.summarizeTestStatus(input),levelData:(views,today)=>dashboardLevelData(views,today),latestPoint:points=>dashboardLatestPoint(points),searchText:(test,levels)=>dashboardTestSearchText(test,levels),markStatus:(testId,status)=>(root as any).statusMemo.set(testId,status)});
@@ -3991,6 +4356,11 @@ root.vnPickerSetYear=year=>root.vnDatePickerController.setYear(year);
 root.vnPickerSetMonth=month=>root.vnDatePickerController.setMonth(month);
 root.vnPickerPick=iso=>root.vnDatePickerController.pick(iso);
 root.vnDatePickerController.bind();
+root.actionDispatcher = createActionDispatcher({
+  document: typeof document !== 'undefined' && typeof document.addEventListener === 'function' ? document : undefined,
+  resolve: name => (root as any)[name],
+});
+root.actionDispatcher.bind();
 root.stateName=s=>root.reportLabels.stateName(s);
 root.qcVerdictLabel=level=>root.reportLabels.verdictLabel(level);
 const routerDispatch=createRouterDispatchController({
@@ -4017,7 +4387,7 @@ root.actionSideChipsHtml=createActionSideChipsHtml({escape:(value:any)=>(root as
 root.actionDetailCheckHtml=createActionDetailCheckHtml({escape:(value:any)=>(root as any).esc(value)});
 root.actionEvidenceTimelinePresentation=createActionEvidenceTimelineHtml({escape:(value:any)=>(root as any).esc(value)});
 root.actionReviewButtonsHtml=createActionReviewButtonsHtml({button:(label,action,variant,title)=>(root as any).btn(label,action,variant,title)});
-root.actionRerunEvidencePresentation=createActionRerunEvidenceHtml<any>({escape:(value:any)=>(root as any).esc(value),pointValue:(point:any,test:any)=>(root as any).fmtPointValue(point,test),date:(value:any)=>(root as any).vnDate(value),button:(label,action,variant,title)=>(root as any).btn(label,action,variant,title),quote:(value:any)=>(root as any).jsq(value)});
+root.actionRerunEvidencePresentation=createActionRerunEvidenceHtml<any>({escape:(value:any)=>(root as any).esc(value),pointValue:(point:any,test:any)=>(root as any).fmtPointValue(point,test),date:(value:any)=>(root as any).vnDate(value),button:(label,action,variant,title)=>(root as any).btn(label,action,variant,title)});
 root.actionIssueRowPresentation=createActionIssueRowHtml({escape:(value:any)=>(root as any).esc(value),button:(label,action,variant)=>(root as any).btn(label,action,variant),quote:(value:any)=>(root as any).jsq(value)});
 root.actionOpenIssuePresentation=createActionOpenIssueHtml({escape:(value:any)=>(root as any).esc(value),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
 root.actionIssueGroupPresentation=createActionIssueGroupHtml({escape:(value:any)=>(root as any).esc(value)});
@@ -4158,9 +4528,12 @@ root.firebaseOwnSnapshotPlan=firebaseOwnSnapshotPlan;
 root.firebaseFirstConnectPlan=firebaseFirstConnectPlan;
 /* Khởi tạo có điều kiện: SG_CLIA_FIXED được dựng MỘT LẦN ngay lúc gọi factory (đọc
    TEA_SOURCE_REGISTRY/TEA_ANALYTE_CATALOG/REFTESTS trực tiếp, không lazy) — y hệt
-   cách sigma-tea.js cũ tự thực hiện lúc file nạp. Một số sandbox test tải bundle mà
-   không nạp (hoặc nạp SAU) state.js/analyte-catalog.js — không guard sẽ ném
-   ReferenceError ngay khi nạp bundle dù sandbox đó không hề gọi tới sgTea/... */
+   cách sigma-tea.js cũ tự thực hiện lúc file nạp. Từ lát 6 (2026-08-20, retire
+   state.js + analyte-catalog.js), khối port state.js ở đầu bundle luôn gán đủ ba
+   tên này TRƯỚC khi tới đây — guard vẫn giữ nguyên làm lưới an toàn rẻ tiền cho
+   sandbox tối giản chỉ nạp core.js + bundle mà bỏ qua toàn bộ dây chuyền construct
+   phía trên (không nên xảy ra trong test hiện có, nhưng ném ReferenceError giữa
+   chừng lúc nạp bundle tệ hơn nhiều so với một điều kiện luôn đúng). */
 if (typeof TEA_SOURCE_REGISTRY !== 'undefined' && typeof TEA_ANALYTE_CATALOG !== 'undefined' && typeof REFTESTS !== 'undefined') {
   root.SigmaTeaResolution = createSigmaTeaResolution({
     teaSourceRegistry: TEA_SOURCE_REGISTRY, teaAnalyteCatalog: TEA_ANALYTE_CATALOG, refTests: REFTESTS as any,
@@ -4514,13 +4887,16 @@ root.openRangeWorkflow=(tid,level)=>{
   const c=r.c;
   const nceNotice=r.nce?root.rangeNceNoticeHtml({nceId:(root as any).esc(r.nce.nceId||'NCE'),rule:(root as any).esc(r.nce.rule||''),cause:(root as any).esc((r.nce.cause||'').slice(0,200))}):'';
   const contextHtml=`<b>${(root as any).esc((root as any).testDisplayName(r.t))}</b> · Mức ${level} · Lô ${(root as any).esc(r.l.lot||'?')} · ${(root as any).esc(r.t.machine||'')}`,comparisonRowsHtml=root.rangeWorkflowComparisonRowsHtml({label:`Đang dùng (${r.l.applied==='lab'?'PXN':'NSX'})`,mean:(root as any).fmtTestValue(r.t,r.l.mean),sd:(root as any).fmtTestValue(r.t,r.l.sd),cv:fmt(r.l.mean?r.l.sd/Math.abs(r.l.mean)*100:0),limits:`${(root as any).fmtTestValue(r.t,r.l.mean-2*r.l.sd)} – ${(root as any).fmtTestValue(r.t,r.l.mean+2*r.l.sd)}`},c?{label:'Đề xuất PXN',mean:(root as any).fmtTestValue(r.t,c.m),sd:(root as any).fmtTestValue(r.t,c.sd),cv:fmt(c.cv),limits:`${(root as any).fmtTestValue(r.t,c.m-2*c.sd)} – ${(root as any).fmtTestValue(r.t,c.m+2*c.sd)}`,proposed:true}:null);
-  root.openModal(root.rangeWorkflowModalHtml({contextHtml,nceNoticeHtml:nceNotice,checklistRowsHtml:checklist,currentRangeRowHtml:comparisonRowsHtml,proposedRangeRowHtml:'',printButtonHtml:(root as any).btn('In biểu mẫu',`printRangeForm('${tid}',${level})`,'ghost'),applyButtonHtml:root.canWrite()?(root as any).btn('Áp dụng dải PXN',`closeModal();applyNewRange('${tid}',${level})`,'teal','',{disabled:!r.eligible}):'',closeButtonHtml:(root as any).btn('Đóng','closeModal()','ghost')}));
+  root.openModal(root.rangeWorkflowModalHtml({contextHtml,nceNoticeHtml:nceNotice,checklistRowsHtml:checklist,currentRangeRowHtml:comparisonRowsHtml,proposedRangeRowHtml:'',printButtonHtml:(root as any).btn('In biểu mẫu',{action:'printRangeForm',args:[tid,level]},'ghost'),applyButtonHtml:root.canWrite()?(root as any).btn('Áp dụng dải PXN',{action:'rangeApplyFromWorkflow',args:[tid,level]},'teal','',{disabled:!r.eligible}):'',closeButtonHtml:(root as any).btn('Đóng',{action:'closeModal'},'ghost')}));
 };
+/* Pha H2 nhóm (d) lát 4: thay onclick="closeModal();applyNewRange(...)" gọi
+   2 lệnh liền — cùng mẫu goManageTargets/entryCloseKeepScroll ở trên. */
+root.rangeApplyFromWorkflow=(tid,level)=>{root.closeModal();root.applyNewRange(tid,level);};
 root.rangeTeaPercent=(t,l)=>root.qcRangeTea!.percent(t,l);
 root.rangeGateHtml=(r,tid,level)=>{
   if(!r.nce)return'';
   const tea=root.rangeTeaPercent(r.t,r.l),threshold=root.qcRangeTea!.quarter(tea);
-  return root.rangeSafetyGateHtml({nceId:(root as any).esc(r.nce.nceId||'NCE'),rule:(root as any).esc(r.nce.rule||''),biasInputAction:`rangeUpdateBiasHint('${tid}',${level})`,thresholdText:threshold!=null?fmt(threshold)+'%':'—',noTeaHint:tea?'':'Chưa có TEa% cho xét nghiệm này — vào Cấu hình Sigma để bổ sung, hoặc vẫn có thể xác nhận thủ công nếu ngưỡng đã biết theo cách khác.'});
+  return root.rangeSafetyGateHtml({nceId:(root as any).esc(r.nce.nceId||'NCE'),rule:(root as any).esc(r.nce.rule||''),biasInputActionAttrs:`data-action="rangeUpdateBiasHint" data-args="${(root as any).escAttr(JSON.stringify([tid,level]))}" data-action-on="input"`,thresholdText:threshold!=null?fmt(threshold)+'%':'—',noTeaHint:tea?'':'Chưa có TEa% cho xét nghiệm này — vào Cấu hình Sigma để bổ sung, hoặc vẫn có thể xác nhận thủ công nếu ngưỡng đã biết theo cách khác.'});
 };
 root.rangeUpdateBiasHint=(tid,level)=>{
   const r=root.rangeCandidate(tid,level),biasEl=document.getElementById('rangeBiasInput') as HTMLInputElement|null,hint=document.getElementById('rangeBiasHint');
@@ -4540,7 +4916,7 @@ root.applyNewRange=async(tid,level)=>{
   if(!requireWrite())return;
   const r=root.rangeCandidate(tid,level),{t,l,c,days,bad,warn,eligible}=r;
   if(!eligible){await root.infoDialog(`Chưa đủ điều kiện: cần ≥20 kết quả trên ≥20 ngày, không có điểm vi phạm/cảnh báo chưa xử lý và SD >0.\nHiện tại: n=${c?c.n:0}, ngày=${days}, điểm loại=${bad}, điểm cảnh báo=${warn}.`);return;}
-  root.openModal(root.rangeApplyConfirmationModalHtml({changeSummaryHtml:`X̄: ${(root as any).fmtTestValue(t,l.mean)} → ${(root as any).fmtTestValue(t,c.m)}<br>SD: ${(root as any).fmtTestStat(t,l.sd)} → ${(root as any).fmtTestStat(t,c.sd)}<br>Dải nhà sản xuất vẫn được lưu để hoàn về.`,gateHtml:root.rangeGateHtml(r,tid,level),cancelButtonHtml:(root as any).btn('Hủy','closeModal()','ghost'),applyButtonHtml:(root as any).btn('Áp dụng',`confirmApplyNewRange('${tid}',${level})`,'teal')}));
+  root.openModal(root.rangeApplyConfirmationModalHtml({changeSummaryHtml:`X̄: ${(root as any).fmtTestValue(t,l.mean)} → ${(root as any).fmtTestValue(t,c.m)}<br>SD: ${(root as any).fmtTestStat(t,l.sd)} → ${(root as any).fmtTestStat(t,c.sd)}<br>Dải nhà sản xuất vẫn được lưu để hoàn về.`,gateHtml:root.rangeGateHtml(r,tid,level),cancelButtonHtml:(root as any).btn('Hủy',{action:'closeModal'},'ghost'),applyButtonHtml:(root as any).btn('Áp dụng',{action:'confirmApplyNewRange',args:[tid,level]},'teal')}));
   setTimeout(()=>{const e=document.getElementById('rangeReasonInput');if(e)e.focus();},50);
 };
 root.confirmApplyNewRange=async(tid,level)=>{
@@ -4559,7 +4935,7 @@ root.confirmApplyNewRange=async(tid,level)=>{
 };
 root.revertRange=(tid,level)=>{
   if(!requireWrite())return;
-  root.openModal(root.rangeRevertConfirmationModalHtml({cancelButtonHtml:(root as any).btn('Hủy','closeModal()','ghost'),revertButtonHtml:(root as any).btn('Hoàn về dải NSX',`confirmRevertRange('${tid}',${level})`,'danger')}));
+  root.openModal(root.rangeRevertConfirmationModalHtml({cancelButtonHtml:(root as any).btn('Hủy',{action:'closeModal'},'ghost'),revertButtonHtml:(root as any).btn('Hoàn về dải NSX',{action:'confirmRevertRange',args:[tid,level]},'danger')}));
   setTimeout(()=>{const e=document.getElementById('rangeReasonInput');if(e)e.focus();},50);
 };
 root.confirmRevertRange=async(tid,level)=>{
@@ -4666,7 +5042,7 @@ root.AUDIT_PAGE_SIZES = ACTIVITY_AUDIT_PAGE_SIZES;
 root.pageUsers = () => {
   const users = root.userListModel(state.users, currentUser && currentUser.id);
   const rows = users.map((u: Record<string, any>) => root.userRowHtml({ user: u, currentUserId: currentUser && currentUser.id, esc: escapeHtml, roleLabel: (r: unknown) => root.roleLabel(r as string), btn: root.btn })).join('');
-  return root.usersPageHtml({ head: root.headOnly('Quản lý người dùng', 'Phân quyền thao tác và kiểm soát tài khoản'), rows, roleOptions: root.roleSelectOptions('technician'), permissionChecks: root.userPermChecks(root.rolePageIds('technician'), 'newUserPerms', 'technician'), addButton: root.btn('Thêm', 'addUser()', 'teal') });
+  return root.usersPageHtml({ head: root.headOnly('Quản lý người dùng', 'Phân quyền thao tác và kiểm soát tài khoản'), rows, roleOptions: root.roleSelectOptions('technician'), permissionChecks: root.userPermChecks(root.rolePageIds('technician'), 'newUserPerms', 'technician'), addButton: root.btn('Thêm', { action: 'addUser' }, 'teal') });
 };
 root.auditDateKey = activity => root.activityAuditFilter.dateKey(activity);
 root.auditFilteredActivities = (items = state.activity || []) => root.activityAuditFilter.filter(items, auditQ, auditFrom, auditTo);
@@ -4695,7 +5071,7 @@ root.pageAudit = () => {
   const oversizeWarn = total > root.ACTIVITY_ROTATE_TO! ? ` <span class="tag warn">Nhật ký đang rất lớn</span> <span class="hint">Nên lưu trữ bớt dòng cũ — hệ thống sẽ tự xoay vòng ở ${root.ACTIVITY_HARD_CAP} dòng (không xuất CSV).</span>` : '';
   const chain = typeof root.auditChainStatus === 'function' ? root.auditChainStatus() : { ok: true, checked: 0, legacy: total, idle: false } as Record<string, any>;
   const chainHtml = chain.idle
-    ? `<span class="tag none">Chưa kiểm chuỗi hash</span> ${root.btn('Kiểm tra chuỗi hash', 'auditVerifyChainNow()', 'ghost sm')} <span class="hint">Nhật ký lớn (${chain.total} dòng) nên không tự kiểm mỗi lần mở trang.</span>`
+    ? `<span class="tag none">Chưa kiểm chuỗi hash</span> ${root.btn('Kiểm tra chuỗi hash', { action: 'auditVerifyChainNow' }, 'ghost sm')} <span class="hint">Nhật ký lớn (${chain.total} dòng) nên không tự kiểm mỗi lần mở trang.</span>`
     : chain.ok ? `<span class="tag ok">Chuỗi hash hợp lệ</span> <span class="hint">${chain.checked} dòng đã khóa hash${chain.legacy ? ` · ${chain.legacy} dòng cũ chưa có hash` : ''}</span>` : `<span class="tag rej">Audit có dấu hiệu bị sửa</span> <span class="hint">Lỗi tại dòng #${((state.activity as any)[chain.brokenIndex] || {}).seq || chain.brokenIndex + 1}: ${escapeHtml(chain.reason)}</span>`;
   const filtered = root.auditFilteredActivities(), pageInfo = root.activityAuditPagination(filtered, auditPage, auditPageSize), pageCount = pageInfo.pageCount;
   auditPage = pageInfo ? pageInfo.page : Math.min(Math.max(1, auditPage), pageCount);
@@ -4704,9 +5080,9 @@ root.pageAudit = () => {
   const hasFilter = !!(auditQ || auditFrom || auditTo);
   const pageSizeOptions = (root.AUDIT_PAGE_SIZES as unknown as number[]).map(size => `<option value="${size}" ${size === auditPageSize ? 'selected' : ''}>${size} dòng</option>`).join('');
   const resultFrom = pageInfo ? pageInfo.resultFrom : (filtered.length ? offset + 1 : 0), resultTo = pageInfo ? pageInfo.resultTo : Math.min(offset + auditPageSize, filtered.length);
-  const pagination = filtered.length ? `<div class="audit-pagination"><span class="hint">Hiển thị ${resultFrom}–${resultTo} / ${filtered.length} dòng</span><div>${root.btn('‹ Trước', `auditSetPage(${auditPage - 1})`, 'ghost sm', '', { disabled: auditPage <= 1 })}<b>Trang ${auditPage}/${pageCount}</b>${root.btn('Sau ›', `auditSetPage(${auditPage + 1})`, 'ghost sm', '', { disabled: auditPage >= pageCount })}</div></div>` : '';
+  const pagination = filtered.length ? `<div class="audit-pagination"><span class="hint">Hiển thị ${resultFrom}–${resultTo} / ${filtered.length} dòng</span><div>${root.btn('‹ Trước', { action: 'auditSetPage', args: [auditPage - 1] }, 'ghost sm', '', { disabled: auditPage <= 1 })}<b>Trang ${auditPage}/${pageCount}</b>${root.btn('Sau ›', { action: 'auditSetPage', args: [auditPage + 1] }, 'ghost sm', '', { disabled: auditPage >= pageCount })}</div></div>` : '';
   const rowsOrEmptyState = rows ? `<div class="audit-table-wrap"><table class="audit-table"><thead><tr><th>Thời gian</th><th>Người dùng</th><th>Hành động</th><th>Đối tượng</th><th>Chi tiết</th></tr></thead><tbody>${rows}</tbody></table></div>` : root.emptyState(total ? 'Không tìm thấy nhật ký' : 'Chưa có hoạt động', total ? 'Thử từ khóa hoặc khoảng ngày khác.' : 'Nhật ký sẽ bắt đầu ghi từ các thao tác tiếp theo.');
-  return root.activityAuditPageHtml({ head: root.headOnly('Nhật ký hoạt động', 'Lưu vết các thao tác quan trọng; chỉ quản trị viên được xem'), exportButton: root.btn('Xuất CSV nhật ký', 'exportActivityCSV()', 'teal sm'), archiveButton: total ? root.btn('Lưu trữ nhật ký cũ', 'archiveActivityLog()', 'ghost sm') : '', total, chainHtml, oversizeWarn, searchValue: escapeHtmlAttr(auditQ), fromDate: root.dateBox('auditFromDate', auditFrom, 'audit-date', `aria-label="Lọc nhật ký từ ngày" onchange="auditSetDate('from',this.value)"`), toDate: root.dateBox('auditToDate', auditTo, 'audit-date', `aria-label="Lọc nhật ký đến ngày" onchange="auditSetDate('to',this.value)"`), pageSizeOptions, clearFiltersButton: hasFilter ? root.btn('Xóa bộ lọc', 'auditClearFilters()', 'ghost sm audit-clear-filter') : '', filteredCount: filtered.length, rowsOrEmptyState, pagination });
+  return root.activityAuditPageHtml({ head: root.headOnly('Nhật ký hoạt động', 'Lưu vết các thao tác quan trọng; chỉ quản trị viên được xem'), exportButton: root.btn('Xuất CSV nhật ký', { action: 'exportActivityCSV' }, 'teal sm'), archiveButton: total ? root.btn('Lưu trữ nhật ký cũ', { action: 'archiveActivityLog' }, 'ghost sm') : '', total, chainHtml, oversizeWarn, searchValue: escapeHtmlAttr(auditQ), fromDate: root.dateBox('auditFromDate', auditFrom, 'audit-date', `aria-label="Lọc nhật ký từ ngày" data-action="auditSetDate" data-args='["from"]' data-action-on="change"`), toDate: root.dateBox('auditToDate', auditTo, 'audit-date', `aria-label="Lọc nhật ký đến ngày" data-action="auditSetDate" data-args='["to"]' data-action-on="change"`), pageSizeOptions, clearFiltersButton: hasFilter ? root.btn('Xóa bộ lọc', { action: 'auditClearFilters' }, 'ghost sm audit-clear-filter') : '', filteredCount: filtered.length, rowsOrEmptyState, pagination });
 };
 root.activityCSVRows = items => root.activityAuditCsv(items);
 root.exportActivityCSV = () => { root.csvDownload!('Nhat_ky_hoat_dong_QCLab.csv', root.activityCSVRows(state.activity || [])); };
@@ -4718,7 +5094,7 @@ root.exportActivityCSV = () => { root.csvDownload!('Nhat_ky_hoat_dong_QCLab.csv'
 root.archiveActivityLog = () => {
   if (!root.requireAdmin()) return;
   const total = (state.activity || []).length; if (!total) return;
-  root.openModal(root.activityAuditArchiveModalHtml({ total, cancelButtonHtml: root.btn('Hủy', 'closeModal()', 'ghost'), archiveButtonHtml: root.btn('Xuất CSV và lưu trữ', 'confirmArchiveActivityLog()', 'teal') }));
+  root.openModal(root.activityAuditArchiveModalHtml({ total, cancelButtonHtml: root.btn('Hủy', { action: 'closeModal' }, 'ghost'), archiveButtonHtml: root.btn('Xuất CSV và lưu trữ', { action: 'confirmArchiveActivityLog' }, 'teal') }));
 };
 root.confirmArchiveActivityLog = async () => {
   if (!root.requireAdmin()) return;
@@ -4751,7 +5127,7 @@ root.openUserPerms = async id => {
   const u = (state.users || []).find((x: Record<string, any>) => x.id === id); if (!u) return;
   if (currentUser && currentUser.id === id) { await root.infoDialog('Không thể tự sửa quyền của tài khoản đang đăng nhập. Hãy dùng tài khoản quản trị khác nếu cần thay đổi.'); return; }
   const roleSelect = root.userRoleSelectHtml(root.roleSelectOptions(u.role));
-  root.openModal(root.userPermissionsModalHtml({ userName: escapeHtml(u.name || u.username), username: escapeHtml(u.username), roleSelectHtml: roleSelect, permissionChecksHtml: root.userPermChecks(u.pagePerms, 'editUserPerms', u.role), cancelButtonHtml: root.btn('Hủy', 'closeModal()', 'ghost'), saveButtonHtml: root.btn('Lưu quyền', `applyUserPerms('${id}')`, 'teal') }));
+  root.openModal(root.userPermissionsModalHtml({ userName: escapeHtml(u.name || u.username), username: escapeHtml(u.username), roleSelectHtml: roleSelect, permissionChecksHtml: root.userPermChecks(u.pagePerms, 'editUserPerms', u.role), cancelButtonHtml: root.btn('Hủy', { action: 'closeModal' }, 'ghost'), saveButtonHtml: root.btn('Lưu quyền', { action: 'applyUserPerms', args: [id] }, 'teal') }));
 };
 root.applyUserPerms = async id => {
   if (!root.requireAdmin()) return;
@@ -4765,7 +5141,7 @@ root.resetPass = id => {
   if (!root.requireAdmin()) return;
   const u = (state.users || []).find((x: Record<string, any>) => x.id === id); if (!u) return;
   const self = currentUser && currentUser.id === id;
-  root.openModal(root.resetPasswordModalHtml({ title: self ? 'Đổi mật khẩu' : 'Đặt lại mật khẩu', message: self ? 'Nhập mật khẩu mới cho tài khoản đang đăng nhập.' : 'Nhập mật khẩu tạm; người dùng sẽ phải đổi lại khi đăng nhập.', enterAction: `if(event.key==='Enter')applyResetPass('${id}')`, cancelButtonHtml: root.btn('Hủy', 'closeModal()', 'ghost'), saveButtonHtml: root.btn('Lưu mật khẩu', `applyResetPass('${id}')`, 'teal') }));
+  root.openModal(root.resetPasswordModalHtml({ title: self ? 'Đổi mật khẩu' : 'Đặt lại mật khẩu', message: self ? 'Nhập mật khẩu mới cho tài khoản đang đăng nhập.' : 'Nhập mật khẩu tạm; người dùng sẽ phải đổi lại khi đăng nhập.', actionAttrs: `data-keydown-action="applyResetPass" data-keydown-args="${(root as any).escAttr(JSON.stringify([id]))}" data-keydown-keys='["Enter"]'`, cancelButtonHtml: root.btn('Hủy', { action: 'closeModal' }, 'ghost'), saveButtonHtml: root.btn('Lưu mật khẩu', { action: 'applyResetPass', args: [id] }, 'teal') }));
   setTimeout(() => { const e = document.getElementById('resetPass1'); if (e) e.focus(); }, 50);
 };
 root.applyResetPass = async id => {
@@ -4803,15 +5179,15 @@ root.confirmReauthentication = async () => {
 root.reauthenticateCurrentUser = ({ title = 'Xác thực lại', message = 'Nhập lại mật khẩu để tiếp tục.' } = {}) => {
   if (!currentUser) return Promise.resolve(false);
   return new Promise<boolean>(resolve => root.openDialogOverlay(`<div class="modal confirm-modal">
-    <div class="confirm-modal-h"><div class="confirm-modal-kicker">Thao tác được kiểm soát</div>${root.modalCloseButton('closeDialogOverlay(false)')}</div>
+    <div class="confirm-modal-h"><div class="confirm-modal-kicker">Thao tác được kiểm soát</div>${root.modalCloseButton({action:'closeDialogOverlay',args:[false]})}</div>
     <h3 class="confirm-modal-title">${escapeHtml(title)}</h3>
     <div class="confirm-modal-body"><div class="confirm-modal-icon info" aria-hidden="true">✓</div><div class="confirm-modal-text"><b>${escapeHtml(message)}</b><p>Tài khoản: ${escapeHtml(currentUser.name || currentUser.username || '')}</p></div></div>
     <div class="reauth-modal-field">
       <label for="reauthPassword">Mật khẩu hiện tại</label>
-      <input id="reauthPassword" type="password" autocomplete="current-password" autofocus onkeydown="if(event.key==='Enter'){event.preventDefault();confirmReauthentication()}">
+      <input id="reauthPassword" type="password" autocomplete="current-password" autofocus data-keydown-action="confirmReauthentication" data-keydown-keys='["Enter"]'>
       <div id="reauthError" class="auth-err" hidden>Mật khẩu không đúng.</div>
     </div>
-    <div class="confirm-modal-actions">${root.btn('Hủy', 'closeDialogOverlay(false)', 'ghost')}${root.btn('Xác thực', 'confirmReauthentication()', 'teal')}</div>
+    <div class="confirm-modal-actions">${root.btn('Hủy', { action: 'closeDialogOverlay', args: [false] }, 'ghost')}${root.btn('Xác thực', { action: 'confirmReauthentication' }, 'teal')}</div>
   </div>`, resolve as (result?: unknown) => void));
 };
 root.ensureAdmin = async () => { await root.AdminBootstrapCommand.ensure(); };
@@ -4841,7 +5217,7 @@ root.showStartupRecovery = () => {
   ov.innerHTML = `<div class="auth-card"><div class="auth-head">${root.authBrandMark()}<div class="auth-brand">Cần phục hồi dữ liệu</div></div>
     <div class="auth-sub">QC Lab phát hiện dữ liệu cục bộ không hợp lệ và đã dừng để tránh ghi đè.</div>
     <div class="auth-err">${escapeHtml(startupProblem && startupProblem.message || 'Không đọc được dữ liệu.')}</div>
-    <div class="auth-actions">${root.btn('Tải dữ liệu gốc xuống', 'downloadStartupData()', 'teal')}${root.btn('Tạo dữ liệu mới', 'resetStartupData()', 'ghost')}</div>
+    <div class="auth-actions">${root.btn('Tải dữ liệu gốc xuống', { action: 'downloadStartupData' }, 'teal')}${root.btn('Tạo dữ liệu mới', { action: 'resetStartupData' }, 'ghost')}</div>
     <div class="auth-hint">Ưu tiên tải dữ liệu gốc xuống trước để có thể kiểm tra và phục hồi.</div></div>`;
 };
 root.showLogin = msg => {
@@ -4856,9 +5232,9 @@ root.showLogin = msg => {
   const trialLine = trial && trial.active ? `<div class="auth-hint ${trial.daysLeft <= 7 ? 'auth-trial-warning' : 'auth-trial-ok'}">Bản dùng thử: còn ${trial.daysLeft}/${trial.totalDays} ngày</div>` : '';
   ov.innerHTML = `<div class="auth-card"><div class="auth-head">${root.authBrandMark()}<div class="auth-head-text"><div class="auth-brand">${escapeHtml(root.brandTitle())}</div><div class="auth-sub">${escapeHtml(root.brandSub())}</div></div></div>
     <label>Tên đăng nhập</label><input id="liUser" autocomplete="username" autofocus>
-    <label>Mật khẩu</label><input id="liPass" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+    <label>Mật khẩu</label><input id="liPass" type="password" autocomplete="current-password" data-keydown-action="doLogin" data-keydown-keys='["Enter"]'>
     ${msg ? `<div class="auth-err">${escapeHtml(msg)}</div>` : ''}
-    <div class="auth-actions">${root.btn('Đăng nhập', 'doLogin()', 'teal')}</div>
+    <div class="auth-actions">${root.btn('Đăng nhập', { action: 'doLogin' }, 'teal')}</div>
     ${trialLine}<div class="auth-hint">${defaultHint}Phiên bản ${escapeHtml(app.version || 'dev')}</div></div>`;
   requestAnimationFrame(root.focusLoginField); setTimeout(root.focusLoginField, 50);
 };
@@ -4895,9 +5271,9 @@ root.showPasswordChange = msg => {
   let ov = document.getElementById('authOverlay'); if (!ov) { ov = document.createElement('div'); ov.id = 'authOverlay'; document.body.appendChild(ov); } (ov as HTMLElement).style.display = 'flex';
   ov.innerHTML = `<div class="auth-card"><div class="auth-head">${root.authBrandMark()}<div class="auth-brand">Đổi mật khẩu</div></div><div class="auth-sub">Cần cập nhật mật khẩu trước khi vào hệ thống</div>
     <label>Mật khẩu mới</label><input id="newPass1" type="password" autocomplete="new-password">
-    <label>Nhập lại mật khẩu mới</label><input id="newPass2" type="password" autocomplete="new-password" onkeydown="if(event.key==='Enter')changeRequiredPassword()">
+    <label>Nhập lại mật khẩu mới</label><input id="newPass2" type="password" autocomplete="new-password" data-keydown-action="changeRequiredPassword" data-keydown-keys='["Enter"]'>
     ${msg ? `<div class="auth-err">${escapeHtml(msg)}</div>` : ''}
-    <div class="auth-actions">${root.btn('Lưu mật khẩu mới', 'changeRequiredPassword()', 'teal')}</div>
+    <div class="auth-actions">${root.btn('Lưu mật khẩu mới', { action: 'changeRequiredPassword' }, 'teal')}</div>
     <div class="auth-hint">Mật khẩu cần ít nhất 8 ký tự và không nên dùng lại mật khẩu mặc định.</div></div>`;
   setTimeout(() => { const e = document.getElementById('newPass1'); if (e) (e as HTMLElement).focus(); }, 50);
 };
@@ -5129,6 +5505,12 @@ const manageTestsActionsController = createManageTestsActionsController({
 });
 root.parseVN = manageTestsActionsController.parseVN;
 root.setManageTab = manageTestsActionsController.setManageTab;
+/* Pha H2 (2026-08-20): gộp cặp lệnh go('manage');setManageTab('targets') —
+   lặp lại ~7 nơi trong src/presentation — thành một action tên riêng, vì
+   data-action="..." chỉ định tuyến MỘT hàm; các cặp lệnh khác gặp sau này
+   nhận cùng cách xử lý (thêm một wrapper nhỏ tại đây) hoặc dispatcher tự nhận
+   nhiều action nếu số lượng lớn hơn nhiều — chưa cần tới mức đó. */
+root.goManageTargets = () => { root.go('manage'); root.setManageTab!('targets'); };
 root.setTargetPanel = manageTestsActionsController.setTargetPanel;
 root.setTargetGroup = manageTestsActionsController.setTargetGroup;
 root.setTargetLevel = manageTestsActionsController.setTargetLevel;
@@ -5185,6 +5567,7 @@ root.configAssayRefRecord = manageTestsActionsController.configAssayRefRecord;
 root.configAssayNaming = manageTestsActionsController.configAssayNaming;
 root.configAssayFindRef = manageTestsActionsController.configAssayFindRef;
 root.configAssaySuggestionInput = manageTestsActionsController.configAssaySuggestionInput;
+root.configAssayInstrumentChanged = manageTestsActionsController.configAssayInstrumentChanged;
 root.openConfigAssay = manageTestsActionsController.openConfigAssay;
 root.saveConfigAssay = manageTestsActionsController.saveConfigAssay;
 root.delTest = manageTestsActionsController.delTest;
@@ -5249,11 +5632,14 @@ root.entrySheetKey = entryPageController.entrySheetKey;
 root.entryLatestTreeState = entryPageController.entryLatestTreeState;
 root.entrySyncTreeState = entryPageController.entrySyncTreeState;
 root.entryRenderKeepScroll = entryPageController.entryRenderKeepScroll;
+root.entryCloseKeepScroll = entryPageController.entryCloseKeepScroll;
+root.entryConfirmInlineSave = entryPageController.entryConfirmInlineSave;
 root.entrySetLastMsg = entryPageController.entrySetLastMsg;
 root.entryUnlockExtraRun = entryPageController.entryUnlockExtraRun;
 root.entryDateNoteSave = entryPageController.entryDateNoteSave;
 root.entryColumnCfg = entryPageController.entryColumnCfg;
 root.entryInlineSave = entryPageController.entryInlineSave;
+root.entrySheetRunChanged = entryPageController.entrySheetRunChanged;
 root.entryInlineSaveCommit = entryPageController.entryInlineSaveCommit;
 root.syncVoidNceChoice = entryPageController.syncVoidNceChoice;
 root.voidQcPoint = entryPageController.voidQcPoint;
@@ -5275,7 +5661,7 @@ const actionFormController = createActionFormController({
   actionUi: () => (root as any).actionFormUiState, currentUser: () => currentUser,
   rerender: () => rerender(), requireWrite: () => requireWrite(), canWrite: () => root.canWrite(),
   infoDialog: (message, opts) => root.infoDialog(message, opts),
-  esc: value => (root as any).esc(value), escapeAttr: value => (root as any).escAttr(value), jsq: value => jsq(value),
+  esc: value => (root as any).esc(value), escapeAttr: value => (root as any).escAttr(value),
   btn: (label, action, cls, title, options) => (root as any).btn(label, action, cls, title, options),
   dateBox: (id, value, cls, attrs) => (root as any).dateBox(id, value, cls, attrs),
   vnDate: value => vnDate(value), fmt: (value, decimals) => fmt(value, decimals),
@@ -5331,6 +5717,10 @@ root.addAction = actionFormController.addAction;
 root.syncActionRiskScore = actionFormController.syncActionRiskScore;
 root.syncActionResidualRiskScore = actionFormController.syncActionResidualRiskScore;
 root.editAction = actionFormController.editAction;
+/* Pha H2 (2026-08-20): gộp cặp lệnh nhiều bước từ các item dashboard, cùng lý
+   do với goManageTargets ở trên — data-action chỉ định tuyến một hàm. */
+root.dashboardGoEntryFollowup = (testId, level) => { entrySel = { testId, level }; entryStart = null; entryEnd = null; root.go('entry'); };
+root.dashboardContinueAction = index => { root.go('actions'); root.editAction!(index); };
 root.actionInvestigationField = actionFormController.actionInvestigationField;
 root.actionInvestigationChoiceLabel = actionFormController.actionInvestigationChoiceLabel;
 root.actionInvestigationStateClass = actionFormController.actionInvestigationStateClass;
@@ -5360,7 +5750,7 @@ const actionsPageController = createActionsPageController({
   rerender: () => rerender(), role: () => role(), userName: () => userName(), canWrite: () => root.canWrite(), requireWrite: () => requireWrite(),
   requireAdmin: message => root.requireAdmin(message), reauthenticateCurrentUser: opts => (root as any).reauthenticateCurrentUser(opts),
   openModal: html => root.openModal(html), closeModal: () => root.closeModal(), confirmDialog: opts => root.confirmDialog(opts), infoDialog: (message, opts) => root.infoDialog(message, opts),
-  esc: value => (root as any).esc(value), jsq: value => jsq(value),
+  esc: value => (root as any).esc(value),
   btn: (label, action, cls, title, options) => (root as any).btn(label, action, cls, title, options),
   headOnly: (title, subtitle, actions) => (root as any).headOnly(title, subtitle, actions),
   vnDate: value => vnDate(value), formatDateTimeVN: value => formatDateTimeVN(value as string),
@@ -5865,3 +6255,29 @@ root.sigmaTeaTrace=dataIoController.sigmaTeaTrace;
 root.buildSigmaXlsx=dataIoController.buildSigmaXlsx;
 root.exportSigmaPeriodXLSX=dataIoController.exportSigmaPeriodXLSX;
 root.exportSigmaPeriodsXLSX=dataIoController.exportSigmaPeriodsXLSX;
+
+// Retire classic assets/app.js (2026-08-20, Pha H lát 1) — boot entry point (9
+// dòng, không có logic mới). Đặt CUỐI file (mọi service ở trên đã construct
+// xong) và không tự gọi ngay như classic script — classic app.js là <script
+// defer> RIÊNG, luôn nạp SAU toàn bộ script khác nên boot() chạy đúng lúc mọi
+// thứ đã sẵn sàng; gộp vào cùng bundle này thì lời gọi module-load-time sẽ
+// chạy TRƯỚC UI của nó có nghĩa gì (DOM #main chưa parse xong khi bundle này
+// là <script defer> — vẫn chạy trước DOMContentLoaded) và sẽ crash mọi sandbox
+// test tải bundle này mà không cấp document/window (phần lớn test hiện không
+// cấp, vì trước đây app.js không nằm trong loadSandbox([...]) của bất kỳ test
+// nào). Thay vào đó, đợi 'DOMContentLoaded' — theo đặc tả HTML, sự kiện này
+// LUÔN nổ ra sau khi mọi <script defer> đã chạy xong (không có race), nên
+// root.boot() vẫn chạy đúng lúc cũ mà không cần app.js làm <script> cuối cùng
+// riêng. Guard kép `typeof document!=='undefined' && document.addEventListener`
+// khớp đúng mẫu đã dùng cho 6 listener top-level khác trong file này — sandbox
+// không cấp document thì bỏ qua hoàn toàn (không đăng ký, không lỗi); sandbox
+// có cấp document stub tối giản (không addEventListener thật) thì đăng ký
+// nhưng never fire, vẫn không lỗi và không chạy boot().
+root.boot=async()=>{
+  if(await loadBootState())await ensureAdmin().then(()=>{
+    showLogin();
+    setTimeout(()=>storageHydrationPromise.then(ok=>{if(ok)initFirebase();else showStartupRecovery();}),0);
+  });
+  else showStartupRecovery();
+};
+if(typeof document!=='undefined'&&document.addEventListener)document.addEventListener('DOMContentLoaded',()=>{root.boot();});

@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
-const ctx = loadSandbox(['core.js', 'modules/state.js']);
+const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js']);
 run(ctx, "state.westgardRules=Object.fromEntries(QCCore.WG_RULES.map(rule=>[rule,true]));");
 
 assert.equal(run(ctx, "defaultRuleAction('6x')"), 'alert', '6x must default to warning');

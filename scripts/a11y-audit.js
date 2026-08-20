@@ -165,7 +165,12 @@ async function keyboardSmoke(page, id) {
 async function main() {
   const session = await openSeededSession({ headless: true });
   try {
-    await session.page.addScriptTag({ content: AXE_SOURCE });
+    /* Pha H2 lat cuoi (2026-08-20): index.html's CSP script-src bo 'unsafe-inline',
+       nen addScriptTag({content}) (chen mot <script> that vao trang) bi chan.
+       page.evaluate() voi mot chuoi bieu thuc chay qua CDP Runtime.evaluate — khong
+       phai <script> cua trang — nen khong bi CSP script-src chan (da xac minh bang
+       mot trang CSP rieng: addScriptTag loi, evaluate(string) chay duoc). */
+    await session.page.evaluate(AXE_SOURCE);
 
     // seed-browser-session.js only seeds operational QC data, not Sigma
     // tracking — without this the Sigma page audits empty (no content to

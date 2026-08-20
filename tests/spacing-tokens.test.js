@@ -16,12 +16,17 @@ assert.ok(components.includes('.sr-only{position:absolute!important;'),'Nội du
 
 assert.ok(components.includes('.auth-actions{display:grid;gap:var(--space-sm);margin-top:var(--space-panel)}'),'Nút xác thực phải dùng nhóm action và spacing token chung');
 
+// assets/modules/ rỗng hoàn toàn từ 2026-08-20 (Pha G nhóm C xong) — quét đổi
+// sang src/presentation/**/*.ts, nơi toàn bộ HTML dựng động giờ sống; quét
+// thư mục rỗng cũ đã âm thầm thành no-op.
+function walkTs(dir){return fs.readdirSync(dir,{withFileTypes:true}).flatMap(entry=>{const full=path.join(dir,entry.name);return entry.isDirectory()?walkTs(full):[full];});}
 const violations=[];
-for(const name of fs.readdirSync(path.join(assets,'modules'))){
-  if(!name.endsWith('.js'))continue;
-  const source=fs.readFileSync(path.join(assets,'modules',name),'utf8');
+for(const file of walkTs(path.join(root,'src','presentation'))){
+  if(!file.endsWith('.ts'))continue;
+  const source=fs.readFileSync(file,'utf8');
+  const relFile=path.relative(root,file);
   source.split(/\r?\n/).forEach((line,index)=>{
-    if(/style="[^"]*margin-(?:top|bottom):\d+px/.test(line)||/style="[^"]*clip:rect\(0,0,0,0\)/.test(line))violations.push(`${name}:${index+1}`);
+    if(/style="[^"]*margin-(?:top|bottom):\d+px/.test(line)||/style="[^"]*clip:rect\(0,0,0,0\)/.test(line))violations.push(`${relFile}:${index+1}`);
   });
 }
 assert.deepStrictEqual(violations,[],`Spacing tĩnh và sr-only phải dùng class chung, còn inline tại:\n${violations.join('\n')}`);

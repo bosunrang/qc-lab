@@ -24,7 +24,7 @@ export function createManageTestsActionsController(deps: {
   reauthenticateCurrentUser: (opts: AnyRec) => Promise<boolean>;
   esc: (value: unknown) => string;
   escapeAttr: (value: unknown) => string;
-  btn: (label: string, action: string, cls?: string, title?: string, options?: AnyRec) => string;
+  btn: (label: string, action: string | { action: string; args?: unknown[] } | null, cls?: string, title?: string, options?: AnyRec) => string;
   emptyState: (title: string, body: string, actions?: string) => string;
   dateBox: (id: string, value: string, cls?: string, attrs?: string) => string;
   openModal: (html: string) => void;
@@ -76,7 +76,12 @@ export function createManageTestsActionsController(deps: {
   const targetNumberText = (value: unknown, test: AnyRec = null, kind = 'value') => deps.pres.targetNumberTextPresentation(value, test, kind);
   const targetConfigAssigned = (cfg: AnyRec) => deps.pres.targetConfigAssignedPresentation(cfg);
   const targetRangeDraft = (cfg: AnyRec = {}) => deps.pres.targetRangeDraftPresentation(cfg);
-  const syncTargetRange = (el: AnyRec, source: unknown) => {
+  /* Pha H2 nhóm (d): hai hàm dưới đây thay onclick="...(this,...)" — chuyển
+     sang `function` trần (không phải arrow) để đọc `this` đúng phần tử, vì
+     action-dispatcher.ts gọi qua `fn.apply(el,args)` (chỉ `function` mới
+     nhận `this` từ apply(), arrow function bỏ qua). */
+  const syncTargetRange = function (this: AnyRec, source: unknown) {
+    const el = this;
     const row = el.closest('.target-row'); if (!row) return;
     const test = state().tests.find((x: AnyRec) => x.id === row.dataset.test) || null;
     const get = (selector: string) => { const value = row.querySelector(selector).value.trim(); return value === '' ? NaN : Number(value); };
@@ -85,8 +90,8 @@ export function createManageTestsActionsController(deps: {
     if (source === 'limits') { row.querySelector('.tm-mean').value = targetNumberText(result.mean, test); row.querySelector('.tm-sd').value = targetNumberText(result.sd, test, 'stat'); }
     else { row.querySelector('.tm-low').value = targetNumberText(result.low, test); row.querySelector('.tm-high').value = targetNumberText(result.high, test); }
   };
-  const toggleTargetRow = (el: AnyRec) => { const row = el.closest('.target-row'); row.querySelectorAll('.tm-mean,.tm-low,.tm-high,.tm-sd').forEach((x: AnyRec) => x.disabled = !el.checked); if (el.checked) { const mean = row.querySelector('.tm-mean'); if (!mean.value) mean.focus(); } };
-  const targetCheckAll = (on: unknown) => { doc().querySelectorAll('.tm-use').forEach((box: AnyRec) => { box.checked = !!on; toggleTargetRow(box); }); };
+  const toggleTargetRow = function (this: AnyRec) { const el = this; const row = el.closest('.target-row'); row.querySelectorAll('.tm-mean,.tm-low,.tm-high,.tm-sd').forEach((x: AnyRec) => x.disabled = !el.checked); if (el.checked) { const mean = row.querySelector('.tm-mean'); if (!mean.value) mean.focus(); } };
+  const targetCheckAll = (on: unknown) => { doc().querySelectorAll('.tm-use').forEach((box: AnyRec) => { box.checked = !!on; toggleTargetRow.call(box); }); };
   /* Áp 1 dòng Mean/SD (đã đọc/kiểm tra từ form) vào state cho đúng lô đang chọn.
      Nếu mức này trước đó đang gắn với MỘT LÔ KHÁC (một nhóm lô song song khác),
      chụp lại Mean/SD của lô cũ vào meanSdHistory trước khi ghi đè — nếu không, dữ
@@ -135,7 +140,7 @@ export function createManageTestsActionsController(deps: {
     const { group, overwrites, locked } = ui().targetSwitchCtx || {}; if (!group) return;
     const names = deps.pres.targetSwitchAssayNamesPresentation(overwrites.map((pick: AnyRec) => { const pt = state().tests.find((t: AnyRec) => t.id === pick.testId); return pt && deps.testDisplayName(pt); }));
     const lockNote = deps.pres.targetLockedBackfillNotePresentation({ count: (locked && locked.count) || 0, periods: (locked && locked.periods.map(deps.monthVN)) || [], emphasize: true });
-    deps.openModal(deps.pres.targetSwitchModalHtml({ groupName: deps.esc(group.name), overwriteCount: overwrites.length, assayNames: deps.esc(names), lockNote, cancelButtonHtml: deps.btn('Hủy', 'closeModal()', 'ghost'), plannedButtonHtml: deps.btn('Dự kiến', "resolveTargetSwitch('planned')", 'ghost'), switchButtonHtml: deps.btn('Chuyển qua nhóm lô này', "resolveTargetSwitch('switch')", 'teal') }));
+    deps.openModal(deps.pres.targetSwitchModalHtml({ groupName: deps.esc(group.name), overwriteCount: overwrites.length, assayNames: deps.esc(names), lockNote, cancelButtonHtml: deps.btn('Hủy', { action: 'closeModal' }, 'ghost'), plannedButtonHtml: deps.btn('Dự kiến', { action: 'resolveTargetSwitch', args: ['planned'] }, 'ghost'), switchButtonHtml: deps.btn('Chuyển qua nhóm lô này', { action: 'resolveTargetSwitch', args: ['switch'] }, 'teal') }));
   };
   const resolveTargetSwitch = async (mode: unknown) => {
     const ctx = ui().targetSwitchCtx; deps.closeModal(); ui().targetSwitchCtx = null; if (!ctx) return;
@@ -151,7 +156,7 @@ export function createManageTestsActionsController(deps: {
     const histRows = hist.length ? deps.pres.qcHistoryMeanSdRowsHtml(hist.map((h: AnyRec) => { const rowLot = h.lot || lotNo || '', cumSt = deps.stats(deps.pointsForLot(tid as string, level as number, rowLot).filter((p: AnyRec) => !h.effectiveTo || p.date <= h.effectiveTo).map((p: AnyRec) => p.val)); return { lot: deps.esc(rowLot || '—'), mean: deps.fmtTestValue(t, h.mean), sd: deps.fmtTestValue(t, h.sd), cumulativeMean: cumSt ? deps.fmtTestValue(t, cumSt.m) : '—', cumulativeSd: cumSt ? deps.fmtTestValue(t, cumSt.sd) : '—', cumulativeCv: cumSt ? deps.fmt(cumSt.cv) + '%' : '—', period: `${h.effectiveFrom ? deps.vnDate(h.effectiveFrom) : 'Không giới hạn'} → ${h.effectiveTo ? deps.vnDate(h.effectiveTo) : 'Không giới hạn'}`, source: h.source === 'lab' ? 'PXN' : 'NSX' }; })) : '';
     const pts = (state().data[tid as string] || []).filter((p: AnyRec) => +p.level === +(level as AnyRec) && (!lotNo || (p.lot || '') === lotNo)).sort((a: AnyRec, b: AnyRec) => String(a.date || '').localeCompare(String(b.date || '')) || String(a.runId || '').localeCompare(String(b.runId || ''), 'vi', { numeric: true }));
     const ptRows = deps.pres.qcHistoryPointRowsHtml(pts.map((p: AnyRec) => { const mean = Number.isFinite(+p.qcMean) ? +p.qcMean : +l.mean, sd = Number.isFinite(+p.qcSd) && +p.qcSd > 0 ? +p.qcSd : +l.sd, z = sd ? (+p.val - mean) / sd : NaN, abs = Math.abs(z), verdict = abs > 3 ? 'Loại bỏ' : abs > 2 ? 'Cảnh báo' : 'Đạt', verdictClass = abs > 3 ? 'rej' : abs > 2 ? 'warn' : 'ok', staff = deps.pointStaff(p); return { date: deps.vnDate(p.date), run: deps.esc(p.runId || '—'), value: deps.fmtPointValue(p, t), z: Number.isFinite(z) ? (z >= 0 ? '+' : '') + deps.fmt(z) + 's' : '—', mean: deps.fmtTestValue(t, mean), sd: deps.fmtTestValue(t, sd), verdict, verdictClass, staffCode: deps.esc(staff.code || '—') }; }));
-    deps.openModal(deps.pres.qcHistoryDetailModalHtml({ title: `${deps.esc(deps.testDisplayName(t))} · Mức ${level}${lotNo ? ' · Lô ' + deps.esc(lotNo) : ''}`, historyRowsHtml: histRows, historyEmptyHtml: deps.emptyState('Chưa có mốc Mean/SD', 'Không tìm thấy lịch sử Mean/SD cho lô này.'), pointCount: pts.length, pointRowsHtml: ptRows, pointsEmptyHtml: deps.emptyState('Chưa có điểm QC', 'Không có điểm QC nào khớp với lô/mức này.'), closeButtonHtml: deps.btn('Đóng', 'closeModal()', 'teal') }));
+    deps.openModal(deps.pres.qcHistoryDetailModalHtml({ title: `${deps.esc(deps.testDisplayName(t))} · Mức ${level}${lotNo ? ' · Lô ' + deps.esc(lotNo) : ''}`, historyRowsHtml: histRows, historyEmptyHtml: deps.emptyState('Chưa có mốc Mean/SD', 'Không tìm thấy lịch sử Mean/SD cho lô này.'), pointCount: pts.length, pointRowsHtml: ptRows, pointsEmptyHtml: deps.emptyState('Chưa có điểm QC', 'Không có điểm QC nào khớp với lô/mức này.'), closeButtonHtml: deps.btn('Đóng', { action: 'closeModal' }, 'teal') }));
   };
   const openConfigPanel = async (id = '') => {
     if (!state().tests.length) { await deps.infoDialog('Hãy tạo xét nghiệm trước khi tạo Panel QC.'); setManageTab('assays'); return; }
@@ -159,7 +164,7 @@ export function createManageTestsActionsController(deps: {
     const p = state().qcPanels.find((x: AnyRec) => x.id === id) || { testIds: [], instrumentId: state().instruments[0] && state().instruments[0].id, active: true };
     const instruments = deps.pres.configPanelInstrumentOptionsHtml(state().instruments.map((i: AnyRec) => ({ id: i.id, selected: i.id === p.instrumentId, label: deps.esc(i.name) + (i.model ? ' · ' + deps.esc(i.model) : '') })));
     const panelTestRows = (instrumentId: unknown, selected: unknown[] = []) => deps.pres.configPanelTestRows(state().tests.filter((t: AnyRec) => t.instrumentId === instrumentId).map((t: AnyRec) => ({ id: t.id, name: deps.esc(deps.testDisplayName(t)), instrument: deps.esc(deps.instrumentName(t.instrumentId, t.machine)), unit: deps.esc(t.unit || ''), selected: selected.includes(t.id) })));
-    deps.openModal(deps.pres.configPanelModalHtml({ title: id ? 'Sửa Panel QC' : 'Thêm Panel QC', name: deps.escapeAttr(p.name || ''), instrumentsHtml: instruments, testRowsHtml: panelTestRows(p.instrumentId, p.testIds || []), note: deps.esc(p.note || ''), active: p.active !== false, cancelButtonHtml: deps.btn('Hủy', 'closeModal()', 'ghost'), saveButtonHtml: deps.btn(id ? 'Lưu thay đổi' : 'Thêm Panel QC', `saveConfigPanel('${id}')`, 'teal') }));
+    deps.openModal(deps.pres.configPanelModalHtml({ title: id ? 'Sửa Panel QC' : 'Thêm Panel QC', name: deps.escapeAttr(p.name || ''), instrumentsHtml: instruments, testRowsHtml: panelTestRows(p.instrumentId, p.testIds || []), note: deps.esc(p.note || ''), active: p.active !== false, cancelButtonHtml: deps.btn('Hủy', { action: 'closeModal' }, 'ghost'), saveButtonHtml: deps.btn(id ? 'Lưu thay đổi' : 'Thêm Panel QC', { action: 'saveConfigPanel', args: [id] }, 'teal') }));
   };
   const renderConfigPanelTests = () => {
     const root = doc().getElementById('cfgPanelTests'), instrumentId = doc().getElementById('cfgPanelInstrument').value;
@@ -176,14 +181,18 @@ export function createManageTestsActionsController(deps: {
   const lotTransitionChoiceLots = (selectedId = '') => deps.LotTransitionPickerService.availableLots(state().qcLots || [], selectedId);
   const lotTransitionChoiceMatch = (value: unknown, selectedId = '') => deps.LotTransitionPickerService.match(state().qcLots || [], value, selectedId);
   const lotTransitionSelectedId = (inputId: string) => { const el = doc().getElementById(inputId); if (!el) return ''; const lot = lotTransitionChoiceMatch(el.value, el.dataset.lotId || ''); if (lot) el.dataset.lotId = lot.id; return (lot && lot.id) || ''; };
-  const lotTransitionChoiceInput = (el: AnyRec, commit = false) => { const lot = lotTransitionChoiceMatch(el.value, el.dataset.lotId || ''); el.dataset.lotId = (lot && lot.id) || ''; if (commit && lot) el.value = lotTransitionChoiceLabel(lot); refreshLotTransitionTargets(); };
+  /* Pha H2 lát cuối: đọc `this` (không phải tham số `el` trần) vì
+     action-dispatcher.ts gọi qua `fn.apply(el,args)` — data-input-action cho
+     'input' (commit=false, không tham số), data-change-action cho 'change'
+     (commit=true qua data-change-args='[true]'), cùng phần tử. */
+  const lotTransitionChoiceInput = function (this: AnyRec, commit = false) { const el = this; const lot = lotTransitionChoiceMatch(el.value, el.dataset.lotId || ''); el.dataset.lotId = (lot && lot.id) || ''; if (commit && lot) el.value = lotTransitionChoiceLabel(lot); refreshLotTransitionTargets(); };
   const lotTransitionChoiceHtml = (inputId: string, selectedId: unknown): string => { const lot = state().qcLots.find((l: AnyRec) => l.id === selectedId), options = lotTransitionChoiceLots(selectedId as string).map((l: AnyRec) => `<option value="${deps.escapeAttr(lotTransitionChoiceLabel(l))}"></option>`).join(''); return deps.pres.lotTransitionChoiceHtmlPresentation({ inputId, selectedId: deps.escapeAttr(selectedId || ''), value: deps.escapeAttr(lotTransitionChoiceLabel(lot)), optionsHtml: options }); };
   const openLotTransitionV2 = async (id = '') => {
     if (!state().qcPanels.length) { await deps.infoDialog('Hãy tạo Panel QC trước khi tạo chuyển tiếp lô.'); setManageTab('panels'); return; }
     if (state().qcLots.length < 2) { await deps.infoDialog('Cần ít nhất 2 lô QC để tạo chuyển tiếp.'); setManageTab('lots'); return; }
     const tr = state().lotTransitions.find((x: AnyRec) => x.id === id) || { panelId: state().qcPanels[0] && state().qcPanels[0].id, fromLotId: '', toLotId: '', startDate: deps.isoToday(), status: 'planned', approvedBy: '', approvedAt: '' };
     const panels = `<option value="">— Chọn Panel QC —</option>` + state().qcPanels.map((p: AnyRec) => `<option value="${p.id}" ${p.id === tr.panelId ? 'selected' : ''}>${deps.esc(p.name)} · ${deps.esc(deps.instrumentName(p.instrumentId))}</option>`).join('');
-    deps.openModal(deps.pres.lotTransitionModalHtml({ title: id ? 'Sửa hồ sơ chuyển lô' : 'Thêm hồ sơ chuyển lô', panelsHtml: panels, fromChoiceHtml: lotTransitionChoiceHtml('cfgTransFrom', tr.fromLotId), toChoiceHtml: lotTransitionChoiceHtml('cfgTransTo', tr.toLotId), startDateHtml: deps.dateBox('cfgTransStart', tr.startDate || ''), status: tr.status, targetsHtml: lotTransitionTargetsHtml(tr.panelId, tr.fromLotId, tr.toLotId), cancelButtonHtml: deps.btn('Hủy', 'closeModal()', 'ghost'), saveButtonHtml: deps.btn(id ? 'Lưu thay đổi' : 'Thêm hồ sơ chuyển lô', `saveLotTransitionV2('${id}')`, 'teal') }));
+    deps.openModal(deps.pres.lotTransitionModalHtml({ title: id ? 'Sửa hồ sơ chuyển lô' : 'Thêm hồ sơ chuyển lô', panelsHtml: panels, fromChoiceHtml: lotTransitionChoiceHtml('cfgTransFrom', tr.fromLotId), toChoiceHtml: lotTransitionChoiceHtml('cfgTransTo', tr.toLotId), startDateHtml: deps.dateBox('cfgTransStart', tr.startDate || ''), status: tr.status, targetsHtml: lotTransitionTargetsHtml(tr.panelId, tr.fromLotId, tr.toLotId), cancelButtonHtml: deps.btn('Hủy', { action: 'closeModal' }, 'ghost'), saveButtonHtml: deps.btn(id ? 'Lưu thay đổi' : 'Thêm hồ sơ chuyển lô', { action: 'saveLotTransitionV2', args: [id] }, 'teal') }));
   };
   /* Bảng Mean/SD nhúng ngay trong hồ sơ chuyển lô — cùng danh sách xét nghiệm mà
      inspectAcceptedLotTransition() sẽ kiểm tra lúc chấp nhận, để không lệch tiêu
@@ -249,7 +258,7 @@ export function createManageTestsActionsController(deps: {
     const levels = [...new Set(state().qcLots.map((l: AnyRec) => +l.level).filter(Number.isFinite))].sort((a: AnyRec, b: AnyRec) => a - b);
     const levelLayout = levels.length >= 3 ? 'levels-3plus' : levels.length === 2 ? 'levels-2' : 'levels-1';
     const lotColumns = deps.pres.lotGroupColumnsHtml(levels.map((level: AnyRec) => ({ level, lots: state().qcLots.filter((l: AnyRec) => +l.level === level).map((l: AnyRec) => { const selected = (g.lotIds || []).includes(l.id), locked = l.depleted && !selected, to = l.depleted ? deps.lotTransitionToNo(l.id) : '', depletedLabel = l.depleted ? (to ? 'đã chuyển tiếp qua lô ' + to : 'đã hết QC') : ''; return { id: l.id, lotNo: deps.esc(l.lotNo), expiry: l.exp ? deps.vnDate(l.exp) : 'chưa có', selected, depleted: !!l.depleted, locked, depletedLabel: deps.escapeAttr(depletedLabel) }; }) })));
-    deps.openModal(deps.pres.lotGroupModalHtml({ title: id ? 'Sửa nhóm lô' : 'Thêm nhóm lô', levelLayout, lotColumnsHtml: lotColumns, name: deps.escapeAttr(g.name || ''), note: deps.esc(g.note || ''), cancelButtonHtml: deps.btn('Hủy', 'closeModal()', 'ghost'), saveButtonHtml: deps.btn(id ? 'Lưu thay đổi' : 'Thêm nhóm lô', `saveConfigGroup('${id}')`, 'teal') }));
+    deps.openModal(deps.pres.lotGroupModalHtml({ title: id ? 'Sửa nhóm lô' : 'Thêm nhóm lô', levelLayout, lotColumnsHtml: lotColumns, name: deps.escapeAttr(g.name || ''), note: deps.esc(g.note || ''), cancelButtonHtml: deps.btn('Hủy', { action: 'closeModal' }, 'ghost'), saveButtonHtml: deps.btn(id ? 'Lưu thay đổi' : 'Thêm nhóm lô', { action: 'saveConfigGroup', args: [id] }, 'teal') }));
   };
   const suggestConfigGroupName = () => { const ids = [...doc().querySelectorAll('.cfg-group-lot:checked')].map((x: AnyRec) => x.value), name = ids.map((id: unknown) => (state().qcLots.find((l: AnyRec) => l.id === id) || {}).lotNo).filter(Boolean).join('/'), el = doc().getElementById('cfgGroupName'); if (el) el.value = name; };
   const saveConfigGroup = async (id: unknown) => {
@@ -293,7 +302,7 @@ export function createManageTestsActionsController(deps: {
   };
   const openConfigLot = (id = '') => {
     const l = state().qcLots.find((x: AnyRec) => x.id === id) || { level: 1, active: true };
-    deps.openModal(deps.pres.configLotModalHtml({ title: id ? 'Sửa thông tin lô QC' : 'Thêm lô QC', lotNo: deps.escapeAttr(l.lotNo || ''), levelOptionsHtml: deps.pres.configLotLevelOptionsHtml(+l.level), description: deps.escapeAttr(l.description || ''), supplier: deps.escapeAttr(l.supplier || ''), openedDateHtml: deps.dateBox('cfgLotOpened', l.opened || ''), expiryDateHtml: deps.dateBox('cfgLotExp', l.exp || ''), note: deps.esc(l.note || ''), cancelButtonHtml: deps.btn('Hủy', 'closeModal()', 'ghost'), saveButtonHtml: deps.btn(id ? 'Lưu thay đổi' : 'Thêm lô QC', `saveConfigLot('${id}')`, 'teal') }));
+    deps.openModal(deps.pres.configLotModalHtml({ title: id ? 'Sửa thông tin lô QC' : 'Thêm lô QC', lotNo: deps.escapeAttr(l.lotNo || ''), levelOptionsHtml: deps.pres.configLotLevelOptionsHtml(+l.level), description: deps.escapeAttr(l.description || ''), supplier: deps.escapeAttr(l.supplier || ''), openedDateHtml: deps.dateBox('cfgLotOpened', l.opened || ''), expiryDateHtml: deps.dateBox('cfgLotExp', l.exp || ''), note: deps.esc(l.note || ''), cancelButtonHtml: deps.btn('Hủy', { action: 'closeModal' }, 'ghost'), saveButtonHtml: deps.btn(id ? 'Lưu thay đổi' : 'Thêm lô QC', { action: 'saveConfigLot', args: [id] }, 'teal') }));
   };
   const saveConfigLot = async (id: unknown) => {
     if (!deps.requireAdmin()) return;
@@ -342,7 +351,7 @@ export function createManageTestsActionsController(deps: {
   const deleteConfigLot = async (id: unknown) => { if (!deps.requireAdmin()) return; const check = deps.pres.ManageLotWorkflowCommand.checkRemoval({ id }); if (check.error) { if (check.error !== 'not-found') await deps.infoDialog(check.message); return; } if (!await deps.confirmDialog({ kicker: 'Thao tác không thể hoàn tác', title: 'Xóa lô QC', message: `Xóa lô QC ${check.record.lotNo}?`, confirmLabel: 'Xóa lô QC', cancelLabel: 'Hủy' })) return; const result = deps.pres.ManageLotWorkflowCommand.remove({ id }); if (!result.ok) { await deps.infoDialog(result.message); return; } };
   const openConfigInstrument = (id = '') => {
     const i = state().instruments.find((x: AnyRec) => x.id === id) || { active: true };
-    deps.openModal(deps.pres.configInstrumentModalHtml({ title: id ? 'Sửa máy xét nghiệm' : 'Thêm máy xét nghiệm', name: deps.escapeAttr(i.name || ''), section: deps.escapeAttr(i.section || ''), manufacturer: deps.escapeAttr(i.manufacturer || ''), serial: deps.escapeAttr(i.serial || ''), active: i.active !== false, cancelButtonHtml: deps.btn('Hủy', 'closeModal()', 'ghost'), saveButtonHtml: deps.btn(id ? 'Lưu thay đổi' : 'Thêm máy xét nghiệm', `saveConfigInstrument('${id}')`, 'teal') }));
+    deps.openModal(deps.pres.configInstrumentModalHtml({ title: id ? 'Sửa máy xét nghiệm' : 'Thêm máy xét nghiệm', name: deps.escapeAttr(i.name || ''), section: deps.escapeAttr(i.section || ''), manufacturer: deps.escapeAttr(i.manufacturer || ''), serial: deps.escapeAttr(i.serial || ''), active: i.active !== false, cancelButtonHtml: deps.btn('Hủy', { action: 'closeModal' }, 'ghost'), saveButtonHtml: deps.btn(id ? 'Lưu thay đổi' : 'Thêm máy xét nghiệm', { action: 'saveConfigInstrument', args: [id] }, 'teal') }));
   };
   const saveConfigInstrument = async (id: unknown) => {
     if (!deps.requireAdmin()) return;
@@ -368,6 +377,14 @@ export function createManageTestsActionsController(deps: {
     doc().getElementById('cfgAssayName').value = naming.displayName || ref[0]; if (keyEl) keyEl.value = ref[6] || ref[0]; if (sourceEl) sourceEl.value = source;
     doc().getElementById('cfgAssayUnit').value = ref[1] || ''; doc().getElementById('cfgAssayTea').value = tea == null ? '' : tea;
   };
+  /* Pha H2 nhóm (d): thay onchange="const o=this.selectedOptions[0];...".
+     Hàm dùng `this` trần (không phải arrow) vì action-dispatcher.ts gọi qua
+     `fn.apply(el,args)` — chỉ hàm khai báo bằng `function` mới nhận đúng
+     `this`, arrow function bỏ qua thisArg của apply(). */
+  const configAssayInstrumentChanged = function (this: AnyRec) {
+    const o = this.selectedOptions[0], e = doc().getElementById('cfgAssaySection');
+    if (e) e.value = o ? o.dataset.section || '' : '';
+  };
   const openConfigAssay = (id = '') => {
     if (!state().instruments.length) { openConfigInstrument(); return; }
     const t = state().tests.find((x: AnyRec) => x.id === id) || { levels: defaultAssayLevels(), active: true };
@@ -386,7 +403,7 @@ export function createManageTestsActionsController(deps: {
     const cusum = deps.testCusumConfig(t), decimalValue = t.decimalPlaces !== null && t.decimalPlaces !== '' && Number.isInteger(Number(t.decimalPlaces)) ? String(t.decimalPlaces) : String(deps.qcDecimalsDefault()), hasRuleOverrides = deps.wgRules().some(rule => (t.ruleActions && ['inactive', 'alert', 'reject'].includes(t.ruleActions[rule])) || (t.ruleScopes && ['within', 'across', 'both'].includes(t.ruleScopes[rule])));
     const initialRef = configAssayTeaRefs().find(r => t.analyteId && r[6] === t.analyteId) || configAssayFindRef(t.name || t.displayName || ''), initialNaming = initialRef ? configAssayNaming(initialRef) : null, initialName = (initialNaming && initialNaming.displayName) || t.displayName || t.name || '', currentTeaSource = ['lab', 'eflm', 'clia', 'ricos'].includes(t.teaSource) ? t.teaSource : '', initialSource = currentTeaSource || (initialRef ? (initialRef[2] != null ? 'clia' : initialRef[3] != null ? 'ricos' : '') : '');
     const teaOptions = deps.pres.configAssayTeaOptionsHtml(configAssayTeaRefs().map(ref => ({ ref, naming: configAssayNaming(ref) })).sort((a, b) => String(a.ref[4] || '').localeCompare(String(b.ref[4] || ''), 'vi') || String(a.naming.displayName || '').localeCompare(String(b.naming.displayName || ''), 'vi')).map(({ ref, naming }) => ({ value: deps.escapeAttr(naming.displayName || ref[0]), label: deps.escapeAttr([naming.standardName !== naming.displayName ? naming.standardName : '', naming.abbreviation, ...naming.aliases.filter((x: unknown) => x !== ref[0] && x !== naming.displayName && x !== naming.standardName).slice(0, 3), ref[1], ref[4]].filter(Boolean).join(' · ')) })));
-    deps.openModal(deps.pres.configAssayModalHtml({ title: id ? 'Sửa xét nghiệm' : 'Thêm xét nghiệm', name: deps.escapeAttr(initialName), teaOptionsHtml: teaOptions, teaRefKey: deps.escapeAttr((initialRef && (initialRef[6] || initialRef[0])) || ''), teaSource: deps.escapeAttr(initialSource), unit: deps.escapeAttr(t.unit || ''), instrumentsHtml: instruments, section: deps.escapeAttr(t.section || (defaultInst && defaultInst.section) || ''), method: deps.escapeAttr(t.method || ''), decimalOptionsHtml: deps.pres.configAssayDecimalOptionsHtml(decimalValue), reagent: deps.escapeAttr(t.reagent || ''), tea: deps.escapeAttr(t.tea || ''), ruleRowsHtml: ruleRows, hasRuleOverrides, cusumOn: cusum.on, cusumK: deps.escapeAttr(cusum.k), cusumH: deps.escapeAttr(cusum.h), closed: !!t.closed, cancelButtonHtml: deps.btn('Hủy', 'closeModal()', 'ghost'), saveButtonHtml: deps.btn(id ? 'Lưu thay đổi' : 'Thêm xét nghiệm', `saveConfigAssay('${id}')`, 'teal') }));
+    deps.openModal(deps.pres.configAssayModalHtml({ title: id ? 'Sửa xét nghiệm' : 'Thêm xét nghiệm', name: deps.escapeAttr(initialName), teaOptionsHtml: teaOptions, teaRefKey: deps.escapeAttr((initialRef && (initialRef[6] || initialRef[0])) || ''), teaSource: deps.escapeAttr(initialSource), unit: deps.escapeAttr(t.unit || ''), instrumentsHtml: instruments, section: deps.escapeAttr(t.section || (defaultInst && defaultInst.section) || ''), method: deps.escapeAttr(t.method || ''), decimalOptionsHtml: deps.pres.configAssayDecimalOptionsHtml(decimalValue), reagent: deps.escapeAttr(t.reagent || ''), tea: deps.escapeAttr(t.tea || ''), ruleRowsHtml: ruleRows, hasRuleOverrides, cusumOn: cusum.on, cusumK: deps.escapeAttr(cusum.k), cusumH: deps.escapeAttr(cusum.h), closed: !!t.closed, cancelButtonHtml: deps.btn('Hủy', { action: 'closeModal' }, 'ghost'), saveButtonHtml: deps.btn(id ? 'Lưu thay đổi' : 'Thêm xét nghiệm', { action: 'saveConfigAssay', args: [id] }, 'teal') }));
   };
   const saveConfigAssay = async (id: unknown) => {
     if (!deps.requireAdmin()) return;
@@ -427,6 +444,6 @@ export function createManageTestsActionsController(deps: {
     suggestConfigGroupName, saveConfigGroup, deleteConfigGroup, toggleLotGroupStatus, activateLotGroup,
     openConfigLot, saveConfigLot, renameLotAcrossPoints, deleteConfigLot, openConfigInstrument,
     saveConfigInstrument, deleteConfigInstrument, defaultAssayLevels, configAssayTeaRefs, configAssayRefRecord,
-    configAssayNaming, configAssayFindRef, configAssaySuggestionInput, openConfigAssay, saveConfigAssay, delTest,
+    configAssayNaming, configAssayFindRef, configAssaySuggestionInput, configAssayInstrumentChanged, openConfigAssay, saveConfigAssay, delTest,
   };
 }

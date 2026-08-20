@@ -4,7 +4,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
-const ctx = loadSandbox(['core.js', 'modules/state.js']);
+const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js']);
 run(ctx, `
   var currentUser = { id: 'u1', username: 'admin', name: 'Admin', role: 'admin' };
   var fb = { clientId: 'client-a' };

@@ -27,7 +27,7 @@ export function createReagentPageController(deps: {
   requireWrite: () => boolean;
   requireAdmin: () => boolean;
   dateBox: (id: string, value: string, cls: string, attrs: string) => string;
-  button: (label: string, action: string, cls?: string, title?: string, options?: AnyRec) => string;
+  button: (label: string, action: string | { action: string; args?: unknown[] } | null, cls?: string, title?: string, options?: AnyRec) => string;
   headOnly: (title: string, subtitle: string, actions?: string) => string;
   emptyState: (title: string, body: string, actions?: string) => string;
   searchText: (value: unknown) => string;
@@ -65,9 +65,9 @@ export function createReagentPageController(deps: {
     const ds = rcAct(), t = ds.test, ro = !deps.canWrite() ? 'disabled' : '';
     const oldLotHead = 'Lô cũ' + (t.lotOld ? `: ${deps.esc(t.lotOld)}` : ''), newLotHead = 'Lô mới' + (t.lotNew ? `: ${deps.esc(t.lotNew)}` : '');
     const rows = ds.rows.map((r: AnyRec, i: number) => { const c = rcPairCalc(r); return deps.pres.pairRow({ index: i, row: r, readOnly: !deps.canWrite(), pair: c, format: deps.fmt, escAttr: deps.escapeAttr }); }).join('');
-    const toolbarHtml = deps.pres.toolbar({ selectOptionsHtml: rcSelectOptions(), primaryActionsHtml: deps.canWrite() ? deps.button('+ Thêm', 'openRcCreateModal()', 'teal rc-add-btn') + deps.button(rcToolIcon('trash') + ' Xóa', 'rcDeleteCurrent()', 'danger rc-delete-btn') : '', secondaryActionsHtml: (deps.canWrite() ? deps.button(rcToolIcon('search') + ' Tìm', 'openRcModal()', 'ghost rc-find-btn') : '') + deps.button(rcToolIcon('print') + ' In hóa chất này', 'rcPrint()', 'teal rc-report-btn') + deps.button(rcToolIcon('report') + ' Báo cáo tổng hợp', 'rcPrintSummary()', 'teal rc-report-main') });
-    const pairPanelHtml = deps.pres.pairPanel({ oldLotHeadHtml: oldLotHead, newLotHeadHtml: newLotHead, rowsHtml: rows, actionsHtml: deps.canWrite() ? deps.button('+ Thêm mẫu', 'rcAddRow()', 'ghost sm') + ' ' + deps.button('Xóa dữ liệu', 'rcClearRows()', 'ghost sm') : '', minPairs: RC_MIN_PAIRS });
-    const infoPanelHtml = deps.pres.infoPanel({ disabledAttr: ro, reagentValueHtml: deps.escapeAttr(t.reagent), unitValueHtml: deps.escapeAttr(t.unit), lotOldValueHtml: deps.escapeAttr(t.lotOld), lotNewValueHtml: deps.escapeAttr(t.lotNew), dateInputHtml: deps.dateBox('rcDate', t.date || '', '', `${ro} onchange="rcMeta('date',this.value)"`), operatorValueHtml: deps.escapeAttr(t.operator), sampleTypeValueHtml: deps.escapeAttr(t.sampleType), biasTarget: t.biasTarget, alpha: t.alpha, coverageChecked: !!t.coverageConfirmed, canWrite: deps.canWrite(), userIconHtml: rcMiniIcon('user'), sampleIconHtml: rcMiniIcon('sample') });
+    const toolbarHtml = deps.pres.toolbar({ selectOptionsHtml: rcSelectOptions(), primaryActionsHtml: deps.canWrite() ? deps.button('+ Thêm', { action: 'openRcCreateModal' }, 'teal rc-add-btn') + deps.button(rcToolIcon('trash') + ' Xóa', { action: 'rcDeleteCurrent' }, 'danger rc-delete-btn') : '', secondaryActionsHtml: (deps.canWrite() ? deps.button(rcToolIcon('search') + ' Tìm', { action: 'openRcModal' }, 'ghost rc-find-btn') : '') + deps.button(rcToolIcon('print') + ' In hóa chất này', { action: 'rcPrint' }, 'teal rc-report-btn') + deps.button(rcToolIcon('report') + ' Báo cáo tổng hợp', { action: 'rcPrintSummary' }, 'teal rc-report-main') });
+    const pairPanelHtml = deps.pres.pairPanel({ oldLotHeadHtml: oldLotHead, newLotHeadHtml: newLotHead, rowsHtml: rows, actionsHtml: deps.canWrite() ? deps.button('+ Thêm mẫu', { action: 'rcAddRow' }, 'ghost sm') + ' ' + deps.button('Xóa dữ liệu', { action: 'rcClearRows' }, 'ghost sm') : '', minPairs: RC_MIN_PAIRS });
+    const infoPanelHtml = deps.pres.infoPanel({ disabledAttr: ro, reagentValueHtml: deps.escapeAttr(t.reagent), unitValueHtml: deps.escapeAttr(t.unit), lotOldValueHtml: deps.escapeAttr(t.lotOld), lotNewValueHtml: deps.escapeAttr(t.lotNew), dateInputHtml: deps.dateBox('rcDate', t.date || '', '', `${ro} data-action="rcMeta" data-args='["date"]' data-action-on="change"`), operatorValueHtml: deps.escapeAttr(t.operator), sampleTypeValueHtml: deps.escapeAttr(t.sampleType), biasTarget: t.biasTarget, alpha: t.alpha, coverageChecked: !!t.coverageConfirmed, canWrite: deps.canWrite(), userIconHtml: rcMiniIcon('user'), sampleIconHtml: rcMiniIcon('sample') });
     const chartsPanelHtml = deps.pres.chartsPanel();
     const resultsPanelsHtml = deps.pres.resultsPanels();
     return deps.headOnly('So sánh 2 lô hóa chất', 'Sàng lọc định lượng · hồi quy mô tả · Bland-Altman · phê duyệt theo SOP') +
@@ -121,8 +121,8 @@ export function createReagentPageController(deps: {
   const rcOpenQuick = (type: string) => { if (!deps.requireWrite()) return; deps.ui().rcQuickType = type; rcRenderQuickModal(); };
   const rcRenderQuickModal = () => {
     const type = deps.ui().rcQuickType || 'operator', items = rcQuickList(type), label = rcQuickLabel(type);
-    const rows = deps.pres.quickPickerRows({ items, labelHtml: deps.esc(label), esc: deps.esc, selectButtonHtml: (i: number) => deps.button('Chọn', `rcPickQuick(${i})`, 'teal sm') });
-    deps.openModal(deps.pres.quickPickerModal({ labelHtml: deps.esc(label), rowsHtml: rows, placeholderHtml: deps.escapeAttr(label), addButtonHtml: deps.button('Thêm', 'rcAddQuick()', 'teal sm'), closeButtonHtml: deps.button('Đóng', 'closeModal()', 'ghost') }));
+    const rows = deps.pres.quickPickerRows({ items, labelHtml: deps.esc(label), esc: deps.esc, selectButtonHtml: (i: number) => deps.button('Chọn', { action: 'rcPickQuick', args: [i] }, 'teal sm') });
+    deps.openModal(deps.pres.quickPickerModal({ labelHtml: deps.esc(label), rowsHtml: rows, placeholderHtml: deps.escapeAttr(label), addButtonHtml: deps.button('Thêm', { action: 'rcAddQuick' }, 'teal sm'), closeButtonHtml: deps.button('Đóng', { action: 'closeModal' }, 'ghost') }));
     deps.requestFrame(() => { const e = deps.document.getElementById('rcQuickNew') as AnyRec; if (e) e.focus(); }, 0);
   };
   const rcPickQuick = (i: number) => { const result = deps.service.pickQuick(deps.getState(), { id: deps.ui().rcId, type: deps.ui().rcQuickType, index: i }); if (result.error) return; deps.save({ clearDerived: false }); deps.closeModal(); deps.rerender(); };
@@ -141,8 +141,8 @@ export function createReagentPageController(deps: {
   const renderRcModal = () => {
     const q = deps.searchText(deps.ui().rcModalQ);
     const hit = (d: AnyRec) => !q || [rcLabel(d), d.test.reagent, d.test.lotOld, d.test.lotNew, d.test.unit, d.test.operator].some((v: unknown) => deps.searchText(v).includes(q));
-    const rows = deps.pres.pickerRows({ items: deps.getState().reagentTests.filter(hit).map((d: AnyRec) => ({ id: d.id, labelHtml: deps.esc(rcLabel(d)), unitHtml: deps.esc(d.test.unit || ''), rowCount: d.rows && d.rows.length || 0, selected: d.id === deps.ui().rcId })), canWrite: deps.canWrite(), selectButtonHtml: (id: string, selected: boolean) => deps.button(selected ? 'Đang chọn' : 'Chọn', `rcPick('${id}')`, (selected ? 'teal' : 'ghost') + ' sm') });
-    deps.openModal(deps.pres.pickerModal({ searchValueHtml: deps.escapeAttr(deps.ui().rcModalQ), rowsHtml: rows, closeButtonHtml: deps.button('Đóng', 'closeModal()', 'ghost') }));
+    const rows = deps.pres.pickerRows({ items: deps.getState().reagentTests.filter(hit).map((d: AnyRec) => ({ id: d.id, labelHtml: deps.esc(rcLabel(d)), unitHtml: deps.esc(d.test.unit || ''), rowCount: d.rows && d.rows.length || 0, selected: d.id === deps.ui().rcId })), canWrite: deps.canWrite(), selectButtonHtml: (id: string, selected: boolean) => deps.button(selected ? 'Đang chọn' : 'Chọn', { action: 'rcPick', args: [id] }, (selected ? 'teal' : 'ghost') + ' sm') });
+    deps.openModal(deps.pres.pickerModal({ searchValueHtml: deps.escapeAttr(deps.ui().rcModalQ), rowsHtml: rows, closeButtonHtml: deps.button('Đóng', { action: 'closeModal' }, 'ghost') }));
     deps.requestFrame(() => { const e = deps.document.getElementById('rcModalSearch') as AnyRec; if (e) { e.focus(); e.setSelectionRange(e.value.length, e.value.length); } }, 0);
   };
   const rcPick = (id: string) => { deps.ui().rcId = id; deps.closeModal(); deps.rerender(); };
@@ -152,12 +152,12 @@ export function createReagentPageController(deps: {
   const renderRcCreateModal = () => {
     const q = deps.ui().rcCreateModalQ.trim(), ql = deps.searchText(q);
     const cats: Record<string, AnyRec[]> = {}; deps.refTests().forEach((r: AnyRec) => { if (ql && ![r[0], r[1], r[4], deps.teaAnalyteDisplay(r[0])].some((v: unknown) => deps.searchText(v).includes(ql))) return; (cats[r[4]] = cats[r[4]] || []).push(r); });
-    const refs = deps.pres.createReferenceRows(Object.keys(cats).map(cat => ({ nameHtml: deps.esc(cat), rowsHtml: cats[cat].map((r: AnyRec) => `<button class="refrow" onclick="rcCreateFrom('${deps.jsq(r[0])}','${deps.jsq(r[1] || '')}')">${deps.esc(deps.teaAnalyteDisplay(r[0]))}</button>`).join('') })), '');
-    const createTyped = deps.pres.createTypedRow(q ? deps.esc(q) : '', q ? `rcCreateFrom('${deps.jsq(q)}','')` : "rcCreateFrom('Hóa chất mới','')");
-    deps.openModal(deps.pres.createModal({ searchValueHtml: deps.escapeAttr(deps.ui().rcCreateModalQ), createTypedHtml: createTyped, referenceRowsHtml: refs, emptyReferenceHtml: '<div class="empty" style="padding:18px">Không tìm thấy trong danh mục chuẩn.</div>', closeButtonHtml: deps.button('Đóng', 'closeModal()', 'ghost') }));
+    const refs = deps.pres.createReferenceRows(Object.keys(cats).map(cat => ({ nameHtml: deps.esc(cat), rowsHtml: cats[cat].map((r: AnyRec) => `<button class="refrow" data-action="rcCreateFrom" data-args="${deps.escapeAttr(JSON.stringify([r[0], r[1] || '']))}">${deps.esc(deps.teaAnalyteDisplay(r[0]))}</button>`).join('') })), '');
+    const createTyped = deps.pres.createTypedRow(q ? deps.esc(q) : '', `data-action="rcCreateFrom" data-args="${deps.escapeAttr(JSON.stringify([q || 'Hóa chất mới']))}"`);
+    deps.openModal(deps.pres.createModal({ searchValueHtml: deps.escapeAttr(deps.ui().rcCreateModalQ), createTypedHtml: createTyped, referenceRowsHtml: refs, emptyReferenceHtml: '<div class="empty" style="padding:18px">Không tìm thấy trong danh mục chuẩn.</div>', closeButtonHtml: deps.button('Đóng', { action: 'closeModal' }, 'ghost') }));
     deps.requestFrame(() => { const e = deps.document.getElementById('rcCreateSearch') as AnyRec; if (e) { e.focus(); e.setSelectionRange(e.value.length, e.value.length); } }, 0);
   };
-  const rcCreateFrom = (name: string, unit: string) => { if (!deps.requireWrite()) return; const result = deps.workflow.create({ id: deps.uid(), name, unit }); if (result.error) return; deps.ui().rcId = result.comparison.id; deps.closeModal(); deps.rerender(); };
+  const rcCreateFrom = (name: string, unit = '') => { if (!deps.requireWrite()) return; const result = deps.workflow.create({ id: deps.uid(), name, unit }); if (result.error) return; deps.ui().rcId = result.comparison.id; deps.closeModal(); deps.rerender(); };
   const rcFmt = (x: AnyRec, k = 4) => deps.pres.report.formatNumber(x, k);
   const rcFmtT = (x: AnyRec) => deps.pres.report.formatTStatistic(x);
   const rcDateText = (v: AnyRec) => v ? deps.esc(deps.vnDate(v)) : deps.formatDateTimeVN(new Date().toISOString()).split(' ').slice(1).join(' ');

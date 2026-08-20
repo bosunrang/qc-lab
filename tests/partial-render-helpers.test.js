@@ -5,7 +5,6 @@ const { loadSandbox, run } = require('./helpers/sandbox');
 
 const ctx = loadSandbox([
   'core.js',
-  'modules/state.js',
   'generated/modular-pilot.js',
 ], { document: { addEventListener() {} } });
 
@@ -67,9 +66,9 @@ const keyboardTree = run(ctx, `
   (function(){
     var events=[],items=[0,1,2].map(function(i){return{offsetParent:{},focus:function(){events.push('focus:'+i);},click:function(){events.push('click:'+i);},getAttribute:function(name){return name==='aria-expanded'&&i===0?'false':null;}};});
     document={querySelectorAll:function(){return items;}};
-    entryTreeKey({currentTarget:items[1],key:'ArrowDown',preventDefault:function(){events.push('prevent:down');}});
-    entryTreeKey({currentTarget:items[1],key:'Enter',preventDefault:function(){events.push('prevent:enter');}});
-    entryTreeKey({currentTarget:items[0],key:'ArrowRight',preventDefault:function(){events.push('prevent:right');}});
+    entryTreeKey.call(items[1],{key:'ArrowDown',preventDefault:function(){events.push('prevent:down');}});
+    entryTreeKey.call(items[1],{key:'Enter',preventDefault:function(){events.push('prevent:enter');}});
+    entryTreeKey.call(items[0],{key:'ArrowRight',preventDefault:function(){events.push('prevent:right');}});
     return events;
   })()
 `);

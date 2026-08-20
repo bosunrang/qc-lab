@@ -157,7 +157,7 @@ assert.equal(QCCore.uncertaintyBudget({cv: -2}), null, 'CV âm bị loại');
 
 /* ===== 3. Nối vào trang Sigma ===== */
 
-const ctx = loadSandbox(['core.js', 'modules/state.js', 'generated/modular-pilot.js']);
+const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js']);
 
 assert.equal(ctx.sgMuDominant({shares: {uRw: .1, uBias: .8, uCal: .1}}), 'u(bias) chiếm 80%', 'thành phần trội được nêu tên để biết đi sửa cái gì trước');
 assert.equal(ctx.sgMuDominant({shares: {uRw: .4, uBias: .35, uCal: .25}}), '', 'ba thành phần xấp xỉ nhau thì không gợi ý sai một "thủ phạm"');

@@ -12,7 +12,7 @@ assert.match(html, /<h3>Chọn nhanh Người thực hiện<\/h3>/, 'Tiêu đề
 assert.match(html, /<div class="mrow">Nguyễn A<\/div>/, 'Các dòng chọn nhanh phải được giữ nguyên');
 assert.match(html, /id="rcQuickNew"/, 'Ô thêm nhanh phải giữ ID để focus');
 assert.match(html, /placeholder="Thêm Người thực hiện mới"/, 'Placeholder phải nhận nhãn đã escape');
-assert.match(html, /rcAddQuick\(\)/, 'Phím Enter phải thêm mục nhanh');
+assert.match(html, /data-keydown-action="rcAddQuick" data-keydown-keys='\["Enter"\]'/, 'Phím Enter phải thêm mục nhanh');
 assert.match(html, /<button>Thêm<\/button>/, 'Nút thêm phải được ghép vào modal');
 assert.match(html, /<button>Đóng<\/button>/, 'Nút đóng phải được ghép vào modal');
 

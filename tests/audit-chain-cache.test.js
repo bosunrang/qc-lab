@@ -10,7 +10,7 @@ const { loadSandbox, run } = require('./helpers/sandbox');
  * hoac cache khong xa khi nhat ky doi, se khien pageAudit() hien trang thai chuoi cu
  * hoac treo giao dien tren nhat ky lon ma khong test nao bat duoc.
  */
-const ctx = loadSandbox(['core.js', 'modules/state.js']);
+const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js']);
 run(ctx, `
   var currentUser = { id: 'u1', username: 'admin', name: 'Admin', role: 'admin' };
   var fb = { clientId: 'client-a' };

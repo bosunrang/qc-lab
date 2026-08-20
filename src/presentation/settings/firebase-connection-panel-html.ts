@@ -1,4 +1,4 @@
-export function createFirebaseConnectionPanelHtml(deps: { escape: (value: unknown) => string; escapeAttribute: (value: unknown) => string; button: (label: string, action: string, variant: string) => string }) {
+export function createFirebaseConnectionPanelHtml(deps: { escape: (value: unknown) => string; escapeAttribute: (value: unknown) => string; button: (label: string, action: string | { action: string; args?: unknown[] } | null, variant: string) => string }) {
   return (input: { labCode?: unknown; email?: unknown; config?: unknown; locked?: unknown; dataPath?: unknown }): string => {
     const locked = !!input.locked;
     const readOnly = locked ? 'readonly' : '';
@@ -19,6 +19,6 @@ export function createFirebaseConnectionPanelHtml(deps: { escape: (value: unknow
   messagingSenderId: "...",
   appId: "..."
 };'>${deps.escape(config)}</textarea>
-     <div class="firebase-actions">${deps.button('Lưu &amp; kết nối', 'saveFb()', 'teal')} ${deps.button('Ngắt đám mây', 'clearFb()', 'ghost')}</div></div>`;
+     <div class="firebase-actions">${deps.button('Lưu &amp; kết nối', { action: 'saveFb' }, 'teal')} ${deps.button('Ngắt đám mây', { action: 'clearFb' }, 'ghost')}</div></div>`;
   };
 }

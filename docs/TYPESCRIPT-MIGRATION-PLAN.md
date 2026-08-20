@@ -128,11 +128,12 @@ chuyển toàn bộ bản in (`openPrint`, `printReport`/`printWestgard`/`printS
 `printRangeForm`) sang TypeScript. Route 15 chuyển nốt xuất CSV/XLSX (Sigma + Báo cáo +
 Westgard) — **toàn bộ nhóm B (Canvas/adapter) của Pha G đã hoàn tất**.
 
-**Chưa xong — 7 file classic còn lại, chia theo nhóm rủi ro:**
+**Nhóm C (Hạ tầng/bootstrap) đã HOÀN TẤT 2026-08-20 — `assets/modules/` rỗng.**
+Chỉ còn nhóm D (lõi UMD + worker, dự án con parity riêng):
 
 | Nhóm | File | Dòng | Ghi chú port |
 | --- | --- | --- | --- |
-| **C. Hạ tầng/bootstrap** (rủi ro cao — kế hoạch yêu cầu làm CUỐI, từng lát độc lập) | `state.js` | 128 | `ensureShape`/state gốc; lifecycle nhạy. **Đã TÁCH NỀN 2026-08-19** (state + cache + mem/startupProblem → globalThis property, xem lát tách nền bên dưới) — chưa retire, nhưng port sau này giờ đã mang tính cơ học |
+| **C. Hạ tầng/bootstrap** (đã HOÀN TẤT 2026-08-20) | ~~`state.js`~~ | ~~140~~ | **xong 2026-08-20, Lát nhóm C — 6 (LÁT CUỐI)** — xem "Kế hoạch các lát nhóm C còn lại" |
 | | ~~`qc-domain.js`~~ | ~~255~~ | **xong 2026-08-20, Lát nhóm C — 5** — xem "Kế hoạch các lát nhóm C còn lại" |
 | | ~~`state-storage.js`~~ | ~~120~~ | **xong 2026-08-20, Lát nhóm C — 4** — xem "Kế hoạch các lát nhóm C còn lại" |
 | | ~~`local-store.js`~~ | ~~13~~ | **xong 2026-08-19, Hạ tầng lát 1** — xem bên dưới |
@@ -142,7 +143,7 @@ Westgard) — **toàn bộ nhóm B (Canvas/adapter) của Pha G đã hoàn tất
 | | ~~`range.js`~~ | ~~95~~ | **xong 2026-08-19, Hạ tầng lát 4** — xem bên dưới |
 | | ~~`backup-ui.js`~~ | ~~27~~ | **xong 2026-08-19, Hạ tầng lát 2** — xem bên dưới |
 | | ~~`app-meta.js`~~ | ~~28~~ | **xong 2026-08-19, Hạ tầng lát 3** — xem bên dưới |
-| | `analyte-catalog.js` | 80 | dữ liệu measurand đóng băng (thuần data) — `state.js` đọc TRẦN ở top-level, xem cảnh báo bên dưới |
+| | ~~`analyte-catalog.js`~~ | ~~80~~ | **xong 2026-08-20, Lát nhóm C — 6 (LÁT CUỐI, cùng lát với state.js)** |
 | **D. Lõi UMD + worker** (dự án con parity riêng, làm sau cùng Pha G) | `assets/core.js` | 637 | UMD, dùng chung Node/browser/worker |
 | | `assets/workers/westgard-worker.js` | — | contract worker, cần parity test |
 | **E. Bootstrap cuối** | `assets/app.js` | 9 | entry `boot()` — xử lý ở đầu Pha H |
@@ -1938,20 +1939,12 @@ phải tách nền nó; làm sớm để gỡ mọi ràng buộc thứ tự.)
    xanh). Chỉ khi retire `state.js` mới cần chuyển các const này thành
    `globalThis.X`/`root.X` hoặc đưa vào bundle.
 
-6. **Lát cuối — retire `state.js` + `analyte-catalog.js` CÙNG MỘT LÁT.** Chỉ khi
-   5 file trên đã vào bundle (không còn classic reader nào đọc `state`/caches/
-   `WG_RULES`/`TEA_ANALYTE_CATALOG` trần). Hai file phải đi cùng vì `state.js`
-   đọc `TEA_ANALYTE_CATALOG` trần Ở TOP-LEVEL (dựng `REFTESTS`/`TEA_ANALYTE_META`
-   ngay lúc nạp) — tách rời sẽ vỡ boot. Khi vào bundle: `globalThis.state=`/
-   `globalThis.wgMemo=`… chuyển nguyên vẹn (đã tách nền); các `const` data
-   (`WG_RULES`/`REFTESTS`/`TEA_*`/`STATE_SCHEMA_VERSION`) thành `root.X` hoặc để
-   bundle-internal nếu không còn caller trần; hàm delegator (`fmt`/`isoToday`/
-   `ensureShape`/`uid`/…) thành `root.X`. Gate: TOÀN BỘ (test + typecheck +
-   ui-check + nce-check + a11y + visual-check + print-check + benchmark) — đây là
-   lát đóng nhóm C.
+6. ~~**Lát cuối — retire `state.js` + `analyte-catalog.js` CÙNG MỘT LÁT.**~~ —
+   **xong 2026-08-20, xem "Lát nhóm C — 6" bên dưới.**
 
-Sau nhóm C: `assets/modules/` rỗng. Còn lại `assets/core.js` (nhóm D),
-`assets/workers/westgard-worker.js` (nhóm D), `assets/app.js` (Pha H).
+**Pha G nhóm C hoàn tất 2026-08-20.** `assets/modules/` rỗng. Còn lại
+`assets/core.js` (nhóm D), `assets/workers/westgard-worker.js` (nhóm D),
+`assets/app.js` (Pha H).
 
 #### Lát 0 — tách nền `fb` + `storageHydrationPromise` (2026-08-20, xong)
 
@@ -2456,21 +2449,665 @@ Sau lát này: nhóm C chỉ còn ĐÚNG MỘT lát cuối — retire `state.js`
 `analyte-catalog.js` CÙNG LÚC (bắt buộc cùng lúc vì `state.js` đọc
 `TEA_ANALYTE_CATALOG` đồng bộ ở top-level).
 
-### Pha H — bỏ global bridge và nhiều script tags
+#### Lát nhóm C — 6 (LÁT CUỐI, đóng nhóm C): `state.js` + `analyte-catalog.js` (2026-08-20, xong)
 
-Chỉ bắt đầu khi Pha G hoàn thành.
+Retire `assets/modules/state.js` (140 dòng — `state` gốc, `ensureShape()`,
+toàn bộ hàm định dạng/ngày giờ/nhân sự dùng chung) CÙNG `assets/modules/
+analyte-catalog.js` (80 dòng — `TEA_ANALYTE_CATALOG`, dữ liệu tĩnh) vào
+`src/compat/modular-pilot.global.ts` trong MỘT lát, đúng như kế hoạch đã ghi
+từ lát tách nền: `state.js` đọc `TEA_ANALYTE_CATALOG` đồng bộ ở top-level
+(`REFTESTS`/`TEA_ANALYTE_META`), tách rời sẽ vỡ boot. Đây là lát ĐÓNG NHÓM C —
+sau lát này `assets/modules/` rỗng hoàn toàn.
 
-1. Thay `modular-pilot.global.ts` bằng entry composition có kiểu dữ liệu.
-2. Chuyển event binding/router/bootstrap vào TypeScript entry.
-3. Giảm dần các `<script defer>` đến một entry bundle do Vite sinh ra.
-4. Giữ Firebase CDN riêng chỉ nếu vẫn cần compat SDK; nếu đổi cách nạp SDK thì
-   đó là quyết định hạ tầng có test offline/Electron riêng.
-5. Retire `assets/app.js`, sau cùng xử lý `core.js`/worker bằng dự án nhỏ độc
-   lập có parity test.
+**Vị trí chèn — quan trọng hơn 5 lát trước:** không đặt cạnh cụm dependency của
+riêng nó (như 5 lát trước) mà đặt NGAY SAU guard kiểm tra `root.QCCore` hợp lệ,
+TRƯỚC MỌI thứ khác trong bundle (kể cả `root.QCLAB_APP`/`installUiState(...)`).
+Lý do: đúng thứ tự nạp classic cũ (`analyte-catalog.js` → `state.js` → mọi
+module khác), và ít nhất một chỗ trong bundle (`SigmaTeaResolution`'s factory)
+đọc `TEA_SOURCE_REGISTRY`/`TEA_ANALYTE_CATALOG`/`REFTESTS` TRỰC TIẾP KHÔNG QUA
+lazy closure ngay lúc gọi — nếu port của lát này nằm SAU điểm đó, ba tên sẽ vẫn
+`undefined` khi guard đó chạy. Xác nhận bằng thực nghiệm `vm.runInContext` hai
+lần riêng biệt trên cùng context: một `const` khai TRONG một IIFE ở lần chạy
+đầu KHÔNG thấy được bằng tham chiếu trần ở lần chạy sau (`ReferenceError`),
+nhưng một `globalThis.X=`/`root.X=` ở lần chạy đầu THÌ thấy được — xác nhận lại
+đúng bẫy "IIFE-scope" đã ghi từ lát 4, lần này áp dụng cho DATA CONST chứ không
+chỉ biến khả biến.
 
-Pha H hoàn thành khi `index.html` không còn phụ thuộc thứ tự load của các source
-classic script, không còn shared global application API và toàn bộ source ứng
-dụng nằm trong `src/`.
+**~55 tên phải chuyển `root.X=`:** toàn bộ 41 hàm (tất cả vốn là `function`
+classic, tự thành property `globalThis` sẵn — chuyển sang `root.X=` an toàn
+không cần rà thêm) và 14 tên DATA (`const`/`globalThis.X=` sẵn có):
+`TEA_ANALYTE_CATALOG`, `teaAnalyteKey`, `REFTESTS`, `TEA_ANALYTE_META`,
+`TEA_ANALYTE_META_BY_ID`, `TEA_REFERENCE_SCHEMA_VERSION`,
+`teaReferenceSchemaVersion`, `TEA_SOURCE_REGISTRY`, `WG_RULE_REGISTRY`,
+`WG_RULES`, `WG_DEFAULT`, `STATE_SCHEMA_VERSION`, `QC_DECIMALS_DEFAULT`,
+`QC_DECIMALS_MAX`, `QC_STAT_EXTRA_DECIMALS` — cộng `state`/`mem`/`pointsCache`/
+`pointsIndexCache`/`pointsLotCache`/`wgMemo`/`acceptedMemo`/`cusumMemo`/
+`derivedIndex`/`startupProblem`/`legacyDerivedCacheState` (đã là
+`globalThis.X=` từ lát tách nền 2026-08-19, chuyển nguyên vẹn sang `root.X=`
+trong bundle — không đổi bản chất, chỉ đổi nơi khai báo). `WG_RULES`/
+`QC_DECIMALS_DEFAULT`/`REFTESTS`/`TEA_SOURCE_REGISTRY`/`teaAnalyteKey` trước
+đây CHỈ là `const` global lexical (đọc trần được nhờ "script scope" dùng
+chung giữa các thẻ `<script>` cổ điển, KHÔNG phải property) — comment ambient
+declare cũ mô tả sai lệch sau lát này nên đã cập nhật lại tại từng chỗ.
+
+**Không xóa nhánh dead code nào ở đây** (khác 5 lát trước) — mọi hàm/const của
+`state.js` đều còn caller thật, không có JS fallback nào để dọn.
+
+**4 nhóm lỗi typecheck, đều là kiểu dữ liệu quá lỏng/quá chặt so với chỗ khác
+trong file, không phải bẫy hành vi:**
+1. `legacyDerivedCacheState` — trùng khai báo: đã có SẴN một `const
+   legacyDerivedCacheState=(root as any).legacyDerivedCacheState;` thật ở chỗ
+   gọi `installDerivedCacheInvalidation` (dòng ~3600) — bỏ ambient declare mới
+   thêm, dùng lại khai báo có sẵn.
+2. `qcValueDecimals` — trùng field: `root.qcValueDecimals?: (value: unknown) =>
+   number` đã tồn tại từ trước (một lát khác forward-reference sẵn), field mới
+   thêm của lát này là bản sao — xóa bản trùng, giữ bản gốc (khớp kiểu, vì
+   `(value: any) => number` gán được cho `(value: unknown) => number`).
+3. `REFTESTS` — `Object.freeze(array.map(row=>Object.freeze([...])))` cho kiểu
+   thực tế `readonly (readonly any[])[]`, lệch với field khai `readonly
+   any[][]` (đã có từ trước, có test dò nguyên văn chuỗi ambient declare —
+   xem mục dưới) — sửa bằng ép kiểu `as readonly any[][]` ngay tại chỗ gán,
+   giữ nguyên khai báo field.
+4. `ManageConfigState`/`PeriodState` — các phương thức của
+   `ManageConfigService`/`PeriodService` đòi kiểu `state` chặt hơn (cần
+   `instruments`/`machines`...) so với kiểu lỏng `Record<string, any> &
+   {data?:...; tests?:...}` đã khai cho `root.state` — ép `state as any` tại
+   5 điểm gọi, khớp mẫu `s as any` đã dùng sẵn ở nơi khác trong file cho đúng
+   hai service này.
+
+**1 test dò nguyên văn chuỗi ambient declare chặn một lần sửa kiểu:**
+`tests/tea-reference-service-bridge.test.js` khẳng định `declare const
+REFTESTS: readonly any[][];` xuất hiện Y NGUYÊN trong bundle (chốt bài học cũ:
+`sigma-tea-resolution.ts`'s wiring từng đọc nhầm `(globalThis as
+any).REFTESTS`, luôn `undefined`, làm sửa CLIA/Ricos trong tab "Bảng TEa tham
+chiếu" ném lỗi) — đây là lý do chọn ép kiểu tại chỗ gán (mục 3 trên) thay vì
+đổi field, giữ nguyên assertion cũ không cần sửa test.
+
+**`manageTargetGroup`** (đọc/ghi trần trong `applyAcceptedLotTransitionToConfig`/
+`normalizeLotGroups`, cùng `typeof...!=='undefined'` guard y hệt bản classic) —
+xác nhận đây là accessor thật của `ManageUIState` (`ui-state.ts`), đã khai
+`declare var manageTargetGroup: any;` sẵn ở `global.d.ts` gốc nhưng KHÔNG khai
+trong `modular-pilot.global.ts` (file này là module — có `import` — nên ambient
+declare ở `global.d.ts` không tự lan vào; phải khai riêng bên trong file này).
+Thêm `declare let manageTargetGroup: any;` cạnh khối `auditQ`/… cùng mẫu.
+
+**`assets/modules/` RỖNG sau khi xóa hai file** — `git status`/`ls` xác nhận.
+`index.html` giảm từ 3 thẻ `<script>` classic (`core.js`/`analyte-catalog.js`/
+`state.js`) xuống còn 1 (`core.js`), cộng bundle và `app.js`.
+
+**Dọn nhánh tự chèn bundle (`sandbox.js`)** — nhánh này kiểm `files.includes(
+'modules/state.js')` để tự thêm `analyte-catalog.js` + đẩy bundle vào cuối
+danh sách; vì `modules/state.js` không còn tồn tại, nhánh này VĨNH VIỄN không
+kích hoạt nữa — xóa hẳn (không phải comment lại), doc comment ở đầu file cũng
+cập nhật: mọi sandbox cần state/domain logic từ nay phải tự liệt kê
+`'generated/modular-pilot.js'` tường minh.
+
+**Cập nhật 41 file test/benchmark** (đọc/nạp file classic đã xóa qua
+`loadSandbox([...])`, không phải đổi hành vi) — viết một script Node dùng
+regex khớp từng lời gọi `loadSandbox([...])`, tự quyết định theo NGỮ CẢNH của
+CHÍNH mảng đó: nếu mảng đã có sẵn `'generated/modular-pilot.js'` thì chỉ xóa
+`'modules/state.js'`; nếu chưa có thì THAY `'modules/state.js'` bằng
+`'generated/modular-pilot.js'` tại chỗ (giữ đúng vị trí, không dồn về cuối) —
+tránh phải soát tay từng file khi không còn nhánh tự chèn. Danh sách 37 test +
+4 benchmark: `accepted-lot-points`/`action-form`/`action-workflow-service`/
+`audit-chain-cache`/`audit-hash`/`audit-ingress-gates`/`audit-retention`/
+`backup-download-bridge`/`cache-invalidation`/`derived-cache`/`entry-service`/
+`firebase-config`/`firebase-merge`/`firebase-offline`/`local-store`/
+`locked-period-guards`/`lot-rename`/`lot-transition-picker`/`lot-transition`/
+`manage-history-bridge`/`missing-target-warning`/`parallel-lot-run`/
+`partial-render-helpers`/`prune-unused-levels`/`qc-rules`/`range-candidate`/
+`reagent-comparison-service`/`reagent-stats`/`sigma-comp`/
+`sigma-level-reconcile`/`sigma-tea`/`state-storage-safety`/`storage-pipeline`/
+`target-matrix`/`uncertainty`/`westgard-rule-action`/`westgard-worker` +
+`benchmarks/partitioned-startup`/`performance-baseline`/
+`performance-regression`/`startup-pipeline`.
+
+**Riêng `tests/tea-sources.test.js` cần viết lại cách nạp catalog** (không chỉ
+xóa tên file): trước đây `vm.runInNewContext(fs.readFileSync(analyte-catalog.js)
++ ';TEA_ANALYTE_CATALOG', {})` — tự eval trực tiếp file classic, không qua
+`loadSandbox`. Đổi sang `loadSandbox(['core.js','generated/modular-pilot.js'])`
+rồi `run(ctx,'TEA_ANALYTE_CATALOG')`, đúng mẫu mọi test khác trong bộ đã dùng.
+
+**`typescript-module-pilot.test.js`:** xóa nguyên khối 5 assertion scanner cũ
+dò cấu trúc `read('assets/modules/state.js')` (đúng cách đã làm với
+`firebase-sync.js`/`qc-domain.js` ở lát 3/5 — xóa hẳn, không viết thay thế).
+
+**`global.d.ts` gốc — không cần sửa gì thêm:** mọi tên `state.js` từng cần
+classic checkJs khác đọc trần (chỉ còn `app.js`, đã có `loadBootState`/
+`ensureAdmin`/… ambient từ lát trước) đã đủ; `typecheck` xanh ngay không cần
+thêm declare mới ở đây (khác lát 5 cần thêm `normalizePointLots`/`searchText`).
+
+**Dọn comment mô tả sai lệch:** 3 khối comment ambient declare
+(`REFTESTS`/`TEA_SOURCE_REGISTRY`/`WG_RULES`/`QC_DECIMALS_DEFAULT`/
+`teaAnalyteKey`) và 1 khối comment tại `SigmaTeaResolution`'s eager-guard đều
+từng khẳng định các tên này "không phải property trên globalThis" — cập nhật
+lại nói rõ từ lát này chúng ĐÃ là `root.X=` property thật, ambient declare chỉ
+còn phục vụ tham chiếu trần NỘI BỘ file (vì file là module). Guard của
+`SigmaTeaResolution` (đọc ba tên không qua lazy closure) giữ nguyên KHÔNG xóa
+dù nay luôn `true` — khác các "eager guard" đã dọn ở lát 1/3 (từng luôn
+`false`, gây lỗi ẩn), guard này chỉ thừa chứ không sai, và việc bỏ thân điều
+kiện (~20 dòng gán `root.X=`) rủi ro gõ sai cao hơn lợi ích dọn dẹp.
+
+Gate: `typecheck` xanh, `build:pilot` xanh, `npm test` 611/611 xanh,
+`node benchmarks/performance-regression.js` **pass** (`coldDomainMs` 2202,28 ms
+≤ 12 000; `warmDomainColdRatio` 0,00025 ≤ 0,02), `npm run ui-check` 29/29,
+`npm run nce-check` 91/91, `npm run a11y-audit` ratchet PASS (0 vi phạm mọi
+trang/modal/keyboard), `npm run visual-check` PASS (2 báo cáo, toàn bộ header
+in đúng màu nền), `npm run print-check` PASS (PDF Westgard 100,3 KB, 0 khối
+xám lớn, 3 header teal, 567 lệnh chữ) — đủ TOÀN BỘ gate mà kế hoạch yêu cầu
+cho lát đóng nhóm C.
+
+**Pha G nhóm C HOÀN TẤT.** `assets/modules/` rỗng. Còn lại `assets/core.js`
+(nhóm D, chưa port — UMD wrapper thuần, pure domain math), `assets/workers/
+westgard-worker.js` (nhóm D), `assets/app.js` (Pha H, boot entry point nhỏ).
+
+### Pha H1 — dọn bootstrap/script tag (xong 2026-08-20)
+
+Khung 5-dòng gốc của "Pha H" (chỉ ghi mục tiêu, chưa khảo sát chi tiết) đặt
+tiêu chí hoàn thành là *"không còn shared global application API"*. Khảo sát
+thực tế trước khi viết lát nào cho thấy tiêu chí đó, nếu hiểu đúng nghĩa, đòi
+hỏi một khối lượng công việc khác hẳn (và rủi ro cao hơn) so với việc tổ chức
+lại `modular-pilot.global.ts`:
+
+**Toàn bộ UI vẫn gắn sự kiện qua chuỗi HTML `onclick="tenHam(...)"`.**
+`src/presentation/shared/ui-primitives.ts`'s `btn()` bake thẳng
+`onclick="${onclick}"` vào chuỗi HTML trả về; `router-dispatch-controller.ts`
+render trang bằng `#main.innerHTML = (map[page]||map.dash)()` — thay toàn bộ
+chuỗi mỗi lần, không cập nhật DOM node lẻ. Đếm được ~150+ điểm (91 lời gọi
+`btn(` + 63 `onclick="` trực tiếp trong `src/presentation/`), MỖI điểm đòi
+hàm đích phải là **global trần** lúc click. CSP hiện tại
+(`index.html`, comment tại thẻ `<meta>`) phải giữ `script-src 'unsafe-inline'`
+CHÍNH VÌ lý do này. Bỏ hẳn "shared global application API" tức là viết lại
+cách gắn sự kiện cho tất cả ~150+ điểm đó sang `addEventListener` thật — quy
+mô lớn hơn cả nhóm C, không nằm trong phạm vi lát này. Vì vậy phần khung gốc
+được TÁCH thành hai:
+
+- **Pha H1** (lát này, phạm vi an toàn — không đổi `onclick=`, không đổi CSP):
+  1. Retire `assets/app.js` (boot entry point 9 dòng) vào
+     `src/compat/modular-pilot.global.ts` — `root.boot` đăng ký qua
+     `document.addEventListener('DOMContentLoaded', ...)` ở cuối bundle thay
+     vì tự chạy ngay lúc classic script nạp (theo đặc tả HTML,
+     `DOMContentLoaded` LUÔN nổ ra sau khi mọi `<script defer>` đã chạy xong —
+     không có race). Gọi ngay lập tức (như classic `boot()` tự invoke) sẽ
+     crash mọi sandbox test tải bundle mà không cấp `document`/`window` (đa số
+     test hiện không cấp, vì trước đây `app.js` không nằm trong
+     `loadSandbox([...])` của bất kỳ test nào). `index.html` giảm từ 3 thẻ
+     `<script>` app xuống 2 (`core.js` + 1 bundle).
+  2. Gom 6 lời gọi `(window|document).addEventListener` top-level từng rải ở
+     hai chỗ khác nhau trong bundle (flush lưu cục bộ khi thoát trang;
+     Firebase khi mạng/tiêu điểm đổi) vào `createAppBootstrap(deps)`
+     (`src/presentation/app/app-bootstrap.ts`, factory nhận dependency đúng
+     mẫu mọi controller khác) — gọi MỘT LẦN. Bẫy tìm thấy khi chạy lại
+     `npm test`: viết `window: typeof window!=='undefined'?window:undefined`
+     thiếu nửa sau của guard kép gốc (`&&window.addEventListener`) làm 7 test
+     crash (`deps.window.addEventListener is not a function`) — một số sandbox
+     cấp `window` tồn tại nhưng KHÔNG có `addEventListener` (stub tối giản,
+     ví dụ `westgard-xlsx.test.js`'s `window:{QCLAB_APP:{...}}`); sửa bằng
+     kiểm cả hai lại đúng mẫu gốc. Bẫy TypeScript riêng (TS2774 "condition
+     always true"): viết `typeof window!=='undefined'&&window.addEventListener
+     ?window:undefined` (ternary) bị chặn dù cú pháp `if` y hệt ở chỗ khác
+     trong CÙNG FILE (dòng boot ở mục 1) không hề bị chặn — nguyên nhân chưa
+     rõ hoàn toàn (nghi khác nhau giữa ngữ cảnh biểu thức gán field vs câu lệnh
+     `if` riêng), sửa bằng đổi hẳn sang `typeof window.addEventListener===
+     'function'` (so sánh, không phải truthy check) cho cả hai, vừa né lỗi
+     TS vừa đúng ý hơn (kiểm THẬT là function, không chỉ truthy).
+  3. Rà toàn bộ khối ambient `declare` trong `modular-pilot.global.ts` (254
+     tên) tìm tên KHÔNG còn `root.X=`/`(root as any).X=` nào gán — viết script
+     kiểm tự động, ra 5 "nghi vấn": `entryLjRenderCache`, `wgMultiViews`,
+     `wgArchivedMultiViews`, `rcCompute`, `firebase`. Xác minh tay cả 5: TOÀN
+     BỘ là false positive của chính cách quét (regex chỉ bắt `root.X=` với
+     `root` NGAY TRƯỚC `.`, bỏ sót ba mẫu gán khác đang tồn tại thật trong
+     file — `(root as any).X=` cast-assignment, `Object.defineProperty`
+     accessor của UI state, và vòng lặp gán động
+     `for(const k of Object.keys(rc))(root as any)[k]=rc[k]` của
+     `reagentPageController`; `firebase` thì không do code này gán mà do 3
+     thẻ `<script>` CDN Firebase compat SDK cấp). Kết luận: KHÔNG có declare
+     chết nào cần xóa — file đã sạch qua toàn bộ Pha G.
+  4. Sửa `global.d.ts`: xóa 6 declare (`storageHydrationPromise`,
+     `ensureAdmin`, `showLogin`, `showStartupRecovery`, `initFirebase`,
+     `loadBootState`) từng tồn tại CHỈ VÌ `assets/app.js` đọc chúng trần — xác
+     nhận `core.js` (file classic duy nhất còn lại) không đọc tên nào trong số
+     này. Fix một ambient declare NỘI BỘ sai từ trước (không phải do lát này
+     gây ra): `declare function ensureAdmin(): void;` phải là
+     `Promise<void>` — `boot()` gọi `.then()` trên kết quả, lộ ra type error
+     lần đầu khi boot() thực sự được port vào cùng file.
+
+  Gate: `typecheck`, `build:pilot`, `npm test` 611/611, `ui-check` 29/29,
+  `nce-check` 91/91 (cả hai đi qua `page.goto(url,{waitUntil:'load'})` —
+  navigation thật, xác nhận `DOMContentLoaded` thật sự kích hoạt `root.boot()`
+  đúng lúc trong Chromium, không chỉ gọi hàm trực tiếp).
+
+- **Pha H2** (2026-08-20, HOÀN TẤT): viết lại toàn bộ ~150+ điểm
+  `onclick="..."`/`btn()` sang event delegation thật (`data-action`/
+  `data-args` + `createActionDispatcher`), cho phép cuối cùng bỏ
+  `'unsafe-inline'` khỏi CSP `script-src`. Người dùng chọn: làm toàn bộ, từng
+  lát theo độ khó tăng dần, báo tiến độ sau mỗi cụm.
+
+  **Hạ tầng** (`src/presentation/app/action-dispatcher.ts`,
+  `createActionDispatcher(deps)`): một listener `click` DUY NHẤT gắn vào
+  `document` một lần (`bind()`, guard idempotent), khớp
+  `event.target.closest('[data-action]')`, đọc `dataset.action` (tên hàm) +
+  `dataset.args` (JSON), gọi `fn.apply(el, args)` — `this` trong hàm đích vẫn
+  là phần tử được click, giữ đúng ngữ nghĩa `onclick` cũ. Nối vào
+  `modular-pilot.global.ts` ngay sau `vnDatePickerController.bind()`, đúng vị
+  trí và mẫu đã có sẵn cho `vn-date-picker-controller.ts`/
+  `modal-focus-trap.ts`. `router-dispatch-controller.ts`'s `render()` chỉ
+  thay `#main.innerHTML` (không thay node `#main`), nên một listener delegate
+  gắn một lần sống sót qua mọi `render()`/`rerender()` — không cần gắn lại.
+
+  **`btn()` (`ui-primitives.ts`) chuyển sang song vận có chủ đích**: tham số
+  `onclick` giờ nhận `string | {action, args?} | null` — dạng string cũ (`
+  onclick="..."`) vẫn hoạt động y hệt cho các điểm CHƯA chuyển, dạng object
+  mới sinh `data-action`/`data-args` (qua `JSON.stringify(args)` rồi
+  `escapeHtmlAttr()` — an toàn hơn `jsq()` cũ vì không cần tự tay né dấu nháy
+  kép). Việc này cho phép chuyển từng lát độc lập, không cần đổi tất cả cùng
+  lúc. Mỗi controller/`*-html.ts` tự khai kiểu `button`/`btn` riêng (không có
+  type chung), nên mở rộng kiểu phải sửa tay từng file có điểm gọi thật —
+  đúng như dự tính, không phải nợ kỹ thuật.
+
+  **Đã xong** (nhóm a — literal không tham số; nhóm b — ID/giá trị tĩnh bake
+  vào chuỗi): toàn bộ `manage-*-row-html.ts` (6 file), phần lớn
+  `manage-page-controller.ts` (lô, nhóm lô, Mean/SD, TEa tham chiếu — bỏ luôn
+  `deps.quote()`/`deps.escapeAttr()` không cần nữa ở các điểm này vì
+  `JSON.stringify` tự lo escape), `dashboard-qc-followup-item-html.ts` và
+  `dashboard-overdue-action-item-html.ts` (nhóm c — 2 wrapper mới:
+  `root.dashboardGoEntryFollowup`/`root.dashboardContinueAction`, cùng mẫu
+  `root.goManageTargets` ở Pha H1), `entry-page-controller.ts` (trừ 1 điểm
+  `event.stopPropagation()` — nhóm d, để sau), `action-form-controller.ts`,
+  toàn bộ `nce/action-*.ts` trừ `lis-queue-presentation.ts`'s `onclick()`
+  helper (bị 2 test source-scanner ghim nguyên văn — `lisOnclick`/`onclick`,
+  xem dưới), `report/report-*.ts`, `settings/*-panel-html.ts`,
+  `westgard/westgard-*.ts` trừ `westgard-page-controller.ts` (chưa đụng),
+  `range-actions-html.ts`. Một wrapper mới cho DOM trực tiếp:
+  `root.brandPickLogo` thay `onclick="document.getElementById('logoFile').click()"`.
+
+  **Cố ý CHƯA chuyển, có lý do cụ thể** (không phải bỏ quên):
+  - `lis-queue-presentation.ts`'s `onclick(functionName, messageId)` helper +
+    `lisOnclick` bridge — `tests/lis-queue-bridge.test.js` ghim nguyên văn
+    chữ ký `lisOnclick = (functionName, messageId) => deps.presentation.onclick(...)`
+    bằng regex trên source thật; đổi cấu trúc này cần sửa cả test đó, để dành
+    cho lát nhóm (e)/(d) riêng, không lẫn vào lát (b).
+  - `entry-page-controller.ts` dòng "Xem lô mới/lô cũ" (`event.stopPropagation()`)
+    — nhóm (d), cần dispatcher truyền `event`/`this` thật.
+  Cụm tiếp theo trong cùng ngày đã dọn xong nốt ba file lớn còn lại:
+  `sigma-page-controller.ts` (9 điểm — thêm/xóa test theo dõi, xuất Excel/PDF
+  đơn kỳ và tổng hợp, nạp CV lô, mở Bias/MU, xóa vòng Bias, đóng/áp dụng modal
+  cohort), `reagent-page-controller.ts` (4 điểm — toolbar +Thêm/Xóa/Tìm/In,
+  panel +Thêm mẫu/Xóa dữ liệu, chọn nhanh theo index, chọn hóa chất theo id),
+  `westgard-page-controller.ts` (2 điểm — bật/tắt xem lô cũ theo mức, và nút
+  "Nhập QC" ở trạng thái rỗng tái dùng luôn wrapper
+  `dashboardGoEntryFollowup` đã có từ cụm dashboard). 2 file test source-scan
+  (`tests/sigma-comp.test.js`, `tests/sigma-print.test.js`) ghim nguyên văn
+  chuỗi `onclick` cũ và phải sửa theo cùng lát — cùng mẫu với
+  `nce-workflow-check.js` ở trên, không phải lỗi mới.
+
+  Còn lại cố ý CHƯA chuyển (không đổi so với ghi chú trên): 1 điểm
+  `event.stopPropagation()` trong `entry-page-controller.ts` (nhóm d), và
+  `lis-queue-presentation.ts`'s `onclick()` helper bị test ghim nguyên văn
+  (nhóm e/d, để lát riêng).
+
+  **Một gate script cần sửa theo cùng đợt** (KHÔNG phải bug của lát này —
+  đúng như CLAUDE.md dự đoán, một số check browser-level ghim văn bản
+  `onclick=` nguyên văn và phải cập nhật cùng lúc với mọi điểm chuyển):
+  `scripts/nce-workflow-check.js`'s "Nút mở thẳng đúng hồ sơ" check từng regex
+  trên `go('actions');editAction(0)` trong `innerHTML` — sau khi
+  `dashboard-overdue-action-item-html.ts` chuyển sang
+  `dashboardContinueAction`, sửa lại thành regex trên
+  `data-action="dashboardContinueAction" data-args="[0]"`. Phát hiện được vì
+  `npm run nce-check` chạy browser thật, không phải vì đọc trước — xác nhận
+  gate này vẫn "discriminating" đúng như CLAUDE.md ghi.
+
+  Gate mỗi cụm: `typecheck`, `build:pilot`, `npm test` 611/611, `ui-check`
+  29/29, `nce-check` 91/91, `visual-check`, `a11y-audit` (ratchet PASS, cả 18
+  modal vẫn mở được — xác nhận các nút `Sửa`/`+Thêm` mới chuyển sang
+  `data-action` vẫn hoạt động qua click thật trong Chromium, không chỉ qua
+  test string), `print-check`. ~19 file test unit (`*-html.test.js`) phải sửa
+  đồng thời mỗi lần chuyển: stub `button`/`btn` giả trong các test này làm
+  nối chuỗi ngây thơ (`label + '|' + action + ...`), phải đổi thành
+  `typeof action === 'string' ? action : JSON.stringify(action)` để phản
+  ánh đúng object mới — một mẫu cơ học, lặp lại, không phải lỗi thiết kế.
+
+  **Nhóm (d) — `this`/`event` trần (2026-08-20, cùng ngày)**: quy mô thật lớn
+  hơn nhiều so với ước tính ban đầu ("~5 điểm") — hàng chục `oninput=`/
+  `onchange=` dùng `this.value`/`this.checked` trải khắp form nhập liệu toàn
+  app (audit, dashboard, entry, manage, reagent, report, sigma, users,
+  westgard). `action-dispatcher.ts` mở rộng thêm (giữ nguyên `data-action`
+  cho click, không đổi):
+  - `data-action-on="input"|"change"|"focus"`: đổi sự kiện lắng nghe.
+    Input/change tự nối thêm giá trị SỐNG của phần tử (`.checked` cho
+    checkbox/radio, còn lại `.value`) vào CUỐI mảng args — khớp đúng cách
+    onclick cũ luôn đặt `this.value`/`this.checked` làm tham số CUỐI, nên
+    hàm đích không cần đổi chữ ký. `focus` lắng nghe qua `focusin` thật (event
+    `focus` không nổi bong bóng, không delegate được) và không nối giá trị.
+  - `data-action-self-only`: chỉ gọi hàm khi target đúng là phần tử mang
+    data-action, không phải một hậu duệ — thay `onclick="if(event.target===this)fn()"`
+    của lớp phông modal (`modal-controller.ts`/`dialog-overlay-controller.ts`).
+    Khác với `closest()` dùng cho nút lồng trong card (nhóm a/b) — hai mục
+    đích ngược nhau nên cần một cờ riêng, không tái dùng `closest()`.
+  - `entry-chart-html.ts`: đổi luôn `.lj-mini`'s `onclick` (chọn mức QC) sang
+    `data-action`, xoá `event.stopPropagation()` khỏi 2 nút "Xem lô mới/cũ"
+    lồng trong nó — vì giờ CHỈ CÓ MỘT listener delegate duy nhất, `closest()`
+    tự chọn khớp GẦN NHẤT (nút, không phải card), tái tạo đúng hiệu ứng
+    "bấm nút không làm card cũng được chọn" mà không cần `event`/`stopPropagation`
+    nữa — đơn giản hơn hẳn so với dự tính ban đầu (nghĩ là phải truyền `event`
+    thật qua dispatcher).
+  - Hai hàm nghiệp vụ đổi từ arrow sang `function` trần để đọc đúng `this`
+    (dispatcher gọi `fn.apply(el,args)` — chỉ `function` mới nhận `this` từ
+    `apply()`, arrow function bỏ qua): `syncTargetRange`/`toggleTargetRow`
+    (`manage-tests-actions-controller.ts`, thay `onclick="...(this,...)"` —
+    `toggleTargetRow`'s 1 lời gọi nội bộ còn lại đổi thành `.call(box)`), và
+    `configAssayInstrumentChanged` (hàm MỚI, thay logic JS phức tạp
+    `onchange="const o=this.selectedOptions[0];..."` từng nhúng thẳng trong
+    HTML — không chỉ đổi cách gắn sự kiện mà còn đặt tên cho một hành vi
+    trước đây vô danh).
+  - Một wrapper MỚI cho gán trần vào global accessor (không phải gọi hàm):
+    `root.wgSelectTest` thay `onchange="if(this.value){selTest=this.value;rerender()}"`
+    — `selTest` là accessor global thật (`AnalysisUIState`), không phải biến
+    chết như nghi ngờ ban đầu.
+  - `wgSetArchivedTest` được thêm guard `if(!id)return;` NỘI BỘ (xác nhận chỉ
+    1 nơi gọi) để bỏ được lớp `if(this.value){...}` bọc ngoài trong HTML cũ.
+
+  **Bắt được 1 bug thật, không phải do lát này gây ra**: `report-page-html.ts`'s
+  `onchange="reportTest=this.value"` là code CHẾT — `reportTest` ở đây là một
+  `let` closure riêng trong `report-page-controller.ts`, còn chuỗi onclick chạy
+  ở global scope (non-strict) nên phép gán trần tạo ra MỘT `window.reportTest`
+  hoàn toàn khác, không ai đọc. Tính năng lại vẫn chạy đúng vì
+  `printReport()`/`exportReportXLSX()`/`exportReportCSV()` đọc trực tiếp
+  `document.getElementById('rTest').value` tại thời điểm bấm, không qua
+  `reportTest` closure. Cố ý KHÔNG sửa trong lát này (ngoài phạm vi chuyển
+  onclick — sửa sẽ đổi hành vi observable, cần quyết định riêng); dòng này vẫn
+  giữ nguyên `onchange="reportTest=this.value"` chưa chuyển sang `data-action`.
+
+  **Cố ý CHƯA làm ở lát này** (khác hẳn "chỉ cần giá trị/không cần gì" của
+  click/input/change/focus — để dành lát riêng):
+  - `onkeydown=` (7 chỗ: Enter submit ô tìm kiếm, điều hướng mũi tên trong cây
+    xét nghiệm, Enter/Space kích hoạt card) — cần dispatcher truyền `event`
+    bàn phím thật cho hàm đích.
+  - `onmousemove=` (`sgPointTipShow(event,...)` trong `sigma-page-controller.ts`,
+    tooltip theo con trỏ) — cùng lý do, cần `event` thật.
+  - `lot-transition-choice-html.ts`: MỘT input có CẢ `oninput` (commit=false)
+    VÀ `onchange` (commit=true) gọi CÙNG hàm `lotTransitionChoiceInput` với
+    tham số `commit` khác nhau — dispatcher hiện chỉ cho MỘT `data-action-on`
+    mỗi phần tử, cần quyết định thiết kế riêng (nhiều action/phần tử, hay tách
+    hàm) trước khi chuyển.
+  - 4 field còn `onfocus`/`onchange` khác `oninput` trên CÙNG input
+    (`reagent-info-panel-html.ts`'s lô cũ/mới, Bias mong muốn, alpha) — cùng
+    xung đột "nhiều sự kiện, một phần tử" nêu trên; chỉ `oninput` của các
+    field này đã chuyển, `onfocus`/`onchange` giữ nguyên.
+  - `lis-queue-presentation.ts`'s `onclick()` helper — vẫn bị
+    `tests/lis-queue-bridge.test.js` ghim nguyên văn chữ ký, như đã ghi ở lát
+    trước.
+
+  Gate: `typecheck`, `build:pilot`, `npm test` 612/612 (thêm
+  `tests/action-dispatcher.test.js` — test thuần cho dispatcher, mock DOM
+  bằng object JS thường, không cần browser thật), `ui-check` 29/29,
+  `nce-check` 91/91, `a11y-audit` (ratchet PASS, đủ 18 modal — xác nhận riêng
+  `manage:add-assay` vì đó là modal exercise cả 2 hàm mới), `visual-check`,
+  `print-check`. Bắt được 1 lần trùng tên global thật khi build
+  (`tests/global-name-uniqueness.test.js`): viết `globalThis.selTest=value`
+  thay vì `selTest=value` khiến scanner đọc nhầm thành một global MỚI (nó chỉ
+  so khớp assignment có tiền tố `root.`/`window.`/`globalThis.`, không phải vì
+  đây thực sự là hai binding khác nhau) — sửa bằng cách quay lại phép gán
+  trần + thêm `declare let selTest: any;` vào danh sách ambient nội bộ của
+  `modular-pilot.global.ts` (giống `entrySel`/`page`/...).
+
+  **Nhóm (d) lát 3 — `onkeydown=`/`onmousemove=`/`onmouseleave=` (cùng ngày)**:
+  mở rộng `action-dispatcher.ts` thêm 3 cơ chế mới, mỗi cơ chế giải quyết một
+  nhu cầu THẬT KHÁC NHAU (không gộp chung được):
+  - `data-keydown-action`+`data-keydown-args`+`data-keydown-keys` (JSON, vì
+    phím Space chính là ký tự `" "`) — CÓ `data-keydown-keys`: lọc theo phím,
+    luôn `preventDefault()`, nối giá trị sống vào cuối args (giống input/
+    change) — dùng cho "Enter tạo mới"/"Enter/Space chọn dòng". KHÔNG có
+    `data-keydown-keys`: mọi phím đều gọi, không lọc, không tự
+    `preventDefault`, gọi `fn.apply(el,[event,...args])` (event ở ĐẦU) — dùng
+    cho điều hướng bàn phím thật (cây xét nghiệm, bảng nhập QC theo tháng).
+  - `data-keydown-self-only` — CỜ RIÊNG với `data-action-self-only`, không
+    dùng chung: một `<tr>` (`sigma-period-row-html.ts`) vừa cần `data-action`
+    cho click (muốn `closest()` tự loại trừ nút/select lồng trong dòng,
+    KHÔNG self-only) vừa cần `data-keydown-action` cho Enter/Space (CẦN
+    self-only, vì phím Enter khi select con đang focus không có
+    `data-keydown-action` riêng để `closest()` dừng lại đúng chỗ) — hai nhu
+    cầu ngược nhau trên CÙNG một phần tử.
+  - `data-mousemove-action`/`data-mousemove-args` và
+    `data-action-on="mouseout"` (thay `onmouseleave=` — cũng không nổi bong
+    bóng, `mouseout` là bản nổi bong bóng tương đương, chỉ khác khi có hậu
+    duệ — dùng an toàn ở đây vì là phần tử SVG lá) — tooltip theo điểm trên
+    biểu đồ Sigma Trend/MDC.
+  - Hai hàm đọc `event.currentTarget` phải đổi sang đọc `this`
+    (`entryTreeKey`, `entrySheetKey`) — `currentTarget` của một listener
+    delegate luôn là `document`, không phải phần tử cây/ô nhập thật.
+  - Một trường hợp "value không ở CUỐI" thật (`entryInlineSave`'s
+    `(tid,level,date,value,runIdHint,lotNo)` — `value` là tham số thứ 4, mà
+    `scripts/ui-workflow-check.js` gọi trực tiếp theo thứ tự này nên KHÔNG đổi
+    được chữ ký): thêm wrapper `entrySheetRunChanged(tid,level,date,runIdHint,
+    lotNo,value)` chỉ để đảo tham số, gọi lại `entryInlineSave` với thứ tự
+    cũ — giữ nguyên cả API công khai (gate) và quy ước "value luôn cuối" của
+    dispatcher.
+  - Ba builder HTML vốn nhận một CHUỖI `onclick=`/`onchange=` ĐÃ DỰNG SẴN từ
+    nơi khác truyền vào (`entrySheetEmptyRunHtml`, `entrySheetNoteHtml`,
+    `entrySheetAddRunHtml`, `reagentCreateTypedRowHtml`) đổi tên trường thành
+    `actionAttrs` và nhận cả CỤM thuộc tính `data-action="..." data-args="..."`
+    đã dựng sẵn từ nơi gọi (cùng mẫu `dateBox()`'s tham số `attrs` đã có từ
+    trước) — bản thân các hàm dựng HTML này không đổi kiến trúc, chỉ đổi NỘI
+    DUNG chuỗi được truyền vào.
+  - `sigma-comp.test.js`/`ui-accessibility.test.js`/`partial-render-helpers.test.js`
+    và 4 file `*-modal-html.test.js`/`*-typed-row-html.test.js` phải sửa theo
+    (source-scanner ghim văn bản cũ, hoặc gọi hàm trực tiếp theo quy ước
+    `event.currentTarget` cũ — `partial-render-helpers.test.js` phải đổi
+    `entryTreeKey({currentTarget:el,...})` thành `entryTreeKey.call(el,{...})`).
+  - Rà thêm một lượt `deps.jsq`-based `onclick=`/`onchange=` trực tiếp trong
+    `modular-pilot.global.ts` (không đi qua `src/presentation/`, nên lọt khỏi
+    mọi lần rà trước): trang Users/Audit và toàn bộ màn hình xác thực (đăng
+    nhập, đổi mật khẩu bắt buộc, xác thực lại trước hành động nhạy cảm, khôi
+    phục dữ liệu khởi động) — khoảng 15 điểm, cùng mẫu nhóm (a)/(b)/(d) đã
+    làm, không có gì mới về thiết kế.
+
+  **Còn phát hiện thêm, CHƯA làm, quy mô LỚN HƠN ước tính ban đầu** — một lượt
+  rà toàn bộ `src/presentation/` cho MỌI `onclick=`/`onchange=`/`oninput=`
+  còn sót (không chỉ trong các file đã từng chạm tới) lộ ra khoảng 45+ điểm
+  nữa, tập trung nhiều nhất ở form NCE (`action-form-controller.ts` và các
+  `*-html.ts` liên quan — nhiều nhất là các ô textarea "xóa thông báo lỗi khi
+  gõ lại" dùng `document.getElementById(...).style.display='none'` ngay
+  trong chuỗi `oninput=`, và các `actSel()`/`actionSuggestBox()` với
+  `onchange=`/`onclick=` riêng), cùng rải rác ở dashboard, entry, manage,
+  range, reagent, report, router shell, settings, sigma, westgard. Phần này
+  cần một lát riêng — không nằm trong phạm vi "làm luôn đi" đã xác nhận
+  (vốn chỉ nhắm 3 mục cụ thể: onkeydown/onmousemove, 2 phần tử nhiều sự
+  kiện, và `lis-queue-presentation.ts`).
+
+  **Nhóm (d) lát 4 — quét sạch toàn bộ phần còn lại (cùng ngày, người dùng
+  xác nhận "có làm luôn")**: chuyển hết ~45+ điểm phát hiện ở trên. Mọi mẫu
+  đều khớp các cơ chế đã có (nhóm a/b/c/d), TRỪ hai bổ sung THẬT MỚI cho
+  dispatcher:
+
+  - `data-notify-changed="tenHam"` — cơ chế ĐỘC LẬP với `data-action`: gọi
+    hàm (không tham số) mỗi khi có 'input'/'change' nổi bong bóng từ BẤT KỲ
+    hậu duệ, KỂ CẢ khi hậu duệ đó đã có `data-action` riêng xử lý CÙNG sự
+    kiện đó rồi — đây là trường hợp ĐẦU TIÊN một sự kiện cần gọi HAI hàm
+    (khớp gần nhất qua `data-action`, cộng thông báo nổi bọt qua
+    `data-notify-changed`), khác hẳn `data-action` (luôn đúng một hàm — khớp
+    gần nhất). Thay `onclick="actionFormChanged()"` gắn trên nguyên khối bọc
+    toàn bộ form NCE (mọi trường đổi thì lưu draft + làm mới chip trạng
+    thái từng mục — không được phép "thế chỗ" hành vi riêng của từng
+    trường).
+  - `<input type="file">` khi dùng `data-action-on="change"` nối THẲNG
+    `event` thật thay cho `liveValue(el)` — `.value` của input file chỉ là
+    tên file, vô nghĩa với `importData`/`verifyBackupFile`/`pickLogo` (luôn
+    cần đọc `event.target.files`). Phát hiện được nhờ đọc kỹ 2 hàm đích
+    trước khi chuyển, không phải đoán.
+
+  Hai wrapper chung mới (tái dùng ở NHIỀU file không liên quan, thay một mẫu
+  hay lặp lại trong toàn app): `root.hideFieldError(id)` (thay
+  `onclick="document.getElementById('xxxErr').style.display='none'"`, xuất
+  hiện ở form hủy/mở lại NCE, 2 modal áp dụng/hoàn dải QC, mở khóa kỳ báo
+  cáo, cổng an toàn dịch chuyển) và `root.clickElementById(id)` (thay
+  `onclick="document.getElementById('xxx').click()"` cho các nút "Chọn
+  file..." kích hoạt input ẩn, không riêng gì logo).
+
+  Vài trường hợp cần đọc kỹ hơn một chuyển đổi cơ học:
+  - `target-level-tabs-html.ts`'s tham số `setLevelAction` (tên HÀM tính
+    động, nhóm (e) khó nhất theo kế hoạch gốc) hoá ra CHẾT — chỉ một nơi gọi
+    duy nhất, luôn dùng giá trị mặc định `'setTargetLevel'` — xác nhận bằng
+    cách grep hết mọi lời gọi trước khi xoá tham số, không phải suy đoán.
+  - `sigma-add-test-rows-html.ts`'s `row.action` cũng là tên hàm tính động,
+    nhưng chỉ có ĐÚNG HAI giá trị khả dĩ (`sgViewTrackedTest`/`sgTrackTest`),
+    cùng nhận một tham số — tách `action` (tên hàm) khỏi `args` là đủ, không
+    cần cơ chế phức tạp hơn.
+  - `entrySheetEmptyRunHtml`/`entrySheetNoteHtml`/`entrySheetAddRunHtml`/
+    `reagentCreateTypedRowHtml`/`teaReferenceRowHtml`/`rangeSafetyGateHtml`:
+    đổi tên trường nhận một CHUỖI `onclick=`/`onchange=` đã dựng sẵn thành
+    `actionAttrs` nhận CỤM `data-action="..." data-args="..."` đã dựng sẵn —
+    cùng mẫu `dateBox()`'s tham số `attrs` có từ trước, không đổi kiến trúc.
+  - `entryInlineSave`'s thứ tự tham số cố định (`value` ở giữa, không ở
+    cuối) vì `scripts/ui-workflow-check.js` gọi trực tiếp theo thứ tự cũ →
+    thêm wrapper `entrySheetRunChanged` đảo tham số, không đổi hàm gốc.
+    Tương tự `rangeWorkflowModalHtml`'s "Áp dụng dải PXN" (gọi 2 lệnh liền
+    `closeModal();applyNewRange(...)`) → wrapper `rangeApplyFromWorkflow`.
+  - `report-print-controller.ts`'s "Lưu PDF"/"In / Lưu PDF" (`qcSavePdf()`/
+    `qcDoPrint()`) CỐ Ý không chuyển — hai nút này nằm trong HTML của một
+    cửa sổ popup in ẤN RIÊNG (`w.document.write(...)`), một `document` hoàn
+    toàn khác với app chính; `action-dispatcher.ts`'s listener chỉ gắn vào
+    `document` của app chính, không có cách nào với tới cửa sổ popup đó.
+    Cửa sổ in vốn đã tự viết một `<script>` nội tuyến riêng để định nghĩa
+    `qcSavePdf`/`qcDoPrint` ngay trong `w.document.write(...)`, nên việc bỏ
+    `'unsafe-inline'` khỏi CSP của APP CHÍNH không ảnh hưởng gì tới luồng in
+    — cửa sổ popup có CSP/script riêng, ngoài phạm vi lát này.
+  - **Bắt được 3 lỗi HTML thật do tự tay viết `data-args="${JSON.stringify(...)}"`
+    KHÔNG escape** (thuộc tính bọc nháy kép, mà `JSON.stringify` cũng sinh
+    nháy kép bên trong → cắt đứt attribute giữa đường):
+    `reagent-picker-rows-html.ts`, `router-shell-controller.ts`,
+    `sigma-add-test-rows-html.ts` — sửa bằng cách bọc `data-args` bằng nháy
+    ĐƠN (khớp mọi chỗ khác trong cùng lát), không phải bằng cách thêm hàm
+    escape (giá trị chỉ là id nội bộ, không cần thoát kỹ hơn). Tự phát hiện
+    bằng cách quét lại toàn bộ chỗ vừa sửa trước khi chạy test, không phải
+    do test bắt được — nhắc lại nguyên tắc: MỌI `data-args`/`data-keydown-args`/
+    `data-mousemove-args` xây bằng tay phải bọc nháy đơn khi giá trị bên
+    trong có thể chứa nháy kép (chuỗi JSON), hoặc đi qua `escapeAttr()` nếu
+    bọc nháy kép.
+
+  Gate: `typecheck`, `build:pilot`, `npm test` 612/612, `ui-check` 29/29,
+  `nce-check` 91/91 (đặc biệt xác nhận các chip "đã xong"/"còn thiếu" đổi
+  ngay khi gõ — chính là hành vi `data-notify-changed` mới xây), `a11y-audit`
+  18/18 modal, `visual-check`, `print-check`. 16 file test cần sửa theo
+  cùng đợt, cùng 2 mẫu cơ học đã quen: `typeof action==='string'?...` cho
+  stub `button` giả, và cập nhật regex ghim `onclick=`/`this.value` cũ sang
+  `data-action=`/`data-args=` mới.
+
+  **Lát cuối cùng (2026-08-20) — bỏ `script-src 'unsafe-inline'`, Pha H2
+  HOÀN TẤT.** Giải quyết đúng 3 việc "cố ý để dành" ở trên, cộng những gì lộ
+  ra khi thật sự thử bỏ CSP (không thể lường hết bằng đọc code):
+
+  - `lot-transition-choice-html.ts`: thêm `data-input-action` (bind `input`,
+    KHÔNG nối giá trị sống — khác `data-action-on="input"`, vì
+    `lotTransitionChoiceInput` cần đọc `this`/`el.dataset.lotId`, nối thêm
+    `el.value` làm tham số `commit` sẽ luôn truthy sai) song song
+    `data-change-action` (bind `change`, độc lập hoàn toàn với `data-action`)
+    gọi cùng hàm với `data-change-args="[true]"`. Hàm đổi từ
+    `(el, commit=false) => {...}` sang `function(this, commit=false) {const
+    el=this;...}`.
+  - `reagent-info-panel-html.ts`: thêm `data-focus-action`/`data-change-action`
+    (cùng khuôn `data-input-action`, không nối giá trị sống) cho 4 field —
+    `rcMetaFocus`/`rcMetaLog` giờ độc lập với `data-action="rcMeta"` (bind
+    `input`, CẦN giá trị sống) đã có từ lát trước.
+  - `report-page-html.ts`: bỏ hẳn `onchange="reportTest=this.value"` — xác
+    nhận lại là code chết (đường chọn thật đọc `field('rTest').value` trực
+    tiếp trong `reportApplySearch()`, không đọc biến closure `reportTest`).
+  - `<details ontoggle="fn('key',this.open)">` — KHÔNG khớp 5 mẫu onXXX= đã
+    quét ở các lát trước (chỉ có onclick/oninput/onchange/onkeydown/
+    onmousemove), sống sót qua mọi grep tới tận lát này. Lộ ra không phải
+    qua đọc code mà qua `nce-check` thật báo đỏ: "Trạng thái mở/đóng sống
+    sót qua rerender()" — trạng thái mở/đóng của `<details>` không còn được
+    ghi lại vì `actionSectionToggled()`/`entryDetailToggled()` không bao giờ
+    được gọi. `toggle` không nổi bong bóng (khác hẳn mọi sự kiện dispatcher
+    đã xử lý) nên phải bind qua PHA BẮT
+    (`document.addEventListener('toggle',fn,true)`) và đọc `event.target`
+    trực tiếp thay vì `closest()`. Thêm `data-toggle-action`+
+    `data-toggle-args`, nối `el.open` sau args tĩnh (khớp `this.open` cũ). 3
+    điểm: `action-form-section-html.ts` (form NCE), `entry-points-panel-
+    html.ts`, `entry-range-summary-html.ts`.
+  - **Phát hiện lớn nhất của lát này**: một lời gọi `btn()`/`button()` build
+    chuỗi `onclick` bằng template literal tại RUNTIME (
+    `` `confirmReturnAction('${jsq(id)}','${jsq(token)}')` ``) không để lại
+    chữ `onclick=` nào trong mã nguồn TypeScript — mọi grep tĩnh trước giờ
+    (kể cả lát này ban đầu) đều bỏ lọt các điểm này. Chỉ lộ ra khi bật CSP
+    thật rồi chạy `ui-check`: nút "Xác nhận hủy" (hủy điểm QC) và nút "Xác
+    nhận mở khóa" (mở khóa kỳ báo cáo) không phản hồi, và
+    `page.on('console')` bắt được đúng lỗi CSP. Viết một script Node nhỏ
+    phân tích cú pháp thật (đếm ngoặc/nháy cân bằng, không phải một regex)
+    cho MỌI lời gọi `btn(`/`button(` trong `src/`, gắn cờ bất kỳ tham số thứ
+    hai nào không bắt đầu bằng `{` — tìm được 21 điểm thật rải trên 7 file
+    (`entry-page-controller.ts`, `actions-page-controller.ts` × 4,
+    `manage-page-controller.ts` × 2, `manage-tests-actions-controller.ts` ×
+    8, `sigma-page-controller.ts` × 7, `report-page-controller.ts`,
+    `reagent-page-controller.ts`, `dashboard-test-action.ts`,
+    `lis-queue-presentation.ts`) — nhiều gấp 5 lần số điểm nghi ban đầu.
+    `dashboard-test-action.ts`'s 3-lệnh-liền (`entrySel=...;entryStart=
+    null;entryEnd=null;go('entry')`) được gói vào một hàm mới
+    `dashViewTestInEntry(testId,level)`, cùng mẫu `openActionQcEvidence()`
+    có sẵn. `lis-queue-presentation.ts`'s `onclick()` helper trả `{action,
+    args}` object thay vì chuỗi — bài test hồi quy XSS
+    (`tests/lis-client-service.test.js`, chốt lại việc `messageId` từ
+    middleware LIS ngoài không được thoát khỏi thuộc tính HTML) viết lại để
+    soi `data-args="..."` (JSON.stringify + escapeAttr, kiểm bằng giải mã
+    entity + JSON.parse round-trip đúng messageId) thay vì `onclick="..."`
+    — nguyên tắc an toàn CHỐT BẰNG DOM PARSER THẬT vẫn giữ, chỉ đổi thuộc
+    tính đang soi. Hai nhánh ternary rỗng cho action (
+    `latestEntry ? {...} : ''`, nút disabled) được xác nhận AN TOÀN không
+    cần sửa: `<button disabled onclick="">` không tạo CSP violation lúc
+    parse (đã tự kiểm bằng Playwright + CSP tối giản) — trình duyệt chỉ
+    kiểm CSP lúc HANDLER THỰC THI (click), và nút `disabled` không bao giờ
+    phát sự kiện click.
+  - `report-print-controller.ts`'s popup thoát khỏi diện "cố ý không đổi":
+    hoá ra popup KẾ THỪA CSP của app chính (cùng-origin `document.write()`),
+    nên bỏ `unsafe-inline` ở CSP chính cũng chặn luôn khối `<script>` nội
+    tuyến cũ của popup (định nghĩa `qcSavePdf`/`qcDoPrint`). Chuyển hẳn logic
+    đó sang phía OPENER, gắn listener trực tiếp vào nút "Lưu PDF" sau
+    `w.document.close()`; `(window as any).qcPrintPdf` thay `opener.
+    qcPrintPdf` (code giờ CHÍNH LÀ opener, không cần tiền tố). `w.
+    __qcPrintToken=...` là gán property thường, CSP không chặn — hợp đồng
+    với `electron/main.js`/`scripts/print-check.js` (đọc qua
+    `executeJavaScript('window.__qcPrintToken')`) không đổi.
+  - `index.html`'s 2 khối `<script>` nội tuyến cuối cùng: check nav-collapsed
+    (đọc `localStorage` rồi thêm class trước khi `<aside>` vẽ, PHẢI chạy
+    đồng bộ đúng vị trí đó để không nhấp nháy) chuyển thành
+    `assets/nav-collapse-init.js`, nạp qua `<script src=...>` KHÔNG `defer`
+    ngay đúng vị trí cũ (script không-defer chạy ngay khi parser gặp nó,
+    giữ đúng thời điểm); override `window.alert` qua `window.qcDialog`
+    (Electron only) chuyển vào cuối `modular-pilot.global.ts`, ngay sau
+    `appBootstrap.run()` — thời điểm không quan trọng (chỉ cần chạy trước
+    khi có `alert()` nào được gọi, và bundle load trước mọi tương tác
+    người dùng).
+  - `a11y-audit.js` dùng `page.addScriptTag({content: AXE_SOURCE})` để nạp
+    axe-core — chèn một `<script>` THẬT vào trang, bị CSP script-src chặn.
+    Đổi sang `page.evaluate(AXE_SOURCE)` (chuỗi biểu thức, không phải hàm) —
+    Playwright gửi qua Chrome DevTools Protocol (`Runtime.evaluate`), không
+    qua `<script>` của trang, nên không bị CSP script-src chặn (tự kiểm
+    bằng một trang CSP tối giản: `addScriptTag` lỗi, `evaluate(string)`
+    chạy được).
+  - `visual-check.js`'s mock `window.open()` (bắt lại HTML cửa sổ in mà
+    không mở cửa sổ thật) chỉ có `document.write`/`close`/`focus` — đủ cho
+    bản cũ (opener chỉ ghi rồi đóng, không đọc lại `document`). Bản
+    `openPrintImpl()` mới đọc `getElementById`/`document.body`/gán
+    `onbeforeprint` từ phía opener, nên mock cần thêm các thuộc tính đó
+    (no-op vô hại — script này chỉ soi CSS, không soi hành vi bấm nút).
+
+  Gate cuối: `typecheck`, `build:pilot`, `npm test` 612/612, `ui-check`
+  29/29, `nce-check` 91/91, `a11y-audit` 0 vi phạm (ratchet PASS),
+  `visual-check`, `print-check` — CẢ 8 xanh sau khi CSP đã đổi thật, không
+  phải trước. Xác nhận cuối bằng grep `\bon[a-z]+="` (khớp MỌI tên thuộc
+  tính onXXX=, không chỉ 5 tên đã biết) trên `src/` và `index.html`: chỉ còn
+  chú thích/tài liệu và 2 nhánh string-form dự phòng cố ý giữ trong
+  `btn()`/`modalCloseButton()` (xem "Module roles" → `action-dispatcher.ts`
+  trong CLAUDE.md).
+
+**Pha H1 hoàn thành khi:** `index.html` chỉ còn 2 thẻ `<script>` ứng dụng
+(`core.js` + bundle Vite), `assets/app.js` không còn tồn tại, 6 listener
+top-level từng rải rác đã gom vào một factory có tên/test được. KHÔNG đạt tiêu
+chí gốc "không còn shared global application API" — `root.X=`/`onclick=` vẫn
+là cơ chế chính, cố ý giữ nguyên cho tới khi (nếu) Pha H2 được quyết định làm.
+`assets/core.js` + `assets/workers/westgard-worker.js` (nhóm D) vẫn tách riêng
+như kế hoạch cũ — UMD dùng chung Node (`require()` trong test/benchmark) VÀ
+browser, gộp vào bundle Vite (chỉ chạy browser) sẽ gãy toàn bộ test đó.
 
 ## 6. Quy trình bắt buộc cho mỗi lát
 

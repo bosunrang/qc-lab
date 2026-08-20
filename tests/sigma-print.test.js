@@ -73,8 +73,8 @@ assert.match(rowHtml, /Chưa đủ CV IQC và Bias EQA\/EQC/);
   assert.match(combined.body, /<td><b>07\/2026<\/b><\/td><td><b>Mức 1<\/b><\/td>/, 'bảng MU tổng hợp tách theo kỳ × mức');
 
   const sigmaSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'sigma', 'sigma-page-controller.ts'), 'utf8');
-  assert.match(sigmaSource, /`printSigmaPeriod\('\$\{e\.id\}'\)`/);
-  assert.match(sigmaSource, /'printSigmaPeriods\(\)'/);
+  assert.match(sigmaSource, /action: 'printSigmaPeriod', args: \[e\.id\]/);
+  assert.match(sigmaSource, /action: 'printSigmaPeriods'/);
   assert.match(sigmaSource, /printIcon \+ 'In PDF'/);
   console.log('Sigma period print tests passed');
 })().catch(error=>{console.error(error);process.exitCode=1;});

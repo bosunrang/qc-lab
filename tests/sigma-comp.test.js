@@ -12,7 +12,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
-const ctx = loadSandbox(['core.js', 'modules/state.js', 'generated/modular-pilot.js']);
+const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js']);
 
 assert.equal(ctx.sgInputDisplayValue(.721694321),'0.72','CV/Bias display is concise while stored precision remains unchanged');
 assert.equal(ctx.sgInputDisplayValue(''),'');
@@ -157,21 +157,21 @@ assert.equal(ctx.sgInputDisplayValue(''),'');
   assert.match(periodTableSource, /class="sg-data-head-actions"/, 'per-level EQA Bias actions are placed in the period header');
   assert.ok(periodTableSource.includes('>Số liệu theo kỳ</h2>')&&source.indexOf('>Thiết kế QC theo Sigma (OPSpecs)</span>')<source.indexOf('>Độ không đảm bảo đo (MU)</span>'), 'Sigma follows the input-to-results order: period data, QC design, then MU');
   assert.match(periodTableHeadSource, /class="sg-action-col">Thao tác<\/th>/, 'period table has a labelled and separated action column');
-  assert.match(periodRowSource, /data-sg-period-id="\$\{input\.id\}"[\s\S]*?onclick="sgSelectPeriod\('\$\{input\.id\}'\)"/, 'each period row is selected by clicking the row');
+  assert.match(periodRowSource, /data-sg-period-id="\$\{input\.id\}"[\s\S]*?data-action="sgSelectPeriod"/, 'each period row is selected by clicking the row');
   assert.doesNotMatch(source, /name="sgStatusPeriod"/, 'the per-row status radio is removed in favour of clicking the row');
   assert.match(source, /<h2 class="sg-setup-heading panel-title">Tình trạng<\/h2>/, 'the status panel has the concise requested title and a real level-2 heading');
   assert.doesNotMatch(source, /Tình trạng kỳ gần nhất|Kỳ gần nhất:/, 'the obsolete latest-period wording is removed');
   assert.match(source, /sgFrequencyHTML\(t, selectedRow, levels\)/, 'the QC design table follows the period selected for status');
   assert.match(frequencyPanelSource, /sg-selected-period-hint[\s\S]*?Kỳ đang xem:/, 'the QC design table identifies the period it is evaluating');
-  assert.match(source, /exportSigmaPeriodXLSX\('\$\{e\.id\}'\)/, 'each period row exports its own workbook');
-  assert.match(source, /deps\.btn\('Xóa', `sgDelPeriod\('\$\{e\.id\}'\)`, 'danger sm sg-row-delete'/, 'each writable period row uses the labelled system-danger delete button');
+  assert.match(source, /action: 'exportSigmaPeriodXLSX', args: \[e\.id\]/, 'each period row exports its own workbook');
+  assert.match(source, /deps\.btn\('Xóa', \{ action: 'sgDelPeriod', args: \[e\.id\] \}, 'danger sm sg-row-delete'/, 'each writable period row uses the labelled system-danger delete button');
   assert.doesNotMatch(source, /class="x" onclick="sgDelPeriod/, 'the obsolete icon-only period delete control is removed');
-  assert.match(source, /'exportSigmaPeriodsXLSX\(\)'/, 'the footer exports the combined multi-period comparison workbook');
-  assert.match(source, /'Xuất Excel', 'exportSigmaPeriodsXLSX/, 'combined export is clearly distinguished from row export');
+  assert.match(source, /action: 'exportSigmaPeriodsXLSX'/, 'the footer exports the combined multi-period comparison workbook');
+  assert.match(source, /'Xuất Excel', \{ action: 'exportSigmaPeriodsXLSX'/, 'combined export is clearly distinguished from row export');
   assert.doesNotMatch(source, /sgSaveSoon|sgSaveT/, 'manual Sigma edits no longer wait on the obsolete pre-save timer');
   assert.doesNotMatch(source, /sg-cv-row-hint/, 'the obsolete CV-lot instruction under the table is removed');
-  assert.match(source, /deps\.btn\(deps\.icoDownload\(\) \+ 'Xuất Excel', 'exportSigmaPeriodsXLSX\(\)', 'teal sg-combined-export'/, 'combined Excel export is available under the period table');
-  assert.match(source, /deps\.btn\(printIcon \+ 'Xuất PDF', 'printSigmaPeriods\(\)', 'teal sg-combined-print'/, 'combined PDF export is available under the period table');
+  assert.match(source, /deps\.btn\(deps\.icoDownload\(\) \+ 'Xuất Excel', \{ action: 'exportSigmaPeriodsXLSX' \}, 'teal sg-combined-export'/, 'combined Excel export is available under the period table');
+  assert.match(source, /deps\.btn\(printIcon \+ 'Xuất PDF', \{ action: 'printSigmaPeriods' \}, 'teal sg-combined-print'/, 'combined PDF export is available under the period table');
   assert.doesNotMatch(source, /sg-period-actions/, 'the obsolete footer action row is removed');
   assert.doesNotMatch(source, /<button class="btn ghost sm" title="Tính Bias EQA\/EQC từ nhiều vòng"/, 'period cells no longer repeat a Bias calculation button');
   assert.match(biasModalSource, /class="sg-eqa-table"/, 'EQA Bias modal uses the compact reference-style table');
@@ -216,7 +216,7 @@ assert.equal(ctx.sgInputDisplayValue(''),'');
 //     Local/Firebase writers retain their own debounce, so reload can flush local state
 //     without sending one network request for every keystroke.
 {
-  const editCtx=loadSandbox(['core.js','modules/state.js','generated/modular-pilot.js']);
+  const editCtx=loadSandbox(['core.js','generated/modular-pilot.js']);
   const saved=run(editCtx, `(function(){
     globalThis.requireWrite=function(){return true;};
     globalThis.save=function(opts){globalThis.__manualSaveCalls=(globalThis.__manualSaveCalls||0)+1;globalThis.__manualSaveOpts=opts;};
@@ -237,7 +237,7 @@ assert.equal(ctx.sgInputDisplayValue(''),'');
 
 // --- Adding an assay to Sigma uses the existing shared assay catalog ---
 {
-  const pickerCtx=loadSandbox(['core.js','modules/state.js','generated/modular-pilot.js']);
+  const pickerCtx=loadSandbox(['core.js','generated/modular-pilot.js']);
   const added=run(pickerCtx, `(function(){
     state.tests=[{id:'T1',name:'Glucose',levels:[{level:1,qcLotId:'L1'},{level:2,qcLotId:'L2'},{level:3,qcLotId:''}],sgTracked:false}];
     operationalLevels=function(t){return t.levels.filter(l=>l.qcLotId);};
@@ -249,7 +249,7 @@ assert.equal(ctx.sgInputDisplayValue(''),'');
 
 // --- Already-tracked assays in the picker can be selected for inspection ---
 {
-  const pickerCtx=loadSandbox(['core.js','modules/state.js','generated/modular-pilot.js']);
+  const pickerCtx=loadSandbox(['core.js','generated/modular-pilot.js']);
   const selected=run(pickerCtx, `(function(){
     state.tests=[{id:'T1',name:'Glucose',sgTracked:true},{id:'T2',name:'Sodium',sgTracked:true}];sgTest='T1';
     closeModal=function(){globalThis.__closed=true;};rerender=function(){globalThis.__rendered=true;};

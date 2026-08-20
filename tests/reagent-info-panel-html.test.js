@@ -10,11 +10,14 @@ const program = `import { reagentInfoPanelHtml } from ${JSON.stringify(pathToFil
 const html = execFileSync(process.execPath, ['--experimental-strip-types', '--input-type=module', '--eval', program], { encoding: 'utf8' });
 
 assert.match(html, /<h2 class="panel-title">Thông tin đánh giá<\/h2>/);
-assert.match(html, /value="Glucose" oninput="rcMeta\('reagent',this\.value\)"/);
+assert.match(html, /value="Glucose" data-action="rcMeta" data-args='\["reagent"\]' data-action-on="input"/);
 assert.match(html, /id="rcDate"/, 'Ô ngày phải được ghép vào panel');
-assert.match(html, /onclick="rcOpenQuick\('operator'\)"/);
-assert.match(html, /onclick="rcOpenQuick\('sampleType'\)"/);
+assert.match(html, /data-action="rcOpenQuick" data-args='\["operator"\]'/);
+assert.match(html, /data-action="rcOpenQuick" data-args='\["sampleType"\]'/);
 assert.match(html, /type="checkbox" checked/);
+assert.match(html, /data-focus-action="rcMetaFocus" data-focus-args='\["lotOld"\]' data-change-action="rcMetaLog" data-change-args='\["lotOld"\]'/);
+assert.match(html, /data-focus-action="rcMetaFocus" data-focus-args='\["biasTarget"\]' data-change-action="rcMetaLog" data-change-args='\["biasTarget"\]'/);
+assert.doesNotMatch(html, /onfocus=|onchange=/);
 
 const readOnly = { ...input, disabledAttr: 'disabled', canWrite: false, coverageChecked: false };
 const readOnlyProgram = `import { reagentInfoPanelHtml } from ${JSON.stringify(pathToFileURL(source).href)}; console.log(reagentInfoPanelHtml(${JSON.stringify(readOnly)}));`;

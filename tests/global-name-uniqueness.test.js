@@ -23,17 +23,15 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..');
+// assets/modules/ rỗng hoàn toàn từ 2026-08-20 (Pha G nhóm C xong) — git không
+// theo dõi thư mục rỗng, nên nó có thể không tồn tại trên một checkout sạch;
+// không còn quét thư mục này (sẽ không bao giờ có file classic nào nữa).
 const FILES = [
   'assets/core.js',
-  'assets/app.js',
   ...fs.readdirSync(path.join(ROOT, 'assets', 'generated'))
     .filter((f) => f.endsWith('.js'))
     .sort()
     .map((f) => 'assets/generated/' + f),
-  ...fs.readdirSync(path.join(ROOT, 'assets', 'modules'))
-    .filter((f) => f.endsWith('.js'))
-    .sort()
-    .map((f) => 'assets/modules/' + f),
 ];
 // assets/workers/ có global scope RIÊNG (worker context), không quét chung.
 

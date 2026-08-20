@@ -30,7 +30,7 @@ export function createEntryPageController(deps: {
   esc: (value: unknown) => string;
   escapeAttr: (value: unknown) => string;
   jsq: (value: unknown) => string;
-  btn: (label: string, action: string, cls?: string, title?: string, options?: AnyRec) => string;
+  btn: (label: string, action: string | { action: string; args?: unknown[] } | null, cls?: string, title?: string, options?: AnyRec) => string;
   headOnly: (title: string, subtitle: string, actions?: string) => string;
   dateBox: (id: string, value: string, cls?: string, attrs?: string) => string;
   openModal: (html: string) => void;
@@ -121,7 +121,7 @@ export function createEntryPageController(deps: {
       return deps.pres.entryEmptyPageHtml({
         title: 'Chưa có xét nghiệm',
         message: 'Cần khai báo xét nghiệm và mức QC trước khi nhập kết quả.',
-        actionHtml: deps.role() === 'admin' ? deps.btn('Thêm xét nghiệm', `go('manage')`, 'teal') : '',
+        actionHtml: deps.role() === 'admin' ? deps.btn('Thêm xét nghiệm', { action: 'go', args: ['manage'] }, 'teal') : '',
       });
     }
     const entryTests = deps.operationalTests();
@@ -129,7 +129,7 @@ export function createEntryPageController(deps: {
       return deps.pres.entryEmptyPageHtml({
         title: 'Chưa có xét nghiệm sẵn sàng nhập',
         message: 'Cần đưa xét nghiệm vào Panel QC, ghép Nhóm lô QC và gán Mean/SD trước khi nhập kết quả.',
-        actionHtml: deps.role() === 'admin' ? deps.btn('Cấu hình Mean/SD', `go('manage');setManageTab('targets')`, 'teal') : '',
+        actionHtml: deps.role() === 'admin' ? deps.btn('Cấu hình Mean/SD', { action: 'goManageTargets' }, 'teal') : '',
       });
     }
     if (!ui().entrySheetMonth) ui().entrySheetMonth = deps.isoMonth();
@@ -165,7 +165,7 @@ export function createEntryPageController(deps: {
          nếu heading/input/select nằm trực tiếp trong đó. CSS `.tree h4`/`.tree-tools ...`
          vẫn là descendant selector nên không cần đổi gì ở CSS. */
       treeHead = deps.pres.entryTreeHeaderHtml({
-        collapseButtonHtml: deps.btn(treePanelIcon, 'toggleEntryTree()', 'ghost icon entry-tree-toggle', 'Ẩn danh mục nội kiểm', { attrs: { 'aria-label': 'Ẩn danh mục nội kiểm', 'aria-controls': 'entryTreePanel', 'aria-expanded': 'true' } }),
+        collapseButtonHtml: deps.btn(treePanelIcon, { action: 'toggleEntryTree' },'ghost icon entry-tree-toggle', 'Ẩn danh mục nội kiểm', { attrs: { 'aria-label': 'Ẩn danh mục nội kiểm', 'aria-controls': 'entryTreePanel', 'aria-expanded': 'true' } }),
         query: ui().entryQ,
         machineOptionsHtml: machineOpts,
       });
@@ -237,12 +237,12 @@ export function createEntryPageController(deps: {
         const rawPrev = prevView && prevWg.F[i], verdict = prevView ? (rawPrev ? { ...rawPrev, level: deps.ruleResultLevel(t, rawPrev.rules || []), z: prevWg.zs[i] } : { level: 'ok', rules: [] }) : colVerdict(x, p),
           view = deps.EntryService.buildPointView({ point: p, verdict, mean: lvlMean, sd: lvlSd, previousLot: prevView ? prevView.lot : undefined }),
           lv = deps.qcVerdictLabel(view.level),
-          voidBtn = deps.canWrite() ? deps.btn('Hủy', `voidQcPoint('${t.id}','${p.id}')`, 'danger sm', 'Hủy điểm QC có ghi lý do') : '',
+          voidBtn = deps.canWrite() ? deps.btn('Hủy', { action: 'voidQcPoint', args: [t.id, p.id] }, 'danger sm', 'Hủy điểm QC có ghi lý do') : '',
           rulesHtml = [...new Set(view.rules)].map((r: unknown) => `<span class="pill">${r}</span>`).join('') || '—';
         return deps.pres.entryPointTableRowHtml({ rejected: view.level === 'rej', warning: view.level === 'warn', pointId: deps.escapeAttr(p.id || ''), dateText: deps.vnDate(p.date), valueText: deps.fmtPointValue(p, t), zText: `${view.z >= 0 ? '+' : ''}${deps.fmt(view.z)}s`, verdictLevel: view.level, verdictText: lv, rulesHtml, voidButtonHtml: voidBtn });
       }).join('');
       const cumulative = deps.pres.entryCumulativeStatsHtml({ endDateText: deps.vnDate(W.end), count: cumulativeSt ? cumulativeSt.n : 0, mean: cumulativeSt ? deps.fmtTestValue(t, cumulativeSt.m) : '—', sd: cumulativeSt ? deps.fmtTestStat(t, cumulativeSt.sd) : '—', cv: cumulativeSt ? deps.fmt(cumulativeSt.cv) + '%' : '—' });
-      const rowControl = deps.pres.entryTableWindowNoteHtml({ limited: rowWindow.limited, expanded: rowWindow.expanded && rowWindow.total > ENTRY_TABLE_INITIAL_ROWS, shown: rowWindow.rows.length, total: rowWindow.total, actionButtonHtml: deps.btn(rowWindow.limited ? 'Hiện toàn bộ' : 'Thu gọn', `entryToggleRows('${deps.jsq(tableKey)}')`, 'ghost sm') });
+      const rowControl = deps.pres.entryTableWindowNoteHtml({ limited: rowWindow.limited, expanded: rowWindow.expanded && rowWindow.total > ENTRY_TABLE_INITIAL_ROWS, shown: rowWindow.rows.length, total: rowWindow.total, actionButtonHtml: deps.btn(rowWindow.limited ? 'Hiện toàn bộ' : 'Thu gọn', { action: 'entryToggleRows', args: [tableKey] }, 'ghost sm') });
       return deps.pres.entryPointTableCardHtml({ parallel: x.parallel, level: x.level, previousLot: !!prevView, lot: deps.esc(lvlLot || '?'), pointCount: allPtsIdx.length, bodyHtml: `${cumulative}${ptsIdx.length ? `<table><thead><tr><th>Ngày</th><th class="num">Giá trị</th><th class="num">Z</th><th>Kết luận</th><th>Luật</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table>${rowControl}` : '<div class="empty qc-table-empty">Chưa có điểm nào trong khoảng này.</div>'}` });
     }).join('');
     const prevLotByLevel = new Map<unknown, AnyRec>(levelViews.filter((v: AnyRec) => v.prevView).map((v: AnyRec) => [v.x.level, v.prevView.lot]));
@@ -270,7 +270,7 @@ export function createEntryPageController(deps: {
         { label: 'Mean mục tiêu', value: deps.fmtTestValue(t, chartMean), control: true },
         { label: 'SD mục tiêu', value: deps.fmtTestStat(t, chartSd), control: true },
       ];
-      const prevBtn = x.parallel ? '<span class="hint">Đang đánh giá</span>' : prevSeries.length ? (prevView ? deps.btn('Xem lô mới', `event.stopPropagation();entryShowCurrentLot(${x.level})`, 'teal sm') : deps.btn('Xem lô cũ', `event.stopPropagation();entryShowPrevLot(${x.level},'${deps.jsq(prevSeries[0].lot || '')}')`, 'ghost sm')) : `<span class="hint">${x.applied === 'lab' ? 'Dải PXN' : 'Dải NSX'}</span>`;
+      const prevBtn = x.parallel ? '<span class="hint">Đang đánh giá</span>' : prevSeries.length ? (prevView ? deps.btn('Xem lô mới', { action: 'entryShowCurrentLot', args: [x.level] }, 'teal sm') : deps.btn('Xem lô cũ', { action: 'entryShowPrevLot', args: [x.level, prevSeries[0].lot || ''] }, 'ghost sm')) : `<span class="hint">${x.applied === 'lab' ? 'Dải PXN' : 'Dải NSX'}</span>`;
       return deps.pres.entryLeveyJenningsMiniHtml({ on, parallel: x.parallel, level: x.level, lot: chartLot || '', pointCount: chartPts.length, previousLot: !!prevView, metrics, actionHtml: prevBtn, testId: t.id, mean: chartMean, sd: chartSd, start: W.start, end: W.end });
     }).join('');
     const levelHead = deps.pres.entrySheetLevelHeads(entryCols.map((x: AnyRec) => {
@@ -308,20 +308,20 @@ export function createEntryPageController(deps: {
       };
       const cells = entryCols.map((x: AnyRec, levelIdx: number) => {
         let levelHasPoint = false, emptyShown = false;
-        const levelRunNos = levelRuns(x).map((r: AnyRec) => r.runNo), nextLevelRunNo = levelRunNos.length ? Math.max(...levelRunNos) + 1 : 1, lotArg = deps.jsq(x.parallel ? x.lot || '' : '');
+        const levelRunNos = levelRuns(x).map((r: AnyRec) => r.runNo), nextLevelRunNo = levelRunNos.length ? Math.max(...levelRunNos) + 1 : 1;
         const runInputs = dayGroup.runs.map((g: AnyRec) => {
-          const p = g.levels[x.key], runArg = deps.jsq(g.runId || '');
+          const p = g.levels[x.key];
           if (!p) {
             if (!shouldShowEmptyRun(x, g)) return '';
             emptyShown = true;
-            return deps.pres.entrySheetEmptyRunHtml({ editable: deps.canWrite(), title: 'Dùng phím mũi tên để chuyển ô', ariaLabel: `Nhập QC ngày ${deps.vnDate(g.date)}, mức ${x.level}, lô ${deps.escapeAttr(x.lot || '')}, lần ${g.runNo}`, date: deps.escapeAttr(g.date), runNo: g.runNo, levelIndex: levelIdx, changeAction: `entryInlineSave('${t.id}',${x.level},'${g.date}',this.value,'${runArg}','${lotArg}')` });
+            return deps.pres.entrySheetEmptyRunHtml({ editable: deps.canWrite(), title: 'Dùng phím mũi tên để chuyển ô', ariaLabel: `Nhập QC ngày ${deps.vnDate(g.date)}, mức ${x.level}, lô ${deps.escapeAttr(x.lot || '')}, lần ${g.runNo}`, date: deps.escapeAttr(g.date), runNo: g.runNo, levelIndex: levelIdx, actionAttrs: `data-action="entrySheetRunChanged" data-args="${deps.escapeAttr(JSON.stringify([t.id, x.level, g.date, g.runId || '', x.parallel ? x.lot || '' : '']))}" data-action-on="change"` });
           }
           levelHasPoint = true;
           const isPrev = !!p._prevLot, pMean = isPrev && Number.isFinite(+p.qcMean) ? +p.qcMean : x.mean, pSd = isPrev && Number.isFinite(+p.qcSd) ? +p.qcSd : x.sd;
           const verdict = isPrev ? { level: 'ok', rules: [] } : colVerdict(x, p), view = deps.EntryService.buildPointView({ point: p, verdict, mean: pMean, sd: pSd, previousLot: isPrev ? p._prevLot : undefined }), lv = deps.qcVerdictLabel(view.level);
           return deps.pres.entrySheetSavedRunHtml({ previousLot: isPrev, previousLotName: deps.esc(p._prevLot || ''), valueClass: view.valueClass, title: isPrev ? 'Lô cũ ' + deps.escapeAttr(p._prevLot) + ' · đã chuyển tiếp · chỉ đọc' : 'Đã lưu, không sửa trực tiếp', valueText: deps.fmtPointValue(p, t), zText: `${view.z >= 0 ? '+' : ''}${deps.fmt(view.z)}s`, verdictText: lv });
         }).join('');
-        const addRunBtn = deps.pres.entrySheetAddRunHtml({ visible: deps.canWrite() && levelHasPoint && !emptyShown, action: `entryUnlockExtraRun('${t.id}','${deps.jsq(x.key)}','${dayGroup.date}',${levelIdx},${nextLevelRunNo})` });
+        const addRunBtn = deps.pres.entrySheetAddRunHtml({ visible: deps.canWrite() && levelHasPoint && !emptyShown, actionAttrs: `data-action="entryUnlockExtraRun" data-args="${deps.escapeAttr(JSON.stringify([t.id, x.key, dayGroup.date, levelIdx, nextLevelRunNo]))}"` });
         return deps.pres.entrySheetCellHtml({ parallel: x.parallel, hasAddButton: !!addRunBtn, runInputsHtml: runInputs, addRunButtonHtml: addRunBtn });
       }).join('');
       const staff = [...new Map(dayGroup.runs.flatMap((g: AnyRec) => Object.values(g.levels)).map((p: AnyRec) => deps.pointStaff(p)).filter((x: AnyRec) => x.code).map((x: AnyRec) => [x.code, x])).values()];
@@ -330,15 +330,15 @@ export function createEntryPageController(deps: {
       const autoNote = rulesAll.length ? (worst === 'rej' ? deps.errorType([...new Set(rejRules.length ? rejRules : rulesAll)] as string[]) : 'Theo dõi / cảnh báo') : '';
       const datePoints = dayGroup.runs.flatMap((g: AnyRec) => Object.values(g.levels)).filter(Boolean);
       const manualNote = ((datePoints.find((p: AnyRec) => String(p.note || '').trim())) || ({} as AnyRec)).note || '';
-      const note = deps.pres.entrySheetNoteHtml({ hasPoint, writable: deps.canWrite(), placeholder: deps.escapeAttr(autoNote || 'Nhập ghi chú...'), changeAction: `entryDateNoteSave('${t.id}','${dayGroup.date}',this.value)`, manualNote: deps.esc(manualNote), autoNote });
+      const note = deps.pres.entrySheetNoteHtml({ hasPoint, writable: deps.canWrite(), placeholder: deps.escapeAttr(autoNote || 'Nhập ghi chú...'), actionAttrs: `data-action="entryDateNoteSave" data-args="${deps.escapeAttr(JSON.stringify([t.id, dayGroup.date]))}" data-action-on="change"`, manualNote: deps.esc(manualNote), autoNote });
       const liveCols = entryCols.filter((x: AnyRec) => !x.parallel), doneLevels = liveCols.filter((x: AnyRec) => dayGroup.runs.some((g: AnyRec) => g.levels[x.key])).length, rowCls = [dayGroup.date === today ? 'today' : '', dayGroup.date <= today && doneLevels < liveCols.length ? 'missing' : '', hasPoint ? 'has-data' : ''].filter(Boolean).join(' ');
       return deps.pres.entrySheetDayRowHtml({ rowClass: rowCls, date: dayGroup.date, dayOfMonth: deps.dateObj(dayGroup.date).getDate(), today: dayGroup.date === today, cellsHtml: cells, staffHtml: staffCell, warningRules: [...new Set(warnRules)].join(', '), rejectRules: [...new Set(rejRules)].join(', '), statusHtml: status, noteHtml: note });
     }).join('');
-    const worksheet = deps.pres.entryWorksheetHtml({ testName: deps.esc(deps.testDisplayName(t)), lotLabel: deps.esc(deps.pres.entryLotLabelsTs(entryCols)), monthOptionsHtml: sheetMonthOptions, yearOptionsHtml: sheetYearOptions, currentMonthButtonHtml: deps.btn('Tháng hiện tại', 'entrySetSheetMonth(isoMonth())', 'ghost sm qc-current-month'), todayButtonHtml: deps.btn('Tới hôm nay', 'entryGoToday()', 'teal sm qc-today-jump'), levelHeadHtml: levelHead, rowsHtml: sheetRows, columnCount: entryCols.length, messageHtml: ui().entryLastMsg });
-    const right = `${worksheet}${deps.pres.entryLeveyPanelHtml({ startDateHtml: deps.dateBox('entryStartDate', W.start, '', 'onchange="entrySetStart(this.value)"'), endDateHtml: deps.dateBox('entryEndDate', W.end, '', 'onchange="entrySetEnd(this.value)"'), dayButtonsHtml: dayBtns, rangeText: `${deps.vnDate(W.start)} – ${deps.vnDate(W.end)} · ${deps.operationalLevels(t).length} mức QC`, stackHtml: ljStack })}${pointsInView}${rangeBox}`;
+    const worksheet = deps.pres.entryWorksheetHtml({ testName: deps.esc(deps.testDisplayName(t)), lotLabel: deps.esc(deps.pres.entryLotLabelsTs(entryCols)), monthOptionsHtml: sheetMonthOptions, yearOptionsHtml: sheetYearOptions, currentMonthButtonHtml: deps.btn('Tháng hiện tại', { action: 'entrySetSheetMonth', args: [deps.isoMonth()] }, 'ghost sm qc-current-month'), todayButtonHtml: deps.btn('Tới hôm nay', { action: 'entryGoToday' }, 'teal sm qc-today-jump'), levelHeadHtml: levelHead, rowsHtml: sheetRows, columnCount: entryCols.length, messageHtml: ui().entryLastMsg });
+    const right = `${worksheet}${deps.pres.entryLeveyPanelHtml({ startDateHtml: deps.dateBox('entryStartDate', W.start, '', 'data-action="entrySetStart" data-action-on="change"'), endDateHtml: deps.dateBox('entryEndDate', W.end, '', 'data-action="entrySetEnd" data-action-on="change"'), dayButtonsHtml: dayBtns, rangeText: `${deps.vnDate(W.start)} – ${deps.vnDate(W.end)} · ${deps.operationalLevels(t).length} mức QC`, stackHtml: ljStack })}${pointsInView}${rangeBox}`;
     ui().entryPartialRenderCache = { testId: t.id, right };
     if (rightOnly) return right;
-    return deps.pres.entryPageLayoutHtml({ pageHeadHtml: deps.headOnly('Nhập QC', 'Ghi nhận kết quả theo ngày, mức QC và lô đang vận hành'), treeCollapsed, expandButtonHtml: deps.btn(treePanelIcon, 'toggleEntryTree()', 'teal icon entry-tree-expand', 'Hiện danh mục nội kiểm', { attrs: { 'aria-label': 'Hiện danh mục nội kiểm', 'aria-controls': 'entryTreePanel', 'aria-expanded': 'false' } }), treeHeadHtml: treeHead, treeHtml: tree, rightHtml: right });
+    return deps.pres.entryPageLayoutHtml({ pageHeadHtml: deps.headOnly('Nhập QC', 'Ghi nhận kết quả theo ngày, mức QC và lô đang vận hành'), treeCollapsed, expandButtonHtml: deps.btn(treePanelIcon, { action: 'toggleEntryTree' },'teal icon entry-tree-expand', 'Hiện danh mục nội kiểm', { attrs: { 'aria-label': 'Hiện danh mục nội kiểm', 'aria-controls': 'entryTreePanel', 'aria-expanded': 'false' } }), treeHeadHtml: treeHead, treeHtml: tree, rightHtml: right });
   };
 
   /* Mở/thu nhánh ngay trên DOM, không vẽ lại toàn trang: khung cây có scroll riêng nên
@@ -363,8 +363,12 @@ export function createEntryPageController(deps: {
     const target = grid.querySelector(ui().entryTreeCollapsed ? '.entry-tree-expand' : '.entry-tree-toggle');
     requestAnimationFrame(() => { if (target) target.focus({ preventScroll: true }); });
   };
-  const entryTreeKey = (event: AnyRec) => {
-    const item = event.currentTarget, key = event.key;
+  /* Pha H2 nhóm (d) lát 3: đọc `this` thay `event.currentTarget` — dispatcher
+     gọi qua listener delegate trên `document`, nên `event.currentTarget` lúc
+     nào cũng là `document`, không phải phần tử cây thật; `this` (đặt qua
+     `fn.apply(el,...)`) mới đúng là phần tử `data-keydown-action` khớp. */
+  const entryTreeKey = function (this: AnyRec, event: AnyRec) {
+    const item = this, key = event.key;
     const command = deps.pres.entryTreeKeyCommand(key, item.getAttribute('aria-expanded'));
     if (command === 'toggle') { event.preventDefault(); item.click(); return; }
     if (command !== 'navigate') return;
@@ -420,11 +424,11 @@ export function createEntryPageController(deps: {
   };
   const entrySheetInputs = () => deps.pres.entrySheetInputOrder([...doc().querySelectorAll('.qc-sheet .qc-inline-input')].filter((el: AnyRec) => !el.disabled && el.offsetParent !== null));
   const entrySheetTarget = (inputs: AnyRec[], current: AnyRec, key: string, shiftKey = false) => deps.pres.entrySheetNavigation.target(inputs, current, key, shiftKey);
-  const entrySheetKey = (event: AnyRec) => {
+  const entrySheetKey = function (this: AnyRec, event: AnyRec) {
     if (event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return;
     const supported = ['Enter', 'Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
     if (!supported.includes(event.key)) return;
-    const cur = event.currentTarget, next = entrySheetTarget(entrySheetInputs(), cur, event.key, event.shiftKey);
+    const cur = this, next = entrySheetTarget(entrySheetInputs(), cur, event.key, event.shiftKey);
     if (!next) return;
     event.preventDefault();
     ui().entryPendingSheetFocus = `${next.dataset.focusDate}|${next.dataset.focusLevel}`;
@@ -520,11 +524,16 @@ export function createEntryPageController(deps: {
       // Native confirm()/alert() dialogs leave the Electron renderer's input
       // unresponsive after close (until the window blurs/refocuses), so
       // unusual-data confirmation goes through the app's own modal instead.
-      deps.openModal(deps.pres.entryPreSaveWarningModalHtml({ issuesHtml: preIssues.map((x: string) => `<div class="alert warn">${deps.esc(x)}</div>`).join(''), cancelButtonHtml: deps.btn('Hủy', 'closeModal();entryRenderKeepScroll()', 'ghost'), saveButtonHtml: deps.btn('Vẫn lưu', `closeModal();entryInlineSaveCommit('${deps.jsq(tid)}',${level},'${deps.jsq(date)}',${val},'${deps.jsq(runId)}','${deps.jsq(lotNo)}',${valueDecimals})`, 'teal') }));
+      deps.openModal(deps.pres.entryPreSaveWarningModalHtml({ issuesHtml: preIssues.map((x: string) => `<div class="alert warn">${deps.esc(x)}</div>`).join(''), cancelButtonHtml: deps.btn('Hủy', { action: 'entryCloseKeepScroll' }, 'ghost'), saveButtonHtml: deps.btn('Vẫn lưu', { action: 'entryConfirmInlineSave', args: [tid, level, date, val, runId, lotNo, valueDecimals] }, 'teal') }));
       return;
     }
     entryInlineSaveCommit(tid, level, date, val, runId, lotNo, valueDecimals);
   };
+  /* Pha H2 nhóm (d) lát 3: `entryInlineSave`'s vị trí tham số cố định (value ở
+     giữa) vì `scripts/ui-workflow-check.js` gọi trực tiếp theo đúng thứ tự
+     cũ — không đổi được. Wrapper này chỉ đảo lại thứ tự để value luôn ở CUỐI,
+     khớp quy ước data-action-on="change" tự nối giá trị sống vào cuối args. */
+  const entrySheetRunChanged = (tid: unknown, level: unknown, date: string, runIdHint: string, lotNo: string, value: unknown) => entryInlineSave(tid, level, date, value, runIdHint, lotNo);
   const entryInlineSaveCommit = (tid: unknown, level: unknown, date: string, val: unknown, runId: unknown, lotNo: unknown = '', valueDecimals = deps.qcValueDecimals(val)) => {
     const t = state().tests.find((x: AnyRec) => x.id === tid), cfg = entryColumnCfg(t, level, lotNo);
     // Kiểm tra lại tại thời điểm ghi vì nhóm lô có thể vừa bị dừng trong lúc hộp
@@ -545,6 +554,11 @@ export function createEntryPageController(deps: {
     ui().entryLastMsg = feedback ? `<div class="alert ${feedback.cls}">${feedback.emphasis ? '<b>' + deps.esc(feedback.message) + '</b>' : deps.esc(feedback.message)}</div>` : f.level === 'rej' ? `<div class="alert rej"><b>⚠ ${tag} vi phạm — ${rules.join(', ')}</b></div>` : f.level === 'warn' ? `<div class="alert warn"><b>${tag} cảnh báo — ${rules.join(', ')}</b></div>` : `<div class="alert ok">✓ Đã lưu ${tag} ngày ${deps.vnDate(date)}.</div>`;
     entryRenderKeepScroll();
   };
+  /* Pha H2 (2026-08-20): hai wrapper cho nút trên entryPreSaveWarningModalHtml
+     — trước đây onclick="closeModal();fn(...)" gọi 2 lệnh liền, data-action
+     chỉ định tuyến một hàm nên gộp lại đây. */
+  const entryCloseKeepScroll = () => { deps.closeModal(); entryRenderKeepScroll(); };
+  const entryConfirmInlineSave = (tid: unknown, level: unknown, date: string, val: unknown, runId: unknown, lotNo: unknown, valueDecimals: number) => { deps.closeModal(); entryInlineSaveCommit(tid, level, date, val, runId, lotNo, valueDecimals); };
   const syncVoidNceChoice = () => {
     const kind = (doc().getElementById('voidKindInput') || {}).value, box = doc().getElementById('voidOpenNce'), hint = doc().getElementById('voidNceHint'), reasonBox = doc().getElementById('voidReasonBox'), reasonErr = doc().getElementById('voidReasonErr');
     if (!box) return;
@@ -562,7 +576,7 @@ export function createEntryPageController(deps: {
     const t = state().tests.find((x: AnyRec) => x.id === tid), p = (state().data[tid as string] || []).find((x: AnyRec) => x.id === pointId);
     if (!t || !p || p.voided) return;
     if (!await deps.requireUnlockedPeriod(p.date, 'hủy điểm QC')) return;
-    deps.openModal(deps.pres.entryVoidModalHtml({ pointInfoHtml: `Ngày ${deps.vnDate(p.date)} · Mức ${p.level} · Giá trị ${deps.fmtPointValue(p, t)}`, closeButtonHtml: '<button class="modal-close" onclick="closeModal()">×</button>', closeFooterButtonHtml: deps.btn('Đóng', 'closeModal()', 'ghost'), confirmButtonHtml: deps.btn('Xác nhận hủy', `confirmVoidQcPoint('${tid}','${pointId}')`, 'danger') }));
+    deps.openModal(deps.pres.entryVoidModalHtml({ pointInfoHtml: `Ngày ${deps.vnDate(p.date)} · Mức ${p.level} · Giá trị ${deps.fmtPointValue(p, t)}`, closeButtonHtml: '<button class="modal-close" data-action="closeModal">×</button>', closeFooterButtonHtml: deps.btn('Đóng', { action: 'closeModal' }, 'ghost'), confirmButtonHtml: deps.btn('Xác nhận hủy', { action: 'confirmVoidQcPoint', args: [tid, pointId] }, 'danger') }));
     setTimeout(() => { const e = doc().getElementById('voidKindInput'); if (e) e.focus(); }, 50);
   };
   const confirmVoidQcPoint = async (tid: unknown, pointId: unknown) => {
@@ -626,7 +640,7 @@ export function createEntryPageController(deps: {
     pageEntry, entryWindow, entryWindowFor, entryRowsWindow, entryToggleRows, entryDetailToggled, entryTreeIsCollapsed,
     treeToggle, toggleEntryTree, entryTreeKey, entryFilter, entryPick, entryFocusLevel, entryShowPrevLot, entryShowCurrentLot,
     entryFocusPendingSheet, entrySheetInputs, entrySheetTarget, entrySheetKey, entryLatestTreeState, entrySyncTreeState,
-    entryRenderKeepScroll, entrySetLastMsg, entryUnlockExtraRun, entryDateNoteSave, entryColumnCfg, entryInlineSave,
+    entryRenderKeepScroll, entryCloseKeepScroll, entryConfirmInlineSave, entrySetLastMsg, entryUnlockExtraRun, entryDateNoteSave, entryColumnCfg, entryInlineSave, entrySheetRunChanged,
     entryInlineSaveCommit, syncVoidNceChoice, voidQcPoint, confirmVoidQcPoint, entrySetSheetMonth, entryGoToday,
     entrySetSheetPart, entrySetDays, entrySetStart, entrySetEnd,
   };

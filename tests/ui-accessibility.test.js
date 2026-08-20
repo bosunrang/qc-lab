@@ -57,7 +57,7 @@ assert.ok(dialogZ>authZ, 'dialog xác nhận phải nằm trên auth/recovery ov
 
 assert.match(router, /role="tree" aria-label="Danh mục nội kiểm"/);
 assert.match(router, /role="treeitem" tabindex="0" aria-expanded=/);
-assert.match(router, /const entryTreeKey = \(event: AnyRec\) => \{/);
+assert.match(router, /const entryTreeKey = function \(this: AnyRec, event: AnyRec\) \{/);
 assert.match(router, /key\s*===\s*'ArrowDown'/);
 assert.match(router, /aria-live="polite"/);
 assert.match(router, /aria-current="\$\{id===page\?'page':'false'\}"/);
@@ -76,10 +76,14 @@ assert.match(components, /outline:1px solid var\(--focus-outline\);outline-offse
 assert.match(indexHtml, /<nav id="nav" aria-label="Điều hướng chính">/);
 assert.match(indexHtml, /<main id="main" tabindex="-1">/);
 
+// assets/modules/ rỗng hoàn toàn từ 2026-08-20 (Pha G nhóm C xong) — quét đổi
+// sang src/presentation/**/*.ts, nơi toàn bộ HTML dựng động giờ sống; quét
+// thư mục rỗng cũ đã âm thầm thành no-op.
+function walkPresentation(dir){return fs.readdirSync(dir,{withFileTypes:true}).flatMap(entry=>{const full=path.join(dir,entry.name);return entry.isDirectory()?walkPresentation(full):[full];});}
 const rawRequiredLabels=[];
-for(const file of fs.readdirSync(path.join(root,'assets','modules')).filter(name=>name.endsWith('.js'))){
-  const source=read(`assets/modules/${file}`);
-  if(/<label>[^<\r\n]*\s\*<\/label>/.test(source))rawRequiredLabels.push(file);
+for(const file of walkPresentation(path.join(root,'src','presentation')).filter(name=>name.endsWith('.ts'))){
+  const source=fs.readFileSync(file,'utf8');
+  if(/<label>[^<\r\n]*\s\*<\/label>/.test(source))rawRequiredLabels.push(path.relative(root,file));
 }
 assert.deepEqual(rawRequiredLabels,[],'dấu sao bắt buộc trong label phải bọc bằng <span class="req"> để luôn có màu đỏ');
 assert.match(manageRoutes+teaReferenceLabProfileBodyPresentation,/TEa chuẩn hóa % <span class="req">\*<\/span>/,'hồ sơ TEa phải hiển thị dấu bắt buộc bằng marker chung');

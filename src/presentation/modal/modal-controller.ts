@@ -19,7 +19,7 @@ export function createModalController(deps:{document:Document;requestFrame:(work
   const openModal=(html:string)=>{
     const r=modalRoot();if(!r)return;
     modalReturnFocus=deps.document.activeElement&&deps.document.activeElement!==deps.document.body?deps.document.activeElement:null;
-    r.innerHTML=`<div class="modal-bg" role="presentation" onclick="if(event.target===this)closeModal()">${html}</div>`;
+    r.innerHTML=`<div class="modal-bg" role="presentation" data-action="closeModal" data-action-self-only>${html}</div>`;
     const modal=r.querySelector('.modal');if(!modal)return;
     modal.setAttribute('role','dialog');modal.setAttribute('aria-modal','true');(modal as HTMLElement).tabIndex=-1;
     const title=modal.querySelector('.modal-h h3');if(title){if(!title.id)title.id='modalTitle';modal.setAttribute('aria-labelledby',title.id);}

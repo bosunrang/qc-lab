@@ -17,7 +17,7 @@
 const assert = require('node:assert/strict');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
-const ctx = loadSandbox(['core.js', 'modules/state.js']);
+const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js']);
 const plain = (v) => JSON.parse(JSON.stringify(v));
 
 // A phantom, entirely untouched level 3 sitting alongside two real, configured levels

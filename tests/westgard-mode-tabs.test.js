@@ -16,12 +16,12 @@ const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=modul
 assert.equal(result.status, 0, result.stderr || 'không thể chạy Westgard mode tabs TypeScript');
 const [empty, archived, lj, cusum] = JSON.parse(result.stdout);
 assert.equal(empty, '');
-assert.match(archived, /wgSetViewMode\('archived'\)/);
+assert.match(archived, /data-action="wgSetViewMode" data-args='\["archived"\]'/);
 assert.match(archived, /Nhóm lô đã dừng\/lưu trữ \(3\)/);
 assert.match(archived, /class="on"/);
-assert.match(lj, /wgSetChartMode\('lj'\)/);
+assert.match(lj, /data-action="wgSetChartMode" data-args='\["lj"\]'/);
 assert.match(lj, /class="on"/);
-assert.match(cusum, /wgSetChartMode\('cusum'\)/);
+assert.match(cusum, /data-action="wgSetChartMode" data-args='\["cusum"\]'/);
 assert.match(cusum, /Xu hướng CUSUM/);
-assert.doesNotMatch(cusum, /<button class="on" onclick="wgSetChartMode\('lj'\)"/);
+assert.doesNotMatch(cusum, /<button class="on" data-action="wgSetChartMode" data-args='\["lj"\]'/);
 console.log('Westgard mode tabs TypeScript tests passed');

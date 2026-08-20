@@ -9,7 +9,7 @@ const program = `import { reagentToolbarHtml } from ${JSON.stringify(pathToFileU
 const html = execFileSync(process.execPath, ['--experimental-strip-types', '--input-type=module', '--eval', program], { encoding: 'utf8' });
 
 assert.match(html, /id="rcSel"/, 'Selector phải giữ ID');
-assert.match(html, /onchange="rcSwitch\(this\.value\)"/, 'Selector phải giữ handler');
+assert.match(html, /data-action="rcSwitch" data-action-on="change"/, 'Selector phải giữ handler');
 assert.match(html, /<option value="r1">Glucose<\/option>/, 'Các lựa chọn phải được ghép vào toolbar');
 assert.match(html, /rc-toolbar-primary/, 'Hành động ghi dữ liệu phải có vùng riêng');
 assert.match(html, /<button>Thêm<\/button>/);

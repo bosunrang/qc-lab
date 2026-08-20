@@ -15,7 +15,7 @@ export function createUsersPageHtml() {
        <div><label>Tên đăng nhập</label><input id="uUser" placeholder="vd: lan.nt"></div>
        <div><label>Họ tên</label><input id="uName" aria-label="Họ tên"></div>
        <div><label>Mã viết tắt</label><input id="uInitials" maxlength="12" placeholder="NTL"></div>
-       <div><label>Vai trò</label><select id="uRole" aria-label="Vai trò" onchange="syncUserPermChecks('newUserPerms',this.value)">${roleOptions}</select></div>
+       <div><label>Vai trò</label><select id="uRole" aria-label="Vai trò" data-action="syncUserPermChecks" data-args='["newUserPerms"]' data-action-on="change">${roleOptions}</select></div>
        <div><label>Mật khẩu tạm</label><input id="uPass" aria-label="Mật khẩu tạm" type="password" autocomplete="new-password"></div>
        <div class="user-create-actions">${addButton}</div>
        </div>

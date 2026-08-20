@@ -1,7 +1,11 @@
-export type ActionSuggestPhrase = { phraseHtml: string; phraseJs: string };
+export type ActionSuggestPhrase = { phraseHtml: string; phrase: string };
 
-export function actionSuggestRowHtml(targetIdHtml: string, targetIdJs: string, phrases: ActionSuggestPhrase[]) {
+function escapeAttribute(value: unknown) {
+  return String(value ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+export function actionSuggestRowHtml(targetIdHtml: string, targetId: string, phrases: ActionSuggestPhrase[]) {
   if(!phrases.length)return '';
-  const chips=phrases.map(phrase=>`<button type="button" class="sugg-chip" onclick="actionInsertSuggestion('${targetIdJs}','${phrase.phraseJs}')">${phrase.phraseHtml}</button>`).join('');
+  const chips=phrases.map(phrase=>`<button type="button" class="sugg-chip" data-action="actionInsertSuggestion" data-args="${escapeAttribute(JSON.stringify([targetId, phrase.phrase]))}">${phrase.phraseHtml}</button>`).join('');
   return `<div class="sugg-row" id="sugg-${targetIdHtml}">${chips}</div>`;
 }

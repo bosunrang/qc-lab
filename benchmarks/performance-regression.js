@@ -20,7 +20,7 @@ function measure(fn, repeats = 1) {
 const source = makeState(config.scenario),raw = JSON.stringify(source),shell = { ...source, data:{} },shellRaw = JSON.stringify({ format:1, slot:'a', shell });
 
 (async () => {
-const startup = loadSandbox(['core.js', 'modules/state.js']);
+const startup = loadSandbox(['core.js', 'generated/modular-pilot.js']);
 startup.__shellCopies = Array.from({ length:3 }, () => JSON.parse(shellRaw));
 const shellInit = measure(i => {
   startup.__candidate = startup.__shellCopies[i];
@@ -29,7 +29,7 @@ const shellInit = measure(i => {
 startup.__full = JSON.parse(raw);
 const fullStartup = measure(() => run(startup, `(()=>{const errors=QCCore.validateBackup(__full);if(errors.length)throw new Error(errors[0]);state=QCCore.sanitizeBackup(__full,{owned:true});ensureShape({sanitized:true});const invariantErrors=QCCore.validateStateInvariants(state,{sanitized:true});if(invariantErrors.length)throw new Error(invariantErrors[0]);})()`));
 
-const domain = loadSandbox(['core.js', 'modules/state.js']);
+const domain = loadSandbox(['core.js', 'generated/modular-pilot.js']);
 domain.__state = makeState(config.scenario);run(domain, 'state=__state;clearDerived()');
 const domainAll = `operationalTests().forEach(t=>{activeWestgard(t);operationalLevels(t).forEach(l=>{acceptedLotPoints(t,l.level);cusumSeries(t,l);});});`;
 const coldDomain = measure(() => run(domain, `(()=>{clearDerived();${domainAll}})()`));
@@ -48,7 +48,7 @@ const mapLookup = measure(() => queries.forEach(value => runIndex.get(value)), 3
    gate này khóa cả tín hiệu cấu trúc (chỉ 1 partition được ghi lại, byte ghi
    nhỏ hơn nhiều ghi đầy đủ) lẫn thời gian. IndexedDB giả đếm byte qua put() để
    xấp xỉ chi phí structured-clone thật của trình duyệt. */
-const saveCtx = loadSandbox(['core.js', 'modules/state.js'], { performance });
+const saveCtx = loadSandbox(['core.js', 'generated/modular-pilot.js'], { performance });
 saveCtx.__state = source;
 const saveBench = await run(saveCtx, `
   var __records=new Map(),__hasStore=false,__putBytes=0;

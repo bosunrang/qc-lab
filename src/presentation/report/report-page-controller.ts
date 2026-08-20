@@ -12,8 +12,7 @@ export function createReportPageController(deps: {
   rerender: () => void;
   requestFrame: (work: () => void, delay: number) => void;
   esc: (value: unknown) => string;
-  jsq: (value: unknown) => string;
-  button: (label: string, action: string, variant?: string, title?: string, options?: AnyRec) => string;
+  button: (label: string, action: string | { action: string; args?: unknown[] } | null, variant?: string, title?: string, options?: AnyRec) => string;
   isoMonth: () => string;
   isoToday: () => string;
   monthVN: (ym: string) => string;
@@ -68,7 +67,7 @@ export function createReportPageController(deps: {
   const reportUnlockPeriod = (ym: string) => {
     if (!deps.requireAdmin()) return;
     const label = deps.monthVN(ym);
-    deps.openModal(deps.unlockModalHtml({ titleHtml: `Mở khóa kỳ ${deps.esc(label)}`, periodLabelHtml: deps.esc(label), closeButtonHtml: deps.button('Đóng', 'closeModal()', 'ghost'), confirmButtonHtml: deps.button('Xác nhận mở khóa', `reportConfirmUnlockPeriod('${deps.jsq(ym)}')`, 'danger') }));
+    deps.openModal(deps.unlockModalHtml({ titleHtml: `Mở khóa kỳ ${deps.esc(label)}`, periodLabelHtml: deps.esc(label), closeButtonHtml: deps.button('Đóng', { action: 'closeModal' }, 'ghost'), confirmButtonHtml: deps.button('Xác nhận mở khóa', { action: 'reportConfirmUnlockPeriod', args: [ym] }, 'danger') }));
     deps.requestFrame(() => { const e = field('unlockReasonInput'); if (e) e.focus(); }, 50);
   };
 

@@ -80,13 +80,28 @@ export function createReportPrintController(deps: ReportPrintControllerDeps) {
   }
   function signBlock() { return deps.reportSignBlock(); }
 
+  /* Pha H2 lát cuối (2026-08-20): cửa sổ popup in kế thừa CSP của app chính
+     (about:blank được document.write() từ cùng origin) — sau khi bỏ
+     'unsafe-inline' khỏi script-src, thẻ <script> nội tuyến VÀ onclick=
+     trần cũ trong HTML popup đều bị CSP chặn. Thay bằng: KHÔNG viết script
+     nào vào HTML popup nữa — nút in chỉ còn một `id`, và listener/hàm
+     qcDoPrint/qcSavePdf được gắn/định nghĩa từ PHÍA MỞ popup (chính là code
+     này, một file thật trong bundle, không phải chuỗi HTML) ngay sau
+     document.write(). `window` (trần, không tiền tố `opener.`) ở đây CHÍNH
+     LÀ app chính — vì hàm này chạy trong app chính, không phải trong popup —
+     nên `opener.qcPrintPdf` cũ giờ chỉ còn là `(window as any).qcPrintPdf`.
+     `w.__qcPrintToken` VẪN phải là một property thật trên window của popup
+     (main process Electron và scripts/print-check.js đọc trực tiếp qua
+     executeJavaScript('window.__qcPrintToken')) — gán từ đây vẫn ra đúng kết
+     quả, vì đó là property assignment thường, không phải thực thi script
+     nội tuyến nên CSP không liên quan. */
   async function openPrintImpl(title: string, bodyHtml: string, options: { landscape?: boolean } = {}) {
     const w = deps.openPrintWindow(); if (!w) { await deps.infoDialog('Trình duyệt chặn cửa sổ. Cho phép pop-up để in báo cáo.'); return; }
     const printFontCss = new URL('assets/tokens.css', deps.currentHref()).href;
     const printToken = 'qp' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
     const btns = deps.hasPdfPrinter()
-      ? '<button class="print-btn" onclick="qcSavePdf()">Lưu PDF</button>'
-      : '<button class="print-btn" onclick="qcDoPrint()">In / Lưu PDF</button>';
+      ? '<button class="print-btn" id="qcPrintTriggerBtn">Lưu PDF</button>'
+      : '<button class="print-btn" id="qcPrintTriggerBtn">In / Lưu PDF</button>';
     w.document.write('<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>' + deps.escape(title) + '</title><link rel="stylesheet" href="' + printFontCss + '"><style>' +
       '@page{size:' + (options.landscape ? 'A4 landscape' : 'A4') + ';margin:13mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:"Manrope",Arial,Helvetica,sans-serif;color:#14202b;margin:0;background:#eef2f5;font-size:var(--type-meta);line-height:1.42}' +
       '.page{max-width:1120px;margin:18px auto;background:#fff;padding:22px 26px 28px;border:1px solid #dce3e9;box-shadow:0 10px 30px rgba(20,33,43,.08)}' +
@@ -95,9 +110,24 @@ export function createReportPrintController(deps: ReportPrintControllerDeps) {
       'table{width:100%;border-collapse:separate;border-spacing:0;margin:0 0 8px;border:1px solid #dce3e9;border-radius:7px;overflow:hidden}th,td{padding:7px 9px;text-align:center;border-bottom:1px solid #eef2f5}tr:last-child td{border-bottom:none}th{background:#e7f1f4;color:#244452;font-size:var(--type-caption);font-weight:800}td.num,th.num{font-variant-numeric:tabular-nums}.pill{display:inline-block;border-radius:999px;background:#e8f3f2;color:#0a6e6e;padding:2px 8px;font-weight:800;font-size:var(--type-overline)}.hint,.muted{color:#647686}.alert{display:block;margin:8px 0;padding:9px 11px;border-left:3px solid #3f7795;background:#edf5fa;border-radius:5px}.rpt-chart-grid{display:grid;grid-template-columns:1fr;gap:12px}.rpt-chart svg{display:block;width:100%;height:auto;max-height:315px}.sign-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:36px}.sign-grid div{text-align:center;padding-top:48px;border-top:1px solid #9aa8b3}.sign-grid b{display:block}.sign-grid span{font-size:var(--type-caption);color:#647686;font-style:italic}.nce-summary-table{font-size:var(--type-overline)}.nce-summary-cell{text-align:left;min-width:240px}.nce-summary div+div{margin-top:3px}.nce-summary b{color:#244452}.nce-appendix{margin-top:18px}.nce-appendix-intro{margin:0 0 12px;color:#647686}.nce-detail{margin-top:16px}.nce-detail-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:8px}.nce-detail-head h3{flex:1;margin:0}.nce-detail-status{white-space:nowrap;font-weight:800;color:#0a6e6e;padding-top:9px}.nce-detail h4{margin:14px 0 7px;color:#244452;font-size:var(--type-meta)}.nce-detail-text{min-height:42px;padding:8px 10px;border:1px solid #dce3e9;border-radius:6px;background:#f8fafb;text-align:left;white-space:pre-wrap}.nce-detail-stack{display:grid;gap:7px;break-inside:avoid}.nce-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:1fr;gap:7px}.nce-detail-grid>div{display:flex;min-height:52px;padding:7px 9px;border:1px solid #dce3e9;border-radius:6px;background:#f8fafb;flex-direction:column;justify-content:center}.nce-detail-grid>div.nce-detail-wide{grid-column:1/-1}.nce-detail-grid span{display:block;color:#647686;font-size:var(--type-overline)}.nce-detail-grid b{display:block;margin-top:2px}.nce-check-table{table-layout:fixed}.nce-check-table th,.nce-check-table td{height:38px;padding:8px 10px;vertical-align:middle}.nce-check-table th:nth-child(1),.nce-check-table td:nth-child(1),.nce-check-table th:nth-child(3),.nce-check-table td:nth-child(3){text-align:left}.nce-check-table th:nth-child(2),.nce-check-table td:nth-child(2){text-align:center}.print-btn{position:fixed;top:12px;right:12px;border:none;border-radius:8px;background:#14202b;color:#fff;padding:9px 13px;font-weight:800;box-shadow:0 8px 22px rgba(20,33,43,.22);cursor:pointer}' +
       '@media print{body{background:#fff}.page{max-width:none;margin:0;padding:0;border:none;box-shadow:none}.print-btn{display:none}.rpt-card{break-inside:avoid}.chart-img{max-height:310px}.nce-appendix{break-before:page}.nce-detail+.nce-detail{break-before:page}.nce-detail h4{break-after:avoid-page;page-break-after:avoid}.nce-detail-grid>div,.nce-detail-text,.nce-check-table tr{break-inside:avoid}}' +
       'body.printing{background:#fff}body.printing .page{max-width:none;margin:0;padding:0;border:none;box-shadow:none}body.printing .print-btn{display:none}' +
-      '</style></head><body><div class="page">' + bodyHtml + '</div>' + btns +
-      '<script>window.__qcPrintToken="' + printToken + '";function qcDoPrint(){document.body.classList.add("printing");if(window.opener&&opener.qcPrintPdf){opener.qcPrintPdf.printPaper(window.__qcPrintToken)}else{window.print()}}function qcSavePdf(){document.body.classList.add("printing");if(window.opener&&opener.qcPrintPdf){opener.qcPrintPdf.save(window.__qcPrintToken,document.title||"Bao-cao")}else{qcDoPrint()}}window.onbeforeprint=function(){document.body.classList.add("printing")};window.onafterprint=function(){document.body.classList.remove("printing")};</' + 'script></body></html>');
-    w.document.close(); w.focus();
+      '</style></head><body><div class="page">' + bodyHtml + '</div>' + btns + '</body></html>');
+    w.document.close();
+    w.__qcPrintToken = printToken;
+    const doPrint = () => {
+      w.document.body.classList.add('printing');
+      if (typeof window !== 'undefined' && (window as any).qcPrintPdf) (window as any).qcPrintPdf.printPaper(printToken);
+      else w.print();
+    };
+    const savePdf = () => {
+      w.document.body.classList.add('printing');
+      if (typeof window !== 'undefined' && (window as any).qcPrintPdf) (window as any).qcPrintPdf.save(printToken, w.document.title || 'Bao-cao');
+      else doPrint();
+    };
+    const triggerBtn = w.document.getElementById('qcPrintTriggerBtn');
+    if (triggerBtn) triggerBtn.addEventListener('click', deps.hasPdfPrinter() ? savePdf : doPrint);
+    w.onbeforeprint = () => { w.document.body.classList.add('printing'); };
+    w.onafterprint = () => { w.document.body.classList.remove('printing'); };
+    w.focus();
   }
 
   function sigmaPeriodPrintRows(row: any, levels: any[]) { return deps.sigmaPrintRowsService.periodRows(row, levels); }

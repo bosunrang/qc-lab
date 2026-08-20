@@ -16,5 +16,5 @@ export function actionFormPanelHtml(input: ActionFormPanelInput) {
   const title = editing
     ? `Tiếp tục hồ sơ ${escapeHtml(editing.nceId || 'NCE')}`
     : 'Lập hồ sơ sự không phù hợp (NCE)';
-  return `<div class="panel action-form-panel"><div class="action-form-panel-head"><h2 class="panel-title">${title}</h2>${input.guideButtonHtml}</div>${input.formOpen ? `<div class="action-form-body" oninput="actionFormChanged()" onchange="actionFormChanged()">${input.formBodyHtml}</div>` : input.closedHtml}</div>`;
+  return `<div class="panel action-form-panel"><div class="action-form-panel-head"><h2 class="panel-title">${title}</h2>${input.guideButtonHtml}</div>${input.formOpen ? `<div class="action-form-body" data-notify-changed="actionFormChanged">${input.formBodyHtml}</div>` : input.closedHtml}</div>`;
 }

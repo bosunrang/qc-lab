@@ -40,7 +40,7 @@ assert.match(bridge, /TeaReferenceService: TeaReferenceServiceApi;/, 'Service TE
    tea-reference-service.test.js) từng gọi qua ĐÚNG dây chuyền thật này để bắt
    được lỗi — chỉ lộ ra khi dò trực tiếp qua vm với state.js + bundle thật. */
 {
-  const ctx = loadSandbox(['core.js', 'modules/state.js']);
+  const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js']);
   run(ctx, "state={tests:[],teaRefs:[]};");
   const edited = run(ctx, "TeaReferenceService.edit(state,'qclab-glucose','clia',9)");
   assert.equal(edited.record.clia, 9, 'sửa CLIA phải cập nhật đúng giá trị');

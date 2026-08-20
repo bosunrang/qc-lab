@@ -5,13 +5,11 @@ export function createLisQueuePresentation(deps: {
   formatTestValue: (test: Row, value: unknown) => string;
   format: (value: unknown, decimals: number) => string;
   escape: (value: unknown) => string;
-  escapeAttribute: (value: unknown) => string;
-  quoteJs: (value: unknown) => string;
   formatDateTime: (value: unknown) => string;
   testDisplayName: (test: Row | null | undefined) => string;
-  button: (label: string, action: string, variant: string) => string;
+  button: (label: string, action: string | { action: string; args?: unknown[] } | null, variant: string) => string;
   emptyState: (title: string, message: string, action: string) => string;
-  modalCloseButton: (action: string) => string;
+  modalCloseButton: (action?: string | { action: string; args?: unknown[] }) => string;
 }) {
   const valueText = (record: Row): string => {
     const message = record.message || {}, resolved = record.resolved;
@@ -19,7 +17,7 @@ export function createLisQueuePresentation(deps: {
     const text = test ? deps.formatTestValue(test, message.value) : deps.format(message.value, 3);
     return text + (message.unit ? ' ' + deps.escape(message.unit) : '');
   };
-  const onclick = (functionName: string, messageId: unknown): string => deps.escapeAttribute(`${functionName}('${deps.quoteJs(messageId)}')`);
+  const onclick = (functionName: string, messageId: unknown): { action: string; args?: unknown[] } => ({ action: functionName, args: [messageId] });
   const rowHtml = (record: Row): string => {
     const message = record.message || {}, resolved = record.resolved;
     const when = deps.formatDateTime(message.measuredAt) || message.measuredAt || '—';
@@ -39,7 +37,7 @@ export function createLisQueuePresentation(deps: {
     const body = pending.length || unresolved.length
       ? sectionHtml('Sẵn sàng nhận', pending, '') + (unresolved.length ? `<div class="flow-panel">${sectionHtml('Chưa khớp cấu hình', unresolved, '')}</div>` : '')
       : deps.emptyState('Hàng chờ trống', 'Không có kết quả QC nào đang chờ từ LIS Gateway.', '');
-    return `<div class="modal" style="width:820px"><div class="modal-h"><h3>QC chờ nhập từ LIS</h3>${deps.modalCloseButton('closeModal()')}</div><div class="modal-b" tabindex="0">${body}</div><div class="modal-f">${deps.button('Làm mới', 'lisQueueRefresh()', 'ghost')}${deps.button('Đóng', 'closeModal()', 'ghost')}</div></div>`;
+    return `<div class="modal" style="width:820px"><div class="modal-h"><h3>QC chờ nhập từ LIS</h3>${deps.modalCloseButton({ action: 'closeModal' })}</div><div class="modal-b" tabindex="0">${body}</div><div class="modal-f">${deps.button('Làm mới', { action: 'lisQueueRefresh' }, 'ghost')}${deps.button('Đóng', { action: 'closeModal' }, 'ghost')}</div></div>`;
   };
   return { valueText, onclick, rowHtml, sectionHtml, modalHtml };
 }

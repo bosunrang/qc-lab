@@ -22,32 +22,17 @@ declare var mem: any, startupProblem: any, derivedIndex: any;
 declare var pointsCache: Map<string, any>, pointsIndexCache: Map<string, any>, pointsLotCache: Map<string, any>,
   wgMemo: Map<string, any>, acceptedMemo: Map<string, any>, cusumMemo: Map<string, any>;
 
-// --- Storage hydration gate (globalThis property, khai báo tại
-// src/compat/modular-pilot.global.ts từ khi state-storage.js retire vào đó
-// 2026-08-20 — cùng lý do tách nền như `state`/`mem` ở trên: assets/app.js đọc
-// nó TRẦN. `fb` (firebase-sync.js retire 2026-08-20) không còn khai báo ở đây —
-// không còn file classic nào trong assets/**/*.js đọc nó trần nữa. ---
-declare var storageHydrationPromise: Promise<boolean>;
-
 // --- UI state accessors (cài từ modular compatibility artifact) ---
 declare var selTest: any, statusMemo: any, wgTestQ: any, dashTestQ: any, dashTestStatus: any,
   wgPrevOpen: any, wgExpandedRows: any, wgViewMode: any, wgArchivedGroupId: any,
   wgArchivedTestId: any, wgArchivedTestQ: any, wgChartMode: any;
 declare var currentUser: any;
 declare var page: string;
-// Users/Audit/Auth glue (users-auth.js retired 2026-08-20 into
-// src/compat/modular-pilot.global.ts) — assets/app.js still calls these bare.
-declare function ensureAdmin(): Promise<void>;
-declare function showLogin(msg?: string): void;
-declare function showStartupRecovery(): void;
-// Firebase sync glue (firebase-sync.js retired 2026-08-20 into
-// src/compat/modular-pilot.global.ts) — assets/app.js still calls this bare.
-// `fbDataPath`/`getFbCfg` không còn khai báo ở đây — chỉ state-storage.js (đã
-// retire 2026-08-20) từng đọc chúng trần.
-declare function initFirebase(): Promise<unknown>;
-// Local storage glue (state-storage.js retired 2026-08-20 into
-// src/compat/modular-pilot.global.ts) — assets/app.js still calls this bare.
-declare function loadBootState(): Promise<boolean>;
+// `storageHydrationPromise`/`ensureAdmin`/`showLogin`/`showStartupRecovery`/
+// `initFirebase`/`loadBootState` không còn khai báo ở đây — chỉ classic
+// assets/app.js từng đọc chúng trần, và nó đã retire vào
+// src/compat/modular-pilot.global.ts (2026-08-20, Pha H lát 1); không còn file
+// classic nào trong assets/**/*.js (chỉ còn core.js, UMD thuần toán) đọc chúng.
 declare function afterRender(page: string): void;
 declare function openModal(html: string): void;
 declare function closeModal(): void;

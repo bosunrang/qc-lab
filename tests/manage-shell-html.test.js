@@ -11,7 +11,7 @@ const program = `
 const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=module', '--eval', program], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
 assert.equal(result.status, 0, result.stderr || 'không thể chạy manage shell HTML TypeScript');
 assert.match(result.stdout, /config-shell-nav/);
-assert.match(result.stdout, /class="on" onclick="setManageTab\('lots'\)"/);
+assert.match(result.stdout, /class="on" data-action="setManageTab" data-args='\["lots"\]'/);
 assert.match(result.stdout, /Lô &lt;QC>/);
 assert.match(result.stdout, /<section>Body<\/section>/);
 console.log('Manage shell HTML TypeScript tests passed');

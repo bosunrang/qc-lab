@@ -32,8 +32,7 @@ export function createActionsPageController(deps: {
   confirmDialog: (opts: AnyRec) => Promise<boolean>;
   infoDialog: (message: string, opts?: AnyRec) => Promise<unknown>;
   esc: (value: unknown) => string;
-  jsq: (value: unknown) => string;
-  btn: (label: string, action: string, cls?: string, title?: string, options?: AnyRec) => string;
+  btn: (label: string, action: string | { action: string; args?: unknown[] } | null, cls?: string, title?: string, options?: AnyRec) => string;
   headOnly: (title: string, subtitle: string, actions?: string) => string;
   vnDate: (value: unknown) => string;
   formatDateTimeVN: (value: unknown) => string;
@@ -101,7 +100,7 @@ export function createActionsPageController(deps: {
     if (!await deps.reauthenticateCurrentUser({ title: 'Xác thực hủy hồ sơ NCE', message: 'Nhập lại mật khẩu trước khi hủy hồ sơ. Toàn bộ nội dung vẫn được giữ lại trong nhật ký.' })) return;
     const current = (state().actions || []).find((x: AnyRec) => x.id === id);
     if (!current || actionApprovalToken(current) !== token) { await deps.infoDialog('Hồ sơ đã thay đổi trong lúc xác thực. Vui lòng kiểm tra lại trước khi hủy.'); return; }
-    deps.openModal(deps.pres.actionCancelModalHtml({ closeButtonHtml: deps.btn('Đóng', 'closeModal()', 'ghost'), cancelButtonHtml: deps.btn('Hủy hồ sơ', `confirmCancelAction('${deps.jsq(current.id)}','${deps.jsq(token)}')`, 'danger') }));
+    deps.openModal(deps.pres.actionCancelModalHtml({ closeButtonHtml: deps.btn('Đóng', { action: 'closeModal' }, 'ghost'), cancelButtonHtml: deps.btn('Hủy hồ sơ', { action: 'confirmCancelAction', args: [current.id, token] }, 'danger') }));
     setTimeout(() => { const e = doc().getElementById('actionCancelReason'); if (e) e.focus(); }, 50);
   };
   const confirmCancelAction = (id: unknown, token: unknown) => {
@@ -144,7 +143,7 @@ export function createActionsPageController(deps: {
     const current = (state().actions || []).find((x: AnyRec) => x.id === approvalId);
     if (!current || actionApprovalToken(current) !== preAuthToken) { await deps.infoDialog('Hồ sơ đã thay đổi trong lúc xác thực. Vui lòng kiểm tra lại trước khi duyệt.'); return; }
     const token = actionApprovalToken(current);
-    deps.openModal(deps.pres.actionReviewNoteModalHtml({ title: 'Duyệt hành động khắc phục', label: 'Ý kiến duyệt (tối thiểu 3 ký tự)', placeholder: 'Nhận xét về hành động khắc phục...', errorText: 'Cần nhập ý kiến duyệt tối thiểu 3 ký tự.', closeButtonHtml: deps.btn('Đóng', 'closeModal()', 'ghost'), submitButtonHtml: deps.btn('Duyệt', `confirmApproveAction('${deps.jsq(current.id)}','${deps.jsq(token)}')`, 'teal') }));
+    deps.openModal(deps.pres.actionReviewNoteModalHtml({ title: 'Duyệt hành động khắc phục', label: 'Ý kiến duyệt (tối thiểu 3 ký tự)', placeholder: 'Nhận xét về hành động khắc phục...', errorText: 'Cần nhập ý kiến duyệt tối thiểu 3 ký tự.', closeButtonHtml: deps.btn('Đóng', { action: 'closeModal' }, 'ghost'), submitButtonHtml: deps.btn('Duyệt', { action: 'confirmApproveAction', args: [current.id, token] }, 'teal') }));
     setTimeout(() => { const e = doc().getElementById('actionNoteInput'); if (e) e.focus(); }, 50);
   };
   const confirmApproveAction = (id: unknown, token: unknown) => {
@@ -175,7 +174,7 @@ export function createActionsPageController(deps: {
     const current = (state().actions || []).find((x: AnyRec) => x.id === returnId);
     if (!current || actionApprovalToken(current) !== preAuthToken || !deps.ActionReviewService.returnReadiness(current).ok) { await deps.infoDialog('Hồ sơ đã thay đổi trong lúc xác thực. Vui lòng kiểm tra lại trước khi trả lại.'); return; }
     const token = actionApprovalToken(current);
-    deps.openModal(deps.pres.actionReviewNoteModalHtml({ title: 'Trả lại hành động khắc phục', label: 'Lý do trả lại (tối thiểu 3 ký tự)', placeholder: 'Vì sao trả lại hành động khắc phục này...', errorText: 'Cần nhập lý do tối thiểu 3 ký tự.', closeButtonHtml: deps.btn('Đóng', 'closeModal()', 'ghost'), submitButtonHtml: deps.btn('Trả lại', `confirmReturnAction('${deps.jsq(current.id)}','${deps.jsq(token)}')`, 'danger') }));
+    deps.openModal(deps.pres.actionReviewNoteModalHtml({ title: 'Trả lại hành động khắc phục', label: 'Lý do trả lại (tối thiểu 3 ký tự)', placeholder: 'Vì sao trả lại hành động khắc phục này...', errorText: 'Cần nhập lý do tối thiểu 3 ký tự.', closeButtonHtml: deps.btn('Đóng', { action: 'closeModal' }, 'ghost'), submitButtonHtml: deps.btn('Trả lại', { action: 'confirmReturnAction', args: [current.id, token] }, 'danger') }));
     setTimeout(() => { const e = doc().getElementById('actionNoteInput'); if (e) e.focus(); }, 50);
   };
   const confirmReturnAction = (id: unknown, token: unknown) => {
@@ -227,7 +226,7 @@ export function createActionsPageController(deps: {
     if (!a) return;
     if (!actionCanReopen(a)) { await deps.infoDialog('Chỉ mở lại được hồ sơ đã duyệt nhưng không còn đủ điều kiện khép vòng. Hồ sơ đã khép vòng hợp lệ thì mở hồ sơ NCE mới.'); return; }
     if (!await deps.reauthenticateCurrentUser({ title: 'Xác thực mở lại hồ sơ', message: 'Nhập lại mật khẩu trước khi mở lại hồ sơ đã duyệt.' })) return;
-    deps.openModal(deps.pres.actionReopenModalHtml({ workflowLabelHtml: deps.esc(deps.actionWorkflowStatus(a).label), closeButtonHtml: deps.btn('Đóng', 'closeModal()', 'ghost'), reopenButtonHtml: deps.btn('Mở lại hồ sơ', `confirmReopenAction(${i})`, 'danger') }));
+    deps.openModal(deps.pres.actionReopenModalHtml({ workflowLabelHtml: deps.esc(deps.actionWorkflowStatus(a).label), closeButtonHtml: deps.btn('Đóng', { action: 'closeModal' }, 'ghost'), reopenButtonHtml: deps.btn('Mở lại hồ sơ', { action: 'confirmReopenAction', args: [i] }, 'danger') }));
     setTimeout(() => { const e = doc().getElementById('actionNoteInput'); if (e) e.focus(); }, 50);
   };
   const confirmReopenAction = (i: number) => {
@@ -305,7 +304,7 @@ export function createActionsPageController(deps: {
       ${deps.pres.actionPatientImpactHtml(LABELS.patient[a.patientImpact] || '', a.patientAction || '')}
       ${deps.pres.actionEffectivenessDetailHtml({ effectiveness: modern ? eff.label : a.cause || '—', note: modern && a.effectivenessNote ? `${a.effectivenessDate ? deps.vnDate(a.effectivenessDate) + ' · ' : ''}${a.effectivenessNote}${a.effectivenessBy ? ' · ' + a.effectivenessBy : ''}` : '', residual: +a.protocolVersion >= 3 && residual ? { risk: LABELS.risk[a.residualRiskLevel] || '', score: residual, basis: a.residualRiskBasis || '' } : undefined, returned: a.returnNote ? `${a.returnNote}${a.returnBy ? ' — ' + a.returnBy : ''}${a.returnAt ? ' · ' + deps.formatDateTimeVN(a.returnAt) : ''}` : '', followUpNceId: a.followUpNceId || '', parentNceId: a.parentNceId || '', approval: `${deps.actionApprovalLabel(a)}${a.approvedBy ? ' · ' + a.approvedBy : ''}`, workflow: wf.label })}
     </ol>`;
-    deps.openModal(deps.pres.actionDetailModalHtml({ bodyHtml: body, closeButtonHtml: deps.btn('Đóng', 'closeModal()', 'teal') }));
+    deps.openModal(deps.pres.actionDetailModalHtml({ bodyHtml: body, closeButtonHtml: deps.btn('Đóng', { action: 'closeModal' }, 'teal') }));
   };
   const openActionGuide = () => {
     const content = deps.pres.actionGuideContent(deps.ActionGuidePresentation.steps);

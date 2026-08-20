@@ -9,4 +9,4 @@ const legacy=fs.readFileSync(path.join(root,'src','presentation','actions','acti
 assert.match(source,/export function actionFormPanelHtml/,'renderer khung biểu mẫu NCE phải ở TypeScript');
 assert.match(source,/action-form-body/,'renderer TypeScript phải sở hữu khung vùng nhập liệu');
 assert.match(bridge,/actionFormPanelPresentation=actionFormPanelPresentation/,'bridge phải công bố renderer NCE');
-assert.match(legacy,/return deps\.pres\.actionFormPanelPresentation\(\{ editing, formOpen, guideButtonHtml: deps\.btn\('Quy trình 8 bước', 'openActionGuide\(\)', 'ghost sm'\), closedHtml: actionFormClosedHtml\(issueCount\), formBodyHtml \}\)/,'route NCE phải gọi renderer TypeScript');
+assert.match(legacy,/return deps\.pres\.actionFormPanelPresentation\(\{ editing, formOpen, guideButtonHtml: deps\.btn\('Quy trình 8 bước', \{ action: 'openActionGuide' \}, 'ghost sm'\), closedHtml: actionFormClosedHtml\(issueCount\), formBodyHtml \}\)/,'route NCE phải gọi renderer TypeScript');

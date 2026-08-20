@@ -91,7 +91,7 @@ function makeState() {
 }
 
 {
-  const integration = loadSandbox(['core.js', 'modules/state.js'], { ensureLabBrandShape() {}, ReagentComparisonService: service });
+  const integration = loadSandbox(['core.js', 'generated/modular-pilot.js'], { ensureLabBrandShape() {}, ReagentComparisonService: service });
   run(integration, 'state.reagentTests=[];ensureShape();globalThis.__reagentShape=state.reagentTests;');
   assert.equal(integration.__reagentShape.length, 1, 'ensureShape phải tạo dữ liệu mặc định ngoài render');
   assert.equal(integration.__reagentShape[0].rows.length, 5);
@@ -114,11 +114,19 @@ function makeState() {
 }
 
 {
-  const appSource = fs.readFileSync(path.join(__dirname, '..', 'assets', 'app.js'), 'utf8');
-  const indexSource = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-  assert.doesNotMatch(appSource, /\bimport\s*\(/, 'production boot phải chạy được khi mở index.html trực tiếp qua file://');
-  const serviceAt=indexSource.indexOf('assets/generated/modular-pilot.js'),appAt=indexSource.indexOf('assets/app.js');
-  assert.ok(serviceAt>=0&&appAt>serviceAt, 'classic Reagent service phải tải trước app boot');
+  // assets/app.js retired into src/compat/modular-pilot.global.ts (2026-08-20,
+  // Pha H lát 1) — boot() giờ đăng ký qua DOMContentLoaded ở cuối bundle thay
+  // vì tự chạy ngay lúc classic script nạp, nên không cần index.html xếp thứ
+  // tự hai file classic riêng nữa; JS execution order tự đảm bảo root.boot()
+  // (đăng ký lúc bundle nạp, CHẠY lúc DOMContentLoaded) luôn sau khi
+  // ReagentComparisonService và mọi service khác trong cùng bundle đã dựng.
+  const bundleSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'compat', 'modular-pilot.global.ts'), 'utf8');
+  const bootAt = bundleSource.indexOf('root.boot=async()=>{');
+  assert.ok(bootAt >= 0, 'boot() phải retire vào modular-pilot.global.ts');
+  assert.doesNotMatch(bundleSource.slice(bootAt), /\bimport\s*\(/, 'production boot phải chạy được khi mở index.html trực tiếp qua file://');
+  const serviceAt = bundleSource.indexOf('root.ReagentComparisonService=') >= 0 ? bundleSource.indexOf('root.ReagentComparisonService=') : bundleSource.indexOf('root.ReagentComparisonService =');
+  assert.ok(serviceAt >= 0 && serviceAt < bootAt, 'ReagentComparisonService phải dựng xong trước điểm đăng ký boot() ở cuối bundle');
+  assert.match(bundleSource.slice(bootAt), /document\.addEventListener\('DOMContentLoaded'/, "boot() phải đợi DOMContentLoaded, không tự chạy ngay lúc bundle nạp (sẽ crash sandbox test không cấp document/window)");
 }
 
 console.log('ReagentComparisonService tests passed');

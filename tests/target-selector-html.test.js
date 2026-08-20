@@ -11,7 +11,7 @@ const program = `
 const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=module', '--eval', program], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
 assert.equal(result.status, 0, result.stderr || 'không thể chạy target selector HTML TypeScript');
 const [full, empty] = JSON.parse(result.stdout);
-assert.match(full, /setTargetPanel\(this.value\).*<option>P1<\/option>/s);
-assert.match(full, /setTargetGroup\(this.value\).*<option>G1<\/option>/s);
+assert.match(full, /data-action="setTargetPanel" data-action-on="change".*<option>P1<\/option>/s);
+assert.match(full, /data-action="setTargetGroup" data-action-on="change".*<option>G1<\/option>/s);
 assert.match(empty, /<option value="">Chưa có panel<\/option>/);
 console.log('Target selector HTML TypeScript tests passed');

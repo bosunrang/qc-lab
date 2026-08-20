@@ -9,7 +9,7 @@ const program = `import { reagentQuickPickerRowsHtml } from ${JSON.stringify(pat
 const output = JSON.parse(execFileSync(process.execPath, ['--experimental-strip-types', '--input-type=module', '--eval', program], { encoding: 'utf8' }));
 
 assert.match(output.rows, /&lt;Nguyễn A&gt;/, 'Tên phải được escape');
-assert.match(output.rows, /rcDelQuick\(0\)/);
+assert.match(output.rows, /data-action="rcDelQuick" data-args="\[0\]"/);
 assert.match(output.rows, /<button>Chọn 1<\/button>/);
 assert.match(output.empty, /Chưa có loại mẫu trong danh sách/);
 

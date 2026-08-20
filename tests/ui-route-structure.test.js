@@ -41,6 +41,16 @@ const cspTags=index.match(/<meta\s+http-equiv="Content-Security-Policy"\s+conten
 assert.equal(cspTags.length,1,'index.html phải có đúng một thẻ CSP hợp lệ');
 assert.match(cspTags[0],/object-src 'none'/,'CSP phải tiếp tục chặn object nhúng');
 assert.doesNotMatch(index,/http-equi\?+/,'thuộc tính http-equiv không được bị hỏng bởi chuỗi cache version');
+/* Pha H2 lát cuối (2026-08-20): script-src không còn 'unsafe-inline' — toàn bộ
+   onclick=/oninput=/onchange=/onkeydown=/onmousemove= trần và 2 khối <script> nội tuyến
+   cũ đã chuyển sang action-dispatcher.ts/file ngoài. style-src giữ nguyên, không liên
+   quan (JS còn gán style="..." trực tiếp ở nhiều nơi, chưa nằm trong phạm vi này). */
+const scriptSrc=cspTags[0].match(/script-src [^;]+/)[0];
+assert.doesNotMatch(scriptSrc,/'unsafe-inline'/,'script-src không được có unsafe-inline sau Pha H2');
+assert.match(cspTags[0],/style-src 'self' 'unsafe-inline'/,'style-src vẫn giữ unsafe-inline, không thuộc phạm vi Pha H2');
+const indexNoComments=index.replace(/<!--[\s\S]*?-->/g,'');
+assert.doesNotMatch(indexNoComments,/<script(?![^>]*\ssrc=)[^>]*>/,'index.html không còn khối <script> nội tuyến (mọi <script> phải có src=)');
+assert.doesNotMatch(indexNoComments,/ onclick="| oninput="| onchange="| onkeydown="| onmousemove="/,'index.html không còn thuộc tính onXXX= trần');
 
 assert.doesNotMatch(router,/function page(?:Dash|Entry|Westgard)\(/,'router-render chỉ giữ điều phối và UI primitives');
 assert.match(dashboard,/const pageDash = \(\) => \{/);
@@ -109,7 +119,7 @@ assert.doesNotMatch(actionsArea,/state\(\)\.actions\.splice\(/,'hồ sơ NCE kh�
 assert.match(actions,/deps\.NceLifecycleWorkflowCommand\.execute\(\{\s*kind: 'cancel'/,'quy trình hủy phải gọi workflow hủy mềm TypeScript');
 assert.doesNotMatch(actions,/const confirmReturnAction = \(i:/,'xác nhận trả lại không được dựa vào vị trí mảng có thể thay đổi khi đồng bộ');
 assert.match(actions,/const confirmReturnAction = \(id: unknown, token: unknown\) => \{/,'xác nhận trả lại phải khóa theo ID và token phiên bản');
-assert.match(actions,/confirmReturnAction\('\$\{deps\.jsq\(current\.id\)\}','\$\{deps\.jsq\(token\)\}'\)/,'hộp thoại trả lại phải truyền đúng ID và token của hồ sơ sau xác thực');
+assert.match(actions,/\{ action: 'confirmReturnAction', args: \[current\.id, token\] \}/,'hộp thoại trả lại phải truyền đúng ID và token của hồ sơ sau xác thực');
 
 /* Form hồ sơ NCE phải render THẲNG từ state qua actionFormModel(): bản cũ đổ giá trị
    vào DOM sau render (populateActionForm trong setTimeout) nên mọi rerender() — đổi
@@ -118,7 +128,7 @@ assert.match(form,/const actionFormModel = \(editing: AnyRec, tests: AnyRec\[\]\
 assert.doesNotMatch(actionsArea,/const (?:populateActionForm|actionSetField|fillAction) = /,'không đổ giá trị vào form sau render');
 /* Danh tính sự cố bất biến khi sửa: đổi ô "Xét nghiệm" từng làm actionPoint() trả null
    và bỏ luôn yêu cầu QC chạy lại, còn lot bị ghi đè theo lô hiện hành sau mỗi lần chuyển lô. */
-assert.match(form,/editing \? 'disabled' : 'onchange="syncActLevels\(\)"'/,'ô Xét nghiệm phải khoá khi sửa hồ sơ');
+assert.match(form,/editing \? 'disabled' : 'data-action="syncActLevels" data-action-on="change"'/,'ô Xét nghiệm phải khoá khi sửa hồ sơ');
 assert.match(form,/const tid = editing \? editing\.testId : /,'addAction\\(\\) không lấy testId từ form khi sửa');
 assert.match(form,/const lot = editing \? \(editing\.lot \|\| ''\) : /,'lot phải giữ snapshot lúc mở hồ sơ');
 /* Lối thoát cho hồ sơ đã duyệt nhưng không còn đủ điều kiện khép vòng (sửa/xóa/duyệt
@@ -132,7 +142,7 @@ assert.match(actionInvestigationField,/class="action-investigation-select"/,'sel
 assert.match(form,/const actionChecklistChip = \(form: AnyRec\) => /,'tiêu đề checklist phải hiển thị tiến độ hoàn tất');
 assert.match(form,/const actionSuggestBox = \(targetId: string, phrases: string\[\], label = 'Gợi ý nhập nhanh'\): string => \{/,'gợi ý nhập liệu NCE phải dùng cùng một khối thu gọn');
 assert.match(actionFormPanel,/class="action-form-panel-head"/,'renderer TypeScript phải giữ nút quy trình cạnh tiêu đề panel lập hồ sơ NCE');
-assert.match(form,/guideButtonHtml: deps\.btn\('Quy trình 8 bước', 'openActionGuide\(\)', 'ghost sm'\)/,'nút quy trình phải tiếp tục dùng helper btn của route legacy');
+assert.match(form,/guideButtonHtml: deps\.btn\('Quy trình 8 bước', \{ action: 'openActionGuide' \}, 'ghost sm'\)/,'nút quy trình phải tiếp tục dùng helper btn của route legacy');
 assert.match(reportsCss,/\.action-form-panel-head\{[^}]*justify-content:space-between/,'header lập hồ sơ NCE phải tách tiêu đề trái và nút quy trình sang phải');
 assert.match(reportsCss,/\.action-form-panel-head\{[^}]*color:var\(--card-head-ink\);[^}]*font-size:var\(--section-head-size\);[^}]*font-weight:800/,'header lập hồ sơ NCE phải dùng đúng token chữ của header panel hệ thống');
 assert.match(reportsCss,/\.action-form-panel \.action-form-panel-head > \.panel-title\{[^}]*flex:1;[^}]*color:inherit;[^}]*font:inherit/,'tiêu đề lập hồ sơ NCE phải kế thừa nguyên kiểu chữ hệ thống từ header');

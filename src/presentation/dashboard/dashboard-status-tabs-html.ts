@@ -4,6 +4,6 @@ const TABS = [['all', 'Tất cả'], ['missing', 'Chưa QC'], ['rej', 'Loại b�
 export function createDashboardStatusTabsHtml(deps: { matches: (item: Item, key: string) => boolean }) {
   return (items: Item[], selected: string) => TABS.map(([key, label]) => {
     const count = key === 'all' ? items.length : items.filter(item => deps.matches(item, key)).length;
-    return `<button class="${selected === key ? 'on' : ''}" onclick="dashTestSetStatus('${key}')">${label}<b>${count}</b></button>`;
+    return `<button class="${selected === key ? 'on' : ''}" data-action="dashTestSetStatus" data-args='${JSON.stringify([key])}'>${label}<b>${count}</b></button>`;
   }).join('');
 }

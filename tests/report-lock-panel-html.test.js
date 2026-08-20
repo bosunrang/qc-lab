@@ -6,7 +6,7 @@ const { pathToFileURL } = require('node:url');
 const source = pathToFileURL(path.join(__dirname, '..', 'src', 'presentation', 'report', 'report-lock-panel-html.ts')).href;
 const program = `
   import { createReportLockPanelHtml } from ${JSON.stringify(source)};
-  const render = createReportLockPanelHtml({ button: (label, action, variant, _title, options) => '[' + label + '|' + action + '|' + variant + '|' + Boolean(options && options.disabled) + ']' });
+  const render = createReportLockPanelHtml({ button: (label, action, variant, _title, options) => '[' + label + '|' + (typeof action === 'string' ? action : JSON.stringify(action)) + '|' + variant + '|' + Boolean(options && options.disabled) + ']' });
   const common = { year: 2026, month: 8, months: [7, 8], years: [2025, 2026], lockListHtml: '<i>locks</i>' };
   console.log(JSON.stringify([render({ ...common, isAdmin: true, already: false }), render({ ...common, isAdmin: true, already: true }), render({ ...common, isAdmin: false, already: false })]));
 `;
@@ -14,7 +14,7 @@ const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=modul
 assert.equal(result.status, 0, result.stderr || 'không thể chạy report lock panel HTML TypeScript');
 const [admin, locked, reader] = JSON.parse(result.stdout);
 assert.match(admin, /<option value="8" selected>Tháng 8<\/option>/);
-assert.match(admin, /Khóa kỳ này\|reportLockPeriod\(\)\|teal\|false/);
+assert.match(admin, /Khóa kỳ này\|\{"action":"reportLockPeriod"\}\|teal\|false/);
 assert.match(locked, /Kỳ này đã khóa\|\|ghost\|true/);
 assert.match(reader, /select aria-label="Tháng" disabled/);
 assert.match(reader, /Chỉ admin mới khóa\/mở khóa/);

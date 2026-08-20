@@ -1,4 +1,4 @@
-export function createBrandPanelHtml(deps: { escapeAttribute: (value: unknown) => string; button: (label: string, action: string, variant: string, title?: string, options?: unknown) => string }) {
+export function createBrandPanelHtml(deps: { escapeAttribute: (value: unknown) => string; button: (label: string, action: string | { action: string; args?: unknown[] } | null, variant: string, title?: string, options?: unknown) => string }) {
   return (input: { title?: unknown; subtitle?: unknown; markText?: unknown; previewHtml?: string }): string => `<div class="panel"><h2 class="panel-title">Logo & tên phần mềm</h2>
      <div class="grid2">
        <div>
@@ -9,11 +9,11 @@ export function createBrandPanelHtml(deps: { escapeAttribute: (value: unknown) =
        <div>
          <label>Logo hiện tại</label>${input.previewHtml || ''}
          <label>Chọn ảnh logo</label>
-         <div class="file-pick">${deps.button('Chọn tệp', "document.getElementById('logoFile').click()", 'ghost sm', '', {attrs:{type:'button'}})}<span id="logoFileName" class="hint">Chưa chọn tệp</span></div>
-         <input id="logoFile" type="file" accept="image/*" style="display:none" onchange="pickLogo(event)">
+         <div class="file-pick">${deps.button('Chọn tệp', { action: 'brandPickLogo' }, 'ghost sm', '', {attrs:{type:'button'}})}<span id="logoFileName" class="hint">Chưa chọn tệp</span></div>
+         <input id="logoFile" type="file" accept="image/*" style="display:none" data-action="pickLogo" data-action-on="change">
          <div class="hint settings-brand-note">Nên dùng ảnh vuông PNG/JPG, dung lượng nhỏ. Logo được lưu cùng dữ liệu phần mềm.</div>
        </div>
      </div>
-     <div class="settings-panel-actions">${deps.button('Lưu logo', 'saveBrand()', 'teal')}${deps.button('Bỏ ảnh logo', 'clearLogo()', 'ghost')}</div>
+     <div class="settings-panel-actions">${deps.button('Lưu logo', { action: 'saveBrand' }, 'teal')}${deps.button('Bỏ ảnh logo', { action: 'clearLogo' }, 'ghost')}</div>
     </div>`;
 }

@@ -164,32 +164,32 @@ const { loadSandbox, run } = require('./helpers/sandbox');
      tiem duoc thuoc tinh/HTML tuy y vao trinh duyet cua quan tri vien — da xac minh
      bang DOM parser that (Chromium): thuoc tinh onmouseover THAT su duoc tao tren
      the <button>. Sua bang lisOnclick() boc escAttr() quanh CA chuoi onclick, khong
-     chi rieng id. Chot lai o day bang DOM parser that (khong so khop chuoi tho —
-     chuoi da escape van CHUA nguyen van "onmouseover=" duoi dang van ban vo hai,
-     so sanh chuoi se bao am tinh sai). */
+     chi rieng id. Pha H2 lat cuoi (2026-08-20) doi hang onclick="..." sang
+     data-action/data-args (event delegation, de bo CSP script-src 'unsafe-inline') —
+     duong bao ve gio la JSON.stringify(args) roi escapeAttr() boc ca chuoi JSON, kiem
+     lai bang DOM parser that (khong so khop chuoi tho). */
   {
     const evilId = 'X" onmouseover="window.__pwned=true" data-x="';
     const evilRecord = JSON.parse(JSON.stringify(okRecord));
     evilRecord.message.messageId = evilId;
     const row = run(ctx2, `lisQueueRowHtml(${JSON.stringify(evilRecord)})`);
     // Dung 1 DOM that trong sandbox Node? khong co — dung phep giai ma HTML entity
-    // deu quy y het cac truong hop can, roi kiem tra thuoc tinh onmouseover KHONG
-    // con nam ngoai pham vi chuoi JS (tuong duong voi kiem tra bang trinh duyet that
-    // da lam o buoc phat trien — o day chot lai bang dac diem HTML: gia tri thuoc
-    // tinh onclick khong duoc chua ky tu " chua duoc entity-hoa).
-    const onclickValues = [...row.matchAll(/onclick="([^"]*)"/g)].map(m => m[1]);
-    // Neu messageId thoat duoc khoi thuoc tinh, regex /onclick="([^"]*)"/ se dung lai
-    // O DAU " THAT (khong phai " ma ung dung sinh ra), tuc so match se KHAC 2 hoac
-    // gia tri bat duoc se rat ngan (chi phan truoc dau " dau tien trong messageId).
-    assert.equal(onclickValues.length, 2, 'phai co dung 2 thuoc tinh onclick (Nhan + Bo) — neu messageId pha duoc thuoc tinh, regex se bat sai so luong hoac sai noi dung');
-    onclickValues.forEach(v => {
-      assert.doesNotMatch(v, /"/, 'gia tri thuoc tinh onclick khong duoc con ky tu " song — do la dieu kien de KHONG thoat duoc khoi thuoc tinh HTML');
-      // Giai ma dung nhung gi trinh duyet giai ma khi doc thuoc tinh HTML, roi kiem
-      // tra JS nguon con lai la MOT loi goi ham hop le voi DUNG 1 tham so — khong bi
-      // tach thanh nhieu tham so hay chen them ma.
+    // deu quy y het cac truong hop can, roi kiem tra data-args KHONG con nam ngoai
+    // pham vi thuoc tinh HTML (gia tri thuoc tinh khong duoc chua ky tu " song).
+    const dataArgsValues = [...row.matchAll(/data-args="([^"]*)"/g)].map(m => m[1]);
+    // Neu messageId thoat duoc khoi thuoc tinh, regex /data-args="([^"]*)"/ se dung
+    // lai O DAU " THAT (khong phai " ma ung dung sinh ra), tuc so match se KHAC 2
+    // hoac gia tri bat duoc se rat ngan (chi phan truoc dau " dau tien trong messageId).
+    assert.equal(dataArgsValues.length, 2, 'phai co dung 2 thuoc tinh data-args (Nhan + Bo) — neu messageId pha duoc thuoc tinh, regex se bat sai so luong hoac sai noi dung');
+    dataArgsValues.forEach(v => {
+      assert.doesNotMatch(v, /"/, 'gia tri thuoc tinh data-args khong duoc con ky tu " song — do la dieu kien de KHONG thoat duoc khoi thuoc tinh HTML');
+      // Giai ma dung nhung gi trinh duyet giai ma khi doc thuoc tinh HTML, roi
+      // JSON.parse — phai tra ve DUNG mot mang [messageId], nguyen van, khong bi
+      // phan manh hay chen them phan tu/ma.
       const decoded = v.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
-      assert.match(decoded, /^lis(QueueImport|QueueReject)\('X" onmouseover="window\.__pwned=true" data-x="'\)$/, 'sau khi giai ma, JS nguon phai la DUNG mot loi goi ham voi nguyen van messageId lam tham so, khong bi phan manh');
+      assert.deepEqual(JSON.parse(decoded), [evilId], 'sau khi giai ma, data-args phai la DUNG mot mang JSON hop le chua nguyen van messageId, khong bi phan manh');
     });
+    assert.match(row, /data-action="lisQueueImport"/); assert.match(row, /data-action="lisQueueReject"/);
     assert.equal(row.match(/<button/g).length, 2, 'DOM van chi co dung 2 <button>, khong bi tiem the/thuoc tinh moi');
   }
 

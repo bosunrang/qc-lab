@@ -3,14 +3,19 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<!-- CSP: han che nguon tai. script-src 'unsafe-inline' vi app dung inline event handler
-     va vai khoi <script> noi tuyen trong file nay; CDN duy nhat duoc phep la gstatic
-     (Firebase, kem SRI ben duoi). Hai host RTDB nam trong script-src KHONG phai thua:
-     khi WebSocket khong dung duoc (mo bang file://, hoac mang chan wss) thi RTDB tu lui
-     ve long-polling, ma co che do chen the <script> tro thang toi host database — thieu
-     chung thi dong bo chet im lang, chi thay loi CSP trong console. connect-src mo dung
-     Firebase Auth/RTDB va LIS Gateway localhost:8787; font/anh/worker gioi han ve chinh app. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self';script-src 'self' 'unsafe-inline' https://www.gstatic.com https://*.firebaseio.com https://*.firebasedatabase.app;style-src 'self' 'unsafe-inline';img-src 'self' data: blob:;font-src 'self';connect-src 'self' http://127.0.0.1:8787 http://localhost:8787 https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasedatabase.app wss://*.firebasedatabase.app https://identitytoolkit.googleapis.com https://securetoken.googleapis.com;worker-src 'self';object-src 'none';base-uri 'self';form-action 'self'">
+<!-- CSP: han che nguon tai. script-src KHONG con 'unsafe-inline' (bo ngay 2026-08-20,
+     Pha H2 lat cuoi) — toan bo onclick=/oninput=/onchange=/onkeydown=/onmousemove= tran
+     va 2 khoi <script> noi tuyen cu (nav-collapsed, qcDialog override) da chuyen sang
+     event delegation (action-dispatcher.ts) va file ngoai/bundle, xem CLAUDE.md muc
+     "action-dispatcher.ts". CDN duy nhat duoc phep la gstatic (Firebase, kem SRI ben
+     duoi). Hai host RTDB nam trong script-src KHONG phai thua: khi WebSocket khong dung
+     duoc (mo bang file://, hoac mang chan wss) thi RTDB tu lui ve long-polling, ma co che
+     do chen the <script> tro thang toi host database — thieu chung thi dong bo chet im
+     lang, chi thay loi CSP trong console. connect-src mo dung Firebase Auth/RTDB va LIS
+     Gateway localhost:8787; font/anh/worker gioi han ve chinh app. style-src van giu
+     'unsafe-inline' — khong lien quan, JS render HTML gan thang style="..." o hang tram
+     cho, doi sang class rieng la mot du an rieng, khong thuoc Pha H2. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self';script-src 'self' https://www.gstatic.com https://*.firebaseio.com https://*.firebasedatabase.app;style-src 'self' 'unsafe-inline';img-src 'self' data: blob:;font-src 'self';connect-src 'self' http://127.0.0.1:8787 http://localhost:8787 https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasedatabase.app wss://*.firebasedatabase.app https://identitytoolkit.googleapis.com https://securetoken.googleapis.com;worker-src 'self';object-src 'none';base-uri 'self';form-action 'self'">
 <title>QC Lab - Nội kiểm chất lượng xét nghiệm</title>
 <link rel="stylesheet" href="assets/tokens.css?v=spacing-system-20260809-1">
 <link rel="stylesheet" href="assets/app.css?v=status-accent-20260808-1">
@@ -32,15 +37,15 @@
 </head>
 <body>
 <div class="app" id="appShell">
-<script>try{if(localStorage.getItem('qclab_nav_collapsed')==='1')document.getElementById('appShell').classList.add('nav-collapsed');}catch(e){}</script>
-  <button type="button" id="navExpandBtn" class="nav-expand" onclick="toggleSidebarNav()" title="Hiện thanh điều hướng" aria-label="Hiện thanh điều hướng"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="9" y1="4" x2="9" y2="20"/></svg></button>
+<script src="assets/nav-collapse-init.js?v=csp-no-inline-20260820-1"></script>
+  <button type="button" id="navExpandBtn" class="nav-expand" data-action="toggleSidebarNav" title="Hiện thanh điều hướng" aria-label="Hiện thanh điều hướng"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="9" y1="4" x2="9" y2="20"/></svg></button>
   <aside aria-label="Điều hướng ứng dụng">
     <div class="brand-row">
       <div class="brand" id="brandBox"><div class="brand-mark">QC</div><div>QC Lab<small>Nội kiểm xét nghiệm</small></div></div>
-      <button type="button" id="navToggleBtn" class="nav-toggle" onclick="toggleSidebarNav()" title="Ẩn thanh điều hướng" aria-label="Ẩn thanh điều hướng"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="9" y1="4" x2="9" y2="20"/></svg></button>
+      <button type="button" id="navToggleBtn" class="nav-toggle" data-action="toggleSidebarNav" title="Ẩn thanh điều hướng" aria-label="Ẩn thanh điều hướng"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="9" y1="4" x2="9" y2="20"/></svg></button>
     </div>
     <div class="cloud offline" id="cloudStatus" role="status" aria-live="polite">Đang chạy cục bộ</div>
-    <button type="button" id="backupDot" class="backup-dot" hidden onclick="exportData()"></button>
+    <button type="button" id="backupDot" class="backup-dot" hidden data-action="exportData"></button>
     <div class="save-status" id="saveStatus" role="status" aria-live="polite">Lưu trữ: <b>cục bộ</b></div>
     <div id="userBox"></div>
     <nav id="nav" aria-label="Điều hướng chính"></nav>
@@ -50,22 +55,8 @@
 </div>
 <div id="modalRoot"></div>
 <div id="dialogRoot"></div>
-<script>
-// Electron only (window.qcDialog comes from electron/preload.js): route alert()
-// through a native OS dialog instead of Chromium's own, which has a Windows-only bug
-// where the renderer's inputs stop responding after the dialog closes. No-op in a plain
-// browser (python -m http.server), where window.qcDialog is never defined.
-// confirm() has no app callers anymore (see modals.js confirmDialog()), so it's not
-// overridden here.
-if (window.qcDialog) {
-  window.alert = function (message) { return window.qcDialog.alert(message); };
-}
-</script>
 
 <script defer src="assets/core.js?v=audit-integrity-gates-20260809-1"></script>
-<script defer src="assets/modules/analyte-catalog.js?v=dead-code-cleanup-20260721-1"></script>
-<script defer src="assets/modules/state.js?v=ts-state-global-decouple-20260819-1"></script>
-<script defer src="assets/generated/modular-pilot.js?v=ts-qc-domain-retire-20260820-1"></script>
-<script defer src="assets/app.js?v=reagent-classic-20260801-1"></script>
+<script defer src="assets/generated/modular-pilot.js?v=csp-no-inline-script-20260820-1"></script>
 </body>
 </html>

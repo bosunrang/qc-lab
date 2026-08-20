@@ -11,7 +11,7 @@ const program = `
 const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=module', '--eval', program], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
 assert.equal(result.status, 0, result.stderr || 'không thể chạy report range picker HTML TypeScript');
 assert.match(result.stdout, /Từ ngày/);
-assert.match(result.stdout, /rStartDate\|2026-08-01\|\|onchange="reportRangeChanged\(\)"/);
+assert.match(result.stdout, /rStartDate\|2026-08-01\|\|data-action="reportRangeChanged" data-action-on="change"/);
 assert.match(result.stdout, /Đến ngày/);
 assert.match(result.stdout, /rEndDate\|2026-08-31/);
 console.log('Report range picker HTML TypeScript tests passed');

@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
-const ctx = loadSandbox(['core.js', 'modules/state.js']);
+const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js']);
 
 // Removing lot 1103 from the only group that contains it must unlink level 3 and
 // physically remove its saved Sigma inputs/calculation sources from every period.

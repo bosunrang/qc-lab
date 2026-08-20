@@ -14,7 +14,7 @@ export function createLisQueueController(deps: {
   document: Document;
   presentation: {
     valueText: (record: AnyRec) => string;
-    onclick: (functionName: string, messageId: unknown) => string;
+    onclick: (functionName: string, messageId: unknown) => { action: string; args?: unknown[] };
     rowHtml: (record: AnyRec) => string;
     sectionHtml: (title: string, records: AnyRec[], emptyText: string) => string;
     modalHtml: (pending: AnyRec[], unresolved: AnyRec[]) => string;

@@ -558,7 +558,7 @@ async function checkOverdueReachesDashboard(page) {
       text: main.innerText,
       hasOverdueRow: /NCE-QUA-HAN/.test(main.innerHTML),
       hasInTimeRow: /NCE-CON-HAN/.test(main.innerHTML),
-      opensRecord: /go\('actions'\);editAction\(0\)/.test(main.innerHTML),
+      opensRecord: /data-action="dashboardContinueAction" data-args="\[0\]"/.test(main.innerHTML),
     };
   });
   check('Dashboard nêu hồ sơ NCE quá hạn', out.hasOverdueRow === true, out.text.slice(0, 200));

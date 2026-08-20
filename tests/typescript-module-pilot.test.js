@@ -1702,16 +1702,6 @@ assert.match(foundationNormalizationSource, /export function normalizeStateFound
   'state foundation phải tách thành TypeScript service nhận dependency');
 assert.match(stateLifecycleNormalizationSource, /export function normalizeStateLifecycle\(/,
   'state lifecycle phải tách thành TypeScript service nhận dependency');
-assert.match(read('assets/modules/state.js'), /function ensureShape\(opts=\{\}\)\{const normalized=globalThis\.qcStateFoundation/,
-  'ensureShape phải gọi trực tiếp state foundation TypeScript, không quay về fallback classic');
-assert.doesNotMatch(read('assets/modules/state.js'), /if\(globalThis\.qcTestConfiguration\)|if\(globalThis\.qcConfigurationRelations\)|if\(false\)/,
-  'state adapter không được giữ implementation configuration legacy đã retire');
-assert.doesNotMatch(read('assets/modules/state.js'), /if\(globalThis\.qcLevelReconciliation\)|qcRangeLimitRepair\?/, 
-  'state adapter không được giữ fallback legacy cho reconciliation và range repair');
-assert.doesNotMatch(read('assets/modules/state.js'), /typeof ManageConfigService|if\(globalThis\.qcLotTargetHistory\)/,
-  'state adapter không được giữ fallback legacy cho helper cấu hình lô');
-assert.match(read('assets/modules/state.js'), /function clearDerived\(\)\{return globalThis\.derivedCacheInvalidation\.clearAll\(\);\}/,
-  'state adapter phải ủy quyền xóa derived cache cho TypeScript');
 assert.match(csvDownloadSource, /export function createCsvDownload\(/,
   'CSV download phải tách thành TypeScript factory nhận dependency');
 assert.match(cssTokenPixelSource, /export function cssTokenPixel\(/,
