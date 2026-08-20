@@ -23,8 +23,8 @@ const WG_DEFAULT=Object.fromEntries(WG_RULES.map(r=>[r,QCCore.WG_DEFAULT_ON.has(
 const STATE_SCHEMA_VERSION=QCCore.STATE_SCHEMA_VERSION;
 /* `state` và các cache dẫn xuất là GLOBAL PROPERTY (globalThis.X), không phải
    `let` lexical (Pha G hạ tầng, tách nền cho state.js — 2026-08-19). Lý do: chúng
-   được ĐỌC/GHI TRẦN bởi ba file classic còn lại (qc-domain/state-storage/
-   firebase-sync) LẪN bundle (users-auth/action-workflow-service đã retire vào
+   được ĐỌC/GHI TRẦN bởi hai file classic còn lại (qc-domain/state-storage)
+   LẪN bundle (users-auth/action-workflow-service/firebase-sync đã retire vào
    đây). Với `let` lexical,
    bundle (IIFE) đọc/ghi được qua scope chain, nhưng khi state.js chuyển vào bundle
    sau này thì `let` sẽ nằm trong IIFE và các file classic không còn thấy → vỡ.

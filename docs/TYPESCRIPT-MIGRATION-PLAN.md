@@ -58,7 +58,7 @@ scope**, không phải không còn file `.js` trong gói phát hành.
 | Hạng mục | Trạng thái |
 | --- | --- |
 | Nguồn TypeScript | 739 tệp (thêm `sigma-page-controller.ts`; domain/application/bridge không đổi khác — lát nhóm C chỉ chuyển glue vào `modular-pilot.global.ts` đã có sẵn) |
-| Nguồn classic còn lại | 5 tệp `assets/modules/*.js` (nhóm C hạ tầng — `action-workflow-service.js`+`users-auth.js` retire 2026-08-20), thêm `assets/core.js` và `assets/app.js` |
+| Nguồn classic còn lại | 4 tệp `assets/modules/*.js` (nhóm C hạ tầng — `action-workflow-service.js`+`users-auth.js`+`firebase-sync.js` retire 2026-08-20), thêm `assets/core.js` và `assets/app.js` |
 | Bundle hiện tại | `assets/generated/modular-pilot.js`, Vite sinh ra và nạp bằng `<script defer>` |
 | Kiểm tra kiểu | `npm.cmd run typecheck` đạt: checkJs legacy + strict TypeScript modules |
 | Test Node | `npm.cmd test` đạt ngày 2026-08-20 (611/611) |
@@ -136,7 +136,7 @@ Westgard) — **toàn bộ nhóm B (Canvas/adapter) của Pha G đã hoàn tất
 | | `qc-domain.js` | 255 | wiring Westgard/worker + point derivation |
 | | `state-storage.js` | 120 | load/save + partitioned + boot shell. **`storageHydrationPromise` đã TÁCH NỀN 2026-08-20** (Lát 0) — chưa retire |
 | | ~~`local-store.js`~~ | ~~13~~ | **xong 2026-08-19, Hạ tầng lát 1** — xem bên dưới |
-| | `firebase-sync.js` | 173 | 3-way merge + retry + online/offline. **`fb` đã TÁCH NỀN 2026-08-20** (Lát 0, xem "Kế hoạch các lát nhóm C còn lại") — chưa retire |
+| | ~~`firebase-sync.js`~~ | ~~173~~ | **xong 2026-08-20, Lát nhóm C — 3** — xem "Kế hoạch các lát nhóm C còn lại" |
 | | `users-auth.js` | 256 | auth/user + PBKDF2 wiring + trang audit |
 | | ~~`action-workflow-service.js`~~ | ~~149~~ | **xong 2026-08-20, Lát nhóm C — 1** — xem "Kế hoạch các lát nhóm C còn lại" |
 | | ~~`range.js`~~ | ~~95~~ | **xong 2026-08-19, Hạ tầng lát 4** — xem bên dưới |
@@ -1925,9 +1925,7 @@ phải tách nền nó; làm sớm để gỡ mọi ràng buộc thứ tự.)
 1. ~~**`action-workflow-service.js`** (149)~~ — **xong 2026-08-20, xem "Lát nhóm C
    — 1" bên dưới.**
 2. ~~**`users-auth.js`** (256)~~ — **xong 2026-08-20, xem "Lát nhóm C — 2" bên dưới.**
-3. **`firebase-sync.js`** (173) — đọc `state`(9×); `fb` đã tách nền ở lát 0 nên
-   giờ chỉ còn logic sync. Gate: `firebase-merge.test.js`/`firebase-offline.test.js`
-   + `ui-check` (không có đường sync thật trong gate — cẩn thận merge semantics).
+3. ~~**`firebase-sync.js`** (173)~~ — **xong 2026-08-20, xem "Lát nhóm C — 3" bên dưới.**
 4. **`state-storage.js`** (120) — đọc `state`/`mem`/`startupProblem`;
    `storageHydrationPromise` đã tách nền ở lát 0. Lifecycle-critical (boot shell,
    partitioned save, quarantine). Gate: `storage-pipeline.test.js`,
@@ -2168,6 +2166,98 @@ Sau lát này: còn 3 file nhóm C (`firebase-sync.js`/`state-storage.js`/
 `qc-domain.js`) trước khi tới lát cuối (retire `state.js` + `analyte-catalog.js`
 cùng lúc). **Lát tiếp theo: `firebase-sync.js`** (xem mục 3 trong danh sách
 thứ tự đề xuất).
+
+#### Lát nhóm C — 3: `firebase-sync.js` (2026-08-20, xong)
+
+Retire hoàn toàn `assets/modules/firebase-sync.js` (173 dòng — 3-way merge,
+retry, online/offline, toàn bộ vòng đời kết nối Firebase). Giống `action-
+workflow-service.js`, mọi hàm ở đây vốn chỉ gọi thẳng service TypeScript đã có
+sẵn (`createSyncXxx`/`createFirebaseXxx` — codec, retry scheduler, merge,
+identity, polling, snapshot gate...). Chuyển nguyên vào
+`src/compat/modular-pilot.global.ts`, đặt ngay TRƯỚC khối construct các service
+Firebase (`root.firebaseDisconnectService = createFirebaseDisconnectService(...)`
+trở đi).
+
+**Bẫy lớn nhất của lát này — 17 "eager guard" y hệt bẫy `local-store.js`
+(Hạ tầng lát 1), nhân rộng nhiều lần:** bản compat trước đó có
+`if (typeof (root as any).fbDisconnect === 'function') root.firebaseDisconnectService = createFirebaseDisconnectService({...})`
+(và tương tự cho `fbFlushPush`/`syncNow`/`scheduleFbPush`/`fbHandleValue` ×5/
+`fbRejectBrokenAudit`/`applyRemoteRender`/`initFirebase`/`setCloudStatus`/
+`markSaved`/`remoteRenderUnsafe`/`ensureFirebaseApp`/`getDeployFbCfg` — 17 điểm
+trên 13 tên khác nhau). Guard này chỉ từng đúng vì `firebase-sync.js` nạp
+TRƯỚC bundle trong `index.html`, nên hàm classic đã tồn tại lúc guard chạy;
+nhưng MỌI dependency closure bên trong đều đã là lazy arrow (gọi tên trần LÚC
+GỌI, không phải lúc định nghĩa service — vd `stopPolling: () => fbStopPull()`).
+Gộp cả 17 dịch vụ này vào CÙNG một script với các hàm port (đặt SAU chúng
+trong thứ tự file) sẽ làm mọi guard vĩnh viễn sai → toàn bộ Firebase sync câm
+lặng thành no-op, không có gì báo lỗi vì `if(typeof...)` false chỉ đơn giản
+bỏ qua dòng gán. Xóa sạch cả 17 guard, dựng vô điều kiện — đúng cách đã áp
+dụng cho `LocalStore`.
+
+**Hai lỗi thật do việc xóa guard phơi ra (không phải guard tạo ra — guard chỉ
+che giấu), cả hai bắt được nhờ chạy lại toàn bộ `npm test` sau khi port:**
+
+1. **`root.fb = {...clientId: 'c_'+uid(), ...}` gọi `uid()` NGAY LÚC BUNDLE
+   NẠP** (không phải trong closure trì hoãn — đây là phần khởi tạo giá trị
+   ban đầu của `fb`, không phải một hàm thao tác trên `fb`). `uid()` là hàm
+   classic của `state.js`; nhiều sandbox test (28 file: `chart-view-model`,
+   `sigma-*`, `westgard-view-model`, `reagent-*`, `report-*`, v.v.) chỉ nạp
+   `['core.js', 'generated/modular-pilot.js']` — không nạp `state.js` — vì
+   chúng chỉ kiểm view-model/presentation thuần, không cần `uid` thật. Trước
+   lát này việc này vô hại vì `fb` là dữ liệu THUẦN do `firebase-sync.js` tự
+   khởi tạo (không đụng tới các test đó); giờ `fb` sống trong CHÍNH bundle mà
+   mọi test đều nạp, nên `uid is not defined` sập toàn bộ 28 test ngay khi
+   nạp bundle. Sửa bằng bảo vệ tại chỗ:
+   `clientId: 'c_' + (typeof uid === 'function' ? uid() : Math.random().toString(36).slice(2, 9))`
+   — không đổi thuật toán sinh id (giống hệt cách `uid()` tự làm), chỉ thêm
+   phòng vệ cho sandbox thiếu `state.js`.
+2. **`firebaseConfigSourceService`'s `cloud: () => (window as any).QCLAB_CLOUD`
+   và `readStored: () => localStorage.getItem('qclab_fb')` giả định `window`/
+   `localStorage` luôn tồn tại.** Đây LÀ closure trì hoãn thật (chỉ gọi khi
+   `.deploy()`/`.stored()` được gọi) — nhưng trước lát này, đường gọi tới nó
+   (`fbDataPath()` trong `persistSigmaDraft()` của `state-storage.js`) tự
+   canh bằng `typeof fbDataPath==='function'?fbDataPath():''`, và `fbDataPath`
+   luôn `undefined` trong các sandbox không nạp `firebase-sync.js` (vd
+   `storage-pipeline.test.js`, chỉ nạp `state.js`/`qc-domain.js`/
+   `state-storage.js`) — nên nhánh gọi thật CHƯA BAO GIỜ chạy tới. Giờ
+   `fbDataPath` luôn tồn tại (bundle luôn có mặt), nhánh `?fbDataPath():''`
+   lần đầu tiên thực sự gọi tới `window`/`localStorage` trong một sandbox
+   không có chúng → `ReferenceError`. Sửa bằng đúng idiom phòng vệ đã dùng ở
+   nơi khác trong file này (`typeof window==='undefined'?...`):
+   `cloud: () => typeof window === 'undefined' ? undefined : (window as any).QCLAB_CLOUD`,
+   `readStored: () => typeof localStorage === 'undefined' ? null : localStorage.getItem('qclab_fb')`.
+
+**Bài học cho lát sau (`state-storage.js`/`qc-domain.js`):** một `if(typeof
+X==='function')` ở file KHÁC (không phải file đang port) có thể đã âm thầm
+che một đường gọi thật suốt nhiều năm, chỉ vì trong TOÀN BỘ sandbox test hiện
+có, tên đó tình cờ luôn `undefined`. Port một file không tự làm lộ bug ở
+CHÍNH nó — nó có thể làm lộ bug ở NHỮNG FILE KHÁC gọi vào nó qua `typeof`
+guard. Cách bắt duy nhất đáng tin cậy: chạy lại **toàn bộ** `npm test` (không
+chỉ test riêng của file đang port) sau mỗi lát, đúng như CLAUDE.md đã dặn.
+
+**Cập nhật test đi kèm** (đọc/nạp file classic đã xóa, hoặc quét nguyên văn
+source của nó):
+
+- `tests/firebase-merge.test.js`, `tests/firebase-offline.test.js` (×13 lần
+  lặp lại cùng một `loadSandbox([...])`), `tests/firebase-config.test.js`,
+  `tests/audit-ingress-gates.test.js` — bỏ `'modules/firebase-sync.js'` khỏi
+  danh sách nạp.
+- `tests/firebase-merge.test.js` — 9 assertion source-scanner đọc nguyên văn
+  `assets/modules/firebase-sync.js`; sửa để đọc `src/compat/modular-pilot.global.ts`
+  và khớp đúng cú pháp arrow-assignment mới.
+- `tests/typescript-module-pilot.test.js` — bỏ biến `firebaseSyncSource` và
+  hai assertion `doesNotMatch` dựa vào nó (khóa "không còn hàm dead-code cũ"
+  — nay hiển nhiên đúng vì file không còn tồn tại).
+
+Gate: `typecheck` xanh, `npm test` 611/611 xanh (bắt được và sửa 2 lỗi ở trên
+trong lúc chạy gate này), `npm run ui-check` 29/29 xanh. Kiểm thêm bằng tay
+trong Chromium thật: boot hiện đúng trạng thái "Cần đăng nhập Firebase"; đăng
+nhập xong hiện đúng "Lưu trữ: Cục bộ" (qua `updateSaveStatus()`/`markSaved()`
+mới port); không có lỗi console ở bất kỳ bước nào.
+
+**Lát tiếp theo: `state-storage.js`** (120 dòng — lifecycle-critical: boot
+shell, partitioned save, quarantine; xem mục 4 trong danh sách thứ tự đề
+xuất, và LƯU Ý bài học "eager guard ở file khác" bên trên trước khi port).
 
 ### Pha H — bỏ global bridge và nhiều script tags
 

@@ -16,10 +16,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { loadSandbox, run } = require('./helpers/sandbox');
-const firebaseSource=fs.readFileSync(path.join(__dirname,'..','assets','modules','firebase-sync.js'),'utf8');
 const bridgeSource=fs.readFileSync(path.join(__dirname,'..','src','compat','modular-pilot.global.ts'),'utf8');
 
-const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/firebase-sync.js', 'modules/state-storage.js', 'modules/qc-domain.js', 'generated/modular-pilot.js']);
+const ctx = loadSandbox(['core.js', 'modules/state.js', 'modules/state-storage.js', 'modules/qc-domain.js', 'generated/modular-pilot.js']);
 run(ctx, 'function __getState(){return state;} function __setState(s){state=s;} function __getUpdateCalls(){return __updateCalls||0;}');
 
 function baseState(overrides = {}) {
@@ -38,15 +37,16 @@ const plain = (v) => JSON.parse(JSON.stringify(v));
 assert.equal(typeof ctx.syncStateMerge, 'function', 'bộ trộn state Firebase phải dùng artifact TypeScript');
 assert.equal(typeof ctx.syncFirstConnectMerge, 'function', 'bộ trộn kết nối Firebase lần đầu phải dùng artifact TypeScript');
 assert.equal(typeof ctx.syncHasContent, 'function', 'kiểm tra dữ liệu cục bộ Firebase phải dùng artifact TypeScript');
-assert.match(firebaseSource,/function fbClone\(v\)\{return globalThis\.syncValueCodec\.clone\(v\);\}/,'codec Firebase phải gọi TypeScript trực tiếp');
-assert.doesNotMatch(firebaseSource,/syncValueCodec\?|if\(globalThis\.syncHasContent\)|if\(globalThis\.syncCanon\)/,'codec Firebase không được giữ fallback classic');
-assert.match(firebaseSource,/function fbBuildUpdate\(cur\)\{return globalThis\.syncUpdateBuilder\.build\(cur,fb\.synced\);\}/,'update payload Firebase phải gọi TypeScript trực tiếp');
-assert.match(firebaseSource,/function fbHasLocalChanges\(\)\{return globalThis\.syncUpdateBuilder\.hasChanges\(state,fb\.synced\);\}/,'quyết định đẩy payload Firebase phải gọi TypeScript trực tiếp');
-assert.doesNotMatch(firebaseSource,/\bFB_(?:TOP|LIST_KEYS|LOCAL_CONTENT_KEYS|COMPARE_KEYS)\b|fbSyncMergeConfig/,'adapter Firebase không được sở hữu metadata đồng bộ');
-assert.match(firebaseSource,/function fbMerge\(local,remote,base\)\{\s*return globalThis\.syncStateMerge\(local,remote,base\);\s*\}/,'merge ba chiều Firebase phải gọi TypeScript trực tiếp');
-assert.match(firebaseSource,/function fbFirstConnectMerge\(local,remote\)\{\s*return globalThis\.syncFirstConnectMerge\(local,remote\);\s*\}/,'merge lần kết nối đầu Firebase phải gọi TypeScript trực tiếp');
-assert.doesNotMatch(firebaseSource,/function (?:mergePointArray|fbMergeDataBranch|fbPointKey)\(/,'Firebase adapter không được giữ implementation merge JavaScript');
-assert.match(firebaseSource,/function statesLikelyEqual\(a,b\)\{return globalThis\.syncedStatesEqual\(a,b,globalThis\.syncCompareKeys\);\}/,'so sánh xung đột Firebase phải gọi TypeScript trực tiếp');
+// firebase-sync.js đã retire vào src/compat/modular-pilot.global.ts (2026-08-20, Pha G nhóm C lát 3).
+assert.match(bridgeSource,/root\.fbClone\s*=\s*v\s*=>\s*root\.syncValueCodec!\.clone\(v\)/,'codec Firebase phải gọi TypeScript trực tiếp');
+assert.doesNotMatch(bridgeSource,/if\s*\(globalThis\.syncHasContent\)|if\s*\(globalThis\.syncCanon\)/,'codec Firebase không được giữ fallback classic');
+assert.match(bridgeSource,/root\.fbBuildUpdate\s*=\s*cur\s*=>\s*root\.syncUpdateBuilder!\.build\(cur,\s*fb\.synced\)/,'update payload Firebase phải gọi TypeScript trực tiếp');
+assert.match(bridgeSource,/root\.fbHasLocalChanges\s*=\s*\(\)\s*=>\s*root\.syncUpdateBuilder!\.hasChanges\(state,\s*fb\.synced\)/,'quyết định đẩy payload Firebase phải gọi TypeScript trực tiếp');
+assert.doesNotMatch(bridgeSource,/\bFB_(?:TOP|LIST_KEYS|LOCAL_CONTENT_KEYS|COMPARE_KEYS)\b|fbSyncMergeConfig/,'adapter Firebase không được sở hữu metadata đồng bộ');
+assert.match(bridgeSource,/root\.fbMerge\s*=\s*\(local,\s*remote,\s*base\)\s*=>\s*root\.syncStateMerge!\(local,\s*remote,\s*base\)/,'merge ba chiều Firebase phải gọi TypeScript trực tiếp');
+assert.match(bridgeSource,/root\.fbFirstConnectMerge\s*=\s*\(local,\s*remote\)\s*=>\s*root\.syncFirstConnectMerge!\(local,\s*remote\)/,'merge lần kết nối đầu Firebase phải gọi TypeScript trực tiếp');
+assert.doesNotMatch(bridgeSource,/function (?:mergePointArray|fbMergeDataBranch|fbPointKey)\(/,'Firebase adapter không được giữ implementation merge JavaScript');
+assert.match(bridgeSource,/root\.statesLikelyEqual\s*=\s*\(a,\s*b\)\s*=>\s*root\.syncedStatesEqual!\(a,\s*b,\s*root\.syncCompareKeys!\)/,'so sánh xung đột Firebase phải gọi TypeScript trực tiếp');
 assert.doesNotMatch(bridgeSource,/root\.firebaseMergeApplication\s*=/,'chọn chiến lược merge phải là dependency nội bộ bundle, không phải facade global');
 assert.doesNotMatch(bridgeSource,/root\.firebase(?:DisconnectedState|CanPull)\s*=/,'lifecycle và pull gate nội bộ không được công bố global facade');
 assert.doesNotMatch(bridgeSource,/root\.firebaseEmptySnapshotPlan\s*=/,'empty-snapshot plan không được công bố khi adapter gọi service trực tiếp');

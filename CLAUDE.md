@@ -486,13 +486,43 @@ the Google Fonts link, offline labs must print with correct metrics.
   `createIndexedDbRecordService`'s `get`/`put`/`delete` already resolve to a
   safe empty value when `indexedDB` itself is undefined, so the outer
   existence guard was redundant leftover, not load-bearing.
-- `firebase-sync.js` — optional Firebase Realtime Database sync. Per-branch,
-  per-element 3-way merge (list branches merge by `id`/content key; scalar
-  branches like `lab`/`westgardRules` replace wholesale). Failed pushes retry
-  via `fbScheduleRetry()` with exponential backoff (1s doubling to a 30s cap),
-  and `online`/`offline` listeners re-trigger push/pull. Merge semantics are
-  covered by `tests/firebase-merge.test.js`/`firebase-offline.test.js` — keep
-  them in step with any merge change.
+- Firebase Realtime Database sync (`fbMerge`/`fbHandleValue`/`initFirebase`/
+  `syncNow`/`scheduleFbPush`/`fbFlushPush`/…) — optional, per-branch/per-element
+  3-way merge (list branches merge by `id`/content key; scalar branches like
+  `lab`/`westgardRules` replace wholesale). Failed pushes retry via
+  `fbScheduleRetry()` with exponential backoff (1s doubling to a 30s cap), and
+  `online`/`offline` listeners re-trigger push/pull. Merge semantics are covered
+  by `tests/firebase-merge.test.js`/`firebase-offline.test.js` — keep them in
+  step with any merge change. Retired from classic `firebase-sync.js` on
+  2026-08-20 (Pha G nhóm C, lát 3): every function there already only forwarded
+  to an existing TypeScript service, so it moved as-is into
+  `src/compat/modular-pilot.global.ts` right before the block that constructs
+  those services. That block used to guard each construction with
+  `if (typeof (root as any).fbDisconnect === 'function') root.firebaseDisconnectService = ...`
+  (and 16 more, on 13 different classic names) — valid only because
+  `firebase-sync.js` used to load *before* the bundle in `index.html`, so the
+  classic function already existed when the guard ran; every dependency closure
+  inside was already a lazy arrow (calling the bare name at *call* time, not at
+  service-construction time), so the guard was never behaviorally necessary —
+  it just happened to hold thanks to classic load order. Moving the classic
+  functions into the same script and placing them after those guards would have
+  made every one of them permanently false, silently turning all of Firebase
+  sync into a no-op. Fixed by deleting all 17 guards and constructing
+  unconditionally (same fix as the `LocalStore` trap above). Removing the guards
+  exposed two latent environment-safety gaps rather than causing them — both
+  found by running the *full* `npm test`, not just this file's own tests:
+  `root.fb`'s initial `clientId: 'c_'+uid()` ran at bundle-load time (not
+  inside a closure) and broke ~28 sandbox tests that load the bundle without
+  `state.js` (where `uid()` lives), since `fb` used to be inert classic-only
+  data those tests never touched; and
+  `firebaseConfigSourceService`'s `cloud`/`readStored` closures assumed
+  `window`/`localStorage` always exist, which used to be masked because their
+  caller (`fbDataPath()` in `state-storage.js`'s `persistSigmaDraft()`) guarded
+  itself with `typeof fbDataPath==='function'` and `fbDataPath` was always
+  `undefined` in sandboxes that didn't load `firebase-sync.js` — now that it
+  always exists, that guard stopped skipping the real call. Both fixed with
+  defensive `typeof`-checks, the same idiom already used elsewhere in this file
+  for optional `window` access.
 - `state-storage.js` — `localStorage` load/save. `loadBootState()` tries
   `localStorage` first, then the `LocalStore` IndexedDB mirror; boot loads a
   small shell first and hydrates the full QC data in the background — login

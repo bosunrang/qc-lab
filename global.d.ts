@@ -23,9 +23,9 @@ declare var pointsCache: Map<string, any>, pointsIndexCache: Map<string, any>, p
   wgMemo: Map<string, any>, acceptedMemo: Map<string, any>, cusumMemo: Map<string, any>;
 
 // --- Firebase sync state + storage hydration gate (globalThis property,
-// khai báo tại firebase-sync.js/state-storage.js — cùng lý do tách nền như
-// `state`/`mem` ở trên: state-storage.js/app.js đọc chúng TRẦN, cùng bundle
-// src/compat/modular-pilot.global.ts từ khi users-auth.js retire vào đó). ---
+// khai báo tại src/compat/modular-pilot.global.ts từ khi firebase-sync.js retire
+// vào đó 2026-08-20 — cùng lý do tách nền như `state`/`mem` ở trên:
+// state-storage.js (còn classic) và assets/app.js đọc chúng TRẦN). ---
 declare var fb: { ready: boolean; initialized: boolean; ref: any; dirty: boolean; clientId: string;
   authUser: any; pendingRenderT: any; pullT: any; seenSig: any; synced: any; retryT: any; retryMs: number };
 declare var storageHydrationPromise: Promise<boolean>;
@@ -41,6 +41,12 @@ declare var page: string;
 declare function ensureAdmin(): Promise<void>;
 declare function showLogin(msg?: string): void;
 declare function showStartupRecovery(): void;
+// Firebase sync glue (firebase-sync.js retired 2026-08-20 into
+// src/compat/modular-pilot.global.ts) — assets/app.js and state-storage.js
+// (still classic) call these bare.
+declare function initFirebase(): Promise<unknown>;
+declare function fbDataPath(): string;
+declare function getFbCfg(): Record<string, any> | null;
 declare function afterRender(page: string): void;
 declare function openModal(html: string): void;
 declare function closeModal(): void;

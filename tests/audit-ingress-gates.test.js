@@ -3,7 +3,7 @@ const { webcrypto } = require('node:crypto');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
 (async()=>{
-  const ctx=loadSandbox(['core.js','modules/state.js','modules/firebase-sync.js','modules/state-storage.js','generated/modular-pilot.js'],{crypto:webcrypto});
+  const ctx=loadSandbox(['core.js','modules/state.js','modules/state-storage.js','generated/modular-pilot.js'],{crypto:webcrypto});
   const result=await run(ctx,`
     (async function(){
       currentUser={id:'u1',username:'admin',name:'Admin',role:'admin'};

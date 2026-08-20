@@ -26535,7 +26535,180 @@
 			if (typeof mirrorIndexedDb === "function") mirrorIndexedDb(raw);
 		}
 	});
-	if (typeof root.fbDisconnect === "function") root.firebaseDisconnectService = createFirebaseDisconnectService({
+	root.fb = {
+		ready: false,
+		initialized: false,
+		ref: null,
+		dirty: false,
+		clientId: "c_" + (typeof uid === "function" ? uid() : Math.random().toString(36).slice(2, 9)),
+		authUser: null,
+		pendingRenderT: null,
+		pullT: null,
+		seenSig: null,
+		synced: null,
+		retryT: null,
+		retryMs: 1e3
+	};
+	root.fbSaveT = null;
+	root.fbClone = (v) => root.syncValueCodec.clone(v);
+	root.fbCanWrite = () => root.firebaseConnectionGate.canWrite(fb);
+	root.fbNetworkOnline = () => root.firebaseConnectionGate.networkOnline(typeof navigator === "undefined" ? void 0 : navigator.onLine);
+	root.fbResetRetry = () => {
+		const next = root.syncRetryScheduler.reset({
+			timer: fb.retryT,
+			delay: fb.retryMs
+		});
+		fb.retryT = next.timer;
+		fb.retryMs = next.delay;
+	};
+	root.fbScheduleRetry = () => {
+		const next = root.syncRetryScheduler.schedule({
+			dirty: fb.dirty,
+			writable: root.fbCanWrite(),
+			online: root.fbNetworkOnline(),
+			retry: {
+				timer: fb.retryT,
+				delay: fb.retryMs
+			},
+			retryFn: () => {
+				fb.retryT = null;
+				root.fbFlushPush();
+			}
+		});
+		fb.retryT = next.timer;
+		fb.retryMs = next.delay;
+	};
+	root.fbSetReady = () => {
+		Object.assign(fb, root.firebaseReadyState(fb));
+	};
+	root.fbStoreLocal = () => {
+		root.firebaseLocalStoreService.store(state);
+	};
+	root.hasLocalQcContent = (s) => root.syncHasContent(s);
+	root.fbSyncedShape = (s) => root.syncedShape(s, root.syncCompareKeys);
+	root.statesLikelyEqual = (a, b) => root.syncedStatesEqual(a, b, root.syncCompareKeys);
+	root.fbSyncedSnapKeys = (s) => root.syncUpdateBuilder.baseSnapshot(s);
+	root.fbBuildUpdate = (cur) => root.syncUpdateBuilder.build(cur, fb.synced);
+	root.fbHasLocalChanges = () => root.syncUpdateBuilder.hasChanges(state, fb.synced);
+	root.fbMerge = (local, remote, base) => root.syncStateMerge(local, remote, base);
+	root.fbFirstConnectMerge = (local, remote) => root.syncFirstConnectMerge(local, remote);
+	root.saveLabel = "Cục bộ";
+	root.saveDetail = "";
+	root.getDeployFbCfg = () => root.firebaseConfigSourceService.deploy();
+	root.getStoredFbCfg = () => root.firebaseConfigSourceService.stored();
+	root.getFbCfg = () => root.firebaseConfigSelection.select(root.getDeployFbCfg(), root.getStoredFbCfg());
+	root.fbConfigSig = (cfg) => root.firebaseConfigSelection.signature(cfg);
+	root.ensureFirebaseApp = async (cfg) => root.firebaseAppService.ensure(cfg);
+	root.setCloudStatus = (t, on) => {
+		root.firebaseCloudStatusPresentation.set(t, on);
+	};
+	root.saveTime = () => (/* @__PURE__ */ new Date()).toLocaleTimeString("vi-VN", {
+		hour: "2-digit",
+		minute: "2-digit"
+	});
+	root.updateSaveStatus = () => {
+		const el = document.getElementById("saveStatus");
+		if (el) el.innerHTML = `Lưu trữ: <b>${saveLabel}</b>${saveDetail ? `<br>${saveDetail}` : ""}`;
+	};
+	root.markSaved = (label, detail) => {
+		root.firebaseSaveStatusService.mark(label, detail || "");
+	};
+	root.fbDataPath = () => root.firebaseIdentity.dataPath(root.getFbCfg() || {});
+	root.fbStatusLabel = () => root.firebaseIdentity.statusLabel(root.getFbCfg() || {}, fb.authUser || {});
+	root.fbRejectBrokenAudit = (source, result) => root.firebaseAuditRejectionService.reject(source, result);
+	root.fbAuditMaySync = (snapshot, source) => {
+		const result = root.firebaseAuditGate(snapshot);
+		return result.ok || root.fbRejectBrokenAudit(source, result);
+	};
+	root.fbStopPull = () => {
+		fb.pullT = root.firebasePollingService.stop(fb.pullT);
+	};
+	root.fbStartPull = () => {
+		fb.pullT = root.firebasePollingService.start(fb.pullT, root.fbPullOnce, 8e3);
+	};
+	root.fbDisconnect = (clearAuthUser) => root.firebaseDisconnectService.disconnect(!!clearAuthUser);
+	root.fbPullOnce = async () => root.firebasePullService.pull(fb);
+	if (typeof window !== "undefined" && window.addEventListener) {
+		window.addEventListener("focus", root.fbPullOnce);
+		window.addEventListener("online", () => {
+			if (fb.dirty) root.scheduleFbPush();
+			else root.fbPullOnce();
+		});
+		window.addEventListener("offline", () => {
+			if (fb.dirty) root.markSaved("cục bộ", "Mạng ngoại tuyến · sẽ tự đồng bộ khi có mạng");
+		});
+	}
+	if (typeof document !== "undefined" && document.addEventListener) document.addEventListener("visibilitychange", () => {
+		if (document.visibilityState === "visible") root.fbPullOnce();
+	});
+	var fbConflictDialogOpen = false;
+	root.fbHandleValue = async (v, opts = {}) => {
+		const sig = root.syncSnapshotSignature(v);
+		const gate = root.firebaseSnapshotGate(fb.seenSig, sig);
+		if (!gate.handle) return;
+		fb.seenSig = gate.seenSignature;
+		if (!v) return root.firebaseEmptySnapshotService.handle({
+			initialized: fb.initialized,
+			dirty: fb.dirty,
+			hasLocalContent: root.hasLocalQcContent(state),
+			silent: !!opts.silent
+		});
+		const remoteSnapshot = root.firebaseRemoteSnapshot(v), cloudErrors = remoteSnapshot.errors;
+		if (cloudErrors.length) return root.firebaseInvalidSnapshotService.handle(cloudErrors[0]);
+		const remote = remoteSnapshot.remote, base = fb.synced;
+		if (!root.fbAuditMaySync(remote, "Nhật ký trên đám mây")) return;
+		if (!root.fbAuditMaySync(state, "Nhật ký cục bộ")) return;
+		if (root.firebaseOwnSnapshotPlan(v, fb.clientId).own) return root.firebaseOwnSnapshotService.handle(remote, !!opts.silent);
+		const hadLocalChanges = fb.dirty;
+		const firstConnectPlan = root.firebaseFirstConnectPlan(base, hadLocalChanges, root.hasLocalQcContent(state), root.statesLikelyEqual(state, remote));
+		let mergeFirstConnect = firstConnectPlan.mergeFirstConnect;
+		if (firstConnectPlan.confirmConflict) {
+			if (fbConflictDialogOpen) return;
+			fbConflictDialogOpen = true;
+			const proceed = await root.firebaseConflictDialogService.ask((root.getFbCfg() || {}).labCode || "default");
+			fbConflictDialogOpen = false;
+			if (!proceed) {
+				root.fbDisconnect(false);
+				root.setCloudStatus("Đã hủy kết nối để bảo vệ dữ liệu cục bộ", false);
+				root.markSaved("cục bộ", "Đã hủy đồng bộ — dữ liệu cục bộ được giữ nguyên");
+				return;
+			}
+			if (typeof clearSigmaDraftThrough === "function") clearSigmaDraftThrough(Number.MAX_SAFE_INTEGER);
+			mergeFirstConnect = false;
+		}
+		fb.dirty = false;
+		return root.firebaseMergeCommitService.commit({
+			base,
+			mergeFirstConnect,
+			remote,
+			hadLocalChanges
+		});
+	};
+	root.initFirebase = async () => {
+		const cfg = root.getFbCfg();
+		if (!cfg || !cfg.config) {
+			root.setCloudStatus("Đang chạy cục bộ", false);
+			return;
+		}
+		if (typeof firebase === "undefined" || typeof firebase.auth !== "function") {
+			root.setCloudStatus("Thiếu Firebase Authentication", false);
+			return;
+		}
+		return root.firebaseSessionStartService.start(cfg);
+	};
+	root.remoteRenderUnsafe = () => root.firebaseRemoteRenderSafetyService.unsafe();
+	root.applyRemoteRender = () => {
+		root.firebaseRemoteRenderService.apply();
+	};
+	root.syncNow = async () => root.firebaseFullSyncService.sync(fb);
+	root.scheduleFbPush = () => {
+		fbSaveT = root.firebasePushScheduler.schedule(fb, fbSaveT);
+	};
+	root.fbFlushPush = async () => {
+		fbSaveT = null;
+		return root.firebasePushService.flush(fb);
+	};
+	root.firebaseDisconnectService = createFirebaseDisconnectService({
 		stopPolling: () => fbStopPull(),
 		cancelPendingPush: () => {
 			if (fbSaveT) {
@@ -26551,7 +26724,7 @@
 			Object.assign(fb, firebaseDisconnectedState(fb, clearAuthUser));
 		}
 	});
-	if (typeof root.fbFlushPush === "function") root.firebasePushService = createFirebasePushService({
+	root.firebasePushService = createFirebasePushService({
 		canPush: () => fbCanWrite() && fbNetworkOnline(),
 		auditMaySync: () => fbAuditMaySync(state, "Nhật ký cục bộ"),
 		prepare: () => {
@@ -26586,7 +26759,7 @@
 			fbScheduleRetry();
 		}
 	});
-	if (typeof root.syncNow === "function") root.firebaseFullSyncService = createFirebaseFullSyncService({
+	root.firebaseFullSyncService = createFirebaseFullSyncService({
 		canSync: () => fbCanWrite(),
 		auditMaySync: () => fbAuditMaySync(state, "Nhật ký cục bộ"),
 		prepare: () => {
@@ -26609,7 +26782,7 @@
 		},
 		failed: () => markSaved("lỗi đồng bộ", "Dữ liệu cục bộ vẫn còn")
 	});
-	if (typeof root.scheduleFbPush === "function") root.firebasePushScheduler = createFirebasePushScheduler({
+	root.firebasePushScheduler = createFirebasePushScheduler({
 		canWrite: () => fbCanWrite(),
 		networkOnline: () => fbNetworkOnline(),
 		resetRetry: () => fbResetRetry(),
@@ -26619,7 +26792,7 @@
 		offline: () => markSaved("cục bộ", "Mạng ngoại tuyến · sẽ tự đồng bộ khi có mạng"),
 		queued: () => markSaved("chờ đồng bộ", "Firebase")
 	});
-	if (typeof root.fbHandleValue === "function") root.firebaseEmptySnapshotService = createFirebaseEmptySnapshotService({
+	root.firebaseEmptySnapshotService = createFirebaseEmptySnapshotService({
 		setReady: () => fbSetReady(),
 		clearSynced: () => {
 			fb.synced = null;
@@ -26628,7 +26801,7 @@
 		schedulePush: () => scheduleFbPush(),
 		readyWithoutPush: () => markSaved("đám mây", "Sẵn sàng đồng bộ · " + fbDataPath())
 	});
-	if (typeof root.fbHandleValue === "function") root.firebaseOwnSnapshotService = createFirebaseOwnSnapshotService({
+	root.firebaseOwnSnapshotService = createFirebaseOwnSnapshotService({
 		setReady: () => fbSetReady(),
 		setBaseline: (remote) => {
 			fb.synced = remote;
@@ -26640,16 +26813,16 @@
 		connected: () => setCloudStatus(fbStatusLabel(), true),
 		synchronized: () => markSaved("đã đồng bộ", "Lúc " + saveTime())
 	});
-	if (typeof root.fbHandleValue === "function") root.firebaseInvalidSnapshotService = createFirebaseInvalidSnapshotService({
+	root.firebaseInvalidSnapshotService = createFirebaseInvalidSnapshotService({
 		setReady: () => fbSetReady(),
 		report: (firstError) => markSaved("dữ liệu đám mây không hợp lệ", firstError + " · " + fbDataPath())
 	});
-	if (typeof root.fbRejectBrokenAudit === "function") root.firebaseAuditRejectionService = createFirebaseAuditRejectionService({
+	root.firebaseAuditRejectionService = createFirebaseAuditRejectionService({
 		disconnect: () => fbDisconnect(),
 		disconnected: () => setCloudStatus("Đã ngắt đồng bộ để bảo vệ nhật ký", false),
 		report: (detail) => markSaved("audit không hợp lệ", detail)
 	});
-	if (typeof root.applyRemoteRender === "function") root.firebaseRemoteRenderService = createFirebaseRemoteRenderService({
+	root.firebaseRemoteRenderService = createFirebaseRemoteRenderService({
 		loggedIn: () => typeof currentUser !== "undefined" && !!currentUser,
 		focusLogin: () => {
 			if (typeof focusLoginField === "function") try {
@@ -26665,7 +26838,7 @@
 		deferred: () => markSaved("có dữ liệu mới", "Sẽ hiển thị khi bạn xong thao tác"),
 		rerender: () => rerender()
 	});
-	if (typeof root.initFirebase === "function") root.firebaseSessionStartService = createFirebaseSessionStartService({
+	root.firebaseSessionStartService = createFirebaseSessionStartService({
 		ensureApp: (config) => ensureFirebaseApp(config),
 		persistAuth: () => firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL),
 		currentAuthUser: () => new Promise((resolve) => {
@@ -26714,7 +26887,7 @@
 		merge: (local, remote, base) => globalThis.fbMerge(local, remote, base),
 		firstMerge: (local, remote) => globalThis.fbFirstConnectMerge(local, remote)
 	});
-	if (typeof root.fbHandleValue === "function") root.firebaseMergeCommitService = createFirebaseMergeCommitService({
+	root.firebaseMergeCommitService = createFirebaseMergeCommitService({
 		state: () => state,
 		replaceState: (value) => {
 			state = value;
@@ -26750,10 +26923,10 @@
 			if (fbHasLocalChanges()) scheduleFbPush();
 		}
 	});
-	if (typeof root.fbHandleValue === "function") root.firebaseConflictDialogService = createFirebaseConflictDialogService((options) => root.confirmDialog(options));
-	if (typeof root.setCloudStatus === "function") root.firebaseCloudStatusPresentation = createFirebaseCloudStatusPresentation((id) => document.getElementById(id));
-	if (typeof root.markSaved === "function") root.firebaseSaveStatusService = createFirebaseSaveStatusService((id) => document.getElementById(id));
-	if (typeof root.remoteRenderUnsafe === "function") root.firebaseRemoteRenderSafetyService = createFirebaseRemoteRenderSafetyService({
+	root.firebaseConflictDialogService = createFirebaseConflictDialogService((options) => root.confirmDialog(options));
+	root.firebaseCloudStatusPresentation = createFirebaseCloudStatusPresentation((id) => document.getElementById(id));
+	root.firebaseSaveStatusService = createFirebaseSaveStatusService((id) => document.getElementById(id));
+	root.firebaseRemoteRenderSafetyService = createFirebaseRemoteRenderSafetyService({
 		modalOpen: () => {
 			const modal = document.getElementById("modalRoot");
 			return !!(modal && modal.children && modal.children.length);
@@ -26763,13 +26936,13 @@
 			return !!(active && main && main.contains(active) && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName));
 		}
 	});
-	if (typeof root.ensureFirebaseApp === "function") root.firebaseAppService = createFirebaseAppService({
+	root.firebaseAppService = createFirebaseAppService({
 		sdk: () => firebase,
 		signature: (config) => fbConfigSig(config)
 	});
-	if (typeof root.getDeployFbCfg === "function") root.firebaseConfigSourceService = createFirebaseConfigSourceService({
-		cloud: () => window.QCLAB_CLOUD,
-		readStored: () => localStorage.getItem("qclab_fb")
+	root.firebaseConfigSourceService = createFirebaseConfigSourceService({
+		cloud: () => typeof window === "undefined" ? void 0 : window.QCLAB_CLOUD,
+		readStored: () => typeof localStorage === "undefined" ? null : localStorage.getItem("qclab_fb")
 	});
 	root.firebaseReadyState = firebaseReadyState;
 	root.settingsStorageUsageText = storageUsageText;

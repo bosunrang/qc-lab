@@ -179,7 +179,6 @@ const syncValueCodecSource = read('src/domain/sync/value-codec.ts');
 const firebaseConfigSelectionSource = read('src/domain/sync/firebase-config-selection.ts');
 const firebaseConnectionGateSource = read('src/domain/sync/firebase-connection-gate.ts');
 const snapshotSignatureSource = read('src/domain/sync/snapshot-signature.ts');
-const firebaseSyncSource = read('assets/modules/firebase-sync.js');
 const derivedCacheInvalidationSource = read('src/application/state/derived-cache-invalidation.ts');
 const configurationRelationsSource = read('src/application/state/configuration-relations.ts');
 const testConfigurationSource = read('src/application/state/test-configuration-normalization.ts');
@@ -1608,10 +1607,6 @@ assert.match(generated, /root\.firebaseConnectionGate\s*=\s*createFirebaseConnec
   'artifact must publish TypeScript Firebase connection gate for the legacy bridge');
 assert.match(generated, /root\.syncSnapshotSignature\s*=\s*syncSnapshotSignature/,
   'artifact must publish TypeScript sync snapshot signature for the legacy bridge');
-assert.doesNotMatch(firebaseSyncSource, /function fbCanon\(/,
-  'Firebase adapter must not retain the retired canonical-snapshot facade');
-assert.doesNotMatch(firebaseSyncSource, /function fbSnapshotSig\(|function fbAuditIntegrity\(/,
-  'Firebase adapter must not retain retired single-call snapshot/audit facades');
 assert.doesNotMatch(manageRoutesSource, /function teaRef(?:SourceMeta|StampSource)\(/,
   'Manage adapter must not retain retired TEa metadata facades');
 assert.doesNotMatch(reagentClassicSource, /function rc(?:PTwo|TCrit|Max|Min|Mean|Var|Pearson|Ols|Median|PB|Valid)\(/,

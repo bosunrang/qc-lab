@@ -8,9 +8,10 @@
      {testId|testIds} ghi tăng dần đúng các test đó; {sigmaTestId} kèm nháp Sigma
      đồng bộ bắc cầu reload; {clearDerived:false} giữ cache dẫn xuất; {cloud:false}
      chỉ lưu cục bộ, không đẩy Firebase.
-   - firebase-sync.js: persistLocalSnapshot({changed:true,quiet:true}) sau khi
-     merge từ cloud; clearSigmaDraftThrough(stamp) khi cloud đã ack;
-     mirrorIndexedDb(raw) ở đường legacy.
+   - firebaseLocalStoreService (firebase-sync.js retire vào
+     src/compat/modular-pilot.global.ts, 2026-08-20): persistLocalSnapshot(
+     {changed:true,quiet:true}) sau khi merge từ cloud; clearSigmaDraftThrough(stamp)
+     khi cloud đã ack; mirrorIndexedDb(raw) ở đường legacy.
    - Trang tự gọi: lsFlush() qua beforeunload/pagehide/visibilitychange.
    BOOT HAI PHA (hợp đồng quan trọng): loadBootState() có thể trả true khi mới
    đọc được boot shell — state.data đang RỖNG, localLoadStatus='partition-shell',
