@@ -13,7 +13,7 @@ const program = `
   ]));
 `;
 const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=module', '--eval', program], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
-assert.equal(result.status, 0, result.stderr || 'khÃ´ng thá»ƒ cháº¡y entry expanded tables state TypeScript');
+assert.equal(result.status, 0, result.stderr || 'không thể chạy entry expanded tables state TypeScript');
 const [closed, opened, capped] = JSON.parse(result.stdout);
 assert.deepEqual(closed, ['b']);
 assert.deepEqual(opened, ['a', 'b', 'c']);

@@ -17,6 +17,6 @@ const program = `
   ]));
 `;
 const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=module', '--eval', program], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
-assert.equal(result.status, 0, result.stderr || 'khÃ´ng thá»ƒ cháº¡y entry tree visibility TypeScript');
+assert.equal(result.status, 0, result.stderr || 'không thể chạy entry tree visibility TypeScript');
 assert.deepEqual(JSON.parse(result.stdout), [[true, true, true, true, true, false, false], [true, true, false, false, true, false, false], [true, true, false, true, false, false, false]]);
 console.log('Entry tree visibility TypeScript tests passed');

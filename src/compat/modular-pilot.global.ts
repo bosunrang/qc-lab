@@ -3016,14 +3016,14 @@ const modularLocalStorageLoadService = createLocalStorageLoadService({
   },
   adopt: value => adoptValidatedState(value),
   accepted: () => { localLoadStatus = 'local'; },
-  rejectedRead: () => { startupProblem = {raw:'',message:'TrÃ¬nh duyá»‡t khÃ´ng cho phÃ©p Ä‘á»c vÃ¹ng lÆ°u trá»¯ cá»¥c bá»™.'}; },
-  rejectedInvalid: (raw, error) => { localLoadStatus = 'invalid'; quarantineCorruptLocal(raw, error); startupProblem = {raw,message:error && (error as Error).message ? (error as Error).message : 'Dá»¯ liá»‡u cá»¥c bá»™ khÃ´ng há»£p lá»‡.'}; },
+  rejectedRead: () => { startupProblem = {raw:'',message:'Trình duyệt không cho phép đọc vùng lưu trữ cục bộ.'}; },
+  rejectedInvalid: (raw, error) => { localLoadStatus = 'invalid'; quarantineCorruptLocal(raw, error); startupProblem = {raw,message:error && (error as Error).message ? (error as Error).message : 'Dữ liệu cục bộ không hợp lệ.'}; },
 });
 const modularLocalStorageSnapshotWriter = createLocalStorageSnapshotWriter({
   set: (key, value) => localStorage.setItem(key, value),
   remove: key => localStorage.removeItem(key),
-  saved: quiet => { if (!quiet) markSaved('Ä‘Ã£ lÆ°u cá»¥c bá»™','LÃºc '+saveTime()); },
-  failed: quiet => { if (!quiet) markSaved('lá»—i lÆ°u cá»¥c bá»™','Kiá»ƒm tra dung lÆ°á»£ng trÃ¬nh duyá»‡t'); },
+  saved: quiet => { if (!quiet) markSaved('đã lưu cục bộ','Lúc '+saveTime()); },
+  failed: quiet => { if (!quiet) markSaved('lỗi lưu cục bộ','Kiểm tra dung lượng trình duyệt'); },
 });
 const modularPartitionedSnapshotWriter = createPartitionedSnapshotWriter({
   plan: input => {
@@ -3038,9 +3038,9 @@ const modularPartitionedSnapshotWriter = createPartitionedSnapshotWriter({
     partitionSlot = String(result.slot || ''); lsSaveFailures = 0;
     try { localStorage.setItem('qclab_boot',JSON.stringify({format:1,slot:result.slot,savedAt:result.savedAt,shell:result.shell})); localStorage.setItem('qclab_saved_at',String(result.savedAt)); localStorage.removeItem('qclab'); } catch {}
     if (!sigmaDraftNeedsCloud()) clearSigmaDraftThrough(input.localDraftStamp);
-    if (!input.quiet) markSaved('Ä‘Ã£ lÆ°u cá»¥c bá»™','IndexedDB phÃ¢n vÃ¹ng Â· LÃºc '+saveTime());
+    if (!input.quiet) markSaved('đã lưu cục bộ','IndexedDB phân vùng · Lúc '+saveTime());
   },
-  failed: input => { lsDirty = true; lsFullDirty = true; lsSaveFailures++; scheduleLocalRetry(); if (!input.quiet) markSaved('lá»—i lÆ°u cá»¥c bá»™','KhÃ´ng thá»ƒ ghi IndexedDB phÃ¢n vÃ¹ng'); },
+  failed: input => { lsDirty = true; lsFullDirty = true; lsSaveFailures++; scheduleLocalRetry(); if (!input.quiet) markSaved('lỗi lưu cục bộ','Không thể ghi IndexedDB phân vùng'); },
 });
 root.storageSnapshotService = createStorageSnapshotService({
   markChanged: () => { lsRevision++; lsDirty = true; lsFullDirty = true; },
@@ -3072,7 +3072,7 @@ root.saveService = createSaveService({
     else if (plan.fullDirty) lsFullDirty = true;
     if (plan.persistSigmaDraft) persistSigmaDraft(options.sigmaTestId);
   },
-  beginLocalSave: () => { lsRevision++; lsDirty = true; markSaved('Ä‘ang lÆ°u','...'); scheduleLocalSave(); },
+  beginLocalSave: () => { lsRevision++; lsDirty = true; markSaved('đang lưu','...'); scheduleLocalSave(); },
   scheduleCloud: () => { fb.dirty = true; scheduleFbPush(); },
 });
 root.firebaseLocalStoreService = createFirebaseLocalStoreService({
@@ -3578,7 +3578,7 @@ const modularIndexedDbRecoveryService = createIndexedDbRecoveryService({
   },
   acceptLegacy: () => { mem = state; localLoadStatus = 'indexeddb'; startupProblem = null; try { localStorage.setItem('qclab', JSON.stringify(state)); } catch {} },
   reportFailure: (kind, error, raw = '') => {
-    const message = kind === 'partitioned' ? 'Dá»¯ liá»‡u phÃ¢n vÃ¹ng IndexedDB khÃ´ng há»£p lá»‡.' : 'Dá»¯ liá»‡u IndexedDB khÃ´ng há»£p lá»‡.';
+    const message = kind === 'partitioned' ? 'Dữ liệu phân vùng IndexedDB không hợp lệ.' : 'Dữ liệu IndexedDB không hợp lệ.';
     startupProblem = {raw,message:error && (error as Error).message ? (error as Error).message : message};
     if (raw) startupProblem.raw = raw;
   },
@@ -3588,7 +3588,7 @@ const modularPartitionHydrationService = createPartitionHydrationService({
   adopt: value => (globalThis as any).adoptValidatedState(value),
   recoverPendingSigmaDraft: () => (globalThis as any).recoverPendingSigmaDraft(),
   accept: record => { mem = state; partitionSlot = String(record.slot || ''); localLoadStatus = 'partitioned'; clearDerived(); startupProblem = null; if (lsDirty) scheduleLocalSave(); },
-  reportFailure: error => { startupProblem = {raw:'',message:error && (error as Error).message ? (error as Error).message : 'KhÃ´ng thá»ƒ táº£i cÃ¡c phÃ¢n vÃ¹ng dá»¯ liá»‡u QC.'}; },
+  reportFailure: error => { startupProblem = {raw:'',message:error && (error as Error).message ? (error as Error).message : 'Không thể tải các phân vùng dữ liệu QC.'}; },
 });
 root.storageLifecycleService = createStorageLifecycleService({
   sanitize: value => modularStateAdoptionService.sanitize(value),

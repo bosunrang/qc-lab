@@ -180,7 +180,7 @@
   min-height:var(--panel-header-min-height); display:flex; align-items:center; justify-content:space-between; gap:12px; padding:5px 14px; border-bottom:1px solid var(--section-head-border); background:var(--section-head-bg);
 }
 
-.sg-data-head .panel-title{
+.sg-data-head h2.panel-title{
   margin:0; color:var(--section-head-ink); font-size:var(--type-subhead); font-weight:850;
 }
 

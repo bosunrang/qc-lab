@@ -713,7 +713,7 @@
   min-height:44px; margin:0; padding:10px 14px; gap:14px 18px; grid-template-columns:minmax(180px,1fr) auto; background:var(--section-head-bg); border-bottom:1px solid var(--section-head-border); color:var(--card-head-ink); font-size:var(--surface-head-size); font-weight:800; text-transform:none; letter-spacing:0; box-shadow:none;
 }
 
-.lj-toolbar .panel-title{
+.lj-toolbar h2.panel-title{
   color:var(--section-head-ink); font-size:var(--section-head-size); font-weight:800; text-transform:none; letter-spacing:0;
 }
 

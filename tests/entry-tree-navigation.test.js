@@ -14,6 +14,6 @@ const program = `
   ]));
 `;
 const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=module', '--eval', program], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
-assert.equal(result.status, 0, result.stderr || 'khÃ´ng thá»ƒ cháº¡y entry tree navigation TypeScript');
+assert.equal(result.status, 0, result.stderr || 'không thể chạy entry tree navigation TypeScript');
 assert.deepEqual(JSON.parse(result.stdout), ['c', 'c', 'a', 'c', null]);
 console.log('Entry tree navigation TypeScript tests passed');

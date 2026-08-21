@@ -62,7 +62,7 @@
   display:flex; align-items:center; min-height:58px; padding:9px 18px; border-bottom:1px solid var(--section-head-border); background:var(--section-head-bg);
 }
 
-.dash-test-toolbar .panel-title{
+.dash-test-toolbar h2.panel-title{
   margin:0; padding:0; border-bottom:none; color:var(--card-head-ink); font-size:var(--section-head-size); font-weight:800; letter-spacing:0; text-transform:none;
 }
 

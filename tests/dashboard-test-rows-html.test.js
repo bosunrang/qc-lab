@@ -15,7 +15,7 @@ const program=`
   ])));
 `;
 const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
-assert.equal(result.status,0,result.stderr||'khÃ´ng thá»ƒ cháº¡y dashboard test rows TypeScript');
+assert.equal(result.status,0,result.stderr||'không thể chạy dashboard test rows TypeScript');
 const output=JSON.parse(result.stdout);
 assert.equal(output,'{"status":"rej","search":"alpha","name":"display:a","machine":"M1","levelsHtml":"levels:L1,L3","todayTag":"today:1/2","totalPoints":8,"statusTag":"status:rej","latestText":"latest:p1/a","actionHtml":"action:a/L1"}{"status":"ok","search":"beta","name":"display:b","machine":"M2","levelsHtml":"levels:L2","todayTag":"today:1/1","totalPoints":4,"statusTag":"status:ok","latestText":"latest:p2/b","actionHtml":"action:b/L2"}');
 console.log('Dashboard test rows HTML TypeScript tests passed');

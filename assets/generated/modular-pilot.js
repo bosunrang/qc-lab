@@ -72,7 +72,6 @@
 		return [...kept].sort((a, b) => a - b);
 	}
 	var chartViewModel = Object.freeze({
-		filterPoints,
 		buildLeveyJennings,
 		buildCusum,
 		buildMultiLevel,
@@ -15239,30 +15238,30 @@
 			const trace = [];
 			(levels || []).forEach((level) => {
 				const item = row.e.lv && row.e.lv[level] || {};
-				if (item.uCalBasis) trace.push("Má»©c " + level + " Â· nguá»“n u(cal): " + deps.escape(item.uCalBasis));
+				if (item.uCalBasis) trace.push("Mức " + level + " · nguồn u(cal): " + deps.escape(item.uCalBasis));
 			});
 			const signed = (levels || []).map((level) => row.e.lv && row.e.lv[level] || {}).find((item) => item.muReviewedBy || item.muReviewedDate);
-			if (signed) trace.push("NgÆ°á»i rÃ\xA0 soÃ¡t ngÃ¢n sÃ¡ch MU: " + deps.escape(signed.muReviewedBy || "â€”") + (signed.muReviewedDate ? " Â· " + deps.formatDate(signed.muReviewedDate) : ""));
+			if (signed) trace.push("Người rà soát ngân sách MU: " + deps.escape(signed.muReviewedBy || "—") + (signed.muReviewedDate ? " · " + deps.formatDate(signed.muReviewedDate) : ""));
 			return trace;
 		};
 	}
 	//#endregion
 	//#region src/presentation/sigma/sigma-print-rows.ts
 	function createSigmaPrintRows(deps) {
-		const source = (metric) => metric.cvSource === "iqc-period" || metric.cvSource === "iqc-cohort" ? (metric.n || 0) + " Ä‘iá»ƒm" + (metric.sourceLot ? " Â· LÃ´ " + deps.escape(metric.sourceLot) : "") : "Nháº­p tay";
+		const source = (metric) => metric.cvSource === "iqc-period" || metric.cvSource === "iqc-cohort" ? (metric.n || 0) + " điểm" + (metric.sourceLot ? " · Lô " + deps.escape(metric.sourceLot) : "") : "Nhập tay";
 		const rowCells = (metric) => {
-			const sigma = (metric.classifiable ? "" : "â‰ˆ") + deps.format(metric.sigma, 2);
-			return "<td class=\"num\">" + deps.format(metric.tea, 2) + "</td><td class=\"num\"><b style=\"color:" + deps.escapeAttr(metric.c) + "\">" + sigma + "</b></td><td><span class=\"pill\" style=\"color:" + deps.escapeAttr(metric.c) + "\">" + deps.escape(metric.label) + "</span></td><td class=\"num\">" + deps.format(metric.cv, 2) + "</td><td class=\"num\">" + deps.format(metric.bias, 2) + "</td><td class=\"num\">" + deps.dpmo(metric.dpmo) + "</td><td class=\"num\">" + deps.format(metric.yld, 4) + "%</td><td>" + source(metric) + "</td><td>" + deps.escape(metric.readinessLabel || metric.cohortStatus || "â€”") + "</td>";
+			const sigma = (metric.classifiable ? "" : "≈") + deps.format(metric.sigma, 2);
+			return "<td class=\"num\">" + deps.format(metric.tea, 2) + "</td><td class=\"num\"><b style=\"color:" + deps.escapeAttr(metric.c) + "\">" + sigma + "</b></td><td><span class=\"pill\" style=\"color:" + deps.escapeAttr(metric.c) + "\">" + deps.escape(metric.label) + "</span></td><td class=\"num\">" + deps.format(metric.cv, 2) + "</td><td class=\"num\">" + deps.format(metric.bias, 2) + "</td><td class=\"num\">" + deps.dpmo(metric.dpmo) + "</td><td class=\"num\">" + deps.format(metric.yld, 4) + "%</td><td>" + source(metric) + "</td><td>" + deps.escape(metric.readinessLabel || metric.cohortStatus || "—") + "</td>";
 		};
 		const periodRows = (row, levels) => (levels || []).map((level, index) => {
 			const metric = row && row.rs && row.rs[index];
-			return !metric ? "<tr><td>Má»©c " + level + "</td><td colspan=\"9\" class=\"muted\">ChÆ°a Ä‘á»§ CV IQC vÃ\xA0 Bias EQA/EQC Ä‘á»ƒ tÃ­nh Sigma</td></tr>" : "<tr><td><b>Má»©c " + level + "</b></td>" + rowCells(metric) + "</tr>";
+			return !metric ? "<tr><td>Mức " + level + "</td><td colspan=\"9\" class=\"muted\">Chưa đủ CV IQC và Bias EQA/EQC để tính Sigma</td></tr>" : "<tr><td><b>Mức " + level + "</b></td>" + rowCells(metric) + "</tr>";
 		}).join("");
 		const periodsRows = (rows, levels) => (rows || []).flatMap((row) => {
 			const period = deps.period(row.e.period) || row.e.period || "?";
 			return (levels || []).map((level, index) => {
 				const metric = row.rs && row.rs[index];
-				return !metric ? "<tr><td><b>" + deps.escape(period) + "</b></td><td>Má»©c " + level + "</td><td colspan=\"9\" class=\"muted\">ChÆ°a Ä‘á»§ CV IQC vÃ\xA0 Bias EQA/EQC Ä‘á»ƒ tÃ­nh Sigma</td></tr>" : "<tr><td><b>" + deps.escape(period) + "</b></td><td><b>Má»©c " + level + "</b></td>" + rowCells(metric) + "</tr>";
+				return !metric ? "<tr><td><b>" + deps.escape(period) + "</b></td><td>Mức " + level + "</td><td colspan=\"9\" class=\"muted\">Chưa đủ CV IQC và Bias EQA/EQC để tính Sigma</td></tr>" : "<tr><td><b>" + deps.escape(period) + "</b></td><td><b>Mức " + level + "</b></td>" + rowCells(metric) + "</tr>";
 			});
 		}).join("");
 		return Object.freeze({
@@ -15275,15 +15274,15 @@
 	function createSigmaMuPrintRows(deps) {
 		const cells = (test, row, level, index) => {
 			const metric = row && row.rs && row.rs[index], mu = metric && metric.mu || deps.mu(test, row.e, level), unit = test && test.unit || "";
-			if (!mu) return "<td colspan=\"7\" class=\"muted\">ChÆ°a cÃ³ CV IQC â€” chÆ°a láº­p Ä‘Æ°á»£c ngÃ¢n sÃ¡ch MU</td>";
-			const uBias = !mu.includeBias ? "KhÃ´ng cá»™ng" : mu.uBias == null ? "ChÆ°a cÃ³ Bias" : deps.format(mu.uBias, 2), uCal = mu.uCal == null ? "ChÆ°a cÃ³ CoA" : deps.format(mu.uCal, 2);
-			const absolute = mu.absoluteU == null ? "â€”" : deps.format(mu.absoluteU, 3) + (unit ? " " + deps.escape(unit) : "");
-			return "<td class=\"num\">" + deps.format(mu.uRw, 2) + "</td><td class=\"num\">" + uBias + "</td><td class=\"num\">" + uCal + "</td><td class=\"num\">" + deps.format(mu.uc, 2) + "</td><td class=\"num\"><b>" + deps.format(mu.U, 2) + "</b></td><td class=\"num\">" + absolute + "</td><td>" + (mu.complete ? "<span class=\"pill\">Äá»§ thÃ\xA0nh pháº§n</span>" : "Thiáº¿u " + deps.escape(mu.missing.join(", "))) + "</td>";
+			if (!mu) return "<td colspan=\"7\" class=\"muted\">Chưa có CV IQC — chưa lập được ngân sách MU</td>";
+			const uBias = !mu.includeBias ? "Không cộng" : mu.uBias == null ? "Chưa có Bias" : deps.format(mu.uBias, 2), uCal = mu.uCal == null ? "Chưa có CoA" : deps.format(mu.uCal, 2);
+			const absolute = mu.absoluteU == null ? "—" : deps.format(mu.absoluteU, 3) + (unit ? " " + deps.escape(unit) : "");
+			return "<td class=\"num\">" + deps.format(mu.uRw, 2) + "</td><td class=\"num\">" + uBias + "</td><td class=\"num\">" + uCal + "</td><td class=\"num\">" + deps.format(mu.uc, 2) + "</td><td class=\"num\"><b>" + deps.format(mu.U, 2) + "</b></td><td class=\"num\">" + absolute + "</td><td>" + (mu.complete ? "<span class=\"pill\">Đủ thành phần</span>" : "Thiếu " + deps.escape(mu.missing.join(", "))) + "</td>";
 		};
-		const periodRows = (test, row, levels) => (levels || []).map((level, index) => "<tr><td><b>Má»©c " + level + "</b></td>" + cells(test, row, level, index) + "</tr>").join("");
+		const periodRows = (test, row, levels) => (levels || []).map((level, index) => "<tr><td><b>Mức " + level + "</b></td>" + cells(test, row, level, index) + "</tr>").join("");
 		const periodsRows = (test, rows, levels) => (rows || []).flatMap((row) => {
 			const period = deps.period(row.e.period) || row.e.period || "?";
-			return (levels || []).map((level, index) => "<tr><td><b>" + deps.escape(period) + "</b></td><td><b>Má»©c " + level + "</b></td>" + cells(test, row, level, index) + "</tr>");
+			return (levels || []).map((level, index) => "<tr><td><b>" + deps.escape(period) + "</b></td><td><b>Mức " + level + "</b></td>" + cells(test, row, level, index) + "</tr>");
 		}).join("");
 		return Object.freeze({
 			periodRows,
@@ -16268,7 +16267,7 @@
 		return (raw, error) => ({
 			capturedAt: now(),
 			source: "localStorage:qclab",
-			message: error && error.message ? error.message : "Dá»¯ liá»‡u cá»¥c bá»™ khÃ´ng há»£p lá»‡.",
+			message: error && error.message ? error.message : "Dữ liệu cục bộ không hợp lệ.",
 			raw: String(raw || "")
 		});
 	}
@@ -16317,7 +16316,7 @@
 	//#region src/domain/sync/firebase-identity.ts
 	function createFirebaseIdentity() {
 		const dataPath = (config) => "qclab-shared/" + String(config && config.labCode || "default").replace(/[.#$/\[\]]/g, "_");
-		const statusLabel = (config, user) => (user.email || (user.isAnonymous ? "áº©n danh" : "Ä‘Ã£ xÃ¡c thá»±c")) + " Â· " + (config.labCode || "default") + " Â· " + dataPath(config);
+		const statusLabel = (config, user) => (user.email || (user.isAnonymous ? "ẩn danh" : "đã xác thực")) + " · " + (config.labCode || "default") + " · " + dataPath(config);
 		return Object.freeze({
 			dataPath,
 			statusLabel
@@ -16935,9 +16934,9 @@
 	//#region src/presentation/reagent/reagent-tool-icon.ts
 	var paths = {
 		search: "<circle cx=\"11\" cy=\"11\" r=\"7\"/><line x1=\"21\" y1=\"21\" x2=\"16.65\" y2=\"16.65\"/>",
-		print: "<path d=\"M6 9V2h12v7\"/>",
-		report: "<path d=\"M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5Z\"/>",
-		trash: "<path d=\"M3 6h18\"/>",
+		print: "<path d=\"M6 9V2h12v7\"/><path d=\"M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2\"/><rect x=\"6\" y=\"14\" width=\"12\" height=\"8\"/>",
+		report: "<path d=\"M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5Z\"/><path d=\"M14 2v4a2 2 0 0 0 2 2h4\"/><path d=\"M8.5 13h7\"/><path d=\"M8.5 17h7\"/>",
+		trash: "<path d=\"M3 6h18\"/><path d=\"M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2\"/><path d=\"M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6\"/><line x1=\"10\" y1=\"11\" x2=\"10\" y2=\"17\"/><line x1=\"14\" y1=\"11\" x2=\"14\" y2=\"17\"/>",
 		sample: "<path d=\"M9 5h6\"/><path d=\"M9 3h6v4H9z\"/><rect x=\"6\" y=\"5\" width=\"12\" height=\"16\" rx=\"2\"/><path d=\"M9 11h6M9 15h6\"/>",
 		user: "<path d=\"M16 11a4 4 0 1 0-8 0\"/><path d=\"M4 21a8 8 0 0 1 16 0\"/><path d=\"M17.5 7.5a3 3 0 0 1 2.6 4.5\"/><path d=\"M20.5 21a6 6 0 0 0-3-5.2\"/>"
 	};
@@ -28232,7 +28231,7 @@
 		rejectedRead: () => {
 			startupProblem = {
 				raw: "",
-				message: "TrÃ¬nh duyá»‡t khÃ´ng cho phÃ©p Ä‘á»c vÃ¹ng lÆ°u trá»¯ cá»¥c bá»™."
+				message: "Trình duyệt không cho phép đọc vùng lưu trữ cục bộ."
 			};
 		},
 		rejectedInvalid: (raw, error) => {
@@ -28240,7 +28239,7 @@
 			quarantineCorruptLocal(raw, error);
 			startupProblem = {
 				raw,
-				message: error && error.message ? error.message : "Dá»¯ liá»‡u cá»¥c bá»™ khÃ´ng há»£p lá»‡."
+				message: error && error.message ? error.message : "Dữ liệu cục bộ không hợp lệ."
 			};
 		}
 	});
@@ -28248,10 +28247,10 @@
 		set: (key, value) => localStorage.setItem(key, value),
 		remove: (key) => localStorage.removeItem(key),
 		saved: (quiet) => {
-			if (!quiet) markSaved("Ä‘Ã£ lÆ°u cá»¥c bá»™", "LÃºc " + saveTime());
+			if (!quiet) markSaved("đã lưu cục bộ", "Lúc " + saveTime());
 		},
 		failed: (quiet) => {
-			if (!quiet) markSaved("lá»—i lÆ°u cá»¥c bá»™", "Kiá»ƒm tra dung lÆ°á»£ng trÃ¬nh duyá»‡t");
+			if (!quiet) markSaved("lỗi lưu cục bộ", "Kiểm tra dung lượng trình duyệt");
 		}
 	});
 	var modularPartitionedSnapshotWriter = createPartitionedSnapshotWriter({
@@ -28293,14 +28292,14 @@
 				localStorage.removeItem("qclab");
 			} catch {}
 			if (!sigmaDraftNeedsCloud()) clearSigmaDraftThrough(input.localDraftStamp);
-			if (!input.quiet) markSaved("Ä‘Ã£ lÆ°u cá»¥c bá»™", "IndexedDB phÃ¢n vÃ¹ng Â· LÃºc " + saveTime());
+			if (!input.quiet) markSaved("đã lưu cục bộ", "IndexedDB phân vùng · Lúc " + saveTime());
 		},
 		failed: (input) => {
 			lsDirty = true;
 			lsFullDirty = true;
 			lsSaveFailures++;
 			scheduleLocalRetry();
-			if (!input.quiet) markSaved("lá»—i lÆ°u cá»¥c bá»™", "KhÃ´ng thá»ƒ ghi IndexedDB phÃ¢n vÃ¹ng");
+			if (!input.quiet) markSaved("lỗi lưu cục bộ", "Không thể ghi IndexedDB phân vùng");
 		}
 	});
 	root.storageSnapshotService = createStorageSnapshotService({
@@ -28370,7 +28369,7 @@
 		beginLocalSave: () => {
 			lsRevision++;
 			lsDirty = true;
-			markSaved("Ä‘ang lÆ°u", "...");
+			markSaved("đang lưu", "...");
 			scheduleLocalSave();
 		},
 		scheduleCloud: () => {
@@ -29182,7 +29181,7 @@
 			} catch {}
 		},
 		reportFailure: (kind, error, raw = "") => {
-			const message = kind === "partitioned" ? "Dá»¯ liá»‡u phÃ¢n vÃ¹ng IndexedDB khÃ´ng há»£p lá»‡." : "Dá»¯ liá»‡u IndexedDB khÃ´ng há»£p lá»‡.";
+			const message = kind === "partitioned" ? "Dữ liệu phân vùng IndexedDB không hợp lệ." : "Dữ liệu IndexedDB không hợp lệ.";
 			startupProblem = {
 				raw,
 				message: error && error.message ? error.message : message
@@ -29205,7 +29204,7 @@
 		reportFailure: (error) => {
 			startupProblem = {
 				raw: "",
-				message: error && error.message ? error.message : "KhÃ´ng thá»ƒ táº£i cÃ¡c phÃ¢n vÃ¹ng dá»¯ liá»‡u QC."
+				message: error && error.message ? error.message : "Không thể tải các phân vùng dữ liệu QC."
 			};
 		}
 	});

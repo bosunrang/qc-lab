@@ -16,6 +16,6 @@ const program=`
   console.log(JSON.stringify({result,marked}));
 `;
 const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
-assert.equal(result.status,0,result.stderr||'khÃ´ng thá»ƒ cháº¡y dashboard test items TypeScript');
+assert.equal(result.status,0,result.stderr||'không thể chạy dashboard test items TypeScript');
 assert.deepEqual(JSON.parse(result.stdout),{result:[{t:{id:'t1',name:'Glucose'},s:'warn',levelData:[{l:{level:'L1'},views:['view:t1'],today:'2026-08-13'}],todayCount:1,totalPoints:3,latest:{id:'new'},search:'Glucose/L1',alerts:['alert'],missingToday:false}],marked:['t1/warn']});
 console.log('Dashboard test items TypeScript tests passed');

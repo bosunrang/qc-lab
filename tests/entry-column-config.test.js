@@ -11,7 +11,7 @@ const program = `
   console.log(JSON.stringify([select({ id: 'T1' }, 1, ''), select({ id: 'T1' }, 1, 'LOT-B'), select({ id: 'T1' }, 1, 'other')]));
 `;
 const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=module', '--eval', program], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
-assert.equal(result.status, 0, result.stderr || 'khÃ´ng thá»ƒ cháº¡y entry column config TypeScript');
+assert.equal(result.status, 0, result.stderr || 'không thể chạy entry column config TypeScript');
 const [base, parallel, missing] = JSON.parse(result.stdout);
 assert.deepEqual(base, { level: 1, lot: 'LOT-A', mean: 10, sd: 1, meanSdHistory: [{ mean: 9 }] });
 assert.deepEqual(parallel, { level: 1, lot: 'LOT-B', mean: 20, sd: 2, low: 16, high: 24, exp: '2027-01-01', meanSdHistory: [], applied: 'mfg' });

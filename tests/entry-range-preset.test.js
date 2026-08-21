@@ -9,6 +9,6 @@ const program = `
   console.log(JSON.stringify([entryRangePreset(30), entryRangePreset(365)]));
 `;
 const result = spawnSync(process.execPath, ['--no-warnings', '--input-type=module', '--eval', program], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
-assert.equal(result.status, 0, result.stderr || 'khÃ´ng thá»ƒ cháº¡y entry range preset TypeScript');
+assert.equal(result.status, 0, result.stderr || 'không thể chạy entry range preset TypeScript');
 assert.deepEqual(JSON.parse(result.stdout), [{ days: 30, start: null, end: null }, { days: 90, start: null, end: null }]);
 console.log('Entry range preset TypeScript tests passed');
