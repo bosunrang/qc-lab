@@ -9,7 +9,9 @@
   "scripts": {
     "start": "electron .",
     "dev": "npm run build:pilot && vite",
-    "build:pilot": "vite build",
+    "build:pilot": "vite build && npm run build:core && npm run build:worker",
+    "build:core": "vite build --config vite.core.config.mjs",
+    "build:worker": "tsc -p tsconfig.worker.json",
     "test": "node scripts/run-tests.js",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.modules.json",
     "visual-check": "node scripts/visual-check.js",

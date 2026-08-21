@@ -3729,7 +3729,7 @@ root.westgardWorkerMessage=event=>{
 root.ensureWestgardWorker=()=>{
   if(wgWorker)return wgWorker;if(typeof Worker!=='function'||wgWorkerFailed)return null;
   try{
-    wgWorker=new Worker('assets/workers/westgard-worker.js?v=rule-table-single-source-20260801-1');
+    wgWorker=new Worker('assets/workers/westgard-worker.js?v=ts-nhom-d-worker-20260820-1');
     wgWorker.onmessage=westgardWorkerMessage;
     wgWorker.onerror=()=>{wgWorkerFailed=true;wgWorkerPending.clear();if(wgWorker){try{wgWorker.terminate();}catch(e){/* worker đã chết */}wgWorker=null;}if(typeof page!=='undefined'&&page==='dash')setTimeout(()=>rerender(),0);};
     return wgWorker;

@@ -18,7 +18,7 @@ export type MultiLevelView = {
   [key: string]: unknown;
 };
 
-export function filterPoints(
+function filterPoints(
   points: ChartPoint[] | unknown,
   { start = '', end = '', lot }: { start?: string; end?: string; lot?: unknown } = {},
 ): ChartPoint[] {
@@ -105,7 +105,6 @@ export function sampleIndices({
 }
 
 export const chartViewModel = Object.freeze({
-  filterPoints,
   buildLeveyJennings,
   buildCusum,
   buildMultiLevel,

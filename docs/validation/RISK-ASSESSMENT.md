@@ -10,7 +10,7 @@ RPN = S × P × D. RPN ≥40 phải có hành động trước go-live.
 | R-03 | Gộp lô khi tính Sigma | 4/2/2 | 16 | Sigma cohort service và test single-lot |
 | R-04 | Tự duyệt CAPA | 4/2/2 | 16 | `createdByUserId`, chặn self-approval, re-auth |
 | R-05 | Sửa dữ liệu kỳ đã chốt | 5/2/2 | 20 | Period lock trong entry service, lý do mở khóa, re-auth |
-| R-06 | Backup tạo được nhưng không restore | 5/2/2 | 20 | Giới hạn 64 MB, test round-trip 34+ MB, restore drill định kỳ |
+| R-06 | Backup tạo được nhưng không restore | 5/2/2 | 20 | Giới hạn 128 MB, test round-trip 34+ MB, restore drill định kỳ |
 | R-07 | Mất dữ liệu khi ghi gián đoạn | 5/2/2 | 20 | IndexedDB slot A/B, manifest atomic, storage tests |
 | R-08 | Xung đột nhiều máy | 4/3/3 | 36 | 3-way merge theo phần tử, retry, offline/merge tests |
 | R-09 | UID ngoài phòng truy cập cloud | 5/2/2 | 20 | Default deny, ACL theo labCode/UID, rules contract test |
@@ -41,6 +41,11 @@ hành `minimatch` vá cho các nhánh 1.x/2.x, và ép `overrides: brace-expansi
 build hỏng. Kiểm soát: chấp nhận rủi ro, rà lại mỗi kỳ phát hành khi
 `npm run verify-release` in dòng "Build tooling audit", và chỉ dựng bản phát hành
 trên máy build được kiểm soát.
+
+Sửa 2026-08-21: R-06 ghi nhầm "Giới hạn 64 MB" — hằng số thật trong code
+(`BACKUP_IMPORT_MAX_BYTES`, `src/application/backup/backup-service.ts`) và
+`URS-16` đều là 128 MB, khớp `tests/backup-roundtrip.test.js` (chốt
+`maxBytes===128*1024*1024`). Đã sửa lại số trong bảng cho khớp.
 
 Cập nhật 2026-08-04: `npm audit` (nhánh devDependencies) phát hiện thêm advisory
 `fast-uri` GHSA-7p8r-x3mc-p8w7 (host confusion qua dấu `\` mở đầu authority, severity

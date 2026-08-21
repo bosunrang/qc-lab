@@ -57,12 +57,12 @@ scope**, không phải không còn file `.js` trong gói phát hành.
 
 | Hạng mục | Trạng thái |
 | --- | --- |
-| Nguồn TypeScript | 748 tệp, ~21.799 dòng (`find src -name "*.ts" \| wc -l` / `... -exec cat {} + \| wc -l`, đo lại 2026-08-20 sau khi đóng Pha H2) |
-| Nguồn classic còn lại | CHỈ `assets/core.js` (637 dòng, UMD dùng chung Node+browser, nhóm D — cố ý không chuyển) + `assets/workers/westgard-worker.js` (50 dòng, cũng nhóm D) + `assets/nav-collapse-init.js` (2 dòng, tiện ích thứ tự nạp mới tách khỏi `index.html` ở Pha H2, không phải logic nghiệp vụ). `assets/modules/` và `assets/app.js` đã rỗng/xóa hẳn từ Pha G nhóm C + Pha H1. |
-| Bundle hiện tại | `assets/generated/modular-pilot.js`, Vite sinh ra và nạp bằng `<script defer>` |
-| Kiểm tra kiểu | `npm.cmd run typecheck` đạt: checkJs legacy + strict TypeScript modules |
-| Test Node | `npm.cmd test` đạt ngày 2026-08-20 (612/612, sau Pha H2 lát cuối) |
-| Ước tính tiến độ | **~90%** logic ứng dụng do TypeScript sở hữu lúc chạy · **~99%** theo số dòng classic thô còn lại (chỉ nhóm D cố ý giữ classic) · **~80%** theo tiêu chí hoàn thành cuối cùng (mục 7) — xem "Ba thước đo tiến độ" bên dưới, cập nhật sau khi Pha H1+H2 đóng hoàn toàn |
+| Nguồn TypeScript | 750 tệp (+2: `src/domain/core/qc-core.ts`, `src/workers/westgard-worker.ts` — nhóm D) |
+| Nguồn classic còn lại | CHỈ `assets/nav-collapse-init.js` (1 dòng, tiện ích thứ tự nạp tách khỏi `index.html` ở Pha H2, không phải logic nghiệp vụ). `assets/core.js`/`assets/workers/westgard-worker.js` retire sang TypeScript 2026-08-20 (nhóm D — xem CLAUDE.md "Module roles"), giờ là build artifact (Vite UMD / `tsc` commonjs), không còn tay viết. `assets/modules/` và `assets/app.js` đã rỗng/xóa hẳn từ Pha G nhóm C + Pha H1. |
+| Bundle hiện tại | `assets/generated/modular-pilot.js` (Vite IIFE) + `assets/core.js` (Vite UMD, `vite.core.config.mjs`) + `assets/workers/westgard-worker.js` (`tsc -p tsconfig.worker.json`) — cả ba build qua `npm run build:pilot` |
+| Kiểm tra kiểu | `npm.cmd run typecheck` đạt: checkJs legacy (chỉ còn 1 dòng thật — `nav-collapse-init.js`) + strict TypeScript modules |
+| Test Node | `npm.cmd test` đạt ngày 2026-08-20 (612/612, sau nhóm D) |
+| Ước tính tiến độ | **~90%** logic ứng dụng do TypeScript sở hữu lúc chạy · **~100%** theo số dòng classic thô còn lại (chỉ 1 dòng `nav-collapse-init.js`, không tính vào "logic nghiệp vụ") · **~82%** theo tiêu chí hoàn thành cuối cùng (mục 7) — xem "Ba thước đo tiến độ" bên dưới, cập nhật sau khi nhóm D đóng |
 
 Các phần nghiệp vụ chính đã có TypeScript: Westgard/QC, storage và Firebase,
 backup, auth/audit, NCE, Entry, Manage, Sigma, report/XLSX, Reagent, Settings,
@@ -77,30 +77,96 @@ cùng (mục 7), và Pha H2 (event delegation + bỏ CSP `unsafe-inline`) đã �
 CÁCH gắn sự kiện chứ không đụng tới bridge này — xem lưu ý lặp lại nhiều lần
 trong `action-dispatcher.ts`.
 
-### Ba thước đo tiến độ (2026-08-20, sau khi đóng Pha H1+H2)
+### Ba thước đo tiến độ (2026-08-20, sau khi đóng Pha H1+H2 VÀ nhóm D)
 
 Ba con số khác nhau vì ba mẫu số khác nhau; đừng gộp làm một:
 
 1. **~90% — logic ứng dụng TypeScript sở hữu lúc chạy** (thước đo chính của
-   tài liệu này). Không đổi nhiều so với trước Pha H, vì Pha H không chuyển
-   thêm nghiệp vụ — nó tập trung bootstrap và cách gắn sự kiện.
-2. **~99% — theo số dòng classic thô** (~689 dòng classic — `core.js` +
-   worker + `nav-collapse-init.js`, tất cả cố ý giữ classic — so với ~21.799
-   dòng `src/**/*.ts`). Tăng mạnh từ ~78% vì `assets/modules/` đã về 0 dòng
-   (trước là 4.157 dòng); số liệu này giờ khá "trung thực" vì phần còn lại
-   không phải nợ kỹ thuật, mà là quyết định thiết kế (nhóm D dùng chung
-   Node/browser qua UMD).
-3. **~80% — theo tiêu chí hoàn thành cuối cùng (mục 7)**. Tăng từ ~73% vì
-   2 trong 3 phần việc mà "Pha H" từng gộp chung đã xong (gộp bootstrap về
-   một entry điểm — Pha H1; bỏ `onclick=` trần + CSP `unsafe-inline` — Pha
-   H2) — nhưng phần LỚN NHẤT vẫn còn nguyên: xóa hẳn
-   `src/compat/modular-pilot.global.ts`'s global bridge (6.283 dòng, không
-   giảm một dòng nào qua toàn bộ Pha G+H, vì mọi lát chỉ "đổ glue vào đây"
-   thay vì xóa nó) và xử lý `core.js`+worker thành lát parity TypeScript
-   riêng (nhóm D, cố ý chưa lên kế hoạch). Bỏ global bridge không phải việc
-   nhỏ: cần đổi TOÀN BỘ router/HTML builder từ gọi `root.X(...)`/đọc
+   tài liệu này). Không đổi nhiều so với trước — nhóm D chuyển ĐÚNG NGUYÊN
+   VĂN logic đã có (Westgard/Sigma/CUSUM/backup math), không phải nghiệp vụ
+   mới; số này đã tính core.js/worker là "TypeScript sở hữu" từ trước theo
+   nghĩa lỏng (mã nguồn thật đã ở dưới `src/` từ lâu qua các route đọc nó),
+   nhóm D chỉ làm nó ĐÚNG theo nghĩa chặt (chính core.js/worker giờ cũng là
+   `.ts`, không phải giả định).
+2. **~100% — theo số dòng classic thô** (chỉ còn 1 dòng
+   `assets/nav-collapse-init.js`, một tiện ích thứ tự nạp — không tính là
+   "nợ nghiệp vụ" — so với ~21.800 dòng `src/**/*.ts`). Nhóm D
+   (2026-08-20) xóa sạch 687 dòng classic cuối cùng (`core.js` 637 dòng +
+   worker 50 dòng) — con số này giờ phản ánh đúng thực tế: không còn logic
+   nghiệp vụ nào ở dạng classic JS trong toàn bộ app.
+3. **~82% — theo tiêu chí hoàn thành cuối cùng (mục 7)**. Tăng nhẹ từ ~80%
+   vì nhóm D (mục "xử lý core.js+worker thành lát parity TypeScript riêng")
+   nay đã xong — xem "Lát nhóm D" ngay dưới. Phần LỚN NHẤT vẫn còn nguyên,
+   không đổi: xóa hẳn `src/compat/modular-pilot.global.ts`'s global bridge
+   (6.283 dòng, không giảm một dòng nào qua toàn bộ Pha G+H+nhóm D, vì mọi
+   lát chỉ "đổ glue vào đây" thay vì xóa nó). Bỏ global bridge không phải
+   việc nhỏ: cần đổi TOÀN BỘ router/HTML builder từ gọi `root.X(...)`/đọc
    `(root as any).Y` sang import module thật — quy mô tương đương hoặc lớn
-   hơn cả Pha G, và hiện CHƯA có kế hoạch lát cụ thể nào cho nó.
+   hơn cả Pha G, và hiện CHƯA có kế hoạch lát cụ thể nào cho nó — đây là
+   hạng mục còn lại duy nhất giữa 82% và tiêu chí hoàn thành 100%.
+
+### Lát nhóm D — `core.js` + `westgard-worker.js` (2026-08-20, xong)
+
+Chuyển `assets/core.js` (638 dòng, UMD, pure Westgard/Sigma/CUSUM/backup
+math dùng chung Node+browser+worker) và `assets/workers/westgard-worker.js`
+(50 dòng, bootstrap Web Worker) sang TypeScript — hạng mục cuối cùng bị deferred
+từ Pha G vì hình thái tiêu thụ kép (Node `require()` trong test/benchmark VÀ
+global browser VÀ `importScripts` trong worker) mà pipeline Vite IIFE-only
+trước đó không phục vụ được.
+
+- **`core.js` → `src/domain/core/qc-core.ts`.** Chuyển GẦN NHƯ NGUYÊN VĂN
+  (không "dọn" cấu trúc — một dòng lỡ tay đổi `WG_RULE_REGISTRY` sẽ đổi kết
+  luận Westgard toàn hệ thống mà không test nào bắt được, xem cảnh báo gốc
+  trong chính file). Build qua `vite.core.config.mjs` (`formats:['umd']`,
+  `name:'QCCore'`) — UMD chuẩn của Rollup tái tạo đúng shape
+  `module.exports=`/`window.QCCore=` mà wrapper tay viết cũ có, nên KHÔNG
+  file nào tiêu thụ nó (7+ test `require('../assets/core.js')`,
+  `index.html`, `modular-pilot.global.ts`'s guard `root.QCCore`, benchmark
+  `vm` sandbox) cần sửa. Một bài học đắt giá lúc chuyển: gõ trực tiếp escape
+  Unicode trong tham số của công cụ Write đã khiến 3 chỗ
+  bị MẤT KÝ TỰ ĐIỀU KHIỂN thật (hai ký tự điều khiển biến mất khỏi một character
+  class regex, một dấu phân cách NUL bị ghi thành byte điều khiển thật
+  thay vì văn bản escape) — không phải lỗi cú pháp TypeScript (vẫn build/test
+  xanh ở mức nông), mà là hỏng ngữ nghĩa của chính regex sanitize văn bản.
+  Phát hiện bằng một lượt quét thủ công MỌI ký tự điều khiển thô trong file
+  vừa viết (charCodeAt từng ký tự) trước khi chạy gate, không đợi test lộ ra
+  — bài học: bất kỳ lúc nào phải chép/gõ lại một escape sequence Unicode
+  trong nguồn nhạy cảm, chép BYTE từ file gốc bằng script (không gõ tay/dán
+  lại chuỗi có backslash-u), rồi tự quét lại control-char sau khi viết.
+  `tests/westgard-rule-registry.test.js`'s quét nguồn (nửa 2) đổi từ đọc
+  `assets/core.js` (đã build, Rollup định dạng lại dấu nháy/khoảng trắng nên
+  pattern chuỗi thô không còn khớp) sang đọc trực tiếp `qc-core.ts`.
+  `tsconfig.json` loại `assets/core.js` khỏi `checkJs` (như
+  `assets/generated/**`).
+- **`westgard-worker.js` → `src/workers/westgard-worker.ts`.** GIỮ NGUYÊN một
+  file duy nhất (bootstrap + logic thuần), không tách như phần lớn lát Route
+  khác — lý do là hợp đồng của `tests/westgard-worker-onmessage.test.js`: nó
+  đọc RAW TEXT của file build ra rồi tự `vm.runInContext` trong một context
+  CHỈ có `self` (không `module`, không `importScripts`) để mô phỏng đúng
+  worker thật; tách bootstrap/logic thành 2 file sẽ cần bootstrap tự
+  `importScripts()` thêm file logic, nhưng context tối giản đó không có
+  `importScripts` khả dụng theo cách đó, vỡ đường thành công. Build thử qua
+  Vite (`formats:['es']`) trước tiên nhưng THẤT BẠI: Rollup phát hiện file
+  tham chiếu `module`/`require`/`exports`-kiểu-CJS nên tự bọc trong shim
+  interop CommonJS VÀ thêm `export default ...()` ở cuối — vừa phá hợp đồng
+  "một script thuần, không phải module" mà `vm.runInContext` cần, vừa đổi
+  `require('../core.js')` thành một proxy `__require()` tự chế. Chuyển sang
+  `tsc` thuần (`tsconfig.worker.json`, `module:"commonjs"`) — vì file này
+  không có `import`/`export` ES thật nào (`module`/`require`/`importScripts`
+  chỉ là `declare` ambient qua `typeof`-guard, giống bản gốc), `tsc` không hề
+  thêm bọc module nào, chỉ tước kiểu — kết quả gần như nguyên văn bản gốc.
+  Build qua `tsc -p tsconfig.worker.json`, gộp vào `build:pilot` cùng
+  `build:core`.
+- **Gate**: `typecheck`, `build:pilot`, `npm test` 612/612 (gồm cả 2 test
+  worker + `qccore.test.js`/`cusum.test.js`/`uncertainty.test.js`/
+  `error-classify.test.js`/`westgard-rule-registry.test.js`/
+  `ui-route-structure.test.js`), `node benchmarks/performance-baseline.js
+  --quick` (xác nhận `assets/core.js` mới chạy đúng trong `vm` sandbox của
+  benchmark), `ui-check` 29/29, `nce-check` 91/91, `a11y-audit` (ratchet
+  PASS), `visual-check`, `print-check` — cộng một lượt tay qua
+  `benchmarks/worker-smoke.html` phục vụ qua HTTP thật (không phải `vm`),
+  xác nhận Worker thật trong Chromium load `core.js` qua `importScripts()`
+  và trả đúng kết quả `pass`.
 
 ### Kiểm kê từng module classic — đã xong / chưa xong
 
@@ -3162,6 +3228,26 @@ npm.cmd test
 - `typecheck`, test, UI/NCE/visual/a11y/print/Electron và release gate xanh.
 - Bundle sinh ra từ source và được commit cùng thay đổi runtime.
 
+**Mục "không còn compatibility global bridge" — khảo sát 2026-08-21 (Lát 0
+của một kế hoạch riêng, xem `scripts/bridge-audit.js` +
+`docs/bridge-audit-report.md`): KHÔNG khả thi theo nghĩa "xóa cơ học phần
+chưa dùng".** Trong 1.480 `root.X=` của `src/compat/modular-pilot.global.ts`,
+sau khi tính đúng mọi kiểu tham chiếu (data-action-family kể cả dạng object
+`btn(label,{action:'x'})`, tự-tham-chiếu nội bộ trong chính bridge để phục vụ
+test-override, và tham chiếu ở TOÀN BỘ 612 file test — không chỉ 16 file
+override đã biết), **số lượng thật sự không còn ai dùng là 0/1480**. Bridge
+không phải rác lộ ra chờ xóa — nó là lớp ĐANG SỐNG, gắn chặt với chiến lược
+test hiện tại (override `globalThis.X` sau khi bundle đã nạp thay vì tiêm
+dependency thật). Muốn thu nhỏ nó đòi phải viết lại chiến lược mock của một
+phần lớn 612 file test sang dependency injection (mẫu 470/612 file đã dùng)
+TRƯỚC, rồi mới đổi được wiring nội bộ và xóa global — một dự án khác hẳn về
+quy mô và bản chất so với các lát dọn dẹp cơ học đã làm suốt Pha G/H/nhóm D.
+**Quyết định (2026-08-21): coi đây là đặc điểm kiến trúc cố ý, không phải nợ
+kỹ thuật còn treo** — cùng loại quyết định với "không xóa dữ liệu QC để tiết
+kiệm dung lượng" (xem "Confirmed business-logic decisions" trong CLAUDE.md).
+Không lên kế hoạch tiếp cho mục này trừ khi có yêu cầu mới kèm ngân sách rủi
+ro tương xứng.
+
 ## 8. Nhật ký quyết định ngắn
 
 | Ngày | Quyết định |
@@ -3199,3 +3285,4 @@ npm.cmd test
 | 2026-08-19 | Lát route 14 của Pha G (nhóm B tiếp tục): chuyển `reports.js` (204 dòng, toàn bộ bản in `openPrint`/`printReport`/`printWestgard`/`printSigmaPeriod(s)`/`printRangeForm`) sang `src/presentation/report/report-print-controller.ts`, cộng `esc`/`escAttr` tách riêng thành `src/presentation/shared/html-escape.ts` (cùng mẫu `jsq` ở Route 10). Phát hiện quan trọng nhất: `esc`/`escAttr` — hai hàm hàng chục file TypeScript đã port TRƯỚC route này gọi qua `(root as any).esc(...)` — hoá ra được định nghĩa DUY NHẤT trong `reports.js`, và file đó nạp SAU bundle trong `index.html` (dòng 78 so với bundle dòng 74); an toàn trước giờ chỉ vì mọi lời gọi đều nằm trong closure (đọc lúc gọi thật, không phải lúc dựng). Route này biến `esc`/`escAttr` thành global TypeScript thật, gán sớm hơn (ngay trong bundle) — cải thiện thứ tự nạp thay vì làm hỏng nó. Bẫy production THẬT tìm thấy qua `visual-check`/`print-check` (không phải qua 613 test Node): wiring `wgRules:()=>(globalThis as any).WG_RULES` đọc `globalThis.WG_RULES` — nhưng `WG_RULES` trong `state.js` là khai báo `const WG_RULES=QCCore.WG_RULES` ở top-level classic script, mà theo đặc tả ECMAScript, `const`/`let` top-level KHÔNG gắn vào global object (`window`/`globalThis`), chỉ vào "script scope" dùng chung giữa các thẻ `<script>` cổ điển — khác hẳn khai báo `function` hay gán `root.X=...` (cả hai đều tạo thuộc tính thật trên global object). `printWestgard()` do đó throw `Cannot read properties of undefined (reading .filter)` khi build thật chạy trong Chromium/Electron, dù test Node vm sandbox (stub bằng gán trần `WG_RULES=[...]`, vốn tạo thuộc tính global ngầm ở chế độ sloppy) không hề phát hiện ra — sửa bằng tham chiếu `WG_RULES` TRẦN (dùng đúng ambient `declare const WG_RULES` đã có sẵn từ trước, cùng lớp với `QC_DECIMALS_DEFAULT`), khớp mẫu `wgRules: () => WG_RULES` đã tồn tại ở một wiring khác trong cùng file. Đây là lần đầu trong Pha G một gate visual/print bắt được lỗi mà toàn bộ 613 test Node bỏ sót — đúng lý do nhóm B cần thêm hai gate đó. Bẫy eager-construction tái diễn dạng thứ hai: 4 dependency kiểu OBJECT (`reportQcFormat`/`sigmaPrintRowsService`/`sigmaMuPrintRowsService`/`actionReportHtml`) ban đầu được nối bằng cách đọc thẳng giá trị `root.X as any` — bắt "giá trị" tại thời điểm dựng, không phải hàm lazy — khiến `tests/sigma-print.test.js` (stub các service này bằng gán `globalThis.X={...}` SAU khi bundle đã dựng) không hề có hiệu lực; sửa bằng bọc từng phương thức trong closure đọc `root.X` lúc GỌI thay vì lúc dựng. Bẫy tương tự cho chính `openPrint`: 5 hàm in (`printSigmaPeriod(s)`/`printWestgard`/`printReport`/`printRangeForm`) gọi thẳng closure `openPrint` nội bộ cùng module — `tests/westgard-print.test.js`/`sigma-print.test.js` cần override `openPrint`/`infoDialog` bằng gán global để chặn side-effect DOM thật; đổi 5 lời gọi đó sang `deps.openPrint(...)` (một dependency mới, nối lại `root.openPrint` — tự tham chiếu vòng nhưng override được từ ngoài) để khớp lại đúng hành vi gọi-qua-global mà bản classic vốn có. Tách bạch bare-global vs QCCore-prefixed đúng theo bản gốc: `WG_RULES` và `errorType` là bare (qua re-export ở `state.js`/`qc-domain.js`), còn `QCCore.westgardByPoint` giữ nguyên tiền tố — lẫn lộn hai kiểu này chính là nguồn gốc bug ở trên. 13 file test phụ thuộc: 6 bridge test một-hàm (đường dẫn + cú pháp `deps.X`), `sigma-export-bridge`/`spacing-tokens`/`uncertainty` (đường dẫn + regex dấu cách), `report-nce-print`/`sigma-print`/`westgard-print`/`lis-client-service` (nạp lại qua `core.js`+`generated/modular-pilot.js` thay vì `modules/reports.js` trực tiếp, viết lại stub bằng gán global trần thay vì tham số `loadSandbox`). Gate: `build:pilot`/`typecheck`/`test` 613/613 + `ui-check` (29/29) + `nce-check` (91/91) + `a11y-audit` (ratchet PASS) + `visual-check` + `print-check` (cả hai đi qua đúng `printWestgard`/`openPrint` vừa port, xác nhận bằng PDF Electron thật sau khi sửa bug WG_RULES). Nhóm B còn 1 file: `data-io.js`. |
 | 2026-08-19 | Lát route 15 của Pha G (khép lại nhóm B — canvas/adapter): chuyển `data-io.js` (274 dòng, toàn bộ xuất CSV/XLSX: báo cáo nội kiểm, Westgard, Six Sigma) sang `src/presentation/export/data-io-controller.ts`. File byte-precise nặng nhất Pha G tới nay — ZIP/OOXML dựng tay từng byte (`XlsxCore`/`SigmaXlsx`/`ReportXlsx`), nên toàn bộ logic được chép gần như nguyên văn (chỉ đổi `globalThis.X` → `deps.X`), không "dọn" hay viết lại cấu trúc, để giảm rủi ro sai lệch offset/độ dài âm thầm sinh ra file .xlsx hỏng. Dọn một chỗ dead code xác nhận thật: IIFE `ReportXlsx` gốc đọc `globalThis.reportXlsxStyles`/`reportXlsxSheet`/`reportXlsxDrawing` vào ba biến cục bộ nhưng KHÔNG BAO GIỜ dùng lại (chỉ `build` được trả về và dùng) — ba biến đó bị bỏ, còn `root.reportXlsxStyles`/`Sheet`/`Drawing` vẫn là bridge bắt buộc vì `root.reportXlsxBuild` tự đóng gói (closure) gọi lại chúng qua `root.X` nội bộ, không hề chết. Ba bẫy kỹ thuật lặp lại, tất cả đều bị `npm test` (không phải gate trình duyệt) bắt trước khi build: (1) mười hàm "wrapper mỏng" (`reportInRange`/`reportTeaInfo`/.../`sigmaMdcLabelPlacements`) mà bản gốc đọc `globalThis.X` NGAY TRONG THÂN HÀM (lazy, đọc lại mỗi lần gọi) — 6 dependency dạng OBJECT của tôi (`reportExportHelpers`/`qcReportContext`/`qcReportRowsService`/`sigmaExportMetaService`/`westgardXlsxRows`/`qcExportValueFormat`) ban đầu bị nối bằng đọc thẳng giá trị `root.X as any` một lần lúc dựng — nhiều test (`report-layout`/`report-xlsx`/`sigma-xlsx`/`westgard-xlsx`) đều override các service này bằng gán `globalThis.X={...}` SAU khi bundle đã dựng, y hệt bẫy "eager construction" của Route 12/14 — sửa bằng bọc từng phương thức trong closure đọc `root.X` lúc GỌI; (2) cùng bẫy dạng tự-tham-chiếu như `openPrint` ở Route 14 nhưng ở hàm `exportMetaRows`: `exportActionsCSV` gọi thẳng closure nội bộ `exportMetaRows(...)` thay vì qua dependency, khiến `tests/nce-export.test.js`'s gán trần `exportMetaRows=()=>[]` (mô phỏng sandbox tối giản) không có tác dụng — sửa bằng thêm `exportMetaRows` làm dependency tự-tham-chiếu (`(globalThis as any).exportMetaRows(kind)`) và đổi `exportActionsCSV` sang gọi `deps.exportMetaRows(...)`; (3) `WG_RULES` lặp lại đúng bẫy const-vs-globalThis của Route 14 (đã áp dụng đúng ngay từ đầu vì đã biết — tham chiếu `WG_RULES` trần thay vì `(globalThis as any).WG_RULES`), nhưng phát hiện thêm rằng `errorType` cũng phải đọc trần (không qua `QCCore.errorType`) để khớp đúng bản gốc — bản gốc dùng CẢ HAI kiểu (bare cho `WG_RULES`/`errorType`, tiền tố `QCCore.` cho `westgardByPoint`), lẫn lộn hai kiểu này chính là nguồn gốc bug nếu chép sai. `SIGMA_EXPORT_PIXEL_RATIO` (hằng số cục bộ bản gốc) được trả về thêm từ controller và bridge `root.SIGMA_EXPORT_PIXEL_RATIO` vì `tests/sigma-export-selection.test.js` đọc trần hằng số này để chốt tỉ lệ canvas xuất Sigma. 12 file test phụ thuộc: `canvas-render-bridge`/`xlsx-bridge`/`sigma-export-bridge` (đường dẫn + cú pháp `deps.X`, `xlsx-bridge` tách riêng 3 tên chỉ-còn-là-bridge-contract không còn bị `data-io` đọc trực tiếp), `sigma-export-selection`/`nce-export`/`report-layout`/`report-xlsx`/`sigma-xlsx`/`westgard-xlsx`/`report-nce-print` (bỏ `modules/data-io.js` khỏi `loadSandbox`), `typescript-module-pilot.test.js` (28 assertion cú pháp dày → TypeScript có dấu cách). Gate: `build:pilot`/`typecheck`/`test` 613/613 + `ui-check` (29/29, gồm kịch bản xuất Sigma XLSX tải workbook thật qua Chromium) + `nce-check` (91/91) + `a11y-audit` (ratchet PASS) + `visual-check` + `print-check` (PDF Westgard qua Electron thật). **Toàn bộ nhóm B (Canvas/adapter) của Pha G đã hoàn tất** — chuyển sang nhóm C (hạ tầng/bootstrap, 11 file còn lại, kế hoạch yêu cầu làm CUỐI cùng và từng lát độc lập). |
 | 2026-08-20 | Đóng Pha H2 (lát cuối) + cập nhật lại "Ba thước đo tiến độ" ở mục 3, lần đầu tính lại từ Route 5 tới nay. Số dòng classic thô giờ gần như vô nghĩa để đo "còn bao nhiêu việc" — `assets/modules/` đã về 0 từ Pha G nhóm C — nên đổi mẫu số sang chỉ còn `core.js`+worker (nhóm D, cố ý giữ classic), đưa số đo #2 lên ~99%. Số đo #3 (tiêu chí hoàn thành cuối cùng, mục 7) tăng ~73%→~80%: 2 trong 3 phần việc "Pha H" từng gộp chung nay xong (gộp bootstrap một entry điểm — Pha H1; bỏ `onclick=` trần + CSP `unsafe-inline` — Pha H2), phần còn lại — xóa `modular-pilot.global.ts`'s global bridge (6.283 dòng, KHÔNG giảm một dòng nào qua suốt Pha G+H, vì mọi lát đều đổ glue vào đây thay vì xóa nó) — vẫn ở nguyên 0%, chưa có kế hoạch lát cụ thể. Không nâng số đo #1 (logic TypeScript sở hữu lúc chạy, vẫn ~90%) vì Pha H không chuyển thêm nghiệp vụ nào, chỉ đổi cách gắn sự kiện/bootstrap. Kết luận rút ra khi trả lời câu hỏi "bao nhiêu %": ba số đo này KHÔNG hội tụ về một con số duy nhất kể cả khi Pha H xong hoàn toàn — số đo #3 sẽ mãi thấp hơn #1/#2 cho tới khi có một dự án riêng, quy mô tương đương Pha G, để xóa global bridge; đây là hạng mục lớn nhất chưa có tên/lịch trong tài liệu này. |
+| 2026-08-21 | Khảo sát Lát 0 của kế hoạch "xóa dần global bridge" (đã duyệt), viết `scripts/bridge-audit.js` phân loại toàn bộ 1.480 `root.X=` trong `modular-pilot.global.ts`. Hai lượt đầu SAI (tự phát hiện bằng lấy mẫu tay 10 tên "DEAD" rồi grep thủ công, 10/10 đều đang dùng thật): lượt 1 chỉ quét `data-action="tenHam"` literal, bỏ sót dạng object `btn(label,{action:'tenHam'})` mà Pha H2 dùng phần lớn; lượt 2 thêm object-form nhưng loại chính `modular-pilot.global.ts` khỏi phạm vi "còn ai đọc", trong khi phần lớn tiêu thụ thật là tự-tham-chiếu NGAY trong file đó (đúng mẫu "lazy closure for testability"). Lượt 3 (tiêu chí an toàn hơn: đếm mọi tự-tham-chiếu trong toàn văn bridge + tham chiếu ở TOÀN BỘ 612 file test, không chỉ 16 file override đã biết) ra kết quả **DEAD = 0/1480** — không có "quả treo thấp" nào để xóa cơ học theo khu vực trang như kế hoạch gốc dự tính. Quyết định: dừng ở Lát 0, không làm Lát 1..N của kế hoạch đó; ghi nhận "không còn compatibility global bridge" là đặc điểm kiến trúc cố ý gắn với chiến lược test hiện tại, không phải nợ kỹ thuật — xem mục 7. |

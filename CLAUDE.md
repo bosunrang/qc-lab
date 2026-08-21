@@ -133,18 +133,30 @@ desktop print path on Linux, an OS the product never runs on.
 
 `npm run coverage-map` (`scripts/coverage-map.js`) runs the whole suite under
 Node's built-in `NODE_V8_COVERAGE` — no extra dependency — and writes
-`docs/coverage-map.md`: percent of each `assets/**/*.js` executed, which files no
-test loads at all, and the names+lines of functions never executed. It is
-deliberately **not a gate**: no thresholds, and it only exits non-zero if the test
-suite itself fails or no coverage data was found. Two things to know when reading
-it: V8's offsets are source *character* offsets (not UTF-8 bytes — this codebase is
-full of Vietnamese, so the two differ a lot), and render modules can only run their
-pure halves inside the `vm` sandbox, so a low number there is the sandbox boundary,
-not test debt. The 2026-08-01 baseline: 40.5% overall, 9 files never loaded by any
-test, `sigma.js` at 26.9% (all UI) with 49 never-executed functions, and the TEa
-layer it was split into (`sigma-tea.js`) at 90.4% with none. That contrast is the
-map's whole point: before the split those two numbers were averaged into one
-uninformative 34.4%.
+`docs/coverage-map.md`. **Rewritten 2026-08-21**: the original (2026-08-01)
+version only measured `assets/**/*.js`, which made sense when most business
+logic still lived there as classic JS; after nhóm D closed the migration,
+`assets/**/*.js` is down to 3 build artifacts + a 1-line boot utility, so
+measuring only that told you almost nothing. The tool now reports two
+sections: **(A) `src/**/*.ts`** — measured directly from the real script URL
+each test process reports (the ~450 test files that `spawnSync(process.execPath,
+['--input-type=module', ...])` a single `.ts` file inherit `NODE_V8_COVERAGE`
+from the parent and V8 reports coverage keyed by that file's own path, no
+sourcemap needed); **(B) `assets/**/*.js`** — the ~61 `vm`-sandbox tests
+(`tests/helpers/sandbox.js`) still only exercise the *built* bundle/`core.js`/
+worker, and since none of those builds emit a sourcemap, section B cannot map
+back to individual `.ts` lines — it only tells you whether the bundle's own
+wiring ran at all, not which business function is untested (that question
+belongs to section A). It is still deliberately **not a gate**: no thresholds,
+exits non-zero only if the test suite itself fails or no coverage data was
+found at all. V8's offsets are source *character* offsets (not UTF-8 bytes —
+this codebase is full of Vietnamese, so the two differ a lot). The 2026-08-21
+baseline after the rewrite: section A 22.5% over 750 files with 279 never
+loaded by any direct-import test — expect this, not a red flag: the files at
+the top of that never-loaded list are exactly the large `*-page-controller.ts`/
+`modular-pilot.global.ts` factory files that are only ever exercised *indirectly*
+through the wired bundle (section B), never imported standalone by a test;
+section B separately shows 49.7% across the 3 real build artifacts.
 
 ### Visual/print and accessibility checks
 
@@ -321,21 +333,29 @@ TypeScript modules the bundle imports. `assets/app.js` (the boot entry point)
 retired the same way on 2026-08-20 (Pha H1, lát 1) — `root.boot` is now
 registered via `document.addEventListener('DOMContentLoaded', ...)` at the
 end of the bundle rather than a classic script that just calls `boot()` at
-load time; see "Module roles" below. There is still no namespacing at the
+load time; see "Module roles" below. `assets/core.js` itself retired to
+TypeScript the same day (nhóm D, closing the migration's last classic-app
+file — see "Module roles" → `core.js` for the build-pipeline detail), so as
+of this writing the ONLY hand-written classic JS left anywhere in the app is
+`assets/nav-collapse-init.js` (1 line, a boot-order utility, not business
+logic — see "CSP + SRI" below). There is still no namespacing at the
 global-scope boundary — when adding a global (a bare `root.X=` in the
-bundle, or a `function` in the one remaining classic file, `core.js`) check
-the name isn't already taken; a collision silently replaces the other
-binding and only surfaces weeks later, so
-`tests/global-name-uniqueness.test.js` scans `core.js` AND the generated
+bundle, or an `export`ed name in `src/domain/core/qc-core.ts`, which is
+`assets/core.js`'s TypeScript source) check the name isn't already taken; a
+collision silently replaces the other binding and only surfaces weeks later,
+so `tests/global-name-uniqueness.test.js` scans `core.js` AND the generated
 bundle and fails on duplicates. If you reorder the 2 remaining `<script>`
 tags in `index.html`, you can still break forward references.
 
-`assets/core.js` is the one exception: it's wrapped in a UMD shim
-(`(function(root, factory){...})`) so it also works via `require()` — that's
-what makes it usable from both the browser (as `window.QCCore`) and Node test
-files (`require('../assets/core.js')`). It holds pure, side-effect-free domain
-math (stats, Westgard rule evaluation, Sigma metric, measurement uncertainty,
-CUSUM, backup validation/sanitization) with no DOM or state dependency — new pure
+`assets/core.js` is the one exception: it's wrapped in a UMD shim so it also
+works via `require()` — that's what makes it usable from both the browser
+(as `window.QCCore`) and Node test files (`require('../assets/core.js')`).
+Since 2026-08-20 (nhóm D) this file is a Vite build artifact, not hand-written
+— see "Module roles" → `core.js` for the source path and build command; the
+UMD shape itself is unchanged, generated by Rollup's own UMD template instead
+of a hand-written wrapper. It holds pure, side-effect-free domain math (stats,
+Westgard rule evaluation, Sigma metric, measurement uncertainty, CUSUM, backup
+validation/sanitization) with no DOM or state dependency — new pure
 calculations belong here, not in the bundle's `state`/Westgard wiring (former
 classic `state.js`/`qc-domain.js`, retired 2026-08-20 — see "Module roles").
 
@@ -422,7 +442,53 @@ Google Fonts link, offline labs must print with correct metrics.
   `tests/westgard-rule-registry.test.js` pins both halves: every derived list must
   match the registry, and **no source file outside `core.js` may spell out three or
   more rule ids** (a text scan, like `button-conventions.test.js`; 1–2 ids is
-  legitimate single-rule logic).
+  legitimate single-rule logic — the registry-list scan itself now reads
+  `src/domain/core/qc-core.ts` rather than the built `assets/core.js`, see
+  below). **Retired to TypeScript 2026-08-20 (nhóm D, the last classic-app
+  file — `assets/workers/westgard-worker.js` retired the same day, see its own
+  bullet below).** Source is `src/domain/core/qc-core.ts` — a near-verbatim
+  port (deliberately not "cleaned up" while porting, for the same reason
+  `data-io.js`'s Route 15 wasn't: a misplaced line here silently changes a
+  Westgard verdict app-wide with no test catching it, so minimizing the diff
+  minimizes that risk) with real ES `export`s instead of the classic
+  `return{...}` object, and mostly `any`-typed parameters — matching this
+  repo's typecheck philosophy (catch typos/arity errors, not model every
+  dynamic JSON shape precisely) rather than attempting a rigorous type system
+  for `sanitizeBackup()`/`validateBackup()`/`validateStateInvariants()`'s
+  deliberately-loose input shapes. Built by `npm run build:core`
+  (`vite build --config vite.core.config.mjs`, folded into `build:pilot`),
+  `formats:['umd']`, `name:'QCCore'` — Rollup's own UMD template reproduces
+  the same `module.exports=`/`window.QCCore=` dual shape the hand-written
+  wrapper used to provide, so every consumer (`index.html`'s script tag, the
+  7+ `require('../assets/core.js')` test files, `modular-pilot.global.ts`'s
+  `root.QCCore` guard, the `vm`-sandboxed benchmarks) needed zero changes.
+  `tsconfig.json` excludes the built `assets/core.js` from `checkJs` (like
+  `assets/generated/**`) — its real type-checking now happens on the `.ts`
+  source under `tsconfig.modules.json`'s `strict:true`.
+- `assets/workers/westgard-worker.js` — the Westgard-evaluation Web Worker
+  bootstrap (see below, "Westgard rule wiring" bullet, for when it's used and
+  what `computeWestgardJob`/`ruleAction`/etc. do). Retired to TypeScript
+  2026-08-20 (nhóm D) as `src/workers/westgard-worker.ts` — kept as ONE file,
+  bootstrap and pure logic together, deliberately NOT split the way most other
+  route retirements were: `tests/westgard-worker-onmessage.test.js` reads this
+  file's raw built TEXT and `vm.runInContext`s it directly in a context
+  containing only `self` (no `module`, no `importScripts`) to exercise the
+  real `self.onmessage` path a plain Node `require()` never reaches — splitting
+  bootstrap from logic into two files would mean the built bootstrap needs a
+  second `importScripts()` to reach the logic, which that minimal `vm` context
+  doesn't support, breaking the test's success path. Built by
+  `npm run build:worker` (`tsc -p tsconfig.worker.json`, folded into
+  `build:pilot`) rather than Vite: Vite/Rollup's ES-module output wraps any
+  file that references `module`/`require`/`exports`-like identifiers in a
+  CommonJS-interop shim and appends a top-level `export default ...` — which
+  broke both the "plain script, not a module" contract `vm.runInContext` needs
+  and silently changed `require('../core.js')` into a custom `__require()`
+  proxy shim. Plain `tsc` targeting `module:"commonjs"` for this one file
+  (which has zero real `import`/`export` statements — `module`/`require`/
+  `importScripts` are just `declare`d ambient identifiers referenced through
+  `typeof` guards, exactly like the original hand-written file) emits an
+  almost byte-identical file, since TypeScript only adds module-wrapper
+  boilerplate when a file actually contains `import`/`export` syntax.
 - `QCLAB_APP`/`QCLAB_CLOUD` — sets `window.QCLAB_APP` (name/version/releaseDate
   — bump both per `docs/validation/RELEASE-PUBLISH.md`) and `window.QCLAB_CLOUD`
   (Firebase config, `labCode`, `anonymous`/`locked` flags). Contains the live

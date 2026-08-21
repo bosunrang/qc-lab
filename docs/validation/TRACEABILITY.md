@@ -3,7 +3,7 @@
 | URS | Thành phần chính | Bằng chứng tự động |
 |---|---|---|
 | 01–02 | state, entry service, target matrix, `rangeCandidate()` | entry-service, target-matrix, lot-rename, range-candidate tests |
-| 03 | core, qc-domain, worker | qccore, qc-rules, westgard-worker/action, westgard-rule-registry, derived-cache tests |
+| 03 | core, qc-domain, worker | qccore, qc-rules, westgard-worker/action, westgard-rule-registry, derived-cache, westgard-reference-verdicts (đối chiếu nguồn ngoài westgard.com/WHO, không chỉ tự-đối-chiếu implementation) tests |
 | 04 | parallel lot/transition | parallel-lot-run, lot-transition tests |
 | 05 | draw, chart view-model, core CUSUM | cusum, chart-view-model, render-downsampling |
 | 06–07 | entry/action workflow | entry-service, action-workflow-service tests; `npm run nce-check` (vòng đời hồ sơ NCE trong trình duyệt thật) |

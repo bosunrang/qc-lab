@@ -96,9 +96,13 @@ for (const file of jsFiles(assetsDir)) {
   );
 }
 
-// core.js phải khai đúng một dòng registry cho mỗi luật (không có mảng phụ nào
-// còn sót lại liệt kê song song).
-const coreSrc = fs.readFileSync(path.join(assetsDir, 'core.js'), 'utf8');
+// core.js (nhóm D, 2026-08-20: bây giờ là build artifact Vite từ
+// src/domain/core/qc-core.ts, xem vite.core.config.mjs) phải khai đúng một
+// dòng registry cho mỗi luật (không có mảng phụ nào còn sót lại liệt kê song
+// song). Quét NGUỒN THẬT (qc-core.ts), không phải assets/core.js đã build —
+// Rollup định dạng lại dấu nháy/khoảng trắng của object literal khi build nên
+// pattern chuỗi thô chỉ còn khớp trên nguồn chưa qua build.
+const coreSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'domain', 'core', 'qc-core.ts'), 'utf8');
 // Escape kiểu danh-sách-trắng: id luật hiện chỉ có chữ/số/gạch ngang, nhưng một id
 // tương lai kiểu "1-3.5s" mà không escape thì dấu chấm thành ký tự đại diện và phép
 // đếm "đúng 1 dòng" âm thầm hết chặt. Escape MỌI ký tự ngoài [\w-] nên không phải
@@ -106,7 +110,7 @@ const coreSrc = fs.readFileSync(path.join(assetsDir, 'core.js'), 'utf8');
 const reEscape = s => s.replace(/[^\w-]/g, m => '\\' + m);
 for (const id of IDS) {
   const rows = [...coreSrc.matchAll(new RegExp(`\\{id:'${reEscape(id)}'`, 'g'))];
-  assert.equal(rows.length, 1, `core.js: luật ${id} phải có đúng 1 dòng trong WG_RULE_REGISTRY, thấy ${rows.length}`);
+  assert.equal(rows.length, 1, `qc-core.ts: luật ${id} phải có đúng 1 dòng trong WG_RULE_REGISTRY, thấy ${rows.length}`);
 }
 
 console.log('Westgard rule registry tests passed');
