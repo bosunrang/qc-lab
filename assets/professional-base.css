@@ -511,11 +511,11 @@ aside{
 }
 
 .nav-group{
-  margin:14px 12px 6px; color:#8fa2ad; font-size:var(--type-overline); font-weight:800;
+  margin:14px 12px 6px; color:#8fa2ad; font-size:var(--type-meta); font-weight:800;
 }
 
 nav button{
-  padding:9px 12px;border-radius:var(--radius-lg);font-weight:650;color:#c6d3da;transition:background .14s ease, color .14s ease, border-color .14s ease;font-size:var(--type-body-sm);gap:10px;min-height:42px;
+  padding:9px 12px;border-radius:var(--radius-lg);font-weight:650;color:#c6d3da;transition:background .14s ease, color .14s ease, border-color .14s ease;font-size:var(--type-subhead);gap:10px;min-height:42px;
 }
 
 nav button:hover{
