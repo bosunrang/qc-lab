@@ -1460,9 +1460,8 @@ dependencies, no HL7/ASTM) that lets an analyzer's existing middleware push QC
 results into QC Lab — it is **not** part of the Electron app (`package.json`
 `build.files` excludes `lis-gateway/` and `scripts/`) and only runs from the
 source tree via `npm run lis:gateway`. It is explicitly out-of-scope in
-`docs/validation/URS.md` (prototype/research, not in `TRACEABILITY.md`); see
-`docs/lis-bridge-prototype.md` for the full write-up. Direction was reversed
-once (`5d1a061`, "đảo chiều"): the original design had the gateway push QC
+`docs/validation/URS.md` (prototype/research, not in `TRACEABILITY.md`).
+Direction was reversed once (`5d1a061`, "đảo chiều"): the original design had the gateway push QC
 accept/review/held gatekeeping status out toward the LIS so it could hold
 patient results — that required the LIS vendor to change their release
 workflow, which was infeasible, so the gateway now only **receives** QC
