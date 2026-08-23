@@ -40,7 +40,7 @@ export function createWestgardPageController(deps: {
   westgardModeTabs: { chart: (mode: string) => string; view: (mode: string, count: number) => string };
   westgardCusumLevels: (test: AnyRec) => AnyRec[];
   westgardCusumPageHtml: (input: AnyRec) => string;
-  westgardRowsWindow: (rows: AnyRec[], expanded: boolean, initial: number) => AnyRec;
+  westgardRowsWindow: (rows: AnyRec[], visibleCount: number, initial: number) => AnyRec;
   westgardRowsControl: (view: AnyRec, key: string, initial: number) => string;
   westgardLotBlockHtml: (input: AnyRec) => string;
   westgardArchivedMultiViews: (rows: AnyRec[], points: (t: AnyRec, level: AnyRec, lotNo: AnyRec) => AnyRec[]) => AnyRec[];
@@ -62,8 +62,8 @@ export function createWestgardPageController(deps: {
   const wgSetArchivedGroup = (id: string) => { const next = deps.westgardUiState.archivedGroup(id); deps.ui().wgArchivedGroupId = next.groupId; deps.ui().wgArchivedTestId = next.testId; deps.rerender(); };
   const wgSetArchivedTest = (id: string) => { if (!id) return; const next = deps.westgardUiState.archivedTest(id); deps.ui().wgArchivedTestId = next.testId; deps.rerender(); };
   const wgViewModeTabs = (archivedGroups: AnyRec[]) => deps.westgardModeTabs.view(deps.ui().wgViewMode, archivedGroups.length);
-  const wgRowsWindow = (rows: AnyRec[], key: string) => deps.westgardRowsWindow(rows, deps.ui().wgExpandedRows.has(key), WG_TABLE_INITIAL_ROWS);
-  const wgToggleRows = (key: string) => { deps.ui().wgExpandedRows = deps.westgardUiState.toggleOpen(deps.ui().wgExpandedRows, key); deps.rerender(); };
+  const wgRowsWindow = (rows: AnyRec[], key: string) => deps.westgardRowsWindow(rows, deps.ui().wgVisibleRows.get(key) || WG_TABLE_INITIAL_ROWS, WG_TABLE_INITIAL_ROWS);
+  const wgLoadMoreRows = (key: string, next: number) => { const ui = deps.ui(); if (next <= WG_TABLE_INITIAL_ROWS) ui.wgVisibleRows.delete(key); else ui.wgVisibleRows.set(key, next); deps.rerender(); };
   const wgRowsControl = (view: AnyRec, key: string) => deps.westgardRowsControl(view, key, WG_TABLE_INITIAL_ROWS);
   const wgLotBlock = (t: AnyRec, level: number, lotNo: string, mean: number, sd: number, pts: AnyRec[], badge: string, titleMain: string, lotLabel: string, extraMeta = '') =>
     deps.westgardLotBlockHtml({ test: t, level, lotNo, mean, sd, points: pts, badge, title: titleMain, lotLabel, extraMeta });
@@ -160,5 +160,5 @@ export function createWestgardPageController(deps: {
     deps.scheduleSearchRender(wgFilterArchivedTests, () => { deps.rerender(); }, 'wgArchivedTestSearch');
   };
 
-  return { wgMultiViews, wgTogglePrevLot, wgArchivedGroups, wgSetViewMode, wgSetChartMode, wgChartModeTabs, pageWestgardCusum, wgSetArchivedGroup, wgSetArchivedTest, wgViewModeTabs, wgRowsWindow, wgToggleRows, wgRowsControl, wgLotBlock, wgArchivedMultiViews, wgArchivedGroupMatches, pageWestgardArchived, pageWestgard, wgFilterTests, wgFilterArchivedTests };
+  return { wgMultiViews, wgTogglePrevLot, wgArchivedGroups, wgSetViewMode, wgSetChartMode, wgChartModeTabs, pageWestgardCusum, wgSetArchivedGroup, wgSetArchivedTest, wgViewModeTabs, wgRowsWindow, wgLoadMoreRows, wgRowsControl, wgLotBlock, wgArchivedMultiViews, wgArchivedGroupMatches, pageWestgardArchived, pageWestgard, wgFilterTests, wgFilterArchivedTests };
 }

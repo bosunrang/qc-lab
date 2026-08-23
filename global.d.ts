@@ -24,7 +24,7 @@ declare var pointsCache: Map<string, any>, pointsIndexCache: Map<string, any>, p
 
 // --- UI state accessors (cài từ modular compatibility artifact) ---
 declare var selTest: any, statusMemo: any, wgTestQ: any, dashTestQ: any, dashTestStatus: any,
-  wgPrevOpen: any, wgExpandedRows: any, wgViewMode: any, wgArchivedGroupId: any,
+  wgPrevOpen: any, wgVisibleRows: any, wgViewMode: any, wgArchivedGroupId: any,
   wgArchivedTestId: any, wgArchivedTestQ: any, wgChartMode: any;
 declare var currentUser: any;
 declare var page: string;

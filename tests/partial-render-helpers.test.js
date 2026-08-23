@@ -31,19 +31,27 @@ const rowWindow = run(ctx, `
   (function(){
     var rows=Array.from({length:250},function(_,i){return{id:i};});
     var compact=wgRowsWindow(rows,'current:T1|1|L1');
-    wgExpandedRows.add('current:T1|1|L1');
+    wgVisibleRows.set('current:T1|1|L1', 240);
+    var loadedMore=wgRowsWindow(rows,'current:T1|1|L1');
+    wgVisibleRows.set('current:T1|1|L1', 250);
     var expanded=wgRowsWindow(rows,'current:T1|1|L1');
+    wgVisibleRows.delete('current:T1|1|L1');
+    var collapsedBack=wgRowsWindow(rows,'current:T1|1|L1');
     var short=wgRowsWindow(rows.slice(0,40),'short');
     return{
       compact:{length:compact.rows.length,first:compact.rows[0].id,last:compact.rows[compact.rows.length-1].id,total:compact.total,limited:compact.limited},
+      loadedMore:{length:loadedMore.rows.length,first:loadedMore.rows[0].id,total:loadedMore.total,limited:loadedMore.limited},
       expanded:{length:expanded.rows.length,first:expanded.rows[0].id,total:expanded.total,limited:expanded.limited},
+      collapsedBack:{length:collapsedBack.rows.length,total:collapsedBack.total,limited:collapsedBack.limited},
       short:{length:short.rows.length,limited:short.limited}
     };
   })()
 `);
 const windowValue = JSON.parse(JSON.stringify(rowWindow));
 assert.deepEqual(windowValue.compact, { length: 120, first: 130, last: 249, total: 250, limited: true });
+assert.deepEqual(windowValue.loadedMore, { length: 240, first: 10, total: 250, limited: true });
 assert.deepEqual(windowValue.expanded, { length: 250, first: 0, total: 250, limited: false });
+assert.deepEqual(windowValue.collapsedBack, { length: 120, total: 250, limited: true });
 assert.deepEqual(windowValue.short, { length: 40, limited: false });
 
 const entryWindow = run(ctx, `

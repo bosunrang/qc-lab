@@ -14609,13 +14609,15 @@
 	//#endregion
 	//#region src/presentation/westgard/westgard-rows-control.ts
 	function createWestgardRowsControl(deps) {
-		return (view, key, initialRows) => {
+		return (view, key, initialRows, step = initialRows) => {
 			if (view.total <= initialRows) return "";
-			const label = view.expanded ? `Thu gọn còn ${initialRows} điểm` : `Xem toàn bộ ${view.total} điểm`;
-			const suffix = view.expanded ? "" : " mới nhất";
+			const hasMore = view.visibleCount < view.total;
+			const next = hasMore ? Math.min(view.visibleCount + step, view.total) : initialRows;
+			const label = hasMore ? `Tải thêm ${next - view.visibleCount} điểm` : `Thu gọn còn ${initialRows} điểm`;
+			const suffix = hasMore ? " mới nhất" : "";
 			return `<div class="wg-row-window"><span>Đang hiển thị ${view.rows.length}/${view.total} điểm${suffix}</span>${deps.button(label, {
-				action: "wgToggleRows",
-				args: [key]
+				action: "wgLoadMoreRows",
+				args: [key, next]
 			}, "ghost sm")}</div>`;
 		};
 	}
@@ -14690,9 +14692,11 @@
 			deps.rerender();
 		};
 		const wgViewModeTabs = (archivedGroups) => deps.westgardModeTabs.view(deps.ui().wgViewMode, archivedGroups.length);
-		const wgRowsWindow = (rows, key) => deps.westgardRowsWindow(rows, deps.ui().wgExpandedRows.has(key), WG_TABLE_INITIAL_ROWS);
-		const wgToggleRows = (key) => {
-			deps.ui().wgExpandedRows = deps.westgardUiState.toggleOpen(deps.ui().wgExpandedRows, key);
+		const wgRowsWindow = (rows, key) => deps.westgardRowsWindow(rows, deps.ui().wgVisibleRows.get(key) || WG_TABLE_INITIAL_ROWS, WG_TABLE_INITIAL_ROWS);
+		const wgLoadMoreRows = (key, next) => {
+			const ui = deps.ui();
+			if (next <= WG_TABLE_INITIAL_ROWS) ui.wgVisibleRows.delete(key);
+			else ui.wgVisibleRows.set(key, next);
 			deps.rerender();
 		};
 		const wgRowsControl = (view, key) => deps.westgardRowsControl(view, key, WG_TABLE_INITIAL_ROWS);
@@ -14854,7 +14858,7 @@
 			wgSetArchivedTest,
 			wgViewModeTabs,
 			wgRowsWindow,
-			wgToggleRows,
+			wgLoadMoreRows,
 			wgRowsControl,
 			wgLotBlock,
 			wgArchivedMultiViews,
@@ -24367,14 +24371,15 @@
 	});
 	//#endregion
 	//#region src/presentation/westgard/westgard-row-window.ts
-	function westgardRowsWindow(rows, expanded, initialRows = 120) {
+	function westgardRowsWindow(rows, visibleCount, initialRows = 120) {
 		const all = Array.isArray(rows) ? rows : [];
-		const limit = Number.isInteger(initialRows) && initialRows > 0 ? initialRows : 120;
-		const visible = expanded ? all : all.slice(-limit);
+		const fallback = Number.isInteger(initialRows) && initialRows > 0 ? initialRows : 120;
+		const count = Math.min(Number.isInteger(visibleCount) && visibleCount > 0 ? visibleCount : fallback, all.length);
+		const visible = all.slice(all.length - count);
 		return {
 			rows: visible,
 			total: all.length,
-			expanded: !!expanded,
+			visibleCount: count,
 			limited: visible.length < all.length
 		};
 	}
@@ -26613,7 +26618,7 @@
 			dashTestQ: "",
 			dashTestStatus: "all",
 			wgPrevOpen: /* @__PURE__ */ new Set(),
-			wgExpandedRows: /* @__PURE__ */ new Set(),
+			wgVisibleRows: /* @__PURE__ */ new Map(),
 			wgViewMode: "current",
 			wgArchivedGroupId: "",
 			wgArchivedTestId: "",
@@ -30256,7 +30261,7 @@
 	root.wgSetArchivedTest = westgardPageController.wgSetArchivedTest;
 	root.wgViewModeTabs = westgardPageController.wgViewModeTabs;
 	root.wgRowsWindow = westgardPageController.wgRowsWindow;
-	root.wgToggleRows = westgardPageController.wgToggleRows;
+	root.wgLoadMoreRows = westgardPageController.wgLoadMoreRows;
 	root.wgRowsControl = westgardPageController.wgRowsControl;
 	root.wgLotBlock = westgardPageController.wgLotBlock;
 	root.wgArchivedMultiViews = westgardPageController.wgArchivedMultiViews;

@@ -14,7 +14,7 @@ export function installUiState<T extends UiStateBag>(root: object, namespace: st
 
 export function createAnalysisUiState() {
   return { selTest: null, statusMemo: new Map(), wgTestQ: '', dashTestQ: '', dashTestStatus: 'all',
-    wgPrevOpen: new Set(), wgExpandedRows: new Set(), wgViewMode: 'current', wgArchivedGroupId: '',
+    wgPrevOpen: new Set(), wgVisibleRows: new Map(), wgViewMode: 'current', wgArchivedGroupId: '',
     wgArchivedTestId: '', wgArchivedTestQ: '', wgChartMode: 'lj' };
 }
 
