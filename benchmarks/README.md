@@ -56,7 +56,18 @@ Run the complete pre-release check with:
 node benchmarks/verify-release.js
 ```
 
-This runs every `tests/*.test.js` file first, then `npm audit --audit-level=high`.
+This runs every `tests/*.test.js` file first, then `node benchmarks/check-build-freshness.js`
+(also runnable alone as `npm run check-build-freshness`) — rebuilds
+`assets/generated/modular-pilot.js`, `assets/core.js` and
+`assets/workers/westgard-worker.js` into a temp directory and compares them
+byte-for-byte against the committed files, blocking the release if they
+differ. `npm test`/the pre-commit hook deliberately skip this (they need no
+`npm install`, so no guarantee `vite`/`tsc` are even present) and only ever
+test whatever is already committed in `assets/` — editing a `src/**/*.ts`
+file and forgetting to rebuild before committing passes both silently. This
+gate is the only place that catches it, which is why it lives here (after
+`npm ci` in the `release-gate` CI job) rather than in the fast suite. Then
+`npm audit --audit-level=high`.
 Only when both checks pass does it run `performance-regression.js`. A failed
 functional test, high/critical dependency advisory, exceeded budget, lost display
 signal, or non-zero child process exits with a non-zero status suitable for a CI job

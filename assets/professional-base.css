@@ -186,7 +186,7 @@ canvas{width:100%;height:auto;display:block}
 .datepick{width:34px;align-self:stretch;border:none;background:var(--surface-subtle);color:var(--muted);display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
 
 aside{
-  background:linear-gradient(180deg,#17303f 0%,#1a3444 100%); border-right:1px solid #294656; box-shadow:none;
+  background:linear-gradient(180deg,var(--auth-overlay-from) 0%,var(--auth-overlay-to) 100%); border-right:1px solid #294656; box-shadow:none;
 }
 
 .cloud{
@@ -519,7 +519,7 @@ nav button{
 }
 
 nav button:hover{
-  background:rgba(255,255,255,.06);color:#ffffff;
+  background:rgba(255,255,255,.06);color:var(--gray-0);
 }
 
 .head p{
@@ -622,7 +622,7 @@ nav button.active .ic{
 }
 
 .app > aside, #authOverlay{
-  background:#14232c;
+  background:var(--sidebar-bg);
 }
 
 .datebox input.date-text{

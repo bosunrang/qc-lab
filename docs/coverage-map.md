@@ -4,19 +4,18 @@ Sinh bằng `npm run coverage-map` (`NODE_V8_COVERAGE` của Node, không cài t
 **Không phải cổng chặn** — không có ngưỡng nào, đây là bản đồ để quyết định viết test
 hoặc tách file, không phải một con số để đuổi.
 
-Sinh ngày 2026-08-21 · Node v26.5.0
+Sinh ngày 2026-08-23 · Node v26.7.0
 
 ## A. `src/**/*.ts` — mã nghiệp vụ thật
 
 Đo trực tiếp từ URL script thật của mỗi tiến trình test import file .ts — không qua sourcemap, không xấp xỉ.
 
-750 file · 22.5% ký tự đã chạy.
+745 file · 24.7% ký tự đã chạy.
 
-**279 file KHÔNG test nào nạp tới** — không phải "độ phủ thấp" mà là không có dữ liệu coverage nào cho file đó:
+**278 file KHÔNG test nào nạp tới** — không phải "độ phủ thấp" mà là không có dữ liệu coverage nào cho file đó:
 
-- `compat/modular-pilot.global.ts` (504.3 KB)
+- `compat/modular-pilot.global.ts` (504.1 KB)
 - `presentation/sigma/sigma-page-controller.ts` (70.0 KB)
-- `domain/core/qc-core.ts` (63.7 KB)
 - `presentation/actions/action-form-controller.ts` (63.9 KB)
 - `presentation/manage/manage-tests-actions-controller.ts` (57.2 KB)
 - `presentation/entry/entry-page-controller.ts` (52.1 KB)
@@ -26,7 +25,7 @@ Sinh ngày 2026-08-21 · Node v26.5.0
 - `presentation/manage/manage-page-controller.ts` (33.8 KB)
 - `presentation/actions/actions-page-controller.ts` (32.4 KB)
 - `presentation/reagent/reagent-page-controller.ts` (20.1 KB)
-- `presentation/westgard/westgard-page-controller.ts` (17.3 KB)
+- `presentation/westgard/westgard-page-controller.ts` (17.4 KB)
 - `presentation/chart/qc-chart-renderer.ts` (15.2 KB)
 - `domain/sigma/sigma-tea-resolution.ts` (15.7 KB)
 - `application/entry/entry-service.ts` (14.6 KB)
@@ -78,8 +77,8 @@ Sinh ngày 2026-08-21 · Node v26.5.0
 - `domain/qc/level-reconciliation.ts` (2.2 KB)
 - `domain/tea/analyte-meta.ts` (2.1 KB)
 - `domain/nce/action-approval-gates.ts` (2.1 KB)
-- `presentation/sigma/sigma-print-rows.ts` (2.2 KB)
 - `domain/nce/action-basics.ts` (2.1 KB)
+- `presentation/sigma/sigma-print-rows.ts` (2.1 KB)
 - `application/storage/partitioned-indexeddb-write-service.ts` (2.1 KB)
 - `domain/nce/action-draft-status.ts` (2.1 KB)
 - `domain/nce/action-rerun-evaluator.ts` (2.1 KB)
@@ -88,9 +87,9 @@ Sinh ngày 2026-08-21 · Node v26.5.0
 - `presentation/app/app-bootstrap.ts` (2.0 KB)
 - `domain/sigma/sigma-level-selection-service.ts` (1.9 KB)
 - `presentation/export/xlsx-zip.ts` (1.8 KB)
-- `presentation/sigma/sigma-mu-print-rows.ts` (1.9 KB)
 - `domain/qc/range-candidate.ts` (1.8 KB)
 - `domain/qc/value-format.ts` (1.8 KB)
+- `presentation/sigma/sigma-mu-print-rows.ts` (1.8 KB)
 - `presentation/report/report-xlsx-sheet.ts` (1.8 KB)
 - `domain/qc/date-format.ts` (1.7 KB)
 - `application/sigma/sigma-tea-snapshot-service.ts` (1.7 KB)
@@ -180,9 +179,9 @@ Sinh ngày 2026-08-21 · Node v26.5.0
 - `domain/qc/active-westgard.ts` (0.8 KB)
 - `application/sync/firebase-push-scheduler.ts` (0.7 KB)
 - `domain/qc/parallel-lot-lookup.ts` (0.7 KB)
-- `presentation/sigma/sigma-mu-trace.ts` (0.8 KB)
 - `presentation/router/date-box-html.ts` (0.7 KB)
 - `application/storage/local-storage-snapshot-writer.ts` (0.7 KB)
+- `presentation/sigma/sigma-mu-trace.ts` (0.7 KB)
 - `presentation/audit/activity-audit-pagination.ts` (0.7 KB)
 - `application/storage/indexeddb-clear-service.ts` (0.7 KB)
 - `domain/auth/new-user-validation.ts` (0.7 KB)
@@ -259,7 +258,6 @@ Sinh ngày 2026-08-21 · Node v26.5.0
 - `application/sync/firebase-merge-application.ts` (0.3 KB)
 - `application/storage/save-scheduler.ts` (0.3 KB)
 - `domain/sync/snapshot-signature.ts` (0.3 KB)
-- `application/storage/corrupt-local-quarantine.ts` (0.3 KB)
 - `application/storage/partition-write-policy.ts` (0.3 KB)
 - `presentation/sigma/data-url-bytes.ts` (0.3 KB)
 - `domain/sync/firebase-connection-gate.ts` (0.3 KB)
@@ -268,6 +266,7 @@ Sinh ngày 2026-08-21 · Node v26.5.0
 - `domain/westgard/memo-cache.ts` (0.3 KB)
 - `presentation/sigma/sigma-export-pixel-ratio.ts` (0.3 KB)
 - `presentation/report/qc-export-value-format.ts` (0.3 KB)
+- `application/storage/corrupt-local-quarantine.ts` (0.3 KB)
 - `domain/sync/firebase-remote-snapshot.ts` (0.2 KB)
 - `domain/sync/firebase-lifecycle-state.ts` (0.2 KB)
 - `domain/sync/firebase-empty-snapshot.ts` (0.2 KB)
@@ -296,9 +295,8 @@ Sinh ngày 2026-08-21 · Node v26.5.0
 
 | File | KB | % đã chạy | Ký tự chưa chạy | Hàm chưa từng chạy |
 |---|---:|---:|---:|---:|
-| `compat/modular-pilot.global.ts` | 504.3 | chưa nạp | 509.736 | — |
+| `compat/modular-pilot.global.ts` | 504.1 | chưa nạp | 509.631 | — |
 | `presentation/sigma/sigma-page-controller.ts` | 70.0 | chưa nạp | 68.849 | — |
-| `domain/core/qc-core.ts` | 63.7 | chưa nạp | 62.020 | — |
 | `presentation/actions/action-form-controller.ts` | 63.9 | chưa nạp | 60.594 | — |
 | `presentation/manage/manage-tests-actions-controller.ts` | 57.2 | chưa nạp | 55.306 | — |
 | `presentation/entry/entry-page-controller.ts` | 52.1 | chưa nạp | 51.902 | — |
@@ -307,8 +305,9 @@ Sinh ngày 2026-08-21 · Node v26.5.0
 | `presentation/report/report-print-controller.ts` | 35.9 | chưa nạp | 35.290 | — |
 | `presentation/manage/manage-page-controller.ts` | 33.8 | chưa nạp | 33.400 | — |
 | `presentation/actions/actions-page-controller.ts` | 32.4 | chưa nạp | 31.482 | — |
+| `domain/core/qc-core.ts` | 63.7 | 66.7% | 20.635 | 11 |
 | `presentation/reagent/reagent-page-controller.ts` | 20.1 | chưa nạp | 20.236 | — |
-| `presentation/westgard/westgard-page-controller.ts` | 17.3 | chưa nạp | 17.241 | — |
+| `presentation/westgard/westgard-page-controller.ts` | 17.4 | chưa nạp | 17.320 | — |
 | `presentation/chart/qc-chart-renderer.ts` | 15.2 | chưa nạp | 15.611 | — |
 | `domain/sigma/sigma-tea-resolution.ts` | 15.7 | chưa nạp | 15.558 | — |
 | `application/entry/entry-service.ts` | 14.6 | chưa nạp | 14.853 | — |
@@ -353,15 +352,15 @@ Sinh ngày 2026-08-21 · Node v26.5.0
 | `presentation/sigma/sigma-xlsx-styles.ts` | 2.4 | chưa nạp | 2.474 | — |
 | `domain/nce/action-workflow-status.ts` | 2.5 | chưa nạp | 2.471 | — |
 | `presentation/modal/modal-controller.ts` | 2.3 | chưa nạp | 2.346 | — |
-| `presentation/state/ui-state.ts` | 2.3 | chưa nạp | 2.316 | — |
+| `presentation/state/ui-state.ts` | 2.3 | chưa nạp | 2.315 | — |
 | `presentation/router/router-dispatch-controller.ts` | 2.3 | chưa nạp | 2.296 | — |
 | `domain/nce/action-bias-service.ts` | 2.2 | chưa nạp | 2.285 | — |
 | `domain/auth/pbkdf2-password-service.ts` | 2.2 | chưa nạp | 2.283 | — |
 | `domain/qc/level-reconciliation.ts` | 2.2 | chưa nạp | 2.230 | — |
 | `domain/tea/analyte-meta.ts` | 2.1 | chưa nạp | 2.182 | — |
 | `domain/nce/action-approval-gates.ts` | 2.1 | chưa nạp | 2.167 | — |
-| `presentation/sigma/sigma-print-rows.ts` | 2.2 | chưa nạp | 2.165 | — |
 | `domain/nce/action-basics.ts` | 2.1 | chưa nạp | 2.152 | — |
+| `presentation/sigma/sigma-print-rows.ts` | 2.1 | chưa nạp | 2.128 | — |
 | `application/storage/partitioned-indexeddb-write-service.ts` | 2.1 | chưa nạp | 2.122 | — |
 | `domain/nce/action-draft-status.ts` | 2.1 | chưa nạp | 2.048 | — |
 | `domain/nce/action-rerun-evaluator.ts` | 2.1 | chưa nạp | 2.041 | — |
@@ -370,9 +369,9 @@ Sinh ngày 2026-08-21 · Node v26.5.0
 | `presentation/app/app-bootstrap.ts` | 2.0 | chưa nạp | 1.926 | — |
 | `domain/sigma/sigma-level-selection-service.ts` | 1.9 | chưa nạp | 1.907 | — |
 | `presentation/export/xlsx-zip.ts` | 1.8 | chưa nạp | 1.890 | — |
-| `presentation/sigma/sigma-mu-print-rows.ts` | 1.9 | chưa nạp | 1.867 | — |
 | `domain/qc/range-candidate.ts` | 1.8 | chưa nạp | 1.862 | — |
 | `domain/qc/value-format.ts` | 1.8 | chưa nạp | 1.841 | — |
+| `presentation/sigma/sigma-mu-print-rows.ts` | 1.8 | chưa nạp | 1.833 | — |
 | `presentation/report/report-xlsx-sheet.ts` | 1.8 | chưa nạp | 1.815 | — |
 | `domain/qc/date-format.ts` | 1.7 | chưa nạp | 1.761 | — |
 | `application/sigma/sigma-tea-snapshot-service.ts` | 1.7 | chưa nạp | 1.759 | — |
@@ -468,9 +467,9 @@ Sinh ngày 2026-08-21 · Node v26.5.0
 | `domain/qc/active-westgard.ts` | 0.8 | chưa nạp | 777 | — |
 | `application/sync/firebase-push-scheduler.ts` | 0.7 | chưa nạp | 765 | — |
 | `domain/qc/parallel-lot-lookup.ts` | 0.7 | chưa nạp | 765 | — |
-| `presentation/sigma/sigma-mu-trace.ts` | 0.8 | chưa nạp | 763 | — |
 | `presentation/router/date-box-html.ts` | 0.7 | chưa nạp | 759 | — |
 | `application/storage/local-storage-snapshot-writer.ts` | 0.7 | chưa nạp | 757 | — |
+| `presentation/sigma/sigma-mu-trace.ts` | 0.7 | chưa nạp | 748 | — |
 | `presentation/audit/activity-audit-pagination.ts` | 0.7 | chưa nạp | 746 | — |
 | `application/storage/indexeddb-clear-service.ts` | 0.7 | chưa nạp | 740 | — |
 | `domain/auth/new-user-validation.ts` | 0.7 | chưa nạp | 735 | — |
@@ -523,7 +522,7 @@ Sinh ngày 2026-08-21 · Node v26.5.0
 | `domain/auth/default-admin-user.ts` | 0.4 | chưa nạp | 422 | — |
 | `presentation/export/xlsx-cell.ts` | 0.4 | chưa nạp | 421 | — |
 | `presentation/format/basic-format.ts` | 0.4 | chưa nạp | 419 | — |
-| `domain/sync/firebase-identity.ts` | 0.4 | chưa nạp | 412 | — |
+| `domain/sync/firebase-identity.ts` | 0.4 | chưa nạp | 403 | — |
 | `application/sync/firebase-invalid-snapshot-service.ts` | 0.4 | chưa nạp | 402 | — |
 | `presentation/audit/activity-audit-archive-window.ts` | 0.4 | chưa nạp | 399 | — |
 | `presentation/report/qc-report-context.ts` | 0.4 | chưa nạp | 399 | — |
@@ -553,7 +552,6 @@ Sinh ngày 2026-08-21 · Node v26.5.0
 | `application/storage/save-scheduler.ts` | 0.3 | chưa nạp | 299 | — |
 | `domain/sync/snapshot-signature.ts` | 0.3 | chưa nạp | 286 | — |
 | `presentation/report/report-nce-detail-html.ts` | 3.9 | 92.5% | 279 | 0 |
-| `application/storage/corrupt-local-quarantine.ts` | 0.3 | chưa nạp | 272 | — |
 | `application/storage/partition-write-policy.ts` | 0.3 | chưa nạp | 270 | — |
 | `presentation/sigma/data-url-bytes.ts` | 0.3 | chưa nạp | 269 | — |
 | `domain/sync/firebase-connection-gate.ts` | 0.3 | chưa nạp | 267 | — |
@@ -562,6 +560,7 @@ Sinh ngày 2026-08-21 · Node v26.5.0
 | `domain/westgard/memo-cache.ts` | 0.3 | chưa nạp | 263 | — |
 | `presentation/sigma/sigma-export-pixel-ratio.ts` | 0.3 | chưa nạp | 263 | — |
 | `presentation/report/qc-export-value-format.ts` | 0.3 | chưa nạp | 262 | — |
+| `application/storage/corrupt-local-quarantine.ts` | 0.3 | chưa nạp | 259 | — |
 | `application/audit/activity-archive-command.ts` | 3.2 | 91.5% | 251 | 0 |
 | `presentation/dashboard/dashboard-shift-status.ts` | 0.9 | 70.2% | 245 | 0 |
 | `application/nce/action-form-ui-state.ts` | 1.2 | 79.8% | 238 | 2 |
@@ -757,7 +756,6 @@ Sinh ngày 2026-08-21 · Node v26.5.0
 | `presentation/manage/config-instrument-modal-html.ts` | 1.2 | 99.7% | 4 | 0 |
 | `presentation/manage/config-panel-modal-html.ts` | 1.2 | 99.7% | 4 | 0 |
 | `presentation/manage/target-group-options-html.ts` | 0.6 | 99.3% | 4 | 0 |
-| `presentation/manage/tea-positive-number.ts` | 0.2 | 98.0% | 4 | 0 |
 | `presentation/manage/tea-source-registry-html.ts` | 0.9 | 99.5% | 4 | 0 |
 | `presentation/nce/action-issue-row-html.ts` | 1.6 | 99.8% | 4 | 0 |
 | `presentation/nce/action-staff-options-html.ts` | 0.3 | 98.7% | 4 | 0 |
@@ -826,7 +824,6 @@ Sinh ngày 2026-08-21 · Node v26.5.0
 | `presentation/chart/levey-jennings-point-style.ts` | 0.2 | 100.0% | 0 | 0 |
 | `presentation/chart/levey-jennings-y-axis.ts` | 0.2 | 100.0% | 0 | 0 |
 | `presentation/chart/westgard-rule-scope.ts` | 0.4 | 100.0% | 0 | 0 |
-| `presentation/dashboard/dashboard-completion.ts` | 0.2 | 100.0% | 0 | 0 |
 | `presentation/dashboard/dashboard-empty-tests-html.ts` | 0.5 | 100.0% | 0 | 0 |
 | `presentation/dashboard/dashboard-expiring-lot-items.ts` | 0.3 | 100.0% | 0 | 0 |
 | `presentation/dashboard/dashboard-followup-panel-html.ts` | 0.3 | 100.0% | 0 | 0 |
@@ -918,8 +915,6 @@ Sinh ngày 2026-08-21 · Node v26.5.0
 | `presentation/manage/manage-transition-status.ts` | 0.3 | 100.0% | 0 | 0 |
 | `presentation/manage/manage-transition-table-html.ts` | 0.5 | 100.0% | 0 | 0 |
 | `presentation/manage/qc-history-detail-rows-html.ts` | 1.1 | 100.0% | 0 | 0 |
-| `presentation/manage/same-id-set.ts` | 0.2 | 100.0% | 0 | 0 |
-| `presentation/manage/same-normalized-text.ts` | 0.2 | 100.0% | 0 | 0 |
 | `presentation/manage/target-empty-state.ts` | 0.9 | 100.0% | 0 | 0 |
 | `presentation/manage/target-group-label.ts` | 0.1 | 100.0% | 0 | 0 |
 | `presentation/manage/target-group-status-suffix.ts` | 0.2 | 100.0% | 0 | 0 |
@@ -945,7 +940,6 @@ Sinh ngày 2026-08-21 · Node v26.5.0
 | `presentation/manage/tea-lab-basis-label.ts` | 0.2 | 100.0% | 0 | 0 |
 | `presentation/manage/tea-reference-add-modal-html.ts` | 1.4 | 100.0% | 0 | 0 |
 | `presentation/manage/tea-reference-empty-state.ts` | 0.3 | 100.0% | 0 | 0 |
-| `presentation/manage/tea-reference-external-changed.ts` | 0.6 | 100.0% | 0 | 0 |
 | `presentation/manage/tea-reference-input-value.ts` | 0.1 | 100.0% | 0 | 0 |
 | `presentation/manage/tea-reference-kind.ts` | 0.3 | 100.0% | 0 | 0 |
 | `presentation/manage/tea-reference-lab-profile-body-html.ts` | 2.1 | 100.0% | 0 | 0 |
@@ -1001,7 +995,7 @@ Sinh ngày 2026-08-21 · Node v26.5.0
 | `presentation/reagent/reagent-report-detail-card-html.ts` | 0.6 | 100.0% | 0 | 0 |
 | `presentation/reagent/reagent-report-items.ts` | 0.4 | 100.0% | 0 | 0 |
 | `presentation/reagent/reagent-results-panels-html.ts` | 0.3 | 100.0% | 0 | 0 |
-| `presentation/reagent/reagent-tool-icon.ts` | 0.8 | 100.0% | 0 | 0 |
+| `presentation/reagent/reagent-tool-icon.ts` | 1.2 | 100.0% | 0 | 0 |
 | `presentation/reagent/reagent-toolbar-html.ts` | 0.7 | 100.0% | 0 | 0 |
 | `presentation/render/default-date-fields-service.ts` | 0.2 | 100.0% | 0 | 0 |
 | `presentation/render/entry-jump-scroll-service.ts` | 0.4 | 100.0% | 0 | 0 |
@@ -1041,14 +1035,15 @@ Sinh ngày 2026-08-21 · Node v26.5.0
 | `presentation/westgard/westgard-export-actions-html.ts` | 0.8 | 100.0% | 0 | 0 |
 | `presentation/westgard/westgard-lot-block-html.ts` | 1.7 | 100.0% | 0 | 0 |
 | `presentation/westgard/westgard-multi-views.ts` | 0.8 | 100.0% | 0 | 0 |
-| `presentation/westgard/westgard-row-window.ts` | 0.4 | 100.0% | 0 | 0 |
-| `presentation/westgard/westgard-rows-control.ts` | 0.7 | 100.0% | 0 | 0 |
+| `presentation/westgard/westgard-row-window.ts` | 0.5 | 100.0% | 0 | 0 |
+| `presentation/westgard/westgard-rows-control.ts` | 0.9 | 100.0% | 0 | 0 |
 | `presentation/westgard/westgard-rule-guide-html.ts` | 1.1 | 100.0% | 0 | 0 |
 | `presentation/westgard/westgard-rule-toggles-html.ts` | 0.7 | 100.0% | 0 | 0 |
 | `presentation/westgard/westgard-ui-state.ts` | 0.5 | 100.0% | 0 | 0 |
 
 ### Hàm chưa từng chạy (10 hàm đầu mỗi file, theo thứ tự xuất hiện)
 
+- **domain/core/qc-core.ts** — 11 hàm: `numericCell` (dòng 108) · `cleanPeriod` (dòng 120) · `cleanSigmaRounds` (dòng 129) · `cleanSigmaLevel` (dòng 132) · `isOn` (dòng 174) · `isOn` (dòng 202) · `add` (dòng 209) · `isOn` (dòng 247) · `isOn` (dòng 256) · `isOn` (dòng 281) …
 - **presentation/router/router-shell-controller.ts** — 9 hàm: `brandTitle` (dòng 2) · `brandSub` (dòng 2) · `brandMarkText` (dòng 2) · `brandLogo` (dòng 2) · `renderBrand` (dòng 3) · `licensedLabName` (dòng 5) · `trialInfo` (dòng 5) · `sideFoot` (dòng 6) · `toggleSidebarNav` (dòng 7)
 - **application/state/derived-cache-invalidation.ts** — 2 hàm: `clearPrefixed` (dòng 22) · `clearForTest` (dòng 34)
 - **application/manage/manage-lot-transition-command.ts** — 1 hàm: `checkRemoval` (dòng 57)
@@ -1069,13 +1064,13 @@ Chỉ còn 3 build artifact (`core.js`, `generated/modular-pilot.js`, `workers/w
 
 | File | KB | % đã chạy | Ký tự chưa chạy | Hàm chưa từng chạy |
 |---|---:|---:|---:|---:|
-| `generated/modular-pilot.js` | 1464.2 | 47.7% | 767.417 | 2354 |
-| `core.js` | 58.8 | 94.9% | 3.059 | 6 |
+| `generated/modular-pilot.js` | 1464.6 | 47.7% | 767.465 | 2354 |
+| `core.js` | 58.8 | 95.0% | 2.993 | 6 |
 | `workers/westgard-worker.js` | 5.1 | 93.2% | 339 | 1 |
 | `nav-collapse-init.js` | 0.1 | chưa nạp | 136 | — |
 
 ### Hàm chưa từng chạy (10 hàm đầu mỗi file, theo thứ tự xuất hiện)
 
-- **generated/modular-pilot.js** — 2354 hàm: `pointRunNoFor` (dòng 92) · `execute` (dòng 467) · `execute` (dòng 510) · `execute` (dòng 526) · `execute` (dòng 547) · `save` (dòng 563) · `applyLab` (dòng 580) · `revertMfg` (dòng 633) · `commit` (dòng 692) · `applyLab` (dòng 699) …
+- **generated/modular-pilot.js** — 2354 hàm: `pointRunNoFor` (dòng 91) · `execute` (dòng 466) · `execute` (dòng 509) · `execute` (dòng 525) · `execute` (dòng 546) · `save` (dòng 562) · `applyLab` (dòng 579) · `revertMfg` (dòng 632) · `commit` (dòng 691) · `applyLab` (dòng 698) …
 - **core.js** — 6 hàm: `isOn` (dòng 384) · `isOn` (dòng 455) · `isOn` (dòng 535) · `isOn` (dòng 544) · `isOn` (dòng 577) · `isOn` (dòng 586)
 - **workers/westgard-worker.js** — 1 hàm: `pointRunNo` (dòng 44)

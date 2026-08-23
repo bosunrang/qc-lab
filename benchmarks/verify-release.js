@@ -26,6 +26,13 @@ process.stdout.write(`Functional tests: ${tests.length-failures.length}/${tests.
 if (failures.length) {
   process.stderr.write(`Failed tests: ${failures.join(', ')}\n`);process.exitCode=1;
 } else {
+  // npm test/pre-commit hook cố tình không rebuild (không cần npm install) nên chỉ
+  // test đúng bản assets/*.js đã COMMIT — sửa src/**/*.ts mà quên `npm run build:pilot`
+  // vẫn qua sạch cả hai. Gate phát hành có npm ci nên chắc chắn có vite/tsc, đây là
+  // chỗ duy nhất xác nhận bản đã commit thật sự khớp nguồn hiện tại trước khi đóng gói.
+  const freshness = spawnSync(process.execPath, [path.join(__dirname, 'check-build-freshness.js')], { cwd:root,encoding:'utf8' });
+  process.stdout.write(freshness.stdout||'');process.stderr.write(freshness.stderr||'');
+  if (freshness.status !== 0) { process.stderr.write('Build freshness FAILED — chặn phát hành.\n'); process.exitCode = 1; return; }
   const npm=process.platform==='win32'?'npm.cmd':'npm';
   const bundledNpm=process.env.npm_execpath||path.join(path.dirname(process.execPath),'node_modules','npm','bin','npm-cli.js');
   const runAudit=args=>fs.existsSync(bundledNpm)

@@ -20,6 +20,7 @@
     "a11y-audit": "node scripts/a11y-audit.js",
     "print-check": "node scripts/print-check.js",
     "coverage-map": "node scripts/coverage-map.js",
+    "check-build-freshness": "node benchmarks/check-build-freshness.js",
     "benchmark:10y": "node benchmarks/performance-baseline.js --ten-years",
     "lis:gateway": "node lis-gateway/server.js",
     "lis:config": "node scripts/lis-config.js",

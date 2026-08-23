@@ -514,7 +514,7 @@
 }
 
 .rc-pair-panel .rc-pair-row:nth-child(even){
-  background:#f9fbfc;
+  background:var(--surface-subtle);
 }
 
 .rc-pair-panel .rc-pair-row:hover{

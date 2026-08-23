@@ -80,7 +80,7 @@
 }
 
 .rcfg-tools input{
-  height:34px; background:#f9fbfc;
+  height:34px; background:var(--surface-subtle);
 }
 
 .rcfg-list{

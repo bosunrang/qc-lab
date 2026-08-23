@@ -116,6 +116,16 @@ structural change and fix the structure, not the test:
 - `westgard-rule-registry.test.js` — the Westgard rule list lives only in
   `core.js`'s `WG_RULE_REGISTRY`; no other source file may spell out three or
   more rule ids (see "Module roles" → `core.js`).
+- `css-hex-ratchet.test.js` (added 2026-08-23, same pattern as
+  `tests/a11y-ratchet.json`) — a per-file cap on raw `#rrggbb` hex literals in
+  `assets/*.css` outside `tokens.css`, checked against
+  `tests/css-hex-ratchet-baseline.json`. A rà soát that day counted 242 such
+  literals; most are one-off gradient/shading shades a mechanical
+  find-replace can't safely collapse into existing tokens without a design
+  call, so this isn't a flat ban like `button-conventions.test.js` — it only
+  blocks the count from **growing**. Update the baseline with
+  `node tests/css-hex-ratchet.test.js --update-baseline` after an intentional
+  cleanup, never to allow a new one-off color.
 
 A pre-commit hook (`.githooks/pre-commit`, installed into `.git/hooks/`) runs
 `node scripts/run-tests.js` and blocks the commit on failure; needs no `npm
@@ -295,8 +305,9 @@ methodology, recorded baselines, and which optimizations they justified — read
 it before touching startup, storage, Westgard, or chart-render hot paths.
 
 - `node benchmarks/verify-release.js` — pre-release gate: runs all functional
-  tests, then two dependency audits, then `performance-regression.js` against
-  budgets in `performance-budget.json`. Ratio/structural checks are the real
+  tests, then `check-build-freshness.js` (below), then two dependency audits,
+  then `performance-regression.js` against budgets in `performance-budget.json`.
+  Ratio/structural checks are the real
   regression signal; absolute ms budgets are intentionally generous — don't
   tighten them from a single fast local run. The audit step is deliberately
   split (2026-07-28): `npm audit --omit=dev --audit-level=high` **blocks** the
@@ -311,6 +322,19 @@ it before touching startup, storage, Westgard, or chart-render hot paths.
   `expand is not a function` and packaging breaks while `npm audit` reads
   green. Neither audit may skip the performance gate — that's how a red gate
   used to hide whether performance still passed.
+- `node benchmarks/check-build-freshness.js` (`npm run check-build-freshness`,
+  added 2026-08-23) — rebuilds `assets/generated/modular-pilot.js`,
+  `assets/core.js` and `assets/workers/westgard-worker.js` into a temp
+  directory and diffs them byte-for-byte against the committed files.
+  `npm test`/the pre-commit hook are deliberately install-free (see "Tests"
+  above) and never rebuild, so they only ever exercise whatever is already
+  committed in `assets/` — editing a `src/**/*.ts` file and forgetting
+  `npm run build:pilot` before committing passes the hook and the fast CI
+  `test` job silently, exactly the class of bug `qc-core.ts`'s own
+  `WG_RULE_REGISTRY` warning worries about, but for the whole bundle instead
+  of one file. This gate is the only place that catches it, which is why it
+  only runs after `npm ci` in `verify-release.js`/the `release-gate` CI job,
+  never in the fast suite.
 - `node benchmarks/performance-baseline.js [--quick]` — full/smoke benchmark.
 - `startup-pipeline.js`, `partitioned-startup.js`, `render-pipeline.js` —
   focused profiles; `worker-smoke.html` (served over HTTP alongside the app)
