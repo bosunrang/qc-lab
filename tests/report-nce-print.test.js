@@ -61,11 +61,10 @@ for(const[key,value]of rendered)assert.ok(detail.includes(value),`bản in bỏ 
 for(const[,statusText,noteText]of model.checks){assert.ok(detail.includes(statusText));assert.ok(detail.includes(noteText));}
 
 const reportSource=fs.readFileSync(path.join(__dirname,'..','src','presentation','report','report-print-controller.ts'),'utf8');
-// Markup ô "Kèm phụ lục NCE" đã chuyển sang createReportPageHtml() (TypeScript)
-// từ khi pageReportV2() (nay ở report-page-controller.ts) không còn tự dựng HTML.
-const reportPageHtmlSource=fs.readFileSync(path.join(__dirname,'..','src','presentation','report','report-page-html.ts'),'utf8');
+// Markup ô "Kèm phụ lục NCE" đã chuyển sang React (2026-08-30, xem ReportPage.tsx).
+const reportPageSource=fs.readFileSync(path.join(__dirname,'..','src','react','pages','ReportPage.tsx'),'utf8');
 assert.match(reportSource,/\.nce-check-item-col\{width:30%\}\.nce-check-result-col\{width:22%\}\.nce-check-note-col\{width:48%\}/,'stylesheet bản in phải giữ đúng tỷ lệ ba cột checklist');
-assert.match(reportPageHtmlSource,/id="reportNceAppendix"[^>]*checked/,'trang báo cáo phải có tùy chọn phụ lục bật sẵn');
+assert.match(reportPageSource,/id="reportNceAppendix"[^>]*defaultChecked/,'trang báo cáo phải có tùy chọn phụ lục bật sẵn');
 assert.match(reportSource,/acts\.length && includeNceAppendix/,'phụ lục chỉ được thêm khi có NCE và người dùng bật tùy chọn');
 assert.match(reportSource,/\.nce-detail-stack\{display:grid;gap:7px;break-inside:avoid\}/,'mục 1 và 4 phải có khoảng lưới 7px và không bị tách hai hàng qua trang');
 assert.equal((detail.match(/class="nce-detail-stack"/g)||[]).length,2,'mục 1 và 4 phải dùng cùng cấu trúc khoảng cách');

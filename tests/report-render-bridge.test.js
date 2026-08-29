@@ -10,7 +10,6 @@ const bridge=fs.readFileSync(path.join(root,'src','compat','modular-pilot.global
 for(const [name,type] of [
   ['reportLabels','ReturnType<typeof createReportLabels>'],
   ['reportSelection','ReturnType<typeof createReportSelection>'],
-  ['reportSearch','ReturnType<typeof createReportSearch>'],
   ['reportPointsTableService','ReturnType<typeof createReportPointsTable>'],
   ['reportNceAppendixPresentation','ReportNceAppendixApi'],
   ['reportNceDetailHtmlPresentation','ReturnType<typeof createReportNceDetailHtml>']
@@ -19,7 +18,6 @@ for(const [name,type] of [
   assert.match(bridge,new RegExp(`${name}: ${escaped};`),`${name} must be a required report UI bridge contract`);
   assert.match(bridge,new RegExp(`root\\.${name}=`),`${name} must be assigned by the TypeScript bootstrap`);
 }
-assert.match(route,/deps\.reportSearch\.select\(/,'Bộ tìm kiếm báo cáo phải dùng bridge TypeScript');
 assert.match(route,/deps\.reportSelection\.exportSelection\(/,'Lựa chọn báo cáo phải dùng bridge TypeScript');
 assert.match(route,/deps\.rangeText\(start, end\)/,'Nhãn phạm vi báo cáo phải dùng bridge TypeScript');
 assert.match(reports,/deps\.reportPointsTableService\(items, t\)/,'Bảng điểm QC báo cáo phải dùng dependency injected');

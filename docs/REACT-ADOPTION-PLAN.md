@@ -78,33 +78,36 @@ bước phải để lại một bản chạy được — không có big-bang.
 | Cài đặt (settings) | **Hoàn tất** (2026-08-29) — chạy bằng React (`src/react/pages/SettingsPage.tsx`), đã qua kiểm chứng song song (khớp tuyệt đối, 164 phần tử, 0 lệch) và **xoá sạch code HTML cổ điển** (`pageSettings()` cùng 8 file `admin-tools-html.ts`/`brand-panel-html.ts`/`brand-preview-html.ts`/`firebase-connection-panel-html.ts`/`firebase-rules-panel-html.ts`/`lis-gateway-panel-html.ts`/`settings-page-layout-html.ts`/`unit-profile-html.ts` và 8 test file tương ứng). Chỉ còn `root.settingsModel()` (dữ liệu thuần) trong `settings-page-controller.ts`. Mọi field (tên đơn vị, logo, Firebase config, LIS Gateway...) là input/textarea/select không điều khiển (`defaultValue`/`defaultChecked`) vì chỉ đọc lúc bấm nút lưu — không trang nào cần đặt lại giá trị từ bên ngoài. `firebaseGuideHtml()` (nội dung `<details>` tĩnh) và `headOnly()` vẫn tái dùng qua `dangerouslySetInnerHTML`; các hàm điều khiển (`saveLab`, `saveBrand`, `pickLogo`, `saveFb`, `checkStorageUsage`,...) trong `settings-page-controller.ts` không cần sửa. |
 | Cấu hình chung (manage) | **Hoàn tất** (2026-08-29) — chạy bằng React (`src/react/pages/ManagePage.tsx`), trang lớn nhất tới nay: 8 tab (máy, xét nghiệm, panel, lô/nhóm lô, Mean/SD, chuyển tiếp lô, lịch sử, TEa tham chiếu). Đã qua kiểm chứng song song từng tab (script tự đổi `ManageUIState.manageTab` trước khi so — xem `SUB_TABS` trong script) và **xoá sạch 37 file HTML cổ điển** (`manage-shell-html.ts`, `manage-toolbar-html.ts`, mọi `*-row-html.ts`/`*-table-html.ts` theo tab, cả cụm `target-*-html.ts` của tab Mean/SD) cùng 37 test file tương ứng, cộng các hàm `manageShell`/`manageToolbar`/`manageLots`/`manageInstruments`/`managePanels`/`manageTransitionsV2`/`manageTargets`/`manageAssays`/`manageHistory`/`manageTeaRefs`/`manageView`/`renderManageBody`/`pageManage` trong `manage-page-controller.ts`. Chỉ còn `root.manageModel()` (dữ liệu thuần cho cả 8 tab) cùng các hàm mở modal (`teaRefOpenAdd`, `teaLabProfileOpen`, ...) — modal thêm/sửa máy/lô/panel/xét nghiệm và hồ sơ TEa chuẩn hóa không cần sửa gì vì render vào `#modalRoot`. Bảng Mean/SD (tab phức tạp/rủi ro nhất) giữ nguyên input/checkbox KHÔNG điều khiển (`defaultValue`/`defaultChecked`) — `syncTargetRange()`/`toggleTargetRow()`/`targetCheckAll()` chỉ đọc/ghi DOM trực tiếp của dòng đó, không gọi `rerender()`, nên React không bao giờ vẽ lại các ô này giữa lúc gõ. Panel/Nhóm lô QC (tab Mean/SD) và Xét nghiệm (tab Lịch sử) là 3 `<select>` cần đặt lại giá trị từ bên ngoài (đổi panel/nhóm lô tự sửa lựa chọn không hợp lệ) nên dùng `value=`+`onChange` React thật gọi thẳng `setTargetPanel`/`setTargetGroup`/`setHistoryTest`, giống ô tìm kiếm chung của cả trang (`manageSearchSet`, đổi từ hàm vẽ lại cục bộ `renderManageBody()` sang gọi thẳng `deps.rerender()` — an toàn vì trang giờ do React sở hữu toàn bộ `#main`). |
 | So sánh hóa chất (reagent) | **Hoàn tất** (2026-08-29) — chạy bằng React (`src/react/pages/ReagentPage.tsx`). Đã qua kiểm chứng song song (khớp tuyệt đối sau khi sửa script — xem `POST_RENDER` bên dưới) và **xoá sạch code HTML cổ điển** (`pageReagent()` cùng 8 file `reagent-toolbar-html.ts`/`reagent-info-panel-html.ts`/`reagent-pair-panel-html.ts`/`reagent-pair-row-html.ts`/`reagent-results-panels-html.ts`/`reagent-charts-panel-html.ts`/`reagent-select-options-html.ts`/`reagent-empty-page-html.ts` và 8 test file tương ứng). Chỉ còn `root.reagentModel()` (dữ liệu thuần) trong `reagent-page-controller.ts`; `rcCompute()` (tự vá trực tiếp `#rcStats`/`#rcCrit`/`#rcVerdict`/`#rcScatter`/`#rcBland` bằng SVG/HTML string, không qua React) và mọi hàm mở modal (`openRcModal`, `openRcCreateModal`, `rcOpenQuick`, ...) không cần sửa gì. Trang này phát hiện một **lỗi thật** trong khuôn mẫu "input không điều khiển" đã dùng cho Users/Settings/Manage: `rcSel` (chọn phép so sánh) và mọi field trong info/pair panel dùng `defaultValue`/`defaultChecked` an toàn khi chỉ GÕ (vì `rcMeta`/`rcCell` không gọi `rerender()`), nhưng khi ĐỔI SANG một phép so sánh khác (`rcSwitch`/`rcCreateFrom`/`rcPick`/`rcDelete`, đều gọi `rerender()`) mà các phần tử vẫn giữ NGUYÊN vị trí/khoá (cùng `currentId` cũ) thì React tái dùng đúng DOM node cũ và KHÔNG áp lại `defaultValue` mới — hiện đúng dữ liệu của phép so sánh vừa rời đi, không phải phép so sánh vừa chọn (xác nhận trực tiếp trong trình duyệt). Sửa bằng cách bọc toàn bộ toolbar + info/pair panel trong một `<div key={model.currentId} style={{display:'contents'}}>` để ép remount mỗi khi đổi phép so sánh, và khoá mỗi dòng cặp số liệu bằng `${rows.length}-${row.index}` để tránh kẹt dữ liệu cũ khi xoá một dòng ở giữa (dòng sau bị dịch chỉ số nhưng khoá cũ trùng, nếu không thêm `rows.length` vào khoá). Script kiểm chứng song song cũng cần sửa: `rcCompute()` chạy SAU khi `#main` đã vẽ (qua `useEffect` ở bản React, nhưng không có gì gọi lại nó khi ép về bản cổ điển), nên thêm cơ chế `POST_RENDER` gọi `rcCompute()` cho CẢ HAI bản trước khi so, nếu không bản cổ điển bị so ở trạng thái "chưa tính" trong khi bản React đã tính xong. |
-| 5 trang còn lại | Chưa chuyển, vẫn chạy code cổ điển như cũ. |
+| Báo cáo (report) | **Hoàn tất** (2026-08-30) — chạy bằng React (`src/react/pages/ReportPage.tsx`). Đã qua kiểm chứng song song (khớp tuyệt đối, 91 phần tử, sau khi sửa lệch có chủ đích ở ô tìm kiếm) và **xoá sạch code HTML cổ điển** (`pageReportV2()`, `reportLockPanelHtml()`, `reportRangePicker()`, `reportApplySearch()`, cùng 4 file `report-page-html.ts`/`report-range-picker-html.ts`/`report-lock-panel-html.ts`/`report-lock-list-html.ts` và module thuần `report-search.ts` (chỉ còn dùng bởi `reportApplySearch()` nay đã xoá), cộng 5 test file tương ứng). Chỉ còn `reportModel()`/`reportLockPanelModel()` (dữ liệu thuần) trong `report-page-controller.ts`; các hàm khóa/mở khóa kỳ, in, xuất Excel/CSV không cần sửa gì vì đọc DOM trực tiếp lúc gọi hoặc render vào `#modalRoot`. Panel "Khóa kỳ báo cáo" áp dụng khuôn mẫu Reagent NGAY TỪ ĐẦU (không đợi phát hiện lỗi): `<select>` tháng/năm dùng `key={ym}` để ép remount mỗi khi `reportSetLockPart()` đổi kỳ đang chọn (nếu không sẽ dính đúng lỗi stale-`defaultValue` đã gặp ở Reagent). Trong lúc kiểm thử phát hiện một **lỗi thật, có từ trước** (không liên quan React): `exportReportCSV()` luôn crash vì bẫy khởi tạo sớm — `root.qcReportCsvRows` đọc `root.qcReportRowsService` ngay lúc khởi tạo bundle (trước khi biến đó được gán), giống các bẫy đã ghi trong "Module roles" của CLAUDE.md; đã sửa bằng closure đọc lại `root.X` mỗi lần gọi, xác nhận lỗi tồn tại ở CẢ bản React lẫn bản cổ điển trước khi sửa. |
+| 4 trang còn lại | Chưa chuyển, vẫn chạy code cổ điển như cũ. |
 
 ### Thứ tự dự kiến cho các trang còn lại
 
-1. Báo cáo — chủ sở hữu pipeline in/PDF/XLSX dùng chung. **(tiếp theo)**
-2. Six Sigma — canvas Levey-Jennings + XLSX riêng.
-3. Phân tích Westgard — Web Worker (≥3000 điểm) + canvas + XLSX.
-4. Khắc phục sự cố (NCE) — có bộ Playwright riêng vì lỗi ở đây là lỗi trạng thái `rerender()`.
-5. Nhập QC & Biểu đồ — phức tạp và dùng nhiều nhất, làm cuối cùng.
+1. Six Sigma — canvas Levey-Jennings + XLSX riêng. **(tiếp theo)**
+2. Phân tích Westgard — Web Worker (≥3000 điểm) + canvas + XLSX.
+3. Khắc phục sự cố (NCE) — có bộ Playwright riêng vì lỗi ở đây là lỗi trạng thái `rerender()`.
+4. Nhập QC & Biểu đồ — phức tạp và dùng nhiều nhất, làm cuối cùng.
 
 ## Kiểm chứng đã chạy (đầy đủ, kể cả bước dọn dẹp) cho từng trang đã xong
 
-Cả sáu trang đều theo cùng một quy trình: `npm run build:pilot` (gồm
+Cả bảy trang đều theo cùng một quy trình: `npm run build:pilot` (gồm
 `build:react`) → `npm run typecheck` (3 lần gọi tsc) →
 `node scripts/react-migration-parity-check.js` (so cấu trúc DOM React vs bản
 cũ trước khi xoá — mỗi lần chỉ lệch đúng 1-2 điểm CÓ CHỦ ĐÍCH ở ô tìm kiếm/
 select đã ghi lý do trong code, hoặc khớp tuyệt đối như trang Người dùng/Cài
-đặt/So sánh hóa chất) → kiểm tra thủ công qua trình duyệt thật (gõ tìm kiếm,
-đổi ngày/số dòng mỗi trang, phân trang, mở modal liên quan, với trang Manage
-còn thêm: gõ số vào bảng Mean/SD và xác nhận không bị reset giữa chừng,
-bật/tắt checkbox hàng loạt, lưu Mean/SD qua bước xác thực lại mật khẩu, sửa
-CLIA/Ricos ở bảng TEa; với trang Reagent còn thêm: đổi qua lại giữa hai phép
-so sánh và xác nhận field/select hiện ĐÚNG dữ liệu của phép đang chọn, xoá một
-dòng cặp số liệu ở giữa bảng và xác nhận các dòng sau không kẹt dữ liệu cũ) →
-xoá code cũ → chạy lại `npm test` + `npm run a11y-audit` +
-`npm run check-build-freshness` lần nữa. Tổng: `npm test` 527/527 (giảm dần
-từ 613 ban đầu do xoá các test file của code cổ điển đã dọn qua từng trang),
-`npm run a11y-audit` 0 vi phạm giữ nguyên baseline (bao gồm modal
-`users:edit-permissions`/`settings:lis-queue`/7 modal của trang `manage`/2
-modal của trang `reagent`), `npm run check-build-freshness` khớp cả 4 bundle.
+đặt/So sánh hóa chất/Báo cáo) → kiểm tra thủ công qua trình duyệt thật (gõ tìm
+kiếm, đổi ngày/số dòng mỗi trang, phân trang, mở modal liên quan, với trang
+Manage còn thêm: gõ số vào bảng Mean/SD và xác nhận không bị reset giữa
+chừng, bật/tắt checkbox hàng loạt, lưu Mean/SD qua bước xác thực lại mật
+khẩu, sửa CLIA/Ricos ở bảng TEa; với trang Reagent còn thêm: đổi qua lại giữa
+hai phép so sánh và xác nhận field/select hiện ĐÚNG dữ liệu của phép đang
+chọn, xoá một dòng cặp số liệu ở giữa bảng và xác nhận các dòng sau không kẹt
+dữ liệu cũ; với trang Báo cáo còn thêm: khóa rồi mở khóa một kỳ qua đủ bước
+xác thực lại mật khẩu và xác nhận panel cập nhật đúng, gọi thử cả ba nút
+in/Xuất Excel/Xuất CSV không lỗi) → xoá code cũ → chạy lại `npm test` +
+`npm run a11y-audit` + `npm run check-build-freshness` lần nữa. Tổng:
+`npm test` 522/522 (giảm dần từ 613 ban đầu do xoá các test file của code cổ
+điển đã dọn qua từng trang), `npm run a11y-audit` 0 vi phạm giữ nguyên
+baseline (bao gồm modal `users:edit-permissions`/`settings:lis-queue`/7 modal
+của trang `manage`/2 modal của trang `reagent`), `npm run
+check-build-freshness` khớp cả 4 bundle.

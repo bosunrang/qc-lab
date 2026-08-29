@@ -25,24 +25,20 @@ export function createReportPageController(deps: {
   operationalLevels: (test: AnyRec) => AnyRec[];
   operationalPanelForTest: (test: AnyRec) => AnyRec;
   operationalLotGroupForTest: (test: AnyRec) => AnyRec;
-  replaceSelectItems: (select: AnyRec, items: AnyRec[], emptyText?: string) => void;
   scheduleSearchRender: (owner: AnyRec, apply: () => void, focusId?: string) => void;
   periodPresentation: { currentYearMonth: (value: string, fallback: string) => string; setPart: (ym: string, part: string, value: string) => string };
   periodWorkflow: { lock: (input: AnyRec) => AnyRec; unlock: (input: AnyRec) => AnyRec };
   findLock: (state: AnyRec, ym: string) => AnyRec;
   unlockModalHtml: (input: AnyRec) => string;
   unlockReason: (value: string) => { valid: boolean; reason: string };
-  lockListHtml: (locks: AnyRec[], isAdmin: boolean) => string;
-  lockPanelHtml: (input: AnyRec) => string;
   lockPicker: (ym: string, year: number) => AnyRec;
   searchValuePresentation: { values: (test: AnyRec, deps: AnyRec) => string[] };
-  reportSearch: { select: (tests: AnyRec[], q: string, selected: string, values: (t: AnyRec) => string[], searchText: (v: unknown) => string) => AnyRec };
   reportSelection: { defaults: (start: string, end: string, isoMonth: string, isoToday: string) => AnyRec; dateRange: (start: string, end: string) => AnyRec; exportSelection: (tests: AnyRec[], tid: string, start: string, end: string, includeNce: boolean) => AnyRec };
   rangeText: (start: string, end: string) => string;
   actionIconPresentation: { icon: (type: string) => string };
   role: () => string;
-  pageHtml: (input: AnyRec) => string;
-  rangePickerHtml: (start: string, end: string) => string;
+  sortedLocks: (locks: AnyRec[]) => AnyRec[];
+  formatDateTimeVN: (value: unknown) => string;
 }) {
   let reportQ = '', reportTest = '', reportRangeStart = '', reportRangeEnd = '', reportLockYm = '';
   const field = (id: string) => deps.document.getElementById(id) as AnyRec;
@@ -86,23 +82,11 @@ export function createReportPageController(deps: {
     await deps.infoDialog(`Đã mở khóa kỳ ${label}.`, { type: 'success' });
   };
 
-  const reportLockListHtml = () => deps.lockListHtml(deps.getState().periodLocks || [], deps.role() === 'admin');
-
   const reportSearchValues = (t: AnyRec) => deps.searchValuePresentation.values(t, { testLabel: deps.testSelectLabel, operationalLevels: deps.operationalLevels, panelForTest: deps.operationalPanelForTest, lotGroupForTest: deps.operationalLotGroupForTest });
-
-  const reportApplySearch = () => {
-    const tests = deps.operationalTests(), q = deps.searchText(reportQ), result = deps.reportSearch.select(tests, q, reportTest, reportSearchValues, deps.searchText), matched = result.matched;
-    reportTest = result.selected;
-    const select = field('rTest'), count = field('reportTestCount');
-    deps.replaceSelectItems(select, matched.map((t: AnyRec) => ({ value: t.id, label: deps.testSelectLabel(t, tests) })), 'Không tìm thấy xét nghiệm phù hợp');
-    if (select && reportTest) select.value = reportTest;
-    if (count) count.textContent = `(${matched.length}/${tests.length})`;
-    deps.document.querySelectorAll('[data-report-action]').forEach((button: AnyRec) => button.disabled = !matched.length);
-  };
 
   const reportSearchSet = (v: string) => {
     reportQ = v;
-    deps.scheduleSearchRender(reportSearchSet, reportApplySearch, 'reportSearch');
+    deps.scheduleSearchRender(reportSearchSet, deps.rerender, 'reportSearch');
   };
 
   const reportRangeDefaults = () => {
@@ -130,21 +114,36 @@ export function createReportPageController(deps: {
 
   const reportActionIcon = (type: string) => deps.actionIconPresentation.icon(type);
 
-  const reportLockPanelHtml = () => {
+  const reportLockPanelModel = () => {
     const state = deps.getState(), isAdmin = deps.role() === 'admin', ym = reportLockYmValue(), picker = deps.lockPicker(ym, new Date().getFullYear());
-    return deps.lockPanelHtml({ isAdmin, year: picker.year, month: picker.month, months: picker.months, years: picker.years, already: !!deps.findLock(state, ym), lockListHtml: reportLockListHtml() });
+    const locks = deps.sortedLocks(state.periodLocks || []).map((lock: AnyRec) => ({
+      ym: lock.ym,
+      monthLabel: deps.monthVN(lock.ym),
+      lockedBy: lock.lockedBy || '—',
+      lockedAtText: lock.lockedAt ? deps.formatDateTimeVN(lock.lockedAt) : '',
+    }));
+    return { isAdmin, year: picker.year, month: picker.month, months: picker.months, years: picker.years, already: !!deps.findLock(state, ym), ym, locks };
   };
 
-  const pageReportV2 = () => {
+  const reportModel = () => {
     const tests = deps.operationalTests();
     const q = deps.searchText(reportQ), matched = tests.filter((t: AnyRec) => !q || reportSearchValues(t).some((v: string) => deps.searchText(v).includes(q)));
     if (matched.length && (!reportTest || !matched.some((t: AnyRec) => t.id === reportTest))) reportTest = matched[0].id;
     if (!matched.length) reportTest = '';
+    const isAdmin = deps.role() === 'admin';
+    if (!tests.length) return { empty: true as const, isAdmin, lockPanel: reportLockPanelModel() };
     const { start, end } = reportRangeDefaults();
-    return deps.pageHtml({ tests, matched, selectedId: reportTest, query: reportQ, start, end, isAdmin: deps.role() === 'admin', lockPanelHtml: reportLockPanelHtml() });
+    return {
+      empty: false as const,
+      query: reportQ,
+      totalCount: tests.length,
+      matched: matched.map((t: AnyRec) => ({ id: t.id, label: deps.testSelectLabel(t, tests) })),
+      selectedId: reportTest,
+      start, end,
+      disabled: !matched.length,
+      lockPanel: reportLockPanelModel(),
+    };
   };
 
-  const reportRangePicker = (start: string, end: string) => deps.rangePickerHtml(start, end);
-
-  return { reportLockYmValue, reportSetLockPart, reportLockPeriod, reportUnlockPeriod, reportConfirmUnlockPeriod, reportLockListHtml, reportSearchValues, reportSearchSet, reportApplySearch, reportRangeDefaults, reportDateRange, reportExportSelection, reportRangeChanged, reportRangeText, reportActionIcon, reportLockPanelHtml, pageReportV2, reportRangePicker };
+  return { reportLockYmValue, reportSetLockPart, reportLockPeriod, reportUnlockPeriod, reportConfirmUnlockPeriod, reportSearchValues, reportSearchSet, reportRangeDefaults, reportDateRange, reportExportSelection, reportRangeChanged, reportRangeText, reportActionIcon, reportModel };
 }

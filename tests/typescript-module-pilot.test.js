@@ -166,7 +166,6 @@ const qcExportValueFormatSource = read('src/presentation/report/qc-export-value-
 const canvasFontSource = read('src/presentation/sigma/canvas-font.ts');
 const reportLabelsSource = read('src/presentation/report/report-labels.ts');
 const reportSelectionSource = read('src/presentation/report/report-selection.ts');
-const reportSearchSource = read('src/presentation/report/report-search.ts');
 const sigmaMuTraceSource = read('src/presentation/sigma/sigma-mu-trace.ts');
 const sigmaPrintRowsSource = read('src/presentation/sigma/sigma-print-rows.ts');
 const sigmaMuPrintRowsSource = read('src/presentation/sigma/sigma-mu-print-rows.ts');
@@ -1079,10 +1078,6 @@ assert.match(reportSelectionSource, /export function createReportSelection\(/,
   'Report selection must expose a dependency-injected factory');
 assert.doesNotMatch(reportSelectionSource, /\bstate\b|\bglobalThis\b|\bdocument\b/,
   'Report selection must not read global state or DOM');
-assert.match(reportSearchSource, /export function createReportSearch\(/,
-  'Report search must expose a dependency-injected factory');
-assert.doesNotMatch(reportSearchSource, /\bstate\b|\bglobalThis\b|\bdocument\b/,
-  'Report search must not read global state or DOM');
 assert.match(sigmaMuTraceSource, /export function createSigmaMuTrace\(/,
   'Sigma MU trace must expose a dependency-injected factory');
 assert.doesNotMatch(sigmaMuTraceSource, /\bstate\b|\bglobalThis\b|\bdocument\b/,
@@ -1409,8 +1404,6 @@ assert.match(generated, /root\.reportLabels\s*=\s*createReportLabels/,
   'artifact must publish TypeScript report labels for the legacy bridge');
 assert.match(generated, /root\.reportSelection\s*=\s*createReportSelection/,
   'artifact must publish TypeScript report selection for the legacy bridge');
-assert.match(generated, /root\.reportSearch\s*=\s*createReportSearch/,
-  'artifact must publish TypeScript report search for the legacy bridge');
 assert.match(generated, /root\.sigmaMuTraceService\s*=\s*createSigmaMuTrace/,
   'artifact must publish TypeScript Sigma MU trace for the legacy bridge');
 assert.match(generated, /root\.sigmaPrintRowsService\s*=\s*createSigmaPrintRows/,

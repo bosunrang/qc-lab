@@ -24,9 +24,8 @@ const actionForm = read('src/presentation/actions/action-form-controller.ts');
 const actionLogPanelPresentation = read('src/presentation/nce/action-log-panel-html.ts');
 const actionRerunEvidencePresentation = read('src/presentation/nce/action-rerun-evidence-html.ts');
 const reportRoutes = read('src/presentation/report/report-page-controller.ts');
-const reportPageHtml = read('src/presentation/report/report-page-html.ts');
+const reportPage = read('src/react/pages/ReportPage.tsx');
 const reportActionIconPresentation = read('src/presentation/report/report-action-icon.ts');
-const reportLockPanelPresentation = read('src/presentation/report/report-lock-panel-html.ts');
 const manageRoutes = read('src/presentation/manage/manage-page-controller.ts');
 const teaReferenceLabProfileBodyPresentation = read('src/presentation/manage/tea-reference-lab-profile-body-html.ts');
 const westgardRoutes = read('src/presentation/westgard/westgard-page-controller.ts');
@@ -81,8 +80,8 @@ assert.match(manageRoutes+teaReferenceLabProfileBodyPresentation,/TEa chuẩn h�
    quét văn bản nguồn kiểu này không áp dụng được cho các trang đó nữa.
    Heading semantic của các trang React được xác nhận bằng npm run a11y-audit
    (kiểm DOM thật qua axe-core), không phải quét chuỗi nguồn ở đây. */
-const semanticPageRoutes=[sigmaRoutes,sigmaPeriodTablePresentation,sigmaChartsPanelPresentation,actionsRoutes,actionForm,actionLogPanelPresentation,reportRoutes,reportLockPanelPresentation,router].join('\n');
-for(const title of ['Tình trạng','Số liệu theo kỳ','Biểu đồ Sigma & MDC','Nhật ký khắc phục','Khóa kỳ báo cáo','Biểu đồ Levey-Jennings']){
+const semanticPageRoutes=[sigmaRoutes,sigmaPeriodTablePresentation,sigmaChartsPanelPresentation,actionsRoutes,actionForm,actionLogPanelPresentation,reportRoutes,router].join('\n');
+for(const title of ['Tình trạng','Số liệu theo kỳ','Biểu đồ Sigma & MDC','Nhật ký khắc phục','Biểu đồ Levey-Jennings']){
   const escaped=title.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
   assert.match(semanticPageRoutes,new RegExp(`<h2[^>]*class="[^"]*panel-title[^"]*"[^>]*>${escaped}`),`panel chính "${title}" phải dùng heading cấp 2 thật`);
 }
@@ -93,11 +92,11 @@ assert.equal((entryCss.match(/!important/g) || []).length, 0, 'entry UI must not
 assert.equal((dashboardCss.match(/!important/g) || []).length, 0, 'dashboard UI must not depend on !important');
 assert.match(sigmaCss, /\.sg-eqa-table th\{[^}]*text-transform:none/);
 assert.match(sigmaCss, /\.sg-eqa-summary span\{[^}]*text-transform:none/);
-// Icon nút của trang Báo cáo đi theo trang sang report-routes.js (tách 2026-07-30);
-// nút "Tạo báo cáo & In" tự nó đã chuyển sang createReportPageHtml() (TypeScript)
-// khi pageReportV2() không còn tự dựng HTML — xem report-page-html.ts.
+// Trang Báo cáo chuyển sang React (2026-08-30, xem ReportPage.tsx) — nút
+// "Tạo báo cáo & In" gọi thẳng bridge reportActionIcon('print') thay vì
+// deps.actionIcon() cổ điển.
 assert.match(reportRoutes, /const reportActionIcon = \(type: string\) =>/);
-assert.match(reportPageHtml, /deps\.actionIcon\('print'\)/);
+assert.match(reportPage, /reportActionIcon\('print'\)/);
 assert.match(reportActionIconPresentation, /aria-hidden="true"/);
 assert.match(actionRerunEvidencePresentation, /aria-hidden="true"/);
 assert.match(tokens, /--space-section:14px/);

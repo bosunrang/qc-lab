@@ -397,8 +397,9 @@ without touching the existing strict TS config. Dashboard/"Tổng quan"
 (`src/react/pages/AuditPage.tsx`), Users/"Người dùng"
 (`src/react/pages/UsersPage.tsx`), Settings/"Cài đặt"
 (`src/react/pages/SettingsPage.tsx`), Manage/"Cấu hình chung"
-(`src/react/pages/ManagePage.tsx`) and Reagent/"So sánh hóa chất"
-(`src/react/pages/ReagentPage.tsx`) are the first six migrated pages, all
+(`src/react/pages/ManagePage.tsx`), Reagent/"So sánh hóa chất"
+(`src/react/pages/ReagentPage.tsx`) and Report/"Báo cáo"
+(`src/react/pages/ReportPage.tsx`) are the first seven migrated pages, all
 with their classic HTML-builder code already deleted post-parity-check; see
 `docs/REACT-ADOPTION-PLAN.md` for the page-by-page order and status of the
 rest.
@@ -949,6 +950,13 @@ Google Fonts link, offline labs must print with correct metrics.
     `reportSetLockPart()`/`reportSearchSet()` handlers, never by direct global
     assignment, so nothing outside may write it. Those two pages share no
     function — only `professional-reports.css`, see "CSS structure".
+    **`pageReportV2()`/`reportLockPanelHtml()`/`reportRangePicker()`/
+    `reportApplySearch()` no longer exist**: the page retired again on
+    2026-08-30 to `src/react/pages/ReportPage.tsx` (see the
+    `report-page-controller.ts` bullet further below and
+    `docs/REACT-ADOPTION-PLAN.md`), and `pageMap()` in
+    `modular-pilot.global.ts` no longer carries a `report` entry at all —
+    `isReactPage('report')` intercepts it first.
   - The NCE form then moved to classic `action-form.js`: the `ACT_*` option/
     suggestion constants, `actSel()`, the `<details>` section machinery, the
     investigation checklist, the draft that survives `rerender()`,
@@ -1300,6 +1308,44 @@ Google Fonts link, offline labs must print with correct metrics.
   "computed" React version against an "uncomputed" classic one until a
   `POST_RENDER` hook was added to call `rcCompute()` for both sides before
   diffing.
+- `src/presentation/report/report-page-controller.ts` — Report/"Báo cáo"
+  retired to React 2026-08-30: `src/react/pages/ReportPage.tsx` now owns the
+  page, reading data from `reportModel()`/`reportLockPanelModel()` (new
+  pure-data functions added right where `pageReportV2()`/`reportLockPanelHtml()`
+  used to sit). `pageReportV2()`, `reportLockPanelHtml()`, `reportRangePicker()`,
+  `reportApplySearch()` and their 4 classic HTML-builder files
+  (`report-page-html.ts`, `report-range-picker-html.ts`,
+  `report-lock-panel-html.ts`, `report-lock-list-html.ts`) are deleted
+  outright, along with their 5 dedicated test files (the 4 builder tests plus
+  `report-page-bridge.test.js`, which pinned only the now-gone `pageHtml`
+  bridge contract). `reportApplySearch()` was the sole caller of
+  `report-search.ts`'s `createReportSearch()` — confirmed via a repo-wide
+  grep before deleting that file too, plus its bridge wiring
+  (`root.reportSearch`) and the assertions referencing it in
+  `tests/typescript-module-pilot.test.js`/`tests/report-render-bridge.test.js`.
+  Every other Report function (`reportLockPeriod`, `reportUnlockPeriod`,
+  `reportConfirmUnlockPeriod`, `reportExportSelection`, `reportRangeChanged`,
+  `printReport`/`exportReportXLSX`/`exportReportCSV` in
+  `report-print-controller.ts`/`data-io-controller.ts`) needed no change —
+  they read the DOM directly at call time or render into `#modalRoot`,
+  outside React. The Lock Panel's month/year `<select>`s applied the
+  Reagent-class `key={ym}` remount fix **proactively, before hitting the bug
+  live** (`reportSetLockPart()` changes which value should show via
+  `rerender()` without changing the tree's structure — exactly the pattern
+  that bit Reagent's `rcSel`); confirmed correct by calling
+  `reportSetLockPart('month','3')` directly and checking the rendered
+  `<select>` value. Testing this page surfaced one **pre-existing bug
+  unrelated to the React migration**: `exportReportCSV()` always threw
+  `TypeError: Cannot read properties of undefined (reading 'currentLot')` —
+  `root.qcReportCsvRows`'s `rows:` dependency read `root.qcReportRowsService`
+  eagerly at construction time (line ordering placed it before
+  `root.qcReportRowsService` itself was assigned), the same
+  eager-construction trap documented throughout this file for other routes.
+  Confirmed the bug predates this migration by reproducing it with
+  `isReactPage('report')` forced `false` (the classic path) before fixing;
+  fixed by wrapping the dependency in a closure that re-reads `root.X` per
+  call, matching the pattern `data-io-controller.ts`'s own
+  `qcReportRowsService` dependency already used correctly.
 - QC target-range workflow (`rangeCandidate`/`openRangeWorkflow`/`applyNewRange`/
   `confirmApplyNewRange`/`revertRange`/`confirmRevertRange`/`rangeGateHtml`/
   `rangeGatePasses`/`rangeUpdateBiasHint`/`rangeTeaPercent`/`rangeSystematicNce`)

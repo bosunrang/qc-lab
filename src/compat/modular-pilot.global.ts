@@ -279,14 +279,10 @@ import { reportHeaderPresentation } from '../presentation/report/report-header';
 import { createReportNceAppendix, type ReportNceAppendixApi } from '../presentation/report/report-nce-appendix';
 import { createReportNceDetailHtml } from '../presentation/report/report-nce-detail-html';
 import { reportSignBlock } from '../presentation/report/report-sign-block';
-import { createReportLockListHtml } from '../presentation/report/report-lock-list-html';
 import { createReportUnlockReason } from '../presentation/report/report-unlock-reason';
 import { reportUnlockModalHtml } from '../presentation/report/report-unlock-modal-html';
 import { createReportPageController } from '../presentation/report/report-page-controller';
 import { reportLockPicker } from '../presentation/report/report-lock-picker';
-import { createReportLockPanelHtml } from '../presentation/report/report-lock-panel-html';
-import { createReportPageHtml } from '../presentation/report/report-page-html';
-import { createReportRangePickerHtml } from '../presentation/report/report-range-picker-html';
 import { createDashboardStatusFilter } from '../presentation/dashboard/dashboard-status-filter';
 import { dashboardExpiringLots } from '../domain/qc/dashboard-expiring-lots';
 import { dashboardShiftStatus } from '../presentation/dashboard/dashboard-shift-status';
@@ -480,7 +476,6 @@ import { createQcExportValueFormat } from '../presentation/report/qc-export-valu
 import { createCanvasFont as createSigmaCanvasFont } from '../presentation/sigma/canvas-font';
 import { createReportLabels } from '../presentation/report/report-labels';
 import { createReportSelection } from '../presentation/report/report-selection';
-import { createReportSearch } from '../presentation/report/report-search';
 import { createSigmaMuTrace } from '../presentation/sigma/sigma-mu-trace';
 import { createSigmaPrintRows } from '../presentation/sigma/sigma-print-rows';
 import { createSigmaMuPrintRows } from '../presentation/sigma/sigma-mu-print-rows';
@@ -1802,31 +1797,23 @@ type QCLabGlobal = typeof globalThis & {
   reportHeaderPresentation: typeof reportHeaderPresentation;
   reportNceAppendixPresentation: ReportNceAppendixApi;
   reportSignBlock: typeof reportSignBlock;
-  reportLockListHtmlPresentation: ReturnType<typeof createReportLockListHtml<any>>;
   reportUnlockReason?: ReturnType<typeof createReportUnlockReason>;
   reportUnlockModalHtml: typeof reportUnlockModalHtml;
   reportLockPicker: typeof reportLockPicker;
-  reportLockPanelHtmlPresentation: ReturnType<typeof createReportLockPanelHtml>;
-  reportPageHtml: ReturnType<typeof createReportPageHtml>;
-  reportRangePickerHtml: ReturnType<typeof createReportRangePickerHtml>;
   reportLockYmValue: ReturnType<typeof createReportPageController>['reportLockYmValue'];
   reportSetLockPart: ReturnType<typeof createReportPageController>['reportSetLockPart'];
   reportLockPeriod: ReturnType<typeof createReportPageController>['reportLockPeriod'];
   reportUnlockPeriod: ReturnType<typeof createReportPageController>['reportUnlockPeriod'];
   reportConfirmUnlockPeriod: ReturnType<typeof createReportPageController>['reportConfirmUnlockPeriod'];
-  reportLockListHtml: ReturnType<typeof createReportPageController>['reportLockListHtml'];
   reportSearchValues: ReturnType<typeof createReportPageController>['reportSearchValues'];
   reportSearchSet: ReturnType<typeof createReportPageController>['reportSearchSet'];
-  reportApplySearch: ReturnType<typeof createReportPageController>['reportApplySearch'];
   reportRangeDefaults: ReturnType<typeof createReportPageController>['reportRangeDefaults'];
   reportDateRange: ReturnType<typeof createReportPageController>['reportDateRange'];
   reportExportSelection: ReturnType<typeof createReportPageController>['reportExportSelection'];
   reportRangeChanged: ReturnType<typeof createReportPageController>['reportRangeChanged'];
   reportRangeText: ReturnType<typeof createReportPageController>['reportRangeText'];
   reportActionIcon: ReturnType<typeof createReportPageController>['reportActionIcon'];
-  reportLockPanelHtml: ReturnType<typeof createReportPageController>['reportLockPanelHtml'];
-  pageReportV2: ReturnType<typeof createReportPageController>['pageReportV2'];
-  reportRangePicker: ReturnType<typeof createReportPageController>['reportRangePicker'];
+  reportModel: ReturnType<typeof createReportPageController>['reportModel'];
   ReportPeriodWorkflowCommand: ReportPeriodWorkflowCommand;
   dashboardStatusFilter: ReturnType<typeof createDashboardStatusFilter>;
   dashboardExpiringLots: typeof dashboardExpiringLots;
@@ -2107,7 +2094,6 @@ type QCLabGlobal = typeof globalThis & {
   sigmaCanvasFont: ReturnType<typeof createSigmaCanvasFont>;
   reportLabels: ReturnType<typeof createReportLabels>;
   reportSelection: ReturnType<typeof createReportSelection>;
-  reportSearch: ReturnType<typeof createReportSearch>;
   sigmaMuTraceService: ReturnType<typeof createSigmaMuTrace>;
   sigmaPrintRowsService: ReturnType<typeof createSigmaPrintRows>;
   sigmaMuPrintRowsService: ReturnType<typeof createSigmaMuPrintRows>;
@@ -3474,7 +3460,7 @@ root.cusumPointRenderModel=cusumPointRenderModel;
 root.cusumReferenceLines=cusumReferenceLines;
 root.cusumLinePoints=cusumLinePoints;
 root.blobDownload=createBlobDownload({createUrl:blob=>URL.createObjectURL(blob),revokeUrl:url=>URL.revokeObjectURL(url),download:(url,name)=>{const anchor=document.createElement('a');anchor.href=url;anchor.download=name;anchor.click();},schedule:(work,delay)=>globalThis.setTimeout(work,delay)});
-root.qcReportCsvRows=createQcReportCsvRows({test:(id:any)=>(state.tests||[]).find((test:any)=>test.id===id),lab:()=>(state as any).lab||{},meta:(kind:any)=>(root as any).exportMetaRows(kind),range:(start:any,end:any)=>(root as any).reportRangeText(start,end),testName:(test:any)=>(root as any).testDisplayName(test),tea:(test:any)=>(root as any).sgTea(test),teaSource:(test:any)=>(root as any).sgTeaSource(test),teaLabel:(source:any)=>(root as any).sgTeaLabel(source),teaReference:(test:any)=>(root as any).sgTeaRefText(test),levels:(test:any)=>(root as any).operationalLevels(test),previous:(test:any,level:any)=>(root as any).previousLotSeries(test,level),rows:(root as any).qcReportRowsService,westgard:(test:any)=>(root as any).activeWestgard(test),staff:(point:any)=>(root as any).pointStaff(point),date:(value:any)=>(root as any).vnDate(value),number:(value:any,decimals?:any)=>(root as any).fmt(value,decimals),state:(value:any)=>(root as any).stateName(value),error:(rules:any)=>(root as any).errorType(rules),stats:(points:any,mean:any,tea:any)=>(root as any).reportLevelStats(points,mean,tea),levelLabel:(test:any,level:any,lot:any)=>(root as any).actionLevelShort(test,level,lot),workflow:(action:any)=>(root as any).actionWorkflowStatus(action),rerun:(action:any)=>(root as any).actionRerunStatus(action),protocol:(action:any)=>(root as any).actionProtocolSummary(action),approval:(action:any)=>(root as any).actionApprovalLabel(action)});
+root.qcReportCsvRows=createQcReportCsvRows({test:(id:any)=>(state.tests||[]).find((test:any)=>test.id===id),lab:()=>(state as any).lab||{},meta:(kind:any)=>(root as any).exportMetaRows(kind),range:(start:any,end:any)=>(root as any).reportRangeText(start,end),testName:(test:any)=>(root as any).testDisplayName(test),tea:(test:any)=>(root as any).sgTea(test),teaSource:(test:any)=>(root as any).sgTeaSource(test),teaLabel:(source:any)=>(root as any).sgTeaLabel(source),teaReference:(test:any)=>(root as any).sgTeaRefText(test),levels:(test:any)=>(root as any).operationalLevels(test),previous:(test:any,level:any)=>(root as any).previousLotSeries(test,level),rows:{previousLot:(t:any,s:any,inRange:any)=>(root.qcReportRowsService as any).previousLot(t,s,inRange),currentLot:(t:any,l:any,wg:any,inRange:any)=>(root.qcReportRowsService as any).currentLot(t,l,wg,inRange),actions:(tid:any,inRange:any)=>(root.qcReportRowsService as any).actions(tid,inRange)},westgard:(test:any)=>(root as any).activeWestgard(test),staff:(point:any)=>(root as any).pointStaff(point),date:(value:any)=>(root as any).vnDate(value),number:(value:any,decimals?:any)=>(root as any).fmt(value,decimals),state:(value:any)=>(root as any).stateName(value),error:(rules:any)=>(root as any).errorType(rules),stats:(points:any,mean:any,tea:any)=>(root as any).reportLevelStats(points,mean,tea),levelLabel:(test:any,level:any,lot:any)=>(root as any).actionLevelShort(test,level,lot),workflow:(action:any)=>(root as any).actionWorkflowStatus(action),rerun:(action:any)=>(root as any).actionRerunStatus(action),protocol:(action:any)=>(root as any).actionProtocolSummary(action),approval:(action:any)=>(root as any).actionApprovalLabel(action)});
 root.installDerivedCacheInvalidation=legacy=>root.derivedCacheInvalidation=createDerivedCacheInvalidation({...legacy,resetQcDerivedIndex:()=>root.qcDerivedIndex?.clear(),pointCache:()=>root.qcPointCache,westgardCache:()=>root.westgardMemoCache,acceptedCache:()=>root.qcAcceptedMemoCache,cusumCache:()=>root.qcCusumMemoCache,invalidateWestgardWorker:(testId:unknown)=>(root as any).invalidateWestgardWorker(testId),invalidateActionCaches:(testId:unknown)=>(root as any).invalidateActionCaches(testId)} as any);
 const legacyDerivedCacheState=(root as any).legacyDerivedCacheState;
 if(legacyDerivedCacheState)root.installDerivedCacheInvalidation(legacyDerivedCacheState);
@@ -3674,13 +3660,9 @@ root.reportHeaderPresentation=reportHeaderPresentation;
 root.reportNceAppendixPresentation=createReportNceAppendix({detail:(action,test)=>(globalThis as any).reportNceDetailHtml(action,test)});
 root.reportNceDetailHtmlPresentation=createReportNceDetailHtml({model:(action,test)=>(globalThis as any).reportNceModel(action,test),field:(label,value,wide)=>(globalThis as any).reportNceDetailField(label,value,wide),escape:(value:any)=>typeof (globalThis as any).esc==='function'?(globalThis as any).esc(value):String(value??'')});
 root.reportSignBlock=reportSignBlock;
-root.reportLockListHtmlPresentation=createReportLockListHtml<any>({sorted:(locks:any[])=>(root as any).ReportPeriodPresentation.sortedLocks(locks),month:(ym:any)=>(root as any).monthVN(ym),dateTime:(value:any)=>(root as any).formatDateTimeVN(value),escape:(value:any)=>(root as any).esc(value),button:(label,action,variant)=>(root as any).btn(label,action,variant),quote:(value:any)=>(root as any).jsq(value)});
 root.reportUnlockReason=createReportUnlockReason({clean:(value:any,maxLength:number)=>(root as any).QCCore.cleanText(value,maxLength)});
 root.reportUnlockModalHtml=reportUnlockModalHtml;
 root.reportLockPicker=reportLockPicker;
-root.reportLockPanelHtmlPresentation=createReportLockPanelHtml({button:(label,action,variant,title,options)=>(root as any).btn(label,action,variant,title,options)});
-root.reportPageHtml=createReportPageHtml({head:(title,subtitle)=>(root as any).headOnly(title,subtitle),empty:(title,message,action)=>(root as any).emptyState(title,message,action),button:(label,action,variant,title,options)=>(root as any).btn(label,action,variant,title,options),escape:(value:any)=>(root as any).esc(value),escapeAttr:(value:any)=>(root as any).escAttr(value),label:(test:any,tests:any[])=>(root as any).testSelectLabel(test,tests),rangePicker:(start,end)=>(root as any).reportRangePicker(start,end),actionIcon:(type)=>(root as any).reportActionIcon(type)});
-root.reportRangePickerHtml=createReportRangePickerHtml({dateBox:(id,value,placeholder,attrs)=>(root as any).dateBox(id,value,placeholder,attrs)});
 const reportPageController=createReportPageController({
   document:typeof document!=='undefined'?document:({getElementById:()=>null,querySelectorAll:()=>[]} as unknown as Document),
   getState:()=>state,
@@ -3706,43 +3688,35 @@ const reportPageController=createReportPageController({
   operationalLevels:test=>(root as any).operationalLevels(test),
   operationalPanelForTest:test=>(root as any).operationalPanelForTest(test),
   operationalLotGroupForTest:test=>(root as any).operationalLotGroupForTest(test),
-  replaceSelectItems:(select,items,emptyText)=>root.replaceSelectItems(select,items,emptyText),
   scheduleSearchRender:(owner,apply,focusId)=>root.scheduleSearchRender(owner,apply,focusId),
   periodPresentation:{currentYearMonth:(value,fallback)=>root.ReportPeriodPresentation.currentYearMonth(value,fallback),setPart:(ym,part,value)=>root.ReportPeriodPresentation.setPart(ym,part as any,value)},
   periodWorkflow:{lock:input=>root.ReportPeriodWorkflowCommand.lock(input),unlock:input=>root.ReportPeriodWorkflowCommand.unlock(input)},
   findLock:(s,ym)=>root.PeriodService.findLock(s,ym),
   unlockModalHtml:input=>root.reportUnlockModalHtml(input),
   unlockReason:value=>root.reportUnlockReason!(value),
-  lockListHtml:(locks,isAdmin)=>root.reportLockListHtmlPresentation(locks,isAdmin),
-  lockPanelHtml:input=>root.reportLockPanelHtmlPresentation(input),
   lockPicker:(ym,year)=>root.reportLockPicker(ym,year),
   searchValuePresentation:{values:(test,d)=>root.reportSearchValuePresentation.values(test,d) as string[]},
-  reportSearch:{select:(tests,q,selected,values,st)=>(root as any).reportSearch.select(tests,q,selected,values,st)},
   reportSelection:{defaults:(start,end,im,it)=>(root as any).reportSelection.defaults(start,end,im,it),dateRange:(start,end)=>(root as any).reportSelection.dateRange(start,end),exportSelection:(tests,tid,start,end,includeNce)=>(root as any).reportSelection.exportSelection(tests,tid,start,end,includeNce)},
   rangeText:(start,end)=>root.reportLabels.rangeText(start,end),
   actionIconPresentation:{icon:type=>root.reportActionIconPresentation.icon(type)},
   role:()=>root.role(),
-  pageHtml:input=>root.reportPageHtml(input),
-  rangePickerHtml:(start,end)=>root.reportRangePickerHtml(start,end),
+  sortedLocks:locks=>root.ReportPeriodPresentation.sortedLocks(locks),
+  formatDateTimeVN:value=>(root as any).formatDateTimeVN(value),
 });
 root.reportLockYmValue=reportPageController.reportLockYmValue;
 root.reportSetLockPart=reportPageController.reportSetLockPart;
 root.reportLockPeriod=reportPageController.reportLockPeriod;
 root.reportUnlockPeriod=reportPageController.reportUnlockPeriod;
 root.reportConfirmUnlockPeriod=reportPageController.reportConfirmUnlockPeriod;
-root.reportLockListHtml=reportPageController.reportLockListHtml;
 root.reportSearchValues=reportPageController.reportSearchValues;
 root.reportSearchSet=reportPageController.reportSearchSet;
-root.reportApplySearch=reportPageController.reportApplySearch;
 root.reportRangeDefaults=reportPageController.reportRangeDefaults;
 root.reportDateRange=reportPageController.reportDateRange;
 root.reportExportSelection=reportPageController.reportExportSelection;
 root.reportRangeChanged=reportPageController.reportRangeChanged;
 root.reportRangeText=reportPageController.reportRangeText;
 root.reportActionIcon=reportPageController.reportActionIcon;
-root.reportLockPanelHtml=reportPageController.reportLockPanelHtml;
-root.pageReportV2=reportPageController.pageReportV2;
-root.reportRangePicker=reportPageController.reportRangePicker;
+root.reportModel=reportPageController.reportModel;
 const reportPeriodCommand=createReportPeriodCommand({lock:(s,input)=>root.PeriodService.lock(s as any,input),unlock:(s,input)=>root.PeriodService.unlock(s as any,input)});
 root.ReportPeriodWorkflowCommand=createReportPeriodWorkflowCommand({current:()=>state,period:reportPeriodCommand,log:(type,detail,target)=>logAct(type,detail,target),save:options=>save(options),render:()=>rerender()});
 root.ActionCurrentIssues=createActionCurrentIssues({operationalTests:()=>typeof (globalThis as any).operationalTests==='function'?(globalThis as any).operationalTests():[],activeWestgard:test=>(globalThis as any).activeWestgard(test),pointWorkflowComplete:pointId=>typeof (globalThis as any).pointWorkflowComplete==='function'?(globalThis as any).pointWorkflowComplete(pointId):false});
@@ -4141,7 +4115,7 @@ const routerDispatch=createRouterDispatchController({
   nav:()=>root.nav(),
   requestFrame:work=>requestAnimationFrame(work),
   resetStatusMemo:()=>{(root as any).AnalysisUIState.statusMemo=new Map();},
-  pageMap:()=>({entry:(root as any).pageEntry,westgard:(root as any).pageWestgard,sigma:(root as any).pageSigma,actions:(root as any).pageActionsV4,report:(root as any).pageReportV2}),
+  pageMap:()=>({entry:(root as any).pageEntry,westgard:(root as any).pageWestgard,sigma:(root as any).pageSigma,actions:(root as any).pageActionsV4}),
   afterRender:p=>root.afterRender(p),
   entryQ:()=>(root as any).entryQ,
   entryFilter:v=>(root as any).entryFilter(v),
@@ -4239,7 +4213,6 @@ root.qcExportValueFormat=createQcExportValueFormat({testValue:(test:any,value:an
 root.sigmaCanvasFont=createSigmaCanvasFont((token:string,fallback:number)=>{if(typeof getComputedStyle==='function'&&typeof document!=='undefined'){const value=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--'+token));if(Number.isFinite(value))return value;}return fallback;});
 root.reportLabels=createReportLabels((value:any)=>vnDate(value));
 root.reportSelection=createReportSelection();
-root.reportSearch=createReportSearch();
 root.sigmaMuTraceService=createSigmaMuTrace({escape:(value:any)=>typeof (globalThis as any).esc==='function'?(globalThis as any).esc(value):String(value??''),formatDate:(value:any)=>vnDate(value)});
 root.sigmaPrintRowsService=createSigmaPrintRows({escape:(value:any)=>typeof (globalThis as any).esc==='function'?(globalThis as any).esc(value):String(value??''),escapeAttr:(value:any)=>typeof (globalThis as any).escAttr==='function'?(globalThis as any).escAttr(value):String(value??''),format:(value:any,decimals?:number)=>fmt(value,decimals),dpmo:(value:any)=>(globalThis as any).sgFmtDPMO(value),period:(value:any)=>typeof (globalThis as any).vnPeriod==='function'?(globalThis as any).vnPeriod(value):String(value??'')});
 root.sigmaMuPrintRowsService=createSigmaMuPrintRows({mu:(test:any,entry:any,level:any)=>typeof (globalThis as any).sgMU==='function'?(globalThis as any).sgMU(test,entry,level):undefined,format:(value:any,decimals?:number)=>fmt(value,decimals),escape:(value:any)=>typeof (globalThis as any).esc==='function'?(globalThis as any).esc(value):String(value??''),period:(value:any)=>typeof (globalThis as any).vnPeriod==='function'?(globalThis as any).vnPeriod(value):String(value??'')});

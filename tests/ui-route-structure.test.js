@@ -22,7 +22,7 @@ const form=read('src/presentation/actions/action-form-controller.ts');
 const actionRecordService=read('src/application/nce/action-record-service.ts');
 const actionEvidencePresentation=read('src/presentation/nce/action-evidence-presentation.ts');
 const report=read('src/presentation/report/report-page-controller.ts');
-const reportPageHtml=read('src/presentation/report/report-page-html.ts');
+const reportPage=read('src/react/pages/ReportPage.tsx');
 const sigma=read('src/presentation/sigma/sigma-page-controller.ts');
 const sigmaTea=read('src/domain/sigma/sigma-tea-resolution.ts');
 const reportsCss=read('assets/professional-reports.css');
@@ -73,13 +73,15 @@ assert.match(compat,/root\.routerShell\.nav/,'router bridge phải ủy quyền 
 assert.match(vnDatePicker,/export function createVnDatePickerController\(/,'VN date picker controller phải nằm trong TypeScript');
 assert.match(compat,/root\.vnDatePickerController\.parse/,'router bridge phải dùng parser ngày TypeScript');
 
-/* Trang Báo cáo tách khỏi actions-routes.js (2026-07-30) vì file đó từng giữ CẢ hai
-   trang và phình lên 105 KB — cùng lý do đã tách dash/entry/westgard khỏi
-   router-render.js. Chốt cả hai chiều: mỗi trang nằm đúng file của nó VÀ không có
-   tham chiếu chéo nào lẻn ngược lại, nếu không lần gộp sau sẽ âm thầm tái diễn. */
-assert.match(report,/const pageReportV2 = \(\) => \{/,'trang Báo cáo phải nằm ở report-page-controller.ts');
-assert.doesNotMatch(actions,/function pageReportV2\(/,'actions-routes.js không được giữ lại trang Báo cáo');
-for(const name of ['reportLockPanelHtml','reportRangePicker','reportDateRange','reportRangeText','reportApplySearch'])assert.match(report,new RegExp(`const ${name} = `),`${name} thuộc controller trang Báo cáo`);
+/* Trang Báo cáo chuyển sang React (2026-08-30, xem ReportPage.tsx và
+   docs/REACT-ADOPTION-PLAN.md) — pageReportV2()/reportLockPanelHtml()/
+   reportRangePicker()/reportApplySearch() đã xóa, chỉ còn reportModel() (dữ
+   liệu thuần) ở report-page-controller.ts. Vẫn chốt report-page-controller.ts
+   không lẫn logic trang Khắc phục sự cố, và actions-routes.js không còn tham
+   chiếu ngược lại trang Báo cáo — cùng lý do đã tách dash/entry/westgard khỏi
+   router-render.js. */
+assert.match(report,/const reportModel = \(\) => \{/,'trang Báo cáo (reportModel) phải nằm ở report-page-controller.ts');
+for(const name of ['reportDateRange','reportRangeText'])assert.match(report,new RegExp(`const ${name} = `),`${name} thuộc controller trang Báo cáo`);
 assert.match(report,/let reportQ = ''/,'state của trang Báo cáo đi cùng controller (closure), không bỏ lại actions-routes.js');
 assert.doesNotMatch(actions,/\breport[A-Z_]/,'actions-routes.js không còn tham chiếu nào tới trang Báo cáo');
 assert.doesNotMatch(report,/\bpageActionsV4\b|\bACT_[A-Z]/,'report-page-controller.ts không được kéo theo logic trang Khắc phục sự cố');
@@ -148,12 +150,12 @@ assert.doesNotMatch(actionsArea,/headOnly\([^;\n]+btn\('Quy trình 8 bước'/,'
 assert.match(actions,/cls: 'action-guide-modal'/,'hướng dẫn 8 bước phải dùng popup NCE chuyên biệt');
 assert.match(actionCancelModal,/class="alert warn action-cancel-warning"/,'cảnh báo hủy NCE phải có bố cục riêng để nội dung không bị ép thành hai cột');
 assert.match(reportsCss,/\.action-cancel-warning\{[^}]*width:100%;[^}]*flex-direction:column/,'cảnh báo hủy NCE phải xếp câu chính và giải thích theo chiều dọc');
-assert.match(reportPageHtml,/class="report-export-options"[\s\S]*?Kèm phụ lục NCE[\s\S]*?\(Áp dụng cho PDF và Excel\)[\s\S]*?class="report-actions"/,'tùy chọn phụ lục NCE phải nằm ở dòng riêng phía trên các nút xuất và có chú thích trong ngoặc');
+assert.match(reportPage,/className="report-export-options"[\s\S]*?Kèm phụ lục NCE[\s\S]*?\(Áp dụng cho PDF và Excel\)[\s\S]*?className="report-actions"/,'tùy chọn phụ lục NCE phải nằm ở dòng riêng phía trên các nút xuất và có chú thích trong ngoặc');
 assert.match(reportsCss,/\.report-nce-option span\{[^}]*display:inline-flex;[^}]*align-items:baseline;[^}]*white-space:nowrap/,'nhãn và chú thích phụ lục NCE phải nằm cùng hàng');
 assert.match(reportsCss,/\.report-nce-option\{[^}]*align-items:center/,'ô tick phải căn giữa theo chiều dọc với nhãn phụ lục NCE');
 assert.match(reportsCss,/\.report-nce-option input\{[^}]*margin:0/,'ô tick phụ lục NCE không được giữ độ lệch thủ công');
 assert.match(reportsCss,/@media\(max-width:760px\)\{[\s\S]*?\.report-nce-option span\{[^}]*white-space:normal;[^}]*flex-wrap:wrap/,'nhãn phụ lục NCE được phép xuống hàng trên màn hình hẹp');
-assert.doesNotMatch(reportPageHtml,/class="report-actions"[\s\S]*?report-nce-option/,'checkbox phụ lục NCE không được trộn cùng hàng nút hành động');
+assert.doesNotMatch(reportPage,/className="report-actions"[\s\S]*?report-nce-option/,'checkbox phụ lục NCE không được trộn cùng hàng nút hành động');
 assert.doesNotMatch(actions,/action-guide-(?:mark|legend)/,'hướng dẫn NCE không được dùng logo phụ hoặc dải màu phân nhóm');
 assert.match(reportsCss,/\.action-guide-list\{[^}]*grid-template-columns:1fr/,'quy trình NCE phải là một danh sách tuyến tính dễ đọc');
 assert.match(reportsCss,/\.action-guide-card\{[^}]*border-bottom:1px solid var\(--line\)/,'các bước NCE chỉ phân cách bằng đường kẻ trung tính, không dùng card màu');
