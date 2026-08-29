@@ -398,8 +398,9 @@ without touching the existing strict TS config. Dashboard/"Tổng quan"
 (`src/react/pages/UsersPage.tsx`), Settings/"Cài đặt"
 (`src/react/pages/SettingsPage.tsx`), Manage/"Cấu hình chung"
 (`src/react/pages/ManagePage.tsx`), Reagent/"So sánh hóa chất"
-(`src/react/pages/ReagentPage.tsx`) and Report/"Báo cáo"
-(`src/react/pages/ReportPage.tsx`) are the first seven migrated pages, all
+(`src/react/pages/ReagentPage.tsx`), Report/"Báo cáo"
+(`src/react/pages/ReportPage.tsx`) and Six Sigma/"Six Sigma & Sai số"
+(`src/react/pages/SigmaPage.tsx`) are the first eight migrated pages, all
 with their classic HTML-builder code already deleted post-parity-check; see
 `docs/REACT-ADOPTION-PLAN.md` for the page-by-page order and status of the
 rest.
@@ -1105,7 +1106,42 @@ Google Fonts link, offline labs must print with correct metrics.
   by stubbing `sgVisibleLevels` in that test, not by changing the guard.
   `sgCohortCtx` (the cohort-picker modal's transient context, read/written as
   a bare global by a regression test) joined `sgBiasCtx`/`sgMuCtx` in
-  `SigmaUIState`.
+  `SigmaUIState`. Six Sigma/"Six Sigma & Sai số" (`pageSigma()`,
+  `sgTrackedOptions()`, `sigma-analysis-setup-html.ts`,
+  `sigma-no-levels-panel-html.ts`, `sigma-period-table-html.ts`,
+  `sigma-period-table-head-html.ts`, `sigma-period-row-html.ts`,
+  `sigma-charts-panel-html.ts`, `sigma-tracked-options-html.ts`) retired to
+  React 2026-08-30: `src/react/pages/SigmaPage.tsx` now owns the page's body,
+  reading data from `sigmaModel()` (a new pure-data function added right
+  where `pageSigma()` used to sit — the biggest dependency surface migrated
+  so far). `pageSigma()`, `sgTrackedOptions()` and all 7 HTML builders are
+  deleted outright, along with their 7 dedicated test files. The panels that
+  compute AFTER the initial render (`#sgStatus`/`#sgTrend`/`#sgMDC`/`#sgFreq`/
+  `#sgMUAction`/`#sgMU`, filled by `sgRefresh()`) needed no change at all —
+  they were already just empty containers in the classic HTML too, and
+  `sgRefresh()` keeps patching them via `innerHTML` from a `useEffect` with no
+  dependency array, the same trigger point as Reagent's `rcCompute()`. Every
+  modal (`sgOpenBias`, `sgOpenMU`, `sgRenderAddTestModal`,
+  `sgRenderCohortModal`) is unchanged since they render into `#modalRoot`.
+  This page surfaced a **new variant** of the stale-`defaultValue` bug class
+  already seen on Reagent/Report: each period row's month/year `<select>`
+  (`sgPart()`) does NOT call `rerender()` on a successful change (only
+  `sgRefreshSoon()`), but DOES call `rerender()` when the change is REJECTED
+  (duplicate period) — and at that point the select must revert to the OLD
+  value even though that value is unchanged between the two render passes.
+  A fully controlled `value=` select (no local state) was tried first and
+  **failed** — confirmed live in the browser: `notify()` ran, the model was
+  correct, but the select kept showing the just-rejected value, because React
+  compares the new `value` prop against what it last set itself, not against
+  the DOM's actual live value after an out-of-band native mutation. Fixed by
+  keying just those two `<select>` elements with `renderVersion` (a counter
+  from `useRenderVersion()` that increments on every `rerender()`), forcing a
+  fresh remount with a fresh `defaultValue` on every render pass — matching
+  the classic page's own cost profile (it rebuilt the whole table on every
+  rerender too), scoped down to only these two small elements instead of the
+  whole row. The outer `<div key={model.testId}>` wrapping the rest of the
+  page reuses the same Reagent-class fix to avoid stale CV/Bias data when
+  switching tracked tests.
 - `src/domain/sigma/sigma-tea-resolution.ts` (`createSigmaTeaResolution(deps)`) —
   the Six Sigma page's **TEa resolution layer**, split out of `sigma.js` on
   2026-08-01 as classic `sigma-tea.js` and retired to TypeScript on 2026-08-19

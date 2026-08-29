@@ -30,9 +30,7 @@ const manageRoutes = read('src/presentation/manage/manage-page-controller.ts');
 const teaReferenceLabProfileBodyPresentation = read('src/presentation/manage/tea-reference-lab-profile-body-html.ts');
 const westgardRoutes = read('src/presentation/westgard/westgard-page-controller.ts');
 const westgardCusumPagePresentation = read('src/presentation/westgard/westgard-cusum-page-html.ts');
-const sigmaRoutes = read('src/presentation/sigma/sigma-page-controller.ts');
-const sigmaPeriodTablePresentation = read('src/presentation/sigma/sigma-period-table-html.ts');
-const sigmaChartsPanelPresentation = read('src/presentation/sigma/sigma-charts-panel-html.ts');
+const sigmaPage = read('src/react/pages/SigmaPage.tsx');
 const indexHtml = read('index.html');
 const cssFiles = fs.readdirSync(path.join(root, 'assets')).filter(name => name.endsWith('.css'));
 
@@ -74,18 +72,19 @@ assert.deepEqual(rawRequiredLabels,[],'dấu sao bắt buộc trong label phải
 assert.match(manageRoutes+teaReferenceLabProfileBodyPresentation,/TEa chuẩn hóa % <span class="req">\*<\/span>/,'hồ sơ TEa phải hiển thị dấu bắt buộc bằng marker chung');
 
 /* Trang Tổng quan (dash), Nhật ký hoạt động (audit), Người dùng (users), Cài
-   đặt (settings), Cấu hình chung (manage) và So sánh hóa chất (reagent) đã
-   chuyển sang React (src/react/pages/*.tsx, xem docs/REACT-ADOPTION-PLAN.md)
-   — JSX viết "className=", không viết "class=" như chuỗi HTML cổ điển, nên
-   quét văn bản nguồn kiểu này không áp dụng được cho các trang đó nữa.
-   Heading semantic của các trang React được xác nhận bằng npm run a11y-audit
-   (kiểm DOM thật qua axe-core), không phải quét chuỗi nguồn ở đây. */
-const semanticPageRoutes=[sigmaRoutes,sigmaPeriodTablePresentation,sigmaChartsPanelPresentation,actionsRoutes,actionForm,actionLogPanelPresentation,reportRoutes,router].join('\n');
-for(const title of ['Tình trạng','Số liệu theo kỳ','Biểu đồ Sigma & MDC','Nhật ký khắc phục','Biểu đồ Levey-Jennings']){
+   đặt (settings), Cấu hình chung (manage), So sánh hóa chất (reagent), Báo
+   cáo (report) và Six Sigma (sigma) đã chuyển sang React
+   (src/react/pages/*.tsx, xem docs/REACT-ADOPTION-PLAN.md) — JSX viết
+   "className=", không viết "class=" như chuỗi HTML cổ điển, nên quét văn bản
+   nguồn kiểu này không áp dụng được cho các trang đó nữa. Heading semantic
+   của các trang React được xác nhận bằng npm run a11y-audit (kiểm DOM thật
+   qua axe-core), không phải quét chuỗi nguồn ở đây. */
+const semanticPageRoutes=[actionsRoutes,actionForm,actionLogPanelPresentation,reportRoutes,router].join('\n');
+for(const title of ['Nhật ký khắc phục','Biểu đồ Levey-Jennings']){
   const escaped=title.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
   assert.match(semanticPageRoutes,new RegExp(`<h2[^>]*class="[^"]*panel-title[^"]*"[^>]*>${escaped}`),`panel chính "${title}" phải dùng heading cấp 2 thật`);
 }
-assert.match(sigmaRoutes,/<summary class="sg-collapse-summary"><span role="heading" aria-level="2">Độ không đảm bảo đo \(MU\)<\/span><\/summary>/,'summary MU phải giữ heading cấp 2 mà không lồng control focus');
+assert.match(sigmaPage,/<summary className="sg-collapse-summary"><span role="heading" aria-level=\{2\}>Độ không đảm bảo đo \(MU\)<\/span><\/summary>/,'summary MU phải giữ heading cấp 2 mà không lồng control focus');
 
 assert.match(sigmaCss,/\.sg-mu-panel > \.sg-collapse-summary::after\{\s*position:absolute; right:14px;/,'MU collapse mark must stay at the far right, after the action button');
 assert.equal((entryCss.match(/!important/g) || []).length, 0, 'entry UI must not depend on !important');

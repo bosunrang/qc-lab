@@ -13476,11 +13476,6 @@
 		return `<div class="sg-mu-preview-values"><span><small>u<sub>c</sub></small><b>${input.ucText}%</b></span><span class="is-u"><small>U (k=2)</small><b>${input.uText}%</b></span></div><div class="sg-mu-preview-state ${input.complete ? "ok" : "warn"}">${state}</div>`;
 	}
 	//#endregion
-	//#region src/presentation/sigma/sigma-tracked-options-html.ts
-	function sigmaTrackedOptionsHtml(options, selectedId) {
-		return options.map((option) => `<option value="${option.id}" ${option.id === selectedId ? "selected" : ""}>${option.labelHtml}</option>`).join("");
-	}
-	//#endregion
 	//#region src/presentation/sigma/sigma-input-display-value.ts
 	function sigmaInputDisplayValue(value, digits = 2) {
 		if (value == null || String(value).trim() === "") return "";
@@ -13501,40 +13496,6 @@
 			if (!row.eligible) return `<tr><td>Mức ${row.level}</td><td class="num">${row.sigmaText}</td><td><span class="muted">Chưa đủ dữ liệu</span></td><td>${row.readinessHtml}</td><td>Không dùng để đề xuất QC</td></tr>`;
 			return `<tr><td>Mức ${row.level}</td><td class="num" style="color:${row.color};font-weight:800">${row.sigmaText}</td><td>${row.opspecHtml}</td><td>${row.riskText || "—"}</td><td>${row.planText || "Xây dựng theo SOP"}</td></tr>`;
 		}).join("");
-	}
-	//#endregion
-	//#region src/presentation/sigma/sigma-period-table-html.ts
-	function sigmaPeriodTableHtml(input) {
-		const content = input.hasData ? `<div class="sg-simple-table-wrap"><table class="sg-simple-table" style="min-width:${input.tableMinWidth}px">${input.colGroupHtml}${input.tableHeadHtml}<tbody>${input.rowsHtml}</tbody></table></div>` : "<div class=\"empty\" style=\"margin:14px 16px 10px\">Chưa có kỳ nào.</div>";
-		return `<div class="panel"><div class="sg-data-head"><h2 class="panel-title">Số liệu theo kỳ</h2><div class="sg-data-head-actions">${input.headerActionsHtml}</div></div>${content}${input.combinedExportHtml ? `<div class="sg-data-foot">${input.combinedExportHtml}</div>` : ""}</div>`;
-	}
-	//#endregion
-	//#region src/presentation/sigma/sigma-analysis-setup-html.ts
-	function sigmaAnalysisSetupHtml(input) {
-		return `<div class="panel"><h2 class="sg-setup-heading panel-title">Thiết lập phân tích</h2><div class="row-flex sg-control-row">${input.testSelectHtml}</div><div class="sg-setup-fields">${input.fieldsHtml}</div>${input.eflmHtml}<div class="hint sg-sigma-input-note">${input.hintHtml}</div></div>`;
-	}
-	//#endregion
-	//#region src/presentation/sigma/sigma-period-row-html.ts
-	function sigmaPeriodRowHtml(input) {
-		const selectedClass = input.selected ? " sg-period-selected" : "";
-		const selectedValue = input.selected ? "true" : "false";
-		const idArgs = JSON.stringify([input.id]);
-		return `<tr data-sg-period-id="${input.id}" class="sg-period-row${selectedClass}" tabindex="0" aria-selected="${selectedValue}" aria-label="Chọn kỳ ${input.periodLabelHtml} để xem tình trạng" data-action="sgSelectPeriod" data-args='${idArgs}' data-keydown-action="sgSelectPeriod" data-keydown-args='${idArgs}' data-keydown-keys='["Enter"," "]' data-keydown-self-only><td class="sg-period-cell"><div class="sg-period-select-wrap">${input.periodSelectHtml}</div></td>${input.levelCellsHtml}<td class="sg-row-action sg-action-col"><div class="sg-row-action-buttons">${input.actionHtml}</div></td></tr>`;
-	}
-	//#endregion
-	//#region src/presentation/sigma/sigma-charts-panel-html.ts
-	function sigmaChartsPanelHtml() {
-		return `<div class="panel"><h2 class="panel-title">Biểu đồ Sigma & MDC</h2><div class="sg-chart-grid"><div class="sg-chart-box"><h3>Xu hướng Sigma theo kỳ</h3><div class="chart-inner" id="sgTrend"></div></div><div class="sg-chart-box"><h3>Biểu đồ Quyết định Phương pháp (MDC)</h3><div class="hint">X = CV/TEA, Y = |BIAS|/TEA. Điểm to nhất là kỳ gần nhất.</div><div class="chart-inner" id="sgMDC"></div></div></div></div>`;
-	}
-	//#endregion
-	//#region src/presentation/sigma/sigma-period-table-head-html.ts
-	function sigmaPeriodTableHeadHtml(levels) {
-		return `<thead><tr><th rowspan="2">Kỳ / Năm</th>${levels.map((level) => `<th colspan="3" class="sg-group-start">Mức ${level}</th>`).join("")}<th rowspan="2" class="sg-action-col">Thao tác</th></tr><tr>${levels.map(() => "<th class=\"sg-group-start\">CV IQC%</th><th>Bias EQA%</th><th>Sigma</th>").join("")}</tr></thead>`;
-	}
-	//#endregion
-	//#region src/presentation/sigma/sigma-no-levels-panel-html.ts
-	function sigmaNoLevelsPanelHtml(input) {
-		return `<div class="panel"><div class="row-flex sg-control-row">${input.testSelectHtml}</div><div class="alert warn flow-control">${input.messageHtml}</div></div>`;
 	}
 	//#endregion
 	//#region src/presentation/nce/action-form-closed-html.ts
@@ -22502,10 +22463,6 @@
 			}, 80);
 		};
 		const sgTrackedTests = () => (state().tests || []).filter((t) => t.sgTracked).sort((a, b) => deps.operationalTestOrder(a) - deps.operationalTestOrder(b) || String(a.name || "").localeCompare(String(b.name || "")));
-		const sgTrackedOptions = (tests, selectedId) => deps.pres.sigmaTrackedOptionsHtml(tests.map((x) => ({
-			id: x.id,
-			labelHtml: deps.esc(deps.testDisplayName(x))
-		})), selectedId);
 		const sgHistoricalLevels = (t) => deps.SigmaLevelSelectionService.historical(t, state().data && t && state().data[t.id] || [], t ? sgData(t.id) : [], (x) => typeof deps.operationalLevels === "function" ? deps.operationalLevels(x) : []);
 		const sgVisibleLevels = (t) => sgHistoricalLevels(t);
 		const sgPeriodLevels = (t, e) => deps.SigmaLevelSelectionService.period(t, e, state().data && t && state().data[t.id] || [], t ? sgData(t.id) : [], (x) => typeof deps.operationalLevels === "function" ? deps.operationalLevels(x) : [], (period) => deps.SigmaCohortService.normalizePeriod(period), sgCohortCutoff);
@@ -22607,118 +22564,122 @@
 			deps.closeModal();
 			deps.rerender();
 		};
-		const pageSigma = () => {
+		const sigmaModel = () => {
 			const s = state();
 			const tests = sgTrackedTests();
-			const addBtn = deps.role() === "admin" ? deps.btn("+ Thêm xét nghiệm", { action: "sgOpenAddTest" }, "teal") : "";
-			if (!tests.length) return deps.headOnly("Six Sigma & Sai số", "") + `<div class="panel">${deps.emptyState("Chưa có xét nghiệm nào trong Sigma", deps.role() === "admin" ? (s.tests || []).length ? "Bấm \"+ Thêm xét nghiệm\" để chọn từ danh mục đã khai báo trong Cấu hình chung." : "Chưa có xét nghiệm trong Cấu hình chung. Hãy khai báo xét nghiệm trước rồi quay lại Six Sigma." : "Liên hệ quản trị viên để thêm xét nghiệm từ Cấu hình chung.", addBtn)}</div>`;
-			if (!ui().sgTest || !tests.find((t) => t.id === ui().sgTest)) ui().sgTest = tests[0].id;
-			const t = tests.find((t) => t.id === ui().sgTest), calcIcon = "<svg class=\"btn-ico\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"4\" y=\"2\" width=\"16\" height=\"20\" rx=\"2\"/><line x1=\"8\" y1=\"6\" x2=\"16\" y2=\"6\"/><circle cx=\"8\" cy=\"12\" r=\".6\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"12\" cy=\"12\" r=\".6\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"16\" cy=\"12\" r=\".6\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"8\" cy=\"16\" r=\".6\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"12\" cy=\"16\" r=\".6\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"16\" cy=\"16\" r=\".6\" fill=\"currentColor\" stroke=\"none\"/></svg>";
-			const combinedExport = sgData(t.id).length ? deps.btn(deps.icoDownload() + "Xuất Excel", { action: "exportSigmaPeriodsXLSX" }, "teal sg-combined-export", "Xuất báo cáo Excel tổng hợp để so sánh Sigma giữa các kỳ") + deps.btn("<svg class=\"btn-ico\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M6 9V3h12v6\"/><path d=\"M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2\"/><path d=\"M6 14h12v7H6z\"/></svg>Xuất PDF", { action: "printSigmaPeriods" }, "teal sg-combined-print", "Tạo bản in PDF/HTML tổng hợp để so sánh Sigma giữa các kỳ") : "";
-			const testActions = `${deps.role() === "admin" ? deps.btn("+ Thêm", { action: "sgOpenAddTest" }, "teal") : ""}${deps.role() === "admin" ? deps.btn("<svg class=\"btn-ico\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 6h18\"/><path d=\"M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2\"/><path d=\"M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6\"/><path d=\"M10 11v6M14 11v6\"/></svg>Xóa", {
-				action: "sgRemoveTracked",
-				args: [t.id]
-			}, "danger") : ""}`;
-			const testSelectFields = `<div class="sg-test-picker"><label>Chọn xét nghiệm</label><select id="sgTestSelect" aria-label="Chọn xét nghiệm" data-action="sgPickTest" data-action-on="change">${sgTrackedOptions(tests, ui().sgTest)}</select></div><div class="sg-inline-btns"><label>&nbsp;</label><div class="sg-inline-btns-row">${testActions}</div></div>`;
+			const isAdmin = deps.role() === "admin";
+			if (!tests.length) return {
+				empty: true,
+				isAdmin,
+				hasCatalogTests: !!(s.tests || []).length
+			};
+			if (!ui().sgTest || !tests.find((x) => x.id === ui().sgTest)) ui().sgTest = tests[0].id;
+			const t = tests.find((x) => x.id === ui().sgTest);
+			const testOptions = tests.map((x) => ({
+				id: x.id,
+				label: deps.testDisplayName(x)
+			}));
+			const canWrite = deps.canWrite();
 			const levels = sgVisibleLevels(t);
-			if (!levels.length) return deps.headOnly("Six Sigma & Sai số", "Đánh giá hiệu năng phương pháp theo TEa, CV IQC và Bias EQA/EQC") + deps.pres.sigmaNoLevelsPanelHtml({
-				testSelectHtml: testSelectFields,
-				messageHtml: `Xét nghiệm này chưa có mức QC hoặc dữ liệu IQC lịch sử để tính Sigma. Hãy kiểm tra Panel QC, Nhóm lô QC, Mean/SD và dữ liệu QC trong Cấu hình chung.${deps.role() === "admin" ? " " + deps.btn("Cấu hình Mean/SD", { action: "goManageTargets" }, "teal") : ""}`
-			});
-			const isOperational = deps.operationalLevels(t).length > 0;
+			if (!levels.length) return {
+				empty: false,
+				isAdmin,
+				canWrite,
+				testId: t.id,
+				tests: testOptions,
+				noLevels: true,
+				message: `Xét nghiệm này chưa có mức QC hoặc dữ liệu IQC lịch sử để tính Sigma. Hãy kiểm tra Panel QC, Nhóm lô QC, Mean/SD và dữ liệu QC trong Cấu hình chung.`
+			};
 			const data = sgData(t.id);
-			const ro = !deps.canWrite() ? "disabled" : "";
 			const teaSrc = deps.sgTeaSource(t), teaVal = deps.sgTea(t);
 			const teaHint = teaSrc === "clia" ? `Tiêu chí CLIA đang dùng: ${deps.sgTeaCriterionText(t, "clia")}. TEa% được tính riêng tại Mean mục tiêu của từng mức QC.` : teaVal ? `TEa đang dùng: ${deps.fmt(teaVal, 2)}% · nguồn ${deps.sgTeaLabel(teaSrc)}.` : teaSrc === "eflm" ? "Chọn EFLM thì cần tra database EFLM và nhập TEa% cùng thông tin truy xuất." : teaSrc === "lab" ? "Xét nghiệm này chưa có TEa chuẩn hóa. Hãy cập nhật tại Cấu hình chung › Bảng TEa tham chiếu." : "Chưa có TEa% cho nguồn đang chọn. Hãy chọn nguồn khác hoặc cập nhật danh mục tham chiếu.";
-			const teaOpts = deps.pres.SG_TEA_SOURCES.map(([v, txt]) => {
-				const val = deps.sgTeaBySource(t, v), extra = v === "clia" ? ` · ${deps.sgTeaCriterionText(t, v)}` : val ? ` · ${deps.fmt(val, 2)}%` : " · chưa có";
-				return `<option value="${v}" ${teaSrc === v ? "selected" : ""}>${txt}${extra}</option>`;
-			}).join("");
-			const teaControl = teaSrc === "eflm" ? `<label>TEa% EFLM</label><input type="number" step="any" aria-label="TEa% EFLM" title="Nhập TEa% đã tra từ EFLM Database" value="${teaVal || ""}" ${deps.canWrite() ? "" : "disabled"} data-action="sgSetTea" data-action-on="change">` : `<label>${teaSrc === "clia" ? "Tiêu chí CLIA" : "TEa% tham chiếu"}</label><input type="text" aria-label="${teaSrc === "clia" ? "Tiêu chí CLIA" : "TEa% tham chiếu"}" value="${deps.escapeAttr(teaSrc === "clia" ? deps.sgTeaCriterionText(t, "clia") : teaVal ? deps.fmt(teaVal, 2) + "%" : "")}" disabled>`;
-			const eflmApsOpts = [
-				"minimum",
-				"desirable",
-				"optimum"
-			].map((v) => `<option value="${v}" ${(t.eflmAps || "desirable") === v ? "selected" : ""}>${v}</option>`).join("");
-			const eflmBox = teaSrc === "eflm" ? `<div class="sg-eflm-box">
-       <div><label>Analyte trên EFLM</label><input ${ro} value="${deps.escapeAttr(t.eflmAnalyte || t.name || "")}" placeholder="VD: Glucose" data-action="sgSetTeaMeta" data-args='["eflmAnalyte"]' data-action-on="change"></div>
-       <div><label>Mức APS</label><select ${ro} data-action="sgSetTeaMeta" data-args='["eflmAps"]' data-action-on="change">${eflmApsOpts}</select></div>
-       <div><label>Ngày tra cứu</label>${deps.dateBox("sgEflmLookupDate", t.eflmLookupDate || "", "manage-date", `${ro} data-action="sgSetTeaMeta" data-args='["eflmLookupDate"]' data-action-on="change"`)}</div>
-       <div><label>Link/tài liệu EFLM</label><input ${ro} value="${deps.escapeAttr(t.eflmRef || "")}" placeholder="biologicalvariation.eu / bản in PDF" data-action="sgSetTeaMeta" data-args='["eflmRef"]' data-action-on="change"></div>
-     </div>` : "";
+			const teaOptions = deps.pres.SG_TEA_SOURCES.map(([v, txt]) => {
+				const val = deps.sgTeaBySource(t, v);
+				return {
+					value: v,
+					label: txt + (v === "clia" ? ` · ${deps.sgTeaCriterionText(t, v)}` : val ? ` · ${deps.fmt(val, 2)}%` : " · chưa có")
+				};
+			});
+			const isOperational = deps.operationalLevels(t).length > 0;
 			const selectedPeriodId = sgStatusPeriodId(t.id, data), levelIndex = new Map(levels.map((level, i) => [level, i])), pageRows = sgRows(t, data, levels), pageRowMap = new Map(pageRows.map((row) => [row.e.id, row]));
 			sgPendingRows = {
 				tid: t.id,
 				data,
 				rows: pageRows
 			};
-			const cvMeta = (L) => sgIsAutoCV(L) ? `<div class="sg-cell-meta sg-cv-meta" title="${deps.escapeAttr(`Số điểm IQC: ${L.n || 0}${L.sourceLot ? " · Lô: " + L.sourceLot : ""}${L.sourceStart && L.sourceEnd ? " · " + deps.vnDate(L.sourceStart) + "–" + deps.vnDate(L.sourceEnd) : ""}`)}">${L.n || 0} điểm${L.sourceLot ? " · Lô " + deps.esc(L.sourceLot) : ""}</div>` : "";
-			const levelCells = (e, l) => {
-				const L = e.lv && e.lv[l] || {}, bias = sgBiasVal(L), row = pageRowMap.get(e.id), r = row ? row.rs[levelIndex.get(l)] : sgComp(t, e, l);
-				return `<td class="sg-group-start"><div class="sg-cell-stack"><input class="sg-number" ${ro} type="number" step="any" value="${sgInputValue(sgInputDisplayValue(L.cv))}" placeholder="CV%" data-action="sgCell" data-args="${deps.escapeAttr(JSON.stringify([
-					e.id,
-					l,
-					"cv"
-				]))}" data-action-on="input">${cvMeta(L)}</div></td>
-      <td><div class="sg-cell-stack"><input class="sg-number" ${ro} type="number" step="any" value="${sgInputValue(sgInputDisplayValue(bias))}" placeholder="Bias%" data-action="sgCell" data-args="${deps.escapeAttr(JSON.stringify([
-					e.id,
-					l,
-					"biasEqa"
-				]))}" data-action-on="input"><div class="sg-cell-meta sg-cell-meta-empty" aria-hidden="true">&nbsp;</div></div></td>
-      <td class="sg-result-cell" title="${r ? deps.escapeAttr((r.biasLabel || "") + " " + deps.fmt(r.bias, 2) + "%" + (r.warning ? " · " + r.warning : "")) : "Nhập CV và Bias"}"><div class="sg-cell-stack"><span id="sg_${e.id}_${l}" class="tag ${r ? "sg-zone " + (r.classifiable ? r.sigma >= 3 ? "ok" : "rej" : "none") : ""}" style="${r ? "--sg-color:" + r.c + ";color:" + r.c : ""}">${r ? (r.classifiable ? "" : "≈") + deps.fmt(r.sigma, 2) : "—"}</span><div class="sg-cell-meta" style="${r ? "color:" + r.c : ""}">${r ? deps.esc(r.label) : "Chưa đủ dữ liệu"}</div></div></td>`;
-			};
-			const rows = data.map((e) => {
-				const periodLabel = deps.vnPeriod(e.period) || e.period || "", selected = e.id === selectedPeriodId, periodLabelHtml = deps.escapeAttr(periodLabel), actionHtml = `${deps.canWrite() ? deps.btn("Nạp CV lô", {
-					action: "sgPullCV",
-					args: [e.id]
-				}, "ghost sm sg-row-cv", `Chọn CV IQC theo lô lịch sử cho kỳ ${periodLabelHtml}`) : ""}${deps.btn(deps.icoDownload() + "Excel", {
-					action: "exportSigmaPeriodXLSX",
-					args: [e.id]
-				}, "ghost sm sg-row-export", `Xuất Excel riêng kỳ ${periodLabelHtml}`)}${deps.btn("<svg class=\"btn-ico\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M6 9V3h12v6\"/><path d=\"M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2\"/><path d=\"M6 14h12v7H6z\"/></svg>In PDF", {
-					action: "printSigmaPeriod",
-					args: [e.id]
-				}, "ghost sm sg-row-print", `Tạo bản in PDF/HTML riêng kỳ ${periodLabelHtml}`)}${deps.role() === "admin" ? deps.btn("Xóa", {
-					action: "sgDelPeriod",
-					args: [e.id]
-				}, "danger sm sg-row-delete", `Xóa kỳ ${periodLabelHtml}`) : ""}`;
-				return deps.pres.sigmaPeriodRowHtml({
-					id: deps.escapeAttr(e.id),
-					selected,
-					periodLabelHtml,
-					periodSelectHtml: sgPeriodSel(e, ro),
-					levelCellsHtml: levels.map((l) => levelCells(e, l)).join(""),
-					actionHtml
+			const periods = data.map((e) => {
+				const [py, pmo] = (e.period || "").split("-"), nowYear = (/* @__PURE__ */ new Date()).getFullYear(), yr = py || String(nowYear), mm = pmo ? +pmo : (/* @__PURE__ */ new Date()).getMonth() + 1;
+				const selectedYear = parseInt(yr) || nowYear, minYear = Math.min(selectedYear, nowYear - 4), maxYear = Math.max(selectedYear, nowYear + 2);
+				const years = [];
+				for (let yy = minYear; yy <= maxYear; yy++) years.push(yy);
+				const levelCells = levels.map((l) => {
+					const L = e.lv && e.lv[l] || {}, bias = sgBiasVal(L), row = pageRowMap.get(e.id), r = row ? row.rs[levelIndex.get(l)] : sgComp(t, e, l);
+					return {
+						level: l,
+						cv: sgInputValue(sgInputDisplayValue(L.cv)),
+						bias: sgInputValue(sgInputDisplayValue(bias)),
+						cvMeta: sgIsAutoCV(L) ? {
+							text: `${L.n || 0} điểm${L.sourceLot ? " · Lô " + L.sourceLot : ""}`,
+							title: `Số điểm IQC: ${L.n || 0}${L.sourceLot ? " · Lô: " + L.sourceLot : ""}${L.sourceStart && L.sourceEnd ? " · " + deps.vnDate(L.sourceStart) + "–" + deps.vnDate(L.sourceEnd) : ""}`
+						} : null,
+						result: r ? {
+							classifiable: !!r.classifiable,
+							sigma: deps.fmt(r.sigma, 2),
+							color: r.c,
+							label: r.label,
+							title: `${r.biasLabel || ""} ${deps.fmt(r.bias, 2)}%${r.warning ? " · " + r.warning : ""}`
+						} : null
+					};
 				});
-			}).join("");
-			const tableHead = deps.pres.sigmaPeriodTableHeadHtml(levels);
-			const colGroup = `<colgroup><col style="width:140px">${levels.flatMap(() => [
-				"<col style=\"width:100px\">",
-				"<col style=\"width:100px\">",
-				"<col style=\"width:95px\">"
-			]).join("")}<col style="width:228px"></colgroup>`, tableMin = 368 + levels.length * 295, latestEntry = [...data].sort((a, b) => String(a.period || "").localeCompare(String(b.period || ""))).pop();
-			const headerActions = (deps.canWrite() ? levels.map((l) => deps.btn(`${calcIcon}Bias EQA% Mức ${l}`, latestEntry ? {
-				action: "sgOpenBias",
-				args: [latestEntry.id, l]
-			} : "", "ghost sm", latestEntry ? `Tính Bias EQA/EQC Mức ${l} cho kỳ ${deps.escapeAttr(latestEntry.period || "mới nhất")}` : "Hãy thêm kỳ trước khi tính Bias", { disabled: !latestEntry })).join("") : "") + (deps.canWrite() ? deps.btn("+ Thêm kỳ", { action: "sgAddPeriod" }, "teal sm") : "");
-			return deps.headOnly("Six Sigma & Sai số", "Đánh giá hiệu năng phương pháp theo TEa, CV IQC và Bias EQA/EQC") + `<div class="sg-top-grid">${deps.pres.sigmaAnalysisSetupHtml({
-				testSelectHtml: testSelectFields,
-				fieldsHtml: `<div><label>Tên xét nghiệm</label><input value="${deps.escapeAttr(deps.testDisplayName(t))}" aria-label="Tên xét nghiệm" readonly></div><div><label>Đơn vị</label><input value="${deps.escapeAttr(t.unit || "")}" aria-label="Đơn vị" readonly></div><div><label>Thiết bị</label><input value="${deps.escapeAttr(deps.instrumentName(t.instrumentId, t.machine) || "Chưa gán thiết bị")}" readonly placeholder="Bấm để chọn / quản lý thiết bị"></div><div class="sg-tea-source"><label>Nguồn TEa</label><select aria-label="Nguồn TEa" ${!deps.canWrite() ? "disabled" : ""} data-action="sgSetTeaSource" data-action-on="change">${teaOpts}</select></div><div class="sg-tea-input">${teaControl}</div>`,
-				eflmHtml: eflmBox,
-				hintHtml: `${deps.esc(teaHint)} Mỗi mức dùng <b>CV từ IQC</b> và <b>Bias từ EQA/EQC</b>; nhiều vòng EQA được tổng hợp bằng <b>RMS</b> để tránh triệt tiêu dấu. Dữ liệu IQC không được dùng để tính Bias. Quy tắc thận trọng của phần mềm: &lt;20 điểm chỉ hiển thị ước tính, 20–29 điểm là tạm thời, ≥30 điểm mới dùng để gợi ý QC. DPMO/Yield chỉ là quy đổi tham khảo với dịch 1,5σ.${isOperational ? "" : " Nhóm lô hiện không vận hành; các kỳ cũ vẫn lấy CV theo đúng lô và Mean/SD đã lưu trong lịch sử IQC."}`
-			})}
-   <div class="panel"><h2 class="sg-setup-heading panel-title">Tình trạng</h2><div id="sgStatus"></div></div></div>
-   ${deps.pres.sigmaPeriodTableHtml({
-				headerActionsHtml: headerActions,
-				hasData: !!data.length,
-				tableMinWidth: tableMin,
-				colGroupHtml: colGroup,
-				tableHeadHtml: tableHead,
-				rowsHtml: rows,
-				combinedExportHtml: combinedExport
-			})}
-   <details class="panel sg-collapse-panel"><summary class="sg-collapse-summary"><span role="heading" aria-level="2">Thiết kế QC theo Sigma (OPSpecs)</span></summary><div class="sg-collapse-body" id="sgFreq"></div></details>
-   <details class="panel sg-collapse-panel sg-mu-panel"><summary class="sg-collapse-summary"><span role="heading" aria-level="2">Độ không đảm bảo đo (MU)</span></summary><div id="sgMUAction" class="sg-data-head-actions"></div><div id="sgMU"></div></details>
-   ${deps.pres.sigmaChartsPanelHtml()}`;
+				return {
+					id: e.id,
+					selected: e.id === selectedPeriodId,
+					periodLabel: deps.vnPeriod(e.period) || e.period || "",
+					month: mm,
+					year: parseInt(yr) || nowYear,
+					years,
+					levelCells,
+					canExport: true,
+					canDelete: isAdmin
+				};
+			});
+			const latestEntry = [...data].sort((a, b) => String(a.period || "").localeCompare(String(b.period || ""))).pop();
+			const biasButtons = canWrite ? levels.map((l) => ({
+				level: l,
+				enabled: !!latestEntry,
+				periodId: latestEntry ? latestEntry.id : null,
+				title: latestEntry ? `Tính Bias EQA/EQC Mức ${l} cho kỳ ${latestEntry.period || "mới nhất"}` : "Hãy thêm kỳ trước khi tính Bias"
+			})) : [];
+			return {
+				empty: false,
+				isAdmin,
+				canWrite,
+				testId: t.id,
+				tests: testOptions,
+				noLevels: false,
+				testName: deps.testDisplayName(t),
+				unit: t.unit || "",
+				instrument: deps.instrumentName(t.instrumentId, t.machine) || "Chưa gán thiết bị",
+				tea: {
+					source: teaSrc,
+					value: teaVal,
+					hint: teaHint,
+					options: teaOptions,
+					controlValue: teaSrc === "eflm" ? teaVal || "" : teaSrc === "clia" ? deps.sgTeaCriterionText(t, "clia") : teaVal ? deps.fmt(teaVal, 2) + "%" : "",
+					eflm: teaSrc === "eflm" ? {
+						analyte: t.eflmAnalyte || t.name || "",
+						aps: t.eflmAps || "desirable",
+						lookupDate: t.eflmLookupDate || "",
+						ref: t.eflmRef || ""
+					} : null
+				},
+				hintText: `Mỗi mức dùng CV từ IQC và Bias từ EQA/EQC; nhiều vòng EQA được tổng hợp bằng RMS để tránh triệt tiêu dấu. Dữ liệu IQC không được dùng để tính Bias. Quy tắc thận trọng của phần mềm: <20 điểm chỉ hiển thị ước tính, 20–29 điểm là tạm thời, ≥30 điểm mới dùng để gợi ý QC. DPMO/Yield chỉ là quy đổi tham khảo với dịch 1,5σ.${isOperational ? "" : " Nhóm lô hiện không vận hành; các kỳ cũ vẫn lấy CV theo đúng lô và Mean/SD đã lưu trong lịch sử IQC."}`,
+				levels,
+				periods,
+				combinedExport: !!data.length,
+				biasButtons,
+				canAddPeriod: canWrite
+			};
 		};
 		const sgOpSpecCell = (spec) => deps.pres.sigmaOpSpecCellHtml(spec);
 		const sgFrequencyHTML = (t, selectedRow, levels) => {
@@ -23464,7 +23425,6 @@
 			sgSetTeaMeta,
 			sgRefreshSoon,
 			sgTrackedTests,
-			sgTrackedOptions,
 			sgHistoricalLevels,
 			sgVisibleLevels,
 			sgPeriodLevels,
@@ -23477,7 +23437,7 @@
 			sgViewTrackedTest,
 			sgRenderAddTestModal,
 			sgTrackTest,
-			pageSigma,
+			sigmaModel,
 			sgOpSpecCell,
 			sgFrequencyHTML,
 			sgMuDominant,
@@ -29259,16 +29219,9 @@
 	root.sigmaBiasRowsHtml = sigmaBiasRowsHtml;
 	root.sigmaMuRowsHtml = sigmaMuRowsHtml;
 	root.sigmaMuPreviewHtml = sigmaMuPreviewHtml;
-	root.sigmaTrackedOptionsHtml = sigmaTrackedOptionsHtml;
 	root.sigmaInputDisplayValue = sigmaInputDisplayValue;
 	root.sigmaGoverningRuleBlockHtml = sigmaGoverningRuleBlockHtml;
 	root.sigmaFrequencyRowsHtml = sigmaFrequencyRowsHtml;
-	root.sigmaPeriodTableHtml = sigmaPeriodTableHtml;
-	root.sigmaAnalysisSetupHtml = sigmaAnalysisSetupHtml;
-	root.sigmaPeriodRowHtml = sigmaPeriodRowHtml;
-	root.sigmaChartsPanelHtml = sigmaChartsPanelHtml;
-	root.sigmaPeriodTableHeadHtml = sigmaPeriodTableHeadHtml;
-	root.sigmaNoLevelsPanelHtml = sigmaNoLevelsPanelHtml;
 	root.actionFormClosedPresentation = actionFormClosedHtml;
 	root.actionFormPanelPresentation = actionFormPanelHtml;
 	root.actionImmediateStepPresentation = actionImmediateStepHtml;
@@ -29757,7 +29710,6 @@
 		pageMap: () => ({
 			entry: root.pageEntry,
 			westgard: root.pageWestgard,
-			sigma: root.pageSigma,
 			actions: root.pageActionsV4
 		}),
 		afterRender: (p) => root.afterRender(p),
@@ -32386,8 +32338,6 @@
 		escapeAttr: (value) => root.escAttr(value),
 		jsq: (value) => jsq(value),
 		btn: (label, action, cls, title, options) => root.btn(label, action, cls, title, options),
-		headOnly: (title, subtitle, actions) => root.headOnly(title, subtitle, actions),
-		emptyState: (title, body, actions) => root.emptyState(title, body, actions),
 		dateBox: (id, value, cls, attrs) => root.dateBox(id, value, cls, attrs),
 		vnDate: (value) => vnDate(value),
 		vnPeriod: (value) => root.vnPeriod(value),
@@ -32395,7 +32345,6 @@
 		isoMonth: () => root.isoMonth(),
 		isoDate: (value) => root.isoDate(value),
 		uid: () => root.uid(),
-		icoDownload: () => root.icoDownload(),
 		testDisplayName: (test) => root.testDisplayName(test),
 		instrumentName: (id, fallback) => root.instrumentName(id, fallback),
 		operationalLevels: (test) => root.operationalLevels(test),
@@ -32458,7 +32407,6 @@
 	root.sgSetTeaMeta = sigmaPageController.sgSetTeaMeta;
 	root.sgRefreshSoon = sigmaPageController.sgRefreshSoon;
 	root.sgTrackedTests = sigmaPageController.sgTrackedTests;
-	root.sgTrackedOptions = sigmaPageController.sgTrackedOptions;
 	root.sgHistoricalLevels = sigmaPageController.sgHistoricalLevels;
 	root.sgVisibleLevels = sigmaPageController.sgVisibleLevels;
 	root.sgPeriodLevels = sigmaPageController.sgPeriodLevels;
@@ -32471,7 +32419,7 @@
 	root.sgViewTrackedTest = sigmaPageController.sgViewTrackedTest;
 	root.sgRenderAddTestModal = sigmaPageController.sgRenderAddTestModal;
 	root.sgTrackTest = sigmaPageController.sgTrackTest;
-	root.pageSigma = sigmaPageController.pageSigma;
+	root.sigmaModel = sigmaPageController.sigmaModel;
 	root.sgOpSpecCell = sigmaPageController.sgOpSpecCell;
 	root.sgFrequencyHTML = sigmaPageController.sgFrequencyHTML;
 	root.sgMuDominant = sigmaPageController.sgMuDominant;

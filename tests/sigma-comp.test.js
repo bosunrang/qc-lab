@@ -140,40 +140,44 @@ assert.equal(ctx.sgInputDisplayValue(''),'');
 
 {
   const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'sigma', 'sigma-page-controller.ts'), 'utf8');
+  // Trang Six Sigma chuyển sang React (2026-08-30, xem SigmaPage.tsx) —
+  // pageSigma() và các file HTML-builder của thân trang (sigma-period-table-html.ts,
+  // sigma-period-row-html.ts, sigma-period-table-head-html.ts, sigma-analysis-setup-html.ts,
+  // sigma-no-levels-panel-html.ts, sigma-charts-panel-html.ts, sigma-tracked-options-html.ts)
+  // đã xoá; các khẳng định về cấu trúc thân trang giờ soi thẳng JSX. Modal
+  // (Bias/thêm xét nghiệm) và các panel tính SAU khi vẽ (#sgFreq qua sgFrequencyHTML(),
+  // vẫn ở sigma-page-controller.ts) không đổi.
+  const sigmaPage = fs.readFileSync(path.join(__dirname, '..', 'src', 'react', 'pages', 'SigmaPage.tsx'), 'utf8');
   const biasModalSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'sigma', 'sigma-bias-modal-html.ts'), 'utf8');
   const addTestModalSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'sigma', 'sigma-add-test-modal-html.ts'), 'utf8');
   const frequencyPanelSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'sigma', 'sigma-frequency-panel-html.ts'), 'utf8');
-  const periodTableSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'sigma', 'sigma-period-table-html.ts'), 'utf8');
-  const periodRowSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'sigma', 'sigma-period-row-html.ts'), 'utf8');
-  const periodTableHeadSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'sigma', 'sigma-period-table-head-html.ts'), 'utf8');
   const sigmaCss = fs.readFileSync(path.join(__dirname, '..', 'assets', 'professional-sigma.css'), 'utf8');
   const baseCss = fs.readFileSync(path.join(__dirname, '..', 'assets', 'professional-base.css'), 'utf8');
-  assert.match(periodTableSource, /class="sg-simple-table"/, 'Sigma periods use the compact CV–Bias–Sigma table');
+  assert.match(sigmaPage, /className="sg-simple-table"/, 'Sigma periods use the compact CV–Bias–Sigma table');
   assert.match(source, /const sgRemoveTracked = \(id: unknown\) => \{\s*if \(!deps\.requireAdmin\(\)\) return;/, 'untracking a test from Sigma requires admin, matching the admin-only "+ Thêm" action');
-  assert.doesNotMatch(source, /role\(\)==='admin'\?'<button class="btn teal" onclick="sgOpenAddTest\(\)">\+ Thêm<\/button>':''\}\$\{canWrite\(\)/, 'the "Xóa" tracked-test button is no longer shown to non-admin roles that can only canWrite()');
-  assert.doesNotMatch(source, /<label>Độ lệch so với target IQC%<\/label>/, 'Bias IQC input is absent from the Sigma UI');
-  assert.match(source, /Chọn CV IQC theo lô/, 'automatic import is labelled as a lot-based CV cohort');
-  assert.doesNotMatch(source, /Bias Peer|Peer group|sg-bias-source/, 'Peer is absent from the Sigma UI and business logic');
-  assert.match(periodTableSource, /class="sg-data-head-actions"/, 'per-level EQA Bias actions are placed in the period header');
-  assert.ok(periodTableSource.includes('>Số liệu theo kỳ</h2>')&&source.indexOf('>Thiết kế QC theo Sigma (OPSpecs)</span>')<source.indexOf('>Độ không đảm bảo đo (MU)</span>'), 'Sigma follows the input-to-results order: period data, QC design, then MU');
-  assert.match(periodTableHeadSource, /class="sg-action-col">Thao tác<\/th>/, 'period table has a labelled and separated action column');
-  assert.match(periodRowSource, /data-sg-period-id="\$\{input\.id\}"[\s\S]*?data-action="sgSelectPeriod"/, 'each period row is selected by clicking the row');
-  assert.doesNotMatch(source, /name="sgStatusPeriod"/, 'the per-row status radio is removed in favour of clicking the row');
-  assert.match(source, /<h2 class="sg-setup-heading panel-title">Tình trạng<\/h2>/, 'the status panel has the concise requested title and a real level-2 heading');
-  assert.doesNotMatch(source, /Tình trạng kỳ gần nhất|Kỳ gần nhất:/, 'the obsolete latest-period wording is removed');
+  assert.doesNotMatch(sigmaPage, /<label>Độ lệch so với target IQC%<\/label>/, 'Bias IQC input is absent from the Sigma UI');
+  assert.match(sigmaPage, /Chọn CV IQC theo lô/, 'automatic import is labelled as a lot-based CV cohort');
+  assert.doesNotMatch(sigmaPage, /Bias Peer|Peer group|sg-bias-source/, 'Peer is absent from the Sigma UI and business logic');
+  assert.match(sigmaPage, /className="sg-data-head-actions"/, 'per-level EQA Bias actions are placed in the period header');
+  assert.ok(sigmaPage.includes('>Số liệu theo kỳ</h2>')&&sigmaPage.indexOf('>Thiết kế QC theo Sigma (OPSpecs)</span>')<sigmaPage.indexOf('>Độ không đảm bảo đo (MU)</span>'), 'Sigma follows the input-to-results order: period data, QC design, then MU');
+  assert.match(sigmaPage, /className="sg-action-col">Thao tác<\/th>/, 'period table has a labelled and separated action column');
+  assert.match(sigmaPage, /data-sg-period-id=\{row\.id\}[\s\S]*?data-action="sgSelectPeriod"/, 'each period row is selected by clicking the row');
+  assert.doesNotMatch(sigmaPage, /name="sgStatusPeriod"/, 'the per-row status radio is removed in favour of clicking the row');
+  assert.match(sigmaPage, /<h2 className="sg-setup-heading panel-title">Tình trạng<\/h2>/, 'the status panel has the concise requested title and a real level-2 heading');
+  assert.doesNotMatch(sigmaPage, /Tình trạng kỳ gần nhất|Kỳ gần nhất:/, 'the obsolete latest-period wording is removed');
   assert.match(source, /sgFrequencyHTML\(t, selectedRow, levels\)/, 'the QC design table follows the period selected for status');
   assert.match(frequencyPanelSource, /sg-selected-period-hint[\s\S]*?Kỳ đang xem:/, 'the QC design table identifies the period it is evaluating');
-  assert.match(source, /action: 'exportSigmaPeriodXLSX', args: \[e\.id\]/, 'each period row exports its own workbook');
-  assert.match(source, /deps\.btn\('Xóa', \{ action: 'sgDelPeriod', args: \[e\.id\] \}, 'danger sm sg-row-delete'/, 'each writable period row uses the labelled system-danger delete button');
-  assert.doesNotMatch(source, /class="x" onclick="sgDelPeriod/, 'the obsolete icon-only period delete control is removed');
-  assert.match(source, /action: 'exportSigmaPeriodsXLSX'/, 'the footer exports the combined multi-period comparison workbook');
-  assert.match(source, /'Xuất Excel', \{ action: 'exportSigmaPeriodsXLSX'/, 'combined export is clearly distinguished from row export');
+  assert.match(sigmaPage, /data-action="exportSigmaPeriodXLSX" data-args=\{JSON\.stringify\(\[row\.id\]\)\}/, 'each period row exports its own workbook');
+  assert.match(sigmaPage, /className="btn danger sm sg-row-delete"[\s\S]*?data-action="sgDelPeriod"/, 'each writable period row uses the labelled system-danger delete button');
+  assert.doesNotMatch(sigmaPage, /class="x" onclick="sgDelPeriod/, 'the obsolete icon-only period delete control is removed');
+  assert.match(sigmaPage, /data-action="exportSigmaPeriodsXLSX"/, 'the footer exports the combined multi-period comparison workbook');
+  assert.match(sigmaPage, /sg-combined-export"[\s\S]*?icoDownloadHtml\(\) \+ 'Xuất Excel'/, 'combined export is clearly distinguished from row export');
   assert.doesNotMatch(source, /sgSaveSoon|sgSaveT/, 'manual Sigma edits no longer wait on the obsolete pre-save timer');
-  assert.doesNotMatch(source, /sg-cv-row-hint/, 'the obsolete CV-lot instruction under the table is removed');
-  assert.match(source, /deps\.btn\(deps\.icoDownload\(\) \+ 'Xuất Excel', \{ action: 'exportSigmaPeriodsXLSX' \}, 'teal sg-combined-export'/, 'combined Excel export is available under the period table');
-  assert.match(source, /deps\.btn\(printIcon \+ 'Xuất PDF', \{ action: 'printSigmaPeriods' \}, 'teal sg-combined-print'/, 'combined PDF export is available under the period table');
-  assert.doesNotMatch(source, /sg-period-actions/, 'the obsolete footer action row is removed');
-  assert.doesNotMatch(source, /<button class="btn ghost sm" title="Tính Bias EQA\/EQC từ nhiều vòng"/, 'period cells no longer repeat a Bias calculation button');
+  assert.doesNotMatch(sigmaPage, /sg-cv-row-hint/, 'the obsolete CV-lot instruction under the table is removed');
+  assert.match(sigmaPage, /sg-combined-export"[\s\S]*?data-action="exportSigmaPeriodsXLSX"[\s\S]*?icoDownloadHtml\(\) \+ 'Xuất Excel'/, 'combined Excel export is available under the period table');
+  assert.match(sigmaPage, /sg-combined-print"[\s\S]*?data-action="printSigmaPeriods"[\s\S]*?<PrintIcon \/>Xuất PDF/, 'combined PDF export is available under the period table');
+  assert.doesNotMatch(sigmaPage, /sg-period-actions/, 'the obsolete footer action row is removed');
+  assert.doesNotMatch(sigmaPage, /<button class="btn ghost sm" title="Tính Bias EQA\/EQC từ nhiều vòng"/, 'period cells no longer repeat a Bias calculation button');
   assert.match(biasModalSource, /class="sg-eqa-table"/, 'EQA Bias modal uses the compact reference-style table');
   assert.match(addTestModalSource, /Chọn hoặc thêm xét nghiệm vào Six Sigma/, 'Sigma add opens a picker that also navigates tracked assays');
   assert.match(source, /sgTrackTest/, 'Sigma picker tracks an assay selected from the shared catalog');
@@ -194,10 +198,10 @@ assert.equal(ctx.sgInputDisplayValue(''),'');
   // not a per-selector rule — the Sigma table inherits it like every other scroll box.
   assert.match(baseCss, /\*::-webkit-scrollbar\{[\s\S]*?height:var\(--scrollbar-size\);/, 'the global thin-scrollbar default (inherited by the Sigma table) uses the shared token');
   assert.match(baseCss, /\*::-webkit-scrollbar-button\{[\s\S]*?display:none;/, 'the global scrollbar default removes the bulky native arrow buttons everywhere, including Sigma');
-  assert.match(source, /<col style="width:140px">/, 'the period/year column has a little more room while staying compact');
-  assert.match(source, /<col style="width:228px"><\/colgroup>/, 'the action column gives a small share back to the period column while retaining all row actions');
-  assert.match(source, /tableMin = 368 \+ levels\.length \* 295/, 'the minimum table width is derived from the compact columns');
-  assert.match(source, /class="sg-period-month"[\s\S]*?class="sg-period-year"/, 'month and year selectors have dedicated compact sizing hooks');
+  assert.match(sigmaPage, /<col style=\{\{ width: 140 \}\}/, 'the period/year column has a little more room while staying compact');
+  assert.match(sigmaPage, /<col style=\{\{ width: 228 \}\} \/><\/colgroup>/, 'the action column gives a small share back to the period column while retaining all row actions');
+  assert.match(sigmaPage, /const tableMin = 368 \+ model\.levels\.length \* 295/, 'the minimum table width is derived from the compact columns');
+  assert.match(sigmaPage, /className="sg-period-month"[\s\S]*?className="sg-period-year"/, 'month and year selectors have dedicated compact sizing hooks');
   assert.doesNotMatch(sigmaCss, /\.sg-period-actions\{/, 'unused footer action styling is removed');
   assert.match(sigmaCss, /#sgFreq table\{[\s\S]*?table-layout:fixed;/, 'Sigma QC-frequency table uses a stable fixed column layout');
   assert.match(sigmaCss, /#sgFreq table th:nth-child\(1\), #sgFreq table td:nth-child\(1\)\{width:7%;\}/, 'Sigma QC-design table gives Mức 7%');

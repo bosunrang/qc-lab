@@ -392,16 +392,9 @@ import { sigmaCohortRowsHtml } from '../presentation/sigma/sigma-cohort-rows-htm
 import { sigmaBiasRowsHtml } from '../presentation/sigma/sigma-bias-rows-html';
 import { sigmaMuRowsHtml } from '../presentation/sigma/sigma-mu-rows-html';
 import { sigmaMuPreviewHtml } from '../presentation/sigma/sigma-mu-preview-html';
-import { sigmaTrackedOptionsHtml } from '../presentation/sigma/sigma-tracked-options-html';
 import { sigmaInputDisplayValue } from '../presentation/sigma/sigma-input-display-value';
 import { sigmaGoverningRuleBlockHtml } from '../presentation/sigma/sigma-governing-rule-block-html';
 import { sigmaFrequencyRowsHtml } from '../presentation/sigma/sigma-frequency-rows-html';
-import { sigmaPeriodTableHtml } from '../presentation/sigma/sigma-period-table-html';
-import { sigmaAnalysisSetupHtml } from '../presentation/sigma/sigma-analysis-setup-html';
-import { sigmaPeriodRowHtml } from '../presentation/sigma/sigma-period-row-html';
-import { sigmaChartsPanelHtml } from '../presentation/sigma/sigma-charts-panel-html';
-import { sigmaPeriodTableHeadHtml } from '../presentation/sigma/sigma-period-table-head-html';
-import { sigmaNoLevelsPanelHtml } from '../presentation/sigma/sigma-no-levels-panel-html';
 import { actionFormClosedHtml as actionFormClosedPresentation } from '../presentation/nce/action-form-closed-html';
 import { actionFormPanelHtml as actionFormPanelPresentation } from '../presentation/nce/action-form-panel-html';
 import { actionImmediateStepHtml as actionImmediateStepPresentation, actionRiskStepHtml as actionRiskStepPresentation, actionInvestigationStepHtml as actionInvestigationStepPresentation, actionCauseStepHtml as actionCauseStepPresentation, actionPatientStepHtml as actionPatientStepPresentation, actionEffectivenessStepHtml as actionEffectivenessStepPresentation } from '../presentation/nce/action-form-steps-html';
@@ -1275,7 +1268,6 @@ type QCLabGlobal = typeof globalThis & {
   sgSetTeaMeta?: (field: string, val: unknown) => void;
   sgRefreshSoon?: () => void;
   sgTrackedTests?: () => Record<string, any>[];
-  sgTrackedOptions?: (tests: Record<string, any>[], selectedId: unknown) => string;
   sgHistoricalLevels?: (t: Record<string, any>) => unknown[];
   sgVisibleLevels?: (t: Record<string, any>) => unknown[];
   sgPeriodLevels?: (t: Record<string, any>, e: Record<string, any>) => unknown[];
@@ -1288,7 +1280,7 @@ type QCLabGlobal = typeof globalThis & {
   sgViewTrackedTest?: (id: unknown) => void;
   sgRenderAddTestModal?: () => void;
   sgTrackTest?: (id: unknown) => void;
-  pageSigma?: () => string;
+  sigmaModel?: () => any;
   sgOpSpecCell?: (spec: Record<string, any>) => string;
   sgFrequencyHTML?: (t: unknown, selectedRow: unknown, levels: unknown[]) => string;
   sgMuDominant?: (mu: Record<string, any>) => string;
@@ -1905,16 +1897,9 @@ type QCLabGlobal = typeof globalThis & {
   sigmaBiasRowsHtml: typeof sigmaBiasRowsHtml;
   sigmaMuRowsHtml: typeof sigmaMuRowsHtml;
   sigmaMuPreviewHtml: typeof sigmaMuPreviewHtml;
-  sigmaTrackedOptionsHtml: typeof sigmaTrackedOptionsHtml;
   sigmaInputDisplayValue: typeof sigmaInputDisplayValue;
   sigmaGoverningRuleBlockHtml: typeof sigmaGoverningRuleBlockHtml;
   sigmaFrequencyRowsHtml: typeof sigmaFrequencyRowsHtml;
-  sigmaPeriodTableHtml: typeof sigmaPeriodTableHtml;
-  sigmaAnalysisSetupHtml: typeof sigmaAnalysisSetupHtml;
-  sigmaPeriodRowHtml: typeof sigmaPeriodRowHtml;
-  sigmaChartsPanelHtml: typeof sigmaChartsPanelHtml;
-  sigmaPeriodTableHeadHtml: typeof sigmaPeriodTableHeadHtml;
-  sigmaNoLevelsPanelHtml: typeof sigmaNoLevelsPanelHtml;
   actionFormClosedPresentation: typeof actionFormClosedPresentation;
   actionFormPanelPresentation: typeof actionFormPanelPresentation;
   actionImmediateStepPresentation: typeof actionImmediateStepPresentation;
@@ -3819,16 +3804,9 @@ root.sigmaCohortRowsHtml=sigmaCohortRowsHtml;
 root.sigmaBiasRowsHtml=sigmaBiasRowsHtml;
 root.sigmaMuRowsHtml=sigmaMuRowsHtml;
 root.sigmaMuPreviewHtml=sigmaMuPreviewHtml;
-root.sigmaTrackedOptionsHtml=sigmaTrackedOptionsHtml;
 root.sigmaInputDisplayValue=sigmaInputDisplayValue;
 root.sigmaGoverningRuleBlockHtml=sigmaGoverningRuleBlockHtml;
 root.sigmaFrequencyRowsHtml=sigmaFrequencyRowsHtml;
-root.sigmaPeriodTableHtml=sigmaPeriodTableHtml;
-root.sigmaAnalysisSetupHtml=sigmaAnalysisSetupHtml;
-root.sigmaPeriodRowHtml=sigmaPeriodRowHtml;
-root.sigmaChartsPanelHtml=sigmaChartsPanelHtml;
-root.sigmaPeriodTableHeadHtml=sigmaPeriodTableHeadHtml;
-root.sigmaNoLevelsPanelHtml=sigmaNoLevelsPanelHtml;
 root.actionFormClosedPresentation=actionFormClosedPresentation;
 root.actionFormPanelPresentation=actionFormPanelPresentation;
 root.actionImmediateStepPresentation=actionImmediateStepPresentation;
@@ -4115,7 +4093,7 @@ const routerDispatch=createRouterDispatchController({
   nav:()=>root.nav(),
   requestFrame:work=>requestAnimationFrame(work),
   resetStatusMemo:()=>{(root as any).AnalysisUIState.statusMemo=new Map();},
-  pageMap:()=>({entry:(root as any).pageEntry,westgard:(root as any).pageWestgard,sigma:(root as any).pageSigma,actions:(root as any).pageActionsV4}),
+  pageMap:()=>({entry:(root as any).pageEntry,westgard:(root as any).pageWestgard,actions:(root as any).pageActionsV4}),
   afterRender:p=>root.afterRender(p),
   entryQ:()=>(root as any).entryQ,
   entryFilter:v=>(root as any).entryFilter(v),
@@ -5601,12 +5579,10 @@ const sigmaPageController = createSigmaPageController({
   openModal: html => root.openModal(html), closeModal: () => root.closeModal(), infoDialog: (message, opts) => root.infoDialog(message, opts),
   esc: value => (root as any).esc(value), escapeAttr: value => (root as any).escAttr(value), jsq: value => jsq(value),
   btn: (label, action, cls, title, options) => (root as any).btn(label, action, cls, title, options),
-  headOnly: (title, subtitle, actions) => (root as any).headOnly(title, subtitle, actions),
-  emptyState: (title, body, actions) => (root as any).emptyState(title, body, actions),
   dateBox: (id, value, cls, attrs) => (root as any).dateBox(id, value, cls, attrs),
   vnDate: value => vnDate(value), vnPeriod: value => (root as any).vnPeriod(value),
   fmt: (value, decimals) => fmt(value, decimals), isoMonth: () => (root as any).isoMonth(), isoDate: value => (root as any).isoDate(value),
-  uid: () => (root as any).uid(), icoDownload: () => (root as any).icoDownload(),
+  uid: () => (root as any).uid(),
   testDisplayName: test => root.testDisplayName!(test), instrumentName: (id, fallback) => root.instrumentName!(id, fallback),
   operationalLevels: test => (root as any).operationalLevels(test), operationalTestOrder: test => (root as any).operationalTestOrder(test),
   searchText: value => (root as any).searchText(value), scheduleSearchRender: (owner, apply, focusId) => root.scheduleSearchRender(owner, apply, focusId),
@@ -5645,7 +5621,6 @@ root.sgSetTeaSource = sigmaPageController.sgSetTeaSource;
 root.sgSetTeaMeta = sigmaPageController.sgSetTeaMeta;
 root.sgRefreshSoon = sigmaPageController.sgRefreshSoon;
 root.sgTrackedTests = sigmaPageController.sgTrackedTests;
-root.sgTrackedOptions = sigmaPageController.sgTrackedOptions;
 root.sgHistoricalLevels = sigmaPageController.sgHistoricalLevels;
 root.sgVisibleLevels = sigmaPageController.sgVisibleLevels;
 root.sgPeriodLevels = sigmaPageController.sgPeriodLevels;
@@ -5658,7 +5633,7 @@ root.sgAddTestSearchSet = sigmaPageController.sgAddTestSearchSet;
 root.sgViewTrackedTest = sigmaPageController.sgViewTrackedTest;
 root.sgRenderAddTestModal = sigmaPageController.sgRenderAddTestModal;
 root.sgTrackTest = sigmaPageController.sgTrackTest;
-root.pageSigma = sigmaPageController.pageSigma;
+root.sigmaModel = sigmaPageController.sigmaModel;
 root.sgOpSpecCell = sigmaPageController.sgOpSpecCell;
 root.sgFrequencyHTML = sigmaPageController.sgFrequencyHTML;
 root.sgMuDominant = sigmaPageController.sgMuDominant;

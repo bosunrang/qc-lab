@@ -72,9 +72,11 @@ assert.match(rowHtml, /Chưa đủ CV IQC và Bias EQA\/EQC/);
   assert.match(combined.body, /Độ không đảm bảo đo \(MU\) theo kỳ/, 'báo cáo tổng hợp cũng phải kèm MU của từng kỳ');
   assert.match(combined.body, /<td><b>07\/2026<\/b><\/td><td><b>Mức 1<\/b><\/td>/, 'bảng MU tổng hợp tách theo kỳ × mức');
 
-  const sigmaSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'sigma', 'sigma-page-controller.ts'), 'utf8');
-  assert.match(sigmaSource, /action: 'printSigmaPeriod', args: \[e\.id\]/);
-  assert.match(sigmaSource, /action: 'printSigmaPeriods'/);
-  assert.match(sigmaSource, /printIcon \+ 'In PDF'/);
+  // Trang Six Sigma chuyển sang React (2026-08-30) — pageSigma() đã xoá, nút
+  // in giờ nằm ở SigmaPage.tsx (JSX), không còn ở sigma-page-controller.ts.
+  const sigmaPage = fs.readFileSync(path.join(__dirname, '..', 'src', 'react', 'pages', 'SigmaPage.tsx'), 'utf8');
+  assert.match(sigmaPage, /data-action="printSigmaPeriod" data-args=\{JSON\.stringify\(\[row\.id\]\)\}/);
+  assert.match(sigmaPage, /data-action="printSigmaPeriods"/);
+  assert.match(sigmaPage, /<PrintIcon \/>In PDF/);
   console.log('Sigma period print tests passed');
 })().catch(error=>{console.error(error);process.exitCode=1;});

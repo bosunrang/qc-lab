@@ -7,6 +7,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { ManagePage } from './pages/ManagePage';
 import { ReagentPage } from './pages/ReagentPage';
 import { ReportPage } from './pages/ReportPage';
+import { SigmaPage } from './pages/SigmaPage';
 
 const registry = createReactPageRegistry({
   dash: () => <DashboardPage />,
@@ -16,6 +17,7 @@ const registry = createReactPageRegistry({
   manage: () => <ManagePage />,
   reagent: () => <ReagentPage />,
   report: () => <ReportPage />,
+  sigma: () => <SigmaPage />,
 });
 
 (window as any).QCLabReact = {
