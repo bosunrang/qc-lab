@@ -53,7 +53,10 @@ assert.doesNotMatch(indexNoComments,/ onclick="| oninput="| onchange="| onkeydow
 
 assert.doesNotMatch(router,/function page(?:Dash|Entry|Westgard)\(/,'router-render chỉ giữ điều phối và UI primitives');
 assert.match(entry,/const pageEntry = \(rightOnly = false\)/);
-assert.match(westgard,/const pageWestgard = \(\) => \{/);
+// Trang Phân tích Westgard chuyển sang React (2026-08-30, xem WestgardPage.tsx)
+// — pageWestgard()/pageWestgardArchived() đã xoá, chỉ còn westgardModel()
+// (dữ liệu thuần) ở westgard-page-controller.ts.
+assert.match(westgard,/const westgardModel = \(\): AnyRec => \{/);
 
 /* core.js phải tiếp tục độc lập với bundle presentation, nên PAGE_SET/ROLE_SET ở core.js
    và router policy TypeScript vẫn là hai khai báo tách rời. Test này là lưới an toàn: nếu

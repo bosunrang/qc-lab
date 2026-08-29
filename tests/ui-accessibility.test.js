@@ -29,7 +29,7 @@ const reportActionIconPresentation = read('src/presentation/report/report-action
 const manageRoutes = read('src/presentation/manage/manage-page-controller.ts');
 const teaReferenceLabProfileBodyPresentation = read('src/presentation/manage/tea-reference-lab-profile-body-html.ts');
 const westgardRoutes = read('src/presentation/westgard/westgard-page-controller.ts');
-const westgardCusumPagePresentation = read('src/presentation/westgard/westgard-cusum-page-html.ts');
+const westgardPage = read('src/react/pages/WestgardPage.tsx');
 const sigmaPage = read('src/react/pages/SigmaPage.tsx');
 const indexHtml = read('index.html');
 const cssFiles = fs.readdirSync(path.join(root, 'assets')).filter(name => name.endsWith('.css'));
@@ -169,8 +169,14 @@ assert.match(usersCss, /\.user-perm-block\{[^}]*padding:var\(--panel-content-gap
 assert.match(usersCss, /\.user-perm-grid label\{[^}]*margin:0/);
 assert.match(westgardCss, /\.wg-panel-intro\{\s*margin:var\(--panel-content-gap\) 16px 8px/);
 assert.match(westgardCss, /\.wg-target-warning\{\s*margin:var\(--panel-content-gap\) 16px 0/);
-assert.equal((westgardRoutes.match(/wg-panel-intro/g) || []).length+(westgardCusumPagePresentation.match(/wg-panel-intro/g) || []).length, 3);
-assert.equal((westgardRoutes.match(/wg-target-warning/g) || []).length, 1);
+// Trang Westgard chuyển sang React (2026-08-30, xem WestgardPage.tsx) — panel
+// Levey-Jennings tổng hợp (đang vận hành/đã lưu trữ) giờ dùng chung MỘT
+// component <MultiChart>, nên "wg-panel-intro" chỉ còn 2 chỗ trong MÃ NGUỒN
+// (MultiChart + CusumLevel) dù vẫn hiện đủ 3 lần khi vẽ ra màn hình (LJ hiện
+// hành, LJ lưu trữ, CUSUM) — giảm từ 3 xuống 2 là gộp trùng lặp hợp lệ, không
+// phải mất nội dung.
+assert.equal((westgardPage.match(/wg-panel-intro/g) || []).length, 2);
+assert.equal((westgardPage.match(/wg-target-warning/g) || []).length, 1);
 
 const canonicalWidths = new Set([640, 760, 900, 980, 1150, 1280]);
 for (const file of cssFiles) {

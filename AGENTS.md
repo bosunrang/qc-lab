@@ -399,8 +399,9 @@ without touching the existing strict TS config. Dashboard/"Tổng quan"
 (`src/react/pages/SettingsPage.tsx`), Manage/"Cấu hình chung"
 (`src/react/pages/ManagePage.tsx`), Reagent/"So sánh hóa chất"
 (`src/react/pages/ReagentPage.tsx`), Report/"Báo cáo"
-(`src/react/pages/ReportPage.tsx`) and Six Sigma/"Six Sigma & Sai số"
-(`src/react/pages/SigmaPage.tsx`) are the first eight migrated pages, all
+(`src/react/pages/ReportPage.tsx`), Six Sigma/"Six Sigma & Sai số"
+(`src/react/pages/SigmaPage.tsx`) and Westgard analysis/"Phân tích Westgard"
+(`src/react/pages/WestgardPage.tsx`) are the first nine migrated pages, all
 with their classic HTML-builder code already deleted post-parity-check; see
 `docs/REACT-ADOPTION-PLAN.md` for the page-by-page order and status of the
 rest.
@@ -927,7 +928,12 @@ Google Fonts link, offline labs must print with correct metrics.
   branches; its UI state (`selTest`/`wgViewMode`/`wgChartMode`/`wgPrevOpen`/…)
   stays in the `AnalysisUIState` bag (written directly from onclick handlers
   like `selTest=this.value`, so it must remain accessor globals, unlike the
-  Report page's closure state). `pageDash()` retired to
+  Report page's closure state). **`pageWestgard()`/`pageWestgardArchived()`
+  no longer exist**: the page retired again on 2026-08-30 to
+  `src/react/pages/WestgardPage.tsx` (see the `westgard-page-controller.ts`
+  bullet further below and `docs/REACT-ADOPTION-PLAN.md`), and `pageMap()` in
+  `modular-pilot.global.ts` no longer carries a `westgard` entry at all —
+  `isReactPage('westgard')` intercepts it first. `pageDash()` retired to
   `src/presentation/dashboard/dashboard-page-controller.ts` on 2026-08-18
   (Pha G slice 2) and `router-dispatch-controller.ts`'s dispatch table called
   it as `root.pageDash` through the compat bridge like any other bundle-owned
@@ -1142,6 +1148,51 @@ Google Fonts link, offline labs must print with correct metrics.
   whole row. The outer `<div key={model.testId}>` wrapping the rest of the
   page reuses the same Reagent-class fix to avoid stale CV/Bias data when
   switching tracked tests.
+- `src/presentation/westgard/westgard-page-controller.ts` — Westgard
+  analysis/"Phân tích Westgard" retired to React 2026-08-30:
+  `src/react/pages/WestgardPage.tsx` now owns both view modes (operational
+  tests and archived/stopped lot groups), reading data from `westgardModel()`
+  (a new pure-data function added right where `pageWestgard()`/
+  `pageWestgardArchived()` used to sit). Those two functions,
+  `wgChartModeTabs()`, `wgViewModeTabs()`, `wgRowsControl()`, `wgLotBlock()`,
+  `pageWestgardCusum()`, and their 8 classic HTML-builder files
+  (`westgard-mode-tabs.ts`, `westgard-point-rows-html.ts`,
+  `westgard-rows-control.ts`, `westgard-cusum-page-html.ts`,
+  `westgard-lot-block-html.ts`, `westgard-rule-guide-html.ts`,
+  `westgard-rule-toggles-html.ts`, `westgard-export-actions-html.ts`) are
+  deleted outright, along with their 8 dedicated test files; the pure
+  `icoRefArrow()` helper in `router-icons.ts` lost its only remaining caller
+  in the same cleanup and was dropped too. The three near-identical classic
+  row-table builders (current-lot level, previous-lot-after-transition,
+  archived-lot-group) collapsed into one `<LevelBlock>` component reading a
+  single `WestgardBlock` shape from the model, keyed off whether `badgeText`
+  is present (lot-block contexts) vs absent (the live current level). Canvas
+  drawing (`wgLJMulti`/`wgLJMultiArchived` Levey-Jennings, `cusumChart`) needed
+  no new logic — those stay empty `<canvas>` elements exactly like the classic
+  HTML, and the existing `afterRender()` sweep (an `IntersectionObserver`+rAF
+  service already keyed by CSS class/`dataset`, see
+  `src/presentation/render/after-render-controller.ts` and
+  `visible-canvas-service.ts`) keeps painting them — the only change is
+  calling `afterRender('westgard')` from a dependency-free `useEffect` in
+  `WestgardPage.tsx` instead of relying on the classic `rerender()` → `render()`
+  → `afterRender()` call chain, because that chain calls `afterRender()`
+  synchronously right after `render()` while `createRoot().render()` commits
+  asynchronously, so the `<canvas>` might not exist in the DOM yet at that
+  point (found by code inspection, not a live failure). Applied the Sigma-page
+  `key={renderVersion}` remount fix to the Westgard rule-toggle checkboxes:
+  `wgSet()`/`wgReset()` both call `rerender()` unconditionally, and
+  `wgReset()` in particular can change many checkboxes' `on` state at once
+  without any of them being individually clicked — confirmed live in the
+  browser that a plain `defaultChecked` row left every checkbox showing its
+  pre-reset state, fixed by keying the whole toggle row with `renderVersion`
+  so it remounts fresh on every `rerender()`, matching the classic page's own
+  full-HTML-rebuild cost profile for just that one row. Testing also
+  reconfirmed (as first found on the Report page) that the canvases' lazy
+  `IntersectionObserver`-gated draw does not fire automatically in this
+  session's headless browser regardless of React or classic rendering —
+  calling `canvas._ljDraw()` directly confirmed the paint function and
+  underlying chart data are both correct on both versions, so this is an
+  environment limitation, not a regression.
 - `src/domain/sigma/sigma-tea-resolution.ts` (`createSigmaTeaResolution(deps)`) —
   the Six Sigma page's **TEa resolution layer**, split out of `sigma.js` on
   2026-08-01 as classic `sigma-tea.js` and retired to TypeScript on 2026-08-19

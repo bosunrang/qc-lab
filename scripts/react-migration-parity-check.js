@@ -10,10 +10,11 @@
    trang đó đã bị xoá (không còn gì để so). */
 const { openSeededSession } = require('./lib/seed-browser-session');
 
-// Trang 'dash', 'audit', 'users', 'settings', 'manage', 'reagent', 'report' và
-// 'sigma' đã qua parity check và code cũ đã bị xoá (2026-08-29, report/sigma
-// 2026-08-30) — không còn gì để so nên bỏ khỏi danh sách. Thêm id trang mới
-// vào đây khi đến lượt migrate, xoá lại khi code HTML cũ của trang đó bị dọn.
+// Trang 'dash', 'audit', 'users', 'settings', 'manage', 'reagent', 'report',
+// 'sigma' và 'westgard' đã qua parity check và code cũ đã bị xoá (2026-08-29,
+// report/sigma/westgard 2026-08-30) — không còn gì để so nên bỏ khỏi danh
+// sách. Thêm id trang mới vào đây khi đến lượt migrate, xoá lại khi code HTML
+// cũ của trang đó bị dọn.
 const PAGES_TO_CHECK = [];
 
 // Trang 'manage' có 8 tab con (ManageUIState.manageTab) với thân trang khác

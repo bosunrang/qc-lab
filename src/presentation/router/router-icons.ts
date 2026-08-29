@@ -28,11 +28,3 @@ export function icoDownload() {
 export function icoPrint() {
   return '<svg class="btn-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/></svg>';
 }
-
-/* Icon "dẫn tới" dùng thay ký tự ↳ (U+21B3) — font Manrope tự host chỉ có bộ
-   glyph latin+vietnamese (xem tokens.css) nên trình duyệt fallback sang font hệ
-   thống khác cho riêng ký tự này, làm nó trông lệch/khác cỡ giữa câu chữ. SVG
-   không phụ thuộc font nên luôn hiển thị nhất quán. */
-export function icoRefArrow() {
-  return '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;flex-shrink:0"><path d="M4 4v7a4 4 0 0 0 4 4h12"/><path d="M15 10l5 5-5 5"/></svg>';
-}

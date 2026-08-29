@@ -8,17 +8,9 @@ const bridge=fs.readFileSync(path.join(root,'src','compat','modular-pilot.global
 
 for(const [name,type] of [
   ['westgardUiState','typeof westgardUiState'],
-  ['westgardModeTabs','typeof westgardModeTabs'],
   ['westgardTestSearch','ReturnType<typeof createWestgardTestSearch<any>>'],
   ['westgardMultiViews','ReturnType<typeof createWestgardMultiViews<any, any>>'],
   ['westgardCusumLevels','ReturnType<typeof createWestgardCusumLevels<any, any, any>>'],
-  ['westgardPointRowsHtml','ReturnType<typeof createWestgardPointRowsHtml<any>>'],
-  ['westgardRowsControl','ReturnType<typeof createWestgardRowsControl>'],
-  ['westgardCusumPageHtml','ReturnType<typeof createWestgardCusumPageHtml<any>>'],
-  ['westgardLotBlockHtml','ReturnType<typeof createWestgardLotBlockHtml>'],
-  ['westgardRuleGuideHtml','ReturnType<typeof createWestgardRuleGuideHtml>'],
-  ['westgardRuleTogglesHtml','ReturnType<typeof createWestgardRuleTogglesHtml>'],
-  ['westgardExportActionsHtml','ReturnType<typeof createWestgardExportActionsHtml>']
 ]){
   const escaped=type.replace(/[<>()[\]{}?+*.$^|\\]/g,'\\$&');
   assert.match(bridge,new RegExp(`${name}: ${escaped};`),`${name} must be a required Westgard bridge contract`);
