@@ -189,10 +189,6 @@ const cssTokenPixelSource = read('src/presentation/style/css-token-pixel.ts');
 const chartCanvasFontSource = read('src/presentation/chart/canvas-font.ts');
 const chartDataUrlSource = read('src/presentation/chart/chart-data-url.ts');
 const dashboardHeadHtmlSource = read('src/presentation/dashboard/dashboard-head-html.ts');
-const dashboardTestPanelHtmlSource = read('src/presentation/dashboard/dashboard-test-panel-html.ts');
-const dashboardTestRowHtmlSource = read('src/presentation/dashboard/dashboard-test-row-html.ts');
-const dashboardKpiItemsSource = read('src/presentation/dashboard/dashboard-kpi-items.ts');
-const dashboardEmptyTestsHtmlSource = read('src/presentation/dashboard/dashboard-empty-tests-html.ts');
 const cusumColorsSource = read('src/presentation/chart/cusum-colors.ts');
 const leveyJenningsMultiColorsSource = read('src/presentation/chart/levey-jennings-multi-colors.ts');
 const cusumChartTitleSource = read('src/presentation/chart/cusum-chart-title.ts');
@@ -206,16 +202,10 @@ const defaultDateFieldsServiceSource = read('src/presentation/render/default-dat
 const postRenderPageActionsSource = read('src/presentation/render/post-render-page-actions.ts');
 const afterRenderControllerSource = read('src/presentation/render/after-render-controller.ts');
 const dashboardOverdueActionsSource = read('src/presentation/dashboard/dashboard-overdue-actions.ts');
-const dashboardOverdueActionListHtmlSource = read('src/presentation/dashboard/dashboard-overdue-action-list-html.ts');
-const dashboardQcFollowupListHtmlSource = read('src/presentation/dashboard/dashboard-qc-followup-list-html.ts');
-const dashboardMissingTargetListHtmlSource = read('src/presentation/dashboard/dashboard-missing-target-list-html.ts');
 const dashboardExpiringLotItemsSource = read('src/presentation/dashboard/dashboard-expiring-lot-items.ts');
 const dashboardWestgardAlertsSource = read('src/presentation/dashboard/dashboard-westgard-alerts.ts');
 const dashboardMissingTargetItemsSource = read('src/presentation/dashboard/dashboard-missing-target-items.ts');
 const dashboardLevelDataSource = read('src/presentation/dashboard/dashboard-level-data.ts');
-const dashboardTestActionSource = read('src/presentation/dashboard/dashboard-test-action.ts');
-const dashboardLevelPillsHtmlSource = read('src/presentation/dashboard/dashboard-level-pills-html.ts');
-const dashboardTestRowsHtmlSource = read('src/presentation/dashboard/dashboard-test-rows-html.ts');
 const dashboardTestItemsSource = read('src/presentation/dashboard/dashboard-test-items.ts');
 const visibleCanvasServiceSource = read('src/presentation/render/visible-canvas-service.ts');
 const chartTooltipServiceSource = read('src/presentation/chart/chart-tooltip-service.ts');
@@ -268,18 +258,6 @@ assert.match(backupLocalMarkerSource, /export function createBackupLocalMarker\(
   'backup local marker must be a TypeScript factory');
 assert.match(dashboardHeadHtmlSource, /export function createDashboardHeadHtml\(/,
   'dashboard head HTML must be a TypeScript factory');
-assert.match(read('src/presentation/dashboard/dashboard-loading.ts'), /deps\.kpisHtml\(/,
-  'dashboard loading presentation must receive the TypeScript KPI renderer');
-assert.match(read('src/presentation/dashboard/dashboard-loading.ts'), /deps\.headHtml\(lab\)/,
-  'dashboard loading presentation must receive the TypeScript head renderer');
-assert.match(dashboardTestPanelHtmlSource, /export function createDashboardTestPanelHtml\(/,
-  'dashboard test panel HTML must be a TypeScript factory');
-assert.match(dashboardTestRowHtmlSource, /export function createDashboardTestRowHtml\(/,
-  'dashboard test row HTML must be a TypeScript factory');
-assert.match(dashboardKpiItemsSource, /export function dashboardKpiItems\(/,
-  'dashboard KPI items must be a TypeScript helper');
-assert.match(dashboardEmptyTestsHtmlSource, /export function createDashboardEmptyTestsHtml\(/,
-  'dashboard empty tests HTML must be a TypeScript factory');
 assert.match(cusumColorsSource, /export const CUSUM_COLORS=/,
   'CUSUM colors must be a TypeScript presentation constant');
 assert.match(leveyJenningsMultiColorsSource, /export const LEVEY_JENNINGS_MULTI_COLORS=/,
@@ -304,12 +282,6 @@ assert.match(postRenderPageActionsSource, /export function createPostRenderPageA
   'post-render page actions must be a TypeScript service');
 assert.match(dashboardOverdueActionsSource, /export function createDashboardOverdueActions\(/,
   'dashboard overdue actions must be a TypeScript factory');
-assert.match(dashboardOverdueActionListHtmlSource, /export function createDashboardOverdueActionListHtml\(/,
-  'dashboard overdue action list must be a TypeScript factory');
-assert.match(dashboardQcFollowupListHtmlSource, /export function createDashboardQcFollowupListHtml\(/,
-  'dashboard QC followup list must be a TypeScript factory');
-assert.match(dashboardMissingTargetListHtmlSource, /export function createDashboardMissingTargetListHtml\(/,
-  'dashboard missing target list must be a TypeScript factory');
 assert.match(dashboardExpiringLotItemsSource, /export function dashboardExpiringLotItems\(/,
   'dashboard expiring lot items must be a TypeScript helper');
 assert.match(dashboardWestgardAlertsSource, /export function dashboardWestgardAlerts\(/,
@@ -318,12 +290,6 @@ assert.match(dashboardMissingTargetItemsSource, /export function dashboardMissin
   'dashboard missing target items must be a TypeScript helper');
 assert.match(dashboardLevelDataSource, /export function createDashboardLevelData\(/,
   'dashboard level data must be a TypeScript factory');
-assert.match(dashboardTestActionSource, /export function createDashboardTestAction\(/,
-  'dashboard test action must be a TypeScript factory');
-assert.match(dashboardLevelPillsHtmlSource, /export function createDashboardLevelPillsHtml\(/,
-  'dashboard level pills must be a TypeScript factory');
-assert.match(dashboardTestRowsHtmlSource, /export function createDashboardTestRowsHtml\(/,
-  'dashboard test rows must be a TypeScript factory');
 assert.match(dashboardTestItemsSource, /export function createDashboardTestItems\(/,
   'dashboard test items must be a TypeScript factory');
 assert.match(backupInspectionSummarySource, /export function createBackupInspectionSummary\(/,
@@ -350,14 +316,6 @@ assert.doesNotMatch(backupLocalMarkerSource, /\bglobalThis\b|\bdocument\b|\bloca
   'backup local marker must receive browser storage as a dependency');
 assert.doesNotMatch(dashboardHeadHtmlSource, /\bglobalThis\b|\bdocument\b/,
   'dashboard head HTML must receive browser helpers as dependencies');
-assert.doesNotMatch(dashboardTestPanelHtmlSource, /\bglobalThis\b|\bdocument\b/,
-  'dashboard test panel HTML must receive browser helpers as dependencies');
-assert.doesNotMatch(dashboardTestRowHtmlSource, /\bglobalThis\b|\bdocument\b/,
-  'dashboard test row HTML must receive browser helpers as dependencies');
-assert.doesNotMatch(dashboardKpiItemsSource, /\bglobalThis\b|\bdocument\b/,
-  'dashboard KPI items must not read browser globals');
-assert.doesNotMatch(dashboardEmptyTestsHtmlSource, /\bglobalThis\b|\bdocument\b/,
-  'dashboard empty tests HTML must receive UI helpers as dependencies');
 assert.doesNotMatch(cusumColorsSource, /\bglobalThis\b|\bdocument\b/,
   'CUSUM colors must not read browser globals');
 assert.doesNotMatch(leveyJenningsMultiColorsSource, /\bglobalThis\b|\bdocument\b/,
@@ -382,12 +340,6 @@ assert.doesNotMatch(postRenderPageActionsSource, /\bglobalThis\b|\bdocument\b/,
   'post-render page actions service must receive browser access as dependencies');
 assert.doesNotMatch(dashboardOverdueActionsSource, /\bglobalThis\b|\bdocument\b/,
   'dashboard overdue actions must receive status evaluation as a dependency');
-assert.doesNotMatch(dashboardOverdueActionListHtmlSource, /\bglobalThis\b|\bdocument\b/,
-  'dashboard overdue action list must receive rendering as a dependency');
-assert.doesNotMatch(dashboardQcFollowupListHtmlSource, /\bglobalThis\b|\bdocument\b/,
-  'dashboard QC followup list must receive rendering as a dependency');
-assert.doesNotMatch(dashboardMissingTargetListHtmlSource, /\bglobalThis\b|\bdocument\b/,
-  'dashboard missing target list must receive rendering as a dependency');
 assert.doesNotMatch(dashboardExpiringLotItemsSource, /\bglobalThis\b|\bdocument\b/,
   'dashboard expiring lot items must receive date calculation as a dependency');
 assert.doesNotMatch(dashboardWestgardAlertsSource, /\bglobalThis\b|\bdocument\b/,
@@ -396,12 +348,6 @@ assert.doesNotMatch(dashboardMissingTargetItemsSource, /\bglobalThis\b|\bdocumen
   'dashboard missing target items must receive target lookup as a dependency');
 assert.doesNotMatch(dashboardLevelDataSource, /\bglobalThis\b|\bdocument\b/,
   'dashboard level data must receive statistics as a dependency');
-assert.doesNotMatch(dashboardTestActionSource, /\bglobalThis\b|\bdocument\b/,
-  'dashboard test action must receive button rendering as a dependency');
-assert.doesNotMatch(dashboardLevelPillsHtmlSource, /\bglobalThis\b|\bdocument\b/,
-  'dashboard level pills must receive rendering as dependencies');
-assert.doesNotMatch(dashboardTestRowsHtmlSource, /\bglobalThis\b|\bdocument\b/,
-  'dashboard test rows must receive rendering as dependencies');
 assert.doesNotMatch(dashboardTestItemsSource, /\bglobalThis\b|\bdocument\b/,
   'dashboard test items must receive data access as dependencies');
 assert.doesNotMatch(backupInspectionSummarySource, /\bglobalThis\b|\bdocument\b/,
@@ -426,32 +372,6 @@ assert.doesNotMatch(backupImportConfirmationSource, /\bglobalThis\b|\bdocument\b
   'backup import confirmation must not read browser globals');
 assert.match(backupUiSource, /root\.backupStatusText=\(\)=>root\.BackupStatusCommand\.status\(/,
   'backup status must use the TypeScript status command');
-assert.match(dashboardRoutesSource, /deps\.dashboardHeadHtml\(deps\.stateLab\(\)\)/,
-  'dashboard route must render header through TypeScript bridge');
-assert.match(dashboardRoutesSource, /const pageDashLoading = \(tests: AnyRec\[\], pending: number\) => deps\.dashboardLoadingPresentation\(tests, pending, deps\.stateData\(\), deps\.stateLab\(\)\);/,
-  'dashboard loading route must use the TypeScript renderer directly');
-assert.doesNotMatch(dashboardRoutesSource, /dashStatusTabsFallback/,
-  'dashboard route must not retain a classic status-tab renderer');
-assert.doesNotMatch(dashboardRoutesSource, /let mood=rej\?/,
-  'dashboard route must not retain a duplicate classic shift-status renderer');
-assert.match(dashboardRoutesSource, /const statusItems = dashItems\.filter\(item => deps\.dashboardStatusFilter\.matches\(item, dashTestStatus\)\);/,
-  'dashboard route must filter statuses through the TypeScript service directly');
-assert.match(dashboardRoutesSource, /const overdue = deps\.dashboardOverdueActions\(deps\.stateActions\(\), today\);/,
-  'dashboard route must collect overdue actions through TypeScript service');
-assert.match(dashboardRoutesSource, /const overdueHtml = deps\.dashboardOverdueActionListHtml\(overdue, deps\.stateTests\(\)\);/,
-  'dashboard route must render overdue actions through TypeScript service');
-assert.match(dashboardRoutesSource, /const urgentHtml = deps\.dashboardQcFollowupListHtml\(urgent, 5, 'rej'\);/,
-  'dashboard route must render urgent followup through TypeScript service');
-assert.match(dashboardRoutesSource, /const noTargetHtml = deps\.dashboardMissingTargetListHtml\(noTarget\);/,
-  'dashboard route must render missing targets through TypeScript service');
-assert.match(dashboardRoutesSource, /const exp = deps\.dashboardExpiringLotItems\(dashItems, deps\.daysToExp\);/,
-  'dashboard route must collect expiring lots through TypeScript helper');
-assert.match(dashboardRoutesSource, /const \{ urgent, watch \} = deps\.dashboardWestgardAlerts\(dashItems\.map\(item => \(\{ test: item\.t, alerts: item\.alerts \}\)\)\);/,
-  'dashboard route must collect Westgard alerts through TypeScript helper');
-assert.match(dashboardRoutesSource, /const noTarget = deps\.dashboardMissingTargetItems\(dashItems, deps\.levelsMissingTarget\);/,
-  'dashboard route must collect missing targets through TypeScript helper');
-assert.match(dashboardRoutesSource, /const dashItems = deps\.dashboardTestItems\(tests, today\);/,
-  'dashboard route must build test items through TypeScript presentation');
 assert.match(actionsRoutesSource, /const currentIssues = \(\) => deps\.ActionCurrentIssues\(\);/,
   'actions route must use the TypeScript current-issues service directly');
 assert.doesNotMatch(actionsRoutesSource, /const out=\[\],rank=\{rej:2,warn:1,ok:0\}/,
@@ -460,20 +380,6 @@ assert.match(actionsRoutesSource, /const actionIssueGroupHtml = \(model: AnyRec\
   'actions route must render issue groups through TypeScript presentation');
 assert.doesNotMatch(actionsRoutesSource, /if\(globalThis\.actionIssueRowPresentation\)|if\(globalThis\.actionIssueGroupPresentation\)/,
   'actions route must not retain classic issue-render fallbacks');
-assert.match(dashboardRoutesSource, /const testRows = deps\.dashboardTestRowsHtml\(statusItems\);/,
-  'dashboard route must render test rows through TypeScript presentation');
-assert.match(dashboardRoutesSource, /const dashboardKpi = deps\.dashboardKpis\(dashItems, tests\.length\), \{ totalPoints: totalPts, todayPoints: todayPts, rejected: rej, warnings: warn, missingToday: missingTodayCount, completeTests: doneTests, completionPercent: pct \} = dashboardKpi;/,
-  'dashboard route must derive all KPIs through the TypeScript helper');
-assert.match(dashboardRoutesSource, /deps\.dashboardTestPanelHtml\(\{ testsCount: tests\.length/,
-  'dashboard route must render test panel through TypeScript bridge');
-assert.match(dashboardRoutesSource, /deps\.dashboardKpiItems\(\{ tests: tests\.length, totalPoints: totalPts, rejected: rej, todayPoints: done \}\)/,
-  'dashboard route must create KPI data through TypeScript bridge');
-assert.match(dashboardRoutesSource, /progressHtml = deps\.dashboardProgressHtml\(doneTests, tests\.length, pct\)/,
-  'dashboard route must render progress through TypeScript bridge directly');
-assert.doesNotMatch(dashboardRoutesSource, /if\(globalThis\.dashboardPageHtml\)|return globalThis\.dashboardHeadHtml\(state\.lab\)\+`/,
-  'dashboard route must not retain a classic page-render fallback');
-assert.match(dashboardRoutesSource, /emptyHtml: deps\.dashboardEmptyTestsHtml\(deps\.role\(\) === 'admin'\)/,
-  'dashboard route must render empty test state through TypeScript bridge');
 assert.match(drawSource, /const cc = deps\.cusumColors;/,
   'CUSUM renderer must use injected palette dependency');
 assert.match(drawSource, /const colors = deps\.leveyJenningsMultiColors;/,
@@ -518,14 +424,6 @@ assert.match(generated, /root\.backupLocalMarker\s*=\s*createBackupLocalMarker/,
   'artifact must publish TypeScript backup local marker');
 assert.match(generated, /root\.dashboardHeadHtml\s*=\s*createDashboardHeadHtml/,
   'artifact must publish TypeScript dashboard head HTML');
-assert.match(generated, /root\.dashboardTestPanelHtml\s*=\s*createDashboardTestPanelHtml/,
-  'artifact must publish TypeScript dashboard test panel HTML');
-assert.doesNotMatch(generated, /root\.dashboardTestRowHtml\s*=/,
-  'artifact must keep dashboard test-row HTML internal to the TypeScript bundle');
-assert.match(generated, /root\.dashboardKpiItems\s*=\s*dashboardKpiItems/,
-  'artifact must publish TypeScript dashboard KPI items');
-assert.match(generated, /root\.dashboardEmptyTestsHtml\s*=\s*createDashboardEmptyTestsHtml/,
-  'artifact must publish TypeScript dashboard empty tests HTML');
 assert.match(generated, /root\.cusumColors\s*=\s*CUSUM_COLORS/,
   'artifact must publish TypeScript CUSUM palette');
 assert.match(generated, /root\.leveyJenningsMultiColors\s*=\s*LEVEY_JENNINGS_MULTI_COLORS/,
@@ -550,22 +448,14 @@ assert.match(generated, /root\.postRenderPageActions\s*=\s*createPostRenderPageA
   'artifact must publish TypeScript post-render page actions service');
 assert.match(generated, /root\.dashboardOverdueActions\s*=\s*createDashboardOverdueActions/,
   'artifact must publish TypeScript dashboard overdue actions');
-assert.match(generated, /root\.dashboardOverdueActionListHtml\s*=\s*createDashboardOverdueActionListHtml/,
-  'artifact must publish TypeScript dashboard overdue action list');
-assert.match(generated, /root\.dashboardQcFollowupListHtml\s*=\s*createDashboardQcFollowupListHtml/,
-  'artifact must publish TypeScript dashboard QC followup list');
-assert.match(generated, /root\.dashboardMissingTargetListHtml\s*=\s*createDashboardMissingTargetListHtml/,
-  'artifact must publish TypeScript dashboard missing target list');
 assert.match(generated, /root\.dashboardExpiringLotItems\s*=\s*dashboardExpiringLotItems/,
   'artifact must publish TypeScript dashboard expiring lot items');
 assert.match(generated, /root\.dashboardWestgardAlerts\s*=\s*dashboardWestgardAlerts/,
   'artifact must publish TypeScript dashboard Westgard alerts');
 assert.match(generated, /root\.dashboardMissingTargetItems\s*=\s*dashboardMissingTargetItems/,
   'artifact must publish TypeScript dashboard missing target items');
-assert.doesNotMatch(generated, /root\.dashboardLevelData\s*=|root\.dashboardTestAction\s*=|root\.dashboardLevelPillsHtml\s*=|root\.dashboardLatestPoint\s*=/,
+assert.doesNotMatch(generated, /root\.dashboardLevelData\s*=|root\.dashboardLatestPoint\s*=/,
   'artifact must keep dashboard-only dependencies internal to the TypeScript bundle');
-assert.match(generated, /root\.dashboardTestRowsHtml\s*=\s*createDashboardTestRowsHtml/,
-  'artifact must publish TypeScript dashboard test rows');
 assert.match(generated, /root\.dashboardTestItems\s*=\s*createDashboardTestItems/,
   'artifact must publish TypeScript dashboard test items');
 assert.match(generated, /root\.backupInspectionSummary\s*=\s*createBackupInspectionSummary/,
@@ -1480,31 +1370,8 @@ assert.doesNotMatch(generated, /root\.labProfileService\s*=/,
   'artifact must not publish the lab-profile facade used only by the settings command');
 assert.match(generated, /root\.firebaseSettingsService\s*=\s*createFirebaseSettingsService/,
   'artifact must publish TypeScript Firebase settings validation for settings callers');
-assert.match(generated, /root\.settingsBrandPreviewHtml\s*=\s*createBrandPreviewHtml/,
-  'artifact must publish TypeScript brand preview HTML for settings callers');
-assert.match(generated, /root\.settingsUnitProfileHtml\s*=\s*createUnitProfileHtml/,
-  'artifact must publish TypeScript unit profile HTML for settings callers');
-assert.match(generated, /root\.settingsBrandPanelHtml\s*=\s*createBrandPanelHtml/,
-  'artifact must publish TypeScript brand panel HTML for settings callers');
-assert.match(generated, /root\.settingsAdminToolsHtml\s*=\s*createAdminToolsHtml/,
-  'artifact must publish TypeScript admin tools HTML for settings callers');
-assert.match(generated, /root\.settingsFirebaseRulesPanelHtml\s*=\s*createFirebaseRulesPanelHtml/,
-  'artifact must publish TypeScript Firebase Rules panel HTML for settings callers');
-assert.match(generated, /root\.settingsLisGatewayPanelHtml\s*=\s*createLisGatewayPanelHtml/,
-  'artifact must publish TypeScript LIS Gateway panel HTML for settings callers');
-assert.match(generated, /root\.settingsFirebaseConnectionPanelHtml\s*=\s*createFirebaseConnectionPanelHtml/,
-  'artifact must publish TypeScript Firebase connection panel HTML for settings callers');
-assert.match(generated, /root\.settingsPageLayoutHtml\s*=\s*createSettingsPageLayoutHtml/,
-  'artifact must publish TypeScript settings page layout HTML for settings callers');
-assert.match(generated, /root\.userRowHtml\s*=\s*createUserRowHtml/, 'artifact must publish TypeScript user row HTML for the legacy bridge');
-assert.match(generated, /root\.usersPageHtml\s*=\s*createUsersPageHtml/, 'artifact must publish TypeScript users page HTML for the legacy bridge');
-assert.match(generated, /root\.activityAuditPageHtml\s*=\s*createActivityAuditPageHtml/, 'artifact must publish TypeScript activity audit page HTML for the legacy bridge');
-assert.match(generated, /root\.reagentSelectOptionsHtml\s*=\s*createReagentSelectOptionsHtml/, 'artifact must publish TypeScript reagent selector options for the legacy bridge');
 assert.match(generated, /root\.reagentResultHtml\s*=\s*createReagentResultHtml/, 'artifact must publish TypeScript reagent result HTML for the legacy bridge');
-assert.match(generated, /root\.reagentPairRowHtml\s*=\s*createReagentPairRowHtml/, 'artifact must publish TypeScript reagent pair-row HTML for the legacy bridge');
 assert.match(generated, /root\.reportNceDetailHtmlPresentation\s*=\s*createReportNceDetailHtml/, 'artifact must publish TypeScript NCE detail report HTML for the legacy bridge');
-assert.match(generated, /root\.dashboardPageHtml\s*=\s*createDashboardPageHtml/, 'artifact must publish TypeScript dashboard page HTML for the legacy bridge');
-assert.match(generated, /root\.managePageHtml\s*=\s*createManagePageHtml/, 'artifact must publish TypeScript manage page HTML for the legacy bridge');
 assert.match(generated, /root\.actionPageHtml\s*=\s*createActionPageHtml/, 'artifact must publish TypeScript NCE page HTML for the legacy bridge');
 assert.doesNotMatch(generated, /root\.csvCellService\s*=/,
   'artifact must not publish the retired CSV cell facade');
@@ -1892,8 +1759,6 @@ assert.match(generated, /root\.afterRender\s*=\s*createAfterRenderController/,
   'artifact phải công bố after-render controller TypeScript cho caller route legacy');
 assert.doesNotMatch(generated, /root\.chartTooltipService\s*=/,
   'artifact không được công bố facade tooltip chỉ dùng nội bộ bundle');
-assert.doesNotMatch(generated, /root\.dashboard(?:TestStatusTags|TestRank|Completion)\s*=/,
-  'artifact không được công bố helper dashboard chỉ dùng nội bộ bundle');
 assert.doesNotMatch(generated, /root\.BackupService\s*=/,
   'artifact không được công bố namespace backup chỉ dùng nội bộ bundle');
 assert.match(generated, /root\.qcTooltip\s*=\s*chartTooltip/,
@@ -1928,34 +1793,6 @@ assert.match(drawSource, /deps\.canvasFont\(800, 'type-caption', 11\.5\)/,
   'renderer phải gọi trực tiếp canvas font từ dependency injected');
 assert.match(drawSource, /deps\.leveyJenningsTooltipController\(canvas\)/,
   'renderer phải gọi trực tiếp tooltip controller từ dependency injected');
-assert.match(dashboardRoutesSource, /return pageDashLoading\(tests, missingWestgard\.length\);/,
-  'dashboard phải gọi trực tiếp loading presentation từ TypeScript bridge');
-assert.match(dashboardRoutesSource, /dashItems\.filter\(item => deps\.dashboardStatusFilter\.matches\(item, dashTestStatus\)\)/,
-  'dashboard phải gọi trực tiếp status filter TypeScript bridge');
-assert.match(dashboardRoutesSource, /deps\.setDashTestStatus\(deps\.dashboardStatusFilter\.normalize\(value\)\);/,
-  'dashboard phải chuẩn hóa status qua TypeScript bridge');
-assert.match(dashboardRoutesSource, /const expByLot = deps\.dashboardExpiringLots\(exp\);/,
-  'dashboard phải gom lô sắp hết hạn qua TypeScript bridge');
-assert.match(dashboardRoutesSource, /const expHtml = deps\.dashboardExpiringLotsHtml\(expByLot\.values\(\)\);/,
-  'dashboard phải render lô sắp hết hạn qua TypeScript bridge');
-assert.match(dashboardRoutesSource, /const dashItems = deps\.dashboardTestItems\(tests, today\);/,
-  'dashboard phải chọn điểm mới nhất qua TypeScript bridge');
-assert.match(dashboardRoutesSource, /const dashItems = deps\.dashboardTestItems\(tests, today\);/,
-  'dashboard phải tạo chuỗi tìm kiếm qua TypeScript bridge');
-assert.match(dashboardRoutesSource, /const dashboardKpi = deps\.dashboardKpis\(dashItems, tests\.length\), \{ totalPoints: totalPts, todayPoints: todayPts, rejected: rej, warnings: warn, missingToday: missingTodayCount, completeTests: doneTests, completionPercent: pct \} = dashboardKpi;/,
-  'dashboard phải tính KPI qua TypeScript bridge');
-assert.match(dashboardRoutesSource, /const testRows = deps\.dashboardTestRowsHtml\(statusItems\);/,
-  'dashboard phải tạo tag Westgard qua TypeScript bridge');
-assert.doesNotMatch(dashboardRoutesSource, /dashboardCompletion\(/,
-  'dashboard phải tính hoàn thành QC qua TypeScript bridge');
-assert.match(dashboardRoutesSource, /const shift = deps\.dashboardShiftStatus\(/,
-  'dashboard phải xác định trạng thái ca trực qua TypeScript bridge');
-assert.match(dashboardRoutesSource, /const followHtml = deps\.dashboardFollowupPanelHtml\(urgentHtml, overdueHtml, noTargetHtml, watchHtml\);/,
-  'dashboard phải dựng bảng theo dõi qua TypeScript bridge');
-assert.match(dashboardRoutesSource, /const dashStatusTabs = deps\.dashboardStatusTabsHtml\(dashItems, dashTestStatus\);/,
-  'dashboard phải dựng tab trạng thái qua TypeScript bridge');
-assert.match(dashboardRoutesSource, /const testListHtml = deps\.dashboardTestListHtml\(statusItems\.length, testRows\);/,
-  'dashboard phải dựng danh sách xét nghiệm qua TypeScript bridge');
 assert.match(generated, /root\.leveyJenningsColors\s*=\s*LEVEY_JENNINGS_COLORS/,
   'artifact phải công bố TypeScript palette Levey-Jennings cho wrapper cũ');
 assert.match(generated, /root\.leveyJenningsTicks\s*=\s*createLeveyJenningsTicks/,

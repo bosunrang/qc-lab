@@ -9,11 +9,12 @@
   "scripts": {
     "start": "electron .",
     "dev": "npm run build:pilot && vite",
-    "build:pilot": "vite build && npm run build:core && npm run build:worker",
+    "build:pilot": "vite build && npm run build:core && npm run build:worker && npm run build:react",
     "build:core": "vite build --config vite.core.config.mjs",
+    "build:react": "vite build --config vite.react.config.mjs",
     "build:worker": "tsc -p tsconfig.worker.json",
     "test": "node scripts/run-tests.js",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.modules.json",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.modules.json && tsc -p tsconfig.react.json",
     "visual-check": "node scripts/visual-check.js",
     "nce-check": "node scripts/nce-workflow-check.js",
     "ui-check": "node scripts/ui-workflow-check.js",
@@ -30,10 +31,14 @@
     "dist:publish": "npm run build:pilot && node scripts/patch-7za-symlink.js && electron-builder --win nsis --publish always"
   },
   "devDependencies": {
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
     "axe-core": "^4.12.1",
     "electron": "^43.2.0",
     "electron-builder": "^26.15.3",
     "playwright": "^1.61.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "typescript": "^7.0.2",
     "vite": "^8.2.1"
   },

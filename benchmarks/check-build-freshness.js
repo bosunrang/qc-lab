@@ -60,6 +60,10 @@ try {
   const workerOut = path.join(tmpDir, 'worker');
   runBuild('build:worker', tscBin, ['-p', 'tsconfig.worker.json', '--outDir', workerOut], () =>
     compare('assets/workers/westgard-worker.js', path.join(workerOut, 'westgard-worker.js'), path.join(root, 'assets', 'workers', 'westgard-worker.js')));
+
+  const reactOut = path.join(tmpDir, 'react');
+  runBuild('build:react', viteBin, ['build', '--config', 'vite.react.config.mjs', '--outDir', reactOut], () =>
+    compare('assets/generated/react-pilot.js', path.join(reactOut, 'react-pilot.js'), path.join(root, 'assets', 'generated', 'react-pilot.js')));
 } finally {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 }
@@ -68,5 +72,5 @@ if (failures.length) {
   process.stderr.write('Build đã commit KHÔNG khớp với mã nguồn TypeScript hiện tại:\n' + failures.map(f => '  - ' + f).join('\n') + '\n');
   process.exitCode = 1;
 } else {
-  process.stdout.write('Build freshness: assets/generated/modular-pilot.js, assets/core.js, assets/workers/westgard-worker.js đều khớp với src/ hiện tại.\n');
+  process.stdout.write('Build freshness: assets/generated/modular-pilot.js, assets/core.js, assets/workers/westgard-worker.js, assets/generated/react-pilot.js đều khớp với src/ hiện tại.\n');
 }

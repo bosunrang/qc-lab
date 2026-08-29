@@ -49,7 +49,13 @@ scope**, không phải không còn file `.js` trong gói phát hành.
    truyền vào factory/command ở ranh giới.
 4. Mọi mutation QC phải giữ period lock, audit log, cache invalidation và đúng
    `save(opts)`/sync policy.
-5. Không đưa React/Vue/Svelte, state library hay microservice vào migration này.
+5. Không đưa React/Vue/Svelte, state library hay microservice vào migration NÀY
+   (migration TypeScript, đã đóng 2026-08-20). **Cập nhật 2026-08-29**: sau khi
+   migration này đóng, một sáng kiến MỚI và TÁCH BIỆT đã bắt đầu đưa React vào
+   ứng dụng theo mô hình "đảo" (từng trang một, song song với bundle cổ điển) —
+   xem `docs/REACT-ADOPTION-PLAN.md`. Ràng buộc này (không trộn framework vào
+   *migration TypeScript* nói riêng) vẫn đúng và không bị xoá; nó không cấm một
+   sáng kiến sau đó, có phạm vi và tài liệu riêng.
 6. Không sửa tay `assets/generated/*.js`; source thay đổi trong `src/`, sau đó
    chạy build và commit artifact sinh ra.
 

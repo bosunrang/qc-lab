@@ -42,8 +42,6 @@ declare function confirmDialog(options?: Record<string, any>): Promise<boolean>;
 declare function infoDialog(message: string, options?: Record<string, any>): Promise<unknown>;
 declare function openDialogOverlay(html: string, resolve: (result?: any) => void): void;
 declare function closeDialogOverlay(result?: any): void;
-declare function pageDash(): string;
-declare function dashTestFilter(value: string): void;
 declare function ensureLabBrandShape(): void;
 declare function backupCurrentData(prefix?: string): Promise<boolean>;
 declare function reportExportSelection(): { tid: string; t: any; start: string; end: string; includeNceAppendix: boolean };

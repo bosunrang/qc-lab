@@ -1,1 +1,0 @@
-export function createDashboardQcFollowupListHtml({render}:{render:(item:any,kind:string)=>string}){return(items:any[],limit:number,kind:string)=>items.slice(0,limit).map(item=>render(item,kind)).join('');}

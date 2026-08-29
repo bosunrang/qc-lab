@@ -10,7 +10,6 @@ const compat=read('src/compat/modular-pilot.global.ts');
 const routerPolicy=read('src/presentation/router/router-page-policy.ts');
 const routerShell=read('src/presentation/router/router-shell-controller.ts');
 const vnDatePicker=read('src/presentation/router/vn-date-picker-controller.ts');
-const dashboard=read('src/presentation/dashboard/dashboard-page-controller.ts');
 const entry=read('src/presentation/entry/entry-page-controller.ts');
 const entryPointRow=read('src/presentation/entry/entry-point-table-row-html.ts');
 const westgard=read('src/presentation/westgard/westgard-page-controller.ts');
@@ -53,7 +52,6 @@ assert.doesNotMatch(indexNoComments,/<script(?![^>]*\ssrc=)[^>]*>/,'index.html k
 assert.doesNotMatch(indexNoComments,/ onclick="| oninput="| onchange="| onkeydown="| onmousemove="/,'index.html không còn thuộc tính onXXX= trần');
 
 assert.doesNotMatch(router,/function page(?:Dash|Entry|Westgard)\(/,'router-render chỉ giữ điều phối và UI primitives');
-assert.match(dashboard,/const pageDash = \(\) => \{/);
 assert.match(entry,/const pageEntry = \(rightOnly = false\)/);
 assert.match(westgard,/const pageWestgard = \(\) => \{/);
 

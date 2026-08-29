@@ -460,18 +460,6 @@
   height:36px;
 }
 
-.target-lot-info{
-  display:inline-flex; align-items:center; gap:6px; min-height:36px; padding:0 10px; border:1px solid #d5e1e7; border-radius:var(--surface-radius); background:var(--panel); color:#5d7180; font-size:var(--type-caption); font-weight:750;
-}
-
-.target-lot-info b{
-  color:var(--tealink); font-size:var(--type-subhead);
-}
-
-.target-lot-info span{
-  font-size:var(--type-caption);
-}
-
 .target-summary{
   display:flex; gap:8px; flex-wrap:wrap; padding:10px 14px 0;
 }
@@ -728,7 +716,7 @@ aside,
 }
 
 .target-selector.history-selector{
-  grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));
+  grid-template-columns:minmax(200px,320px) repeat(2,minmax(min(180px,100%),max-content));
 }
 
 .target-lot-info{
@@ -914,15 +902,15 @@ aside,
 }
 
 .target-matrix-panel .target-lot-info{
-  min-height:40px; padding:0 14px; border:1px solid #dbe5ea; border-radius:var(--radius-md); background:var(--surface-subtle); color:var(--muted); display:flex; align-items:center; gap:8px; font-size:var(--type-caption);
+  padding:6px 14px; border:1px solid var(--success-border); border-radius:var(--radius-pill); background:var(--success-bg); color:var(--success-ink); display:flex; align-items:baseline; justify-content:center; gap:8px; font-size:var(--type-caption); font-weight:750;
 }
 
 .target-matrix-panel .target-lot-info b{
-  font-size:var(--type-subhead); color:var(--teal);
+  font-size:var(--type-subhead); color:var(--success-ink); font-weight:800;
 }
 
 .target-matrix-panel .target-lot-info span{
-  color:#6e828e; font-size:var(--type-meta);
+  color:var(--success-ink); font-size:var(--type-meta); font-weight:750;
 }
 
 .lot-group-card-h small,
@@ -1042,6 +1030,7 @@ aside,
   .assay-rule-row{grid-template-columns:56px minmax(0,1fr)}
   .assay-rule-row .cfg-assay-scope{grid-column:2}
   .assay-cusum-grid{grid-template-columns:minmax(0,1fr)}
+  .target-selector.history-selector{grid-template-columns:1fr}
 }
 
 .rcfg-group-modal .lot-level-picker{
@@ -1303,7 +1292,7 @@ aside,
 }
 
 .target-matrix-panel .target-lot-info{
-  min-height:38px; padding:0 12px;
+  padding:6px 12px;
 }
 
 .config-shell-main > .rcfg-list table.history-table{

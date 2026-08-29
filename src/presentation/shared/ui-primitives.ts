@@ -22,7 +22,8 @@ export function createUiPrimitives(deps: { currentUser: () => any; escape: (valu
     if (!currentUser) return '';
     const name = currentUser.name || currentUser.username;
     const initial = deps.escape(String(name || 'U').trim().charAt(0).toUpperCase() || 'U');
-    return `<div class="top-user"><div class="avatar">${initial}</div><div class="meta"><div class="name">${deps.escape(name)}</div><div class="role">${deps.roleLabel(currentUser.role)}</div></div><button data-action="logout" title="Đăng xuất"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M21 5v14"/></svg>Đăng xuất</button></div>`;
+    const avatarInner = currentUser.avatar ? `<img src="${deps.escapeAttr(currentUser.avatar)}" alt="">` : initial;
+    return `<div class="top-user"><div class="avatar" role="button" tabindex="0" aria-label="Đổi ảnh đại diện" data-action="openAvatarModal" data-keydown-action="openAvatarModal" data-keydown-keys='[" ","Enter"]'>${avatarInner}</div><div class="meta"><div class="name">${deps.escape(name)}</div><div class="role">${deps.roleLabel(currentUser.role)}</div></div><button data-action="logout" title="Đăng xuất"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M21 5v14"/></svg>Đăng xuất</button></div>`;
   };
   const headOnly = (t: string, p: string, actions = '') => `<div class="head"><div><h1>${t}</h1>${p ? `<p>${p}</p>` : ''}</div><div class="head-actions">${actions}${topUserBox()}</div></div>`;
   return { btn, emptyState, topUserBox, headOnly };

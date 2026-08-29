@@ -6,7 +6,7 @@ const root=path.join(__dirname,'..');
 const bridge=fs.readFileSync(path.join(root,'src','compat','modular-pilot.global.ts'),'utf8');
 
 // users-auth.js đã retire vào src/compat/modular-pilot.global.ts (2026-08-20, Pha G nhóm C lát 2).
-assert.match(bridge,/const users\s*=\s*root\.userListModel\(state\.users,\s*currentUser\s*&&\s*currentUser\.id\)/,'Trang người dùng phải dùng model TypeScript');
+assert.match(bridge,/root\.usersModel\s*=\s*\(\)\s*=>\s*root\.userListModel\(state\.users,\s*currentUser\s*&&\s*currentUser\.id\)/,'Trang người dùng phải dùng model TypeScript');
 assert.match(bridge,/root\.AUDIT_PAGE_SIZES\s*=\s*ACTIVITY_AUDIT_PAGE_SIZES/,'Kích thước trang nhật ký phải dùng bridge TypeScript');
 assert.match(bridge,/root\.auditDateKey\s*=\s*activity\s*=>\s*root\.activityAuditFilter\.dateKey\(activity\)/,'Khóa ngày nhật ký phải dùng bridge TypeScript');
 assert.match(bridge,/root\.auditFilteredActivities\s*=\s*\(items\s*=\s*state\.activity\s*\|\|\s*\[\]\)\s*=>\s*root\.activityAuditFilter\.filter\(items,\s*auditQ,\s*auditFrom,\s*auditTo\)/,'Bộ lọc nhật ký phải dùng bridge TypeScript');

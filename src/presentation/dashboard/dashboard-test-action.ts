@@ -1,1 +1,0 @@
-export function createDashboardTestAction({button}:{button:(label:string,action:{action:string;args?:unknown[]},variant:string)=>string}){return(testId:string,level:number)=>button('Xem QC',{action:'dashViewTestInEntry',args:[testId,level]},'ghost sm');}

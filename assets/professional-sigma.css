@@ -399,6 +399,22 @@
   max-width:420px;
 }
 
+/* Trong panel "Thiết lập phân tích", canh mép phải ô chọn xét nghiệm khớp với ô
+   Đơn vị bên dưới bằng cách dùng chung lưới cột với .sg-setup-fields, thay vì
+   để flex tự co giãn theo nội dung — hai hàng dùng chung margin trái/phải
+   (--panel-inline-padding = 16px) nên lưới giống nhau sẽ thẳng mép. */
+.sg-setup-heading + .sg-control-row{
+  display:grid; grid-template-columns:minmax(0,1fr) 118px minmax(0,1fr); column-gap:12px; align-items:end;
+}
+
+.sg-setup-heading + .sg-control-row > .sg-test-picker{
+  grid-column:1 / span 2; flex:initial; max-width:none; min-width:0;
+}
+
+.sg-setup-heading + .sg-control-row > .sg-inline-btns{
+  grid-column:3;
+}
+
 .sg-setup-fields{
   display:grid;
   grid-template-columns:minmax(0,1fr) 118px minmax(0,1fr);
@@ -585,6 +601,18 @@
 
 .sg-mu-modal .sg-setup-fields{
   grid-template-columns:1fr;
+}
+
+.sg-setup-heading + .sg-control-row{
+  grid-template-columns:1fr;
+}
+
+.sg-setup-heading + .sg-control-row > .sg-test-picker{
+  grid-column:auto;
+}
+
+.sg-setup-heading + .sg-control-row > .sg-inline-btns{
+  grid-column:auto;
 }
 
 .sg-setup-fields .sg-tea-input{

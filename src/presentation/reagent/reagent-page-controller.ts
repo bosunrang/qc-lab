@@ -52,29 +52,33 @@ export function createReagentPageController(deps: {
   const rcCalc = (ds: AnyRec) => deps.pres.calculator.calculate(ds, RC_MIN_PAIRS);
   const rcAxis = (W: number, H: number, xmin: number, xmax: number, ymin: number, ymax: number, xlab: string, ylab: string) => deps.pres.chartAxis(W, H, xmin, xmax, ymin, ymax, xlab, ylab, RCC, RCPAD, deps.esc);
   const rcPadr = (min: number, max: number) => deps.pres.chart.range([min, max]);
-  const rcToolIcon = (type: string) => deps.pres.toolIcon.icon(type);
-  const rcMiniIcon = (type: string) => deps.pres.toolIcon.icon(type);
   const rcScatterSVG = (R: AnyRec, t: AnyRec) => deps.pres.scatterSvg(R, t, rcPadr, rcAxis, RCC);
   const rcBlandSVG = (R: AnyRec) => deps.pres.blandSvg(R, rcPadr, rcAxis, RCC);
-  const rcSelectOptions = () => deps.pres.selectOptions(deps.getState().reagentTests, deps.ui().rcId, deps.escapeAttr, (d: AnyRec) => deps.esc(rcLabel(d)));
-
-  const pageReagent = () => {
+  /* reagentModel(): dữ liệu thuần cho trang React (src/react/pages/ReagentPage.tsx) —
+     song song với pageReagent() bên dưới, cùng logic đọc state nhưng trả về dữ liệu
+     thay vì HTML. Không sửa pageReagent()/rcCompute() — rcCompute() vẫn được React
+     gọi lại sau khi mount (giữ nguyên cách nó tự vá trực tiếp #rcStats/#rcCrit/
+     #rcVerdict/#rcScatter/#rcBland, không qua React). */
+  const reagentModel = () => {
     const state = deps.getState(), ui = deps.ui();
-    if (!state.reagentTests.length) return deps.pres.emptyPage({ headHtml: deps.headOnly('So sánh 2 lô hóa chất', ''), emptyStateHtml: deps.emptyState('Chưa có phép so sánh', 'Tải lại dữ liệu hoặc tạo phép so sánh mới.', '') });
+    if (!state.reagentTests.length) return { empty: true as const };
     if (!ui.rcId || !state.reagentTests.find((d: AnyRec) => d.id === ui.rcId)) ui.rcId = state.reagentTests[0].id;
-    const ds = rcAct(), t = ds.test, ro = !deps.canWrite() ? 'disabled' : '';
-    const oldLotHead = 'Lô cũ' + (t.lotOld ? `: ${deps.esc(t.lotOld)}` : ''), newLotHead = 'Lô mới' + (t.lotNew ? `: ${deps.esc(t.lotNew)}` : '');
-    const rows = ds.rows.map((r: AnyRec, i: number) => { const c = rcPairCalc(r); return deps.pres.pairRow({ index: i, row: r, readOnly: !deps.canWrite(), pair: c, format: deps.fmt, escAttr: deps.escapeAttr }); }).join('');
-    const toolbarHtml = deps.pres.toolbar({ selectOptionsHtml: rcSelectOptions(), primaryActionsHtml: deps.canWrite() ? deps.button('+ Thêm', { action: 'openRcCreateModal' }, 'teal rc-add-btn') + deps.button(rcToolIcon('trash') + ' Xóa', { action: 'rcDeleteCurrent' }, 'danger rc-delete-btn') : '', secondaryActionsHtml: (deps.canWrite() ? deps.button(rcToolIcon('search') + ' Tìm', { action: 'openRcModal' }, 'ghost rc-find-btn') : '') + deps.button(rcToolIcon('print') + ' In hóa chất này', { action: 'rcPrint' }, 'teal rc-report-btn') + deps.button(rcToolIcon('report') + ' Báo cáo tổng hợp', { action: 'rcPrintSummary' }, 'teal rc-report-main') });
-    const pairPanelHtml = deps.pres.pairPanel({ oldLotHeadHtml: oldLotHead, newLotHeadHtml: newLotHead, rowsHtml: rows, actionsHtml: deps.canWrite() ? deps.button('+ Thêm mẫu', { action: 'rcAddRow' }, 'ghost sm') + ' ' + deps.button('Xóa dữ liệu', { action: 'rcClearRows' }, 'ghost sm') : '', minPairs: RC_MIN_PAIRS });
-    const infoPanelHtml = deps.pres.infoPanel({ disabledAttr: ro, reagentValueHtml: deps.escapeAttr(t.reagent), unitValueHtml: deps.escapeAttr(t.unit), lotOldValueHtml: deps.escapeAttr(t.lotOld), lotNewValueHtml: deps.escapeAttr(t.lotNew), dateInputHtml: deps.dateBox('rcDate', t.date || '', '', `${ro} data-action="rcMeta" data-args='["date"]' data-action-on="change"`), operatorValueHtml: deps.escapeAttr(t.operator), sampleTypeValueHtml: deps.escapeAttr(t.sampleType), biasTarget: t.biasTarget, alpha: t.alpha, coverageChecked: !!t.coverageConfirmed, canWrite: deps.canWrite(), userIconHtml: rcMiniIcon('user'), sampleIconHtml: rcMiniIcon('sample') });
-    const chartsPanelHtml = deps.pres.chartsPanel();
-    const resultsPanelsHtml = deps.pres.resultsPanels();
-    return deps.headOnly('So sánh 2 lô hóa chất', 'Sàng lọc định lượng · hồi quy mô tả · Bland-Altman · phê duyệt theo SOP') +
-     toolbarHtml + `<div class="rc-entry-grid">${infoPanelHtml}
-   ${pairPanelHtml}</div>
-   ${resultsPanelsHtml}
-   ${chartsPanelHtml}`;
+    const ds = rcAct(), t = ds.test, canWrite = deps.canWrite();
+    const comparisons = state.reagentTests.map((d: AnyRec) => ({ id: d.id, label: rcLabel(d) }));
+    const rows = ds.rows.map((r: AnyRec, i: number) => {
+      const c = rcPairCalc(r);
+      return { index: i, old: r?.[0], new: r?.[1], avg: c ? deps.fmt(c.avg, 3) : '–', dif: c ? deps.fmt(c.dif, 3) : '–', difNeg: !!(c && c.dif < 0) };
+    });
+    return {
+      empty: false as const,
+      currentId: ui.rcId as string, comparisons, canWrite,
+      oldLotHead: 'Lô cũ' + (t.lotOld ? `: ${t.lotOld}` : ''),
+      newLotHead: 'Lô mới' + (t.lotNew ? `: ${t.lotNew}` : ''),
+      reagent: t.reagent, unit: t.unit, lotOld: t.lotOld, lotNew: t.lotNew, date: t.date || '',
+      operator: t.operator, sampleType: t.sampleType, biasTarget: t.biasTarget, alpha: t.alpha,
+      coverageConfirmed: !!t.coverageConfirmed,
+      rows, minPairs: RC_MIN_PAIRS,
+    };
   };
 
   const rcCompute = () => {
@@ -197,5 +201,5 @@ export function createReagentPageController(deps: {
     await deps.openPrint('So sánh lô — ' + (ds.test.reagent || ''), body);
   };
 
-  return { rcLabel, rcAct, rcCalc, rcCompute, pageReagent, rcMeta, rcMetaFocus, rcMetaLog, rcCell, rcUpdateRowCalc, rcAddRow, rcRmRow, rcClearRows, rcSwitch, rcDelete, rcDeleteCurrent, rcOpenQuick, rcPickQuick, rcAddQuick, rcDelQuick, openRcModal, rcModalSearchSet, renderRcModal, rcPick, rcDeleteFromModal, openRcCreateModal, rcCreateSearchSet, renderRcCreateModal, rcCreateFrom, rcPrint, rcPrintSummary, rcReportDetail, rcReportItems, rcReportSummaryTable };
+  return { rcLabel, rcAct, rcCalc, rcCompute, reagentModel, rcMeta, rcMetaFocus, rcMetaLog, rcCell, rcUpdateRowCalc, rcAddRow, rcRmRow, rcClearRows, rcSwitch, rcDelete, rcDeleteCurrent, rcOpenQuick, rcPickQuick, rcAddQuick, rcDelQuick, openRcModal, rcModalSearchSet, renderRcModal, rcPick, rcDeleteFromModal, openRcCreateModal, rcCreateSearchSet, renderRcCreateModal, rcCreateFrom, rcPrint, rcPrintSummary, rcReportDetail, rcReportItems, rcReportSummaryTable };
 }

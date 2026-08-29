@@ -10,10 +10,12 @@ export function createRouterDispatchController(deps: {
   resetStatusMemo: () => void;
   pageMap: () => Record<string, () => string>;
   afterRender: (page: string) => void;
-  dashTestQ: () => string;
   entryQ: () => string;
-  dashTestFilter: (value: string) => void;
   entryFilter: (value: string) => void;
+  isReactPage: (id: string) => boolean;
+  mountReactPage: (id: string, container: HTMLElement) => void;
+  unmountReactPageIfMounted: () => void;
+  notifyReactStore: () => void;
 }) {
   const resetMainScroll = () => {
     const m = deps.document.querySelector('main');
@@ -24,12 +26,20 @@ export function createRouterDispatchController(deps: {
     deps.resetStatusMemo();
     if (!deps.canAccessPage(deps.page())) deps.setPage(deps.firstAccessPage());
     const m = deps.document.getElementById('main');
+    if (!m) return;
+    const id = deps.page();
+    if (deps.isReactPage(id)) { deps.mountReactPage(id, m); return; }
+    deps.unmountReactPageIfMounted();
     const map = deps.pageMap();
-    if (m) m.innerHTML = (map[deps.page()] || map.dash)();
+    // 'dash' (Tổng quan) không còn nằm trong pageMap() — nó luôn được isReactPage()
+    // bắt ở nhánh trên. Dự phòng cho id lạ lùi về 'entry' thay vì 'dash'.
+    m.innerHTML = (map[id] || map.entry)();
   };
+  /* Trang 'dash' (Tổng quan) đã chuyển sang React (xem isReactPage/mountReactPage
+     ở trên) — component tự đọc lại ô tìm kiếm lúc mount, không cần dòng gọi
+     dashTestFilter() kiểu DOM cũ ở đây nữa (xem src/react/pages/DashboardPage.tsx). */
   const restoreRouteFilters = () => {
-    if (deps.page() === 'dash' && deps.dashTestQ()) deps.dashTestFilter(deps.dashTestQ());
-    else if (deps.page() === 'entry' && deps.entryQ()) deps.entryFilter(deps.entryQ());
+    if (deps.page() === 'entry' && deps.entryQ()) deps.entryFilter(deps.entryQ());
   };
   /* render() gán lại #main.innerHTML nên scrollTop của <main> về 0 mỗi lần. Khi vẽ
      lại CÙNG một trang (vd Firebase dội bản đồng bộ về gọi rerender(), hoặc sau một
@@ -42,6 +52,7 @@ export function createRouterDispatchController(deps: {
     deps.afterRender(deps.page());
     restoreRouteFilters();
     if (m && keepScroll) m.scrollTop = keepScroll;
+    deps.notifyReactStore();
   };
   const go = (p: string) => {
     if (!deps.canAccessPage(p)) return;

@@ -1,5 +1,0 @@
-'use strict';
-const assert=require('node:assert/strict');const{spawnSync}=require('node:child_process');const path=require('node:path');const{pathToFileURL}=require('node:url');
-const source=pathToFileURL(path.join(__dirname,'..','src','presentation','dashboard','dashboard-kpi-items.ts')).href;
-const program=`import { dashboardKpiItems } from ${JSON.stringify(source)};const items=dashboardKpiItems({tests:3,totalPoints:12,rejected:1,todayPoints:2});if(JSON.stringify(items)!==JSON.stringify([{label:'Xét nghiệm',value:3},{label:'Điểm QC',value:12},{label:'Vi phạm',value:1,color:'var(--red)'},{label:'QC hôm nay',value:2,color:'var(--teal)'}]))throw new Error('must preserve dashboard KPI items');console.log('Dashboard KPI items TypeScript tests passed');`;
-const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});assert.equal(result.status,0,result.stderr||result.stdout||'không thể chạy dashboard KPI items TypeScript');console.log(result.stdout.trim());

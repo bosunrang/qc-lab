@@ -92,6 +92,9 @@ const sheetArrows = run(ctx, `
 `);
 assert.deepEqual(JSON.parse(JSON.stringify(sheetArrows)), { right:'b', left:'a', down:'c', up:'a', rightEdge:null, upEdge:null, enterWrap:'a', tabWrap:'a' });
 
+// Trang 'dash' (Tổng quan) đã chuyển sang React (xem router-dispatch-controller.ts
+// và src/react/pages/DashboardPage.tsx) — restoreRouteFilters() không còn nhánh
+// riêng cho 'dash' nữa, component tự đọc lại ô tìm kiếm lúc mount.
 const restoredFilters = run(ctx, `
   (function(){
     var calls=[];
@@ -103,7 +106,7 @@ const restoredFilters = run(ctx, `
     return calls;
   })()
 `);
-assert.deepEqual(JSON.parse(JSON.stringify(restoredFilters)), ['dash:glucose','entry:lot-01']);
+assert.deepEqual(JSON.parse(JSON.stringify(restoredFilters)), ['entry:lot-01']);
 // Tiêu đề lô đi qua entryColumns() (dựng từ operationalLevels + lô đang chạy song
 // song), không bao giờ từ t.levels thô — giữ nguyên ý ban đầu của guard này.
 // Vế "entryColumns chỉ dựng từ operationalLevels" được khoá ở parallel-lot-run.test.js,

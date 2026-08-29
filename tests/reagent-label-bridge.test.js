@@ -23,27 +23,18 @@ for (const [needle, message] of [
   [/deps\.pres\.createModal\(/, 'Modal thêm hóa chất phải dùng renderer TypeScript'],
   [/deps\.pres\.createReferenceRows\(/, 'Danh mục modal thêm hóa chất phải dùng renderer TypeScript'],
   [/deps\.pres\.createTypedRow\(/, 'Nút tạo hóa chất theo truy vấn phải dùng renderer TypeScript'],
-  [/deps\.pres\.emptyPage\(/, 'Empty state hóa chất phải dùng renderer TypeScript'],
-  [/deps\.pres\.toolbar\(/, 'Toolbar hóa chất phải dùng renderer TypeScript'],
-  [/deps\.pres\.pairPanel\(/, 'Panel cặp hóa chất phải dùng renderer TypeScript'],
-  [/deps\.pres\.infoPanel\(/, 'Panel thông tin hóa chất phải dùng renderer TypeScript'],
-  [/deps\.pres\.chartsPanel\(/, 'Panel biểu đồ hóa chất phải dùng renderer TypeScript'],
-  [/deps\.pres\.resultsPanels\(/, 'Panel kết quả hóa chất phải dùng renderer TypeScript'],
   [/deps\.pres\.resultHtml\(/, 'Kết quả so sánh hóa chất phải dùng renderer TypeScript'],
   [/deps\.pres\.reportDetailCard\(/, 'Card báo cáo hóa chất phải dùng renderer TypeScript'],
   [/deps\.pres\.reportChartGrid\(/, 'Lưới biểu đồ báo cáo phải dùng renderer TypeScript'],
   [/deps\.pres\.report\.summaryTableHtml\(/, 'Bảng tổng hợp báo cáo phải dùng presentation TypeScript'],
   [/deps\.pres\.report\.detailModel\(/, 'Chi tiết hóa chất phải dùng model TypeScript'],
   [/deps\.pres\.report\.formatNumber\(/, 'Định dạng số báo cáo phải dùng presentation TypeScript'],
-  [/deps\.pres\.toolIcon\.icon\(/, 'Biểu tượng hóa chất phải dùng presentation TypeScript'],
   [/deps\.pres\.chartAxis\(/, 'Trục biểu đồ hóa chất phải dùng renderer TypeScript'],
   [/deps\.pres\.scatterSvg\(/, 'Biểu đồ Scatter hóa chất phải dùng renderer TypeScript'],
   [/deps\.pres\.blandSvg\(/, 'Biểu đồ Bland-Altman hóa chất phải dùng renderer TypeScript'],
-  [/deps\.pres\.selectOptions\(/, 'Danh sách so sánh hóa chất phải dùng presentation TypeScript'],
   [/deps\.pres\.reportItem\.items\(/, 'Mục báo cáo hóa chất phải dùng presentation TypeScript'],
   [/deps\.pres\.pairMath\.pairCalc\(/, 'Tính từng cặp hóa chất phải dùng domain TypeScript'],
   [/deps\.pres\.calculator\.calculate\(ds, RC_MIN_PAIRS\)/, 'Calculator hóa chất phải dùng service TypeScript'],
-  [/deps\.pres\.pairRow\(/, 'Dòng cặp số liệu phải dùng renderer TypeScript'],
 ]) assert.match(route, needle, message);
 // Không giữ facade thống kê / xấp xỉ phân phối classic đã retire.
 assert.doesNotMatch(route, /function rc(?:PTwo|TCrit|Betacf|Lgamma|Betai)\(/, 'Không giữ facade thống kê/beta classic đã retire');
@@ -59,12 +50,6 @@ for (const contract of [
   /reagentCreateModalPresentation: typeof reagentCreateModalHtml;/,
   /reagentCreateReferenceRowsHtml: typeof reagentCreateReferenceRowsHtml;/,
   /reagentCreateTypedRowHtml: typeof reagentCreateTypedRowHtml;/,
-  /reagentEmptyPageHtml: typeof reagentEmptyPageHtml;/,
-  /reagentToolbarHtml: typeof reagentToolbarHtml;/,
-  /reagentPairPanelHtml: typeof reagentPairPanelHtml;/,
-  /reagentInfoPanelHtml: typeof reagentInfoPanelHtml;/,
-  /reagentChartsPanelHtml: typeof reagentChartsPanelHtml;/,
-  /reagentResultsPanelsHtml: typeof reagentResultsPanelsHtml;/,
   /reagentReportDetailCardHtml: typeof reagentReportDetailCardHtml;/,
   /reagentReportChartGridHtml: typeof reagentReportChartGridHtml;/,
   /reagentReportPresentation: typeof reagentReportPresentation;/,
@@ -75,7 +60,6 @@ for (const contract of [
   /reagentReportItemPresentation: typeof reagentReportItemPresentation;/,
   /reagentPairMath: typeof reagentPairMath;/,
   /reagentComparisonCalculator: ReturnType<typeof createReagentComparisonCalculator>;/,
-  /reagentPairRowHtml: ReturnType<typeof createReagentPairRowHtml>;/,
 ]) assert.match(bridge, contract, `bridge contract thiếu: ${contract}`);
 assert.doesNotMatch(bridge, /reagent(?:Statistics|TDistribution): typeof/, 'Không công bố facade thống kê hóa chất đã retire');
 

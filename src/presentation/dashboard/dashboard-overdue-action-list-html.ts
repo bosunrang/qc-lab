@@ -1,1 +1,0 @@
-export function createDashboardOverdueActionListHtml({render}:{render:(item:{action:any,index:number,info:any,test:any})=>string}){return(items:any[],tests:any[])=>items.slice(0,4).map(item=>render({action:item.action,index:item.index,info:item.info,test:tests.find(test=>test.id===item.action.testId)})).join('');}

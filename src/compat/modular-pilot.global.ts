@@ -36,6 +36,9 @@ import { createLoginWorkflowCommand, type LoginWorkflowCommand } from '../applic
 import { createRequiredPasswordWorkflowCommand, type RequiredPasswordWorkflowCommand } from '../application/auth/required-password-workflow-command';
 import { createAdminBootstrapCommand, type AdminBootstrapCommand } from '../application/auth/admin-bootstrap-command';
 import { createUserLifecycleCommand, type UserLifecycleCommand } from '../application/auth/user-lifecycle-command';
+import { createUserAvatarCommand, type UserAvatarCommand } from '../application/auth/user-avatar-command';
+import { avatarModalHtml } from '../presentation/auth/avatar-modal-html';
+import { createAvatarModalController } from '../presentation/auth/avatar-modal-controller';
 import { createBackupImportConfirmation } from '../presentation/backup/backup-import-confirmation';
 import { createBackupImportMessage } from '../presentation/backup/backup-import-message';
 import { createBackupOversizeConfirmation } from '../presentation/backup/backup-oversize-confirmation';
@@ -165,14 +168,6 @@ import { createSettingsProfileCommand, type SettingsProfileCommand } from '../ap
 import { createSettingsFirebaseCommand, type SettingsFirebaseCommand } from '../application/settings/settings-firebase-command';
 import { createSettingsPageController } from '../presentation/settings/settings-page-controller';
 import { createFirebaseSettingsService } from '../application/sync/firebase-settings-service';
-import { createBrandPreviewHtml } from '../presentation/settings/brand-preview-html';
-import { createUnitProfileHtml } from '../presentation/settings/unit-profile-html';
-import { createBrandPanelHtml } from '../presentation/settings/brand-panel-html';
-import { createAdminToolsHtml } from '../presentation/settings/admin-tools-html';
-import { createFirebaseRulesPanelHtml } from '../presentation/settings/firebase-rules-panel-html';
-import { createLisGatewayPanelHtml } from '../presentation/settings/lis-gateway-panel-html';
-import { createFirebaseConnectionPanelHtml } from '../presentation/settings/firebase-connection-panel-html';
-import { createSettingsPageLayoutHtml } from '../presentation/settings/settings-page-layout-html';
 import { createIndexedDbOpenService } from '../application/storage/indexeddb-open-service';
 import { createIndexedDbRecordService } from '../application/storage/indexeddb-record-service';
 import { createPartitionedIndexedDbWriteService } from '../application/storage/partitioned-indexeddb-write-service';
@@ -187,20 +182,14 @@ import { createDefaultAdminUser } from '../domain/auth/default-admin-user';
 import { newUserValidationError } from '../domain/auth/new-user-validation';
 import { selectUserPermissions } from '../domain/auth/user-permission-selection';
 import { createActivityAuditFilter } from '../presentation/audit/activity-audit-filter';
-import { createActivityAuditPageHtml } from '../presentation/audit/activity-audit-page-html';
 import { activityAuditPagination } from '../presentation/audit/activity-audit-pagination';
 import { createActivityAuditCsv } from '../presentation/audit/activity-audit-csv';
 import { updateActivityAuditDateRange } from '../presentation/audit/activity-audit-date-range';
 import { ACTIVITY_AUDIT_PAGE_SIZES, activityAuditFilterState } from '../presentation/audit/activity-audit-filter-state';
 import { activityAuditArchiveWindow } from '../presentation/audit/activity-audit-archive-window';
 import { activityAuditArchiveModalHtml } from '../presentation/audit/activity-audit-archive-modal-html';
-import { activityAuditRowHtml } from '../presentation/audit/activity-audit-row-html';
 import { userListModel } from '../presentation/auth/user-list-model';
-import { createUserRowHtml } from '../presentation/auth/user-row-html';
-import { createUsersPageHtml } from '../presentation/auth/users-page-html';
-import { createReagentSelectOptionsHtml } from '../presentation/reagent/reagent-select-options-html';
 import { createReagentResultHtml } from '../presentation/reagent/reagent-result-html';
-import { createReagentPairRowHtml } from '../presentation/reagent/reagent-pair-row-html';
 import { planPartitionWrite } from '../application/storage/partition-write-policy';
 import { createQcValueFormat } from '../domain/qc/value-format';
 import { createQcStaffIdentity } from '../domain/qc/staff-identity';
@@ -298,30 +287,13 @@ import { reportLockPicker } from '../presentation/report/report-lock-picker';
 import { createReportLockPanelHtml } from '../presentation/report/report-lock-panel-html';
 import { createReportPageHtml } from '../presentation/report/report-page-html';
 import { createReportRangePickerHtml } from '../presentation/report/report-range-picker-html';
-import { createDashboardLoading } from '../presentation/dashboard/dashboard-loading';
 import { createDashboardStatusFilter } from '../presentation/dashboard/dashboard-status-filter';
 import { dashboardExpiringLots } from '../domain/qc/dashboard-expiring-lots';
 import { dashboardShiftStatus } from '../presentation/dashboard/dashboard-shift-status';
 import { dashboardKpis } from '../domain/qc/dashboard-kpis';
-import { createDashboardStatusTabsHtml } from '../presentation/dashboard/dashboard-status-tabs-html';
-import { createDashboardExpiringLotsHtml } from '../presentation/dashboard/dashboard-expiring-lots-html';
-import { createDashboardQcFollowupItemHtml } from '../presentation/dashboard/dashboard-qc-followup-item-html';
-import { createDashboardMissingTargetItemHtml } from '../presentation/dashboard/dashboard-missing-target-item-html';
-import { createDashboardOverdueActionItemHtml } from '../presentation/dashboard/dashboard-overdue-action-item-html';
-import { dashboardTestStatusTags } from '../presentation/dashboard/dashboard-test-status-tags';
-import { createDashboardLevelPillHtml } from '../presentation/dashboard/dashboard-level-pill-html';
-import { dashboardTestRank } from '../presentation/dashboard/dashboard-test-rank';
-import { createDashboardLatestPointText } from '../presentation/dashboard/dashboard-latest-point-text';
-import { dashboardFollowupPanelHtml } from '../presentation/dashboard/dashboard-followup-panel-html';
 import { createDashboardTestSearchText } from '../presentation/dashboard/dashboard-test-search-text';
 import { createDashboardLatestPoint } from '../presentation/dashboard/dashboard-latest-point';
-import { dashboardKpisHtml } from '../presentation/dashboard/dashboard-kpis-html';
-import { dashboardProgressHtml } from '../presentation/dashboard/dashboard-progress-html';
 import { createDashboardHeadHtml } from '../presentation/dashboard/dashboard-head-html';
-import { createDashboardTestPanelHtml } from '../presentation/dashboard/dashboard-test-panel-html';
-import { createDashboardTestRowHtml } from '../presentation/dashboard/dashboard-test-row-html';
-import { dashboardKpiItems } from '../presentation/dashboard/dashboard-kpi-items';
-import { createDashboardEmptyTestsHtml } from '../presentation/dashboard/dashboard-empty-tests-html';
 import { CUSUM_COLORS } from '../presentation/chart/cusum-colors';
 import { LEVEY_JENNINGS_MULTI_COLORS } from '../presentation/chart/levey-jennings-multi-colors';
 import { createCusumChartTitle } from '../presentation/chart/cusum-chart-title';
@@ -334,19 +306,11 @@ import { createEntryJumpScrollService } from '../presentation/render/entry-jump-
 import { createDefaultDateFieldsService } from '../presentation/render/default-date-fields-service';
 import { createPostRenderPageActions } from '../presentation/render/post-render-page-actions';
 import { createDashboardOverdueActions } from '../presentation/dashboard/dashboard-overdue-actions';
-import { createDashboardOverdueActionListHtml } from '../presentation/dashboard/dashboard-overdue-action-list-html';
-import { createDashboardQcFollowupListHtml } from '../presentation/dashboard/dashboard-qc-followup-list-html';
-import { createDashboardMissingTargetListHtml } from '../presentation/dashboard/dashboard-missing-target-list-html';
 import { dashboardExpiringLotItems } from '../presentation/dashboard/dashboard-expiring-lot-items';
 import { dashboardWestgardAlerts } from '../presentation/dashboard/dashboard-westgard-alerts';
 import { dashboardMissingTargetItems } from '../presentation/dashboard/dashboard-missing-target-items';
 import { createDashboardLevelData } from '../presentation/dashboard/dashboard-level-data';
-import { createDashboardTestAction } from '../presentation/dashboard/dashboard-test-action';
-import { createDashboardLevelPillsHtml } from '../presentation/dashboard/dashboard-level-pills-html';
-import { createDashboardTestRowsHtml } from '../presentation/dashboard/dashboard-test-rows-html';
 import { createDashboardTestItems } from '../presentation/dashboard/dashboard-test-items';
-import { dashboardTestListHtml } from '../presentation/dashboard/dashboard-test-list-html';
-import { createDashboardPageHtml } from '../presentation/dashboard/dashboard-page-html';
 import { createDashboardPageController } from '../presentation/dashboard/dashboard-page-controller';
 import { icon, icoCal, icoDownload, icoPrint, icoRefArrow } from '../presentation/router/router-icons';
 import { createRouterPermission } from '../presentation/router/router-permission';
@@ -402,7 +366,6 @@ import { createTargetNumberText } from '../presentation/manage/target-number-tex
 import { parseVnDate } from '../presentation/shared/parse-vn-date';
 import { createTargetRangeSync } from '../presentation/manage/target-range-sync';
 import { targetOverwritePicks } from '../presentation/manage/target-overwrite-picks';
-import { lotGroupLotPillsHtml } from '../presentation/manage/lot-group-lot-pills-html';
 import { lotGroupStatus as lotGroupStatusPresentation } from '../presentation/manage/lot-group-status';
 import { lotGroupToggleAction } from '../presentation/manage/lot-group-toggle-action';
 import { targetSwitchAssayNames } from '../presentation/manage/target-switch-assay-names';
@@ -549,30 +512,10 @@ import { createActionCauseDetailHtml } from '../presentation/nce/action-cause-de
 import { createActionEffectivenessDetailHtml } from '../presentation/nce/action-effectiveness-detail-html';
 import { createActionLogPanelHtml } from '../presentation/nce/action-log-panel-html';
 import { actionIssuesPanelHtml } from '../presentation/nce/action-issues-panel-html';
-import { createManageToolbarHtml } from '../presentation/manage/manage-toolbar-html';
-import { createManagePageHtml } from '../presentation/manage/manage-page-html';
-import { createManageShellHtml } from '../presentation/manage/manage-shell-html';
-import { createManageInstrumentRowHtml } from '../presentation/manage/manage-instrument-row-html';
-import { manageInstrumentTableHtml } from '../presentation/manage/manage-instrument-table-html';
-import { createManagePanelRowHtml } from '../presentation/manage/manage-panel-row-html';
-import { managePanelTableHtml } from '../presentation/manage/manage-panel-table-html';
-import { createManageLotRowHtml } from '../presentation/manage/manage-lot-row-html';
-import { manageLotConfigLayoutHtml } from '../presentation/manage/manage-lot-config-layout-html';
-import { createManageLotGroupCardHtml } from '../presentation/manage/manage-lot-group-card-html';
-import { createManageTransitionRowHtml } from '../presentation/manage/manage-transition-row-html';
-import { manageTransitionTableHtml } from '../presentation/manage/manage-transition-table-html';
-import { manageTransitionDetailsHtml } from '../presentation/manage/manage-transition-details-html';
 import { teaReferenceAddModalHtml } from '../presentation/manage/tea-reference-add-modal-html';
 import { teaReferenceLabProfileBodyHtml } from '../presentation/manage/tea-reference-lab-profile-body-html';
 import { teaReferenceLabProfileModalHtml } from '../presentation/manage/tea-reference-lab-profile-modal-html';
-import { teaReferenceRowHtml } from '../presentation/manage/tea-reference-row-html';
-import { teaReferenceTableHtml } from '../presentation/manage/tea-reference-table-html';
-import { createTeaSourceRegistryHtml } from '../presentation/manage/tea-source-registry-html';
-import { createManageHistoryRowHtml } from '../presentation/manage/manage-history-row-html';
 import { manageSearchPlaceholder } from '../presentation/manage/manage-search-placeholder';
-import { createManageAssayRowHtml } from '../presentation/manage/manage-assay-row-html';
-import { manageAssayTableHtml } from '../presentation/manage/manage-assay-table-html';
-import { teaReferenceStatusHtml } from '../presentation/manage/tea-reference-status-html';
 import { manageTransitionStatus } from '../presentation/manage/manage-transition-status';
 import { createManageLotStatus } from '../presentation/manage/manage-lot-status';
 import { manageInstrumentName } from '../presentation/manage/manage-instrument-name';
@@ -585,15 +528,12 @@ import { targetGroupLabel } from '../presentation/manage/target-group-label';
 import { targetGroupStatusSuffix } from '../presentation/manage/target-group-status-suffix';
 import { targetPanelLabel } from '../presentation/manage/target-panel-label';
 import { targetPanelTests } from '../presentation/manage/target-panel-tests';
-import { targetPanelOptionsHtml } from '../presentation/manage/target-panel-options-html';
-import { targetGroupOptionsHtml } from '../presentation/manage/target-group-options-html';
 import { targetSelection } from '../presentation/manage/target-selection';
 import { targetLevelSelection } from '../presentation/manage/target-level-selection';
 import { historySearchValues } from '../presentation/manage/history-search-values';
 import { teaLabBasisLabel } from '../presentation/manage/tea-lab-basis-label';
 import { targetLevelLots } from '../presentation/manage/target-level-lots';
 import { targetSearchValues } from '../presentation/manage/target-search-values';
-import { historyAssayOptionsHtml } from '../presentation/manage/history-assay-options-html';
 import { historyAssaySelection } from '../presentation/manage/history-assay-selection';
 import { historyVisibleRows } from '../presentation/manage/history-visible-rows';
 import { sortHistoryRows } from '../presentation/manage/history-row-sort';
@@ -605,27 +545,14 @@ import { historyPeriodLabel } from '../presentation/manage/history-period-label'
 import { targetRowState } from '../presentation/manage/target-row-state';
 import { targetMatrixStats } from '../presentation/manage/target-matrix-stats';
 import { targetMatrixItems } from '../presentation/manage/target-matrix-items';
-import { targetLevelTabsHtml } from '../presentation/manage/target-level-tabs-html';
-import { targetSummaryHtml } from '../presentation/manage/target-summary-html';
-import { targetMatrixRowHtml } from '../presentation/manage/target-matrix-row-html';
-import { targetMatrixPanelHtml } from '../presentation/manage/target-matrix-panel-html';
 import { historyRows } from '../presentation/manage/history-rows';
-import { historySelectorHtml } from '../presentation/manage/history-selector-html';
-import { targetSelectorHtml } from '../presentation/manage/target-selector-html';
-import { historyTableHtml } from '../presentation/manage/history-table-html';
-import { historyPanelHtml } from '../presentation/manage/history-panel-html';
-import { manageEmptyPanelHtml } from '../presentation/manage/manage-empty-panel-html';
 import { targetEmptyState } from '../presentation/manage/target-empty-state';
-import { targetMatrixTableHtml } from '../presentation/manage/target-matrix-table-html';
-import { targetMatrixActionsHtml } from '../presentation/manage/target-matrix-actions-html';
 import { targetPrerequisite } from '../presentation/manage/target-prerequisite';
-import { targetLevelToolbarHtml } from '../presentation/manage/target-level-toolbar-html';
 import { teaReferenceKind } from '../presentation/manage/tea-reference-kind';
 import { teaReferenceRowActions } from '../presentation/manage/tea-reference-row-actions';
 import { sortTeaReferences } from '../presentation/manage/tea-reference-sort';
 import { teaReferenceNamingTitle } from '../presentation/manage/tea-reference-naming-title';
 import { teaReferenceEmptyState } from '../presentation/manage/tea-reference-empty-state';
-import { teaReferenceLabValueHtml } from '../presentation/manage/tea-reference-lab-value-html';
 import { teaReferenceInputValue } from '../presentation/manage/tea-reference-input-value';
 import { createSigmaDraftService } from '../application/storage/sigma-draft-service';
 import { createStateAdoptionService } from '../application/storage/state-adoption-service';
@@ -665,12 +592,6 @@ import { reagentToolIconPresentation } from '../presentation/reagent/reagent-too
 import { reagentQuickPickerModalHtml } from '../presentation/reagent/reagent-quick-picker-modal-html';
 import { reagentPickerModalHtml } from '../presentation/reagent/reagent-picker-modal-html';
 import { reagentCreateModalHtml } from '../presentation/reagent/reagent-create-modal-html';
-import { reagentEmptyPageHtml } from '../presentation/reagent/reagent-empty-page-html';
-import { reagentToolbarHtml } from '../presentation/reagent/reagent-toolbar-html';
-import { reagentPairPanelHtml } from '../presentation/reagent/reagent-pair-panel-html';
-import { reagentInfoPanelHtml } from '../presentation/reagent/reagent-info-panel-html';
-import { reagentChartsPanelHtml } from '../presentation/reagent/reagent-charts-panel-html';
-import { reagentResultsPanelsHtml } from '../presentation/reagent/reagent-results-panels-html';
 import { reagentChartAxis } from '../presentation/reagent/reagent-chart-axis';
 import { reagentScatterSvg } from '../presentation/reagent/reagent-scatter-svg';
 import { reagentBlandSvg } from '../presentation/reagent/reagent-bland-svg';
@@ -1137,35 +1058,21 @@ type QCLabGlobal = typeof globalThis & {
   lotLabel?: (id: unknown) => string;
   lotTransitionToNo?: (lotId: unknown) => unknown;
   lotStatus?: (l: Record<string, any>) => unknown;
-  manageShell?: (body: string) => string;
-  manageToolbar?: (title: string, sub: string, action?: string, label?: string) => string;
-  manageLots?: () => string;
-  manageInstruments?: () => string;
-  managePanels?: () => string;
-  manageTransitionsV2?: () => string;
   targetGroupLots?: (group: Record<string, any>) => Record<string, any>[];
-  targetGroupOptions?: () => string;
   ensureTargetSelection?: () => void;
-  manageTargets?: () => string;
-  manageAssays?: () => string;
   manageHistorySearchValues?: (t: Record<string, any>) => unknown[];
-  manageHistory?: () => string;
   teaRefFind?: (refKey: unknown) => Record<string, any>;
   teaRefNumOrNull?: (v: unknown) => number | null;
   teaRefExternalChanged?: (row: Record<string, any>, refKey: unknown) => boolean;
   teaRefEnsure?: (refKey: unknown) => Record<string, any>;
   teaRefEdit?: (name: unknown, field: string, val: unknown) => void;
   teaRefRemove?: (refKey: unknown) => void;
-  teaSourceRegistryHtml?: () => string;
   teaRefOpenAdd?: () => void;
   teaRefAddSubmit?: () => Promise<void>;
   teaLabProfileOpen?: (refKey: unknown) => void;
   teaLabProfileSave?: (refKey: unknown) => Promise<void>;
   teaLabProfileRemove?: (refKey: unknown) => Promise<void>;
-  manageTeaRefs?: () => string;
-  manageView?: () => string;
-  renderManageBody?: () => void;
-  pageManage?: () => string;
+  manageModel?: () => any;
   parseVN?: (value: unknown) => string;
   setManageTab?: (tab: unknown) => void;
   setTargetPanel?: (id: unknown) => void;
@@ -1449,12 +1356,6 @@ type QCLabGlobal = typeof globalThis & {
   reagentQuickPickerModalPresentation: typeof reagentQuickPickerModalHtml;
   reagentPickerModalPresentation: typeof reagentPickerModalHtml;
   reagentCreateModalPresentation: typeof reagentCreateModalHtml;
-  reagentEmptyPageHtml: typeof reagentEmptyPageHtml;
-  reagentToolbarHtml: typeof reagentToolbarHtml;
-  reagentPairPanelHtml: typeof reagentPairPanelHtml;
-  reagentInfoPanelHtml: typeof reagentInfoPanelHtml;
-  reagentChartsPanelHtml: typeof reagentChartsPanelHtml;
-  reagentResultsPanelsHtml: typeof reagentResultsPanelsHtml;
   reagentChartAxis: typeof reagentChartAxis;
   reagentScatterSvg: typeof reagentScatterSvg;
   reagentBlandSvg: typeof reagentBlandSvg;
@@ -1662,6 +1563,7 @@ type QCLabGlobal = typeof globalThis & {
    RequiredPasswordWorkflowCommand: RequiredPasswordWorkflowCommand;
    AdminBootstrapCommand: AdminBootstrapCommand;
    UserLifecycleCommand: UserLifecycleCommand;
+   UserAvatarCommand: UserAvatarCommand;
    ActivityArchiveCommand: ActivityArchiveCommand;
   lisQueuePresentation: ReturnType<typeof createLisQueuePresentation>;
   lisSettingsService: ReturnType<typeof createLisSettingsService>;
@@ -1679,14 +1581,6 @@ type QCLabGlobal = typeof globalThis & {
   SettingsProfileCommand: SettingsProfileCommand;
   SettingsFirebaseCommand: SettingsFirebaseCommand;
   firebaseSettingsService: ReturnType<typeof createFirebaseSettingsService>;
-  settingsBrandPreviewHtml: ReturnType<typeof createBrandPreviewHtml>;
-  settingsUnitProfileHtml: ReturnType<typeof createUnitProfileHtml>;
-  settingsBrandPanelHtml: ReturnType<typeof createBrandPanelHtml>;
-  settingsAdminToolsHtml: ReturnType<typeof createAdminToolsHtml>;
-  settingsFirebaseRulesPanelHtml: ReturnType<typeof createFirebaseRulesPanelHtml>;
-  settingsLisGatewayPanelHtml: ReturnType<typeof createLisGatewayPanelHtml>;
-  settingsFirebaseConnectionPanelHtml: ReturnType<typeof createFirebaseConnectionPanelHtml>;
-  settingsPageLayoutHtml: ReturnType<typeof createSettingsPageLayoutHtml>;
   checkStorageUsage: ReturnType<typeof createSettingsPageController>['checkStorageUsage'];
   saveLab: ReturnType<typeof createSettingsPageController>['saveLab'];
   ensureLabBrandShape: ReturnType<typeof createSettingsPageController>['ensureLabBrandShape'];
@@ -1697,7 +1591,7 @@ type QCLabGlobal = typeof globalThis & {
   saveFb: ReturnType<typeof createSettingsPageController>['saveFb'];
   clearFb: ReturnType<typeof createSettingsPageController>['clearFb'];
   copyFirebaseRules: ReturnType<typeof createSettingsPageController>['copyFirebaseRules'];
-  pageSettings: ReturnType<typeof createSettingsPageController>['pageSettings'];
+  settingsModel: ReturnType<typeof createSettingsPageController>['settingsModel'];
   partitionedIndexedDbWriteService?: ReturnType<typeof createPartitionedIndexedDbWriteService>;
   partitionedIndexedDbReadService?: ReturnType<typeof createPartitionedIndexedDbReadService>;
   passwordPolicyError?: typeof passwordPolicyError;
@@ -1712,7 +1606,6 @@ type QCLabGlobal = typeof globalThis & {
   newUserValidationError?: typeof newUserValidationError;
   selectUserPermissions?: typeof selectUserPermissions;
   activityAuditFilter: ReturnType<typeof createActivityAuditFilter>;
-  activityAuditPageHtml: ReturnType<typeof createActivityAuditPageHtml>;
   activityAuditPagination: typeof activityAuditPagination;
   activityAuditCsv: ReturnType<typeof createActivityAuditCsv>;
   updateActivityAuditDateRange: typeof updateActivityAuditDateRange;
@@ -1720,13 +1613,10 @@ type QCLabGlobal = typeof globalThis & {
   activityAuditPageSizes: typeof ACTIVITY_AUDIT_PAGE_SIZES;
   activityAuditArchiveWindow?: typeof activityAuditArchiveWindow;
   activityAuditArchiveModalHtml: typeof activityAuditArchiveModalHtml;
-  activityAuditRowHtml: typeof activityAuditRowHtml;
   userListModel: typeof userListModel;
-  userRowHtml: ReturnType<typeof createUserRowHtml>;
-  usersPageHtml: ReturnType<typeof createUsersPageHtml>;
   // Retire classic users-auth.js (2026-08-20, Pha G nhóm C lát 2) — Users/Audit/Auth pages.
   AUDIT_PAGE_SIZES: typeof ACTIVITY_AUDIT_PAGE_SIZES;
-  pageUsers: () => string;
+  usersModel: () => Record<string, any>[];
   auditDateKey: (activity: Record<string, any>) => string;
   auditFilteredActivities: (items?: Record<string, any>[]) => Record<string, any>[];
   auditSetQuery: (value: string) => void;
@@ -1734,7 +1624,7 @@ type QCLabGlobal = typeof globalThis & {
   auditSetPageSize: (value: unknown) => void;
   auditSetPage: (value: unknown) => void;
   auditClearFilters: () => void;
-  pageAudit: () => string;
+  auditModel: () => Record<string, any>;
   activityCSVRows: (items: Record<string, any>[]) => unknown[][];
   exportActivityCSV: () => void;
   archiveActivityLog: () => void;
@@ -1747,6 +1637,9 @@ type QCLabGlobal = typeof globalThis & {
   applyUserPerms: (id: string) => Promise<void>;
   resetPass: (id: string) => void;
   applyResetPass: (id: string) => Promise<void>;
+  openAvatarModal: () => void;
+  pickAvatar: (e: unknown) => void;
+  clearAvatarPhoto: () => void;
   toggleUser: (id: string) => void;
   delUser: (id: string) => Promise<void>;
   passwordError: (password: string) => string;
@@ -1770,9 +1663,7 @@ type QCLabGlobal = typeof globalThis & {
   changeRequiredPassword: () => Promise<void>;
   logout: () => void;
   showApp: () => void;
-  reagentSelectOptionsHtml: ReturnType<typeof createReagentSelectOptionsHtml>;
   reagentResultHtml: ReturnType<typeof createReagentResultHtml>;
-  reagentPairRowHtml: ReturnType<typeof createReagentPairRowHtml>;
   qcValueFormat?: ReturnType<typeof createQcValueFormat>;
   qcStaffIdentity?: ReturnType<typeof createQcStaffIdentity>;
   qcDateFormat?: ReturnType<typeof createQcDateFormat>;
@@ -1937,7 +1828,6 @@ type QCLabGlobal = typeof globalThis & {
   pageReportV2: ReturnType<typeof createReportPageController>['pageReportV2'];
   reportRangePicker: ReturnType<typeof createReportPageController>['reportRangePicker'];
   ReportPeriodWorkflowCommand: ReportPeriodWorkflowCommand;
-  dashboardLoadingPresentation: ReturnType<typeof createDashboardLoading>;
   dashboardStatusFilter: ReturnType<typeof createDashboardStatusFilter>;
   dashboardExpiringLots: typeof dashboardExpiringLots;
   dashboardShiftStatus: typeof dashboardShiftStatus;
@@ -1998,7 +1888,6 @@ type QCLabGlobal = typeof globalThis & {
   parseVnDatePresentation: typeof parseVnDate;
   targetRangeSyncPresentation: ReturnType<typeof createTargetRangeSync>;
   targetOverwritePicksPresentation: typeof targetOverwritePicks;
-  lotGroupLotPillsHtml: typeof lotGroupLotPillsHtml;
   lotGroupStatusPresentation: typeof lotGroupStatusPresentation;
   lotGroupToggleActionPresentation: typeof lotGroupToggleAction;
   targetSwitchAssayNamesPresentation: typeof targetSwitchAssayNames;
@@ -2099,15 +1988,7 @@ type QCLabGlobal = typeof globalThis & {
   westgardRuleGuideHtml: ReturnType<typeof createWestgardRuleGuideHtml>;
   westgardRuleTogglesHtml: ReturnType<typeof createWestgardRuleTogglesHtml>;
   westgardExportActionsHtml: ReturnType<typeof createWestgardExportActionsHtml>;
-  dashboardStatusTabsHtml: ReturnType<typeof createDashboardStatusTabsHtml>;
-  dashboardExpiringLotsHtml: ReturnType<typeof createDashboardExpiringLotsHtml>;
-  dashboardFollowupPanelHtml: typeof dashboardFollowupPanelHtml;
-  dashboardKpisHtml: typeof dashboardKpisHtml;
-  dashboardProgressHtml: typeof dashboardProgressHtml;
   dashboardHeadHtml: ReturnType<typeof createDashboardHeadHtml>;
-  dashboardTestPanelHtml: ReturnType<typeof createDashboardTestPanelHtml>;
-  dashboardKpiItems: typeof dashboardKpiItems;
-  dashboardEmptyTestsHtml: ReturnType<typeof createDashboardEmptyTestsHtml>;
   cusumColors: typeof CUSUM_COLORS;
   leveyJenningsMultiColors: typeof LEVEY_JENNINGS_MULTI_COLORS;
   cusumChartTitle: ReturnType<typeof createCusumChartTitle>;
@@ -2120,20 +2001,12 @@ type QCLabGlobal = typeof globalThis & {
   defaultDateFieldsService: ReturnType<typeof createDefaultDateFieldsService>;
   postRenderPageActions: ReturnType<typeof createPostRenderPageActions>;
   dashboardOverdueActions: ReturnType<typeof createDashboardOverdueActions>;
-  dashboardOverdueActionListHtml: ReturnType<typeof createDashboardOverdueActionListHtml>;
-  dashboardQcFollowupListHtml: ReturnType<typeof createDashboardQcFollowupListHtml>;
-  dashboardMissingTargetListHtml: ReturnType<typeof createDashboardMissingTargetListHtml>;
   dashboardExpiringLotItems: typeof dashboardExpiringLotItems;
   dashboardWestgardAlerts: typeof dashboardWestgardAlerts;
   dashboardMissingTargetItems: typeof dashboardMissingTargetItems;
-  dashboardTestRowsHtml: ReturnType<typeof createDashboardTestRowsHtml>;
   dashboardTestItems: ReturnType<typeof createDashboardTestItems>;
-  dashboardTestListHtml: typeof dashboardTestListHtml;
-  dashboardPageHtml: ReturnType<typeof createDashboardPageHtml>;
-  pageDash: ReturnType<typeof createDashboardPageController>['pageDash'];
-  pageDashLoading: ReturnType<typeof createDashboardPageController>['pageDashLoading'];
-  dashTestFilter: ReturnType<typeof createDashboardPageController>['dashTestFilter'];
   dashTestSetStatus: ReturnType<typeof createDashboardPageController>['dashTestSetStatus'];
+  dashboardModel: ReturnType<typeof createDashboardPageController>['dashboardModel'];
   actionGuideContent: ReturnType<typeof createActionGuideContent>;
   actionPageHtml: ReturnType<typeof createActionPageHtml>;
   actionSideChipsHtml: ReturnType<typeof createActionSideChipsHtml>;
@@ -2160,30 +2033,10 @@ type QCLabGlobal = typeof globalThis & {
   actionEffectivenessDetailHtml: ReturnType<typeof createActionEffectivenessDetailHtml>;
   actionLogPanelHtml: ReturnType<typeof createActionLogPanelHtml>;
   actionIssuesPanelHtml: typeof actionIssuesPanelHtml;
-  manageToolbarPresentation: ReturnType<typeof createManageToolbarHtml>;
-  managePageHtml: ReturnType<typeof createManagePageHtml>;
-  manageShellPresentation: ReturnType<typeof createManageShellHtml>;
-  manageInstrumentRowPresentation: ReturnType<typeof createManageInstrumentRowHtml>;
-  manageInstrumentTablePresentation: typeof manageInstrumentTableHtml;
-  managePanelRowPresentation: ReturnType<typeof createManagePanelRowHtml>;
-  managePanelTablePresentation: typeof managePanelTableHtml;
-  manageLotRowPresentation: ReturnType<typeof createManageLotRowHtml>;
-  manageLotConfigLayoutPresentation: typeof manageLotConfigLayoutHtml;
-  manageLotGroupCardPresentation: ReturnType<typeof createManageLotGroupCardHtml>;
-  manageTransitionRowPresentation: ReturnType<typeof createManageTransitionRowHtml>;
-  manageTransitionTablePresentation: typeof manageTransitionTableHtml;
-  manageTransitionDetailsPresentation: typeof manageTransitionDetailsHtml;
   teaReferenceAddModalPresentation: typeof teaReferenceAddModalHtml;
   teaReferenceLabProfileBodyPresentation: typeof teaReferenceLabProfileBodyHtml;
   teaReferenceLabProfileModalHtml: typeof teaReferenceLabProfileModalHtml;
-  teaReferenceRowPresentation: typeof teaReferenceRowHtml;
-  teaReferenceTablePresentation: typeof teaReferenceTableHtml;
-  teaSourceRegistryPresentation: ReturnType<typeof createTeaSourceRegistryHtml>;
-  manageHistoryRowPresentation: ReturnType<typeof createManageHistoryRowHtml>;
   manageSearchPlaceholderPresentation: typeof manageSearchPlaceholder;
-  manageAssayRowPresentation: ReturnType<typeof createManageAssayRowHtml>;
-  manageAssayTablePresentation: typeof manageAssayTableHtml;
-  teaReferenceStatusPresentation: typeof teaReferenceStatusHtml;
   manageTransitionStatusPresentation: typeof manageTransitionStatus;
   manageLotStatusPresentation: ReturnType<typeof createManageLotStatus>;
   manageInstrumentNamePresentation: typeof manageInstrumentName;
@@ -2196,15 +2049,12 @@ type QCLabGlobal = typeof globalThis & {
   targetGroupStatusSuffixPresentation: typeof targetGroupStatusSuffix;
   targetPanelLabelPresentation: typeof targetPanelLabel;
   targetPanelTestsPresentation: typeof targetPanelTests;
-  targetPanelOptionsPresentation: typeof targetPanelOptionsHtml;
-  targetGroupOptionsPresentation: typeof targetGroupOptionsHtml;
   targetSelectionPresentation: typeof targetSelection;
   targetLevelSelectionPresentation: typeof targetLevelSelection;
   historySearchValuesPresentation: typeof historySearchValues;
   teaLabBasisLabelPresentation: typeof teaLabBasisLabel;
   targetLevelLotsPresentation: typeof targetLevelLots;
   targetSearchValuesPresentation: typeof targetSearchValues;
-  historyAssayOptionsPresentation: typeof historyAssayOptionsHtml;
   historyAssaySelectionPresentation: typeof historyAssaySelection;
   historyVisibleRowsPresentation: typeof historyVisibleRows;
   historyRowSortPresentation: typeof sortHistoryRows;
@@ -2216,27 +2066,14 @@ type QCLabGlobal = typeof globalThis & {
   targetRowStatePresentation: typeof targetRowState;
   targetMatrixStatsPresentation: typeof targetMatrixStats;
   targetMatrixItemsPresentation: typeof targetMatrixItems;
-  targetLevelTabsPresentation: typeof targetLevelTabsHtml;
-  targetSummaryPresentation: typeof targetSummaryHtml;
-  targetMatrixRowPresentation: typeof targetMatrixRowHtml;
-  targetMatrixPanelPresentation: typeof targetMatrixPanelHtml;
   historyRowsPresentation: typeof historyRows;
-  historySelectorPresentation: typeof historySelectorHtml;
-  targetSelectorPresentation: typeof targetSelectorHtml;
-  historyTablePresentation: typeof historyTableHtml;
-  historyPanelPresentation: typeof historyPanelHtml;
-  manageEmptyPanelPresentation: typeof manageEmptyPanelHtml;
   targetEmptyStatePresentation: typeof targetEmptyState;
-  targetMatrixTablePresentation: typeof targetMatrixTableHtml;
-  targetMatrixActionsPresentation: typeof targetMatrixActionsHtml;
   targetPrerequisitePresentation: typeof targetPrerequisite;
-  targetLevelToolbarPresentation: typeof targetLevelToolbarHtml;
   teaReferenceKindPresentation: typeof teaReferenceKind;
   teaReferenceRowActionsPresentation: typeof teaReferenceRowActions;
   teaReferenceSortPresentation: typeof sortTeaReferences;
   teaReferenceNamingTitlePresentation: typeof teaReferenceNamingTitle;
   teaReferenceEmptyStatePresentation: typeof teaReferenceEmptyState;
-  teaReferenceLabValuePresentation: typeof teaReferenceLabValueHtml;
   teaReferenceInputValuePresentation: typeof teaReferenceInputValue;
   xlsxEscape: typeof xlsxEscape;
   reportXlsxStyleIds: typeof REPORT_XLSX_STYLE_IDS;
@@ -3406,14 +3243,6 @@ const labProfileService=createLabProfileService((value, limit) => (root.QCCore a
 root.SettingsProfileCommand=createSettingsProfileCommand({current:()=>state.lab||{},set:lab=>{state.lab=lab;},profile:labProfileService,save:()=>save({clearDerived:false}),renderBrand:()=>renderBrand(),render:()=>rerender()});
 root.SettingsFirebaseCommand=createSettingsFirebaseCommand({available:()=>typeof firebase!=='undefined'&&typeof firebase.auth==='function',ensureApp:cfg=>ensureFirebaseApp(cfg),persist:()=>firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL),signIn:(email,password)=>firebase.auth().signInWithEmailAndPassword(email,password),store:plan=>localStorage.setItem('qclab_fb',JSON.stringify({labCode:plan.labCode,email:plan.email,anonymous:false,config:plan.config})),disconnect:()=>fbDisconnect(),connected:plan=>{setCloudStatus(plan.email+' · '+plan.labCode,true);},clearPassword:()=>{const input=document.getElementById('fbPassword') as any;if(input)input.value='';},init:()=>initFirebase(),hasRemote:()=>!!fb.ref,remoteExists:async()=>{const snap=await fb.ref.once('value');if(snap.exists()){markSaved('đã kết nối','Đã tải dữ liệu từ Firebase');return true;}return false;},remoteReady:()=>{fb.ready=true;fb.initialized=true;},sync:()=>(root as any).syncNow(),clearStore:()=>localStorage.removeItem('qclab_fb'),signOut:()=>typeof firebase!=='undefined'&&typeof firebase.auth==='function'?firebase.auth().signOut():Promise.resolve(),local:()=>{fb.authUser=null;setCloudStatus('Đang chạy cục bộ',false);markSaved('đã lưu cục bộ','Đã ngắt Firebase');}});
 root.firebaseSettingsService = createFirebaseSettingsService(value => parseFirebaseConfigTs(value));
-root.settingsBrandPreviewHtml = createBrandPreviewHtml(value => (root as any).esc(value), value => (root as any).escAttr(value));
-root.settingsUnitProfileHtml = createUnitProfileHtml({escapeAttribute:value=>(root as any).escAttr(value),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
-root.settingsBrandPanelHtml = createBrandPanelHtml({escapeAttribute:value=>(root as any).escAttr(value),button:(label,action,variant,title,options)=>(root as any).btn(label,action,variant,title,options)});
-root.settingsAdminToolsHtml = createAdminToolsHtml((label,action,variant)=>(root as any).btn(label,action,variant));
-root.settingsFirebaseRulesPanelHtml = createFirebaseRulesPanelHtml({escape:value=>(root as any).esc(value),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
-root.settingsLisGatewayPanelHtml = createLisGatewayPanelHtml({escape:value=>(root as any).esc(value),escapeAttribute:value=>(root as any).escAttr(value),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
-root.settingsFirebaseConnectionPanelHtml = createFirebaseConnectionPanelHtml({escape:value=>(root as any).esc(value),escapeAttribute:value=>(root as any).escAttr(value),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
-root.settingsPageLayoutHtml = createSettingsPageLayoutHtml((title,subtitle)=>(root as any).headOnly(title,subtitle));
 const settingsPageController=createSettingsPageController({
   document:typeof document!=='undefined'?document:({getElementById:()=>null,createElement:()=>({}),body:{appendChild:()=>{}},execCommand:()=>{}} as unknown as Document),
   navigator:()=>typeof navigator!=='undefined'?navigator:null,
@@ -3441,16 +3270,7 @@ const settingsPageController=createSettingsPageController({
   brand:{logo:()=>root.brandLogo(),markText:()=>root.brandMarkText(),title:()=>root.brandTitle(),subtitle:()=>root.brandSub(),profile:lab=>root.settingsBrandProfile!(lab)},
   html:{
     storageUsageText:(data,estimate)=>root.settingsStorageUsageText!(data,estimate),
-    brandPreviewHtml:input=>root.settingsBrandPreviewHtml(input),
-    firebaseRulesPanelHtml:(guideHtml,rulesText)=>root.settingsFirebaseRulesPanelHtml(guideHtml,rulesText),
-    firebaseGuideHtml:()=>root.settingsFirebaseGuideHtml!(),
     firebaseRulesText:()=>root.settingsFirebaseRulesText!(),
-    pageLayoutHtml:input=>root.settingsPageLayoutHtml(input),
-    unitProfileHtml:lab=>root.settingsUnitProfileHtml(lab),
-    brandPanelHtml:input=>root.settingsBrandPanelHtml(input),
-    adminToolsHtml:(statusText,capacityText)=>root.settingsAdminToolsHtml(statusText,capacityText),
-    firebaseConnectionPanelHtml:input=>root.settingsFirebaseConnectionPanelHtml(input),
-    lisGatewayPanelHtml:input=>root.settingsLisGatewayPanelHtml(input),
     firebaseAclHelp:(labCode,uid)=>root.settingsFirebaseAclHelp!(labCode,uid),
   },
   lis:{config:()=>root.lisGatewayConfig!(),runtime:()=>(root as any).lisGatewayRuntime,statusText:()=>root.lisGatewayStatusText!()},
@@ -3477,7 +3297,7 @@ root.clickElementById = (id: string) => { if (typeof document !== 'undefined' &&
 root.saveFb=settingsPageController.saveFb;
 root.clearFb=settingsPageController.clearFb;
 root.copyFirebaseRules=settingsPageController.copyFirebaseRules;
-root.pageSettings=settingsPageController.pageSettings;
+root.settingsModel=settingsPageController.settingsModel;
 const modularIndexedDbOpenService=createIndexedDbOpenService({indexedDb:()=>typeof indexedDB === 'undefined'?null:indexedDB});
 const modularIndexedDbRecordService=createIndexedDbRecordService({open:()=>modularIndexedDbOpenService.open()});
 root.partitionedIndexedDbWriteService = createPartitionedIndexedDbWriteService({
@@ -3540,7 +3360,6 @@ root.activityAuditFilter = createActivityAuditFilter({
   searchText: value => (globalThis as any).searchText(value), isoDate: value => (globalThis as any).isoDate(value),
   formatDateTime: value => (globalThis as any).formatDateTimeVN(value), roleLabel: value => (globalThis as any).roleLabel(value),
 });
-root.activityAuditPageHtml = createActivityAuditPageHtml();
 root.activityAuditPagination = activityAuditPagination;
 root.activityAuditCsv = createActivityAuditCsv({
   formatDateTime: value => (globalThis as any).formatDateTimeVN(value), roleLabel: value => (globalThis as any).roleLabel(value),
@@ -3550,13 +3369,8 @@ root.activityAuditFilterState = activityAuditFilterState;
 root.activityAuditPageSizes = ACTIVITY_AUDIT_PAGE_SIZES;
 root.activityAuditArchiveWindow = activityAuditArchiveWindow;
 root.activityAuditArchiveModalHtml = activityAuditArchiveModalHtml;
-root.activityAuditRowHtml = activityAuditRowHtml;
 root.userListModel = userListModel;
-root.userRowHtml = createUserRowHtml();
-root.usersPageHtml = createUsersPageHtml();
-root.reagentSelectOptionsHtml = createReagentSelectOptionsHtml();
 root.reagentResultHtml = createReagentResultHtml();
-root.reagentPairRowHtml = createReagentPairRowHtml();
 const modularStorageBootService = createStorageBootService({
   partitionedSupported: () => typeof root.localStoreService !== 'undefined' && root.localStoreService!.supported(),
   readBootRecord: () => localStorage.getItem('qclab_boot'),
@@ -3933,7 +3747,6 @@ const reportPeriodCommand=createReportPeriodCommand({lock:(s,input)=>root.Period
 root.ReportPeriodWorkflowCommand=createReportPeriodWorkflowCommand({current:()=>state,period:reportPeriodCommand,log:(type,detail,target)=>logAct(type,detail,target),save:options=>save(options),render:()=>rerender()});
 root.ActionCurrentIssues=createActionCurrentIssues({operationalTests:()=>typeof (globalThis as any).operationalTests==='function'?(globalThis as any).operationalTests():[],activeWestgard:test=>(globalThis as any).activeWestgard(test),pointWorkflowComplete:pointId=>typeof (globalThis as any).pointWorkflowComplete==='function'?(globalThis as any).pointWorkflowComplete(pointId):false});
 root.ActionReviewMessages=actionReviewMessages;
-root.dashboardLoadingPresentation=createDashboardLoading({headHtml:createDashboardHeadHtml({escape:(value:any)=>(root as any).esc(value),topUserBox:()=>typeof (globalThis as any).topUserBox==='function'?(globalThis as any).topUserBox():''}),kpisHtml:dashboardKpisHtml});
 root.dashboardStatusFilter=createDashboardStatusFilter();
 root.dashboardExpiringLots=dashboardExpiringLots;
 root.dashboardShiftStatus=dashboardShiftStatus;
@@ -4002,7 +3815,6 @@ root.targetRangeDraftPresentation=createTargetRangeDraft({targetFromLimits:(low,
 root.parseVnDatePresentation=parseVnDate;
 root.targetRangeSyncPresentation=createTargetRangeSync({targetFromLimits:(low,high)=>(globalThis as any).QCCore.targetFromLimits(low,high),limitsFromTarget:(mean,sd)=>(globalThis as any).QCCore.limitsFromTarget(mean,sd)});
 root.targetOverwritePicksPresentation=targetOverwritePicks;
-root.lotGroupLotPillsHtml=lotGroupLotPillsHtml;
 root.lotGroupStatusPresentation=lotGroupStatusPresentation;
 root.lotGroupToggleActionPresentation=lotGroupToggleAction;
 root.targetSwitchAssayNamesPresentation=targetSwitchAssayNames;
@@ -4178,25 +3990,9 @@ const westgardPageController=createWestgardPageController({
 root.wgSelectTest = (value: unknown) => { if (!value) return; selTest = value; root.rerender(); };
 (root as any).wgFilterTests=westgardPageController.wgFilterTests;
 (root as any).wgFilterArchivedTests=westgardPageController.wgFilterArchivedTests;
-root.dashboardStatusTabsHtml=createDashboardStatusTabsHtml({matches:(item:any,key:string)=>(root as any).dashboardStatusFilter.matches(item,key)});
-root.dashboardExpiringLotsHtml=createDashboardExpiringLotsHtml({escape:(value:any)=>(root as any).esc(value)});
-const dashboardQcFollowupItemHtml=createDashboardQcFollowupItemHtml({escape:(value:any)=>(root as any).esc(value),testLabel:(test:any)=>(root as any).testDisplayName(test),date:(value:any)=>(root as any).vnDate(value),pointValue:(point:any,test:any)=>(root as any).fmtPointValue(point,test),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
-const dashboardMissingTargetItemHtml=createDashboardMissingTargetItemHtml({escape:(value:any)=>(root as any).esc(value),testLabel:(test:any)=>(root as any).testDisplayName(test),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
-const dashboardOverdueActionItemHtml=createDashboardOverdueActionItemHtml({escape:(value:any)=>(root as any).esc(value),testLabel:(test:any)=>(root as any).testDisplayName(test),date:(value:any)=>(root as any).vnDate(value),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
-const dashboardStatusTags=dashboardTestStatusTags;
-const dashboardLevelPillHtml=createDashboardLevelPillHtml({escape:(value:any)=>(root as any).esc(value),format:(value:any)=>(root as any).fmt(value)});
-const dashboardRank=dashboardTestRank;
-const dashboardLatestPointText=createDashboardLatestPointText({date:(value:any)=>(root as any).vnDate(value),pointValue:(point:any,test:any)=>(root as any).fmtPointValue(point,test)});
-root.dashboardFollowupPanelHtml=dashboardFollowupPanelHtml;
 const dashboardTestSearchText=createDashboardTestSearchText({normalize:(value:any)=>(root as any).searchText(value),label:(test:any)=>(root as any).testDisplayName(test)});
 const dashboardLatestPoint=createDashboardLatestPoint<any>({runNumber:(point:any)=>(root as any).pointRunNo(point)});
-root.dashboardKpisHtml=dashboardKpisHtml;
-root.dashboardProgressHtml=dashboardProgressHtml;
 root.dashboardHeadHtml=createDashboardHeadHtml({escape:(value:any)=>(root as any).esc(value),topUserBox:()=>typeof (globalThis as any).topUserBox==='function'?(globalThis as any).topUserBox():''});
-root.dashboardTestPanelHtml=createDashboardTestPanelHtml({escapeAttr:(value:any)=>(root as any).escAttr(value)});
-const dashboardTestRowHtml=createDashboardTestRowHtml({escape:(value:any)=>(root as any).esc(value),escapeAttr:(value:any)=>(root as any).escAttr(value)});
-root.dashboardKpiItems=dashboardKpiItems;
-root.dashboardEmptyTestsHtml=createDashboardEmptyTestsHtml({emptyState:(title,detail,action)=>(root as any).emptyState(title,detail,action),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
 root.cusumColors=CUSUM_COLORS;
 root.leveyJenningsMultiColors=LEVEY_JENNINGS_MULTI_COLORS;
 root.cusumChartTitle=createCusumChartTitle({format:(value:number,digits:number)=>(root as any).fmt(value,digits)});
@@ -4255,23 +4051,15 @@ root.defaultDateFieldsService=createDefaultDateFieldsService({find:id=>typeof do
 root.postRenderPageActions=createPostRenderPageActions({requestFrame:work=>requestAnimationFrame(work)});
 root.afterRender=createAfterRenderController({document:typeof document!=='undefined'?document:({querySelectorAll:()=>[]} as unknown as Document),canvas:root.afterRenderCanvasService,tests:()=>state.tests||[],levelConfig:(test,level)=>lvlCfg(test,level),buildLeveyJennings:input=>ChartViewModel.buildLeveyJennings(input),acceptedLotPoints:(test,level)=>acceptedLotPoints(test,level),drawLeveyJennings:(canvas,points,mean,sd)=>qcChartRenderer.drawLJ(canvas,points,mean,sd),entryCache:()=>entryLjRenderCache,multiViews:test=>wgMultiViews(test),buildMultiLevel:input=>ChartViewModel.buildMultiLevel(input),drawMultiLevel:(canvas,chart,test)=>qcChartRenderer.drawLJMultiZ(canvas,chart,test),lotGroups:()=>((state as any).lotGroups||[]),levelsForLotGroup:group=>levelsForLotGroup(group),archivedMultiViews:levels=>wgArchivedMultiViews(levels),operationalLotPoints:(test,level)=>operationalLotPoints(test,level),cusumSeries:(test,level)=>cusumSeries(test,level),buildCusum:input=>ChartViewModel.buildCusum(input),drawCusum:(canvas,points,series)=>qcChartRenderer.drawCUSUM(canvas,points,series),fillDefaultDates:()=>root.defaultDateFieldsService.fill(['eDate','aDate'],vnDate(isoToday())),runPageActions:()=>root.postRenderPageActions.run(page,{reagent:rcCompute,sigma:sgRefresh}),consumeEntryJump:()=>{if(!entryJumpToday)return false;entryJumpToday=false;return true;},requestFrame:work=>requestAnimationFrame(work),scrollEntryJump:()=>root.entryJumpScrollService.scroll(),updateSaveStatus:()=>updateSaveStatus(),updateBackupBanner:()=>updateBackupBanner(),restoreConfigNavScroll:()=>root.configNavScrollService.restore()}).afterRender;
 root.dashboardOverdueActions=createDashboardOverdueActions({overdue:action=>(root as any).actionOverdue(action)});
-root.dashboardOverdueActionListHtml=createDashboardOverdueActionListHtml({render:item=>dashboardOverdueActionItemHtml(item)});
-root.dashboardQcFollowupListHtml=createDashboardQcFollowupListHtml({render:(item,kind)=>dashboardQcFollowupItemHtml(item,kind)});
-root.dashboardMissingTargetListHtml=createDashboardMissingTargetListHtml({render:item=>dashboardMissingTargetItemHtml(item)});
 root.dashboardExpiringLotItems=dashboardExpiringLotItems;
 root.dashboardWestgardAlerts=dashboardWestgardAlerts;
 root.dashboardMissingTargetItems=dashboardMissingTargetItems;
 const dashboardLevelData=createDashboardLevelData({stats:(values:number[])=>(root as any).stats(values)});
-const dashboardTestAction=createDashboardTestAction({button:(label,action,variant)=>(root as any).btn(label,action,variant)});
 /* Pha H2 lát cuối: thay onclick="entrySel={...};entryStart=null;entryEnd=null;go('entry')"
    (3 lệnh liền) — gọn thành một hàm đặt tên, cùng mẫu openActionQcEvidence() trong
    actions-page-controller.ts. */
 root.dashViewTestInEntry=(testId:string,level:number)=>{const entryUi=(root as any).EntryUIState;entryUi.entrySel={testId,level:Number(level)};entryUi.entryStart=null;entryUi.entryEnd=null;(root as any).go('entry');};
-const dashboardLevelPillsHtml=createDashboardLevelPillsHtml({targetOk:level=>(root as any).levelTargetOk(level),render:input=>dashboardLevelPillHtml(input)});
-root.dashboardTestRowsHtml=createDashboardTestRowsHtml({statusTag:status=>dashboardStatusTags.westgard(status),todayTag:(count,total)=>dashboardStatusTags.today(count,total),levelsHtml:levels=>dashboardLevelPillsHtml(levels),latestText:(point,test)=>dashboardLatestPointText(point,test),rank:(status,count,total)=>dashboardRank(status,count,total),rowHtml:input=>dashboardTestRowHtml(input),actionHtml:(testId,level)=>dashboardTestAction(testId,Number(level)),testDisplayName:test=>(root as any).testDisplayName(test)});
 root.dashboardTestItems=createDashboardTestItems({activeWestgard:test=>(root as any).activeWestgard(test),summarize:input=>(root as any).WestgardViewModel.summarizeTestStatus(input),levelData:(views,today)=>dashboardLevelData(views,today),latestPoint:points=>dashboardLatestPoint(points),searchText:(test,levels)=>dashboardTestSearchText(test,levels),markStatus:(testId,status)=>(root as any).statusMemo.set(testId,status)});
-root.dashboardTestListHtml=dashboardTestListHtml;
-root.dashboardPageHtml=createDashboardPageHtml();
 const dashboardPageController=createDashboardPageController({
   operationalTests:()=>(root as any).operationalTests(),
   isWestgardMemoized:testId=>wgMemo.has(testId),
@@ -4291,36 +4079,16 @@ const dashboardPageController=createDashboardPageController({
   dashboardWestgardAlerts:root.dashboardWestgardAlerts,
   dashboardExpiringLotItems:root.dashboardExpiringLotItems,
   dashboardExpiringLots:root.dashboardExpiringLots,
-  dashboardQcFollowupListHtml:root.dashboardQcFollowupListHtml,
   dashboardOverdueActions:root.dashboardOverdueActions,
-  dashboardOverdueActionListHtml:root.dashboardOverdueActionListHtml,
-  dashboardMissingTargetListHtml:root.dashboardMissingTargetListHtml,
-  dashboardFollowupPanelHtml:root.dashboardFollowupPanelHtml,
-  dashboardExpiringLotsHtml:root.dashboardExpiringLotsHtml,
-  dashboardStatusTabsHtml:root.dashboardStatusTabsHtml,
   dashboardStatusFilter:root.dashboardStatusFilter,
-  dashboardTestRowsHtml:root.dashboardTestRowsHtml,
-  dashboardTestListHtml:root.dashboardTestListHtml,
   dashboardShiftStatus:root.dashboardShiftStatus,
-  dashboardHeadHtml:root.dashboardHeadHtml,
-  dashboardProgressHtml:root.dashboardProgressHtml,
-  dashboardKpisHtml:root.dashboardKpisHtml,
-  dashboardKpiItems:root.dashboardKpiItems,
-  dashboardTestPanelHtml:root.dashboardTestPanelHtml,
-  dashboardEmptyTestsHtml:root.dashboardEmptyTestsHtml,
-  dashboardPageHtml:root.dashboardPageHtml,
-  dashboardLoadingPresentation:root.dashboardLoadingPresentation,
   dashTestQ:()=>(root as any).dashTestQ,
   dashTestStatus:()=>(root as any).dashTestStatus,
-  setDashTestQ:value=>{(root as any).AnalysisUIState.dashTestQ=value;},
   setDashTestStatus:value=>{(root as any).AnalysisUIState.dashTestStatus=value;},
-  liveRowFilter:(selector,query,opts)=>(root as any).liveRowFilter(selector,query,opts),
   rerender:()=>rerender(),
 });
-root.pageDash=dashboardPageController.pageDash;
-root.pageDashLoading=dashboardPageController.pageDashLoading;
-root.dashTestFilter=dashboardPageController.dashTestFilter;
 root.dashTestSetStatus=dashboardPageController.dashTestSetStatus;
+root.dashboardModel=dashboardPageController.dashboardModel;
 root.icon=icon;root.icoCal=icoCal;root.icoDownload=icoDownload;root.icoPrint=icoPrint;root.icoRefArrow=icoRefArrow;
 const routerPermission=createRouterPermission({currentUser:()=>currentUser,infoDialog:message=>root.infoDialog(message),roles:()=>root.routerPagePolicy.roles});
 root.role=routerPermission.role;root.canWrite=routerPermission.canWrite;root.requireWrite=routerPermission.requireWrite;root.requireAdmin=routerPermission.requireAdmin;root.roleLabel=routerPermission.roleLabel;root.roleSelectOptions=routerPermission.roleSelectOptions;
@@ -4373,12 +4141,14 @@ const routerDispatch=createRouterDispatchController({
   nav:()=>root.nav(),
   requestFrame:work=>requestAnimationFrame(work),
   resetStatusMemo:()=>{(root as any).AnalysisUIState.statusMemo=new Map();},
-  pageMap:()=>({dash:root.pageDash,entry:(root as any).pageEntry,westgard:(root as any).pageWestgard,sigma:(root as any).pageSigma,reagent:(root as any).pageReagent,actions:(root as any).pageActionsV4,report:(root as any).pageReportV2,manage:(root as any).pageManage,users:(root as any).pageUsers,audit:(root as any).pageAudit,settings:(root as any).pageSettings}),
+  pageMap:()=>({entry:(root as any).pageEntry,westgard:(root as any).pageWestgard,sigma:(root as any).pageSigma,actions:(root as any).pageActionsV4,report:(root as any).pageReportV2}),
   afterRender:p=>root.afterRender(p),
-  dashTestQ:()=>(root as any).dashTestQ,
   entryQ:()=>(root as any).entryQ,
-  dashTestFilter:v=>root.dashTestFilter(v),
   entryFilter:v=>(root as any).entryFilter(v),
+  isReactPage:id=>(window as any).QCLabReact?.isReactPage(id)||false,
+  mountReactPage:(id,container)=>(window as any).QCLabReact?.mountReactPage(id,container),
+  unmountReactPageIfMounted:()=>(window as any).QCLabReact?.unmountReactPageIfMounted(),
+  notifyReactStore:()=>(window as any).QCLabReact?.notify(),
 });
 root.go=routerDispatch.go;root.resetMainScroll=routerDispatch.resetMainScroll;root.render=routerDispatch.render;root.restoreRouteFilters=routerDispatch.restoreRouteFilters;root.rerender=routerDispatch.rerender;
 root.actionGuideContent=createActionGuideContent({escape:(value:any)=>(root as any).esc(value),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
@@ -4407,30 +4177,10 @@ root.actionCauseDetailHtml=createActionCauseDetailHtml({escape:(value:any)=>(roo
 root.actionEffectivenessDetailHtml=createActionEffectivenessDetailHtml({escape:(value:any)=>(root as any).esc(value)});
 root.actionLogPanelHtml=createActionLogPanelHtml({button:(label,action,variant)=>(root as any).btn(label,action,variant),emptyState:(title,text)=>(root as any).emptyState(title,text)});
 root.actionIssuesPanelHtml=actionIssuesPanelHtml;
-root.manageToolbarPresentation=createManageToolbarHtml({escape:(value:any)=>(root as any).esc(value),escapeAttr:(value:any)=>(root as any).escAttr(value),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
-root.managePageHtml=createManagePageHtml();
-root.manageShellPresentation=createManageShellHtml({escape:(value:any)=>(root as any).esc(value)});
-root.manageInstrumentRowPresentation=createManageInstrumentRowHtml({escape:(value:any)=>(root as any).esc(value),button:(label,action,variant)=>(root as any).btn(label,action,variant),quote:(value:any)=>(root as any).jsq(value)});
-root.manageInstrumentTablePresentation=manageInstrumentTableHtml;
-root.managePanelRowPresentation=createManagePanelRowHtml({escape:(value:any)=>(root as any).esc(value),button:(label,action,variant)=>(root as any).btn(label,action,variant),quote:(value:any)=>(root as any).jsq(value)});
-root.managePanelTablePresentation=managePanelTableHtml;
-root.manageLotRowPresentation=createManageLotRowHtml({escape:(value:any)=>(root as any).esc(value),button:(label,action,variant)=>(root as any).btn(label,action,variant),quote:(value:any)=>(root as any).jsq(value)});
-root.manageLotConfigLayoutPresentation=manageLotConfigLayoutHtml;
-root.manageLotGroupCardPresentation=createManageLotGroupCardHtml({escape:(value:any)=>(root as any).esc(value)});
-root.manageTransitionRowPresentation=createManageTransitionRowHtml({escape:(value:any)=>(root as any).esc(value),button:(label,action,variant)=>(root as any).btn(label,action,variant),quote:(value:any)=>(root as any).jsq(value)});
-root.manageTransitionTablePresentation=manageTransitionTableHtml;
-root.manageTransitionDetailsPresentation=manageTransitionDetailsHtml;
 root.teaReferenceAddModalPresentation=teaReferenceAddModalHtml;
 root.teaReferenceLabProfileBodyPresentation=teaReferenceLabProfileBodyHtml;
 root.teaReferenceLabProfileModalHtml=teaReferenceLabProfileModalHtml;
-root.teaReferenceRowPresentation=teaReferenceRowHtml;
-root.teaReferenceTablePresentation=teaReferenceTableHtml;
-root.teaSourceRegistryPresentation=createTeaSourceRegistryHtml({escape:(value:any)=>(root as any).esc(value),escapeAttr:(value:any)=>(root as any).escAttr(value)});
-root.manageHistoryRowPresentation=createManageHistoryRowHtml({escape:(value:any)=>(root as any).esc(value),button:(label,action,variant)=>(root as any).btn(label,action,variant),quote:(value:any)=>(root as any).jsq(value)});
 root.manageSearchPlaceholderPresentation=manageSearchPlaceholder;
-root.manageAssayRowPresentation=createManageAssayRowHtml({escape:(value:any)=>(root as any).esc(value),button:(label,action,variant)=>(root as any).btn(label,action,variant),quote:(value:any)=>(root as any).jsq(value)});
-root.manageAssayTablePresentation=manageAssayTableHtml;
-root.teaReferenceStatusPresentation=teaReferenceStatusHtml;
 root.manageTransitionStatusPresentation=manageTransitionStatus;
 root.manageLotStatusPresentation=createManageLotStatus({daysToExpiry:(value:any)=>(root as any).daysToExp(value)});
 root.manageInstrumentNamePresentation=manageInstrumentName;
@@ -4443,15 +4193,12 @@ root.targetGroupLabelPresentation=targetGroupLabel;
 root.targetGroupStatusSuffixPresentation=targetGroupStatusSuffix;
 root.targetPanelLabelPresentation=targetPanelLabel;
 root.targetPanelTestsPresentation=targetPanelTests;
-root.targetPanelOptionsPresentation=targetPanelOptionsHtml;
-root.targetGroupOptionsPresentation=targetGroupOptionsHtml;
 root.targetSelectionPresentation=targetSelection;
 root.targetLevelSelectionPresentation=targetLevelSelection;
 root.historySearchValuesPresentation=historySearchValues;
 root.teaLabBasisLabelPresentation=teaLabBasisLabel;
 root.targetLevelLotsPresentation=targetLevelLots;
 root.targetSearchValuesPresentation=targetSearchValues;
-root.historyAssayOptionsPresentation=historyAssayOptionsHtml;
 root.historyAssaySelectionPresentation=historyAssaySelection;
 root.historyVisibleRowsPresentation=historyVisibleRows;
 root.historyRowSortPresentation=sortHistoryRows;
@@ -4463,27 +4210,14 @@ root.historyPeriodLabelPresentation=historyPeriodLabel;
 root.targetRowStatePresentation=targetRowState;
 root.targetMatrixStatsPresentation=targetMatrixStats;
 root.targetMatrixItemsPresentation=targetMatrixItems;
-root.targetLevelTabsPresentation=targetLevelTabsHtml;
-root.targetSummaryPresentation=targetSummaryHtml;
-root.targetMatrixRowPresentation=targetMatrixRowHtml;
-root.targetMatrixPanelPresentation=targetMatrixPanelHtml;
 root.historyRowsPresentation=historyRows;
-root.historySelectorPresentation=historySelectorHtml;
-root.targetSelectorPresentation=targetSelectorHtml;
-root.historyTablePresentation=historyTableHtml;
-root.historyPanelPresentation=historyPanelHtml;
-root.manageEmptyPanelPresentation=manageEmptyPanelHtml;
 root.targetEmptyStatePresentation=targetEmptyState;
-root.targetMatrixTablePresentation=targetMatrixTableHtml;
-root.targetMatrixActionsPresentation=targetMatrixActionsHtml;
 root.targetPrerequisitePresentation=targetPrerequisite;
-root.targetLevelToolbarPresentation=targetLevelToolbarHtml;
 root.teaReferenceKindPresentation=teaReferenceKind;
 root.teaReferenceRowActionsPresentation=teaReferenceRowActions;
 root.teaReferenceSortPresentation=sortTeaReferences;
 root.teaReferenceNamingTitlePresentation=teaReferenceNamingTitle;
 root.teaReferenceEmptyStatePresentation=teaReferenceEmptyState;
-root.teaReferenceLabValuePresentation=teaReferenceLabValueHtml;
 root.teaReferenceInputValuePresentation=teaReferenceInputValue;
 root.xlsxEscape=xlsxEscape;
 root.reportXlsxStyleIds=REPORT_XLSX_STYLE_IDS;
@@ -5030,6 +4764,9 @@ const requiredPasswordCommand=createRequiredPasswordCommand({validate:(password,
 root.RequiredPasswordWorkflowCommand=createRequiredPasswordWorkflowCommand({command:requiredPasswordCommand,log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options)});
 root.AdminBootstrapCommand=createAdminBootstrapCommand({current:()=>state as {users?:Record<string,any>[]},id:()=>(root as any).uid(),hashDefault:()=>(root as any).legacyHashPass('admin'),createDefault:(id,passHash)=>root.defaultAdminUserFactory!(id,passHash),save:()=>save({cloud:false,clearDerived:false})});
 root.UserLifecycleCommand=createUserLifecycleCommand({current:()=>state as {users?:Record<string,any>[]},manage:userManagementCommand,hash:password=>(root as any).hashPass(password),log:(type,detail,target)=>logAct(type,detail,target),save:()=>save({clearDerived:false})});
+root.UserAvatarCommand=createUserAvatarCommand({manage:userManagementCommand,log:(type,detail,target)=>logAct(type,detail,target),save:()=>save({clearDerived:false})});
+const avatarModalController=createAvatarModalController({document:typeof document!=='undefined'?document:({createElement:()=>({})} as unknown as Document),createImage:()=>new Image(),createFileReader:()=>new FileReader(),currentUser:()=>currentUser,avatarCommand:root.UserAvatarCommand,infoDialog:(message,opts)=>root.infoDialog(message,opts),openModal:html=>root.openModal(html),closeModal:()=>root.closeModal(),rerender:()=>rerender(),escapeAttr:value=>(root as any).escAttr(value),html:{avatarModalHtml},btn:(label,onclick,cls,title,opts)=>root.btn(label,onclick,cls,title,opts)});
+root.openAvatarModal=avatarModalController.openAvatarModal;root.pickAvatar=avatarModalController.pickAvatar;root.clearAvatarPhoto=avatarModalController.clearAvatarPhoto;
 /* ===== USERS / AUDIT / AUTH ===== Retire classic users-auth.js (2026-08-20, Pha G nhóm C
    lát 2) — mọi hàm bên dưới vốn đã chỉ gọi thẳng service/command TypeScript đã có sẵn ở
    trên (password/PBKDF2, login/reset/admin/user-lifecycle command, activity audit filter/
@@ -5039,11 +4776,7 @@ root.UserLifecycleCommand=createUserLifecycleCommand({current:()=>state as {user
    đã ở đó từ trước — test vm sandbox gán bare `auditQ='...'` phải trúng đúng accessor
    property của globalThis, một `let` bên trong IIFE của bundle sẽ không thấy được. */
 root.AUDIT_PAGE_SIZES = ACTIVITY_AUDIT_PAGE_SIZES;
-root.pageUsers = () => {
-  const users = root.userListModel(state.users, currentUser && currentUser.id);
-  const rows = users.map((u: Record<string, any>) => root.userRowHtml({ user: u, currentUserId: currentUser && currentUser.id, esc: escapeHtml, roleLabel: (r: unknown) => root.roleLabel(r as string), btn: root.btn })).join('');
-  return root.usersPageHtml({ head: root.headOnly('Quản lý người dùng', 'Phân quyền thao tác và kiểm soát tài khoản'), rows, roleOptions: root.roleSelectOptions('technician'), permissionChecks: root.userPermChecks(root.rolePageIds('technician'), 'newUserPerms', 'technician'), addButton: root.btn('Thêm', { action: 'addUser' }, 'teal') });
-};
+root.usersModel = () => root.userListModel(state.users, currentUser && currentUser.id);
 root.auditDateKey = activity => root.activityAuditFilter.dateKey(activity);
 root.auditFilteredActivities = (items = state.activity || []) => root.activityAuditFilter.filter(items, auditQ, auditFrom, auditTo);
 root.auditSetQuery = value => {
@@ -5066,23 +4799,28 @@ root.auditClearFilters = () => {
   const next = root.activityAuditFilterState.cleared({ query: auditQ, from: auditFrom, to: auditTo, page: auditPage, pageSize: auditPageSize });
   auditQ = next.query; auditFrom = next.from; auditTo = next.to; auditPage = next.page; rerender();
 };
-root.pageAudit = () => {
+/* Mô hình dữ liệu thuần (không HTML) cho trang Nhật ký hoạt động — dùng bởi
+   src/react/pages/AuditPage.tsx (xem docs/REACT-ADOPTION-PLAN.md). Chạy lại
+   ĐÚNG pipeline của pageAudit() ở dưới (cùng thứ tự gọi) nhưng dừng lại trước
+   bước dựng *Html, trả về dữ liệu để JSX tự vẽ. Thêm hàm riêng thay vì sửa
+   pageAudit() để giữ rủi ro bằng 0 trong lúc còn giữ song song hai bản (xem
+   cách làm tương tự ở dashboardModel() trong dashboard-page-controller.ts). */
+root.auditModel = () => {
   const total = (state.activity || []).length;
-  const oversizeWarn = total > root.ACTIVITY_ROTATE_TO! ? ` <span class="tag warn">Nhật ký đang rất lớn</span> <span class="hint">Nên lưu trữ bớt dòng cũ — hệ thống sẽ tự xoay vòng ở ${root.ACTIVITY_HARD_CAP} dòng (không xuất CSV).</span>` : '';
+  const oversize = total > root.ACTIVITY_ROTATE_TO!;
   const chain = typeof root.auditChainStatus === 'function' ? root.auditChainStatus() : { ok: true, checked: 0, legacy: total, idle: false } as Record<string, any>;
-  const chainHtml = chain.idle
-    ? `<span class="tag none">Chưa kiểm chuỗi hash</span> ${root.btn('Kiểm tra chuỗi hash', { action: 'auditVerifyChainNow' }, 'ghost sm')} <span class="hint">Nhật ký lớn (${chain.total} dòng) nên không tự kiểm mỗi lần mở trang.</span>`
-    : chain.ok ? `<span class="tag ok">Chuỗi hash hợp lệ</span> <span class="hint">${chain.checked} dòng đã khóa hash${chain.legacy ? ` · ${chain.legacy} dòng cũ chưa có hash` : ''}</span>` : `<span class="tag rej">Audit có dấu hiệu bị sửa</span> <span class="hint">Lỗi tại dòng #${((state.activity as any)[chain.brokenIndex] || {}).seq || chain.brokenIndex + 1}: ${escapeHtml(chain.reason)}</span>`;
   const filtered = root.auditFilteredActivities(), pageInfo = root.activityAuditPagination(filtered, auditPage, auditPageSize), pageCount = pageInfo.pageCount;
   auditPage = pageInfo ? pageInfo.page : Math.min(Math.max(1, auditPage), pageCount);
   const offset = pageInfo ? pageInfo.offset : (auditPage - 1) * auditPageSize, pageRows = pageInfo ? pageInfo.rows : filtered.slice(offset, offset + auditPageSize);
-  const rows = pageRows.map((a: any) => root.activityAuditRowHtml({ sequenceHtml: a.seq ? '#' + a.seq : '', timeHtml: formatDateTimeVN(a.ts), userHtml: escapeHtml(a.user || ''), roleHtml: root.roleLabel(a.role || 'viewer'), usernameHtml: a.username ? ' · @' + escapeHtml(a.username) : '', typeHtml: escapeHtml(a.type || ''), targetHtml: escapeHtml(a.target || ''), detailHtml: escapeHtml(a.detail || '') })).join('');
-  const hasFilter = !!(auditQ || auditFrom || auditTo);
-  const pageSizeOptions = (root.AUDIT_PAGE_SIZES as unknown as number[]).map(size => `<option value="${size}" ${size === auditPageSize ? 'selected' : ''}>${size} dòng</option>`).join('');
   const resultFrom = pageInfo ? pageInfo.resultFrom : (filtered.length ? offset + 1 : 0), resultTo = pageInfo ? pageInfo.resultTo : Math.min(offset + auditPageSize, filtered.length);
-  const pagination = filtered.length ? `<div class="audit-pagination"><span class="hint">Hiển thị ${resultFrom}–${resultTo} / ${filtered.length} dòng</span><div>${root.btn('‹ Trước', { action: 'auditSetPage', args: [auditPage - 1] }, 'ghost sm', '', { disabled: auditPage <= 1 })}<b>Trang ${auditPage}/${pageCount}</b>${root.btn('Sau ›', { action: 'auditSetPage', args: [auditPage + 1] }, 'ghost sm', '', { disabled: auditPage >= pageCount })}</div></div>` : '';
-  const rowsOrEmptyState = rows ? `<div class="audit-table-wrap"><table class="audit-table"><thead><tr><th>Thời gian</th><th>Người dùng</th><th>Hành động</th><th>Đối tượng</th><th>Chi tiết</th></tr></thead><tbody>${rows}</tbody></table></div>` : root.emptyState(total ? 'Không tìm thấy nhật ký' : 'Chưa có hoạt động', total ? 'Thử từ khóa hoặc khoảng ngày khác.' : 'Nhật ký sẽ bắt đầu ghi từ các thao tác tiếp theo.');
-  return root.activityAuditPageHtml({ head: root.headOnly('Nhật ký hoạt động', 'Lưu vết các thao tác quan trọng; chỉ quản trị viên được xem'), exportButton: root.btn('Xuất CSV nhật ký', { action: 'exportActivityCSV' }, 'teal sm'), archiveButton: total ? root.btn('Lưu trữ nhật ký cũ', { action: 'archiveActivityLog' }, 'ghost sm') : '', total, chainHtml, oversizeWarn, searchValue: escapeHtmlAttr(auditQ), fromDate: root.dateBox('auditFromDate', auditFrom, 'audit-date', `aria-label="Lọc nhật ký từ ngày" data-action="auditSetDate" data-args='["from"]' data-action-on="change"`), toDate: root.dateBox('auditToDate', auditTo, 'audit-date', `aria-label="Lọc nhật ký đến ngày" data-action="auditSetDate" data-args='["to"]' data-action-on="change"`), pageSizeOptions, clearFiltersButton: hasFilter ? root.btn('Xóa bộ lọc', { action: 'auditClearFilters' }, 'ghost sm audit-clear-filter') : '', filteredCount: filtered.length, rowsOrEmptyState, pagination });
+  return {
+    total, oversize, hardCap: root.ACTIVITY_HARD_CAP!, chain,
+    rows: pageRows as any[], filteredCount: filtered.length,
+    page: auditPage, pageCount, resultFrom, resultTo,
+    pageSizes: root.AUDIT_PAGE_SIZES as unknown as number[], pageSize: auditPageSize,
+    query: auditQ, from: auditFrom, to: auditTo, hasFilter: !!(auditQ || auditFrom || auditTo),
+    brokenSeq: chain.idle || chain.ok ? null : (((state.activity as any)[chain.brokenIndex] || {}).seq || chain.brokenIndex + 1),
+  };
 };
 root.activityCSVRows = items => root.activityAuditCsv(items);
 root.exportActivityCSV = () => { root.csvDownload!('Nhat_ky_hoat_dong_QCLab.csv', root.activityCSVRows(state.activity || [])); };
@@ -5405,13 +5143,11 @@ root.LotTransitionPickerService = createLotTransitionPickerService({
 });
 const managePageController = createManagePageController({
   document: typeof document !== 'undefined' ? document : ({ getElementById: () => null, querySelector: () => null } as unknown as Document),
-  getState: () => state, ui: () => (root as any).ManageUIState, currentPage: () => (root as any).RouterUIState.page,
+  getState: () => state, ui: () => (root as any).ManageUIState,
   rerender: () => rerender(), role: () => role(), userName: () => userName(), requireAdmin: message => root.requireAdmin(message),
   esc: value => (root as any).esc(value), escapeAttr: value => (root as any).escAttr(value),
   btn: (label, action, cls, title, options) => (root as any).btn(label, action, cls, title, options),
-  emptyState: (title, body, actions) => (root as any).emptyState(title, body, actions),
   dateBox: (id, value, cls, attrs) => (root as any).dateBox(id, value, cls, attrs),
-  headOnly: (title, subtitle, actions) => (root as any).headOnly(title, subtitle, actions),
   openModal: html => root.openModal(html), closeModal: () => root.closeModal(),
   confirmDialog: opts => root.confirmDialog(opts), infoDialog: (message, opts) => root.infoDialog(message, opts),
   searchText: value => (globalThis as any).searchText(value), vnDate: value => vnDate(value),
@@ -5440,35 +5176,21 @@ root.panelName = managePageController.panelName;
 root.lotLabel = managePageController.lotLabel;
 root.lotTransitionToNo = managePageController.lotTransitionToNo;
 root.lotStatus = managePageController.lotStatus;
-root.manageShell = managePageController.manageShell;
-root.manageToolbar = managePageController.manageToolbar;
-root.manageLots = managePageController.manageLots;
-root.manageInstruments = managePageController.manageInstruments;
-root.managePanels = managePageController.managePanels;
-root.manageTransitionsV2 = managePageController.manageTransitionsV2;
 root.targetGroupLots = managePageController.targetGroupLots;
-root.targetGroupOptions = managePageController.targetGroupOptions;
 root.ensureTargetSelection = managePageController.ensureTargetSelection;
-root.manageTargets = managePageController.manageTargets;
-root.manageAssays = managePageController.manageAssays;
 root.manageHistorySearchValues = managePageController.manageHistorySearchValues;
-root.manageHistory = managePageController.manageHistory;
 root.teaRefFind = managePageController.teaRefFind;
 root.teaRefNumOrNull = managePageController.teaRefNumOrNull;
 root.teaRefExternalChanged = managePageController.teaRefExternalChanged;
 root.teaRefEnsure = managePageController.teaRefEnsure;
 root.teaRefEdit = managePageController.teaRefEdit;
 root.teaRefRemove = managePageController.teaRefRemove;
-root.teaSourceRegistryHtml = managePageController.teaSourceRegistryHtml;
 root.teaRefOpenAdd = managePageController.teaRefOpenAdd;
 root.teaRefAddSubmit = managePageController.teaRefAddSubmit;
 root.teaLabProfileOpen = managePageController.teaLabProfileOpen;
 root.teaLabProfileSave = managePageController.teaLabProfileSave;
 root.teaLabProfileRemove = managePageController.teaLabProfileRemove;
-root.manageTeaRefs = managePageController.manageTeaRefs;
-root.manageView = managePageController.manageView;
-root.renderManageBody = managePageController.renderManageBody;
-root.pageManage = managePageController.pageManage;
+root.manageModel = managePageController.manageModel;
 /* document là getter LAZY (không capture một lần) — nhiều test đổi document
    giữa các lần gọi để mô phỏng form khác nhau; đọc lại mỗi lần qua deps.document()
    để phản ánh đúng bản mới nhất, khớp cách các dep khác (requireAdmin, rerender,
@@ -5819,12 +5541,6 @@ root.reagentToolIconPresentation = reagentToolIconPresentation;
 root.reagentQuickPickerModalPresentation = reagentQuickPickerModalHtml;
 root.reagentPickerModalPresentation = reagentPickerModalHtml;
 root.reagentCreateModalPresentation = reagentCreateModalHtml;
-root.reagentEmptyPageHtml = reagentEmptyPageHtml;
-root.reagentToolbarHtml = reagentToolbarHtml;
-root.reagentPairPanelHtml = reagentPairPanelHtml;
-root.reagentInfoPanelHtml = reagentInfoPanelHtml;
-root.reagentChartsPanelHtml = reagentChartsPanelHtml;
-root.reagentResultsPanelsHtml = reagentResultsPanelsHtml;
 root.reagentChartAxis = reagentChartAxis;
 root.reagentScatterSvg = reagentScatterSvg;
 root.reagentBlandSvg = reagentBlandSvg;
@@ -5884,17 +5600,8 @@ const reagentPageController=createReagentPageController({
     calculator:(root as any).reagentComparisonCalculator,
     chartAxis:(root as any).reagentChartAxis,
     chart:(root as any).reagentChartPresentation,
-    toolIcon:(root as any).reagentToolIconPresentation,
     scatterSvg:(root as any).reagentScatterSvg,
     blandSvg:(root as any).reagentBlandSvg,
-    selectOptions:(root as any).reagentSelectOptionsHtml,
-    emptyPage:(root as any).reagentEmptyPageHtml,
-    pairRow:(root as any).reagentPairRowHtml,
-    toolbar:(root as any).reagentToolbarHtml,
-    pairPanel:(root as any).reagentPairPanelHtml,
-    infoPanel:(root as any).reagentInfoPanelHtml,
-    chartsPanel:(root as any).reagentChartsPanelHtml,
-    resultsPanels:(root as any).reagentResultsPanelsHtml,
     resultHtml:(root as any).reagentResultHtml,
     quickLabel:(root as any).reagentQuickLabelPresentation,
     quickPickerRows:(root as any).reagentQuickPickerRowsHtml,

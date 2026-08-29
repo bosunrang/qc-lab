@@ -114,7 +114,19 @@ nav .ic{
   display:flex; align-items:center; gap:10px; border:1px solid var(--line-strong);
 }
 .top-user .avatar{
-  color:var(--tealink); display:flex; align-items:center; justify-content:center; font-size:var(--type-meta); font-weight:900;
+  color:var(--tealink); display:flex; align-items:center; justify-content:center; font-size:var(--type-meta); font-weight:900; cursor:pointer; overflow:hidden; flex-shrink:0;
+}
+.top-user .avatar img{
+  width:100%; height:100%; object-fit:cover; display:block;
+}
+.avatar-modal-preview{
+  display:flex; justify-content:center; margin-bottom:var(--panel-content-gap);
+}
+.avatar-modal-preview img, .avatar-modal-initial{
+  width:96px; height:96px; border-radius:var(--radius-md); overflow:hidden; object-fit:cover;
+}
+.avatar-modal-initial{
+  display:flex; align-items:center; justify-content:center; background:var(--neutral-bg); color:var(--tealink); font-size:var(--type-heading-lg); font-weight:900;
 }
 .top-user .name{
   font-size:var(--type-meta); font-weight:800; color:var(--ink); white-space:nowrap;

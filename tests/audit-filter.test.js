@@ -1,4 +1,6 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const { loadSandbox, run } = require('./helpers/sandbox');
 
 const searchText = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().trim();
@@ -35,7 +37,6 @@ const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js'], {
   activityAuditFilterState,
   updateActivityAuditDateRange,
   activityAuditPageSizes: [25, 50, 100],
-  activityAuditRowHtml: input => `<tr><td>${input.sequenceHtml}</td><td>${input.timeHtml}</td><td>${input.userHtml}</td><td>${input.typeHtml}</td><td>${input.targetHtml}</td><td>${input.detailHtml}</td></tr>`,
 });
 // headOnly/btn/emptyState/dateBox/rerender/vnPickerParse/auditVerifyChain/
 // ACTIVITY_HARD_CAP/ACTIVITY_ROTATE_TO giờ cũng được generated/modular-pilot.js
@@ -77,21 +78,32 @@ assert.equal(run(ctx, 'auditFilteredActivities().length'), 0);
 
 assert.deepEqual(Array.from(run(ctx, 'AUDIT_PAGE_SIZES')), [25, 50, 100]);
 
+// Trang Nhật ký hoạt động đã chuyển sang React (src/react/pages/AuditPage.tsx,
+// xem docs/REACT-ADOPTION-PLAN.md) — pageAudit() không còn tồn tại. Phần phân
+// trang dưới đây kiểm qua auditModel() (dữ liệu thuần AuditPage.tsx dùng để
+// vẽ) thay vì quét chuỗi HTML của pageAudit() cũ.
 const manyRows = Array.from({ length: 30 }, (_, index) => ({ ...rows[index % rows.length], seq: index + 1 }));
 run(ctx, `state.activity=${JSON.stringify(manyRows)}; auditQ=''; auditFrom=''; auditTo=''; auditPage=1; auditPageSize=25;`);
-const firstPage = run(ctx, 'pageAudit()');
-assert.match(firstPage, /id="auditSearch"/);
-assert.match(firstPage, /class="datebox audit-date"/);
-assert.match(firstPage, /placeholder="dd\/mm\/yyyy"/);
-assert.match(firstPage, /class="audit-table-wrap"/);
-assert.match(firstPage, /Hiển thị 1–25 \/ 30 dòng/);
-assert.match(firstPage, /Trang 1\/2/);
-assert.match(firstPage, /Lưu trữ nhật ký cũ/, 'Trang nhật ký phải có nút lưu trữ nhật ký cũ');
-assert.doesNotMatch(firstPage, /Xóa nhật ký/, 'Nhật ký chỉ được lưu trữ có kiểm chứng, không được xóa trắng trong app');
+const firstPage = run(ctx, 'auditModel()');
+assert.equal(firstPage.total, 30);
+assert.equal(firstPage.rows.length, 25);
+assert.equal(firstPage.resultFrom, 1);
+assert.equal(firstPage.resultTo, 25);
+assert.equal(firstPage.page, 1);
+assert.equal(firstPage.pageCount, 2);
 
 run(ctx, 'auditPage=2;');
-const secondPage = run(ctx, 'pageAudit()');
-assert.match(secondPage, /Hiển thị 26–30 \/ 30 dòng/);
-assert.match(secondPage, /Trang 2\/2/);
+const secondPage = run(ctx, 'auditModel()');
+assert.equal(secondPage.rows.length, 5);
+assert.equal(secondPage.resultFrom, 26);
+assert.equal(secondPage.resultTo, 30);
+assert.equal(secondPage.page, 2);
+
+// Bảo đảm không có nút "xóa nhật ký" toàn phần trong UI React của trang này —
+// chỉ được lưu trữ có kiểm chứng (xem CLAUDE.md "app deliberately has no
+// 'delete all audit' action").
+const auditPageSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'react', 'pages', 'AuditPage.tsx'), 'utf8');
+assert.match(auditPageSource, /Lưu trữ nhật ký cũ/, 'Trang nhật ký phải có nút lưu trữ nhật ký cũ');
+assert.doesNotMatch(auditPageSource, /Xóa nhật ký/, 'Nhật ký chỉ được lưu trữ có kiểm chứng, không được xóa trắng trong app');
 
 console.log('Audit search, date filter and pagination tests passed');

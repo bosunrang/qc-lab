@@ -21,16 +21,7 @@ export function createSettingsPageController(deps: {
   brand: { logo: () => string; markText: () => string; title: () => string; subtitle: () => string; profile: (lab: AnyRec) => AnyRec };
   html: {
     storageUsageText: (data: AnyRec, estimate: AnyRec) => string;
-    brandPreviewHtml: (input: AnyRec) => string;
-    firebaseRulesPanelHtml: (guideHtml: string, rulesText: string) => string;
-    firebaseGuideHtml: () => string;
     firebaseRulesText: () => string;
-    pageLayoutHtml: (input: AnyRec) => string;
-    unitProfileHtml: (lab: AnyRec) => string;
-    brandPanelHtml: (input: AnyRec) => string;
-    adminToolsHtml: (statusText: string, capacityText: string) => string;
-    firebaseConnectionPanelHtml: (input: AnyRec) => string;
-    lisGatewayPanelHtml: (input: AnyRec) => string;
     firebaseAclHelp: (labCode: string, uid: string) => string;
   };
   lis: { config: () => AnyRec; runtime: () => AnyRec; statusText: () => string };
@@ -134,21 +125,19 @@ export function createSettingsPageController(deps: {
     } catch { await deps.infoDialog('Không copy được tự động. Bạn có thể chọn và copy trong thẻ Firebase Rules.'); }
   };
 
-  const pageSettings = () => {
+  const settingsModel = () => {
     const fbcfg = deps.cloud.getConfig() || {};
     const liscfg = deps.lis.config();
-    const lockedCloud = !!(fbcfg && fbcfg.locked);
-    const logo = deps.brand.logo();
-    const brandPreview = deps.html.brandPreviewHtml({ logo, markText: deps.brand.markText(), title: deps.brand.title(), subtitle: deps.brand.subtitle() });
-    const firebaseRulesPanel = deps.html.firebaseRulesPanelHtml(deps.html.firebaseGuideHtml(), deps.html.firebaseRulesText());
-    return deps.html.pageLayoutHtml({
-      profileHtml: deps.html.unitProfileHtml(deps.getState().lab) + deps.html.brandPanelHtml({ title: deps.brand.title(), subtitle: deps.brand.subtitle(), markText: deps.brand.markText(), previewHtml: brandPreview }),
-      adminHtml: deps.html.adminToolsHtml(deps.backup.statusText(), deps.backup.capacityText()),
-      firebaseHtml: deps.html.firebaseConnectionPanelHtml({ labCode: fbcfg.labCode, email: fbcfg.email, config: fbcfg.config, locked: lockedCloud, dataPath: deps.cloud.dataPath() }),
-      lisHtml: deps.html.lisGatewayPanelHtml({ url: liscfg.url, token: liscfg.token, enabled: liscfg.enabled, status: deps.lis.runtime().status, statusText: deps.lis.statusText() }),
-      rulesHtml: firebaseRulesPanel,
-    });
+    const lab = deps.getState().lab || {};
+    return {
+      lab: { name: lab.name || '', dept: lab.dept || '', address: lab.address || '' },
+      brand: { title: deps.brand.title(), subtitle: deps.brand.subtitle(), markText: deps.brand.markText(), logo: deps.brand.logo() },
+      backup: { statusText: deps.backup.statusText(), capacityText: deps.backup.capacityText() },
+      firebase: { labCode: fbcfg.labCode || '', email: fbcfg.email || '', config: fbcfg.config ? JSON.stringify(fbcfg.config, null, 2) : '', locked: !!(fbcfg && fbcfg.locked), dataPath: deps.cloud.dataPath() },
+      lis: { url: liscfg.url || '', token: liscfg.token || '', enabled: !!liscfg.enabled, status: deps.lis.runtime().status, statusText: deps.lis.statusText() },
+      firebaseRulesText: deps.html.firebaseRulesText(),
+    };
   };
 
-  return { checkStorageUsage, saveLab, ensureLabBrandShape, saveBrand, readBrandInputs, pickLogo, clearLogo, saveFb, clearFb, copyFirebaseRules, pageSettings };
+  return { checkStorageUsage, saveLab, ensureLabBrandShape, saveBrand, readBrandInputs, pickLogo, clearLogo, saveFb, clearFb, copyFirebaseRules, settingsModel };
 }

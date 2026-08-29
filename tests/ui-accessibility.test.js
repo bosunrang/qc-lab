@@ -27,27 +27,13 @@ const reportRoutes = read('src/presentation/report/report-page-controller.ts');
 const reportPageHtml = read('src/presentation/report/report-page-html.ts');
 const reportActionIconPresentation = read('src/presentation/report/report-action-icon.ts');
 const reportLockPanelPresentation = read('src/presentation/report/report-lock-panel-html.ts');
-const firebaseRulesPanelPresentation = read('src/presentation/settings/firebase-rules-panel-html.ts');
-const settingsBrandPanelPresentation = read('src/presentation/settings/brand-panel-html.ts');
-const settingsAdminToolsPresentation = read('src/presentation/settings/admin-tools-html.ts');
-const settingsFirebaseConnectionPresentation = read('src/presentation/settings/firebase-connection-panel-html.ts');
-const settingsLisGatewayPresentation = read('src/presentation/settings/lis-gateway-panel-html.ts');
 const manageRoutes = read('src/presentation/manage/manage-page-controller.ts');
 const teaReferenceLabProfileBodyPresentation = read('src/presentation/manage/tea-reference-lab-profile-body-html.ts');
 const westgardRoutes = read('src/presentation/westgard/westgard-page-controller.ts');
 const westgardCusumPagePresentation = read('src/presentation/westgard/westgard-cusum-page-html.ts');
-const dashboardRoutes = read('src/presentation/dashboard/dashboard-page-controller.ts');
-const dashboardPagePresentation = read('src/presentation/dashboard/dashboard-page-html.ts');
-const dashboardTestPanelPresentation = read('src/presentation/dashboard/dashboard-test-panel-html.ts');
 const sigmaRoutes = read('src/presentation/sigma/sigma-page-controller.ts');
 const sigmaPeriodTablePresentation = read('src/presentation/sigma/sigma-period-table-html.ts');
 const sigmaChartsPanelPresentation = read('src/presentation/sigma/sigma-charts-panel-html.ts');
-const reagentRoutes = read('src/presentation/reagent/reagent-page-controller.ts');
-const reagentPairPanelPresentation = read('src/presentation/reagent/reagent-pair-panel-html.ts');
-const reagentInfoPanelPresentation = read('src/presentation/reagent/reagent-info-panel-html.ts');
-const reagentChartsPanelPresentation = read('src/presentation/reagent/reagent-charts-panel-html.ts');
-const reagentResultsPanelsPresentation = read('src/presentation/reagent/reagent-results-panels-html.ts');
-const settingsRoutes = read('src/presentation/settings/settings-page-controller.ts');
 const indexHtml = read('index.html');
 const cssFiles = fs.readdirSync(path.join(root, 'assets')).filter(name => name.endsWith('.css'));
 
@@ -88,8 +74,15 @@ for(const file of walkPresentation(path.join(root,'src','presentation')).filter(
 assert.deepEqual(rawRequiredLabels,[],'dấu sao bắt buộc trong label phải bọc bằng <span class="req"> để luôn có màu đỏ');
 assert.match(manageRoutes+teaReferenceLabProfileBodyPresentation,/TEa chuẩn hóa % <span class="req">\*<\/span>/,'hồ sơ TEa phải hiển thị dấu bắt buộc bằng marker chung');
 
-const semanticPageRoutes=[dashboardRoutes,dashboardPagePresentation,sigmaRoutes,sigmaPeriodTablePresentation,sigmaChartsPanelPresentation,reagentRoutes,reagentPairPanelPresentation,reagentInfoPanelPresentation,reagentChartsPanelPresentation,reagentResultsPanelsPresentation,actionsRoutes,actionForm,actionLogPanelPresentation,reportRoutes,reportLockPanelPresentation,settingsRoutes,firebaseRulesPanelPresentation,settingsBrandPanelPresentation,settingsAdminToolsPresentation,settingsFirebaseConnectionPresentation,settingsLisGatewayPresentation,router].join('\n');
-for(const title of ['Cần xử lý / Theo dõi','Lô & hạn dùng','Tình trạng','Số liệu theo kỳ','Biểu đồ Sigma & MDC','Thông tin đánh giá','Dữ liệu đo bắt cặp','Kết quả thống kê','Tiêu chí chấp nhận &amp; kết luận','Biểu đồ','Nhật ký khắc phục','Khóa kỳ báo cáo','Logo & tên phần mềm','Quản trị dữ liệu','Đồng bộ đám mây (Firebase Realtime Database)','LIS Gateway (thử nghiệm)','Firebase Rules','Biểu đồ Levey-Jennings']){
+/* Trang Tổng quan (dash), Nhật ký hoạt động (audit), Người dùng (users), Cài
+   đặt (settings), Cấu hình chung (manage) và So sánh hóa chất (reagent) đã
+   chuyển sang React (src/react/pages/*.tsx, xem docs/REACT-ADOPTION-PLAN.md)
+   — JSX viết "className=", không viết "class=" như chuỗi HTML cổ điển, nên
+   quét văn bản nguồn kiểu này không áp dụng được cho các trang đó nữa.
+   Heading semantic của các trang React được xác nhận bằng npm run a11y-audit
+   (kiểm DOM thật qua axe-core), không phải quét chuỗi nguồn ở đây. */
+const semanticPageRoutes=[sigmaRoutes,sigmaPeriodTablePresentation,sigmaChartsPanelPresentation,actionsRoutes,actionForm,actionLogPanelPresentation,reportRoutes,reportLockPanelPresentation,router].join('\n');
+for(const title of ['Tình trạng','Số liệu theo kỳ','Biểu đồ Sigma & MDC','Nhật ký khắc phục','Khóa kỳ báo cáo','Biểu đồ Levey-Jennings']){
   const escaped=title.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
   assert.match(semanticPageRoutes,new RegExp(`<h2[^>]*class="[^"]*panel-title[^"]*"[^>]*>${escaped}`),`panel chính "${title}" phải dùng heading cấp 2 thật`);
 }
@@ -130,7 +123,6 @@ assert.match(components, /\.sg-chart-box > h3\{[^}]*min-height:var\(--subpanel-h
 assert.match(sigmaCss, /\.sg-chart-box \.chart-inner > \.hint\{[^}]*min-height:40px[^}]*padding:0/,'trạng thái biểu đồ rỗng phải có chiều cao cân đối');
 assert.match(sigmaCss, /\.sg-simple-table-wrap\{[^}]*margin:var\(--panel-content-gap\) 16px 12px/);
 assert.match(dashboardCss, /margin:var\(--panel-content-gap\) 16px 14px/);
-assert.match(dashboardTestPanelPresentation, /<div class="dash-test-filterbar"><div class="dash-test-tabs">\$\{input\.statusTabs\}<\/div><div class="dash-test-search">/);
 assert.match(dashboardCss, /\.dash-test-filterbar \.dash-test-search input\{\s*height:32px; min-height:32px;/);
 assert.equal((dashboardCss.match(/\.dash-main \.alert\{/g)||[]).length,1,'dashboard alert styles must stay consolidated');
 assert.match(reportsCss,/\.action-chipline \.action-chip\{\s*max-width:none; white-space:nowrap;/,'chip trạng thái NCE phải giữ một dòng khi hàng còn đủ rộng');

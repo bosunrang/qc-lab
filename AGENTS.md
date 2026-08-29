@@ -371,6 +371,38 @@ so `tests/global-name-uniqueness.test.js` scans `core.js` AND the generated
 bundle and fails on duplicates. If you reorder the 2 remaining `<script>`
 tags in `index.html`, you can still break forward references.
 
+**React island (2026-08-29, `docs/REACT-ADOPTION-PLAN.md`).** A third
+`<script defer>`, `assets/generated/react-pilot.js` (built by
+`npm run build:react` from `src/react/react-pilot.entry.tsx` via
+`vite.react.config.mjs`, loaded in `index.html` *before* `core.js`/
+`modular-pilot.js` so `window.QCLabReact` exists first), lets individual pages
+be migrated to React one at a time while the rest keep running on the classic
+bundle — a new, separate initiative from the TypeScript migration above (see
+`docs/TYPESCRIPT-MIGRATION-PLAN.md` §2 item 5, updated to record this).
+`router-dispatch-controller.ts`'s `render()` checks `isReactPage(id)` and
+mounts/unmounts a React root into `#main` for migrated pages instead of the
+classic `innerHTML` swap; `rerender()` additionally calls `notifyReactStore()`
+so migrated pages re-render through the same `useSyncExternalStore`-based
+bridge (`src/react/state/renderBus.ts`) whenever anything elsewhere triggers a
+redraw. Migrated components keep using `data-action`/`data-args` markup (not
+`onClick=`) so `action-dispatcher.ts` and the existing Playwright checks need
+no changes. `react-pilot.js` is built with `minify:true` (unlike
+`modular-pilot.js`/`core.js`, which use `minify:false` to keep hand-written
+code diffable) — both to cut bundle size and because unminified React
+internals produce false positives in `tests/global-name-uniqueness.test.js`'s
+line/column-based scanner. `tsconfig.react.json` (separate from
+`tsconfig.modules.json`, includes only `src/react/**`) adds `jsx:"react-jsx"`
+without touching the existing strict TS config. Dashboard/"Tổng quan"
+(`src/react/pages/DashboardPage.tsx`) and Activity log/"Nhật ký hoạt động"
+(`src/react/pages/AuditPage.tsx`), Users/"Người dùng"
+(`src/react/pages/UsersPage.tsx`), Settings/"Cài đặt"
+(`src/react/pages/SettingsPage.tsx`), Manage/"Cấu hình chung"
+(`src/react/pages/ManagePage.tsx`) and Reagent/"So sánh hóa chất"
+(`src/react/pages/ReagentPage.tsx`) are the first six migrated pages, all
+with their classic HTML-builder code already deleted post-parity-check; see
+`docs/REACT-ADOPTION-PLAN.md` for the page-by-page order and status of the
+rest.
+
 `assets/core.js` is the one exception: it's wrapped in a UMD shim so it also
 works via `require()` — that's what makes it usable from both the browser
 (as `window.QCCore`) and Node test files (`require('../assets/core.js')`).
@@ -820,10 +852,12 @@ Google Fonts link, offline labs must print with correct metrics.
   empty list, so every path that rebuilds the log (backup import, reset)
   is covered without remembering to. `activityAnchor` is in `FB_TOP` because a
   machine that pulls a cut log without the anchor would report a false "audit
-  bị sửa". `pageAudit()` no longer verifies on every render (paging/filtering
-  rerenders): `auditChainStatus()` caches by (row count, last hash, anchor) and
-  skips auto-verification above `AUDIT_AUTO_VERIFY_MAX`, offering a button
-  instead.
+  bị sửa". `root.auditModel()` (the pure-data function behind
+  `src/react/pages/AuditPage.tsx` — see "Module roles" below; formerly
+  `pageAudit()`, retired 2026-08-29) no longer verifies on every render
+  (paging/filtering rerenders): `auditChainStatus()` caches by (row count,
+  last hash, anchor) and skips auto-verification above
+  `AUDIT_AUTO_VERIFY_MAX`, offering a button instead.
 - `src/presentation/modal/` (`modal-focus-trap.ts`, `modal-template.ts`,
   `modal-controller.ts`, `dialog-overlay-controller.ts`) — retired the classic
   `modals.js` on 2026-08-18 (Pha G slice 1); wired into the global scope via
@@ -893,9 +927,14 @@ Google Fonts link, offline labs must print with correct metrics.
   like `selTest=this.value`, so it must remain accessor globals, unlike the
   Report page's closure state). `pageDash()` retired to
   `src/presentation/dashboard/dashboard-page-controller.ts` on 2026-08-18
-  (Pha G slice 2) and `router-dispatch-controller.ts`'s dispatch table calls
+  (Pha G slice 2) and `router-dispatch-controller.ts`'s dispatch table called
   it as `root.pageDash` through the compat bridge like any other bundle-owned
-  global, same as `pageEntry`/`pageWestgard`/etc.
+  global, same as `pageEntry`/`pageWestgard`/etc. — **`pageDash`/`root.pageDash`
+  no longer exist**: the page retired again on 2026-08-29 to
+  `src/react/pages/DashboardPage.tsx` (see "Module roles" below and
+  `docs/REACT-ADOPTION-PLAN.md`), and `router-dispatch-controller.ts`'s
+  dispatch table no longer carries a `dash` entry at all — `isReactPage('dash')`
+  intercepts it before the dispatch table is ever consulted.
   On 2026-07-30 the same treatment
   reached `actions-routes.js`, which had been holding **two** whole pages and
   had grown to 105 KB, in two steps:
@@ -1075,48 +1114,192 @@ Google Fonts link, offline labs must print with correct metrics.
   charts or modals — that boundary is one-directional and pinned by
   `tests/ui-route-structure.test.js`, and it is what makes the layer testable in
   Node (`tests/sigma-tea.test.js` loads the bundle with only `core.js`).
-- `src/presentation/dashboard/dashboard-page-controller.ts` —
-  `createDashboardPageController(deps)` owns `pageDash()`/`pageDashLoading()`/
+- `src/presentation/dashboard/dashboard-page-controller.ts` — originally
+  `createDashboardPageController(deps)` owned `pageDash()`/`pageDashLoading()`/
   `dashTestFilter()`/`dashTestSetStatus()`, retired from classic
-  `dashboard-routes.js` on 2026-08-18 (Pha G slice 2). It is pure orchestration
-  — every actual computation (KPIs, Westgard alerts, expiring-lot grouping,
-  status filter, row/panel HTML) is one of the `dashboardXxx` builders under
-  `src/presentation/dashboard/`/`src/domain/qc/` that this controller was
-  already calling through the bridge before the route itself moved; this slice
-  only moved the calling code, not the math. Wired via
-  `src/compat/modular-pilot.global.ts` (`root.pageDash`, etc.) so
-  `router-dispatch-controller.ts`'s page dispatch table keeps working
-  unchanged. A
+  `dashboard-routes.js` on 2026-08-18 (Pha G slice 2) as pure orchestration
+  over `dashboardXxx` builders under `src/presentation/dashboard/`/
+  `src/domain/qc/`. **Retired again on 2026-08-29** (React island, see below):
+  `pageDash`/`pageDashLoading` and every `*Html`-only builder they called
+  (25 files — `dashboard-page-html.ts`, `dashboard-loading.ts`,
+  `dashboard-*-list-html.ts`/`dashboard-*-item-html.ts`,
+  `dashboard-kpi-items.ts`, `dashboard-test-rank.ts`,
+  `dashboard-test-action.ts`, `dashboard-test-status-tags.ts`,
+  `dashboard-level-pill(s)-html.ts`, `dashboard-latest-point-text.ts`, plus
+  their ~27 dedicated test files) are deleted outright, not just superseded —
+  `src/react/pages/DashboardPage.tsx` now owns the "Tổng quan" page, styled
+  with real JSX instead of template strings. The controller's only remaining
+  export is `dashboardModel()` (a pure-data twin of the old `pageDash()`
+  pipeline — same domain calls in the same order, stopping before any HTML
+  composition) plus `dashTestSetStatus()`, which is still `data-action`-driven
+  from React markup per the React-island convention below. The still-pure
+  data-shaping files that pipeline depends on (`dashboard-status-filter.ts`,
+  `dashboard-shift-status.ts`, `dashboard-test-search-text.ts`,
+  `dashboard-latest-point.ts`, `dashboard-expiring-lot-items.ts`,
+  `dashboard-level-data.ts`, `dashboard-missing-target-items.ts`,
+  `dashboard-overdue-actions.ts`, `dashboard-test-items.ts`,
+  `dashboard-westgard-alerts.ts`, plus `dashboard-head-html.ts` — the one HTML
+  builder React still calls, via `dangerouslySetInnerHTML` for the shared
+  top-user/avatar header) are untouched and still bridged the same way. A
   dashboard KPI/CAPA panel (`dashboardKpiSnapshot()`) existed briefly
   (`5673eb49`) and was removed again before release (`890604eb`, "tinh gon
   dashboard") — the dashboard page has no such panel today.
+- Activity log/"Nhật ký hoạt động" (`pageAudit()`, defined inline in
+  `src/compat/modular-pilot.global.ts` rather than its own controller file)
+  retired to React the same way as Dashboard, same day (2026-08-29):
+  `src/react/pages/AuditPage.tsx` now owns the page, reading data from
+  `root.auditModel()` (a new pure-data function added right next to where
+  `pageAudit()` used to sit, running the identical filter → chain-status →
+  paginate pipeline but returning plain data instead of composing HTML).
+  `pageAudit()` itself and its two now-unused HTML builders
+  (`activity-audit-page-html.ts`, `activity-audit-row-html.ts`) are deleted
+  outright, along with their 2 dedicated test files; `tests/audit-filter.test.js`
+  (the real behavioral coverage — search/date-range/pagination correctness)
+  was repointed at `auditModel()` instead of scanning `pageAudit()`'s HTML
+  output. The search box is the one control that doesn't use `data-action`
+  (see "React island" above) — it calls the still-existing `auditSetQuery()`
+  directly from a real `onChange`, so the existing debounce
+  (`scheduleSearchRender`) keeps working unchanged. The date-range boxes
+  (`dateBox()`) and page header (`headOnly()`) are still classic HTML-string
+  builders, reused as-is via `dangerouslySetInnerHTML` — same pattern as
+  Dashboard's `topUserBox()`/`dashboardHeadHtml()`, not worth porting to JSX
+  for a shared, page-agnostic widget.
+- Users/"Người dùng" (`pageUsers()`, `user-row-html.ts`, `users-page-html.ts`)
+  retired to React the same day (2026-08-29): `src/react/pages/UsersPage.tsx`
+  now owns the page, reading data from `root.usersModel()` (a new one-line
+  pure-data function, `() => root.userListModel(state.users, currentUser &&
+  currentUser.id)`, added right where `pageUsers()` used to sit).
+  `pageUsers()` and both HTML builders are deleted outright, along with their
+  2 dedicated test files. This page needed the narrowest migration surface of
+  the three so far: every modal/action handler (`addUser`, `openUserPerms`,
+  `applyUserPerms`, `resetPass`, `applyResetPass`, `toggleUser`, `delUser`)
+  needed zero changes, since they either render into `#modalRoot` (a separate
+  DOM root outside React's control) or read `document.getElementById(...)
+  .value` directly at submit time — an uncontrolled form React never
+  intercepts. `userPermissionsModalHtml()`/`resetPasswordModalHtml()`/
+  `roleSelectOptions()`/`userPermChecks()`/`headOnly()` are all still classic
+  HTML-string builders, reused as-is via `dangerouslySetInnerHTML` for the
+  role `<select>` options and the permissions checkbox grid. The "Thêm người
+  dùng" form's inputs and role select are plain uncontrolled JSX
+  (`defaultValue`, no `onChange`) — safe because nothing reads or resets
+  their value except the submit-time handler, unlike Dashboard/Audit's search
+  boxes which need live external resets and so keep the local-state+
+  `onChange` pattern documented above.
 - `src/presentation/settings/settings-page-controller.ts` —
-  `createSettingsPageController(deps)` owns `pageSettings()` plus the Settings
-  page's form handlers (`saveLab`/`saveBrand`/`pickLogo`/`clearLogo`/`saveFb`/
-  `clearFb`/`copyFirebaseRules`/`readBrandInputs`/`checkStorageUsage`) and the
+  `createSettingsPageController(deps)` owns the Settings page's form handlers
+  (`saveLab`/`saveBrand`/`pickLogo`/`clearLogo`/`saveFb`/`clearFb`/
+  `copyFirebaseRules`/`readBrandInputs`/`checkStorageUsage`) and the
   `ensureLabBrandShape()` state-normalization callback `state.js`'s
   `ensureShape()` invokes. Retired classic `settings.js` on 2026-08-18 (Pha G
   route slice 1). It is a DOM/browser adapter — every computation is already a
   TypeScript command/service (`SettingsProfileCommand`, `SettingsFirebaseCommand`,
-  `firebaseSettingsService`) or HTML builder (`settingsXxxHtml`); the controller
-  reads the form, drives FileReader/canvas for the logo, opens dialogs, and
-  delegates. Browser APIs (`FileReader`/`Image`/canvas/clipboard/`navigator`)
-  are injected as deps so it stays testable. Wired via
-  `src/compat/modular-pilot.global.ts` (`root.pageSettings`, `root.saveLab`,
-  `root.ensureLabBrandShape`, …) so the onclick handlers in the TS HTML builders
-  and `ensureShape()`'s bare `ensureLabBrandShape` call keep working unchanged.
+  `firebaseSettingsService`); the controller reads the form, drives
+  FileReader/canvas for the logo, opens dialogs, and delegates. Browser APIs
+  (`FileReader`/`Image`/canvas/clipboard/`navigator`) are injected as deps so
+  it stays testable. Wired via `src/compat/modular-pilot.global.ts`
+  (`root.saveLab`, `root.ensureLabBrandShape`, …) so `ensureShape()`'s bare
+  `ensureLabBrandShape` call keeps working unchanged. Settings/"Cài đặt"
+  (`pageSettings()`, `admin-tools-html.ts`, `brand-panel-html.ts`,
+  `brand-preview-html.ts`, `firebase-connection-panel-html.ts`,
+  `firebase-rules-panel-html.ts`, `lis-gateway-panel-html.ts`,
+  `settings-page-layout-html.ts`, `unit-profile-html.ts`) retired to React the
+  same day as Users, 2026-08-29: `src/react/pages/SettingsPage.tsx` now owns
+  the page, reading data from `root.settingsModel()` (a new pure-data function
+  added right where `pageSettings()` used to sit, gathering the same lab/
+  brand/backup/firebase/LIS fields the old function composed into HTML).
+  `pageSettings()` and all 8 now-unused HTML builders are deleted outright,
+  along with their 8 dedicated test files — every field the page renders
+  (unit profile, brand/logo, admin tools, Firebase connection, LIS Gateway)
+  is read only at submit time via `document.getElementById(...).value`, so
+  every input/textarea/select in `SettingsPage.tsx` is plain uncontrolled JSX
+  (`defaultValue`/`defaultChecked`), matching Users' add-user form rather than
+  Dashboard/Audit's live-reset search boxes. `firebaseGuideHtml()` (a static
+  `<details>` block) and `headOnly()` are still classic HTML-string builders,
+  reused as-is via `dangerouslySetInnerHTML`. None of the controller's form
+  handlers needed any change — they already read the DOM by id at call time,
+  oblivious to whether React or a template string produced those elements.
+- Manage/"Cấu hình chung" (`src/presentation/manage/manage-page-controller.ts`)
+  retired to React 2026-08-29: `src/react/pages/ManagePage.tsx` now owns the
+  page's 8 tabs (máy xét nghiệm, danh mục xét nghiệm, Panel QC, lô & nhóm lô,
+  Mean/SD, chuyển tiếp lô, lịch sử dữ liệu, bảng TEa tham chiếu), the largest
+  single page migrated so far. `manageShell`/`manageToolbar`/`manageLots`/
+  `manageInstruments`/`managePanels`/`manageTransitionsV2`/`manageTargets`/
+  `manageAssays`/`manageHistory`/`manageTeaRefs`/`manageView`/
+  `renderManageBody`/`pageManage` and their 37 backing `*-html.ts` files
+  (one table/row builder per tab, plus the whole `target-*-html.ts` cluster
+  for the Mean/SD matrix) are deleted outright, along with 37 dedicated test
+  files. `root.manageModel()` — a new pure-data function reading the same
+  filtered/sorted state each classic `manageXxx()` used to, one branch per
+  active tab — is the only page-body export left; every modal-opening
+  function (`teaRefOpenAdd`, `teaLabProfileOpen`, `teaRefEdit`, …) stays
+  unchanged since modals render into `#modalRoot`, outside React. The Mean/SD
+  matrix (tab `targets`) is the highest-risk part of this page — dozens of
+  per-row checkboxes and 4 number inputs (mean/low/high/sd) with live
+  cross-field sync — and is deliberately left fully uncontrolled
+  (`defaultChecked`/`defaultValue`, keyed by `${testId}:${lotId}`):
+  `syncTargetRange()`/`toggleTargetRow()`/`targetCheckAll()`
+  (`manage-tests-actions-controller.ts`) read/write only the DOM of the row
+  being edited via `querySelector`/`closest`, and never call `rerender()`, so
+  React never re-renders these inputs mid-keystroke and there is no reset-on-
+  type risk — confirmed live (typed into `.tm-mean`, cross-synced `.tm-low`/
+  `.tm-high` from `.tm-sd`, toggled the row checkbox, saved through the
+  re-authentication modal, and the saved Mean/SD showed up correctly on both
+  the matrix and the History tab afterward). Three `<select>`s — Panel QC/
+  Nhóm lô QC (tab `targets`) and Xét nghiệm (tab `history`) — DO need live
+  external resets (`ensureTargetSelection()` can silently correct an invalid
+  panel/group, and search can auto-switch the selected assay), so those use
+  real `value=`/`onChange` calling `setTargetPanel`/`setTargetGroup`/
+  `setHistoryTest` directly, same exception class as the search boxes below.
+  The page's own search box (`manageSearchSet`) used to debounce into a
+  narrow `renderManageBody()` that replaced only `.config-shell-main`'s
+  `innerHTML` — unsafe once React owns that DOM node — so it now debounces
+  into `deps.rerender()` directly (matching every other migrated page's
+  search box), a strict simplification since `renderManageBody()` already
+  fell back to full `rerender()` whenever `.config-shell-main` was missing.
 - `src/presentation/reagent/reagent-page-controller.ts` —
   `createReagentPageController(deps)` owns the reagent lot-comparison page
-  (`pageReagent`/`rcCompute`/`rcMeta`/`rcCell`/row+quick-list+picker+create
-  modals/`rcPrint`/`rcPrintSummary`/…), retired classic `reagent.js` on
-  2026-08-18 (Pha G route slice 4). Page state (`rcId`/`rcModalQ`/`rcQuickType`/…)
-  is written directly from handlers into the `ReagentUIState` bag (accessor
-  globals), like the Westgard page. Every stat/render is a TS domain/service/
-  presentation reached through `deps` (`ReagentComparisonService`,
-  `ReagentComparisonWorkflowCommand`, `reagentComparisonCalculator`, the
-  `reagentXxx` HTML builders); the palette consts `RCC`/`RCPAD`/`RC_MIN_PAIRS`
-  live in the controller. `tests/reagent-stats.test.js` drives `rcCalc`/
-  `rcReportSummaryTable` (bridged as globals) directly.
+  (`rcCompute`/`rcMeta`/`rcCell`/row+quick-list+picker+create modals/`rcPrint`/
+  `rcPrintSummary`/…), retired classic `reagent.js` on 2026-08-18 (Pha G route
+  slice 4). Page state (`rcId`/`rcModalQ`/`rcQuickType`/…) is written directly
+  from handlers into the `ReagentUIState` bag (accessor globals), like the
+  Westgard page. Every stat/render is a TS domain/service/presentation reached
+  through `deps` (`ReagentComparisonService`, `ReagentComparisonWorkflowCommand`,
+  `reagentComparisonCalculator`, the modal/print HTML builders); the palette
+  consts `RCC`/`RCPAD`/`RC_MIN_PAIRS` live in the controller.
+  `tests/reagent-stats.test.js` drives `rcCalc`/`rcReportSummaryTable` (bridged
+  as globals) directly. Reagent/"So sánh hóa chất" (`pageReagent()`,
+  `reagent-toolbar-html.ts`, `reagent-info-panel-html.ts`,
+  `reagent-pair-panel-html.ts`, `reagent-pair-row-html.ts`,
+  `reagent-results-panels-html.ts`, `reagent-charts-panel-html.ts`,
+  `reagent-select-options-html.ts`, `reagent-empty-page-html.ts`) retired to
+  React 2026-08-29: `src/react/pages/ReagentPage.tsx` now owns the page,
+  reading data from `root.reagentModel()` (a new pure-data function added
+  right where `pageReagent()` used to sit). `pageReagent()` and all 8 HTML
+  builders are deleted outright, along with their 8 dedicated test files.
+  `rcCompute()` — which patches `#rcStats`/`#rcCrit`/`#rcVerdict`/`#rcScatter`/
+  `#rcBland` directly via `innerHTML`, entirely outside React — is unchanged;
+  `ReagentPage.tsx` calls it once via `useEffect` after every mount/re-render,
+  the same trigger point classic code reached through
+  `postRenderPageActions.run('reagent', {reagent: rcCompute, …})` on an
+  animation frame after `afterRender()`. This page surfaced a real bug in the
+  "uncontrolled input" pattern already used for Users/Settings/Manage: typing
+  is safe with `defaultValue` (`rcMeta`/`rcCell` never call `rerender()`), but
+  *switching to a different comparison* (`rcSwitch`/`rcCreateFrom`/`rcPick`/
+  `rcDelete`, all of which DO call `rerender()`) left every field showing the
+  **previous** comparison's data — confirmed live in the browser — because
+  React reuses the same DOM node at the same tree position across renders and
+  never re-applies `defaultValue` after first mount. Fixed by wrapping the
+  toolbar + info/pair panels in `<div key={model.currentId}
+  style={{display:'contents'}}>` so switching comparisons forces a full
+  remount, and keying each pair-row by `` `${rows.length}-${row.index}` ``
+  (not `row.index` alone) so deleting a middle row — which renumbers every
+  row after it — also forces a remount instead of leaving stale values in
+  shifted positions. `scripts/react-migration-parity-check.js` needed a
+  matching fix: it forces the legacy fallback via `render()` alone, which
+  never re-triggers `rcCompute()`, so the parity snapshot compared a
+  "computed" React version against an "uncomputed" classic one until a
+  `POST_RENDER` hook was added to call `rcCompute()` for both sides before
+  diffing.
 - QC target-range workflow (`rangeCandidate`/`openRangeWorkflow`/`applyNewRange`/
   `confirmApplyNewRange`/`revertRange`/`confirmRevertRange`/`rangeGateHtml`/
   `rangeGatePasses`/`rangeUpdateBiasHint`/`rangeTeaPercent`/`rangeSystematicNce`)

@@ -776,65 +776,48 @@
 		const rcCalc = (ds) => deps.pres.calculator.calculate(ds, RC_MIN_PAIRS);
 		const rcAxis = (W, H, xmin, xmax, ymin, ymax, xlab, ylab) => deps.pres.chartAxis(W, H, xmin, xmax, ymin, ymax, xlab, ylab, RCC, RCPAD, deps.esc);
 		const rcPadr = (min, max) => deps.pres.chart.range([min, max]);
-		const rcToolIcon = (type) => deps.pres.toolIcon.icon(type);
-		const rcMiniIcon = (type) => deps.pres.toolIcon.icon(type);
 		const rcScatterSVG = (R, t) => deps.pres.scatterSvg(R, t, rcPadr, rcAxis, RCC);
 		const rcBlandSVG = (R) => deps.pres.blandSvg(R, rcPadr, rcAxis, RCC);
-		const rcSelectOptions = () => deps.pres.selectOptions(deps.getState().reagentTests, deps.ui().rcId, deps.escapeAttr, (d) => deps.esc(rcLabel(d)));
-		const pageReagent = () => {
+		const reagentModel = () => {
 			const state = deps.getState(), ui = deps.ui();
-			if (!state.reagentTests.length) return deps.pres.emptyPage({
-				headHtml: deps.headOnly("So sánh 2 lô hóa chất", ""),
-				emptyStateHtml: deps.emptyState("Chưa có phép so sánh", "Tải lại dữ liệu hoặc tạo phép so sánh mới.", "")
-			});
+			if (!state.reagentTests.length) return { empty: true };
 			if (!ui.rcId || !state.reagentTests.find((d) => d.id === ui.rcId)) ui.rcId = state.reagentTests[0].id;
-			const ds = rcAct(), t = ds.test, ro = !deps.canWrite() ? "disabled" : "";
-			const oldLotHead = "Lô cũ" + (t.lotOld ? `: ${deps.esc(t.lotOld)}` : ""), newLotHead = "Lô mới" + (t.lotNew ? `: ${deps.esc(t.lotNew)}` : "");
+			const ds = rcAct(), t = ds.test, canWrite = deps.canWrite();
+			const comparisons = state.reagentTests.map((d) => ({
+				id: d.id,
+				label: rcLabel(d)
+			}));
 			const rows = ds.rows.map((r, i) => {
 				const c = rcPairCalc(r);
-				return deps.pres.pairRow({
+				return {
 					index: i,
-					row: r,
-					readOnly: !deps.canWrite(),
-					pair: c,
-					format: deps.fmt,
-					escAttr: deps.escapeAttr
-				});
-			}).join("");
-			const toolbarHtml = deps.pres.toolbar({
-				selectOptionsHtml: rcSelectOptions(),
-				primaryActionsHtml: deps.canWrite() ? deps.button("+ Thêm", { action: "openRcCreateModal" }, "teal rc-add-btn") + deps.button(rcToolIcon("trash") + " Xóa", { action: "rcDeleteCurrent" }, "danger rc-delete-btn") : "",
-				secondaryActionsHtml: (deps.canWrite() ? deps.button(rcToolIcon("search") + " Tìm", { action: "openRcModal" }, "ghost rc-find-btn") : "") + deps.button(rcToolIcon("print") + " In hóa chất này", { action: "rcPrint" }, "teal rc-report-btn") + deps.button(rcToolIcon("report") + " Báo cáo tổng hợp", { action: "rcPrintSummary" }, "teal rc-report-main")
+					old: r?.[0],
+					new: r?.[1],
+					avg: c ? deps.fmt(c.avg, 3) : "–",
+					dif: c ? deps.fmt(c.dif, 3) : "–",
+					difNeg: !!(c && c.dif < 0)
+				};
 			});
-			const pairPanelHtml = deps.pres.pairPanel({
-				oldLotHeadHtml: oldLotHead,
-				newLotHeadHtml: newLotHead,
-				rowsHtml: rows,
-				actionsHtml: deps.canWrite() ? deps.button("+ Thêm mẫu", { action: "rcAddRow" }, "ghost sm") + " " + deps.button("Xóa dữ liệu", { action: "rcClearRows" }, "ghost sm") : "",
-				minPairs: RC_MIN_PAIRS
-			});
-			const infoPanelHtml = deps.pres.infoPanel({
-				disabledAttr: ro,
-				reagentValueHtml: deps.escapeAttr(t.reagent),
-				unitValueHtml: deps.escapeAttr(t.unit),
-				lotOldValueHtml: deps.escapeAttr(t.lotOld),
-				lotNewValueHtml: deps.escapeAttr(t.lotNew),
-				dateInputHtml: deps.dateBox("rcDate", t.date || "", "", `${ro} data-action="rcMeta" data-args='["date"]' data-action-on="change"`),
-				operatorValueHtml: deps.escapeAttr(t.operator),
-				sampleTypeValueHtml: deps.escapeAttr(t.sampleType),
+			return {
+				empty: false,
+				currentId: ui.rcId,
+				comparisons,
+				canWrite,
+				oldLotHead: "Lô cũ" + (t.lotOld ? `: ${t.lotOld}` : ""),
+				newLotHead: "Lô mới" + (t.lotNew ? `: ${t.lotNew}` : ""),
+				reagent: t.reagent,
+				unit: t.unit,
+				lotOld: t.lotOld,
+				lotNew: t.lotNew,
+				date: t.date || "",
+				operator: t.operator,
+				sampleType: t.sampleType,
 				biasTarget: t.biasTarget,
 				alpha: t.alpha,
-				coverageChecked: !!t.coverageConfirmed,
-				canWrite: deps.canWrite(),
-				userIconHtml: rcMiniIcon("user"),
-				sampleIconHtml: rcMiniIcon("sample")
-			});
-			const chartsPanelHtml = deps.pres.chartsPanel();
-			const resultsPanelsHtml = deps.pres.resultsPanels();
-			return deps.headOnly("So sánh 2 lô hóa chất", "Sàng lọc định lượng · hồi quy mô tả · Bland-Altman · phê duyệt theo SOP") + toolbarHtml + `<div class="rc-entry-grid">${infoPanelHtml}
-   ${pairPanelHtml}</div>
-   ${resultsPanelsHtml}
-   ${chartsPanelHtml}`;
+				coverageConfirmed: !!t.coverageConfirmed,
+				rows,
+				minPairs: RC_MIN_PAIRS
+			};
 		};
 		const rcCompute = () => {
 			const ds = rcAct();
@@ -1203,7 +1186,7 @@
 			rcAct,
 			rcCalc,
 			rcCompute,
-			pageReagent,
+			reagentModel,
 			rcMeta,
 			rcMetaFocus,
 			rcMetaLog,
@@ -1602,12 +1585,16 @@
 			users.splice(users.indexOf(user), 1);
 			return user;
 		};
+		const setAvatar = (user, dataUrl) => Object.assign(user, { avatar: String(dataUrl || "") });
+		const clearAvatar = (user) => Object.assign(user, { avatar: "" });
 		return Object.freeze({
 			add,
 			updatePermissions,
 			resetPassword,
 			toggle,
-			remove
+			remove,
+			setAvatar,
+			clearAvatar
 		});
 	}
 	//#endregion
@@ -1793,6 +1780,106 @@
 			toggle,
 			remove
 		});
+	}
+	//#endregion
+	//#region src/application/auth/user-avatar-command.ts
+	function createUserAvatarCommand(deps) {
+		const setAvatar = (user, dataUrl) => {
+			const updated = deps.manage.setAvatar(user, dataUrl);
+			deps.log("Cập nhật ảnh đại diện", "Đổi ảnh đại diện cá nhân", updated.username);
+			deps.save();
+			return updated;
+		};
+		const clearAvatar = (user) => {
+			const updated = deps.manage.clearAvatar(user);
+			deps.log("Cập nhật ảnh đại diện", "Xóa ảnh đại diện cá nhân", updated.username);
+			deps.save();
+			return updated;
+		};
+		return Object.freeze({
+			setAvatar,
+			clearAvatar
+		});
+	}
+	//#endregion
+	//#region src/presentation/auth/avatar-modal-html.ts
+	function avatarModalHtml(input) {
+		return `<div class="modal avatar-modal"><div class="modal-h"><h3>Ảnh đại diện</h3><button class="modal-close" data-action="closeModal">✕</button></div>
+    <div class="modal-b">
+      <div class="avatar-modal-preview">${input.previewHtml}</div>
+      <label>Chọn ảnh mới</label>
+      <div class="file-pick">${input.pickButtonHtml}<span id="avatarFileName" class="hint">${input.fileNameText}</span></div>
+      <input id="avatarPick" type="file" accept="image/*" style="display:none" data-action="pickAvatar" data-action-on="change" aria-label="Chọn ảnh đại diện mới">
+      <div class="hint flow-note">Ảnh sẽ được cắt vuông và thu nhỏ tự động.</div>
+    </div>
+    <div class="modal-f">${input.clearButtonHtml}${input.closeButtonHtml}</div></div>`;
+	}
+	//#endregion
+	//#region src/presentation/auth/avatar-modal-controller.ts
+	function createAvatarModalController(deps) {
+		const previewHtml = () => {
+			const user = deps.currentUser();
+			if (user && user.avatar) return `<img src="${deps.escapeAttr(user.avatar)}" alt="Ảnh đại diện">`;
+			return `<div class="avatar-modal-initial">${String(user && (user.name || user.username) || "U").trim().charAt(0).toUpperCase() || "U"}</div>`;
+		};
+		let pickedFileName = "Chưa chọn ảnh nào";
+		const renderModal = () => deps.openModal(deps.html.avatarModalHtml({
+			previewHtml: previewHtml(),
+			pickButtonHtml: deps.btn("Chọn tệp", {
+				action: "clickElementById",
+				args: ["avatarPick"]
+			}, "ghost sm", "", { attrs: { type: "button" } }),
+			fileNameText: pickedFileName,
+			clearButtonHtml: deps.btn("Xóa ảnh", { action: "clearAvatarPhoto" }, "ghost", "", { disabled: !(deps.currentUser() && deps.currentUser().avatar) }),
+			closeButtonHtml: deps.btn("Đóng", { action: "closeModal" }, "teal")
+		}));
+		const openAvatarModal = () => {
+			if (!deps.currentUser()) return;
+			pickedFileName = "Chưa chọn ảnh nào";
+			renderModal();
+		};
+		const pickAvatar = (e) => {
+			const user = deps.currentUser();
+			if (!user) return;
+			const f = e && e.target && e.target.files && e.target.files[0];
+			if (!f) return;
+			if (!/^image\//.test(f.type)) {
+				deps.infoDialog("Vui lòng chọn file ảnh.");
+				return;
+			}
+			pickedFileName = f.name;
+			const r = deps.createFileReader();
+			r.onload = () => {
+				const img = deps.createImage();
+				img.onload = () => {
+					const size = 160, c = deps.document.createElement("canvas"), ctx = c.getContext("2d");
+					c.width = size;
+					c.height = size;
+					const scale = Math.max(size / img.width, size / img.height), w = img.width * scale, h = img.height * scale, x = (size - w) / 2, y = (size - h) / 2;
+					ctx.drawImage(img, x, y, w, h);
+					deps.avatarCommand.setAvatar(user, c.toDataURL("image/png"));
+					renderModal();
+					deps.rerender();
+				};
+				img.onerror = async () => {
+					await deps.infoDialog("Không đọc được ảnh.");
+				};
+				img.src = String(r.result);
+			};
+			r.readAsDataURL(f);
+		};
+		const clearAvatarPhoto = () => {
+			const user = deps.currentUser();
+			if (!user) return;
+			deps.avatarCommand.clearAvatar(user);
+			renderModal();
+			deps.rerender();
+		};
+		return {
+			openAvatarModal,
+			pickAvatar,
+			clearAvatarPhoto
+		};
 	}
 	//#endregion
 	//#region src/presentation/backup/backup-import-confirmation.ts
@@ -6453,42 +6540,42 @@
 				await deps.infoDialog("Không copy được tự động. Bạn có thể chọn và copy trong thẻ Firebase Rules.");
 			}
 		};
-		const pageSettings = () => {
+		const settingsModel = () => {
 			const fbcfg = deps.cloud.getConfig() || {};
 			const liscfg = deps.lis.config();
-			const lockedCloud = !!(fbcfg && fbcfg.locked);
-			const logo = deps.brand.logo();
-			const brandPreview = deps.html.brandPreviewHtml({
-				logo,
-				markText: deps.brand.markText(),
-				title: deps.brand.title(),
-				subtitle: deps.brand.subtitle()
-			});
-			const firebaseRulesPanel = deps.html.firebaseRulesPanelHtml(deps.html.firebaseGuideHtml(), deps.html.firebaseRulesText());
-			return deps.html.pageLayoutHtml({
-				profileHtml: deps.html.unitProfileHtml(deps.getState().lab) + deps.html.brandPanelHtml({
+			const lab = deps.getState().lab || {};
+			return {
+				lab: {
+					name: lab.name || "",
+					dept: lab.dept || "",
+					address: lab.address || ""
+				},
+				brand: {
 					title: deps.brand.title(),
 					subtitle: deps.brand.subtitle(),
 					markText: deps.brand.markText(),
-					previewHtml: brandPreview
-				}),
-				adminHtml: deps.html.adminToolsHtml(deps.backup.statusText(), deps.backup.capacityText()),
-				firebaseHtml: deps.html.firebaseConnectionPanelHtml({
-					labCode: fbcfg.labCode,
-					email: fbcfg.email,
-					config: fbcfg.config,
-					locked: lockedCloud,
+					logo: deps.brand.logo()
+				},
+				backup: {
+					statusText: deps.backup.statusText(),
+					capacityText: deps.backup.capacityText()
+				},
+				firebase: {
+					labCode: fbcfg.labCode || "",
+					email: fbcfg.email || "",
+					config: fbcfg.config ? JSON.stringify(fbcfg.config, null, 2) : "",
+					locked: !!(fbcfg && fbcfg.locked),
 					dataPath: deps.cloud.dataPath()
-				}),
-				lisHtml: deps.html.lisGatewayPanelHtml({
-					url: liscfg.url,
-					token: liscfg.token,
-					enabled: liscfg.enabled,
+				},
+				lis: {
+					url: liscfg.url || "",
+					token: liscfg.token || "",
+					enabled: !!liscfg.enabled,
 					status: deps.lis.runtime().status,
 					statusText: deps.lis.statusText()
-				}),
-				rulesHtml: firebaseRulesPanel
-			});
+				},
+				firebaseRulesText: deps.html.firebaseRulesText()
+			};
 		};
 		return {
 			checkStorageUsage,
@@ -6501,7 +6588,7 @@
 			saveFb,
 			clearFb,
 			copyFirebaseRules,
-			pageSettings
+			settingsModel
 		};
 	}
 	//#endregion
@@ -6525,118 +6612,6 @@
 			};
 		};
 		return { prepare };
-	}
-	//#endregion
-	//#region src/presentation/settings/brand-preview-html.ts
-	function createBrandPreviewHtml(escape, escapeAttribute) {
-		return (input) => {
-			const logo = input.logo;
-			return `<div class="brand-preview"><div class="brand-mark">${logo ? `<img src="${escapeAttribute(logo)}" alt="">` : escape(input.markText)}</div><div><b>${escape(input.title)}</b><small>${escape(input.subtitle)}</small></div></div>`;
-		};
-	}
-	//#endregion
-	//#region src/presentation/settings/unit-profile-html.ts
-	function createUnitProfileHtml(deps) {
-		return (lab) => {
-			const value = lab || {};
-			return `<div class="panel"><h2 class="panel-title">Thông tin đơn vị</h2>
-      <div class="settings-unit-fields"><div><label>Tên bệnh viện / đơn vị</label><input id="labName" aria-label="Tên bệnh viện / đơn vị" value="${deps.escapeAttribute(value.name || "")}"></div>
-        <div><label>Khoa / phòng</label><input id="labDept" aria-label="Khoa / phòng" value="${deps.escapeAttribute(value.dept || "")}"></div>
-        <div><label>Địa chỉ</label><input id="labAddr" aria-label="Địa chỉ" value="${deps.escapeAttribute(value.address || "")}"></div></div>
-     <div class="settings-panel-actions">${deps.button("Lưu thông tin", { action: "saveLab" }, "teal")}</div>
-    </div>`;
-		};
-	}
-	//#endregion
-	//#region src/presentation/settings/brand-panel-html.ts
-	function createBrandPanelHtml(deps) {
-		return (input) => `<div class="panel"><h2 class="panel-title">Logo & tên phần mềm</h2>
-     <div class="grid2">
-       <div>
-         <label>Tên hiển thị trên thanh bên</label><input id="brandTitle" aria-label="Tên hiển thị trên thanh bên" value="${deps.escapeAttribute(input.title || "")}">
-         <label>Dòng phụ</label><input id="brandSub" aria-label="Dòng phụ" value="${deps.escapeAttribute(input.subtitle || "")}">
-         <label>Chữ trong logo khi chưa dùng ảnh</label><input id="logoText" aria-label="Chữ trong logo khi chưa dùng ảnh" maxlength="4" value="${deps.escapeAttribute(input.markText || "")}">
-       </div>
-       <div>
-         <label>Logo hiện tại</label>${input.previewHtml || ""}
-         <label>Chọn ảnh logo</label>
-         <div class="file-pick">${deps.button("Chọn tệp", { action: "brandPickLogo" }, "ghost sm", "", { attrs: { type: "button" } })}<span id="logoFileName" class="hint">Chưa chọn tệp</span></div>
-         <input id="logoFile" type="file" accept="image/*" style="display:none" data-action="pickLogo" data-action-on="change">
-         <div class="hint settings-brand-note">Nên dùng ảnh vuông PNG/JPG, dung lượng nhỏ. Logo được lưu cùng dữ liệu phần mềm.</div>
-       </div>
-     </div>
-     <div class="settings-panel-actions">${deps.button("Lưu logo", { action: "saveBrand" }, "teal")}${deps.button("Bỏ ảnh logo", { action: "clearLogo" }, "ghost")}</div>
-    </div>`;
-	}
-	//#endregion
-	//#region src/presentation/settings/admin-tools-html.ts
-	function createAdminToolsHtml(button) {
-		return (backupStatus, backupCapacity) => `<div class="panel"><h2 class="panel-title">Quản trị dữ liệu</h2>
-     <div class="admin-tools">
-        <div class="admin-tool"><b>Xuất backup</b><span>Lưu dữ liệu hiện tại ra file. ${backupStatus} ${backupCapacity}</span>${button("Xuất backup", { action: "exportData" }, "ghost")}</div>
-        <div class="admin-tool"><b>Nhập backup</b><span>Khôi phục dữ liệu từ file backup đã xuất. Chỉ quản trị viên được nhập.</span>${button("Chọn file backup", {
-			action: "clickElementById",
-			args: ["imp"]
-		}, "ghost")}<input id="imp" type="file" accept="application/json" style="display:none" data-action="importData" data-action-on="change"></div>
-        <div class="admin-tool"><b>Kiểm tra backup</b><span>Kiểm tra checksum, cấu trúc và số điểm — không ảnh hưởng dữ liệu đang dùng.</span>${button("Chọn file để kiểm tra", {
-			action: "clickElementById",
-			args: ["verifyBackup"]
-		}, "ghost")}<input id="verifyBackup" type="file" accept="application/json" style="display:none" data-action="verifyBackupFile" data-action-on="change"></div>
-        <div class="admin-tool"><b>Dung lượng cục bộ</b><span>Xem số điểm QC và dung lượng trình duyệt đang dùng.</span>${button("Kiểm tra dung lượng", { action: "checkStorageUsage" }, "ghost")}</div>
-        <div class="admin-tool"><b>Xóa sạch dữ liệu test</b><span>Xóa toàn bộ dữ liệu, giữ lại tài khoản đang đăng nhập.</span>${button("Xóa sạch dữ liệu", { action: "resetAllData" }, "danger")}</div>
-      </div></div>`;
-	}
-	//#endregion
-	//#region src/presentation/settings/firebase-rules-panel-html.ts
-	function createFirebaseRulesPanelHtml(deps) {
-		return (guideHtml, rulesText) => `<div class="panel"><h2 class="panel-title">Firebase Rules</h2>
-     ${guideHtml}
-     <div class="rules-tools"><span>Copy cố định vào Realtime Database → Rules. Không sửa <code>$labCode</code> hoặc <code>$uid</code>.</span>${deps.button("Copy rules", { action: "copyFirebaseRules" }, "ghost sm")}</div>
-     <pre class="rules-code" tabindex="0">${deps.escape(rulesText)}</pre></div>`;
-	}
-	//#endregion
-	//#region src/presentation/settings/lis-gateway-panel-html.ts
-	function createLisGatewayPanelHtml(deps) {
-		return (input) => {
-			const status = input.status === "ok" ? "ok" : input.status === "error" ? "rej" : "";
-			const token = String(input.token || "");
-			return `<div class="panel lis-gateway-panel"><h2 class="panel-title">LIS Gateway (thử nghiệm)</h2>
-     <div class="lis-gateway-body"><div class="lis-gateway-grid"><div><label for="lisGatewayUrl">Địa chỉ Gateway cục bộ</label><input id="lisGatewayUrl" value="${deps.escapeAttribute(input.url || "")}" placeholder="http://127.0.0.1:8787"></div><div><label for="lisGatewayToken">Bearer token${token ? " (đã lưu — để trống nếu giữ nguyên)" : ""}</label><input id="lisGatewayToken" type="password" autocomplete="off" placeholder="${token ? "••••••••" : "Dán token in ra khi chạy npm run lis:gateway"}"></div><label class="lis-gateway-toggle"><input id="lisGatewayEnabled" type="checkbox" ${input.enabled ? "checked" : ""}><span>Tự động kiểm tra hàng chờ mỗi 5 phút</span></label></div>
-       <div id="lisGatewayStatus" class="alert ${status}">${deps.escape(input.statusText || "")}</div>
-       <div class="hint">Lấy kết quả nội kiểm mà middleware LIS đã đẩy vào Gateway. Kết quả KHÔNG tự thành điểm QC — phải mở hàng chờ và xác nhận từng dòng thì mới ghi vào dữ liệu nội kiểm. Không nhận dữ liệu bệnh nhân. Prototype chỉ cho phép localhost:8787.</div></div>
-     <div class="settings-panel-actions">${deps.button("Lưu &amp; kiểm tra", { action: "lisGatewaySaveSettings" }, "teal")}${deps.button("Xem hàng chờ QC", { action: "lisOpenQueueModal" }, "ghost")}</div></div>`;
-		};
-	}
-	//#endregion
-	//#region src/presentation/settings/firebase-connection-panel-html.ts
-	function createFirebaseConnectionPanelHtml(deps) {
-		return (input) => {
-			const locked = !!input.locked;
-			const readOnly = locked ? "readonly" : "";
-			const config = input.config ? JSON.stringify(input.config, null, 2) : "";
-			const lockNote = locked ? `<div class="hint flow-note">Bản deploy này khóa sẵn <code>${deps.escape(input.dataPath || "")}</code>. Muốn đổi mã phòng cần sửa <code>assets/modules/app-meta.js</code>.</div>` : "";
-			return `<div class="panel firebase-sync-panel"><h2 class="panel-title">Đồng bộ đám mây (Firebase Realtime Database)</h2>
-     <div class="firebase-auth-grid"><div><label>Mã phòng</label><input id="fbCode" aria-label="Mã phòng" value="${deps.escapeAttribute(input.labCode || "khoaXN")}" ${readOnly}></div>
-       <div><label>Email Firebase Authentication</label><input id="fbEmail" aria-label="Email Firebase Authentication" type="email" autocomplete="username" value="${deps.escapeAttribute(input.email || "")}"></div>
-       <div><label>Mật khẩu Firebase</label><input id="fbPassword" type="password" autocomplete="current-password" placeholder="Chỉ dùng để đăng nhập, không lưu"></div></div>
-     ${lockNote}
-     <label>Firebase config (dán nguyên đoạn từ tab Config của Firebase console)</label>
-     <textarea id="fbConfig" class="firebase-config-input" ${readOnly} placeholder='const firebaseConfig = {
-  apiKey: "...",
-  authDomain: "yourapp.firebaseapp.com",
-  databaseURL: "https://yourapp-default-rtdb.firebaseio.com",
-  projectId: "yourapp",
-  storageBucket: "yourapp.firebasestorage.app",
-  messagingSenderId: "...",
-  appId: "..."
-};'>${deps.escape(config)}</textarea>
-     <div class="firebase-actions">${deps.button("Lưu &amp; kết nối", { action: "saveFb" }, "teal")} ${deps.button("Ngắt đám mây", { action: "clearFb" }, "ghost")}</div></div>`;
-		};
-	}
-	//#endregion
-	//#region src/presentation/settings/settings-page-layout-html.ts
-	function createSettingsPageLayoutHtml(head) {
-		return (input) => head("Cài đặt & Đồng bộ", "Thông tin đơn vị, backup và kết nối Firebase") + `<div class="settings-profile-grid">${input.profileHtml}</div>${input.adminHtml}<div class="settings-cloud-grid">${input.firebaseHtml}${input.lisHtml}</div>${input.rulesHtml}`;
 	}
 	//#endregion
 	//#region src/application/storage/indexeddb-open-service.ts
@@ -6984,20 +6959,6 @@
 		};
 	}
 	//#endregion
-	//#region src/presentation/audit/activity-audit-page-html.ts
-	function createActivityAuditPageHtml() {
-		return (input) => `${input.head}
-    <div class="panel"><h2 class="panel-title">Công cụ</h2><div class="row-flex">
-      ${input.exportButton}
-      ${input.archiveButton}
-      <div class="hint audit-summary-status">${input.total} dòng hoạt động đã ghi nhận. ${input.chainHtml}${input.oversizeWarn}</div>
-    </div></div>
-    <div class="panel audit-log-panel"><div class="audit-log-head"><h2 class="panel-title">Hoạt động gần đây</h2><input id="auditSearch" type="search" aria-label="Tìm nhật ký hoạt động" placeholder="Tìm người dùng, hành động, đối tượng..." value="${input.searchValue}" data-action="auditSetQuery" data-action-on="input"></div>
-      <div class="audit-filterbar"><div><label>Từ ngày</label>${input.fromDate}</div><div><label>Đến ngày</label>${input.toDate}</div><div><label>Số dòng mỗi trang</label><select aria-label="Số dòng nhật ký mỗi trang" data-action="auditSetPageSize" data-action-on="change">${input.pageSizeOptions}</select></div>${input.clearFiltersButton}<div class="audit-filter-summary" role="status">${input.filteredCount}/${input.total} dòng</div></div>
-      ${input.rowsOrEmptyState}
-      ${input.pagination}</div>`;
-	}
-	//#endregion
 	//#region src/presentation/audit/activity-audit-pagination.ts
 	function activityAuditPagination(items, page, pageSize) {
 		const rows = Array.isArray(items) ? items : [];
@@ -7122,13 +7083,6 @@
     </div><div class="modal-f">${input.cancelButtonHtml}${input.archiveButtonHtml}</div></div>`;
 	}
 	//#endregion
-	//#region src/presentation/audit/activity-audit-row-html.ts
-	function activityAuditRowHtml(input) {
-		const target = input.targetHtml || "<span class=\"hint\">—</span>";
-		const detail = input.detailHtml || "<span class=\"hint\">—</span>";
-		return `<tr><td><div class="audit-time-cell"><span class="audit-seq">${input.sequenceHtml}</span><span class="audit-time">${input.timeHtml}</span></div></td><td><b>${input.userHtml}</b><div class="hint">${input.roleHtml}${input.usernameHtml}</div></td><td><span class="pill">${input.typeHtml}</span></td><td>${target}</td><td class="audit-detail">${detail}</td></tr>`;
-	}
-	//#endregion
 	//#region src/presentation/auth/user-list-model.ts
 	function userListModel(users, currentUserId) {
 		return (Array.isArray(users) ? users : []).map((user) => ({
@@ -7141,60 +7095,6 @@
 			active: user.active !== false,
 			current: String(user.id || "") === String(currentUserId || "")
 		}));
-	}
-	//#endregion
-	//#region src/presentation/auth/user-row-html.ts
-	function createUserRowHtml() {
-		return ({ user, currentUserId, esc, roleLabel, btn }) => {
-			const actions = Boolean(user.current || currentUserId && user.id === currentUserId) ? `<span class="hint">(bạn)</span> ${btn("Đổi mật khẩu", {
-				action: "resetPass",
-				args: [user.id]
-			}, "ghost sm")}` : `${btn("Sửa quyền", {
-				action: "openUserPerms",
-				args: [user.id]
-			}, "ghost sm")} ${btn("Đặt lại MK", {
-				action: "resetPass",
-				args: [user.id]
-			}, "ghost sm")} ${btn(user.active === false ? "Mở khóa" : "Khóa", {
-				action: "toggleUser",
-				args: [user.id]
-			}, "ghost sm")} ${btn("Xóa", {
-				action: "delUser",
-				args: [user.id]
-			}, "danger sm")}`;
-			return `<tr>
-    <td><b>${esc(user.name || user.username)}</b><div class="hint">@${esc(user.username)}${user.initials ? " · " + esc(user.initials) : ""}</div></td>
-    <td>${roleLabel(user.role)}</td>
-    <td>${user.active === false ? "<span class=\"tag rej\">Khóa</span>" : "<span class=\"tag ok\">Hoạt động</span>"}</td>
-    <td><div class="user-row-actions">${actions}</div></td></tr>`;
-		};
-	}
-	//#endregion
-	//#region src/presentation/auth/users-page-html.ts
-	function createUsersPageHtml() {
-		return ({ head, rows, roleOptions, permissionChecks, addButton }) => `${head}
-   <div class="panel"><h2 class="panel-title">Thêm người dùng</h2><div class="user-create-layout">
-     <div class="user-create-card">
-       <div class="user-create-card-title">Thông tin tài khoản</div>
-       <div class="user-create-fields">
-       <div><label>Tên đăng nhập</label><input id="uUser" placeholder="vd: lan.nt"></div>
-       <div><label>Họ tên</label><input id="uName" aria-label="Họ tên"></div>
-       <div><label>Mã viết tắt</label><input id="uInitials" maxlength="12" placeholder="NTL"></div>
-       <div><label>Vai trò</label><select id="uRole" aria-label="Vai trò" data-action="syncUserPermChecks" data-args='["newUserPerms"]' data-action-on="change">${roleOptions}</select></div>
-       <div><label>Mật khẩu tạm</label><input id="uPass" aria-label="Mật khẩu tạm" type="password" autocomplete="new-password"></div>
-       <div class="user-create-actions">${addButton}</div>
-       </div>
-     </div>
-     <div class="user-create-card"><div class="user-create-card-title">Thẻ được phép dùng</div><div class="user-perm-block">${permissionChecks}</div></div>
-     </div>
-     <div class="hint user-create-hint"><b>Vai trò</b> quyết định quyền sửa/quản trị trong các thẻ được tick. <b>KTV:</b> nhập/sửa dữ liệu vận hành · <b>Chỉ xem:</b> chỉ đọc. Người dùng mới sẽ phải đổi mật khẩu khi đăng nhập lần đầu.</div></div>
-   <div class="panel"><h2 class="panel-title">Danh sách người dùng</h2>
-     <div class="user-table-wrap"><table class="user-table"><thead><tr><th>Người dùng</th><th>Vai trò</th><th>Trạng thái</th><th>Hành động</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
-	}
-	//#endregion
-	//#region src/presentation/reagent/reagent-select-options-html.ts
-	function createReagentSelectOptionsHtml() {
-		return (items, selectedId, escAttr, label) => (Array.isArray(items) ? items : []).map((item) => `<option value="${escAttr(item.id)}"${item.id === selectedId ? " selected" : ""}>${label(item)}</option>`).join("");
 	}
 	//#endregion
 	//#region src/presentation/reagent/reagent-result-html.ts
@@ -7280,11 +7180,6 @@
 				verdictHtml: `<div class="rc-verdict ${verdict.cls}"><div class="rc-verdict-icon">${verdict.icon}</div><div><div class="rc-verdict-title">${verdict.title}</div><div class="rc-verdict-desc">${verdict.desc}</div></div></div>`
 			};
 		};
-	}
-	//#endregion
-	//#region src/presentation/reagent/reagent-pair-row-html.ts
-	function createReagentPairRowHtml() {
-		return ({ index, row, readOnly, pair, format, escAttr }) => `<div class="rc-pair-row" data-rc-row="${index}"><div class="rc-idx">${index + 1}</div><input ${readOnly ? "disabled" : ""} value="${escAttr(row?.[0])}" data-action="rcCell" data-args="[${index},0]" data-action-on="input" type="number" step="any" placeholder="–"><input ${readOnly ? "disabled" : ""} value="${escAttr(row?.[1])}" data-action="rcCell" data-args="[${index},1]" data-action-on="input" type="number" step="any" placeholder="–"><div class="rc-calc avg">${pair ? format(pair.avg, 3) : "–"}</div><div class="rc-calc dif ${pair && pair.dif < 0 ? "neg" : ""}">${pair ? format(pair.dif, 3) : "–"}</div>${readOnly ? "<span></span>" : `<button class="x" data-action="rcRmRow" data-args="[${index}]" title="Xóa dòng">✕</button>`}</div>`;
 	}
 	//#endregion
 	//#region src/application/storage/partition-write-policy.ts
@@ -7997,7 +7892,7 @@
 	var ROUTER_PAGE_DEFS = [
 		[
 			"dash",
-			"Bảng điều khiển",
+			"Tổng quan",
 			[
 				"admin",
 				"technician",
@@ -12391,37 +12286,6 @@
 		return (start, end) => `<div><label>Từ ngày</label>${deps.dateBox("rStartDate", start, "", "data-action=\"reportRangeChanged\" data-action-on=\"change\"")}</div><div><label>Đến ngày</label>${deps.dateBox("rEndDate", end, "", "data-action=\"reportRangeChanged\" data-action-on=\"change\"")}</div>`;
 	}
 	//#endregion
-	//#region src/presentation/dashboard/dashboard-loading.ts
-	function createDashboardLoading(deps) {
-		return (tests, pending, data, lab) => {
-			const points = (tests || []).reduce((sum, test) => sum + (data[test.id] || []).length, 0);
-			return `${deps.headHtml(lab)}
-    <div class="dash-hero dash-analysis-loading">
-      <div class="dash-status"><div class="eyebrow">Đang chuẩn bị dữ liệu</div><h2>Phân tích Westgard chạy nền</h2><p>Bạn có thể tiếp tục sử dụng ứng dụng. Bảng điều khiển sẽ tự cập nhật khi phân tích hoàn tất.</p><div class="dash-loading-bar"><span></span></div></div>
-      ${deps.kpisHtml([
-				{
-					label: "Xét nghiệm",
-					value: tests.length
-				},
-				{
-					label: "Điểm QC",
-					value: points
-				},
-				{
-					label: "Đang xử lý",
-					value: pending
-				},
-				{
-					label: "Giao diện",
-					value: "✓",
-					className: "dash-ready-mark"
-				}
-			])}
-    </div>
-    <div class="panel dash-loading-panel"><div class="dash-spinner"></div><div><h2 class="panel-title">Đang tính trạng thái kiểm soát chất lượng</h2><p class="hint">Công việc nặng đã được chuyển khỏi luồng giao diện để thao tác không bị đóng băng.</p></div></div>`;
-		};
-	}
-	//#endregion
 	//#region src/presentation/dashboard/dashboard-status-filter.ts
 	var DASH_TEST_STATUSES = Object.freeze([
 		"all",
@@ -12500,104 +12364,6 @@
 		};
 	}
 	//#endregion
-	//#region src/presentation/dashboard/dashboard-status-tabs-html.ts
-	var TABS = [
-		["all", "Tất cả"],
-		["missing", "Chưa QC"],
-		["rej", "Loại bỏ"],
-		["warn", "Cảnh báo"],
-		["ok", "Đạt"]
-	];
-	function createDashboardStatusTabsHtml(deps) {
-		return (items, selected) => TABS.map(([key, label]) => {
-			const count = key === "all" ? items.length : items.filter((item) => deps.matches(item, key)).length;
-			return `<button class="${selected === key ? "on" : ""}" data-action="dashTestSetStatus" data-args='${JSON.stringify([key])}'>${label}<b>${count}</b></button>`;
-		}).join("");
-	}
-	//#endregion
-	//#region src/presentation/dashboard/dashboard-expiring-lots-html.ts
-	function createDashboardExpiringLotsHtml(deps) {
-		return (lots) => {
-			return [...lots].sort((a, b) => a.d - b.d).slice(0, 5).map((item) => {
-				const expired = item.d < 0;
-				const state = expired ? "rej" : "warn";
-				const meta = item.count > 1 ? `${item.count} xét nghiệm · ` : "";
-				const remaining = expired ? `Hết hạn ${-item.d} ngày` : `Còn ${item.d} ngày`;
-				return `<div class="shift-item ${state}"><div><b>Lô ${deps.escape(item.l.lot || "?")} · M${item.l.level}</b><div class="meta">${meta}${remaining}</div></div><span class="tag ${state}">${expired ? "Hết hạn" : "Sắp hết"}</span></div>`;
-			}).join("") || "<div class=\"hint\">Không có lô sắp hết hạn trong 30 ngày.</div>";
-		};
-	}
-	//#endregion
-	//#region src/presentation/dashboard/dashboard-qc-followup-item-html.ts
-	function createDashboardQcFollowupItemHtml(deps) {
-		return (item, status) => `<div class="shift-item ${status}"><div><b>${deps.escape(deps.testLabel(item.t))} · M${item.l.level}</b><div class="meta">${deps.date(item.p.date)} · ${deps.pointValue(item.p, item.t)} ${deps.escape(item.t.unit || "")} · ${item.rules.join(", ") || "—"}</div></div>${deps.button("Xem", {
-			action: "dashboardGoEntryFollowup",
-			args: [item.t.id, item.l.level]
-		}, "ghost sm")}</div>`;
-	}
-	//#endregion
-	//#region src/presentation/dashboard/dashboard-missing-target-item-html.ts
-	function createDashboardMissingTargetItemHtml(deps) {
-		return (item) => `<div class="shift-item warn"><div><b>${deps.escape(deps.testLabel(item.t))} · M${item.l.level}</b><div class="meta">Chưa có Mean/SD hợp lệ — điểm QC mức này không được đánh giá Westgard</div></div>${deps.button("Gán Mean/SD", { action: "goManageTargets" }, "ghost sm")}</div>`;
-	}
-	//#endregion
-	//#region src/presentation/dashboard/dashboard-overdue-action-item-html.ts
-	function createDashboardOverdueActionItemHtml(deps) {
-		return (input) => {
-			const title = input.test ? deps.escape(deps.testLabel(input.test)) : deps.escape(input.action.rule || "Sự cố");
-			return `<div class="shift-item rej"><div><b>${deps.escape(input.action.nceId || "Hồ sơ khắc phục")} · ${title}</b><div class="meta">${deps.escape(input.info.label)} · hạn ${deps.date(input.action.dueDate)} · phụ trách ${deps.escape(input.action.by || "—")}</div></div>${deps.button("Tiếp tục hồ sơ", {
-				action: "dashboardContinueAction",
-				args: [input.index]
-			}, "ghost sm")}</div>`;
-		};
-	}
-	//#endregion
-	//#region src/presentation/dashboard/dashboard-test-status-tags.ts
-	var dashboardTestStatusTags = Object.freeze({
-		westgard(status) {
-			if (status === "rej") return "<span class=\"tag rej\">Loại bỏ</span>";
-			if (status === "warn") return "<span class=\"tag warn\">Cảnh báo</span>";
-			if (status === "ok") return "<span class=\"tag ok\">Đạt</span>";
-			return "<span class=\"pill\">chưa có</span>";
-		},
-		today(todayCount, levelCount) {
-			if (todayCount >= levelCount && levelCount) return "<span class=\"tag ok\">Đủ hôm nay</span>";
-			if (todayCount) return `<span class="tag warn">${todayCount}/${levelCount} mức</span>`;
-			return "<span class=\"tag none\">Chưa QC</span>";
-		}
-	});
-	//#endregion
-	//#region src/presentation/dashboard/dashboard-level-pill-html.ts
-	function createDashboardLevelPillHtml(deps) {
-		return (input) => {
-			const className = `dash-level-pill ${input.today ? "done" : ""}${input.targetOk ? "" : " missing-target"}`;
-			const title = input.targetOk ? "" : " title=\"Chưa có Mean/SD hợp lệ — không đánh giá Westgard\"";
-			const lot = input.level.lot ? ` · ${deps.escape(input.level.lot)}` : "";
-			const cv = input.cv == null ? "" : ` · CV ${deps.format(input.cv)}%`;
-			return `<span class="${className}"${title}>M${input.level.level}${lot}${cv}${input.targetOk ? "" : " · thiếu Mean/SD"}</span>`;
-		};
-	}
-	//#endregion
-	//#region src/presentation/dashboard/dashboard-test-rank.ts
-	function dashboardTestRank(status, todayCount, levelCount) {
-		if (status === "rej") return 0;
-		if (status === "warn") return 1;
-		if (todayCount < levelCount) return 2;
-		if (status === "ok") return 3;
-		return 4;
-	}
-	//#endregion
-	//#region src/presentation/dashboard/dashboard-latest-point-text.ts
-	function createDashboardLatestPointText(deps) {
-		return (point, test) => point ? `${deps.date(point.date)} · M${point._level} · ${deps.pointValue(point, test)}` : "Chưa có điểm";
-	}
-	//#endregion
-	//#region src/presentation/dashboard/dashboard-followup-panel-html.ts
-	function dashboardFollowupPanelHtml(urgent, overdue, missingTarget, watch) {
-		const content = `${urgent}${overdue}${missingTarget}${watch}`;
-		return content ? `<div class="dash-list">${content}</div>` : "<div class=\"alert ok\">Không có điểm bị loại/cảnh báo cần xử lý ngay.</div>";
-	}
-	//#endregion
 	//#region src/presentation/dashboard/dashboard-test-search-text.ts
 	function createDashboardTestSearchText(deps) {
 		return (test, levels) => deps.normalize([
@@ -12619,59 +12385,9 @@
 		};
 	}
 	//#endregion
-	//#region src/presentation/dashboard/dashboard-kpis-html.ts
-	function dashboardKpisHtml(items) {
-		return `<div class="dash-kpis">${items.map((item) => `<div class="dash-kpi"><div class="k">${item.label}</div><div class="v${item.className ? ` ${item.className}` : ""}"${item.color ? ` style="color:${item.color}"` : ""}>${item.value}</div></div>`).join("")}</div>`;
-	}
-	//#endregion
-	//#region src/presentation/dashboard/dashboard-progress-html.ts
-	function dashboardProgressHtml(completeTests, testCount, percent) {
-		const safePercent = Math.max(0, Math.min(100, Number.isFinite(percent) ? percent : 0));
-		return `<div class="dash-progress"><span style="width:${safePercent}%"></span></div><div class="hint flow-item">${completeTests}/${testCount || 0} xét nghiệm đã đủ QC hôm nay · ${safePercent}% hoàn tất</div>`;
-	}
-	//#endregion
 	//#region src/presentation/dashboard/dashboard-head-html.ts
 	function createDashboardHeadHtml({ escape, topUserBox }) {
-		return (lab) => `<div class="head"><div><h1>Bảng điều khiển</h1><p>${escape(lab.name || "Khoa Xét nghiệm")}${lab.dept ? " · " + escape(lab.dept) : ""}</p></div>${topUserBox()}</div>`;
-	}
-	//#endregion
-	//#region src/presentation/dashboard/dashboard-test-panel-html.ts
-	function createDashboardTestPanelHtml({ escapeAttr }) {
-		return (input) => `<div class="panel">${input.testsCount ? `<div class="dash-test-toolbar"><h2 class="panel-title">Danh sách xét nghiệm</h2></div><div class="dash-test-filterbar"><div class="dash-test-tabs">${input.statusTabs}</div><div class="dash-test-search"><input id="dashTestSearch" type="search" placeholder="Tìm xét nghiệm, máy, lô..." value="${escapeAttr(input.query)}" data-action="dashTestFilter" data-action-on="input"><span id="dashTestCount">${input.filteredCount}/${input.filteredCount}</span></div></div>${input.testListHtml}` : input.emptyHtml}</div>`;
-	}
-	//#endregion
-	//#region src/presentation/dashboard/dashboard-test-row-html.ts
-	function createDashboardTestRowHtml({ escape, escapeAttr }) {
-		return (input) => `<tr class="${input.status}" data-search="${escapeAttr(input.search)}"><td><div class="dash-test-name">${escape(input.name)}</div><div class="dash-test-sub">${escape(input.machine || "Chưa gán máy")}</div></td><td><div class="dash-level-list">${input.levelsHtml}</div></td><td>${input.todayTag}</td><td class="num"><b>${input.totalPoints}</b></td><td>${input.statusTag}</td><td><span class="dash-latest">${input.latestText}</span></td><td>${input.actionHtml}</td></tr>`;
-	}
-	//#endregion
-	//#region src/presentation/dashboard/dashboard-kpi-items.ts
-	function dashboardKpiItems(input) {
-		return [
-			{
-				label: "Xét nghiệm",
-				value: input.tests
-			},
-			{
-				label: "Điểm QC",
-				value: input.totalPoints
-			},
-			{
-				label: "Vi phạm",
-				value: input.rejected,
-				color: "var(--red)"
-			},
-			{
-				label: "QC hôm nay",
-				value: input.todayPoints,
-				color: "var(--teal)"
-			}
-		];
-	}
-	//#endregion
-	//#region src/presentation/dashboard/dashboard-empty-tests-html.ts
-	function createDashboardEmptyTestsHtml({ emptyState, button }) {
-		return (isAdmin) => emptyState("Chưa có xét nghiệm đang vận hành", "Cần đưa xét nghiệm vào Panel QC, ghép Nhóm lô QC và gán Mean/SD trước khi theo dõi.", isAdmin ? button("Cấu hình Mean/SD", { action: "goManageTargets" }, "teal") : "");
+		return (lab) => `<div class="head"><div><h1>Tổng quan</h1><p>${escape(lab.name || "Khoa Xét nghiệm")}${lab.dept ? " · " + escape(lab.dept) : ""}</p></div>${topUserBox()}</div>`;
 	}
 	//#endregion
 	//#region src/presentation/chart/cusum-colors.ts
@@ -12797,26 +12513,6 @@
 		})).filter((item) => item.info.overdue).sort((a, b) => b.info.days - a.info.days);
 	}
 	//#endregion
-	//#region src/presentation/dashboard/dashboard-overdue-action-list-html.ts
-	function createDashboardOverdueActionListHtml({ render }) {
-		return (items, tests) => items.slice(0, 4).map((item) => render({
-			action: item.action,
-			index: item.index,
-			info: item.info,
-			test: tests.find((test) => test.id === item.action.testId)
-		})).join("");
-	}
-	//#endregion
-	//#region src/presentation/dashboard/dashboard-qc-followup-list-html.ts
-	function createDashboardQcFollowupListHtml({ render }) {
-		return (items, limit, kind) => items.slice(0, limit).map((item) => render(item, kind)).join("");
-	}
-	//#endregion
-	//#region src/presentation/dashboard/dashboard-missing-target-list-html.ts
-	function createDashboardMissingTargetListHtml({ render }) {
-		return (items) => items.slice(0, 4).map(render).join("");
-	}
-	//#endregion
 	//#region src/presentation/dashboard/dashboard-expiring-lot-items.ts
 	function dashboardExpiringLotItems(items, daysToExpiry, limit = 30) {
 		const result = [];
@@ -12869,47 +12565,6 @@
 		}));
 	}
 	//#endregion
-	//#region src/presentation/dashboard/dashboard-test-action.ts
-	function createDashboardTestAction({ button }) {
-		return (testId, level) => button("Xem QC", {
-			action: "dashViewTestInEntry",
-			args: [testId, level]
-		}, "ghost sm");
-	}
-	//#endregion
-	//#region src/presentation/dashboard/dashboard-level-pills-html.ts
-	function createDashboardLevelPillsHtml({ targetOk, render }) {
-		return (levels) => levels.map((item) => render({
-			level: item.l,
-			today: item.todayLevel,
-			targetOk: targetOk(item.l),
-			cv: item.st ? item.st.cv : null
-		})).join("");
-	}
-	//#endregion
-	//#region src/presentation/dashboard/dashboard-test-rows-html.ts
-	function createDashboardTestRowsHtml(deps) {
-		return (items) => items.map((item) => {
-			const { t, s, levelData, todayCount, totalPoints, latest, search } = item, levels = levelData.map((x) => x.l);
-			return {
-				rank: deps.rank(s, todayCount, levels.length),
-				name: t.name,
-				html: deps.rowHtml({
-					status: s,
-					search,
-					name: deps.testDisplayName(t),
-					machine: t.machine,
-					levelsHtml: deps.levelsHtml(levelData),
-					todayTag: deps.todayTag(todayCount, levels.length),
-					totalPoints,
-					statusTag: deps.statusTag(s),
-					latestText: deps.latestText(latest, t),
-					actionHtml: deps.actionHtml(t.id, levels[0].level)
-				})
-			};
-		}).sort((a, b) => a.rank - b.rank || String(a.name || "").localeCompare(String(b.name || ""), "vi")).map((item) => item.html).join("");
-	}
-	//#endregion
 	//#region src/presentation/dashboard/dashboard-test-items.ts
 	function createDashboardTestItems(deps) {
 		return (tests, today) => tests.map((t) => {
@@ -12933,35 +12588,24 @@
 		});
 	}
 	//#endregion
-	//#region src/presentation/dashboard/dashboard-test-list-html.ts
-	function dashboardTestListHtml(visibleCount, rowsHtml) {
-		if (!visibleCount) return "<div class=\"dash-test-empty\">Không tìm thấy xét nghiệm phù hợp.</div>";
-		return `<div class="dash-test-list"><table><thead><tr><th>Xét nghiệm</th><th>Mức QC / lô</th><th>QC hôm nay</th><th class="num">Tổng điểm</th><th>Westgard</th><th>Gần nhất</th><th><span class="sr-only">Thao tác</span></th></tr></thead><tbody>${rowsHtml}</tbody></table></div><div id="dashTestEmpty" class="dash-test-empty" style="display:none">Không tìm thấy xét nghiệm phù hợp.</div>`;
-	}
-	//#endregion
-	//#region src/presentation/dashboard/dashboard-page-html.ts
-	function createDashboardPageHtml() {
-		return (input) => `${input.headHtml}
-   <div class="dash-hero">
-     <div class="dash-status"><div class="eyebrow">Trạng thái trực ca · ${input.todayText}</div><h2>${input.mood}</h2><p>${input.moodText}</p>${input.progressHtml}</div>
-     ${input.kpisHtml}
-   </div>
-   <div class="dash-main">
-     <div class="panel"><h2 class="panel-title">Cần xử lý / Theo dõi</h2>${input.followHtml}</div>
-     <div class="panel"><h2 class="panel-title">Lô & hạn dùng</h2><div class="dash-list">${input.expiringLotsHtml}</div></div>
-   </div>
-   ${input.testsPanelHtml}`;
-	}
-	//#endregion
 	//#region src/presentation/dashboard/dashboard-page-controller.ts
 	function createDashboardPageController(deps) {
-		const pageDashLoading = (tests, pending) => deps.dashboardLoadingPresentation(tests, pending, deps.stateData(), deps.stateLab());
-		const pageDash = () => {
+		const dashTestSetStatus = (value) => {
+			deps.setDashTestStatus(deps.dashboardStatusFilter.normalize(value));
+			deps.rerender();
+		};
+		const dashboardModel = () => {
 			const tests = deps.operationalTests(), missingWestgard = tests.filter((t) => !deps.isWestgardMemoized(t.id));
-			if (missingWestgard.length && deps.scheduleWestgardPrewarm(missingWestgard)) return pageDashLoading(tests, missingWestgard.length);
+			if (missingWestgard.length && deps.scheduleWestgardPrewarm(missingWestgard)) return {
+				loading: true,
+				tests,
+				pending: missingWestgard.length,
+				data: deps.stateData(),
+				lab: deps.stateLab()
+			};
 			const today = deps.isoToday();
 			const dashItems = deps.dashboardTestItems(tests, today);
-			const { totalPoints: totalPts, todayPoints: todayPts, rejected: rej, warnings: warn, missingToday: missingTodayCount, completeTests: doneTests, completionPercent: pct } = deps.dashboardKpis(dashItems, tests.length);
+			const kpi = deps.dashboardKpis(dashItems, tests.length);
 			const noTarget = deps.dashboardMissingTargetItems(dashItems, deps.levelsMissingTarget);
 			const { urgent, watch } = deps.dashboardWestgardAlerts(dashItems.map((item) => ({
 				test: item.t,
@@ -12969,66 +12613,40 @@
 			})));
 			const exp = deps.dashboardExpiringLotItems(dashItems, deps.daysToExp);
 			const expByLot = deps.dashboardExpiringLots(exp);
-			const urgentHtml = deps.dashboardQcFollowupListHtml(urgent, 5, "rej");
-			const watchHtml = deps.dashboardQcFollowupListHtml(watch, 4, "warn");
 			const overdue = deps.dashboardOverdueActions(deps.stateActions(), today);
-			const overdueHtml = deps.dashboardOverdueActionListHtml(overdue, deps.stateTests());
-			const noTargetHtml = deps.dashboardMissingTargetListHtml(noTarget);
-			const followHtml = deps.dashboardFollowupPanelHtml(urgentHtml, overdueHtml, noTargetHtml, watchHtml);
-			const expHtml = deps.dashboardExpiringLotsHtml(expByLot.values());
 			const dashTestStatus = deps.dashTestStatus();
-			const dashStatusTabs = deps.dashboardStatusTabsHtml(dashItems, dashTestStatus);
 			const statusItems = dashItems.filter((item) => deps.dashboardStatusFilter.matches(item, dashTestStatus));
-			const testRows = deps.dashboardTestRowsHtml(statusItems);
-			const testListHtml = deps.dashboardTestListHtml(statusItems.length, testRows);
-			const done = todayPts;
 			const shift = deps.dashboardShiftStatus({
-				rejected: rej,
+				rejected: kpi.rejected,
 				overdueActions: overdue.length,
-				warnings: warn,
-				missingToday: missingTodayCount
-			}), mood = shift.mood, moodText = shift.text;
-			const headHtml = deps.dashboardHeadHtml(deps.stateLab()), progressHtml = deps.dashboardProgressHtml(doneTests, tests.length, pct), kpisHtml = deps.dashboardKpisHtml(deps.dashboardKpiItems({
-				tests: tests.length,
-				totalPoints: totalPts,
-				rejected: rej,
-				todayPoints: done
-			})), testsPanelHtml = deps.dashboardTestPanelHtml({
-				testsCount: tests.length,
-				statusTabs: dashStatusTabs,
-				query: deps.dashTestQ(),
-				filteredCount: statusItems.length,
-				testListHtml,
-				emptyHtml: deps.dashboardEmptyTestsHtml(deps.role() === "admin")
+				warnings: kpi.warnings,
+				missingToday: kpi.missingToday
 			});
-			return deps.dashboardPageHtml({
-				headHtml,
+			return {
+				loading: false,
+				today,
 				todayText: deps.vnDate(today),
-				mood,
-				moodText,
-				progressHtml,
-				kpisHtml,
-				followHtml,
-				expiringLotsHtml: expHtml,
-				testsPanelHtml
-			});
-		};
-		const dashTestFilter = (value) => {
-			deps.setDashTestQ(value);
-			deps.liveRowFilter(".dash-test-list tbody tr", value, {
-				countId: "dashTestCount",
-				emptyId: "dashTestEmpty"
-			});
-		};
-		const dashTestSetStatus = (value) => {
-			deps.setDashTestStatus(deps.dashboardStatusFilter.normalize(value));
-			deps.rerender();
+				tests,
+				dashItems,
+				kpi,
+				noTarget,
+				urgent,
+				watch,
+				expiringLots: [...expByLot.values()],
+				overdue,
+				dashTestStatus,
+				statusItems,
+				mood: shift.mood,
+				moodText: shift.text,
+				isAdmin: deps.role() === "admin",
+				lab: deps.stateLab(),
+				stateTests: deps.stateTests(),
+				query: deps.dashTestQ()
+			};
 		};
 		return {
-			pageDash,
-			pageDashLoading,
-			dashTestFilter,
-			dashTestSetStatus
+			dashTestSetStatus,
+			dashboardModel
 		};
 	}
 	//#endregion
@@ -13199,7 +12817,8 @@
 			const currentUser = deps.currentUser();
 			if (!currentUser) return "";
 			const name = currentUser.name || currentUser.username;
-			return `<div class="top-user"><div class="avatar">${deps.escape(String(name || "U").trim().charAt(0).toUpperCase() || "U")}</div><div class="meta"><div class="name">${deps.escape(name)}</div><div class="role">${deps.roleLabel(currentUser.role)}</div></div><button data-action="logout" title="Đăng xuất"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M21 5v14"/></svg>Đăng xuất</button></div>`;
+			const initial = deps.escape(String(name || "U").trim().charAt(0).toUpperCase() || "U");
+			return `<div class="top-user"><div class="avatar" role="button" tabindex="0" aria-label="Đổi ảnh đại diện" data-action="openAvatarModal" data-keydown-action="openAvatarModal" data-keydown-keys='[" ","Enter"]'>${currentUser.avatar ? `<img src="${deps.escapeAttr(currentUser.avatar)}" alt="">` : initial}</div><div class="meta"><div class="name">${deps.escape(name)}</div><div class="role">${deps.roleLabel(currentUser.role)}</div></div><button data-action="logout" title="Đăng xuất"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M21 5v14"/></svg>Đăng xuất</button></div>`;
 		};
 		const headOnly = (t, p, actions = "") => `<div class="head"><div><h1>${t}</h1>${p ? `<p>${p}</p>` : ""}</div><div class="head-actions">${actions}${topUserBox()}</div></div>`;
 		return {
@@ -13221,12 +12840,18 @@
 			deps.resetStatusMemo();
 			if (!deps.canAccessPage(deps.page())) deps.setPage(deps.firstAccessPage());
 			const m = deps.document.getElementById("main");
+			if (!m) return;
+			const id = deps.page();
+			if (deps.isReactPage(id)) {
+				deps.mountReactPage(id, m);
+				return;
+			}
+			deps.unmountReactPageIfMounted();
 			const map = deps.pageMap();
-			if (m) m.innerHTML = (map[deps.page()] || map.dash)();
+			m.innerHTML = (map[id] || map.entry)();
 		};
 		const restoreRouteFilters = () => {
-			if (deps.page() === "dash" && deps.dashTestQ()) deps.dashTestFilter(deps.dashTestQ());
-			else if (deps.page() === "entry" && deps.entryQ()) deps.entryFilter(deps.entryQ());
+			if (deps.page() === "entry" && deps.entryQ()) deps.entryFilter(deps.entryQ());
 		};
 		const rerender = () => {
 			const m = deps.document.getElementById("main"), keepScroll = m ? m.scrollTop : 0;
@@ -13234,6 +12859,7 @@
 			deps.afterRender(deps.page());
 			restoreRouteFilters();
 			if (m && keepScroll) m.scrollTop = keepScroll;
+			deps.notifyReactStore();
 		};
 		const go = (p) => {
 			if (!deps.canAccessPage(p)) return;
@@ -13644,11 +13270,6 @@
 			const test = tests.find((item) => item.id === pick.testId), same = test && test.levels.find((level) => +level.level === +pick.lot.level);
 			return !!(same && (same.qcLotId && same.qcLotId !== pick.lot.id || !same.qcLotId && same.lot && same.lot !== pick.lot.lotNo));
 		});
-	}
-	//#endregion
-	//#region src/presentation/manage/lot-group-lot-pills-html.ts
-	function lotGroupLotPillsHtml(lots) {
-		return lots.map((lot) => `<span class="pill">${lot.lotNo} · M${lot.level}</span>`).join("");
 	}
 	//#endregion
 	//#region src/presentation/manage/lot-group-status.ts
@@ -15521,103 +15142,6 @@
 		return `<div class="panel action-issues-panel"><h2 class="panel-title">Sự cố cần xử lý</h2><div class="dash-list">${issuesHtml}</div></div>`;
 	}
 	//#endregion
-	//#region src/presentation/manage/manage-toolbar-html.ts
-	function createManageToolbarHtml(deps) {
-		return (model) => {
-			const search = model.placeholder ? `<input id="manageSearch" placeholder="${deps.escapeAttr(model.placeholder)}" value="${deps.escapeAttr(model.query || "")}" data-action="manageSearchSet" data-action-on="input">` : "";
-			return `<div class="rcfg-toolbar"><div><h2>${deps.escape(model.title)}</h2>${model.subtitle ? `<p>${deps.escape(model.subtitle)}</p>` : ""}</div><div class="rcfg-tools">${search}${model.action ? deps.button("＋ " + (model.actionLabel || ""), model.action, "teal") : ""}</div></div>`;
-		};
-	}
-	//#endregion
-	//#region src/presentation/manage/manage-page-html.ts
-	function createManagePageHtml() {
-		return (headHtml, shellHtml) => `${headHtml}${shellHtml}`;
-	}
-	//#endregion
-	//#region src/presentation/manage/manage-shell-html.ts
-	function createManageShellHtml(deps) {
-		return (items, selected, body) => `<div class="config-shell"><aside class="config-shell-nav" aria-label="Danh mục cấu hình"><div class="rcfg-title">CẤU HÌNH CHUNG</div>${items.map((item) => `<button class="${selected === item.id ? "on" : ""}" data-action="setManageTab" data-args='${JSON.stringify([item.id])}'><b>${deps.escape(item.label)}</b><small>${deps.escape(item.count)}</small></button>`).join("")}</aside><section class="config-shell-main">${body}</section></div>`;
-	}
-	//#endregion
-	//#region src/presentation/manage/manage-instrument-row-html.ts
-	function createManageInstrumentRowHtml(deps) {
-		return (model) => `<tr><td><b>${deps.escape(model.name)}</b><div class="hint">${deps.escape(model.section || "Chưa phân khoa")}</div></td><td>${deps.escape(model.manufacturer || "—")}</td><td>${deps.escape(model.serial || "—")}</td><td class="num">${model.assayCount}</td><td><span class="tag ${model.active ? "ok" : "none"}">${model.active ? "Đang hoạt động" : "Ngừng hoạt động"}</span></td><td><div class="manage-actions">${deps.button("Sửa", {
-			action: "openConfigInstrument",
-			args: [model.id]
-		}, "ghost sm")}${deps.button("Xóa", {
-			action: "deleteConfigInstrument",
-			args: [model.id]
-		}, "danger sm")}</div></td></tr>`;
-	}
-	//#endregion
-	//#region src/presentation/manage/manage-instrument-table-html.ts
-	function manageInstrumentTableHtml(input) {
-		return `<div class="panel rcfg-list">${input.rowsHtml ? `<table class="instrument-table"><thead><tr><th>Máy xét nghiệm</th><th>Nhà sản xuất</th><th>Số sê-ri</th><th class="num">Xét nghiệm</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${input.rowsHtml}</tbody></table>` : input.emptyHtml}</div>`;
-	}
-	//#endregion
-	//#region src/presentation/manage/manage-panel-row-html.ts
-	function createManagePanelRowHtml(deps) {
-		return (model) => `<tr><td><b>${deps.escape(model.name)}</b></td><td>${deps.escape(model.instrument)}</td><td>${model.testsHtml || "—"}</td><td class="num">${model.testCount}</td><td><span class="tag ${model.active ? "ok" : "none"}">${model.active ? "Đang dùng" : "Tạm ngưng"}</span></td><td><div class="manage-actions">${deps.button("Sửa", {
-			action: "openConfigPanel",
-			args: [model.id]
-		}, "ghost sm")}${deps.button("Xóa", {
-			action: "deleteConfigPanel",
-			args: [model.id]
-		}, "danger sm")}</div></td></tr>`;
-	}
-	//#endregion
-	//#region src/presentation/manage/manage-panel-table-html.ts
-	function managePanelTableHtml(input) {
-		return `<div class="panel rcfg-list">${input.rowsHtml ? `<table class="panel-qc-table"><thead><tr><th>Tên panel</th><th>Máy xét nghiệm</th><th>Xét nghiệm trong panel</th><th class="num">Số vị trí</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${input.rowsHtml}</tbody></table>` : input.emptyHtml}</div>`;
-	}
-	//#endregion
-	//#region src/presentation/manage/manage-lot-row-html.ts
-	function createManageLotRowHtml(deps) {
-		return (model) => `<tr><td><b>${deps.escape(model.lotNo)}</b>${model.description || model.program ? `<div class="hint">${deps.escape(model.description || model.program || "")}</div>` : ""}</td><td><span class="pill">M${model.level}</span></td><td>${deps.escape(model.expiry || "—")}</td><td><span class="tag ${model.status.cls}">${deps.escape(model.status.text)}</span></td><td class="num">${model.used}</td><td><div class="lot-row-actions">${deps.button("Sửa", {
-			action: "openConfigLot",
-			args: [model.id]
-		}, "ghost sm")}${deps.button("Xóa", {
-			action: "deleteConfigLot",
-			args: [model.id]
-		}, "danger sm")}</div></td></tr>`;
-	}
-	//#endregion
-	//#region src/presentation/manage/manage-lot-config-layout-html.ts
-	function manageLotConfigLayoutHtml(input) {
-		const lotContent = input.lotRowsHtml ? `<table class="lot-table"><thead><tr><th>Số lô</th><th>Mức</th><th>Hạn dùng</th><th>Trạng thái</th><th class="num">Gán</th><th>Thao tác</th></tr></thead><tbody>${input.lotRowsHtml}</tbody></table>` : input.lotEmptyHtml;
-		const groupContent = input.groupRowsHtml ? `<div class="lot-group-list">${input.groupRowsHtml}</div>` : input.groupEmptyHtml;
-		return `<div class="lot-config-grid"><div class="panel rcfg-list lot-config-left"><div class="rcfg-panel-h"><h3>Lô QC</h3>${input.lotAddButtonHtml}</div>${lotContent}</div><div class="panel rcfg-list lot-config-right"><div class="rcfg-panel-h"><h3>Nhóm lô QC</h3>${input.groupAddButtonHtml}</div>${groupContent}</div></div>`;
-	}
-	//#endregion
-	//#region src/presentation/manage/manage-lot-group-card-html.ts
-	function createManageLotGroupCardHtml(deps) {
-		return (model) => `<div class="lot-group-card${model.archived ? " lot-opt-depleted" : ""}"><div class="lot-group-card-h"><div><b>${deps.escape(model.name)}</b><small>${deps.escape(model.note || "Nhóm lô để gán Mean/SD theo Panel")}</small></div><span class="tag ${model.status.cls}">${deps.escape(model.status.text)}</span></div><div class="lot-group-chipline">${model.lotsHtml || "<span class=\"hint\">Chưa chọn lô</span>"}</div><div class="lot-group-actions">${model.actionsHtml}</div></div>`;
-	}
-	//#endregion
-	//#region src/presentation/manage/manage-transition-row-html.ts
-	function createManageTransitionRowHtml(deps) {
-		return (model) => `<tr><td><b>${deps.escape(model.panel)}</b></td><td><div><b>${deps.escape(model.fromLot)}</b></div><div class="hint">→ ${deps.escape(model.toLot)}</div></td><td>${deps.escape(model.startDate || "—")}</td><td><span class="tag ${model.status.cls}">${deps.escape(model.status.text)}</span>${model.movedHtml}${model.approvalHtml}</td><td><div class="manage-actions">${deps.button("Sửa", {
-			action: "openLotTransitionV2",
-			args: [model.id]
-		}, "ghost sm")}${deps.button("Xóa", {
-			action: "deleteLotTransition",
-			args: [model.id]
-		}, "danger sm")}</div></td></tr>`;
-	}
-	//#endregion
-	//#region src/presentation/manage/manage-transition-table-html.ts
-	function manageTransitionTableHtml(input) {
-		return `<div class="panel rcfg-list transition-list">${input.rowsHtml ? `<table class="transition-table"><thead><tr><th>Panel QC</th><th>Chuyển lô</th><th>Bắt đầu</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${input.rowsHtml}</tbody></table>` : input.emptyHtml}</div>`;
-	}
-	//#endregion
-	//#region src/presentation/manage/manage-transition-details-html.ts
-	function manageTransitionDetailsHtml(input) {
-		return {
-			movedHtml: input.movedLotNo ? `<div class="hint">Đã chuyển tiếp qua lô ${input.movedLotNo}</div>` : "",
-			approvalHtml: input.approvalText ? `<div class="hint">Duyệt: ${input.approvalText}</div>` : ""
-		};
-	}
-	//#endregion
 	//#region src/presentation/manage/tea-reference-add-modal-html.ts
 	function teaReferenceAddModalHtml(input) {
 		return `<div class="modal"><div class="modal-h"><h3>Thêm xét nghiệm tham chiếu</h3><button class="modal-close" data-action="closeModal">✕</button></div><div class="modal-b"><div class="grid2"><div><label>Tên quốc tế <span class="req">*</span></label><input id="trAddName" placeholder="VD: Creatine kinase-MB"></div><div><label>Viết tắt</label><input id="trAddAbbreviation" placeholder="VD: CK-MB"></div></div><div class="grid2"><div><label>Loại mẫu (matrix)</label><input id="trAddMatrix" placeholder="VD: Serum/Plasma"></div><div></div></div><div class="grid2"><div><label>Đơn vị</label><input id="trAddUnit" placeholder="U/L"></div><div><label>Nhóm</label><input id="trAddSection" placeholder="Hóa sinh"></div></div><div class="grid2"><div><label>TEa CLIA %</label><input id="trAddClia" type="number" step="any"></div><div><label>TEa Ricos %</label><input id="trAddRicos" type="number" step="any"></div></div><div class="hint flow-item">Mỗi xét nghiệm dùng một tên quốc tế duy nhất; viết tắt được hiển thị trong ngoặc. TEa chuẩn hóa được lập thành hồ sơ riêng sau khi thêm dòng.</div></div><div class="modal-f">${input.cancelButtonHtml}${input.submitButtonHtml}</div></div>`;
@@ -15633,33 +15157,6 @@
 		return `<div class="modal tea-lab-profile-modal"><div class="modal-h"><h3>${input.title}</h3><button class="modal-close" data-action="closeModal">✕</button></div><div class="modal-b">${input.bodyHtml}</div><div class="modal-f">${input.removeButtonHtml}${input.cancelButtonHtml}${input.saveButtonHtml}</div></div>`;
 	}
 	//#endregion
-	//#region src/presentation/manage/tea-reference-row-html.ts
-	function teaReferenceRowHtml(input) {
-		return `<tr><td><b title="${input.namingTitle}">${input.displayName}</b></td><td>${input.unit}</td><td>${input.section}</td><td><input class="tea-ref-value" ${input.disabled} type="number" step="any" value="${input.cliaValue}" ${input.cliaChangeActionAttrs}></td><td><input class="tea-ref-value" ${input.disabled} type="number" step="any" value="${input.ricosValue}" ${input.ricosChangeActionAttrs}></td><td><div class="tea-lab-cell">${input.labCellHtml}</div></td><td><div class="tea-ref-status">${input.statusHtml}${input.actionHtml}</div></td></tr>`;
-	}
-	//#endregion
-	//#region src/presentation/manage/tea-reference-table-html.ts
-	function teaReferenceTableHtml(input) {
-		return `<div class="panel rcfg-list tea-ref-panel">${input.rowsHtml ? `<table class="tea-ref-table"><thead><tr><th>Xét nghiệm</th><th>Đơn vị</th><th>Nhóm</th><th>TEa CLIA %</th><th>TEa Ricos %</th><th>TEa chuẩn hóa %</th><th>Trạng thái</th></tr></thead><tbody>${input.rowsHtml}</tbody></table>` : input.emptyHtml}</div>`;
-	}
-	//#endregion
-	//#region src/presentation/manage/tea-source-registry-html.ts
-	function createTeaSourceRegistryHtml(deps) {
-		return (items) => `<div class="tea-source-registry">${items.map((item) => `<div class="tea-source-card ${item.status}"><div><b>${deps.escape(item.label)}</b><span class="tag ${item.tagClass}">${deps.escape(item.statusLabel)}</span></div><p>${deps.escape(item.version)}${item.effectiveDate ? " · hiệu lực " + deps.escape(item.effectiveDate) : ""} · rà soát ${deps.escape(item.reviewedDate)}</p><a href="${deps.escapeAttr(item.url)}" target="_blank" rel="noopener">Mở nguồn chính thức</a></div>`).join("")}</div>`;
-	}
-	//#endregion
-	//#region src/presentation/manage/manage-history-row-html.ts
-	function createManageHistoryRowHtml(deps) {
-		return (model) => `<tr><td><span class="pill">M${model.level}</span></td><td><b>${deps.escape(model.lot || "—")}</b><div class="hint">${deps.escape(model.group)}</div></td><td class="num">${model.mean}</td><td class="num">${model.low}</td><td class="num">${model.high}</td><td class="num">${model.sd}</td><td>${deps.escape(model.period)}</td><td><span class="tag ${model.source === "lab" ? "warn" : "ok"}">${model.source === "lab" ? "PXN" : "NSX"}</span></td><td class="num">${model.pointCount}</td><td>${deps.button("Chi tiết", {
-			action: "openQcHistoryDetail",
-			args: [
-				model.testId,
-				model.level,
-				model.lot || ""
-			]
-		}, "ghost sm")}</td></tr>`;
-	}
-	//#endregion
 	//#region src/presentation/manage/manage-search-placeholder.ts
 	var PLACEHOLDERS = Object.freeze({
 		instruments: "Tìm theo tên máy, hãng, số sê-ri...",
@@ -15673,46 +15170,6 @@
 	});
 	function manageSearchPlaceholder(tab) {
 		return PLACEHOLDERS[tab] || "";
-	}
-	//#endregion
-	//#region src/presentation/manage/manage-assay-row-html.ts
-	function createManageAssayRowHtml(deps) {
-		return (model) => `<tr><td class="num">${model.index}</td><td><b>${deps.escape(model.name)}</b><div class="hint">${deps.escape(model.method || "Chưa nhập phương pháp")} · ${deps.escape(model.unit || "Chưa có đơn vị")}</div></td><td>${deps.escape(model.instrument)}<div class="hint">${deps.escape(model.section || "Chưa gán khoa/khu vực")}</div></td><td>${deps.escape(model.reagent || "—")}</td><td>${model.tea ? deps.escape(model.tea) + "%" : "—"}</td><td><span class="tag ${model.closed ? "none" : "ok"}">${model.closed ? "Ngưng dùng" : "Đang dùng"}</span></td><td><div class="manage-actions">${deps.button("Sửa", {
-			action: "openConfigAssay",
-			args: [model.id]
-		}, "ghost sm")}${deps.button("Xóa", {
-			action: "delTest",
-			args: [model.id]
-		}, "danger sm")}</div></td></tr>`;
-	}
-	//#endregion
-	//#region src/presentation/manage/manage-assay-table-html.ts
-	function manageAssayTableHtml(input) {
-		return `<div class="panel rcfg-list">${input.rowsHtml ? `<table class="assay-table"><thead><tr><th class="num">STT</th><th>Tên xét nghiệm</th><th>Máy xét nghiệm</th><th>Hóa chất</th><th>TEa</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${input.rowsHtml}</tbody></table>` : input.emptyHtml}</div>`;
-	}
-	//#endregion
-	//#region src/presentation/manage/tea-reference-status-html.ts
-	var STATUS = Object.freeze({
-		default: {
-			cls: "none",
-			label: "Mặc định"
-		},
-		override: {
-			cls: "warn",
-			label: "Đã sửa"
-		},
-		lab: {
-			cls: "ok",
-			label: "TEa PXN"
-		},
-		custom: {
-			cls: "ok",
-			label: "Tự thêm"
-		}
-	});
-	function teaReferenceStatusHtml(kind) {
-		const status = STATUS[kind] || STATUS.default;
-		return `<span class="tag ${status.cls}">${status.label}</span>`;
 	}
 	//#endregion
 	//#region src/presentation/manage/manage-transition-status.ts
@@ -15816,17 +15273,6 @@
 		return (panels.find((item) => item.id === panelId)?.testIds || []).map((id) => tests.find((test) => test.id === id)).filter((test) => !!test);
 	}
 	//#endregion
-	//#region src/presentation/manage/target-panel-options-html.ts
-	function targetPanelOptionsHtml(panels, panelId, instrumentName, escape) {
-		return panels.map((panel) => `<option value="${panel.id}" ${panel.id === panelId ? "selected" : ""}>${escape(panel.name)} · ${escape(instrumentName(panel.instrumentId))}</option>`).join("");
-	}
-	//#endregion
-	//#region src/presentation/manage/target-group-options-html.ts
-	function targetGroupOptionsHtml(groups, selectedId, lotsOf, labelOf, statusSuffix, escape) {
-		const available = groups.filter((group) => lotsOf(group).length);
-		return available.length ? available.map((group) => `<option value="${group.id}" ${group.id === selectedId ? "selected" : ""}>${escape(labelOf(group) + statusSuffix(group))}</option>`).join("") : "<option value=\"\">Không tìm thấy nhóm lô QC phù hợp</option>";
-	}
-	//#endregion
 	//#region src/presentation/manage/target-selection.ts
 	function targetSelection(panels, groups, selectedPanelId, selectedGroupId, lotsOf) {
 		const panelId = panels.some((panel) => panel.id === selectedPanelId) ? selectedPanelId : panels[0]?.id || "";
@@ -15889,11 +15335,6 @@
 			groupName,
 			...lots.map((lot) => lot.lotNo)
 		];
-	}
-	//#endregion
-	//#region src/presentation/manage/history-assay-options-html.ts
-	function historyAssayOptionsHtml(assays, selectedId, displayName, escape) {
-		return assays.map((assay) => `<option value="${assay.id}" ${assay.id === selectedId ? "selected" : ""}>${escape(displayName(assay))}</option>`).join("");
 	}
 	//#endregion
 	//#region src/presentation/manage/history-assay-selection.ts
@@ -16023,35 +15464,6 @@
 		});
 	}
 	//#endregion
-	//#region src/presentation/manage/target-level-tabs-html.ts
-	function targetLevelTabsHtml(levels, selectedLevel) {
-		return levels.map((level) => `<button class="${String(level) === String(selectedLevel) ? "on" : ""}" data-action="setTargetLevel" data-args="[${level}]">Mức ${level}</button>`).join("");
-	}
-	//#endregion
-	//#region src/presentation/manage/target-summary-html.ts
-	function targetSummaryHtml(stats) {
-		return `<div class="target-summary"><span class="ok"><b>${stats.linked}</b> đã gán mức này</span><span class="${stats.other ? "warn" : "none"}"><b>${stats.other}</b> đang dùng lô khác</span><span class="${stats.empty ? "warn" : "none"}"><b>${stats.empty}</b> chưa gán lô</span><span class="${stats.missing ? "warn" : "ok"}"><b>${stats.missing}</b> thiếu Mean/SD</span></div>`;
-	}
-	//#endregion
-	//#region src/presentation/manage/target-matrix-row-html.ts
-	function targetMatrixRowHtml(model, escape, escapeAttribute) {
-		const statusHtml = model.status === "retired" ? `<b class="tag rej">${model.retiredTo ? `Đã chuyển tiếp qua lô ${escape(model.retiredTo)}` : "Đã chuyển tiếp"}</b>` : model.status === "linked" ? "<b class=\"tag ok\">Đã gán</b>" : model.status === "planned" ? "<b class=\"tag warn\">Dự kiến</b>" : model.status === "other" ? `<b class="tag warn">Đang dùng ${escape(model.otherLot || "lô khác")}</b>` : "<b class=\"tag none\">Chưa gán</b>";
-		return `<div class="target-row${model.locked ? " target-row-locked" : ""}" data-test="${model.testId}" data-lot="${model.lotId}"${model.locked ? " data-locked=\"1\"" : ""}>
-    <label class="lot-assay-check"><input class="tm-use" type="checkbox" ${model.checked ? "checked" : ""} ${model.locked ? "disabled" : ""} data-action="toggleTargetRow" data-action-on="change"><span></span></label>
-    <div class="lot-assay-name"><b>${escape(model.name)}</b><small>${escape(model.unit || "Chưa có đơn vị")}</small></div>
-    <input class="tm-mean" type="number" step="any" value="${escapeAttribute(model.mean)}" placeholder="Trung bình" data-action="syncTargetRange" data-args='["target"]' data-action-on="input" ${model.disabled ? "disabled" : ""}>
-    <input class="tm-low" type="number" step="any" value="${escapeAttribute(model.low)}" placeholder="Giới hạn dưới" data-action="syncTargetRange" data-args='["limits"]' data-action-on="input" ${model.disabled ? "disabled" : ""}>
-    <input class="tm-high" type="number" step="any" value="${escapeAttribute(model.high)}" placeholder="Giới hạn trên" data-action="syncTargetRange" data-args='["limits"]' data-action-on="input" ${model.disabled ? "disabled" : ""}>
-    <input class="tm-sd" type="number" step="any" value="${escapeAttribute(model.sd)}" placeholder="Độ lệch chuẩn" data-action="syncTargetRange" data-args='["target"]' data-action-on="input" ${model.disabled ? "disabled" : ""}>
-    <span>${statusHtml}</span>
-  </div>`;
-	}
-	//#endregion
-	//#region src/presentation/manage/target-matrix-panel-html.ts
-	function targetMatrixPanelHtml(input) {
-		return `<div class="panel target-matrix-panel">${input.selectorHtml}${input.summaryHtml}${input.contentHtml}</div>`;
-	}
-	//#endregion
 	//#region src/presentation/manage/history-rows.ts
 	function historyRows(assay, lots, points, groupLabel) {
 		const rows = [];
@@ -16084,38 +15496,6 @@
 		return rows;
 	}
 	//#endregion
-	//#region src/presentation/manage/history-selector-html.ts
-	function historySelectorHtml(optionsHtml, rowCount, pointCount) {
-		return `<div class="target-selector history-selector">
-      <div><label>Xét nghiệm</label><select data-action="setHistoryTest" data-action-on="change">${optionsHtml}</select></div>
-      <div class="target-lot-info"><b>${rowCount}</b><span>mốc lô/Mean-SD</span></div>
-      <div class="target-lot-info"><b>${pointCount}</b><span>điểm QC đã nhập</span></div>
-    </div>`;
-	}
-	//#endregion
-	//#region src/presentation/manage/target-selector-html.ts
-	function targetSelectorHtml(panelOptionsHtml, groupOptionsHtml) {
-		return `<div class="target-selector">
-      <div><label>Panel QC</label><select data-action="setTargetPanel" data-action-on="change">${panelOptionsHtml || "<option value=\"\">Chưa có panel</option>"}</select></div>
-      <div><label>Nhóm lô QC</label><select data-action="setTargetGroup" data-action-on="change">${groupOptionsHtml}</select></div>
-    </div>`;
-	}
-	//#endregion
-	//#region src/presentation/manage/history-table-html.ts
-	function historyTableHtml(rowsHtml, emptyHtml) {
-		return `<div class="rcfg-list">${rowsHtml ? `<table class="history-table"><thead><tr><th>Mức</th><th>Lô QC / Nhóm lô</th><th class="num">Mean</th><th class="num">Giới hạn dưới</th><th class="num">Giới hạn trên</th><th class="num">SD</th><th>Hiệu lực</th><th>Nguồn</th><th class="num">Điểm QC</th><th></th></tr></thead><tbody>${rowsHtml}</tbody></table>` : emptyHtml}</div>`;
-	}
-	//#endregion
-	//#region src/presentation/manage/history-panel-html.ts
-	function historyPanelHtml(input) {
-		return `<div class="panel target-matrix-panel">${input.selectorHtml}${input.tableHtml}</div>`;
-	}
-	//#endregion
-	//#region src/presentation/manage/manage-empty-panel-html.ts
-	function manageEmptyPanelHtml(contentHtml) {
-		return `<div class="panel">${contentHtml}</div>`;
-	}
-	//#endregion
 	//#region src/presentation/manage/target-empty-state.ts
 	function targetEmptyState(allAssayCount, levelLotNos, depletedLotNos, level) {
 		if (!allAssayCount) return {
@@ -16132,16 +15512,6 @@
 		};
 	}
 	//#endregion
-	//#region src/presentation/manage/target-matrix-table-html.ts
-	function targetMatrixTableHtml(rowsHtml) {
-		return `<div class="target-table"><div class="target-head"><span>Dùng</span><span>Xét nghiệm</span><span>Trung bình mục tiêu</span><span>Giới hạn dưới</span><span>Giới hạn trên</span><span>Độ lệch chuẩn</span><span>Trạng thái</span></div>${rowsHtml}</div>`;
-	}
-	//#endregion
-	//#region src/presentation/manage/target-matrix-actions-html.ts
-	function targetMatrixActionsHtml(clearButtonHtml, selectButtonHtml, saveButtonHtml) {
-		return `<div class="modal-f target-actions">${clearButtonHtml}${selectButtonHtml}${saveButtonHtml}</div>`;
-	}
-	//#endregion
 	//#region src/presentation/manage/target-prerequisite.ts
 	function targetPrerequisite(counts) {
 		if (!counts.tests) return "tests";
@@ -16149,11 +15519,6 @@
 		if (!counts.lots) return "lots";
 		if (!counts.groups) return "groups";
 		return null;
-	}
-	//#endregion
-	//#region src/presentation/manage/target-level-toolbar-html.ts
-	function targetLevelToolbarHtml(level, lotNos, tabsHtml, escape) {
-		return `<div class="target-level-toolbar"><div><b>Mức ${escape(level)}</b><span class="target-level-lot">${lotNos.map((lotNo) => escape(lotNo)).join(" / ")}</span></div><div class="dayseg">${tabsHtml}</div></div>`;
 	}
 	//#endregion
 	//#region src/presentation/manage/tea-reference-kind.ts
@@ -16195,11 +15560,6 @@
 			title: "Chưa có bảng tham chiếu",
 			description: "Không có xét nghiệm nào."
 		};
-	}
-	//#endregion
-	//#region src/presentation/manage/tea-reference-lab-value-html.ts
-	function teaReferenceLabValueHtml(value, formatNumber) {
-		return value == null ? "" : `<b>${formatNumber(value, 2)}%</b>`;
 	}
 	//#endregion
 	//#region src/presentation/manage/tea-reference-input-value.ts
@@ -16971,55 +16331,6 @@
       <div class="flow-control">${input.createTypedHtml}</div>
       <div class="refcat">Danh mục chuẩn</div>${input.referenceRowsHtml || input.emptyReferenceHtml}</div>
     <div class="modal-f">${input.closeButtonHtml}</div></div>`;
-	}
-	//#endregion
-	//#region src/presentation/reagent/reagent-empty-page-html.ts
-	function reagentEmptyPageHtml(input) {
-		return `${input.headHtml}<div class="panel">${input.emptyStateHtml}</div>`;
-	}
-	//#endregion
-	//#region src/presentation/reagent/reagent-toolbar-html.ts
-	function reagentToolbarHtml(input) {
-		return `<div class="panel rc-toolbar-panel"><h2 class="panel-title">Thiết lập so sánh</h2><div class="rc-toolbar">
-     <div class="rc-toolbar-selcol"><label>Chọn hóa chất</label><select id="rcSel" aria-label="Chọn hóa chất" data-action="rcSwitch" data-action-on="change">${input.selectOptionsHtml}</select></div>
-     ${input.primaryActionsHtml ? `<div class="rc-toolbar-primary"><div>${input.primaryActionsHtml}</div></div>` : ""}
-     <div class="rc-toolbar-secondary">${input.secondaryActionsHtml}</div></div></div>`;
-	}
-	//#endregion
-	//#region src/presentation/reagent/reagent-pair-panel-html.ts
-	function reagentPairPanelHtml(input) {
-		return `<div class="panel rc-pair-panel"><h2 class="panel-title">Dữ liệu đo bắt cặp</h2><div class="rc-pair-wrap"><div class="rc-pair-head"><div>Mẫu</div><div id="rcOldLotHead">${input.oldLotHeadHtml}</div><div id="rcNewLotHead">${input.newLotHeadHtml}</div><div>Trung bình</div><div>Hiệu số (cũ − mới)</div><div></div></div>${input.rowsHtml}</div>
-     ${input.actionsHtml ? `<div class="rc-pair-actions">${input.actionsHtml}</div>` : ""}
-     <div class="hint" style="margin:8px 16px 16px">Nhập tối thiểu ${input.minPairs} cặp để tính mô tả; để phần mềm đánh dấu “đạt sàng lọc” cần ≥20 cặp hợp lệ, bao phủ khoảng đo/điểm quyết định lâm sàng và %bias trong giới hạn SOP. Không dùng p-value để tự chấp nhận lô.</div></div>`;
-	}
-	//#endregion
-	//#region src/presentation/reagent/reagent-info-panel-html.ts
-	function reagentInfoPanelHtml(input) {
-		const ro = input.disabledAttr;
-		return `<div class="panel rc-info-panel"><h2 class="panel-title">Thông tin đánh giá</h2><div class="rc-info-grid">
-     <div class="rc-field"><label>Tên hóa chất</label><input ${ro} value="${input.reagentValueHtml}" data-action="rcMeta" data-args='["reagent"]' data-action-on="input" placeholder="Tên hóa chất / xét nghiệm"></div>
-     <div class="rc-field"><label>Đơn vị</label><input ${ro} value="${input.unitValueHtml}" data-action="rcMeta" data-args='["unit"]' data-action-on="input" placeholder="mmol/L..."></div>
-     <div class="rc-field"><label>Số lô cũ</label><input ${ro} aria-label="Số lô cũ" value="${input.lotOldValueHtml}" data-action="rcMeta" data-args='["lotOld"]' data-action-on="input" data-focus-action="rcMetaFocus" data-focus-args='["lotOld"]' data-change-action="rcMetaLog" data-change-args='["lotOld"]'></div>
-     <div class="rc-field"><label>Số lô mới</label><input ${ro} aria-label="Số lô mới" value="${input.lotNewValueHtml}" data-action="rcMeta" data-args='["lotNew"]' data-action-on="input" data-focus-action="rcMetaFocus" data-focus-args='["lotNew"]' data-change-action="rcMetaLog" data-change-args='["lotNew"]'></div>
-     <div class="rc-field rc-date-field"><label>Ngày thực hiện</label>${input.dateInputHtml}</div>
-     <div class="rc-field"><label>Người thực hiện</label><div class="rc-quick-field"><input ${ro} value="${input.operatorValueHtml}" data-action="rcMeta" data-args='["operator"]' data-action-on="input" placeholder="Họ tên"><button class="rc-icon-btn" ${input.canWrite ? "" : "disabled"} data-action="rcOpenQuick" data-args='["operator"]' title="Chọn nhanh người thực hiện" aria-label="Chọn nhanh người thực hiện">${input.userIconHtml}</button></div></div>
-     <div class="rc-field"><label>Loại mẫu</label><div class="rc-quick-field"><input ${ro} value="${input.sampleTypeValueHtml}" data-action="rcMeta" data-args='["sampleType"]' data-action-on="input" placeholder="Loại mẫu"><button class="rc-icon-btn" ${input.canWrite ? "" : "disabled"} data-action="rcOpenQuick" data-args='["sampleType"]' title="Chọn nhanh loại mẫu" aria-label="Chọn nhanh loại mẫu">${input.sampleIconHtml}</button></div></div>
-     <div class="rc-field"><label>Bias mong muốn (%)</label><input ${ro} aria-label="Bias mong muốn (%)" type="number" step="any" value="${input.biasTarget}" data-action="rcMeta" data-args='["biasTarget"]' data-action-on="input" data-focus-action="rcMetaFocus" data-focus-args='["biasTarget"]' data-change-action="rcMetaLog" data-change-args='["biasTarget"]'></div>
-     <div class="rc-field"><label>Mức ý nghĩa (α, alpha)</label><input ${ro} aria-label="Mức ý nghĩa (alpha)" type="number" step="any" value="${input.alpha}" data-action="rcMeta" data-args='["alpha"]' data-action-on="input" data-focus-action="rcMetaFocus" data-focus-args='["alpha"]' data-change-action="rcMetaLog" data-change-args='["alpha"]'></div>
-     <div class="rc-field rc-coverage-cell"><label class="rc-coverage-check"><input ${ro} type="checkbox" ${input.coverageChecked ? "checked" : ""} data-action="rcMeta" data-args='["coverageConfirmed"]' data-action-on="change"><span>Mẫu đã bao phủ khoảng đo và/hoặc điểm quyết định lâm sàng theo SOP</span></label></div></div></div>`;
-	}
-	//#endregion
-	//#region src/presentation/reagent/reagent-charts-panel-html.ts
-	function reagentChartsPanelHtml() {
-		return `<div class="panel rc-chart-panel"><h2 class="panel-title">Biểu đồ</h2><div class="rc-charts">
-     <div class="rc-chart-box"><h3>Biểu đồ tương quan</h3><p>Lô cũ (trục X) so với Lô mới (trục Y)</p><div id="rcScatter"></div><div class="rc-chart-legend"><span><i class="reg"></i>Đường hồi quy</span><span><i class="ideal"></i>Đường lý tưởng y = x</span></div></div>
-     <div class="rc-chart-box"><h3>Biểu đồ Bland-Altman</h3><p>Hiệu số (cũ − mới) so với giá trị trung bình</p><div id="rcBland"></div><div class="rc-chart-legend"><span><i class="bias"></i>Bias trung bình</span><span><i class="limit"></i>±1.96 SD</span></div></div></div></div>`;
-	}
-	//#endregion
-	//#region src/presentation/reagent/reagent-results-panels-html.ts
-	function reagentResultsPanelsHtml() {
-		return `<div class="panel rc-stats-panel"><h2 class="panel-title">Kết quả thống kê</h2><div id="rcStats"></div></div>
-   <div class="panel rc-crit-panel"><h2 class="panel-title">Tiêu chí chấp nhận &amp; kết luận</h2><div id="rcCrit"></div><div id="rcVerdict"></div></div>`;
 	}
 	//#endregion
 	//#region src/presentation/reagent/reagent-chart-axis.ts
@@ -18550,17 +17861,18 @@
 	//#region src/presentation/manage/manage-page-controller.ts
 	/**
 	* Trang "Cấu hình chung" (Manage) — máy/panel/lô/nhóm lô/Mean-SD/chuyển tiếp
-	* lô/danh mục xét nghiệm/lịch sử dữ liệu/Bảng TEa tham chiếu. Toàn bộ HTML thật
-	* đã nằm trong các hàm `deps.pres.xxxPresentation()` (TypeScript) từ các đợt
-	* trước; controller này chỉ còn phần điều phối — đọc state, gọi đúng
-	* presentation, ghi UI state, mở modal/dialog.
+	* lô/danh mục xét nghiệm/lịch sử dữ liệu/Bảng TEa tham chiếu. Trang này chạy
+	* bằng React (src/react/pages/ManagePage.tsx, retired 2026-08-29) — controller
+	* này giờ chỉ còn `manageModel()` (dữ liệu thuần cho React) cùng các hàm mở
+	* modal/dialog (teaRefOpenAdd, teaLabProfileOpen, ...) mà modal vẫn dùng
+	* nguyên vẹn vì render vào #modalRoot, ngoài tầm React.
 	*/
 	function createManagePageController(deps) {
 		const state = () => deps.getState();
 		const ui = () => deps.ui();
 		const manageSearchSet = (v) => {
 			ui().manageQ = v;
-			deps.scheduleSearchRender(manageSearchSet, renderManageBody, "manageSearch");
+			deps.scheduleSearchRender(manageSearchSet, deps.rerender, "manageSearch");
 		};
 		const manageMatch = (values) => deps.pres.manageSearchMatchPresentation(values, ui().manageQ, deps.searchText);
 		const manageSearchPlaceholder = () => deps.pres.manageSearchPlaceholderPresentation(ui().manageTab);
@@ -18571,325 +17883,13 @@
 		const lotLabel = (id) => deps.pres.manageLotLabelPresentation(state().qcLots, id);
 		const lotTransitionToNo = (lotId) => deps.pres.lotTransitionTargetNumberPresentation(state().lotTransitions || [], state().qcLots, lotId, deps.transitionSwitchesLot);
 		const lotStatus = (l) => deps.pres.manageLotStatusPresentation(l, lotTransitionToNo(l.id));
-		const manageShell = (body) => {
-			const histCount = state().tests.reduce((n, t) => n + (t.levels || []).reduce((m, l) => m + Math.max(1, (l.meanSdHistory || []).length), 0), 0);
-			const items = [
-				["instruments", "Máy xét nghiệm"],
-				["assays", "Danh mục xét nghiệm"],
-				["panels", "Panel QC"],
-				["lots", "Lô & Nhóm QC"],
-				["targets", "Mean/SD"],
-				["transitions", "Chuyển tiếp lô"],
-				["history", "Lịch sử dữ liệu"],
-				["tearefs", "Bảng TEa tham chiếu"]
-			];
-			const counts = {
-				lots: state().qcLots.length + " / " + state().lotGroups.length,
-				panels: state().qcPanels.length,
-				targets: state().tests.reduce((n, t) => n + t.levels.filter((l) => l.qcLotId).length, 0),
-				history: histCount,
-				transitions: state().lotTransitions.length,
-				assays: state().tests.length,
-				instruments: state().instruments.length,
-				tearefs: deps.effectiveTeaRefs().length
-			};
-			return deps.pres.manageShellPresentation(items.map((x) => ({
-				id: x[0],
-				label: x[1],
-				count: counts[x[0]] || ""
-			})), ui().manageTab, body);
-		};
-		const manageToolbar = (title, sub, action, label) => {
-			const ph = manageSearchPlaceholder();
-			return deps.pres.manageToolbarPresentation({
-				title,
-				subtitle: sub,
-				placeholder: ph,
-				query: ui().manageQ,
-				action,
-				actionLabel: label
-			});
-		};
-		const manageLots = () => {
-			const rows = state().qcLots.filter((l) => manageMatch([
-				l.lotNo,
-				l.description,
-				l.supplier,
-				l.program,
-				lotGroupLabels(l.id),
-				l.level,
-				l.exp
-			])).map((l) => {
-				const used = state().tests.reduce((n, t) => n + t.levels.filter((x) => x.qcLotId === l.id).length, 0), s = lotStatus(l), model = {
-					id: l.id,
-					lotNo: l.lotNo,
-					description: l.description,
-					program: l.program,
-					level: l.level,
-					expiry: l.exp ? deps.vnDate(l.exp) : "",
-					status: s,
-					used
-				};
-				return deps.pres.manageLotRowPresentation(model);
-			}).join("");
-			const groupRows = state().lotGroups.filter((g) => manageMatch([
-				g.name,
-				g.note,
-				...(g.lotIds || []).map((id) => (state().qcLots.find((l) => l.id === id) || {}).lotNo)
-			])).map((g) => {
-				const lots = (g.lotIds || []).map((id) => state().qcLots.find((l) => l.id === id)).filter(Boolean), archived = g.active === false;
-				const inUse = deps.lotGroupInUse(g);
-				const statusTag = deps.pres.lotGroupStatusPresentation(archived, g.status, inUse);
-				const toggle = deps.pres.lotGroupToggleActionPresentation(archived, g.status, inUse), toggleBtn = toggle ? deps.btn(toggle.label, {
-					action: toggle.command === "activate" ? "activateLotGroup" : "toggleLotGroupStatus",
-					args: [g.id]
-				}, toggle.variant) : "";
-				const lotsHtml = deps.pres.lotGroupLotPillsHtml(lots.map((l) => ({
-					lotNo: deps.esc(l.lotNo),
-					level: l.level
-				}))), actionsHtml = deps.btn("Sửa nhóm", {
-					action: "openConfigGroup",
-					args: [g.id]
-				}, "ghost sm") + deps.btn("Mean/SD", {
-					action: "openTargetMatrix",
-					args: ["", g.id]
-				}, "ghost sm") + toggleBtn + deps.btn("Xóa", {
-					action: "deleteConfigGroup",
-					args: [g.id]
-				}, "danger sm"), model = {
-					archived,
-					name: g.name,
-					note: g.note,
-					status: statusTag,
-					lotsHtml,
-					actionsHtml
-				};
-				return deps.pres.manageLotGroupCardPresentation(model);
-			}).join("");
-			return manageToolbar("Lô & Nhóm QC", "Quản lý từng lô và nhóm lô QC.") + deps.pres.manageLotConfigLayoutPresentation({
-				lotAddButtonHtml: deps.btn("Thêm lô QC", { action: "openConfigLot" }, "teal sm"),
-				lotRowsHtml: rows,
-				lotEmptyHtml: deps.emptyState("Chưa có lô QC", "Tạo từng lô QC độc lập, sau đó nhập Mean/SD cho Panel QC."),
-				groupAddButtonHtml: deps.btn("Thêm nhóm lô", { action: "openConfigGroup" }, "teal sm"),
-				groupRowsHtml: groupRows,
-				groupEmptyHtml: deps.emptyState("Chưa có nhóm lô", "Chọn các lô QC đã tạo để ghép thành một nhóm, ví dụ 1101/1102.")
-			});
-		};
-		const manageInstruments = () => {
-			const rows = state().instruments.filter((i) => manageMatch([
-				i.name,
-				i.manufacturer,
-				i.model,
-				i.serial,
-				i.section
-			])).map((i) => {
-				const n = state().tests.filter((t) => t.instrumentId === i.id).length;
-				const model = {
-					id: i.id,
-					name: i.name,
-					section: i.section,
-					manufacturer: i.manufacturer,
-					serial: i.serial,
-					assayCount: n,
-					active: !!i.active
-				};
-				return deps.pres.manageInstrumentRowPresentation(model);
-			}).join("");
-			return manageToolbar("Máy xét nghiệm", "Quản lý máy xét nghiệm, hãng và số sê-ri.", { action: "openConfigInstrument" }, "Thêm máy xét nghiệm") + deps.pres.manageInstrumentTablePresentation({
-				rowsHtml: rows,
-				emptyHtml: deps.emptyState("Chưa có máy xét nghiệm", "Thêm máy trước khi cấu hình xét nghiệm.")
-			});
-		};
-		const managePanels = () => {
-			const rows = state().qcPanels.filter((p) => manageMatch([
-				p.name,
-				p.note,
-				instrumentName(p.instrumentId),
-				...(p.testIds || []).map((id) => (state().tests.find((t) => t.id === id) || {}).name)
-			])).map((p) => {
-				const tests = (p.testIds || []).map((id) => state().tests.find((t) => t.id === id)).filter(Boolean), testsHtml = tests.map((t) => `<span class="pill">${deps.esc(deps.testDisplayName(t))}</span>`).join(""), model = {
-					id: p.id,
-					name: p.name,
-					instrument: instrumentName(p.instrumentId),
-					testsHtml,
-					testCount: tests.length,
-					active: p.active !== false
-				};
-				return deps.pres.managePanelRowPresentation(model);
-			}).join("");
-			return manageToolbar("Panel QC", "Nhóm các xét nghiệm theo từng máy để thiết lập và quản lý QC.", { action: "openConfigPanel" }, "Thêm Panel QC") + deps.pres.managePanelTablePresentation({
-				rowsHtml: rows,
-				emptyHtml: deps.emptyState("Chưa có Panel QC", "Tạo Panel QC trước, sau đó nhập Mean/SD theo nhóm lô trong thẻ Mean/SD.")
-			});
-		};
-		const manageTransitionsV2 = () => {
-			const rows = state().lotTransitions.filter((tr) => manageMatch([
-				panelName(tr.panelId),
-				lotLabel(tr.fromLotId),
-				lotLabel(tr.toLotId),
-				tr.startDate,
-				tr.status,
-				tr.approvedBy
-			])).map((tr) => {
-				const s = deps.pres.manageTransitionStatusPresentation(tr.status), to = state().qcLots.find((l) => l.id === tr.toLotId), details = deps.pres.manageTransitionDetailsPresentation({
-					movedLotNo: deps.transitionSwitchesLot(tr) && to ? deps.esc(to.lotNo) : "",
-					approvalText: tr.approvedBy ? deps.esc(tr.approvedBy) + (tr.approvedAt ? " · " + deps.formatDateTimeVN(tr.approvedAt) : "") : ""
-				}), model = {
-					id: tr.id,
-					panel: panelName(tr.panelId),
-					fromLot: lotLabel(tr.fromLotId),
-					toLot: lotLabel(tr.toLotId),
-					startDate: tr.startDate ? deps.vnDate(tr.startDate) : "",
-					status: s,
-					movedHtml: details.movedHtml,
-					approvalHtml: details.approvalHtml
-				};
-				return deps.pres.manageTransitionRowPresentation(model);
-			}).join("");
-			return manageToolbar("Chuyển tiếp lô QC", "Theo dõi lô cũ, lô mới và trạng thái khi thay lô.", { action: "openLotTransitionV2" }, "Thêm hồ sơ chuyển lô") + deps.pres.manageTransitionTablePresentation({
-				rowsHtml: rows,
-				emptyHtml: deps.emptyState("Chưa có hồ sơ chuyển lô", "Tạo hồ sơ để theo dõi chuyển từ lô cũ sang lô mới.")
-			});
-		};
 		const targetGroupLots = (group) => deps.pres.targetGroupLotsPresentation(state().qcLots, group);
-		const targetGroupOptions = () => {
-			const groups = state().lotGroups.filter((g) => g.active !== false);
-			return deps.pres.targetGroupOptionsPresentation(groups, ui().manageTargetGroup, targetGroupLots, deps.pres.targetGroupLabelPresentation, deps.pres.targetGroupStatusSuffixPresentation, deps.esc);
-		};
 		const ensureTargetSelection = () => {
 			const picked = deps.pres.targetSelectionPresentation(state().qcPanels, state().lotGroups, ui().manageTargetPanel, ui().manageTargetGroup, targetGroupLots);
 			ui().manageTargetPanel = picked.panelId;
 			ui().manageTargetGroup = picked.groupId;
 		};
-		const manageTargets = () => {
-			ensureTargetSelection();
-			const prerequisite = deps.pres.targetPrerequisitePresentation({
-				tests: state().tests.length,
-				panels: state().qcPanels.length,
-				lots: state().qcLots.length,
-				groups: state().lotGroups.length
-			});
-			if (prerequisite === "tests") return manageToolbar("Mean/SD theo nhóm lô QC", "Chọn Panel QC để nhập Mean/SD hàng loạt.", {
-				action: "setManageTab",
-				args: ["assays"]
-			}, "Thêm xét nghiệm") + deps.pres.manageEmptyPanelPresentation(deps.emptyState("Chưa có xét nghiệm", "Tạo xét nghiệm trước, sau đó quay lại nhập Mean/SD theo nhóm lô."));
-			if (prerequisite === "panels") return manageToolbar("Mean/SD theo nhóm lô QC", "Chỉ dùng Panel QC để nhập Mean/SD hàng loạt.", {
-				action: "setManageTab",
-				args: ["panels"]
-			}, "Thêm Panel QC") + deps.pres.manageEmptyPanelPresentation(deps.emptyState("Chưa có Panel QC", "Tạo Panel QC và chọn các xét nghiệm thành viên trước, sau đó quay lại nhập Mean/SD theo nhóm lô."));
-			if (prerequisite === "lots") return manageToolbar("Mean/SD theo nhóm lô QC", "Chọn Panel QC và nhóm lô để nhập Mean/SD hàng loạt.", {
-				action: "setManageTab",
-				args: ["lots"]
-			}, "Thêm lô QC") + deps.pres.manageEmptyPanelPresentation(deps.emptyState("Chưa có lô QC", "Tạo lô QC trước, gom vào nhóm lô rồi quay lại nhập Mean/SD theo nhóm."));
-			if (prerequisite === "groups") return manageToolbar("Mean/SD theo nhóm lô QC", "Chọn Panel QC và nhóm lô để nhập Mean/SD hàng loạt.", {
-				action: "setManageTab",
-				args: ["lots"]
-			}, "Thêm nhóm lô") + deps.pres.manageEmptyPanelPresentation(deps.emptyState("Chưa có nhóm lô QC", "Tạo nhóm lô từ các lô QC trước, sau đó quay lại nhập Mean/SD theo nhóm."));
-			const group = state().lotGroups.find((x) => x.id === ui().manageTargetGroup), groupLots = targetGroupLots(group), targetLevelPick = deps.pres.targetLevelSelectionPresentation(groupLots, ui().manageTargetLevel), targetLevels = targetLevelPick.levels;
-			ui().manageTargetLevel = targetLevelPick.level;
-			const selectedLevel = Number(ui().manageTargetLevel), levelLotPick = deps.pres.targetLevelLotsPresentation(groupLots, selectedLevel), levelLots = levelLotPick.levelLots, levelDepletedLots = levelLotPick.depletedLots, q = deps.searchText(ui().manageQ), allTests = deps.pres.targetPanelTestsPresentation(state().qcPanels, state().tests, ui().manageTargetPanel), tests = allTests.filter((t) => !q || deps.pres.targetSearchValuesPresentation(t, group && group.name, levelLots, deps.testDisplayName, instrumentName).some((v) => deps.searchText(v).includes(q)));
-			if (!group || !groupLots.length) return manageToolbar("Mean/SD theo nhóm lô QC", "Chọn Panel QC và nhóm lô để nhập Mean/SD hàng loạt.") + deps.pres.manageEmptyPanelPresentation(deps.emptyState("Nhóm lô chưa có lô QC", "Sửa nhóm lô và chọn các lô QC cần dùng trước."));
-			const rowItems = deps.pres.targetMatrixItemsPresentation(tests, levelLots, deps.targetConfigAssigned, deps.plannedTargetFor, deps.lotTargetSnapshot);
-			const targetStats = deps.pres.targetMatrixStatsPresentation(rowItems);
-			const rows = rowItems.map(({ t, lot, linked, same, assigned, planned, cfg }) => {
-				const draft = deps.targetRangeDraft(cfg || {}), rowState = deps.pres.targetRowStatePresentation(linked, assigned, planned, lot.depleted), locked = rowState.locked, retiredTo = locked ? lotTransitionToNo(lot.id) : "", checked = rowState.checked, disabled = rowState.disabled;
-				return deps.pres.targetMatrixRowPresentation({
-					testId: t.id,
-					lotId: lot.id,
-					locked,
-					checked,
-					disabled,
-					name: deps.testDisplayName(t),
-					unit: t.unit,
-					mean: deps.targetNumberText(draft.mean, t),
-					low: deps.targetNumberText(draft.low, t),
-					high: deps.targetNumberText(draft.high, t),
-					sd: deps.targetNumberText(draft.sd, t, "stat"),
-					status: rowState.status,
-					retiredTo,
-					otherLot: same && same.lot
-				}, deps.esc, deps.escapeAttr);
-			}).join("");
-			const targetLevelTabs = deps.pres.targetLevelTabsPresentation(targetLevels, ui().manageTargetLevel), targetLevelToolbar = deps.pres.targetLevelToolbarPresentation(ui().manageTargetLevel, levelLots.map((l) => l.lotNo), targetLevelTabs, deps.esc), targetContent = rowItems.length ? targetLevelToolbar + deps.pres.targetMatrixTablePresentation(rows) + deps.pres.targetMatrixActionsPresentation(deps.btn("Bỏ chọn tất cả", {
-				action: "targetCheckAll",
-				args: [false]
-			}, "ghost"), deps.btn("Chọn tất cả", {
-				action: "targetCheckAll",
-				args: [true]
-			}, "ghost"), deps.btn("Lưu Mean/SD mức này", { action: "saveTargetMatrix" }, "teal")) : (() => {
-				const empty = deps.pres.targetEmptyStatePresentation(allTests.length, levelLots.map((l) => l.lotNo), levelDepletedLots.map((l) => l.lotNo), ui().manageTargetLevel);
-				return deps.emptyState(empty.title, empty.description);
-			})();
-			return manageToolbar("Mean/SD theo nhóm lô QC", "Chọn Panel QC và nhóm lô, app tự đưa các xét nghiệm trong panel vào bảng Mean/SD.") + deps.pres.targetMatrixPanelPresentation({
-				selectorHtml: deps.pres.targetSelectorPresentation(deps.pres.targetPanelOptionsPresentation(state().qcPanels, ui().manageTargetPanel, instrumentName, deps.esc), targetGroupOptions()),
-				summaryHtml: rowItems.length ? deps.pres.targetSummaryPresentation(targetStats) : "",
-				contentHtml: targetContent
-			});
-		};
-		const manageAssays = () => {
-			const rows = state().tests.filter((t) => manageMatch([
-				t.name,
-				deps.testDisplayName(t),
-				t.unit,
-				t.method,
-				t.reagent,
-				instrumentName(t.instrumentId, t.machine),
-				t.section,
-				t.tea
-			])).map((t, idx) => {
-				const model = {
-					index: idx + 1,
-					id: t.id,
-					name: deps.testDisplayName(t),
-					method: t.method,
-					unit: t.unit,
-					instrument: instrumentName(t.instrumentId, t.machine),
-					section: t.section,
-					reagent: t.reagent,
-					tea: t.tea,
-					closed: !!t.closed
-				};
-				return deps.pres.manageAssayRowPresentation(model);
-			}).join("");
-			return manageToolbar("Danh mục xét nghiệm", "Quản lý xét nghiệm, máy, đơn vị, phương pháp và TEa.", { action: "openConfigAssay" }, "Thêm xét nghiệm") + deps.pres.manageAssayTablePresentation({
-				rowsHtml: rows,
-				emptyHtml: deps.emptyState("Chưa có xét nghiệm", "Tạo xét nghiệm trước, sau đó gán lô và Mean/SD ở các thẻ cấu hình tương ứng.")
-			});
-		};
 		const manageHistorySearchValues = (t) => deps.pres.historySearchValuesPresentation(t, state().qcLots, deps.testDisplayName);
-		const manageHistory = () => {
-			const q = deps.searchText(ui().manageQ), matches = state().tests.filter((t) => !q || manageHistorySearchValues(t).some((v) => deps.searchText(v).includes(q)));
-			if (!state().tests.length) return manageToolbar("Lịch sử dữ liệu QC", "Chọn xét nghiệm để xem các lô, Mean/SD và thời gian hiệu lực.") + deps.pres.manageEmptyPanelPresentation(deps.emptyState("Chưa có xét nghiệm", "Tạo xét nghiệm trước, sau đó cấu hình lô và Mean/SD."));
-			if (!matches.length) return manageToolbar("Lịch sử dữ liệu QC", "Chọn xét nghiệm để xem các lô, Mean/SD và thời gian hiệu lực.") + deps.pres.manageEmptyPanelPresentation(deps.emptyState("Không tìm thấy xét nghiệm", "Thử tìm theo tên xét nghiệm."));
-			const historyPick = deps.pres.historyAssaySelectionPresentation(matches, ui().manageHistoryTest);
-			ui().manageHistoryTest = historyPick.selectedId;
-			const t = historyPick.assay;
-			const opts = deps.pres.historyAssayOptionsPresentation(matches, t.id, deps.testDisplayName, deps.esc);
-			const rows = deps.pres.historyRowsPresentation(t, state().qcLots, state().data[t.id] || [], lotGroupLabels);
-			const visibleRows = deps.pres.historyVisibleRowsPresentation(rows, t.name, q, deps.searchText);
-			const html = deps.pres.historyRowSortPresentation(visibleRows).map((r) => {
-				const period = deps.pres.historyPeriodLabelPresentation(r.h.effectiveFrom, r.h.effectiveTo, deps.vnDate);
-				const model = {
-					testId: r.t.id,
-					level: r.l.level,
-					lot: r.lotNo || "",
-					group: r.group,
-					mean: deps.fmtTestValue(r.t, r.h.mean),
-					low: r.h.low != null ? deps.fmtTestValue(r.t, r.h.low) : "—",
-					high: r.h.high != null ? deps.fmtTestValue(r.t, r.h.high) : "—",
-					sd: deps.fmtTestValue(r.t, r.h.sd),
-					period,
-					source: r.h.source,
-					pointCount: r.pts.length
-				};
-				return deps.pres.manageHistoryRowPresentation(model);
-			}).join("");
-			const historyTotals = deps.pres.historySummaryPresentation(visibleRows);
-			return manageToolbar("Lịch sử dữ liệu QC", "Chọn một xét nghiệm để xem các lô/Mean-SD đã từng dùng.") + deps.pres.historyPanelPresentation({
-				selectorHtml: deps.pres.historySelectorPresentation(opts, historyTotals.rowCount, historyTotals.pointCount),
-				tableHtml: deps.pres.historyTablePresentation(html, q ? deps.emptyState("Không tìm thấy mốc phù hợp", "Thử tìm theo tên xét nghiệm, mức hoặc lô QC.") : deps.emptyState("Chưa có lịch sử lô", "Xét nghiệm này chưa được gán lô/Mean-SD."))
-			});
-		};
 		const TEA_LAB_BASIS_SOURCES = [
 			["regulation", "Quy định pháp lý / CLIA / quốc gia"],
 			["pt", "Chương trình ngoại kiểm / PT"],
@@ -18917,10 +17917,6 @@
 				refKey,
 				isDefault
 			});
-		};
-		const teaSourceRegistryHtml = () => {
-			const items = deps.pres.teaSourceRegistryItemsPresentation(deps.teaSourceRegistry(), deps.vnDate);
-			return deps.pres.teaSourceRegistryPresentation(items);
 		};
 		const teaRefOpenAdd = () => {
 			if (!deps.requireAdmin()) return;
@@ -19057,8 +18053,261 @@
 				isDefault
 			});
 		};
-		const manageTeaRefs = () => {
-			const canManage = deps.role() === "admin", ro = canManage ? "" : "disabled";
+		const MANAGE_TABS = [
+			["instruments", "Máy xét nghiệm"],
+			["assays", "Danh mục xét nghiệm"],
+			["panels", "Panel QC"],
+			["lots", "Lô & Nhóm QC"],
+			["targets", "Mean/SD"],
+			["transitions", "Chuyển tiếp lô"],
+			["history", "Lịch sử dữ liệu"],
+			["tearefs", "Bảng TEa tham chiếu"]
+		];
+		const manageShellModel = () => {
+			const histCount = state().tests.reduce((n, t) => n + (t.levels || []).reduce((m, l) => m + Math.max(1, (l.meanSdHistory || []).length), 0), 0);
+			const counts = {
+				lots: state().qcLots.length + " / " + state().lotGroups.length,
+				panels: state().qcPanels.length,
+				targets: state().tests.reduce((n, t) => n + t.levels.filter((l) => l.qcLotId).length, 0),
+				history: histCount,
+				transitions: state().lotTransitions.length,
+				assays: state().tests.length,
+				instruments: state().instruments.length,
+				tearefs: deps.effectiveTeaRefs().length
+			};
+			return MANAGE_TABS.map((x) => ({
+				id: x[0],
+				label: x[1],
+				count: counts[x[0]] || ""
+			}));
+		};
+		const manageInstrumentsModel = () => {
+			return {
+				toolbar: {
+					title: "Máy xét nghiệm",
+					subtitle: "Quản lý máy xét nghiệm, hãng và số sê-ri.",
+					action: { action: "openConfigInstrument" },
+					actionLabel: "Thêm máy xét nghiệm"
+				},
+				rows: state().instruments.filter((i) => manageMatch([
+					i.name,
+					i.manufacturer,
+					i.model,
+					i.serial,
+					i.section
+				])).map((i) => ({
+					id: i.id,
+					name: i.name,
+					section: i.section,
+					manufacturer: i.manufacturer,
+					serial: i.serial,
+					assayCount: state().tests.filter((t) => t.instrumentId === i.id).length,
+					active: !!i.active
+				}))
+			};
+		};
+		const manageAssaysModel = () => {
+			return {
+				toolbar: {
+					title: "Danh mục xét nghiệm",
+					subtitle: "Quản lý xét nghiệm, máy, đơn vị, phương pháp và TEa.",
+					action: { action: "openConfigAssay" },
+					actionLabel: "Thêm xét nghiệm"
+				},
+				rows: state().tests.filter((t) => manageMatch([
+					t.name,
+					deps.testDisplayName(t),
+					t.unit,
+					t.method,
+					t.reagent,
+					instrumentName(t.instrumentId, t.machine),
+					t.section,
+					t.tea
+				])).map((t, idx) => ({
+					index: idx + 1,
+					id: t.id,
+					name: deps.testDisplayName(t),
+					method: t.method,
+					unit: t.unit,
+					instrument: instrumentName(t.instrumentId, t.machine),
+					section: t.section,
+					reagent: t.reagent,
+					tea: t.tea,
+					closed: !!t.closed
+				}))
+			};
+		};
+		const managePanelsModel = () => {
+			return {
+				toolbar: {
+					title: "Panel QC",
+					subtitle: "Nhóm các xét nghiệm theo từng máy để thiết lập và quản lý QC.",
+					action: { action: "openConfigPanel" },
+					actionLabel: "Thêm Panel QC"
+				},
+				rows: state().qcPanels.filter((p) => manageMatch([
+					p.name,
+					p.note,
+					instrumentName(p.instrumentId),
+					...(p.testIds || []).map((id) => (state().tests.find((t) => t.id === id) || {}).name)
+				])).map((p) => {
+					const tests = (p.testIds || []).map((id) => state().tests.find((t) => t.id === id)).filter(Boolean);
+					return {
+						id: p.id,
+						name: p.name,
+						instrument: instrumentName(p.instrumentId),
+						tests: tests.map((t) => ({
+							id: t.id,
+							label: deps.testDisplayName(t)
+						})),
+						testCount: tests.length,
+						active: p.active !== false
+					};
+				})
+			};
+		};
+		const manageLotsModel = () => {
+			return {
+				toolbar: {
+					title: "Lô & Nhóm QC",
+					subtitle: "Quản lý từng lô và nhóm lô QC."
+				},
+				lotRows: state().qcLots.filter((l) => manageMatch([
+					l.lotNo,
+					l.description,
+					l.supplier,
+					l.program,
+					lotGroupLabels(l.id),
+					l.level,
+					l.exp
+				])).map((l) => {
+					const used = state().tests.reduce((n, t) => n + t.levels.filter((x) => x.qcLotId === l.id).length, 0);
+					return {
+						id: l.id,
+						lotNo: l.lotNo,
+						description: l.description,
+						program: l.program,
+						level: l.level,
+						expiry: l.exp ? deps.vnDate(l.exp) : "",
+						status: lotStatus(l),
+						used
+					};
+				}),
+				groupCards: state().lotGroups.filter((g) => manageMatch([
+					g.name,
+					g.note,
+					...(g.lotIds || []).map((id) => (state().qcLots.find((l) => l.id === id) || {}).lotNo)
+				])).map((g) => {
+					const lots = (g.lotIds || []).map((id) => state().qcLots.find((l) => l.id === id)).filter(Boolean), archived = g.active === false;
+					const inUse = deps.lotGroupInUse(g);
+					return {
+						id: g.id,
+						archived,
+						name: g.name,
+						note: g.note,
+						status: deps.pres.lotGroupStatusPresentation(archived, g.status, inUse),
+						lots: lots.map((l) => ({
+							lotNo: l.lotNo,
+							level: l.level
+						})),
+						toggle: deps.pres.lotGroupToggleActionPresentation(archived, g.status, inUse)
+					};
+				})
+			};
+		};
+		const manageTransitionsModel = () => {
+			return {
+				toolbar: {
+					title: "Chuyển tiếp lô QC",
+					subtitle: "Theo dõi lô cũ, lô mới và trạng thái khi thay lô.",
+					action: { action: "openLotTransitionV2" },
+					actionLabel: "Thêm hồ sơ chuyển lô"
+				},
+				rows: state().lotTransitions.filter((tr) => manageMatch([
+					panelName(tr.panelId),
+					lotLabel(tr.fromLotId),
+					lotLabel(tr.toLotId),
+					tr.startDate,
+					tr.status,
+					tr.approvedBy
+				])).map((tr) => {
+					const to = state().qcLots.find((l) => l.id === tr.toLotId);
+					return {
+						id: tr.id,
+						panel: panelName(tr.panelId),
+						fromLot: lotLabel(tr.fromLotId),
+						toLot: lotLabel(tr.toLotId),
+						startDate: tr.startDate ? deps.vnDate(tr.startDate) : "",
+						status: deps.pres.manageTransitionStatusPresentation(tr.status),
+						movedLotNo: deps.transitionSwitchesLot(tr) && to ? to.lotNo : "",
+						approvalText: tr.approvedBy ? tr.approvedBy + (tr.approvedAt ? " · " + deps.formatDateTimeVN(tr.approvedAt) : "") : ""
+					};
+				})
+			};
+		};
+		const manageHistoryModel = () => {
+			const toolbar = {
+				title: "Lịch sử dữ liệu QC",
+				subtitle: "Chọn xét nghiệm để xem các lô, Mean/SD và thời gian hiệu lực."
+			};
+			const q = deps.searchText(ui().manageQ), matches = state().tests.filter((t) => !q || manageHistorySearchValues(t).some((v) => deps.searchText(v).includes(q)));
+			if (!state().tests.length) return {
+				toolbar,
+				empty: {
+					title: "Chưa có xét nghiệm",
+					description: "Tạo xét nghiệm trước, sau đó cấu hình lô và Mean/SD."
+				}
+			};
+			if (!matches.length) return {
+				toolbar,
+				empty: {
+					title: "Không tìm thấy xét nghiệm",
+					description: "Thử tìm theo tên xét nghiệm."
+				}
+			};
+			const historyPick = deps.pres.historyAssaySelectionPresentation(matches, ui().manageHistoryTest);
+			ui().manageHistoryTest = historyPick.selectedId;
+			const t = historyPick.assay;
+			const rows = deps.pres.historyRowsPresentation(t, state().qcLots, state().data[t.id] || [], lotGroupLabels);
+			const visibleRows = deps.pres.historyVisibleRowsPresentation(rows, t.name, q, deps.searchText);
+			const tableRows = deps.pres.historyRowSortPresentation(visibleRows).map((r) => ({
+				testId: r.t.id,
+				level: r.l.level,
+				lot: r.lotNo || "",
+				group: r.group,
+				mean: deps.fmtTestValue(r.t, r.h.mean),
+				low: r.h.low != null ? deps.fmtTestValue(r.t, r.h.low) : "—",
+				high: r.h.high != null ? deps.fmtTestValue(r.t, r.h.high) : "—",
+				sd: deps.fmtTestValue(r.t, r.h.sd),
+				period: deps.pres.historyPeriodLabelPresentation(r.h.effectiveFrom, r.h.effectiveTo, deps.vnDate),
+				source: r.h.source,
+				pointCount: r.pts.length
+			}));
+			const totals = deps.pres.historySummaryPresentation(visibleRows);
+			return {
+				toolbar: {
+					title: "Lịch sử dữ liệu QC",
+					subtitle: "Chọn một xét nghiệm để xem các lô/Mean-SD đã từng dùng."
+				},
+				selectedTestId: t.id,
+				options: matches.map((a) => ({
+					id: a.id,
+					label: deps.testDisplayName(a)
+				})),
+				rowCount: totals.rowCount,
+				pointCount: totals.pointCount,
+				rows: tableRows,
+				tableEmpty: !tableRows.length ? q ? {
+					title: "Không tìm thấy mốc phù hợp",
+					description: "Thử tìm theo tên xét nghiệm, mức hoặc lô QC."
+				} : {
+					title: "Chưa có lịch sử lô",
+					description: "Xét nghiệm này chưa được gán lô/Mean-SD."
+				} : null
+			};
+		};
+		const manageTeaRefsModel = () => {
+			const canManage = deps.role() === "admin";
 			const overMap = new Map((state().teaRefs || []).map((r) => [r.analyteId || deps.teaAnalyteMeta(r.name, r).analyteId || deps.teaRefName(r.name), r]));
 			const rows = deps.effectiveTeaRefs().map(([name, unit, clia, ricos, section, , analyteId, lab]) => {
 				const isDef = deps.teaRefIsDefault(analyteId), record = overMap.get(analyteId), naming = deps.teaAnalyteMeta(name, record), externalChanged = teaRefExternalChanged(record, analyteId), kind = deps.pres.teaReferenceKindPresentation(isDef, externalChanged, !!(record && record.lab != null));
@@ -19085,63 +18334,182 @@
 				r.section
 			]));
 			deps.pres.teaReferenceSortPresentation(rows);
-			const teaStatus = (kind) => deps.pres.teaReferenceStatusPresentation(kind);
-			const body = rows.map((r) => {
-				const rowActions = deps.pres.teaReferenceRowActionsPresentation(r.kind, canManage, r.lab != null), act = rowActions.action === "restore" ? deps.btn("Khôi phục", {
-					action: "teaRefRemove",
-					args: [r.analyteId]
-				}, "ghost sm", "Khôi phục giá trị mặc định") : rowActions.action === "remove" ? `<button class="x" data-action="teaRefRemove" data-args="${deps.escapeAttr(JSON.stringify([r.analyteId]))}" title="Xóa xét nghiệm tự thêm">✕</button>` : "";
-				const namingTitle = deps.pres.teaReferenceNamingTitlePresentation(r);
-				const labButton = rowActions.labProfile === "none" ? "" : deps.btn(rowActions.labProfile === "add" ? "Thêm hồ sơ" : "Xem hồ sơ", {
-					action: "teaLabProfileOpen",
-					args: [r.analyteId]
-				}, "ghost sm", rowActions.labProfile === "add" ? "Lập hồ sơ TEa chuẩn hóa" : "Xem hoặc cập nhật nguồn và lý do lựa chọn");
-				return deps.pres.teaReferenceRowPresentation({
-					namingTitle: deps.escapeAttr(namingTitle),
-					displayName: deps.esc(r.displayName || r.name),
-					unit: deps.esc(r.unit || "—"),
-					section: deps.esc(r.section || "—"),
-					disabled: ro,
-					cliaValue: deps.pres.teaReferenceInputValuePresentation(r.clia),
-					ricosValue: deps.pres.teaReferenceInputValuePresentation(r.ricos),
-					cliaChangeActionAttrs: `data-action="teaRefEdit" data-args='${JSON.stringify([r.analyteId, "clia"])}' data-action-on="change"`,
-					ricosChangeActionAttrs: `data-action="teaRefEdit" data-args='${JSON.stringify([r.analyteId, "ricos"])}' data-action-on="change"`,
-					labCellHtml: deps.pres.teaReferenceLabValuePresentation(r.lab, deps.fmt) + labButton,
-					statusHtml: teaStatus(r.kind),
-					actionHtml: act
-				});
-			}).join("");
-			const empty = deps.pres.teaReferenceEmptyStatePresentation(!!deps.searchText(ui().manageQ));
-			return manageToolbar("Bảng TEa tham chiếu", "Tổng hợp TEa từ các nguồn tham chiếu, dùng thống nhất khi tính Sigma.", canManage ? { action: "teaRefOpenAdd" } : "", "Thêm xét nghiệm") + teaSourceRegistryHtml() + deps.pres.teaReferenceTablePresentation({
-				rowsHtml: body,
-				emptyHtml: deps.emptyState(empty.title, empty.description)
-			});
-		};
-		const manageView = () => {
-			const views = {
-				lots: manageLots,
-				panels: managePanels,
-				targets: manageTargets,
-				history: manageHistory,
-				transitions: manageTransitionsV2,
-				assays: manageAssays,
-				instruments: manageInstruments,
-				tearefs: manageTeaRefs
+			const tableRows = rows.map((r) => ({
+				analyteId: r.analyteId,
+				namingTitle: deps.pres.teaReferenceNamingTitlePresentation(r),
+				displayName: r.displayName || r.name,
+				unit: r.unit || "—",
+				section: r.section || "—",
+				clia: deps.pres.teaReferenceInputValuePresentation(r.clia),
+				ricos: deps.pres.teaReferenceInputValuePresentation(r.ricos),
+				lab: r.lab,
+				rowActions: deps.pres.teaReferenceRowActionsPresentation(r.kind, canManage, r.lab != null),
+				kind: r.kind
+			}));
+			const sourceItems = deps.pres.teaSourceRegistryItemsPresentation(deps.teaSourceRegistry(), deps.vnDate);
+			return {
+				toolbar: {
+					title: "Bảng TEa tham chiếu",
+					subtitle: "Tổng hợp TEa từ các nguồn tham chiếu, dùng thống nhất khi tính Sigma.",
+					action: canManage ? { action: "teaRefOpenAdd" } : null,
+					actionLabel: "Thêm xét nghiệm"
+				},
+				canManage,
+				sourceItems,
+				rows: tableRows,
+				empty: !tableRows.length ? deps.pres.teaReferenceEmptyStatePresentation(!!deps.searchText(ui().manageQ)) : null
 			};
-			if (!views[ui().manageTab]) ui().manageTab = "instruments";
-			return views[ui().manageTab]();
 		};
-		const renderManageBody = () => {
-			const el = deps.document.querySelector(".config-shell-main");
-			if (deps.currentPage() !== "manage" || !el) {
-				deps.rerender();
-				return;
-			}
-			el.innerHTML = manageView();
+		const manageTargetsModel = () => {
+			const T = "Mean/SD theo nhóm lô QC";
+			ensureTargetSelection();
+			const prerequisite = deps.pres.targetPrerequisitePresentation({
+				tests: state().tests.length,
+				panels: state().qcPanels.length,
+				lots: state().qcLots.length,
+				groups: state().lotGroups.length
+			});
+			if (prerequisite === "tests") return {
+				toolbar: {
+					title: T,
+					subtitle: "Chọn Panel QC để nhập Mean/SD hàng loạt.",
+					action: {
+						action: "setManageTab",
+						args: ["assays"]
+					},
+					actionLabel: "Thêm xét nghiệm"
+				},
+				empty: {
+					title: "Chưa có xét nghiệm",
+					description: "Tạo xét nghiệm trước, sau đó quay lại nhập Mean/SD theo nhóm lô."
+				}
+			};
+			if (prerequisite === "panels") return {
+				toolbar: {
+					title: T,
+					subtitle: "Chỉ dùng Panel QC để nhập Mean/SD hàng loạt.",
+					action: {
+						action: "setManageTab",
+						args: ["panels"]
+					},
+					actionLabel: "Thêm Panel QC"
+				},
+				empty: {
+					title: "Chưa có Panel QC",
+					description: "Tạo Panel QC và chọn các xét nghiệm thành viên trước, sau đó quay lại nhập Mean/SD theo nhóm lô."
+				}
+			};
+			if (prerequisite === "lots") return {
+				toolbar: {
+					title: T,
+					subtitle: "Chọn Panel QC và nhóm lô để nhập Mean/SD hàng loạt.",
+					action: {
+						action: "setManageTab",
+						args: ["lots"]
+					},
+					actionLabel: "Thêm lô QC"
+				},
+				empty: {
+					title: "Chưa có lô QC",
+					description: "Tạo lô QC trước, gom vào nhóm lô rồi quay lại nhập Mean/SD theo nhóm."
+				}
+			};
+			if (prerequisite === "groups") return {
+				toolbar: {
+					title: T,
+					subtitle: "Chọn Panel QC và nhóm lô để nhập Mean/SD hàng loạt.",
+					action: {
+						action: "setManageTab",
+						args: ["lots"]
+					},
+					actionLabel: "Thêm nhóm lô"
+				},
+				empty: {
+					title: "Chưa có nhóm lô QC",
+					description: "Tạo nhóm lô từ các lô QC trước, sau đó quay lại nhập Mean/SD theo nhóm."
+				}
+			};
+			const group = state().lotGroups.find((x) => x.id === ui().manageTargetGroup), groupLots = targetGroupLots(group);
+			if (!group || !groupLots.length) return {
+				toolbar: {
+					title: "Mean/SD theo nhóm lô QC",
+					subtitle: "Chọn Panel QC và nhóm lô để nhập Mean/SD hàng loạt."
+				},
+				empty: {
+					title: "Nhóm lô chưa có lô QC",
+					description: "Sửa nhóm lô và chọn các lô QC cần dùng trước."
+				}
+			};
+			const panels = state().qcPanels.map((p) => ({
+				id: p.id,
+				label: `${p.name} · ${instrumentName(p.instrumentId)}`
+			}));
+			const groups = state().lotGroups.filter((g) => g.active !== false && targetGroupLots(g).length).map((g) => ({
+				id: g.id,
+				label: deps.pres.targetGroupLabelPresentation(g) + deps.pres.targetGroupStatusSuffixPresentation(g)
+			}));
+			const targetLevelPick = deps.pres.targetLevelSelectionPresentation(groupLots, ui().manageTargetLevel);
+			ui().manageTargetLevel = targetLevelPick.level;
+			const selectedLevel = Number(ui().manageTargetLevel), levelLotPick = deps.pres.targetLevelLotsPresentation(groupLots, selectedLevel), levelLots = levelLotPick.levelLots, levelDepletedLots = levelLotPick.depletedLots;
+			const q = deps.searchText(ui().manageQ), allTests = deps.pres.targetPanelTestsPresentation(state().qcPanels, state().tests, ui().manageTargetPanel), tests = allTests.filter((t) => !q || deps.pres.targetSearchValuesPresentation(t, group.name, levelLots, deps.testDisplayName, instrumentName).some((v) => deps.searchText(v).includes(q)));
+			const rowItems = deps.pres.targetMatrixItemsPresentation(tests, levelLots, deps.targetConfigAssigned, deps.plannedTargetFor, deps.lotTargetSnapshot);
+			const stats = deps.pres.targetMatrixStatsPresentation(rowItems);
+			const rows = rowItems.map(({ t, lot, linked, same, assigned, planned, cfg }) => {
+				const draft = deps.targetRangeDraft(cfg || {}), rowState = deps.pres.targetRowStatePresentation(linked, assigned, planned, lot.depleted);
+				return {
+					testId: t.id,
+					lotId: lot.id,
+					locked: rowState.locked,
+					checked: rowState.checked,
+					disabled: rowState.disabled,
+					name: deps.testDisplayName(t),
+					unit: t.unit,
+					mean: deps.targetNumberText(draft.mean, t),
+					low: deps.targetNumberText(draft.low, t),
+					high: deps.targetNumberText(draft.high, t),
+					sd: deps.targetNumberText(draft.sd, t, "stat"),
+					status: rowState.status,
+					retiredTo: rowState.locked ? lotTransitionToNo(lot.id) : "",
+					otherLot: same && same.lot
+				};
+			});
+			return {
+				toolbar: {
+					title: T,
+					subtitle: "Chọn Panel QC và nhóm lô, app tự đưa các xét nghiệm trong panel vào bảng Mean/SD."
+				},
+				panels,
+				groups,
+				panelId: ui().manageTargetPanel,
+				groupId: ui().manageTargetGroup,
+				levels: targetLevelPick.levels,
+				level: ui().manageTargetLevel,
+				levelLotNos: levelLots.map((l) => l.lotNo),
+				rows,
+				stats: rowItems.length ? stats : null,
+				empty: rowItems.length ? null : deps.pres.targetEmptyStatePresentation(allTests.length, levelLots.map((l) => l.lotNo), levelDepletedLots.map((l) => l.lotNo), ui().manageTargetLevel)
+			};
 		};
-		const pageManage = () => {
-			const head = deps.headOnly("Cấu hình chung", "Quản lý máy, Panel QC, lô QC, Mean/SD và luật QC"), shell = manageShell(manageView());
-			return deps.pres.managePageHtml(head, shell);
+		const manageModel = () => {
+			if (!MANAGE_TABS.some((x) => x[0] === ui().manageTab)) ui().manageTab = "instruments";
+			const tab = ui().manageTab;
+			const builders = {
+				lots: manageLotsModel,
+				panels: managePanelsModel,
+				targets: manageTargetsModel,
+				history: manageHistoryModel,
+				transitions: manageTransitionsModel,
+				assays: manageAssaysModel,
+				instruments: manageInstrumentsModel,
+				tearefs: manageTeaRefsModel
+			};
+			return {
+				tab,
+				tabs: manageShellModel(),
+				query: ui().manageQ,
+				searchPlaceholder: manageSearchPlaceholder(),
+				body: builders[tab]()
+			};
 		};
 		return {
 			manageSearchSet,
@@ -19154,35 +18522,21 @@
 			lotLabel,
 			lotTransitionToNo,
 			lotStatus,
-			manageShell,
-			manageToolbar,
-			manageLots,
-			manageInstruments,
-			managePanels,
-			manageTransitionsV2,
 			targetGroupLots,
-			targetGroupOptions,
 			ensureTargetSelection,
-			manageTargets,
-			manageAssays,
 			manageHistorySearchValues,
-			manageHistory,
 			teaRefFind,
 			teaRefNumOrNull,
 			teaRefExternalChanged,
 			teaRefEnsure,
 			teaRefEdit,
 			teaRefRemove,
-			teaSourceRegistryHtml,
 			teaRefOpenAdd,
 			teaRefAddSubmit,
 			teaLabProfileOpen,
 			teaLabProfileSave,
 			teaLabProfileRemove,
-			manageTeaRefs,
-			manageView,
-			renderManageBody,
-			pageManage
+			manageModel
 		};
 	}
 	//#endregion
@@ -28941,31 +28295,6 @@
 		}
 	});
 	root.firebaseSettingsService = createFirebaseSettingsService((value) => parseFirebaseConfig(value));
-	root.settingsBrandPreviewHtml = createBrandPreviewHtml((value) => root.esc(value), (value) => root.escAttr(value));
-	root.settingsUnitProfileHtml = createUnitProfileHtml({
-		escapeAttribute: (value) => root.escAttr(value),
-		button: (label, action, variant) => root.btn(label, action, variant)
-	});
-	root.settingsBrandPanelHtml = createBrandPanelHtml({
-		escapeAttribute: (value) => root.escAttr(value),
-		button: (label, action, variant, title, options) => root.btn(label, action, variant, title, options)
-	});
-	root.settingsAdminToolsHtml = createAdminToolsHtml((label, action, variant) => root.btn(label, action, variant));
-	root.settingsFirebaseRulesPanelHtml = createFirebaseRulesPanelHtml({
-		escape: (value) => root.esc(value),
-		button: (label, action, variant) => root.btn(label, action, variant)
-	});
-	root.settingsLisGatewayPanelHtml = createLisGatewayPanelHtml({
-		escape: (value) => root.esc(value),
-		escapeAttribute: (value) => root.escAttr(value),
-		button: (label, action, variant) => root.btn(label, action, variant)
-	});
-	root.settingsFirebaseConnectionPanelHtml = createFirebaseConnectionPanelHtml({
-		escape: (value) => root.esc(value),
-		escapeAttribute: (value) => root.escAttr(value),
-		button: (label, action, variant) => root.btn(label, action, variant)
-	});
-	root.settingsPageLayoutHtml = createSettingsPageLayoutHtml((title, subtitle) => root.headOnly(title, subtitle));
 	var settingsPageController = createSettingsPageController({
 		document: typeof document !== "undefined" ? document : {
 			getElementById: () => null,
@@ -29007,16 +28336,7 @@
 		},
 		html: {
 			storageUsageText: (data, estimate) => root.settingsStorageUsageText(data, estimate),
-			brandPreviewHtml: (input) => root.settingsBrandPreviewHtml(input),
-			firebaseRulesPanelHtml: (guideHtml, rulesText) => root.settingsFirebaseRulesPanelHtml(guideHtml, rulesText),
-			firebaseGuideHtml: () => root.settingsFirebaseGuideHtml(),
 			firebaseRulesText: () => root.settingsFirebaseRulesText(),
-			pageLayoutHtml: (input) => root.settingsPageLayoutHtml(input),
-			unitProfileHtml: (lab) => root.settingsUnitProfileHtml(lab),
-			brandPanelHtml: (input) => root.settingsBrandPanelHtml(input),
-			adminToolsHtml: (statusText, capacityText) => root.settingsAdminToolsHtml(statusText, capacityText),
-			firebaseConnectionPanelHtml: (input) => root.settingsFirebaseConnectionPanelHtml(input),
-			lisGatewayPanelHtml: (input) => root.settingsLisGatewayPanelHtml(input),
 			firebaseAclHelp: (labCode, uid) => root.settingsFirebaseAclHelp(labCode, uid)
 		},
 		lis: {
@@ -29051,7 +28371,7 @@
 	root.saveFb = settingsPageController.saveFb;
 	root.clearFb = settingsPageController.clearFb;
 	root.copyFirebaseRules = settingsPageController.copyFirebaseRules;
-	root.pageSettings = settingsPageController.pageSettings;
+	root.settingsModel = settingsPageController.settingsModel;
 	var modularIndexedDbOpenService = createIndexedDbOpenService({ indexedDb: () => typeof indexedDB === "undefined" ? null : indexedDB });
 	var modularIndexedDbRecordService = createIndexedDbRecordService({ open: () => modularIndexedDbOpenService.open() });
 	root.partitionedIndexedDbWriteService = createPartitionedIndexedDbWriteService({
@@ -29122,7 +28442,6 @@
 		formatDateTime: (value) => globalThis.formatDateTimeVN(value),
 		roleLabel: (value) => globalThis.roleLabel(value)
 	});
-	root.activityAuditPageHtml = createActivityAuditPageHtml();
 	root.activityAuditPagination = activityAuditPagination;
 	root.activityAuditCsv = createActivityAuditCsv({
 		formatDateTime: (value) => globalThis.formatDateTimeVN(value),
@@ -29133,13 +28452,8 @@
 	root.activityAuditPageSizes = ACTIVITY_AUDIT_PAGE_SIZES;
 	root.activityAuditArchiveWindow = activityAuditArchiveWindow;
 	root.activityAuditArchiveModalHtml = activityAuditArchiveModalHtml;
-	root.activityAuditRowHtml = activityAuditRowHtml;
 	root.userListModel = userListModel;
-	root.userRowHtml = createUserRowHtml();
-	root.usersPageHtml = createUsersPageHtml();
-	root.reagentSelectOptionsHtml = createReagentSelectOptionsHtml();
 	root.reagentResultHtml = createReagentResultHtml();
-	root.reagentPairRowHtml = createReagentPairRowHtml();
 	var modularStorageBootService = createStorageBootService({
 		partitionedSupported: () => typeof root.localStoreService !== "undefined" && root.localStoreService.supported(),
 		readBootRecord: () => localStorage.getItem("qclab_boot"),
@@ -29919,13 +29233,6 @@
 		pointWorkflowComplete: (pointId) => typeof globalThis.pointWorkflowComplete === "function" ? globalThis.pointWorkflowComplete(pointId) : false
 	});
 	root.ActionReviewMessages = actionReviewMessages;
-	root.dashboardLoadingPresentation = createDashboardLoading({
-		headHtml: createDashboardHeadHtml({
-			escape: (value) => root.esc(value),
-			topUserBox: () => typeof globalThis.topUserBox === "function" ? globalThis.topUserBox() : ""
-		}),
-		kpisHtml: dashboardKpisHtml
-	});
 	root.dashboardStatusFilter = createDashboardStatusFilter();
 	root.dashboardExpiringLots = dashboardExpiringLots;
 	root.dashboardShiftStatus = dashboardShiftStatus;
@@ -30019,7 +29326,6 @@
 		limitsFromTarget: (mean, sd) => globalThis.QCCore.limitsFromTarget(mean, sd)
 	});
 	root.targetOverwritePicksPresentation = targetOverwritePicks;
-	root.lotGroupLotPillsHtml = lotGroupLotPillsHtml;
 	root.lotGroupStatusPresentation = lotGroupStatus;
 	root.lotGroupToggleActionPresentation = lotGroupToggleAction;
 	root.targetSwitchAssayNamesPresentation = targetSwitchAssayNames;
@@ -30275,57 +29581,14 @@
 	};
 	root.wgFilterTests = westgardPageController.wgFilterTests;
 	root.wgFilterArchivedTests = westgardPageController.wgFilterArchivedTests;
-	root.dashboardStatusTabsHtml = createDashboardStatusTabsHtml({ matches: (item, key) => root.dashboardStatusFilter.matches(item, key) });
-	root.dashboardExpiringLotsHtml = createDashboardExpiringLotsHtml({ escape: (value) => root.esc(value) });
-	var dashboardQcFollowupItemHtml = createDashboardQcFollowupItemHtml({
-		escape: (value) => root.esc(value),
-		testLabel: (test) => root.testDisplayName(test),
-		date: (value) => root.vnDate(value),
-		pointValue: (point, test) => root.fmtPointValue(point, test),
-		button: (label, action, variant) => root.btn(label, action, variant)
-	});
-	var dashboardMissingTargetItemHtml = createDashboardMissingTargetItemHtml({
-		escape: (value) => root.esc(value),
-		testLabel: (test) => root.testDisplayName(test),
-		button: (label, action, variant) => root.btn(label, action, variant)
-	});
-	var dashboardOverdueActionItemHtml = createDashboardOverdueActionItemHtml({
-		escape: (value) => root.esc(value),
-		testLabel: (test) => root.testDisplayName(test),
-		date: (value) => root.vnDate(value),
-		button: (label, action, variant) => root.btn(label, action, variant)
-	});
-	var dashboardStatusTags = dashboardTestStatusTags;
-	var dashboardLevelPillHtml = createDashboardLevelPillHtml({
-		escape: (value) => root.esc(value),
-		format: (value) => root.fmt(value)
-	});
-	var dashboardRank = dashboardTestRank;
-	var dashboardLatestPointText = createDashboardLatestPointText({
-		date: (value) => root.vnDate(value),
-		pointValue: (point, test) => root.fmtPointValue(point, test)
-	});
-	root.dashboardFollowupPanelHtml = dashboardFollowupPanelHtml;
 	var dashboardTestSearchText = createDashboardTestSearchText({
 		normalize: (value) => root.searchText(value),
 		label: (test) => root.testDisplayName(test)
 	});
 	var dashboardLatestPoint = createDashboardLatestPoint({ runNumber: (point) => root.pointRunNo(point) });
-	root.dashboardKpisHtml = dashboardKpisHtml;
-	root.dashboardProgressHtml = dashboardProgressHtml;
 	root.dashboardHeadHtml = createDashboardHeadHtml({
 		escape: (value) => root.esc(value),
 		topUserBox: () => typeof globalThis.topUserBox === "function" ? globalThis.topUserBox() : ""
-	});
-	root.dashboardTestPanelHtml = createDashboardTestPanelHtml({ escapeAttr: (value) => root.escAttr(value) });
-	var dashboardTestRowHtml = createDashboardTestRowHtml({
-		escape: (value) => root.esc(value),
-		escapeAttr: (value) => root.escAttr(value)
-	});
-	root.dashboardKpiItems = dashboardKpiItems;
-	root.dashboardEmptyTestsHtml = createDashboardEmptyTestsHtml({
-		emptyState: (title, detail, action) => root.emptyState(title, detail, action),
-		button: (label, action, variant) => root.btn(label, action, variant)
 	});
 	root.cusumColors = CUSUM_COLORS;
 	root.leveyJenningsMultiColors = LEVEY_JENNINGS_MULTI_COLORS;
@@ -30431,14 +29694,10 @@
 		restoreConfigNavScroll: () => root.configNavScrollService.restore()
 	}).afterRender;
 	root.dashboardOverdueActions = createDashboardOverdueActions({ overdue: (action) => root.actionOverdue(action) });
-	root.dashboardOverdueActionListHtml = createDashboardOverdueActionListHtml({ render: (item) => dashboardOverdueActionItemHtml(item) });
-	root.dashboardQcFollowupListHtml = createDashboardQcFollowupListHtml({ render: (item, kind) => dashboardQcFollowupItemHtml(item, kind) });
-	root.dashboardMissingTargetListHtml = createDashboardMissingTargetListHtml({ render: (item) => dashboardMissingTargetItemHtml(item) });
 	root.dashboardExpiringLotItems = dashboardExpiringLotItems;
 	root.dashboardWestgardAlerts = dashboardWestgardAlerts;
 	root.dashboardMissingTargetItems = dashboardMissingTargetItems;
 	var dashboardLevelData = createDashboardLevelData({ stats: (values) => root.stats(values) });
-	var dashboardTestAction = createDashboardTestAction({ button: (label, action, variant) => root.btn(label, action, variant) });
 	root.dashViewTestInEntry = (testId, level) => {
 		const entryUi = root.EntryUIState;
 		entryUi.entrySel = {
@@ -30449,20 +29708,6 @@
 		entryUi.entryEnd = null;
 		root.go("entry");
 	};
-	var dashboardLevelPillsHtml = createDashboardLevelPillsHtml({
-		targetOk: (level) => root.levelTargetOk(level),
-		render: (input) => dashboardLevelPillHtml(input)
-	});
-	root.dashboardTestRowsHtml = createDashboardTestRowsHtml({
-		statusTag: (status) => dashboardStatusTags.westgard(status),
-		todayTag: (count, total) => dashboardStatusTags.today(count, total),
-		levelsHtml: (levels) => dashboardLevelPillsHtml(levels),
-		latestText: (point, test) => dashboardLatestPointText(point, test),
-		rank: (status, count, total) => dashboardRank(status, count, total),
-		rowHtml: (input) => dashboardTestRowHtml(input),
-		actionHtml: (testId, level) => dashboardTestAction(testId, Number(level)),
-		testDisplayName: (test) => root.testDisplayName(test)
-	});
 	root.dashboardTestItems = createDashboardTestItems({
 		activeWestgard: (test) => root.activeWestgard(test),
 		summarize: (input) => root.WestgardViewModel.summarizeTestStatus(input),
@@ -30471,8 +29716,6 @@
 		searchText: (test, levels) => dashboardTestSearchText(test, levels),
 		markStatus: (testId, status) => root.statusMemo.set(testId, status)
 	});
-	root.dashboardTestListHtml = dashboardTestListHtml;
-	root.dashboardPageHtml = createDashboardPageHtml();
 	var dashboardPageController = createDashboardPageController({
 		operationalTests: () => root.operationalTests(),
 		isWestgardMemoized: (testId) => wgMemo.has(testId),
@@ -30492,40 +29735,18 @@
 		dashboardWestgardAlerts: root.dashboardWestgardAlerts,
 		dashboardExpiringLotItems: root.dashboardExpiringLotItems,
 		dashboardExpiringLots: root.dashboardExpiringLots,
-		dashboardQcFollowupListHtml: root.dashboardQcFollowupListHtml,
 		dashboardOverdueActions: root.dashboardOverdueActions,
-		dashboardOverdueActionListHtml: root.dashboardOverdueActionListHtml,
-		dashboardMissingTargetListHtml: root.dashboardMissingTargetListHtml,
-		dashboardFollowupPanelHtml: root.dashboardFollowupPanelHtml,
-		dashboardExpiringLotsHtml: root.dashboardExpiringLotsHtml,
-		dashboardStatusTabsHtml: root.dashboardStatusTabsHtml,
 		dashboardStatusFilter: root.dashboardStatusFilter,
-		dashboardTestRowsHtml: root.dashboardTestRowsHtml,
-		dashboardTestListHtml: root.dashboardTestListHtml,
 		dashboardShiftStatus: root.dashboardShiftStatus,
-		dashboardHeadHtml: root.dashboardHeadHtml,
-		dashboardProgressHtml: root.dashboardProgressHtml,
-		dashboardKpisHtml: root.dashboardKpisHtml,
-		dashboardKpiItems: root.dashboardKpiItems,
-		dashboardTestPanelHtml: root.dashboardTestPanelHtml,
-		dashboardEmptyTestsHtml: root.dashboardEmptyTestsHtml,
-		dashboardPageHtml: root.dashboardPageHtml,
-		dashboardLoadingPresentation: root.dashboardLoadingPresentation,
 		dashTestQ: () => root.dashTestQ,
 		dashTestStatus: () => root.dashTestStatus,
-		setDashTestQ: (value) => {
-			root.AnalysisUIState.dashTestQ = value;
-		},
 		setDashTestStatus: (value) => {
 			root.AnalysisUIState.dashTestStatus = value;
 		},
-		liveRowFilter: (selector, query, opts) => root.liveRowFilter(selector, query, opts),
 		rerender: () => rerender()
 	});
-	root.pageDash = dashboardPageController.pageDash;
-	root.pageDashLoading = dashboardPageController.pageDashLoading;
-	root.dashTestFilter = dashboardPageController.dashTestFilter;
 	root.dashTestSetStatus = dashboardPageController.dashTestSetStatus;
+	root.dashboardModel = dashboardPageController.dashboardModel;
 	root.icon = icon;
 	root.icoCal = icoCal;
 	root.icoDownload = icoDownload;
@@ -30631,23 +29852,19 @@
 			root.AnalysisUIState.statusMemo = /* @__PURE__ */ new Map();
 		},
 		pageMap: () => ({
-			dash: root.pageDash,
 			entry: root.pageEntry,
 			westgard: root.pageWestgard,
 			sigma: root.pageSigma,
-			reagent: root.pageReagent,
 			actions: root.pageActionsV4,
-			report: root.pageReportV2,
-			manage: root.pageManage,
-			users: root.pageUsers,
-			audit: root.pageAudit,
-			settings: root.pageSettings
+			report: root.pageReportV2
 		}),
 		afterRender: (p) => root.afterRender(p),
-		dashTestQ: () => root.dashTestQ,
 		entryQ: () => root.entryQ,
-		dashTestFilter: (v) => root.dashTestFilter(v),
-		entryFilter: (v) => root.entryFilter(v)
+		entryFilter: (v) => root.entryFilter(v),
+		isReactPage: (id) => window.QCLabReact?.isReactPage(id) || false,
+		mountReactPage: (id, container) => window.QCLabReact?.mountReactPage(id, container),
+		unmountReactPageIfMounted: () => window.QCLabReact?.unmountReactPageIfMounted(),
+		notifyReactStore: () => window.QCLabReact?.notify()
 	});
 	root.go = routerDispatch.go;
 	root.resetMainScroll = routerDispatch.resetMainScroll;
@@ -30698,61 +29915,10 @@
 		emptyState: (title, text) => root.emptyState(title, text)
 	});
 	root.actionIssuesPanelHtml = actionIssuesPanelHtml;
-	root.manageToolbarPresentation = createManageToolbarHtml({
-		escape: (value) => root.esc(value),
-		escapeAttr: (value) => root.escAttr(value),
-		button: (label, action, variant) => root.btn(label, action, variant)
-	});
-	root.managePageHtml = createManagePageHtml();
-	root.manageShellPresentation = createManageShellHtml({ escape: (value) => root.esc(value) });
-	root.manageInstrumentRowPresentation = createManageInstrumentRowHtml({
-		escape: (value) => root.esc(value),
-		button: (label, action, variant) => root.btn(label, action, variant),
-		quote: (value) => root.jsq(value)
-	});
-	root.manageInstrumentTablePresentation = manageInstrumentTableHtml;
-	root.managePanelRowPresentation = createManagePanelRowHtml({
-		escape: (value) => root.esc(value),
-		button: (label, action, variant) => root.btn(label, action, variant),
-		quote: (value) => root.jsq(value)
-	});
-	root.managePanelTablePresentation = managePanelTableHtml;
-	root.manageLotRowPresentation = createManageLotRowHtml({
-		escape: (value) => root.esc(value),
-		button: (label, action, variant) => root.btn(label, action, variant),
-		quote: (value) => root.jsq(value)
-	});
-	root.manageLotConfigLayoutPresentation = manageLotConfigLayoutHtml;
-	root.manageLotGroupCardPresentation = createManageLotGroupCardHtml({ escape: (value) => root.esc(value) });
-	root.manageTransitionRowPresentation = createManageTransitionRowHtml({
-		escape: (value) => root.esc(value),
-		button: (label, action, variant) => root.btn(label, action, variant),
-		quote: (value) => root.jsq(value)
-	});
-	root.manageTransitionTablePresentation = manageTransitionTableHtml;
-	root.manageTransitionDetailsPresentation = manageTransitionDetailsHtml;
 	root.teaReferenceAddModalPresentation = teaReferenceAddModalHtml;
 	root.teaReferenceLabProfileBodyPresentation = teaReferenceLabProfileBodyHtml;
 	root.teaReferenceLabProfileModalHtml = teaReferenceLabProfileModalHtml;
-	root.teaReferenceRowPresentation = teaReferenceRowHtml;
-	root.teaReferenceTablePresentation = teaReferenceTableHtml;
-	root.teaSourceRegistryPresentation = createTeaSourceRegistryHtml({
-		escape: (value) => root.esc(value),
-		escapeAttr: (value) => root.escAttr(value)
-	});
-	root.manageHistoryRowPresentation = createManageHistoryRowHtml({
-		escape: (value) => root.esc(value),
-		button: (label, action, variant) => root.btn(label, action, variant),
-		quote: (value) => root.jsq(value)
-	});
 	root.manageSearchPlaceholderPresentation = manageSearchPlaceholder;
-	root.manageAssayRowPresentation = createManageAssayRowHtml({
-		escape: (value) => root.esc(value),
-		button: (label, action, variant) => root.btn(label, action, variant),
-		quote: (value) => root.jsq(value)
-	});
-	root.manageAssayTablePresentation = manageAssayTableHtml;
-	root.teaReferenceStatusPresentation = teaReferenceStatusHtml;
 	root.manageTransitionStatusPresentation = manageTransitionStatus;
 	root.manageLotStatusPresentation = createManageLotStatus({ daysToExpiry: (value) => root.daysToExp(value) });
 	root.manageInstrumentNamePresentation = manageInstrumentName;
@@ -30765,15 +29931,12 @@
 	root.targetGroupStatusSuffixPresentation = targetGroupStatusSuffix;
 	root.targetPanelLabelPresentation = targetPanelLabel;
 	root.targetPanelTestsPresentation = targetPanelTests;
-	root.targetPanelOptionsPresentation = targetPanelOptionsHtml;
-	root.targetGroupOptionsPresentation = targetGroupOptionsHtml;
 	root.targetSelectionPresentation = targetSelection;
 	root.targetLevelSelectionPresentation = targetLevelSelection;
 	root.historySearchValuesPresentation = historySearchValues;
 	root.teaLabBasisLabelPresentation = teaLabBasisLabel;
 	root.targetLevelLotsPresentation = targetLevelLots;
 	root.targetSearchValuesPresentation = targetSearchValues;
-	root.historyAssayOptionsPresentation = historyAssayOptionsHtml;
 	root.historyAssaySelectionPresentation = historyAssaySelection;
 	root.historyVisibleRowsPresentation = historyVisibleRows;
 	root.historyRowSortPresentation = sortHistoryRows;
@@ -30785,27 +29948,14 @@
 	root.targetRowStatePresentation = targetRowState;
 	root.targetMatrixStatsPresentation = targetMatrixStats;
 	root.targetMatrixItemsPresentation = targetMatrixItems;
-	root.targetLevelTabsPresentation = targetLevelTabsHtml;
-	root.targetSummaryPresentation = targetSummaryHtml;
-	root.targetMatrixRowPresentation = targetMatrixRowHtml;
-	root.targetMatrixPanelPresentation = targetMatrixPanelHtml;
 	root.historyRowsPresentation = historyRows;
-	root.historySelectorPresentation = historySelectorHtml;
-	root.targetSelectorPresentation = targetSelectorHtml;
-	root.historyTablePresentation = historyTableHtml;
-	root.historyPanelPresentation = historyPanelHtml;
-	root.manageEmptyPanelPresentation = manageEmptyPanelHtml;
 	root.targetEmptyStatePresentation = targetEmptyState;
-	root.targetMatrixTablePresentation = targetMatrixTableHtml;
-	root.targetMatrixActionsPresentation = targetMatrixActionsHtml;
 	root.targetPrerequisitePresentation = targetPrerequisite;
-	root.targetLevelToolbarPresentation = targetLevelToolbarHtml;
 	root.teaReferenceKindPresentation = teaReferenceKind;
 	root.teaReferenceRowActionsPresentation = teaReferenceRowActions;
 	root.teaReferenceSortPresentation = sortTeaReferences;
 	root.teaReferenceNamingTitlePresentation = teaReferenceNamingTitle;
 	root.teaReferenceEmptyStatePresentation = teaReferenceEmptyState;
-	root.teaReferenceLabValuePresentation = teaReferenceLabValueHtml;
 	root.teaReferenceInputValuePresentation = teaReferenceInputValue;
 	root.xlsxEscape = xlsxEscape;
 	root.reportXlsxStyleIds = REPORT_XLSX_STYLE_IDS;
@@ -31875,23 +31025,30 @@
 		log: (type, detail, target) => logAct(type, detail, target),
 		save: () => save({ clearDerived: false })
 	});
+	root.UserAvatarCommand = createUserAvatarCommand({
+		manage: userManagementCommand,
+		log: (type, detail, target) => logAct(type, detail, target),
+		save: () => save({ clearDerived: false })
+	});
+	var avatarModalController = createAvatarModalController({
+		document: typeof document !== "undefined" ? document : { createElement: () => ({}) },
+		createImage: () => new Image(),
+		createFileReader: () => new FileReader(),
+		currentUser: () => currentUser,
+		avatarCommand: root.UserAvatarCommand,
+		infoDialog: (message, opts) => root.infoDialog(message, opts),
+		openModal: (html) => root.openModal(html),
+		closeModal: () => root.closeModal(),
+		rerender: () => rerender(),
+		escapeAttr: (value) => root.escAttr(value),
+		html: { avatarModalHtml },
+		btn: (label, onclick, cls, title, opts) => root.btn(label, onclick, cls, title, opts)
+	});
+	root.openAvatarModal = avatarModalController.openAvatarModal;
+	root.pickAvatar = avatarModalController.pickAvatar;
+	root.clearAvatarPhoto = avatarModalController.clearAvatarPhoto;
 	root.AUDIT_PAGE_SIZES = ACTIVITY_AUDIT_PAGE_SIZES;
-	root.pageUsers = () => {
-		const rows = root.userListModel(state.users, currentUser && currentUser.id).map((u) => root.userRowHtml({
-			user: u,
-			currentUserId: currentUser && currentUser.id,
-			esc: escapeHtml$2,
-			roleLabel: (r) => root.roleLabel(r),
-			btn: root.btn
-		})).join("");
-		return root.usersPageHtml({
-			head: root.headOnly("Quản lý người dùng", "Phân quyền thao tác và kiểm soát tài khoản"),
-			rows,
-			roleOptions: root.roleSelectOptions("technician"),
-			permissionChecks: root.userPermChecks(root.rolePageIds("technician"), "newUserPerms", "technician"),
-			addButton: root.btn("Thêm", { action: "addUser" }, "teal")
-		});
-	};
+	root.usersModel = () => root.userListModel(state.users, currentUser && currentUser.id);
 	root.auditDateKey = (activity) => root.activityAuditFilter.dateKey(activity);
 	root.auditFilteredActivities = (items = state.activity || []) => root.activityAuditFilter.filter(items, auditQ, auditFrom, auditTo);
 	root.auditSetQuery = (value) => {
@@ -31953,56 +31110,38 @@
 		auditPage = next.page;
 		rerender();
 	};
-	root.pageAudit = () => {
+	root.auditModel = () => {
 		const total = (state.activity || []).length;
-		const oversizeWarn = total > root.ACTIVITY_ROTATE_TO ? ` <span class="tag warn">Nhật ký đang rất lớn</span> <span class="hint">Nên lưu trữ bớt dòng cũ — hệ thống sẽ tự xoay vòng ở ${root.ACTIVITY_HARD_CAP} dòng (không xuất CSV).</span>` : "";
+		const oversize = total > root.ACTIVITY_ROTATE_TO;
 		const chain = typeof root.auditChainStatus === "function" ? root.auditChainStatus() : {
 			ok: true,
 			checked: 0,
 			legacy: total,
 			idle: false
 		};
-		const chainHtml = chain.idle ? `<span class="tag none">Chưa kiểm chuỗi hash</span> ${root.btn("Kiểm tra chuỗi hash", { action: "auditVerifyChainNow" }, "ghost sm")} <span class="hint">Nhật ký lớn (${chain.total} dòng) nên không tự kiểm mỗi lần mở trang.</span>` : chain.ok ? `<span class="tag ok">Chuỗi hash hợp lệ</span> <span class="hint">${chain.checked} dòng đã khóa hash${chain.legacy ? ` · ${chain.legacy} dòng cũ chưa có hash` : ""}</span>` : `<span class="tag rej">Audit có dấu hiệu bị sửa</span> <span class="hint">Lỗi tại dòng #${(state.activity[chain.brokenIndex] || {}).seq || chain.brokenIndex + 1}: ${escapeHtml$2(chain.reason)}</span>`;
 		const filtered = root.auditFilteredActivities(), pageInfo = root.activityAuditPagination(filtered, auditPage, auditPageSize), pageCount = pageInfo.pageCount;
 		auditPage = pageInfo ? pageInfo.page : Math.min(Math.max(1, auditPage), pageCount);
-		const offset = pageInfo ? pageInfo.offset : (auditPage - 1) * auditPageSize;
-		const rows = (pageInfo ? pageInfo.rows : filtered.slice(offset, offset + auditPageSize)).map((a) => root.activityAuditRowHtml({
-			sequenceHtml: a.seq ? "#" + a.seq : "",
-			timeHtml: formatDateTimeVN(a.ts),
-			userHtml: escapeHtml$2(a.user || ""),
-			roleHtml: root.roleLabel(a.role || "viewer"),
-			usernameHtml: a.username ? " · @" + escapeHtml$2(a.username) : "",
-			typeHtml: escapeHtml$2(a.type || ""),
-			targetHtml: escapeHtml$2(a.target || ""),
-			detailHtml: escapeHtml$2(a.detail || "")
-		})).join("");
-		const hasFilter = !!(auditQ || auditFrom || auditTo);
-		const pageSizeOptions = root.AUDIT_PAGE_SIZES.map((size) => `<option value="${size}" ${size === auditPageSize ? "selected" : ""}>${size} dòng</option>`).join("");
+		const offset = pageInfo ? pageInfo.offset : (auditPage - 1) * auditPageSize, pageRows = pageInfo ? pageInfo.rows : filtered.slice(offset, offset + auditPageSize);
 		const resultFrom = pageInfo ? pageInfo.resultFrom : filtered.length ? offset + 1 : 0, resultTo = pageInfo ? pageInfo.resultTo : Math.min(offset + auditPageSize, filtered.length);
-		const pagination = filtered.length ? `<div class="audit-pagination"><span class="hint">Hiển thị ${resultFrom}–${resultTo} / ${filtered.length} dòng</span><div>${root.btn("‹ Trước", {
-			action: "auditSetPage",
-			args: [auditPage - 1]
-		}, "ghost sm", "", { disabled: auditPage <= 1 })}<b>Trang ${auditPage}/${pageCount}</b>${root.btn("Sau ›", {
-			action: "auditSetPage",
-			args: [auditPage + 1]
-		}, "ghost sm", "", { disabled: auditPage >= pageCount })}</div></div>` : "";
-		const rowsOrEmptyState = rows ? `<div class="audit-table-wrap"><table class="audit-table"><thead><tr><th>Thời gian</th><th>Người dùng</th><th>Hành động</th><th>Đối tượng</th><th>Chi tiết</th></tr></thead><tbody>${rows}</tbody></table></div>` : root.emptyState(total ? "Không tìm thấy nhật ký" : "Chưa có hoạt động", total ? "Thử từ khóa hoặc khoảng ngày khác." : "Nhật ký sẽ bắt đầu ghi từ các thao tác tiếp theo.");
-		return root.activityAuditPageHtml({
-			head: root.headOnly("Nhật ký hoạt động", "Lưu vết các thao tác quan trọng; chỉ quản trị viên được xem"),
-			exportButton: root.btn("Xuất CSV nhật ký", { action: "exportActivityCSV" }, "teal sm"),
-			archiveButton: total ? root.btn("Lưu trữ nhật ký cũ", { action: "archiveActivityLog" }, "ghost sm") : "",
+		return {
 			total,
-			chainHtml,
-			oversizeWarn,
-			searchValue: escapeHtmlAttr(auditQ),
-			fromDate: root.dateBox("auditFromDate", auditFrom, "audit-date", `aria-label="Lọc nhật ký từ ngày" data-action="auditSetDate" data-args='["from"]' data-action-on="change"`),
-			toDate: root.dateBox("auditToDate", auditTo, "audit-date", `aria-label="Lọc nhật ký đến ngày" data-action="auditSetDate" data-args='["to"]' data-action-on="change"`),
-			pageSizeOptions,
-			clearFiltersButton: hasFilter ? root.btn("Xóa bộ lọc", { action: "auditClearFilters" }, "ghost sm audit-clear-filter") : "",
+			oversize,
+			hardCap: root.ACTIVITY_HARD_CAP,
+			chain,
+			rows: pageRows,
 			filteredCount: filtered.length,
-			rowsOrEmptyState,
-			pagination
-		});
+			page: auditPage,
+			pageCount,
+			resultFrom,
+			resultTo,
+			pageSizes: root.AUDIT_PAGE_SIZES,
+			pageSize: auditPageSize,
+			query: auditQ,
+			from: auditFrom,
+			to: auditTo,
+			hasFilter: !!(auditQ || auditFrom || auditTo),
+			brokenSeq: chain.idle || chain.ok ? null : (state.activity[chain.brokenIndex] || {}).seq || chain.brokenIndex + 1
+		};
 	};
 	root.activityCSVRows = (items) => root.activityAuditCsv(items);
 	root.exportActivityCSV = () => {
@@ -32659,7 +31798,6 @@
 		},
 		getState: () => state,
 		ui: () => root.ManageUIState,
-		currentPage: () => root.RouterUIState.page,
 		rerender: () => rerender(),
 		role: () => role(),
 		userName: () => userName(),
@@ -32667,9 +31805,7 @@
 		esc: (value) => root.esc(value),
 		escapeAttr: (value) => root.escAttr(value),
 		btn: (label, action, cls, title, options) => root.btn(label, action, cls, title, options),
-		emptyState: (title, body, actions) => root.emptyState(title, body, actions),
 		dateBox: (id, value, cls, attrs) => root.dateBox(id, value, cls, attrs),
-		headOnly: (title, subtitle, actions) => root.headOnly(title, subtitle, actions),
 		openModal: (html) => root.openModal(html),
 		closeModal: () => root.closeModal(),
 		confirmDialog: (opts) => root.confirmDialog(opts),
@@ -32711,35 +31847,21 @@
 	root.lotLabel = managePageController.lotLabel;
 	root.lotTransitionToNo = managePageController.lotTransitionToNo;
 	root.lotStatus = managePageController.lotStatus;
-	root.manageShell = managePageController.manageShell;
-	root.manageToolbar = managePageController.manageToolbar;
-	root.manageLots = managePageController.manageLots;
-	root.manageInstruments = managePageController.manageInstruments;
-	root.managePanels = managePageController.managePanels;
-	root.manageTransitionsV2 = managePageController.manageTransitionsV2;
 	root.targetGroupLots = managePageController.targetGroupLots;
-	root.targetGroupOptions = managePageController.targetGroupOptions;
 	root.ensureTargetSelection = managePageController.ensureTargetSelection;
-	root.manageTargets = managePageController.manageTargets;
-	root.manageAssays = managePageController.manageAssays;
 	root.manageHistorySearchValues = managePageController.manageHistorySearchValues;
-	root.manageHistory = managePageController.manageHistory;
 	root.teaRefFind = managePageController.teaRefFind;
 	root.teaRefNumOrNull = managePageController.teaRefNumOrNull;
 	root.teaRefExternalChanged = managePageController.teaRefExternalChanged;
 	root.teaRefEnsure = managePageController.teaRefEnsure;
 	root.teaRefEdit = managePageController.teaRefEdit;
 	root.teaRefRemove = managePageController.teaRefRemove;
-	root.teaSourceRegistryHtml = managePageController.teaSourceRegistryHtml;
 	root.teaRefOpenAdd = managePageController.teaRefOpenAdd;
 	root.teaRefAddSubmit = managePageController.teaRefAddSubmit;
 	root.teaLabProfileOpen = managePageController.teaLabProfileOpen;
 	root.teaLabProfileSave = managePageController.teaLabProfileSave;
 	root.teaLabProfileRemove = managePageController.teaLabProfileRemove;
-	root.manageTeaRefs = managePageController.manageTeaRefs;
-	root.manageView = managePageController.manageView;
-	root.renderManageBody = managePageController.renderManageBody;
-	root.pageManage = managePageController.pageManage;
+	root.manageModel = managePageController.manageModel;
 	var manageTestsActionsController = createManageTestsActionsController({
 		document: () => typeof document !== "undefined" ? document : {
 			getElementById: () => null,
@@ -33247,12 +32369,6 @@
 	root.reagentQuickPickerModalPresentation = reagentQuickPickerModalHtml;
 	root.reagentPickerModalPresentation = reagentPickerModalHtml;
 	root.reagentCreateModalPresentation = reagentCreateModalHtml;
-	root.reagentEmptyPageHtml = reagentEmptyPageHtml;
-	root.reagentToolbarHtml = reagentToolbarHtml;
-	root.reagentPairPanelHtml = reagentPairPanelHtml;
-	root.reagentInfoPanelHtml = reagentInfoPanelHtml;
-	root.reagentChartsPanelHtml = reagentChartsPanelHtml;
-	root.reagentResultsPanelsHtml = reagentResultsPanelsHtml;
 	root.reagentChartAxis = reagentChartAxis;
 	root.reagentScatterSvg = reagentScatterSvg;
 	root.reagentBlandSvg = reagentBlandSvg;
@@ -33321,17 +32437,8 @@
 			calculator: root.reagentComparisonCalculator,
 			chartAxis: root.reagentChartAxis,
 			chart: root.reagentChartPresentation,
-			toolIcon: root.reagentToolIconPresentation,
 			scatterSvg: root.reagentScatterSvg,
 			blandSvg: root.reagentBlandSvg,
-			selectOptions: root.reagentSelectOptionsHtml,
-			emptyPage: root.reagentEmptyPageHtml,
-			pairRow: root.reagentPairRowHtml,
-			toolbar: root.reagentToolbarHtml,
-			pairPanel: root.reagentPairPanelHtml,
-			infoPanel: root.reagentInfoPanelHtml,
-			chartsPanel: root.reagentChartsPanelHtml,
-			resultsPanels: root.reagentResultsPanelsHtml,
 			resultHtml: root.reagentResultHtml,
 			quickLabel: root.reagentQuickLabelPresentation,
 			quickPickerRows: root.reagentQuickPickerRowsHtml,

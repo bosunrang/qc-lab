@@ -1,0 +1,24 @@
+const assert=require('node:assert/strict');
+const {spawnSync}=require('node:child_process');
+const path=require('node:path');
+
+const program=`import {createUserAvatarCommand} from './src/application/auth/user-avatar-command.ts';
+const logs=[];let saves=0;
+const manage={setAvatar:(user,dataUrl)=>Object.assign(user,{avatar:dataUrl}),clearAvatar:(user)=>Object.assign(user,{avatar:''})};
+const command=createUserAvatarCommand({manage,log:(type,detail,target)=>logs.push({type,detail,target}),save:()=>{saves++;}});
+const user={username:'lan.nt'};
+command.setAvatar(user,'data:image/png;base64,xyz');
+const afterSet=user.avatar;
+command.clearAvatar(user);
+const afterClear=user.avatar;
+console.log(JSON.stringify({afterSet,afterClear,logs,saves}));`;
+const output=spawnSync(process.execPath,['--experimental-strip-types','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+assert.equal(output.status,0,output.stderr);
+const value=JSON.parse(output.stdout);
+assert.equal(value.afterSet,'data:image/png;base64,xyz');
+assert.equal(value.afterClear,'');
+assert.equal(value.saves,2);
+assert.equal(value.logs.length,2);
+assert.equal(value.logs[0].target,'lan.nt');
+assert.equal(value.logs[1].target,'lan.nt');
+console.log('User avatar command TypeScript tests passed');
