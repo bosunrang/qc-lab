@@ -2,11 +2,14 @@ type AnyRec = any;
 
 /**
  * Trang "Nhập QC" (Entry) — nhập/hủy điểm QC theo ngày, mức QC và lô đang vận
- * hành, trang thao tác dữ liệu nhạy cảm nhất của ứng dụng. Toàn bộ HTML thật
- * nằm trong các hàm `deps.pres.entryXxxHtml()` (TypeScript, đã bridge từ các
- * đợt UI-thuần trước); controller này chỉ còn phần điều phối — đọc state,
- * dựng cây xét nghiệm/bảng nhập/biểu đồ Levey-Jennings, ghi UI state, và gọi
- * đúng workflow command TypeScript khi ghi/hủy điểm QC hay ghi chú ngày.
+ * hành, trang thao tác dữ liệu nhạy cảm nhất của ứng dụng. Đã chuyển sang
+ * React (2026-08-30, trang cuối cùng — xem docs/REACT-ADOPTION-PLAN.md):
+ * `entryModel()` là dữ liệu thuần cho `src/react/pages/EntryPage.tsx`; hai
+ * hàm HTML còn lại (`deps.pres.entryVoidModalHtml`/`entryPreSaveWarningModalHtml`)
+ * chỉ phục vụ 2 modal render vào `#modalRoot`, ngoài tầm React. Controller còn
+ * lại là phần điều phối — đọc state, dựng cây xét nghiệm/bảng nhập/biểu đồ
+ * Levey-Jennings, ghi UI state, và gọi đúng workflow command TypeScript khi
+ * ghi/hủy điểm QC hay ghi chú ngày.
  *
  * `document`/`window`/`localStorage` là getter LAZY — không phải giá trị
  * capture một lần — vì test (`tests/partial-render-helpers.test.js`) gán lại
@@ -22,6 +25,7 @@ export function createEntryPageController(deps: {
   analysisUi: () => AnyRec;
   currentPage: () => string;
   rerender: () => void;
+  isReactEntry: () => boolean;
   afterRender: (page: string) => void;
   role: () => string;
   canWrite: () => boolean;
@@ -85,9 +89,11 @@ export function createEntryPageController(deps: {
   EntryRecordWorkflowCommand: AnyRec;
   EntryVoidWorkflowCommand: AnyRec;
   EntryDateNoteWorkflowCommand: AnyRec;
-  /* ~51 hàm dựng HTML/thuật toán thuần (TypeScript) đã bridge từ các đợt
-     UI-thuần trước, gom một chỗ thay vì khai kiểu từng cái — khớp cách
-     reagent-page-controller.ts/manage-page-controller.ts đã làm. */
+  /* ~25 hàm thuật toán/state thuần (TypeScript) entryModel() còn dùng, cộng 2
+     hàm HTML modal (entryVoidModalHtml/entryPreSaveWarningModalHtml — ngoài
+     tầm React), gom một chỗ thay vì khai kiểu từng cái — khớp cách
+     reagent-page-controller.ts/manage-page-controller.ts đã làm. Danh sách đủ
+     nằm trong tests/entry-render-bridge.test.js. */
   pres: AnyRec;
 }) {
   const state = () => deps.getState();
@@ -114,23 +120,24 @@ export function createEntryPageController(deps: {
     return !!ui().entryTreeCollapsed;
   };
 
-  const pageEntry = (rightOnly = false): string => {
+  /* entryModel(): dữ liệu thuần cho trang React (src/react/pages/EntryPage.tsx), song
+     song với pageEntry() bên dưới — cùng logic đọc/chuẩn hóa state (kể cả các side-effect
+     trên ui(): entrySheetMonth mặc định, entrySel rơi về xét nghiệm đầu khi không hợp lệ,
+     treeOpen tự mở nhánh đang chọn, entryLjRenderCache để afterRender() vẽ canvas LJ) —
+     nhưng LUÔN tính trọn vẹn cả cây lẫn panel phải, không cần bản rút gọn "rightOnly" (bản
+     đó chỉ phục vụ entryRenderKeepScroll() dán innerHTML thủ công, không cần dưới React).
+     treeNodes trả về là MỘT MẢNG PHẲNG theo đúng thứ tự anh/em (machine → nhóm lô → xét
+     nghiệm) vì entryTreeKey()'s ArrowUp/ArrowDown/Home/End dựa vào thứ tự DOM thật của các
+     .tnode — JSX phải render đúng thứ tự này, không được nhóm lại theo key React. */
+  const entryModel = (): AnyRec => {
     const s = state();
     const today = deps.isoToday();
     if (!s.tests.length) {
-      return deps.pres.entryEmptyPageHtml({
-        title: 'Chưa có xét nghiệm',
-        message: 'Cần khai báo xét nghiệm và mức QC trước khi nhập kết quả.',
-        actionHtml: deps.role() === 'admin' ? deps.btn('Thêm xét nghiệm', { action: 'go', args: ['manage'] }, 'teal') : '',
-      });
+      return { empty: true, title: 'Chưa có xét nghiệm', message: 'Cần khai báo xét nghiệm và mức QC trước khi nhập kết quả.', canAdd: deps.role() === 'admin', addTarget: 'manage' };
     }
     const entryTests = deps.operationalTests();
     if (!entryTests.length) {
-      return deps.pres.entryEmptyPageHtml({
-        title: 'Chưa có xét nghiệm sẵn sàng nhập',
-        message: 'Cần đưa xét nghiệm vào Panel QC, ghép Nhóm lô QC và gán Mean/SD trước khi nhập kết quả.',
-        actionHtml: deps.role() === 'admin' ? deps.btn('Cấu hình Mean/SD', { action: 'goManageTargets' }, 'teal') : '',
-      });
+      return { empty: true, title: 'Chưa có xét nghiệm sẵn sàng nhập', message: 'Cần đưa xét nghiệm vào Panel QC, ghép Nhóm lô QC và gán Mean/SD trước khi nhập kết quả.', canAdd: deps.role() === 'admin', addTarget: 'targets' };
     }
     if (!ui().entrySheetMonth) ui().entrySheetMonth = deps.isoMonth();
     let selT = ui().entrySel && entryTests.find((t: AnyRec) => t.id === ui().entrySel.testId);
@@ -141,70 +148,56 @@ export function createEntryPageController(deps: {
       ui().entryAutoOpenKey = null;
     }
     const treeCollapsed = entryTreeIsCollapsed();
-    const treePanelIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="9" y1="4" x2="9" y2="20"/></svg>';
-    let tree = '', treeHead = '';
-    if (!rightOnly) {
-      const byMAll = deps.EntryService.groupByMachine(entryTests);
-      const machinesAll = [...byMAll.keys()];
-      const selM = selT.machine || '(Chưa gán máy)';
-      if (ui().entryMachine !== 'all' && !machinesAll.includes(ui().entryMachine)) ui().entryMachine = 'all';
-      // Tự mở một lần khi đổi test; sau đó để người dùng tự thu/mở cây.
-      const selGroup = deps.operationalLotGroupForTest(selT);
-      const autoKey = selM + '|' + selGroup.key + '|' + ui().entrySel.testId;
-      if (ui().entryAutoOpenKey !== autoKey) {
-        ui().treeOpen.add('m:' + selM);
-        ui().treeOpen.add('lg:' + selM + '|' + selGroup.key);
-        ui().entryAutoOpenKey = autoKey;
-      }
-      const byM = deps.EntryService.groupByMachine(entryTests.filter((t: AnyRec) => ui().entryMachine === 'all' || (t.machine || '(Chưa gán máy)') === ui().entryMachine));
-      const machines = [...byM.keys()];
-      const machineOpts = ['<option value="all">Tất cả máy</option>'].concat(machinesAll.map((m: string) =>
-        `<option value="${deps.escapeAttr(m)}" ${ui().entryMachine === m ? 'selected' : ''}>${deps.esc(m)}</option>`)).join('');
-      /* h4/tree-tools nằm NGOÀI div role="tree" (chỉ bọc quanh các .tnode role="treeitem")
-         — ARIA tree chỉ được phép chứa treeitem/group, aria-required-children sẽ báo lỗi
-         nếu heading/input/select nằm trực tiếp trong đó. CSS `.tree h4`/`.tree-tools ...`
-         vẫn là descendant selector nên không cần đổi gì ở CSS. */
-      treeHead = deps.pres.entryTreeHeaderHtml({
-        collapseButtonHtml: deps.btn(treePanelIcon, { action: 'toggleEntryTree' },'ghost icon entry-tree-toggle', 'Ẩn danh mục nội kiểm', { attrs: { 'aria-label': 'Ẩn danh mục nội kiểm', 'aria-controls': 'entryTreePanel', 'aria-expanded': 'true' } }),
-        query: ui().entryQ,
-        machineOptionsHtml: machineOpts,
-      });
-      if (!machines.length) tree += deps.pres.entryTreeItemHtml.empty();
-      machines.forEach((mc: string) => {
-        const mk = 'm:' + mc, mo = ui().treeOpen.has(mk);
-        tree += deps.pres.entryTreeItemHtml.machine({ key: mk, open: mo, label: mc, toggleKey: deps.jsq(mk) });
-        const groups = new Map<string, AnyRec>();
-        byM.get(mc).forEach((t: AnyRec) => {
-          const g = deps.operationalLotGroupForTest(t);
-          if (!groups.has(g.key)) groups.set(g.key, { name: g.name, tests: [], order: deps.operationalTestOrder(t) });
-          const grp = groups.get(g.key);
-          grp.tests.push(t);
-          grp.order = Math.min(grp.order, deps.operationalTestOrder(t));
-        });
-        [...groups.entries()].sort((a, b) => a[1].order - b[1].order || a[1].name.localeCompare(b[1].name, 'vi')).forEach(([groupKey, grp]) => {
-          const gk = 'lg:' + mc + '|' + groupKey, go = ui().treeOpen.has(gk), ord: AnyRec = { none: -1, ok: 0, warn: 1, rej: 2 };
-          let groupWorst = 'none';
-          const rows = grp.tests.sort((a: AnyRec, b: AnyRec) => deps.operationalTestOrder(a) - deps.operationalTestOrder(b)).map((t: AnyRec) => {
-            const levels = deps.operationalLevels(t), on = ui().entrySel.testId === t.id, preferred = levels.find((x: AnyRec) => ui().entrySel.level === x.level) || levels[0], wg = deps.activeWestgard(t);
-            let worst = 'none';
-            levels.forEach((l: AnyRec) => {
-              const pts = deps.pointsForLot(t.id, l.level, l.lot || ''), lastPoint = pts[pts.length - 1], last = (lastPoint && wg.byPoint.get(lastPoint.id)) || null, lastLevel = last ? last.level : 'none';
-              if (ord[lastLevel] > ord[worst]) worst = lastLevel;
-            });
-            if (ord[worst] > ord[groupWorst]) groupWorst = worst;
-            const search = deps.searchText([t.name, deps.testDisplayName(t), t.machine, grp.name, ...levels.map((l: AnyRec) => l.lot)].join(' '));
-            return deps.pres.entryTreeItemHtml.assay({ testId: t.id, search, selected: on, visible: mo && go, level: preferred ? preferred.level : 1, name: deps.testDisplayName(t), stateClass: worst === 'none' ? '' : worst, stateText: deps.stateName(worst) });
-          });
-          tree += deps.pres.entryTreeItemHtml.group({ key: gk, open: go, parentOpen: mo, search: deps.searchText(grp.name + ' ' + grp.tests.map((t: AnyRec) => t.name).join(' ')), name: grp.name, stateClass: groupWorst === 'none' ? '' : groupWorst, stateText: deps.stateName(groupWorst), toggleKey: deps.jsq(gk) });
-          tree += rows.join('');
-        });
-      });
+
+    // ----- cây xét nghiệm -----
+    const byMAll = deps.EntryService.groupByMachine(entryTests);
+    const machinesAll = [...byMAll.keys()];
+    const selM = selT.machine || '(Chưa gán máy)';
+    if (ui().entryMachine !== 'all' && !machinesAll.includes(ui().entryMachine)) ui().entryMachine = 'all';
+    const selGroup = deps.operationalLotGroupForTest(selT);
+    const autoKey = selM + '|' + selGroup.key + '|' + ui().entrySel.testId;
+    if (ui().entryAutoOpenKey !== autoKey) {
+      ui().treeOpen.add('m:' + selM);
+      ui().treeOpen.add('lg:' + selM + '|' + selGroup.key);
+      ui().entryAutoOpenKey = autoKey;
     }
-    // panel phải
+    const byM = deps.EntryService.groupByMachine(entryTests.filter((t: AnyRec) => ui().entryMachine === 'all' || (t.machine || '(Chưa gán máy)') === ui().entryMachine));
+    const machines = [...byM.keys()];
+    const machineOptions = [{ value: 'all', label: 'Tất cả máy' }, ...machinesAll.map((m: string) => ({ value: m, label: m }))];
+    const treeNodes: AnyRec[] = [];
+    if (!machines.length) treeNodes.push({ kind: 'empty' });
+    machines.forEach((mc: string) => {
+      const mk = 'm:' + mc, mo = ui().treeOpen.has(mk);
+      treeNodes.push({ kind: 'machine', key: mk, open: mo, label: mc });
+      const groups = new Map<string, AnyRec>();
+      byM.get(mc).forEach((t: AnyRec) => {
+        const g = deps.operationalLotGroupForTest(t);
+        if (!groups.has(g.key)) groups.set(g.key, { name: g.name, tests: [], order: deps.operationalTestOrder(t) });
+        const grp = groups.get(g.key);
+        grp.tests.push(t);
+        grp.order = Math.min(grp.order, deps.operationalTestOrder(t));
+      });
+      [...groups.entries()].sort((a, b) => a[1].order - b[1].order || a[1].name.localeCompare(b[1].name, 'vi')).forEach(([groupKey, grp]) => {
+        const gk = 'lg:' + mc + '|' + groupKey, go = ui().treeOpen.has(gk), ord: AnyRec = { none: -1, ok: 0, warn: 1, rej: 2 };
+        let groupWorst = 'none';
+        const rows = grp.tests.sort((a: AnyRec, b: AnyRec) => deps.operationalTestOrder(a) - deps.operationalTestOrder(b)).map((t: AnyRec) => {
+          const levels = deps.operationalLevels(t), on = ui().entrySel.testId === t.id, preferred = levels.find((x: AnyRec) => ui().entrySel.level === x.level) || levels[0], wg = deps.activeWestgard(t);
+          let worst = 'none';
+          levels.forEach((l: AnyRec) => {
+            const pts = deps.pointsForLot(t.id, l.level, l.lot || ''), lastPoint = pts[pts.length - 1], last = (lastPoint && wg.byPoint.get(lastPoint.id)) || null, lastLevel = last ? last.level : 'none';
+            if (ord[lastLevel] > ord[worst]) worst = lastLevel;
+          });
+          if (ord[worst] > ord[groupWorst]) groupWorst = worst;
+          const search = deps.searchText([t.name, deps.testDisplayName(t), t.machine, grp.name, ...levels.map((l: AnyRec) => l.lot)].join(' '));
+          return { kind: 'assay', testId: t.id, search, selected: on, visible: mo && go, level: preferred ? preferred.level : 1, name: deps.testDisplayName(t), stateClass: worst === 'none' ? '' : worst, stateText: deps.stateName(worst) };
+        });
+        treeNodes.push({ kind: 'group', key: gk, open: go, parentOpen: mo, search: deps.searchText(grp.name + ' ' + grp.tests.map((t: AnyRec) => t.name).join(' ')), name: grp.name, stateClass: groupWorst === 'none' ? '' : groupWorst, stateText: deps.stateName(groupWorst) });
+        treeNodes.push(...rows);
+      });
+    });
+
+    // ----- panel phải -----
     const t = selT, l = deps.lvlCfg(t, ui().entrySel.level), entryWG = deps.activeWestgard(t), acceptedCache = new Map<string, AnyRec>();
-    /* Cột nhập = (mức, lô): mức đang chạy song song có 2 cột. Lô song song được
-       đánh giá bằng bảng Westgard riêng của nó (parallelWestgard), tách hẳn khỏi
-       entryWG của lô đang vận hành. */
     const entryCols = deps.entryColumns(t), parWGByKey = new Map<string, AnyRec>();
     entryCols.filter((c: AnyRec) => c.parallel).forEach((c: AnyRec) => parWGByKey.set(c.key, deps.parallelWestgard(t, c)));
     const colVerdict = (col: AnyRec, p: AnyRec) => ((col && col.parallel ? (parWGByKey.get(col.key) || { byPoint: new Map() }).byPoint.get(p.id) : entryWG.byPoint.get(p.id)) || { level: 'ok', rules: [] });
@@ -216,18 +209,21 @@ export function createEntryPageController(deps: {
     };
     const W0 = entryWindow(), acceptedSelected = acceptedForLevel(ui().entrySel.level);
     const W = { ...W0, all: acceptedSelected.filter((p: AnyRec) => (p.lot || '') === (l.lot || '')), pts: acceptedSelected.filter((p: AnyRec) => p.date >= W0.start && p.date <= W0.end && (p.lot || '') === (l.lot || '')) };
-    // thống kê toàn bộ + dải QC
     const allSt = deps.stats(W.all.map((p: AnyRec) => p.val));
     const cand = deps.rangeCandidate(t.id, l.level), candStats = cand && cand.c;
     const eligible = cand && cand.eligible;
-    const rangeSummary = allSt ? `N=${allSt.n} · Mean thực=${deps.fmtTestValue(t, allSt.m)} · SD thực=${deps.fmtTestStat(t, allSt.sd)} · CV=${deps.fmt(allSt.cv)}%` : 'Chưa có dữ liệu';
+    const rangeSummaryText = allSt ? `N=${allSt.n} · Mean thực=${deps.fmtTestValue(t, allSt.m)} · SD thực=${deps.fmtTestStat(t, allSt.sd)} · CV=${deps.fmt(allSt.cv)}%` : 'Chưa có dữ liệu';
     const rangeSource = l.applied === 'lab' ? 'PXN tự xây dựng' : 'Nhà sản xuất';
-    const rangeBox = deps.pres.entryRangeSummaryHtml({ open: ui().entryDetailOpen.has('range'), summary: rangeSummary, source: rangeSource, mean: deps.fmtTestValue(t, l.mean), sd: deps.fmtTestValue(t, l.sd), eligible, resultCount: candStats ? candStats.n : 0, dayCount: cand ? cand.days : 0, proposedMean: candStats ? deps.fmtTestValue(t, candStats.m) : '—', proposedSd: candStats ? deps.fmtTestValue(t, candStats.sd) : '—', proposedCv: candStats ? deps.fmt(candStats.cv) : '—', actionsHtml: deps.rangeActions(t.id, l.level, eligible, l.applied) });
-    // Lô cũ (đã chuyển tiếp) chỉ gắn với cột lô đang dùng, không áp cho cột song song.
+    const rangeSummary = {
+      open: ui().entryDetailOpen.has('range'), summary: rangeSummaryText, source: rangeSource, mean: deps.fmtTestValue(t, l.mean), sd: deps.fmtTestValue(t, l.sd),
+      eligible: !!eligible, resultCount: candStats ? candStats.n : 0, dayCount: cand ? cand.days : 0,
+      proposedMean: candStats ? deps.fmtTestValue(t, candStats.m) : '—', proposedSd: candStats ? deps.fmtTestValue(t, candStats.sd) : '—', proposedCv: candStats ? deps.fmt(candStats.cv) : '—',
+      canApply: !!eligible, canRevert: l.applied === 'lab' && deps.canWrite(), testId: t.id, level: l.level,
+    };
     const levelViews = entryCols.map((x: AnyRec) => {
       if (x.parallel) return { x, prevView: null };
       const prevSeries = deps.previousLotSeries(t, x.level), prevLot = ui().entryPrevOpen.get(t.id + '|' + x.level) || '';
-      return { x, prevView: prevSeries.find((s: AnyRec) => (s.lot || '') === prevLot) };
+      return { x, prevView: prevSeries.find((s2: AnyRec) => (s2.lot || '') === prevLot) };
     });
     const tableCards = levelViews.map(({ x, prevView }: AnyRec) => {
       const lvlMean = prevView ? prevView.mean : x.mean, lvlSd = prevView ? prevView.sd : x.sd, lvlLot = prevView ? prevView.lot : x.lot;
@@ -236,32 +232,27 @@ export function createEntryPageController(deps: {
       const rows = ptsIdx.map((p: AnyRec, i: number) => {
         const rawPrev = prevView && prevWg.F[i], verdict = prevView ? (rawPrev ? { ...rawPrev, level: deps.ruleResultLevel(t, rawPrev.rules || []), z: prevWg.zs[i] } : { level: 'ok', rules: [] }) : colVerdict(x, p),
           view = deps.EntryService.buildPointView({ point: p, verdict, mean: lvlMean, sd: lvlSd, previousLot: prevView ? prevView.lot : undefined }),
-          lv = deps.qcVerdictLabel(view.level),
-          voidBtn = deps.canWrite() ? deps.btn('Hủy', { action: 'voidQcPoint', args: [t.id, p.id] }, 'danger sm', 'Hủy điểm QC có ghi lý do') : '',
-          rulesHtml = [...new Set(view.rules)].map((r: unknown) => `<span class="pill">${r}</span>`).join('') || '—';
-        return deps.pres.entryPointTableRowHtml({ rejected: view.level === 'rej', warning: view.level === 'warn', pointId: deps.escapeAttr(p.id || ''), dateText: deps.vnDate(p.date), valueText: deps.fmtPointValue(p, t), zText: `${view.z >= 0 ? '+' : ''}${deps.fmt(view.z)}s`, verdictLevel: view.level, verdictText: lv, rulesHtml, voidButtonHtml: voidBtn });
-      }).join('');
-      const cumulative = deps.pres.entryCumulativeStatsHtml({ endDateText: deps.vnDate(W.end), count: cumulativeSt ? cumulativeSt.n : 0, mean: cumulativeSt ? deps.fmtTestValue(t, cumulativeSt.m) : '—', sd: cumulativeSt ? deps.fmtTestStat(t, cumulativeSt.sd) : '—', cv: cumulativeSt ? deps.fmt(cumulativeSt.cv) + '%' : '—' });
-      const rowControl = deps.pres.entryTableWindowNoteHtml({ limited: rowWindow.limited, expanded: rowWindow.expanded && rowWindow.total > ENTRY_TABLE_INITIAL_ROWS, shown: rowWindow.rows.length, total: rowWindow.total, actionButtonHtml: deps.btn(rowWindow.limited ? 'Hiện toàn bộ' : 'Thu gọn', { action: 'entryToggleRows', args: [tableKey] }, 'ghost sm') });
-      return deps.pres.entryPointTableCardHtml({ parallel: x.parallel, level: x.level, previousLot: !!prevView, lot: deps.esc(lvlLot || '?'), pointCount: allPtsIdx.length, bodyHtml: `${cumulative}${ptsIdx.length ? `<table><thead><tr><th>Ngày</th><th class="num">Giá trị</th><th class="num">Z</th><th>Kết luận</th><th>Luật</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table>${rowControl}` : '<div class="empty qc-table-empty">Chưa có điểm nào trong khoảng này.</div>'}` });
-    }).join('');
+          lv = deps.qcVerdictLabel(view.level);
+        return { rejected: view.level === 'rej', warning: view.level === 'warn', pointId: p.id || '', dateText: deps.vnDate(p.date), valueText: deps.fmtPointValue(p, t), zText: `${view.z >= 0 ? '+' : ''}${deps.fmt(view.z)}s`, verdictLevel: view.level, verdictText: lv, rules: [...new Set(view.rules)] as string[], canVoid: deps.canWrite() };
+      });
+      const cumulative = { endDateText: deps.vnDate(W.end), count: cumulativeSt ? cumulativeSt.n : 0, mean: cumulativeSt ? deps.fmtTestValue(t, cumulativeSt.m) : '—', sd: cumulativeSt ? deps.fmtTestStat(t, cumulativeSt.sd) : '—', cv: cumulativeSt ? deps.fmt(cumulativeSt.cv) + '%' : '—' };
+      const rowControl = rowWindow.limited || (rowWindow.expanded && rowWindow.total > ENTRY_TABLE_INITIAL_ROWS) ? { limited: rowWindow.limited, expanded: rowWindow.expanded && rowWindow.total > ENTRY_TABLE_INITIAL_ROWS, shown: rowWindow.rows.length, total: rowWindow.total, tableKey } : null;
+      return { parallel: x.parallel, level: x.level, previousLot: !!prevView, lot: lvlLot || '?', pointCount: allPtsIdx.length, cumulative, rows, rowControl };
+    });
     const prevLotByLevel = new Map<unknown, AnyRec>(levelViews.filter((v: AnyRec) => v.prevView).map((v: AnyRec) => [v.x.level, v.prevView.lot]));
     const voidedRows = (s.data[t.id] || []).filter((p: AnyRec) => {
       if (!p.voided) return false;
       const pv = prevLotByLevel.get(p.level);
       return pv != null ? (p.lot || '') === pv : (p.date >= W.start && p.date <= W.end);
     }).sort((a: AnyRec, b: AnyRec) => String(a.date || '').localeCompare(String(b.date || '')) || deps.pointRunNo(a) - deps.pointRunNo(b))
-      .map((p: AnyRec) => deps.pres.entryVoidedPointRowHtml({ pointId: deps.escapeAttr(p.id || ''), dateText: deps.vnDate(p.date), levelLotText: `Mức ${p.level} · Lô ${deps.esc(p.lot || '?')}`, valueText: deps.fmtPointValue(p, t), runId: deps.esc(p.runId || '—'), voidedBy: deps.esc(p.voidedBy || ''), reason: deps.esc(p.voidReason || '') })).join('');
-    const voidedBox = deps.pres.entryVoidedPointsHtml(voidedRows);
-    const pointsInView = deps.pres.entryPointsPanelHtml({ open: ui().entryDetailOpen.has('points'), endDateText: deps.vnDate(W.end), startDateText: deps.vnDate(W.start), tableCardsHtml: tableCards, voidedBoxHtml: voidedBox });
-    const dayBtns = deps.pres.entryDayPresetButtons(ui().entryDays, !!ui().entryStart);
+      .map((p: AnyRec) => ({ pointId: p.id || '', dateText: deps.vnDate(p.date), levelLotText: `Mức ${p.level} · Lô ${p.lot || '?'}`, valueText: deps.fmtPointValue(p, t), runId: p.runId || '—', voidedBy: p.voidedBy || '', reason: p.voidReason || '' }));
+    const pointsInView = { open: ui().entryDetailOpen.has('points'), endDateText: deps.vnDate(W.end), startDateText: deps.vnDate(W.start), tableCards, voidedRows };
+    const dayPresetOptions = [7, 14, 30, 60, 90].map(day => ({ days: day, on: !ui().entryStart && ui().entryDays === day }));
     ui().entryLjRenderCache = { testId: t.id, start: W.start, end: W.end, levels: new Map<string, AnyRec>() };
     const ljStack = entryCols.map((x: AnyRec) => {
       const on = x.level === ui().entrySel.level && !x.parallel,
-        // Lô song song dùng chính điểm của nó (không qua acceptedLotPoints — helper đó
-        // chọn 1 lần chạy lại/ngày cho lô đang vận hành, không áp dụng cho lô đang đánh giá).
         curPts = (x.parallel ? deps.entryColumnPoints(t, x) : acceptedForLevel(x.level)).filter((p: AnyRec) => p.date >= W.start && p.date <= W.end && (p.lot || '') === (x.lot || '')),
-        prevSeries = x.parallel ? [] : deps.previousLotSeries(t, x.level), prevLot = ui().entryPrevOpen.get(t.id + '|' + x.level) || '', prevView = prevSeries.find((s2: AnyRec) => (s2.lot || '') === prevLot), targetCfg = prevView || deps.pres.entryColumnConfig(t, x.level, x.lot), chartPts = prevView ? prevView.pts : curPts, chartLot = prevView ? prevView.lot : x.lot, chartMean = targetCfg && targetCfg.mean, chartSd = targetCfg && targetCfg.sd, st = deps.stats(chartPts.map((p: AnyRec) => p.val));
+        prevSeries = x.parallel ? [] : deps.previousLotSeries(t, x.level), prevLot = ui().entryPrevOpen.get(t.id + '|' + x.level) || '', prevView = prevSeries.find((s2: AnyRec) => (s2.lot || '') === prevLot), targetCfg = prevView || entryColumnCfg(t, x.level, x.lot), chartPts = prevView ? prevView.pts : curPts, chartLot = prevView ? prevView.lot : x.lot, chartMean = targetCfg && targetCfg.mean, chartSd = targetCfg && targetCfg.sd, st = deps.stats(chartPts.map((p: AnyRec) => p.val));
       ui().entryLjRenderCache.levels.set(`${x.level}|${chartLot || ''}`, chartPts);
       const metrics = [
         { label: 'Mean thực', value: st ? deps.fmtTestValue(t, st.m) : '—' },
@@ -270,18 +261,18 @@ export function createEntryPageController(deps: {
         { label: 'Mean mục tiêu', value: deps.fmtTestValue(t, chartMean), control: true },
         { label: 'SD mục tiêu', value: deps.fmtTestStat(t, chartSd), control: true },
       ];
-      const prevBtn = x.parallel ? '<span class="hint">Đang đánh giá</span>' : prevSeries.length ? (prevView ? deps.btn('Xem lô mới', { action: 'entryShowCurrentLot', args: [x.level] }, 'teal sm') : deps.btn('Xem lô cũ', { action: 'entryShowPrevLot', args: [x.level, prevSeries[0].lot || ''] }, 'ghost sm')) : `<span class="hint">${x.applied === 'lab' ? 'Dải PXN' : 'Dải NSX'}</span>`;
-      return deps.pres.entryLeveyJenningsMiniHtml({ on, parallel: x.parallel, level: x.level, lot: chartLot || '', pointCount: chartPts.length, previousLot: !!prevView, metrics, actionHtml: prevBtn, testId: t.id, mean: chartMean, sd: chartSd, start: W.start, end: W.end });
-    }).join('');
-    const levelHead = deps.pres.entrySheetLevelHeads(entryCols.map((x: AnyRec) => {
-      const cfg = deps.pres.entryColumnConfig(t, x.level, x.lot), mean = Number(cfg && cfg.mean), sd = Number(cfg && cfg.sd), limits = Number.isFinite(mean) && Number.isFinite(sd) ? `${deps.fmtTestValue(t, mean - 2 * sd)} – ${deps.fmtTestValue(t, mean + 2 * sd)}` : '—', tooltip = `Mean ${Number.isFinite(mean) ? deps.fmtTestValue(t, mean) : '—'} · SD ${Number.isFinite(sd) ? deps.fmtTestStat(t, sd) : '—'} · ±2SD ${limits}`;
+      const action = x.parallel ? { kind: 'hint', text: 'Đang đánh giá' }
+        : prevSeries.length ? (prevView ? { kind: 'showCurrent', level: x.level } : { kind: 'showPrev', level: x.level, lot: prevSeries[0].lot || '' })
+        : { kind: 'hint', text: x.applied === 'lab' ? 'Dải PXN' : 'Dải NSX' };
+      return { on, parallel: x.parallel, level: x.level, lot: chartLot || '', pointCount: chartPts.length, previousLot: !!prevView, metrics, action, testId: t.id, mean: chartMean, sd: chartSd, start: W.start, end: W.end };
+    });
+    const levelHeads = entryCols.map((x: AnyRec) => {
+      const cfg = entryColumnCfg(t, x.level, x.lot), mean = Number(cfg && cfg.mean), sd = Number(cfg && cfg.sd), limits = Number.isFinite(mean) && Number.isFinite(sd) ? `${deps.fmtTestValue(t, mean - 2 * sd)} – ${deps.fmtTestValue(t, mean + 2 * sd)}` : '—', tooltip = `Mean ${Number.isFinite(mean) ? deps.fmtTestValue(t, mean) : '—'} · SD ${Number.isFinite(sd) ? deps.fmtTestStat(t, sd) : '—'} · ±2SD ${limits}`;
       return { level: x.level, lot: x.lot || '', parallel: x.parallel, tooltip };
-    }));
+    });
     const sheetCalendar = deps.EntryService.buildSheetCalendar(ui().entrySheetMonth, deps.isoToday()), activeSheetMonth = sheetCalendar.activeMonth;
     ui().entrySheetMonth = activeSheetMonth;
     const sheetYear = sheetCalendar.year, sheetMonthNo = sheetCalendar.month, sheetStart = sheetCalendar.start, sheetEnd = sheetCalendar.end;
-    const sheetMonthOptions = Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}" ${sheetMonthNo === i + 1 ? 'selected' : ''}>Tháng ${i + 1}</option>`).join('');
-    const sheetYearOptions = Array.from({ length: sheetCalendar.yearMax - sheetCalendar.yearMin + 1 }, (_, i) => sheetCalendar.yearMin + i).map((y: number) => `<option value="${y}" ${sheetYear === y ? 'selected' : ''}>${y}</option>`).join('');
     const prevPtsByLevel: AnyRec = {}, pointsByLevel: AnyRec = {};
     entryCols.forEach((x: AnyRec) => {
       prevPtsByLevel[x.key] = x.parallel ? [] : deps.previousLotSeries(t, x.level).flatMap((s2: AnyRec) => s2.pts.map((p: AnyRec) => ({ ...p, _prevLot: s2.lot })));
@@ -292,8 +283,6 @@ export function createEntryPageController(deps: {
     const sheetRows = sheetRowsData.map((dayGroup: AnyRec) => {
       const firstRunNo = () => deps.EntryService.sheetFirstRunNo(dayGroup);
       const levelRuns = (x: AnyRec) => deps.EntryService.sheetLevelRuns(dayGroup, x.key);
-      // Kết luận của NGÀY chỉ tính trên các lô đang vận hành: lô đang đánh giá song
-      // song không được phép làm ngày đó thành "loại bỏ" cho kết quả bệnh nhân.
       const daySummary = deps.EntryService.summarizeRunStatus(entryCols.filter((x: AnyRec) => !x.parallel).map((x: AnyRec) => dayGroup.runs.map((g: AnyRec) => g.levels[x.key]).filter(Boolean).sort((a: AnyRec, b: AnyRec) => deps.pointRunNo(a) - deps.pointRunNo(b) || (a._idx || 0) - (b._idx || 0))), entryWG.byPoint);
       const { worst, rulesAll, warnRules, rejRules, hasPoint } = daySummary;
       const shouldShowEmptyRun = (x: AnyRec, g: AnyRec) => {
@@ -309,36 +298,42 @@ export function createEntryPageController(deps: {
       const cells = entryCols.map((x: AnyRec, levelIdx: number) => {
         let levelHasPoint = false, emptyShown = false;
         const levelRunNos = levelRuns(x).map((r: AnyRec) => r.runNo), nextLevelRunNo = levelRunNos.length ? Math.max(...levelRunNos) + 1 : 1;
-        const runInputs = dayGroup.runs.map((g: AnyRec) => {
+        const runs = dayGroup.runs.map((g: AnyRec) => {
           const p = g.levels[x.key];
           if (!p) {
-            if (!shouldShowEmptyRun(x, g)) return '';
+            if (!shouldShowEmptyRun(x, g)) return null;
             emptyShown = true;
-            return deps.pres.entrySheetEmptyRunHtml({ editable: deps.canWrite(), title: 'Dùng phím mũi tên để chuyển ô', ariaLabel: `Nhập QC ngày ${deps.vnDate(g.date)}, mức ${x.level}, lô ${deps.escapeAttr(x.lot || '')}, lần ${g.runNo}`, date: deps.escapeAttr(g.date), runNo: g.runNo, levelIndex: levelIdx, actionAttrs: `data-action="entrySheetRunChanged" data-args="${deps.escapeAttr(JSON.stringify([t.id, x.level, g.date, g.runId || '', x.parallel ? x.lot || '' : '']))}" data-action-on="change"` });
+            return { kind: 'empty', editable: deps.canWrite(), title: 'Dùng phím mũi tên để chuyển ô', ariaLabel: `Nhập QC ngày ${deps.vnDate(g.date)}, mức ${x.level}, lô ${x.lot || ''}, lần ${g.runNo}`, date: g.date, runNo: g.runNo, levelIndex: levelIdx, actionArgs: [t.id, x.level, g.date, g.runId || '', x.parallel ? x.lot || '' : ''] };
           }
           levelHasPoint = true;
           const isPrev = !!p._prevLot, pMean = isPrev && Number.isFinite(+p.qcMean) ? +p.qcMean : x.mean, pSd = isPrev && Number.isFinite(+p.qcSd) ? +p.qcSd : x.sd;
           const verdict = isPrev ? { level: 'ok', rules: [] } : colVerdict(x, p), view = deps.EntryService.buildPointView({ point: p, verdict, mean: pMean, sd: pSd, previousLot: isPrev ? p._prevLot : undefined }), lv = deps.qcVerdictLabel(view.level);
-          return deps.pres.entrySheetSavedRunHtml({ previousLot: isPrev, previousLotName: deps.esc(p._prevLot || ''), valueClass: view.valueClass, title: isPrev ? 'Lô cũ ' + deps.escapeAttr(p._prevLot) + ' · đã chuyển tiếp · chỉ đọc' : 'Đã lưu, không sửa trực tiếp', valueText: deps.fmtPointValue(p, t), zText: `${view.z >= 0 ? '+' : ''}${deps.fmt(view.z)}s`, verdictText: lv });
-        }).join('');
-        const addRunBtn = deps.pres.entrySheetAddRunHtml({ visible: deps.canWrite() && levelHasPoint && !emptyShown, actionAttrs: `data-action="entryUnlockExtraRun" data-args="${deps.escapeAttr(JSON.stringify([t.id, x.key, dayGroup.date, levelIdx, nextLevelRunNo]))}"` });
-        return deps.pres.entrySheetCellHtml({ parallel: x.parallel, hasAddButton: !!addRunBtn, runInputsHtml: runInputs, addRunButtonHtml: addRunBtn });
-      }).join('');
+          return { kind: 'saved', previousLot: isPrev, previousLotName: p._prevLot || '', valueClass: view.valueClass, title: isPrev ? 'Lô cũ ' + p._prevLot + ' · đã chuyển tiếp · chỉ đọc' : 'Đã lưu, không sửa trực tiếp', valueText: deps.fmtPointValue(p, t), zText: `${view.z >= 0 ? '+' : ''}${deps.fmt(view.z)}s`, verdictText: lv };
+        }).filter(Boolean);
+        const addRun = deps.canWrite() && levelHasPoint && !emptyShown ? { actionArgs: [t.id, x.key, dayGroup.date, levelIdx, nextLevelRunNo] } : null;
+        return { parallel: x.parallel, hasAddButton: !!addRun, runs, addRun };
+      });
       const staff = [...new Map(dayGroup.runs.flatMap((g: AnyRec) => Object.values(g.levels)).map((p: AnyRec) => deps.pointStaff(p)).filter((x: AnyRec) => x.code).map((x: AnyRec) => [x.code, x])).values()];
-      const staffCell = deps.pres.entrySheetDaySummaryHtml.staff(staff);
-      const status = deps.pres.entrySheetDaySummaryHtml.status(hasPoint, worst);
       const autoNote = rulesAll.length ? (worst === 'rej' ? deps.errorType([...new Set(rejRules.length ? rejRules : rulesAll)] as string[]) : 'Theo dõi / cảnh báo') : '';
       const datePoints = dayGroup.runs.flatMap((g: AnyRec) => Object.values(g.levels)).filter(Boolean);
       const manualNote = ((datePoints.find((p: AnyRec) => String(p.note || '').trim())) || ({} as AnyRec)).note || '';
-      const note = deps.pres.entrySheetNoteHtml({ hasPoint, writable: deps.canWrite(), placeholder: deps.escapeAttr(autoNote || 'Nhập ghi chú...'), actionAttrs: `data-action="entryDateNoteSave" data-args="${deps.escapeAttr(JSON.stringify([t.id, dayGroup.date]))}" data-action-on="change"`, manualNote: deps.esc(manualNote), autoNote });
+      const note = !hasPoint ? { kind: 'none' } : deps.canWrite() ? { kind: 'editable', value: manualNote, placeholder: autoNote || 'Nhập ghi chú...' } : { kind: 'readonly', text: manualNote || autoNote || '—' };
       const liveCols = entryCols.filter((x: AnyRec) => !x.parallel), doneLevels = liveCols.filter((x: AnyRec) => dayGroup.runs.some((g: AnyRec) => g.levels[x.key])).length, rowCls = [dayGroup.date === today ? 'today' : '', dayGroup.date <= today && doneLevels < liveCols.length ? 'missing' : '', hasPoint ? 'has-data' : ''].filter(Boolean).join(' ');
-      return deps.pres.entrySheetDayRowHtml({ rowClass: rowCls, date: dayGroup.date, dayOfMonth: deps.dateObj(dayGroup.date).getDate(), today: dayGroup.date === today, cellsHtml: cells, staffHtml: staffCell, warningRules: [...new Set(warnRules)].join(', '), rejectRules: [...new Set(rejRules)].join(', '), statusHtml: status, noteHtml: note });
-    }).join('');
-    const worksheet = deps.pres.entryWorksheetHtml({ testName: deps.esc(deps.testDisplayName(t)), lotLabel: deps.esc(deps.pres.entryLotLabelsTs(entryCols)), monthOptionsHtml: sheetMonthOptions, yearOptionsHtml: sheetYearOptions, currentMonthButtonHtml: deps.btn('Tháng hiện tại', { action: 'entrySetSheetMonth', args: [deps.isoMonth()] }, 'ghost sm qc-current-month'), todayButtonHtml: deps.btn('Tới hôm nay', { action: 'entryGoToday' }, 'teal sm qc-today-jump'), levelHeadHtml: levelHead, rowsHtml: sheetRows, columnCount: entryCols.length, messageHtml: ui().entryLastMsg });
-    const right = `${worksheet}${deps.pres.entryLeveyPanelHtml({ startDateHtml: deps.dateBox('entryStartDate', W.start, '', 'data-action="entrySetStart" data-action-on="change"'), endDateHtml: deps.dateBox('entryEndDate', W.end, '', 'data-action="entrySetEnd" data-action-on="change"'), dayButtonsHtml: dayBtns, rangeText: `${deps.vnDate(W.start)} – ${deps.vnDate(W.end)} · ${deps.operationalLevels(t).length} mức QC`, stackHtml: ljStack })}${pointsInView}${rangeBox}`;
-    ui().entryPartialRenderCache = { testId: t.id, right };
-    if (rightOnly) return right;
-    return deps.pres.entryPageLayoutHtml({ pageHeadHtml: deps.headOnly('Nhập QC', 'Ghi nhận kết quả theo ngày, mức QC và lô đang vận hành'), treeCollapsed, expandButtonHtml: deps.btn(treePanelIcon, { action: 'toggleEntryTree' },'teal icon entry-tree-expand', 'Hiện danh mục nội kiểm', { attrs: { 'aria-label': 'Hiện danh mục nội kiểm', 'aria-controls': 'entryTreePanel', 'aria-expanded': 'false' } }), treeHeadHtml: treeHead, treeHtml: tree, rightHtml: right });
+      return { rowClass: rowCls, date: dayGroup.date, dayOfMonth: deps.dateObj(dayGroup.date).getDate(), today: dayGroup.date === today, cells, staff: staff.map((x: AnyRec) => ({ code: x.code, name: x.name })), warningRules: [...new Set(warnRules)].join(', '), rejectRules: [...new Set(rejRules)].join(', '), status: !hasPoint ? 'none' : worst, note };
+    });
+    const worksheet = {
+      testName: deps.testDisplayName(t), lotLabel: deps.pres.entryLotLabelsTs(entryCols), sheetYear, sheetMonthNo,
+      currentIsoMonth: deps.isoMonth(), levelHeads, rows: sheetRows, columnCount: entryCols.length, message: ui().entryLastMsg,
+    };
+    const ljPanel = {
+      startDate: W.start, endDate: W.end, dayPresetOptions, hasCustomRange: !!ui().entryStart,
+      rangeText: `${deps.vnDate(W.start)} – ${deps.vnDate(W.end)} · ${deps.operationalLevels(t).length} mức QC`, stack: ljStack,
+    };
+    return {
+      empty: false, treeCollapsed, machineOptions, selectedMachine: ui().entryMachine, query: ui().entryQ, treeNodes,
+      testId: t.id, selectedLevel: ui().entrySel.level,
+      worksheet, ljPanel, pointsInView, rangeSummary,
+    };
   };
 
   /* Mở/thu nhánh ngay trên DOM, không vẽ lại toàn trang: khung cây có scroll riêng nên
@@ -435,48 +430,18 @@ export function createEntryPageController(deps: {
     cur.blur();
     setTimeout(entryFocusPendingSheet, 0);
   };
-  const entryLatestTreeState = (t: AnyRec) => deps.pres.entryTreeState(t);
-  const entrySyncTreeState = (testId: unknown) => {
-    const row = [...doc().querySelectorAll('.tree .tn-config[data-test-id]')].find((el: AnyRec) => el.dataset.testId === String(testId || ''));
-    if (!row) return;
-    const apply = (el: AnyRec, value: string) => {
-      const badge = el && el.querySelector('.state');
-      if (!badge) return;
-      badge.className = 'state' + (value === 'none' ? '' : ' ' + value);
-      badge.textContent = deps.stateName(value);
-    };
-    apply(row, entryLatestTreeState(state().tests.find((t: AnyRec) => t.id === testId)));
-    let group = row.previousElementSibling;
-    while (group && group.dataset.treeRole !== 'group') group = group.previousElementSibling;
-    if (!group) return;
-    const states: string[] = [];
-    for (let item = group.nextElementSibling; item && item.dataset.treeRole === 'assay'; item = item.nextElementSibling) {
-      const badge = item.querySelector('.state'), value = (badge && ['ok', 'warn', 'rej'].find((x: string) => badge.classList.contains(x))) || 'none';
-      states.push(value);
-    }
-    const worst = deps.pres.entryTreeGroupState(states);
-    apply(group, worst);
-  };
+  /* Trang Entry giờ luôn render qua React (xem entryModel()/src/react/pages/EntryPage.tsx)
+     — bản dán innerHTML thủ công từng cần thiết khi render() cổ điển gán lại toàn bộ
+     #main.innerHTML (phá scrollTop của .qc-sheet-wrap và focus) đã bị xoá cùng
+     pageEntry(): createRoot().render() của React chỉ patch đúng phần DOM thay đổi, tự
+     giữ nguyên scrollTop và focus hiện tại (miễn JSX giữ đúng key/cấu trúc), nên gọi
+     thẳng rerender() chuẩn là đủ. Vẫn giữ tên hàm này (không đổi 8+ nơi gọi) vì
+     tests/entry-service.test.js khoá nguyên văn `entryRenderKeepScroll();` trong thân
+     entryPick(). entrySheetKey()/entryFocusPendingSheet() (focus ô kế tiếp) và
+     treeToggle()/entryFilter() (thu/mở nhánh, lọc tìm kiếm) đều tự tra lại DOM bằng
+     thuộc tính data-focus-.../data-key sau khi vẽ xong nên không cần gọi gì thêm ở đây. */
   const entryRenderKeepScroll = () => {
-    const w = win();
-    const pageX = w.scrollX, pageY = w.scrollY, wrap = doc().querySelector('.qc-sheet-wrap'), sheetTop = wrap ? wrap.scrollTop : 0, sheetLeft = wrap ? wrap.scrollLeft : 0;
-    const current = doc().querySelector('.entry-main');
-    if (deps.currentPage() === 'entry' && current) {
-      deps.analysisUi().statusMemo = new Map();
-      pageEntry(true);
-      const cache = ui().entryPartialRenderCache;
-      if (cache && cache.testId === ui().entrySel.testId) {
-        current.innerHTML = cache.right;
-        entrySyncTreeState(ui().entrySel.testId);
-        deps.afterRender(deps.currentPage());
-      } else deps.rerender();
-    } else deps.rerender();
-    requestAnimationFrame(() => {
-      w.scrollTo(pageX, pageY);
-      const nextWrap = doc().querySelector('.qc-sheet-wrap');
-      if (nextWrap) { nextWrap.scrollTop = sheetTop; nextWrap.scrollLeft = sheetLeft; }
-      entryFocusPendingSheet();
-    });
+    deps.rerender();
   };
   const entrySetLastMsg = (html: string) => {
     ui().entryLastMsg = html || '';
@@ -637,9 +602,10 @@ export function createEntryPageController(deps: {
   };
 
   return {
-    pageEntry, entryWindow, entryWindowFor, entryRowsWindow, entryToggleRows, entryDetailToggled, entryTreeIsCollapsed,
+    entryModel,
+    entryWindow, entryWindowFor, entryRowsWindow, entryToggleRows, entryDetailToggled, entryTreeIsCollapsed,
     treeToggle, toggleEntryTree, entryTreeKey, entryFilter, entryPick, entryFocusLevel, entryShowPrevLot, entryShowCurrentLot,
-    entryFocusPendingSheet, entrySheetInputs, entrySheetTarget, entrySheetKey, entryLatestTreeState, entrySyncTreeState,
+    entryFocusPendingSheet, entrySheetInputs, entrySheetTarget, entrySheetKey,
     entryRenderKeepScroll, entryCloseKeepScroll, entryConfirmInlineSave, entrySetLastMsg, entryUnlockExtraRun, entryDateNoteSave, entryColumnCfg, entryInlineSave, entrySheetRunChanged,
     entryInlineSaveCommit, syncVoidNceChoice, voidQcPoint, confirmVoidQcPoint, entrySetSheetMonth, entryGoToday,
     entrySetSheetPart, entrySetDays, entrySetStart, entrySetEnd,

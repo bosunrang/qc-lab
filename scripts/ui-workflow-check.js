@@ -15,7 +15,12 @@ async function installPassword(page){await page.evaluate(async password=>{state.
 async function checkEntryLifecycle(page){
   await page.evaluate(()=>go('entry'));await page.waitForSelector('.qc-sheet');
   const before=await page.evaluate(()=>state.data[state.tests[0].id].length);
-  const saved=await page.evaluate(async()=>{const t=state.tests[0],date=isoToday();await entryInlineSave(t.id,1,date,'140.12','UI-CHECK-1');const p=state.data[t.id].find(x=>x.runId==='UI-CHECK-1');return{count:state.data[t.id].length,id:p&&p.id,date:p&&p.date,lot:p&&p.lot,qcMean:p&&p.qcMean,qcSd:p&&p.qcSd,audit:(state.activity||[]).at(-1)&&state.activity.at(-1).type,msg:document.getElementById('entryMsg').textContent};});
+  // Trang 'entry' render qua React (createRoot().render() commit BẤT ĐỒNG BỘ) — gọi
+  // entryInlineSave() (kích hoạt rerender() qua entryRenderKeepScroll()) rồi đọc
+  // #entryMsg ngay trong CÙNG một page.evaluate() có thể đọc trúng khung hình CŨ. Tách
+  // lượt kích hoạt và lượt đọc thành hai page.evaluate() riêng, như các chỗ khác đã sửa.
+  await page.evaluate(async()=>{const t=state.tests[0],date=isoToday();await entryInlineSave(t.id,1,date,'140.12','UI-CHECK-1');});
+  const saved=await page.evaluate(()=>{const t=state.tests[0];const p=state.data[t.id].find(x=>x.runId==='UI-CHECK-1');return{count:state.data[t.id].length,id:p&&p.id,date:p&&p.date,lot:p&&p.lot,qcMean:p&&p.qcMean,qcSd:p&&p.qcSd,audit:(state.activity||[]).at(-1)&&state.activity.at(-1).type,msg:document.getElementById('entryMsg').textContent};});
   check('Nhập QC từ route UI tạo đúng một điểm',saved.count===before+1&&!!saved.id,JSON.stringify(saved));
   check('Điểm QC chốt lô và Mean/SD lúc nhập',saved.lot==='1101'&&saved.qcMean===140&&saved.qcSd===2.5,JSON.stringify(saved));
   check('Nhập QC ghi audit và phản hồi thành công',saved.audit==='Thêm điểm QC'&&/lưu/i.test(saved.msg),JSON.stringify(saved));

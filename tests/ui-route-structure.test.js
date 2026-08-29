@@ -11,7 +11,7 @@ const routerPolicy=read('src/presentation/router/router-page-policy.ts');
 const routerShell=read('src/presentation/router/router-shell-controller.ts');
 const vnDatePicker=read('src/presentation/router/vn-date-picker-controller.ts');
 const entry=read('src/presentation/entry/entry-page-controller.ts');
-const entryPointRow=read('src/presentation/entry/entry-point-table-row-html.ts');
+const entryPage=read('src/react/pages/EntryPage.tsx');
 const westgard=read('src/presentation/westgard/westgard-page-controller.ts');
 const modals=read('src/presentation/modal/modal-focus-trap.ts')+read('src/presentation/modal/modal-template.ts')+read('src/presentation/modal/modal-controller.ts')+read('src/presentation/modal/dialog-overlay-controller.ts');
 const actions=read('src/presentation/actions/actions-page-controller.ts');
@@ -51,7 +51,11 @@ assert.doesNotMatch(indexNoComments,/<script(?![^>]*\ssrc=)[^>]*>/,'index.html k
 assert.doesNotMatch(indexNoComments,/ onclick="| oninput="| onchange="| onkeydown="| onmousemove="/,'index.html không còn thuộc tính onXXX= trần');
 
 assert.doesNotMatch(router,/function page(?:Dash|Entry|Westgard)\(/,'router-render chỉ giữ điều phối và UI primitives');
-assert.match(entry,/const pageEntry = \(rightOnly = false\)/);
+// Trang Nhập QC & Biểu đồ chuyển sang React (2026-08-30, trang cuối cùng — xem
+// EntryPage.tsx) — pageEntry() đã xoá, chỉ còn entryModel() (dữ liệu thuần) ở
+// entry-page-controller.ts.
+assert.match(entry,/const entryModel = \(\): AnyRec => \{/);
+assert.doesNotMatch(entry,/const pageEntry/,'pageEntry() phải đã xoá sau khi trang Entry chuyển sang React');
 // Trang Phân tích Westgard chuyển sang React (2026-08-30, xem WestgardPage.tsx)
 // — pageWestgard()/pageWestgardArchived() đã xoá, chỉ còn westgardModel()
 // (dữ liệu thuần) ở westgard-page-controller.ts.
@@ -176,8 +180,8 @@ assert.match(actions,/deps\.ActionEvidencePresentation\.timeline\(a, rr\)/,'rout
 for(const label of ['Ngày xảy ra','QC chạy lại','Hủy điểm','Mở hồ sơ'])assert.match(actionEvidencePresentation,new RegExp(`label: '${label}'`),`timeline NCE phải giữ mốc ${label}`);
 assert.match(actions,/const actionRerunEvidenceHtml = \(a: AnyRec, rr: AnyRec, t: AnyRec\) => \{/,'NCE phải có khung bằng chứng QC chạy lại riêng');
 assert.match(actions,/const openActionQcEvidence = \(tid: unknown, level: unknown, pointId: unknown, date: unknown, lot: unknown\) => \{/,'khung bằng chứng phải mở được đúng điểm QC');
-assert.match(entryPointRow,/data-qc-point-id=/,'dòng dữ liệu QC phải mang ID để liên kết từ hồ sơ NCE');
-assert.match(entry,/const rangeSummary = allSt \? `N=\$\{allSt\.n\}/,'thống kê toàn bộ phải dùng ký hiệu N viết hoa');
+assert.match(entryPage,/data-qc-point-id=/,'dòng dữ liệu QC phải mang ID để liên kết từ hồ sơ NCE');
+assert.match(entry,/const rangeSummaryText = allSt \? `N=\$\{allSt\.n\}/,'thống kê toàn bộ phải dùng ký hiệu N viết hoa');
 assert.match(actions,/const openActionQcEvidence = \([^)]*\) => \{[\s\S]*?entryDetailOpen\.add\('points'\)[\s\S]*?deps\.go\('entry'\)/,'mở bằng chứng NCE phải bung khối điểm QC trước khi tô sáng dòng');
 
 console.log('UI route structure tests passed');

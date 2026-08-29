@@ -120,7 +120,7 @@ declare const PAGES: [string, string][];
 declare var entrySel: any, entryDays: any, entryStart: any, entryEnd: any, entrySheetMonth: any,
   entryQ: any, entryMachine: any, entryLastMsg: any, entryAutoOpenKey: any,
   entryPendingSheetFocus: any, entryJumpToday: any, entryLjRenderCache: any,
-  entryPartialRenderCache: any, entryPrevOpen: any, entryExpandedTables: any, entryDetailOpen: any, treeOpen: any,
+  entryPrevOpen: any, entryExpandedTables: any, entryDetailOpen: any, treeOpen: any,
   entryExtraRun: any, entryTreeCollapsed: any;
 declare var manageQ: any, manageTab: any, manageTargetPanel: any, manageTargetGroup: any,
   manageTargetLevel: any, manageHistoryTest: any, targetSwitchCtx: any;

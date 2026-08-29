@@ -12779,13 +12779,7 @@
 			const m = deps.document.getElementById("main");
 			if (!m) return;
 			const id = deps.page();
-			if (deps.isReactPage(id)) {
-				deps.mountReactPage(id, m);
-				return;
-			}
-			deps.unmountReactPageIfMounted();
-			const map = deps.pageMap();
-			m.innerHTML = (map[id] || map.entry)();
+			deps.mountReactPage(deps.isReactPage(id) ? id : "dash", m);
 		};
 		const restoreRouteFilters = () => {
 			if (deps.page() === "entry" && deps.entryQ()) deps.entryFilter(deps.entryQ());
@@ -12858,114 +12852,6 @@
 		return (levels || []).map((level) => String(level.lot || "").trim()).filter(Boolean).join(" / ") || "Chưa gán lô";
 	}
 	//#endregion
-	//#region src/presentation/entry/entry-chart-html.ts
-	function entryDayPresetButtons(days, customRange) {
-		return [
-			7,
-			14,
-			30,
-			60,
-			90
-		].map((day) => `<button class="${!customRange && days === day ? "on" : ""}" data-action="entrySetDays" data-args="[${day}]">${day} ngày</button>`).join("");
-	}
-	function createEntrySheetLevelHeads(deps) {
-		return (levels) => levels.map((level) => `<th class="qc-level-head" tabindex="0" data-qc-tooltip="${deps.escapeAttribute(level.tooltip)}" aria-label="Mức ${level.level}, lô ${deps.escapeAttribute(level.lot || "?")}. ${deps.escapeAttribute(level.tooltip)}">Mức ${level.level} · Lô ${deps.escape(level.lot || "?")}${level.parallel ? " <span class=\"qc-parallel-label\">Song song</span>" : ""}</th>`).join("");
-	}
-	function createEntryLeveyJenningsMiniHtml(deps) {
-		return (input) => {
-			const metrics = input.metrics.map((metric) => `<div class="lj-qc-stat${metric.control ? " control" : ""}"><span class="k">${metric.label}</span><span class="v">${metric.value}</span></div>`).join("");
-			const lot = input.lot || "?", previousLot = input.previousLot ? "Lô cũ" : "Lô";
-			return `<div class="lj-mini ${input.on ? "on" : ""}${input.parallel ? " lj-mini-parallel" : ""}" data-action="entryFocusLevel" data-args="[${input.level}]" data-keydown-action="entryFocusLevel" data-keydown-args="[${input.level}]" data-keydown-keys='["Enter"," "]' role="button" tabindex="0" aria-label="Chọn mức ${input.level}, lô ${deps.escapeAttribute(lot)}, ${input.pointCount} điểm${input.parallel ? ", lô chạy song song" : ""}"><div class="lj-mini-h"><b>Mức ${input.level} · ${previousLot} ${deps.escape(lot)}${input.parallel ? " <span class=\"qc-parallel-label\">Song song</span>" : ""}<span class="lj-point-count">${input.pointCount} điểm</span></b>${input.actionHtml}</div><div class="lj-qc-strip" tabindex="0">${metrics}</div><div class="chart-scroll" tabindex="0"><canvas class="entryLJStack" data-render-scale="2" data-test="${deps.escapeAttribute(input.testId)}" data-level="${input.level}" data-lot="${deps.escapeAttribute(input.lot)}" data-mean="${deps.escapeAttribute(input.mean)}" data-sd="${deps.escapeAttribute(input.sd)}" data-start="${input.start}" data-end="${input.end}" width="1400" height="380"></canvas></div></div>`;
-		};
-	}
-	//#endregion
-	//#region src/presentation/entry/entry-tree-html.ts
-	function createEntryTreeHeaderHtml(deps) {
-		return (input) => `<div class="entry-tree-head"><h4 role="heading" aria-level="2">Danh mục nội kiểm</h4>${input.collapseButtonHtml}</div><div class="tree-tools"><input id="entrySearch" aria-label="Tìm xét nghiệm, máy hoặc lô" placeholder="Tìm test, máy hoặc lô..." value="${deps.escapeAttribute(input.query)}" data-action="entryFilter" data-action-on="input"><select aria-label="Lọc theo máy xét nghiệm" data-action="entrySetMachine" data-action-on="change">${input.machineOptionsHtml}</select></div>`;
-	}
-	function createEntryTreeItemHtml(deps) {
-		const caret = (open) => open ? "−" : "+";
-		return Object.freeze({
-			empty: () => "<div class=\"tree-empty\" role=\"presentation\">Không có xét nghiệm phù hợp.</div>",
-			machine: (input) => `<div class="tnode tn-machine" data-tree-role="machine" data-key="${deps.escapeAttribute(input.key)}" role="treeitem" tabindex="0" aria-expanded="${input.open}" data-action="treeToggle" data-args="${deps.escapeAttribute(JSON.stringify([input.toggleKey]))}" data-keydown-action="entryTreeKey"><span class="caret" aria-hidden="true">${caret(input.open)}</span>${deps.escape(input.label)}</div>`,
-			group: (input) => `<div class="tnode tn-test ${input.open ? "open" : ""}" data-tree-role="group" data-key="${deps.escapeAttribute(input.key)}" data-search="${deps.escapeAttribute(input.search)}" role="treeitem" tabindex="0" aria-expanded="${input.open}" style="${input.parentOpen ? "" : "display:none"}" data-action="treeToggle" data-args="${deps.escapeAttribute(JSON.stringify([input.toggleKey]))}" data-keydown-action="entryTreeKey"><span class="caret" aria-hidden="true">${caret(input.open)}</span>${deps.escape(input.name)}<span class="state ${input.stateClass}">${deps.escape(input.stateText)}</span></div>`,
-			assay: (input) => `<div class="tnode tn-config ${input.selected ? "on" : ""}" data-tree-role="assay" data-test-id="${deps.escapeAttribute(input.testId)}" data-search="${deps.escapeAttribute(input.search)}" role="treeitem" tabindex="0" aria-current="${input.selected ? "true" : "false"}" style="${input.visible ? "" : "display:none"}" data-action="entryPick" data-args="${deps.escapeAttribute(JSON.stringify([input.testId, input.level]))}" data-keydown-action="entryTreeKey"><span class="config-name">${deps.escape(input.name)}</span><span class="state ${input.stateClass}">${deps.escape(input.stateText)}</span></div>`
-		});
-	}
-	//#endregion
-	//#region src/presentation/entry/entry-range-summary-html.ts
-	function entryRangeSummaryHtml(input) {
-		const detail = input.eligible ? ` Đủ điều kiện lập dải mới (${input.resultCount} kết quả / ${input.dayCount} ngày độc lập). Dải đề xuất: Mean=${input.proposedMean} SD=${input.proposedSd} CV=${input.proposedCv}%.` : ` Cần ≥20 kết quả trên ≥20 ngày độc lập, không có điểm vi phạm/cảnh báo chưa xử lý — hiện ${input.resultCount} kết quả / ${input.dayCount} ngày.`;
-		return `<details class="panel entry-secondary-panel range-summary-panel" ${input.open ? "open" : ""} data-toggle-action="entryDetailToggled" data-toggle-args='["range"]'><summary class="entry-secondary-summary"><span>Thống kê toàn bộ &amp; Dải kiểm soát</span><small>${input.summary}</small></summary><div class="entry-secondary-body"><div class="range-band-note"><div class="range-band-label">Dải đang dùng:</div><div class="range-band-source">${input.source}</div><div class="range-band-body">· Mean=${input.mean} SD=${input.sd}.${detail}</div></div>${input.actionsHtml}</div></details>`;
-	}
-	//#endregion
-	//#region src/presentation/entry/entry-worksheet-html.ts
-	function entryWorksheetHtml(input) {
-		const rows = input.rowsHtml || `<tr><td colspan="${6 + input.columnCount}" class="empty-cell">Chưa có điểm nào trong khoảng này.</td></tr>`;
-		return `<div class="panel qc-sheet-panel"><div class="qc-sheet-heading"><div class="qc-sheet-title"><span>Bảng nhập QC</span><strong>${input.testName}</strong><small>Lô ${input.lotLabel}</small></div><div class="qc-month-area"><div class="qc-month-picker"><select aria-label="Chọn tháng" data-action="entrySetSheetPart" data-args='["month"]' data-action-on="change">${input.monthOptionsHtml}</select><select aria-label="Chọn năm" data-action="entrySetSheetPart" data-args='["year"]' data-action-on="change">${input.yearOptionsHtml}</select>${input.currentMonthButtonHtml}${input.todayButtonHtml}</div></div></div><div class="qc-sheet-wrap" role="region" aria-label="Bảng nhập QC theo tháng" tabindex="0"><table class="qc-sheet"><thead><tr><th>Ngày</th>${input.levelHeadHtml}<th>NV thực hiện</th><th>Vi phạm cảnh báo</th><th>Vi phạm loại bỏ</th><th>Chấp nhận</th><th>Ghi chú</th></tr></thead><tbody>${rows}</tbody></table></div><div id="entryMsg" role="status" aria-live="polite" style="margin:12px 16px 16px">${input.messageHtml}</div></div>`;
-	}
-	//#endregion
-	//#region src/presentation/entry/entry-levey-panel-html.ts
-	function entryLeveyPanelHtml(input) {
-		return `<div class="panel"><div class="lj-toolbar"><h2 class="panel-title">Biểu đồ Levey-Jennings</h2><div class="lj-filter"><label class="lj-date-field"><span class="hint">Từ ngày</span>${input.startDateHtml}</label><label class="lj-date-field"><span class="hint">Đến ngày</span>${input.endDateHtml}</label><div class="dayseg">${input.dayButtonsHtml}</div></div></div><div class="hint lj-range">Khoảng xem: ${input.rangeText}</div><div class="lj-stack">${input.stackHtml}</div><div class="legend"><span><span class="dot" style="background:#0e8f8f"></span> Trong ±2SD</span><span><span class="dot" style="background:#dd8b1f"></span> Cảnh báo 2–3SD</span><span><span class="dot" style="background:#c5221f"></span> Loại bỏ ngoài 3SD</span></div></div>`;
-	}
-	//#endregion
-	//#region src/presentation/entry/entry-page-layout-html.ts
-	function entryPageLayoutHtml(input) {
-		return `${input.pageHeadHtml}<div class="entrygrid${input.treeCollapsed ? " tree-collapsed" : ""}">${input.expandButtonHtml}<div class="tree" id="entryTreePanel">${input.treeHeadHtml}<div role="tree" aria-label="Danh mục nội kiểm">${input.treeHtml}</div></div><div class="entry-main">${input.rightHtml}</div></div>`;
-	}
-	//#endregion
-	//#region src/presentation/entry/entry-voided-points-html.ts
-	function entryVoidedPointsHtml(rowsHtml) {
-		if (!rowsHtml) return "";
-		return `<div class="qc-voided-box"><h4>Điểm đã hủy trong khoảng</h4><table class="qc-voided-table"><thead><tr><th>Ngày</th><th>Mức / lô</th><th class="num">Giá trị</th><th>Lần chạy</th><th>Người hủy</th><th>Lý do</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`;
-	}
-	//#endregion
-	//#region src/presentation/entry/entry-points-panel-html.ts
-	function entryPointsPanelHtml(input) {
-		return `<details class="panel entry-secondary-panel qc-points-panel" ${input.open ? "open" : ""} data-toggle-action="entryDetailToggled" data-toggle-args='["points"]'><summary class="entry-secondary-summary"><span>Điểm trong khoảng xem</span><small>Tra cứu chi tiết, luật vi phạm và điểm đã hủy</small></summary><div class="entry-secondary-body"><div class="hint qc-cumulative-note">Thống kê tích lũy tính từ đầu LOT đến ${input.endDateText}; bảng bên dưới hiển thị từ ${input.startDateText} đến ${input.endDateText}.</div><div class="qc-table-grid">${input.tableCardsHtml}</div>${input.voidedBoxHtml}</div></details>`;
-	}
-	//#endregion
-	//#region src/presentation/entry/entry-cumulative-stats-html.ts
-	function entryCumulativeStatsHtml(input) {
-		return `<div class="qc-cumulative" title="Tính từ đầu LOT đến ${input.endDateText}"><div><span>N tích lũy</span><b>${input.count}</b></div><div><span>Mean tích lũy</span><b>${input.mean}</b></div><div><span>SD tích lũy</span><b>${input.sd}</b></div><div><span>CV tích lũy</span><b>${input.cv}</b></div></div>`;
-	}
-	//#endregion
-	//#region src/presentation/entry/entry-table-window-note-html.ts
-	function entryTableWindowNoteHtml(input) {
-		if (input.limited) return `<div class="table-window-note">Đang hiển thị ${input.shown}/${input.total} điểm gần nhất. ${input.actionButtonHtml}</div>`;
-		if (input.expanded && input.total > 0) return `<div class="table-window-note">Đang hiển thị toàn bộ ${input.total} điểm. ${input.actionButtonHtml}</div>`;
-		return "";
-	}
-	//#endregion
-	//#region src/presentation/entry/entry-point-table-card-html.ts
-	function entryPointTableCardHtml(input) {
-		return `<div class="qc-table-card${input.parallel ? " qc-parallel-card" : ""}" role="region" aria-label="Điểm QC mức ${input.level}, lô ${input.lot}${input.parallel ? ", lô chạy song song" : ""}" tabindex="0"><h4><span>Mức ${input.level} · ${input.previousLot ? "Lô cũ" : "Lô"} ${input.lot}${input.parallel ? " <span class=\"qc-parallel-label\">Song song</span>" : ""}<span class="hint qc-table-count">${input.pointCount} điểm trong khoảng</span></span></h4>${input.bodyHtml}</div>`;
-	}
-	//#endregion
-	//#region src/presentation/entry/entry-point-table-row-html.ts
-	function entryPointTableRowHtml(input) {
-		return `<tr${input.rejected ? " class=\"qc-point-rej\"" : input.warning ? " class=\"qc-point-warn\"" : ""} data-qc-point-id="${input.pointId}" tabindex="-1"><td>${input.dateText}</td><td class="num"><b>${input.valueText}</b></td><td class="num">${input.zText}</td><td><span class="tag ${input.verdictLevel}">${input.verdictText}</span></td><td>${input.rulesHtml}</td><td class="qc-row-actions">${input.voidButtonHtml}</td></tr>`;
-	}
-	//#endregion
-	//#region src/presentation/entry/entry-voided-point-row-html.ts
-	function entryVoidedPointRowHtml(input) {
-		return `<tr data-qc-point-id="${input.pointId}" tabindex="-1"><td>${input.dateText}</td><td>${input.levelLotText}</td><td class="num">${input.valueText}</td><td>${input.runId}</td><td>${input.voidedBy}</td><td>${input.reason}</td></tr>`;
-	}
-	//#endregion
-	//#region src/presentation/entry/entry-sheet-day-row-html.ts
-	function entrySheetDayRowHtml(input) {
-		return `<tr class="${input.rowClass}" data-date="${input.date}"><td><span>${input.dayOfMonth}</span>${input.today ? "<b>Hôm nay</b>" : ""}</td>${input.cellsHtml}<td class="qc-staff-cell">${input.staffHtml}</td><td>${input.warningRules || "—"}</td><td>${input.rejectRules || "—"}</td><td>${input.statusHtml}</td><td>${input.noteHtml}</td></tr>`;
-	}
-	//#endregion
-	//#region src/presentation/entry/entry-sheet-day-summary-html.ts
-	function createEntrySheetDaySummaryHtml(deps) {
-		return Object.freeze({
-			staff: (staff) => staff.length ? staff.map((item) => `<span class="qc-staff" title="${deps.escapeAttribute(item.name || item.code)}">${deps.escape(item.code)}</span>`).join("<span class=\"qc-staff-sep\">/</span>") : "—",
-			status: (hasPoint, worst) => !hasPoint ? "—" : worst === "rej" ? "<span class=\"tag rej\">R</span>" : worst === "warn" ? "<span class=\"tag warn\">W(A)</span>" : "<span class=\"tag ok\">A</span>"
-		});
-	}
-	//#endregion
 	//#region src/presentation/entry/entry-void-modal-html.ts
 	function entryVoidModalHtml(input) {
 		return `<div class="modal"><div class="modal-h"><h3>Hủy điểm QC</h3>${input.closeButtonHtml}</div><div class="modal-b"><div class="hint">${input.pointInfoHtml}</div><label>Loại hủy</label><select id="voidKindInput" aria-label="Loại hủy điểm QC" data-action="syncVoidNceChoice" data-action-on="change"><option value="analytical">Kết quả QC thực tế không hợp lệ</option><option value="data-entry">Nhập sai dữ liệu</option><option value="other">Lý do khác</option></select><div class="void-nce-choice"><label><input id="voidOpenNce" type="checkbox" checked disabled> Lập hồ sơ NCE và yêu cầu chạy lại QC</label><div id="voidNceHint" class="hint">Hệ thống sẽ mở hoặc tái sử dụng hồ sơ NCE và chờ một kết quả QC chạy lại được chấp nhận.</div></div><div id="voidReasonBox"><label id="voidReasonLabel">Ghi chú / bằng chứng (khuyến nghị)</label><textarea id="voidReasonInput" aria-label="Ghi chú lý do hủy điểm QC" placeholder="VD: Máy báo lỗi hút mẫu lúc 08:15, đã ghi nhận trong sổ bảo trì..." data-action="hideFieldError" data-args='["voidReasonErr"]' data-action-on="input"></textarea><div id="voidReasonErr" class="hint field-error">Cần ghi lý do hủy tối thiểu 5 ký tự.</div></div></div><div class="modal-f">${input.closeFooterButtonHtml}${input.confirmButtonHtml}</div></div>`;
@@ -12974,35 +12860,6 @@
 	//#region src/presentation/entry/entry-pre-save-warning-modal-html.ts
 	function entryPreSaveWarningModalHtml(input) {
 		return `<div class="modal"><div class="modal-h"><h3>Cảnh báo dữ liệu bất thường</h3><button class="modal-close" data-action="entryCloseKeepScroll">×</button></div><div class="modal-b">${input.issuesHtml}<div class="hint">Bạn vẫn muốn lưu điểm QC này?</div></div><div class="modal-f">${input.cancelButtonHtml}${input.saveButtonHtml}</div></div>`;
-	}
-	//#endregion
-	//#region src/presentation/entry/entry-sheet-run-slot-html.ts
-	function entrySheetEmptyRunHtml(input) {
-		if (!input.editable) return "<div class=\"qc-run-slot muted\"><b>—</b></div>";
-		return `<div class="qc-run-slot"><input class="qc-inline-input empty" type="text" inputmode="decimal" autocomplete="off" placeholder="--" title="${input.title}" aria-label="${input.ariaLabel}" aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Enter" data-focus-date="${input.date}" data-focus-run="${input.runNo}" data-focus-level="${input.levelIndex}" data-keydown-action="entrySheetKey" ${input.actionAttrs}></div>`;
-	}
-	function entrySheetSavedRunHtml(input) {
-		return `<div class="qc-run-slot${input.previousLot ? " prev-lot-slot" : ""}"><b class="qc-value-chip ${input.valueClass}" title="${input.title}">${input.valueText}</b><small>${input.zText} · ${input.previousLot ? `Lô ${input.previousLotName}` : input.verdictText}</small></div>`;
-	}
-	//#endregion
-	//#region src/presentation/entry/entry-sheet-cell-html.ts
-	function entrySheetCellHtml(input) {
-		return `<td class="num qc-run-cell${input.parallel ? " qc-parallel-cell" : ""}"><div class="qc-run-grid${input.hasAddButton ? " has-add-btn" : ""}">${input.runInputsHtml}</div>${input.addRunButtonHtml}</td>`;
-	}
-	//#endregion
-	//#region src/presentation/entry/entry-sheet-day-detail-html.ts
-	function entrySheetNoteHtml(input) {
-		if (!input.hasPoint) return "—";
-		if (input.writable) return `<textarea class="qc-note-input" rows="1" placeholder="${input.placeholder}" ${input.actionAttrs}>${input.manualNote}</textarea>`;
-		return input.manualNote || input.autoNote || "—";
-	}
-	function entrySheetAddRunHtml(input) {
-		return input.visible ? `<button type="button" class="qc-add-run-btn" title="Thêm lần chạy bổ sung" ${input.actionAttrs}><span class="qc-add-run-icon">+</span><span class="qc-add-run-label">Thêm</span></button>` : "";
-	}
-	//#endregion
-	//#region src/presentation/entry/entry-empty-page-html.ts
-	function createEntryEmptyPageHtml(deps) {
-		return (input) => `${deps.head("Nhập QC", "")}<div class="panel">${deps.empty(input.title, input.message, input.actionHtml || "")}</div>`;
 	}
 	//#endregion
 	//#region src/presentation/manage/target-switch-modal-html.ts
@@ -13658,28 +13515,6 @@
 		return `${year}-${String(month).padStart(2, "0")}`;
 	}
 	//#endregion
-	//#region src/presentation/entry/entry-tree-state.ts
-	function createEntryTreeState(deps) {
-		return (test) => {
-			if (!test) return "none";
-			const order = {
-				none: -1,
-				ok: 0,
-				warn: 1,
-				rej: 2
-			};
-			const westgard = deps.activeWestgard(test);
-			let worst = "none";
-			deps.operationalLevels(test).forEach((level) => {
-				const points = deps.pointsForLot(test.id, level.level, level.lot || "");
-				const last = points[points.length - 1];
-				const verdict = (last && westgard.byPoint.get(last.id) || {}).level || "none";
-				if ((order[verdict] ?? -1) > order[worst]) worst = verdict;
-			});
-			return worst;
-		};
-	}
-	//#endregion
 	//#region src/presentation/entry/entry-sheet-navigation.ts
 	function createEntrySheetNavigation(deps) {
 		const target = (inputs, current, key, shiftKey = false) => {
@@ -13707,21 +13542,6 @@
 	//#region src/presentation/entry/entry-sheet-input-order.ts
 	function createEntrySheetInputOrder(deps) {
 		return (inputs) => [...inputs].sort((left, right) => deps.date(left).localeCompare(deps.date(right), "vi", { numeric: true }) || deps.run(left) - deps.run(right) || deps.level(left) - deps.level(right));
-	}
-	//#endregion
-	//#region src/presentation/entry/entry-tree-group-state.ts
-	var ENTRY_TREE_STATE_ORDER = {
-		none: -1,
-		ok: 0,
-		warn: 1,
-		rej: 2
-	};
-	function entryTreeGroupState(states) {
-		let worst = "none";
-		states.forEach((state) => {
-			if ((ENTRY_TREE_STATE_ORDER[state] ?? -1) > ENTRY_TREE_STATE_ORDER[worst]) worst = state;
-		});
-		return worst;
 	}
 	//#endregion
 	//#region src/presentation/entry/entry-tree-navigation.ts
@@ -19444,11 +19264,14 @@
 	//#region src/presentation/entry/entry-page-controller.ts
 	/**
 	* Trang "Nhập QC" (Entry) — nhập/hủy điểm QC theo ngày, mức QC và lô đang vận
-	* hành, trang thao tác dữ liệu nhạy cảm nhất của ứng dụng. Toàn bộ HTML thật
-	* nằm trong các hàm `deps.pres.entryXxxHtml()` (TypeScript, đã bridge từ các
-	* đợt UI-thuần trước); controller này chỉ còn phần điều phối — đọc state,
-	* dựng cây xét nghiệm/bảng nhập/biểu đồ Levey-Jennings, ghi UI state, và gọi
-	* đúng workflow command TypeScript khi ghi/hủy điểm QC hay ghi chú ngày.
+	* hành, trang thao tác dữ liệu nhạy cảm nhất của ứng dụng. Đã chuyển sang
+	* React (2026-08-30, trang cuối cùng — xem docs/REACT-ADOPTION-PLAN.md):
+	* `entryModel()` là dữ liệu thuần cho `src/react/pages/EntryPage.tsx`; hai
+	* hàm HTML còn lại (`deps.pres.entryVoidModalHtml`/`entryPreSaveWarningModalHtml`)
+	* chỉ phục vụ 2 modal render vào `#modalRoot`, ngoài tầm React. Controller còn
+	* lại là phần điều phối — đọc state, dựng cây xét nghiệm/bảng nhập/biểu đồ
+	* Levey-Jennings, ghi UI state, và gọi đúng workflow command TypeScript khi
+	* ghi/hủy điểm QC hay ghi chú ngày.
 	*
 	* `document`/`window`/`localStorage` là getter LAZY — không phải giá trị
 	* capture một lần — vì test (`tests/partial-render-helpers.test.js`) gán lại
@@ -19459,7 +19282,6 @@
 		const state = () => deps.getState();
 		const ui = () => deps.ui();
 		const doc = () => deps.document();
-		const win = () => deps.window();
 		const ENTRY_TABLE_INITIAL_ROWS = 180;
 		const entryWindowFor = (testId, level, endOverride, startOverride) => deps.EntryService.buildEntryWindow({
 			points: deps.pointsOf(testId, level),
@@ -19485,23 +19307,24 @@
 			ui().entryTreeCollapsed = deps.pres.entryTreeCollapsePreference.read(() => deps.localStorage().getItem("qclab_entry_tree_collapsed"));
 			return !!ui().entryTreeCollapsed;
 		};
-		const pageEntry = (rightOnly = false) => {
+		const entryModel = () => {
 			const s = state();
 			const today = deps.isoToday();
-			if (!s.tests.length) return deps.pres.entryEmptyPageHtml({
+			if (!s.tests.length) return {
+				empty: true,
 				title: "Chưa có xét nghiệm",
 				message: "Cần khai báo xét nghiệm và mức QC trước khi nhập kết quả.",
-				actionHtml: deps.role() === "admin" ? deps.btn("Thêm xét nghiệm", {
-					action: "go",
-					args: ["manage"]
-				}, "teal") : ""
-			});
+				canAdd: deps.role() === "admin",
+				addTarget: "manage"
+			};
 			const entryTests = deps.operationalTests();
-			if (!entryTests.length) return deps.pres.entryEmptyPageHtml({
+			if (!entryTests.length) return {
+				empty: true,
 				title: "Chưa có xét nghiệm sẵn sàng nhập",
 				message: "Cần đưa xét nghiệm vào Panel QC, ghép Nhóm lô QC và gán Mean/SD trước khi nhập kết quả.",
-				actionHtml: deps.role() === "admin" ? deps.btn("Cấu hình Mean/SD", { action: "goManageTargets" }, "teal") : ""
-			});
+				canAdd: deps.role() === "admin",
+				addTarget: "targets"
+			};
 			if (!ui().entrySheetMonth) ui().entrySheetMonth = deps.isoMonth();
 			let selT = ui().entrySel && entryTests.find((t) => t.id === ui().entrySel.testId);
 			if (!selT || !deps.operationalLevels(selT).some((l) => l.level === ui().entrySel.level)) {
@@ -19514,100 +19337,95 @@
 				ui().entryAutoOpenKey = null;
 			}
 			const treeCollapsed = entryTreeIsCollapsed();
-			const treePanelIcon = "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"2\"/><line x1=\"9\" y1=\"4\" x2=\"9\" y2=\"20\"/></svg>";
-			let tree = "", treeHead = "";
-			if (!rightOnly) {
-				const machinesAll = [...deps.EntryService.groupByMachine(entryTests).keys()];
-				const selM = selT.machine || "(Chưa gán máy)";
-				if (ui().entryMachine !== "all" && !machinesAll.includes(ui().entryMachine)) ui().entryMachine = "all";
-				const selGroup = deps.operationalLotGroupForTest(selT);
-				const autoKey = selM + "|" + selGroup.key + "|" + ui().entrySel.testId;
-				if (ui().entryAutoOpenKey !== autoKey) {
-					ui().treeOpen.add("m:" + selM);
-					ui().treeOpen.add("lg:" + selM + "|" + selGroup.key);
-					ui().entryAutoOpenKey = autoKey;
-				}
-				const byM = deps.EntryService.groupByMachine(entryTests.filter((t) => ui().entryMachine === "all" || (t.machine || "(Chưa gán máy)") === ui().entryMachine));
-				const machines = [...byM.keys()];
-				const machineOpts = ["<option value=\"all\">Tất cả máy</option>"].concat(machinesAll.map((m) => `<option value="${deps.escapeAttr(m)}" ${ui().entryMachine === m ? "selected" : ""}>${deps.esc(m)}</option>`)).join("");
-				treeHead = deps.pres.entryTreeHeaderHtml({
-					collapseButtonHtml: deps.btn(treePanelIcon, { action: "toggleEntryTree" }, "ghost icon entry-tree-toggle", "Ẩn danh mục nội kiểm", { attrs: {
-						"aria-label": "Ẩn danh mục nội kiểm",
-						"aria-controls": "entryTreePanel",
-						"aria-expanded": "true"
-					} }),
-					query: ui().entryQ,
-					machineOptionsHtml: machineOpts
-				});
-				if (!machines.length) tree += deps.pres.entryTreeItemHtml.empty();
-				machines.forEach((mc) => {
-					const mk = "m:" + mc, mo = ui().treeOpen.has(mk);
-					tree += deps.pres.entryTreeItemHtml.machine({
-						key: mk,
-						open: mo,
-						label: mc,
-						toggleKey: deps.jsq(mk)
-					});
-					const groups = /* @__PURE__ */ new Map();
-					byM.get(mc).forEach((t) => {
-						const g = deps.operationalLotGroupForTest(t);
-						if (!groups.has(g.key)) groups.set(g.key, {
-							name: g.name,
-							tests: [],
-							order: deps.operationalTestOrder(t)
-						});
-						const grp = groups.get(g.key);
-						grp.tests.push(t);
-						grp.order = Math.min(grp.order, deps.operationalTestOrder(t));
-					});
-					[...groups.entries()].sort((a, b) => a[1].order - b[1].order || a[1].name.localeCompare(b[1].name, "vi")).forEach(([groupKey, grp]) => {
-						const gk = "lg:" + mc + "|" + groupKey, go = ui().treeOpen.has(gk), ord = {
-							none: -1,
-							ok: 0,
-							warn: 1,
-							rej: 2
-						};
-						let groupWorst = "none";
-						const rows = grp.tests.sort((a, b) => deps.operationalTestOrder(a) - deps.operationalTestOrder(b)).map((t) => {
-							const levels = deps.operationalLevels(t), on = ui().entrySel.testId === t.id, preferred = levels.find((x) => ui().entrySel.level === x.level) || levels[0], wg = deps.activeWestgard(t);
-							let worst = "none";
-							levels.forEach((l) => {
-								const pts = deps.pointsForLot(t.id, l.level, l.lot || ""), lastPoint = pts[pts.length - 1], last = lastPoint && wg.byPoint.get(lastPoint.id) || null, lastLevel = last ? last.level : "none";
-								if (ord[lastLevel] > ord[worst]) worst = lastLevel;
-							});
-							if (ord[worst] > ord[groupWorst]) groupWorst = worst;
-							const search = deps.searchText([
-								t.name,
-								deps.testDisplayName(t),
-								t.machine,
-								grp.name,
-								...levels.map((l) => l.lot)
-							].join(" "));
-							return deps.pres.entryTreeItemHtml.assay({
-								testId: t.id,
-								search,
-								selected: on,
-								visible: mo && go,
-								level: preferred ? preferred.level : 1,
-								name: deps.testDisplayName(t),
-								stateClass: worst === "none" ? "" : worst,
-								stateText: deps.stateName(worst)
-							});
-						});
-						tree += deps.pres.entryTreeItemHtml.group({
-							key: gk,
-							open: go,
-							parentOpen: mo,
-							search: deps.searchText(grp.name + " " + grp.tests.map((t) => t.name).join(" ")),
-							name: grp.name,
-							stateClass: groupWorst === "none" ? "" : groupWorst,
-							stateText: deps.stateName(groupWorst),
-							toggleKey: deps.jsq(gk)
-						});
-						tree += rows.join("");
-					});
-				});
+			const machinesAll = [...deps.EntryService.groupByMachine(entryTests).keys()];
+			const selM = selT.machine || "(Chưa gán máy)";
+			if (ui().entryMachine !== "all" && !machinesAll.includes(ui().entryMachine)) ui().entryMachine = "all";
+			const selGroup = deps.operationalLotGroupForTest(selT);
+			const autoKey = selM + "|" + selGroup.key + "|" + ui().entrySel.testId;
+			if (ui().entryAutoOpenKey !== autoKey) {
+				ui().treeOpen.add("m:" + selM);
+				ui().treeOpen.add("lg:" + selM + "|" + selGroup.key);
+				ui().entryAutoOpenKey = autoKey;
 			}
+			const byM = deps.EntryService.groupByMachine(entryTests.filter((t) => ui().entryMachine === "all" || (t.machine || "(Chưa gán máy)") === ui().entryMachine));
+			const machines = [...byM.keys()];
+			const machineOptions = [{
+				value: "all",
+				label: "Tất cả máy"
+			}, ...machinesAll.map((m) => ({
+				value: m,
+				label: m
+			}))];
+			const treeNodes = [];
+			if (!machines.length) treeNodes.push({ kind: "empty" });
+			machines.forEach((mc) => {
+				const mk = "m:" + mc, mo = ui().treeOpen.has(mk);
+				treeNodes.push({
+					kind: "machine",
+					key: mk,
+					open: mo,
+					label: mc
+				});
+				const groups = /* @__PURE__ */ new Map();
+				byM.get(mc).forEach((t) => {
+					const g = deps.operationalLotGroupForTest(t);
+					if (!groups.has(g.key)) groups.set(g.key, {
+						name: g.name,
+						tests: [],
+						order: deps.operationalTestOrder(t)
+					});
+					const grp = groups.get(g.key);
+					grp.tests.push(t);
+					grp.order = Math.min(grp.order, deps.operationalTestOrder(t));
+				});
+				[...groups.entries()].sort((a, b) => a[1].order - b[1].order || a[1].name.localeCompare(b[1].name, "vi")).forEach(([groupKey, grp]) => {
+					const gk = "lg:" + mc + "|" + groupKey, go = ui().treeOpen.has(gk), ord = {
+						none: -1,
+						ok: 0,
+						warn: 1,
+						rej: 2
+					};
+					let groupWorst = "none";
+					const rows = grp.tests.sort((a, b) => deps.operationalTestOrder(a) - deps.operationalTestOrder(b)).map((t) => {
+						const levels = deps.operationalLevels(t), on = ui().entrySel.testId === t.id, preferred = levels.find((x) => ui().entrySel.level === x.level) || levels[0], wg = deps.activeWestgard(t);
+						let worst = "none";
+						levels.forEach((l) => {
+							const pts = deps.pointsForLot(t.id, l.level, l.lot || ""), lastPoint = pts[pts.length - 1], last = lastPoint && wg.byPoint.get(lastPoint.id) || null, lastLevel = last ? last.level : "none";
+							if (ord[lastLevel] > ord[worst]) worst = lastLevel;
+						});
+						if (ord[worst] > ord[groupWorst]) groupWorst = worst;
+						const search = deps.searchText([
+							t.name,
+							deps.testDisplayName(t),
+							t.machine,
+							grp.name,
+							...levels.map((l) => l.lot)
+						].join(" "));
+						return {
+							kind: "assay",
+							testId: t.id,
+							search,
+							selected: on,
+							visible: mo && go,
+							level: preferred ? preferred.level : 1,
+							name: deps.testDisplayName(t),
+							stateClass: worst === "none" ? "" : worst,
+							stateText: deps.stateName(worst)
+						};
+					});
+					treeNodes.push({
+						kind: "group",
+						key: gk,
+						open: go,
+						parentOpen: mo,
+						search: deps.searchText(grp.name + " " + grp.tests.map((t) => t.name).join(" ")),
+						name: grp.name,
+						stateClass: groupWorst === "none" ? "" : groupWorst,
+						stateText: deps.stateName(groupWorst)
+					});
+					treeNodes.push(...rows);
+				});
+			});
 			const t = selT, l = deps.lvlCfg(t, ui().entrySel.level), entryWG = deps.activeWestgard(t), acceptedCache = /* @__PURE__ */ new Map();
 			const entryCols = deps.entryColumns(t), parWGByKey = /* @__PURE__ */ new Map();
 			entryCols.filter((c) => c.parallel).forEach((c) => parWGByKey.set(c.key, deps.parallelWestgard(t, c)));
@@ -19630,22 +19448,25 @@
 			const allSt = deps.stats(W.all.map((p) => p.val));
 			const cand = deps.rangeCandidate(t.id, l.level), candStats = cand && cand.c;
 			const eligible = cand && cand.eligible;
-			const rangeSummary = allSt ? `N=${allSt.n} · Mean thực=${deps.fmtTestValue(t, allSt.m)} · SD thực=${deps.fmtTestStat(t, allSt.sd)} · CV=${deps.fmt(allSt.cv)}%` : "Chưa có dữ liệu";
+			const rangeSummaryText = allSt ? `N=${allSt.n} · Mean thực=${deps.fmtTestValue(t, allSt.m)} · SD thực=${deps.fmtTestStat(t, allSt.sd)} · CV=${deps.fmt(allSt.cv)}%` : "Chưa có dữ liệu";
 			const rangeSource = l.applied === "lab" ? "PXN tự xây dựng" : "Nhà sản xuất";
-			const rangeBox = deps.pres.entryRangeSummaryHtml({
+			const rangeSummary = {
 				open: ui().entryDetailOpen.has("range"),
-				summary: rangeSummary,
+				summary: rangeSummaryText,
 				source: rangeSource,
 				mean: deps.fmtTestValue(t, l.mean),
 				sd: deps.fmtTestValue(t, l.sd),
-				eligible,
+				eligible: !!eligible,
 				resultCount: candStats ? candStats.n : 0,
 				dayCount: cand ? cand.days : 0,
 				proposedMean: candStats ? deps.fmtTestValue(t, candStats.m) : "—",
 				proposedSd: candStats ? deps.fmtTestValue(t, candStats.sd) : "—",
 				proposedCv: candStats ? deps.fmt(candStats.cv) : "—",
-				actionsHtml: deps.rangeActions(t.id, l.level, eligible, l.applied)
-			});
+				canApply: !!eligible,
+				canRevert: l.applied === "lab" && deps.canWrite(),
+				testId: t.id,
+				level: l.level
+			};
 			const levelViews = entryCols.map((x) => {
 				if (x.parallel) return {
 					x,
@@ -19654,7 +19475,7 @@
 				const prevSeries = deps.previousLotSeries(t, x.level), prevLot = ui().entryPrevOpen.get(t.id + "|" + x.level) || "";
 				return {
 					x,
-					prevView: prevSeries.find((s) => (s.lot || "") === prevLot)
+					prevView: prevSeries.find((s2) => (s2.lot || "") === prevLot)
 				};
 			});
 			const tableCards = levelViews.map(({ x, prevView }) => {
@@ -19675,72 +19496,76 @@
 						mean: lvlMean,
 						sd: lvlSd,
 						previousLot: prevView ? prevView.lot : void 0
-					}), lv = deps.qcVerdictLabel(view.level), voidBtn = deps.canWrite() ? deps.btn("Hủy", {
-						action: "voidQcPoint",
-						args: [t.id, p.id]
-					}, "danger sm", "Hủy điểm QC có ghi lý do") : "", rulesHtml = [...new Set(view.rules)].map((r) => `<span class="pill">${r}</span>`).join("") || "—";
-					return deps.pres.entryPointTableRowHtml({
+					}), lv = deps.qcVerdictLabel(view.level);
+					return {
 						rejected: view.level === "rej",
 						warning: view.level === "warn",
-						pointId: deps.escapeAttr(p.id || ""),
+						pointId: p.id || "",
 						dateText: deps.vnDate(p.date),
 						valueText: deps.fmtPointValue(p, t),
 						zText: `${view.z >= 0 ? "+" : ""}${deps.fmt(view.z)}s`,
 						verdictLevel: view.level,
 						verdictText: lv,
-						rulesHtml,
-						voidButtonHtml: voidBtn
-					});
-				}).join("");
-				const cumulative = deps.pres.entryCumulativeStatsHtml({
+						rules: [...new Set(view.rules)],
+						canVoid: deps.canWrite()
+					};
+				});
+				const cumulative = {
 					endDateText: deps.vnDate(W.end),
 					count: cumulativeSt ? cumulativeSt.n : 0,
 					mean: cumulativeSt ? deps.fmtTestValue(t, cumulativeSt.m) : "—",
 					sd: cumulativeSt ? deps.fmtTestStat(t, cumulativeSt.sd) : "—",
 					cv: cumulativeSt ? deps.fmt(cumulativeSt.cv) + "%" : "—"
-				});
-				const rowControl = deps.pres.entryTableWindowNoteHtml({
+				};
+				const rowControl = rowWindow.limited || rowWindow.expanded && rowWindow.total > ENTRY_TABLE_INITIAL_ROWS ? {
 					limited: rowWindow.limited,
 					expanded: rowWindow.expanded && rowWindow.total > ENTRY_TABLE_INITIAL_ROWS,
 					shown: rowWindow.rows.length,
 					total: rowWindow.total,
-					actionButtonHtml: deps.btn(rowWindow.limited ? "Hiện toàn bộ" : "Thu gọn", {
-						action: "entryToggleRows",
-						args: [tableKey]
-					}, "ghost sm")
-				});
-				return deps.pres.entryPointTableCardHtml({
+					tableKey
+				} : null;
+				return {
 					parallel: x.parallel,
 					level: x.level,
 					previousLot: !!prevView,
-					lot: deps.esc(lvlLot || "?"),
+					lot: lvlLot || "?",
 					pointCount: allPtsIdx.length,
-					bodyHtml: `${cumulative}${ptsIdx.length ? `<table><thead><tr><th>Ngày</th><th class="num">Giá trị</th><th class="num">Z</th><th>Kết luận</th><th>Luật</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table>${rowControl}` : "<div class=\"empty qc-table-empty\">Chưa có điểm nào trong khoảng này.</div>"}`
-				});
-			}).join("");
+					cumulative,
+					rows,
+					rowControl
+				};
+			});
 			const prevLotByLevel = new Map(levelViews.filter((v) => v.prevView).map((v) => [v.x.level, v.prevView.lot]));
 			const voidedRows = (s.data[t.id] || []).filter((p) => {
 				if (!p.voided) return false;
 				const pv = prevLotByLevel.get(p.level);
 				return pv != null ? (p.lot || "") === pv : p.date >= W.start && p.date <= W.end;
-			}).sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")) || deps.pointRunNo(a) - deps.pointRunNo(b)).map((p) => deps.pres.entryVoidedPointRowHtml({
-				pointId: deps.escapeAttr(p.id || ""),
+			}).sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")) || deps.pointRunNo(a) - deps.pointRunNo(b)).map((p) => ({
+				pointId: p.id || "",
 				dateText: deps.vnDate(p.date),
-				levelLotText: `Mức ${p.level} · Lô ${deps.esc(p.lot || "?")}`,
+				levelLotText: `Mức ${p.level} · Lô ${p.lot || "?"}`,
 				valueText: deps.fmtPointValue(p, t),
-				runId: deps.esc(p.runId || "—"),
-				voidedBy: deps.esc(p.voidedBy || ""),
-				reason: deps.esc(p.voidReason || "")
-			})).join("");
-			const voidedBox = deps.pres.entryVoidedPointsHtml(voidedRows);
-			const pointsInView = deps.pres.entryPointsPanelHtml({
+				runId: p.runId || "—",
+				voidedBy: p.voidedBy || "",
+				reason: p.voidReason || ""
+			}));
+			const pointsInView = {
 				open: ui().entryDetailOpen.has("points"),
 				endDateText: deps.vnDate(W.end),
 				startDateText: deps.vnDate(W.start),
-				tableCardsHtml: tableCards,
-				voidedBoxHtml: voidedBox
-			});
-			const dayBtns = deps.pres.entryDayPresetButtons(ui().entryDays, !!ui().entryStart);
+				tableCards,
+				voidedRows
+			};
+			const dayPresetOptions = [
+				7,
+				14,
+				30,
+				60,
+				90
+			].map((day) => ({
+				days: day,
+				on: !ui().entryStart && ui().entryDays === day
+			}));
 			ui().entryLjRenderCache = {
 				testId: t.id,
 				start: W.start,
@@ -19748,7 +19573,7 @@
 				levels: /* @__PURE__ */ new Map()
 			};
 			const ljStack = entryCols.map((x) => {
-				const on = x.level === ui().entrySel.level && !x.parallel, curPts = (x.parallel ? deps.entryColumnPoints(t, x) : acceptedForLevel(x.level)).filter((p) => p.date >= W.start && p.date <= W.end && (p.lot || "") === (x.lot || "")), prevSeries = x.parallel ? [] : deps.previousLotSeries(t, x.level), prevLot = ui().entryPrevOpen.get(t.id + "|" + x.level) || "", prevView = prevSeries.find((s2) => (s2.lot || "") === prevLot), targetCfg = prevView || deps.pres.entryColumnConfig(t, x.level, x.lot), chartPts = prevView ? prevView.pts : curPts, chartLot = prevView ? prevView.lot : x.lot, chartMean = targetCfg && targetCfg.mean, chartSd = targetCfg && targetCfg.sd, st = deps.stats(chartPts.map((p) => p.val));
+				const on = x.level === ui().entrySel.level && !x.parallel, curPts = (x.parallel ? deps.entryColumnPoints(t, x) : acceptedForLevel(x.level)).filter((p) => p.date >= W.start && p.date <= W.end && (p.lot || "") === (x.lot || "")), prevSeries = x.parallel ? [] : deps.previousLotSeries(t, x.level), prevLot = ui().entryPrevOpen.get(t.id + "|" + x.level) || "", prevView = prevSeries.find((s2) => (s2.lot || "") === prevLot), targetCfg = prevView || entryColumnCfg(t, x.level, x.lot), chartPts = prevView ? prevView.pts : curPts, chartLot = prevView ? prevView.lot : x.lot, chartMean = targetCfg && targetCfg.mean, chartSd = targetCfg && targetCfg.sd, st = deps.stats(chartPts.map((p) => p.val));
 				ui().entryLjRenderCache.levels.set(`${x.level}|${chartLot || ""}`, chartPts);
 				const metrics = [
 					{
@@ -19774,14 +19599,21 @@
 						control: true
 					}
 				];
-				const prevBtn = x.parallel ? "<span class=\"hint\">Đang đánh giá</span>" : prevSeries.length ? prevView ? deps.btn("Xem lô mới", {
-					action: "entryShowCurrentLot",
-					args: [x.level]
-				}, "teal sm") : deps.btn("Xem lô cũ", {
-					action: "entryShowPrevLot",
-					args: [x.level, prevSeries[0].lot || ""]
-				}, "ghost sm") : `<span class="hint">${x.applied === "lab" ? "Dải PXN" : "Dải NSX"}</span>`;
-				return deps.pres.entryLeveyJenningsMiniHtml({
+				const action = x.parallel ? {
+					kind: "hint",
+					text: "Đang đánh giá"
+				} : prevSeries.length ? prevView ? {
+					kind: "showCurrent",
+					level: x.level
+				} : {
+					kind: "showPrev",
+					level: x.level,
+					lot: prevSeries[0].lot || ""
+				} : {
+					kind: "hint",
+					text: x.applied === "lab" ? "Dải PXN" : "Dải NSX"
+				};
+				return {
 					on,
 					parallel: x.parallel,
 					level: x.level,
@@ -19789,28 +19621,26 @@
 					pointCount: chartPts.length,
 					previousLot: !!prevView,
 					metrics,
-					actionHtml: prevBtn,
+					action,
 					testId: t.id,
 					mean: chartMean,
 					sd: chartSd,
 					start: W.start,
 					end: W.end
-				});
-			}).join("");
-			const levelHead = deps.pres.entrySheetLevelHeads(entryCols.map((x) => {
-				const cfg = deps.pres.entryColumnConfig(t, x.level, x.lot), mean = Number(cfg && cfg.mean), sd = Number(cfg && cfg.sd), limits = Number.isFinite(mean) && Number.isFinite(sd) ? `${deps.fmtTestValue(t, mean - 2 * sd)} – ${deps.fmtTestValue(t, mean + 2 * sd)}` : "—", tooltip = `Mean ${Number.isFinite(mean) ? deps.fmtTestValue(t, mean) : "—"} · SD ${Number.isFinite(sd) ? deps.fmtTestStat(t, sd) : "—"} · ±2SD ${limits}`;
+				};
+			});
+			const levelHeads = entryCols.map((x) => {
+				const cfg = entryColumnCfg(t, x.level, x.lot), mean = Number(cfg && cfg.mean), sd = Number(cfg && cfg.sd), limits = Number.isFinite(mean) && Number.isFinite(sd) ? `${deps.fmtTestValue(t, mean - 2 * sd)} – ${deps.fmtTestValue(t, mean + 2 * sd)}` : "—", tooltip = `Mean ${Number.isFinite(mean) ? deps.fmtTestValue(t, mean) : "—"} · SD ${Number.isFinite(sd) ? deps.fmtTestStat(t, sd) : "—"} · ±2SD ${limits}`;
 				return {
 					level: x.level,
 					lot: x.lot || "",
 					parallel: x.parallel,
 					tooltip
 				};
-			}));
+			});
 			const sheetCalendar = deps.EntryService.buildSheetCalendar(ui().entrySheetMonth, deps.isoToday()), activeSheetMonth = sheetCalendar.activeMonth;
 			ui().entrySheetMonth = activeSheetMonth;
 			const sheetYear = sheetCalendar.year, sheetMonthNo = sheetCalendar.month, sheetStart = sheetCalendar.start, sheetEnd = sheetCalendar.end;
-			const sheetMonthOptions = Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}" ${sheetMonthNo === i + 1 ? "selected" : ""}>Tháng ${i + 1}</option>`).join("");
-			const sheetYearOptions = Array.from({ length: sheetCalendar.yearMax - sheetCalendar.yearMin + 1 }, (_, i) => sheetCalendar.yearMin + i).map((y) => `<option value="${y}" ${sheetYear === y ? "selected" : ""}>${y}</option>`).join("");
 			const prevPtsByLevel = {}, pointsByLevel = {};
 			entryCols.forEach((x) => {
 				prevPtsByLevel[x.key] = x.parallel ? [] : deps.previousLotSeries(t, x.level).flatMap((s2) => s2.pts.map((p) => ({
@@ -19844,26 +19674,27 @@
 				const cells = entryCols.map((x, levelIdx) => {
 					let levelHasPoint = false, emptyShown = false;
 					const levelRunNos = levelRuns(x).map((r) => r.runNo), nextLevelRunNo = levelRunNos.length ? Math.max(...levelRunNos) + 1 : 1;
-					const runInputs = dayGroup.runs.map((g) => {
+					const runs = dayGroup.runs.map((g) => {
 						const p = g.levels[x.key];
 						if (!p) {
-							if (!shouldShowEmptyRun(x, g)) return "";
+							if (!shouldShowEmptyRun(x, g)) return null;
 							emptyShown = true;
-							return deps.pres.entrySheetEmptyRunHtml({
+							return {
+								kind: "empty",
 								editable: deps.canWrite(),
 								title: "Dùng phím mũi tên để chuyển ô",
-								ariaLabel: `Nhập QC ngày ${deps.vnDate(g.date)}, mức ${x.level}, lô ${deps.escapeAttr(x.lot || "")}, lần ${g.runNo}`,
-								date: deps.escapeAttr(g.date),
+								ariaLabel: `Nhập QC ngày ${deps.vnDate(g.date)}, mức ${x.level}, lô ${x.lot || ""}, lần ${g.runNo}`,
+								date: g.date,
 								runNo: g.runNo,
 								levelIndex: levelIdx,
-								actionAttrs: `data-action="entrySheetRunChanged" data-args="${deps.escapeAttr(JSON.stringify([
+								actionArgs: [
 									t.id,
 									x.level,
 									g.date,
 									g.runId || "",
 									x.parallel ? x.lot || "" : ""
-								]))}" data-action-on="change"`
-							});
+								]
+							};
 						}
 						levelHasPoint = true;
 						const isPrev = !!p._prevLot, pMean = isPrev && Number.isFinite(+p.qcMean) ? +p.qcMean : x.mean, pSd = isPrev && Number.isFinite(+p.qcSd) ? +p.qcSd : x.sd;
@@ -19877,102 +19708,96 @@
 							sd: pSd,
 							previousLot: isPrev ? p._prevLot : void 0
 						}), lv = deps.qcVerdictLabel(view.level);
-						return deps.pres.entrySheetSavedRunHtml({
+						return {
+							kind: "saved",
 							previousLot: isPrev,
-							previousLotName: deps.esc(p._prevLot || ""),
+							previousLotName: p._prevLot || "",
 							valueClass: view.valueClass,
-							title: isPrev ? "Lô cũ " + deps.escapeAttr(p._prevLot) + " · đã chuyển tiếp · chỉ đọc" : "Đã lưu, không sửa trực tiếp",
+							title: isPrev ? "Lô cũ " + p._prevLot + " · đã chuyển tiếp · chỉ đọc" : "Đã lưu, không sửa trực tiếp",
 							valueText: deps.fmtPointValue(p, t),
 							zText: `${view.z >= 0 ? "+" : ""}${deps.fmt(view.z)}s`,
 							verdictText: lv
-						});
-					}).join("");
-					const addRunBtn = deps.pres.entrySheetAddRunHtml({
-						visible: deps.canWrite() && levelHasPoint && !emptyShown,
-						actionAttrs: `data-action="entryUnlockExtraRun" data-args="${deps.escapeAttr(JSON.stringify([
-							t.id,
-							x.key,
-							dayGroup.date,
-							levelIdx,
-							nextLevelRunNo
-						]))}"`
-					});
-					return deps.pres.entrySheetCellHtml({
+						};
+					}).filter(Boolean);
+					const addRun = deps.canWrite() && levelHasPoint && !emptyShown ? { actionArgs: [
+						t.id,
+						x.key,
+						dayGroup.date,
+						levelIdx,
+						nextLevelRunNo
+					] } : null;
+					return {
 						parallel: x.parallel,
-						hasAddButton: !!addRunBtn,
-						runInputsHtml: runInputs,
-						addRunButtonHtml: addRunBtn
-					});
-				}).join("");
+						hasAddButton: !!addRun,
+						runs,
+						addRun
+					};
+				});
 				const staff = [...new Map(dayGroup.runs.flatMap((g) => Object.values(g.levels)).map((p) => deps.pointStaff(p)).filter((x) => x.code).map((x) => [x.code, x])).values()];
-				const staffCell = deps.pres.entrySheetDaySummaryHtml.staff(staff);
-				const status = deps.pres.entrySheetDaySummaryHtml.status(hasPoint, worst);
 				const autoNote = rulesAll.length ? worst === "rej" ? deps.errorType([...new Set(rejRules.length ? rejRules : rulesAll)]) : "Theo dõi / cảnh báo" : "";
 				const manualNote = (dayGroup.runs.flatMap((g) => Object.values(g.levels)).filter(Boolean).find((p) => String(p.note || "").trim()) || {}).note || "";
-				const note = deps.pres.entrySheetNoteHtml({
-					hasPoint,
-					writable: deps.canWrite(),
-					placeholder: deps.escapeAttr(autoNote || "Nhập ghi chú..."),
-					actionAttrs: `data-action="entryDateNoteSave" data-args="${deps.escapeAttr(JSON.stringify([t.id, dayGroup.date]))}" data-action-on="change"`,
-					manualNote: deps.esc(manualNote),
-					autoNote
-				});
-				const liveCols = entryCols.filter((x) => !x.parallel), doneLevels = liveCols.filter((x) => dayGroup.runs.some((g) => g.levels[x.key])).length, rowCls = [
-					dayGroup.date === today ? "today" : "",
-					dayGroup.date <= today && doneLevels < liveCols.length ? "missing" : "",
-					hasPoint ? "has-data" : ""
-				].filter(Boolean).join(" ");
-				return deps.pres.entrySheetDayRowHtml({
-					rowClass: rowCls,
+				const note = !hasPoint ? { kind: "none" } : deps.canWrite() ? {
+					kind: "editable",
+					value: manualNote,
+					placeholder: autoNote || "Nhập ghi chú..."
+				} : {
+					kind: "readonly",
+					text: manualNote || autoNote || "—"
+				};
+				const liveCols = entryCols.filter((x) => !x.parallel), doneLevels = liveCols.filter((x) => dayGroup.runs.some((g) => g.levels[x.key])).length;
+				return {
+					rowClass: [
+						dayGroup.date === today ? "today" : "",
+						dayGroup.date <= today && doneLevels < liveCols.length ? "missing" : "",
+						hasPoint ? "has-data" : ""
+					].filter(Boolean).join(" "),
 					date: dayGroup.date,
 					dayOfMonth: deps.dateObj(dayGroup.date).getDate(),
 					today: dayGroup.date === today,
-					cellsHtml: cells,
-					staffHtml: staffCell,
+					cells,
+					staff: staff.map((x) => ({
+						code: x.code,
+						name: x.name
+					})),
 					warningRules: [...new Set(warnRules)].join(", "),
 					rejectRules: [...new Set(rejRules)].join(", "),
-					statusHtml: status,
-					noteHtml: note
-				});
-			}).join("");
-			const right = `${deps.pres.entryWorksheetHtml({
-				testName: deps.esc(deps.testDisplayName(t)),
-				lotLabel: deps.esc(deps.pres.entryLotLabelsTs(entryCols)),
-				monthOptionsHtml: sheetMonthOptions,
-				yearOptionsHtml: sheetYearOptions,
-				currentMonthButtonHtml: deps.btn("Tháng hiện tại", {
-					action: "entrySetSheetMonth",
-					args: [deps.isoMonth()]
-				}, "ghost sm qc-current-month"),
-				todayButtonHtml: deps.btn("Tới hôm nay", { action: "entryGoToday" }, "teal sm qc-today-jump"),
-				levelHeadHtml: levelHead,
-				rowsHtml: sheetRows,
-				columnCount: entryCols.length,
-				messageHtml: ui().entryLastMsg
-			})}${deps.pres.entryLeveyPanelHtml({
-				startDateHtml: deps.dateBox("entryStartDate", W.start, "", "data-action=\"entrySetStart\" data-action-on=\"change\""),
-				endDateHtml: deps.dateBox("entryEndDate", W.end, "", "data-action=\"entrySetEnd\" data-action-on=\"change\""),
-				dayButtonsHtml: dayBtns,
-				rangeText: `${deps.vnDate(W.start)} – ${deps.vnDate(W.end)} · ${deps.operationalLevels(t).length} mức QC`,
-				stackHtml: ljStack
-			})}${pointsInView}${rangeBox}`;
-			ui().entryPartialRenderCache = {
-				testId: t.id,
-				right
-			};
-			if (rightOnly) return right;
-			return deps.pres.entryPageLayoutHtml({
-				pageHeadHtml: deps.headOnly("Nhập QC", "Ghi nhận kết quả theo ngày, mức QC và lô đang vận hành"),
-				treeCollapsed,
-				expandButtonHtml: deps.btn(treePanelIcon, { action: "toggleEntryTree" }, "teal icon entry-tree-expand", "Hiện danh mục nội kiểm", { attrs: {
-					"aria-label": "Hiện danh mục nội kiểm",
-					"aria-controls": "entryTreePanel",
-					"aria-expanded": "false"
-				} }),
-				treeHeadHtml: treeHead,
-				treeHtml: tree,
-				rightHtml: right
+					status: !hasPoint ? "none" : worst,
+					note
+				};
 			});
+			const worksheet = {
+				testName: deps.testDisplayName(t),
+				lotLabel: deps.pres.entryLotLabelsTs(entryCols),
+				sheetYear,
+				sheetMonthNo,
+				currentIsoMonth: deps.isoMonth(),
+				levelHeads,
+				rows: sheetRows,
+				columnCount: entryCols.length,
+				message: ui().entryLastMsg
+			};
+			const ljPanel = {
+				startDate: W.start,
+				endDate: W.end,
+				dayPresetOptions,
+				hasCustomRange: !!ui().entryStart,
+				rangeText: `${deps.vnDate(W.start)} – ${deps.vnDate(W.end)} · ${deps.operationalLevels(t).length} mức QC`,
+				stack: ljStack
+			};
+			return {
+				empty: false,
+				treeCollapsed,
+				machineOptions,
+				selectedMachine: ui().entryMachine,
+				query: ui().entryQ,
+				treeNodes,
+				testId: t.id,
+				selectedLevel: ui().entrySel.level,
+				worksheet,
+				ljPanel,
+				pointsInView,
+				rangeSummary
+			};
 		};
 		const treeToggle = (k) => {
 			if (ui().treeOpen.has(k)) ui().treeOpen.delete(k);
@@ -20088,55 +19913,8 @@
 			cur.blur();
 			setTimeout(entryFocusPendingSheet, 0);
 		};
-		const entryLatestTreeState = (t) => deps.pres.entryTreeState(t);
-		const entrySyncTreeState = (testId) => {
-			const row = [...doc().querySelectorAll(".tree .tn-config[data-test-id]")].find((el) => el.dataset.testId === String(testId || ""));
-			if (!row) return;
-			const apply = (el, value) => {
-				const badge = el && el.querySelector(".state");
-				if (!badge) return;
-				badge.className = "state" + (value === "none" ? "" : " " + value);
-				badge.textContent = deps.stateName(value);
-			};
-			apply(row, entryLatestTreeState(state().tests.find((t) => t.id === testId)));
-			let group = row.previousElementSibling;
-			while (group && group.dataset.treeRole !== "group") group = group.previousElementSibling;
-			if (!group) return;
-			const states = [];
-			for (let item = group.nextElementSibling; item && item.dataset.treeRole === "assay"; item = item.nextElementSibling) {
-				const badge = item.querySelector(".state"), value = badge && [
-					"ok",
-					"warn",
-					"rej"
-				].find((x) => badge.classList.contains(x)) || "none";
-				states.push(value);
-			}
-			const worst = deps.pres.entryTreeGroupState(states);
-			apply(group, worst);
-		};
 		const entryRenderKeepScroll = () => {
-			const w = win();
-			const pageX = w.scrollX, pageY = w.scrollY, wrap = doc().querySelector(".qc-sheet-wrap"), sheetTop = wrap ? wrap.scrollTop : 0, sheetLeft = wrap ? wrap.scrollLeft : 0;
-			const current = doc().querySelector(".entry-main");
-			if (deps.currentPage() === "entry" && current) {
-				deps.analysisUi().statusMemo = /* @__PURE__ */ new Map();
-				pageEntry(true);
-				const cache = ui().entryPartialRenderCache;
-				if (cache && cache.testId === ui().entrySel.testId) {
-					current.innerHTML = cache.right;
-					entrySyncTreeState(ui().entrySel.testId);
-					deps.afterRender(deps.currentPage());
-				} else deps.rerender();
-			} else deps.rerender();
-			requestAnimationFrame(() => {
-				w.scrollTo(pageX, pageY);
-				const nextWrap = doc().querySelector(".qc-sheet-wrap");
-				if (nextWrap) {
-					nextWrap.scrollTop = sheetTop;
-					nextWrap.scrollLeft = sheetLeft;
-				}
-				entryFocusPendingSheet();
-			});
+			deps.rerender();
 		};
 		const entrySetLastMsg = (html) => {
 			ui().entryLastMsg = html || "";
@@ -20400,7 +20178,7 @@
 			deps.rerender();
 		};
 		return {
-			pageEntry,
+			entryModel,
 			entryWindow,
 			entryWindowFor,
 			entryRowsWindow,
@@ -20419,8 +20197,6 @@
 			entrySheetInputs,
 			entrySheetTarget,
 			entrySheetKey,
-			entryLatestTreeState,
-			entrySyncTreeState,
 			entryRenderKeepScroll,
 			entryCloseKeepScroll,
 			entryConfirmInlineSave,
@@ -25770,7 +25546,6 @@
 			entryPendingSheetFocus: "",
 			entryJumpToday: false,
 			entryLjRenderCache: null,
-			entryPartialRenderCache: null,
 			entryPrevOpen: /* @__PURE__ */ new Map(),
 			entryExpandedTables: /* @__PURE__ */ new Set(),
 			entryDetailOpen: /* @__PURE__ */ new Set(),
@@ -28988,47 +28763,8 @@
 	});
 	root.entryRowsWindowTs = entryRowsWindow;
 	root.entryLotLabelsTs = entryLotLabels;
-	root.entryDayPresetButtons = entryDayPresetButtons;
-	root.entryLeveyJenningsMiniHtml = createEntryLeveyJenningsMiniHtml({
-		escape: (value) => root.esc(value),
-		escapeAttribute: (value) => root.escAttr(value)
-	});
-	root.entrySheetLevelHeads = createEntrySheetLevelHeads({
-		escape: (value) => root.esc(value),
-		escapeAttribute: (value) => root.escAttr(value)
-	});
-	root.entryTreeHeaderHtml = createEntryTreeHeaderHtml({ escapeAttribute: (value) => root.escAttr(value) });
-	root.entryTreeItemHtml = createEntryTreeItemHtml({
-		escape: (value) => root.esc(value),
-		escapeAttribute: (value) => root.escAttr(value)
-	});
-	root.entryRangeSummaryHtml = entryRangeSummaryHtml;
-	root.entryWorksheetHtml = entryWorksheetHtml;
-	root.entryLeveyPanelHtml = entryLeveyPanelHtml;
-	root.entryPageLayoutHtml = entryPageLayoutHtml;
-	root.entryVoidedPointsHtml = entryVoidedPointsHtml;
-	root.entryPointsPanelHtml = entryPointsPanelHtml;
-	root.entryCumulativeStatsHtml = entryCumulativeStatsHtml;
-	root.entryTableWindowNoteHtml = entryTableWindowNoteHtml;
-	root.entryPointTableCardHtml = entryPointTableCardHtml;
-	root.entryPointTableRowHtml = entryPointTableRowHtml;
-	root.entryVoidedPointRowHtml = entryVoidedPointRowHtml;
-	root.entrySheetDayRowHtml = entrySheetDayRowHtml;
-	root.entrySheetDaySummaryHtml = createEntrySheetDaySummaryHtml({
-		escape: (value) => root.esc(value),
-		escapeAttribute: (value) => root.escAttr(value)
-	});
 	root.entryVoidModalHtml = entryVoidModalHtml;
 	root.entryPreSaveWarningModalHtml = entryPreSaveWarningModalHtml;
-	root.entrySheetEmptyRunHtml = entrySheetEmptyRunHtml;
-	root.entrySheetSavedRunHtml = entrySheetSavedRunHtml;
-	root.entrySheetCellHtml = entrySheetCellHtml;
-	root.entrySheetAddRunHtml = entrySheetAddRunHtml;
-	root.entrySheetNoteHtml = entrySheetNoteHtml;
-	root.entryEmptyPageHtml = createEntryEmptyPageHtml({
-		head: (title, subtitle) => root.headOnly(title, subtitle),
-		empty: (title, message, action) => root.emptyState(title, message, action)
-	});
 	root.targetSwitchModalHtml = targetSwitchModalHtml;
 	root.configPanelTestRows = configPanelTestRows;
 	root.configPanelModalHtml = configPanelModalHtml;
@@ -29111,11 +28847,6 @@
 	root.actionFormRenderState = actionFormRenderState;
 	root.entrySheetMonthPart = entrySheetMonthPart;
 	root.entrySheetMonthValue = entrySheetMonthValue;
-	root.entryTreeState = createEntryTreeState({
-		activeWestgard: (test) => globalThis.activeWestgard(test),
-		operationalLevels: (test) => globalThis.operationalLevels(test),
-		pointsForLot: (testId, level, lot) => globalThis.pointsForLot(testId, level, lot)
-	});
 	root.entrySheetNavigation = createEntrySheetNavigation({
 		date: (element) => String(element.dataset.focusDate || ""),
 		run: (element) => String(element.dataset.focusRun || ""),
@@ -29126,7 +28857,6 @@
 		run: (element) => Number(element.dataset.focusRun || 0),
 		level: (element) => Number(element.dataset.focusLevel || 0)
 	});
-	root.entryTreeGroupState = entryTreeGroupState;
 	root.entryTreeNavigation = createEntryTreeNavigation();
 	root.entrySheetFocus = createEntrySheetFocus((element) => !!element.classList.contains("empty"));
 	root.entryColumnConfig = createEntryColumnConfig({
@@ -29499,13 +29229,11 @@
 		resetStatusMemo: () => {
 			root.AnalysisUIState.statusMemo = /* @__PURE__ */ new Map();
 		},
-		pageMap: () => ({ entry: root.pageEntry }),
 		afterRender: (p) => root.afterRender(p),
 		entryQ: () => root.entryQ,
 		entryFilter: (v) => root.entryFilter(v),
 		isReactPage: (id) => window.QCLabReact?.isReactPage(id) || false,
 		mountReactPage: (id, container) => window.QCLabReact?.mountReactPage(id, container),
-		unmountReactPageIfMounted: () => window.QCLabReact?.unmountReactPageIfMounted(),
 		notifyReactStore: () => window.QCLabReact?.notify()
 	});
 	root.go = routerDispatch.go;
@@ -31626,6 +31354,7 @@
 		analysisUi: () => root.AnalysisUIState,
 		currentPage: () => root.RouterUIState.page,
 		rerender: () => rerender(),
+		isReactEntry: () => window.QCLabReact?.isReactPage("entry") || false,
 		afterRender: (page) => root.afterRender(page),
 		role: () => role(),
 		canWrite: () => root.canWrite(),
@@ -31691,7 +31420,7 @@
 		EntryDateNoteWorkflowCommand: root.EntryDateNoteWorkflowCommand,
 		pres: root
 	});
-	root.pageEntry = entryPageController.pageEntry;
+	root.entryModel = entryPageController.entryModel;
 	root.entryWindow = entryPageController.entryWindow;
 	root.entryWindowFor = entryPageController.entryWindowFor;
 	root.entryRowsWindow = entryPageController.entryRowsWindow;
@@ -31710,8 +31439,6 @@
 	root.entrySheetInputs = entryPageController.entrySheetInputs;
 	root.entrySheetTarget = entryPageController.entrySheetTarget;
 	root.entrySheetKey = entryPageController.entrySheetKey;
-	root.entryLatestTreeState = entryPageController.entryLatestTreeState;
-	root.entrySyncTreeState = entryPageController.entrySyncTreeState;
 	root.entryRenderKeepScroll = entryPageController.entryRenderKeepScroll;
 	root.entryCloseKeepScroll = entryPageController.entryCloseKeepScroll;
 	root.entryConfirmInlineSave = entryPageController.entryConfirmInlineSave;

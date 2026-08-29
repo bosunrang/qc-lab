@@ -10,11 +10,12 @@ const plain = v => JSON.parse(JSON.stringify(v));
 
 {
   const routeSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'entry', 'entry-page-controller.ts'), 'utf8');
-  const chartSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'entry', 'entry-chart-html.ts'), 'utf8');
-  const pointsPanelSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'entry', 'entry-points-panel-html.ts'), 'utf8');
-  const cumulativeStatsSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'entry', 'entry-cumulative-stats-html.ts'), 'utf8');
-  const pointTableCardSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'entry', 'entry-point-table-card-html.ts'), 'utf8');
-  const pointTableRowSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'entry', 'entry-point-table-row-html.ts'), 'utf8');
+  // Trang Entry chuyển sang React (2026-08-30, trang cuối cùng — xem
+  // EntryPage.tsx): các chuỗi HTML cổ điển (entry-chart-html.ts,
+  // entry-points-panel-html.ts, entry-cumulative-stats-html.ts,
+  // entry-point-table-card-html.ts, entry-point-table-row-html.ts) đã xoá,
+  // cùng nội dung nay là JSX trong EntryPage.tsx — soi thẳng file đó.
+  const entryPageSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'react', 'pages', 'EntryPage.tsx'), 'utf8');
   const entryActionsSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'manage', 'manage-tests-actions-controller.ts'), 'utf8');
   const assayModalSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'manage', 'config-assay-modal-html.ts'), 'utf8');
   const assayDecimalOptionsSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'manage', 'config-assay-decimal-options-html.ts'), 'utf8');
@@ -29,7 +30,7 @@ const plain = v => JSON.parse(JSON.stringify(v));
   assert.match(routeSource, /label: 'Mean thực', value: st \? deps\.fmtTestValue\(t, st\.m\)/, 'Mean thực phải dùng số thập phân của xét nghiệm');
   assert.match(routeSource, /label: 'SD thực', value: st \? deps\.fmtTestStat\(t, st\.sd\)/, 'SD thực phải dùng số thập phân thống kê của xét nghiệm');
   assert.match(routeSource, /label: 'Mean mục tiêu', value: deps\.fmtTestValue\(t, chartMean\)/, 'Mean mục tiêu phải dùng số thập phân của xét nghiệm');
-  assert.match(routeSource, /targetCfg = prevView \|\| deps\.pres\.entryColumnConfig\(t, x\.level, x\.lot\)/, 'Mean/SD mục tiêu phải đọc cấu hình chung đang áp dụng cho đúng mức và lô');
+  assert.match(routeSource, /targetCfg = prevView \|\| entryColumnCfg\(t, x\.level, x\.lot\)/, 'Mean/SD mục tiêu phải đọc cấu hình chung đang áp dụng cho đúng mức và lô');
   assert.match(routeSource, /label: 'SD mục tiêu', value: deps\.fmtTestStat\(t, chartSd\)/, 'SD mục tiêu phải giữ độ chính xác thống kê, không được làm tròn thành 0 theo số lẻ của kết quả');
   {
     const treeToggleMatch = /const treeToggle = \(k: unknown\) => \{[\s\S]*?\n  \};/.exec(routeSource);
@@ -48,16 +49,16 @@ const plain = v => JSON.parse(JSON.stringify(v));
     assert.match(toggleEntryTreeMatch[0], /classList\.toggle\('tree-collapsed'/, 'ẩn/hiện danh mục nội kiểm phải cập nhật tại chỗ để giữ vị trí cuộn và nhóm đang mở');
   }
   assert.match(routeSource, /qclab_entry_tree_collapsed/, 'tùy chọn ẩn danh mục nội kiểm phải được ghi nhớ riêng trên máy');
-  assert.match(pointsPanelSource, /<details class="panel entry-secondary-panel qc-points-panel"/, 'bảng điểm tra cứu phải thu gọn mặc định');
+  assert.match(entryPageSource, /<details className="panel entry-secondary-panel qc-points-panel"/, 'bảng điểm tra cứu phải thu gọn mặc định');
   assert.doesNotMatch(routeSource, /metric\('LOT \/ Hạn dùng'/, 'dải thông số biểu đồ không lặp lại lô và hạn dùng');
-  assert.match(chartSource, /class="lj-point-count">\$\{input\.pointCount\} điểm/, 'số điểm biểu đồ phải nằm cạnh mức và lô');
-  assert.match(chartSource, /class="entryLJStack" data-render-scale="2"/, 'biểu đồ nhập QC phải yêu cầu canvas 2x để tránh mờ khi co giãn');
-  assert.match(pointTableCardSource, /input\.previousLot \? 'Lô cũ' : 'Lô'\} \$\{input\.lot\}.*qc-table-count/, 'số điểm phải nằm cùng cụm tiêu đề với số lô');
+  assert.match(entryPageSource, /className="lj-point-count">\{item\.pointCount\} điểm/, 'số điểm biểu đồ phải nằm cạnh mức và lô');
+  assert.match(entryPageSource, /className="entryLJStack" data-render-scale=\{2\}/, 'biểu đồ nhập QC phải yêu cầu canvas 2x để tránh mờ khi co giãn');
+  assert.match(entryPageSource, /card\.previousLot \? 'Lô cũ' : 'Lô'\} \{card\.lot\}.*qc-table-count/, 'số điểm phải nằm cùng cụm tiêu đề với số lô');
   assert.match(routeSource, /valueText: deps\.fmtPointValue\(p, t\)/, 'điểm trong khoảng xem phải dùng số thập phân của xét nghiệm');
-  assert.match(pointTableRowSource, /<b>\$\{input\.valueText\}<\/b>/, 'renderer hàng điểm phải hiển thị giá trị đã định dạng');
+  assert.match(entryPageSource, /<b>\{row\.valueText\}<\/b>/, 'renderer hàng điểm phải hiển thị giá trị đã định dạng');
   assert.match(routeSource, /mean: cumulativeSt \? deps\.fmtTestValue\(t, cumulativeSt\.m\)/, 'Mean tích lũy phải dùng số thập phân của xét nghiệm');
-  assert.match(cumulativeStatsSource, /Mean tích lũy<\/span><b>\$\{input\.mean\}/, 'renderer thống kê tích lũy phải hiển thị giá trị Mean đã định dạng');
-  assert.match(chartSource, /class="qc-level-head" tabindex="0" data-qc-tooltip=/, 'tiêu đề mức phải có tooltip Mean\/SD dùng được bằng chuột và bàn phím');
+  assert.match(entryPageSource, /Mean tích lũy<\/span><b>\{card\.cumulative\.mean\}/, 'renderer thống kê tích lũy phải hiển thị giá trị Mean đã định dạng');
+  assert.match(entryPageSource, /className="qc-level-head" tabIndex=\{0\} data-qc-tooltip=/, 'tiêu đề mức phải có tooltip Mean\/SD dùng được bằng chuột và bàn phím');
   assert.match(routeSource, /±2SD \$\{limits\}/, 'tooltip tiêu đề mức phải có khoảng ±2SD');
   assert.match(assayModalSource, /id="cfgAssayDecimals"/, 'form xét nghiệm phải có ô chọn số thập phân');
   assert.match(assayDecimalOptionsSource, /\[0,1,2,3,4,5,6\]/, 'form phải cho chọn đầy đủ số thập phân từ 0 đến 6');

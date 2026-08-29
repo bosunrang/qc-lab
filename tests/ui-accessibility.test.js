@@ -4,7 +4,11 @@ const path = require('node:path');
 
 const root = path.join(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
-const router = read('src/presentation/entry/entry-page-controller.ts') + read('src/presentation/entry/entry-sheet-navigation.ts') + read('src/presentation/entry/entry-tree-html.ts') + read('src/presentation/entry/entry-worksheet-html.ts') + read('src/presentation/entry/entry-levey-panel-html.ts') + read('src/presentation/entry/entry-page-layout-html.ts') + read('src/presentation/router/router-shell-controller.ts');
+// Trang Entry chuyển sang React (2026-08-30, trang cuối cùng — xem
+// EntryPage.tsx): entry-tree-html.ts/entry-worksheet-html.ts/
+// entry-levey-panel-html.ts/entry-page-layout-html.ts (chuỗi HTML cổ điển)
+// đã xoá — cùng nội dung nay là JSX trong EntryPage.tsx.
+const router = read('src/presentation/entry/entry-page-controller.ts') + read('src/presentation/entry/entry-sheet-navigation.ts') + read('src/react/pages/EntryPage.tsx') + read('src/presentation/router/router-shell-controller.ts');
 const modals = read('src/presentation/modal/modal-focus-trap.ts') + read('src/presentation/modal/modal-template.ts') + read('src/presentation/modal/modal-controller.ts') + read('src/presentation/modal/dialog-overlay-controller.ts');
 const appCss = read('assets/app.css');
 const auditCss = read('assets/professional-audit.css');
@@ -36,12 +40,12 @@ const authZ=Number((/#authOverlay\{[^}]*z-index:(\d+)/.exec(components)||[])[1])
 assert.ok(dialogZ>authZ, 'dialog xác nhận phải nằm trên auth/recovery overlay');
 
 assert.match(router, /role="tree" aria-label="Danh mục nội kiểm"/);
-assert.match(router, /role="treeitem" tabindex="0" aria-expanded=/);
+assert.match(router, /role="treeitem" tabIndex=\{0\} aria-expanded=/);
 assert.match(router, /const entryTreeKey = function \(this: AnyRec, event: AnyRec\) \{/);
 assert.match(router, /key\s*===\s*'ArrowDown'/);
 assert.match(router, /aria-live="polite"/);
 assert.match(router, /aria-current="\$\{id===page\?'page':'false'\}"/);
-assert.match(router, /role="region" aria-label="Bảng nhập QC theo tháng" tabindex="0"/);
+assert.match(router, /role="region" aria-label="Bảng nhập QC theo tháng" tabIndex=\{0\}/);
 
 assert.match(modals, /setAttribute\('role','dialog'\)/);
 assert.match(modals, /setAttribute\('aria-modal','true'\)/);
@@ -68,21 +72,16 @@ for(const file of walkPresentation(path.join(root,'src','presentation')).filter(
 assert.deepEqual(rawRequiredLabels,[],'dấu sao bắt buộc trong label phải bọc bằng <span class="req"> để luôn có màu đỏ');
 assert.match(manageRoutes+teaReferenceLabProfileBodyPresentation,/TEa chuẩn hóa % <span class="req">\*<\/span>/,'hồ sơ TEa phải hiển thị dấu bắt buộc bằng marker chung');
 
-/* Trang Tổng quan (dash), Nhật ký hoạt động (audit), Người dùng (users), Cài
-   đặt (settings), Cấu hình chung (manage), So sánh hóa chất (reagent), Báo
-   cáo (report), Six Sigma (sigma), Phân tích Westgard (westgard) và Khắc phục
-   sự cố (actions) đã chuyển sang React (src/react/pages/*.tsx, xem
-   docs/REACT-ADOPTION-PLAN.md) — JSX viết "className=", không viết "class="
-   như chuỗi HTML cổ điển, nên quét văn bản nguồn kiểu này không áp dụng được
-   cho các trang đó nữa. Heading semantic của các trang React được xác nhận
-   bằng npm run a11y-audit (kiểm DOM thật qua axe-core), không phải quét chuỗi
-   nguồn ở đây. "Nhật ký khắc phục" (trang actions) đã rời khỏi vòng lặp này
-   cùng lý do — panel-title thật của nó giờ nằm trong ActionsPage.tsx. */
-const semanticPageRoutes=[reportRoutes,router].join('\n');
-for(const title of ['Biểu đồ Levey-Jennings']){
-  const escaped=title.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-  assert.match(semanticPageRoutes,new RegExp(`<h2[^>]*class="[^"]*panel-title[^"]*"[^>]*>${escaped}`),`panel chính "${title}" phải dùng heading cấp 2 thật`);
-}
+/* Cả 10 trang (Tổng quan, Nhật ký hoạt động, Người dùng, Cài đặt, Cấu hình
+   chung, So sánh hóa chất, Báo cáo, Six Sigma, Phân tích Westgard, Khắc phục
+   sự cố, và Nhập QC & Biểu đồ — trang cuối cùng, 2026-08-30) đã chuyển sang
+   React (src/react/pages/*.tsx, xem docs/REACT-ADOPTION-PLAN.md) — JSX viết
+   "className=", không viết "class=" như chuỗi HTML cổ điển, nên quét văn bản
+   nguồn kiểu `<h2 class="...panel-title...">` không còn áp dụng được cho bất
+   kỳ trang nào nữa (panel "Biểu đồ Levey-Jennings" của Entry giờ nằm trong
+   EntryPage.tsx). Heading semantic của các trang React được xác nhận bằng
+   npm run a11y-audit (kiểm DOM thật qua axe-core), không phải quét chuỗi
+   nguồn ở đây — nên vòng lặp panel-title cũ đã bỏ hẳn thay vì để trống. */
 assert.match(sigmaPage,/<summary className="sg-collapse-summary"><span role="heading" aria-level=\{2\}>Độ không đảm bảo đo \(MU\)<\/span><\/summary>/,'summary MU phải giữ heading cấp 2 mà không lồng control focus');
 
 assert.match(sigmaCss,/\.sg-mu-panel > \.sg-collapse-summary::after\{\s*position:absolute; right:14px;/,'MU collapse mark must stay at the far right, after the action button');

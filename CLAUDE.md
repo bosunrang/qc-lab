@@ -401,11 +401,12 @@ without touching the existing strict TS config. Dashboard/"Tổng quan"
 (`src/react/pages/ReagentPage.tsx`), Report/"Báo cáo"
 (`src/react/pages/ReportPage.tsx`), Six Sigma/"Six Sigma & Sai số"
 (`src/react/pages/SigmaPage.tsx`), Westgard analysis/"Phân tích Westgard"
-(`src/react/pages/WestgardPage.tsx`) and Corrective action/"Khắc phục sự cố"
-(`src/react/pages/ActionsPage.tsx`) are the first ten migrated pages, all
-with their classic HTML-builder code already deleted post-parity-check; see
-`docs/REACT-ADOPTION-PLAN.md` for the page-by-page order and status of the
-rest.
+(`src/react/pages/WestgardPage.tsx`), Corrective action/"Khắc phục sự cố"
+(`src/react/pages/ActionsPage.tsx`) and Entry/"Nhập QC & Biểu đồ"
+(`src/react/pages/EntryPage.tsx`) are all ten pages — the entire app — with
+their classic HTML-builder code already deleted post-parity-check; the
+React migration is complete, see `docs/REACT-ADOPTION-PLAN.md` for the
+page-by-page history.
 
 `assets/core.js` is the one exception: it's wrapped in a UMD shim so it also
 works via `require()` — that's what makes it usable from both the browser
@@ -922,7 +923,54 @@ Google Fonts link, offline labs must print with correct metrics.
   the `EntryUIState` bag (written directly from onclick handlers, so it must
   remain accessor globals). `document`/`window`/`localStorage` are lazy
   getters in its deps since tests reassign the bare `document` global between
-  keyboard-navigation cases. `pageWestgard()` retired to
+  keyboard-navigation cases. **`pageEntry()` no longer exists**: the page
+  retired again on 2026-08-30 to `src/react/pages/EntryPage.tsx` — the
+  **last** page in the React migration (see `docs/REACT-ADOPTION-PLAN.md`).
+  Entry needed one architectural fix none of the other 9 pages did: classic
+  `entryRenderKeepScroll()` never called standard `rerender()` (which
+  replaces all of `#main.innerHTML`, resetting `.qc-sheet-wrap`'s own scroll
+  position and dropping keyboard focus) — instead it hand-patched
+  `.entry-main` via `element.innerHTML=...`, and nearly every interaction
+  handler (`entryPick`, `entryFocusLevel`, `entryShowPrevLot`/
+  `entryShowCurrentLot`, `entryUnlockExtraRun`, `entryInlineSaveCommit`,
+  `confirmVoidQcPoint`, `entryToggleRows`) called it as its last step. Live
+  verification (scroll `.qc-sheet-wrap` to 300px, save a new QC point,
+  confirm `scrollTop` unchanged and the DOM node reused) confirmed React's
+  own reconciliation (`mountReactPage()` → real `root.render()`, never
+  `innerHTML=`) already preserves scroll/focus for free — no manual
+  snapshot/restore needed. `entryModel()` (the pure-data twin) was added
+  alongside the still-live classic branch first, and only once React owned
+  the page for real did `entryRenderKeepScroll()` collapse to a bare
+  `deps.rerender()` call (name kept unchanged — `tests/entry-service.test.js`
+  pins the literal call site inside `entryPick()`). Deleting the classic
+  branch cascaded: `entryLatestTreeState`/`entrySyncTreeState` (only caller
+  of both) became dead, which made `entry-tree-state.ts`/
+  `entry-tree-group-state.ts` dead too — all four removed together with the
+  19 classic HTML-builder files `pageEntry()` used to call
+  (`entry-tree-html.ts`, `entry-page-layout-html.ts`, `entry-worksheet-html.ts`,
+  `entry-levey-panel-html.ts`, `entry-points-panel-html.ts`,
+  `entry-point-table-card-html.ts`, `entry-point-table-row-html.ts`,
+  `entry-range-summary-html.ts`, `entry-voided-points-html.ts`,
+  `entry-voided-point-row-html.ts`, `entry-cumulative-stats-html.ts`,
+  `entry-table-window-note-html.ts`, `entry-sheet-day-row-html.ts`,
+  `entry-sheet-cell-html.ts`, `entry-sheet-day-summary-html.ts`,
+  `entry-sheet-day-detail-html.ts`, `entry-sheet-run-slot-html.ts`,
+  `entry-chart-html.ts`, `entry-empty-page-html.ts`) and their 21 test files.
+  `entry-void-modal-html.ts`/`entry-pre-save-warning-modal-html.ts` stay —
+  both render into `#modalRoot`, outside React. The parity check
+  (`scripts/react-migration-parity-check.js`) caught one real bug this way:
+  `TableCardView` only rendered the cumulative-stats block when
+  `card.rows.length>0`, but classic code always renders it (cumulative stats
+  come from `cumulativePts`, a separate point set independent of the
+  windowed `rows`) — fixed by moving that block outside the conditional.
+  Because Entry was the last page, removing `pageEntry()` also retired the
+  router-level strangler-fig scaffolding itself:
+  `router-dispatch-controller.ts`'s `pageMap()`/classic `innerHTML` branch
+  and `unmountReactPageIfMounted()` had no remaining consumer (every id in
+  `ROUTER_PAGE_DEFS` is now in the React registry), so `render()` collapsed
+  to `deps.mountReactPage(deps.isReactPage(id) ? id : 'dash', m)` — the
+  `'dash'` fallback exists only for a corrupt/unknown page id, not normal
+  flow. `pageWestgard()` retired to
   `src/presentation/westgard/westgard-page-controller.ts`
   (`createWestgardPageController(deps)`) on 2026-08-18 (Pha G route slice 3) —
   a faithful port of the whole page including the archived-lot-group and CUSUM

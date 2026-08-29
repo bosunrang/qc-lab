@@ -318,27 +318,8 @@ import { createRouterDispatchController } from '../presentation/router/router-di
 import { createReportQcFormat } from '../presentation/report/report-qc-format';
 import { createRangeTea } from '../domain/qc/range-tea';
 import { entryRowsWindow as entryRowsWindowTs, entryLotLabels as entryLotLabelsTs } from '../presentation/entry/entry-rows-window';
-import { entryDayPresetButtons, createEntryLeveyJenningsMiniHtml, createEntrySheetLevelHeads } from '../presentation/entry/entry-chart-html';
-import { createEntryTreeHeaderHtml, createEntryTreeItemHtml } from '../presentation/entry/entry-tree-html';
-import { entryRangeSummaryHtml } from '../presentation/entry/entry-range-summary-html';
-import { entryWorksheetHtml } from '../presentation/entry/entry-worksheet-html';
-import { entryLeveyPanelHtml } from '../presentation/entry/entry-levey-panel-html';
-import { entryPageLayoutHtml } from '../presentation/entry/entry-page-layout-html';
-import { entryVoidedPointsHtml } from '../presentation/entry/entry-voided-points-html';
-import { entryPointsPanelHtml } from '../presentation/entry/entry-points-panel-html';
-import { entryCumulativeStatsHtml } from '../presentation/entry/entry-cumulative-stats-html';
-import { entryTableWindowNoteHtml } from '../presentation/entry/entry-table-window-note-html';
-import { entryPointTableCardHtml } from '../presentation/entry/entry-point-table-card-html';
-import { entryPointTableRowHtml } from '../presentation/entry/entry-point-table-row-html';
-import { entryVoidedPointRowHtml } from '../presentation/entry/entry-voided-point-row-html';
-import { entrySheetDayRowHtml } from '../presentation/entry/entry-sheet-day-row-html';
-import { createEntrySheetDaySummaryHtml } from '../presentation/entry/entry-sheet-day-summary-html';
 import { entryVoidModalHtml } from '../presentation/entry/entry-void-modal-html';
 import { entryPreSaveWarningModalHtml } from '../presentation/entry/entry-pre-save-warning-modal-html';
-import { entrySheetEmptyRunHtml, entrySheetSavedRunHtml } from '../presentation/entry/entry-sheet-run-slot-html';
-import { entrySheetCellHtml } from '../presentation/entry/entry-sheet-cell-html';
-import { entrySheetAddRunHtml, entrySheetNoteHtml } from '../presentation/entry/entry-sheet-day-detail-html';
-import { createEntryEmptyPageHtml } from '../presentation/entry/entry-empty-page-html';
 import { targetSwitchModalHtml } from '../presentation/manage/target-switch-modal-html';
 import { configPanelTestRows } from '../presentation/manage/config-panel-test-rows';
 import { configPanelModalHtml } from '../presentation/manage/config-panel-modal-html';
@@ -407,10 +388,8 @@ import { ActionFormUiState } from '../application/nce/action-form-ui-state';
 import { actionFormRenderState } from '../application/nce/action-form-render-state';
 import { targetConfigAssigned as targetConfigAssignedPresentation, createTargetRangeDraft } from '../presentation/manage/target-config-state';
 import { entrySheetMonthPart, entrySheetMonthValue } from '../presentation/entry/entry-sheet-month';
-import { createEntryTreeState } from '../presentation/entry/entry-tree-state';
 import { createEntrySheetNavigation } from '../presentation/entry/entry-sheet-navigation';
 import { createEntrySheetInputOrder } from '../presentation/entry/entry-sheet-input-order';
-import { entryTreeGroupState } from '../presentation/entry/entry-tree-group-state';
 import { createEntryTreeNavigation } from '../presentation/entry/entry-tree-navigation';
 import { createEntrySheetFocus } from '../presentation/entry/entry-sheet-focus';
 import { createEntryColumnConfig } from '../presentation/entry/entry-column-config';
@@ -1098,6 +1077,7 @@ type QCLabGlobal = typeof globalThis & {
   delTest?: (id: unknown) => Promise<void>;
   jsq?: (value: unknown) => string;
   pageEntry?: (rightOnly?: boolean) => string;
+  entryModel?: () => Record<string, any>;
   entryWindow?: () => Record<string, any>;
   entryWindowFor?: (testId: unknown, level: unknown, endOverride?: string, startOverride?: string) => Record<string, any>;
   entryRowsWindow?: (rows: Record<string, any>[], key: string) => Record<string, any>;
@@ -1773,32 +1753,8 @@ type QCLabGlobal = typeof globalThis & {
   qcRangeTea: ReturnType<typeof createRangeTea>;
   entryRowsWindowTs: typeof entryRowsWindowTs;
   entryLotLabelsTs: typeof entryLotLabelsTs;
-  entryDayPresetButtons: typeof entryDayPresetButtons;
-  entryLeveyJenningsMiniHtml: ReturnType<typeof createEntryLeveyJenningsMiniHtml>;
-  entrySheetLevelHeads: ReturnType<typeof createEntrySheetLevelHeads>;
-  entryTreeHeaderHtml: ReturnType<typeof createEntryTreeHeaderHtml>;
-  entryTreeItemHtml: ReturnType<typeof createEntryTreeItemHtml>;
-  entryRangeSummaryHtml: typeof entryRangeSummaryHtml;
-  entryWorksheetHtml: typeof entryWorksheetHtml;
-  entryLeveyPanelHtml: typeof entryLeveyPanelHtml;
-  entryPageLayoutHtml: typeof entryPageLayoutHtml;
-  entryVoidedPointsHtml: typeof entryVoidedPointsHtml;
-  entryPointsPanelHtml: typeof entryPointsPanelHtml;
-  entryCumulativeStatsHtml: typeof entryCumulativeStatsHtml;
-  entryTableWindowNoteHtml: typeof entryTableWindowNoteHtml;
-  entryPointTableCardHtml: typeof entryPointTableCardHtml;
-  entryPointTableRowHtml: typeof entryPointTableRowHtml;
-  entryVoidedPointRowHtml: typeof entryVoidedPointRowHtml;
-  entrySheetDayRowHtml: typeof entrySheetDayRowHtml;
-  entrySheetDaySummaryHtml: ReturnType<typeof createEntrySheetDaySummaryHtml>;
   entryVoidModalHtml: typeof entryVoidModalHtml;
   entryPreSaveWarningModalHtml: typeof entryPreSaveWarningModalHtml;
-  entrySheetEmptyRunHtml: typeof entrySheetEmptyRunHtml;
-  entrySheetSavedRunHtml: typeof entrySheetSavedRunHtml;
-  entrySheetCellHtml: typeof entrySheetCellHtml;
-  entrySheetAddRunHtml: typeof entrySheetAddRunHtml;
-  entrySheetNoteHtml: typeof entrySheetNoteHtml;
-  entryEmptyPageHtml: ReturnType<typeof createEntryEmptyPageHtml>;
   targetSwitchModalHtml: typeof targetSwitchModalHtml;
   configPanelTestRows: typeof configPanelTestRows;
   configPanelModalHtml: typeof configPanelModalHtml;
@@ -1871,10 +1827,8 @@ type QCLabGlobal = typeof globalThis & {
   actionFormRenderState: typeof actionFormRenderState;
   entrySheetMonthPart: typeof entrySheetMonthPart;
   entrySheetMonthValue: typeof entrySheetMonthValue;
-  entryTreeState: ReturnType<typeof createEntryTreeState>;
   entrySheetNavigation: ReturnType<typeof createEntrySheetNavigation<any>>;
   entrySheetInputOrder: ReturnType<typeof createEntrySheetInputOrder<any>>;
-  entryTreeGroupState: typeof entryTreeGroupState;
   entryTreeNavigation: ReturnType<typeof createEntryTreeNavigation<any>>;
   entrySheetFocus: ReturnType<typeof createEntrySheetFocus<any>>;
   entryColumnConfig: ReturnType<typeof createEntryColumnConfig>;
@@ -3640,32 +3594,8 @@ root.reportQcFormat=createReportQcFormat({testValue:(test,value)=>typeof (global
 root.qcRangeTea=createRangeTea({teaBySource:(test,source,target)=>(globalThis as any).sgTeaBySource(test,source,target),teaSource:test=>(globalThis as any).sgTeaSource(test)});
 root.entryRowsWindowTs=entryRowsWindowTs;
 root.entryLotLabelsTs=entryLotLabelsTs;
-root.entryDayPresetButtons=entryDayPresetButtons;
-root.entryLeveyJenningsMiniHtml=createEntryLeveyJenningsMiniHtml({escape:(value:any)=>(root as any).esc(value),escapeAttribute:(value:any)=>(root as any).escAttr(value)});
-root.entrySheetLevelHeads=createEntrySheetLevelHeads({escape:(value:any)=>(root as any).esc(value),escapeAttribute:(value:any)=>(root as any).escAttr(value)});
-root.entryTreeHeaderHtml=createEntryTreeHeaderHtml({escapeAttribute:(value:any)=>(root as any).escAttr(value)});
-root.entryTreeItemHtml=createEntryTreeItemHtml({escape:(value:any)=>(root as any).esc(value),escapeAttribute:(value:any)=>(root as any).escAttr(value)});
-root.entryRangeSummaryHtml=entryRangeSummaryHtml;
-root.entryWorksheetHtml=entryWorksheetHtml;
-root.entryLeveyPanelHtml=entryLeveyPanelHtml;
-root.entryPageLayoutHtml=entryPageLayoutHtml;
-root.entryVoidedPointsHtml=entryVoidedPointsHtml;
-root.entryPointsPanelHtml=entryPointsPanelHtml;
-root.entryCumulativeStatsHtml=entryCumulativeStatsHtml;
-root.entryTableWindowNoteHtml=entryTableWindowNoteHtml;
-root.entryPointTableCardHtml=entryPointTableCardHtml;
-root.entryPointTableRowHtml=entryPointTableRowHtml;
-root.entryVoidedPointRowHtml=entryVoidedPointRowHtml;
-root.entrySheetDayRowHtml=entrySheetDayRowHtml;
-root.entrySheetDaySummaryHtml=createEntrySheetDaySummaryHtml({escape:(value:any)=>(root as any).esc(value),escapeAttribute:(value:any)=>(root as any).escAttr(value)});
 root.entryVoidModalHtml=entryVoidModalHtml;
 root.entryPreSaveWarningModalHtml=entryPreSaveWarningModalHtml;
-root.entrySheetEmptyRunHtml=entrySheetEmptyRunHtml;
-root.entrySheetSavedRunHtml=entrySheetSavedRunHtml;
-root.entrySheetCellHtml=entrySheetCellHtml;
-root.entrySheetAddRunHtml=entrySheetAddRunHtml;
-root.entrySheetNoteHtml=entrySheetNoteHtml;
-root.entryEmptyPageHtml=createEntryEmptyPageHtml({head:(title,subtitle)=>(root as any).headOnly(title,subtitle),empty:(title,message,action)=>(root as any).emptyState(title,message,action)});
 root.targetSwitchModalHtml=targetSwitchModalHtml;
 root.configPanelTestRows=configPanelTestRows;
 root.configPanelModalHtml=configPanelModalHtml;
@@ -3746,10 +3676,8 @@ root.actionFormUiState=new ActionFormUiState();
 root.actionFormRenderState=actionFormRenderState;
 root.entrySheetMonthPart=entrySheetMonthPart;
 root.entrySheetMonthValue=entrySheetMonthValue;
-root.entryTreeState=createEntryTreeState({activeWestgard:test=>(globalThis as any).activeWestgard(test),operationalLevels:test=>(globalThis as any).operationalLevels(test),pointsForLot:(testId,level,lot)=>(globalThis as any).pointsForLot(testId,level,lot)});
 root.entrySheetNavigation=createEntrySheetNavigation<any>({date:element=>String(element.dataset.focusDate||''),run:element=>String(element.dataset.focusRun||''),level:element=>String(element.dataset.focusLevel||'')});
 root.entrySheetInputOrder=createEntrySheetInputOrder<any>({date:element=>String(element.dataset.focusDate||''),run:element=>Number(element.dataset.focusRun||0),level:element=>Number(element.dataset.focusLevel||0)});
-root.entryTreeGroupState=entryTreeGroupState;
 root.entryTreeNavigation=createEntryTreeNavigation<any>();
 root.entrySheetFocus=createEntrySheetFocus<any>(element=>!!element.classList.contains('empty'));
 root.entryColumnConfig=createEntryColumnConfig({levelConfig:qcLevelConfig,parallelLot:(test,level)=>(root as any).qcParallelLotLookup(test,level)});
@@ -3986,13 +3914,11 @@ const routerDispatch=createRouterDispatchController({
   nav:()=>root.nav(),
   requestFrame:work=>requestAnimationFrame(work),
   resetStatusMemo:()=>{(root as any).AnalysisUIState.statusMemo=new Map();},
-  pageMap:()=>({entry:(root as any).pageEntry}),
   afterRender:p=>root.afterRender(p),
   entryQ:()=>(root as any).entryQ,
   entryFilter:v=>(root as any).entryFilter(v),
   isReactPage:id=>(window as any).QCLabReact?.isReactPage(id)||false,
   mountReactPage:(id,container)=>(window as any).QCLabReact?.mountReactPage(id,container),
-  unmountReactPageIfMounted:()=>(window as any).QCLabReact?.unmountReactPageIfMounted(),
   notifyReactStore:()=>(window as any).QCLabReact?.notify(),
 });
 root.go=routerDispatch.go;root.resetMainScroll=routerDispatch.resetMainScroll;root.render=routerDispatch.render;root.restoreRouteFilters=routerDispatch.restoreRouteFilters;root.rerender=routerDispatch.rerender;
@@ -5134,7 +5060,8 @@ const entryPageController = createEntryPageController({
   localStorage: () => typeof localStorage !== 'undefined' ? localStorage : ({ getItem: () => null, setItem: () => {} } as unknown as Storage),
   getState: () => state, ui: () => (root as any).EntryUIState, analysisUi: () => (root as any).AnalysisUIState,
   currentPage: () => (root as any).RouterUIState.page,
-  rerender: () => rerender(), afterRender: page => (root as any).afterRender(page),
+  rerender: () => rerender(), isReactEntry: () => (window as any).QCLabReact?.isReactPage('entry') || false,
+  afterRender: page => (root as any).afterRender(page),
   role: () => role(), canWrite: () => root.canWrite(), requireWrite: () => requireWrite(),
   requireUnlockedPeriod: (date, action) => (root as any).requireUnlockedPeriod(date, action),
   esc: value => (root as any).esc(value), escapeAttr: value => (root as any).escAttr(value), jsq: value => jsq(value),
@@ -5166,7 +5093,7 @@ const entryPageController = createEntryPageController({
   EntryVoidWorkflowCommand: root.EntryVoidWorkflowCommand, EntryDateNoteWorkflowCommand: root.EntryDateNoteWorkflowCommand,
   pres: root as any,
 });
-root.pageEntry = entryPageController.pageEntry;
+root.entryModel = entryPageController.entryModel;
 root.entryWindow = entryPageController.entryWindow;
 root.entryWindowFor = entryPageController.entryWindowFor;
 root.entryRowsWindow = entryPageController.entryRowsWindow;
@@ -5185,8 +5112,6 @@ root.entryFocusPendingSheet = entryPageController.entryFocusPendingSheet;
 root.entrySheetInputs = entryPageController.entrySheetInputs;
 root.entrySheetTarget = entryPageController.entrySheetTarget;
 root.entrySheetKey = entryPageController.entrySheetKey;
-root.entryLatestTreeState = entryPageController.entryLatestTreeState;
-root.entrySyncTreeState = entryPageController.entrySyncTreeState;
 root.entryRenderKeepScroll = entryPageController.entryRenderKeepScroll;
 root.entryCloseKeepScroll = entryPageController.entryCloseKeepScroll;
 root.entryConfirmInlineSave = entryPageController.entryConfirmInlineSave;

@@ -27,7 +27,7 @@ export function createAuthUiState(lockout: unknown = null) {
 export function createEntryUiState() {
   return { entrySel: null, entryDays: 30, entryStart: null, entryEnd: null, entrySheetMonth: '', entryQ: '',
     entryMachine: 'all', entryLastMsg: '', entryAutoOpenKey: null, entryPendingSheetFocus: '', entryJumpToday: false,
-    entryLjRenderCache: null, entryPartialRenderCache: null, entryPrevOpen: new Map(), entryExpandedTables: new Set(),
+    entryLjRenderCache: null, entryPrevOpen: new Map(), entryExpandedTables: new Set(),
     entryDetailOpen: new Set(), treeOpen: new Set(), entryExtraRun: new Set(), entryTreeCollapsed: null };
 }
 

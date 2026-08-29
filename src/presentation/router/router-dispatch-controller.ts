@@ -8,13 +8,11 @@ export function createRouterDispatchController(deps: {
   nav: () => void;
   requestFrame: (work: () => void) => unknown;
   resetStatusMemo: () => void;
-  pageMap: () => Record<string, () => string>;
   afterRender: (page: string) => void;
   entryQ: () => string;
   entryFilter: (value: string) => void;
   isReactPage: (id: string) => boolean;
   mountReactPage: (id: string, container: HTMLElement) => void;
-  unmountReactPageIfMounted: () => void;
   notifyReactStore: () => void;
 }) {
   const resetMainScroll = () => {
@@ -22,18 +20,20 @@ export function createRouterDispatchController(deps: {
     if (m) (m as HTMLElement).scrollTop = 0;
     deps.window.scrollTo(0, 0);
   };
+  /* Mọi trang hợp lệ (xem router-page-policy.ts's ROUTER_PAGE_DEFS) đều đã chuyển
+     sang React (Entry — trang cuối cùng — xong 2026-08-30) nên isReactPage() luôn
+     đúng cho một id thật; nhánh HTML cổ điển (pageMap()/unmountReactPageIfMounted())
+     đã bị xoá cùng lúc. Chỉ còn dự phòng cho một id LẠ (ví dụ RouterUIState.page bị
+     hỏng dữ liệu) — lùi về 'dash' thay vì crash vào mountReactPage(id) với id không
+     tồn tại trong registry (mountReactPage tự no-op khi factory không có, xem
+     react-page-registry.ts, nhưng khi đó #main sẽ trống trơn không có gì hiển thị). */
   const render = () => {
     deps.resetStatusMemo();
     if (!deps.canAccessPage(deps.page())) deps.setPage(deps.firstAccessPage());
     const m = deps.document.getElementById('main');
     if (!m) return;
     const id = deps.page();
-    if (deps.isReactPage(id)) { deps.mountReactPage(id, m); return; }
-    deps.unmountReactPageIfMounted();
-    const map = deps.pageMap();
-    // 'dash' (Tổng quan) không còn nằm trong pageMap() — nó luôn được isReactPage()
-    // bắt ở nhánh trên. Dự phòng cho id lạ lùi về 'entry' thay vì 'dash'.
-    m.innerHTML = (map[id] || map.entry)();
+    deps.mountReactPage(deps.isReactPage(id) ? id : 'dash', m);
   };
   /* Trang 'dash' (Tổng quan) đã chuyển sang React (xem isReactPage/mountReactPage
      ở trên) — component tự đọc lại ô tìm kiếm lúc mount, không cần dòng gọi
