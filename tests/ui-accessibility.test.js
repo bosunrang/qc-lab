@@ -19,9 +19,6 @@ const reportsCss = read('assets/professional-reports.css');
 const settingsCss = read('assets/professional-settings.css');
 const usersCss = read('assets/professional-users.css');
 const westgardCss = read('assets/professional-westgard.css');
-const actionsRoutes = read('src/presentation/actions/actions-page-controller.ts');
-const actionForm = read('src/presentation/actions/action-form-controller.ts');
-const actionLogPanelPresentation = read('src/presentation/nce/action-log-panel-html.ts');
 const actionRerunEvidencePresentation = read('src/presentation/nce/action-rerun-evidence-html.ts');
 const reportRoutes = read('src/presentation/report/report-page-controller.ts');
 const reportPage = read('src/react/pages/ReportPage.tsx');
@@ -73,14 +70,16 @@ assert.match(manageRoutes+teaReferenceLabProfileBodyPresentation,/TEa chuẩn h�
 
 /* Trang Tổng quan (dash), Nhật ký hoạt động (audit), Người dùng (users), Cài
    đặt (settings), Cấu hình chung (manage), So sánh hóa chất (reagent), Báo
-   cáo (report) và Six Sigma (sigma) đã chuyển sang React
-   (src/react/pages/*.tsx, xem docs/REACT-ADOPTION-PLAN.md) — JSX viết
-   "className=", không viết "class=" như chuỗi HTML cổ điển, nên quét văn bản
-   nguồn kiểu này không áp dụng được cho các trang đó nữa. Heading semantic
-   của các trang React được xác nhận bằng npm run a11y-audit (kiểm DOM thật
-   qua axe-core), không phải quét chuỗi nguồn ở đây. */
-const semanticPageRoutes=[actionsRoutes,actionForm,actionLogPanelPresentation,reportRoutes,router].join('\n');
-for(const title of ['Nhật ký khắc phục','Biểu đồ Levey-Jennings']){
+   cáo (report), Six Sigma (sigma), Phân tích Westgard (westgard) và Khắc phục
+   sự cố (actions) đã chuyển sang React (src/react/pages/*.tsx, xem
+   docs/REACT-ADOPTION-PLAN.md) — JSX viết "className=", không viết "class="
+   như chuỗi HTML cổ điển, nên quét văn bản nguồn kiểu này không áp dụng được
+   cho các trang đó nữa. Heading semantic của các trang React được xác nhận
+   bằng npm run a11y-audit (kiểm DOM thật qua axe-core), không phải quét chuỗi
+   nguồn ở đây. "Nhật ký khắc phục" (trang actions) đã rời khỏi vòng lặp này
+   cùng lý do — panel-title thật của nó giờ nằm trong ActionsPage.tsx. */
+const semanticPageRoutes=[reportRoutes,router].join('\n');
+for(const title of ['Biểu đồ Levey-Jennings']){
   const escaped=title.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
   assert.match(semanticPageRoutes,new RegExp(`<h2[^>]*class="[^"]*panel-title[^"]*"[^>]*>${escaped}`),`panel chính "${title}" phải dùng heading cấp 2 thật`);
 }

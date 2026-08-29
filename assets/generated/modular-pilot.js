@@ -10991,11 +10991,11 @@
 		"\"": "&quot;",
 		"'": "&#39;"
 	};
-	function escapeHtml$2(value) {
+	function escapeHtml(value) {
 		return (value == null ? "" : String(value)).replace(/[&<>"']/g, (c) => HTML_ESCAPE_MAP[c]);
 	}
 	function escapeHtmlAttr(value) {
-		return escapeHtml$2(value);
+		return escapeHtml(value);
 	}
 	//#endregion
 	//#region src/presentation/format/basic-format.ts
@@ -13495,56 +13495,9 @@
 		}).join("");
 	}
 	//#endregion
-	//#region src/presentation/nce/action-form-closed-html.ts
-	function actionFormClosedHtml(input) {
-		return `<div class="empty"><b>${input.title}</b><p>${input.message}</p>${input.actionHtml}</div>`;
-	}
-	//#endregion
-	//#region src/presentation/nce/action-form-panel-html.ts
-	function escapeHtml$1(value) {
-		return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-	}
-	/** Khung ổn định của biểu mẫu NCE; nội dung và handler vẫn do compatibility layer cung cấp. */
-	function actionFormPanelHtml(input) {
-		const editing = input.editing;
-		return `<div class="panel action-form-panel"><div class="action-form-panel-head"><h2 class="panel-title">${editing ? `Tiếp tục hồ sơ ${escapeHtml$1(editing.nceId || "NCE")}` : "Lập hồ sơ sự không phù hợp (NCE)"}</h2>${input.guideButtonHtml}</div>${input.formOpen ? `<div class="action-form-body" data-notify-changed="actionFormChanged">${input.formBodyHtml}</div>` : input.closedHtml}</div>`;
-	}
-	//#endregion
-	//#region src/presentation/nce/action-form-steps-html.ts
-	function actionImmediateStepHtml(input) {
-		return `<div class="action-immediate-grid"><div><label>Phạm vi kiểm soát tức thời</label>${input.containmentSelectHtml}</div><div><label>Ghi chú phạm vi</label><input id="aContainmentNote" placeholder="VD: Giữ kết quả từ 08:00 đến khi QC đạt" value="${input.containmentNoteValueHtml}">${input.containmentNoteSuggestHtml}</div><div><label>Xử lý tức thời đã thực hiện</label><textarea id="aCorrection" rows="1" placeholder="VD: Dừng trả kết quả, cô lập lô QC và thông báo phụ trách...">${input.correctionTextHtml}</textarea>${input.correctionSuggestHtml}</div></div>`;
-	}
-	function actionRiskStepHtml(input) {
-		return `<div class="action-risk-grid"><div><label>Mức độ ảnh hưởng (S)</label>${input.severitySelectHtml}</div><div><label>Khả năng xảy ra (O)</label>${input.occurrenceSelectHtml}</div><div><label>Khả năng không phát hiện (D)</label>${input.detectabilitySelectHtml}</div><div class="action-risk-level"><label>Phân loại theo SOP</label>${input.levelSelectHtml}</div><div class="action-risk-result"><label>RPN</label><div id="aRiskScoreCard" class="action-risk-score risk-${input.scoreClassHtml}" aria-live="polite"><b id="aRiskScore">${input.scoreHtml}</b></div></div><div class="action-risk-basis"><label>Căn cứ phân loại theo SOP</label><input id="aRiskBasis" placeholder="VD: SOP-QC-07, ma trận nguy cơ bảng 3" value="${input.basisValueHtml}">${input.basisSuggestHtml}</div></div>`;
-	}
-	function actionInvestigationStepHtml(fieldsHtml) {
-		return `<div class="action-investigation-grid">${fieldsHtml.join("")}</div>`;
-	}
-	function actionCauseStepHtml(input) {
-		const releaseHint = input.containmentHeld ? "Bắt buộc sau khi QC được chấp nhận và hành động đã hoàn thành" : "Không bắt buộc vì mục 1 không ghi nhận kết quả liên quan bị giữ";
-		return `<div class="action-cause-grid"><div><label>Nhóm nguyên nhân</label>${input.causeCategory}</div><div><label>Nguyên nhân gốc hoặc nghi ngờ</label><textarea id="aCause" rows="1" placeholder="Mô tả bằng chứng và nguyên nhân...">${input.cause}</textarea>${input.causeSuggest}</div><div><label>Hành động khắc phục để ngăn tái diễn</label><textarea id="aAct" rows="1" placeholder="VD: Thay lọ QC mới, vệ sinh kim hút, cập nhật lịch bảo trì...">${input.action}</textarea>${input.actionSuggest}</div></div><div class="action-cause-second-row"><div><label>Ngày hoàn thành hành động</label>${input.completedDate}</div><div><label>Bias trước khắc phục (%) <small class="hint">tham khảo</small></label><input id="aBiasBefore" type="text" inputmode="decimal" placeholder="VD: 8.5" value="${input.biasBefore}" data-action="actionUpdateBiasHint" data-action-on="input">${input.sigmaBias}</div><div><label>Bias sau khắc phục (%) <small class="hint">tham khảo</small></label><input id="aBiasAfter" type="text" inputmode="decimal" placeholder="VD: 1.2" value="${input.biasAfter}" data-action="actionUpdateBiasHint" data-action-on="input"></div></div><div id="aBiasThresholdHint" class="hint flow-note">${input.threshold}</div>${input.rerun}<div class="action-release-block"><div class="action-release-title"><b>Cho phép hoạt động/trả kết quả trở lại</b><small>${releaseHint}</small></div><div class="action-release-grid"><div><label>Quyết định</label>${input.releaseStatus}</div><div><label>Ngày cho phép</label>${input.releaseDate}</div><div><label>Người cho phép</label><input id="aReleaseBy" list="aByList" autocomplete="off" placeholder="Chọn hoặc gõ tên" value="${input.releaseBy}"></div><div><label>Căn cứ cho phép</label><input id="aReleaseNote" placeholder="VD: QC chạy lại đã được chấp nhận" value="${input.releaseNote}">${input.releaseSuggest}</div></div></div>`;
-	}
-	function actionPatientStepHtml(input) {
-		return `<div id="aPatientRiskRef" class="hint space-after-control">${input.reference}</div><div class="action-patient-grid"><div><label>Kết luận ảnh hưởng</label>${input.impact}</div><div><label>Xử lý mẫu/kết quả liên quan</label><textarea id="aPatientAction" rows="1" placeholder="VD: Rà soát các mẫu từ 08:00–10:00; chạy lại 3 mẫu...">${input.action}</textarea>${input.suggest}</div></div>`;
-	}
-	function actionEffectivenessStepHtml(input) {
-		return `<div class="action-effectiveness-grid"><div><label>Kết luận hiệu lực</label>${input.status}</div><div class="action-effectiveness-date"><label>Ngày đánh giá</label>${input.date}</div><div><label>Bằng chứng/nhận xét hiệu lực</label><textarea id="aEffectivenessNote" rows="1" placeholder="VD: Theo dõi 20 lần chạy tiếp theo không tái diễn...">${input.note}</textarea>${input.noteSuggest}</div></div><div class="action-residual-block"><div class="action-release-title"><b>Nguy cơ còn lại sau khắc phục</b><small>Chỉ bắt buộc khi kết luận có hiệu lực; dùng cùng thang điểm và SOP với đánh giá ban đầu</small></div><div class="action-residual-grid"><div><label>Mức độ (S)</label>${input.severity}</div><div><label>Khả năng xảy ra (O)</label>${input.occurrence}</div><div><label>Khả năng không phát hiện (D)</label>${input.detectability}</div><div><label>Phân loại theo SOP</label>${input.level}</div><div class="action-risk-result"><label>RPN còn lại</label><div id="aResidualRiskScoreCard" class="action-risk-score risk-${input.scoreClass}" aria-live="polite"><b id="aResidualRiskScore">${input.score}</b></div></div><div class="action-residual-basis"><label>Căn cứ đánh giá lại</label><input id="aResidualRiskBasis" placeholder="VD: SOP-QC-07; dữ liệu theo dõi sau khắc phục" value="${input.basis}">${input.basisSuggest}</div></div></div>`;
-	}
-	//#endregion
 	//#region src/presentation/nce/action-incident-banner-html.ts
 	function actionIncidentBannerHtml(input) {
 		return `<div class="action-incident-banner"><b>${input.titleHtml}</b><div>${input.detailsHtml}</div></div>`;
-	}
-	//#endregion
-	//#region src/presentation/nce/action-form-section-html.ts
-	function actionFormSectionHtml(input) {
-		return `<details class="action-form-section" data-action-section="${input.keyHtml}" ${input.open ? "open" : ""} data-toggle-action="actionSectionToggled" data-toggle-args='${JSON.stringify([input.key])}'><summary class="action-form-section-title"><span>${input.badgeHtml}</span><div><b>${input.titleHtml}</b><small>${input.hintHtml}</small></div>${input.chipHtml}</summary>${input.bodyHtml}</details>`;
-	}
-	//#endregion
-	//#region src/presentation/nce/action-investigation-field-html.ts
-	function actionInvestigationFieldHtml(input) {
-		const choices = input.choices.map((choice) => `<button type="button" class="action-choice ${choice.active ? "active" : ""}" data-value="${choice.valueHtml}" aria-pressed="${choice.active ? "true" : "false"}" data-action="actionInvestigationChoose" data-args='${JSON.stringify([input.statusId, choice.value])}'>${choice.labelHtml}</button>`).join("");
-		return `<div class="action-investigation-item ${input.stateClass}" id="check-${input.statusIdHtml}"><div class="action-investigation-head"><div><b>${input.titleHtml}</b><small>${input.hintHtml}</small></div><span class="action-investigation-state">${input.stateLabelHtml}</span></div><select id="${input.statusIdHtml}" class="action-investigation-select" aria-hidden="true" tabindex="-1" data-action="actionInvestigationSync" data-args='${JSON.stringify([input.statusId])}' data-action-on="change">${input.selectOptionsHtml}</select><div class="action-investigation-choices" role="group" aria-label="Kết quả ${input.titleHtml}">${choices}</div><div class="action-investigation-note"><input id="${input.noteIdHtml}" aria-label="Ghi chú ${input.titleHtml}" placeholder="Ghi chú / bằng chứng" value="${input.noteValueHtml}">${input.suggestHtml}</div></div>`;
 	}
 	//#endregion
 	//#region src/presentation/nce/action-bias-context.ts
@@ -13573,41 +13526,6 @@
 		const range = ` · Mean ${formatValue(input.mean)} · SD ${formatStat(input.sd)}`;
 		const band = input.applied ? ` · ${input.applied === "lab" ? "PXN" : "NSX"}` : "";
 		return `Mức ${input.level}${lot}${range}${band}`;
-	}
-	//#endregion
-	//#region src/presentation/nce/action-select-html.ts
-	function escapeAttribute$2(value) {
-		return String(value ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-	}
-	function escapeHtml(value) {
-		return escapeAttribute$2(value).replace(/'/g, "&#39;");
-	}
-	function actionSelectHtml(input) {
-		const current = input.current == null ? "" : String(input.current);
-		const optionsHtml = (input.options.some((option) => option[0] === current) || !current ? input.options : [...input.options, [current, current]]).map(([value, text]) => `<option value="${escapeAttribute$2(value)}" ${value === current ? "selected" : ""}>${escapeHtml(text)}</option>`).join("");
-		return `<select id="${escapeAttribute$2(input.id)}" aria-label="${escapeAttribute$2(input.label)}" ${input.extra || ""}>${optionsHtml}</select>`;
-	}
-	//#endregion
-	//#region src/presentation/nce/action-suggest-row-html.ts
-	function escapeAttribute$1(value) {
-		return String(value ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-	}
-	function actionSuggestRowHtml(targetIdHtml, targetId, phrases) {
-		if (!phrases.length) return "";
-		return `<div class="sugg-row" id="sugg-${targetIdHtml}">${phrases.map((phrase) => `<button type="button" class="sugg-chip" data-action="actionInsertSuggestion" data-args="${escapeAttribute$1(JSON.stringify([targetId, phrase.phrase]))}">${phrase.phraseHtml}</button>`).join("")}</div>`;
-	}
-	//#endregion
-	//#region src/presentation/nce/action-suggest-box-html.ts
-	function actionSuggestBoxHtml(labelHtml, rowHtml) {
-		return `<details class="action-suggestions"><summary>+ ${labelHtml}</summary>${rowHtml}</details>`;
-	}
-	//#endregion
-	//#region src/presentation/nce/action-staff-options-html.ts
-	function escapeAttribute(value) {
-		return String(value ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-	}
-	function actionStaffOptionsHtml(names) {
-		return names.map((name) => `<option value="${escapeAttribute(name)}"></option>`).join("");
 	}
 	//#endregion
 	//#region src/presentation/nce/action-rule-options.ts
@@ -13639,6 +13557,7 @@
 		seed = null;
 		draft = null;
 		openSections = null;
+		openSeq = 0;
 		toggleSection(key, open) {
 			if (!this.openSections) this.openSections = /* @__PURE__ */ new Set();
 			if (open) this.openSections.add(key);
@@ -13667,18 +13586,21 @@
 			this.seed = { manual: true };
 			this.clearDraft();
 			this.openSections = null;
+			this.openSeq++;
 		}
 		startIssue(seed) {
 			this.editId = "";
 			this.seed = seed;
 			this.clearDraft();
 			this.openSections = null;
+			this.openSeq++;
 		}
 		edit(id) {
 			this.editId = id;
 			this.seed = null;
 			this.clearDraft();
 			this.openSections = null;
+			this.openSeq++;
 		}
 	};
 	//#endregion
@@ -14863,16 +14785,6 @@
 		};
 	}
 	//#endregion
-	//#region src/presentation/nce/action-page-html.ts
-	function createActionPageHtml() {
-		return (input) => `${input.headHtml}${input.issuesHtml}${input.formHtml}${input.logHtml}`;
-	}
-	//#endregion
-	//#region src/presentation/nce/action-side-chips-html.ts
-	function createActionSideChipsHtml(deps) {
-		return (chips) => chips.map((chip) => `<span class="action-chip ${chip.cls}">${deps.escape(chip.label)}</span>`).join("");
-	}
-	//#endregion
 	//#region src/presentation/nce/action-detail-check-html.ts
 	function createActionDetailCheckHtml(deps) {
 		return (label, view, note) => `<div class="action-detail-check"><div><b>${deps.escape(label)}</b>${note ? `<div class="hint">${deps.escape(note)}</div>` : ""}</div><span class="tag ${view.cls}">${deps.escape(view.label)}</span></div>`;
@@ -14881,32 +14793,6 @@
 	//#region src/presentation/nce/action-evidence-timeline-html.ts
 	function createActionEvidenceTimelineHtml(deps) {
 		return (items) => `<div class="action-evidence-timeline" aria-label="Các mốc thời gian hồ sơ">${items.map((item) => `<div><span>${deps.escape(item.label)}</span><b>${deps.escape(item.value)}</b>${item.note ? `<small>${deps.escape(item.note)}</small>` : ""}</div>`).join("")}</div>`;
-	}
-	//#endregion
-	//#region src/presentation/nce/action-review-buttons-html.ts
-	function createActionReviewButtonsHtml(deps) {
-		return (index, model) => `<div class="action-row-actions">${deps.button("Chi tiết", {
-			action: "viewActionDetail",
-			args: [index]
-		}, "ghost sm")}${model.edit ? deps.button("Tiếp tục", {
-			action: "editAction",
-			args: [index]
-		}, "ghost sm") : ""}${model.escalate ? deps.button("Lập hồ sơ tiếp theo", {
-			action: "escalateAction",
-			args: [index]
-		}, "teal sm", "Hành động chưa hiệu lực — mở vòng điều tra mới") : ""}${model.approve ? deps.button("Duyệt", {
-			action: "approveAction",
-			args: [index]
-		}, "teal sm") : ""}${model.returnForRevision ? deps.button("Trả lại", {
-			action: "returnAction",
-			args: [index]
-		}, "ghost sm") : ""}${model.reopen ? deps.button("Mở lại", {
-			action: "reopenAction",
-			args: [index]
-		}, "danger sm", "Hồ sơ đã duyệt nhưng không còn đủ điều kiện khép vòng") : ""}${model.cancel ? deps.button("Hủy hồ sơ", {
-			action: "cancelAction",
-			args: [index]
-		}, "danger sm", "Hủy có lưu vết — không xóa dữ liệu") : ""}</div>`;
 	}
 	//#endregion
 	//#region src/presentation/nce/action-rerun-evidence-html.ts
@@ -14927,51 +14813,6 @@
 			}, "ghost sm", "Mở đúng điểm QC được dùng làm bằng chứng");
 			return `<div class="action-rerun-evidence ${evidence.cls}"><div class="action-rerun-mark" aria-hidden="true">QC</div><div class="action-rerun-copy"><small>Bằng chứng QC chạy lại</small><b>${deps.escape(evidence.heading)}</b><span>${deps.pointValue(point, test)} ${deps.escape(test?.unit || "")} · ${deps.date(point.date)} · ${deps.escape(point.runId || "Không có mã lần chạy")}</span><span>${deps.escape(evidence.context || "")}</span></div><div class="action-rerun-actions">${viewButton}</div></div>`;
 		};
-	}
-	//#endregion
-	//#region src/presentation/nce/action-issue-row-html.ts
-	function createActionIssueRowHtml(deps) {
-		return (model) => {
-			const action = !model.action ? "" : model.action.kind === "continue" ? deps.button("Tiếp tục hồ sơ", {
-				action: "editAction",
-				args: [model.action.index]
-			}, "ghost sm") : deps.button("Lập hồ sơ", {
-				action: "beginActionFromIssue",
-				args: [
-					model.action.testId,
-					model.action.level,
-					model.action.rules,
-					model.action.error,
-					model.action.hint,
-					model.action.pointId,
-					model.action.date
-				]
-			}, "ghost sm");
-			return `<div class="issue-row ${model.severity}"><div class="issue-row-main"><b>${deps.escape(model.level)} · ${deps.escape(model.state)}</b><div class="meta">${model.value} ${deps.escape(model.unit || "")} · ${model.rules || "—"} · ${model.error}</div><div class="action-chipline"><span class="action-chip ${model.workflowClass}">${deps.escape(model.workflowLabel)}</span>${model.sideChips}</div><div class="hint">${model.footer}</div></div>${action}</div>`;
-		};
-	}
-	//#endregion
-	//#region src/presentation/nce/action-open-issue-html.ts
-	function createActionOpenIssueHtml(deps) {
-		return (model) => `<div class="issue-row ${model.severity}"><div class="issue-row-main"><b>${deps.escape(model.title)} · ${deps.escape(model.context)}</b><div class="meta">${model.date}${model.verdict ? " · " + deps.escape(model.verdict) : ""} · ${deps.escape(model.rule)} · ${deps.escape(model.errorType)}</div><div class="action-chipline"><span class="action-chip ${model.workflowClass}">${deps.escape(model.workflowLabel)}</span>${model.sideChips}</div><div class="hint">${deps.escape(model.primary)} · Phụ trách: ${deps.escape(model.owner || "—")}${model.dueDate ? " · hạn " + model.dueDate : ""}</div></div>${model.editable ? deps.button("Tiếp tục hồ sơ", {
-			action: "editAction",
-			args: [model.index]
-		}, "ghost sm") : ""}</div>`;
-	}
-	//#endregion
-	//#region src/presentation/nce/action-issue-group-html.ts
-	function createActionIssueGroupHtml(deps) {
-		return (model) => `<div class="issue-group ${model.severity}"><div class="issue-group-h"><div><b>${deps.escape(model.title)}</b><span class="issue-group-date">${deps.escape(model.date)}</span></div><span class="issue-group-count">${model.count} ${deps.escape(model.countLabel)}</span></div><div class="issue-group-body">${model.itemsHtml}</div></div>`;
-	}
-	//#endregion
-	//#region src/presentation/nce/action-log-row-html.ts
-	function createActionLogRowHtml(deps) {
-		return (model) => `<tr><td><div class="action-date">${deps.escape(model.date)}</div>${model.openedAt ? `<div class="action-time">Mở: ${deps.escape(model.openedAt)}</div>` : ""}</td><td><div class="action-test">${model.identity}</div><div class="action-sub">${model.sub}</div><div class="action-rule">${model.rule}</div></td><td><div class="action-text">${deps.escape(model.primary)}</div><div class="action-sub">Phụ trách: ${deps.escape(model.owner || "—")}${model.dueDate ? " · hạn " + deps.escape(model.dueDate) : ""}</div></td><td><div class="action-status-stack"><span class="action-chip ${model.workflowClass}">${deps.escape(model.workflowLabel)}</span>${model.sideChips}${model.approvalTag}${model.approvalMeta}</div></td><td>${model.actions}</td></tr>`;
-	}
-	//#endregion
-	//#region src/presentation/nce/action-approval-tag-html.ts
-	function createActionApprovalTagHtml(deps) {
-		return (view, label) => `<span class="tag ${view.cls}">${deps.escape(label)}</span>`;
 	}
 	//#endregion
 	//#region src/presentation/nce/action-detail-meta-html.ts
@@ -15046,16 +14887,6 @@
 	//#region src/presentation/nce/action-effectiveness-detail-html.ts
 	function createActionEffectivenessDetailHtml(deps) {
 		return (model) => `<li><b>Đánh giá hiệu lực, phê duyệt và khép vòng</b><div>${deps.escape(model.effectiveness || "—")}</div>${model.note ? `<div class="hint">${deps.escape(model.note)}</div>` : ""}${model.residual ? `<div>Nguy cơ còn lại: ${deps.escape(model.residual.risk || "Chưa phân loại")} · RPN ${model.residual.score}</div>${model.residual.basis ? `<div class="hint">${deps.escape(model.residual.basis)}</div>` : ""}` : ""}${model.returned ? `<div class="hint">Đã trả lại: ${deps.escape(model.returned)}</div>` : ""}${model.followUpNceId ? `<div class="hint">Đã chuyển sang hồ sơ ${deps.escape(model.followUpNceId)}</div>` : ""}${model.parentNceId ? `<div class="hint">Nối tiếp hồ sơ ${deps.escape(model.parentNceId)}</div>` : ""}<div class="hint">${deps.escape(model.approval)} · ${deps.escape(model.workflow)}</div></li>`;
-	}
-	//#endregion
-	//#region src/presentation/nce/action-log-panel-html.ts
-	function createActionLogPanelHtml(deps) {
-		return (rows) => `<div class="panel action-log-panel"><h2 class="panel-title">Nhật ký khắc phục</h2>${rows ? `<div class="action-log-tools">${deps.button("Xuất CSV nhật ký", { action: "exportActionsCSV" }, "teal sm")}</div><div class="action-log-wrap"><table class="action-log-table"><thead><tr><th>Thời điểm</th><th>Sự cố</th><th>Hành động</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows}</tbody></table></div>` : deps.emptyState("Chưa có nhật ký", "Các hành động khắc phục sẽ xuất hiện ở đây sau khi được lưu.")}</div>`;
-	}
-	//#endregion
-	//#region src/presentation/nce/action-issues-panel-html.ts
-	function actionIssuesPanelHtml(issuesHtml) {
-		return `<div class="panel action-issues-panel"><h2 class="panel-title">Sự cố cần xử lý</h2><div class="dash-list">${issuesHtml}</div></div>`;
 	}
 	//#endregion
 	//#region src/presentation/manage/tea-reference-add-modal-html.ts
@@ -20614,24 +20445,26 @@
 	//#endregion
 	//#region src/presentation/actions/action-form-controller.ts
 	/**
-	* Form hồ sơ NCE (trang "Khắc phục sự cố"): hằng số lựa chọn (ACT_*), chip gợi ý, khối
-	* <details> 8 mục, checklist điều tra, bản nháp giữ qua rerender(), model render-từ-state
-	* và addAction(). actions-page-controller.ts giữ phần còn lại của trang: danh sách sự
-	* cố, vòng đời hồ sơ (duyệt/trả lại/hủy/escalate/mở lại) và phiếu chi tiết.
+	* Form hồ sơ NCE (trang "Khắc phục sự cố"): hằng số lựa chọn (ACT_*), chip gợi ý,
+	* checklist điều tra, bản nháp giữ qua rerender(), actionFormViewModel() (dữ liệu thuần
+	* cho src/react/pages/ActionsPage.tsx) và addAction(). actions-page-controller.ts giữ
+	* phần còn lại của trang: danh sách sự cố, vòng đời hồ sơ (duyệt/trả lại/hủy/escalate/
+	* mở lại) và phiếu chi tiết.
 	*
-	* Đường cắt này KHÔNG một chiều: form gọi ngược vài hàm dựng bằng chứng của trang
-	* (deps.evidenceTimelineHtml/deps.rerunEvidenceHtml/deps.levelShort) vì phiếu chi tiết
-	* dùng chung đúng các khối đó, và trang gọi vào deps.formHtml (từ phía bên kia) để
-	* mở/đóng/lưu hồ sơ. modular-pilot.global.ts nối hai chiều này bằng cách dựng controller
-	* này TRƯỚC (không cần actions-page-controller.ts tồn tại — ba dep trên trỏ qua một biến
-	* tham chiếu được gán sau khi actions-page-controller.ts dựng xong), rồi dựng
-	* actions-page-controller.ts với `formHtml` trỏ thẳng vào `pageActionsV4`... của controller
-	* này vì lúc đó nó đã tồn tại.
+	* Đường cắt CÒN LẠI ở đây chỉ một chiều: form gọi ngược vài hàm dựng bằng chứng của
+	* trang (deps.evidenceTimelineHtml/deps.rerunEvidenceHtml/deps.levelShort) vì phiếu chi
+	* tiết dùng chung đúng các khối đó — modular-pilot.global.ts dựng controller này TRƯỚC
+	* (ba dep trên trỏ qua một biến tham chiếu được gán sau khi actions-page-controller.ts
+	* dựng xong).
 	*
 	* Form hồ sơ NCE được render THẲNG TỪ STATE (bản ghi đang sửa qua actionUi().editId, hoặc
 	* seed khi mở từ một vi phạm) chứ không đổ giá trị vào DOM sau render — mọi rerender() sau
 	* đó (đổi trang rồi quay lại, hay một bản đồng bộ Firebase dội về) không được xoá trắng
-	* form đang gõ dở.
+	* form đang gõ dở. Ở trang React, mỗi lần mở một hồ sơ (startManual()/startIssue()/
+	* edit()) tăng actionFormUiState.openSeq — actionFormViewModel() gộp nó vào formKey nên
+	* ActionsPage.tsx remount đúng subtree form mỗi lần mở, kể cả khi mở lại form thủ công
+	* hai lần liên tiếp (seed giống hệt nhau) — nếu không, nội dung đã gõ dở của lần mở
+	* trước còn sót trên các ô uncontrolled dù model đã tính lại đúng là rỗng.
 	*/
 	function createActionFormController(deps) {
 		const state = () => deps.getState();
@@ -21088,16 +20921,11 @@
 				"Đào tạo lại thao tác cho nhân viên"
 			]
 		};
-		let actionStepRenderInputs = null;
 		const actionSectionToggled = (key, open) => {
 			actionUi().toggleSection(key, open);
 		};
 		const actionDefaultOpenSections = (editing, protocol) => deps.ActionFormModel.defaultOpenSections(editing, protocol);
 		const actionRuleOptions = () => deps.pres.actionRuleOptionsPresentation(deps.QCCore.WG_RULES);
-		const actionStaffOptions = () => {
-			const names = [...new Set((state().users || []).filter((u) => u.active !== false).map((u) => String(u.name || u.username || "").trim()).filter(Boolean))];
-			return deps.pres.actionStaffOptionsPresentation(names);
-		};
 		const captureActionDraft = () => {
 			const values = {};
 			let found = false;
@@ -21121,17 +20949,6 @@
 		const actionSourceOptions = (qcBound, current) => deps.ActionFormModel.sourceOptions(ACT_SOURCE_OPTS, qcBound, current);
 		const actionCausePhrases = (category) => deps.pres.actionCausePhrasesPresentation(category, ACT_SUGGEST_CAUSE);
 		const actionActionPhrases = (errorType) => deps.pres.actionPhrasesPresentation(errorType, ACT_SUGGEST_ACTION);
-		const actionSuggestRow = (targetId, phrases) => {
-			if (!phrases || !phrases.length) return "";
-			return deps.pres.actionSuggestRowPresentation(deps.escapeAttr(targetId), targetId, phrases.map((p) => ({
-				phraseHtml: deps.esc(p),
-				phrase: p
-			})));
-		};
-		const actionSuggestBox = (targetId, phrases, label = "Gợi ý nhập nhanh") => {
-			if (!phrases || !phrases.length) return "";
-			return deps.pres.actionSuggestBoxPresentation(deps.esc(label), actionSuggestRow(targetId, phrases));
-		};
 		const actionInsertSuggestion = (targetId, phrase) => {
 			const e = doc().getElementById(targetId);
 			if (!e) return;
@@ -21141,18 +20958,6 @@
 			e.focus();
 			e.setSelectionRange(e.value.length, e.value.length);
 		};
-		const syncActionSuggestions = () => {
-			const cause = doc().getElementById("sugg-aCause"), act = doc().getElementById("sugg-aAct");
-			if (cause) cause.outerHTML = actionSuggestRow("aCause", actionCausePhrases(actionFieldValue("aCauseCategory", 40)));
-			if (act) act.outerHTML = actionSuggestRow("aAct", actionActionPhrases(actionFieldValue("aErr", 80)));
-		};
-		const actSel = (id, label, list, cur, extra = "") => deps.pres.actionSelectPresentation({
-			id,
-			label,
-			options: list,
-			current: cur,
-			extra
-		});
 		const actionLevelLabel = (l, t = null) => deps.pres.actionLevelLabelPresentation(l, (value) => deps.fmtTestValue(t, value), (value) => deps.fmtTestStat(t, value));
 		const syncActLevels = () => {
 			const testEl = doc().getElementById("aTest"), levelEl = doc().getElementById("aLevel"), labelEl = doc().getElementById("aLevelLabel");
@@ -21174,18 +20979,6 @@
 		const closeActionForm = () => {
 			actionUi().reset();
 			deps.rerender();
-		};
-		const actionFormClosedHtml = (issueCount) => {
-			const manual = deps.canWrite() ? deps.btn("Lập hồ sơ từ nguồn khác", { action: "beginActionManual" }, "ghost") : "";
-			return issueCount ? deps.pres.actionFormClosedPresentation({
-				title: "Chọn một sự cố để lập hồ sơ",
-				message: `Có ${issueCount} sự cố ở trên — bấm "Lập hồ sơ" ngay trên dòng cần xử lý để hồ sơ được gắn đúng điểm QC và tự theo dõi QC chạy lại.`,
-				actionHtml: manual
-			}) : deps.pres.actionFormClosedPresentation({
-				title: "Không có vi phạm nào cần lập hồ sơ",
-				message: "Hồ sơ NCE thường bắt đầu từ một vi phạm ở trên. Nếu sự không phù hợp đến từ EQA, cảnh báo thiết bị, phản hồi lâm sàng hay đánh giá nội bộ thì mở hồ sơ thủ công.",
-				actionHtml: manual
-			});
 		};
 		const actionIncidentBanner = (form, editing) => {
 			const p = form.pointId ? (state().data && state().data[form.testId] || []).find((x) => x.id === form.pointId) : null;
@@ -21351,28 +21144,6 @@
 				block: "start"
 			});
 		};
-		const actionInvestigationField = (statusId, noteId, title, hint, form, statusKey, noteKey, lotToLot = false) => {
-			const value = String(form[statusKey] || ""), choices = (lotToLot ? ACT_LOT2LOT_OPTS : ACT_CHECK_OPTS).filter(([v]) => v), stateCls = actionInvestigationStateClass(value), stateLabel = LABELS.check[value] || "Chưa kết luận";
-			const opts = lotToLot ? ACT_LOT2LOT_OPTS : ACT_CHECK_OPTS;
-			return deps.pres.actionInvestigationFieldPresentation({
-				stateClass: stateCls,
-				statusIdHtml: deps.escapeAttr(statusId),
-				statusId,
-				noteIdHtml: deps.escapeAttr(noteId),
-				titleHtml: deps.esc(title),
-				hintHtml: deps.esc(hint),
-				stateLabelHtml: deps.esc(stateLabel),
-				selectOptionsHtml: opts.map(([v, label]) => `<option value="${deps.escapeAttr(v)}" ${v === value ? "selected" : ""}>${deps.esc(label)}</option>`).join(""),
-				choices: choices.map(([v, label]) => ({
-					valueHtml: deps.escapeAttr(v),
-					labelHtml: deps.esc(actionInvestigationChoiceLabel(v, label)),
-					active: v === value,
-					value: v
-				})),
-				noteValueHtml: deps.escapeAttr(form[noteKey] || ""),
-				suggestHtml: actionSuggestBox(noteId, ACT_SUGGEST[noteKey], "Gợi ý bằng chứng")
-			});
-		};
 		const actionInvestigationChoiceLabel = (value, label) => deps.ActionInvestigationPresentation.choiceLabel(value, label);
 		const actionInvestigationStateClass = (value) => deps.ActionInvestigationPresentation.stateClass(value);
 		const actionInvestigationChoose = (statusId, value) => {
@@ -21450,22 +21221,6 @@
 			actionUpdateSectionChip("eff", actionEffSectionChip(form));
 			actionChecklistRefresh();
 		};
-		const actionSection = (key, badge, title, hint, bodyHtml, chipInfo, openSet) => {
-			if (key === "cause" && actionStepRenderInputs) bodyHtml = deps.pres.actionCauseStepPresentation(actionStepRenderInputs.cause);
-			if (key === "patient" && actionStepRenderInputs) bodyHtml = deps.pres.actionPatientStepPresentation(actionStepRenderInputs.patient);
-			if (key === "eff" && actionStepRenderInputs) bodyHtml = deps.pres.actionEffectivenessStepPresentation(actionStepRenderInputs.eff);
-			const open = openSet.has(key), chip = `<span class="action-chip ${chipInfo.cls}" aria-label="${deps.escapeAttr(chipInfo.title || chipInfo.label)}"${chipInfo.title ? ` title="${deps.escapeAttr(chipInfo.title)}"` : ""}>${deps.esc(chipInfo.label)}</span>`;
-			return deps.pres.actionFormSectionPresentation({
-				keyHtml: deps.escapeAttr(key),
-				key,
-				open,
-				badgeHtml: deps.esc(badge),
-				titleHtml: deps.esc(title),
-				hintHtml: deps.esc(hint),
-				chipHtml: chip,
-				bodyHtml
-			});
-		};
 		const actionFormModel = (editing, tests) => deps.ActionFormModel.build(editing, tests, actionUi().seed, deps.currentUser(), actionDraftValues());
 		const actionFormDefaults = (tests) => deps.ActionFormModel.defaults(tests, actionUi().seed, deps.currentUser());
 		const focusActionField = (key) => {
@@ -21510,7 +21265,7 @@
 			const ref = doc().getElementById("aPatientRiskRef");
 			if (ref) ref.innerHTML = actionBiasReferenceHtml(info);
 		};
-		const actionFormHtml = (issueCount) => {
+		const actionFormViewModel = (issueCount) => {
 			const tests = deps.operationalTests();
 			const renderState = deps.pres.actionFormRenderState({
 				actions: state().actions || [],
@@ -21538,134 +21293,247 @@
 				lot: editing.lot || "",
 				pointId: editing.pointId || ""
 			} : null, formRerun = formAction ? deps.actionRerunStatus(formAction) : null;
-			const formOpen = renderState.formOpen;
+			if (!renderState.formOpen) return {
+				open: false,
+				canWrite: deps.canWrite(),
+				closed: {
+					title: issueCount ? "Chọn một sự cố để lập hồ sơ" : "Không có vi phạm nào cần lập hồ sơ",
+					message: issueCount ? `Có ${issueCount} sự cố ở trên — bấm "Lập hồ sơ" ngay trên dòng cần xử lý để hồ sơ được gắn đúng điểm QC và tự theo dõi QC chạy lại.` : "Hồ sơ NCE thường bắt đầu từ một vi phạm ở trên. Nếu sự không phù hợp đến từ EQA, cảnh báo thiết bị, phản hồi lâm sàng hay đánh giá nội bộ thì mở hồ sơ thủ công."
+				}
+			};
 			const miss = renderState.protocol.missingBySection || {};
 			const openSet = renderState.openSet;
 			const qcBound = !!(form.pointId && (state().data && state().data[form.testId] || []).some((x) => x.id === form.pointId));
 			const knownTest = tests.some((t) => t.id === form.testId), missingTest = !knownTest && form.testId ? state().tests.find((t) => t.id === form.testId) : null;
-			const opts = (qcBound ? "" : `<option value="" ${form.testId ? "" : "selected"}>— Không gắn xét nghiệm —</option>`) + (missingTest || !knownTest && form.testId ? `<option value="${deps.escapeAttr(form.testId)}" selected>${deps.esc(missingTest ? deps.testDisplayName(missingTest) : "Xét nghiệm không còn vận hành")}</option>` : "") + tests.map((t) => `<option value="${deps.escapeAttr(t.id)}" ${t.id === form.testId ? "selected" : ""}>${deps.esc(deps.testDisplayName(t))}</option>`).join("");
+			const testOptions = [];
+			if (!qcBound) testOptions.push({
+				id: "",
+				label: "— Không gắn xét nghiệm —"
+			});
+			if (missingTest || !knownTest && form.testId) testOptions.push({
+				id: form.testId,
+				label: missingTest ? deps.testDisplayName(missingTest) : "Xét nghiệm không còn vận hành"
+			});
+			tests.forEach((t) => testOptions.push({
+				id: t.id,
+				label: deps.testDisplayName(t)
+			}));
 			const { t: biasT, l: biasL } = actionBiasContext(form, editing), biasInfo = actionBiasInfo(biasT, biasL, form.biasBefore, form.biasAfter);
 			const sigmaBias = actionLatestSigmaBias(biasT, editing ? editing.level : form.level);
-			const sigmaBiasChip = sigmaBias ? `<div class="sugg-row"><button type="button" class="sugg-chip" data-action="actionFillBias" data-args="${deps.escapeAttr(JSON.stringify(["aBiasBefore", sigmaBias.value]))}" title="Lấy từ Bias EQA/EQC kỳ ${deps.escapeAttr(sigmaBias.period)} ở trang Six Sigma">Dùng Bias EQA gần nhất (kỳ ${deps.esc(sigmaBias.period)}): ${deps.fmt(sigmaBias.value)}%</button></div>` : "";
-			actionStepRenderInputs = {
-				cause: {
-					causeCategory: actSel("aCauseCategory", "Nhóm nguyên nhân", ACT_CAUSE_OPTS, form.causeCategory, "data-action=\"syncActionSuggestions\" data-action-on=\"change\""),
-					cause: deps.esc(form.cause || ""),
-					causeSuggest: actionSuggestBox("aCause", actionCausePhrases(form.causeCategory)),
-					action: deps.esc(form.action || ""),
-					actionSuggest: actionSuggestBox("aAct", actionActionPhrases(form.errorType)),
-					completedDate: deps.dateBox("aActionCompletedDate", form.actionCompletedDate || "", "action-date"),
-					biasBefore: deps.escapeAttr(form.biasBefore || ""),
-					sigmaBias: sigmaBiasChip,
-					biasAfter: deps.escapeAttr(form.biasAfter || ""),
-					threshold: actionBiasThresholdHtml(biasInfo),
-					rerun: formAction ? deps.rerunEvidenceHtml(formAction, formRerun, state().tests.find((x) => x.id === formAction.testId)) : "",
-					containmentHeld: form.containmentStatus === "held",
-					releaseStatus: actSel("aReleaseStatus", "Quyết định cho phép trở lại", ACT_RELEASE_OPTS, form.releaseStatus),
-					releaseDate: deps.dateBox("aReleaseDate", form.releaseDate || "", "action-date"),
-					releaseBy: deps.escapeAttr(form.releaseBy || ""),
-					releaseNote: deps.escapeAttr(form.releaseNote || ""),
-					releaseSuggest: actionSuggestBox("aReleaseNote", ACT_SUGGEST.releaseNote)
-				},
-				patient: {
-					reference: actionBiasReferenceHtml(biasInfo),
-					impact: actSel("aPatientImpact", "Kết luận ảnh hưởng", ACT_PATIENT_OPTS, form.patientImpact),
-					action: deps.esc(form.patientAction || ""),
-					suggest: actionSuggestBox("aPatientAction", ACT_SUGGEST.patientAction)
-				},
-				eff: {
-					status: actSel("aEffectivenessStatus", "Kết luận hiệu lực", ACT_EFF_OPTS, form.effectivenessStatus || "pending"),
-					date: deps.dateBox("aEffectivenessDate", form.effectivenessDate || "", "action-date"),
-					note: deps.esc(form.effectivenessNote || ""),
-					noteSuggest: actionSuggestBox("aEffectivenessNote", ACT_SUGGEST.effectivenessNote),
-					severity: actSel("aResidualSeverity", "Mức độ còn lại", ACT_SEVERITY_OPTS, form.residualSeverity, "data-action=\"syncActionResidualRiskScore\" data-action-on=\"change\""),
-					occurrence: actSel("aResidualOccurrence", "Khả năng xảy ra còn lại", ACT_OCCURRENCE_OPTS, form.residualOccurrence, "data-action=\"syncActionResidualRiskScore\" data-action-on=\"change\""),
-					detectability: actSel("aResidualDetectability", "Khả năng không phát hiện còn lại", ACT_DETECT_OPTS, form.residualDetectability, "data-action=\"syncActionResidualRiskScore\" data-action-on=\"change\""),
-					level: actSel("aResidualRiskLevel", "Phân loại nguy cơ còn lại", ACT_RISK_LEVEL_OPTS, form.residualRiskLevel, "data-action=\"syncActionResidualRiskScore\" data-action-on=\"change\""),
-					scoreClass: deps.escapeAttr([
-						"low",
-						"medium",
-						"high",
-						"critical"
-					].includes(form.residualRiskLevel) ? form.residualRiskLevel : "none"),
-					score: deps.actionResidualRiskScore(form) || "—",
-					basis: deps.escapeAttr(form.residualRiskBasis || ""),
-					basisSuggest: actionSuggestBox("aResidualRiskBasis", ACT_SUGGEST.residualRiskBasis)
+			const nceId = editing ? editing.nceId || deps.nextNceId(deps.isoToday()) : deps.nextNceId(deps.isoToday());
+			const investigationItem = (statusId, noteId, title, hint, statusKey, noteKey, lotToLot = false) => {
+				const value = String(form[statusKey] || ""), opts = lotToLot ? ACT_LOT2LOT_OPTS : ACT_CHECK_OPTS, choices = opts.filter(([v]) => v);
+				return {
+					statusId,
+					noteId,
+					title,
+					hint,
+					stateClass: actionInvestigationStateClass(value),
+					stateLabel: LABELS.check[value] || "Chưa kết luận",
+					value,
+					options: opts.map(([v, label]) => ({
+						value: v,
+						label
+					})),
+					choices: choices.map(([v, label]) => ({
+						value: v,
+						label: actionInvestigationChoiceLabel(v, label),
+						active: v === value
+					})),
+					noteValue: form[noteKey] || "",
+					suggestPhrases: ACT_SUGGEST[noteKey] || []
+				};
+			};
+			return {
+				open: true,
+				canWrite: deps.canWrite(),
+				editing: !!editing,
+				title: editing ? `Tiếp tục hồ sơ ${editing.nceId || "NCE"}` : "Lập hồ sơ sự không phù hợp (NCE)",
+				incidentBanner: (() => {
+					const html = actionIncidentBanner(form, editing);
+					return html ? html : null;
+				})(),
+				formKey: (editing ? editing.id : actionUi().seed ? "seed:" + JSON.stringify(actionUi().seed) : "new") + ":" + actionUi().openSeq,
+				nceId,
+				qcBound,
+				testOptions,
+				selectedTestId: form.testId || "",
+				testDisabled: !!editing,
+				pointId: form.pointId || "",
+				level: form.level == null ? "" : form.level,
+				levelLabel: qcBound ? actionLevelContext(form.testId, form.level, form.lot) : null,
+				date: form.date || deps.isoToday(),
+				ruleOptions: actionRuleOptions().map((r) => Array.isArray(r) ? {
+					value: r[0],
+					label: r[1]
+				} : r),
+				selectedRule: form.rule || "",
+				sourceOptions: actionSourceOptions(qcBound, form.eventSource || "").map(([v, l]) => ({
+					value: v,
+					label: l
+				})),
+				selectedSource: form.eventSource || "",
+				phaseOptions: ACT_PHASE_OPTS.map(([v, l]) => ({
+					value: v,
+					label: l
+				})),
+				selectedPhase: form.processPhase || "exam",
+				errOptions: ACT_ERR_OPTS.map(([v, l]) => ({
+					value: v,
+					label: l
+				})),
+				selectedErr: form.errorType || "",
+				by: form.by || "",
+				staffNames: [...new Set((state().users || []).filter((u) => u.active !== false).map((u) => String(u.name || u.username || "").trim()).filter(Boolean))],
+				dueDate: form.dueDate || "",
+				evidenceTimelineHtml: formAction ? deps.evidenceTimelineHtml(formAction, formRerun) : "",
+				openSections: [...openSet],
+				sections: {
+					immediate: {
+						chip: actionSectionChip(miss.immediate),
+						containmentOptions: ACT_CONTAIN_OPTS.map(([v, l]) => ({
+							value: v,
+							label: l
+						})),
+						containmentStatus: form.containmentStatus || "",
+						containmentNote: form.containmentNote || "",
+						containmentNoteSuggest: ACT_SUGGEST.containmentNote,
+						correction: form.correction || "",
+						correctionSuggest: ACT_SUGGEST.correction
+					},
+					risk: {
+						chip: actionSectionChip(miss.risk),
+						severityOptions: ACT_SEVERITY_OPTS.map(([v, l]) => ({
+							value: v,
+							label: l
+						})),
+						severity: form.riskSeverity ?? "",
+						occurrenceOptions: ACT_OCCURRENCE_OPTS.map(([v, l]) => ({
+							value: v,
+							label: l
+						})),
+						occurrence: form.riskOccurrence ?? "",
+						detectOptions: ACT_DETECT_OPTS.map(([v, l]) => ({
+							value: v,
+							label: l
+						})),
+						detectability: form.riskDetectability ?? "",
+						levelOptions: ACT_RISK_LEVEL_OPTS.map(([v, l]) => ({
+							value: v,
+							label: l
+						})),
+						level: form.riskLevel || "",
+						scoreClass: [
+							"low",
+							"medium",
+							"high",
+							"critical"
+						].includes(form.riskLevel) ? form.riskLevel : "none",
+						score: deps.actionRiskScore(form) || "—",
+						basis: form.riskBasis || "",
+						basisSuggest: ACT_SUGGEST.riskBasis
+					},
+					check: {
+						chip: actionChecklistChip(form),
+						items: [
+							investigationItem("aQcMaterial", "aQcMaterialNote", "Vật liệu QC", "Hạn dùng, bảo quản, hoàn nguyên", "qcMaterialStatus", "qcMaterialNote"),
+							investigationItem("aInstrument", "aInstrumentNote", "Máy phân tích", "Điện, nước, nhiệt độ, cảnh báo, bảo trì", "instrumentStatus", "instrumentNote"),
+							investigationItem("aReagent", "aReagentNote", "Hóa chất / calibrator", "Hạn dùng, số lô và điều kiện bảo quản", "reagentStatus", "reagentNote"),
+							investigationItem("aCalibration", "aCalibrationNote", "Hiệu chuẩn", "Tình trạng và chỉ định tái hiệu chuẩn", "calibrationStatus", "calibrationNote"),
+							investigationItem("aLotToLot", "aLotToLotNote", "So sánh lot-to-lot", "Dùng khi có thay đổi lô gần đây", "lotToLotStatus", "lotToLotNote", true)
+						]
+					},
+					cause: {
+						chip: actionSectionChip(miss.cause),
+						causeCategoryOptions: ACT_CAUSE_OPTS.map(([v, l]) => ({
+							value: v,
+							label: l
+						})),
+						causeCategory: form.causeCategory || "",
+						cause: form.cause || "",
+						causeSuggest: actionCausePhrases(form.causeCategory),
+						action: form.action || "",
+						actionSuggest: actionActionPhrases(form.errorType),
+						completedDate: form.actionCompletedDate || "",
+						biasBefore: form.biasBefore || "",
+						biasAfter: form.biasAfter || "",
+						sigmaBiasChip: sigmaBias ? {
+							period: sigmaBias.period,
+							value: sigmaBias.value,
+							valueText: deps.fmt(sigmaBias.value)
+						} : null,
+						thresholdHtml: actionBiasThresholdHtml(biasInfo),
+						rerunEvidenceHtml: formAction ? deps.rerunEvidenceHtml(formAction, formRerun, state().tests.find((x) => x.id === formAction.testId)) : "",
+						containmentHeld: form.containmentStatus === "held",
+						releaseOptions: ACT_RELEASE_OPTS.map(([v, l]) => ({
+							value: v,
+							label: l
+						})),
+						releaseStatus: form.releaseStatus || "",
+						releaseDate: form.releaseDate || "",
+						releaseBy: form.releaseBy || "",
+						releaseNote: form.releaseNote || "",
+						releaseSuggest: ACT_SUGGEST.releaseNote
+					},
+					patient: {
+						chip: actionSectionChip(miss.patient),
+						referenceHtml: actionBiasReferenceHtml(biasInfo),
+						impactOptions: ACT_PATIENT_OPTS.map(([v, l]) => ({
+							value: v,
+							label: l
+						})),
+						impact: form.patientImpact || "",
+						action: form.patientAction || "",
+						actionSuggest: ACT_SUGGEST.patientAction
+					},
+					eff: {
+						chip: actionEffSectionChip(form),
+						statusOptions: ACT_EFF_OPTS.map(([v, l]) => ({
+							value: v,
+							label: l
+						})),
+						status: form.effectivenessStatus || "pending",
+						date: form.effectivenessDate || "",
+						note: form.effectivenessNote || "",
+						noteSuggest: ACT_SUGGEST.effectivenessNote,
+						severityOptions: ACT_SEVERITY_OPTS.map(([v, l]) => ({
+							value: v,
+							label: l
+						})),
+						severity: form.residualSeverity ?? "",
+						occurrenceOptions: ACT_OCCURRENCE_OPTS.map(([v, l]) => ({
+							value: v,
+							label: l
+						})),
+						occurrence: form.residualOccurrence ?? "",
+						detectOptions: ACT_DETECT_OPTS.map(([v, l]) => ({
+							value: v,
+							label: l
+						})),
+						detectability: form.residualDetectability ?? "",
+						levelOptions: ACT_RISK_LEVEL_OPTS.map(([v, l]) => ({
+							value: v,
+							label: l
+						})),
+						level: form.residualRiskLevel || "",
+						scoreClass: [
+							"low",
+							"medium",
+							"high",
+							"critical"
+						].includes(form.residualRiskLevel) ? form.residualRiskLevel : "none",
+						score: deps.actionResidualRiskScore(form) || "—",
+						basis: form.residualRiskBasis || "",
+						basisSuggest: ACT_SUGGEST.residualRiskBasis
+					}
 				}
 			};
-			const formBodyHtml = `${actionIncidentBanner(form, editing)}<div class="action-form-section"><div class="action-form-section-title"><span>Hồ sơ</span><div><b>Nhận diện sự cố</b><small>Có thể lưu ngay sau khi kiểm soát tức thời; không cần chờ điều tra xong</small></div></div>
-     <input id="aPointId" type="hidden" value="${deps.escapeAttr(form.pointId || "")}">
-     ${qcBound ? `<input id="aLevel" type="hidden" value="${deps.escapeAttr(form.level == null ? "" : form.level)}">` : ""}
-     <div class="action-ident-groups">
-       <div class="action-ident-group"><div class="action-ident-group-title"><b>Đối tượng QC</b><small>${editing ? "Khóa theo hồ sơ đã mở — sai đối tượng thì hủy có lưu vết và mở hồ sơ mới" : "Hồ sơ và cấu hình QC đang xảy ra sự cố"}</small></div><div class="action-form-main">
-         <div><label>Mã hồ sơ</label><input id="aNceId" aria-label="Mã hồ sơ NCE" readonly value="${deps.escapeAttr(editing ? editing.nceId || deps.nextNceId(deps.isoToday()) : deps.nextNceId(deps.isoToday()))}"></div>
-         <div><label>Xét nghiệm${qcBound ? "" : " <span class=\"hint\">(nếu có)</span>"}</label><select id="aTest" aria-label="Xét nghiệm" ${editing ? "disabled" : "data-action=\"syncActLevels\" data-action-on=\"change\""}>${opts}</select></div>
-         ${qcBound ? `<div><label>Ngữ cảnh QC</label><input id="aLevelLabel" aria-label="Ngữ cảnh QC" readonly value="${deps.escapeAttr(actionLevelContext(form.testId, form.level, form.lot))}"></div>` : ""}
-       </div></div>
-       <div class="action-ident-group"><div class="action-ident-group-title"><b>Phân loại sự cố</b><small>Thời điểm, dấu hiệu phát hiện và loại sai số</small></div><div class="action-form-meta">
-         <div><label>Ngày ghi nhận</label>${deps.dateBox("aDate", form.date || deps.isoToday(), "action-date")}</div>
-         <div><label>Luật vi phạm</label>${actSel("aRule", "Luật vi phạm", actionRuleOptions(), form.rule)}</div>
-         <div><label>Nguồn phát hiện</label>${actSel("aEventSource", "Nguồn phát hiện", actionSourceOptions(qcBound, form.eventSource), form.eventSource || "")}</div>
-         <div><label>Giai đoạn</label>${actSel("aProcessPhase", "Giai đoạn quá trình", ACT_PHASE_OPTS, form.processPhase || "exam")}</div>
-         <div><label>Loại sai số</label>${actSel("aErr", "Loại sai số", ACT_ERR_OPTS, form.errorType, "data-action=\"syncActionSuggestions\" data-action-on=\"change\"")}</div>
-       </div></div>
-       <div class="action-ident-group"><div class="action-ident-group-title"><b>Phân công xử lý</b><small>Người chịu trách nhiệm và thời hạn dự kiến</small></div><div class="action-form-owner">
-         <div><label>Người phụ trách</label><input id="aBy" aria-label="Người phụ trách" list="aByList" autocomplete="off" placeholder="Chọn hoặc gõ tên" value="${deps.escapeAttr(form.by || "")}"><datalist id="aByList">${actionStaffOptions()}</datalist></div>
-         <div><label>Hạn hoàn thành</label>${deps.dateBox("aDueDate", form.dueDate || "", "action-date")}</div>
-       </div></div>
-     </div>${formAction ? deps.evidenceTimelineHtml(formAction, formRerun) : ""}</div>
-     ${actionSection("immediate", "1", "Kiểm soát và xử lý tức thời", "Phần tối thiểu bắt buộc để mở hồ sơ NCE; kết luận ảnh hưởng bệnh nhân ghi ở mục 7", deps.pres.actionImmediateStepPresentation({
-				containmentSelectHtml: actSel("aContainment", "Phạm vi kiểm soát tức thời", ACT_CONTAIN_OPTS, form.containmentStatus),
-				containmentNoteValueHtml: deps.escapeAttr(form.containmentNote || ""),
-				containmentNoteSuggestHtml: actionSuggestBox("aContainmentNote", ACT_SUGGEST.containmentNote),
-				correctionTextHtml: deps.esc(form.correction || ""),
-				correctionSuggestHtml: actionSuggestBox("aCorrection", ACT_SUGGEST.correction)
-			}), actionSectionChip(miss.immediate), openSet)}
-     ${actionSection("risk", "2", "Đánh giá nguy cơ", "RPN được tính tự động; mức phân loại phải truy xuất được về SOP của đơn vị", deps.pres.actionRiskStepPresentation({
-				severitySelectHtml: actSel("aRiskSeverity", "Mức độ ảnh hưởng", ACT_SEVERITY_OPTS, form.riskSeverity, "data-action=\"syncActionRiskScore\" data-action-on=\"change\""),
-				occurrenceSelectHtml: actSel("aRiskOccurrence", "Khả năng xảy ra", ACT_OCCURRENCE_OPTS, form.riskOccurrence, "data-action=\"syncActionRiskScore\" data-action-on=\"change\""),
-				detectabilitySelectHtml: actSel("aRiskDetectability", "Khả năng không phát hiện", ACT_DETECT_OPTS, form.riskDetectability, "data-action=\"syncActionRiskScore\" data-action-on=\"change\""),
-				levelSelectHtml: actSel("aRiskLevel", "Phân loại nguy cơ", ACT_RISK_LEVEL_OPTS, form.riskLevel, "data-action=\"syncActionRiskScore\" data-action-on=\"change\""),
-				scoreClassHtml: deps.escapeAttr([
-					"low",
-					"medium",
-					"high",
-					"critical"
-				].includes(form.riskLevel) ? form.riskLevel : "none"),
-				scoreHtml: deps.actionRiskScore(form) || "—",
-				basisValueHtml: deps.escapeAttr(form.riskBasis || ""),
-				basisSuggestHtml: actionSuggestBox("aRiskBasis", ACT_SUGGEST.riskBasis)
-			}), actionSectionChip(miss.risk), openSet)}
-     ${actionSection("check", "3", "Checklist điều tra", "Ghi rõ khi bất thường hoặc không áp dụng", deps.pres.actionInvestigationStepPresentation([
-				actionInvestigationField("aQcMaterial", "aQcMaterialNote", "Vật liệu QC", "Hạn dùng, bảo quản, hoàn nguyên", form, "qcMaterialStatus", "qcMaterialNote"),
-				actionInvestigationField("aInstrument", "aInstrumentNote", "Máy phân tích", "Điện, nước, nhiệt độ, cảnh báo, bảo trì", form, "instrumentStatus", "instrumentNote"),
-				actionInvestigationField("aReagent", "aReagentNote", "Hóa chất / calibrator", "Hạn dùng, số lô và điều kiện bảo quản", form, "reagentStatus", "reagentNote"),
-				actionInvestigationField("aCalibration", "aCalibrationNote", "Hiệu chuẩn", "Tình trạng và chỉ định tái hiệu chuẩn", form, "calibrationStatus", "calibrationNote"),
-				actionInvestigationField("aLotToLot", "aLotToLotNote", "So sánh lot-to-lot", "Dùng khi có thay đổi lô gần đây", form, "lotToLotStatus", "lotToLotNote", true)
-			]), actionChecklistChip(form), openSet)}
-      ${actionSection("cause", "4–6", "Nguyên nhân gốc và hành động khắc phục", "Tách khỏi xử lý tức thời; QC chạy lại được tự liên kết", `<div class="action-cause-grid"><div><label>Nhóm nguyên nhân</label>${actSel("aCauseCategory", "Nhóm nguyên nhân", ACT_CAUSE_OPTS, form.causeCategory, "data-action=\"syncActionSuggestions\" data-action-on=\"change\"")}</div><div><label>Nguyên nhân gốc hoặc nghi ngờ</label><textarea id="aCause" rows="1" placeholder="Mô tả bằng chứng và nguyên nhân...">${deps.esc(form.cause || "")}</textarea>${actionSuggestBox("aCause", actionCausePhrases(form.causeCategory))}</div><div><label>Hành động khắc phục để ngăn tái diễn</label><textarea id="aAct" rows="1" placeholder="VD: Thay lọ QC mới, vệ sinh kim hút, cập nhật lịch bảo trì...">${deps.esc(form.action || "")}</textarea>${actionSuggestBox("aAct", actionActionPhrases(form.errorType))}</div></div><div class="action-cause-second-row"><div><label>Ngày hoàn thành hành động</label>${deps.dateBox("aActionCompletedDate", form.actionCompletedDate || "", "action-date")}</div><div><label>Bias trước khắc phục (%) <small class="hint">tham khảo</small></label><input id="aBiasBefore" type="text" inputmode="decimal" placeholder="VD: 8.5" value="${deps.escapeAttr(form.biasBefore || "")}" data-action="actionUpdateBiasHint" data-action-on="input">${sigmaBiasChip}</div><div><label>Bias sau khắc phục (%) <small class="hint">tham khảo</small></label><input id="aBiasAfter" type="text" inputmode="decimal" placeholder="VD: 1.2" value="${deps.escapeAttr(form.biasAfter || "")}" data-action="actionUpdateBiasHint" data-action-on="input"></div></div><div id="aBiasThresholdHint" class="hint flow-note">${actionBiasThresholdHtml(biasInfo)}</div>${formAction ? deps.rerunEvidenceHtml(formAction, formRerun, state().tests.find((x) => x.id === formAction.testId)) : ""}<div class="action-release-block"><div class="action-release-title"><b>Cho phép hoạt động/trả kết quả trở lại</b><small>${form.containmentStatus === "held" ? "Bắt buộc sau khi QC được chấp nhận và hành động đã hoàn thành" : "Không bắt buộc vì mục 1 không ghi nhận kết quả liên quan bị giữ"}</small></div><div class="action-release-grid"><div><label>Quyết định</label>${actSel("aReleaseStatus", "Quyết định cho phép trở lại", ACT_RELEASE_OPTS, form.releaseStatus)}</div><div><label>Ngày cho phép</label>${deps.dateBox("aReleaseDate", form.releaseDate || "", "action-date")}</div><div><label>Người cho phép</label><input id="aReleaseBy" list="aByList" autocomplete="off" placeholder="Chọn hoặc gõ tên" value="${deps.escapeAttr(form.releaseBy || "")}"></div><div><label>Căn cứ cho phép</label><input id="aReleaseNote" placeholder="VD: QC chạy lại đã được chấp nhận" value="${deps.escapeAttr(form.releaseNote || "")}">${actionSuggestBox("aReleaseNote", ACT_SUGGEST.releaseNote)}</div></div></div>`, actionSectionChip(miss.cause), openSet)}
-     ${actionSection("patient", "7", "Đánh giá ảnh hưởng bệnh nhân", "Ghi rõ phạm vi và cách xử lý nếu có liên quan", `<div id="aPatientRiskRef" class="hint space-after-control">${actionBiasReferenceHtml(biasInfo)}</div><div class="action-patient-grid"><div><label>Kết luận ảnh hưởng</label>${actSel("aPatientImpact", "Kết luận ảnh hưởng", ACT_PATIENT_OPTS, form.patientImpact)}</div><div><label>Xử lý mẫu/kết quả liên quan</label><textarea id="aPatientAction" rows="1" placeholder="VD: Rà soát các mẫu từ 08:00–10:00; chạy lại 3 mẫu...">${deps.esc(form.patientAction || "")}</textarea>${actionSuggestBox("aPatientAction", ACT_SUGGEST.patientAction)}</div></div>`, actionSectionChip(miss.patient), openSet)}
-     ${actionSection("eff", "8", "Đánh giá hiệu lực", "Làm sau thời gian theo dõi; kết luận \"có hiệu lực\" cần đánh giá nguy cơ còn lại", `<div class="action-effectiveness-grid"><div><label>Kết luận hiệu lực</label>${actSel("aEffectivenessStatus", "Kết luận hiệu lực", ACT_EFF_OPTS, form.effectivenessStatus || "pending")}</div><div class="action-effectiveness-date"><label>Ngày đánh giá</label>${deps.dateBox("aEffectivenessDate", form.effectivenessDate || "", "action-date")}</div><div><label>Bằng chứng/nhận xét hiệu lực</label><textarea id="aEffectivenessNote" rows="1" placeholder="VD: Theo dõi 20 lần chạy tiếp theo không tái diễn...">${deps.esc(form.effectivenessNote || "")}</textarea>${actionSuggestBox("aEffectivenessNote", ACT_SUGGEST.effectivenessNote)}</div></div><div class="action-residual-block"><div class="action-release-title"><b>Nguy cơ còn lại sau khắc phục</b><small>Chỉ bắt buộc khi kết luận có hiệu lực; dùng cùng thang điểm và SOP với đánh giá ban đầu</small></div><div class="action-residual-grid"><div><label>Mức độ (S)</label>${actSel("aResidualSeverity", "Mức độ còn lại", ACT_SEVERITY_OPTS, form.residualSeverity, "data-action=\"syncActionResidualRiskScore\" data-action-on=\"change\"")}</div><div><label>Khả năng xảy ra (O)</label>${actSel("aResidualOccurrence", "Khả năng xảy ra còn lại", ACT_OCCURRENCE_OPTS, form.residualOccurrence, "data-action=\"syncActionResidualRiskScore\" data-action-on=\"change\"")}</div><div><label>Khả năng không phát hiện (D)</label>${actSel("aResidualDetectability", "Khả năng không phát hiện còn lại", ACT_DETECT_OPTS, form.residualDetectability, "data-action=\"syncActionResidualRiskScore\" data-action-on=\"change\"")}</div><div><label>Phân loại theo SOP</label>${actSel("aResidualRiskLevel", "Phân loại nguy cơ còn lại", ACT_RISK_LEVEL_OPTS, form.residualRiskLevel, "data-action=\"syncActionResidualRiskScore\" data-action-on=\"change\"")}</div><div class="action-risk-result"><label>RPN còn lại</label><div id="aResidualRiskScoreCard" class="action-risk-score risk-${deps.escapeAttr([
-				"low",
-				"medium",
-				"high",
-				"critical"
-			].includes(form.residualRiskLevel) ? form.residualRiskLevel : "none")}" aria-live="polite"><b id="aResidualRiskScore">${deps.actionResidualRiskScore(form) || "—"}</b></div></div><div class="action-residual-basis"><label>Căn cứ đánh giá lại</label><input id="aResidualRiskBasis" placeholder="VD: SOP-QC-07; dữ liệu theo dõi sau khắc phục" value="${deps.escapeAttr(form.residualRiskBasis || "")}">${actionSuggestBox("aResidualRiskBasis", ACT_SUGGEST.residualRiskBasis)}</div></div></div>`, actionEffSectionChip(form), openSet)}
-     <div class="action-form-submit"><div><b>${editing ? "Cập nhật tiến độ hồ sơ" : "Lưu ngay ở trạng thái đang điều tra"}</b><span>Chỉ cần hoàn tất phần nhận diện và kiểm soát tức thời để lưu; phê duyệt chỉ xuất hiện khi hồ sơ đủ điều kiện khép vòng.</span></div><div class="action-submit-buttons">${deps.btn(editing ? "Hủy chỉnh sửa" : "Đóng", { action: "closeActionForm" }, "ghost")}${deps.btn(editing ? "Lưu thay đổi" : "Lập hồ sơ NCE", { action: "addAction" }, "teal")}</div></div>`;
-			return deps.pres.actionFormPanelPresentation({
-				editing,
-				formOpen,
-				guideButtonHtml: deps.btn("Quy trình 8 bước", { action: "openActionGuide" }, "ghost sm"),
-				closedHtml: actionFormClosedHtml(issueCount),
-				formBodyHtml
-			});
 		};
 		return {
 			actionUi,
 			actionSectionToggled,
 			actionDefaultOpenSections,
 			actionRuleOptions,
-			actionStaffOptions,
 			captureActionDraft,
 			actionFormChanged,
 			actionDraftValues,
@@ -21673,17 +21541,12 @@
 			actionSourceOptions,
 			actionCausePhrases,
 			actionActionPhrases,
-			actionSuggestRow,
-			actionSuggestBox,
 			actionInsertSuggestion,
-			syncActionSuggestions,
-			actSel,
 			actionLevelLabel,
 			syncActLevels,
 			actionLevelContext,
 			beginActionManual,
 			closeActionForm,
-			actionFormClosedHtml,
 			actionIncidentBanner,
 			beginActionFromIssue,
 			actionFieldValue,
@@ -21693,7 +21556,6 @@
 			syncActionRiskScore,
 			syncActionResidualRiskScore,
 			editAction,
-			actionInvestigationField,
 			actionInvestigationChoiceLabel,
 			actionInvestigationStateClass,
 			actionInvestigationChoose,
@@ -21704,7 +21566,6 @@
 			actionEffSectionChip,
 			actionUpdateSectionChip,
 			actionRefreshSectionChips,
-			actionSection,
 			actionFormModel,
 			actionFormDefaults,
 			focusActionField,
@@ -21715,7 +21576,7 @@
 			actionBiasThresholdHtml,
 			actionBiasReferenceHtml,
 			actionUpdateBiasHint,
-			actionFormHtml
+			actionFormViewModel
 		};
 	}
 	//#endregion
@@ -21723,13 +21584,13 @@
 	/**
 	* Trang "Khắc phục sự cố" trừ phần form: danh sách sự cố cần xử lý, vòng đời hồ sơ
 	* NCE (duyệt/trả lại/hủy có lưu vết/escalate/mở lại) cùng token khóa phiên bản,
-	* phiếu chi tiết và các khối dựng bằng chứng. Phần DỰNG VÀ ĐỌC LẠI form 8 mục nằm ở
-	* action-form-controller.ts — pageActionsV4() gọi sang deps.formHtml() (không import
-	* trực tiếp file kia, vì đường cắt cố ý KHÔNG một chiều: form cũng gọi ngược
-	* actionEvidenceTimelineHtml/actionRerunEvidenceHtml/actionLevelShort của trang này).
-	* Việc nối hai chiều này do modular-pilot.global.ts lo (dựng controller này trước với
-	* deps.formHtml trỏ qua một biến tham chiếu được gán sau khi action-form-controller.ts
-	* dựng xong).
+	* phiếu chi tiết và các khối dựng bằng chứng. Phần DỰNG form 8 mục nằm ở
+	* action-form-controller.ts. actionsModel() (dữ liệu thuần cho
+	* src/react/pages/ActionsPage.tsx) gọi thẳng action-form-controller.ts's
+	* actionFormViewModel() từ phía React, không qua đường cắt của controller này —
+	* đường cắt CÒN LẠI ở đây chỉ một chiều: form gọi ngược
+	* actionEvidenceTimelineHtml/actionRerunEvidenceHtml/actionLevelShort của trang này
+	* (dựng modular-pilot.global.ts qua một biến tham chiếu, xem ghi chú ở đó).
 	*
 	* `document` là getter LAZY, cùng lý do với entry/manage: một số test đổi `document`
 	* giữa các bước.
@@ -21835,10 +21696,6 @@
 			}
 			if (deps.actionFormUiState.editId === a.id) deps.actionFormUiState.reset();
 			deps.rerender();
-		};
-		const actionApprovalTag = (a) => {
-			const s = deps.actionApprovalStatus(a), view = deps.ActionReviewPresentation.approvalTag(s, deps.actionCancelled(a)), label = deps.actionApprovalLabel(a);
-			return deps.pres.actionApprovalTagPresentation(view, label);
 		};
 		const actionApprovalToken = (a) => deps.ActionReviewService.reviewToken(a);
 		const actionApprovalReadinessMessage = (r, afterAuth) => deps.ActionReviewMessages.approval(r, afterAuth);
@@ -22109,24 +21966,6 @@
 				return;
 			}
 		};
-		const actionReviewButtons = (i, a) => {
-			const s = deps.actionApprovalStatus(a), wf = deps.actionWorkflowStatus(a);
-			const model = deps.ActionReviewPresentation.buttons(a, {
-				approval: s,
-				workflowStage: wf.stage,
-				cancelled: deps.actionCancelled(a),
-				isAdmin: deps.role() === "admin",
-				canWrite: deps.canWrite(),
-				canEscalate: actionCanEscalate(a),
-				canReopen: actionCanReopen(a)
-			});
-			return deps.pres.actionReviewButtonsHtml(i, model);
-		};
-		const actionSideChips = (a, stage) => {
-			if (deps.actionCancelled(a)) return "";
-			const chips = deps.ActionStatusPresentation.sideChips(a, stage, deps.actionRerunStatus(a), deps.actionOverdue(a), deps.actionEffectivenessStatus(a));
-			return deps.pres.actionSideChipsHtml(chips);
-		};
 		const actionDetailCheck = (label, status, note) => {
 			const view = deps.ActionStatusPresentation.detailCheck(status);
 			return deps.pres.actionDetailCheckHtml(label, view, note);
@@ -22259,118 +22098,132 @@
 			}));
 		};
 		const groupIssuesByTestDate = (issues) => deps.ActionListPresentation.groupIssuesByTestDate(issues);
-		const issueRowHtml = (o) => {
-			const rules = o.rules.join(", "), err = deps.errorType(o.rules), hint = deps.fixHint(o.rules), wf = deps.pointWorkflowSummary(o.p.id), acts = deps.pointRealActions(o.p.id) || [], latest = acts[acts.length - 1], idx = latest ? (state().actions || []).indexOf(latest) : -1;
-			const sideChips = latest ? actionSideChips(latest, deps.actionWorkflowStatus(latest).stage) : "";
-			const foot = latest ? `${latest.nceId ? deps.esc(latest.nceId) + " · " : ""}Phụ trách: ${deps.esc(latest.by || "—")}${latest.dueDate ? " · hạn " + deps.vnDate(latest.dueDate) : ""}` : hint;
-			return deps.pres.actionIssueRowPresentation({
-				severity: o.f.level,
-				level: actionLevelShort(o.t, o.l.level, o.l.lot),
-				state: deps.stateName(o.f.level),
-				value: deps.fmtPointValue(o.p, o.t),
-				unit: o.t.unit || "",
-				rules,
-				error: err,
-				workflowClass: wf.cls,
-				workflowLabel: wf.label,
-				sideChips,
-				footer: foot,
-				action: deps.canWrite() ? idx >= 0 ? {
-					kind: "continue",
-					index: idx
-				} : {
-					kind: "create",
-					testId: o.t.id,
-					level: o.l.level,
-					rules,
-					error: err,
-					hint,
-					pointId: o.p.id || "",
-					date: o.p.date || ""
-				} : void 0
-			});
-		};
 		const actionViolationInfo = (a) => deps.ActionViolationService.info(a);
 		const actionQcVerdictLabel = (a) => deps.ActionViolationService.verdictLabel(a);
-		const openActionIssueHtml = (a, idx) => {
-			const t = state().tests.find((x) => x.id === a.testId), wf = deps.actionWorkflowStatus(a), violation = actionViolationInfo(a), title = a.nceId || "Hồ sơ khắc phục", context = t ? `${deps.testDisplayName(t)} · ${actionLevelShort(t, a.level, a.lot)}` : violation.rule || "Sự cố", primary = a.correction || a.action || "Đang điều tra", verdict = actionQcVerdictLabel(a);
-			return deps.pres.actionOpenIssuePresentation({
-				severity: wf.cls === "rej" ? "rej" : "warn",
-				title,
-				context,
-				date: deps.vnDate(deps.actionEventDate(a)),
-				verdict,
-				rule: violation.rule,
-				errorType: violation.errorType,
-				workflowClass: wf.cls,
-				workflowLabel: wf.label,
-				sideChips: actionSideChips(a, wf.stage),
-				primary,
-				owner: a.by || "",
-				dueDate: a.dueDate ? deps.vnDate(a.dueDate) : "",
-				editable: deps.canWrite(),
-				index: idx
-			});
-		};
-		const actionIssueGroupHtml = (model) => deps.pres.actionIssueGroupPresentation(model);
-		const pageActionsV4 = () => {
+		const actionsModel = () => {
 			const issues = currentIssues(), activePointIds = new Set(issues.map((o) => o.p.id));
-			const violationHtml = groupIssuesByTestDate(issues).map((g) => actionIssueGroupHtml({
+			const issueGroups = groupIssuesByTestDate(issues);
+			const chipsData = (a, stage) => deps.actionCancelled(a) ? [] : deps.ActionStatusPresentation.sideChips(a, stage, deps.actionRerunStatus(a), deps.actionOverdue(a), deps.actionEffectivenessStatus(a));
+			const issueItem = (o) => {
+				const rules = o.rules.join(", "), err = deps.errorType(o.rules), hint = deps.fixHint(o.rules), wf = deps.pointWorkflowSummary(o.p.id), acts = deps.pointRealActions(o.p.id) || [], latest = acts[acts.length - 1], idx = latest ? (state().actions || []).indexOf(latest) : -1;
+				const sideChips = latest ? chipsData(latest, deps.actionWorkflowStatus(latest).stage) : [];
+				const footer = latest ? `${latest.nceId ? latest.nceId + " · " : ""}Phụ trách: ${latest.by || "—"}${latest.dueDate ? " · hạn " + deps.vnDate(latest.dueDate) : ""}` : hint;
+				return {
+					severity: o.f.level,
+					level: actionLevelShort(o.t, o.l.level, o.l.lot),
+					state: deps.stateName(o.f.level),
+					value: deps.fmtPointValue(o.p, o.t),
+					unit: o.t.unit || "",
+					rules,
+					error: err,
+					workflowClass: wf.cls,
+					workflowLabel: wf.label,
+					sideChips,
+					footer,
+					action: deps.canWrite() ? idx >= 0 ? {
+						kind: "continue",
+						index: idx
+					} : {
+						kind: "create",
+						testId: o.t.id,
+						level: o.l.level,
+						rules,
+						error: err,
+						hint,
+						pointId: o.p.id || "",
+						date: o.p.date || ""
+					} : null
+				};
+			};
+			const violationGroups = issueGroups.map((g) => ({
 				severity: g.worst,
 				title: deps.testDisplayName(g.t),
 				date: deps.vnDate(g.date),
 				count: g.items.length,
 				countLabel: "vi phạm",
-				itemsHtml: g.items.map(issueRowHtml).join("")
-			})).join("");
+				items: g.items.map(issueItem)
+			}));
 			const openActions = (state().actions || []).map((a, idx) => ({
 				a,
 				idx
 			})).filter(({ a }) => !deps.actionCancelled(a) && deps.actionRecorded(a) && !deps.actionWorkflowStatus(a).complete && (!a.pointId || !activePointIds.has(a.pointId)));
-			const issueHtml = violationHtml + (openActions.length ? actionIssueGroupHtml({
-				severity: "warn",
-				title: "Hồ sơ NCE đang mở",
-				date: "Cần tiếp tục xử lý",
-				count: openActions.length,
-				countLabel: "hồ sơ",
-				itemsHtml: openActions.map(({ a, idx }) => openActionIssueHtml(a, idx)).join("")
-			}) : "") || "<div class=\"alert ok\">Không có vi phạm/cảnh báo hoặc hồ sơ NCE đang mở.</div>";
-			const rows = (state().actions || []).slice().reverse().map((a, idx) => {
-				const realIdx = state().actions.length - 1 - idx, t = state().tests.find((x) => x.id === a.testId), wf = deps.actionWorkflowStatus(a), approval = deps.actionApprovalStatus(a), openedAt = a.createdAt ? deps.formatDateTimeVN(a.createdAt) : "", primary = a.action || a.correction || "Đang điều tra";
-				const approveMeta = approval === "pending" ? "" : `<div class="action-note">${deps.esc(a.approvedBy || "")} ${a.approvedAt ? deps.formatDateTimeVN(a.approvedAt) : ""}${a.approvalNote ? " · " + deps.esc(a.approvalNote) : ""}</div>`;
-				const identity = `${a.nceId ? deps.esc(a.nceId) + " · " : ""}${t ? deps.esc(deps.testDisplayName(t)) : deps.esc(a.rule || "Cập nhật")}`, sub = t ? deps.esc(actionLevelShort(t, a.level, a.lot)) : deps.esc(a.lot ? "Nhóm lô " + a.lot : "—"), rule = t ? (actionQcVerdictLabel(a) ? deps.esc(actionQcVerdictLabel(a)) + " · " : "") + deps.esc(actionViolationInfo(a).rule) + " · " + deps.esc(actionViolationInfo(a).errorType) : deps.esc(a.errorType || "—");
-				const model = {
+			const openActionItem = (a, idx) => {
+				const t = state().tests.find((x) => x.id === a.testId), wf = deps.actionWorkflowStatus(a), violation = actionViolationInfo(a), title = a.nceId || "Hồ sơ khắc phục", context = t ? `${deps.testDisplayName(t)} · ${actionLevelShort(t, a.level, a.lot)}` : violation.rule || "Sự cố", primary = a.correction || a.action || "Đang điều tra", verdict = actionQcVerdictLabel(a);
+				return {
+					severity: wf.cls === "rej" ? "rej" : "warn",
+					title,
+					context,
 					date: deps.vnDate(deps.actionEventDate(a)),
-					openedAt,
-					identity,
-					sub,
-					rule,
+					verdict,
+					rule: violation.rule,
+					errorType: violation.errorType,
+					workflowClass: wf.cls,
+					workflowLabel: wf.label,
+					sideChips: chipsData(a, wf.stage),
 					primary,
 					owner: a.by || "",
 					dueDate: a.dueDate ? deps.vnDate(a.dueDate) : "",
-					workflowClass: wf.cls,
-					workflowLabel: wf.label,
-					sideChips: actionSideChips(a, wf.stage),
-					approvalTag: !deps.actionCancelled(a) && approval !== "pending" ? actionApprovalTag(a) : "",
-					approvalMeta: approveMeta,
-					actions: actionReviewButtons(realIdx, a)
+					editable: deps.canWrite(),
+					index: idx
 				};
-				return deps.pres.actionLogRowPresentation(model);
-			}).join("");
-			const head = deps.headOnly("Khắc phục sự cố", "Điều tra nguyên nhân, ghi nhận, chạy lại QC và phê duyệt khép vòng"), issuesPanel = deps.pres.actionIssuesPanelHtml(issueHtml), formPanel = deps.formHtml(issues.length), logPanel = deps.pres.actionLogPanelHtml(rows);
-			return deps.pres.actionPageHtml({
-				headHtml: head,
-				issuesHtml: issuesPanel,
-				formHtml: formPanel,
-				logHtml: logPanel
-			});
+			};
+			return {
+				violationGroups,
+				openActionGroup: openActions.length ? {
+					severity: "warn",
+					title: "Hồ sơ NCE đang mở",
+					date: "Cần tiếp tục xử lý",
+					count: openActions.length,
+					countLabel: "hồ sơ",
+					items: openActions.map(({ a, idx }) => openActionItem(a, idx))
+				} : null,
+				logRows: (state().actions || []).slice().reverse().map((a, idx) => {
+					const realIdx = state().actions.length - 1 - idx, t = state().tests.find((x) => x.id === a.testId), wf = deps.actionWorkflowStatus(a), approval = deps.actionApprovalStatus(a), openedAt = a.createdAt ? deps.formatDateTimeVN(a.createdAt) : "", primary = a.action || a.correction || "Đang điều tra";
+					const approvalMeta = approval === "pending" ? null : {
+						by: a.approvedBy || "",
+						at: a.approvedAt ? deps.formatDateTimeVN(a.approvedAt) : "",
+						note: a.approvalNote || ""
+					};
+					const identity = `${a.nceId ? a.nceId + " · " : ""}${t ? deps.testDisplayName(t) : a.rule || "Cập nhật"}`, sub = t ? actionLevelShort(t, a.level, a.lot) : a.lot ? "Nhóm lô " + a.lot : "—", rule = t ? (actionQcVerdictLabel(a) ? actionQcVerdictLabel(a) + " · " : "") + actionViolationInfo(a).rule + " · " + actionViolationInfo(a).errorType : a.errorType || "—";
+					const approvalTag = !deps.actionCancelled(a) && approval !== "pending" ? {
+						cls: deps.ActionReviewPresentation.approvalTag(approval, deps.actionCancelled(a)).cls,
+						label: deps.actionApprovalLabel(a)
+					} : null;
+					const buttons = deps.ActionReviewPresentation.buttons(a, {
+						approval,
+						workflowStage: wf.stage,
+						cancelled: deps.actionCancelled(a),
+						isAdmin: deps.role() === "admin",
+						canWrite: deps.canWrite(),
+						canEscalate: actionCanEscalate(a),
+						canReopen: actionCanReopen(a)
+					});
+					return {
+						index: realIdx,
+						date: deps.vnDate(deps.actionEventDate(a)),
+						openedAt,
+						identity,
+						sub,
+						rule,
+						primary,
+						owner: a.by || "",
+						dueDate: a.dueDate ? deps.vnDate(a.dueDate) : "",
+						workflowClass: wf.cls,
+						workflowLabel: wf.label,
+						sideChips: chipsData(a, wf.stage),
+						approvalTag,
+						approvalMeta,
+						buttons
+					};
+				}),
+				issueCount: issues.length
+			};
 		};
 		return {
 			actionLevelShort,
 			currentIssues,
 			cancelAction,
 			confirmCancelAction,
-			actionApprovalTag,
 			actionApprovalToken,
 			approveAction,
 			confirmApproveAction,
@@ -22381,8 +22234,6 @@
 			actionCanReopen,
 			reopenAction,
 			confirmReopenAction,
-			actionReviewButtons,
-			actionSideChips,
 			actionDetailCheck,
 			actionEvidenceTimelineHtml,
 			actionRerunEvidenceHtml,
@@ -22390,12 +22241,9 @@
 			viewActionDetail,
 			openActionGuide,
 			groupIssuesByTestDate,
-			issueRowHtml,
 			actionViolationInfo,
 			actionQcVerdictLabel,
-			openActionIssueHtml,
-			actionIssueGroupHtml,
-			pageActionsV4
+			actionsModel
 		};
 	}
 	//#endregion
@@ -29250,24 +29098,10 @@
 	root.sigmaInputDisplayValue = sigmaInputDisplayValue;
 	root.sigmaGoverningRuleBlockHtml = sigmaGoverningRuleBlockHtml;
 	root.sigmaFrequencyRowsHtml = sigmaFrequencyRowsHtml;
-	root.actionFormClosedPresentation = actionFormClosedHtml;
-	root.actionFormPanelPresentation = actionFormPanelHtml;
-	root.actionImmediateStepPresentation = actionImmediateStepHtml;
-	root.actionRiskStepPresentation = actionRiskStepHtml;
-	root.actionInvestigationStepPresentation = actionInvestigationStepHtml;
-	root.actionCauseStepPresentation = actionCauseStepHtml;
-	root.actionPatientStepPresentation = actionPatientStepHtml;
-	root.actionEffectivenessStepPresentation = actionEffectivenessStepHtml;
 	root.actionIncidentBannerPresentation = actionIncidentBannerHtml;
-	root.actionFormSectionPresentation = actionFormSectionHtml;
-	root.actionInvestigationFieldPresentation = actionInvestigationFieldHtml;
 	root.actionBiasContextPresentation = actionBiasContext;
 	root.actionLevelContextPresentation = actionLevelContext;
 	root.actionLevelLabelPresentation = actionLevelLabel;
-	root.actionSelectPresentation = actionSelectHtml;
-	root.actionSuggestRowPresentation = actionSuggestRowHtml;
-	root.actionSuggestBoxPresentation = actionSuggestBoxHtml;
-	root.actionStaffOptionsPresentation = actionStaffOptionsHtml;
 	root.actionRuleOptionsPresentation = actionRuleOptions;
 	root.actionCausePhrasesPresentation = actionCausePhrases;
 	root.actionPhrasesPresentation = actionPhrases;
@@ -29665,10 +29499,7 @@
 		resetStatusMemo: () => {
 			root.AnalysisUIState.statusMemo = /* @__PURE__ */ new Map();
 		},
-		pageMap: () => ({
-			entry: root.pageEntry,
-			actions: root.pageActionsV4
-		}),
+		pageMap: () => ({ entry: root.pageEntry }),
 		afterRender: (p) => root.afterRender(p),
 		entryQ: () => root.entryQ,
 		entryFilter: (v) => root.entryFilter(v),
@@ -29686,29 +29517,14 @@
 		escape: (value) => root.esc(value),
 		button: (label, action, variant) => root.btn(label, action, variant)
 	});
-	root.actionPageHtml = createActionPageHtml();
-	root.actionSideChipsHtml = createActionSideChipsHtml({ escape: (value) => root.esc(value) });
 	root.actionDetailCheckHtml = createActionDetailCheckHtml({ escape: (value) => root.esc(value) });
 	root.actionEvidenceTimelinePresentation = createActionEvidenceTimelineHtml({ escape: (value) => root.esc(value) });
-	root.actionReviewButtonsHtml = createActionReviewButtonsHtml({ button: (label, action, variant, title) => root.btn(label, action, variant, title) });
 	root.actionRerunEvidencePresentation = createActionRerunEvidenceHtml({
 		escape: (value) => root.esc(value),
 		pointValue: (point, test) => root.fmtPointValue(point, test),
 		date: (value) => root.vnDate(value),
 		button: (label, action, variant, title) => root.btn(label, action, variant, title)
 	});
-	root.actionIssueRowPresentation = createActionIssueRowHtml({
-		escape: (value) => root.esc(value),
-		button: (label, action, variant) => root.btn(label, action, variant),
-		quote: (value) => root.jsq(value)
-	});
-	root.actionOpenIssuePresentation = createActionOpenIssueHtml({
-		escape: (value) => root.esc(value),
-		button: (label, action, variant) => root.btn(label, action, variant)
-	});
-	root.actionIssueGroupPresentation = createActionIssueGroupHtml({ escape: (value) => root.esc(value) });
-	root.actionLogRowPresentation = createActionLogRowHtml({ escape: (value) => root.esc(value) });
-	root.actionApprovalTagPresentation = createActionApprovalTagHtml({ escape: (value) => root.esc(value) });
 	root.actionDetailMetaHtml = createActionDetailMetaHtml({ escape: (value) => root.esc(value) });
 	root.actionCancelledAlertHtml = createActionCancelledAlertHtml({ escape: (value) => root.esc(value) });
 	root.actionCancelModalHtml = actionCancelModalHtml;
@@ -29721,11 +29537,6 @@
 	root.actionPatientImpactHtml = createActionPatientImpactHtml({ escape: (value) => root.esc(value) });
 	root.actionCauseDetailHtml = createActionCauseDetailHtml({ escape: (value) => root.esc(value) });
 	root.actionEffectivenessDetailHtml = createActionEffectivenessDetailHtml({ escape: (value) => root.esc(value) });
-	root.actionLogPanelHtml = createActionLogPanelHtml({
-		button: (label, action, variant) => root.btn(label, action, variant),
-		emptyState: (title, text) => root.emptyState(title, text)
-	});
-	root.actionIssuesPanelHtml = actionIssuesPanelHtml;
 	root.teaReferenceAddModalPresentation = teaReferenceAddModalHtml;
 	root.teaReferenceLabProfileBodyPresentation = teaReferenceLabProfileBodyHtml;
 	root.teaReferenceLabProfileModalHtml = teaReferenceLabProfileModalHtml;
@@ -31005,7 +30816,7 @@
 		const base = new Set(root.rolePageIds(roleValue)), initial = selectedIds && selectedIds.length ? selectedIds : root.rolePageIds(roleValue), selected = new Set(root.selectUserPermissions(initial, [...base]));
 		return root.userPermissionChecksHtml(escapeHtmlAttr(groupId), root.PAGES.map(([id, title]) => ({
 			idHtml: escapeHtmlAttr(id),
-			titleHtml: escapeHtml$2(title),
+			titleHtml: escapeHtml(title),
 			allowed: base.has(id),
 			selected: selected.has(id)
 		})));
@@ -31041,8 +30852,8 @@
 		}
 		const roleSelect = root.userRoleSelectHtml(root.roleSelectOptions(u.role));
 		root.openModal(root.userPermissionsModalHtml({
-			userName: escapeHtml$2(u.name || u.username),
-			username: escapeHtml$2(u.username),
+			userName: escapeHtml(u.name || u.username),
+			username: escapeHtml(u.username),
 			roleSelectHtml: roleSelect,
 			permissionChecksHtml: root.userPermChecks(u.pagePerms, "editUserPerms", u.role),
 			cancelButtonHtml: root.btn("Hủy", { action: "closeModal" }, "ghost"),
@@ -31098,7 +30909,7 @@
 		if (!u) return;
 		const p1 = document.getElementById("resetPass1").value, p2 = document.getElementById("resetPass2").value, msg = document.getElementById("resetPassMsg"), err = root.passwordChangeError(p1, p2);
 		if (err) {
-			if (msg) msg.innerHTML = `<div class="auth-err">${escapeHtml$2(err)}</div>`;
+			if (msg) msg.innerHTML = `<div class="auth-err">${escapeHtml(err)}</div>`;
 			return;
 		}
 		const updated = await root.UserLifecycleCommand.resetPassword(u, p1, !(currentUser && currentUser.id === id));
@@ -31161,8 +30972,8 @@
 			action: "closeDialogOverlay",
 			args: [false]
 		})}</div>
-    <h3 class="confirm-modal-title">${escapeHtml$2(title)}</h3>
-    <div class="confirm-modal-body"><div class="confirm-modal-icon info" aria-hidden="true">✓</div><div class="confirm-modal-text"><b>${escapeHtml$2(message)}</b><p>Tài khoản: ${escapeHtml$2(currentUser.name || currentUser.username || "")}</p></div></div>
+    <h3 class="confirm-modal-title">${escapeHtml(title)}</h3>
+    <div class="confirm-modal-body"><div class="confirm-modal-icon info" aria-hidden="true">✓</div><div class="confirm-modal-text"><b>${escapeHtml(message)}</b><p>Tài khoản: ${escapeHtml(currentUser.name || currentUser.username || "")}</p></div></div>
     <div class="reauth-modal-field">
       <label for="reauthPassword">Mật khẩu hiện tại</label>
       <input id="reauthPassword" type="password" autocomplete="current-password" autofocus data-keydown-action="confirmReauthentication" data-keydown-keys='["Enter"]'>
@@ -31236,7 +31047,7 @@
 	};
 	root.authBrandMark = () => {
 		const logo = root.brandLogo();
-		return `<div class="brand-mark">${logo ? `<img src="${escapeHtmlAttr(logo)}" alt="">` : escapeHtml$2(root.brandMarkText())}</div>`;
+		return `<div class="brand-mark">${logo ? `<img src="${escapeHtmlAttr(logo)}" alt="">` : escapeHtml(root.brandMarkText())}</div>`;
 	};
 	root.showStartupRecovery = () => {
 		let ov = document.getElementById("authOverlay");
@@ -31248,7 +31059,7 @@
 		ov.style.display = "flex";
 		ov.innerHTML = `<div class="auth-card"><div class="auth-head">${root.authBrandMark()}<div class="auth-brand">Cần phục hồi dữ liệu</div></div>
     <div class="auth-sub">QC Lab phát hiện dữ liệu cục bộ không hợp lệ và đã dừng để tránh ghi đè.</div>
-    <div class="auth-err">${escapeHtml$2(startupProblem && startupProblem.message || "Không đọc được dữ liệu.")}</div>
+    <div class="auth-err">${escapeHtml(startupProblem && startupProblem.message || "Không đọc được dữ liệu.")}</div>
     <div class="auth-actions">${root.btn("Tải dữ liệu gốc xuống", { action: "downloadStartupData" }, "teal")}${root.btn("Tạo dữ liệu mới", { action: "resetStartupData" }, "ghost")}</div>
     <div class="auth-hint">Ưu tiên tải dữ liệu gốc xuống trước để có thể kiểm tra và phục hồi.</div></div>`;
 	};
@@ -31270,12 +31081,12 @@
 		const defaultHint = admin && admin.mustChangePassword ? "Tài khoản mặc định: <b>admin</b> / <b>admin</b><br>Hệ thống sẽ yêu cầu đổi mật khẩu ở lần đăng nhập đầu tiên.<br>" : "";
 		const trial = window.qcLicense && window.qcLicense.trial;
 		const trialLine = trial && trial.active ? `<div class="auth-hint ${trial.daysLeft <= 7 ? "auth-trial-warning" : "auth-trial-ok"}">Bản dùng thử: còn ${trial.daysLeft}/${trial.totalDays} ngày</div>` : "";
-		ov.innerHTML = `<div class="auth-card"><div class="auth-head">${root.authBrandMark()}<div class="auth-head-text"><div class="auth-brand">${escapeHtml$2(root.brandTitle())}</div><div class="auth-sub">${escapeHtml$2(root.brandSub())}</div></div></div>
+		ov.innerHTML = `<div class="auth-card"><div class="auth-head">${root.authBrandMark()}<div class="auth-head-text"><div class="auth-brand">${escapeHtml(root.brandTitle())}</div><div class="auth-sub">${escapeHtml(root.brandSub())}</div></div></div>
     <label>Tên đăng nhập</label><input id="liUser" autocomplete="username" autofocus>
     <label>Mật khẩu</label><input id="liPass" type="password" autocomplete="current-password" data-keydown-action="doLogin" data-keydown-keys='["Enter"]'>
-    ${msg ? `<div class="auth-err">${escapeHtml$2(msg)}</div>` : ""}
+    ${msg ? `<div class="auth-err">${escapeHtml(msg)}</div>` : ""}
     <div class="auth-actions">${root.btn("Đăng nhập", { action: "doLogin" }, "teal")}</div>
-    ${trialLine}<div class="auth-hint">${defaultHint}Phiên bản ${escapeHtml$2(app.version || "dev")}</div></div>`;
+    ${trialLine}<div class="auth-hint">${defaultHint}Phiên bản ${escapeHtml(app.version || "dev")}</div></div>`;
 		requestAnimationFrame(root.focusLoginField);
 		setTimeout(root.focusLoginField, 50);
 	};
@@ -31346,7 +31157,7 @@
 		ov.innerHTML = `<div class="auth-card"><div class="auth-head">${root.authBrandMark()}<div class="auth-brand">Đổi mật khẩu</div></div><div class="auth-sub">Cần cập nhật mật khẩu trước khi vào hệ thống</div>
     <label>Mật khẩu mới</label><input id="newPass1" type="password" autocomplete="new-password">
     <label>Nhập lại mật khẩu mới</label><input id="newPass2" type="password" autocomplete="new-password" data-keydown-action="changeRequiredPassword" data-keydown-keys='["Enter"]'>
-    ${msg ? `<div class="auth-err">${escapeHtml$2(msg)}</div>` : ""}
+    ${msg ? `<div class="auth-err">${escapeHtml(msg)}</div>` : ""}
     <div class="auth-actions">${root.btn("Lưu mật khẩu mới", { action: "changeRequiredPassword" }, "teal")}</div>
     <div class="auth-hint">Mật khẩu cần ít nhất 8 ký tự và không nên dùng lại mật khẩu mặc định.</div></div>`;
 		setTimeout(() => {
@@ -31936,8 +31747,6 @@
 		infoDialog: (message, opts) => root.infoDialog(message, opts),
 		esc: (value) => root.esc(value),
 		escapeAttr: (value) => root.escAttr(value),
-		btn: (label, action, cls, title, options) => root.btn(label, action, cls, title, options),
-		dateBox: (id, value, cls, attrs) => root.dateBox(id, value, cls, attrs),
 		vnDate: (value) => vnDate(value),
 		fmt: (value, decimals) => fmt(value, decimals),
 		fmtPointValue: (point, test) => root.fmtPointValue(point, test),
@@ -31988,7 +31797,6 @@
 	root.actionSectionToggled = actionFormController.actionSectionToggled;
 	root.actionDefaultOpenSections = actionFormController.actionDefaultOpenSections;
 	root.actionRuleOptions = actionFormController.actionRuleOptions;
-	root.actionStaffOptions = actionFormController.actionStaffOptions;
 	root.captureActionDraft = actionFormController.captureActionDraft;
 	root.actionFormChanged = actionFormController.actionFormChanged;
 	root.actionDraftValues = actionFormController.actionDraftValues;
@@ -31996,17 +31804,12 @@
 	root.actionSourceOptions = actionFormController.actionSourceOptions;
 	root.actionCausePhrases = actionFormController.actionCausePhrases;
 	root.actionActionPhrases = actionFormController.actionActionPhrases;
-	root.actionSuggestRow = actionFormController.actionSuggestRow;
-	root.actionSuggestBox = actionFormController.actionSuggestBox;
 	root.actionInsertSuggestion = actionFormController.actionInsertSuggestion;
-	root.syncActionSuggestions = actionFormController.syncActionSuggestions;
-	root.actSel = actionFormController.actSel;
 	root.actionLevelLabel = actionFormController.actionLevelLabel;
 	root.syncActLevels = actionFormController.syncActLevels;
 	root.actionLevelContext = actionFormController.actionLevelContext;
 	root.beginActionManual = actionFormController.beginActionManual;
 	root.closeActionForm = actionFormController.closeActionForm;
-	root.actionFormClosedHtml = actionFormController.actionFormClosedHtml;
 	root.actionIncidentBanner = actionFormController.actionIncidentBanner;
 	root.beginActionFromIssue = actionFormController.beginActionFromIssue;
 	root.actionFieldValue = actionFormController.actionFieldValue;
@@ -32029,7 +31832,6 @@
 		root.go("actions");
 		root.editAction(index);
 	};
-	root.actionInvestigationField = actionFormController.actionInvestigationField;
 	root.actionInvestigationChoiceLabel = actionFormController.actionInvestigationChoiceLabel;
 	root.actionInvestigationStateClass = actionFormController.actionInvestigationStateClass;
 	root.actionInvestigationChoose = actionFormController.actionInvestigationChoose;
@@ -32040,7 +31842,6 @@
 	root.actionEffSectionChip = actionFormController.actionEffSectionChip;
 	root.actionUpdateSectionChip = actionFormController.actionUpdateSectionChip;
 	root.actionRefreshSectionChips = actionFormController.actionRefreshSectionChips;
-	root.actionSection = actionFormController.actionSection;
 	root.actionFormModel = actionFormController.actionFormModel;
 	root.actionFormDefaults = actionFormController.actionFormDefaults;
 	root.focusActionField = actionFormController.focusActionField;
@@ -32051,7 +31852,7 @@
 	root.actionBiasThresholdHtml = actionFormController.actionBiasThresholdHtml;
 	root.actionBiasReferenceHtml = actionFormController.actionBiasReferenceHtml;
 	root.actionUpdateBiasHint = actionFormController.actionUpdateBiasHint;
-	root.actionFormHtml = actionFormController.actionFormHtml;
+	root.actionFormViewModel = actionFormController.actionFormViewModel;
 	var actionsPageController = createActionsPageController({
 		getState: () => state,
 		document: () => typeof document !== "undefined" ? document : {
@@ -32124,7 +31925,6 @@
 		actionFormUiState: root.actionFormUiState,
 		modalTemplate: (opts) => root.modalTemplate(opts),
 		QCCore: { cleanText: (value, maximumLength) => root.QCCore.cleanText(value, maximumLength) },
-		formHtml: (issueCount) => actionFormController.actionFormHtml(issueCount),
 		captureFormDraft: () => actionFormController.captureActionDraft(),
 		pres: root
 	});
@@ -32133,7 +31933,6 @@
 	root.currentIssues = actionsPageController.currentIssues;
 	root.cancelAction = actionsPageController.cancelAction;
 	root.confirmCancelAction = actionsPageController.confirmCancelAction;
-	root.actionApprovalTag = actionsPageController.actionApprovalTag;
 	root.actionApprovalToken = actionsPageController.actionApprovalToken;
 	root.approveAction = actionsPageController.approveAction;
 	root.confirmApproveAction = actionsPageController.confirmApproveAction;
@@ -32144,8 +31943,6 @@
 	root.actionCanReopen = actionsPageController.actionCanReopen;
 	root.reopenAction = actionsPageController.reopenAction;
 	root.confirmReopenAction = actionsPageController.confirmReopenAction;
-	root.actionReviewButtons = actionsPageController.actionReviewButtons;
-	root.actionSideChips = actionsPageController.actionSideChips;
 	root.actionDetailCheck = actionsPageController.actionDetailCheck;
 	root.actionEvidenceTimelineHtml = actionsPageController.actionEvidenceTimelineHtml;
 	root.actionRerunEvidenceHtml = actionsPageController.actionRerunEvidenceHtml;
@@ -32153,12 +31950,9 @@
 	root.viewActionDetail = actionsPageController.viewActionDetail;
 	root.openActionGuide = actionsPageController.openActionGuide;
 	root.groupIssuesByTestDate = actionsPageController.groupIssuesByTestDate;
-	root.issueRowHtml = actionsPageController.issueRowHtml;
 	root.actionViolationInfo = actionsPageController.actionViolationInfo;
 	root.actionQcVerdictLabel = actionsPageController.actionQcVerdictLabel;
-	root.openActionIssueHtml = actionsPageController.openActionIssueHtml;
-	root.actionIssueGroupHtml = actionsPageController.actionIssueGroupHtml;
-	root.pageActionsV4 = actionsPageController.pageActionsV4;
+	root.actionsModel = actionsPageController.actionsModel;
 	root.ReagentComparisonService = createReagentComparisonService({
 		cleanText: root.QCCore.cleanText,
 		cleanId: root.QCCore.cleanId
@@ -32426,7 +32220,7 @@
 	root.sgCohortClose = sigmaPageController.sgCohortClose;
 	root.sgCohortApply = sigmaPageController.sgCohortApply;
 	root.sgPullCV = sigmaPageController.sgPullCV;
-	root.esc = escapeHtml$2;
+	root.esc = escapeHtml;
 	root.escAttr = escapeHtmlAttr;
 	var reportPrintController = createReportPrintController({
 		reportQcFormat: {

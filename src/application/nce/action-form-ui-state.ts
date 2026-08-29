@@ -6,6 +6,14 @@ export class ActionFormUiState {
   seed: ActionFormSeed | null=null;
   draft: ActionFormDraft | null=null;
   openSections: Set<string> | null=null;
+  /* Đếm dần mỗi lần startManual()/startIssue()/edit() mở một hồ sơ — dùng làm một phần
+     khoá remount (formKey) ở trang React (ActionsPage.tsx). seed của startManual() luôn
+     là CÙNG một hình dạng {manual:true}, nên nếu chỉ khoá theo seed/editId thì mở form
+     thủ công, gõ dở, đóng lại, rồi mở form thủ công LẦN NỮA sẽ không remount — React
+     giữ nguyên DOM cũ và nội dung đã gõ (đã bị clearDraft()) vẫn còn trên các ô
+     defaultValue chưa từng được áp lại. Bộ đếm này đảm bảo mỗi lần MỞ là một khoá khác
+     nhau dù seed giống hệt. */
+  openSeq=0;
 
   toggleSection(key: string, open: boolean) {
     if(!this.openSections)this.openSections=new Set();
@@ -27,14 +35,14 @@ export class ActionFormUiState {
   }
 
   startManual() {
-    this.editId='';this.seed={manual:true};this.clearDraft();this.openSections=null;
+    this.editId='';this.seed={manual:true};this.clearDraft();this.openSections=null;this.openSeq++;
   }
 
   startIssue(seed: ActionFormSeed) {
-    this.editId='';this.seed=seed;this.clearDraft();this.openSections=null;
+    this.editId='';this.seed=seed;this.clearDraft();this.openSections=null;this.openSeq++;
   }
 
   edit(id: string) {
-    this.editId=id;this.seed=null;this.clearDraft();this.openSections=null;
+    this.editId=id;this.seed=null;this.clearDraft();this.openSections=null;this.openSeq++;
   }
 }

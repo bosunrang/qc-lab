@@ -395,19 +395,10 @@ import { sigmaMuPreviewHtml } from '../presentation/sigma/sigma-mu-preview-html'
 import { sigmaInputDisplayValue } from '../presentation/sigma/sigma-input-display-value';
 import { sigmaGoverningRuleBlockHtml } from '../presentation/sigma/sigma-governing-rule-block-html';
 import { sigmaFrequencyRowsHtml } from '../presentation/sigma/sigma-frequency-rows-html';
-import { actionFormClosedHtml as actionFormClosedPresentation } from '../presentation/nce/action-form-closed-html';
-import { actionFormPanelHtml as actionFormPanelPresentation } from '../presentation/nce/action-form-panel-html';
-import { actionImmediateStepHtml as actionImmediateStepPresentation, actionRiskStepHtml as actionRiskStepPresentation, actionInvestigationStepHtml as actionInvestigationStepPresentation, actionCauseStepHtml as actionCauseStepPresentation, actionPatientStepHtml as actionPatientStepPresentation, actionEffectivenessStepHtml as actionEffectivenessStepPresentation } from '../presentation/nce/action-form-steps-html';
 import { actionIncidentBannerHtml as actionIncidentBannerPresentation } from '../presentation/nce/action-incident-banner-html';
-import { actionFormSectionHtml as actionFormSectionPresentation } from '../presentation/nce/action-form-section-html';
-import { actionInvestigationFieldHtml as actionInvestigationFieldPresentation } from '../presentation/nce/action-investigation-field-html';
 import { actionBiasContext as actionBiasContextPresentation } from '../presentation/nce/action-bias-context';
 import { actionLevelContext as actionLevelContextPresentation } from '../presentation/nce/action-level-context';
 import { actionLevelLabel as actionLevelLabelPresentation } from '../presentation/nce/action-level-label';
-import { actionSelectHtml as actionSelectPresentation } from '../presentation/nce/action-select-html';
-import { actionSuggestRowHtml as actionSuggestRowPresentation } from '../presentation/nce/action-suggest-row-html';
-import { actionSuggestBoxHtml as actionSuggestBoxPresentation } from '../presentation/nce/action-suggest-box-html';
-import { actionStaffOptionsHtml as actionStaffOptionsPresentation } from '../presentation/nce/action-staff-options-html';
 import { actionRuleOptions as actionRuleOptionsPresentation } from '../presentation/nce/action-rule-options';
 import { actionCausePhrases as actionCausePhrasesPresentation, actionPhrases as actionPhrasesPresentation } from '../presentation/nce/action-suggest-phrases';
 import { userPermissionChecksHtml } from '../presentation/auth/user-permission-checks-html';
@@ -467,17 +458,9 @@ import { createSigmaMuPrintRows } from '../presentation/sigma/sigma-mu-print-row
 import { createReportPointsTable } from '../presentation/report/report-points-table';
 import { createActionReportHtml } from '../presentation/nce/action-report-html';
 import { createActionGuideContent } from '../presentation/nce/action-guide-content';
-import { createActionPageHtml } from '../presentation/nce/action-page-html';
-import { createActionSideChipsHtml } from '../presentation/nce/action-side-chips-html';
 import { createActionDetailCheckHtml } from '../presentation/nce/action-detail-check-html';
 import { createActionEvidenceTimelineHtml } from '../presentation/nce/action-evidence-timeline-html';
-import { createActionReviewButtonsHtml } from '../presentation/nce/action-review-buttons-html';
 import { createActionRerunEvidenceHtml } from '../presentation/nce/action-rerun-evidence-html';
-import { createActionIssueRowHtml } from '../presentation/nce/action-issue-row-html';
-import { createActionOpenIssueHtml } from '../presentation/nce/action-open-issue-html';
-import { createActionIssueGroupHtml } from '../presentation/nce/action-issue-group-html';
-import { createActionLogRowHtml } from '../presentation/nce/action-log-row-html';
-import { createActionApprovalTagHtml } from '../presentation/nce/action-approval-tag-html';
 import { createActionDetailMetaHtml } from '../presentation/nce/action-detail-meta-html';
 import { createActionCancelledAlertHtml } from '../presentation/nce/action-cancelled-alert-html';
 import { actionCancelModalHtml } from '../presentation/nce/action-cancel-modal-html';
@@ -490,8 +473,6 @@ import { createActionInspectionDetailsHtml } from '../presentation/nce/action-in
 import { createActionPatientImpactHtml } from '../presentation/nce/action-patient-impact-html';
 import { createActionCauseDetailHtml } from '../presentation/nce/action-cause-detail-html';
 import { createActionEffectivenessDetailHtml } from '../presentation/nce/action-effectiveness-detail-html';
-import { createActionLogPanelHtml } from '../presentation/nce/action-log-panel-html';
-import { actionIssuesPanelHtml } from '../presentation/nce/action-issues-panel-html';
 import { teaReferenceAddModalHtml } from '../presentation/manage/tea-reference-add-modal-html';
 import { teaReferenceLabProfileBodyHtml } from '../presentation/manage/tea-reference-lab-profile-body-html';
 import { teaReferenceLabProfileModalHtml } from '../presentation/manage/tea-reference-lab-profile-modal-html';
@@ -1158,7 +1139,6 @@ type QCLabGlobal = typeof globalThis & {
   actionSectionToggled?: (key: string, open: boolean) => void;
   actionDefaultOpenSections?: (editing: unknown, protocol: unknown) => Record<string, any>;
   actionRuleOptions?: () => [string, string][];
-  actionStaffOptions?: () => string;
   captureActionDraft?: () => void;
   actionFormChanged?: () => void;
   actionDraftValues?: () => Record<string, any>;
@@ -1166,17 +1146,12 @@ type QCLabGlobal = typeof globalThis & {
   actionSourceOptions?: (qcBound: boolean, current: unknown) => [string, string][];
   actionCausePhrases?: (category: unknown) => string[];
   actionActionPhrases?: (errorType: unknown) => string[];
-  actionSuggestRow?: (targetId: string, phrases: string[]) => string;
-  actionSuggestBox?: (targetId: string, phrases: string[], label?: string) => string;
   actionInsertSuggestion?: (targetId: string, phrase: string) => void;
-  syncActionSuggestions?: () => void;
-  actSel?: (id: string, label: string, list: unknown, cur: unknown, extra?: string) => string;
   actionLevelLabel?: (l: Record<string, any>, t?: Record<string, any> | null) => string;
   syncActLevels?: () => void;
   actionLevelContext?: (testId: unknown, level: unknown, lot: unknown) => string;
   beginActionManual?: () => void;
   closeActionForm?: () => void;
-  actionFormClosedHtml?: (issueCount: number) => string;
   actionIncidentBanner?: (form: Record<string, any>, editing: unknown) => string;
   beginActionFromIssue?: (tid: unknown, level: unknown, rule: unknown, err: unknown, act: unknown, pointId?: string, pointDate?: string) => void;
   actionFieldValue?: (id: string, max?: number) => string;
@@ -1186,7 +1161,6 @@ type QCLabGlobal = typeof globalThis & {
   syncActionRiskScore?: () => void;
   syncActionResidualRiskScore?: () => void;
   editAction?: (i: number) => Promise<void>;
-  actionInvestigationField?: (statusId: string, noteId: string, title: string, hint: string, form: Record<string, any>, statusKey: string, noteKey: string, lotToLot?: boolean) => string;
   actionInvestigationChoiceLabel?: (value: unknown, label: unknown) => string;
   actionInvestigationStateClass?: (value: unknown) => string;
   actionInvestigationChoose?: (statusId: string, value: string) => void;
@@ -1197,7 +1171,6 @@ type QCLabGlobal = typeof globalThis & {
   actionEffSectionChip?: (form: Record<string, any>) => Record<string, any>;
   actionUpdateSectionChip?: (key: string, info: Record<string, any>) => void;
   actionRefreshSectionChips?: () => void;
-  actionSection?: (key: string, badge: string, title: string, hint: string, bodyHtml: string, chipInfo: Record<string, any>, openSet: Set<string>) => string;
   actionFormModel?: (editing: unknown, tests: Record<string, any>[]) => Record<string, any>;
   actionFormDefaults?: (tests: Record<string, any>[]) => Record<string, any>;
   focusActionField?: (key: string) => void;
@@ -1208,12 +1181,11 @@ type QCLabGlobal = typeof globalThis & {
   actionBiasThresholdHtml?: (info: Record<string, any>) => string;
   actionBiasReferenceHtml?: (info: Record<string, any>) => string;
   actionUpdateBiasHint?: () => void;
-  actionFormHtml?: (issueCount: number) => string;
+  actionFormViewModel?: (issueCount: number) => Record<string, any>;
   actionLevelShort?: (t: unknown, level: unknown, lotSnap: unknown) => string;
   currentIssues?: () => Record<string, any>[];
   cancelAction?: (i: number) => Promise<void>;
   confirmCancelAction?: (id: unknown, token: unknown) => void;
-  actionApprovalTag?: (a: Record<string, any>) => string;
   actionApprovalToken?: (a: Record<string, any>) => string;
   approveAction?: (i: number) => Promise<void>;
   confirmApproveAction?: (id: unknown, token: unknown) => void;
@@ -1224,8 +1196,6 @@ type QCLabGlobal = typeof globalThis & {
   actionCanReopen?: (a: Record<string, any>) => boolean;
   reopenAction?: (i: number) => Promise<void>;
   confirmReopenAction?: (i: number) => void;
-  actionReviewButtons?: (i: number, a: Record<string, any>) => string;
-  actionSideChips?: (a: Record<string, any>, stage: string) => string;
   actionDetailCheck?: (label: string, status: unknown, note: unknown) => string;
   actionEvidenceTimelineHtml?: (a: Record<string, any>, rr: unknown) => string;
   actionRerunEvidenceHtml?: (a: Record<string, any>, rr: unknown, t: unknown) => string;
@@ -1233,12 +1203,9 @@ type QCLabGlobal = typeof globalThis & {
   viewActionDetail?: (i: number) => void;
   openActionGuide?: () => void;
   groupIssuesByTestDate?: (issues: Record<string, any>[]) => Record<string, any>[];
-  issueRowHtml?: (o: Record<string, any>) => string;
   actionViolationInfo?: (a: Record<string, any>) => Record<string, any>;
   actionQcVerdictLabel?: (a: Record<string, any>) => string;
-  openActionIssueHtml?: (a: Record<string, any>, idx: number) => string;
-  actionIssueGroupHtml?: (model: Record<string, any>) => string;
-  pageActionsV4?: () => string;
+  actionsModel?: () => Record<string, any>;
   sgZone?: (s: unknown) => string;
   sgFmtDPMO?: (n: unknown) => string;
   sgData?: (tid: string) => Record<string, any>[];
@@ -1891,24 +1858,10 @@ type QCLabGlobal = typeof globalThis & {
   sigmaInputDisplayValue: typeof sigmaInputDisplayValue;
   sigmaGoverningRuleBlockHtml: typeof sigmaGoverningRuleBlockHtml;
   sigmaFrequencyRowsHtml: typeof sigmaFrequencyRowsHtml;
-  actionFormClosedPresentation: typeof actionFormClosedPresentation;
-  actionFormPanelPresentation: typeof actionFormPanelPresentation;
-  actionImmediateStepPresentation: typeof actionImmediateStepPresentation;
-  actionRiskStepPresentation: typeof actionRiskStepPresentation;
-  actionInvestigationStepPresentation: typeof actionInvestigationStepPresentation;
-  actionCauseStepPresentation: typeof actionCauseStepPresentation;
-  actionPatientStepPresentation: typeof actionPatientStepPresentation;
-  actionEffectivenessStepPresentation: typeof actionEffectivenessStepPresentation;
   actionIncidentBannerPresentation: typeof actionIncidentBannerPresentation;
-  actionFormSectionPresentation: typeof actionFormSectionPresentation;
-  actionInvestigationFieldPresentation: typeof actionInvestigationFieldPresentation;
   actionBiasContextPresentation: typeof actionBiasContextPresentation;
   actionLevelContextPresentation: typeof actionLevelContextPresentation;
   actionLevelLabelPresentation: typeof actionLevelLabelPresentation;
-  actionSelectPresentation: typeof actionSelectPresentation;
-  actionSuggestRowPresentation: typeof actionSuggestRowPresentation;
-  actionSuggestBoxPresentation: typeof actionSuggestBoxPresentation;
-  actionStaffOptionsPresentation: typeof actionStaffOptionsPresentation;
   actionRuleOptionsPresentation: typeof actionRuleOptionsPresentation;
   actionCausePhrasesPresentation: typeof actionCausePhrasesPresentation;
   actionPhrasesPresentation: typeof actionPhrasesPresentation;
@@ -1963,17 +1916,9 @@ type QCLabGlobal = typeof globalThis & {
   dashTestSetStatus: ReturnType<typeof createDashboardPageController>['dashTestSetStatus'];
   dashboardModel: ReturnType<typeof createDashboardPageController>['dashboardModel'];
   actionGuideContent: ReturnType<typeof createActionGuideContent>;
-  actionPageHtml: ReturnType<typeof createActionPageHtml>;
-  actionSideChipsHtml: ReturnType<typeof createActionSideChipsHtml>;
   actionDetailCheckHtml: ReturnType<typeof createActionDetailCheckHtml>;
   actionEvidenceTimelinePresentation: ReturnType<typeof createActionEvidenceTimelineHtml>;
-  actionReviewButtonsHtml: ReturnType<typeof createActionReviewButtonsHtml>;
   actionRerunEvidencePresentation: ReturnType<typeof createActionRerunEvidenceHtml<any>>;
-  actionIssueRowPresentation: ReturnType<typeof createActionIssueRowHtml>;
-  actionOpenIssuePresentation: ReturnType<typeof createActionOpenIssueHtml>;
-  actionIssueGroupPresentation: ReturnType<typeof createActionIssueGroupHtml>;
-  actionLogRowPresentation: ReturnType<typeof createActionLogRowHtml>;
-  actionApprovalTagPresentation: ReturnType<typeof createActionApprovalTagHtml>;
   actionDetailMetaHtml: ReturnType<typeof createActionDetailMetaHtml>;
   actionCancelledAlertHtml: ReturnType<typeof createActionCancelledAlertHtml>;
   actionCancelModalHtml: typeof actionCancelModalHtml;
@@ -1986,8 +1931,6 @@ type QCLabGlobal = typeof globalThis & {
   actionPatientImpactHtml: ReturnType<typeof createActionPatientImpactHtml>;
   actionCauseDetailHtml: ReturnType<typeof createActionCauseDetailHtml>;
   actionEffectivenessDetailHtml: ReturnType<typeof createActionEffectivenessDetailHtml>;
-  actionLogPanelHtml: ReturnType<typeof createActionLogPanelHtml>;
-  actionIssuesPanelHtml: typeof actionIssuesPanelHtml;
   teaReferenceAddModalPresentation: typeof teaReferenceAddModalHtml;
   teaReferenceLabProfileBodyPresentation: typeof teaReferenceLabProfileBodyHtml;
   teaReferenceLabProfileModalHtml: typeof teaReferenceLabProfileModalHtml;
@@ -3790,24 +3733,10 @@ root.sigmaMuPreviewHtml=sigmaMuPreviewHtml;
 root.sigmaInputDisplayValue=sigmaInputDisplayValue;
 root.sigmaGoverningRuleBlockHtml=sigmaGoverningRuleBlockHtml;
 root.sigmaFrequencyRowsHtml=sigmaFrequencyRowsHtml;
-root.actionFormClosedPresentation=actionFormClosedPresentation;
-root.actionFormPanelPresentation=actionFormPanelPresentation;
-root.actionImmediateStepPresentation=actionImmediateStepPresentation;
-root.actionRiskStepPresentation=actionRiskStepPresentation;
-root.actionInvestigationStepPresentation=actionInvestigationStepPresentation;
-root.actionCauseStepPresentation=actionCauseStepPresentation;
-root.actionPatientStepPresentation=actionPatientStepPresentation;
-root.actionEffectivenessStepPresentation=actionEffectivenessStepPresentation;
 root.actionIncidentBannerPresentation=actionIncidentBannerPresentation;
-root.actionFormSectionPresentation=actionFormSectionPresentation;
-root.actionInvestigationFieldPresentation=actionInvestigationFieldPresentation;
 root.actionBiasContextPresentation=actionBiasContextPresentation;
 root.actionLevelContextPresentation=actionLevelContextPresentation;
 root.actionLevelLabelPresentation=actionLevelLabelPresentation;
-root.actionSelectPresentation=actionSelectPresentation;
-root.actionSuggestRowPresentation=actionSuggestRowPresentation;
-root.actionSuggestBoxPresentation=actionSuggestBoxPresentation;
-root.actionStaffOptionsPresentation=actionStaffOptionsPresentation;
 root.actionRuleOptionsPresentation=actionRuleOptionsPresentation;
 root.actionCausePhrasesPresentation=actionCausePhrasesPresentation;
 root.actionPhrasesPresentation=actionPhrasesPresentation;
@@ -4057,7 +3986,7 @@ const routerDispatch=createRouterDispatchController({
   nav:()=>root.nav(),
   requestFrame:work=>requestAnimationFrame(work),
   resetStatusMemo:()=>{(root as any).AnalysisUIState.statusMemo=new Map();},
-  pageMap:()=>({entry:(root as any).pageEntry,actions:(root as any).pageActionsV4}),
+  pageMap:()=>({entry:(root as any).pageEntry}),
   afterRender:p=>root.afterRender(p),
   entryQ:()=>(root as any).entryQ,
   entryFilter:v=>(root as any).entryFilter(v),
@@ -4068,17 +3997,9 @@ const routerDispatch=createRouterDispatchController({
 });
 root.go=routerDispatch.go;root.resetMainScroll=routerDispatch.resetMainScroll;root.render=routerDispatch.render;root.restoreRouteFilters=routerDispatch.restoreRouteFilters;root.rerender=routerDispatch.rerender;
 root.actionGuideContent=createActionGuideContent({escape:(value:any)=>(root as any).esc(value),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
-root.actionPageHtml=createActionPageHtml();
-root.actionSideChipsHtml=createActionSideChipsHtml({escape:(value:any)=>(root as any).esc(value)});
 root.actionDetailCheckHtml=createActionDetailCheckHtml({escape:(value:any)=>(root as any).esc(value)});
 root.actionEvidenceTimelinePresentation=createActionEvidenceTimelineHtml({escape:(value:any)=>(root as any).esc(value)});
-root.actionReviewButtonsHtml=createActionReviewButtonsHtml({button:(label,action,variant,title)=>(root as any).btn(label,action,variant,title)});
 root.actionRerunEvidencePresentation=createActionRerunEvidenceHtml<any>({escape:(value:any)=>(root as any).esc(value),pointValue:(point:any,test:any)=>(root as any).fmtPointValue(point,test),date:(value:any)=>(root as any).vnDate(value),button:(label,action,variant,title)=>(root as any).btn(label,action,variant,title)});
-root.actionIssueRowPresentation=createActionIssueRowHtml({escape:(value:any)=>(root as any).esc(value),button:(label,action,variant)=>(root as any).btn(label,action,variant),quote:(value:any)=>(root as any).jsq(value)});
-root.actionOpenIssuePresentation=createActionOpenIssueHtml({escape:(value:any)=>(root as any).esc(value),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
-root.actionIssueGroupPresentation=createActionIssueGroupHtml({escape:(value:any)=>(root as any).esc(value)});
-root.actionLogRowPresentation=createActionLogRowHtml({escape:(value:any)=>(root as any).esc(value)});
-root.actionApprovalTagPresentation=createActionApprovalTagHtml({escape:(value:any)=>(root as any).esc(value)});
 root.actionDetailMetaHtml=createActionDetailMetaHtml({escape:(value:any)=>(root as any).esc(value)});
 root.actionCancelledAlertHtml=createActionCancelledAlertHtml({escape:(value:any)=>(root as any).esc(value)});
 root.actionCancelModalHtml=actionCancelModalHtml;
@@ -4091,8 +4012,6 @@ root.actionInspectionDetailsHtml=createActionInspectionDetailsHtml();
 root.actionPatientImpactHtml=createActionPatientImpactHtml({escape:(value:any)=>(root as any).esc(value)});
 root.actionCauseDetailHtml=createActionCauseDetailHtml({escape:(value:any)=>(root as any).esc(value)});
 root.actionEffectivenessDetailHtml=createActionEffectivenessDetailHtml({escape:(value:any)=>(root as any).esc(value)});
-root.actionLogPanelHtml=createActionLogPanelHtml({button:(label,action,variant)=>(root as any).btn(label,action,variant),emptyState:(title,text)=>(root as any).emptyState(title,text)});
-root.actionIssuesPanelHtml=actionIssuesPanelHtml;
 root.teaReferenceAddModalPresentation=teaReferenceAddModalHtml;
 root.teaReferenceLabProfileBodyPresentation=teaReferenceLabProfileBodyHtml;
 root.teaReferenceLabProfileModalHtml=teaReferenceLabProfileModalHtml;
@@ -5299,8 +5218,6 @@ const actionFormController = createActionFormController({
   rerender: () => rerender(), requireWrite: () => requireWrite(), canWrite: () => root.canWrite(),
   infoDialog: (message, opts) => root.infoDialog(message, opts),
   esc: value => (root as any).esc(value), escapeAttr: value => (root as any).escAttr(value),
-  btn: (label, action, cls, title, options) => (root as any).btn(label, action, cls, title, options),
-  dateBox: (id, value, cls, attrs) => (root as any).dateBox(id, value, cls, attrs),
   vnDate: value => vnDate(value), fmt: (value, decimals) => fmt(value, decimals),
   fmtPointValue: (point, test) => (root as any).fmtPointValue(point, test),
   fmtTestValue: (test, value) => (root as any).fmtTestValue(test, value), fmtTestStat: (test, value) => (root as any).fmtTestStat(test, value),
@@ -5326,7 +5243,6 @@ root.actionUi = actionFormController.actionUi;
 root.actionSectionToggled = actionFormController.actionSectionToggled;
 root.actionDefaultOpenSections = actionFormController.actionDefaultOpenSections;
 root.actionRuleOptions = actionFormController.actionRuleOptions;
-root.actionStaffOptions = actionFormController.actionStaffOptions;
 root.captureActionDraft = actionFormController.captureActionDraft;
 root.actionFormChanged = actionFormController.actionFormChanged;
 root.actionDraftValues = actionFormController.actionDraftValues;
@@ -5334,17 +5250,12 @@ root.clearActionDraft = actionFormController.clearActionDraft;
 root.actionSourceOptions = actionFormController.actionSourceOptions;
 root.actionCausePhrases = actionFormController.actionCausePhrases;
 root.actionActionPhrases = actionFormController.actionActionPhrases;
-root.actionSuggestRow = actionFormController.actionSuggestRow;
-root.actionSuggestBox = actionFormController.actionSuggestBox;
 root.actionInsertSuggestion = actionFormController.actionInsertSuggestion;
-root.syncActionSuggestions = actionFormController.syncActionSuggestions;
-root.actSel = actionFormController.actSel;
 root.actionLevelLabel = actionFormController.actionLevelLabel;
 root.syncActLevels = actionFormController.syncActLevels;
 root.actionLevelContext = actionFormController.actionLevelContext;
 root.beginActionManual = actionFormController.beginActionManual;
 root.closeActionForm = actionFormController.closeActionForm;
-root.actionFormClosedHtml = actionFormController.actionFormClosedHtml;
 root.actionIncidentBanner = actionFormController.actionIncidentBanner;
 root.beginActionFromIssue = actionFormController.beginActionFromIssue;
 root.actionFieldValue = actionFormController.actionFieldValue;
@@ -5358,7 +5269,6 @@ root.editAction = actionFormController.editAction;
    do với goManageTargets ở trên — data-action chỉ định tuyến một hàm. */
 root.dashboardGoEntryFollowup = (testId, level) => { entrySel = { testId, level }; entryStart = null; entryEnd = null; root.go('entry'); };
 root.dashboardContinueAction = index => { root.go('actions'); root.editAction!(index); };
-root.actionInvestigationField = actionFormController.actionInvestigationField;
 root.actionInvestigationChoiceLabel = actionFormController.actionInvestigationChoiceLabel;
 root.actionInvestigationStateClass = actionFormController.actionInvestigationStateClass;
 root.actionInvestigationChoose = actionFormController.actionInvestigationChoose;
@@ -5369,7 +5279,6 @@ root.actionChecklistChip = actionFormController.actionChecklistChip;
 root.actionEffSectionChip = actionFormController.actionEffSectionChip;
 root.actionUpdateSectionChip = actionFormController.actionUpdateSectionChip;
 root.actionRefreshSectionChips = actionFormController.actionRefreshSectionChips;
-root.actionSection = actionFormController.actionSection;
 root.actionFormModel = actionFormController.actionFormModel;
 root.actionFormDefaults = actionFormController.actionFormDefaults;
 root.focusActionField = actionFormController.focusActionField;
@@ -5380,7 +5289,7 @@ root.actionFillBias = actionFormController.actionFillBias;
 root.actionBiasThresholdHtml = actionFormController.actionBiasThresholdHtml;
 root.actionBiasReferenceHtml = actionFormController.actionBiasReferenceHtml;
 root.actionUpdateBiasHint = actionFormController.actionUpdateBiasHint;
-root.actionFormHtml = actionFormController.actionFormHtml;
+root.actionFormViewModel = actionFormController.actionFormViewModel;
 const actionsPageController = createActionsPageController({
   getState: () => state, document: () => typeof document !== 'undefined' ? document : ({ getElementById: () => null, querySelector: () => null, querySelectorAll: () => [] } as unknown as Document),
   entryUi: () => (root as any).EntryUIState, currentPage: () => (root as any).RouterUIState.page, currentUser: () => currentUser,
@@ -5407,7 +5316,6 @@ const actionsPageController = createActionsPageController({
   ActionViolationService: root.ActionViolationService, ActionGuidePresentation: root.ActionGuidePresentation, ActionCurrentIssues: () => root.ActionCurrentIssues!(),
   NceLifecycleWorkflowCommand: root.NceLifecycleWorkflowCommand, actionFormUiState: (root as any).actionFormUiState, modalTemplate: opts => root.modalTemplate(opts),
   QCCore: { cleanText: (value, maximumLength) => root.QCCore!.cleanText(value, maximumLength) },
-  formHtml: issueCount => actionFormController.actionFormHtml(issueCount),
   captureFormDraft: () => actionFormController.captureActionDraft(),
   pres: root as any,
 });
@@ -5416,7 +5324,6 @@ root.actionLevelShort = actionsPageController.actionLevelShort;
 root.currentIssues = actionsPageController.currentIssues;
 root.cancelAction = actionsPageController.cancelAction;
 root.confirmCancelAction = actionsPageController.confirmCancelAction;
-root.actionApprovalTag = actionsPageController.actionApprovalTag;
 root.actionApprovalToken = actionsPageController.actionApprovalToken;
 root.approveAction = actionsPageController.approveAction;
 root.confirmApproveAction = actionsPageController.confirmApproveAction;
@@ -5427,8 +5334,6 @@ root.escalateAction = actionsPageController.escalateAction;
 root.actionCanReopen = actionsPageController.actionCanReopen;
 root.reopenAction = actionsPageController.reopenAction;
 root.confirmReopenAction = actionsPageController.confirmReopenAction;
-root.actionReviewButtons = actionsPageController.actionReviewButtons;
-root.actionSideChips = actionsPageController.actionSideChips;
 root.actionDetailCheck = actionsPageController.actionDetailCheck;
 root.actionEvidenceTimelineHtml = actionsPageController.actionEvidenceTimelineHtml;
 root.actionRerunEvidenceHtml = actionsPageController.actionRerunEvidenceHtml;
@@ -5436,12 +5341,9 @@ root.openActionQcEvidence = actionsPageController.openActionQcEvidence;
 root.viewActionDetail = actionsPageController.viewActionDetail;
 root.openActionGuide = actionsPageController.openActionGuide;
 root.groupIssuesByTestDate = actionsPageController.groupIssuesByTestDate;
-root.issueRowHtml = actionsPageController.issueRowHtml;
 root.actionViolationInfo = actionsPageController.actionViolationInfo;
 root.actionQcVerdictLabel = actionsPageController.actionQcVerdictLabel;
-root.openActionIssueHtml = actionsPageController.openActionIssueHtml;
-root.actionIssueGroupHtml = actionsPageController.actionIssueGroupHtml;
-root.pageActionsV4 = actionsPageController.pageActionsV4;
+root.actionsModel = actionsPageController.actionsModel;
 root.ReagentComparisonService = createReagentComparisonService({
   cleanText: root.QCCore.cleanText,
   cleanId: root.QCCore.cleanId,

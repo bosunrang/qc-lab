@@ -3,13 +3,13 @@ type AnyRec = any;
 /**
  * Trang "Khắc phục sự cố" trừ phần form: danh sách sự cố cần xử lý, vòng đời hồ sơ
  * NCE (duyệt/trả lại/hủy có lưu vết/escalate/mở lại) cùng token khóa phiên bản,
- * phiếu chi tiết và các khối dựng bằng chứng. Phần DỰNG VÀ ĐỌC LẠI form 8 mục nằm ở
- * action-form-controller.ts — pageActionsV4() gọi sang deps.formHtml() (không import
- * trực tiếp file kia, vì đường cắt cố ý KHÔNG một chiều: form cũng gọi ngược
- * actionEvidenceTimelineHtml/actionRerunEvidenceHtml/actionLevelShort của trang này).
- * Việc nối hai chiều này do modular-pilot.global.ts lo (dựng controller này trước với
- * deps.formHtml trỏ qua một biến tham chiếu được gán sau khi action-form-controller.ts
- * dựng xong).
+ * phiếu chi tiết và các khối dựng bằng chứng. Phần DỰNG form 8 mục nằm ở
+ * action-form-controller.ts. actionsModel() (dữ liệu thuần cho
+ * src/react/pages/ActionsPage.tsx) gọi thẳng action-form-controller.ts's
+ * actionFormViewModel() từ phía React, không qua đường cắt của controller này —
+ * đường cắt CÒN LẠI ở đây chỉ một chiều: form gọi ngược
+ * actionEvidenceTimelineHtml/actionRerunEvidenceHtml/actionLevelShort của trang này
+ * (dựng modular-pilot.global.ts qua một biến tham chiếu, xem ghi chú ở đó).
  *
  * `document` là getter LAZY, cùng lý do với entry/manage: một số test đổi `document`
  * giữa các bước.
@@ -73,11 +73,9 @@ export function createActionsPageController(deps: {
   actionFormUiState: AnyRec;
   modalTemplate: (opts: AnyRec) => string;
   QCCore: { cleanText: (value: unknown, maxLength?: number) => string };
-  /* Cầu nối hai chiều sang action-form-controller.ts — xem ghi chú đầu file. */
-  formHtml: (issueCount: number) => string;
   captureFormDraft: () => void;
-  /* ~29 hàm dựng HTML thuần (TypeScript) đã bridge từ các đợt trước, gom một chỗ
-     thay vì khai kiểu từng cái — khớp cách các controller trước đã làm. */
+  /* Vài hàm dựng HTML thuần (TypeScript) còn dùng cho phiếu chi tiết/modal cổ điển,
+     gom một chỗ thay vì khai kiểu từng cái. */
   pres: AnyRec;
 }) {
   const state = () => deps.getState();
@@ -124,10 +122,6 @@ export function createActionsPageController(deps: {
     }).ok) { deps.closeModal(); deps.rerender(); return; }
     if (deps.actionFormUiState.editId === a.id) deps.actionFormUiState.reset();
     deps.rerender();
-  };
-  const actionApprovalTag = (a: AnyRec) => {
-    const s = deps.actionApprovalStatus(a), view = deps.ActionReviewPresentation.approvalTag(s, deps.actionCancelled(a)), label = deps.actionApprovalLabel(a);
-    return deps.pres.actionApprovalTagPresentation(view, label);
   };
   const actionApprovalToken = (a: AnyRec) => deps.ActionReviewService.reviewToken(a);
   const actionApprovalReadinessMessage = (r: AnyRec, afterAuth: boolean) => deps.ActionReviewMessages.approval(r, afterAuth);
@@ -243,18 +237,6 @@ export function createActionsPageController(deps: {
     }).ok) { deps.closeModal(); deps.rerender(); return; }
   };
 
-  const actionReviewButtons = (i: number, a: AnyRec) => {
-    const s = deps.actionApprovalStatus(a), wf = deps.actionWorkflowStatus(a);
-    const model = deps.ActionReviewPresentation.buttons(a, { approval: s, workflowStage: wf.stage, cancelled: deps.actionCancelled(a), isAdmin: deps.role() === 'admin', canWrite: deps.canWrite(), canEscalate: actionCanEscalate(a), canReopen: actionCanReopen(a) });
-    return deps.pres.actionReviewButtonsHtml(i, model);
-  };
-  /* Chip phụ dùng chung cho dòng vi phạm, dòng NCE đang mở và bảng nhật ký, để ba chỗ
-     không lệch nhau (đúng lỗi chip QC chạy lại chỉ hiện ở một chỗ trước đây). */
-  const actionSideChips = (a: AnyRec, stage: string) => {
-    if (deps.actionCancelled(a)) return '';
-    const chips = deps.ActionStatusPresentation.sideChips(a, stage, deps.actionRerunStatus(a), deps.actionOverdue(a), deps.actionEffectivenessStatus(a));
-    return deps.pres.actionSideChipsHtml(chips);
-  };
   const actionDetailCheck = (label: string, status: unknown, note: unknown) => {
     const view = deps.ActionStatusPresentation.detailCheck(status);
     return deps.pres.actionDetailCheckHtml(label, view, note);
@@ -311,16 +293,6 @@ export function createActionsPageController(deps: {
     deps.openModal(deps.modalTemplate({ title: 'Quy trình 8 bước xử lý hồ sơ NCE', body: content.body, footer: content.footer, cls: 'action-guide-modal', bodyClass: '' }));
   };
   const groupIssuesByTestDate = (issues: AnyRec[]) => deps.ActionListPresentation.groupIssuesByTestDate(issues);
-  /* Dòng vi phạm phải hiện luôn tình trạng QC chạy lại và mã hồ sơ, y như dòng ở mục
-     "Hồ sơ NCE đang mở": hồ sơ của chính điểm này bị lọc khỏi mục đó để khỏi trùng
-     (xem openActions trong pageActionsV4), nên nếu chỉ hiện một chip trạng thái thì
-     chạy lại QC xong người dùng không thấy gì đổi ở đây cả. */
-  const issueRowHtml = (o: AnyRec) => {
-    const rules = o.rules.join(', '), err = deps.errorType(o.rules), hint = deps.fixHint(o.rules), wf = deps.pointWorkflowSummary(o.p.id), acts = deps.pointRealActions(o.p.id) || [], latest = acts[acts.length - 1], idx = latest ? (state().actions || []).indexOf(latest) : -1;
-    const sideChips = latest ? actionSideChips(latest, deps.actionWorkflowStatus(latest).stage) : '';
-    const foot = latest ? `${latest.nceId ? deps.esc(latest.nceId) + ' · ' : ''}Phụ trách: ${deps.esc(latest.by || '—')}${latest.dueDate ? ' · hạn ' + deps.vnDate(latest.dueDate) : ''}` : hint;
-    return deps.pres.actionIssueRowPresentation({ severity: o.f.level, level: actionLevelShort(o.t, o.l.level, o.l.lot), state: deps.stateName(o.f.level), value: deps.fmtPointValue(o.p, o.t), unit: o.t.unit || '', rules, error: err, workflowClass: wf.cls, workflowLabel: wf.label, sideChips, footer: foot, action: deps.canWrite() ? (idx >= 0 ? { kind: 'continue', index: idx } : { kind: 'create', testId: o.t.id, level: o.l.level, rules, error: err, hint, pointId: o.p.id || '', date: o.p.date || '' }) : undefined });
-  };
   /* Hồ sơ cũ tự sinh lúc hủy điểm chỉ lưu rule='Hủy điểm QC' — không phải luật Westgard.
      Suy |Z| của chính điểm đó ra ngữ cảnh đọc được, nhưng LUÔN gắn nhãn "suy từ Z" và
      không bao giờ ghi ngược vào bản ghi: luật thật có thể là 2-2s/R4s/4-1s chứ không chỉ
@@ -329,36 +301,47 @@ export function createActionsPageController(deps: {
      a.rule gốc. */
   const actionViolationInfo = (a: AnyRec) => deps.ActionViolationService.info(a);
   const actionQcVerdictLabel = (a: AnyRec) => deps.ActionViolationService.verdictLabel(a);
-  const openActionIssueHtml = (a: AnyRec, idx: number) => {
-    const t = state().tests.find((x: AnyRec) => x.id === a.testId), wf = deps.actionWorkflowStatus(a), violation = actionViolationInfo(a), title = a.nceId || 'Hồ sơ khắc phục', context = t ? `${deps.testDisplayName(t)} · ${actionLevelShort(t, a.level, a.lot)}` : (violation.rule || 'Sự cố'), primary = a.correction || a.action || 'Đang điều tra', verdict = actionQcVerdictLabel(a);
-    return deps.pres.actionOpenIssuePresentation({ severity: wf.cls === 'rej' ? 'rej' : 'warn', title, context, date: deps.vnDate(deps.actionEventDate(a)), verdict, rule: violation.rule, errorType: violation.errorType, workflowClass: wf.cls, workflowLabel: wf.label, sideChips: actionSideChips(a, wf.stage), primary, owner: a.by || '', dueDate: a.dueDate ? deps.vnDate(a.dueDate) : '', editable: deps.canWrite(), index: idx });
-  };
-  const actionIssueGroupHtml = (model: AnyRec) => deps.pres.actionIssueGroupPresentation(model);
 
-  const pageActionsV4 = () => {
+  /* actionsModel(): dữ liệu thuần cho trang React (src/react/pages/ActionsPage.tsx), song
+     song với pageActionsV4() bên dưới — cùng logic đọc state nhưng trả mảng/đối tượng
+     thay vì chuỗi HTML. sideChips trả thẳng mảng {cls,label} (bỏ qua actionSideChipsHtml),
+     nút duyệt/trả lại/hủy/escalate/mở lại trả thẳng cờ boolean từ
+     ActionReviewPresentation.buttons() (bỏ qua actionReviewButtonsHtml) — JSX tự dựng nút
+     bằng btn() qua bridge, không tái dựng chuỗi HTML rồi dán lại. */
+  const actionsModel = () => {
     const issues = currentIssues(), activePointIds = new Set(issues.map((o: AnyRec) => o.p.id));
     const issueGroups = groupIssuesByTestDate(issues);
-    const violationHtml = issueGroups.map((g: AnyRec) => actionIssueGroupHtml({ severity: g.worst, title: deps.testDisplayName(g.t), date: deps.vnDate(g.date), count: g.items.length, countLabel: 'vi phạm', itemsHtml: g.items.map(issueRowHtml).join('') })).join('');
+    const chipsData = (a: AnyRec, stage: string) => deps.actionCancelled(a) ? [] : deps.ActionStatusPresentation.sideChips(a, stage, deps.actionRerunStatus(a), deps.actionOverdue(a), deps.actionEffectivenessStatus(a));
+    const issueItem = (o: AnyRec) => {
+      const rules = o.rules.join(', '), err = deps.errorType(o.rules), hint = deps.fixHint(o.rules), wf = deps.pointWorkflowSummary(o.p.id), acts = deps.pointRealActions(o.p.id) || [], latest = acts[acts.length - 1], idx = latest ? (state().actions || []).indexOf(latest) : -1;
+      const sideChips = latest ? chipsData(latest, deps.actionWorkflowStatus(latest).stage) : [];
+      const footer = latest ? `${latest.nceId ? latest.nceId + ' · ' : ''}Phụ trách: ${latest.by || '—'}${latest.dueDate ? ' · hạn ' + deps.vnDate(latest.dueDate) : ''}` : hint;
+      return { severity: o.f.level, level: actionLevelShort(o.t, o.l.level, o.l.lot), state: deps.stateName(o.f.level), value: deps.fmtPointValue(o.p, o.t), unit: o.t.unit || '', rules, error: err, workflowClass: wf.cls, workflowLabel: wf.label, sideChips, footer, action: deps.canWrite() ? (idx >= 0 ? { kind: 'continue', index: idx } : { kind: 'create', testId: o.t.id, level: o.l.level, rules, error: err, hint, pointId: o.p.id || '', date: o.p.date || '' }) : null };
+    };
+    const violationGroups = issueGroups.map((g: AnyRec) => ({ severity: g.worst, title: deps.testDisplayName(g.t), date: deps.vnDate(g.date), count: g.items.length, countLabel: 'vi phạm', items: g.items.map(issueItem) }));
     const openActions = (state().actions || []).map((a: AnyRec, idx: number) => ({ a, idx })).filter(({ a }: AnyRec) => !deps.actionCancelled(a) && deps.actionRecorded(a) && !deps.actionWorkflowStatus(a).complete && (!a.pointId || !activePointIds.has(a.pointId)));
-    const openActionHtml = openActions.length ? actionIssueGroupHtml({ severity: 'warn', title: 'Hồ sơ NCE đang mở', date: 'Cần tiếp tục xử lý', count: openActions.length, countLabel: 'hồ sơ', itemsHtml: openActions.map(({ a, idx }: AnyRec) => openActionIssueHtml(a, idx)).join('') }) : '';
-    const issueHtml = violationHtml + openActionHtml || '<div class="alert ok">Không có vi phạm/cảnh báo hoặc hồ sơ NCE đang mở.</div>';
-    const rows = (state().actions || []).slice().reverse().map((a: AnyRec, idx: number) => {
+    const openActionItem = (a: AnyRec, idx: number) => {
+      const t = state().tests.find((x: AnyRec) => x.id === a.testId), wf = deps.actionWorkflowStatus(a), violation = actionViolationInfo(a), title = a.nceId || 'Hồ sơ khắc phục', context = t ? `${deps.testDisplayName(t)} · ${actionLevelShort(t, a.level, a.lot)}` : (violation.rule || 'Sự cố'), primary = a.correction || a.action || 'Đang điều tra', verdict = actionQcVerdictLabel(a);
+      return { severity: wf.cls === 'rej' ? 'rej' : 'warn', title, context, date: deps.vnDate(deps.actionEventDate(a)), verdict, rule: violation.rule, errorType: violation.errorType, workflowClass: wf.cls, workflowLabel: wf.label, sideChips: chipsData(a, wf.stage), primary, owner: a.by || '', dueDate: a.dueDate ? deps.vnDate(a.dueDate) : '', editable: deps.canWrite(), index: idx };
+    };
+    const openActionGroup = openActions.length ? { severity: 'warn', title: 'Hồ sơ NCE đang mở', date: 'Cần tiếp tục xử lý', count: openActions.length, countLabel: 'hồ sơ', items: openActions.map(({ a, idx }: AnyRec) => openActionItem(a, idx)) } : null;
+    const logRows = (state().actions || []).slice().reverse().map((a: AnyRec, idx: number) => {
       const realIdx = state().actions.length - 1 - idx, t = state().tests.find((x: AnyRec) => x.id === a.testId), wf = deps.actionWorkflowStatus(a), approval = deps.actionApprovalStatus(a), openedAt = a.createdAt ? deps.formatDateTimeVN(a.createdAt) : '', primary = a.action || a.correction || 'Đang điều tra';
-      const approveMeta = approval === 'pending' ? '' : `<div class="action-note">${deps.esc(a.approvedBy || '')} ${a.approvedAt ? deps.formatDateTimeVN(a.approvedAt) : ''}${a.approvalNote ? ' · ' + deps.esc(a.approvalNote) : ''}</div>`;
-      const identity = `${a.nceId ? deps.esc(a.nceId) + ' · ' : ''}${t ? deps.esc(deps.testDisplayName(t)) : deps.esc(a.rule || 'Cập nhật')}`, sub = t ? deps.esc(actionLevelShort(t, a.level, a.lot)) : deps.esc(a.lot ? 'Nhóm lô ' + a.lot : '—'), rule = t ? (actionQcVerdictLabel(a) ? deps.esc(actionQcVerdictLabel(a)) + ' · ' : '') + deps.esc(actionViolationInfo(a).rule) + ' · ' + deps.esc(actionViolationInfo(a).errorType) : deps.esc(a.errorType || '—');
-      const model = { date: deps.vnDate(deps.actionEventDate(a)), openedAt, identity, sub, rule, primary, owner: a.by || '', dueDate: a.dueDate ? deps.vnDate(a.dueDate) : '', workflowClass: wf.cls, workflowLabel: wf.label, sideChips: actionSideChips(a, wf.stage), approvalTag: !deps.actionCancelled(a) && approval !== 'pending' ? actionApprovalTag(a) : '', approvalMeta: approveMeta, actions: actionReviewButtons(realIdx, a) };
-      return deps.pres.actionLogRowPresentation(model);
-    }).join('');
-    const head = deps.headOnly('Khắc phục sự cố', 'Điều tra nguyên nhân, ghi nhận, chạy lại QC và phê duyệt khép vòng'), issuesPanel = deps.pres.actionIssuesPanelHtml(issueHtml), formPanel = deps.formHtml(issues.length), logPanel = deps.pres.actionLogPanelHtml(rows);
-    return deps.pres.actionPageHtml({ headHtml: head, issuesHtml: issuesPanel, formHtml: formPanel, logHtml: logPanel });
+      const approvalMeta = approval === 'pending' ? null : { by: a.approvedBy || '', at: a.approvedAt ? deps.formatDateTimeVN(a.approvedAt) : '', note: a.approvalNote || '' };
+      const identity = `${a.nceId ? a.nceId + ' · ' : ''}${t ? deps.testDisplayName(t) : (a.rule || 'Cập nhật')}`, sub = t ? actionLevelShort(t, a.level, a.lot) : (a.lot ? 'Nhóm lô ' + a.lot : '—'), rule = t ? (actionQcVerdictLabel(a) ? actionQcVerdictLabel(a) + ' · ' : '') + actionViolationInfo(a).rule + ' · ' + actionViolationInfo(a).errorType : (a.errorType || '—');
+      const approvalTag = !deps.actionCancelled(a) && approval !== 'pending' ? { cls: deps.ActionReviewPresentation.approvalTag(approval, deps.actionCancelled(a)).cls, label: deps.actionApprovalLabel(a) } : null;
+      const buttons = deps.ActionReviewPresentation.buttons(a, { approval, workflowStage: wf.stage, cancelled: deps.actionCancelled(a), isAdmin: deps.role() === 'admin', canWrite: deps.canWrite(), canEscalate: actionCanEscalate(a), canReopen: actionCanReopen(a) });
+      return { index: realIdx, date: deps.vnDate(deps.actionEventDate(a)), openedAt, identity, sub, rule, primary, owner: a.by || '', dueDate: a.dueDate ? deps.vnDate(a.dueDate) : '', workflowClass: wf.cls, workflowLabel: wf.label, sideChips: chipsData(a, wf.stage), approvalTag, approvalMeta, buttons };
+    });
+    return { violationGroups, openActionGroup, logRows, issueCount: issues.length };
   };
 
   return {
-    actionLevelShort, currentIssues, cancelAction, confirmCancelAction, actionApprovalTag, actionApprovalToken,
+    actionLevelShort, currentIssues, cancelAction, confirmCancelAction, actionApprovalToken,
     approveAction, confirmApproveAction, returnAction, confirmReturnAction, actionCanEscalate, escalateAction,
-    actionCanReopen, reopenAction, confirmReopenAction, actionReviewButtons, actionSideChips, actionDetailCheck,
+    actionCanReopen, reopenAction, confirmReopenAction, actionDetailCheck,
     actionEvidenceTimelineHtml, actionRerunEvidenceHtml, openActionQcEvidence, viewActionDetail, openActionGuide,
-    groupIssuesByTestDate, issueRowHtml, actionViolationInfo, actionQcVerdictLabel, openActionIssueHtml,
-    actionIssueGroupHtml, pageActionsV4,
+    groupIssuesByTestDate, actionViolationInfo, actionQcVerdictLabel,
+    actionsModel,
   };
 }

@@ -375,8 +375,8 @@ assert.match(actionsRoutesSource, /const currentIssues = \(\) => deps\.ActionCur
   'actions route must use the TypeScript current-issues service directly');
 assert.doesNotMatch(actionsRoutesSource, /const out=\[\],rank=\{rej:2,warn:1,ok:0\}/,
   'actions route must not retain a classic current-issues fallback');
-assert.match(actionsRoutesSource, /const actionIssueGroupHtml = \(model: AnyRec\) => deps\.pres\.actionIssueGroupPresentation\(model\);/,
-  'actions route must render issue groups through TypeScript presentation');
+assert.match(actionsRoutesSource, /const actionsModel = \(\) => \{/,
+  'actions route must expose the React page data model (actionsModel)');
 assert.doesNotMatch(actionsRoutesSource, /if\(globalThis\.actionIssueRowPresentation\)|if\(globalThis\.actionIssueGroupPresentation\)/,
   'actions route must not retain classic issue-render fallbacks');
 assert.match(drawSource, /const cc = deps\.cusumColors;/,
@@ -1367,7 +1367,6 @@ assert.match(generated, /root\.firebaseSettingsService\s*=\s*createFirebaseSetti
   'artifact must publish TypeScript Firebase settings validation for settings callers');
 assert.match(generated, /root\.reagentResultHtml\s*=\s*createReagentResultHtml/, 'artifact must publish TypeScript reagent result HTML for the legacy bridge');
 assert.match(generated, /root\.reportNceDetailHtmlPresentation\s*=\s*createReportNceDetailHtml/, 'artifact must publish TypeScript NCE detail report HTML for the legacy bridge');
-assert.match(generated, /root\.actionPageHtml\s*=\s*createActionPageHtml/, 'artifact must publish TypeScript NCE page HTML for the legacy bridge');
 assert.doesNotMatch(generated, /root\.csvCellService\s*=/,
   'artifact must not publish the retired CSV cell facade');
 assert.match(generated, /root\.reportExportHelpers\s*=\s*reportExportHelpers/,

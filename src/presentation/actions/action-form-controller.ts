@@ -1,24 +1,26 @@
 type AnyRec = any;
 
 /**
- * Form hồ sơ NCE (trang "Khắc phục sự cố"): hằng số lựa chọn (ACT_*), chip gợi ý, khối
- * <details> 8 mục, checklist điều tra, bản nháp giữ qua rerender(), model render-từ-state
- * và addAction(). actions-page-controller.ts giữ phần còn lại của trang: danh sách sự
- * cố, vòng đời hồ sơ (duyệt/trả lại/hủy/escalate/mở lại) và phiếu chi tiết.
+ * Form hồ sơ NCE (trang "Khắc phục sự cố"): hằng số lựa chọn (ACT_*), chip gợi ý,
+ * checklist điều tra, bản nháp giữ qua rerender(), actionFormViewModel() (dữ liệu thuần
+ * cho src/react/pages/ActionsPage.tsx) và addAction(). actions-page-controller.ts giữ
+ * phần còn lại của trang: danh sách sự cố, vòng đời hồ sơ (duyệt/trả lại/hủy/escalate/
+ * mở lại) và phiếu chi tiết.
  *
- * Đường cắt này KHÔNG một chiều: form gọi ngược vài hàm dựng bằng chứng của trang
- * (deps.evidenceTimelineHtml/deps.rerunEvidenceHtml/deps.levelShort) vì phiếu chi tiết
- * dùng chung đúng các khối đó, và trang gọi vào deps.formHtml (từ phía bên kia) để
- * mở/đóng/lưu hồ sơ. modular-pilot.global.ts nối hai chiều này bằng cách dựng controller
- * này TRƯỚC (không cần actions-page-controller.ts tồn tại — ba dep trên trỏ qua một biến
- * tham chiếu được gán sau khi actions-page-controller.ts dựng xong), rồi dựng
- * actions-page-controller.ts với `formHtml` trỏ thẳng vào `pageActionsV4`... của controller
- * này vì lúc đó nó đã tồn tại.
+ * Đường cắt CÒN LẠI ở đây chỉ một chiều: form gọi ngược vài hàm dựng bằng chứng của
+ * trang (deps.evidenceTimelineHtml/deps.rerunEvidenceHtml/deps.levelShort) vì phiếu chi
+ * tiết dùng chung đúng các khối đó — modular-pilot.global.ts dựng controller này TRƯỚC
+ * (ba dep trên trỏ qua một biến tham chiếu được gán sau khi actions-page-controller.ts
+ * dựng xong).
  *
  * Form hồ sơ NCE được render THẲNG TỪ STATE (bản ghi đang sửa qua actionUi().editId, hoặc
  * seed khi mở từ một vi phạm) chứ không đổ giá trị vào DOM sau render — mọi rerender() sau
  * đó (đổi trang rồi quay lại, hay một bản đồng bộ Firebase dội về) không được xoá trắng
- * form đang gõ dở.
+ * form đang gõ dở. Ở trang React, mỗi lần mở một hồ sơ (startManual()/startIssue()/
+ * edit()) tăng actionFormUiState.openSeq — actionFormViewModel() gộp nó vào formKey nên
+ * ActionsPage.tsx remount đúng subtree form mỗi lần mở, kể cả khi mở lại form thủ công
+ * hai lần liên tiếp (seed giống hệt nhau) — nếu không, nội dung đã gõ dở của lần mở
+ * trước còn sót trên các ô uncontrolled dù model đã tính lại đúng là rỗng.
  */
 export function createActionFormController(deps: {
   getState: () => AnyRec;
@@ -31,8 +33,6 @@ export function createActionFormController(deps: {
   infoDialog: (message: string, opts?: AnyRec) => Promise<unknown>;
   esc: (value: unknown) => string;
   escapeAttr: (value: unknown) => string;
-  btn: (label: string, action: string | { action: string; args?: unknown[] } | null, cls?: string, title?: string, options?: AnyRec) => string;
-  dateBox: (id: string, value: string, cls?: string, attrs?: string) => string;
   vnDate: (value: unknown) => string;
   fmt: (value: unknown, decimals?: number) => string;
   fmtPointValue: (point: AnyRec, test: AnyRec) => string;
@@ -157,22 +157,12 @@ export function createActionFormController(deps: {
     '': ['Hiệu chuẩn lại và xác nhận bằng QC', 'Vệ sinh kim hút, loại bọt khí', 'Thay lọ QC mới, trộn đều đúng cách', 'Đào tạo lại thao tác cho nhân viên'],
   };
 
-  let actionStepRenderInputs: AnyRec = null;
-
   const actionSectionToggled = (key: string, open: boolean) => { actionUi().toggleSection(key, open); };
   const actionDefaultOpenSections = (editing: AnyRec, protocol: AnyRec) => deps.ActionFormModel.defaultOpenSections(editing, protocol);
-  /* Luật Westgard là bộ từ vựng đóng — không có lý do gì để gõ tay. actSel() tự thêm
-     option cho giá trị lạ nên hồ sơ cũ (hoặc chuỗi nhiều luật "1-3s, 2-2s" sinh từ dòng
-     vi phạm) vẫn hiện đúng thay vì rơi im lặng về option đầu. */
+  /* Luật Westgard là bộ từ vựng đóng — không có lý do gì để gõ tay. actionRuleOptions()
+     luôn kèm một option rỗng đầu tiên nên hồ sơ cũ (hoặc chuỗi nhiều luật "1-3s, 2-2s"
+     sinh từ dòng vi phạm) vẫn hiện đúng thay vì rơi im lặng về option đầu. */
   const actionRuleOptions = () => deps.pres.actionRuleOptionsPresentation(deps.QCCore.WG_RULES);
-  /* Người phụ trách: datalist thay vì select vì vẫn phải cho gõ tên người ngoài danh
-     sách (nhân viên mới, người trực thay). Chọn từ danh sách còn giúp actionCanApprove()
-     đối chiếu đúng — hiện nó so theo tên, gõ sai chính tả là quy tắc "không tự duyệt hồ
-     sơ của mình" bị vô hiệu. */
-  const actionStaffOptions = () => {
-    const names = [...new Set((state().users || []).filter((u: AnyRec) => u.active !== false).map((u: AnyRec) => String(u.name || u.username || '').trim()).filter(Boolean))];
-    return deps.pres.actionStaffOptionsPresentation(names);
-  };
   /* Bản nháp đang gõ được chụp lại sau mỗi lần thay đổi ô, và render lại từ đó. Nếu chỉ
      dựa vào bản ghi trong state thì hồ sơ MỚI (chưa lưu) vẫn mất sạch nội dung mỗi khi
      có rerender() — ví dụ Firebase dội một bản đồng bộ về giữa lúc đang nhập. */
@@ -191,16 +181,8 @@ export function createActionFormController(deps: {
   const actionSourceOptions = (qcBound: boolean, current: unknown) => deps.ActionFormModel.sourceOptions(ACT_SOURCE_OPTS, qcBound, current);
   const actionCausePhrases = (category: unknown) => deps.pres.actionCausePhrasesPresentation(category, ACT_SUGGEST_CAUSE);
   const actionActionPhrases = (errorType: unknown) => deps.pres.actionPhrasesPresentation(errorType, ACT_SUGGEST_ACTION);
-  /* Chip không dùng btn(): đây không phải nút hành động teal/ghost/danger mà là một
-     affordance riêng, cùng kiểu với tab lọc trạng thái ở dashboard. */
-  const actionSuggestRow = (targetId: string, phrases: string[]): string => {
-    if (!phrases || !phrases.length) return '';
-    return deps.pres.actionSuggestRowPresentation(deps.escapeAttr(targetId), targetId, phrases.map(p => ({ phraseHtml: deps.esc(p), phrase: p })));
-  };
-  const actionSuggestBox = (targetId: string, phrases: string[], label = 'Gợi ý nhập nhanh'): string => {
-    if (!phrases || !phrases.length) return '';
-    return deps.pres.actionSuggestBoxPresentation(deps.esc(label), actionSuggestRow(targetId, phrases));
-  };
+  /* Chip gợi ý (JSX SuggestBox trong ActionsPage.tsx) chèn câu bằng cách gọi thẳng hàm
+     này qua data-action — không còn dựng bằng HTML string ở đây. */
   const actionInsertSuggestion = (targetId: string, phrase: string) => {
     const e = doc().getElementById(targetId);
     if (!e) return;
@@ -210,16 +192,6 @@ export function createActionFormController(deps: {
     e.focus();
     e.setSelectionRange(e.value.length, e.value.length);
   };
-  /* Đổi nhóm nguyên nhân / loại sai số thì vẽ lại đúng hàng chip liên quan, không
-     rerender cả trang (sẽ giật và mất vị trí con trỏ). */
-  const syncActionSuggestions = () => {
-    const cause = doc().getElementById('sugg-aCause'), act = doc().getElementById('sugg-aAct');
-    if (cause) cause.outerHTML = actionSuggestRow('aCause', actionCausePhrases(actionFieldValue('aCauseCategory', 40)));
-    if (act) act.outerHTML = actionSuggestRow('aAct', actionActionPhrases(actionFieldValue('aErr', 80)));
-  };
-  /* Giá trị lạ (hồ sơ cũ, ví dụ errorType 'Quản lý dữ liệu QC') được thêm thành một option
-     riêng thay vì rơi im lặng về option đầu tiên rồi bị ghi đè khi lưu. */
-  const actSel = (id: string, label: string, list: AnyRec, cur: unknown, extra = '') => deps.pres.actionSelectPresentation({ id, label, options: list, current: cur, extra });
   const actionLevelLabel = (l: AnyRec, t: AnyRec = null) => deps.pres.actionLevelLabelPresentation(l, (value: unknown) => deps.fmtTestValue(t, value), (value: unknown) => deps.fmtTestStat(t, value));
   /* Chỉ chạy cho hồ sơ MỚI — khi sửa, ô "Xét nghiệm" bị disabled và addAction() lấy
      testId/level/lot thẳng từ bản ghi nên hàm này không đụng tới được. */
@@ -247,13 +219,6 @@ export function createActionFormController(deps: {
     if (e) e.focus();
   };
   const closeActionForm = () => { actionUi().reset(); deps.rerender(); };
-  /* Trạng thái đóng: nói rõ hai đường vào thay vì để một form trống lơ lửng. */
-  const actionFormClosedHtml = (issueCount: number) => {
-    const manual = deps.canWrite() ? deps.btn('Lập hồ sơ từ nguồn khác', { action: 'beginActionManual' }, 'ghost') : '';
-    return issueCount
-      ? deps.pres.actionFormClosedPresentation({ title: 'Chọn một sự cố để lập hồ sơ', message: `Có ${issueCount} sự cố ở trên — bấm "Lập hồ sơ" ngay trên dòng cần xử lý để hồ sơ được gắn đúng điểm QC và tự theo dõi QC chạy lại.`, actionHtml: manual })
-      : deps.pres.actionFormClosedPresentation({ title: 'Không có vi phạm nào cần lập hồ sơ', message: 'Hồ sơ NCE thường bắt đầu từ một vi phạm ở trên. Nếu sự không phù hợp đến từ EQA, cảnh báo thiết bị, phản hồi lâm sàng hay đánh giá nội bộ thì mở hồ sơ thủ công.', actionHtml: manual });
-  };
   /* Dải nhận diện chỉ xuất hiện khi có ĐIỂM QC THẬT để nhận diện. Hồ sơ nguồn ngoài IQC
      chưa gắn điểm nào thì không có gì để nói: bản trước hiện "không gắn với điểm QC nào"
      rồi lại liệt kê Mean/SD/lô của xét nghiệm đầu dropdown mà người dùng chưa hề chọn —
@@ -321,11 +286,6 @@ export function createActionFormController(deps: {
     const panel = doc().querySelector('.action-form-panel');
     if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
-  const actionInvestigationField = (statusId: string, noteId: string, title: string, hint: string, form: AnyRec, statusKey: string, noteKey: string, lotToLot = false) => {
-    const value = String(form[statusKey] || ''), choices = (lotToLot ? ACT_LOT2LOT_OPTS : ACT_CHECK_OPTS).filter(([v]) => v), stateCls = actionInvestigationStateClass(value), stateLabel = LABELS.check[value] || 'Chưa kết luận';
-    const opts = lotToLot ? ACT_LOT2LOT_OPTS : ACT_CHECK_OPTS;
-    return deps.pres.actionInvestigationFieldPresentation({ stateClass: stateCls, statusIdHtml: deps.escapeAttr(statusId), statusId, noteIdHtml: deps.escapeAttr(noteId), titleHtml: deps.esc(title), hintHtml: deps.esc(hint), stateLabelHtml: deps.esc(stateLabel), selectOptionsHtml: opts.map(([v, label]) => `<option value="${deps.escapeAttr(v)}" ${v === value ? 'selected' : ''}>${deps.esc(label)}</option>`).join(''), choices: choices.map(([v, label]) => ({ valueHtml: deps.escapeAttr(v), labelHtml: deps.esc(actionInvestigationChoiceLabel(v, label)), active: v === value, value: v })), noteValueHtml: deps.escapeAttr(form[noteKey] || ''), suggestHtml: actionSuggestBox(noteId, ACT_SUGGEST[noteKey], 'Gợi ý bằng chứng') });
-  };
   const actionInvestigationChoiceLabel = (value: unknown, label: unknown) => deps.ActionInvestigationPresentation.choiceLabel(value, label);
   const actionInvestigationStateClass = (value: unknown) => deps.ActionInvestigationPresentation.stateClass(value);
   const actionInvestigationChoose = (statusId: string, value: string) => {
@@ -379,13 +339,6 @@ export function createActionFormController(deps: {
     (['immediate', 'risk', 'cause', 'patient'] as const).forEach(key => actionUpdateSectionChip(key, actionSectionChip((miss as AnyRec)[key])));
     actionUpdateSectionChip('eff', actionEffSectionChip(form));
     actionChecklistRefresh();
-  };
-  const actionSection = (key: string, badge: string, title: string, hint: string, bodyHtml: string, chipInfo: AnyRec, openSet: Set<string>) => {
-    if (key === 'cause' && actionStepRenderInputs) bodyHtml = deps.pres.actionCauseStepPresentation(actionStepRenderInputs.cause);
-    if (key === 'patient' && actionStepRenderInputs) bodyHtml = deps.pres.actionPatientStepPresentation(actionStepRenderInputs.patient);
-    if (key === 'eff' && actionStepRenderInputs) bodyHtml = deps.pres.actionEffectivenessStepPresentation(actionStepRenderInputs.eff);
-    const open = openSet.has(key), chip = `<span class="action-chip ${chipInfo.cls}" aria-label="${deps.escapeAttr(chipInfo.title || chipInfo.label)}"${chipInfo.title ? ` title="${deps.escapeAttr(chipInfo.title)}"` : ''}>${deps.esc(chipInfo.label)}</span>`;
-    return deps.pres.actionFormSectionPresentation({ keyHtml: deps.escapeAttr(key), key, open, badgeHtml: deps.esc(badge), titleHtml: deps.esc(title), hintHtml: deps.esc(hint), chipHtml: chip, bodyHtml });
   };
   /* Giá trị khởi tạo của form: bản ghi đang sửa > seed từ vi phạm vừa bấm "Ghi nhận" >
      mặc định cho hồ sơ mới. Trả về object phẳng để mọi ô render được value/selected. */
@@ -452,89 +405,132 @@ export function createActionFormController(deps: {
     const ref = doc().getElementById('aPatientRiskRef');
     if (ref) ref.innerHTML = actionBiasReferenceHtml(info);
   };
-  /* Panel lập hồ sơ NCE tách khỏi trang (2026-07-30): trước đó cả form 8 mục, danh sách
-     sự cố và bảng nhật ký nằm chung MỘT hàm 17 KB, nên không đọc được phần nào thuộc về
-     đâu. Ranh giới đã kiểm chứng: mọi biến dựng ở đây (editing/form/openSet/qcBound/
-     opts...) chỉ được dùng trong chính markup form, và phần form chỉ cần đúng một thứ
-     từ bên ngoài — số sự cố đang chờ, nên nhận qua tham số issueCount thay vì tính lại
-     currentIssues() lần thứ hai. */
-  const actionFormHtml = (issueCount: number): string => {
+  /* actionFormViewModel(): dữ liệu thuần cho trang React (src/react/pages/ActionsPage.tsx) —
+     bản form 8 mục cổ điển (actionFormHtml(), từng dựng HTML string) đã bị xoá sau khi
+     qua parity-check và xác minh trực tiếp trong trình duyệt (xem
+     docs/REACT-ADOPTION-PLAN.md). actionEvidenceTimelineHtml/rerunEvidenceHtml/bias
+     threshold-hint/reference-hint vẫn là chuỗi HTML tái dùng nguyên (không viết lại
+     bằng JSX): đây đúng là nội dung được vá trực tiếp qua actionUpdateBiasHint() sau
+     khi mount, y hệt cách sgRefresh()/rcCompute() vá DOM ở các trang trước — viết lại
+     bằng JSX sẽ tạo ra hai nơi tính cùng một thứ, một nguồn dữ liệu duy nhất là điều
+     phải giữ. */
+  const actionFormViewModel = (issueCount: number): AnyRec => {
     const tests = deps.operationalTests();
     const renderState = deps.pres.actionFormRenderState({ actions: state().actions || [], tests, editId: actionUi().editId, seed: actionUi().seed, currentUser: deps.currentUser(), draft: actionDraftValues(), buildModel: actionFormModel, defaultModel: actionFormDefaults, protocol: (form: AnyRec) => deps.actionProtocolStatus({ ...form, protocolVersion: form.protocolVersion || 3 }), defaultOpen: actionDefaultOpenSections, openSections: actionUi().openSections, actionId: (a: AnyRec) => a.id });
     const editing = renderState.editing, form = renderState.form;
     const formAction = editing ? { ...editing, ...form, testId: editing.testId, level: editing.level, lot: editing.lot || '', pointId: editing.pointId || '' } : null, formRerun = formAction ? deps.actionRerunStatus(formAction) : null;
-    /* Form chỉ hiện khi thật sự đang làm MỘT hồ sơ cụ thể — mở từ một vi phạm, mở lại hồ
-       sơ cũ, hoặc chủ động mở cho nguồn ngoài IQC. Trước đây nó luôn bung sẵn, không gắn
-       với sự cố nào, nên vừa chiếm chỗ vừa khiến người dùng mất dấu đang xử lý cái gì. */
     const formOpen = renderState.formOpen;
-    /* Tính trên FORM đang hiện chứ không trên bản ghi đã lưu: dải tóm tắt phải phản ánh
-       những gì người dùng vừa gõ, không phải trạng thái lúc mở hồ sơ. */
+    if (!formOpen) return { open: false, canWrite: deps.canWrite(), closed: { title: issueCount ? 'Chọn một sự cố để lập hồ sơ' : 'Không có vi phạm nào cần lập hồ sơ', message: issueCount ? `Có ${issueCount} sự cố ở trên — bấm "Lập hồ sơ" ngay trên dòng cần xử lý để hồ sơ được gắn đúng điểm QC và tự theo dõi QC chạy lại.` : 'Hồ sơ NCE thường bắt đầu từ một vi phạm ở trên. Nếu sự không phù hợp đến từ EQA, cảnh báo thiết bị, phản hồi lâm sàng hay đánh giá nội bộ thì mở hồ sơ thủ công.' } };
     const formProtocol = renderState.protocol, miss = formProtocol.missingBySection || {};
     const openSet = renderState.openSet;
-    /* Chỉ hồ sơ gắn một điểm QC thật mới có mức/lô. Hồ sơ nguồn ngoài IQC (EQA, thiết bị,
-       lâm sàng, đánh giá) thì xét nghiệm là tùy chọn và không có ngữ cảnh QC nào cả. */
     const qcBound = !!(form.pointId && (((state().data && state().data[form.testId]) || []).some((x: AnyRec) => x.id === form.pointId)));
     const knownTest = tests.some((t: AnyRec) => t.id === form.testId), missingTest = !knownTest && form.testId ? state().tests.find((t: AnyRec) => t.id === form.testId) : null;
-    const opts = (qcBound ? '' : `<option value="" ${form.testId ? '' : 'selected'}>— Không gắn xét nghiệm —</option>`) +
-      (missingTest || (!knownTest && form.testId) ? `<option value="${deps.escapeAttr(form.testId)}" selected>${deps.esc(missingTest ? deps.testDisplayName(missingTest) : 'Xét nghiệm không còn vận hành')}</option>` : '') +
-      tests.map((t: AnyRec) => `<option value="${deps.escapeAttr(t.id)}" ${t.id === form.testId ? 'selected' : ''}>${deps.esc(deps.testDisplayName(t))}</option>`).join('');
+    const testOptions: { id: string; label: string }[] = [];
+    if (!qcBound) testOptions.push({ id: '', label: '— Không gắn xét nghiệm —' });
+    if (missingTest || (!knownTest && form.testId)) testOptions.push({ id: form.testId, label: missingTest ? deps.testDisplayName(missingTest) : 'Xét nghiệm không còn vận hành' });
+    tests.forEach((t: AnyRec) => testOptions.push({ id: t.id, label: deps.testDisplayName(t) }));
     const { t: biasT, l: biasL } = actionBiasContext(form, editing), biasInfo = actionBiasInfo(biasT, biasL, form.biasBefore, form.biasAfter);
     const sigmaBias = actionLatestSigmaBias(biasT, editing ? editing.level : form.level);
-    const sigmaBiasChip = sigmaBias ? `<div class="sugg-row"><button type="button" class="sugg-chip" data-action="actionFillBias" data-args="${deps.escapeAttr(JSON.stringify(['aBiasBefore', sigmaBias.value]))}" title="Lấy từ Bias EQA/EQC kỳ ${deps.escapeAttr(sigmaBias.period)} ở trang Six Sigma">Dùng Bias EQA gần nhất (kỳ ${deps.esc(sigmaBias.period)}): ${deps.fmt(sigmaBias.value)}%</button></div>` : '';
-    actionStepRenderInputs = {
-      cause: { causeCategory: actSel('aCauseCategory', 'Nhóm nguyên nhân', ACT_CAUSE_OPTS, form.causeCategory, 'data-action="syncActionSuggestions" data-action-on="change"'), cause: deps.esc(form.cause || ''), causeSuggest: actionSuggestBox('aCause', actionCausePhrases(form.causeCategory)), action: deps.esc(form.action || ''), actionSuggest: actionSuggestBox('aAct', actionActionPhrases(form.errorType)), completedDate: deps.dateBox('aActionCompletedDate', form.actionCompletedDate || '', 'action-date'), biasBefore: deps.escapeAttr(form.biasBefore || ''), sigmaBias: sigmaBiasChip, biasAfter: deps.escapeAttr(form.biasAfter || ''), threshold: actionBiasThresholdHtml(biasInfo), rerun: formAction ? deps.rerunEvidenceHtml(formAction, formRerun, state().tests.find((x: AnyRec) => x.id === formAction.testId)) : '', containmentHeld: form.containmentStatus === 'held', releaseStatus: actSel('aReleaseStatus', 'Quyết định cho phép trở lại', ACT_RELEASE_OPTS, form.releaseStatus), releaseDate: deps.dateBox('aReleaseDate', form.releaseDate || '', 'action-date'), releaseBy: deps.escapeAttr(form.releaseBy || ''), releaseNote: deps.escapeAttr(form.releaseNote || ''), releaseSuggest: actionSuggestBox('aReleaseNote', ACT_SUGGEST.releaseNote) },
-      patient: { reference: actionBiasReferenceHtml(biasInfo), impact: actSel('aPatientImpact', 'Kết luận ảnh hưởng', ACT_PATIENT_OPTS, form.patientImpact), action: deps.esc(form.patientAction || ''), suggest: actionSuggestBox('aPatientAction', ACT_SUGGEST.patientAction) },
-      eff: { status: actSel('aEffectivenessStatus', 'Kết luận hiệu lực', ACT_EFF_OPTS, form.effectivenessStatus || 'pending'), date: deps.dateBox('aEffectivenessDate', form.effectivenessDate || '', 'action-date'), note: deps.esc(form.effectivenessNote || ''), noteSuggest: actionSuggestBox('aEffectivenessNote', ACT_SUGGEST.effectivenessNote), severity: actSel('aResidualSeverity', 'Mức độ còn lại', ACT_SEVERITY_OPTS, form.residualSeverity, 'data-action="syncActionResidualRiskScore" data-action-on="change"'), occurrence: actSel('aResidualOccurrence', 'Khả năng xảy ra còn lại', ACT_OCCURRENCE_OPTS, form.residualOccurrence, 'data-action="syncActionResidualRiskScore" data-action-on="change"'), detectability: actSel('aResidualDetectability', 'Khả năng không phát hiện còn lại', ACT_DETECT_OPTS, form.residualDetectability, 'data-action="syncActionResidualRiskScore" data-action-on="change"'), level: actSel('aResidualRiskLevel', 'Phân loại nguy cơ còn lại', ACT_RISK_LEVEL_OPTS, form.residualRiskLevel, 'data-action="syncActionResidualRiskScore" data-action-on="change"'), scoreClass: deps.escapeAttr(['low', 'medium', 'high', 'critical'].includes(form.residualRiskLevel) ? form.residualRiskLevel : 'none'), score: deps.actionResidualRiskScore(form) || '—', basis: deps.escapeAttr(form.residualRiskBasis || ''), basisSuggest: actionSuggestBox('aResidualRiskBasis', ACT_SUGGEST.residualRiskBasis) },
+    const nceId = editing ? (editing.nceId || deps.nextNceId(deps.isoToday())) : deps.nextNceId(deps.isoToday());
+    const investigationItem = (statusId: string, noteId: string, title: string, hint: string, statusKey: string, noteKey: string, lotToLot = false) => {
+      const value = String((form as AnyRec)[statusKey] || ''), opts = lotToLot ? ACT_LOT2LOT_OPTS : ACT_CHECK_OPTS, choices = opts.filter(([v]) => v);
+      return {
+        statusId, noteId, title, hint, stateClass: actionInvestigationStateClass(value), stateLabel: LABELS.check[value] || 'Chưa kết luận', value,
+        options: opts.map(([v, label]) => ({ value: v, label })),
+        choices: choices.map(([v, label]) => ({ value: v, label: actionInvestigationChoiceLabel(v, label), active: v === value })),
+        noteValue: (form as AnyRec)[noteKey] || '', suggestPhrases: ACT_SUGGEST[noteKey] || [],
+      };
     };
-    const formBodyHtml = `${actionIncidentBanner(form, editing)}<div class="action-form-section"><div class="action-form-section-title"><span>Hồ sơ</span><div><b>Nhận diện sự cố</b><small>Có thể lưu ngay sau khi kiểm soát tức thời; không cần chờ điều tra xong</small></div></div>
-     <input id="aPointId" type="hidden" value="${deps.escapeAttr(form.pointId || '')}">
-     ${qcBound ? `<input id="aLevel" type="hidden" value="${deps.escapeAttr(form.level == null ? '' : form.level)}">` : ''}
-     <div class="action-ident-groups">
-       <div class="action-ident-group"><div class="action-ident-group-title"><b>Đối tượng QC</b><small>${editing ? 'Khóa theo hồ sơ đã mở — sai đối tượng thì hủy có lưu vết và mở hồ sơ mới' : 'Hồ sơ và cấu hình QC đang xảy ra sự cố'}</small></div><div class="action-form-main">
-         <div><label>Mã hồ sơ</label><input id="aNceId" aria-label="Mã hồ sơ NCE" readonly value="${deps.escapeAttr(editing ? (editing.nceId || deps.nextNceId(deps.isoToday())) : deps.nextNceId(deps.isoToday()))}"></div>
-         <div><label>Xét nghiệm${qcBound ? '' : ' <span class="hint">(nếu có)</span>'}</label><select id="aTest" aria-label="Xét nghiệm" ${editing ? 'disabled' : 'data-action="syncActLevels" data-action-on="change"'}>${opts}</select></div>
-         ${qcBound ? `<div><label>Ngữ cảnh QC</label><input id="aLevelLabel" aria-label="Ngữ cảnh QC" readonly value="${deps.escapeAttr(actionLevelContext(form.testId, form.level, form.lot))}"></div>` : ''}
-       </div></div>
-       <div class="action-ident-group"><div class="action-ident-group-title"><b>Phân loại sự cố</b><small>Thời điểm, dấu hiệu phát hiện và loại sai số</small></div><div class="action-form-meta">
-         <div><label>Ngày ghi nhận</label>${deps.dateBox('aDate', form.date || deps.isoToday(), 'action-date')}</div>
-         <div><label>Luật vi phạm</label>${actSel('aRule', 'Luật vi phạm', actionRuleOptions(), form.rule)}</div>
-         <div><label>Nguồn phát hiện</label>${actSel('aEventSource', 'Nguồn phát hiện', actionSourceOptions(qcBound, form.eventSource), form.eventSource || '')}</div>
-         <div><label>Giai đoạn</label>${actSel('aProcessPhase', 'Giai đoạn quá trình', ACT_PHASE_OPTS, form.processPhase || 'exam')}</div>
-         <div><label>Loại sai số</label>${actSel('aErr', 'Loại sai số', ACT_ERR_OPTS, form.errorType, 'data-action="syncActionSuggestions" data-action-on="change"')}</div>
-       </div></div>
-       <div class="action-ident-group"><div class="action-ident-group-title"><b>Phân công xử lý</b><small>Người chịu trách nhiệm và thời hạn dự kiến</small></div><div class="action-form-owner">
-         <div><label>Người phụ trách</label><input id="aBy" aria-label="Người phụ trách" list="aByList" autocomplete="off" placeholder="Chọn hoặc gõ tên" value="${deps.escapeAttr(form.by || '')}"><datalist id="aByList">${actionStaffOptions()}</datalist></div>
-         <div><label>Hạn hoàn thành</label>${deps.dateBox('aDueDate', form.dueDate || '', 'action-date')}</div>
-       </div></div>
-     </div>${formAction ? deps.evidenceTimelineHtml(formAction, formRerun) : ''}</div>
-     ${actionSection('immediate', '1', 'Kiểm soát và xử lý tức thời', 'Phần tối thiểu bắt buộc để mở hồ sơ NCE; kết luận ảnh hưởng bệnh nhân ghi ở mục 7', deps.pres.actionImmediateStepPresentation({ containmentSelectHtml: actSel('aContainment', 'Phạm vi kiểm soát tức thời', ACT_CONTAIN_OPTS, form.containmentStatus), containmentNoteValueHtml: deps.escapeAttr(form.containmentNote || ''), containmentNoteSuggestHtml: actionSuggestBox('aContainmentNote', ACT_SUGGEST.containmentNote), correctionTextHtml: deps.esc(form.correction || ''), correctionSuggestHtml: actionSuggestBox('aCorrection', ACT_SUGGEST.correction) }), actionSectionChip(miss.immediate), openSet)}
-     ${actionSection('risk', '2', 'Đánh giá nguy cơ', 'RPN được tính tự động; mức phân loại phải truy xuất được về SOP của đơn vị', deps.pres.actionRiskStepPresentation({ severitySelectHtml: actSel('aRiskSeverity', 'Mức độ ảnh hưởng', ACT_SEVERITY_OPTS, form.riskSeverity, 'data-action="syncActionRiskScore" data-action-on="change"'), occurrenceSelectHtml: actSel('aRiskOccurrence', 'Khả năng xảy ra', ACT_OCCURRENCE_OPTS, form.riskOccurrence, 'data-action="syncActionRiskScore" data-action-on="change"'), detectabilitySelectHtml: actSel('aRiskDetectability', 'Khả năng không phát hiện', ACT_DETECT_OPTS, form.riskDetectability, 'data-action="syncActionRiskScore" data-action-on="change"'), levelSelectHtml: actSel('aRiskLevel', 'Phân loại nguy cơ', ACT_RISK_LEVEL_OPTS, form.riskLevel, 'data-action="syncActionRiskScore" data-action-on="change"'), scoreClassHtml: deps.escapeAttr(['low', 'medium', 'high', 'critical'].includes(form.riskLevel) ? form.riskLevel : 'none'), scoreHtml: deps.actionRiskScore(form) || '—', basisValueHtml: deps.escapeAttr(form.riskBasis || ''), basisSuggestHtml: actionSuggestBox('aRiskBasis', ACT_SUGGEST.riskBasis) }), actionSectionChip(miss.risk), openSet)}
-     ${actionSection('check', '3', 'Checklist điều tra', 'Ghi rõ khi bất thường hoặc không áp dụng', deps.pres.actionInvestigationStepPresentation([
-    actionInvestigationField('aQcMaterial', 'aQcMaterialNote', 'Vật liệu QC', 'Hạn dùng, bảo quản, hoàn nguyên', form, 'qcMaterialStatus', 'qcMaterialNote'),
-    actionInvestigationField('aInstrument', 'aInstrumentNote', 'Máy phân tích', 'Điện, nước, nhiệt độ, cảnh báo, bảo trì', form, 'instrumentStatus', 'instrumentNote'),
-    actionInvestigationField('aReagent', 'aReagentNote', 'Hóa chất / calibrator', 'Hạn dùng, số lô và điều kiện bảo quản', form, 'reagentStatus', 'reagentNote'),
-    actionInvestigationField('aCalibration', 'aCalibrationNote', 'Hiệu chuẩn', 'Tình trạng và chỉ định tái hiệu chuẩn', form, 'calibrationStatus', 'calibrationNote'),
-    actionInvestigationField('aLotToLot', 'aLotToLotNote', 'So sánh lot-to-lot', 'Dùng khi có thay đổi lô gần đây', form, 'lotToLotStatus', 'lotToLotNote', true),
-  ]), actionChecklistChip(form), openSet)}
-      ${actionSection('cause', '4–6', 'Nguyên nhân gốc và hành động khắc phục', 'Tách khỏi xử lý tức thời; QC chạy lại được tự liên kết', `<div class="action-cause-grid"><div><label>Nhóm nguyên nhân</label>${actSel('aCauseCategory', 'Nhóm nguyên nhân', ACT_CAUSE_OPTS, form.causeCategory, 'data-action="syncActionSuggestions" data-action-on="change"')}</div><div><label>Nguyên nhân gốc hoặc nghi ngờ</label><textarea id="aCause" rows="1" placeholder="Mô tả bằng chứng và nguyên nhân...">${deps.esc(form.cause || '')}</textarea>${actionSuggestBox('aCause', actionCausePhrases(form.causeCategory))}</div><div><label>Hành động khắc phục để ngăn tái diễn</label><textarea id="aAct" rows="1" placeholder="VD: Thay lọ QC mới, vệ sinh kim hút, cập nhật lịch bảo trì...">${deps.esc(form.action || '')}</textarea>${actionSuggestBox('aAct', actionActionPhrases(form.errorType))}</div></div><div class="action-cause-second-row"><div><label>Ngày hoàn thành hành động</label>${deps.dateBox('aActionCompletedDate', form.actionCompletedDate || '', 'action-date')}</div><div><label>Bias trước khắc phục (%) <small class="hint">tham khảo</small></label><input id="aBiasBefore" type="text" inputmode="decimal" placeholder="VD: 8.5" value="${deps.escapeAttr(form.biasBefore || '')}" data-action="actionUpdateBiasHint" data-action-on="input">${sigmaBiasChip}</div><div><label>Bias sau khắc phục (%) <small class="hint">tham khảo</small></label><input id="aBiasAfter" type="text" inputmode="decimal" placeholder="VD: 1.2" value="${deps.escapeAttr(form.biasAfter || '')}" data-action="actionUpdateBiasHint" data-action-on="input"></div></div><div id="aBiasThresholdHint" class="hint flow-note">${actionBiasThresholdHtml(biasInfo)}</div>${formAction ? deps.rerunEvidenceHtml(formAction, formRerun, state().tests.find((x: AnyRec) => x.id === formAction.testId)) : ''}<div class="action-release-block"><div class="action-release-title"><b>Cho phép hoạt động/trả kết quả trở lại</b><small>${form.containmentStatus === 'held' ? 'Bắt buộc sau khi QC được chấp nhận và hành động đã hoàn thành' : 'Không bắt buộc vì mục 1 không ghi nhận kết quả liên quan bị giữ'}</small></div><div class="action-release-grid"><div><label>Quyết định</label>${actSel('aReleaseStatus', 'Quyết định cho phép trở lại', ACT_RELEASE_OPTS, form.releaseStatus)}</div><div><label>Ngày cho phép</label>${deps.dateBox('aReleaseDate', form.releaseDate || '', 'action-date')}</div><div><label>Người cho phép</label><input id="aReleaseBy" list="aByList" autocomplete="off" placeholder="Chọn hoặc gõ tên" value="${deps.escapeAttr(form.releaseBy || '')}"></div><div><label>Căn cứ cho phép</label><input id="aReleaseNote" placeholder="VD: QC chạy lại đã được chấp nhận" value="${deps.escapeAttr(form.releaseNote || '')}">${actionSuggestBox('aReleaseNote', ACT_SUGGEST.releaseNote)}</div></div></div>`, actionSectionChip(miss.cause), openSet)}
-     ${actionSection('patient', '7', 'Đánh giá ảnh hưởng bệnh nhân', 'Ghi rõ phạm vi và cách xử lý nếu có liên quan', `<div id="aPatientRiskRef" class="hint space-after-control">${actionBiasReferenceHtml(biasInfo)}</div><div class="action-patient-grid"><div><label>Kết luận ảnh hưởng</label>${actSel('aPatientImpact', 'Kết luận ảnh hưởng', ACT_PATIENT_OPTS, form.patientImpact)}</div><div><label>Xử lý mẫu/kết quả liên quan</label><textarea id="aPatientAction" rows="1" placeholder="VD: Rà soát các mẫu từ 08:00–10:00; chạy lại 3 mẫu...">${deps.esc(form.patientAction || '')}</textarea>${actionSuggestBox('aPatientAction', ACT_SUGGEST.patientAction)}</div></div>`, actionSectionChip(miss.patient), openSet)}
-     ${actionSection('eff', '8', 'Đánh giá hiệu lực', 'Làm sau thời gian theo dõi; kết luận "có hiệu lực" cần đánh giá nguy cơ còn lại', `<div class="action-effectiveness-grid"><div><label>Kết luận hiệu lực</label>${actSel('aEffectivenessStatus', 'Kết luận hiệu lực', ACT_EFF_OPTS, form.effectivenessStatus || 'pending')}</div><div class="action-effectiveness-date"><label>Ngày đánh giá</label>${deps.dateBox('aEffectivenessDate', form.effectivenessDate || '', 'action-date')}</div><div><label>Bằng chứng/nhận xét hiệu lực</label><textarea id="aEffectivenessNote" rows="1" placeholder="VD: Theo dõi 20 lần chạy tiếp theo không tái diễn...">${deps.esc(form.effectivenessNote || '')}</textarea>${actionSuggestBox('aEffectivenessNote', ACT_SUGGEST.effectivenessNote)}</div></div><div class="action-residual-block"><div class="action-release-title"><b>Nguy cơ còn lại sau khắc phục</b><small>Chỉ bắt buộc khi kết luận có hiệu lực; dùng cùng thang điểm và SOP với đánh giá ban đầu</small></div><div class="action-residual-grid"><div><label>Mức độ (S)</label>${actSel('aResidualSeverity', 'Mức độ còn lại', ACT_SEVERITY_OPTS, form.residualSeverity, 'data-action="syncActionResidualRiskScore" data-action-on="change"')}</div><div><label>Khả năng xảy ra (O)</label>${actSel('aResidualOccurrence', 'Khả năng xảy ra còn lại', ACT_OCCURRENCE_OPTS, form.residualOccurrence, 'data-action="syncActionResidualRiskScore" data-action-on="change"')}</div><div><label>Khả năng không phát hiện (D)</label>${actSel('aResidualDetectability', 'Khả năng không phát hiện còn lại', ACT_DETECT_OPTS, form.residualDetectability, 'data-action="syncActionResidualRiskScore" data-action-on="change"')}</div><div><label>Phân loại theo SOP</label>${actSel('aResidualRiskLevel', 'Phân loại nguy cơ còn lại', ACT_RISK_LEVEL_OPTS, form.residualRiskLevel, 'data-action="syncActionResidualRiskScore" data-action-on="change"')}</div><div class="action-risk-result"><label>RPN còn lại</label><div id="aResidualRiskScoreCard" class="action-risk-score risk-${deps.escapeAttr(['low', 'medium', 'high', 'critical'].includes(form.residualRiskLevel) ? form.residualRiskLevel : 'none')}" aria-live="polite"><b id="aResidualRiskScore">${deps.actionResidualRiskScore(form) || '—'}</b></div></div><div class="action-residual-basis"><label>Căn cứ đánh giá lại</label><input id="aResidualRiskBasis" placeholder="VD: SOP-QC-07; dữ liệu theo dõi sau khắc phục" value="${deps.escapeAttr(form.residualRiskBasis || '')}">${actionSuggestBox('aResidualRiskBasis', ACT_SUGGEST.residualRiskBasis)}</div></div></div>`, actionEffSectionChip(form), openSet)}
-     <div class="action-form-submit"><div><b>${editing ? 'Cập nhật tiến độ hồ sơ' : 'Lưu ngay ở trạng thái đang điều tra'}</b><span>Chỉ cần hoàn tất phần nhận diện và kiểm soát tức thời để lưu; phê duyệt chỉ xuất hiện khi hồ sơ đủ điều kiện khép vòng.</span></div><div class="action-submit-buttons">${deps.btn(editing ? 'Hủy chỉnh sửa' : 'Đóng', { action: 'closeActionForm' }, 'ghost')}${deps.btn(editing ? 'Lưu thay đổi' : 'Lập hồ sơ NCE', { action: 'addAction' }, 'teal')}</div></div>`;
-    return deps.pres.actionFormPanelPresentation({ editing, formOpen, guideButtonHtml: deps.btn('Quy trình 8 bước', { action: 'openActionGuide' }, 'ghost sm'), closedHtml: actionFormClosedHtml(issueCount), formBodyHtml });
+    return {
+      open: true, canWrite: deps.canWrite(), editing: !!editing,
+      title: editing ? `Tiếp tục hồ sơ ${editing.nceId || 'NCE'}` : 'Lập hồ sơ sự không phù hợp (NCE)',
+      incidentBanner: (() => { const html = actionIncidentBanner(form, editing); return html ? html : null; })(),
+      formKey: (editing ? editing.id : (actionUi().seed ? 'seed:' + JSON.stringify(actionUi().seed) : 'new')) + ':' + actionUi().openSeq,
+      nceId, qcBound, testOptions, selectedTestId: form.testId || '', testDisabled: !!editing,
+      pointId: form.pointId || '', level: form.level == null ? '' : form.level,
+      levelLabel: qcBound ? actionLevelContext(form.testId, form.level, form.lot) : null,
+      date: form.date || deps.isoToday(),
+      ruleOptions: actionRuleOptions().map((r: AnyRec) => (Array.isArray(r) ? { value: r[0], label: r[1] } : r)), selectedRule: form.rule || '',
+      sourceOptions: actionSourceOptions(qcBound, form.eventSource || '').map(([v, l]: AnyRec) => ({ value: v, label: l })), selectedSource: form.eventSource || '',
+      phaseOptions: ACT_PHASE_OPTS.map(([v, l]) => ({ value: v, label: l })), selectedPhase: form.processPhase || 'exam',
+      errOptions: ACT_ERR_OPTS.map(([v, l]) => ({ value: v, label: l })), selectedErr: form.errorType || '',
+      by: form.by || '', staffNames: [...new Set((state().users || []).filter((u: AnyRec) => u.active !== false).map((u: AnyRec) => String(u.name || u.username || '').trim()).filter(Boolean))],
+      dueDate: form.dueDate || '',
+      evidenceTimelineHtml: formAction ? deps.evidenceTimelineHtml(formAction, formRerun) : '',
+      openSections: [...openSet],
+      sections: {
+        immediate: {
+          chip: actionSectionChip(miss.immediate),
+          containmentOptions: ACT_CONTAIN_OPTS.map(([v, l]) => ({ value: v, label: l })), containmentStatus: form.containmentStatus || '',
+          containmentNote: form.containmentNote || '', containmentNoteSuggest: ACT_SUGGEST.containmentNote,
+          correction: form.correction || '', correctionSuggest: ACT_SUGGEST.correction,
+        },
+        risk: {
+          chip: actionSectionChip(miss.risk),
+          severityOptions: ACT_SEVERITY_OPTS.map(([v, l]) => ({ value: v, label: l })), severity: form.riskSeverity ?? '',
+          occurrenceOptions: ACT_OCCURRENCE_OPTS.map(([v, l]) => ({ value: v, label: l })), occurrence: form.riskOccurrence ?? '',
+          detectOptions: ACT_DETECT_OPTS.map(([v, l]) => ({ value: v, label: l })), detectability: form.riskDetectability ?? '',
+          levelOptions: ACT_RISK_LEVEL_OPTS.map(([v, l]) => ({ value: v, label: l })), level: form.riskLevel || '',
+          scoreClass: ['low', 'medium', 'high', 'critical'].includes(form.riskLevel) ? form.riskLevel : 'none', score: deps.actionRiskScore(form) || '—',
+          basis: form.riskBasis || '', basisSuggest: ACT_SUGGEST.riskBasis,
+        },
+        check: {
+          chip: actionChecklistChip(form),
+          items: [
+            investigationItem('aQcMaterial', 'aQcMaterialNote', 'Vật liệu QC', 'Hạn dùng, bảo quản, hoàn nguyên', 'qcMaterialStatus', 'qcMaterialNote'),
+            investigationItem('aInstrument', 'aInstrumentNote', 'Máy phân tích', 'Điện, nước, nhiệt độ, cảnh báo, bảo trì', 'instrumentStatus', 'instrumentNote'),
+            investigationItem('aReagent', 'aReagentNote', 'Hóa chất / calibrator', 'Hạn dùng, số lô và điều kiện bảo quản', 'reagentStatus', 'reagentNote'),
+            investigationItem('aCalibration', 'aCalibrationNote', 'Hiệu chuẩn', 'Tình trạng và chỉ định tái hiệu chuẩn', 'calibrationStatus', 'calibrationNote'),
+            investigationItem('aLotToLot', 'aLotToLotNote', 'So sánh lot-to-lot', 'Dùng khi có thay đổi lô gần đây', 'lotToLotStatus', 'lotToLotNote', true),
+          ],
+        },
+        cause: {
+          chip: actionSectionChip(miss.cause),
+          causeCategoryOptions: ACT_CAUSE_OPTS.map(([v, l]) => ({ value: v, label: l })), causeCategory: form.causeCategory || '',
+          cause: form.cause || '', causeSuggest: actionCausePhrases(form.causeCategory),
+          action: form.action || '', actionSuggest: actionActionPhrases(form.errorType),
+          completedDate: form.actionCompletedDate || '',
+          biasBefore: form.biasBefore || '', biasAfter: form.biasAfter || '',
+          sigmaBiasChip: sigmaBias ? { period: sigmaBias.period, value: sigmaBias.value, valueText: deps.fmt(sigmaBias.value) } : null,
+          thresholdHtml: actionBiasThresholdHtml(biasInfo),
+          rerunEvidenceHtml: formAction ? deps.rerunEvidenceHtml(formAction, formRerun, state().tests.find((x: AnyRec) => x.id === formAction.testId)) : '',
+          containmentHeld: form.containmentStatus === 'held',
+          releaseOptions: ACT_RELEASE_OPTS.map(([v, l]) => ({ value: v, label: l })), releaseStatus: form.releaseStatus || '',
+          releaseDate: form.releaseDate || '', releaseBy: form.releaseBy || '', releaseNote: form.releaseNote || '', releaseSuggest: ACT_SUGGEST.releaseNote,
+        },
+        patient: {
+          chip: actionSectionChip(miss.patient),
+          referenceHtml: actionBiasReferenceHtml(biasInfo),
+          impactOptions: ACT_PATIENT_OPTS.map(([v, l]) => ({ value: v, label: l })), impact: form.patientImpact || '',
+          action: form.patientAction || '', actionSuggest: ACT_SUGGEST.patientAction,
+        },
+        eff: {
+          chip: actionEffSectionChip(form),
+          statusOptions: ACT_EFF_OPTS.map(([v, l]) => ({ value: v, label: l })), status: form.effectivenessStatus || 'pending',
+          date: form.effectivenessDate || '', note: form.effectivenessNote || '', noteSuggest: ACT_SUGGEST.effectivenessNote,
+          severityOptions: ACT_SEVERITY_OPTS.map(([v, l]) => ({ value: v, label: l })), severity: form.residualSeverity ?? '',
+          occurrenceOptions: ACT_OCCURRENCE_OPTS.map(([v, l]) => ({ value: v, label: l })), occurrence: form.residualOccurrence ?? '',
+          detectOptions: ACT_DETECT_OPTS.map(([v, l]) => ({ value: v, label: l })), detectability: form.residualDetectability ?? '',
+          levelOptions: ACT_RISK_LEVEL_OPTS.map(([v, l]) => ({ value: v, label: l })), level: form.residualRiskLevel || '',
+          scoreClass: ['low', 'medium', 'high', 'critical'].includes(form.residualRiskLevel) ? form.residualRiskLevel : 'none', score: deps.actionResidualRiskScore(form) || '—',
+          basis: form.residualRiskBasis || '', basisSuggest: ACT_SUGGEST.residualRiskBasis,
+        },
+      },
+    };
   };
 
   return {
-    actionUi, actionSectionToggled, actionDefaultOpenSections, actionRuleOptions, actionStaffOptions,
+    actionUi, actionSectionToggled, actionDefaultOpenSections, actionRuleOptions,
     captureActionDraft, actionFormChanged, actionDraftValues, clearActionDraft, actionSourceOptions,
-    actionCausePhrases, actionActionPhrases, actionSuggestRow, actionSuggestBox, actionInsertSuggestion,
-    syncActionSuggestions, actSel, actionLevelLabel, syncActLevels, actionLevelContext, beginActionManual,
-    closeActionForm, actionFormClosedHtml, actionIncidentBanner, beginActionFromIssue, actionFieldValue,
+    actionCausePhrases, actionActionPhrases, actionInsertSuggestion,
+    actionLevelLabel, syncActLevels, actionLevelContext, beginActionManual,
+    closeActionForm, actionIncidentBanner, beginActionFromIssue, actionFieldValue,
     readActionProtocolForm, actionEffectivenessMissingKey, addAction, syncActionRiskScore,
-    syncActionResidualRiskScore, editAction, actionInvestigationField, actionInvestigationChoiceLabel,
+    syncActionResidualRiskScore, editAction, actionInvestigationChoiceLabel,
     actionInvestigationStateClass, actionInvestigationChoose, actionInvestigationSync, actionChecklistRefresh,
     actionSectionChip, actionChecklistChip, actionEffSectionChip, actionUpdateSectionChip,
-    actionRefreshSectionChips, actionSection, actionFormModel, actionFormDefaults, focusActionField,
+    actionRefreshSectionChips, actionFormModel, actionFormDefaults, focusActionField,
     actionBiasInfo, actionBiasContext, actionLatestSigmaBias, actionFillBias, actionBiasThresholdHtml,
-    actionBiasReferenceHtml, actionUpdateBiasHint, actionFormHtml,
+    actionBiasReferenceHtml, actionUpdateBiasHint, actionFormViewModel,
   };
 }

@@ -6,26 +6,13 @@ const root=path.join(__dirname,'..');
 const route=fs.readFileSync(path.join(root,'src','presentation','actions','actions-page-controller.ts'),'utf8');
 const bridge=fs.readFileSync(path.join(root,'src','compat','modular-pilot.global.ts'),'utf8');
 
-assert.match(route,/return deps\.pres\.actionSideChipsHtml\(chips\);/,'Chip NCE phải dùng bridge TypeScript');
-assert.match(route,/return deps\.pres\.actionPageHtml\(\{ headHtml: head, issuesHtml: issuesPanel, formHtml: formPanel, logHtml: logPanel \}\);/,'Trang NCE phải dùng renderer TypeScript');
-assert.match(route,/const actionReviewButtons = \(i: number, a: AnyRec\) => \{[\s\S]*?return deps\.pres\.actionReviewButtonsHtml\(i, model\);/,'Nút thao tác NCE phải dùng bridge TypeScript');
 assert.match(route,/return deps\.pres\.actionDetailCheckHtml\(label, view, note\);/,'Chi tiết kiểm tra NCE phải dùng bridge TypeScript');
 assert.match(route,/return deps\.pres\.actionEvidenceTimelinePresentation\(items\);/,'Timeline bằng chứng NCE phải dùng bridge TypeScript');
-assert.match(bridge,/actionSideChipsHtml: ReturnType<typeof createActionSideChipsHtml>;/,'Chip NCE phải là hợp đồng bridge bắt buộc');
-assert.match(bridge,/actionPageHtml: ReturnType<typeof createActionPageHtml>;/,'Trang NCE phải là hợp đồng bridge bắt buộc');
-assert.match(bridge,/actionLogPanelHtml: ReturnType<typeof createActionLogPanelHtml>;/,'Nhật ký NCE phải là hợp đồng bridge bắt buộc');
-assert.match(bridge,/actionIssuesPanelHtml: typeof actionIssuesPanelHtml;/,'Panel sự cố NCE phải là hợp đồng bridge bắt buộc');
-assert.match(bridge,/actionReviewButtonsHtml: ReturnType<typeof createActionReviewButtonsHtml>;/,'Nút thao tác NCE phải là hợp đồng bridge bắt buộc');
 assert.match(bridge,/actionDetailCheckHtml: ReturnType<typeof createActionDetailCheckHtml>;/,'Chi tiết kiểm tra NCE phải là hợp đồng bridge bắt buộc');
 assert.match(bridge,/actionEvidenceTimelinePresentation: ReturnType<typeof createActionEvidenceTimelineHtml>;/,'Timeline NCE phải là hợp đồng bridge bắt buộc');
 
 for(const [name,type] of [
   ['actionRerunEvidencePresentation','ReturnType<typeof createActionRerunEvidenceHtml<any>>'],
-  ['actionIssueRowPresentation','ReturnType<typeof createActionIssueRowHtml>'],
-  ['actionOpenIssuePresentation','ReturnType<typeof createActionOpenIssueHtml>'],
-  ['actionIssueGroupPresentation','ReturnType<typeof createActionIssueGroupHtml>'],
-  ['actionLogRowPresentation','ReturnType<typeof createActionLogRowHtml>'],
-  ['actionApprovalTagPresentation','ReturnType<typeof createActionApprovalTagHtml>'],
   ['actionDetailMetaHtml','ReturnType<typeof createActionDetailMetaHtml>'],
   ['actionCancelledAlertHtml','ReturnType<typeof createActionCancelledAlertHtml>'],
   ['actionLegacyDetailHtml','ReturnType<typeof createActionLegacyDetailHtml>'],

@@ -129,7 +129,8 @@ async function openAllSections(page) {
 }
 
 async function checkSectionsStartCollapsed(page) {
-  await page.evaluate(lot => { state.actions = []; state.tests = state.tests.filter(t => t.id !== 'T2'); state.tests[0].levels[0].lot = lot; clearDerived(); closeActionForm(); beginActionManual(); }, NCE.lot);
+  await page.evaluate(lot => { state.actions = []; state.tests = state.tests.filter(t => t.id !== 'T2'); state.tests[0].levels[0].lot = lot; clearDerived(); closeActionForm(); }, NCE.lot);
+  await page.evaluate(() => { beginActionManual(); });
   await page.waitForSelector('#aCorrection');
   const shape = await page.evaluate(() => {
     const body = document.querySelector('.action-form-body');
@@ -227,7 +228,15 @@ async function checkPickersReplaceTyping(page) {
 }
 
 async function checkSectionChipsRefreshWhileTyping(page) {
-  await page.evaluate(() => { closeActionForm(); beginActionManual(); });
+  // closeActionForm() rồi beginActionManual() ngay trong CÙNG một page.evaluate() từng
+  // để lọt nội dung cũ: cả hai đều gọi rerender() (root.render() của React) — hai lượt
+  // gọi liên tiếp không có điểm dừng nào ở giữa khiến React gộp lại thành một lần
+  // commit DUY NHẤT theo cách không đảm bảo áp lại defaultValue cho các ô uncontrolled
+  // (xem ghi chú "React commit bất đồng bộ" ở các khối khác trong file này). Tách
+  // thành hai lượt evaluate() riêng — như mọi chỗ khác đã sửa — để mỗi lệnh gọi
+  // rerender() được flush trọn vẹn trước khi lệnh tiếp theo chạy.
+  await page.evaluate(() => { closeActionForm(); });
+  await page.evaluate(() => { beginActionManual(); });
   await page.waitForSelector('#aCorrection');
   await openAllSections(page);
   const chip = key => page.locator(`details[data-action-section="${key}"] .action-chip`);
@@ -251,7 +260,8 @@ async function checkSectionChipsRefreshWhileTyping(page) {
   await page.fill('#aRiskBasis', 'SOP-QC-07, ma trận nguy cơ bảng 3');
   check('Chip nguy cơ đổi ngay khi có đủ điểm và căn cứ SOP', /Đã xong/.test(await chip('risk').innerText()));
 
-  check('Chip nguyên nhân ban đầu tính cả cổng cho phép trở lại', /Còn thiếu 3 mục/.test(await chip('cause').innerText()));
+  const causeInitial = await chip('cause').innerText();
+  check('Chip nguyên nhân ban đầu tính cả cổng cho phép trở lại', /Còn thiếu 3 mục/.test(causeInitial), causeInitial);
   await page.selectOption('#aCauseCategory', 'instrument');
   await page.fill('#aCause', 'Kim hút bẩn làm sai thể tích hút');
   await page.fill('#aAct', 'Vệ sinh kim hút và cập nhật lịch bảo trì');
@@ -275,7 +285,8 @@ async function checkSectionChipsRefreshWhileTyping(page) {
 }
 
 async function checkNewRecordDraftSurvivesRerender(page) {
-  await page.evaluate(() => { state.actions = []; closeActionForm(); beginActionManual(); });
+  await page.evaluate(() => { state.actions = []; closeActionForm(); });
+  await page.evaluate(() => { beginActionManual(); });
   await page.waitForSelector('#aCorrection');
   await openAllSections(page);
   await page.fill('#aCorrection', 'Dừng trả kết quả và cô lập lô QC');
@@ -318,7 +329,8 @@ async function checkNewRecordDraftSurvivesRerender(page) {
 async function checkMissingFieldIsPinpointed(page) {
   // Cố tình chỉ để THIẾU "xử lý tức thời": đây là ô hay bị nhầm với "hành động khắc
   // phục" ở mục 4–6, nên phải chắc là thông báo và con trỏ trỏ đúng vào nó.
-  await page.evaluate(() => { closeActionForm(); beginActionManual(); });
+  await page.evaluate(() => { closeActionForm(); });
+  await page.evaluate(() => { beginActionManual(); });
   await page.waitForSelector('#aCorrection');
   await page.selectOption('#aEventSource', 'eqa');
   await page.selectOption('#aContainment', 'held');
@@ -359,21 +371,28 @@ async function checkRerunChipOnBothSurfaces(page) {
       by: 'Quản trị viên', dueDate: '2099-01-01', effectivenessStatus: 'pending', approvalStatus: 'pending',
     }];
     clearDerived(); go('actions');
-    const a = state.actions[0], rr = actionRerunStatus(a), issue = currentIssues().find(o => o.p.id === 'k1');
-    const chips = html => [...new DOMParser().parseFromString(html, 'text/html').querySelectorAll('.action-chip')].map(c => c.textContent);
+    const a = state.actions[0], rr = actionRerunStatus(a);
+    // pageActionsV4()/issueRowHtml()/openActionIssueHtml() đã xóa cùng đợt chuyển
+    // sang React — trang giờ đọc từ actionsModel() (dữ liệu thuần), trong đó dòng
+    // vi phạm ("Sự cố cần xử lý") và dòng nhật ký cho CÙNG bản ghi này đều gọi
+    // chung một hàm sideChips() nội bộ, nên khớp nhau đúng theo cách dựng chứ
+    // không phải một phép so hai chuỗi HTML độc lập như bản cũ.
+    const model = actionsModel();
+    const issueItem = model.violationGroups.flatMap(g => g.items).find(o => o.action && o.action.kind === 'continue' && state.actions[o.action.index] && state.actions[o.action.index].id === a.id);
+    const logRow = model.logRows.find(r => state.actions[r.index] && state.actions[r.index].id === a.id);
     return {
       rerunOk: rr.needed && rr.ok,
       rerunLabel: rr.label,
-      issueChips: issue ? chips(issueRowHtml(issue)) : [],
-      nceChips: chips(openActionIssueHtml(a, 0)),
+      issueChips: issueItem ? issueItem.sideChips.map(c => c.label) : [],
+      logChips: logRow ? logRow.sideChips.map(c => c.label) : [],
     };
   });
   check('Lần QC chạy lại cùng ngày được nhận diện', out.rerunOk && /5\.72/.test(out.rerunLabel), out.rerunLabel);
   check('Chip "QC đạt lại" hiện trên dòng "Sự cố cần xử lý"',
     out.issueChips.some(c => /QC đạt lại/.test(c)), JSON.stringify(out.issueChips));
-  check('Chip trên dòng vi phạm và dòng hồ sơ NCE khớp nhau',
-    JSON.stringify(out.issueChips) === JSON.stringify(out.nceChips),
-    JSON.stringify({ issue: out.issueChips, nce: out.nceChips }));
+  check('Chip trên dòng vi phạm và dòng nhật ký khớp nhau',
+    JSON.stringify(out.issueChips) === JSON.stringify(out.logChips),
+    JSON.stringify({ issue: out.issueChips, log: out.logChips }));
 }
 
 async function checkEvidenceTimelineAndLink(page) {
@@ -411,7 +430,10 @@ async function checkOverdueAndEscalation(page) {
     a.dueDate = '2020-01-01';
     rerender();
     const overdue = actionOverdue(a);
-    const chips = [...new DOMParser().parseFromString(openActionIssueHtml(a, 0), 'text/html').querySelectorAll('.action-chip')].map(c => c.textContent);
+    // openActionIssueHtml() đã xóa cùng đợt chuyển sang React — đọc chip qua
+    // actionsModel() (dữ liệu thuần), xem checkRerunChipOnBothSurfaces ở trên.
+    const issueItem = actionsModel().violationGroups.flatMap(g => g.items).find(o => o.action && o.action.kind === 'continue' && state.actions[o.action.index] && state.actions[o.action.index].id === a.id);
+    const chips = issueItem ? issueItem.sideChips.map(c => c.label) : [];
     a.dueDate = '2099-01-01';
     a.effectivenessStatus = 'ineffective';
     const blocked = actionEffectivenessStatus(a);
@@ -446,12 +468,20 @@ async function checkFormIsBoundToAnIncident(page) {
   check('Vẫn còn đường lập hồ sơ cho nguồn ngoài IQC', closed.manualBtn === true, closed.text.slice(0, 200));
 
   // Mở từ một vi phạm -> dải nhận diện phải nói rõ đang xử lý điểm QC nào.
-  const fromIssue = await page.evaluate(() => {
+  // Trang "actions" render qua React (createRoot().render() commit BẤT ĐỒNG BỘ,
+  // xem CLAUDE.md "westgard-page-controller.ts") — gọi hàm kích hoạt rerender() rồi
+  // đọc DOM ngay trong CÙNG MỘT page.evaluate() sẽ đọc trúng khung hình CŨ (đua với
+  // commit chưa xảy ra). Tách thành hai lượt evaluate() riêng — như các khối
+  // page.waitForSelector()/page.evaluate() tách rời khác trong file này — để lượt
+  // đọc luôn chạy sau khi React đã commit.
+  await page.evaluate(() => {
     const t = state.tests[0], lvl = t.levels[0];
     state.data[t.id] = [{ id: 'v1', date: '2026-07-20', runId: '2026-07-20-1', level: 1, lot: lvl.lot, val: lvl.mean + lvl.sd * 4, qcMean: lvl.mean, qcSd: lvl.sd }];
     clearDerived(); go('actions');
     const issue = currentIssues()[0];
     beginActionFromIssue(t.id, 1, '1-3s', 'RE — Sai số ngẫu nhiên', 'hint', issue.p.id, issue.p.date);
+  });
+  const fromIssue = await page.evaluate(() => {
     const banner = document.querySelector('.action-incident-banner');
     return { hasForm: !!document.getElementById('aCorrection'), banner: banner ? banner.innerText : '' };
   });
@@ -463,8 +493,9 @@ async function checkFormIsBoundToAnIncident(page) {
   /* Hồ sơ chưa gắn điểm QC thì KHÔNG được có dải nhận diện: bản trước hiện "không gắn
      với điểm QC nào" rồi lại liệt kê Mean/SD/lô của xét nghiệm đầu dropdown mà người
      dùng chưa chọn — vừa thừa vừa tự mâu thuẫn. */
+  await page.evaluate(() => { closeActionForm(); });
+  await page.evaluate(() => { beginActionManual(); });
   const manual = await page.evaluate(() => {
-    closeActionForm(); beginActionManual();
     const banner = document.querySelector('.action-incident-banner');
     return { hasBanner: !!banner, banner: banner ? banner.innerText : '', hasForm: !!document.getElementById('aCorrection') };
   });
@@ -501,16 +532,17 @@ async function checkFormIsBoundToAnIncident(page) {
   check('Và chặn ở tầng lưu nếu giá trị đó lọt vào bằng đường khác',
     iqcGate.blocked === true && /mở từ dòng vi phạm/.test(iqcGate.why), iqcGate.why);
 
-  const boundKeepsIqc = await page.evaluate(() => {
-    closeActionForm();
+  await page.evaluate(() => { closeActionForm(); });
+  await page.evaluate(() => {
     const t = state.tests[0];
     const p = state.data[t.id].find(x => x.level === t.levels[0].level);
     beginActionFromIssue(t.id, t.levels[0].level, '1-3s', 'RE — Sai số ngẫu nhiên', 'hint', p.id, p.date);
-    return [...document.getElementById('aEventSource').options].map(o => o.value);
   });
+  const boundKeepsIqc = await page.evaluate(() => [...document.getElementById('aEventSource').options].map(o => o.value));
   check('Hồ sơ mở từ dòng vi phạm vẫn chọn được "Nội kiểm IQC"',
     boundKeepsIqc.includes('iqc'), JSON.stringify(boundKeepsIqc));
-  await page.evaluate(() => { closeActionForm(); beginActionManual(); });
+  await page.evaluate(() => { closeActionForm(); });
+  await page.evaluate(() => { beginActionManual(); });
   await page.waitForSelector('#aCorrection');
 
   const blocked = await page.evaluate(() => {
@@ -540,7 +572,11 @@ async function checkFormIsBoundToAnIncident(page) {
 }
 
 async function checkOverdueReachesDashboard(page) {
-  const out = await page.evaluate(() => {
+  // Trang "dash" cũng render qua React (Pha React-island 2026-08-29) — gọi go('dash')
+  // rồi đọc #main ngay trong CÙNG một evaluate() đọc trúng khung hình cũ vì
+  // createRoot().render() commit bất đồng bộ. Tách trigger/đọc thành hai lượt evaluate()
+  // riêng, cùng lý do đã sửa ở checkFormIsBoundToAnIncident.
+  await page.evaluate(() => {
     const t = state.tests[0];
     state.actions = [
       { id: 'D1', nceId: 'NCE-QUA-HAN', protocolVersion: 2, testId: t.id, level: 1, lot: t.levels[0].lot, pointId: '',
@@ -553,6 +589,8 @@ async function checkOverdueReachesDashboard(page) {
         effectivenessStatus: 'pending', approvalStatus: 'pending' },
     ];
     go('dash');
+  });
+  const out = await page.evaluate(() => {
     const main = document.getElementById('main');
     return {
       text: main.innerText,
@@ -567,7 +605,8 @@ async function checkOverdueReachesDashboard(page) {
   check('Câu trạng thái trực ca phản ánh hồ sơ quá hạn', /hồ sơ NCE quá hạn/i.test(out.text), out.text.slice(0, 200));
   check('Nút mở thẳng đúng hồ sơ', out.opensRecord === true);
 
-  const cleared = await page.evaluate(() => { state.actions = []; go('dash'); return document.getElementById('main').innerText; });
+  await page.evaluate(() => { state.actions = []; go('dash'); });
+  const cleared = await page.evaluate(() => document.getElementById('main').innerText);
   check('Hết hồ sơ quá hạn thì dashboard không còn cảnh báo', !/Quá hạn \d+ ngày/.test(cleared));
 }
 

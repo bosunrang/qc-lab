@@ -400,8 +400,9 @@ without touching the existing strict TS config. Dashboard/"Tổng quan"
 (`src/react/pages/ManagePage.tsx`), Reagent/"So sánh hóa chất"
 (`src/react/pages/ReagentPage.tsx`), Report/"Báo cáo"
 (`src/react/pages/ReportPage.tsx`), Six Sigma/"Six Sigma & Sai số"
-(`src/react/pages/SigmaPage.tsx`) and Westgard analysis/"Phân tích Westgard"
-(`src/react/pages/WestgardPage.tsx`) are the first nine migrated pages, all
+(`src/react/pages/SigmaPage.tsx`), Westgard analysis/"Phân tích Westgard"
+(`src/react/pages/WestgardPage.tsx`) and Corrective action/"Khắc phục sự cố"
+(`src/react/pages/ActionsPage.tsx`) are the first ten migrated pages, all
 with their classic HTML-builder code already deleted post-parity-check; see
 `docs/REACT-ADOPTION-PLAN.md` for the page-by-page order and status of the
 rest.
@@ -998,6 +999,78 @@ Google Fonts link, offline labs must print with correct metrics.
   straight at the already-built form controller. No cyclic import between the
   two TypeScript modules — the forward reference lives in the bridge, which is
   exactly its job as a transitional mechanism.
+
+  Corrective action/"Khắc phục sự cố" retired to React 2026-08-30:
+  `src/react/pages/ActionsPage.tsx` now owns the whole page, and `pageMap()`
+  in `modular-pilot.global.ts` no longer carries an `actions` entry at all —
+  `isReactPage('actions')` intercepts it first. `pageActionsV4()`
+  (issue list + log table) and `actionFormHtml()` (the 8-section form) are
+  deleted outright, along with the 19 classic HTML-builder files whose only
+  caller was one of those two functions (`action-issue-row-html.ts`,
+  `action-open-issue-html.ts`, `action-issue-group-html.ts`,
+  `action-log-row-html.ts`, `action-review-buttons-html.ts`,
+  `action-side-chips-html.ts`, `action-approval-tag-html.ts`,
+  `action-issues-panel-html.ts`, `action-log-panel-html.ts`,
+  `action-page-html.ts`, `action-select-html.ts`, `action-suggest-box-html.ts`,
+  `action-suggest-row-html.ts`, `action-form-closed-html.ts`,
+  `action-form-section-html.ts`, `action-investigation-field-html.ts`,
+  `action-staff-options-html.ts`, `action-form-panel-html.ts`,
+  `action-form-steps-html.ts`) and their 19 dedicated test files. Only
+  `actionsModel()` (issue list + log table, pure data, in
+  `actions-page-controller.ts`) and `actionFormViewModel()` (the 8-section
+  form, pure data, in `action-form-controller.ts`) remain. The two-way bridge
+  above is now one-way in practice: the page no longer calls into the form
+  (`deps.formHtml` is gone from `actions-page-controller.ts`'s deps — React
+  calls `actionFormViewModel(model.issueCount)` directly from
+  `ActionsPage.tsx`), but the form still calls back into the page's evidence
+  builders (`actionEvidenceTimelineHtml`, `actionRerunEvidenceHtml`,
+  `actionLevelShort`), since the classic detail modal (`viewActionDetail()`,
+  unchanged — renders into `#modalRoot` like every other page's modals) still
+  reuses those same blocks. Much of the issue-list/log-table "presentation
+  builder" tier turned out to be unnecessary for React: `ActionReviewPresentation.buttons()`/
+  `.approvalTag()` and `ActionStatusPresentation.sideChips()` already return
+  plain data (button-visibility flags, `{cls,label}` chip arrays), not HTML —
+  `actionsModel()` calls them directly and `ActionsPage.tsx` renders buttons/
+  chips as real JSX, skipping the `deps.pres.actionReviewButtonsHtml`/
+  `actionSideChipsHtml` wrapper tier `pageActionsV4()` used to go through.
+  This page hit a **new variant** of the stale-`defaultValue` bug class:
+  classic `syncActionSuggestions()` refreshed the cause/action suggestion-chip
+  rows via `node.outerHTML = ...` — replacing the DOM node outright, unlike
+  every prior direct-DOM-patch precedent (bias hint, section chips, risk
+  score), which only ever mutate a stable node's `textContent`/`className`.
+  Reusing that function for the React page would let an unrelated `rerender()`
+  arrive after the outerHTML swap and hand React a now-detached node to
+  reconcile (a real `NotFoundError` risk on `removeChild`). Fixed by NOT
+  reusing it: the cause-category (`aCauseCategory`) and error-type (`aErr`)
+  fields recompute their sibling suggestion boxes via local `useState` in two
+  small components (`CauseSection`'s `causeCategory` state,
+  `ErrTypeSelect`/`ActSuggestBox`'s `errType` state), calling the already-pure
+  `actionCausePhrases()`/`actionActionPhrases()` directly — no DOM mutation at
+  all. Also hit a real remount bug independent of that fix:
+  `beginActionManual()` always seeds the identical shape `{manual:true}`, so
+  opening the manual form, typing, closing, then opening it manually AGAIN
+  produced the same `formKey` both times — React reused the old DOM node and
+  the previously-typed (already `clearDraft()`-cleared in the model) text
+  stayed visible in the uncontrolled fields despite the fresh model saying
+  empty. Fixed with a monotonic `openSeq` counter on `ActionFormUiState`
+  (incremented in `startManual()`/`startIssue()`/`edit()`), folded into
+  `actionFormViewModel()`'s `formKey` — every *open* action now gets a distinct
+  key regardless of seed shape, confirmed live in the browser (typed a marker,
+  closed, reopened, confirmed the field came back empty). Running
+  `scripts/nce-workflow-check.js` for real surfaced a further, more general
+  finding that applies to every React page, not just this one: a script that
+  calls a `rerender()`-triggering function and reads the DOM back in the
+  *same* `page.evaluate()` call races React's asynchronous `createRoot().render()`
+  commit — 10 of 91 checks failed this way at first, including one in the
+  Dashboard block (a latent bug dating back to Dashboard's own 2026-08-29
+  React migration that nothing had exercised via this script until now).
+  Fixed by splitting each offending trigger+read pair into two separate
+  `page.evaluate()` calls, matching the pattern already used successfully
+  elsewhere in the same script — not a real user-facing regression (a genuine
+  browser click is itself an async DOM event, always leaving React time to
+  flush before the next script step), just a gap in how directly the test
+  script was calling internal functions.
+
   `router-page-policy.ts` owns the page list
   (`PAGES`, bridged as `root.PAGES`) and per-role page permissions:
   `rolePageIds(role)` gives each role's default page set, and a user's own
