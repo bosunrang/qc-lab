@@ -445,8 +445,10 @@ assert.match(generated, /root\.defaultDateFieldsService\s*=\s*createDefaultDateF
   'artifact must publish TypeScript default date fields service');
 assert.match(generated, /root\.postRenderPageActions\s*=\s*createPostRenderPageActions/,
   'artifact must publish TypeScript post-render page actions service');
-assert.match(generated, /root\.dashboardOverdueActions\s*=\s*createDashboardOverdueActions/,
+assert.match(generated, /dashboardOverdueActions\s*=\s*createDashboardOverdueActions/,
   'artifact must publish TypeScript dashboard overdue actions');
+assert.match(generated, /root\.dashboardOverdueActions\s*=\s*dashboardOverdueActions/,
+  'artifact must publish TypeScript dashboard overdue actions to root');
 assert.match(generated, /root\.dashboardExpiringLotItems\s*=\s*dashboardExpiringLotItems/,
   'artifact must publish TypeScript dashboard expiring lot items');
 assert.match(generated, /root\.dashboardWestgardAlerts\s*=\s*dashboardWestgardAlerts/,
@@ -455,8 +457,10 @@ assert.match(generated, /root\.dashboardMissingTargetItems\s*=\s*dashboardMissin
   'artifact must publish TypeScript dashboard missing target items');
 assert.doesNotMatch(generated, /root\.dashboardLevelData\s*=|root\.dashboardLatestPoint\s*=/,
   'artifact must keep dashboard-only dependencies internal to the TypeScript bundle');
-assert.match(generated, /root\.dashboardTestItems\s*=\s*createDashboardTestItems/,
+assert.match(generated, /dashboardTestItems\s*=\s*createDashboardTestItems/,
   'artifact must publish TypeScript dashboard test items');
+assert.match(generated, /root\.dashboardTestItems\s*=\s*dashboardTestItems/,
+  'artifact must publish TypeScript dashboard test items to root');
 assert.match(generated, /root\.backupInspectionSummary\s*=\s*createBackupInspectionSummary/,
   'artifact must publish TypeScript backup inspection summary');
 assert.match(generated, /root\.backupInspectionMessage\s*=\s*createBackupInspectionMessage/,

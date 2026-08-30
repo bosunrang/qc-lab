@@ -3511,7 +3511,8 @@ const reportPeriodCommand=createReportPeriodCommand({lock:(s,input)=>root.Period
 root.ReportPeriodWorkflowCommand=createReportPeriodWorkflowCommand({current:()=>state,period:reportPeriodCommand,log:(type,detail,target)=>logAct(type,detail,target),save:options=>save(options),render:()=>rerender()});
 root.ActionCurrentIssues=createActionCurrentIssues({operationalTests:()=>typeof (globalThis as any).operationalTests==='function'?(globalThis as any).operationalTests():[],activeWestgard:test=>(globalThis as any).activeWestgard(test),pointWorkflowComplete:pointId=>typeof (globalThis as any).pointWorkflowComplete==='function'?(globalThis as any).pointWorkflowComplete(pointId):false});
 root.ActionReviewMessages=actionReviewMessages;
-root.dashboardStatusFilter=createDashboardStatusFilter();
+const dashboardStatusFilter=createDashboardStatusFilter();
+root.dashboardStatusFilter=dashboardStatusFilter;
 root.dashboardExpiringLots=dashboardExpiringLots;
 root.dashboardShiftStatus=dashboardShiftStatus;
 root.dashboardKpis=dashboardKpis;
@@ -3723,7 +3724,8 @@ root.entryJumpScrollService=createEntryJumpScrollService({findWrap:()=>typeof do
 root.defaultDateFieldsService=createDefaultDateFieldsService({find:id=>typeof document==='undefined'?null:document.getElementById(id) as any});
 root.postRenderPageActions=createPostRenderPageActions({requestFrame:work=>requestAnimationFrame(work)});
 root.afterRender=createAfterRenderController({document:typeof document!=='undefined'?document:({querySelectorAll:()=>[]} as unknown as Document),canvas:root.afterRenderCanvasService,tests:()=>state.tests||[],levelConfig:(test,level)=>lvlCfg(test,level),buildLeveyJennings:input=>ChartViewModel.buildLeveyJennings(input),acceptedLotPoints:(test,level)=>acceptedLotPoints(test,level),drawLeveyJennings:(canvas,points,mean,sd)=>qcChartRenderer.drawLJ(canvas,points,mean,sd),entryCache:()=>entryLjRenderCache,multiViews:test=>wgMultiViews(test),buildMultiLevel:input=>ChartViewModel.buildMultiLevel(input),drawMultiLevel:(canvas,chart,test)=>qcChartRenderer.drawLJMultiZ(canvas,chart,test),lotGroups:()=>((state as any).lotGroups||[]),levelsForLotGroup:group=>levelsForLotGroup(group),archivedMultiViews:levels=>wgArchivedMultiViews(levels),operationalLotPoints:(test,level)=>operationalLotPoints(test,level),cusumSeries:(test,level)=>cusumSeries(test,level),buildCusum:input=>ChartViewModel.buildCusum(input),drawCusum:(canvas,points,series)=>qcChartRenderer.drawCUSUM(canvas,points,series),fillDefaultDates:()=>root.defaultDateFieldsService.fill(['eDate','aDate'],vnDate(isoToday())),runPageActions:()=>root.postRenderPageActions.run(page,{reagent:rcCompute,sigma:sgRefresh}),consumeEntryJump:()=>{if(!entryJumpToday)return false;entryJumpToday=false;return true;},requestFrame:work=>requestAnimationFrame(work),scrollEntryJump:()=>root.entryJumpScrollService.scroll(),updateSaveStatus:()=>updateSaveStatus(),updateBackupBanner:()=>updateBackupBanner(),restoreConfigNavScroll:()=>root.configNavScrollService.restore()}).afterRender;
-root.dashboardOverdueActions=createDashboardOverdueActions({overdue:action=>(root as any).actionOverdue(action)});
+const dashboardOverdueActions=createDashboardOverdueActions({overdue:action=>(root as any).actionOverdue(action)});
+root.dashboardOverdueActions=dashboardOverdueActions;
 root.dashboardExpiringLotItems=dashboardExpiringLotItems;
 root.dashboardWestgardAlerts=dashboardWestgardAlerts;
 root.dashboardMissingTargetItems=dashboardMissingTargetItems;
@@ -3732,7 +3734,8 @@ const dashboardLevelData=createDashboardLevelData({stats:(values:number[])=>(roo
    (3 lệnh liền) — gọn thành một hàm đặt tên, cùng mẫu openActionQcEvidence() trong
    actions-page-controller.ts. */
 root.dashViewTestInEntry=(testId:string,level:number)=>{const entryUi=(root as any).EntryUIState;entryUi.entrySel={testId,level:Number(level)};entryUi.entryStart=null;entryUi.entryEnd=null;(root as any).go('entry');};
-root.dashboardTestItems=createDashboardTestItems({activeWestgard:test=>(root as any).activeWestgard(test),summarize:input=>(root as any).WestgardViewModel.summarizeTestStatus(input),levelData:(views,today)=>dashboardLevelData(views,today),latestPoint:points=>dashboardLatestPoint(points),searchText:(test,levels)=>dashboardTestSearchText(test,levels),markStatus:(testId,status)=>(root as any).statusMemo.set(testId,status)});
+const dashboardTestItems=createDashboardTestItems({activeWestgard:test=>(root as any).activeWestgard(test),summarize:input=>(root as any).WestgardViewModel.summarizeTestStatus(input),levelData:(views,today)=>dashboardLevelData(views,today),latestPoint:points=>dashboardLatestPoint(points),searchText:(test,levels)=>dashboardTestSearchText(test,levels),markStatus:(testId,status)=>(root as any).statusMemo.set(testId,status)});
+root.dashboardTestItems=dashboardTestItems;
 const dashboardPageController=createDashboardPageController({
   operationalTests:()=>(root as any).operationalTests(),
   isWestgardMemoized:testId=>wgMemo.has(testId),
@@ -3746,15 +3749,15 @@ const dashboardPageController=createDashboardPageController({
   vnDate:iso=>vnDate(iso),
   levelsMissingTarget:test=>(root as any).levelsMissingTarget(test),
   daysToExp:value=>(root as any).daysToExp(value),
-  dashboardTestItems:root.dashboardTestItems,
-  dashboardKpis:root.dashboardKpis,
-  dashboardMissingTargetItems:root.dashboardMissingTargetItems,
-  dashboardWestgardAlerts:root.dashboardWestgardAlerts,
-  dashboardExpiringLotItems:root.dashboardExpiringLotItems,
-  dashboardExpiringLots:root.dashboardExpiringLots,
-  dashboardOverdueActions:root.dashboardOverdueActions,
-  dashboardStatusFilter:root.dashboardStatusFilter,
-  dashboardShiftStatus:root.dashboardShiftStatus,
+  dashboardTestItems,
+  dashboardKpis,
+  dashboardMissingTargetItems,
+  dashboardWestgardAlerts,
+  dashboardExpiringLotItems,
+  dashboardExpiringLots,
+  dashboardOverdueActions,
+  dashboardStatusFilter,
+  dashboardShiftStatus,
   dashTestQ:()=>(root as any).dashTestQ,
   dashTestStatus:()=>(root as any).dashTestStatus,
   setDashTestStatus:value=>{(root as any).AnalysisUIState.dashTestStatus=value;},

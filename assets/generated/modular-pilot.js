@@ -28078,7 +28078,8 @@
 		pointWorkflowComplete: (pointId) => typeof globalThis.pointWorkflowComplete === "function" ? globalThis.pointWorkflowComplete(pointId) : false
 	});
 	root.ActionReviewMessages = actionReviewMessages;
-	root.dashboardStatusFilter = createDashboardStatusFilter();
+	var dashboardStatusFilter = createDashboardStatusFilter();
+	root.dashboardStatusFilter = dashboardStatusFilter;
 	root.dashboardExpiringLots = dashboardExpiringLots;
 	root.dashboardShiftStatus = dashboardShiftStatus;
 	root.dashboardKpis = dashboardKpis;
@@ -28378,7 +28379,8 @@
 		updateBackupBanner: () => updateBackupBanner(),
 		restoreConfigNavScroll: () => root.configNavScrollService.restore()
 	}).afterRender;
-	root.dashboardOverdueActions = createDashboardOverdueActions({ overdue: (action) => root.actionOverdue(action) });
+	var dashboardOverdueActions = createDashboardOverdueActions({ overdue: (action) => root.actionOverdue(action) });
+	root.dashboardOverdueActions = dashboardOverdueActions;
 	root.dashboardExpiringLotItems = dashboardExpiringLotItems;
 	root.dashboardWestgardAlerts = dashboardWestgardAlerts;
 	root.dashboardMissingTargetItems = dashboardMissingTargetItems;
@@ -28393,7 +28395,7 @@
 		entryUi.entryEnd = null;
 		root.go("entry");
 	};
-	root.dashboardTestItems = createDashboardTestItems({
+	var dashboardTestItems = createDashboardTestItems({
 		activeWestgard: (test) => root.activeWestgard(test),
 		summarize: (input) => root.WestgardViewModel.summarizeTestStatus(input),
 		levelData: (views, today) => dashboardLevelData(views, today),
@@ -28401,6 +28403,7 @@
 		searchText: (test, levels) => dashboardTestSearchText(test, levels),
 		markStatus: (testId, status) => root.statusMemo.set(testId, status)
 	});
+	root.dashboardTestItems = dashboardTestItems;
 	var dashboardPageController = createDashboardPageController({
 		operationalTests: () => root.operationalTests(),
 		isWestgardMemoized: (testId) => wgMemo.has(testId),
@@ -28414,15 +28417,15 @@
 		vnDate: (iso) => vnDate(iso),
 		levelsMissingTarget: (test) => root.levelsMissingTarget(test),
 		daysToExp: (value) => root.daysToExp(value),
-		dashboardTestItems: root.dashboardTestItems,
-		dashboardKpis: root.dashboardKpis,
-		dashboardMissingTargetItems: root.dashboardMissingTargetItems,
-		dashboardWestgardAlerts: root.dashboardWestgardAlerts,
-		dashboardExpiringLotItems: root.dashboardExpiringLotItems,
-		dashboardExpiringLots: root.dashboardExpiringLots,
-		dashboardOverdueActions: root.dashboardOverdueActions,
-		dashboardStatusFilter: root.dashboardStatusFilter,
-		dashboardShiftStatus: root.dashboardShiftStatus,
+		dashboardTestItems,
+		dashboardKpis,
+		dashboardMissingTargetItems,
+		dashboardWestgardAlerts,
+		dashboardExpiringLotItems,
+		dashboardExpiringLots,
+		dashboardOverdueActions,
+		dashboardStatusFilter,
+		dashboardShiftStatus,
 		dashTestQ: () => root.dashTestQ,
 		dashTestStatus: () => root.dashTestStatus,
 		setDashTestStatus: (value) => {
