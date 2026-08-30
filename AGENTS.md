@@ -644,8 +644,47 @@ updates the active tab class; a rule checkbox's `onChange` correctly flips
 errors. `visual-check`/`print-check` re-run since this page shares the
 print/export pipeline.
 
+Six Sigma (done): 19 of 21 `data-action` usages converted
+(`sgOpenAddTest`/`sgRemoveTracked`/`sgSetTea`/`sgSetTeaMeta`×3/
+`sgSetTeaSource`/`sgSelectPeriod`/`sgCell`×2/`sgPullCV`/
+`exportSigmaPeriodXLSX`/`printSigmaPeriod`/`sgDelPeriod`/`sgOpenBias`/
+`sgAddPeriod`/`exportSigmaPeriodsXLSX`/`printSigmaPeriods`/
+`goManageTargets`) — everything was already reachable via `kernel.sigma`
+(`sigmaPageController`), `kernel.dataIo`, `kernel.reportPrint`, or
+`kernel.pres`, so this page needed zero NEW kernel wiring, only bridge
+exports. Remaining 2 (`sgOpenAddTest` in `EmptyPanel`, `sgSetTeaMeta` for
+the EFLM lookup date) stay deferred inside `emptyStateHtml()`/`dateBoxHtml()`
+strings. The period `<tr>` combining `data-action="sgSelectPeriod"` (click)
++ `data-keydown-action` (Enter/Space, self-only) surfaced a **real semantic
+gap** converting to React: the classic dispatcher resolves via
+`event.target.closest('[data-action]')`, which returns the NEAREST matching
+element only — a click on a nested button (`data-action="sgPullCV"` etc.)
+never reaches the row's own handler, because `closest()` stops at the first
+match. React's `onClick` has no such short-circuit — both the button's and
+the row's handlers fire via normal bubbling. Fixed by checking
+`(e.target as HTMLElement).closest('button, input, select')` inside the
+row's `onClick` and bailing out if the click originated on/inside any
+interactive descendant — every other multi-level `data-action` nesting in
+this app was audited and confirmed to not hit this (buttons/inputs
+elsewhere are not nested inside another `data-action` element), but this is
+the pattern to check for whenever a `data-action` container HOLDS other
+`data-action` descendants. Verified with an ad-hoc Playwright script:
+clicking a `<td>` background selects the row; clicking a nested button/input
+does not also select it. Hit a **test-harness pitfall, not a product bug**
+while verifying `sgCell`: setting `input.value` directly and dispatching a
+plain `input` event does NOT reliably trigger a React `onChange` (React's
+internal value-tracking misses changes made through the raw DOM setter) —
+confirmed by comparing against the pre-conversion code (via a throwaway
+`git stash`/`pop` round-trip) which worked with the naive dispatch, then
+finding the fix: set the value through
+`Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set`
+before dispatching, which both correctly triggered `onChange` and confirmed
+`sgCell` behaves identically to before. `ui-workflow-check`'s own "Xuất
+Sigma XLSX từ browser tải workbook" independently re-confirms the export
+button through a real click on the fully-converted page.
+
 **Remaining phases (not yet started)**: finish converting `data-action` on
-the other 5 pages; then modals as `createPortal`, one modal at a time; then
+the other 4 pages; then modals as `createPortal`, one modal at a time; then
 shrink/delete the now-dead `root.X=` aliases, `global.d.ts`'s ambient
 bare-global declarations, and rewrite the 61 sandbox tests + ~88
 bridge-wiring text-scanner tests. See the plan file for the full phase

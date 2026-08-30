@@ -74,9 +74,11 @@ assert.match(rowHtml, /Chưa đủ CV IQC và Bias EQA\/EQC/);
 
   // Trang Six Sigma chuyển sang React (2026-08-30) — pageSigma() đã xoá, nút
   // in giờ nằm ở SigmaPage.tsx (JSX), không còn ở sigma-page-controller.ts.
+  // Nút đổi từ data-action="printSigmaPeriod" sang onClick={() =>
+  // printSigmaPeriod(row.id)} thật (Giai đoạn 2 gỡ global bridge, 2026-08-30).
   const sigmaPage = fs.readFileSync(path.join(__dirname, '..', 'src', 'react', 'pages', 'SigmaPage.tsx'), 'utf8');
-  assert.match(sigmaPage, /data-action="printSigmaPeriod" data-args=\{JSON\.stringify\(\[row\.id\]\)\}/);
-  assert.match(sigmaPage, /data-action="printSigmaPeriods"/);
+  assert.match(sigmaPage, /onClick=\{\(\) => printSigmaPeriod\(row\.id\)\}/);
+  assert.match(sigmaPage, /onClick=\{printSigmaPeriods\}/);
   assert.match(sigmaPage, /<PrintIcon \/>In PDF/);
   console.log('Sigma period print tests passed');
 })().catch(error=>{console.error(error);process.exitCode=1;});

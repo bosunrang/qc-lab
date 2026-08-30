@@ -2,7 +2,10 @@ import { useState, useEffect, Fragment } from 'react';
 import { useAppStore } from '../state/kernel';
 import {
   sigmaModel, headOnlyHtml, emptyStateHtml, dateBoxHtml, icoDownloadHtml, sgRefresh,
-  sgPickTest, sgPart, type SigmaModel, type SigmaPeriod, type SigmaLevelCell,
+  sgPickTest, sgPart, sgSetTeaSource, goManageTargets, sgOpenAddTest, sgRemoveTracked, sgSetTea, sgSetTeaMeta,
+  sgSelectPeriod, sgCell, sgPullCV, exportSigmaPeriodXLSX, printSigmaPeriod, sgDelPeriod, sgOpenBias,
+  sgAddPeriod, exportSigmaPeriodsXLSX, printSigmaPeriods,
+  type SigmaModel, type SigmaPeriod, type SigmaLevelCell,
 } from '../bridge/sigmaBridge';
 
 type NonEmptyModel = Extract<SigmaModel, { empty: false }>;
@@ -62,8 +65,8 @@ function TestActions({ isAdmin, testId }: { isAdmin: boolean; testId: string }) 
     <div className="sg-inline-btns">
       <label>&nbsp;</label>
       <div className="sg-inline-btns-row">
-        <button className="btn teal" data-action="sgOpenAddTest">+ Thêm</button>
-        <button className="btn danger" data-action="sgRemoveTracked" data-args={JSON.stringify([testId])}><TrashIcon />Xóa</button>
+        <button className="btn teal" onClick={sgOpenAddTest}>+ Thêm</button>
+        <button className="btn danger" onClick={() => sgRemoveTracked(testId)}><TrashIcon />Xóa</button>
       </div>
     </div>
   );
@@ -71,7 +74,7 @@ function TestActions({ isAdmin, testId }: { isAdmin: boolean; testId: string }) 
 
 function TeaControl({ tea, canWrite }: { tea: NormalModel['tea']; canWrite: boolean }) {
   if (tea.source === 'eflm') {
-    return <><label>TEa% EFLM</label><input type="number" step="any" aria-label="TEa% EFLM" title="Nhập TEa% đã tra từ EFLM Database" defaultValue={tea.controlValue} disabled={!canWrite} data-action="sgSetTea" data-action-on="change" /></>;
+    return <><label>TEa% EFLM</label><input type="number" step="any" aria-label="TEa% EFLM" title="Nhập TEa% đã tra từ EFLM Database" defaultValue={tea.controlValue} disabled={!canWrite} onChange={e => sgSetTea(e.target.value)} /></>;
   }
   const label = tea.source === 'clia' ? 'Tiêu chí CLIA' : 'TEa% tham chiếu';
   return <><label>{label}</label><input type="text" aria-label={label} defaultValue={tea.controlValue} disabled /></>;
@@ -81,12 +84,12 @@ function EflmBox({ eflm, canWrite }: { eflm: NonNullable<NormalModel['tea']['efl
   const ro = !canWrite;
   return (
     <div className="sg-eflm-box">
-      <div><label>Analyte trên EFLM</label><input disabled={ro} defaultValue={eflm.analyte} placeholder="VD: Glucose" data-action="sgSetTeaMeta" data-args='["eflmAnalyte"]' data-action-on="change" /></div>
-      <div><label>Mức APS</label><select disabled={ro} defaultValue={eflm.aps} data-action="sgSetTeaMeta" data-args='["eflmAps"]' data-action-on="change">
+      <div><label>Analyte trên EFLM</label><input disabled={ro} defaultValue={eflm.analyte} placeholder="VD: Glucose" onChange={e => sgSetTeaMeta('eflmAnalyte', e.target.value)} /></div>
+      <div><label>Mức APS</label><select disabled={ro} defaultValue={eflm.aps} onChange={e => sgSetTeaMeta('eflmAps', e.target.value)}>
         {['minimum', 'desirable', 'optimum'].map(v => <option value={v} key={v}>{v}</option>)}
       </select></div>
       <div><label>Ngày tra cứu</label><span style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: dateBoxHtml('sgEflmLookupDate', eflm.lookupDate, 'manage-date', `${ro ? 'disabled' : ''} data-action="sgSetTeaMeta" data-args='["eflmLookupDate"]' data-action-on="change"`) }} /></div>
-      <div><label>Link/tài liệu EFLM</label><input disabled={ro} defaultValue={eflm.ref} placeholder="biologicalvariation.eu / bản in PDF" data-action="sgSetTeaMeta" data-args='["eflmRef"]' data-action-on="change" /></div>
+      <div><label>Link/tài liệu EFLM</label><input disabled={ro} defaultValue={eflm.ref} placeholder="biologicalvariation.eu / bản in PDF" onChange={e => sgSetTeaMeta('eflmRef', e.target.value)} /></div>
     </div>
   );
 }
@@ -105,7 +108,7 @@ function AnalysisSetup({ model }: { model: NormalModel }) {
         <div><label>Thiết bị</label><input value={model.instrument} readOnly placeholder="Bấm để chọn / quản lý thiết bị" /></div>
         <div className="sg-tea-source">
           <label>Nguồn TEa</label>
-          <select aria-label="Nguồn TEa" disabled={!model.canWrite} defaultValue={model.tea.source} data-action="sgSetTeaSource" data-action-on="change">
+          <select aria-label="Nguồn TEa" disabled={!model.canWrite} defaultValue={model.tea.source} onChange={e => sgSetTeaSource(e.target.value)}>
             {model.tea.options.map(o => <option value={o.value} key={o.value}>{o.label}</option>)}
           </select>
         </div>
@@ -150,11 +153,11 @@ function LevelCell({ eid, level, cell, canWrite }: { eid: string; level: string 
   return (
     <>
       <td className="sg-group-start"><div className="sg-cell-stack">
-        <input className="sg-number" disabled={!canWrite} type="number" step="any" defaultValue={cell.cv} placeholder="CV%" data-action="sgCell" data-args={JSON.stringify([eid, level, 'cv'])} data-action-on="input" />
+        <input className="sg-number" disabled={!canWrite} type="number" step="any" defaultValue={cell.cv} placeholder="CV%" onChange={e => sgCell(eid, level, 'cv', e.target.value)} />
         {cell.cvMeta ? <div className="sg-cell-meta sg-cv-meta" title={cell.cvMeta.title}>{cell.cvMeta.text}</div> : null}
       </div></td>
       <td><div className="sg-cell-stack">
-        <input className="sg-number" disabled={!canWrite} type="number" step="any" defaultValue={cell.bias} placeholder="Bias%" data-action="sgCell" data-args={JSON.stringify([eid, level, 'biasEqa'])} data-action-on="input" />
+        <input className="sg-number" disabled={!canWrite} type="number" step="any" defaultValue={cell.bias} placeholder="Bias%" onChange={e => sgCell(eid, level, 'biasEqa', e.target.value)} />
         <div className="sg-cell-meta sg-cell-meta-empty" aria-hidden="true">&nbsp;</div>
       </div></td>
       <td className="sg-result-cell" title={r ? r.title : 'Nhập CV và Bias'}><div className="sg-cell-stack">
@@ -166,17 +169,17 @@ function LevelCell({ eid, level, cell, canWrite }: { eid: string; level: string 
 }
 
 function PeriodRow({ row, levels, canWrite, isAdmin, version }: { row: SigmaPeriod; levels: (string | number)[]; canWrite: boolean; isAdmin: boolean; version: number }) {
-  const args = JSON.stringify([row.id]);
   return (
     <tr data-sg-period-id={row.id} className={`sg-period-row${row.selected ? ' sg-period-selected' : ''}`} tabIndex={0} aria-selected={row.selected ? 'true' : 'false'} aria-label={`Chọn kỳ ${row.periodLabel} để xem tình trạng`}
-      data-action="sgSelectPeriod" data-args={args} data-keydown-action="sgSelectPeriod" data-keydown-args={args} data-keydown-keys='["Enter"," "]' data-keydown-self-only="">
+      onClick={e => { if ((e.target as HTMLElement).closest('button, input, select')) return; sgSelectPeriod(row.id); }}
+      onKeyDown={e => { if (e.target !== e.currentTarget) return; if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); sgSelectPeriod(row.id); } }}>
       <td className="sg-period-cell"><div className="sg-period-select-wrap"><PeriodMonthYearSelect eid={row.id} month={row.month} year={row.year} years={row.years} key={version} /></div></td>
       {row.levelCells.map(cell => <LevelCell eid={row.id} level={cell.level} cell={cell} canWrite={canWrite} key={cell.level} />)}
       <td className="sg-row-action sg-action-col"><div className="sg-row-action-buttons">
-        {canWrite ? <button className="btn ghost sm sg-row-cv" title={`Chọn CV IQC theo lô lịch sử cho kỳ ${row.periodLabel}`} data-action="sgPullCV" data-args={JSON.stringify([row.id])}>Nạp CV lô</button> : null}
-        <button className="btn ghost sm sg-row-export" title={`Xuất Excel riêng kỳ ${row.periodLabel}`} data-action="exportSigmaPeriodXLSX" data-args={JSON.stringify([row.id])} dangerouslySetInnerHTML={{ __html: icoDownloadHtml() + 'Excel' }} />
-        <button className="btn ghost sm sg-row-print" title={`Tạo bản in PDF/HTML riêng kỳ ${row.periodLabel}`} data-action="printSigmaPeriod" data-args={JSON.stringify([row.id])}><PrintIcon />In PDF</button>
-        {isAdmin ? <button className="btn danger sm sg-row-delete" title={`Xóa kỳ ${row.periodLabel}`} data-action="sgDelPeriod" data-args={JSON.stringify([row.id])}>Xóa</button> : null}
+        {canWrite ? <button className="btn ghost sm sg-row-cv" title={`Chọn CV IQC theo lô lịch sử cho kỳ ${row.periodLabel}`} onClick={() => sgPullCV(row.id)}>Nạp CV lô</button> : null}
+        <button className="btn ghost sm sg-row-export" title={`Xuất Excel riêng kỳ ${row.periodLabel}`} onClick={() => exportSigmaPeriodXLSX(row.id)} dangerouslySetInnerHTML={{ __html: icoDownloadHtml() + 'Excel' }} />
+        <button className="btn ghost sm sg-row-print" title={`Tạo bản in PDF/HTML riêng kỳ ${row.periodLabel}`} onClick={() => printSigmaPeriod(row.id)}><PrintIcon />In PDF</button>
+        {isAdmin ? <button className="btn danger sm sg-row-delete" title={`Xóa kỳ ${row.periodLabel}`} onClick={() => sgDelPeriod(row.id)}>Xóa</button> : null}
       </div></td>
     </tr>
   );
@@ -185,7 +188,7 @@ function PeriodRow({ row, levels, canWrite, isAdmin, version }: { row: SigmaPeri
 function PeriodTable({ model, version }: { model: NormalModel; version: number }) {
   const tableMin = 368 + model.levels.length * 295;
   const biasActions = model.canWrite ? model.biasButtons.map(b => (
-    <button key={b.level} className="btn ghost sm" disabled={!b.enabled} title={b.title} data-action={b.enabled ? 'sgOpenBias' : undefined} data-args={b.enabled ? JSON.stringify([b.periodId, b.level]) : undefined}><CalcIcon />Bias EQA% Mức {b.level}</button>
+    <button key={b.level} className="btn ghost sm" disabled={!b.enabled} title={b.title} onClick={b.enabled ? () => sgOpenBias(b.periodId!, b.level) : undefined}><CalcIcon />Bias EQA% Mức {b.level}</button>
   )) : null;
   return (
     <div className="panel">
@@ -193,7 +196,7 @@ function PeriodTable({ model, version }: { model: NormalModel; version: number }
         <h2 className="panel-title">Số liệu theo kỳ</h2>
         <div className="sg-data-head-actions">
           {biasActions}
-          {model.canAddPeriod ? <button className="btn teal sm" data-action="sgAddPeriod">+ Thêm kỳ</button> : null}
+          {model.canAddPeriod ? <button className="btn teal sm" onClick={sgAddPeriod}>+ Thêm kỳ</button> : null}
         </div>
       </div>
       {model.periods.length ? (
@@ -212,8 +215,8 @@ function PeriodTable({ model, version }: { model: NormalModel; version: number }
       ) : <div className="empty" style={{ margin: '14px 16px 10px' }}>Chưa có kỳ nào.</div>}
       {model.combinedExport ? (
         <div className="sg-data-foot">
-          <button className="btn teal sg-combined-export" title="Xuất báo cáo Excel tổng hợp để so sánh Sigma giữa các kỳ" data-action="exportSigmaPeriodsXLSX" dangerouslySetInnerHTML={{ __html: icoDownloadHtml() + 'Xuất Excel' }} />
-          <button className="btn teal sg-combined-print" title="Tạo bản in PDF/HTML tổng hợp để so sánh Sigma giữa các kỳ" data-action="printSigmaPeriods"><PrintIcon />Xuất PDF</button>
+          <button className="btn teal sg-combined-export" title="Xuất báo cáo Excel tổng hợp để so sánh Sigma giữa các kỳ" onClick={exportSigmaPeriodsXLSX} dangerouslySetInnerHTML={{ __html: icoDownloadHtml() + 'Xuất Excel' }} />
+          <button className="btn teal sg-combined-print" title="Tạo bản in PDF/HTML tổng hợp để so sánh Sigma giữa các kỳ" onClick={printSigmaPeriods}><PrintIcon />Xuất PDF</button>
         </div>
       ) : null}
     </div>
@@ -243,7 +246,7 @@ export function SigmaPage() {
           </div>
           <div className="alert warn flow-control">
             {model.message}
-            {model.isAdmin ? <> <button className="btn teal" data-action="goManageTargets">Cấu hình Mean/SD</button></> : null}
+            {model.isAdmin ? <> <button className="btn teal" onClick={goManageTargets}>Cấu hình Mean/SD</button></> : null}
           </div>
         </div>
       </>
