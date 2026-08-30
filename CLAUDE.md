@@ -707,8 +707,60 @@ split fires correctly and only once); "+ Thêm mẫu" grows the pair-row count
 confirms both `reagent:create-comparison`/`reagent:find-existing` modals
 still open via the converted `openRcCreateModal`/`openRcModal` handlers.
 
+Entry (done): all real-JSX `data-action` usages converted (tree nodes'
+`treeToggle`/`entryPick` + `entryTreeKey` keydown, `toggleEntryTree`,
+`entryFilter`, `entrySheetRunChanged`, `entryUnlockExtraRun`,
+`entryDateNoteSave`, `entrySetSheetPart`×2, `entrySetSheetMonth`,
+`entryGoToday`, `entryShowPrevLot`/`entryShowCurrentLot`, `entryFocusLevel` +
+its click/keydown combo, `entrySetDays`, `voidQcPoint`, `entryToggleRows`,
+`entryDetailToggled`×2 (via `<details onToggle>`), `openRangeWorkflow`,
+`revertRange`) — everything already on `kernel.entry`
+(`entryPageController`) except `openRangeWorkflow`/`revertRange`
+(standalone globals, merged in) and `go` (added to `kernel.pres`, the
+generic page-navigation primitive every page could plausibly need).
+Remaining `entrySetStart`/`entrySetEnd` stay deferred inside `dateBoxHtml()`
+strings. Found and fixed a **genuine pre-existing bug** while auditing every
+`data-action` on this page: `entrySetMachine` (the "Lọc theo máy xét
+nghiệm" `<select>`) had NEVER had a matching function anywhere in the
+codebase since Entry's original React migration — `action-dispatcher.ts`'s
+`resolve()` silently returned `undefined` for it, so the filter select had
+done nothing since it was written. Added a real `entrySetMachine(value)` to
+`entry-page-controller.ts` (same shape as the neighboring `entrySetDays`)
+rather than leaving the select non-functional. The keydown-bound tree/sheet
+navigation (`entryTreeKey`/`entrySheetKey`) uses the SAME `this`-bound
+classic function signature as before — bridged as
+`(el, event) => kernel.entry.entryTreeKey.call(el, event)`, called from JSX
+as `onKeyDown={e => entryTreeKey(e.currentTarget, e)}`, preserving the
+exact `this`-reads-the-DOM-node contract the navigation logic depends on.
+`LjMini` (Levey-Jennings mini-panel) hit the same nested-data-action
+bubbling gap as Sigma's period row (it wraps a real `<button>` from
+`LjAction`) — fixed with the same `closest('button, input, select')` guard
+in both its `onClick` and `onKeyDown`. **Also fixed 3 real bugs introduced
+in the PREVIOUS (Sigma) commit**, found while auditing this page's
+`data-action-on="change"` fields against React's actual event mapping:
+`data-action-on="change"` on a plain text/number input means "fire on
+commit/blur" (native `change`), but React's `onChange` for text-like inputs
+fires on native `input` (every keystroke) — only for `<select>` and
+checkbox/radio does React's `onChange` correspond to native `change`. Sigma's
+`sgSetTea` and two `sgSetTeaMeta` fields (`eflmAnalyte`/`eflmRef`) are number/
+text inputs that had been wired to `onChange` (saving on every keystroke,
+including a real `deps.save()` persistence call) instead of `onBlur` —
+fixed by switching those 3 to `onBlur`. Confirmed (by grepping every prior
+commit's diff for `data-action-on="change"` paired with `<input>`/`<textarea>`)
+that no other already-converted page has this mistake — the remaining
+`change`-on-text-like cases in this Entry commit
+(`entrySheetRunChanged`/`entryDateNoteSave`) were done correctly as `onBlur`
+from the start. Verified extensively: a11y-audit's dedicated Entry keyboard-
+Tab smoke pass (25 real Tab presses) still reports every focus stop clearly;
+`ui-workflow-check`'s full Entry-heavy suite (create/void a QC point, date
+picker sync, lot search/combobox, period lock/unlock) all pass unchanged;
+an ad-hoc Playwright script additionally confirmed the newly-fixed
+`entrySetMachine` actually filters the tree now, `ArrowDown` moves tree
+focus between nodes, and a `<details>` toggle's open state survives a
+`rerender()`.
+
 **Remaining phases (not yet started)**: finish converting `data-action` on
-the other 3 pages; then modals as `createPortal`, one modal at a time; then
+the other 2 pages; then modals as `createPortal`, one modal at a time; then
 shrink/delete the now-dead `root.X=` aliases, `global.d.ts`'s ambient
 bare-global declarations, and rewrite the 61 sandbox tests + ~88
 bridge-wiring text-scanner tests. See the plan file for the full phase

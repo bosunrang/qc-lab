@@ -20189,6 +20189,10 @@
 			deps.rerender();
 		};
 		const entrySetSheetPart = (part, value) => entrySetSheetMonth(deps.pres.entrySheetMonthPart(ui().entrySheetMonth, deps.isoMonth(), part === "year" ? "year" : "month", value));
+		const entrySetMachine = (value) => {
+			ui().entryMachine = String(value);
+			deps.rerender();
+		};
 		const entrySetDays = (n) => {
 			const range = deps.pres.entryRangePreset(n);
 			ui().entryDays = range.days;
@@ -20252,7 +20256,8 @@
 			entrySetSheetPart,
 			entrySetDays,
 			entrySetStart,
-			entrySetEnd
+			entrySetEnd,
+			entrySetMachine
 		};
 	}
 	//#endregion
@@ -32255,7 +32260,11 @@
 	root.exportSigmaPeriodsXLSX = dataIoController.exportSigmaPeriodsXLSX;
 	var kernel = {
 		store: appStore,
-		entry: entryPageController,
+		entry: {
+			...entryPageController,
+			openRangeWorkflow: root.openRangeWorkflow,
+			revertRange: root.revertRange
+		},
 		actions: actionsPageController,
 		actionForm: actionFormController,
 		sigma: sigmaPageController,
@@ -32340,6 +32349,7 @@
 			reagentToolIconPresentation: root.reagentToolIconPresentation,
 			QCCore: root.QCCore,
 			AnalysisUIState: root.AnalysisUIState,
+			go: root.go,
 			goManageTargets: root.goManageTargets,
 			dashboardGoEntryFollowup: root.dashboardGoEntryFollowup,
 			dashboardContinueAction: root.dashboardContinueAction,

@@ -581,6 +581,19 @@ export function createEntryPageController(deps: {
     deps.rerender();
   };
   const entrySetSheetPart = (part: string, value: unknown) => entrySetSheetMonth(deps.pres.entrySheetMonthPart(ui().entrySheetMonth, deps.isoMonth(), part === 'year' ? 'year' : 'month', value));
+  /* entrySetMachine(): thiếu hoàn toàn trước đây — bộ lọc "Lọc theo máy xét
+     nghiệm" trên cây (EntryPage.tsx) gọi data-action="entrySetMachine" từ
+     hồi trang Entry chuyển sang React lần đầu (2026-08-30), nhưng chưa có
+     hàm nào mang tên đó ở bất kỳ đâu trong repo — action-dispatcher.ts
+     resolve() ra undefined nên select này chưa từng có tác dụng, phát hiện
+     khi rà lại toàn bộ data-action của trang lúc chuyển sang onChange thật
+     (Giai đoạn 2 gỡ global bridge). entryModel() đã tự reset entryMachine về
+     'all' nếu giá trị không hợp lệ (dòng ~156), nên chỉ cần một setter đơn
+     giản đúng khuôn mẫu entrySetDays/entrySetSheetMonth ở trên. */
+  const entrySetMachine = (value: unknown) => {
+    ui().entryMachine = String(value);
+    deps.rerender();
+  };
   const entrySetDays = (n: unknown) => {
     const range = deps.pres.entryRangePreset(n);
     ui().entryDays = range.days;
@@ -608,6 +621,6 @@ export function createEntryPageController(deps: {
     entryFocusPendingSheet, entrySheetInputs, entrySheetTarget, entrySheetKey,
     entryRenderKeepScroll, entryCloseKeepScroll, entryConfirmInlineSave, entrySetLastMsg, entryUnlockExtraRun, entryDateNoteSave, entryColumnCfg, entryInlineSave, entrySheetRunChanged,
     entryInlineSaveCommit, syncVoidNceChoice, voidQcPoint, confirmVoidQcPoint, entrySetSheetMonth, entryGoToday,
-    entrySetSheetPart, entrySetDays, entrySetStart, entrySetEnd,
+    entrySetSheetPart, entrySetDays, entrySetStart, entrySetEnd, entrySetMachine,
   };
 }

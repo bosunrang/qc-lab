@@ -5721,7 +5721,10 @@ root.exportSigmaPeriodsXLSX=dataIoController.exportSigmaPeriodsXLSX;
    TẠI, không phải constructor sẽ chạy sau). */
 const kernel = {
   store: appStore,
-  entry: entryPageController,
+  entry: {
+    ...entryPageController,
+    openRangeWorkflow: (root as any).openRangeWorkflow, revertRange: (root as any).revertRange,
+  },
   actions: actionsPageController,
   actionForm: actionFormController,
   sigma: sigmaPageController,
@@ -5777,6 +5780,7 @@ const kernel = {
     settingsFirebaseGuideHtml: (root as any).settingsFirebaseGuideHtml, dashboardHeadHtml: (root as any).dashboardHeadHtml,
     reportActionIconPresentation: (root as any).reportActionIconPresentation, reagentToolIconPresentation: (root as any).reagentToolIconPresentation,
     QCCore: root.QCCore, AnalysisUIState: (root as any).AnalysisUIState,
+    go: (root as any).go,
     goManageTargets: (root as any).goManageTargets, dashboardGoEntryFollowup: (root as any).dashboardGoEntryFollowup,
     dashboardContinueAction: (root as any).dashboardContinueAction, dashViewTestInEntry: (root as any).dashViewTestInEntry,
     openConfigAssay: (root as any).openConfigAssay,

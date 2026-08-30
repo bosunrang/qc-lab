@@ -74,7 +74,7 @@ function TestActions({ isAdmin, testId }: { isAdmin: boolean; testId: string }) 
 
 function TeaControl({ tea, canWrite }: { tea: NormalModel['tea']; canWrite: boolean }) {
   if (tea.source === 'eflm') {
-    return <><label>TEa% EFLM</label><input type="number" step="any" aria-label="TEa% EFLM" title="Nhập TEa% đã tra từ EFLM Database" defaultValue={tea.controlValue} disabled={!canWrite} onChange={e => sgSetTea(e.target.value)} /></>;
+    return <><label>TEa% EFLM</label><input type="number" step="any" aria-label="TEa% EFLM" title="Nhập TEa% đã tra từ EFLM Database" defaultValue={tea.controlValue} disabled={!canWrite} onBlur={e => sgSetTea(e.target.value)} /></>;
   }
   const label = tea.source === 'clia' ? 'Tiêu chí CLIA' : 'TEa% tham chiếu';
   return <><label>{label}</label><input type="text" aria-label={label} defaultValue={tea.controlValue} disabled /></>;
@@ -84,12 +84,12 @@ function EflmBox({ eflm, canWrite }: { eflm: NonNullable<NormalModel['tea']['efl
   const ro = !canWrite;
   return (
     <div className="sg-eflm-box">
-      <div><label>Analyte trên EFLM</label><input disabled={ro} defaultValue={eflm.analyte} placeholder="VD: Glucose" onChange={e => sgSetTeaMeta('eflmAnalyte', e.target.value)} /></div>
+      <div><label>Analyte trên EFLM</label><input disabled={ro} defaultValue={eflm.analyte} placeholder="VD: Glucose" onBlur={e => sgSetTeaMeta('eflmAnalyte', e.target.value)} /></div>
       <div><label>Mức APS</label><select disabled={ro} defaultValue={eflm.aps} onChange={e => sgSetTeaMeta('eflmAps', e.target.value)}>
         {['minimum', 'desirable', 'optimum'].map(v => <option value={v} key={v}>{v}</option>)}
       </select></div>
       <div><label>Ngày tra cứu</label><span style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: dateBoxHtml('sgEflmLookupDate', eflm.lookupDate, 'manage-date', `${ro ? 'disabled' : ''} data-action="sgSetTeaMeta" data-args='["eflmLookupDate"]' data-action-on="change"`) }} /></div>
-      <div><label>Link/tài liệu EFLM</label><input disabled={ro} defaultValue={eflm.ref} placeholder="biologicalvariation.eu / bản in PDF" onChange={e => sgSetTeaMeta('eflmRef', e.target.value)} /></div>
+      <div><label>Link/tài liệu EFLM</label><input disabled={ro} defaultValue={eflm.ref} placeholder="biologicalvariation.eu / bản in PDF" onBlur={e => sgSetTeaMeta('eflmRef', e.target.value)} /></div>
     </div>
   );
 }
