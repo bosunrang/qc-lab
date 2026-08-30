@@ -50,7 +50,17 @@ export function createManageConfigService({ cleanText, cleanId, targetFromLimits
     const old = state.instruments.find(item => item.id === id) || null;
     const record = old || { id: cleanId(newId) };
     if (!old && !record.id) return { error: 'missing-id', message: 'Không thể tạo mã máy xét nghiệm.' };
-    Object.assign(record, checked.data); if (!old) state.instruments.push(record);
+    /* Giai đoạn 7 (state immutable, nhóm instruments/qcLots/qcPanels,
+       2026-08-30): gán lại mảng bằng bản sao MỚI thay vì .push() tại chỗ —
+       khảo sát xác nhận an toàn (derived()'s stamp tự nhận biết tham chiếu
+       mảng đổi, không cache nào khác đọc mảng instruments). record VẪN được
+       Object.assign() mutate tại chỗ như cũ (không đổi phần này của Nhóm 3 —
+       xem ghi chú kế hoạch kiến trúc về targetSwitchCtx/activateLotGroup giữ
+       tham chiếu OBJECT phần tử lotGroups qua bước re-auth, chỉ liên quan lô
+       nhóm chứ không phải máy/panel/lô, nhưng để nhất quán rủi ro cho cả
+       nhóm, việc đổi mutate phần tử sang tạo object mới hoàn toàn để dành
+       cho một đợt riêng, cẩn trọng hơn). */
+    Object.assign(record, checked.data); if (!old) state.instruments = [...state.instruments, record];
     if (old) (state.tests || []).filter(test => test.instrumentId === id).forEach(test => { test.machine = record.name; });
     state.machines = [...new Set(state.instruments.map(item => item.name))];
     return { record, created: !old };
@@ -96,7 +106,7 @@ export function createManageConfigService({ cleanText, cleanId, targetFromLimits
     const existing = (state.qcPanels || []).find(panel => panel.id === id) || null;
     const record = existing || { id: cleanId(newId) };
     if (!existing && !record.id) return { error: 'missing-id', message: 'Không thể tạo mã Panel QC.' };
-    Object.assign(record, checked.data); if (!existing) { state.qcPanels = state.qcPanels || []; state.qcPanels.push(record); }
+    Object.assign(record, checked.data); if (!existing) state.qcPanels = [...(state.qcPanels || []), record];
     return { record, created: !existing };
   }
   function panelRemoval(state: ManageConfigState, { id = '' }: AnyRecord = {}) {
@@ -375,7 +385,7 @@ export function createManageConfigService({ cleanText, cleanId, targetFromLimits
     const old = checked.record, oldLotNo = old?.lotNo || '', oldLevel = old ? +old.level : checked.level;
     const record = old || { id: cleanId(newId) };
     if (!old && !record.id) return { error: 'missing-id', message: 'Không thể tạo mã lô QC.' };
-    Object.assign(record, data); if (!old) { state.qcLots = state.qcLots || []; state.qcLots.push(record); }
+    Object.assign(record, data); if (!old) state.qcLots = [...(state.qcLots || []), record];
     (state.tests || []).forEach(test => (test.levels || []).filter((level: AnyRecord) => level.qcLotId === record.id).forEach((level: AnyRecord) => {
       level.level = data.level; level.lot = data.lotNo; level.exp = data.exp;
       (level.meanSdHistory || []).filter((entry: AnyRecord) => entry.qcLotId === record.id).forEach((entry: AnyRecord) => { entry.lot = data.lotNo; });

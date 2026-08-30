@@ -2198,6 +2198,71 @@ with zero console errors — confirming the hash-chained log still links
 correctly after switching from in-place `.push()` to reassigning a new
 array.
 
+**Group 3: instruments/qcLots/qcPanels (partly done, deliberately scoped,
+2026-08-31).** A dedicated background-agent survey found this group MUCH
+more complex than the first two — `manage-config-service.ts` has 20+
+mutation spots spread across instruments/qcLots/qcPanels/lotGroups/
+test.levels, and critically: **a REAL risk if EVERY element-level mutation
+were converted to create-a-new-object** — 2 variables hold an OBJECT
+reference (not an id) into one `lotGroups` element across a long ASYNC gap
+(a password re-auth prompt / confirm dialog):
+`manage-tests-actions-controller.ts`'s `ui().targetSwitchCtx.group` (held
+across `reauthenticateCurrentUser()`) and `activateLotGroup()`'s `g`/
+`preview.group` variables (held across `confirmDialog()`). Under the
+CURRENT mutate-in-place design, these two are safe (nothing ever REPLACES a
+`lotGroups` element with a new object — only push/filter, keeping surviving
+elements' identity intact) — but if Group 3 converted the functions that
+create/update `lotGroups` (`saveLotGroup`/`stopLotGroup`/
+`applyAcceptedLotTransition`/`normalizeLotGroups`/`applyLotGroupActivation`)
+to "always create a new object" WITHOUT also fixing these two reference-
+holding variables, it would recreate the exact `currentUser` bug from
+Group 1.
+
+**Deliberate scope narrowing decision**: fixed ONLY the `.push()` calls that
+don't reassign the parent array (`state.instruments`/`state.qcLots`/
+`state.qcPanels` — the 3 arrays this group actually names, same bug class
+as Group 2's `pushRaw()`), LEAVING every element-FIELD mutation
+(`Object.assign(record, patch)`, `lot.groupId = ...`) UNCHANGED — since
+elements stay the SAME reference throughout, this keeps `targetSwitchCtx`/
+`activateLotGroup` safe. Converting EVERY element mutation to "always
+create a new object" (matching the depth done for `users` in Group 1) is
+deferred to a SEPARATE, more careful pass specifically on `lotGroups`
+(belongs to Group 4 "tests/teaRefs/lotTransitions" or its own split) — at
+that point, the two reference-holding variables MUST be fixed at the same
+time (switch to holding an id, `find()` again when needed), never done in
+isolation.
+
+Fixed 5 non-reassigning `.push()` spots: `manage-config-service.ts`'s
+`saveInstrument()`/`savePanel()`/`saveLot()` (3 spots), and
+`test-configuration-normalization.ts`'s 3 spots that auto-generate an
+instrument from legacy data (migration, runs inside `ensureShape()`),
+`configuration-relations.ts`'s 1 spot that auto-generates a Panel QC from
+legacy `assayGroups` — ALL changed from `.push(x)` to
+`state.array=[...state.array,x]`. DELIBERATELY LEFT
+`state.lotGroups.push(...)`/`group.lotIds.push(...)` untouched in BOTH
+migration files (for the exact reason above — splitting this out of this
+pass avoids doing it half-finished).
+
+The survey also confirmed the `derived()`/`derivedIndex` cache
+(`src/domain/qc/derived-index.ts`) DOES read `qcPanels`/`qcLots`/
+`lotGroups`/`lotTransitions`/`tests` as part of its signature (reference +
+length + a few per-element fields) but was ALREADY self-verifying correctly
+(replacing the array reference changes the signature → auto-rebuild, no
+stale read) — nothing needed fixing there. The other memos (`wgMemo`/
+`acceptedMemo`/`cusumMemo`/`pointsCache`) aren't reference-based (manually
+invalidated via `clearDerived`), so this change doesn't affect them either
+way. Verified: `npm test` 431/431 (no test needed updating), `typecheck`
+clean, `build:pilot` succeeds (4/4), `check-build-freshness` matches,
+`a11y-audit` 0 violations (18/18 modals — including `manage:add-instrument`/
+`add-lot`/`add-assay`), `ui-workflow-check` 29/29 (including "Form thêm máy
+lưu đủ dữ liệu"/"Thêm máy ghi audit"/"Form sửa máy cập nhật đúng bản ghi"),
+`nce-workflow-check` 91/91, `benchmarks/verify-release.js` PASSES IN FULL,
+plus an ad-hoc Playwright script calling `ManageConfigService.saveInstrument()`
+directly confirming `state.instruments` is a NEW array afterward
+(`sameArrayRef: false`), the count correctly increments, and the new
+instrument renders correctly right after `rerender()` — no cache read stale
+data.
+
 Then shrink/delete the now-dead
 `root.X=` aliases, `global.d.ts`'s
 ambient bare-global declarations, and rewrite the 61 sandbox tests + ~88

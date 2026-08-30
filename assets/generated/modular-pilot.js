@@ -2013,7 +2013,7 @@
 				message: "Không thể tạo mã máy xét nghiệm."
 			};
 			Object.assign(record, checked.data);
-			if (!old) state.instruments.push(record);
+			if (!old) state.instruments = [...state.instruments, record];
 			if (old) (state.tests || []).filter((test) => test.instrumentId === id).forEach((test) => {
 				test.machine = record.name;
 			});
@@ -2098,10 +2098,7 @@
 				message: "Không thể tạo mã Panel QC."
 			};
 			Object.assign(record, checked.data);
-			if (!existing) {
-				state.qcPanels = state.qcPanels || [];
-				state.qcPanels.push(record);
-			}
+			if (!existing) state.qcPanels = [...state.qcPanels || [], record];
 			return {
 				record,
 				created: !existing
@@ -2612,10 +2609,7 @@
 				message: "Không thể tạo mã lô QC."
 			};
 			Object.assign(record, data);
-			if (!old) {
-				state.qcLots = state.qcLots || [];
-				state.qcLots.push(record);
-			}
+			if (!old) state.qcLots = [...state.qcLots || [], record];
 			(state.tests || []).forEach((test) => (test.levels || []).filter((level) => level.qcLotId === record.id).forEach((level) => {
 				level.level = data.level;
 				level.lot = data.lotNo;
@@ -7580,14 +7574,14 @@
 	function reconcileConfigurationRelations(state, deps) {
 		if (!state.qcPanels.length && state.assayGroups.length) state.assayGroups.forEach((group) => {
 			const first = (state.tests || []).find((test) => (group.testIds || []).includes(test.id));
-			state.qcPanels.push({
+			state.qcPanels = [...state.qcPanels, {
 				id: group.id || deps.uid(),
 				name: group.name || "Panel QC",
 				instrumentId: first && first.instrumentId || state.instruments[0].id,
 				testIds: [...group.testIds || []],
 				note: group.note || "Chuyển từ nhóm xét nghiệm cũ",
 				active: group.active !== false
-			});
+			}];
 		});
 		state.lotGroups.forEach((group) => {
 			group.lotIds = Array.isArray(group.lotIds) ? [...new Set(group.lotIds)].filter((id) => (state.qcLots || []).some((lot) => lot.id === id)) : [];
@@ -7642,7 +7636,7 @@
 			}
 		});
 		(state.machines || []).forEach((name) => {
-			if (name && !state.instruments.some((instrument) => deps.searchText(instrument.name) === deps.searchText(name))) state.instruments.push({
+			if (name && !state.instruments.some((instrument) => deps.searchText(instrument.name) === deps.searchText(name))) state.instruments = [...state.instruments, {
 				id: deps.uid(),
 				name,
 				manufacturer: "",
@@ -7650,9 +7644,9 @@
 				serial: "",
 				section: "",
 				active: true
-			});
+			}];
 		});
-		if (!state.instruments.length) state.instruments.push({
+		if (!state.instruments.length) state.instruments = [{
 			id: deps.uid(),
 			name: "Máy A",
 			manufacturer: "",
@@ -7660,7 +7654,7 @@
 			serial: "",
 			section: "",
 			active: true
-		});
+		}];
 		state.machines = [...new Set(state.instruments.map((instrument) => instrument.name).filter(Boolean))];
 		state.tests.forEach((test) => {
 			let instrument = state.instruments.find((item) => item.id === test.instrumentId) || state.instruments.find((item) => deps.searchText(item.name) === deps.searchText(test.machine));
@@ -7674,7 +7668,7 @@
 					section: "",
 					active: true
 				};
-				state.instruments.push(instrument);
+				state.instruments = [...state.instruments, instrument];
 			}
 			test.instrumentId = instrument.id;
 			test.machine = instrument.name;

@@ -2,7 +2,12 @@ type Row=Record<string,any>;
 export type ConfigurationRelationDependencies={uid:()=>string;switchesLot:(transition:Row)=>boolean;applyAcceptedTransition:(transition:Row)=>void;normalizeLotGroups:()=>void;syncLotDepletion:()=>void};
 
 export function reconcileConfigurationRelations(state:Row,deps:ConfigurationRelationDependencies){
-  if(!state.qcPanels.length&&state.assayGroups.length)state.assayGroups.forEach((group:Row)=>{const first=(state.tests||[]).find((test:Row)=>(group.testIds||[]).includes(test.id));state.qcPanels.push({id:group.id||deps.uid(),name:group.name||'Panel QC',instrumentId:first&&first.instrumentId||state.instruments[0].id,testIds:[...(group.testIds||[])],note:group.note||'Chuyển từ nhóm xét nghiệm cũ',active:group.active!==false});});
+  /* Giai đoạn 7 (state immutable, nhóm instruments/qcLots/qcPanels,
+     2026-08-30): gán lại `state.qcPanels` bằng mảng MỚI thay vì .push() tại
+     chỗ. lotGroups' lotIds/groupId (dòng dưới) CỐ TÌNH chưa đổi — xem ghi
+     chú trong test-configuration-normalization.ts về targetSwitchCtx/
+     activateLotGroup giữ tham chiếu OBJECT phần tử lotGroups. */
+  if(!state.qcPanels.length&&state.assayGroups.length)state.assayGroups.forEach((group:Row)=>{const first=(state.tests||[]).find((test:Row)=>(group.testIds||[]).includes(test.id));state.qcPanels=[...state.qcPanels,{id:group.id||deps.uid(),name:group.name||'Panel QC',instrumentId:first&&first.instrumentId||state.instruments[0].id,testIds:[...(group.testIds||[])],note:group.note||'Chuyển từ nhóm xét nghiệm cũ',active:group.active!==false}];});
   state.lotGroups.forEach((group:Row)=>{group.lotIds=Array.isArray(group.lotIds)?[...new Set(group.lotIds)].filter(id=>(state.qcLots||[]).some((lot:Row)=>lot.id===id)):[];});
   state.qcLots.forEach((lot:Row)=>{if(lot.groupId){const group=state.lotGroups.find((item:Row)=>item.id===lot.groupId);if(group&&!group.lotIds.includes(lot.id))group.lotIds.push(lot.id);}});
   const retiredTo=new Map((state.lotTransitions||[]).filter(deps.switchesLot).map((transition:Row)=>[String(transition.fromLotId),String(transition.toLotId)]));
