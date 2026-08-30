@@ -454,9 +454,18 @@ calls. The existing `notifyReactStore` dependency (passed into
 now also calls `appStore.getState().touch()` alongside the pre-existing
 `window.QCLabReact?.notify()` call — the only behavior change in this phase,
 and inert until something actually subscribes to the store. `kernel`'s
-`window.__QC_KERNEL__` assignment is guarded by `typeof window!=='undefined'`
-(caught immediately by the sandbox tests otherwise — `vm.createContext` has
-no `window`). `kernel`'s namespaces mirror each page's OWN controller return
+`window.__QC_KERNEL__` assignment was originally guarded by
+`typeof window!=='undefined'` (caught immediately by the sandbox tests
+otherwise — `vm.createContext` has no `window`) — **since Giai đoạn 4 Bước 1
+(2026-08-30) this guard is gone**: the assignment goes through `root`
+(`=globalThis`, already used everywhere else in this file) instead of
+`window` directly, since `globalThis` always exists (that's exactly what
+`vm.createContext(sandbox)` turns `sandbox` into) while `window` doesn't in a
+bare vm context — `root===window` in a real browser, so this changed nothing
+observable there, but it makes `__QC_KERNEL__` reachable from
+`tests/helpers/sandbox.js`'s sandboxed tests for the first time, which is the
+foundation the sandbox-test-rewrite portion of Giai đoạn 4 depends on.
+`kernel`'s namespaces mirror each page's OWN controller return
 object 1:1 (`kernel.entry = entryPageController`, `kernel.sigma =
 sigmaPageController`, etc. — no new taxonomy invented) plus a `kernel.pres`
 grab-bag for the cross-page shared helpers that aren't owned by any single

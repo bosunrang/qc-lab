@@ -31442,7 +31442,7 @@
 	root.buildSigmaXlsx = dataIoController.buildSigmaXlsx;
 	root.exportSigmaPeriodXLSX = dataIoController.exportSigmaPeriodXLSX;
 	root.exportSigmaPeriodsXLSX = dataIoController.exportSigmaPeriodsXLSX;
-	var kernel = {
+	root.__QC_KERNEL__ = {
 		store: appStore,
 		entry: {
 			...entryPageController,
@@ -31587,7 +31587,6 @@
 			reauthAccountLabel: root.reauthAccountLabel
 		}
 	};
-	if (typeof window !== "undefined") window.__QC_KERNEL__ = kernel;
 	root.boot = async () => {
 		if (await loadBootState()) await ensureAdmin().then(() => {
 			showLogin();

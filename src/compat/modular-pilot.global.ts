@@ -5687,7 +5687,13 @@ const kernel = {
     reauthVerify: (root as any).reauthVerify, reauthAccountLabel: (root as any).reauthAccountLabel,
   },
 };
-if (typeof window !== 'undefined') (window as any).__QC_KERNEL__ = kernel;
+/* root === globalThis luôn tồn tại (kể cả trong vm.createContext của
+   tests/helpers/sandbox.js, không có window) — không cần guard
+   typeof window!=='undefined' như trước (kernel chỉ cần gán qua root, và
+   trong trình duyệt thật root===window nên hành vi không đổi). Đây là nền
+   tảng để Giai đoạn 4 viết lại các sandbox test đọc qua __QC_KERNEL__ thay
+   vì tên toàn cục rời rạc. */
+(root as any).__QC_KERNEL__ = kernel;
 
 // Retire classic assets/app.js (2026-08-20, Pha H lát 1) — boot entry point (9
 // dòng, không có logic mới). Đặt CUỐI file (mọi service ở trên đã construct
