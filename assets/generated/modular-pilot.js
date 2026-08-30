@@ -8117,85 +8117,6 @@
 		};
 	}
 	//#endregion
-	//#region src/presentation/modal/modal-focus-trap.ts
-	function queryFocusable(container) {
-		return [...container.querySelectorAll("button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),a[href],[tabindex]:not([tabindex=\"-1\"])")].filter((el) => el.offsetParent !== null);
-	}
-	function createFocusTrapKeydown(deps) {
-		return (event) => {
-			const container = deps.activeContainer();
-			if (!container) return;
-			if (event.key === "Escape") {
-				event.preventDefault();
-				deps.onEscape();
-				return;
-			}
-			if (event.key !== "Tab") return;
-			const items = queryFocusable(container);
-			if (!items.length) {
-				event.preventDefault();
-				container.focus();
-				return;
-			}
-			const first = items[0], last = items[items.length - 1];
-			if (event.shiftKey && deps.activeElement() === first) {
-				event.preventDefault();
-				last.focus();
-			} else if (!event.shiftKey && deps.activeElement() === last) {
-				event.preventDefault();
-				first.focus();
-			}
-		};
-	}
-	//#endregion
-	//#region src/presentation/modal/modal-controller.ts
-	function createModalController(deps) {
-		let modalReturnFocus = null;
-		const modalRoot = () => deps.document.getElementById("modalRoot");
-		const activeModal = () => deps.document.querySelector("#modalRoot .modal");
-		const closeModal = () => {
-			const r = modalRoot(), restore = modalReturnFocus;
-			deps.document.removeEventListener("keydown", modalKeydown);
-			if (r) r.innerHTML = "";
-			modalReturnFocus = null;
-			if (restore && restore.isConnected && restore.focus) deps.requestFrame(() => restore.focus({ preventScroll: true }));
-		};
-		const modalKeydown = createFocusTrapKeydown({
-			activeContainer: activeModal,
-			activeElement: () => deps.document.activeElement,
-			onEscape: closeModal
-		});
-		const openModal = (html) => {
-			const r = modalRoot();
-			if (!r) return;
-			modalReturnFocus = deps.document.activeElement && deps.document.activeElement !== deps.document.body ? deps.document.activeElement : null;
-			r.innerHTML = `<div class="modal-bg" role="presentation" data-action="closeModal" data-action-self-only>${html}</div>`;
-			const modal = r.querySelector(".modal");
-			if (!modal) return;
-			modal.setAttribute("role", "dialog");
-			modal.setAttribute("aria-modal", "true");
-			modal.tabIndex = -1;
-			const title = modal.querySelector(".modal-h h3");
-			if (title) {
-				if (!title.id) title.id = "modalTitle";
-				modal.setAttribute("aria-labelledby", title.id);
-			}
-			modal.querySelectorAll(".modal-close").forEach((button) => {
-				if (!button.getAttribute("aria-label")) button.setAttribute("aria-label", "Đóng hộp thoại");
-			});
-			deps.document.removeEventListener("keydown", modalKeydown);
-			deps.document.addEventListener("keydown", modalKeydown);
-			deps.requestFrame(() => {
-				(modal.querySelector("[autofocus]") || queryFocusable(modal)[0] || modal).focus({ preventScroll: true });
-			});
-		};
-		return {
-			openModal,
-			closeModal,
-			modalKeydown
-		};
-	}
-	//#endregion
 	//#region src/presentation/router/vn-date-picker-controller.ts
 	var MONTHS = [
 		"Tháng 1",
@@ -28087,17 +28008,11 @@
 		license: () => typeof window === "undefined" ? null : window.qcLicense,
 		storage: typeof localStorage === "undefined" ? { setItem: () => {} } : localStorage
 	});
-	var modalDocument = () => typeof document !== "undefined" ? document : { querySelectorAll: () => [] };
 	var modalTemplateApi = createModalTemplate({ escapeAttr: (value) => root.escAttr(value) });
 	root.modalTemplate = modalTemplateApi.modalTemplate;
 	root.modalCloseButton = modalTemplateApi.modalCloseButton;
-	var modalControllerApi = createModalController({
-		document: modalDocument(),
-		requestFrame: (work) => requestAnimationFrame(work)
-	});
-	root.openModal = modalControllerApi.openModal;
-	root.closeModal = modalControllerApi.closeModal;
-	root.modalKeydown = modalControllerApi.modalKeydown;
+	root.openModal = (html) => window.QCLabReact.openModal(html);
+	root.closeModal = () => window.QCLabReact.closeModal();
 	root.closeDialogOverlay = (result) => window.QCLabReact.closeDialogOverlay(result);
 	root.confirmDialog = (opts) => window.QCLabReact.confirmDialog(opts);
 	root.infoDialog = (message, opts) => window.QCLabReact.infoDialog(message, opts);

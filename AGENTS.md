@@ -913,13 +913,54 @@ confirm/Escape/backdrop-click, `infoDialog` resolves on "Đã hiểu", and
 `reauthenticateCurrentUser` shows the inline error and stays open on a wrong
 password.
 
-Remaining for Giai đoạn 3: the ~17 page-specific form modals (`openModal`/
-`closeModal`, `#modalRoot` — Manage's instrument/lot/assay/tea-lab-profile,
-Sigma's add-test/bias/MU-budget, Reagent's create-comparison/find-existing,
-Actions' NCE guide, Users' edit-permissions, Settings' LIS-queue, Audit's
-archive-log — the same 18-modal list `scripts/a11y-audit.js`'s `MODALS`
-already enumerates, now 2 down/18), one at a time, same full-verify-after-each
-discipline. Then shrink/delete the now-dead `root.X=` aliases, `global.d.ts`'s
+`#modalRoot` infrastructure (done): the ~16 remaining page-specific form
+modals (Manage's instrument/lot/assay/tea-lab-profile, Sigma's
+add-test/bias/MU-budget, Reagent's create-comparison/find-existing, Actions'
+NCE guide, Users' edit-permissions, Settings' LIS-queue, Audit's archive-log)
+all still render as classic HTML strings via `openModal(html)` — but
+`#modalRoot` itself is now permanently React-owned, the same strangler-fig
+shape already proven across the whole page migration: `src/react/dialogs/
+modal-store.ts`'s `ModalState` has an `'html'` variant (a raw string, shown
+via `dangerouslySetInnerHTML` — what every unconverted modal still produces)
+and a `'react'` variant (`render: () => ReactNode`, for a modal once it's
+actually ported to JSX) side by side, so modals can be converted **one at a
+time** without two writers ever fighting over the same DOM node — the exact
+trap `reauthenticateCurrentUser` hit and had to be fixed alongside
+confirmDialog/infoDialog. `openModal(html)` keeps its original signature
+(now `(window as any).QCLabReact.openModal(html)` under the hood), so **none
+of the ~17 existing call sites needed to change** — only the container
+itself moved to React. `src/react/dialogs/ModalOverlay.tsx` mirrors
+`DialogOverlay.tsx`'s pattern but can't hold a stable `ref` to the modal
+element the way `DialogOverlay` does (an `'html'`-kind child isn't a React
+tree, so there's nothing to attach a ref to) — it re-queries `#modalRoot
+.modal` on demand instead, exactly like classic `modal-controller.ts`'s own
+`activeModal()` used to. For the `'html'` kind only, a `useHtmlModalA11y`
+effect reproduces the same post-render DOM annotation classic code did
+(`role="dialog"`, `aria-modal`, `aria-labelledby` wired to the first `<h3>`,
+a default `aria-label` on any `.modal-close` button missing one) — a
+future `'react'`-kind modal sets all of this directly in its own JSX instead,
+same division of labor as `DialogOverlay.tsx`'s `confirm`/`info`/`reauth`
+kinds. Classic `modal-controller.ts` was deleted outright (confirmed zero
+consumers left after `root.openModal`/`root.closeModal` were repointed) —
+`tests/ui-accessibility.test.js`/`ui-route-structure.test.js`'s `modals`
+text-scanner concatenation now reads `ModalOverlay.tsx` in its place (one
+literal string tweak: `setAttribute('role','dialog')` needed the same
+no-space style as the deleted classic file, since the scanner regex is an
+exact string match, not whitespace-tolerant). Verified: `npm test` 467/467,
+`typecheck` clean, `check-build-freshness` matches all 4 bundles,
+`a11y-audit` 0 violations across **all 18** modals (proving the `'html'`
+compatibility path is pixel-for-pixel behaviorally identical to the classic
+container for every still-unconverted modal), `ui-workflow-check` 29/29,
+`nce-workflow-check` 91/91.
+
+Remaining for Giai đoạn 3: convert each of the ~16 form modals from the
+`'html'` string path to a real `'react'` component, one at a time, same
+full-verify-after-each discipline established across Giai đoạn 2 — each
+conversion touches exactly one modal's trigger function (swap
+`deps.openModal(deps.modalTemplate(...))` for `openReactModal(() =>
+<TheModal .../>)`) and needs no changes to any other still-unconverted
+modal, thanks to the infrastructure above. Then shrink/delete the now-dead
+`root.X=` aliases, `global.d.ts`'s
 ambient bare-global declarations, and rewrite the 61 sandbox tests + ~88
 bridge-wiring text-scanner tests. See the plan file for the full phase
 breakdown and the risks already identified (LIS Gateway's

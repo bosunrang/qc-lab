@@ -213,7 +213,6 @@ import { createAfterRenderController } from '../presentation/render/after-render
 import { createRouterPagePolicy } from '../presentation/router/router-page-policy';
 import { createRouterShellController } from '../presentation/router/router-shell-controller';
 import { createModalTemplate } from '../presentation/modal/modal-template';
-import { createModalController } from '../presentation/modal/modal-controller';
 import { createVnDatePickerController } from '../presentation/router/vn-date-picker-controller';
 import { createActionDispatcher } from '../presentation/app/action-dispatcher';
 import { createChartTooltipService } from '../presentation/chart/chart-tooltip-service';
@@ -1669,9 +1668,8 @@ type QCLabGlobal = typeof globalThis & {
   rerender: ReturnType<typeof createRouterDispatchController>['rerender'];
   modalTemplate: ReturnType<typeof createModalTemplate>['modalTemplate'];
   modalCloseButton: ReturnType<typeof createModalTemplate>['modalCloseButton'];
-  openModal: ReturnType<typeof createModalController>['openModal'];
-  closeModal: ReturnType<typeof createModalController>['closeModal'];
-  modalKeydown: ReturnType<typeof createModalController>['modalKeydown'];
+  openModal: (html: string) => void;
+  closeModal: () => void;
   closeDialogOverlay: (result?: unknown) => void;
   confirmDialog: (opts?: { kicker?: string; title?: string; message?: string; detail?: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean }) => Promise<boolean>;
   infoDialog: (message: string, opts?: { title?: string; type?: 'warn' | 'success' }) => Promise<void>;
@@ -3290,11 +3288,17 @@ root.chartDataUrl=createChartDataUrl({createCanvas:()=>document.createElement('c
 root.afterRenderCanvasService=createVisibleCanvasService({requestFrame:work=>requestAnimationFrame(work),intersectionObserver:typeof IntersectionObserver==='function'?onVisible=>new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting))onVisible();},{rootMargin:'160px'}):undefined,resizeObserver:typeof ResizeObserver==='function'?onResize=>new ResizeObserver(onResize):undefined,isConnected:canvas=>canvas.isConnected!==false});
 root.routerPagePolicy=createRouterPagePolicy();
 root.routerShell=createRouterShellController({find:id=>typeof document==='undefined'?null:document.getElementById(id),findShell:()=>typeof document==='undefined'?null:document.getElementById('appShell'),lab:()=>state.lab||{},pages:()=>root.routerPagePolicy.pages,canAccess:(id,user)=>root.routerPagePolicy.canAccessPage(id,user),escape:value=>(root as any).esc(value),escapeAttr:value=>(root as any).escAttr(value),app:()=>typeof window==='undefined'?{version:'dev'}:(window as any).QCLAB_APP||{version:'dev'},license:()=>typeof window==='undefined'?null:(window as any).qcLicense,storage:typeof localStorage==='undefined'?{setItem:()=>{}}:localStorage});
-const modalDocument=()=>typeof document!=='undefined'?document:({querySelectorAll:()=>[]} as unknown as Document);
 const modalTemplateApi=createModalTemplate({escapeAttr:value=>(root as any).escAttr(value)});
 root.modalTemplate=modalTemplateApi.modalTemplate;root.modalCloseButton=modalTemplateApi.modalCloseButton;
-const modalControllerApi=createModalController({document:modalDocument(),requestFrame:work=>requestAnimationFrame(work)});
-root.openModal=modalControllerApi.openModal;root.closeModal=modalControllerApi.closeModal;root.modalKeydown=modalControllerApi.modalKeydown;
+/* openModal/closeModal retired sang React thật (Giai đoạn 3,
+   ModalOverlay.tsx trong react-pilot.js) — #modalRoot giờ do MỘT React root
+   sở hữu vĩnh viễn, giống #dialogRoot. openModal(html) giữ NGUYÊN chữ ký cũ
+   (nhận chuỗi HTML) nên ~17 modal form chưa chuyển vẫn gọi được không cần
+   sửa — ModalOverlay.tsx tự bơm chuỗi đó qua dangerouslySetInnerHTML cho
+   tới lượt từng modal chuyển hẳn sang component thật (xem modal-store.ts).
+   modal-controller.ts bị xóa cùng lát này (mọi consumer đã chuyển). */
+root.openModal=html=>(window as any).QCLabReact.openModal(html);
+root.closeModal=()=>(window as any).QCLabReact.closeModal();
 /* confirmDialog/infoDialog/closeDialogOverlay retired sang React thật (Giai
    đoạn 3, DialogOverlay.tsx trong react-pilot.js) — #dialogRoot giờ do MỘT
    React root sở hữu vĩnh viễn (mount một lần lúc react-pilot.js chạy), nên
