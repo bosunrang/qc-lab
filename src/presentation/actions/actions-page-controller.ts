@@ -67,7 +67,6 @@ export function createActionsPageController(deps: {
   ActionEvidencePresentation: AnyRec;
   ActionRerunEvidencePresentation: AnyRec;
   ActionViolationService: AnyRec;
-  ActionGuidePresentation: AnyRec;
   ActionCurrentIssues: () => AnyRec[];
   NceLifecycleWorkflowCommand: AnyRec;
   actionFormUiState: AnyRec;
@@ -288,10 +287,6 @@ export function createActionsPageController(deps: {
     </ol>`;
     deps.openModal(deps.pres.actionDetailModalHtml({ bodyHtml: body, closeButtonHtml: deps.btn('Đóng', { action: 'closeModal' }, 'teal') }));
   };
-  const openActionGuide = () => {
-    const content = deps.pres.actionGuideContent(deps.ActionGuidePresentation.steps);
-    deps.openModal(deps.modalTemplate({ title: 'Quy trình 8 bước xử lý hồ sơ NCE', body: content.body, footer: content.footer, cls: 'action-guide-modal', bodyClass: '' }));
-  };
   const groupIssuesByTestDate = (issues: AnyRec[]) => deps.ActionListPresentation.groupIssuesByTestDate(issues);
   /* Hồ sơ cũ tự sinh lúc hủy điểm chỉ lưu rule='Hủy điểm QC' — không phải luật Westgard.
      Suy |Z| của chính điểm đó ra ngữ cảnh đọc được, nhưng LUÔN gắn nhãn "suy từ Z" và
@@ -340,7 +335,7 @@ export function createActionsPageController(deps: {
     actionLevelShort, currentIssues, cancelAction, confirmCancelAction, actionApprovalToken,
     approveAction, confirmApproveAction, returnAction, confirmReturnAction, actionCanEscalate, escalateAction,
     actionCanReopen, reopenAction, confirmReopenAction, actionDetailCheck,
-    actionEvidenceTimelineHtml, actionRerunEvidenceHtml, openActionQcEvidence, viewActionDetail, openActionGuide,
+    actionEvidenceTimelineHtml, actionRerunEvidenceHtml, openActionQcEvidence, viewActionDetail,
     groupIssuesByTestDate, actionViolationInfo, actionQcVerdictLabel,
     actionsModel,
   };

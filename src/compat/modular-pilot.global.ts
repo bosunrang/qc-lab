@@ -435,7 +435,6 @@ import { createSigmaPrintRows } from '../presentation/sigma/sigma-print-rows';
 import { createSigmaMuPrintRows } from '../presentation/sigma/sigma-mu-print-rows';
 import { createReportPointsTable } from '../presentation/report/report-points-table';
 import { createActionReportHtml } from '../presentation/nce/action-report-html';
-import { createActionGuideContent } from '../presentation/nce/action-guide-content';
 import { createActionDetailCheckHtml } from '../presentation/nce/action-detail-check-html';
 import { createActionEvidenceTimelineHtml } from '../presentation/nce/action-evidence-timeline-html';
 import { createActionRerunEvidenceHtml } from '../presentation/nce/action-rerun-evidence-html';
@@ -1180,7 +1179,6 @@ type QCLabGlobal = typeof globalThis & {
   actionRerunEvidenceHtml?: (a: Record<string, any>, rr: unknown, t: unknown) => string;
   openActionQcEvidence?: (tid: unknown, level: unknown, pointId: unknown, date: unknown, lot: unknown) => void;
   viewActionDetail?: (i: number) => void;
-  openActionGuide?: () => void;
   groupIssuesByTestDate?: (issues: Record<string, any>[]) => Record<string, any>[];
   actionViolationInfo?: (a: Record<string, any>) => Record<string, any>;
   actionQcVerdictLabel?: (a: Record<string, any>) => string;
@@ -1864,7 +1862,6 @@ type QCLabGlobal = typeof globalThis & {
   dashboardTestItems: ReturnType<typeof createDashboardTestItems>;
   dashTestSetStatus: ReturnType<typeof createDashboardPageController>['dashTestSetStatus'];
   dashboardModel: ReturnType<typeof createDashboardPageController>['dashboardModel'];
-  actionGuideContent: ReturnType<typeof createActionGuideContent>;
   actionDetailCheckHtml: ReturnType<typeof createActionDetailCheckHtml>;
   actionEvidenceTimelinePresentation: ReturnType<typeof createActionEvidenceTimelineHtml>;
   actionRerunEvidencePresentation: ReturnType<typeof createActionRerunEvidenceHtml<any>>;
@@ -3937,7 +3934,6 @@ const routerDispatch=createRouterDispatchController({
   notifyReactStore:()=>{appStore.getState().touch();},
 });
 root.go=routerDispatch.go;root.resetMainScroll=routerDispatch.resetMainScroll;root.render=routerDispatch.render;root.restoreRouteFilters=routerDispatch.restoreRouteFilters;root.rerender=routerDispatch.rerender;
-root.actionGuideContent=createActionGuideContent({escape:(value:any)=>(root as any).esc(value),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
 root.actionDetailCheckHtml=createActionDetailCheckHtml({escape:(value:any)=>(root as any).esc(value)});
 root.actionEvidenceTimelinePresentation=createActionEvidenceTimelineHtml({escape:(value:any)=>(root as any).esc(value)});
 root.actionRerunEvidencePresentation=createActionRerunEvidenceHtml<any>({escape:(value:any)=>(root as any).esc(value),pointValue:(point:any,test:any)=>(root as any).fmtPointValue(point,test),date:(value:any)=>(root as any).vnDate(value),button:(label,action,variant,title)=>(root as any).btn(label,action,variant,title)});
@@ -5241,7 +5237,7 @@ const actionsPageController = createActionsPageController({
   ActionReviewService: root.ActionReviewService, ActionReviewMessages: root.ActionReviewMessages, ActionEscalationService: root.ActionEscalationService,
   ActionListPresentation: root.ActionListPresentation, ActionStatusPresentation: root.ActionStatusPresentation, ActionReviewPresentation: root.ActionReviewPresentation,
   ActionDetailPresentation: root.ActionDetailPresentation, ActionEvidencePresentation: root.ActionEvidencePresentation, ActionRerunEvidencePresentation: root.ActionRerunEvidencePresentation,
-  ActionViolationService: root.ActionViolationService, ActionGuidePresentation: root.ActionGuidePresentation, ActionCurrentIssues: () => root.ActionCurrentIssues!(),
+  ActionViolationService: root.ActionViolationService, ActionCurrentIssues: () => root.ActionCurrentIssues!(),
   NceLifecycleWorkflowCommand: root.NceLifecycleWorkflowCommand, actionFormUiState: (root as any).actionFormUiState, modalTemplate: opts => root.modalTemplate(opts),
   QCCore: { cleanText: (value, maximumLength) => root.QCCore!.cleanText(value, maximumLength) },
   captureFormDraft: () => actionFormController.captureActionDraft(),
@@ -5267,7 +5263,6 @@ root.actionEvidenceTimelineHtml = actionsPageController.actionEvidenceTimelineHt
 root.actionRerunEvidenceHtml = actionsPageController.actionRerunEvidenceHtml;
 root.openActionQcEvidence = actionsPageController.openActionQcEvidence;
 root.viewActionDetail = actionsPageController.viewActionDetail;
-root.openActionGuide = actionsPageController.openActionGuide;
 root.groupIssuesByTestDate = actionsPageController.groupIssuesByTestDate;
 root.actionViolationInfo = actionsPageController.actionViolationInfo;
 root.actionQcVerdictLabel = actionsPageController.actionQcVerdictLabel;
@@ -5721,7 +5716,7 @@ const kernel = {
     ...entryPageController,
     openRangeWorkflow: (root as any).openRangeWorkflow, revertRange: (root as any).revertRange,
   },
-  actions: actionsPageController,
+  actions: { ...actionsPageController, actionGuideSteps: (root as any).ActionGuidePresentation.steps },
   actionForm: actionFormController,
   sigma: sigmaPageController,
   westgard: {

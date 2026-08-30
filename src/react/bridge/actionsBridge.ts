@@ -1,4 +1,7 @@
+import { createElement } from 'react';
 import { getKernel } from '../state/kernel';
+import { openReactModal } from '../dialogs/modal-store';
+import { ActionGuideModal } from '../modals/ActionGuideModal';
 
 export type ActionSideChip = { cls: string; label: string };
 
@@ -78,7 +81,7 @@ export const actionUpdateBiasHint = (): void => getKernel().actionForm.actionUpd
 export const actionFillBias = (targetId: string, value: unknown): void => getKernel().actionForm.actionFillBias(targetId, value);
 export const closeActionForm = (): void => getKernel().actionForm.closeActionForm();
 export const addAction = (): void => { getKernel().actionForm.addAction(); };
-export const openActionGuide = (): void => getKernel().actions.openActionGuide();
+export const openActionGuide = (): void => { openReactModal(() => createElement(ActionGuideModal, { steps: getKernel().actions.actionGuideSteps })); };
 export const syncActLevels = (): void => getKernel().actionForm.syncActLevels();
 export const syncActionRiskScore = (): void => getKernel().actionForm.syncActionRiskScore();
 export const syncActionResidualRiskScore = (): void => getKernel().actionForm.syncActionResidualRiskScore();

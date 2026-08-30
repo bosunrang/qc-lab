@@ -953,8 +953,61 @@ compatibility path is pixel-for-pixel behaviorally identical to the classic
 container for every still-unconverted modal), `ui-workflow-check` 29/29,
 `nce-workflow-check` 91/91.
 
-Remaining for Giai đoạn 3: convert each of the ~16 form modals from the
-`'html'` string path to a real `'react'` component, one at a time, same
+Actions' NCE guide (done, first modal actually converted to `'react'`):
+`openActionGuide()` — a purely informational popup (the 8-step NCE process,
+no form state, no re-authentication) — was picked first for exactly that
+reason, same "simplest first" logic as picking confirmDialog/infoDialog
+before reauthenticateCurrentUser. `src/react/modals/ActionGuideModal.tsx`
+reads the SAME step data as before (`root.ActionGuidePresentation.steps`,
+exposed via `kernel.actions.actionGuideSteps` — a plain data array, no
+duplication risk) and declares its own `role="dialog"`/`aria-modal`/
+`aria-labelledby`/`tabIndex` directly in JSX, same division of labor as
+`DialogOverlay.tsx`'s `'confirm'`/`'info'`/`'reauth'` kinds vs.
+`ModalOverlay.tsx`'s `useHtmlModalA11y` (which only runs for the `'html'`
+kind). The bridge function `openActionGuide` (`src/react/bridge/
+actionsBridge.ts`) keeps its exact name and call signature — `ActionsPage.tsx`
+needed ZERO changes, still `onClick={openActionGuide}` — but its
+implementation switched from `getKernel().actions.openActionGuide()` to
+`openReactModal(() => createElement(ActionGuideModal, {steps:
+getKernel().actions.actionGuideSteps}))`; `createElement` (not JSX) because
+`actionsBridge.ts` is a plain `.ts` file, and — the one build-config fix this
+conversion needed — `tsconfig.modules.json` (the non-JSX classic/bridge
+config, `include: ["src/**/*.ts"]`) was unintentionally also type-checking
+every `src/react/**/*.ts` bridge file redundantly alongside
+`tsconfig.react.json` (which already covers `src/react/**/*.ts` *and*
+`*.tsx` with `jsx:"react-jsx"`); that redundancy was harmless until a bridge
+file needed to import a `.tsx` component, at which point the non-JSX config
+failed to resolve it. Fixed by adding `"exclude": ["src/react/**"]` to
+`tsconfig.modules.json` — `src/react/**` was always meant to be
+`tsconfig.react.json`'s domain alone. The classic implementation
+(`openActionGuide()` in `actions-page-controller.ts`, `createActionGuideContent`/
+`action-guide-content.ts`, and their `root.X=` wiring) was deleted outright
+once confirmed to have zero remaining callers — `root.ActionGuidePresentation`
+itself (the pure step *data*, from `action-guide-presentation.ts`) stays,
+since the React side still reads it. Two now-obsolete test files were
+deleted (`action-guide-content.test.js` — exercised the deleted HTML
+builder directly; `admin-render-bridge.test.js` — its one-entry table
+existed solely to pin `actionGuideContent`'s classic bridge-contract shape),
+and two scanner assertions in `tests/ui-route-structure.test.js` were
+repointed at the new source of truth (the `const openActionGuide = ` check
+dropped from the classic-file list since the function no longer lives
+there; the `cls: 'action-guide-modal'` check now reads
+`ActionGuideModal.tsx`'s `className` instead, preserving the original
+intent — a dedicated CSS class, not a generic modal — against wherever the
+modal now actually lives). `scripts/a11y-audit.js`'s `actions:nce-guide`
+entry called `openActionGuide()` as a bare global — no longer possible since
+it's now React-only, not a `root.X=` global — fixed by clicking the real
+"Quy trình 8 bước" button instead (arguably more faithful to the file's own
+stated goal of exercising "the real trigger function, not a synthetic
+click", since a button click *is* the real trigger now). Verified: `npm
+test` 465/465 (467 minus the 2 deleted files), `typecheck` clean,
+`check-build-freshness` matches, `a11y-audit` 0 violations across all 18
+modals, `ui-workflow-check` 29/29, `nce-workflow-check` 91/91, plus an
+ad-hoc script confirming all 8 steps render with correct text, and the
+modal closes via Escape and via its "Đóng" button.
+
+Remaining for Giai đoạn 3: convert each of the other ~15 form modals from
+the `'html'` string path to a real `'react'` component, one at a time, same
 full-verify-after-each discipline established across Giai đoạn 2 — each
 conversion touches exactly one modal's trigger function (swap
 `deps.openModal(deps.modalTemplate(...))` for `openReactModal(() =>

@@ -112,7 +112,7 @@ assert.doesNotMatch(modals,/(?:function|const) (?:syncActLevels|currentIssues|be
    Đường cắt này cố ý KHÔNG một chiều (khác report-routes.js): form gọi ngược các khối
    dựng bằng chứng của trang, trang gọi vào form để mở/lưu hồ sơ. Vì vậy test chốt theo
    TRÁCH NHIỆM — hàm nào ở file nào — chứ không đòi đồ thị phụ thuộc không chu trình. */
-for(const name of ['currentIssues','cancelAction','viewActionDetail','openActionGuide'])assert.match(actions,new RegExp(`const ${name} = `),`${name} thuộc phần trang/vòng đời`);
+for(const name of ['currentIssues','cancelAction','viewActionDetail'])assert.match(actions,new RegExp(`const ${name} = `),`${name} thuộc phần trang/vòng đời`);
 for(const name of ['syncActLevels','beginActionFromIssue','addAction','actionFormModel','actionFormViewModel','readActionProtocolForm'])assert.match(form,new RegExp(`const ${name} = `),`${name} thuộc form NCE`);
 assert.doesNotMatch(actions,/const actionFormModel = |\bACT_SUGGEST\b\s*=/,'actions-routes.js không được giữ lại phần dựng form');
 assert.doesNotMatch(form,/const (?:pageActionsV4|currentIssues|approveAction|viewActionDetail) = /,'action-form.js không được kéo theo trang và vòng đời hồ sơ');
@@ -153,7 +153,7 @@ assert.match(reportsCss,/\.action-form-panel-head\{[^}]*justify-content:space-be
 assert.match(reportsCss,/\.action-form-panel-head\{[^}]*color:var\(--card-head-ink\);[^}]*font-size:var\(--section-head-size\);[^}]*font-weight:800/,'header lập hồ sơ NCE phải dùng đúng token chữ của header panel hệ thống');
 assert.match(reportsCss,/\.action-form-panel \.action-form-panel-head > \.panel-title\{[^}]*flex:1;[^}]*color:inherit;[^}]*font:inherit/,'tiêu đề lập hồ sơ NCE phải kế thừa nguyên kiểu chữ hệ thống từ header');
 assert.doesNotMatch(actionsArea,/headOnly\([^;\n]+btn\('Quy trình 8 bước'/,'nút quy trình không được chiếm chỗ trên header trang');
-assert.match(actions,/cls: 'action-guide-modal'/,'hướng dẫn 8 bước phải dùng popup NCE chuyên biệt');
+assert.match(read('src/react/modals/ActionGuideModal.tsx'),/className="modal action-guide-modal"/,'hướng dẫn 8 bước phải dùng popup NCE chuyên biệt');
 assert.match(actionCancelModal,/class="alert warn action-cancel-warning"/,'cảnh báo hủy NCE phải có bố cục riêng để nội dung không bị ép thành hai cột');
 assert.match(reportsCss,/\.action-cancel-warning\{[^}]*width:100%;[^}]*flex-direction:column/,'cảnh báo hủy NCE phải xếp câu chính và giải thích theo chiều dọc');
 assert.match(reportPage,/className="report-export-options"[\s\S]*?Kèm phụ lục NCE[\s\S]*?\(Áp dụng cho PDF và Excel\)[\s\S]*?className="report-actions"/,'tùy chọn phụ lục NCE phải nằm ở dòng riêng phía trên các nút xuất và có chú thích trong ngoặc');

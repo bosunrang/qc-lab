@@ -14463,16 +14463,6 @@
 		});
 	}
 	//#endregion
-	//#region src/presentation/nce/action-guide-content.ts
-	function createActionGuideContent(deps) {
-		return (steps) => {
-			return {
-				body: `<div class="modal-b" tabindex="0" aria-label="Nội dung quy trình 8 bước"><div class="action-guide-intro"><b>Nguyên tắc thực hiện</b><p>Lưu hồ sơ ngay sau bước 1 ở trạng thái <strong>Đang điều tra</strong>, sau đó hoàn thiện theo tiến độ xử lý.</p></div><ol class="action-guide-list">${steps.map((step, index) => `<li class="action-guide-card"><span class="action-guide-number">${index + 1}</span><div><small>${deps.escape(step.phase)}</small><b>${deps.escape(step.title)}</b><p>${deps.escape(step.text)}</p></div></li>`).join("")}</ol></div>`,
-				footer: `<div class="action-guide-footer-note"><b>Điều kiện khép vòng</b><span>Đủ bằng chứng QC, quyết định cho phép trở lại khi cần, đánh giá nguy cơ còn lại và phê duyệt độc lập.</span></div>${deps.button("Đóng", { action: "closeModal" }, "ghost")}`
-			};
-		};
-	}
-	//#endregion
 	//#region src/presentation/nce/action-detail-check-html.ts
 	function createActionDetailCheckHtml(deps) {
 		return (label, view, note) => `<div class="action-detail-check"><div><b>${deps.escape(label)}</b>${note ? `<div class="hint">${deps.escape(note)}</div>` : ""}</div><span class="tag ${view.cls}">${deps.escape(view.label)}</span></div>`;
@@ -21736,16 +21726,6 @@
 				closeButtonHtml: deps.btn("Đóng", { action: "closeModal" }, "teal")
 			}));
 		};
-		const openActionGuide = () => {
-			const content = deps.pres.actionGuideContent(deps.ActionGuidePresentation.steps);
-			deps.openModal(deps.modalTemplate({
-				title: "Quy trình 8 bước xử lý hồ sơ NCE",
-				body: content.body,
-				footer: content.footer,
-				cls: "action-guide-modal",
-				bodyClass: ""
-			}));
-		};
 		const groupIssuesByTestDate = (issues) => deps.ActionListPresentation.groupIssuesByTestDate(issues);
 		const actionViolationInfo = (a) => deps.ActionViolationService.info(a);
 		const actionQcVerdictLabel = (a) => deps.ActionViolationService.verdictLabel(a);
@@ -21888,7 +21868,6 @@
 			actionRerunEvidenceHtml,
 			openActionQcEvidence,
 			viewActionDetail,
-			openActionGuide,
 			groupIssuesByTestDate,
 			actionViolationInfo,
 			actionQcVerdictLabel,
@@ -29100,10 +29079,6 @@
 	root.render = routerDispatch.render;
 	root.restoreRouteFilters = routerDispatch.restoreRouteFilters;
 	root.rerender = routerDispatch.rerender;
-	root.actionGuideContent = createActionGuideContent({
-		escape: (value) => root.esc(value),
-		button: (label, action, variant) => root.btn(label, action, variant)
-	});
 	root.actionDetailCheckHtml = createActionDetailCheckHtml({ escape: (value) => root.esc(value) });
 	root.actionEvidenceTimelinePresentation = createActionEvidenceTimelineHtml({ escape: (value) => root.esc(value) });
 	root.actionRerunEvidencePresentation = createActionRerunEvidenceHtml({
@@ -31477,7 +31452,6 @@
 		ActionEvidencePresentation: root.ActionEvidencePresentation,
 		ActionRerunEvidencePresentation: root.ActionRerunEvidencePresentation,
 		ActionViolationService: root.ActionViolationService,
-		ActionGuidePresentation: root.ActionGuidePresentation,
 		ActionCurrentIssues: () => root.ActionCurrentIssues(),
 		NceLifecycleWorkflowCommand: root.NceLifecycleWorkflowCommand,
 		actionFormUiState: root.actionFormUiState,
@@ -31506,7 +31480,6 @@
 	root.actionRerunEvidenceHtml = actionsPageController.actionRerunEvidenceHtml;
 	root.openActionQcEvidence = actionsPageController.openActionQcEvidence;
 	root.viewActionDetail = actionsPageController.viewActionDetail;
-	root.openActionGuide = actionsPageController.openActionGuide;
 	root.groupIssuesByTestDate = actionsPageController.groupIssuesByTestDate;
 	root.actionViolationInfo = actionsPageController.actionViolationInfo;
 	root.actionQcVerdictLabel = actionsPageController.actionQcVerdictLabel;
@@ -32051,7 +32024,10 @@
 			openRangeWorkflow: root.openRangeWorkflow,
 			revertRange: root.revertRange
 		},
-		actions: actionsPageController,
+		actions: {
+			...actionsPageController,
+			actionGuideSteps: root.ActionGuidePresentation.steps
+		},
 		actionForm: actionFormController,
 		sigma: sigmaPageController,
 		westgard: {
