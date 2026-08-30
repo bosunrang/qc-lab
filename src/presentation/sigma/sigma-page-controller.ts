@@ -28,7 +28,6 @@ export function createSigmaPageController(deps: {
   escapeAttr: (value: unknown) => string;
   jsq: (value: unknown) => string;
   btn: (label: string, action: string | { action: string; args?: unknown[] } | null, cls?: string, title?: string, options?: AnyRec) => string;
-  dateBox: (id: string, value: string, cls?: string, attrs?: string) => string;
   vnDate: (value: unknown) => string;
   vnPeriod: (value: unknown) => string;
   fmt: (value: unknown, decimals?: number) => string;

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useAppStore } from '../state/kernel';
 import { PageHeader } from '../components/PageHeader';
+import { DateField } from '../components/DateField';
 import {
-  auditModel, roleLabel, formatDateTimeVN, dateBoxHtml, auditSetQuery,
+  auditModel, roleLabel, formatDateTimeVN, auditSetQuery, auditSetDate,
   exportActivityCSV, archiveActivityLog, auditVerifyChainNow, auditSetPageSize, auditClearFilters, auditSetPage,
   type AuditModel,
 } from '../bridge/auditBridge';
@@ -11,9 +12,8 @@ function Head() {
   return <PageHeader title="Nhật ký hoạt động" subtitle="Lưu vết các thao tác quan trọng; chỉ quản trị viên được xem" />;
 }
 
-function DateBox({ id, value, action }: { id: string; value: string; action: string }) {
-  const attrs = `aria-label="${action === 'from' ? 'Lọc nhật ký từ ngày' : 'Lọc nhật ký đến ngày'}" data-action="auditSetDate" data-args='["${action}"]' data-action-on="change"`;
-  return <span style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: dateBoxHtml(id, value, 'audit-date', attrs) }} />;
+function DateBox({ id, value, action }: { id: string; value: string; action: 'from' | 'to' }) {
+  return <DateField key={value} id={id} value={value} className="audit-date" ariaLabel={action === 'from' ? 'Lọc nhật ký từ ngày' : 'Lọc nhật ký đến ngày'} onChange={v => auditSetDate(action, v)} />;
 }
 
 function ChainStatus({ model }: { model: AuditModel }) {

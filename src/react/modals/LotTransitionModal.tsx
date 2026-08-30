@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
 import { closeModal } from '../dialogs/modal-store';
 import { getKernel } from '../state/kernel';
-import { dateBoxHtml, syncTargetRange } from '../bridge/manageBridge';
+import { syncTargetRange } from '../bridge/manageBridge';
+import { DateField } from '../components/DateField';
 
 type LotOption = string;
 type TargetRow = { testId: string; name: string; unit: string; mean: string; low: string; high: string; sd: string; assigned: boolean };
@@ -68,7 +69,7 @@ export function LotTransitionModal({ id, panels, panelId: initialPanelId, fromLo
           <div><label>Lô mới</label><LotComboInput inputId="cfgTransTo" initialValue={toValue} initialLotId={initialToLotId} options={toOptions} onResolve={setToLotId} /></div>
         </div>
         <div className="lot-trans-row2">
-          <div><label>Ngày bắt đầu (dd/mm/yyyy)</label><span style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: dateBoxHtml('cfgTransStart', startDate, '', '') }} /></div>
+          <div><label>Ngày bắt đầu (dd/mm/yyyy)</label><DateField id="cfgTransStart" value={startDate} /></div>
           <div><label>Trạng thái</label>
             <select id="cfgTransStatus" defaultValue={status === 'completed' ? 'active' : status}>
               <option value="planned">Dự kiến</option>

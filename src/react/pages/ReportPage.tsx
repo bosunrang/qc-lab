@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { useAppStore } from '../state/kernel';
 import { PageHeader } from '../components/PageHeader';
 import { PrintIcon } from '../components/PrintIcon';
+import { DateField } from '../components/DateField';
 import {
-  reportModel, dateBoxHtml, reportSearchSet,
+  reportModel, reportSearchSet, reportRangeChanged,
   goManageTargets, reportUnlockPeriod, reportSetLockPart, reportLockPeriod, printReport, exportReportXLSX, exportReportCSV,
   type ReportLockPanel,
 } from '../bridge/reportBridge';
@@ -33,8 +34,8 @@ function SearchInput({ query }: { query: string }) {
 function RangePicker({ start, end }: { start: string; end: string }) {
   return (
     <>
-      <div><label>Từ ngày</label><span style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: dateBoxHtml('rStartDate', start, '', 'data-action="reportRangeChanged" data-action-on="change"') }} /></div>
-      <div><label>Đến ngày</label><span style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: dateBoxHtml('rEndDate', end, '', 'data-action="reportRangeChanged" data-action-on="change"') }} /></div>
+      <div><label>Từ ngày</label><DateField id="rStartDate" value={start} onChange={() => reportRangeChanged()} /></div>
+      <div><label>Đến ngày</label><DateField id="rEndDate" value={end} onChange={() => reportRangeChanged()} /></div>
     </>
   );
 }

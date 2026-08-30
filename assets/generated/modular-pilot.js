@@ -12472,9 +12472,6 @@
 	function icon(id) {
 		return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${NAV_ICON_PATHS[id] || ""}</svg>`;
 	}
-	function icoCal() {
-		return "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"4\" y=\"5\" width=\"16\" height=\"16\" rx=\"2\"/><path d=\"M8 3v4M16 3v4M4 10h16\"/></svg>";
-	}
 	function icoDownload() {
 		return "<svg class=\"btn-ico\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/><polyline points=\"7 10 12 15 17 10\"/><line x1=\"12\" y1=\"15\" x2=\"12\" y2=\"3\"/></svg>";
 	}
@@ -12573,14 +12570,6 @@
 			replaceSelectItems,
 			liveRowFilter,
 			scheduleSearchRender
-		};
-	}
-	//#endregion
-	//#region src/presentation/router/date-box-html.ts
-	function createDateBoxHtml(deps) {
-		return (id, value = "", cls = "manage-date", attrs = "") => {
-			const iso = deps.vnPickerParse(value) || deps.parseVN(value) || "";
-			return `<span class="datebox ${cls}"><input id="${id}" class="date-text" inputmode="numeric" value="${deps.escapeAttr(deps.formatVnDate(value || ""))}" placeholder="dd/mm/yyyy" ${attrs}><span class="datepick" title="Chọn ngày">${icoCal()}</span><input class="native-date" type="date" lang="vi" value="${deps.escapeAttr(iso)}" title="Chọn ngày"></span>`;
 		};
 	}
 	//#endregion
@@ -28390,7 +28379,6 @@
 	root.dashTestSetStatus = dashboardPageController.dashTestSetStatus;
 	root.dashboardModel = dashboardPageController.dashboardModel;
 	root.icon = icon;
-	root.icoCal = icoCal;
 	root.icoDownload = icoDownload;
 	root.icoPrint = icoPrint;
 	var routerPermission = createRouterPermission({
@@ -28422,12 +28410,6 @@
 	root.replaceSelectItems = liveRowFilterService.replaceSelectItems;
 	root.liveRowFilter = liveRowFilterService.liveRowFilter;
 	root.scheduleSearchRender = liveRowFilterService.scheduleSearchRender;
-	root.dateBox = createDateBoxHtml({
-		vnPickerParse: (value) => root.vnDatePickerController.parse(value),
-		parseVN: (value) => root.parseVnDatePresentation(value),
-		escapeAttr: (value) => root.escAttr(value),
-		formatVnDate: (value) => vnDate(value)
-	});
 	var uiPrimitives = createUiPrimitives({ escapeAttr: (value) => root.escAttr(value) });
 	root.btn = uiPrimitives.btn;
 	root.emptyState = uiPrimitives.emptyState;
@@ -30362,7 +30344,6 @@
 		esc: (value) => root.esc(value),
 		escapeAttr: (value) => root.escAttr(value),
 		btn: (label, action, cls, title, options) => root.btn(label, action, cls, title, options),
-		dateBox: (id, value, cls, attrs) => root.dateBox(id, value, cls, attrs),
 		openModal: (html) => root.openModal(html),
 		closeModal: () => root.closeModal(),
 		confirmDialog: (opts) => root.confirmDialog(opts),
@@ -30439,7 +30420,6 @@
 		escapeAttr: (value) => root.escAttr(value),
 		btn: (label, action, cls, title, options) => root.btn(label, action, cls, title, options),
 		emptyState: (title, body, actions) => root.emptyState(title, body, actions),
-		dateBox: (id, value, cls, attrs) => root.dateBox(id, value, cls, attrs),
 		openModal: (html) => root.openModal(html),
 		closeModal: () => root.closeModal(),
 		openReactInstrumentModal: () => window.QCLabReact.openConfigInstrument(),
@@ -30563,7 +30543,6 @@
 		escapeAttr: (value) => root.escAttr(value),
 		jsq: (value) => jsq(value),
 		btn: (label, action, cls, title, options) => root.btn(label, action, cls, title, options),
-		dateBox: (id, value, cls, attrs) => root.dateBox(id, value, cls, attrs),
 		openModal: (html) => root.openModal(html),
 		closeModal: () => root.closeModal(),
 		confirmDialog: (opts) => root.confirmDialog(opts),
@@ -30939,7 +30918,6 @@
 		canWrite: () => root.canWrite(),
 		requireWrite: () => root.requireWrite(),
 		requireAdmin: () => root.requireAdmin(),
-		dateBox: (id, value, cls, attrs) => root.dateBox(id, value, cls, attrs),
 		button: (label, action, cls, title, options) => root.btn(label, action, cls, title, options),
 		emptyState: (title, body, actions) => root.emptyState(title, body, actions),
 		searchText: (value) => root.normalizeSearchText(value),
@@ -31007,7 +30985,6 @@
 		escapeAttr: (value) => root.escAttr(value),
 		jsq: (value) => jsq(value),
 		btn: (label, action, cls, title, options) => root.btn(label, action, cls, title, options),
-		dateBox: (id, value, cls, attrs) => root.dateBox(id, value, cls, attrs),
 		vnDate: (value) => vnDate(value),
 		vnPeriod: (value) => root.vnPeriod(value),
 		fmt: (value, decimals) => fmt(value, decimals),
@@ -31479,7 +31456,8 @@
 			auditVerifyChainNow: root.auditVerifyChainNow,
 			auditSetPageSize: root.auditSetPageSize,
 			auditClearFilters: root.auditClearFilters,
-			auditSetPage: root.auditSetPage
+			auditSetPage: root.auditSetPage,
+			auditSetDate: root.auditSetDate
 		},
 		users: {
 			usersModel: root.usersModel,
@@ -31496,7 +31474,6 @@
 			esc: root.esc,
 			escAttr: root.escAttr,
 			btn: root.btn,
-			dateBox: root.dateBox,
 			emptyState: root.emptyState,
 			fmt: root.fmt,
 			vnDate: root.vnDate,
@@ -31507,7 +31484,6 @@
 			normalizeSearchText: root.normalizeSearchText,
 			levelTargetOk: root.levelTargetOk,
 			icon: root.icon,
-			icoCal: root.icoCal,
 			icoDownload: root.icoDownload,
 			icoPrint: root.icoPrint,
 			role: routerPermission.role,

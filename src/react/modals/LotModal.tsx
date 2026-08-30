@@ -1,18 +1,17 @@
 import { closeModal } from '../dialogs/modal-store';
 import { getKernel } from '../state/kernel';
-import { dateBoxHtml } from '../bridge/manageBridge';
+import { DateField } from '../components/DateField';
 
 export type LotModel = { id: string; lotNo: string; level: number; description: string; supplier: string; opened: string; exp: string; note: string };
 
 const LOT_LEVELS = [1, 2, 3, 4, 5, 6];
 
 /* Modal thứ bảy của Giai đoạn 3 chuyển sang 'react' — Manage's lô QC
-   (openConfigLot). Cùng nhóm CRUD thuần như InstrumentModal, nhưng có 2
-   trường ngày (Ngày mở/Hạn sử dụng) — vẫn qua dateBoxHtml() +
-   dangerouslySetInnerHTML (như mọi "trường hoãn" khác trong migration này):
-   không cần forward sự kiện ra ngoài vì saveConfigLot() đọc DOM
+   (openConfigLot). Cùng nhóm CRUD thuần như InstrumentModal, có 2 trường
+   ngày (Ngày mở/Hạn sử dụng) — Giai đoạn 5 (5c) đổi hẳn sang <DateField>
+   JSX thật (không truyền onChange: saveConfigLot() vẫn đọc DOM
    #cfgLotOpened/#cfgLotExp trực tiếp lúc submit, không có logic nào khác
-   trong modal phụ thuộc giá trị ngày đang gõ dở. Mức QC (Giai đoạn 5, dọn
+   trong modal phụ thuộc giá trị ngày đang gõ dở). Mức QC (Giai đoạn 5, dọn
    dangerouslySetInnerHTML) đổi hẳn sang JSX <option> thật — danh sách tĩnh
    1-6, không có lý do giữ dạng chuỗi HTML (configLotLevelOptionsHtml cũ đã
    xóa hẳn). */
@@ -35,8 +34,8 @@ export function LotModal({ id, lotNo, level, description, supplier, opened, exp,
           <div><label>Nhà cung cấp</label><input id="cfgLotSupplier" defaultValue={supplier} placeholder="Randox" /></div>
         </div>
         <div className="grid2">
-          <div><label>Ngày mở (dd/mm/yyyy)</label><span style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: dateBoxHtml('cfgLotOpened', opened, '', '') }} /></div>
-          <div><label>Hạn sử dụng (dd/mm/yyyy)</label><span style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: dateBoxHtml('cfgLotExp', exp, '', '') }} /></div>
+          <div><label>Ngày mở (dd/mm/yyyy)</label><DateField id="cfgLotOpened" value={opened} /></div>
+          <div><label>Hạn sử dụng (dd/mm/yyyy)</label><DateField id="cfgLotExp" value={exp} /></div>
         </div>
         <label>Ghi chú</label>
         <textarea id="cfgLotNote" aria-label="Ghi chú" defaultValue={note} />

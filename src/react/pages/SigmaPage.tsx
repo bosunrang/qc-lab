@@ -1,8 +1,9 @@
 import { useState, useEffect, Fragment } from 'react';
 import { useAppStore } from '../state/kernel';
 import { PageHeader } from '../components/PageHeader';
+import { DateField } from '../components/DateField';
 import {
-  sigmaModel, dateBoxHtml, icoDownloadHtml, sgRefresh,
+  sigmaModel, icoDownloadHtml, sgRefresh,
   sgPickTest, sgPart, sgSetTeaSource, goManageTargets, sgOpenAddTest, sgRemoveTracked, sgSetTea, sgSetTeaMeta,
   sgSelectPeriod, sgCell, sgPullCV, exportSigmaPeriodXLSX, printSigmaPeriod, sgDelPeriod, sgOpenBias,
   sgAddPeriod, exportSigmaPeriodsXLSX, printSigmaPeriods,
@@ -93,7 +94,7 @@ function EflmBox({ eflm, canWrite }: { eflm: NonNullable<NormalModel['tea']['efl
       <div><label>Mức APS</label><select disabled={ro} defaultValue={eflm.aps} onChange={e => sgSetTeaMeta('eflmAps', e.target.value)}>
         {['minimum', 'desirable', 'optimum'].map(v => <option value={v} key={v}>{v}</option>)}
       </select></div>
-      <div><label>Ngày tra cứu</label><span style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: dateBoxHtml('sgEflmLookupDate', eflm.lookupDate, 'manage-date', `${ro ? 'disabled' : ''} data-action="sgSetTeaMeta" data-args='["eflmLookupDate"]' data-action-on="change"`) }} /></div>
+      <div><label>Ngày tra cứu</label><DateField id="sgEflmLookupDate" value={eflm.lookupDate} className="manage-date" disabled={ro} onChange={v => sgSetTeaMeta('eflmLookupDate', v)} /></div>
       <div><label>Link/tài liệu EFLM</label><input disabled={ro} defaultValue={eflm.ref} placeholder="biologicalvariation.eu / bản in PDF" onBlur={e => sgSetTeaMeta('eflmRef', e.target.value)} /></div>
     </div>
   );

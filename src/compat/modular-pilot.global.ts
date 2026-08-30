@@ -305,10 +305,9 @@ import { dashboardMissingTargetItems } from '../presentation/dashboard/dashboard
 import { createDashboardLevelData } from '../presentation/dashboard/dashboard-level-data';
 import { createDashboardTestItems } from '../presentation/dashboard/dashboard-test-items';
 import { createDashboardPageController } from '../presentation/dashboard/dashboard-page-controller';
-import { icon, icoCal, icoDownload, icoPrint } from '../presentation/router/router-icons';
+import { icon, icoDownload, icoPrint } from '../presentation/router/router-icons';
 import { createRouterPermission } from '../presentation/router/router-permission';
 import { createLiveRowFilter } from '../presentation/router/live-row-filter';
-import { createDateBoxHtml } from '../presentation/router/date-box-html';
 import { createRangeActionsHtml } from '../presentation/range/range-actions-html';
 import { createUiPrimitives } from '../presentation/shared/ui-primitives';
 import { createRouterDispatchController } from '../presentation/router/router-dispatch-controller';
@@ -1558,7 +1557,6 @@ type QCLabGlobal = typeof globalThis & {
   canAccessPage: (id: string, user?: any) => boolean;
   firstAccessPage: (user?: any) => string;
   icon: typeof icon;
-  icoCal: typeof icoCal;
   icoDownload: typeof icoDownload;
   icoPrint: typeof icoPrint;
   setSearchCount: ReturnType<typeof createLiveRowFilter>['setSearchCount'];
@@ -1566,7 +1564,6 @@ type QCLabGlobal = typeof globalThis & {
   replaceSelectItems: ReturnType<typeof createLiveRowFilter>['replaceSelectItems'];
   liveRowFilter: ReturnType<typeof createLiveRowFilter>['liveRowFilter'];
   scheduleSearchRender: ReturnType<typeof createLiveRowFilter>['scheduleSearchRender'];
-  dateBox: ReturnType<typeof createDateBoxHtml>;
   rangeActions: ReturnType<typeof createRangeActionsHtml>;
   btn: ReturnType<typeof createUiPrimitives>['btn'];
   emptyState: ReturnType<typeof createUiPrimitives>['emptyState'];
@@ -3755,7 +3752,7 @@ const dashboardPageController=createDashboardPageController({
 });
 root.dashTestSetStatus=dashboardPageController.dashTestSetStatus;
 root.dashboardModel=dashboardPageController.dashboardModel;
-root.icon=icon;root.icoCal=icoCal;root.icoDownload=icoDownload;root.icoPrint=icoPrint;
+root.icon=icon;root.icoDownload=icoDownload;root.icoPrint=icoPrint;
 const routerPermission=createRouterPermission({currentUser:()=>currentUser,infoDialog:message=>root.infoDialog(message),roles:()=>root.routerPagePolicy.roles});
 root.role=routerPermission.role;root.canWrite=routerPermission.canWrite;root.requireWrite=routerPermission.requireWrite;root.requireAdmin=routerPermission.requireAdmin;root.roleLabel=routerPermission.roleLabel;root.roleSelectOptions=routerPermission.roleSelectOptions;
 root.PAGES=root.routerPagePolicy.pages;
@@ -3765,7 +3762,6 @@ root.canAccessPage=(id,u=currentUser)=>root.routerPagePolicy.canAccessPage(id,u)
 root.firstAccessPage=(u=currentUser)=>root.routerPagePolicy.firstAccessPage(u);
 const liveRowFilterService=createLiveRowFilter({document:typeof document!=='undefined'?document:({querySelectorAll:()=>[],getElementById:()=>null,createElement:()=>({})} as unknown as Document),searchText:value=>root.normalizeSearchText!(value)});
 root.setSearchCount=liveRowFilterService.setSearchCount;root.showSearchEmpty=liveRowFilterService.showSearchEmpty;root.replaceSelectItems=liveRowFilterService.replaceSelectItems;root.liveRowFilter=liveRowFilterService.liveRowFilter;root.scheduleSearchRender=liveRowFilterService.scheduleSearchRender;
-root.dateBox=createDateBoxHtml({vnPickerParse:value=>root.vnDatePickerController.parse(value),parseVN:value=>root.parseVnDatePresentation!(value),escapeAttr:value=>(root as any).escAttr(value),formatVnDate:value=>vnDate(value)});
 const uiPrimitives=createUiPrimitives({escapeAttr:value=>(root as any).escAttr(value)});
 root.btn=uiPrimitives.btn;root.emptyState=uiPrimitives.emptyState;
 root.rangeActions=createRangeActionsHtml({button:(label,action,cls,title)=>root.btn(label,action,cls,title),canWrite:()=>routerPermission.canWrite()});
@@ -4783,7 +4779,6 @@ const managePageController = createManagePageController({
   rerender: () => rerender(), role: () => role(), userName: () => userName(), requireAdmin: message => root.requireAdmin(message),
   esc: value => (root as any).esc(value), escapeAttr: value => (root as any).escAttr(value),
   btn: (label, action, cls, title, options) => (root as any).btn(label, action, cls, title, options),
-  dateBox: (id, value, cls, attrs) => (root as any).dateBox(id, value, cls, attrs),
   openModal: html => root.openModal(html), closeModal: () => root.closeModal(),
   confirmDialog: opts => root.confirmDialog(opts), infoDialog: (message, opts) => root.infoDialog(message, opts),
   searchText: value => (globalThis as any).searchText(value), vnDate: value => vnDate(value),
@@ -4840,7 +4835,6 @@ const manageTestsActionsController = createManageTestsActionsController({
   esc: value => (root as any).esc(value), escapeAttr: value => (root as any).escAttr(value),
   btn: (label, action, cls, title, options) => (root as any).btn(label, action, cls, title, options),
   emptyState: (title, body, actions) => (root as any).emptyState(title, body, actions),
-  dateBox: (id, value, cls, attrs) => (root as any).dateBox(id, value, cls, attrs),
   openModal: html => root.openModal(html), closeModal: () => root.closeModal(),
   openReactInstrumentModal: () => (window as any).QCLabReact.openConfigInstrument(),
   confirmDialog: opts => root.confirmDialog(opts), infoDialog: (message, opts) => root.infoDialog(message, opts),
@@ -4933,7 +4927,6 @@ const entryPageController = createEntryPageController({
   requireUnlockedPeriod: (date, action) => (root as any).requireUnlockedPeriod(date, action),
   esc: value => (root as any).esc(value), escapeAttr: value => (root as any).escAttr(value), jsq: value => jsq(value),
   btn: (label, action, cls, title, options) => (root as any).btn(label, action, cls, title, options),
-  dateBox: (id, value, cls, attrs) => (root as any).dateBox(id, value, cls, attrs),
   openModal: html => root.openModal(html), closeModal: () => root.closeModal(), confirmDialog: opts => root.confirmDialog(opts),
   searchText: value => (root as any).searchText(value), vnDate: value => vnDate(value),
   fmt: (value, decimals) => fmt(value, decimals), fmtTestValue: (test, value) => (root as any).fmtTestValue(test, value),
@@ -5182,7 +5175,6 @@ const reagentPageController=createReagentPageController({
   canWrite:()=>root.canWrite(),
   requireWrite:()=>root.requireWrite(),
   requireAdmin:()=>root.requireAdmin(),
-  dateBox:(id,value,cls,attrs)=>(root as any).dateBox(id,value,cls,attrs),
   button:(label,action,cls,title,options)=>(root as any).btn(label,action,cls,title,options),
   emptyState:(title,body,actions)=>(root as any).emptyState(title,body,actions),
   searchText:value=>root.normalizeSearchText!(value),
@@ -5230,7 +5222,6 @@ const sigmaPageController = createSigmaPageController({
   openModal: html => root.openModal(html), closeModal: () => root.closeModal(), infoDialog: (message, opts) => root.infoDialog(message, opts),
   esc: value => (root as any).esc(value), escapeAttr: value => (root as any).escAttr(value), jsq: value => jsq(value),
   btn: (label, action, cls, title, options) => (root as any).btn(label, action, cls, title, options),
-  dateBox: (id, value, cls, attrs) => (root as any).dateBox(id, value, cls, attrs),
   vnDate: value => vnDate(value), vnPeriod: value => (root as any).vnPeriod(value),
   fmt: (value, decimals) => fmt(value, decimals), isoMonth: () => (root as any).isoMonth(), isoDate: value => (root as any).isoDate(value),
   uid: () => (root as any).uid(),
@@ -5643,6 +5634,7 @@ const kernel = {
     activityTotal: () => (state.activity || []).length, confirmArchiveActivityLog: (root as any).confirmArchiveActivityLog,
     auditVerifyChainNow: (root as any).auditVerifyChainNow, auditSetPageSize: (root as any).auditSetPageSize,
     auditClearFilters: (root as any).auditClearFilters, auditSetPage: (root as any).auditSetPage,
+    auditSetDate: (root as any).auditSetDate,
   },
   users: {
     usersModel: (root as any).usersModel, userPermChecks: (root as any).userPermChecks,
@@ -5658,12 +5650,12 @@ const kernel = {
      chút (không chỉ HTML-builder thuần mà cả các service nhỏ dùng chung). */
   pres: {
     esc: (root as any).esc, escAttr: (root as any).escAttr, btn: (root as any).btn,
-    dateBox: (root as any).dateBox, emptyState: (root as any).emptyState,
+    emptyState: (root as any).emptyState,
     fmt: (root as any).fmt, vnDate: (root as any).vnDate, fmtPointValue: (root as any).fmtPointValue,
     formatDateTimeVN: (root as any).formatDateTimeVN, testDisplayName: (root as any).testDisplayName,
     afterRender: (root as any).afterRender, normalizeSearchText: (root as any).normalizeSearchText,
     levelTargetOk: (root as any).levelTargetOk,
-    icon: (root as any).icon, icoCal: (root as any).icoCal, icoDownload: (root as any).icoDownload, icoPrint: (root as any).icoPrint,
+    icon: (root as any).icon, icoDownload: (root as any).icoDownload, icoPrint: (root as any).icoPrint,
     role: routerPermission.role, canWrite: routerPermission.canWrite, requireWrite: routerPermission.requireWrite,
     requireAdmin: routerPermission.requireAdmin, roleLabel: routerPermission.roleLabel, roleSelectOptions: routerPermission.roleSelectOptions,
     rolePageIds: (root as any).rolePageIds,

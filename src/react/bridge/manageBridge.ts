@@ -20,7 +20,6 @@ export type ManageModel = {
 };
 
 export const manageModel = (): ManageModel => getKernel().manage.manageModel();
-export const dateBoxHtml = (id: string, value: string, cls: string, attrs: string): string => getKernel().pres.dateBox(id, value, cls, attrs);
 export const manageSearchSet = (value: string): void => getKernel().manage.manageSearchSet(value);
 export const setTargetPanel = (id: string): void => getKernel().manage.setTargetPanel(id);
 export const setTargetGroup = (id: string): void => getKernel().manage.setTargetGroup(id);

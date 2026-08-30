@@ -27,9 +27,9 @@ export const auditModel = (): AuditModel => getKernel().audit.auditModel();
 export const roleLabel = (role: string): string => getKernel().pres.roleLabel(role);
 export const formatDateTimeVN = (value: string): string => getKernel().pres.formatDateTimeVN(value);
 export const escapeHtml = (value: unknown): string => getKernel().pres.esc(value);
-export const dateBoxHtml = (id: string, value: string, cls: string, attrs: string): string => getKernel().pres.dateBox(id, value, cls, attrs);
 export const requireAdmin = (): boolean => getKernel().pres.requireAdmin();
 export const auditSetQuery = (value: string) => getKernel().audit.auditSetQuery(value);
+export const auditSetDate = (field: 'from' | 'to', value: string): void => getKernel().audit.auditSetDate(field, value);
 export const exportActivityCSV = (): void => getKernel().audit.exportActivityCSV();
 export const archiveActivityLog = (): void => {
   if (!getKernel().pres.requireAdmin()) return;

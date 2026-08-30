@@ -26,7 +26,6 @@ export function createReagentPageController(deps: {
   canWrite: () => boolean;
   requireWrite: () => boolean;
   requireAdmin: () => boolean;
-  dateBox: (id: string, value: string, cls: string, attrs: string) => string;
   button: (label: string, action: string | { action: string; args?: unknown[] } | null, cls?: string, title?: string, options?: AnyRec) => string;
   emptyState: (title: string, body: string, actions?: string) => string;
   searchText: (value: unknown) => string;

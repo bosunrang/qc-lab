@@ -19,7 +19,6 @@ export function createManagePageController(deps: {
   esc: (value: unknown) => string;
   escapeAttr: (value: unknown) => string;
   btn: (label: string, action: string | { action: string; args?: unknown[] } | null, cls?: string, title?: string, options?: AnyRec) => string;
-  dateBox: (id: string, value: string, cls: string, attrs: string) => string;
   openModal: (html: string) => void;
   closeModal: () => void;
   confirmDialog: (opts: AnyRec) => Promise<boolean>;

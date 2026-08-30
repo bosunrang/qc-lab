@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { PageHeader } from '../components/PageHeader';
+import { DateField } from '../components/DateField';
 import {
-  actionsModel, actionFormViewModel, dateBoxHtml, actionCausePhrases, actionActionPhrases,
+  actionsModel, actionFormViewModel, actionCausePhrases, actionActionPhrases,
   editAction, beginActionFromIssue, viewActionDetail, escalateAction, approveAction, returnAction, reopenAction,
   cancelAction, exportActionsCSV, actionInsertSuggestion, actionSectionToggled, actionInvestigationSync,
   actionInvestigationChoose, beginActionManual, actionUpdateBiasHint, actionFillBias, closeActionForm, addAction,
@@ -150,25 +151,6 @@ function Select({ id, label, options, defaultValue, disabled, onChange }: {
   );
 }
 
-function DateField({ id, value, attrs = '' }: { id: string; value: string; attrs?: string }) {
-  // dangerouslySetInnerHTML tạo DOM ngoài fiber tree của React, nên onChange bắt sự kiện
-  // theo kiểu ủy quyền đặt trên .action-form-body (FormOpenBody) không bao giờ thấy sự
-  // kiện nổi bọt từ bên trong span này — xác nhận bằng cách gõ tay: sự kiện 'input' gốc
-  // nổi bọt tới đúng phần tử cha (browser DOM thật), nhưng actionFormChanged qua onChange
-  // của React không hề chạy. Phải tự gắn listener gốc ở đây để chip mục 4-6 (nguyên nhân)
-  // cập nhật đúng khi gõ ngày hoàn thành/ngày cho phép/ngày đánh giá hiệu lực.
-  const ref = useRef<HTMLSpanElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const handler = () => actionFormChanged();
-    el.addEventListener('input', handler);
-    el.addEventListener('change', handler);
-    return () => { el.removeEventListener('input', handler); el.removeEventListener('change', handler); };
-  }, []);
-  return <span ref={ref} style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: dateBoxHtml(id, value, '', attrs) }} />;
-}
-
 function SuggestBox({ targetId, phrases, label = 'Gợi ý nhập nhanh' }: { targetId: string; phrases: string[]; label?: string }) {
   if (!phrases || !phrases.length) return null;
   return (
@@ -238,7 +220,7 @@ function IdentitySection({ model }: { model: ActionFormOpenModel }) {
         <div className="action-ident-group">
           <div className="action-ident-group-title"><b>Phân loại sự cố</b><small>Thời điểm, dấu hiệu phát hiện và loại sai số</small></div>
           <div className="action-form-meta">
-            <div><label>Ngày ghi nhận</label><DateField id="aDate" value={model.date} attrs="action-date" /></div>
+            <div><label>Ngày ghi nhận</label><DateField id="aDate" value={model.date} className="action-date" /></div>
             <div><label>Luật vi phạm</label><Select id="aRule" label="Luật vi phạm" options={model.ruleOptions} defaultValue={model.selectedRule} /></div>
             <div><label>Nguồn phát hiện</label><Select id="aEventSource" label="Nguồn phát hiện" options={model.sourceOptions} defaultValue={model.selectedSource} /></div>
             <div><label>Giai đoạn</label><Select id="aProcessPhase" label="Giai đoạn quá trình" options={model.phaseOptions} defaultValue={model.selectedPhase} /></div>
@@ -249,7 +231,7 @@ function IdentitySection({ model }: { model: ActionFormOpenModel }) {
           <div className="action-ident-group-title"><b>Phân công xử lý</b><small>Người chịu trách nhiệm và thời hạn dự kiến</small></div>
           <div className="action-form-owner">
             <div><label>Người phụ trách</label><input id="aBy" aria-label="Người phụ trách" list="aByList" autoComplete="off" placeholder="Chọn hoặc gõ tên" defaultValue={model.by} /><datalist id="aByList">{model.staffNames.map(n => <option value={n} key={n} />)}</datalist></div>
-            <div><label>Hạn hoàn thành</label><DateField id="aDueDate" value={model.dueDate} attrs="action-date" /></div>
+            <div><label>Hạn hoàn thành</label><DateField id="aDueDate" value={model.dueDate} className="action-date" /></div>
           </div>
         </div>
       </div>
@@ -307,7 +289,7 @@ function CauseSection({ s, model }: { s: ActionFormOpenModel['sections']['cause'
         <div><label>Hành động khắc phục để ngăn tái diễn</label><textarea id="aAct" rows={1} placeholder="VD: Thay lọ QC mới, vệ sinh kim hút, cập nhật lịch bảo trì..." defaultValue={s.action} /><ActSuggestBox model={model} /></div>
       </div>
       <div className="action-cause-second-row">
-        <div><label>Ngày hoàn thành hành động</label><DateField id="aActionCompletedDate" value={s.completedDate} attrs="action-date" /></div>
+        <div><label>Ngày hoàn thành hành động</label><DateField id="aActionCompletedDate" value={s.completedDate} className="action-date" /></div>
         <div><label>Bias trước khắc phục (%) <small className="hint">tham khảo</small></label>
           <input id="aBiasBefore" type="text" inputMode="decimal" placeholder="VD: 8.5" defaultValue={s.biasBefore} onChange={actionUpdateBiasHint} />
           {s.sigmaBiasChip ? <div className="sugg-row"><button type="button" className="sugg-chip" onClick={() => actionFillBias('aBiasBefore', s.sigmaBiasChip!.value)} title={`Lấy từ Bias EQA/EQC kỳ ${s.sigmaBiasChip.period} ở trang Six Sigma`}>Dùng Bias EQA gần nhất (kỳ {s.sigmaBiasChip.period}): {s.sigmaBiasChip.valueText}%</button></div> : null}
@@ -320,7 +302,7 @@ function CauseSection({ s, model }: { s: ActionFormOpenModel['sections']['cause'
         <div className="action-release-title"><b>Cho phép hoạt động/trả kết quả trở lại</b><small>{releaseHint}</small></div>
         <div className="action-release-grid">
           <div><label>Quyết định</label><Select id="aReleaseStatus" label="Quyết định cho phép trở lại" options={s.releaseOptions} defaultValue={s.releaseStatus} /></div>
-          <div><label>Ngày cho phép</label><DateField id="aReleaseDate" value={s.releaseDate} attrs="action-date" /></div>
+          <div><label>Ngày cho phép</label><DateField id="aReleaseDate" value={s.releaseDate} className="action-date" /></div>
           <div><label>Người cho phép</label><input id="aReleaseBy" list="aByList" autoComplete="off" placeholder="Chọn hoặc gõ tên" defaultValue={s.releaseBy} /></div>
           <div><label>Căn cứ cho phép</label><input id="aReleaseNote" placeholder="VD: QC chạy lại đã được chấp nhận" defaultValue={s.releaseNote} /><SuggestBox targetId="aReleaseNote" phrases={s.releaseSuggest} /></div>
         </div>
@@ -352,7 +334,7 @@ function EffSection({ s }: { s: ActionFormOpenModel['sections']['eff'] }) {
     <>
       <div className="action-effectiveness-grid">
         <div><label>Kết luận hiệu lực</label><Select id="aEffectivenessStatus" label="Kết luận hiệu lực" options={s.statusOptions} defaultValue={s.status} /></div>
-        <div className="action-effectiveness-date"><label>Ngày đánh giá</label><DateField id="aEffectivenessDate" value={s.date} attrs="action-date" /></div>
+        <div className="action-effectiveness-date"><label>Ngày đánh giá</label><DateField id="aEffectivenessDate" value={s.date} className="action-date" /></div>
         <div><label>Bằng chứng/nhận xét hiệu lực</label><textarea id="aEffectivenessNote" rows={1} placeholder="VD: Theo dõi 20 lần chạy tiếp theo không tái diễn..." defaultValue={s.note} /><SuggestBox targetId="aEffectivenessNote" phrases={s.noteSuggest} /></div>
       </div>
       <div className="action-residual-block">

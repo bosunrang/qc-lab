@@ -1,6 +1,6 @@
 import { closeModal } from '../dialogs/modal-store';
 import { getKernel } from '../state/kernel';
-import { dateBoxHtml } from '../bridge/manageBridge';
+import { DateField } from '../components/DateField';
 
 export type TeaLabProfileModel = {
   refKey: string;
@@ -35,13 +35,13 @@ export function TeaLabProfileModal({ refKey, hasProfile, title, labValue, source
         <div><label>Tài liệu / phiên bản / đường dẫn tham chiếu <span className="req">*</span></label><input id="teaLabReference" aria-label="Tài liệu tham chiếu TEa chuẩn hóa" defaultValue={referenceValue} placeholder="VD: 42 CFR §493.931, hiệu lực 11/07/2024" /></div>
         <div><label>Lý do lựa chọn <span className="req">*</span></label><textarea id="teaLabReason" className="tea-lab-reason" aria-label="Lý do lựa chọn TEa chuẩn hóa" rows={1} placeholder="Nêu lý do chọn nguồn và mức TEa này cho mục đích sử dụng của xét nghiệm..." defaultValue={reasonValue} /></div>
         <div className="tea-lab-meta-grid tea-lab-meta-primary">
-          <div><label>Ngày hiệu lực <span className="req">*</span></label><span style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: dateBoxHtml('teaLabEffectiveDate', effective, 'manage-date', 'aria-label="Ngày hiệu lực TEa chuẩn hóa"') }} /></div>
-          <div><label>Ngày xem xét lại</label><span style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: dateBoxHtml('teaLabNextReviewDate', nextReview, 'manage-date', 'aria-label="Ngày xem xét lại TEa chuẩn hóa"') }} /></div>
+          <div><label>Ngày hiệu lực <span className="req">*</span></label><DateField id="teaLabEffectiveDate" value={effective} className="manage-date" ariaLabel="Ngày hiệu lực TEa chuẩn hóa" /></div>
+          <div><label>Ngày xem xét lại</label><DateField id="teaLabNextReviewDate" value={nextReview} className="manage-date" ariaLabel="Ngày xem xét lại TEa chuẩn hóa" /></div>
           <div><label>Người xây dựng <span className="req">*</span></label><input id="teaLabPreparedBy" aria-label="Người xây dựng TEa chuẩn hóa" defaultValue={prepared} /></div>
         </div>
         <div className="tea-lab-meta-grid tea-lab-meta-approval">
           <div><label>Người phê duyệt <span className="req">*</span></label><input id="teaLabApprovedBy" aria-label="Người phê duyệt TEa chuẩn hóa" defaultValue={approved} /></div>
-          <div><label>Ngày phê duyệt <span className="req">*</span></label><span style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: dateBoxHtml('teaLabApprovedDate', approvedDate, 'manage-date', 'aria-label="Ngày phê duyệt TEa chuẩn hóa"') }} /></div>
+          <div><label>Ngày phê duyệt <span className="req">*</span></label><DateField id="teaLabApprovedDate" value={approvedDate} className="manage-date" ariaLabel="Ngày phê duyệt TEa chuẩn hóa" /></div>
         </div>
       </div>
       <div className="modal-f">

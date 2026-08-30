@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { getKernel } from '../state/kernel';
 import { closeModal } from '../dialogs/modal-store';
-import { dateBoxHtml } from '../bridge/sigmaBridge';
+import { DateField } from '../components/DateField';
 
 type MuRow = { level: number | string; uCal: string; uCalBasis: string; muBiasMode: string };
 type MuPeriod = { id: string; label: string };
@@ -79,7 +79,7 @@ export function SigmaMuModal({ eid, sourceLabel, rows: initialRows, periodIds: i
         <div className="sg-mu-section-title"><b>Thông tin rà soát</b></div>
         <div className="sg-setup-fields">
           <div><label htmlFor="sgMuBy">Người rà soát</label><input id="sgMuBy" value={reviewedBy} placeholder="Họ tên người rà soát ngân sách MU" onChange={e => setReviewedBy(e.target.value)} /></div>
-          <div><label htmlFor="sgMuDate">Ngày rà soát</label><span style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: dateBoxHtml('sgMuDate', reviewedDate, '', '') }} /></div>
+          <div><label htmlFor="sgMuDate">Ngày rà soát</label><DateField id="sgMuDate" value={reviewedDate} /></div>
         </div>
         <div className="sg-eqa-period-wrap sg-mu-period-wrap">
           <div className="sg-eqa-period-head">

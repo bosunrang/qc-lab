@@ -95,7 +95,6 @@ declare function canAccessPage(id: string, user?: any): boolean;
 declare function firstAccessPage(user?: any): string;
 declare function icon(id: string): string;
 declare function icoDownload(): string;
-declare function dateBox(id: string, value?: string, cls?: string, attrs?: string): string;
 declare function go(page: string): void;
 declare function resetMainScroll(): void;
 declare function emptyState(title: string, body: string, actions?: string): string;

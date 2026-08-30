@@ -5,7 +5,7 @@ const root=path.join(__dirname,'..');
 const read=file=>fs.readFileSync(path.join(root,file),'utf8');
 const QCCore=require('../assets/core.js');
 
-const router=read('src/presentation/router/router-dispatch-controller.ts')+read('src/presentation/router/router-permission.ts')+read('src/presentation/router/router-icons.ts')+read('src/presentation/router/live-row-filter.ts')+read('src/presentation/router/date-box-html.ts');
+const router=read('src/presentation/router/router-dispatch-controller.ts')+read('src/presentation/router/router-permission.ts')+read('src/presentation/router/router-icons.ts')+read('src/presentation/router/live-row-filter.ts');
 const compat=read('src/compat/modular-pilot.global.ts');
 const routerPolicy=read('src/presentation/router/router-page-policy.ts');
 const routerShell=read('src/presentation/router/router-shell-controller.ts');

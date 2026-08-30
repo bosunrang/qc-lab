@@ -26,7 +26,6 @@ export function createManageTestsActionsController(deps: {
   escapeAttr: (value: unknown) => string;
   btn: (label: string, action: string | { action: string; args?: unknown[] } | null, cls?: string, title?: string, options?: AnyRec) => string;
   emptyState: (title: string, body: string, actions?: string) => string;
-  dateBox: (id: string, value: string, cls?: string, attrs?: string) => string;
   openModal: (html: string) => void;
   closeModal: () => void;
   openReactInstrumentModal: () => void;

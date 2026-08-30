@@ -2,8 +2,9 @@ import { useEffect } from 'react';
 import { useAppStore } from '../state/kernel';
 import { PageHeader } from '../components/PageHeader';
 import { ReagentToolIcon } from '../components/ReagentToolIcon';
+import { DateField } from '../components/DateField';
 import {
-  reagentModel, dateBoxHtml, rcCompute,
+  reagentModel, rcCompute,
   rcSwitch, openRcCreateModal, rcDeleteCurrent, openRcModal, rcPrint, rcPrintSummary,
   rcMeta, rcMetaFocus, rcMetaLog, rcOpenQuick, rcCell, rcRmRow, rcAddRow, rcClearRows,
   type ReagentRow,
@@ -63,7 +64,7 @@ function InfoPanel({ model }: { model: Extract<ReturnType<typeof reagentModel>, 
         <div className="rc-field"><label>Số lô mới</label><input disabled={disabled} aria-label="Số lô mới" defaultValue={model.lotNew as string} onChange={e => rcMeta('lotNew', e.target.value)} onFocus={() => rcMetaFocus('lotNew')} onBlur={() => rcMetaLog('lotNew')} /></div>
         <div className="rc-field rc-date-field">
           <label>Ngày thực hiện</label>
-          <div style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: dateBoxHtml('rcDate', (model.date as string) || '', '', `${disabled ? 'disabled' : ''} data-action="rcMeta" data-args='["date"]' data-action-on="change"`) }} />
+          <DateField id="rcDate" value={(model.date as string) || ''} disabled={disabled} onChange={v => rcMeta('date', v)} />
         </div>
         <div className="rc-field">
           <label>Người thực hiện</label>

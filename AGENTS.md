@@ -1925,6 +1925,89 @@ clicking outside closes correctly; AND a still-classic date field elsewhere
 (Manage's Lot QC modal, `#vnDatePicker`) still opens/works normally
 alongside the new system, with zero console errors on either side.
 
+Giai đoạn 5, Bước 6 (done) — 5c COMPLETE: converted the remaining 15 date
+fields and deleted the now-fully-dead classic date-box infrastructure.
+LotModal (2) → TeaLabProfileModal (3) → LotTransitionModal (1) → SigmaMuModal
+(1) — all four are pure uncontrolled fields (no `onChange` needed, read via
+DOM at submit time, same as every other CRUD modal). AuditPage (2, from/to
+filter) — the FIRST time `auditSetDate` (previously "deferred", embedded as
+raw `data-action` text inside the classic HTML string, per this file's own
+earlier note "until dateBoxHtml itself becomes a real component") got a
+real `onChange` — added `auditSetDate` to `kernel.audit` + a bridge export,
+verified with a REAL Playwright check (not just reading DOM values): seeded
+fake activity rows, set a future filter date, confirmed the row count
+actually dropped from 2/2 to 0/2 — proving the underlying STATE changed, not
+just the DOM. ReagentPage (1, `rcMeta('date', v)`) → SigmaPage (1,
+`sgSetTeaMeta('eflmLookupDate', v)`, using `onChange` per the established
+"text field → onBlur" rule from Giai đoạn 2) → ReportPage (2,
+`reportRangeChanged()` with no params — re-reads `#rStartDate`/`#rEndDate`
+directly from the DOM, matching classic behavior exactly). ActionsPage (5
+fields: aDate/aDueDate/aActionCompletedDate/aReleaseDate/aEffectivenessDate)
+— **deleted the manual addEventListener workaround entirely** (the
+`useRef`+`useEffect` binding native 'input'/'change' to call
+`actionFormChanged()`, built in Giai đoạn 2 because the field used to be
+`dangerouslySetInnerHTML`, outside React's fiber tree) — now that the field
+is real JSX, the event naturally bubbles to the existing
+`<div className="action-form-body" onChange={actionFormChanged}>`
+container, no workaround needed. Also fixed a REAL PRE-EXISTING CSS BUG
+found along the way: `attrs="action-date"` (the 4th, raw-attrs parameter)
+should have been the 3rd (`cls`) parameter — the `action-date` class (which
+has real CSS: `.datebox.action-date{height:38px}`) had never actually been
+applied to `.datebox` since this page went React; fixed with
+`className="action-date"` in the correct slot.
+
+Once all 16 fields were converted, deleted the entire now-dead classic
+system (confirmed zero consumers via grep at each step, never assumed):
+`date-box-html.ts`/`createDateBoxHtml` deleted outright (`dateBoxHtml`/
+`root.dateBox` was never actually CALLED anywhere — only ever assigned);
+`icoCal()` deleted from `router-icons.ts` (its only caller was
+`date-box-html.ts`); cleaned up 5 dead `deps.dateBox=(root as
+any).dateBox(...)` wirings in `kernel.pres`/the deps objects of
+`managePageController`/`manageTestsActionsController`/`entryPageController`/
+`reagentPageController`/`sigmaPageController` — confirmed all 5 were never
+actually called (`deps.dateBox(` matched nowhere in any of those controller
+source files) before removing, along with the matching type declaration in
+each source file. `vn-date-picker-controller.ts` (the DOM/popup half)
+DELIBERATELY STAYS — its pure `parse()`/`valid()`/`text()` half is STILL
+called by classic `auditSetDate()` via `root.vnPickerParse` (used to
+normalize the input value before updating the filter range); deleting the
+whole file would remove that still-needed pure half too. The DOM/popup half
+(`open`/`render`/`bind`...) is now inert dead weight (no classic `.datepick`
+is left anywhere for its listener to find) — left for a future dedicated
+refactor to split the pure half out, not urgent since there's no functional
+benefit to doing it right now. `tests/ui-route-structure.test.js`'s `router`
+string concatenation dropped `date-box-html.ts` (deleted, would otherwise
+throw a file-read error).
+
+Verified: `npm test` 431/431, `typecheck` clean, `build:pilot` succeeds
+(4/4 artifacts), `check-build-freshness` matches, `a11y-audit` 0 violations
+(18/18 modals, 11/11 pages — including `manage:add-lot`/`edit-lot`/
+`tea-lab-profile`, which carry the just-converted date fields),
+`ui-workflow-check` 29/29, `nce-workflow-check` 91/91 (including the EXACT
+check "Sau ngày hoàn thành, cổng cho phép trở lại vẫn còn thiếu" —
+`page.fill('#aActionCompletedDate', ...)` confirms the real container
+onChange correctly replaced the old workaround), plus an ad-hoc Playwright
+script confirming: Audit filters correctly by date (seeded 2 fake rows, set
+a future date, confirmed filtering down to 0/2 — proving real STATE
+changed, not just DOM); Reagent's rcDate commits correctly to `model.date`
+on blur; Report's rStartDate retains the correct value after blur; zero
+console errors on any page.
+
+**Giai đoạn 5 (removing `dangerouslySetInnerHTML`) is essentially complete
+for its core scope — both 5a (easy group) and 5c (date-picker, the hardest
+part) are done.** What remains of Giai đoạn 5 is a narrower slice of 5b than
+originally scoped: `icoDownloadHtml`'s 2 spots in SigmaPage (shares
+`icoDownload()` with the nav icon — low risk/benefit either way to split
+out); `ActionDetailModal`/`UserPermissionsModal`'s checkbox grid/
+`ActionsPage.tsx`'s dynamic HTML blocks (evidenceTimelineHtml,
+thresholdHtml, rerunEvidenceHtml, referenceHtml, incidentBanner) — these
+were ALREADY evaluated and deliberately kept as-is back in Giai đoạn 3 for
+substantive reasons (100%-read-only content, or genuinely complex content
+where a JSX rewrite has no functional benefit), not neglected debt; the
+Avatar modal (the side-finding from Bước 1 — the 20th modal, never counted
+before — still 'html'-kind, convertible to 'react' for absolute
+completeness if wanted).
+
 Then shrink/delete the now-dead
 `root.X=` aliases, `global.d.ts`'s
 ambient bare-global declarations, and rewrite the 61 sandbox tests + ~88
