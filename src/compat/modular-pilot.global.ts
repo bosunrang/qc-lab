@@ -188,7 +188,6 @@ import { createActivityAuditCsv } from '../presentation/audit/activity-audit-csv
 import { updateActivityAuditDateRange } from '../presentation/audit/activity-audit-date-range';
 import { ACTIVITY_AUDIT_PAGE_SIZES, activityAuditFilterState } from '../presentation/audit/activity-audit-filter-state';
 import { activityAuditArchiveWindow } from '../presentation/audit/activity-audit-archive-window';
-import { activityAuditArchiveModalHtml } from '../presentation/audit/activity-audit-archive-modal-html';
 import { userListModel } from '../presentation/auth/user-list-model';
 import { createReagentResultHtml } from '../presentation/reagent/reagent-result-html';
 import { planPartitionWrite } from '../application/storage/partition-write-policy';
@@ -1535,7 +1534,6 @@ type QCLabGlobal = typeof globalThis & {
   activityAuditFilterState: typeof activityAuditFilterState;
   activityAuditPageSizes: typeof ACTIVITY_AUDIT_PAGE_SIZES;
   activityAuditArchiveWindow?: typeof activityAuditArchiveWindow;
-  activityAuditArchiveModalHtml: typeof activityAuditArchiveModalHtml;
   userListModel: typeof userListModel;
   // Retire classic users-auth.js (2026-08-20, Pha G nhóm C lát 2) — Users/Audit/Auth pages.
   AUDIT_PAGE_SIZES: typeof ACTIVITY_AUDIT_PAGE_SIZES;
@@ -1550,7 +1548,6 @@ type QCLabGlobal = typeof globalThis & {
   auditModel: () => Record<string, any>;
   activityCSVRows: (items: Record<string, any>[]) => unknown[][];
   exportActivityCSV: () => void;
-  archiveActivityLog: () => void;
   confirmArchiveActivityLog: () => Promise<void>;
   addUser: () => Promise<void>;
   userPermChecks: (selectedIds: string[] | null | undefined, groupId: string, roleValue: string) => string;
@@ -3217,7 +3214,6 @@ root.updateActivityAuditDateRange = updateActivityAuditDateRange;
 root.activityAuditFilterState = activityAuditFilterState;
 root.activityAuditPageSizes = ACTIVITY_AUDIT_PAGE_SIZES;
 root.activityAuditArchiveWindow = activityAuditArchiveWindow;
-root.activityAuditArchiveModalHtml = activityAuditArchiveModalHtml;
 root.userListModel = userListModel;
 root.reagentResultHtml = createReagentResultHtml();
 const modularStorageBootService = createStorageBootService({
@@ -4600,11 +4596,6 @@ root.exportActivityCSV = () => { root.csvDownload!('Nhat_ky_hoat_dong_QCLab.csv'
    đường này không mất dữ liệu. CSV giữ nguyên cột PrevHash/Hash để phần đã lưu
    trữ kiểm chứng độc lập được: hash dòng cuối file phải khớp tipHash trong dòng
    checkpoint ghi lại sau khi cắt. */
-root.archiveActivityLog = () => {
-  if (!root.requireAdmin()) return;
-  const total = (state.activity || []).length; if (!total) return;
-  root.openModal(root.activityAuditArchiveModalHtml({ total, cancelButtonHtml: root.btn('Hủy', { action: 'closeModal' }, 'ghost'), archiveButtonHtml: root.btn('Xuất CSV và lưu trữ', { action: 'confirmArchiveActivityLog' }, 'teal') }));
-};
 root.confirmArchiveActivityLog = async () => {
   if (!root.requireAdmin()) return;
   const result = await root.ActivityArchiveCommand.execute((document.getElementById('auditArchiveMonths') as HTMLInputElement | null)?.value);
@@ -5764,7 +5755,8 @@ const kernel = {
   dash: { dashboardModel: dashboardPageController.dashboardModel, dashTestSetStatus: dashboardPageController.dashTestSetStatus },
   audit: {
     auditModel: (root as any).auditModel, auditSetQuery: (root as any).auditSetQuery,
-    exportActivityCSV: (root as any).exportActivityCSV, archiveActivityLog: (root as any).archiveActivityLog,
+    exportActivityCSV: (root as any).exportActivityCSV,
+    activityTotal: () => (state.activity || []).length, confirmArchiveActivityLog: (root as any).confirmArchiveActivityLog,
     auditVerifyChainNow: (root as any).auditVerifyChainNow, auditSetPageSize: (root as any).auditSetPageSize,
     auditClearFilters: (root as any).auditClearFilters, auditSetPage: (root as any).auditSetPage,
   },

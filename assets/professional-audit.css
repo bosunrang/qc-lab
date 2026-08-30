@@ -92,7 +92,7 @@
 }
 
 .audit-seq{
-  font-size:var(--type-overline); font-weight:700; color:#7c8e9a;
+  font-size:var(--type-overline); font-weight:700; color:var(--muted);
 }
 
 .audit-time{

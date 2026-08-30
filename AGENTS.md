@@ -1006,7 +1006,56 @@ modals, `ui-workflow-check` 29/29, `nce-workflow-check` 91/91, plus an
 ad-hoc script confirming all 8 steps render with correct text, and the
 modal closes via Escape and via its "Đóng" button.
 
-Remaining for Giai đoạn 3: convert each of the other ~15 form modals from
+Audit's "Lưu trữ nhật ký cũ" (done, second real modal converted): picked
+next for being the next-simplest — one `<select>` (12/24/36 months, no
+validation) plus a submit button, with **zero local error/loading state
+needed in the component itself**, since `ActivityArchiveCommand.execute()`
+(unchanged, already using React confirmDialog/infoDialog from the very first
+Giai đoạn 3 commit) owns the entire confirm → reauthenticate → download →
+confirm-again → close flow internally — `ArchiveLogModal.tsx` only renders
+the initial form and calls `confirmArchiveActivityLog()` on submit, letting
+that command decide whether/when to call `closeModal()`. This is a
+meaningfully different (simpler) shape than a modal that manages its own
+draft/validation state, worth remembering as a category: **modals whose
+"confirm" button hands off to an existing command that already owns the
+close/cancel decision need no local React state at all** — only modals that
+validate/collect input themselves (the next tier up in complexity) will.
+`root.archiveActivityLog`/`activityAuditArchiveModalHtml` (the classic
+opener + HTML builder) were deleted outright, confirmed dead — the gate
+logic they held (`requireAdmin()` + "is there anything to archive at all"
+via `state.activity.length`) moved into the bridge function
+(`src/react/bridge/auditBridge.ts`), reading the count via a new
+`kernel.audit.activityTotal()` (`root.confirmArchiveActivityLog` itself
+stays classic-side, exposed the same way). Two now-dead files removed
+(`activity-audit-archive-modal-html.ts` + its test). This conversion also
+exposed a real gap in `scripts/a11y-audit.js`'s own seeding for this modal:
+its `open()` used to call `logAct(...)` then the (now-retired) global
+`archiveActivityLog()` directly, bypassing the Audit page's own render
+entirely — `logAct()` alone does **not** call `rerender()`/`touch()` (most
+callers trigger their own re-render right after logging), so nothing had
+ever required the just-logged row to actually reach the screen before. Once
+the trigger became "click the real button" (same fix pattern as the NCE
+guide's `actions:nce-guide` entry), the button's own visibility gate
+(`model.total > 0`) meant the test had to force a `rerender()` after
+`logAct()` and poll for the button (mirroring the "React commit is
+asynchronous relative to a synchronous `page.evaluate` body" lesson from
+`nce-workflow-check.js`) — and doing so surfaced a **real, pre-existing**
+accessibility bug the old test had never actually exercised: `.audit-seq`'s
+`#7c8e9a` on white was only 3.39:1 contrast (needs 4.5:1, since 10.5px bold
+doesn't qualify as WCAG "large text"). Fixed by switching to the existing
+`--muted` token (`--gray-600`, `#506674`, ~6:1 contrast) instead of a new
+one-off hex — a genuine accessibility fix that happened to fall out of
+fixing the test's own fidelity, not a change requested by this modal
+conversion itself. Verified: `npm test` 464/464, `typecheck` clean,
+`check-build-freshness` matches, `a11y-audit` 0 violations across all 18
+modals, `ui-workflow-check` 29/29, `nce-workflow-check` 91/91, plus an
+ad-hoc script confirming the form renders with the right default
+(24 months), and that submitting with only a same-day seeded row correctly
+takes the "nothing old enough to archive" path (closes the form, shows the
+matching info message) — proving the hand-off to the unchanged
+`ActivityArchiveCommand` still works end to end through the new UI.
+
+Remaining for Giai đoạn 3: convert each of the other ~14 form modals from
 the `'html'` string path to a real `'react'` component, one at a time, same
 full-verify-after-each discipline established across Giai đoạn 2 — each
 conversion touches exactly one modal's trigger function (swap

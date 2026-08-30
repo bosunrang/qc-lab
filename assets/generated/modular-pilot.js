@@ -7111,15 +7111,6 @@
 		};
 	}
 	//#endregion
-	//#region src/presentation/audit/activity-audit-archive-modal-html.ts
-	function activityAuditArchiveModalHtml(input) {
-		return `<div class="modal"><div class="modal-h"><h3>Lưu trữ nhật ký cũ</h3><button class="modal-close" data-action="closeModal">✕</button></div><div class="modal-b">
-      <div class="hint">Nhật ký hiện có <b>${input.total}</b> dòng. Các dòng cũ hơn mốc chọn sẽ được <b>xuất ra file CSV</b> (kèm PrevHash/Hash), sau đó mới bị gỡ khỏi hệ thống — hash dòng cuối file trở thành điểm nối vào chuỗi còn lại nên phần lưu trữ vẫn kiểm chứng được.</div>
-      <label class="flow-section">Chỉ giữ lại nhật ký trong</label>
-      <select id="auditArchiveMonths" aria-label="Mốc tuổi nhật ký được giữ lại"><option value="12">12 tháng gần nhất</option><option value="24" selected>24 tháng gần nhất</option><option value="36">36 tháng gần nhất</option></select>
-    </div><div class="modal-f">${input.cancelButtonHtml}${input.archiveButtonHtml}</div></div>`;
-	}
-	//#endregion
 	//#region src/presentation/auth/user-list-model.ts
 	function userListModel(users, currentUserId) {
 		return (Array.isArray(users) ? users : []).map((user) => ({
@@ -27842,7 +27833,6 @@
 	root.activityAuditFilterState = activityAuditFilterState;
 	root.activityAuditPageSizes = ACTIVITY_AUDIT_PAGE_SIZES;
 	root.activityAuditArchiveWindow = activityAuditArchiveWindow;
-	root.activityAuditArchiveModalHtml = activityAuditArchiveModalHtml;
 	root.userListModel = userListModel;
 	root.reagentResultHtml = createReagentResultHtml();
 	var modularStorageBootService = createStorageBootService({
@@ -30330,16 +30320,6 @@
 	root.exportActivityCSV = () => {
 		root.csvDownload("Nhat_ky_hoat_dong_QCLab.csv", root.activityCSVRows(state.activity || []));
 	};
-	root.archiveActivityLog = () => {
-		if (!root.requireAdmin()) return;
-		const total = (state.activity || []).length;
-		if (!total) return;
-		root.openModal(root.activityAuditArchiveModalHtml({
-			total,
-			cancelButtonHtml: root.btn("Hủy", { action: "closeModal" }, "ghost"),
-			archiveButtonHtml: root.btn("Xuất CSV và lưu trữ", { action: "confirmArchiveActivityLog" }, "teal")
-		}));
-	};
 	root.confirmArchiveActivityLog = async () => {
 		if (!root.requireAdmin()) return;
 		if ((await root.ActivityArchiveCommand.execute(document.getElementById("auditArchiveMonths")?.value)).status === "done") auditPage = 1;
@@ -32085,7 +32065,8 @@
 			auditModel: root.auditModel,
 			auditSetQuery: root.auditSetQuery,
 			exportActivityCSV: root.exportActivityCSV,
-			archiveActivityLog: root.archiveActivityLog,
+			activityTotal: () => (state.activity || []).length,
+			confirmArchiveActivityLog: root.confirmArchiveActivityLog,
 			auditVerifyChainNow: root.auditVerifyChainNow,
 			auditSetPageSize: root.auditSetPageSize,
 			auditClearFilters: root.auditClearFilters,

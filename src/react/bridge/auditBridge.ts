@@ -1,4 +1,7 @@
+import { createElement } from 'react';
 import { getKernel } from '../state/kernel';
+import { openReactModal } from '../dialogs/modal-store';
+import { ArchiveLogModal } from '../modals/ArchiveLogModal';
 
 export type AuditModel = {
   total: number;
@@ -29,7 +32,12 @@ export const requireAdmin = (): boolean => getKernel().pres.requireAdmin();
 export const headOnlyHtml = (title: string, subtitle: string): string => getKernel().pres.headOnly(title, subtitle);
 export const auditSetQuery = (value: string) => getKernel().audit.auditSetQuery(value);
 export const exportActivityCSV = (): void => getKernel().audit.exportActivityCSV();
-export const archiveActivityLog = (): void => getKernel().audit.archiveActivityLog();
+export const archiveActivityLog = (): void => {
+  if (!getKernel().pres.requireAdmin()) return;
+  const total = getKernel().audit.activityTotal();
+  if (!total) return;
+  openReactModal(() => createElement(ArchiveLogModal, { total }));
+};
 export const auditVerifyChainNow = (): void => getKernel().audit.auditVerifyChainNow();
 export const auditSetPageSize = (value: string): void => getKernel().audit.auditSetPageSize(value);
 export const auditClearFilters = (): void => getKernel().audit.auditClearFilters();

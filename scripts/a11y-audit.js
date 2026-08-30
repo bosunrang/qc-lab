@@ -73,7 +73,22 @@ const MODALS = [
   // archiveActivityLog() thoát sớm khi nhật ký rỗng, mà seed chỉ có dữ liệu QC vận
   // hành — ghi một dòng trước để cổng đó không chặn (cùng lý do Sigma phải tự
   // sgTrackTest/sgAddPeriod trước khi audit).
-  { page: 'audit', label: 'audit:archive-log', open: () => { logAct('Nhập QC', 'seed cho a11y audit', 'Glucose'); archiveActivityLog(); } },
+  // archiveActivityLog() (Giai đoạn 3) giờ chỉ tồn tại trong react-pilot.js, không
+  // còn là global tới được từ đây — bấm thẳng nút thật thay vì gọi hàm trần. logAct()
+  // kích hoạt rerender() bất đồng bộ (React commit không đồng bộ trong cùng lượt gọi
+  // đồng bộ) nên phải chờ một nhịp trước khi tìm nút — cùng bài học "React commit bất
+  // đồng bộ" đã gặp ở Actions/nce-workflow-check.js.
+  { page: 'audit', label: 'audit:archive-log', open: async () => {
+    // logAct() tự nó không rerender() — trang chỉ vẽ lại số dòng mới khi có gì khác
+    // gọi rerender()/touch(), nên phải tự gọi để nút "Lưu trữ nhật ký cũ" xuất hiện.
+    logAct('Nhập QC', 'seed cho a11y audit', 'Glucose');
+    rerender();
+    for (let tries = 0; tries < 20; tries++) {
+      const btn = [...document.querySelectorAll('button')].find(b => b.textContent === 'Lưu trữ nhật ký cũ');
+      if (btn) { btn.click(); return; }
+      await new Promise(r => setTimeout(r, 25));
+    }
+  } },
   // Shared confirm-dialog component (modals.js #dialogRoot layer, separate
   // from #modalRoot) — every delete/destructive confirmation across the app
   // renders through this one function, so testing it once covers all of
