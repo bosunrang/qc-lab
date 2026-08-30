@@ -148,7 +148,7 @@ assert.equal(ctx.sgInputDisplayValue(''),'');
   // (Bias/thêm xét nghiệm) và các panel tính SAU khi vẽ (#sgFreq qua sgFrequencyHTML(),
   // vẫn ở sigma-page-controller.ts) không đổi.
   const sigmaPage = fs.readFileSync(path.join(__dirname, '..', 'src', 'react', 'pages', 'SigmaPage.tsx'), 'utf8');
-  const biasModalSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'sigma', 'sigma-bias-modal-html.ts'), 'utf8');
+  const biasModalSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'react', 'modals', 'SigmaBiasModal.tsx'), 'utf8');
   // Modal "Chọn hoặc thêm xét nghiệm" (Giai đoạn 3) đã chuyển sang component React thật.
   const addTestModalSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'react', 'modals', 'SigmaAddTestModal.tsx'), 'utf8');
   const frequencyPanelSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'sigma', 'sigma-frequency-panel-html.ts'), 'utf8');
@@ -179,7 +179,7 @@ assert.equal(ctx.sgInputDisplayValue(''),'');
   assert.match(sigmaPage, /sg-combined-print"[\s\S]*?onClick=\{printSigmaPeriods\}[\s\S]*?<PrintIcon \/>Xuất PDF/, 'combined PDF export is available under the period table');
   assert.doesNotMatch(sigmaPage, /sg-period-actions/, 'the obsolete footer action row is removed');
   assert.doesNotMatch(sigmaPage, /<button class="btn ghost sm" title="Tính Bias EQA\/EQC từ nhiều vòng"/, 'period cells no longer repeat a Bias calculation button');
-  assert.match(biasModalSource, /class="sg-eqa-table"/, 'EQA Bias modal uses the compact reference-style table');
+  assert.match(biasModalSource, /className="sg-eqa-table"/, 'EQA Bias modal uses the compact reference-style table');
   assert.match(addTestModalSource, /Chọn hoặc thêm xét nghiệm vào Six Sigma/, 'Sigma add opens a picker that also navigates tracked assays');
   assert.match(source, /sgTrackTest/, 'Sigma picker tracks an assay selected from the shared catalog');
   assert.match(source, /sgViewTrackedTest/, 'Sigma picker can open an already-tracked assay for inspection');

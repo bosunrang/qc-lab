@@ -1374,7 +1374,52 @@ violations across all 18 modals, `ui-workflow-check` 29/29,
 paths (the real toolbar button and the embedded empty-state button) open
 the identical modal correctly.
 
-Remaining for Giai đoạn 3: convert each of the other ~6 form modals from
+Six Sigma's "Tính Bias% từ EQA/EQC" (done, 11th real modal converted):
+the first modal with a **dynamic list edited live per keystroke** —
+add/remove EQA/EQC rounds, with per-round Bias% and a rolling summary
+(valid-round count, signed mean, RMS, mixed-signs warning) all recomputed on
+every edit. Classic `sgRenderBiasModal()`/`sgBiasUpdateSummary()` did this by
+re-reading the whole `<table>` via `sgBiasRowsFromDom()` and patching
+`innerHTML`/`textContent` by hand on every keystroke and every add/delete.
+The conversion did **not** port that DOM-patching machinery at all: `rounds`/
+`periodIds` became real `useState`, and the summary math — `sgBiasStats()`,
+already a pure TypeScript service call (`deps.SigmaBiasService.stats(rounds)`,
+no DOM involved) — is called directly inside the component's render
+(`getKernel().sigma.sgBiasStats(rounds)`), so React just re-renders whenever
+`rounds` changes; no "update the summary" function of any kind survives.
+This is the first Giai đoạn 3 modal where an entire cluster of DOM-reader/
+DOM-writer functions (`sgRenderBiasModal`, `sgBiasUpdateSummary`,
+`sgBiasSelectPeriods`, `sgBiasAdd`, `sgBiasDel`, `sgBiasRowsFromDom`,
+`sgBiasPeriodsFromDom`) was deleted with **no replacement function at all** —
+every bit of that state now just lives in the component. `sgOpenBias()` split
+into `sgOpenBiasModel(eid, level)` (synchronous, returns `Model | null` — no
+permission gate on open, matching prior behavior exactly, since the triggering
+button itself is already hidden unless `canWrite`). `sgBiasApply()` changed
+signature from reading `ui().sgBiasCtx` (a DOM-fed side-channel) to taking
+`(level, periodIds, rounds)` directly as parameters — with no more side-channel
+needed, `sgBiasCtx` itself was deleted from `SigmaUIState`/`global.d.ts`
+outright (confirmed zero remaining readers). `sgBiasStats`/`sgBiasRoundsKey`/
+`sgBiasLinkedPeriodIds`/`sgApplyBiasToPeriods` (pure functions with their own
+public contract via `tests/sigma-comp.test.js`) were left untouched. Classic
+`sigma-bias-modal-html.ts`/`sigma-bias-rows-html.ts`/`sigma-bias-summary-html.ts`
+deleted outright (3 dedicated tests removed). `scripts/a11y-audit.js`'s
+`sigma:add-bias` switched from calling the retired `sgOpenBias()` global to
+clicking the real "Bias EQA% Mức 1" button. This modal's first a11y run
+surfaced a real, expected gap: the new component was missing
+`role="dialog"`/`aria-modal`/`aria-labelledby`/`tabIndex` (present in every
+prior real-JSX modal since `ActionGuideModal.tsx`, simply forgotten here) —
+axe-core caught it as a genuine "region" (moderate) violation; adding the same
+attributes brought it back to 0 violations across all 18 modals. Verified:
+`npm test` 448/448, `typecheck` clean, `check-build-freshness` matches,
+`a11y-audit` 0 violations (18/18 modals), `ui-workflow-check` 29/29,
+`nce-workflow-check` 91/91, plus an ad-hoc script confirming two rounds with
+opposite-sign bias produce the correct per-row values, RMS, and mixed-signs
+warning live as they're typed; add/delete correctly changes the row count
+(never below 1, even deleting every round); the period checkbox and Apply
+button correctly persist `biasEqa`/`eqaRounds` onto the record and close the
+modal.
+
+Remaining for Giai đoạn 3: convert each of the other ~5 form modals from
 the `'html'` string path to a real `'react'` component, one at a time, same
 full-verify-after-each discipline established across Giai đoạn 2 — each
 conversion touches exactly one modal's trigger function (swap

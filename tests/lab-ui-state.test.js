@@ -3,9 +3,9 @@ const { loadSandbox, run } = require('./helpers/sandbox');
 
 {
   const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js']);
-  run(ctx, "sgTest='T1'; sgBiasCtx={eid:'E1',level:1,rounds:[]};");
+  run(ctx, "sgTest='T1'; sgMuCtx={eid:'E1',levels:[1],rows:[]};");
   assert.equal(ctx.SigmaUIState.sgTest, 'T1');
-  assert.equal(ctx.SigmaUIState.sgBiasCtx.eid, 'E1');
+  assert.equal(ctx.SigmaUIState.sgMuCtx.eid, 'E1');
   ctx.SigmaUIState.sgTest = null;
   assert.equal(ctx.sgTest, null);
 }

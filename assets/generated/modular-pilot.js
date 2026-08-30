@@ -13006,15 +13006,6 @@
     <div class="modal-f">${input.cancelButtonHtml}${input.saveButtonHtml}</div></div>`;
 	}
 	//#endregion
-	//#region src/presentation/sigma/sigma-bias-modal-html.ts
-	function sigmaBiasModalHtml(input) {
-		return `<div class="modal sg-eqa-modal"><div class="modal-h"><h3>Tính Bias% từ EQA/EQC — Mức ${input.level}</h3><button class="modal-close" data-action="closeModal">✕</button></div>
-    <div class="modal-b"><div class="sg-eqa-table-wrap"><table class="sg-eqa-table"><thead><tr><th>#</th><th>KQ PXN</th><th>Target EQA</th><th>Bias%</th><th><span class="sr-only">Thao tác</span></th></tr></thead><tbody>${input.rowsHtml}</tbody></table></div>
-      ${input.addRoundButtonHtml}<div id="sgBiasSummary" class="sg-eqa-summary alert info"></div>
-      <div class="sg-eqa-period-wrap"><div class="sg-eqa-period-head"><b>Áp dụng cho kỳ nào?</b><div>${input.selectAllButtonHtml}${input.clearSelectionButtonHtml}</div></div><div class="sg-eqa-period-list">${input.periodRowsHtml}</div></div></div>
-    <div class="modal-f">${input.cancelButtonHtml}${input.applyButtonHtml}</div></div>`;
-	}
-	//#endregion
 	//#region src/presentation/sigma/sigma-mu-modal-html.ts
 	function sigmaMuModalHtml(input) {
 		return `<div class="modal sg-eqa-modal sg-mu-modal"><div class="modal-h"><h3>Ngân sách độ không đảm bảo đo (MU)</h3><button class="modal-close" data-action="closeModal" aria-label="Đóng">✕</button></div>
@@ -13085,24 +13076,12 @@
 		return top[1] > .5 ? `${labels$1[top[0]] || top[0]} chiếm ${format(top[1] * 100, 0)}%` : "";
 	}
 	//#endregion
-	//#region src/presentation/sigma/sigma-bias-summary-html.ts
-	function sigmaBiasSummaryHtml(input) {
-		if (!input.validCount) return "<span class=\"sg-eqa-empty\">Chưa có vòng hợp lệ.</span>";
-		const warning = input.mixedSigns ? "<div class=\"sg-eqa-warning\">Bias đổi dấu giữa các vòng — RMS giúp tránh triệt tiêu.</div>" : "";
-		return `<div><span>Số vòng hợp lệ</span><b>${input.validCount}</b></div><div><span>Bias có dấu TB</span><b>${input.signedMeanText}%</b></div><div><span>Bias RMS dùng tính Sigma</span><b class="sg-eqa-average">${input.rmsText}%</b></div>${warning}`;
-	}
-	//#endregion
 	//#region src/presentation/sigma/sigma-cohort-rows-html.ts
 	function sigmaCohortRowsHtml(groups) {
 		return groups.map((group) => {
 			if (!group.rows.length) return `<tr><td>Mức ${group.level}</td><td colspan="5" class="muted">${group.missingLotCount ? `Có ${group.missingLotCount} điểm IQC chưa gắn mã lô QC — hãy gắn mã lô cho điểm QC để dùng làm CV.` : "Không có nhóm dữ liệu IQC đã gắn mã lô trong kỳ đánh giá."}</td></tr>`;
 			return group.rows.map((row) => `<tr><td>${row.showLevel ? `Mức ${row.level}` : ""}</td><td><label><input type="radio" name="sgCohort_${row.level}" value="${row.lotHtml}" ${row.checked ? "checked" : ""}> Lô ${row.lotHtml}</label></td><td>${row.startText}–${row.endText}</td><td class="num">${row.count}</td><td class="num">${row.cvText}</td><td>${row.statusHtml}</td></tr>`).join("");
 		}).join("");
-	}
-	//#endregion
-	//#region src/presentation/sigma/sigma-bias-rows-html.ts
-	function sigmaBiasRowsHtml(rows) {
-		return rows.map((row) => `<tr class="sg-eqa-row"><td class="sg-eqa-index">${row.index}</td><td><input type="number" step="any" data-f="lab" value="${row.labValue}" placeholder="—" data-action="sgBiasUpdateSummary" data-action-on="input"></td><td><input type="number" step="any" data-f="target" value="${row.targetValue}" placeholder="—" data-action="sgBiasUpdateSummary" data-action-on="input"></td><td class="sg-eqa-bias" data-bias>${row.biasText}</td><td>${row.deleteButtonHtml}</td></tr>`).join("");
 	}
 	//#endregion
 	//#region src/presentation/sigma/sigma-mu-rows-html.ts
@@ -22315,127 +22294,38 @@
 			g += `<text transform="translate(13,128) rotate(-90)" font-size="var(--type-overline)" fill="#40515c" text-anchor="middle" font-weight="750">|BIAS| / TEA (%)</text>`;
 			return valid.length ? `<div style="width:100%;margin:4px auto 0"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;display:block" xmlns="http://www.w3.org/2000/svg">${g}</svg></div>` : "<div class=\"hint\">Chưa có dữ liệu.</div>";
 		};
-		const sgBiasRowsFromDom = () => [...doc().querySelectorAll(".sg-eqa-row")].map((r) => ({
-			lab: r.querySelector("[data-f=\"lab\"]").value,
-			target: r.querySelector("[data-f=\"target\"]").value
-		}));
-		const sgBiasPeriodsFromDom = () => {
-			const boxes = [...doc().querySelectorAll("[data-sg-bias-period]")];
-			return boxes.length ? boxes.filter((x) => x.checked).map((x) => x.value) : ui().sgBiasCtx && ui().sgBiasCtx.periodIds || [];
-		};
 		const sgBiasStats = (rounds) => deps.SigmaBiasService.stats(rounds);
 		const sgBiasRoundsKey = (rounds) => deps.SigmaBiasService.roundsKey(rounds);
 		const sgBiasLinkedPeriodIds = (data, eid, level) => deps.SigmaBiasService.linkedPeriodIds(data, eid, level);
-		const sgOpenBias = (eid, level) => {
+		const sgOpenBiasModel = (eid, level) => {
 			const data = sgData(ui().sgTest), e = data.find((x) => x.id === eid);
-			if (!e) return;
+			if (!e) return null;
 			e.lv = e.lv || {};
 			e.lv[level] = e.lv[level] || {};
-			const saved = e.lv[level].eqaRounds, rounds = (Array.isArray(saved) && saved.length ? saved : []).map((r) => ({ ...r }));
+			const saved = e.lv[level].eqaRounds, rounds = (Array.isArray(saved) && saved.length ? saved : []).map((r) => ({
+				lab: String(r.lab ?? ""),
+				target: String(r.target ?? "")
+			}));
 			while (rounds.length < 3) rounds.push({
 				lab: "",
 				target: ""
 			});
-			ui().sgBiasCtx = {
+			const periods = [...data].sort((a, b) => String(a.period || "").localeCompare(String(b.period || ""))).map((p) => ({
+				id: p.id,
+				label: deps.vnPeriod(p.period) || p.period || "Chưa chọn kỳ"
+			}));
+			return {
 				eid,
 				level,
 				periodIds: sgBiasLinkedPeriodIds(data, eid, level),
-				rounds
+				rounds,
+				periods
 			};
-			sgRenderBiasModal();
-		};
-		const sgRenderBiasModal = () => {
-			const c = ui().sgBiasCtx;
-			if (!c) return;
-			const rounds = c.rounds.length ? c.rounds : [{
-				lab: "",
-				target: ""
-			}], periods = [...sgData(ui().sgTest)].sort((a, b) => String(a.period || "").localeCompare(String(b.period || "")));
-			const rows = deps.pres.sigmaBiasRowsHtml(rounds.map((r, i) => {
-				const lab = parseFloat(r.lab), target = parseFloat(r.target), bias = isFinite(lab) && isFinite(target) && target !== 0 ? (lab - target) / Math.abs(target) * 100 : null;
-				return {
-					index: i + 1,
-					labValue: deps.escapeAttr(r.lab ?? ""),
-					targetValue: deps.escapeAttr(r.target ?? ""),
-					biasText: bias == null ? "—" : deps.fmt(bias, 2) + "%",
-					deleteButtonHtml: deps.btn("Xóa", {
-						action: "sgBiasDel",
-						args: [i]
-					}, "danger sm sg-eqa-del", "Xóa vòng")
-				};
-			}));
-			const periodRows = periods.map((e) => `<label class="sg-eqa-period"><input type="checkbox" data-sg-bias-period value="${deps.escapeAttr(e.id)}" ${(c.periodIds || []).includes(e.id) ? "checked" : ""}><span>${deps.esc(deps.vnPeriod(e.period) || "Chưa chọn kỳ")}</span></label>`).join("");
-			deps.openModal(deps.pres.sigmaBiasModalHtml({
-				level: c.level,
-				rowsHtml: rows,
-				periodRowsHtml: periodRows,
-				addRoundButtonHtml: deps.btn("+ Thêm vòng", { action: "sgBiasAdd" }, "ghost sm sg-eqa-add"),
-				selectAllButtonHtml: deps.btn("Chọn tất cả", {
-					action: "sgBiasSelectPeriods",
-					args: [true]
-				}, "ghost sm"),
-				clearSelectionButtonHtml: deps.btn("Bỏ chọn", {
-					action: "sgBiasSelectPeriods",
-					args: [false]
-				}, "ghost sm"),
-				cancelButtonHtml: deps.btn("Hủy", { action: "closeModal" }, "ghost"),
-				applyButtonHtml: deps.btn("Áp dụng Bias%", { action: "sgBiasApply" }, "teal")
-			}));
-			sgBiasUpdateSummary();
-		};
-		const sgBiasUpdateSummary = () => {
-			if (!ui().sgBiasCtx) return;
-			const rounds = sgBiasRowsFromDom();
-			ui().sgBiasCtx.rounds = rounds;
-			const stats = sgBiasStats(rounds);
-			doc().querySelectorAll("[data-bias]").forEach((el, i) => {
-				const r = rounds[i], lab = parseFloat(r.lab), target = parseFloat(r.target), b = isFinite(lab) && isFinite(target) && target !== 0 ? (lab - target) / Math.abs(target) * 100 : null;
-				el.textContent = b == null ? "—" : deps.fmt(b, 2) + "%";
-				el.style.color = b != null && Math.abs(b) > 10 ? "var(--red)" : "var(--teal)";
-			});
-			const el = doc().getElementById("sgBiasSummary");
-			if (!el) return;
-			const mixed = stats.valid.some((r) => r.bias < 0) && stats.valid.some((r) => r.bias > 0);
-			el.classList.toggle("is-empty", !stats.valid.length);
-			el.innerHTML = deps.pres.sigmaBiasSummaryHtml({
-				validCount: stats.valid.length,
-				signedMeanText: deps.fmt(stats.signedMean, 2),
-				rmsText: deps.fmt(stats.rms, 2),
-				mixedSigns: mixed
-			});
-		};
-		const sgBiasSelectPeriods = (checked) => {
-			doc().querySelectorAll("[data-sg-bias-period]").forEach((x) => x.checked = checked);
-			if (ui().sgBiasCtx) ui().sgBiasCtx.periodIds = sgBiasPeriodsFromDom();
-		};
-		const sgBiasAdd = () => {
-			if (!ui().sgBiasCtx) return;
-			ui().sgBiasCtx.periodIds = sgBiasPeriodsFromDom();
-			ui().sgBiasCtx.rounds = sgBiasRowsFromDom();
-			ui().sgBiasCtx.rounds.push({
-				lab: "",
-				target: ""
-			});
-			sgRenderBiasModal();
-		};
-		const sgBiasDel = (i) => {
-			if (!ui().sgBiasCtx) return;
-			ui().sgBiasCtx.periodIds = sgBiasPeriodsFromDom();
-			ui().sgBiasCtx.rounds = sgBiasRowsFromDom();
-			ui().sgBiasCtx.rounds.splice(i, 1);
-			if (!ui().sgBiasCtx.rounds.length) ui().sgBiasCtx.rounds.push({
-				lab: "",
-				target: ""
-			});
-			sgRenderBiasModal();
 		};
 		const sgApplyBiasToPeriods = (data, periodIds, level, bias, rounds, batchId = deps.uid()) => deps.SigmaBiasService.applyToPeriods(data, periodIds, level, bias, rounds, batchId);
-		const sgBiasApply = async () => {
+		const sgBiasApply = async (level, periodIds, rounds) => {
 			if (!deps.requireWrite()) return;
-			if (!ui().sgBiasCtx) return;
-			ui().sgBiasCtx.rounds = sgBiasRowsFromDom();
-			ui().sgBiasCtx.periodIds = sgBiasPeriodsFromDom();
-			const r = deps.SigmaBiasWorkflowService.apply(sgData(ui().sgTest), ui().sgBiasCtx.periodIds, ui().sgBiasCtx.level, ui().sgBiasCtx.rounds);
+			const r = deps.SigmaBiasWorkflowService.apply(sgData(ui().sgTest), periodIds, level, rounds);
 			if (r.status === "invalid-rounds") {
 				await deps.infoDialog("Chưa có vòng hợp lệ để tính Bias.");
 				return;
@@ -22798,17 +22688,10 @@
 			sgPointTipHide,
 			sgTrendSVG,
 			sgMDCSVG,
-			sgBiasRowsFromDom,
-			sgBiasPeriodsFromDom,
 			sgBiasStats,
 			sgBiasRoundsKey,
 			sgBiasLinkedPeriodIds,
-			sgOpenBias,
-			sgRenderBiasModal,
-			sgBiasUpdateSummary,
-			sgBiasSelectPeriods,
-			sgBiasAdd,
-			sgBiasDel,
+			sgOpenBiasModel,
 			sgApplyBiasToPeriods,
 			sgBiasApply,
 			sgMuRowsFromDom,
@@ -25277,7 +25160,6 @@
 		return {
 			sgTest: null,
 			sgRefreshT: null,
-			sgBiasCtx: null,
 			sgMuCtx: null,
 			sgCohortCtx: null,
 			sgAddTestQ: "",
@@ -28487,7 +28369,6 @@
 	root.rangeNceNoticeHtml = rangeNceNoticeHtml;
 	root.rangeWorkflowComparisonRowsHtml = rangeWorkflowComparisonRowsHtml;
 	root.resetPasswordModalHtml = resetPasswordModalHtml;
-	root.sigmaBiasModalHtml = sigmaBiasModalHtml;
 	root.sigmaMuModalHtml = sigmaMuModalHtml;
 	root.sigmaCohortModalHtml = sigmaCohortModalHtml;
 	root.sigmaFrequencyPanelHtml = sigmaFrequencyPanelHtml;
@@ -28497,9 +28378,7 @@
 	root.sigmaOpSpecCellHtml = sigmaOpSpecCellHtml;
 	root.sigmaMuStateChipHtml = sigmaMuStateChipHtml;
 	root.sigmaMuDominantText = sigmaMuDominantText;
-	root.sigmaBiasSummaryHtml = sigmaBiasSummaryHtml;
 	root.sigmaCohortRowsHtml = sigmaCohortRowsHtml;
-	root.sigmaBiasRowsHtml = sigmaBiasRowsHtml;
 	root.sigmaMuRowsHtml = sigmaMuRowsHtml;
 	root.sigmaMuPreviewHtml = sigmaMuPreviewHtml;
 	root.sigmaInputDisplayValue = sigmaInputDisplayValue;
@@ -31521,17 +31400,10 @@
 	root.sgPointTipHide = sigmaPageController.sgPointTipHide;
 	root.sgTrendSVG = sigmaPageController.sgTrendSVG;
 	root.sgMDCSVG = sigmaPageController.sgMDCSVG;
-	root.sgBiasRowsFromDom = sigmaPageController.sgBiasRowsFromDom;
-	root.sgBiasPeriodsFromDom = sigmaPageController.sgBiasPeriodsFromDom;
 	root.sgBiasStats = sigmaPageController.sgBiasStats;
 	root.sgBiasRoundsKey = sigmaPageController.sgBiasRoundsKey;
 	root.sgBiasLinkedPeriodIds = sigmaPageController.sgBiasLinkedPeriodIds;
-	root.sgOpenBias = sigmaPageController.sgOpenBias;
-	root.sgRenderBiasModal = sigmaPageController.sgRenderBiasModal;
-	root.sgBiasUpdateSummary = sigmaPageController.sgBiasUpdateSummary;
-	root.sgBiasSelectPeriods = sigmaPageController.sgBiasSelectPeriods;
-	root.sgBiasAdd = sigmaPageController.sgBiasAdd;
-	root.sgBiasDel = sigmaPageController.sgBiasDel;
+	root.sgOpenBiasModel = sigmaPageController.sgOpenBiasModel;
 	root.sgApplyBiasToPeriods = sigmaPageController.sgApplyBiasToPeriods;
 	root.sgBiasApply = sigmaPageController.sgBiasApply;
 	root.sgMuRowsFromDom = sigmaPageController.sgMuRowsFromDom;

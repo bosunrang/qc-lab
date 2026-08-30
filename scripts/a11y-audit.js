@@ -84,7 +84,9 @@ const MODALS = [
   { page: 'manage', label: 'manage:edit-assay', open: () => openConfigAssay('T-NA') },
   { page: 'manage', label: 'manage:tea-lab-profile', open: () => teaLabProfileOpen('qclab-sodium') },
   { page: 'sigma', label: 'sigma:add-test', open: () => sgOpenAddTest() },
-  { page: 'sigma', label: 'sigma:add-bias', open: () => sgOpenBias(sgData(state.tests[0].id)[0].id, 1) },
+  // sgOpenBias() (Giai đoạn 3) giờ chỉ mở modal qua react-pilot.js — bấm thẳng nút
+  // thật "Bias EQA% Mức 1" thay vì gọi hàm trần.
+  { page: 'sigma', label: 'sigma:add-bias', open: () => { const btn = [...document.querySelectorAll('button')].find(b => b.textContent.includes('Bias EQA% Mức 1')); if (btn) btn.click(); } },
   // Ngân sách MU (ISO 15189:2022 §7.3.4) — form nhiều mức, có input số, select và
   // ô ngày, tức đúng loại nội dung mà audit trên thân trang không nhìn thấy.
   { page: 'sigma', label: 'sigma:mu-budget', open: () => sgOpenMU(sgData(state.tests[0].id)[0].id) },
