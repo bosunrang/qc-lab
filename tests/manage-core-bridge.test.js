@@ -27,10 +27,6 @@ assert.match(actions,/deps.pres.lotTransitionModalHtml\(/,'Lot-transition modal 
 assert.match(bridge,/lotTransitionModalHtml: typeof lotTransitionModalHtml;/,'Lot-transition modal must be a required bridge contract');
 assert.match(actions,/deps.pres.lotTransitionTargetsHtmlPresentation\(/,'Lot-transition Mean/SD table must use the TypeScript bridge');
 assert.match(bridge,/lotTransitionTargetsHtmlPresentation: typeof lotTransitionTargetsHtmlPresentation;/,'Lot-transition Mean/SD table must be a required bridge contract');
-assert.match(actions,/deps.pres.lotGroupColumnsHtml\(/,'Lot-group picker columns must use the TypeScript bridge');
-assert.match(bridge,/lotGroupColumnsHtml: typeof lotGroupColumnsHtml;/,'Lot-group picker columns must be a required bridge contract');
-assert.match(actions,/deps.pres.lotGroupModalHtml\(/,'Lot-group modal must use the TypeScript bridge');
-assert.match(bridge,/lotGroupModalHtml: typeof lotGroupModalHtml;/,'Lot-group modal must be a required bridge contract');
 assert.match(actions,/deps.pres.configAssayModalHtml\(/,'Assay modal must use the TypeScript bridge');
 assert.match(bridge,/configAssayModalHtml: typeof configAssayModalHtml;/,'Assay modal must be a required bridge contract');
 assert.match(actions,/deps.pres.qcHistoryDetailModalHtml\(/,'Mean/SD history modal must use the TypeScript bridge');

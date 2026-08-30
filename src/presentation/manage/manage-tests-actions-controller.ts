@@ -260,13 +260,21 @@ export function createManageTestsActionsController(deps: {
     const gate = deps.pres.ManageLotTransitionCommand.acceptanceGate({ state: state(), data: prep.data, finalChanged: prep.finalChanged }); if (!gate.ok) { await deps.infoDialog(gate.message); return; }
     const result = deps.pres.ManageLotTransitionWorkflowCommand.execute({ id, newId: deps.uid(), data: prep.data }); if (!result.ok) { await deps.infoDialog(result.message); return; }
   };
-  const openConfigGroup = async (id = '') => {
-    if (!state().qcLots.length) { await deps.infoDialog('Hãy tạo lô QC trước khi tạo nhóm lô.'); setManageTab('lots'); return; }
+  /* openConfigGroupModel(): dữ liệu thuần cho modal React (Giai đoạn 3,
+     LotGroupModal.tsx) — thay openConfigGroup() tự dựng chuỗi HTML rồi mở
+     modal. Danh sách lô theo mức KHÔNG cần state React (không có logic lọc
+     lại theo lựa chọn khác như Panel QC) nên dựng thẳng bằng JSX thay vì
+     dangerouslySetInnerHTML; suggestConfigGroupName() (không đổi, vẫn đọc
+     DOM .cfg-group-lot:checked trực tiếp) được gọi qua onChange bắt ở
+     container cha (giống data-notify-changed cũ), không cần onChange riêng
+     từng checkbox. */
+  const openConfigGroupModel = async (id = '') => {
+    if (!state().qcLots.length) { await deps.infoDialog('Hãy tạo lô QC trước khi tạo nhóm lô.'); setManageTab('lots'); return null; }
     const g = state().lotGroups.find((x: AnyRec) => x.id === id) || { lotIds: [] };
     const levels = [...new Set(state().qcLots.map((l: AnyRec) => +l.level).filter(Number.isFinite))].sort((a: AnyRec, b: AnyRec) => a - b);
     const levelLayout = levels.length >= 3 ? 'levels-3plus' : levels.length === 2 ? 'levels-2' : 'levels-1';
-    const lotColumns = deps.pres.lotGroupColumnsHtml(levels.map((level: AnyRec) => ({ level, lots: state().qcLots.filter((l: AnyRec) => +l.level === level).map((l: AnyRec) => { const selected = (g.lotIds || []).includes(l.id), locked = l.depleted && !selected, to = l.depleted ? deps.lotTransitionToNo(l.id) : '', depletedLabel = l.depleted ? (to ? 'đã chuyển tiếp qua lô ' + to : 'đã hết QC') : ''; return { id: l.id, lotNo: deps.esc(l.lotNo), expiry: l.exp ? deps.vnDate(l.exp) : 'chưa có', selected, depleted: !!l.depleted, locked, depletedLabel: deps.escapeAttr(depletedLabel) }; }) })));
-    deps.openModal(deps.pres.lotGroupModalHtml({ title: id ? 'Sửa nhóm lô' : 'Thêm nhóm lô', levelLayout, lotColumnsHtml: lotColumns, name: deps.escapeAttr(g.name || ''), note: deps.esc(g.note || ''), cancelButtonHtml: deps.btn('Hủy', { action: 'closeModal' }, 'ghost'), saveButtonHtml: deps.btn(id ? 'Lưu thay đổi' : 'Thêm nhóm lô', { action: 'saveConfigGroup', args: [id] }, 'teal') }));
+    const columns = levels.map((level: AnyRec) => ({ level, lots: state().qcLots.filter((l: AnyRec) => +l.level === level).map((l: AnyRec) => { const selected = (g.lotIds || []).includes(l.id), locked = l.depleted && !selected, to = l.depleted ? deps.lotTransitionToNo(l.id) : '', depletedLabel = l.depleted ? (to ? 'đã chuyển tiếp qua lô ' + to : 'đã hết QC') : ''; return { id: l.id, lotNo: l.lotNo, expiry: l.exp ? deps.vnDate(l.exp) : 'chưa có', selected, depleted: !!l.depleted, locked, depletedLabel }; }) }));
+    return { id, levelLayout, columns, name: g.name || '', note: g.note || '' };
   };
   const suggestConfigGroupName = () => { const ids = [...doc().querySelectorAll('.cfg-group-lot:checked')].map((x: AnyRec) => x.value), name = ids.map((id: unknown) => (state().qcLots.find((l: AnyRec) => l.id === id) || {}).lotNo).filter(Boolean).join('/'), el = doc().getElementById('cfgGroupName'); if (el) el.value = name; };
   const saveConfigGroup = async (id: unknown) => {
@@ -455,7 +463,7 @@ export function createManageTestsActionsController(deps: {
     saveConfigPanel, deleteConfigPanel, deleteLotTransition, lotTransitionChoiceLabel,
     lotTransitionChoiceLots, lotTransitionChoiceMatch, lotTransitionSelectedId, lotTransitionChoiceInput,
     lotTransitionChoiceHtml, openLotTransitionV2, lotTransitionTargetsHtml, filterLotTransitionTargets,
-    refreshLotTransitionTargets, readLotTransitionTargetPicks, saveLotTransitionV2, openConfigGroup,
+    refreshLotTransitionTargets, readLotTransitionTargetPicks, saveLotTransitionV2, openConfigGroupModel,
     suggestConfigGroupName, saveConfigGroup, deleteConfigGroup, toggleLotGroupStatus, activateLotGroup,
     openConfigLotModel, saveConfigLot, renameLotAcrossPoints, deleteConfigLot, openConfigInstrumentModel,
     saveConfigInstrument, deleteConfigInstrument, defaultAssayLevels, configAssayTeaRefs, configAssayRefRecord,

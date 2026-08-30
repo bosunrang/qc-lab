@@ -12776,21 +12776,6 @@
     <div class="target-table lot-trans-target-table"><div class="target-head"><span></span><span>Xét nghiệm</span><span>Trung bình mục tiêu</span><span>Giới hạn dưới</span><span>Giới hạn trên</span><span>Độ lệch chuẩn</span><span>Trạng thái</span></div>${rows}</div>`;
 	}
 	//#endregion
-	//#region src/presentation/manage/lot-group-columns-html.ts
-	function lotGroupColumnsHtml(columns) {
-		return columns.map((column) => `<div class="lot-level-col"><div class="lot-level-title">Mức ${column.level}</div>${column.lots.map((lot) => `<label class="${lot.depleted ? "lot-opt-depleted" : ""}"${lot.locked ? ` title="Lô ${lot.depletedLabel} — không thể chọn"` : ""}><input class="cfg-group-lot" type="checkbox" value="${lot.id}" ${lot.selected ? "checked" : ""} ${lot.locked ? "disabled" : ""} data-action="suggestConfigGroupName" data-action-on="change"><span><b>${lot.lotNo}</b><small>HSD ${lot.expiry}${lot.depleted ? " · " + lot.depletedLabel : ""}</small></span></label>`).join("")}</div>`).join("");
-	}
-	//#endregion
-	//#region src/presentation/manage/lot-group-modal-html.ts
-	function lotGroupModalHtml(input) {
-		return `<div class="modal rcfg-modal rcfg-group-modal ${input.levelLayout}"><div class="modal-h"><div><h3>${input.title}</h3></div><button class="modal-close" data-action="closeModal">✕</button></div><div class="modal-b">
-    <label>Chọn các lô QC</label>
-    <div class="lot-level-picker">${input.lotColumnsHtml}</div>
-    <label>Tên nhóm lô</label><input id="cfgGroupName" value="${input.name}" placeholder="Tự động: 1102/1103">
-    <label>Ghi chú</label><textarea id="cfgGroupNote">${input.note}</textarea></div>
-    <div class="modal-f">${input.cancelButtonHtml}${input.saveButtonHtml}</div></div>`;
-	}
-	//#endregion
 	//#region src/presentation/manage/config-assay-modal-html.ts
 	function configAssayModalHtml(input) {
 		return `<div class="modal rcfg-modal rcfg-assay-modal"><div class="modal-h"><div><h3>${input.title}</h3></div><button class="modal-close" data-action="closeModal">✕</button></div><div class="modal-b">
@@ -18481,42 +18466,35 @@
 				return;
 			}
 		};
-		const openConfigGroup = async (id = "") => {
+		const openConfigGroupModel = async (id = "") => {
 			if (!state().qcLots.length) {
 				await deps.infoDialog("Hãy tạo lô QC trước khi tạo nhóm lô.");
 				setManageTab("lots");
-				return;
+				return null;
 			}
 			const g = state().lotGroups.find((x) => x.id === id) || { lotIds: [] };
 			const levels = [...new Set(state().qcLots.map((l) => +l.level).filter(Number.isFinite))].sort((a, b) => a - b);
-			const levelLayout = levels.length >= 3 ? "levels-3plus" : levels.length === 2 ? "levels-2" : "levels-1";
-			const lotColumns = deps.pres.lotGroupColumnsHtml(levels.map((level) => ({
-				level,
-				lots: state().qcLots.filter((l) => +l.level === level).map((l) => {
-					const selected = (g.lotIds || []).includes(l.id), locked = l.depleted && !selected, to = l.depleted ? deps.lotTransitionToNo(l.id) : "", depletedLabel = l.depleted ? to ? "đã chuyển tiếp qua lô " + to : "đã hết QC" : "";
-					return {
-						id: l.id,
-						lotNo: deps.esc(l.lotNo),
-						expiry: l.exp ? deps.vnDate(l.exp) : "chưa có",
-						selected,
-						depleted: !!l.depleted,
-						locked,
-						depletedLabel: deps.escapeAttr(depletedLabel)
-					};
-				})
-			})));
-			deps.openModal(deps.pres.lotGroupModalHtml({
-				title: id ? "Sửa nhóm lô" : "Thêm nhóm lô",
-				levelLayout,
-				lotColumnsHtml: lotColumns,
-				name: deps.escapeAttr(g.name || ""),
-				note: deps.esc(g.note || ""),
-				cancelButtonHtml: deps.btn("Hủy", { action: "closeModal" }, "ghost"),
-				saveButtonHtml: deps.btn(id ? "Lưu thay đổi" : "Thêm nhóm lô", {
-					action: "saveConfigGroup",
-					args: [id]
-				}, "teal")
-			}));
+			return {
+				id,
+				levelLayout: levels.length >= 3 ? "levels-3plus" : levels.length === 2 ? "levels-2" : "levels-1",
+				columns: levels.map((level) => ({
+					level,
+					lots: state().qcLots.filter((l) => +l.level === level).map((l) => {
+						const selected = (g.lotIds || []).includes(l.id), locked = l.depleted && !selected, to = l.depleted ? deps.lotTransitionToNo(l.id) : "", depletedLabel = l.depleted ? to ? "đã chuyển tiếp qua lô " + to : "đã hết QC" : "";
+						return {
+							id: l.id,
+							lotNo: l.lotNo,
+							expiry: l.exp ? deps.vnDate(l.exp) : "chưa có",
+							selected,
+							depleted: !!l.depleted,
+							locked,
+							depletedLabel
+						};
+					})
+				})),
+				name: g.name || "",
+				note: g.note || ""
+			};
 		};
 		const suggestConfigGroupName = () => {
 			const name = [...doc().querySelectorAll(".cfg-group-lot:checked")].map((x) => x.value).map((id) => (state().qcLots.find((l) => l.id === id) || {}).lotNo).filter(Boolean).join("/"), el = doc().getElementById("cfgGroupName");
@@ -18998,7 +18976,7 @@
 			refreshLotTransitionTargets,
 			readLotTransitionTargetPicks,
 			saveLotTransitionV2,
-			openConfigGroup,
+			openConfigGroupModel,
 			suggestConfigGroupName,
 			saveConfigGroup,
 			deleteConfigGroup,
@@ -28510,8 +28488,6 @@
 	root.lotTransitionChoiceHtmlPresentation = lotTransitionChoiceHtml;
 	root.lotTransitionModalHtml = lotTransitionModalHtml;
 	root.lotTransitionTargetsHtmlPresentation = lotTransitionTargetsHtml;
-	root.lotGroupColumnsHtml = lotGroupColumnsHtml;
-	root.lotGroupModalHtml = lotGroupModalHtml;
 	root.configAssayModalHtml = configAssayModalHtml;
 	root.qcHistoryDetailModalHtml = qcHistoryDetailModalHtml;
 	root.configAssayRuleRowsHtml = configAssayRuleRowsHtml;
@@ -30997,7 +30973,6 @@
 	root.refreshLotTransitionTargets = manageTestsActionsController.refreshLotTransitionTargets;
 	root.readLotTransitionTargetPicks = manageTestsActionsController.readLotTransitionTargetPicks;
 	root.saveLotTransitionV2 = manageTestsActionsController.saveLotTransitionV2;
-	root.openConfigGroup = manageTestsActionsController.openConfigGroup;
 	root.suggestConfigGroupName = manageTestsActionsController.suggestConfigGroupName;
 	root.saveConfigGroup = manageTestsActionsController.saveConfigGroup;
 	root.deleteConfigGroup = manageTestsActionsController.deleteConfigGroup;
@@ -31946,7 +31921,9 @@
 			openConfigLotModel: manageTestsActionsController.openConfigLotModel,
 			saveConfigLot: manageTestsActionsController.saveConfigLot,
 			deleteConfigLot: manageTestsActionsController.deleteConfigLot,
-			openConfigGroup: manageTestsActionsController.openConfigGroup,
+			openConfigGroupModel: manageTestsActionsController.openConfigGroupModel,
+			suggestConfigGroupName: manageTestsActionsController.suggestConfigGroupName,
+			saveConfigGroup: manageTestsActionsController.saveConfigGroup,
 			openTargetMatrix: manageTestsActionsController.openTargetMatrix,
 			activateLotGroup: manageTestsActionsController.activateLotGroup,
 			toggleLotGroupStatus: manageTestsActionsController.toggleLotGroupStatus,

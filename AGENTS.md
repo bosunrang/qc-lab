@@ -1300,7 +1300,39 @@ test list correctly filters per instrument, shows the empty state for an
 instrument with none, and resets to unchecked when switching instruments
 and back.
 
-Remaining for Giai đoạn 3: convert each of the other ~8 form modals from
+Manage's nhóm lô (done, ninth real modal converted): lots grouped into
+columns by level, each a real checkbox — simpler than Panel QC since
+nothing here needs to be re-filtered when a checkbox changes (unlike
+Panel's instrument-dependent test list), so the whole column structure is
+plain JSX with uncontrolled (`defaultChecked`) checkboxes, no local
+`useState` at all. `suggestConfigGroupName()` (unchanged, still reads
+`.cfg-group-lot:checked` and writes `#cfgGroupName` directly) is wired via
+one `onChange` on the `.lot-level-picker` container — the same
+"container-level catch-all instead of per-checkbox handlers" pattern
+`FormOpenBody`'s `actionFormChanged` established back in the Actions page.
+`openConfigGroupModel(id)` has one precondition (no lots yet exist at all)
+returning `Promise<Model | null>`, same shape as the last several
+conversions. Classic `lot-group-modal-html.ts`/`lot-group-columns-html.ts`
+deleted outright (2 dedicated tests removed — NOT
+`lot-group-status.test.js`/`lot-group-toggle-action.test.js`, which test
+unrelated status/toggle logic and were left untouched);
+`tests/manage-core-bridge.test.js` had its 4 now-retired contract checks
+removed, `tests/manage-crud-labels.test.js`'s "nhóm lô" branch repointed to
+`LotGroupModal.tsx`. Neither `a11y-audit.js` nor `ui-workflow-check.js`
+tracks this modal, so no script changes needed. An ad-hoc verification
+script's first attempt looked like a save failure (`groupCount` unchanged,
+modal stayed open) — turned out to be the test picking lots already
+belonging to the existing seeded group, then (after fixing that) picking
+only one fresh lot, both correctly rejected by the **pre-existing** "a lot
+group needs at least 2 lots" validation with an `infoDialog` message; not a
+regression, a reminder to check for a blocking `infoDialog` before assuming
+a save silently failed. Verified: `npm test` 453/453, `typecheck` clean,
+`check-build-freshness` matches, `a11y-audit` 0 violations across all 18
+modals, `ui-workflow-check` 29/29, `nce-workflow-check` 91/91, plus the
+corrected ad-hoc script confirming the auto-name suggestion updates live as
+lots are checked and the group saves/closes correctly with 2+ lots.
+
+Remaining for Giai đoạn 3: convert each of the other ~7 form modals from
 the `'html'` string path to a real `'react'` component, one at a time, same
 full-verify-after-each discipline established across Giai đoạn 2 — each
 conversion touches exactly one modal's trigger function (swap

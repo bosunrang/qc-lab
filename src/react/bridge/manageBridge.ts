@@ -4,6 +4,7 @@ import { openReactModal } from '../dialogs/modal-store';
 import { InstrumentModal } from '../modals/InstrumentModal';
 import { LotModal } from '../modals/LotModal';
 import { PanelModal } from '../modals/PanelModal';
+import { LotGroupModal } from '../modals/LotGroupModal';
 
 export type ManageTab = { id: string; label: string; count: string | number };
 export type ManageToolbar = { title: string; subtitle?: string; action?: { action: string; args?: unknown[] } | null; actionLabel?: string };
@@ -40,7 +41,10 @@ export const openConfigLot = (id?: string): void => {
   openReactModal(() => createElement(LotModal, model));
 };
 export const deleteConfigLot = (id: string): void => getKernel().manage.deleteConfigLot(id);
-export const openConfigGroup = (id?: string): void => getKernel().manage.openConfigGroup(id);
+export const openConfigGroup = async (id?: string): Promise<void> => {
+  const model = await getKernel().manage.openConfigGroupModel(id);
+  if (model) openReactModal(() => createElement(LotGroupModal, model));
+};
 export const openTargetMatrix = (panelId: string, groupId: string): void => getKernel().manage.openTargetMatrix(panelId, groupId);
 export const activateLotGroup = (id: string): void => getKernel().manage.activateLotGroup(id);
 export const toggleLotGroupStatus = (id: string): void => getKernel().manage.toggleLotGroupStatus(id);
