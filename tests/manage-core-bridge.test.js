@@ -19,12 +19,6 @@ assert.match(bridge,/manageLotStatusPresentation: ReturnType<typeof createManage
 
 assert.match(actions,/deps\.pres\.targetSwitchModalHtml\(/,'target switch modal must use the TypeScript bridge');
 assert.match(bridge,/targetSwitchModalHtml: typeof targetSwitchModalHtml;/,'target switch modal must be a required bridge contract');
-assert.match(actions,/deps.pres.lotTransitionChoiceHtmlPresentation\(/,'Lot-transition picker must use the TypeScript bridge');
-assert.match(bridge,/lotTransitionChoiceHtmlPresentation: typeof lotTransitionChoiceHtmlPresentation;/,'Lot-transition picker must be a required bridge contract');
-assert.match(actions,/deps.pres.lotTransitionModalHtml\(/,'Lot-transition modal must use the TypeScript bridge');
-assert.match(bridge,/lotTransitionModalHtml: typeof lotTransitionModalHtml;/,'Lot-transition modal must be a required bridge contract');
-assert.match(actions,/deps.pres.lotTransitionTargetsHtmlPresentation\(/,'Lot-transition Mean/SD table must use the TypeScript bridge');
-assert.match(bridge,/lotTransitionTargetsHtmlPresentation: typeof lotTransitionTargetsHtmlPresentation;/,'Lot-transition Mean/SD table must be a required bridge contract');
 assert.match(actions,/deps.pres.configAssayModalHtml\(/,'Assay modal must use the TypeScript bridge');
 assert.match(bridge,/configAssayModalHtml: typeof configAssayModalHtml;/,'Assay modal must be a required bridge contract');
 assert.match(actions,/deps.pres.qcHistoryDetailModalHtml\(/,'Mean/SD history modal must use the TypeScript bridge');

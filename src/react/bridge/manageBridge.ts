@@ -6,6 +6,7 @@ import { LotModal } from '../modals/LotModal';
 import { PanelModal } from '../modals/PanelModal';
 import { LotGroupModal } from '../modals/LotGroupModal';
 import { TeaLabProfileModal } from '../modals/TeaLabProfileModal';
+import { LotTransitionModal } from '../modals/LotTransitionModal';
 
 export type ManageTab = { id: string; label: string; count: string | number };
 export type ManageToolbar = { title: string; subtitle?: string; action?: { action: string; args?: unknown[] } | null; actionLabel?: string };
@@ -50,7 +51,10 @@ export const openTargetMatrix = (panelId: string, groupId: string): void => getK
 export const activateLotGroup = (id: string): void => getKernel().manage.activateLotGroup(id);
 export const toggleLotGroupStatus = (id: string): void => getKernel().manage.toggleLotGroupStatus(id);
 export const deleteConfigGroup = (id: string): void => getKernel().manage.deleteConfigGroup(id);
-export const openLotTransitionV2 = (id?: string): void => getKernel().manage.openLotTransitionV2(id);
+export const openLotTransitionV2 = async (id?: string): Promise<void> => {
+  const model = await getKernel().manage.openLotTransitionModel(id);
+  if (model) openReactModal(() => createElement(LotTransitionModal, model));
+};
 export const deleteLotTransition = (id: string): void => getKernel().manage.deleteLotTransition(id);
 export const openQcHistoryDetail = (testId: string, level: unknown, lot: string): void => getKernel().manage.openQcHistoryDetail(testId, level, lot);
 export const teaRefEdit = (analyteId: string, field: string, val: unknown): void => getKernel().manage.teaRefEdit(analyteId, field, val);

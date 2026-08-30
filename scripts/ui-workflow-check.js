@@ -78,7 +78,18 @@ async function checkVnDatePicker(page){
 }
 
 async function checkLotTransitionPicker(page){
-  await page.evaluate(()=>{state.qcLots.push({id:'L-FAST',lotNo:'FAST-NEW',level:1,exp:'2028-12-31',active:true});go('manage');setManageTab('transitions');openLotTransitionV2();});
+  // openLotTransitionV2() (Giai đoạn 3) giờ chỉ mở modal qua react-pilot.js —
+  // không còn global đồng bộ tới được từ đây, nên bấm thẳng nút toolbar thật
+  // thay vì gọi hàm trần. setManageTab() gọi rerender() bất đồng bộ nên phải
+  // chờ nút xuất hiện, cùng bài học đã gặp ở a11y-audit.js.
+  await page.evaluate(()=>{state.qcLots.push({id:'L-FAST',lotNo:'FAST-NEW',level:1,exp:'2028-12-31',active:true});go('manage');setManageTab('transitions');});
+  await page.evaluate(async()=>{
+    for(let tries=0;tries<20;tries++){
+      const btn=document.querySelector('.rcfg-tools .btn.teal');
+      if(btn){btn.click();return;}
+      await new Promise(r=>setTimeout(r,25));
+    }
+  });
   await page.locator('#cfgTransFrom').waitFor();
   const structure={fromOptions:await page.locator('#cfgTransFromList option').count(),toOptions:await page.locator('#cfgTransToList option').count(),fromRole:await page.locator('#cfgTransFrom').getAttribute('role'),toggles:await page.locator('.lot-choice-toggle').count()};
   check('Lô cũ/mới có ô tìm kiếm gọn, không có nút xổ xuống rời',structure.fromOptions>=3&&structure.toOptions>=3&&structure.fromRole==='combobox'&&structure.toggles===0,JSON.stringify(structure));

@@ -189,48 +189,38 @@ export function createManageTestsActionsController(deps: {
   const lotTransitionChoiceLots = (selectedId = '') => deps.LotTransitionPickerService.availableLots(state().qcLots || [], selectedId);
   const lotTransitionChoiceMatch = (value: unknown, selectedId = '') => deps.LotTransitionPickerService.match(state().qcLots || [], value, selectedId);
   const lotTransitionSelectedId = (inputId: string) => { const el = doc().getElementById(inputId); if (!el) return ''; const lot = lotTransitionChoiceMatch(el.value, el.dataset.lotId || ''); if (lot) el.dataset.lotId = lot.id; return (lot && lot.id) || ''; };
-  /* Pha H2 lát cuối: đọc `this` (không phải tham số `el` trần) vì
-     action-dispatcher.ts gọi qua `fn.apply(el,args)` — data-input-action cho
-     'input' (commit=false, không tham số), data-change-action cho 'change'
-     (commit=true qua data-change-args='[true]'), cùng phần tử. */
-  const lotTransitionChoiceInput = function (this: AnyRec, commit = false) { const el = this; const lot = lotTransitionChoiceMatch(el.value, el.dataset.lotId || ''); el.dataset.lotId = (lot && lot.id) || ''; if (commit && lot) el.value = lotTransitionChoiceLabel(lot); refreshLotTransitionTargets(); };
-  const lotTransitionChoiceHtml = (inputId: string, selectedId: unknown): string => { const lot = state().qcLots.find((l: AnyRec) => l.id === selectedId), options = lotTransitionChoiceLots(selectedId as string).map((l: AnyRec) => `<option value="${deps.escapeAttr(lotTransitionChoiceLabel(l))}"></option>`).join(''); return deps.pres.lotTransitionChoiceHtmlPresentation({ inputId, selectedId: deps.escapeAttr(selectedId || ''), value: deps.escapeAttr(lotTransitionChoiceLabel(lot)), optionsHtml: options }); };
-  const openLotTransitionV2 = async (id = '') => {
-    if (!state().qcPanels.length) { await deps.infoDialog('Hãy tạo Panel QC trước khi tạo chuyển tiếp lô.'); setManageTab('panels'); return; }
-    if (state().qcLots.length < 2) { await deps.infoDialog('Cần ít nhất 2 lô QC để tạo chuyển tiếp.'); setManageTab('lots'); return; }
+  /* openLotTransitionModel(): dữ liệu thuần cho modal React (Giai đoạn 3,
+     LotTransitionModal.tsx) — thay openLotTransitionV2() tự dựng chuỗi HTML
+     rồi mở modal. Danh sách lô cho mỗi ô combobox (fromOptions/toOptions) chỉ
+     tính MỘT LẦN lúc mở (giống bản classic — lotTransitionChoiceHtml() cũ cũng
+     chỉ build optionsHtml một lần, không refresh theo từng phím gõ), nên
+     component không cần tính lại khi đổi giá trị đang gõ dở. */
+  const openLotTransitionModel = async (id = '') => {
+    if (!state().qcPanels.length) { await deps.infoDialog('Hãy tạo Panel QC trước khi tạo chuyển tiếp lô.'); setManageTab('panels'); return null; }
+    if (state().qcLots.length < 2) { await deps.infoDialog('Cần ít nhất 2 lô QC để tạo chuyển tiếp.'); setManageTab('lots'); return null; }
     const tr = state().lotTransitions.find((x: AnyRec) => x.id === id) || { panelId: state().qcPanels[0] && state().qcPanels[0].id, fromLotId: '', toLotId: '', startDate: deps.isoToday(), status: 'planned', approvedBy: '', approvedAt: '' };
-    const panels = `<option value="">— Chọn Panel QC —</option>` + state().qcPanels.map((p: AnyRec) => `<option value="${p.id}" ${p.id === tr.panelId ? 'selected' : ''}>${deps.esc(p.name)} · ${deps.esc(deps.instrumentName(p.instrumentId))}</option>`).join('');
-    deps.openModal(deps.pres.lotTransitionModalHtml({ title: id ? 'Sửa hồ sơ chuyển lô' : 'Thêm hồ sơ chuyển lô', panelsHtml: panels, fromChoiceHtml: lotTransitionChoiceHtml('cfgTransFrom', tr.fromLotId), toChoiceHtml: lotTransitionChoiceHtml('cfgTransTo', tr.toLotId), startDateHtml: deps.dateBox('cfgTransStart', tr.startDate || ''), status: tr.status, targetsHtml: lotTransitionTargetsHtml(tr.panelId, tr.fromLotId, tr.toLotId), cancelButtonHtml: deps.btn('Hủy', { action: 'closeModal' }, 'ghost'), saveButtonHtml: deps.btn(id ? 'Lưu thay đổi' : 'Thêm hồ sơ chuyển lô', { action: 'saveLotTransitionV2', args: [id] }, 'teal') }));
+    const fromLot = state().qcLots.find((l: AnyRec) => l.id === tr.fromLotId), toLot = state().qcLots.find((l: AnyRec) => l.id === tr.toLotId);
+    return {
+      id, panels: state().qcPanels.map((p: AnyRec) => ({ id: p.id, label: `${p.name} · ${deps.instrumentName(p.instrumentId)}` })), panelId: tr.panelId || '',
+      fromLotId: tr.fromLotId || '', fromValue: lotTransitionChoiceLabel(fromLot), fromOptions: lotTransitionChoiceLots(tr.fromLotId).map((l: AnyRec) => lotTransitionChoiceLabel(l)),
+      toLotId: tr.toLotId || '', toValue: lotTransitionChoiceLabel(toLot), toOptions: lotTransitionChoiceLots(tr.toLotId).map((l: AnyRec) => lotTransitionChoiceLabel(l)),
+      startDate: tr.startDate || '', status: tr.status,
+    };
   };
-  /* Bảng Mean/SD nhúng ngay trong hồ sơ chuyển lô — cùng danh sách xét nghiệm mà
-     inspectAcceptedLotTransition() sẽ kiểm tra lúc chấp nhận, để không lệch tiêu
-     chí giữa lúc nhập và lúc chặn. Chỉ đọc/hiển thị; refreshLotTransitionTargets()
-     render lại đúng vùng này mỗi khi đổi Panel/Lô cũ/Lô mới, không đụng phần còn
-     lại của modal (giữ giá trị người dùng đã gõ ở Ngày/Trạng thái). */
-  const lotTransitionTargetsHtml = (panelId: unknown, fromLotId: unknown, toLotId: unknown): string => {
-    if (!panelId || !fromLotId || !toLotId || fromLotId === toLotId) return deps.pres.lotTransitionTargetsHtmlPresentation({ kind: 'hint', message: 'Chọn Panel QC, Lô cũ và Lô mới (khác nhau, cùng mức) để nhập Mean/SD cho lô mới.' });
+  /* lotTransitionTargetsModel(): bản dữ liệu thuần của lotTransitionTargetsHtml()
+     cũ — component React gọi trực tiếp trong render mỗi khi Panel/Lô cũ/Lô mới
+     đổi (qua useState), nên không cần hàm "refresh" nào vá lại DOM như bản
+     classic (refreshLotTransitionTargets() đã xóa). */
+  const lotTransitionTargetsModel = (panelId: unknown, fromLotId: unknown, toLotId: unknown): AnyRec => {
+    if (!panelId || !fromLotId || !toLotId || fromLotId === toLotId) return { kind: 'hint', message: 'Chọn Panel QC, Lô cũ và Lô mới (khác nhau, cùng mức) để nhập Mean/SD cho lô mới.' };
     const check = deps.inspectAcceptedLotTransition({ panelId, fromLotId, toLotId, status: 'accepted' });
-    if (!check.valid) return deps.pres.lotTransitionTargetsHtmlPresentation({ kind: 'hint', message: 'Lô cũ và lô mới phải cùng mức QC.' });
-    if (!check.rows.length) return deps.pres.lotTransitionTargetsHtmlPresentation({ kind: 'hint', message: `Panel đã chọn không có xét nghiệm nào đang dùng lô cũ ${deps.esc(check.from.lotNo)}.` });
+    if (!check.valid) return { kind: 'hint', message: 'Lô cũ và lô mới phải cùng mức QC.' };
+    if (!check.rows.length) return { kind: 'hint', message: `Panel đã chọn không có xét nghiệm nào đang dùng lô cũ ${check.from.lotNo}.` };
     const rows = check.rows.map(({ t, nextHist }: AnyRec) => {
       const draft = targetRangeDraft(nextHist || {}), has = Number.isFinite(draft.mean) && ((Number.isFinite(draft.sd) && draft.sd > 0) || (Number.isFinite(draft.low) && Number.isFinite(draft.high)));
-      return { testId: t.id, name: deps.esc(deps.testDisplayName(t)), unit: deps.esc(t.unit || ''), mean: deps.escapeAttr(targetNumberText(draft.mean, t)), low: deps.escapeAttr(targetNumberText(draft.low, t)), high: deps.escapeAttr(targetNumberText(draft.high, t)), sd: deps.escapeAttr(targetNumberText(draft.sd, t, 'stat')), assigned: has };
+      return { testId: t.id, name: deps.testDisplayName(t), unit: t.unit || '', mean: targetNumberText(draft.mean, t), low: targetNumberText(draft.low, t), high: targetNumberText(draft.high, t), sd: targetNumberText(draft.sd, t, 'stat'), assigned: has };
     });
-    return deps.pres.lotTransitionTargetsHtmlPresentation({ kind: 'rows', lotNo: deps.esc(check.to.lotNo), rows });
-  };
-  /* Lọc thuần DOM (ẩn/hiện .target-row), không render lại — nếu gọi lại
-     lotTransitionTargetsHtml() ở đây sẽ xóa mất giá trị người dùng đang gõ dở ở
-     các dòng khác. */
-  const filterLotTransitionTargets = (term: unknown) => {
-    const q = deps.searchText(term || '');
-    doc().querySelectorAll('#cfgTransTargets .target-row').forEach((row: AnyRec) => {
-      const name = row.querySelector('.lot-assay-name b');
-      row.style.display = (!q || deps.searchText(name ? name.textContent : '').includes(q)) ? '' : 'none';
-    });
-  };
-  const refreshLotTransitionTargets = () => {
-    const panelId = doc().getElementById('cfgTransPanel').value, fromLotId = lotTransitionSelectedId('cfgTransFrom'), toLotId = lotTransitionSelectedId('cfgTransTo');
-    const el = doc().getElementById('cfgTransTargets'); if (el) el.innerHTML = lotTransitionTargetsHtml(panelId, fromLotId, toLotId);
+    return { kind: 'rows', lotNo: check.to.lotNo, rows };
   };
   /* Đọc bảng Mean/SD nhúng trong modal chuyển lô. Dòng để trống hoàn toàn (cả 4 ô)
      được bỏ qua, không báo lỗi — cho phép lưu hồ sơ ở trạng thái Dự kiến/Đang chạy
@@ -461,9 +451,9 @@ export function createManageTestsActionsController(deps: {
     targetPickBackfillPoints, applyTargetPick, applyPlannedTarget, readTargetMatrixPicks, saveTargetMatrix,
     openTargetSwitchModal, resolveTargetSwitch, commitTargetMatrix, openQcHistoryDetail, openConfigPanelModel,
     saveConfigPanel, deleteConfigPanel, deleteLotTransition, lotTransitionChoiceLabel,
-    lotTransitionChoiceLots, lotTransitionChoiceMatch, lotTransitionSelectedId, lotTransitionChoiceInput,
-    lotTransitionChoiceHtml, openLotTransitionV2, lotTransitionTargetsHtml, filterLotTransitionTargets,
-    refreshLotTransitionTargets, readLotTransitionTargetPicks, saveLotTransitionV2, openConfigGroupModel,
+    lotTransitionChoiceLots, lotTransitionChoiceMatch, lotTransitionSelectedId,
+    openLotTransitionModel, lotTransitionTargetsModel,
+    readLotTransitionTargetPicks, saveLotTransitionV2, openConfigGroupModel,
     suggestConfigGroupName, saveConfigGroup, deleteConfigGroup, toggleLotGroupStatus, activateLotGroup,
     openConfigLotModel, saveConfigLot, renameLotAcrossPoints, deleteConfigLot, openConfigInstrumentModel,
     saveConfigInstrument, deleteConfigInstrument, defaultAssayLevels, configAssayTeaRefs, configAssayRefRecord,

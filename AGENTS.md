@@ -1519,7 +1519,58 @@ complete profile (source, reference, reason, dates, preparer/approver) into
 `state.teaRefs` and closes the modal; reopening correctly shows edit mode
 ("Xem hồ sơ" button, a remove button present, the saved value pre-filled).
 
-Remaining for Giai đoạn 3: convert each of the other ~2 form modals from
+Manage's "Hồ sơ chuyển tiếp lô" (done, 14th real modal converted, tab
+"transitions"): the most complex modal so far — a hand-written fuzzy-match
+combobox (free typing, not a `<select>`) for Lô cũ/Lô mới, plus an embedded
+Mean/SD table that recomputes dynamically from whichever Panel/Lô cũ/Lô mới
+are currently selected. Key design decision: the combobox stays
+**uncontrolled** — `LotComboInput` reads/writes `dataset.lotId` directly on
+the input via a ref, matching the exact `this`-bound classic contract, so
+`lotTransitionSelectedId()` (unchanged) still reads it correctly by DOM id —
+meaning `saveLotTransitionV2()` needed **zero changes**. Only a resolved lot
+ID is reported up to parent state (`fromLotId`/`toLotId`) to trigger
+recomputing the Mean/SD table — the component never controls what the user
+is mid-typing. The suggestion `<datalist>` is computed **once** at open time
+(matching classic behavior — it was never live-refreshed per keystroke
+either). The Mean/SD table itself moved to pure data:
+`lotTransitionTargetsModel(panelId, fromLotId, toLotId)` is a 1:1 port of
+classic `lotTransitionTargetsHtml()` (same calls to
+`inspectAcceptedLotTransition`/`targetRangeDraft`/`targetNumberText`) but
+returns an object instead of an HTML string, called directly during render —
+eliminating `refreshLotTransitionTargets()`/`filterLotTransitionTargets()`
+entirely (the search filter becomes a plain `useState` + `normalizeSearchText`
+filter over the rows). The 4 mean/low/high/sd inputs per row stay
+uncontrolled (`defaultValue`), wired to `syncTargetRange(el, kind)` via
+`onChange` — the exact same pattern as Manage's own Mean/SD matrix tab.
+`openLotTransitionV2()` split into `openLotTransitionModel()`
+(`Promise<Model | null>`, with its two existing preconditions — no Panel QC
+yet / fewer than 2 lots — unchanged). Hit the **missing-kernel-wiring bug a
+fourth time**: `kernel.manage` was also missing `saveLotTransitionV2` (same
+root cause as every prior instance — its save button was classic
+`data-action`, never routed through the kernel). Classic
+`lot-transition-choice-html.ts`/`lot-transition-modal-html.ts`/
+`lot-transition-targets-html.ts` deleted outright (3 dedicated tests
+removed); 2 other tests updated (`manage-crud-labels.test.js`;
+`lot-transition-picker.test.js` — its pure `lotTransitionChoiceMatch` half
+stays unchanged, only the HTML-shape half now scans the new `.tsx`'s JSX).
+**`scripts/ui-workflow-check.js` needed a real fix, not just a test tweak**:
+its `checkLotTransitionPicker()` called the now-gone bare global
+`openLotTransitionV2()` directly — switched to clicking the real toolbar
+button (`.rcfg-tools .btn.teal`) with the same async retry-poll used
+elsewhere after `setManageTab()`. This modal was never in
+`scripts/a11y-audit.js`'s 18-modal list, so that script needed no change.
+Verified: `npm test` 440/440, `typecheck` clean, `check-build-freshness`
+matches, `a11y-audit` still 0 violations across the existing 18 modals (no
+regression), `ui-workflow-check` 29/29 (including its 3 real
+lot-transition-combobox checks, now exercising the converted modal end to
+end), `nce-workflow-check` 91/91, plus two ad-hoc scripts confirming:
+create → reopen correctly shows "Sửa hồ sơ chuyển lô"/"Lưu thay đổi" with
+the combobox showing the full saved label; and, once the test's `levels[]`/
+`meanSdHistory` were seeded correctly, the Mean/SD table renders one "Đã
+nhập" row, the live search box correctly hides/restores it, and editing the
+mean field keeps the newly typed value.
+
+Remaining for Giai đoạn 3: convert the one remaining Manage form modal from
 the `'html'` string path to a real `'react'` component, one at a time, same
 full-verify-after-each discipline established across Giai đoạn 2 — each
 conversion touches exactly one modal's trigger function (swap

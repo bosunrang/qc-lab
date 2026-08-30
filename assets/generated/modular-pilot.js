@@ -12745,37 +12745,6 @@
   </div>`;
 	}
 	//#endregion
-	//#region src/presentation/manage/lot-transition-choice-html.ts
-	function lotTransitionChoiceHtml(input) {
-		return `<input id="${input.inputId}" list="${input.inputId}List" autocomplete="off" role="combobox" aria-autocomplete="list" placeholder="Gõ số lô hoặc chọn danh sách" value="${input.value}" data-lot-id="${input.selectedId}" data-input-action="lotTransitionChoiceInput" data-change-action="lotTransitionChoiceInput" data-change-args="[true]"><datalist id="${input.inputId}List">${input.optionsHtml}</datalist>`;
-	}
-	//#endregion
-	//#region src/presentation/manage/lot-transition-modal-html.ts
-	function lotTransitionModalHtml(input) {
-		return `<div class="modal rcfg-modal lot-trans-modal"><div class="modal-h"><div><h3>${input.title}</h3></div><button class="modal-close" data-action="closeModal">✕</button></div><div class="modal-b">
-    <div class="lot-trans-row3"><div><label>Panel QC áp dụng</label><select id="cfgTransPanel" data-action="refreshLotTransitionTargets" data-action-on="change">${input.panelsHtml}</select></div><div><label>Lô cũ</label>${input.fromChoiceHtml}</div><div><label>Lô mới</label>${input.toChoiceHtml}</div></div>
-    <div class="lot-trans-row2"><div><label>Ngày bắt đầu (dd/mm/yyyy)</label>${input.startDateHtml}</div><div><label>Trạng thái</label><select id="cfgTransStatus"><option value="planned" ${input.status === "planned" ? "selected" : ""}>Dự kiến</option><option value="active" ${input.status === "active" || input.status === "completed" ? "selected" : ""}>Đang chạy song song</option><option value="accepted" ${input.status === "accepted" ? "selected" : ""}>Chấp nhận lô mới</option><option value="rejected" ${input.status === "rejected" ? "selected" : ""}>Không chấp nhận</option></select></div></div>
-    <div id="cfgTransTargets">${input.targetsHtml}</div>
-    </div>
-    <div class="modal-f">${input.cancelButtonHtml}${input.saveButtonHtml}</div></div>`;
-	}
-	//#endregion
-	//#region src/presentation/manage/lot-transition-targets-html.ts
-	function lotTransitionTargetsHtml(input) {
-		if (input.kind === "hint") return `<div class="hint flow-section">${input.message || ""}</div>`;
-		const rows = (input.rows || []).map((row) => `<div class="target-row" data-test="${row.testId}">
-      <label class="lot-assay-check"><input type="checkbox" checked disabled><span></span></label>
-      <div class="lot-assay-name"><b>${row.name}</b><small>${row.unit || "Chưa có đơn vị"}</small></div>
-      <input class="tm-mean" type="number" step="any" value="${row.mean}" placeholder="Trung bình" data-action="syncTargetRange" data-args='["target"]' data-action-on="input">
-      <input class="tm-low" type="number" step="any" value="${row.low}" placeholder="Giới hạn dưới" data-action="syncTargetRange" data-args='["limits"]' data-action-on="input">
-      <input class="tm-high" type="number" step="any" value="${row.high}" placeholder="Giới hạn trên" data-action="syncTargetRange" data-args='["limits"]' data-action-on="input">
-      <input class="tm-sd" type="number" step="any" value="${row.sd}" placeholder="Độ lệch chuẩn" data-action="syncTargetRange" data-args='["target"]' data-action-on="input">
-      <span>${row.assigned ? "<b class=\"tag ok\">Đã nhập</b>" : "<b class=\"tag none\">Chưa nhập</b>"}</span>
-    </div>`).join("");
-		return `<div class="lot-trans-target-head-row"><label>Mean/SD cho lô mới ${input.lotNo || ""}</label><input type="search" class="lot-trans-target-search" placeholder="Tìm xét nghiệm..." data-action="filterLotTransitionTargets" data-action-on="input"></div>
-    <div class="target-table lot-trans-target-table"><div class="target-head"><span></span><span>Xét nghiệm</span><span>Trung bình mục tiêu</span><span>Giới hạn dưới</span><span>Giới hạn trên</span><span>Độ lệch chuẩn</span><span>Trạng thái</span></div>${rows}</div>`;
-	}
-	//#endregion
 	//#region src/presentation/manage/config-assay-modal-html.ts
 	function configAssayModalHtml(input) {
 		return `<div class="modal rcfg-modal rcfg-assay-modal"><div class="modal-h"><div><h3>${input.title}</h3></div><button class="modal-close" data-action="closeModal">✕</button></div><div class="modal-b">
@@ -18181,32 +18150,16 @@
 			if (lot) el.dataset.lotId = lot.id;
 			return lot && lot.id || "";
 		};
-		const lotTransitionChoiceInput = function(commit = false) {
-			const el = this;
-			const lot = lotTransitionChoiceMatch(el.value, el.dataset.lotId || "");
-			el.dataset.lotId = lot && lot.id || "";
-			if (commit && lot) el.value = lotTransitionChoiceLabel(lot);
-			refreshLotTransitionTargets();
-		};
-		const lotTransitionChoiceHtml = (inputId, selectedId) => {
-			const lot = state().qcLots.find((l) => l.id === selectedId), options = lotTransitionChoiceLots(selectedId).map((l) => `<option value="${deps.escapeAttr(lotTransitionChoiceLabel(l))}"></option>`).join("");
-			return deps.pres.lotTransitionChoiceHtmlPresentation({
-				inputId,
-				selectedId: deps.escapeAttr(selectedId || ""),
-				value: deps.escapeAttr(lotTransitionChoiceLabel(lot)),
-				optionsHtml: options
-			});
-		};
-		const openLotTransitionV2 = async (id = "") => {
+		const openLotTransitionModel = async (id = "") => {
 			if (!state().qcPanels.length) {
 				await deps.infoDialog("Hãy tạo Panel QC trước khi tạo chuyển tiếp lô.");
 				setManageTab("panels");
-				return;
+				return null;
 			}
 			if (state().qcLots.length < 2) {
 				await deps.infoDialog("Cần ít nhất 2 lô QC để tạo chuyển tiếp.");
 				setManageTab("lots");
-				return;
+				return null;
 			}
 			const tr = state().lotTransitions.find((x) => x.id === id) || {
 				panelId: state().qcPanels[0] && state().qcPanels[0].id,
@@ -18217,71 +18170,61 @@
 				approvedBy: "",
 				approvedAt: ""
 			};
-			const panels = `<option value="">— Chọn Panel QC —</option>` + state().qcPanels.map((p) => `<option value="${p.id}" ${p.id === tr.panelId ? "selected" : ""}>${deps.esc(p.name)} · ${deps.esc(deps.instrumentName(p.instrumentId))}</option>`).join("");
-			deps.openModal(deps.pres.lotTransitionModalHtml({
-				title: id ? "Sửa hồ sơ chuyển lô" : "Thêm hồ sơ chuyển lô",
-				panelsHtml: panels,
-				fromChoiceHtml: lotTransitionChoiceHtml("cfgTransFrom", tr.fromLotId),
-				toChoiceHtml: lotTransitionChoiceHtml("cfgTransTo", tr.toLotId),
-				startDateHtml: deps.dateBox("cfgTransStart", tr.startDate || ""),
-				status: tr.status,
-				targetsHtml: lotTransitionTargetsHtml(tr.panelId, tr.fromLotId, tr.toLotId),
-				cancelButtonHtml: deps.btn("Hủy", { action: "closeModal" }, "ghost"),
-				saveButtonHtml: deps.btn(id ? "Lưu thay đổi" : "Thêm hồ sơ chuyển lô", {
-					action: "saveLotTransitionV2",
-					args: [id]
-				}, "teal")
-			}));
+			const fromLot = state().qcLots.find((l) => l.id === tr.fromLotId), toLot = state().qcLots.find((l) => l.id === tr.toLotId);
+			return {
+				id,
+				panels: state().qcPanels.map((p) => ({
+					id: p.id,
+					label: `${p.name} · ${deps.instrumentName(p.instrumentId)}`
+				})),
+				panelId: tr.panelId || "",
+				fromLotId: tr.fromLotId || "",
+				fromValue: lotTransitionChoiceLabel(fromLot),
+				fromOptions: lotTransitionChoiceLots(tr.fromLotId).map((l) => lotTransitionChoiceLabel(l)),
+				toLotId: tr.toLotId || "",
+				toValue: lotTransitionChoiceLabel(toLot),
+				toOptions: lotTransitionChoiceLots(tr.toLotId).map((l) => lotTransitionChoiceLabel(l)),
+				startDate: tr.startDate || "",
+				status: tr.status
+			};
 		};
-		const lotTransitionTargetsHtml = (panelId, fromLotId, toLotId) => {
-			if (!panelId || !fromLotId || !toLotId || fromLotId === toLotId) return deps.pres.lotTransitionTargetsHtmlPresentation({
+		const lotTransitionTargetsModel = (panelId, fromLotId, toLotId) => {
+			if (!panelId || !fromLotId || !toLotId || fromLotId === toLotId) return {
 				kind: "hint",
 				message: "Chọn Panel QC, Lô cũ và Lô mới (khác nhau, cùng mức) để nhập Mean/SD cho lô mới."
-			});
+			};
 			const check = deps.inspectAcceptedLotTransition({
 				panelId,
 				fromLotId,
 				toLotId,
 				status: "accepted"
 			});
-			if (!check.valid) return deps.pres.lotTransitionTargetsHtmlPresentation({
+			if (!check.valid) return {
 				kind: "hint",
 				message: "Lô cũ và lô mới phải cùng mức QC."
-			});
-			if (!check.rows.length) return deps.pres.lotTransitionTargetsHtmlPresentation({
+			};
+			if (!check.rows.length) return {
 				kind: "hint",
-				message: `Panel đã chọn không có xét nghiệm nào đang dùng lô cũ ${deps.esc(check.from.lotNo)}.`
-			});
+				message: `Panel đã chọn không có xét nghiệm nào đang dùng lô cũ ${check.from.lotNo}.`
+			};
 			const rows = check.rows.map(({ t, nextHist }) => {
 				const draft = targetRangeDraft(nextHist || {}), has = Number.isFinite(draft.mean) && (Number.isFinite(draft.sd) && draft.sd > 0 || Number.isFinite(draft.low) && Number.isFinite(draft.high));
 				return {
 					testId: t.id,
-					name: deps.esc(deps.testDisplayName(t)),
-					unit: deps.esc(t.unit || ""),
-					mean: deps.escapeAttr(targetNumberText(draft.mean, t)),
-					low: deps.escapeAttr(targetNumberText(draft.low, t)),
-					high: deps.escapeAttr(targetNumberText(draft.high, t)),
-					sd: deps.escapeAttr(targetNumberText(draft.sd, t, "stat")),
+					name: deps.testDisplayName(t),
+					unit: t.unit || "",
+					mean: targetNumberText(draft.mean, t),
+					low: targetNumberText(draft.low, t),
+					high: targetNumberText(draft.high, t),
+					sd: targetNumberText(draft.sd, t, "stat"),
 					assigned: has
 				};
 			});
-			return deps.pres.lotTransitionTargetsHtmlPresentation({
+			return {
 				kind: "rows",
-				lotNo: deps.esc(check.to.lotNo),
+				lotNo: check.to.lotNo,
 				rows
-			});
-		};
-		const filterLotTransitionTargets = (term) => {
-			const q = deps.searchText(term || "");
-			doc().querySelectorAll("#cfgTransTargets .target-row").forEach((row) => {
-				const name = row.querySelector(".lot-assay-name b");
-				row.style.display = !q || deps.searchText(name ? name.textContent : "").includes(q) ? "" : "none";
-			});
-		};
-		const refreshLotTransitionTargets = () => {
-			const panelId = doc().getElementById("cfgTransPanel").value, fromLotId = lotTransitionSelectedId("cfgTransFrom"), toLotId = lotTransitionSelectedId("cfgTransTo");
-			const el = doc().getElementById("cfgTransTargets");
-			if (el) el.innerHTML = lotTransitionTargetsHtml(panelId, fromLotId, toLotId);
+			};
 		};
 		const readLotTransitionTargetPicks = async (rows) => {
 			const picks = [];
@@ -18887,12 +18830,8 @@
 			lotTransitionChoiceLots,
 			lotTransitionChoiceMatch,
 			lotTransitionSelectedId,
-			lotTransitionChoiceInput,
-			lotTransitionChoiceHtml,
-			openLotTransitionV2,
-			lotTransitionTargetsHtml,
-			filterLotTransitionTargets,
-			refreshLotTransitionTargets,
+			openLotTransitionModel,
+			lotTransitionTargetsModel,
 			readLotTransitionTargetPicks,
 			saveLotTransitionV2,
 			openConfigGroupModel,
@@ -28211,9 +28150,6 @@
 	root.entryVoidModalHtml = entryVoidModalHtml;
 	root.entryPreSaveWarningModalHtml = entryPreSaveWarningModalHtml;
 	root.targetSwitchModalHtml = targetSwitchModalHtml;
-	root.lotTransitionChoiceHtmlPresentation = lotTransitionChoiceHtml;
-	root.lotTransitionModalHtml = lotTransitionModalHtml;
-	root.lotTransitionTargetsHtmlPresentation = lotTransitionTargetsHtml;
 	root.configAssayModalHtml = configAssayModalHtml;
 	root.qcHistoryDetailModalHtml = qcHistoryDetailModalHtml;
 	root.configAssayRuleRowsHtml = configAssayRuleRowsHtml;
@@ -30681,12 +30617,8 @@
 	root.lotTransitionChoiceLots = manageTestsActionsController.lotTransitionChoiceLots;
 	root.lotTransitionChoiceMatch = manageTestsActionsController.lotTransitionChoiceMatch;
 	root.lotTransitionSelectedId = manageTestsActionsController.lotTransitionSelectedId;
-	root.lotTransitionChoiceInput = manageTestsActionsController.lotTransitionChoiceInput;
-	root.lotTransitionChoiceHtml = manageTestsActionsController.lotTransitionChoiceHtml;
-	root.openLotTransitionV2 = manageTestsActionsController.openLotTransitionV2;
-	root.lotTransitionTargetsHtml = manageTestsActionsController.lotTransitionTargetsHtml;
-	root.filterLotTransitionTargets = manageTestsActionsController.filterLotTransitionTargets;
-	root.refreshLotTransitionTargets = manageTestsActionsController.refreshLotTransitionTargets;
+	root.openLotTransitionModel = manageTestsActionsController.openLotTransitionModel;
+	root.lotTransitionTargetsModel = manageTestsActionsController.lotTransitionTargetsModel;
 	root.readLotTransitionTargetPicks = manageTestsActionsController.readLotTransitionTargetPicks;
 	root.saveLotTransitionV2 = manageTestsActionsController.saveLotTransitionV2;
 	root.suggestConfigGroupName = manageTestsActionsController.suggestConfigGroupName;
@@ -31630,7 +31562,11 @@
 			activateLotGroup: manageTestsActionsController.activateLotGroup,
 			toggleLotGroupStatus: manageTestsActionsController.toggleLotGroupStatus,
 			deleteConfigGroup: manageTestsActionsController.deleteConfigGroup,
-			openLotTransitionV2: manageTestsActionsController.openLotTransitionV2,
+			openLotTransitionModel: manageTestsActionsController.openLotTransitionModel,
+			lotTransitionTargetsModel: manageTestsActionsController.lotTransitionTargetsModel,
+			lotTransitionChoiceMatch: manageTestsActionsController.lotTransitionChoiceMatch,
+			lotTransitionChoiceLabel: manageTestsActionsController.lotTransitionChoiceLabel,
+			saveLotTransitionV2: manageTestsActionsController.saveLotTransitionV2,
 			deleteLotTransition: manageTestsActionsController.deleteLotTransition,
 			openQcHistoryDetail: manageTestsActionsController.openQcHistoryDetail,
 			toggleTargetRow: manageTestsActionsController.toggleTargetRow,
