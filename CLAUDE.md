@@ -1101,7 +1101,45 @@ violations across all 18 modals, `ui-workflow-check` 29/29,
 narrows/restores the row list without any debounce delay, and picking a row
 closes the modal.
 
-Remaining for Giai đoạn 3: convert each of the other ~13 form modals from
+Settings' "Xem hàng chờ QC" (done, fourth real modal converted, LIS Gateway
+queue): the most involved conversion so far, because unlike the prior
+three, **the trigger itself does real async work before deciding whether to
+open anything** (`lisOpenQueueModal()` checks `gatewayConfig().enabled` and
+does a network `gatewayPull()` before showing data) — a classic `.ts` file
+can run that logic, but can't construct the JSX to show afterward. Split
+cleanly: `lis-queue-controller.ts`'s `lisOpenQueueModal()` now does only the
+check-and-pull and returns a `Promise<boolean>` (open or don't); the bridge
+(`settingsBridge.ts`) awaits it and calls `openReactModal(...)` only on
+`true` — the same "classic owns verification, React owns presentation"
+split used for `reauthenticateCurrentUser`'s PBKDF2 check vs. its form.
+`lisQueueModel()` (new, mirrors `rowHtml`/`sectionHtml`/`modalHtml`'s branch
+logic but returns `{pending, unresolved}` data) reuses the SAME `rowModel()`
+addition to `lis-queue-presentation.ts`, added alongside — not replacing —
+`rowHtml`, since `rowHtml`/`sectionHtml`/`modalHtml` still exist and pass
+their own dedicated tests unchanged; only the *controller's* call sites
+moved off them. `lisQueueRefresh`/`lisQueueImport`/`lisQueueReject` — which
+used to call the classic `lisRenderQueueModal()` to redraw the list after
+every action — were simplified to call the already-existing `deps.rerender()`
+instead (a new `rerender` dependency added to the controller's `deps`), and
+`LisQueueModal.tsx` subscribes via `useAppStore()`; this is now the **third**
+instance of the exact fix pattern first found in Reagent's picker
+(`keepModal`/manual re-open → store subscription), confirming it as the
+general rule for any modal that must reflect a mutation it just caused.
+`scripts/a11y-audit.js`'s `settings:lis-queue` entry could no longer bypass
+the network check by calling `lisRenderQueueModal()` directly (that
+function still exists but nothing in the live UI calls it anymore) — fixed
+by stubbing the two classic globals its real check reads
+(`lisGatewayConfig`/`lisGatewayPull`, both bare, reassignable `root.X`
+functions) and clicking the real "Xem hàng chờ QC" button, matching the
+"click the real trigger" convention from the two prior a11y-script fixes.
+Verified: `npm test` 462/462, `typecheck` clean, `check-build-freshness`
+matches, `a11y-audit` 0 violations across all 18 modals, `ui-workflow-check`
+29/29, `nce-workflow-check` 91/91, plus an ad-hoc script confirming both
+queue sections render with correct counts, and that rejecting an
+unresolved row removes it from the list — and the section disappears
+entirely — without the modal ever closing or being reopened.
+
+Remaining for Giai đoạn 3: convert each of the other ~12 form modals from
 the `'html'` string path to a real `'react'` component, one at a time, same
 full-verify-after-each discipline established across Giai đoạn 2 — each
 conversion touches exactly one modal's trigger function (swap

@@ -6156,12 +6156,46 @@
 			const body = pending.length || unresolved.length ? sectionHtml("Sẵn sàng nhận", pending, "") + (unresolved.length ? `<div class="flow-panel">${sectionHtml("Chưa khớp cấu hình", unresolved, "")}</div>` : "") : deps.emptyState("Hàng chờ trống", "Không có kết quả QC nào đang chờ từ LIS Gateway.", "");
 			return `<div class="modal" style="width:820px"><div class="modal-h"><h3>QC chờ nhập từ LIS</h3>${deps.modalCloseButton({ action: "closeModal" })}</div><div class="modal-b" tabindex="0">${body}</div><div class="modal-f">${deps.button("Làm mới", { action: "lisQueueRefresh" }, "ghost")}${deps.button("Đóng", { action: "closeModal" }, "ghost")}</div></div>`;
 		};
+		const rowModel = (record) => {
+			const message = record.message || {}, resolved = record.resolved;
+			const when = deps.formatDateTime(message.measuredAt) || message.measuredAt || "—";
+			const value = valueText(record);
+			const runId = message.runId || "—";
+			const operator = message.operator || "";
+			const messageId = message.messageId;
+			if (resolved && resolved.ok) {
+				const test = deps.test(resolved.qclabTestId);
+				return {
+					resolved: true,
+					when,
+					name: deps.testDisplayName(test) || resolved.displayName || resolved.qclabTestId,
+					level: resolved.level,
+					lot: resolved.lot || "—",
+					value,
+					runId,
+					operator,
+					messageId
+				};
+			}
+			return {
+				resolved: false,
+				when,
+				analyzerId: message.analyzerId,
+				testCode: message.testCode,
+				reason: resolved && resolved.reason || "Chưa khớp cấu hình",
+				value,
+				runId,
+				operator,
+				messageId
+			};
+		};
 		return {
 			valueText,
 			onclick,
 			rowHtml,
 			sectionHtml,
-			modalHtml
+			modalHtml,
+			rowModel
 		};
 	}
 	//#endregion
@@ -6266,20 +6300,26 @@
 			const runtime = deps.gatewayRuntime();
 			deps.openModal(deps.presentation.modalHtml(runtime.pending || [], runtime.unresolved || []));
 		};
+		const lisQueueModel = () => {
+			const runtime = deps.gatewayRuntime();
+			return {
+				pending: (runtime.pending || []).map(deps.presentation.rowModel),
+				unresolved: (runtime.unresolved || []).map(deps.presentation.rowModel)
+			};
+		};
 		const lisOpenQueueModal = async () => {
 			if (!deps.gatewayConfig().enabled) {
 				await deps.infoDialog("Hãy bật LIS Gateway và lưu cấu hình trước khi xem hàng chờ.", { type: "warning" });
-				return;
+				return false;
 			}
-			if (!(await deps.gatewayPull({ manual: true })).ok) return;
-			lisRenderQueueModal();
+			return (await deps.gatewayPull({ manual: true })).ok;
 		};
 		const lisQueueRefresh = async () => {
 			await deps.gatewayPull();
-			lisRenderQueueModal();
+			deps.rerender();
 		};
 		const lisQueueImport = async (messageId) => {
-			if ((await deps.importResult(messageId)).ok) lisRenderQueueModal();
+			if ((await deps.importResult(messageId)).ok) deps.rerender();
 		};
 		const lisQueueReject = async (messageId) => {
 			if (!await deps.confirmDialog({
@@ -6289,7 +6329,7 @@
 				confirmLabel: "Bỏ",
 				cancelLabel: "Hủy"
 			})) return;
-			if ((await deps.rejectResult(messageId)).ok) lisRenderQueueModal();
+			if ((await deps.rejectResult(messageId)).ok) deps.rerender();
 		};
 		return {
 			lisGatewaySaveSettings,
@@ -6298,6 +6338,7 @@
 			lisQueueRowHtml,
 			lisQueueSectionHtml,
 			lisRenderQueueModal,
+			lisQueueModel,
 			lisOpenQueueModal,
 			lisQueueRefresh,
 			lisQueueImport,
@@ -27569,7 +27610,8 @@
 		requireAdmin: (message) => root.requireAdmin(message),
 		infoDialog: (message, opts) => root.infoDialog(message, opts),
 		confirmDialog: (opts) => root.confirmDialog(opts),
-		openModal: (html) => root.openModal(html)
+		openModal: (html) => root.openModal(html),
+		rerender: () => rerender()
 	});
 	root.lisGatewaySaveSettings = lisQueueController.lisGatewaySaveSettings;
 	root.lisQueueValueText = lisQueueController.lisQueueValueText;
@@ -31979,7 +32021,11 @@
 			verifyBackupFile: root.verifyBackupFile,
 			resetAllData: root.resetAllData,
 			lisGatewaySaveSettings: lisQueueController.lisGatewaySaveSettings,
-			lisOpenQueueModal: lisQueueController.lisOpenQueueModal
+			lisOpenQueueModal: lisQueueController.lisOpenQueueModal,
+			lisQueueModel: lisQueueController.lisQueueModel,
+			lisQueueRefresh: lisQueueController.lisQueueRefresh,
+			lisQueueImport: lisQueueController.lisQueueImport,
+			lisQueueReject: lisQueueController.lisQueueReject
 		},
 		manage: {
 			...managePageController,

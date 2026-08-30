@@ -63,14 +63,20 @@ const MODALS = [
   { page: 'users', label: 'users:edit-permissions', open: () => openUserPerms(state.users[1].id) },
   // Modal nay ghi diem QC that qua EntryService khi bam Nhan, nen dang o muc "modal
   // lon" dang audit. Khong co LIS Gateway that dang chay trong harness nay nen seed
-  // thang lisGatewayRuntime.pending/unresolved roi goi lisRenderQueueModal() — bo qua
-  // vong fetch mang cua lisOpenQueueModal(), giong cach Sigma tu goi sgTrackTest()/
-  // sgAddPeriod() truoc khi audit thay vi di qua luong nhap lieu day du.
-  { page: 'settings', label: 'settings:lis-queue', open: () => {
+  // thang lisGatewayRuntime.pending/unresolved va gia lap gatewayConfig/gatewayPull de
+  // qua duoc vong kiem tra cua lisOpenQueueModal() (Giai doan 3 — modal gio la React
+  // thuc su, khong con lisRenderQueueModal() classic de goi tat), giong cach Sigma tu
+  // goi sgTrackTest()/sgAddPeriod() truoc khi audit thay vi di qua luong nhap lieu day
+  // du. Bam nut That "Xem hang cho QC" thay vi goi ham tran.
+  { page: 'settings', label: 'settings:lis-queue', open: async () => {
       const t = state.tests[0], l = t.levels[0];
       lisGatewayRuntime.pending = [{ message: { messageId: 'A11Y-OK', analyzerId: 'SIM-01', testCode: 'GLU', qcLevel: '1', value: 5.6, unit: t.unit || '', measuredAt: new Date().toISOString(), runId: 'r1', operator: 'KTV A11Y' }, resolved: { ok: true, qclabTestId: t.id, level: l.level, lot: l.lot || '', displayName: '' } }];
       lisGatewayRuntime.unresolved = [{ message: { messageId: 'A11Y-BAD', analyzerId: 'MAY-LA', testCode: 'XX', qcLevel: '1', value: 1, measuredAt: new Date().toISOString() }, resolved: { ok: false, code: 'UNMAPPED_TEST', reason: 'Chưa mapping mã máy sang xét nghiệm QC Lab.' } }];
-      lisRenderQueueModal();
+      lisGatewayConfig = () => ({ enabled: true });
+      lisGatewayPull = async () => ({ ok: true });
+      const btn = [...document.querySelectorAll('button')].find(b => b.textContent === 'Xem hàng chờ QC');
+      btn.click();
+      await new Promise(r => setTimeout(r, 50));
     } },
   // archiveActivityLog() thoát sớm khi nhật ký rỗng, mà seed chỉ có dữ liệu QC vận
   // hành — ghi một dòng trước để cổng đó không chặn (cùng lý do Sigma phải tự

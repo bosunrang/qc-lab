@@ -3070,6 +3070,7 @@ const lisQueueController=createLisQueueController({
   infoDialog:(message,opts)=>root.infoDialog(message,opts),
   confirmDialog:opts=>root.confirmDialog(opts),
   openModal:html=>root.openModal(html),
+  rerender:()=>rerender(),
 });
 root.lisGatewaySaveSettings=lisQueueController.lisGatewaySaveSettings;
 root.lisQueueValueText=lisQueueController.lisQueueValueText;
@@ -5715,6 +5716,8 @@ const kernel = {
     exportData: (root as any).exportData, importData: (root as any).importData,
     verifyBackupFile: (root as any).verifyBackupFile, resetAllData: (root as any).resetAllData,
     lisGatewaySaveSettings: lisQueueController.lisGatewaySaveSettings, lisOpenQueueModal: lisQueueController.lisOpenQueueModal,
+    lisQueueModel: lisQueueController.lisQueueModel, lisQueueRefresh: lisQueueController.lisQueueRefresh,
+    lisQueueImport: lisQueueController.lisQueueImport, lisQueueReject: lisQueueController.lisQueueReject,
   },
   manage: {
     ...managePageController,

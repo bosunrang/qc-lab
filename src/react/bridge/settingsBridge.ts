@@ -1,4 +1,7 @@
+import { createElement } from 'react';
 import { getKernel } from '../state/kernel';
+import { openReactModal } from '../dialogs/modal-store';
+import { LisQueueModal } from '../modals/LisQueueModal';
 
 export type SettingsModel = {
   lab: { name: string; dept: string; address: string };
@@ -24,5 +27,8 @@ export const resetAllData = (): void => { getKernel().settings.resetAllData(); }
 export const saveFb = (): void => { getKernel().settings.saveFb(); };
 export const clearFb = (): void => { getKernel().settings.clearFb(); };
 export const lisGatewaySaveSettings = (): void => { getKernel().settings.lisGatewaySaveSettings(); };
-export const lisOpenQueueModal = (): void => getKernel().settings.lisOpenQueueModal();
+export const lisOpenQueueModal = async (): Promise<void> => {
+  const ok = await getKernel().settings.lisOpenQueueModal();
+  if (ok) openReactModal(() => createElement(LisQueueModal));
+};
 export const copyFirebaseRules = (): void => { getKernel().settings.copyFirebaseRules(); };

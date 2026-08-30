@@ -18,6 +18,7 @@ export function createLisQueueController(deps: {
     rowHtml: (record: AnyRec) => string;
     sectionHtml: (title: string, records: AnyRec[], emptyText: string) => string;
     modalHtml: (pending: AnyRec[], unresolved: AnyRec[]) => string;
+    rowModel: (record: AnyRec) => AnyRec;
   };
   settingsService: { prepare: (input: LisSettingsInput) => LisSettingsResult };
   gatewayCommand: LisGatewayCommand;
@@ -31,6 +32,7 @@ export function createLisQueueController(deps: {
   infoDialog: (message: string, opts?: AnyRec) => Promise<unknown>;
   confirmDialog: (opts: AnyRec) => Promise<boolean>;
   openModal: (html: string) => void;
+  rerender: () => void;
 }) {
   const field = (id: string) => deps.document.getElementById(id) as AnyRec;
 
@@ -63,21 +65,32 @@ export function createLisQueueController(deps: {
     deps.openModal(deps.presentation.modalHtml(runtime.pending || [], runtime.unresolved || []));
   };
 
-  const lisOpenQueueModal = async () => {
-    if (!deps.gatewayConfig().enabled) { await deps.infoDialog('Hãy bật LIS Gateway và lưu cấu hình trước khi xem hàng chờ.', { type: 'warning' }); return; }
-    const result = await deps.gatewayPull({ manual: true });
-    if (!result.ok) return;
-    lisRenderQueueModal();
+  /* lisQueueModel(): dữ liệu thuần cho modal React (Giai đoạn 3, LisQueueModal.tsx) —
+     dùng rowModel() thay rowHtml(). */
+  const lisQueueModel = () => {
+    const runtime = deps.gatewayRuntime();
+    return { pending: (runtime.pending || []).map(deps.presentation.rowModel), unresolved: (runtime.unresolved || []).map(deps.presentation.rowModel) };
   };
 
-  const lisQueueRefresh = async () => { await deps.gatewayPull(); lisRenderQueueModal(); };
+  /* lisOpenQueueModal() trả true/false thay vì tự mở modal — phần "mở modal React
+     thật" giờ ở settingsBridge.ts (chỉ react-pilot.js mới dựng được JSX). Các hàm
+     refresh/import/reject bên dưới gọi deps.rerender() thay vì lisRenderQueueModal():
+     LisQueueModal.tsx subscribe useAppStore() nên tự vẽ lại dữ liệu mới, đúng hướng
+     sửa đã áp dụng cho ReagentPickerModal (không còn "modal tự gọi lại hàm mở cũ"). */
+  const lisOpenQueueModal = async (): Promise<boolean> => {
+    if (!deps.gatewayConfig().enabled) { await deps.infoDialog('Hãy bật LIS Gateway và lưu cấu hình trước khi xem hàng chờ.', { type: 'warning' }); return false; }
+    const result = await deps.gatewayPull({ manual: true });
+    return result.ok;
+  };
 
-  const lisQueueImport = async (messageId: unknown) => { if ((await deps.importResult(messageId)).ok) lisRenderQueueModal(); };
+  const lisQueueRefresh = async () => { await deps.gatewayPull(); deps.rerender(); };
+
+  const lisQueueImport = async (messageId: unknown) => { if ((await deps.importResult(messageId)).ok) deps.rerender(); };
 
   const lisQueueReject = async (messageId: unknown) => {
     if (!await deps.confirmDialog({ kicker: 'Hàng chờ LIS', title: 'Bỏ kết quả QC này?', message: 'Kết quả sẽ được đánh dấu đã bỏ ở Gateway và biến khỏi hàng chờ. Middleware có thể gửi lại nếu cần.', confirmLabel: 'Bỏ', cancelLabel: 'Hủy' })) return;
-    if ((await deps.rejectResult(messageId)).ok) lisRenderQueueModal();
+    if ((await deps.rejectResult(messageId)).ok) deps.rerender();
   };
 
-  return { lisGatewaySaveSettings, lisQueueValueText, lisOnclick, lisQueueRowHtml, lisQueueSectionHtml, lisRenderQueueModal, lisOpenQueueModal, lisQueueRefresh, lisQueueImport, lisQueueReject };
+  return { lisGatewaySaveSettings, lisQueueValueText, lisOnclick, lisQueueRowHtml, lisQueueSectionHtml, lisRenderQueueModal, lisQueueModel, lisOpenQueueModal, lisQueueRefresh, lisQueueImport, lisQueueReject };
 }
