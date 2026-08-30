@@ -346,8 +346,6 @@ import { rangeWorkflowChecklistRowsHtml } from '../presentation/range/range-work
 import { rangeNceNoticeHtml } from '../presentation/range/range-nce-notice-html';
 import { rangeWorkflowComparisonRowsHtml } from '../presentation/range/range-workflow-comparison-rows-html';
 import { resetPasswordModalHtml } from '../presentation/auth/reset-password-modal-html';
-import { sigmaAddTestModalHtml } from '../presentation/sigma/sigma-add-test-modal-html';
-import { sigmaAddTestRowsHtml } from '../presentation/sigma/sigma-add-test-rows-html';
 import { sigmaBiasModalHtml } from '../presentation/sigma/sigma-bias-modal-html';
 import { sigmaMuModalHtml } from '../presentation/sigma/sigma-mu-modal-html';
 import { sigmaCohortModalHtml } from '../presentation/sigma/sigma-cohort-modal-html';
@@ -1194,9 +1192,7 @@ type QCLabGlobal = typeof globalThis & {
   sgSelectPeriod?: (eid: string) => void;
   sgRemoveTracked?: (id: unknown) => void;
   sgOpenAddTest?: () => void;
-  sgAddTestSearchSet?: (v: unknown) => void;
   sgViewTrackedTest?: (id: unknown) => void;
-  sgRenderAddTestModal?: () => void;
   sgTrackTest?: (id: unknown) => void;
   sigmaModel?: () => any;
   sgOpSpecCell?: (spec: Record<string, any>) => string;
@@ -1757,8 +1753,6 @@ type QCLabGlobal = typeof globalThis & {
   rangeNceNoticeHtml: typeof rangeNceNoticeHtml;
   rangeWorkflowComparisonRowsHtml: typeof rangeWorkflowComparisonRowsHtml;
   resetPasswordModalHtml: typeof resetPasswordModalHtml;
-  sigmaAddTestModalHtml: typeof sigmaAddTestModalHtml;
-  sigmaAddTestRowsHtml: typeof sigmaAddTestRowsHtml;
   sigmaBiasModalHtml: typeof sigmaBiasModalHtml;
   sigmaMuModalHtml: typeof sigmaMuModalHtml;
   sigmaCohortModalHtml: typeof sigmaCohortModalHtml;
@@ -3616,8 +3610,6 @@ root.rangeWorkflowChecklistRowsHtml=rangeWorkflowChecklistRowsHtml;
 root.rangeNceNoticeHtml=rangeNceNoticeHtml;
 root.rangeWorkflowComparisonRowsHtml=rangeWorkflowComparisonRowsHtml;
 root.resetPasswordModalHtml=resetPasswordModalHtml;
-root.sigmaAddTestModalHtml=sigmaAddTestModalHtml;
-root.sigmaAddTestRowsHtml=sigmaAddTestRowsHtml;
 root.sigmaBiasModalHtml=sigmaBiasModalHtml;
 root.sigmaMuModalHtml=sigmaMuModalHtml;
 root.sigmaCohortModalHtml=sigmaCohortModalHtml;
@@ -5367,10 +5359,15 @@ root.sgPickTest = sigmaPageController.sgPickTest;
 root.sgStatusPeriodId = sigmaPageController.sgStatusPeriodId;
 root.sgSelectPeriod = sigmaPageController.sgSelectPeriod;
 root.sgRemoveTracked = sigmaPageController.sgRemoveTracked;
-root.sgOpenAddTest = sigmaPageController.sgOpenAddTest;
-root.sgAddTestSearchSet = sigmaPageController.sgAddTestSearchSet;
+/* sgOpenAddTest() (Giai đoạn 3) giờ mở modal React thật — root.sgOpenAddTest
+   phải trỏ sang window.QCLabReact.sgOpenAddTest() (không phải
+   sigmaPageController.sgOpenAddTestModel(), chỉ kiểm quyền chứ không mở gì)
+   vì nút "+ Thêm xét nghiệm" nhúng trong emptyStateHtml() vẫn dùng
+   data-action="sgOpenAddTest" cổ điển — action-dispatcher.ts tra thẳng
+   global này, giống cách openConfigAssay() trỏ qua
+   deps.openReactInstrumentModal(). */
+root.sgOpenAddTest = () => (window as any).QCLabReact.sgOpenAddTest();
 root.sgViewTrackedTest = sigmaPageController.sgViewTrackedTest;
-root.sgRenderAddTestModal = sigmaPageController.sgRenderAddTestModal;
 root.sgTrackTest = sigmaPageController.sgTrackTest;
 root.sigmaModel = sigmaPageController.sigmaModel;
 root.sgOpSpecCell = sigmaPageController.sgOpSpecCell;

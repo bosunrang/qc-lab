@@ -149,7 +149,8 @@ assert.equal(ctx.sgInputDisplayValue(''),'');
   // vẫn ở sigma-page-controller.ts) không đổi.
   const sigmaPage = fs.readFileSync(path.join(__dirname, '..', 'src', 'react', 'pages', 'SigmaPage.tsx'), 'utf8');
   const biasModalSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'sigma', 'sigma-bias-modal-html.ts'), 'utf8');
-  const addTestModalSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'sigma', 'sigma-add-test-modal-html.ts'), 'utf8');
+  // Modal "Chọn hoặc thêm xét nghiệm" (Giai đoạn 3) đã chuyển sang component React thật.
+  const addTestModalSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'react', 'modals', 'SigmaAddTestModal.tsx'), 'utf8');
   const frequencyPanelSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'sigma', 'sigma-frequency-panel-html.ts'), 'utf8');
   const sigmaCss = fs.readFileSync(path.join(__dirname, '..', 'assets', 'professional-sigma.css'), 'utf8');
   const baseCss = fs.readFileSync(path.join(__dirname, '..', 'assets', 'professional-base.css'), 'utf8');

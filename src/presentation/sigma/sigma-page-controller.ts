@@ -195,25 +195,26 @@ export function createSigmaPageController(deps: {
     deps.save({ clearDerived: false });
     deps.rerender();
   };
-  const sgOpenAddTest = () => { if (!deps.requireAdmin()) return; ui().sgAddTestQ = ''; sgRenderAddTestModal(); };
-  const sgAddTestSearchSet = (v: unknown) => { ui().sgAddTestQ = v; deps.scheduleSearchRender(sgAddTestSearchSet, sgRenderAddTestModal, 'sgAddTestSearch'); };
+  /* sgOpenAddTest() trả true/false thay vì tự mở modal (Giai đoạn 3) — bridge
+     chỉ mở SigmaAddTestModal.tsx khi true. sgAddTestPickerItems(query) là hàm
+     dữ liệu thuần thay sgRenderAddTestModal(), gọi lại mỗi lần gõ trong ô tìm
+     kiếm (state cục bộ trong component, giống ReagentPickerModal — không cần
+     debounce vì lọc mảng trong React rẻ hơn dựng lại chuỗi HTML). */
+  const sgOpenAddTestModel = (): boolean => !!deps.requireAdmin();
+  const sgAddTestPickerItems = (query: unknown) => {
+    const all = [...(state().tests || [])].sort((a: AnyRec, b: AnyRec) => deps.operationalTestOrder(a) - deps.operationalTestOrder(b) || String(deps.testDisplayName(a)).localeCompare(String(deps.testDisplayName(b)), 'vi')), q = deps.searchText(query);
+    const matched = all.filter((t: AnyRec) => !q || [deps.testDisplayName(t), t.name, t.machine, t.unit, t.section, t.method].some((v: unknown) => deps.searchText(v).includes(q)));
+    return matched.map((t: AnyRec) => {
+      const tracked = !!t.sgTracked, current = tracked && t.id === ui().sgTest, meta = [t.machine, t.unit, t.section].filter(Boolean).join(' · ') || 'Chưa có thông tin máy/đơn vị', action = tracked ? 'view' : 'track', label = current ? 'Đang xem' : tracked ? 'Xem' : 'Thêm';
+      return { id: t.id, tracked, current, name: deps.testDisplayName(t), meta, action, label };
+    });
+  };
   const sgViewTrackedTest = (id: unknown) => {
     const t = deps.SigmaTrackedTestService.select(state().tests || [], id);
     if (!t) return;
     ui().sgTest = t.id;
     deps.closeModal();
     deps.rerender();
-  };
-  const sgRenderAddTestModal = () => {
-    const all = [...(state().tests || [])].sort((a: AnyRec, b: AnyRec) => deps.operationalTestOrder(a) - deps.operationalTestOrder(b) || String(deps.testDisplayName(a)).localeCompare(String(deps.testDisplayName(b)), 'vi')), q = deps.searchText(ui().sgAddTestQ);
-    const matched = all.filter((t: AnyRec) => !q || [deps.testDisplayName(t), t.name, t.machine, t.unit, t.section, t.method].some((v: unknown) => deps.searchText(v).includes(q)));
-    const rows = deps.pres.sigmaAddTestRowsHtml(matched.map((t: AnyRec) => {
-      const tracked = !!t.sgTracked, current = tracked && t.id === ui().sgTest, meta = [t.machine, t.unit, t.section].filter(Boolean).map(deps.esc).join(' · ') || 'Chưa có thông tin máy/đơn vị', action = tracked ? 'sgViewTrackedTest' : 'sgTrackTest', label = current ? 'Đang xem' : tracked ? 'Xem' : 'Thêm';
-      return { id: t.id, tracked, current, name: deps.esc(deps.testDisplayName(t)), meta, action, label };
-    }));
-    const empty = !all.length ? '<div class="empty"><div class="empty-title">Chưa có xét nghiệm trong Cấu hình chung</div><div>Hãy nhập xét nghiệm tại Cấu hình chung › Danh mục xét nghiệm trước khi thêm vào Six Sigma.</div></div>' : `<div class="empty">${q ? 'Không tìm thấy xét nghiệm phù hợp.' : 'Không có xét nghiệm để hiển thị.'}</div>`;
-    deps.openModal(deps.pres.sigmaAddTestModalHtml({ showSearch: !!all.length, searchValue: deps.escapeAttr(ui().sgAddTestQ), rowsHtml: rows, emptyHtml: empty, closeButtonHtml: deps.btn('Đóng', { action: 'closeModal' }, 'ghost') }));
-    setTimeout(() => { const e = doc().getElementById('sgAddTestSearch'); if (e) { e.focus(); e.setSelectionRange(e.value.length, e.value.length); } }, 0);
   };
   const sgTrackTest = (id: unknown) => {
     if (!deps.requireAdmin()) return;
@@ -665,8 +666,8 @@ export function createSigmaPageController(deps: {
     sgZone, sgFmtDPMO, sgData, sgInputValue, sgInputDisplayValue, sgCleanCell, sgBiasVal, sgIsAutoCV, sgReadiness,
     sgBiasRefU, sgMuBiasMode, sgMU, sgComp, sgRows, sgSyncCurrentPeriodTea, sgReconcileAllTeaSnapshots, sgSetTea,
     sgSetTeaSource, sgSetTeaMeta, sgRefreshSoon, sgTrackedTests, sgHistoricalLevels, sgVisibleLevels,
-    sgPeriodLevels, sgPickTest, sgStatusPeriodId, sgSelectPeriod, sgRemoveTracked, sgOpenAddTest, sgAddTestSearchSet,
-    sgViewTrackedTest, sgRenderAddTestModal, sgTrackTest, sigmaModel, sgOpSpecCell, sgFrequencyHTML, sgMuDominant,
+    sgPeriodLevels, sgPickTest, sgStatusPeriodId, sgSelectPeriod, sgRemoveTracked, sgOpenAddTestModel, sgAddTestPickerItems,
+    sgViewTrackedTest, sgTrackTest, sigmaModel, sgOpSpecCell, sgFrequencyHTML, sgMuDominant,
     sgMuStateChip, sgMuHTML, sgRefresh, sgTips, sgPointTipShow, sgPointTipHide, sgTrendSVG, sgMDCSVG,
     sgBiasRowsFromDom, sgBiasPeriodsFromDom, sgBiasStats, sgBiasRoundsKey, sgBiasLinkedPeriodIds, sgOpenBias,
     sgRenderBiasModal, sgBiasUpdateSummary, sgBiasSelectPeriods, sgBiasAdd, sgBiasDel, sgApplyBiasToPeriods,

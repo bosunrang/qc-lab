@@ -1,4 +1,7 @@
+import { createElement } from 'react';
 import { getKernel } from '../state/kernel';
+import { openReactModal } from '../dialogs/modal-store';
+import { SigmaAddTestModal } from '../modals/SigmaAddTestModal';
 
 export type SigmaTeaOption = { value: string; label: string };
 export type SigmaLevelCell = {
@@ -36,7 +39,9 @@ export const sgPickTest = (id: string): void => getKernel().sigma.sgPickTest(id)
 export const sgSetTeaSource = (value: string): void => getKernel().sigma.sgSetTeaSource(value);
 export const sgPart = (eid: string, part: string, value: string): void => { getKernel().sigma.sgPart(eid, part, value); };
 export const goManageTargets = (): void => getKernel().pres.goManageTargets();
-export const sgOpenAddTest = (): void => { getKernel().sigma.sgOpenAddTest(); };
+export const sgOpenAddTest = (): void => {
+  if (getKernel().sigma.sgOpenAddTestModel()) openReactModal(() => createElement(SigmaAddTestModal));
+};
 export const sgRemoveTracked = (testId: string): void => { getKernel().sigma.sgRemoveTracked(testId); };
 export const sgSetTea = (value: string): void => { getKernel().sigma.sgSetTea(value); };
 export const sgSetTeaMeta = (field: string, value: string): void => { getKernel().sigma.sgSetTeaMeta(field, value); };

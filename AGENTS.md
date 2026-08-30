@@ -1332,7 +1332,49 @@ modals, `ui-workflow-check` 29/29, `nce-workflow-check` 91/91, plus the
 corrected ad-hoc script confirming the auto-name suggestion updates live as
 lots are checked and the group saves/closes correctly with 2+ lots.
 
-Remaining for Giai đoạn 3: convert each of the other ~7 form modals from
+Six Sigma's "Chọn hoặc thêm xét nghiệm" (done, tenth real modal converted,
+first Sigma modal): the first modal after the Manage series, and the first
+case where `kernel.sigma` needed **zero new wiring** at all —
+`kernel.sigma = sigmaPageController` is a direct spread of the whole
+controller (unlike `kernel.manage`'s hand-curated object), so every new
+function (`sgOpenAddTestModel`, `sgAddTestPickerItems`) was automatically
+reachable the moment it existed on the controller — confirming Manage's
+repeated "missing kernel wiring" bug class was specific to `kernel.manage`'s
+itemized shape, not a general risk for every page. Otherwise the same
+picker shape as Reagent's modal: `useState` query, no debounce, `sgTrackTest`/
+`sgViewTrackedTest` per row depending on whether that test is already
+tracked. Found a **real trigger-duplication trap** distinct from anything
+seen so far: the "+ Thêm xét nghiệm" button appears in TWO places — a real
+JSX button on the tracked-tests toolbar, AND a second copy embedded as raw
+`data-action="sgOpenAddTest"` HTML inside `emptyStateHtml()`'s
+`dangerouslySetInnerHTML` output (shown only when Sigma has zero tracked
+tests). `action-dispatcher.ts` resolves that second button by looking up
+the bare global `window.sgOpenAddTest` — so simply repointing the *bridge*
+export (as done for every other modal) would leave this one embedded button
+silently broken, since it never goes through the bridge at all. Fixed by
+also repointing the classic `root.sgOpenAddTest` global itself to call
+`window.QCLabReact.sgOpenAddTest()` (the same React-opening bridge
+function) — the third instance of the "classic caller reaching into the
+React modal system via `window.QCLabReact`" pattern (after
+`openReactInstrumentModal`/`reauthenticateCurrentUser`), but the first time
+it was needed to keep a *dead-simple* global name working rather than a
+deliberate cross-controller redirect. The gate-check function itself was
+renamed `sgOpenAddTest` → `sgOpenAddTestModel` to free up the bare name for
+this redirect, matching Manage's `openConfigXModel` convention retroactively.
+`scripts/a11y-audit.js`'s `sigma:add-test` entry needed **no change** —
+unlike every other converted modal, calling `sgOpenAddTest()` as a bare
+global still correctly opens the React modal now, precisely because of the
+redirect above. Classic `sigma-add-test-modal-html.ts`/`sigma-add-test-rows-html.ts`
+deleted outright (2 dedicated tests removed); `tests/sigma-comp.test.js`/
+`tests/sigma-tracked-test-bridge.test.js` had their now-retired
+classic-file/contract checks repointed or removed. Verified: `npm test`
+451/451, `typecheck` clean, `check-build-freshness` matches, `a11y-audit` 0
+violations across all 18 modals, `ui-workflow-check` 29/29,
+`nce-workflow-check` 91/91, plus an ad-hoc script confirming BOTH trigger
+paths (the real toolbar button and the embedded empty-state button) open
+the identical modal correctly.
+
+Remaining for Giai đoạn 3: convert each of the other ~6 form modals from
 the `'html'` string path to a real `'react'` component, one at a time, same
 full-verify-after-each discipline established across Giai đoạn 2 — each
 conversion touches exactly one modal's trigger function (swap

@@ -13006,19 +13006,6 @@
     <div class="modal-f">${input.cancelButtonHtml}${input.saveButtonHtml}</div></div>`;
 	}
 	//#endregion
-	//#region src/presentation/sigma/sigma-add-test-modal-html.ts
-	function sigmaAddTestModalHtml(input) {
-		return `<div class="modal"><div class="modal-h"><h3>Chọn hoặc thêm xét nghiệm vào Six Sigma</h3><button class="modal-close" data-action="closeModal">✕</button></div>
-    <div class="modal-b">${input.showSearch ? `<input id="sgAddTestSearch" type="search" placeholder="Tìm tên xét nghiệm, máy hoặc đơn vị..." value="${input.searchValue}" data-action="sgAddTestSearchSet" data-action-on="input">` : ""}
-      <div class="sg-add-test-list">${input.rowsHtml || input.emptyHtml}</div></div>
-    <div class="modal-f">${input.closeButtonHtml}</div></div>`;
-	}
-	//#endregion
-	//#region src/presentation/sigma/sigma-add-test-rows-html.ts
-	function sigmaAddTestRowsHtml(rows) {
-		return rows.map((row) => `<button class="refrow sg-add-test-row${row.tracked ? " is-tracked" : ""}${row.current ? " is-current" : ""}" ${row.current ? "aria-current=\"true\"" : ""} data-action="${row.action}" data-args='${JSON.stringify([row.id])}'><span><b>${row.name}</b><span class="meta">${row.meta}</span></span><span class="tag ${row.tracked ? "ok" : "none"}">${row.label}</span></button>`).join("");
-	}
-	//#endregion
 	//#region src/presentation/sigma/sigma-bias-modal-html.ts
 	function sigmaBiasModalHtml(input) {
 		return `<div class="modal sg-eqa-modal"><div class="modal-h"><h3>Tính Bias% từ EQA/EQC — Mức ${input.level}</h3><button class="modal-close" data-action="closeModal">✕</button></div>
@@ -21884,14 +21871,32 @@
 			deps.save({ clearDerived: false });
 			deps.rerender();
 		};
-		const sgOpenAddTest = () => {
-			if (!deps.requireAdmin()) return;
-			ui().sgAddTestQ = "";
-			sgRenderAddTestModal();
-		};
-		const sgAddTestSearchSet = (v) => {
-			ui().sgAddTestQ = v;
-			deps.scheduleSearchRender(sgAddTestSearchSet, sgRenderAddTestModal, "sgAddTestSearch");
+		const sgOpenAddTestModel = () => !!deps.requireAdmin();
+		const sgAddTestPickerItems = (query) => {
+			const all = [...state().tests || []].sort((a, b) => deps.operationalTestOrder(a) - deps.operationalTestOrder(b) || String(deps.testDisplayName(a)).localeCompare(String(deps.testDisplayName(b)), "vi")), q = deps.searchText(query);
+			return all.filter((t) => !q || [
+				deps.testDisplayName(t),
+				t.name,
+				t.machine,
+				t.unit,
+				t.section,
+				t.method
+			].some((v) => deps.searchText(v).includes(q))).map((t) => {
+				const tracked = !!t.sgTracked, current = tracked && t.id === ui().sgTest, meta = [
+					t.machine,
+					t.unit,
+					t.section
+				].filter(Boolean).join(" · ") || "Chưa có thông tin máy/đơn vị", action = tracked ? "view" : "track", label = current ? "Đang xem" : tracked ? "Xem" : "Thêm";
+				return {
+					id: t.id,
+					tracked,
+					current,
+					name: deps.testDisplayName(t),
+					meta,
+					action,
+					label
+				};
+			});
 		};
 		const sgViewTrackedTest = (id) => {
 			const t = deps.SigmaTrackedTestService.select(state().tests || [], id);
@@ -21899,48 +21904,6 @@
 			ui().sgTest = t.id;
 			deps.closeModal();
 			deps.rerender();
-		};
-		const sgRenderAddTestModal = () => {
-			const all = [...state().tests || []].sort((a, b) => deps.operationalTestOrder(a) - deps.operationalTestOrder(b) || String(deps.testDisplayName(a)).localeCompare(String(deps.testDisplayName(b)), "vi")), q = deps.searchText(ui().sgAddTestQ);
-			const matched = all.filter((t) => !q || [
-				deps.testDisplayName(t),
-				t.name,
-				t.machine,
-				t.unit,
-				t.section,
-				t.method
-			].some((v) => deps.searchText(v).includes(q)));
-			const rows = deps.pres.sigmaAddTestRowsHtml(matched.map((t) => {
-				const tracked = !!t.sgTracked, current = tracked && t.id === ui().sgTest, meta = [
-					t.machine,
-					t.unit,
-					t.section
-				].filter(Boolean).map(deps.esc).join(" · ") || "Chưa có thông tin máy/đơn vị", action = tracked ? "sgViewTrackedTest" : "sgTrackTest", label = current ? "Đang xem" : tracked ? "Xem" : "Thêm";
-				return {
-					id: t.id,
-					tracked,
-					current,
-					name: deps.esc(deps.testDisplayName(t)),
-					meta,
-					action,
-					label
-				};
-			}));
-			const empty = !all.length ? "<div class=\"empty\"><div class=\"empty-title\">Chưa có xét nghiệm trong Cấu hình chung</div><div>Hãy nhập xét nghiệm tại Cấu hình chung › Danh mục xét nghiệm trước khi thêm vào Six Sigma.</div></div>" : `<div class="empty">${q ? "Không tìm thấy xét nghiệm phù hợp." : "Không có xét nghiệm để hiển thị."}</div>`;
-			deps.openModal(deps.pres.sigmaAddTestModalHtml({
-				showSearch: !!all.length,
-				searchValue: deps.escapeAttr(ui().sgAddTestQ),
-				rowsHtml: rows,
-				emptyHtml: empty,
-				closeButtonHtml: deps.btn("Đóng", { action: "closeModal" }, "ghost")
-			}));
-			setTimeout(() => {
-				const e = doc().getElementById("sgAddTestSearch");
-				if (e) {
-					e.focus();
-					e.setSelectionRange(e.value.length, e.value.length);
-				}
-			}, 0);
 		};
 		const sgTrackTest = (id) => {
 			if (!deps.requireAdmin()) return;
@@ -22819,10 +22782,9 @@
 			sgStatusPeriodId,
 			sgSelectPeriod,
 			sgRemoveTracked,
-			sgOpenAddTest,
-			sgAddTestSearchSet,
+			sgOpenAddTestModel,
+			sgAddTestPickerItems,
 			sgViewTrackedTest,
-			sgRenderAddTestModal,
 			sgTrackTest,
 			sigmaModel,
 			sgOpSpecCell,
@@ -28525,8 +28487,6 @@
 	root.rangeNceNoticeHtml = rangeNceNoticeHtml;
 	root.rangeWorkflowComparisonRowsHtml = rangeWorkflowComparisonRowsHtml;
 	root.resetPasswordModalHtml = resetPasswordModalHtml;
-	root.sigmaAddTestModalHtml = sigmaAddTestModalHtml;
-	root.sigmaAddTestRowsHtml = sigmaAddTestRowsHtml;
 	root.sigmaBiasModalHtml = sigmaBiasModalHtml;
 	root.sigmaMuModalHtml = sigmaMuModalHtml;
 	root.sigmaCohortModalHtml = sigmaCohortModalHtml;
@@ -31546,10 +31506,8 @@
 	root.sgStatusPeriodId = sigmaPageController.sgStatusPeriodId;
 	root.sgSelectPeriod = sigmaPageController.sgSelectPeriod;
 	root.sgRemoveTracked = sigmaPageController.sgRemoveTracked;
-	root.sgOpenAddTest = sigmaPageController.sgOpenAddTest;
-	root.sgAddTestSearchSet = sigmaPageController.sgAddTestSearchSet;
+	root.sgOpenAddTest = () => window.QCLabReact.sgOpenAddTest();
 	root.sgViewTrackedTest = sigmaPageController.sgViewTrackedTest;
-	root.sgRenderAddTestModal = sigmaPageController.sgRenderAddTestModal;
 	root.sgTrackTest = sigmaPageController.sgTrackTest;
 	root.sigmaModel = sigmaPageController.sigmaModel;
 	root.sgOpSpecCell = sigmaPageController.sgOpSpecCell;

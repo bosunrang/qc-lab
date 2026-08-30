@@ -5,6 +5,7 @@ import { confirmDialog, infoDialog, closeDialogOverlay, reauthenticateCurrentUse
 import { ModalOverlay } from './dialogs/ModalOverlay';
 import { openModal, closeModal } from './dialogs/modal-store';
 import { openConfigInstrument } from './bridge/manageBridge';
+import { sgOpenAddTest } from './bridge/sigmaBridge';
 import { DashboardPage } from './pages/DashboardPage';
 import { AuditPage } from './pages/AuditPage';
 import { UsersPage } from './pages/UsersPage';
@@ -38,6 +39,7 @@ const registry = createReactPageRegistry({
   confirmDialog, infoDialog, closeDialogOverlay, reauthenticateCurrentUser,
   openModal, closeModal,
   openConfigInstrument,
+  sgOpenAddTest,
 };
 
 /* #dialogRoot/#modalRoot giờ mỗi cái do MỘT React root sở hữu vĩnh viễn,
