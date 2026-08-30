@@ -10,11 +10,9 @@ const bridge=fs.readFileSync(path.join(root,'src','compat','modular-pilot.global
 assert.match(route,/deps\.pres\.teaReferenceKindPresentation\(/,'Trạng thái TEa phải dùng bridge TypeScript');
 assert.match(route,/deps\.pres\.teaReferenceRowActionsPresentation\(/,'Thao tác TEa phải dùng bridge TypeScript');
 assert.match(route,/deps\.pres\.teaReferenceAddModalPresentation\(/,'Modal thêm TEa phải dùng bridge TypeScript');
-assert.match(route,/deps\.pres\.teaReferenceLabProfileBodyPresentation\(/,'Nội dung hồ sơ TEa phải dùng bridge TypeScript');
 assert.match(bridge,/teaReferenceKindPresentation: typeof teaReferenceKind;/,'Trạng thái TEa phải là hợp đồng bridge bắt buộc');
 assert.match(bridge,/teaReferenceRowActionsPresentation: typeof teaReferenceRowActions;/,'Thao tác TEa phải là hợp đồng bridge bắt buộc');
 assert.match(bridge,/teaReferenceAddModalPresentation: typeof teaReferenceAddModalHtml;/,'Modal thêm TEa phải là hợp đồng bridge bắt buộc');
-assert.match(bridge,/teaReferenceLabProfileBodyPresentation: typeof teaReferenceLabProfileBodyHtml;/,'Nội dung hồ sơ TEa phải là hợp đồng bridge bắt buộc');
 assert.match(bridge,/manageSearchMatchPresentation: typeof manageSearchMatch;/,'Tìm kiếm cấu hình phải là hợp đồng bridge bắt buộc');
 assert.match(bridge,/manageInstrumentNamePresentation: typeof manageInstrumentName;/,'Tên máy cấu hình phải là hợp đồng bridge bắt buộc');
 assert.match(bridge,/manageLotStatusPresentation: ReturnType<typeof createManageLotStatus>;/,'Trạng thái lô QC phải là hợp đồng bridge bắt buộc');

@@ -14441,16 +14441,6 @@
 		return `<div class="modal"><div class="modal-h"><h3>Thêm xét nghiệm tham chiếu</h3><button class="modal-close" data-action="closeModal">✕</button></div><div class="modal-b"><div class="grid2"><div><label>Tên quốc tế <span class="req">*</span></label><input id="trAddName" placeholder="VD: Creatine kinase-MB"></div><div><label>Viết tắt</label><input id="trAddAbbreviation" placeholder="VD: CK-MB"></div></div><div class="grid2"><div><label>Loại mẫu (matrix)</label><input id="trAddMatrix" placeholder="VD: Serum/Plasma"></div><div></div></div><div class="grid2"><div><label>Đơn vị</label><input id="trAddUnit" placeholder="U/L"></div><div><label>Nhóm</label><input id="trAddSection" placeholder="Hóa sinh"></div></div><div class="grid2"><div><label>TEa CLIA %</label><input id="trAddClia" type="number" step="any"></div><div><label>TEa Ricos %</label><input id="trAddRicos" type="number" step="any"></div></div><div class="hint flow-item">Mỗi xét nghiệm dùng một tên quốc tế duy nhất; viết tắt được hiển thị trong ngoặc. TEa chuẩn hóa được lập thành hồ sơ riêng sau khi thêm dòng.</div></div><div class="modal-f">${input.cancelButtonHtml}${input.submitButtonHtml}</div></div>`;
 	}
 	//#endregion
-	//#region src/presentation/manage/tea-reference-lab-profile-body-html.ts
-	function teaReferenceLabProfileBodyHtml(input) {
-		return `<div class="grid2"><div><label>TEa chuẩn hóa % <span class="req">*</span></label><input id="teaLabValue" type="number" step="any" min="0" aria-label="TEa chuẩn hóa phần trăm" value="${input.labValue}"></div><div><label>Nguồn chính <span class="req">*</span></label><select id="teaLabSource" aria-label="Nguồn chính của TEa chuẩn hóa">${input.sourceOptionsHtml}</select></div></div><div><label>Tài liệu / phiên bản / đường dẫn tham chiếu <span class="req">*</span></label><input id="teaLabReference" aria-label="Tài liệu tham chiếu TEa chuẩn hóa" value="${input.referenceValue}" placeholder="VD: 42 CFR §493.931, hiệu lực 11/07/2024"></div><div><label>Lý do lựa chọn <span class="req">*</span></label><textarea id="teaLabReason" class="tea-lab-reason" aria-label="Lý do lựa chọn TEa chuẩn hóa" rows="1" placeholder="Nêu lý do chọn nguồn và mức TEa này cho mục đích sử dụng của xét nghiệm...">${input.reasonHtml}</textarea></div><div class="tea-lab-meta-grid tea-lab-meta-primary"><div><label>Ngày hiệu lực <span class="req">*</span></label>${input.effectiveDateHtml}</div><div><label>Ngày xem xét lại</label>${input.nextReviewDateHtml}</div><div><label>Người xây dựng <span class="req">*</span></label><input id="teaLabPreparedBy" aria-label="Người xây dựng TEa chuẩn hóa" value="${input.preparedValue}"></div></div><div class="tea-lab-meta-grid tea-lab-meta-approval"><div><label>Người phê duyệt <span class="req">*</span></label><input id="teaLabApprovedBy" aria-label="Người phê duyệt TEa chuẩn hóa" value="${input.approvedValue}"></div><div><label>Ngày phê duyệt <span class="req">*</span></label>${input.approvedDateHtml}</div></div>`;
-	}
-	//#endregion
-	//#region src/presentation/manage/tea-reference-lab-profile-modal-html.ts
-	function teaReferenceLabProfileModalHtml(input) {
-		return `<div class="modal tea-lab-profile-modal"><div class="modal-h"><h3>${input.title}</h3><button class="modal-close" data-action="closeModal">✕</button></div><div class="modal-b">${input.bodyHtml}</div><div class="modal-f">${input.removeButtonHtml}${input.cancelButtonHtml}${input.saveButtonHtml}</div></div>`;
-	}
-	//#endregion
 	//#region src/presentation/manage/manage-search-placeholder.ts
 	var PLACEHOLDERS = Object.freeze({
 		instruments: "Tìm theo tên máy, hãng, số sê-ri...",
@@ -17227,39 +17217,30 @@
 			};
 			deps.TeaReferenceWorkflowCommand.addCustom({ data });
 		};
-		const teaLabProfileOpen = (refKey) => {
-			if (!deps.requireAdmin()) return;
-			if (!deps.effectiveTeaRefs().find((r) => r[6] === refKey || deps.teaRefName(r[0]) === deps.teaRefName(refKey))) return;
-			const row = teaRefFind(refKey), meta = row && row.sources && row.sources.lab || {}, source = row && row.labSource || "", sourceOpts = ["<option value=\"\">— Chọn nguồn chính —</option>", ...TEA_LAB_BASIS_SOURCES.map(([v, label]) => `<option value="${v}" ${source === v ? "selected" : ""}>${deps.esc(label)}</option>`)].join(""), effective = meta.effectiveDate || deps.isoToday(), approvedDate = meta.reviewedDate || deps.isoToday(), prepared = row && row.labPreparedBy || deps.userName(), approved = meta.reviewedBy || deps.userName(), nextReview = row && row.labNextReviewDate || "";
-			const body = deps.pres.teaReferenceLabProfileBodyPresentation({
-				labValue: row && row.lab != null ? row.lab : "",
-				sourceOptionsHtml: sourceOpts,
-				referenceValue: deps.escapeAttr(meta.document || ""),
-				reasonHtml: deps.esc(meta.note || ""),
-				effectiveDateHtml: deps.dateBox("teaLabEffectiveDate", effective, "manage-date", "aria-label=\"Ngày hiệu lực TEa chuẩn hóa\""),
-				nextReviewDateHtml: deps.dateBox("teaLabNextReviewDate", nextReview, "manage-date", "aria-label=\"Ngày xem xét lại TEa chuẩn hóa\""),
-				preparedValue: deps.escapeAttr(prepared),
-				approvedValue: deps.escapeAttr(approved),
-				approvedDateHtml: deps.dateBox("teaLabApprovedDate", approvedDate, "manage-date", "aria-label=\"Ngày phê duyệt TEa chuẩn hóa\"")
-			});
-			const hasProfile = row && row.lab != null, remove = hasProfile ? deps.btn("Xóa TEa chuẩn hóa", {
-				action: "teaLabProfileRemove",
-				args: [refKey]
-			}, "danger") : "";
-			deps.openModal(deps.pres.teaReferenceLabProfileModalHtml({
+		const teaLabProfileOpenModel = (refKey) => {
+			if (!deps.requireAdmin()) return null;
+			if (!deps.effectiveTeaRefs().find((r) => r[6] === refKey || deps.teaRefName(r[0]) === deps.teaRefName(refKey))) return null;
+			const row = teaRefFind(refKey), meta = row && row.sources && row.sources.lab || {}, source = row && row.labSource || "";
+			const effective = meta.effectiveDate || deps.isoToday(), approvedDate = meta.reviewedDate || deps.isoToday(), prepared = row && row.labPreparedBy || deps.userName(), approved = meta.reviewedBy || deps.userName(), nextReview = row && row.labNextReviewDate || "";
+			const hasProfile = !!(row && row.lab != null);
+			return {
+				refKey,
+				hasProfile,
 				title: hasProfile ? "Sửa hồ sơ TEa chuẩn hóa" : "Thêm hồ sơ TEa chuẩn hóa",
-				bodyHtml: body,
-				removeButtonHtml: remove,
-				cancelButtonHtml: deps.btn("Hủy", { action: "closeModal" }, "ghost"),
-				saveButtonHtml: deps.btn(hasProfile ? "Lưu thay đổi" : "Thêm hồ sơ TEa", {
-					action: "teaLabProfileSave",
-					args: [refKey]
-				}, "teal")
-			}));
-			setTimeout(() => {
-				const e = deps.document.getElementById("teaLabValue");
-				if (e) e.focus();
-			}, 0);
+				labValue: hasProfile ? row.lab : "",
+				sourceOptions: TEA_LAB_BASIS_SOURCES.map(([value, label]) => ({
+					value,
+					label
+				})),
+				source,
+				referenceValue: meta.document || "",
+				reasonValue: meta.note || "",
+				effective,
+				nextReview,
+				prepared,
+				approved,
+				approvedDate
+			};
 		};
 		const teaLabProfileSave = async (refKey) => {
 			if (!deps.requireAdmin()) return;
@@ -17813,7 +17794,7 @@
 			teaRefRemove,
 			teaRefOpenAdd,
 			teaRefAddSubmit,
-			teaLabProfileOpen,
+			teaLabProfileOpenModel,
 			teaLabProfileSave,
 			teaLabProfileRemove,
 			manageModel
@@ -28711,8 +28692,6 @@
 	root.actionCauseDetailHtml = createActionCauseDetailHtml({ escape: (value) => root.esc(value) });
 	root.actionEffectivenessDetailHtml = createActionEffectivenessDetailHtml({ escape: (value) => root.esc(value) });
 	root.teaReferenceAddModalPresentation = teaReferenceAddModalHtml;
-	root.teaReferenceLabProfileBodyPresentation = teaReferenceLabProfileBodyHtml;
-	root.teaReferenceLabProfileModalHtml = teaReferenceLabProfileModalHtml;
 	root.manageSearchPlaceholderPresentation = manageSearchPlaceholder;
 	root.manageTransitionStatusPresentation = manageTransitionStatus;
 	root.manageLotStatusPresentation = createManageLotStatus({ daysToExpiry: (value) => root.daysToExp(value) });
@@ -30609,7 +30588,7 @@
 	root.teaRefRemove = managePageController.teaRefRemove;
 	root.teaRefOpenAdd = managePageController.teaRefOpenAdd;
 	root.teaRefAddSubmit = managePageController.teaRefAddSubmit;
-	root.teaLabProfileOpen = managePageController.teaLabProfileOpen;
+	root.teaLabProfileOpenModel = managePageController.teaLabProfileOpenModel;
 	root.teaLabProfileSave = managePageController.teaLabProfileSave;
 	root.teaLabProfileRemove = managePageController.teaLabProfileRemove;
 	root.manageModel = managePageController.manageModel;

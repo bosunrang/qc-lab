@@ -1474,7 +1474,52 @@ select from "include" to "exclude" correctly flips the state from "Thiếu
 u(bias)" to "Đủ thành phần"; Apply persists `uCal`/`muBiasMode`/
 `muReviewedBy` and closes the modal.
 
-Remaining for Giai đoạn 3: convert each of the other ~3 form modals from
+Manage's "Hồ sơ TEa chuẩn hóa" (done, 13th real modal converted, tab
+"tearefs"): the most validation-heavy CRUD modal so far —
+`teaLabProfileSave()` runs 6 sequential `infoDialog` checks (value > 0, a
+source chosen, reference text ≥3 chars, reason ≥10 chars, valid
+effective+approved dates, approved date not after effective date, next-review
+date not before effective date, both preparer and approver filled) — but
+needed **zero changes** to `teaLabProfileSave()`/`teaLabProfileRemove()`
+themselves, since both already read the DOM directly by element id (same
+uncontrolled-form pattern as Instrument/Lot). `teaLabProfileOpen()` split into
+`teaLabProfileOpenModel()` — a plain synchronous data reader, no async gate.
+`kernel.manage` needed **no new wiring** this time: `teaRefEdit`/
+`teaRefRemove`/`teaLabProfileOpenModel`/`teaLabProfileSave`/
+`teaLabProfileRemove` all belong to `managePageController` (not
+`manageTestsActionsController`), and `kernel.manage`'s `...managePageController`
+spread already carried all of them — reconfirming the standing rule that the
+missing-wiring bug class is specific to functions owned by
+`manageTestsActionsController`, not a blanket risk for every Manage modal.
+The 6-option "primary source" select renders real JSX `<option>`s instead of
+`dangerouslySetInnerHTML` — a small, static list with no reason to keep as a
+string. Classic `tea-reference-lab-profile-body-html.ts`/
+`tea-reference-lab-profile-modal-html.ts` deleted outright (2 dedicated
+tests removed); 4 other scanner tests (`ui-accessibility.test.js`,
+`manage-crud-labels.test.js`, `manage-core-bridge.test.js`,
+`tea-reference-bridges.test.js`) updated to match the new function/file
+locations. `scripts/a11y-audit.js`'s `manage:tea-lab-profile` switched from
+calling the retired bare global to switching to the "tearefs" tab and
+clicking the real row button for "Sodium". This is the first time switching
+to a real-button trigger surfaced a **genuine pre-existing accessibility
+bug unrelated to the modal itself**: since the test had never before made a
+real browser actually render the "tearefs" tab, axe-core had never scanned
+the underlying TEa reference table — its two per-row CLIA%/Ricos% inputs
+(`.tea-ref-value`) had no accessible label at all, a real "critical"
+violation dating back to Manage's 2026-08-29 React migration. Fixed by
+adding a descriptive `aria-label` (naming the column and the test) to both
+inputs in `ManagePage.tsx`'s `TeaRefRow`. Verified: `npm test` 443/443,
+`typecheck` clean, `check-build-freshness` matches, `a11y-audit` 0
+violations across all 18 modals (including the newly-fixed table gap),
+`ui-workflow-check` 29/29, `nce-workflow-check` 91/91, plus an ad-hoc script
+confirming: clicking "Thêm hồ sơ" opens the modal in create mode (no remove
+button); saving with required fields empty shows the correct validation
+message and keeps the modal open; filling all 6 required fields saves the
+complete profile (source, reference, reason, dates, preparer/approver) into
+`state.teaRefs` and closes the modal; reopening correctly shows edit mode
+("Xem hồ sơ" button, a remove button present, the saved value pre-filled).
+
+Remaining for Giai đoạn 3: convert each of the other ~2 form modals from
 the `'html'` string path to a real `'react'` component, one at a time, same
 full-verify-after-each discipline established across Giai đoạn 2 — each
 conversion touches exactly one modal's trigger function (swap

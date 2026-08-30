@@ -433,8 +433,6 @@ import { createActionPatientImpactHtml } from '../presentation/nce/action-patien
 import { createActionCauseDetailHtml } from '../presentation/nce/action-cause-detail-html';
 import { createActionEffectivenessDetailHtml } from '../presentation/nce/action-effectiveness-detail-html';
 import { teaReferenceAddModalHtml } from '../presentation/manage/tea-reference-add-modal-html';
-import { teaReferenceLabProfileBodyHtml } from '../presentation/manage/tea-reference-lab-profile-body-html';
-import { teaReferenceLabProfileModalHtml } from '../presentation/manage/tea-reference-lab-profile-modal-html';
 import { manageSearchPlaceholder } from '../presentation/manage/manage-search-placeholder';
 import { manageTransitionStatus } from '../presentation/manage/manage-transition-status';
 import { createManageLotStatus } from '../presentation/manage/manage-lot-status';
@@ -987,7 +985,7 @@ type QCLabGlobal = typeof globalThis & {
   teaRefRemove?: (refKey: unknown) => void;
   teaRefOpenAdd?: () => void;
   teaRefAddSubmit?: () => Promise<void>;
-  teaLabProfileOpen?: (refKey: unknown) => void;
+  teaLabProfileOpenModel?: (refKey: unknown) => Record<string, any> | null;
   teaLabProfileSave?: (refKey: unknown) => Promise<void>;
   teaLabProfileRemove?: (refKey: unknown) => Promise<void>;
   manageModel?: () => any;
@@ -1817,8 +1815,6 @@ type QCLabGlobal = typeof globalThis & {
   actionCauseDetailHtml: ReturnType<typeof createActionCauseDetailHtml>;
   actionEffectivenessDetailHtml: ReturnType<typeof createActionEffectivenessDetailHtml>;
   teaReferenceAddModalPresentation: typeof teaReferenceAddModalHtml;
-  teaReferenceLabProfileBodyPresentation: typeof teaReferenceLabProfileBodyHtml;
-  teaReferenceLabProfileModalHtml: typeof teaReferenceLabProfileModalHtml;
   manageSearchPlaceholderPresentation: typeof manageSearchPlaceholder;
   manageTransitionStatusPresentation: typeof manageTransitionStatus;
   manageLotStatusPresentation: ReturnType<typeof createManageLotStatus>;
@@ -3872,8 +3868,6 @@ root.actionPatientImpactHtml=createActionPatientImpactHtml({escape:(value:any)=>
 root.actionCauseDetailHtml=createActionCauseDetailHtml({escape:(value:any)=>(root as any).esc(value)});
 root.actionEffectivenessDetailHtml=createActionEffectivenessDetailHtml({escape:(value:any)=>(root as any).esc(value)});
 root.teaReferenceAddModalPresentation=teaReferenceAddModalHtml;
-root.teaReferenceLabProfileBodyPresentation=teaReferenceLabProfileBodyHtml;
-root.teaReferenceLabProfileModalHtml=teaReferenceLabProfileModalHtml;
 root.manageSearchPlaceholderPresentation=manageSearchPlaceholder;
 root.manageTransitionStatusPresentation=manageTransitionStatus;
 root.manageLotStatusPresentation=createManageLotStatus({daysToExpiry:(value:any)=>(root as any).daysToExp(value)});
@@ -4867,7 +4861,7 @@ root.teaRefEdit = managePageController.teaRefEdit;
 root.teaRefRemove = managePageController.teaRefRemove;
 root.teaRefOpenAdd = managePageController.teaRefOpenAdd;
 root.teaRefAddSubmit = managePageController.teaRefAddSubmit;
-root.teaLabProfileOpen = managePageController.teaLabProfileOpen;
+root.teaLabProfileOpenModel = managePageController.teaLabProfileOpenModel;
 root.teaLabProfileSave = managePageController.teaLabProfileSave;
 root.teaLabProfileRemove = managePageController.teaLabProfileRemove;
 root.manageModel = managePageController.manageModel;

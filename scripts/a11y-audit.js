@@ -82,7 +82,18 @@ const MODALS = [
       }
     } },
   { page: 'manage', label: 'manage:edit-assay', open: () => openConfigAssay('T-NA') },
-  { page: 'manage', label: 'manage:tea-lab-profile', open: () => teaLabProfileOpen('qclab-sodium') },
+  // teaLabProfileOpen() (Giai đoạn 3) giờ chỉ tồn tại trong react-pilot.js, không còn
+  // global tới được từ đây — chuyển tab "tearefs" rồi bấm thẳng nút thật trên dòng
+  // Sodium (qclab-sodium).
+  { page: 'manage', label: 'manage:tea-lab-profile', open: async () => {
+      setManageTab('tearefs');
+      for (let tries = 0; tries < 20; tries++) {
+        const row = [...document.querySelectorAll('tr')].find(tr => tr.textContent.includes('Sodium'));
+        const btn = row && [...row.querySelectorAll('button')].find(b => b.textContent.includes('hồ sơ'));
+        if (btn) { btn.click(); return; }
+        await new Promise(r => setTimeout(r, 25));
+      }
+    } },
   { page: 'sigma', label: 'sigma:add-test', open: () => sgOpenAddTest() },
   // sgOpenBias() (Giai đoạn 3) giờ chỉ mở modal qua react-pilot.js — bấm thẳng nút
   // thật "Bias EQA% Mức 1" thay vì gọi hàm trần.

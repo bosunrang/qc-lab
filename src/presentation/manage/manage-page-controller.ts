@@ -103,15 +103,18 @@ export function createManagePageController(deps: {
     const data = { name, abbreviation: deps.QCCore.cleanText((deps.document.getElementById('trAddAbbreviation') as AnyRec).value, 40).trim(), matrix: deps.QCCore.cleanText((deps.document.getElementById('trAddMatrix') as AnyRec).value, 80).trim(), unit: deps.QCCore.cleanText((deps.document.getElementById('trAddUnit') as AnyRec).value, 40), section: deps.QCCore.cleanText((deps.document.getElementById('trAddSection') as AnyRec).value, 80), clia: (deps.document.getElementById('trAddClia') as AnyRec).value, ricos: (deps.document.getElementById('trAddRicos') as AnyRec).value };
     deps.TeaReferenceWorkflowCommand.addCustom({ data });
   };
-  const teaLabProfileOpen = (refKey: unknown) => {
-    if (!deps.requireAdmin()) return;
+  const teaLabProfileOpenModel = (refKey: unknown) => {
+    if (!deps.requireAdmin()) return null;
     const ref = deps.effectiveTeaRefs().find(r => r[6] === refKey || deps.teaRefName(r[0]) === deps.teaRefName(refKey));
-    if (!ref) return;
-    const row = teaRefFind(refKey), meta = (row && row.sources && row.sources.lab) || {}, source = (row && row.labSource) || '', sourceOpts = ['<option value="">— Chọn nguồn chính —</option>', ...TEA_LAB_BASIS_SOURCES.map(([v, label]) => `<option value="${v}" ${source === v ? 'selected' : ''}>${deps.esc(label)}</option>`)].join(''), effective = meta.effectiveDate || deps.isoToday(), approvedDate = meta.reviewedDate || deps.isoToday(), prepared = (row && row.labPreparedBy) || deps.userName(), approved = meta.reviewedBy || deps.userName(), nextReview = (row && row.labNextReviewDate) || '';
-    const body = deps.pres.teaReferenceLabProfileBodyPresentation({ labValue: row && row.lab != null ? row.lab : '', sourceOptionsHtml: sourceOpts, referenceValue: deps.escapeAttr(meta.document || ''), reasonHtml: deps.esc(meta.note || ''), effectiveDateHtml: deps.dateBox('teaLabEffectiveDate', effective, 'manage-date', 'aria-label="Ngày hiệu lực TEa chuẩn hóa"'), nextReviewDateHtml: deps.dateBox('teaLabNextReviewDate', nextReview, 'manage-date', 'aria-label="Ngày xem xét lại TEa chuẩn hóa"'), preparedValue: deps.escapeAttr(prepared), approvedValue: deps.escapeAttr(approved), approvedDateHtml: deps.dateBox('teaLabApprovedDate', approvedDate, 'manage-date', 'aria-label="Ngày phê duyệt TEa chuẩn hóa"') });
-    const hasProfile = row && row.lab != null, remove = hasProfile ? deps.btn('Xóa TEa chuẩn hóa', { action: 'teaLabProfileRemove', args: [refKey] }, 'danger') : '';
-    deps.openModal(deps.pres.teaReferenceLabProfileModalHtml({ title: hasProfile ? 'Sửa hồ sơ TEa chuẩn hóa' : 'Thêm hồ sơ TEa chuẩn hóa', bodyHtml: body, removeButtonHtml: remove, cancelButtonHtml: deps.btn('Hủy', { action: 'closeModal' }, 'ghost'), saveButtonHtml: deps.btn(hasProfile ? 'Lưu thay đổi' : 'Thêm hồ sơ TEa', { action: 'teaLabProfileSave', args: [refKey] }, 'teal') }));
-    setTimeout(() => { const e = deps.document.getElementById('teaLabValue'); if (e) e.focus(); }, 0);
+    if (!ref) return null;
+    const row = teaRefFind(refKey), meta = (row && row.sources && row.sources.lab) || {}, source = (row && row.labSource) || '';
+    const effective = meta.effectiveDate || deps.isoToday(), approvedDate = meta.reviewedDate || deps.isoToday(), prepared = (row && row.labPreparedBy) || deps.userName(), approved = meta.reviewedBy || deps.userName(), nextReview = (row && row.labNextReviewDate) || '';
+    const hasProfile = !!(row && row.lab != null);
+    return {
+      refKey, hasProfile, title: hasProfile ? 'Sửa hồ sơ TEa chuẩn hóa' : 'Thêm hồ sơ TEa chuẩn hóa',
+      labValue: hasProfile ? row.lab : '', sourceOptions: TEA_LAB_BASIS_SOURCES.map(([value, label]) => ({ value, label })), source,
+      referenceValue: meta.document || '', reasonValue: meta.note || '', effective, nextReview, prepared, approved, approvedDate,
+    };
   };
   const teaLabProfileSave = async (refKey: unknown) => {
     if (!deps.requireAdmin()) return;
@@ -257,7 +260,7 @@ export function createManagePageController(deps: {
     manageSearchSet, manageMatch, manageSearchPlaceholder, groupsOfLot, lotGroupLabels, instrumentName, panelName,
     lotLabel, lotTransitionToNo, lotStatus, targetGroupLots, ensureTargetSelection,
     manageHistorySearchValues, teaRefFind, teaRefNumOrNull, teaRefExternalChanged, teaRefEnsure,
-    teaRefEdit, teaRefRemove, teaRefOpenAdd, teaRefAddSubmit, teaLabProfileOpen,
+    teaRefEdit, teaRefRemove, teaRefOpenAdd, teaRefAddSubmit, teaLabProfileOpenModel,
     teaLabProfileSave, teaLabProfileRemove, manageModel,
   };
 }

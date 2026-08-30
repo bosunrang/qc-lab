@@ -293,8 +293,8 @@ function TeaRefRow({ row }: { row: any }) {
       <td><b title={row.namingTitle}>{row.displayName}</b></td>
       <td>{row.unit}</td>
       <td>{row.section}</td>
-      <td><input className="tea-ref-value" disabled={!row.canManage} type="number" step="any" defaultValue={row.clia} onBlur={e => teaRefEdit(row.analyteId, 'clia', e.target.value)} /></td>
-      <td><input className="tea-ref-value" disabled={!row.canManage} type="number" step="any" defaultValue={row.ricos} onBlur={e => teaRefEdit(row.analyteId, 'ricos', e.target.value)} /></td>
+      <td><input className="tea-ref-value" disabled={!row.canManage} type="number" step="any" aria-label={`TEa CLIA % cho ${row.displayName}`} defaultValue={row.clia} onBlur={e => teaRefEdit(row.analyteId, 'clia', e.target.value)} /></td>
+      <td><input className="tea-ref-value" disabled={!row.canManage} type="number" step="any" aria-label={`TEa Ricos % cho ${row.displayName}`} defaultValue={row.ricos} onBlur={e => teaRefEdit(row.analyteId, 'ricos', e.target.value)} /></td>
       <td><div className="tea-lab-cell">
         {row.lab != null ? <b>{Number(row.lab).toFixed(2)}%</b> : null}
         {row.rowActions.labProfile !== 'none' ? <button className="btn ghost sm" onClick={() => teaLabProfileOpen(row.analyteId)}>{row.rowActions.labProfile === 'add' ? 'Thêm hồ sơ' : 'Xem hồ sơ'}</button> : null}

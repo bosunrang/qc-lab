@@ -12,6 +12,7 @@ const instrumentModal = fs.readFileSync(path.join(__dirname, '..', 'src', 'react
 const lotModal = fs.readFileSync(path.join(__dirname, '..', 'src', 'react', 'modals', 'LotModal.tsx'), 'utf8');
 const panelModal = fs.readFileSync(path.join(__dirname, '..', 'src', 'react', 'modals', 'PanelModal.tsx'), 'utf8');
 const lotGroupModal = fs.readFileSync(path.join(__dirname, '..', 'src', 'react', 'modals', 'LotGroupModal.tsx'), 'utf8');
+const teaLabProfileModal = fs.readFileSync(path.join(__dirname, '..', 'src', 'react', 'modals', 'TeaLabProfileModal.tsx'), 'utf8');
 const routes = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'manage', 'manage-page-controller.ts'), 'utf8');
 const records = [
   ['Panel QC','Panel QC'],
@@ -35,6 +36,6 @@ records.forEach(([editName,addName])=>{
 ['Lưu Panel QC','Lưu hồ sơ','Lưu nhóm lô','Lưu lô','Lưu máy xét nghiệm'].forEach(label=>assert.equal(actions.includes(`btn('${label}'`),false,`không dùng nhãn tĩnh “${label}” trong popup CRUD`));
 ['Thêm lô QC','Thêm nhóm lô','Thêm máy xét nghiệm','Thêm Panel QC','Thêm hồ sơ chuyển lô','Thêm xét nghiệm'].forEach(label=>assert.ok(routes.includes(`'${label}'`),`toolbar phải dùng “${label}”`));
 assert.ok(routes.includes(`title: hasProfile ? 'Sửa hồ sơ TEa chuẩn hóa' : 'Thêm hồ sơ TEa chuẩn hóa'`),'hồ sơ TEa phải phân biệt Thêm/Sửa');
-assert.ok(routes.includes(`btn(hasProfile ? 'Lưu thay đổi' : 'Thêm hồ sơ TEa'`),'nút hồ sơ TEa phải phân biệt Thêm/Lưu thay đổi');
+assert.ok(teaLabProfileModal.includes(`{hasProfile ? 'Lưu thay đổi' : 'Thêm hồ sơ TEa'}`),'nút hồ sơ TEa phải phân biệt Thêm/Lưu thay đổi');
 assert.doesNotMatch(actions,/Các trường có dấu/,'popup xét nghiệm không cần lặp lại chú thích dấu sao bắt buộc');
 console.log('Manage CRUD label convention tests passed');

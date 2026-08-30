@@ -5,6 +5,7 @@ import { InstrumentModal } from '../modals/InstrumentModal';
 import { LotModal } from '../modals/LotModal';
 import { PanelModal } from '../modals/PanelModal';
 import { LotGroupModal } from '../modals/LotGroupModal';
+import { TeaLabProfileModal } from '../modals/TeaLabProfileModal';
 
 export type ManageTab = { id: string; label: string; count: string | number };
 export type ManageToolbar = { title: string; subtitle?: string; action?: { action: string; args?: unknown[] } | null; actionLabel?: string };
@@ -53,7 +54,10 @@ export const openLotTransitionV2 = (id?: string): void => getKernel().manage.ope
 export const deleteLotTransition = (id: string): void => getKernel().manage.deleteLotTransition(id);
 export const openQcHistoryDetail = (testId: string, level: unknown, lot: string): void => getKernel().manage.openQcHistoryDetail(testId, level, lot);
 export const teaRefEdit = (analyteId: string, field: string, val: unknown): void => getKernel().manage.teaRefEdit(analyteId, field, val);
-export const teaLabProfileOpen = (analyteId: string): void => getKernel().manage.teaLabProfileOpen(analyteId);
+export const teaLabProfileOpen = (analyteId: string): void => {
+  const model = getKernel().manage.teaLabProfileOpenModel(analyteId);
+  if (model) openReactModal(() => createElement(TeaLabProfileModal, model));
+};
 export const teaRefRemove = (analyteId: string): void => getKernel().manage.teaRefRemove(analyteId);
 export const teaRefOpenAdd = (): void => getKernel().manage.teaRefOpenAdd();
 export const toggleTargetRow = (el: HTMLInputElement): void => { getKernel().manage.toggleTargetRow.call(el); };

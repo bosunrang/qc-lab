@@ -28,7 +28,7 @@ const reportRoutes = read('src/presentation/report/report-page-controller.ts');
 const reportPage = read('src/react/pages/ReportPage.tsx');
 const reportActionIconPresentation = read('src/presentation/report/report-action-icon.ts');
 const manageRoutes = read('src/presentation/manage/manage-page-controller.ts');
-const teaReferenceLabProfileBodyPresentation = read('src/presentation/manage/tea-reference-lab-profile-body-html.ts');
+const teaReferenceLabProfileBodyPresentation = read('src/react/modals/TeaLabProfileModal.tsx');
 const westgardRoutes = read('src/presentation/westgard/westgard-page-controller.ts');
 const westgardPage = read('src/react/pages/WestgardPage.tsx');
 const sigmaPage = read('src/react/pages/SigmaPage.tsx');
@@ -70,7 +70,7 @@ for(const file of walkPresentation(path.join(root,'src','presentation')).filter(
   if(/<label>[^<\r\n]*\s\*<\/label>/.test(source))rawRequiredLabels.push(path.relative(root,file));
 }
 assert.deepEqual(rawRequiredLabels,[],'dấu sao bắt buộc trong label phải bọc bằng <span class="req"> để luôn có màu đỏ');
-assert.match(manageRoutes+teaReferenceLabProfileBodyPresentation,/TEa chuẩn hóa % <span class="req">\*<\/span>/,'hồ sơ TEa phải hiển thị dấu bắt buộc bằng marker chung');
+assert.match(manageRoutes+teaReferenceLabProfileBodyPresentation,/TEa chuẩn hóa % <span className="req">\*<\/span>/,'hồ sơ TEa phải hiển thị dấu bắt buộc bằng marker chung');
 
 /* Cả 10 trang (Tổng quan, Nhật ký hoạt động, Người dùng, Cài đặt, Cấu hình
    chung, So sánh hóa chất, Báo cáo, Six Sigma, Phân tích Westgard, Khắc phục
