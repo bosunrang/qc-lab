@@ -31,6 +31,7 @@ import { createBackupSizeWarningConfirmation } from '../presentation/backup/back
 import { createBackupExportMessage } from '../presentation/backup/backup-export-message';
 import { createResetOperationalDataCommand, type ResetOperationalDataCommand } from '../application/auth/reset-operational-data-command';
 import { createUserManagementCommand } from '../application/auth/user-management-command';
+import { createUserStoreUpdate } from '../application/auth/user-store-update';
 import { createLoginCommand } from '../application/auth/login-command';
 import { createRequiredPasswordCommand } from '../application/auth/required-password-command';
 import { createLoginWorkflowCommand, type LoginWorkflowCommand } from '../application/auth/login-workflow-command';
@@ -4409,13 +4410,22 @@ root.updateBackupBanner=()=>{
 };
 root.ResetOperationalDataCommand=createResetOperationalDataCommand({current:()=>state,clearPersistence:()=>{localStorage.removeItem('qclab');localStorage.removeItem('qclab_boot');if(typeof clearSigmaDraftThrough==='function')clearSigmaDraftThrough(Number.MAX_SAFE_INTEGER);if(typeof root.localStoreService!=='undefined')root.localStoreService!.clear().catch(()=>{});},blank:users=>(root as any).blankAppStateFactory(users),replace:value=>{state=value;},normalize:()=>ensureShape(),ensureAdmin:()=>ensureAdmin(),log:()=>logAct('Xóa sạch dữ liệu test','Đưa app về trạng thái trắng, giữ người dùng và nhật ký audit','Dữ liệu'),save:()=>save({}),render:()=>rerender()});
 const userManagementCommand=createUserManagementCommand();
+/* Giai đoạn 7 (state immutable, nhóm users/settings/lab, 2026-08-30): mọi
+   thao tác đổi một user (quyền/mật khẩu/khóa/ảnh đại diện) đều đi qua ĐÚNG
+   MỘT điểm thay thế phần tử trong state.users + đồng bộ lại currentUser —
+   xem user-store-update.ts. syncCurrentUser chỉ áp dụng khi id trùng với
+   currentUser đang đăng nhập (người khác sửa hồ sơ ai đó không ảnh hưởng
+   currentUser); currentUser ở đây là biến toàn cục (AuthUIState.currentUser
+   qua accessor, xem ui-state.ts), gán lại TRỰC TIẾP đúng quy ước "page = ..."
+   đã dùng xuyên suốt file này. */
+const userStoreUpdate=createUserStoreUpdate({current:()=>state as {users?:Record<string,any>[]},syncCurrentUser:user=>{if(currentUser&&currentUser.id===user.id)currentUser=user;}});
 const loginCommand=createLoginCommand({isLocked:(until,now)=>root.loginLockoutPolicy!.isLocked(until,now),lockedMessage:(until,now)=>root.loginLockoutPolicy!.message(until,now),recordFailure:(lock,now)=>root.loginLockoutPolicy!.recordFailure(lock,now),resetLock:()=>root.loginLockoutPolicy!.reset(),verify:(password,stored)=>(root as any).verifyPass(password,stored),hash:password=>(root as any).hashPass(password),isPbkdf2:stored=>root.isPbkdf2PasswordHash!(stored),hashNeedsUpgrade:stored=>root.passwordHashNeedsUpgrade!(stored)});
 root.LoginWorkflowCommand=createLoginWorkflowCommand({login:loginCommand,log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options)});
 const requiredPasswordCommand=createRequiredPasswordCommand({validate:(password,confirmation)=>root.passwordChangeError!(password,confirmation),hash:password=>(root as any).hashPass(password)});
 root.RequiredPasswordWorkflowCommand=createRequiredPasswordWorkflowCommand({command:requiredPasswordCommand,log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options)});
 root.AdminBootstrapCommand=createAdminBootstrapCommand({current:()=>state as {users?:Record<string,any>[]},id:()=>(root as any).uid(),hashDefault:()=>(root as any).legacyHashPass('admin'),createDefault:(id,passHash)=>root.defaultAdminUserFactory!(id,passHash),save:()=>save({cloud:false,clearDerived:false})});
-root.UserLifecycleCommand=createUserLifecycleCommand({current:()=>state as {users?:Record<string,any>[]},manage:userManagementCommand,hash:password=>(root as any).hashPass(password),log:(type,detail,target)=>logAct(type,detail,target),save:()=>save({clearDerived:false})});
-root.UserAvatarCommand=createUserAvatarCommand({manage:userManagementCommand,log:(type,detail,target)=>logAct(type,detail,target),save:()=>save({clearDerived:false})});
+root.UserLifecycleCommand=createUserLifecycleCommand({current:()=>state as {users?:Record<string,any>[]},manage:userManagementCommand,userStore:userStoreUpdate,hash:password=>(root as any).hashPass(password),log:(type,detail,target)=>logAct(type,detail,target),save:()=>save({clearDerived:false})});
+root.UserAvatarCommand=createUserAvatarCommand({manage:userManagementCommand,userStore:userStoreUpdate,log:(type,detail,target)=>logAct(type,detail,target),save:()=>save({clearDerived:false})});
 const avatarModalController=createAvatarModalController({document:typeof document!=='undefined'?document:({createElement:()=>({})} as unknown as Document),createImage:()=>new Image(),createFileReader:()=>new FileReader(),currentUser:()=>currentUser,avatarCommand:root.UserAvatarCommand,infoDialog:(message,opts)=>root.infoDialog(message,opts),openModal:html=>root.openModal(html),closeModal:()=>root.closeModal(),rerender:()=>rerender(),escapeAttr:value=>(root as any).escAttr(value),html:{avatarModalHtml},btn:(label,onclick,cls,title,opts)=>root.btn(label,onclick,cls,title,opts)});
 root.openAvatarModal=avatarModalController.openAvatarModal;root.pickAvatar=avatarModalController.pickAvatar;root.clearAvatarPhoto=avatarModalController.clearAvatarPhoto;
 /* ===== USERS / AUDIT / AUTH ===== Retire classic users-auth.js (2026-08-20, Pha G nhóm C
@@ -4522,7 +4532,7 @@ root.applyUserPerms = async id => {
   const u = (state.users || []).find((x: Record<string, any>) => x.id === id); if (!u) return;
   if (currentUser && currentUser.id === id) { await root.infoDialog('Không thể tự sửa quyền của tài khoản đang đăng nhập.'); return; }
   const rolev = (document.getElementById('editUserRole') as HTMLInputElement).value, pagePerms = await root.collectUserPerms('editUserPerms', rolev); if (!pagePerms) return;
-  root.UserLifecycleCommand.updatePermissions(u, { role: rolev, pagePerms, auditDetail: `${root.roleLabel(rolev)} · ${pagePerms.length} thẻ` });
+  root.UserLifecycleCommand.updatePermissions(id, { role: rolev, pagePerms, auditDetail: `${root.roleLabel(rolev)} · ${pagePerms.length} thẻ` });
   root.closeModal(); if (!root.canAccessPage(root.page)) { page = root.firstAccessPage(); if (typeof history !== 'undefined') history.replaceState(null, '', hashForPage(root.page)); } renderBrand(); root.nav(); rerender();
 };
 root.resetPass = id => {
@@ -4537,10 +4547,11 @@ root.applyResetPass = async id => {
   const u = (state.users || []).find((x: Record<string, any>) => x.id === id); if (!u) return;
   const p1 = (document.getElementById('resetPass1') as HTMLInputElement).value, p2 = (document.getElementById('resetPass2') as HTMLInputElement).value, msg = document.getElementById('resetPassMsg'), err = root.passwordChangeError!(p1, p2);
   if (err) { if (msg) msg.innerHTML = `<div class="auth-err">${escapeHtml(err)}</div>`; return; }
-  const updated = await root.UserLifecycleCommand.resetPassword(u, p1, !(currentUser && currentUser.id === id));
+  const updated = await root.UserLifecycleCommand.resetPassword(id, p1, !(currentUser && currentUser.id === id));
+  if (!updated) return;
   root.closeModal(); rerender(); await root.infoDialog(updated.mustChangePassword ? 'Đã đặt mật khẩu tạm. Người dùng sẽ phải đổi mật khẩu khi đăng nhập.' : 'Đã cập nhật mật khẩu.', { type: 'success' });
 };
-root.toggleUser = id => { if (!root.requireAdmin()) return; const u = (state.users || []).find((x: Record<string, any>) => x.id === id); root.UserLifecycleCommand.toggle(u); rerender(); };
+root.toggleUser = id => { if (!root.requireAdmin()) return; root.UserLifecycleCommand.toggle(id); rerender(); };
 root.delUser = async id => { if (!root.requireAdmin()) return; if (id === currentUser.id) { await root.infoDialog('Không thể xóa chính mình.'); return; } const u = (state.users || []).find((x: Record<string, any>) => x.id === id); if (!await root.confirmDialog({ kicker: 'Thao tác không thể hoàn tác', title: 'Xóa người dùng', message: `Xóa người dùng ${u ? (u.name || u.username) : ''}?`, confirmLabel: 'Xóa người dùng', cancelLabel: 'Hủy' })) return; root.UserLifecycleCommand.remove(id); rerender(); };
 
 /* ===== AUTH =====

@@ -1562,47 +1562,64 @@
 	//#endregion
 	//#region src/application/auth/user-management-command.ts
 	function createUserManagementCommand() {
-		const add = (users, input) => {
-			const user = {
-				id: input.id,
-				username: input.username,
-				name: input.name,
-				initials: input.initials,
-				role: input.role,
-				pagePerms: [...input.pagePerms],
-				passHash: input.passHash,
-				active: true,
-				mustChangePassword: true
-			};
-			users.push(user);
-			return user;
-		};
-		const updatePermissions = (user, input) => Object.assign(user, {
+		const add = (input) => ({
+			id: input.id,
+			username: input.username,
+			name: input.name,
+			initials: input.initials,
+			role: input.role,
+			pagePerms: [...input.pagePerms],
+			passHash: input.passHash,
+			active: true,
+			mustChangePassword: true
+		});
+		const updatePermissions = (user, input) => ({
+			...user,
 			role: input.role,
 			pagePerms: [...input.pagePerms]
 		});
-		const resetPassword = (user, hash, mustChange) => Object.assign(user, {
+		const resetPassword = (user, hash, mustChange) => ({
+			...user,
 			passHash: hash,
 			mustChangePassword: mustChange
 		});
-		const toggle = (user) => Object.assign(user, { active: user.active === false });
-		const remove = (users, id) => {
-			const user = users.find((item) => item.id === id);
-			if (!user) return void 0;
-			users.splice(users.indexOf(user), 1);
-			return user;
-		};
-		const setAvatar = (user, dataUrl) => Object.assign(user, { avatar: String(dataUrl || "") });
-		const clearAvatar = (user) => Object.assign(user, { avatar: "" });
+		const toggle = (user) => ({
+			...user,
+			active: user.active === false
+		});
+		const setAvatar = (user, dataUrl) => ({
+			...user,
+			avatar: String(dataUrl || "")
+		});
+		const clearAvatar = (user) => ({
+			...user,
+			avatar: ""
+		});
 		return Object.freeze({
 			add,
 			updatePermissions,
 			resetPassword,
 			toggle,
-			remove,
 			setAvatar,
 			clearAvatar
 		});
+	}
+	//#endregion
+	//#region src/application/auth/user-store-update.ts
+	function createUserStoreUpdate(deps) {
+		const replaceById = (id, transform) => {
+			const state = deps.current(), users = state.users || [], idx = users.findIndex((u) => u.id === id);
+			if (idx < 0) return void 0;
+			const updated = transform(users[idx]);
+			state.users = [
+				...users.slice(0, idx),
+				updated,
+				...users.slice(idx + 1)
+			];
+			deps.syncCurrentUser(updated);
+			return updated;
+		};
+		return Object.freeze({ replaceById });
 	}
 	//#endregion
 	//#region src/application/auth/login-command.ts
@@ -1742,40 +1759,43 @@
 	//#endregion
 	//#region src/application/auth/user-lifecycle-command.ts
 	function createUserLifecycleCommand(deps) {
-		const users = () => {
-			const state = deps.current();
-			return state.users || (state.users = []);
-		};
 		const add = async (input) => {
-			const user = deps.manage.add(users(), {
+			const state = deps.current(), users = state.users || (state.users = []);
+			const user = deps.manage.add({
 				...input,
 				passHash: await deps.hash(String(input.password || ""))
 			});
+			state.users = [...users, user];
 			deps.log("Thêm người dùng", input.auditDetail, user.username);
 			deps.save();
 			return user;
 		};
-		const updatePermissions = (user, input) => {
-			const updated = deps.manage.updatePermissions(user, input);
+		const updatePermissions = (id, input) => {
+			const updated = deps.userStore.replaceById(id, (user) => deps.manage.updatePermissions(user, input));
+			if (!updated) return void 0;
 			deps.log("Cập nhật quyền người dùng", input.auditDetail, updated.username);
 			deps.save();
 			return updated;
 		};
-		const resetPassword = async (user, password, mustChange) => {
-			const updated = deps.manage.resetPassword(user, await deps.hash(password), mustChange);
+		const resetPassword = async (id, password, mustChange) => {
+			const hash = await deps.hash(password);
+			const updated = deps.userStore.replaceById(id, (user) => deps.manage.resetPassword(user, hash, mustChange));
+			if (!updated) return void 0;
 			deps.log("Đổi mật khẩu", updated.mustChangePassword ? "Đặt mật khẩu tạm và yêu cầu đổi lại" : "Người dùng đổi mật khẩu", updated.username);
 			deps.save();
 			return updated;
 		};
-		const toggle = (user) => {
-			const updated = deps.manage.toggle(user);
+		const toggle = (id) => {
+			const updated = deps.userStore.replaceById(id, (user) => deps.manage.toggle(user));
+			if (!updated) return void 0;
 			deps.log(updated.active ? "Mở khóa người dùng" : "Khóa người dùng", "Cập nhật trạng thái tài khoản", updated.username);
 			deps.save();
 			return updated;
 		};
 		const remove = (id) => {
-			const removed = deps.manage.remove(users(), id);
+			const state = deps.current(), users = state.users || [], removed = users.find((u) => u.id === id);
 			if (!removed) return void 0;
+			state.users = users.filter((u) => u.id !== id);
 			deps.log("Xóa người dùng", "Xóa tài khoản khỏi hệ thống", removed.username);
 			deps.save();
 			return removed;
@@ -1792,13 +1812,15 @@
 	//#region src/application/auth/user-avatar-command.ts
 	function createUserAvatarCommand(deps) {
 		const setAvatar = (user, dataUrl) => {
-			const updated = deps.manage.setAvatar(user, dataUrl);
+			const updated = deps.userStore.replaceById(user.id, (current) => deps.manage.setAvatar(current, dataUrl));
+			if (!updated) return void 0;
 			deps.log("Cập nhật ảnh đại diện", "Đổi ảnh đại diện cá nhân", updated.username);
 			deps.save();
 			return updated;
 		};
 		const clearAvatar = (user) => {
-			const updated = deps.manage.clearAvatar(user);
+			const updated = deps.userStore.replaceById(user.id, (current) => deps.manage.clearAvatar(current));
+			if (!updated) return void 0;
 			deps.log("Cập nhật ảnh đại diện", "Xóa ảnh đại diện cá nhân", updated.username);
 			deps.save();
 			return updated;
@@ -6472,8 +6494,10 @@
 		};
 		const ensureLabBrandShape = () => {
 			const state = deps.getState();
-			state.lab = state.lab || {};
-			Object.assign(state.lab, deps.brand.profile(state.lab));
+			state.lab = {
+				...state.lab || {},
+				...deps.brand.profile(state.lab || {})
+			};
 		};
 		const saveBrand = async () => {
 			if (!deps.requireAdmin()) return;
@@ -7745,7 +7769,10 @@
 		}, state = options.sanitized ? merged : deps.sanitize(merged);
 		if (previousSchema < 2) state.periodLocks = Array.isArray(state.periodLocks) ? state.periodLocks : [];
 		delete state.archiveRegistry;
-		if (state.lab && typeof state.lab === "object") delete state.lab.kpiTargets;
+		if (state.lab && typeof state.lab === "object") {
+			state.lab = { ...state.lab };
+			delete state.lab.kpiTargets;
+		}
 		if (previousSchema < 3 || !state.teaRegistryVersion || state.teaRegistryVersion < deps.teaRegistryVersion) state.teaRegistryVersion = deps.teaRegistryVersion;
 		state.schemaVersion = deps.schemaVersion;
 		if (!state.westgardProfileVersion) {
@@ -29592,6 +29619,12 @@
 		render: () => rerender()
 	});
 	var userManagementCommand = createUserManagementCommand();
+	var userStoreUpdate = createUserStoreUpdate({
+		current: () => state,
+		syncCurrentUser: (user) => {
+			if (currentUser && currentUser.id === user.id) currentUser = user;
+		}
+	});
 	root.LoginWorkflowCommand = createLoginWorkflowCommand({
 		login: createLoginCommand({
 			isLocked: (until, now) => root.loginLockoutPolicy.isLocked(until, now),
@@ -29627,12 +29660,14 @@
 	root.UserLifecycleCommand = createUserLifecycleCommand({
 		current: () => state,
 		manage: userManagementCommand,
+		userStore: userStoreUpdate,
 		hash: (password) => root.hashPass(password),
 		log: (type, detail, target) => logAct(type, detail, target),
 		save: () => save({ clearDerived: false })
 	});
 	root.UserAvatarCommand = createUserAvatarCommand({
 		manage: userManagementCommand,
+		userStore: userStoreUpdate,
 		log: (type, detail, target) => logAct(type, detail, target),
 		save: () => save({ clearDerived: false })
 	});
@@ -29835,15 +29870,14 @@
 	};
 	root.applyUserPerms = async (id) => {
 		if (!root.requireAdmin()) return;
-		const u = (state.users || []).find((x) => x.id === id);
-		if (!u) return;
+		if (!(state.users || []).find((x) => x.id === id)) return;
 		if (currentUser && currentUser.id === id) {
 			await root.infoDialog("Không thể tự sửa quyền của tài khoản đang đăng nhập.");
 			return;
 		}
 		const rolev = document.getElementById("editUserRole").value, pagePerms = await root.collectUserPerms("editUserPerms", rolev);
 		if (!pagePerms) return;
-		root.UserLifecycleCommand.updatePermissions(u, {
+		root.UserLifecycleCommand.updatePermissions(id, {
 			role: rolev,
 			pagePerms,
 			auditDetail: `${root.roleLabel(rolev)} · ${pagePerms.length} thẻ`
@@ -29878,22 +29912,21 @@
 	};
 	root.applyResetPass = async (id) => {
 		if (!root.requireAdmin()) return;
-		const u = (state.users || []).find((x) => x.id === id);
-		if (!u) return;
+		if (!(state.users || []).find((x) => x.id === id)) return;
 		const p1 = document.getElementById("resetPass1").value, p2 = document.getElementById("resetPass2").value, msg = document.getElementById("resetPassMsg"), err = root.passwordChangeError(p1, p2);
 		if (err) {
 			if (msg) msg.innerHTML = `<div class="auth-err">${escapeHtml(err)}</div>`;
 			return;
 		}
-		const updated = await root.UserLifecycleCommand.resetPassword(u, p1, !(currentUser && currentUser.id === id));
+		const updated = await root.UserLifecycleCommand.resetPassword(id, p1, !(currentUser && currentUser.id === id));
+		if (!updated) return;
 		root.closeModal();
 		rerender();
 		await root.infoDialog(updated.mustChangePassword ? "Đã đặt mật khẩu tạm. Người dùng sẽ phải đổi mật khẩu khi đăng nhập." : "Đã cập nhật mật khẩu.", { type: "success" });
 	};
 	root.toggleUser = (id) => {
 		if (!root.requireAdmin()) return;
-		const u = (state.users || []).find((x) => x.id === id);
-		root.UserLifecycleCommand.toggle(u);
+		root.UserLifecycleCommand.toggle(id);
 		rerender();
 	};
 	root.delUser = async (id) => {

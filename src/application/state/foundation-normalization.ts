@@ -5,7 +5,14 @@ export function normalizeStateFoundation(input:Row|undefined,options:Row,deps:St
   const previousSchema=Number(input&&input.schemaVersion||1),merged={...deps.defaults(),...(input||{})},state=options.sanitized?merged:deps.sanitize(merged);
   if(previousSchema<2)state.periodLocks=Array.isArray(state.periodLocks)?state.periodLocks:[];
   delete state.archiveRegistry;
-  if(state.lab&&typeof state.lab==='object')delete state.lab.kpiTargets;
+  /* Giai đoạn 7 (state immutable, nhóm users/settings/lab, 2026-08-30): trước
+     đây `delete state.lab.kpiTargets` mutate TRỰC TIẾP object `lab` — vì
+     `merged` chỉ spread NÔNG (`{...deps.defaults(),...input}`), `state.lab`
+     ở đây có thể CHÍNH LÀ tham chiếu `input.lab` gốc (payload Firebase/backup
+     import parse từ JSON) — xóa field trên đó làm hỏng bản gốc nếu nơi gọi
+     còn dùng lại `input` sau khi hàm này chạy xong. Tạo bản sao nông của
+     `lab` trước khi xóa field để không đụng vào object CHIA SẺ từ bên ngoài. */
+  if(state.lab&&typeof state.lab==='object'){state.lab={...state.lab};delete state.lab.kpiTargets;}
   if(previousSchema<3||!state.teaRegistryVersion||state.teaRegistryVersion<deps.teaRegistryVersion)state.teaRegistryVersion=deps.teaRegistryVersion;
   state.schemaVersion=deps.schemaVersion;
   if(!state.westgardProfileVersion){state.westgardRules={...deps.westgardDefaults};state.westgardProfileVersion=2;}

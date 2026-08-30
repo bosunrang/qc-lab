@@ -2067,6 +2067,107 @@ clicking the classic sidebar nav button ("Nhập QC") still works via
 link scenario); logging out correctly resets to `#/dash`; zero console
 errors at any step.
 
+**Giai đoạn 7 — state genuinely immutable, group 1 of 6 (users/settings/lab
+profile, done, 2026-08-30).** Key design decision, different from the
+original "write a clear Zustand action" wording: after investigation
+(surveyed via a background agent before writing any code), confirmed
+`users`/`lab`/etc. CANNOT be moved out of the single `state` object into a
+"real" separate Zustand store — the entire persistence stack (localStorage/
+IndexedDB), Firebase merge-by-branch sync, backup import/export, and
+`validateStateInvariants()`/`ensureShape()` all operate on `state` as ONE
+object; splitting fields out would require rewriting all of that for
+unclear benefit. "Immutable" for Giai đoạn 7 therefore does NOT mean
+"move state out of the classic object into Zustand" — it means: **`state`
+STAYS a single object (so the existing persistence/sync/validation
+machinery keeps working unchanged), but how each of its fields gets
+UPDATED changes from "mutate the nested object/array in place"
+(`Object.assign`, `.push()`, `.splice()`, `delete`) to "replace the field
+with a newly-computed value"** (`state.users = newArray`, `state.lab =
+newObject`). This is the actual "immutable update" the original 3-agent
+survey's finding was about (the risk being an intermediate variable holding
+a STALE reference) — no storage-architecture change needed to fix it.
+
+**Group 1: users/settings/lab profile (done, 2026-08-30).** A dedicated
+background-agent survey (before writing any code) confirmed: mutation call
+sites are HIGHLY concentrated (mostly one large file,
+`modular-pilot.global.ts`, plus 2 small controllers,
+`settings-page-controller.ts`/`avatar-modal-controller.ts` — not scattered);
+every READ site is a lazy closure (`() => state.lab`), so it's safe against
+reference replacement; and the group's SINGLE HIGHEST RISK: `currentUser`
+is a SEPARATE variable (`AuthUIState.currentUser`, not inside `state`)
+holding a reference into one element of `state.users` — without actively
+re-syncing it after `state.users` is replaced with a new array,
+`currentUser` would point at the OLD object the very first time a user
+edits their own profile/avatar/password (a silent bug, no visible error).
+
+The `lab` half turned out to be ALREADY mostly correct
+(`lab-profile-service.ts`/`settings-profile-command.ts` already return new
+objects via spread every time, and `set: lab => { state.lab = lab; }` was
+already a replace, not a mutation) — only 2 spots needed fixing:
+`foundation-normalization.ts`'s `delete state.lab.kpiTargets` (mutated an
+object that could be a SHARED reference from the original `input`, since
+the surrounding spread is only SHALLOW — fixed by copying `state.lab =
+{...state.lab}` before deleting the field) and
+`settings-page-controller.ts`'s `ensureLabBrandShape()` (`Object.assign` →
+replace with `state.lab = {...old, ...newProfile}`).
+
+The `users` half needed deeper changes: rewrote ALL 6 functions in
+`user-management-command.ts` (`add`/`updatePermissions`/`resetPassword`/
+`toggle`/`setAvatar`/`clearAvatar`) from mutate-and-return-the-same-
+reference to PURE — each returns a NEW object, touching nothing passed in;
+dropped `remove` from this file entirely (filtering out one id needs no
+dedicated logic). Added a new module `user-store-update.ts`
+(`createUserStoreUpdate`) — the SINGLE place that finds-and-replaces one
+element of `state.users` by id, then calls `syncCurrentUser(updated)` after
+every successful replacement — shared by both `user-lifecycle-command.ts`
+(permissions/password/lock changes) and `user-avatar-command.ts` (avatar
+changes), avoiding writing the "resync currentUser" logic twice.
+`user-lifecycle-command.ts`'s API changed from accepting a `user` reference
+(already `find()`'d by the caller) to accepting `id` directly (matching
+what `remove(id)` already did) — the caller
+(`modular-pilot.global.ts`'s `applyUserPerms`/`applyResetPass`/`toggleUser`)
+got simpler too (no longer needs to `find()` just to pass a reference
+through). `user-avatar-command.ts` DELIBERATELY KEPT its old public
+signature (still takes the whole `user` object, not just an id) —
+`avatar-modal-controller.ts` (its only caller) already has the full user
+via `deps.currentUser()`, so nothing there needed to change; internally,
+the new `user-avatar-command.ts` uses `user.id` to call
+`userStore.replaceById()`. The `syncCurrentUser` wiring
+(`modular-pilot.global.ts`): `user => { if (currentUser && currentUser.id
+=== user.id) currentUser = user; }` — reassigns `currentUser` DIRECTLY,
+matching the exact `page = ...` convention already used throughout this
+file (a bare-global accessor via `AuthUIState`/`installUiState`).
+
+Rewrote all 3 affected tests (`user-management-command.test.js`/
+`user-lifecycle-command.test.js`/`user-avatar-command.test.js`) to match
+the new pure contract — `user-avatar-command.test.js` specifically proves
+the exact bug the survey flagged: captures a reference to the OLD user
+before calling `setAvatar()`, confirms that OLD reference stays UNCHANGED
+(proof it's no longer mutated in place) while `currentUser`/`state.users`
+DID update correctly (proof the `userStore`-based sync works). Verified:
+`npm test` 431/431, `typecheck` clean, `build:pilot` succeeds (4/4
+artifacts), `check-build-freshness` matches, `a11y-audit` 0 violations
+(18/18 modals — including `users:edit-permissions`), `ui-workflow-check`
+29/29, `nce-workflow-check` 91/91, `benchmarks/verify-release.js` PASSES IN
+FULL (the ISO 15189 dossier gate: 431/431 tests, build freshness matches,
+clean dependency audit, performance regression within budget — confirming
+no performance regression), plus an ad-hoc Playwright script confirming the
+EXACT highest-risk scenario in a REAL BROWSER (not just a unit test):
+self-service password change through the real `resetPass`/`applyResetPass`
+flow (filling the form, clicking Save) — `passHash` genuinely changes AND
+`currentUser` is ALWAYS the same object reference as the matching element
+in `state.users` afterward (no "two copies diverging" bug); the avatar
+modal still opens correctly; zero console errors.
+
+Remaining for Giai đoạn 7 (not yet done): activity/audit log →
+instruments/qcLots/qcPanels → tests/teaRefs/lotTransitions → actions (NCE)
+→ `state.data` (QC points, the largest, highest-risk, done LAST) — each
+group repeats the same discipline: survey before coding, convert
+mutate-in-place to replace-the-reference, check for any intermediate
+variable holding a long-lived reference outside a single function call's
+lifetime (the `currentUser` lesson from this group), full verification +
+`benchmarks/verify-release.js` after EACH group.
+
 Then shrink/delete the now-dead
 `root.X=` aliases, `global.d.ts`'s
 ambient bare-global declarations, and rewrite the 61 sandbox tests + ~88

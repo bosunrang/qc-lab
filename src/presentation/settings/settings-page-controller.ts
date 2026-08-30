@@ -45,10 +45,15 @@ export function createSettingsPageController(deps: {
     await deps.infoDialog('Đã lưu thông tin đơn vị.', { type: 'success' });
   };
 
+  /* Giai đoạn 7 (state immutable, nhóm users/settings/lab, 2026-08-30): thay
+     `Object.assign(state.lab, ...)` (mutate tại chỗ) bằng gán lại toàn bộ
+     `state.lab` thành object MỚI — không có nơi nào giữ tham chiếu cũ tới
+     `state.lab` lâu hơn một lượt gọi (mọi nơi đọc đều là closure lazy
+     `()=>state.lab`, xem CLAUDE.md/kế hoạch kiến trúc), nên thay thế tham
+     chiếu là an toàn và đúng ngữ nghĩa "cập nhật bất biến". */
   const ensureLabBrandShape = () => {
     const state = deps.getState();
-    state.lab = state.lab || {};
-    Object.assign(state.lab, deps.brand.profile(state.lab));
+    state.lab = { ...(state.lab || {}), ...deps.brand.profile(state.lab || {}) };
   };
 
   const saveBrand = async () => {
