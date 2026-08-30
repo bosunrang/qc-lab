@@ -1,6 +1,7 @@
 import { useAppStore } from '../state/kernel';
 import {
   usersList, roleLabel, roleSelectOptionsHtml, userPermChecksHtml, rolePageIds, headOnlyHtml,
+  addUser, syncUserPermChecks, resetPass, openUserPerms, toggleUser, delUser,
   type UserRow,
 } from '../bridge/usersBridge';
 
@@ -15,7 +16,7 @@ function Head() {
    .querySelectorAll(...), không quan tâm React hay chuỗi HTML tạo ra chúng,
    nên tái dùng nguyên vẹn là an toàn và đỡ trùng lặp logic. */
 function RoleSelect() {
-  return <select id="uRole" aria-label="Vai trò" data-action="syncUserPermChecks" data-args='["newUserPerms"]' data-action-on="change" dangerouslySetInnerHTML={{ __html: roleSelectOptionsHtml('technician') }} />;
+  return <select id="uRole" aria-label="Vai trò" onChange={e => syncUserPermChecks('newUserPerms', e.target.value)} dangerouslySetInnerHTML={{ __html: roleSelectOptionsHtml('technician') }} />;
 }
 
 function PermissionChecks() {
@@ -27,16 +28,16 @@ function UserActions({ user }: { user: UserRow }) {
     return (
       <>
         <span className="hint">(bạn)</span>{' '}
-        <button className="btn ghost sm" data-action="resetPass" data-args={JSON.stringify([user.id])}>Đổi mật khẩu</button>
+        <button className="btn ghost sm" onClick={() => resetPass(user.id)}>Đổi mật khẩu</button>
       </>
     );
   }
   return (
     <>
-      <button className="btn ghost sm" data-action="openUserPerms" data-args={JSON.stringify([user.id])}>Sửa quyền</button>{' '}
-      <button className="btn ghost sm" data-action="resetPass" data-args={JSON.stringify([user.id])}>Đặt lại MK</button>{' '}
-      <button className="btn ghost sm" data-action="toggleUser" data-args={JSON.stringify([user.id])}>{user.active === false ? 'Mở khóa' : 'Khóa'}</button>{' '}
-      <button className="btn danger sm" data-action="delUser" data-args={JSON.stringify([user.id])}>Xóa</button>
+      <button className="btn ghost sm" onClick={() => openUserPerms(user.id)}>Sửa quyền</button>{' '}
+      <button className="btn ghost sm" onClick={() => resetPass(user.id)}>Đặt lại MK</button>{' '}
+      <button className="btn ghost sm" onClick={() => toggleUser(user.id)}>{user.active === false ? 'Mở khóa' : 'Khóa'}</button>{' '}
+      <button className="btn danger sm" onClick={() => delUser(user.id)}>Xóa</button>
     </>
   );
 }
@@ -70,7 +71,7 @@ export function UsersPage() {
               <div><label>Mã viết tắt</label><input id="uInitials" maxLength={12} placeholder="NTL" /></div>
               <div><label>Vai trò</label><RoleSelect /></div>
               <div><label>Mật khẩu tạm</label><input id="uPass" aria-label="Mật khẩu tạm" type="password" autoComplete="new-password" /></div>
-              <div className="user-create-actions"><button className="btn teal" data-action="addUser">Thêm</button></div>
+              <div className="user-create-actions"><button className="btn teal" onClick={addUser}>Thêm</button></div>
             </div>
           </div>
           <div className="user-create-card">

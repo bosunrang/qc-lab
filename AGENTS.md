@@ -530,8 +530,24 @@ shared builders to become real components first (a separate sub-task, not
 yet started); Dashboard's own usages were all plain JSX buttons, so this
 page needed no such dependency.
 
+Users (done): all 7 `data-action` buttons/select (`addUser`,
+`syncUserPermChecks` on the role `<select>`'s `onChange`, `resetPass`,
+`openUserPerms`, `toggleUser`, `delUser`) converted — these 6 functions are
+genuinely Users-page-specific (confirmed via grep, unlike Dashboard's shared
+nav helpers) so they went into `kernel.users`, not `kernel.pres`. No test
+fallout this time (nothing scanned for `data-action="addUser"` etc. as
+literal text). Verified with an ad-hoc Playwright script (not committed) that
+exercised every converted handler end-to-end under a real seeded admin
+session: create user (count 2→3, confirmed reliable across 4 runs), toggle
+active state, open the edit-permissions modal, and the role `<select>`'s
+`onChange` correctly recomputing which permission checkboxes are
+enabled/checked for the newly chosen role — this last one is the same
+"append the live value" semantic `data-action-on="change"` used to provide
+automatically; converting it to a plain `onChange={e => fn(id, e.target.value)}`
+preserves that without the dispatcher.
+
 **Remaining phases (not yet started)**: finish converting `data-action` on
-the other 10 pages; then modals as `createPortal`, one modal at a time; then
+the other 9 pages; then modals as `createPortal`, one modal at a time; then
 shrink/delete the now-dead `root.X=` aliases, `global.d.ts`'s ambient
 bare-global declarations, and rewrite the 61 sandbox tests + ~88
 bridge-wiring text-scanner tests. See the plan file for the full phase

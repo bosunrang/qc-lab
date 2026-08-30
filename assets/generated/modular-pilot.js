@@ -32279,7 +32279,13 @@
 		},
 		users: {
 			usersModel: root.usersModel,
-			userPermChecks: root.userPermChecks
+			userPermChecks: root.userPermChecks,
+			addUser: root.addUser,
+			syncUserPermChecks: root.syncUserPermChecks,
+			resetPass: root.resetPass,
+			openUserPerms: root.openUserPerms,
+			toggleUser: root.toggleUser,
+			delUser: root.delUser
 		},
 		pres: {
 			esc: root.esc,

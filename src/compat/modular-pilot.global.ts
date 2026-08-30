@@ -5737,7 +5737,12 @@ const kernel = {
   },
   dash: { dashboardModel: dashboardPageController.dashboardModel, dashTestSetStatus: dashboardPageController.dashTestSetStatus },
   audit: { auditModel: (root as any).auditModel, auditSetQuery: (root as any).auditSetQuery },
-  users: { usersModel: (root as any).usersModel, userPermChecks: (root as any).userPermChecks },
+  users: {
+    usersModel: (root as any).usersModel, userPermChecks: (root as any).userPermChecks,
+    addUser: (root as any).addUser, syncUserPermChecks: (root as any).syncUserPermChecks,
+    resetPass: (root as any).resetPass, openUserPerms: (root as any).openUserPerms,
+    toggleUser: (root as any).toggleUser, delUser: (root as any).delUser,
+  },
   /* Hàm/service dùng chung nhiều trang — KHÔNG thuộc riêng một page controller
      nào (định dạng, icon, quyền, render-cycle...). Namespace `pres` giữ đúng
      tên đã dùng trong các `deps.pres.*` của từng page controller (xem
