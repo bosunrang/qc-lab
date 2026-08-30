@@ -808,16 +808,62 @@ the real `onChange`/`onClick` patterns), `typecheck` clean,
 `check-build-freshness` matches, `a11y-audit` 0 violations (18/18 modals),
 `ui-workflow-check` 29/29, `nce-workflow-check` 91/91.
 
-**Remaining phases (not yet started)**: finish converting `data-action` on
-the last remaining page (Manage); then modals as `createPortal`, one modal at a time; then
-shrink/delete the now-dead `root.X=` aliases, `global.d.ts`'s ambient
-bare-global declarations, and rewrite the 61 sandbox tests + ~88
-bridge-wiring text-scanner tests. See the plan file for the full phase
-breakdown and the risks already identified (LIS Gateway's
-`lis-client-service.ts` shares the same `getState`/`rerender` deps shape and
-gets swept into this even though it's unrelated to the UI rewrite; several
-`data-*` conventions in `action-dispatcher.ts` encode real event-timing
-semantics that a naive `onClick`-only conversion would silently drop).
+Manage/"Cấu hình chung" (done, the last page — **Giai đoạn 2 is now 11/11
+complete**): 34 of 34 `data-action` usages across all 8 tabs converted.
+`kernel.manage` needed 22 new entries beyond the 3 (`setTargetPanel`/
+`setTargetGroup`/`setHistoryTest`) added in Giai đoạn 1 — every one of them
+was already a plain export on `manageTestsActionsController` (the
+`teaRefEdit`/`teaRefRemove`/`teaLabProfileOpen`/`teaRefOpenAdd` quartet
+needed nothing extra, since `kernel.manage`'s `...managePageController`
+spread already carried them). Two functions are **`this`-bound**
+(`syncTargetRange`, `toggleTargetRow` — same calling convention as Entry's
+`entryTreeKey`/`entrySheetKey`: they read `this.closest('.target-row')`
+internally), so their bridge wrappers take the DOM element as an explicit
+first parameter and `.call(el, ...)` the kernel method
+(`syncTargetRange(el, 'target')` → `getKernel().manage.syncTargetRange.call(el,
+'target')`), called from JSX as `onChange={e =>
+syncTargetRange(e.currentTarget, 'target')}` — the Mean/SD matrix stays
+exactly as uncontrolled (`defaultValue`/`defaultChecked`, no `rerender()` on
+change) as documented under "Module roles" → Manage, only the event wiring
+changed. The toolbar's "+ Thêm..." button and the Mean/SD matrix's row
+checkbox both needed the SAME dynamic-name-to-function resolution the
+Actions page's `IssueRow` needed for its discriminated union, but at the
+page level instead of per-row: `toolbar.action.action` is a runtime string
+from `manage-page-controller.ts` (one of 6 values —
+`openConfigInstrument`/`openConfigAssay`/`openConfigPanel`/
+`openLotTransitionV2`/`teaRefOpenAdd`/`setManageTab`), so a small closed
+`TOOLBAR_ACTIONS` lookup object (module-scope, listing exactly those 6) maps
+the string to the real imported function — a deliberately narrow, closed
+dispatch table, not a re-implementation of `action-dispatcher.ts`'s general
+name-to-global lookup. `LotGroupCard`'s activate/toggle button picked its
+function the same way but inline (`group.toggle.command === 'activate' ?
+activateLotGroup : toggleLotGroupStatus`), since it's only ever those two.
+This page surfaced the SAME `dangerouslySetInnerHTML`-vs-fiber-tree gap
+Actions found — but did **not** need the same fix: none of Manage's own
+fields render through that mechanism (its `EmptyState`/table rows are all
+real JSX), so the container-catch-all issue documented under Actions simply
+didn't arise here. Verified: `npm test` 467/467 (no scanner test needed
+updating — nothing scanned Manage's `data-action` strings literally),
+`typecheck` clean, `check-build-freshness` matches all 4 bundles, `a11y-audit`
+0 violations (18/18 modals, including the 6 Manage ones), `ui-workflow-check`
+29/29 (covers add/edit instrument, add test, apply Mean/SD range, lot
+transition combobox — all Manage-page workflows), `nce-workflow-check` 91/91,
+plus an ad-hoc Playwright script confirming tab switching, the TEa reference
+onBlur commit, the toolbar's dynamic "+ Thêm..." dispatch, and the lot
+group's "Sửa nhóm" button all still work correctly.
+
+**Giai đoạn 2 (data-action → React events) is now fully done, 11/11 pages.**
+Next: modals as `createPortal`, one modal at a time; then shrink/delete the
+now-dead `root.X=` aliases, `global.d.ts`'s ambient bare-global declarations,
+and rewrite the 61 sandbox tests + ~88 bridge-wiring text-scanner tests. See
+the plan file for the full phase breakdown and the risks already identified
+(LIS Gateway's `lis-client-service.ts` shares the same `getState`/`rerender`
+deps shape and gets swept into this even though it's unrelated to the UI
+rewrite; several `data-*` conventions in `action-dispatcher.ts` encode real
+event-timing semantics that a naive `onClick`-only conversion would silently
+drop; a `dangerouslySetInnerHTML`-rendered field needs its own native
+`addEventListener` if it must notify an ancestor's `onChange`, since it sits
+outside React's fiber tree — see the Actions page bullet above).
 
 `assets/core.js` is the one exception: it's wrapped in a UMD shim so it also
 works via `require()` — that's what makes it usable from both the browser

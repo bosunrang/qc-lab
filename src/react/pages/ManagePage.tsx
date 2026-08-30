@@ -1,6 +1,23 @@
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../state/kernel';
-import { manageModel, headOnlyHtml, manageSearchSet, setTargetPanel, setTargetGroup, setHistoryTest, type ManageTab, type ManageToolbar } from '../bridge/manageBridge';
+import {
+  manageModel, headOnlyHtml, manageSearchSet, setTargetPanel, setTargetGroup, setHistoryTest,
+  setManageTab, openConfigInstrument, deleteConfigInstrument, openConfigAssay, delTest,
+  openConfigPanel, deleteConfigPanel, openConfigLot, deleteConfigLot, openConfigGroup,
+  openTargetMatrix, activateLotGroup, toggleLotGroupStatus, deleteConfigGroup,
+  openLotTransitionV2, deleteLotTransition, openQcHistoryDetail, teaRefEdit, teaLabProfileOpen,
+  teaRefRemove, teaRefOpenAdd, toggleTargetRow, syncTargetRange, setTargetLevel, targetCheckAll,
+  saveTargetMatrix, type ManageTab, type ManageToolbar,
+} from '../bridge/manageBridge';
+
+const TOOLBAR_ACTIONS: Record<string, (...args: string[]) => void> = {
+  openConfigInstrument: () => openConfigInstrument(),
+  openConfigAssay: () => openConfigAssay(),
+  openConfigPanel: () => openConfigPanel(),
+  openLotTransitionV2: () => openLotTransitionV2(),
+  teaRefOpenAdd: () => teaRefOpenAdd(),
+  setManageTab: (tab: string) => setManageTab(tab),
+};
 
 function Head() {
   return <div style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: headOnlyHtml('Cấu hình chung', 'Quản lý máy, Panel QC, lô QC, Mean/SD và luật QC') }} />;
@@ -22,7 +39,7 @@ function Toolbar({ toolbar, query, searchPlaceholder }: { toolbar: ManageToolbar
       <div><h2>{toolbar.title}</h2>{toolbar.subtitle ? <p>{toolbar.subtitle}</p> : null}</div>
       <div className="rcfg-tools">
         <SearchInput query={query} placeholder={searchPlaceholder} />
-        {toolbar.action ? <button className="btn teal" data-action={toolbar.action.action} data-args={toolbar.action.args ? JSON.stringify(toolbar.action.args) : undefined}>{'＋ ' + (toolbar.actionLabel || '')}</button> : null}
+        {toolbar.action ? <button className="btn teal" onClick={() => TOOLBAR_ACTIONS[toolbar.action!.action]?.(...((toolbar.action!.args as string[]) || []))}>{'＋ ' + (toolbar.actionLabel || '')}</button> : null}
       </div>
     </div>
   );
@@ -33,7 +50,7 @@ function ShellNav({ tabs, active }: { tabs: ManageTab[]; active: string }) {
     <aside className="config-shell-nav" aria-label="Danh mục cấu hình">
       <div className="rcfg-title">CẤU HÌNH CHUNG</div>
       {tabs.map(item => (
-        <button key={item.id} className={active === item.id ? 'on' : ''} data-action="setManageTab" data-args={JSON.stringify([item.id])}>
+        <button key={item.id} className={active === item.id ? 'on' : ''} onClick={() => setManageTab(item.id)}>
           <b>{item.label}</b><small>{item.count}</small>
         </button>
       ))}
@@ -51,8 +68,8 @@ function InstrumentRow({ row }: { row: any }) {
       <td className="num">{row.assayCount}</td>
       <td><span className={`tag ${row.active ? 'ok' : 'none'}`}>{row.active ? 'Đang hoạt động' : 'Ngừng hoạt động'}</span></td>
       <td><div className="manage-actions">
-        <button className="btn ghost sm" data-action="openConfigInstrument" data-args={JSON.stringify([row.id])}>Sửa</button>
-        <button className="btn danger sm" data-action="deleteConfigInstrument" data-args={JSON.stringify([row.id])}>Xóa</button>
+        <button className="btn ghost sm" onClick={() => openConfigInstrument(row.id)}>Sửa</button>
+        <button className="btn danger sm" onClick={() => deleteConfigInstrument(row.id)}>Xóa</button>
       </div></td>
     </tr>
   );
@@ -81,8 +98,8 @@ function AssayRow({ row }: { row: any }) {
       <td>{row.tea ? `${row.tea}%` : '—'}</td>
       <td><span className={`tag ${row.closed ? 'none' : 'ok'}`}>{row.closed ? 'Ngưng dùng' : 'Đang dùng'}</span></td>
       <td><div className="manage-actions">
-        <button className="btn ghost sm" data-action="openConfigAssay" data-args={JSON.stringify([row.id])}>Sửa</button>
-        <button className="btn danger sm" data-action="delTest" data-args={JSON.stringify([row.id])}>Xóa</button>
+        <button className="btn ghost sm" onClick={() => openConfigAssay(row.id)}>Sửa</button>
+        <button className="btn danger sm" onClick={() => delTest(row.id)}>Xóa</button>
       </div></td>
     </tr>
   );
@@ -110,8 +127,8 @@ function PanelRow({ row }: { row: any }) {
       <td className="num">{row.testCount}</td>
       <td><span className={`tag ${row.active ? 'ok' : 'none'}`}>{row.active ? 'Đang dùng' : 'Tạm ngưng'}</span></td>
       <td><div className="manage-actions">
-        <button className="btn ghost sm" data-action="openConfigPanel" data-args={JSON.stringify([row.id])}>Sửa</button>
-        <button className="btn danger sm" data-action="deleteConfigPanel" data-args={JSON.stringify([row.id])}>Xóa</button>
+        <button className="btn ghost sm" onClick={() => openConfigPanel(row.id)}>Sửa</button>
+        <button className="btn danger sm" onClick={() => deleteConfigPanel(row.id)}>Xóa</button>
       </div></td>
     </tr>
   );
@@ -140,14 +157,14 @@ function LotRow({ row }: { row: any }) {
       <td><span className={`tag ${row.status.cls}`}>{row.status.text}</span></td>
       <td className="num">{row.used}</td>
       <td><div className="lot-row-actions">
-        <button className="btn ghost sm" data-action="openConfigLot" data-args={JSON.stringify([row.id])}>Sửa</button>
-        <button className="btn danger sm" data-action="deleteConfigLot" data-args={JSON.stringify([row.id])}>Xóa</button>
+        <button className="btn ghost sm" onClick={() => openConfigLot(row.id)}>Sửa</button>
+        <button className="btn danger sm" onClick={() => deleteConfigLot(row.id)}>Xóa</button>
       </div></td>
     </tr>
   );
 }
 function LotGroupCard({ group }: { group: any }) {
-  const toggleAction = group.toggle ? (group.toggle.command === 'activate' ? 'activateLotGroup' : 'toggleLotGroupStatus') : null;
+  const toggleFn = group.toggle ? (group.toggle.command === 'activate' ? activateLotGroup : toggleLotGroupStatus) : null;
   return (
     <div className={`lot-group-card${group.archived ? ' lot-opt-depleted' : ''}`}>
       <div className="lot-group-card-h">
@@ -158,10 +175,10 @@ function LotGroupCard({ group }: { group: any }) {
         {group.lots.length ? group.lots.map((l: any, i: number) => <span className="pill" key={i}>{l.lotNo} · M{l.level}</span>) : <span className="hint">Chưa chọn lô</span>}
       </div>
       <div className="lot-group-actions">
-        <button className="btn ghost sm" data-action="openConfigGroup" data-args={JSON.stringify([group.id])}>Sửa nhóm</button>
-        <button className="btn ghost sm" data-action="openTargetMatrix" data-args={JSON.stringify(['', group.id])}>Mean/SD</button>
-        {group.toggle ? <button className={`btn ${group.toggle.variant}`} data-action={toggleAction} data-args={JSON.stringify([group.id])}>{group.toggle.label}</button> : null}
-        <button className="btn danger sm" data-action="deleteConfigGroup" data-args={JSON.stringify([group.id])}>Xóa</button>
+        <button className="btn ghost sm" onClick={() => openConfigGroup(group.id)}>Sửa nhóm</button>
+        <button className="btn ghost sm" onClick={() => openTargetMatrix('', group.id)}>Mean/SD</button>
+        {group.toggle ? <button className={`btn ${group.toggle.variant}`} onClick={() => toggleFn!(group.id)}>{group.toggle.label}</button> : null}
+        <button className="btn danger sm" onClick={() => deleteConfigGroup(group.id)}>Xóa</button>
       </div>
     </div>
   );
@@ -170,7 +187,7 @@ function LotsTab({ body }: { body: any }) {
   return (
     <div className="lot-config-grid">
       <div className="panel rcfg-list lot-config-left">
-        <div className="rcfg-panel-h"><h3>Lô QC</h3><button className="btn teal sm" data-action="openConfigLot">Thêm lô QC</button></div>
+        <div className="rcfg-panel-h"><h3>Lô QC</h3><button className="btn teal sm" onClick={() => openConfigLot()}>Thêm lô QC</button></div>
         {body.lotRows.length ? (
           <table className="lot-table">
             <thead><tr><th>Số lô</th><th>Mức</th><th>Hạn dùng</th><th>Trạng thái</th><th className="num">Gán</th><th>Thao tác</th></tr></thead>
@@ -179,7 +196,7 @@ function LotsTab({ body }: { body: any }) {
         ) : <EmptyState title="Chưa có lô QC" description="Tạo từng lô QC độc lập, sau đó nhập Mean/SD cho Panel QC." />}
       </div>
       <div className="panel rcfg-list lot-config-right">
-        <div className="rcfg-panel-h"><h3>Nhóm lô QC</h3><button className="btn teal sm" data-action="openConfigGroup">Thêm nhóm lô</button></div>
+        <div className="rcfg-panel-h"><h3>Nhóm lô QC</h3><button className="btn teal sm" onClick={() => openConfigGroup()}>Thêm nhóm lô</button></div>
         {body.groupCards.length ? (
           <div className="lot-group-list">{body.groupCards.map((group: any) => <LotGroupCard group={group} key={group.id} />)}</div>
         ) : <EmptyState title="Chưa có nhóm lô" description="Chọn các lô QC đã tạo để ghép thành một nhóm, ví dụ 1101/1102." />}
@@ -201,8 +218,8 @@ function TransitionRow({ row }: { row: any }) {
         {row.approvalText ? <div className="hint">Duyệt: {row.approvalText}</div> : null}
       </td>
       <td><div className="manage-actions">
-        <button className="btn ghost sm" data-action="openLotTransitionV2" data-args={JSON.stringify([row.id])}>Sửa</button>
-        <button className="btn danger sm" data-action="deleteLotTransition" data-args={JSON.stringify([row.id])}>Xóa</button>
+        <button className="btn ghost sm" onClick={() => openLotTransitionV2(row.id)}>Sửa</button>
+        <button className="btn danger sm" onClick={() => deleteLotTransition(row.id)}>Xóa</button>
       </div></td>
     </tr>
   );
@@ -233,7 +250,7 @@ function HistoryRow({ row }: { row: any }) {
       <td>{row.period}</td>
       <td><span className={`tag ${row.source === 'lab' ? 'warn' : 'ok'}`}>{row.source === 'lab' ? 'PXN' : 'NSX'}</span></td>
       <td className="num">{row.pointCount}</td>
-      <td><button className="btn ghost sm" data-action="openQcHistoryDetail" data-args={JSON.stringify([row.testId, row.level, row.lot || ''])}>Chi tiết</button></td>
+      <td><button className="btn ghost sm" onClick={() => openQcHistoryDetail(row.testId, row.level, row.lot || '')}>Chi tiết</button></td>
     </tr>
   );
 }
@@ -276,16 +293,16 @@ function TeaRefRow({ row }: { row: any }) {
       <td><b title={row.namingTitle}>{row.displayName}</b></td>
       <td>{row.unit}</td>
       <td>{row.section}</td>
-      <td><input className="tea-ref-value" disabled={!row.canManage} type="number" step="any" defaultValue={row.clia} data-action="teaRefEdit" data-args={JSON.stringify([row.analyteId, 'clia'])} data-action-on="change" /></td>
-      <td><input className="tea-ref-value" disabled={!row.canManage} type="number" step="any" defaultValue={row.ricos} data-action="teaRefEdit" data-args={JSON.stringify([row.analyteId, 'ricos'])} data-action-on="change" /></td>
+      <td><input className="tea-ref-value" disabled={!row.canManage} type="number" step="any" defaultValue={row.clia} onBlur={e => teaRefEdit(row.analyteId, 'clia', e.target.value)} /></td>
+      <td><input className="tea-ref-value" disabled={!row.canManage} type="number" step="any" defaultValue={row.ricos} onBlur={e => teaRefEdit(row.analyteId, 'ricos', e.target.value)} /></td>
       <td><div className="tea-lab-cell">
         {row.lab != null ? <b>{Number(row.lab).toFixed(2)}%</b> : null}
-        {row.rowActions.labProfile !== 'none' ? <button className="btn ghost sm" data-action="teaLabProfileOpen" data-args={JSON.stringify([row.analyteId])}>{row.rowActions.labProfile === 'add' ? 'Thêm hồ sơ' : 'Xem hồ sơ'}</button> : null}
+        {row.rowActions.labProfile !== 'none' ? <button className="btn ghost sm" onClick={() => teaLabProfileOpen(row.analyteId)}>{row.rowActions.labProfile === 'add' ? 'Thêm hồ sơ' : 'Xem hồ sơ'}</button> : null}
       </div></td>
       <td><div className="tea-ref-status">
         <span className={`tag ${status.cls}`}>{status.label}</span>
-        {row.rowActions.action === 'restore' ? <button className="btn ghost sm" title="Khôi phục giá trị mặc định" data-action="teaRefRemove" data-args={JSON.stringify([row.analyteId])}>Khôi phục</button> : null}
-        {row.rowActions.action === 'remove' ? <button className="x" title="Xóa xét nghiệm tự thêm" data-action="teaRefRemove" data-args={JSON.stringify([row.analyteId])}>✕</button> : null}
+        {row.rowActions.action === 'restore' ? <button className="btn ghost sm" title="Khôi phục giá trị mặc định" onClick={() => teaRefRemove(row.analyteId)}>Khôi phục</button> : null}
+        {row.rowActions.action === 'remove' ? <button className="x" title="Xóa xét nghiệm tự thêm" onClick={() => teaRefRemove(row.analyteId)}>✕</button> : null}
       </div></td>
     </tr>
   );
@@ -320,11 +337,12 @@ function TeaRefsTab({ body }: { body: any }) {
 }
 
 /* ===== Mean/SD theo nhóm lô QC =====
-   4 ô số + checkbox mỗi dòng KHÔNG điều khiển (defaultValue/defaultChecked) — giữ nguyên
-   data-action="syncTargetRange"/"toggleTargetRow" cũ. syncTargetRange()/toggleTargetRow()/
-   targetCheckAll() (manage-tests-actions-controller.ts) chỉ đọc/ghi trực tiếp DOM của CHÍNH
-   dòng đó (querySelector trong .target-row), KHÔNG gọi rerender() — nên React không bao giờ
-   vẽ lại các input này trong lúc gõ, và giá trị gõ dở không bị bảng điều khiển này ghi đè.
+   4 ô số + checkbox mỗi dòng KHÔNG điều khiển (defaultValue/defaultChecked) — onChange gọi
+   thẳng syncTargetRange(el, kind)/toggleTargetRow(el) (this-bound, nên bridge tự .call(el, ...)
+   thay vì gọi hàm trơn). syncTargetRange()/toggleTargetRow()/targetCheckAll()
+   (manage-tests-actions-controller.ts) chỉ đọc/ghi trực tiếp DOM của CHÍNH dòng đó
+   (querySelector trong .target-row), KHÔNG gọi rerender() — nên React không bao giờ vẽ lại các
+   input này trong lúc gõ, và giá trị gõ dở không bị bảng điều khiển này ghi đè.
    readTargetMatrixPicks() lúc "Lưu Mean/SD mức này" cũng đọc thẳng DOM, giống hệt trước. */
 function TargetRow({ row }: { row: any }) {
   const statusTag = row.status === 'retired'
@@ -335,12 +353,12 @@ function TargetRow({ row }: { row: any }) {
           : <b className="tag none">Chưa gán</b>;
   return (
     <div className={`target-row${row.locked ? ' target-row-locked' : ''}`} data-test={row.testId} data-lot={row.lotId} data-locked={row.locked ? '1' : undefined}>
-      <label className="lot-assay-check"><input className="tm-use" type="checkbox" defaultChecked={row.checked} disabled={row.locked} data-action="toggleTargetRow" data-action-on="change" /><span></span></label>
+      <label className="lot-assay-check"><input className="tm-use" type="checkbox" defaultChecked={row.checked} disabled={row.locked} onChange={e => toggleTargetRow(e.currentTarget)} /><span></span></label>
       <div className="lot-assay-name"><b>{row.name}</b><small>{row.unit || 'Chưa có đơn vị'}</small></div>
-      <input className="tm-mean" type="number" step="any" defaultValue={row.mean} placeholder="Trung bình" data-action="syncTargetRange" data-args='["target"]' data-action-on="input" disabled={row.disabled} />
-      <input className="tm-low" type="number" step="any" defaultValue={row.low} placeholder="Giới hạn dưới" data-action="syncTargetRange" data-args='["limits"]' data-action-on="input" disabled={row.disabled} />
-      <input className="tm-high" type="number" step="any" defaultValue={row.high} placeholder="Giới hạn trên" data-action="syncTargetRange" data-args='["limits"]' data-action-on="input" disabled={row.disabled} />
-      <input className="tm-sd" type="number" step="any" defaultValue={row.sd} placeholder="Độ lệch chuẩn" data-action="syncTargetRange" data-args='["target"]' data-action-on="input" disabled={row.disabled} />
+      <input className="tm-mean" type="number" step="any" defaultValue={row.mean} placeholder="Trung bình" onChange={e => syncTargetRange(e.currentTarget, 'target')} disabled={row.disabled} />
+      <input className="tm-low" type="number" step="any" defaultValue={row.low} placeholder="Giới hạn dưới" onChange={e => syncTargetRange(e.currentTarget, 'limits')} disabled={row.disabled} />
+      <input className="tm-high" type="number" step="any" defaultValue={row.high} placeholder="Giới hạn trên" onChange={e => syncTargetRange(e.currentTarget, 'limits')} disabled={row.disabled} />
+      <input className="tm-sd" type="number" step="any" defaultValue={row.sd} placeholder="Độ lệch chuẩn" onChange={e => syncTargetRange(e.currentTarget, 'target')} disabled={row.disabled} />
       <span>{statusTag}</span>
     </div>
   );
@@ -383,16 +401,16 @@ function TargetsTab({ body }: { body: any }) {
         <>
           <div className="target-level-toolbar">
             <div><b>Mức {body.level}</b><span className="target-level-lot">{body.levelLotNos.join(' / ')}</span></div>
-            <div className="dayseg">{body.levels.map((level: number) => <button key={level} className={String(level) === String(body.level) ? 'on' : ''} data-action="setTargetLevel" data-args={`[${level}]`}>Mức {level}</button>)}</div>
+            <div className="dayseg">{body.levels.map((level: number) => <button key={level} className={String(level) === String(body.level) ? 'on' : ''} onClick={() => setTargetLevel(level)}>Mức {level}</button>)}</div>
           </div>
           <div className="target-table">
             <div className="target-head"><span>Dùng</span><span>Xét nghiệm</span><span>Trung bình mục tiêu</span><span>Giới hạn dưới</span><span>Giới hạn trên</span><span>Độ lệch chuẩn</span><span>Trạng thái</span></div>
             {body.rows.map((row: any) => <TargetRow row={row} key={`${row.testId}:${row.lotId}`} />)}
           </div>
           <div className="modal-f target-actions">
-            <button className="btn ghost" data-action="targetCheckAll" data-args="[false]">Bỏ chọn tất cả</button>
-            <button className="btn ghost" data-action="targetCheckAll" data-args="[true]">Chọn tất cả</button>
-            <button className="btn teal" data-action="saveTargetMatrix">Lưu Mean/SD mức này</button>
+            <button className="btn ghost" onClick={() => targetCheckAll(false)}>Bỏ chọn tất cả</button>
+            <button className="btn ghost" onClick={() => targetCheckAll(true)}>Chọn tất cả</button>
+            <button className="btn teal" onClick={saveTargetMatrix}>Lưu Mean/SD mức này</button>
           </div>
         </>
       ) : <EmptyState title={body.empty.title} description={body.empty.description} />}
