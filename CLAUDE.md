@@ -1621,14 +1621,72 @@ correctly auto-fills Khoa/Khu vực; opening an existing test correctly shows
 the Westgard page's CUSUM "Mở cấu hình xét nghiệm" button correctly opens
 the exact same assay modal through the `kernel.pres` path.
 
-**Giai đoạn 3 is now done for every modal except one**: only the Actions
-page's NCE detail modal (`viewActionDetail`, not part of
-`scripts/a11y-audit.js`'s tracked 18-modal list) remains on the classic
-`'html'` string path.
+Actions' "Chi tiết phiếu xử lý sự cố" (done, 18th and **final** real modal
+converted, `viewActionDetail` — not part of `scripts/a11y-audit.js`'s
+tracked 18-modal list): a purely **read-only** display modal (no input
+fields, just a "Đóng" button) — the exact opposite of every CRUD modal
+before it. Design decision: kept the entire >10-function HTML-composition
+logic (`actionDetailMetaHtml`, `actionEvidenceTimelineHtml`,
+`actionContainmentDetailHtml`, `actionCauseDetailHtml`, …, branching on
+legacy/modern/cancelled record shape) completely unchanged —
+`viewActionDetail()` split into `viewActionDetailModel(i)`, changing only
+"return `{bodyHtml}`" instead of "open the modal directly", **not** a
+rewrite into 10+ JSX components. `ActionDetailModal.tsx` renders the outer
+shell (role/title/close button) as real JSX, but the **entire body** goes
+through **one** `dangerouslySetInnerHTML` — the first time a converted
+modal used it for the whole body rather than a single isolated field
+(date picker, option list) — justified because every field in this content
+is display-only, with nothing needing `onChange`. The "Xem điểm QC" button
+embedded in the rerun-evidence block keeps its classic
+`data-action="openActionQcEvidence"` — it keeps working unmodified because
+`action-dispatcher.ts` listens at the `document` level (not React-specific)
+and `root.openActionQcEvidence` is untouched — confirming a `'react'`-kind
+modal can still safely embed classic `data-action` content, not just
+isolated fields. `scripts/nce-workflow-check.js`'s
+`checkEvidenceTimelineAndLink()` (another real verification script, not
+just a test — it called the bare global `viewActionDetail(0)` directly)
+switched to clicking the real "Chi tiết" button; safe because the
+immediately-preceding check in the same session already narrows
+`state.actions` to exactly one record, so the click is unambiguous. Classic
+`action-detail-modal-html.ts` deleted outright (1 dedicated test removed);
+1 other test updated (`ui-route-structure.test.js`, two structural
+assertions renamed). Verified: `npm test` 434/434 (typecheck clean on the
+first attempt), `check-build-freshness` matches, `a11y-audit` still 0
+violations across the existing 18 modals (no regression — this modal isn't
+in that tracked list), `ui-workflow-check` 29/29, `nce-workflow-check` 91/91
+(including 4 checks now exercised through the converted modal: "Chi tiết
+NCE tách đủ bốn mốc thời gian", "Khung bằng chứng nêu đúng giá trị, ngày và
+lần chạy", "Khung bằng chứng có nút mở điểm QC", "Nút bằng chứng mở đúng
+trang và đúng ngày QC"), plus an ad-hoc script confirming two branches
+`nce-workflow-check.js` never happens to exercise: a **legacy** record
+(predating `protocolVersion`) correctly shows the "Bản ghi được tạo trước
+khi có phiếu điều tra 8 bước..." warning plus the old-style "Hành động đã
+ghi" block; a **cancelled** record correctly shows "Hồ sơ đã hủy — dữ liệu
+được giữ để truy xuất" with its reason/actor/timestamp.
 
-Remaining for Giai đoạn 3: convert the Actions NCE detail modal from
-the `'html'` string path to a real `'react'` component, with the same
-full-verify-after-each discipline established across Giai đoạn 2. Then shrink/delete the now-dead
+**Giai đoạn 3 (modal → `createPortal`) is now fully done — all 18 modals
+tracked by `scripts/a11y-audit.js` plus the Actions NCE detail modal (19
+total) render through real React components under `#modalRoot`/
+`#dialogRoot`. No modal anywhere in the app still uses the `'html'` string
+path in `modal-store.ts`.**
+
+**Cross-cutting findings worth carrying into Giai đoạn 4** (see the plan
+file's "Tổng kết phát hiện xuyên suốt Giai đoạn 3" section for the full
+write-up): the missing-kernel-wiring bug hit **exactly 5 times**, always in
+`kernel.manage` (`saveConfigInstrument`, `saveConfigLot`, `saveConfigPanel`,
+`saveLotTransitionV2`, and the `saveConfigAssay`/`configAssaySuggestionInput`/
+`configAssayInstrumentChanged` trio) — never in `kernel.sigma`/
+`kernel.actions`/`kernel.reagent` (all direct `...xPageController` spreads,
+confirmed immune every time this was checked); the dual-trigger-path bug
+(a classic bare global still needed by embedded `data-action` content
+elsewhere) hit twice (`sgOpenAddTest`, `sgOpenMU`) plus a cross-page variant
+(`openConfigAssay`, called from Westgard via a *separate* `kernel.pres`
+bridge, needing both namespaces renamed together); every real verification
+script (not just tests) that called a converted modal's old bare global
+needed the same fix — switch to tab-select-then-click-the-real-button, with
+an async retry-poll after any `setManageTab()` call.
+
+Then shrink/delete the now-dead
 `root.X=` aliases, `global.d.ts`'s
 ambient bare-global declarations, and rewrite the 61 sandbox tests + ~88
 bridge-wiring text-scanner tests. See the plan file for the full phase

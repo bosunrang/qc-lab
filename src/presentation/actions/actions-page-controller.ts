@@ -268,9 +268,9 @@ export function createActionsPageController(deps: {
       row.focus({ preventScroll: true });
     }));
   };
-  const viewActionDetail = (i: number) => {
+  const viewActionDetailModel = (i: number) => {
     const a = state().actions && state().actions[i], t = a && state().tests.find((x: AnyRec) => x.id === a.testId);
-    if (!a) return;
+    if (!a) return null;
     const LABELS = deps.ACTION_LABELS();
     const legacy = !a.protocolVersion, modern = a.protocolVersion >= 2, rr = deps.actionRerunStatus(a), wf = deps.actionWorkflowStatus(a), eff = deps.actionEffectivenessStatus(a), residual = deps.actionResidualRiskScore(a), overdue = deps.actionOverdue(a);
     const verdict = actionQcVerdictLabel(a), violation = actionViolationInfo(a), metaRows = deps.ActionDetailPresentation.meta(a, { testName: t ? deps.testDisplayName(t) : '—', levelShort: actionLevelShort(t, a.level, a.lot), verdict, violation, riskScore: deps.actionRiskScore(a), dueDate: a.dueDate ? deps.vnDate(a.dueDate) : '—', overdueLabel: overdue.overdue ? overdue.label : '', workflowLabel: wf.label }), meta = deps.pres.actionDetailMetaHtml(metaRows);
@@ -285,7 +285,7 @@ export function createActionsPageController(deps: {
       ${deps.pres.actionPatientImpactHtml(LABELS.patient[a.patientImpact] || '', a.patientAction || '')}
       ${deps.pres.actionEffectivenessDetailHtml({ effectiveness: modern ? eff.label : a.cause || '—', note: modern && a.effectivenessNote ? `${a.effectivenessDate ? deps.vnDate(a.effectivenessDate) + ' · ' : ''}${a.effectivenessNote}${a.effectivenessBy ? ' · ' + a.effectivenessBy : ''}` : '', residual: +a.protocolVersion >= 3 && residual ? { risk: LABELS.risk[a.residualRiskLevel] || '', score: residual, basis: a.residualRiskBasis || '' } : undefined, returned: a.returnNote ? `${a.returnNote}${a.returnBy ? ' — ' + a.returnBy : ''}${a.returnAt ? ' · ' + deps.formatDateTimeVN(a.returnAt) : ''}` : '', followUpNceId: a.followUpNceId || '', parentNceId: a.parentNceId || '', approval: `${deps.actionApprovalLabel(a)}${a.approvedBy ? ' · ' + a.approvedBy : ''}`, workflow: wf.label })}
     </ol>`;
-    deps.openModal(deps.pres.actionDetailModalHtml({ bodyHtml: body, closeButtonHtml: deps.btn('Đóng', { action: 'closeModal' }, 'teal') }));
+    return { bodyHtml: body };
   };
   const groupIssuesByTestDate = (issues: AnyRec[]) => deps.ActionListPresentation.groupIssuesByTestDate(issues);
   /* Hồ sơ cũ tự sinh lúc hủy điểm chỉ lưu rule='Hủy điểm QC' — không phải luật Westgard.
@@ -335,7 +335,7 @@ export function createActionsPageController(deps: {
     actionLevelShort, currentIssues, cancelAction, confirmCancelAction, actionApprovalToken,
     approveAction, confirmApproveAction, returnAction, confirmReturnAction, actionCanEscalate, escalateAction,
     actionCanReopen, reopenAction, confirmReopenAction, actionDetailCheck,
-    actionEvidenceTimelineHtml, actionRerunEvidenceHtml, openActionQcEvidence, viewActionDetail,
+    actionEvidenceTimelineHtml, actionRerunEvidenceHtml, openActionQcEvidence, viewActionDetailModel,
     groupIssuesByTestDate, actionViolationInfo, actionQcVerdictLabel,
     actionsModel,
   };

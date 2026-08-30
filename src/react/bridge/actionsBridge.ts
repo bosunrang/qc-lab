@@ -2,6 +2,7 @@ import { createElement } from 'react';
 import { getKernel } from '../state/kernel';
 import { openReactModal } from '../dialogs/modal-store';
 import { ActionGuideModal } from '../modals/ActionGuideModal';
+import { ActionDetailModal } from '../modals/ActionDetailModal';
 
 export type ActionSideChip = { cls: string; label: string };
 
@@ -65,7 +66,10 @@ export const actionFormViewModel = (issueCount: number): ActionFormModel => getK
 
 export const editAction = (i: number): void => { getKernel().actionForm.editAction(i); };
 export const beginActionFromIssue = (tid: unknown, level: unknown, rule: unknown, err: unknown, act: unknown, pointId: string, pointDate: string): void => getKernel().actionForm.beginActionFromIssue(tid, level, rule, err, act, pointId, pointDate);
-export const viewActionDetail = (i: number): void => getKernel().actions.viewActionDetail(i);
+export const viewActionDetail = (i: number): void => {
+  const model = getKernel().actions.viewActionDetailModel(i);
+  if (model) openReactModal(() => createElement(ActionDetailModal, model));
+};
 export const escalateAction = (i: number): void => { getKernel().actions.escalateAction(i); };
 export const approveAction = (i: number): void => { getKernel().actions.approveAction(i); };
 export const returnAction = (i: number): void => { getKernel().actions.returnAction(i); };

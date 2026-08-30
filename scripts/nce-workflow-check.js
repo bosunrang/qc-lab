@@ -396,7 +396,14 @@ async function checkRerunChipOnBothSurfaces(page) {
 }
 
 async function checkEvidenceTimelineAndLink(page) {
-  await page.evaluate(() => viewActionDetail(0));
+  // viewActionDetail() (Giai đoạn 3) giờ chỉ mở modal qua react-pilot.js — không
+  // còn là global đồng bộ tới được từ đây. checkRerunChipOnBothSurfaces() (chạy
+  // ngay trước, cùng session) đặt state.actions về đúng MỘT bản ghi (index 0),
+  // nên bấm nút "Chi tiết" duy nhất trên trang không mơ hồ.
+  await page.evaluate(() => {
+    const btn = [...document.querySelectorAll('button')].find(b => b.textContent === 'Chi tiết');
+    if (btn) btn.click();
+  });
   await page.waitForSelector('.action-evidence-timeline');
   const detail = await page.evaluate(() => ({
     timelineLabels: [...document.querySelectorAll('.action-evidence-timeline span')].map(x => x.textContent),

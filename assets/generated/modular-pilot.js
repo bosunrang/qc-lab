@@ -14330,11 +14330,6 @@
     </div><div class="modal-f">${input.closeButtonHtml}${input.reopenButtonHtml}</div></div>`;
 	}
 	//#endregion
-	//#region src/presentation/nce/action-detail-modal-html.ts
-	function actionDetailModalHtml(input) {
-		return `<div class="modal"><div class="modal-h"><h3>Chi tiết phiếu xử lý sự cố</h3><button class="modal-close" data-action="closeModal">✕</button></div><div class="modal-b">${input.bodyHtml}</div><div class="modal-f">${input.closeButtonHtml}</div></div>`;
-	}
-	//#endregion
 	//#region src/presentation/nce/action-legacy-detail-html.ts
 	function createActionLegacyDetailHtml(deps) {
 		return (model) => `<div class="action-detail-legacy"><b>Hành động đã ghi</b><div>${deps.escape(model.action || "—")}</div><div class="hint">${deps.escape(model.owner || "—")} · ${deps.escape(model.rerunLabel || "Chưa có dữ liệu")} · ${deps.escape(model.approvalLabel)}</div></div>`;
@@ -21340,9 +21335,9 @@
 				row.focus({ preventScroll: true });
 			}));
 		};
-		const viewActionDetail = (i) => {
+		const viewActionDetailModel = (i) => {
 			const a = state().actions && state().actions[i], t = a && state().tests.find((x) => x.id === a.testId);
-			if (!a) return;
+			if (!a) return null;
 			const LABELS = deps.ACTION_LABELS();
 			const legacy = !a.protocolVersion, modern = a.protocolVersion >= 2, rr = deps.actionRerunStatus(a), wf = deps.actionWorkflowStatus(a), eff = deps.actionEffectivenessStatus(a), residual = deps.actionResidualRiskScore(a), overdue = deps.actionOverdue(a);
 			const verdict = actionQcVerdictLabel(a), violation = actionViolationInfo(a), metaRows = deps.ActionDetailPresentation.meta(a, {
@@ -21366,7 +21361,7 @@
 				rerunLabel: rr.label || "",
 				approvalLabel: deps.actionApprovalLabel(a)
 			});
-			const body = legacy ? `${cancelledAlert}<div class="alert warn">Bản ghi được tạo trước khi có phiếu điều tra 8 bước. Dữ liệu hành động cũ vẫn được giữ nguyên.</div>${meta}${legacyDetail}` : `
+			return { bodyHtml: legacy ? `${cancelledAlert}<div class="alert warn">Bản ghi được tạo trước khi có phiếu điều tra 8 bước. Dữ liệu hành động cũ vẫn được giữ nguyên.</div>${meta}${legacyDetail}` : `
     ${cancelledAlert}${meta}${actionEvidenceTimelineHtml(a, rr)}${actionRerunEvidenceHtml(a, rr, t)}
     <ol class="action-detail-steps">
       ${deps.pres.actionContainmentDetailHtml({
@@ -21417,11 +21412,7 @@
 				approval: `${deps.actionApprovalLabel(a)}${a.approvedBy ? " · " + a.approvedBy : ""}`,
 				workflow: wf.label
 			})}
-    </ol>`;
-			deps.openModal(deps.pres.actionDetailModalHtml({
-				bodyHtml: body,
-				closeButtonHtml: deps.btn("Đóng", { action: "closeModal" }, "teal")
-			}));
+    </ol>` };
 		};
 		const groupIssuesByTestDate = (issues) => deps.ActionListPresentation.groupIssuesByTestDate(issues);
 		const actionViolationInfo = (a) => deps.ActionViolationService.info(a);
@@ -21564,7 +21555,7 @@
 			actionEvidenceTimelineHtml,
 			actionRerunEvidenceHtml,
 			openActionQcEvidence,
-			viewActionDetail,
+			viewActionDetailModel,
 			groupIssuesByTestDate,
 			actionViolationInfo,
 			actionQcVerdictLabel,
@@ -28571,7 +28562,6 @@
 	root.actionCancelModalHtml = actionCancelModalHtml;
 	root.actionReviewNoteModalHtml = actionReviewNoteModalHtml;
 	root.actionReopenModalHtml = actionReopenModalHtml;
-	root.actionDetailModalHtml = actionDetailModalHtml;
 	root.actionLegacyDetailHtml = createActionLegacyDetailHtml({ escape: (value) => root.esc(value) });
 	root.actionContainmentDetailHtml = createActionContainmentDetailHtml({ escape: (value) => root.esc(value) });
 	root.actionInspectionDetailsHtml = createActionInspectionDetailsHtml();
@@ -30932,7 +30922,7 @@
 	root.actionEvidenceTimelineHtml = actionsPageController.actionEvidenceTimelineHtml;
 	root.actionRerunEvidenceHtml = actionsPageController.actionRerunEvidenceHtml;
 	root.openActionQcEvidence = actionsPageController.openActionQcEvidence;
-	root.viewActionDetail = actionsPageController.viewActionDetail;
+	root.viewActionDetailModel = actionsPageController.viewActionDetailModel;
 	root.groupIssuesByTestDate = actionsPageController.groupIssuesByTestDate;
 	root.actionViolationInfo = actionsPageController.actionViolationInfo;
 	root.actionQcVerdictLabel = actionsPageController.actionQcVerdictLabel;

@@ -112,10 +112,10 @@ assert.doesNotMatch(modals,/(?:function|const) (?:syncActLevels|currentIssues|be
    Đường cắt này cố ý KHÔNG một chiều (khác report-routes.js): form gọi ngược các khối
    dựng bằng chứng của trang, trang gọi vào form để mở/lưu hồ sơ. Vì vậy test chốt theo
    TRÁCH NHIỆM — hàm nào ở file nào — chứ không đòi đồ thị phụ thuộc không chu trình. */
-for(const name of ['currentIssues','cancelAction','viewActionDetail'])assert.match(actions,new RegExp(`const ${name} = `),`${name} thuộc phần trang/vòng đời`);
+for(const name of ['currentIssues','cancelAction','viewActionDetailModel'])assert.match(actions,new RegExp(`const ${name} = `),`${name} thuộc phần trang/vòng đời`);
 for(const name of ['syncActLevels','beginActionFromIssue','addAction','actionFormModel','actionFormViewModel','readActionProtocolForm'])assert.match(form,new RegExp(`const ${name} = `),`${name} thuộc form NCE`);
 assert.doesNotMatch(actions,/const actionFormModel = |\bACT_SUGGEST\b\s*=/,'actions-routes.js không được giữ lại phần dựng form');
-assert.doesNotMatch(form,/const (?:pageActionsV4|currentIssues|approveAction|viewActionDetail) = /,'action-form.js không được kéo theo trang và vòng đời hồ sơ');
+assert.doesNotMatch(form,/const (?:pageActionsV4|currentIssues|approveAction|viewActionDetailModel) = /,'action-form.js không được kéo theo trang và vòng đời hồ sơ');
 /* actionsModel() (React) tính issueCount MỘT lần rồi ActionsPage.tsx truyền thẳng vào
    actionFormViewModel(model.issueCount) — nếu form tự gọi currentIssues() lần nữa thì
    danh sách trên màn hình và con số trong khung "chưa chọn sự cố" có thể lệch nhau. */

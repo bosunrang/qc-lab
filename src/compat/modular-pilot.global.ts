@@ -417,7 +417,6 @@ import { createActionCancelledAlertHtml } from '../presentation/nce/action-cance
 import { actionCancelModalHtml } from '../presentation/nce/action-cancel-modal-html';
 import { actionReviewNoteModalHtml } from '../presentation/nce/action-review-note-modal-html';
 import { actionReopenModalHtml } from '../presentation/nce/action-reopen-modal-html';
-import { actionDetailModalHtml } from '../presentation/nce/action-detail-modal-html';
 import { createActionLegacyDetailHtml } from '../presentation/nce/action-legacy-detail-html';
 import { createActionContainmentDetailHtml } from '../presentation/nce/action-containment-detail-html';
 import { createActionInspectionDetailsHtml } from '../presentation/nce/action-inspection-details-html';
@@ -1138,7 +1137,7 @@ type QCLabGlobal = typeof globalThis & {
   actionEvidenceTimelineHtml?: (a: Record<string, any>, rr: unknown) => string;
   actionRerunEvidenceHtml?: (a: Record<string, any>, rr: unknown, t: unknown) => string;
   openActionQcEvidence?: (tid: unknown, level: unknown, pointId: unknown, date: unknown, lot: unknown) => void;
-  viewActionDetail?: (i: number) => void;
+  viewActionDetailModel?: (i: number) => Record<string, any> | null;
   groupIssuesByTestDate?: (issues: Record<string, any>[]) => Record<string, any>[];
   actionViolationInfo?: (a: Record<string, any>) => Record<string, any>;
   actionQcVerdictLabel?: (a: Record<string, any>) => string;
@@ -1787,7 +1786,6 @@ type QCLabGlobal = typeof globalThis & {
   actionCancelModalHtml: typeof actionCancelModalHtml;
   actionReviewNoteModalHtml: typeof actionReviewNoteModalHtml;
   actionReopenModalHtml: typeof actionReopenModalHtml;
-  actionDetailModalHtml: typeof actionDetailModalHtml;
   actionLegacyDetailHtml: ReturnType<typeof createActionLegacyDetailHtml>;
   actionContainmentDetailHtml: ReturnType<typeof createActionContainmentDetailHtml>;
   actionInspectionDetailsHtml: ReturnType<typeof createActionInspectionDetailsHtml>;
@@ -3832,7 +3830,6 @@ root.actionCancelledAlertHtml=createActionCancelledAlertHtml({escape:(value:any)
 root.actionCancelModalHtml=actionCancelModalHtml;
 root.actionReviewNoteModalHtml=actionReviewNoteModalHtml;
 root.actionReopenModalHtml=actionReopenModalHtml;
-root.actionDetailModalHtml=actionDetailModalHtml;
 root.actionLegacyDetailHtml=createActionLegacyDetailHtml({escape:(value:any)=>(root as any).esc(value)});
 root.actionContainmentDetailHtml=createActionContainmentDetailHtml({escape:(value:any)=>(root as any).esc(value)});
 root.actionInspectionDetailsHtml=createActionInspectionDetailsHtml();
@@ -5140,7 +5137,7 @@ root.actionDetailCheck = actionsPageController.actionDetailCheck;
 root.actionEvidenceTimelineHtml = actionsPageController.actionEvidenceTimelineHtml;
 root.actionRerunEvidenceHtml = actionsPageController.actionRerunEvidenceHtml;
 root.openActionQcEvidence = actionsPageController.openActionQcEvidence;
-root.viewActionDetail = actionsPageController.viewActionDetail;
+root.viewActionDetailModel = actionsPageController.viewActionDetailModel;
 root.groupIssuesByTestDate = actionsPageController.groupIssuesByTestDate;
 root.actionViolationInfo = actionsPageController.actionViolationInfo;
 root.actionQcVerdictLabel = actionsPageController.actionQcVerdictLabel;
