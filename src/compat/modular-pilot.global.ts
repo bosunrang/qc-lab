@@ -326,7 +326,6 @@ import { lotTransitionModalHtml } from '../presentation/manage/lot-transition-mo
 import { lotTransitionTargetsHtml as lotTransitionTargetsHtmlPresentation } from '../presentation/manage/lot-transition-targets-html';
 import { lotGroupColumnsHtml } from '../presentation/manage/lot-group-columns-html';
 import { lotGroupModalHtml } from '../presentation/manage/lot-group-modal-html';
-import { configLotModalHtml } from '../presentation/manage/config-lot-modal-html';
 import { configAssayModalHtml } from '../presentation/manage/config-assay-modal-html';
 import { qcHistoryDetailModalHtml } from '../presentation/manage/qc-history-detail-modal-html';
 import { configAssayRuleRowsHtml } from '../presentation/manage/config-assay-rule-rows-html';
@@ -1050,7 +1049,6 @@ type QCLabGlobal = typeof globalThis & {
   deleteConfigGroup?: (id: unknown) => Promise<void>;
   toggleLotGroupStatus?: (id: unknown) => void;
   activateLotGroup?: (id: unknown) => Promise<void>;
-  openConfigLot?: (id?: string) => void;
   saveConfigLot?: (id: unknown) => Promise<void>;
   renameLotAcrossPoints?: (oldLevel: unknown, oldLotNo: unknown, newLotNo: unknown) => unknown;
   deleteConfigLot?: (id: unknown) => Promise<void>;
@@ -1745,7 +1743,6 @@ type QCLabGlobal = typeof globalThis & {
   lotTransitionTargetsHtmlPresentation: typeof lotTransitionTargetsHtmlPresentation;
   lotGroupColumnsHtml: typeof lotGroupColumnsHtml;
   lotGroupModalHtml: typeof lotGroupModalHtml;
-  configLotModalHtml: typeof configLotModalHtml;
   configAssayModalHtml: typeof configAssayModalHtml;
   qcHistoryDetailModalHtml: typeof qcHistoryDetailModalHtml;
   configAssayRuleRowsHtml: typeof configAssayRuleRowsHtml;
@@ -3602,7 +3599,6 @@ root.lotTransitionModalHtml=lotTransitionModalHtml;
 root.lotTransitionTargetsHtmlPresentation=lotTransitionTargetsHtmlPresentation;
 root.lotGroupColumnsHtml=lotGroupColumnsHtml;
 root.lotGroupModalHtml=lotGroupModalHtml;
-root.configLotModalHtml=configLotModalHtml;
 root.configAssayModalHtml=configAssayModalHtml;
 root.qcHistoryDetailModalHtml=qcHistoryDetailModalHtml;
 root.configAssayRuleRowsHtml=configAssayRuleRowsHtml;
@@ -5018,7 +5014,6 @@ root.saveConfigGroup = manageTestsActionsController.saveConfigGroup;
 root.deleteConfigGroup = manageTestsActionsController.deleteConfigGroup;
 root.toggleLotGroupStatus = manageTestsActionsController.toggleLotGroupStatus;
 root.activateLotGroup = manageTestsActionsController.activateLotGroup;
-root.openConfigLot = manageTestsActionsController.openConfigLot;
 root.saveConfigLot = manageTestsActionsController.saveConfigLot;
 root.renameLotAcrossPoints = manageTestsActionsController.renameLotAcrossPoints;
 root.deleteConfigLot = manageTestsActionsController.deleteConfigLot;
@@ -5722,11 +5717,13 @@ const kernel = {
     openConfigInstrumentModel: manageTestsActionsController.openConfigInstrumentModel,
     deleteConfigInstrument: manageTestsActionsController.deleteConfigInstrument,
     saveConfigInstrument: manageTestsActionsController.saveConfigInstrument,
+    configLotLevelOptionsHtml: (root as any).configLotLevelOptionsHtml,
     openConfigAssay: manageTestsActionsController.openConfigAssay,
     delTest: manageTestsActionsController.delTest,
     openConfigPanel: manageTestsActionsController.openConfigPanel,
     deleteConfigPanel: manageTestsActionsController.deleteConfigPanel,
-    openConfigLot: manageTestsActionsController.openConfigLot,
+    openConfigLotModel: manageTestsActionsController.openConfigLotModel,
+    saveConfigLot: manageTestsActionsController.saveConfigLot,
     deleteConfigLot: manageTestsActionsController.deleteConfigLot,
     openConfigGroup: manageTestsActionsController.openConfigGroup,
     openTargetMatrix: manageTestsActionsController.openTargetMatrix,

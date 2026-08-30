@@ -35,8 +35,6 @@ assert.match(actions,/deps.pres.lotGroupColumnsHtml\(/,'Lot-group picker columns
 assert.match(bridge,/lotGroupColumnsHtml: typeof lotGroupColumnsHtml;/,'Lot-group picker columns must be a required bridge contract');
 assert.match(actions,/deps.pres.lotGroupModalHtml\(/,'Lot-group modal must use the TypeScript bridge');
 assert.match(bridge,/lotGroupModalHtml: typeof lotGroupModalHtml;/,'Lot-group modal must be a required bridge contract');
-assert.match(actions,/deps.pres.configLotModalHtml\(/,'Lot QC modal must use the TypeScript bridge');
-assert.match(bridge,/configLotModalHtml: typeof configLotModalHtml;/,'Lot QC modal must be a required bridge contract');
 assert.match(actions,/deps.pres.configAssayModalHtml\(/,'Assay modal must use the TypeScript bridge');
 assert.match(bridge,/configAssayModalHtml: typeof configAssayModalHtml;/,'Assay modal must be a required bridge contract');
 assert.match(actions,/deps.pres.qcHistoryDetailModalHtml\(/,'Mean/SD history modal must use the TypeScript bridge');
@@ -51,7 +49,10 @@ assert.match(actions,/deps.pres.configAssayDecimalOptionsHtml\(/,'Assay decimal 
 assert.match(bridge,/configAssayDecimalOptionsHtml: typeof configAssayDecimalOptionsHtml;/,'Assay decimal options must be a required bridge contract');
 assert.match(actions,/deps.pres.configPanelInstrumentOptionsHtml\(/,'Panel instrument options must use the TypeScript bridge');
 assert.match(bridge,/configPanelInstrumentOptionsHtml: typeof configPanelInstrumentOptionsHtml;/,'Panel instrument options must be a required bridge contract');
-assert.match(actions,/deps.pres.configLotLevelOptionsHtml\(/,'Lot level options must use the TypeScript bridge');
+// Lô QC (Giai đoạn 3) đã chuyển sang component React thật — configLotLevelOptionsHtml()
+// giờ được LotModal.tsx gọi qua kernel.manage, không còn qua deps.pres trong actions.
+const lotModal=fs.readFileSync(path.join(root,'src','react','modals','LotModal.tsx'),'utf8');
+assert.match(lotModal,/getKernel\(\)\.manage\.configLotLevelOptionsHtml\(/,'Lot level options must use the TypeScript bridge');
 assert.match(bridge,/configLotLevelOptionsHtml: typeof configLotLevelOptionsHtml;/,'Lot level options must be a required bridge contract');
 assert.match(actions,/deps.pres.qcHistoryMeanSdRowsHtml\(/,'Mean/SD history rows must use the TypeScript bridge');
 assert.match(actions,/deps.pres.qcHistoryPointRowsHtml\(/,'QC history point rows must use the TypeScript bridge');

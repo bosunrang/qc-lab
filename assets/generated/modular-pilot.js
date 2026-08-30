@@ -12806,16 +12806,6 @@
     <div class="modal-f">${input.cancelButtonHtml}${input.saveButtonHtml}</div></div>`;
 	}
 	//#endregion
-	//#region src/presentation/manage/config-lot-modal-html.ts
-	function configLotModalHtml(input) {
-		return `<div class="modal rcfg-modal"><div class="modal-h"><div><h3>${input.title}</h3></div><button class="modal-close" data-action="closeModal">✕</button></div><div class="modal-b">
-    <div class="grid2"><div><label>Số lô</label><input id="cfgLotNo" value="${input.lotNo}" placeholder="VD: 1234UE"></div><div><label>Mức QC</label><select id="cfgLotLevel" aria-label="Mức QC">${input.levelOptionsHtml}</select></div></div>
-    <div class="grid2"><div><label>Mô tả</label><input id="cfgLotDescription" value="${input.description}" placeholder="VD: Acusera Assayed Chemistry Control"></div><div><label>Nhà cung cấp</label><input id="cfgLotSupplier" value="${input.supplier}" placeholder="Randox"></div></div>
-    <div class="grid2"><div><label>Ngày mở (dd/mm/yyyy)</label>${input.openedDateHtml}</div><div><label>Hạn sử dụng (dd/mm/yyyy)</label>${input.expiryDateHtml}</div></div>
-    <label>Ghi chú</label><textarea id="cfgLotNote" aria-label="Ghi chú">${input.note}</textarea></div>
-    <div class="modal-f">${input.cancelButtonHtml}${input.saveButtonHtml}</div></div>`;
-	}
-	//#endregion
 	//#region src/presentation/manage/config-assay-modal-html.ts
 	function configAssayModalHtml(input) {
 		return `<div class="modal rcfg-modal rcfg-assay-modal"><div class="modal-h"><div><h3>${input.title}</h3></div><button class="modal-close" data-action="closeModal">✕</button></div><div class="modal-b">
@@ -18646,26 +18636,21 @@
 			}
 			await deps.infoDialog(`Đã áp dụng Mean/SD cho ${result.count} dòng và chuyển sang nhóm lô ${g.name}.`, { type: "success" });
 		};
-		const openConfigLot = (id = "") => {
+		const openConfigLotModel = (id = "") => {
 			const l = state().qcLots.find((x) => x.id === id) || {
 				level: 1,
 				active: true
 			};
-			deps.openModal(deps.pres.configLotModalHtml({
-				title: id ? "Sửa thông tin lô QC" : "Thêm lô QC",
-				lotNo: deps.escapeAttr(l.lotNo || ""),
-				levelOptionsHtml: deps.pres.configLotLevelOptionsHtml(+l.level),
-				description: deps.escapeAttr(l.description || ""),
-				supplier: deps.escapeAttr(l.supplier || ""),
-				openedDateHtml: deps.dateBox("cfgLotOpened", l.opened || ""),
-				expiryDateHtml: deps.dateBox("cfgLotExp", l.exp || ""),
-				note: deps.esc(l.note || ""),
-				cancelButtonHtml: deps.btn("Hủy", { action: "closeModal" }, "ghost"),
-				saveButtonHtml: deps.btn(id ? "Lưu thay đổi" : "Thêm lô QC", {
-					action: "saveConfigLot",
-					args: [id]
-				}, "teal")
-			}));
+			return {
+				id,
+				lotNo: l.lotNo || "",
+				level: +l.level || 1,
+				description: l.description || "",
+				supplier: l.supplier || "",
+				opened: l.opened || "",
+				exp: l.exp || "",
+				note: l.note || ""
+			};
 		};
 		const saveConfigLot = async (id) => {
 			if (!deps.requireAdmin()) return;
@@ -19056,7 +19041,7 @@
 			deleteConfigGroup,
 			toggleLotGroupStatus,
 			activateLotGroup,
-			openConfigLot,
+			openConfigLotModel,
 			saveConfigLot,
 			renameLotAcrossPoints,
 			deleteConfigLot,
@@ -28566,7 +28551,6 @@
 	root.lotTransitionTargetsHtmlPresentation = lotTransitionTargetsHtml;
 	root.lotGroupColumnsHtml = lotGroupColumnsHtml;
 	root.lotGroupModalHtml = lotGroupModalHtml;
-	root.configLotModalHtml = configLotModalHtml;
 	root.configAssayModalHtml = configAssayModalHtml;
 	root.qcHistoryDetailModalHtml = qcHistoryDetailModalHtml;
 	root.configAssayRuleRowsHtml = configAssayRuleRowsHtml;
@@ -31062,7 +31046,6 @@
 	root.deleteConfigGroup = manageTestsActionsController.deleteConfigGroup;
 	root.toggleLotGroupStatus = manageTestsActionsController.toggleLotGroupStatus;
 	root.activateLotGroup = manageTestsActionsController.activateLotGroup;
-	root.openConfigLot = manageTestsActionsController.openConfigLot;
 	root.saveConfigLot = manageTestsActionsController.saveConfigLot;
 	root.renameLotAcrossPoints = manageTestsActionsController.renameLotAcrossPoints;
 	root.deleteConfigLot = manageTestsActionsController.deleteConfigLot;
@@ -31997,11 +31980,13 @@
 			openConfigInstrumentModel: manageTestsActionsController.openConfigInstrumentModel,
 			deleteConfigInstrument: manageTestsActionsController.deleteConfigInstrument,
 			saveConfigInstrument: manageTestsActionsController.saveConfigInstrument,
+			configLotLevelOptionsHtml: root.configLotLevelOptionsHtml,
 			openConfigAssay: manageTestsActionsController.openConfigAssay,
 			delTest: manageTestsActionsController.delTest,
 			openConfigPanel: manageTestsActionsController.openConfigPanel,
 			deleteConfigPanel: manageTestsActionsController.deleteConfigPanel,
-			openConfigLot: manageTestsActionsController.openConfigLot,
+			openConfigLotModel: manageTestsActionsController.openConfigLotModel,
+			saveConfigLot: manageTestsActionsController.saveConfigLot,
 			deleteConfigLot: manageTestsActionsController.deleteConfigLot,
 			openConfigGroup: manageTestsActionsController.openConfigGroup,
 			openTargetMatrix: manageTestsActionsController.openTargetMatrix,

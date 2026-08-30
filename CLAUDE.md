@@ -1217,7 +1217,52 @@ modals, `ui-workflow-check` 29/29 (including the real add/edit-instrument
 flows that caught the `saveConfigInstrument` gap), `nce-workflow-check`
 91/91.
 
-Remaining for Giai đoạn 3: convert each of the other ~10 form modals from
+Manage's lô QC (done, seventh real modal converted): same CRUD-form shape as
+the instrument modal, plus **2 date fields** (Ngày mở/Hạn sử dụng) — kept as
+`dateBoxHtml()` + `dangerouslySetInnerHTML`, the established "deferred
+field" treatment, since nothing else in this modal needs to react to the
+date value while typing (only read at submit via `saveConfigLot`, unchanged).
+The level `<select>` also stays `dangerouslySetInnerHTML` for its `<option>`s
+(`configLotLevelOptionsHtml(level)`, newly exposed on `kernel.manage`) since
+it needs no live interaction either — matching Users' role-select precedent
+of keeping simple, read-at-submit pickers as raw HTML rather than converting
+them to controlled `<option>` JSX for no behavioral benefit. Caught the
+**exact same missing-kernel-wiring bug class** as the instrument modal,
+twice in a row now: `kernel.manage` was missing `saveConfigLot` too (same
+root cause — its save button used to be classic `data-action`, dispatched
+straight off `root.X`, never through the kernel) — found immediately via
+typecheck-clean-but-runtime-broken behavior, fixed the same way. This
+confirms the lesson from the instrument modal as a **standing checklist
+item** for every remaining Manage/Sigma conversion: before wiring a modal's
+save button to `getKernel().manage.X(...)`, grep `kernel.manage`'s
+construction block for `X:` — don't assume presence from the open-path
+already working. Classic `config-lot-modal-html.ts` deleted outright (1
+dedicated test removed); `tests/manage-core-bridge.test.js` had 2 more
+now-retired contract checks removed, one of which needed repointing rather
+than deleting outright (`configLotLevelOptionsHtml`'s *consumption* check
+moved to `LotModal.tsx`, since the function itself is still a valid bridge
+contract — only *where* it's called from changed). `tests/manage-crud-labels.test.js`'s
+lot branch repointed to `LotModal.tsx`'s JSX, mirroring the instrument
+branch. `scripts/a11y-audit.js`'s `manage:add-lot`/`manage:edit-lot`
+entries needed to switch to the "lots" tab first (`Manage` defaults to
+"instruments") — and since that tab switch shares the exact "React commit
+is async relative to a synchronous script body" race documented for
+`audit:archive-log`, this surfaced a **latent ordering bug in the audit
+script itself**: `manage:add-lot`/`manage:edit-lot` leaving the tab
+switched to "lots" made the *already-passing* `manage:edit-instrument`
+entry (which runs later in the same array and assumed the default
+"instruments" tab was still active) start failing — fixed by having every
+Manage tab-dependent entry explicitly call `setManageTab(...)` itself
+(with the same async retry-poll for the resulting button) rather than
+relying on residual state from whichever entry happened to run before it.
+Verified: `npm test` 458/458, `typecheck` clean, `check-build-freshness`
+matches, `a11y-audit` 0 violations across all 18 modals, `ui-workflow-check`
+29/29, `nce-workflow-check` 91/91, plus an ad-hoc script confirming the
+level options render correctly (1–6), the date field widgets are present,
+and saving persists all fields (including a blank date correctly staying
+blank) and closes the modal.
+
+Remaining for Giai đoạn 3: convert each of the other ~9 form modals from
 the `'html'` string path to a real `'react'` component, one at a time, same
 full-verify-after-each discipline established across Giai đoạn 2 — each
 conversion touches exactly one modal's trigger function (swap

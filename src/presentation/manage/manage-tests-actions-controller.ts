@@ -301,9 +301,12 @@ export function createManageTestsActionsController(deps: {
     }
     await deps.infoDialog(`Đã áp dụng Mean/SD cho ${result.count} dòng và chuyển sang nhóm lô ${g.name}.`, { type: 'success' });
   };
-  const openConfigLot = (id = '') => {
+  /* openConfigLotModel(): dữ liệu thuần cho modal React (Giai đoạn 3,
+     LotModal.tsx) — thay openConfigLot() tự dựng chuỗi HTML rồi mở modal.
+     Không gate quyền ở đây (giống bản cũ) — requireAdmin() chỉ kiểm khi lưu. */
+  const openConfigLotModel = (id = '') => {
     const l = state().qcLots.find((x: AnyRec) => x.id === id) || { level: 1, active: true };
-    deps.openModal(deps.pres.configLotModalHtml({ title: id ? 'Sửa thông tin lô QC' : 'Thêm lô QC', lotNo: deps.escapeAttr(l.lotNo || ''), levelOptionsHtml: deps.pres.configLotLevelOptionsHtml(+l.level), description: deps.escapeAttr(l.description || ''), supplier: deps.escapeAttr(l.supplier || ''), openedDateHtml: deps.dateBox('cfgLotOpened', l.opened || ''), expiryDateHtml: deps.dateBox('cfgLotExp', l.exp || ''), note: deps.esc(l.note || ''), cancelButtonHtml: deps.btn('Hủy', { action: 'closeModal' }, 'ghost'), saveButtonHtml: deps.btn(id ? 'Lưu thay đổi' : 'Thêm lô QC', { action: 'saveConfigLot', args: [id] }, 'teal') }));
+    return { id, lotNo: l.lotNo || '', level: +l.level || 1, description: l.description || '', supplier: l.supplier || '', opened: l.opened || '', exp: l.exp || '', note: l.note || '' };
   };
   const saveConfigLot = async (id: unknown) => {
     if (!deps.requireAdmin()) return;
@@ -447,7 +450,7 @@ export function createManageTestsActionsController(deps: {
     lotTransitionChoiceHtml, openLotTransitionV2, lotTransitionTargetsHtml, filterLotTransitionTargets,
     refreshLotTransitionTargets, readLotTransitionTargetPicks, saveLotTransitionV2, openConfigGroup,
     suggestConfigGroupName, saveConfigGroup, deleteConfigGroup, toggleLotGroupStatus, activateLotGroup,
-    openConfigLot, saveConfigLot, renameLotAcrossPoints, deleteConfigLot, openConfigInstrumentModel,
+    openConfigLotModel, saveConfigLot, renameLotAcrossPoints, deleteConfigLot, openConfigInstrumentModel,
     saveConfigInstrument, deleteConfigInstrument, defaultAssayLevels, configAssayTeaRefs, configAssayRefRecord,
     configAssayNaming, configAssayFindRef, configAssaySuggestionInput, configAssayInstrumentChanged, openConfigAssay, saveConfigAssay, delTest,
   };

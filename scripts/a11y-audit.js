@@ -42,13 +42,45 @@ const MODALS = [
   // openConfigInstrument() (Giai đoạn 3) giờ chỉ tồn tại trong react-pilot.js, không
   // còn là global tới được từ đây — bấm thẳng nút thật thay vì gọi hàm trần. Manage
   // mặc định mở ở tab "instruments" (ManageUIState.manageTab), nên nút đã hiện sẵn.
-  { page: 'manage', label: 'manage:add-instrument', open: () => { document.querySelector('.rcfg-tools .btn.teal').click(); } },
-  { page: 'manage', label: 'manage:add-lot', open: () => openConfigLot() },
+  { page: 'manage', label: 'manage:add-instrument', open: async () => {
+      setManageTab('instruments');
+      for (let tries = 0; tries < 20; tries++) {
+        const btn = document.querySelector('.rcfg-tools .btn.teal');
+        if (btn) { btn.click(); return; }
+        await new Promise(r => setTimeout(r, 25));
+      }
+    } },
+  // openConfigLot() (Giai đoạn 3) giờ chỉ tồn tại trong react-pilot.js, không còn là
+  // global tới được từ đây — chuyển tab "lots" rồi bấm thẳng nút thật. setManageTab()
+  // gọi rerender() bất đồng bộ (React commit không đồng bộ trong cùng lượt gọi đồng
+  // bộ) nên phải chờ nút xuất hiện, cùng bài học đã gặp ở audit:archive-log.
+  { page: 'manage', label: 'manage:add-lot', open: async () => {
+      setManageTab('lots');
+      for (let tries = 0; tries < 20; tries++) {
+        const btn = document.querySelector('.lot-config-left .rcfg-panel-h .btn.teal');
+        if (btn) { btn.click(); return; }
+        await new Promise(r => setTimeout(r, 25));
+      }
+    } },
   { page: 'manage', label: 'manage:add-assay', open: () => openConfigAssay() },
   // "Edit" variants render extra fields (history, etc.) the "add" form
   // doesn't, so they're checked separately, not assumed identical.
-  { page: 'manage', label: 'manage:edit-instrument', open: () => { [...document.querySelectorAll('.instrument-table .manage-actions button')].find(b => b.textContent === 'Sửa').click(); } },
-  { page: 'manage', label: 'manage:edit-lot', open: () => openConfigLot('L1101') },
+  { page: 'manage', label: 'manage:edit-instrument', open: async () => {
+      setManageTab('instruments');
+      for (let tries = 0; tries < 20; tries++) {
+        const btn = [...document.querySelectorAll('.instrument-table .manage-actions button')].find(b => b.textContent === 'Sửa');
+        if (btn) { btn.click(); return; }
+        await new Promise(r => setTimeout(r, 25));
+      }
+    } },
+  { page: 'manage', label: 'manage:edit-lot', open: async () => {
+      setManageTab('lots');
+      for (let tries = 0; tries < 20; tries++) {
+        const btn = [...document.querySelectorAll('.lot-table .lot-row-actions button')].find(b => b.textContent === 'Sửa' && b.closest('tr').textContent.includes('1101'));
+        if (btn) { btn.click(); return; }
+        await new Promise(r => setTimeout(r, 25));
+      }
+    } },
   { page: 'manage', label: 'manage:edit-assay', open: () => openConfigAssay('T-NA') },
   { page: 'manage', label: 'manage:tea-lab-profile', open: () => teaLabProfileOpen('qclab-sodium') },
   { page: 'sigma', label: 'sigma:add-test', open: () => sgOpenAddTest() },
