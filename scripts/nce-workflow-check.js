@@ -596,14 +596,22 @@ async function checkOverdueReachesDashboard(page) {
       text: main.innerText,
       hasOverdueRow: /NCE-QUA-HAN/.test(main.innerHTML),
       hasInTimeRow: /NCE-CON-HAN/.test(main.innerHTML),
-      opensRecord: /data-action="dashboardContinueAction" data-args="\[0\]"/.test(main.innerHTML),
     };
   });
   check('Dashboard nêu hồ sơ NCE quá hạn', out.hasOverdueRow === true, out.text.slice(0, 200));
   check('Hồ sơ còn trong hạn không bị báo nhầm', out.hasInTimeRow === false);
   check('Nhãn "Quá hạn N ngày" hiện trên dashboard', /Quá hạn \d+ ngày/.test(out.text));
   check('Câu trạng thái trực ca phản ánh hồ sơ quá hạn', /hồ sơ NCE quá hạn/i.test(out.text), out.text.slice(0, 200));
-  check('Nút mở thẳng đúng hồ sơ', out.opensRecord === true);
+  // Trang Dashboard đã chuyển "Tiếp tục hồ sơ" từ data-action sang onClick thật
+  // (2026-08-30, xem kế hoạch kiến trúc "gỡ bỏ global bridge" Giai đoạn 2) — kiểm
+  // bằng cách BẤM THẬT nút thay vì soi chuỗi data-action="..." trong HTML.
+  await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('.shift-item')];
+    const row = rows.find(el => el.textContent.includes('NCE-QUA-HAN'));
+    row.querySelector('button').click();
+  });
+  const opened = await page.evaluate(() => ({ page, formText: document.getElementById('main').innerText }));
+  check('Nút mở thẳng đúng hồ sơ', opened.page === 'actions' && opened.formText.includes('NCE-QUA-HAN'), opened.formText.slice(0, 200));
 
   await page.evaluate(() => { state.actions = []; go('dash'); });
   const cleared = await page.evaluate(() => document.getElementById('main').innerText);

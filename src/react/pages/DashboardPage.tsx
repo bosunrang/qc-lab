@@ -3,6 +3,7 @@ import { useAppStore } from '../state/kernel';
 import {
   dashboardModel, dashboardHeadHtml, testDisplayName, vnDate, fmtPointValue, fmt,
   dashTestSetStatus, setDashTestQuery, normalizeSearchText, levelTargetOk,
+  goManageTargets, dashboardGoEntryFollowup, dashboardContinueAction, dashViewTestInEntry,
   type DashboardModel,
 } from '../bridge/dashboardBridge';
 
@@ -64,7 +65,7 @@ function FollowupPanel({ model }: { model: Extract<DashboardModel, { loading: fa
         <ShiftItem key={`u${i}`} tone="rej"
           title={<>{testDisplayName(item.t)} · M{String(item.l.level)}</>}
           meta={<>{vnDate(item.p.date)} · {fmtPointValue(item.p, item.t)} {item.t.unit || ''} · {item.rules.join(', ') || '—'}</>}
-          action={<button className="btn ghost sm" data-action="dashboardGoEntryFollowup" data-args={JSON.stringify([item.t.id, item.l.level])}>Xem</button>} />
+          action={<button className="btn ghost sm" onClick={() => dashboardGoEntryFollowup(item.t.id, item.l.level)}>Xem</button>} />
       ))}
       {overdue.map((item: any) => {
         const test = model.stateTests.find((t: any) => t.id === item.action.testId);
@@ -73,20 +74,20 @@ function FollowupPanel({ model }: { model: Extract<DashboardModel, { loading: fa
           <ShiftItem key={`o${item.index}`} tone="rej"
             title={<>{item.action.nceId || 'Hồ sơ khắc phục'} · {title}</>}
             meta={<>{item.info.label} · hạn {vnDate(item.action.dueDate)} · phụ trách {item.action.by || '—'}</>}
-            action={<button className="btn ghost sm" data-action="dashboardContinueAction" data-args={JSON.stringify([item.index])}>Tiếp tục hồ sơ</button>} />
+            action={<button className="btn ghost sm" onClick={() => dashboardContinueAction(item.index)}>Tiếp tục hồ sơ</button>} />
         );
       })}
       {noTarget.map((item: any, i: number) => (
         <ShiftItem key={`m${i}`} tone="warn"
           title={<>{testDisplayName(item.t)} · M{String(item.l.level)}</>}
           meta="Chưa có Mean/SD hợp lệ — điểm QC mức này không được đánh giá Westgard"
-          action={<button className="btn ghost sm" data-action="goManageTargets">Gán Mean/SD</button>} />
+          action={<button className="btn ghost sm" onClick={goManageTargets}>Gán Mean/SD</button>} />
       ))}
       {watch.map((item: any, i: number) => (
         <ShiftItem key={`w${i}`} tone="warn"
           title={<>{testDisplayName(item.t)} · M{String(item.l.level)}</>}
           meta={<>{vnDate(item.p.date)} · {fmtPointValue(item.p, item.t)} {item.t.unit || ''} · {item.rules.join(', ') || '—'}</>}
-          action={<button className="btn ghost sm" data-action="dashboardGoEntryFollowup" data-args={JSON.stringify([item.t.id, item.l.level])}>Xem</button>} />
+          action={<button className="btn ghost sm" onClick={() => dashboardGoEntryFollowup(item.t.id, item.l.level)}>Xem</button>} />
       ))}
     </div>
   );
@@ -123,7 +124,7 @@ function TestRow({ item }: { item: any }) {
       <td className="num"><b>{item.totalPoints}</b></td>
       <td><WestgardTag status={item.s} /></td>
       <td><span className="dash-latest">{item.latest ? <>{vnDate(item.latest.date)} · M{item.latest._level} · {fmtPointValue(item.latest, item.t)}</> : 'Chưa có điểm'}</span></td>
-      <td><button className="btn ghost sm" data-action="dashViewTestInEntry" data-args={JSON.stringify([item.t.id, Number(levels[0].level)])}>Xem QC</button></td>
+      <td><button className="btn ghost sm" onClick={() => dashViewTestInEntry(item.t.id, Number(levels[0].level))}>Xem QC</button></td>
     </tr>
   );
 }
@@ -164,7 +165,7 @@ function TestsPanel({ model }: { model: Extract<DashboardModel, { loading: false
         <div className="empty">
           <div className="empty-title">Chưa có xét nghiệm đang vận hành</div>
           <div>Cần đưa xét nghiệm vào Panel QC, ghép Nhóm lô QC và gán Mean/SD trước khi theo dõi.</div>
-          {model.isAdmin && <div className="empty-actions"><button className="btn teal" data-action="goManageTargets">Cấu hình Mean/SD</button></div>}
+          {model.isAdmin && <div className="empty-actions"><button className="btn teal" onClick={goManageTargets}>Cấu hình Mean/SD</button></div>}
         </div>
       </div>
     );
@@ -178,7 +179,7 @@ function TestsPanel({ model }: { model: Extract<DashboardModel, { loading: false
           {STATUS_TABS.map(([key, label]) => {
             const count = key === 'all' ? model.dashItems.length : model.dashItems.filter((item: any) => key === 'missing' ? item.missingToday : item.s === key).length;
             return (
-              <button key={key} className={model.dashTestStatus === key ? 'on' : ''} data-action="dashTestSetStatus" data-args={JSON.stringify([key])}>
+              <button key={key} className={model.dashTestStatus === key ? 'on' : ''} onClick={() => dashTestSetStatus(key)}>
                 {label}<b>{count}</b>
               </button>
             );

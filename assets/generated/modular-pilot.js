@@ -32312,7 +32312,11 @@
 			reportActionIconPresentation: root.reportActionIconPresentation,
 			reagentToolIconPresentation: root.reagentToolIconPresentation,
 			QCCore: root.QCCore,
-			AnalysisUIState: root.AnalysisUIState
+			AnalysisUIState: root.AnalysisUIState,
+			goManageTargets: root.goManageTargets,
+			dashboardGoEntryFollowup: root.dashboardGoEntryFollowup,
+			dashboardContinueAction: root.dashboardContinueAction,
+			dashViewTestInEntry: root.dashViewTestInEntry
 		}
 	};
 	if (typeof window !== "undefined") window.__QC_KERNEL__ = kernel;

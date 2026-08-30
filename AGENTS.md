@@ -500,17 +500,46 @@ violations (18/18 modals — every kernel-routed function across every page
 exercised via real browser clicks), `ui-check` 29/29, `nce-check` 91/91,
 `visual-check`/`print-check` pass.
 
-**Next phases (not yet started)**: replace `data-action` with real
-`onClick`/`onChange`/`onKeyDown`, one page at a time; then modals as
-`createPortal`, one modal at a time; then shrink/delete the now-dead
-`root.X=` aliases, `global.d.ts`'s ambient bare-global declarations, and
-rewrite the 61 sandbox tests + ~88 bridge-wiring text-scanner tests. See the
-plan file for the full phase breakdown and the risks already identified (LIS
-Gateway's `lis-client-service.ts` shares the same `getState`/`rerender` deps
-shape and gets swept into this even though it's unrelated to the UI rewrite;
-several `data-*` conventions in `action-dispatcher.ts` encode real
-event-timing semantics that a naive `onClick`-only conversion would silently
-drop).
+**Giai đoạn 2 (in progress) — `data-action` → real `onClick`/`onChange`/
+`onKeyDown`, one page at a time, full e2e suite after every single page (not
+batched — this is the highest-behavior-risk phase).** Dashboard (done): all
+7 `data-action` buttons converted (`dashboardGoEntryFollowup`,
+`dashboardContinueAction`, `goManageTargets`, `dashViewTestInEntry`,
+`dashTestSetStatus` — the last already had a real bridge export, just wasn't
+wired to `onClick` yet). `goManageTargets`/`dashboardGoEntryFollowup`/
+`dashboardContinueAction`/`dashViewTestInEntry` are page-agnostic navigation
+helpers (confirmed used across 6 pages via grep) added to `kernel.pres`, not
+`kernel.dash` — they don't belong to Dashboard's own controller. Running
+`scripts/nce-workflow-check.js` surfaced one test that had drifted into
+checking an implementation detail rather than behavior: `checkOverdue-
+ReachesDashboard()`'s "Nút mở thẳng đúng hồ sơ" asserted
+`/data-action="dashboardContinueAction" data-args="\[0\]"/.test(main.innerHTML)`
+— true by construction before this conversion, meaningless after (the
+button still opens the right record, it just does so via a real `onClick`
+closure now, with no `data-action` attribute left to match). Fixed by
+clicking the actual button and asserting the real outcome (navigates to
+`'actions'`, form shows the right `nceId`) instead of scanning for the
+attribute string — this is a strict improvement, not a workaround, and is
+the same class of fix anticipated for the ~88 bridge-wiring text-scanner
+tests in the final cleanup phase, just found early because pages are being
+converted before that phase runs. `goManageTargets`/`dashViewTestInEntry`
+etc. embedded as raw text inside strings returned by shared classic
+HTML-builders (`emptyStateHtml`, used via `dangerouslySetInnerHTML` on
+Westgard/Sigma/Entry/Report) are NOT yet convertible — that requires those
+shared builders to become real components first (a separate sub-task, not
+yet started); Dashboard's own usages were all plain JSX buttons, so this
+page needed no such dependency.
+
+**Remaining phases (not yet started)**: finish converting `data-action` on
+the other 10 pages; then modals as `createPortal`, one modal at a time; then
+shrink/delete the now-dead `root.X=` aliases, `global.d.ts`'s ambient
+bare-global declarations, and rewrite the 61 sandbox tests + ~88
+bridge-wiring text-scanner tests. See the plan file for the full phase
+breakdown and the risks already identified (LIS Gateway's
+`lis-client-service.ts` shares the same `getState`/`rerender` deps shape and
+gets swept into this even though it's unrelated to the UI rewrite; several
+`data-*` conventions in `action-dispatcher.ts` encode real event-timing
+semantics that a naive `onClick`-only conversion would silently drop).
 
 `assets/core.js` is the one exception: it's wrapped in a UMD shim so it also
 works via `require()` — that's what makes it usable from both the browser

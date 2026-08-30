@@ -44,3 +44,7 @@ export const dashTestSetStatus = (status: string) => getKernel().dash.dashTestSe
 export const setDashTestQuery = (value: string) => { getKernel().pres.AnalysisUIState.dashTestQ = value; };
 export const normalizeSearchText = (value: unknown): string => getKernel().pres.normalizeSearchText(value);
 export const levelTargetOk = (level: any): boolean => getKernel().pres.levelTargetOk(level);
+export const goManageTargets = (): void => getKernel().pres.goManageTargets();
+export const dashboardGoEntryFollowup = (testId: string, level: number): void => getKernel().pres.dashboardGoEntryFollowup(testId, level);
+export const dashboardContinueAction = (index: number): void => getKernel().pres.dashboardContinueAction(index);
+export const dashViewTestInEntry = (testId: string, level: number): void => getKernel().pres.dashViewTestInEntry(testId, level);
