@@ -12745,18 +12745,6 @@
   </div>`;
 	}
 	//#endregion
-	//#region src/presentation/manage/config-assay-modal-html.ts
-	function configAssayModalHtml(input) {
-		return `<div class="modal rcfg-modal rcfg-assay-modal"><div class="modal-h"><div><h3>${input.title}</h3></div><button class="modal-close" data-action="closeModal">✕</button></div><div class="modal-b">
-    <div class="assay-form-heading"><h4>Thông tin xét nghiệm</h4></div>
-    <div class="assay-main-grid"><div><label>Tên xét nghiệm <span class="req">*</span></label><input id="cfgAssayName" list="cfgAssayTeaSuggestions" autocomplete="off" value="${input.name}" placeholder="Gõ tên, viết tắt hoặc bí danh" data-action="configAssaySuggestionInput" data-action-on="input"><datalist id="cfgAssayTeaSuggestions">${input.teaOptionsHtml}</datalist><input id="cfgAssayTeaRefKey" type="hidden" value="${input.teaRefKey}"><input id="cfgAssayTeaSource" type="hidden" value="${input.teaSource}"></div><div><label>Đơn vị</label><input id="cfgAssayUnit" aria-label="Đơn vị" value="${input.unit}"></div><div><label>Máy xét nghiệm <span class="req">*</span></label><select id="cfgAssayInstrument" aria-label="Máy xét nghiệm" data-action="configAssayInstrumentChanged" data-action-on="change">${input.instrumentsHtml}</select></div><div><label>Khoa / Khu vực</label><input id="cfgAssaySection" value="${input.section}" placeholder="VD: Điện giải"></div></div>
-    <div class="assay-detail-grid"><div><label>Phương pháp</label><input id="cfgAssayMethod" aria-label="Phương pháp" value="${input.method}"></div><div><label>Số thập phân</label><select id="cfgAssayDecimals" aria-label="Số chữ số thập phân">${input.decimalOptionsHtml}</select></div><div><label>Hóa chất</label><input id="cfgAssayReagent" aria-label="Hóa chất" value="${input.reagent}"></div><div><label>TEa %</label><input id="cfgAssayTea" aria-label="TEa %" type="number" step="any" value="${input.tea}"></div></div>
-    <details class="assay-advanced" ${input.hasRuleOverrides ? "open" : ""}><summary><span><b>Cấu hình Westgard nâng cao</b><small>Mặc định dùng cấu hình chung của hệ thống</small></span></summary><div class="assay-advanced-body"><div class="assay-rule-head" aria-hidden="true"><span>Luật</span><span>Hành động</span><span>Phạm vi áp dụng</span></div><div class="assay-rule-grid">${input.ruleRowsHtml}</div></div></details>
-    <details class="assay-advanced" ${input.cusumOn ? "open" : ""}><summary><span><b>Giám sát xu hướng CUSUM</b><small>Tùy chọn hỗ trợ phát hiện trôi hoặc dịch chuyển kéo dài</small></span></summary><div class="assay-advanced-body"><label class="rcfg-check"><input id="cfgAssayCusumOn" type="checkbox" ${input.cusumOn ? "checked" : ""}> Bật biểu đồ CUSUM cho xét nghiệm này</label><div class="assay-cusum-grid"><div><label>Ngưỡng tích lũy k (SD)</label><input id="cfgAssayCusumK" aria-label="Ngưỡng tích lũy k (SD)" type="number" step="0.1" min="0.1" value="${input.cusumK}"></div><div><label>Ngưỡng cảnh báo h (SD)</label><input id="cfgAssayCusumH" aria-label="Ngưỡng cảnh báo h (SD)" type="number" step="0.5" min="0.5" value="${input.cusumH}"></div></div></div></details>
-    <label class="rcfg-check"><input id="cfgAssayClosed" type="checkbox" ${input.closed ? "checked" : ""}> Ngừng sử dụng xét nghiệm này cho cấu hình QC mới</label></div>
-    <div class="modal-f">${input.cancelButtonHtml}${input.saveButtonHtml}</div></div>`;
-	}
-	//#endregion
 	//#region src/presentation/manage/qc-history-detail-modal-html.ts
 	function qcHistoryDetailModalHtml(input) {
 		const history = input.historyRowsHtml ? `<table class="history-detail-table hist-meansd-table"><thead><tr><th>Lô QC</th><th class="num">Mean</th><th class="num">SD</th><th class="num">Mean tích lũy</th><th class="num">SD tích lũy</th><th class="num">CV tích lũy</th><th>Hiệu lực</th><th>Nguồn</th></tr></thead><tbody>${input.historyRowsHtml}</tbody></table>` : input.historyEmptyHtml;
@@ -12764,34 +12752,6 @@
 		return `<div class="modal rcfg-history-detail-modal"><div class="modal-h"><div><h3>${input.title}</h3></div><button class="modal-close" data-action="closeModal">✕</button></div><div class="modal-b">
     <h4 class="history-detail-heading">Mean/SD đã dùng</h4>${history}
     <h4 class="flow-panel space-after-section">Điểm QC đã nhập (${input.pointCount})</h4>${points}</div><div class="modal-f">${input.closeButtonHtml}</div></div>`;
-	}
-	//#endregion
-	//#region src/presentation/manage/config-assay-rule-rows-html.ts
-	function configAssayRuleRowsHtml(rows) {
-		return rows.map((row) => `<div class="assay-rule-row"><b>${row.id}</b><select class="cfg-assay-rule" data-rule="${row.id}" aria-label="Hành động ${row.id}"><option value="" ${row.action === "" ? "selected" : ""}>Theo cấu hình chung</option><option value="inactive" ${row.action === "inactive" ? "selected" : ""}>Không dùng</option><option value="alert" ${row.action === "alert" ? "selected" : ""}>Cảnh báo</option><option value="reject" ${row.action === "reject" ? "selected" : ""}>Loại bỏ</option></select><select class="cfg-assay-scope" data-rule="${row.id}" aria-label="Phạm vi ${row.id}"><option value="" ${row.scope === "" ? "selected" : ""}>Phạm vi SOP khuyến nghị</option><option value="within" ${row.scope === "within" ? "selected" : ""}>Chỉ trong từng mức</option><option value="across" ${row.scope === "across" ? "selected" : ""}>Chỉ chéo mức/lần chạy</option><option value="both" ${row.scope === "both" ? "selected" : ""}>Cả hai phạm vi</option></select></div>`).join("");
-	}
-	//#endregion
-	//#region src/presentation/manage/config-assay-tea-options-html.ts
-	function configAssayTeaOptionsHtml(options) {
-		return options.map((option) => `<option value="${option.value}" label="${option.label}"></option>`).join("");
-	}
-	//#endregion
-	//#region src/presentation/manage/config-assay-instrument-options-html.ts
-	function configAssayInstrumentOptionsHtml(options) {
-		return options.map((option) => `<option value="${option.id}" ${option.selected ? "selected" : ""} data-section="${option.section}">${option.label}</option>`).join("");
-	}
-	//#endregion
-	//#region src/presentation/manage/config-assay-decimal-options-html.ts
-	function configAssayDecimalOptionsHtml(selected) {
-		return [
-			0,
-			1,
-			2,
-			3,
-			4,
-			5,
-			6
-		].map((value) => `<option value="${value}" ${selected === String(value) ? "selected" : ""}>${value}</option>`).join("");
 	}
 	//#endregion
 	//#region src/presentation/manage/config-lot-level-options-html.ts
@@ -18631,23 +18591,23 @@
 			const o = this.selectedOptions[0], e = doc().getElementById("cfgAssaySection");
 			if (e) e.value = o ? o.dataset.section || "" : "";
 		};
-		const openConfigAssay = (id = "") => {
+		const openConfigAssayModel = (id = "") => {
 			if (!state().instruments.length) {
 				deps.openReactInstrumentModal();
-				return;
+				return null;
 			}
 			const t = state().tests.find((x) => x.id === id) || {
 				levels: defaultAssayLevels(),
 				active: true
 			};
 			const defaultInst = state().instruments.find((i) => i.id === (t.instrumentId || "")) || state().instruments[0];
-			const instruments = deps.pres.configAssayInstrumentOptionsHtml(state().instruments.map((i) => ({
+			const instruments = state().instruments.map((i) => ({
 				id: i.id,
 				selected: i.id === (t.instrumentId || ""),
-				section: deps.escapeAttr(i.section || ""),
-				label: deps.esc(i.name) + (i.model ? " · " + deps.esc(i.model) : "")
-			})));
-			const ruleRows = deps.pres.configAssayRuleRowsHtml(deps.wgRules().map((rule) => ({
+				section: i.section || "",
+				label: i.name + (i.model ? " · " + i.model : "")
+			}));
+			const ruleRows = deps.wgRules().map((rule) => ({
 				id: rule,
 				action: t && t.ruleActions && [
 					"inactive",
@@ -18659,7 +18619,7 @@
 					"across",
 					"both"
 				].includes(t.ruleScopes[rule]) ? t.ruleScopes[rule] : ""
-			})));
+			}));
 			const cusum = deps.testCusumConfig(t), decimalValue = t.decimalPlaces !== null && t.decimalPlaces !== "" && Number.isInteger(Number(t.decimalPlaces)) ? String(t.decimalPlaces) : String(deps.qcDecimalsDefault()), hasRuleOverrides = deps.wgRules().some((rule) => t.ruleActions && [
 				"inactive",
 				"alert",
@@ -18675,44 +18635,40 @@
 				"clia",
 				"ricos"
 			].includes(t.teaSource) ? t.teaSource : "") || (initialRef ? initialRef[2] != null ? "clia" : initialRef[3] != null ? "ricos" : "" : "");
-			const teaOptions = deps.pres.configAssayTeaOptionsHtml(configAssayTeaRefs().map((ref) => ({
+			const teaOptions = configAssayTeaRefs().map((ref) => ({
 				ref,
 				naming: configAssayNaming(ref)
 			})).sort((a, b) => String(a.ref[4] || "").localeCompare(String(b.ref[4] || ""), "vi") || String(a.naming.displayName || "").localeCompare(String(b.naming.displayName || ""), "vi")).map(({ ref, naming }) => ({
-				value: deps.escapeAttr(naming.displayName || ref[0]),
-				label: deps.escapeAttr([
+				value: naming.displayName || ref[0],
+				label: [
 					naming.standardName !== naming.displayName ? naming.standardName : "",
 					naming.abbreviation,
 					...naming.aliases.filter((x) => x !== ref[0] && x !== naming.displayName && x !== naming.standardName).slice(0, 3),
 					ref[1],
 					ref[4]
-				].filter(Boolean).join(" · "))
-			})));
-			deps.openModal(deps.pres.configAssayModalHtml({
+				].filter(Boolean).join(" · ")
+			}));
+			return {
+				id,
 				title: id ? "Sửa xét nghiệm" : "Thêm xét nghiệm",
-				name: deps.escapeAttr(initialName),
-				teaOptionsHtml: teaOptions,
-				teaRefKey: deps.escapeAttr(initialRef && (initialRef[6] || initialRef[0]) || ""),
-				teaSource: deps.escapeAttr(initialSource),
-				unit: deps.escapeAttr(t.unit || ""),
-				instrumentsHtml: instruments,
-				section: deps.escapeAttr(t.section || defaultInst && defaultInst.section || ""),
-				method: deps.escapeAttr(t.method || ""),
-				decimalOptionsHtml: deps.pres.configAssayDecimalOptionsHtml(decimalValue),
-				reagent: deps.escapeAttr(t.reagent || ""),
-				tea: deps.escapeAttr(t.tea || ""),
-				ruleRowsHtml: ruleRows,
+				name: initialName,
+				teaOptions,
+				teaRefKey: initialRef && (initialRef[6] || initialRef[0]) || "",
+				teaSource: initialSource,
+				unit: t.unit || "",
+				instruments,
+				section: t.section || defaultInst && defaultInst.section || "",
+				method: t.method || "",
+				decimalValue,
+				reagent: t.reagent || "",
+				tea: t.tea || "",
+				ruleRows,
 				hasRuleOverrides,
 				cusumOn: cusum.on,
-				cusumK: deps.escapeAttr(cusum.k),
-				cusumH: deps.escapeAttr(cusum.h),
-				closed: !!t.closed,
-				cancelButtonHtml: deps.btn("Hủy", { action: "closeModal" }, "ghost"),
-				saveButtonHtml: deps.btn(id ? "Lưu thay đổi" : "Thêm xét nghiệm", {
-					action: "saveConfigAssay",
-					args: [id]
-				}, "teal")
-			}));
+				cusumK: String(cusum.k),
+				cusumH: String(cusum.h),
+				closed: !!t.closed
+			};
 		};
 		const saveConfigAssay = async (id) => {
 			if (!deps.requireAdmin()) return;
@@ -18854,7 +18810,7 @@
 			configAssayFindRef,
 			configAssaySuggestionInput,
 			configAssayInstrumentChanged,
-			openConfigAssay,
+			openConfigAssayModel,
 			saveConfigAssay,
 			delTest
 		};
@@ -28150,12 +28106,7 @@
 	root.entryVoidModalHtml = entryVoidModalHtml;
 	root.entryPreSaveWarningModalHtml = entryPreSaveWarningModalHtml;
 	root.targetSwitchModalHtml = targetSwitchModalHtml;
-	root.configAssayModalHtml = configAssayModalHtml;
 	root.qcHistoryDetailModalHtml = qcHistoryDetailModalHtml;
-	root.configAssayRuleRowsHtml = configAssayRuleRowsHtml;
-	root.configAssayTeaOptionsHtml = configAssayTeaOptionsHtml;
-	root.configAssayInstrumentOptionsHtml = configAssayInstrumentOptionsHtml;
-	root.configAssayDecimalOptionsHtml = configAssayDecimalOptionsHtml;
 	root.configLotLevelOptionsHtml = configLotLevelOptionsHtml;
 	root.qcHistoryMeanSdRowsHtml = qcHistoryMeanSdRowsHtml;
 	root.qcHistoryPointRowsHtml = qcHistoryPointRowsHtml;
@@ -30638,7 +30589,7 @@
 	root.configAssayFindRef = manageTestsActionsController.configAssayFindRef;
 	root.configAssaySuggestionInput = manageTestsActionsController.configAssaySuggestionInput;
 	root.configAssayInstrumentChanged = manageTestsActionsController.configAssayInstrumentChanged;
-	root.openConfigAssay = manageTestsActionsController.openConfigAssay;
+	root.openConfigAssayModel = manageTestsActionsController.openConfigAssayModel;
 	root.saveConfigAssay = manageTestsActionsController.saveConfigAssay;
 	root.delTest = manageTestsActionsController.delTest;
 	root.jsq = jsq;
@@ -31547,7 +31498,10 @@
 			deleteConfigInstrument: manageTestsActionsController.deleteConfigInstrument,
 			saveConfigInstrument: manageTestsActionsController.saveConfigInstrument,
 			configLotLevelOptionsHtml: root.configLotLevelOptionsHtml,
-			openConfigAssay: manageTestsActionsController.openConfigAssay,
+			openConfigAssayModel: manageTestsActionsController.openConfigAssayModel,
+			saveConfigAssay: manageTestsActionsController.saveConfigAssay,
+			configAssaySuggestionInput: manageTestsActionsController.configAssaySuggestionInput,
+			configAssayInstrumentChanged: manageTestsActionsController.configAssayInstrumentChanged,
 			delTest: manageTestsActionsController.delTest,
 			openConfigPanelModel: manageTestsActionsController.openConfigPanelModel,
 			saveConfigPanel: manageTestsActionsController.saveConfigPanel,
@@ -31638,7 +31592,7 @@
 			dashboardGoEntryFollowup: root.dashboardGoEntryFollowup,
 			dashboardContinueAction: root.dashboardContinueAction,
 			dashViewTestInEntry: root.dashViewTestInEntry,
-			openConfigAssay: root.openConfigAssay,
+			openConfigAssayModel: root.openConfigAssayModel,
 			reauthVerify: root.reauthVerify,
 			reauthAccountLabel: root.reauthAccountLabel
 		}

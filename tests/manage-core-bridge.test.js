@@ -19,18 +19,8 @@ assert.match(bridge,/manageLotStatusPresentation: ReturnType<typeof createManage
 
 assert.match(actions,/deps\.pres\.targetSwitchModalHtml\(/,'target switch modal must use the TypeScript bridge');
 assert.match(bridge,/targetSwitchModalHtml: typeof targetSwitchModalHtml;/,'target switch modal must be a required bridge contract');
-assert.match(actions,/deps.pres.configAssayModalHtml\(/,'Assay modal must use the TypeScript bridge');
-assert.match(bridge,/configAssayModalHtml: typeof configAssayModalHtml;/,'Assay modal must be a required bridge contract');
 assert.match(actions,/deps.pres.qcHistoryDetailModalHtml\(/,'Mean/SD history modal must use the TypeScript bridge');
 assert.match(bridge,/qcHistoryDetailModalHtml: typeof qcHistoryDetailModalHtml;/,'Mean/SD history modal must be a required bridge contract');
-assert.match(actions,/deps.pres.configAssayRuleRowsHtml\(/,'Assay Westgard rows must use the TypeScript bridge');
-assert.match(bridge,/configAssayRuleRowsHtml: typeof configAssayRuleRowsHtml;/,'Assay Westgard rows must be a required bridge contract');
-assert.match(actions,/deps.pres.configAssayTeaOptionsHtml\(/,'Assay TEa suggestions must use the TypeScript bridge');
-assert.match(bridge,/configAssayTeaOptionsHtml: typeof configAssayTeaOptionsHtml;/,'Assay TEa suggestions must be a required bridge contract');
-assert.match(actions,/deps.pres.configAssayInstrumentOptionsHtml\(/,'Assay instrument options must use the TypeScript bridge');
-assert.match(bridge,/configAssayInstrumentOptionsHtml: typeof configAssayInstrumentOptionsHtml;/,'Assay instrument options must be a required bridge contract');
-assert.match(actions,/deps.pres.configAssayDecimalOptionsHtml\(/,'Assay decimal options must use the TypeScript bridge');
-assert.match(bridge,/configAssayDecimalOptionsHtml: typeof configAssayDecimalOptionsHtml;/,'Assay decimal options must be a required bridge contract');
 // Lô QC (Giai đoạn 3) đã chuyển sang component React thật — configLotLevelOptionsHtml()
 // giờ được LotModal.tsx gọi qua kernel.manage, không còn qua deps.pres trong actions.
 const lotModal=fs.readFileSync(path.join(root,'src','react','modals','LotModal.tsx'),'utf8');

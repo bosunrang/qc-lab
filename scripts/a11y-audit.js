@@ -62,7 +62,16 @@ const MODALS = [
         await new Promise(r => setTimeout(r, 25));
       }
     } },
-  { page: 'manage', label: 'manage:add-assay', open: () => openConfigAssay() },
+  // openConfigAssay() (Giai đoạn 3) giờ chỉ tồn tại trong react-pilot.js, không
+  // còn là global tới được từ đây — chuyển tab "assays" rồi bấm thẳng nút thật.
+  { page: 'manage', label: 'manage:add-assay', open: async () => {
+      setManageTab('assays');
+      for (let tries = 0; tries < 20; tries++) {
+        const btn = document.querySelector('.rcfg-tools .btn.teal');
+        if (btn) { btn.click(); return; }
+        await new Promise(r => setTimeout(r, 25));
+      }
+    } },
   // "Edit" variants render extra fields (history, etc.) the "add" form
   // doesn't, so they're checked separately, not assumed identical.
   { page: 'manage', label: 'manage:edit-instrument', open: async () => {
@@ -81,7 +90,15 @@ const MODALS = [
         await new Promise(r => setTimeout(r, 25));
       }
     } },
-  { page: 'manage', label: 'manage:edit-assay', open: () => openConfigAssay('T-NA') },
+  { page: 'manage', label: 'manage:edit-assay', open: async () => {
+      setManageTab('assays');
+      for (let tries = 0; tries < 20; tries++) {
+        const row = [...document.querySelectorAll('.assay-table tbody tr')].find(tr => tr.textContent.includes('Sodium'));
+        const btn = row && [...row.querySelectorAll('button')].find(b => b.textContent === 'Sửa');
+        if (btn) { btn.click(); return; }
+        await new Promise(r => setTimeout(r, 25));
+      }
+    } },
   // teaLabProfileOpen() (Giai đoạn 3) giờ chỉ tồn tại trong react-pilot.js, không còn
   // global tới được từ đây — chuyển tab "tearefs" rồi bấm thẳng nút thật trên dòng
   // Sodium (qclab-sodium).

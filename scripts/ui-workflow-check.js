@@ -51,7 +51,10 @@ async function checkManageForms(page){
   const edited=await page.evaluate(id=>{const i=state.instruments.find(x=>x.id===id);return{section:i.section,audit:state.activity.at(-1).type};},added.id);
   check('Form sửa máy cập nhật đúng bản ghi',edited.section==='Hóa sinh 2'&&edited.audit==='Cập nhật máy',JSON.stringify(edited));
 
-  await page.evaluate(()=>openConfigAssay());await page.waitForSelector('#cfgAssayName');
+  // openConfigAssay() (Giai đoạn 3) giờ chỉ tồn tại trong react-pilot.js, không
+  // còn là global tới được từ đây — chuyển tab "assays" rồi bấm nút thật.
+  await page.evaluate(()=>setManageTab('assays'));
+  await page.locator('.rcfg-tools .btn.teal').click();await page.waitForSelector('#cfgAssayName');
   await page.fill('#cfgAssayName','Calcium UI');await page.fill('#cfgAssayUnit','mmol/L');await page.selectOption('#cfgAssayInstrument','I1');await page.selectOption('#cfgAssayDecimals','3');await page.fill('#cfgAssayMethod','ISE');await page.fill('#cfgAssayTea','5');
   const details=page.locator('#modalRoot details.assay-advanced').last();await details.locator('summary').click();await page.check('#cfgAssayCusumOn');await page.fill('#cfgAssayCusumK','0.7');await page.fill('#cfgAssayCusumH','5');
   await page.locator('#modalRoot').getByRole('button',{name:'Thêm xét nghiệm',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('#modalRoot .modal'));

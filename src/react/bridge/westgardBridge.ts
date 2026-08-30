@@ -1,4 +1,7 @@
+import { createElement } from 'react';
 import { getKernel } from '../state/kernel';
+import { openReactModal } from '../dialogs/modal-store';
+import { AssayModal } from '../modals/AssayModal';
 
 export type WestgardRow = {
   index: number; date: string; value: string; z: string;
@@ -40,7 +43,10 @@ export const wgFilterTests = (value: string): void => getKernel().westgard.wgFil
 export const wgFilterArchivedTests = (value: string): void => getKernel().westgard.wgFilterArchivedTests(value);
 export const goManageTargets = (): void => getKernel().pres.goManageTargets();
 export const dashboardGoEntryFollowup = (testId: string, level: number): void => getKernel().pres.dashboardGoEntryFollowup(testId, level);
-export const openConfigAssay = (testId: string): void => getKernel().pres.openConfigAssay(testId);
+export const openConfigAssay = (testId: string): void => {
+  const model = getKernel().pres.openConfigAssayModel(testId);
+  if (model) openReactModal(() => createElement(AssayModal, model));
+};
 export const wgSetViewMode = (mode: string): void => getKernel().westgard.wgSetViewMode(mode);
 export const wgSetChartMode = (mode: string): void => getKernel().westgard.wgSetChartMode(mode);
 export const exportWestgardXLSX = (): void => getKernel().dataIo.exportWestgardXLSX();

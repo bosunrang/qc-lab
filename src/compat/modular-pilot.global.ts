@@ -319,12 +319,7 @@ import { entryRowsWindow as entryRowsWindowTs, entryLotLabels as entryLotLabelsT
 import { entryVoidModalHtml } from '../presentation/entry/entry-void-modal-html';
 import { entryPreSaveWarningModalHtml } from '../presentation/entry/entry-pre-save-warning-modal-html';
 import { targetSwitchModalHtml } from '../presentation/manage/target-switch-modal-html';
-import { configAssayModalHtml } from '../presentation/manage/config-assay-modal-html';
 import { qcHistoryDetailModalHtml } from '../presentation/manage/qc-history-detail-modal-html';
-import { configAssayRuleRowsHtml } from '../presentation/manage/config-assay-rule-rows-html';
-import { configAssayTeaOptionsHtml } from '../presentation/manage/config-assay-tea-options-html';
-import { configAssayInstrumentOptionsHtml } from '../presentation/manage/config-assay-instrument-options-html';
-import { configAssayDecimalOptionsHtml } from '../presentation/manage/config-assay-decimal-options-html';
 import { configLotLevelOptionsHtml } from '../presentation/manage/config-lot-level-options-html';
 import { qcHistoryMeanSdRowsHtml, qcHistoryPointRowsHtml } from '../presentation/manage/qc-history-detail-rows-html';
 import { createTargetNumberText } from '../presentation/manage/target-number-text';
@@ -1035,7 +1030,7 @@ type QCLabGlobal = typeof globalThis & {
   configAssayFindRef?: (value: unknown) => Record<string, any>;
   configAssaySuggestionInput?: (value: unknown) => void;
   configAssayInstrumentChanged?: (this: any) => void;
-  openConfigAssay?: (id?: string) => void;
+  openConfigAssayModel?: (id?: string) => Record<string, any> | null;
   saveConfigAssay?: (id: unknown) => Promise<void>;
   delTest?: (id: unknown) => Promise<void>;
   jsq?: (value: unknown) => string;
@@ -1696,12 +1691,7 @@ type QCLabGlobal = typeof globalThis & {
   entryVoidModalHtml: typeof entryVoidModalHtml;
   entryPreSaveWarningModalHtml: typeof entryPreSaveWarningModalHtml;
   targetSwitchModalHtml: typeof targetSwitchModalHtml;
-  configAssayModalHtml: typeof configAssayModalHtml;
   qcHistoryDetailModalHtml: typeof qcHistoryDetailModalHtml;
-  configAssayRuleRowsHtml: typeof configAssayRuleRowsHtml;
-  configAssayTeaOptionsHtml: typeof configAssayTeaOptionsHtml;
-  configAssayInstrumentOptionsHtml: typeof configAssayInstrumentOptionsHtml;
-  configAssayDecimalOptionsHtml: typeof configAssayDecimalOptionsHtml;
   configLotLevelOptionsHtml: typeof configLotLevelOptionsHtml;
   qcHistoryMeanSdRowsHtml: typeof qcHistoryMeanSdRowsHtml;
   qcHistoryPointRowsHtml: typeof qcHistoryPointRowsHtml;
@@ -3534,12 +3524,7 @@ root.entryLotLabelsTs=entryLotLabelsTs;
 root.entryVoidModalHtml=entryVoidModalHtml;
 root.entryPreSaveWarningModalHtml=entryPreSaveWarningModalHtml;
 root.targetSwitchModalHtml=targetSwitchModalHtml;
-root.configAssayModalHtml=configAssayModalHtml;
 root.qcHistoryDetailModalHtml=qcHistoryDetailModalHtml;
-root.configAssayRuleRowsHtml=configAssayRuleRowsHtml;
-root.configAssayTeaOptionsHtml=configAssayTeaOptionsHtml;
-root.configAssayInstrumentOptionsHtml=configAssayInstrumentOptionsHtml;
-root.configAssayDecimalOptionsHtml=configAssayDecimalOptionsHtml;
 root.configLotLevelOptionsHtml=configLotLevelOptionsHtml;
 root.qcHistoryMeanSdRowsHtml=qcHistoryMeanSdRowsHtml;
 root.qcHistoryPointRowsHtml=qcHistoryPointRowsHtml;
@@ -4942,7 +4927,7 @@ root.configAssayNaming = manageTestsActionsController.configAssayNaming;
 root.configAssayFindRef = manageTestsActionsController.configAssayFindRef;
 root.configAssaySuggestionInput = manageTestsActionsController.configAssaySuggestionInput;
 root.configAssayInstrumentChanged = manageTestsActionsController.configAssayInstrumentChanged;
-root.openConfigAssay = manageTestsActionsController.openConfigAssay;
+root.openConfigAssayModel = manageTestsActionsController.openConfigAssayModel;
 root.saveConfigAssay = manageTestsActionsController.saveConfigAssay;
 root.delTest = manageTestsActionsController.delTest;
 root.jsq = jsq;
@@ -5633,7 +5618,10 @@ const kernel = {
     deleteConfigInstrument: manageTestsActionsController.deleteConfigInstrument,
     saveConfigInstrument: manageTestsActionsController.saveConfigInstrument,
     configLotLevelOptionsHtml: (root as any).configLotLevelOptionsHtml,
-    openConfigAssay: manageTestsActionsController.openConfigAssay,
+    openConfigAssayModel: manageTestsActionsController.openConfigAssayModel,
+    saveConfigAssay: manageTestsActionsController.saveConfigAssay,
+    configAssaySuggestionInput: manageTestsActionsController.configAssaySuggestionInput,
+    configAssayInstrumentChanged: manageTestsActionsController.configAssayInstrumentChanged,
     delTest: manageTestsActionsController.delTest,
     openConfigPanelModel: manageTestsActionsController.openConfigPanelModel,
     saveConfigPanel: manageTestsActionsController.saveConfigPanel,
@@ -5698,7 +5686,7 @@ const kernel = {
     go: (root as any).go,
     goManageTargets: (root as any).goManageTargets, dashboardGoEntryFollowup: (root as any).dashboardGoEntryFollowup,
     dashboardContinueAction: (root as any).dashboardContinueAction, dashViewTestInEntry: (root as any).dashViewTestInEntry,
-    openConfigAssay: (root as any).openConfigAssay,
+    openConfigAssayModel: (root as any).openConfigAssayModel,
     reauthVerify: (root as any).reauthVerify, reauthAccountLabel: (root as any).reauthAccountLabel,
   },
 };

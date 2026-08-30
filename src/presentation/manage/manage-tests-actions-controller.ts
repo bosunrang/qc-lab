@@ -398,25 +398,36 @@ export function createManageTestsActionsController(deps: {
     const o = this.selectedOptions[0], e = doc().getElementById('cfgAssaySection');
     if (e) e.value = o ? o.dataset.section || '' : '';
   };
-  const openConfigAssay = (id = '') => {
-    if (!state().instruments.length) { deps.openReactInstrumentModal(); return; }
+  /* openConfigAssayModel(): dữ liệu thuần cho modal React (Giai đoạn 3,
+     AssayModal.tsx) — thay openConfigAssay() tự dựng chuỗi HTML rồi mở
+     modal. teaOptions/instruments/ruleRows trả mảng dữ liệu thay vì chuỗi
+     HTML — component tự dựng JSX <option>/<div>. saveConfigAssay() và 2 hàm
+     tự động điền (configAssaySuggestionInput/configAssayInstrumentChanged)
+     GIỮ NGUYÊN không đổi — cả ba đều đọc/ghi DOM trực tiếp qua đúng id, nên
+     component chỉ cần render đúng các id đó. */
+  const openConfigAssayModel = (id = '') => {
+    if (!state().instruments.length) { deps.openReactInstrumentModal(); return null; }
     const t = state().tests.find((x: AnyRec) => x.id === id) || { levels: defaultAssayLevels(), active: true };
     // Trình duyệt tự chọn option đầu tiên khi không có option nào đánh dấu "selected" (test mới,
     // chưa gán máy) — lấy đúng máy đó làm mặc định để Khoa/Khu vực điền sẵn ngay từ đầu, thay vì
     // chỉ điền khi onchange bắn ra (không bắn nếu máy đầu tiên người dùng chọn trùng máy mặc định).
     const defaultInst = state().instruments.find((i: AnyRec) => i.id === (t.instrumentId || '')) || state().instruments[0];
-    const instruments = deps.pres.configAssayInstrumentOptionsHtml(state().instruments.map((i: AnyRec) => ({ id: i.id, selected: i.id === (t.instrumentId || ''), section: deps.escapeAttr(i.section || ''), label: deps.esc(i.name) + (i.model ? ' · ' + deps.esc(i.model) : '') })));
+    const instruments = state().instruments.map((i: AnyRec) => ({ id: i.id, selected: i.id === (t.instrumentId || ''), section: i.section || '', label: i.name + (i.model ? ' · ' + i.model : '') }));
     /* Chỉ coi là "đã ghi đè" khi ruleActions[rule] có giá trị hợp lệ tường minh — nếu
        chưa (rỗng/thiếu), mặc định chọn "Theo cấu hình chung" thay vì âm thầm chốt cứng
        giá trị đang áp dụng lúc mở modal. Nếu không, MỌI lần lưu xét nghiệm (kể cả chỉ
        đổi tên/đơn vị, không đụng phần luật) sẽ ghi cứng cả 13 luật theo cấu hình chung
        tại đúng thời điểm đó — làm xét nghiệm hết đồng bộ với cấu hình chung mãi mãi mà
        không có cảnh báo nào, dù người dùng chưa từng chủ ý ghi đè. */
-    const ruleRows = deps.pres.configAssayRuleRowsHtml(deps.wgRules().map(rule => ({ id: rule, action: t && t.ruleActions && ['inactive', 'alert', 'reject'].includes(t.ruleActions[rule]) ? t.ruleActions[rule] : '', scope: t && t.ruleScopes && ['within', 'across', 'both'].includes(t.ruleScopes[rule]) ? t.ruleScopes[rule] : '' })));
+    const ruleRows = deps.wgRules().map(rule => ({ id: rule, action: t && t.ruleActions && ['inactive', 'alert', 'reject'].includes(t.ruleActions[rule]) ? t.ruleActions[rule] : '', scope: t && t.ruleScopes && ['within', 'across', 'both'].includes(t.ruleScopes[rule]) ? t.ruleScopes[rule] : '' }));
     const cusum = deps.testCusumConfig(t), decimalValue = t.decimalPlaces !== null && t.decimalPlaces !== '' && Number.isInteger(Number(t.decimalPlaces)) ? String(t.decimalPlaces) : String(deps.qcDecimalsDefault()), hasRuleOverrides = deps.wgRules().some(rule => (t.ruleActions && ['inactive', 'alert', 'reject'].includes(t.ruleActions[rule])) || (t.ruleScopes && ['within', 'across', 'both'].includes(t.ruleScopes[rule])));
     const initialRef = configAssayTeaRefs().find(r => t.analyteId && r[6] === t.analyteId) || configAssayFindRef(t.name || t.displayName || ''), initialNaming = initialRef ? configAssayNaming(initialRef) : null, initialName = (initialNaming && initialNaming.displayName) || t.displayName || t.name || '', currentTeaSource = ['lab', 'eflm', 'clia', 'ricos'].includes(t.teaSource) ? t.teaSource : '', initialSource = currentTeaSource || (initialRef ? (initialRef[2] != null ? 'clia' : initialRef[3] != null ? 'ricos' : '') : '');
-    const teaOptions = deps.pres.configAssayTeaOptionsHtml(configAssayTeaRefs().map(ref => ({ ref, naming: configAssayNaming(ref) })).sort((a, b) => String(a.ref[4] || '').localeCompare(String(b.ref[4] || ''), 'vi') || String(a.naming.displayName || '').localeCompare(String(b.naming.displayName || ''), 'vi')).map(({ ref, naming }) => ({ value: deps.escapeAttr(naming.displayName || ref[0]), label: deps.escapeAttr([naming.standardName !== naming.displayName ? naming.standardName : '', naming.abbreviation, ...naming.aliases.filter((x: unknown) => x !== ref[0] && x !== naming.displayName && x !== naming.standardName).slice(0, 3), ref[1], ref[4]].filter(Boolean).join(' · ')) })));
-    deps.openModal(deps.pres.configAssayModalHtml({ title: id ? 'Sửa xét nghiệm' : 'Thêm xét nghiệm', name: deps.escapeAttr(initialName), teaOptionsHtml: teaOptions, teaRefKey: deps.escapeAttr((initialRef && (initialRef[6] || initialRef[0])) || ''), teaSource: deps.escapeAttr(initialSource), unit: deps.escapeAttr(t.unit || ''), instrumentsHtml: instruments, section: deps.escapeAttr(t.section || (defaultInst && defaultInst.section) || ''), method: deps.escapeAttr(t.method || ''), decimalOptionsHtml: deps.pres.configAssayDecimalOptionsHtml(decimalValue), reagent: deps.escapeAttr(t.reagent || ''), tea: deps.escapeAttr(t.tea || ''), ruleRowsHtml: ruleRows, hasRuleOverrides, cusumOn: cusum.on, cusumK: deps.escapeAttr(cusum.k), cusumH: deps.escapeAttr(cusum.h), closed: !!t.closed, cancelButtonHtml: deps.btn('Hủy', { action: 'closeModal' }, 'ghost'), saveButtonHtml: deps.btn(id ? 'Lưu thay đổi' : 'Thêm xét nghiệm', { action: 'saveConfigAssay', args: [id] }, 'teal') }));
+    const teaOptions = configAssayTeaRefs().map(ref => ({ ref, naming: configAssayNaming(ref) })).sort((a, b) => String(a.ref[4] || '').localeCompare(String(b.ref[4] || ''), 'vi') || String(a.naming.displayName || '').localeCompare(String(b.naming.displayName || ''), 'vi')).map(({ ref, naming }) => ({ value: naming.displayName || ref[0], label: [naming.standardName !== naming.displayName ? naming.standardName : '', naming.abbreviation, ...naming.aliases.filter((x: unknown) => x !== ref[0] && x !== naming.displayName && x !== naming.standardName).slice(0, 3), ref[1], ref[4]].filter(Boolean).join(' · ') }));
+    return {
+      id, title: id ? 'Sửa xét nghiệm' : 'Thêm xét nghiệm', name: initialName, teaOptions, teaRefKey: (initialRef && (initialRef[6] || initialRef[0])) || '', teaSource: initialSource,
+      unit: t.unit || '', instruments, section: t.section || (defaultInst && defaultInst.section) || '', method: t.method || '', decimalValue, reagent: t.reagent || '', tea: t.tea || '',
+      ruleRows, hasRuleOverrides, cusumOn: cusum.on, cusumK: String(cusum.k), cusumH: String(cusum.h), closed: !!t.closed,
+    };
   };
   const saveConfigAssay = async (id: unknown) => {
     if (!deps.requireAdmin()) return;
@@ -457,6 +468,6 @@ export function createManageTestsActionsController(deps: {
     suggestConfigGroupName, saveConfigGroup, deleteConfigGroup, toggleLotGroupStatus, activateLotGroup,
     openConfigLotModel, saveConfigLot, renameLotAcrossPoints, deleteConfigLot, openConfigInstrumentModel,
     saveConfigInstrument, deleteConfigInstrument, defaultAssayLevels, configAssayTeaRefs, configAssayRefRecord,
-    configAssayNaming, configAssayFindRef, configAssaySuggestionInput, configAssayInstrumentChanged, openConfigAssay, saveConfigAssay, delTest,
+    configAssayNaming, configAssayFindRef, configAssaySuggestionInput, configAssayInstrumentChanged, openConfigAssayModel, saveConfigAssay, delTest,
   };
 }

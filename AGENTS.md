@@ -1570,13 +1570,65 @@ the combobox showing the full saved label; and, once the test's `levels[]`/
 nhập" row, the live search box correctly hides/restores it, and editing the
 mean field keeps the newly typed value.
 
-Remaining for Giai đoạn 3: convert the one remaining Manage form modal from
-the `'html'` string path to a real `'react'` component, one at a time, same
-full-verify-after-each discipline established across Giai đoạn 2 — each
-conversion touches exactly one modal's trigger function (swap
-`deps.openModal(deps.modalTemplate(...))` for `openReactModal(() =>
-<TheModal .../>)`) and needs no changes to any other still-unconverted
-modal, thanks to the infrastructure above. Then shrink/delete the now-dead
+Manage's xét nghiệm (done, 15th real modal converted — the largest form in
+the whole migration): a 13-row Westgard rule action/scope table, CUSUM
+settings, a TEa autocomplete matched against the analyte catalog, and an
+instrument-driven Khoa/Khu vực auto-fill. `saveConfigAssay()` needed **zero
+changes** (still reads every field via `document.getElementById(...)`, same
+as every prior CRUD modal), and neither did the two auto-fill side effects —
+`configAssaySuggestionInput(value)` (looks up a TEa ref for the typed name,
+overwrites `#cfgAssayTeaRefKey`/`#cfgAssayTeaSource`/`#cfgAssayUnit`/
+`#cfgAssayTea` directly, deliberately **not** `#cfgAssaySection`) is wired via
+`onChange` on `#cfgAssayName`; `configAssayInstrumentChanged` (`this`-bound,
+auto-fills `#cfgAssaySection` from the selected option's `data-section`) is
+wired via `onChange` on `#cfgAssayInstrument` — the same `this`-bound
+convention as `syncTargetRange`/`toggleTargetRow`. `openConfigAssay()` split
+into `openConfigAssayModel(id)` (synchronous, `Model | null` — keeping the
+existing "no instruments yet" gate that redirects to the instrument modal).
+Hit the **missing-kernel-wiring bug a fifth time**: `saveConfigAssay`,
+`configAssaySuggestionInput`, and `configAssayInstrumentChanged` were *all
+three* missing from `kernel.manage` (only `openConfigAssay` itself was
+present, needing renaming). This modal's own unique wrinkle: `openConfigAssay`
+is also called from a **different page** — Westgard's CUSUM empty state
+("Mở cấu hình xét nghiệm") — through a **separate** bridge
+(`westgardBridge.ts`, routed via `kernel.pres.openConfigAssay`, not
+`kernel.manage`) — so both bridge files needed updating together to open the
+same `AssayModal.tsx`, and the rename had to be applied consistently on
+**both** `kernel.manage` and `kernel.pres` (the latter reads `root.openConfigAssay`,
+also renamed). Classic `config-assay-modal-html.ts`/
+`config-assay-instrument-options-html.ts`/`config-assay-rule-rows-html.ts`/
+`config-assay-tea-options-html.ts`/`config-assay-decimal-options-html.ts`
+deleted outright (5 dedicated tests removed); 3 other tests updated
+(`manage-crud-labels.test.js`, `manage-core-bridge.test.js`,
+`entry-service.test.js` — two assertions needed their old template-literal
+interpolation syntax `${value}` updated to JSX's `{v}`). Both
+`scripts/a11y-audit.js`'s `manage:add-assay`/`manage:edit-assay` entries and
+**`scripts/ui-workflow-check.js`'s `checkManageForms()`** (a real
+verification script, not just a test — it called the bare global
+`openConfigAssay()` directly) needed switching to select the "assays" tab
+and click the real button. Verified: `npm test` 435/435 (typecheck clean on
+the **first** attempt — despite being the largest, most complex form,
+keeping every save/auto-fill function completely unchanged kept the actual
+risk lower than expected), `check-build-freshness` matches, `a11y-audit` 0
+violations across all 18 modals, `ui-workflow-check` 29/29 (including "Form
+thêm xét nghiệm tạo data branch...", "Số thập phân và CUSUM được lưu từ
+DOM", "Thêm xét nghiệm ghi audit" — all now exercised through the converted
+modal), `nce-workflow-check` 91/91, plus two ad-hoc scripts confirming:
+typing a known analyte name correctly auto-fills TEa ref/unit/value without
+touching section; changing to an instrument that actually has a section
+correctly auto-fills Khoa/Khu vực; opening an existing test correctly shows
+"Sửa xét nghiệm"/"Lưu thay đổi" with all 13 Westgard rule rows present; and
+the Westgard page's CUSUM "Mở cấu hình xét nghiệm" button correctly opens
+the exact same assay modal through the `kernel.pres` path.
+
+**Giai đoạn 3 is now done for every modal except one**: only the Actions
+page's NCE detail modal (`viewActionDetail`, not part of
+`scripts/a11y-audit.js`'s tracked 18-modal list) remains on the classic
+`'html'` string path.
+
+Remaining for Giai đoạn 3: convert the Actions NCE detail modal from
+the `'html'` string path to a real `'react'` component, with the same
+full-verify-after-each discipline established across Giai đoạn 2. Then shrink/delete the now-dead
 `root.X=` aliases, `global.d.ts`'s
 ambient bare-global declarations, and rewrite the 61 sandbox tests + ~88
 bridge-wiring text-scanner tests. See the plan file for the full phase

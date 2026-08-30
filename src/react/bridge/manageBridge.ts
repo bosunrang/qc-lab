@@ -7,6 +7,7 @@ import { PanelModal } from '../modals/PanelModal';
 import { LotGroupModal } from '../modals/LotGroupModal';
 import { TeaLabProfileModal } from '../modals/TeaLabProfileModal';
 import { LotTransitionModal } from '../modals/LotTransitionModal';
+import { AssayModal } from '../modals/AssayModal';
 
 export type ManageTab = { id: string; label: string; count: string | number };
 export type ManageToolbar = { title: string; subtitle?: string; action?: { action: string; args?: unknown[] } | null; actionLabel?: string };
@@ -31,7 +32,10 @@ export const openConfigInstrument = (id?: string): void => {
   openReactModal(() => createElement(InstrumentModal, model));
 };
 export const deleteConfigInstrument = (id: string): void => getKernel().manage.deleteConfigInstrument(id);
-export const openConfigAssay = (id?: string): void => getKernel().manage.openConfigAssay(id);
+export const openConfigAssay = (id?: string): void => {
+  const model = getKernel().manage.openConfigAssayModel(id);
+  if (model) openReactModal(() => createElement(AssayModal, model));
+};
 export const delTest = (id: string): void => getKernel().manage.delTest(id);
 export const openConfigPanel = async (id?: string): Promise<void> => {
   const model = await getKernel().manage.openConfigPanelModel(id);
