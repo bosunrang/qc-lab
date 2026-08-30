@@ -13048,18 +13048,6 @@
 		return row(current) + (proposed ? row(proposed) : "");
 	}
 	//#endregion
-	//#region src/presentation/auth/user-permissions-modal-html.ts
-	function userPermissionsModalHtml(input) {
-		return `<div class="modal"><div class="modal-h"><h3>Sửa quyền người dùng</h3><button class="modal-close" data-action="closeModal">✕</button></div>
-    <div class="modal-b">
-      <div class="hint"><b>${input.userName}</b> · @${input.username}</div>
-      <label>Vai trò</label>${input.roleSelectHtml}
-      <label class="flow-section">Thẻ được phép dùng</label>${input.permissionChecksHtml}
-      <div class="hint flow-control">Vai trò quyết định quyền sửa/quản trị; danh sách thẻ chỉ quyết định người dùng thấy và mở được màn hình nào.</div>
-    </div>
-    <div class="modal-f">${input.cancelButtonHtml}${input.saveButtonHtml}</div></div>`;
-	}
-	//#endregion
 	//#region src/presentation/auth/reset-password-modal-html.ts
 	function resetPasswordModalHtml(input) {
 		return `<div class="modal"><div class="modal-h"><h3>${input.title}</h3><button class="modal-close" data-action="closeModal">✕</button></div>
@@ -13271,11 +13259,6 @@
 	//#region src/presentation/auth/user-permission-checks-html.ts
 	function userPermissionChecksHtml(groupIdHtml, pages) {
 		return `<div id="${groupIdHtml}" class="user-perm-grid">${pages.map((page) => `<label class="${page.allowed ? "" : "disabled"}"><input type="checkbox" value="${page.idHtml}" ${page.selected ? "checked" : ""} ${!page.allowed ? "disabled" : ""}><span>${page.titleHtml}</span></label>`).join("")}</div>`;
-	}
-	//#endregion
-	//#region src/presentation/auth/user-role-select-html.ts
-	function userRoleSelectHtml(optionsHtml) {
-		return `<select id="editUserRole" aria-label="Vai trò" data-action="syncUserPermChecks" data-args='["editUserPerms"]' data-action-on="change">${optionsHtml}</select>`;
 	}
 	//#endregion
 	//#region src/application/nce/action-form-ui-state.ts
@@ -28636,7 +28619,6 @@
 	root.rangeWorkflowChecklistRowsHtml = rangeWorkflowChecklistRowsHtml;
 	root.rangeNceNoticeHtml = rangeNceNoticeHtml;
 	root.rangeWorkflowComparisonRowsHtml = rangeWorkflowComparisonRowsHtml;
-	root.userPermissionsModalHtml = userPermissionsModalHtml;
 	root.resetPasswordModalHtml = resetPasswordModalHtml;
 	root.sigmaAddTestModalHtml = sigmaAddTestModalHtml;
 	root.sigmaAddTestRowsHtml = sigmaAddTestRowsHtml;
@@ -28666,7 +28648,6 @@
 	root.actionCausePhrasesPresentation = actionCausePhrases;
 	root.actionPhrasesPresentation = actionPhrases;
 	root.userPermissionChecksHtml = userPermissionChecksHtml;
-	root.userRoleSelectHtml = userRoleSelectHtml;
 	root.actionFormUiState = new ActionFormUiState();
 	root.actionFormRenderState = actionFormRenderState;
 	root.entrySheetMonthPart = entrySheetMonthPart;
@@ -30383,25 +30364,20 @@
 		return [...new Set(picked)];
 	};
 	root.openUserPerms = async (id) => {
-		if (!root.requireAdmin()) return;
+		if (!root.requireAdmin()) return null;
 		const u = (state.users || []).find((x) => x.id === id);
-		if (!u) return;
+		if (!u) return null;
 		if (currentUser && currentUser.id === id) {
 			await root.infoDialog("Không thể tự sửa quyền của tài khoản đang đăng nhập. Hãy dùng tài khoản quản trị khác nếu cần thay đổi.");
-			return;
+			return null;
 		}
-		const roleSelect = root.userRoleSelectHtml(root.roleSelectOptions(u.role));
-		root.openModal(root.userPermissionsModalHtml({
-			userName: escapeHtml(u.name || u.username),
-			username: escapeHtml(u.username),
-			roleSelectHtml: roleSelect,
-			permissionChecksHtml: root.userPermChecks(u.pagePerms, "editUserPerms", u.role),
-			cancelButtonHtml: root.btn("Hủy", { action: "closeModal" }, "ghost"),
-			saveButtonHtml: root.btn("Lưu quyền", {
-				action: "applyUserPerms",
-				args: [id]
-			}, "teal")
-		}));
+		return {
+			userId: id,
+			userName: u.name || u.username,
+			username: u.username,
+			role: u.role,
+			pagePerms: u.pagePerms
+		};
 	};
 	root.applyUserPerms = async (id) => {
 		if (!root.requireAdmin()) return;
@@ -32077,6 +32053,7 @@
 			syncUserPermChecks: root.syncUserPermChecks,
 			resetPass: root.resetPass,
 			openUserPerms: root.openUserPerms,
+			applyUserPerms: root.applyUserPerms,
 			toggleUser: root.toggleUser,
 			delUser: root.delUser
 		},

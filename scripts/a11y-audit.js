@@ -60,7 +60,9 @@ const MODALS = [
   // openActionGuide() (Giai đoạn 3) giờ chỉ tồn tại trong react-pilot.js, không còn
   // là global tới được từ đây — bấm thẳng nút thật thay vì gọi hàm trần.
   { page: 'actions', label: 'actions:nce-guide', open: () => { [...document.querySelectorAll('button')].find(b => b.textContent === 'Quy trình 8 bước').click(); } },
-  { page: 'users', label: 'users:edit-permissions', open: () => openUserPerms(state.users[1].id) },
+  // openUserPerms() (Giai đoạn 3) giờ chỉ tồn tại trong react-pilot.js, không còn là
+  // global tới được từ đây — bấm thẳng nút thật thay vì gọi hàm trần.
+  { page: 'users', label: 'users:edit-permissions', open: () => { [...document.querySelectorAll('button')].find(b => b.textContent === 'Sửa quyền').click(); } },
   // Modal nay ghi diem QC that qua EntryService khi bam Nhan, nen dang o muc "modal
   // lon" dang audit. Khong co LIS Gateway that dang chay trong harness nay nen seed
   // thang lisGatewayRuntime.pending/unresolved va gia lap gatewayConfig/gatewayPull de

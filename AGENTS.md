@@ -1139,7 +1139,41 @@ queue sections render with correct counts, and that rejecting an
 unresolved row removes it from the list — and the section disappears
 entirely — without the modal ever closing or being reopened.
 
-Remaining for Giai đoạn 3: convert each of the other ~12 form modals from
+Users' "Sửa quyền" (done, fifth real modal converted): the first modal
+where **the checkbox grid stays `dangerouslySetInnerHTML` on purpose** —
+`syncUserPermChecks(groupId, roleValue)` (unchanged) directly toggles
+`disabled`/`checked` on the raw DOM checkboxes when the role `<select>`
+changes, exactly the same pattern the "Thêm người dùng" form already used
+since Giai đoạn 2 (a classic function mutating inside a React-opaque
+`dangerouslySetInnerHTML` block is safe, since React never diffs inside
+it) — so this modal needed NO new interaction logic, just wiring the
+existing pieces (`roleSelectOptionsHtml`, `userPermChecksHtml`,
+`syncUserPermChecks`, all already bridged from Giai đoạn 2's Users page)
+into a real `.modal`/`.modal-h`/`.modal-b`/`.modal-f` JSX shell. `openUserPerms(id)`
+followed the same split as `lisOpenQueueModal()`: the classic function now
+returns `Promise<Model | null>` (permission gate + "not editing yourself"
+check, `null` on any failure) instead of opening anything; the bridge awaits
+it and calls `openReactModal(...)` only on a non-null result.
+`applyUserPerms(id)` needed **zero changes** — it already read
+`#editUserRole`/`#editUserPerms` straight from the DOM at submit time,
+oblivious to whether React or a template string produced those elements
+(same reason Manage/Settings' uncontrolled-form fields never needed
+conversion work either). Classic `user-permissions-modal-html.ts`/
+`user-role-select-html.ts` deleted outright (2 dedicated tests removed);
+`tests/users-page-bridge.test.js` had its now-retired
+`userPermissionsModalHtml` contract check removed while its `resetPasswordModalHtml`
+check (a different, still-unconverted modal) stayed untouched.
+`scripts/a11y-audit.js`'s `users:edit-permissions` switched from calling
+the retired `openUserPerms()` global to clicking the real "Sửa quyền"
+button. Verified: `npm test` 460/460, `typecheck` clean,
+`check-build-freshness` matches, `a11y-audit` 0 violations across all 18
+modals, `ui-workflow-check` 29/29, `nce-workflow-check` 91/91, plus an
+ad-hoc script confirming the modal opens with the right role/permission
+state (4 disabled checkboxes under "technician"), and that switching the
+role to "admin" correctly re-enables every checkbox live, matching the
+exact classic behavior.
+
+Remaining for Giai đoạn 3: convert each of the other ~11 form modals from
 the `'html'` string path to a real `'react'` component, one at a time, same
 full-verify-after-each discipline established across Giai đoạn 2 — each
 conversion touches exactly one modal's trigger function (swap

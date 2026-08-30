@@ -1,4 +1,7 @@
+import { createElement } from 'react';
 import { getKernel } from '../state/kernel';
+import { openReactModal } from '../dialogs/modal-store';
+import { UserPermissionsModal } from '../modals/UserPermissionsModal';
 
 export type UserRow = {
   id: string;
@@ -19,6 +22,9 @@ export const headOnlyHtml = (title: string, subtitle: string): string => getKern
 export const addUser = (): void => { getKernel().users.addUser(); };
 export const syncUserPermChecks = (groupId: string, roleValue: string): void => getKernel().users.syncUserPermChecks(groupId, roleValue);
 export const resetPass = (id: string): void => { getKernel().users.resetPass(id); };
-export const openUserPerms = (id: string): void => { getKernel().users.openUserPerms(id); };
+export const openUserPerms = async (id: string): Promise<void> => {
+  const model = await getKernel().users.openUserPerms(id);
+  if (model) openReactModal(() => createElement(UserPermissionsModal, model));
+};
 export const toggleUser = (id: string): void => { getKernel().users.toggleUser(id); };
 export const delUser = (id: string): void => { getKernel().users.delUser(id); };

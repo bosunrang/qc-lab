@@ -352,7 +352,6 @@ import { rangeSafetyGateHtml } from '../presentation/range/range-safety-gate-htm
 import { rangeWorkflowChecklistRowsHtml } from '../presentation/range/range-workflow-checklist-rows-html';
 import { rangeNceNoticeHtml } from '../presentation/range/range-nce-notice-html';
 import { rangeWorkflowComparisonRowsHtml } from '../presentation/range/range-workflow-comparison-rows-html';
-import { userPermissionsModalHtml } from '../presentation/auth/user-permissions-modal-html';
 import { resetPasswordModalHtml } from '../presentation/auth/reset-password-modal-html';
 import { sigmaAddTestModalHtml } from '../presentation/sigma/sigma-add-test-modal-html';
 import { sigmaAddTestRowsHtml } from '../presentation/sigma/sigma-add-test-rows-html';
@@ -381,7 +380,6 @@ import { actionLevelLabel as actionLevelLabelPresentation } from '../presentatio
 import { actionRuleOptions as actionRuleOptionsPresentation } from '../presentation/nce/action-rule-options';
 import { actionCausePhrases as actionCausePhrasesPresentation, actionPhrases as actionPhrasesPresentation } from '../presentation/nce/action-suggest-phrases';
 import { userPermissionChecksHtml } from '../presentation/auth/user-permission-checks-html';
-import { userRoleSelectHtml } from '../presentation/auth/user-role-select-html';
 import { ActionFormUiState } from '../application/nce/action-form-ui-state';
 import { actionFormRenderState } from '../application/nce/action-form-render-state';
 import { targetConfigAssigned as targetConfigAssignedPresentation, createTargetRangeDraft } from '../presentation/manage/target-config-state';
@@ -1549,7 +1547,7 @@ type QCLabGlobal = typeof globalThis & {
   userPermChecks: (selectedIds: string[] | null | undefined, groupId: string, roleValue: string) => string;
   syncUserPermChecks: (groupId: string, roleValue: string) => void;
   collectUserPerms: (groupId: string, roleValue: string) => Promise<string[] | null>;
-  openUserPerms: (id: string) => Promise<void>;
+  openUserPerms: (id: string) => Promise<{ userId: string; userName: string; username: string; role: string; pagePerms: string[] } | null>;
   applyUserPerms: (id: string) => Promise<void>;
   resetPass: (id: string) => void;
   applyResetPass: (id: string) => Promise<void>;
@@ -1778,7 +1776,6 @@ type QCLabGlobal = typeof globalThis & {
   rangeWorkflowChecklistRowsHtml: typeof rangeWorkflowChecklistRowsHtml;
   rangeNceNoticeHtml: typeof rangeNceNoticeHtml;
   rangeWorkflowComparisonRowsHtml: typeof rangeWorkflowComparisonRowsHtml;
-  userPermissionsModalHtml: typeof userPermissionsModalHtml;
   resetPasswordModalHtml: typeof resetPasswordModalHtml;
   sigmaAddTestModalHtml: typeof sigmaAddTestModalHtml;
   sigmaAddTestRowsHtml: typeof sigmaAddTestRowsHtml;
@@ -1808,7 +1805,6 @@ type QCLabGlobal = typeof globalThis & {
   actionCausePhrasesPresentation: typeof actionCausePhrasesPresentation;
   actionPhrasesPresentation: typeof actionPhrasesPresentation;
   userPermissionChecksHtml: typeof userPermissionChecksHtml;
-  userRoleSelectHtml: typeof userRoleSelectHtml;
   actionFormUiState: ActionFormUiState;
   actionFormRenderState: typeof actionFormRenderState;
   entrySheetMonthPart: typeof entrySheetMonthPart;
@@ -3646,7 +3642,6 @@ root.rangeSafetyGateHtml=rangeSafetyGateHtml;
 root.rangeWorkflowChecklistRowsHtml=rangeWorkflowChecklistRowsHtml;
 root.rangeNceNoticeHtml=rangeNceNoticeHtml;
 root.rangeWorkflowComparisonRowsHtml=rangeWorkflowComparisonRowsHtml;
-root.userPermissionsModalHtml=userPermissionsModalHtml;
 root.resetPasswordModalHtml=resetPasswordModalHtml;
 root.sigmaAddTestModalHtml=sigmaAddTestModalHtml;
 root.sigmaAddTestRowsHtml=sigmaAddTestRowsHtml;
@@ -3676,7 +3671,6 @@ root.actionRuleOptionsPresentation=actionRuleOptionsPresentation;
 root.actionCausePhrasesPresentation=actionCausePhrasesPresentation;
 root.actionPhrasesPresentation=actionPhrasesPresentation;
 root.userPermissionChecksHtml=userPermissionChecksHtml;
-root.userRoleSelectHtml=userRoleSelectHtml;
 root.actionFormUiState=new ActionFormUiState();
 root.actionFormRenderState=actionFormRenderState;
 root.entrySheetMonthPart=entrySheetMonthPart;
@@ -4619,12 +4613,16 @@ root.collectUserPerms = async (groupId, roleValue) => {
   if (!picked.length) { await root.infoDialog('Cần chọn ít nhất một thẻ được phép dùng.'); return null; }
   return [...new Set(picked)];
 };
-root.openUserPerms = async id => {
-  if (!root.requireAdmin()) return;
-  const u = (state.users || []).find((x: Record<string, any>) => x.id === id); if (!u) return;
-  if (currentUser && currentUser.id === id) { await root.infoDialog('Không thể tự sửa quyền của tài khoản đang đăng nhập. Hãy dùng tài khoản quản trị khác nếu cần thay đổi.'); return; }
-  const roleSelect = root.userRoleSelectHtml(root.roleSelectOptions(u.role));
-  root.openModal(root.userPermissionsModalHtml({ userName: escapeHtml(u.name || u.username), username: escapeHtml(u.username), roleSelectHtml: roleSelect, permissionChecksHtml: root.userPermChecks(u.pagePerms, 'editUserPerms', u.role), cancelButtonHtml: root.btn('Hủy', { action: 'closeModal' }, 'ghost'), saveButtonHtml: root.btn('Lưu quyền', { action: 'applyUserPerms', args: [id] }, 'teal') }));
+/* openUserPerms() trả model hoặc null thay vì tự mở modal — phần "mở modal
+   React thật" giờ ở usersBridge.ts (chỉ react-pilot.js mới dựng được JSX),
+   cùng cách tách đã dùng cho lisOpenQueueModal()/reauthenticateCurrentUser().
+   applyUserPerms() bên dưới GIỮ NGUYÊN — vẫn đọc DOM #editUserRole/#editUserPerms
+   trực tiếp, không phụ thuộc React hay classic dựng ra chúng. */
+root.openUserPerms = async (id: string) => {
+  if (!root.requireAdmin()) return null;
+  const u = (state.users || []).find((x: Record<string, any>) => x.id === id); if (!u) return null;
+  if (currentUser && currentUser.id === id) { await root.infoDialog('Không thể tự sửa quyền của tài khoản đang đăng nhập. Hãy dùng tài khoản quản trị khác nếu cần thay đổi.'); return null; }
+  return { userId: id, userName: u.name || u.username, username: u.username, role: u.role, pagePerms: u.pagePerms };
 };
 root.applyUserPerms = async id => {
   if (!root.requireAdmin()) return;
@@ -5759,6 +5757,7 @@ const kernel = {
     usersModel: (root as any).usersModel, userPermChecks: (root as any).userPermChecks,
     addUser: (root as any).addUser, syncUserPermChecks: (root as any).syncUserPermChecks,
     resetPass: (root as any).resetPass, openUserPerms: (root as any).openUserPerms,
+    applyUserPerms: (root as any).applyUserPerms,
     toggleUser: (root as any).toggleUser, delUser: (root as any).delUser,
   },
   /* Hàm/service dùng chung nhiều trang — KHÔNG thuộc riêng một page controller
