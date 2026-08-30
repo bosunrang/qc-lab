@@ -134,7 +134,7 @@ assert.match(form,/const actionFormModel = \(editing: AnyRec, tests: AnyRec\[\]\
 assert.doesNotMatch(actionsArea,/const (?:populateActionForm|actionSetField|fillAction) = /,'không đổ giá trị vào form sau render');
 /* Danh tính sự cố bất biến khi sửa: đổi ô "Xét nghiệm" từng làm actionPoint() trả null
    và bỏ luôn yêu cầu QC chạy lại, còn lot bị ghi đè theo lô hiện hành sau mỗi lần chuyển lô. */
-assert.match(actionsPage,/disabled=\{model\.testDisabled\} \{\.\.\.\(model\.testDisabled \? \{\} : \{ 'data-action': 'syncActLevels', 'data-action-on': 'change' \}\)\}/,'ô Xét nghiệm phải khoá khi sửa hồ sơ');
+assert.match(actionsPage,/disabled=\{model\.testDisabled\} onChange=\{model\.testDisabled \? undefined : syncActLevels\}/,'ô Xét nghiệm phải khoá khi sửa hồ sơ');
 assert.match(form,/const tid = editing \? editing\.testId : /,'addAction\\(\\) không lấy testId từ form khi sửa');
 assert.match(form,/const lot = editing \? \(editing\.lot \|\| ''\) : /,'lot phải giữ snapshot lúc mở hồ sơ');
 /* Lối thoát cho hồ sơ đã duyệt nhưng không còn đủ điều kiện khép vòng (sửa/xóa/duyệt
@@ -148,7 +148,7 @@ assert.match(actionsPage,/className="action-investigation-select"/,'select dữ 
 assert.match(form,/const actionChecklistChip = \(form: AnyRec\) => /,'tiêu đề checklist phải hiển thị tiến độ hoàn tất');
 assert.match(actionsPage,/function SuggestBox\(/,'gợi ý nhập liệu NCE phải dùng cùng một khối thu gọn');
 assert.match(actionsPage,/className="action-form-panel-head"/,'renderer React phải giữ nút quy trình cạnh tiêu đề panel lập hồ sơ NCE');
-assert.match(actionsPage,/data-action="openActionGuide">Quy trình 8 bước<\/button>/,'nút quy trình phải tiếp tục gọi openActionGuide qua data-action');
+assert.match(actionsPage,/onClick=\{openActionGuide\}>Quy trình 8 bước<\/button>/,'nút quy trình phải tiếp tục gọi openActionGuide qua onClick');
 assert.match(reportsCss,/\.action-form-panel-head\{[^}]*justify-content:space-between/,'header lập hồ sơ NCE phải tách tiêu đề trái và nút quy trình sang phải');
 assert.match(reportsCss,/\.action-form-panel-head\{[^}]*color:var\(--card-head-ink\);[^}]*font-size:var\(--section-head-size\);[^}]*font-weight:800/,'header lập hồ sơ NCE phải dùng đúng token chữ của header panel hệ thống');
 assert.match(reportsCss,/\.action-form-panel \.action-form-panel-head > \.panel-title\{[^}]*flex:1;[^}]*color:inherit;[^}]*font:inherit/,'tiêu đề lập hồ sơ NCE phải kế thừa nguyên kiểu chữ hệ thống từ header');

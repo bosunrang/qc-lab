@@ -59,3 +59,27 @@ export type ActionFormOpenModel = {
 export type ActionFormModel = { open: false; canWrite: boolean; closed: { title: string; message: string } } | ActionFormOpenModel;
 
 export const actionFormViewModel = (issueCount: number): ActionFormModel => getKernel().actionForm.actionFormViewModel(issueCount);
+
+export const editAction = (i: number): void => { getKernel().actionForm.editAction(i); };
+export const beginActionFromIssue = (tid: unknown, level: unknown, rule: unknown, err: unknown, act: unknown, pointId: string, pointDate: string): void => getKernel().actionForm.beginActionFromIssue(tid, level, rule, err, act, pointId, pointDate);
+export const viewActionDetail = (i: number): void => getKernel().actions.viewActionDetail(i);
+export const escalateAction = (i: number): void => { getKernel().actions.escalateAction(i); };
+export const approveAction = (i: number): void => { getKernel().actions.approveAction(i); };
+export const returnAction = (i: number): void => { getKernel().actions.returnAction(i); };
+export const reopenAction = (i: number): void => { getKernel().actions.reopenAction(i); };
+export const cancelAction = (i: number): void => { getKernel().actions.cancelAction(i); };
+export const exportActionsCSV = (): void => getKernel().dataIo.exportActionsCSV();
+export const actionInsertSuggestion = (targetId: string, phrase: string): void => getKernel().actionForm.actionInsertSuggestion(targetId, phrase);
+export const actionSectionToggled = (key: string, open: boolean): void => getKernel().actionForm.actionSectionToggled(key, open);
+export const actionInvestigationSync = (statusId: string): void => getKernel().actionForm.actionInvestigationSync(statusId);
+export const actionInvestigationChoose = (statusId: string, value: string): void => getKernel().actionForm.actionInvestigationChoose(statusId, value);
+export const beginActionManual = (): void => getKernel().actionForm.beginActionManual();
+export const actionUpdateBiasHint = (): void => getKernel().actionForm.actionUpdateBiasHint();
+export const actionFillBias = (targetId: string, value: unknown): void => getKernel().actionForm.actionFillBias(targetId, value);
+export const closeActionForm = (): void => getKernel().actionForm.closeActionForm();
+export const addAction = (): void => { getKernel().actionForm.addAction(); };
+export const openActionGuide = (): void => getKernel().actions.openActionGuide();
+export const syncActLevels = (): void => getKernel().actionForm.syncActLevels();
+export const syncActionRiskScore = (): void => getKernel().actionForm.syncActionRiskScore();
+export const syncActionResidualRiskScore = (): void => getKernel().actionForm.syncActionResidualRiskScore();
+export const actionFormChanged = (): void => getKernel().actionForm.actionFormChanged();

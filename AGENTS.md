@@ -759,8 +759,57 @@ an ad-hoc Playwright script additionally confirmed the newly-fixed
 focus between nodes, and a `<details>` toggle's open state survives a
 `rerender()`.
 
+Corrective action/"Khắc phục sự cố" (done): 21 of 21 `data-action`/
+`data-notify-changed` usages converted — every function needed was ALREADY
+on `kernel.actions`/`kernel.actionForm`/`kernel.dataIo` (no new kernel wiring
+at all, unlike every other page so far). The generic `<Select>` component
+was simplified to a single `onChange?: (v: string) => void` prop (dropped
+the old `dataAction`/`dataActionOn`/extra-attrs plumbing it briefly carried
+mid-conversion). `IssueRow` hit the same TS discriminated-union narrowing gap
+as Westgard's `block.prevToggle!` fix: `item.action!.index` doesn't narrow
+`item.action`'s `kind`, so `continueIndex`/`createArgs` are extracted as
+plain `const`s via a ternary BEFORE the JSX, not inline. `<details
+data-action-section={sectionKey} onToggle={...}>` and
+`data-notify-changed="actionFormChanged"` (the form-wide "any field changed
+→ save draft + refresh section chips" catch-all) became a container-level
+`<div className="action-form-body" onChange={actionFormChanged}
+key={model.formKey}>` — this covers every plain-JSX field correctly (a
+select/textarea/input rendered directly by React bubbles its native
+'input'/'change' up to a real ancestor fiber, so the ancestor's `onChange`
+fires), but **not** the 5 `DateField`-rendered fields (`aDate`, `aDueDate`,
+`aActionCompletedDate`, `aReleaseDate`, `aEffectivenessDate`), which render
+via `dangerouslySetInnerHTML` and so create DOM nodes outside React's fiber
+tree entirely — confirmed live (a raw native capture listener on
+`.action-form-body` sees the bubbled 'input' event from inside a
+`dangerouslySetInnerHTML` span just fine, but React's synthetic `onChange`
+on that same ancestor never fires, because React resolves an event's
+dispatch path by walking up looking for a stashed fiber reference starting
+at `event.target`, and a `dangerouslySetInnerHTML`-injected node never gets
+one). This is exactly the `nce-workflow-check.js` failure that had this
+page at 90/91 mid-conversion ("Sau ngày hoàn thành, cổng cho phép trở lại
+vẫn còn thiếu" — filling `#aActionCompletedDate` never recomputed the
+"nguyên nhân" chip). Fixed by giving `DateField` its own `useRef`+`useEffect`
+that binds native `input`+`change` listeners directly on its wrapper span,
+calling `actionFormChanged()` — deliberately listening to **both** events,
+matching `action-dispatcher.ts`'s own `data-notify-changed` implementation
+(bound to both `document`-level `input` and `change` for the exact same
+reason: `vn-date-picker-controller.ts`'s `pick()` dispatches both events
+synchronously on a single calendar-day click, and a value typed then blurred
+also fires a native `change` after the `input`). This means `actionFormChanged`
+sometimes runs twice for one edit (once per event) — confirmed intentional
+and harmless (verified live with call-count instrumentation): it's a pure
+recompute-from-DOM function with no side effect beyond overwriting the same
+chip text/title twice, and the classic implementation had identical
+double-firing for the same reason. `nce-workflow-check.js` back to 91/91
+after the fix. Verified: `npm test` 467/467 (1 `ui-route-structure.test.js`
+assertion updated — it scanned for the old conditional `data-action` spread
+and the literal `data-action="openActionGuide"` string, both replaced with
+the real `onChange`/`onClick` patterns), `typecheck` clean,
+`check-build-freshness` matches, `a11y-audit` 0 violations (18/18 modals),
+`ui-workflow-check` 29/29, `nce-workflow-check` 91/91.
+
 **Remaining phases (not yet started)**: finish converting `data-action` on
-the other 2 pages; then modals as `createPortal`, one modal at a time; then
+the last remaining page (Manage); then modals as `createPortal`, one modal at a time; then
 shrink/delete the now-dead `root.X=` aliases, `global.d.ts`'s ambient
 bare-global declarations, and rewrite the 61 sandbox tests + ~88
 bridge-wiring text-scanner tests. See the plan file for the full phase

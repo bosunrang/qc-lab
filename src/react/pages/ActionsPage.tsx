@@ -1,6 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   actionsModel, actionFormViewModel, headOnlyHtml, dateBoxHtml, actionCausePhrases, actionActionPhrases,
+  editAction, beginActionFromIssue, viewActionDetail, escalateAction, approveAction, returnAction, reopenAction,
+  cancelAction, exportActionsCSV, actionInsertSuggestion, actionSectionToggled, actionInvestigationSync,
+  actionInvestigationChoose, beginActionManual, actionUpdateBiasHint, actionFillBias, closeActionForm, addAction,
+  openActionGuide, syncActLevels, syncActionRiskScore, syncActionResidualRiskScore, actionFormChanged,
   type ActionsModel, type ActionIssueItem, type ActionIssueGroup, type ActionOpenItem, type ActionOpenGroup,
   type ActionLogRow, type ActionSideChip, type ActionFormModel, type ActionFormOpenModel, type ActionFormSelectOption,
   type ActionFormInvestigationItem, type ActionFormChip,
@@ -17,6 +21,8 @@ function SideChips({ chips }: { chips: ActionSideChip[] }) {
 /* ---------------- Mục "Sự cố cần xử lý" ---------------- */
 
 function IssueRow({ item }: { item: ActionIssueItem }) {
+  const continueIndex = item.action && item.action.kind === 'continue' ? item.action.index : null;
+  const createArgs = item.action && item.action.kind === 'create' ? item.action : null;
   return (
     <div className={`issue-row ${item.severity}`}>
       <div className="issue-row-main">
@@ -25,10 +31,10 @@ function IssueRow({ item }: { item: ActionIssueItem }) {
         <div className="action-chipline"><span className={`action-chip ${item.workflowClass}`}>{item.workflowLabel}</span><SideChips chips={item.sideChips} /></div>
         <div className="hint">{item.footer}</div>
       </div>
-      {item.action ? (
-        item.action.kind === 'continue'
-          ? <button type="button" className="btn ghost sm" data-action="editAction" data-args={JSON.stringify([item.action.index])}>Tiếp tục hồ sơ</button>
-          : <button type="button" className="btn ghost sm" data-action="beginActionFromIssue" data-args={JSON.stringify([item.action.testId, item.action.level, item.action.rules, item.action.error, item.action.hint, item.action.pointId, item.action.date])}>Lập hồ sơ</button>
+      {continueIndex != null ? (
+        <button type="button" className="btn ghost sm" onClick={() => editAction(continueIndex)}>Tiếp tục hồ sơ</button>
+      ) : createArgs ? (
+        <button type="button" className="btn ghost sm" onClick={() => beginActionFromIssue(createArgs.testId, createArgs.level, createArgs.rules, createArgs.error, createArgs.hint, createArgs.pointId, createArgs.date)}>Lập hồ sơ</button>
       ) : null}
     </div>
   );
@@ -43,7 +49,7 @@ function OpenActionRow({ item }: { item: ActionOpenItem }) {
         <div className="action-chipline"><span className={`action-chip ${item.workflowClass}`}>{item.workflowLabel}</span><SideChips chips={item.sideChips} /></div>
         <div className="hint">{item.primary} · Phụ trách: {item.owner || '—'}{item.dueDate ? ` · hạn ${item.dueDate}` : ''}</div>
       </div>
-      {item.editable ? <button type="button" className="btn ghost sm" data-action="editAction" data-args={JSON.stringify([item.index])}>Tiếp tục hồ sơ</button> : null}
+      {item.editable ? <button type="button" className="btn ghost sm" onClick={() => editAction(item.index)}>Tiếp tục hồ sơ</button> : null}
     </div>
   );
 }
@@ -99,13 +105,13 @@ function LogRowView({ row }: { row: ActionLogRow }) {
         {row.approvalMeta ? <div className="action-note">{row.approvalMeta.by} {row.approvalMeta.at}{row.approvalMeta.note ? ` · ${row.approvalMeta.note}` : ''}</div> : null}
       </div></td>
       <td><div className="action-row-actions">
-        <button type="button" className="btn ghost sm" data-action="viewActionDetail" data-args={JSON.stringify([row.index])}>Chi tiết</button>
-        {b.edit ? <button type="button" className="btn ghost sm" data-action="editAction" data-args={JSON.stringify([row.index])}>Tiếp tục</button> : null}
-        {b.escalate ? <button type="button" className="btn teal sm" title="Hành động chưa hiệu lực — mở vòng điều tra mới" data-action="escalateAction" data-args={JSON.stringify([row.index])}>Lập hồ sơ tiếp theo</button> : null}
-        {b.approve ? <button type="button" className="btn teal sm" data-action="approveAction" data-args={JSON.stringify([row.index])}>Duyệt</button> : null}
-        {b.returnForRevision ? <button type="button" className="btn ghost sm" data-action="returnAction" data-args={JSON.stringify([row.index])}>Trả lại</button> : null}
-        {b.reopen ? <button type="button" className="btn danger sm" title="Hồ sơ đã duyệt nhưng không còn đủ điều kiện khép vòng" data-action="reopenAction" data-args={JSON.stringify([row.index])}>Mở lại</button> : null}
-        {b.cancel ? <button type="button" className="btn danger sm" title="Hủy có lưu vết — không xóa dữ liệu" data-action="cancelAction" data-args={JSON.stringify([row.index])}>Hủy hồ sơ</button> : null}
+        <button type="button" className="btn ghost sm" onClick={() => viewActionDetail(row.index)}>Chi tiết</button>
+        {b.edit ? <button type="button" className="btn ghost sm" onClick={() => editAction(row.index)}>Tiếp tục</button> : null}
+        {b.escalate ? <button type="button" className="btn teal sm" title="Hành động chưa hiệu lực — mở vòng điều tra mới" onClick={() => escalateAction(row.index)}>Lập hồ sơ tiếp theo</button> : null}
+        {b.approve ? <button type="button" className="btn teal sm" onClick={() => approveAction(row.index)}>Duyệt</button> : null}
+        {b.returnForRevision ? <button type="button" className="btn ghost sm" onClick={() => returnAction(row.index)}>Trả lại</button> : null}
+        {b.reopen ? <button type="button" className="btn danger sm" title="Hồ sơ đã duyệt nhưng không còn đủ điều kiện khép vòng" onClick={() => reopenAction(row.index)}>Mở lại</button> : null}
+        {b.cancel ? <button type="button" className="btn danger sm" title="Hủy có lưu vết — không xóa dữ liệu" onClick={() => cancelAction(row.index)}>Hủy hồ sơ</button> : null}
       </div></td>
     </tr>
   );
@@ -117,7 +123,7 @@ function LogPanel({ rows }: { rows: ActionLogRow[] }) {
       <h2 className="panel-title">Nhật ký khắc phục</h2>
       {rows.length ? (
         <>
-          <div className="action-log-tools"><button type="button" className="btn teal sm" data-action="exportActionsCSV">Xuất CSV nhật ký</button></div>
+          <div className="action-log-tools"><button type="button" className="btn teal sm" onClick={exportActionsCSV}>Xuất CSV nhật ký</button></div>
           <div className="action-log-wrap"><table className="action-log-table">
             <thead><tr><th>Thời điểm</th><th>Sự cố</th><th>Hành động</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
             <tbody>{rows.map(row => <LogRowView row={row} key={row.index} />)}</tbody>
@@ -130,24 +136,36 @@ function LogPanel({ rows }: { rows: ActionLogRow[] }) {
 
 /* ---------------- Form NCE (mục form) ---------------- */
 
-function Select({ id, label, options, defaultValue, dataAction, dataActionOn, disabled, onChange }: {
+function Select({ id, label, options, defaultValue, disabled, onChange }: {
   id: string; label: string; options: ActionFormSelectOption[]; defaultValue: unknown;
-  dataAction?: string; dataActionOn?: string; disabled?: boolean; onChange?: (v: string) => void;
+  disabled?: boolean; onChange?: (v: string) => void;
 }) {
   const current = defaultValue == null ? '' : String(defaultValue);
   const opts = options.some(o => o.value === current) || !current ? options : [...options, { value: current, label: current }];
-  const extra: Record<string, string> = {};
-  if (dataAction) extra['data-action'] = dataAction;
-  if (dataActionOn) extra['data-action-on'] = dataActionOn;
   return (
-    <select id={id} aria-label={label} defaultValue={current} disabled={disabled} onChange={onChange ? e => onChange(e.target.value) : undefined} {...extra}>
+    <select id={id} aria-label={label} defaultValue={current} disabled={disabled} onChange={onChange ? e => onChange(e.target.value) : undefined}>
       {opts.map(o => <option value={o.value} key={o.value}>{o.label}</option>)}
     </select>
   );
 }
 
 function DateField({ id, value, attrs = '' }: { id: string; value: string; attrs?: string }) {
-  return <span style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: dateBoxHtml(id, value, '', attrs) }} />;
+  // dangerouslySetInnerHTML tạo DOM ngoài fiber tree của React, nên onChange bắt sự kiện
+  // theo kiểu ủy quyền đặt trên .action-form-body (FormOpenBody) không bao giờ thấy sự
+  // kiện nổi bọt từ bên trong span này — xác nhận bằng cách gõ tay: sự kiện 'input' gốc
+  // nổi bọt tới đúng phần tử cha (browser DOM thật), nhưng actionFormChanged qua onChange
+  // của React không hề chạy. Phải tự gắn listener gốc ở đây để chip mục 4-6 (nguyên nhân)
+  // cập nhật đúng khi gõ ngày hoàn thành/ngày cho phép/ngày đánh giá hiệu lực.
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const handler = () => actionFormChanged();
+    el.addEventListener('input', handler);
+    el.addEventListener('change', handler);
+    return () => { el.removeEventListener('input', handler); el.removeEventListener('change', handler); };
+  }, []);
+  return <span ref={ref} style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: dateBoxHtml(id, value, '', attrs) }} />;
 }
 
 function SuggestBox({ targetId, phrases, label = 'Gợi ý nhập nhanh' }: { targetId: string; phrases: string[]; label?: string }) {
@@ -156,7 +174,7 @@ function SuggestBox({ targetId, phrases, label = 'Gợi ý nhập nhanh' }: { ta
     <details className="action-suggestions">
       <summary>+ {label}</summary>
       <div className="sugg-row" id={`sugg-${targetId}`}>
-        {phrases.map(p => <button type="button" className="sugg-chip" key={p} data-action="actionInsertSuggestion" data-args={JSON.stringify([targetId, p])}>{p}</button>)}
+        {phrases.map(p => <button type="button" className="sugg-chip" key={p} onClick={() => actionInsertSuggestion(targetId, p)}>{p}</button>)}
       </div>
     </details>
   );
@@ -170,7 +188,7 @@ function FormSection({ sectionKey, open, badge, title, hint, chip, children }: {
   sectionKey: string; open: boolean; badge: string; title: string; hint: string; chip: ActionFormChip; children: React.ReactNode;
 }) {
   return (
-    <details className="action-form-section" data-action-section={sectionKey} open={open} data-toggle-action="actionSectionToggled" data-toggle-args={JSON.stringify([sectionKey])}>
+    <details className="action-form-section" data-action-section={sectionKey} open={open} onToggle={e => actionSectionToggled(sectionKey, (e.target as HTMLDetailsElement).open)}>
       <summary className="action-form-section-title"><span>{badge}</span><div><b>{title}</b><small>{hint}</small></div><SectionChip chip={chip} /></summary>
       {children}
     </details>
@@ -181,12 +199,12 @@ function InvestigationItemView({ item }: { item: ActionFormInvestigationItem }) 
   return (
     <div className={`action-investigation-item ${item.stateClass}`} id={`check-${item.statusId}`}>
       <div className="action-investigation-head"><div><b>{item.title}</b><small>{item.hint}</small></div><span className="action-investigation-state">{item.stateLabel}</span></div>
-      <select id={item.statusId} className="action-investigation-select" aria-hidden="true" tabIndex={-1} defaultValue={item.value} data-action="actionInvestigationSync" data-args={JSON.stringify([item.statusId])} data-action-on="change">
+      <select id={item.statusId} className="action-investigation-select" aria-hidden="true" tabIndex={-1} defaultValue={item.value} onChange={() => actionInvestigationSync(item.statusId)}>
         {item.options.map(o => <option value={o.value} key={o.value}>{o.label}</option>)}
       </select>
       <div className="action-investigation-choices" role="group" aria-label={`Kết quả ${item.title}`}>
         {item.choices.map(c => (
-          <button type="button" className={`action-choice ${c.active ? 'active' : ''}`} data-value={c.value} aria-pressed={c.active ? 'true' : 'false'} data-action="actionInvestigationChoose" data-args={JSON.stringify([item.statusId, c.value])} key={c.value}>{c.label}</button>
+          <button type="button" className={`action-choice ${c.active ? 'active' : ''}`} data-value={c.value} aria-pressed={c.active ? 'true' : 'false'} onClick={() => actionInvestigationChoose(item.statusId, c.value)} key={c.value}>{c.label}</button>
         ))}
       </div>
       <div className="action-investigation-note">
@@ -209,7 +227,7 @@ function IdentitySection({ model }: { model: ActionFormOpenModel }) {
           <div className="action-form-main">
             <div><label>Mã hồ sơ</label><input id="aNceId" aria-label="Mã hồ sơ NCE" readOnly defaultValue={model.nceId} /></div>
             <div><label>Xét nghiệm{model.qcBound ? null : <span className="hint"> (nếu có)</span>}</label>
-              <select id="aTest" aria-label="Xét nghiệm" defaultValue={model.selectedTestId} disabled={model.testDisabled} {...(model.testDisabled ? {} : { 'data-action': 'syncActLevels', 'data-action-on': 'change' })}>
+              <select id="aTest" aria-label="Xét nghiệm" defaultValue={model.selectedTestId} disabled={model.testDisabled} onChange={model.testDisabled ? undefined : syncActLevels}>
                 {model.testOptions.map(t => <option value={t.id} key={t.id}>{t.label}</option>)}
               </select>
             </div>
@@ -262,10 +280,10 @@ function ImmediateSection({ s }: { s: ActionFormOpenModel['sections']['immediate
 function RiskSection({ s }: { s: ActionFormOpenModel['sections']['risk'] }) {
   return (
     <div className="action-risk-grid">
-      <div><label>Mức độ ảnh hưởng (S)</label><Select id="aRiskSeverity" label="Mức độ ảnh hưởng" options={s.severityOptions} defaultValue={s.severity} dataAction="syncActionRiskScore" dataActionOn="change" /></div>
-      <div><label>Khả năng xảy ra (O)</label><Select id="aRiskOccurrence" label="Khả năng xảy ra" options={s.occurrenceOptions} defaultValue={s.occurrence} dataAction="syncActionRiskScore" dataActionOn="change" /></div>
-      <div><label>Khả năng không phát hiện (D)</label><Select id="aRiskDetectability" label="Khả năng không phát hiện" options={s.detectOptions} defaultValue={s.detectability} dataAction="syncActionRiskScore" dataActionOn="change" /></div>
-      <div className="action-risk-level"><label>Phân loại theo SOP</label><Select id="aRiskLevel" label="Phân loại nguy cơ" options={s.levelOptions} defaultValue={s.level} dataAction="syncActionRiskScore" dataActionOn="change" /></div>
+      <div><label>Mức độ ảnh hưởng (S)</label><Select id="aRiskSeverity" label="Mức độ ảnh hưởng" options={s.severityOptions} defaultValue={s.severity} onChange={syncActionRiskScore} /></div>
+      <div><label>Khả năng xảy ra (O)</label><Select id="aRiskOccurrence" label="Khả năng xảy ra" options={s.occurrenceOptions} defaultValue={s.occurrence} onChange={syncActionRiskScore} /></div>
+      <div><label>Khả năng không phát hiện (D)</label><Select id="aRiskDetectability" label="Khả năng không phát hiện" options={s.detectOptions} defaultValue={s.detectability} onChange={syncActionRiskScore} /></div>
+      <div className="action-risk-level"><label>Phân loại theo SOP</label><Select id="aRiskLevel" label="Phân loại nguy cơ" options={s.levelOptions} defaultValue={s.level} onChange={syncActionRiskScore} /></div>
       <div className="action-risk-result"><label>RPN</label><div id="aRiskScoreCard" className={`action-risk-score risk-${s.scoreClass}`} aria-live="polite"><b id="aRiskScore">{s.score}</b></div></div>
       <div className="action-risk-basis"><label>Căn cứ phân loại theo SOP</label><input id="aRiskBasis" placeholder="VD: SOP-QC-07, ma trận nguy cơ bảng 3" defaultValue={s.basis} /><SuggestBox targetId="aRiskBasis" phrases={s.basisSuggest} /></div>
     </div>
@@ -290,10 +308,10 @@ function CauseSection({ s, model }: { s: ActionFormOpenModel['sections']['cause'
       <div className="action-cause-second-row">
         <div><label>Ngày hoàn thành hành động</label><DateField id="aActionCompletedDate" value={s.completedDate} attrs="action-date" /></div>
         <div><label>Bias trước khắc phục (%) <small className="hint">tham khảo</small></label>
-          <input id="aBiasBefore" type="text" inputMode="decimal" placeholder="VD: 8.5" defaultValue={s.biasBefore} data-action="actionUpdateBiasHint" data-action-on="input" />
-          {s.sigmaBiasChip ? <div className="sugg-row"><button type="button" className="sugg-chip" data-action="actionFillBias" data-args={JSON.stringify(['aBiasBefore', s.sigmaBiasChip.value])} title={`Lấy từ Bias EQA/EQC kỳ ${s.sigmaBiasChip.period} ở trang Six Sigma`}>Dùng Bias EQA gần nhất (kỳ {s.sigmaBiasChip.period}): {s.sigmaBiasChip.valueText}%</button></div> : null}
+          <input id="aBiasBefore" type="text" inputMode="decimal" placeholder="VD: 8.5" defaultValue={s.biasBefore} onChange={actionUpdateBiasHint} />
+          {s.sigmaBiasChip ? <div className="sugg-row"><button type="button" className="sugg-chip" onClick={() => actionFillBias('aBiasBefore', s.sigmaBiasChip!.value)} title={`Lấy từ Bias EQA/EQC kỳ ${s.sigmaBiasChip.period} ở trang Six Sigma`}>Dùng Bias EQA gần nhất (kỳ {s.sigmaBiasChip.period}): {s.sigmaBiasChip.valueText}%</button></div> : null}
         </div>
-        <div><label>Bias sau khắc phục (%) <small className="hint">tham khảo</small></label><input id="aBiasAfter" type="text" inputMode="decimal" placeholder="VD: 1.2" defaultValue={s.biasAfter} data-action="actionUpdateBiasHint" data-action-on="input" /></div>
+        <div><label>Bias sau khắc phục (%) <small className="hint">tham khảo</small></label><input id="aBiasAfter" type="text" inputMode="decimal" placeholder="VD: 1.2" defaultValue={s.biasAfter} onChange={actionUpdateBiasHint} /></div>
       </div>
       <div id="aBiasThresholdHint" className="hint flow-note" dangerouslySetInnerHTML={{ __html: s.thresholdHtml }} />
       {s.rerunEvidenceHtml ? <div style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: s.rerunEvidenceHtml }} /> : null}
@@ -339,10 +357,10 @@ function EffSection({ s }: { s: ActionFormOpenModel['sections']['eff'] }) {
       <div className="action-residual-block">
         <div className="action-release-title"><b>Nguy cơ còn lại sau khắc phục</b><small>Chỉ bắt buộc khi kết luận có hiệu lực; dùng cùng thang điểm và SOP với đánh giá ban đầu</small></div>
         <div className="action-residual-grid">
-          <div><label>Mức độ (S)</label><Select id="aResidualSeverity" label="Mức độ còn lại" options={s.severityOptions} defaultValue={s.severity} dataAction="syncActionResidualRiskScore" dataActionOn="change" /></div>
-          <div><label>Khả năng xảy ra (O)</label><Select id="aResidualOccurrence" label="Khả năng xảy ra còn lại" options={s.occurrenceOptions} defaultValue={s.occurrence} dataAction="syncActionResidualRiskScore" dataActionOn="change" /></div>
-          <div><label>Khả năng không phát hiện (D)</label><Select id="aResidualDetectability" label="Khả năng không phát hiện còn lại" options={s.detectOptions} defaultValue={s.detectability} dataAction="syncActionResidualRiskScore" dataActionOn="change" /></div>
-          <div><label>Phân loại theo SOP</label><Select id="aResidualRiskLevel" label="Phân loại nguy cơ còn lại" options={s.levelOptions} defaultValue={s.level} dataAction="syncActionResidualRiskScore" dataActionOn="change" /></div>
+          <div><label>Mức độ (S)</label><Select id="aResidualSeverity" label="Mức độ còn lại" options={s.severityOptions} defaultValue={s.severity} onChange={syncActionResidualRiskScore} /></div>
+          <div><label>Khả năng xảy ra (O)</label><Select id="aResidualOccurrence" label="Khả năng xảy ra còn lại" options={s.occurrenceOptions} defaultValue={s.occurrence} onChange={syncActionResidualRiskScore} /></div>
+          <div><label>Khả năng không phát hiện (D)</label><Select id="aResidualDetectability" label="Khả năng không phát hiện còn lại" options={s.detectOptions} defaultValue={s.detectability} onChange={syncActionResidualRiskScore} /></div>
+          <div><label>Phân loại theo SOP</label><Select id="aResidualRiskLevel" label="Phân loại nguy cơ còn lại" options={s.levelOptions} defaultValue={s.level} onChange={syncActionResidualRiskScore} /></div>
           <div className="action-risk-result"><label>RPN còn lại</label><div id="aResidualRiskScoreCard" className={`action-risk-score risk-${s.scoreClass}`} aria-live="polite"><b id="aResidualRiskScore">{s.score}</b></div></div>
           <div className="action-residual-basis"><label>Căn cứ đánh giá lại</label><input id="aResidualRiskBasis" placeholder="VD: SOP-QC-07; dữ liệu theo dõi sau khắc phục" defaultValue={s.basis} /><SuggestBox targetId="aResidualRiskBasis" phrases={s.basisSuggest} /></div>
         </div>
@@ -356,7 +374,7 @@ function FormClosed({ model }: { model: Extract<ActionFormModel, { open: false }
     <div className="empty">
       <b>{model.closed.title}</b>
       <p>{model.closed.message}</p>
-      {model.canWrite ? <button type="button" className="btn ghost" data-action="beginActionManual">Lập hồ sơ từ nguồn khác</button> : null}
+      {model.canWrite ? <button type="button" className="btn ghost" onClick={beginActionManual}>Lập hồ sơ từ nguồn khác</button> : null}
     </div>
   );
 }
@@ -365,7 +383,7 @@ function FormOpenBody({ model }: { model: ActionFormOpenModel }) {
   const openSet = new Set(model.openSections);
   const s = model.sections;
   return (
-    <div className="action-form-body" data-notify-changed="actionFormChanged" key={model.formKey}>
+    <div className="action-form-body" onChange={actionFormChanged} key={model.formKey}>
       {model.incidentBanner ? <div style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: model.incidentBanner }} /> : null}
       <IdentitySection model={model} />
       <FormSection sectionKey="immediate" open={openSet.has('immediate')} badge="1" title="Kiểm soát và xử lý tức thời" hint="Phần tối thiểu bắt buộc để mở hồ sơ NCE; kết luận ảnh hưởng bệnh nhân ghi ở mục 7" chip={s.immediate.chip}>
@@ -389,8 +407,8 @@ function FormOpenBody({ model }: { model: ActionFormOpenModel }) {
       <div className="action-form-submit">
         <div><b>{model.editing ? 'Cập nhật tiến độ hồ sơ' : 'Lưu ngay ở trạng thái đang điều tra'}</b><span>Chỉ cần hoàn tất phần nhận diện và kiểm soát tức thời để lưu; phê duyệt chỉ xuất hiện khi hồ sơ đủ điều kiện khép vòng.</span></div>
         <div className="action-submit-buttons">
-          <button type="button" className="btn ghost" data-action="closeActionForm">{model.editing ? 'Hủy chỉnh sửa' : 'Đóng'}</button>
-          <button type="button" className="btn teal" data-action="addAction">{model.editing ? 'Lưu thay đổi' : 'Lập hồ sơ NCE'}</button>
+          <button type="button" className="btn ghost" onClick={closeActionForm}>{model.editing ? 'Hủy chỉnh sửa' : 'Đóng'}</button>
+          <button type="button" className="btn teal" onClick={addAction}>{model.editing ? 'Lưu thay đổi' : 'Lập hồ sơ NCE'}</button>
         </div>
       </div>
     </div>
@@ -402,7 +420,7 @@ function FormPanel({ model }: { model: ActionFormModel }) {
     <div className="panel action-form-panel">
       <div className="action-form-panel-head">
         <h2 className="panel-title">{model.open ? model.title : 'Lập hồ sơ sự không phù hợp (NCE)'}</h2>
-        <button type="button" className="btn ghost sm" data-action="openActionGuide">Quy trình 8 bước</button>
+        <button type="button" className="btn ghost sm" onClick={openActionGuide}>Quy trình 8 bước</button>
       </div>
       {model.open ? <FormOpenBody model={model} /> : <FormClosed model={model} />}
     </div>
