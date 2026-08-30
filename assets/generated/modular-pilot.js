@@ -1,4 +1,41 @@
 (function() {
+	//#region node_modules/zustand/esm/vanilla.mjs
+	var createStoreImpl = (createState) => {
+		let state;
+		const listeners = /* @__PURE__ */ new Set();
+		const setState = (partial, replace) => {
+			const nextState = typeof partial === "function" ? partial(state) : partial;
+			if (!Object.is(nextState, state)) {
+				const previousState = state;
+				state = (replace != null ? replace : typeof nextState !== "object" || nextState === null) ? nextState : Object.assign({}, state, nextState);
+				listeners.forEach((listener) => listener(state, previousState));
+			}
+		};
+		const getState = () => state;
+		const getInitialState = () => initialState;
+		const subscribe = (listener) => {
+			listeners.add(listener);
+			return () => listeners.delete(listener);
+		};
+		const api = {
+			setState,
+			getState,
+			getInitialState,
+			subscribe
+		};
+		const initialState = state = createState(setState, getState, api);
+		return api;
+	};
+	var createStore = ((createState) => createState ? createStoreImpl(createState) : createStoreImpl);
+	//#endregion
+	//#region src/application/state/app-store.ts
+	function createAppStore() {
+		return createStore((set) => ({
+			revision: 0,
+			touch: () => set((s) => ({ revision: s.revision + 1 }))
+		}));
+	}
+	//#endregion
 	//#region src/domain/charts/chart-view-model.ts
 	function filterPoints(points, { start = "", end = "", lot } = {}) {
 		return (Array.isArray(points) ? points : []).filter((point) => {
@@ -26680,6 +26717,7 @@
 	root.cusumMemo = /* @__PURE__ */ new Map();
 	root.derivedIndex = null;
 	root.startupProblem = null;
+	var appStore = createAppStore();
 	root.legacyDerivedCacheState = {
 		pointCaches: () => [
 			pointsCache,
@@ -29234,7 +29272,10 @@
 		entryFilter: (v) => root.entryFilter(v),
 		isReactPage: (id) => window.QCLabReact?.isReactPage(id) || false,
 		mountReactPage: (id, container) => window.QCLabReact?.mountReactPage(id, container),
-		notifyReactStore: () => window.QCLabReact?.notify()
+		notifyReactStore: () => {
+			appStore.getState().touch();
+			window.QCLabReact?.notify();
+		}
 	});
 	root.go = routerDispatch.go;
 	root.resetMainScroll = routerDispatch.resetMainScroll;
@@ -32213,6 +32254,35 @@
 	root.buildSigmaXlsx = dataIoController.buildSigmaXlsx;
 	root.exportSigmaPeriodXLSX = dataIoController.exportSigmaPeriodXLSX;
 	root.exportSigmaPeriodsXLSX = dataIoController.exportSigmaPeriodsXLSX;
+	var kernel = {
+		store: appStore,
+		entry: entryPageController,
+		actions: actionsPageController,
+		actionForm: actionFormController,
+		sigma: sigmaPageController,
+		westgard: westgardPageController,
+		reagent: reagentPageController,
+		report: reportPageController,
+		settings: settingsPageController,
+		manage: managePageController,
+		dash: {
+			dashboardModel: dashboardPageController.dashboardModel,
+			dashTestSetStatus: dashboardPageController.dashTestSetStatus
+		},
+		audit: { auditModel: root.auditModel },
+		users: { usersModel: root.usersModel },
+		pres: {
+			esc: root.esc,
+			escAttr: root.escAttr,
+			btn: root.btn,
+			headOnly: root.headOnly,
+			dateBox: root.dateBox,
+			emptyState: root.emptyState,
+			fmt: root.fmt,
+			vnDate: root.vnDate
+		}
+	};
+	if (typeof window !== "undefined") window.__QC_KERNEL__ = kernel;
 	root.boot = async () => {
 		if (await loadBootState()) await ensureAdmin().then(() => {
 			showLogin();

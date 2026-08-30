@@ -408,6 +408,73 @@ their classic HTML-builder code already deleted post-parity-check; the
 React migration is complete, see `docs/REACT-ADOPTION-PLAN.md` for the
 page-by-page history.
 
+**Kernel / gỡ global bridge (2026-08-30–, in progress, see plan file
+"gỡ bỏ global bridge, đưa QC Lab sang kiến trúc React chuẩn").** A second,
+new-and-separate initiative from the React-island work above: even though
+every page renders via React now, the underlying architecture is unchanged —
+`src/compat/modular-pilot.global.ts` still imports ~600 modules and assigns
+~1,305 individual names to `root.X=` (root = globalThis) so they're reachable
+as bare identifiers, `src/react/bridge/*.ts` still read everything via
+`(window as any).x`, events still go through `data-action="fnName"` +
+`action-dispatcher.ts`'s global-name lookup, modals still build raw HTML
+strings and `innerHTML`-inject them, and state-change notification is the
+fully manual `save()`→`rerender()`→`notifyReactStore()`→hand-rolled
+`renderBus.ts` chain. Merging the two separate Vite bundles
+(`modular-pilot.js`/`react-pilot.js`) into one was considered and rejected:
+`react-pilot.js` is deliberately minified to dodge
+`tests/global-name-uniqueness.test.js`'s false-positive behavior on
+unminified React internals, the 61 `tests/helpers/sandbox.js`-based tests
+`vm`-sandbox only `modular-pilot.js` with no `document`/`window` (React's
+own module-top-level code touches `document` and would throw immediately in
+that bare sandbox), and Rollup's import-graph-determined evaluation order
+inside one shared IIFE risks reintroducing the exact "eager-construction
+trap"/"IIFE-scope trap" bug class documented throughout this file. Instead:
+the two bundles stay separate (no build/Electron/CSP/
+`check-build-freshness.js` changes), and the ~1,305 scattered globals
+collapse into **one** typed object, `window.__QC_KERNEL__` — constructed
+once in `modular-pilot.global.ts`, right before `root.boot=`, from the
+SAME already-constructed page controllers (`entryPageController`,
+`actionsPageController`, `sigmaPageController`, etc. — each already returns
+exactly the right group of functions via `createXPageController()`, so no
+new taxonomy was invented) plus a `store` field. **Giai đoạn 0 (done)**:
+added `zustand` (devDependency) and `src/application/state/app-store.ts`
+(`createAppStore()`, a `zustand/vanilla` store holding only `{revision,
+touch()}` — a deliberate, documented **notify-bus wrapper**, not a real
+immutable-state migration, since 16 files across `src/application`/
+`src/presentation` mutate `state.x=` directly outside any DI-injected
+setter; converting all of them to immutable updates is a separate, much
+larger project not attempted here). `createAppStore()` is constructed once
+in `modular-pilot.global.ts` (module-scope `const appStore`, right after
+`root.state=`/the derived-cache `root.mem=...` line) since the store must be
+a SINGLE shared instance — the two bundles have no shared module registry,
+so constructing it in each bundle separately would give React and classic
+code two different store instances that never see each other's `touch()`
+calls. The existing `notifyReactStore` dependency (passed into
+`createRouterDispatchController`, called at the end of every `rerender()`)
+now also calls `appStore.getState().touch()` alongside the pre-existing
+`window.QCLabReact?.notify()` call — the only behavior change in this phase,
+and inert until something actually subscribes to the store. `kernel`'s
+`window.__QC_KERNEL__` assignment is guarded by `typeof window!=='undefined'`
+(caught immediately by the sandbox tests otherwise — `vm.createContext` has
+no `window`). **Nothing reads the kernel yet** — every existing `root.X=`
+bare global stays exactly as-is in parallel; this phase is purely additive
+and was verified to change zero observable behavior (`npm test` 467/467,
+`typecheck`, `check-build-freshness`, `a11y-audit` all unchanged, plus a live
+browser check confirming `window.__QC_KERNEL__.store.getState().revision`
+increments on `rerender()`). Next phases (not yet started): wire
+`src/react/bridge/*.ts` to read the kernel via a `<KernelProvider>`/
+`useKernel()` React context instead of `window.x`, one page at a time; then
+replace `data-action` with real `onClick`/`onChange`/`onKeyDown`, one page at
+a time; then modals as `createPortal`, one modal at a time; then shrink/
+delete the now-dead `root.X=` aliases, `global.d.ts`'s ambient bare-global
+declarations, and rewrite the 61 sandbox tests + ~88 bridge-wiring text-scanner
+tests. See the plan file for the full phase breakdown and the risks already
+identified (LIS Gateway's `lis-client-service.ts` shares the same `getState`/
+`rerender` deps shape and gets swept into this even though it's unrelated to
+the UI rewrite; several `data-*` conventions in `action-dispatcher.ts` encode
+real event-timing semantics that a naive `onClick`-only conversion would
+silently drop).
+
 `assets/core.js` is the one exception: it's wrapped in a UMD shim so it also
 works via `require()` — that's what makes it usable from both the browser
 (as `window.QCCore`) and Node test files (`require('../assets/core.js')`).

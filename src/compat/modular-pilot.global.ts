@@ -1,3 +1,4 @@
+import { createAppStore } from '../application/state/app-store';
 import { chartViewModel, type ChartViewModelApi } from '../domain/charts/chart-view-model';
 import { createEntryService, type EntryServiceApi } from '../application/entry/entry-service';
 import { createEntryRecordCommand } from '../application/entry/entry-record-command';
@@ -2445,6 +2446,12 @@ root.WG_DEFAULT=Object.fromEntries(WG_RULES.map((r:string)=>[r,(root.QCCore as a
 root.STATE_SCHEMA_VERSION=(root.QCCore as any).STATE_SCHEMA_VERSION;
 root.state={lab:{name:'',dept:'',address:''} as any,tests:[],machines:["Máy A"],instruments:[],assayGroups:[],qcPanels:[],lotTransitions:[],lotGroups:[],qcLots:[],data:{},actions:[],activity:[],activityAnchor:'',users:[],reagentTests:[],reagentOperators:[],reagentSampleTypes:['Mẫu bệnh nhân','Mẫu nội kiểm (IQC)','Mẫu ngoại kiểm (EQA)'],sigmaData:{},periodLocks:[],teaRefs:[],teaRegistryVersion:TEA_REFERENCE_SCHEMA_VERSION,westgardRules:{...WG_DEFAULT},configMigrationVersion:1,schemaVersion:STATE_SCHEMA_VERSION};
 root.mem=null;root.pointsCache=new Map();root.pointsIndexCache=new Map();root.pointsLotCache=new Map();root.wgMemo=new Map();root.acceptedMemo=new Map();root.cusumMemo=new Map();root.derivedIndex=null;root.startupProblem=null;
+/* Zustand vanilla store — notify-bus thay renderBus.ts tự viết (xem
+   src/application/state/app-store.ts). Construct MỘT LẦN DUY NHẤT ở đây, chia
+   sẻ qua window.__QC_KERNEL__ cho bundle react-pilot.js đọc (2 bundle Vite
+   riêng biệt không dùng chung module registry, nên phải là MỘT instance đi
+   qua window, không phải mỗi bên tự `import` rồi có bản riêng). */
+const appStore = createAppStore();
 root.legacyDerivedCacheState={pointCaches:()=>[pointsCache,pointsIndexCache,pointsLotCache,cusumMemo],westgardMemo:()=>wgMemo,acceptedMemo:()=>acceptedMemo,cusumMemo:()=>cusumMemo,resetDerivedIndex:()=>{derivedIndex=null;},resetStatus:()=>{},clearStatus:(_testId:any)=>{}};
 root.ensureShape=(opts:Record<string,any>={})=>{
   const normalized=root.qcStateFoundation!(state,opts,{defaults:()=>({lab:{name:'',dept:'',address:''} as any,tests:[],machines:["Máy A"],instruments:[],assayGroups:[],qcPanels:[],lotTransitions:[],lotGroups:[],qcLots:[],data:{},actions:[],activity:[],activityAnchor:'',users:[],reagentTests:[],reagentOperators:[],reagentSampleTypes:['Mẫu bệnh nhân','Mẫu nội kiểm (IQC)','Mẫu ngoại kiểm (EQA)'],sigmaData:{},periodLocks:[],teaRefs:[],teaRegistryVersion:TEA_REFERENCE_SCHEMA_VERSION,westgardRules:{...WG_DEFAULT}}),sanitize:(value:any)=>(root.QCCore as any).sanitizeBackup(value),schemaVersion:STATE_SCHEMA_VERSION,teaRegistryVersion:TEA_REFERENCE_SCHEMA_VERSION,westgardDefaults:WG_DEFAULT});
@@ -3919,7 +3926,7 @@ const routerDispatch=createRouterDispatchController({
   entryFilter:v=>(root as any).entryFilter(v),
   isReactPage:id=>(window as any).QCLabReact?.isReactPage(id)||false,
   mountReactPage:(id,container)=>(window as any).QCLabReact?.mountReactPage(id,container),
-  notifyReactStore:()=>(window as any).QCLabReact?.notify(),
+  notifyReactStore:()=>{appStore.getState().touch();(window as any).QCLabReact?.notify();},
 });
 root.go=routerDispatch.go;root.resetMainScroll=routerDispatch.resetMainScroll;root.render=routerDispatch.render;root.restoreRouteFilters=routerDispatch.restoreRouteFilters;root.rerender=routerDispatch.rerender;
 root.actionGuideContent=createActionGuideContent({escape:(value:any)=>(root as any).esc(value),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
@@ -5701,6 +5708,38 @@ root.sigmaTeaTrace=dataIoController.sigmaTeaTrace;
 root.buildSigmaXlsx=dataIoController.buildSigmaXlsx;
 root.exportSigmaPeriodXLSX=dataIoController.exportSigmaPeriodXLSX;
 root.exportSigmaPeriodsXLSX=dataIoController.exportSigmaPeriodsXLSX;
+
+/* Kernel — Giai đoạn 0 của việc gỡ global bridge (xem kế hoạch kiến trúc,
+   "gỡ bỏ global bridge, đưa QC Lab sang kiến trúc React chuẩn"). Thay vì
+   1.305+ tên `root.X=` rời rạc, gom MỘT đối tượng duy nhất, đặt tên theo
+   miền đã có sẵn (mỗi trang đã tự trả về đúng nhóm hàm nó cần qua
+   createXPageController() — không cần phát minh lại phân loại). Đây là bước
+   ĐẦU TIÊN, THUẦN CỘNG THÊM: mọi root.X= cũ vẫn giữ nguyên song song, chưa
+   trang React nào đọc qua đây — sẽ chuyển từng trang một ở giai đoạn sau.
+   Đặt ở cuối file (sau khi mọi controller/service đã construct xong) để
+   không có rủi ro thứ tự (mọi tham chiếu trong kernel trỏ tới biến ĐÃ TỒN
+   TẠI, không phải constructor sẽ chạy sau). */
+const kernel = {
+  store: appStore,
+  entry: entryPageController,
+  actions: actionsPageController,
+  actionForm: actionFormController,
+  sigma: sigmaPageController,
+  westgard: westgardPageController,
+  reagent: reagentPageController,
+  report: reportPageController,
+  settings: settingsPageController,
+  manage: managePageController,
+  dash: { dashboardModel: dashboardPageController.dashboardModel, dashTestSetStatus: dashboardPageController.dashTestSetStatus },
+  audit: { auditModel: (root as any).auditModel },
+  users: { usersModel: (root as any).usersModel },
+  pres: {
+    esc: (root as any).esc, escAttr: (root as any).escAttr, btn: (root as any).btn,
+    headOnly: (root as any).headOnly, dateBox: (root as any).dateBox, emptyState: (root as any).emptyState,
+    fmt: (root as any).fmt, vnDate: (root as any).vnDate,
+  },
+};
+if (typeof window !== 'undefined') (window as any).__QC_KERNEL__ = kernel;
 
 // Retire classic assets/app.js (2026-08-20, Pha H lát 1) — boot entry point (9
 // dòng, không có logic mới). Đặt CUỐI file (mọi service ở trên đã construct
