@@ -35,7 +35,6 @@ export type DashboardModel =
     };
 
 export const dashboardModel = (): DashboardModel => getKernel().dash.dashboardModel();
-export const dashboardHeadHtml = (lab: any): string => getKernel().pres.dashboardHeadHtml(lab);
 export const testDisplayName = (test: any): string => getKernel().pres.testDisplayName(test);
 export const vnDate = (value: unknown): string => getKernel().pres.vnDate(value);
 export const fmtPointValue = (point: unknown, test: unknown): string => getKernel().pres.fmtPointValue(point, test);

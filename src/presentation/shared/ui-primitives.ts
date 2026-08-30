@@ -1,6 +1,6 @@
 export type BtnAction = { action: string; args?: unknown[] };
 
-export function createUiPrimitives(deps: { currentUser: () => any; escape: (value: unknown) => string; escapeAttr: (value: unknown) => string; roleLabel: (role: string) => string }) {
+export function createUiPrimitives(deps: { escapeAttr: (value: unknown) => string }) {
   /* Pha H2 (2026-08-20): `onclick` nhận thêm dạng {action,args} — sinh
      data-action/data-args cho action-dispatcher.ts (event delegation) thay
      vì chuỗi JS source nhúng thẳng vào onclick="...". Dạng string cũ (chuỗi
@@ -17,14 +17,5 @@ export function createUiPrimitives(deps: { currentUser: () => any; escape: (valu
     return `<button class="btn ${cls}"${disabled ? ' disabled' : ''}${clickAttr}${title ? ` title="${deps.escapeAttr(title)}"` : ''}${attrStr}>${label}</button>`;
   };
   const emptyState = (title: string, body: string, actions = '') => `<div class="empty"><div class="empty-title">${title}</div><div>${body}</div>${actions ? `<div class="empty-actions">${actions}</div>` : ''}</div>`;
-  const topUserBox = () => {
-    const currentUser = deps.currentUser();
-    if (!currentUser) return '';
-    const name = currentUser.name || currentUser.username;
-    const initial = deps.escape(String(name || 'U').trim().charAt(0).toUpperCase() || 'U');
-    const avatarInner = currentUser.avatar ? `<img src="${deps.escapeAttr(currentUser.avatar)}" alt="">` : initial;
-    return `<div class="top-user"><div class="avatar" role="button" tabindex="0" aria-label="Đổi ảnh đại diện" data-action="openAvatarModal" data-keydown-action="openAvatarModal" data-keydown-keys='[" ","Enter"]'>${avatarInner}</div><div class="meta"><div class="name">${deps.escape(name)}</div><div class="role">${deps.roleLabel(currentUser.role)}</div></div><button data-action="logout" title="Đăng xuất"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M21 5v14"/></svg>Đăng xuất</button></div>`;
-  };
-  const headOnly = (t: string, p: string, actions = '') => `<div class="head"><div><h1>${t}</h1>${p ? `<p>${p}</p>` : ''}</div><div class="head-actions">${actions}${topUserBox()}</div></div>`;
-  return { btn, emptyState, topUserBox, headOnly };
+  return { btn, emptyState };
 }

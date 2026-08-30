@@ -28,7 +28,6 @@ export function createReagentPageController(deps: {
   requireAdmin: () => boolean;
   dateBox: (id: string, value: string, cls: string, attrs: string) => string;
   button: (label: string, action: string | { action: string; args?: unknown[] } | null, cls?: string, title?: string, options?: AnyRec) => string;
-  headOnly: (title: string, subtitle: string, actions?: string) => string;
   emptyState: (title: string, body: string, actions?: string) => string;
   searchText: (value: unknown) => string;
   openModal: (html: string) => void;

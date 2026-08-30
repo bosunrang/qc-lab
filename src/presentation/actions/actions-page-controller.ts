@@ -33,7 +33,6 @@ export function createActionsPageController(deps: {
   infoDialog: (message: string, opts?: AnyRec) => Promise<unknown>;
   esc: (value: unknown) => string;
   btn: (label: string, action: string | { action: string; args?: unknown[] } | null, cls?: string, title?: string, options?: AnyRec) => string;
-  headOnly: (title: string, subtitle: string, actions?: string) => string;
   vnDate: (value: unknown) => string;
   formatDateTimeVN: (value: unknown) => string;
   fmtPointValue: (point: AnyRec, test: AnyRec) => string;

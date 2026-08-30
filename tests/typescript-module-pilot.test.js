@@ -187,7 +187,6 @@ const csvDownloadSource = read('src/presentation/export/csv-download.ts');
 const cssTokenPixelSource = read('src/presentation/style/css-token-pixel.ts');
 const chartCanvasFontSource = read('src/presentation/chart/canvas-font.ts');
 const chartDataUrlSource = read('src/presentation/chart/chart-data-url.ts');
-const dashboardHeadHtmlSource = read('src/presentation/dashboard/dashboard-head-html.ts');
 const cusumColorsSource = read('src/presentation/chart/cusum-colors.ts');
 const leveyJenningsMultiColorsSource = read('src/presentation/chart/levey-jennings-multi-colors.ts');
 const cusumChartTitleSource = read('src/presentation/chart/cusum-chart-title.ts');
@@ -255,8 +254,6 @@ const adapter = read('src/compat/modular-pilot.global.ts');
 const generated = read('assets/generated/modular-pilot.js');
 assert.match(backupLocalMarkerSource, /export function createBackupLocalMarker\(/,
   'backup local marker must be a TypeScript factory');
-assert.match(dashboardHeadHtmlSource, /export function createDashboardHeadHtml\(/,
-  'dashboard head HTML must be a TypeScript factory');
 assert.match(cusumColorsSource, /export const CUSUM_COLORS=/,
   'CUSUM colors must be a TypeScript presentation constant');
 assert.match(leveyJenningsMultiColorsSource, /export const LEVEY_JENNINGS_MULTI_COLORS=/,
@@ -313,8 +310,6 @@ assert.match(backupImportConfirmationSource, /export function createBackupImport
   'backup import confirmation must be a TypeScript factory');
 assert.doesNotMatch(backupLocalMarkerSource, /\bglobalThis\b|\bdocument\b|\blocalStorage\b/,
   'backup local marker must receive browser storage as a dependency');
-assert.doesNotMatch(dashboardHeadHtmlSource, /\bglobalThis\b|\bdocument\b/,
-  'dashboard head HTML must receive browser helpers as dependencies');
 assert.doesNotMatch(cusumColorsSource, /\bglobalThis\b|\bdocument\b/,
   'CUSUM colors must not read browser globals');
 assert.doesNotMatch(leveyJenningsMultiColorsSource, /\bglobalThis\b|\bdocument\b/,
@@ -421,8 +416,6 @@ assert.doesNotMatch(backupUiSource, /downloadBackupText=\(name,json\)=>\{[^}]*UR
   'backup export must not retain a classic object-URL fallback');
 assert.match(generated, /root\.backupLocalMarker\s*=\s*createBackupLocalMarker/,
   'artifact must publish TypeScript backup local marker');
-assert.match(generated, /root\.dashboardHeadHtml\s*=\s*createDashboardHeadHtml/,
-  'artifact must publish TypeScript dashboard head HTML');
 assert.match(generated, /root\.cusumColors\s*=\s*CUSUM_COLORS/,
   'artifact must publish TypeScript CUSUM palette');
 assert.match(generated, /root\.leveyJenningsMultiColors\s*=\s*LEVEY_JENNINGS_MULTI_COLORS/,

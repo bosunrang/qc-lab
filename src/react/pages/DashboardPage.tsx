@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useAppStore } from '../state/kernel';
+import { PageHeader } from '../components/PageHeader';
 import {
-  dashboardModel, dashboardHeadHtml, testDisplayName, vnDate, fmtPointValue, fmt,
+  dashboardModel, testDisplayName, vnDate, fmtPointValue, fmt,
   dashTestSetStatus, setDashTestQuery, normalizeSearchText, levelTargetOk,
   goManageTargets, dashboardGoEntryFollowup, dashboardContinueAction, dashViewTestInEntry,
   type DashboardModel,
@@ -12,11 +13,7 @@ const STATUS_TABS: ReadonlyArray<readonly [string, string]> = [
 ];
 
 function Head({ lab }: { lab: any }) {
-  /* dashboardHeadHtml() dựng cả top-user/avatar (đã có modal riêng ở
-     avatar-modal-controller.ts) — chưa cần port sang JSX cho bản thí điểm này,
-     nên tái dùng nguyên HTML đã có. display:contents để div bọc ngoài không
-     sinh thêm hộp trong layout flex của .head. */
-  return <div style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: dashboardHeadHtml(lab) }} />;
+  return <PageHeader title="Tổng quan" subtitle={(lab.name || 'Khoa Xét nghiệm') + (lab.dept ? ' · ' + lab.dept : '')} />;
 }
 
 function WestgardTag({ status }: { status: string }) {

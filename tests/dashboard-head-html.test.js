@@ -1,5 +1,0 @@
-'use strict';
-const assert=require('node:assert/strict');const{spawnSync}=require('node:child_process');const path=require('node:path');const{pathToFileURL}=require('node:url');
-const source=pathToFileURL(path.join(__dirname,'..','src','presentation','dashboard','dashboard-head-html.ts')).href;
-const program=`import { createDashboardHeadHtml } from ${JSON.stringify(source)};const head=createDashboardHeadHtml({escape:value=>'['+value+']',topUserBox:()=>'<user/>'});if(head({name:'Hóa sinh',dept:'Nội trú'})!=='<div class="head"><div><h1>Tổng quan</h1><p>[Hóa sinh] · [Nội trú]</p></div><user/></div>'||!head({name:''}).includes('[Khoa Xét nghiệm]'))throw new Error('must preserve dashboard header');console.log('Dashboard head HTML TypeScript tests passed');`;
-const result=spawnSync(process.execPath,['--no-warnings','--input-type=module','--eval',program],{cwd:path.join(__dirname,'..'),encoding:'utf8'});assert.equal(result.status,0,result.stderr||result.stdout||'không thể chạy dashboard head HTML TypeScript');console.log(result.stdout.trim());

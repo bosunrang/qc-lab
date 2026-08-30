@@ -287,7 +287,6 @@ import { dashboardShiftStatus } from '../presentation/dashboard/dashboard-shift-
 import { dashboardKpis } from '../domain/qc/dashboard-kpis';
 import { createDashboardTestSearchText } from '../presentation/dashboard/dashboard-test-search-text';
 import { createDashboardLatestPoint } from '../presentation/dashboard/dashboard-latest-point';
-import { createDashboardHeadHtml } from '../presentation/dashboard/dashboard-head-html';
 import { CUSUM_COLORS } from '../presentation/chart/cusum-colors';
 import { LEVEY_JENNINGS_MULTI_COLORS } from '../presentation/chart/levey-jennings-multi-colors';
 import { createCusumChartTitle } from '../presentation/chart/cusum-chart-title';
@@ -1574,8 +1573,6 @@ type QCLabGlobal = typeof globalThis & {
   rangeActions: ReturnType<typeof createRangeActionsHtml>;
   btn: ReturnType<typeof createUiPrimitives>['btn'];
   emptyState: ReturnType<typeof createUiPrimitives>['emptyState'];
-  topUserBox: ReturnType<typeof createUiPrimitives>['topUserBox'];
-  headOnly: ReturnType<typeof createUiPrimitives>['headOnly'];
   brandTitle: () => string;
   brandSub: () => string;
   brandMarkText: () => string;
@@ -1759,7 +1756,6 @@ type QCLabGlobal = typeof globalThis & {
   westgardTestSearch: ReturnType<typeof createWestgardTestSearch<any>>;
   westgardMultiViews: ReturnType<typeof createWestgardMultiViews<any, any>>;
   westgardCusumLevels: ReturnType<typeof createWestgardCusumLevels<any, any, any>>;
-  dashboardHeadHtml: ReturnType<typeof createDashboardHeadHtml>;
   cusumColors: typeof CUSUM_COLORS;
   leveyJenningsMultiColors: typeof LEVEY_JENNINGS_MULTI_COLORS;
   cusumChartTitle: ReturnType<typeof createCusumChartTitle>;
@@ -3666,7 +3662,6 @@ root.wgSelectTest = (value: unknown) => { if (!value) return; selTest = value; r
 (root as any).westgardModel=westgardPageController.westgardModel;
 const dashboardTestSearchText=createDashboardTestSearchText({normalize:(value:any)=>(root as any).searchText(value),label:(test:any)=>(root as any).testDisplayName(test)});
 const dashboardLatestPoint=createDashboardLatestPoint<any>({runNumber:(point:any)=>(root as any).pointRunNo(point)});
-root.dashboardHeadHtml=createDashboardHeadHtml({escape:(value:any)=>(root as any).esc(value),topUserBox:()=>typeof (globalThis as any).topUserBox==='function'?(globalThis as any).topUserBox():''});
 root.cusumColors=CUSUM_COLORS;
 root.leveyJenningsMultiColors=LEVEY_JENNINGS_MULTI_COLORS;
 root.cusumChartTitle=createCusumChartTitle({format:(value:number,digits:number)=>(root as any).fmt(value,digits)});
@@ -3776,8 +3771,8 @@ root.firstAccessPage=(u=currentUser)=>root.routerPagePolicy.firstAccessPage(u);
 const liveRowFilterService=createLiveRowFilter({document:typeof document!=='undefined'?document:({querySelectorAll:()=>[],getElementById:()=>null,createElement:()=>({})} as unknown as Document),searchText:value=>root.normalizeSearchText!(value)});
 root.setSearchCount=liveRowFilterService.setSearchCount;root.showSearchEmpty=liveRowFilterService.showSearchEmpty;root.replaceSelectItems=liveRowFilterService.replaceSelectItems;root.liveRowFilter=liveRowFilterService.liveRowFilter;root.scheduleSearchRender=liveRowFilterService.scheduleSearchRender;
 root.dateBox=createDateBoxHtml({vnPickerParse:value=>root.vnDatePickerController.parse(value),parseVN:value=>root.parseVnDatePresentation!(value),escapeAttr:value=>(root as any).escAttr(value),formatVnDate:value=>vnDate(value)});
-const uiPrimitives=createUiPrimitives({currentUser:()=>currentUser,escape:value=>(root as any).esc(value),escapeAttr:value=>(root as any).escAttr(value),roleLabel:r=>routerPermission.roleLabel(r)});
-root.btn=uiPrimitives.btn;root.emptyState=uiPrimitives.emptyState;root.topUserBox=uiPrimitives.topUserBox;root.headOnly=uiPrimitives.headOnly;
+const uiPrimitives=createUiPrimitives({escapeAttr:value=>(root as any).escAttr(value)});
+root.btn=uiPrimitives.btn;root.emptyState=uiPrimitives.emptyState;
 root.rangeActions=createRangeActionsHtml({button:(label,action,cls,title)=>root.btn(label,action,cls,title),canWrite:()=>routerPermission.canWrite()});
 root.brandTitle=()=>root.routerShell.brandTitle();
 root.brandSub=()=>root.routerShell.brandSub();
@@ -4943,7 +4938,6 @@ const entryPageController = createEntryPageController({
   requireUnlockedPeriod: (date, action) => (root as any).requireUnlockedPeriod(date, action),
   esc: value => (root as any).esc(value), escapeAttr: value => (root as any).escAttr(value), jsq: value => jsq(value),
   btn: (label, action, cls, title, options) => (root as any).btn(label, action, cls, title, options),
-  headOnly: (title, subtitle, actions) => (root as any).headOnly(title, subtitle, actions),
   dateBox: (id, value, cls, attrs) => (root as any).dateBox(id, value, cls, attrs),
   openModal: html => root.openModal(html), closeModal: () => root.closeModal(), confirmDialog: opts => root.confirmDialog(opts),
   searchText: value => (root as any).searchText(value), vnDate: value => vnDate(value),
@@ -5100,7 +5094,6 @@ const actionsPageController = createActionsPageController({
   openModal: html => root.openModal(html), closeModal: () => root.closeModal(), confirmDialog: opts => root.confirmDialog(opts), infoDialog: (message, opts) => root.infoDialog(message, opts),
   esc: value => (root as any).esc(value),
   btn: (label, action, cls, title, options) => (root as any).btn(label, action, cls, title, options),
-  headOnly: (title, subtitle, actions) => (root as any).headOnly(title, subtitle, actions),
   vnDate: value => vnDate(value), formatDateTimeVN: value => formatDateTimeVN(value as string),
   fmtPointValue: (point, test) => (root as any).fmtPointValue(point, test), testDisplayName: test => root.testDisplayName!(test), stateName: value => root.stateName!(value as string),
   errorType: rules => (root as any).errorType(rules), fixHint: rules => (root as any).fixHint(rules), lvlCfg: (test, level) => lvlCfg(test, level),
@@ -5197,7 +5190,6 @@ const reagentPageController=createReagentPageController({
   requireAdmin:()=>root.requireAdmin(),
   dateBox:(id,value,cls,attrs)=>(root as any).dateBox(id,value,cls,attrs),
   button:(label,action,cls,title,options)=>(root as any).btn(label,action,cls,title,options),
-  headOnly:(title,subtitle,actions)=>(root as any).headOnly(title,subtitle,actions),
   emptyState:(title,body,actions)=>(root as any).emptyState(title,body,actions),
   searchText:value=>root.normalizeSearchText!(value),
   openModal:html=>root.openModal(html),
@@ -5682,7 +5674,7 @@ const kernel = {
     role: routerPermission.role, canWrite: routerPermission.canWrite, requireWrite: routerPermission.requireWrite,
     requireAdmin: routerPermission.requireAdmin, roleLabel: routerPermission.roleLabel, roleSelectOptions: routerPermission.roleSelectOptions,
     rolePageIds: (root as any).rolePageIds,
-    settingsFirebaseGuideHtml: (root as any).settingsFirebaseGuideHtml, dashboardHeadHtml: (root as any).dashboardHeadHtml,
+    settingsFirebaseGuideHtml: (root as any).settingsFirebaseGuideHtml,
     reportActionIconPresentation: (root as any).reportActionIconPresentation, reagentToolIconPresentation: (root as any).reagentToolIconPresentation,
     QCCore: root.QCCore, AnalysisUIState: (root as any).AnalysisUIState,
     go: (root as any).go,

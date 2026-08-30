@@ -12195,11 +12195,6 @@
 		};
 	}
 	//#endregion
-	//#region src/presentation/dashboard/dashboard-head-html.ts
-	function createDashboardHeadHtml({ escape, topUserBox }) {
-		return (lab) => `<div class="head"><div><h1>Tổng quan</h1><p>${escape(lab.name || "Khoa Xét nghiệm")}${lab.dept ? " · " + escape(lab.dept) : ""}</p></div>${topUserBox()}</div>`;
-	}
-	//#endregion
 	//#region src/presentation/chart/cusum-colors.ts
 	var CUSUM_COLORS = Object.freeze({
 		cpos: "#0e8f8f",
@@ -12620,19 +12615,9 @@
 			return `<button class="btn ${cls}"${disabled ? " disabled" : ""}${clickAttr}${title ? ` title="${deps.escapeAttr(title)}"` : ""}${attrStr}>${label}</button>`;
 		};
 		const emptyState = (title, body, actions = "") => `<div class="empty"><div class="empty-title">${title}</div><div>${body}</div>${actions ? `<div class="empty-actions">${actions}</div>` : ""}</div>`;
-		const topUserBox = () => {
-			const currentUser = deps.currentUser();
-			if (!currentUser) return "";
-			const name = currentUser.name || currentUser.username;
-			const initial = deps.escape(String(name || "U").trim().charAt(0).toUpperCase() || "U");
-			return `<div class="top-user"><div class="avatar" role="button" tabindex="0" aria-label="Đổi ảnh đại diện" data-action="openAvatarModal" data-keydown-action="openAvatarModal" data-keydown-keys='[" ","Enter"]'>${currentUser.avatar ? `<img src="${deps.escapeAttr(currentUser.avatar)}" alt="">` : initial}</div><div class="meta"><div class="name">${deps.escape(name)}</div><div class="role">${deps.roleLabel(currentUser.role)}</div></div><button data-action="logout" title="Đăng xuất"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M21 5v14"/></svg>Đăng xuất</button></div>`;
-		};
-		const headOnly = (t, p, actions = "") => `<div class="head"><div><h1>${t}</h1>${p ? `<p>${p}</p>` : ""}</div><div class="head-actions">${actions}${topUserBox()}</div></div>`;
 		return {
 			btn,
-			emptyState,
-			topUserBox,
-			headOnly
+			emptyState
 		};
 	}
 	//#endregion
@@ -28272,10 +28257,6 @@
 		label: (test) => root.testDisplayName(test)
 	});
 	var dashboardLatestPoint = createDashboardLatestPoint({ runNumber: (point) => root.pointRunNo(point) });
-	root.dashboardHeadHtml = createDashboardHeadHtml({
-		escape: (value) => root.esc(value),
-		topUserBox: () => typeof globalThis.topUserBox === "function" ? globalThis.topUserBox() : ""
-	});
 	root.cusumColors = CUSUM_COLORS;
 	root.leveyJenningsMultiColors = LEVEY_JENNINGS_MULTI_COLORS;
 	root.cusumChartTitle = createCusumChartTitle({ format: (value, digits) => root.fmt(value, digits) });
@@ -28474,16 +28455,9 @@
 		escapeAttr: (value) => root.escAttr(value),
 		formatVnDate: (value) => vnDate(value)
 	});
-	var uiPrimitives = createUiPrimitives({
-		currentUser: () => currentUser,
-		escape: (value) => root.esc(value),
-		escapeAttr: (value) => root.escAttr(value),
-		roleLabel: (r) => routerPermission.roleLabel(r)
-	});
+	var uiPrimitives = createUiPrimitives({ escapeAttr: (value) => root.escAttr(value) });
 	root.btn = uiPrimitives.btn;
 	root.emptyState = uiPrimitives.emptyState;
-	root.topUserBox = uiPrimitives.topUserBox;
-	root.headOnly = uiPrimitives.headOnly;
 	root.rangeActions = createRangeActionsHtml({
 		button: (label, action, cls, title) => root.btn(label, action, cls, title),
 		canWrite: () => routerPermission.canWrite()
@@ -30616,7 +30590,6 @@
 		escapeAttr: (value) => root.escAttr(value),
 		jsq: (value) => jsq(value),
 		btn: (label, action, cls, title, options) => root.btn(label, action, cls, title, options),
-		headOnly: (title, subtitle, actions) => root.headOnly(title, subtitle, actions),
 		dateBox: (id, value, cls, attrs) => root.dateBox(id, value, cls, attrs),
 		openModal: (html) => root.openModal(html),
 		closeModal: () => root.closeModal(),
@@ -30855,7 +30828,6 @@
 		infoDialog: (message, opts) => root.infoDialog(message, opts),
 		esc: (value) => root.esc(value),
 		btn: (label, action, cls, title, options) => root.btn(label, action, cls, title, options),
-		headOnly: (title, subtitle, actions) => root.headOnly(title, subtitle, actions),
 		vnDate: (value) => vnDate(value),
 		formatDateTimeVN: (value) => formatDateTimeVN(value),
 		fmtPointValue: (point, test) => root.fmtPointValue(point, test),
@@ -30997,7 +30969,6 @@
 		requireAdmin: () => root.requireAdmin(),
 		dateBox: (id, value, cls, attrs) => root.dateBox(id, value, cls, attrs),
 		button: (label, action, cls, title, options) => root.btn(label, action, cls, title, options),
-		headOnly: (title, subtitle, actions) => root.headOnly(title, subtitle, actions),
 		emptyState: (title, body, actions) => root.emptyState(title, body, actions),
 		searchText: (value) => root.normalizeSearchText(value),
 		openModal: (html) => root.openModal(html),
@@ -31576,7 +31547,6 @@
 			roleSelectOptions: routerPermission.roleSelectOptions,
 			rolePageIds: root.rolePageIds,
 			settingsFirebaseGuideHtml: root.settingsFirebaseGuideHtml,
-			dashboardHeadHtml: root.dashboardHeadHtml,
 			reportActionIconPresentation: root.reportActionIconPresentation,
 			reagentToolIconPresentation: root.reagentToolIconPresentation,
 			QCCore: root.QCCore,

@@ -98,7 +98,6 @@ declare function icoDownload(): string;
 declare function dateBox(id: string, value?: string, cls?: string, attrs?: string): string;
 declare function go(page: string): void;
 declare function resetMainScroll(): void;
-declare function headOnly(title: string, subtitle: string, actions?: string): string;
 declare function emptyState(title: string, body: string, actions?: string): string;
 declare function btn(label: string, onclick: string, cls?: string, title?: string, opts?: Record<string, any>): string;
 declare function rangeActions(testId: string, level: number, eligible: boolean, applied?: string): string;

@@ -1747,6 +1747,40 @@ violations across all 18 tracked modals and all 11 pages, `ui-workflow-check`
 avatar (both mouse and keyboard Enter) opens the "Ảnh đại diện" modal
 correctly; zero console errors.
 
+Giai đoạn 5, Bước 2 (done): Dashboard's own `dashboardHeadHtml()` — the one
+page held back from Bước 1 — now reuses the SAME `<PageHeader title="Tổng
+quan" subtitle={...}/>` (verified safe first: `.head-actions`'s flex wrapper
+is harmless even with Dashboard's single child, unlike the other 10 pages
+which render both a subtitle AND `.top-user`). This closed the last gap in
+Bước 1's "10/11 trang" header conversion (now 11/11) and triggered a
+dead-code cascade: `dashboardHeadHtml` itself (bridge export, `kernel.dash`
+wiring, `src/presentation/dashboard/dashboard-head-html.ts` source file, its
+dedicated test) is deleted outright; since `headOnlyHtml`/`dashboardHeadHtml`
+were the ONLY two callers of `topUserBox()`/`headOnly()` in
+`src/presentation/shared/ui-primitives.ts`, both functions are deleted too
+(`createUiPrimitives`'s `deps` type shrunk to just `{escapeAttr}`, return
+shape now `{btn, emptyState}`). Deleting those two functions exposed 3
+dead-code references that PREDATE Giai đoạn 5 (not introduced by this step):
+`managePageController`/`entryPageController`/`reagentPageController`'s deps
+objects each carried a `headOnly: (title, subtitle, actions) =>
+(root as any).headOnly(...)` line that no function in any of those 3
+controller source files ever calls (confirmed via grep for `deps.headOnly(`
+before touching anything) — cleaned up properly rather than left as noted-
+but-untouched dead code (per this session's "chuẩn tuyệt đối" thoroughness
+standard): removed the wiring line from `modular-pilot.global.ts`, removed
+the matching `headOnly: (...) => string;` type declaration from all 3
+controller source files, and removed `declare function headOnly(...)` from
+`global.d.ts` (nothing assigns or reads that bare global any more). Verified:
+`npm test` 433/433, `typecheck` clean, `build:pilot` succeeds (all 4
+artifacts), `check-build-freshness` matches, `a11y-audit` 0 violations
+(18/18 modals, 11/11 pages), `ui-workflow-check` 29/29, `nce-workflow-check`
+91/91, plus an ad-hoc Playwright script confirming: Dashboard renders "Tổng
+quan" + the hospital/department subtitle, `.top-user` shows the correct
+name/role, the avatar (`role="button" tabindex="0"`) opens the avatar modal
+via both a mouse click and the Enter key, and 3 other pages (entry/users/
+settings) still render their titles correctly through the shared
+`PageHeader` — zero console errors.
+
 Then shrink/delete the now-dead
 `root.X=` aliases, `global.d.ts`'s
 ambient bare-global declarations, and rewrite the 61 sandbox tests + ~88

@@ -1,1 +1,0 @@
-export function createDashboardHeadHtml({escape,topUserBox}:{escape:(value:any)=>string,topUserBox:()=>string}){return(lab:any)=>`<div class="head"><div><h1>Tổng quan</h1><p>${escape(lab.name||'Khoa Xét nghiệm')}${lab.dept?' · '+escape(lab.dept):''}</p></div>${topUserBox()}</div>`;}

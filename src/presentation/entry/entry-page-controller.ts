@@ -35,7 +35,6 @@ export function createEntryPageController(deps: {
   escapeAttr: (value: unknown) => string;
   jsq: (value: unknown) => string;
   btn: (label: string, action: string | { action: string; args?: unknown[] } | null, cls?: string, title?: string, options?: AnyRec) => string;
-  headOnly: (title: string, subtitle: string, actions?: string) => string;
   dateBox: (id: string, value: string, cls?: string, attrs?: string) => string;
   openModal: (html: string) => void;
   closeModal: () => void;
