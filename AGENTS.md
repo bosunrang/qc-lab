@@ -1695,6 +1695,58 @@ script (not just tests) that called a converted modal's old bare global
 needed the same fix — switch to tab-select-then-click-the-real-button, with
 an async retry-poll after any `setManageTab()` call.
 
+**Mục tiêu mở rộng (2026-08-30) — "chuẩn tuyệt đối".** Sau khi Giai đoạn 3
+xong, người dùng quyết định nâng mục tiêu từ "gỡ global bridge, thực dụng"
+lên "kiến trúc React/Vite/TS chuẩn hoàn toàn" — chấp nhận làm hết, kể cả 2
+việc đã bị bác bỏ có chủ đích ở phiên trước (gộp 2 bundle Vite; state
+immutable thật). Đã khảo sát kỹ bằng 3 agent trước khi lên kế hoạch chi
+tiết (xem file kế hoạch kiến trúc, mục "MỞ RỘNG MỤC TIÊU") — 2 phát hiện
+quan trọng nhất: (1) state immutable thật là rủi ro CAO NHẤT toàn kế hoạch,
+vì middleware `immer` của Zustand không giảm rủi ro thật (rủi ro cốt lõi là
+hàng trăm hàm đóng trực tiếp lên biến `state` toàn cục, đọc lại field ngay
+sau mutate — chuyển sang `set()` chuẩn sẽ làm mọi biến trung gian giữ tham
+chiếu tới field con của state CŨ stale ngay lập tức, bug âm thầm khó bắt
+bằng test); (2) gộp bundle đã kiểm chứng THỰC NGHIỆM sẽ vỡ ngay 61 sandbox
+test (`ReferenceError: window is not defined`, vì bootstrap của
+`react-pilot.entry.tsx` gọi `document.getElementById(...)` không có guard ở
+top-level module) — quyết định giữ 2 bundle tách biệt là có chủ đích, có lý
+do kỹ thuật thật, không phải nợ kỹ thuật bị bỏ quên. Thứ tự ưu tiên: Giai
+đoạn 5 (bỏ `dangerouslySetInnerHTML`, rủi ro thấp→trung bình) → Giai đoạn 6
+(Router chuẩn, rủi ro thấp) → Giai đoạn 4 tiếp tục (dọn alias) → Giai đoạn 7
+(state immutable, RỦI RO CAO NHẤT, làm theo từng nhóm dữ liệu nhỏ→lớn,
+KHÔNG dùng middleware `immer`) → Giai đoạn 8 (gộp bundle, RỦI RO CAO, cần
+thêm `jsdom` vào sandbox test TRƯỚC KHI thử gộp).
+
+Giai đoạn 5, Bước 1 (done): Header dùng chung 10/11 trang (trừ Dashboard,
+có `dashboardHeadHtml()` riêng, cấu trúc khác biệt nhỏ — chưa đụng).
+`headOnlyHtml()`+`topUserBox()` cũ (dangerouslySetInnerHTML, giống hệt nhau
+ở cả 10 trang) thay bằng `src/react/components/PageHeader.tsx` — component
+JSX thật đầu tiên trong thư mục `src/react/components/` (mới tạo, chưa từng
+có nơi chứa component dùng chung trước Giai đoạn 5). Avatar (click hoặc
+phím Enter/Space → mở modal đổi ảnh đại diện) và nút Đăng xuất giờ là
+`onClick`/`onKeyDown` React thật, không còn `data-action="openAvatarModal"`/
+`"logout"`. Thêm `currentUser`/`openAvatarModal`/`logout` vào `kernel.pres`
+(chưa từng cần lộ ra ngoài trước đây). **Phát hiện phụ quan trọng**:
+`openAvatarModal()` mở một modal **'html' cổ điển** (`avatar-modal-controller.ts`)
+— đây là **modal thứ 20, chưa từng được tính vào danh sách 18+1 modal của
+Giai đoạn 3** (bị bỏ sót hoàn toàn, không nằm trong `scripts/a11y-audit.js`'s
+MODALS list). Vẫn hoạt động đúng qua `ModalOverlay.tsx`'s nhánh 'html'
+(không cần đổi gì để giữ app chạy đúng), nhưng để đạt "chuẩn tuyệt đối"
+thật sự thì modal này cũng cần chuyển sang 'react' — chưa làm, ghi nhận lại
+để không bỏ sót lần nữa. Cũng xóa hẳn `headOnlyHtml` khỏi cả 10 file bridge
+và `headOnly` khỏi `kernel.pres` (không còn ai gọi từ React); phát hiện
+`root.headOnly` còn 3 chỗ được truyền vào deps object
+(`managePageController`/`entryPageController`/`reagentPageController`) mà
+KHÔNG BAO GIỜ được gọi (`deps.headOnly(` không khớp ở đâu trong 3 file đó)
+— xác nhận đây là dead code có TỪ TRƯỚC, không phải do đổi lần này, để
+nguyên (dọn dead params ngoài phạm vi bước này). Verified: `npm test`
+434/434, `typecheck` clean, `check-build-freshness` matches, `a11y-audit` 0
+violations across all 18 tracked modals and all 11 pages, `ui-workflow-check`
+29/29, `nce-workflow-check` 91/91, plus two ad-hoc scripts confirming: all
+11 pages render the correct title + `.top-user` (name, role); clicking the
+avatar (both mouse and keyboard Enter) opens the "Ảnh đại diện" modal
+correctly; zero console errors.
+
 Then shrink/delete the now-dead
 `root.X=` aliases, `global.d.ts`'s
 ambient bare-global declarations, and rewrite the 61 sandbox tests + ~88

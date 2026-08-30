@@ -1,7 +1,8 @@
 import { useState, useEffect, Fragment } from 'react';
 import { useAppStore } from '../state/kernel';
+import { PageHeader } from '../components/PageHeader';
 import {
-  sigmaModel, headOnlyHtml, emptyStateHtml, dateBoxHtml, icoDownloadHtml, sgRefresh,
+  sigmaModel, emptyStateHtml, dateBoxHtml, icoDownloadHtml, sgRefresh,
   sgPickTest, sgPart, sgSetTeaSource, goManageTargets, sgOpenAddTest, sgRemoveTracked, sgSetTea, sgSetTeaMeta,
   sgSelectPeriod, sgCell, sgPullCV, exportSigmaPeriodXLSX, printSigmaPeriod, sgDelPeriod, sgOpenBias,
   sgAddPeriod, exportSigmaPeriodsXLSX, printSigmaPeriods,
@@ -12,7 +13,7 @@ type NonEmptyModel = Extract<SigmaModel, { empty: false }>;
 type NormalModel = Extract<NonEmptyModel, { noLevels: false }>;
 
 function Head({ subtitle }: { subtitle: string }) {
-  return <div style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: headOnlyHtml('Six Sigma & Sai số', subtitle) }} />;
+  return <PageHeader title="Six Sigma & Sai số" subtitle={subtitle} />;
 }
 
 function TrashIcon() {

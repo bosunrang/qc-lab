@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
+import { PageHeader } from '../components/PageHeader';
 import {
-  entryModel, headOnlyHtml, emptyStateHtml, dateBoxHtml, afterRender, entryFocusPendingSheet,
+  entryModel, emptyStateHtml, dateBoxHtml, afterRender, entryFocusPendingSheet,
   go, goManageTargets, treeToggle, toggleEntryTree, entryTreeKey, entryFilter, entrySetMachine,
   entryPick, entryFocusLevel, entryShowPrevLot, entryShowCurrentLot, entrySheetRunChanged, entryUnlockExtraRun,
   entryDateNoteSave, entrySetSheetPart, entrySetSheetMonth, entryGoToday, entrySetDays, entrySetStart, entrySetEnd,
@@ -10,7 +11,7 @@ import {
 } from '../bridge/entryBridge';
 
 function Head() {
-  return <div style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: headOnlyHtml('Nhập QC', 'Ghi nhận kết quả theo ngày, mức QC và lô đang vận hành') }} />;
+  return <PageHeader title="Nhập QC" subtitle="Ghi nhận kết quả theo ngày, mức QC và lô đang vận hành" />;
 }
 
 function TreeIcon() {

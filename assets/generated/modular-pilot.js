@@ -31554,7 +31554,6 @@
 			esc: root.esc,
 			escAttr: root.escAttr,
 			btn: root.btn,
-			headOnly: root.headOnly,
 			dateBox: root.dateBox,
 			emptyState: root.emptyState,
 			fmt: root.fmt,
@@ -31589,7 +31588,10 @@
 			dashViewTestInEntry: root.dashViewTestInEntry,
 			openConfigAssayModel: root.openConfigAssayModel,
 			reauthVerify: root.reauthVerify,
-			reauthAccountLabel: root.reauthAccountLabel
+			reauthAccountLabel: root.reauthAccountLabel,
+			currentUser: () => currentUser,
+			openAvatarModal: () => root.openAvatarModal(),
+			logout: () => root.logout()
 		}
 	};
 	root.boot = async () => {

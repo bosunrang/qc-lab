@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useAppStore } from '../state/kernel';
+import { PageHeader } from '../components/PageHeader';
 import {
-  auditModel, roleLabel, formatDateTimeVN, dateBoxHtml, headOnlyHtml, auditSetQuery,
+  auditModel, roleLabel, formatDateTimeVN, dateBoxHtml, auditSetQuery,
   exportActivityCSV, archiveActivityLog, auditVerifyChainNow, auditSetPageSize, auditClearFilters, auditSetPage,
   type AuditModel,
 } from '../bridge/auditBridge';
 
 function Head() {
-  return <div style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: headOnlyHtml('Nhật ký hoạt động', 'Lưu vết các thao tác quan trọng; chỉ quản trị viên được xem') }} />;
+  return <PageHeader title="Nhật ký hoạt động" subtitle="Lưu vết các thao tác quan trọng; chỉ quản trị viên được xem" />;
 }
 
 function DateBox({ id, value, action }: { id: string; value: string; action: string }) {

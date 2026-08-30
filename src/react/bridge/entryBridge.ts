@@ -49,7 +49,6 @@ export type EntryModel =
     };
 
 export const entryModel = (): EntryModel => getKernel().entry.entryModel();
-export const headOnlyHtml = (title: string, subtitle: string): string => getKernel().pres.headOnly(title, subtitle);
 export const emptyStateHtml = (title: string, body: string, actions?: string): string => getKernel().pres.emptyState(title, body, actions);
 export const dateBoxHtml = (id: string, value: string, cls: string, attrs: string): string => getKernel().pres.dateBox(id, value, cls, attrs);
 export const afterRender = (page: string): void => getKernel().pres.afterRender(page);

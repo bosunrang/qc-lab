@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../state/kernel';
+import { PageHeader } from '../components/PageHeader';
 import {
-  manageModel, headOnlyHtml, manageSearchSet, setTargetPanel, setTargetGroup, setHistoryTest,
+  manageModel, manageSearchSet, setTargetPanel, setTargetGroup, setHistoryTest,
   setManageTab, openConfigInstrument, deleteConfigInstrument, openConfigAssay, delTest,
   openConfigPanel, deleteConfigPanel, openConfigLot, deleteConfigLot, openConfigGroup,
   openTargetMatrix, activateLotGroup, toggleLotGroupStatus, deleteConfigGroup,
@@ -20,7 +21,7 @@ const TOOLBAR_ACTIONS: Record<string, (...args: string[]) => void> = {
 };
 
 function Head() {
-  return <div style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: headOnlyHtml('Cấu hình chung', 'Quản lý máy, Panel QC, lô QC, Mean/SD và luật QC') }} />;
+  return <PageHeader title="Cấu hình chung" subtitle="Quản lý máy, Panel QC, lô QC, Mean/SD và luật QC" />;
 }
 
 function EmptyState({ title, description }: { title: string; description: string }) {

@@ -1,12 +1,13 @@
 import { useAppStore } from '../state/kernel';
+import { PageHeader } from '../components/PageHeader';
 import {
-  usersList, roleLabel, roleSelectOptionsHtml, userPermChecksHtml, rolePageIds, headOnlyHtml,
+  usersList, roleLabel, roleSelectOptionsHtml, userPermChecksHtml, rolePageIds,
   addUser, syncUserPermChecks, resetPass, openUserPerms, toggleUser, delUser,
   type UserRow,
 } from '../bridge/usersBridge';
 
 function Head() {
-  return <div style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: headOnlyHtml('Quản lý người dùng', 'Phân quyền thao tác và kiểm soát tài khoản') }} />;
+  return <PageHeader title="Quản lý người dùng" subtitle="Phân quyền thao tác và kiểm soát tài khoản" />;
 }
 
 /* <select> và khối checkbox quyền vẫn dùng HTML dựng sẵn (roleSelectOptions()/

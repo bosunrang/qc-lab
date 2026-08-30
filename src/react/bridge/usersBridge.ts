@@ -18,7 +18,6 @@ export const roleLabel = (role: string): string => getKernel().pres.roleLabel(ro
 export const roleSelectOptionsHtml = (selected: string): string => getKernel().pres.roleSelectOptions(selected);
 export const userPermChecksHtml = (pageIds: string[], groupId: string, role: string): string => getKernel().users.userPermChecks(pageIds, groupId, role);
 export const rolePageIds = (role: string): string[] => getKernel().pres.rolePageIds(role);
-export const headOnlyHtml = (title: string, subtitle: string): string => getKernel().pres.headOnly(title, subtitle);
 export const addUser = (): void => { getKernel().users.addUser(); };
 export const syncUserPermChecks = (groupId: string, roleValue: string): void => getKernel().users.syncUserPermChecks(groupId, roleValue);
 export const resetPass = (id: string): void => { getKernel().users.resetPass(id); };

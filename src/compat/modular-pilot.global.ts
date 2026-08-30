@@ -5673,7 +5673,7 @@ const kernel = {
      chút (không chỉ HTML-builder thuần mà cả các service nhỏ dùng chung). */
   pres: {
     esc: (root as any).esc, escAttr: (root as any).escAttr, btn: (root as any).btn,
-    headOnly: (root as any).headOnly, dateBox: (root as any).dateBox, emptyState: (root as any).emptyState,
+    dateBox: (root as any).dateBox, emptyState: (root as any).emptyState,
     fmt: (root as any).fmt, vnDate: (root as any).vnDate, fmtPointValue: (root as any).fmtPointValue,
     formatDateTimeVN: (root as any).formatDateTimeVN, testDisplayName: (root as any).testDisplayName,
     afterRender: (root as any).afterRender, normalizeSearchText: (root as any).normalizeSearchText,
@@ -5690,6 +5690,7 @@ const kernel = {
     dashboardContinueAction: (root as any).dashboardContinueAction, dashViewTestInEntry: (root as any).dashViewTestInEntry,
     openConfigAssayModel: (root as any).openConfigAssayModel,
     reauthVerify: (root as any).reauthVerify, reauthAccountLabel: (root as any).reauthAccountLabel,
+    currentUser: () => currentUser, openAvatarModal: () => (root as any).openAvatarModal(), logout: () => (root as any).logout(),
   },
 };
 /* root === globalThis luôn tồn tại (kể cả trong vm.createContext của

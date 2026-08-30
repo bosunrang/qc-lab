@@ -29,7 +29,6 @@ export const formatDateTimeVN = (value: string): string => getKernel().pres.form
 export const escapeHtml = (value: unknown): string => getKernel().pres.esc(value);
 export const dateBoxHtml = (id: string, value: string, cls: string, attrs: string): string => getKernel().pres.dateBox(id, value, cls, attrs);
 export const requireAdmin = (): boolean => getKernel().pres.requireAdmin();
-export const headOnlyHtml = (title: string, subtitle: string): string => getKernel().pres.headOnly(title, subtitle);
 export const auditSetQuery = (value: string) => getKernel().audit.auditSetQuery(value);
 export const exportActivityCSV = (): void => getKernel().audit.exportActivityCSV();
 export const archiveActivityLog = (): void => {

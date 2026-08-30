@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
+import { PageHeader } from '../components/PageHeader';
 import {
-  actionsModel, actionFormViewModel, headOnlyHtml, dateBoxHtml, actionCausePhrases, actionActionPhrases,
+  actionsModel, actionFormViewModel, dateBoxHtml, actionCausePhrases, actionActionPhrases,
   editAction, beginActionFromIssue, viewActionDetail, escalateAction, approveAction, returnAction, reopenAction,
   cancelAction, exportActionsCSV, actionInsertSuggestion, actionSectionToggled, actionInvestigationSync,
   actionInvestigationChoose, beginActionManual, actionUpdateBiasHint, actionFillBias, closeActionForm, addAction,
@@ -11,7 +12,7 @@ import {
 } from '../bridge/actionsBridge';
 
 function Head() {
-  return <div style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: headOnlyHtml('Khắc phục sự cố', 'Điều tra nguyên nhân, ghi nhận, chạy lại QC và phê duyệt khép vòng') }} />;
+  return <PageHeader title="Khắc phục sự cố" subtitle="Điều tra nguyên nhân, ghi nhận, chạy lại QC và phê duyệt khép vòng" />;
 }
 
 function SideChips({ chips }: { chips: ActionSideChip[] }) {

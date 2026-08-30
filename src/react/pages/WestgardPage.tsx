@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../state/kernel';
+import { PageHeader } from '../components/PageHeader';
 import {
-  westgardModel, headOnlyHtml, emptyStateHtml, afterRender, ruleGuideRows, wgFilterTests, wgFilterArchivedTests,
+  westgardModel, emptyStateHtml, afterRender, ruleGuideRows, wgFilterTests, wgFilterArchivedTests,
   goManageTargets, dashboardGoEntryFollowup, openConfigAssay, wgSetViewMode, wgSetChartMode, exportWestgardXLSX, printWestgard,
   wgSet, wgReset, wgLoadMoreRows, wgTogglePrevLot, wgSelectTest, wgSetArchivedTest, wgSetArchivedGroup,
   type WestgardModel, type WestgardBlock, type WestgardCurrentModel, type WestgardArchivedModel,
@@ -10,7 +11,7 @@ import {
 type NonEmptyModel = Extract<WestgardModel, { empty: false }>;
 
 function Head({ subtitle }: { subtitle: string }) {
-  return <div style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: headOnlyHtml('Phân tích Westgard', subtitle) }} />;
+  return <PageHeader title="Phân tích Westgard" subtitle={subtitle} />;
 }
 
 function DownloadIcon() {

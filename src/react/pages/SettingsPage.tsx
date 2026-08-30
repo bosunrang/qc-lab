@@ -1,13 +1,14 @@
 import { useAppStore } from '../state/kernel';
+import { PageHeader } from '../components/PageHeader';
 import {
-  settingsModel, headOnlyHtml, firebaseGuideHtml,
+  settingsModel, firebaseGuideHtml,
   saveLab, saveBrand, pickLogo, clearLogo, exportData, importData, verifyBackupFile, checkStorageUsage, resetAllData,
   saveFb, clearFb, lisGatewaySaveSettings, lisOpenQueueModal, copyFirebaseRules,
   type SettingsModel,
 } from '../bridge/settingsBridge';
 
 function Head() {
-  return <div style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: headOnlyHtml('Cài đặt & Đồng bộ', 'Thông tin đơn vị, backup và kết nối Firebase') }} />;
+  return <PageHeader title="Cài đặt & Đồng bộ" subtitle="Thông tin đơn vị, backup và kết nối Firebase" />;
 }
 
 function UnitProfilePanel({ lab }: { lab: SettingsModel['lab'] }) {

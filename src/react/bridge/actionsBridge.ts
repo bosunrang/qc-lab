@@ -30,7 +30,6 @@ export type ActionLogRow = {
 export type ActionsModel = { violationGroups: ActionIssueGroup[]; openActionGroup: ActionOpenGroup | null; logRows: ActionLogRow[]; issueCount: number };
 
 export const actionsModel = (): ActionsModel => getKernel().actions.actionsModel();
-export const headOnlyHtml = (title: string, subtitle: string): string => getKernel().pres.headOnly(title, subtitle);
 export const dateBoxHtml = (id: string, value: string, cls: string, attrs: string): string => getKernel().pres.dateBox(id, value, cls, attrs);
 export const actionCausePhrases = (category: string): string[] => getKernel().actionForm.actionCausePhrases(category);
 export const actionActionPhrases = (errorType: string): string[] => getKernel().actionForm.actionActionPhrases(errorType);

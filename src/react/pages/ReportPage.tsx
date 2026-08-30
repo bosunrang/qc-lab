@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../state/kernel';
+import { PageHeader } from '../components/PageHeader';
 import {
-  reportModel, headOnlyHtml, dateBoxHtml, reportActionIcon, reportSearchSet,
+  reportModel, dateBoxHtml, reportActionIcon, reportSearchSet,
   goManageTargets, reportUnlockPeriod, reportSetLockPart, reportLockPeriod, printReport, exportReportXLSX, exportReportCSV,
   type ReportLockPanel,
 } from '../bridge/reportBridge';
 
 function Head({ subtitle }: { subtitle: string }) {
-  return <div style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: headOnlyHtml('Báo cáo & Biểu mẫu', subtitle) }} />;
+  return <PageHeader title="Báo cáo & Biểu mẫu" subtitle={subtitle} />;
 }
 
 function EmptyPanel({ isAdmin }: { isAdmin: boolean }) {

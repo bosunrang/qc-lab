@@ -1,14 +1,15 @@
 import { useEffect } from 'react';
 import { useAppStore } from '../state/kernel';
+import { PageHeader } from '../components/PageHeader';
 import {
-  reagentModel, headOnlyHtml, dateBoxHtml, rcToolIcon, rcCompute,
+  reagentModel, dateBoxHtml, rcToolIcon, rcCompute,
   rcSwitch, openRcCreateModal, rcDeleteCurrent, openRcModal, rcPrint, rcPrintSummary,
   rcMeta, rcMetaFocus, rcMetaLog, rcOpenQuick, rcCell, rcRmRow, rcAddRow, rcClearRows,
   type ReagentRow,
 } from '../bridge/reagentBridge';
 
 function Head({ subtitle }: { subtitle: string }) {
-  return <div style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: headOnlyHtml('So sánh 2 lô hóa chất', subtitle) }} />;
+  return <PageHeader title="So sánh 2 lô hóa chất" subtitle={subtitle} />;
 }
 
 function EmptyPanel() {

@@ -13,7 +13,6 @@ export type SettingsModel = {
 };
 
 export const settingsModel = (): SettingsModel => getKernel().settings.settingsModel();
-export const headOnlyHtml = (title: string, subtitle: string): string => getKernel().pres.headOnly(title, subtitle);
 export const firebaseGuideHtml = (): string => getKernel().pres.settingsFirebaseGuideHtml();
 export const saveLab = (): void => { getKernel().settings.saveLab(); };
 export const saveBrand = (): void => { getKernel().settings.saveBrand(); };

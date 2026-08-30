@@ -35,7 +35,6 @@ export type WestgardModel =
   | { empty: false; isAdmin: boolean; canWrite: boolean; viewMode: 'current' | 'archived'; archivedCount: number; current: WestgardCurrentModel | null; archived: WestgardArchivedModel | null };
 
 export const westgardModel = (): WestgardModel => getKernel().westgard.westgardModel();
-export const headOnlyHtml = (title: string, subtitle: string): string => getKernel().pres.headOnly(title, subtitle);
 export const emptyStateHtml = (title: string, body: string, actions?: string): string => getKernel().pres.emptyState(title, body, actions);
 export const afterRender = (page: string): void => getKernel().pres.afterRender(page);
 export const ruleGuideRows = (): { id: string; desc: string; alert: boolean; fix: string }[] => getKernel().pres.QCCore.WG_RULE_REGISTRY.map((r: any) => ({ id: r.id, desc: r.desc, alert: r.alert, fix: r.fix }));
