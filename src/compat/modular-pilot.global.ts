@@ -5145,11 +5145,13 @@ root.groupIssuesByTestDate = actionsPageController.groupIssuesByTestDate;
 root.actionViolationInfo = actionsPageController.actionViolationInfo;
 root.actionQcVerdictLabel = actionsPageController.actionQcVerdictLabel;
 root.actionsModel = actionsPageController.actionsModel;
-root.ReagentComparisonService = createReagentComparisonService({
+const reagentComparisonService = createReagentComparisonService({
   cleanText: root.QCCore.cleanText,
   cleanId: root.QCCore.cleanId,
 });
-root.ReagentComparisonWorkflowCommand=createReagentComparisonWorkflowCommand({current:()=>state,comparison:root.ReagentComparisonService,label:comparison=>(globalThis as any).rcLabel(comparison),log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options)});
+root.ReagentComparisonService = reagentComparisonService;
+const reagentComparisonWorkflowCommand=createReagentComparisonWorkflowCommand({current:()=>state,comparison:reagentComparisonService,label:comparison=>(globalThis as any).rcLabel(comparison),log:(action,detail,target)=>logAct(action,detail,target),saveState:options=>save(options)});
+root.ReagentComparisonWorkflowCommand=reagentComparisonWorkflowCommand;
 root.reagentReportPresentation = reagentReportPresentation;
 root.reagentChartPresentation = reagentChartPresentation;
 root.reagentReportItemPresentation = reagentReportItemPresentation;
@@ -5208,8 +5210,8 @@ const reagentPageController=createReagentPageController({
   openPrint:(title,body)=>(root as any).openPrint(title,body),
   teaAnalyteDisplay:name=>(root as any).teaAnalyteDisplay(name),
   refTests:()=>REFTESTS as any,
-  service:root.ReagentComparisonService,
-  workflow:root.ReagentComparisonWorkflowCommand,
+  service:reagentComparisonService,
+  workflow:reagentComparisonWorkflowCommand,
   pres:{
     comparisonLabel:(root as any).reagentComparisonLabelPresentation,
     pairMath:(root as any).reagentPairMath,

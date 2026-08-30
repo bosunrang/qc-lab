@@ -1535,8 +1535,10 @@ assert.match(generated, /root\.reagentQuickLabelPresentation\s*=\s*reagentQuickL
   'artifact must publish TypeScript reagent quick labels for legacy route callers');
 assert.match(generated, /root\.reagentToolIconPresentation\s*=\s*reagentToolIconPresentation/,
   'artifact must publish TypeScript reagent tool icons for legacy route callers');
-assert.match(generated, /root\.ReagentComparisonService\s*=\s*createReagentComparisonService/,
+assert.match(generated, /reagentComparisonService\s*=\s*createReagentComparisonService/,
   'artifact phải công bố Reagent application service cho caller cũ');
+assert.match(generated, /root\.ReagentComparisonService\s*=\s*reagentComparisonService/,
+  'artifact phải công bố Reagent application service ra root cho caller cũ');
 assert.match(generated, /root\.reagentReportPresentation\s*=\s*reagentReportPresentation/,
   'artifact must publish TypeScript reagent report presentation for legacy print callers');
 assert.match(generated, /root\.EntryService\s*=\s*createEntryService/,

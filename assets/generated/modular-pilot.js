@@ -30930,17 +30930,19 @@
 	root.actionViolationInfo = actionsPageController.actionViolationInfo;
 	root.actionQcVerdictLabel = actionsPageController.actionQcVerdictLabel;
 	root.actionsModel = actionsPageController.actionsModel;
-	root.ReagentComparisonService = createReagentComparisonService({
+	var reagentComparisonService = createReagentComparisonService({
 		cleanText: root.QCCore.cleanText,
 		cleanId: root.QCCore.cleanId
 	});
-	root.ReagentComparisonWorkflowCommand = createReagentComparisonWorkflowCommand({
+	root.ReagentComparisonService = reagentComparisonService;
+	var reagentComparisonWorkflowCommand = createReagentComparisonWorkflowCommand({
 		current: () => state,
-		comparison: root.ReagentComparisonService,
+		comparison: reagentComparisonService,
 		label: (comparison) => globalThis.rcLabel(comparison),
 		log: (action, detail, target) => logAct(action, detail, target),
 		saveState: (options) => save(options)
 	});
+	root.ReagentComparisonWorkflowCommand = reagentComparisonWorkflowCommand;
 	root.reagentReportPresentation = reagentReportPresentation;
 	root.reagentChartPresentation = reagentChartPresentation;
 	root.reagentReportItemPresentation = reagentReportItemPresentation;
@@ -31008,8 +31010,8 @@
 		openPrint: (title, body) => root.openPrint(title, body),
 		teaAnalyteDisplay: (name) => root.teaAnalyteDisplay(name),
 		refTests: () => REFTESTS,
-		service: root.ReagentComparisonService,
-		workflow: root.ReagentComparisonWorkflowCommand,
+		service: reagentComparisonService,
+		workflow: reagentComparisonWorkflowCommand,
 		pres: {
 			comparisonLabel: root.reagentComparisonLabelPresentation,
 			pairMath: root.reagentPairMath,

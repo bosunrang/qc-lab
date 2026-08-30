@@ -12,6 +12,6 @@ assert.match(reagent,/deps\.workflow\.create\(/,'Tạo so sánh phải đi qua w
 assert.match(reagent,/deps\.workflow\.remove\(/,'Xóa so sánh phải đi qua workflow command TypeScript');
 assert.doesNotMatch(reagent,/deps\.service\.create\(/,'Tạo so sánh không được gọi thẳng service cấp thấp, phải qua workflow command');
 assert.match(bridge,/ReagentComparisonService: ReagentComparisonServiceApi;/,'Dịch vụ so sánh hóa chất phải là hợp đồng bridge bắt buộc');
-assert.match(bridge,/comparison:root\.ReagentComparisonService,label:comparison=>\(globalThis as any\)\.rcLabel\(comparison\)/,'Workflow command so sánh hóa chất phải bọc service TypeScript');
+assert.match(bridge,/comparison:reagentComparisonService,label:comparison=>\(globalThis as any\)\.rcLabel\(comparison\)/,'Workflow command so sánh hóa chất phải bọc service TypeScript');
 
 console.log('Reagent service TypeScript bridge tests passed');
