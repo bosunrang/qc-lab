@@ -12745,21 +12745,6 @@
   </div>`;
 	}
 	//#endregion
-	//#region src/presentation/manage/config-panel-test-rows.ts
-	function configPanelTestRows(rows) {
-		return rows.map((row) => `<label><input class="cfg-panel-test" type="checkbox" value="${row.id}" ${row.selected ? "checked" : ""}><span><b>${row.name}</b><small>${row.instrument} · ${row.unit || "Chưa có đơn vị"}</small></span></label>`).join("") || "<div class=\"empty cfg-panel-empty\">Máy này chưa có xét nghiệm.</div>";
-	}
-	//#endregion
-	//#region src/presentation/manage/config-panel-modal-html.ts
-	function configPanelModalHtml(input) {
-		return `<div class="modal rcfg-modal"><div class="modal-h"><div><h3>${input.title}</h3></div><button class="modal-close" data-action="closeModal">✕</button></div><div class="modal-b">
-    <div class="grid2"><div><label>Tên Panel QC</label><input id="cfgPanelName" value="${input.name}" placeholder="VD: Sinh hóa AU5800"></div><div><label>Máy xét nghiệm</label><select id="cfgPanelInstrument" data-action="renderConfigPanelTests" data-action-on="change">${input.instrumentsHtml}</select></div></div>
-    <label>Chọn xét nghiệm trong panel</label><div id="cfgPanelTests" class="group-lot-picker assay-group-picker">${input.testRowsHtml}</div>
-    <label>Ghi chú</label><textarea id="cfgPanelNote">${input.note}</textarea>
-    <label class="rcfg-check"><input id="cfgPanelActive" type="checkbox" ${input.active ? "checked" : ""}> Panel đang sử dụng</label></div>
-    <div class="modal-f">${input.cancelButtonHtml}${input.saveButtonHtml}</div></div>`;
-	}
-	//#endregion
 	//#region src/presentation/manage/lot-transition-choice-html.ts
 	function lotTransitionChoiceHtml(input) {
 		return `<input id="${input.inputId}" list="${input.inputId}List" autocomplete="off" role="combobox" aria-autocomplete="list" placeholder="Gõ số lô hoặc chọn danh sách" value="${input.value}" data-lot-id="${input.selectedId}" data-input-action="lotTransitionChoiceInput" data-change-action="lotTransitionChoiceInput" data-change-args="[true]"><datalist id="${input.inputId}List">${input.optionsHtml}</datalist>`;
@@ -12853,11 +12838,6 @@
 			5,
 			6
 		].map((value) => `<option value="${value}" ${selected === String(value) ? "selected" : ""}>${value}</option>`).join("");
-	}
-	//#endregion
-	//#region src/presentation/manage/config-panel-instrument-options-html.ts
-	function configPanelInstrumentOptionsHtml(options) {
-		return options.map((option) => `<option value="${option.id}" ${option.selected ? "selected" : ""}>${option.label}</option>`).join("");
 	}
 	//#endregion
 	//#region src/presentation/manage/config-lot-level-options-html.ts
@@ -18196,57 +18176,41 @@
 				closeButtonHtml: deps.btn("Đóng", { action: "closeModal" }, "teal")
 			}));
 		};
-		const openConfigPanel = async (id = "") => {
+		const openConfigPanelModel = async (id = "") => {
 			if (!state().tests.length) {
 				await deps.infoDialog("Hãy tạo xét nghiệm trước khi tạo Panel QC.");
 				setManageTab("assays");
-				return;
+				return null;
 			}
 			if (!state().instruments.length) {
 				await deps.infoDialog("Hãy tạo máy xét nghiệm trước khi tạo Panel QC.");
 				setManageTab("instruments");
-				return;
+				return null;
 			}
 			const p = state().qcPanels.find((x) => x.id === id) || {
 				testIds: [],
 				instrumentId: state().instruments[0] && state().instruments[0].id,
 				active: true
 			};
-			const instruments = deps.pres.configPanelInstrumentOptionsHtml(state().instruments.map((i) => ({
-				id: i.id,
-				selected: i.id === p.instrumentId,
-				label: deps.esc(i.name) + (i.model ? " · " + deps.esc(i.model) : "")
-			})));
-			const panelTestRows = (instrumentId, selected = []) => deps.pres.configPanelTestRows(state().tests.filter((t) => t.instrumentId === instrumentId).map((t) => ({
-				id: t.id,
-				name: deps.esc(deps.testDisplayName(t)),
-				instrument: deps.esc(deps.instrumentName(t.instrumentId, t.machine)),
-				unit: deps.esc(t.unit || ""),
-				selected: selected.includes(t.id)
-			})));
-			deps.openModal(deps.pres.configPanelModalHtml({
-				title: id ? "Sửa Panel QC" : "Thêm Panel QC",
-				name: deps.escapeAttr(p.name || ""),
-				instrumentsHtml: instruments,
-				testRowsHtml: panelTestRows(p.instrumentId, p.testIds || []),
-				note: deps.esc(p.note || ""),
-				active: p.active !== false,
-				cancelButtonHtml: deps.btn("Hủy", { action: "closeModal" }, "ghost"),
-				saveButtonHtml: deps.btn(id ? "Lưu thay đổi" : "Thêm Panel QC", {
-					action: "saveConfigPanel",
-					args: [id]
-				}, "teal")
-			}));
-		};
-		const renderConfigPanelTests = () => {
-			const root = doc().getElementById("cfgPanelTests"), instrumentId = doc().getElementById("cfgPanelInstrument").value;
-			if (!root) return;
-			root.innerHTML = deps.pres.configPanelTestRows(state().tests.filter((t) => t.instrumentId === instrumentId).map((t) => ({
-				id: t.id,
-				name: deps.esc(deps.testDisplayName(t)),
-				instrument: deps.esc(deps.instrumentName(t.instrumentId, t.machine)),
-				unit: deps.esc(t.unit || "")
-			})));
+			return {
+				id,
+				name: p.name || "",
+				instruments: state().instruments.map((i) => ({
+					id: i.id,
+					label: i.name + (i.model ? " · " + i.model : "")
+				})),
+				instrumentId: p.instrumentId || "",
+				allTests: state().tests.map((t) => ({
+					id: t.id,
+					name: deps.testDisplayName(t),
+					instrument: deps.instrumentName(t.instrumentId, t.machine),
+					unit: t.unit || "",
+					instrumentId: t.instrumentId
+				})),
+				testIds: p.testIds || [],
+				note: p.note || "",
+				active: p.active !== false
+			};
 		};
 		const saveConfigPanel = async (id) => {
 			if (!deps.requireAdmin()) return;
@@ -19018,8 +18982,7 @@
 			resolveTargetSwitch,
 			commitTargetMatrix,
 			openQcHistoryDetail,
-			openConfigPanel,
-			renderConfigPanelTests,
+			openConfigPanelModel,
 			saveConfigPanel,
 			deleteConfigPanel,
 			deleteLotTransition,
@@ -28544,8 +28507,6 @@
 	root.entryVoidModalHtml = entryVoidModalHtml;
 	root.entryPreSaveWarningModalHtml = entryPreSaveWarningModalHtml;
 	root.targetSwitchModalHtml = targetSwitchModalHtml;
-	root.configPanelTestRows = configPanelTestRows;
-	root.configPanelModalHtml = configPanelModalHtml;
 	root.lotTransitionChoiceHtmlPresentation = lotTransitionChoiceHtml;
 	root.lotTransitionModalHtml = lotTransitionModalHtml;
 	root.lotTransitionTargetsHtmlPresentation = lotTransitionTargetsHtml;
@@ -28557,7 +28518,6 @@
 	root.configAssayTeaOptionsHtml = configAssayTeaOptionsHtml;
 	root.configAssayInstrumentOptionsHtml = configAssayInstrumentOptionsHtml;
 	root.configAssayDecimalOptionsHtml = configAssayDecimalOptionsHtml;
-	root.configPanelInstrumentOptionsHtml = configPanelInstrumentOptionsHtml;
 	root.configLotLevelOptionsHtml = configLotLevelOptionsHtml;
 	root.qcHistoryMeanSdRowsHtml = qcHistoryMeanSdRowsHtml;
 	root.qcHistoryPointRowsHtml = qcHistoryPointRowsHtml;
@@ -31023,9 +30983,6 @@
 	root.resolveTargetSwitch = manageTestsActionsController.resolveTargetSwitch;
 	root.commitTargetMatrix = manageTestsActionsController.commitTargetMatrix;
 	root.openQcHistoryDetail = manageTestsActionsController.openQcHistoryDetail;
-	root.openConfigPanel = manageTestsActionsController.openConfigPanel;
-	root.renderConfigPanelTests = manageTestsActionsController.renderConfigPanelTests;
-	root.saveConfigPanel = manageTestsActionsController.saveConfigPanel;
 	root.deleteConfigPanel = manageTestsActionsController.deleteConfigPanel;
 	root.deleteLotTransition = manageTestsActionsController.deleteLotTransition;
 	root.lotTransitionChoiceLabel = manageTestsActionsController.lotTransitionChoiceLabel;
@@ -31983,7 +31940,8 @@
 			configLotLevelOptionsHtml: root.configLotLevelOptionsHtml,
 			openConfigAssay: manageTestsActionsController.openConfigAssay,
 			delTest: manageTestsActionsController.delTest,
-			openConfigPanel: manageTestsActionsController.openConfigPanel,
+			openConfigPanelModel: manageTestsActionsController.openConfigPanelModel,
+			saveConfigPanel: manageTestsActionsController.saveConfigPanel,
 			deleteConfigPanel: manageTestsActionsController.deleteConfigPanel,
 			openConfigLotModel: manageTestsActionsController.openConfigLotModel,
 			saveConfigLot: manageTestsActionsController.saveConfigLot,

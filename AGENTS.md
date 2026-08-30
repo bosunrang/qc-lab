@@ -1262,7 +1262,45 @@ level options render correctly (1–6), the date field widgets are present,
 and saving persists all fields (including a blank date correctly staying
 blank) and closes the modal.
 
-Remaining for Giai đoạn 3: convert each of the other ~9 form modals from
+Manage's Panel QC (done, eighth real modal converted): the first modal with
+a **dependent, live-filtered list** — which tests show as checkboxes
+depends on the currently-selected instrument. Classic `renderConfigPanelTests()`
+rebuilt the whole checkbox-list HTML string on every instrument change (a
+`data-action-on="change"` handler); the React version needs no such
+rebuild-and-inject step — `PanelModal.tsx` keeps `instrumentId` in real
+`useState` (the ONE genuinely-controlled field in this modal) and derives
+`visibleTests = allTests.filter(t => t.instrumentId === instrumentId)`
+inline, letting React's own reconciliation mount/unmount the right
+`<input>` checkboxes. The subtlety: classic behavior always resets to an
+all-unchecked list on instrument change (never remembers a previous
+selection for a re-selected instrument) — reproduced with
+`defaultChecked={instrumentId === initialInstrumentId && testIds.includes(t.id)}`,
+which is `true` only for the ORIGINALLY-loaded instrument's originally-saved
+test IDs; switching to any other instrument (including switching back)
+naturally unmounts/remounts those checkbox nodes with a fresh (unchecked)
+`defaultChecked`, matching classic behavior with zero manual reset code.
+`openConfigPanelModel(id)` also has **two sequential preconditions** (no
+tests yet / no instruments yet), each showing an `infoDialog` and switching
+the Manage tab before returning `null` — same `Promise<Model | null>` shape
+as `lisOpenQueueModal`/`openUserPerms`. Hit the **exact missing-kernel-wiring
+bug a third time**: `kernel.manage` was missing `saveConfigPanel` too — by
+now a fully expected, quickly-caught category rather than a surprise.
+`renderConfigPanelTests()` itself, and the 3 classic HTML builders it and
+`openConfigPanel()` used (`config-panel-modal-html.ts`, `config-panel-test-rows.ts`,
+`config-panel-instrument-options-html.ts`), were deleted outright once
+confirmed to have zero remaining callers (6 dedicated tests removed across
+the 3 files); `tests/manage-core-bridge.test.js` had 4 more now-retired
+contract checks removed, `tests/manage-crud-labels.test.js`'s Panel QC
+branch repointed to `PanelModal.tsx`'s JSX. No a11y-audit.js/ui-workflow-check.js
+changes needed — Panel QC was never in either script's tracked list.
+Verified: `npm test` 455/455, `typecheck` clean, `check-build-freshness`
+matches, `a11y-audit` 0 violations across all 18 modals, `ui-workflow-check`
+29/29, `nce-workflow-check` 91/91, plus an ad-hoc script confirming the
+test list correctly filters per instrument, shows the empty state for an
+instrument with none, and resets to unchecked when switching instruments
+and back.
+
+Remaining for Giai đoạn 3: convert each of the other ~8 form modals from
 the `'html'` string path to a real `'react'` component, one at a time, same
 full-verify-after-each discipline established across Giai đoạn 2 — each
 conversion touches exactly one modal's trigger function (swap

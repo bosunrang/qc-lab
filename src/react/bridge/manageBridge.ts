@@ -3,6 +3,7 @@ import { getKernel } from '../state/kernel';
 import { openReactModal } from '../dialogs/modal-store';
 import { InstrumentModal } from '../modals/InstrumentModal';
 import { LotModal } from '../modals/LotModal';
+import { PanelModal } from '../modals/PanelModal';
 
 export type ManageTab = { id: string; label: string; count: string | number };
 export type ManageToolbar = { title: string; subtitle?: string; action?: { action: string; args?: unknown[] } | null; actionLabel?: string };
@@ -29,7 +30,10 @@ export const openConfigInstrument = (id?: string): void => {
 export const deleteConfigInstrument = (id: string): void => getKernel().manage.deleteConfigInstrument(id);
 export const openConfigAssay = (id?: string): void => getKernel().manage.openConfigAssay(id);
 export const delTest = (id: string): void => getKernel().manage.delTest(id);
-export const openConfigPanel = (id?: string): void => getKernel().manage.openConfigPanel(id);
+export const openConfigPanel = async (id?: string): Promise<void> => {
+  const model = await getKernel().manage.openConfigPanelModel(id);
+  if (model) openReactModal(() => createElement(PanelModal, model));
+};
 export const deleteConfigPanel = (id: string): void => getKernel().manage.deleteConfigPanel(id);
 export const openConfigLot = (id?: string): void => {
   const model = getKernel().manage.openConfigLotModel(id);

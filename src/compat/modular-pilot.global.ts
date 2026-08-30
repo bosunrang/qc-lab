@@ -319,8 +319,6 @@ import { entryRowsWindow as entryRowsWindowTs, entryLotLabels as entryLotLabelsT
 import { entryVoidModalHtml } from '../presentation/entry/entry-void-modal-html';
 import { entryPreSaveWarningModalHtml } from '../presentation/entry/entry-pre-save-warning-modal-html';
 import { targetSwitchModalHtml } from '../presentation/manage/target-switch-modal-html';
-import { configPanelTestRows } from '../presentation/manage/config-panel-test-rows';
-import { configPanelModalHtml } from '../presentation/manage/config-panel-modal-html';
 import { lotTransitionChoiceHtml as lotTransitionChoiceHtmlPresentation } from '../presentation/manage/lot-transition-choice-html';
 import { lotTransitionModalHtml } from '../presentation/manage/lot-transition-modal-html';
 import { lotTransitionTargetsHtml as lotTransitionTargetsHtmlPresentation } from '../presentation/manage/lot-transition-targets-html';
@@ -332,7 +330,6 @@ import { configAssayRuleRowsHtml } from '../presentation/manage/config-assay-rul
 import { configAssayTeaOptionsHtml } from '../presentation/manage/config-assay-tea-options-html';
 import { configAssayInstrumentOptionsHtml } from '../presentation/manage/config-assay-instrument-options-html';
 import { configAssayDecimalOptionsHtml } from '../presentation/manage/config-assay-decimal-options-html';
-import { configPanelInstrumentOptionsHtml } from '../presentation/manage/config-panel-instrument-options-html';
 import { configLotLevelOptionsHtml } from '../presentation/manage/config-lot-level-options-html';
 import { qcHistoryMeanSdRowsHtml, qcHistoryPointRowsHtml } from '../presentation/manage/qc-history-detail-rows-html';
 import { createTargetNumberText } from '../presentation/manage/target-number-text';
@@ -1026,9 +1023,6 @@ type QCLabGlobal = typeof globalThis & {
   resolveTargetSwitch?: (mode: unknown) => Promise<void>;
   commitTargetMatrix?: (picked: Record<string, any>, group: Record<string, any>, mode: unknown, overwrites: Record<string, any>) => void;
   openQcHistoryDetail?: (tid: unknown, level: unknown, lotNo?: string) => void;
-  openConfigPanel?: (id?: string) => Promise<void>;
-  renderConfigPanelTests?: () => void;
-  saveConfigPanel?: (id: unknown) => Promise<void>;
   deleteConfigPanel?: (id: unknown) => Promise<void>;
   deleteLotTransition?: (id: unknown) => Promise<void>;
   lotTransitionChoiceLabel?: (lot: Record<string, any>) => string;
@@ -1736,8 +1730,6 @@ type QCLabGlobal = typeof globalThis & {
   entryVoidModalHtml: typeof entryVoidModalHtml;
   entryPreSaveWarningModalHtml: typeof entryPreSaveWarningModalHtml;
   targetSwitchModalHtml: typeof targetSwitchModalHtml;
-  configPanelTestRows: typeof configPanelTestRows;
-  configPanelModalHtml: typeof configPanelModalHtml;
   lotTransitionChoiceHtmlPresentation: typeof lotTransitionChoiceHtmlPresentation;
   lotTransitionModalHtml: typeof lotTransitionModalHtml;
   lotTransitionTargetsHtmlPresentation: typeof lotTransitionTargetsHtmlPresentation;
@@ -1749,7 +1741,6 @@ type QCLabGlobal = typeof globalThis & {
   configAssayTeaOptionsHtml: typeof configAssayTeaOptionsHtml;
   configAssayInstrumentOptionsHtml: typeof configAssayInstrumentOptionsHtml;
   configAssayDecimalOptionsHtml: typeof configAssayDecimalOptionsHtml;
-  configPanelInstrumentOptionsHtml: typeof configPanelInstrumentOptionsHtml;
   configLotLevelOptionsHtml: typeof configLotLevelOptionsHtml;
   qcHistoryMeanSdRowsHtml: typeof qcHistoryMeanSdRowsHtml;
   qcHistoryPointRowsHtml: typeof qcHistoryPointRowsHtml;
@@ -3592,8 +3583,6 @@ root.entryLotLabelsTs=entryLotLabelsTs;
 root.entryVoidModalHtml=entryVoidModalHtml;
 root.entryPreSaveWarningModalHtml=entryPreSaveWarningModalHtml;
 root.targetSwitchModalHtml=targetSwitchModalHtml;
-root.configPanelTestRows=configPanelTestRows;
-root.configPanelModalHtml=configPanelModalHtml;
 root.lotTransitionChoiceHtmlPresentation=lotTransitionChoiceHtmlPresentation;
 root.lotTransitionModalHtml=lotTransitionModalHtml;
 root.lotTransitionTargetsHtmlPresentation=lotTransitionTargetsHtmlPresentation;
@@ -3605,7 +3594,6 @@ root.configAssayRuleRowsHtml=configAssayRuleRowsHtml;
 root.configAssayTeaOptionsHtml=configAssayTeaOptionsHtml;
 root.configAssayInstrumentOptionsHtml=configAssayInstrumentOptionsHtml;
 root.configAssayDecimalOptionsHtml=configAssayDecimalOptionsHtml;
-root.configPanelInstrumentOptionsHtml=configPanelInstrumentOptionsHtml;
 root.configLotLevelOptionsHtml=configLotLevelOptionsHtml;
 root.qcHistoryMeanSdRowsHtml=qcHistoryMeanSdRowsHtml;
 root.qcHistoryPointRowsHtml=qcHistoryPointRowsHtml;
@@ -4991,9 +4979,6 @@ root.openTargetSwitchModal = manageTestsActionsController.openTargetSwitchModal;
 root.resolveTargetSwitch = manageTestsActionsController.resolveTargetSwitch;
 root.commitTargetMatrix = manageTestsActionsController.commitTargetMatrix;
 root.openQcHistoryDetail = manageTestsActionsController.openQcHistoryDetail;
-root.openConfigPanel = manageTestsActionsController.openConfigPanel;
-root.renderConfigPanelTests = manageTestsActionsController.renderConfigPanelTests;
-root.saveConfigPanel = manageTestsActionsController.saveConfigPanel;
 root.deleteConfigPanel = manageTestsActionsController.deleteConfigPanel;
 root.deleteLotTransition = manageTestsActionsController.deleteLotTransition;
 root.lotTransitionChoiceLabel = manageTestsActionsController.lotTransitionChoiceLabel;
@@ -5720,7 +5705,8 @@ const kernel = {
     configLotLevelOptionsHtml: (root as any).configLotLevelOptionsHtml,
     openConfigAssay: manageTestsActionsController.openConfigAssay,
     delTest: manageTestsActionsController.delTest,
-    openConfigPanel: manageTestsActionsController.openConfigPanel,
+    openConfigPanelModel: manageTestsActionsController.openConfigPanelModel,
+    saveConfigPanel: manageTestsActionsController.saveConfigPanel,
     deleteConfigPanel: manageTestsActionsController.deleteConfigPanel,
     openConfigLotModel: manageTestsActionsController.openConfigLotModel,
     saveConfigLot: manageTestsActionsController.saveConfigLot,

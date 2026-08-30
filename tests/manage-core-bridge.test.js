@@ -21,10 +21,6 @@ assert.match(bridge,/manageLotStatusPresentation: ReturnType<typeof createManage
 
 assert.match(actions,/deps\.pres\.targetSwitchModalHtml\(/,'target switch modal must use the TypeScript bridge');
 assert.match(bridge,/targetSwitchModalHtml: typeof targetSwitchModalHtml;/,'target switch modal must be a required bridge contract');
-assert.match(actions,/deps.pres.configPanelTestRows\(/,'Panel QC test rows must use the TypeScript bridge');
-assert.match(actions,/deps.pres.configPanelModalHtml\(/,'Panel QC modal must use the TypeScript bridge');
-assert.match(bridge,/configPanelTestRows: typeof configPanelTestRows;/,'Panel QC test rows must be a required bridge contract');
-assert.match(bridge,/configPanelModalHtml: typeof configPanelModalHtml;/,'Panel QC modal must be a required bridge contract');
 assert.match(actions,/deps.pres.lotTransitionChoiceHtmlPresentation\(/,'Lot-transition picker must use the TypeScript bridge');
 assert.match(bridge,/lotTransitionChoiceHtmlPresentation: typeof lotTransitionChoiceHtmlPresentation;/,'Lot-transition picker must be a required bridge contract');
 assert.match(actions,/deps.pres.lotTransitionModalHtml\(/,'Lot-transition modal must use the TypeScript bridge');
@@ -47,8 +43,6 @@ assert.match(actions,/deps.pres.configAssayInstrumentOptionsHtml\(/,'Assay instr
 assert.match(bridge,/configAssayInstrumentOptionsHtml: typeof configAssayInstrumentOptionsHtml;/,'Assay instrument options must be a required bridge contract');
 assert.match(actions,/deps.pres.configAssayDecimalOptionsHtml\(/,'Assay decimal options must use the TypeScript bridge');
 assert.match(bridge,/configAssayDecimalOptionsHtml: typeof configAssayDecimalOptionsHtml;/,'Assay decimal options must be a required bridge contract');
-assert.match(actions,/deps.pres.configPanelInstrumentOptionsHtml\(/,'Panel instrument options must use the TypeScript bridge');
-assert.match(bridge,/configPanelInstrumentOptionsHtml: typeof configPanelInstrumentOptionsHtml;/,'Panel instrument options must be a required bridge contract');
 // Lô QC (Giai đoạn 3) đã chuyển sang component React thật — configLotLevelOptionsHtml()
 // giờ được LotModal.tsx gọi qua kernel.manage, không còn qua deps.pres trong actions.
 const lotModal=fs.readFileSync(path.join(root,'src','react','modals','LotModal.tsx'),'utf8');

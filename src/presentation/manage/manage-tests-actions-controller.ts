@@ -159,18 +159,25 @@ export function createManageTestsActionsController(deps: {
     const ptRows = deps.pres.qcHistoryPointRowsHtml(pts.map((p: AnyRec) => { const mean = Number.isFinite(+p.qcMean) ? +p.qcMean : +l.mean, sd = Number.isFinite(+p.qcSd) && +p.qcSd > 0 ? +p.qcSd : +l.sd, z = sd ? (+p.val - mean) / sd : NaN, abs = Math.abs(z), verdict = abs > 3 ? 'Loại bỏ' : abs > 2 ? 'Cảnh báo' : 'Đạt', verdictClass = abs > 3 ? 'rej' : abs > 2 ? 'warn' : 'ok', staff = deps.pointStaff(p); return { date: deps.vnDate(p.date), run: deps.esc(p.runId || '—'), value: deps.fmtPointValue(p, t), z: Number.isFinite(z) ? (z >= 0 ? '+' : '') + deps.fmt(z) + 's' : '—', mean: deps.fmtTestValue(t, mean), sd: deps.fmtTestValue(t, sd), verdict, verdictClass, staffCode: deps.esc(staff.code || '—') }; }));
     deps.openModal(deps.pres.qcHistoryDetailModalHtml({ title: `${deps.esc(deps.testDisplayName(t))} · Mức ${level}${lotNo ? ' · Lô ' + deps.esc(lotNo) : ''}`, historyRowsHtml: histRows, historyEmptyHtml: deps.emptyState('Chưa có mốc Mean/SD', 'Không tìm thấy lịch sử Mean/SD cho lô này.'), pointCount: pts.length, pointRowsHtml: ptRows, pointsEmptyHtml: deps.emptyState('Chưa có điểm QC', 'Không có điểm QC nào khớp với lô/mức này.'), closeButtonHtml: deps.btn('Đóng', { action: 'closeModal' }, 'teal') }));
   };
-  const openConfigPanel = async (id = '') => {
-    if (!state().tests.length) { await deps.infoDialog('Hãy tạo xét nghiệm trước khi tạo Panel QC.'); setManageTab('assays'); return; }
-    if (!state().instruments.length) { await deps.infoDialog('Hãy tạo máy xét nghiệm trước khi tạo Panel QC.'); setManageTab('instruments'); return; }
+  /* openConfigPanelModel(): dữ liệu thuần cho modal React (Giai đoạn 3,
+     PanelModal.tsx) — thay openConfigPanel() tự dựng chuỗi HTML rồi mở
+     modal. Trả Promise<Model|null> giống lisOpenQueueModal()/openUserPerms():
+     hai gate kiểm tra ("chưa có xét nghiệm"/"chưa có máy") mỗi cái đều
+     chuyển tab + báo lỗi rồi trả null — bridge chỉ mở modal React khi khác
+     null. allTests trả CẢ danh sách (không lọc theo máy) vì component React
+     tự lọc lại mỗi khi đổi máy — khác renderConfigPanelTests() cũ (dựng lại
+     chuỗi HTML mỗi lần đổi máy). */
+  const openConfigPanelModel = async (id = '') => {
+    if (!state().tests.length) { await deps.infoDialog('Hãy tạo xét nghiệm trước khi tạo Panel QC.'); setManageTab('assays'); return null; }
+    if (!state().instruments.length) { await deps.infoDialog('Hãy tạo máy xét nghiệm trước khi tạo Panel QC.'); setManageTab('instruments'); return null; }
     const p = state().qcPanels.find((x: AnyRec) => x.id === id) || { testIds: [], instrumentId: state().instruments[0] && state().instruments[0].id, active: true };
-    const instruments = deps.pres.configPanelInstrumentOptionsHtml(state().instruments.map((i: AnyRec) => ({ id: i.id, selected: i.id === p.instrumentId, label: deps.esc(i.name) + (i.model ? ' · ' + deps.esc(i.model) : '') })));
-    const panelTestRows = (instrumentId: unknown, selected: unknown[] = []) => deps.pres.configPanelTestRows(state().tests.filter((t: AnyRec) => t.instrumentId === instrumentId).map((t: AnyRec) => ({ id: t.id, name: deps.esc(deps.testDisplayName(t)), instrument: deps.esc(deps.instrumentName(t.instrumentId, t.machine)), unit: deps.esc(t.unit || ''), selected: selected.includes(t.id) })));
-    deps.openModal(deps.pres.configPanelModalHtml({ title: id ? 'Sửa Panel QC' : 'Thêm Panel QC', name: deps.escapeAttr(p.name || ''), instrumentsHtml: instruments, testRowsHtml: panelTestRows(p.instrumentId, p.testIds || []), note: deps.esc(p.note || ''), active: p.active !== false, cancelButtonHtml: deps.btn('Hủy', { action: 'closeModal' }, 'ghost'), saveButtonHtml: deps.btn(id ? 'Lưu thay đổi' : 'Thêm Panel QC', { action: 'saveConfigPanel', args: [id] }, 'teal') }));
-  };
-  const renderConfigPanelTests = () => {
-    const root = doc().getElementById('cfgPanelTests'), instrumentId = doc().getElementById('cfgPanelInstrument').value;
-    if (!root) return;
-    root.innerHTML = deps.pres.configPanelTestRows(state().tests.filter((t: AnyRec) => t.instrumentId === instrumentId).map((t: AnyRec) => ({ id: t.id, name: deps.esc(deps.testDisplayName(t)), instrument: deps.esc(deps.instrumentName(t.instrumentId, t.machine)), unit: deps.esc(t.unit || '') })));
+    return {
+      id, name: p.name || '',
+      instruments: state().instruments.map((i: AnyRec) => ({ id: i.id, label: i.name + (i.model ? ' · ' + i.model : '') })),
+      instrumentId: p.instrumentId || '',
+      allTests: state().tests.map((t: AnyRec) => ({ id: t.id, name: deps.testDisplayName(t), instrument: deps.instrumentName(t.instrumentId, t.machine), unit: t.unit || '', instrumentId: t.instrumentId })),
+      testIds: p.testIds || [], note: p.note || '', active: p.active !== false,
+    };
   };
   const saveConfigPanel = async (id: unknown) => {
     if (!deps.requireAdmin()) return;
@@ -444,8 +451,8 @@ export function createManageTestsActionsController(deps: {
     parseVN, setManageTab, setTargetPanel, setTargetGroup, setTargetLevel, setHistoryTest, openTargetMatrix,
     targetNumberText, targetConfigAssigned, targetRangeDraft, syncTargetRange, toggleTargetRow, targetCheckAll,
     targetPickBackfillPoints, applyTargetPick, applyPlannedTarget, readTargetMatrixPicks, saveTargetMatrix,
-    openTargetSwitchModal, resolveTargetSwitch, commitTargetMatrix, openQcHistoryDetail, openConfigPanel,
-    renderConfigPanelTests, saveConfigPanel, deleteConfigPanel, deleteLotTransition, lotTransitionChoiceLabel,
+    openTargetSwitchModal, resolveTargetSwitch, commitTargetMatrix, openQcHistoryDetail, openConfigPanelModel,
+    saveConfigPanel, deleteConfigPanel, deleteLotTransition, lotTransitionChoiceLabel,
     lotTransitionChoiceLots, lotTransitionChoiceMatch, lotTransitionSelectedId, lotTransitionChoiceInput,
     lotTransitionChoiceHtml, openLotTransitionV2, lotTransitionTargetsHtml, filterLotTransitionTargets,
     refreshLotTransitionTargets, readLotTransitionTargetPicks, saveLotTransitionV2, openConfigGroup,
