@@ -1851,6 +1851,80 @@ Playwright script that forced Sigma into its empty state (untracking every
 test) and confirmed the correct title/message/button render, clicking the
 button opens the real add-test modal, and zero console errors.
 
+Giai đoạn 5, Bước 5 (done) — 5c begins, infrastructure + the FIRST date
+field fully converted: built `<DateField>`/`<DatePickerPopup>` as real JSX
+(`src/react/components/DateField.tsx`/`DatePickerPopup.tsx`) plus a plain
+Zustand store `src/react/state/date-picker-store.ts` (holds DOM refs of the
+currently-open field — box/input/native — NOT the date "value" in React
+state, since every date field across the app deliberately stays
+uncontrolled). Mounted once, permanently, via `#datePickerRoot` (new,
+added to `index.html`, same pattern as `#dialogRoot`/`#modalRoot`).
+Converted the FIRST field: Entry page's Từ ngày/Đến ngày
+(`entryStartDate`/`entryEndDate`) — chosen first because
+`ui-workflow-check.js` already has a dedicated check ("Date picker
+TypeScript đồng bộ ngày text và native") targeting exactly this field,
+giving fast feedback on the new component's design. `entrySetStart`/
+`entrySetEnd` (existing, calls `rerender()`) wired through an `onChange`
+prop (fires on blur after typing OR on calendar pick) — applied the
+`key={lj.startDate}` remount pattern immediately (same "stale defaultValue"
+bug class hit repeatedly before: Reagent's picker, Report's lock panel,
+Sigma's period selects, Westgard's rule toggles).
+
+**3 real bugs found AND fixed during this step** (not assumed in advance —
+caught through actual browser verification):
+1. **Two date-picker systems colliding**: classic `vn-date-picker-
+   controller.ts` (still serving ~15 not-yet-converted date fields) binds
+   ONE `document`-level click listener keyed on `.datepick`/`#vnDatePicker`
+   — it doesn't distinguish a React trigger from a classic one. If the new
+   React component shared the SAME id, the classic code would directly
+   `remove()`/overwrite the innerHTML of a node React owns (classic
+   `close()` in particular runs UNCONDITIONALLY on any outside click,
+   without checking whether the classic module actually has anything open)
+   — React would then try to detach a node something else already removed,
+   throwing a real `removeChild: The node to be removed is not a child of
+   this node` error. Fixed by using a DIFFERENT id for the React popup
+   (`#reactDatePicker`, not `#vnDatePicker`) — not a stopgap patch, but a
+   real boundary that holds until every date field is converted (at which
+   point `vn-date-picker-controller.ts` is deleted outright and the
+   collision risk disappears entirely). `ui-workflow-check.js`'s
+   `checkVnDatePicker()` updated to the new id.
+2. **`stopPropagation()` on `DateField.tsx`'s `.datepick`**: even with
+   separate ids, the classic document-level listener still reacts to EVERY
+   `.datepick` click (React's included) before the id split — kept
+   `stopPropagation()` as an INDEPENDENT second layer of defense (stops the
+   event at the source instead of relying only on the id boundary), in case
+   one protection layer develops a gap later.
+3. **`target.closest()` racing a mid-event DOM change**: `DatePickerPopup.tsx`'s
+   "click outside closes" listener originally used
+   `event.target.closest('#reactDatePicker')` to decide "was this click
+   inside the popup" — but some clicks INSIDE the popup (e.g. picking a
+   month in month/year mode) trigger a `mode` change that makes React
+   re-render and REMOVE the just-clicked button from the DOM WHILE the
+   original event was STILL BUBBLING to `document`. By the time the
+   listener ran, `target` had already left the DOM tree, so `.closest()`
+   always returned `null` — misread as "clicked outside", closing the
+   popup mid-interaction (caught via real Playwright verification: picking
+   a month made the popup vanish entirely, with no console error at all).
+   Fixed with `event.composedPath()` instead of `.closest()` — the path is
+   FROZEN at the moment the event is dispatched, unaffected by DOM changes
+   later in the same dispatch.
+
+Removed the now-unused `dateBoxHtml`/`icoCal` import from `EntryPage.tsx`
+and the `dateBoxHtml` export from `entryBridge.ts` (its only 2 call sites in
+that file are converted). Verified: `npm test` 431/431, `typecheck` clean,
+`build:pilot` succeeds (4/4 artifacts), `check-build-freshness` matches,
+`a11y-audit` 0 violations (18/18 modals, 11/11 pages), `ui-workflow-check`
+29/29 (including "Date picker TypeScript đồng bộ ngày text và native"
+itself), `nce-workflow-check` 91/91, plus SEVERAL ad-hoc Playwright scripts
+confirming each of the 3 bugs above stays fixed: switching to month/year
+mode then picking a month correctly returns to day view (no accidental
+popup close); picking a date via the calendar updates the REAL underlying
+state (not just DOM — `.lj-range`'s text changes accordingly, confirming
+`entrySetStart` actually ran); manual typing + blur also commits correctly;
+clicking outside closes correctly; AND a still-classic date field elsewhere
+(Manage's Lot QC modal, `#vnDatePicker`) still opens/works normally
+alongside the new system, with zero console errors on either side.
+
 Then shrink/delete the now-dead
 `root.X=` aliases, `global.d.ts`'s
 ambient bare-global declarations, and rewrite the 61 sandbox tests + ~88

@@ -73,9 +73,13 @@ async function checkRangeTargetDisplay(page){
 }
 
 async function checkVnDatePicker(page){
+  // Entry page (DateField.tsx, Giai đoạn 5) dùng #reactDatePicker — id KHÁC
+  // #vnDatePicker của vn-date-picker-controller.ts cổ điển (vẫn còn phục vụ
+  // các trường ngày chưa chuyển đổi khác), cố ý để hai hệ thống không tranh
+  // chấp cùng một DOM node — xem ghi chú trong DatePickerPopup.tsx.
   await page.evaluate(()=>go('entry'));await page.waitForSelector('.datebox .datepick');
-  const box=page.locator('.datebox').first();await box.locator('.datepick').click();await page.locator('#vnDatePicker').waitFor();
-  await page.locator('#vnDatePicker').getByRole('button',{name:'Hôm nay',exact:true}).click();
+  const box=page.locator('.datebox').first();await box.locator('.datepick').click();await page.locator('#reactDatePicker').waitFor();
+  await page.locator('#reactDatePicker').getByRole('button',{name:'Hôm nay',exact:true}).click();
   const values=await box.evaluate(element=>({text:element.querySelector('.date-text').value,native:element.querySelector('.native-date').value}));
   check('Date picker TypeScript đồng bộ ngày text và native',/^\d{2}\/\d{2}\/\d{4}$/.test(values.text)&&/^\d{4}-\d{2}-\d{2}$/.test(values.native),JSON.stringify(values));
 }

@@ -50,7 +50,6 @@ export type EntryModel =
 
 export const entryModel = (): EntryModel => getKernel().entry.entryModel();
 export const emptyStateHtml = (title: string, body: string, actions?: string): string => getKernel().pres.emptyState(title, body, actions);
-export const dateBoxHtml = (id: string, value: string, cls: string, attrs: string): string => getKernel().pres.dateBox(id, value, cls, attrs);
 export const afterRender = (page: string): void => getKernel().pres.afterRender(page);
 export const entryFocusPendingSheet = (): void => getKernel().entry.entryFocusPendingSheet();
 export const go = (page: string): void => getKernel().pres.go(page);

@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 import { PageHeader } from '../components/PageHeader';
+import { DateField } from '../components/DateField';
 import {
-  entryModel, emptyStateHtml, dateBoxHtml, afterRender, entryFocusPendingSheet,
+  entryModel, emptyStateHtml, afterRender, entryFocusPendingSheet,
   go, goManageTargets, treeToggle, toggleEntryTree, entryTreeKey, entryFilter, entrySetMachine,
   entryPick, entryFocusLevel, entryShowPrevLot, entryShowCurrentLot, entrySheetRunChanged, entryUnlockExtraRun,
   entryDateNoteSave, entrySetSheetPart, entrySetSheetMonth, entryGoToday, entrySetDays, entrySetStart, entrySetEnd,
@@ -219,8 +220,8 @@ function LeveyPanel({ model }: { model: Extract<EntryModel, { empty: false }> })
       <div className="lj-toolbar">
         <h2 className="panel-title">Biểu đồ Levey-Jennings</h2>
         <div className="lj-filter">
-          <label className="lj-date-field"><span className="hint">Từ ngày</span><span style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: dateBoxHtml('entryStartDate', lj.startDate, '', 'data-action="entrySetStart" data-action-on="change"') }} /></label>
-          <label className="lj-date-field"><span className="hint">Đến ngày</span><span style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: dateBoxHtml('entryEndDate', lj.endDate, '', 'data-action="entrySetEnd" data-action-on="change"') }} /></label>
+          <label className="lj-date-field"><span className="hint">Từ ngày</span><DateField key={lj.startDate} id="entryStartDate" value={lj.startDate} onChange={entrySetStart} /></label>
+          <label className="lj-date-field"><span className="hint">Đến ngày</span><DateField key={lj.endDate} id="entryEndDate" value={lj.endDate} onChange={entrySetEnd} /></label>
           <div className="dayseg">{lj.dayPresetOptions.map(o => (
             <button type="button" className={o.on ? 'on' : ''} onClick={() => entrySetDays(o.days)} key={o.days}>{o.days} ngày</button>
           ))}</div>
