@@ -564,8 +564,33 @@ button, CSV export (stubbed `csvDownload` and confirmed it's called), and
 chain hasn't been auto-verified yet, unrelated to this conversion) — all
 correct.
 
+Report (done): 8 of 10 `data-action` usages converted
+(`goManageTargets`/`reportUnlockPeriod`/`reportSetLockPart`×2/
+`reportLockPeriod`/`printReport`/`exportReportXLSX`/`exportReportCSV`) —
+remaining 2 (`reportRangeChanged`, on the two date-range inputs) deferred
+like Audit's `auditSetDate`, same reason (`dateBoxHtml` string). This page
+needed TWO new kernel namespaces beyond its own `kernel.report`:
+`kernel.reportPrint` (= `reportPrintController`, also used by Westgard/Sigma
+print) and `kernel.dataIo` (= `dataIoController`, also used by Westgard/Sigma
+Excel export) — `printReport`/`exportReportXLSX`/`exportReportCSV` live on
+those sibling controllers, not on `reportPageController` itself, found the
+same way as Manage's `manageTestsActionsController` merge in Giai đoạn 1
+(tracing each bridge call to its actual source rather than assuming
+"one page, one controller"). Verified with an ad-hoc Playwright script:
+clicking "Khóa kỳ này" correctly opens the real confirm dialog ("Khóa kỳ báo
+cáo"); month/year `<select>`'s `onChange` fires `reportSetLockPart` with the
+right part+value; clicking the Excel/CSV export buttons ran the real export
+functions with zero console errors (a first attempt tried to stub
+`window.exportReportXLSX`/`exportReportCSV` to detect the call — this no
+longer works after the conversion, since the button now reads
+`kernel.dataIo.exportReportXLSX` directly and never touches the bare global
+at all; that's the intended outcome of this whole rewrite, not a test bug to
+route around — switched to confirming zero errors on the real call instead).
+`ui-workflow-check`/`visual-check`/`print-check` also re-run since this page
+owns the print/export pipeline other pages share.
+
 **Remaining phases (not yet started)**: finish converting `data-action` on
-the other 8 pages; then modals as `createPortal`, one modal at a time; then
+the other 7 pages; then modals as `createPortal`, one modal at a time; then
 shrink/delete the now-dead `root.X=` aliases, `global.d.ts`'s ambient
 bare-global declarations, and rewrite the 61 sandbox tests + ~88
 bridge-wiring text-scanner tests. See the plan file for the full phase

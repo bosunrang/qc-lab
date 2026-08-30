@@ -32262,6 +32262,8 @@
 		westgard: westgardPageController,
 		reagent: reagentPageController,
 		report: reportPageController,
+		reportPrint: reportPrintController,
+		dataIo: dataIoController,
 		settings: settingsPageController,
 		manage: {
 			...managePageController,

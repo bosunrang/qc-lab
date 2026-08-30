@@ -18,6 +18,8 @@ export interface QCKernel {
   westgard: any;
   reagent: any;
   report: any;
+  reportPrint: any;
+  dataIo: any;
   settings: any;
   manage: any;
   dash: any;

@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../state/kernel';
-import { reportModel, headOnlyHtml, dateBoxHtml, reportActionIcon, reportSearchSet, type ReportLockPanel } from '../bridge/reportBridge';
+import {
+  reportModel, headOnlyHtml, dateBoxHtml, reportActionIcon, reportSearchSet,
+  goManageTargets, reportUnlockPeriod, reportSetLockPart, reportLockPeriod, printReport, exportReportXLSX, exportReportCSV,
+  type ReportLockPanel,
+} from '../bridge/reportBridge';
 
 function Head({ subtitle }: { subtitle: string }) {
   return <div style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: headOnlyHtml('Báo cáo & Biểu mẫu', subtitle) }} />;
@@ -12,7 +16,7 @@ function EmptyPanel({ isAdmin }: { isAdmin: boolean }) {
       <div className="empty">
         <div className="empty-title">Chưa có xét nghiệm đang vận hành</div>
         <div>Cần có Panel QC, Nhóm lô QC, Mean/SD và dữ liệu QC trước khi tạo báo cáo.</div>
-        {isAdmin ? <div className="empty-actions"><button className="btn teal" data-action="goManageTargets">Cấu hình Mean/SD</button></div> : null}
+        {isAdmin ? <div className="empty-actions"><button className="btn teal" onClick={goManageTargets}>Cấu hình Mean/SD</button></div> : null}
       </div>
     </div>
   );
@@ -37,7 +41,7 @@ function LockRow({ lock, isAdmin }: { lock: ReportLockPanel['locks'][number]; is
   return (
     <div className="period-lock-row">
       <div><b>Kỳ {lock.monthLabel}</b><span className="hint"> · Khóa bởi {lock.lockedBy}{lock.lockedAtText ? ` lúc ${lock.lockedAtText}` : ''}</span></div>
-      {isAdmin ? <button className="btn ghost sm" data-action="reportUnlockPeriod" data-args={JSON.stringify([lock.ym])}>Mở khóa</button> : null}
+      {isAdmin ? <button className="btn ghost sm" onClick={() => reportUnlockPeriod(lock.ym)}>Mở khóa</button> : null}
     </div>
   );
 }
@@ -51,19 +55,19 @@ function LockPanel({ lockPanel }: { lockPanel: ReportLockPanel }) {
       <div className="report-lock-controls">
         <div>
           <label>Tháng</label>
-          <select key={ym} aria-label="Tháng" disabled={!isAdmin} defaultValue={month} data-action="reportSetLockPart" data-args='["month"]' data-action-on="change">
+          <select key={ym} aria-label="Tháng" disabled={!isAdmin} defaultValue={month} onChange={e => reportSetLockPart('month', e.target.value)}>
             {months.map(m => <option value={m} key={m}>Tháng {m}</option>)}
           </select>
         </div>
         <div>
           <label>Năm</label>
-          <select key={ym} aria-label="Năm" disabled={!isAdmin} defaultValue={year} data-action="reportSetLockPart" data-args='["year"]' data-action-on="change">
+          <select key={ym} aria-label="Năm" disabled={!isAdmin} defaultValue={year} onChange={e => reportSetLockPart('year', e.target.value)}>
             {years.map(y => <option value={y} key={y}>{y}</option>)}
           </select>
         </div>
         <div style={{ alignSelf: 'end' }}>
           {isAdmin
-            ? (already ? <button className="btn ghost" disabled>Kỳ này đã khóa</button> : <button className="btn teal" data-action="reportLockPeriod">Khóa kỳ này</button>)
+            ? (already ? <button className="btn ghost" disabled>Kỳ này đã khóa</button> : <button className="btn teal" onClick={reportLockPeriod}>Khóa kỳ này</button>)
             : <span className="hint">Chỉ admin mới khóa/mở khóa được kỳ báo cáo.</span>}
         </div>
       </div>
@@ -110,9 +114,9 @@ export function ReportPage() {
           </label>
         </div>
         <div className="report-actions">
-          <button className="btn teal" disabled={model.disabled} data-action="printReport" dangerouslySetInnerHTML={{ __html: reportActionIcon('print') + 'Tạo báo cáo & In' }} />
-          <button className="btn teal" disabled={model.disabled} data-action="exportReportXLSX">Xuất Excel</button>
-          <button className="btn teal" disabled={model.disabled} data-action="exportReportCSV">Xuất CSV</button>
+          <button className="btn teal" disabled={model.disabled} onClick={printReport} dangerouslySetInnerHTML={{ __html: reportActionIcon('print') + 'Tạo báo cáo & In' }} />
+          <button className="btn teal" disabled={model.disabled} onClick={exportReportXLSX}>Xuất Excel</button>
+          <button className="btn teal" disabled={model.disabled} onClick={exportReportCSV}>Xuất CSV</button>
         </div>
       </div>
       <LockPanel lockPanel={model.lockPanel} />

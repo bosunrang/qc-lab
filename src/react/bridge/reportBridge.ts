@@ -23,3 +23,10 @@ export const headOnlyHtml = (title: string, subtitle: string): string => getKern
 export const dateBoxHtml = (id: string, value: string, cls: string, attrs: string): string => getKernel().pres.dateBox(id, value, cls, attrs);
 export const reportActionIcon = (type: string): string => getKernel().pres.reportActionIconPresentation.icon(type);
 export const reportSearchSet = (value: string): void => getKernel().report.reportSearchSet(value);
+export const goManageTargets = (): void => getKernel().pres.goManageTargets();
+export const reportUnlockPeriod = (ym: string): void => getKernel().report.reportUnlockPeriod(ym);
+export const reportSetLockPart = (part: 'month' | 'year', value: string): void => getKernel().report.reportSetLockPart(part, value);
+export const reportLockPeriod = (): void => getKernel().report.reportLockPeriod();
+export const printReport = (): void => getKernel().reportPrint.printReport();
+export const exportReportXLSX = (): void => getKernel().dataIo.exportReportXLSX();
+export const exportReportCSV = (): void => getKernel().dataIo.exportReportCSV();
