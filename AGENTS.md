@@ -589,8 +589,37 @@ route around — switched to confirming zero errors on the real call instead).
 `ui-workflow-check`/`visual-check`/`print-check` also re-run since this page
 owns the print/export pipeline other pages share.
 
+Settings (done): all 17 `data-action` usages converted — the first page
+needing ZERO deferrals, since none of its buttons/inputs live inside a
+`dangerouslySetInnerHTML`-injected string. `kernel.settings` merged in 6
+standalone backup/reset functions (`exportData`/`importData`/
+`verifyBackupFile`/`resetAllData`) plus `lisQueueController`'s
+`lisGatewaySaveSettings`/`lisOpenQueueModal` (a LIS-Gateway-specific
+sibling controller, same merge pattern as Manage/Report). The generic
+`data-action="clickElementById" data-args='["imp"]'` pattern (used to click
+a hidden `<input type="file">` from a visible button) and the one-line
+`brandPickLogo` helper (itself just `document.getElementById('logoFile')
+?.click()`) were both replaced with a plain inline
+`onClick={() => document.getElementById('imp')?.click()}` instead of being
+routed through the kernel at all — pure DOM operations with zero state
+dependency don't need kernel indirection, matching the "pure functions get
+direct treatment" principle from Giai đoạn 1. `pickLogo`/`importData`/
+`verifyBackupFile` (wired to file `<input>`'s `onChange`) all take the raw
+event object as their only parameter — confirmed by reading their
+signatures before converting, so `onChange={pickLogo}` works as a direct
+pass-through, same as the classic `data-action-on="change"` dispatch for
+file inputs (which forwards the real event, not `.value`, since a file
+input's `.value` is just the filename). Verified with an ad-hoc Playwright
+script: `saveLab()` persisted a typed name into `state.lab.name`, the
+backup file-picker button correctly triggers the hidden input's `.click()`,
+`checkStorageUsage()` opens a real info dialog, `copyFirebaseRules()` wrote
+649 characters to a stubbed `navigator.clipboard`. `ui-workflow-check`'s own
+"Chọn file backup chưa tự thay state"/"Restore UI thay dữ liệu sau xác nhận
++ re-auth" checks independently cover the real import/restore flow through
+the converted picker button.
+
 **Remaining phases (not yet started)**: finish converting `data-action` on
-the other 7 pages; then modals as `createPortal`, one modal at a time; then
+the other 6 pages; then modals as `createPortal`, one modal at a time; then
 shrink/delete the now-dead `root.X=` aliases, `global.d.ts`'s ambient
 bare-global declarations, and rewrite the 61 sandbox tests + ~88
 bridge-wiring text-scanner tests. See the plan file for the full phase

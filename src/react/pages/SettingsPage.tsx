@@ -1,5 +1,10 @@
 import { useAppStore } from '../state/kernel';
-import { settingsModel, headOnlyHtml, firebaseGuideHtml, type SettingsModel } from '../bridge/settingsBridge';
+import {
+  settingsModel, headOnlyHtml, firebaseGuideHtml,
+  saveLab, saveBrand, pickLogo, clearLogo, exportData, importData, verifyBackupFile, checkStorageUsage, resetAllData,
+  saveFb, clearFb, lisGatewaySaveSettings, lisOpenQueueModal, copyFirebaseRules,
+  type SettingsModel,
+} from '../bridge/settingsBridge';
 
 function Head() {
   return <div style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: headOnlyHtml('Cài đặt & Đồng bộ', 'Thông tin đơn vị, backup và kết nối Firebase') }} />;
@@ -14,7 +19,7 @@ function UnitProfilePanel({ lab }: { lab: SettingsModel['lab'] }) {
         <div><label>Khoa / phòng</label><input id="labDept" aria-label="Khoa / phòng" defaultValue={lab.dept} /></div>
         <div><label>Địa chỉ</label><input id="labAddr" aria-label="Địa chỉ" defaultValue={lab.address} /></div>
       </div>
-      <div className="settings-panel-actions"><button className="btn teal" data-action="saveLab">Lưu thông tin</button></div>
+      <div className="settings-panel-actions"><button className="btn teal" onClick={saveLab}>Lưu thông tin</button></div>
     </div>
   );
 }
@@ -43,16 +48,16 @@ function BrandPanel({ brand }: { brand: SettingsModel['brand'] }) {
           <BrandPreview logo={brand.logo} markText={brand.markText} title={brand.title} subtitle={brand.subtitle} />
           <label>Chọn ảnh logo</label>
           <div className="file-pick">
-            <button type="button" className="btn ghost sm" data-action="brandPickLogo">Chọn tệp</button>
+            <button type="button" className="btn ghost sm" onClick={() => document.getElementById('logoFile')?.click()}>Chọn tệp</button>
             <span id="logoFileName" className="hint">Chưa chọn tệp</span>
           </div>
-          <input id="logoFile" type="file" accept="image/*" style={{ display: 'none' }} data-action="pickLogo" data-action-on="change" />
+          <input id="logoFile" type="file" accept="image/*" style={{ display: 'none' }} onChange={pickLogo} />
           <div className="hint settings-brand-note">Nên dùng ảnh vuông PNG/JPG, dung lượng nhỏ. Logo được lưu cùng dữ liệu phần mềm.</div>
         </div>
       </div>
       <div className="settings-panel-actions">
-        <button className="btn teal" data-action="saveBrand">Lưu logo</button>
-        <button className="btn ghost" data-action="clearLogo">Bỏ ảnh logo</button>
+        <button className="btn teal" onClick={saveBrand}>Lưu logo</button>
+        <button className="btn ghost" onClick={clearLogo}>Bỏ ảnh logo</button>
       </div>
     </div>
   );
@@ -66,29 +71,29 @@ function AdminToolsPanel({ backup }: { backup: SettingsModel['backup'] }) {
         <div className="admin-tool">
           <b>Xuất backup</b>
           <span>Lưu dữ liệu hiện tại ra file. {backup.statusText} {backup.capacityText}</span>
-          <button className="btn ghost" data-action="exportData">Xuất backup</button>
+          <button className="btn ghost" onClick={exportData}>Xuất backup</button>
         </div>
         <div className="admin-tool">
           <b>Nhập backup</b>
           <span>Khôi phục dữ liệu từ file backup đã xuất. Chỉ quản trị viên được nhập.</span>
-          <button className="btn ghost" data-action="clickElementById" data-args='["imp"]'>Chọn file backup</button>
-          <input id="imp" type="file" accept="application/json" style={{ display: 'none' }} data-action="importData" data-action-on="change" />
+          <button className="btn ghost" onClick={() => document.getElementById('imp')?.click()}>Chọn file backup</button>
+          <input id="imp" type="file" accept="application/json" style={{ display: 'none' }} onChange={importData} />
         </div>
         <div className="admin-tool">
           <b>Kiểm tra backup</b>
           <span>Kiểm tra checksum, cấu trúc và số điểm — không ảnh hưởng dữ liệu đang dùng.</span>
-          <button className="btn ghost" data-action="clickElementById" data-args='["verifyBackup"]'>Chọn file để kiểm tra</button>
-          <input id="verifyBackup" type="file" accept="application/json" style={{ display: 'none' }} data-action="verifyBackupFile" data-action-on="change" />
+          <button className="btn ghost" onClick={() => document.getElementById('verifyBackup')?.click()}>Chọn file để kiểm tra</button>
+          <input id="verifyBackup" type="file" accept="application/json" style={{ display: 'none' }} onChange={verifyBackupFile} />
         </div>
         <div className="admin-tool">
           <b>Dung lượng cục bộ</b>
           <span>Xem số điểm QC và dung lượng trình duyệt đang dùng.</span>
-          <button className="btn ghost" data-action="checkStorageUsage">Kiểm tra dung lượng</button>
+          <button className="btn ghost" onClick={checkStorageUsage}>Kiểm tra dung lượng</button>
         </div>
         <div className="admin-tool">
           <b>Xóa sạch dữ liệu test</b>
           <span>Xóa toàn bộ dữ liệu, giữ lại tài khoản đang đăng nhập.</span>
-          <button className="btn danger" data-action="resetAllData">Xóa sạch dữ liệu</button>
+          <button className="btn danger" onClick={resetAllData}>Xóa sạch dữ liệu</button>
         </div>
       </div>
     </div>
@@ -122,8 +127,8 @@ function FirebaseConnectionPanel({ firebase }: { firebase: SettingsModel['fireba
       <label>Firebase config (dán nguyên đoạn từ tab Config của Firebase console)</label>
       <textarea id="fbConfig" className="firebase-config-input" readOnly={firebase.locked} placeholder={FIREBASE_CONFIG_PLACEHOLDER} defaultValue={firebase.config} />
       <div className="firebase-actions">
-        <button className="btn teal" data-action="saveFb">Lưu & kết nối</button>
-        <button className="btn ghost" data-action="clearFb">Ngắt đám mây</button>
+        <button className="btn teal" onClick={saveFb}>Lưu & kết nối</button>
+        <button className="btn ghost" onClick={clearFb}>Ngắt đám mây</button>
       </div>
     </div>
   );
@@ -144,8 +149,8 @@ function LisGatewayPanel({ lis }: { lis: SettingsModel['lis'] }) {
         <div className="hint">Lấy kết quả nội kiểm mà middleware LIS đã đẩy vào Gateway. Kết quả KHÔNG tự thành điểm QC — phải mở hàng chờ và xác nhận từng dòng thì mới ghi vào dữ liệu nội kiểm. Không nhận dữ liệu bệnh nhân. Prototype chỉ cho phép localhost:8787.</div>
       </div>
       <div className="settings-panel-actions">
-        <button className="btn teal" data-action="lisGatewaySaveSettings">Lưu & kiểm tra</button>
-        <button className="btn ghost" data-action="lisOpenQueueModal">Xem hàng chờ QC</button>
+        <button className="btn teal" onClick={lisGatewaySaveSettings}>Lưu & kiểm tra</button>
+        <button className="btn ghost" onClick={lisOpenQueueModal}>Xem hàng chờ QC</button>
       </div>
     </div>
   );
@@ -158,7 +163,7 @@ function FirebaseRulesPanel({ rulesText }: { rulesText: string }) {
       <div style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: firebaseGuideHtml() }} />
       <div className="rules-tools">
         <span>Copy cố định vào Realtime Database → Rules. Không sửa <code>$labCode</code> hoặc <code>$uid</code>.</span>
-        <button className="btn ghost sm" data-action="copyFirebaseRules">Copy rules</button>
+        <button className="btn ghost sm" onClick={copyFirebaseRules}>Copy rules</button>
       </div>
       <pre className="rules-code" tabIndex={0}>{rulesText}</pre>
     </div>

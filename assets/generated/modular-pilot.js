@@ -32264,7 +32264,15 @@
 		report: reportPageController,
 		reportPrint: reportPrintController,
 		dataIo: dataIoController,
-		settings: settingsPageController,
+		settings: {
+			...settingsPageController,
+			exportData: root.exportData,
+			importData: root.importData,
+			verifyBackupFile: root.verifyBackupFile,
+			resetAllData: root.resetAllData,
+			lisGatewaySaveSettings: lisQueueController.lisGatewaySaveSettings,
+			lisOpenQueueModal: lisQueueController.lisOpenQueueModal
+		},
 		manage: {
 			...managePageController,
 			setTargetPanel: manageTestsActionsController.setTargetPanel,

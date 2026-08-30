@@ -5730,7 +5730,12 @@ const kernel = {
   report: reportPageController,
   reportPrint: reportPrintController,
   dataIo: dataIoController,
-  settings: settingsPageController,
+  settings: {
+    ...settingsPageController,
+    exportData: (root as any).exportData, importData: (root as any).importData,
+    verifyBackupFile: (root as any).verifyBackupFile, resetAllData: (root as any).resetAllData,
+    lisGatewaySaveSettings: lisQueueController.lisGatewaySaveSettings, lisOpenQueueModal: lisQueueController.lisOpenQueueModal,
+  },
   manage: {
     ...managePageController,
     setTargetPanel: manageTestsActionsController.setTargetPanel,
