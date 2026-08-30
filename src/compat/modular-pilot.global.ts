@@ -214,7 +214,6 @@ import { createRouterPagePolicy } from '../presentation/router/router-page-polic
 import { createRouterShellController } from '../presentation/router/router-shell-controller';
 import { createModalTemplate } from '../presentation/modal/modal-template';
 import { createModalController } from '../presentation/modal/modal-controller';
-import { createDialogOverlayController } from '../presentation/modal/dialog-overlay-controller';
 import { createVnDatePickerController } from '../presentation/router/vn-date-picker-controller';
 import { createActionDispatcher } from '../presentation/app/action-dispatcher';
 import { createChartTooltipService } from '../presentation/chart/chart-tooltip-service';
@@ -1573,7 +1572,8 @@ type QCLabGlobal = typeof globalThis & {
   legacyHashPass: (password: string) => Promise<string>;
   hashPass: (password: string) => Promise<string>;
   verifyPass: (password: string, stored: string) => Promise<boolean>;
-  confirmReauthentication: () => Promise<void>;
+  reauthVerify: (password: string) => Promise<boolean>;
+  reauthAccountLabel: () => string | null;
   reauthenticateCurrentUser: (options?: { title?: string; message?: string }) => Promise<boolean>;
   ensureAdmin: () => Promise<void>;
   blankAppState: (users: unknown) => Record<string, any>;
@@ -1672,13 +1672,9 @@ type QCLabGlobal = typeof globalThis & {
   openModal: ReturnType<typeof createModalController>['openModal'];
   closeModal: ReturnType<typeof createModalController>['closeModal'];
   modalKeydown: ReturnType<typeof createModalController>['modalKeydown'];
-  openDialogOverlay: ReturnType<typeof createDialogOverlayController>['openDialogOverlay'];
-  closeDialogOverlay: ReturnType<typeof createDialogOverlayController>['closeDialogOverlay'];
-  dialogKeydown: ReturnType<typeof createDialogOverlayController>['dialogKeydown'];
-  confirmDialog: ReturnType<typeof createDialogOverlayController>['confirmDialog'];
-  confirmDialogAnswer: ReturnType<typeof createDialogOverlayController>['confirmDialogAnswer'];
-  infoDialog: ReturnType<typeof createDialogOverlayController>['infoDialog'];
-  infoDialogAnswer: ReturnType<typeof createDialogOverlayController>['infoDialogAnswer'];
+  closeDialogOverlay: (result?: unknown) => void;
+  confirmDialog: (opts?: { kicker?: string; title?: string; message?: string; detail?: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean }) => Promise<boolean>;
+  infoDialog: (message: string, opts?: { title?: string; type?: 'warn' | 'success' }) => Promise<void>;
   vnDatePickerController: ReturnType<typeof createVnDatePickerController>;
   actionDispatcher: ReturnType<typeof createActionDispatcher>;
   qcTooltip: ReturnType<typeof createChartTooltipService>;
@@ -3299,8 +3295,16 @@ const modalTemplateApi=createModalTemplate({escapeAttr:value=>(root as any).escA
 root.modalTemplate=modalTemplateApi.modalTemplate;root.modalCloseButton=modalTemplateApi.modalCloseButton;
 const modalControllerApi=createModalController({document:modalDocument(),requestFrame:work=>requestAnimationFrame(work)});
 root.openModal=modalControllerApi.openModal;root.closeModal=modalControllerApi.closeModal;root.modalKeydown=modalControllerApi.modalKeydown;
-const dialogOverlayApi=createDialogOverlayController({document:modalDocument(),requestFrame:work=>requestAnimationFrame(work),modalCloseButton:action=>root.modalCloseButton(action),escape:value=>(root as any).esc(value),button:(label,action,cls)=>(root as any).btn(label,action,cls)});
-root.openDialogOverlay=dialogOverlayApi.openDialogOverlay;root.closeDialogOverlay=dialogOverlayApi.closeDialogOverlay;root.dialogKeydown=dialogOverlayApi.dialogKeydown;root.confirmDialog=dialogOverlayApi.confirmDialog;root.confirmDialogAnswer=dialogOverlayApi.confirmDialogAnswer;root.infoDialog=dialogOverlayApi.infoDialog;root.infoDialogAnswer=dialogOverlayApi.infoDialogAnswer;
+/* confirmDialog/infoDialog/closeDialogOverlay retired sang React thật (Giai
+   đoạn 3, DialogOverlay.tsx trong react-pilot.js) — #dialogRoot giờ do MỘT
+   React root sở hữu vĩnh viễn (mount một lần lúc react-pilot.js chạy), nên
+   không còn ai được phép tự tay r.innerHTML=... vào đó nữa (kể cả
+   reauthenticateCurrentUser bên dưới — nó cũng đã chuyển hẳn sang React).
+   dialog-overlay-controller.ts bị xóa cùng lát này (mọi consumer đã chuyển
+   qua window.QCLabReact). */
+root.closeDialogOverlay=result=>(window as any).QCLabReact.closeDialogOverlay(result);
+root.confirmDialog=opts=>(window as any).QCLabReact.confirmDialog(opts);
+root.infoDialog=(message,opts)=>(window as any).QCLabReact.infoDialog(message,opts);
 root.vnDatePickerController=createVnDatePickerController({document:typeof document==='undefined'?null:document,window:typeof window==='undefined'?{innerWidth:0,innerHeight:0}:window,today:()=>isoToday()});
 const chartTooltip=createChartTooltipService({find:()=>document.getElementById('qcTooltip'),create:()=>document.createElement('div'),append:element=>document.body.appendChild(element)});
 root.qcTooltip=chartTooltip;
@@ -4673,28 +4677,16 @@ root.verifyPass = async (p, stored) => {
   if (root.isPbkdf2PasswordHash!(stored)) return root.pbkdf2PasswordService!.verify(p, stored);
   return await root.legacyHashPass(p) === stored;
 };
-root.confirmReauthentication = async () => {
-  const input = document.getElementById('reauthPassword') as HTMLInputElement | null, err = document.getElementById('reauthError') as HTMLElement | null;
-  if (!currentUser || !input) { root.closeDialogOverlay(false); return; }
-  let ok = false; try { ok = await root.verifyPass(input.value, currentUser.passHash); } catch (e) { /* mật khẩu không xác thực được coi như sai */ }
-  input.value = '';
-  if (!ok) { if (err) err.hidden = false; input.focus(); return; }
-  root.closeDialogOverlay(true);
+/* reauthenticateCurrentUser() retired sang React thật (Giai đoạn 3,
+   DialogOverlay.tsx's ReauthForm trong react-pilot.js). Logic xác minh mật
+   khẩu (PBKDF2, so passHash) VẪN nằm ở đây — React chỉ gọi reauthVerify()
+   qua kernel.pres và không bao giờ thấy currentUser.passHash. */
+root.reauthVerify = async password => {
+  if (!currentUser) return false;
+  try { return await root.verifyPass(password, currentUser.passHash); } catch (e) { return false; }
 };
-root.reauthenticateCurrentUser = ({ title = 'Xác thực lại', message = 'Nhập lại mật khẩu để tiếp tục.' } = {}) => {
-  if (!currentUser) return Promise.resolve(false);
-  return new Promise<boolean>(resolve => root.openDialogOverlay(`<div class="modal confirm-modal">
-    <div class="confirm-modal-h"><div class="confirm-modal-kicker">Thao tác được kiểm soát</div>${root.modalCloseButton({action:'closeDialogOverlay',args:[false]})}</div>
-    <h3 class="confirm-modal-title">${escapeHtml(title)}</h3>
-    <div class="confirm-modal-body"><div class="confirm-modal-icon info" aria-hidden="true">✓</div><div class="confirm-modal-text"><b>${escapeHtml(message)}</b><p>Tài khoản: ${escapeHtml(currentUser.name || currentUser.username || '')}</p></div></div>
-    <div class="reauth-modal-field">
-      <label for="reauthPassword">Mật khẩu hiện tại</label>
-      <input id="reauthPassword" type="password" autocomplete="current-password" autofocus data-keydown-action="confirmReauthentication" data-keydown-keys='["Enter"]'>
-      <div id="reauthError" class="auth-err" hidden>Mật khẩu không đúng.</div>
-    </div>
-    <div class="confirm-modal-actions">${root.btn('Hủy', { action: 'closeDialogOverlay', args: [false] }, 'ghost')}${root.btn('Xác thực', { action: 'confirmReauthentication' }, 'teal')}</div>
-  </div>`, resolve as (result?: unknown) => void));
-};
+root.reauthAccountLabel = () => currentUser ? (currentUser.name || currentUser.username || '') : null;
+root.reauthenticateCurrentUser = opts => (window as any).QCLabReact.reauthenticateCurrentUser(opts);
 root.ensureAdmin = async () => { await root.AdminBootstrapCommand.ensure(); };
 root.blankAppState = users => root.blankAppStateFactory!(users);
 root.resetAllData = async () => {
@@ -5806,6 +5798,7 @@ const kernel = {
     goManageTargets: (root as any).goManageTargets, dashboardGoEntryFollowup: (root as any).dashboardGoEntryFollowup,
     dashboardContinueAction: (root as any).dashboardContinueAction, dashViewTestInEntry: (root as any).dashViewTestInEntry,
     openConfigAssay: (root as any).openConfigAssay,
+    reauthVerify: (root as any).reauthVerify, reauthAccountLabel: (root as any).reauthAccountLabel,
   },
 };
 if (typeof window !== 'undefined') (window as any).__QC_KERNEL__ = kernel;

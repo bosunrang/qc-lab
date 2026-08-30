@@ -8196,96 +8196,6 @@
 		};
 	}
 	//#endregion
-	//#region src/presentation/modal/dialog-overlay-controller.ts
-	function createDialogOverlayController(deps) {
-		let dialogReturnFocus = null;
-		let pendingDialogResolve = null;
-		const dialogRoot = () => deps.document.getElementById("dialogRoot");
-		const activeDialog = () => deps.document.querySelector("#dialogRoot .modal");
-		const closeDialogOverlay = (result) => {
-			const r = dialogRoot(), restore = dialogReturnFocus, resolve = pendingDialogResolve;
-			deps.document.removeEventListener("keydown", dialogKeydown);
-			if (r) r.innerHTML = "";
-			dialogReturnFocus = null;
-			pendingDialogResolve = null;
-			if (restore && restore.isConnected && restore.focus) deps.requestFrame(() => restore.focus({ preventScroll: true }));
-			if (resolve) resolve(result);
-		};
-		const dialogKeydown = createFocusTrapKeydown({
-			activeContainer: activeDialog,
-			activeElement: () => deps.document.activeElement,
-			onEscape: () => closeDialogOverlay()
-		});
-		const openDialogOverlay = (html, resolve) => {
-			const r = dialogRoot();
-			if (!r) return;
-			dialogReturnFocus = deps.document.activeElement && deps.document.activeElement !== deps.document.body ? deps.document.activeElement : null;
-			pendingDialogResolve = resolve;
-			r.innerHTML = `<div class="modal-bg" role="presentation" data-action="closeDialogOverlay" data-action-self-only>${html}</div>`;
-			const box = r.querySelector(".modal");
-			if (!box) return;
-			box.setAttribute("role", "dialog");
-			box.setAttribute("aria-modal", "true");
-			box.tabIndex = -1;
-			const title = box.querySelector(".confirm-modal-title, .confirm-modal-text b");
-			if (title) {
-				if (!title.id) title.id = "dialogTitle";
-				box.setAttribute("aria-labelledby", title.id);
-			}
-			box.querySelectorAll(".modal-close").forEach((button) => {
-				if (!button.getAttribute("aria-label")) button.setAttribute("aria-label", "Đóng hộp thoại");
-			});
-			deps.document.removeEventListener("keydown", dialogKeydown);
-			deps.document.addEventListener("keydown", dialogKeydown);
-			deps.requestFrame(() => {
-				(box.querySelector("[autofocus]") || queryFocusable(box)[0] || box).focus({ preventScroll: true });
-			});
-		};
-		const confirmDialogAnswer = (result) => closeDialogOverlay(result);
-		const confirmDialog = (opts = {}) => {
-			const { kicker = "", title = "", message = "", detail = "", confirmLabel = "Xác nhận", cancelLabel = "Hủy", danger = true } = opts;
-			return new Promise((resolve) => {
-				openDialogOverlay(`<div class="modal confirm-modal">
-        <div class="confirm-modal-h">${kicker ? `<div class="confirm-modal-kicker">${deps.escape(kicker)}</div>` : "<div></div>"}${deps.modalCloseButton({
-					action: "confirmDialogAnswer",
-					args: [false]
-				})}</div>
-        <h3 class="confirm-modal-title">${deps.escape(title)}</h3>
-        <div class="confirm-modal-body"><div class="confirm-modal-icon${danger ? "" : " info"}" aria-hidden="true">!</div><div class="confirm-modal-text"><b>${deps.escape(message)}</b>${detail ? `<p>${deps.escape(detail)}</p>` : ""}</div></div>
-        <div class="confirm-modal-actions">${deps.button(deps.escape(cancelLabel), {
-					action: "confirmDialogAnswer",
-					args: [false]
-				}, "ghost")}${deps.button(deps.escape(confirmLabel), {
-					action: "confirmDialogAnswer",
-					args: [true]
-				}, danger ? "danger" : "teal")}</div>
-      </div>`, resolve);
-			});
-		};
-		const infoDialogAnswer = () => closeDialogOverlay();
-		const infoDialog = (message, opts = {}) => {
-			const { title = "", type = "warn" } = opts;
-			const glyph = type === "success" ? "✓" : "!";
-			return new Promise((resolve) => {
-				openDialogOverlay(`<div class="modal confirm-modal info-modal">
-        <div class="confirm-modal-h"><div></div>${deps.modalCloseButton({ action: "infoDialogAnswer" })}</div>
-        ${title ? `<h3 class="confirm-modal-title">${deps.escape(title)}</h3>` : ""}
-        <div class="confirm-modal-body"><div class="confirm-modal-icon info-modal-icon ${type}" aria-hidden="true">${glyph}</div><div class="confirm-modal-text"><b>${deps.escape(message)}</b></div></div>
-        <div class="confirm-modal-actions">${deps.button("Đã hiểu", { action: "infoDialogAnswer" }, "teal")}</div>
-      </div>`, resolve);
-			});
-		};
-		return {
-			openDialogOverlay,
-			closeDialogOverlay,
-			dialogKeydown,
-			confirmDialog,
-			confirmDialogAnswer,
-			infoDialog,
-			infoDialogAnswer
-		};
-	}
-	//#endregion
 	//#region src/presentation/router/vn-date-picker-controller.ts
 	var MONTHS = [
 		"Tháng 1",
@@ -28188,20 +28098,9 @@
 	root.openModal = modalControllerApi.openModal;
 	root.closeModal = modalControllerApi.closeModal;
 	root.modalKeydown = modalControllerApi.modalKeydown;
-	var dialogOverlayApi = createDialogOverlayController({
-		document: modalDocument(),
-		requestFrame: (work) => requestAnimationFrame(work),
-		modalCloseButton: (action) => root.modalCloseButton(action),
-		escape: (value) => root.esc(value),
-		button: (label, action, cls) => root.btn(label, action, cls)
-	});
-	root.openDialogOverlay = dialogOverlayApi.openDialogOverlay;
-	root.closeDialogOverlay = dialogOverlayApi.closeDialogOverlay;
-	root.dialogKeydown = dialogOverlayApi.dialogKeydown;
-	root.confirmDialog = dialogOverlayApi.confirmDialog;
-	root.confirmDialogAnswer = dialogOverlayApi.confirmDialogAnswer;
-	root.infoDialog = dialogOverlayApi.infoDialog;
-	root.infoDialogAnswer = dialogOverlayApi.infoDialogAnswer;
+	root.closeDialogOverlay = (result) => window.QCLabReact.closeDialogOverlay(result);
+	root.confirmDialog = (opts) => window.QCLabReact.confirmDialog(opts);
+	root.infoDialog = (message, opts) => window.QCLabReact.infoDialog(message, opts);
 	root.vnDatePickerController = createVnDatePickerController({
 		document: typeof document === "undefined" ? null : document,
 		window: typeof window === "undefined" ? {
@@ -30720,44 +30619,16 @@
 		if (root.isPbkdf2PasswordHash(stored)) return root.pbkdf2PasswordService.verify(p, stored);
 		return await root.legacyHashPass(p) === stored;
 	};
-	root.confirmReauthentication = async () => {
-		const input = document.getElementById("reauthPassword"), err = document.getElementById("reauthError");
-		if (!currentUser || !input) {
-			root.closeDialogOverlay(false);
-			return;
-		}
-		let ok = false;
+	root.reauthVerify = async (password) => {
+		if (!currentUser) return false;
 		try {
-			ok = await root.verifyPass(input.value, currentUser.passHash);
-		} catch (e) {}
-		input.value = "";
-		if (!ok) {
-			if (err) err.hidden = false;
-			input.focus();
-			return;
+			return await root.verifyPass(password, currentUser.passHash);
+		} catch (e) {
+			return false;
 		}
-		root.closeDialogOverlay(true);
 	};
-	root.reauthenticateCurrentUser = ({ title = "Xác thực lại", message = "Nhập lại mật khẩu để tiếp tục." } = {}) => {
-		if (!currentUser) return Promise.resolve(false);
-		return new Promise((resolve) => root.openDialogOverlay(`<div class="modal confirm-modal">
-    <div class="confirm-modal-h"><div class="confirm-modal-kicker">Thao tác được kiểm soát</div>${root.modalCloseButton({
-			action: "closeDialogOverlay",
-			args: [false]
-		})}</div>
-    <h3 class="confirm-modal-title">${escapeHtml(title)}</h3>
-    <div class="confirm-modal-body"><div class="confirm-modal-icon info" aria-hidden="true">✓</div><div class="confirm-modal-text"><b>${escapeHtml(message)}</b><p>Tài khoản: ${escapeHtml(currentUser.name || currentUser.username || "")}</p></div></div>
-    <div class="reauth-modal-field">
-      <label for="reauthPassword">Mật khẩu hiện tại</label>
-      <input id="reauthPassword" type="password" autocomplete="current-password" autofocus data-keydown-action="confirmReauthentication" data-keydown-keys='["Enter"]'>
-      <div id="reauthError" class="auth-err" hidden>Mật khẩu không đúng.</div>
-    </div>
-    <div class="confirm-modal-actions">${root.btn("Hủy", {
-			action: "closeDialogOverlay",
-			args: [false]
-		}, "ghost")}${root.btn("Xác thực", { action: "confirmReauthentication" }, "teal")}</div>
-  </div>`, resolve));
-	};
+	root.reauthAccountLabel = () => currentUser ? currentUser.name || currentUser.username || "" : null;
+	root.reauthenticateCurrentUser = (opts) => window.QCLabReact.reauthenticateCurrentUser(opts);
 	root.ensureAdmin = async () => {
 		await root.AdminBootstrapCommand.ensure();
 	};
@@ -32376,7 +32247,9 @@
 			dashboardGoEntryFollowup: root.dashboardGoEntryFollowup,
 			dashboardContinueAction: root.dashboardContinueAction,
 			dashViewTestInEntry: root.dashViewTestInEntry,
-			openConfigAssay: root.openConfigAssay
+			openConfigAssay: root.openConfigAssay,
+			reauthVerify: root.reauthVerify,
+			reauthAccountLabel: root.reauthAccountLabel
 		}
 	};
 	if (typeof window !== "undefined") window.__QC_KERNEL__ = kernel;

@@ -853,17 +853,86 @@ onBlur commit, the toolbar's dynamic "+ Thêm..." dispatch, and the lot
 group's "Sửa nhóm" button all still work correctly.
 
 **Giai đoạn 2 (data-action → React events) is now fully done, 11/11 pages.**
-Next: modals as `createPortal`, one modal at a time; then shrink/delete the
-now-dead `root.X=` aliases, `global.d.ts`'s ambient bare-global declarations,
-and rewrite the 61 sandbox tests + ~88 bridge-wiring text-scanner tests. See
-the plan file for the full phase breakdown and the risks already identified
-(LIS Gateway's `lis-client-service.ts` shares the same `getState`/`rerender`
-deps shape and gets swept into this even though it's unrelated to the UI
-rewrite; several `data-*` conventions in `action-dispatcher.ts` encode real
-event-timing semantics that a naive `onClick`-only conversion would silently
-drop; a `dangerouslySetInnerHTML`-rendered field needs its own native
+
+**Giai đoạn 3 (modal → `createPortal`, one modal at a time) — started.**
+`confirmDialog`/`infoDialog`/`reauthenticateCurrentUser` (the 3 shared,
+cross-page dialogs — `#dialogRoot`, used from dozens of call sites app-wide,
+not page-specific forms) are the first piece done, since they're the
+simplest and most foundational of the ~18 modals. `src/react/dialogs/
+dialog-store.ts` (a plain `zustand/vanilla` store — no need to route through
+`window.__QC_KERNEL__`, since both producer and consumer of this state live
+in the SAME bundle, react-pilot.js) replaces classic `dialog-overlay-
+controller.ts` (deleted outright — confirmed zero remaining consumers of
+`openDialogOverlay`/`dialogKeydown`/`confirmDialogAnswer`/`infoDialogAnswer`
+once `confirmDialog`/`infoDialog` themselves were replaced).
+`src/react/dialogs/DialogOverlay.tsx` is mounted ONCE, permanently, into
+`#dialogRoot` from `react-pilot.entry.tsx` (a `createRoot().render()` call
+at module top level, not per-page-switch like `#main` — `#dialogRoot` is a
+static element in `index.html`, already parsed by the time this `<script
+defer>` runs) — it renders `null` when no dialog is open, exactly matching
+the a11y-audit/ui-check test convention of checking
+`#dialogRoot.innerHTML.trim()` to detect "is a dialog open". The component
+replicates the classic HTML structure/CSS classes byte-for-semantic
+(`.modal-bg`/`.confirm-modal`/`.confirm-modal-h`/`.confirm-modal-body`/
+`.confirm-modal-actions`, the `dialog-enter` CSS animation, `role="dialog"`/
+`aria-modal`/`aria-labelledby`) so no CSS changes were needed and the a11y
+ratchet's `shared:confirm-dialog`/`shared:reauth-dialog` entries keep passing
+unmodified. The focus-trap contract (Escape closes, Tab/Shift+Tab wraps,
+focus returns to the pre-open element) is ported from `modal-focus-trap.ts`
+into a `useDialogFocusTrap` hook — `modal-focus-trap.ts` stays a pure,
+DOM-free-at-module-scope helper, so importing it directly into `react-pilot.js`
+is safe and duplicates zero risk (same "pure functions get direct import"
+rule from Giai đoạn 1), rather than reimplementing the same logic twice.
+`reauthenticateCurrentUser` (the password re-auth gate in front of ~9
+critical operations — approve/return NCE, lock/unlock report periods,
+Mean/SD range changes, lot transitions, reset-all-data, restore-from-backup)
+turned out to depend on the SAME `openDialogOverlay` primitive with its own
+custom HTML (a password field, not just message+buttons) — discovered while
+tracing consumers before assuming `dialog-overlay-controller.ts` was safe to
+delete outright. Converted in the same unit of work rather than left on the
+classic HTML-string path (which would have meant TWO different code paths
+writing to the same `#dialogRoot` DOM node — the classic one competing with
+React's now-permanent ownership of that container, guaranteed to corrupt
+React's reconciliation the moment both write to it). The actual PBKDF2
+password check stays entirely in `modular-pilot.js`
+(`root.reauthVerify`/`root.reauthAccountLabel`, exposed to React via
+`kernel.pres`) — the React `ReauthForm` component only ever sees a
+true/false verification result, never `currentUser.passHash`, preserving the
+same security boundary as before. Verified: `npm test` 467/467 (2 source-scanner
+tests — `ui-route-structure.test.js`/`ui-accessibility.test.js` — updated to
+drop the deleted `dialog-overlay-controller.ts` from their `read()`
+concatenation; their assertions all target patterns that also exist in the
+still-live `modal-controller.ts`/`modal-focus-trap.ts`, so nothing else
+needed to change), `typecheck` clean, `check-build-freshness` matches all 4
+bundles, `a11y-audit` 0 violations (18/18 modals, `shared:confirm-dialog`/
+`shared:reauth-dialog` included), `ui-workflow-check` 29/29 (3 of its checks
+exercise the real reauth flow end to end: period lock/unlock, backup
+restore), `nce-workflow-check` 91/91, `visual-check` passes, plus an ad-hoc
+script confirming `confirmDialog` resolves `true`/`false` correctly on
+confirm/Escape/backdrop-click, `infoDialog` resolves on "Đã hiểu", and
+`reauthenticateCurrentUser` shows the inline error and stays open on a wrong
+password.
+
+Remaining for Giai đoạn 3: the ~17 page-specific form modals (`openModal`/
+`closeModal`, `#modalRoot` — Manage's instrument/lot/assay/tea-lab-profile,
+Sigma's add-test/bias/MU-budget, Reagent's create-comparison/find-existing,
+Actions' NCE guide, Users' edit-permissions, Settings' LIS-queue, Audit's
+archive-log — the same 18-modal list `scripts/a11y-audit.js`'s `MODALS`
+already enumerates, now 2 down/18), one at a time, same full-verify-after-each
+discipline. Then shrink/delete the now-dead `root.X=` aliases, `global.d.ts`'s
+ambient bare-global declarations, and rewrite the 61 sandbox tests + ~88
+bridge-wiring text-scanner tests. See the plan file for the full phase
+breakdown and the risks already identified (LIS Gateway's
+`lis-client-service.ts` shares the same `getState`/`rerender` deps shape and
+gets swept into this even though it's unrelated to the UI rewrite; several
+`data-*` conventions in `action-dispatcher.ts` encode real event-timing
+semantics that a naive `onClick`-only conversion would silently drop; a
+`dangerouslySetInnerHTML`-rendered field needs its own native
 `addEventListener` if it must notify an ancestor's `onChange`, since it sits
-outside React's fiber tree — see the Actions page bullet above).
+outside React's fiber tree — see the Actions page bullet above; a modal that
+shares its DOM container with a still-classic caller must convert BOTH sides
+together, not just the one being planned — see the `reauthenticateCurrentUser`
+finding above).
 
 `assets/core.js` is the one exception: it's wrapped in a UMD shim so it also
 works via `require()` — that's what makes it usable from both the browser

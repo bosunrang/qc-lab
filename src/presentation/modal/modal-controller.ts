@@ -1,9 +1,10 @@
 import{queryFocusable,createFocusTrapKeydown}from'./modal-focus-trap';
 
 /* Lớp modal chung (#modalRoot) — form trang (Sửa Panel QC, sửa user...). Tách
-   khỏi lớp dialog overlay (#dialogRoot, xem dialog-overlay-controller.ts) vì
-   confirmDialog()/infoDialog() thường được gọi từ một guard bên trong modal
-   form đang mở; dùng chung root sẽ xóa mất DOM của form đó khi mở hộp thoại. */
+   khỏi lớp dialog overlay (#dialogRoot, giờ là React thật — xem
+   src/react/dialogs/DialogOverlay.tsx, Giai đoạn 3) vì confirmDialog()/
+   infoDialog() thường được gọi từ một guard bên trong modal form đang mở;
+   dùng chung root sẽ xóa mất DOM của form đó khi mở hộp thoại. */
 export function createModalController(deps:{document:Document;requestFrame:(work:()=>void)=>unknown}){
   let modalReturnFocus:Element|null=null;
   const modalRoot=()=>deps.document.getElementById('modalRoot');

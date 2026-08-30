@@ -9,7 +9,7 @@ const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 // entry-levey-panel-html.ts/entry-page-layout-html.ts (chuỗi HTML cổ điển)
 // đã xoá — cùng nội dung nay là JSX trong EntryPage.tsx.
 const router = read('src/presentation/entry/entry-page-controller.ts') + read('src/presentation/entry/entry-sheet-navigation.ts') + read('src/react/pages/EntryPage.tsx') + read('src/presentation/router/router-shell-controller.ts');
-const modals = read('src/presentation/modal/modal-focus-trap.ts') + read('src/presentation/modal/modal-template.ts') + read('src/presentation/modal/modal-controller.ts') + read('src/presentation/modal/dialog-overlay-controller.ts');
+const modals = read('src/presentation/modal/modal-focus-trap.ts') + read('src/presentation/modal/modal-template.ts') + read('src/presentation/modal/modal-controller.ts');
 const appCss = read('assets/app.css');
 const auditCss = read('assets/professional-audit.css');
 const tokens = read('assets/tokens.css');
