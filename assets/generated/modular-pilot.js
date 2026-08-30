@@ -962,7 +962,7 @@
 			deps.ui().rcId = id;
 			deps.rerender();
 		};
-		const rcDelete = async (id, keepModal = false) => {
+		const rcDelete = async (id) => {
 			if (!deps.requireAdmin()) return;
 			if (deps.getState().reagentTests.length <= 1) {
 				await deps.infoDialog("Phải còn ít nhất 1 phép so sánh.");
@@ -978,7 +978,6 @@
 			const result = deps.workflow.remove({ id });
 			if (result.error) return;
 			if (deps.ui().rcId === id) deps.ui().rcId = result.nextId;
-			if (keepModal) renderRcModal();
 			deps.rerender();
 		};
 		const rcDeleteCurrent = () => rcDelete(deps.ui().rcId);
@@ -1052,16 +1051,8 @@
 			deps.save({ clearDerived: false });
 			rcRenderQuickModal();
 		};
-		const openRcModal = () => {
-			deps.ui().rcModalQ = "";
-			renderRcModal();
-		};
-		const rcModalSearchSet = (v) => {
-			deps.ui().rcModalQ = v;
-			deps.scheduleSearchRender(rcModalSearchSet, renderRcModal, "rcModalSearch");
-		};
-		const renderRcModal = () => {
-			const q = deps.searchText(deps.ui().rcModalQ);
+		const rcPickerItems = (query) => {
+			const q = deps.searchText(query);
 			const hit = (d) => !q || [
 				rcLabel(d),
 				d.test.reagent,
@@ -1070,39 +1061,20 @@
 				d.test.unit,
 				d.test.operator
 			].some((v) => deps.searchText(v).includes(q));
-			const rows = deps.pres.pickerRows({
-				items: deps.getState().reagentTests.filter(hit).map((d) => ({
-					id: d.id,
-					labelHtml: deps.esc(rcLabel(d)),
-					unitHtml: deps.esc(d.test.unit || ""),
-					rowCount: d.rows && d.rows.length || 0,
-					selected: d.id === deps.ui().rcId
-				})),
-				canWrite: deps.canWrite(),
-				selectButtonHtml: (id, selected) => deps.button(selected ? "Đang chọn" : "Chọn", {
-					action: "rcPick",
-					args: [id]
-				}, (selected ? "teal" : "ghost") + " sm")
-			});
-			deps.openModal(deps.pres.pickerModal({
-				searchValueHtml: deps.escapeAttr(deps.ui().rcModalQ),
-				rowsHtml: rows,
-				closeButtonHtml: deps.button("Đóng", { action: "closeModal" }, "ghost")
+			return deps.getState().reagentTests.filter(hit).map((d) => ({
+				id: d.id,
+				label: rcLabel(d),
+				unit: d.test.unit || "",
+				rowCount: d.rows && d.rows.length || 0,
+				selected: d.id === deps.ui().rcId
 			}));
-			deps.requestFrame(() => {
-				const e = deps.document.getElementById("rcModalSearch");
-				if (e) {
-					e.focus();
-					e.setSelectionRange(e.value.length, e.value.length);
-				}
-			}, 0);
 		};
 		const rcPick = (id) => {
 			deps.ui().rcId = id;
 			deps.closeModal();
 			deps.rerender();
 		};
-		const rcDeleteFromModal = (id) => rcDelete(id, true);
+		const rcDeleteFromModal = (id) => rcDelete(id);
 		const openRcCreateModal = () => {
 			deps.ui().rcCreateModalQ = "";
 			renderRcCreateModal();
@@ -1239,9 +1211,7 @@
 			rcPickQuick,
 			rcAddQuick,
 			rcDelQuick,
-			openRcModal,
-			rcModalSearchSet,
-			renderRcModal,
+			rcPickerItems,
 			rcPick,
 			rcDeleteFromModal,
 			openRcCreateModal,
@@ -15732,14 +15702,6 @@
     <div class="modal-f">${input.closeButtonHtml}</div></div>`;
 	}
 	//#endregion
-	//#region src/presentation/reagent/reagent-picker-modal-html.ts
-	function reagentPickerModalHtml(input) {
-		return `<div class="modal"><div class="modal-h"><h3>Chọn phép so sánh</h3><button class="modal-close" data-action="closeModal">✕</button></div>
-    <div class="modal-b"><input id="rcModalSearch" placeholder="Tìm phép so sánh..." value="${input.searchValueHtml}" data-action="rcModalSearchSet" data-action-on="input">
-      <div class="flow-control">${input.rowsHtml}</div></div>
-    <div class="modal-f">${input.closeButtonHtml}</div></div>`;
-	}
-	//#endregion
 	//#region src/presentation/reagent/reagent-create-modal-html.ts
 	function reagentCreateModalHtml(input) {
 		return `<div class="modal"><div class="modal-h"><h3>Thêm hóa chất</h3><button class="modal-close" data-action="closeModal">✕</button></div>
@@ -15812,12 +15774,6 @@
 	function reagentQuickPickerRowsHtml(input) {
 		if (!input.items.length) return `<div class="empty">Chưa có ${input.labelHtml} trong danh sách.</div>`;
 		return input.items.map((name, index) => `<div class="mrow"><span><b>${input.esc(name)}</b></span><span class="acts">${input.selectButtonHtml(index)}<button class="x" data-action="rcDelQuick" data-args="[${index}]" title="Xóa">✕</button></span></div>`).join("");
-	}
-	//#endregion
-	//#region src/presentation/reagent/reagent-picker-rows-html.ts
-	function reagentPickerRowsHtml(input) {
-		if (!input.items.length) return "<div class=\"empty\">Không có phép so sánh phù hợp.</div>";
-		return input.items.map((item) => `<div class="mrow ${item.selected ? "on" : ""}"><span><b>${item.labelHtml}</b><div class="hint flow-tight">${item.unitHtml} ${item.rowCount ? "· " + item.rowCount + " dòng" : ""}</div></span><span class="acts">${input.selectButtonHtml(item.id, item.selected)}${input.canWrite ? `<button class="x" data-action="rcDeleteFromModal" data-args='${JSON.stringify([item.id])}' title="Xóa">✕</button>` : ""}</span></div>`).join("");
 	}
 	//#endregion
 	//#region src/presentation/reagent/reagent-create-reference-rows-html.ts
@@ -31482,13 +31438,11 @@
 	root.reagentQuickLabelPresentation = reagentQuickLabelPresentation;
 	root.reagentToolIconPresentation = reagentToolIconPresentation;
 	root.reagentQuickPickerModalPresentation = reagentQuickPickerModalHtml;
-	root.reagentPickerModalPresentation = reagentPickerModalHtml;
 	root.reagentCreateModalPresentation = reagentCreateModalHtml;
 	root.reagentChartAxis = reagentChartAxis;
 	root.reagentScatterSvg = reagentScatterSvg;
 	root.reagentBlandSvg = reagentBlandSvg;
 	root.reagentQuickPickerRowsHtml = reagentQuickPickerRowsHtml;
-	root.reagentPickerRowsHtml = reagentPickerRowsHtml;
 	root.reagentCreateReferenceRowsHtml = reagentCreateReferenceRowsHtml;
 	root.reagentCreateTypedRowHtml = reagentCreateTypedRowHtml;
 	root.reagentReportDetailCardHtml = reagentReportDetailCardHtml;
@@ -31558,8 +31512,6 @@
 			quickLabel: root.reagentQuickLabelPresentation,
 			quickPickerRows: root.reagentQuickPickerRowsHtml,
 			quickPickerModal: root.reagentQuickPickerModalPresentation,
-			pickerRows: root.reagentPickerRowsHtml,
-			pickerModal: root.reagentPickerModalPresentation,
 			createReferenceRows: root.reagentCreateReferenceRowsHtml,
 			createTypedRow: root.reagentCreateTypedRowHtml,
 			createModal: root.reagentCreateModalPresentation,

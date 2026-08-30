@@ -527,13 +527,11 @@ import { reagentComparisonLabelPresentation } from '../presentation/reagent/reag
 import { reagentQuickLabelPresentation } from '../presentation/reagent/reagent-quick-label';
 import { reagentToolIconPresentation } from '../presentation/reagent/reagent-tool-icon';
 import { reagentQuickPickerModalHtml } from '../presentation/reagent/reagent-quick-picker-modal-html';
-import { reagentPickerModalHtml } from '../presentation/reagent/reagent-picker-modal-html';
 import { reagentCreateModalHtml } from '../presentation/reagent/reagent-create-modal-html';
 import { reagentChartAxis } from '../presentation/reagent/reagent-chart-axis';
 import { reagentScatterSvg } from '../presentation/reagent/reagent-scatter-svg';
 import { reagentBlandSvg } from '../presentation/reagent/reagent-bland-svg';
 import { reagentQuickPickerRowsHtml } from '../presentation/reagent/reagent-quick-picker-rows-html';
-import { reagentPickerRowsHtml } from '../presentation/reagent/reagent-picker-rows-html';
 import { reagentCreateReferenceRowsHtml } from '../presentation/reagent/reagent-create-reference-rows-html';
 import { reagentCreateTypedRowHtml } from '../presentation/reagent/reagent-create-typed-row-html';
 import { reagentReportDetailCardHtml, reagentReportChartGridHtml } from '../presentation/reagent/reagent-report-detail-card-html';
@@ -1276,13 +1274,11 @@ type QCLabGlobal = typeof globalThis & {
   reagentQuickLabelPresentation: typeof reagentQuickLabelPresentation;
   reagentToolIconPresentation: typeof reagentToolIconPresentation;
   reagentQuickPickerModalPresentation: typeof reagentQuickPickerModalHtml;
-  reagentPickerModalPresentation: typeof reagentPickerModalHtml;
   reagentCreateModalPresentation: typeof reagentCreateModalHtml;
   reagentChartAxis: typeof reagentChartAxis;
   reagentScatterSvg: typeof reagentScatterSvg;
   reagentBlandSvg: typeof reagentBlandSvg;
   reagentQuickPickerRowsHtml: typeof reagentQuickPickerRowsHtml;
-  reagentPickerRowsHtml: typeof reagentPickerRowsHtml;
   reagentCreateReferenceRowsHtml: typeof reagentCreateReferenceRowsHtml;
   reagentCreateTypedRowHtml: typeof reagentCreateTypedRowHtml;
   reagentReportDetailCardHtml: typeof reagentReportDetailCardHtml;
@@ -5270,13 +5266,11 @@ root.reagentComparisonLabelPresentation = reagentComparisonLabelPresentation;
 root.reagentQuickLabelPresentation = reagentQuickLabelPresentation;
 root.reagentToolIconPresentation = reagentToolIconPresentation;
 root.reagentQuickPickerModalPresentation = reagentQuickPickerModalHtml;
-root.reagentPickerModalPresentation = reagentPickerModalHtml;
 root.reagentCreateModalPresentation = reagentCreateModalHtml;
 root.reagentChartAxis = reagentChartAxis;
 root.reagentScatterSvg = reagentScatterSvg;
 root.reagentBlandSvg = reagentBlandSvg;
 root.reagentQuickPickerRowsHtml = reagentQuickPickerRowsHtml;
-root.reagentPickerRowsHtml = reagentPickerRowsHtml;
 root.reagentCreateReferenceRowsHtml = reagentCreateReferenceRowsHtml;
 root.reagentCreateTypedRowHtml = reagentCreateTypedRowHtml;
 root.reagentReportDetailCardHtml = reagentReportDetailCardHtml;
@@ -5337,8 +5331,6 @@ const reagentPageController=createReagentPageController({
     quickLabel:(root as any).reagentQuickLabelPresentation,
     quickPickerRows:(root as any).reagentQuickPickerRowsHtml,
     quickPickerModal:(root as any).reagentQuickPickerModalPresentation,
-    pickerRows:(root as any).reagentPickerRowsHtml,
-    pickerModal:(root as any).reagentPickerModalPresentation,
     createReferenceRows:(root as any).reagentCreateReferenceRowsHtml,
     createTypedRow:(root as any).reagentCreateTypedRowHtml,
     createModal:(root as any).reagentCreateModalPresentation,

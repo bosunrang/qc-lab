@@ -110,7 +110,7 @@ function makeState() {
   const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'reagent', 'reagent-page-controller.ts'), 'utf8');
   assert.doesNotMatch(source, /state\.reagentTests\s*=/, 'UI không được thay cả nhánh reagentTests');
   assert.doesNotMatch(source, /reagentTests\.(?:push|splice)\s*\(/, 'UI không được mutation reagentTests trực tiếp');
-  assert.match(source, /const rcDelete = async \(id: string, keepModal = false\) => \{\s*if \(!deps\.requireAdmin\(\)\) return;/, 'Xóa phép so sánh hóa chất phải yêu cầu quyền admin, không chỉ quyền ghi (giống delTest())');
+  assert.match(source, /const rcDelete = async \(id: string\) => \{\s*if \(!deps\.requireAdmin\(\)\) return;/, 'Xóa phép so sánh hóa chất phải yêu cầu quyền admin, không chỉ quyền ghi (giống delTest())');
 }
 
 {

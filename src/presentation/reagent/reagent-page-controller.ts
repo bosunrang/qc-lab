@@ -114,10 +114,10 @@ export function createReagentPageController(deps: {
   const rcRmRow = (i: number) => { if (!deps.requireWrite()) return; if (deps.service.removeRow(deps.getState(), { id: deps.ui().rcId, rowIndex: i }).error) return; deps.save({ clearDerived: false }); deps.rerender(); };
   const rcClearRows = () => { if (!deps.requireWrite()) return; if (deps.service.clearRows(deps.getState(), { id: deps.ui().rcId }).error) return; deps.save({ clearDerived: false }); deps.rerender(); };
   const rcSwitch = (id: string) => { deps.ui().rcId = id; deps.rerender(); };
-  const rcDelete = async (id: string, keepModal = false) => {
+  const rcDelete = async (id: string) => {
     if (!deps.requireAdmin()) return; if (deps.getState().reagentTests.length <= 1) { await deps.infoDialog('Phải còn ít nhất 1 phép so sánh.'); return; }
     if (!await deps.confirmDialog({ kicker: 'Thao tác không thể hoàn tác', title: 'Xóa phép so sánh', message: 'Xóa phép so sánh này?', confirmLabel: 'Xóa', cancelLabel: 'Hủy' })) return;
-    const result = deps.workflow.remove({ id }); if (result.error) return; if (deps.ui().rcId === id) deps.ui().rcId = result.nextId; if (keepModal) renderRcModal(); deps.rerender();
+    const result = deps.workflow.remove({ id }); if (result.error) return; if (deps.ui().rcId === id) deps.ui().rcId = result.nextId; deps.rerender();
   };
   const rcDeleteCurrent = () => rcDelete(deps.ui().rcId);
   const rcQuickLabel = (type: string) => deps.pres.quickLabel.label(type);
@@ -140,17 +140,16 @@ export function createReagentPageController(deps: {
     if (!await deps.confirmDialog({ kicker: 'Thao tác không thể hoàn tác', title: 'Xóa khỏi danh sách', message: `Xóa "${v}" khỏi danh sách?`, confirmLabel: 'Xóa', cancelLabel: 'Hủy' })) return;
     if (deps.service.removeQuick(deps.getState(), { type: deps.ui().rcQuickType, index: i }).error) return; deps.save({ clearDerived: false }); rcRenderQuickModal();
   };
-  const openRcModal = () => { deps.ui().rcModalQ = ''; renderRcModal(); };
-  const rcModalSearchSet = (v: string) => { deps.ui().rcModalQ = v; deps.scheduleSearchRender(rcModalSearchSet, renderRcModal, 'rcModalSearch'); };
-  const renderRcModal = () => {
-    const q = deps.searchText(deps.ui().rcModalQ);
+  /* rcPickerItems(query): dữ liệu thuần cho modal "Chọn phép so sánh" trang React
+     (src/react/modals/ReagentPickerModal.tsx) — cùng luật lọc như renderRcModal() cũ,
+     trả mảng thay vì chuỗi HTML. */
+  const rcPickerItems = (query: string) => {
+    const q = deps.searchText(query);
     const hit = (d: AnyRec) => !q || [rcLabel(d), d.test.reagent, d.test.lotOld, d.test.lotNew, d.test.unit, d.test.operator].some((v: unknown) => deps.searchText(v).includes(q));
-    const rows = deps.pres.pickerRows({ items: deps.getState().reagentTests.filter(hit).map((d: AnyRec) => ({ id: d.id, labelHtml: deps.esc(rcLabel(d)), unitHtml: deps.esc(d.test.unit || ''), rowCount: d.rows && d.rows.length || 0, selected: d.id === deps.ui().rcId })), canWrite: deps.canWrite(), selectButtonHtml: (id: string, selected: boolean) => deps.button(selected ? 'Đang chọn' : 'Chọn', { action: 'rcPick', args: [id] }, (selected ? 'teal' : 'ghost') + ' sm') });
-    deps.openModal(deps.pres.pickerModal({ searchValueHtml: deps.escapeAttr(deps.ui().rcModalQ), rowsHtml: rows, closeButtonHtml: deps.button('Đóng', { action: 'closeModal' }, 'ghost') }));
-    deps.requestFrame(() => { const e = deps.document.getElementById('rcModalSearch') as AnyRec; if (e) { e.focus(); e.setSelectionRange(e.value.length, e.value.length); } }, 0);
+    return deps.getState().reagentTests.filter(hit).map((d: AnyRec) => ({ id: d.id, label: rcLabel(d), unit: d.test.unit || '', rowCount: d.rows && d.rows.length || 0, selected: d.id === deps.ui().rcId }));
   };
   const rcPick = (id: string) => { deps.ui().rcId = id; deps.closeModal(); deps.rerender(); };
-  const rcDeleteFromModal = (id: string) => rcDelete(id, true);
+  const rcDeleteFromModal = (id: string) => rcDelete(id);
   const openRcCreateModal = () => { deps.ui().rcCreateModalQ = ''; renderRcCreateModal(); };
   const rcCreateSearchSet = (v: string) => { deps.ui().rcCreateModalQ = v; deps.scheduleSearchRender(rcCreateSearchSet, renderRcCreateModal, 'rcCreateSearch'); };
   const renderRcCreateModal = () => {
@@ -201,5 +200,5 @@ export function createReagentPageController(deps: {
     await deps.openPrint('So sánh lô — ' + (ds.test.reagent || ''), body);
   };
 
-  return { rcLabel, rcAct, rcCalc, rcCompute, reagentModel, rcMeta, rcMetaFocus, rcMetaLog, rcCell, rcUpdateRowCalc, rcAddRow, rcRmRow, rcClearRows, rcSwitch, rcDelete, rcDeleteCurrent, rcOpenQuick, rcPickQuick, rcAddQuick, rcDelQuick, openRcModal, rcModalSearchSet, renderRcModal, rcPick, rcDeleteFromModal, openRcCreateModal, rcCreateSearchSet, renderRcCreateModal, rcCreateFrom, rcPrint, rcPrintSummary, rcReportDetail, rcReportItems, rcReportSummaryTable };
+  return { rcLabel, rcAct, rcCalc, rcCompute, reagentModel, rcMeta, rcMetaFocus, rcMetaLog, rcCell, rcUpdateRowCalc, rcAddRow, rcRmRow, rcClearRows, rcSwitch, rcDelete, rcDeleteCurrent, rcOpenQuick, rcPickQuick, rcAddQuick, rcDelQuick, rcPickerItems, rcPick, rcDeleteFromModal, openRcCreateModal, rcCreateSearchSet, renderRcCreateModal, rcCreateFrom, rcPrint, rcPrintSummary, rcReportDetail, rcReportItems, rcReportSummaryTable };
 }

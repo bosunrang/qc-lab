@@ -1,4 +1,7 @@
+import { createElement } from 'react';
 import { getKernel } from '../state/kernel';
+import { openReactModal } from '../dialogs/modal-store';
+import { ReagentPickerModal } from '../modals/ReagentPickerModal';
 
 export type ReagentRow = { index: number; old: unknown; new: unknown; avg: string; dif: string; difNeg: boolean };
 export type ReagentModel =
@@ -25,7 +28,7 @@ export const rcCompute = (): void => getKernel().reagent.rcCompute();
 export const rcSwitch = (id: string): void => getKernel().reagent.rcSwitch(id);
 export const openRcCreateModal = (): void => getKernel().reagent.openRcCreateModal();
 export const rcDeleteCurrent = (): void => { getKernel().reagent.rcDeleteCurrent(); };
-export const openRcModal = (): void => getKernel().reagent.openRcModal();
+export const openRcModal = (): void => { openReactModal(() => createElement(ReagentPickerModal)); };
 export const rcPrint = (): void => { getKernel().reagent.rcPrint(); };
 export const rcPrintSummary = (): void => { getKernel().reagent.rcPrintSummary(); };
 export const rcMeta = (key: string, value: unknown): void => getKernel().reagent.rcMeta(key, value);

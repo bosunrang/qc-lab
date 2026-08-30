@@ -1055,7 +1055,53 @@ takes the "nothing old enough to archive" path (closes the form, shows the
 matching info message) — proving the hand-off to the unchanged
 `ActivityArchiveCommand` still works end to end through the new UI.
 
-Remaining for Giai đoạn 3: convert each of the other ~14 form modals from
+Reagent's "Chọn phép so sánh" (done, third real modal converted): the first
+one with **live search filtering**. Classic `renderRcModal()` had to
+debounce the search box (`scheduleSearchRender`) because every keystroke
+rebuilt the whole modal's HTML string and re-opened it via `openModal()`;
+the React version doesn't need that — `ReagentPickerModal.tsx` holds `query`
+in local `useState` and re-filters a plain array on every keystroke, which
+is cheap enough to skip debouncing entirely (worth remembering as a general
+pattern: a debounce that existed to amortize *string-rebuild-and-reopen*
+cost usually isn't needed once the same list becomes a React re-render).
+`rcPickerItems(query)` is a new pure-data twin of the deleted
+`renderRcModal()`'s filter logic, added to `reagent-page-controller.ts` (mirrors
+Actions' `actionGuideSteps` and Audit's `activityTotal()` — expose a plain
+data reader on the existing controller rather than inventing new
+architecture). This conversion surfaced a **real latent bug in the classic
+code**, not just a test-fidelity gap: `rcDelete(id, keepModal)` special-cased
+`keepModal=true` (only ever passed by the picker's own delete button) to
+call `renderRcModal()` again afterward, refreshing the list to remove the
+deleted row — a manual "re-render this one modal" step that has no React
+equivalent and would have thrown `ReferenceError` the moment
+`renderRcModal` was deleted. Fixed by dropping the `keepModal` parameter
+entirely and having `ReagentPickerModal` call `useAppStore()` — the same
+`deps.rerender()` that already ran unconditionally at the end of
+`rcDelete()` now reaches the picker automatically through the shared store,
+same as any other page. This is the general fix for the whole "modal needs
+to manually re-open itself after a mutation" class: once a modal subscribes
+to the store, that class of special-casing becomes unnecessary and should
+be deleted, not ported. Classic `reagent-picker-modal-html.ts`/
+`reagent-picker-rows-html.ts` (plus their 2 dedicated tests) were deleted
+outright; `tests/reagent-label-bridge.test.js` had its 2 now-retired
+contract checks removed (`deps.pres.pickerModal`/`pickerRows`, and the
+matching bridge-type-declaration checks) while its ~20 *other* contract
+checks (for the parts of this page NOT yet converted) were left untouched;
+`tests/reagent-comparison-service.test.js` had one assertion's pinned
+`rcDelete` signature text updated to drop `keepModal` while preserving its
+actual intent (rcDelete must require admin, not just write — unchanged).
+`scripts/a11y-audit.js`'s `reagent:find-existing` entry switched from
+calling the now-retired `openRcModal()` global to clicking the real
+`.rc-find-btn` (a class selector, since the button's actual text is mixed
+with an SVG icon via `dangerouslySetInnerHTML` — matching-by-class is more
+robust here than matching visible text). Verified: `npm test` 462/462,
+`typecheck` clean, `check-build-freshness` matches, `a11y-audit` 0
+violations across all 18 modals, `ui-workflow-check` 29/29,
+`nce-workflow-check` 91/91, plus an ad-hoc script confirming live search
+narrows/restores the row list without any debounce delay, and picking a row
+closes the modal.
+
+Remaining for Giai đoạn 3: convert each of the other ~13 form modals from
 the `'html'` string path to a real `'react'` component, one at a time, same
 full-verify-after-each discipline established across Giai đoạn 2 — each
 conversion touches exactly one modal's trigger function (swap

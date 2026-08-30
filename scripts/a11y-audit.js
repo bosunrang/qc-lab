@@ -54,7 +54,9 @@ const MODALS = [
   // ô ngày, tức đúng loại nội dung mà audit trên thân trang không nhìn thấy.
   { page: 'sigma', label: 'sigma:mu-budget', open: () => sgOpenMU(sgData(state.tests[0].id)[0].id) },
   { page: 'reagent', label: 'reagent:create-comparison', open: () => openRcCreateModal() },
-  { page: 'reagent', label: 'reagent:find-existing', open: () => openRcModal() },
+  // openRcModal() (Giai đoạn 3) giờ chỉ tồn tại trong react-pilot.js, không còn là
+  // global tới được từ đây — bấm thẳng nút thật thay vì gọi hàm trần.
+  { page: 'reagent', label: 'reagent:find-existing', open: () => { document.querySelector('.rc-find-btn').click(); } },
   // openActionGuide() (Giai đoạn 3) giờ chỉ tồn tại trong react-pilot.js, không còn
   // là global tới được từ đây — bấm thẳng nút thật thay vì gọi hàm trần.
   { page: 'actions', label: 'actions:nce-guide', open: () => { [...document.querySelectorAll('button')].find(b => b.textContent === 'Quy trình 8 bước').click(); } },
