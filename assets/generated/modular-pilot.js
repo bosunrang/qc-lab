@@ -32275,7 +32275,13 @@
 		},
 		audit: {
 			auditModel: root.auditModel,
-			auditSetQuery: root.auditSetQuery
+			auditSetQuery: root.auditSetQuery,
+			exportActivityCSV: root.exportActivityCSV,
+			archiveActivityLog: root.archiveActivityLog,
+			auditVerifyChainNow: root.auditVerifyChainNow,
+			auditSetPageSize: root.auditSetPageSize,
+			auditClearFilters: root.auditClearFilters,
+			auditSetPage: root.auditSetPage
 		},
 		users: {
 			usersModel: root.usersModel,

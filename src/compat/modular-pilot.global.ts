@@ -5736,7 +5736,12 @@ const kernel = {
     setHistoryTest: manageTestsActionsController.setHistoryTest,
   },
   dash: { dashboardModel: dashboardPageController.dashboardModel, dashTestSetStatus: dashboardPageController.dashTestSetStatus },
-  audit: { auditModel: (root as any).auditModel, auditSetQuery: (root as any).auditSetQuery },
+  audit: {
+    auditModel: (root as any).auditModel, auditSetQuery: (root as any).auditSetQuery,
+    exportActivityCSV: (root as any).exportActivityCSV, archiveActivityLog: (root as any).archiveActivityLog,
+    auditVerifyChainNow: (root as any).auditVerifyChainNow, auditSetPageSize: (root as any).auditSetPageSize,
+    auditClearFilters: (root as any).auditClearFilters, auditSetPage: (root as any).auditSetPage,
+  },
   users: {
     usersModel: (root as any).usersModel, userPermChecks: (root as any).userPermChecks,
     addUser: (root as any).addUser, syncUserPermChecks: (root as any).syncUserPermChecks,

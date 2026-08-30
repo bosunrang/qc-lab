@@ -546,8 +546,26 @@ enabled/checked for the newly chosen role — this last one is the same
 automatically; converting it to a plain `onChange={e => fn(id, e.target.value)}`
 preserves that without the dispatcher.
 
+Audit (done): 6 of 8 `data-action` usages converted
+(`exportActivityCSV`/`archiveActivityLog`/`auditVerifyChainNow`/
+`auditSetPageSize`/`auditClearFilters`/`auditSetPage`×2, all Audit-only →
+`kernel.audit`) — the remaining one (`auditSetDate`, on the two date-range
+inputs) is embedded as raw `data-action=` text inside `dateBoxHtml()`'s
+returned string, injected via `dangerouslySetInnerHTML`; left as-is
+(coexists fine with the converted handlers on the same page) until
+`dateBoxHtml` itself becomes a real component — a cross-cutting change
+shared by ~6 pages, deliberately deferred rather than done ad hoc per page.
+Verified with an ad-hoc Playwright script: page-size `<select>` (using a
+VALID option value — `AUDIT_PAGE_SIZES = [25, 50, 100]`, no `20` — a mistake
+in the first draft of the check itself, not a product bug, caught by the
+row count not changing and fixed by using a real option), pagination "Sau"
+button, CSV export (stubbed `csvDownload` and confirmed it's called), and
+`auditVerifyChainNow()` invoked directly (its button only renders when the
+chain hasn't been auto-verified yet, unrelated to this conversion) — all
+correct.
+
 **Remaining phases (not yet started)**: finish converting `data-action` on
-the other 9 pages; then modals as `createPortal`, one modal at a time; then
+the other 8 pages; then modals as `createPortal`, one modal at a time; then
 shrink/delete the now-dead `root.X=` aliases, `global.d.ts`'s ambient
 bare-global declarations, and rewrite the 61 sandbox tests + ~88
 bridge-wiring text-scanner tests. See the plan file for the full phase

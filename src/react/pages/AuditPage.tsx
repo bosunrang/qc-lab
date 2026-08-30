@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAppStore } from '../state/kernel';
 import {
   auditModel, roleLabel, formatDateTimeVN, dateBoxHtml, headOnlyHtml, auditSetQuery,
+  exportActivityCSV, archiveActivityLog, auditVerifyChainNow, auditSetPageSize, auditClearFilters, auditSetPage,
   type AuditModel,
 } from '../bridge/auditBridge';
 
@@ -20,7 +21,7 @@ function ChainStatus({ model }: { model: AuditModel }) {
     return (
       <>
         <span className="tag none">Chưa kiểm chuỗi hash</span>{' '}
-        <button className="btn ghost sm" data-action="auditVerifyChainNow">Kiểm tra chuỗi hash</button>{' '}
+        <button className="btn ghost sm" onClick={auditVerifyChainNow}>Kiểm tra chuỗi hash</button>{' '}
         <span className="hint">Nhật ký lớn ({chain.total} dòng) nên không tự kiểm mỗi lần mở trang.</span>
       </>
     );
@@ -85,8 +86,8 @@ export function AuditPage() {
       <div className="panel">
         <h2 className="panel-title">Công cụ</h2>
         <div className="row-flex">
-          <button className="btn teal sm" data-action="exportActivityCSV">Xuất CSV nhật ký</button>
-          {model.total > 0 && <button className="btn ghost sm" data-action="archiveActivityLog">Lưu trữ nhật ký cũ</button>}
+          <button className="btn teal sm" onClick={exportActivityCSV}>Xuất CSV nhật ký</button>
+          {model.total > 0 && <button className="btn ghost sm" onClick={archiveActivityLog}>Lưu trữ nhật ký cũ</button>}
         </div>
         <div className="hint audit-summary-status flow-item">
           {model.total} dòng hoạt động đã ghi nhận.{' '}
@@ -109,11 +110,11 @@ export function AuditPage() {
           <div><label>Đến ngày</label><DateBox id="auditToDate" value={model.to} action="to" /></div>
           <div>
             <label>Số dòng mỗi trang</label>
-            <select aria-label="Số dòng nhật ký mỗi trang" data-action="auditSetPageSize" data-action-on="change" defaultValue={model.pageSize}>
+            <select aria-label="Số dòng nhật ký mỗi trang" onChange={e => auditSetPageSize(e.target.value)} defaultValue={model.pageSize}>
               {model.pageSizes.map(size => <option value={size} key={size}>{size} dòng</option>)}
             </select>
           </div>
-          {model.hasFilter && <button className="btn ghost sm audit-clear-filter" data-action="auditClearFilters">Xóa bộ lọc</button>}
+          {model.hasFilter && <button className="btn ghost sm audit-clear-filter" onClick={auditClearFilters}>Xóa bộ lọc</button>}
           <div className="audit-filter-summary" role="status">{model.filteredCount}/{model.total} dòng</div>
         </div>
         {model.rows.length ? (
@@ -133,9 +134,9 @@ export function AuditPage() {
           <div className="audit-pagination">
             <span className="hint">Hiển thị {model.resultFrom}–{model.resultTo} / {model.filteredCount} dòng</span>
             <div>
-              <button className="btn ghost sm" data-action="auditSetPage" data-args={JSON.stringify([model.page - 1])} disabled={model.page <= 1}>‹ Trước</button>
+              <button className="btn ghost sm" onClick={() => auditSetPage(model.page - 1)} disabled={model.page <= 1}>‹ Trước</button>
               <b>Trang {model.page}/{model.pageCount}</b>
-              <button className="btn ghost sm" data-action="auditSetPage" data-args={JSON.stringify([model.page + 1])} disabled={model.page >= model.pageCount}>Sau ›</button>
+              <button className="btn ghost sm" onClick={() => auditSetPage(model.page + 1)} disabled={model.page >= model.pageCount}>Sau ›</button>
             </div>
           </div>
         )}
