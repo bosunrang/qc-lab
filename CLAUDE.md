@@ -1781,6 +1781,47 @@ via both a mouse click and the Enter key, and 3 other pages (entry/users/
 settings) still render their titles correctly through the shared
 `PageHeader` — zero console errors.
 
+Giai đoạn 5, Bước 3 (done) — nhóm "dễ": icon-button + option list nhỏ.
+Reagent's 6 icon buttons (trash/search/print/report/user/sample, formerly
+`rcToolIcon()`/`reagentToolIconPresentation`) became a real JSX component
+`src/react/components/ReagentToolIcon.tsx` (same SVG path data, just a
+different construction mechanism); Report's "Tạo báo cáo & In" button
+(`reportActionIcon('print')`) became `src/react/components/PrintIcon.tsx` —
+but `reportActionIconPresentation`/`report-action-icon.ts` itself stays
+UNCHANGED, since the classic print-HTML path in `report-page-controller.ts`
+still needs it; only the React-side read was removed. Because
+`reagentToolIconPresentation` had zero consumers left outside React
+(confirmed via grep), it was deleted end-to-end: source file, its
+`root.reagentToolIconPresentation=`/type-declaration wiring in
+`modular-pilot.global.ts`, the `rcToolIcon`/`reportActionIcon`(kernel.pres
+field) bridge exports, its dedicated test, and 2 assertions in
+`typescript-module-pilot.test.js` — the same "delete the now-superseded
+builder outright" discipline used throughout Giai đoạn 3.
+`tests/ui-accessibility.test.js`'s old assertion scanning for the literal
+`reportActionIcon('print')` string in `ReportPage.tsx` was updated to scan
+for `<PrintIcon` JSX instead, plus a new assertion confirming `PrintIcon.tsx`
+itself carries `aria-hidden="true"`. Option list: Manage's Lot QC modal
+(`LotModal.tsx`) — the `#cfgLotLevel` `<select>`'s 6 options (levels 1-6),
+formerly built via `configLotLevelOptionsHtml()` + `dangerouslySetInnerHTML`,
+are now plain static JSX `<option>`s (`LOT_LEVELS.map(...)`) —
+`saveConfigLot()` needed no change (still reads `#cfgLotLevel`'s value via
+DOM at submit time, same as every other CRUD modal). `configLotLevelOptionsHtml`/
+`config-lot-level-options-html.ts` deleted outright (zero other consumers),
+along with its dedicated test and 2 assertions in `manage-core-bridge.test.js`
+(updated to scan for the JSX `[1, 2, 3, 4, 5, 6]` literal instead of the old
+bridge contract). Westgard's `ArchivedView` empty-state (the variant with NO
+embedded `data-action` button — unlike the sibling one in the same file
+that still embeds `goManageTargets`, deferred to the "hard" 5b group)
+converted straight to static JSX (title+message only, same `.empty`/
+`.empty-title` classes). Verified: `npm test` 431/431, `typecheck` clean,
+`build:pilot` succeeds (4/4 artifacts), `check-build-freshness` matches,
+`a11y-audit` 0 violations (18/18 modals, 11/11 pages), `ui-workflow-check`
+29/29, `nce-workflow-check` 91/91, `visual-check` passes, plus an ad-hoc
+Playwright script confirming: the Reagent/Report buttons render real
+`<svg>` elements (no HTML string) with correct text; the Lot QC level
+`<select>` shows all 6 options with the right selected value; zero console
+errors.
+
 Then shrink/delete the now-dead
 `root.X=` aliases, `global.d.ts`'s
 ambient bare-global declarations, and rewrite the 61 sandbox tests + ~88

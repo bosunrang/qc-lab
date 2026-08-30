@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../state/kernel';
 import { PageHeader } from '../components/PageHeader';
+import { PrintIcon } from '../components/PrintIcon';
 import {
-  reportModel, dateBoxHtml, reportActionIcon, reportSearchSet,
+  reportModel, dateBoxHtml, reportSearchSet,
   goManageTargets, reportUnlockPeriod, reportSetLockPart, reportLockPeriod, printReport, exportReportXLSX, exportReportCSV,
   type ReportLockPanel,
 } from '../bridge/reportBridge';
@@ -115,7 +116,7 @@ export function ReportPage() {
           </label>
         </div>
         <div className="report-actions">
-          <button className="btn teal" disabled={model.disabled} onClick={printReport} dangerouslySetInnerHTML={{ __html: reportActionIcon('print') + 'Tạo báo cáo & In' }} />
+          <button className="btn teal" disabled={model.disabled} onClick={printReport}><PrintIcon />Tạo báo cáo & In</button>
           <button className="btn teal" disabled={model.disabled} onClick={exportReportXLSX}>Xuất Excel</button>
           <button className="btn teal" disabled={model.disabled} onClick={exportReportCSV}>Xuất CSV</button>
         </div>

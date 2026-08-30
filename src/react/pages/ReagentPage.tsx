@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
 import { useAppStore } from '../state/kernel';
 import { PageHeader } from '../components/PageHeader';
+import { ReagentToolIcon } from '../components/ReagentToolIcon';
 import {
-  reagentModel, dateBoxHtml, rcToolIcon, rcCompute,
+  reagentModel, dateBoxHtml, rcCompute,
   rcSwitch, openRcCreateModal, rcDeleteCurrent, openRcModal, rcPrint, rcPrintSummary,
   rcMeta, rcMetaFocus, rcMetaLog, rcOpenQuick, rcCell, rcRmRow, rcAddRow, rcClearRows,
   type ReagentRow,
@@ -37,13 +38,13 @@ function Toolbar({ comparisons, currentId, canWrite }: { comparisons: { id: stri
         {canWrite ? (
           <div className="rc-toolbar-primary"><div>
             <button className="btn teal rc-add-btn" onClick={openRcCreateModal}>+ Thêm</button>
-            <button className="btn danger rc-delete-btn" onClick={rcDeleteCurrent} dangerouslySetInnerHTML={{ __html: rcToolIcon('trash') + ' Xóa' }} />
+            <button className="btn danger rc-delete-btn" onClick={rcDeleteCurrent}><ReagentToolIcon type="trash" /> Xóa</button>
           </div></div>
         ) : null}
         <div className="rc-toolbar-secondary">
-          {canWrite ? <button className="btn ghost rc-find-btn" onClick={openRcModal} dangerouslySetInnerHTML={{ __html: rcToolIcon('search') + ' Tìm' }} /> : null}
-          <button className="btn teal rc-report-btn" onClick={rcPrint} dangerouslySetInnerHTML={{ __html: rcToolIcon('print') + ' In hóa chất này' }} />
-          <button className="btn teal rc-report-main" onClick={rcPrintSummary} dangerouslySetInnerHTML={{ __html: rcToolIcon('report') + ' Báo cáo tổng hợp' }} />
+          {canWrite ? <button className="btn ghost rc-find-btn" onClick={openRcModal}><ReagentToolIcon type="search" /> Tìm</button> : null}
+          <button className="btn teal rc-report-btn" onClick={rcPrint}><ReagentToolIcon type="print" /> In hóa chất này</button>
+          <button className="btn teal rc-report-main" onClick={rcPrintSummary}><ReagentToolIcon type="report" /> Báo cáo tổng hợp</button>
         </div>
       </div>
     </div>
@@ -68,14 +69,14 @@ function InfoPanel({ model }: { model: Extract<ReturnType<typeof reagentModel>, 
           <label>Người thực hiện</label>
           <div className="rc-quick-field">
             <input disabled={disabled} defaultValue={model.operator as string} onChange={e => rcMeta('operator', e.target.value)} placeholder="Họ tên" />
-            <button className="rc-icon-btn" disabled={!model.canWrite} onClick={() => rcOpenQuick('operator')} title="Chọn nhanh người thực hiện" aria-label="Chọn nhanh người thực hiện" dangerouslySetInnerHTML={{ __html: rcToolIcon('user') }} />
+            <button className="rc-icon-btn" disabled={!model.canWrite} onClick={() => rcOpenQuick('operator')} title="Chọn nhanh người thực hiện" aria-label="Chọn nhanh người thực hiện"><ReagentToolIcon type="user" /></button>
           </div>
         </div>
         <div className="rc-field">
           <label>Loại mẫu</label>
           <div className="rc-quick-field">
             <input disabled={disabled} defaultValue={model.sampleType as string} onChange={e => rcMeta('sampleType', e.target.value)} placeholder="Loại mẫu" />
-            <button className="rc-icon-btn" disabled={!model.canWrite} onClick={() => rcOpenQuick('sampleType')} title="Chọn nhanh loại mẫu" aria-label="Chọn nhanh loại mẫu" dangerouslySetInnerHTML={{ __html: rcToolIcon('sample') }} />
+            <button className="rc-icon-btn" disabled={!model.canWrite} onClick={() => rcOpenQuick('sampleType')} title="Chọn nhanh loại mẫu" aria-label="Chọn nhanh loại mẫu"><ReagentToolIcon type="sample" /></button>
           </div>
         </div>
         <div className="rc-field"><label>Bias mong muốn (%)</label><input disabled={disabled} aria-label="Bias mong muốn (%)" type="number" step="any" defaultValue={model.biasTarget as number} onChange={e => rcMeta('biasTarget', e.target.value)} onFocus={() => rcMetaFocus('biasTarget')} onBlur={() => rcMetaLog('biasTarget')} /></div>

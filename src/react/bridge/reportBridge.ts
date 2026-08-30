@@ -20,7 +20,6 @@ export type ReportModel =
 
 export const reportModel = (): ReportModel => getKernel().report.reportModel();
 export const dateBoxHtml = (id: string, value: string, cls: string, attrs: string): string => getKernel().pres.dateBox(id, value, cls, attrs);
-export const reportActionIcon = (type: string): string => getKernel().pres.reportActionIconPresentation.icon(type);
 export const reportSearchSet = (value: string): void => getKernel().report.reportSearchSet(value);
 export const goManageTargets = (): void => getKernel().pres.goManageTargets();
 export const reportUnlockPeriod = (ym: string): void => getKernel().report.reportUnlockPeriod(ym);

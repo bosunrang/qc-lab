@@ -4,13 +4,18 @@ import { dateBoxHtml } from '../bridge/manageBridge';
 
 export type LotModel = { id: string; lotNo: string; level: number; description: string; supplier: string; opened: string; exp: string; note: string };
 
+const LOT_LEVELS = [1, 2, 3, 4, 5, 6];
+
 /* Modal thứ bảy của Giai đoạn 3 chuyển sang 'react' — Manage's lô QC
    (openConfigLot). Cùng nhóm CRUD thuần như InstrumentModal, nhưng có 2
    trường ngày (Ngày mở/Hạn sử dụng) — vẫn qua dateBoxHtml() +
    dangerouslySetInnerHTML (như mọi "trường hoãn" khác trong migration này):
    không cần forward sự kiện ra ngoài vì saveConfigLot() đọc DOM
    #cfgLotOpened/#cfgLotExp trực tiếp lúc submit, không có logic nào khác
-   trong modal phụ thuộc giá trị ngày đang gõ dở. */
+   trong modal phụ thuộc giá trị ngày đang gõ dở. Mức QC (Giai đoạn 5, dọn
+   dangerouslySetInnerHTML) đổi hẳn sang JSX <option> thật — danh sách tĩnh
+   1-6, không có lý do giữ dạng chuỗi HTML (configLotLevelOptionsHtml cũ đã
+   xóa hẳn). */
 export function LotModal({ id, lotNo, level, description, supplier, opened, exp, note }: LotModel) {
   return (
     <div className="modal rcfg-modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" tabIndex={-1}>
@@ -21,7 +26,9 @@ export function LotModal({ id, lotNo, level, description, supplier, opened, exp,
       <div className="modal-b">
         <div className="grid2">
           <div><label>Số lô</label><input id="cfgLotNo" defaultValue={lotNo} placeholder="VD: 1234UE" /></div>
-          <div><label>Mức QC</label><select id="cfgLotLevel" aria-label="Mức QC" defaultValue={String(level)} dangerouslySetInnerHTML={{ __html: getKernel().manage.configLotLevelOptionsHtml(level) }} /></div>
+          <div><label>Mức QC</label><select id="cfgLotLevel" aria-label="Mức QC" defaultValue={String(level)}>
+            {LOT_LEVELS.map(l => <option value={l} key={l}>{l}</option>)}
+          </select></div>
         </div>
         <div className="grid2">
           <div><label>Mô tả</label><input id="cfgLotDescription" defaultValue={description} placeholder="VD: Acusera Assayed Chemistry Control" /></div>

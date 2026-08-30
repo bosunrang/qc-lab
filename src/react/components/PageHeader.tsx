@@ -1,11 +1,11 @@
 import { getKernel } from '../state/kernel';
 
-/* Component dùng chung cho tiêu đề của 10/11 trang (trừ Dashboard, có
-   dashboardHeadHtml() riêng — xem ghi chú Giai đoạn 5 trong kế hoạch kiến
-   trúc) — thay cho headOnlyHtml()+topUserBox() cũ (dangerouslySetInnerHTML).
-   React tự escape mọi text nội suy nên không cần esc()/escapeAttr() thủ
-   công như bản HTML cũ. Avatar/Đăng xuất gọi thẳng onClick/onKeyDown thay
-   vì data-action="openAvatarModal"/"logout" cổ điển. */
+/* Component dùng chung cho tiêu đề của cả 11/11 trang (kể cả Dashboard, xem
+   ghi chú Giai đoạn 5 trong kế hoạch kiến trúc) — thay cho headOnlyHtml()+
+   topUserBox()/dashboardHeadHtml() cũ (dangerouslySetInnerHTML). React tự
+   escape mọi text nội suy nên không cần esc()/escapeAttr() thủ công như
+   bản HTML cũ. Avatar/Đăng xuất gọi thẳng onClick/onKeyDown thay vì
+   data-action="openAvatarModal"/"logout" cổ điển. */
 export function PageHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   const user = getKernel().pres.currentUser();
   const openAvatar = () => getKernel().pres.openAvatarModal();

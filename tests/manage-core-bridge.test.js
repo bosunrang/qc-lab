@@ -21,11 +21,11 @@ assert.match(actions,/deps\.pres\.targetSwitchModalHtml\(/,'target switch modal 
 assert.match(bridge,/targetSwitchModalHtml: typeof targetSwitchModalHtml;/,'target switch modal must be a required bridge contract');
 assert.match(actions,/deps.pres.qcHistoryDetailModalHtml\(/,'Mean/SD history modal must use the TypeScript bridge');
 assert.match(bridge,/qcHistoryDetailModalHtml: typeof qcHistoryDetailModalHtml;/,'Mean/SD history modal must be a required bridge contract');
-// Lô QC (Giai đoạn 3) đã chuyển sang component React thật — configLotLevelOptionsHtml()
-// giờ được LotModal.tsx gọi qua kernel.manage, không còn qua deps.pres trong actions.
+// Lô QC (Giai đoạn 3) đã chuyển sang component React thật; Mức QC (Giai đoạn 5,
+// dọn dangerouslySetInnerHTML) đổi hẳn sang JSX <option> tĩnh trong LotModal.tsx
+// — configLotLevelOptionsHtml() đã xóa hẳn, không còn hợp đồng bridge nào ở đây.
 const lotModal=fs.readFileSync(path.join(root,'src','react','modals','LotModal.tsx'),'utf8');
-assert.match(lotModal,/getKernel\(\)\.manage\.configLotLevelOptionsHtml\(/,'Lot level options must use the TypeScript bridge');
-assert.match(bridge,/configLotLevelOptionsHtml: typeof configLotLevelOptionsHtml;/,'Lot level options must be a required bridge contract');
+assert.match(lotModal,/\[1, 2, 3, 4, 5, 6\]/,'Lot level options must render the static 1-6 list as real JSX');
 assert.match(actions,/deps.pres.qcHistoryMeanSdRowsHtml\(/,'Mean/SD history rows must use the TypeScript bridge');
 assert.match(actions,/deps.pres.qcHistoryPointRowsHtml\(/,'QC history point rows must use the TypeScript bridge');
 assert.match(bridge,/qcHistoryMeanSdRowsHtml: typeof qcHistoryMeanSdRowsHtml;/,'Mean/SD history rows must be a required bridge contract');

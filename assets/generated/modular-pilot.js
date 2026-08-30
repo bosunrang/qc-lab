@@ -12739,18 +12739,6 @@
     <h4 class="flow-panel space-after-section">Điểm QC đã nhập (${input.pointCount})</h4>${points}</div><div class="modal-f">${input.closeButtonHtml}</div></div>`;
 	}
 	//#endregion
-	//#region src/presentation/manage/config-lot-level-options-html.ts
-	function configLotLevelOptionsHtml(selected) {
-		return [
-			1,
-			2,
-			3,
-			4,
-			5,
-			6
-		].map((level) => `<option${selected === level ? " selected" : ""}>${level}</option>`).join("");
-	}
-	//#endregion
 	//#region src/presentation/manage/qc-history-detail-rows-html.ts
 	function qcHistoryMeanSdRowsHtml(rows) {
 		return rows.map((row) => `<tr><td><b>${row.lot}</b></td><td class="num">${row.mean}</td><td class="num">${row.sd}</td><td class="num">${row.cumulativeMean}</td><td class="num">${row.cumulativeSd}</td><td class="num">${row.cumulativeCv}</td><td>${row.period}</td><td>${row.source}</td></tr>`).join("");
@@ -15487,20 +15475,6 @@
 		return type === "sampleType" ? "loại mẫu" : "người thực hiện";
 	}
 	var reagentQuickLabelPresentation = Object.freeze({ label: reagentQuickLabel });
-	//#endregion
-	//#region src/presentation/reagent/reagent-tool-icon.ts
-	var paths = {
-		search: "<circle cx=\"11\" cy=\"11\" r=\"7\"/><line x1=\"21\" y1=\"21\" x2=\"16.65\" y2=\"16.65\"/>",
-		print: "<path d=\"M6 9V2h12v7\"/><path d=\"M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2\"/><rect x=\"6\" y=\"14\" width=\"12\" height=\"8\"/>",
-		report: "<path d=\"M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5Z\"/><path d=\"M14 2v4a2 2 0 0 0 2 2h4\"/><path d=\"M8.5 13h7\"/><path d=\"M8.5 17h7\"/>",
-		trash: "<path d=\"M3 6h18\"/><path d=\"M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2\"/><path d=\"M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6\"/><line x1=\"10\" y1=\"11\" x2=\"10\" y2=\"17\"/><line x1=\"14\" y1=\"11\" x2=\"14\" y2=\"17\"/>",
-		sample: "<path d=\"M9 5h6\"/><path d=\"M9 3h6v4H9z\"/><rect x=\"6\" y=\"5\" width=\"12\" height=\"16\" rx=\"2\"/><path d=\"M9 11h6M9 15h6\"/>",
-		user: "<path d=\"M16 11a4 4 0 1 0-8 0\"/><path d=\"M4 21a8 8 0 0 1 16 0\"/><path d=\"M17.5 7.5a3 3 0 0 1 2.6 4.5\"/><path d=\"M20.5 21a6 6 0 0 0-3-5.2\"/>"
-	};
-	function reagentToolIcon(type) {
-		return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${paths[type] || ""}</svg>`;
-	}
-	var reagentToolIconPresentation = Object.freeze({ icon: reagentToolIcon });
 	//#endregion
 	//#region src/presentation/reagent/reagent-quick-picker-modal-html.ts
 	function reagentQuickPickerModalHtml(input) {
@@ -28084,7 +28058,6 @@
 	root.entryPreSaveWarningModalHtml = entryPreSaveWarningModalHtml;
 	root.targetSwitchModalHtml = targetSwitchModalHtml;
 	root.qcHistoryDetailModalHtml = qcHistoryDetailModalHtml;
-	root.configLotLevelOptionsHtml = configLotLevelOptionsHtml;
 	root.qcHistoryMeanSdRowsHtml = qcHistoryMeanSdRowsHtml;
 	root.qcHistoryPointRowsHtml = qcHistoryPointRowsHtml;
 	root.targetNumberTextPresentation = createTargetNumberText({
@@ -30920,7 +30893,6 @@
 	root.reagentReportItemPresentation = reagentReportItemPresentation;
 	root.reagentComparisonLabelPresentation = reagentComparisonLabelPresentation;
 	root.reagentQuickLabelPresentation = reagentQuickLabelPresentation;
-	root.reagentToolIconPresentation = reagentToolIconPresentation;
 	root.reagentQuickPickerModalPresentation = reagentQuickPickerModalHtml;
 	root.reagentCreateModalPresentation = reagentCreateModalHtml;
 	root.reagentChartAxis = reagentChartAxis;
@@ -31463,7 +31435,6 @@
 			openConfigInstrumentModel: manageTestsActionsController.openConfigInstrumentModel,
 			deleteConfigInstrument: manageTestsActionsController.deleteConfigInstrument,
 			saveConfigInstrument: manageTestsActionsController.saveConfigInstrument,
-			configLotLevelOptionsHtml: root.configLotLevelOptionsHtml,
 			openConfigAssayModel: manageTestsActionsController.openConfigAssayModel,
 			saveConfigAssay: manageTestsActionsController.saveConfigAssay,
 			configAssaySuggestionInput: manageTestsActionsController.configAssaySuggestionInput,
@@ -31547,8 +31518,6 @@
 			roleSelectOptions: routerPermission.roleSelectOptions,
 			rolePageIds: root.rolePageIds,
 			settingsFirebaseGuideHtml: root.settingsFirebaseGuideHtml,
-			reportActionIconPresentation: root.reportActionIconPresentation,
-			reagentToolIconPresentation: root.reagentToolIconPresentation,
 			QCCore: root.QCCore,
 			AnalysisUIState: root.AnalysisUIState,
 			go: root.go,

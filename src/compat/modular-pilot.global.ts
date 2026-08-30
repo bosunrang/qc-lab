@@ -319,7 +319,6 @@ import { entryVoidModalHtml } from '../presentation/entry/entry-void-modal-html'
 import { entryPreSaveWarningModalHtml } from '../presentation/entry/entry-pre-save-warning-modal-html';
 import { targetSwitchModalHtml } from '../presentation/manage/target-switch-modal-html';
 import { qcHistoryDetailModalHtml } from '../presentation/manage/qc-history-detail-modal-html';
-import { configLotLevelOptionsHtml } from '../presentation/manage/config-lot-level-options-html';
 import { qcHistoryMeanSdRowsHtml, qcHistoryPointRowsHtml } from '../presentation/manage/qc-history-detail-rows-html';
 import { createTargetNumberText } from '../presentation/manage/target-number-text';
 import { parseVnDate } from '../presentation/shared/parse-vn-date';
@@ -496,7 +495,6 @@ import { reagentChartPresentation } from '../presentation/reagent/reagent-chart-
 import { reagentReportItemPresentation } from '../presentation/reagent/reagent-report-items';
 import { reagentComparisonLabelPresentation } from '../presentation/reagent/reagent-comparison-label';
 import { reagentQuickLabelPresentation } from '../presentation/reagent/reagent-quick-label';
-import { reagentToolIconPresentation } from '../presentation/reagent/reagent-tool-icon';
 import { reagentQuickPickerModalHtml } from '../presentation/reagent/reagent-quick-picker-modal-html';
 import { reagentCreateModalHtml } from '../presentation/reagent/reagent-create-modal-html';
 import { reagentChartAxis } from '../presentation/reagent/reagent-chart-axis';
@@ -1219,7 +1217,6 @@ type QCLabGlobal = typeof globalThis & {
   reagentReportItemPresentation: typeof reagentReportItemPresentation;
   reagentComparisonLabelPresentation: typeof reagentComparisonLabelPresentation;
   reagentQuickLabelPresentation: typeof reagentQuickLabelPresentation;
-  reagentToolIconPresentation: typeof reagentToolIconPresentation;
   reagentQuickPickerModalPresentation: typeof reagentQuickPickerModalHtml;
   reagentCreateModalPresentation: typeof reagentCreateModalHtml;
   reagentChartAxis: typeof reagentChartAxis;
@@ -1688,7 +1685,6 @@ type QCLabGlobal = typeof globalThis & {
   entryPreSaveWarningModalHtml: typeof entryPreSaveWarningModalHtml;
   targetSwitchModalHtml: typeof targetSwitchModalHtml;
   qcHistoryDetailModalHtml: typeof qcHistoryDetailModalHtml;
-  configLotLevelOptionsHtml: typeof configLotLevelOptionsHtml;
   qcHistoryMeanSdRowsHtml: typeof qcHistoryMeanSdRowsHtml;
   qcHistoryPointRowsHtml: typeof qcHistoryPointRowsHtml;
   targetNumberTextPresentation: ReturnType<typeof createTargetNumberText>;
@@ -3520,7 +3516,6 @@ root.entryVoidModalHtml=entryVoidModalHtml;
 root.entryPreSaveWarningModalHtml=entryPreSaveWarningModalHtml;
 root.targetSwitchModalHtml=targetSwitchModalHtml;
 root.qcHistoryDetailModalHtml=qcHistoryDetailModalHtml;
-root.configLotLevelOptionsHtml=configLotLevelOptionsHtml;
 root.qcHistoryMeanSdRowsHtml=qcHistoryMeanSdRowsHtml;
 root.qcHistoryPointRowsHtml=qcHistoryPointRowsHtml;
 /* QC_DECIMALS_DEFAULT từng chỉ là `const` global lexical của classic state.js
@@ -5150,7 +5145,6 @@ root.reagentChartPresentation = reagentChartPresentation;
 root.reagentReportItemPresentation = reagentReportItemPresentation;
 root.reagentComparisonLabelPresentation = reagentComparisonLabelPresentation;
 root.reagentQuickLabelPresentation = reagentQuickLabelPresentation;
-root.reagentToolIconPresentation = reagentToolIconPresentation;
 root.reagentQuickPickerModalPresentation = reagentQuickPickerModalHtml;
 root.reagentCreateModalPresentation = reagentCreateModalHtml;
 root.reagentChartAxis = reagentChartAxis;
@@ -5611,7 +5605,6 @@ const kernel = {
     openConfigInstrumentModel: manageTestsActionsController.openConfigInstrumentModel,
     deleteConfigInstrument: manageTestsActionsController.deleteConfigInstrument,
     saveConfigInstrument: manageTestsActionsController.saveConfigInstrument,
-    configLotLevelOptionsHtml: (root as any).configLotLevelOptionsHtml,
     openConfigAssayModel: manageTestsActionsController.openConfigAssayModel,
     saveConfigAssay: manageTestsActionsController.saveConfigAssay,
     configAssaySuggestionInput: manageTestsActionsController.configAssaySuggestionInput,
@@ -5675,7 +5668,6 @@ const kernel = {
     requireAdmin: routerPermission.requireAdmin, roleLabel: routerPermission.roleLabel, roleSelectOptions: routerPermission.roleSelectOptions,
     rolePageIds: (root as any).rolePageIds,
     settingsFirebaseGuideHtml: (root as any).settingsFirebaseGuideHtml,
-    reportActionIconPresentation: (root as any).reportActionIconPresentation, reagentToolIconPresentation: (root as any).reagentToolIconPresentation,
     QCCore: root.QCCore, AnalysisUIState: (root as any).AnalysisUIState,
     go: (root as any).go,
     goManageTargets: (root as any).goManageTargets, dashboardGoEntryFollowup: (root as any).dashboardGoEntryFollowup,

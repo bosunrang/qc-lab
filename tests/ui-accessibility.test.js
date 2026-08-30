@@ -90,10 +90,16 @@ assert.equal((dashboardCss.match(/!important/g) || []).length, 0, 'dashboard UI 
 assert.match(sigmaCss, /\.sg-eqa-table th\{[^}]*text-transform:none/);
 assert.match(sigmaCss, /\.sg-eqa-summary span\{[^}]*text-transform:none/);
 // Trang Báo cáo chuyển sang React (2026-08-30, xem ReportPage.tsx) — nút
-// "Tạo báo cáo & In" gọi thẳng bridge reportActionIcon('print') thay vì
-// deps.actionIcon() cổ điển.
+// "Tạo báo cáo & In" ban đầu gọi bridge reportActionIcon('print'); Giai đoạn 5
+// (dọn dangerouslySetInnerHTML, 2026-08-30) đổi hẳn sang JSX thật <PrintIcon/>
+// (src/react/components/PrintIcon.tsx) — reportActionIcon/
+// reportActionIconPresentation cổ điển (report-page-controller.ts/
+// report-action-icon.ts) vẫn giữ nguyên cho đường in HTML cổ điển, chỉ phía
+// JSX đổi.
 assert.match(reportRoutes, /const reportActionIcon = \(type: string\) =>/);
-assert.match(reportPage, /reportActionIcon\('print'\)/);
+assert.match(reportPage, /<PrintIcon\s*\/>/);
+const printIconComponent = read('src/react/components/PrintIcon.tsx');
+assert.match(printIconComponent, /aria-hidden="true"/);
 assert.match(reportActionIconPresentation, /aria-hidden="true"/);
 assert.match(actionRerunEvidencePresentation, /aria-hidden="true"/);
 assert.match(tokens, /--space-section:14px/);

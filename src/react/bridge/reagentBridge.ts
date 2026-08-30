@@ -22,7 +22,6 @@ export type ReagentModel =
 
 export const reagentModel = (): ReagentModel => getKernel().reagent.reagentModel();
 export const dateBoxHtml = (id: string, value: string, cls: string, attrs: string): string => getKernel().pres.dateBox(id, value, cls, attrs);
-export const rcToolIcon = (type: string): string => getKernel().pres.reagentToolIconPresentation.icon(type);
 export const rcCompute = (): void => getKernel().reagent.rcCompute();
 export const rcSwitch = (id: string): void => getKernel().reagent.rcSwitch(id);
 export const openRcCreateModal = (): void => getKernel().reagent.openRcCreateModal();

@@ -301,7 +301,10 @@ function ArchivedView({ model, isAdmin, archivedCount }: { model: WestgardArchiv
     return (
       <div key={model.selectedGroupId} style={{ display: 'contents' }}>
         <ArchivedSetup model={model} archivedCount={archivedCount} />
-        <div className="panel" dangerouslySetInnerHTML={{ __html: emptyStateHtml('Không tìm thấy xét nghiệm nào', 'Nhóm lô này không gắn với xét nghiệm/mức nào có Mean/SD hợp lệ.') }} />
+        <div className="panel"><div className="empty">
+          <div className="empty-title">Không tìm thấy xét nghiệm nào</div>
+          <div>Nhóm lô này không gắn với xét nghiệm/mức nào có Mean/SD hợp lệ.</div>
+        </div></div>
       </div>
     );
   }

@@ -66,7 +66,6 @@ const reagentReportItemsSource = read('src/presentation/reagent/reagent-report-i
 const reagentComparisonLabelSource = read('src/presentation/reagent/reagent-comparison-label.ts');
 const reportActionIconSource = read('src/presentation/report/report-action-icon.ts');
 const reagentQuickLabelSource = read('src/presentation/reagent/reagent-quick-label.ts');
-const reagentToolIconSource = read('src/presentation/reagent/reagent-tool-icon.ts');
 const protocolSource = read('src/domain/nce/action-protocol-service.ts');
 const reviewSource = read('src/application/nce/action-review-service.ts');
 const escalationSource = read('src/application/nce/action-escalation-service.ts');
@@ -631,8 +630,6 @@ assert.match(reportActionIconSource, /export const reportActionIconPresentation 
   'Report action icons must be a pure TypeScript presentation helper');
 assert.match(reagentQuickLabelSource, /export const reagentQuickLabelPresentation = Object\.freeze/,
   'Reagent quick labels must be a pure TypeScript presentation helper');
-assert.match(reagentToolIconSource, /export const reagentToolIconPresentation=Object\.freeze/,
-  'Reagent tool icons must be a pure TypeScript presentation helper');
 assert.doesNotMatch(westgardSource, /\bstate\b|\bglobalThis\b|\bdocument\b/,
   'Westgard view-model không được đọc state hoặc môi trường toàn cục');
 assert.match(reagentSource, /export function createReagentComparisonService\(/,
@@ -1526,8 +1523,6 @@ assert.match(generated, /root\.reportActionIconPresentation\s*=\s*reportActionIc
   'artifact must publish TypeScript report action icons for legacy route callers');
 assert.match(generated, /root\.reagentQuickLabelPresentation\s*=\s*reagentQuickLabelPresentation/,
   'artifact must publish TypeScript reagent quick labels for legacy route callers');
-assert.match(generated, /root\.reagentToolIconPresentation\s*=\s*reagentToolIconPresentation/,
-  'artifact must publish TypeScript reagent tool icons for legacy route callers');
 assert.match(generated, /reagentComparisonService\s*=\s*createReagentComparisonService/,
   'artifact phải công bố Reagent application service cho caller cũ');
 assert.match(generated, /root\.ReagentComparisonService\s*=\s*reagentComparisonService/,
