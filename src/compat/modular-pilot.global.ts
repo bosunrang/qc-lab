@@ -327,7 +327,6 @@ import { lotTransitionTargetsHtml as lotTransitionTargetsHtmlPresentation } from
 import { lotGroupColumnsHtml } from '../presentation/manage/lot-group-columns-html';
 import { lotGroupModalHtml } from '../presentation/manage/lot-group-modal-html';
 import { configLotModalHtml } from '../presentation/manage/config-lot-modal-html';
-import { configInstrumentModalHtml } from '../presentation/manage/config-instrument-modal-html';
 import { configAssayModalHtml } from '../presentation/manage/config-assay-modal-html';
 import { qcHistoryDetailModalHtml } from '../presentation/manage/qc-history-detail-modal-html';
 import { configAssayRuleRowsHtml } from '../presentation/manage/config-assay-rule-rows-html';
@@ -1055,7 +1054,6 @@ type QCLabGlobal = typeof globalThis & {
   saveConfigLot?: (id: unknown) => Promise<void>;
   renameLotAcrossPoints?: (oldLevel: unknown, oldLotNo: unknown, newLotNo: unknown) => unknown;
   deleteConfigLot?: (id: unknown) => Promise<void>;
-  openConfigInstrument?: (id?: string) => void;
   saveConfigInstrument?: (id: unknown) => Promise<void>;
   deleteConfigInstrument?: (id: unknown) => Promise<void>;
   defaultAssayLevels?: () => Record<string, any>[];
@@ -1748,7 +1746,6 @@ type QCLabGlobal = typeof globalThis & {
   lotGroupColumnsHtml: typeof lotGroupColumnsHtml;
   lotGroupModalHtml: typeof lotGroupModalHtml;
   configLotModalHtml: typeof configLotModalHtml;
-  configInstrumentModalHtml: typeof configInstrumentModalHtml;
   configAssayModalHtml: typeof configAssayModalHtml;
   qcHistoryDetailModalHtml: typeof qcHistoryDetailModalHtml;
   configAssayRuleRowsHtml: typeof configAssayRuleRowsHtml;
@@ -3606,7 +3603,6 @@ root.lotTransitionTargetsHtmlPresentation=lotTransitionTargetsHtmlPresentation;
 root.lotGroupColumnsHtml=lotGroupColumnsHtml;
 root.lotGroupModalHtml=lotGroupModalHtml;
 root.configLotModalHtml=configLotModalHtml;
-root.configInstrumentModalHtml=configInstrumentModalHtml;
 root.configAssayModalHtml=configAssayModalHtml;
 root.qcHistoryDetailModalHtml=qcHistoryDetailModalHtml;
 root.configAssayRuleRowsHtml=configAssayRuleRowsHtml;
@@ -4951,6 +4947,7 @@ const manageTestsActionsController = createManageTestsActionsController({
   emptyState: (title, body, actions) => (root as any).emptyState(title, body, actions),
   dateBox: (id, value, cls, attrs) => (root as any).dateBox(id, value, cls, attrs),
   openModal: html => root.openModal(html), closeModal: () => root.closeModal(),
+  openReactInstrumentModal: () => (window as any).QCLabReact.openConfigInstrument(),
   confirmDialog: opts => root.confirmDialog(opts), infoDialog: (message, opts) => root.infoDialog(message, opts),
   searchText: value => (globalThis as any).searchText(value), vnDate: value => vnDate(value),
   fmt: (value, decimals) => fmt(value, decimals), fmtTestValue: (test, value) => (root as any).fmtTestValue(test, value),
@@ -5025,7 +5022,6 @@ root.openConfigLot = manageTestsActionsController.openConfigLot;
 root.saveConfigLot = manageTestsActionsController.saveConfigLot;
 root.renameLotAcrossPoints = manageTestsActionsController.renameLotAcrossPoints;
 root.deleteConfigLot = manageTestsActionsController.deleteConfigLot;
-root.openConfigInstrument = manageTestsActionsController.openConfigInstrument;
 root.saveConfigInstrument = manageTestsActionsController.saveConfigInstrument;
 root.deleteConfigInstrument = manageTestsActionsController.deleteConfigInstrument;
 root.defaultAssayLevels = manageTestsActionsController.defaultAssayLevels;
@@ -5723,8 +5719,9 @@ const kernel = {
     setTargetGroup: manageTestsActionsController.setTargetGroup,
     setHistoryTest: manageTestsActionsController.setHistoryTest,
     setManageTab: manageTestsActionsController.setManageTab,
-    openConfigInstrument: manageTestsActionsController.openConfigInstrument,
+    openConfigInstrumentModel: manageTestsActionsController.openConfigInstrumentModel,
     deleteConfigInstrument: manageTestsActionsController.deleteConfigInstrument,
+    saveConfigInstrument: manageTestsActionsController.saveConfigInstrument,
     openConfigAssay: manageTestsActionsController.openConfigAssay,
     delTest: manageTestsActionsController.delTest,
     openConfigPanel: manageTestsActionsController.openConfigPanel,

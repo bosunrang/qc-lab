@@ -12816,15 +12816,6 @@
     <div class="modal-f">${input.cancelButtonHtml}${input.saveButtonHtml}</div></div>`;
 	}
 	//#endregion
-	//#region src/presentation/manage/config-instrument-modal-html.ts
-	function configInstrumentModalHtml(input) {
-		return `<div class="modal rcfg-modal"><div class="modal-h"><div><h3>${input.title}</h3></div><button class="modal-close" data-action="closeModal">✕</button></div><div class="modal-b">
-    <div class="grid2"><div><label>Tên hiển thị</label><input id="cfgInstName" value="${input.name}" placeholder="VD: AU5800-01"></div><div><label>Khoa / Khu vực</label><input id="cfgInstSection" value="${input.section}" placeholder="Hóa sinh"></div></div>
-    <div class="grid2"><div><label>Nhà sản xuất</label><input id="cfgInstMfr" value="${input.manufacturer}" placeholder="Beckman Coulter"></div><div><label>Số sê-ri</label><input id="cfgInstSerial" aria-label="Số sê-ri" value="${input.serial}"></div></div>
-    <label class="rcfg-check"><input id="cfgInstActive" type="checkbox" ${input.active ? "checked" : ""}> Máy đang hoạt động</label></div>
-    <div class="modal-f">${input.cancelButtonHtml}${input.saveButtonHtml}</div></div>`;
-	}
-	//#endregion
 	//#region src/presentation/manage/config-assay-modal-html.ts
 	function configAssayModalHtml(input) {
 		return `<div class="modal rcfg-modal rcfg-assay-modal"><div class="modal-h"><div><h3>${input.title}</h3></div><button class="modal-close" data-action="closeModal">✕</button></div><div class="modal-b">
@@ -18754,21 +18745,16 @@
 				return;
 			}
 		};
-		const openConfigInstrument = (id = "") => {
+		const openConfigInstrumentModel = (id = "") => {
 			const i = state().instruments.find((x) => x.id === id) || { active: true };
-			deps.openModal(deps.pres.configInstrumentModalHtml({
-				title: id ? "Sửa máy xét nghiệm" : "Thêm máy xét nghiệm",
-				name: deps.escapeAttr(i.name || ""),
-				section: deps.escapeAttr(i.section || ""),
-				manufacturer: deps.escapeAttr(i.manufacturer || ""),
-				serial: deps.escapeAttr(i.serial || ""),
-				active: i.active !== false,
-				cancelButtonHtml: deps.btn("Hủy", { action: "closeModal" }, "ghost"),
-				saveButtonHtml: deps.btn(id ? "Lưu thay đổi" : "Thêm máy xét nghiệm", {
-					action: "saveConfigInstrument",
-					args: [id]
-				}, "teal")
-			}));
+			return {
+				id,
+				name: i.name || "",
+				section: i.section || "",
+				manufacturer: i.manufacturer || "",
+				serial: i.serial || "",
+				active: i.active !== false
+			};
 		};
 		const saveConfigInstrument = async (id) => {
 			if (!deps.requireAdmin()) return;
@@ -18858,7 +18844,7 @@
 		};
 		const openConfigAssay = (id = "") => {
 			if (!state().instruments.length) {
-				openConfigInstrument();
+				deps.openReactInstrumentModal();
 				return;
 			}
 			const t = state().tests.find((x) => x.id === id) || {
@@ -19074,7 +19060,7 @@
 			saveConfigLot,
 			renameLotAcrossPoints,
 			deleteConfigLot,
-			openConfigInstrument,
+			openConfigInstrumentModel,
 			saveConfigInstrument,
 			deleteConfigInstrument,
 			defaultAssayLevels,
@@ -28581,7 +28567,6 @@
 	root.lotGroupColumnsHtml = lotGroupColumnsHtml;
 	root.lotGroupModalHtml = lotGroupModalHtml;
 	root.configLotModalHtml = configLotModalHtml;
-	root.configInstrumentModalHtml = configInstrumentModalHtml;
 	root.configAssayModalHtml = configAssayModalHtml;
 	root.qcHistoryDetailModalHtml = qcHistoryDetailModalHtml;
 	root.configAssayRuleRowsHtml = configAssayRuleRowsHtml;
@@ -30994,6 +30979,7 @@
 		dateBox: (id, value, cls, attrs) => root.dateBox(id, value, cls, attrs),
 		openModal: (html) => root.openModal(html),
 		closeModal: () => root.closeModal(),
+		openReactInstrumentModal: () => window.QCLabReact.openConfigInstrument(),
 		confirmDialog: (opts) => root.confirmDialog(opts),
 		infoDialog: (message, opts) => root.infoDialog(message, opts),
 		searchText: (value) => globalThis.searchText(value),
@@ -31080,7 +31066,6 @@
 	root.saveConfigLot = manageTestsActionsController.saveConfigLot;
 	root.renameLotAcrossPoints = manageTestsActionsController.renameLotAcrossPoints;
 	root.deleteConfigLot = manageTestsActionsController.deleteConfigLot;
-	root.openConfigInstrument = manageTestsActionsController.openConfigInstrument;
 	root.saveConfigInstrument = manageTestsActionsController.saveConfigInstrument;
 	root.deleteConfigInstrument = manageTestsActionsController.deleteConfigInstrument;
 	root.defaultAssayLevels = manageTestsActionsController.defaultAssayLevels;
@@ -32009,8 +31994,9 @@
 			setTargetGroup: manageTestsActionsController.setTargetGroup,
 			setHistoryTest: manageTestsActionsController.setHistoryTest,
 			setManageTab: manageTestsActionsController.setManageTab,
-			openConfigInstrument: manageTestsActionsController.openConfigInstrument,
+			openConfigInstrumentModel: manageTestsActionsController.openConfigInstrumentModel,
 			deleteConfigInstrument: manageTestsActionsController.deleteConfigInstrument,
+			saveConfigInstrument: manageTestsActionsController.saveConfigInstrument,
 			openConfigAssay: manageTestsActionsController.openConfigAssay,
 			delTest: manageTestsActionsController.delTest,
 			openConfigPanel: manageTestsActionsController.openConfigPanel,

@@ -39,12 +39,15 @@ const KEYBOARD_STEPS = 25;
 // trang và gọi trực tiếp, nên audit vẫn chạy được dưới CSP không có 'unsafe-eval'
 // (index.html đặt script-src không gồm unsafe-eval từ 2026-07-24).
 const MODALS = [
-  { page: 'manage', label: 'manage:add-instrument', open: () => openConfigInstrument() },
+  // openConfigInstrument() (Giai đoạn 3) giờ chỉ tồn tại trong react-pilot.js, không
+  // còn là global tới được từ đây — bấm thẳng nút thật thay vì gọi hàm trần. Manage
+  // mặc định mở ở tab "instruments" (ManageUIState.manageTab), nên nút đã hiện sẵn.
+  { page: 'manage', label: 'manage:add-instrument', open: () => { document.querySelector('.rcfg-tools .btn.teal').click(); } },
   { page: 'manage', label: 'manage:add-lot', open: () => openConfigLot() },
   { page: 'manage', label: 'manage:add-assay', open: () => openConfigAssay() },
   // "Edit" variants render extra fields (history, etc.) the "add" form
   // doesn't, so they're checked separately, not assumed identical.
-  { page: 'manage', label: 'manage:edit-instrument', open: () => openConfigInstrument('I1') },
+  { page: 'manage', label: 'manage:edit-instrument', open: () => { [...document.querySelectorAll('.instrument-table .manage-actions button')].find(b => b.textContent === 'Sửa').click(); } },
   { page: 'manage', label: 'manage:edit-lot', open: () => openConfigLot('L1101') },
   { page: 'manage', label: 'manage:edit-assay', open: () => openConfigAssay('T-NA') },
   { page: 'manage', label: 'manage:tea-lab-profile', open: () => teaLabProfileOpen('qclab-sodium') },

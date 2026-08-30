@@ -7,8 +7,11 @@ const panelPresentation = fs.readFileSync(path.join(__dirname, '..', 'src', 'pre
 const transitionPresentation = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'manage', 'lot-transition-modal-html.ts'), 'utf8');
 const groupPresentation = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'manage', 'lot-group-modal-html.ts'), 'utf8');
 const lotPresentation = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'manage', 'config-lot-modal-html.ts'), 'utf8');
-const instrumentPresentation = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'manage', 'config-instrument-modal-html.ts'), 'utf8');
 const assayPresentation = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'manage', 'config-assay-modal-html.ts'), 'utf8');
+// Máy xét nghiệm (Giai đoạn 3) đã chuyển sang component React thật — không còn
+// modal-html.ts/chuỗi "title: id ? ..." trong manage-tests-actions-controller.ts nữa,
+// nên nhánh riêng bên dưới đọc thẳng JSX của InstrumentModal.tsx thay vì actions/instrumentPresentation.
+const instrumentModal = fs.readFileSync(path.join(__dirname, '..', 'src', 'react', 'modals', 'InstrumentModal.tsx'), 'utf8');
 const routes = fs.readFileSync(path.join(__dirname, '..', 'src', 'presentation', 'manage', 'manage-page-controller.ts'), 'utf8');
 const records = [
   ['Panel QC','Panel QC'],
@@ -24,7 +27,7 @@ records.forEach(([editName,addName])=>{
   else if(addName==='hồ sơ chuyển lô')assert.ok(actions.includes(`title: id ? 'Sửa ${editName}' : 'Thêm ${addName}'`)&&transitionPresentation.includes('${input.title}'), `tiêu đề ${addName} phải phân biệt Thêm/Sửa`);
   else if(addName==='nhóm lô')assert.ok(actions.includes(`title: id ? 'Sửa ${editName}' : 'Thêm ${addName}'`)&&groupPresentation.includes('${input.title}'), `tiêu đề ${addName} phải phân biệt Thêm/Sửa`);
   else if(addName==='lô QC')assert.ok(actions.includes(`title: id ? 'Sửa ${editName}' : 'Thêm ${addName}'`)&&lotPresentation.includes('${input.title}'), `tiêu đề ${addName} phải phân biệt Thêm/Sửa`);
-  else if(addName==='máy xét nghiệm')assert.ok(actions.includes(`title: id ? 'Sửa ${editName}' : 'Thêm ${addName}'`)&&instrumentPresentation.includes('${input.title}'), `tiêu đề ${addName} phải phân biệt Thêm/Sửa`);
+  else if(addName==='máy xét nghiệm'){assert.ok(instrumentModal.includes(`{id ? 'Sửa ${editName}' : 'Thêm ${addName}'}`), `tiêu đề ${addName} phải phân biệt Thêm/Sửa`);assert.ok(instrumentModal.includes(`{id ? 'Lưu thay đổi' : 'Thêm ${addName}'}`), `nút ${addName} phải dùng Thêm khi tạo và Lưu thay đổi khi sửa`);return;}
   else if(addName==='xét nghiệm')assert.ok(actions.includes(`title: id ? 'Sửa ${editName}' : 'Thêm ${addName}'`)&&assayPresentation.includes('${input.title}'), `tiêu đề ${addName} phải phân biệt Thêm/Sửa`);
   else assert.ok(actions.includes(`${'${'}id ? 'Sửa ${editName}' : 'Thêm ${addName}'}`), `tiêu đề ${addName} phải phân biệt Thêm/Sửa`);
   assert.ok(actions.includes(`btn(id ? 'Lưu thay đổi' : 'Thêm ${addName}'`), `nút ${addName} phải dùng Thêm khi tạo và Lưu thay đổi khi sửa`);

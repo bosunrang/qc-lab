@@ -1173,7 +1173,51 @@ state (4 disabled checkboxes under "technician"), and that switching the
 role to "admin" correctly re-enables every checkbox live, matching the
 exact classic behavior.
 
-Remaining for Giai đoạn 3: convert each of the other ~11 form modals from
+Manage's máy xét nghiệm (done, sixth real modal converted): the first
+**pure CRUD form** in Giai đoạn 3 — no async gate on open, no live search, no
+role-driven checkbox logic, just 4 text inputs + a checkbox, entirely
+uncontrolled (`defaultValue`/`defaultChecked`), submit hands off to the
+unchanged `saveConfigInstrument(id)`. `openConfigInstrumentModel(id)` (new,
+replaces `openConfigInstrument`) is a plain synchronous data reader — no
+`Promise`/gate split needed this time, unlike `lisOpenQueueModal`/
+`openUserPerms`, since the classic function never checked permissions on
+*open*, only on *save*. This conversion surfaced a **real, pre-existing
+wiring gap** that had nothing to do with the HTML-vs-React question: `kernel.manage`
+was missing `saveConfigInstrument` entirely — it was never needed before,
+because the classic modal's save button was plain `data-action="saveConfigInstrument"`
+HTML, dispatched by `action-dispatcher.ts`'s direct `root.X` lookup, which
+never went through the kernel at all. The moment the button became a real
+`onClick={() => getKernel().manage.saveConfigInstrument(id)}`, the missing
+kernel entry surfaced immediately as `getKernel(...).manage.saveConfigInstrument
+is not a function` — caught by an ad-hoc debug script before it could reach
+committed code. General lesson for the remaining Manage/Sigma modals: **check
+that every action a converted modal's buttons call is actually present on
+`kernel.X`, not just assume it's not there because it "was working before"** —
+a modal only reaching the kernel for its OPEN path (already routed through
+`kernel.manage.openConfigInstrument` since Giai đoạn 2) says nothing about
+whether its SAVE path was ever exercised through the kernel too. `openConfigAssay()`
+(still classic, unconverted) has its own internal redirect — if no
+instruments exist yet, it force-opens the instrument modal first, to guide
+the user — which used to call the local `openConfigInstrument()` directly;
+now it calls a new `deps.openReactInstrumentModal()` dependency, wired to
+`window.QCLabReact.openConfigInstrument()` (the same bridge function real
+buttons call), the same "classic caller reaching into the React modal
+system" pattern already used for `reauthenticateCurrentUser`. Classic
+`config-instrument-modal-html.ts` deleted outright (1 dedicated test
+removed); `tests/manage-core-bridge.test.js` had its 2 now-retired contract
+checks removed; `tests/manage-crud-labels.test.js` (a title-convention
+check running across every Manage CRUD modal) had its instrument branch
+repointed from the deleted classic file to `InstrumentModal.tsx`'s JSX text.
+`scripts/a11y-audit.js`'s `manage:add-instrument`/`manage:edit-instrument`
+and `scripts/ui-workflow-check.js`'s instrument add/edit checks all switched
+from calling the retired `openConfigInstrument()` global to clicking the
+real toolbar/row buttons. Verified: `npm test` 459/459, `typecheck` clean,
+`check-build-freshness` matches, `a11y-audit` 0 violations across all 18
+modals, `ui-workflow-check` 29/29 (including the real add/edit-instrument
+flows that caught the `saveConfigInstrument` gap), `nce-workflow-check`
+91/91.
+
+Remaining for Giai đoạn 3: convert each of the other ~10 form modals from
 the `'html'` string path to a real `'react'` component, one at a time, same
 full-verify-after-each discipline established across Giai đoạn 2 — each
 conversion touches exactly one modal's trigger function (swap

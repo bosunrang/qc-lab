@@ -36,14 +36,18 @@ async function checkEntryLifecycle(page){
 }
 
 async function checkManageForms(page){
-  await page.evaluate(()=>{go('manage');setManageTab('instruments');openConfigInstrument();});await page.waitForSelector('#cfgInstName');
+  // openConfigInstrument() (Giai đoạn 3) giờ chỉ tồn tại trong react-pilot.js, không
+  // còn là global tới được từ đây — bấm thẳng nút thật thay vì gọi hàm trần.
+  await page.evaluate(()=>{go('manage');setManageTab('instruments');});
+  await page.locator('.rcfg-tools .btn.teal').click();await page.waitForSelector('#cfgInstName');
   await page.fill('#cfgInstName','AU5800 UI');await page.fill('#cfgInstSection','Hóa sinh');await page.fill('#cfgInstMfr','Beckman Coulter');await page.fill('#cfgInstSerial','UI-5800');
   await page.locator('#modalRoot').getByRole('button',{name:'Thêm máy xét nghiệm',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('#modalRoot .modal'));
   const added=await page.evaluate(()=>{const i=state.instruments.find(x=>x.name==='AU5800 UI');return{id:i&&i.id,section:i&&i.section,serial:i&&i.serial,audit:state.activity.at(-1)&&state.activity.at(-1).type};});
   check('Form thêm máy lưu đủ dữ liệu',!!added.id&&added.section==='Hóa sinh'&&added.serial==='UI-5800',JSON.stringify(added));
   check('Thêm máy ghi audit',added.audit==='Thêm máy xét nghiệm',JSON.stringify(added));
 
-  await page.evaluate(id=>openConfigInstrument(id),added.id);await page.fill('#cfgInstSection','Hóa sinh 2');await page.locator('#modalRoot').getByRole('button',{name:'Lưu thay đổi',exact:true}).click();
+  await page.locator('.instrument-table tr',{hasText:'AU5800 UI'}).getByRole('button',{name:'Sửa',exact:true}).click();await page.waitForSelector('#cfgInstName');
+  await page.fill('#cfgInstSection','Hóa sinh 2');await page.locator('#modalRoot').getByRole('button',{name:'Lưu thay đổi',exact:true}).click();
   const edited=await page.evaluate(id=>{const i=state.instruments.find(x=>x.id===id);return{section:i.section,audit:state.activity.at(-1).type};},added.id);
   check('Form sửa máy cập nhật đúng bản ghi',edited.section==='Hóa sinh 2'&&edited.audit==='Cập nhật máy',JSON.stringify(edited));
 

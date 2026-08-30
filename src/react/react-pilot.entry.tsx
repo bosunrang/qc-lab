@@ -4,6 +4,7 @@ import { DialogOverlay } from './dialogs/DialogOverlay';
 import { confirmDialog, infoDialog, closeDialogOverlay, reauthenticateCurrentUser } from './dialogs/dialog-store';
 import { ModalOverlay } from './dialogs/ModalOverlay';
 import { openModal, closeModal } from './dialogs/modal-store';
+import { openConfigInstrument } from './bridge/manageBridge';
 import { DashboardPage } from './pages/DashboardPage';
 import { AuditPage } from './pages/AuditPage';
 import { UsersPage } from './pages/UsersPage';
@@ -36,6 +37,7 @@ const registry = createReactPageRegistry({
   unmountReactPageIfMounted: registry.unmountReactPageIfMounted,
   confirmDialog, infoDialog, closeDialogOverlay, reauthenticateCurrentUser,
   openModal, closeModal,
+  openConfigInstrument,
 };
 
 /* #dialogRoot/#modalRoot giờ mỗi cái do MỘT React root sở hữu vĩnh viễn,

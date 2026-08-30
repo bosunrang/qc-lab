@@ -1,4 +1,7 @@
+import { createElement } from 'react';
 import { getKernel } from '../state/kernel';
+import { openReactModal } from '../dialogs/modal-store';
+import { InstrumentModal } from '../modals/InstrumentModal';
 
 export type ManageTab = { id: string; label: string; count: string | number };
 export type ManageToolbar = { title: string; subtitle?: string; action?: { action: string; args?: unknown[] } | null; actionLabel?: string };
@@ -17,7 +20,10 @@ export const setTargetPanel = (id: string): void => getKernel().manage.setTarget
 export const setTargetGroup = (id: string): void => getKernel().manage.setTargetGroup(id);
 export const setHistoryTest = (id: string): void => getKernel().manage.setHistoryTest(id);
 export const setManageTab = (id: string): void => getKernel().manage.setManageTab(id);
-export const openConfigInstrument = (id?: string): void => getKernel().manage.openConfigInstrument(id);
+export const openConfigInstrument = (id?: string): void => {
+  const model = getKernel().manage.openConfigInstrumentModel(id);
+  openReactModal(() => createElement(InstrumentModal, model));
+};
 export const deleteConfigInstrument = (id: string): void => getKernel().manage.deleteConfigInstrument(id);
 export const openConfigAssay = (id?: string): void => getKernel().manage.openConfigAssay(id);
 export const delTest = (id: string): void => getKernel().manage.delTest(id);

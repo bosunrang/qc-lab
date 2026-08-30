@@ -29,6 +29,7 @@ export function createManageTestsActionsController(deps: {
   dateBox: (id: string, value: string, cls?: string, attrs?: string) => string;
   openModal: (html: string) => void;
   closeModal: () => void;
+  openReactInstrumentModal: () => void;
   confirmDialog: (opts: AnyRec) => Promise<boolean>;
   infoDialog: (message: string, opts?: AnyRec) => Promise<unknown>;
   searchText: (value: unknown) => string;
@@ -349,9 +350,13 @@ export function createManageTestsActionsController(deps: {
      ở đây cho nhất quán với bảo vệ đó — chỉ chặn hồ sơ đã chấp nhận, không chặn hồ sơ
      dự kiến/đang chạy song song/không chấp nhận (những hồ sơ đó vốn xóa trực tiếp được). */
   const deleteConfigLot = async (id: unknown) => { if (!deps.requireAdmin()) return; const check = deps.pres.ManageLotWorkflowCommand.checkRemoval({ id }); if (check.error) { if (check.error !== 'not-found') await deps.infoDialog(check.message); return; } if (!await deps.confirmDialog({ kicker: 'Thao tác không thể hoàn tác', title: 'Xóa lô QC', message: `Xóa lô QC ${check.record.lotNo}?`, confirmLabel: 'Xóa lô QC', cancelLabel: 'Hủy' })) return; const result = deps.pres.ManageLotWorkflowCommand.remove({ id }); if (!result.ok) { await deps.infoDialog(result.message); return; } };
-  const openConfigInstrument = (id = '') => {
+  /* openConfigInstrumentModel(): dữ liệu thuần cho modal React (Giai đoạn 3,
+     InstrumentModal.tsx) — thay openConfigInstrument() tự dựng chuỗi HTML rồi
+     mở modal. Không có gate quyền ở đây (giống bản cũ) — requireAdmin() chỉ
+     kiểm khi lưu (saveConfigInstrument), không kiểm lúc mở form. */
+  const openConfigInstrumentModel = (id = '') => {
     const i = state().instruments.find((x: AnyRec) => x.id === id) || { active: true };
-    deps.openModal(deps.pres.configInstrumentModalHtml({ title: id ? 'Sửa máy xét nghiệm' : 'Thêm máy xét nghiệm', name: deps.escapeAttr(i.name || ''), section: deps.escapeAttr(i.section || ''), manufacturer: deps.escapeAttr(i.manufacturer || ''), serial: deps.escapeAttr(i.serial || ''), active: i.active !== false, cancelButtonHtml: deps.btn('Hủy', { action: 'closeModal' }, 'ghost'), saveButtonHtml: deps.btn(id ? 'Lưu thay đổi' : 'Thêm máy xét nghiệm', { action: 'saveConfigInstrument', args: [id] }, 'teal') }));
+    return { id, name: i.name || '', section: i.section || '', manufacturer: i.manufacturer || '', serial: i.serial || '', active: i.active !== false };
   };
   const saveConfigInstrument = async (id: unknown) => {
     if (!deps.requireAdmin()) return;
@@ -386,7 +391,7 @@ export function createManageTestsActionsController(deps: {
     if (e) e.value = o ? o.dataset.section || '' : '';
   };
   const openConfigAssay = (id = '') => {
-    if (!state().instruments.length) { openConfigInstrument(); return; }
+    if (!state().instruments.length) { deps.openReactInstrumentModal(); return; }
     const t = state().tests.find((x: AnyRec) => x.id === id) || { levels: defaultAssayLevels(), active: true };
     // Trình duyệt tự chọn option đầu tiên khi không có option nào đánh dấu "selected" (test mới,
     // chưa gán máy) — lấy đúng máy đó làm mặc định để Khoa/Khu vực điền sẵn ngay từ đầu, thay vì
@@ -442,7 +447,7 @@ export function createManageTestsActionsController(deps: {
     lotTransitionChoiceHtml, openLotTransitionV2, lotTransitionTargetsHtml, filterLotTransitionTargets,
     refreshLotTransitionTargets, readLotTransitionTargetPicks, saveLotTransitionV2, openConfigGroup,
     suggestConfigGroupName, saveConfigGroup, deleteConfigGroup, toggleLotGroupStatus, activateLotGroup,
-    openConfigLot, saveConfigLot, renameLotAcrossPoints, deleteConfigLot, openConfigInstrument,
+    openConfigLot, saveConfigLot, renameLotAcrossPoints, deleteConfigLot, openConfigInstrumentModel,
     saveConfigInstrument, deleteConfigInstrument, defaultAssayLevels, configAssayTeaRefs, configAssayRefRecord,
     configAssayNaming, configAssayFindRef, configAssaySuggestionInput, configAssayInstrumentChanged, openConfigAssay, saveConfigAssay, delTest,
   };
