@@ -91,9 +91,12 @@ run(ctx, `
 
   // Trang Westgard chuyển sang React (2026-08-30) — các nút xuất báo cáo giờ
   // ở component ExportActions trong WestgardPage.tsx thay vì
-  // westgard-export-actions-html.ts (đã xoá).
+  // westgard-export-actions-html.ts (đã xoá). Nút "In PDF" đổi từ
+  // data-action="printWestgard" sang onClick={printWestgard} thật
+  // (Giai đoạn 2 gỡ global bridge, 2026-08-30) — soi onClick thay vì chuỗi
+  // data-action= đã không còn tồn tại.
   const presentation = fs.readFileSync(path.join(__dirname, '..', 'src', 'react', 'pages', 'WestgardPage.tsx'), 'utf8');
-  assert.match(presentation, /data-action="printWestgard"/, 'the Westgard export presentation wires up a print action');
+  assert.match(presentation, /onClick=\{printWestgard\}/, 'the Westgard export presentation wires up a print action');
   assert.match(presentation, /if \(chartMode !== 'lj'\) return null;/, 'the export actions only show in the default Levey-Jennings view, not CUSUM');
 
   console.log('Westgard print tests passed');

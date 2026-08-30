@@ -5725,7 +5725,10 @@ const kernel = {
   actions: actionsPageController,
   actionForm: actionFormController,
   sigma: sigmaPageController,
-  westgard: westgardPageController,
+  westgard: {
+    ...westgardPageController,
+    wgSet: (root as any).wgSet, wgReset: (root as any).wgReset, wgSelectTest: (root as any).wgSelectTest,
+  },
   reagent: reagentPageController,
   report: reportPageController,
   reportPrint: reportPrintController,
@@ -5776,6 +5779,7 @@ const kernel = {
     QCCore: root.QCCore, AnalysisUIState: (root as any).AnalysisUIState,
     goManageTargets: (root as any).goManageTargets, dashboardGoEntryFollowup: (root as any).dashboardGoEntryFollowup,
     dashboardContinueAction: (root as any).dashboardContinueAction, dashViewTestInEntry: (root as any).dashViewTestInEntry,
+    openConfigAssay: (root as any).openConfigAssay,
   },
 };
 if (typeof window !== 'undefined') (window as any).__QC_KERNEL__ = kernel;

@@ -91,9 +91,11 @@ assert.match(text, /không gồm luật liên mức/);
 
 // Trang Westgard chuyển sang React (2026-08-30) — các nút xuất báo cáo giờ ở
 // component ExportActions trong WestgardPage.tsx thay vì
-// westgard-export-actions-html.ts (đã xoá).
+// westgard-export-actions-html.ts (đã xoá). Nút "Xuất Excel" đổi từ
+// data-action="exportWestgardXLSX" sang onClick={exportWestgardXLSX} thật
+// (Giai đoạn 2 gỡ global bridge, 2026-08-30).
 const presentation = fs.readFileSync(path.join(__dirname, '..', 'src', 'react', 'pages', 'WestgardPage.tsx'), 'utf8');
-assert.match(presentation, /data-action="exportWestgardXLSX"/);
+assert.match(presentation, /onClick=\{exportWestgardXLSX\}/);
 assert.match(presentation, /if \(chartMode !== 'lj'\) return null;/, 'Excel/PDF actions only show in Levey-Jennings mode');
 
 console.log('Westgard Excel tests passed');

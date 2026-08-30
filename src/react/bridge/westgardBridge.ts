@@ -38,3 +38,17 @@ export const afterRender = (page: string): void => getKernel().pres.afterRender(
 export const ruleGuideRows = (): { id: string; desc: string; alert: boolean; fix: string }[] => getKernel().pres.QCCore.WG_RULE_REGISTRY.map((r: any) => ({ id: r.id, desc: r.desc, alert: r.alert, fix: r.fix }));
 export const wgFilterTests = (value: string): void => getKernel().westgard.wgFilterTests(value);
 export const wgFilterArchivedTests = (value: string): void => getKernel().westgard.wgFilterArchivedTests(value);
+export const goManageTargets = (): void => getKernel().pres.goManageTargets();
+export const dashboardGoEntryFollowup = (testId: string, level: number): void => getKernel().pres.dashboardGoEntryFollowup(testId, level);
+export const openConfigAssay = (testId: string): void => getKernel().pres.openConfigAssay(testId);
+export const wgSetViewMode = (mode: string): void => getKernel().westgard.wgSetViewMode(mode);
+export const wgSetChartMode = (mode: string): void => getKernel().westgard.wgSetChartMode(mode);
+export const exportWestgardXLSX = (): void => getKernel().dataIo.exportWestgardXLSX();
+export const printWestgard = (): void => getKernel().reportPrint.printWestgard();
+export const wgSet = (rule: string, on: boolean): void => getKernel().westgard.wgSet(rule, on);
+export const wgReset = (): void => getKernel().westgard.wgReset();
+export const wgLoadMoreRows = (key: string, next: number): void => getKernel().westgard.wgLoadMoreRows(key, next);
+export const wgTogglePrevLot = (level: number): void => getKernel().westgard.wgTogglePrevLot(level);
+export const wgSelectTest = (value: string): void => getKernel().westgard.wgSelectTest(value);
+export const wgSetArchivedTest = (value: string): void => getKernel().westgard.wgSetArchivedTest(value);
+export const wgSetArchivedGroup = (value: string): void => getKernel().westgard.wgSetArchivedGroup(value);

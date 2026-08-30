@@ -32259,7 +32259,12 @@
 		actions: actionsPageController,
 		actionForm: actionFormController,
 		sigma: sigmaPageController,
-		westgard: westgardPageController,
+		westgard: {
+			...westgardPageController,
+			wgSet: root.wgSet,
+			wgReset: root.wgReset,
+			wgSelectTest: root.wgSelectTest
+		},
 		reagent: reagentPageController,
 		report: reportPageController,
 		reportPrint: reportPrintController,
@@ -32338,7 +32343,8 @@
 			goManageTargets: root.goManageTargets,
 			dashboardGoEntryFollowup: root.dashboardGoEntryFollowup,
 			dashboardContinueAction: root.dashboardContinueAction,
-			dashViewTestInEntry: root.dashViewTestInEntry
+			dashViewTestInEntry: root.dashViewTestInEntry,
+			openConfigAssay: root.openConfigAssay
 		}
 	};
 	if (typeof window !== "undefined") window.__QC_KERNEL__ = kernel;

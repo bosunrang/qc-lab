@@ -618,8 +618,34 @@ backup file-picker button correctly triggers the hidden input's `.click()`,
 + re-auth" checks independently cover the real import/restore flow through
 the converted picker button.
 
+Westgard (done): 15 of 16 `data-action` usages converted
+(`wgSetViewMode`×2/`wgSetChartMode`×2/`exportWestgardXLSX`/`printWestgard`/
+`wgSet`(checkbox)/`wgReset`/`goManageTargets`(one of its two usages — the
+other stays embedded in an `emptyStateHtml()` string)/`wgLoadMoreRows`/
+`wgTogglePrevLot`/`dashboardGoEntryFollowup`/`wgSelectTest`/
+`openConfigAssay`/`wgSetArchivedTest`/`wgSetArchivedGroup`) — most were
+ALREADY on `westgardPageController` (just needed wiring into JSX);
+`wgSet`/`wgReset`/`wgSelectTest` were standalone globals, merged into
+`kernel.westgard`; `openConfigAssay` came from `manageTestsActionsController`
+(a cross-page helper — Westgard's CUSUM empty-state opens the SAME assay
+config modal Manage uses — added to `kernel.pres`, not `kernel.manage`, since
+reading `kernel.manage.X` from the Westgard page would misleadingly imply a
+Manage-page dependency); `exportWestgardXLSX`/`printWestgard` came from the
+`kernel.dataIo`/`kernel.reportPrint` namespaces added during the Report
+page's conversion. Two source-text scanner tests broke exactly as
+anticipated — `tests/westgard-print.test.js` and `tests/westgard-xlsx.test.js`
+each asserted `/data-action="(printWestgard|exportWestgardXLSX)"/` against
+`WestgardPage.tsx`'s raw source; fixed by asserting
+`/onClick=\{(printWestgard|exportWestgardXLSX)\}/` instead — confirms the
+button is still wired to the right function, just via the new mechanism.
+Verified with an ad-hoc Playwright script: chart-mode tab switch (LJ↔CUSUM)
+updates the active tab class; a rule checkbox's `onChange` correctly flips
+`state.westgardRules['1-2s']`; "Khôi phục mặc định" click succeeds with no
+errors. `visual-check`/`print-check` re-run since this page shares the
+print/export pipeline.
+
 **Remaining phases (not yet started)**: finish converting `data-action` on
-the other 6 pages; then modals as `createPortal`, one modal at a time; then
+the other 5 pages; then modals as `createPortal`, one modal at a time; then
 shrink/delete the now-dead `root.X=` aliases, `global.d.ts`'s ambient
 bare-global declarations, and rewrite the 61 sandbox tests + ~88
 bridge-wiring text-scanner tests. See the plan file for the full phase

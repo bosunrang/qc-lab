@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useAppStore } from '../state/kernel';
 import {
   westgardModel, headOnlyHtml, emptyStateHtml, afterRender, ruleGuideRows, wgFilterTests, wgFilterArchivedTests,
+  goManageTargets, dashboardGoEntryFollowup, openConfigAssay, wgSetViewMode, wgSetChartMode, exportWestgardXLSX, printWestgard,
+  wgSet, wgReset, wgLoadMoreRows, wgTogglePrevLot, wgSelectTest, wgSetArchivedTest, wgSetArchivedGroup,
   type WestgardModel, type WestgardBlock, type WestgardCurrentModel, type WestgardArchivedModel,
 } from '../bridge/westgardBridge';
 
@@ -43,8 +45,8 @@ function ViewModeTabs({ mode, archivedCount }: { mode: string; archivedCount: nu
   if (!archivedCount) return null;
   return (
     <div className="dayseg wg-view-mode">
-      <button className={mode === 'current' ? 'on' : ''} data-action="wgSetViewMode" data-args='["current"]'>Xét nghiệm đang vận hành</button>
-      <button className={mode === 'archived' ? 'on' : ''} data-action="wgSetViewMode" data-args='["archived"]'>Nhóm lô đã dừng/lưu trữ ({archivedCount})</button>
+      <button className={mode === 'current' ? 'on' : ''} onClick={() => wgSetViewMode('current')}>Xét nghiệm đang vận hành</button>
+      <button className={mode === 'archived' ? 'on' : ''} onClick={() => wgSetViewMode('archived')}>Nhóm lô đã dừng/lưu trữ ({archivedCount})</button>
     </div>
   );
 }
@@ -52,8 +54,8 @@ function ViewModeTabs({ mode, archivedCount }: { mode: string; archivedCount: nu
 function ChartModeTabs({ mode }: { mode: string }) {
   return (
     <div className="dayseg wg-view-mode">
-      <button className={mode === 'lj' ? 'on' : ''} data-action="wgSetChartMode" data-args='["lj"]'>Levey-Jennings</button>
-      <button className={mode === 'cusum' ? 'on' : ''} data-action="wgSetChartMode" data-args='["cusum"]'>Xu hướng CUSUM</button>
+      <button className={mode === 'lj' ? 'on' : ''} onClick={() => wgSetChartMode('lj')}>Levey-Jennings</button>
+      <button className={mode === 'cusum' ? 'on' : ''} onClick={() => wgSetChartMode('cusum')}>Xu hướng CUSUM</button>
     </div>
   );
 }
@@ -68,8 +70,8 @@ function ExportActions({ chartMode }: { chartMode: string }) {
   if (chartMode !== 'lj') return null;
   return (
     <div><label>&nbsp;</label><div className="wg-export-actions">
-      <button className="btn teal wg-excel-btn" title="Xuất Excel biểu đồ Levey-Jennings, các vi phạm và điểm bằng chứng đang xem" data-action="exportWestgardXLSX"><DownloadIcon />Xuất Excel</button>
-      <button className="btn teal wg-print-btn" title="Tạo bản in PDF/HTML biểu đồ Levey-Jennings và các vi phạm đang xem" data-action="printWestgard"><PrintIcon />In PDF</button>
+      <button className="btn teal wg-excel-btn" title="Xuất Excel biểu đồ Levey-Jennings, các vi phạm và điểm bằng chứng đang xem" onClick={exportWestgardXLSX}><DownloadIcon />Xuất Excel</button>
+      <button className="btn teal wg-print-btn" title="Tạo bản in PDF/HTML biểu đồ Levey-Jennings và các vi phạm đang xem" onClick={printWestgard}><PrintIcon />In PDF</button>
     </div></div>
   );
 }
@@ -79,10 +81,10 @@ function RuleToggles({ registry, canWrite, version }: { registry: { id: string; 
     <div className="flow-note" key={version}>
       {registry.map(r => (
         <span className="wg-rule-item" key={r.id}>
-          <label><input type="checkbox" defaultChecked={r.on} disabled={!canWrite} data-action="wgSet" data-args={JSON.stringify([r.id])} data-action-on="change" /> <span className="pill">{r.id}</span></label>
+          <label><input type="checkbox" defaultChecked={r.on} disabled={!canWrite} onChange={e => wgSet(r.id, e.target.checked)} /> <span className="pill">{r.id}</span></label>
         </span>
       ))}
-      {canWrite ? <div className="wg-rule-reset"><button className="btn ghost sm" data-action="wgReset">Khôi phục mặc định</button></div> : null}
+      {canWrite ? <div className="wg-rule-reset"><button className="btn ghost sm" onClick={wgReset}>Khôi phục mặc định</button></div> : null}
     </div>
   );
 }
@@ -110,7 +112,7 @@ function RuleGuide() {
 function TargetWarning({ isAdmin }: { isAdmin: boolean }) {
   return (
     <div className="alert warn wg-target-warning">
-      Mức này <b>chưa có Mean/SD hợp lệ</b> — các điểm QC không được đánh giá Westgard; bảng dưới chỉ liệt kê giá trị, không có kết luận Đạt/Cảnh báo/Loại bỏ. {isAdmin ? <button className="btn teal sm" data-action="goManageTargets">Cấu hình Mean/SD</button> : null}
+      Mức này <b>chưa có Mean/SD hợp lệ</b> — các điểm QC không được đánh giá Westgard; bảng dưới chỉ liệt kê giá trị, không có kết luận Đạt/Cảnh báo/Loại bỏ. {isAdmin ? <button className="btn teal sm" onClick={goManageTargets}>Cấu hình Mean/SD</button> : null}
     </div>
   );
 }
@@ -119,7 +121,7 @@ function RowsControlRow({ rowsControl, rowKey }: { rowsControl: NonNullable<Extr
   return (
     <div className="wg-row-window">
       <span>Đang hiển thị {rowsControl.shownCount}/{rowsControl.total} điểm{rowsControl.suffix}</span>
-      <button className="btn ghost sm" data-action="wgLoadMoreRows" data-args={JSON.stringify([rowKey, rowsControl.next])}>{rowsControl.label}</button>
+      <button className="btn ghost sm" onClick={() => wgLoadMoreRows(rowKey, rowsControl.next)}>{rowsControl.label}</button>
     </div>
   );
 }
@@ -154,7 +156,7 @@ function LevelHeading({ block }: { block: WestgardBlock }) {
       <span className="wg-level-meta">
         {block.badgeText ? <span className="tag rej">{block.badgeText}</span> : null}
         <span>Mean {block.meanText}</span><span>SD {block.sdText}</span><span>{block.pointCount} điểm</span>
-        {block.prevToggle ? <button className="btn ghost sm wg-prev-toggle" data-action="wgTogglePrevLot" data-args={JSON.stringify([block.prevToggle.level])}>{block.prevToggle.label}</button> : null}
+        {block.prevToggle ? <button className="btn ghost sm wg-prev-toggle" onClick={() => wgTogglePrevLot(block.prevToggle!.level)}>{block.prevToggle.label}</button> : null}
       </span>
     </h3>
   );
@@ -170,7 +172,7 @@ function LevelBlock({ block, isAdmin }: { block: WestgardBlock; isAdmin: boolean
         <div className="empty">
           <div className="empty-title">{block.emptyTitle}</div>
           <div>{block.emptyMessage}</div>
-          {block.emptyActionArgs ? <div className="empty-actions"><button className="btn teal" data-action="dashboardGoEntryFollowup" data-args={JSON.stringify(block.emptyActionArgs)}>Nhập QC</button></div> : null}
+          {block.emptyActionArgs ? <div className="empty-actions"><button className="btn teal" onClick={() => dashboardGoEntryFollowup(block.emptyActionArgs![0], block.emptyActionArgs![1])}>Nhập QC</button></div> : null}
         </div>
       </div>
     );
@@ -205,7 +207,7 @@ function CurrentSetup({ model, isAdmin, canWrite, archivedCount, version }: { mo
         <div><label>Tìm nhanh</label><TestSearchInput id="wgTestSearch" query={model.query} placeholder="Tên xét nghiệm, LOT hoặc máy..." onSet={wgFilterTests} /></div>
         <div>
           <label>Chọn xét nghiệm <span id="wgTestCount" className="hint">({model.matchedCount}/{model.totalCount})</span></label>
-          <select id="wgTestSelect" aria-label="Chọn xét nghiệm" key={model.selectedTestId} disabled={!model.matchedCount} defaultValue={model.selectedTestId} data-action="wgSelectTest" data-action-on="change">
+          <select id="wgTestSelect" aria-label="Chọn xét nghiệm" key={model.selectedTestId} disabled={!model.matchedCount} defaultValue={model.selectedTestId} onChange={e => wgSelectTest(e.target.value)}>
             {model.tests.length ? model.tests.map(t => <option value={t.id} key={t.id}>{t.label}</option>) : <option value="">Không tìm thấy xét nghiệm phù hợp</option>}
           </select>
         </div>
@@ -242,7 +244,7 @@ function CusumPage({ cusum, canWrite }: { cusum: WestgardCurrentModel['cusum']; 
       <div className="panel"><div className="empty">
         <div className="empty-title">Chưa bật CUSUM cho xét nghiệm này</div>
         <div>Bật trong cấu hình xét nghiệm để xem biểu đồ xu hướng CUSUM.</div>
-        {canWrite ? <div className="empty-actions"><button className="btn teal" data-action="openConfigAssay" data-args={JSON.stringify([cusum.testId])}>Mở cấu hình xét nghiệm</button></div> : null}
+        {canWrite ? <div className="empty-actions"><button className="btn teal" onClick={() => openConfigAssay(cusum.testId)}>Mở cấu hình xét nghiệm</button></div> : null}
       </div></div>
     );
   }
@@ -276,14 +278,14 @@ function ArchivedSetup({ model, archivedCount }: { model: WestgardArchivedModel;
         {!model.empty ? (
           <div>
             <label>Chọn xét nghiệm <span className="hint">({model.tests.length}/{model.totalCount})</span></label>
-            <select key={model.selectedTestId} defaultValue={model.selectedTestId} data-action="wgSetArchivedTest" data-action-on="change">
+            <select key={model.selectedTestId} defaultValue={model.selectedTestId} onChange={e => wgSetArchivedTest(e.target.value)}>
               {model.tests.map(t => <option value={t.id} key={t.id}>{t.label}</option>)}
             </select>
           </div>
         ) : null}
         <div>
           <label>Nhóm lô đã dừng/lưu trữ <span className="hint">({model.groups.length}/{model.groups.length})</span></label>
-          <select key={model.selectedGroupId} defaultValue={model.selectedGroupId} data-action="wgSetArchivedGroup" data-action-on="change">
+          <select key={model.selectedGroupId} defaultValue={model.selectedGroupId} onChange={e => wgSetArchivedGroup(e.target.value)}>
             {model.groups.map(g => <option value={g.id} key={g.id}>{g.label}</option>)}
           </select>
         </div>
