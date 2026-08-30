@@ -2168,6 +2168,36 @@ variable holding a long-lived reference outside a single function call's
 lifetime (the `currentUser` lesson from this group), full verification +
 `benchmarks/verify-release.js` after EACH group.
 
+**Group 2: activity/audit log (done, 2026-08-30).** A dedicated background-
+agent survey (before writing any code) found this group was ALREADY nearly
+fully correct — unlike group 1, which needed deep changes. Every place that
+assigns `state.activity`/`state.activityAnchor` (`activity-archive-command.ts`,
+`qc-core.ts`'s `ensureShape()`, `reset-operational-data-command.ts`,
+`backup-restore-command.ts` via the `setActivity` dep, `blank-app-state.ts`)
+was ALREADY replacing with a newly-computed value (arrays from `.slice()`/
+`.map()`/`.filter()`, no in-place `.push()`/`.splice()`) — only ONE spot
+didn't follow the convention: `audit-service.ts`'s `pushRaw()` used
+`state.activity.push(entry)` (in-place mutation) — fixed to
+`state.activity=[...state.activity,entry]`. The survey also confirmed NO
+stale-reference risk in this group: `chainCache` (the memo behind
+`auditChainStatus()`/`chainStatus()`) only stores 3 PRIMITIVE values
+(`"${length}|${lastHash}|${anchor}"`), never an array reference — so
+replacing the array with a new reference can't make this cache go stale the
+way the `currentUser` lesson from Group 1 warned about. Every read site
+(`auditModel`, `exportActivityCSV`, `activityTotal`, etc.) is a lazy closure
+over `state.activity`, entirely safe against reference replacement.
+Verified: `npm test` 431/431 (no test needed updating — the change is fully
+behavior-compatible), `typecheck` clean, `build:pilot` succeeds (4/4),
+`check-build-freshness` matches, `a11y-audit` 0 violations (18/18 modals —
+including `audit:archive-log`), `ui-workflow-check` 29/29 (including
+several audit-logging checks), `nce-workflow-check` 91/91,
+`benchmarks/verify-release.js` PASSES IN FULL, plus an ad-hoc Playwright
+script logging 5 activity entries in a row and confirming
+`auditVerifyChain()` still passes (`chainOk: true`), in the correct order,
+with zero console errors — confirming the hash-chained log still links
+correctly after switching from in-place `.push()` to reassigning a new
+array.
+
 Then shrink/delete the now-dead
 `root.X=` aliases, `global.d.ts`'s
 ambient bare-global declarations, and rewrite the 61 sandbox tests + ~88

@@ -4071,7 +4071,7 @@
 				prevHash: lastHash()
 			};
 			entry.hash = deps.entryHash(entry);
-			state.activity.push(entry);
+			state.activity = [...state.activity, entry];
 		};
 		const rotateOverflow = () => {
 			const state = deps.getState(), activity = list(), limits = deps.limits();

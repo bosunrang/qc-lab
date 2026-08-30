@@ -39,7 +39,13 @@ export function createAuditService(deps: AuditServiceDeps) {
       userId: actor.userId, role: actor.role, type, detail, target, clientId: actor.clientId, prevHash: lastHash(),
     };
     entry.hash = deps.entryHash(entry);
-    state.activity.push(entry);
+    /* Giai đoạn 7 (state immutable, nhóm activity/audit log, 2026-08-30):
+       gán lại `state.activity` bằng mảng MỚI thay vì `.push()` mutate tại
+       chỗ — khảo sát xác nhận không có nơi nào giữ tham chiếu mảng activity
+       cũ dài hạn (chainCache chỉ lưu 3 giá trị nguyên thủy độ dài/hash/
+       anchor, không lưu tham chiếu mảng), nên đây là thay đổi an toàn, chỉ
+       để nhất quán với quy ước "gán lại, không mutate" của mọi field khác. */
+    state.activity = [...state.activity, entry];
   };
   const rotateOverflow = () => {
     const state = deps.getState(), activity = list(), limits = deps.limits();
