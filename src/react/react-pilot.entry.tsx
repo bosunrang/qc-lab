@@ -1,5 +1,4 @@
 import { createReactPageRegistry } from './bootstrap/react-page-registry';
-import { renderBus } from './state/renderBus';
 import { DashboardPage } from './pages/DashboardPage';
 import { AuditPage } from './pages/AuditPage';
 import { UsersPage } from './pages/UsersPage';
@@ -30,5 +29,4 @@ const registry = createReactPageRegistry({
   isReactPage: registry.isReactPage,
   mountReactPage: registry.mountReactPage,
   unmountReactPageIfMounted: registry.unmountReactPageIfMounted,
-  notify: renderBus.notify,
 };

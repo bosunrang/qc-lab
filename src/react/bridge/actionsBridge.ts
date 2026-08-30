@@ -1,4 +1,4 @@
-const w = () => window as any;
+import { getKernel } from '../state/kernel';
 
 export type ActionSideChip = { cls: string; label: string };
 
@@ -25,11 +25,11 @@ export type ActionLogRow = {
 };
 export type ActionsModel = { violationGroups: ActionIssueGroup[]; openActionGroup: ActionOpenGroup | null; logRows: ActionLogRow[]; issueCount: number };
 
-export const actionsModel = (): ActionsModel => w().actionsModel();
-export const headOnlyHtml = (title: string, subtitle: string): string => w().headOnly(title, subtitle);
-export const dateBoxHtml = (id: string, value: string, cls: string, attrs: string): string => w().dateBox(id, value, cls, attrs);
-export const actionCausePhrases = (category: string): string[] => w().actionCausePhrases(category);
-export const actionActionPhrases = (errorType: string): string[] => w().actionActionPhrases(errorType);
+export const actionsModel = (): ActionsModel => getKernel().actions.actionsModel();
+export const headOnlyHtml = (title: string, subtitle: string): string => getKernel().pres.headOnly(title, subtitle);
+export const dateBoxHtml = (id: string, value: string, cls: string, attrs: string): string => getKernel().pres.dateBox(id, value, cls, attrs);
+export const actionCausePhrases = (category: string): string[] => getKernel().actionForm.actionCausePhrases(category);
+export const actionActionPhrases = (errorType: string): string[] => getKernel().actionForm.actionActionPhrases(errorType);
 
 export type ActionFormSelectOption = { value: string; label: string };
 export type ActionFormChip = { cls: string; label: string; title?: string };
@@ -58,4 +58,4 @@ export type ActionFormOpenModel = {
 };
 export type ActionFormModel = { open: false; canWrite: boolean; closed: { title: string; message: string } } | ActionFormOpenModel;
 
-export const actionFormViewModel = (issueCount: number): ActionFormModel => w().actionFormViewModel(issueCount);
+export const actionFormViewModel = (issueCount: number): ActionFormModel => getKernel().actionForm.actionFormViewModel(issueCount);

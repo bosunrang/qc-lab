@@ -1,4 +1,4 @@
-const w = () => window as any;
+import { getKernel } from '../state/kernel';
 
 export type EntryTreeNode =
   | { kind: 'empty' }
@@ -48,9 +48,9 @@ export type EntryModel =
       worksheet: EntryWorksheet; ljPanel: EntryLjPanel; pointsInView: EntryPointsInView; rangeSummary: EntryRangeSummary;
     };
 
-export const entryModel = (): EntryModel => w().entryModel();
-export const headOnlyHtml = (title: string, subtitle: string): string => w().headOnly(title, subtitle);
-export const emptyStateHtml = (title: string, body: string, actions?: string): string => w().emptyState(title, body, actions);
-export const dateBoxHtml = (id: string, value: string, cls: string, attrs: string): string => w().dateBox(id, value, cls, attrs);
-export const afterRender = (page: string): void => w().afterRender(page);
-export const entryFocusPendingSheet = (): void => w().entryFocusPendingSheet();
+export const entryModel = (): EntryModel => getKernel().entry.entryModel();
+export const headOnlyHtml = (title: string, subtitle: string): string => getKernel().pres.headOnly(title, subtitle);
+export const emptyStateHtml = (title: string, body: string, actions?: string): string => getKernel().pres.emptyState(title, body, actions);
+export const dateBoxHtml = (id: string, value: string, cls: string, attrs: string): string => getKernel().pres.dateBox(id, value, cls, attrs);
+export const afterRender = (page: string): void => getKernel().pres.afterRender(page);
+export const entryFocusPendingSheet = (): void => getKernel().entry.entryFocusPendingSheet();

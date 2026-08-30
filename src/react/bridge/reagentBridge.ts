@@ -1,4 +1,4 @@
-const w = () => window as any;
+import { getKernel } from '../state/kernel';
 
 export type ReagentRow = { index: number; old: unknown; new: unknown; avg: string; dif: string; difNeg: boolean };
 export type ReagentModel =
@@ -17,8 +17,8 @@ export type ReagentModel =
       minPairs: number;
     };
 
-export const reagentModel = (): ReagentModel => w().reagentModel();
-export const headOnlyHtml = (title: string, subtitle: string): string => w().headOnly(title, subtitle);
-export const dateBoxHtml = (id: string, value: string, cls: string, attrs: string): string => w().dateBox(id, value, cls, attrs);
-export const rcToolIcon = (type: string): string => w().reagentToolIconPresentation.icon(type);
-export const rcCompute = (): void => w().rcCompute();
+export const reagentModel = (): ReagentModel => getKernel().reagent.reagentModel();
+export const headOnlyHtml = (title: string, subtitle: string): string => getKernel().pres.headOnly(title, subtitle);
+export const dateBoxHtml = (id: string, value: string, cls: string, attrs: string): string => getKernel().pres.dateBox(id, value, cls, attrs);
+export const rcToolIcon = (type: string): string => getKernel().pres.reagentToolIconPresentation.icon(type);
+export const rcCompute = (): void => getKernel().reagent.rcCompute();

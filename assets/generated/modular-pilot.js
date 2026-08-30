@@ -29274,7 +29274,6 @@
 		mountReactPage: (id, container) => window.QCLabReact?.mountReactPage(id, container),
 		notifyReactStore: () => {
 			appStore.getState().touch();
-			window.QCLabReact?.notify();
 		}
 	});
 	root.go = routerDispatch.go;
@@ -32264,13 +32263,24 @@
 		reagent: reagentPageController,
 		report: reportPageController,
 		settings: settingsPageController,
-		manage: managePageController,
+		manage: {
+			...managePageController,
+			setTargetPanel: manageTestsActionsController.setTargetPanel,
+			setTargetGroup: manageTestsActionsController.setTargetGroup,
+			setHistoryTest: manageTestsActionsController.setHistoryTest
+		},
 		dash: {
 			dashboardModel: dashboardPageController.dashboardModel,
 			dashTestSetStatus: dashboardPageController.dashTestSetStatus
 		},
-		audit: { auditModel: root.auditModel },
-		users: { usersModel: root.usersModel },
+		audit: {
+			auditModel: root.auditModel,
+			auditSetQuery: root.auditSetQuery
+		},
+		users: {
+			usersModel: root.usersModel,
+			userPermChecks: root.userPermChecks
+		},
 		pres: {
 			esc: root.esc,
 			escAttr: root.escAttr,
@@ -32279,7 +32289,30 @@
 			dateBox: root.dateBox,
 			emptyState: root.emptyState,
 			fmt: root.fmt,
-			vnDate: root.vnDate
+			vnDate: root.vnDate,
+			fmtPointValue: root.fmtPointValue,
+			formatDateTimeVN: root.formatDateTimeVN,
+			testDisplayName: root.testDisplayName,
+			afterRender: root.afterRender,
+			normalizeSearchText: root.normalizeSearchText,
+			levelTargetOk: root.levelTargetOk,
+			icon: root.icon,
+			icoCal: root.icoCal,
+			icoDownload: root.icoDownload,
+			icoPrint: root.icoPrint,
+			role: routerPermission.role,
+			canWrite: routerPermission.canWrite,
+			requireWrite: routerPermission.requireWrite,
+			requireAdmin: routerPermission.requireAdmin,
+			roleLabel: routerPermission.roleLabel,
+			roleSelectOptions: routerPermission.roleSelectOptions,
+			rolePageIds: root.rolePageIds,
+			settingsFirebaseGuideHtml: root.settingsFirebaseGuideHtml,
+			dashboardHeadHtml: root.dashboardHeadHtml,
+			reportActionIconPresentation: root.reportActionIconPresentation,
+			reagentToolIconPresentation: root.reagentToolIconPresentation,
+			QCCore: root.QCCore,
+			AnalysisUIState: root.AnalysisUIState
 		}
 	};
 	if (typeof window !== "undefined") window.__QC_KERNEL__ = kernel;

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useRenderVersion } from '../state/useRenderVersion';
+import { useAppStore } from '../state/kernel';
 import {
   dashboardModel, dashboardHeadHtml, testDisplayName, vnDate, fmtPointValue, fmt,
   dashTestSetStatus, setDashTestQuery, normalizeSearchText, levelTargetOk,
@@ -232,7 +232,7 @@ function LoadingView({ model }: { model: Extract<DashboardModel, { loading: true
 }
 
 export function DashboardPage() {
-  useRenderVersion();
+  useAppStore();
   const model = dashboardModel();
 
   if (model.loading) return <LoadingView model={model} />;

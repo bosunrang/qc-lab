@@ -456,24 +456,61 @@ now also calls `appStore.getState().touch()` alongside the pre-existing
 and inert until something actually subscribes to the store. `kernel`'s
 `window.__QC_KERNEL__` assignment is guarded by `typeof window!=='undefined'`
 (caught immediately by the sandbox tests otherwise — `vm.createContext` has
-no `window`). **Nothing reads the kernel yet** — every existing `root.X=`
-bare global stays exactly as-is in parallel; this phase is purely additive
-and was verified to change zero observable behavior (`npm test` 467/467,
-`typecheck`, `check-build-freshness`, `a11y-audit` all unchanged, plus a live
-browser check confirming `window.__QC_KERNEL__.store.getState().revision`
-increments on `rerender()`). Next phases (not yet started): wire
-`src/react/bridge/*.ts` to read the kernel via a `<KernelProvider>`/
-`useKernel()` React context instead of `window.x`, one page at a time; then
-replace `data-action` with real `onClick`/`onChange`/`onKeyDown`, one page at
-a time; then modals as `createPortal`, one modal at a time; then shrink/
-delete the now-dead `root.X=` aliases, `global.d.ts`'s ambient bare-global
-declarations, and rewrite the 61 sandbox tests + ~88 bridge-wiring text-scanner
-tests. See the plan file for the full phase breakdown and the risks already
-identified (LIS Gateway's `lis-client-service.ts` shares the same `getState`/
-`rerender` deps shape and gets swept into this even though it's unrelated to
-the UI rewrite; several `data-*` conventions in `action-dispatcher.ts` encode
-real event-timing semantics that a naive `onClick`-only conversion would
-silently drop).
+no `window`). `kernel`'s namespaces mirror each page's OWN controller return
+object 1:1 (`kernel.entry = entryPageController`, `kernel.sigma =
+sigmaPageController`, etc. — no new taxonomy invented) plus a `kernel.pres`
+grab-bag for the cross-page shared helpers that aren't owned by any single
+page controller (formatting: `esc`/`escAttr`/`fmt`/`vnDate`/`fmtPointValue`/
+`formatDateTimeVN`/`testDisplayName`; permissions: `role`/`canWrite`/
+`requireWrite`/`requireAdmin`/`roleLabel`/`roleSelectOptions`/`rolePageIds`
+from `routerPermission`; icons: `icon`/`icoCal`/`icoDownload`/`icoPrint`;
+render-cycle: `afterRender`; misc: `normalizeSearchText`/`levelTargetOk`/
+`QCCore`/`AnalysisUIState`). `kernel.manage` merges TWO controllers
+(`managePageController` plus `manageTestsActionsController`'s
+`setTargetPanel`/`setTargetGroup`/`setHistoryTest`, which the Manage page's
+Mean/SD tab needs but which live in a sibling controller, not
+`managePageController` itself) — this was the one page where "just alias the
+page's own controller" wasn't enough, found by tracing every bridge file's
+actual dependencies rather than assuming the taxonomy.
+
+**Giai đoạn 1 (done, 2026-08-30).** All 11 `src/react/bridge/*.ts` files
+(actions, audit, dashboard, entry, manage, reagent, report, settings, sigma,
+users, westgard) converted from `const w = () => window as any; ... w().x()`
+to `import { getKernel } from '../state/kernel'; ... getKernel().page.x()` —
+a purely mechanical swap (same call shape, different lookup path), verified
+by TypeScript catching every wrong/missing kernel field name at compile time
+(a few were: `kernel.manage` needed the `manageTestsActionsController` merge
+above; everything else matched the page's own controller on the first try).
+`src/react/state/kernel.ts` (new) exports `getKernel()` (throws a clear error
+if called before `modular-pilot.js` has run boot() — should never happen in
+practice, since actual page rendering only starts after `DOMContentLoaded`)
+and `useAppStore(selector)` (wraps Zustand's `useStore` React binding over
+`kernel.store`, default selector returns `revision` — an exact drop-in
+replacement for the old `useRenderVersion()`, confirmed by the 2 pages
+(Sigma, Westgard) that capture the return value as `key={version}` for their
+documented stale-`defaultValue` remount fix still working unchanged). The 9
+pages that called `useRenderVersion()` now call `useAppStore()` instead;
+`src/react/state/renderBus.ts`/`useRenderVersion.ts` and the
+`window.QCLabReact.notify`/`notifyReactStore`'s `QCLabReact?.notify()` call
+were deleted outright (zero remaining consumers once every page switched to
+the Zustand-backed hook) — `notifyReactStore` is now just
+`appStore.getState().touch()`. Verified: `npm test` 467/467, `typecheck`
+clean, `check-build-freshness` matches all 4 bundles, `a11y-audit` 0
+violations (18/18 modals — every kernel-routed function across every page
+exercised via real browser clicks), `ui-check` 29/29, `nce-check` 91/91,
+`visual-check`/`print-check` pass.
+
+**Next phases (not yet started)**: replace `data-action` with real
+`onClick`/`onChange`/`onKeyDown`, one page at a time; then modals as
+`createPortal`, one modal at a time; then shrink/delete the now-dead
+`root.X=` aliases, `global.d.ts`'s ambient bare-global declarations, and
+rewrite the 61 sandbox tests + ~88 bridge-wiring text-scanner tests. See the
+plan file for the full phase breakdown and the risks already identified (LIS
+Gateway's `lis-client-service.ts` shares the same `getState`/`rerender` deps
+shape and gets swept into this even though it's unrelated to the UI rewrite;
+several `data-*` conventions in `action-dispatcher.ts` encode real
+event-timing semantics that a naive `onClick`-only conversion would silently
+drop).
 
 `assets/core.js` is the one exception: it's wrapped in a UMD shim so it also
 works via `require()` — that's what makes it usable from both the browser

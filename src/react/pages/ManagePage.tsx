@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useRenderVersion } from '../state/useRenderVersion';
+import { useAppStore } from '../state/kernel';
 import { manageModel, headOnlyHtml, manageSearchSet, setTargetPanel, setTargetGroup, setHistoryTest, type ManageTab, type ManageToolbar } from '../bridge/manageBridge';
 
 function Head() {
@@ -406,7 +406,7 @@ const TAB_COMPONENTS: Record<string, (props: { body: any }) => any> = {
 };
 
 export function ManagePage() {
-  useRenderVersion();
+  useAppStore();
   const model = manageModel();
   const TabBody = TAB_COMPONENTS[model.tab];
   return (

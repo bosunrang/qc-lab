@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useRenderVersion } from '../state/useRenderVersion';
+import { useAppStore } from '../state/kernel';
 import { reagentModel, headOnlyHtml, dateBoxHtml, rcToolIcon, rcCompute, type ReagentRow } from '../bridge/reagentBridge';
 
 function Head({ subtitle }: { subtitle: string }) {
@@ -157,7 +157,7 @@ function ChartsPanel() {
 }
 
 export function ReagentPage() {
-  useRenderVersion();
+  useAppStore();
   const model = reagentModel();
 
   useEffect(() => {

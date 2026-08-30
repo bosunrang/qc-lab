@@ -1,4 +1,4 @@
-import { useRenderVersion } from '../state/useRenderVersion';
+import { useAppStore } from '../state/kernel';
 import {
   usersList, roleLabel, roleSelectOptionsHtml, userPermChecksHtml, rolePageIds, headOnlyHtml,
   type UserRow,
@@ -53,7 +53,7 @@ function UserRowView({ user }: { user: UserRow }) {
 }
 
 export function UsersPage() {
-  useRenderVersion();
+  useAppStore();
   const users = usersList();
 
   return (

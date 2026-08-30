@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useRenderVersion } from '../state/useRenderVersion';
+import { useAppStore } from '../state/kernel';
 import { reportModel, headOnlyHtml, dateBoxHtml, reportActionIcon, reportSearchSet, type ReportLockPanel } from '../bridge/reportBridge';
 
 function Head({ subtitle }: { subtitle: string }) {
@@ -75,7 +75,7 @@ function LockPanel({ lockPanel }: { lockPanel: ReportLockPanel }) {
 }
 
 export function ReportPage() {
-  useRenderVersion();
+  useAppStore();
   const model = reportModel();
 
   if (model.empty) {

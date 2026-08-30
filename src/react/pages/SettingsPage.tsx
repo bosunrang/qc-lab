@@ -1,4 +1,4 @@
-import { useRenderVersion } from '../state/useRenderVersion';
+import { useAppStore } from '../state/kernel';
 import { settingsModel, headOnlyHtml, firebaseGuideHtml, type SettingsModel } from '../bridge/settingsBridge';
 
 function Head() {
@@ -166,7 +166,7 @@ function FirebaseRulesPanel({ rulesText }: { rulesText: string }) {
 }
 
 export function SettingsPage() {
-  useRenderVersion();
+  useAppStore();
   const model = settingsModel();
 
   return (

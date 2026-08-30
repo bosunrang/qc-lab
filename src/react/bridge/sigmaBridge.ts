@@ -1,4 +1,4 @@
-const w = () => window as any;
+import { getKernel } from '../state/kernel';
 
 export type SigmaTeaOption = { value: string; label: string };
 export type SigmaLevelCell = {
@@ -26,12 +26,12 @@ export type SigmaModel =
       canAddPeriod: boolean;
     };
 
-export const sigmaModel = (): SigmaModel => w().sigmaModel();
-export const headOnlyHtml = (title: string, subtitle: string): string => w().headOnly(title, subtitle);
-export const emptyStateHtml = (title: string, body: string, actions?: string): string => w().emptyState(title, body, actions);
-export const dateBoxHtml = (id: string, value: string, cls: string, attrs: string): string => w().dateBox(id, value, cls, attrs);
-export const icoDownloadHtml = (): string => w().icoDownload();
-export const sgRefresh = (): void => w().sgRefresh();
-export const sgPickTest = (id: string): void => w().sgPickTest(id);
-export const sgSetTeaSource = (value: string): void => w().sgSetTeaSource(value);
-export const sgPart = (eid: string, part: string, value: string): void => { w().sgPart(eid, part, value); };
+export const sigmaModel = (): SigmaModel => getKernel().sigma.sigmaModel();
+export const headOnlyHtml = (title: string, subtitle: string): string => getKernel().pres.headOnly(title, subtitle);
+export const emptyStateHtml = (title: string, body: string, actions?: string): string => getKernel().pres.emptyState(title, body, actions);
+export const dateBoxHtml = (id: string, value: string, cls: string, attrs: string): string => getKernel().pres.dateBox(id, value, cls, attrs);
+export const icoDownloadHtml = (): string => getKernel().pres.icoDownload();
+export const sgRefresh = (): void => getKernel().sigma.sgRefresh();
+export const sgPickTest = (id: string): void => getKernel().sigma.sgPickTest(id);
+export const sgSetTeaSource = (value: string): void => getKernel().sigma.sgSetTeaSource(value);
+export const sgPart = (eid: string, part: string, value: string): void => { getKernel().sigma.sgPart(eid, part, value); };

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useRenderVersion } from '../state/useRenderVersion';
+import { useAppStore } from '../state/kernel';
 import {
   westgardModel, headOnlyHtml, emptyStateHtml, afterRender, ruleGuideRows, wgFilterTests, wgFilterArchivedTests,
   type WestgardModel, type WestgardBlock, type WestgardCurrentModel, type WestgardArchivedModel,
@@ -312,7 +312,7 @@ function ArchivedView({ model, isAdmin, archivedCount }: { model: WestgardArchiv
 }
 
 export function WestgardPage() {
-  const version = useRenderVersion();
+  const version = useAppStore();
   const model = westgardModel();
 
   useEffect(() => {

@@ -1,10 +1,4 @@
-/* Cầu nối sang các global cổ điển (window.X) do modular-pilot.global.ts gán.
-   Bundle React (assets/generated/react-pilot.js) và bundle cổ điển
-   (assets/generated/modular-pilot.js) là hai IIFE tách biệt, chỉ chia sẻ được
-   qua window — không import trực tiếp được như trong cùng cây src (dưới src/).
-   Mọi truy cập ở đây PHẢI lười (đọc window.X lúc gọi hàm, không phải lúc module
-   này được nạp), vì react-pilot.js chạy TRƯỚC modular-pilot.js theo thứ tự
-   script trong index.html. */
+import { getKernel } from '../state/kernel';
 
 export type DashboardKpi = {
   totalPoints: number;
@@ -40,15 +34,13 @@ export type DashboardModel =
       query: string;
     };
 
-const w = () => window as any;
-
-export const dashboardModel = (): DashboardModel => w().dashboardModel();
-export const dashboardHeadHtml = (lab: any): string => w().dashboardHeadHtml(lab);
-export const testDisplayName = (test: any): string => w().testDisplayName(test);
-export const vnDate = (value: unknown): string => w().vnDate(value);
-export const fmtPointValue = (point: unknown, test: unknown): string => w().fmtPointValue(point, test);
-export const fmt = (value: unknown): string => w().fmt(value);
-export const dashTestSetStatus = (status: string) => w().dashTestSetStatus(status);
-export const setDashTestQuery = (value: string) => { w().AnalysisUIState.dashTestQ = value; };
-export const normalizeSearchText = (value: unknown): string => w().normalizeSearchText(value);
-export const levelTargetOk = (level: any): boolean => w().levelTargetOk(level);
+export const dashboardModel = (): DashboardModel => getKernel().dash.dashboardModel();
+export const dashboardHeadHtml = (lab: any): string => getKernel().pres.dashboardHeadHtml(lab);
+export const testDisplayName = (test: any): string => getKernel().pres.testDisplayName(test);
+export const vnDate = (value: unknown): string => getKernel().pres.vnDate(value);
+export const fmtPointValue = (point: unknown, test: unknown): string => getKernel().pres.fmtPointValue(point, test);
+export const fmt = (value: unknown): string => getKernel().pres.fmt(value);
+export const dashTestSetStatus = (status: string) => getKernel().dash.dashTestSetStatus(status);
+export const setDashTestQuery = (value: string) => { getKernel().pres.AnalysisUIState.dashTestQ = value; };
+export const normalizeSearchText = (value: unknown): string => getKernel().pres.normalizeSearchText(value);
+export const levelTargetOk = (level: any): boolean => getKernel().pres.levelTargetOk(level);

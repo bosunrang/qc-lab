@@ -1,5 +1,4 @@
-/* Cầu nối sang các global cổ điển (window.X) cho trang Nhật ký hoạt động — xem
-   ghi chú đầu dashboardBridge.ts về lý do phải đọc window.X một cách LƯỜI. */
+import { getKernel } from '../state/kernel';
 
 export type AuditModel = {
   total: number;
@@ -21,13 +20,11 @@ export type AuditModel = {
   brokenSeq: number | null;
 };
 
-const w = () => window as any;
-
-export const auditModel = (): AuditModel => w().auditModel();
-export const roleLabel = (role: string): string => w().roleLabel(role);
-export const formatDateTimeVN = (value: string): string => w().formatDateTimeVN(value);
-export const escapeHtml = (value: unknown): string => w().esc(value);
-export const dateBoxHtml = (id: string, value: string, cls: string, attrs: string): string => w().dateBox(id, value, cls, attrs);
-export const requireAdmin = (): boolean => w().requireAdmin();
-export const headOnlyHtml = (title: string, subtitle: string): string => w().headOnly(title, subtitle);
-export const auditSetQuery = (value: string) => w().auditSetQuery(value);
+export const auditModel = (): AuditModel => getKernel().audit.auditModel();
+export const roleLabel = (role: string): string => getKernel().pres.roleLabel(role);
+export const formatDateTimeVN = (value: string): string => getKernel().pres.formatDateTimeVN(value);
+export const escapeHtml = (value: unknown): string => getKernel().pres.esc(value);
+export const dateBoxHtml = (id: string, value: string, cls: string, attrs: string): string => getKernel().pres.dateBox(id, value, cls, attrs);
+export const requireAdmin = (): boolean => getKernel().pres.requireAdmin();
+export const headOnlyHtml = (title: string, subtitle: string): string => getKernel().pres.headOnly(title, subtitle);
+export const auditSetQuery = (value: string) => getKernel().audit.auditSetQuery(value);

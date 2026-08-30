@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useRenderVersion } from '../state/useRenderVersion';
+import { useAppStore } from '../state/kernel';
 import {
   auditModel, roleLabel, formatDateTimeVN, dateBoxHtml, headOnlyHtml, auditSetQuery,
   type AuditModel,
@@ -76,7 +76,7 @@ function AuditRow({ activity }: { activity: any }) {
 }
 
 export function AuditPage() {
-  useRenderVersion();
+  useAppStore();
   const model = auditModel();
 
   return (

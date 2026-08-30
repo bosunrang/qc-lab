@@ -1,4 +1,4 @@
-const w = () => window as any;
+import { getKernel } from '../state/kernel';
 
 export type ReportLock = { ym: string; monthLabel: string; lockedBy: string; lockedAtText: string };
 export type ReportLockPanel = {
@@ -18,8 +18,8 @@ export type ReportModel =
       lockPanel: ReportLockPanel;
     };
 
-export const reportModel = (): ReportModel => w().reportModel();
-export const headOnlyHtml = (title: string, subtitle: string): string => w().headOnly(title, subtitle);
-export const dateBoxHtml = (id: string, value: string, cls: string, attrs: string): string => w().dateBox(id, value, cls, attrs);
-export const reportActionIcon = (type: string): string => w().reportActionIconPresentation.icon(type);
-export const reportSearchSet = (value: string): void => w().reportSearchSet(value);
+export const reportModel = (): ReportModel => getKernel().report.reportModel();
+export const headOnlyHtml = (title: string, subtitle: string): string => getKernel().pres.headOnly(title, subtitle);
+export const dateBoxHtml = (id: string, value: string, cls: string, attrs: string): string => getKernel().pres.dateBox(id, value, cls, attrs);
+export const reportActionIcon = (type: string): string => getKernel().pres.reportActionIconPresentation.icon(type);
+export const reportSearchSet = (value: string): void => getKernel().report.reportSearchSet(value);

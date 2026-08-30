@@ -1,4 +1,4 @@
-const w = () => window as any;
+import { getKernel } from '../state/kernel';
 
 export type WestgardRow = {
   index: number; date: string; value: string; z: string;
@@ -31,10 +31,10 @@ export type WestgardModel =
   | { empty: true; isAdmin: boolean }
   | { empty: false; isAdmin: boolean; canWrite: boolean; viewMode: 'current' | 'archived'; archivedCount: number; current: WestgardCurrentModel | null; archived: WestgardArchivedModel | null };
 
-export const westgardModel = (): WestgardModel => w().westgardModel();
-export const headOnlyHtml = (title: string, subtitle: string): string => w().headOnly(title, subtitle);
-export const emptyStateHtml = (title: string, body: string, actions?: string): string => w().emptyState(title, body, actions);
-export const afterRender = (page: string): void => w().afterRender(page);
-export const ruleGuideRows = (): { id: string; desc: string; alert: boolean; fix: string }[] => w().QCCore.WG_RULE_REGISTRY.map((r: any) => ({ id: r.id, desc: r.desc, alert: r.alert, fix: r.fix }));
-export const wgFilterTests = (value: string): void => w().wgFilterTests(value);
-export const wgFilterArchivedTests = (value: string): void => w().wgFilterArchivedTests(value);
+export const westgardModel = (): WestgardModel => getKernel().westgard.westgardModel();
+export const headOnlyHtml = (title: string, subtitle: string): string => getKernel().pres.headOnly(title, subtitle);
+export const emptyStateHtml = (title: string, body: string, actions?: string): string => getKernel().pres.emptyState(title, body, actions);
+export const afterRender = (page: string): void => getKernel().pres.afterRender(page);
+export const ruleGuideRows = (): { id: string; desc: string; alert: boolean; fix: string }[] => getKernel().pres.QCCore.WG_RULE_REGISTRY.map((r: any) => ({ id: r.id, desc: r.desc, alert: r.alert, fix: r.fix }));
+export const wgFilterTests = (value: string): void => getKernel().westgard.wgFilterTests(value);
+export const wgFilterArchivedTests = (value: string): void => getKernel().westgard.wgFilterArchivedTests(value);

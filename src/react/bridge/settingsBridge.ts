@@ -1,4 +1,4 @@
-const w = () => window as any;
+import { getKernel } from '../state/kernel';
 
 export type SettingsModel = {
   lab: { name: string; dept: string; address: string };
@@ -9,6 +9,6 @@ export type SettingsModel = {
   firebaseRulesText: string;
 };
 
-export const settingsModel = (): SettingsModel => w().settingsModel();
-export const headOnlyHtml = (title: string, subtitle: string): string => w().headOnly(title, subtitle);
-export const firebaseGuideHtml = (): string => w().settingsFirebaseGuideHtml();
+export const settingsModel = (): SettingsModel => getKernel().settings.settingsModel();
+export const headOnlyHtml = (title: string, subtitle: string): string => getKernel().pres.headOnly(title, subtitle);
+export const firebaseGuideHtml = (): string => getKernel().pres.settingsFirebaseGuideHtml();

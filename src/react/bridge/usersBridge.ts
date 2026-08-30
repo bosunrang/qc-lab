@@ -1,7 +1,4 @@
-/* Cầu nối sang các global cổ điển (window.X) cho trang Người dùng — xem ghi
-   chú đầu dashboardBridge.ts về lý do phải đọc window.X một cách LƯỜI. */
-
-const w = () => window as any;
+import { getKernel } from '../state/kernel';
 
 export type UserRow = {
   id: string;
@@ -13,9 +10,9 @@ export type UserRow = {
   current: boolean;
 };
 
-export const usersList = (): UserRow[] => w().usersModel();
-export const roleLabel = (role: string): string => w().roleLabel(role);
-export const roleSelectOptionsHtml = (selected: string): string => w().roleSelectOptions(selected);
-export const userPermChecksHtml = (pageIds: string[], groupId: string, role: string): string => w().userPermChecks(pageIds, groupId, role);
-export const rolePageIds = (role: string): string[] => w().rolePageIds(role);
-export const headOnlyHtml = (title: string, subtitle: string): string => w().headOnly(title, subtitle);
+export const usersList = (): UserRow[] => getKernel().users.usersModel();
+export const roleLabel = (role: string): string => getKernel().pres.roleLabel(role);
+export const roleSelectOptionsHtml = (selected: string): string => getKernel().pres.roleSelectOptions(selected);
+export const userPermChecksHtml = (pageIds: string[], groupId: string, role: string): string => getKernel().users.userPermChecks(pageIds, groupId, role);
+export const rolePageIds = (role: string): string[] => getKernel().pres.rolePageIds(role);
+export const headOnlyHtml = (title: string, subtitle: string): string => getKernel().pres.headOnly(title, subtitle);

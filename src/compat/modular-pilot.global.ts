@@ -3926,7 +3926,7 @@ const routerDispatch=createRouterDispatchController({
   entryFilter:v=>(root as any).entryFilter(v),
   isReactPage:id=>(window as any).QCLabReact?.isReactPage(id)||false,
   mountReactPage:(id,container)=>(window as any).QCLabReact?.mountReactPage(id,container),
-  notifyReactStore:()=>{appStore.getState().touch();(window as any).QCLabReact?.notify();},
+  notifyReactStore:()=>{appStore.getState().touch();},
 });
 root.go=routerDispatch.go;root.resetMainScroll=routerDispatch.resetMainScroll;root.render=routerDispatch.render;root.restoreRouteFilters=routerDispatch.restoreRouteFilters;root.rerender=routerDispatch.rerender;
 root.actionGuideContent=createActionGuideContent({escape:(value:any)=>(root as any).esc(value),button:(label,action,variant)=>(root as any).btn(label,action,variant)});
@@ -5729,14 +5729,34 @@ const kernel = {
   reagent: reagentPageController,
   report: reportPageController,
   settings: settingsPageController,
-  manage: managePageController,
+  manage: {
+    ...managePageController,
+    setTargetPanel: manageTestsActionsController.setTargetPanel,
+    setTargetGroup: manageTestsActionsController.setTargetGroup,
+    setHistoryTest: manageTestsActionsController.setHistoryTest,
+  },
   dash: { dashboardModel: dashboardPageController.dashboardModel, dashTestSetStatus: dashboardPageController.dashTestSetStatus },
-  audit: { auditModel: (root as any).auditModel },
-  users: { usersModel: (root as any).usersModel },
+  audit: { auditModel: (root as any).auditModel, auditSetQuery: (root as any).auditSetQuery },
+  users: { usersModel: (root as any).usersModel, userPermChecks: (root as any).userPermChecks },
+  /* Hàm/service dùng chung nhiều trang — KHÔNG thuộc riêng một page controller
+     nào (định dạng, icon, quyền, render-cycle...). Namespace `pres` giữ đúng
+     tên đã dùng trong các `deps.pres.*` của từng page controller (xem
+     entry-page-controller.ts,...) cho nhất quán, dù ở đây gom rộng hơn một
+     chút (không chỉ HTML-builder thuần mà cả các service nhỏ dùng chung). */
   pres: {
     esc: (root as any).esc, escAttr: (root as any).escAttr, btn: (root as any).btn,
     headOnly: (root as any).headOnly, dateBox: (root as any).dateBox, emptyState: (root as any).emptyState,
-    fmt: (root as any).fmt, vnDate: (root as any).vnDate,
+    fmt: (root as any).fmt, vnDate: (root as any).vnDate, fmtPointValue: (root as any).fmtPointValue,
+    formatDateTimeVN: (root as any).formatDateTimeVN, testDisplayName: (root as any).testDisplayName,
+    afterRender: (root as any).afterRender, normalizeSearchText: (root as any).normalizeSearchText,
+    levelTargetOk: (root as any).levelTargetOk,
+    icon: (root as any).icon, icoCal: (root as any).icoCal, icoDownload: (root as any).icoDownload, icoPrint: (root as any).icoPrint,
+    role: routerPermission.role, canWrite: routerPermission.canWrite, requireWrite: routerPermission.requireWrite,
+    requireAdmin: routerPermission.requireAdmin, roleLabel: routerPermission.roleLabel, roleSelectOptions: routerPermission.roleSelectOptions,
+    rolePageIds: (root as any).rolePageIds,
+    settingsFirebaseGuideHtml: (root as any).settingsFirebaseGuideHtml, dashboardHeadHtml: (root as any).dashboardHeadHtml,
+    reportActionIconPresentation: (root as any).reportActionIconPresentation, reagentToolIconPresentation: (root as any).reagentToolIconPresentation,
+    QCCore: root.QCCore, AnalysisUIState: (root as any).AnalysisUIState,
   },
 };
 if (typeof window !== 'undefined') (window as any).__QC_KERNEL__ = kernel;

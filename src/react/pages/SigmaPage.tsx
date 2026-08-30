@@ -1,5 +1,5 @@
 import { useState, useEffect, Fragment } from 'react';
-import { useRenderVersion } from '../state/useRenderVersion';
+import { useAppStore } from '../state/kernel';
 import {
   sigmaModel, headOnlyHtml, emptyStateHtml, dateBoxHtml, icoDownloadHtml, sgRefresh,
   sgPickTest, sgPart, type SigmaModel, type SigmaPeriod, type SigmaLevelCell,
@@ -128,7 +128,7 @@ function AnalysisSetup({ model }: { model: NormalModel }) {
    nhưng select vẫn hiện giá trị vừa bị từ chối) vì React so sánh prop mới với
    giá trị NÓ nhớ đã set lần trước (không đổi), không so với giá trị DOM thật
    sự đang hiển thị. Ép remount bằng key={renderVersion} (đếm tăng mỗi lần
-   rerender(), từ useRenderVersion() ở SigmaPage) buộc React dựng lại select
+   rerender(), từ useAppStore() ở SigmaPage) buộc React dựng lại select
    với defaultValue mới mỗi lần rerender() chạy — đúng chi phí của bản cổ điển
    (dựng lại toàn bộ HTML mỗi lần rerender()), chỉ áp cho 2 select nhỏ này. */
 function PeriodMonthYearSelect({ eid, month, year, years }: { eid: string; month: number; year: number; years: number[] }) {
@@ -221,7 +221,7 @@ function PeriodTable({ model, version }: { model: NormalModel; version: number }
 }
 
 export function SigmaPage() {
-  const version = useRenderVersion();
+  const version = useAppStore();
   const model = sigmaModel();
 
   useEffect(() => {
