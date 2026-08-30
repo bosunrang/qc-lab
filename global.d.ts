@@ -125,7 +125,7 @@ declare var entrySel: any, entryDays: any, entryStart: any, entryEnd: any, entry
 declare var manageQ: any, manageTab: any, manageTargetPanel: any, manageTargetGroup: any,
   manageTargetLevel: any, manageHistoryTest: any, targetSwitchCtx: any;
 declare var rcId: any, rcSaveT: any, rcModalQ: any, rcCreateModalQ: any, rcQuickType: any, rcMetaBefore: any;
-declare var sgTest: any, sgRefreshT: any, sgMuCtx: any, sgAddTestQ: any, sgSelectedPeriods: any;
+declare var sgTest: any, sgRefreshT: any, sgAddTestQ: any, sgSelectedPeriods: any;
 
 // --- Service / view-model namespaces (`root.Foo = {...}`) ---
 declare var EntryService: any, PeriodService: any, ReagentComparisonService: any, ChartViewModel: any,

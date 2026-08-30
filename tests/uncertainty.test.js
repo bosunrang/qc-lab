@@ -246,10 +246,10 @@ const sigmaPageSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'react', 
 
 assert.match(sigmaPageSrc, /<details className="panel sg-collapse-panel sg-mu-panel">[\s\S]*?<summary className="sg-collapse-summary"><span role="heading" aria-level=\{2\}>Độ không đảm bảo đo \(MU\)<\/span><\/summary>[\s\S]*?<div id="sgMUAction" className="sg-data-head-actions" \/>[\s\S]*?<div id="sgMU" \/>/, 'panel MU phải thu gọn được, giữ heading cấp 2 và đặt nút CoA cạnh summary thay vì lồng control focus');
 assert.match(sigmaSrc, /muBox\.innerHTML = sgMuHTML\(t, selectedRow, levels\)/, 'panel MU phải bám theo ĐÚNG kỳ đang chọn như bảng OPSpecs, không phải kỳ mới nhất');
-assert.match(sigmaSrc, /const sgMuApply = async \(\) => \{[\s\S]{0,80}deps\.requireWrite\(\)/, 'ghi ngân sách MU phải qua cổng quyền ghi');
+assert.match(sigmaSrc, /const sgMuApply = async \(eid: string, periodIds: string\[\], rows: AnyRec\[\], reviewedBy: string, reviewedDate: string\) => \{[\s\S]{0,80}deps\.requireWrite\(\)/, 'ghi ngân sách MU phải qua cổng quyền ghi');
 assert.match(sigmaSrc, /deps\.SigmaMuWorkflowCommand\.apply\(/, 'áp dụng ngân sách MU phải đi qua workflow command TypeScript');
 assert.match(sigmaMuWorkflowSrc, /deps\.log\('Cập nhật ngân sách MU'/, 'sửa ngân sách MU phải để lại vết trong nhật ký');
-assert.match(sigmaSrc, /const sgMuPreview = \(level: unknown\): AnyRec => \{[\s\S]{0,400}deps\.QCCore\.uncertaintyBudget\(/, 'xem trước trong modal phải gọi lại đúng hàm ngân sách, không tự nhân chia lại');
+assert.match(sigmaSrc, /const sgMuPreview = \(eid: string, level: unknown, rows: AnyRec\[\]\): AnyRec => \{[\s\S]{0,400}deps\.QCCore\.uncertaintyBudget\(/, 'xem trước trong modal phải gọi lại đúng hàm ngân sách, không tự nhân chia lại');
 assert.doesNotMatch(sigmaSrc, /uCal:\s*[^,)]*\|\|\s*0/, 'u(cal) chưa nhập không được ngầm hoá thành 0 trước khi vào ngân sách');
 assert.doesNotMatch(coreSrc, /pct\(o\.uCal\)\s*\|\|\s*0/, 'core cũng không được thay u(cal) thiếu bằng 0');
 

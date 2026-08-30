@@ -3,6 +3,7 @@ import { getKernel } from '../state/kernel';
 import { openReactModal } from '../dialogs/modal-store';
 import { SigmaAddTestModal } from '../modals/SigmaAddTestModal';
 import { SigmaBiasModal } from '../modals/SigmaBiasModal';
+import { SigmaMuModal } from '../modals/SigmaMuModal';
 
 export type SigmaTeaOption = { value: string; label: string };
 export type SigmaLevelCell = {
@@ -55,6 +56,10 @@ export const sgDelPeriod = (eid: string): void => { getKernel().sigma.sgDelPerio
 export const sgOpenBias = (eid: string, level: string | number): void => {
   const model = getKernel().sigma.sgOpenBiasModel(eid, level);
   if (model) openReactModal(() => createElement(SigmaBiasModal, model));
+};
+export const sgOpenMU = (eid: string): void => {
+  const model = getKernel().sigma.sgOpenMUModel(eid);
+  if (model) openReactModal(() => createElement(SigmaMuModal, model));
 };
 export const sgAddPeriod = (): void => { getKernel().sigma.sgAddPeriod(); };
 export const exportSigmaPeriodsXLSX = (): void => { getKernel().dataIo.exportSigmaPeriodsXLSX(); };

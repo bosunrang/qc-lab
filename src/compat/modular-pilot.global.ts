@@ -346,7 +346,6 @@ import { rangeWorkflowChecklistRowsHtml } from '../presentation/range/range-work
 import { rangeNceNoticeHtml } from '../presentation/range/range-nce-notice-html';
 import { rangeWorkflowComparisonRowsHtml } from '../presentation/range/range-workflow-comparison-rows-html';
 import { resetPasswordModalHtml } from '../presentation/auth/reset-password-modal-html';
-import { sigmaMuModalHtml } from '../presentation/sigma/sigma-mu-modal-html';
 import { sigmaCohortModalHtml } from '../presentation/sigma/sigma-cohort-modal-html';
 import { sigmaFrequencyPanelHtml } from '../presentation/sigma/sigma-frequency-panel-html';
 import { sigmaMuSummaryHtml } from '../presentation/sigma/sigma-mu-summary-html';
@@ -356,8 +355,6 @@ import { sigmaOpSpecCellHtml } from '../presentation/sigma/sigma-opspec-cell-htm
 import { sigmaMuStateChipHtml } from '../presentation/sigma/sigma-mu-state-chip-html';
 import { sigmaMuDominantText } from '../presentation/sigma/sigma-mu-dominant-text';
 import { sigmaCohortRowsHtml } from '../presentation/sigma/sigma-cohort-rows-html';
-import { sigmaMuRowsHtml } from '../presentation/sigma/sigma-mu-rows-html';
-import { sigmaMuPreviewHtml } from '../presentation/sigma/sigma-mu-preview-html';
 import { sigmaInputDisplayValue } from '../presentation/sigma/sigma-input-display-value';
 import { sigmaGoverningRuleBlockHtml } from '../presentation/sigma/sigma-governing-rule-block-html';
 import { sigmaFrequencyRowsHtml } from '../presentation/sigma/sigma-frequency-rows-html';
@@ -1209,15 +1206,10 @@ type QCLabGlobal = typeof globalThis & {
   sgOpenBiasModel?: (eid: string, level: unknown) => Record<string, any> | null;
   sgApplyBiasToPeriods?: (data: Record<string, any>[], periodIds: string[], level: unknown, bias: number, rounds: Record<string, any>[], batchId?: string) => number;
   sgBiasApply?: (level: unknown, periodIds: string[], rounds: Record<string, any>[]) => Promise<void>;
-  sgMuRowsFromDom?: () => Record<string, any>[];
-  sgMuPeriodsFromDom?: () => string[];
-  sgMuCaptureDom?: () => void;
-  sgMuPreview?: (level: unknown) => Record<string, any> | null;
-  sgMuUpdatePreview?: () => void;
+  sgMuPreview?: (eid: string, level: unknown, rows: Record<string, any>[]) => Record<string, any> | null;
+  sgOpenMUModel?: (eid: string) => Record<string, any> | null;
   sgOpenMU?: (eid: string) => void;
-  sgRenderMuModal?: () => void;
-  sgMuSelectPeriods?: (checked: boolean) => void;
-  sgMuApply?: () => Promise<void>;
+  sgMuApply?: (eid: string, periodIds: string[], rows: Record<string, any>[], reviewedBy: string, reviewedDate: string) => Promise<void>;
   sgCell?: (eid: string, level: unknown, field: string, val: unknown) => void;
   sgPeriodSel?: (e: Record<string, any>, ro: string) => string;
   sgPart?: (eid: string, part: string, val: unknown) => Promise<void>;
@@ -1743,7 +1735,6 @@ type QCLabGlobal = typeof globalThis & {
   rangeNceNoticeHtml: typeof rangeNceNoticeHtml;
   rangeWorkflowComparisonRowsHtml: typeof rangeWorkflowComparisonRowsHtml;
   resetPasswordModalHtml: typeof resetPasswordModalHtml;
-  sigmaMuModalHtml: typeof sigmaMuModalHtml;
   sigmaCohortModalHtml: typeof sigmaCohortModalHtml;
   sigmaFrequencyPanelHtml: typeof sigmaFrequencyPanelHtml;
   sigmaMuSummaryHtml: typeof sigmaMuSummaryHtml;
@@ -1753,8 +1744,6 @@ type QCLabGlobal = typeof globalThis & {
   sigmaMuStateChipHtml: typeof sigmaMuStateChipHtml;
   sigmaMuDominantText: typeof sigmaMuDominantText;
   sigmaCohortRowsHtml: typeof sigmaCohortRowsHtml;
-  sigmaMuRowsHtml: typeof sigmaMuRowsHtml;
-  sigmaMuPreviewHtml: typeof sigmaMuPreviewHtml;
   sigmaInputDisplayValue: typeof sigmaInputDisplayValue;
   sigmaGoverningRuleBlockHtml: typeof sigmaGoverningRuleBlockHtml;
   sigmaFrequencyRowsHtml: typeof sigmaFrequencyRowsHtml;
@@ -3597,7 +3586,6 @@ root.rangeWorkflowChecklistRowsHtml=rangeWorkflowChecklistRowsHtml;
 root.rangeNceNoticeHtml=rangeNceNoticeHtml;
 root.rangeWorkflowComparisonRowsHtml=rangeWorkflowComparisonRowsHtml;
 root.resetPasswordModalHtml=resetPasswordModalHtml;
-root.sigmaMuModalHtml=sigmaMuModalHtml;
 root.sigmaCohortModalHtml=sigmaCohortModalHtml;
 root.sigmaFrequencyPanelHtml=sigmaFrequencyPanelHtml;
 root.sigmaMuSummaryHtml=sigmaMuSummaryHtml;
@@ -3607,8 +3595,6 @@ root.sigmaOpSpecCellHtml=sigmaOpSpecCellHtml;
 root.sigmaMuStateChipHtml=sigmaMuStateChipHtml;
 root.sigmaMuDominantText=sigmaMuDominantText;
 root.sigmaCohortRowsHtml=sigmaCohortRowsHtml;
-root.sigmaMuRowsHtml=sigmaMuRowsHtml;
-root.sigmaMuPreviewHtml=sigmaMuPreviewHtml;
 root.sigmaInputDisplayValue=sigmaInputDisplayValue;
 root.sigmaGoverningRuleBlockHtml=sigmaGoverningRuleBlockHtml;
 root.sigmaFrequencyRowsHtml=sigmaFrequencyRowsHtml;
@@ -5371,14 +5357,15 @@ root.sgBiasLinkedPeriodIds = sigmaPageController.sgBiasLinkedPeriodIds;
 root.sgOpenBiasModel = sigmaPageController.sgOpenBiasModel;
 root.sgApplyBiasToPeriods = sigmaPageController.sgApplyBiasToPeriods;
 root.sgBiasApply = sigmaPageController.sgBiasApply;
-root.sgMuRowsFromDom = sigmaPageController.sgMuRowsFromDom;
-root.sgMuPeriodsFromDom = sigmaPageController.sgMuPeriodsFromDom;
-root.sgMuCaptureDom = sigmaPageController.sgMuCaptureDom;
 root.sgMuPreview = sigmaPageController.sgMuPreview;
-root.sgMuUpdatePreview = sigmaPageController.sgMuUpdatePreview;
-root.sgOpenMU = sigmaPageController.sgOpenMU;
-root.sgRenderMuModal = sigmaPageController.sgRenderMuModal;
-root.sgMuSelectPeriods = sigmaPageController.sgMuSelectPeriods;
+root.sgOpenMUModel = sigmaPageController.sgOpenMUModel;
+/* sgOpenMU(eid) (Giai đoạn 3) giờ mở modal React thật — root.sgOpenMU phải trỏ
+   sang window.QCLabReact.sgOpenMU(eid) (không phải
+   sigmaPageController.sgOpenMUModel(eid), chỉ kiểm quyền+dựng dữ liệu chứ
+   không mở gì) vì nút "Nhập u(Cal)" trong #sgMUAction (sgRefresh() vá
+   innerHTML sau khi vẽ, không phải JSX) vẫn dùng data-action="sgOpenMU" cổ
+   điển — action-dispatcher.ts tra thẳng global này, giống sgOpenAddTest. */
+root.sgOpenMU = (eid: string) => (window as any).QCLabReact.sgOpenMU(eid);
 root.sgMuApply = sigmaPageController.sgMuApply;
 root.sgCell = sigmaPageController.sgCell;
 root.sgPeriodSel = sigmaPageController.sgPeriodSel;

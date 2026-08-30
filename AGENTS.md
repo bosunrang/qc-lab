@@ -1419,7 +1419,62 @@ warning live as they're typed; add/delete correctly changes the row count
 button correctly persist `biasEqa`/`eqaRounds` onto the record and close the
 modal.
 
-Remaining for Giai đoạn 3: convert each of the other ~5 form modals from
+Six Sigma's "Ngân sách độ không đảm bảo đo (MU)" (done, 12th real modal
+converted): same family as Bias (multiple rows edited live, values
+recomputed on every keystroke) but with **no dynamic add/remove** — the row
+count is fixed to the test's operational level count
+(`sgVisibleLevels(t)`), so `rows` is just a fixed-size `useState` array, no
+add/delete logic needed. Same cluster-deletion pattern as Bias: classic
+`sgMuRowsFromDom`/`sgMuPeriodsFromDom`/`sgMuCaptureDom`/`sgRenderMuModal`/
+`sgMuUpdatePreview`/`sgMuSelectPeriods` deleted with **no replacement** —
+`sgMuPreview(level)` became `sgMuPreview(eid, level, rows)`, a pure function
+(no more `ui().sgMuCtx` side-channel) called directly during render for each
+row, so the live u_c/U preview and the "Thiếu ..."/"Đủ thành phần" state
+update automatically on every uCal/uCalBasis/muBiasMode change with no
+"update the preview" function surviving at all. `sgOpenMU(eid)` split into
+`sgOpenMUModel(eid)` — **keeping** the `requireWrite()` gate on open (unlike
+Bias, which has none — matching each one's original classic behavior
+exactly, not a new convention). `sgMuApply()` changed from reading
+`ui().sgMuCtx` to taking `(eid, periodIds, rows, reviewedBy, reviewedDate)`
+directly; the audit-log/save/close/rerender sequencing stays entirely inside
+`SigmaMuWorkflowCommand` (unchanged) — the first Sigma modal in this
+sub-group where the apply hand-off already owned the close decision, same
+shape as Audit's archive-log modal. `sgMuCtx` deleted from `SigmaUIState`/
+`global.d.ts` (zero remaining readers); `tests/lab-ui-state.test.js`'s
+generic accessor-round-trip example switched to `sgCohortCtx` (the one
+remaining ctx-shaped field, for the still-unconverted cohort-picker modal).
+Hit the **dual-trigger-path bug a second time** (after `sgOpenAddTest`): the
+"Nhập u(Cal)" trigger is not JSX at all — it lives in `#sgMUAction`, an
+empty `<div>` in `SigmaPage.tsx` that `sgRefresh()` patches via `innerHTML`
+after every render, embedding classic `data-action="sgOpenMU"` —
+`action-dispatcher.ts` resolves it via the bare global `window.sgOpenMU`.
+Fixed the same way: `root.sgOpenMU` stays a bare global but now redirects to
+`window.QCLabReact.sgOpenMU(eid)` instead of
+`sigmaPageController.sgOpenMUModel` (gate-check only, opens nothing) —
+`scripts/a11y-audit.js`'s `sigma:mu-budget` entry needed **no change**
+(calling the bare global still correctly opens the React modal). The
+review-date field (`sgMuDate`) stays `dangerouslySetInnerHTML` via
+`dateBoxHtml()` like every other deferred date field — its value is read
+directly off the DOM at Apply time (the calendar widget writes to that
+input outside React's knowledge), not tracked in React state. Classic
+`sigma-mu-modal-html.ts`/`sigma-mu-rows-html.ts`/`sigma-mu-preview-html.ts`
+deleted outright (3 dedicated tests removed); two scanner assertions
+(`tests/uncertainty.test.js`, `tests/sigma-mu-workflow-bridge.test.js`)
+updated to match the new function signatures, same intent preserved (MU
+apply always gates on write permission, always goes through the TypeScript
+workflow command, a missing u(cal) is never silently treated as 0).
+Verified: `npm test` 445/445, `typecheck` clean, `check-build-freshness`
+matches, `a11y-audit` 0 violations across all 18 modals (this component had
+`role="dialog"`/`aria-modal`/`aria-labelledby`/`tabIndex` from the start,
+learned from Bias's initial miss), `ui-workflow-check` 29/29,
+`nce-workflow-check` 91/91, plus an ad-hoc script confirming: clicking the
+real embedded `#sgMUAction` button opens the modal with the correct row
+count; typing u(cal) live-recomputes u_c/U; switching the bias-handling
+select from "include" to "exclude" correctly flips the state from "Thiếu
+u(bias)" to "Đủ thành phần"; Apply persists `uCal`/`muBiasMode`/
+`muReviewedBy` and closes the modal.
+
+Remaining for Giai đoạn 3: convert each of the other ~3 form modals from
 the `'html'` string path to a real `'react'` component, one at a time, same
 full-verify-after-each discipline established across Giai đoạn 2 — each
 conversion touches exactly one modal's trigger function (swap

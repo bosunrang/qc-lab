@@ -13006,18 +13006,6 @@
     <div class="modal-f">${input.cancelButtonHtml}${input.saveButtonHtml}</div></div>`;
 	}
 	//#endregion
-	//#region src/presentation/sigma/sigma-mu-modal-html.ts
-	function sigmaMuModalHtml(input) {
-		return `<div class="modal sg-eqa-modal sg-mu-modal"><div class="modal-h"><h3>Ngân sách độ không đảm bảo đo (MU)</h3><button class="modal-close" data-action="closeModal" aria-label="Đóng">✕</button></div>
-    <div class="modal-b"><div class="sg-mu-intro"><div><b>Nhập thông tin theo từng mức QC</b></div><span class="tag none">Kỳ gốc: ${input.sourceLabel}</span></div>
-      <div class="sg-eqa-table-wrap"><table class="sg-eqa-table sg-mu-table"><thead><tr><th>Mức QC</th><th>u(cal) từ CoA</th><th>Nguồn / mã CoA</th><th>Xử lý u(bias)</th><th>MU dự kiến</th></tr></thead><tbody>${input.rowsHtml}</tbody></table></div>
-      <div class="alert info" style="display:block">${input.modelNoteHtml}</div>
-      <div class="sg-mu-section-title"><b>Thông tin rà soát</b></div>
-      <div class="sg-setup-fields"><div><label for="sgMuBy">Người rà soát</label><input id="sgMuBy" value="${input.reviewedByValue}" placeholder="Họ tên người rà soát ngân sách MU"></div><div><label for="sgMuDate">Ngày rà soát</label>${input.reviewedDateHtml}</div></div>
-      <div class="sg-eqa-period-wrap sg-mu-period-wrap"><div class="sg-eqa-period-head"><div><b>Kỳ áp dụng</b></div><div>${input.selectAllButtonHtml}${input.clearSelectionButtonHtml}</div></div><div class="sg-eqa-period-list">${input.periodRowsHtml}</div></div></div>
-    <div class="modal-f">${input.cancelButtonHtml}${input.applyButtonHtml}</div></div>`;
-	}
-	//#endregion
 	//#region src/presentation/sigma/sigma-cohort-modal-html.ts
 	function sigmaCohortModalHtml(input) {
 		return `<div class="modal"><div class="modal-h"><h3>Chọn dữ liệu CV IQC theo lô — ${input.testName}</h3><button class="modal-close" data-action="sgCohortClose">✕</button></div><div class="modal-b"><div class="hint space-after-control">Dữ liệu IQC được gom xuyên tháng nhưng luôn tách theo lô và mức QC. Nếu Mean/SD mục tiêu thay đổi, nhóm dữ liệu sẽ được đánh dấu không ổn định. Dữ liệu được tính đến ${input.cutoffDate}.</div><table><thead><tr><th>Mức</th><th>Lô QC</th><th>Khoảng dữ liệu</th><th class="num">n</th><th class="num">CV</th><th>Trạng thái</th></tr></thead><tbody>${input.sectionsHtml}</tbody></table></div><div class="modal-f">${input.cancelButtonHtml}${input.applyButtonHtml}</div></div>`;
@@ -13082,22 +13070,6 @@
 			if (!group.rows.length) return `<tr><td>Mức ${group.level}</td><td colspan="5" class="muted">${group.missingLotCount ? `Có ${group.missingLotCount} điểm IQC chưa gắn mã lô QC — hãy gắn mã lô cho điểm QC để dùng làm CV.` : "Không có nhóm dữ liệu IQC đã gắn mã lô trong kỳ đánh giá."}</td></tr>`;
 			return group.rows.map((row) => `<tr><td>${row.showLevel ? `Mức ${row.level}` : ""}</td><td><label><input type="radio" name="sgCohort_${row.level}" value="${row.lotHtml}" ${row.checked ? "checked" : ""}> Lô ${row.lotHtml}</label></td><td>${row.startText}–${row.endText}</td><td class="num">${row.count}</td><td class="num">${row.cvText}</td><td>${row.statusHtml}</td></tr>`).join("");
 		}).join("");
-	}
-	//#endregion
-	//#region src/presentation/sigma/sigma-mu-rows-html.ts
-	function sigmaMuRowsHtml(rows) {
-		return rows.map((row) => `<tr class="sg-mu-row" data-level="${row.level}"><td><b>Mức ${row.level}</b></td>
-    <td><div class="sg-mu-number-field"><input type="number" step="any" min="0" data-f="uCal" aria-label="u(cal) phần trăm cho mức ${row.level}" value="${row.uCalValue}" placeholder="0,00" data-action="sgMuUpdatePreview" data-action-on="input"><span aria-hidden="true">%</span></div></td>
-    <td><input type="text" data-f="uCalBasis" aria-label="Nguồn CoA của u(cal) cho mức ${row.level}" value="${row.basisValue}" placeholder="VD: CoA lô 1234, mục U(k=2)" data-action="sgMuUpdatePreview" data-action-on="input"></td>
-    <td><select data-f="muBiasMode" aria-label="Cách xử lý độ chệch cho mức ${row.level}" data-action="sgMuUpdatePreview" data-action-on="change"><option value="include" ${row.excludeBias ? "" : "selected"}>Cộng u(bias)</option><option value="exclude" ${row.excludeBias ? "selected" : ""}>Đã hiệu chỉnh — không cộng</option></select></td>
-    <td class="sg-mu-preview" data-sg-mu-preview="${row.level}"></td></tr>`).join("");
-	}
-	//#endregion
-	//#region src/presentation/sigma/sigma-mu-preview-html.ts
-	function sigmaMuPreviewHtml(input) {
-		if (!input.hasMu) return "<div class=\"sg-mu-preview-empty\">Chưa có CV IQC</div>";
-		const state = input.complete ? "Đủ thành phần" : `Thiếu ${input.missingHtml || ""}`;
-		return `<div class="sg-mu-preview-values"><span><small>u<sub>c</sub></small><b>${input.ucText}%</b></span><span class="is-u"><small>U (k=2)</small><b>${input.uText}%</b></span></div><div class="sg-mu-preview-state ${input.complete ? "ok" : "warn"}">${state}</div>`;
 	}
 	//#endregion
 	//#region src/presentation/sigma/sigma-input-display-value.ts
@@ -22342,29 +22314,10 @@
 			deps.closeModal();
 			deps.rerender();
 		};
-		const sgMuRowsFromDom = () => [...doc().querySelectorAll(".sg-mu-row")].map((tr) => ({
-			level: Number(tr.dataset.level),
-			uCal: tr.querySelector("[data-f=\"uCal\"]").value,
-			uCalBasis: tr.querySelector("[data-f=\"uCalBasis\"]").value,
-			muBiasMode: tr.querySelector("[data-f=\"muBiasMode\"]").value
-		}));
-		const sgMuPeriodsFromDom = () => {
-			const boxes = [...doc().querySelectorAll("[data-sg-mu-period]")];
-			return boxes.length ? boxes.filter((x) => x.checked).map((x) => x.value) : ui().sgMuCtx && ui().sgMuCtx.periodIds || [];
-		};
-		const sgMuCaptureDom = () => {
-			if (!ui().sgMuCtx) return;
-			if (doc().querySelector(".sg-mu-row")) ui().sgMuCtx.rows = sgMuRowsFromDom();
-			ui().sgMuCtx.periodIds = sgMuPeriodsFromDom();
-			const by = doc().getElementById("sgMuBy"), dt = doc().getElementById("sgMuDate");
-			if (by) ui().sgMuCtx.reviewedBy = by.value;
-			if (dt) ui().sgMuCtx.reviewedDate = dt.value;
-		};
-		const sgMuPreview = (level) => {
-			if (!ui().sgMuCtx) return null;
-			const t = state().tests.find((x) => x.id === ui().sgTest), e = sgData(ui().sgTest).find((x) => x.id === ui().sgMuCtx.eid);
+		const sgMuPreview = (eid, level, rows) => {
+			const t = state().tests.find((x) => x.id === ui().sgTest), e = sgData(ui().sgTest).find((x) => x.id === eid);
 			if (!t || !e) return null;
-			const row = (ui().sgMuCtx.rows || []).find((r) => r.level === level) || {}, L = e.lv && e.lv[level] || {};
+			const row = (rows || []).find((r) => r.level === level) || {}, L = e.lv && e.lv[level] || {};
 			return deps.QCCore.uncertaintyBudget({
 				cv: L.cv,
 				bias: sgBiasVal(L),
@@ -22376,29 +22329,23 @@
 				k: 2
 			});
 		};
-		const sgMuUpdatePreview = () => {
-			sgMuCaptureDom();
-			doc().querySelectorAll("[data-sg-mu-preview]").forEach((cell) => {
-				const mu = sgMuPreview(Number(cell.dataset.sgMuPreview));
-				cell.innerHTML = deps.pres.sigmaMuPreviewHtml({
-					hasMu: !!mu,
-					ucText: mu ? deps.fmt(mu.uc, 2) : "",
-					uText: mu ? deps.fmt(mu.U, 2) : "",
-					complete: !!(mu && mu.complete),
-					missingHtml: mu ? deps.esc(mu.missing.join(", ")) : ""
-				});
-			});
-		};
-		const sgOpenMU = (eid) => {
-			if (!deps.requireWrite()) return;
-			const t = state().tests.find((x) => x.id === ui().sgTest), e = sgData(ui().sgTest).find((x) => x.id === eid);
-			if (!t || !e) return;
+		const sgOpenMUModel = (eid) => {
+			if (!deps.requireWrite()) return null;
+			const data = sgData(ui().sgTest), t = state().tests.find((x) => x.id === ui().sgTest), e = data.find((x) => x.id === eid);
+			if (!t || !e) return null;
 			e.lv = e.lv || {};
 			const levels = sgVisibleLevels(t), signed = levels.map((l) => e.lv[l] || {}).find((L) => L.muReviewedBy || L.muReviewedDate) || {};
-			ui().sgMuCtx = {
+			const periods = [...data].sort((a, b) => String(a.period || "").localeCompare(String(b.period || ""))).map((p) => ({
+				id: p.id,
+				label: deps.vnPeriod(p.period) || p.period || "Chưa chọn kỳ"
+			}));
+			const sourcePeriod = data.find((p) => p.id === eid);
+			return {
 				eid,
-				levels,
+				sourceLabel: sourcePeriod ? deps.vnPeriod(sourcePeriod.period) || sourcePeriod.period || "—" : "—",
 				periodIds: [eid],
+				periods,
+				modelNoteHtml: SG_MU_MODEL_NOTE,
 				rows: levels.map((l) => {
 					const L = e.lv[l] || {};
 					return {
@@ -22411,56 +22358,17 @@
 				reviewedBy: signed.muReviewedBy || deps.userName(),
 				reviewedDate: deps.vnDate(signed.muReviewedDate || deps.isoDate())
 			};
-			sgRenderMuModal();
 		};
-		const sgRenderMuModal = () => {
-			const c = ui().sgMuCtx;
-			if (!c) return;
-			const periods = [...sgData(ui().sgTest)].sort((a, b) => String(a.period || "").localeCompare(String(b.period || "")));
-			const sourcePeriod = periods.find((e) => e.id === c.eid), sourceLabel = sourcePeriod ? deps.vnPeriod(sourcePeriod.period) || sourcePeriod.period || "—" : "—";
-			const rows = deps.pres.sigmaMuRowsHtml(c.rows.map((r) => ({
-				level: r.level,
-				uCalValue: deps.escapeAttr(r.uCal ?? ""),
-				basisValue: deps.escapeAttr(r.uCalBasis || ""),
-				excludeBias: r.muBiasMode === "exclude"
-			})));
-			const periodRows = periods.map((e) => `<label class="sg-eqa-period"><input type="checkbox" data-sg-mu-period value="${deps.escapeAttr(e.id)}" ${(c.periodIds || []).includes(e.id) ? "checked" : ""}><span>${deps.esc(deps.vnPeriod(e.period) || "Chưa chọn kỳ")}</span></label>`).join("");
-			deps.openModal(deps.pres.sigmaMuModalHtml({
-				sourceLabel: deps.esc(sourceLabel),
-				rowsHtml: rows,
-				modelNoteHtml: SG_MU_MODEL_NOTE,
-				reviewedByValue: deps.escapeAttr(c.reviewedBy || ""),
-				reviewedDateHtml: deps.dateBox("sgMuDate", c.reviewedDate || "", "manage-date"),
-				periodRowsHtml: periodRows,
-				selectAllButtonHtml: deps.btn("Chọn tất cả", {
-					action: "sgMuSelectPeriods",
-					args: [true]
-				}, "ghost sm"),
-				clearSelectionButtonHtml: deps.btn("Bỏ chọn", {
-					action: "sgMuSelectPeriods",
-					args: [false]
-				}, "ghost sm"),
-				cancelButtonHtml: deps.btn("Hủy", { action: "closeModal" }, "ghost"),
-				applyButtonHtml: deps.btn("Áp dụng ngân sách MU", { action: "sgMuApply" }, "teal")
-			}));
-			sgMuUpdatePreview();
-		};
-		const sgMuSelectPeriods = (checked) => {
-			doc().querySelectorAll("[data-sg-mu-period]").forEach((x) => x.checked = checked);
-			sgMuCaptureDom();
-		};
-		const sgMuApply = async () => {
+		const sgMuApply = async (eid, periodIds, rows, reviewedBy, reviewedDate) => {
 			if (!deps.requireWrite()) return;
-			if (!ui().sgMuCtx) return;
-			sgMuCaptureDom();
 			const t = state().tests.find((x) => x.id === ui().sgTest);
 			if (!t) return;
 			if (deps.SigmaMuWorkflowCommand.apply({
 				records: sgData(ui().sgTest),
-				periodIds: ui().sgMuCtx.periodIds,
-				rows: ui().sgMuCtx.rows,
-				reviewedBy: ui().sgMuCtx.reviewedBy,
-				reviewedDate: ui().sgMuCtx.reviewedDate,
+				periodIds,
+				rows,
+				reviewedBy,
+				reviewedDate,
 				testName: deps.testDisplayName(t),
 				sigmaTestId: ui().sgTest
 			}).status === "missing-periods") {
@@ -22694,14 +22602,8 @@
 			sgOpenBiasModel,
 			sgApplyBiasToPeriods,
 			sgBiasApply,
-			sgMuRowsFromDom,
-			sgMuPeriodsFromDom,
-			sgMuCaptureDom,
 			sgMuPreview,
-			sgMuUpdatePreview,
-			sgOpenMU,
-			sgRenderMuModal,
-			sgMuSelectPeriods,
+			sgOpenMUModel,
 			sgMuApply,
 			sgCell,
 			sgPeriodSel,
@@ -25160,7 +25062,6 @@
 		return {
 			sgTest: null,
 			sgRefreshT: null,
-			sgMuCtx: null,
 			sgCohortCtx: null,
 			sgAddTestQ: "",
 			sgSelectedPeriods: {}
@@ -28369,7 +28270,6 @@
 	root.rangeNceNoticeHtml = rangeNceNoticeHtml;
 	root.rangeWorkflowComparisonRowsHtml = rangeWorkflowComparisonRowsHtml;
 	root.resetPasswordModalHtml = resetPasswordModalHtml;
-	root.sigmaMuModalHtml = sigmaMuModalHtml;
 	root.sigmaCohortModalHtml = sigmaCohortModalHtml;
 	root.sigmaFrequencyPanelHtml = sigmaFrequencyPanelHtml;
 	root.sigmaMuSummaryHtml = sigmaMuSummaryHtml;
@@ -28379,8 +28279,6 @@
 	root.sigmaMuStateChipHtml = sigmaMuStateChipHtml;
 	root.sigmaMuDominantText = sigmaMuDominantText;
 	root.sigmaCohortRowsHtml = sigmaCohortRowsHtml;
-	root.sigmaMuRowsHtml = sigmaMuRowsHtml;
-	root.sigmaMuPreviewHtml = sigmaMuPreviewHtml;
 	root.sigmaInputDisplayValue = sigmaInputDisplayValue;
 	root.sigmaGoverningRuleBlockHtml = sigmaGoverningRuleBlockHtml;
 	root.sigmaFrequencyRowsHtml = sigmaFrequencyRowsHtml;
@@ -31406,14 +31304,9 @@
 	root.sgOpenBiasModel = sigmaPageController.sgOpenBiasModel;
 	root.sgApplyBiasToPeriods = sigmaPageController.sgApplyBiasToPeriods;
 	root.sgBiasApply = sigmaPageController.sgBiasApply;
-	root.sgMuRowsFromDom = sigmaPageController.sgMuRowsFromDom;
-	root.sgMuPeriodsFromDom = sigmaPageController.sgMuPeriodsFromDom;
-	root.sgMuCaptureDom = sigmaPageController.sgMuCaptureDom;
 	root.sgMuPreview = sigmaPageController.sgMuPreview;
-	root.sgMuUpdatePreview = sigmaPageController.sgMuUpdatePreview;
-	root.sgOpenMU = sigmaPageController.sgOpenMU;
-	root.sgRenderMuModal = sigmaPageController.sgRenderMuModal;
-	root.sgMuSelectPeriods = sigmaPageController.sgMuSelectPeriods;
+	root.sgOpenMUModel = sigmaPageController.sgOpenMUModel;
+	root.sgOpenMU = (eid) => window.QCLabReact.sgOpenMU(eid);
 	root.sgMuApply = sigmaPageController.sgMuApply;
 	root.sgCell = sigmaPageController.sgCell;
 	root.sgPeriodSel = sigmaPageController.sgPeriodSel;

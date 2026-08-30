@@ -480,61 +480,33 @@ export function createSigmaPageController(deps: {
   /* Modal MU sửa MỘT LẦN mọi mức của kỳ đang xem rồi áp cho nhiều kỳ, giống modal
      Bias: u(cal) là thuộc tính của LÔ CALIBRATOR chứ không của tháng, nên bắt nhập
      lại từng kỳ chỉ tạo cơ hội gõ lệch nhau giữa các kỳ dùng chung một CoA. */
-  const sgMuRowsFromDom = () => [...doc().querySelectorAll('.sg-mu-row')].map((tr: AnyRec) => ({ level: Number(tr.dataset.level), uCal: tr.querySelector('[data-f="uCal"]').value, uCalBasis: tr.querySelector('[data-f="uCalBasis"]').value, muBiasMode: tr.querySelector('[data-f="muBiasMode"]').value }));
-  const sgMuPeriodsFromDom = () => { const boxes = [...doc().querySelectorAll('[data-sg-mu-period]')]; return boxes.length ? boxes.filter((x: AnyRec) => x.checked).map((x: AnyRec) => x.value) : ((ui().sgMuCtx && ui().sgMuCtx.periodIds) || []); };
-  const sgMuCaptureDom = () => {
-    if (!ui().sgMuCtx) return;
-    if (doc().querySelector('.sg-mu-row')) ui().sgMuCtx.rows = sgMuRowsFromDom();
-    ui().sgMuCtx.periodIds = sgMuPeriodsFromDom();
-    const by = doc().getElementById('sgMuBy'), dt = doc().getElementById('sgMuDate');
-    if (by) ui().sgMuCtx.reviewedBy = by.value; if (dt) ui().sgMuCtx.reviewedDate = dt.value;
-  };
   /* Xem trước dùng ĐÚNG QCCore.uncertaintyBudget() như bảng ngoài trang, chỉ thay
      u(cal)/chế độ bias bằng thứ đang gõ dở — nếu tự nhân chia lại ở đây thì con số
      trong modal và con số sau khi bấm "Áp dụng" có thể lệch nhau mà không ai biết. */
-  const sgMuPreview = (level: unknown): AnyRec => {
-    if (!ui().sgMuCtx) return null;
-    const t = state().tests.find((x: AnyRec) => x.id === ui().sgTest), e = sgData(ui().sgTest).find((x: AnyRec) => x.id === ui().sgMuCtx.eid);
+  const sgMuPreview = (eid: string, level: unknown, rows: AnyRec[]): AnyRec => {
+    const t = state().tests.find((x: AnyRec) => x.id === ui().sgTest), e = sgData(ui().sgTest).find((x: AnyRec) => x.id === eid);
     if (!t || !e) return null;
-    const row = (ui().sgMuCtx.rows || []).find((r: AnyRec) => r.level === level) || {}, L = (e.lv && e.lv[level as any]) || {};
+    const row = (rows || []).find((r: AnyRec) => r.level === level) || {}, L = (e.lv && e.lv[level as any]) || {};
     return deps.QCCore.uncertaintyBudget({ cv: L.cv, bias: sgBiasVal(L), biasRefU: sgBiasRefU(L.eqaRounds), uCal: row.uCal, includeBias: row.muBiasMode !== 'exclude', tea: deps.sgEntryTea(t, e, level), target: deps.sgLevelTarget(t, L, level), k: 2 });
   };
-  const sgMuUpdatePreview = () => {
-    sgMuCaptureDom();
-    doc().querySelectorAll('[data-sg-mu-preview]').forEach((cell: AnyRec) => {
-      const mu = sgMuPreview(Number(cell.dataset.sgMuPreview));
-      cell.innerHTML = deps.pres.sigmaMuPreviewHtml({ hasMu: !!mu, ucText: mu ? deps.fmt(mu.uc, 2) : '', uText: mu ? deps.fmt(mu.U, 2) : '', complete: !!(mu && mu.complete), missingHtml: mu ? deps.esc(mu.missing.join(', ')) : '' });
-    });
-  };
-  const sgOpenMU = (eid: string) => {
-    if (!deps.requireWrite()) return;
-    const t = state().tests.find((x: AnyRec) => x.id === ui().sgTest), e = sgData(ui().sgTest).find((x: AnyRec) => x.id === eid);
-    if (!t || !e) return;
+  const sgOpenMUModel = (eid: string) => {
+    if (!deps.requireWrite()) return null;
+    const data = sgData(ui().sgTest), t = state().tests.find((x: AnyRec) => x.id === ui().sgTest), e = data.find((x: AnyRec) => x.id === eid);
+    if (!t || !e) return null;
     e.lv = e.lv || {};
     const levels = sgVisibleLevels(t), signed = levels.map((l: unknown) => e.lv[l as any] || {}).find((L: AnyRec) => L.muReviewedBy || L.muReviewedDate) || {};
-    ui().sgMuCtx = {
-      eid, levels, periodIds: [eid],
+    const periods = [...data].sort((a: AnyRec, b: AnyRec) => String(a.period || '').localeCompare(String(b.period || ''))).map((p: AnyRec) => ({ id: p.id, label: deps.vnPeriod(p.period) || p.period || 'Chưa chọn kỳ' }));
+    const sourcePeriod = data.find((p: AnyRec) => p.id === eid), sourceLabel = sourcePeriod ? (deps.vnPeriod(sourcePeriod.period) || sourcePeriod.period || '—') : '—';
+    return {
+      eid, sourceLabel, periodIds: [eid], periods, modelNoteHtml: SG_MU_MODEL_NOTE,
       rows: levels.map((l: unknown) => { const L = e.lv[l as any] || {}; return { level: l, uCal: L.uCal ?? '', uCalBasis: L.uCalBasis || '', muBiasMode: sgMuBiasMode(L) }; }),
       reviewedBy: signed.muReviewedBy || deps.userName(), reviewedDate: deps.vnDate(signed.muReviewedDate || deps.isoDate()),
     };
-    sgRenderMuModal();
   };
-  const sgRenderMuModal = () => {
-    const c = ui().sgMuCtx; if (!c) return;
-    const periods = [...sgData(ui().sgTest)].sort((a: AnyRec, b: AnyRec) => String(a.period || '').localeCompare(String(b.period || '')));
-    const sourcePeriod = periods.find((e: AnyRec) => e.id === c.eid), sourceLabel = sourcePeriod ? (deps.vnPeriod(sourcePeriod.period) || sourcePeriod.period || '—') : '—';
-    const rows = deps.pres.sigmaMuRowsHtml(c.rows.map((r: AnyRec) => ({ level: r.level, uCalValue: deps.escapeAttr(r.uCal ?? ''), basisValue: deps.escapeAttr(r.uCalBasis || ''), excludeBias: r.muBiasMode === 'exclude' })));
-    const periodRows = periods.map((e: AnyRec) => `<label class="sg-eqa-period"><input type="checkbox" data-sg-mu-period value="${deps.escapeAttr(e.id)}" ${(c.periodIds || []).includes(e.id) ? 'checked' : ''}><span>${deps.esc(deps.vnPeriod(e.period) || 'Chưa chọn kỳ')}</span></label>`).join('');
-    deps.openModal(deps.pres.sigmaMuModalHtml({ sourceLabel: deps.esc(sourceLabel), rowsHtml: rows, modelNoteHtml: SG_MU_MODEL_NOTE, reviewedByValue: deps.escapeAttr(c.reviewedBy || ''), reviewedDateHtml: deps.dateBox('sgMuDate', c.reviewedDate || '', 'manage-date'), periodRowsHtml: periodRows, selectAllButtonHtml: deps.btn('Chọn tất cả', { action: 'sgMuSelectPeriods', args: [true] }, 'ghost sm'), clearSelectionButtonHtml: deps.btn('Bỏ chọn', { action: 'sgMuSelectPeriods', args: [false] }, 'ghost sm'), cancelButtonHtml: deps.btn('Hủy', { action: 'closeModal' }, 'ghost'), applyButtonHtml: deps.btn('Áp dụng ngân sách MU', { action: 'sgMuApply' }, 'teal') }));
-    sgMuUpdatePreview();
-  };
-  const sgMuSelectPeriods = (checked: boolean) => { doc().querySelectorAll('[data-sg-mu-period]').forEach((x: AnyRec) => x.checked = checked); sgMuCaptureDom(); };
-  const sgMuApply = async () => {
+  const sgMuApply = async (eid: string, periodIds: string[], rows: AnyRec[], reviewedBy: string, reviewedDate: string) => {
     if (!deps.requireWrite()) return;
-    if (!ui().sgMuCtx) return;
-    sgMuCaptureDom();
     const t = state().tests.find((x: AnyRec) => x.id === ui().sgTest); if (!t) return;
-    const result = deps.SigmaMuWorkflowCommand.apply({ records: sgData(ui().sgTest), periodIds: ui().sgMuCtx.periodIds, rows: ui().sgMuCtx.rows, reviewedBy: ui().sgMuCtx.reviewedBy, reviewedDate: ui().sgMuCtx.reviewedDate, testName: deps.testDisplayName(t), sigmaTestId: ui().sgTest });
+    const result = deps.SigmaMuWorkflowCommand.apply({ records: sgData(ui().sgTest), periodIds, rows, reviewedBy, reviewedDate, testName: deps.testDisplayName(t), sigmaTestId: ui().sgTest });
     if (result.status === 'missing-periods') { await deps.infoDialog('Chưa chọn kỳ nào để áp dụng ngân sách MU.'); return; }
   };
   const sgCell = (eid: string, level: unknown, field: string, val: unknown) => {
@@ -646,8 +618,7 @@ export function createSigmaPageController(deps: {
     sgViewTrackedTest, sgTrackTest, sigmaModel, sgOpSpecCell, sgFrequencyHTML, sgMuDominant,
     sgMuStateChip, sgMuHTML, sgRefresh, sgTips, sgPointTipShow, sgPointTipHide, sgTrendSVG, sgMDCSVG,
     sgBiasStats, sgBiasRoundsKey, sgBiasLinkedPeriodIds, sgOpenBiasModel, sgApplyBiasToPeriods,
-    sgBiasApply, sgMuRowsFromDom, sgMuPeriodsFromDom, sgMuCaptureDom, sgMuPreview, sgMuUpdatePreview, sgOpenMU,
-    sgRenderMuModal, sgMuSelectPeriods, sgMuApply, sgCell, sgPeriodSel, sgPart, sgAddPeriod, sgDelPeriod,
+    sgBiasApply, sgMuPreview, sgOpenMUModel, sgMuApply, sgCell, sgPeriodSel, sgPart, sgAddPeriod, sgDelPeriod,
     sgClearImportedCV, sgCohortCutoff, sgCohortGroups, sgCohortStatusText, sgImportCohort, sgApplyCohortChoices,
     sgCohortImportMessage, sgRenderCohortModal, sgCohortClose, sgCohortApply, sgPullCV,
   };
