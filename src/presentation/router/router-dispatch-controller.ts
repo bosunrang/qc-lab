@@ -14,6 +14,7 @@ export function createRouterDispatchController(deps: {
   isReactPage: (id: string) => boolean;
   mountReactPage: (id: string, container: HTMLElement) => void;
   notifyReactStore: () => void;
+  pushUrl: (id: string) => void;
 }) {
   const resetMainScroll = () => {
     const m = deps.document.querySelector('main');
@@ -54,13 +55,28 @@ export function createRouterDispatchController(deps: {
     if (m && keepScroll) m.scrollTop = keepScroll;
     deps.notifyReactStore();
   };
-  const go = (p: string) => {
-    if (!deps.canAccessPage(p)) return;
+  /* activate() là phần chung giữa go() (điều hướng từ trong app — bấm nút/
+     nav sidebar) và goFromHistory() (điều hướng do trình duyệt tự gây ra —
+     bấm nút Back/Forward, tức sự kiện popstate): cả hai đều phải setPage/
+     vẽ lại/focus #main giống hệt nhau, chỉ khác ở việc CÓ đẩy thêm một mục
+     lịch sử mới (pushUrl) hay không — popstate nghĩa là trình duyệt ĐÃ tự
+     thay đổi lịch sử rồi, gọi pushUrl lần nữa sẽ tạo một mục lịch sử thừa,
+     làm nút Back phải bấm hai lần mới lùi được một trang. */
+  const activate = (p: string) => {
     deps.setPage(p);
     deps.nav();
     rerender();
     resetMainScroll();
     deps.requestFrame(() => { const main = deps.document.getElementById('main'); if (main) (main as HTMLElement).focus({ preventScroll: true }); });
   };
-  return { go, resetMainScroll, render, restoreRouteFilters, rerender };
+  const go = (p: string) => {
+    if (!deps.canAccessPage(p)) return;
+    deps.pushUrl(p);
+    activate(p);
+  };
+  const goFromHistory = (p: string) => {
+    if (!deps.canAccessPage(p)) return;
+    activate(p);
+  };
+  return { go, goFromHistory, resetMainScroll, render, restoreRouteFilters, rerender };
 }

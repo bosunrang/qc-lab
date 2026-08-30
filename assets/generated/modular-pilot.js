@@ -12636,8 +12636,7 @@
 			if (m && keepScroll) m.scrollTop = keepScroll;
 			deps.notifyReactStore();
 		};
-		const go = (p) => {
-			if (!deps.canAccessPage(p)) return;
+		const activate = (p) => {
 			deps.setPage(p);
 			deps.nav();
 			rerender();
@@ -12647,13 +12646,31 @@
 				if (main) main.focus({ preventScroll: true });
 			});
 		};
+		const go = (p) => {
+			if (!deps.canAccessPage(p)) return;
+			deps.pushUrl(p);
+			activate(p);
+		};
+		const goFromHistory = (p) => {
+			if (!deps.canAccessPage(p)) return;
+			activate(p);
+		};
 		return {
 			go,
+			goFromHistory,
 			resetMainScroll,
 			render,
 			restoreRouteFilters,
 			rerender
 		};
+	}
+	//#endregion
+	//#region src/presentation/router/router-hash.ts
+	function pageIdFromHash(hash) {
+		return String(hash || "").replace(/^#\/?/, "").trim();
+	}
+	function hashForPage(id) {
+		return `#/${id}`;
 	}
 	//#endregion
 	//#region src/presentation/report/report-qc-format.ts
@@ -24900,6 +24917,7 @@
 				deps.window.addEventListener("offline", () => {
 					if (deps.isDirty()) deps.markSaved("cục bộ", "Mạng ngoại tuyến · sẽ tự đồng bộ khi có mạng");
 				});
+				deps.window.addEventListener("popstate", deps.onPopState);
 			}
 			if (deps.document) deps.document.addEventListener("visibilitychange", () => {
 				if (deps.document.visibilityState === "hidden") deps.lsFlush();
@@ -26689,7 +26707,8 @@
 		fbPullOnce: () => root.fbPullOnce(),
 		scheduleFbPush: () => root.scheduleFbPush(),
 		markSaved: (label, detail) => root.markSaved(label, detail),
-		isDirty: () => fb.dirty
+		isDirty: () => fb.dirty,
+		onPopState: () => root.goFromHistory(root.pageFromUrlHash())
 	}).run();
 	if (typeof window !== "undefined" && window.qcDialog) window.alert = (message) => window.qcDialog.alert(message);
 	var fbConflictDialogOpen = false;
@@ -28474,13 +28493,18 @@
 		mountReactPage: (id, container) => window.QCLabReact?.mountReactPage(id, container),
 		notifyReactStore: () => {
 			appStore.getState().touch();
+		},
+		pushUrl: (id) => {
+			if (typeof history !== "undefined") history.pushState(null, "", hashForPage(id));
 		}
 	});
 	root.go = routerDispatch.go;
+	root.goFromHistory = routerDispatch.goFromHistory;
 	root.resetMainScroll = routerDispatch.resetMainScroll;
 	root.render = routerDispatch.render;
 	root.restoreRouteFilters = routerDispatch.restoreRouteFilters;
 	root.rerender = routerDispatch.rerender;
+	root.pageFromUrlHash = () => pageIdFromHash(typeof location !== "undefined" ? location.hash : "");
 	root.actionDetailCheckHtml = createActionDetailCheckHtml({ escape: (value) => root.esc(value) });
 	root.actionEvidenceTimelinePresentation = createActionEvidenceTimelineHtml({ escape: (value) => root.esc(value) });
 	root.actionRerunEvidencePresentation = createActionRerunEvidenceHtml({
@@ -29825,7 +29849,10 @@
 			auditDetail: `${root.roleLabel(rolev)} · ${pagePerms.length} thẻ`
 		});
 		root.closeModal();
-		if (!root.canAccessPage(root.page)) page = root.firstAccessPage();
+		if (!root.canAccessPage(root.page)) {
+			page = root.firstAccessPage();
+			if (typeof history !== "undefined") history.replaceState(null, "", hashForPage(root.page));
+		}
 		renderBrand();
 		root.nav();
 		rerender();
@@ -30102,12 +30129,16 @@
 		if (currentUser) root.LoginWorkflowCommand.logout();
 		currentUser = null;
 		page = "dash";
+		if (typeof history !== "undefined") history.pushState(null, "", hashForPage("dash"));
 		root.showLogin();
 	};
 	root.showApp = () => {
 		const ov = document.getElementById("authOverlay");
 		if (ov) ov.style.display = "none";
-		if (!root.canAccessPage(root.page)) page = root.firstAccessPage();
+		const fromHash = root.pageFromUrlHash();
+		if (fromHash && root.canAccessPage(fromHash)) page = fromHash;
+		else if (!root.canAccessPage(root.page)) page = root.firstAccessPage();
+		if (typeof history !== "undefined") history.replaceState(null, "", hashForPage(root.page));
 		document.getElementById("userBox").innerHTML = "";
 		renderBrand();
 		root.nav();

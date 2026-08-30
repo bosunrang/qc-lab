@@ -2008,6 +2008,65 @@ Avatar modal (the side-finding from Bước 1 — the 20th modal, never counted
 before — still 'html'-kind, convertible to 'react' for absolute
 completeness if wanted).
 
+**Giai đoạn 6 — Router chuẩn (done, 2026-08-30).** Key design decision
+(different from the original idea of "React Router or a Zustand-backed
+page state"): after surveying the options, chose **hash-based navigation
+via the plain History API** (`location.hash`/`history.pushState`/
+`popstate`), NOT adding `react-router-dom` as a dependency. Reasoning: (1)
+the app has 11 FLAT pages, no nested routes or dynamic params — a real
+router would be disproportionate machinery for this; (2) the sidebar nav
+(`<nav id="nav">`) is STILL classic HTML (`router-shell-controller.ts`'s
+`nav()`, building `data-action="go" data-args='["id"]'` buttons), not
+React — a real router would first need that sidebar converted to React
+too, a separate, larger undertaking outside Giai đoạn 6's actual scope;
+(3) it matches the codebase's existing minimal-dependency philosophy
+(CLAUDE.md: zero runtime npm dependencies except electron-updater; zustand
+is the ONE deliberate exception, with a clear reason). A hash (`#/entry`)
+is the technically correct choice for a static-file app (runs via `file://`
+in Electron, or any static HTTP server — there's no server-side route to
+serve `index.html` for an arbitrary path-based URL).
+
+Implementation: 2 new pure functions in `src/presentation/router/
+router-hash.ts` (`pageIdFromHash(hash)`/`hashForPage(id)`, no DOM touch).
+`router-dispatch-controller.ts`'s `go(p)` split its shared "activate this
+page" logic into an internal `activate()`, reused by TWO paths: `go(p)`
+(in-app navigation — button/nav-sidebar clicks, also calls `pushUrl` to
+push a new history entry) and `goFromHistory(p)` (browser-driven navigation
+— Back/Forward, does NOT call `pushUrl` since the browser already changed
+its own history; calling it again would create a redundant entry, making
+Back require two clicks to go back one page). `app-bootstrap.ts` (which
+already centralizes the app's top-level `window`/`document` listener
+registrations from Pha H) gained an `onPopState` dep → binds
+`window.addEventListener('popstate', ...)` calling
+`goFromHistory(pageFromUrlHash())`. `modular-pilot.global.ts` wiring:
+`pushUrl` uses `history.pushState(null,'',hashForPage(id))` (guarded by
+`typeof history!=='undefined'` for DOM-less sandbox tests); `root.
+pageFromUrlHash` reads `location.hash` via `pageIdFromHash` (same guard).
+`showApp()` (runs after login/session restore) now prefers opening the
+page named in the URL hash if the user can ACTUALLY access it (bookmark/
+page reload/shared link) — falling back to the existing `firstAccessPage()`
+logic only if not; both that fallback branch and the analogous one in
+`applyUserPerms()` (when the current page's access is revoked) call
+`history.replaceState` (not `pushState`) to resync the URL without adding a
+spurious history entry for an "invalid, correcting" hash. `logout()` resets
+the hash to `#/dash`, matching the existing `page='dash'` reset.
+
+Verified: `npm test` 431/431 (no sandbox test needed updating — `go()` kept
+its exact signature; `pushUrl`/`pageFromUrlHash` safely no-op when
+`history`/`location` don't exist), `typecheck` clean, `build:pilot`
+succeeds (4/4 artifacts), `check-build-freshness` matches, `a11y-audit` 0
+violations (18/18 modals, 11/11 pages — the script navigates constantly via
+`go()`), `ui-workflow-check` 29/29, `nce-workflow-check` 91/91,
+`visual-check` passes, plus an ad-hoc Playwright script confirming the full
+lifecycle: `go('manage')`/`go('sigma')` correctly update the hash
+(`#/manage`, `#/sigma`) and page title; clicking the browser Back button
+correctly returns to `#/manage`; Forward correctly returns to `#/sigma`;
+clicking the classic sidebar nav button ("Nhập QC") still works via
+`data-action="go"`, correctly updating to `#/entry`; reloading with
+`#/report` in the URL opens the Report page DIRECTLY (the bookmark/shared-
+link scenario); logging out correctly resets to `#/dash`; zero console
+errors at any step.
+
 Then shrink/delete the now-dead
 `root.X=` aliases, `global.d.ts`'s
 ambient bare-global declarations, and rewrite the 61 sandbox tests + ~88

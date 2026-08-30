@@ -311,6 +311,7 @@ import { createLiveRowFilter } from '../presentation/router/live-row-filter';
 import { createRangeActionsHtml } from '../presentation/range/range-actions-html';
 import { createUiPrimitives } from '../presentation/shared/ui-primitives';
 import { createRouterDispatchController } from '../presentation/router/router-dispatch-controller';
+import { pageIdFromHash, hashForPage } from '../presentation/router/router-hash';
 import { createReportQcFormat } from '../presentation/report/report-qc-format';
 import { createRangeTea } from '../domain/qc/range-tea';
 import { entryRowsWindow as entryRowsWindowTs, entryLotLabels as entryLotLabelsTs } from '../presentation/entry/entry-rows-window';
@@ -1592,6 +1593,8 @@ type QCLabGlobal = typeof globalThis & {
   qcVerdictLabel: (value: string) => string;
   page: string;
   go: ReturnType<typeof createRouterDispatchController>['go'];
+  goFromHistory: ReturnType<typeof createRouterDispatchController>['goFromHistory'];
+  pageFromUrlHash: () => string;
   resetMainScroll: ReturnType<typeof createRouterDispatchController>['resetMainScroll'];
   render: ReturnType<typeof createRouterDispatchController>['render'];
   restoreRouteFilters: ReturnType<typeof createRouterDispatchController>['restoreRouteFilters'];
@@ -2754,6 +2757,7 @@ const appBootstrap = createAppBootstrap({
   scheduleFbPush: () => root.scheduleFbPush!(),
   markSaved: (label, detail) => root.markSaved!(label, detail),
   isDirty: () => fb.dirty,
+  onPopState: () => root.goFromHistory!(root.pageFromUrlHash!()),
 });
 appBootstrap.run();
 /* Pha H2 lát cuối (2026-08-20): chuyển khối <script> nội tuyến trong
@@ -3809,8 +3813,10 @@ const routerDispatch=createRouterDispatchController({
   isReactPage:id=>(window as any).QCLabReact?.isReactPage(id)||false,
   mountReactPage:(id,container)=>(window as any).QCLabReact?.mountReactPage(id,container),
   notifyReactStore:()=>{appStore.getState().touch();},
+  pushUrl:id=>{if(typeof history!=='undefined')history.pushState(null,'',hashForPage(id));},
 });
-root.go=routerDispatch.go;root.resetMainScroll=routerDispatch.resetMainScroll;root.render=routerDispatch.render;root.restoreRouteFilters=routerDispatch.restoreRouteFilters;root.rerender=routerDispatch.rerender;
+root.go=routerDispatch.go;root.goFromHistory=routerDispatch.goFromHistory;root.resetMainScroll=routerDispatch.resetMainScroll;root.render=routerDispatch.render;root.restoreRouteFilters=routerDispatch.restoreRouteFilters;root.rerender=routerDispatch.rerender;
+root.pageFromUrlHash=()=>pageIdFromHash(typeof location!=='undefined'?location.hash:'');
 root.actionDetailCheckHtml=createActionDetailCheckHtml({escape:(value:any)=>(root as any).esc(value)});
 root.actionEvidenceTimelinePresentation=createActionEvidenceTimelineHtml({escape:(value:any)=>(root as any).esc(value)});
 root.actionRerunEvidencePresentation=createActionRerunEvidenceHtml<any>({escape:(value:any)=>(root as any).esc(value),pointValue:(point:any,test:any)=>(root as any).fmtPointValue(point,test),date:(value:any)=>(root as any).vnDate(value),button:(label,action,variant,title)=>(root as any).btn(label,action,variant,title)});
@@ -4517,7 +4523,7 @@ root.applyUserPerms = async id => {
   if (currentUser && currentUser.id === id) { await root.infoDialog('Không thể tự sửa quyền của tài khoản đang đăng nhập.'); return; }
   const rolev = (document.getElementById('editUserRole') as HTMLInputElement).value, pagePerms = await root.collectUserPerms('editUserPerms', rolev); if (!pagePerms) return;
   root.UserLifecycleCommand.updatePermissions(u, { role: rolev, pagePerms, auditDetail: `${root.roleLabel(rolev)} · ${pagePerms.length} thẻ` });
-  root.closeModal(); if (!root.canAccessPage(root.page)) page = root.firstAccessPage(); renderBrand(); root.nav(); rerender();
+  root.closeModal(); if (!root.canAccessPage(root.page)) { page = root.firstAccessPage(); if (typeof history !== 'undefined') history.replaceState(null, '', hashForPage(root.page)); } renderBrand(); root.nav(); rerender();
 };
 root.resetPass = id => {
   if (!root.requireAdmin()) return;
@@ -4653,10 +4659,16 @@ root.changeRequiredPassword = async () => {
   if (result.status === 'invalid') { root.showPasswordChange(result.error); return; }
   currentUser = result.user; root.showApp();
 };
-root.logout = () => { if (currentUser) root.LoginWorkflowCommand.logout(); currentUser = null; page = 'dash'; root.showLogin(); };
+root.logout = () => { if (currentUser) root.LoginWorkflowCommand.logout(); currentUser = null; page = 'dash'; if (typeof history !== 'undefined') history.pushState(null, '', hashForPage('dash')); root.showLogin(); };
 root.showApp = () => {
   const ov = document.getElementById('authOverlay'); if (ov) (ov as HTMLElement).style.display = 'none';
-  if (!root.canAccessPage(root.page)) page = root.firstAccessPage();
+  /* Giai đoạn 6 (Router chuẩn): mở đúng trang trong URL nếu có (bookmark/tải
+     lại trang/link chia sẻ) — chỉ khi người dùng thực sự được vào trang đó,
+     nếu không rơi về đúng logic firstAccessPage() cũ. */
+  const fromHash = root.pageFromUrlHash!();
+  if (fromHash && root.canAccessPage(fromHash)) page = fromHash;
+  else if (!root.canAccessPage(root.page)) page = root.firstAccessPage();
+  if (typeof history !== 'undefined') history.replaceState(null, '', hashForPage(root.page));
   document.getElementById('userBox')!.innerHTML = '';
   renderBrand(); root.nav(); root.sideFoot(); rerender(); if (typeof root.lisGatewayStart === 'function') setTimeout(root.lisGatewayStart, 0);
 };

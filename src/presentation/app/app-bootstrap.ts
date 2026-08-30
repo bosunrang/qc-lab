@@ -18,6 +18,7 @@ export function createAppBootstrap(deps: {
   scheduleFbPush: () => void;
   markSaved: (label: string, detail?: string) => void;
   isDirty: () => boolean;
+  onPopState: () => void;
 }) {
   const run = () => {
     if (deps.window) {
@@ -26,6 +27,10 @@ export function createAppBootstrap(deps: {
       deps.window.addEventListener('focus', deps.fbPullOnce);
       deps.window.addEventListener('online', () => { if (deps.isDirty()) deps.scheduleFbPush(); else deps.fbPullOnce(); });
       deps.window.addEventListener('offline', () => { if (deps.isDirty()) deps.markSaved('cục bộ', 'Mạng ngoại tuyến · sẽ tự đồng bộ khi có mạng'); });
+      /* Giai đoạn 6 (Router chuẩn): nút Back/Forward của trình duyệt bắn
+         popstate — đồng bộ trang đang hiển thị theo hash MỚI (đã đổi rồi,
+         không phải sự kiện để "xin phép" đổi) chứ không push thêm lịch sử. */
+      deps.window.addEventListener('popstate', deps.onPopState);
     }
     if (deps.document) {
       deps.document.addEventListener('visibilitychange', () => {
