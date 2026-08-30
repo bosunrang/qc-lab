@@ -1,6 +1,11 @@
 import { useEffect } from 'react';
 import { useAppStore } from '../state/kernel';
-import { reagentModel, headOnlyHtml, dateBoxHtml, rcToolIcon, rcCompute, type ReagentRow } from '../bridge/reagentBridge';
+import {
+  reagentModel, headOnlyHtml, dateBoxHtml, rcToolIcon, rcCompute,
+  rcSwitch, openRcCreateModal, rcDeleteCurrent, openRcModal, rcPrint, rcPrintSummary,
+  rcMeta, rcMetaFocus, rcMetaLog, rcOpenQuick, rcCell, rcRmRow, rcAddRow, rcClearRows,
+  type ReagentRow,
+} from '../bridge/reagentBridge';
 
 function Head({ subtitle }: { subtitle: string }) {
   return <div style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: headOnlyHtml('So sánh 2 lô hóa chất', subtitle) }} />;
@@ -24,20 +29,20 @@ function Toolbar({ comparisons, currentId, canWrite }: { comparisons: { id: stri
       <div className="rc-toolbar">
         <div className="rc-toolbar-selcol">
           <label>Chọn hóa chất</label>
-          <select id="rcSel" aria-label="Chọn hóa chất" defaultValue={currentId} data-action="rcSwitch" data-action-on="change">
+          <select id="rcSel" aria-label="Chọn hóa chất" defaultValue={currentId} onChange={e => rcSwitch(e.target.value)}>
             {comparisons.map(c => <option value={c.id} key={c.id}>{c.label}</option>)}
           </select>
         </div>
         {canWrite ? (
           <div className="rc-toolbar-primary"><div>
-            <button className="btn teal rc-add-btn" data-action="openRcCreateModal">+ Thêm</button>
-            <button className="btn danger rc-delete-btn" data-action="rcDeleteCurrent" dangerouslySetInnerHTML={{ __html: rcToolIcon('trash') + ' Xóa' }} />
+            <button className="btn teal rc-add-btn" onClick={openRcCreateModal}>+ Thêm</button>
+            <button className="btn danger rc-delete-btn" onClick={rcDeleteCurrent} dangerouslySetInnerHTML={{ __html: rcToolIcon('trash') + ' Xóa' }} />
           </div></div>
         ) : null}
         <div className="rc-toolbar-secondary">
-          {canWrite ? <button className="btn ghost rc-find-btn" data-action="openRcModal" dangerouslySetInnerHTML={{ __html: rcToolIcon('search') + ' Tìm' }} /> : null}
-          <button className="btn teal rc-report-btn" data-action="rcPrint" dangerouslySetInnerHTML={{ __html: rcToolIcon('print') + ' In hóa chất này' }} />
-          <button className="btn teal rc-report-main" data-action="rcPrintSummary" dangerouslySetInnerHTML={{ __html: rcToolIcon('report') + ' Báo cáo tổng hợp' }} />
+          {canWrite ? <button className="btn ghost rc-find-btn" onClick={openRcModal} dangerouslySetInnerHTML={{ __html: rcToolIcon('search') + ' Tìm' }} /> : null}
+          <button className="btn teal rc-report-btn" onClick={rcPrint} dangerouslySetInnerHTML={{ __html: rcToolIcon('print') + ' In hóa chất này' }} />
+          <button className="btn teal rc-report-main" onClick={rcPrintSummary} dangerouslySetInnerHTML={{ __html: rcToolIcon('report') + ' Báo cáo tổng hợp' }} />
         </div>
       </div>
     </div>
@@ -50,10 +55,10 @@ function InfoPanel({ model }: { model: Extract<ReturnType<typeof reagentModel>, 
     <div className="panel rc-info-panel">
       <h2 className="panel-title">Thông tin đánh giá</h2>
       <div className="rc-info-grid">
-        <div className="rc-field"><label>Tên hóa chất</label><input disabled={disabled} defaultValue={model.reagent as string} data-action="rcMeta" data-args='["reagent"]' data-action-on="input" placeholder="Tên hóa chất / xét nghiệm" /></div>
-        <div className="rc-field"><label>Đơn vị</label><input disabled={disabled} defaultValue={model.unit as string} data-action="rcMeta" data-args='["unit"]' data-action-on="input" placeholder="mmol/L..." /></div>
-        <div className="rc-field"><label>Số lô cũ</label><input disabled={disabled} aria-label="Số lô cũ" defaultValue={model.lotOld as string} data-action="rcMeta" data-args='["lotOld"]' data-action-on="input" data-focus-action="rcMetaFocus" data-focus-args='["lotOld"]' data-change-action="rcMetaLog" data-change-args='["lotOld"]' /></div>
-        <div className="rc-field"><label>Số lô mới</label><input disabled={disabled} aria-label="Số lô mới" defaultValue={model.lotNew as string} data-action="rcMeta" data-args='["lotNew"]' data-action-on="input" data-focus-action="rcMetaFocus" data-focus-args='["lotNew"]' data-change-action="rcMetaLog" data-change-args='["lotNew"]' /></div>
+        <div className="rc-field"><label>Tên hóa chất</label><input disabled={disabled} defaultValue={model.reagent as string} onChange={e => rcMeta('reagent', e.target.value)} placeholder="Tên hóa chất / xét nghiệm" /></div>
+        <div className="rc-field"><label>Đơn vị</label><input disabled={disabled} defaultValue={model.unit as string} onChange={e => rcMeta('unit', e.target.value)} placeholder="mmol/L..." /></div>
+        <div className="rc-field"><label>Số lô cũ</label><input disabled={disabled} aria-label="Số lô cũ" defaultValue={model.lotOld as string} onChange={e => rcMeta('lotOld', e.target.value)} onFocus={() => rcMetaFocus('lotOld')} onBlur={() => rcMetaLog('lotOld')} /></div>
+        <div className="rc-field"><label>Số lô mới</label><input disabled={disabled} aria-label="Số lô mới" defaultValue={model.lotNew as string} onChange={e => rcMeta('lotNew', e.target.value)} onFocus={() => rcMetaFocus('lotNew')} onBlur={() => rcMetaLog('lotNew')} /></div>
         <div className="rc-field rc-date-field">
           <label>Ngày thực hiện</label>
           <div style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: dateBoxHtml('rcDate', (model.date as string) || '', '', `${disabled ? 'disabled' : ''} data-action="rcMeta" data-args='["date"]' data-action-on="change"`) }} />
@@ -61,22 +66,22 @@ function InfoPanel({ model }: { model: Extract<ReturnType<typeof reagentModel>, 
         <div className="rc-field">
           <label>Người thực hiện</label>
           <div className="rc-quick-field">
-            <input disabled={disabled} defaultValue={model.operator as string} data-action="rcMeta" data-args='["operator"]' data-action-on="input" placeholder="Họ tên" />
-            <button className="rc-icon-btn" disabled={!model.canWrite} data-action="rcOpenQuick" data-args='["operator"]' title="Chọn nhanh người thực hiện" aria-label="Chọn nhanh người thực hiện" dangerouslySetInnerHTML={{ __html: rcToolIcon('user') }} />
+            <input disabled={disabled} defaultValue={model.operator as string} onChange={e => rcMeta('operator', e.target.value)} placeholder="Họ tên" />
+            <button className="rc-icon-btn" disabled={!model.canWrite} onClick={() => rcOpenQuick('operator')} title="Chọn nhanh người thực hiện" aria-label="Chọn nhanh người thực hiện" dangerouslySetInnerHTML={{ __html: rcToolIcon('user') }} />
           </div>
         </div>
         <div className="rc-field">
           <label>Loại mẫu</label>
           <div className="rc-quick-field">
-            <input disabled={disabled} defaultValue={model.sampleType as string} data-action="rcMeta" data-args='["sampleType"]' data-action-on="input" placeholder="Loại mẫu" />
-            <button className="rc-icon-btn" disabled={!model.canWrite} data-action="rcOpenQuick" data-args='["sampleType"]' title="Chọn nhanh loại mẫu" aria-label="Chọn nhanh loại mẫu" dangerouslySetInnerHTML={{ __html: rcToolIcon('sample') }} />
+            <input disabled={disabled} defaultValue={model.sampleType as string} onChange={e => rcMeta('sampleType', e.target.value)} placeholder="Loại mẫu" />
+            <button className="rc-icon-btn" disabled={!model.canWrite} onClick={() => rcOpenQuick('sampleType')} title="Chọn nhanh loại mẫu" aria-label="Chọn nhanh loại mẫu" dangerouslySetInnerHTML={{ __html: rcToolIcon('sample') }} />
           </div>
         </div>
-        <div className="rc-field"><label>Bias mong muốn (%)</label><input disabled={disabled} aria-label="Bias mong muốn (%)" type="number" step="any" defaultValue={model.biasTarget as number} data-action="rcMeta" data-args='["biasTarget"]' data-action-on="input" data-focus-action="rcMetaFocus" data-focus-args='["biasTarget"]' data-change-action="rcMetaLog" data-change-args='["biasTarget"]' /></div>
-        <div className="rc-field"><label>Mức ý nghĩa (α, alpha)</label><input disabled={disabled} aria-label="Mức ý nghĩa (alpha)" type="number" step="any" defaultValue={model.alpha as number} data-action="rcMeta" data-args='["alpha"]' data-action-on="input" data-focus-action="rcMetaFocus" data-focus-args='["alpha"]' data-change-action="rcMetaLog" data-change-args='["alpha"]' /></div>
+        <div className="rc-field"><label>Bias mong muốn (%)</label><input disabled={disabled} aria-label="Bias mong muốn (%)" type="number" step="any" defaultValue={model.biasTarget as number} onChange={e => rcMeta('biasTarget', e.target.value)} onFocus={() => rcMetaFocus('biasTarget')} onBlur={() => rcMetaLog('biasTarget')} /></div>
+        <div className="rc-field"><label>Mức ý nghĩa (α, alpha)</label><input disabled={disabled} aria-label="Mức ý nghĩa (alpha)" type="number" step="any" defaultValue={model.alpha as number} onChange={e => rcMeta('alpha', e.target.value)} onFocus={() => rcMetaFocus('alpha')} onBlur={() => rcMetaLog('alpha')} /></div>
         <div className="rc-field rc-coverage-cell">
           <label className="rc-coverage-check">
-            <input disabled={disabled} type="checkbox" defaultChecked={model.coverageConfirmed} data-action="rcMeta" data-args='["coverageConfirmed"]' data-action-on="change" />
+            <input disabled={disabled} type="checkbox" defaultChecked={model.coverageConfirmed} onChange={e => rcMeta('coverageConfirmed', e.target.checked)} />
             <span>Mẫu đã bao phủ khoảng đo và/hoặc điểm quyết định lâm sàng theo SOP</span>
           </label>
         </div>
@@ -89,11 +94,11 @@ function PairRow({ row, readOnly }: { row: ReagentRow; readOnly: boolean }) {
   return (
     <div className="rc-pair-row" data-rc-row={row.index}>
       <div className="rc-idx">{row.index + 1}</div>
-      <input disabled={readOnly} defaultValue={row.old as string} data-action="rcCell" data-args={`[${row.index},0]`} data-action-on="input" type="number" step="any" placeholder="–" />
-      <input disabled={readOnly} defaultValue={row.new as string} data-action="rcCell" data-args={`[${row.index},1]`} data-action-on="input" type="number" step="any" placeholder="–" />
+      <input disabled={readOnly} defaultValue={row.old as string} onChange={e => rcCell(row.index, 0, e.target.value)} type="number" step="any" placeholder="–" />
+      <input disabled={readOnly} defaultValue={row.new as string} onChange={e => rcCell(row.index, 1, e.target.value)} type="number" step="any" placeholder="–" />
       <div className="rc-calc avg">{row.avg}</div>
       <div className={`rc-calc dif${row.difNeg ? ' neg' : ''}`}>{row.dif}</div>
-      {readOnly ? <span></span> : <button className="x" data-action="rcRmRow" data-args={`[${row.index}]`} title="Xóa dòng">✕</button>}
+      {readOnly ? <span></span> : <button className="x" onClick={() => rcRmRow(row.index)} title="Xóa dòng">✕</button>}
     </div>
   );
 }
@@ -116,8 +121,8 @@ function PairPanel({ model }: { model: Extract<ReturnType<typeof reagentModel>, 
       </div>
       {model.canWrite ? (
         <div className="rc-pair-actions">
-          <button className="btn ghost sm" data-action="rcAddRow">+ Thêm mẫu</button>{' '}
-          <button className="btn ghost sm" data-action="rcClearRows">Xóa dữ liệu</button>
+          <button className="btn ghost sm" onClick={rcAddRow}>+ Thêm mẫu</button>{' '}
+          <button className="btn ghost sm" onClick={rcClearRows}>Xóa dữ liệu</button>
         </div>
       ) : null}
       <div className="hint" style={{ margin: '8px 16px 16px' }}>Nhập tối thiểu {model.minPairs} cặp để tính mô tả; để phần mềm đánh dấu “đạt sàng lọc” cần ≥20 cặp hợp lệ, bao phủ khoảng đo/điểm quyết định lâm sàng và %bias trong giới hạn SOP. Không dùng p-value để tự chấp nhận lô.</div>

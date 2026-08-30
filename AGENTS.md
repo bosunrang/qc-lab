@@ -683,8 +683,32 @@ before dispatching, which both correctly triggered `onChange` and confirmed
 Sigma XLSX từ browser tải workbook" independently re-confirms the export
 button through a real click on the fully-converted page.
 
+Reagent (done): 22 of 23 `data-action` usages converted
+(`rcSwitch`/`openRcCreateModal`/`rcDeleteCurrent`/`openRcModal`/`rcPrint`/
+`rcPrintSummary`/`rcMeta`(9 fields)/`rcMetaFocus`+`rcMetaLog`(4 fields)/
+`rcOpenQuick`×2/`rcCell`×2/`rcRmRow`/`rcAddRow`/`rcClearRows`) — all already
+on `reagentPageController` (`kernel.reagent`), zero new kernel wiring.
+Remaining 1 (`rcMeta` for the date field) deferred, embedded in
+`dateBoxHtml()`. The `data-focus-action="rcMetaFocus"` +
+`data-change-action="rcMetaLog"` pair (used on lô cũ/lô mới/Bias/alpha —
+the 4 fields worth an audit trail) needed a real mapping decision: classic
+`data-change-action` binds the native `change` event, which for a text/
+number input fires on commit (blur after an edit) — React exposes no direct
+`onChange`-for-native-`change` equivalent (`onChange` is really `input`), so
+`onFocus`/`onBlur` is the correct React counterpart; `rcMetaLog` itself
+already no-ops when the before/after values are equal, so firing it on
+every blur (not just "value actually changed since focus") is harmless.
+Verified with an ad-hoc Playwright script (fixing the same native-value-
+setter technique learned on the Sigma page): typing into "Tên hóa chất"
+persists to `rcAct().test.reagent`; focusing then editing then blurring
+"Số lô cũ" adds exactly one audit-log entry (confirming the onFocus/onBlur
+split fires correctly and only once); "+ Thêm mẫu" grows the pair-row count
+5→6; the row's own "✕" button shrinks it back 5→4. `a11y-audit` independently
+confirms both `reagent:create-comparison`/`reagent:find-existing` modals
+still open via the converted `openRcCreateModal`/`openRcModal` handlers.
+
 **Remaining phases (not yet started)**: finish converting `data-action` on
-the other 4 pages; then modals as `createPortal`, one modal at a time; then
+the other 3 pages; then modals as `createPortal`, one modal at a time; then
 shrink/delete the now-dead `root.X=` aliases, `global.d.ts`'s ambient
 bare-global declarations, and rewrite the 61 sandbox tests + ~88
 bridge-wiring text-scanner tests. See the plan file for the full phase
