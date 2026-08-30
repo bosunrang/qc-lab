@@ -1822,6 +1822,35 @@ Playwright script confirming: the Reagent/Report buttons render real
 `<select>` shows all 6 options with the right selected value; zero console
 errors.
 
+Giai đoạn 5, Bước 4 (done) — easier half of the "hard" 5b group: the 2
+`emptyStateHtml` calls with an embedded `data-action` button (Westgard's
+"Cấu hình Mean/SD" → `goManageTargets`; Sigma's "+ Thêm xét nghiệm" →
+`sgOpenAddTest`) converted straight to static JSX (same `.empty`/
+`.empty-title`/`.empty-actions` classes), with the button calling
+`onClick={goManageTargets}`/`onClick={sgOpenAddTest}` directly — both
+functions were already real imports in these two pages (used elsewhere), so
+no new kernel wiring was needed. The `emptyStateHtml` import was removed
+from both `WestgardPage.tsx`/`SigmaPage.tsx` (no longer used); since those
+were the ONLY two call sites of `westgardBridge.ts`'s/`sigmaBridge.ts`'s own
+`emptyStateHtml` bridge export (EntryPage.tsx has its own separate bridge
+copy, untouched), those two dead export lines were deleted too — the
+underlying `emptyState()`/`kernel.pres.emptyState` itself stays UNCHANGED
+(still used by plenty of classic call sites). Side finding: once the only
+embedded `data-action="sgOpenAddTest"` string anywhere in the repo was
+removed, the `root.sgOpenAddTest = () => window.QCLabReact.sgOpenAddTest()`
+redirect (built in Giai đoạn 3 for the dual-trigger-path bug) **still had to
+stay** — for a different reason now: `scripts/a11y-audit.js`'s
+`sigma:add-test` entry calls `sgOpenAddTest()` directly as a bare global
+(not a real button click), so the redirect remains load-bearing, just
+serving a verification script instead of embedded HTML. Verified: `npm test`
+431/431, `typecheck` clean, `build:pilot` succeeds (4/4 artifacts),
+`check-build-freshness` matches, `a11y-audit` 0 violations (18/18 modals,
+11/11 pages — `sigma:add-test` still opens correctly through the redirect),
+`ui-workflow-check` 29/29, `nce-workflow-check` 91/91, plus an ad-hoc
+Playwright script that forced Sigma into its empty state (untracking every
+test) and confirmed the correct title/message/button render, clicking the
+button opens the real add-test modal, and zero console errors.
+
 Then shrink/delete the now-dead
 `root.X=` aliases, `global.d.ts`'s
 ambient bare-global declarations, and rewrite the 61 sandbox tests + ~88

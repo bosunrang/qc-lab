@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAppStore } from '../state/kernel';
 import { PageHeader } from '../components/PageHeader';
 import {
-  westgardModel, emptyStateHtml, afterRender, ruleGuideRows, wgFilterTests, wgFilterArchivedTests,
+  westgardModel, afterRender, ruleGuideRows, wgFilterTests, wgFilterArchivedTests,
   goManageTargets, dashboardGoEntryFollowup, openConfigAssay, wgSetViewMode, wgSetChartMode, exportWestgardXLSX, printWestgard,
   wgSet, wgReset, wgLoadMoreRows, wgTogglePrevLot, wgSelectTest, wgSetArchivedTest, wgSetArchivedGroup,
   type WestgardModel, type WestgardBlock, type WestgardCurrentModel, type WestgardArchivedModel,
@@ -38,7 +38,11 @@ function RefArrowIcon() {
 
 function EmptyPanel({ isAdmin }: { isAdmin: boolean }) {
   return (
-    <div className="panel" dangerouslySetInnerHTML={{ __html: emptyStateHtml('Chưa có xét nghiệm đang vận hành', 'Cần đưa xét nghiệm vào Panel QC, ghép Nhóm lô QC và gán Mean/SD trước khi phân tích Westgard.', isAdmin ? '<button class="btn teal" data-action="goManageTargets">Cấu hình Mean/SD</button>' : '') }} />
+    <div className="panel"><div className="empty">
+      <div className="empty-title">Chưa có xét nghiệm đang vận hành</div>
+      <div>Cần đưa xét nghiệm vào Panel QC, ghép Nhóm lô QC và gán Mean/SD trước khi phân tích Westgard.</div>
+      {isAdmin ? <div className="empty-actions"><button className="btn teal" onClick={goManageTargets}>Cấu hình Mean/SD</button></div> : null}
+    </div></div>
   );
 }
 

@@ -2,7 +2,7 @@ import { useState, useEffect, Fragment } from 'react';
 import { useAppStore } from '../state/kernel';
 import { PageHeader } from '../components/PageHeader';
 import {
-  sigmaModel, emptyStateHtml, dateBoxHtml, icoDownloadHtml, sgRefresh,
+  sigmaModel, dateBoxHtml, icoDownloadHtml, sgRefresh,
   sgPickTest, sgPart, sgSetTeaSource, goManageTargets, sgOpenAddTest, sgRemoveTracked, sgSetTea, sgSetTeaMeta,
   sgSelectPeriod, sgCell, sgPullCV, exportSigmaPeriodXLSX, printSigmaPeriod, sgDelPeriod, sgOpenBias,
   sgAddPeriod, exportSigmaPeriodsXLSX, printSigmaPeriods,
@@ -43,7 +43,11 @@ function CalcIcon() {
 function EmptyPanel({ isAdmin, hasCatalogTests }: { isAdmin: boolean; hasCatalogTests: boolean }) {
   const message = isAdmin ? (hasCatalogTests ? 'Bấm "+ Thêm xét nghiệm" để chọn từ danh mục đã khai báo trong Cấu hình chung.' : 'Chưa có xét nghiệm trong Cấu hình chung. Hãy khai báo xét nghiệm trước rồi quay lại Six Sigma.') : 'Liên hệ quản trị viên để thêm xét nghiệm từ Cấu hình chung.';
   return (
-    <div className="panel" dangerouslySetInnerHTML={{ __html: emptyStateHtml('Chưa có xét nghiệm nào trong Sigma', message, isAdmin ? '<button class="btn teal" data-action="sgOpenAddTest">+ Thêm xét nghiệm</button>' : '') }} />
+    <div className="panel"><div className="empty">
+      <div className="empty-title">Chưa có xét nghiệm nào trong Sigma</div>
+      <div>{message}</div>
+      {isAdmin ? <div className="empty-actions"><button className="btn teal" onClick={sgOpenAddTest}>+ Thêm xét nghiệm</button></div> : null}
+    </div></div>
   );
 }
 
