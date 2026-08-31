@@ -2263,6 +2263,67 @@ directly confirming `state.instruments` is a NEW array afterward
 instrument renders correctly right after `rerender()` — no cache read stale
 data.
 
+**Group 4: lotGroups + tests/teaRefs/lotTransitions (partly done, deliberately
+scoped, 2026-08-31).** A dedicated background-agent survey found one MORE risk
+point beyond Group 3's `targetSwitchCtx.group`/`activateLotGroup`'s `g`/
+`preview.group`: `saveTargetMatrix()` (same `manage-config-service.ts` file)
+also holds its own local `group` variable (an OBJECT reference into a
+`state.lotGroups` element) across TWO consecutive `await`s
+(`confirmDialog()` then `reauthenticateCurrentUser()`) before reusing it in
+the `!overwrites.length` branch — the same risk class as the two Group 3
+variables, just a different call site.
+
+**Deliberate scope-narrowing decision (differs from the plan file's original
+wording, which said all three reference-holding variables MUST be fixed
+simultaneously)**: with the Group 4 survey in hand, confirmed none of them
+need touching to reach Group 7's actual goal (no parent array left mutated
+via bare `.push()`) — applying the SAME narrowing already used in Group 3:
+fix only the `.push()` spots that don't reassign the parent array, LEAVE
+every mutate-a-field-of-an-EXISTING-element spot unchanged
+(`Object.assign(record, patch)`, `group.lotIds.push(...)` when `group` is an
+existing element). Safe because none of this pass's fixes REPLACE an
+EXISTING `lotGroups` element with a different object — every
+`state.lotGroups=[...state.lotGroups,x]` only fires when CREATING a brand-new
+element (`x` is a fresh object nothing held a reference to before the push).
+Converting every field-mutation on an EXISTING element to also create a new
+object (matching the depth already done for `users` in Group 1) is deferred
+to a SEPARATE, more careful pass — at that point all THREE reference-holding
+variables (`targetSwitchCtx.group`, `activateLotGroup`'s `g`/`preview.group`,
+`saveTargetMatrix`'s `group`) must be fixed at the same time (switch to
+holding an id, `find()` again when needed), not in isolation.
+
+Fixed the non-reassigning `.push()` spots: `manage-config-service.ts`'s
+`saveLotGroup()` (new lot group), `saveLotTransition()` (new transition
+record), `saveAssay()` (new test — `state.tests.push(record)` → reassign,
+same line that initializes `state.data[record.id]=[]`), `applyTargetPick()`
+(`test.levels.push(target);test.levels.sort(...)` → reassign `test.levels`
+to a new sorted array), `applyAcceptedLotTransition()` (the branch that
+creates an "archived/stopped" lot group inside the accepted-transition loop
+— reassign instead of push). `tea-reference-service.ts`'s `ensure()`
+(`state.teaRefs.push(record)` → reassign, dropping the now-redundant
+`state.teaRefs=state.teaRefs||[]` line before it). The two migration files
+DELIBERATELY LEFT UNFINISHED in Group 3 are now complete:
+`test-configuration-normalization.ts`'s `migrateLegacyLots` (3 spots —
+`state.lotGroups.push(group)`, `state.qcLots.push(lot)`,
+`group.lotIds.push(lot.id)` — all only CREATE new groups/lots during
+one-time legacy-data migration, never REPLACE an existing one, so safe to
+fix without waiting on the reference-holding variables) and
+`configuration-relations.ts`'s `group.lotIds.push(lot.id)` (just a
+string-id array, no OBJECT element replaced — the `group` object itself
+still mutates in place, only its `lotIds` field changes, so
+`targetSwitchCtx`/`activateLotGroup`/`saveTargetMatrix` are unaffected).
+
+Verified: `npm test` 431/431 (no test needed updating), `typecheck` clean,
+`build:pilot` succeeds (4/4), `check-build-freshness` matches, `a11y-audit`
+0 violations (18/18 modals), `ui-workflow-check` 29/29, `nce-workflow-check`
+91/91, `benchmarks/verify-release.js` PASSES IN FULL, plus an ad-hoc
+Playwright script calling `ManageConfigService.saveLotGroup()`/`saveAssay()`/
+`TeaReferenceService.ensure()` directly confirming all three:
+`state.lotGroups`/`state.tests`/`state.teaRefs` are NEW arrays afterward
+(`sameRef: false`), the count correctly increments, and the new element
+renders correctly on the Manage page (tab "Danh mục xét nghiệm"/"Lô & Nhóm
+QC") right after `rerender()` — no cache read stale data.
+
 Then shrink/delete the now-dead
 `root.X=` aliases, `global.d.ts`'s
 ambient bare-global declarations, and rewrite the 61 sandbox tests + ~88

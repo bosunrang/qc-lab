@@ -2166,10 +2166,7 @@
 				message: "Không thể tạo mã nhóm lô."
 			};
 			Object.assign(record, checked.data);
-			if (!existing) {
-				state.lotGroups = state.lotGroups || [];
-				state.lotGroups.push(record);
-			}
+			if (!existing) state.lotGroups = [...state.lotGroups || [], record];
 			return {
 				record,
 				created: !existing
@@ -2244,10 +2241,7 @@
 				message: "Không thể tạo mã hồ sơ chuyển tiếp lô."
 			};
 			Object.assign(record, data);
-			if (!existing) {
-				state.lotTransitions = state.lotTransitions || [];
-				state.lotTransitions.push(record);
-			}
+			if (!existing) state.lotTransitions = [...state.lotTransitions || [], record];
 			return {
 				record,
 				created: !existing
@@ -2337,7 +2331,7 @@
 				if (group.active === false || !(group.lotIds || []).includes(from.id)) return;
 				const oldIds = [...new Set(group.lotIds || [])], nextIds = [...new Set((group.lotIds || []).map((id) => id === from.id ? to.id : id))];
 				const oldKey = groupKey(oldIds), autoNamed = !group.name || group.name === groupName(oldIds);
-				if (!(state.lotGroups.find((item) => item.id !== group.id && item.active === false && item.stoppedByTransitionId === transition.id) || state.lotGroups.find((item) => item.active === false && groupKey(item.lotIds) === oldKey))) state.lotGroups.push({
+				if (!(state.lotGroups.find((item) => item.id !== group.id && item.active === false && item.stoppedByTransitionId === transition.id) || state.lotGroups.find((item) => item.active === false && groupKey(item.lotIds) === oldKey))) state.lotGroups = [...state.lotGroups, {
 					id: uid(),
 					name: group.name || groupName(oldIds),
 					lotIds: oldIds,
@@ -2346,7 +2340,7 @@
 					status: "stopped",
 					stoppedAt: transition.startDate || today(),
 					stoppedByTransitionId: transition.id
-				});
+				}];
 				const nextKey = groupKey(nextIds), existing = state.lotGroups.find((item) => item.id !== group.id && item.active !== false && groupKey(item.lotIds) === nextKey);
 				if (existing) {
 					removeGroups.add(group.id);
@@ -2465,7 +2459,7 @@
 			};
 			Object.assign(record, data);
 			if (!existing) {
-				state.tests.push(record);
+				state.tests = [...state.tests, record];
 				state.data = state.data || {};
 				state.data[record.id] = [];
 			}
@@ -2743,9 +2737,7 @@
 					mfgSd: pick.sd,
 					applied: "mfg"
 				};
-				test.levels = test.levels || [];
-				test.levels.push(target);
-				test.levels.sort((first, second) => first.level - second.level);
+				test.levels = [...test.levels || [], target].sort((first, second) => first.level - second.level);
 			}
 			target.meanSdHistory = Array.isArray(target.meanSdHistory) ? target.meanSdHistory : [];
 			if (target.qcLotId && target.qcLotId !== lot.id) {
@@ -3688,8 +3680,7 @@
 					section: source ? source[4] : "",
 					sources: {}
 				};
-				state.teaRefs = state.teaRefs || [];
-				state.teaRefs.push(record);
+				state.teaRefs = [...state.teaRefs || [], record];
 				created = true;
 			}
 			return {
@@ -7589,7 +7580,7 @@
 		state.qcLots.forEach((lot) => {
 			if (lot.groupId) {
 				const group = state.lotGroups.find((item) => item.id === lot.groupId);
-				if (group && !group.lotIds.includes(lot.id)) group.lotIds.push(lot.id);
+				if (group && !group.lotIds.includes(lot.id)) group.lotIds = [...group.lotIds, lot.id];
 			}
 		});
 		const retiredTo = new Map((state.lotTransitions || []).filter(deps.switchesLot).map((transition) => [String(transition.fromLotId), String(transition.toLotId)]));
@@ -7713,7 +7704,7 @@
 							note: "Tự động chuyển từ dữ liệu cũ",
 							active: true
 						};
-						state.lotGroups.push(group);
+						state.lotGroups = [...state.lotGroups, group];
 					}
 					lot = state.qcLots.find((item) => item.groupId === group.id && item.lotNo === level.lot && +item.level === +level.level);
 					if (!lot) {
@@ -7727,9 +7718,9 @@
 							active: true,
 							note: ""
 						};
-						state.qcLots.push(lot);
+						state.qcLots = [...state.qcLots, lot];
 					}
-					if (lot && !group.lotIds.includes(lot.id)) group.lotIds.push(lot.id);
+					if (lot && !group.lotIds.includes(lot.id)) group.lotIds = [...group.lotIds, lot.id];
 				}
 				if (lot) {
 					level.qcLotId = lot.id;

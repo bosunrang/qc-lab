@@ -146,7 +146,13 @@ export function createManageConfigService({ cleanText, cleanId, targetFromLimits
     const existing = (state.lotGroups || []).find(group => group.id === id) || null;
     const record = existing || { id: cleanId(newId) };
     if (!existing && !record.id) return { error: 'missing-id', message: 'Không thể tạo mã nhóm lô.' };
-    Object.assign(record, checked.data); if (!existing) { state.lotGroups = state.lotGroups || []; state.lotGroups.push(record); }
+    /* Giai đoạn 7 (state immutable, nhóm lotGroups/tests/teaRefs/lotTransitions,
+       2026-08-31): gán lại mảng bằng bản sao MỚI khi TẠO MỚI một nhóm lô
+       (record hoàn toàn mới, không phải phần tử đang được giữ tham chiếu ở
+       đâu khác) — record vẫn Object.assign() mutate tại chỗ khi SỬA (nhánh
+       existing) như cũ, giữ an toàn cho targetSwitchCtx/activateLotGroup
+       (giữ tham chiếu vào NHÓM LÔ ĐANG SỬA, không phải nhóm mới tạo). */
+    Object.assign(record, checked.data); if (!existing) state.lotGroups = [...(state.lotGroups || []), record];
     return { record, created: !existing };
   }
   function lotGroupRemoval(state: ManageConfigState, { id = '' }: AnyRecord = {}) {
@@ -187,7 +193,7 @@ export function createManageConfigService({ cleanText, cleanId, targetFromLimits
     const existing = (state.lotTransitions || []).find(transition => transition.id === id) || null;
     const record = existing || { id: cleanId(newId) };
     if (!existing && !record.id) return { error: 'missing-id', message: 'Không thể tạo mã hồ sơ chuyển tiếp lô.' };
-    Object.assign(record, data); if (!existing) { state.lotTransitions = state.lotTransitions || []; state.lotTransitions.push(record); }
+    Object.assign(record, data); if (!existing) state.lotTransitions = [...(state.lotTransitions || []), record];
     return { record, created: !existing };
   }
   function prepareLotTransitionData(options: AnyRecord = {}) {
@@ -251,9 +257,9 @@ export function createManageConfigService({ cleanText, cleanId, targetFromLimits
       const oldKey = groupKey(oldIds), autoNamed = !group.name || group.name === groupName(oldIds);
       const archived = state.lotGroups!.find(item => item.id !== group.id && item.active === false && item.stoppedByTransitionId === transition.id)
         || state.lotGroups!.find(item => item.active === false && groupKey(item.lotIds) === oldKey);
-      if (!archived) state.lotGroups!.push({ id: uid(), name: group.name || groupName(oldIds), lotIds: oldIds,
+      if (!archived) state.lotGroups = [...state.lotGroups!, { id: uid(), name: group.name || groupName(oldIds), lotIds: oldIds,
         note: `Đã dừng khi chuyển tiếp lô ${from.lotNo} sang ${to.lotNo}`, active: false, status: 'stopped',
-        stoppedAt: transition.startDate || today(), stoppedByTransitionId: transition.id });
+        stoppedAt: transition.startDate || today(), stoppedByTransitionId: transition.id }];
       const nextKey = groupKey(nextIds), existing = state.lotGroups!.find(item => item.id !== group.id && item.active !== false && groupKey(item.lotIds) === nextKey);
       if (existing) { removeGroups.add(group.id); onMergeGroup(group, existing); }
       else { group.lotIds = nextIds; if (autoNamed) group.name = groupName(nextIds) || group.name; }
@@ -311,7 +317,7 @@ export function createManageConfigService({ cleanText, cleanId, targetFromLimits
     const record = existing || { id: cleanId(newId) };
     if (!existing && !record.id) return { error: 'missing-id', message: 'Không thể tạo mã xét nghiệm.' };
     Object.assign(record, data);
-    if (!existing) { state.tests.push(record); state.data = state.data || {}; state.data[record.id] = []; }
+    if (!existing) { state.tests = [...state.tests, record]; state.data = state.data || {}; state.data[record.id] = []; }
     if (existing && oldInstrumentId && oldInstrumentId !== record.instrumentId) {
       (state.qcPanels || []).forEach(panel => {
         if (panel.instrumentId !== record.instrumentId) panel.testIds = (panel.testIds || []).filter((testId: string) => testId !== id);
@@ -459,7 +465,7 @@ export function createManageConfigService({ cleanText, cleanId, targetFromLimits
     if (!target) {
       target = { level: lot.level, mean: pick.mean, sd: pick.sd, low: pick.low, high: pick.high, rangeK: 2,
         mfgMean: pick.mean, mfgSd: pick.sd, applied: 'mfg' };
-      test.levels = test.levels || []; test.levels.push(target); test.levels.sort((first: AnyRecord, second: AnyRecord) => first.level - second.level);
+      test.levels = [...(test.levels || []), target].sort((first: AnyRecord, second: AnyRecord) => first.level - second.level);
     }
     target.meanSdHistory = Array.isArray(target.meanSdHistory) ? target.meanSdHistory : [];
     if (target.qcLotId && target.qcLotId !== lot.id) {

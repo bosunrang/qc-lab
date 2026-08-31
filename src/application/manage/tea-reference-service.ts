@@ -43,8 +43,7 @@ export function createTeaReferenceService(deps: {
       const id = deps.createId();
       const naming = deps.analyteMeta(source ? source[0] : refKey);
       record = { id, analyteId: (source && source[6]) || naming.analyteId || ('custom-' + id), name: source ? source[0] : refKey, displayName: naming.displayName, standardName: naming.standardName, abbreviation: naming.abbreviation, aliases: naming.aliases, matrix: naming.matrix, unit: source ? source[1] : '', clia: source ? source[2] : null, ricos: source ? source[3] : null, lab: source ? source[7] : null, section: source ? source[4] : '', sources: {} };
-      state.teaRefs = state.teaRefs || [];
-      state.teaRefs.push(record);
+      state.teaRefs = [...(state.teaRefs || []), record];
       created = true;
     }
     return { record, created };
