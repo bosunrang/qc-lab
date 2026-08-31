@@ -14,12 +14,18 @@ export function createActionRecordService(deps: ActionRecordServiceDeps) {
     createdByUserId: user.id || '', createdByUsername: user.username || '',
     contentEditorUserIds: [user.id || ''].filter(Boolean), contentEditorUsernames: [String(user.username || '').trim().toLowerCase()].filter(Boolean),
   });
-  const create = (actions: Action[], values: Action, user: { id?: string; username?: string; name?: string }) => {
+  /* Giai đoạn 7 (bất biến hoá dữ liệu ứng dụng, nhóm actions/NCE, 2026-08-31):
+     `create()` KHÔNG còn tự `.push()` vào mảng actions (đã bỏ hẳn tham số
+     `actions`) — chỉ dựng và trả lại record MỚI thuần túy. Việc gán lại mảng
+     actions bằng bản sao mới chuyển lên `nce-form-workflow-command.ts`'s
+     `submit()`, nơi DUY NHẤT có tham chiếu dữ liệu ứng dụng thật để gán lại
+     mảng cha. */
+  const create = (values: Action, user: { id?: string; username?: string; name?: string }) => {
     const now = deps.now(), effective = values.effectivenessStatus !== 'pending';
     const record = { id: deps.createId(), ...values, createdAt: now, updatedAt: now, ...userFields(user),
       effectivenessBy: effective ? user.name || '' : '', effectivenessAt: effective ? now : '',
       approvalStatus: 'pending', recordStatus: 'active', approvedAt: '', approvedBy: '', approvalNote: '' };
-    actions.push(record); return record;
+    return record;
   };
   const update = (action: Action, values: Action, user: { id?: string; username?: string; name?: string }) => {
     if (deps.isCancelled(action) || deps.approvalStatus(action) === 'approved') return null;

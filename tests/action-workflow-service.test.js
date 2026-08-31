@@ -578,11 +578,17 @@ function fixture(actionOverrides = {}) {
 }
 
 {
+  // Giai đoạn 7 (state immutable, nhóm actions/NCE, 2026-08-31): createFollowUp()
+  // không còn tự .push() vào `actions` — chỉ trả record mới, để caller thật
+  // (nce-lifecycle-workflow-command.ts) gán lại state.actions=[...actions,record].
+  // Test này giả lập đúng bước gán lại đó để khớp hợp đồng mới.
   const parent = { id: 'parent', nceId: 'NCE-CŨ', testId: 'T1', level: 1, lot: 'L1', pointId: 'p1', rule: '1-3s',
     errorType: 'Sai số ngẫu nhiên', protocolVersion: 3, eventSource: 'iqc', processPhase: 'exam', containmentStatus: 'held', effectivenessStatus: 'ineffective', approvalStatus: 'pending' };
-  const actions = [parent];
+  let actions = [parent];
   const followUp = ctx.ActionEscalationService.createFollowUp(actions, parent, { id: 'u1', username: 'ktv-a', name: 'KTV A' });
   assert.ok(followUp, 'hồ sơ chưa hiệu lực hợp lệ phải mở được vòng NCE tiếp theo');
+  assert.equal(actions.length, 1, 'createFollowUp() không còn tự mutate mảng actions truyền vào');
+  actions = [...actions, followUp];
   assert.equal(actions.length, 2);
   assert.equal(parent.followUpNceId, followUp.nceId);
   assert.equal(followUp.parentNceId, 'NCE-CŨ');

@@ -6,6 +6,10 @@ export function createNceFormWorkflowCommand(deps:{current:()=>{actions?:Value[]
   const submit=(input:Value&{audit:(result:Value)=>{action:string;detail:string;target:string}})=>{
     const state=deps.current(),actions=state.actions||(state.actions=[]),result=deps.form.submit({...input,actions});
     if(!result.ok)return result;
+    /* Giai doan 7 (state immutable, nhom actions/NCE, 2026-08-31): action-record-
+       service.ts's create() khong con tu push - gan lai state.actions bang mang
+       MOI o day (noi DUY NHAT co tham chieu state that) khi vua tao NCE record moi. */
+    if(result.mode==='create')state.actions=[...actions,result.record];
     const audit=input.audit(result);deps.log(audit.action,audit.detail,audit.target);deps.reset();deps.save();deps.render();
     return result;
   };

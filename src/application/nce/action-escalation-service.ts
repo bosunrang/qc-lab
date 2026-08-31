@@ -29,8 +29,13 @@ export function createActionEscalationService(deps: ActionEscalationServiceDeps)
       correction: `Hành động của ${parentId} được đánh giá chưa hiệu lực, mở vòng điều tra mới.`, by: user.name || '', dueDate: deps.dueDate(7),
       effectivenessStatus: 'pending', approvalStatus: 'pending', recordStatus: 'active', approvedAt: '', approvedBy: '', approvalNote: '',
     };
+    /* Giai đoạn 7 (bất biến hoá dữ liệu ứng dụng, nhóm actions/NCE, 2026-08-31):
+       KHÔNG còn .push() vào `actions` ở đây — record MỚI chỉ được dựng và trả
+       lại; việc gán lại mảng ứng dụng-actions=[...actions,record] chuyển lên
+       nce-lifecycle-workflow-command.ts's execute() (nơi có tham chiếu dữ liệu
+       ứng dụng thật). parent's field vẫn mutate tại chỗ (phần tử ĐANG TỒN TẠI,
+       không đổi identity, khớp phạm vi thu hẹp của Giai đoạn 7). */
     parent!.followUpNceId = nceId;
-    (actions || []).push(record);
     return record;
   };
   return Object.freeze({ canEscalate, createFollowUp });

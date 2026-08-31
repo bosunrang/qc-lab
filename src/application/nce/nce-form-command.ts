@@ -47,7 +47,7 @@ export function createNceFormCommand(deps: NceFormCommandDeps) {
       if (!record) return { ok: false, reason: 'approved', message: 'Hồ sơ đã thay đổi và không thể cập nhật. Vui lòng mở lại để kiểm tra.' };
       return { ok: true, mode: 'update', record };
     }
-    return { ok: true, mode: 'create', record: deps.records.create(input.actions, candidate, input.user) };
+    return { ok: true, mode: 'create', record: deps.records.create(candidate, input.user) };
   };
   return Object.freeze({ submit });
 }

@@ -138,6 +138,9 @@ export function createEntryService({ cleanText, cleanId, valueDecimals, isPeriod
     const clean = kindLabel ? (note ? `${kindLabel} — ${note}` : kindLabel) : note;
     point.voided = true; point.voidReason = clean; point.voidKind = normalizedKind; point.voidRequiresRerun = !!openNce;
     point.voidedAt = nowIso; point.voidedBy = staff.operatorName || staff.operatorUsername || '';
+    /* Giai đoạn 7 (state immutable, nhóm actions/NCE, 2026-08-31): gán lại
+       `state.actions` bằng mảng MỚI khi TẠO MỚI một NCE record từ hủy điểm
+       QC (dòng dưới), thay vì `.push()` tại chỗ. */
     state.actions = state.actions || [];
     const existing = [...state.actions].reverse().find(action => action.pointId === point.id && +action.protocolVersion >= 2
       && action.recordStatus !== 'cancelled' && (action.approvalStatus || 'pending') !== 'approved');
@@ -152,7 +155,7 @@ export function createEntryService({ cleanText, cleanId, valueDecimals, isPeriod
       correction: `Hủy điểm ngày ${formatDate(point.date)}, lần ${point.runId || '—'}, giá trị ${formatNumber(point.val)}. Lý do: ${clean}`,
       by: point.voidedBy, dueDate: dueDate || '', containmentStatus: '', effectivenessStatus: 'pending', approvalStatus: 'pending',
       recordStatus: 'active', approvedAt: '', approvedBy: '', approvalNote: '' };
-    if (openNce && !existing) state.actions.push(action as AnyRecord);
+    if (openNce && !existing) state.actions = [...state.actions, action as AnyRecord];
     return { point, action, reason: clean, openNce: !!openNce, reusedAction: !!existing };
   }
   function buildSheetRowsData({ levels, sheetStart, sheetEnd, sheetDays, pointsByLevel, previousPointsByLevel }: AnyRecord) {

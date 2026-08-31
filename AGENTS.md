@@ -2324,6 +2324,99 @@ Playwright script calling `ManageConfigService.saveLotGroup()`/`saveAssay()`/
 renders correctly on the Manage page (tab "Danh mục xét nghiệm"/"Lô & Nhóm
 QC") right after `rerender()` — no cache read stale data.
 
+**Group 5: actions/NCE (partly done, deliberately scoped, 2026-08-31).** A
+dedicated background-agent survey confirmed exactly 5 non-reassigning
+`.push()` spots against `state.actions` (creating a new NCE record):
+`entry-service.ts`'s `voidPoint()` (auto-opens an NCE when a QC point is
+voided), `range-target-command.ts`'s `applyLab()`/`revertMfg()` (opens an
+NCE when the QC range is changed/reverted), `action-record-service.ts`'s
+`create()`, `action-escalation-service.ts`'s `createFollowUp()` (opens the
+next NCE round on escalate). Every other write (`update()`,
+`action-review-service.ts`'s `cancel/approve/returnForRevision/reopen`) is
+an `Object.assign()` field-mutation on an EXISTING element — left unchanged,
+matching the same scope-narrowing already used in Group 3/4. No
+`.splice()`/`delete` anywhere (cancelling a record is always
+`recordStatus='cancelled'`, a soft delete). `ActionPointIndexService`'s
+cache (signature = `state.actions`'s reference+length) was already
+self-verifying correctly; `ActionRerunService`/`actionLotPoints()` don't
+read `state.actions` as part of their signature at all, so neither needed
+touching.
+
+The survey also found ONE new reference-holding risk (a different class
+from the `lotGroups` one): `actions-page-controller.ts`'s `reopenAction()`
+captures `a=state().actions[i]` and reuses that SAME `a` (no id re-fetch)
+after `await deps.reauthenticateCurrentUser(...)` to build the modal's
+label — unlike its sibling `cancelAction`/`approveAction`/`returnAction`
+(all of which re-fetch `current` by id AFTER the await). Harmless today
+(every review function still mutates in place, so `a`'s identity never
+changes) but WOULD go stale if `action-review-service.ts` is ever converted
+to always create a new object — deliberately NOT touched in this pass
+(matches the narrow scope), noted for whenever that deeper conversion
+happens.
+
+**Design decision for a `.push()` reached through multiple service layers
+(a different shape than Groups 1-4's direct fixes)**: `action-record-
+service.ts`'s `create()` and `action-escalation-service.ts`'s
+`createFollowUp()` only receive the `actions` array as a plain parameter —
+no access to the real `state` object — so neither can do
+`state.actions=[...]` itself. Rather than threading `state` down into these
+pure services (breaking the existing "pure service never touches state"
+boundary), the reassignment responsibility moved UP to the outermost layer
+that already holds the real `state`:
+- `action-record-service.ts`'s `create(values, user)` changed signature
+  (dropped the `actions` parameter entirely) — it now ONLY builds and
+  returns a new record, no side effect at all. `nce-form-command.ts`'s
+  `submit()` calls `deps.records.create(candidate, input.user)` (dropped
+  `input.actions`). `nce-form-workflow-command.ts`'s `submit()` (the ONLY
+  place with the real `state` via `deps.current()`) assigns
+  `state.actions=[...actions,result.record]` itself when
+  `result.mode==='create'` — AFTER `form.submit()` returns success.
+- `action-escalation-service.ts`'s `createFollowUp()` still takes `actions`
+  (needed to compute `nextNceId`/`activeFollowUp`) but dropped the
+  `(actions||[]).push(record)` line — it only returns the new record.
+  `nce-lifecycle-workflow-command.ts`'s `execute()` (also holding the real
+  `state` via `deps.current()`) assigns
+  `state.actions=[...actions,result.record]` itself when
+  `input.kind==='escalate'` AND `result.ok` — after `lifecycle.execute()`
+  returns success.
+- `entry-service.ts`'s `voidPoint()` and `range-target-command.ts`'s
+  `applyLab()`/`revertMfg()` already held a real `state`/`input.state`
+  reference, so those just changed `.push(x)` to
+  `state.actions=[...state.actions,x]` in place — no layer-splitting needed.
+
+Fixed 5 broken tests exactly as expected (matching the new signature/
+contract, same test intent preserved): `action-record-service.test.js`
+(dropped the now-unused `records=[]` param), `action-workflow-service.test.js`
+(the test calling `createFollowUp()` directly now simulates the caller's
+reassignment step itself, plus a new assertion confirming `createFollowUp()`
+no longer mutates the array it's given), `nce-form-command.test.js` (the
+`records.create` stub's signature changed, and the `actions.length`
+assertion changed from 1 to 0 since `submit()` no longer pushes itself),
+`nce-form-workflow-command.test.js` (the `state` assertion changed from
+`{actions:[]}` to `{actions:[{id:'n1'}]}` since `submit()` now assigns the
+reassignment itself after a successful create), `typescript-module-pilot.test.js`
+(2 new comments in `action-record-service.ts`/`action-escalation-service.ts`
+accidentally contained the literal word "state", matching the
+`doesNotMatch(/\bstate\b/)` regex of the test asserting "this pure service
+must not read global state" — FIXED THE WORD CHOICE in the comments, not
+the test's intent, since the assertion itself is still correct: neither
+service actually reads any global, the comment just happened to use a
+matching word).
+
+Verified: `npm test` 431/431 (5 tests fixed as above), `typecheck` clean,
+`build:pilot` succeeds (4/4), `check-build-freshness` matches, `a11y-audit`
+0 violations (18/18 modals), `ui-workflow-check` 29/29, `nce-workflow-check`
+91/91 (including the EXACT "một hồ sơ không được mở vòng tiếp theo hai
+lần"/"Đã chuyển hồ sơ thì không còn kẹt" checks — both directly exercise
+the just-changed behavior through a real browser), `benchmarks/verify-release.js`
+PASSES IN FULL, plus an ad-hoc Playwright script calling
+`NceFormWorkflowCommand.submit()` directly (creating a real NCE from a
+voided QC point) and `NceLifecycleWorkflowCommand.execute({kind:'escalate'})`
+confirming both: `state.actions` is a NEW array after success
+(`sameRef: false`), the count correctly increments, the new record/follow-up
+is found in the array, and `parent.followUpNceId` is set correctly (the
+in-place field mutation still works normally) — no console errors.
+
 Then shrink/delete the now-dead
 `root.X=` aliases, `global.d.ts`'s
 ambient bare-global declarations, and rewrite the 61 sandbox tests + ~88

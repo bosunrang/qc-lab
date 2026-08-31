@@ -411,7 +411,7 @@
 				approvedBy: "",
 				approvalNote: ""
 			};
-			if (openNce && !existing) state.actions.push(action);
+			if (openNce && !existing) state.actions = [...state.actions, action];
 			return {
 				point,
 				action,
@@ -636,7 +636,7 @@
 				note: input.reason + input.gateNote
 			});
 			input.state.actions = input.state.actions || [];
-			input.state.actions.push({
+			input.state.actions = [...input.state.actions, {
 				id: input.actionId,
 				date: input.today,
 				createdAt: input.createdAt,
@@ -653,7 +653,7 @@
 				approvedAt: "",
 				approvedBy: "",
 				approvalNote: ""
-			});
+			}];
 			return {
 				ok: true,
 				effects: {
@@ -687,7 +687,7 @@
 				note: input.reason
 			});
 			input.state.actions = input.state.actions || [];
-			input.state.actions.push({
+			input.state.actions = [...input.state.actions, {
 				id: input.actionId,
 				date: input.today,
 				createdAt: input.createdAt,
@@ -704,7 +704,7 @@
 				approvedAt: "",
 				approvedBy: "",
 				approvalNote: ""
-			});
+			}];
 			return {
 				ok: true,
 				effects: {
@@ -24401,7 +24401,6 @@
 				approvalNote: ""
 			};
 			parent.followUpNceId = nceId;
-			(actions || []).push(record);
 			return record;
 		};
 		return Object.freeze({
@@ -24428,9 +24427,9 @@
 			contentEditorUserIds: [user.id || ""].filter(Boolean),
 			contentEditorUsernames: [String(user.username || "").trim().toLowerCase()].filter(Boolean)
 		});
-		const create = (actions, values, user) => {
+		const create = (values, user) => {
 			const now = deps.now(), effective = values.effectivenessStatus !== "pending";
-			const record = {
+			return {
 				id: deps.createId(),
 				...values,
 				createdAt: now,
@@ -24444,8 +24443,6 @@
 				approvedBy: "",
 				approvalNote: ""
 			};
-			actions.push(record);
-			return record;
 		};
 		const update = (action, values, user) => {
 			if (deps.isCancelled(action) || deps.approvalStatus(action) === "approved") return null;
@@ -24534,7 +24531,7 @@
 			return {
 				ok: true,
 				mode: "create",
-				record: deps.records.create(input.actions, candidate, input.user)
+				record: deps.records.create(candidate, input.user)
 			};
 		};
 		return Object.freeze({ submit });
@@ -24548,6 +24545,7 @@
 				actions
 			});
 			if (!result.ok) return result;
+			if (result.mode === "create") state.actions = [...actions, result.record];
 			const audit = input.audit(result);
 			deps.log(audit.action, audit.detail, audit.target);
 			deps.reset();
@@ -24642,11 +24640,13 @@
 	//#region src/application/nce/nce-lifecycle-workflow-command.ts
 	function createNceLifecycleWorkflowCommand(deps) {
 		const execute = (input) => {
+			const state = deps.current(), actions = state.actions || [];
 			const result = deps.lifecycle.execute({
 				...input,
-				actions: deps.current().actions || []
+				actions
 			});
 			if (!result.ok) return result;
+			if (input.kind === "escalate") state.actions = [...actions, result.record];
 			const audit = input.audit(result.record), record = audit && audit;
 			deps.log(record.action, record.detail, record.target);
 			deps.save();

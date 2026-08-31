@@ -13,8 +13,11 @@ export function createRangeTargetCommand(deps:{assignTarget:(config:Value,mean:n
     l.cvRef=input.cv;l.rangeDate=input.today;
     l.meanSdHistory=Array.isArray(l.meanSdHistory)?l.meanSdHistory:[];
     l.meanSdHistory.push({id:input.historyId,qcLotId:l.qcLotId||'',lot:l.lot||'',mean:l.mean,sd:l.sd,low:l.low,high:l.high,effectiveFrom:input.today,effectiveTo:l.exp||'',source:'lab',note:input.reason+input.gateNote});
+    /* Giai doan 7 (state immutable, nhom actions/NCE, 2026-08-31): gan lai
+       state.actions bang mang MOI khi TAO MOI mot NCE record tu doi dai QC,
+       thay vi .push() tai cho. */
     input.state.actions=input.state.actions||[];
-    input.state.actions.push({id:input.actionId,date:input.today,createdAt:input.createdAt,createdByUserId:input.userId,createdByUsername:input.username,testId:input.testId,level:input.levelNo,lot:input.lot,rule:'Thiết lập dải QC mới',errorType:'Quản lý dải kiểm soát',action:input.actionText,by:input.userName,approvalStatus:'pending',approvedAt:'',approvedBy:'',approvalNote:''});
+    input.state.actions=[...input.state.actions,{id:input.actionId,date:input.today,createdAt:input.createdAt,createdByUserId:input.userId,createdByUsername:input.username,testId:input.testId,level:input.levelNo,lot:input.lot,rule:'Thiết lập dải QC mới',errorType:'Quản lý dải kiểm soát',action:input.actionText,by:input.userName,approvalStatus:'pending',approvedAt:'',approvedBy:'',approvalNote:''}];
     return{ok:true as const,effects:{audit:{action:'Áp dụng dải QC',detail:input.detail,target:input.testName},save:{testId:input.testId}}};
   };
   const revertMfg=(input:{state:Value;level:Value;testId:string;levelNo:number;lot:string;testName:string;reason:string;detail:string;actionText:string;historyId:string;actionId:string;today:string;createdAt:string;userId:string;username:string;userName:string})=>{
@@ -23,7 +26,7 @@ export function createRangeTargetCommand(deps:{assignTarget:(config:Value,mean:n
     l.meanSdHistory=Array.isArray(l.meanSdHistory)?l.meanSdHistory:[];
     l.meanSdHistory.push({id:input.historyId,qcLotId:l.qcLotId||'',lot:l.lot||'',mean:l.mean,sd:l.sd,low:l.low,high:l.high,effectiveFrom:input.today,effectiveTo:l.exp||'',source:'mfg',note:input.reason});
     input.state.actions=input.state.actions||[];
-    input.state.actions.push({id:input.actionId,date:input.today,createdAt:input.createdAt,createdByUserId:input.userId,createdByUsername:input.username,testId:input.testId,level:input.levelNo,lot:input.lot,rule:'Hoàn dải QC',errorType:'Quản lý dải kiểm soát',action:input.actionText,by:input.userName,approvalStatus:'pending',approvedAt:'',approvedBy:'',approvalNote:''});
+    input.state.actions=[...input.state.actions,{id:input.actionId,date:input.today,createdAt:input.createdAt,createdByUserId:input.userId,createdByUsername:input.username,testId:input.testId,level:input.levelNo,lot:input.lot,rule:'Hoàn dải QC',errorType:'Quản lý dải kiểm soát',action:input.actionText,by:input.userName,approvalStatus:'pending',approvedAt:'',approvedBy:'',approvalNote:''}];
     return{ok:true as const,effects:{audit:{action:'Hoàn dải QC',detail:input.detail,target:input.testName},save:{testId:input.testId}}};
   };
   return Object.freeze({applyLab,revertMfg});
