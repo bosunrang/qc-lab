@@ -447,9 +447,16 @@ export function createManageTestsActionsController(deps: {
   const delTest = async (id: unknown) => {
     if (!deps.requireAdmin()) return;
     const context = deps.ManageConfigService.assayRemoval(state(), { id }); if (context.error) return; const t = context.record, points = context.points, locked = deps.PeriodService.lockedPoints(state(), points);
+    /* Giai đoạn 7 (state immutable, nhóm state.data/điểm QC, 2026-08-31): chụp
+       số đếm NGAY LÚC NÀY bằng một số nguyên thủy, không giữ tham chiếu mảng
+       `points` xuyên qua confirmDialog/reauthenticateCurrentUser bên dưới —
+       addPoint() giờ gán lại `state.data[tid]` bằng mảng MỚI mỗi lần thêm
+       điểm, nên `points.length` đọc lại sau await có thể lệch (thiếu) nếu có
+       điểm mới được thêm trong lúc chờ xác thực mật khẩu. */
+    const pointsCount = points.length;
     if (locked.count) { await deps.infoDialog(`Không thể xóa "${deps.testDisplayName(t)}": còn ${locked.count} điểm QC thuộc kỳ đã khóa (${locked.periods.map(deps.monthVN).join(', ')}). Hãy mở khóa các kỳ này ở trang Báo cáo trước — thao tác mở khóa yêu cầu lý do và được ghi vào nhật ký.`); return; }
-    if (!await deps.confirmDialog({ kicker: 'Thao tác không thể hoàn tác', title: 'Xóa xét nghiệm', message: `Xóa xét nghiệm ${t.name} và toàn bộ dữ liệu QC?`, detail: `${points.length} điểm QC cùng toàn bộ kết quả Westgard và Sigma của xét nghiệm này sẽ mất, không thể khôi phục.`, confirmLabel: 'Xóa xét nghiệm', cancelLabel: 'Hủy' })) return;
-    if (!await deps.reauthenticateCurrentUser({ title: 'Xác thực xóa xét nghiệm', message: `Nhập lại mật khẩu trước khi xóa ${t.name} và ${points.length} điểm QC.` })) return;
+    if (!await deps.confirmDialog({ kicker: 'Thao tác không thể hoàn tác', title: 'Xóa xét nghiệm', message: `Xóa xét nghiệm ${t.name} và toàn bộ dữ liệu QC?`, detail: `${pointsCount} điểm QC cùng toàn bộ kết quả Westgard và Sigma của xét nghiệm này sẽ mất, không thể khôi phục.`, confirmLabel: 'Xóa xét nghiệm', cancelLabel: 'Hủy' })) return;
+    if (!await deps.reauthenticateCurrentUser({ title: 'Xác thực xóa xét nghiệm', message: `Nhập lại mật khẩu trước khi xóa ${t.name} và ${pointsCount} điểm QC.` })) return;
     const result = deps.pres.ManageAssayWorkflowCommand.remove({ id }); if (!result.ok) { await deps.infoDialog(result.message); return; }
     if (deps.analysisUi().selTest === id) deps.analysisUi().selTest = (state().tests[0] && state().tests[0].id) || null;
     if (deps.entryUi().entrySel && deps.entryUi().entrySel.testId === id) deps.entryUi().entrySel = null;

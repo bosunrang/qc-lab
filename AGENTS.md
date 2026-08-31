@@ -2417,6 +2417,102 @@ confirming both: `state.actions` is a NEW array after success
 is found in the array, and `parent.followUpNceId` is set correctly (the
 in-place field mutation still works normally) — no console errors.
 
+**Group 6: `state.data` — QC points (partly done, deliberately scoped, the
+LAST group of Giai đoạn 7, 2026-08-31).** A dedicated background-agent
+survey ran before writing any code — this group was rated the HIGHEST RISK
+in the original plan (the largest dataset, the most complex caches, the
+center of every Westgard/Sigma/CUSUM calculation), but the survey found the
+actual CODE fix needed is SMALLER than every prior group: exactly ONE
+non-reassigning `.push()` spot — `entry-service.ts`'s `addPoint()`
+(`state.data[tid].push(point)`). No `.splice()` anywhere (voiding a point
+is always a soft-delete via the `voided` field, never an element removal).
+Every other "bulk" operation on QC points (`renameLotPoints()` for lot
+renames, `applyTargetPick()`'s Mean/SD backfill) only mutates a FIELD on an
+EXISTING element (`point.lot=...`, `point.qcMean=...`) — no new/replaced
+elements, left unchanged, matching the same scope-narrowing used in
+Groups 3-5. `delete state.data[id]` (`removeAssay()`, deleting a whole
+test) is a key deletion, not a non-reassigning push, and is already swept
+clean by `save({})`'s default full `clearDerived()` — out of scope for
+this pass.
+
+Caches: the survey drew a clear line between two entirely different kinds
+despite similar-sounding names. (a) SELF-VERIFYING by reference+length —
+`qcPointCache` (`src/application/qc/point-cache-service.ts`, backing
+`pointsOf`/`pointsWithIndex`/`pointsForLot`) and `ActionRerunService` —
+both confirmed to correctly auto-rebuild when `state.data[testId]` is
+REASSIGNED to a new array (not just on `.push()`), with no hidden
+assumption anywhere depending on array identity staying stable. (b) PURELY
+MANUAL, keyed by the `testId` string — `wgMemo`/`acceptedMemo`/`cusumMemo`
+— these do NOT check array reference at all, they rely entirely on
+`clearDerivedForTest(testId)`/`clearDerived()` being called at the right
+moment at the command layer (already in place, independent of how the
+mutation happens) — switching `.push()` to reassignment doesn't affect
+group (b) either way. The 3 raw Maps `pointsCache`/`pointsIndexCache`/
+`pointsLotCache` declared in `modular-pilot.global.ts` were confirmed to be
+DEAD CODE — only ever constructed and registered into `clearAll()`, never
+actually read or written anywhere else — no action needed (out of Giai
+đoạn 7's scope).
+
+**Found ONE real reference-holding risk that this very change would
+"unlock"** (same class as `currentUser`/`targetSwitchCtx.group`/
+`reopenAction`'s `a`): `manage-tests-actions-controller.ts`'s `delTest()`
+captures `points=context.points` (a DIRECT reference into
+`state.data[id]`, from `ManageConfigService.assayRemoval()`) and uses
+`points.length` to show the point count in BOTH confirmation dialogs — the
+second (`reauthenticateCurrentUser`) reads `points.length` AFTER
+`confirmDialog` has already resolved. Before fixing `addPoint()`
+(`.push()` → reassign), this risk didn't exist — `.push()` kept
+`points.length` "live"-correct even if new points were added while waiting;
+after the fix, if another flow calls `addPoint()` for the SAME test while
+the user is mid-password-entry, the stale `points` would show an
+UNDERCOUNT in the reauth dialog (display-only — the actual deletion via
+`ManageAssayWorkflowCommand.remove()` re-reads fresh state, never uses the
+captured `points`). Fixed by capturing `pointsCount=points.length` as a
+plain number right after getting `context` (before `confirmDialog` even
+runs), using `pointsCount` in both messages instead of holding the live
+array across two `await`s.
+
+**Real before/after performance measurement (specific to Group 6, not
+needed for the prior 5 groups since none had comparable write frequency +
+data volume)**: since `[...arr,point]` is O(n) per insert versus
+`.push()`'s O(1) amortized, and `addPoint()` is the single MOST FREQUENTLY
+user-triggered operation in the whole app (every QC point entry), measured
+directly with an ad-hoc script: 500 consecutive `EntryService.addPoint()`
+calls against a test that already holds 40,000 points — BEFORE the fix:
+346.82ms total / 0.6936ms per call; AFTER the fix: 413.23ms total /
+0.8265ms per call (~19% slower per call, but still under 1ms/point at
+40,000+ scale — negligible for a user-triggered action, not a hot loop).
+`benchmarks/verify-release.js`'s full scenario (50 tests × 3 levels × 730
+days = 109,500 points) also PASSES every performance budget in full, no
+regression.
+
+Verified: `npm test` 431/431 (no test needed updating), `typecheck` clean,
+`build:pilot` succeeds (4/4), `check-build-freshness` matches, `a11y-audit`
+0 violations (18/18 modals), `ui-workflow-check` 29/29, `nce-workflow-check`
+91/91, `benchmarks/verify-release.js` PASSES IN FULL (including the full
+performance budget at 109,500-point scale), plus an ad-hoc Playwright
+script calling `EntryService.addPoint()` directly confirming
+`state.data[testId]` is a NEW array (`sameRef: false`), the count correctly
+increments, the new point is found in the result, AND `pointsOf(testId,level)`
+(routed through `qcPointCache`) correctly auto-rebuilds and finds the new
+point right after the array reference changes — no cache read stale data,
+the Entry page still renders normally after `rerender()`, no console
+errors.
+
+**Giai đoạn 7 (state genuinely immutable) is now essentially complete for
+its core scope — all 6 data groups (users/settings/lab, activity/audit
+log, instruments/qcLots/qcPanels, lotGroups/tests/teaRefs/lotTransitions,
+actions/NCE, state.data/QC points) have had every non-reassigning parent-
+array `.push()`/`.splice()` eliminated.** What remains (NOT done, deferred
+to separate, more careful passes, NOT required to meet Giai đoạn 7's
+minimum goal): converting mutate-a-field-on-an-EXISTING-element to
+always-create-a-new-object more deeply for `state.lotGroups` (requires
+simultaneously fixing `targetSwitchCtx.group`/`activateLotGroup`'s
+`g`/`preview.group`/`saveTargetMatrix`'s `group`) and for `state.actions`
+(requires patching `reopenAction()`'s stale-`a`-after-await at the same
+time) — both reasons for deferring are already documented in CLAUDE.md/the
+plan file under their respective groups.
+
 Then shrink/delete the now-dead
 `root.X=` aliases, `global.d.ts`'s
 ambient bare-global declarations, and rewrite the 61 sandbox tests + ~88

@@ -119,7 +119,10 @@ export function createEntryService({ cleanText, cleanId, valueDecimals, isPeriod
     state.data = state.data || {}; state.data[tid] = state.data[tid] || [];
     const dayNote = ((state.data[tid] || []).find(point => !point.voided && point.date === date && String(point.note || '').trim()) || {}).note || '';
     const point = { id, date, runId, level, val, valueDecimals: decimals, lot: cfg.lot || '', qcMean: cfg.mean, qcSd: cfg.sd, note: dayNote, ...staff };
-    state.data[tid].push(point); return point;
+    /* Giai đoạn 7 (state immutable, nhóm state.data/điểm QC, 2026-08-31): gán
+       lại `state.data[tid]` bằng mảng MỚI khi thêm điểm, thay vì `.push()`
+       tại chỗ. */
+    state.data[tid] = [...state.data[tid], point]; return point;
   }
   function recordPoint(state: EntryState, input: AnyRecord) {
     const prepared = preparePointInput(input || {}); if (!prepared.ok) return prepared;
