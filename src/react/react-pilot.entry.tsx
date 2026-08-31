@@ -33,25 +33,38 @@ const registry = createReactPageRegistry({
   entry: () => <EntryPage />,
 });
 
-(window as any).QCLabReact = {
-  isReactPage: registry.isReactPage,
-  mountReactPage: registry.mountReactPage,
-  unmountReactPageIfMounted: registry.unmountReactPageIfMounted,
-  confirmDialog, infoDialog, closeDialogOverlay, reauthenticateCurrentUser,
-  openModal, closeModal,
-  openConfigInstrument,
-  sgOpenAddTest,
-  sgOpenMU,
-};
+/* Giai đoạn 9+ (composition root viết lại/gộp bundle, Bước 0, 2026-08-31):
+   guard `typeof window!=='undefined'`/`typeof document!=='undefined'` cho
+   4 chỗ đụng DOM ở top-level module scope này — khớp ĐÚNG mẫu đã dùng 6 lần
+   khác trong modular-pilot.global.ts (xem dòng 5715-5719 ở đó) cho
+   root.boot()'s DOMContentLoaded listener. Làm việc này TRƯỚC KHI gộp 2
+   bundle Vite thành một, vì đây là nguyên nhân chính xác (không phải chính
+   React) khiến 61 sandbox test (tests/helpers/sandbox.js, vm.createContext
+   không có window/document) từng ném ReferenceError khi thử gộp — bản thân
+   thư viện React đã tự guard qua biến nội bộ canUseDOM, không cần jsdom. */
+if (typeof window !== 'undefined') {
+  (window as any).QCLabReact = {
+    isReactPage: registry.isReactPage,
+    mountReactPage: registry.mountReactPage,
+    unmountReactPageIfMounted: registry.unmountReactPageIfMounted,
+    confirmDialog, infoDialog, closeDialogOverlay, reauthenticateCurrentUser,
+    openModal, closeModal,
+    openConfigInstrument,
+    sgOpenAddTest,
+    sgOpenMU,
+  };
+}
 
 /* #dialogRoot/#modalRoot giờ mỗi cái do MỘT React root sở hữu vĩnh viễn,
    mount một lần ngay khi react-pilot.js chạy (element tĩnh trong
    index.html, có sẵn trước khi script defer này chạy) — không mount/unmount
    theo trang như #main, vì các hàm này có thể được gọi từ bất kỳ trang nào,
    kể cả lúc không có trang React nào đang active. */
-const dialogRootEl = document.getElementById('dialogRoot');
-if (dialogRootEl) createRoot(dialogRootEl).render(<DialogOverlay />);
-const modalRootEl = document.getElementById('modalRoot');
-if (modalRootEl) createRoot(modalRootEl).render(<ModalOverlay />);
-const datePickerRootEl = document.getElementById('datePickerRoot');
-if (datePickerRootEl) createRoot(datePickerRootEl).render(<DatePickerPopup />);
+if (typeof document !== 'undefined') {
+  const dialogRootEl = document.getElementById('dialogRoot');
+  if (dialogRootEl) createRoot(dialogRootEl).render(<DialogOverlay />);
+  const modalRootEl = document.getElementById('modalRoot');
+  if (modalRootEl) createRoot(modalRootEl).render(<ModalOverlay />);
+  const datePickerRootEl = document.getElementById('datePickerRoot');
+  if (datePickerRootEl) createRoot(datePickerRootEl).render(<DatePickerPopup />);
+}
