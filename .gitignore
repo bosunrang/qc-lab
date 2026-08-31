@@ -1,6 +1,7 @@
 # Generated test and tooling output
 coverage/
 dist/
+app-v2-dist/
 .cache/
 *.log
 *.tmp

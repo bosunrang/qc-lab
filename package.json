@@ -15,6 +15,12 @@
     "build:worker": "tsc -p tsconfig.worker.json",
     "test": "node scripts/run-tests.js",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.modules.json && tsc -p tsconfig.react.json",
+    "app-v2:typecheck": "tsc -p tsconfig.app-v2-main.json --noEmit && tsc -p tsconfig.app-v2-renderer.json",
+    "app-v2:test": "node app-v2/scripts/run-tests.cjs",
+    "app-v2:build:main": "tsc -p tsconfig.app-v2-main.json",
+    "app-v2:build:renderer": "vite build --config vite.app-v2-renderer.config.mjs",
+    "app-v2:build": "npm run app-v2:build:main && npm run app-v2:build:renderer",
+    "app-v2:start": "npm run app-v2:build && electron app-v2-dist/main/index.js",
     "visual-check": "node scripts/visual-check.js",
     "nce-check": "node scripts/nce-workflow-check.js",
     "ui-check": "node scripts/ui-workflow-check.js",
@@ -31,6 +37,8 @@
     "dist:publish": "npm run build:pilot && node scripts/patch-7za-symlink.js && electron-builder --win nsis --publish always"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.2.0",
+    "@types/node": "^26.4.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",
     "axe-core": "^4.12.1",
@@ -39,6 +47,7 @@
     "playwright": "^1.61.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "react-router-dom": "^7.18.3",
     "typescript": "^7.0.2",
     "vite": "^8.2.1",
     "zustand": "^5.0.15"
@@ -89,6 +98,7 @@
     }
   },
   "dependencies": {
-    "electron-updater": "^6.8.9"
+    "electron-updater": "^6.8.9",
+    "firebase": "^12.18.0"
   }
 }

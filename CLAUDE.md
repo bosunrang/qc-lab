@@ -50,6 +50,109 @@ Releases, which requires a `GH_TOKEN` env var (a GitHub personal access token
 with `repo` scope) — don't run it without one configured, and never commit
 that token.
 
+## app-v2 — bản viết lại kiến trúc mới (song song, chưa đóng gói)
+
+`app-v2/` là một bản viết lại QC Lab từ đầu bằng kiến trúc khác hẳn phần còn
+lại của repo này — KHÔNG phải một bước tiếp theo của "Giai đoạn 9" (viết lại
+composition root + gộp bundle, xem "Kernel / gỡ global bridge" bên dưới).
+Giai đoạn 9 vẫn tiến hoá app cũ (`index.html`/`assets/`/`src/`) tại chỗ, không
+backend, `localStorage`/IndexedDB; `app-v2/` là một sản phẩm khác đang được
+xây song song, sẽ thay thế app cũ khi đủ tính năng — không đọc/ghi chung dữ
+liệu, không chia sẻ code với `src/`/`assets/`. Bắt đầu 2026-08-31, chưa có tên
+trong `package.json`'s `build.files` (chưa đóng gói cùng bản Electron chính
+thức) — chạy/test bằng các script `app-v2:*` riêng.
+
+**Kiến trúc**: Electron 2 tiến trình thật (không còn một global scope dùng
+chung như app cũ) — `app-v2/main/` (main process: `node:sqlite` làm nguồn dữ
+liệu thật thay cho `localStorage`, `ipcMain.handle` theo named channel
+`<module>:<action>`, `preload.ts` lộ đúng các hàm đó qua `contextBridge` dưới
+`window.qcApi`) và `app-v2/renderer/` (React 19 thật + `react-router-dom`
+`HashRouter` — bắt buộc hash vì app đóng gói `file://`, không có server phục
+vụ route dạng path — + Zustand store THẬT theo state chuẩn `set()`/`get()`
+cho từng trang, không phải notify-bus bọc quanh 1 object `state` lớn như
+`app-store.ts` của app cũ). `app-v2/shared/qc-api.d.ts` là hợp đồng IPC dùng
+chung giữa 2 tiến trình — sửa handler ở main phải sửa cả interface `QcApi`
+này, không renderer nào gọi SQL trực tiếp.
+
+**Schema SQLite** (`app-v2/main/db/schema.ts`, `applySchema()` idempotent
+qua `CREATE TABLE IF NOT EXISTS`) được thiết kế đủ cho TOÀN BỘ ứng dụng ngay
+từ đầu (lab/instruments/tests/test_levels/qc_points/qc_panels/qc_lots/
+lot_groups/lot_transitions/sigma_data/actions/activity/users/reagent_tests/
+period_locks/tea_refs) — không phải chỉ đủ cho phần đã code. Nguyên tắc tách
+bảng quan hệ thật (đặc biệt `qc_points`, có index theo `(test_id,level,date)`)
+vs giữ cột `*_json` (khi cấu trúc luôn đọc/ghi nguyên khối theo cha, không có
+truy vấn `WHERE`/`JOIN` xuyên hàng) ghi ngay trong comment đầu file. Không có
+"xoá thật" QC — chỉ `voided` (soft-delete), giữ đúng chính sách sản phẩm của
+app cũ.
+
+**Mỗi IPC handler theo cùng khuôn**: nhận input thô → validate qua 1 hàm
+thuần trong `main/domain/*-validation.ts` (không đụng DB, dễ test không cần
+SQLite) → nếu hợp lệ thì UPDATE/INSERT trong 1 transaction → `writeAudit()`
+ghi 1 dòng vào bảng `activity` (chuỗi hash tamper-evident, thuật toán y hệt
+bản cũ nhưng dùng `node:crypto` thật — xem `main/domain/audit-chain.ts`) →
+trả `IpcResult<T>` (`{ok:true,data}` hoặc `{ok:false,error:{code,message}}`).
+`main/ipc/shared.ts` (thêm 2026-08-31 khi có handler thứ 7) gom `Actor`/
+`IpcResult`/`writeAudit`/`rowToAuditEntry`/`nowIso` dùng chung — TRƯỚC đó 6
+file handler đầu tiên (config/entry/westgard/sigma/nce/reagent) mỗi file tự
+khai báo lại y hệt; đừng quay lại kiểu nhân bản đó khi thêm handler mới.
+
+**Test**: `npm run app-v2:test` (`app-v2/scripts/run-tests.cjs`) tự build
+main process (CommonJS) rồi chạy `node --test app-v2/tests/*.test.mjs` —
+BẮT BUỘC build trước vì phần lớn module `main/` import chéo lẫn nhau
+(`manage-validation.ts` → `text-utils.ts`...), Node's ESM type-stripping
+không resolve được import không đuôi file kiểu CommonJS. CHỈ module KHÔNG
+import chéo module khác trong `main/` (vd `westgard-rules.ts`,
+`audit-chain.ts`, `password-hash.ts`) mới test thẳng trên `.ts` qua ESM được
+— xem comment đầu mỗi file test để biết đang dùng cách nào. Test theo 2 tầng:
+"oracle" (so hành vi domain thuần với công thức/hằng số đã biết, không cần
+DB) và "end-to-end" (SQLite `:memory:` thật + handler thật + validate + audit
+hash-chain — chứng minh cả 4 lớp chạy đúng cùng nhau, không phải unit test cô
+lập). `npm run app-v2:typecheck` chạy 2 lượt `tsc` riêng (main CommonJS,
+renderer JSX) vì 2 tiến trình có target/module khác nhau.
+
+**Trạng thái module** (thứ tự triển khai — mỗi module thêm cả domain +
+validate + IPC handler + preload + Zustand store + trang React, verify bằng
+`npm run app-v2:test`/`app-v2:typecheck` VÀ chạy thật trong cửa sổ Electron
+qua Playwright's `_electron` trước khi coi là xong, không chỉ tin typecheck):
+Cấu hình chung (máy/xét nghiệm/mức QC), Nhập QC, Phân tích Westgard, Six
+Sigma, Khắc phục sự cố (NCE — chưa có protocol-v3 FMEA đầy đủ như bản cũ),
+So sánh hóa chất — 6 module "thí điểm" đầu tiên, xây trước để chứng minh
+kiến trúc (main↔IPC↔SQLite↔renderer) chạy đúng, dùng chung 1
+`TEMP_ACTOR` cứng (admin) vì chưa có đăng nhập thật. **Users/Auth (thêm
+2026-08-31)** là module thứ 7, đúng thứ tự đã ghi sẵn trong comment cũ của
+`main/index.ts` ("Audit/Users nằm sau module thí điểm"): PBKDF2-SHA256 600k
+vòng lặp (`main/domain/password-hash.ts`, cùng định dạng chuỗi lưu
+`pbkdf2$<iter>$<salt>$<hash>` với bản cũ để giữ khả năng import backup sau
+này, nhưng dùng `node:crypto` thật thay vì tự viết SHA-256 bằng JS như
+`assets/core.js` phải làm vì chạy trong trình duyệt), 3 vai trò cố định
+admin/technician/viewer (chưa có `pagePerms` tuỳ biến theo trang như bản cũ).
+`bootstrapAdmin()` chỉ chạy được đúng 1 lần khi bảng `users` còn rỗng (không
+cần actor có sẵn — chưa ai đăng nhập được); mọi thao tác ghi ở 6 module kia
+giờ đi qua `requireActor()` trong `main/index.ts` (actor đăng nhập thật, giữ
+trong biến bộ nhớ của main process — app 1 cửa sổ duy nhất nên không cần
+session token/cookie) thay vì `TEMP_ACTOR`, sẽ ném lỗi rõ ràng nếu gọi trước
+khi đăng nhập — điều này không nên xảy ra vì `AppRouter`
+(`renderer/router.tsx`) đã chặn hiển thị mọi route khác cho tới khi
+`useAuthStore` báo `status==='logged-in'`. Guard "không tự khoá/hạ quyền
+admin ACTIVE cuối cùng" (`wouldRemoveLastActiveAdmin()` trong
+`auth-handlers.ts`) tồn tại vì app này không có đường "quên mật khẩu" nào
+khác — khoá cứng tài khoản admin duy nhất là không thể tự cứu. Verify:
+`npm run app-v2:test` 15/15, `app-v2:typecheck` sạch, `app-v2:build` (main +
+renderer) sạch, cộng kịch bản Playwright `_electron` tạm thời (không commit)
+xác nhận trong cửa sổ Electron THẬT: chưa có user → hiện form khởi tạo admin
+→ tạo xong chuyển sang form đăng nhập → đăng nhập đúng vào được app, nav
+hiện đúng tên/vai trò + link "Người dùng" (chỉ admin) → mở được trang Người
+dùng → đăng xuất quay lại form đăng nhập → sai mật khẩu báo đúng lỗi.
+
+Còn thiếu so với bản cũ (chưa làm, không phải bug): Dashboard/Báo cáo/Cài
+đặt/Nhật ký hoạt động (trang) chưa có UI riêng — `listActivity` đã có ở
+`config-handlers.ts` nhưng chưa trang nào hiển thị; `pagePerms` theo từng
+trang; đồng bộ Firebase (gói `firebase` đã có trong `dependencies` của
+`package.json` gốc nhưng CHƯA có chỗ nào trong `app-v2/` import nó — chuẩn bị
+trước cho module này, chưa dùng); backup/restore; in ấn/xuất Excel; toàn bộ
+CSS/styling (mọi trang hiện là "thí điểm" — `<table>`/`<input>` trần, style
+inline tối thiểu, cố ý chưa đầu tư giao diện trước khi kiến trúc ổn định).
+
 ## Tests
 
 No test framework. Each file under `tests/*.test.js` is a plain Node script
