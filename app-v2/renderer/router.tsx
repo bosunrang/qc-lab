@@ -7,6 +7,7 @@ import { SigmaPage } from './pages/SigmaPage';
 import { ActionsPage } from './pages/ActionsPage';
 import { ReagentPage } from './pages/ReagentPage';
 import { UsersPage } from './pages/UsersPage';
+import { AuditPage } from './pages/AuditPage';
 import { LoginPage } from './pages/LoginPage';
 import { useAuthStore } from './store/auth-store';
 
@@ -24,7 +25,7 @@ export function AppRouter() {
   return (
     <HashRouter>
       <nav style={{ padding: 12, fontFamily: 'sans-serif' }}>
-        <Link to="/manage">Cấu hình chung</Link> | <Link to="/entry">Nhập QC</Link> | <Link to="/westgard">Phân tích Westgard</Link> | <Link to="/sigma">Six Sigma</Link> | <Link to="/actions">Khắc phục sự cố</Link> | <Link to="/reagent">So sánh hóa chất</Link>
+        <Link to="/manage">Cấu hình chung</Link> | <Link to="/entry">Nhập QC</Link> | <Link to="/westgard">Phân tích Westgard</Link> | <Link to="/sigma">Six Sigma</Link> | <Link to="/actions">Khắc phục sự cố</Link> | <Link to="/reagent">So sánh hóa chất</Link> | <Link to="/audit">Nhật ký hoạt động</Link>
         {user?.role === 'admin' && <> | <Link to="/users">Người dùng</Link></>}
         {' '}— {user?.name} ({user?.role}) <button onClick={logout}>Đăng xuất</button>
       </nav>
@@ -35,6 +36,7 @@ export function AppRouter() {
         <Route path="/sigma" element={<SigmaPage />} />
         <Route path="/actions" element={<ActionsPage />} />
         <Route path="/reagent" element={<ReagentPage />} />
+        <Route path="/audit" element={<AuditPage />} />
         <Route path="/users" element={user?.role === 'admin' ? <UsersPage /> : <Navigate to="/manage" replace />} />
         <Route path="*" element={<Navigate to="/manage" replace />} />
       </Routes>

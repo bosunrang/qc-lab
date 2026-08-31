@@ -47,6 +47,10 @@ export interface ActivityEntry {
 
 export type IpcResult<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string } };
 
+export interface ActivityPage {
+  page: number; pageCount: number; offset: number; rows: ActivityEntry[]; resultFrom: number; resultTo: number;
+}
+
 export interface QcPointView {
   id: string; test_id: string; level: number; date: string; run_id: string; val: number;
   note: string; operator_name: string; voided: 0 | 1; void_reason: string;
@@ -122,6 +126,7 @@ export interface QcApi {
   listTestLevels(testId: string): Promise<TestLevel[]>;
   saveTestLevel(input: { testId: string; data: Partial<TestLevel> }): Promise<IpcResult<TestLevel>>;
   listActivity(limit?: number): Promise<ActivityEntry[]>;
+  queryActivity(input: { query?: string; from?: string; to?: string; page?: number; pageSize?: number }): Promise<ActivityPage>;
   queryPoints(testId: string, level: number): Promise<QcPointView[]>;
   addPoint(input: { data: { testId: string; level: number; date: string; val: number; runId?: string; note?: string; operatorName?: string } }): Promise<IpcResult<QcPointView>>;
   voidPoint(input: { data: { pointId: string; reason: string } }): Promise<IpcResult<{ id: string }>>;

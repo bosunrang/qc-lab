@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('qcApi', {
   listTestLevels: (testId: string) => ipcRenderer.invoke('config:listTestLevels', testId),
   saveTestLevel: (input: unknown) => ipcRenderer.invoke('config:saveTestLevel', input),
   listActivity: (limit?: number) => ipcRenderer.invoke('config:listActivity', limit),
+  queryActivity: (input: unknown) => ipcRenderer.invoke('audit:query', input),
   queryPoints: (testId: string, level: number) => ipcRenderer.invoke('entry:queryPoints', testId, level),
   addPoint: (input: unknown) => ipcRenderer.invoke('entry:addPoint', input),
   voidPoint: (input: unknown) => ipcRenderer.invoke('entry:voidPoint', input),

@@ -144,14 +144,31 @@ xác nhận trong cửa sổ Electron THẬT: chưa có user → hiện form kh�
 hiện đúng tên/vai trò + link "Người dùng" (chỉ admin) → mở được trang Người
 dùng → đăng xuất quay lại form đăng nhập → sai mật khẩu báo đúng lỗi.
 
-Còn thiếu so với bản cũ (chưa làm, không phải bug): Dashboard/Báo cáo/Cài
-đặt/Nhật ký hoạt động (trang) chưa có UI riêng — `listActivity` đã có ở
-`config-handlers.ts` nhưng chưa trang nào hiển thị; `pagePerms` theo từng
-trang; đồng bộ Firebase (gói `firebase` đã có trong `dependencies` của
-`package.json` gốc nhưng CHƯA có chỗ nào trong `app-v2/` import nó — chuẩn bị
-trước cho module này, chưa dùng); backup/restore; in ấn/xuất Excel; toàn bộ
-CSS/styling (mọi trang hiện là "thí điểm" — `<table>`/`<input>` trần, style
-inline tối thiểu, cố ý chưa đầu tư giao diện trước khi kiến trúc ổn định).
+**Nhật ký hoạt động/Audit log (thêm 2026-08-31, module thứ 8)**: trang đầu
+tiên KHÔNG cần domain mới — `main/domain/audit-filter.ts`
+(`filterActivity`/`paginateActivity`/`updateAuditDateRange`) đã được port sẵn
+từ bản cũ cùng đợt với 6 module thí điểm đầu tiên, có test oracle riêng
+(`audit-filter.test.mjs`) từ trước, nhưng chưa từng được nối vào IPC/renderer
+nào cho tới module này. `main/ipc/audit-handlers.ts`'s `query()` đọc bảng
+`activity` theo `ORDER BY seq ASC` RỒI MỚI đưa qua `filterActivity()` — hàm
+đó tự đảo về mới-nhất-trước ở bước cuối; đọc theo `DESC` sẵn (như
+`config.listActivity()` cũ) rồi đưa qua sẽ bị đảo 2 lần thành cũ-nhất-trước,
+sai quy ước hiển thị của bản cũ — bẫy này được ghi lại bằng comment ngay tại
+chỗ gọi, không chỉ trong changelog này. `renderer/pages/AuditPage.tsx` +
+`audit-store.ts`: ô tìm kiếm + 2 ô ngày + phân trang, mọi thay đổi filter đều
+reset về trang 1. Verify: `npm run app-v2:test` 16/16 (thêm
+`audit-handlers.test.mjs` — lọc văn bản, lọc rỗng không lỗi, phân trang chia
+đúng không trùng/thiếu dòng), cộng kịch bản Playwright `_electron` xác nhận
+trong Electron thật: mở trang hiện đúng 2 dòng audit (tạo admin + đăng nhập),
+gõ tìm kiếm lọc đúng, ảnh chụp màn hình xác nhận tiếng Việt hiển thị đúng.
+
+Còn thiếu so với bản cũ (chưa làm, không phải bug): Dashboard/Báo cáo/Cài đặt
+(trang) chưa có UI riêng; `pagePerms` theo từng trang; đồng bộ Firebase (gói
+`firebase` đã có trong `dependencies` của `package.json` gốc nhưng CHƯA có
+chỗ nào trong `app-v2/` import nó — chuẩn bị trước cho module này, chưa
+dùng); backup/restore; in ấn/xuất Excel; toàn bộ CSS/styling (mọi trang hiện
+là "thí điểm" — `<table>`/`<input>` trần, style inline tối thiểu, cố ý chưa
+đầu tư giao diện trước khi kiến trúc ổn định).
 
 ## Tests
 

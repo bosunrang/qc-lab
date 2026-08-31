@@ -9,6 +9,7 @@ import { createSigmaHandlers } from './ipc/sigma-handlers';
 import { createNceHandlers } from './ipc/nce-handlers';
 import { createReagentHandlers } from './ipc/reagent-handlers';
 import { createAuthHandlers, type PublicUser } from './ipc/auth-handlers';
+import { createAuditHandlers } from './ipc/audit-handlers';
 
 function createWindow(): void {
   const dbPath = path.join(app.getPath('userData'), 'qclab.sqlite');
@@ -20,6 +21,7 @@ function createWindow(): void {
   const nceHandlers = createNceHandlers(db);
   const reagentHandlers = createReagentHandlers(db);
   const auth = createAuthHandlers(db);
+  const audit = createAuditHandlers(db);
 
   // Danh tính đang đăng nhập: app 1 cửa sổ duy nhất nên giữ ngay trong bộ nhớ
   // main process, không cần session token/cookie. requireActor() là ranh
@@ -60,6 +62,7 @@ function createWindow(): void {
   ipcMain.handle('config:listTestLevels', (_event, testId) => config.listTestLevels(testId));
   ipcMain.handle('config:saveTestLevel', (_event, input) => config.saveTestLevel(input, requireActor()));
   ipcMain.handle('config:listActivity', (_event, limit) => config.listActivity(limit));
+  ipcMain.handle('audit:query', (_event, input) => audit.query(input));
 
   ipcMain.handle('entry:queryPoints', (_event, testId, level) => entry.queryPoints(testId, level));
   ipcMain.handle('entry:addPoint', (_event, input) => entry.addPoint(input, requireActor()));
