@@ -10,6 +10,8 @@ import { createNceHandlers } from './ipc/nce-handlers';
 import { createReagentHandlers } from './ipc/reagent-handlers';
 import { createAuthHandlers, type PublicUser } from './ipc/auth-handlers';
 import { createAuditHandlers } from './ipc/audit-handlers';
+import { createSettingsHandlers } from './ipc/settings-handlers';
+import { createReportHandlers } from './ipc/report-handlers';
 
 function createWindow(): void {
   const dbPath = path.join(app.getPath('userData'), 'qclab.sqlite');
@@ -22,6 +24,8 @@ function createWindow(): void {
   const reagentHandlers = createReagentHandlers(db);
   const auth = createAuthHandlers(db);
   const audit = createAuditHandlers(db);
+  const settings = createSettingsHandlers(db);
+  const report = createReportHandlers(db);
 
   // Danh tính đang đăng nhập: app 1 cửa sổ duy nhất nên giữ ngay trong bộ nhớ
   // main process, không cần session token/cookie. requireActor() là ranh
@@ -88,6 +92,14 @@ function createWindow(): void {
   ipcMain.handle('reagent:saveMetadata', (_event, input) => reagentHandlers.saveMetadata(input, requireActor()));
   ipcMain.handle('reagent:saveRows', (_event, input) => reagentHandlers.saveRows(input, requireActor()));
   ipcMain.handle('reagent:removeComparison', (_event, input) => reagentHandlers.removeComparison(input, requireActor()));
+
+  ipcMain.handle('settings:getLabProfile', () => settings.getLabProfile());
+  ipcMain.handle('settings:saveLabProfile', (_event, input) => settings.saveLabProfile(input, requireActor()));
+
+  ipcMain.handle('report:listPeriodLocks', () => report.listPeriodLocks());
+  ipcMain.handle('report:lockPeriod', (_event, input) => report.lockPeriod(input, requireActor()));
+  ipcMain.handle('report:unlockPeriod', (_event, input) => report.unlockPeriod(input, requireActor()));
+  ipcMain.handle('report:queryReport', (_event, input) => report.queryReport(input));
 
   const win = new BrowserWindow({
     width: 1280,

@@ -7,6 +7,7 @@ import { uid } from '../domain/text-utils';
 import { validateQcPointInput, validateVoidInput, type QcPointInput, type VoidPointInput } from '../domain/entry-validation';
 import { westgard, type QcPointLike, type RuleVerdict } from '../domain/westgard-engine';
 import { parseRuleActions, makeIsOn } from '../domain/rule-config';
+import { ymOfDate } from '../domain/period-lock-validation';
 import { type Actor, type IpcResult, nowIso, writeAudit } from './shared';
 
 interface QcPointRow {
@@ -17,6 +18,17 @@ interface QcPointRow {
 export interface QcPointView extends QcPointRow { verdict: RuleVerdict; rules: string[] }
 
 export function createEntryHandlers(db: Db) {
+  /** Kỳ báo cáo (YYYY-MM) đã khoá chặn thêm/huỷ điểm QC có ngày rơi vào kỳ
+   * đó — trên TẤT CẢ xét nghiệm, không phải theo từng xét nghiệm riêng, khớp
+   * chính sách PeriodService/entry-service.js của bản cũ (xem CLAUDE.md,
+   * report-handlers.ts's lockPeriod/unlockPeriod là nơi ghi/xoá bảng này).
+   * Đọc trực tiếp `period_locks` ở đây thay vì gọi qua report-handlers.ts để
+   * 2 module không phụ thuộc lẫn nhau — mỗi handler tự SQL, khớp quy ước
+   * chung của toàn bộ main/ipc/*. */
+  function isPeriodLocked(date: string): boolean {
+    return !!db.prepare('SELECT id FROM period_locks WHERE ym=?').get(ymOfDate(date));
+  }
+
   function pointsForLevel(testId: string, level: number, includeVoided = false): QcPointRow[] {
     const sql = includeVoided
       ? 'SELECT * FROM qc_points WHERE test_id=? AND level=? ORDER BY date, run_id'
@@ -48,6 +60,7 @@ export function createEntryHandlers(db: Db) {
     const { testId, level, date, val, runId, note, operatorName } = result.data;
     const test = db.prepare('SELECT name FROM tests WHERE id=?').get(testId) as { name: string } | undefined;
     if (!test) return { ok: false, error: { code: 'not-found', message: 'Khong tim thay xet nghiem.' } };
+    if (isPeriodLocked(date)) return { ok: false, error: { code: 'period-locked', message: `Kỳ ${ymOfDate(date)} đã bị khoá, không thể nhập thêm điểm QC.` } };
     const id = uid();
     db.prepare(`INSERT INTO qc_points(id,test_id,level,date,run_id,val,value_decimals,note,operator_name)
       VALUES (?,?,?,?,?,?,?,?,?)`).run(id, testId, level, date, runId, val, 2, note, operatorName);
@@ -60,9 +73,10 @@ export function createEntryHandlers(db: Db) {
     const result = validateVoidInput(input.data);
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
     const { pointId, reason } = result.data;
-    const point = db.prepare('SELECT id, test_id, voided FROM qc_points WHERE id=?').get(pointId) as { id: string; test_id: string; voided: number } | undefined;
+    const point = db.prepare('SELECT id, test_id, date, voided FROM qc_points WHERE id=?').get(pointId) as { id: string; test_id: string; date: string; voided: number } | undefined;
     if (!point) return { ok: false, error: { code: 'not-found', message: 'Khong tim thay diem QC.' } };
     if (point.voided) return { ok: false, error: { code: 'already-voided', message: 'Diem QC nay da bi huy truoc do.' } };
+    if (isPeriodLocked(point.date)) return { ok: false, error: { code: 'period-locked', message: `Kỳ ${ymOfDate(point.date)} đã bị khoá, không thể huỷ điểm QC.` } };
     const test = db.prepare('SELECT name FROM tests WHERE id=?').get(point.test_id) as { name: string } | undefined;
     db.prepare('UPDATE qc_points SET voided=1, void_reason=?, voided_at=?, voided_by=? WHERE id=?')
       .run(reason, nowIso(), actor.username, pointId);

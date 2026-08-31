@@ -41,4 +41,10 @@ contextBridge.exposeInMainWorld('qcApi', {
   saveReagentMetadata: (input: unknown) => ipcRenderer.invoke('reagent:saveMetadata', input),
   saveReagentRows: (input: unknown) => ipcRenderer.invoke('reagent:saveRows', input),
   removeReagentComparison: (input: unknown) => ipcRenderer.invoke('reagent:removeComparison', input),
+  getLabProfile: () => ipcRenderer.invoke('settings:getLabProfile'),
+  saveLabProfile: (input: unknown) => ipcRenderer.invoke('settings:saveLabProfile', input),
+  listPeriodLocks: () => ipcRenderer.invoke('report:listPeriodLocks'),
+  lockPeriod: (input: unknown) => ipcRenderer.invoke('report:lockPeriod', input),
+  unlockPeriod: (input: unknown) => ipcRenderer.invoke('report:unlockPeriod', input),
+  queryReport: (input: unknown) => ipcRenderer.invoke('report:queryReport', input),
 });

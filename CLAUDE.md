@@ -188,14 +188,70 @@ quá hạn xử lý (1)" kèm đúng tên xét nghiệm — không có test Node
 trang này không có logic mới nào ngoài gọi 3 API đã được test qua ở module
 gốc của chúng.
 
-Còn thiếu so với bản cũ (chưa làm, không phải bug): Báo cáo/Cài đặt (trang)
-chưa có UI riêng; `pagePerms` theo từng trang; đồng bộ Firebase (gói
-`firebase` đã có trong `dependencies` của `package.json` gốc nhưng CHƯA có
-chỗ nào trong `app-v2/` import nó — chuẩn bị trước cho module này, chưa
-dùng); backup/restore; in ấn/xuất Excel; toàn bộ CSS/styling (mọi trang hiện
-là "thí điểm" — `<table>`/`<input>` trần, style inline tối thiểu, cố ý chưa
-đầu tư giao diện trước khi kiến trúc ổn định); Dashboard chưa có
-polling/live-update (xem giới hạn ở trên).
+**Cài đặt (thêm 2026-08-31, module thứ 10)**: phạm vi rút gọn đúng tinh thần
+"thí điểm" — chỉ hồ sơ phòng xét nghiệm (bảng `lab`, 1 dòng id=1 đã được
+chèn sẵn bởi `openDatabase()` lần đầu): tên/khoa/địa chỉ + tiêu đề/phụ đề
+thương hiệu. `main/domain/settings-validation.ts`'s `prepareLabProfile()`
+không có trường bắt buộc thật sự (đây là thông tin mô tả, không phải dữ liệu
+QC) — chỉ làm sạch/giới hạn độ dài và giữ mặc định `brandTitle`/`brandSub`
+nếu bỏ trống, khớp `DEFAULT` trong schema. Logo/canvas upload, kết nối
+Firebase, LIS Gateway settings, backup/restore của bản cũ CHƯA làm (xem
+"còn thiếu" bên dưới). `renderer/pages/SettingsPage.tsx` nạp giá trị đã lưu
+vào state cục bộ đúng 1 lần khi profile về (cờ `seeded`), sau đó form là của
+người dùng gõ — tránh bị ghi đè lại mỗi khi store re-render. Verify:
+`npm run app-v2:test` (thêm `settings-handlers.test.mjs` — giá trị mặc định
+đúng schema, lưu/đọc lại khớp, bỏ trống brandTitle/brandSub fallback đúng
+mặc định thay vì lưu chuỗi rỗng), cộng kịch bản Playwright `_electron` xác
+nhận trong Electron thật: lưu xong rời trang rồi quay lại vẫn thấy đúng giá
+trị (chứng minh ghi DB thật, không phải chỉ state cục bộ).
+
+**Báo cáo (thêm 2026-08-31, module thứ 11 — HOÀN TẤT 11/11 TRANG)**: hai
+phần — khoá/mở khoá kỳ báo cáo (bảng `period_locks`, có sẵn trong schema từ
+đầu nhưng CHƯA từng có IPC/enforcement nào cho tới module này) và bảng xem
+lại điểm QC theo khoảng ngày (`report:queryReport`, đọc thẳng `qc_points`
+theo `test_id`+khoảng `date`, KHÔNG tính verdict Westgard — đúng nguyên tắc
+"2 con số Sigma/Report tách biệt" đã ghi trong "Confirmed business-logic
+decisions"). Điểm quan trọng nhất của module này không phải là UI mà là
+**enforcement thật**: `main/ipc/entry-handlers.ts`'s `addPoint`/`voidPoint`
+giờ gọi `isPeriodLocked(date)` (đọc thẳng bảng `period_locks` theo
+`ymOfDate(date)`, một hàm thuần trong `domain/period-lock-validation.ts`) —
+trước module này, khoá 1 kỳ sẽ không có tác dụng thật nào vì chưa có IPC
+`report:*` lẫn chỗ gọi trong Entry, đúng loại lỗi "thiếu wiring" đã gặp nhiều
+lần trong Giai đoạn 3 của app cũ, nhưng lần này bắt được TRƯỚC khi commit
+nhờ viết `tests/period-lock-enforcement.test.mjs` (test end-to-end giao giữa
+`entry-handlers.ts`/`report-handlers.ts`, không phải unit test cô lập cho
+1 trong 2 file) ngay khi thêm handler thay vì để dành đến khi có ai report
+bug. `entry-handlers.ts` KHÔNG import `report-handlers.ts` — mỗi handler tự
+đọc `period_locks` bằng SQL riêng (khớp quy ước "mỗi handler tự SQL, không
+phụ thuộc lẫn nhau" của toàn bộ `main/ipc/*`), chỉ dùng chung hàm thuần
+`ymOfDate()`. Khoá đòi ghi chú tuỳ chọn; MỞ khoá bắt buộc ghi chú ≥5 ký tự —
+một quyết định thiết kế có chủ đích (mở lại một kỳ đã chốt là hành động
+đáng cân nhắc hơn đóng nó), khác với bản cũ (không có gate ghi chú bắt buộc
+ở bước này) nhưng khớp tinh thần thận trọng ISO 15189 xuyên suốt codebase.
+Verify: `npm run app-v2:test` 19/19 (thêm `report-handlers.test.mjs` — khoá/
+mở khoá đúng gate, lọc `queryReport` đúng theo xét nghiệm+khoảng ngày; và
+`period-lock-enforcement.test.mjs` — khoá thật sự chặn add/void, kỳ khác
+không bị ảnh hưởng, mở khoá thì cho phép lại), `app-v2:typecheck`/`build`
+sạch, cộng kịch bản Playwright `_electron` xác nhận trong Electron thật:
+khoá 1 kỳ → sang trang Nhập QC nhập điểm vào đúng kỳ đó bị chặn với thông
+báo đúng → quay lại Báo cáo mở khoá → bảng xem lại hiện đúng dòng đã seed
+qua chính `window.qcApi`.
+
+Còn thiếu so với bản cũ (chưa làm, không phải bug): `pagePerms` theo từng
+trang; đồng bộ Firebase (gói `firebase` đã có trong `dependencies` của
+`package.json` gốc nhưng CHƯA có chỗ nào trong `app-v2/` import nó — chuẩn
+bị trước cho module này, chưa dùng); backup/restore; in ấn/xuất Excel; toàn
+bộ CSS/styling (mọi trang hiện là "thí điểm" — `<table>`/`<input>` trần,
+style inline tối thiểu, cố ý chưa đầu tư giao diện trước khi kiến trúc ổn
+định); Dashboard chưa có polling/live-update (xem giới hạn ở trên); logo/
+brand image upload; Firebase/LIS Gateway settings.
+
+**app-v2 giờ có đủ 11/11 trang** (Tổng quan, Cấu hình chung, Nhập QC, Phân
+tích Westgard, Six Sigma, Khắc phục sự cố, So sánh hóa chất, Báo cáo, Nhật
+ký hoạt động, Cài đặt, Người dùng) — mọi trang đều đọc/ghi qua IPC/SQLite
+thật, có audit log, có test end-to-end. Những gì còn thiếu (liệt kê ở trên)
+là các TÍNH NĂNG bổ sung bên trong các trang đã có, không phải trang nào
+chưa tồn tại.
 
 ## Tests
 

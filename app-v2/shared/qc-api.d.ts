@@ -108,6 +108,18 @@ export interface PublicUser {
   active: boolean; mustChangePassword: boolean;
 }
 
+export interface LabProfile {
+  id: number; name: string; dept: string; address: string;
+  brand_title: string; brand_sub: string; logo_text: string; logo_data: string;
+}
+
+export interface PeriodLockRow { id: string; ym: string; locked_at: string; locked_by: string; note: string }
+
+export interface ReportPointRow {
+  id: string; test_id: string; level: number; date: string; run_id: string; val: number;
+  note: string; operator_name: string; voided: 0 | 1; void_reason: string;
+}
+
 export interface QcApi {
   hasAnyUsers(): Promise<boolean>;
   currentUser(): Promise<PublicUser | null>;
@@ -147,6 +159,12 @@ export interface QcApi {
   saveReagentMetadata(input: { id: string; data: { reagent?: string; lotOld?: string; lotNew?: string; date?: string; operator?: string; sampleType?: string; unit?: string; biasTarget?: number; alpha?: number; coverageConfirmed?: boolean } }): Promise<IpcResult<ReagentComparisonView>>;
   saveReagentRows(input: { id: string; rows: [string, string][] }): Promise<IpcResult<ReagentComparisonView>>;
   removeReagentComparison(input: { id: string }): Promise<IpcResult<{ id: string }>>;
+  getLabProfile(): Promise<LabProfile>;
+  saveLabProfile(input: { data: { name?: string; dept?: string; address?: string; brandTitle?: string; brandSub?: string } }): Promise<IpcResult<LabProfile>>;
+  listPeriodLocks(): Promise<PeriodLockRow[]>;
+  lockPeriod(input: { data: { ym: string; note?: string } }): Promise<IpcResult<PeriodLockRow>>;
+  unlockPeriod(input: { data: { ym: string; note: string } }): Promise<IpcResult<{ ym: string }>>;
+  queryReport(input: { testId: string; from?: string; to?: string }): Promise<ReportPointRow[]>;
 }
 
 declare global {
