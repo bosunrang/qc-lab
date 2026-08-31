@@ -162,13 +162,40 @@ reset về trang 1. Verify: `npm run app-v2:test` 16/16 (thêm
 trong Electron thật: mở trang hiện đúng 2 dòng audit (tạo admin + đăng nhập),
 gõ tìm kiếm lọc đúng, ảnh chụp màn hình xác nhận tiếng Việt hiển thị đúng.
 
-Còn thiếu so với bản cũ (chưa làm, không phải bug): Dashboard/Báo cáo/Cài đặt
-(trang) chưa có UI riêng; `pagePerms` theo từng trang; đồng bộ Firebase (gói
+**Tổng quan/Dashboard (thêm 2026-08-31, module thứ 9)**: trang landing mặc
+định sau đăng nhập (`path="*"` giờ điều hướng về `/dashboard` thay vì
+`/manage`). Cũng KHÔNG có domain/IPC riêng — cố ý chỉ tổng hợp lại 3 endpoint
+đã có sẵn (`westgard:listTestSummaries`, `nce:listRecords`, `audit:query`)
+thay vì phát minh thêm domain mới cho một trang chỉ đọc và gộp: cảnh báo
+Westgard (mọi mức có `worstVerdict!=='ok'`, đã tính sẵn trong
+`listTestSummaries()`), sự cố NCE quá hạn (`record_status==='active' &&
+approval_status==='pending' && due_date<today`, join tên xét nghiệm ở
+`renderer/store/dashboard-store.ts` vì `NceRecord` chỉ có `test_id`), và 5
+dòng hoạt động gần đây nhất. **Giới hạn đã biết, cố ý chưa xử lý ở mức thí
+điểm này**: `DashboardPage.tsx`'s `useEffect(() => { load(); }, [load])`
+chỉ fetch một lần khi component MOUNT — không có polling/live-update như
+`app-store.ts`'s `touch()`/`revision` của app cũ, nên dữ liệu thay đổi ở
+trang khác sau khi Dashboard đã mở sẽ không tự cập nhật cho tới khi rời trang
+rồi quay lại (route unmount/remount). Việc này bị phát hiện ngay khi viết
+kịch bản Playwright kiểm chứng — kịch bản đầu tiên seed dữ liệu SAU khi
+Dashboard (trang mặc định) đã fetch xong, thấy 0 kết quả; sửa bằng cách rời
+trang rồi quay lại trong kịch bản, KHÔNG sửa app — ghi lại y nguyên đặc điểm
+này cho lần đọc code sau. Verify: `npm run app-v2:typecheck`/`build` sạch,
+cộng kịch bản Playwright `_electron` seed dữ liệu thật qua chính
+`window.qcApi` (1 xét nghiệm có Mean/SD, 1 điểm QC vi phạm 1-3s, 1 hồ sơ NCE
+quá hạn) rồi xác nhận Dashboard hiển thị đúng "Cảnh báo Westgard (1)"/"Sự cố
+quá hạn xử lý (1)" kèm đúng tên xét nghiệm — không có test Node riêng vì
+trang này không có logic mới nào ngoài gọi 3 API đã được test qua ở module
+gốc của chúng.
+
+Còn thiếu so với bản cũ (chưa làm, không phải bug): Báo cáo/Cài đặt (trang)
+chưa có UI riêng; `pagePerms` theo từng trang; đồng bộ Firebase (gói
 `firebase` đã có trong `dependencies` của `package.json` gốc nhưng CHƯA có
 chỗ nào trong `app-v2/` import nó — chuẩn bị trước cho module này, chưa
 dùng); backup/restore; in ấn/xuất Excel; toàn bộ CSS/styling (mọi trang hiện
 là "thí điểm" — `<table>`/`<input>` trần, style inline tối thiểu, cố ý chưa
-đầu tư giao diện trước khi kiến trúc ổn định).
+đầu tư giao diện trước khi kiến trúc ổn định); Dashboard chưa có
+polling/live-update (xem giới hạn ở trên).
 
 ## Tests
 
