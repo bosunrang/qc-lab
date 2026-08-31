@@ -60,7 +60,10 @@ backend, `localStorage`/IndexedDB; `app-v2/` là một sản phẩm khác đang 
 xây song song, sẽ thay thế app cũ khi đủ tính năng — không đọc/ghi chung dữ
 liệu, không chia sẻ code với `src/`/`assets/`. Bắt đầu 2026-08-31, chưa có tên
 trong `package.json`'s `build.files` (chưa đóng gói cùng bản Electron chính
-thức) — chạy/test bằng các script `app-v2:*` riêng.
+thức) — chạy/test bằng các script `app-v2:*` riêng. **`docs/APP-V2-PLAN.md`
+giữ bức tranh tổng thể + lộ trình đề xuất** (kiến trúc đã chốt, còn thiếu gì,
+tiêu chí "sẵn sàng thay app cũ") — phần dưới đây trong CLAUDE.md là log chi
+tiết theo từng module, đọc file kia trước nếu chỉ cần biết "đang ở đâu".
 
 **Kiến trúc**: Electron 2 tiến trình thật (không còn một global scope dùng
 chung như app cũ) — `app-v2/main/` (main process: `node:sqlite` làm nguồn dữ
