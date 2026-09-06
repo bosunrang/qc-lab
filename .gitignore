@@ -8,10 +8,15 @@ app-v2-dist/
 *.bak
 *.orig
 *.rej
+# Tệp so sánh dữ liệu ad-hoc, chỉ phục vụ lúc dò migration/local database.
+new_ids.txt
+old_ids.txt
+old_rows.json
 outputs/
 tests/__visual__/
 tests/__a11y__/
 tests/__print__/
+app-v2/tests/__ui-parity__/
 lis-gateway/.data/
 
 # Local dependency/install artifacts

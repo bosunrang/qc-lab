@@ -2,9 +2,12 @@
 // khong bao gio dung SQL truc tiep — chi goi cac ham dat ten ro rang o day.
 import type { Db } from '../db/open-database';
 import { cleanId, uid } from '../domain/text-utils';
-import { prepareReagentMetadata, prepareReagentRows, type ReagentMetadataInput } from '../domain/reagent-validation';
+import {
+  prepareReagentMetadata, prepareReagentRows, cleanQuickValueType, addQuickValue, DEFAULT_SAMPLE_TYPES,
+  type ReagentMetadataInput, type QuickValueType,
+} from '../domain/reagent-validation';
 import { calculateReagentComparison, RC_MIN_PAIRS, type ReagentComparisonResult } from '../domain/reagent-stats';
-import { type Actor, type IpcResult, writeAudit } from './shared';
+import { type Actor, type IpcResult, writeAudit, notifyChanged, requireWrite, requireAdmin } from './shared';
 
 export interface ReagentComparisonRow {
   id: string; reagent: string; lot_old: string; lot_new: string; date: string; operator: string;
@@ -42,16 +45,19 @@ export function createReagentHandlers(db: Db) {
   }
 
   function createComparison(input: { data: { name?: unknown; unit?: unknown } }, actor: Actor): IpcResult<ReagentComparisonView> {
+    const denied = requireWrite(actor); if (denied) return denied;
     const id = cleanId(uid());
     const name = String(input.data?.name || '').trim() || 'Hóa chất mới';
     db.prepare(`INSERT INTO reagent_tests(id,reagent,lot_old,lot_new,date,operator,sample_type,unit,bias_target,alpha,coverage_confirmed,rows_json)
       VALUES (?,?,?,?,?,?,?,?,?,?,0,?)`)
       .run(id, name, '', '', '', '', 'Mẫu bệnh nhân', String(input.data?.unit || ''), 6, 0.05, JSON.stringify(prepareReagentRows(null)));
     writeAudit(db, actor, 'Tạo phép so sánh hóa chất', `Tạo "${name}"`, name);
+    notifyChanged(['reagent_tests']);
     return { ok: true, data: toView(db.prepare('SELECT * FROM reagent_tests WHERE id=?').get(id) as unknown as ReagentComparisonRow) };
   }
 
   function saveMetadata(input: { id: unknown; data: ReagentMetadataInput }, actor: Actor): IpcResult<ReagentComparisonView> {
+    const denied = requireWrite(actor); if (denied) return denied;
     const id = cleanId(input.id);
     const existing = db.prepare('SELECT * FROM reagent_tests WHERE id=?').get(id) as ReagentComparisonRow | undefined;
     if (!existing) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy phép so sánh.' } };
@@ -61,20 +67,24 @@ export function createReagentHandlers(db: Db) {
     db.prepare(`UPDATE reagent_tests SET reagent=?,lot_old=?,lot_new=?,date=?,operator=?,sample_type=?,unit=?,bias_target=?,alpha=?,coverage_confirmed=? WHERE id=?`)
       .run(meta.reagent, meta.lotOld, meta.lotNew, meta.date, meta.operator, meta.sampleType, meta.unit, meta.biasTarget, meta.alpha, meta.coverageConfirmed ? 1 : 0, id);
     writeAudit(db, actor, 'Sửa thông tin so sánh hóa chất', `Cập nhật "${meta.reagent}"`, meta.reagent);
+    notifyChanged(['reagent_tests']);
     return { ok: true, data: toView(db.prepare('SELECT * FROM reagent_tests WHERE id=?').get(id) as unknown as ReagentComparisonRow) };
   }
 
   function saveRows(input: { id: unknown; rows: unknown }, actor: Actor): IpcResult<ReagentComparisonView> {
+    const denied = requireWrite(actor); if (denied) return denied;
     const id = cleanId(input.id);
     const existing = db.prepare('SELECT * FROM reagent_tests WHERE id=?').get(id) as ReagentComparisonRow | undefined;
     if (!existing) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy phép so sánh.' } };
     const rows = prepareReagentRows(input.rows);
     db.prepare('UPDATE reagent_tests SET rows_json=? WHERE id=?').run(JSON.stringify(rows), id);
     writeAudit(db, actor, 'Sửa dữ liệu so sánh hóa chất', `Cập nhật số liệu "${existing.reagent}"`, existing.reagent);
+    notifyChanged(['reagent_tests']);
     return { ok: true, data: toView(db.prepare('SELECT * FROM reagent_tests WHERE id=?').get(id) as unknown as ReagentComparisonRow) };
   }
 
   function removeComparison(input: { id: unknown }, actor: Actor): IpcResult<{ id: string }> {
+    const denied = requireAdmin(actor); if (denied) return denied;
     const id = cleanId(input.id);
     const existing = db.prepare('SELECT * FROM reagent_tests WHERE id=?').get(id) as ReagentComparisonRow | undefined;
     if (!existing) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy phép so sánh.' } };
@@ -82,10 +92,56 @@ export function createReagentHandlers(db: Db) {
     if (count <= 1) return { ok: false, error: { code: 'last-comparison', message: 'Phải giữ lại ít nhất 1 phép so sánh.' } };
     db.prepare('DELETE FROM reagent_tests WHERE id=?').run(id);
     writeAudit(db, actor, 'Xóa phép so sánh hóa chất', `Xóa "${existing.reagent}"`, existing.reagent);
+    notifyChanged(['reagent_tests']);
     return { ok: true, data: { id } };
   }
 
-  return { listComparisons, createComparison, saveMetadata, saveRows, removeComparison };
+  /** "Chọn nhanh" người thực hiện/loại mẫu — 1 danh sách CHUNG cho toàn app
+   * (không gắn theo phép so sánh), lưu ở `app_meta` cùng cơ chế key/value đã
+   * dùng cho `activityAnchor`/cấu hình LIS (schema không có bảng riêng cho
+   * việc này, và bản thân đây chỉ là gợi ý nhập liệu, không phải dữ liệu QC).
+   * Loại mẫu luôn có sẵn 3 giá trị mặc định (`prepareReagentMetadata()` cũng
+   * fallback về đúng giá trị đầu — "Mẫu bệnh nhân" — khi bỏ trống). */
+  function metaKey(type: QuickValueType): string { return `reagent_quick_${type}`; }
+  function readQuickList(type: QuickValueType): string[] {
+    const row = db.prepare('SELECT value FROM app_meta WHERE key=?').get(metaKey(type)) as { value: string } | undefined;
+    if (!row) return type === 'sampleType' ? [...DEFAULT_SAMPLE_TYPES] : [];
+    try { const parsed = JSON.parse(row.value); return Array.isArray(parsed) ? parsed.map(String) : []; } catch { return []; }
+  }
+  function writeQuickList(type: QuickValueType, items: readonly string[]): void {
+    db.prepare('INSERT INTO app_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(metaKey(type), JSON.stringify(items));
+  }
+
+  function listQuickValues(input: { type: unknown }): IpcResult<string[]> {
+    const type = cleanQuickValueType(input.type);
+    if (!type) return { ok: false, error: { code: 'invalid-type', message: 'Loại giá trị chọn nhanh không hợp lệ.' } };
+    return { ok: true, data: readQuickList(type) };
+  }
+
+  function addQuickListValue(input: { type: unknown; value: unknown }, actor: Actor): IpcResult<{ items: string[]; value: string }> {
+    const denied = requireWrite(actor); if (denied) return denied;
+    const type = cleanQuickValueType(input.type);
+    if (!type) return { ok: false, error: { code: 'invalid-type', message: 'Loại giá trị chọn nhanh không hợp lệ.' } };
+    const result = addQuickValue(readQuickList(type), input.value);
+    if ('error' in result) return { ok: false, error: { code: result.error, message: 'Nhập giá trị cần thêm.' } };
+    if (result.added) { writeQuickList(type, result.items); notifyChanged(['app_meta']); }
+    return { ok: true, data: { items: result.items, value: result.value } };
+  }
+
+  function removeQuickListValue(input: { type: unknown; index: unknown }, actor: Actor): IpcResult<{ items: string[] }> {
+    const denied = requireWrite(actor); if (denied) return denied;
+    const type = cleanQuickValueType(input.type);
+    if (!type) return { ok: false, error: { code: 'invalid-type', message: 'Loại giá trị chọn nhanh không hợp lệ.' } };
+    const items = readQuickList(type);
+    const index = Number(input.index);
+    if (!Number.isInteger(index) || index < 0 || index >= items.length) return { ok: false, error: { code: 'invalid-index', message: 'Không tìm thấy giá trị cần xoá.' } };
+    items.splice(index, 1);
+    writeQuickList(type, items);
+    notifyChanged(['app_meta']);
+    return { ok: true, data: { items } };
+  }
+
+  return { listComparisons, createComparison, saveMetadata, saveRows, removeComparison, listQuickValues, addQuickListValue, removeQuickListValue };
 }
 
 export type ReagentHandlers = ReturnType<typeof createReagentHandlers>;

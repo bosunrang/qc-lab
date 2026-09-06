@@ -53,4 +53,40 @@ const notFound = reagent.saveMetadata({ id: 'khong-ton-tai', data: {} }, actor);
 assert.equal(notFound.ok, false);
 assert.equal(notFound.error.code, 'not-found');
 
+// 7) "Chon nhanh" nguoi thuc hien/loai mau — 1 danh sach CHUNG cho toan app.
+// Loai mau co san 3 gia tri mac dinh; nguoi thuc hien bat dau rong.
+const defaultSampleTypes = reagent.listQuickValues({ type: 'sampleType' });
+assert.equal(defaultSampleTypes.ok, true);
+assert.deepEqual(defaultSampleTypes.data, ['Mẫu bệnh nhân', 'Mẫu nội kiểm (IQC)', 'Mẫu ngoại kiểm (EQA)']);
+const defaultOperators = reagent.listQuickValues({ type: 'operator' });
+assert.deepEqual(defaultOperators.data, []);
+const badType = reagent.listQuickValues({ type: 'khong-hop-le' });
+assert.equal(badType.ok, false);
+assert.equal(badType.error.code, 'invalid-type');
+
+const addedOp = reagent.addQuickListValue({ type: 'operator', value: '  Nguyễn Văn A  ' }, actor);
+assert.equal(addedOp.ok, true);
+assert.deepEqual(addedOp.data.items, ['Nguyễn Văn A']);
+assert.equal(addedOp.data.value, 'Nguyễn Văn A');
+// Them trung (khac hoa/thuong/dau) -> KHONG tao them dong moi, tra lai dung
+// gia tri da co.
+const addedDup = reagent.addQuickListValue({ type: 'operator', value: 'nguyen van a' }, actor);
+assert.equal(addedDup.ok, true);
+assert.deepEqual(addedDup.data.items, ['Nguyễn Văn A'], 'them trung khong duoc tao dong moi');
+assert.equal(addedDup.data.value, 'Nguyễn Văn A');
+const addedEmpty = reagent.addQuickListValue({ type: 'operator', value: '   ' }, actor);
+assert.equal(addedEmpty.ok, false);
+assert.equal(addedEmpty.error.code, 'empty-value');
+
+const addedOp2 = reagent.addQuickListValue({ type: 'operator', value: 'Trần Thị B' }, actor);
+assert.deepEqual(addedOp2.data.items, ['Nguyễn Văn A', 'Trần Thị B']);
+const removedOp = reagent.removeQuickListValue({ type: 'operator', index: 0 }, actor);
+assert.equal(removedOp.ok, true);
+assert.deepEqual(removedOp.data.items, ['Trần Thị B'], 'xoa dung vi tri, giu lai dung nguoi con lai');
+const removedBadIndex = reagent.removeQuickListValue({ type: 'operator', index: 99 }, actor);
+assert.equal(removedBadIndex.ok, false);
+assert.equal(removedBadIndex.error.code, 'invalid-index');
+// Danh sach van con nguyen sau khi lay lai (khong bi phu boi index sai)
+assert.deepEqual(reagent.listQuickValues({ type: 'operator' }).data, ['Trần Thị B']);
+
 console.log('app-v2 reagent-handlers end-to-end tests passed');

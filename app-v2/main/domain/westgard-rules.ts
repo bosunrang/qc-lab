@@ -68,6 +68,17 @@ export function primaryErrorRule(ruleIds: readonly string[]): string | null {
   return rows.slice().sort((a, b) => a.priority - b.priority)[0].id;
 }
 
+/** Loại sai số + mô tả luật CHÍNH — port `errorTypeDetailParts()` app cũ:
+ * `type` theo `errorType()` (3 nhánh SE/RE/'—', luật không phân loại như
+ * `1-2s` KHÔNG bị dán nhãn RE), `desc` lấy theo luật có `priority` NHỎ NHẤT
+ * (`primaryErrorRule`), không phải luật đầu tiên trong mảng. */
+export function errorTypeDetail(ruleIds: readonly string[]): { type: string; desc: string } {
+  const type = errorType(ruleIds);
+  if (type === '—') return { type, desc: '' };
+  const primary = primaryErrorRule(ruleIds);
+  return { type, desc: primary ? WG_RULE_DESCRIPTIONS[primary] || '' : '' };
+}
+
 export function errorType(ruleIds: readonly string[]): string {
   for (const id of ruleIds) {
     const rule = WG_RULE_BY_ID[id];

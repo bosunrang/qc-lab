@@ -4,6 +4,7 @@
 // duong ghi diem QC moi ma quen goi isPeriodLocked(), test nay phai bao do.
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { makeOperationalQc } from './helpers/operational-fixture.mjs';
 const require = createRequire(import.meta.url);
 
 const { openDatabase } = require('../../app-v2-dist/main/db/open-database.js');
@@ -19,6 +20,7 @@ const actor = { userId: 'u1', username: 'admin', name: 'Quan tri vien', role: 'a
 
 const instrument = config.saveInstrument({ data: { name: 'May Lock' } }, actor).data;
 const test = config.saveTest({ data: { name: 'Test Lock', instrumentId: instrument.id } }, actor).data;
+makeOperationalQc(db, { testId: test.id, instrumentId: instrument.id, assignments: [{ level: 1 }] });
 
 // 1) Truoc khi khoa: them diem QC binh thuong duoc
 const beforeLock = entry.addPoint({ data: { testId: test.id, level: 1, date: '2026-08-05', val: 5, runId: 'r1' } }, actor);

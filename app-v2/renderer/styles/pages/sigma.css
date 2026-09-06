@@ -1,0 +1,122 @@
+/* Six Sigma & Sai số — hợp nhất từ assets/professional-sigma.css (đọc trực
+   tiếp file gốc, giữ giá trị cuối cùng sau khi resolve cascade — xem CLAUDE.md
+   mục "Sao chép giao diện app cũ"). Chỉ giữ rule khớp class THẬT dùng trong
+   SigmaPage.tsx. CHƯA áp dụng (bỏ, có ghi chú) vì SigmaPage.tsx hiện chưa có:
+   `.sg-collapse-*`/`#sgFreq`/`#sgMU`/`.sg-mu-table`/`.sg-mu-summary-table`
+   (panel OPSpecs/MU tổng hợp theo kỳ — trang hiện chỉ có modal MU 1 mức, dùng
+   bảng `.data-table` chung); `.sg-chart-grid`/`.sg-chart-box` (biểu đồ CV/Bias
+   theo thời gian — chưa vẽ); `.sg-eflm-box`/`.sg-tea-source`/`.sg-tea-input`/
+   `.sg-setup-fields`/`.sg-control-row`/`.sg-inline-btns*` (panel "Thiết lập
+   phân tích" bản cũ có nhiều ô EFLM/đơn vị/nút tra cứu, app-v2 hiện chỉ có 1 ô
+   chọn xét nghiệm); `.sg-add-test-list`/`.sg-add-test-row` (modal chọn/thêm
+   xét nghiệm dạng danh sách — hiện dùng `<select>` đơn giản);
+   `.sg-row-action-buttons`/`.sg-row-cv`/`.sg-period-controls` (nút "Lấy CV từ
+   IQC"/sửa kỳ inline — chưa có); `.sg-improvement-card` (gợi ý cải thiện —
+   chưa có). */
+
+.sg-top-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(360px,.85fr);gap:var(--gap-panel);align-items:stretch;}
+.sg-top-grid>.panel{min-width:0;}
+.sg-setup-heading{display:flex!important;align-items:center;min-height:var(--panel-header-min-height);padding:10px 14px!important;color:var(--ink)!important;background:var(--section-head-bg);font-size:var(--type-subhead)!important;font-weight:850!important;}
+@media(max-width:980px){ .sg-top-grid{ grid-template-columns:1fr; } }
+
+.sgcards{display:grid;gap:var(--gap-panel);grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),240px));justify-content:center;margin:var(--panel-content-gap);}
+@media(min-width:500px){ #sgStatus .sgcards{ grid-template-columns:repeat(2,minmax(0,1fr)); } }
+.sgbig{color:var(--on-accent);border-radius:var(--radius-md);box-shadow:inset 0 0 0 1px rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.18);display:grid;align-content:start;min-height:168px;padding:14px 15px;text-align:center;}
+.sgbig .lab{font-size:var(--type-caption);text-transform:uppercase;opacity:.9;letter-spacing:.08em;}
+.sgbig .v{font-size:var(--type-kpi);font-weight:700;line-height:1.1;margin-top:4px;margin-bottom:4px;letter-spacing:-.03em;font-family:var(--sans);font-variant-numeric:tabular-nums;}
+.sgbig .grade{font-size:var(--type-body-sm);font-weight:600;margin-bottom:6px;}
+.sgbig .sub{font-size:var(--type-caption);opacity:.92;line-height:1.5;margin-top:auto;}
+@media(max-width:1280px){ .sgbig{ min-height:154px; padding:13px 14px; } }
+@media(max-width:1150px){ .sgbig{ min-height:146px; padding:12px 13px; } }
+
+.sg-data-head{min-height:var(--panel-header-min-height);display:flex;align-items:center;justify-content:space-between;gap:12px;padding:5px 14px;border-bottom:1px solid var(--section-head-border);background:var(--section-head-bg);}
+.sg-data-head h2.panel-title{margin:0;color:var(--section-head-ink);font-size:var(--type-subhead);font-weight:850;}
+.sg-data-head-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;}
+.sg-data-head-actions .btn{height:30px;min-height:30px;padding:3px 12px;}
+@media(max-width:760px){ .sg-data-head{ align-items:flex-start; flex-direction:column; } .sg-data-head-actions{ width:100%; justify-content:flex-start; } }
+
+.sg-simple-table-wrap{display:block;max-width:100%;margin:var(--panel-content-gap) 16px 12px;overflow-x:auto;overflow-y:hidden;border:1px solid var(--line);border-radius:var(--radius-md);-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;scrollbar-gutter:auto;padding-bottom:0;contain:paint;}
+.sg-simple-table{width:100%;min-width:760px;border-collapse:collapse;table-layout:fixed;}
+.sg-simple-table th{padding:7px;text-align:center;background:var(--section-head-bg);color:var(--card-head-ink);border-bottom-color:var(--section-head-border);font-size:var(--table-head-size);}
+.sg-simple-table thead tr:first-child th{font-size:var(--table-head-size);font-weight:800;}
+.sg-simple-table td{padding:6px 7px 5px;text-align:center;vertical-align:top;}
+.sg-simple-table .sg-group-start{border-left:2px solid var(--line);}
+.sg-simple-table .sg-period-cell{vertical-align:middle;white-space:nowrap;}
+/* Cả hàng là vùng chọn kỳ — bấm/Enter/Space vào hàng để xem lại kỳ đó ở
+   panel "Tình trạng"/MU (2026-09-04, trước đây hàng không bấm được, class
+   `sg-period-selected` gán cứng vào kỳ mới nhất mà không có rule CSS nào cả
+   nên không ai thấy khác biệt). Port nguyên `professional-sigma.css:69-86`. */
+.sg-simple-table tr.sg-period-row{cursor:pointer;}
+.sg-simple-table tr.sg-period-row:hover:not(.sg-period-selected) td{background:color-mix(in srgb,var(--teal) 4%,var(--panel));}
+.sg-simple-table tr.sg-period-row:focus-visible{outline:2px solid var(--teal);outline-offset:-2px;}
+.sg-simple-table tr.sg-period-selected td{background:color-mix(in srgb,var(--teal) 7%,var(--panel));}
+.sg-simple-table tr.sg-period-selected td:first-child{box-shadow:inset 4px 0 0 var(--teal);}
+.sg-simple-table input.sg-number{box-sizing:border-box;flex:none;width:84px;min-width:84px;max-width:84px;height:32px;min-height:32px;margin:0 auto;padding:4px 6px;border-color:transparent;background:transparent;box-shadow:none;text-align:center;font-size:var(--table-body-size);font-weight:700;cursor:text;appearance:textfield;-moz-appearance:textfield;transition:background-color .15s ease,border-color .15s ease,box-shadow .15s ease;}
+.sg-simple-table input.sg-number::-webkit-inner-spin-button,.sg-simple-table input.sg-number::-webkit-outer-spin-button{margin:0;-webkit-appearance:none;}
+.sg-simple-table input.sg-number:hover:not(:disabled),.sg-simple-table input.sg-number:focus{border-color:var(--line);background:var(--panel);box-shadow:0 0 0 3px rgba(11,116,125,.08);}
+.sg-simple-table input.sg-number:focus{border-color:var(--teal);outline:none;}
+.sg-simple-table input.sg-number::placeholder{color:var(--muted);opacity:.55;}
+.sg-cell-stack{min-height:45px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;}
+.sg-result-cell .tag{box-sizing:border-box;min-width:62px;min-height:32px;display:inline-flex;align-items:center;justify-content:center;font-size:var(--type-subhead);font-weight:800;}
+.sg-result-cell .tag.sg-zone{color:var(--sg-color);border-color:var(--sg-color);background:color-mix(in srgb,var(--sg-color) 10%,transparent);}
+.sg-cell-meta{max-width:100%;margin-top:3px;overflow:hidden;color:var(--muted);font-size:var(--type-overline);line-height:1.15;text-overflow:ellipsis;white-space:nowrap;}
+.sg-row-action{padding:6px!important;vertical-align:middle!important;}
+.sg-simple-table .sg-action-col{border-left:2px solid var(--line);}
+
+.sg-eqa-modal{width:520px;}
+.sg-eqa-table-wrap{overflow-x:auto;}
+.sg-eqa-table{width:100%;min-width:440px;margin:0 0 10px;border:1px solid var(--line);border-radius:var(--radius-md);border-collapse:separate;border-spacing:0;overflow:hidden;table-layout:fixed;font:var(--table-body-size) var(--sans);}
+.sg-eqa-table th{position:static;padding:8px;background:var(--section-head-bg);color:var(--section-head-ink);border-bottom:1px solid var(--section-head-border);font-size:var(--table-head-size);font-weight:800;letter-spacing:0;text-align:center;text-transform:none;}
+.sg-eqa-table th:first-child{width:30px;}
+.sg-eqa-table th:nth-child(2),.sg-eqa-table th:nth-child(3){width:145px;}
+.sg-eqa-table th:nth-last-child(2){width:58px;}
+.sg-eqa-table th:last-child{width:54px;}
+.sg-eqa-table tbody tr:last-child td{border-bottom:0;}
+.sg-eqa-table td{padding:4px;border-bottom:1px solid var(--line);color:var(--ink);text-align:center;}
+.sg-eqa-table td input[type=number]{box-sizing:border-box;width:104px;max-width:100%;height:28px;min-height:28px;padding:2px 6px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--surface-subtle);color:var(--ink);font:700 var(--table-body-size) var(--sans);text-align:center;appearance:textfield;-moz-appearance:textfield;}
+.sg-eqa-table td input[type=number]::-webkit-inner-spin-button,.sg-eqa-table td input[type=number]::-webkit-outer-spin-button{margin:0;-webkit-appearance:none;}
+.sg-eqa-table input:focus{border-color:var(--teal);background:var(--panel);box-shadow:0 0 0 3px rgba(11,116,125,.1);outline:none;}
+.sg-eqa-index{color:var(--muted);font-size:var(--type-caption);}
+.sg-eqa-bias{color:var(--muted);font-weight:750;}
+.sg-eqa-del{min-width:42px;}
+.sg-eqa-add{margin:12px 0 0;}
+.sg-eqa-summary{display:flex;flex-wrap:wrap;gap:12px 28px;min-height:66px;margin-top:12px;}
+.sg-eqa-summary>div:not(.sg-eqa-warning){display:flex;min-width:105px;flex-direction:column;gap:2px;}
+.sg-eqa-summary span{color:var(--muted);font-size:var(--type-caption);font-weight:750;letter-spacing:0;line-height:1.3;text-transform:none;}
+.sg-eqa-summary b{color:var(--ink);font-size:var(--type-heading-sm);}
+.sg-eqa-summary .sg-eqa-average{color:var(--teal-deep);}
+.sg-eqa-empty{align-self:center;font-size:var(--type-body-sm)!important;letter-spacing:0!important;text-transform:none!important;}
+.sg-eqa-summary.is-empty{box-sizing:border-box;display:flex;width:fit-content;max-width:100%;min-height:32px;margin-top:10px;padding:5px 10px;border-left:4px solid var(--warning-accent);background:var(--warning-bg);color:var(--warning-ink);line-height:1.2;}
+.sg-eqa-summary.is-empty .sg-eqa-empty{color:var(--warning-ink);font-weight:650;}
+.sg-eqa-warning{align-self:center;color:var(--warning-ink);font-size:var(--type-caption);font-weight:700;}
+.sg-mu-modal{width:860px;}
+@media(max-width:760px){ .sg-eqa-modal,.sg-mu-modal{ width:100%; } }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Bù các class app cũ CÓ CSS mà app-v2 để trống (phát hiện 2026-09-03 bằng
+   cách quét mọi className trong renderer rồi đối chiếu selector 2 bên — gate
+   UI parity không thấy vì nó so TẬP class trong DOM, mà class vẫn có ở cả 2
+   bản, chỉ khác là bên app-v2 không có rule nào phía sau). Giá trị copy
+   nguyên từ `assets/professional-sigma.css`.
+   ───────────────────────────────────────────────────────────────────────── */
+.sg-setup-fields{display:grid;grid-template-columns:minmax(0,1fr) 118px minmax(0,1fr);column-gap:12px;row-gap:var(--panel-content-gap);margin:var(--panel-content-gap) 16px 0;}
+.sg-setup-fields > div{min-width:0;}
+.sg-setup-fields label{margin-top:0;}
+.sg-setup-fields .sg-tea-source{grid-column:1 / span 2;grid-row:2;}
+.sg-setup-fields .sg-tea-input{grid-column:3;grid-row:2;}
+.sg-setup-fields .sg-tea-input input[type="number"]{-moz-appearance:textfield;}
+.sg-setup-fields .sg-tea-input input[type="number"]::-webkit-inner-spin-button,
+.sg-setup-fields .sg-tea-input input[type="number"]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
+.sg-control-row .sg-inline-btns{flex:0 0 auto;min-width:0;}
+.sg-control-row .sg-inline-btns label{visibility:hidden;}
+.sg-improvement-card{display:block;background:#f8fafb;border-left:3px solid var(--sg-color);color:var(--ink);}
+.sg-improvement-card > b{color:var(--sg-color);}
+.sg-mu-summary-table{min-width:1000px;margin:0;table-layout:fixed;}
+.sg-mu-summary-table th:not(:first-child):not(:last-child),
+.sg-mu-summary-table td:not(:first-child):not(:last-child){text-align:center;}
+.sg-mu-modal .sg-setup-fields{grid-template-columns:minmax(240px,360px) 220px;justify-content:start;margin:9px 0 0;}
+@media(max-width:760px){
+  .sg-setup-fields{grid-template-columns:1fr;}
+  .sg-mu-modal .sg-setup-fields{grid-template-columns:1fr;}
+  .sg-setup-fields .sg-tea-input,.sg-setup-fields .sg-tea-source{grid-column:auto;grid-row:auto;}
+}

@@ -21,6 +21,10 @@
     "app-v2:build:renderer": "vite build --config vite.app-v2-renderer.config.mjs",
     "app-v2:build": "npm run app-v2:build:main && npm run app-v2:build:renderer",
     "app-v2:start": "npm run app-v2:build && electron app-v2-dist/main/index.js",
+    "app-v2:dev": "vite --config vite.app-v2-renderer.config.mjs",
+    "app-v2:ui-parity": "npm run app-v2:build:renderer && node app-v2/scripts/ui-parity-check.cjs",
+    "app-v2:css-parity": "node app-v2/scripts/css-parity-check.cjs",
+    "app-v2:style-parity": "node app-v2/scripts/style-parity-check.cjs",
     "visual-check": "node scripts/visual-check.js",
     "nce-check": "node scripts/nce-workflow-check.js",
     "ui-check": "node scripts/ui-workflow-check.js",
@@ -99,6 +103,7 @@
   },
   "dependencies": {
     "electron-updater": "^6.8.9",
+    "exceljs": "^4.4.0",
     "firebase": "^12.18.0"
   }
 }

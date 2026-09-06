@@ -1,0 +1,69 @@
+/* Khắc phục sự cố — hợp nhất từ assets/professional-reports.css (đọc trực
+   tiếp file gốc — xem CLAUDE.md mục "Sao chép giao diện app cũ"). Chỉ giữ
+   rule khớp class THẬT dùng trong ActionsPage.tsx hiện tại: "Sự cố cần xử
+   lý" (`.issue-*`), "Nhật ký khắc phục" (`.action-log-*`, `.action-chip`),
+   tiêu đề từng phần trong modal (`.action-form-section-title`).
+
+   CHƯA áp dụng (bỏ, có ghi chú) vì form 8 phần của ActionsPage.tsx hiện dùng
+   `.field-row`/`.field`/`<textarea>` chung thay vì layout lưới riêng của bản
+   cũ — `.action-immediate-grid`/`.action-cause-grid`/`.action-release-grid`/
+   `.action-effectiveness-grid`/`.action-residual-grid`/`.action-risk-*`/
+   `.action-investigation-*` (bộ câu hỏi điều tra dạng lưới có chip trạng
+   thái ok/abnormal/na — form app-v2 chỉ có 1 ô textarea tự do), `.sugg-row`/
+   `.sugg-chip`/`.action-suggestions` (bản cũ có khung gợi ý đóng/mở riêng,
+   app-v2 dùng chip phẳng luôn hiện — style riêng cho chip xem ở
+   `app.css`/inline), `.action-incident-banner`, `.action-guide-*` (modal
+   "Quy trình 8 bước" hiện dùng `<Modal>`+`<ol>` chung, không port bố cục thẻ
+   đánh số riêng), `.action-detail-*` (chi tiết hồ sơ hiện dùng `<p>` phẳng
+   theo từng SectionTitle, không port bố cục lưới 2 cột). Đây là khoảng cách
+   kiến trúc JSX, không chỉ CSS — để dành cho một đợt viết lại form/modal chi
+   tiết riêng nếu cần khớp pixel-perfect. */
+
+.action-log-panel{overflow:hidden;}
+.action-log-table{width:100%;min-width:1040px;margin:0;border:0;border-radius:0;table-layout:fixed;}
+.action-log-table th,.action-log-table td{vertical-align:top;padding:13px 12px;}
+.action-log-table th{height:42px;background:var(--section-head-bg);color:var(--card-head-ink);font-size:var(--table-head-size);letter-spacing:0;text-transform:none;}
+.action-log-table th:nth-child(1),.action-log-table td:nth-child(1){width:90px;}
+.action-log-table th:nth-child(2),.action-log-table td:nth-child(2){width:230px;}
+.action-log-table th:nth-child(3),.action-log-table td:nth-child(3){width:360px;}
+.action-log-table th:nth-child(4),.action-log-table td:nth-child(4){width:270px;}
+.action-log-table th:nth-child(5),.action-log-table td:nth-child(5){width:110px;}
+.action-log-table th:nth-child(5){text-align:center;}
+
+.action-chip{display:inline-flex;align-items:center;width:max-content;max-width:230px;min-height:22px;padding:4px 9px;border-radius:var(--radius-pill);font-size:var(--type-caption);font-weight:800;line-height:1.25;white-space:normal;}
+.action-chip.ok{background:var(--success-bg);color:var(--success-ink);border:1px solid var(--success-border);}
+.action-chip.warn{background:var(--warning-bg);color:var(--warning-ink);border:1px solid var(--warning-border);}
+.action-chip.rej{background:var(--danger-bg);color:var(--danger-ink);border:1px solid var(--danger-border);}
+.action-chip.none{background:var(--neutral-bg);color:var(--neutral-ink);border:1px solid var(--neutral-border);}
+
+.issue-group-body{display:grid;}
+.issue-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;border-top:1px solid var(--line2);border-radius:var(--surface-radius);}
+.issue-group-body .issue-row:first-child{border-top:none;}
+.issue-row.rej{background:var(--danger-bg);}
+.issue-row.warn{background:var(--warning-bg);}
+.issue-row-main{min-width:0;}
+.issue-row-main b{font-size:var(--type-meta);color:var(--ink);}
+.issue-row-main .meta{margin-top:2px;}
+.issue-row.rej .meta{color:var(--danger-ink);}
+.issue-row.warn .meta{color:var(--warning-ink);}
+
+.action-form-section-title{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.action-form-section-title>span{display:inline-flex;align-items:center;justify-content:center;flex:none;min-width:30px;height:30px;padding:0 7px;border-radius:var(--radius-pill);background:var(--teal);color:var(--on-accent);font-size:var(--type-meta);font-weight:850;}
+.action-form-section-title b{display:block;font-size:var(--type-body);}
+
+@media(max-width:640px){ .issue-row{ flex-direction:column; align-items:stretch; } }
+
+/* Bù class app cũ CÓ CSS mà app-v2 để trống (2026-09-03, quét bằng đối
+   chiếu selector 2 bên; gate UI parity không thấy vì nó so TẬP class
+   trong DOM — class vẫn có ở cả 2 bản, chỉ bên app-v2 là không có rule
+   nào phía sau). Giá trị copy nguyên từ `assets/*.css`. */
+.action-form-panel,.action-log-panel{margin-top:24px;}
+.action-form-panel-head{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:var(--panel-header-min-height);padding:10px 14px;background:var(--section-head-bg);border-bottom:1px solid var(--section-head-border);color:var(--card-head-ink);font-size:var(--section-head-size);font-weight:800;}
+.action-form-panel .action-form-panel-head > .panel-title{flex:1;margin:0;color:inherit;font:inherit;line-height:1.35;}
+.action-form-panel-head .btn{flex:0 0 auto;margin-left:auto;}
+.action-form-panel-head+.action-form-body{margin:0;}
+.action-form-panel-head+.empty{margin:var(--panel-content-gap) 16px 16px;}
+.issue-group{border:1px solid var(--line);border-radius:var(--surface-radius);overflow:hidden;background:var(--panel);}
+.issue-group.rej{border-left:4px solid var(--danger-accent);}
+.issue-group.warn{border-left:4px solid var(--warning-accent);}
+@media(max-width:640px){.action-form-panel-head{align-items:flex-start;flex-direction:column;}}

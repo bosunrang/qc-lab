@@ -45,16 +45,29 @@ const items = [
 }
 
 // 4) Phan trang - so sanh qua JSON (doi tuong cu tao trong vm context khac
-// realm nen deepStrictEqual se bao "khong reference-equal" du cung cau truc)
+// realm nen deepStrictEqual se bao "khong reference-equal" du cung cau truc).
+// CHI so 4 khoa ma ban cu co (`page`/`pageCount`/`offset`/`rows`):
+// `paginateActivity` cua app-v2 tra THEM `filteredCount` (so dong sau khi loc,
+// de trang Nhat ky hien "N/M dong" nhu app cu — ban cu doc do tu bien rieng
+// ngoai ham phan trang). So JSON ca doi tuong se bao khac chi vi truong moi,
+// khong phai vi phan trang lech; truong moi duoc chot rieng ben duoi.
+const OLD_PAGE_KEYS = ['page', 'pageCount', 'offset', 'rows'];
+const pick = (o) => JSON.stringify(Object.fromEntries(OLD_PAGE_KEYS.map(k => [k, o[k]])));
 {
   const oldR = ctx.activityAuditPagination(items, 1, 2);
   const newR = paginateActivity(items, 1, 2);
-  assert.equal(JSON.stringify(newR), JSON.stringify(oldR));
+  assert.equal(pick(newR), pick(oldR));
+  assert.equal(newR.filteredCount, items.length);
 }
 {
   const oldR = ctx.activityAuditPagination(items, 2, 2);
   const newR = paginateActivity(items, 2, 2);
-  assert.equal(JSON.stringify(newR), JSON.stringify(oldR));
+  assert.equal(pick(newR), pick(oldR));
+  assert.equal(newR.filteredCount, items.length);
+}
+{
+  // Loc rong: filteredCount phai la 0, khong phai tong so dong goc.
+  assert.equal(paginateActivity([], 1, 2).filteredCount, 0);
 }
 
 // 5) Cap nhat khoang ngay - dao nguoc thu tu tu dong keo dau kia

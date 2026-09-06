@@ -4,6 +4,7 @@
 // va report-handlers), khong lap lai o day.
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { makeOperationalQc } from './helpers/operational-fixture.mjs';
 const require = createRequire(import.meta.url);
 
 const { openDatabase } = require('../../app-v2-dist/main/db/open-database.js');
@@ -55,6 +56,8 @@ assert.equal(report.listPeriodLocks().length, 0);
 const instrument = config.saveInstrument({ data: { name: 'May Report' } }, actor).data;
 const testA = config.saveTest({ data: { name: 'Test A', instrumentId: instrument.id } }, actor).data;
 const testB = config.saveTest({ data: { name: 'Test B', instrumentId: instrument.id } }, actor).data;
+makeOperationalQc(db, { testId: testA.id, instrumentId: instrument.id, assignments: [{ level: 1 }] });
+makeOperationalQc(db, { testId: testB.id, instrumentId: instrument.id, assignments: [{ level: 1 }] });
 entry.addPoint({ data: { testId: testA.id, level: 1, date: '2026-08-01', val: 5, runId: 'r1' } }, actor);
 entry.addPoint({ data: { testId: testA.id, level: 1, date: '2026-08-15', val: 6, runId: 'r1' } }, actor);
 entry.addPoint({ data: { testId: testA.id, level: 1, date: '2026-09-01', val: 7, runId: 'r1' } }, actor);

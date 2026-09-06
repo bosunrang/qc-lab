@@ -6,6 +6,13 @@
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "8080"],
       "port": 8080
+    },
+    {
+      "name": "app-v2-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "app-v2:dev"],
+      "port": 5174,
+      "autoPort": true
     }
   ]
 }

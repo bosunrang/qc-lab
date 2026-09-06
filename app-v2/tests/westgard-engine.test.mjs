@@ -10,7 +10,8 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const QCCore = require('../../assets/core.js');
 const {
-  stats, pointTarget, pointZ, westgard, westgardByPoint, cusum,
+  stats, pointTarget, pointZ, westgard, westgardByPoint, westgardMultiByPoint,
+  combinedWestgardByPoint, cusum,
 } = require('../../app-v2-dist/main/domain/westgard-engine.js');
 
 // 1) stats()
@@ -95,6 +96,48 @@ for (const s of scenarios) {
   const newR = cusum(points, 10, 1, 0.5, 4);
   const oldR = QCCore.cusum(points, 10, 1, 0.5, 4);
   assert.deepEqual(newR, oldR, 'cusum() lech ban cu');
+}
+
+// 8) R4s liên mức: hai mức trái phía trong CÙNG run, chênh >4SD, phải gắn
+// luật cho cả hai điểm. Khác run thì không được ghép nhầm.
+{
+  const hi = { val: 12.1, date: '2026-09-01', runId: '2026-09-01-1' };
+  const lo = { val: 17.9, date: '2026-09-01', runId: '2026-09-01-1' };
+  const otherRun = { val: 7.8, date: '2026-09-01', runId: '2026-09-01-2' };
+  const multi = westgardMultiByPoint([
+    { level: 1, pts: [hi], mean: 10, sd: 1 },
+    { level: 2, pts: [lo], mean: 20, sd: 1 },
+    { level: 3, pts: [otherRun], mean: 10, sd: 1 },
+  ], (rule) => rule === 'R4s');
+  assert.deepEqual(multi.get(hi), ['R4s']);
+  assert.deepEqual(multi.get(lo), ['R4s']);
+  assert.equal(multi.has(otherRun), false, 'không được ghép R4s giữa hai run khác nhau');
+  const old = QCCore.westgardMultiByPoint([
+    { level: 1, pts: [hi], mean: 10, sd: 1 },
+    { level: 2, pts: [lo], mean: 20, sd: 1 },
+    { level: 3, pts: [otherRun], mean: 10, sd: 1 },
+  ], (rule) => rule === 'R4s');
+  assert.deepEqual(multi, old, 'R4s liên mức phải khớp oracle app cũ');
+}
+
+// 9) 2-2s liên mức: hai mức cùng phía >+2SD trong cùng run đều bị loại.
+{
+  const a = { val: 12.1, date: '2026-09-02', runId: 'run-1' };
+  const b = { val: 22.2, date: '2026-09-02', runId: 'run-1' };
+  const combined = combinedWestgardByPoint([
+    { level: 1, pts: [a], mean: 10, sd: 1 },
+    { level: 2, pts: [b], mean: 20, sd: 1 },
+  ], () => false, (rule) => rule === '2-2s');
+  assert.equal(combined.get(a).level, 'rej');
+  assert.equal(combined.get(b).level, 'rej');
+  assert.deepEqual(combined.get(a).rules, ['2-2s']);
+  assert.deepEqual(combined.get(b).rules, ['2-2s']);
+  const old = QCCore.westgardMultiByPoint([
+    { level: 1, pts: [a], mean: 10, sd: 1 },
+    { level: 2, pts: [b], mean: 20, sd: 1 },
+  ], (rule) => rule === '2-2s');
+  assert.deepEqual(old.get(a), ['2-2s']);
+  assert.deepEqual(old.get(b), ['2-2s']);
 }
 
 console.log('app-v2 westgard-engine oracle tests passed');

@@ -64,4 +64,18 @@ assert.equal(noCoA.data.levels[0].mu.complete, false);
 assert.ok(noCoA.data.levels[0].mu.missing.includes('u(cal)'));
 assert.equal(noCoA.data.levels[0].mu.uCal, null, 'u(cal) chua danh gia phai la null, khong duoc la 0');
 
+// 6) Nhieu vong EQA/EQC -> Bias% dung RMS, KHONG dung trung binh cong co dau
+// (2 vong doi dau [-2,2] trung binh cong = 0, RMS phai la 2).
+const eqaSaved = sigmaHandlers.savePeriod({
+  testId: test.id, period: '2026-10', tea: 15,
+  levels: [{ level: 1, cv: 3, eqaRounds: [-2, 2], uCal: 0.5 }],
+}, actor);
+assert.equal(eqaSaved.ok, true);
+const eqaLv = eqaSaved.data.levels[0];
+assert.ok(Math.abs(eqaLv.biasEqa - 2) < 1e-9, 'bias phai la RMS=2, khong phai trung binh cong=0');
+assert.equal(eqaLv.mixedSigns, true, 'phai bao dau trai nhau de canh bao tren UI');
+assert.deepEqual(eqaLv.eqaRounds, [-2, 2]);
+// u(bias) phai tinh duoc tu bias RMS + biasRefU (SD giua cac vong/can(n))
+assert.ok(eqaLv.mu.uBias != null, 'co eqaRounds phai tinh duoc u(bias), khong con null');
+
 console.log('app-v2 sigma-handlers end-to-end tests passed');

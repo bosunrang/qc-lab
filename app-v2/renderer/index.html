@@ -2,11 +2,28 @@
 <html lang="vi">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:">
 <title>QC Lab</title>
+<link rel="stylesheet" href="./styles/tokens.css">
+<link rel="stylesheet" href="./styles/app.css">
+<link rel="stylesheet" href="./styles/pages.css">
+<link rel="stylesheet" href="./styles/pages/dashboard.css">
+<link rel="stylesheet" href="./styles/pages/manage.css">
+<link rel="stylesheet" href="./styles/pages/entry.css">
+<link rel="stylesheet" href="./styles/pages/westgard.css">
+<link rel="stylesheet" href="./styles/pages/sigma.css">
+<link rel="stylesheet" href="./styles/pages/reagent.css">
+<link rel="stylesheet" href="./styles/pages/actions.css">
+<link rel="stylesheet" href="./styles/pages/audit.css">
+<link rel="stylesheet" href="./styles/pages/users.css">
+<link rel="stylesheet" href="./styles/pages/report.css">
+<link rel="stylesheet" href="./styles/pages/settings.css">
 </head>
 <body>
 <div id="root"></div>
+<div id="modalRoot"></div>
+<div id="dialogRoot"></div>
+<div id="datePickerRoot"></div>
 <script type="module" src="./main.tsx"></script>
 </body>
 </html>

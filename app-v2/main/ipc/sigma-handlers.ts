@@ -4,29 +4,36 @@
 // trung binh tho). sigma/MU tinh SONG lai tu du lieu da luu, khong cache
 // cung, de doi TEa/CV/Bias sau nay luon phan anh dung.
 import type { Db } from '../db/open-database';
-import { sigmaMetric, uncertaintyBudget, type SigmaMetricResult, type UncertaintyBudgetResult } from '../domain/sigma-metrics';
+import { sigmaMetric, uncertaintyBudget, eqaRoundsStats, type SigmaMetricResult, type UncertaintyBudgetResult } from '../domain/sigma-metrics';
 import { cleanId, cleanText, finiteNumber } from '../domain/text-utils';
-import { type Actor, type IpcResult, writeAudit } from './shared';
+import { type Actor, type IpcResult, writeAudit, notifyChanged, requireWrite, requireAdmin } from './shared';
 
 const PERIOD_RE = /^\d{4}-\d{2}$/;
 
-export interface SigmaLevelInput { level: number; cv?: unknown; biasEqa?: unknown; uCal?: unknown; muBiasMode?: 'include' | 'exclude' }
+export interface SigmaLevelInput { level: number; cv?: unknown; biasEqa?: unknown; eqaRounds?: unknown[]; uCal?: unknown; muBiasMode?: 'include' | 'exclude' }
 export interface SigmaPeriodInput { testId: unknown; period: unknown; tea?: unknown; teaSource?: unknown; levels: SigmaLevelInput[] }
 
 export interface SigmaLevelResult {
-  level: number; cv: number | null; biasEqa: number | null; uCal: number | null;
+  level: number; cv: number | null; biasEqa: number | null; eqaRounds: number[]; mixedSigns: boolean; uCal: number | null;
   sigma: SigmaMetricResult | null; mu: UncertaintyBudgetResult | null;
 }
 export interface SigmaPeriodView { id: string; testId: string; period: string; tea: number | null; teaSource: string; levels: SigmaLevelResult[] }
 
-interface StoredLevel { level: number; cv: number | null; biasEqa: number | null; uCal: number | null; muBiasMode: 'include' | 'exclude' }
+interface StoredLevel { level: number; cv: number | null; biasEqa: number | null; eqaRounds: number[]; uCal: number | null; muBiasMode: 'include' | 'exclude' }
 
+/** Bias% dùng cho Sigma/MU: nếu có ≥1 vòng EQA/EQC lưu kèm, RMS của các vòng
+ * LUÔN thắng giá trị `biasEqa` đơn lẻ cũ (không dùng song song 2 nguồn) —
+ * `eqaRoundsStats()` cũng cho `biasRefU` (u(Cref)) feed thẳng vào
+ * `uncertaintyBudget()`, thứ mà 1 con số `biasEqa` đơn lẻ không bao giờ có. */
 function computeLevel(stored: StoredLevel, tea: number | null): SigmaLevelResult {
-  const sigma = tea != null && stored.cv != null ? sigmaMetric(tea, stored.biasEqa || 0, stored.cv) : null;
+  const roundsStats = stored.eqaRounds && stored.eqaRounds.length ? eqaRoundsStats(stored.eqaRounds) : null;
+  const biasEqa = roundsStats ? roundsStats.rms : stored.biasEqa;
+  const biasRefU = roundsStats ? roundsStats.biasRefU : null;
+  const sigma = tea != null && stored.cv != null ? sigmaMetric(tea, biasEqa || 0, stored.cv) : null;
   const mu = stored.cv != null
-    ? uncertaintyBudget({ cv: stored.cv, bias: stored.biasEqa, includeBias: stored.muBiasMode !== 'exclude', uCal: stored.uCal, tea: tea ?? undefined })
+    ? uncertaintyBudget({ cv: stored.cv, bias: biasEqa, biasRefU, includeBias: stored.muBiasMode !== 'exclude', uCal: stored.uCal, tea: tea ?? undefined })
     : null;
-  return { level: stored.level, cv: stored.cv, biasEqa: stored.biasEqa, uCal: stored.uCal, sigma, mu };
+  return { level: stored.level, cv: stored.cv, biasEqa, eqaRounds: stored.eqaRounds || [], mixedSigns: roundsStats?.mixedSigns ?? false, uCal: stored.uCal, sigma, mu };
 }
 
 export function createSigmaHandlers(db: Db) {
@@ -41,18 +48,20 @@ export function createSigmaHandlers(db: Db) {
   }
 
   function savePeriod(input: SigmaPeriodInput, actor: Actor): IpcResult<SigmaPeriodView> {
+    const denied = requireWrite(actor); if (denied) return denied;
     const testId = cleanId(input.testId);
     const test = db.prepare('SELECT id, name FROM tests WHERE id=?').get(testId) as { id: string; name: string } | undefined;
-    if (!test) return { ok: false, error: { code: 'not-found', message: 'Khong tim thay xet nghiem.' } };
+    if (!test) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy xét nghiệm.' } };
     const period = cleanText(input.period, 7).trim();
-    if (!PERIOD_RE.test(period)) return { ok: false, error: { code: 'invalid-period', message: 'Ky phai co dinh dang YYYY-MM.' } };
-    if (!Array.isArray(input.levels) || !input.levels.length) return { ok: false, error: { code: 'missing-levels', message: 'Can it nhat 1 muc du lieu.' } };
+    if (!PERIOD_RE.test(period)) return { ok: false, error: { code: 'invalid-period', message: 'Kỳ phải có định dạng YYYY-MM.' } };
+    if (!Array.isArray(input.levels) || !input.levels.length) return { ok: false, error: { code: 'missing-levels', message: 'Cần ít nhất 1 mức dữ liệu.' } };
     const tea = input.tea == null || input.tea === '' ? null : finiteNumber(input.tea, NaN);
-    if (tea != null && (!Number.isFinite(tea) || tea <= 0)) return { ok: false, error: { code: 'invalid-tea', message: 'TEa phai la so duong.' } };
+    if (tea != null && (!Number.isFinite(tea) || tea <= 0)) return { ok: false, error: { code: 'invalid-tea', message: 'TEa phải là số dương.' } };
     const stored: StoredLevel[] = input.levels.map(lv => ({
       level: Math.round(finiteNumber(lv.level, 1)),
       cv: lv.cv == null || lv.cv === '' ? null : finiteNumber(lv.cv, NaN),
       biasEqa: lv.biasEqa == null || lv.biasEqa === '' ? null : finiteNumber(lv.biasEqa, NaN),
+      eqaRounds: Array.isArray(lv.eqaRounds) ? lv.eqaRounds.map(v => finiteNumber(v, NaN)).filter(Number.isFinite) : [],
       uCal: lv.uCal == null || lv.uCal === '' ? null : finiteNumber(lv.uCal, NaN),
       muBiasMode: lv.muBiasMode === 'exclude' ? 'exclude' : 'include',
     }));
@@ -64,11 +73,25 @@ export function createSigmaHandlers(db: Db) {
     } else {
       db.prepare('INSERT INTO sigma_data(id,test_id,period,tea,tea_source,lv_json) VALUES (?,?,?,?,?,?)').run(id, testId, period, tea, teaSource, JSON.stringify(stored));
     }
-    writeAudit(db, actor, existing ? 'Sua ky Six Sigma' : 'Them ky Six Sigma', `Ky ${period} cua xet nghiem "${test.name}"`, test.name);
+    writeAudit(db, actor, existing ? 'Sửa kỳ Six Sigma' : 'Thêm kỳ Six Sigma', `Kỳ ${period} của xét nghiệm "${test.name}"`, test.name);
+    notifyChanged(['sigma_data'], [testId]);
     return { ok: true, data: { id, testId, period, tea, teaSource, levels: stored.map(s => computeLevel(s, tea)) } };
   }
 
-  return { listPeriods, savePeriod };
+  /** Xoá 1 kỳ Sigma — chỉ admin, khớp `sgDelPeriod` app cũ. */
+  function removePeriod(input: { data: { id: string } }, actor: Actor): IpcResult<{ id: string }> {
+    const denied = requireAdmin(actor); if (denied) return denied;
+    const id = cleanText(input.data?.id, 200).trim();
+    const row = db.prepare('SELECT id, test_id, period FROM sigma_data WHERE id=?').get(id) as { id: string; test_id: string; period: string } | undefined;
+    if (!row) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy kỳ Six Sigma.' } };
+    const test = db.prepare('SELECT name FROM tests WHERE id=?').get(row.test_id) as { name: string } | undefined;
+    db.prepare('DELETE FROM sigma_data WHERE id=?').run(id);
+    writeAudit(db, actor, 'Xoá kỳ Six Sigma', `Kỳ ${row.period} của xét nghiệm "${test ? test.name : ''}"`, test ? test.name : '');
+    notifyChanged(['sigma_data'], [row.test_id]);
+    return { ok: true, data: { id } };
+  }
+
+  return { listPeriods, savePeriod, removePeriod };
 }
 
 export type SigmaHandlers = ReturnType<typeof createSigmaHandlers>;

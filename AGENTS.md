@@ -256,6 +256,4153 @@ thật, có audit log, có test end-to-end. Những gì còn thiếu (liệt kê
 là các TÍNH NĂNG bổ sung bên trong các trang đã có, không phải trang nào
 chưa tồn tại.
 
+**Kế hoạch "làm đầy đủ" (bắt đầu 2026-08-31, xem `docs/APP-V2-PLAN.md`).**
+Sau khi 11/11 trang đạt mức thí điểm, người dùng chốt mục tiêu cuối: app-v2
+phải đạt giao diện + nghiệp vụ giống hệt app cũ (không chỉ chứng minh kiến
+trúc) — `docs/APP-V2-PLAN.md` giữ kế hoạch/quy trình/tiến độ chi tiết, mục
+này chỉ log từng bước đã làm.
+
+**Giai đoạn A1 — hạ tầng dùng chung (xong, 2026-08-31).** 4 mảnh lõi bắt
+buộc trước khi viết lại bất kỳ trang nào ở Giai đoạn B:
+- `renderer/styles/tokens.css`/`app.css` — port giá trị token (màu/spacing/
+  Manrope tự host, copy nguyên `assets/fonts/*.woff2` sang
+  `renderer/styles/fonts/`) từ `assets/tokens.css` cũ, KHÔNG copy cấu trúc
+  cascade 10 file `professional-*.css` — dựng lại gọn thành 2 file (layout
+  khung + component dùng chung: `.btn`/`.badge`/`.panel`/`.field`/modal).
+- `components/AppShell.tsx` — sidebar 11 mục (ẩn "Người dùng" nếu không phải
+  admin) + topbar (tên/vai trò/avatar chữ cái đầu/đăng xuất) + `<Outlet/>`,
+  thay `<nav>` phẳng viết tay trong `router.tsx`. `router.tsx` chuyển sang
+  route lồng nhau (`<Route element={<AppShell/>}>` bọc 11 route con).
+- `components/Modal.tsx` (portal `#modalRoot`, form CRUD) + `state/
+  dialog-store.ts` + `components/DialogHost.tsx` (portal `#dialogRoot`, mount
+  1 lần trong `AppShell`) — 2 lớp tách biệt giữ đúng lý do bản cũ (dialog luôn
+  nổi trên modal). `confirmDialog()`/`infoDialog()`/`reauthDialog()` là hàm
+  Promise gọi trực tiếp từ bất kỳ đâu, không cần prop-drilling. `reauthDialog()`
+  cần 1 IPC mới hoàn toàn chưa có trong bản thí điểm: `auth:verifyPassword`
+  (`verifyOwnPassword()` trong `auth-handlers.ts`) — chỉ xác thực lại mật khẩu
+  người dùng đang đăng nhập, không đổi gì, không ghi audit cho lần thử sai
+  (tránh rác audit log mỗi lần gõ nhầm 1 ký tự). `components/useFocusTrap.ts`
+  dùng chung cho cả 2 (Escape đóng, Tab/Shift+Tab quẩn, trả focus khi đóng).
+- `components/DateField.tsx` — ĐƠN GIẢN HOÁ có chủ đích so với lịch tự vẽ
+  `vn-date-picker-controller.ts` của bản cũ: dùng `<input type="date">`
+  chuẩn của Chromium/Electron thay vì port nguyên DOM popup — vẫn giữ đúng
+  luồng "gõ tay hoặc chọn lịch đều commit", chỉ khác cách vẽ lịch (đúng
+  nguyên tắc "giống luồng thao tác, không cần giống UI implementation").
+- `store:changed` — **hạng mục quan trọng nhất của A1**, tài liệu kế hoạch
+  gốc mô tả nhưng CHƯA TỪNG được cài đặt cho tới bước này (`grep
+  webContents.send` toàn bộ `main/` từng ra rỗng). Thiết kế: `notifyChanged()`
+  (`main/ipc/shared.ts`) gọi `broadcastWindow.webContents.send('store:changed',
+  {tables, testIds})`; `setBroadcastWindow(win)` gán đúng 1 lần trong
+  `main/index.ts` ngay sau khi tạo `BrowserWindow`. Quyết định thiết kế quan
+  trọng: gọi `notifyChanged(['activity'])` NGAY TRONG `writeAudit()` thay vì
+  bắt mỗi handler tự nhớ báo — vì MỌI thao tác ghi đều gọi `writeAudit()`,
+  nên trang Nhật ký hoạt động sống tự động miễn phí; mỗi handler chỉ cần
+  thêm đúng 1 dòng `notifyChanged([bảng riêng], [testId nếu có])` cho dữ
+  liệu CỦA NÓ (đã thêm cho cả 9 handler còn lại: `instruments`/`tests`/
+  `test_levels`/`qc_points`/`sigma_data`/`actions`/`reagent_tests`/`users`/
+  `lab`/`period_locks`). `preload.ts` lộ `onStoreChanged(callback)` (trả về
+  hàm huỷ đăng ký); `renderer/lib/useStoreInvalidation.ts` là hook dùng
+  chung ở Giai đoạn B, lọc theo `tables`/`testIds` đang mount thay vì
+  "fetch 1 lần khi mount" như 11 trang thí điểm hiện tại.
+- `components/QcChart.tsx` — vẽ Levey-Jennings + CUSUM bằng canvas ref chuẩn
+  React (viết lại từ đầu theo input `westgard:analyzeLevel` đã trả về: điểm
+  kèm z-score/verdict, chuỗi CUSUM), KHÔNG port nguyên hình học pixel của
+  `qc-chart-renderer.ts` cũ — giống về NỘI DUNG (dải ±SD, màu theo verdict,
+  ngưỡng CUSUM h), khác về cách vẽ, cùng lý do như `DateField`.
+
+Verify: `app-v2:typecheck` sạch, `app-v2:test` 19/19 (không cần sửa test nào
+— chỉ thêm dòng `notifyChanged()`, không đổi hợp đồng IPC hiện có),
+`app-v2:build` sạch (4 file font Manrope + CSS bundle đúng qua Vite), cộng
+kịch bản Playwright `_electron` tạm (không commit) xác nhận trong Electron
+thật: khởi tạo admin → đăng nhập → sidebar hiện đúng 11 mục (đúng thứ tự,
+"Người dùng" hiện vì là admin) → topbar hiện đúng tên/vai trò/avatar →
+chuyển qua 4 trang xác nhận `AppShell`/route lồng nhau hoạt động, class
+`.active` cập nhật đúng → gọi thẳng `window.qcApi.saveInstrument(...)` và
+xác nhận renderer nhận đúng 2 sự kiện `store:changed` liên tiếp
+(`{tables:['activity']}` rồi `{tables:['instruments']}`) — chứng minh cơ chế
+invalidation có phạm vi hoạt động đúng từ main tới renderer; ảnh chụp màn
+hình xác nhận token/font/layout hiển thị đúng, tiếng Việt không lỗi font,
+zero console error. `pagePerms` (A2) dời sau theo đúng quyết định trong kế
+hoạch — 3 vai trò cố định vẫn đủ để bắt đầu Giai đoạn B.
+
+**Giai đoạn B1 — Cấu hình chung, "làm đầy đủ" (xong, 2026-08-31).** Trang
+thí điểm cũ (56 dòng: 1 dropdown + 2 form phẳng) thay bằng 8 tab như app cũ:
+máy xét nghiệm, danh mục xét nghiệm, Panel QC, lô & nhóm lô QC, Mean/SD,
+chuyển tiếp lô, lịch sử dữ liệu, TEa tham chiếu. Domain mới hoàn toàn (chưa
+tồn tại ở lượt thí điểm — schema đã có sẵn 20 bảng nhưng KHÔNG có IPC/
+validate nào cho `qc_lots`/`lot_groups`/`qc_panels`/`qc_panel_tests`/
+`lot_transitions`/`tea_refs` cho tới bước này):
+- `main/domain/manage-validation.ts` mở rộng: `PreparedTest` thêm `teaSource`/
+  `teaRefKey`/`method`/`reagent`/`cusumOn`/`cusumK`/`cusumH` (CUSUM chỉ là
+  tham số biểu đồ trend, không đổi verdict Westgard — giữ nguyên tắc cũ);
+  `appendMeanSdHistory()` (hàm thuần) chốt Mean/SD CŨ vào
+  `test_levels.mean_sd_history_json` chỉ khi giá trị thật sự đổi, không ghi
+  đè im lặng — trang "Lịch sử dữ liệu" đọc lại đúng cột này;
+  `validateLot`/`validateLotGroup`/`validatePanel`/`validateLotTransition`
+  (port nguyên tắc "nhóm lô QC cần ≥2 lô" từ bản cũ).
+- `main/domain/tea-ref-validation.ts` (mới) — 6 điều kiện bắt buộc y hệt thứ
+  tự `teaLabProfileSave()` bản cũ (giá trị dương, nguồn, tham chiếu ≥3 ký tự,
+  lý do ≥10 ký tự, ngày duyệt không sau ngày hiệu lực, ngày xem lại không
+  trước ngày hiệu lực, đủ người chuẩn bị+người duyệt). Phạm vi CỐ Ý rút gọn
+  so với bản cũ: đây chỉ là hồ sơ TEa tự khai của phòng xét nghiệm (`lab`/
+  `lab_source`/...), KHÔNG port `TEA_ANALYTE_CATALOG` (hàng trăm analyte
+  built-in CLIA/Ricos của bản cũ, `docs/tea-sources.md`) — dữ liệu tham khảo
+  tĩnh, để dành cho một đợt riêng.
+- `main/domain/rule-config.ts` mở rộng thêm `RuleScopesMap`/`makeScopeOf()`/
+  `effectiveScopeList()` (phạm vi within/across/both theo luật, theo xét
+  nghiệm). Từ 2026-09-06, cấu hình này đã được thực thi thật trong Entry và
+  Westgard: `combinedWestgardByPoint()` ghép đánh giá từng mức với đánh giá
+  liên mức theo cùng `run_id` (R4s/2-2s/2of3-2s/3-1s và chuỗi run), đồng thời
+  chỉ đọc điểm thuộc đúng lô hiện đang gán cho từng mức.
+- `main/ipc/config-handlers.ts` (đã là handler lớn nhất, giờ thêm ~15 hàm):
+  `listLots`/`saveLot`, `listLotGroups`/`saveLotGroup` (gán/gỡ `group_id`
+  trực tiếp trên `qc_lots`, KHÔNG qua bảng junction — 1 lô chỉ thuộc 1 nhóm),
+  `listPanels`/`savePanel` (kèm thay toàn bộ `qc_panel_tests` mỗi lần lưu —
+  xoá hết rồi insert lại theo danh sách mới, đơn giản hơn diff), `listLotTransitions`/
+  `createLotTransition`/`setLotTransitionStatus` (`planned→active→concluded`,
+  CHỈ ĐI 1 CHIỀU — không cho lùi trạng thái, `concluded` bắt buộc có kết
+  luận + tự ghi `approved_at`/`approved_by`), `listTeaRefs`/`saveTeaRef`/
+  `removeTeaRef`, `listRuleScopes`/`saveRuleScope`. `saveTestLevel()` viết
+  lại để SELECT đủ cột cũ trước UPDATE, so sánh đổi thật hay không rồi mới
+  gọi `appendMeanSdHistory()`.
+- `auth-handlers.ts` thêm `verifyOwnPassword` sớm hơn dự kiến (đã làm ở A1)
+  hoá ra là điều kiện cần cho B1: nút "Kết luận" chuyển lô dùng
+  `reauthDialog()` thật (thao tác không thể quay lại, đúng danh sách ~9 thao
+  tác nhạy cảm của bản cũ).
+- Renderer: `manage-store.ts` viết lại — **GIỮ NGUYÊN** tên field/hàm
+  `tests`/`instruments`/`loadTests`/`loadInstruments`/`levelsByTestId`/
+  `loadLevels` vì Entry/Sigma/Actions/Report cũng đọc qua store này (chỉ đọc
+  `tests`, xác nhận bằng grep trước khi sửa); mọi hàm `save*` mới trả thẳng
+  `IpcResult` thay vì 1 field `error` dùng chung — tránh lỗi validate của
+  tab này đè lên tab khác đang mở. `ManagePage.tsx` (8 sub-component trong 1
+  file, ~700 dòng) dùng `<Modal>`/`<DateField>` từ Giai đoạn A1 cho mọi form,
+  `useStoreInvalidation()` cho cả 6 nhóm bảng (`instruments`/`tests`/
+  `qc_lots+lot_groups`/`qc_panels`/`lot_transitions`/`tea_refs`).
+
+**2 bug thật bắt được qua Playwright `_electron` (không phải chỉ qua test
+Node), đúng lý do "Verify = ... chạy thật trong Electron" tồn tại**:
+1. `window.prompt()` cho nhập "kết luận chuyển lô" — Electron renderer
+   KHÔNG hỗ trợ `prompt()` (`Error: prompt() is not supported`, không phải
+   lỗi console thường mà crash luôn thao tác). Sửa bằng 1 modal nhỏ riêng
+   (`<textarea name="conclusion">`) thay vì dialog gốc trình duyệt — bài học
+   chung cho MỌI thao tác sau này cần nhập text ngoài 2 dialog có sẵn
+   (`confirmDialog`/`infoDialog` không có ô nhập liệu, `reauthDialog` chỉ có
+   ô mật khẩu).
+2. **Race điều kiện thật** ở bảng Mean/SD: sửa Mean rồi Tab/click ngay sang
+   ô SD (2 lần mất focus rất gần nhau) — mỗi ô gọi `saveTestLevel` RIÊNG,
+   tính "giá trị ô kia" từ React state đã render TRƯỚC KHI lần lưu đầu tiên
+   hoàn tất → lần lưu thứ 2 ghi đè giá trị vừa lưu của ô thứ nhất bằng giá
+   trị CŨ, mất dữ liệu. Phát hiện gián tiếp qua "Lịch sử dữ liệu" không ghi
+   nhận giá trị cũ đúng như kỳ vọng — không phải lỗi hiển thị, lỗi THẬT ở
+   tầng lưu dữ liệu. Sửa theo đúng nguyên tắc `syncTargetRange()` của bản cũ:
+   đọc thẳng DOM của CẢ HÀNG (`closest('tr')` rồi `querySelector` cho cả 3 ô
+   Lô QC/Mean/SD) tại thời điểm lưu, không tính từ React state — một ô mất
+   focus sẽ lưu đúng giá trị LIVE của cả 2 ô kia, bất kể ô nào lưu trước.
+   Post-mortem: đây là lớp bug mà test Node không bao giờ bắt được (không có
+   khái niệm "2 sự kiện blur gần nhau" trong unit test gọi hàm trực tiếp).
+
+Verify: `npm run app-v2:typecheck` sạch, `app-v2:test` 21/21 (thêm
+`config-lots-handlers.test.mjs` — lô/nhóm lô/panel/chuyển lô/TEa/phạm vi
+luật end-to-end, tách file riêng với `config-handlers.test.mjs` vì file đó
+khoá số đếm audit tuyệt đối; `tea-ref-validation.test.mjs` — oracle 6 điều
+kiện; mở rộng `manage-validation.test.mjs`), `app-v2:build` sạch (font/CSS
+bundle đúng), cộng kịch bản Playwright `_electron` tạm (không commit) đi hết
+cả 8 tab trong 1 phiên: thêm máy → thêm xét nghiệm (bật CUSUM) → đổi phạm vi
+luật → thêm 2 lô → thêm nhóm lô (xác nhận chặn khi chỉ chọn 1 lô, qua khi đủ
+2) → thêm Panel QC → sửa Mean/SD (xác nhận không còn race) → xem lịch sử →
+tạo hồ sơ chuyển lô → kích hoạt (confirmDialog thật) → kết luận (modal nhập
+liệu + reauthDialog thật) → thêm hồ sơ TEa → xác nhận Nhật ký hoạt động ghi
+đủ cả 15 thao tác đúng nội dung tiếng Việt, đúng thứ tự — zero console error
+sau khi sửa 2 bug trên.
+
+**Sửa lịch sử lô/Mean-SD sau chuyển tiếp (2026-09-06).** `HistoryTab` từng
+dùng `entry:queryPoints`, endpoint này cố ý chỉ trả điểm của lô đang vận
+hành; vì vậy sau khi chấp nhận lô mới, điểm lô cũ vẫn còn trong SQLite nhưng
+tab Lịch sử hiện 0 điểm, tạo cảm giác dữ liệu đã bị xoá. Thêm endpoint chỉ
+đọc `entry:listHistoryPoints` trả mọi điểm chưa huỷ của xét nghiệm; bảng
+Nhập QC vẫn dùng `queryPoints` nên chuỗi Westgard hiện hành không bị trộn lô.
+`mean_sd_history_json` được mở rộng tương thích ngược để chốt cả `lot`,
+`low/high`, `effectiveFrom/effectiveTo`, `source`; mọi lần đổi lô đều tạo mốc
+kể cả Mean/SD không đổi. Ngày bắt đầu của lô mới lấy từ `qc_lots.opened`
+(`Ngày mở` trong form Lô QC), fallback về ngày thao tác khi lô chưa khai ngày
+mở; lô cũ kết thúc tại ngày chuyển tiếp. Verify: typecheck sạch, 41/41 test,
+build sạch, Electron thật xác nhận OLD-1101 còn 1 điểm với hiệu lực
+10/02/2026→05/04/2026 và NEW-1111 bắt đầu 02/04/2026.
+
+**Giai đoạn B2 — Nhập QC, "làm đầy đủ" (xong, 2026-09-06).** Trang thí điểm cũ (56 dòng: 1
+dropdown + 1 bảng phẳng) thay bằng: lọc theo máy + tìm kiếm xét nghiệm (danh
+sách bên trái), tab theo mức, `<QcChart>` (Levey-Jennings/CUSUM, dùng lại từ
+Giai đoạn A1) đọc `westgard:analyzeLevel` có sẵn, cửa sổ ngày (`<DateField>`
+Từ/Đến lọc client-side), huỷ điểm qua `<Modal>` (thay input+button inline cũ).
+- `entry-handlers.ts`'s `addPoint()` giờ chốt thêm `qc_mean`/`qc_sd`/`lot`
+  vào mỗi điểm QC lúc ghi (đọc từ `test_levels` của mức tại THỜI ĐIỂM nhập) —
+  trước đây các cột này tồn tại trong schema nhưng không handler nào ghi vào.
+  `westgard-engine.ts`'s `pointTarget()` đã sẵn đọc `point.qcMean`/`qcSd` làm
+  ưu tiên trước fallback, nên đây là bổ sung AN TOÀN (không đổi hành vi tính
+  verdict hiện tại — `queryPoints()`/`analyzeLevel()` vẫn đánh giá theo Mean/
+  SD HIỆN HÀNH của mức, không dùng lại giá trị đã chốt), chỉ chuẩn bị dữ liệu
+  cho bước sau (Levey-Jennings lịch sử dài không bị đổi verdict ngược khi ai
+  sửa lại Mean/SD). Cũng chốt thêm `operator_id`/`operator_username` từ actor
+  thật (trước đây chỉ có `operator_name`).
+- `entry-store.ts` viết lại (chỉ EntryPage.tsx dùng, tự do đổi): thêm
+  `analysis`/`loadAnalysis()` gọi `westgard:analyzeLevel` cho biểu đồ, mọi
+  hàm `save*` trả `IpcResult` thay vì field `error` dùng chung.
+  `useStoreInvalidation(['qc_points','test_levels'], testId, ...)` — xác
+  nhận THẬT qua Electron: sửa Mean/SD ở tab Cấu hình chung rồi quay lại Nhập
+  QC, trang tự refetch đúng, không cần rời/vào lại trang.
+
+**Cột "song song 2 lô" hoàn tất 2026-09-06.** Không cần đổi schema:
+`qc_points.lot` tách chuỗi điểm theo số lô; `qc_mean`/`qc_sd` chốt dải tại
+thời điểm nhập; Mean/SD ứng viên đã nằm trong `lot_transitions.criteria_json`.
+`entry:listParallelColumns` chỉ trả cột khi hồ sơ chuyển lô `active`, đúng
+Panel QC, đúng lô đang vận hành và đúng mức. Điểm ứng viên được đánh giá bằng
+Westgard `within` riêng, không tham gia kết luận ngày, Dashboard hay Westgard
+của lô chính. Khi chấp nhận chuyển lô, `test_levels.qc_lot_id` đổi sang lô
+mới nên chuỗi điểm ứng viên trở thành chuỗi đang vận hành mà không sao chép
+dữ liệu. Renderer xếp cột song song ngay sau mức tương ứng trong worksheet,
+biểu đồ và bảng chi tiết; tô nền hổ phách và gắn nhãn `Song song`. Điều hướng
+bàn phím dùng `data-focus-column` nên hai cột cùng mức không còn bị nhập nhầm.
+
+**Xem lô cũ hoàn tất 2026-09-06.** `entry:listPreviousLotSeries` lần ngược
+chuỗi `lot_transitions` đã `accepted` từ lô đang vận hành, chỉ nhận lô thật
+sự từng dẫn tới lô hiện tại. Mỗi chuỗi đọc Mean/SD đúng lô từ
+`mean_sd_history_json` (fallback bằng snapshot `qc_mean`/`qc_sd` trên điểm),
+tính Westgard `within` riêng và không trộn vào verdict hiện hành. Worksheet
+luôn hiện điểm lô cũ đúng ngày ở trạng thái chỉ đọc; biểu đồ và bảng chi tiết
+có nút "Xem lô cũ"/"Xem lô mới" để đổi cả dải mục tiêu lẫn chuỗi điểm.
+
+**Tra cứu điểm đã hủy hoàn tất 2026-09-06.** Trước đó renderer có sẵn khối
+"Điểm đã hủy" nhưng `entry:queryPoints` chỉ trả `voided=0`, nên khối này
+không bao giờ có dữ liệu. Giữ `queryPoints` sạch cho Westgard và thêm endpoint
+đọc riêng `entry:listVoidedPoints`; bảng tra cứu chung dưới các thẻ mức hiển
+thị ngày, mức/lô, giá trị, lần chạy, đúng `voided_by` và `void_reason`.
+
+Verify: `npm run app-v2:typecheck` sạch, `app-v2:test` 21/21 (không cần
+thêm test Node mới — `addPoint()` chỉ thêm cột lưu, không đổi hợp đồng input/
+output mà test cũ đã khoá), `app-v2:build` sạch, cộng kịch bản Playwright
+`_electron` tạm (không commit): tạo máy+xét nghiệm+Mean/SD qua Cấu hình
+chung → sang Nhập QC, lọc xét nghiệm bằng ô tìm kiếm → thêm 1 điểm bình
+thường (verdict "Đạt") → thêm 1 điểm lệch >3SD (verdict "Vi phạm", luật
+"1-3s" hiện đúng) → lọc theo khoảng ngày còn đúng 1 dòng → huỷ điểm: bấm
+"Huỷ điểm này" khi chưa nhập lý do bị chặn đúng thông báo, nhập lý do xong
+thì điểm biến mất khỏi danh sách đang hoạt động → **xác nhận `store:changed`
+sống thật giữa 2 trang khác nhau**: đổi Mean/SD ở Cấu hình chung, quay lại
+Nhập QC không cần tải lại gì, dữ liệu vẫn đúng — zero console error.
+
+**Giai đoạn B3 — Phân tích Westgard, "làm đầy đủ" (xong, 2026-08-31).** Trang
+thí điểm cũ (đen trắng, không badge, không tab) thay bằng: 2 tab (Tổng
+quan/Nhóm lô đã dừng), `<QcChart>` LJ+CUSUM dùng lại y hệt Entry, bảng luật
+kèm gợi ý khắc phục.
+- `westgard-handlers.ts`'s `analyzeLevel()` trả thêm `fix` (gợi ý khắc phục
+  từ `WG_RULE_REGISTRY`) cho mỗi luật — trước đây chỉ có `id`/`desc`/`on`,
+  trang phải tự đoán nội dung; giờ copy nguyên văn từ registry, khớp nguyên
+  tắc "nội dung lâm sàng copy y nguyên, không diễn giải lại".
+- Tab "Nhóm lô đã dừng" KHÔNG có domain/IPC riêng — chỉ lọc lại
+  `manage-store.ts`'s `lotGroups` (đã có từ B1) theo `status==='stopped'`,
+  đúng nguyên tắc "không domain mới nếu đã có API phù hợp" (giống Dashboard/
+  Audit của bản cũ).
+- `useStoreInvalidation(['tests','qc_points'], testId, ...)` — đổi Mean/SD
+  hoặc thêm điểm QC ở Entry, quay lại Westgard tự cập nhật không cần tải lại.
+
+Verify: `npm run app-v2:typecheck` sạch, `app-v2:test` 21/21 (không cần test
+Node mới — `analyzeLevel()` chỉ thêm 1 field vào object trả về, không đổi gì
+test cũ đang khoá), `app-v2:build` sạch, cộng kịch bản Playwright `_electron`
+tạm: tạo dữ liệu qua Cấu hình chung + Nhập QC (1 điểm đạt, 1 điểm vi phạm
+1-3s) → mở Phân tích Westgard, tổng quan hiện đúng badge "Vi phạm" → bấm vào
+dòng mở chi tiết, bảng luật hiện đúng gợi ý khắc phục → tắt luật 1-3s qua
+checkbox, xác nhận lưu đúng (nối `saveRuleAction` module Westgard, cùng cột
+`rule_actions_json` mà tab "Danh mục xét nghiệm" ở Cấu hình chung ghi) → đổi
+biểu đồ sang CUSUM không lỗi → tab "Nhóm lô đã dừng" hiện đúng nhóm + 2 lô
+đã tạo ở B1 — zero console error.
+
+**Giai đoạn B4 — Six Sigma, "làm đầy đủ" (xong, 2026-08-31).** Trang thí
+điểm cũ (1 input Bias%/1 input u(cal) đơn lẻ) thay bằng: modal Bias% nhiều
+vòng EQA/EQC (RMS, cảnh báo lệch dấu), modal MU budget (bảng 3 thành phần +
+cờ "chưa đánh giá"), TEa tự khớp `tea_refs`.
+- `main/domain/sigma-metrics.ts` thêm `eqaRoundsStats()` (RMS + mean tham
+  khảo + `biasRefU`=u(Cref)=SD giữa các vòng/căn(n), cờ `mixedSigns`) — hàm
+  MỚI hoàn toàn, không có sẵn ở `assets/core.js` bản cũ để đối chiếu trực
+  tiếp (bản cũ tính ở `sgBiasStats()`, một hàm trình bày không tách rời được
+  để require() độc lập), nên `tests/eqa-rounds-stats.test.mjs` đối chiếu
+  bằng số tính tay (RMS của [-2,2] phải là 2, không phải trung bình cộng=0)
+  thay vì so với QCCore — ghi rõ lý do trong comment đầu file, không lặng lẽ
+  hạ chuẩn "đối chiếu test cũ".
+- `sigma-handlers.ts`'s `computeLevel()`: nếu mức có `eqaRounds` lưu kèm,
+  RMS của các vòng LUÔN thắng giá trị `biasEqa` đơn lẻ cũ (không dùng song
+  song 2 nguồn), và `biasRefU` tính được feed thẳng vào `uncertaintyBudget()`
+  — trước đây `biasRefU` luôn `null` vì không có nguồn nào tính ra nó.
+  `SigmaLevelResult` thêm `eqaRounds`/`mixedSigns` — mở rộng thuần tuý,
+  không đổi field cũ nên test cũ (`sigma-handlers.test.mjs`) không cần sửa,
+  chỉ thêm case mới.
+- Renderer: `resolveTeaRef(testName, refs)` (trong `SigmaPage.tsx`, không
+  qua IPC riêng — so khớp chuỗi đơn giản trên danh sách `teaRefs` đã tải sẵn
+  từ `manage-store`) khớp EXACT tên trước, rồi longest-prefix, đúng nguyên
+  tắc `sgRef()` bản cũ (vd "CK-MB" không thừa hưởng "CK") — chỉ gợi ý mặc
+  định khi tạo kỳ mới, người dùng vẫn sửa tay được. `BiasModal` xem trước
+  RMS SỐNG (tính lại tại client mỗi lần gõ, không cần round-trip IPC) trước
+  khi áp dụng — khớp UX "xem trước rồi mới lưu" của bản cũ. `MuModal` liệt
+  kê rõ 3 thành phần + đánh dấu "Chưa đánh giá" cho u(cal) còn thiếu (KHÔNG
+  hiện là 0 — giữ đúng nguyên tắc ISO/TS 20914 đã chốt từ trước).
+
+Verify: `npm run app-v2:typecheck` sạch, `app-v2:test` 22/22 (thêm
+`eqa-rounds-stats.test.mjs`, mở rộng `sigma-handlers.test.mjs` với case
+nhiều vòng lệch dấu), `app-v2:build` sạch, cộng kịch bản Playwright
+`_electron` tạm: tạo hồ sơ TEa tên "Glucose" → tạo xét nghiệm cùng tên → mở
+Six Sigma, "+ Thêm kỳ" tự gợi ý đúng TEa=10 từ hồ sơ vừa tạo → sửa CV=3 →
+mở modal Bias, nhập 2 vòng [-2, 2], xem trước đúng RMS=2.000 + cảnh báo lệch
+dấu → áp dụng, bảng hiện đúng Bias=2.00 kèm badge cảnh báo, Sigma=(10-2)/3=2.67
+→ mở modal MU, xác nhận hiện "Chưa đánh giá" cho u(cal) → nhập u(cal)=0.4,
+lưu → U tính đúng 8.28 (=2×√(3²+2.828²+0.4²)) và badge chuyển thành "Đủ" —
+zero console error.
+
+**Giai đoạn B5 — Khắc phục sự cố (NCE), "làm đầy đủ" (xong, 2026-08-31).**
+Trang thí điểm cũ (1 form phẳng: test/ngày/luật/lỗi/xử lý/hạn) thay bằng
+form/chi tiết 8 phần thật (nhận diện → điều tra → nguyên nhân → khắc phục →
+rerun → release-to-service → hiệu lực → residual-risk), chip gợi ý theo
+SE/RE, mở vòng tiếp theo, quy trình 8 bước dạng modal tĩnh. Phạm vi CỐ Ý rút
+gọn so với bản cũ: chip gợi ý là tập rút gọn 4 câu/loại (không port hết
+`ACT_SUGGEST` — bảng chip lâm sàng rất lớn của bản cũ), chưa có checklist chi
+tiết/investigation theo mẫu SOP cụ thể (chỉ 1 ô văn bản tự do).
+- `main/domain/nce-validation.ts` thêm 3 hàm validate mới:
+  `validateReleaseDecision` (giữ/phát hành kết quả bệnh nhân, bắt buộc lý do
+  ≥5 ký tự), `validateRerunEvidence` (bắt buộc chọn 1 điểm QC THẬT, không
+  phải mô tả tay), `validateResidualRisk` (residualRisk bắt buộc ≥5 ký tự
+  CHỈ khi kết luận "effective" — "ineffective" thì không cần, vì hồ sơ chưa
+  đóng). `NceCreateInput`/`PreparedNceCreate` mở rộng thêm
+  `investigation`/`causeCategory`/`causeDescription`.
+- `nce-handlers.ts` thêm 3 handler: `setReleaseDecision`, `setRerunEvidence`
+  (xác nhận điểm QC tồn tại VÀ cùng xét nghiệm với hồ sơ — chặn gán nhầm
+  bằng chứng từ xét nghiệm khác, có test riêng cho cả 2 điều kiện), `reopenNce`
+  (mở vòng tiếp theo — tạo BẢN GHI MỚI dùng `parent_nce_id`/`follow_up_nce_id`
+  đã có sẵn trong schema nhưng chưa từng được dùng tới bước này, tham khảo
+  `action-escalation-service.ts`'s `createFollowUp()` bản cũ; chặn mở vòng 2
+  từ 1 hồ sơ đã có follow-up — mỗi hồ sơ chỉ mở đúng 1 vòng tiếp theo).
+  `markEffectiveness()` viết lại: cổng `residualRisk` cố ý đặt SAU cổng
+  "chưa có ngày hoàn thành" (không phải trước) — báo lỗi theo đúng thứ tự
+  thao tác thật, tránh hỏi đánh giá rủi ro cho hồ sơ còn chưa đủ điều kiện.
+  Phát hiện khi sửa `tests/nce-handlers.test.mjs` (bài test cũ giả định thứ
+  tự cổng, đổi thứ tự làm lộ ra ngay).
+- Renderer: `ActionsPage.tsx` viết lại hoàn toàn — danh sách hồ sơ (badge
+  màu theo trạng thái duyệt/hiệu lực, đánh dấu "vòng tiếp" nếu có
+  `parent_nce_id`) + `CreateModal` (form 4 phần đầu, chip nguyên nhân bấm là
+  nối thẳng vào ô mô tả) + `DetailModal` (8 phần, mỗi phần tự quyết định
+  hiện form nhập hay chỉ đọc dựa trên dữ liệu đã có — vd phần Rerun chỉ hiện
+  ô chọn điểm QC nếu CHƯA gắn bằng chứng, đọc danh sách điểm qua
+  `window.qcApi.queryPoints()` đã có sẵn từ Entry) + modal "Quy trình 8
+  bước" tĩnh. `nce-store.ts` viết lại, mọi hàm trả `IpcResult` để
+  `DetailModal` hiện đúng lỗi của đúng thao tác đang làm (không còn 1
+  field `error` dùng chung).
+
+Verify: `npm run app-v2:typecheck` sạch, `app-v2:test` 22/22 (mở rộng
+`tests/nce-handlers.test.mjs` với 3 cổng mới + kịch bản mở vòng tiếp theo
+đầy đủ — không mất bài test nào cũ, chỉ sửa 1 chỗ thứ tự lỗi như trên),
+`app-v2:build` sạch, cộng kịch bản Playwright `_electron` tạm đi hết vòng
+đời 1 hồ sơ: tạo qua form 4 phần (bấm chip nguyên nhân RE, xác nhận nối
+đúng vào ô mô tả) → mở chi tiết xác nhận cả 8 phần hiện đúng → gắn bằng
+chứng rerun từ điểm QC thật vừa tạo ở Entry → lưu quyết định
+release-to-service → lưu ngày hoàn thành → kết luận "không hiệu quả" (không
+cần residual-risk) → "Mở vòng tiếp theo" tạo đúng hồ sơ con, badge "vòng
+tiếp" hiện trên danh sách → duyệt hồ sơ, nút Huỷ biến mất đúng quy tắc — zero
+console error.
+
+**Giai đoạn B6 — So sánh hóa chất, "làm đầy đủ" (xong, 2026-08-31).** Trang
+thí điểm cũ (5 trường metadata, danh sách phẳng) thay bằng: modal chọn/tạo
+phép so sánh có tìm kiếm, form đủ 9 trường metadata, bảng cặp mẫu thêm/xoá/
+xoá hết, 2 biểu đồ scatter + Bland-Altman.
+- **Phát hiện quan trọng, tự sửa lại giữa chừng**: kế hoạch (docs/APP-V2-PLAN.md)
+  ghi "kiểm tra `reagent-stats.ts` đã đủ Deming/Passing-Bablok/Bland-Altman
+  chưa" — dựa theo câu mô tả trong CLAUDE.md về app cũ. Khi tra thẳng mã
+  nguồn app cũ (`src/domain/reagent/*.ts`, `grep -ri deming`) thì KHÔNG CÓ
+  hồi quy Deming nào cả — app cũ chỉ có OLS (`reagentOls`) + Passing-Bablok
+  (`reagentPassingBablok`); "Deming/OLS" trong mô tả kiến trúc chỉ là cách
+  gọi lỏng lẻo, không phải 2 thuật toán khác nhau. Đã VIẾT rồi XOÁ LẠI một
+  hàm `reagentDeming()` mới thêm vào `reagent-stats.ts` khi phát hiện ra
+  điều này — đúng nguyên tắc "giống app cũ" nghĩa là KHÔNG được tự thêm
+  thuật toán lâm sàng mà bản cũ không có, dù nghe có vẻ "đầy đủ hơn". Bài
+  học: khi kế hoạch mô tả một tính năng nghe mơ hồ, phải tra thẳng mã nguồn
+  thật trước khi code, không tin nguyên văn tài liệu kiến trúc.
+- Phần "Bland-Altman" THẬT SỰ đang thiếu (không phải hiểu lầm): app cũ có
+  `reagent-bland-svg.ts` vẽ biểu đồ nhưng KHÔNG lộ `loaLower`/`loaUpper` ra
+  ngoài object kết quả — 2 số này chỉ tính inline ngay trong hàm vẽ SVG
+  (`up`/`low` cục bộ). `reagent-stats.ts`'s `calculateReagentComparison()`
+  giờ tính và trả `loaLower`/`loaUpper` ở tầng domain (CÙNG công thức
+  `md ± 1.96·sdd`, đối chiếu tay với `reagent-bland-svg.ts` để xác nhận khớp
+  100%, không phải phát minh công thức mới) — hợp lý hơn vì domain nên là
+  nguồn số liệu duy nhất, không phải trình vẽ SVG giữ số liệu.
+- Renderer: `components/ReagentChart.tsx` (mới, canvas ref chuẩn React) vẽ
+  scatter (kèm đường y=x tham chiếu + hồi quy OLS) và Bland-Altman (bias +
+  2 đường LoA) — thay 2 hàm build chuỗi SVG (`reagent-scatter-svg.ts`/
+  `reagent-bland-svg.ts`) của bản cũ, cùng dữ liệu đầu vào
+  (`ReagentComparisonResult`), khác cách vẽ — đúng nguyên tắc đã chốt.
+  `ReagentPage.tsx` viết lại: `PickerModal` (tìm kiếm + tạo mới, dùng
+  `<Modal>` Giai đoạn A1), form metadata bổ sung 4 trường trước đây chưa có
+  UI (ngày, người thực hiện, loại mẫu, alpha — domain đã có sẵn từ trước,
+  chỉ thiếu form), bảng cặp mẫu thêm nút "Xoá hết" (qua `confirmDialog`,
+  trước đây phải xoá tay từng dòng).
+
+Verify: `npm run app-v2:typecheck` sạch, `app-v2:test` 22/22 (không cần
+test mới — chỉ thêm 2 field tính toán vào object trả về, các test cũ dùng
+so sánh field-by-field chứ không deepEqual toàn bộ object nên không vỡ),
+`app-v2:build` sạch, cộng kịch bản Playwright `_electron` tạm: điền đủ
+metadata → nhập 24 cặp giá trị lệch 1% → xác nhận coverage → bảng kết quả
+hiện đúng N=24, %Bias=1.00% (Đạt), Bland-Altman LoA đúng khoảng, cả 2 biểu
+đồ vẽ đúng hình (đường y=x + hồi quy trên scatter, dải LoA trên Bland-Altman)
+→ mở modal chọn/tạo, tìm kiếm lọc đúng, tạo phép so sánh mới rồi xoá lại
+(quay về đúng phép so sánh cũ) — zero console error.
+
+**Giai đoạn B7 — Người dùng, "làm đầy đủ" một phần (2026-08-31).** Chỉ cần
+polish CSS thật (bảng/badge/Modal token chung thay style trần) vì phần
+nghiệp vụ (CRUD/khoá/đặt lại mật khẩu) đã đúng từ module thí điểm — không
+đổi `users-handlers`/domain nào. `AddUserModal`/`ResetPasswordModal` dùng
+`<Modal>` Giai đoạn A1. **"Modal sửa quyền theo trang" CỐ Ý CHƯA LÀM** — phụ
+thuộc `pagePerms` (Giai đoạn A2, đã dời sau từ đầu kế hoạch, xem
+docs/APP-V2-PLAN.md) — 3 vai trò cố định vẫn đủ dùng, chưa có gì để "sửa
+quyền theo trang" nếu trang nào cũng cho phép như nhau theo vai trò.
+Verify: `app-v2:typecheck`/`test` 22/22/`build` sạch, cộng kịch bản
+Playwright `_electron` tạm: tài khoản đang đăng nhập hiện đúng badge "bạn" →
+thêm người dùng mới qua modal → khoá tài khoản đó (checkbox), badge chuyển
+"Đã khoá" → đặt lại mật khẩu qua modal, xác nhận thông báo đúng — zero
+console error.
+
+**Giai đoạn B8 — Nhật ký hoạt động, "làm đầy đủ" (xong, 2026-08-31).** Trang
+thí điểm cũ (tìm kiếm + phân trang) thay bằng thêm: xuất CSV, lưu trữ log cũ
+(12/24/36 tháng), nút xác minh chuỗi hash thủ công.
+- `main/ipc/audit-handlers.ts` thêm 3 hàm: `exportCsv` (CSV cùng bộ lọc đang
+  áp dụng trên trang), `verifyChainNow` (đọc lại đúng anchor đã lưu, không
+  xác minh từ seq=1 như log chưa từng bị cắt — nếu không sẽ báo sai "chuỗi bị
+  phá" ngay sau một lần lưu trữ hợp lệ), `archive(months)` — **dùng
+  `app_meta` (bảng key/value đã có sẵn từ đầu, dùng cho `schemaVersion`,
+  chưa dùng cho gì khác) để lưu `activityAnchor`** — bản cũ có riêng 1 cột
+  `activityAnchor` ở tầng lưu trữ (Firebase top-level), app-v2 không có
+  khái niệm tương đương nên tái dùng `app_meta` thay vì thêm cột riêng vào
+  bảng `activity`. Chỉ nhận đúng 3 mốc 12/24/36 tháng (khớp bản cũ), xoá
+  thẳng khỏi bảng sống (không soft-delete — bảng `activity` vốn append-only,
+  không có cột `voided` như `qc_points`).
+- Renderer: nút "Xuất CSV" build `Blob` + `<a download>` tự tạo/click/thu hồi
+  `ObjectURL` — không cần IPC lưu file riêng (renderer đã có quyền tạo blob:
+  URL, đây là cơ chế tải file chuẩn của trình duyệt, không phải đặc thù
+  Electron). `ArchiveModal` bắt buộc `reauthDialog()` trước khi xoá (thao
+  tác không thể hoàn tác), TỰ ĐỘNG tải CSV toàn bộ log hiện có trước khi gọi
+  `archive()` — người dùng luôn có bản sao trước khi phần cũ biến mất khỏi
+  bảng sống, không cần thao tác xuất riêng.
+
+Verify: `npm run app-v2:typecheck` sạch, `app-v2:test` 22/22 (mở rộng
+`tests/audit-handlers.test.mjs`: chèn 1 dòng audit giả 3 năm trước trực
+tiếp vào DB — nối lại đúng hash-chain bằng `relinkAuditChain()` với `seq`
+gán TRƯỚC khi tính hash, vì `auditEntryHash()` tính cả `seq` vào payload,
+gán `seq` SAU khi hash sẽ làm hash/seq lệch nhau và tự phá chuỗi của chính
+kịch bản test — rồi xác nhận `archive(12)` xoá đúng 1 dòng, chuỗi vẫn xác
+minh được sau khi cắt), `app-v2:build` sạch, cộng kịch bản Playwright
+`_electron` tạm: xác minh chuỗi báo "Hợp lệ" → tìm kiếm lọc đúng → xuất CSV
+và lưu trữ log cũ chạy không lỗi console (Electron/Playwright trong môi
+trường này không luôn bắt được sự kiện `download` cho click tải blob: URL —
+xác nhận bằng cách khác: không có lỗi console nào khi bấm, và toàn bộ luồng
+reauth→tải CSV→archive→thông báo kết quả chạy trọn vẹn) → lưu trữ với DB
+mới tạo (0 dòng đủ cũ) báo đúng "Không có dòng nào cũ hơn mốc đã chọn" —
+zero console error.
+
+**Giai đoạn B9 — Tổng quan/Dashboard, "làm đầy đủ" (xong, 2026-08-31).**
+Vẫn KHÔNG có domain/IPC riêng — chỉ tổng hợp lại 3 API có sẵn (đúng nguyên
+tắc "không domain mới nếu đã có API phù hợp", giữ nguyên từ module thí
+điểm). Thay đổi thật duy nhất, đúng mục còn thiếu ghi từ đầu:
+`useStoreInvalidation(['qc_points','tests','actions','activity'], undefined,
+load)` — trước đây trang chỉ fetch 1 lần lúc mount, dữ liệu đổi ở trang khác
+sau khi Dashboard đã mở không tự cập nhật cho tới khi rời/vào lại (giới hạn
+đã ghi từ 2026-08-31 lúc tạo module thí điểm này). Còn lại là polish CSS
+(KPI card 4 ô, badge màu theo verdict, `<table class="data-table">` thay
+`<table>` trần).
+
+Verify: `npm run app-v2:typecheck`/`test` 22/22/`build` sạch — không có test
+Node mới vì trang không có logic riêng ngoài gọi API đã test ở module gốc,
+cộng kịch bản Playwright `_electron` tạm **thiết kế đúng để chứng minh live-
+update thật, không phải chỉ tải lại**: mở Dashboard NGAY SAU đăng nhập (chưa
+có dữ liệu, đúng trạng thái rỗng) → **KHÔNG rời trang, không reload** — điều
+hướng qua sidebar sang Cấu hình chung/Nhập QC/Khắc phục sự cố để tạo máy +
+xét nghiệm + Mean/SD + 1 điểm QC vi phạm 1-3s + 1 hồ sơ NCE quá hạn → quay
+lại Dashboard chỉ bằng click sidebar (route vẫn mounted từ đầu, component
+Dashboard không unmount/remount) → xác nhận cả 4 khối (KPI/Cảnh báo Westgard/
+Sự cố quá hạn/Hoạt động gần đây) tự hiện đúng dữ liệu mới — đây chính là kịch
+bản chứng minh giới hạn cũ ĐÃ ĐƯỢC SỬA, không phải chỉ xác nhận trang tải
+được dữ liệu — zero console error.
+
+**Giai đoạn B10 — Cài đặt, "làm đầy đủ" một phần (2026-08-31).** Thêm logo/
+brand ảnh (canvas resize) + kiểm tra dung lượng lưu trữ. Firebase/LIS
+Gateway/backup-restore CỐ Ý CHƯA LÀM — thuộc Giai đoạn C, cần hạ tầng thật
+trước (đồng bộ/backup), không phải chỉ thêm form rỗng.
+- `main/domain/settings-validation.ts`'s `prepareLabProfile()` nhận thêm
+  tham số `existing` (logo hiện có) — vì FORM KHÔNG GỬI LẠI ảnh mỗi lần lưu
+  (chỉ gửi khi người dùng thật sự chọn ảnh mới), thiếu `logoData` trong input
+  phải hiểu là "giữ nguyên", không phải "xoá logo". Thêm cờ `clearLogo`
+  riêng cho hành động xoá tường minh — tránh nhầm giữa "không gửi ảnh mới"
+  và "xoá ảnh".
+- `settings-handlers.ts` thêm `getStorageInfo()` — kích thước file SQLite
+  THẬT trên đĩa (`fs.statSync(dbPath).size`), thay khái niệm "dung lượng
+  localStorage" của bản cũ không còn ý nghĩa gì ở app-v2 (mọi dữ liệu giờ
+  nằm trong 1 file SQLite thật, không phải trình duyệt). `createSettingsHandlers()`
+  đổi chữ ký nhận thêm `dbPath` (trước đó chỉ nhận `db`) — `main/index.ts`
+  truyền vào biến `dbPath` đã có sẵn từ lúc mở DB.
+- **Bug thật bắt được qua Playwright `_electron`**: chọn ảnh logo xong,
+  ảnh xem trước KHÔNG hiện — nguyên nhân là CSP của `app-v2/renderer/index.html`
+  thiếu hẳn chỉ thị `img-src` (mặc định rơi về `default-src 'self'`, mà
+  `data:` URL KHÔNG khớp `'self'` — khác scheme). Bước resize ảnh
+  (`new Image(); img.src = dataURL`) bị chặn ngay từ khi ĐỌC LẠI file vừa
+  chọn, không phải chỉ lúc hiển thị — `onload` không bao giờ chạy, logo
+  "biến mất" một cách im lặng, không có exception nào lộ ra ngoài. Đối
+  chiếu với CSP thật của bản cũ (`index.html` gốc) xác nhận bản cũ đã có sẵn
+  `img-src 'self' data: blob:` — bổ sung đúng chỉ thị này vào
+  `app-v2/renderer/index.html`. Đây là lỗi CÓ THỂ ĐÃ ẨN Ở BẤT KỲ TÍNH NĂNG
+  NÀO cần hiển thị ảnh trong app-v2 (không riêng Settings) — may là logo là
+  tính năng đầu tiên chạm tới ảnh nên bắt được ngay.
+
+Verify: `npm run app-v2:typecheck` sạch, `app-v2:test` 22/22 (mở rộng
+`settings-handlers.test.mjs`: logo giữ nguyên khi sửa trường khác,
+`clearLogo` xoá đúng, `getStorageInfo()` với `:memory:` trả 0 không lỗi),
+`app-v2:build` sạch, cộng kịch bản Playwright `_electron` tạm: mở Cài đặt,
+xác nhận dung lượng hiện đúng kích thước file THẬT (không phải 0 giả) →
+chọn ảnh logo thật (upload file), xem trước hiện đúng sau khi sửa CSP → lưu
+→ điều hướng sang Tổng quan rồi quay lại Cài đặt (không reload toàn trang) —
+tên phòng xét nghiệm VÀ logo đều còn nguyên (chứng minh ghi DB thật, không
+chỉ state cục bộ) → xoá logo, xác nhận biến mất — zero console error sau
+khi sửa CSP.
+
+**Giai đoạn B11 — Báo cáo, "làm đầy đủ" một phần (2026-08-31 — 11/11 trang
+Giai đoạn B đã qua ít nhất 1 lượt "làm đầy đủ").** Thêm: khoá/mở kỳ báo cáo
+giờ bắt buộc `reauthDialog()` trước khi thực thi (đúng danh sách ~9 thao tác
+nhạy cảm bản cũ — trước đây bấm là chạy ngay, không xác thực lại), xuất CSV
+bảng "Xem lại điểm QC". **In PDF + xuất Excel CỐ Ý CHƯA LÀM** — đây chính là
+2 việc thuộc Giai đoạn C ("In ấn & xuất Excel/CSV") mà kế hoạch đã ghi rõ
+cần CHỐT quyết định kiến trúc trước (port `XlsxCore` viết tay của bản cũ hay
+dùng thư viện npm thật như `exceljs`) — không phải chỉ thêm nút, nên không
+tự quyết giữa chừng trang này.
+- Xuất CSV không cần domain/IPC mới: `points` đã có sẵn ở renderer (từ
+  `report:queryReport` đã tồn tại), build CSV thẳng ở client — khác Audit
+  (cần lọc phía server vì Audit lọc toàn bộ dữ liệu, Report chỉ xuất đúng
+  tập đã tải).
+- `report-store.ts` viết lại: `lock`/`unlock` trả `IpcResult` thay vì field
+  `error` dùng chung.
+
+Verify: `npm run app-v2:typecheck`/`test` 22/22/`build` sạch (không cần
+test Node mới — không đổi hợp đồng IPC nào, chỉ thêm gate UI phía renderer),
+cộng kịch bản Playwright `_electron` tạm: khoá kỳ 2026-03 qua `reauthDialog`
+thật → xác nhận enforcement THẬT vẫn đúng bằng cách quay sang Nhập QC thử
+thêm điểm vào đúng kỳ đó, bị chặn với thông báo đúng (test giao 2 module,
+xác nhận lại đúng nguyên tắc `period-lock-enforcement.test.mjs` đã có ở tầng
+Node) → quay lại Báo cáo, xem lại điểm QC đúng 1 dòng, xuất CSV không lỗi →
+mở khoá qua `reauthDialog` thật, bảng khoá trở về rỗng — zero console error.
+
+**11/11 trang Giai đoạn B đã qua ít nhất 1 lượt "làm đầy đủ" (2026-08-31).**
+Các mục còn treo, đã ghi rõ lý do kỹ thuật ở từng trang thay vì chỉ liệt kê
+"chưa làm": modal sửa quyền theo trang (B7, chờ A2), Firebase/LIS Gateway/
+backup-restore/in PDF/xuất Excel (B10/B11, chờ Giai đoạn C). Cột song song
+2 lô và phạm vi luật within/across đã hoàn tất ngày 2026-09-06. Toàn bộ mục
+còn lại đều là hạng mục Giai đoạn C hoặc
+đã ghi rõ trong docs/APP-V2-PLAN.md's bảng Tiến độ — không có gì bị bỏ sót
+không ghi chú.
+
+**Giai đoạn C1 — In ấn & xuất Excel/CSV (xong phần lõi cơ chế, 2026-09-01).**
+Người dùng uỷ quyền chốt quyết định kiến trúc: **dùng thư viện npm thật
+`exceljs`** cho Excel (thêm vào `dependencies` — `npm install exceljs`),
+KHÔNG port `XlsxCore`/ZIP-OOXML viết tay của bản cũ — main process app-v2 là
+Node thật, không còn ràng buộc "0 dependency runtime" mà bản cũ phải tuân
+theo vì chạy trong trình duyệt. PDF dùng thẳng `webContents.printToPDF` của
+Electron, không cần thư viện gì thêm.
+- `main/ipc/export-handlers.ts` (mới): `buildXlsxBase64({sheetName, headers,
+  rows})` — hàm thuần dựng workbook qua `exceljs`, trả base64 (renderer tự
+  giải mã thành Blob rồi tải về, cùng cơ chế `downloadCsv` đã dùng ở Audit/
+  Report — không cần hộp thoại lưu file cho Excel, nhẹ hơn cho tải nhanh 1
+  bảng). Tên sheet tự cắt về ≤31 ký tự (giới hạn thật của định dạng .xlsx,
+  vượt quá sẽ khiến `exceljs` ném lỗi khi ghi).
+- `printHtmlToPdf(parentWin, html, defaultFileName)` — mở 1 `BrowserWindow`
+  ẩn (`sandbox:true, contextIsolation:true, nodeIntegration:false` — cửa sổ
+  chỉ hiển thị HTML tĩnh để in, không cần chạy JS gì), nạp HTML qua
+  `data:` URL (không phải file thật, không cần dọn dẹp), gọi
+  `printToPDF({printBackground:true, preferCSSPageSize:true})`, rồi hỏi nơi
+  lưu qua `dialog.showSaveDialog` NATIVE thật (khác Excel có chủ đích — PDF
+  là "kết xuất trình bày" nên giữ đúng luồng "Lưu PDF" của bản cũ, không tải
+  ngầm qua Blob).
+- Renderer: `renderer/lib/export.ts` (mới, dùng chung mọi trang):
+  `exportTableXlsx()`/`printHtmlToPdf()`. **Trang đầu tiên áp dụng: Báo cáo**
+  (`ReportPage.tsx`) — thêm nút "In PDF"/"Xuất Excel" cạnh "Xuất CSV" đã có
+  từ B11, cộng `buildReportPrintHtml()` (hàm thuần dựng HTML in — trang tĩnh
+  tự đứng một mình, không phụ thuộc CSS/JS của app chính, cùng tinh thần
+  cửa sổ in độc lập của bản cũ).
+
+**Phạm vi CỐ Ý rút gọn** — chỉ chứng minh CƠ CHẾ đúng (Excel thật qua
+exceljs, PDF thật qua printToPDF, cả hai đã verify sinh ra file đúng định
+dạng), CHƯA áp dụng cho mọi báo cáo như bản cũ (Sigma/Westgard cũng có in/
+xuất riêng ở bản cũ, HTML in đẹp có logo/chữ ký/phụ lục NCE) — đó là công
+việc lặp lại cơ chế đã có cho từng trang, để dành cho khi cần, không phải
+thiếu sót kiến trúc.
+
+Verify: `npm run app-v2:typecheck` sạch, `app-v2:test` 23/23 (thêm
+`export-handlers.test.mjs` — build 1 file .xlsx rồi ĐỌC LẠI bằng chính
+`exceljs` để xác nhận header/hàng đúng, không chỉ kiểm tra chuỗi base64
+không rỗng; xác nhận tên sheet quá 31 ký tự tự cắt, không ném lỗi;
+`printHtmlToPdf()` cần `BrowserWindow` thật nên không test được ở Node
+thuần, xác nhận qua Playwright `_electron`), `app-v2:build` sạch, cộng kịch
+bản Playwright `_electron` tạm: **stub `dialog.showSaveDialog` qua
+`app.evaluate()`** (Playwright không điều khiển được hộp thoại lưu file
+native của hệ điều hành) → tạo dữ liệu qua Cấu hình chung/Nhập QC → sang Báo
+cáo, xem lại điểm QC → bấm "Xuất Excel" không lỗi console → bấm "In PDF",
+xác nhận file THẬT được ghi ra đĩa (42KB, mở đầu đúng magic bytes `%PDF-` —
+không chỉ tin nút bấm không crash) — zero console error.
+
+**Giai đoạn C3 — Backup/phục hồi (xong, 2026-09-01).** Người dùng quyết định
+tạm dừng C2 (Firebase sync — cần thông tin dự án Firebase thật chưa có) và
+chuyển sang C3/C4/C5. Định dạng backup app-v2 **cố ý KHÔNG tương thích byte
+với bản cũ** (`'qclab-v2-backup'` riêng, khác `'qclab-backup'` của bản cũ) —
+hai bên có hình dạng dữ liệu hoàn toàn khác nhau (SQLite quan hệ vs 1 object
+JS lồng nhau); phục hồi được TỪ định dạng bản cũ là việc của C4 (di trú dữ
+liệu), không phải C3.
+- `main/domain/backup.ts` (mới): `BACKUP_FORMAT='qclab-v2-backup'`,
+  `BACKUP_FORMAT_VERSION=1`, `computeChecksum()` (SHA-256 qua `node:crypto`
+  thật, không tự viết như bản cũ phải làm để chạy trong trình duyệt),
+  `buildBackupEnvelope()`, và `validateBackupEnvelope()` — hàm THUẦN, không
+  đụng DB, dễ test không cần SQLite: kiểm đủ `format` đúng chuỗi, `schemaVersion`
+  không vượt quá bản hiện tại (backup từ tương lai bị chặn, cùng nguyên tắc
+  `validateStateInvariants()` của bản cũ), `data` là object, và checksum khớp
+  `computeChecksum(JSON.stringify(data))` — sai bất kỳ ký tự nào trong `data`
+  đều bị phát hiện.
+- `main/ipc/backup-handlers.ts` (mới): đọc/ghi TOÀN BỘ bảng một cách TỔNG
+  QUÁT qua `sqlite_master`/`PRAGMA table_info` — không hard-code danh sách
+  bảng/cột, để không lệch mỗi khi `schema.ts` thêm bảng/cột mới (tự động
+  theo kịp, không phải nhớ sửa 2 nơi, đúng tinh thần "đơn giản hơn bản cũ"
+  của kiến trúc mới). `exportBackup(actor)` dump mọi bảng, ghi 1 dòng audit.
+  `importBackup({json}, actor)`: **chỉ admin** → parse JSON (bắt lỗi hỏng
+  hoàn toàn, báo `invalid-json` không crash) → `validateBackupEnvelope()` →
+  **tự động chốt 1 bản "an toàn trước khi phục hồi"** ra đĩa thật
+  (`userDataDir/pre-restore-backup-<ts>.json`) TRƯỚC KHI xoá bất cứ gì — nếu
+  bước này lỗi thì HUỶ LUÔN việc phục hồi (`snapshot-failed`), không ghi đè
+  khi chưa chắc có đường lùi, đúng nguyên tắc `BackupImportCommand` bản cũ →
+  `restoreFromEnvelope()` chạy trong 1 transaction thật
+  (`PRAGMA foreign_keys=OFF` + `BEGIN`, xoá mọi bảng theo thứ tự NGƯỢC liệt
+  kê, insert lại theo thứ tự thuận, `PRAGMA foreign_key_check` xác nhận
+  không vi phạm ràng buộc trước khi `COMMIT`, `ROLLBACK` nếu có lỗi bất kỳ ở
+  giữa) → ghi audit → `notifyChanged(listTableNames(db))` (phục hồi thay đổi
+  GẦN NHƯ MỌI bảng cùng lúc, nên báo rộng hơn thường lệ thay vì chỉ
+  `writeAudit()`'s mặc định `['activity']`, để mọi trang đang mở refetch
+  đúng ngay, không cần khởi động lại app mới thấy dữ liệu đã phục hồi).
+- `main/index.ts`/`preload.ts`/`shared/qc-api.d.ts`: thêm `userDataDir`
+  (đường dẫn thật của Electron, không phải thư mục code), wiring
+  `createBackupHandlers(db, userDataDir)`, kênh IPC `backup:export`/
+  `backup:import`.
+- `renderer/pages/SettingsPage.tsx`: panel "Sao lưu & phục hồi" mới —
+  `exportBackupFile()` gọi IPC lấy JSON, đóng gói `Blob` rồi tải xuống qua
+  `<a download>` (cùng cơ chế `downloadCsv` đã dùng ở Audit/Report).
+  `pickBackupFile()`: đọc file người dùng chọn → **`confirmDialog` cảnh báo
+  rõ ràng** ("sẽ THAY THẾ TOÀN BỘ dữ liệu hiện có... một bản sao lưu an toàn
+  sẽ được tự động tạo trước khi ghi đè") → **`reauthDialog`** (phục hồi là
+  thao tác không thể huỷ ngang, cùng hạng "thao tác nặng" với duyệt/hoàn NCE,
+  khoá/mở khoá kỳ báo cáo của bản cũ) → gọi `importBackup` → `infoDialog`
+  báo thành công kèm ĐƯỜNG DẪN THẬT của bản an toàn vừa tạo (không chỉ nói
+  "đã lưu", để người dùng biết tìm ở đâu nếu cần khôi phục lại bản cũ).
+- Một bug CSP đã sửa ở B10 (thiếu `img-src 'self' data: blob:`) được xác
+  nhận lại không ảnh hưởng panel này — backup không qua `<img>`, chỉ qua
+  `Blob`/`<a download>`, một cơ chế khác.
+
+Verify: `npm run app-v2:typecheck` sạch, `app-v2:test` 24/24 (thêm
+`backup-handlers.test.mjs` — kịch bản END-TO-END thật: tạo dữ liệu qua
+`config-handlers` thật → export → **phục hồi vào 1 DB `:memory:` KHÁC** (mô
+phỏng cài lại máy khác) → đối chiếu instrument/test/level khớp lại đúng;
+cộng 5 điều kiện chặn: viewer không được phục hồi (`forbidden`), checksum bị
+sửa 1 ký tự bị chặn (`checksum-mismatch`), sai định dạng
+`'qclab-backup'` (bản cũ) bị chặn với thông báo riêng (`wrong-format`) —
+xác nhận rõ C3 không nhận nhầm backup bản cũ, `schemaVersion` từ tương lai
+bị chặn (`unsupported-schema`), JSON hỏng hoàn toàn không crash
+(`invalid-json`)), `app-v2:build` sạch, cộng kịch bản Playwright `_electron`
+tạm xác nhận trong Electron THẬT: tạo 1 máy (May A) → xuất backup qua gọi
+IPC trực tiếp lấy đúng nội dung JSON (tránh sự cố Blob-download không đáng
+tin cậy với `_electron` đã gặp nhiều lần ở B8/B11/C1) → thêm máy thứ 2 (May
+B) → sang Cài đặt, chọn file backup cũ (chỉ có May A) qua input file thật →
+đi qua đúng `confirmDialog` cảnh báo → `reauthDialog` nhập mật khẩu →
+`infoDialog` báo thành công → **quay lại Cấu hình chung xác nhận dữ liệu
+THẬT SỰ bị thay thế**: May A có mặt, May B đã biến mất (không chỉ tin thông
+báo thành công, mà đọc lại state thật) → xác nhận file backup-an-toàn-trước-
+khi-phục-hồi thật sự tồn tại trên đĩa trong `userDataDir` — zero console
+error toàn bộ luồng.
+
+**Giai đoạn C4 — Di trú dữ liệu từ app cũ (xong, 2026-09-01).** Khác hẳn C3
+(round-trip trong CÙNG 1 định dạng): đây là ÁNH XẠ giữa 2 hình dạng dữ liệu
+khác nhau — backup app cũ (`'qclab-backup'`, object lồng nhau: `tests[]`
+mỗi test tự mang `levels[]`, `data{testId:[điểm QC]}`, `qcLots[]`,
+`lotGroups[]`, `qcPanels[]` với `testIds[]`, `activity[]` hash-chain, …) sang
+schema SQLite quan hệ của app-v2 (bảng riêng cho từng loại, khoá ngoại thật).
+- `main/db/table-io.ts` (mới, tách ra từ `backup-handlers.ts` của C3): gom
+  `listTableNames`/`columnsOf`/`dumpAllTables`/`restoreAllTables` (transaction
+  xoá-hết-rồi-nạp-lại) và thêm `writeSafetySnapshot()` — dùng CHUNG cho cả
+  phục hồi backup app-v2 (C3) lẫn di trú dữ liệu từ app cũ (C4), vì cả hai
+  đều là thao tác THAY THẾ TOÀN BỘ dữ liệu, cùng cần đúng 1 đường lùi. `backup-
+  handlers.ts` được sửa lại để gọi các hàm này thay vì tự khai báo (refactor
+  thuần, không đổi hành vi — xác nhận lại 24/24 test C3 vẫn qua trước khi
+  code C4 dựa lên trên).
+- `main/domain/migrate-legacy.ts` (mới): `parseLegacyBackupEnvelope()` — kiểm
+  `format==='qclab-backup'` (báo `wrong-format` rõ ràng nếu lỡ đưa nhầm backup
+  app-v2 `'qclab-v2-backup'` vào đây) + checksum SHA-256 hex của
+  `JSON.stringify(data)` qua `node:crypto` — ĐÚNG thuật toán app cũ dùng
+  (`crypto.subtle.digest('SHA-256',...)` trong trình duyệt cho cùng input ra
+  cùng hex). `mapLegacyStateToTables()` — hàm THUẦN, không đụng DB, ánh xạ
+  từng bảng: máy, xét nghiệm + mức QC (kèm lịch sử Mean/SD), lô + nhóm lô,
+  Panel QC (+ bảng nối `qc_panel_tests` từ `testIds[]`), chuyển tiếp lô, toàn
+  bộ điểm QC, Sigma theo kỳ, người dùng, nhật ký hoạt động, hồ sơ NCE, so
+  sánh hoá chất, khoá kỳ báo cáo, bảng TEa tham chiếu. KHÔNG cố "làm sạch
+  lại" như `sanitizeBackup()` bản cũ — dữ liệu backup xuất từ 1 app đang chạy
+  đã qua `ensureShape()` liên tục nên coi là hợp lệ, chỉ phòng thủ chống
+  thiếu trường.
+- **2 phát hiện quan trọng khi ánh xạ, không phải giả định trước**: (1) mật
+  khẩu người dùng GIỮ NGUYÊN được — cả 2 app dùng ĐÚNG thuật toán PBKDF2-
+  SHA256 + ĐÚNG định dạng chuỗi lưu `pbkdf2$<iter>$<salt>$<hash>` (xem
+  CLAUDE.md "Module roles" → users-auth.js), nên chỉ cần copy `passHash`
+  nguyên văn — không cần đặt lại mật khẩu sau di trú, xác nhận bằng test
+  đăng nhập thật với mật khẩu gốc. (2) chuỗi hash tamper-evident của nhật ký
+  hoạt động GIỮ NGUYÊN được — `audit-chain.ts` dùng ĐÚNG thuật toán
+  (`auditCanonical`/`sha256(prevHash+'|'+canonical(payload))`) và ĐÚNG tên
+  trường payload với bản cũ, nên chỉ cần đổi tên cột sang snake_case,
+  `verifyAuditChain()` vẫn xác nhận đúng — KHÔNG cần `relinkAuditChain()` lại
+  toàn bộ. Nếu log app cũ đã từng bị lưu trữ/xoay vòng (`activityAnchor`
+  khác rỗng), anchor đó được mang sang `app_meta` (app-v2 đã có sẵn CÙNG cơ
+  chế cho tính năng lưu trữ B8) — thiếu bước này thì `verifyAuditChain()` sẽ
+  báo sai chuỗi ngay hàng đầu tiên sau di trú.
+- **Hồ sơ NCE là phần lệch hình dạng nhiều nhất**: app-v2's NCE (xem
+  `nce-validation.ts`) là bản RÚT GỌN cho giai đoạn đầu (chưa có protocol-v3
+  FMEA đầy đủ: containment/qcMaterial/instrument/reagent/calibration/
+  lotToLot status, risk S/O/D...). Không cố tổng hợp lại các trường đó thành
+  văn xuôi (rủi ro bịa nội dung) — chỉ ánh xạ những trường CÓ tương ứng trực
+  tiếp vào cột thật + đúng 4 trường `detail_json` mà `ActionsPage.tsx` hiện
+  đọc được (`correction`/`investigation`/`causeCategory`/`causeDescription`,
+  suy từ `action`/`cause`/`causeCategory` của bản ghi cũ), ĐỒNG THỜI giữ
+  NGUYÊN VẸN bản ghi gốc dưới `detail_json.legacy` — không mất dữ liệu dù UI
+  hiện tại chưa hiển thị hết, để lần app-v2's NCE UI được làm đầy đủ hơn
+  (protocol-v3) đọc lại từ đó mà không cần di trú lại lần nữa.
+- **Giới hạn đã biết, ghi lại chứ không sửa ở lượt này**: app-v2's `tests`
+  bảng có cột `section` (dùng để tự điền Khoa/Khu vực) mà bản cũ không có
+  theo TỪNG xét nghiệm — suy 1 lần từ `section` của máy đang gắn lúc di trú,
+  khớp đúng hành vi auto-fill hiện có của app-v2 khi đổi máy, nhưng có thể
+  không đúng nếu Khoa/Khu vực thật của xét nghiệm khác máy. `tea_ref_key`
+  (khoá khớp bảng `tea_refs`) chưa suy được từ dữ liệu bản cũ (bản cũ không
+  có trường tương đương) — để trống, cần rà soát thủ công sau di trú nếu
+  dùng tính năng TEa tự động khớp. `assayGroups` (bản cũ, đã bị chính bản cũ
+  coi là legacy/thay thế bởi `qcPanels`) KHÔNG được di trú — khớp quyết định
+  đã ghi trong "Module roles" của bản cũ, không phải thiếu sót.
+- `main/ipc/migration-handlers.ts` (mới): `preview()` chỉ parse + ánh xạ +
+  đếm (KHÔNG ghi DB) — để renderer hiện rõ "sẽ nhập bao nhiêu máy/xét
+  nghiệm/điểm QC..." TRƯỚC khi hỏi xác nhận, vì đây là thao tác THAY THẾ
+  TOÀN BỘ dữ liệu app-v2 hiện có, người dùng cần biết quy mô trước khi quyết
+  định. `importLegacy()`: chỉ admin → parse+validate → **tự động chốt 1 bản
+  an toàn** qua `writeSafetySnapshot()` TRƯỚC khi xoá bất cứ gì (huỷ luôn nếu
+  bước này lỗi, cùng nguyên tắc C3) → `restoreAllTables()` (CÙNG transaction
+  xoá-hết-rồi-nạp-lại của C3, không viết lại) → `writeAudit()` (dòng log
+  MỚI này tự nối đúng vào cuối chuỗi hash vừa di trú, vì `writeAudit()` luôn
+  đọc `MAX(seq)`/hash cuối cùng THẬT trong bảng, không quan tâm dòng đó từ
+  đâu ra) → `notifyChanged()` toàn bộ bảng liên quan.
+- `renderer/pages/SettingsPage.tsx`: panel "Di trú dữ liệu từ app cũ" mới —
+  chọn file → `previewLegacyBackup` hiện ngay số lượng từng loại sẽ nhập →
+  bấm "Di trú dữ liệu…" → `confirmDialog` liệt kê lại đúng các số đó kèm
+  cảnh báo thay thế toàn bộ → `reauthDialog` → `importLegacyBackup` →
+  `infoDialog` báo thành công kèm đường dẫn bản an toàn vừa tạo.
+
+Verify: `npm run app-v2:typecheck` sạch, `app-v2:test` 26/26 (thêm
+`migrate-legacy.test.mjs` — test oracle cho `parseLegacyBackupEnvelope`/
+`mapLegacyStateToTables` với 1 state tổng hợp đủ mọi nhánh, xác nhận: format
+sai/checksum sai bị chặn đúng mã lỗi, mỗi bảng ánh xạ đúng cột, chuỗi hash
+activity sau khi đổi tên cột sang snake_case vẫn `verifyAuditChain()` đúng,
+`detail_json.legacy` giữ nguyên bản ghi NCE gốc; và `migration-handlers.test.mjs`
+— end-to-end thật: preview không ghi DB, chỉ admin được import, dữ liệu ghi
+đúng vào SQLite thật, **mật khẩu cũ đăng nhập được NGAY qua chính
+`auth-handlers.ts`'s `login()`** (chứng minh bằng test thật, không chỉ đọc
+code), chuỗi audit nối tiếp đúng sau di trú, JSON hỏng/sai định dạng không
+crash), `app-v2:build` sạch, cộng kịch bản Playwright `_electron` tạm xác
+nhận trong Electron THẬT: tạo 1 máy app-v2 thật trước → dựng 1 file backup
+app CŨ hợp lệ (định dạng/checksum thật, không chạy app cũ) → chọn file ở
+Cài đặt → preview hiện đúng số lượng (1 máy/1 xét nghiệm/1 lô/2 điểm QC/1
+người dùng) → xác nhận → `reauthDialog` → di trú thành công → **quay lại
+Cấu hình chung xác nhận dữ liệu THẬT SỰ bị thay thế**: máy từ app cũ có mặt,
+máy app-v2 trước đó đã biến mất (đọc lại qua `window.qcApi.listInstruments()`
+thật, không chỉ tin thông báo) → xác nhận file backup-an-toàn-trước-di-trú
+thật sự tồn tại trên đĩa — zero console error toàn bộ luồng.
+
+**Giai đoạn C5 — Client LIS Gateway (xong, 2026-09-01).** Gateway server
+(`lis-gateway/`, prototype Node độc lập, ngoài phạm vi hồ sơ hiệu lực ISO
+15189 — xem CLAUDE.md phần "LIS Gateway (prototype)") **KHÔNG đổi gì** —
+Giai đoạn C5 chỉ thêm phía app-v2 GỌI VÀO gateway đã có sẵn, tham khảo
+`src/application/lis/lis-client-service.ts` bản cũ nhưng viết lại thuần cho
+kiến trúc main/renderer tách biệt của app-v2 (main process gọi HTTP tới
+gateway, không phải renderer — renderer chỉ gọi IPC như mọi module khác,
+tránh phải nới CSP `connect-src` của renderer cho riêng tính năng này).
+- `main/domain/lis-client.ts` (mới): `normalizeGatewayUrl()` — allowlist
+  CỨNG đúng 2 origin (`http://127.0.0.1:8787`/`http://localhost:8787`, khớp
+  `QCLAB_LIS_PORT` mặc định của gateway) — từ chối mọi origin khác kể cả
+  cùng host sai port. `resultToPointInput()` — **2 nguyên tắc BẮT BUỘC port
+  nguyên vẹn từ bản cũ, không được "đơn giản hoá"**: (1) chỉ chuyển đổi bản
+  ghi ĐÃ khớp cấu hình (`resolved.ok===true`) — bản ghi `UNMAPPED_TEST`/
+  `UNMAPPED_LEVEL`/`UNIT_MISMATCH` trả `null`, không được tạo điểm QC với
+  `testId`/`level` rỗng; (2) ngày điểm QC suy từ **giờ địa phương** của
+  `measuredAt` (`getFullYear()/getMonth()/getDate()` của `Date`), TUYỆT ĐỐI
+  không cắt chuỗi ISO UTC — 1 lần QC lúc 06:05 giờ VN có `measuredAt` là
+  23:05Z NGÀY HÔM TRƯỚC, cắt UTC sẽ lệch ngày âm thầm trên Levey-Jennings.
+- `main/ipc/lis-handlers.ts` (mới): cấu hình (`enabled`/`url`/`token`) lưu ở
+  `app_meta` (thay `localStorage` bản cũ), chỉ admin sửa (`saveSettings`).
+  `pullQueue()`: gọi `/health` rồi `/api/v1/qc-results?status=pending&limit=500`
+  qua Node's `fetch` thật (Electron main process, không phải renderer) với
+  `Authorization: Bearer <token>`, tách `pending` (đã khớp)/`unresolved`
+  (chưa khớp) theo `resolved.ok`. **`importResult()` — bất biến quan trọng
+  nhất của cả tính năng: ghi điểm QC cục bộ (qua chính `entry-handlers.ts`'s
+  `addPoint()` — CÙNG đường kỳ khoá/audit log với nhập tay thủ công, không
+  có đường ghi riêng cho LIS) TRƯỚC, chỉ gọi gateway báo `'imported'` SAU KHI
+  ghi thành công.** Nếu ghi thất bại (vd kỳ đã khoá) → **TUYỆT ĐỐI không gọi
+  gateway** — trả lỗi ngay, bản ghi vẫn còn `'pending'` phía gateway, không
+  mất không báo sai. Nếu ghi thành công nhưng gọi `/decide` thất bại (mạng
+  lỗi) → **vẫn trả `ok:true`** kèm `gatewayWarning` — điểm QC đã ghi thật thì
+  KHÔNG được báo toàn bộ thao tác thất bại (không hoàn tác/rollback), chỉ
+  cảnh báo người dùng kiểm tra kỹ trước khi nhận lại lần sau (tránh trùng
+  điểm, vì `addPoint()` không có kiểm tra trùng ở tầng QC point). `rejectResult()`
+  đơn giản hơn — không ghi gì cục bộ, chỉ báo gateway + ghi audit.
+- `renderer/pages/SettingsPage.tsx`: panel "LIS Gateway (thí điểm)" mới —
+  bật/tắt + địa chỉ + token, nút "Xem hàng chờ QC" mở modal 2 phần (giống bố
+  cục bản cũ): "Sẵn sàng nhận" (nút Nhận + Bỏ) và "Chưa khớp cấu hình" (chỉ
+  nút Bỏ — không có nút Nhận, vì `qclabTestId`/`level` rỗng sẽ tạo điểm QC
+  rác). Sau Nhận/Bỏ tự `refreshLisQueue()` (gọi lại `pullQueue()`, không tự
+  suy đoán trạng thái mới) — cùng nguyên tắc "làm mới từ nguồn thật" mà bản
+  cũ dùng.
+
+Verify: `npm run app-v2:typecheck` sạch, `app-v2:test` 28/28 (thêm
+`lis-client.test.mjs` — oracle cho `normalizeGatewayUrl`/`resultToPointInput`,
+pin đúng 2 nguyên tắc ngày giờ địa phương + chỉ nhận bản ghi đã khớp; và
+`lis-handlers.test.mjs` — end-to-end với `fetch` toàn cục được mock (không
+cần chạy gateway thật ở test Node, gateway thật có bộ test riêng của nó ở
+`lis-gateway/tests`): xác nhận Bearer header đúng khi pull, **ghi thất bại
+(kỳ đã khoá) thì đếm được 0 lần gọi `fetch` tới gateway** (bất biến quan
+trọng nhất, kiểm tra bằng đếm lời gọi thật chứ không chỉ đọc code), ghi
+thành công nhưng `/decide` thất bại vẫn trả `ok:true` kèm điểm QC thật trong
+DB, chỉ admin sửa được cấu hình), `app-v2:build` sạch, cộng kịch bản
+Playwright `_electron` tạm — **verify với chính server `lis-gateway/server.js`
+THẬT chạy song song** (không mock gì): tạo 1 máy + 1 xét nghiệm thật trong
+app-v2, lấy đúng `qclabTestId` thật qua IPC rồi mới dựng file cấu hình
+gateway map đúng id đó → spawn `lis-gateway/server.js` với token/config/data
+dir riêng → 1 script Node độc lập POST 2 kết quả QC thật vào gateway (1 đã
+mapping, 1 chưa) → bật LIS Gateway trên UI Cài đặt, lưu cấu hình, mở "Xem
+hàng chờ QC" → modal hiện đúng "Sẵn sàng nhận (1)"/"Chưa khớp cấu hình (1)"
+kèm đúng giá trị 102.5 → bấm "Nhận" → hàng sẵn sàng về 0 → bấm "Bỏ" → hàng
+chưa khớp về 0 → **xác nhận điểm QC THẬT trong SQLite** (đúng giá trị/testId/
+operator_name lấy từ message LIS "ktv_lis", không phải tên người đăng nhập)
+→ **xác nhận trạng thái THẬT phía gateway** qua `GET /api/v1/status`
+(`imported:1, rejected:1`) — không chỉ tin UI app-v2 báo thành công mà đối
+chiếu cả 2 phía độc lập — zero console error toàn bộ luồng.
+
+**Với C1/C3/C4/C5 xong, chỉ còn C2 (Firebase, tạm dừng theo quyết định
+người dùng) và C6 (bộ gate kiểm thử kiểu app cũ, không chặn — xem
+`docs/APP-V2-PLAN.md`) trong thứ tự Giai đoạn C.**
+
+**Xem giao diện app-v2 qua trình duyệt/localhost (2026-09-01).** app-v2's
+renderer bình thường CHỈ chạy được trong Electron thật — `window.qcApi`
+(cầu nối IPC) chỉ tồn tại sau khi `preload.ts` chạy. `npm run app-v2:dev`
+(`vite --config vite.app-v2-renderer.config.mjs`, cấu hình `app-v2-dev` cổng
+5174 trong `.claude/launch.json`) mở renderer qua `localhost` bằng cách cài
+1 bản `window.qcApi` GIẢ LẬP khi phát hiện không có Electron
+(`app-v2/renderer/browser-mock/install.ts`, kiểm tra `typeof window.qcApi
+==='undefined'`) — cùng kỹ thuật "swap backend theo môi trường" mà 1 app
+Electron khác của người dùng (`Marketing App`, `getDatabaseBridge()`/
+`window.mktDatabase`) đã dùng, khảo sát trước khi làm để tránh đoán mò kiến
+trúc.
+
+Người dùng chọn mức độ **"chỉ xem giao diện"** (không phải "đầy đủ nghiệp
+vụ thật") sau khi được hỏi rõ đánh đổi — xem
+`app-v2/renderer/browser-mock/store.ts`'s comment đầu file. Cụ thể:
+- **TÁI DÙNG THẬT** mọi hàm nghiệp vụ THUẦN từ `main/domain/*` (không đụng
+  `node:crypto`/`node:fs`) — `westgard()`/`cusum()` (Westgard/CUSUM thật),
+  `sigmaMetric()`/`uncertaintyBudget()`/`eqaRoundsStats()` (Six Sigma/MU
+  thật), `calculateReagentComparison()` (hồi quy so sánh hoá chất thật),
+  cùng mọi hàm `validate*`/`prepare*` (Cấu hình chung/Entry/NCE/TEa/Report/
+  Settings/Auth) — Vite bundle thẳng các file `.ts` này vào renderer, KHÔNG
+  viết lại phiên bản đơn giản hoá; xác nhận bằng cách thêm 1 điểm QC >3SD
+  qua trình duyệt thật và thấy đúng "Vi phạm"/"1-3s" xuất hiện nhất quán ở
+  cả Nhập QC, Phân tích Westgard và Tổng quan.
+- **GIẢ LẬP** (không băm/mã hoá thật, vì trình duyệt không có `node:crypto`
+  của main process): mật khẩu lưu dạng chuỗi thường trong
+  `passwordsByUserId` (không phải dữ liệu QC/tài khoản thật, chỉ demo cục
+  bộ trong trình duyệt người xem); chuỗi hash tamper-evident của nhật ký
+  hoạt động luôn để trống (`hash`/`prevHash` rỗng — `verifyActivityChainNow()`
+  trả về canned "mọi dòng đều legacy", đúng cách `verifyAuditChain()` thật
+  xử lý dòng không hash, không phải giả mạo kết quả).
+- **KHÔNG KHẢ DỤNG** (trả lỗi rõ ràng `not-available-in-browser-preview`,
+  không giả vờ thành công): xuất Excel/in PDF/backup/di trú/LIS Gateway —
+  các tính năng này cần Electron thật (file system, `BrowserWindow`,
+  HTTP tới gateway).
+- **Dữ liệu**: lưu 1 blob JSON trong `localStorage` của trình duyệt
+  (`qclab-v2-browser-preview`), KHÔNG dùng chung với SQLite thật, KHÔNG có
+  seed data sẵn — luồng khởi tạo admin/đăng nhập giống hệt lần chạy đầu của
+  bản Electron thật.
+- CSP thật của `index.html` (`script-src 'self'`, không `unsafe-eval`) chặn
+  WebSocket HMR/eval của `vite dev` — `vite.app-v2-renderer.config.mjs`'s
+  plugin `relaxCspForDevServer` chỉ nới lỏng CSP khi `ctx.server` tồn tại
+  (đang chạy dev server), KHÔNG áp dụng khi build cho Electron thật
+  (`npm run app-v2:build`) — xác nhận bằng cách build lại và diff
+  `app-v2-dist/renderer/index.html`'s CSP không đổi.
+- 1 banner cố định màu cam ở đầu trang (`PreviewBanner.tsx`) luôn hiện khi
+  đang ở chế độ này, để không ai nhầm đây là dữ liệu SQLite thật.
+
+Verify: `npm run app-v2:typecheck`/`build`/`test` sạch (mọi handler thật
+không đổi hành vi — chỉ thêm 1 lớp mock hoàn toàn tách biệt, không chạm vào
+`main/ipc/*`), cộng kiểm chứng thật qua Browser pane (`npm run app-v2:dev`
+cổng 5174): khởi tạo admin → đăng nhập → thêm máy+xét nghiệm+Mean/SD qua
+Cấu hình chung (dữ liệu SỐNG SÓT qua F5 reload thật, xác nhận `localStorage`
+hoạt động) → Nhập QC thêm 1 điểm >3SD → xác nhận verdict "Vi phạm"/luật
+"1-3s" hiện ĐÚNG (Westgard thật) nhất quán ở cả Entry/Westgard/Dashboard →
+Nhật ký hoạt động hiện đúng dòng "Thêm máy xét nghiệm" sau khi thêm máy thứ
+2 → Six Sigma/So sánh hoá chất/Cài đặt render không lỗi console — zero
+console error toàn bộ luồng.
+
+**Bug thật bắt được ngay sau khi làm xong ở trên**: `LoginPage.tsx` (màn
+hình đăng nhập/khởi tạo admin) hoá ra CHƯA TỪNG được style từ đầu dự án —
+vẫn `font-family:sans-serif` + input trần + `<button>` không class, vì
+trang này render TRƯỚC khi `AppShell`/router bình thường vào cuộc (không đi
+qua luồng "mỗi trang Giai đoạn B tự thêm CSS lên nền token đã có" như
+10 trang còn lại), nên không ai để ý qua suốt cả Giai đoạn A1–C5. Người
+dùng phát hiện ngay khi so với bản cũ. Sửa bằng cách port đúng bố cục
+`.auth-card`/`.auth-head`/`.brand-mark` của bản cũ
+(`assets/components.css`/`professional-base.css`/`app.css`) sang
+`app-v2/renderer/styles/app.css` — dùng NGUYÊN token màu/khoảng cách app-v2
+đã có sẵn từ A1 (`--teal`, `--panel`, `--radius-lg`, `--space-*`...), chỉ
+thêm 2 token mới cho nền gradient sau card (`--auth-overlay-from`/
+`--auth-overlay-to`, giá trị y hệt bản cũ). Kết quả: nền gradient xanh đậm
+toàn màn hình, card trắng nổi giữa, ô vuông teal "QC" + tiêu đề "QC Lab" +
+phụ đề "Nội kiểm xét nghiệm", nút "Đăng nhập" teal full-width — đúng bố cục
+bản cũ, khác chỉ ở việc dựng bằng component React thật thay vì chuỗi HTML.
+Xác nhận qua Browser pane thật (`npm run app-v2:dev`): đăng xuất → màn hình
+đăng nhập hiện đúng bố cục mới → đăng nhập lại thành công, zero console
+error.
+
+**Sao chép giao diện app cũ vào app-v2 — quyết định "100%" (2026-09-01, đang
+làm).** Người dùng chốt: sao chép CHÍNH XÁC giao diện đã duyệt của app cũ
+sang app-v2 cho toàn bộ khung sườn + 11 trang ("cả trong lẫn ngoài"), chỉ
+kiến trúc code là mới — ghi đè quyết định "dựng lại gọn, không copy cascade"
+của Giai đoạn A1 (xem mục A1 phía trên: quyết định đó vẫn đúng cho cấu
+trúc FILE CSS, chỉ sai ở việc chưa pixel-match được KẾT QUẢ hiển thị).
+
+**Khung sườn (xong phần 1 — sidebar/topbar, chưa làm nội dung riêng từng
+trang).** Khảo sát kỹ bản cũ trước khi code (tránh đoán mò): sidebar bản cũ
+KHÔNG có tiêu đề trang (topbar) cố định trong shell — `.head` (tiêu đề +
+phụ đề + khối người dùng) được LẶP LẠI ở đầu MỖI trang (qua
+`PageHeader.tsx` cũ), không phải 1 topbar chung, để `.head` sticky theo
+scroll RIÊNG của từng trang. Port đúng cấu trúc đó thay vì giữ topbar cố
+định app-v2 đang có trước đây:
+- `app-v2/renderer/components/AppShell.tsx` viết lại: sidebar `<aside>` tối
+  màu (`--sidebar-bg`=`#14242e`), brand row (logo/tên phòng XN đọc từ
+  `useSettingsStore`, nút thu gọn), pill "Đang chạy cục bộ" (tĩnh — app-v2
+  chưa có Firebase nên luôn đúng, không giả vờ có tính năng cloud), 3 nhóm
+  điều hướng có tiêu đề ("Theo dõi"/"Vận hành"/"Quản trị") + icon SVG +
+  active state viền trái teal `#2fb3a6` — ĐÚNG thứ tự/nhãn/icon/vai trò
+  được phép xem của `ROUTER_PAGE_DEFS`/`router-shell-controller.ts` bản cũ.
+  Thu gọn/mở rộng sidebar (nút trong brand row + nút nổi khi đã thu gọn)
+  lưu vào `localStorage['qclab-v2-nav-collapsed']` (khoá riêng, KHÔNG trùng
+  khoá `qclab_nav_collapsed` của bản cũ để tránh 2 app cùng đọc/ghi 1 khoá
+  nếu mở trong cùng trình duyệt).
+- `app-v2/renderer/components/NavIcon.tsx` (mới) — copy nguyên path SVG
+  từng icon từ `router-icons.ts` bản cũ (không tự vẽ lại, đặc biệt icon
+  Westgard có nhiều path+circle chồng nhau, dễ sai nếu vẽ tay).
+- `app-v2/renderer/components/PageHeader.tsx` (mới) — port đúng bố cục
+  `.head`/`.top-user` bản cũ (tiêu đề+phụ đề trái, avatar+tên+vai trò+nút
+  đăng xuất phải). KHÔNG port tính năng đổi ảnh đại diện (app-v2 chưa có
+  modal đó) — avatar chỉ hiện chữ cái đầu, không bấm được, khác duy nhất so
+  với bản cũ. Cả 11 trang app-v2 sửa lại để gọi `<PageHeader title=...
+  subtitle=... />` thay vì tự vẽ `<h1>` riêng — tiêu đề sidebar và tiêu đề
+  trang (`<h1>`) CỐ Ý khác nhau ở 4 trang (entry/reagent/users/settings),
+  khớp đúng bản cũ (vd sidebar "Nhập QC & Biểu đồ" nhưng `<h1>` chỉ "Nhập
+  QC"). Riêng phụ đề trang Cài đặt đổi nội dung so với bản cũ (bản cũ nhắc
+  "kết nối Firebase" — tính năng app-v2 chưa có, C2 tạm dừng) để không gây
+  hiểu lầm, thay bằng "Thông tin đơn vị, sao lưu, di trú dữ liệu và LIS
+  Gateway" khớp tính năng THẬT hiện có.
+- Ẩn/hiện mục điều hướng theo vai trò (vd "Cấu hình chung"/"Người dùng"/
+  "Nhật ký hoạt động"/"Cài đặt" chỉ admin, "Khắc phục sự cố" ẩn với viewer)
+  CHỈ LÀ HIỂN THỊ phía renderer, khớp đúng danh sách vai trò của
+  `ROUTER_PAGE_DEFS` bản cũ — CHƯA phải chặn truy cập thật ở tầng route/IPC
+  (app-v2 cố ý chưa làm `pagePerms` theo trang, Giai đoạn A2 vẫn dời sau
+  như kế hoạch gốc, không đổi quyết định đó).
+- Token mới thêm vào `tokens.css`: `--auth-overlay-from`/`--auth-overlay-to`
+  (nền gradient sau card đăng nhập) và `--surface-radius:7px` (bán kính nút
+  nhỏ trong `.top-user`) — giá trị lấy nguyên từ bản cũ. Mọi màu xám/teal
+  khác của sidebar (`#cdd8e0`, `#294656`, `#1c2e38`, `#2fb3a6`, `#6fd1c4`,
+  `#7f95a5`, `#8fa2ad`...) viết THẲNG trong CSS, không tách token riêng —
+  bản cũ cũng không tách token cho các màu này, giữ đúng cách đó thay vì
+  bịa thêm biến mới không cần thiết.
+
+Verify: `npm run app-v2:typecheck`/`test` 28/28/`build` sạch, cộng kiểm
+chứng thật qua Browser pane (`npm run app-v2:dev`): Tổng quan hiện đúng
+sidebar tối màu + 3 nhóm + icon + brand "QC Lab"/"Nội kiểm xét nghiệm",
+`.head` sticky đúng ở Nhập QC (tiêu đề khác sidebar), thu gọn/mở rộng
+sidebar qua nút hoạt động đúng cả 2 chiều, avatar+tên+vai trò+đăng xuất
+đúng vị trí — zero console error (một lần lỗi 500 thoáng qua từ chính Vite
+dev server khi đang ghi file dở dang, tự phục hồi ở request kế tiếp, không
+phải lỗi code).
+
+**Còn lại của yêu cầu "100%"**: mới xong khung sườn (sidebar/topbar/đăng
+nhập) — nội dung RIÊNG của từng trang (bảng/form/card cụ thể trong 8 tab
+Cấu hình chung, bảng luật Westgard, form 8 phần NCE, biểu đồ Reagent...)
+vẫn là bản CSS đã viết trong các đợt "làm đầy đủ" trước (Giai đoạn B),
+CHƯA được đối chiếu pixel-by-pixel với từng file `professional-*.css`
+tương ứng của bản cũ. Đây là phần việc LỚN HƠN nhiều so với khung sườn,
+đang tiếp tục.
+
+**Nội dung riêng từng trang — đợt 2, "làm đúng, không vẽ thêm" (2026-09-01,
+xong phần lõi 11/11 trang).** Người dùng nhắc lại yêu cầu rõ ràng hơn: phải
+đối chiếu đúng cấu trúc/CSS bản cũ, không tự đơn giản hoá hay bịa thêm chi
+tiết. Khảo sát lại bằng nhiều agent song song đọc trực tiếp
+`assets/professional-*.css` + `src/react/pages/*.tsx` bản cũ (mỗi trang 1
+agent, đọc nguyên văn CSS + cấu trúc JSX) trước khi sửa, thay vì đoán từ mô
+tả kiến trúc.
+
+- **Nền tảng dùng chung** (`app-v2/renderer/styles/tokens.css`) viết lại
+  THÀNH BẢN SAO NGUYÊN VẸN `assets/tokens.css` bản cũ (đúng tên biến, không
+  chỉ giá trị, khác quyết định "dựng lại gọn" của Giai đoạn A1 — quyết định
+  đó bị ghi đè theo yêu cầu "100%" mới). `app.css`'s `.panel`/`.btn`/
+  `.badge`/`table.data-table`/`.modal-box*`/`.empty` viết lại khớp đúng giá
+  trị `assets/components.css` (padding/radius/màu/font-size từng biến thể).
+  **Mẹo kỹ thuật quan trọng nhất**: bản cũ's `.panel` có `padding:0` và
+  header (`h2.panel-title`) là 1 dải nền xám bám sát mép panel — app-v2 vẫn
+  giữ `.panel{padding:16px}` (để không phải sửa lại inline spacing của mọi
+  trang đã viết) nhưng cho `.panel>.panel-head:first-child`/
+  `.panel>h2.panel-title:first-child` bù margin âm đúng bằng padding đó, tự
+  "tràn" ra sát mép — cùng kết quả thị giác, không cần sửa JSX từng trang.
+- **Tổng quan**: đổi thứ tự thẻ KPI (nhãn nhỏ trên, số to dưới — đúng bản
+  cũ, trước đó app-v2 để ngược).
+- **Cấu hình chung**: đổi từ hàng nút tab ngang sang `.config-shell`
+  (sidebar dọc tối nhạt bên trái + nội dung bên phải, đúng bố cục 2 cột bản
+  cũ) — sidebar có nhãn "CẤU HÌNH CHUNG", mỗi mục có badge đếm số dòng, mục
+  đang chọn có vệt teal bên trái (`box-shadow:inset 4px 0`, không phải
+  border thật, đúng cách bản cũ tránh giật layout). Tab "Lô & nhóm lô QC"
+  đổi sang lưới 2 cột (Lô QC/Nhóm lô QC cạnh nhau) đúng bản cũ thay vì xếp
+  chồng.
+- **Nhập QC** — viết lại TOÀN BỘ, không chỉ đổi CSS: từ bảng điểm phẳng
+  đơn-mức sang đúng mô hình bản cũ — cây xét nghiệm bên trái (máy > xét
+  nghiệm > mức, mỗi lá màu theo verdict, lấy dữ liệu từ
+  `useWestgardStore().summaries` đã có sẵn, không domain mới) + bảng
+  "worksheet" theo lịch tháng bên phải (mỗi hàng 1 ngày trong tháng, mỗi cột
+  1 mức của xét nghiệm đang chọn, ô nhập trực tiếp — gõ giá trị rồi Tab/blur
+  là lưu ngay, đúng luồng bản cũ) + biểu đồ Levey-Jennings dạng xếp chồng
+  (1 thẻ mini/mức, dùng lại `<QcChart>` có sẵn từ Giai đoạn A1) + panel gấp
+  lại "Điểm trong khoảng xem" (thẻ theo từng mức, thống kê tích lũy N/Mean/
+  SD/CV tính ngay ở renderer từ điểm đã tải, bảng điểm + điểm đã huỷ).
+  `entry-store.ts` viết lại để nạp điểm+phân tích cho TẤT CẢ mức của 1 xét
+  nghiệm cùng lúc (`loadTestData`), không chỉ 1 mức như bản thí điểm cũ.
+  **CỐ Ý KHÔNG port** "song song 2 lô" (đã ghi lý do kỹ thuật ở Giai đoạn B2,
+  không đổi) và panel "Thống kê toàn bộ & Dải kiểm soát" (bản cũ có nút mở
+  workflow đổi dải PXN — app-v2 chưa có domain/IPC cho tính năng đó, không
+  bịa thêm nút gọi vào chỗ trống).
+- **Six Sigma**: viết lại bảng kỳ từ "1 dòng/mức" phẳng sang đúng bảng bản
+  cũ — header 2 hàng thật (`rowSpan`/`colSpan`: "Kỳ/Năm" xuyên 2 hàng, mỗi
+  mức 1 nhóm `colSpan=3` ở hàng 1 rồi CV IQC%/Bias EQA%/Sigma ở hàng 2),
+  panel "Tình trạng" (thẻ Sigma to màu theo 5 bậc — `sigmaZone()` copy đúng
+  ngưỡng/màu bản cũ: ≥6 xanh đậm/≥5 xanh/≥4 xanh nhạt/≥3 vàng/<3 đỏ, không tự
+  bịa thang màu). Modal Bias/MU giữ nguyên logic (RMS, cảnh báo lệch dấu,
+  bảng 3 thành phần), chỉ thêm class `.sg-eqa-modal`/`.sg-mu-modal` khớp
+  CSS bản cũ.
+- **So sánh hóa chất**: tách "Kết quả thống kê" thành 3 thẻ KPI (Pearson r,
+  %Bias, P hai phía) + panel "Tiêu chí chấp nhận & kết luận" riêng — 6 tiêu
+  chí dạng huy hiệu ĐẠT/KHÔNG ĐẠT (quyết định)/TỐT/LƯU Ý (mô tả), banner kết
+  luận to (✓/!/✕ theo `R.level`) — đúng 2-panel-tách-biệt của bản cũ thay vì
+  1 bảng gộp chung trước đó. Biểu đồ thêm chú giải màu (đường hồi quy/đường
+  y=x/bias/±1.96SD).
+- **Khắc phục sự cố**: thêm hẳn panel "Sự cố cần xử lý" (bản cũ gọi
+  IssuesPanel) — lọc `useWestgardStore().summaries` lấy mọi mức đang cảnh
+  báo/vi phạm mà CHƯA có hồ sơ NCE active gắn đúng test+mức, hiện hàng màu
+  đỏ/vàng theo mức độ + nút "Lập hồ sơ" mở form đã điền sẵn test/mức — không
+  domain/IPC mới, chỉ lọc lại 2 nguồn dữ liệu đã có (đúng nguyên tắc dùng
+  lại API sẵn có). Tiêu đề từng phần trong form (`SectionTitle`) đổi sang
+  huy hiệu tròn teal đánh số 1-8 (`.action-form-section-title`) đúng bản cũ
+  thay vì `<h3>` chữ số thường. Bảng nhật ký đổi badge duyệt/hiệu lực/hồ sơ
+  sang `.action-chip` (pill nhỏ, đúng class/màu bản cũ) thay vì `.badge`
+  dùng chung.
+- **Modal component** (`app-v2/renderer/components/Modal.tsx`) thêm prop
+  `className` (trước đây chỉ có `width`) để mỗi modal có thể áp class riêng
+  bản cũ (`sg-eqa-modal`, `sg-mu-modal`...) khớp đúng chiều rộng/CSS gốc
+  thay vì tất cả modal cùng 1 kích thước mặc định.
+- File CSS mới `app-v2/renderer/styles/pages.css` (nối vào `index.html` sau
+  `app.css`) gom toàn bộ CSS riêng theo trang — 1 file thay vì 10 file
+  `professional-*.css` như bản cũ vì app-v2 chưa có đủ khối lượng để tách;
+  sẽ tách lại khi file quá lớn để đọc. **Bẫy CSS đã gặp**: comment kiểu
+  `/* .action-*/.issue-* */` bị trình minify hiểu `*/` giữa comment là kết
+  thúc sớm, vỡ build production (`vite build` báo `SyntaxError` ở
+  `lightningcss minify`) dù `vite dev`/typecheck không phát hiện — tránh viết
+  `*/` bên trong nội dung comment CSS.
+
+Verify: `npm run app-v2:typecheck`/`test` 28/28/`build` sạch (bắt được và
+sửa lỗi cú pháp CSS `*/` kể trên nhờ build production, không phải chỉ dev
+server), cộng kiểm chứng thật qua Browser pane cho từng trang vừa sửa: Tổng
+quan (thứ tự thẻ KPI), Cấu hình chung (sidebar dọc + lưới 2 cột Lô/Nhóm lô),
+Nhập QC (chọn xét nghiệm qua cây → bảng lịch tháng hiện đúng điểm đã có,
+gõ giá trị mới vào ô trống rồi Tab lưu đúng, biểu đồ LJ hiện đúng điểm vi
+phạm màu đỏ), Six Sigma (bảng 2 hàng header, thêm kỳ + nhập CV, thẻ trạng
+thái), So sánh hóa chất (nhập 5 cặp lệch ~1%, panel tiêu chí hiện đúng 6 huy
+hiệu + banner "Chưa đủ điều kiện sàng lọc" vì N=5<20 và chưa xác nhận
+coverage), Khắc phục sự cố (panel "Sự cố cần xử lý" hiện đúng dòng đỏ, bấm
+"Lập hồ sơ" mở form điền sẵn test/mức, huy hiệu số 1-4 hiện đúng) — zero
+console error thật (loạt lỗi 500 trong log console là do Vite dev server ghi
+file dở dang giữa các lần sửa liên tiếp, tự phục hồi ở request kế tiếp,
+không phải lỗi code — xác nhận bằng cách đọc lại network log thấy request
+kế tiếp cùng file trả 200).
+
+**Còn lại**: Báo cáo/Nhật ký hoạt động/Cài đặt/Người dùng mới dừng ở mức nền
+tảng dùng chung + vài chi tiết nhỏ (chưa đối chiếu từng cột/breakpoint còn
+lại trong nghiên cứu). Các trang đã viết lại (Nhập QC/Six Sigma/Reagent/
+Actions/Westgard) đã lên tới mức cấu trúc+CSS chính đúng bản cũ nhưng CHƯA
+rà lại toàn bộ breakpoint responsive (≤1150px/≤980px/≤760px) từng liệt kê
+trong nghiên cứu — mới verify ở độ rộng desktop.
+
+**Phân tích Westgard — viết lại đúng cấu trúc bản cũ (2026-09-01, tiếp đợt
+2).** Người dùng phản hồi bảng/cỡ chữ/quy tắc chưa giống — bỏ hẳn bảng
+"Tổng quan tất cả xét nghiệm" phẳng (khái niệm KHÔNG tồn tại ở bản cũ, tự
+bịa ra ở bản thí điểm trước) để thay bằng đúng mô hình bản cũ: panel "Thiết
+lập phân tích" (chọn xét nghiệm → chip bật/tắt từng luật kèm mã luật dạng
+pill → `<details class="wg-guide">` bảng hướng dẫn 4 cột Luật/Điều kiện/
+Kết luận/Gợi ý xử lý, lấy đúng mô tả+gợi ý từ `ruleActions` domain đã có →
+tab LJ/CUSUM dạng `.dayseg`), rồi 1 panel riêng cho MỖI mức của xét nghiệm
+đang chọn (không phải 1 mức chọn từ dropdown như trước) — tiêu đề "Mức N ·
+Lô X" bên trái, Mean/SD/n điểm bên phải (cách nhau bằng "|"), biểu đồ, rồi
+bảng điểm `.wg-table` đúng 7 cột (#/Ngày/Giá trị/Z/Kết luận/Luật hoặc bằng
+chứng/Loại sai số) với % độ rộng cột y hệt bản cũ. Cột "Kết luận" của bảng
+hướng dẫn phân biệt đúng CHỈ 3 luật cảnh báo-không-loại-bỏ (`1-2s`/`6x`/
+`7T`, đúng `WG_ALERT_RULES` bản cũ) — lần đầu viết nhầm thành "Cảnh báo/Loại
+bỏ" chung chung cho mọi luật, đã sửa lại sau khi kiểm bằng mắt qua Browser
+pane (không phải chỉ tin code, đọc lại đúng trang xác nhận mới sửa đúng).
+Bật/tắt 1 luật áp dụng cho MỌI mức của xét nghiệm cùng lúc (đúng
+"Cấu hình chung của luật" ở panel setup, không phải theo từng mức riêng lẻ).
+Tab "Nhóm lô đã dừng" đọc lại `lotGroups` đã có (không domain mới).
+
+**Bảng — áp dụng lại cho MỌI `<table>` (2026-09-01).** Phát hiện khi viết
+`.wg-table`/bảng hướng dẫn: app-v2 trước đó chỉ style `table.data-table`,
+nên mọi `<table>` KHÔNG mang class đó (như `.wg-table`, bảng trong
+`.wg-guide`) hiện ra trần trụi, không viền/zebra — khác bản cũ, nơi
+`components.css` style thẳng selector `table` chung rồi mỗi trang chỉ thêm
+class phụ để CHỈNH LẠI độ rộng cột, không phải để "bật" style từ đầu.
+`app-v2/renderer/styles/app.css` đổi `table.data-table{...}` thành `table{...}`
+(bỏ điều kiện class) — sửa 1 lần, khớp lại toàn bộ bảng chưa từng dùng
+`.data-table` trong các trang đã viết trước đó mà không cần sửa JSX nào.
+
+Verify: `npm run app-v2:typecheck`/`test` 28/28/`build` sạch, cộng kiểm
+chứng qua Browser pane: chọn xét nghiệm → chip luật hiện đủ 13 mã, bảng
+hướng dẫn hiện đúng 13 dòng với "Kết luận" phân biệt đúng cảnh báo/loại bỏ
+theo từng luật, tab LJ/CUSUM chuyển đúng, panel mức hiện đúng Mean/SD/số
+điểm + bảng 7 cột đúng dữ liệu điểm QC thật (điểm >3SD hiện "Vi phạm"/
+"1-3s"/"Loại bỏ") — zero console error.
+
+**Giai đoạn D0b — quyền ghi thật ở main + siết gate UI parity (xong,
+2026-09-02).** Hai việc "dọn đường" làm TRƯỚC khi port 10 trang còn lại của
+Giai đoạn D, vì cả hai đều thuộc loại "làm sau thì phải sờ lại từng trang
+lần hai": quyền quyết định nút nào được render, và gate là thứ nói "trang
+này đã parity chưa".
+
+**(1) Quyền ghi — lỗ hổng thật, không phải thiếu tính năng.** Rà soát phát
+hiện `actor.role` KHÔNG xuất hiện ở BẤT KỲ handler dữ liệu nào
+(entry/config/nce/reagent/sigma/westgard/report/settings/audit — đếm được 0
+lần), chỉ auth/backup-import/lis/migration tự kiểm admin. Renderer cũng
+không có `canWrite` ở đâu, mà `AppShell` cho vai trò `viewer` thấy Nhập QC/
+Six Sigma/So sánh hoá chất/Báo cáo. Hệ quả: **vai trò chỉ-xem thêm/huỷ được
+điểm QC và khoá/mở được kỳ báo cáo**, và `backup:export` (toàn bộ DB, gồm
+chuỗi PBKDF2 của mọi người dùng) tải về được. App cũ chặn các thao tác này
+bằng `requireWrite()`/`requireAdmin()` — nhưng CHỈ phía trình duyệt, đánh
+đổi đã chấp nhận của app client-only (xem "Storage and sync model"); app-v2
+có main process thật nên không kế thừa đánh đổi đó.
+- `main/ipc/shared.ts` thêm `canWrite`/`requireWrite`/`requireAdmin` trả
+  `PermissionDenied | null`, dùng dạng `const denied = requireWrite(actor);
+  if (denied) return denied;` — KHÔNG ném exception, vì renderer đọc
+  `{ok:false,error}` ở khắp nơi và một Promise bị reject sẽ không hiện được
+  thông báo tiếng Việt nào. Đặt guard làm câu lệnh ĐẦU TIÊN của hàm, tức
+  TRƯỚC cả cổng validate lẫn `writeAudit()`: sai thứ tự thì mỗi lần một
+  người không có quyền bấm nút sẽ đẻ ra 1 dòng audit rác (có test chốt cả
+  hai tính chất này).
+- Ánh xạ vai trò → mức quyền **tra từng call site của app cũ, không suy
+  diễn**: admin+KTV ghi dữ liệu QC (nhập/huỷ điểm, kỳ Sigma, hồ sơ NCE, so
+  sánh hoá chất); CHỈ admin cho cấu hình (máy/xét nghiệm/lô/nhóm lô/panel/
+  chuyển lô/Mean-SD/TEa), khoá-mở kỳ báo cáo (`report-page-controller.ts`
+  dùng `requireAdmin`, không phải `requireWrite` — dễ đoán sai), xoá phép so
+  sánh hoá chất (`rcDelete` → admin), xoá kỳ Sigma, hồ sơ PXN, lưu trữ nhật
+  ký, xuất backup. Tổng 34 guard.
+- **1 chỗ LỆCH CÓ CHỦ ĐÍCH**: `westgard:saveRuleAction`. App cũ's
+  `root.wgSet` KHÔNG có guard nào (tra cả `westgard-page-controller.ts` lẫn
+  chỗ định nghĩa trong `modular-pilot.global.ts`) — nghĩa là chỉ-xem bật/tắt
+  được luật Westgard, mà đó là cùng cột `rule_actions_json` mà tab "Danh mục
+  xét nghiệm" (admin-only) ghi. Coi đây là lỗi app cũ, không phải quy ước
+  cần copy: app-v2 chặn ở mức `requireWrite` (KTV vẫn dùng được trang), ghi
+  lý do ngay tại chỗ trong code chứ không chỉ ở changelog này.
+- `renderer/lib/permissions.ts` (mới, KHÔNG import gì để test được thẳng
+  trên `.ts` qua ESM) là nguồn DUY NHẤT phía renderer: `PAGE_DEFS` (11 trang,
+  khớp `ROUTER_PAGE_DEFS` app cũ) + `canWrite`/`isAdmin`/`canAccessPage`/
+  `firstAccessPath`/`roleLabel`. `roleOf()` đưa mọi vai trò lạ/rỗng về
+  `viewer` (hẹp nhất), không mặc định mở. `AppShell.tsx` bỏ bảng vai trò
+  inline, đọc từ đây; **`router.tsx` giờ chặn MỌI route** qua
+  `canAccessPage()` — trước đó chỉ `/users` tự kiểm riêng, nên gõ thẳng
+  `#/manage`/`#/audit`/`#/settings` vào URL là vào được trang admin với vai
+  trò KTV/chỉ-xem (sidebar ẩn mục đó nhưng route vẫn mở).
+- 5 trang chỉ-xem vào được (Entry/Sigma/Reagent/Report/Westgard) ẩn hoặc
+  `disabled` control ghi. Nguyên tắc chọn ẩn vs disabled: **disabled khi
+  chính giá trị đó là thông tin cần đọc** (ô CV, nút "MU 8.28", checkbox
+  trạng thái luật — ẩn đi là mất dữ liệu hiển thị và vỡ bố cục bảng hướng
+  dẫn), **ẩn khi nút chỉ để hành động** (Huỷ điểm, + Thêm kỳ, Lưu số liệu,
+  Khoá kỳ). `DateField` thêm prop `disabled` (chưa từng có).
+- `renderer/browser-mock/permission-policy.ts` (mới) bọc `window.qcApi` giả
+  lập của chế độ xem trước trình duyệt bằng CÙNG bảng chính sách — không có
+  nó, bản xem trước sẽ cho chỉ-xem ghi được trong khi Electron thật chặn,
+  tức là nói dối về hành vi thật. `POLICY` gõ theo `keyof QcApi` nên sai TÊN
+  hàm bị TypeScript bắt (sai MỨC write↔admin thì không, phải đọc đối chiếu).
+- **CHƯA chặn, đã ghi rõ trong code**: 3 hàm ĐỌC nhật ký hoạt động
+  (`audit:query`/`exportCsv`/`verifyChainNow`) vẫn mở cho mọi vai trò đã
+  đăng nhập. Route đã chặn nên UI không vào được, nhưng gọi thẳng
+  `window.qcApi.queryActivity()` vẫn đọc được. Chặn cho đúng đòi đổi 3 hàm
+  sang trả `IpcResult` (giờ trả thẳng dữ liệu), kéo theo `qc-api.d.ts`/
+  `preload.ts`/`audit-store.ts`/`AuditPage.tsx`/bản giả lập — là lỗ BẢO MẬT
+  ĐỌC, không phải toàn vẹn dữ liệu, để lại làm một lượt riêng.
+
+**(2) Gate UI parity — trước bản này nó gần như không chặn được gì.**
+`app-v2/scripts/ui-parity-check.cjs` bản đầu chỉ CHỤP ẢNH cặp old/v2:
+`oldTitle`/`v2Title` được ghi vào `report.json` nhưng KHÔNG hề assert bằng
+nhau, `requiredSelectors` chỉ kiểm ở v2 (selector bịa/đổi tên ở app cũ sẽ
+không ai biết, và gate thành "kiểm app-v2 với chính nó"), lỗi console phía
+app cũ không ai nghe, và không có bất kỳ phép so sánh old↔v2 nào. Siết
+thành 4 lớp: (a) hard-fail lỗi console/page ở CẢ HAI bản; (b) hard-fail
+`requiredSelectors` phải tồn tại ở CẢ HAI bản; (c) hard-fail tiêu đề
+`.head h1` phải giống từng ký tự; (d) **ratchet** (khớp quy ước
+`tests/a11y-ratchet.json`/`css-hex-ratchet` của repo gốc) đo 2 chỉ số theo
+chiều "app cũ CÓ mà app-v2 THIẾU" — `missingClasses` và `missingTextLines`
+trong vùng nội dung chính (`#main` ở app cũ, `<main>` ở app-v2) — so với
+`app-v2/tests/ui-parity-baseline.json`; vượt baseline hoặc thêm surface mới
+còn lệch mà chưa có baseline thì FAIL, siết bằng
+`npm run app-v2:ui-parity -- --update-baseline`, không nâng số bằng tay.
+Pixel-diff vẫn CỐ Ý chưa có (kế hoạch D0 mục 5 đặt sau khi DOM ổn định) —
+2 chỉ số này đo được ngay và không phụ thuộc font/DPI.
+
+**Gate mới bắt được ngay 9 lỗi parity thật của Dashboard** mà gate cũ không
+thể thấy (D2 vẫn đang 🟨 nên đúng như dự kiến, đã chốt vào baseline làm danh
+sách việc cho D2, KHÔNG phải để che): hero mood text lệch ("Cần xử lý ngay"
++ câu mô tả), dòng "0/1 xét nghiệm đã đủ QC hôm nay · 0% hoàn tất", nhãn
+`shift-item` dạng "Sodium (Na) · M2", dòng điểm gần nhất thiếu đơn vị + mã
+luật ("02/09/2026 · 109.50 mmol/L · 1-3s"), số ngày hạn lô ("Hết hạn 3
+ngày"/"Còn 17 ngày"), và pill mức thiếu CV ("M1 · 1101 · CV 0.63%"). Đáng
+chú ý: `missingClasses` = 0 ở cả 4 viewport — phần CSS/cấu trúc của
+Dashboard đã khớp, lệch nằm ở NỘI DUNG read-model.
+
+Verify: `npm run app-v2:typecheck` sạch, `app-v2:test` 31/31 (thêm
+`tests/permissions.test.mjs` — oracle bảng trang/vai trò, chốt vai trò lạ
+rơi về `viewer`; và `tests/role-gating.test.mjs` — end-to-end thật với
+SQLite `:memory:`: chỉ-xem bị chặn ở 13 đường ghi, vai trò lạ bị chặn như
+chỉ-xem, KTV ghi được dữ liệu QC nhưng bị chặn ở cấu hình/khoá kỳ/xoá/cài
+đặt/lưu trữ/xuất backup, admin làm được cả hai nhóm, **thao tác bị chặn
+không thêm điểm QC lẫn dòng audit nào**, cổng quyền chạy TRƯỚC cổng validate,
+và đọc KHÔNG bị chặn), `app-v2:build` sạch, `app-v2:ui-parity` đạt 4/4
+surface. Gate mới được chứng minh CÓ khả năng bắt lỗi (không chỉ chạy xanh)
+bằng cách siết tạm baseline `dashboard/desktop` về 0 rồi xác nhận gate
+FAIL đúng 9 dòng chữ kèm exit code 1, sau đó phục hồi baseline.
+
+**Quyết định sản phẩm 2026-09-02 — cắt thẳng, không di trú, không chạy
+song song.** Người dùng chốt: app chưa lên production, dữ liệu CẢ HAI bên
+đều là dữ liệu test. Ba hệ quả, đã ghi vào docs/APP-V2-PLAN.md:
+(1) **C4 (di trú dữ liệu từ app cũ) ĐÓNG BĂNG** — giữ code làm đường lùi vì
+nó đã có test chứng minh mật khẩu cũ đăng nhập được ngay và chuỗi hash audit
+vẫn verify được sau khi chuyển, nhưng KHÔNG đầu tư thêm; 2 giới hạn đã biết
+(`tea_ref_key` để trống, `section` suy từ máy) cố ý KHÔNG sửa vì sẽ không bao
+giờ chạy. **Đừng xoá C4**: `main/db/table-io.ts` dùng chung với backup/phục
+hồi (C3) — xoá C4 mà xoá cả file đó là vỡ backup.
+(2) **Bỏ hẳn mô hình chạy song song 2 bản** (strangler-fig như đã dùng cho
+React trong app cũ). Mô hình đó tồn tại để bảo vệ dữ liệu thật đang chạy;
+không có dữ liệu thật thì nó chỉ là gấp đôi công bảo trì. Khi Giai đoạn D
+xong thì cắt thẳng: đổi `build.files`, xoá DB test, khởi tạo admin mới.
+(3) Tiêu chí cắt còn đúng 2 mục, cả hai kiểm PHẦN MỀM chứ không kiểm dữ
+liệu: Giai đoạn D xong (gate `app-v2:ui-parity` xanh với baseline = 0 cho
+mọi surface trong manifest) và đối chiếu Westgard/Sigma giữa 2 bản khớp 100%
+(mục này GIỮ — nó kiểm công thức lâm sàng, không liên quan dữ liệu thật).
+App cũ KHÔNG còn cần giữ lại để tra cứu lịch sử.
+
+**Giai đoạn D2 — Tổng quan/Dashboard đạt golden master (xong, 2026-09-02).**
+Gate D0b chỉ ra đúng 9 dòng nội dung lệch so với app cũ; sửa hết, baseline
+`app-v2/tests/ui-parity-baseline.json` siết về **0 class / 0 dòng chữ trên cả
+4 viewport**.
+
+**Phát hiện quan trọng nhất: `missingClasses` = 0 NGAY TỪ TRƯỚC KHI SỬA.**
+CSS/cấu trúc DOM của Dashboard đã khớp app cũ từ đợt "sao chép giao diện"
+trước; toàn bộ phần lệch nằm ở READ-MODEL. Và trong 9 mục đó có **3 lệch
+NGHIỆP VỤ thật, không phải lệch chữ** — bản trước tự nghĩ ra cách tính thay
+vì tra mã nguồn app cũ:
+
+1. **Báo động theo ĐIỂM CUỐI, không phải điểm xấu nhất.**
+   `westgard-view-model.ts`'s `summarizeTestStatus()` của app cũ chỉ đọc
+   `points[points.length-1]` của mỗi mức. app-v2 dùng `worstVerdict` (xấu
+   nhất trong MỌI điểm), nên một xét nghiệm đã khắc phục xong vẫn nằm mãi
+   trong "Cần xử lý" và vẫn đếm vào KPI "Vi phạm" — sai lệch tích lũy theo
+   thời gian, càng dùng lâu càng đỏ oan.
+2. **Một dòng báo động cho mỗi MỨC, không phải mỗi XÉT NGHIỆM.** App cũ
+   (`dashboardWestgardAlerts()`) đẩy 1 item cho từng mức đang báo động, kèm
+   ĐÚNG điểm cuối và ĐÚNG danh sách luật của mức đó — nhờ vậy mới hiện được
+   nhãn "Sodium (Na) · M2" và meta "02/09/2026 · 109.50 mmol/L · 1-3s".
+   app-v2 gộp theo xét nghiệm nên mất cả mức, cả giá trị, cả mã luật.
+3. **% hoàn tất tính theo XÉT NGHIỆM, không theo MỨC.** `dashboardKpis()`:
+   `completeTests = testCount - missingToday`,
+   `completionPercent = completeTests/testCount`. app-v2 chia theo tổng số
+   MỨC → 1 xét nghiệm 2 mức mới nhập 1 mức ra 50% thay vì 0%, tức báo "đã
+   làm được nửa" cho một xét nghiệm CHƯA đủ QC.
+
+6 mục còn lại là lệch trình bày/công thức phụ: `daysToExpiry()` của app cũ
+đọc `YYYY-MM-DD` là **nửa đêm giờ địa phương** rồi trừ thời điểm hiện tại
+KÈM giờ-phút và `Math.round` (nên lô hết hạn sau 18 ngày hiện "Còn 17 ngày"
+nếu đang là buổi chiều — app-v2 trước đó chuẩn hoá cả 2 mốc về `T12:00:00Z`
+nên luôn ra số nguyên đúng-toán-học nhưng khác app cũ); pill mức QC thiếu
+`· CV x.xx%` (CV **quan sát được** của chính các điểm QC, không phải CV suy
+từ Mean/SD đích); danh sách lô hết hạn phải **gom theo lô** (`qcLotId`, hoặc
+`lot|level` nếu chưa gán) giữ bản có số ngày nhỏ nhất + đếm số mức dùng
+chung (`${count} xét nghiệm · `); mood/moodText phải là 5 nhánh nguyên văn
+của `dashboardShiftStatus()`; nhãn/meta nhóm "chưa có Mean/SD" và nhóm NCE
+quá hạn theo đúng câu chữ app cũ; thanh tiến độ kẹp 0..100 (`safePercent`).
+
+`westgard:listTestSummaries` thêm 3 field cho mỗi mức: `latestVerdict`,
+`latestRules`, `cv`. **Thêm mới, KHÔNG sửa `worstVerdict`** — cây điều hướng
+trang Nhập QC và trang Phân tích Westgard vẫn đọc `worstVerdict` đúng như
+trước (ở 2 trang đó "mức này từng vi phạm" mới là thông tin cần, khác
+Dashboard). Sửa ở CẢ `main/ipc/westgard-handlers.ts` VÀ
+`renderer/browser-mock/api.ts`: lệch một chút giữa 2 chỗ là bản xem trước
+trình duyệt sẽ hiện Tổng quan khác bản Electron thật — mà chính bản xem
+trước là thứ gate parity đo.
+
+`renderer/view-models/dashboard-view-model.ts` viết lại, `buildDashboardViewModel`
+thành generic theo hồ sơ NCE (`<TOverdue extends NceRecord>`) để giữ được
+`testName` mà store đã join sẵn — `ReturnType<typeof f>` trần sẽ suy generic
+về đúng ràng buộc `NceRecord` và làm mất field đó. Dọn dead code phát hiện
+trong lúc làm: `worstVerdictAlerts()`/`AlertLevel`/`VERDICT_RANK` trong
+`dashboard-store.ts` không còn ai import (xác nhận bằng grep toàn `app-v2/`).
+
+**3 giới hạn còn lại, ghi rõ chứ không lặng lẽ để đó:**
+- Dòng NCE quá hạn hiện "phụ trách —" vì `NceRecord` của app-v2 KHÔNG có
+  trường người phụ trách (app cũ: `action.by`). Thêm trường này thuộc D3.8,
+  không bịa ở D2. Cũng vì vậy điều kiện lọc "quá hạn" của app-v2
+  (`record_status==='active' && approval_status==='pending'`) chỉ xấp xỉ
+  `actionOverdue()` của app cũ (đòi thêm `isRecorded`/`!workflowComplete`).
+- 3 nút "Xem"/"Xem QC"/"Gán Mean/SD" điều hướng đúng trang nhưng CHƯA chọn
+  sẵn xét nghiệm/mức như `dashboardGoEntryFollowup(testId, level)` của app
+  cũ — cần state chọn xét nghiệm xuyên trang, thuộc D3.5 (Nhập QC).
+- Gate chỉ đo chiều "app cũ CÓ mà app-v2 THIẾU", nên nội dung app-v2 hiện
+  THÊM sẽ không bị bắt (đúng trường hợp dòng NCE quá hạn ở trên: app cũ ẩn
+  nó vì hồ sơ chưa đủ điều kiện `isRecorded`, app-v2 vẫn hiện). Siết 2 chiều
+  là việc của lượt sau, cùng lúc với pixel-diff (D0 mục 5).
+
+Verify: `npm run app-v2:test` 31/31 (viết lại `tests/dashboard-view-model.test.mjs`
+thành oracle 8 nhóm — chốt riêng từng quy tắc ở trên, đặc biệt: mức đã khắc
+phục KHÔNG còn báo đỏ, mỗi mức 1 dòng kèm đúng luật, 0/1 xét nghiệm ra 0%
+chứ không phải 50%, `daysToExpiry` ra 17 lúc 15:45 nhưng 18 lúc 08:00 cùng
+ngày — chính giờ-phút làm lệch, và đó là hành vi app cũ), `app-v2:typecheck`/
+`build` sạch, `app-v2:ui-parity` **0/0 trên cả 4 viewport** rồi
+`--update-baseline` siết baseline về 0.
+
+**Giai đoạn D3.1 — Người dùng đạt golden master + `pagePerms` (xong,
+2026-09-02).** Gate đo trước khi sửa: **16 class / 36 dòng chữ lệch + thiếu
+3 selector** (`.user-create-layout`/`.user-table`/`.user-row-actions`). Sau
+khi port: **0/0 trên cả 4 viewport ngay lượt đầu**, baseline chốt 0. Đây
+cũng là mục đóng **Giai đoạn A2** — quyền theo từng trang, đã dời sau từ đầu
+kế hoạch.
+
+**3 lệch CẤU TRÚC, không chỉ CSS** (bản B7 trước đó tự thiết kế lại trang):
+1. Form "Thêm người dùng" của app cũ nằm **ngay trong trang**, 2 thẻ cạnh
+   nhau (`.user-create-card`): "Thông tin tài khoản" (5 field, có **Mã viết
+   tắt** mà app-v2 chưa từng có UI) + "Thẻ được phép dùng" (lưới checkbox),
+   cộng 1 dòng `.hint.user-create-hint` giải thích vai trò. app-v2 trước đó
+   là 1 modal 4 field.
+2. Bảng danh sách 4 cột (Người dùng / Vai trò / Trạng thái / Hành động) với
+   **cụm nút trên từng dòng** (`.user-row-actions`: Sửa quyền · Đặt lại MK ·
+   Khóa/Mở khóa · Xóa; dòng của chính mình chỉ có "(bạn)" + Đổi mật khẩu).
+   app-v2 trước đó nhét `<select>` vai trò + checkbox trạng thái inline vào
+   bảng — nghĩa là **đổi vai trò người khác chỉ bằng 1 lần chọn, không qua
+   modal nào**, khác hẳn luồng app cũ.
+3. Nhãn vai trò: app cũ là "Quản trị"/"KTV"/"Chỉ xem" (`roleLabel`), app-v2
+   đang dùng "Quản trị viên"/"Kỹ thuật viên"/"Người xem".
+
+**`pagePerms` — KHÔNG cần đổi schema.** Cột `users.page_perms_json` và
+`users.initials` đã có trong `main/db/schema.ts` từ đầu (schema được thiết kế
+đủ cho toàn bộ app ngay từ lượt đầu, xem mục app-v2 phía trên) — chỉ là chưa
+handler nào đọc/ghi. Thiết kế:
+- **Bảng trang × vai trò dời sang `main/domain/page-roles.ts`** làm nguồn
+  DUY NHẤT cho cả 2 tiến trình; `renderer/lib/permissions.ts` (tạo ở D0b)
+  giờ chỉ là re-export. Lý do phải nằm ở main: main mới là nơi **thu hẹp**
+  `pagePerms` theo vai trò trước khi ghi DB — không tin danh sách renderer
+  gửi lên. File giữ nguyên tắc KHÔNG import gì để test thẳng trên `.ts`
+  (`tests/page-roles.test.mjs`, thay `tests/permissions.test.mjs`).
+- `null` vs `[]` là HAI trạng thái khác nhau, cố ý: `null` (cột NULL) = chưa
+  thu hẹp, tài khoản xem đủ thẻ của vai trò; `[]` **không bao giờ được lưu**
+  vì sẽ khoá tài khoản khỏi mọi trang — validate chặn với đúng câu chữ app
+  cũ ("Cần chọn ít nhất một thẻ được phép dùng."). `userPageIds()` còn giữ
+  nhánh phòng thân của app cũ: thu hẹp xong ra rỗng thì trả **trang đầu tiên
+  của vai trò**, không trả rỗng.
+- Cổng bảo mật thật: `selectUserPermissions(gửi_lên, rolePageIds(role))`
+  chạy **ở main**. Test chứng minh bằng số: tạo tài khoản KTV kèm
+  `pagePerms: ['dash','manage','users']` thì DB chỉ lưu `['dash']`.
+- `AppShell`/`router.tsx` đổi từ `canAccessPage(id, role)` sang
+  `canUserAccessPage(id, user)`/`firstAccessPath(user)` — `pagePerms` giờ
+  thực thi thật cả ở sidebar lẫn route, không chỉ lưu cho vui.
+
+**2 hành vi app cũ được giữ nguyên dù nhìn hơi lạ** — đổi là lệch golden
+master:
+- Đổi vai trò trong lưới thẻ: thẻ **không còn được phép** thì bị bỏ chọn,
+  nhưng thẻ **mới được phép** thì KHÔNG tự tick (vẫn bật lên cho người dùng
+  tự chọn). Đây đúng là `syncUserPermChecks()` app cũ.
+- Nhãn trang Cài đặt quay lại **"Cài đặt & Đám mây"** như app cũ. D0b từng
+  đổi thành "Cài đặt" vì app-v2 chưa có Firebase, nhưng nhãn này hiện NGAY
+  TRONG lưới "Thẻ được phép dùng" — tức nằm trong vùng gate so sánh, để
+  "Cài đặt" là lệch 1 dòng chữ. Chấp nhận đánh đổi: C2 (Firebase) đang TẠM
+  DỪNG chứ không bị bỏ, và ưu tiên đã chốt là giống app cũ.
+
+**2 tính năng app cũ có mà app-v2 chưa từng có, thêm ở đợt này:**
+- `auth:deleteUser` — app cũ có nút "Xóa" trên từng dòng; app-v2 trước đây
+  KHÔNG có đường nào xoá tài khoản. 3 cổng theo đúng thứ tự: chỉ admin →
+  không tự xoá chính mình → không xoá admin ACTIVE cuối cùng. **Xoá THẬT**
+  khỏi bảng `users`, không soft-delete: khác `qc_points` (dữ liệu QC phải
+  giữ vĩnh viễn theo ISO 15189), một tài khoản không phải bản ghi xét
+  nghiệm — và bảng `activity` lưu `username`/`user_id` dạng chuỗi phẳng,
+  KHÔNG khoá ngoài tới `users`, nên xoá tài khoản không làm mất nhật ký họ
+  đã làm gì (có test: cho tài khoản tự đổi mật khẩu để sinh 1 dòng audit
+  **do họ** đứng tên, xoá tài khoản, rồi xác nhận dòng đó vẫn còn).
+- **Chặn tự sửa quyền của chính mình** (`self-perms`): app cũ không có
+  đường nào đổi vai trò của chính mình — dòng của bạn chỉ có "(bạn)" + "Đổi
+  mật khẩu", và `applyUserPerms()` từ chối thẳng. Đổi TÊN chính mình thì vẫn
+  được (không phải sửa quyền). Cổng này đặt SAU cổng `last-admin` để thông
+  báo đúng nguyên nhân gần nhất.
+
+**Bài test cũ phải sửa vì lý do đúng, không phải để cho xanh:**
+`auth-handlers.test.mjs` mục 11 dùng chính admin tự hạ quyền mình để kiểm
+tra "còn admin thứ 2 thì guard `last-admin` không nổ" — cổng `self-perms`
+mới chặn kịch bản đó. Sửa bằng cách để **admin THỨ HAI** hạ quyền admin đầu
+tiên: giữ nguyên ý định của bài test (kiểm guard last-admin) và khớp luật
+mới, thay vì nới cổng vừa thêm.
+
+`renderer/styles/pages/users.css` (mới) port từ `assets/professional-users.css`
+— giữ đúng % bề rộng 4 cột, `.user-create-card`, lưới `.user-perm-grid`
+(`repeat(auto-fit,minmax(180px,1fr))`) và 2 breakpoint 980/760px; đã xác
+nhận 11 token nó dùng đều có trong `tokens.css` của app-v2.
+
+Verify: `npm run app-v2:test` **31/31** (thay `permissions.test.mjs` bằng
+`page-roles.test.mjs` — 9 nhóm, chốt cả nhánh thu hẹp/vượt quyền/rỗng-phòng-
+thân; mở rộng `auth-handlers.test.mjs` — mã viết tắt chuẩn hoá thành CHỮ IN,
+vượt quyền bị loại, chọn rỗng bị chặn, không gửi `pagePerms` = mặc định đủ
+thẻ vai trò, update thiếu field KHÔNG xoá quyền/mã viết tắt, 3 cổng xoá, và
+nhật ký sống sót sau khi xoá tài khoản), `app-v2:typecheck`/`build` sạch,
+`app-v2:ui-parity` **8/8 surface 0/0** (Tổng quan + Người dùng × 4 viewport),
+baseline chốt 0.
+
+**Giai đoạn D3.2 — Báo cáo đạt golden master + sửa `DateField` ở D1 (xong,
+2026-09-02).** Gate đo trước: **13 class / 32 dòng chữ lệch + thiếu 3
+selector** (`.grid4`/`.report-export-options`/`.report-actions`/
+`.report-lock-controls`). Sau khi port: **0/0 trên cả 4 viewport**, baseline
+chốt 0 cho cả 12 surface (Tổng quan + Người dùng + Báo cáo × 4 viewport).
+
+**4 lệch CẤU TRÚC** (bản B11/C1 trước đó tự thiết kế lại trang):
+1. Panel "Báo cáo nội kiểm theo ngày" của app cũ là 1 lưới `.grid4`: ô tìm
+   kiếm · ô chọn xét nghiệm **kèm bộ đếm khớp/tổng** (`(1/1)`) · từ ngày ·
+   đến ngày. app-v2 đang là `.field-row` 4 ô khác nhau, không có tìm kiếm
+   lẫn bộ đếm.
+2. Panel "Khóa kỳ báo cáo" dùng `.report-lock-controls` (2 ô chọn Tháng/Năm
+   + 1 nút, nút đổi thành "Kỳ này đã khóa" disabled khi kỳ đang chọn đã
+   khoá), danh sách kỳ đã khoá là `.period-lock-list`/`.period-lock-row` —
+   app-v2 đang dùng `<table>` với ô nhập lý do nằm ngay trong hàng.
+3. **Mở khoá đi qua MODAL nhập lý do** (`unlockModalHtml` app cũ), không
+   phải input trong bảng. Cổng lý do ≥5 ký tự giờ có ở CẢ 2 tầng (modal
+   phía renderer + `validateUnlockPeriod` ở main).
+4. **BỎ panel "Xem lại điểm QC"** — app cũ KHÔNG có panel này; nó là thứ
+   bản thí điểm app-v2 tự thêm (chọn xét nghiệm → bấm "Xem" → bảng điểm).
+   Xuất/in giờ tự truy vấn theo lựa chọn hiện tại đúng cách app cũ làm
+   (chọn → xuất, không có bước "Xem" trung gian).
+
+**Thêm phụ lục NCE thật** — ô "Kèm phụ lục NCE · (Áp dụng cho PDF và Excel)"
+của app cũ trước đây app-v2 không có. Nay tick vào thì cả PDF, Excel và CSV
+đều có thêm bảng hồ sơ NCE của đúng xét nghiệm + khoảng ngày đang chọn (mã
+NCE, ngày, mức, luật, loại sai số, hạn xử lý, trạng thái duyệt/hiệu lực).
+Excel vẫn 1 sheet duy nhất: chèn 1 dòng trống + tiêu đề "PHỤ LỤC NCE" rồi
+tới các dòng — `buildXlsxBase64` (Giai đoạn C1) chỉ nhận 1 sheet, đủ dùng,
+không cần đổi hợp đồng IPC cho việc này.
+
+**Kéo theo một mục Giai đoạn D1 — `DateField` viết lại.** Gate chỉ ra 4
+class thiếu là `.datebox`/`.date-text`/`.datepick`/`.native-date`: app cũ
+dựng ô ngày bằng 1 ô văn bản gõ `dd/mm/yyyy` + nút lịch bên phải + 1
+`<input type="date">` ẩn giữ giá trị ISO, còn app-v2 (quyết định "đơn giản
+hoá" từ Giai đoạn A1) dùng thẳng `<input type="date">` trần. Đây là KHÁC
+BIỆT NHÌN THẤY ĐƯỢC (ô trần hiển thị theo locale trình duyệt, icon riêng,
+không gõ được dd/mm/yyyy), không phải chi tiết nội bộ — nên sửa 1 lần ở
+component dùng chung theo đúng quy trình D3 ("component nền tảng phát hiện
+thiếu thì đưa về D1 ngay, không vá riêng cho 1 trang"). Mọi trang có ô ngày
+(Nhập QC, Sigma, Hoá chất, NCE, Nhật ký, Cấu hình chung) được lợi luôn.
+- Phần KHÔNG port: lịch tự vẽ (`vn-date-picker`/`DatePickerPopup.tsx`). Nút
+  `.datepick` gọi `showPicker()` của chính ô `<input type="date">` ẩn — vẫn
+  "bấm icon thì lịch bật lên", chỉ khác ai vẽ lịch, giữ nguyên tắc A1
+  "giống luồng thao tác, không cần giống cách vẽ".
+- **Bẫy đã tránh**: app cũ để `.native-date{display:none}` (nó không cần ô
+  đó tương tác, chỉ dùng làm chỗ chứa giá trị). app-v2 thì PHẢI gọi
+  `showPicker()` trên chính ô đó, mà Chromium từ chối `showPicker()` với
+  phần tử không được render — nên ẩn theo kiểu 1×1 trong suốt thay vì
+  `display:none`. Cùng class, khác cách ẩn.
+- **Bẫy thứ hai, nguy hiểm hơn**: chế độ KHÔNG điều khiển (`name` +
+  `defaultValue`, đọc qua FormData lúc submit — 3 chỗ ở trang Cấu hình
+  chung dùng kiểu này) đòi `name` phải nằm trên ô `.native-date` giữ ISO,
+  KHÔNG phải ô văn bản dd/mm/yyyy. Đặt sai chỗ thì FormData nhận
+  "01/09/2026" và mọi form CRUD lưu sai ngày mà typecheck/test không hề báo.
+  Đã tra toàn bộ 12 chỗ gọi `<DateField>` trước khi sửa: tất cả đều dùng
+  `value`+`onChange` (ISO) hoặc `name`+`defaultValue`, KHÔNG chỗ nào đọc
+  `document.getElementById(id).value` — nên đổi cấu trúc trong là an toàn.
+
+`app.css` thêm 3 nhóm dùng chung cho các trang D3 sau: `.datebox`+3 class
+con, `.grid2`/`.grid4` (+ breakpoint 760px) và `.btn-ico` — port giá trị từ
+`professional-base.css`/`app.css`/`components.css` app cũ.
+`renderer/styles/pages/report.css` (mới) chỉ lấy phần CSS thuộc TRANG BÁO
+CÁO trong `assets/professional-reports.css`; file gốc bên app cũ còn chứa
+CSS của trang Khắc phục sự cố (`.action-*`/`.issue-*`) — phần đó app-v2 đã
+có ở `pages/actions.css`, không trộn vào.
+
+Nguồn dữ liệu trang: đổi từ `manage-store.tests` sang
+`westgard-store.summaries` vì nhãn ô chọn của app cũ
+(`qcOperationalAccess.selectLabel()`) cần cả lô đang gắn từng mức và tên máy
+— `listTestSummaries()` đã trả sẵn cả hai. **Giới hạn đã biết**:
+`listTestSummaries()` trả MỌI xét nghiệm, còn `operationalTests()` app cũ
+chỉ trả xét nghiệm đã vào Panel QC + có nhóm lô đang chạy; app-v2 chưa có
+hàm tương đương nên danh sách có thể rộng hơn app cũ khi cấu hình còn dở.
+
+Verify: `npm run app-v2:test` **31/31** (không cần test Node mới — trang này
+không thêm hàm thuần nào; `DateField`/`ReportPage` là renderer, được gate
+parity thật kiểm), `app-v2:typecheck`/`build` sạch, `app-v2:ui-parity`
+**12/12 surface 0/0**, baseline chốt 0.
+
+**Giai đoạn D3.3 — Cài đặt (xong, 2026-09-02). Surface ĐẦU TIÊN không về 0
+được, và lý do là sản phẩm chứ không phải nợ giao diện.** Gate đo trước:
+**29 class / 67 dòng chữ lệch + thiếu 6 selector**. Sau khi port: **11 class
+/ 30 dòng** — trong đó **11/11 class và 28/30 dòng đều thuộc 2 panel Firebase
+của app cũ** (Đồng bộ đám mây + Firebase Rules). app-v2 chưa có Firebase (C2
+TẠM DỪNG vì thiếu thông tin dự án thật), và dựng panel rỗng cho đủ mặt sẽ tạo
+**control chết** — thứ Giai đoạn D cấm tường minh. 2 dòng còn lại cố ý nói
+đúng thực tế: phụ đề trang (app cũ ghi "kết nối Firebase") và thẻ "Dung lượng
+cục bộ" (app cũ ghi "dung lượng trình duyệt", app-v2 dùng file SQLite).
+
+Lý do này được ghi vào **`surfaceNotes` trong `ui-parity-baseline.json`** —
+trường mới, và `ui-parity-check.cjs` được sửa để GIỮ LẠI nó khi sinh lại
+baseline: nếu bị ghi đè mất, người đọc sau chỉ thấy con số khác 0 mà không
+biết vì sao rồi tưởng là việc chưa làm.
+
+**4 lệch cấu trúc đã sửa:**
+1. 2 panel đầu (Thông tin đơn vị · Logo & tên phần mềm) của app cũ nằm CẠNH
+   NHAU trong `.settings-profile-grid` (lưới 0.8fr/1.2fr), mỗi panel có nút
+   lưu riêng ở `.settings-panel-actions`. app-v2 đang xếp dọc 3 panel rời.
+2. Panel "Logo" của app cũ có ô **"Chữ trong logo khi chưa dùng ảnh"**
+   (`logo_text`, cột đã có trong schema nhưng app-v2 chưa có UI), khối
+   **`.brand-preview`** xem trước logo + tên + dòng phụ, và `.file-pick`
+   hiện tên tệp đã chọn.
+3. Panel "Quản trị dữ liệu" là lưới **5 thẻ `.admin-tool`** (nút dính đáy
+   thẻ nhờ `grid-template-rows:auto minmax(66px,1fr) auto`), không phải 2
+   panel văn xuôi.
+4. app cũ đặt 2 panel [Đồng bộ đám mây] [LIS Gateway] cạnh nhau trong
+   `.settings-cloud-grid`. app-v2 không có Firebase nên ô bên trái là panel
+   **Di trú dữ liệu** (thứ app cũ không có) — giữ lưới 2 cột để không để
+   trống nửa trang. Panel di trú được GIỮ dù C4 đã đóng băng: người dùng
+   quyết định không di trú, nhưng không yêu cầu bỏ tính năng.
+
+**3 tính năng app cũ có mà app-v2 CHƯA TỪNG CÓ, thêm ở đợt này** (5 thẻ admin
+đòi chúng, không thể để nút chết):
+- **`backup:verify`** — "Kiểm tra backup": CHỈ ĐỌC file người dùng chọn
+  (parse + `validateBackupEnvelope` + đếm bảng/dòng/điểm QC), KHÔNG chạm DB
+  đang dùng. Có test chốt đúng tính chất đó: đếm số máy trước/sau khi kiểm
+  tra phải bằng nhau.
+- **`backup:resetAll`** — "Xóa sạch dữ liệu test". Ánh xạ
+  `ResetOperationalDataCommand` app cũ: mặc định GIỮ `users` và GIỮ `activity`
+  (+ `app_meta`), và vì `blankAppState()` app cũ đưa `lab` về mặc định nên ở
+  đây cũng reset bảng `lab` về default schema. **Giữ `activity` + `app_meta`
+  cùng nhau là điều kiện để chuỗi hash tamper-evident không bị phá** — xoá
+  nhật ký mà giữ `activityAnchor` (hoặc ngược lại) sẽ làm
+  `verifyAuditChain()` báo sai ngay dòng đầu; test chốt cả việc chuỗi vẫn
+  verify được sau khi xoá sạch.
+- **Ngưỡng 128 MB khi NHẬP backup** (`BACKUP_IMPORT_MAX_BYTES` app cũ) —
+  kiểm TRƯỚC `JSON.parse` để file khổng lồ không treo tiến trình. app-v2
+  trước đó không có ngưỡng nào.
+
+**1 lời hứa suông đã được làm cho đúng.** Nhãn app cũ là "Tự động kiểm tra
+hàng chờ mỗi 5 phút", còn LIS của app-v2 chỉ lấy hàng chờ khi bấm nút — copy
+nhãn mà không có bộ đếm là nói dối. Nay `SettingsPage` có `useEffect` chạy
+`pullLisQueue()` mỗi `LIS_POLL_MS` (5 phút, copy hằng số app cũ) khi bật, kèm
+dòng trạng thái `.alert` LUÔN hiển thị theo đúng nhãn app cũ
+(`Đang tắt`/`Chưa kiểm tra`/`Đã kết nối`/`Lỗi kết nối` + chi tiết) — trước
+đó app-v2 chỉ hiện `.alert` khi có lỗi, nên class đó cũng bị gate báo thiếu.
+
+Lời nhắc sao lưu cũng port nguyên văn `backupReminder.statusText()/
+capacityText()` app cũ ("Chưa sao lưu trên máy này." / "Sao lưu gần nhất: N
+ngày trước." + "Khuyến nghị dưới 128 MB.") — cần mốc sao lưu gần nhất, lưu
+vào `app_meta` (`lastBackupAt`/`lastBackupBytes`) khi xuất backup, cùng cơ
+chế key/value đã dùng cho `activityAnchor` ở Giai đoạn B8, không thêm bảng.
+
+`renderer/styles/pages/settings.css` (mới) port từ
+`assets/professional-settings.css` + phần `.admin-tools`/`.brand-preview`/
+`.file-pick` nằm rải ở `assets/app.css` và `.admin-tool` ở
+`assets/components.css`. CỐ Ý KHÔNG port CSS của 2 panel Firebase
+(`.firebase-*`, `.rules-*`) — thêm CSS cho panel không tồn tại là rác.
+
+**Bài học quy trình tự rút ra trong lúc làm:** 3 script sửa file liên tiếp
+đều báo "replaced N" nhưng KHÔNG có `fs.writeFileSync` ở cuối, nên toàn bộ
+thay đổi bị mất im lặng — chỉ phát hiện khi grep lại từng chuỗi vừa sửa.
+Từ nay: sau mỗi lượt sửa hàng loạt bằng script, GREP LẠI vài chuỗi đại diện
+để xác nhận đã ghi ra đĩa, đừng tin số đếm do chính script in ra.
+
+Verify: `npm run app-v2:test` **31/31** (mở rộng `backup-handlers.test.mjs`
+— verifyBackup chỉ đọc/không đổi dữ liệu, checksum sai bị chặn, chỉ admin;
+resetAll xoá đúng bảng vận hành, GIỮ users/activity, hồ sơ đơn vị về mặc
+định, và chuỗi hash audit vẫn verify được sau khi xoá), `app-v2:typecheck`/
+`build` sạch, `app-v2:ui-parity` **16/16 surface đạt** (12 ở 0/0, 4 surface
+Cài đặt ở baseline 11/30 kèm `surfaceNotes` giải thích).
+
+**Giai đoạn D3.4 — Cấu hình chung: rà soát bản người dùng tự làm + sửa gate
++ vá thiếu sót (2026-09-02).** Trang này do NGƯỜI DÙNG tự port trước khi
+nhờ rà soát, nên mục này ghi cả 3 việc: (1) sửa một lỗi của chính bộ seed
+gate, (2) vá lỗ hổng lớn nhất của gate, (3) vá danh sách thiếu sót.
+
+**Bản người dùng làm đạt sẵn phần khó nhất:** 0 class CSS lệch, đủ 8 tab,
+đúng `.config-shell`/`.config-shell-nav` + 8 class bảng riêng từng tab,
+typecheck/test sạch. Phần lệch còn lại là nội dung/nhãn/cột, không phải bố
+cục.
+
+**(1) LỖI CỦA GATE, không phải của trang: seed cho 2 bản khác dữ liệu.**
+`ui-parity-seed.cjs` gán cho bản v2 những giá trị "cho đẹp" mà app cũ không
+có — `manufacturer:'Demo'`, `serial:'DEMO-01'`, `section:'Hóa sinh'`,
+`tea:5`, `tea_source:'Demo'`, `supplier:'Demo'`, `description`, `opened`,
+`cusum_on:1`. Hậu quả: gate báo lệch những dòng mà nguyên nhân là DỮ LIỆU
+(vd "— — 1 Đang hoạt động", "Chưa phân khoa" chỉ có ở app cũ vì app-v2 được
+cho thêm hãng/số sê-ri/khoa). Đã viết lại: mọi field của bản v2 phải SUY RA
+TỪ `old`, không có field nào tự bịa; ghi nguyên tắc này thành comment đầu
+file để đợt sau không tái diễn. Đây đúng là loại lỗi làm mất niềm tin vào
+gate — số đo sai theo hướng "báo lỗi oan cho code".
+
+**(2) LỖ HỔNG LỚN NHẤT CỦA GATE: chỉ đo được 1/8 tab.** Gate chụp trang ở
+TRẠNG THÁI MẶC ĐỊNH, nên với trang có tab thì 7/8 tab không có gì canh giữ —
+"6 dòng lệch" đo được ban đầu chỉ là con số của tab đầu tiên. Sửa:
+`ui-parity.manifest.json` cho phép khai `tabNav` + `tabs[]`, và
+`ui-parity-check.cjs` BẤM đúng nút tab thứ `index` ở CẢ HAI bản rồi mới đo,
+mỗi tab thành một surface riêng (`manage:lots/desktop`...). **Bấm theo
+INDEX, không theo nhãn** — nhãn chính là thứ đang được so, dùng nó để điều
+hướng thì khi nhãn lệch gate sẽ chết vì không tìm thấy nút thay vì báo lệch
+nhãn. Số surface của gate: 16 → 48.
+Ngay khi bật, gate lộ ra 7 tab chưa từng được đo: tests 1 class/10 dòng,
+panels 1/7, lots 6/13, targets 6/5, transitions 0/4, history 5/12,
+**tearefs 5/83**.
+
+**(3) Vá thiếu sót.** Kết quả từng tab (class/dòng):
+instruments 1/7 → **0/0** · lots 6/13 → **0/0** · transitions 0/4 → **0/0** ·
+tests 1/10 → 1/1 · panels 1/7 → 1/1 · targets 6/5 → 6/1 · history 5/12 →
+5/7 · tearefs 5/83 → 5/78.
+
+Nhóm sửa đáng ghi lại:
+- **Nhãn/chữ nguyên văn app cũ**: 2 nhãn tab ("Lô & Nhóm QC", "Bảng TEa
+  tham chiếu"), 4 phụ đề toolbar, 5 placeholder tìm kiếm, 6 nhãn cột. Nút
+  toolbar app cũ dùng **dấu ＋ fullwidth + khoảng trắng** (`'＋ ' + label`),
+  còn nút trong panel con của tab Lô thì KHÔNG có dấu cộng — 2 quy ước khác
+  nhau trong cùng trang, phải copy đúng từng chỗ.
+- **Badge sidebar**: tab Lô của app cũ hiện `"số lô / số nhóm"` (chuỗi, vd
+  "2 / 1") chứ không phải 1 con số; tab Mean/SD hiện số MỨC đã gán lô. Số
+  này lấy từ `westgard:listTestSummaries` (1 lời gọi có sẵn cả `qcLotId` lẫn
+  `pointCount`) — KHÔNG dùng `levelsByTestId` của manage-store vì store đó
+  chỉ nạp mức của panel đang chọn, đếm ở tab Lô sẽ ra 0.
+- **Trạng thái lô QC không phải cờ `active`**: app cũ tính từ HẠN DÙNG
+  (`createManageLotStatus`) — "Hết hạn" / "Còn N ngày" (≤30) / "Đang hoạt
+  động" / "Chưa có HSD" / "Đã chuyển tiếp" khi `depleted`. Port nguyên hàm,
+  dùng lại `daysToExpiry()` đã port ở Dashboard (D2) làm 1 nguồn duy nhất.
+  Ngày hạn dùng cũng phải hiện dd/mm/yyyy, không phải ISO.
+- **Fallback chữ luôn hiện**: máy không có khoa → "Chưa phân khoa"; xét
+  nghiệm không có phương pháp → "Chưa nhập phương pháp"; không có khoa →
+  "Chưa gán khoa/khu vực". app-v2 đang ẩn hẳn dòng khi rỗng, mà việc ẩn/hiện
+  làm đổi cả CẤU TRÚC DÒNG (thẻ `<div>` con là block → tách dòng trong
+  `innerText`), nên 1 chỗ ẩn làm lệch tới 3 dòng đo được.
+- **Trạng thái xét nghiệm**: app cũ ghi "Đang dùng"/"Ngừng dùng" cho xét
+  nghiệm nhưng "Đang hoạt động"/"Ngừng hoạt động" cho MÁY — 2 cặp chữ khác
+  nhau, app-v2 dùng chung một cặp.
+- **4 thao tác app cũ có mà app-v2 CHƯA TỪNG CÓ** (`config-handlers.ts`):
+  `removeLot`, `removeLotGroup`, `stopLotGroup`, `removeLotTransition`. Cổng
+  chặn port NGUYÊN VĂN cả thông báo từ `lotRemoval()`/`lotGroupRemoval()`
+  app cũ — lô đang gán Mean/SD cho mức QC thì không xoá được ("Hãy đổi lô
+  trong xét nghiệm trước."), lô đã đi qua hồ sơ chuyển tiếp ĐÃ KẾT LUẬN cũng
+  không, nhóm lô đang gán Mean/SD cũng không. Xoá nhóm thì GIỮ NGUYÊN các lô
+  bên trong (chỉ gỡ `group_id`), đúng chi tiết app cũ ghi trong hộp xác nhận.
+  Xoá lô dọn luôn hồ sơ chuyển lô còn dở dang trỏ tới nó, trong 1 transaction.
+  `stopLotGroup` CHỈ dừng: chiều bật lại của app cũ ("Kích hoạt") kèm việc ÁP
+  Mean/SD của nhóm vào các xét nghiệm liên quan (`applyLotGroupActivation`)
+  chưa port, nên không dựng nút bật lại để tránh nút làm việc nửa vời.
+- Thẻ nhóm lô thêm 3 nút app cũ có: Mean/SD (nhảy sang tab Mean/SD), Dừng
+  (class `btn-stop-tint`), Xóa. Tab Lô thêm ô tìm kiếm (app cũ có ô tìm
+  kiếm ở CẢ 8 tab; tab này trước đó không có), lọc theo đúng bộ field
+  `manageMatch()` app cũ dùng.
+
+**Còn lại, đã ghi lý do vào `surfaceNotes` của baseline** (5 surface):
+xoá xét nghiệm + xoá Panel QC (cần port cổng chặn theo khoá kỳ báo cáo của
+`delTest` app cũ), **ma trận nhập Mean/SD** (app cũ cho nhập trực tiếp 4 ô
+số + checkbox mỗi hàng, app-v2 chỉ hiện giá trị), **tab Lịch sử** (app cũ
+dùng lại đúng panel ma trận đó + số điểm QC từng mức + nút "Chi tiết"), và
+**danh mục TEa tích hợp** (app cũ liệt kê hàng trăm analyte CLIA/Ricos theo
+nhóm kèm ô nhập từng dòng; app-v2 mới có danh mục rút gọn — port đầy đủ là
+một đợt riêng đã ghi từ Giai đoạn B1, cần cả `docs/tea-sources.md`).
+
+Verify: `npm run app-v2:typecheck`/`build` sạch, `app-v2:test` 31/31,
+`app-v2:ui-parity` **48 surface** (24 ở 0/0 gồm cả 3 tab Cấu hình chung vừa
+về 0; 24 surface còn lệch đều có `surfaceNotes` giải thích). Bộ seed sửa
+xong được xác nhận bằng chính việc tab "Máy xét nghiệm" về 0/0 — trước đó
+2 trong 7 dòng lệch của nó là do seed.
+
+**Rà soát chất lượng mã app-v2 (2026-09-02) — đo bằng grep/typecheck, không
+bằng cảm nhận.** Người dùng hỏi "chuyển sang app mới thì code có sạch, có
+đúng kiến trúc không". Kết quả đo và 3 việc đã sửa ngay trong lượt này:
+
+**Ranh giới kiến trúc GIỮ ĐƯỢC (đo được, không phải tin lời)**: renderer
+không có 1 câu SQL nào; `preload.ts` 86 `invoke` khớp CHÍNH XÁC 86
+`ipcMain.handle` (không kênh nào gọi mà thiếu handler, không handler nào
+chết); không handler nào import handler khác — TRỪ ĐÚNG 1 ngoại lệ có chủ
+đích: `lis-handlers.ts` import `createEntryHandlers` để điểm QC từ LIS đi
+CÙNG đường `addPoint()` với nhập tay (kỳ khoá + audit), xem Giai đoạn C5.
+Quy ước "handler không import lẫn nhau" ghi ở đầu file này cần đọc kèm ngoại
+lệ đó.
+
+**`main/domain/` KHÔNG thuần 100% như câu mô tả kiến trúc gợi ý**: 4 file
+dùng `node:` thật (`audit-chain.ts`/`password-hash.ts` cần `node:crypto`,
+`backup.ts`/`migrate-legacy.ts` cần `node:crypto`+`node:fs`). Đây là lý do
+KỸ THUẬT khiến bản xem trước trình duyệt phải giả lập mật khẩu/chuỗi hash
+(đã ghi ở mục "Xem giao diện app-v2 qua trình duyệt") — không phải chọn cho
+nhanh. 15 file domain còn lại thuần thật và được `browser-mock/api.ts` dùng
+LẠI nguyên bản.
+
+**Rủi ro lớn nhất còn lại, chưa sửa: `renderer/browser-mock/api.ts` (729
+dòng, 63 chỗ `any`) KHÔNG có test nào.** Nó được gõ `: QcApi` nên TypeScript
+chặn được lệch TÊN/CHỮ KÝ, nhưng KHÔNG chặn được lệch HÀNH VI so với handler
+thật — mà chính bản xem trước này là thứ `app-v2:ui-parity` đo. Nghĩa là gate
+parity có thể xác nhận một giao diện mà Electron thật hiển thị khác. Cần một
+bộ test end-to-end chạy CÙNG kịch bản qua handler thật và qua mock rồi so
+kết quả; chưa làm, ghi lại để không quên.
+
+**Đã sửa (1) — hợp đồng IPC giờ do trình biên dịch canh, không do kỷ luật.**
+`preload.ts` trước đây là object literal trần truyền vào
+`contextBridge.exposeInMainWorld` với tham số `unknown`, nên gõ sai tên hàm
+so với `shared/qc-api.d.ts` KHÔNG có gì bắt được (86/86 khớp là nhờ cẩn thận,
+không nhờ kiểu). Nay tách `const api = {...} satisfies QcApi` rồi mới expose.
+Chứng minh gate mới CÓ khả năng bắt lỗi (không chỉ chạy xanh): đổi tạm
+`removeLot` thành `removeLotTypo` → `tsc` báo đúng `TS2561 ... Did you mean
+to write 'removeLot'?`, rồi phục hồi.
+
+**Đã sửa (2) — 3 chỗ trùng lặp + 1 field store chết ở trang Westgard.**
+`westgard-store.ts` có `analysis: LevelAnalysis | null` và
+`loadAnalysis(testId, level)` cho MỘT mức mà KHÔNG trang nào đọc (`grep` mọi
+chỗ destructure store xác nhận) — chỉ `toggleRule` ghi vào field không ai
+đọc. Vì vậy `WestgardPage.tsx` tự gọi `window.qcApi.analyzeLevel` ở 3 chỗ,
+trong đó 2 chỗ là 7 dòng copy-paste y nguyên. Đổi store sang
+`analysisByLevel` + `loadAnalysis(testId, levels[])` — ĐÚNG quy ước
+`entry-store.ts` đã dùng từ Giai đoạn B2, không phát minh kiểu mới — trang
+gọi 1 dòng ở cả `useEffect` lẫn `useStoreInvalidation`.
+
+**Đã sửa (3) — BUG THẬT: 1 cú bấm checkbox luật ghi N dòng audit.** Chỗ
+`onChange` của checkbox luật Westgard gọi `levels.forEach((l) =>
+onToggleRule(l.level, ...))`, tức gọi `saveRuleAction` một lần CHO MỖI MỨC.
+Nhưng `saveRuleAction` ghi `rule_actions_json` của XÉT NGHIỆM (không theo
+mức) và tự `writeAudit()` mỗi lần — nên xét nghiệm 3 mức thì mỗi lần bật/tắt
+1 luật đẻ ra 3 dòng nhật ký trùng nhau. Sửa: gọi đúng 1 lần,
+`toggleRule(testId, ruleId, on)` bỏ tham số `level`. Việc nạp lại phân tích
+của MỌI mức không cần làm tay: `saveRuleAction` đã `notifyChanged(['tests'],
+[testId])` nên `useStoreInvalidation` của trang tự lo — lần refetch 1 mức
+viết tay trong `onToggleRule` cũ vừa thừa vừa che mất điều đó.
+
+**Nợ kiến trúc còn lại, đã đo, CHƯA sửa** (không phải bỏ sót không ghi):
+`ManagePage.tsx` 780 dòng (mới tách được `manage/HistoryTab.tsx`, 8 tab còn
+lại vẫn trong 1 file); 23 chỗ trang gọi `window.qcApi` trực tiếp thay vì qua
+store (Settings 16, Westgard 3, Report 2, Actions 1, DialogHost 1 — đều là
+truy vấn đọc 1 lần, nhưng nghĩa là `useStoreInvalidation` không chạm tới
+được); `vnDate()` bị viết lại ở 2 file trang (Dashboard/Manage) trong khi
+`renderer/view-models/` mới có đúng 1 file — cần một chỗ dùng chung cho định
+dạng ngày/số; 77 chỗ `style={{...}}` còn sót ở lớp trình bày (app cũ đã có
+quy ước token khoảng cách, xem "CSS structure"); `ReportPage.tsx` giữ 12 hàm
+helper trong chính file trang.
+
+Verify: `app-v2:typecheck`/`build` sạch, `app-v2:test` 31/31,
+`app-v2:ui-parity` 48/48 surface đạt (refactor không đổi DOM).
+
+**Giai đoạn C7 — test đối chiếu bản giả lập trình duyệt ↔ handler thật (xong,
+2026-09-02). Phủ ĐỦ 87/87 hàm `QcApi`, bắt được 18 lệch thật — trong đó 79
+chuỗi tiếng Việt của bản Electron THẬT bị mất dấu, và nhật ký hoạt động của
+bản xem trước chỉ ghi được một nửa số dòng.**
+
+Lý do có hạng mục này (ghi ở lượt rà soát chất lượng mã phía trên):
+`renderer/browser-mock/api.ts` được gõ `: QcApi` nên TypeScript chặn được
+lệch TÊN/CHỮ KÝ, nhưng KHÔNG chặn được lệch HÀNH VI — mà chính bản giả lập là
+thứ `app-v2:ui-parity` đo (gate chạy `app-v2:dev` qua localhost), nên một
+lệch hành vi khiến gate xác nhận một giao diện mà Electron thật hiển thị
+khác.
+
+**Thiết kế `tests/mock-parity.test.mjs` — 3 nửa, mỗi nửa chốt một kiểu quan
+hệ khác nhau, vì không phải hàm nào cũng "phải giống nhau":**
+
+**(A) So BẰNG NHAU — 126 bước, 73 hàm, đủ 11 module.** Chạy CÙNG 1 kịch bản
+qua 2 đường rồi so kết quả đã chuẩn hoá.
+- Phía giả lập dùng `withPermissionPolicy(createBrowserMockApi())` — ĐÚNG thứ
+  `install.ts` gắn vào `window.qcApi`, không phải api trần (api trần không có
+  cổng quyền, so như vậy sẽ bỏ sót đúng lớp dễ lệch nhất).
+- Phía thật dùng façade `makeRealApi()` viết trong chính file test, sao lại
+  cách `main/index.ts` nối kênh (actor lấy từ phiên đăng nhập giữ trong bộ
+  nhớ). KHÔNG import được `main/index.ts` vì file đó import `electron`.
+- Chuẩn hoá 4 lớp: bỏ trường biến động (`created_at`/`hash`/`seq`/`ts`); id →
+  token theo thứ tự xuất hiện (`#1`, `#2`…) nên giữ được QUAN HỆ giữa các bản
+  ghi mà không phụ thuộc id ngẫu nhiên; mốc thời gian ISO → `<TS>` kể cả khi
+  LỒNG trong chuỗi JSON (`detail_json.releaseDecidedAt` là một CHUỖI nên
+  không bỏ được theo tên khoá); và id thật nhúng trong CHỮ (`target`, chi
+  tiết kiểu "Xoá hồ sơ chuyển lô <id>") → token, nhưng CHỈ khi chuỗi 7 ký tự
+  đó đã từng xuất hiện như một id ở bước trước, nên không có nguy cơ biến một
+  từ tiếng Việt thành token.
+- `browser-mock/store.ts` gọi `localStorage.getItem` NGAY khi nạp module, nên
+  stub `MemStorage` phải cài TRƯỚC `require` — dùng `createRequire`
+  (CommonJS) chính vì thứ tự này điều khiển được, khác `import` ESM tĩnh.
+- Kịch bản đi theo dòng nghiệp vụ thật (tạo → sửa → cổng chặn → xoá) chứ
+  không vét cạn tổ hợp input; có 1 assert chốt `>= 60` bước vì một kịch bản
+  rỗng cũng "khớp".
+
+**(B) CỐ Ý KHÁC — 10 hàm.** `exportBackup`/`verifyBackup`/
+`resetOperationalData`/`importBackup`/`previewLegacyBackup`/
+`importLegacyBackup`/`exportTableXlsx`/`pullLisQueue`/`importLisResult`/
+`rejectLisResult` cần môi trường Electron thật (file system,
+`BrowserWindow`, HTTP tới gateway) nên bản xem trước trả thẳng
+`not-available-in-browser-preview`. Chốt đúng sự khác biệt: mock phải trả
+CHÍNH mã đó (không được giả vờ `ok:true`), bản thật phải KHÔNG trả mã đó.
+Giá trị nằm ở tương lai: ai cài đặt thật một hàm trong nhóm này ở bản giả
+lập thì test đỏ và nhắc chuyển sang nửa (A) — thay vì nó âm thầm nằm ngoài
+mọi vùng kiểm soát.
+
+**(C) HỢP ĐỒNG RIÊNG — 4 hàm không so bằng nhau được nhưng không bỏ trắng:**
+- `getStorageInfo`: bản thật đo kích thước FILE SQLite, bản giả lập đo blob
+  JSON trong localStorage — hai đại lượng khác bản chất. Chốt: cùng hình
+  dạng, dung lượng không âm, và `path` của bản xem trước phải NÓI RÕ đây
+  không phải file thật.
+- `verifyActivityChainNow`: bản giả lập không băm hash (trình duyệt không có
+  `node:crypto`). Chốt: bản thật `ok:true` + `checked>0` (băm thật), bản giả
+  lập `ok:true` + `checked===0` — KHÔNG được báo "chuỗi bị phá", vì đó đúng
+  là cách `verifyAuditChain()` thật xử lý dòng không hash.
+- `printHtmlToPdf`: bản thật cần `BrowserWindow` thật nên không gọi được
+  trong Node (đã kiểm chứng bằng Playwright `_electron` ở Giai đoạn C1) —
+  chỉ chốt phía giả lập phải từ chối rõ ràng.
+- `onStoreChanged`: không có handler nào ở main để so (kênh
+  `webContents.send` một chiều). Chốt thứ MỌI trang phụ thuộc: phải trả về
+  hàm huỷ đăng ký GỌI ĐƯỢC, vì `useStoreInvalidation()` gọi nó trong nhánh
+  dọn dẹp của `useEffect` — trả `undefined` sẽ làm mọi trang ném lỗi khi rời
+  trang.
+
+**Hạ tầng build**: `tsconfig.app-v2-mock.json` (mới) build
+`renderer/browser-mock/*` sang CommonJS vào `app-v2-dist/mock/` — cần lượt
+riêng vì `tsconfig.app-v2-renderer.json` phát ESM+JSX cho Vite còn
+`tsconfig.app-v2-main.json` chỉ include `app-v2/main`. Dùng `tsc` chứ không
+thêm dependency bundler: Vite 8 của repo dùng `rolldown`, KHÔNG còn `esbuild`
+để gọi trực tiếp. `scripts/run-tests.cjs` chạy thêm lượt build này trước khi
+gọi `node --test`.
+
+**18 lệch thật bắt được, nhóm theo lớp lỗi:**
+
+1. **79 chuỗi tiếng Việt của bản Electron THẬT bị mất dấu** — phát hiện lớn
+   nhất, truy ra từ một lệch message duy nhất. Đếm được **52/119 `message:`**
+   (nce-handlers 23, nce-validation 14, entry-validation 6, sigma-handlers 4,
+   entry-handlers 3, westgard-handlers 2), **14 NHÃN AUDIT** ("Nhap QC", "Huy
+   diem QC", "Them ky Six Sigma"…) và **13 chuỗi CHI TIẾT** ("Diem QC muc …,
+   ngay …, gia tri …", "Ly do: …", "Ho so …", "Luat … chuyen thanh bat/tat"…).
+   Nghĩa là người dùng bản Electron đang thấy "Gia tri QC khong hop le." và
+   trang Nhật ký hoạt động hiện "Nhap QC". Đây là di sản đợt module thí điểm
+   đầu tiên (viết ASCII để né lỗi mã hoá), và **gate parity không thể thấy vì
+   nó đo bản giả lập — bản giả lập lại có dấu đầy đủ.** Đã sửa hết bằng bảng
+   ánh xạ TƯỜNG MINH (không tự động thêm dấu bằng thuật toán — đây là chữ
+   người dùng đọc). An toàn với chuỗi hash tamper-evident: dòng audit CŨ giữ
+   text cũ và hash của nó phủ đúng text đó, dòng MỚI dùng text mới;
+   `verifyAuditChain()` không so text với bảng hằng nào. 2 test cũ khoá nhãn
+   `'Nhap QC'`/`'Huy diem QC'` sửa theo (chúng lọc theo `type`, không kiểm
+   chính tả) — mọi test khác assert theo `error.code` nên không vỡ.
+   **Bài học quy trình, đáng nhớ hơn con số**: sweep phải qua 3 lượt mới hết.
+   Lượt 1 chỉ khớp `writeAudit(..., '<nhãn>'` TRÊN CÙNG MỘT DÒNG → bỏ lọt
+   `writeAudit` viết nhiều dòng (Six Sigma). Lượt 2 quét kèm 2 dòng ngữ cảnh
+   → vẫn bỏ lọt phần CHI TIẾT của `entry-handlers`, vì bước `queryActivity`
+   (trang 1, 5 dòng) KHỚP và che mất — 2 dòng đó không nằm trong 5 dòng mới
+   nhất. Chỉ khi so CSV TOÀN BỘ nhật ký mới lộ ra. Lượt 3 quét theo danh sách
+   từ tiếng Việt không dấu thường gặp trên toàn `main/` → ra 0.
+   **Mở rộng phạm vi đọc của một bước có giá trị đúng bằng thêm một bước mới.**
+
+2. **Nhật ký hoạt động của bản xem trước chỉ ghi 19/40 dòng.** 17 loại thao
+   tác ghi audit ở bản thật mà KHÔNG ghi gì ở bản giả lập: thêm/sửa lô QC,
+   nhóm lô, Panel QC, tạo + cập nhật hồ sơ chuyển lô, kỳ Six Sigma, 3 thao
+   tác so sánh hoá chất, bật/tắt + phạm vi luật Westgard, 6 thao tác NCE
+   (duyệt/trả lại/ngày hoàn thành/hiệu lực/release-to-service/mở vòng tiếp
+   theo), và thêm/sửa/xoá hồ sơ TEa. Đã vá đủ, nhãn + chi tiết copy NGUYÊN
+   VĂN từ `writeAudit()` tương ứng.
+
+3. **`saveLisSettings` mất CẢ cổng admin LẪN allowlist origin.** Bản thật chỉ
+   nhận `http://127.0.0.1:8787`/`http://localhost:8787` — kiểm soát an toàn
+   có chủ đích của Giai đoạn C5; bản giả lập nhận `http://vi-du.com:8787` và
+   trả `ok:true`, tức dạy người dùng một hành vi KHÔNG tồn tại. Sửa bằng cách
+   dùng LẠI chính `normalizeGatewayUrl` của `main/domain/lis-client.ts` (file
+   thuần, không `node:`) thay vì viết lại lần thứ hai — cùng nguyên tắc bản
+   giả lập đã dùng cho 15 module domain khác.
+
+4. **CSV xuất từ nhật ký của bản xem trước KHÔNG escape giá trị.** Bản thật
+   có `toCsvValue()` (bọc ngoặc kép khi giá trị chứa dấu phẩy/ngoặc kép/xuống
+   dòng); bản giả lập nối chuỗi thô, nên mọi chi tiết như `Nhóm "Nhom 1" (2
+   lô)` hoặc `Điểm QC mức 1, ngày …, giá trị …` làm **vỡ cấu trúc cột của file
+   tải về**. Sửa bằng cách port đúng hàm escape.
+
+5. **Thiếu cổng `TEa > 0`** (`saveSigmaPeriod`): bản giả lập nhận cả `tea:-5`
+   rồi lưu, nên trang Six Sigma của bản xem trước tính Sigma từ một số vô
+   nghĩa mà không báo gì.
+
+6. **Thông báo `already-reopened` bị cắt ngắn**: "Hồ sơ này đã có vòng tiếp
+   theo." thiếu nửa sau "…, mở tiếp từ vòng đó." — nửa bị mất chính là nửa
+   NÓI CHO NGƯỜI DÙNG BIẾT PHẢI LÀM GÌ.
+
+7. **18 cột thiếu trên 3 bảng** so với schema thật: hàng `tests` thiếu 6
+   (`abbreviation`/`display_name`/`standard_name`/`analyte_id`/`matrix`/
+   `aliases_json`), hàng `tea_refs` thiếu 11, hàng NCE thiếu `risk_level`,
+   hàng `test_levels` thiếu `range_k` (=2, hệ số dải ±2SD — đúng thứ ma trận
+   Mean/SD dùng). `range_k` thiếu ở CẢ HAI chỗ tạo hàng (nhánh trong
+   `saveTestLevel` VÀ chỗ `saveTest` tự sinh sẵn mức 1) — sửa 1 chỗ vẫn còn
+   lệch, vì chỗ tự sinh mới là chỗ chạy trước trong thực tế.
+
+**Đã chứng minh CẢ BA nửa có khả năng bắt lỗi, không chỉ chạy xanh**: (A) sửa
+tạm 1 message ở mock → FAIL đúng bước kèm cả 2 chuỗi; (B) sửa tạm
+`resetOperationalData` thành `ok:true` → FAIL đúng thông báo; (C) sửa tạm
+`onStoreChanged` trả `undefined` → FAIL đúng thông báo. Cả ba đều phục hồi
+sau khi xác nhận.
+
+Verify: `npm run app-v2:test` 32/32 (mock-parity: **126 bước khớp + 10 hàm cố
+ý khác + 4 hàm hợp đồng riêng = 87/87 hàm `QcApi`**), `app-v2:typecheck`/
+`build` sạch, `app-v2:ui-parity` 48/48 surface đạt.
+
+**Giới hạn còn lại, ghi rõ chứ không để ngầm**: phủ 87/87 hàm nghĩa là mỗi
+hàm đã có ÍT NHẤT một hợp đồng, KHÔNG phải mọi nhánh của mỗi hàm đều được
+chốt. Mỗi lần mở rộng phạm vi đọc của một bước lại lộ thêm lệch (xem bài học
+ở mục 1), nên đây là bộ gate sống, không phải cột mốc đóng. Façade
+`makeRealApi()` do test tự giữ nên vẫn có thể lệch với `main/index.ts` nếu ai
+đổi cách nối kênh — nhưng lệch đó sẽ lộ thành test đỏ hoặc ném lỗi, không âm
+thầm.
+
+**Giai đoạn D3.5 — Nhập QC đạt golden master (2026-09-02). Surface LỚN NHẤT
+từ đầu Giai đoạn D: 77 class / 104 dòng chữ lệch → 0/0 trên cả 4 viewport.**
+
+Trang này XL vì nó không chỉ là CSS: 1 lỗi của chính manifest, 1 khác biệt
+hành vi làm mất 2/3 giao diện, 1 hàm domain phải port, và 1 IPC mới.
+
+**Lỗi CỦA MANIFEST bắt được ngay lượt đo đầu**: `requiredSelectors` khai
+`.entry-layout` — class KHÔNG tồn tại ở bản nào. Gate tự báo đúng thông điệp
+lớp (b) của nó ("selector trong manifest sai/đã đổi tên, gate sẽ vô nghĩa").
+Sửa về selector THẬT của app cũ: `.head`/`.entry-main`/`.qc-sheet-panel`/
+`.qc-sheet`/`.lj-toolbar`. Đây là lần thứ hai một lỗi của bộ đo bị chính nó
+phát hiện (lần đầu: seed bịa dữ liệu ở D3.4).
+
+**Khác biệt hành vi làm mất 40 class trong 1 nốt: app-v2 không tự chọn xét
+nghiệm.** App cũ (`entry-page-controller.ts`, chỗ dựng `selT`) TỰ RƠI VỀ xét
+nghiệm ĐẦU TIÊN khi lựa chọn hiện tại không hợp lệ; app-v2 để `testId` rỗng
+nên toàn bộ `.entry-main` (bảng nhập, biểu đồ, toolbar) không render. Chỉ
+thêm `useEffect` tự chọn đã kéo 77/104 xuống 23/49 — nghĩa là 2/3 phần "lệch"
+không phải thiếu code mà là thiếu 1 dòng khởi tạo. **Bài học đo lường: với
+trang có state chọn, phải kiểm trạng thái MẶC ĐỊNH có render gì không trước
+khi kết luận thiếu tính năng.**
+
+Đồng thời đóng luôn mục còn treo từ Giai đoạn D2: `location.state.testId`
+cho điều hướng chéo trang (Tổng quan bấm "Xem"/"Xem QC" mở đúng xét nghiệm
+đó, "Gán Mean/SD" mở sẵn tab Mean/SD của Cấu hình chung) — đúng
+`dashboardGoEntryFollowup()`/`goManageTargets()` app cũ.
+
+**Cây điều hướng dựng lại đúng mô hình app cũ: máy → NHÓM LÔ → xét nghiệm.**
+app-v2 đang là máy → xét nghiệm → MỨC, tức các lá "Mức 1"/"Mức 2" đều chọn
+cùng 1 xét nghiệm (mức là CỘT của bảng nhập, không phải nút điều hướng).
+Port `operationalLotGroupForTest()`: tên nhóm là tên người dùng đặt, không có
+thì ghép số lô ("Nhóm lô 1101/1102"). Nhãn trạng thái dùng bảng NGẮN riêng
+của cây (`reportLabels.stateName` → 'Loại', không phải 'Loại bỏ') và tính
+theo ĐIỂM CUỐI (`latestVerdict`) — cùng lý do đã ghi ở D2, không phải điểm
+xấu nhất từng có.
+
+**1 hàm domain phải port thật: `acceptedPoints()`** (`main/domain/
+westgard-engine.ts`, từ `src/domain/qc/accepted-lot-points.ts`). 3 dòng chữ
+cuối cùng không chịu về 0 hoá ra là NGHIỆP VỤ: app cũ vẽ biểu đồ và tính
+Mean/SD/CV thực trên CHUỖI ĐƯỢC CHẤP NHẬN — điểm nào nổ luật loại bỏ thì
+không vào chuỗi VÀ không tính vào cửa sổ đánh giá các điểm sau, nên 1 lần
+chạy bị loại không "làm bẩn" chuỗi của các lần sau. app-v2 đang lấy hết
+điểm nên số điểm 10 vs 9 và SD 3.0889 vs 0.7621. `westgard:analyzeLevel` giờ
+trả thêm cờ `accepted` cho từng điểm (tính ở main, renderer không chạy lại
+luật); bản giả lập trình duyệt cập nhật y hệt — lệch chỗ này là bản xem
+trước vẽ biểu đồ khác Electron. Khác app cũ đúng 1 chi tiết đã ghi tại chỗ:
+app cũ hỏi bảng hành động từng luật (`reject.has(rule)`), app-v2 dùng
+`level==='rej'` của chính engine (mô hình rút gọn). Cửa sổ 11 điểm giữ
+nguyên. Test oracle `tests/accepted-points.test.mjs` (6 nhóm) chốt đúng tính
+chất cốt lõi: với `[100, 112, 104.5]` bản đánh giá đầy đủ loại CẢ điểm
+104.5 (2of3-2s cùng với 112), còn chuỗi chấp nhận bỏ 112 và GIỮ 104.5.
+**Bài test này viết sai kỳ vọng ở lần đầu** (tưởng bỏ điểm giữa là hết vi
+phạm, thực ra 2-2s vẫn nổ vì 2 điểm 104.5 đều >2SD) — sửa kỳ vọng theo số
+đo thật chứ không sửa hàm.
+
+**1 IPC mới: `entry:setDayNote`** — cột "Ghi chú" của bảng nhập. Port đúng
+`EntryService.saveDateNote()`: ghi chú KHÔNG có bảng riêng, nó nằm ở trường
+`note` của MỌI điểm QC còn hiệu lực trong ngày (`qc_points.note` schema đã có
+sẵn từ đầu). Kéo theo 2 hệ quả của app cũ cũng giữ nguyên: ngày chưa có điểm
+QC nào thì không lưu được (`no-points`), và kỳ báo cáo đã khoá thì chặn.
+TypeScript bắt ngay bản giả lập thiếu hàm này (`satisfies QcApi`/`: QcApi` —
+đúng seam vừa siết ở lượt rà soát chất lượng mã).
+
+**Hợp đồng `TestLevel` thiếu 6 trường mà handler VẪN trả về** (`low`/`high`/
+`range_k`/`mfg_mean`/`mfg_sd`/`applied`) — bổ sung để trang đọc `applied`
+(hiện "Dải NSX"/"Dải PXN") an toàn kiểu, không phải ép `any`.
+
+**Lại là bộ seed (lần 2)**: ô "NV thực hiện" của app cũ luôn hiện '—' vì bộ
+seed dùng chung của repo (`scripts/lib/seed-browser-session.js`) đặt
+`staff:'NV1'`, còn app cũ đọc `operatorName`/`operatorCode`
+(`domain/qc/staff-identity.ts`). Sửa seed đặt đúng field app cũ THẬT SỰ đọc,
+và seed v2 ưu tiên `operatorName`/`operatorCode` rồi mới fallback `staff` —
+2 bản cùng dữ liệu thì mới so được.
+
+Còn lại là 12 nhóm chi tiết trình bày, port theo giá trị nguyên văn của
+`assets/professional-entry.css`: nút "Tới hôm nay" (teal, nhảy tháng RỒI
+cuộn tới hàng hôm nay), nút "＋ Thêm" mở lần chạy bổ sung (app cũ KHÔNG hiện
+sẵn ô trống ở ngày đã có điểm — phải bấm mới mở, `qc-add-run-*`/`has-add-btn`/
+`has-data`), ô ghi chú theo ngày, cửa sổ Từ/Đến + preset 7/14/30/60/90 ngày
+(mặc định 30) + dòng "Khoảng xem: dd/mm/yyyy – dd/mm/yyyy · N mức QC", dải
+`lj-qc-strip` 5 chỉ số (Mean/SD/CV thực + Mean/SD mục tiêu) kèm gợi ý dải
+đang dùng, class canvas `entryLJStack`, panel `qc-points-panel` +
+`qc-cumulative-note`, cột Z trong bảng điểm, huy hiệu `.qc-staff`, dải năm
+11 năm từ (năm nay − 5), nhãn `VERDICT_LABEL` rej là 'Loại bỏ', và giá trị QC
+in theo số thập phân của xét nghiệm (109.5 → "109.50", `fmtPointValue`).
+Nút "Hiện danh mục" (`entry-tree-expand`) render LUÔN như app cũ (CSS ẩn khi
+chưa thu gọn) thay vì chỉ render khi đã thu gọn.
+
+**Bẫy quy trình mất 1 lượt đo**: gate phục vụ `app-v2-dist/renderer` (bản ĐÃ
+BUILD), KHÔNG phải dev server — sửa nguồn rồi đo ngay thì số không đổi. Phải
+`npm run app-v2:build` trước mỗi lượt `app-v2:ui-parity`.
+
+**3 hạng mục CHƯA port, đều cần thiết kế/backend chứ không phải CSS** (ghi cả
+vào `surfaceNotes` của baseline): (1) cột song song 2 lô — cần cột phân biệt
+điểm song song trong `qc_points` + chỗ lưu Mean/SD ứng viên, lý do kỹ thuật
+đã ghi từ Giai đoạn B2; (2) 2 nút "Workflow dải QC"/"Về dải nhà sản xuất" —
+cần `rangeCandidate()` (cổng ≥20 kết quả, ≥20 ngày độc lập, 0 điểm bị loại/
+cảnh báo, SD>0) + IPC áp/hoàn dải; phần HIỂN THỊ dải đang dùng đã port;
+(3) điều hướng bàn phím trong bảng nhập (`entrySheetKey`/`entryTreeKey`).
+Không dựng nút gọi vào chỗ trống — Giai đoạn D cấm control chết.
+
+Verify: `npm run app-v2:typecheck`/`build` sạch, `app-v2:test` **33/33**
+(thêm `accepted-points.test.mjs`; `mock-parity` vẫn khớp sau khi thêm
+`setDayNote` + cờ `accepted` ở cả 2 bên), `app-v2:ui-parity` **52 surface**
+(entry 0/0 cả 4 viewport, baseline chốt 0).
+
+**Giai đoạn D3.6 — Six Sigma (2026-09-02): 73 class / 90 dòng chữ lệch → 7
+class / 32 dòng, phần còn lại thuộc đúng 4 lý do đã ghi rõ, không phải nợ
+CSS.**
+
+**Lại là bộ seed, lần thứ 3 — và lần này nghiêm trọng nhất về mặt ĐO LƯỜNG:
+seed KHÔNG có dữ liệu Six Sigma ở cả 2 bản** (`sigmaPeriods: []`, app cũ
+không có `sigmaData` nào). Đo trước khi sửa sẽ ra "0 lệch" cho một trang gần
+như trống — đúng lỗ hổng đã gặp với 7 tab Cấu hình chung ở D3.4, nhưng ở đây
+là cả một TRANG. Bổ sung `SIGMA_SEED` khai MỘT LẦN (1 kỳ, 2 mức, CV/Bias khác
+nhau giữa 2 mức để Sigma khác nhau) rồi ánh xạ sang 2 hình dạng: app cũ cần
+`test.sgTracked = true` + `state.sigmaData[testId] = [{ id, period, tea,
+teaSource, lv: { <mức>: {cv, biasEqa} } }]`; app-v2 cần
+`sigmaPeriods: [{ id, testId, period, tea, teaSource, levels: [...] }]`.
+**Bài học lặp lại lần 3: với trang chưa từng được đo, việc ĐẦU TIÊN là kiểm
+seed có dữ liệu cho trang đó hay không — số 0 lệch của một trang trống là số
+vô nghĩa.**
+
+**Cùng lỗi "không tự chọn" như D3.5**: app cũ (`sigma-page-controller.ts`:
+`if (!ui().sgTest || !tests.find(...)) ui().sgTest = tests[0].id`) tự chọn
+xét nghiệm đầu tiên; app-v2 để rỗng nên chỉ render vỏ (11 dòng chữ). Thêm
+`useEffect` tự chọn: 73/90 → 49 class/85 dòng. Đây là lần thứ 2 liên tiếp
+cùng một lớp lỗi — đáng coi là hạng mục kiểm bắt buộc cho mọi trang có state
+chọn còn lại (D3.7–D3.10).
+
+**Port theo golden master** (`src/react/pages/SigmaPage.tsx` +
+`sigma-status-*-html.ts` + `professional-sigma.css`):
+- Panel "Thiết lập phân tích": `.sg-control-row` (picker + 2 nút admin) +
+  `.sg-setup-fields` (Tên/Đơn vị/Thiết bị chỉ đọc, `.sg-tea-source` 4 nguồn
+  TEa đúng thứ tự và câu chữ `TEA_SOURCE_REGISTRY`, `.sg-tea-input` nhãn đổi
+  theo nguồn) + `.sg-sigma-input-note` nguyên văn.
+- Panel "Tình trạng": dòng "Kỳ đang xem: <kỳ> · <xét nghiệm> · TEa n%", thẻ
+  `.sgbig` với tiêu đề **"Mức n — Sigma"** (dấu gạch dài, chữ hoa do CSS) và
+  2 dòng chi tiết "CV IQC x% · Bias EQA/EQC y%" + "DPMO … · Yield …%" —
+  `formatSigmaDpmo()` port nguyên (dưới 10 giữ 2 chữ số, dưới 1000 làm tròn,
+  còn lại phân nhóm nghìn en-US).
+- Thẻ **"Khuyến nghị cải thiện"** (`.sg-improvement-*`): port `sgTips()` —
+  chia nguyên nhân theo tỉ lệ `|bias| / (|bias| + 1.65·cv)` (>0.6 do bias,
+  <0.4 do CV, giữa là cả hai) và liệt kê đúng danh sách hành động của bản cũ.
+- Bảng kỳ: ô kỳ thành 2 select tháng/năm (`.sg-period-select-wrap`/
+  `.sg-period-controls`/`.sg-period-month`/`.sg-period-year`), hàng đang xem
+  có `.sg-period-selected`, ô Bias có khối giữ chỗ `.sg-cell-meta-empty`, ô
+  Sigma thêm class `ok`/`rej` theo ngưỡng 3σ, cột "Thao tác" có Excel/In PDF/
+  Xóa, chân bảng `.sg-data-foot` có "Xuất Excel"/"Xuất PDF" tổng hợp, và các
+  nút "Bias EQA% Mức n" trên đầu bảng như app cũ.
+- Panel MU thu gọn (`.sg-collapse-panel.sg-mu-panel`) với bảng 7 cột
+  u(Rw)/u(bias)/u(cal)/u_c/U/thành phần thiếu — đọc thẳng `lv.mu` mà
+  `uncertaintyBudget()` đã trả từ Giai đoạn B4.
+- Panel "Biểu đồ Sigma & MDC": `components/SigmaCharts.tsx` (mới) vẽ 2 biểu
+  đồ bằng canvas + ref chuẩn React — xu hướng Sigma theo kỳ (kèm 2 mốc 3σ/4σ)
+  và MDC (X = CV/TEa, Y = |Bias|/TEa, 4 biên Sigma 3/4/5/6, điểm to nhất là
+  kỳ gần nhất). KHÔNG port hình học SVG `sgTrendSVG`/`sgMDCSVG` — giống nội
+  dung, khác cách vẽ, đúng nguyên tắc đã chốt từ A1.
+
+**1 IPC mới: `sigma:removePeriod`** — app cũ có nút "Xóa" từng kỳ (chỉ admin,
+`sgDelPeriod`), app-v2 chưa có đường xoá nào nên nút sẽ là control chết. Xoá
+THẬT khỏi `sigma_data` (kỳ Sigma là bản ghi đánh giá do người dùng nhập,
+không phải dữ liệu QC gốc phải giữ vĩnh viễn như `qc_points`), vẫn ghi audit.
+Đổi tháng/năm của 1 kỳ ở app-v2 phải lưu sang kỳ MỚI rồi xoá kỳ cũ, vì
+app-v2 khoá `id = testId:period` (app cũ sửa tại chỗ được vì id là uid rời) —
+ghi rõ lý do ngay tại chỗ trong code.
+
+**`tests/mock-parity.test.mjs` mở rộng lên 131 bước, phủ 89/89 hàm** — thêm
+`removeSigmaPeriod` và cả `setDayNote` (thêm ở D3.5 mà lượt đó chưa đưa vào
+kịch bản). TypeScript lại bắt được bản giả lập thiếu hàm mới ngay khi thêm
+vào hợp đồng, đúng seam đã siết.
+
+**4 lý do cho 7 class / 32 dòng còn lại** (ghi cả vào `surfaceNotes`):
+1. **Danh mục TEa tích hợp** (9 dòng): app cũ tự tra `TEA_ANALYTE_CATALOG`
+   được Ricos 0.73% / CLIA ±4.0000 mmol/L cho "Sodium (Na)", nên Sigma ra
+   -0.42/-0.17 và các dòng "TEa đang dùng"/"Kỳ đang xem"/DPMO khác hẳn.
+   app-v2 chỉ tra được nguồn "phòng xét nghiệm" từ bảng `tea_refs` — hoãn từ
+   Giai đoạn B1, cần cả `docs/tea-sources.md`. **Cố ý KHÔNG hardcode 0.73 vào
+   seed để số khớp**: như vậy là làm cho gate xanh chứ không phải làm cho
+   app đúng.
+2. **Panel "Thiết kế QC theo Sigma (OPSpecs)"**: cần domain thiết kế QC theo
+   Westgard Sigma Rules (gợi ý luật + số QC mỗi lần chạy), app-v2 chưa có →
+   `sg-selected-period-hint`/`alert-block`/`info`/`flow-item`/`muted`/`warn`.
+3. **Nút "Nạp CV lô"** (`sg-row-cv`): cần bộ chọn cohort IQC (`sgCohortCtx`)
+   để lấy CV theo lô lịch sử; dựng nút mà chưa có cohort là control chết.
+4. **Nhãn TRỤC biểu đồ** (0/2/4/6/8, 3σ, 6σ, 09/2026, Sigma, 20..100): app cũ
+   vẽ SVG có text node thật nên `innerText` đọc được; app-v2 vẽ canvas nên
+   nhãn nằm trong bitmap. Đã bù bằng **chú giải DOM thật** (tên từng mức +
+   mốc 3σ/6σ) để người dùng và trình đọc màn hình vẫn đọc được — không nhồi
+   số trục vào DOM chỉ để gate xanh.
+
+Verify: `npm run app-v2:typecheck`/`build` sạch, `app-v2:test` **33/33**
+(mock-parity 131 bước, 89/89 hàm), `app-v2:ui-parity` **56 surface** (sigma
+4 viewport ở baseline 7/32 kèm `surfaceNotes`).
+
+**Giai đoạn D3.7–D3.10 — 4 trang cuối, ĐÓNG Giai đoạn D3 (2026-09-03).
+11/11 trang đã qua golden master; gate lên 72 surface, 36 ở 0/0, mọi surface
+còn lệch đều có `surfaceNotes` giải thích lý do sản phẩm/kỹ thuật.**
+
+**D3.7 — So sánh hoá chất (26 class / 58 dòng → 1 / 18).** Bộ seed CHƯA HỀ có
+phép so sánh nào ở CẢ HAI bản — **lỗi đo lường lần thứ 4** (sau Manage bịa
+field, Sigma thiếu cả 2 bên, activity chỉ có ở v2): một trang không có dữ liệu
+thì con số "0 lệch" là con số vô nghĩa. Thêm `REAGENT_SEED` (24 cặp lệch +1%,
+suy từ cùng một nguồn cho 2 bản như quy ước đã ghi ở D3.4). Trang được VIẾT LẠI
+TOÀN BỘ theo bố cục app cũ: `rc-toolbar-panel` → `rc-entry-grid`
+(`rc-info-panel` 10 trường + `rc-pair-panel` có cột TB/Hiệu tính sẵn từng cặp)
+→ `rc-stats-panel` → `rc-crit-panel` (6 tiêu chí + banner kết luận) →
+`rc-chart-panel` kèm chú giải. Chi tiết dễ bỏ sót nhất là **2 hàm định dạng
+KHÁC NHAU** trong cùng trang của app cũ: bảng thống kê cắt số 0 cuối
+(`String(Number(x.toFixed(2)))` → "1" chứ không phải "1.00"), còn bảng cặp mẫu
+GIỮ số 0 (`x.toFixed(3)`) — dùng một hàm cho cả hai làm lệch hàng chục dòng mà
+nhìn code không thấy sai.
+- **Bài học quy trình (không phải lỗi code)**: `git checkout` một file đang có
+  thay đổi CHƯA COMMIT của Giai đoạn D đã xoá sạch bản đang làm — đúng cái bẫy
+  đã ghi trong bộ nhớ dự án. Không đi khảo cổ trong bundle đã build để dựng
+  lại; viết lại nguyên trang theo golden master (việc mà D3.7 vốn đã yêu cầu),
+  nhanh và đúng hơn là ghép mảnh.
+- Còn lại: 1 class `rc-icon-btn` (3 danh sách chọn nhanh lô/xét nghiệm/mẫu) và
+  18 dòng là **nhãn TRỤC biểu đồ** — app cũ vẽ SVG có text node thật nên
+  `innerText` đọc được, app-v2 vẽ canvas nên nhãn nằm trong bitmap (cùng lý do
+  đã ghi ở D3.6, đã bù bằng chú giải DOM thật thay vì nhồi số trục vào DOM cho
+  gate xanh).
+
+**D3.8 — Khắc phục sự cố (42 class / 66 dòng → 0/0 cả 4 viewport).** Hai lệch
+NGHIỆP VỤ, không phải lệch CSS:
+1. **Panel "Sự cố cần xử lý" phải gom theo NHÓM** (xét nghiệm + ngày:
+   `issue-group`/`issue-group-h`/`issue-group-date`/`issue-group-count`), không
+   phải danh sách phẳng theo mức như app-v2 đang làm — một ngày có 3 mức vi
+   phạm ở app cũ là 1 nhóm 3 hàng, ở app-v2 là 3 dòng rời không biết cùng ngày.
+2. **KHÔNG ẩn hàng khi đã có hồ sơ NCE.** app-v2 lọc bỏ mức nào đã có hồ sơ
+   active; app cũ vẫn hiện và đổi nút thành "Tiếp tục hồ sơ" — nghĩa là sự cố
+   đang xử lý dở vẫn nằm trước mắt người dùng. Và khớp hồ sơ bằng
+   `r.point_id === lv.latest.id` (đúng ĐIỂM QC gây ra sự cố), không phải bằng
+   test+mức: khớp theo test+mức sẽ coi một hồ sơ cũ của lần vi phạm TRƯỚC là
+   "đã xử lý" cho lần vi phạm MỚI hôm nay.
+
+Bảng nhật ký đổi từ 7 cột phẳng sang 5 cột xếp tầng đúng app cũ (Thời điểm /
+Sự cố / Hành động / Trạng thái / Thao tác, mỗi ô nhiều dòng con:
+`action-date`/`action-time`/`action-test`/`action-sub`/`action-rule`/
+`action-text`/`action-status-stack`/`action-row-actions`), thêm nút "Xuất CSV
+nhật ký" và nút "Hủy hồ sơ" (hủy CÓ LƯU VẾT, không xoá dữ liệu — dùng
+`nce:cancelRecord` đã có). Form dùng `action-form-panel` có đầu panel + 2 trạng
+thái rỗng ("Chọn một sự cố để lập hồ sơ" / "Lập hồ sơ từ nguồn khác").
+
+**D3.9 — Phân tích Westgard (18 class / 31 dòng → 0 / 1).** Cùng lỗi "app-v2
+không tự chọn xét nghiệm" **lần thứ 4** (Entry, Sigma, và ở đây) — đến mức
+đây là hạng mục kiểm bắt buộc đầu tiên cho mọi trang có state chọn. Thêm ô
+"Tìm nhanh" + bộ đếm khớp/tổng + nhãn xét nghiệm kèm LOT (`testPickerLabel`,
+`… · LOT 1101/1102`), 2 nút Xuất Excel/In PDF (`wg-export-actions`), nút
+"Khôi phục mặc định" (dùng `WG_OFF_BY_DEFAULT` chứ không phải "bật hết"), cột
+"Loại sai số" hiện SE/RE kèm mô tả luật đầu tiên (`errorTypeOf` + `RULE_DESC`,
+port `WG_RULE_REGISTRY[].err` của app cũ), Z in kèm dấu và hậu tố `s`
+(`+2.31s`), giá trị theo số thập phân của xét nghiệm, nhãn `rej` trong bảng
+điểm là **"Loại bỏ"** (khác badge tổng quan "Vi phạm"), class canvas
+`wgLJMulti`. Còn đúng 1 dòng: câu giới thiệu panel biểu đồ của app cũ kết thúc
+bằng lời nhắc công tắc **"Xem lô cũ"** — app-v2 CHƯA có tính năng thêm đường
+của lô đã chuyển tiếp vào Levey-Jennings (cùng nhóm với cột song song 2 lô đã
+hoãn từ Giai đoạn B2, cần cột phân biệt điểm thuộc lô nào trong `qc_points`).
+Câu của app-v2 chỉ nói phần nó THẬT SỰ làm — copy nguyên văn câu cũ là hứa một
+công tắc không tồn tại, đúng điều Giai đoạn D cấm.
+
+**D3.10 — Nhật ký hoạt động (9 class / 16 dòng → 0/0 cả 4 viewport, trang cuối
+của D3).** Ô "Số dòng mỗi trang" ghi "25 dòng" (không phải "25"), cột thời gian
+dùng `formatDateTimeVN` thay chuỗi ISO, ô người dùng đảo lại đúng thứ tự app cũ
+(TÊN in đậm, dòng dưới là "vai trò · @tài khoản" — app-v2 đang in username ở cả
+hai dòng), huy hiệu chuỗi hash 3 trạng thái (`tag none`/`tag ok` "Chuỗi hash
+hợp lệ" + số dòng đã khóa hash/`tag rej`) và TỰ kiểm chuỗi khi nhật ký còn nhỏ
+(`AUTO_VERIFY_MAX`, khớp `AUDIT_AUTO_VERIFY_MAX` của app cũ — trên ngưỡng thì
+chỉ hiện nút để không băm lại hàng chục nghìn dòng mỗi lần đổi trang), 2 ô ngày
+mang class `audit-date`.
+- Kéo theo một thay đổi xuyên 5 tầng: app cũ hiện **"N/M dòng"** (số dòng SAU
+  KHI LỌC / tổng số dòng), app-v2 chỉ có `resultTo` của trang hiện tại. Thêm
+  `filteredCount` vào `paginateActivity()` và `total` vào `audit:query()`, đi
+  qua `qc-api.d.ts` → `preload.ts` → bản giả lập → `audit-store.ts`.
+- `tests/audit-filter.test.mjs` vỡ vì nó so **JSON của cả object** với hàm
+  `activityAuditPagination` của app cũ, nên một trường MỚI cũng làm nó đỏ dù
+  phân trang không lệch. Sửa bằng cách so đúng 4 khoá app cũ có
+  (`page`/`pageCount`/`offset`/`rows`) và chốt RIÊNG trường mới (bằng
+  `items.length`, cộng một case lọc rỗng phải ra 0) — giữ nguyên ý định bài
+  test (phân trang phải khớp app cũ) thay vì nới lỏng nó.
+
+**Tổng kết Giai đoạn D3 — 3 lớp lỗi lặp lại, đáng thành checklist cho mọi
+trang mới:** (1) **seed không có dữ liệu cho trang đang đo** — 4 lần, mỗi lần
+làm con số đo được thành vô nghĩa; việc ĐẦU TIÊN với một trang chưa từng đo là
+kiểm seed, không phải đọc CSS. (2) **app-v2 không tự chọn mục đầu tiên** — 4
+lần; app cũ luôn rơi về phần tử đầu khi lựa chọn hiện tại không hợp lệ, app-v2
+để rỗng và chỉ render vỏ, gate báo hàng chục class thiếu mà nguyên nhân là
+1 dòng `useEffect`. (3) **gate phục vụ `app-v2-dist/renderer` (bản ĐÃ BUILD)** —
+sửa nguồn rồi đo ngay thì số không đổi; phải `npm run app-v2:build` trước mỗi
+lượt đo.
+
+Verify: `npm run app-v2:typecheck` sạch, `app-v2:test` **33/33**,
+`app-v2:build` sạch, `app-v2:ui-parity` **72/72 surface đạt** (36 ở 0/0; 9
+nhóm surface còn lệch — settings, sigma, reagent, westgard và 5 tab Cấu hình
+chung — đều có `surfaceNotes` nêu rõ lý do, không có mục nào bị bỏ sót không
+ghi chú).
+
+**Điểm mù của gate UI parity — 2 lệch CSS HỆ THỐNG + gate mới
+`app-v2:css-parity` (2026-09-03).** Người dùng mở trang Nhập QC và nói "chưa
+giống app cũ" trong khi gate báo entry **0/0**. Cả hai đều đúng: gate chỉ đo
+**tập class** và **dòng chữ** trong vùng nội dung theo chiều "app cũ CÓ mà
+app-v2 THIẾU", nên nó KHÔNG thấy 3 lớp lệch sau — và cả ba đều đang xảy ra:
+1. **Bố cục/kích thước**: không có pixel-diff (cố ý, D0 mục 5 đặt sau), cũng
+   không đo `getBoundingClientRect()` — sidebar rộng hơn 13px, header thấp
+   hơn 17px, mọi panel thụt thêm 16px đều qua gate.
+2. **Class có trong DOM nhưng app-v2 KHÔNG có rule CSS nào**: gate so tập
+   class 2 bên, class vẫn có ở cả hai nên "0 thiếu", dù bên app-v2 không có
+   gì phía sau nó.
+3. **Class có rule nhưng SAI ngữ cảnh/giá trị**: copy rule mobile của app cũ
+   ra ngoài `@media` thì desktop cũng bị áp.
+
+**2 lệch HỆ THỐNG, ảnh hưởng cả 11 trang** (tìm ra bằng cách chạy 2 bản với
+CÙNG bộ seed rồi so `getBoundingClientRect()` từng khối, không phải nhìn ảnh):
+- **`.panel{padding:16px}` trong khi app cũ là `padding:0`.** Đây là quyết
+  định có chủ đích từ Giai đoạn A1 ("để không phải sửa spacing của các trang
+  đã viết", kèm cặp margin âm cho header) — nhưng hệ quả là mọi nội dung
+  trong panel bị thụt THÊM 16px, cộng dồn với margin đã port nguyên từ app cũ
+  (đo được `.qc-sheet-wrap` x=601 thay vì 585, `.lj-stack` thụt 27px thay vì
+  11px). Đổi về `padding:0` + header tự mang padding như bản cũ; toàn bộ
+  margin trong các trang đã port từ `professional-*.css` lập tức khớp lại,
+  không phải sửa trang nào.
+- **Thiếu hẳn rule `body`.** App cũ đặt `font-size:var(--type-subhead)` (14px)
+  và `line-height:1.5` trên `body` (`professional-base.css`); app-v2 không có,
+  nên chữ toàn app thừa hưởng `line-height:normal` (~1.2) và 13.5px của
+  reset — mọi khối nhiều dòng thấp hơn vài px (dải chỉ số Mean/SD 58px thay
+  vì 63px), lệch tích lũy khắp nơi chứ không riêng một trang.
+
+**3 lệch khung sườn cùng loại "một dòng CSS sai nguồn":**
+- Sidebar: `--sidebar-expanded-width:258px` cứng, app cũ là
+  `clamp(208px,17vw,268px)` (=245px ở khung 1440px). Một số cố định làm MỌI
+  trang lệch 13px.
+- `.head{height:82px}` — comment ngay tại chỗ ghi **"App Cước phí dùng topbar
+  cao đúng 82px"**, tức dòng này copy từ một app KHÁC của người dùng, không
+  phải từ golden master (app cũ để chiều cao do `padding` quyết định, ra 99px).
+- Khoảng hở dưới header dùng `main > .head + *{margin-top:...}` — selector
+  này KHÔNG BAO GIỜ khớp, vì mọi trang app-v2 bọc nội dung trong một `<div>`
+  vô danh nên `.head` không phải con trực tiếp của `<main>`; mọi trang mất
+  đúng 22px. Đổi về `margin-bottom` trên chính `.head` như app cũ.
+
+**2 rule dùng chung app cũ có mà app-v2 không có** (khiến thẻ con mất viền/
+thấp hơn): "mặt thẻ dùng chung" (`.qc-table-card,.tree,.lj-mini,.sg-chart-box`
+— viền/bo/nền/shadow, app-v2 chỉ áp riêng cho `.qc-table-card` nên thẻ biểu
+đồ `.lj-mini` không có viền, mất luôn viền teal của mức đang chọn) và "header
+phụ dùng chung" (`.qc-table-card h4,.lj-mini-h,.tree h4,.sg-chart-box>h3` —
+app-v2 đã có token `--subpanel-header-min-height` từ A1 nhưng CHƯA có rule
+nào dùng nó).
+
+**Biểu đồ Levey-Jennings — chỗ lệch NHÌN THẤY rõ nhất, và gate không thể
+thấy vì cả biểu đồ nằm trong bitmap canvas.** Bản A1 cố ý "vẽ lại từ đầu,
+giống nội dung không giống cách vẽ": kết quả là 7 đường kẻ ±SD + đường nối
+điểm, trong khi app cũ có dải màu ±1/±2/±3SD, nhãn trục Y HAI BÊN (bậc SD bên
+trái, GIÁ TRỊ THẬT bên phải), nhãn ngày dd/mm ở trục X và tiêu đề
+"Levey-Jennings" trong khung vẽ. `components/QcChart.tsx` được port đúng hình
+học/màu/nhãn của app cũ (`leveyJenningsGeometry` padL=56/padR=78/padT=34/
+padB=48, trục phủ ±3.25SD, `leveyJenningsBandRects` 6 dải theo đúng thứ tự vẽ,
+`LEVEY_JENNINGS_COLORS`, `createLeveyJenningsYAxisLabels` với '> +3'/'< -3',
+`createLeveyJenningsTicks` tối đa 5 mốc) — vẫn là canvas + ref chuẩn React,
+nhưng các con số không còn là "tự nghĩ". Nhận thêm prop `mean`/`sd`/`decimals`
+để in giá trị thật ở trục phải; không có Mean/SD thì rơi về thang z như
+`drawLJMultiZ` của app cũ.
+
+**5 lệch nội dung/hành vi của riêng trang Nhập QC:**
+- "Dải NSX/Dải PXN" bị đặt làm ô thứ 6 của lưới 5 cột `.lj-qc-strip` (nên
+  xuống hàng), app cũ để BÊN PHẢI header thẻ (`.lj-mini-h`, `LjAction` kind
+  'hint').
+- app-v2 tự thêm cặp tab **Levey-Jennings/CUSUM** mà app cũ KHÔNG có ở trang
+  này (CUSUM chỉ ở trang Phân tích Westgard) — đã bỏ. Đây là chiều gate không
+  đo được: nội dung app-v2 hiện THÊM không bị bắt.
+- Thứ tự 2 panel cuối bị đảo (app cũ: "Điểm trong khoảng xem" TRƯỚC, rồi
+  "Thống kê toàn bộ & Dải kiểm soát").
+- **Vệt cam đánh dấu ngày bị NGƯỢC.** app cũ (`entry-page-controller.ts`):
+  `missing` = ngày ĐÃ QUA (hoặc hôm nay) mà CHƯA nhập đủ MỌI mức đang vận
+  hành, cộng `has-data` khi ngày có ít nhất 1 điểm. app-v2 gán `missing` cho
+  ngày KHÔNG có điểm nào — nên ngày TƯƠNG LAI bị kẻ vệt cam, còn ngày quá khứ
+  mới nhập 1/2 mức thì không, tức đúng ngược ý nghĩa "thiếu QC".
+- Thiếu trạng thái mức đang chọn (`.lj-mini.on`, viền teal) — app cũ giữ
+  trong `entrySel.level` và mặc định là mức đầu tiên.
+
+**2 lệch tương tự ở trang khác, tìm ra khi rà lại toàn bộ:**
+- **Tổng quan**: danh sách "Lô & hạn dùng" của app cũ bọc trong `.dash-list`,
+  app-v2 không — mà rule tô nền đỏ/vàng của app-v2 lại scope theo
+  `.dash-list .shift-item.rej`, nên hàng lô mất hẳn nền màu dù ĐÚNG class
+  `shift-item rej`/`warn`. Gate không thấy: nó so TẬP class của cả vùng nội
+  dung, không so theo từng phần tử.
+- **Six Sigma**: (a) thẻ Sigma xếp dọc vì rule 2 cột của app cũ là
+  `@media(min-width:500px){#sgStatus .sgcards{...}}` mà app-v2 không có
+  `id="sgStatus"`; (b) **class `btn-ico` bị gắn lên chính `<button>`** ở nút
+  "Bias EQA% Mức n" (Sigma) và "Xuất Excel"/"In PDF" (Westgard) — `btn-ico`
+  là class của thẻ `<svg>` (15×15, `flex:0 0 auto`), nên nút co còn **26px**
+  và chữ vắt thành 3 dòng chồng lên tiêu đề panel. Sửa bằng
+  `components/BtnIcons.tsx` (copy nguyên path SVG `icoDownload`/`icoPrint`/
+  `CalcIcon` của app cũ) và bỏ class khỏi nút.
+
+**Gate mới `npm run app-v2:css-parity`** (`app-v2/scripts/css-parity-check.cjs`)
+đóng lớp lệch (2): lấy mọi class trong `className` của
+`app-v2/renderer/**/*.tsx`, FAIL nếu class đó có selector trong `assets/*.css`
+(app cũ style thật) mà KHÔNG có selector nào trong
+`app-v2/renderer/styles/**`. Lần chạy đầu ra **30 class** — trong đó có thứ
+làm vỡ hẳn bố cục: `.sg-setup-fields` (lưới 3 cột panel "Thiết lập phân tích"
+Six Sigma — app-v2 chỉ có nó trong một dòng COMMENT), `.action-form-panel-head`,
+`.issue-group`, `.lot-config-left/right`, `.wg-rule-item`, `.wg-rule-reset`,
+`.qc-note-input`, `.qc-level-head`, `.range-band-note`, `.rc-add-btn`/
+`.rc-report-main`, `.audit-date`, `.transition-list`, `.btn-stop-tint`,
+`.config-name`, `.space-after-item`. Đã port hết từ `assets/*.css` (giữ đúng
+`@media` gốc) → gate về **0**. Đã chứng minh gate CÓ bắt lỗi: xoá thử rule
+`.space-after-item` khỏi `app.css` thì gate FAIL đúng tên class đó.
+**Giới hạn ghi thẳng trong file**: gate chỉ kiểm "có rule hay không", KHÔNG so
+giá trị và KHÔNG kiểm ngữ cảnh `@media` — đúng lớp lệch (3), thứ đã gặp thật
+ở 2 rule `.sg-data-head` (bản mobile của app cũ bị copy ra ngoài media nên
+desktop cũng xếp dọc, làm hàng nút chồng tiêu đề).
+
+**Cách làm đã dùng, nên lặp lại cho mọi trang còn lại**: mở CÙNG bộ seed trên
+2 bản (dùng lại `openSeededSession` + `buildParitySeeds` của gate), đặt khung
+cao 1440×2400 để không bị cắt, rồi so `getBoundingClientRect()` + computed
+style của từng khối (`aside`/`.head`/panel/thẻ con) — số đo chỉ ra ngay nguyên
+nhân (padding/margin/min-height/flex nào lệch), nhanh và chắc hơn nhìn 2 ảnh
+cạnh nhau. Kết quả trang Nhập QC sau khi sửa: `aside` 245×2400, `.head` 99px,
+`.qc-sheet-wrap` x=585 w=812 h=574, `.lj-mini` h=363, `.lj-qc-strip` h=63 —
+**khớp từng pixel với app cũ**; còn đúng 2px lệch dọc tích lũy trong panel
+bảng nhập, chưa truy tiếp.
+
+Verify: `npm run app-v2:typecheck` sạch, `app-v2:test` **33/33** (sửa
+`tests/audit-filter.test.mjs` như mục D3.10; không test nào khác phải đổi vì
+đây là thay đổi CSS/JSX), `app-v2:build` sạch, `app-v2:ui-parity` **72/72
+surface đạt** (không surface nào vượt baseline sau 2 thay đổi CSS TOÀN CỤC),
+`app-v2:css-parity` **0 class bỏ trống**.
+
+**Giai đoạn D3.4b — Cấu hình chung, rà soát cả NGHIỆP VỤ lẫn giao diện theo
+từng tab (2026-09-03).** Người dùng nói trang này "vẫn chưa giống 100%" dù
+baseline chỉ ghi 5 surface còn lệch nhỏ. Rà lại bằng một công cụ đo riêng cho
+trang có tab (mở CÙNG bộ seed trên 2 bản, bấm tab theo INDEX, rồi xuất DANH
+SÁCH ĐẦY ĐỦ class/dòng chữ thiếu + **dòng chữ app-v2 CÓ THÊM** + **đo
+`getBoundingClientRect()` từng khối** + ảnh chụp cặp) — 3 chiều sau cùng là
+những gì `app-v2:ui-parity` không đo. Kết quả: **8/8 tab về 0 class / 0 dòng
+chữ lệch**, và tìm ra 4 lệch NGHIỆP VỤ thật.
+
+**4 control CHẾT ở tab Mean/SD** — nặng nhất, vì Giai đoạn D cấm tường minh:
+checkbox "Dùng" chỉ có `defaultChecked` không handler; 3 nút "Bỏ chọn tất
+cả"/"Chọn tất cả"/**"Lưu Mean/SD mức này"** KHÔNG có `onClick` nào; 2 ô Giới
+hạn dưới/trên không tính gì. Nghĩa là bảng Mean/SD trông đủ nhưng **không thể
+lưu**. Port đúng nghiệp vụ app cũ:
+- `renderer/lib/target-range.ts` (mới): `targetFromLimits`/`limitsFromTarget`/
+  `normalizeTargetPick` — copy nguyên công thức `QCCore.targetFromLimits`
+  (mean=(low+high)/2, sd=(high−low)/2k) và ĐÚNG 5 câu thông báo lỗi của
+  `ManageConfigService.normalizeTargetPick()`, kèm thứ tự kiểm.
+- `syncTargetRange(el, 'limits'|'target')`: đồng bộ 2 chiều Mean/SD ↔ giới
+  hạn, đọc/ghi THẲNG DOM của chính hàng đang gõ (không qua React state) —
+  cùng lý do đã ghi ở Giai đoạn B1: 4 ô có thể lần lượt mất focus rất nhanh
+  khi Tab qua, tính từ state đã render sẽ ghi đè bằng giá trị cũ.
+- `toggleTargetRow`/`targetCheckAll`: bỏ tick thì khoá luôn 4 ô số của hàng.
+- `saveTargetMatrix`: đọc từng hàng đang tick → `normalizeTargetPick` → nếu
+  có hàng đang gắn LÔ KHÁC thì `confirmDialog` nêu tên các xét nghiệm đó →
+  `reauthDialog` (đúng câu app cũ: "Nhập lại mật khẩu trước khi lưu Mean/SD
+  cho lô QC.") → lưu từng mức qua `config:saveTestLevel` (handler đó tự chốt
+  Mean/SD cũ vào `mean_sd_history_json`). **KHÁC app cũ có chủ đích**: app cũ
+  còn "điền lô/Mean-SD cho điểm QC cũ chưa ghi lô" (`targetPickBackfillPoints`)
+  và phải hỏi thêm nếu việc đó đụng kỳ đã khoá — app-v2 KHÔNG cần vì từ Giai
+  đoạn B2 `entry:addPoint` đã chốt `qc_mean`/`qc_sd`/`lot` vào từng điểm ngay
+  lúc nhập, không còn điểm nào thiếu lô để điền bù.
+
+**2 thao tác app cũ CÓ mà app-v2 chưa từng có**: nút "Xóa" của tab Danh mục
+xét nghiệm và tab Panel QC (gate báo thiếu đúng 1 class `danger` + 1 dòng
+"Xóa" ở mỗi tab — dấu vết của một nút bị thiếu hẳn).
+- `config:removeTest`: port cổng chặn của `delTest()` — **TỪ CHỐI** khi còn
+  điểm QC thuộc kỳ báo cáo đã khoá (nêu rõ số điểm + kỳ nào), vì đường đúng
+  là mở khoá kỳ trước (bước đó đòi lý do và tự ghi nhật ký — chính là vết ISO
+  15189 cần). Xoá thật kèm dọn `test_levels`/`qc_points`/`sigma_data`/
+  `actions`/`qc_panel_tests` trong 1 transaction. Renderer: `confirmDialog` →
+  `reauthDialog` → báo số điểm QC đã xoá.
+- `config:removePanel`: port `panelRemoval()` — chặn khi panel còn hồ sơ
+  chuyển tiếp lô, giữ nguyên các xét nghiệm bên trong (đúng câu app cũ "Các
+  xét nghiệm vẫn được giữ nguyên").
+
+**Bảng TEa tham chiếu: 78 dòng lệch KHÔNG phải vì thiếu dữ liệu.** app-v2 đã
+có đủ 77 analyte trong `renderer/data/tea-catalog.ts` — lệch vì app cũ cho
+**SỬA TRỰC TIẾP** TEa CLIA%/Ricos% của từng analyte ngay trên bảng
+(`.tea-ref-value`, lưu khi blur) nên 2 ô đó không góp chữ vào `innerText`,
+còn app-v2 in số đọc-được. Thêm `config:setTeaRefValue` +
+`config:restoreTeaRefDefaults` (ghi đè lưu vào chính bảng `tea_refs` đã có
+sẵn cột `analyte_id`/`clia`/`ricos` từ đầu; để trống ô = bỏ ghi đè, và nếu
+hàng đó cũng không có hồ sơ TEa PXN thì xoá luôn hàng để bảng quay về đúng
+mặc định thay vì giữ một hàng rỗng), cột "TEa chuẩn hóa" thành `.tea-lab-cell`
+có giá trị PXN + nút "Thêm hồ sơ"/"Xem hồ sơ", và cột trạng thái 3 mức
+**Mặc định / Đã sửa / TEa PXN** kèm nút "Khôi phục" — copy nguyên nhãn
+`TEA_STATUS` app cũ. Tên hiển thị cũng theo đúng quy tắc app cũ: chỉ ghép
+viết tắt khi nó KHÁC tên (bỏ khác biệt hoa/thường) — "Sodium (Na)" nhưng chỉ
+"Urea", "pH", "D-dimer".
+
+**Tab Lịch sử dữ liệu bị thiết kế lại thay vì port.** app cũ dùng LẠI khung
+của bảng Mean/SD (`panel target-matrix-panel` + `.target-selector
+.history-selector` + 2 bộ đếm `.target-lot-info`) và bảng 10 cột, trong đó bộ
+đếm thứ hai là **số ĐIỂM QC đã nhập** và cột "Điểm QC" là **SỐ ĐẾM** (nút
+"Chi tiết" ở cột riêng). app-v2 có khung riêng, bộ đếm thứ hai là "mức QC
+đang theo dõi", cột "Nguồn" hiện Hiện tại/Lịch sử thay vì PXN/NSX, và cột
+"Điểm QC" chứa NÚT — nên không còn chỗ nào cho số điểm. Viết lại theo app cũ,
+thêm modal "Chi tiết" (Mean/SD/dải/nguồn/hiệu lực + bảng điểm QC của đúng
+mức/lô, Z tính theo `qc_mean`/`qc_sd` đã chốt tại thời điểm nhập). Giới hạn
+dưới/trên in ĐÚNG cột `low`/`high` đã lưu, để trống thì "—" — KHÔNG suy từ
+Mean ± k·SD như app-v2 đang làm, vì đó là dải hiển thị chứ không phải giới
+hạn đã phê duyệt.
+
+**Lệch CẤU TRÚC chung cho 6/8 tab, gate không thể thấy.** Đo
+`getBoundingClientRect()` cho thấy mọi bảng của app-v2 lệch 16px so với
+golden master. Dump cây DOM 2 bên mới rõ: app cũ đặt `.rcfg-toolbar` là **con
+TRỰC TIẾP của `.config-shell-main`** (dải header full-width), rồi
+`.panel.rcfg-list` (margin 14/16/18) bọc ĐÚNG cái bảng; app-v2 gói cả toolbar
+vào trong panel và đặt margin lên chính cái BẢNG. Sửa cấu trúc cho cả 6 tab
+(máy/xét nghiệm/Panel/Mean-SD/chuyển tiếp/lịch sử/TEa) + bỏ wrapper
+`.lot-config-page` mà app cũ không có. Kèm theo:
+- `.config-shell-main>.panel{border:0;background:transparent}` — rule này gỡ
+  hết viền/nền panel (đúng khi toolbar còn nằm trong panel, sai sau khi tách);
+  app cũ panel CÓ viền 1px + bo 7px + nền trắng (đo được: panel 874px, bảng
+  bên trong 872px).
+- `.rcfg-toolbar` được style theo `:first-child` (di sản thời toolbar ở trong
+  panel) → đổi sang chọn theo cha như app cũ.
+- **Một `.config-shell-main>.panel>` treo lơ lửng** (dòng selector còn sót từ
+  một lần sửa trước, comment ngay dưới nói phần khai báo "đã chuyển sang
+  app.css") đang dính vào rule `.rcfg-toolbar{display:flex…}` ngay sau nó,
+  biến rule DÙNG CHUNG thành rule chỉ áp trong panel. Đã xoá.
+- `.target-table` bị style như `<table>` kèm `!important` (di sản bản thí
+  điểm dùng `<table>` thật) — app cũ nó là **lưới 7 cột**
+  (`.target-head`/`.target-row` grid `54px minmax(280px,1.7fr) repeat(4,…)
+  minmax(130px,.8fr)`). Port nguyên khối.
+- Thiếu 5 rule bố cục mà app-v2 mới port MỘT PHẦN nên gate `css-parity` coi
+  là đủ: `.lot-assay-name{display:grid}`, `.modal-f` (app-v2 đổi tên thành
+  `.modal-box-footer` cho modal, nhưng bảng Mean/SD vẫn dùng tên cũ),
+  `.target-actions`, `.target-matrix-panel .target-lot-info`,
+  `.tea-ref-table input.tea-ref-value{height:34px}` (thiếu rule này thì mỗi
+  hàng TEa cao thêm ~13px → bảng 77 hàng dài hơn golden master hơn 1.000px).
+- `table{line-height:1.45}` của app cũ bị bỏ, nên mọi ô bảng toàn app cao hơn
+  ~1px/dòng theo `body{line-height:1.5}`.
+- `.manage-actions{flex-wrap:wrap}` làm 2 nút Sửa/Xóa xuống 2 dòng (hàng cao
+  90px thay vì 60px) — app cũ là `nowrap`.
+- Badge sidebar: app cũ để TRỐNG khi số đếm = 0 (`count: counts[id] || ''`),
+  app-v2 in "0"; và app-v2 thiếu hẳn số đếm cho tab Lịch sử dữ liệu, còn số
+  đếm tab TEa thì cộng trùng hồ sơ ghi đè lên analyte đã có trong danh mục.
+
+**Bài học quy trình mới, đáng ghi**: một lần `str.replace()` trong script sửa
+CSS đã khớp một chuỗi là **PHẦN của selector dài hơn**
+(`.config-shell-main>.panel>.rcfg-toolbar:first-child`), nên comment tôi chèn
+rơi vào giữa selector và làm hỏng rule. `assert t.count(a)==1` KHÔNG bắt được
+vì chuỗi đó thật sự chỉ xuất hiện 1 lần — điều kiện cần là kiểm cả **ranh
+giới** (ký tự trước/sau), hoặc sửa CSS thì luôn build lại + đo lại ngay, đừng
+tin số lần khớp.
+
+Verify: `npm run app-v2:typecheck` sạch, `app-v2:test` **33/33**,
+`app-v2:build` sạch, `app-v2:ui-parity` **72/72 surface đạt**,
+`app-v2:css-parity` **0** (gate này bắt đúng 2 class mới của modal "Chi tiết"
+lịch sử — `history-detail-table`/`rcfg-history-detail-modal` — chứng minh nó
+hoạt động cho code vừa viết, không chỉ cho code cũ), cộng công cụ đo riêng
+theo tab: **8/8 tab đạt 0 class / 0 dòng chữ lệch**; phần còn lại chỉ là lệch
+CHIỀU CAO vài px (ô bảng/thẻ nhóm lô) và 1-2 class phụ của app-v2
+(`tea-toolbar`, `target-config-selector`) không có ở app cũ.
+
+**Gợi ý TEa khi thêm xét nghiệm + 2 khối chưa nối trong cùng modal
+(2026-09-03).** Người dùng phát hiện: app cũ gõ tên xét nghiệm là TỰ ĐIỀN đơn
+vị và TEa từ bảng TEa tham chiếu, app-v2 không có. Rà lại modal "Thêm/Sửa xét
+nghiệm" thì có tới **3 khối không nối vào nghiệp vụ**, trong đó 2 khối chính
+code app-v2 đã tự ghi chú là "để duyệt giao diện":
+- **Gợi ý TEa (đã làm)**: `renderer/lib/tea-suggest.ts` port
+  `configAssayFindRef`/`configAssaySuggestionInput` + `effectiveTeaRefs()` app
+  cũ — `<datalist>` 77 analyte (sắp theo nhóm rồi tên, nhãn phụ là "viết tắt ·
+  nhóm"), gõ khớp tên/viết tắt/tên-kèm-viết-tắt (so khớp TUYỆT ĐỐI sau khi bỏ
+  dấu + hạ chữ thường, không so khớp một phần — tránh gõ "Na" nhảy sang analyte
+  khác) thì tự điền tên chuẩn hoá, đơn vị, TEa% và 2 trường nguồn
+  `teaSource`/`teaRefKey`. Thứ tự TEa copy nguyên app cũ: **CLIA% trước, Ricos%
+  sau**, KHÔNG lấy giá trị TEa PXN (`lab`). Ghi đè của phòng xét nghiệm trong
+  bảng `tea_refs` được phủ lên danh mục trước khi gợi ý, đúng
+  `effectiveTeaRefs()`. Cố ý KHÔNG tự điền Khoa/Khu vực — app cũ cũng loại
+  trường đó ra vì khoa lấy theo máy xét nghiệm đang chọn.
+  `submit()` trước đây LUÔN gửi `teaSource`/`teaRefKey` lấy lại từ bản ghi cũ
+  (rỗng khi thêm mới) — giờ đọc từ 2 input hidden trong form.
+- **Khối CUSUM (đã làm)**: 3 ô `cusumOn`/`cusumK`/`cusumH` có `name` nhưng
+  `submit()` lấy lại giá trị của bản ghi cũ, nên bật/tắt CUSUM hay đổi k/h
+  KHÔNG có tác dụng gì. Đọc thẳng từ form.
+- **Bảng luật Westgard nâng cao (CỐ Ý CHƯA NỐI, ghi rõ ngay tại chỗ)**: 26
+  `<select>` hành động/phạm vi. Phần "Phạm vi" nối được (`config:saveRuleScope`,
+  lưu thật và từ 2026-09-06 engine đã thực thi khác nhau giữa within/across/
+  both). Phần "Hành động" thì KHÔNG: `config:saveTest` không ghi
+  `rule_actions_json`, còn IPC duy nhất ghi cột đó (`westgard:saveRuleAction`)
+  chỉ nhận BẬT/TẮT dạng boolean — không phân biệt "Cảnh báo" với "Loại bỏ" như
+  app cũ (engine app-v2 lấy mức độ từ chính `WG_RULE_REGISTRY`). Ánh xạ 3 giá
+  trị về 2 sẽ khiến người dùng chọn "Cảnh báo" mà nhận "Loại bỏ" — sai lệch
+  NGHIỆP VỤ LÂM SÀNG, nên để nguyên và ghi chú, chờ engine hỗ trợ mức độ theo
+  từng luật.
+
+Verify: `app-v2:typecheck`/`build` sạch, `app-v2:test` 33/33,
+`app-v2:ui-parity` 72/72, `app-v2:css-parity` 0, cộng kịch bản Playwright tạm
+chạy CẢ HAI bản trên cùng bộ seed và đối chiếu từng giá trị: gõ "Sodium" →
+app-v2 ra `Sodium (Na)` / `mmol/L` / TEa `0.73` / nguồn `ricos` / khoá
+`qclab-sodium`, **khớp từng ký tự với app cũ**; gõ viết tắt "GLU" ra
+`Glucose (GLU)` / `mmol/L` / `8` / `clia`; gõ tên tự đặt thì 2 trường nguồn
+được xoá về rỗng (đúng nhánh `if (!ref)` của bản cũ); `<datalist>` đủ 77 mục
+ở cả 2 bản — zero console error.
+
+**3 chỗ tự-động-điền còn thiếu ở trang Cấu hình chung + lỗi tab mức Mean/SD
+(2026-09-03).** Người dùng dùng thật và báo 3 chỗ liên tiếp, cả 3 đều là
+"app cũ CÓ, app-v2 không" — cùng một lớp lỗi với gợi ý TEa ở mục trên:
+- **Chọn máy xét nghiệm → không điền Khoa/Khu vực.** Ô chọn máy của app-v2
+  không có `onChange` lẫn `data-section` trên `<option>`. Port
+  `configAssayInstrumentChanged()` app cũ: đọc `data-section` của option đang
+  chọn rồi GHI ĐÈ ô Khoa, kể cả khi máy không có khoa thì xoá trống (không
+  giữ lại khoa của máy chọn trước). Nhãn option cũng thêm `· model` như app
+  cũ (`i.name + (i.model ? ' · ' + i.model : '')`). CỐ Ý KHÁC app cũ đúng 1
+  điểm: app-v2 có option rỗng "Chọn máy" nên KHÔNG pre-fill Khoa theo máy đầu
+  tiên lúc mở modal (app cũ không có option rỗng nên máy đầu tiên chính là
+  máy đang chọn, pre-fill mới hợp lý) — pre-fill trong app-v2 sẽ hiện khoa
+  của một máy chưa được chọn.
+- **Tick lô trong modal "Thêm nhóm lô QC" → không điền Tên nhóm lô.** app-v2
+  chỉ có placeholder "Tự động: …" nhưng không có hàm nào ghi. Port
+  `suggestConfigGroupName()`: mỗi lần tick/bỏ tick, tên nhóm = các số lô đang
+  chọn nối bằng "/" (`1101` → `1101/1102` → bỏ tick lô đầu còn `1102`), ghi
+  THẲNG DOM vì ô tên để uncontrolled, và GHI ĐÈ cả khi người dùng đã tự gõ —
+  đúng hành vi bản cũ.
+- **Nhóm lô 2 mức nhưng bảng Mean/SD chỉ hiện "Mức 1".** Đây là lỗi NGHIỆP VỤ
+  nặng nhất trong 3 mục: app-v2 lấy danh sách mức từ những mức ĐÃ TỒN TẠI
+  trong `test_levels`, mà `config:saveTest` chỉ tạo sẵn Mức 1 cho xét nghiệm
+  mới — nên không có đường nào nhập Mean/SD cho Mức 2 (bẫy con-gà-quả-trứng:
+  muốn có tab Mức 2 thì phải có sẵn dữ liệu Mức 2). App cũ lấy từ CHÍNH các
+  lô của nhóm lô đang chọn (`targetLevelSelection(groupLots, …)`), vì nhóm lô
+  mới là thứ định nghĩa mức nào tồn tại. Sửa theo app cũ, cộng `useEffect`
+  tự rơi về mức đầu tiên khi mức đang chọn không còn hợp lệ (vd đổi sang
+  nhóm lô chỉ có Mức 2) — cũng đúng hành vi `targetLevelSelection()`.
+
+Verify: `app-v2:typecheck`/`build` sạch, `app-v2:test` 33/33,
+`app-v2:ui-parity` 72/72, `app-v2:css-parity` 0, cộng 2 kịch bản Playwright
+tạm: (a) đối chiếu với app cũ trên cùng bộ seed — chọn máy có khoa "Sinh hoa
+mien dich" thì cả 2 bản đều điền đúng khoa đó, bỏ chọn máy thì cả 2 đều xoá
+trống; (b) chạy liền 3 kịch bản trên app-v2 — Khoa `""` → `"Sinh hoa mien
+dich"` → `""`; tên nhóm lô `1101` → `1101/1102` → `1102`; tab mức hiện đủ
+`["Mức 1","Mức 2"]`, bấm Mức 2 thì nhãn lô đổi `1101` → `1102` và bảng vẫn
+render đúng 1 hàng xét nghiệm — zero console error.
+
+**Dev server xem trước bind thiếu IPv4 (2026-09-03).** `npm run app-v2:dev`
+mặc định chỉ lắng nghe `[::1]`, nên trình duyệt nào phân giải `localhost`
+thành `127.0.0.1` sẽ báo không kết nối được (đo được: `curl localhost:5174`
+trả 200 nhưng `curl 127.0.0.1:5174` lỗi kết nối). Thêm `server.host = true`
+vào `vite.app-v2-renderer.config.mjs` để lắng nghe cả IPv4 lẫn IPv6 — đây là
+server xem trước chỉ chạy khi gọi tay, dữ liệu là bản giả lập trong
+localStorage, không phải server sản phẩm.
+
+**Gate thứ ba: `app-v2:style-parity` — so COMPUTED STYLE, không chỉ class
+(2026-09-03).** Người dùng mở tab Mean/SD và nói "bảng biểu, ô chữ, màu sắc
+vẫn chưa giống" trong khi CẢ HAI gate đang có đều xanh. Cả hai đều đúng:
+`ui-parity` đo TẬP class + DÒNG CHỮ, `css-parity` đo "class app cũ style thật
+thì app-v2 có rule hay không" — **không cái nào so GIÁ TRỊ của rule**. Lượt đo
+đầu tiên trên tab Mean/SD ra **25 selector lệch**, trong đó có 4 lệch HỆ THỐNG
+ảnh hưởng mọi trang:
+- **`button,input,select,textarea{font:inherit}` trong `tokens.css` của app-v2
+  — app cũ KHÔNG có reset này.** App cũ đặt cỡ chữ TƯỜNG MINH cho
+  `input/select/textarea/button.btn/td/.alert…` (`--type-body` 13.5px) và để
+  `font-weight` theo mặc định trình duyệt. Vì `font:inherit`, mọi ô nhập nằm
+  trong một khối chữ đậm (toolbar `font-weight:800`) bị **in đậm theo** và lệch
+  cỡ. `color:inherit` cũng bị bỏ: nó làm checkbox thừa hưởng màu chữ của hàng
+  thay vì màu mặc định.
+- **Thiếu `th,td{line-height:1.4}`** (app cũ đặt riêng, thấp hơn
+  `table{line-height:1.45}`): mọi ô bảng cao lệch ~1px/dòng, và vì `.tag`/
+  `.pill` không tự khai line-height nên **mọi huy hiệu trong bảng** cũng lệch.
+- **Thiếu `td .hint{margin-top:2px}`**: mọi hàng bảng có dòng phụ (tên + khoa,
+  tên + phương pháp…) thấp hơn golden master đúng 2px.
+- **`.field label{margin:0}`** (app-v2 tự thêm) xoá khoảng hở 4px giữa nhãn và
+  ô nhập trên mọi form; app cũ giữ `label{margin:8px 0 4px}` rồi từng dải bộ
+  lọc mới bỏ riêng margin-top.
+
+Các lệch riêng của trang Cấu hình chung, đều là "bản port tự thêm/tự bớt":
+hàng tiêu đề bảng Mean/SD bị tô nền + chữ của dải header panel (app cũ:
+nền `#f7fafb`, chữ `--muted`, cỡ `--table-head-size`); `.dayseg` được dựng
+lại thành nút teal có viền + bo góc + cao 34px thay vì kiểu segmented nền
+`#1c3442` không viền của app cũ (và `height:34px` bị đặt ở rule DÙNG CHUNG,
+trong khi app cũ chỉ đặt cho `.lj-toolbar .dayseg button`); `.target-selector`
+mất nền + viền dưới + `label{margin-top:0}` + ô cao 36px; `.target-summary`
+lệch padding/margin và cỡ chữ số đếm; huy hiệu trạng thái không được canh
+giữa ô (`.target-row .tag{margin:… auto}`); `.audit-filterbar` mới port 2/9
+rule (thiếu chính phần flex + margin dải bộ lọc); hàng tiêu đề 8 bảng của
+trang thiếu `height:42px`/`letter-spacing:.03em`; và **app cũ canh GIỮA mọi ô**
+của các bảng đó (chỉ chừa vài cột canh trái) trong khi app-v2 canh trái.
+Cột "STT" của bảng Danh mục xét nghiệm cũng phải là ô `.num` như app cũ.
+
+Sau khi sửa: tab Mean/SD **0 selector lệch**, các trang khác từ 7–9 xuống 1–6
+(phần còn lại là khác biệt DOM/nội dung — app cũ có khối mà app-v2 chưa có
+hoặc ngược lại, ví dụ `.hint` đầu tiên của app cũ là dòng "Ver: 2.7.6" ở chân
+sidebar mà app-v2 không có).
+
+**`app-v2/scripts/style-parity-check.cjs`** (npm `app-v2:style-parity`) đóng
+lớp này lại: mở cùng bộ seed trên 2 bản, với 19 selector dùng chung (bảng/ô
+nhập/nhãn/huy hiệu/nút/panel/alert/dayseg) so 16 thuộc tính computed
+(màu chữ/nền, viền, bo góc, cỡ + độ đậm chữ, line-height, padding,
+text-transform, letter-spacing, canh lề) trên **18 surface** (11 trang + 8 tab
+Cấu hình chung), rồi ratchet theo `app-v2/tests/style-parity-baseline.json`
+như `ui-parity`. Đã chứng minh nó BẮT được lỗi: đổi tạm
+`th,td{line-height:1.4}` thành `1.9` → FAIL đúng 6 surface vượt baseline kèm
+exit 1; phục hồi thì 18/18 đạt. GIỚI HẠN ghi trong file: chỉ đo phần tử ĐẦU
+TIÊN khớp mỗi selector, chỉ các selector trong danh sách, và không thay
+pixel-diff (D0 mục 5 vẫn để sau).
+
+Verify: `npm run app-v2:typecheck` sạch, `app-v2:test` 33/33, `app-v2:build`
+sạch, `app-v2:ui-parity` 72/72 (2 thay đổi CSS TOÀN CỤC không làm surface nào
+vượt baseline), `app-v2:css-parity` 0, `app-v2:style-parity` 18/18.
+
+**Ô chọn ngày mở lịch NATIVE thay vì ô gõ dd/mm/yyyy — 2 lỗi CSS chồng nhau
+(2026-09-03).** Người dùng mở modal "Thêm lô QC" và nói ô ngày "vẫn dùng mặc
+định của Windows". Component `DateField` (viết lại ở D3.2) đúng DOM app cũ
+rồi, lỗi nằm ở CSS và đo được ngay:
+- **`<input type="date">` ẩn biến thành LỚP PHỦ TRONG SUỐT che kín ô.** CSS
+  khai `.native-date{position:absolute;width:1px;height:1px;opacity:0;
+  pointer-events:none}` nhưng đo ra **324×38**: rule nền
+  `input:not([type="checkbox"]):not([type="radio"])` có specificity (0,2,1) —
+  hai `:not([type=…])` tính như 2 attribute selector — **thắng `.native-date`
+  trần (0,1,0)** và áp lại `width:100%;min-height:38px`. Hệ quả: bấm vào bất
+  kỳ đâu trên ô ngày đều rơi vào input native → Chromium mở lịch của nó.
+  App cũ không gặp vì nó dùng `display:none` (thuộc tính mà rule nền không
+  đặt) — app-v2 KHÔNG dùng được `display:none` vì còn phải gọi `showPicker()`
+  trên chính ô đó. Sửa bằng cách nâng selector thành
+  `.datebox input.native-date` (0,2,1, khai SAU) — đo lại ra 1×1.
+- **`.field` của app-v2 blockify mọi thứ bên trong.** App cũ KHÔNG có class
+  `.field` (chỉ `.field-error`): mỗi ô là một `<div>` thường, nhãn block với
+  margin `8px 0 4px`, ô nhập `width:100%`. app-v2 tự tạo
+  `.field{display:flex;flex-direction:column;gap:4px}` — và theo CSS, con
+  `inline-flex` của một flex container bị **blockify thành `flex`** rồi giãn
+  hết chiều ngang: `.datebox` đo ra `flex`/326px thay vì `inline-flex`/164px
+  như app cũ. Sửa: `.field{display:block}` + bỏ `.field label{margin-top:0}`
+  để nhãn giữ margin tự nhiên (chính margin-top 8px này tạo nhịp dọc giữa các
+  ô, thay cho `gap`/`margin-bottom` mà app cũ không có). Đây là thay đổi TOÀN
+  CỤC (~90 chỗ dùng `.field`), verify bằng cả 5 gate.
+- Cộng 2 chi tiết nhỏ: bỏ `min-height:0` để ô văn bản dùng lại `min-height:38px`
+  của rule nền (app cũ đo được 38px → `.datebox` cao 40px), và nhãn 3 ô ngày
+  ghi kèm định dạng như app cũ ("Ngày mở (dd/mm/yyyy)", "Hạn sử dụng
+  (dd/mm/yyyy)", "Ngày bắt đầu (dd/mm/yyyy)").
+
+Kết quả đo: `.datebox` **164×40, inline-flex — khớp từng số với app cũ**, ảnh
+chụp 2 modal cạnh nhau gần như trùng khớp.
+
+**Điểm mù mới phát hiện: `app-v2:ui-parity` KHÔNG đo modal.** Gate chỉ chụp
+trang ở TRẠNG THÁI MẶC ĐỊNH, nên mọi lệch bên trong ~20 modal của app-v2 (kể
+cả nhãn thiếu "(dd/mm/yyyy)" ở trên) đều không có gì canh giữ. Cùng loại với
+bài học "gate chỉ đo 1/8 tab" ở D3.4 — **đã sửa cùng ngày, xem mục ngay
+dưới**.
+
+Verify: `app-v2:typecheck` sạch, `app-v2:test` 33/33, `app-v2:build` sạch,
+`app-v2:ui-parity` 72/72, `app-v2:css-parity` 0, `app-v2:style-parity` 18/18.
+
+**Lịch chọn ngày tự vẽ + parity MODAL (2026-09-03).** Người dùng mở modal
+"Thêm lô QC" và hỏi "Datepicker app cũ của tôi đâu" — ảnh chụp cho thấy lịch
+NATIVE của Chromium (tháng tiếng Anh "September 2026", cột Su/Mo/Tu, nút
+Clear/Today). Đúng: Giai đoạn A1/D3.2 cố ý KHÔNG port lịch tự vẽ, nút
+`.datepick` gọi `showPicker()` của `<input type="date">` ẩn, với lý do "giống
+LUỒNG thao tác, không cần giống cách vẽ". Lý do đó SAI với mục tiêu đã chốt
+(giống app cũ 100%) vì đây là khác biệt nhìn thấy ngay, không phải chi tiết
+nội bộ — port hẳn.
+
+- `renderer/state/date-picker-store.ts` + `components/DatePickerPopup.tsx`
+  (port từ `src/react/state/date-picker-store.ts`/`DatePickerPopup.tsx`),
+  mount 1 lần trong `AppShell`, portal vào `#datePickerRoot` mới thêm vào
+  `index.html`. CSS `.vn-date-*` port nguyên từ `assets/professional-base.css`
+  (11 token nó dùng đều đã có sẵn). `z-index:1400` nên nổi trên cả modal
+  (900) và dialog (1100). `.native-date` quay lại `display:none` đúng app cũ
+  (chỉ còn là chỗ chứa ISO cho FormData) vì không cần `showPicker()` nữa.
+- **2 bẫy port nguyên vẹn từ app cũ, không được "đơn giản hoá"**: click ra
+  ngoài dùng `event.composedPath()` chứ KHÔNG phải `target.closest()` — một
+  click bên trong popup có thể tự đổi mode (chọn tháng) khiến React render
+  lại và GỠ nút vừa bấm khỏi DOM trong lúc sự kiện còn nổi bọt, lúc đó
+  `.closest()` luôn trả null và popup tự đóng giữa thao tác; `.vn-year-row
+  input` phải thêm `min-height:0` (KHÁC app cũ) vì app-v2 có rule nền
+  `input…{min-height:38px}` sẽ đè `height:32px`.
+- Verify: đối chiếu song song 2 bản trên cùng bộ seed — tiêu đề "Tháng 9
+  2026", 7 cột T2..CN, 31 ô, ô "today"=3, footer "Hôm nay"/"Đóng", 258×288px,
+  z-index 1400, bo 9px — KHỚP TỪNG GIÁ TRỊ; chọn ngày 15 ghi đúng
+  "15/09/2026" vào ô văn bản và "2026-09-15" vào ô ẩn; chế độ tháng/năm hiện
+  đủ 12 tháng + đúng năm; Escape đóng; zero console error. Còn 1 chỗ dùng
+  `<input type="date">` trần (3 ô ngày của modal hồ sơ TEa) — đã đổi sang
+  `<DateField>`.
+
+**Phát hiện LỚN HƠN cả lịch, từ chính việc đo tay bên trong modal đó: KHÔNG
+một class modal nào của app cũ tồn tại ở app-v2, mà cả 3 gate đều xanh.**
+app-v2 tự đặt `.overlay-backdrop`/`.modal-box`/`.modal-box-header`/`-body`/
+`-footer`/`.modal-close-btn`; app cũ là `.modal-bg`/`.modal`/`.modal-h`/
+`.modal-b`/`.modal-f`/`.modal-close`. Giá trị CSS đã copy đúng từ A1, nhưng
+TÊN khác làm app-v2 mất sạch mọi rule app cũ scope theo tên đó:
+`.modal-b>label:first-child{margin-top:0}`, `.modal-h h3`,
+`.rcfg-modal input[type=checkbox]{accent-color}` + focus-visible,
+`.rcfg-group-modal.levels-2/3plus` (bề rộng + số cột lưới chọn lô theo SỐ
+MỨC), và breakpoint 760px biến modal thành sheet dán đáy
+(`.modal{width:100%;border-radius:12px 12px 0 0}`). Đổi hết về tên app cũ,
+đồng thời `.modal` lấy lại `width:560px` mặc định và mỗi modal Cấu hình chung
+dùng đúng class app cũ (`.rcfg-modal` 700px, `.rcfg-assay-modal`,
+`.lot-trans-modal`, `.rcfg-group-modal.levels-N`, `.tea-lab-profile-modal`)
+thay vì `width={...}` truyền tay.
+
+**`app-v2:ui-parity` giờ ĐO ĐƯỢC BÊN TRONG MODAL** — điểm mù đã ghi ở mục
+trước, nay đóng: manifest cho khai `modals: [{id, tabIndex, trigger,
+requiredSelectors}]`, gate bấm tab rồi bấm nút mở ở CẢ HAI bản, đo với scope
+`.modal` (không phải `#main`), so tiêu đề `.modal-h h3` từng ký tự, chụp ảnh
+riêng, ratchet như mọi surface khác. Đo ở ĐÚNG MỘT viewport (desktop) —
+nhân 4 viewport chỉ làm gate chậm mà lệch cần tìm nằm ở DOM/nội dung. Trước
+khi mở modal, gate bấm Escape tới khi `.modal-bg` biến mất: `go(id)` của app
+cũ KHÔNG đóng modal đang mở nên `.modal-bg` chặn mọi click của lượt sau.
+Trigger phải TỒN TẠI Ở CẢ HAI BẢN — dò trước bằng script tạm cho cả 7 modal
+Cấu hình chung (đúng bài học D3.5: selector bịa trong manifest làm gate vô
+nghĩa), và chính bước dò đó đã lộ ngay 3 lệch: tên class modal, tiêu đề "Thêm
+nhóm lô QC" vs "Thêm nhóm lô", và một nút mở SAI MODAL (dưới).
+
+**Kết quả: 6/7 modal về 0 class / 0 dòng chữ**, gate lên 79 surface. Các lệch
+tìm được và đã sửa:
+- **"Hủy" vs "Huỷ"** — app cũ dùng "Hủy" ở MỌI nút; app-v2 dùng "Huỷ" ở 28
+  chỗ (8 trang + DialogHost). Sửa toàn cục, kèm 2 nhãn AUDIT ở main
+  (`'Huỷ điểm QC'`→`'Hủy điểm QC'`, `'Huỷ hồ sơ NCE'`→`'Hủy hồ sơ NCE'` —
+  đối chiếu app cũ dùng "Hủy điểm QC"/"Hủy hồ sơ"); `mock-parity` bắt được
+  ngay khi mock lệch main, đúng như thiết kế của nó.
+- **`text-transform:uppercase` không chỉ làm lệch HÌNH**: `innerText` của
+  Chromium trả về CHỮ ĐÃ BIẾN ĐỔI, nên `.lot-level-title` (app-v2 tự thêm
+  uppercase) làm gate báo thiếu dòng "Mức 1"/"Mức 2" trong modal nhóm lô.
+  Port nguyên rule app cũ (`text-transform:none`, `#48646e`, overline, 850).
+- **Lỗi "app-v2 không tự chọn mục đầu tiên" — LẦN THỨ 5** (sau Entry, Sigma,
+  Westgard, Reagent): modal Panel QC để `instrumentId=''` + một option rỗng
+  "Chọn máy", nên danh sách xét nghiệm trống hẳn; app cũ tự chọn máy đầu
+  tiên. Bỏ option rỗng, mặc định chọn `instruments[0]`. Modal xét nghiệm
+  cũng bỏ option rỗng tương tự.
+- **Cấu trúc lưới form**: app cũ dùng `.grid2` dùng chung (gap 10px, 1 cột ở
+  ≤760px) cho mọi hàng 2 ô trong modal — app-v2 tự đặt `.field-row`/
+  `.lot-form-grid`/`.panel-qc-main-grid`/`.transition-form-row2|3`, và MỘT
+  lưới 6 ô thay vì BA khối `.grid2` liền nhau. Đổi hết về `.grid2` +
+  `.lot-trans-row2/3`; modal xét nghiệm tách lại 2 lưới `.assay-main-grid` +
+  `.assay-detail-grid` như app cũ, tiêu đề khối là `.assay-form-heading > h4`
+  (không phải `.assay-form-section > b`), select luật mang class
+  `.cfg-assay-rule`/`.cfg-assay-scope`.
+- **`<form>` bọc thân modal làm lệch TOÀN BỘ nội dung 8px**: 3 nhánh
+  `.modal-b>label:first-child` / `>:first-child>label:first-child` /
+  `>:first-child>div>label:first-child` của app cũ (bỏ margin nhãn đầu tiên)
+  không khớp vì app-v2 chèn thêm một cấp `<form>` (để submit bằng Enter và
+  nút `type="submit" form="..."`). Lặp lại đúng 3 nhánh đó qua một cấp
+  `form`. Và ô "Ghi chú" cuối modal lô QC phải là `<label>`+`<textarea>`
+  TRỰC TIẾP như app cũ, không bọc `.field` — bọc lại làm margin nhãn collapse
+  khác đi và modal thấp hơn 8px.
+- Kết quả đo cuối cho modal "Thêm lô QC": **khớp từng pixel** — modal
+  700×432, 3 khối `.grid2` cao 59.3/67.3/69.3, nhãn+textarea ghi chú
+  17.3(m 8/0/4)+54, nhãn "Số lô" y=357 — TRÙNG KHỚP app cũ ở mọi con số.
+
+**1 nghiệp vụ THẬT còn thiếu, phát hiện nhờ bước dò trigger: nút "＋ Thêm xét
+nghiệm" ở tab Bảng TEa mở SAI MODAL.** App cũ mở "Thêm xét nghiệm tham
+chiếu" — thêm một DÒNG analyte mới vào danh mục (tên quốc tế/viết tắt/matrix/
+đơn vị/nhóm/CLIA%/Ricos%); app-v2 mở "Thêm hồ sơ TEa" (hồ sơ TEa CHUẨN HOÁ
+của PXN, 6 trường bắt buộc gồm giá trị > 0 và lý do ≥10 ký tự) — hai nghiệp
+vụ khác nhau, và app-v2 KHÔNG có đường nào thêm analyte mới. Thêm
+`config:addTeaAnalyte` (chỉ admin; CLIA/Ricos để trống vẫn hợp lệ — khác
+`saveTeaRef`; khoá analyte suy từ tên theo cùng quy ước `teaAnalyteKey()` app
+cũ để hồ sơ PXN và ghi đè CLIA/Ricos khớp nhau; thêm trùng tên bị chặn) —
+KHÔNG cần đổi schema, `tea_refs` đã có đủ cột từ đầu. Nối đủ IPC → preload →
+`qc-api.d.ts` → bản giả lập trình duyệt → `permission-policy` → store →
+modal mới; `mock-parity` mở rộng lên 134 bước (3 case: thiếu tên, thêm đúng,
+thêm trùng). Modal hồ sơ TEa cũng đổi về đúng class/tiêu đề app cũ
+(`.tea-lab-profile-modal`, "Thêm/Sửa hồ sơ TEa chuẩn hóa").
+
+**Còn lệch, đã ghi vào `surfaceNotes` của baseline chứ không để ngầm**:
+`manage:modal-transition` còn 4 dòng chữ, cả 4 là khác biệt MÔ HÌNH có chủ
+đích — app cũ cho chọn "Chấp nhận lô mới"/"Không chấp nhận" ngay khi tạo hồ
+sơ, app-v2 chốt vòng planned→active→concluded MỘT CHIỀU (quyết định Giai
+đoạn B1) và `createLotTransition` luôn ghi `'planned'` nên ô trạng thái để
+disabled thay vì liệt kê lựa chọn không thực thi được; dòng nhắc của app cũ
+hứa "để NHẬP Mean/SD cho lô mới" mà app-v2 chưa nối bảng Mean/SD trong modal
+này vào `createLotTransition` (các ô số hiện chỉ để đối chiếu — cần nối hoặc
+bỏ, đúng nguyên tắc "không control chết"); nhãn Panel QC của app-v2 chưa ghép
+tên máy. **15 modal còn lại của app-v2 (Sigma/NCE/Người dùng/Nhật ký/Cài
+đặt/Hoá chất/Entry) CHƯA khai vào manifest** — cơ chế đã có, chỉ là chưa dò
+trigger cho từng cái; đó là việc lặp lại, không phải thiếu kiến trúc.
+
+Verify: `app-v2:typecheck` sạch, `app-v2:test` 33/33 (`mock-parity` 134 bước,
+sửa 1 nhãn audit trong `entry-handlers.test.mjs` theo chính tả app cũ),
+`app-v2:build` sạch, `app-v2:ui-parity` **79/79 surface đạt** (thêm 7 surface
+modal, 6 ở 0/0), `app-v2:css-parity` 0 (gate này bắt được đúng class `.req`
+mới thêm của modal "Thêm xét nghiệm tham chiếu" — chứng minh nó canh cả code
+vừa viết), `app-v2:style-parity` 18/18, cộng 2 công cụ đo tạm (không commit):
+đối chiếu popup lịch 2 bản, và đo `getBoundingClientRect()` + computed style
+từng khối bên trong modal.
+
+**Rà soát nghiệp vụ + chất lượng mã trang Cấu hình chung (2026-09-03).** Người
+dùng hỏi "nghiệp vụ đã thêm vào hết chưa, code có sạch không". Rà bằng cách
+liệt kê toàn bộ hàm export của `manage-page-controller.ts` +
+`manage-tests-actions-controller.ts` app cũ rồi đối chiếu từng thao tác GHI với
+IPC/store/UI của app-v2 — không đọc theo cảm nhận. Kết quả: **4 nghiệp vụ
+thiếu + 5 control chết**, đã làm hết.
+
+**(1) Đổi số lô KHÔNG ghi lại nhãn lô trên điểm QC cũ — lỗi làm SAI DỮ LIỆU
+âm thầm, chưa từng được ghi chú.** `qc_points.lot` là CHUỖI TĨNH chụp lúc nhập
+(Giai đoạn B2), không tham chiếu `qc_lots.id`; `saveLot` của app-v2 chỉ UPDATE
+bảng `qc_lots`, nên sau khi đổi số lô thì mọi điểm QC cũ "biến mất" khỏi bộ lọc
+theo lô ở Nhập QC/Westgard/Sigma: không khớp lô hiện tại (chuỗi đã đổi) mà cũng
+không hiện ở "lô cũ" (không có hồ sơ chuyển tiếp nào giữa 2 TÊN GỌI của cùng
+một lô). App cũ cascade qua `renameLotPoints()`. Đã thêm:
+`config:previewLotRename` (hàm CHỈ ĐẾM — số điểm sẽ bị viết lại + kỳ đã khoá,
+không ghi gì) và cascade trong `saveLot` **cùng một transaction** với việc sửa
+cấu hình (nửa vời — đổi cấu hình mà không đổi điểm — là trạng thái không thể tự
+phục hồi). Renderer hỏi TRƯỚC khi gọi `saveLot` bằng chính con số đó, đúng cách
+`saveConfigLot()` app cũ hỏi: bấm Hủy là không còn dấu vết gì. Kỳ đã khoá KHÔNG
+chặn (khác xoá xét nghiệm) vì số lô là nhãn nhận dạng, nhưng được đếm riêng và
+nói rõ trong hộp xác nhận.
+
+**(2) Kích hoạt nhóm lô — app-v2 chỉ có `stopLotGroup` (một chiều).** Nhóm đã
+dừng không có đường bật lại, và nhóm mới không có đường áp Mean/SD sang các mức
+QC. Thêm `config:activateLotGroup`, port `activateLotGroup` +
+`applyLotGroupActivation` app cũ: ứng viên là mọi (mức QC, lô của nhóm) trùng
+`level` mà mức đang dùng lô KHÁC và có **Mean/SD ĐÃ LƯU** cho đúng lô đó
+(`lotTargetSnapshot()` — port `qcLotTargetSnapshot()`: ưu tiên giá trị đang
+gắn, nếu không thì tìm NGƯỢC trong `mean_sd_history_json` theo `qcLotId`; KHÔNG
+suy từ điểm QC, vì kích hoạt phải dùng số đã được phê duyệt). Giữ nguyên 3
+trạng thái trả về của app cũ vì mỗi cái cần một thông báo khác: `applied` (áp
+N mức + dừng các nhóm bị thay thế), `already-active` (không có gì mới để áp
+nhưng nhóm đang được dùng — vẫn gỡ nhãn "đã dừng"), `unready` (chưa mức nào có
+Mean/SD hợp lệ, KHÔNG đụng gì). UI đi qua `confirmDialog` + `reauthDialog` như
+mọi thao tác Mean/SD khác.
+
+**(3) 5 control CHẾT trong modal "Thêm hồ sơ chuyển lô"** (ô tìm kiếm + 4 ô số
+Mean/SD): hiện ra, gõ được, không lưu đi đâu — thứ Giai đoạn D cấm tường minh.
+App cũ's `saveLotTransitionV2()` gọi `applyPlannedTarget()` cho từng hàng đang
+tick TRƯỚC khi ghi hồ sơ. Nay `submit()` đọc bảng, validate qua
+`normalizeTargetPick` (sai định dạng thì DỪNG LẠI, không để tạo hồ sơ xong mới
+báo lỗi — hồ sơ đã ghi không tự rút lại được), rồi lưu Mean/SD cho lô mới qua
+`saveTestLevel`. Bảng dùng đúng class app cũ (`.lot-trans-target-head-row` +
+`.target-table.lot-trans-target-table` dùng LẠI `.target-head`/`.target-row`
+của bảng Mean/SD) nên `syncTargetRange` chạy y hệt. `syncTargetRange` được
+chuyển từ hàm cục bộ trong TargetsTab sang `renderer/lib/target-range.ts` —
+app cũ cũng dùng đúng một hàm cho cả hai chỗ. 3 rule CSS `.transition-target-*`
+app-v2 tự đặt trở thành dead code, đã xoá.
+
+**(4) Sửa hồ sơ chuyển lô** — app-v2 chỉ tạo mới được (comment trong code ghi
+"chưa có modal sửa, không dựng nút chết"). `createLotTransition` nhận thêm
+`input.id` → sửa; hồ sơ ĐÃ KẾT LUẬN không sửa được, cùng lý do không xoá được
+(bản ghi đã áp vào cấu hình/Mean-SD, sửa đi thì mất dấu vết vì sao Mean/SD
+đổi). `status` KHÔNG đổi qua đường này — vòng planned→active→concluded vẫn đi
+riêng qua `setLotTransitionStatus` để mỗi bước giữ cổng xác thực/ghi chú của
+nó.
+
+**Dọn code (đo bằng số, không bằng cảm nhận).** Trạng thái tốt sẵn: **0 `any`**,
+**0 `style={{...}}`**, chỉ 1 chỗ gọi `window.qcApi` trực tiếp bỏ qua store,
+typecheck `strict` sạch. 2 nợ thật đã trả:
+- `ManagePage.tsx` **1121 dòng gồm 6 tab** → tách mỗi tab một file trong
+  `pages/manage/` (`InstrumentsTab` 87 · `TestsTab` 233 · `PanelsTab` 113 ·
+  `LotsTab` 254 · `TargetsTab` 173 · `TransitionsTab` 184), phần dùng chung
+  (`TABS`/`TabId`/`WESTGARD_RULES`/`parseRuleConfig`/`lotStatus`/`FieldRow`)
+  vào `pages/manage/shared.tsx`; `ManagePage.tsx` còn **100 dòng** đúng vai
+  trò khung trang (sidebar 8 tab + toolbar + badge đếm).
+- `vnDate()` bị viết lại ở **4 file** với **3 hành vi fallback KHÁC NHAU**
+  (`'—'`, chuỗi vào, `''`). Gom về `renderer/lib/format.ts` nhưng GIỮ tham số
+  `fallback` để từng chỗ gọi hiện đúng như trước — đổi fallback là đổi hiển
+  thị, không phải refactor thuần.
+
+Verify: `app-v2:typecheck` sạch, `app-v2:test` **34/34** (thêm
+`tests/config-lot-lifecycle.test.mjs` — end-to-end 3 nghiệp vụ trên: preview
+chỉ đếm/không ghi, cascade đổi tên đúng và KHÔNG mất điểm nào, sửa trường khác
+không chạm điểm QC, kỳ đã khoá được đếm riêng, `activateLotGroup` đủ 3 trạng
+thái + chỉ admin + nhóm rỗng, sửa hồ sơ giữ nguyên id/không đổi trạng thái/hồ
+sơ đã kết luận bị chặn và KHÔNG ghi gì; `mock-parity` lên **141 bước** phủ 3
+hàm mới), `app-v2:build` sạch, `app-v2:ui-parity` 79/79, `app-v2:css-parity` 0,
+`app-v2:style-parity` 18/18, cộng kịch bản Playwright tạm chạy THẬT trong
+trình duyệt: đổi số lô qua modal → hộp hỏi hiện đúng "sẽ cập nhật 10 điểm QC
+đã ghi" → đồng ý → cả 10 điểm mang nhãn lô mới; dừng nhóm lô → nút "Kích hoạt"
+xuất hiện → confirm + reauth thật → thông báo đúng nhánh `already-active` →
+trạng thái về `active`; tạo hồ sơ chuyển lô qua UI: bảng Mean/SD render đúng
+hàng, gõ Mean=120/SD=4 thì 2 ô giới hạn TỰ đồng bộ 112.00/128.00
+(`syncTargetRange` chạy), lưu xong đọc lại `listTestLevels` thấy **mean=120,
+sd=4 ghi thật vào mức** (chứng minh 4 ô không còn là control chết), nút "Sửa"
+hiện và mở đúng modal "Sửa hồ sơ chuyển lô"/"Lưu thay đổi" — zero console
+error.
+
+**3 mục CÒN LẠI của trang này, có lý do kỹ thuật rõ ràng:** (a) nhánh "Dự kiến"
+khi lưu Mean/SD sang nhóm lô khác — app cũ mở modal 3 lựa chọn (Hủy / Dự kiến /
+Chuyển qua nhóm lô này) qua `openTargetSwitchModal`/`resolveTargetSwitch`;
+app-v2 chỉ có Hủy/Chuyển, vì "Dự kiến" cần chỗ lưu Mean/SD ỨNG VIÊN chưa áp mà
+schema hiện chưa có (cùng nhóm vấn đề với cột song song 2 lô ở Giai đoạn B2);
+(b) ô "Hành động" của bảng luật Westgard nâng cao vẫn chỉ hiển thị — cần engine
+hỗ trợ mức độ theo từng luật, đã ghi tại chỗ trong code; (c) danh mục TEa tích
+hợp (`TEA_ANALYTE_CATALOG` hàng trăm analyte CLIA/Ricos + `docs/tea-sources.md`)
+vẫn là bản rút gọn 77 analyte.
+
+**4 lỗi thật ở trang Cấu hình chung + hộp thoại dùng chung, bắt được qua phản
+hồi trực tiếp trên ảnh chụp (2026-09-03).**
+
+**(1) "Ô chồng ô"**: 4 chỗ (`target-empty-card`/`transition-empty-card`/
+`history-empty-card`/`tea-empty-card`) tự bọc thêm một lớp panel THỪA quanh
+`.empty`, trong khi app cũ (và tab Lô QC/Nhóm lô của chính app-v2) chỉ đặt
+`.empty` trực tiếp trong panel — ra 2 khung lồng nhau. Bỏ 4 lớp bọc + 7 rule
+CSS chết đi kèm; TeaRefsTab cũng sửa lại để panel LUÔN render (đúng cấu trúc
+app cũ: `.empty` thay chỗ `<table>` bên trong CÙNG MỘT panel, không phải hai
+nhánh tách biệt có/không có panel).
+
+**(2) `.empty` chạm sát 4 cạnh panel sau khi bỏ lớp bọc.** Nguyên nhân: app-v2
+chỉ copy được NỬA SAU của 2 rule app cũ (`margin:0` — vốn dùng để HỦY margin
+16px của rule chính khi `.empty` nằm trong `.transition-list`), mà THIẾU HẲN
+rule chính cho margin/padding/viền/nền
+(`.config-shell-main>.rcfg-list>.empty:first-child, ...`). Vì `.panel`/
+`.rcfg-list` đều `padding:0` (Giai đoạn A1), `.empty` không còn gì đệm nên
+chạm sát 4 cạnh. Port đủ 3 rule gốc từ `assets/professional-config.css`
+(margin 16px, padding 24px 20px, viền `#cbdce4`, nền `--surface-card-soft`,
+cỡ tiêu đề riêng trong ngữ cảnh này).
+
+**(3) Tiêu đề cột và nội dung ô không thẳng hàng ở bảng Mean/SD.**
+`.target-head>span{text-align:center;}` **vô hiệu**: các span đó đã là flex
+container (`display:flex`), mà `text-align` không căn được flex item — chỉ
+`justify-content` mới có tác dụng. Tiêu đề vì vậy lệch trái theo mặc định
+flex, trong khi ô nhập số lại có padding riêng của input dùng chung
+(`var(--space-sm) var(--space-md)`), tạo cảm giác lệch nhau dù cả hai đều
+"trái" theo cách khác nhau. Sửa: đổi rule sang `justify-content:center` cho
+MỌI cột trừ 2 cột đầu (giữ nguyên 2 override có sẵn: cột 1 "Dùng" canh giữa,
+cột 2 "Xét nghiệm" canh trái) — port đúng app cũ; và 4 ô số
+(`.target-row input[type=number]`) thêm `width:116px;justify-self:center;
+text-align:center` để nội dung ô thật sự nằm giữa cột, không chỉ stretch hết
+chiều rộng.
+
+**(4) BUG THẬT, không phải giao diện: đổi Mức 1 → Mức 2 vẫn giữ nguyên số của
+Mức 1** (người dùng tự phát hiện khi thao tác thật, không phải từ ảnh chụp).
+Nguyên nhân: hàng dữ liệu trong `TargetsTab`/`TransitionsTab` chỉ có
+`key={test.id}` — không đổi theo `level`/lô đang xem. Các ô Mean/SD/giới hạn
+là **uncontrolled** (`defaultValue`, đọc DOM lúc lưu — cố ý, để 4 ô mất focus
+nhanh khi Tab qua không bị ghi đè bởi state cũ, xem `syncTargetRange`). Với
+`key` không đổi, React **tái dùng nguyên DOM node** khi đổi mức — với CÙNG
+một xét nghiệm xuất hiện ở cả 2 mức, `test.id` không đổi nên React không tạo
+lại input, và giá trị cũ vẫn còn nguyên trong DOM dù dữ liệu nền đã đổi. Sửa:
+`key={`${test.id}:${level}:${lotId}`}` (TargetsTab) và
+`key={`${test.id}:${levelNo}`}` (TransitionsTab, cùng lớp lỗi khi đổi "Lô
+mới" trong modal chuyển lô) — buộc remount mỗi khi mức/lô đang xem đổi.
+
+**(5) Hộp thoại confirm/info/reauth dùng khung modal trơn, không phải khung
+"Thao tác được kiểm soát" của app cũ.** Người dùng chỉ vào ảnh app cũ và hỏi
+sao chưa mang qua. app-v2's `DialogHost.tsx` (viết ở Giai đoạn 3) dùng lại
+`.modal-h`/`.modal-b`/`.modal-f` — khung CHUNG với mọi modal CRUD khác —
+trong khi app cũ có hẳn một họ class RIÊNG cho 3 loại hộp thoại thay
+`confirm()`/`alert()` gốc của trình duyệt: `.confirm-modal` (bo góc 16px,
+animation `dialog-enter`), `.confirm-modal-h` + `.confirm-modal-kicker`
+(nhãn đỏ IN HOA "THAO TÁC ĐƯỢC KIỂM SOÁT" — CHỈ hộp reauth luôn có, hộp
+confirm có kicker tuỳ chọn), `.confirm-modal-icon` (hình tròn, đổi màu theo
+mức độ: đỏ cho nguy hiểm, xanh dương cho reauth, vàng/xanh lá cho info
+warn/success), `.confirm-modal-text` (câu chính in đậm + chi tiết phụ), và
+RIÊNG cho reauth: dòng `<p>Tài khoản: {tên người dùng}</p>` — thứ app-v2
+**hoàn toàn không hiển thị**. Viết lại `DialogHost.tsx` theo đúng 3 nhánh cấu
+trúc app cũ (`src/react/dialogs/DialogOverlay.tsx`), đọc tên tài khoản qua
+`useAuthStore()` (khớp `reauthAccountLabel()` app cũ: `name || username`).
+Port nguyên toàn bộ CSS họ `.confirm-modal*` (kể cả breakpoint ≤640px xếp nút
+theo cột và info-modal đặt nút đóng góc trên-phải) — tất cả token màu/cỡ chữ
+đã có sẵn từ trước, đây thuần là thiếu component, không thiếu design token.
+
+Verify: `app-v2:typecheck` sạch, `app-v2:test` 34/34, `app-v2:build` sạch,
+`app-v2:ui-parity` 79/79, `app-v2:css-parity` 0, `app-v2:style-parity` 18/18,
+cộng kiểm chứng thật trong trình duyệt cho cả 5 mục: ảnh "Chưa có hồ sơ
+chuyển lô" còn đúng 1 khung với khoảng cách đều 4 phía; cột "Độ lệch chuẩn"/
+"Trạng thái" tiêu đề và nội dung thẳng hàng; đổi Mức 1→Mức 2 ô Mean/SD về
+đúng trạng thái trống ("0 đã gán mức này") thay vì giữ số cũ; và luồng
+Dừng→Kích hoạt nhóm lô đi qua đúng 2 hộp thoại — confirm "Kích hoạt nhóm lô"
+rồi reauth "Xác thực Mean/SD" hiện đúng kicker đỏ, icon ✓ tròn, dòng
+"Tài khoản: Quan tri" — khớp pixel với ảnh app cũ người dùng gửi.
+
+**Ô chọn ngày canh giữa chữ (2026-09-03, theo yêu cầu người dùng).** Người
+dùng thấy icon lịch "đơn điệu" và đưa 2 ảnh tham khảo, rồi chỉ sang app khác
+của họ ("Quản lý cước phí", `Cost App/src/shared/ui/DateInput/`) để đối
+chiếu. Kiểm tra trực tiếp mã nguồn app đó (không đoán): `.datepick` của họ
+dùng ĐÚNG token `--surface-subtle` (giá trị `#f9fbfc`, cùng hex với app-v2)
+— nghĩa là nền icon hai bên đã GIỐNG NHAU sẵn, không có gì lệch để "tham
+khảo" ở phần đó. Khác biệt THẬT tìm được khi so từng dòng CSS:
+`.datebox input.date-text` của app Cước phí có `text-align:center` — QC Lab
+(cả bản cũ lẫn app-v2) để mặc định lệch trái. Ý "tô 3 màu xanh/cam/đen cho
+ngày/tháng/năm" ở ảnh thứ 2 KHÔNG tồn tại ở app Cước phí lẫn app cũ QC Lab
+(grep toàn bộ 2 codebase ra rỗng) — hỏi lại, người dùng xác nhận chỉ cần
+giống app Cước phí, không cần tô màu. Thêm `text-align:center` +
+`min-height:0` cho `.date-text`, `outline:0` khi focus — áp dụng cho MỌI ô
+ngày trong app-v2 (component dùng chung `DateField.tsx`).
+
+Verify: `app-v2:typecheck`/`test` 34/34/`build` sạch, `app-v2:ui-parity`
+79/79, `app-v2:css-parity` 0, `app-v2:style-parity` 18/18, cộng xác nhận
+trong Electron thật: gõ "01/09/2026" vào ô "Ngày mở" của modal "Thêm lô QC",
+blur ra thì chữ canh giữa ô đúng như app Cước phí.
+
+**Icon lịch "bo cong bên trong" + 2 lần bấm mới đóng được lịch khi lồng
+trong modal (2026-09-03).** Sau khi canh giữa chữ ngày ở trên, người dùng
+gửi ảnh chụp: KHÔNG phải đòi tăng chiều cao ô (đã hiểu nhầm ở lượt đầu), mà
+góc icon bị "bo cong" trông như dính liền vào khung ngoài. Nguyên nhân:
+`.datebox{overflow:hidden;border-radius:...}` cắt góc `.datepick` theo đúng
+bo góc của khung NGOÀI dù `.datepick` tự nó là hình vuông — không có đường
+phân cách nào giữa vùng chữ và icon nên mắt đọc thành "icon bo tròn". App cũ
+QC Lab tự đặt `border-left:0` (không có gạch phân cách); app Cước phí (đối
+chiếu trực tiếp `DateInput.tsx`/`date-input.css`) dùng
+`.manage-date .datepick{border-left:1px solid var(--line)}`. Đổi
+`.datepick` sang có `border-left` thật — lệch có chủ đích so với QC Lab bản
+cũ, đúng theo yêu cầu rõ ràng của người dùng ("làm kiểu dáng ô chọn ngày
+giống bên cost app"), áp dụng app-wide qua `app.css` dùng chung.
+
+Cùng lúc, người dùng báo lỗi thật: bấm mở lịch bên trong modal xong bấm ra
+ngoài thì mất modal NHƯNG lịch vẫn còn, phải bấm ra ngoài LẦN NỮA mới ẩn.
+Nguyên nhân là thứ tự sự kiện: `Modal.tsx` đóng modal ở `mousedown` (đúng
+quy ước dùng chung), còn `DatePickerPopup.tsx` lại nghe `click` để tự đóng —
+`mousedown` xảy ra TRƯỚC `click` trong cùng một cú bấm, nên khi modal đóng ở
+bước `mousedown` (gỡ luôn subtree DOM chứa cả ô ngày), sự kiện `click` kế
+tiếp của CHÍNH cú bấm đó không còn đường nổi bọt lên `document` nữa (node
+phát sinh nó đã bị gỡ) — listener `click` của popup lịch không bao giờ nhận
+được, phải đợi cú bấm THỨ HAI mới đóng. Sửa `DatePickerPopup.tsx` sang nghe
+`mousedown` (khớp đúng cơ chế `Modal.tsx` đang dùng, và khớp
+`DateInput.tsx` của app Cước phí — cũng dùng `mousedown` với đúng lý do
+này). Giữ nguyên kỹ thuật `event.composedPath()` (không dùng
+`target.closest()`) cho nhánh chuyển sang chọn tháng/năm — vẫn an toàn với
+`mousedown` vì đổi mode được gắn ở `onClick`, chạy SAU `mousedown`.
+
+Verify: `app-v2:typecheck`/`test` 34/34/`build` sạch, `app-v2:ui-parity`
+79/79, `app-v2:css-parity` 0, `app-v2:style-parity` 18/18, cộng xác nhận
+trong Electron thật: icon lịch có vạch phân cách rõ ràng, không còn cảm giác
+bo tròn dính liền; mở modal "Thêm lô QC" → bấm mở lịch → bấm ra ngoài ĐÚNG
+MỘT LẦN → cả lịch lẫn modal cùng đóng ngay.
+
+**Nghiệp vụ "Trạng thái" hồ sơ chuyển lô SAI — Mean/SD bị áp ngay lúc tạo,
+không chờ "Chấp nhận" (2026-09-03, sửa ngay trong phiên phát hiện lỗi kiến
+trúc).** Người dùng hỏi về ô "Trạng thái" bị khoá không chọn được trong
+modal "Thêm hồ sơ chuyển lô" — lượt trả lời đầu coi đây là vấn đề HIỂN THỊ
+(thay `<select>` disabled bằng nhãn tĩnh). Người dùng sửa lại: đây là
+NGHIỆP VỤ THẬT có 3 trạng thái người dùng tự chuyển tay — "bấm dự kiến là
+thêm sẵn và set Mean/SD sẵn, khi cần chạy song song thì chuyển sang trạng
+thái song song, khi chấp nhận thì chọn chấp nhận" — và trong lúc dựng lại
+đúng luồng đó mới lộ ra lỗi kiến trúc thật đã có TỪ TRƯỚC trong chính phiên
+này: `createLotTransition` đang gọi thẳng `saveTestLevel` NGAY lúc tạo hồ
+sơ (status vẫn `'planned'`), tức Mean/SD của lô MỚI đã ghi đè vào cấu hình
+sống trước khi ai "chấp nhận" gì cả — vi phạm đúng nguyên tắc "song song 2
+lô" đã ghi trong CLAUDE.md's mục Giai đoạn B2: lô CŨ phải vẫn là lô vận
+hành chính thức cho tới khi được chấp nhận rõ ràng.
+
+Sửa bằng cách dùng lại cột `lot_transitions.criteria_json` (đã có sẵn trong
+schema từ đầu, chưa từng dùng tới bước này — xem mục Giai đoạn B2 "CỐ Ý
+CHƯA LÀM") làm chỗ lưu Mean/SD ỨNG VIÊN, tách hẳn khỏi `test_levels`:
+- **`Dự kiến`** (`planned`, trạng thái khi tạo): `createLotTransition` lưu
+  `criteria` (mảng `{testId,level,mean,sd}` gõ trong modal) vào
+  `criteria_json` — KHÔNG đụng gì tới `test_levels`. Sửa hồ sơ (còn
+  `planned`/`active`) ghi đè lại đúng `criteria_json`, vẫn không đụng cấu
+  hình sống.
+- **`Song song`** (`active`, qua nút "Kích hoạt"): chỉ đổi `status`, không
+  cascade gì — đúng nghĩa "đang chạy song song 2 lô để theo dõi", lô cũ vẫn
+  là lô quyết định.
+- **`Chấp nhận`** (`accepted`, qua nút "Chấp nhận"): ĐÂY MỚI LÀ LÚC áp —
+  đọc lại `criteria_json`, với mỗi `{testId,level,mean,sd}` gọi
+  `appendMeanSdHistory()` chốt Mean/SD CŨ vào lịch sử rồi
+  `UPDATE test_levels SET qc_lot_id=<lô mới>,mean=...,sd=...,applied='lab'`,
+  đánh dấu lô cũ `depleted=1`, và nếu lô cũ thuộc một nhóm lô thì chuyển lô
+  mới vào ĐÚNG nhóm đó (`qc_lots.group_id`) — tất cả trong 1 transaction
+  (`BEGIN`/`COMMIT`/`ROLLBACK`).
+- **`Không chấp nhận`** (`rejected`, qua nút "Không chấp nhận"): chỉ đổi
+  `status` + ghi người/ngày duyệt, không cascade gì, không cần reauth (khác
+  "Chấp nhận" — không có gì để xác thực khi không thay đổi cấu hình).
+- Cổng chặn nhảy lùi (`rank[status]`) + cổng "đã có kết luận thì khoá vĩnh
+  viễn" (`accepted`/`rejected` không đổi được nữa) giữ nguyên tinh thần cũ,
+  đổi tên lỗi `already-concluded`→`already-decided` cho khớp từ vựng mới.
+  Thêm cổng `invalid-status` (từ chối MỌI chuỗi trạng thái lạ ngay từ đầu,
+  không đụng gì tới hồ sơ) — trước đó một chuỗi lạ như `'concluded'` sẽ rơi
+  tọt vào nhánh `else` (đúng là nhánh `accepted`) và ÂM THẦM chạy toàn bộ
+  cascade chấp nhận, một lỗi thật lộ ra khi viết lại test cho vocabulary
+  mới.
+
+**Renderer đổi theo**: `TransitionsTab.tsx` bỏ hẳn modal "Kết luận" nhập tay
+tự do (nguồn gốc của ô Trạng thái bị khoá bị hỏi ban đầu) — 3 nút hành động
+Kích hoạt/Chấp nhận/Không chấp nhận thay thế, `accept()` gọi `confirmDialog`
+nêu ĐÚNG tên lô cũ/mới rồi `reauthDialog` (đây là 1 trong ~9 thao tác nhạy
+cảm cần xác thực lại — thay đổi Mean/SD sống của cấu hình), `reject()` chỉ
+`confirmDialog`. Bảng Mean/SD ứng viên trong modal đọc/ghi từ `criteria_json`
+của hồ sơ (`draftCriteria`, parse khi sửa) thay vì đọc trực tiếp
+`test_levels` sống — khớp đúng ý nghĩa MỚI "đây là Mean/SD DỰ KIẾN cho lô
+mới", không phải "Mean/SD hiện hành".
+
+Verify: `app-v2:typecheck`/`test` 34/34 (viết lại `config-lots-handlers.test.mjs`
+và `config-lot-lifecycle.test.mjs` theo vocabulary `planned/active/accepted/
+rejected`, thêm oracle mới chốt đúng 2 tính chất cốt lõi: Mean/SD KHÔNG đổi
+lúc `planned`/`active`, CHỈ đổi đúng lúc `accepted` — dùng bản Mean/SD đã
+SỬA lần cuối chứ không phải bản gốc lúc tạo; `mock-parity.test.mjs` mở rộng
+cùng lúc), `app-v2:build` sạch, `app-v2:ui-parity` 79/79 (cập nhật lại
+`surfaceNotes` của `manage:modal-transition` — 4 dòng còn lệch giờ là khác
+biệt VỊ TRÍ thao tác (radio ngay trong modal tạo ở app cũ, nút trên từng
+dòng bảng ở app-v2), không còn là nợ Mean/SD chưa nối), `app-v2:css-parity`
+0, `app-v2:style-parity` 18/18, cộng xác nhận bằng chính `window.qcApi`
+trong Electron thật: tạo hồ sơ kèm Mean/SD ứng viên (212/4.2) khi lô đang
+chạy là 200/5 → đọc lại `test_levels` ngay sau đó vẫn `200/5/lô cũ` (đúng
+"Dự kiến" không áp gì) → bấm "Kích hoạt" → vẫn `200/5/lô cũ` → bấm "Chấp
+nhận" qua đúng confirm (nêu tên lô) + reauth (kicker "Thao tác được kiểm
+soát") → đọc lại `test_levels` ra ĐÚNG `212/4.2/lô mới`, `mean_sd_history_json`
+chốt đúng bản ghi cũ `200/5`, lô cũ `depleted=1` — khớp từng trường một,
+không chỉ tin thông báo thành công.
+
+**Hồ sơ chuyển lô — bỏ 3 nút hành động tách rời, quay lại ĐÚNG 1 ô "Trạng
+thái" + 1 nút Lưu như app cũ (2026-09-03, sửa ngay sau mục trên).** Người
+dùng chỉ vào ảnh chụp bảng "Trạng thái | Thao tác" của bản vừa sửa (huy
+hiệu "Dự kiến" cạnh 3 nút Kích hoạt/Chấp nhận/Không chấp nhận) và hỏi thẳng
+"Sao bạn ko sửa giống app cũ". Tra lại đúng mã nguồn app cũ
+(`src/react/modals/LotTransitionModal.tsx`/`saveLotTransitionV2()`/
+`ManageLotTransitionCommand`, KHÔNG suy diễn từ mô tả CLAUDE.md cũ — mô tả
+đó viết trước khi tra thẳng file này) mới lộ ra: mục trước ĐÃ TỰ NGHĨ RA một
+mô hình khác hẳn app cũ. App cũ chỉ có:
+- Modal có ĐÚNG 1 `<select id="cfgTransStatus">` với cả 4 lựa chọn (Dự
+  kiến/Đang chạy song song/Chấp nhận lô mới/Không chấp nhận) LUÔN chọn
+  được — không disable, không tách thành nút riêng.
+- ĐÚNG 1 nút Lưu ("Thêm hồ sơ chuyển lô"/"Lưu thay đổi") gọi
+  `saveLotTransitionV2()` — vừa đổi status, vừa ghi Mean/SD ứng viên, vừa
+  chạy cascade khi chấp nhận, tất cả trong CÙNG một lần bấm.
+- Bảng danh sách (`TransitionRow`) chỉ có "Sửa"/"Xóa" — KHÔNG có nút Kích
+  hoạt/Chấp nhận/Không chấp nhận nào cả.
+- `finalChanged` (chuyển SANG accepted/rejected LẦN ĐẦU) là điều kiện DUY
+  NHẤT cần xác thực lại — và áp dụng cho CẢ 'rejected', không chỉ
+  'accepted' (mục trước cố ý bỏ reauth cho "Không chấp nhận" với lý do
+  "không ghi gì" — SAI theo app cũ: cả hai đều là quyết định không thể xem
+  nhẹ). Không có `confirmDialog` trước reauth — bấm Lưu là đi thẳng vào ô
+  mật khẩu nếu cần.
+- Chỉ 'accepted' khoá vĩnh viễn (`switchesLot(old) && status!=='accepted'`
+  → `accepted-immutable`); 'rejected' KHÔNG khoá — sửa/đổi status lại được
+  sau đó (mục trước khoá cả 'rejected', cũng SAI).
+- Mean/SD ứng viên chỉ hiện cho xét nghiệm ĐANG THẬT SỰ dùng lô cũ
+  (`qc_lot_id===fromLotId`), không phải MỌI xét nghiệm của Panel; checkbox
+  chỉ trang trí (`checked disabled readOnly`), không có nút bỏ chọn từng
+  dòng.
+- "Chấp nhận" có cổng thật (`acceptanceGate`): Panel không có xét nghiệm
+  nào dùng lô cũ → `no-target-tests`; có nhưng thiếu Mean/SD hợp lệ cho dù
+  chỉ 1 xét nghiệm → `missing-target` (nêu đúng tên xét nghiệm còn thiếu) —
+  mục trước hoàn toàn không có cổng này, "Chấp nhận" luôn thành công dù
+  Mean/SD trống.
+
+Viết lại `main/ipc/config-handlers.ts`'s `createLotTransition` thành MỘT
+hàm lưu duy nhất (gộp `setLotTransitionStatus` vào, xoá hẳn hàm đó khỏi
+main/preload/index/qc-api.d.ts/manage-store/browser-mock/permission-policy)
+— nhận thêm `data.status`, tự tính `finalChanged`, chạy `acceptanceGate`
+trước khi ghi, và chỉ cascade khi `status==='accepted' && finalChanged`.
+Thêm 2 validate mới thật (trước đây thiếu hẳn): `different-levels` (lô cũ/
+mới khác mức QC) và `duplicate-transition` (trùng Panel+cặp lô). Sửa luôn
+1 bug thật tìm thấy khi rà: `removeLotTransition` vẫn chặn theo
+`status==='concluded'` — trạng thái không còn tồn tại từ lần đổi vocabulary
+trước — nghĩa là hồ sơ 'accepted' XOÁ ĐƯỢC không bị chặn gì; đổi lại đúng
+`status==='accepted'` (khớp `lotTransitionRemoval()` app cũ). `status`
+thiếu khi SỬA (caller lập trình quên truyền) thì GIỮ NGUYÊN trạng thái cũ
+thay vì âm thầm lùi về 'planned' — modal thật luôn gửi kèm giá trị
+`<select>` hiện tại nên tình huống này chỉ xảy ra với test/caller lập
+trình, an toàn hơn là coi thiếu = ý định lùi trạng thái.
+
+`TransitionsTab.tsx` viết lại: `<select name="status">` 4 lựa chọn thay
+badge + nút hành động; `submit()` tính `finalChanged` PHÍA CLIENT (so
+status mới với `creating.status`) rồi gọi `reauthDialog()` (tiêu đề/câu chữ
+NGUYÊN VĂN app cũ) TRƯỚC KHI gọi API nếu cần, không có confirm riêng; bảng
+Mean/SD ứng viên lọc theo `levelsByTestId[test.id].some(l=>l.qc_lot_id===
+draftFromLotId)` thay vì mọi xét nghiệm của Panel; checkbox đổi sang
+`checked disabled readOnly`; nhãn Panel trong `<select>` ghép thêm tên máy
+(`${panel.name} · ${instrumentName}`, khớp `openLotTransitionModel()` app
+cũ — bảng danh sách vẫn chỉ hiện tên Panel trần, đúng `TransitionRow`).
+Bảng danh sách thêm 2 dòng hint app cũ có mà bản trước thiếu:
+"Đã chuyển tiếp qua lô X" (khi accepted) và "Duyệt: {người}·{giờ ngày}".
+Nhãn trạng thái đổi khớp `manageTransitionStatus()` app cũ nguyên văn
+("Chấp nhận lô mới" không phải "Đã chấp nhận", cls theo đúng bảng
+active/accepted/rejected/mặc định).
+
+Verify: `app-v2:typecheck` sạch, `app-v2:test` 34/34 (viết lại phần chuyển
+lô của `config-lots-handlers.test.mjs`/`config-lot-lifecycle.test.mjs`/
+`mock-parity.test.mjs` theo MỘT-hàm-lưu-duy-nhất — thêm oracle cho
+`no-target-tests`/`missing-target`/`duplicate-transition`/`different-levels`/
+`accepted-immutable` mà bản trước chưa test vì chưa tồn tại; chốt cả tính
+chất "'rejected' không khoá, sửa lại được"), `app-v2:build` sạch,
+`app-v2:ui-parity` **79/79, `manage:modal-transition` về ĐÚNG 0/0** (xoá hẳn
+`surfaceNotes` cho surface này — không còn khác biệt mô hình nào để giải
+thích), `app-v2:css-parity` 0, `app-v2:style-parity` 18/18, cộng xác nhận
+bằng chính `window.qcApi` + thao tác thật trong trình duyệt: modal "Sửa"
+hiện đúng `<select>` "Dự kiến" (không còn badge/nút tách rời); đổi sang
+"Đang chạy song song" lưu KHÔNG cần reauth; đổi tiếp sang "Chấp nhận lô
+mới" lưu ĐI THẲNG vào reauth (kicker "Thao tác được kiểm soát", câu hỏi
+"Nhập lại mật khẩu trước khi chấp nhận hoặc từ chối lô QC mới.") — xác thực
+xong, `acceptanceGate` chạy đúng: Panel có xét nghiệm đang dùng lô cũ +
+Mean/SD hợp lệ trong `criteria_json` từ lần lưu trước → chấp nhận thành
+công, `test_levels` cập nhật đúng qc_lot_id/mean/sd mới, lịch sử chốt đúng
+bản ghi cũ; bảng danh sách sau đó hiện đúng "Chấp nhận lô mới" + 2 dòng
+hint + chỉ còn Sửa/Xóa (không còn 3 nút hành động) — khớp pixel với ảnh app
+cũ người dùng gửi.
+
+**3 sửa nhỏ liền sau (2026-09-03), cùng mạch "chuyển tiếp lô".**
+1. **Ngày "Bắt đầu" hiện ISO thô** (`2026-09-03` thay vì `03/09/2026`) —
+   `TransitionsTab.tsx`'s cột Bắt đầu quên gọi `vnDate()` (hàm dùng chung đã
+   có sẵn trong `renderer/lib/format.ts`, các cột ngày khác trong cùng trang
+   Cấu hình chung đều gọi đúng). Sửa 1 dòng.
+2. **Tỷ lệ cột bảng "Chuyển tiếp lô QC" sai** — người dùng hỏi "sao cột này
+   rộng mà vẫn xuống 2 dòng": đúng là app cũ CŨNG hiện 2 dòng khối cho ô
+   "Chuyển lô" (`<div>{fromLot}</div><div class="hint">→{toLot}</div>`,
+   `professional-config.css`'s `.transition-table .hint{line-height:1.35}`
+   không đổi display) — không phải lỗi tràn dòng. Cái sai thật là TỶ LỆ 5
+   cột: app-v2 tự đặt 19/29/18/18/16%, không cột nào canh trái; app cũ là
+   14/22/12/30/22% với cột 1 (Panel QC) canh trái. Cột "Chuyển lô" quá rộng
+   so với nội dung ngắn khiến 2 dòng nhìn lệch/thừa chỗ. Port đúng % + canh
+   lề app cũ.
+3. **Lô cũ KHÔNG rời nhóm lô sau khi "Chấp nhận" — bug dữ liệu thật**, người
+   dùng phát hiện qua ảnh chụp tab "Lô & Nhóm QC": nhóm "1101/1102" sau khi
+   chấp nhận chuyển 1101→1111 vẫn hiện CẢ BA lô (1101/1102/1111) thay vì
+   đúng hai (1102/1111). Nguyên nhân: cascade "Chấp nhận" trong
+   `createLotTransition()` (mục lớn ở trên) chỉ gán `qc_lots.group_id` của
+   lô MỚI bằng group_id của lô cũ, QUÊN gỡ `group_id` của lô CŨ — dịch sai
+   nửa phép "thay thế" của app cũ (`applyAcceptedLotTransition()`'s
+   `lotIds.map(id => id===from.id ? to.id : id)` thay THẲNG phần tử trong
+   mảng, không phải cộng thêm phần tử mới). Vì app-v2 dùng FK
+   `qc_lots.group_id` thay vì mảng `lotIds`, "thay thế" phải dịch thành HAI
+   bước: gỡ `group_id` của lô cũ VỀ NULL, rồi mới gán group_id đó cho lô
+   mới — thiếu bước gỡ để lại đúng lỗi "lô đã hết dùng vẫn là thành viên
+   nhóm". Sửa ở cả `main/ipc/config-handlers.ts` và
+   `renderer/browser-mock/api.ts` (mock phải đọc `fromLot.group_id` vào
+   biến TRƯỚC khi gán null, vì JS mutate cùng object reference).
+
+Verify: `app-v2:typecheck`/`build` sạch, `app-v2:test` **34/34** (thêm mục
+(4) trong `config-lot-lifecycle.test.mjs` — hồ sơ chuyển lô với lô cũ đang
+thuộc 1 nhóm lô 2 thành viên, "Chấp nhận" xong xác nhận nhóm còn ĐÚNG lô
+còn lại + lô mới, lô cũ `group_id=null`, lô mới `group_id` bằng đúng
+group_id cũ), `app-v2:ui-parity` 79/79, `app-v2:css-parity` 0,
+`app-v2:style-parity` 18/18, cộng xác nhận bằng chính `window.qcApi` +
+đọc lại giao diện thật trong trình duyệt: tạo lại đúng kịch bản của người
+dùng (nhóm 2 lô, chấp nhận chuyển 1 trong 2 lô sang lô thứ 3) — nhóm hiện
+đúng 2 thành viên (lô còn lại + lô mới), lô cũ hiện "Đã chuyển tiếp"
+KHÔNG còn nằm trong card nhóm nào — khớp đúng kỳ vọng ảnh chụp người dùng
+gửi. Cũng dọn `surfaceNotes.manage:history` lỗi thời trong
+`ui-parity-baseline.json` (ghi "chưa có nút Chi tiết" từ đợt trước Giai
+đoạn "rà soát nghiệp vụ" viết lại tab này — surface đã về 0/0 từ lâu,
+ghi chú quên xoá khiến đọc lại tưởng vẫn còn thiếu).
+
+**SỬA LẠI mục "Chấp nhận" ở trên: nhóm lô phải LƯU TRỮ, không chỉ gỡ
+group_id — cộng 2 lỗi khác cùng phát hiện (2026-09-03).** Người dùng gửi
+ảnh chụp app cũ thật: sau khi chấp nhận chuyển 1101→1111, app cũ hiện
+**HAI** thẻ nhóm — "1111/1102" (Đang hoạt động, đã tự đổi tên) VÀ
+"1101/1102" (**Đã lưu trữ**, ghi chú "Đã dùng khi chuyển tiếp lô 1101 sang
+1111", vẫn giữ lô 1101 làm thành viên) — khác hẳn cách sửa ở mục ngay
+phía trên (chỉ gỡ `group_id` của lô cũ về NULL, không tạo nhóm lưu trữ nào).
+Tra lại đúng `applyAcceptedLotTransition()` app cũ mới thấy: nó KHÔNG đơn
+giản là "gỡ khỏi nhóm" — nó lưu trữ TOÀN BỘ trạng thái cũ của nhóm (tên/
+hãng/vật liệu/mã hàng, vẫn giữ lô cũ) thành MỘT bản ghi nhóm RIÊNG, còn
+nhóm ĐANG HOẠT ĐỘNG giữ NGUYÊN id gốc — chỉ thay lô cũ bằng lô mới trong
+thành viên và tự đổi tên NẾU tên đang là tên tự sinh từ số lô (không đổi
+nếu người dùng đã đặt tên riêng).
+
+Viết lại cascade trong `createLotTransition` (cả `main/ipc/config-handlers.ts`
+và `renderer/browser-mock/api.ts`): đọc TOÀN BỘ thành viên hiện tại của
+nhóm lô cũ, tạo một `lot_groups` row MỚI sao chép tên/hãng/vật liệu/mã hàng
++ `active=0, status='stopped', note='Đã dùng khi chuyển tiếp lô X sang Y'`,
+chuyển lô CŨ sang row mới này (KHÔNG null); nhóm GỐC (giữ nguyên id) nhận
+lô MỚI thay chỗ, tự đổi tên nếu tên cũ khớp đúng tổ hợp số lô cũ (so `name
+=== lotNos.join('/')`).
+
+**2 lỗi khác phát hiện cùng lúc, từ chính câu hỏi của người dùng ("cột
+Nguồn sao lại có PXN được, đây là của nhà sản xuất mà — PXN chỉ khi thiết
+lập dải kiểm soát ở thẻ Nhập QC và biểu đồ"):**
+1. **Cột "Nguồn" hiện sai PXN cho Mean/SD không hề qua luồng PXN.** Tra lại
+   `applyPlannedTarget()`/`applyTargetPick()` app cũ (dùng chung bởi modal
+   chuyển lô VÀ kích hoạt nhóm lô VÀ tab Mean/SD) xác nhận: cả hai LUÔN ghi
+   `source:'mfg'` — **'lab' (PXN) CHỈ dành riêng cho luồng "Xây dựng dải
+   PXN" ở trang Nhập QC & Biểu đồ** (`RangeWorkflowCommand`/`applyNewRange()`),
+   không phải bất kỳ chỗ nào khác. app-v2's `createLotTransition`'s cascade
+   VÀ `activateLotGroup`'s cascade đều đang hard-code `applied:'lab'` — sai
+   ở CẢ HAI chỗ. Sửa cả hai thành `'mfg'` (main + mock), ảnh hưởng ngay cột
+   "Nguồn" của tab Lịch sử dữ liệu.
+2. **Modal "Chi tiết" chỉ có 1 dòng hint tĩnh, thiếu hẳn 2 bảng thật của
+   app cũ.** Người dùng chỉ thẳng ảnh chụp modal app cũ
+   (`qc-history-detail-modal-html.ts`/`openQcHistoryDetail()`): modal có
+   **bảng "Mean/SD đã dùng"** (8 cột: Lô QC/Mean/SD/**Mean tích lũy/SD tích
+   lũy/CV tích lũy**/Hiệu lực/Nguồn — thống kê tích lũy tính TỪ CÁC ĐIỂM QC
+   THẬT của đúng lô đó, tới thời điểm mốc hết hiệu lực) VÀ **bảng "Điểm QC
+   đã nhập (N)"** (8 cột: Ngày/Lần chạy/Giá trị/Z/**Mean lúc nhập/SD lúc
+   nhập**/Kết luận nhanh/NV) — app-v2 trước đó chỉ có 1 dòng `<div
+   className="hint">` tĩnh thay bảng đầu, và bảng điểm thiếu 2 cột Mean/SD
+   lúc nhập + đặt sai tên 2 cột còn lại ("Kết luận"→"Kết luận nhanh", "NV
+   thực hiện"→"NV"). Viết lại `HistoryTab.tsx`: thêm `statsOf()` (mean/SD
+   mẫu n-1/CV — CÙNG công thức đã dùng ở panel "Điểm trong khoảng xem" của
+   trang Nhập QC, không phát minh công thức mới) tính tích lũy từ
+   `points.filter(p => ... && (!row.to || p.date <= row.to))`; bảng "Mean/SD
+   đã dùng" liệt kê MỌI mốc lịch sử của ĐÚNG lô đang xem (`rows.filter(r =>
+   r.level===detail.level && r.lotId===detail.lotId)`), không chỉ dòng vừa
+   bấm. "NV" đọc `operator_username` (mã ngắn) trước, không phải tên đầy đủ.
+   Port 4 class CSS còn thiếu (`hist-meansd-table`/`hist-points-table`/
+   `history-detail-heading`/`space-after-section`) từ
+   `assets/professional-config.css` — gate `app-v2:css-parity` tự bắt đúng
+   4 class này trước khi build lại.
+3. **Thẻ nhóm lô "Đã lưu trữ" lẫn với "Đã dừng" — 2 khái niệm khác nhau
+   trong app cũ, app-v2 gộp làm một.** `lot-group-status.ts`/
+   `lot-group-toggle-action.ts` app cũ: `archived` (tính từ `active===false`,
+   KHÁC `status`) hiện "Đã lưu trữ" (cls đỏ) và **KHÔNG có nút Kích hoạt/Dừng
+   nào cả** (kích hoạt lại một nhóm chỉ còn lô đã hết dùng là vô nghĩa);
+   `status==='stopped'` (do tự tay bấm "Dừng", `active` vẫn 1) hiện "Đã
+   dừng" và VẪN có nút "Kích hoạt". app-v2's `LotsTab.tsx` trước đó chỉ nhìn
+   `status`, luôn hiện "Đã dừng" + luôn hiện nút "Kích hoạt" cho MỌI nhóm
+   không active — kể cả nhóm vừa được lưu trữ tự động ở mục trên. Sửa để
+   phân biệt đúng `g.active===0` trước khi xét `status`.
+
+Verify: `app-v2:typecheck`/`build` sạch, `app-v2:test` 34/34 (viết lại mục
+(4) trong `config-lot-lifecycle.test.mjs` theo đúng cơ chế lưu trữ mới —
+chốt nhóm ĐANG HOẠT ĐỘNG giữ nguyên id + tên không đổi khi tên tự đặt, nhóm
+LƯU TRỮ là bản ghi RIÊNG giữ đúng lô cũ + tên/ghi chú, cộng 1 kịch bản thứ
+hai xác nhận tên TỰ SINH thì tự đổi theo tổ hợp lô mới), `app-v2:css-parity`
+0 (bắt đúng 4 class thiếu trước khi sửa), `app-v2:ui-parity` 79/79 (`manage:
+history` vẫn 0/0 — gate chưa đo bên trong modal "Chi tiết" của trang này),
+`app-v2:style-parity` 18/18, cộng dựng lại NGUYÊN VẸN kịch bản ảnh chụp
+người dùng gửi bằng `window.qcApi` (máy "Điện giải", xét nghiệm "Sodium
+(Na)", lô 1101/1102, nhóm "1101/1102", 2 điểm QC trên lô 1101, chuyển tiếp
+sang lô 1111) rồi đọc lại giao diện thật: nhóm "1111/1102" đang hoạt động +
+nhóm "1101/1102" "Đã lưu trữ" chỉ còn 3 nút (không có Kích hoạt) — khớp
+pixel với ảnh chụp; cột "Nguồn" hiện đúng NSX cho cả 2 lô; modal "Chi tiết"
+của lô 1101 hiện đủ 2 bảng với Mean tích lũy 140.3/SD tích lũy 1.1/CV tích
+lũy 0.76% tính đúng từ 2 điểm QC thật (141.0 và 139.5) — không phải số bịa.
+
+**Cột "Hiệu lực" của tab Lịch sử luôn hiện "Không giới hạn" cho mốc BẮT ĐẦU
+dù đã đặt ngày rõ ràng (2026-09-03).** Người dùng chuyển tiếp lô với "Ngày
+bắt đầu" = 03/09/2026 nhưng dòng lịch sử của lô mới vẫn hiện "Không giới hạn
+→ 31/10/2026" (hạn dùng lô) thay vì "03/09/2026 → …". Nguyên nhân:
+`HistoryTab.tsx`'s `build()` hard-code `periodLabel('', to)` — vế "từ" LUÔN
+rỗng cho MỌI dòng, kể cả khi có đủ dữ liệu để suy ra đúng. Trong khi
+`mean_sd_history_json` không lưu `effectiveFrom` riêng (chỉ `{at,mean,sd,
+qcLotId}` — giới hạn dữ liệu đã ghi từ trước), có thể SUY ĐÚNG: mốc TRƯỚC
+`at` lúc nào thì mốc SAU bắt đầu hiệu lực đúng lúc đó (hai mốc liền kề không
+có khoảng trống) — dòng ĐANG hiệu lực nhận "từ" = `at` của mốc lịch sử GẦN
+NHẤT (nếu có), mỗi dòng lịch sử khác nhận "từ" = `at` của mốc NGAY TRƯỚC nó
+trong mảng; chỉ mốc CŨ NHẤT (chưa từng thay, không có gì cũ hơn để suy ra)
+mới thật sự "Không giới hạn" ở đầu. Sửa `rows`'s `useMemo`: `build()` nhận
+thêm tham số `from`, tính từ `history[index-1]?.at` (dòng lịch sử) hoặc
+`history[history.length-1]?.at` (dòng đang hiệu lực).
+
+Verify: `app-v2:typecheck`/`test` 34/34/`build` sạch, `app-v2:css-parity` 0,
+`app-v2:ui-parity` 79/79, `app-v2:style-parity` 18/18, cộng xác nhận trong
+trình duyệt thật với đúng dữ liệu đã tạo ở mục trên: dòng lô 1111 (vừa
+chuyển tiếp) hiện "03/09/2026 → Không giới hạn", dòng lô 1101 (bị thay,
+CHƯA từng bị thay trước đó) hiện "Không giới hạn → 03/09/2026", dòng lô
+1102 (chưa từng đổi) vẫn "Không giới hạn → Không giới hạn" — đúng cả 3
+nhánh (mốc đầu tiên/mốc đã thay/mốc đang hiệu lực sau khi thay).
+
+**Audit sâu toàn bộ nghiệp vụ 8 tab "Cấu hình chung" (2026-09-03) — bắt được
+BUG DỮ LIỆU NGHIÊM TRỌNG NHẤT của cả đợt "làm đầy đủ": Giới hạn dưới/trên bị
+mất khi lưu Mean/SD.** Theo yêu cầu người dùng "đào sâu thật sâu, đảm bảo
+chính xác 100% so với app cũ", chạy song song 6 agent nghiên cứu (mỗi agent
+1-2 tab, đọc thẳng mã nguồn app cũ + app-v2, không tin tài liệu cũ) — tìm
+được ~30 điểm lệch, ưu tiên sửa theo mức độ nghiêm trọng, bắt đầu từ bug này.
+
+- **Nguyên nhân**: `TargetsTab.tsx`'s `saveTargetMatrix()` gọi
+  `normalizeTargetPick()` (đã tính đúng `result.low`/`result.high` từ Mean/SD
+  hoặc ngược lại) nhưng khi `picked.push({...})` **chỉ lấy `mean`/`sd`, bỏ hẳn
+  `low`/`high`**. Sâu hơn: DÙ CÓ gửi lên, main process cũng không lưu được —
+  `TestLevelInput`/`PreparedTestLevel` (`manage-validation.ts`'s
+  `prepareTestLevel()`/`validateTestLevel()`) **chưa từng có trường
+  `low`/`high`**, và `saveTestLevel`'s SQL (`config-handlers.ts`) không ghi 2
+  cột đó dù `test_levels.low`/`.high` đã có sẵn trong schema từ đầu. Hậu quả:
+  người dùng nhập Mean=150/SD=5, ô Giới hạn dưới/trên TỰ ĐỘNG hiện đúng
+  140.00/160.00 (tính ở renderer) — trông như đã lưu — nhưng bấm "Lưu Mean/SD
+  mức này" xong thì 2 số đó BIẾN MẤT khỏi DB, tab "Lịch sử dữ liệu" luôn hiện
+  "—" cho mọi dòng dù đã nhập đủ giới hạn lúc lưu.
+- **Sửa domain**: `prepareTestLevel()`/`TestLevelInput`/`PreparedTestLevel`
+  thêm `low`/`high` (parse giống `mean`/`sd`, không ép buộc — `null` nếu bỏ
+  trống, không validate thêm gì vì `normalizeTargetPick()` ở renderer đã kiểm
+  đủ điều kiện trước khi gửi lên).
+- **Sửa SQL**: `saveTestLevel`'s UPDATE/INSERT ghi thêm `low`/`high`.
+- **Sửa renderer**: `TargetsTab.tsx`'s `picked` giữ lại `result.low`/
+  `result.high`, gửi kèm khi gọi `saveTestLevel(...)`.
+- **Sửa luôn 1 gap cùng loại tìm thấy khi rà**: modal "Chuyển tiếp lô" (Mean/
+  SD ứng viên cho lô mới, lưu tạm trong `lot_transitions.criteria_json`) cũng
+  chỉ giữ `mean`/`sd` khi đọc bảng — cùng lỗ hổng, khác chỗ. Thêm `low`/`high`
+  vào kiểu `criteria`, `TransitionsTab.tsx`'s `submit()` gửi kèm, và cascade
+  "Chấp nhận" (`createLotTransition`'s `applyCascade()`, cả main lẫn
+  `browser-mock/api.ts`) ghi `low`/`high` vào `test_levels` khi áp Mean/SD
+  ứng viên vào lô mới. Cascade `activateLotGroup` đã đúng từ trước (không cần
+  sửa) — nó đọc `low`/`high` qua `lotTargetSnapshot()` rồi ghi thẳng.
+- Mirror đầy đủ trong `renderer/browser-mock/api.ts` (bản xem trước trình
+  duyệt) cho cả 2 đường lưu trên.
+
+Verify: `npm run app-v2:typecheck`/`test` 34/34 (mock-parity vẫn khớp 141
+bước — không đổi hợp đồng IPC, chỉ thêm field)/`build` sạch, `app-v2:css-
+parity` 0, `app-v2:ui-parity` 79/79, `app-v2:style-parity` 18/18, cộng xác
+nhận trong trình duyệt thật qua cả 2 đường: (1) gọi thẳng `window.qcApi
+.saveTestLevel(...)` với `low`/`high` — đọc lại `listTestLevels()` xác nhận
+2 cột không còn `null`; (2) thao tác qua chính UI "Mean/SD" — gõ Mean=150/
+SD=5 (Giới hạn tự đồng bộ 140.00/160.00), tick "Dùng", bấm "Lưu Mean/SD mức
+này" → xác thực lại mật khẩu thật → đọc lại DB thấy `low:140,high:160` đã
+lưu THẬT → chuyển sang tab "Lịch sử dữ liệu", dòng đang hiệu lực hiện đúng
+"140.00"/"160.00" ở cột Giới hạn dưới/trên (trước đây luôn "—") — các dòng
+lịch sử CŨ (lưu trước khi sửa) vẫn hiện "—" đúng như kỳ vọng, vì
+`mean_sd_history_json` chỉ chốt `{at,mean,sd,qcLotId}` mỗi lần đổi (giới hạn
+dữ liệu đã ghi từ Giai đoạn D3.4b, không phải bug mới) — chỉ dòng ĐANG hiệu
+lực (đọc thẳng cột `test_levels.low/high` mới) mới có giới hạn.
+
+**Còn lại từ đợt audit 6-agent này, đã liệt kê theo tab nhưng CHƯA sửa**
+(mức độ thấp hơn, để lại việc kế tiếp; 2 mục nghiêm trọng nhất — mô hình
+trạng thái nhóm lô và checkbox mặc định của Mean/SD — đã sửa ở mục ngay
+dưới): Danh mục xét nghiệm (TEa âm bị clamp lặng lẽ thay vì báo lỗi; chưa
+auto-fill Khoa/Khu vực cho máy mặc định khi mở modal thêm mới; CUSUM k/h ≤0
+chỉ clamp về 0 thay vì trả về mặc định); Lô & Nhóm QC (thiếu chặn trùng số
+lô cùng mức; thiếu chặn đổi mức của lô đang gán cho xét nghiệm; lô đã hết
+dùng không bị vô hiệu hoá trong modal chọn thành viên nhóm; thiếu chặn trùng
+nhóm lô); Mean/SD (bỏ tick một hàng nên gỡ gán lô của mức đó, hiện chưa làm
+gì); Chuyển tiếp lô (danh sách Lô cũ/Lô mới nên loại lô đã `depleted` trừ
+khi đang là giá trị đang chọn; audit log xoá hồ sơ dùng id thô thay vì nhãn
+lô đọc được); Lịch sử dữ liệu (ô tìm kiếm nên lọc theo cả số lô/mức, không
+chỉ tên xét nghiệm); Bảng TEa tham chiếu (ô "Nguồn chính" nên là danh sách
+đóng 6 lựa chọn thay vì gõ tự do; thiếu đường xoá hồ sơ PXN của analyte có
+sẵn trong danh mục; thứ tự ưu tiên trạng thái override/lab bị đảo; audit log
+TEa thiếu các trường tuân thủ (nguồn/tham chiếu/lý do/ngày/người chuẩn
+bị-duyệt) dù đã có sẵn lúc lưu). Toàn bộ đã ghi lại có chủ đích, không phải
+bỏ sót không ghi chú — ưu tiên sửa tiếp theo mức độ nghiêm trọng khi có
+yêu cầu.
+
+**Sửa 2 mục nghiêm trọng tiếp theo của đợt audit — mô hình trạng thái nhóm
+lô QC bị đảo ngược, và checkbox Mean/SD mặc định sai (2026-09-04).**
+
+1. **Lô & Nhóm QC — "Đang hoạt động" bị lưu cứng thay vì SUY ra.** Tra lại
+   đúng app cũ (`src/presentation/manage/lot-group-status.ts`/
+   `lot-group-toggle-action.ts`, `src/domain/qc/lot-group-status.ts`'s
+   `qcLotGroupOperational()`, và `operational-access.ts`'s `lotGroupInUse()`):
+   app cũ **KHÔNG BAO GIỜ lưu literal `'active'`** cho `status` của nhóm lô —
+   trường này chỉ có 2 giá trị tự đặt thật (`'stopped'`/`'planned'`), còn lại
+   là "không có gì tự đặt" (`delete group.status` khi kích hoạt). "Đang hoạt
+   động" vs "Chưa dùng" là nhãn **SUY** từ `lotGroupInUse()` — có lô nào của
+   nhóm đang thật sự được gán (`qcLotId`) cho xét nghiệm nào không.
+   `prepareLotGroup()` (app-v2, `manage-validation.ts`) lại mặc định
+   `status:'active'` ngay lúc TẠO nhóm mới — hậu quả: một nhóm VỪA TẠO, CHƯA
+   hề gán lô cho xét nghiệm nào, đã hiện "Đang hoạt động" + nút "Dừng" ngay
+   lập tức, sai hẳn luồng tạo→kích hoạt của app cũ.
+   - `GROUP_STATUSES` bỏ `'active'`, chỉ còn `['stopped','planned']`;
+     `PreparedLotGroup.status` đổi kiểu `'' | 'stopped' | 'planned'`; mặc
+     định khi tạo mới (hoặc giá trị lạ) là `''` (không phải `'active'`).
+   - `config-handlers.ts` thêm `lotGroupInUse(lotIds)` (SQL `EXISTS` trên
+     `test_levels.qc_lot_id`) — dùng chung ở 3 chỗ: `listLotGroups()` trả
+     thêm trường `inUse` cho mỗi nhóm; `stopLotGroup()` đổi cổng chặn từ
+     `status==='active'` (literal không bao giờ còn được lưu, nên nút "Dừng"
+     sẽ luôn thất bại nếu không sửa) sang "không phải stopped/planned VÀ
+     đang inUse" (đúng `lotGroupToggleAction()` app cũ); `activateLotGroup()`
+     2 chỗ `UPDATE ... status='active'` đổi thành `status=''`.
+   - `LotGroup` (shared `qc-api.d.ts`) thêm trường đọc `inUse: boolean`
+     (tính ở main, không lưu DB) và đổi kiểu `status` khớp domain.
+   - `LotsTab.tsx`: form tạo mới gửi `status:''` thay vì `'active'`; nhãn/
+     class trạng thái và điều kiện hiện nút Dừng/Kích hoạt đổi từ so sánh
+     `g.status==='active'` sang `operational && g.inUse` (`operational =
+     status khác 'stopped'/'planned'`).
+   - Mirror đầy đủ 4 hàm trên trong `renderer/browser-mock/api.ts`
+     (`saveLotGroup` tự động đúng vì dùng chung `validateLotGroup()` từ
+     domain, không cần sửa riêng).
+   - Sửa 2 test cũ khoá sai kỳ vọng (`config-lot-lifecycle.test.mjs`): kỳ
+     vọng `status==='active'` sau khi kích hoạt/chấp nhận chuyển lô đổi
+     thành `status===''` + `inUse===true` — giữ đúng Ý ĐỊNH bài test (nhóm
+     vẫn thật sự đang chạy), chỉ đổi cách biểu diễn.
+2. **Mean/SD — checkbox "Dùng" luôn tick sẵn, kể cả hàng đang gắn LÔ KHÁC.**
+   Tra `src/presentation/manage/target-row-state.ts`'s `targetRowState()` app
+   cũ: `checked = !!linked || !assigned` — tick sẵn khi mức CHƯA gán lô nào
+   (`!assigned`) hoặc đã gán ĐÚNG lô của nhóm đang xem (`linked`); BỎ tick khi
+   mức đang gán một lô KHÁC ngoài nhóm (`assigned && !linked`, nhãn "Đang
+   dùng lô khác"). `TargetsTab.tsx` trước đó `defaultChecked` cứng `true` cho
+   mọi hàng — bấm "Lưu Mean/SD mức này" mà quên bỏ tick sẽ vô tình chuyển cả
+   những xét nghiệm KHÔNG liên quan sang lô của nhóm đang xem, ghi đè Mean/SD
+   đang dùng thật của chúng.
+   - Thêm `const checked = !target?.qc_lot_id || !!linkedLot;` (dùng đúng
+     `linkedLot` đã có sẵn để tính cột "Trạng thái"), gán vào
+     `defaultChecked` của `.tm-use` VÀ `disabled={!checked}` cho cả 4 ô số
+     (Mean/Giới hạn dưới/Giới hạn trên/SD) — khớp `disabled: locked ||
+     !checked` app cũ (bỏ nhánh `locked`/lô đã hết dùng, việc đó vẫn nằm
+     trong backlog TEa/Lô riêng). `toggleTargetRow()`/`targetCheckAll()`
+     (đã có sẵn, không đổi) vẫn xử lý đúng khi người dùng tự tick/bỏ tick.
+
+Verify: `npm run app-v2:typecheck`/`test` 34/34 (2 assertion sửa lại đúng
+kỳ vọng, không nới lỏng)/`build` sạch, `app-v2:css-parity` 0, `app-v2:ui-
+parity` 79/79, `app-v2:style-parity` 18/18, cộng xác nhận trong trình duyệt
+thật qua `window.qcApi`: tạo nhóm lô mới với 2 lô CHƯA gán cho xét nghiệm
+nào → `listLotGroups()` trả đúng `status:'', inUse:false` → giao diện hiện
+đúng "Chưa dùng" + nút "Kích hoạt" (không còn "Đang hoạt động"/"Dừng" ngay
+khi vừa tạo); mở tab Mean/SD, chọn Panel chứa 1 xét nghiệm đang gắn lô KHÁC
+với nhóm đang xem → bảng tổng kết hiện đúng "1 đang dùng lô khác", checkbox
+hàng đó mặc định BỎ TICK và cả 4 ô số bị khoá — khớp đúng hành vi app cũ.
+
+**Sửa hết ~13 mục còn lại của đợt audit 6-agent (2026-09-04) — "sửa hết theo
+thứ tự rõ ràng" theo yêu cầu người dùng.** Trước khi sửa, chạy 3 agent nghiên
+cứu song song đọc thẳng mã nguồn app cũ (không tin lại mô tả cũ trong file
+này) cho từng nhóm nghiệp vụ, lấy đúng tên hàm/số dòng/thông báo lỗi/công
+thức trước khi port. Nhóm theo file bị đụng, không theo thứ tự liệt kê cũ.
+
+**1. Lô & Nhóm QC — 4 validate còn thiếu.**
+- **Chặn trùng số lô cùng mức** (`duplicate-lot`, "Số lô QC này đã tồn tại ở
+  cùng mức QC.") — port `validateLot()` app cũ (`sameText()`, không phân
+  biệt hoa/thường/dấu).
+- **Chặn đổi mức của lô đang gắn Mean/SD cho xét nghiệm** (`level-in-use`,
+  "Lô QC đang gắn với xét nghiệm nên không thể đổi mức QC. Hãy bỏ gán lô
+  trong Mean/SD trước.") — kiểm TRƯỚC cả cổng trùng số lô, đúng thứ tự app
+  cũ. Cả hai gate thêm vào `saveLot()` (`config-handlers.ts`), mirror trong
+  `browser-mock/api.ts`.
+- **Chặn trùng nhóm lô** (`duplicate-group`, "Nhóm lô này đã tồn tại hoặc
+  trùng danh sách lô.") — trùng TÊN (`sameText`) HOẶC trùng NGUYÊN BỘ LÔ
+  (không kể thứ tự) với nhóm khác — thêm vào `saveLotGroup()`.
+- **Lô đã hết dùng (`depleted`) bị khoá trong modal chọn thành viên nhóm** —
+  port `locked = depleted && !selected` app cũ: vẫn GIỮ LẠI nếu đã là thành
+  viên hiện tại (sửa nhóm cũ), chỉ chặn THÊM MỚI một lô đã hết dùng vào
+  nhóm khác. `LotsTab.tsx` thêm `disabled`+`title` cho checkbox.
+
+**2. Chuyển tiếp lô — loại lô hết dùng khỏi dropdown + audit log đọc được.**
+- Port `availableLots()` app cũ: dropdown "Lô cũ"/"Lô mới" ẩn mọi lô
+  `depleted`, TRỪ khi đó chính là giá trị đang chọn/sửa (giữ lại lựa chọn
+  cũ khi mở lại 1 hồ sơ cũ). Nhãn thêm hậu tố "đã chuyển tiếp qua lô X"/"đã
+  hết QC" khi lô đó hết dùng, port `label()` app cũ.
+- **Audit log xoá hồ sơ chuyển lô dùng ID THÔ** (`Xoá hồ sơ chuyển lô
+  <id-nội-bộ>`) — sửa thành nhãn đọc được qua `lotLabel()` mới (`"1101 ·
+  Mức 1 → 1111 · Mức 1"`, `target:'Chuyển tiếp lô'` tĩnh), port đúng
+  `manageLotLabel()`/`manage-lot-transition-command.ts` app cũ.
+- **Bug thật tìm thấy khi rà cùng lúc**: `browser-mock/api.ts`'s
+  `removeLotTransition` còn kiểm `status==='concluded'` — vocabulary CŨ đã
+  đổi sang `accepted`/`rejected` từ 2026-09-03 — nghĩa là bản xem trước
+  KHÔNG BAO GIỜ chặn xoá một hồ sơ đã `accepted`, khác hẳn `main` (đã chặn
+  đúng). Sửa lại đúng `status==='accepted'`.
+
+**3. Mean/SD — bỏ tick hàng ĐANG THẬT SỰ gắn đúng lô đó thì GỠ liên kết
+thật.** Port nhánh `!pick.use` của `applyTargetPick()` app cũ: `linked` (mức
+gắn ĐÚNG lô của hàng đang xét) mới bị gỡ (`qcLotId=''`), giữ nguyên Mean/SD
+đã có; hàng "chưa gán"/"đang gắn lô khác" thì bỏ tick không làm gì (khớp
+app cũ). `TargetsTab.tsx`'s `saveTargetMatrix()` trước đây chỉ SKIP hàng bị
+bỏ tick (không đụng gì tới DB) — giờ tách riêng mảng `unlink`, gọi
+`saveTestLevel(...,{qcLotId:''})` giữ nguyên `mean/sd/low/high` hiện có cho
+từng hàng thoả điều kiện.
+
+**4. Lịch sử dữ liệu — ô tìm kiếm lọc thêm theo số lô/mức.** Port
+`historySearchValues()` app cũ: tập giá trị so khớp gồm tên xét nghiệm CỘNG
+số mức (dạng số/`M{n}`/`Mức {n}`) và số lô của MỌI mốc lịch sử Mean/SD.
+Component nạp mức QC của MỌI xét nghiệm (không chỉ xét nghiệm đang chọn)
+qua `useEffect` mới để có đủ dữ liệu tra cứu.
+- **Bug thật tự bắt được khi kiểm chứng sống (không phải chỉ đọc code)**:
+  port thẳng công thức fallback `history.length ? history : [{qcLotId:
+  level.qcLotId}]` của app cũ SAI với mô hình dữ liệu app-v2 —
+  `mean_sd_history_json` ở đây CHỈ chốt giá trị CŨ (đã bị thay), khác
+  `meanSdHistory` app cũ (tự bao gồm cả mốc mới nhất) — nên khi một mức ĐÃ
+  từng đổi Mean/SD ít nhất 1 lần, lô ĐANG DÙNG hiện tại không bao giờ lọt
+  vào tập so khớp. Phát hiện bằng cách gõ đúng số lô đang dùng của "Kali"
+  vào ô tìm kiếm và thấy 0 kết quả dù dữ liệu đúng — sửa bằng cách LUÔN
+  cộng thêm mốc hiện tại vào danh sách so khớp thay vì chỉ dùng khi rỗng.
+
+**5. Danh mục xét nghiệm — 3 mục.**
+- **TEa âm** giờ bị chặn rõ ràng (`invalid-tea`, "TEa không được âm.") thay
+  vì âm thầm `Math.max(0,...)` — port `validateAssay()` app cũ.
+- **CUSUM k/h ≤0 hoặc không phải số** rơi về ĐÚNG mặc định (k=0.5, h=4,
+  khớp giá trị tạo mới) thay vì clamp về 0 (vô nghĩa hoá CUSUM mà không báo
+  gì) — thêm hàm `cusumParam()` trong `prepareTest()`.
+- **Auto-fill Khoa/Khu vực khi mở modal "Thêm xét nghiệm"**: select Máy
+  không có option rỗng nên trình duyệt tự chọn máy ĐẦU TIÊN khi tạo mới —
+  ô Khoa/Khu vực giờ điền sẵn theo `instruments[0]?.section` ngay lúc mở,
+  thay vì để trống chờ `onChange`, port `openConfigAssayModel()` app cũ.
+
+**6. Bảng TEa tham chiếu — 4 mục.**
+- **"Nguồn chính" đổi từ input tự do sang `<select>` đóng 6 giá trị** —
+  port `TEA_LAB_BASIS_SOURCES` app cũ nguyên văn (regulation/pt/eflm/ricos/
+  professional/other + nhãn tiếng Việt). Domain thêm `TEA_LAB_SOURCES`
+  (danh sách hợp lệ, validate chặn `invalid-source`) và
+  `TEA_LAB_SOURCE_LABELS` (nhãn dùng để ghi audit log đọc được) trong
+  `tea-ref-validation.ts`; renderer giữ bản riêng cùng 6 nhãn để dựng
+  `<select>` (theo đúng quy ước "mỗi lớp giữ hằng số riêng" đã dùng cho
+  `STATUS_TEXT` ở TransitionsTab).
+- **Thêm IPC `removeTeaLabProfile`** — xoá RIÊNG hồ sơ TEa PXN, khác
+  `removeTeaRef` (xoá cả dòng analyte): trước đây analyte có sẵn trong danh
+  mục built-in KHÔNG có đường nào xoá hồ sơ PXN, chỉ "Khôi phục" (chỉ xoá
+  CLIA/Ricos% ghi đè, giữ nguyên hồ sơ PXN). Hàm mới chỉ xoá 5 cột `lab*`,
+  và xoá LUÔN cả dòng nếu sau đó dòng không còn `clia`/`ricos` VÀ không có
+  `abbreviation`/`matrix` (2 cột chỉ được ghi qua `addTeaAnalyte()` — tín
+  hiệu phân biệt "analyte tự thêm" mà không cần main biết tới danh mục
+  catalog phía renderer). Nút "Xóa TEa chuẩn hóa" thêm vào footer modal, ẩn
+  khi chưa có hồ sơ (`current.lab==null`).
+- **Thứ tự ưu tiên trạng thái bị đảo**: `kind = labRef?.lab!=null ? 'lab' :
+  hasOverride ? 'override' : 'default'` — SAI thứ tự, khi một dòng VỪA có
+  override CLIA/Ricos% VỪA có hồ sơ PXN thì hiện "TEa PXN" thay vì "Đã sửa".
+  Port đúng `teaReferenceKind()` app cũ (kiểm `override` TRƯỚC `lab`).
+- **Audit log `saveTeaRef` chỉ ghi "Cập nhật X"/"Tạo X"** — không có gì để
+  đối chiếu tuân thủ dù mọi trường đã có sẵn lúc lưu. Port đúng
+  `saveLabProfile()` app cũ: `detail` giờ có đủ tên/giá trị cũ→mới/nguồn
+  (nhãn tiếng Việt)/tham chiếu/ngày hiệu lực (dd/mm/yyyy)/người xây dựng/
+  người duyệt kèm ngày duyệt/ngày xem xét lại (nếu có)/lý do; `action` phân
+  biệt "Thiết lập TEa chuẩn hóa" (lần đầu) vs "Cập nhật TEa chuẩn hóa".
+
+**Sửa test cũ vì lý do đúng, không phải để cho xanh**: `manage-validation
+.test.mjs` từng khoá `tea:-1` phải LUÔN `ok:true` và tự động kẹp về 0 —
+đúng bug vừa sửa, nên đổi kỳ vọng thành `invalid-tea`, thêm case CUSUM mặc
+định. `tea-ref-validation.test.mjs`'s `BASE.labSource:'CLIA 2024'` và
+`config-lots-handlers.test.mjs`'s `labSource:'CLIA 2024'`/`mock-parity
+.test.mjs`'s 4 chỗ `labSource:'CLIA'` đều là chuỗi KHÔNG nằm trong danh
+sách đóng mới — đổi thành `'regulation'` (khớp đúng ý định "CLIA/quy định"
+ban đầu của test), thêm 1 case mới pin riêng `invalid-source`.
+`config-lot-lifecycle.test.mjs`'s 2 chỗ khoá `status:'active'` của NHÓM LÔ
+(từ đợt sửa mô hình trạng thái trước) đổi thành `status:''` +
+`inUse:true` — nhắc lại đúng, không phải lỗi mới.
+
+Verify: `npm run app-v2:typecheck` sạch, `app-v2:test` 34/34 (`mock-parity`
+lên 145 bước — thêm 4 bước exercising `removeTeaLabProfile` cả 2 nhánh
+`removedRecord` true/false), `app-v2:build` sạch, `app-v2:css-parity` 0,
+`app-v2:ui-parity` 79/79, `app-v2:style-parity` 18/18, cộng xác nhận từng
+mục trong trình duyệt thật qua `window.qcApi` VÀ thao tác UI thật: trùng lô/
+trùng nhóm lô/đổi mức lô đang dùng đều bị chặn đúng mã lỗi; nhóm mới không
+đụng gì tới lô đã hết dùng trong modal (checkbox `disabled` + tooltip);
+dropdown chuyển tiếp lô loại đúng 4 lô đã hết dùng (1101/2101/RUN-1/RUN-2);
+xoá hồ sơ chuyển lô ghi đúng "AUDITX · Mức 1 → AUDITY · Mức 1"; TEa âm/
+CUSUM ≤0 xử lý đúng; gõ "2111" vào ô tìm kiếm Lịch sử dữ liệu ra đúng
+"Kali" (xét nghiệm đang dùng lô đó); modal TEa hiện đúng `<select>` 6
+nguồn + nút "Xóa TEa chuẩn hóa" cho analyte built-in "Sodium", bấm xoá
+đúng: hồ sơ PXN mất, override CLIA vẫn còn, badge đổi đúng "Đã sửa" (không
+còn "TEa PXN") — khớp thứ tự ưu tiên vừa sửa.
+
+**Toàn bộ danh sách audit 6-agent (~30 mục ban đầu) nay đã sửa hết**, trừ 2
+giới hạn kiến trúc đã ghi từ trước (danh mục TEa tích hợp rút gọn 77
+analyte; phạm vi luật Westgard within/across lưu được nhưng engine chưa
+thực thi khác nhau) — cả hai cần một đợt riêng lớn hơn, không phải bug.
+
+**3 tinh chỉnh UX tab Lô & Nhóm QC theo phản hồi trực tiếp (2026-09-04).**
+
+1. **Sắp xếp thẻ nhóm lô — nhóm đang hoạt động lên đầu.** `LotsTab.tsx`
+   trước đây hiện thẳng thứ tự trả về từ `listLotGroups()` (theo tên) — một
+   nhóm "Đã lưu trữ" xen giữa các nhóm đang dùng thật, dễ bị bỏ sót. Thêm
+   `groupSortPriority()` (0=đang hoạt động, 1=dự kiến/chưa dùng, 2=đã dừng,
+   3=đã lưu trữ) và sort trước khi `.map()`, dùng `[...lotGroups].sort()`
+   (không mutate mảng gốc từ store).
+2. **"Đã chuyển tiếp" không nói lô cũ đi ĐÂU.** Cột "Trạng thái" của bảng Lô
+   QC chỉ ghi chung chung "Đã chuyển tiếp" cho lô đã hết dùng — người dùng
+   phải tự mở tab "Chuyển tiếp lô" để tra xem nó thành lô nào. Port
+   `transitionToNo()` app cũ: `lotStatus()` (`shared.tsx`) nhận thêm tham số
+   `toLotNo` tuỳ chọn, in "Đã chuyển tiếp qua lô X" khi tra được (hồ sơ
+   chuyển tiếp đã `accepted`), giữ nguyên câu cũ khi không tra được.
+   `LotsTab.tsx` thêm `transitionToNo(lotId)` (tra `lotTransitions` đã có
+   sẵn từ `ManagePage.tsx`'s load trung tâm, không cần load thêm).
+3. **Dropdown "Nhóm lô QC" ở tab Mean/SD hiện cả nhóm đã lưu trữ/đã dừng.**
+   Đây là nơi GÁN Mean/SD, không phải nơi quản lý vòng đời nhóm lô (khác tab
+   "Lô & Nhóm QC", nơi vẫn cần thấy MỌI nhóm để kích hoạt lại/xoá) — một
+   nhóm đã lưu trữ/dừng không còn là đích gán hợp lý. `TargetsTab.tsx` lọc
+   `lotGroups = allLotGroups.filter(g => g.active!==0 && g.status!=='stopped')`
+   trước khi dùng cho dropdown/`selectedGroup`/mặc định chọn; "Dự kiến"/
+   "Chưa dùng" vẫn hiện vì đây chính là nơi gán Mean/SD LẦN ĐẦU cho một
+   nhóm mới. Effect chọn mặc định cũng đổi từ "chỉ set khi rỗng" sang "set
+   lại nếu giá trị đang chọn không còn nằm trong danh sách lọc" — tự chuyển
+   sang nhóm hợp lệ nếu nhóm đang xem vừa bị lưu trữ/dừng ở nơi khác.
+
+Verify: `npm run app-v2:typecheck`/`test` 34/34/`build` sạch, `app-v2:css-
+parity` 0, `app-v2:ui-parity` 79/79, `app-v2:style-parity` 18/18, cộng xác
+nhận trong trình duyệt thật: thẻ "Đang hoạt động" (1111/1102, 2101/2102)
+lên trước thẻ "Đã lưu trữ" (1101/1102); bảng Lô QC hiện đúng "Đã chuyển
+tiếp qua lô 1111"/"qua lô 2111"/"qua lô CAND-1"/"qua lô CAND-2" cho từng lô
+đã hết dùng; dropdown Mean/SD chỉ còn "1111/1102"/"2101/2102", không còn
+"1101/1102".
+
+**Thẻ "Đã lưu trữ" mất 1 lô — chỉ còn đúng lô đã chuyển tiếp, thiếu lô
+KHÔNG chuyển tiếp trong cùng nhóm cũ (2026-09-04).** Người dùng chỉ vào ảnh
+chụp thẻ "1101/1102" (Đã lưu trữ) chỉ hiện 1 chip "1101 · M1", thiếu hẳn
+"1102 · M2" dù tên thẻ vẫn ngụ ý đủ 2 lô.
+
+**Nguyên nhân — lệch mô hình dữ liệu, không phải thiếu code hiển thị.** Tra
+lại đúng `applyAcceptedLotTransition()` app cũ
+(`src/application/manage/manage-config-service.ts:260`): nhóm LƯU TRỮ được
+tạo với `lotIds: oldIds` — **NGUYÊN VẸN mọi thành viên CŨ của nhóm** (cả
+1101 VÀ 1102), không chỉ lô vừa chuyển tiếp. App cũ làm được vậy vì
+`lotIds` chỉ là 1 mảng id không loại trừ lẫn nhau — lô 1102 nằm trong CẢ
+HAI mảng (`lotIds` của nhóm lưu trữ VÀ nhóm đang hoạt động) cùng lúc, không
+sao cả. app-v2 dùng khoá ngoại thật (`qc_lots.group_id`, "1 lô chỉ thuộc 1
+nhóm tại 1 thời điểm") — cascade "Chấp nhận" (đã port ở mục "SỬA LẠI mục
+'Chấp nhận'..." phía trên) chuyển `group_id` của 1102 SANG nhóm đang hoạt
+động thật sự (đúng, vì 1102 vẫn cần thuộc về MỘT nhóm sống để dùng cho
+Mean/SD), nên nó không còn được đếm khi `listLotGroups()` derive `lotIds`
+SỐNG của nhóm lưu trữ qua `SELECT id FROM qc_lots WHERE group_id=?` — nhóm
+lưu trữ chỉ còn đúng lô KHÔNG di chuyển đi đâu (1101).
+
+**Sửa: thêm 1 cột lưu ẢNH CHỤP thành viên tại thời điểm lưu trữ, tách biệt
+với khoá ngoại sống.**
+- Schema: `lot_groups.archived_lot_ids_json TEXT NOT NULL DEFAULT ''` — `''`
+  = không có ảnh chụp (mọi nhóm ĐANG hoạt động, `listLotGroups()` vẫn derive
+  `lotIds` từ `qc_lots.group_id` SỐNG như cũ); chỉ nhóm do cascade "Chấp
+  nhận" tạo ra mới có giá trị khác rỗng. Vì `CREATE TABLE IF NOT EXISTS`
+  không tự thêm cột vào DB đã tồn tại trên đĩa, thêm kèm 1 bước `ALTER
+  TABLE` idempotent trong `applySchema()` (cùng khuôn với `tests.active` đã
+  có sẵn — kiểm `PRAGMA table_info` trước khi `ALTER`).
+- Cascade "Chấp nhận" (`config-handlers.ts`): chốt
+  `JSON.stringify(members.map(m=>m.id))` — TOÀN BỘ thành viên cũ đọc được
+  NGAY TRƯỚC khi tách nhóm (biến `members` đã có sẵn từ bước tính tên tự
+  sinh) — vào cột mới của dòng nhóm lưu trữ vừa `INSERT`.
+- `listLotGroups()`: nếu `archived_lot_ids_json` khác rỗng thì `lotIds` trả
+  về = ảnh chụp đã parse (không phải derive sống); `inUse` vẫn tính từ
+  danh sách SỐNG (không ảnh hưởng, nhóm lưu trữ luôn hiện "Đã lưu trữ" bất
+  kể `inUse`). Mirror đầy đủ trong `renderer/browser-mock/api.ts` (cả cascade
+  lẫn `listLotGroups`), và `saveLotGroup`'s mock thêm field này vào row object
+  (giữ nguyên giá trị cũ khi sửa, `''` khi tạo mới) để khớp hình dạng `SELECT
+  *` thật — thiếu field này làm `tests/mock-parity.test.mjs` báo lệch ngay
+  (đã chứng minh: chạy thử trước khi thêm field vào mock, gate báo đúng
+  "2 !== 0" tại đúng bước `nhom-lo-list`).
+- Sửa lại kỳ vọng SAI trong `config-lot-lifecycle.test.mjs`: dòng
+  `assert.deepEqual(archivedGroup.lotIds, [groupLotA.id], ...)` từng khoá
+  ĐÚNG bug này (chỉ mong đợi 1 lô) — đổi thành mong đợi CẢ 2 lô gốc
+  (`[groupLotA.id, groupLotB.id]`), giữ đúng Ý ĐỊNH bài test (nhóm lưu trữ
+  phải giữ nguyên trạng thái cũ) thay vì nới lỏng.
+
+Verify: `npm run app-v2:typecheck` sạch, `app-v2:test` 34/34, `app-v2:build`
+sạch, `app-v2:css-parity` 0, `app-v2:ui-parity` 79/79, `app-v2:style-parity`
+18/18, cộng dựng lại kịch bản THẬT qua `window.qcApi` (nhóm 2 lô mới, gán
+Mean/SD cho 1 lô, chuyển tiếp lô đó sang lô thứ 3, "Chấp nhận") rồi đọc lại
+giao diện: thẻ "Đã lưu trữ" hiện đúng CẢ HAI chip lô gốc
+("VERIFY-A · M5"/"VERIFY-B · M5"), không còn thiếu lô không chuyển tiếp.
+
+**Bảng "Lịch sử dữ liệu" tràn ngang — cột "Chi tiết" bị đẩy ra ngoài khung
+nhìn, phải cuộn ngang mới thấy (2026-09-04).** Người dùng chỉ ra bảng bị cắt
+mất cột cuối; hỏi lại có phải do đang xem qua Electron không — không phải,
+tái hiện được ngay trên trình duyệt (port 5174).
+
+**Nguyên nhân — lỗi số học trong CSS, không phải do màn hình hẹp.**
+`.history-table` (`manage.css`) đã có `table-layout:fixed` (kế thừa từ rule
+dùng chung `.rcfg-list>table`), nhưng khối `width:%` RIÊNG cho 10 cột của
+bảng này (thêm ở một đợt trước) chỉ khai đủ 9 cột, **cộng lại đã 104%**
+(8+16+11+11+11+11+15+10+11), không còn % nào cho cột 10 ("Chi tiết") —
+`table-layout:fixed` phân bổ cột không có width khai báo về gần 0, nút
+"Chi tiết" (nội dung tối thiểu ~54px) buộc phải TRÀN ra ngoài bảng thay vì
+được cấp chỗ, kéo `table.scrollWidth` (822px) vượt hẳn `offsetWidth` (768px)
+dù bảng đã "fixed layout, width:100%". Đo trực tiếp qua DOM
+(`getBoundingClientRect`/`scrollWidth` từng ô) xác nhận chính xác cột nào
+đang bị bóp về 0 trước khi sửa, không đoán.
+
+**Sửa: chốt lại đủ 10 cột = 100%, port nguyên % từ `assets/professional-
+config.css`** (1:6% · 2:17% trái · 3:9% · 4:9% · 5:10% · 6:8% · 7:17% ·
+8:8% · 9:7% · 10:9%) — đây chính là bộ % GỐC của app cũ cho bảng này, bản
+port trước không lấy đủ (chỉ 9/10 cột, sai tổng). Không cần đổi
+`table-layout`/cấu trúc HTML gì khác — chỉ là bảng cộng thức % bị thiếu 1
+cột.
+
+Verify: `npm run app-v2:typecheck` sạch, `app-v2:test` 34/34 (CSS thuần,
+không hàm nào đổi), `app-v2:build` sạch, `app-v2:css-parity` 0,
+`app-v2:ui-parity` 79/79, `app-v2:style-parity` 18/18 (không surface nào
+vượt baseline), cộng đo trực tiếp qua DOM trong trình duyệt thật:
+`table.scrollWidth` (768) giờ khớp `offsetWidth` (768, không còn tràn), cột
+"Chi tiết" có `clientWidth` 69px — hiện đủ trong khung nhìn ở đúng độ rộng
+panel trước đây bị cắt (768px), không cần cuộn ngang nữa.
+
+**Modal "Chi tiết" (Lịch sử dữ liệu) rộng SAI so với app cũ, cùng đợt
+(2026-09-04).** Người dùng mở modal này và so trực tiếp với app cũ, thấy độ
+rộng không khớp.
+
+**Nguyên nhân**: `HistoryTab.tsx` gọi `<Modal ... width={860}
+className="rcfg-history-detail-modal" .../>` — CSS thật đã có sẵn đúng giá
+trị app cũ (`.modal.rcfg-history-detail-modal{width:min(1160px,94vw);
+max-width:94vw;}`, port từ trước), nhưng `Modal.tsx`'s prop `width` render
+thành `style={{width}}` — **inline style luôn thắng CSS class bất kể thứ tự/
+độ đặc hiệu** — nên modal bị ép cứng về 860px, đè lên đúng rule đã có sẵn
+cho class riêng của nó. Đây là lỗi CODE (truyền dư 1 prop), không phải
+thiếu CSS — rule CSS đúng đã tồn tại từ trước, chỉ là chưa bao giờ có hiệu
+lực.
+
+**Sửa**: bỏ hẳn `width={860}` khỏi lệnh gọi — đúng quy ước đã ghi ngay
+trong comment đầu `Modal.tsx` ("mỗi modal thêm 1 class riêng... `className`
+phục vụ đúng việc đó", `width` chỉ còn giữ cho các chỗ gọi CŨ chưa có class
+riêng). Không đụng gì tới CSS.
+
+Verify: `npm run app-v2:typecheck` sạch, `app-v2:test` 34/34, `app-v2:build`
+sạch, `app-v2:css-parity` 0, `app-v2:ui-parity` 79/79, `app-v2:style-parity`
+18/18, cộng đo trực tiếp qua DOM trong trình duyệt thật SAU khi mở modal:
+`offsetWidth`/`getComputedStyle().width` đều ra đúng **1160px** ở viewport
+1280px (`min(1160px,94vw)` — 94vw của 1280px là 1203px, 1160px nhỏ hơn nên
+thắng), không còn `style="width:860px"` nào trên phần tử `.modal`.
+
+**Rà soát trang Cấu hình chung — sửa 1 mô tả SAI đã lặp lại nhiều lần, tìm
+ra 1 gap thật của TEa (2026-09-04, hoãn cùng đợt Six Sigma).** Người dùng
+hỏi "Cấu hình chung đã ổn hết chưa" — xác nhận 8/8 tab đạt 0/0 ở cả 3 gate
+(D3.4b), dọn 4 `surfaceNotes` lỗi thời trong `ui-parity-baseline.json`
+(mô tả đúng ở D3.4 nhưng đã vá xong ở D3.4b: xoá xét nghiệm/panel, ma trận
+Mean/SD, danh mục TEa — gate đã đo 0/0 từ lâu, ghi chú quên xoá).
+
+Trong lúc đó phát hiện **mô tả "danh mục TEa app-v2 rút gọn 77 so với hàng
+trăm của app cũ" là SAI**, lặp lại ở nhiều nơi (B1, D3.4, D3.6's
+`surfaceNotes.sigma`) nhưng chưa từng được đối chiếu số liệu thật. Đếm trực
+tiếp cả 2 phía: `root.TEA_ANALYTE_CATALOG` (`src/compat/modular-pilot.global.ts:2244-2320`)
+có đúng **77** analyte; `app-v2/renderer/data/tea-catalog.ts` cũng **77**,
+khớp từng tên/đơn vị/CLIA%/Ricos%. Không có gap về SỐ LƯỢNG.
+
+Gap THẬT (mới tìm ra, chưa từng ghi): app cũ's catalog có thêm 2 trường
+`cliaAbsolute`/`cliaAbsoluteUnit` cho ~9 analyte (Sodium, Calcium,
+Creatinine, Glucose, ALT, AST, Bilirubin, GGT, HDL-C...) — giới hạn CLIA
+dạng TUYỆT ĐỐI kèm đơn vị (Sodium = ±4 mmol/L), tách biệt với giới hạn %
+thường (`clia`). Theo "Confirmed business-logic decisions" ở trên, khi đơn
+vị xét nghiệm khớp đơn vị tiêu chí thì giá trị tuyệt đối này được quy đổi
+sang % theo Mean thực và so với nhánh Ricos, lấy nhánh LỚN HƠN — app-v2's
+`tea-catalog.ts` không có 2 trường này nên luôn chỉ dùng nhánh Ricos, ra TEa
+(và do đó Sigma) khác app cũ cho đúng 9 analyte này (xác nhận bằng Sodium:
+app cũ CLIA ±4.0000 mmol/L/Ricos 0.73% → Sigma -0.42/-0.17; app-v2 chỉ có
+Ricos 0.73%). Đây là gap của Six Sigma (nơi TEa catalog được dùng để tự gợi
+ý), không phải của chính trang Cấu hình chung — trang Cấu hình chung không
+hiển thị `cliaAbsolute` ở đâu cả.
+
+**Người dùng chốt 2026-09-04: hoãn, làm cùng đợt khi quay lại Six Sigma
+(D3.6)** — không sửa riêng lẻ ở đây. Ghi lại trong
+`ui-parity-baseline.json`'s `surfaceNotes.sigma` để không quên khi đợt đó
+tới: cần thêm `cliaAbsolute`/`cliaAbsoluteUnit` vào `tea-catalog.ts` cho 9
+analyte trên + hàm quy đổi tuyệt đối→% theo đơn vị khớp (đã có công thức
+trong "Confirmed business-logic decisions").
+
+2 mục còn treo có chủ đích khác của Cấu hình chung, không liên quan Six
+Sigma: cột "Hành động" nâng cao của bảng luật Westgard (Cảnh báo/Loại bỏ
+riêng từng luật — lưu được nhưng chưa nối vào engine, engine chưa hỗ trợ
+mức độ theo từng luật) và modal chuyển tiếp lô thiếu lựa chọn "Dự kiến"
+(staged, chỉ có Hủy/Chuyển — cần thiết kế schema riêng, đã ghi từ trước).
+
+Verify: không đổi hành vi runtime (chỉ sửa tài liệu/ghi chú baseline), nên
+không cần chạy lại test/build/gate.
+
+**Rà soát sâu trang Nhập QC — 2 agent song song, 6 lệch nghiệp vụ + 6 lệch
+CSS/DOM đều xác nhận bằng đọc thẳng mã nguồn thật (2026-09-04).** Không dùng
+lại ghi chú cũ trong CLAUDE.md — đọc trực tiếp `entry-service.ts`/
+`entry-page-controller.ts` (app cũ, TypeScript nhưng logic gần như y hệt bản
+classic) và, quan trọng nhất, phát hiện `src/react/pages/EntryPage.tsx` —
+bản REACT của CHÍNH app cũ (từ đợt "React island" độc lập với app-v2) —
+**vẫn còn tồn tại**, cho JSX/DOM chuẩn xác thay vì phải suy luận ngược từ
+CSS.
+
+**6 lệch nghiệp vụ, xếp theo mức độ:**
+1. **Hủy điểm QC mất hoàn toàn nhánh liên kết NCE.** App cũ's `voidPoint()`
+   (`entry-service.ts:133-163`) phân loại lý do hủy thành 3 "kind":
+   `analytical` (kết quả QC thực sự sai — LUÔN tự mở/dùng lại 1 hồ sơ NCE
+   gắn đúng `pointId`, không bắt buộc gõ lý do), `data-entry` (nhập sai —
+   LUÔN không mở NCE, không bắt buộc lý do), `other` (cần điều tra — người
+   dùng tự bật/tắt mở NCE, bắt buộc lý do ≥5 ký tự). Cột `void_kind`/
+   `void_requires_rerun` **đã có sẵn trong schema `qc_points` từ đầu**
+   (`main/db/schema.ts`) nhưng chưa handler nào từng ghi — một lỗ hổng kiểu
+   "thiếu wiring" y hệt lớp lỗi đã gặp nhiều lần trước đây. Port đủ:
+   `entry-validation.ts` thêm `voidNceChoice(kind)` (hàm THUẦN, renderer
+   import thẳng để dựng UI, cùng nguyên tắc "renderer dùng lại domain thuần
+   của main" đã dùng cho `normalizeTargetPick`/`page-roles.ts`);
+   `entry-handlers.ts`'s `voidPoint()` viết lại: đọc luật Westgard/loại sai
+   số (`errorType()`, `westgard-rules.ts`) của CHÍNH điểm đang huỷ TRƯỚC khi
+   đánh dấu voided (vì `queryPoints()` chỉ tính verdict cho điểm chưa huỷ),
+   tìm NCE đang mở gắn `point_id` đó để DÙNG LẠI (không tạo trùng) hoặc tạo
+   mới với `correction` tự sinh + `dueDate`=+7 ngày. Renderer: modal "Hủy
+   điểm QC" thêm `<select>` 3 loại (đúng 3 `<option>`/nhãn của
+   `entry-void-modal-html.ts` — file này VẪN còn cổ điển, chỉ dùng để đối
+   chiếu câu chữ, không đụng vào) + checkbox "Lập hồ sơ NCE..." tự khoá theo
+   kind + thông báo kết quả phân biệt "mở hồ sơ mới"/"dùng lại hồ sơ đang
+   mở"/"không yêu cầu NCE".
+2. **Cổng "nhóm lô còn vận hành" khi ghi điểm QC (hoàn tất siết đầy đủ
+   2026-09-06).** App cũ chặn CẢ 2
+   lớp (`entry-page-controller.ts:478,504`, `canEnterQcForLevel()` →
+   `operational-access.ts`/`lot-group-status.ts`'s `qcLotGroupOperational()`
+   = `active!==false && status!=='stopped' && status!=='planned'`) —
+   `entry-handlers.ts`'s `addPoint()` trước đây KHÔNG tra `lot_groups` chút
+   nào, nên nút "Dừng" nhóm lô ở Cấu hình chung chưa từng có tác dụng thật ở
+   trang Nhập QC. Bản hoàn thiện hiện port ĐẦY ĐỦ `canEnterQcForLevel()` vào
+   main: xét nghiệm phải còn hoạt động, thuộc Panel QC đang hoạt động, và
+   CHÍNH mức đang nhập phải gắn lô thuộc nhóm còn vận hành. Vì cổng nằm trong
+   `entry-handlers.ts`, renderer, LIS và mọi lời gọi IPC trực tiếp đều có
+   cùng ranh giới; browser mock mirror đúng điều kiện này. Bộ test cũ dùng
+   Mean/SD trần đã được chuyển sang fixture cấu hình Panel + nhóm có ≥2 lô,
+   đồng thời `entry-handlers.test.mjs` chốt trường hợp thiếu cấu hình phải trả
+   `level-not-operational`.
+3. **Kết luận NGÀY trên bảng worksheet tính theo "tệ nhất trong mọi lần
+   chạy" thay vì "lần chạy CUỐI CÙNG không bị loại" của mỗi mức** (port sai
+   `summarizeRunStatus()`, `entry-service.ts:60-77`). Hậu quả: chạy lại QC
+   sau khi bị loại và đạt, app-v2 vẫn hiện cả ngày là "Loại bỏ" — sai lệch
+   hồ sơ tuân thủ. Sửa: với mỗi mức, lấy điểm cuối KHÔNG rej của ngày (rơi
+   về điểm cuối cùng nếu mọi lần đều rej), rồi mới gộp `warnRules`/
+   `rejRules`/`worst` từ các đại diện đó — khớp đúng thuật toán app cũ.
+4. **Không tự mở ô nhập bổ sung khi lần chạy gần nhất trong ngày bị loại
+   bỏ** (`shouldShowEmptyRun()`, `entry-page-controller.ts:286-295`) — app
+   cũ chủ động nhắc "chạy lại ngay" mà không cần bấm "+ Thêm". Sửa: `runs[
+   runs.length-1].verdict==='rej'` tự đưa `extraOpen=true`, ẩn nút "+ Thêm"
+   tương ứng (cùng logic `!emptyShown` app cũ).
+5. **Công thức CV% thiếu `Math.abs(mean)`** ở 2 chỗ `EntryPage.tsx` tự viết
+   tay (domain `westgard-engine.ts`'s `stats()` đã đúng từ đầu, chỉ 2 bản
+   sao chép tay trong trang là sai) — lộ ra khi Mean âm (vd base excess),
+   CV% bị đảo dấu. Sửa cả 2 chỗ.
+6. **Ghi chú theo ngày không kế thừa khi thêm điểm mới cùng ngày** — app cũ
+   luôn tìm ghi chú của điểm khác cùng ngày/xét nghiệm gán cho điểm mới
+   (`addPoint()`, dòng dựng `dayNote`); `entry-handlers.ts` để trống. Sửa
+   bằng 1 `SELECT ... LIMIT 1` trước khi INSERT.
+
+Mirror đầy đủ cả 6 mục (trừ mục 1 phần renderer, vốn không có ở mock) trong
+`renderer/browser-mock/api.ts`; `tests/mock-parity.test.mjs` mở rộng lên
+**149 bước** (thêm kịch bản kind=analytical tự mở NCE, kind=data-entry
+không mở NCE) — nhân tiện phát hiện **2 bước cũ (`void-thieu-ly-do`/
+`void-ok`) đặt sai `pointId` ở top-level `id` thay vì trong `data`**, khiến
+cả 2 bước luôn ra `missing-point` bất kể lý do đúng/sai — chưa từng kiểm
+đường THÀNH CÔNG thật của `voidPoint` qua đối chiếu mock/real; sửa lại vị
+trí đúng.
+
+**6 lệch CSS/DOM, đều thuộc điểm mù của 3 gate tự động (không phải class
+thiếu — mọi class liên quan đều "có rule", chỉ sai NGỮ CẢNH/THỨ TỰ/nội dung
+thêm mà gate không đo):**
+1. **`.entry-tree-head h4` bị rule "header phụ dùng chung" đè** — cùng độ
+   đặc hiệu (1 class+1 thẻ) với nhánh `.tree h4` của rule dùng chung
+   (`entry.css`'s `.qc-table-card h4,.lj-mini-h,.tree h4,.sg-chart-box>h3`,
+   khai SAU), thắng theo thứ tự nguồn: tiêu đề cây mất màu teal, có thêm nền/
+   viền không mong muốn. Sửa bằng cách di chuyển `.entry-tree-head h4` xuống
+   SAU rule dùng chung trong file (khớp đúng cách app cũ tách 2 file
+   `components.css`/`professional-entry.css`, không phải tăng độ đặc hiệu).
+2. **`.qc-table-card h4` khai 2 lần xung đột nhau** — bản khai riêng (dòng
+   dưới, cho sticky column header) LẶP LẠI background/border-bottom/margin/
+   padding/font-size đã có ở rule dùng chung, đến sau nên đè mất giá trị
+   đúng (font-size 14px→13px). Sửa: bản khai riêng chỉ còn đúng phần app cũ
+   THẬT SỰ khai riêng (`position/left/z-index/display/align-items/
+   box-sizing/width`), không lặp lại phần đã có ở rule dùng chung.
+3. **Thiếu `min-width:620px`** cho `.qc-table-card h4/table` + `.qc-cumulative`
+   (`professional-entry.css:426-428`) — card "Điểm trong khoảng xem" có thể
+   co dưới 620px trong `.qc-table-grid`'s `auto-fit(360px)` thay vì tự cuộn
+   ngang như app cũ. Đã thêm.
+4. **`.qc-table-grid{gap}` dùng nhầm token** `--gap-panel`(16px) thay vì giá
+   trị đúng 14px (`professional-entry.css:119-121`, cùng `--space-section`
+   đã dùng cho margin ngay cạnh nó). Đã sửa dùng chung 1 token.
+5. **2 nút mở/thu cây danh mục dùng ký tự văn bản ("☰"/"⟨") thay icon SVG** —
+   nội dung app-v2 TỰ THÊM, chưa từng tồn tại ở app cũ (`TreeIcon()` thật ở
+   `src/react/pages/EntryPage.tsx:18-24` là 1 SVG rect+line) — đúng chiều mà
+   gate `ui-parity` (chỉ đo "cũ có mà v2 thiếu") không bắt được. Port
+   nguyên SVG + đủ `aria-label`/`aria-controls`/`aria-expanded`, sửa luôn
+   title bị cắt ngắn ("Ẩn danh mục" → "Ẩn danh mục nội kiểm").
+6. **Tooltip cột `.qc-level-head` vỡ hoàn toàn** — CSS có `cursor:help` +
+   gạch chân chấm (hứa hẹn tooltip) nhưng JSX KHÔNG hề gán `data-qc-tooltip`,
+   và CSS thiếu hẳn khối `::after`/`:hover`/`:focus-visible` vẽ bong bóng
+   (`professional-entry.css:190-209`) — di chuột/focus vào không hiện gì,
+   đúng dạng "control chết về hiển thị" mà không gate nào bắt vì
+   `.qc-level-head` vẫn "có rule". Thêm tính `tooltip` (Mean/SD/±2SD) ngay
+   trong JSX + port đủ khối CSS vẽ bong bóng.
+
+Cũng bọc lại 1 lỗ hổng phát hiện khi sửa mục nghiệp vụ #2 (gate nhóm lô mới
+làm lộ rõ hơn): `commitRun()`/`RunSlot` trước đây bỏ qua HOÀN TOÀN kết quả
+`addPoint` — lưu thất bại (kỳ đã khoá, hoặc nhóm lô đã dừng) không hiện gì
+VÀ ô nhập tự xoá trắng như đã lưu thành công, mất luôn giá trị vừa gõ. Sửa:
+`commitRun` trả `Promise<boolean>`, `RunSlot` chỉ xoá ô khi lưu thành công,
+lỗi thật hiện qua `pointErr` (banner `.alert warn` đầu trang, cùng vị trí
+`noteErr`/`voidMsg`).
+
+Verify: `npm run app-v2:typecheck` sạch, `app-v2:test` 34/34 (mở rộng
+`entry-handlers.test.mjs` — kind=analytical tự mở NCE đúng rule/errorType/
+qcVerdict của điểm, kind=data-entry không mở gì, kind=other thiếu lý do bị
+chặn rồi qua khi đủ + tự chọn openNce, điểm đã có sẵn NCE thủ công gắn đúng
+`point_id` thì HUỶ VỚI kind=analytical phải DÙNG LẠI hồ sơ đó chứ không tạo
+trùng, và nhóm lô "Dừng" chặn đúng `addPoint` sau khi trước đó vẫn nhận bình
+thường; `mock-parity` 149 bước), `app-v2:build` sạch, `app-v2:css-parity`
+đạt (0 class thiếu rule), `app-v2:ui-parity` 79/79 (entry vẫn đúng 0/0 cả 4
+viewport, không đổi so với D3.5 dù thêm SVG/tooltip/modal — nội dung/DOM chỉ
+sửa bên trong, không đổi tập class), `app-v2:style-parity` 18/18 (entry vẫn
+đúng 3/3 lệch đã biết trong baseline, không phát sinh thêm).
+
+**Bug thật: cuộn trang kéo theo cả thanh điều hướng — `<aside>` dùng
+`position:relative` thay vì `position:sticky` (2026-09-04).** Người dùng tự
+phát hiện khi dùng thật ("cuộn trang nó cuộn luôn cả trang điều hướng").
+Đối chiếu `assets/professional-base.css:19-20` (`aside{position:sticky;
+top:0;height:100vh}`) với `app-v2/renderer/styles/app.css`'s `aside{}` (đợt
+đầu chỉ ở base rule mang `position:relative`, ĐÃ ĐÚNG `sticky` ở nhánh
+`@media(max-width:900px)` cho layout mobile — chỉ base/desktop bị bỏ sót)
+xác nhận đúng lỗi. Vì `.head` (`PageHeader.tsx`, mọi trang) đã `position:
+sticky;top:0` từ trước và hoạt động đúng, suy ra mô hình cuộn của app-v2
+LUÔN LÀ "toàn trang (document) cuộn, từng phần tử tự dán bằng sticky" —
+không phải "main tự cuộn nội bộ" (`main{overflow-y:auto}` không thực sự có
+tác dụng, chỉ là khai báo trơ vì `main` không bị giới hạn chiều cao) — sửa
+đúng 1 thuộc tính, không đổi gì cấu trúc grid. Đồng thời phát hiện thêm
+**bảng `<table>` dùng chung toàn app thiếu `position:sticky` cho `<th>`**
+(`assets/components.css:76`: `th{position:sticky;top:0;z-index:1}`, app-v2
+chưa port) — thêm vào rule `th` dùng chung trong `app.css`, có lợi cho mọi
+bảng dài nằm trong khung có scroll riêng (vd `.qc-table-card`).
+
+**Rà soát tương tác bàn phím toàn app — 1 agent đọc `action-dispatcher.ts`/
+`modal-focus-trap.ts` + grep `ArrowDown|ArrowUp|ArrowLeft|ArrowRight` xuyên
+suốt `src/` (2026-09-04).** Xác nhận app cũ CHỈ có điều hướng mũi tên ở
+trang Nhập QC (cây + bảng — gap đã biết, cố ý hoãn, xem mục "Rà soát sâu
+trang Nhập QC" ở trên) — không có ở bất kỳ combobox/bảng/danh sách nào
+khác. `DatePickerPopup` khớp đúng app cũ (Escape đóng, Enter ở ô năm, cả
+hai bên đều KHÔNG có điều hướng mũi tên trong lưới ngày) — không cần sửa.
+
+**Bẫy focus modal/dialog (`useFocusTrap.ts`) — cốt lõi đúng, vá 3 chi tiết
+lệch với `modal-focus-trap.ts` app cũ:**
+1. Selector `FOCUSABLE` thiếu `:not([disabled])` ở lượt tìm phần tử focus
+   ĐẦU TIÊN khi mở (chỉ lọc disabled ở vòng lặp Tab, không phải lúc mở) —
+   có thể focus nhầm vào 1 nút đang khoá lúc modal vừa mở.
+2. Thiếu lọc phần tử đang ẩn (`offsetParent!==null`) — 1 input nằm trong
+   nhánh `display:none` của form vẫn bị tính là focusable.
+3. Không ưu tiên phần tử mang `autoFocus` — luôn lấy phần tử focusable đầu
+   tiên theo thứ tự DOM, trong khi app cũ (`ModalOverlay.tsx:25`) ưu tiên
+   `[autofocus]` trước. Gộp cả 3 vào 1 hàm `queryFocusable()` dùng chung
+   (khớp tên/hợp đồng với bản cũ), dùng cho cả lượt focus đầu lẫn vòng lặp
+   Tab — ảnh hưởng MỌI modal/dialog trong app vì đây là hook dùng chung.
+
+**3 lỗi/thiếu tính năng liên quan tới bàn phím tìm thấy khi khảo sát, đã sửa
+2, còn 2 báo lại (ngoài phạm vi bàn phím thuần túy, cần quyết định riêng):**
+- **ĐÃ SỬA — Six Sigma: chọn dòng "kỳ" trong bảng hoàn toàn không hoạt
+  động** (không phải chỉ thiếu bàn phím — thiếu CẢ chuột): app-v2 gán class
+  `sg-period-selected` cứng vào kỳ MỚI NHẤT (`p.id===latestPeriod?.id`),
+  không có `onClick`/`onKeyDown` nào, và CSS `.sg-period-row` cũng thiếu
+  hoàn toàn rule hover/focus-visible/selected (`cursor:default` trơ) — nên
+  dù có thêm handler thì cũng không ai biết bấm được. App cũ cho bấm vào
+  BẤT KỲ dòng kỳ nào để xem lại Sigma/MU của kỳ đó ở 2 panel phía trên
+  (`sgSelectPeriod`, `sigma-page-controller.ts:181-187`), không cố định vào
+  kỳ mới nhất. Thêm state `selectedPeriodId` (reset về `null` — rơi về
+  `latestPeriod` — mỗi khi đổi xét nghiệm), đổi mọi chỗ đọc `latestPeriod`
+  trong 2 panel "Tình trạng"/MU cùng nút "Bias EQA%" sang `displayPeriod`
+  (`= periods.find(id) || latestPeriod`), thêm `onClick`/`onKeyDown` lên
+  `<tr>` (mẫu "self-only + closest(button,input,select)" đã dùng ở Reagent/
+  Manage), port đủ 5 rule CSS còn thiếu từ `professional-sigma.css:69-86`.
+- **ĐÃ SỬA — 2 modal Enter-to-submit**: ô "Tên hóa chất mới"/"Đơn vị" trong
+  modal "Chọn phép so sánh" (So sánh hóa chất) và ô mật khẩu mới trong modal
+  "Đặt lại/Đổi mật khẩu" (Người dùng, dùng chung cho cả tự đổi lẫn admin
+  reset) thiếu `onKeyDown` Enter gọi thẳng hàm submit đã có sẵn qua nút —
+  app cũ có (`data-keydown-keys='["Enter"]'`), chỉ 1 dòng mỗi chỗ.
+- **CHƯA SỬA, báo lại — Avatar (`PageHeader`, cả 11 trang) mất TOÀN BỘ tính
+  năng "Đổi ảnh đại diện", không riêng bàn phím**: app cũ's avatar là
+  `role="button" tabIndex={0}` với `onClick`+`onKeyDown` mở modal đổi ảnh
+  (`src/react/components/PageHeader.tsx:18-27`); app-v2's avatar chỉ còn
+  `aria-hidden="true"`, không click được, không có modal nào — và xác nhận
+  bằng cách grep TOÀN BỘ `app-v2/`: KHÔNG có cột `avatar` trong schema
+  `users`, KHÔNG có IPC nào liên quan. Đây không phải thiếu 1 handler mà
+  thiếu CẢ TÍNH NĂNG từ backend (schema + IPC + validate) tới UI (modal
+  upload/resize ảnh, tương tự logo ở Cài đặt) — quy mô lớn hơn hẳn phạm vi
+  "bàn phím", cần quyết định riêng có làm hay không trước khi động vào.
+- **CHƯA SỬA, báo lại — "Chọn nhanh" (Người thực hiện/Loại mẫu) ở So sánh
+  hóa chất biến mất hoàn toàn**: app cũ có modal chọn nhanh từ danh sách giá
+  trị đã lưu + Enter-để-thêm mới (`rcOpenQuick`/`rcAddQuick`,
+  `reagent-quick-picker-modal-html.ts`); app-v2 chỉ còn 2 ô nhập text trơn
+  (class `rc-quick-field` còn giữ nhưng không có picker/modal nào đứng sau).
+  Cùng loại "thiếu cả tính năng" như avatar, không phải chỉ thiếu bàn phím.
+
+Verify: `npm run app-v2:typecheck` sạch, `app-v2:test` 34/34 (không cần test
+Node mới — toàn bộ thay đổi là CSS/React renderer, không đổi hợp đồng IPC/
+domain nào), `app-v2:build` sạch, `app-v2:css-parity`/`app-v2:ui-parity`
+79/79/`app-v2:style-parity` 18/18 đều đạt, không surface nào vượt baseline
+(kể cả `sigma` vẫn đúng 7/32 đã biết, xác nhận thêm `tabIndex`/`aria-selected`/
+`onClick`/`onKeyDown` không đổi tập class hay nội dung chữ mà gate đo).
+
+**Làm nốt 2 tính năng đã báo lại ở trên: Avatar + "Chọn nhanh" (2026-09-04).**
+Người dùng chốt làm luôn cả hai, không để lại nữa.
+
+1. **Đổi/xoá ảnh đại diện** — port đủ `avatar-modal-controller.ts`/
+   `user-avatar-command.ts` app cũ. Cột `users.avatar` MỚI THÊM (app-v2 chưa
+   từng có, không như `page_perms_json`/`initials` đã có sẵn từ đầu) —
+   `TEXT NOT NULL DEFAULT ''` + `ALTER TABLE` idempotent (cùng khuôn
+   `archived_lot_ids_json`). IPC `auth:setAvatar`/`auth:clearAvatar` LUÔN tự
+   phục vụ (chỉ `actor.userId`, không nhận id người khác) — khớp app cũ:
+   đổi ảnh đại diện không phải thao tác quản trị, không qua `updateUser`.
+   `AvatarModal.tsx` (mới) resize canvas 160×160 fit-cover (phóng ảnh phủ
+   hết khung rồi canh giữa — khác logo ở Cài đặt, nơi CẮT theo cạnh ngắn
+   nhất) trước khi gửi lên, đúng `avatar-modal-controller.ts`'s
+   `pickAvatar()`. `PageHeader.tsx`'s avatar quay lại `role="button"
+   tabIndex={0}` + onClick/onKeyDown (Enter/Space) mở modal — trả lại đúng
+   hành vi bàn phím đã báo mất ở mục "Rà soát tương tác bàn phím toàn app"
+   phía trên. `validateSetAvatar()` chỉ chặn chuỗi không phải
+   `data:image/...` + ngưỡng an toàn 500KB (canvas 160×160 thật không bao
+   giờ chạm ngưỡng này, chỉ chặn request tự dựng gửi thẳng IPC).
+   **Bug thật bắt được ngay khi thêm cột**: `migrate-legacy.ts`'s ánh xạ
+   `users` chưa gán `avatar` → `table-io.ts`'s `restoreAllTables()` bind
+   `null` cho MỌI field vắng mặt trong bản ghi đã ánh xạ (không để SQLite tự
+   dùng `DEFAULT`), vi phạm `NOT NULL` — `migration-handlers.test.mjs` đỏ
+   ngay lập tức. Sửa bằng cách ánh xạ tường minh `avatar` trong
+   `migrate-legacy.ts` (không qua `cleanText()` — có giới hạn độ dài, sẽ cắt
+   cụt giữa 1 data URL base64 làm hỏng ảnh). Đây là lớp lỗi CHUNG cho mọi
+   cột `NOT NULL` thêm sau này qua `ALTER TABLE`: phải cập nhật cả
+   `migrate-legacy.ts`'s row-builder tương ứng, không chỉ thêm cột — gate
+   test tự bắt được, không phải suy luận trước.
+2. **"Chọn nhanh" người thực hiện/loại mẫu** (So sánh hóa chất) — port
+   `ensureQuickList`/`addQuick`/`removeQuick` app cũ
+   (`reagent-comparison-service.ts`): 1 danh sách CHUNG cho toàn app (không
+   theo từng phép so sánh), loại mẫu có sẵn 3 giá trị mặc định, người thực
+   hiện bắt đầu rỗng. Lưu ở `app_meta` (2 key `reagent_quick_operator`/
+   `reagent_quick_sampleType`, JSON array) — cùng cơ chế đã dùng cho
+   `activityAnchor`/cấu hình LIS, vì đây chỉ là gợi ý nhập liệu, không phải
+   dữ liệu QC, không cần bảng riêng. 3 IPC mới: `listReagentQuickValues`
+   (đọc), `addReagentQuickValue`/`removeReagentQuickValue` (`requireWrite`,
+   admin+KTV — cùng mức với các thao tác dữ liệu QC hằng ngày khác). Thêm
+   trùng (so khớp không phân biệt hoa/thường/dấu, `searchKey()` port nguyên
+   app cũ) trả lại đúng giá trị đã có, không tạo dòng giống nhau.
+   `QuickPickerModal.tsx` (mới) + `ReagentToolIcon.tsx` (port `.rc-icon-btn`
+   SVG — giữ nguyên 6 type dù chỉ 2 dùng ngay, 4 còn lại để dành cho lần
+   port `.rc-toolbar` sau, xem ghi chú đầu `reagent.css`) — 2 nút mới cạnh ô
+   "Người thực hiện"/"Loại mẫu", mở modal danh sách (nút "Chọn" + xoá "✕"
+   mỗi dòng) + ô thêm mới (Enter hoặc nút "Thêm"). Ô nhập chính vẫn
+   `defaultValue` (không kiểm soát) — thêm `key={current.operator}`/
+   `key={current.sample_type}` để React remount đúng sau khi chọn nhanh
+   (cùng lớp lỗi "stale defaultValue" đã gặp nhiều lần: đổi giá trị qua
+   `meta()` không tự cập nhật lại DOM của ô uncontrolled đã mount).
+   Port thêm `button.x`/`td.acts` (nút xoá dòng dùng chung, chưa từng có ở
+   app-v2) và `.mrow`/`.rc-quick-add` (khối modal) vào CSS.
+
+Verify: `npm run app-v2:typecheck` sạch, `app-v2:test` 34/34 (mở rộng
+`auth-handlers.test.mjs` — setAvatar chặn chuỗi không phải ảnh, đọc lại
+đúng ảnh vừa lưu, xoá về rỗng; `reagent-handlers.test.mjs` — loại mẫu có
+đúng 3 mặc định, người thực hiện rỗng, thêm trùng không tạo dòng mới, xoá
+đúng vị trí; `migrate-legacy.test.mjs`/`migration-handlers.test.mjs` — avatar
+di trú đúng, KHÔNG rơi về rỗng; `mock-parity` lên **162 bước**, phủ đủ 2
+tính năng mới ở cả 2 phía), `app-v2:build` sạch, `app-v2:css-parity` đạt,
+`app-v2:ui-parity` 79/79 (siết lại baseline `reagent` từ 1 class/18 dòng
+xuống **0 class/18 dòng** — `rc-icon-btn` không còn thiếu, chỉ còn đúng 1 lý
+do nhãn trục biểu đồ canvas-vs-SVG), `app-v2:style-parity` 18/18.
+
+**Rà soát nghiệp vụ Cấu hình chung lần cuối (2026-09-06).** Đối chiếu lại
+trực tiếp handler/UI app-v2 với vòng đời lô, Panel và chính sách Westgard của
+app cũ, phát hiện và sửa 5 lỗi còn tác động tới dữ liệu/kết luận:
+
+1. `removeLot()` còn kiểm trạng thái chuyển lô cũ `concluded`, trong khi
+   vocabulary hiện hành là `accepted`: lô nguồn của hồ sơ đã chấp nhận giờ
+   bị chặn xoá đúng; browser mock được sửa cùng logic.
+2. Cổng chấp nhận chuyển lô đòi `mean > 0`, làm các xét nghiệm có Mean bằng
+   0 hoặc âm (ví dụ Base excess) không thể chuyển lô. Đổi sang Mean hữu hạn +
+   SD hữu hạn dương, thêm test riêng cho Mean âm.
+3. `savePanel()` có thể nhận toàn id xét nghiệm không tồn tại rồi lưu Panel
+   rỗng sau bước lọc. Handler thật và mock giờ kiểm lại danh sách id hợp lệ và
+   trả `missing-tests`.
+4. Cột **Hành động** của 13 luật Westgard trong modal xét nghiệm trước đây chỉ
+   hiển thị. `RuleActionsMap` giờ hỗ trợ đủ `inactive/alert/reject`, vẫn đọc
+   boolean cũ; `makeRuleActionLayered()` phân giải ghi đè theo xét nghiệm →
+   cấu hình chung → mặc định registry. Chính sách này được truyền xuyên suốt
+   `westgard()`/`westgardByPoint()`/`combinedWestgardByPoint()`/
+   `acceptedPoints()`, rồi dùng thống nhất tại Nhập QC, Phân tích Westgard,
+   lô song song, lô trước và nhóm lô lưu trữ. Chọn Cảnh báo không còn vô tình
+   loại điểm; chọn Loại bỏ thật sự loại điểm khỏi chuỗi chấp nhận.
+5. Hai lựa chọn **Theo cấu hình chung** và **Phạm vi SOP khuyến nghị** trước
+   đây không thể xoá ghi đè đã lưu. Hai IPC giờ nhận chuỗi rỗng để xoá key
+   tương ứng; đồng thời chặn action/scope không hợp lệ ở main, không chỉ dựa
+   vào kiểu TypeScript/UI.
+
+Verify: `npm run app-v2:test` **41/41**, `app-v2:typecheck` và
+`app-v2:build` sạch. Kịch bản Playwright `_electron` trên user-data tạm đã
+thao tác trực tiếp modal Danh mục xét nghiệm: lưu Cảnh báo + phạm vi chéo mức,
+mở lại đọc đúng, đưa cả hai về mặc định và xác nhận hai key bị xoá khỏi SQLite.
+Giới hạn TEa tuyệt đối của 9 analyte vẫn thuộc đợt Six Sigma đã chốt hoãn; không
+phải nghiệp vụ ghi/lưu của trang Cấu hình chung.
+
+**Rà tiếp các cổng dữ liệu nền trong cùng đợt:** `parseRuleScopes()` giờ chỉ
+nhận luật tồn tại + `within/across/both`; giá trị legacy `protocol` và chuỗi
+rác được hiểu là không ghi đè, nên tự rơi về phạm vi SOP thay vì lọt một scope
+thứ tư vào engine. Port thêm đúng các cổng mở form của app cũ: thêm xét nghiệm
+khi chưa có máy sẽ chuyển sang tab Máy và mở thẳng modal tạo máy; thêm Panel
+khi chưa có xét nghiệm/máy, thêm nhóm khi chưa có lô, và thêm chuyển tiếp khi
+chưa có Panel/đủ 2 lô đều báo điều kiện còn thiếu rồi đưa người dùng tới đúng
+tab cần chuẩn bị. Hồ sơ chuyển lô mới cũng điền sẵn ngày bắt đầu là hôm nay,
+khớp `openLotTransitionModel()` cũ. Playwright `_electron` đã chạy cả bốn đường trên dữ liệu tạm,
+đúng thông báo/đúng tab và không mở form bất khả thi.
+
+**Rà tiếp tính toàn vẹn Panel/nhóm lô trong cùng đợt:** `saveTest()` giờ port
+đúng `saveAssay()` app cũ: khi chuyển một xét nghiệm sang máy khác, tự gỡ nó
+khỏi mọi Panel QC thuộc máy cũ/khác máy mới; không tự khôi phục liên kết nếu
+đổi máy trở lại. Sự thay đổi phát cả `qc_panels`/`qc_panel_tests` để tab Panel
+đang mở nạp lại ngay. `savePanel()` từ chối toàn bộ lần lưu nếu danh sách chứa
+lẫn id xét nghiệm không tồn tại, thay vì âm thầm lọc bỏ rồi lưu một Panel khác
+với lựa chọn người dùng. Các thao tác nhiều bảng `savePanel()`,
+`saveLotGroup()` và nhánh tạo mới `saveTest()` (xét nghiệm + Mức 1 mặc định)
+được bọc transaction SQLite để hàng cha và toàn bộ liên kết/con mặc định luôn
+cùng thành công hoặc cùng rollback. Handler thật và browser
+mock giữ cùng hành vi; `mock-parity` đạt **171 bước**. Verify lại:
+`app-v2:test` **41/41**, `app-v2:typecheck`, `app-v2:build` sạch; kịch bản
+Playwright `_electron` trên user-data tạm xác nhận Panel A đổi từ 1 xét nghiệm
+sang “— / 0 vị trí” ngay sau khi xét nghiệm chuyển từ Máy A sang Máy B.
+
+**Rà tiếp nhận diện analyte + Mean/SD:** quy tắc trùng xét nghiệm của app cũ
+là theo `(máy, analyteId hoặc tên)`. V2 giờ dùng `teaRefKey` làm khoá analyte:
+cùng Glucose trên hai máy vẫn được phép và giữ hai luồng QC độc lập; Glucose/
+GLU cùng khoá TEa trên một máy bị chặn dù nhãn khác nhau. Nhóm lô để trống tên
+được tự ghép từ số lô theo thứ tự chọn (`L1/L2`), đúng `prepareLotGroup()` cũ.
+`saveTestLevel()` nay chặn lô không tồn tại, lô sai mức, lô đã hết dùng, gán
+lô khi chưa đủ Mean/SD, Mean/SD không đi cùng nhau, số không hợp lệ và cặp
+giới hạn thiếu/ngược. Tab Mean/SD cũng khoá checkbox/ô nhập của lô đã hết dùng
+và nút “Chọn tất cả” bỏ qua hàng bị khoá, đúng `targetRowState()` cũ. Kịch bản
+Electron thật đã xác nhận đủ: chặn trùng analyte cùng máy, cho phép khác máy,
+tự sinh tên nhóm, chặn lô sai mức và hiển thị “Lô đã hết dùng” trên hàng bị
+khóa.
+
 ## Tests
 
 No test framework. Each file under `tests/*.test.js` is a plain Node script

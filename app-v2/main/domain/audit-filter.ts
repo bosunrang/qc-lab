@@ -32,7 +32,11 @@ export function filterActivity(items: ActivityLike[], query: string, from: strin
   }).slice().reverse();
 }
 
-export interface ActivityPage<T> { page: number; pageCount: number; offset: number; rows: T[]; resultFrom: number; resultTo: number }
+export interface ActivityPage<T> {
+  page: number; pageCount: number; offset: number; rows: T[]; resultFrom: number; resultTo: number;
+  /** So dong sau khi loc — trang Nhat ky hien "khop/tong". */
+  filteredCount: number;
+}
 
 export function paginateActivity<T>(items: T[], page: number, pageSize: number): ActivityPage<T> {
   const size = Math.max(1, Number(pageSize) || 1);
@@ -42,6 +46,7 @@ export function paginateActivity<T>(items: T[], page: number, pageSize: number):
   return {
     page: safePage, pageCount, offset, rows: items.slice(offset, offset + size),
     resultFrom: items.length ? offset + 1 : 0, resultTo: Math.min(offset + size, items.length),
+    filteredCount: items.length,
   };
 }
 

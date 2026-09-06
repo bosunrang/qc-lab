@@ -1,0 +1,346 @@
+/* Nhập QC — hợp nhất (không copy nguyên cascade nhiều lớp đè nhau của bản cũ,
+   chỉ giữ giá trị CUỐI CÙNG sau khi resolve — xem CLAUDE.md mục "CSS cascade
+   pitfalls") từ assets/professional-entry.css, đọc trực tiếp file gốc. Chỉ
+   giữ rule khớp class THẬT SỰ dùng trong EntryPage.tsx. */
+
+.entrygrid{
+  display:grid; position:relative; grid-template-columns:auto minmax(0,1fr); gap:var(--space-panel); align-items:start;
+}
+.entrygrid.tree-collapsed{grid-template-columns:minmax(0,1fr);}
+.entrygrid.tree-collapsed>.tree{display:none;}
+.entrygrid.tree-collapsed>.entry-tree-expand{display:inline-flex;}
+.entrygrid.tree-collapsed>.entry-main{grid-column:1;min-width:0;}
+.entrygrid.tree-collapsed .qc-sheet-heading{padding-left:58px;}
+
+/* ---- Cây danh mục nội kiểm ---- */
+.tree{
+  position:sticky; padding:8px; top:20px; max-height:74vh; width:max-content; min-width:280px; max-width:min(440px,34vw);
+}
+@media(min-width:761px) and (min-height:481px){
+  .entrygrid>.tree{ position:sticky; top:112px; max-height:calc(100vh - 132px); overflow-y:auto; overscroll-behavior:contain; align-self:start; }
+}
+@media(max-width:760px){ .entrygrid>.tree{ width:auto; min-width:0; max-width:none; } .entrygrid{ grid-template-columns:minmax(0,1fr); } }
+.entry-tree-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 6px 6px 4px;background:var(--section-head-bg);border-bottom:1px solid var(--section-head-border);}
+button.entry-tree-toggle,button.entry-tree-expand{width:28px;height:28px;min-height:28px;display:flex;align-items:center;justify-content:center;flex:none;padding:0;border:1px solid rgba(11,116,125,.35);border-radius:var(--radius-md);background:rgba(11,116,125,.12);color:var(--tealink);cursor:pointer;transition:.18s ease;}
+button.entry-tree-toggle:hover,button.entry-tree-expand:hover{background:rgba(11,116,125,.22);}
+button.entry-tree-toggle svg,button.entry-tree-expand svg{width:16px;height:16px;}
+button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-index:12;background:var(--panel);border-color:var(--line);color:var(--ink);box-shadow:var(--surface-shadow);}
+.entrygrid.tree-collapsed button.entry-tree-expand{display:flex;}
+.entrygrid.tree-collapsed button.entry-tree-expand svg{transform:rotate(180deg);}
+.tree-tools{display:grid;grid-template-columns:1fr;gap:8px;margin:10px 0 12px;padding:0 4px 10px;border-bottom:1px solid var(--surface-border-soft);}
+.tree-tools input,.tree-tools select{min-height:auto;padding:7px 9px;font-size:var(--type-meta);}
+.tree-empty{font-size:var(--type-meta);padding:14px 8px;text-align:center;border:1px solid var(--line);border-radius:var(--radius-md);color:var(--muted);}
+.tnode{display:flex;align-items:center;gap:4px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:32px;padding:6px 8px;border-radius:var(--surface-radius);font-size:var(--type-body);}
+.tnode:hover{background:var(--section-head-bg);}
+.tree .tnode{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:6px;min-width:0;overflow:visible;text-overflow:clip;white-space:nowrap;}
+.tree .tn-machine{margin-left:0;color:var(--card-head-ink);overflow-wrap:normal;font-weight:700;}
+.tree .tn-test{margin-left:18px;padding-left:8px;color:#28414e;overflow-wrap:normal;font-weight:700;}
+.tn-test.open{background:#e9f4f4;color:#173f45;}
+.tree .tn-config{margin-top:2px;margin-bottom:2px;margin-left:42px;padding-left:10px;grid-template-columns:minmax(0,1fr) auto;font-size:var(--type-body);font-weight:600;color:var(--card-head-ink);}
+.tn-config:hover{background:#f3f8f8;}
+.tn-config.on{background:#e9f4f4;font-weight:800;}
+.tn-config.on .state{background:rgba(12,111,120,.10);color:var(--teal);}
+.tnode .caret{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;flex:0 0 16px;border:1px solid #c5d4dc;border-radius:3px;background:var(--panel);color:#456271;font-size:var(--type-meta);font-weight:850;line-height:1;}
+.tnode:hover .caret{border-color:#73aaa8;background:#f4fbfa;color:var(--tealink);}
+.tnode .state{font-weight:700;border-radius:var(--radius-pill);margin-left:6px;padding:3px 8px;background:#eef3f5;color:var(--muted);font-size:var(--type-caption);}
+.tree .tnode .state{justify-self:end;white-space:nowrap;}
+.tree .tnode .state.ok,.tree .tn-config.on .state.ok{color:var(--success-ink);background:var(--success-bg);border:1px solid var(--success-border);font-weight:800;}
+.tree .tnode .state.warn,.tree .tn-config.on .state.warn{color:var(--warning-ink);background:var(--warning-bg);border:1px solid var(--warning-border);font-weight:800;}
+.tree .tnode .state.rej,.tree .tn-config.on .state.rej{color:var(--danger-ink);background:var(--danger-bg);border:1px solid var(--danger-border);font-weight:800;}
+
+/* ---- Bảng nhập QC (worksheet theo lịch tháng) ---- */
+.qc-sheet-panel{border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);overflow:hidden;}
+.qc-sheet-heading{background:var(--section-head-bg);border-bottom:1px solid var(--section-head-border);color:var(--card-head-ink);display:grid;align-items:center;justify-content:space-between;gap:14px;min-height:64px;padding:10px 16px;position:sticky;top:0;z-index:8;grid-template-columns:minmax(220px,1fr) auto;}
+@media(max-width:980px){ .qc-sheet-heading{ grid-template-columns:1fr; } }
+.qc-sheet-title{display:flex;gap:2px;min-width:0;align-items:baseline;flex-wrap:wrap;column-gap:8px;row-gap:2px;}
+.qc-sheet-title span{color:#087a76;font-size:var(--section-head-size);font-weight:800;}
+.qc-sheet-title strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--section-head-size);color:#15323c;letter-spacing:-.01em;line-height:1.25;}
+.qc-sheet-title small{color:var(--muted);font-size:var(--type-caption);font-weight:700;flex-basis:100%;}
+.qc-month-area{flex:0 0 auto;display:grid;justify-items:end;gap:5px;align-items:center;flex-wrap:wrap;}
+.qc-month-picker{display:flex;justify-content:flex-end;flex-wrap:nowrap;gap:6px;align-items:center;}
+.qc-month-picker select{width:auto;padding-top:0;padding-bottom:0;background:var(--panel);font-weight:750;}
+.qc-month-picker select,.qc-current-month{height:32px;min-height:32px;padding:0 11px;font-size:var(--type-body-sm);}
+.qc-month-picker select:first-of-type{min-width:92px;}
+.qc-current-month{white-space:nowrap;min-width:112px;}
+@media(max-width:980px){ .qc-month-area{ justify-items:start; } .qc-month-picker{ justify-content:flex-start; flex-wrap:wrap; } }
+
+.qc-sheet-wrap{display:block;max-width:100%;margin:14px;border:1px solid var(--line);border-radius:9px;max-height:574px;overflow-x:auto;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;scrollbar-gutter:auto;padding-bottom:0;contain:paint;background:var(--panel);position:relative;}
+.entry-sheet-message{display:grid;gap:8px;margin:12px 16px 16px;}
+.qc-sheet{min-width:1080px;border:none;margin:0;table-layout:auto;border-radius:0;border-collapse:separate;border-spacing:0;overflow:visible;}
+@media(max-width:1280px){ .qc-sheet{ min-width:840px; } }
+@media(max-width:1150px){ .qc-sheet{ min-width:780px; } }
+@media(max-width:980px){ .qc-sheet{ min-width:860px; } }
+@media(max-width:760px){ .qc-sheet{ min-width:760px; } }
+.qc-sheet thead{position:relative;z-index:20;}
+.qc-sheet thead tr{position:sticky;top:0;z-index:20;}
+.qc-sheet thead th,.qc-sheet th{position:sticky;top:0;z-index:21;color:var(--card-head-ink);line-height:1.25;text-align:center;background:var(--section-head-bg);border-right:1px solid #dbe8ed;box-shadow:0 1px 0 #dbe8ed,0 4px 10px rgba(21,33,43,.06);}
+.qc-sheet thead th:first-child{z-index:24;background:var(--section-head-bg);color:var(--card-head-ink);font-weight:800;line-height:1.25;text-transform:none;letter-spacing:0;}
+.qc-sheet td.num{text-align:center;}
+.qc-sheet td{border-right:1px solid #edf2f5;text-align:center;vertical-align:middle;padding-top:5px;padding-bottom:5px;color:inherit;}
+.qc-sheet td:first-child,.qc-sheet th:first-child{position:sticky;left:0;z-index:12;background:inherit;box-shadow:none;font-weight:750;color:#253946;white-space:nowrap;text-align:center;}
+.qc-sheet td:first-child b{margin-top:2px;color:var(--tealink);font-size:var(--type-overline);font-weight:900;}
+.qc-sheet td:last-child,.qc-sheet th:last-child{border-right:none;}
+.qc-sheet tbody tr{height:53px;}
+.qc-sheet tbody tr:nth-child(even){background:var(--surface-card-soft);}
+.qc-sheet tbody tr:hover{background:#f5f9fb;}
+.qc-sheet tbody tr.today{background:#f0faf8;}
+.qc-sheet tbody tr.today td{border-top:1px solid #b9ded9;border-bottom:1px solid #b9ded9;}
+.qc-sheet tbody tr.missing:not(.today) td:first-child{box-shadow:inset 4px 0 0 var(--warning-accent);}
+
+.qc-value-chip{display:inline-flex;align-items:center;justify-content:center;width:75px;height:30px;padding:0 6px;border-radius:var(--radius-md);border:1px solid #d5e1e8;background:#f9fcfd;color:#163541;font-weight:800;font-variant-numeric:tabular-nums;box-sizing:border-box;min-width:68px;font-size:var(--type-body);box-shadow:inset 0 1px 0 rgba(255,255,255,.92);line-height:1;text-align:center;}
+.qc-value-chip.warn{border-color:var(--warning-border);background:var(--warning-bg);color:var(--warning-ink);}
+.qc-value-chip.rej{border-color:var(--danger-border);background:var(--danger-bg);color:var(--danger-ink);}
+.qc-run-slot{padding:0;display:grid;justify-items:center;gap:2px;}
+.qc-run-slot small{color:var(--muted);font-size:var(--type-overline);line-height:1.1;text-align:center;display:block;font-weight:700;white-space:nowrap;}
+.qc-run-grid{display:flex;align-items:flex-start;justify-content:center;max-width:100%;padding:2px 0;overflow-x:auto;gap:6px;}
+.qc-run-cell{position:relative;}
+.qc-parallel-cell{background:var(--warning-bg);}
+.qc-parallel-card{border-color:var(--warning-border);}
+.lj-mini-parallel{border-color:var(--warning-border);background:var(--warning-bg);}
+.qc-parallel-label{display:inline;margin-left:7px;color:var(--warning-ink);font-size:var(--type-caption);font-weight:800;white-space:nowrap;}
+.qc-value-chip.prev{color:#5f7079;border-color:#d6dee2;background:#f0f3f5;font-weight:750}
+.prev-lot-slot small{color:#83909a}
+.qc-old-lot-toggle{margin-left:auto;white-space:nowrap}
+.qc-previous-card{border-color:#cbd7dd;background:#fbfcfc}
+.qc-sheet input.qc-inline-input{box-sizing:border-box;width:75px;min-width:75px;max-width:75px;height:30px;min-height:30px;padding:0 8px;line-height:28px;border:1px dashed #d2dee5;border-radius:var(--radius-md);background:var(--panel);box-shadow:none;color:var(--muted);font-size:var(--type-body);font-weight:700;text-align:center;font-variant-numeric:tabular-nums;}
+.qc-inline-input:hover,.qc-inline-input:focus{border-color:#9ec7c4;background:var(--panel);box-shadow:none;}
+.qc-inline-input:focus,.qc-inline-input:focus-visible{border-color:var(--focus-outline);border-style:solid;outline:none;}
+.qc-staff-cell{min-width:96px;white-space:nowrap;}
+
+.qc-cumulative{border-bottom:1px solid var(--line);position:sticky;left:0;z-index:2;display:grid;grid-template-columns:repeat(4,minmax(105px,1fr));background:#f7fafc;}
+.qc-cumulative>div{padding:9px 11px;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;border-right:1px solid #e1e9ed;text-align:center;}
+.qc-cumulative>div:last-child{border-right:none;}
+.qc-cumulative span{display:block;white-space:nowrap;color:var(--muted);font-size:var(--type-caption);font-weight:800;}
+.qc-cumulative b{color:var(--tealink);display:block;margin-top:2px;font-size:var(--type-body-sm);font-variant-numeric:tabular-nums;}
+
+/* ---- Biểu đồ Levey-Jennings xếp chồng ---- */
+.lj-toolbar{display:grid;align-items:center;min-height:44px;margin:0;padding:10px 14px;gap:14px 18px;grid-template-columns:minmax(180px,1fr) auto;background:var(--section-head-bg);border-bottom:1px solid var(--section-head-border);color:var(--card-head-ink);font-size:var(--surface-head-size);font-weight:800;text-transform:none;letter-spacing:0;box-shadow:none;}
+@media(max-width:980px){ .lj-toolbar{ grid-template-columns:1fr; } }
+.lj-toolbar h2.panel-title{margin:0;color:var(--section-head-ink);font-size:var(--section-head-size);font-weight:800;text-transform:none;letter-spacing:0;}
+.lj-filter{display:flex;gap:12px;align-items:center;justify-content:flex-end;flex-wrap:wrap;}
+@media(max-width:980px){ .lj-filter{ justify-content:flex-start; } }
+.lj-range{margin:var(--panel-content-gap) 16px 12px;}
+/* Trái/phải đổi 10px→14px: khoảng cách viền-với-viền (từ viền panel ngoài
+   tới viền từng thẻ `.lj-mini` bên trong) khớp đúng `.qc-sheet-wrap`/
+   `.qc-table-grid` — theo yêu cầu người dùng, đồng bộ khoảng cách này xuyên
+   suốt mọi khối bảng/biểu đồ trong trang Nhập QC. */
+.lj-stack{display:grid;gap:12px;margin:0 14px 8px;}
+/* 14px đều 4 cạnh (trước 16/8/20/0 lệch nhau, port app cũ) — theo yêu cầu
+   người dùng: khoảng cách từ biểu đồ tới viền thẻ luôn cố định 14px mọi
+   phía, không đổi theo tỉ lệ màn hình (giá trị `px` vốn đã không co giãn
+   theo % kích thước, chỉ cần đều nhau 4 cạnh). */
+.chart-scroll{padding:14px;}
+.chart-scroll canvas.entryLJStack{width:100%;max-width:none;}
+.lj-mini,.lj-mini canvas{cursor:pointer;}
+.lj-mini:hover{border-color:var(--focus-border);}
+/* Bỏ `background:#f7fcfc` app cũ có (dù rất nhạt, gần trắng) — theo yêu cầu
+   người dùng: chỉ cần đổi VIỀN sang teal khi chọn, không phủ nền cả thẻ. */
+.lj-mini.on{box-shadow:none;border-color:var(--teal);}
+.lj-mini.on .lj-mini-h{background:var(--card-head-active);border-bottom-color:var(--focus-border);}
+/* Mặt thẻ dùng chung — port `components.css` app cũ (cùng rule cho
+   `.qc-table-card`/`.tree`/`.lj-mini`/`.sg-chart-box`). app-v2 chỉ áp riêng
+   cho `.qc-table-card`, nên thẻ biểu đồ `.lj-mini` KHÔNG có viền/bo/nền:
+   mất luôn viền teal của mức đang chọn và lệch 1px mỗi cạnh so với app cũ. */
+.qc-table-card,.tree,.lj-mini,.sg-chart-box{
+  border:1px solid var(--line);border-radius:var(--surface-radius);
+  box-shadow:var(--surface-shadow);overflow:hidden;background:var(--panel);
+}
+
+/* Header phụ dùng chung — port `components.css` app cũ (cùng rule cho
+   `.qc-table-card h4`/`.lj-mini-h`/`.tree h4`/`.sg-chart-box > h3`): app-v2
+   đã có token `--subpanel-header-min-height` từ A1 nhưng CHƯA có rule dùng
+   nó, nên các header phụ thấp hơn golden master 7px. */
+.qc-table-card h4,.lj-mini-h,.tree h4,.sg-chart-box > h3{
+  min-height:var(--subpanel-header-min-height);margin:0;padding:var(--space-sm) var(--space-lg);
+  background:var(--section-head-bg);border-bottom:1px solid var(--section-head-border);box-shadow:none;
+  color:var(--card-head-ink);font-size:var(--section-head-size);font-weight:800;letter-spacing:0;text-transform:none;
+}
+/* `.entry-tree-head h4` phải khai SAU rule dùng chung ở trên — cùng độ đặc
+   hiệu (1 class + 1 thẻ) với nhánh `.tree h4` của rule đó (h4 này vừa là con
+   của `.entry-tree-head` vừa là hậu duệ của `.tree`), nên thứ tự nguồn quyết
+   định ai thắng. Khai TRƯỚC (như bản port đầu tiên) khiến `.tree h4` đè mất
+   toàn bộ màu/nền/viền/cỡ chữ dành riêng cho tiêu đề cây — đúng lỗi đã gặp,
+   xem CLAUDE.md mục rà soát Nhập QC 2026-09-04. */
+.entry-tree-head h4{min-width:0;flex:1;margin:0;padding:4px 8px;background:none;border-bottom:none;min-height:auto;font-size:var(--type-body);font-weight:800;color:#087a76;}
+.lj-mini-h{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.lj-mini-h b{color:#1a3946;font-size:var(--type-body);}
+.lj-mini-h .hint{font-size:var(--type-caption);}
+.lj-point-count{margin-left:8px;color:var(--muted);font-size:var(--type-caption);font-weight:700;white-space:nowrap;}
+.lj-qc-strip{display:grid;grid-template-columns:repeat(5,minmax(112px,1fr));border-bottom:1px solid var(--line);padding:0 12px;overflow-x:auto;background:#f7fafc;}
+.lj-qc-stat{min-width:105px;border-right:1px solid #e1e9ed;padding:11px 12px;}
+.lj-qc-stat:last-child{border-right:none;}
+.lj-qc-stat .k{display:block;white-space:nowrap;color:var(--muted);font-size:var(--type-caption);font-weight:800;letter-spacing:0;text-transform:none;}
+.lj-qc-stat .v{display:block;margin-top:2px;color:#213e4b;font-size:var(--type-body);font-weight:800;white-space:nowrap;font-variant-numeric:tabular-nums;}
+.lj-qc-stat.control{background:#f1f8f8;}
+.lj-qc-stat.control .v{color:var(--tealink);}
+.lj-qc-stat:not(.control)+.lj-qc-stat.control{border-left:2px solid #b9d9d7;}
+@media(max-width:760px){
+  .lj-qc-strip{grid-template-columns:repeat(2,minmax(0,1fr));overflow:visible;padding:0;}
+  .lj-qc-stat{min-width:0;border-right:1px solid #e1e9ed;border-bottom:1px solid #e1e9ed;}
+  .lj-qc-stat:nth-child(2n){border-right:none;}
+  .lj-qc-stat:nth-last-child(-n+2){border-bottom:1px solid #e1e9ed;}
+  .lj-qc-stat:last-child{grid-column:1/-1;border-right:none;border-bottom:none;}
+}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin:10px 24px 14px;color:var(--muted);font-size:var(--type-caption);}
+.legend .dot{display:inline-block;width:9px;height:9px;border-radius:50%;vertical-align:middle;margin-right:4px;}
+
+/* ---- "Điểm trong khoảng xem" (panel gấp lại) ---- */
+.entry-secondary-panel{padding:0;overflow:hidden;}
+.entry-secondary-summary{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:48px;padding:10px 16px;border-bottom:1px solid var(--section-head-border);background:var(--section-head-bg);color:var(--card-head-ink);}
+.entry-secondary-summary>span{font-size:var(--section-head-size);font-weight:800;}
+.entry-secondary-summary>small{flex:1;color:var(--muted);font-size:var(--type-body-sm);font-weight:700;text-align:right;}
+/* CHỈ `padding-bottom:14px` — port đúng nguyên văn app cũ
+   (`professional-entry.css:760-762`). KHÔNG có padding trái/phải/trên nào
+   khác: mỗi phần tử con tự mang margin riêng của nó (`.qc-cumulative-note`
+   margin 16px 2 bên, `.qc-table-grid` margin 14px riêng — xem dưới) —
+   app-v2 từng tự thêm `padding:14px 16px` ở đây, CỘNG DỒN với margin riêng
+   của `.qc-table-grid` thành ~30px, sai hẳn với app cũ. */
+.entry-secondary-body{padding-bottom:14px;}
+@media(max-width:760px){ .entry-secondary-summary{ align-items:flex-start; flex-wrap:wrap; padding:10px 12px; } .entry-secondary-summary>small{ order:3; flex-basis:100%; text-align:left; } }
+
+/* Đổi sang flexbox (không dùng CSS Grid `auto-fit`) — lý do kỹ thuật: với
+   `grid-template-columns:repeat(auto-fit,minmax(340px,640px))`, vì TRẦN
+   (640px) là số CỐ ĐỊNH (không phải `1fr`), thuật toán auto-fit đếm số cột
+   dựa theo TRẦN chứ không phải SÀN — 2 mức bị dồn về 1 cột dù còn dư chỗ
+   cho cả 2 ở mức 340px, ngược hẳn ý muốn "luôn ưu tiên xếp cạnh nhau". Flex
+   với `flex-basis:340px` không có bẫy này: trình duyệt xếp được BAO NHIÊU
+   thẻ cạnh nhau THEO SÀN 340px trước, chỉ xuống hàng khi hết chỗ, rồi mới
+   `flex-grow` chia đều phần dư cho các thẻ đang có — không còn trần cứng nào
+   (xem `.qc-table-card` dưới), nên còn bao nhiêu chỗ trống thật (thu gọn
+   thanh điều hướng/danh mục xét nghiệm chẳng hạn) đều được chia hết. */
+/* `margin:14px` TỰ MANG (không nhờ cha) — app cũ luôn khai `.qc-table-grid`
+   cùng `.qc-sheet-wrap` trong MỌI breakpoint (base 14px, ≤760px còn 12px,
+   ≤640px 10px 2 bên — xem cụm `@media` bên dưới), tức 2 khối này LUÔN cùng
+   margin dù `.entry-secondary-body` (cha) không có padding ngang nào. */
+.qc-table-grid{display:flex;flex-wrap:wrap;gap:var(--space-section);margin:var(--space-section);}
+/* Bỏ `max-width:640px` (từng thêm để trị nhầm vụ "khoảng cách viền chưa
+   đúng" — hoá ra lỗi thật nằm ở `.entry-secondary-body` cộng dồn padding
+   với margin của `.qc-table-grid`, đã sửa ở trên; cap ở đây chỉ khiến bảng
+   không kéo giãn hết cỡ khi có thêm chỗ trống thật, vd sau khi thu gọn
+   thanh điều hướng/danh mục xét nghiệm — đúng điều người dùng phản hồi
+   không muốn). Không còn trần: `flex:1 1 340px` co giãn TỰ DO theo chỗ dư. */
+.qc-table-card{display:block;flex:1 1 340px;overflow-x:auto;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;scrollbar-gutter:auto;padding-bottom:0;contain:paint;border:1px solid var(--line);border-radius:var(--surface-radius);background:var(--panel);}
+/* Thu gọn bảng chi tiết để hai mức QC vừa cạnh nhau ở bố cục desktop. */
+.qc-table-card h4,.qc-table-card table,.qc-cumulative{min-width:540px;}
+/* CHỈ thêm phần app cũ khai RIÊNG cho `.qc-table-card h4` ngoài rule dùng
+   chung (`.qc-table-card h4,.lj-mini-h,.tree h4,.sg-chart-box>h3` ở trên) —
+   không lặp lại background/border-bottom/margin/padding/font-size, nếu
+   không bản khai lại (cùng độ đặc hiệu, đến SAU) sẽ đè mất giá trị đúng của
+   rule dùng chung (đã xảy ra: font-size từng bị đè 14px→13px). */
+.qc-table-card h4{position:sticky;left:0;z-index:3;display:flex;align-items:center;box-sizing:border-box;width:100%;}
+.qc-table-card h4>span{display:flex;align-items:center;gap:10px;min-width:0;flex-wrap:wrap;}
+.qc-table-count{font-weight:700;white-space:nowrap;color:var(--muted);font-size:var(--type-caption);}
+.qc-table-card table{border:none;border-radius:0;table-layout:fixed;width:100%;}
+.qc-table-card th,.qc-table-card td{text-align:center;font-size:var(--table-body-size);}
+.qc-table-card th,.qc-sheet thead th{font-weight:800;}
+.qc-table-card td.num,.qc-table-card th.num{text-align:center;font-variant-numeric:tabular-nums;}
+.qc-table-card th:nth-child(1),.qc-table-card td:nth-child(1),.qc-table-card th:nth-child(3),.qc-table-card td:nth-child(3){width:14.25%;}
+.qc-table-card th:nth-child(2),.qc-table-card td:nth-child(2){width:15.2%;}
+.qc-table-card th:nth-child(4),.qc-table-card td:nth-child(4){width:17%;}
+.qc-table-card th:nth-child(5),.qc-table-card td:nth-child(5){width:18%;}
+.qc-table-card>table th:nth-child(-n+5),.qc-table-card>table td:nth-child(-n+5){width:calc((100% - 76px) / 5);}
+.qc-table-card th:nth-child(6),.qc-table-card td:nth-child(6){width:76px;padding-left:6px;padding-right:6px;white-space:nowrap;}
+.qc-table-card tbody tr.qc-point-rej td{background:var(--danger-bg);border-bottom-color:var(--danger-border);}
+.qc-table-card tbody tr.qc-point-rej:hover td{background:var(--danger-bg);}
+.qc-table-card tbody tr.qc-point-warn td{background:var(--warning-bg);border-bottom-color:var(--warning-border);}
+.qc-table-card tbody tr.qc-point-warn:hover td{background:var(--warning-bg);}
+.qc-table-empty{min-height:92px;margin:14px;padding:22px 16px;display:grid;place-items:center;box-sizing:border-box;border-radius:0;border:none;}
+.qc-row-actions{text-align:center;white-space:nowrap;}
+.qc-row-void{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;min-height:30px;padding:0;border:1px solid #efc9c6;border-radius:var(--radius-sm);background:var(--panel);color:var(--danger-ink);cursor:pointer;transition:.15s ease;}
+.qc-row-void svg{width:15px;height:15px;}
+.qc-row-void:hover{border-color:#dda39e;background:var(--danger-bg);}
+.qc-row-void:focus-visible{outline:2px solid var(--focus-outline);outline-offset:2px;}
+.qc-cumulative-note{margin:var(--panel-content-gap) 16px 0;}
+.qc-points-panel{margin-top:16px;}
+
+.qc-voided-box{margin:16px 16px 0;overflow-x:auto;}
+.qc-voided-box h4{margin:0 0 10px;font-size:var(--type-body);font-weight:750;color:#203846;}
+/* Modal "Hủy điểm QC" — khối chọn kind/mở NCE (2026-09-04, port nguyên
+   `professional-entry.css:474-487`). */
+.void-nce-choice{margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--surface-subtle);}
+.void-nce-choice label{display:flex;align-items:center;gap:8px;margin:0;color:var(--ink);}
+.void-nce-choice input{flex:none;}
+.void-nce-choice .hint{margin-top:4px;}
+.qc-voided-table{width:100%;table-layout:fixed;}
+.qc-voided-table th,.qc-voided-table td{vertical-align:middle;text-align:center;}
+.qc-voided-table th:nth-child(1),.qc-voided-table td:nth-child(1){width:16%;}
+.qc-voided-table th:nth-child(2),.qc-voided-table td:nth-child(2),.qc-voided-table th:nth-child(4),.qc-voided-table td:nth-child(4){width:19%;}
+.qc-voided-table th:nth-child(3),.qc-voided-table td:nth-child(3){width:15%;}
+.qc-voided-table th:nth-child(5),.qc-voided-table td:nth-child(5){width:18%;}
+.qc-voided-table th:nth-child(6),.qc-voided-table td:nth-child(6){width:13%;}
+.qc-voided-table td.num{font-weight:800;font-variant-numeric:tabular-nums;}
+
+@media(max-width:760px){
+  .qc-table-card h4,.lj-mini-h,.tree h4{min-height:42px;padding:10px 12px;}
+  .qc-table-grid,.qc-sheet-wrap{margin:12px;}
+}
+@media(max-width:640px){ .qc-table-grid,.qc-sheet-wrap{ margin-left:10px; margin-right:10px; } }
+
+/* ── D3.5: các class port thêm từ `assets/professional-entry.css` ─────────
+   Giữ nguyên giá trị của app cũ; chỉ những class mà gate ui-parity đo được
+   là thiếu, không copy cả file. */
+.lj-date-field { display: grid; grid-template-columns: 54px 164px; gap: 8px; align-items: center; margin: 0; }
+.lj-date-field .hint { display: flex; align-items: center; justify-content: flex-end; height: 36px; white-space: nowrap; line-height: 1; }
+.lj-date-field .datebox { width: 164px; height: 36px; }
+.lj-date-field .datebox input.date-text { height: 34px; padding-top: 0; padding-bottom: 0; }
+
+.qc-month-picker select, .qc-current-month, .qc-today-jump { height: 32px; min-height: 32px; padding: 0 11px; font-size: var(--type-body-sm); }
+.qc-today-jump { white-space: nowrap; min-width: 104px; }
+
+/* Nút "＋ Thêm" chỉ hiện khi trỏ vào ô — app cũ dùng opacity + nở ngang. */
+.qc-run-grid.has-add-btn { padding-right: 14px; }
+.qc-add-run-btn {
+  position: absolute; top: 0; right: 0; bottom: 0; width: 22px; margin: 0; padding: 0;
+  display: flex; align-items: center; justify-content: center; border: none; border-radius: 0;
+  background: transparent; color: var(--teal); cursor: pointer; overflow: hidden; white-space: nowrap;
+  box-sizing: border-box; z-index: 2; opacity: 0; pointer-events: none;
+  transition: opacity .15s ease, width .18s ease, background .18s ease;
+}
+.qc-run-cell:hover .qc-add-run-btn { opacity: 1; pointer-events: auto; background: #eaf6f5; }
+.qc-add-run-btn:hover { width: 70px; background: #d7f0ed; }
+.qc-add-run-icon { font-size: var(--type-subhead); font-weight: 800; line-height: 1; flex: 0 0 auto; }
+.qc-add-run-label {
+  font-size: var(--type-caption); font-weight: 700; letter-spacing: .01em; margin-left: 0;
+  max-width: 0; opacity: 0; white-space: nowrap; overflow: hidden;
+  transition: max-width .15s ease, opacity .15s ease, margin-left .15s ease;
+}
+.qc-add-run-btn:hover .qc-add-run-label { max-width: 44px; margin-left: 4px; opacity: 1; }
+
+.range-band-label, .range-band-source, .range-band-body { display: inline; }
+.range-band-label { color: #274554; font-weight: 650; margin-right: 10px; }
+.range-band-source { color: var(--ink); font-weight: 850; white-space: nowrap; margin-right: 4px; }
+
+/* Huy hiệu nhân sự trong ô "NV thực hiện" — port từ professional-entry.css. */
+.qc-staff {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 34px; height: 25px;
+  padding: 0 7px; border: 1px solid #c9d9e0; border-radius: var(--radius-sm);
+  font-size: var(--type-caption); font-weight: 850; letter-spacing: .02em;
+  background: #eef4f7; color: #36505d;
+}
+.qc-staff-sep { margin: 0 3px; color: #8da0ad; font-weight: 750; }
+
+/* Bù class app cũ CÓ CSS mà app-v2 để trống (2026-09-03, quét bằng đối
+   chiếu selector 2 bên; gate UI parity không thấy vì nó so TẬP class
+   trong DOM — class vẫn có ở cả 2 bản, chỉ bên app-v2 là không có rule
+   nào phía sau). Giá trị copy nguyên từ `assets/*.css`. */
+.qc-note-input{width:100%;min-width:128px;min-height:34px;resize:vertical;padding:7px 9px;border:1px solid #d6e2e8;border-radius:var(--surface-radius);background:var(--panel);color:var(--ink);font-size:var(--type-meta);line-height:1.35;box-shadow:none;}
+.qc-note-input::placeholder{color:#8a9ba6;}
+.qc-note-input:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px rgba(12,111,120,.10);}
+.qc-sheet th.qc-level-head{cursor:help;text-decoration:underline dotted rgba(8,122,118,.48);text-underline-offset:4px;}
+.qc-sheet th.qc-level-head::after{content:attr(data-qc-tooltip);position:absolute;left:50%;top:calc(100% + 7px);transform:translateX(-50%) translateY(-3px);z-index:40;min-width:max-content;padding:8px 11px;border:1px solid #b9d4d8;border-radius:8px;background:#15343d;color:#fff;box-shadow:0 8px 22px rgba(17,43,51,.22);font-size:var(--type-meta);font-weight:750;line-height:1.3;letter-spacing:0;white-space:nowrap;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .12s ease,transform .12s ease,visibility .12s;}
+.qc-sheet th.qc-level-head:hover, .qc-sheet th.qc-level-head:focus-visible{z-index:41;}
+.qc-sheet th.qc-level-head:focus-visible{outline:2px solid var(--teal);outline-offset:-3px;}
+.qc-sheet th.qc-level-head:hover::after, .qc-sheet th.qc-level-head:focus-visible::after{opacity:1;visibility:visible;transform:translateX(-50%) translateY(0);}
+.tree .tn-config .config-name{min-width:0;overflow:visible;text-overflow:clip;white-space:nowrap;overflow-wrap:normal;line-height:1.3;}
+.range-band-note{margin:12px 14px 0;padding:14px 18px 14px 16px;border:0;border-left:5px solid var(--info-accent);border-radius:var(--radius-lg);background:var(--info-bg);color:var(--ink);line-height:1.55;}
+.range-workflow-actions{display:flex;justify-content:flex-end;gap:8px;margin:12px 14px 0;flex-wrap:wrap;}
+.range-workflow-modal{width:min(760px,calc(100vw - 32px));}
+.range-workflow-checks{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;}
+.range-workflow-checks>div,.range-workflow-compare>div{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--surface-soft);}
+.range-workflow-checks .pass{border-left:4px solid var(--success-accent);}.range-workflow-checks .fail{border-left:4px solid var(--danger-accent);}
+.range-workflow-checks span,.range-workflow-compare span{color:var(--muted);}
+.range-workflow-compare{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
+.range-workflow-compare>div{align-items:flex-start;flex-direction:column;gap:3px;}
+.range-safety-gate{display:grid;gap:8px;margin:12px 0;}.range-safety-gate>label:not(.field){display:flex;align-items:center;gap:8px;}
+@media(max-width:760px){.range-band-note{padding:12px 14px;}}
+@media(max-width:760px){.range-workflow-checks,.range-workflow-compare{grid-template-columns:1fr;}}

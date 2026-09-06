@@ -1,0 +1,24 @@
+{
+  "note": "Baseline gate style parity — SỐ selector còn lệch computed style so với app cũ, theo từng surface. Chỉ siết bằng --update-baseline sau khi thật sự sửa; đừng nâng số bằng tay.",
+  "updatedAt": "2026-09-06T15:02:09.046Z",
+  "surfaces": {
+    "dashboard": 6,
+    "users": 3,
+    "report": 2,
+    "settings": 2,
+    "manage:instruments": 7,
+    "manage:tests": 8,
+    "manage:panels": 7,
+    "manage:lots": 8,
+    "manage:targets": 0,
+    "manage:transitions": 3,
+    "manage:history": 5,
+    "manage:tearefs": 5,
+    "entry": 5,
+    "sigma": 6,
+    "reagent": 2,
+    "actions": 5,
+    "westgard": 4,
+    "audit": 2
+  }
+}

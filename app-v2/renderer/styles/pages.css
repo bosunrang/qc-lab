@@ -1,0 +1,156 @@
+/* Tách thành file riêng theo từng trang từ 2026-09-01 (xem CLAUDE.md mục
+   "Sao chép giao diện app cũ"), mirroring quy ước professional-*.css của app
+   cũ — xem app-v2/renderer/styles/pages/*.css. File này không còn CSS riêng
+   nào; giữ lại (rỗng) để index.html khỏi phải sửa nếu sau này cần thêm CSS
+   thật sự dùng chung nhiều trang mà không thuộc app.css. */
+
+/* ── D3.6: Six Sigma — port từ assets/professional-sigma.css ──────────── */
+.sg-control-row > .sg-test-picker { flex: 1 1 360px; max-width: 420px; }
+.sg-setup-heading + .sg-control-row > .sg-test-picker { grid-column: 1 / span 2; flex: initial; max-width: none; min-width: 0; }
+.sg-inline-btns-row { display: flex; gap: 8px; align-items: center; min-height: 36px; }
+.sg-inline-btns-row .btn { min-height: 36px; }
+.sg-sigma-input-note { margin: 10px 16px 16px; padding: 12px 0 0; border-top: 1px solid var(--line2); border-radius: var(--radius-md); line-height: 1.6; }
+
+.sg-improvement-lead { margin: var(--space-2xs) 0; }
+.sg-improvement-target { margin-bottom: var(--space-2xs); }
+.sg-improvement-list { margin: var(--space-2xs) 0 0 var(--modal-inline-padding); }
+
+.sg-period-select-wrap { gap: 0; }
+.sg-period-controls .sg-period-month { width: 50px; min-width: 50px; }
+.sg-period-controls .sg-period-year { width: 66px; min-width: 66px; }
+.sg-cell-meta-empty { visibility: hidden; }
+
+.sg-data-foot { display: flex; justify-content: flex-start; gap: 8px; flex-wrap: wrap; padding: 8px 16px; border-top: 1px solid var(--section-head-border); }
+
+/* Thu gọn OPSpecs/MU: cùng cách .wg-guide bên Westgard làm, đóng mặc định. */
+.sg-collapse-summary { display: flex; align-items: center; gap: 12px; min-height: var(--panel-header-min-height); padding: 9px 14px; border-bottom: 1px solid transparent; background: var(--section-head-bg); cursor: pointer; }
+.sg-collapse-summary::-webkit-details-marker { display: none; }
+.sg-collapse-summary::after { content: "+"; flex: none; color: var(--muted); font-weight: 800; font-size: var(--type-heading-sm); }
+.sg-collapse-panel[open] > .sg-collapse-summary { border-bottom-color: var(--section-head-border); }
+.sg-collapse-panel[open] > .sg-collapse-summary::after { content: "−"; }
+.sg-collapse-summary > span { flex: 1; min-width: 0; font-size: var(--type-subhead); font-weight: 850; }
+.sg-collapse-body { margin: var(--panel-content-gap) 16px 16px; }
+.sg-mu-panel { position: relative; }
+.sg-mu-table-wrap { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+.sg-chart-box .chart-inner { padding: var(--panel-content-gap) 12px 12px; }
+.sg-chart-box > .hint + .chart-inner { padding-top: 8px; }
+.sg-chart-grid, .sg-chart-box .chart-inner { background: transparent; }
+.sg-row-action-buttons { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px; }
+.sg-row-action-buttons .btn { min-height: 32px; padding: 4px 7px; }
+
+/* ── D3.7: So sánh hóa chất — port từ assets/professional-reagent.css ──
+   Chỉ những rule mà gate ui-parity đo được là thiếu; giữ nguyên giá trị. */
+.rc-idx {width:34px; height:34px; margin:0 auto; display:flex; align-items:center; justify-content:center; font-size:var(--type-meta);}
+.rc-calc {text-align:center; color:var(--teal); font-variant-numeric:tabular-nums; font-weight:800; font-size:var(--table-body-size);}
+.rc-calc.neg {color:#b66f10;}
+.rc-toolbar-panel {padding:0;}
+.rc-toolbar-panel > .rc-toolbar {margin-top:var(--panel-content-gap) !important; margin-bottom:var(--panel-content-gap) !important;}
+.rc-toolbar-selcol {display:flex; flex-direction:column; align-items:flex-start; gap:6px;}
+.rc-toolbar-selcol label {margin:0;}
+.rc-toolbar-selcol select {width:100%; max-width:none;}
+.rc-toolbar-primary {flex:0 0 auto; align-self:flex-end;}
+.rc-toolbar-primary > div,.rc-toolbar-secondary {display:flex; flex-wrap:wrap; gap:8px;}
+.rc-toolbar-secondary {align-self:flex-end; margin-left:auto;}
+.rc-entry-grid > .rc-info-panel > .rc-info-grid {grid-template-columns:repeat(2,minmax(0,1fr));}
+.rc-pair-panel .rc-pair-row .x:hover {background:var(--danger-ink); color:var(--on-accent);}
+.rc-pair-actions {display:flex; gap:8px; flex-wrap:wrap; margin:10px 16px 0;}
+.rc-coverage-cell {grid-column:1 / -1;}
+.rc-toolbar-selcol {flex:1 1 360px; width:auto; max-width:420px;}
+.rc-calc {letter-spacing:0;}
+.rc-idx {font-weight:850;border-radius:var(--radius-sm);background:var(--card-head-bg);color:var(--card-head-ink);}
+.rc-coverage-check {gap:8px; width:auto; max-width:100%; margin:2px 0 0 !important; padding:0; border:0; border-radius:0; background:transparent; color:#24414e; font-size:var(--type-meta); font-weight:750; line-height:1.35; cursor:pointer;}
+.rc-coverage-check input[type="checkbox"] {flex:0 0 auto; width:17px; height:17px; min-height:17px; margin:0; padding:0; accent-color:var(--teal); box-shadow:none; cursor:pointer;}
+.rc-coverage-check span {min-width:0; line-height:1.35;}
+.rc-info-panel > .rc-info-grid {margin:0 !important;}
+.rc-info-panel .rc-field label {margin:0 0 7px; color:var(--card-head-ink); font-size:var(--type-meta); font-weight:650; text-transform:none; letter-spacing:0;}
+.rc-field input, .rc-field .datebox, .rc-info-panel .rc-field > input, .rc-info-panel .rc-quick-field input {height:36px;}
+.rc-info-panel .rc-date-field .datebox {display:grid; grid-template-columns:minmax(0,1fr) 36px; width:100%; max-width:none; height:36px;}
+.rc-info-panel .rc-date-field .datebox input.date-text {max-width:none; height:34px; min-width:0; border:0; border-radius:0; background:transparent; box-shadow:none;}
+.rc-info-panel .rc-date-field .datebox input.date-text:focus {border:0; box-shadow:none;}
+.rc-info-panel .rc-date-field .datebox .datepick {width:36px; min-width:36px; border-left:1px solid var(--line); background:var(--surface-subtle);}
+.rc-info-panel .rc-quick-field {display:grid; grid-template-columns:minmax(0,1fr) 36px; gap:8px; align-items:center;}
+.rc-info-panel .rc-icon-btn {width:36px; height:36px; min-width:36px; max-width:36px; min-height:36px; max-height:36px; padding:0;}
+.rc-info-panel .rc-coverage-cell {grid-column:1 / -1;}
+.rc-info-panel .rc-coverage-check {display:inline-flex; align-items:center; width:auto; max-width:100%; min-height:0; margin:0; padding:2px 0;}
+.rc-info-panel > .rc-info-grid {grid-template-columns:1fr 1fr;}
+.rc-stats-panel > .panel-title:first-child + #rcStats, .rc-chart-panel > .panel-title:first-child + .rc-charts {padding:var(--panel-content-gap) 16px 16px;}
+.rc-stat-section h4::after {content:"";display:none;margin-top:8px;border-bottom:1px dashed var(--line);}
+.rc-stat-columns {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;padding:0 12px 8px;}
+.rc-stat-row {display:grid; grid-template-columns:minmax(0,1fr) auto; gap:12px; align-items:center; min-height:40px; border-bottom:1px solid var(--line2); color:var(--ink); font-size:var(--type-body); font-weight:500;}
+.rc-stat-row b {font-variant-numeric:tabular-nums; text-align:right; white-space:nowrap;}
+.rc-crit-panel > #rcCrit {margin:var(--panel-content-gap) 16px 16px; padding:0; border:1px solid var(--line-strong); border-radius:var(--radius-md); overflow:hidden;}
+.rc-crit-panel > #rcVerdict {margin:0 !important;padding:0 16px 16px;}
+.rc-stat-section h4 {margin:0; padding:10px 12px; background:var(--section-head-bg); border-bottom:1px solid var(--section-head-border); color:var(--card-head-ink); font-size:var(--section-head-size); font-weight:800; letter-spacing:0; text-transform:none; line-height:1.35;}
+.rc-stat-section, .rc-chart-box {background:var(--panel); border:1px solid var(--line); box-shadow:var(--surface-shadow); overflow:hidden;}
+.rc-pair-panel > .rc-pair-wrap {margin:var(--panel-content-gap) 16px 16px !important; border:1px solid var(--line-strong); border-radius:var(--radius-md); background:var(--panel); overflow-x:auto;}
+.rc-pair-panel .rc-pair-head, .rc-pair-panel .rc-pair-row {grid-template-columns:44px minmax(100px,1.25fr) minmax(100px,1.25fr) minmax(78px,.7fr) minmax(108px,.85fr) 28px; gap:8px; min-width:600px;}
+.rc-pair-panel .rc-pair-head {min-height:38px; padding:8px 12px; background:var(--section-head-bg); border-bottom:1px solid var(--section-head-border); color:var(--card-head-ink); font-size:var(--table-head-size); line-height:1.35; font-weight:650; text-transform:none; letter-spacing:0;}
+.rc-pair-panel .rc-pair-row {min-height:52px; padding:8px 12px; border-bottom:1px solid var(--line2); background:var(--panel);}
+.rc-pair-panel .rc-pair-row:nth-child(even) {background:var(--surface-subtle);}
+.rc-pair-panel .rc-pair-row:hover {background:#f2f8f9;}
+.rc-pair-panel .rc-idx {width:28px; height:28px; border-radius:var(--surface-radius); border:1px solid var(--line); color:var(--muted); font-size:var(--type-meta);}
+.rc-pair-panel .rc-pair-row input {height:36px; border-color:var(--surface-neutral); border-radius:var(--surface-radius); background:var(--panel); color:var(--ink); font-size:var(--table-body-size); font-weight:650; text-align:center;}
+.rc-pair-panel .rc-pair-row input:focus {border-color:var(--focus-border);}
+.rc-pair-panel .rc-calc {min-height:36px; display:flex; align-items:center; justify-content:center; border-radius:var(--surface-radius); color:var(--ink); font-size:var(--table-body-size); font-weight:750;}
+.rc-pair-panel .rc-calc.dif {color:var(--teal);}
+.rc-pair-panel .rc-calc.neg {color:var(--warning-ink);}
+.rc-pair-panel .rc-pair-row .x {width:32px; height:32px; color:var(--muted); font-size:var(--type-body-sm);}
+.rc-pair-panel .rc-pair-actions {margin:0 16px 0; padding:0 0 16px;}
+.rc-pair-panel .rc-pair-actions .btn {min-height:36px; padding:0 14px; font-size:var(--type-meta);}
+.rc-pair-panel > .hint {margin:0 16px 16px !important; color:var(--muted); font-size:var(--type-meta);}
+.rc-info-panel, .rc-pair-panel, .rc-stats-panel, .rc-crit-panel, .rc-chart-panel, .rc-stat-card, .rc-stat-section, .rc-chart-box {border-radius:var(--surface-radius);}
+.rc-info-panel::before, .rc-pair-panel::before, .rc-stats-panel::before, .rc-crit-panel::before, .rc-chart-panel::before, .rc-info-panel > .panel-title:first-child::before, .rc-pair-panel > .panel-title:first-child::before, .rc-stats-panel > .panel-title:first-child::before, .rc-crit-panel > .panel-title:first-child::before, .rc-chart-panel > .panel-title:first-child::before, .rc-pair-panel .rc-pair-head::before {display:none;}
+.rc-field label, .rc-toolbar-selcol label {color:var(--muted); font-size:var(--type-meta); font-weight:700; letter-spacing:0;}
+.sg-eflm-box > div, .rc-quick-field input, .lot-table, .top-user .meta, .action-form-main > div, .rc-stat-row span, .range-summary-panel > h3:first-child > span, .rc-chart-box {min-width:0;}
+.rc-pair-actions, .config-shell-main .empty .empty-actions, .rc-stat-section {margin-top:12px;}
+.refrow, .mrow b, .rc-stat-row b, .rc-crit-text {color:var(--ink); font-size:var(--type-body); font-weight:700;}
+.rc-toolbar-selcol {flex:0 0 100%; width:100%;}
+.rc-toolbar-primary,.rc-toolbar-secondary {width:100%; margin-left:0;}
+.rc-coverage-check {width:100%;}
+.rc-info-panel > .rc-info-grid {grid-template-columns:1fr; padding:14px;}
+.rc-entry-grid > .rc-info-panel > .rc-info-grid {grid-template-columns:1fr;}
+.rc-info-panel > .panel-title:first-child, .rc-pair-panel > .panel-title:first-child, .rc-stats-panel > .panel-title:first-child, .rc-crit-panel > .panel-title:first-child, .rc-chart-panel > .panel-title:first-child {min-height:42px; padding:10px 12px;}
+.rc-stats-panel > .panel-title:first-child + #rcStats, .rc-chart-panel > .panel-title:first-child + .rc-charts {padding:var(--panel-content-gap) 12px 12px;}
+.rc-crit-panel > #rcVerdict {padding:0 12px 12px;}
+.rc-crit-panel > #rcCrit, .rc-pair-panel > .rc-pair-wrap {margin:var(--panel-content-gap) 12px 12px !important;}
+.rc-pair-panel .rc-pair-actions {margin:0 12px; padding-bottom:12px;}
+.rc-pair-panel > .hint {margin:0 12px 12px !important;}
+.rc-chart-panel > .rc-charts, .dash-main .panel > .dash-list > .shift-item, .dash-main .panel > .dash-list > .hint, .rc-stats-panel > #rcStats {margin:0 !important;}
+
+/* ── D3.8: Khắc phục sự cố — port từ assets/professional-reports.css +
+   professional-dashboard.css (nhóm sự cố, bảng nhật ký). */
+.action-submit-buttons {display:flex; align-items:center; gap:8px; flex:none;}
+.panel>.panel-title:first-child+.action-log-tools {margin:0;}
+.action-date {display:flex; width:100%;}
+.action-log-panel .action-log-tools {display:flex; justify-content:flex-end; padding:var(--panel-content-gap) 16px 10px;}
+.action-log-wrap {margin:0 16px 16px; overflow-x:auto; border:1px solid #d7e3e9; border-radius:var(--radius-md); background:var(--panel);}
+.action-date, .action-test {font-weight:800; color:#153043;}
+.action-time {margin-top:4px; color:#607486; font-size:var(--type-meta); line-height:1.35; font-weight:600;}
+.action-sub, .action-rule, .action-note {margin-top:4px; color:#607486; font-size:var(--type-meta); line-height:1.35;}
+.action-text {color:#243848; line-height:1.45;}
+.action-status-stack {display:flex; flex-direction:column; align-items:flex-start; gap:6px;}
+.action-row-actions {display:flex; flex-direction:column; align-items:stretch; gap:7px;}
+.action-row-actions .btn {justify-content:center; min-height:32px;}
+.action-row-actions .btn.icon {width:100%; min-width:0;}
+.action-date {white-space:nowrap;}
+.rc-stat-sub, .action-chipline {margin-top:6px;}
+.action-chipline {display:flex; align-items:center; flex-wrap:wrap; gap:6px;}
+.action-chipline .action-chip {max-width:none; white-space:nowrap;}
+.issue-group-h {display:flex; align-items:baseline; justify-content:space-between; gap:10px; padding:10px 14px; background:var(--section-head-bg); border-bottom:1px solid var(--section-head-border);}
+.issue-group-h b {color:var(--ink); font-size:var(--type-body-sm);}
+.issue-group-date {margin-left:8px; color:var(--muted); font-size:var(--type-meta); font-weight:650;}
+.issue-group-count {flex:none; color:var(--muted); font-size:var(--type-caption); font-weight:700; white-space:nowrap;}
+.action-chipline .action-chip {max-width:100%; white-space:normal;}
+.action-submit-buttons {align-items:stretch; flex-direction:column-reverse;}
+.dash-list {display:grid;}
+.dash-list .shift-item.rej {border-color:var(--danger-border); border-left:5px solid var(--danger-accent); background:var(--danger-bg); color:var(--danger-ink);}
+.dash-list .shift-item.warn {border-color:var(--warning-border); border-left:5px solid var(--warning-accent); background:var(--warning-bg); color:var(--warning-ink);}
+.dash-list .shift-item.rej .meta {color:var(--danger-ink);}
+.dash-list .shift-item.warn .meta {color:var(--warning-ink);}
+.dash-list {gap:10px;}
+.dash-main .panel > .alert, .panel > .panel-title:first-child + .dash-list, .panel > .panel-title:first-child ~ .dash-list {margin:var(--panel-content-gap) 16px 14px;}
+.dash-main .panel .alert, .dash-list {margin-left:12px; margin-right:12px;}
+
+/* ── D3.9: Phân tích Westgard — port từ assets/professional-westgard.css. */
+.wg-export-actions { display: flex; align-items: center; gap: 8px; min-height: 36px; }

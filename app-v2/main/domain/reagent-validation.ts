@@ -27,6 +27,33 @@ export function prepareReagentMetadata(input: ReagentMetadataInput, existing?: P
   };
 }
 
+// "Chọn nhanh" người thực hiện/loại mẫu — port `reagent-comparison-service.ts`
+// bản cũ (`ensureQuickList`/`addQuick`/`removeQuick`, state top-level
+// `reagentOperators`/`reagentSampleTypes`, KHÔNG gắn theo từng phép so sánh
+// — 1 danh sách CHUNG cho toàn app). Loại mẫu có 3 giá trị mặc định sẵn,
+// người thực hiện bắt đầu rỗng, người dùng tự gõ thêm dần theo thời gian.
+export type QuickValueType = 'operator' | 'sampleType';
+export const DEFAULT_SAMPLE_TYPES: readonly string[] = ['Mẫu bệnh nhân', 'Mẫu nội kiểm (IQC)', 'Mẫu ngoại kiểm (EQA)'];
+
+function searchKey(value: string): string {
+  return value.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().trim();
+}
+
+export function cleanQuickValueType(value: unknown): QuickValueType | null {
+  return value === 'operator' || value === 'sampleType' ? value : null;
+}
+
+/** Thêm giá trị mới vào danh sách — không thêm trùng (so khớp không phân
+ * biệt hoa/thường/dấu, khớp `searchKey()` app cũ), trả lại giá trị đã có
+ * nếu trùng thay vì tạo thêm 1 dòng giống nhau. */
+export function addQuickValue(list: readonly string[], value: unknown): { items: string[]; value: string; added: boolean } | { error: 'empty-value' } {
+  const clean = cleanText(value, 120).trim();
+  if (!clean) return { error: 'empty-value' };
+  const existing = list.find(item => searchKey(item) === searchKey(clean));
+  if (existing) return { items: [...list], value: existing, added: false };
+  return { items: [...list, clean], value: clean, added: true };
+}
+
 export type ReagentRow = [string, string];
 
 export function prepareReagentRows(rows: unknown): ReagentRow[] {

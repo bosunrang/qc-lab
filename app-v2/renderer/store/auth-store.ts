@@ -16,6 +16,9 @@ interface AuthState {
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
+  /** Đọc lại tài khoản đang đăng nhập từ DB — dùng sau khi đổi/xoá ảnh đại
+   * diện (main không trả lại toàn bộ `PublicUser`, chỉ trả avatar mới). */
+  refreshUser: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -48,4 +51,9 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   clearError: () => set({ error: null }),
+
+  refreshUser: async () => {
+    const user = await window.qcApi.currentUser();
+    if (user) set({ user });
+  },
 }));

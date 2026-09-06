@@ -1,26 +1,23 @@
 import { create } from 'zustand';
-import type { LabProfile } from '../../shared/qc-api';
+import type { LabProfile, IpcResult } from '../../shared/qc-api';
 
 interface SettingsState {
   profile: LabProfile | null;
-  error: string | null;
-  saved: boolean;
+  storage: { dbFileBytes: number; path: string } | null;
   load: () => Promise<void>;
-  save: (name: string, dept: string, address: string, brandTitle: string, brandSub: string) => Promise<void>;
+  loadStorage: () => Promise<void>;
+  save: (data: { name: string; dept: string; address: string; brandTitle: string; brandSub: string; logoText?: string; logoData?: string; clearLogo?: boolean }) => Promise<IpcResult<LabProfile>>;
 }
 
-export const useSettingsStore = create<SettingsState>((set) => ({
+export const useSettingsStore = create<SettingsState>((set, get) => ({
   profile: null,
-  error: null,
-  saved: false,
+  storage: null,
 
-  load: async () => {
-    const profile = await window.qcApi.getLabProfile();
-    set({ profile, error: null });
-  },
-  save: async (name, dept, address, brandTitle, brandSub) => {
-    const result = await window.qcApi.saveLabProfile({ data: { name, dept, address, brandTitle, brandSub } });
-    if (!result.ok) { set({ error: result.error.message, saved: false }); return; }
-    set({ profile: result.data, error: null, saved: true });
+  load: async () => set({ profile: await window.qcApi.getLabProfile() }),
+  loadStorage: async () => set({ storage: await window.qcApi.getStorageInfo() }),
+  save: async (data) => {
+    const result = await window.qcApi.saveLabProfile({ data });
+    if (result.ok) set({ profile: result.data });
+    return result;
   },
 }));

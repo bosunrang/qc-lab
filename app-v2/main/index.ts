@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import * as path from 'node:path';
 import { openDatabase } from './db/open-database';
-import { type Actor, writeAudit } from './ipc/shared';
+import { type Actor, writeAudit, setBroadcastWindow } from './ipc/shared';
 import { createConfigHandlers } from './ipc/config-handlers';
 import { createEntryHandlers } from './ipc/entry-handlers';
 import { createWestgardHandlers } from './ipc/westgard-handlers';
@@ -12,9 +12,14 @@ import { createAuthHandlers, type PublicUser } from './ipc/auth-handlers';
 import { createAuditHandlers } from './ipc/audit-handlers';
 import { createSettingsHandlers } from './ipc/settings-handlers';
 import { createReportHandlers } from './ipc/report-handlers';
+import { buildXlsxBase64, printHtmlToPdf, type ExportTableInput } from './ipc/export-handlers';
+import { createBackupHandlers } from './ipc/backup-handlers';
+import { createMigrationHandlers } from './ipc/migration-handlers';
+import { createLisHandlers } from './ipc/lis-handlers';
 
 function createWindow(): void {
-  const dbPath = path.join(app.getPath('userData'), 'qclab.sqlite');
+  const userDataDir = app.getPath('userData');
+  const dbPath = path.join(userDataDir, 'qclab.sqlite');
   const db = openDatabase(dbPath);
   const config = createConfigHandlers(db);
   const entry = createEntryHandlers(db);
@@ -24,8 +29,11 @@ function createWindow(): void {
   const reagentHandlers = createReagentHandlers(db);
   const auth = createAuthHandlers(db);
   const audit = createAuditHandlers(db);
-  const settings = createSettingsHandlers(db);
+  const settings = createSettingsHandlers(db, dbPath);
   const report = createReportHandlers(db);
+  const backup = createBackupHandlers(db, userDataDir);
+  const migration = createMigrationHandlers(db, userDataDir);
+  const lis = createLisHandlers(db);
 
   // Danh tính đang đăng nhập: app 1 cửa sổ duy nhất nên giữ ngay trong bộ nhớ
   // main process, không cần session token/cookie. requireActor() là ranh
@@ -41,7 +49,8 @@ function createWindow(): void {
   }
 
   ipcMain.handle('auth:hasAnyUsers', () => auth.hasAnyUsers());
-  ipcMain.handle('auth:currentUser', () => (sessionActor ? { id: sessionActor.userId, username: sessionActor.username, name: sessionActor.name, role: sessionActor.role, active: true, mustChangePassword: false } : null));
+  // Đọc lại từ DB thay vì dựng từ sessionActor — xem ghi chú getUser().
+  ipcMain.handle('auth:currentUser', () => (sessionActor ? auth.getUser(sessionActor.userId) : null));
   ipcMain.handle('auth:bootstrapAdmin', (_event, input) => auth.bootstrapAdmin(input));
   ipcMain.handle('auth:login', (_event, input) => {
     const result = auth.login(input);
@@ -56,28 +65,75 @@ function createWindow(): void {
   ipcMain.handle('auth:listUsers', () => auth.listUsers(requireActor()));
   ipcMain.handle('auth:createUser', (_event, input) => auth.createUser(input, requireActor()));
   ipcMain.handle('auth:updateUser', (_event, input) => auth.updateUser(input, requireActor()));
+  ipcMain.handle('auth:deleteUser', (_event, input) => auth.deleteUser(input, requireActor()));
   ipcMain.handle('auth:resetPassword', (_event, input) => auth.resetPassword(input, requireActor()));
   ipcMain.handle('auth:changeOwnPassword', (_event, input) => auth.changeOwnPassword(input, requireActor()));
+  ipcMain.handle('auth:verifyPassword', (_event, input) => auth.verifyOwnPassword(input, requireActor()));
+  ipcMain.handle('auth:setAvatar', (_event, input) => auth.setAvatar(input, requireActor()));
+  ipcMain.handle('auth:clearAvatar', () => auth.clearAvatar(requireActor()));
 
   ipcMain.handle('config:listInstruments', () => config.listInstruments());
   ipcMain.handle('config:saveInstrument', (_event, input) => config.saveInstrument(input, requireActor()));
+  ipcMain.handle('config:removeInstrument', (_event, input) => config.removeInstrument(input, requireActor()));
   ipcMain.handle('config:listTests', () => config.listTests());
   ipcMain.handle('config:saveTest', (_event, input) => config.saveTest(input, requireActor()));
   ipcMain.handle('config:listTestLevels', (_event, testId) => config.listTestLevels(testId));
   ipcMain.handle('config:saveTestLevel', (_event, input) => config.saveTestLevel(input, requireActor()));
   ipcMain.handle('config:listActivity', (_event, limit) => config.listActivity(limit));
+  ipcMain.handle('config:listRuleScopes', (_event, testId, levelCount) => config.listRuleScopes(testId, levelCount));
+  ipcMain.handle('config:saveRuleScope', (_event, testId, ruleId, scope) => config.saveRuleScope(testId, ruleId, scope, requireActor()));
+  ipcMain.handle('config:listLots', () => config.listLots());
+  ipcMain.handle('config:saveLot', (_event, input) => config.saveLot(input, requireActor()));
+  ipcMain.handle('config:setTeaRefValue', (_event, input) => config.setTeaRefValue(input, requireActor()));
+  ipcMain.handle('config:restoreTeaRefDefaults', (_event, input) => config.restoreTeaRefDefaults(input, requireActor()));
+  ipcMain.handle('config:addTeaAnalyte', (_event, input) => config.addTeaAnalyte(input, requireActor()));
+  ipcMain.handle('config:removeTest', (_event, input) => config.removeTest(input, requireActor()));
+  ipcMain.handle('config:removePanel', (_event, input) => config.removePanel(input, requireActor()));
+  ipcMain.handle('config:removeLot', (_event, input) => config.removeLot(input, requireActor()));
+  ipcMain.handle('config:listLotGroups', () => config.listLotGroups());
+  ipcMain.handle('config:removeLotGroup', (_event, input) => config.removeLotGroup(input, requireActor()));
+  ipcMain.handle('config:stopLotGroup', (_event, input) => config.stopLotGroup(input, requireActor()));
+  ipcMain.handle('config:activateLotGroup', (_event, input) => config.activateLotGroup(input, requireActor()));
+  ipcMain.handle('config:previewLotRename', (_event, input) => config.previewLotRename(input));
+  ipcMain.handle('config:removeLotTransition', (_event, input) => config.removeLotTransition(input, requireActor()));
+  ipcMain.handle('config:saveLotGroup', (_event, input) => config.saveLotGroup(input, requireActor()));
+  ipcMain.handle('config:listPanels', () => config.listPanels());
+  ipcMain.handle('config:savePanel', (_event, input) => config.savePanel(input, requireActor()));
+  ipcMain.handle('config:listLotTransitions', () => config.listLotTransitions());
+  ipcMain.handle('config:createLotTransition', (_event, input) => config.createLotTransition(input, requireActor()));
+  ipcMain.handle('config:listTeaRefs', () => config.listTeaRefs());
+  ipcMain.handle('config:saveTeaRef', (_event, input) => config.saveTeaRef(input, requireActor()));
+  ipcMain.handle('config:removeTeaRef', (_event, input) => config.removeTeaRef(input, requireActor()));
+  ipcMain.handle('config:removeTeaLabProfile', (_event, input) => config.removeTeaLabProfile(input, requireActor()));
   ipcMain.handle('audit:query', (_event, input) => audit.query(input));
+  ipcMain.handle('audit:exportCsv', (_event, input) => audit.exportCsv(input));
+  ipcMain.handle('audit:verifyChainNow', () => audit.verifyChainNow());
+  ipcMain.handle('audit:archive', (_event, input) => audit.archive(input, requireActor()));
 
   ipcMain.handle('entry:queryPoints', (_event, testId, level) => entry.queryPoints(testId, level));
+  ipcMain.handle('entry:listHistoryPoints', (_event, testId) => entry.listHistoryPoints(testId));
+  ipcMain.handle('entry:listVoidedPoints', (_event, testId) => entry.listVoidedPoints(testId));
+  ipcMain.handle('entry:listParallelColumns', (_event, testId) => entry.listParallelColumns(testId));
+  ipcMain.handle('entry:listPreviousLotSeries', (_event, testId) => entry.listPreviousLotSeries(testId));
+  ipcMain.handle('entry:rangeCandidate', (_event, testId, level) => entry.rangeCandidate(testId, level));
+  ipcMain.handle('entry:applyLabRange', (_event, input) => entry.applyLabRange(input, requireActor()));
+  ipcMain.handle('entry:revertManufacturerRange', (_event, input) => entry.revertManufacturerRange(input, requireActor()));
   ipcMain.handle('entry:addPoint', (_event, input) => entry.addPoint(input, requireActor()));
   ipcMain.handle('entry:voidPoint', (_event, input) => entry.voidPoint(input, requireActor()));
+  ipcMain.handle('entry:setDayNote', (_event, input) => entry.setDayNote(input, requireActor()));
 
   ipcMain.handle('westgard:listTestSummaries', () => westgardHandlers.listTestSummaries());
   ipcMain.handle('westgard:analyzeLevel', (_event, testId, level) => westgardHandlers.analyzeLevel(testId, level));
-  ipcMain.handle('westgard:saveRuleAction', (_event, testId, ruleId, on) => westgardHandlers.saveRuleAction(testId, ruleId, on, requireActor()));
+  ipcMain.handle('westgard:saveRuleAction', (_event, testId, ruleId, action) => westgardHandlers.saveRuleAction(testId, ruleId, action, requireActor()));
+  ipcMain.handle('westgard:listRuleSettings', () => westgardHandlers.listRuleSettings());
+  ipcMain.handle('westgard:saveRuleSetting', (_event, ruleId, on) => westgardHandlers.saveRuleSetting(ruleId, on, requireActor()));
+  ipcMain.handle('westgard:resetRuleSettings', () => westgardHandlers.resetRuleSettings(requireActor()));
+  ipcMain.handle('westgard:listArchivedBlocks', (_event, testId, groupId) => westgardHandlers.listArchivedBlocks(testId, groupId));
+  ipcMain.handle('westgard:listArchivedGroupTests', (_event, groupId) => westgardHandlers.listArchivedGroupTests(groupId));
 
   ipcMain.handle('sigma:listPeriods', (_event, testId) => sigmaHandlers.listPeriods(testId));
   ipcMain.handle('sigma:savePeriod', (_event, input) => sigmaHandlers.savePeriod(input, requireActor()));
+  ipcMain.handle('sigma:removePeriod', (_event, input) => sigmaHandlers.removePeriod(input, requireActor()));
 
   ipcMain.handle('nce:listRecords', () => nceHandlers.listRecords());
   ipcMain.handle('nce:create', (_event, input) => nceHandlers.create(input, requireActor()));
@@ -86,15 +142,22 @@ function createWindow(): void {
   ipcMain.handle('nce:cancel', (_event, input) => nceHandlers.cancel(input, requireActor()));
   ipcMain.handle('nce:setActionCompletedDate', (_event, input) => nceHandlers.setActionCompletedDate(input, requireActor()));
   ipcMain.handle('nce:markEffectiveness', (_event, input) => nceHandlers.markEffectiveness(input, requireActor()));
+  ipcMain.handle('nce:setReleaseDecision', (_event, input) => nceHandlers.setReleaseDecision(input, requireActor()));
+  ipcMain.handle('nce:setRerunEvidence', (_event, input) => nceHandlers.setRerunEvidence(input, requireActor()));
+  ipcMain.handle('nce:reopen', (_event, input) => nceHandlers.reopenNce(input, requireActor()));
 
   ipcMain.handle('reagent:listComparisons', () => reagentHandlers.listComparisons());
   ipcMain.handle('reagent:createComparison', (_event, input) => reagentHandlers.createComparison(input, requireActor()));
   ipcMain.handle('reagent:saveMetadata', (_event, input) => reagentHandlers.saveMetadata(input, requireActor()));
   ipcMain.handle('reagent:saveRows', (_event, input) => reagentHandlers.saveRows(input, requireActor()));
   ipcMain.handle('reagent:removeComparison', (_event, input) => reagentHandlers.removeComparison(input, requireActor()));
+  ipcMain.handle('reagent:listQuickValues', (_event, input) => reagentHandlers.listQuickValues(input));
+  ipcMain.handle('reagent:addQuickValue', (_event, input) => reagentHandlers.addQuickListValue(input, requireActor()));
+  ipcMain.handle('reagent:removeQuickValue', (_event, input) => reagentHandlers.removeQuickListValue(input, requireActor()));
 
   ipcMain.handle('settings:getLabProfile', () => settings.getLabProfile());
   ipcMain.handle('settings:saveLabProfile', (_event, input) => settings.saveLabProfile(input, requireActor()));
+  ipcMain.handle('settings:getStorageInfo', () => settings.getStorageInfo());
 
   ipcMain.handle('report:listPeriodLocks', () => report.listPeriodLocks());
   ipcMain.handle('report:lockPeriod', (_event, input) => report.lockPeriod(input, requireActor()));
@@ -110,6 +173,30 @@ function createWindow(): void {
       nodeIntegration: false,
     },
   });
+
+  setBroadcastWindow(win);
+
+  ipcMain.handle('export:tableXlsx', async (_event, input: ExportTableInput) => {
+    try {
+      return { ok: true, data: await buildXlsxBase64(input) };
+    } catch (e) {
+      return { ok: false, error: { code: 'xlsx-failed', message: e instanceof Error ? e.message : 'Không tạo được file Excel.' } };
+    }
+  });
+  ipcMain.handle('print:htmlToPdf', (_event, input: { html: string; defaultFileName: string }) =>
+    printHtmlToPdf(win, input.html, input.defaultFileName));
+  ipcMain.handle('backup:export', () => backup.exportBackup(requireActor()));
+  ipcMain.handle('backup:import', (_event, input) => backup.importBackup(input, requireActor()));
+  ipcMain.handle('backup:status', () => backup.backupStatus());
+  ipcMain.handle('backup:verify', (_event, input) => backup.verifyBackup(input, requireActor()));
+  ipcMain.handle('backup:resetAll', () => backup.resetOperationalData(requireActor()));
+  ipcMain.handle('migration:previewLegacyBackup', (_event, input) => migration.preview(input));
+  ipcMain.handle('migration:importLegacyBackup', (_event, input) => migration.importLegacy(input, requireActor()));
+  ipcMain.handle('lis:getSettings', () => lis.getSettings());
+  ipcMain.handle('lis:saveSettings', (_event, input) => lis.saveSettings(input, requireActor()));
+  ipcMain.handle('lis:pullQueue', () => lis.pullQueue());
+  ipcMain.handle('lis:importResult', (_event, input) => lis.importResult(input, requireActor()));
+  ipcMain.handle('lis:rejectResult', (_event, input) => lis.rejectResult(input, requireActor()));
 
   const devServerUrl = process.env.APP_V2_DEV_SERVER_URL;
   if (devServerUrl) win.loadURL(devServerUrl);

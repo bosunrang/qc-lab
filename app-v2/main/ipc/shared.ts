@@ -1,17 +1,92 @@
-// Tiện ích dùng chung cho MỌI IPC handler: Actor/IpcResult, và writeAudit
-// (ghi 1 dòng vào chuỗi hash tamper-evident `activity`). Trước khi có file
-// này, config/entry/nce/reagent/sigma/westgard-handlers.ts mỗi file tự khai
-// báo lại y hệt — gom về đây khi thêm handler thứ 7 (auth-handlers.ts) thay
-// vì nhân bản lần nữa.
+// Tiện ích dùng chung cho MỌI IPC handler: Actor/IpcResult, writeAudit (ghi 1
+// dòng vào chuỗi hash tamper-evident `activity`), và notifyChanged
+// (`store:changed` — invalidation có phạm vi cho renderer, xem
+// docs/APP-V2-PLAN.md Giai đoạn A1). Trước khi có file này, config/entry/
+// nce/reagent/sigma/westgard-handlers.ts mỗi file tự khai báo lại y hệt —
+// gom về đây khi thêm handler thứ 7 (auth-handlers.ts) thay vì nhân bản lần
+// nữa.
+import type { BrowserWindow } from 'electron';
 import type { Db } from '../db/open-database';
 import { uid } from '../domain/text-utils';
 import { auditEntryHash } from '../domain/audit-chain';
+import { canWriteRole, isAdminRole } from '../domain/page-roles';
 
 export interface Actor { userId: string; username: string; name: string; role: string; clientId: string }
 
 export type IpcResult<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string } };
 
 export function nowIso(): string { return new Date().toISOString(); }
+
+// Cửa sổ chính duy nhất của app (app 1-cửa-sổ, không cần theo dõi nhiều
+// BrowserWindow) — gán đúng 1 lần từ main/index.ts ngay sau khi tạo `win`.
+// notifyChanged() no-op an toàn nếu gọi trước khi cửa sổ tồn tại (không nên
+// xảy ra vì mọi handler chỉ chạy sau khi renderer đã load).
+let broadcastWindow: BrowserWindow | null = null;
+
+export function setBroadcastWindow(win: BrowserWindow): void {
+  broadcastWindow = win;
+}
+
+export interface StoreChangedPayload { tables: string[]; testIds: string[] }
+
+/** Báo renderer các bảng nào vừa đổi (+ testId liên quan nếu có) để từng
+ * store tự quyết định có refetch không — thay "fetch 1 lần khi mount" cũ.
+ * Renderer lọc theo `tables`/`testIds` ở `useStoreInvalidation()`, không lọc
+ * ở đây — main không cần biết trang nào đang mở. */
+export function notifyChanged(tables: string[], testIds: string[] = []): void {
+  if (!broadcastWindow || broadcastWindow.isDestroyed()) return;
+  const payload: StoreChangedPayload = { tables, testIds };
+  broadcastWindow.webContents.send('store:changed', payload);
+}
+
+// ── Quyền ghi ──────────────────────────────────────────────────────────────
+// Ranh giới quyền THẬT của app-v2 nằm ở ĐÂY, không phải ở renderer: main
+// process giữ actor đã đăng nhập (`requireActor()` trong main/index.ts), nên
+// nó là chỗ duy nhất không thể bị bỏ qua. Ẩn/disable nút ở renderer chỉ là
+// hiển thị — bất kỳ ai gọi thẳng `window.qcApi.*` từ DevTools đều đi qua đây.
+// Khác app cũ: app cũ chỉ có `requireWrite()`/`requireAdmin()` phía trình
+// duyệt (xem CLAUDE.md "Storage and sync model" — đánh đổi đã chấp nhận của
+// app client-only, không có tiến trình nào để chặn thật). app-v2 có main
+// process thật nên KHÔNG kế thừa đánh đổi đó.
+//
+// Ánh xạ vai trò → mức quyền copy đúng theo từng chỗ gọi của app cũ (tra
+// từng call site `deps.requireWrite()`/`deps.requireAdmin()`, không suy
+// diễn): admin+KTV được ghi dữ liệu QC (nhập/huỷ điểm, kỳ Sigma, hồ sơ NCE,
+// so sánh hoá chất); CHỈ admin được đụng cấu hình (máy/xét nghiệm/lô/panel/
+// Mean/SD/TEa), khoá-mở kỳ báo cáo, xoá phép so sánh hoá chất, cài đặt,
+// lưu trữ nhật ký hoạt động và xuất backup.
+//
+// CHƯA chặn: các hàm ĐỌC (`audit:query`/`audit:exportCsv`/
+// `audit:verifyChainNow`) vẫn mở cho mọi vai trò đã đăng nhập. Trang Nhật ký
+// hoạt động là admin-only nên UI không vào được (router.tsx chặn route từ
+// bản này), nhưng gọi thẳng `window.qcApi.queryActivity()` thì vẫn đọc được.
+// Chặn cho đúng đòi đổi 3 hàm đó sang trả `IpcResult` (giờ trả thẳng dữ
+// liệu) — kéo theo `shared/qc-api.d.ts`, `preload.ts`, `audit-store.ts`,
+// `AuditPage.tsx` và bản giả lập trình duyệt. Đây là lỗ BẢO MẬT ĐỌC, không
+// phải toàn vẹn dữ liệu; để lại làm một lượt riêng, đã ghi trong
+// docs/APP-V2-PLAN.md.
+export type PermissionDenied = { ok: false; error: { code: string; message: string } };
+
+// Không tự so chuỗi vai trò ở đây — dùng chung đúng 1 định nghĩa với
+// renderer và với bảng pagePerms (main/domain/page-roles.ts).
+export function canWrite(actor: Actor): boolean {
+  return canWriteRole(actor.role);
+}
+
+/** Chặn vai trò `viewer`. Trả `null` nếu được phép — dùng dạng
+ * `const denied = requireWrite(actor); if (denied) return denied;` để giữ
+ * đúng khuôn `IpcResult` của mọi handler (không ném exception: renderer đọc
+ * `{ok:false,error}` ở khắp nơi, một Promise bị reject sẽ không hiện được
+ * thông báo tiếng Việt nào). */
+export function requireWrite(actor: Actor): PermissionDenied | null {
+  if (canWrite(actor)) return null;
+  return { ok: false, error: { code: 'forbidden', message: 'Bạn không có quyền sửa dữ liệu.' } };
+}
+
+export function requireAdmin(actor: Actor): PermissionDenied | null {
+  if (isAdminRole(actor.role)) return null;
+  return { ok: false, error: { code: 'forbidden', message: 'Chỉ quản trị mới được thực hiện thao tác này.' } };
+}
 
 /** SQLite trả cột snake_case (`prev_hash`, `user_id`...) — chuyển về camelCase
  * đúng shape `AuditEntry` mà audit-chain.ts (hash/verify/relink) mong đợi.
@@ -41,4 +116,5 @@ export function writeAudit(db: Db, actor: Actor, type: string, detail: string, t
       userId: entry.userId, role: entry.role, type: entry.type, detail: entry.detail, target: entry.target,
       clientId: entry.clientId, prevHash: entry.prevHash, hash: entry.hash,
     });
+  notifyChanged(['activity']);
 }

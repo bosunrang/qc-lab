@@ -46,7 +46,7 @@ function buildSeedPoints(testId, level, lot, mean, sd, count = 10) {
   for (let i = 0; i < count; i++) {
     const date = new Date(base + i * 86400000).toISOString().slice(0, 10);
     const jitter = ((i % 3) - 1) * sd * 0.4;
-    points.push({ id: `${testId}-L${level}-${i}`, date, runId: `R${i}`, level, val: Number((mean + jitter).toFixed(2)), lot, staff: 'NV1' });
+    points.push({ id: `${testId}-L${level}-${i}`, date, runId: `R${i}`, level, val: Number((mean + jitter).toFixed(2)), lot, staff: 'NV1', operatorName: 'NV1', operatorCode: 'NV1' });
   }
   return points;
 }
@@ -96,7 +96,7 @@ function buildSeedState() {
  * entirely by setting `currentUser` directly, same trust boundary the app
  * itself has — see CLAUDE.md "Storage and sync model").
  */
-async function openSeededSession({ headless = true } = {}) {
+async function openSeededSession({ headless = true, seedState: suppliedSeedState = null } = {}) {
   const server = await startStaticServer();
   // Everything after the server is listening runs under this guard: the HTTP
   // server keeps the event loop alive, so a failure here (Chromium missing or
@@ -113,7 +113,7 @@ async function openSeededSession({ headless = true } = {}) {
     page.on('pageerror', error => diagnostics.push(`pageerror: ${error.message}`));
     page.on('console', message => { if (message.type() === 'error') diagnostics.push(`console: ${message.text()}`); });
     page.on('requestfailed', request => diagnostics.push(`requestfailed: ${request.url()} · ${request.failure()&&request.failure().errorText||''}`));
-    const seedState = buildSeedState();
+    const seedState = suppliedSeedState || buildSeedState();
 
     await page.addInitScript((state) => { localStorage.setItem('qclab', JSON.stringify(state)); }, seedState);
     await page.goto(baseUrl, { waitUntil: 'load' });

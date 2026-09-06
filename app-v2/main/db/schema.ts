@@ -65,8 +65,26 @@ CREATE TABLE IF NOT EXISTS lot_groups (
   catalog TEXT NOT NULL DEFAULT '',
   note TEXT NOT NULL DEFAULT '',
   active INTEGER NOT NULL DEFAULT 1,
-  status TEXT NOT NULL DEFAULT 'active',
-  stopped_at TEXT NOT NULL DEFAULT ''
+  -- '' = KHÔNG có trạng thái tự đặt (mặc định) — "Đang hoạt động"/"Chưa
+  -- dùng" được SUY từ việc lô của nhóm có đang gán vào xét nghiệm nào không
+  -- (inUse, tính ở listLotGroups()), không phải giá trị lưu cứng. Chỉ
+  -- 'stopped'/'planned' là trạng thái tự đặt thật — port đúng logic
+  -- qcLotGroupOperational() app cũ (status field vắng mặt = "hoạt động
+  -- bình thường", không có literal 'active' nào từng được lưu).
+  status TEXT NOT NULL DEFAULT '',
+  stopped_at TEXT NOT NULL DEFAULT '',
+  -- Ảnh chụp thành viên NGUYÊN VẸN tại thời điểm lưu trữ (JSON mảng id lô,
+  -- '' = không có ảnh chụp — mọi nhóm ĐANG hoạt động dùng giá trị này,
+  -- listLotGroups() suy lotIds SỐNG từ qc_lots.group_id như bình thường).
+  -- Chỉ nhóm "Đã lưu trữ" (do CHẤP NHẬN chuyển tiếp lô tạo ra) mới có giá
+  -- trị khác rỗng — port đúng applyAcceptedLotTransition() app cũ: nhóm lưu
+  -- trữ giữ NGUYÊN mọi lô cũ (kể cả lô KHÔNG chuyển tiếp, vd lô B khi A→C)
+  -- làm thành viên, dù lô đó (B) đã thật sự chuyển sang thuộc nhóm ĐANG
+  -- hoạt động qua group_id (1 lô chỉ có 1 group_id tại 1 thời điểm — khác
+  -- app cũ dùng mảng lotIds không loại trừ lẫn nhau nên 1 lô lưu được trong
+  -- CẢ HAI nhóm cùng lúc). Không có cột này thì card "Đã lưu trữ" chỉ hiện
+  -- đúng lô đã chuyển tiếp, thiếu hẳn lô B dù tên nhóm "A/B" vẫn ngụ ý đủ 2.
+  archived_lot_ids_json TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS qc_lots (
@@ -134,6 +152,12 @@ CREATE TABLE IF NOT EXISTS test_levels (
   mfg_mean REAL, mfg_sd REAL,
   applied TEXT NOT NULL DEFAULT 'mfg',
   mean_sd_history_json TEXT NOT NULL DEFAULT '[]',
+  -- Ngày cấu hình Mean/SD ĐANG HOẠT ĐỘNG bắt đầu có hiệu lực — port
+  -- effectiveFrom:isoToday() app cũ (commitTargetMatrix()/
+  -- applyLotGroupActivation()): mọi lần lưu qua Bảng Mean/SD đều đóng dấu
+  -- NGÀY LƯU, không chỉ khi giá trị đổi. '' = chưa từng lưu qua các luồng
+  -- này (vd Mức 1 tự tạo lúc thêm xét nghiệm, chưa ai gán Mean/SD).
+  mean_sd_effective_from TEXT NOT NULL DEFAULT '',
   UNIQUE (test_id, level)
 );
 
@@ -186,10 +210,21 @@ CREATE TABLE IF NOT EXISTS actions (
   updated_at TEXT NOT NULL DEFAULT '',
   created_by_user_id TEXT NOT NULL DEFAULT '',
   created_by_username TEXT NOT NULL DEFAULT '',
-  test_id TEXT REFERENCES tests(id),
+  -- CỐ Ý KHÔNG khoá ngoại tới tests(id) — cùng nguyên tắc activity.user_id/
+  -- username (chuỗi phẳng, không FK tới users): xoá xét nghiệm ở
+  -- config-handlers.ts's removeTest() là xoá THẬT (không soft-delete),
+  -- nhưng hồ sơ NCE phải giữ NGUYÊN VẸN (port đúng removeAssay() app cũ —
+  -- không đụng state.actions). Có FK ở đây sẽ khiến DELETE FROM tests
+  -- ném lỗi FOREIGN KEY constraint (schema bật PRAGMA foreign_keys=ON)
+  -- ngay khi xét nghiệm đó còn hồ sơ NCE — đúng trường hợp cần giữ lại,
+  -- không phải trường hợp cần chặn.
+  test_id TEXT,
   level INTEGER,
   lot TEXT NOT NULL DEFAULT '',
-  point_id TEXT REFERENCES qc_points(id),
+  -- CỐ Ý KHÔNG khoá ngoại tới qc_points(id) — cùng lý do như test_id ở trên:
+  -- xoá xét nghiệm cũng xoá THẬT mọi qc_points của nó, nhưng hồ sơ NCE vẫn
+  -- phải giữ nguyên point_id (dangling) làm bằng chứng lịch sử.
+  point_id TEXT,
   rule TEXT NOT NULL DEFAULT '',
   error_type TEXT NOT NULL DEFAULT '',
   qc_verdict TEXT NOT NULL DEFAULT '',
@@ -239,7 +274,8 @@ CREATE TABLE IF NOT EXISTS users (
   page_perms_json TEXT,
   pass_hash TEXT NOT NULL DEFAULT '',
   active INTEGER NOT NULL DEFAULT 1,
-  must_change_password INTEGER NOT NULL DEFAULT 0
+  must_change_password INTEGER NOT NULL DEFAULT 0,
+  avatar TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS reagent_tests (
@@ -288,8 +324,33 @@ CREATE TABLE IF NOT EXISTS tea_refs (
 );
 `;
 
-/** Mở kết nối và áp schema (idempotent — mọi CREATE TABLE đều IF NOT EXISTS). */
-export function applySchema(db: { exec: (sql: string) => void }): void {
+/** Mở kết nối và áp schema (idempotent — mọi CREATE TABLE đều IF NOT EXISTS).
+ * `CREATE TABLE IF NOT EXISTS` KHÔNG tự thêm cột mới vào bảng đã tồn tại sẵn
+ * trên đĩa — mọi cột thêm SAU lần tạo bảng đầu tiên (như `tests.active`,
+ * 2026-09-01) cần 1 bước ALTER TABLE idempotent riêng ở đây, kiểm tra qua
+ * `PRAGMA table_info` trước khi thêm để chạy lại nhiều lần không lỗi. */
+export function applySchema(db: { exec: (sql: string) => void; prepare?: (sql: string) => { all: () => unknown[] } }): void {
   db.exec('PRAGMA foreign_keys = ON;');
   db.exec(SCHEMA_SQL);
+  if (db.prepare) {
+    const cols = db.prepare("PRAGMA table_info('tests')").all() as { name: string }[];
+    if (!cols.some((c) => c.name === 'active')) {
+      db.exec('ALTER TABLE tests ADD COLUMN active INTEGER NOT NULL DEFAULT 1;');
+    }
+    if (!cols.some((c) => c.name === 'analyte_id')) {
+      db.exec("ALTER TABLE tests ADD COLUMN analyte_id TEXT NOT NULL DEFAULT '';");
+    }
+    const groupCols = db.prepare("PRAGMA table_info('lot_groups')").all() as { name: string }[];
+    if (!groupCols.some((c) => c.name === 'archived_lot_ids_json')) {
+      db.exec("ALTER TABLE lot_groups ADD COLUMN archived_lot_ids_json TEXT NOT NULL DEFAULT '';");
+    }
+    const userCols = db.prepare("PRAGMA table_info('users')").all() as { name: string }[];
+    if (!userCols.some((c) => c.name === 'avatar')) {
+      db.exec("ALTER TABLE users ADD COLUMN avatar TEXT NOT NULL DEFAULT '';");
+    }
+    const levelCols = db.prepare("PRAGMA table_info('test_levels')").all() as { name: string }[];
+    if (!levelCols.some((c) => c.name === 'mean_sd_effective_from')) {
+      db.exec("ALTER TABLE test_levels ADD COLUMN mean_sd_effective_from TEXT NOT NULL DEFAULT '';");
+    }
+  }
 }

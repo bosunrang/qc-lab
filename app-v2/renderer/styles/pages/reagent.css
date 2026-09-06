@@ -1,0 +1,86 @@
+/* So sánh hóa chất — hợp nhất từ assets/professional-reagent.css (đọc trực
+   tiếp file gốc — xem CLAUDE.md mục "Sao chép giao diện app cũ"). Chỉ giữ
+   rule khớp class THẬT dùng trong ReagentPage.tsx hiện tại: khối KPI thống
+   kê (`.rc-stat-*`), khối tiêu chí chấp nhận (`.rc-crit-*`), khối kết luận
+   (`.rc-verdict*`), khối biểu đồ (`.rc-charts`/`.rc-chart-box`/`.rc-chart-legend`).
+
+   GHI CHÚ QUAN TRỌNG — khoảng cách kiến trúc lớn hơn CSS đơn thuần:
+   ReagentPage.tsx hiện dùng `.field-row`/`.field`/`table.data-table` chung
+   cho phần metadata + bảng cặp mẫu + modal chọn/tạo, THAY VÌ layout gốc của
+   bản cũ (`.rc-toolbar` với icon-button tìm/tạo/xoá, `.rc-entry-grid` 2 cột,
+   `.rc-info-grid`/`.rc-field`/`.rc-date-field`/`.rc-quick-field`/`.rc-icon-btn`,
+   `.rc-pair-wrap`/`.rc-pair-head`/`.rc-pair-row` dạng lưới grid riêng, và
+   `.refrow`/`.refcat`/`.mrow` cho danh sách chọn phép so sánh). Đây KHÔNG chỉ
+   là CSS thiếu — JSX cần viết lại theo đúng cấu trúc này ở một đợt riêng
+   (chưa làm ở đợt này, ghi lại để không bỏ sót). */
+
+.rc-stat-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--gap-panel);margin-bottom:var(--gap-panel);}
+.rc-stat-card{padding:13px 14px;min-height:98px;display:flex;flex-direction:column;justify-content:center;background:var(--panel);border:1px solid var(--line);box-shadow:var(--surface-shadow);overflow:hidden;border-radius:var(--surface-radius);min-width:0;}
+.rc-stat-label{font-size:var(--type-caption);font-weight:800;letter-spacing:0;text-transform:none;}
+.rc-stat-value{margin-top:8px;color:var(--teal);font-family:var(--sans);font-size:var(--type-kpi);line-height:1;font-weight:800;letter-spacing:0;font-variant-numeric:tabular-nums;}
+.rc-stat-value.bad{color:var(--danger-ink);}
+.rc-stat-sub{color:var(--muted);font-size:var(--type-body-sm);font-weight:500;line-height:1.55;}
+
+.rc-crit-item{display:grid;gap:16px;align-items:start;padding:12px 18px 12px 28px;border-bottom:1px solid var(--line2);grid-template-columns:112px minmax(0,1fr);column-gap:8px;min-height:48px;background:var(--panel);}
+.rc-crit-item:first-child{padding-top:12px;}
+.rc-crit-item:nth-child(even){background:#fbfcfd;}
+.rc-crit-badge{flex:0 0 auto;align-self:center;border-radius:var(--radius-pill);padding:5px 12px;justify-self:start;margin:0 0 0 16px;text-align:center;font-size:var(--type-caption);font-weight:800;letter-spacing:0;line-height:1.2;white-space:nowrap;}
+.rc-crit-badge.pass,.rc-crit-badge.info{color:var(--success-ink);background:var(--success-bg);border:1px solid var(--success-border);}
+.rc-crit-badge.fail{color:var(--danger-ink);background:var(--danger-bg);border:1px solid var(--danger-border);}
+.rc-crit-badge.note{color:var(--warning-ink);background:var(--warning-bg);border:1px solid var(--warning-border);}
+.rc-crit-text{color:var(--ink);font-size:var(--type-body);font-weight:700;}
+.rc-crit-text div{color:var(--muted);font-size:var(--type-body-sm);font-weight:500;line-height:1.55;margin-top:2px;}
+
+.rc-verdict{display:flex;align-items:center;gap:14px;border-radius:var(--surface-radius);padding:13px 14px;border:1px solid var(--line);background:var(--panel2);}
+.rc-verdict.ok{background:var(--success-bg);border-color:var(--success-border);color:var(--success-ink);}
+.rc-verdict.mid{background:var(--warning-bg);border-color:var(--warning-border);color:var(--warning-ink);}
+.rc-verdict.no{background:var(--danger-bg);border-color:var(--danger-border);color:var(--danger-ink);}
+.rc-verdict.mid .rc-verdict-icon{color:var(--warning-ink);}
+.rc-verdict.no .rc-verdict-icon{color:var(--danger-ink);}
+.rc-verdict-icon{flex:0 0 auto;color:var(--teal);font-size:var(--type-symbol-xl);line-height:1;font-weight:850;}
+.rc-verdict-title{color:var(--ink);font-size:var(--type-subhead);font-weight:700;}
+.rc-verdict-desc{color:var(--muted);font-size:var(--type-body-sm);line-height:1.55;margin-top:2px;}
+
+.rc-charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--gap-panel);}
+.rc-chart-box{background:var(--panel);border:1px solid var(--line);box-shadow:var(--surface-shadow);overflow:hidden;min-width:0;}
+.rc-chart-box h3{margin:0;color:var(--card-head-ink);font-size:var(--type-meta);font-weight:650;text-transform:none;letter-spacing:0;padding:10px 12px 2px;line-height:1.35;background:var(--section-head-bg);}
+.rc-chart-box p{margin:0;padding:0 12px 10px;border-bottom:1px solid var(--section-head-border);color:var(--muted);font-size:var(--type-body-sm);font-weight:500;line-height:1.55;background:var(--section-head-bg);}
+.rc-chart-box svg{width:100%;height:auto;display:block;}
+.rc-chart-legend{display:flex;flex-wrap:wrap;gap:14px;margin:0;padding:8px 12px 12px;color:var(--muted);font-size:var(--type-caption);}
+.rc-chart-legend i{display:inline-block;width:16px;height:3px;margin-right:5px;border-radius:var(--radius-pill);vertical-align:middle;}
+.rc-chart-legend .reg{background:var(--teal);}
+.rc-chart-legend .ideal{background:var(--muted);}
+.rc-chart-legend .bias{background:var(--amber);}
+.rc-chart-legend .limit{background:var(--red);}
+
+@media(max-width:760px){
+  .rc-stat-kpis{grid-template-columns:1fr;}
+  .rc-charts{grid-template-columns:1fr;}
+}
+
+/* Bù class app cũ CÓ CSS mà app-v2 để trống (2026-09-03, xem ghi chú cùng
+   loại ở các file khác). Giá trị copy nguyên từ `assets/*.css`. */
+.rc-toolbar button.rc-add-btn,.rc-toolbar button.rc-delete-btn,.rc-toolbar button.rc-find-btn,
+.rc-toolbar button.rc-report-btn,.rc-toolbar button.rc-report-main{min-height:36px;padding:0 16px;white-space:nowrap;}
+.rc-toolbar .rc-add-btn{background:var(--teal);border-color:var(--teal);color:var(--on-accent);}
+.rc-toolbar .rc-add-btn,.rc-toolbar .rc-report-main{justify-content:center;}
+.rc-report-btn{background:var(--teal);border-color:var(--teal);color:var(--on-accent);}
+.rc-toolbar .rc-report-main,.rc-report-main{min-width:146px;}
+
+/* Modal "Chọn nhanh" người thực hiện/loại mẫu (2026-09-04) — port
+   `professional-reagent.css:159-217,628-631` (`.mrow` dùng chung với danh
+   sách chọn phép so sánh, `.rc-quick-add` chỉ dùng ở đây). */
+.mrow{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;border:1px solid var(--line);border-radius:var(--radius-md);margin-bottom:6px;font-family:var(--mono);font-size:var(--type-body-sm);}
+.mrow.on{border-color:var(--teal);background:var(--panel2);}
+.mrow .acts{display:flex;gap:6px;align-items:center;}
+.mrow b{color:var(--ink);font-size:var(--type-body);font-weight:700;}
+.rc-quick-add{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin-top:12px;}
+@media(max-width:760px){.rc-quick-add{grid-template-columns:1fr;}}
+/* Nút icon "Chọn nhanh" cạnh ô Người thực hiện/Loại mẫu — kích thước/lưới
+   (`.rc-quick-field`/`.rc-icon-btn` width/height) đã có sẵn ở `pages.css` từ
+   trước (chuẩn bị sẵn cho tính năng này), chỉ thiếu phần MÀU/VIỀN/con trỏ —
+   port `professional-reagent.css:139-151,271`. */
+.rc-icon-btn{display:grid;place-items:center;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--teal);cursor:pointer;}
+.rc-icon-btn:hover{border-color:var(--teal);background:var(--panel2);}
+.rc-icon-btn:disabled{opacity:.55;cursor:not-allowed;}
+.rc-icon-btn svg{width:16px;height:16px;stroke-width:1.9;}

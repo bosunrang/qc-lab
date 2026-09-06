@@ -9,7 +9,7 @@ const { createSettingsHandlers } = require('../../app-v2-dist/main/ipc/settings-
 const { createConfigHandlers } = require('../../app-v2-dist/main/ipc/config-handlers.js');
 
 const db = openDatabase(':memory:');
-const settings = createSettingsHandlers(db);
+const settings = createSettingsHandlers(db, ':memory:');
 const config = createConfigHandlers(db);
 const actor = { userId: 'u1', username: 'admin', name: 'Quan tri vien', role: 'admin', clientId: 'test-client' };
 
@@ -44,5 +44,24 @@ assert.equal(fallback.data.brand_sub, 'Nội kiểm xét nghiệm');
 const activity = config.listActivity();
 assert.equal(activity.length, 2);
 assert.deepEqual(activity.map(a => a.type), ['Sửa thông tin phòng xét nghiệm', 'Sửa thông tin phòng xét nghiệm']);
+
+// 6) Logo: khong gui logoData thi PHAI GIU NGUYEN logo da co (khong xoa
+// ngam khi chi sua truong khac)
+const withLogo = settings.saveLabProfile({ data: { name: 'B', logoData: 'data:image/png;base64,AAA', logoText: 'AB' } }, actor);
+assert.equal(withLogo.ok, true);
+assert.equal(withLogo.data.logo_data, 'data:image/png;base64,AAA');
+assert.equal(withLogo.data.logo_text, 'AB');
+const editOtherField = settings.saveLabProfile({ data: { name: 'C', dept: 'Khoa moi' } }, actor);
+assert.equal(editOtherField.data.logo_data, 'data:image/png;base64,AAA', 'logo phai duoc GIU NGUYEN khi form khong gui lai anh');
+assert.equal(editOtherField.data.logo_text, 'AB');
+
+// 7) clearLogo=true phai xoa han logo, khong phai fallback ve gia tri cu
+const cleared = settings.saveLabProfile({ data: { name: 'C', clearLogo: true } }, actor);
+assert.equal(cleared.data.logo_data, '');
+
+// 8) getStorageInfo() voi :memory: (khong co file that) phai tra 0, khong nem loi
+const storage = settings.getStorageInfo();
+assert.equal(storage.dbFileBytes, 0);
+assert.equal(storage.path, ':memory:');
 
 console.log('app-v2 settings-handlers end-to-end tests passed');

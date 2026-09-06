@@ -4,7 +4,7 @@
 import type { Db } from '../db/open-database';
 import { uid } from '../domain/text-utils';
 import { validateLockPeriod, validateUnlockPeriod, type LockPeriodInput, type UnlockPeriodInput } from '../domain/period-lock-validation';
-import { type Actor, type IpcResult, nowIso, writeAudit } from './shared';
+import { type Actor, type IpcResult, nowIso, writeAudit, notifyChanged, requireAdmin } from './shared';
 
 export interface PeriodLockRow { id: string; ym: string; locked_at: string; locked_by: string; note: string }
 
@@ -23,6 +23,7 @@ export function createReportHandlers(db: Db) {
   }
 
   function lockPeriod(input: { data: LockPeriodInput }, actor: Actor): IpcResult<PeriodLockRow> {
+    const denied = requireAdmin(actor); if (denied) return denied;
     const result = validateLockPeriod(input.data);
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
     const { ym, note } = result.data;
@@ -30,16 +31,19 @@ export function createReportHandlers(db: Db) {
     const id = uid();
     db.prepare('INSERT INTO period_locks(id,ym,locked_at,locked_by,note) VALUES (?,?,?,?,?)').run(id, ym, nowIso(), actor.username, note);
     writeAudit(db, actor, 'Khoá kỳ báo cáo', `Khoá kỳ ${ym}${note ? ': ' + note : ''}`, ym);
+    notifyChanged(['period_locks']);
     return { ok: true, data: db.prepare('SELECT * FROM period_locks WHERE id=?').get(id) as unknown as PeriodLockRow };
   }
 
   function unlockPeriod(input: { data: UnlockPeriodInput }, actor: Actor): IpcResult<{ ym: string }> {
+    const denied = requireAdmin(actor); if (denied) return denied;
     const result = validateUnlockPeriod(input.data);
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
     const { ym, note } = result.data;
     if (!isPeriodLocked(ym)) return { ok: false, error: { code: 'not-locked', message: `Kỳ ${ym} chưa bị khoá.` } };
     db.prepare('DELETE FROM period_locks WHERE ym=?').run(ym);
     writeAudit(db, actor, 'Mở khoá kỳ báo cáo', `Mở khoá kỳ ${ym}: ${note}`, ym);
+    notifyChanged(['period_locks']);
     return { ok: true, data: { ym } };
   }
 

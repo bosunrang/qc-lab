@@ -29,6 +29,30 @@ export function sigmaMetric(tea: unknown, bias: unknown, cv: unknown): SigmaMetr
   return { tea: teaN, bias: biasN, cv: cvN, sigma, dpmo, yieldPercent: 100 - dpmo / 1e4 };
 }
 
+export interface EqaRoundsStats { rms: number; mean: number; n: number; biasRefU: number | null; mixedSigns: boolean }
+
+/** Bias% từ nhiều vòng EQA/EQC — Sigma dùng RMS (root-mean-square) của các
+ * vòng làm bias đại diện, KHÔNG dùng trung bình cộng có dấu: dấu trái nhau
+ * (1 vòng +, 1 vòng -) có thể triệt tiêu lẫn nhau trong trung bình cộng
+ * (chỉ mang tính tham khảo, trả về ở `mean`), che mất sai số hệ thống thật —
+ * xem CLAUDE.md "Confirmed business-logic decisions" → mục Six Sigma.
+ * `biasRefU` = u(Cref) = SD giữa các vòng / căn(n) — null khi chỉ có 1 vòng
+ * (không tính được SD giữa các vòng), dùng làm input cho `uncertaintyBudget()`. */
+export function eqaRoundsStats(rounds: readonly unknown[]): EqaRoundsStats | null {
+  const values = rounds.map(Number).filter((v) => Number.isFinite(v));
+  if (!values.length) return null;
+  const n = values.length;
+  const mean = values.reduce((s, v) => s + v, 0) / n;
+  const rms = Math.sqrt(values.reduce((s, v) => s + v * v, 0) / n);
+  const mixedSigns = values.some((v) => v > 0) && values.some((v) => v < 0);
+  let biasRefU: number | null = null;
+  if (n > 1) {
+    const variance = values.reduce((s, v) => s + (v - mean) ** 2, 0) / (n - 1);
+    biasRefU = Math.sqrt(variance) / Math.sqrt(n);
+  }
+  return { rms, mean, n, biasRefU, mixedSigns };
+}
+
 export interface UncertaintyBudgetInput {
   cv?: unknown; k?: unknown; includeBias?: unknown; bias?: unknown; biasRefU?: unknown; uCal?: unknown;
   tea?: unknown; target?: unknown;

@@ -139,6 +139,10 @@ export function calculateReagentComparison(dataset: ReagentComparisonDataset | n
   const biasT = Number.parseFloat(String(test.biasTarget ?? '')) || 6;
   const coverage = !!test.coverageConfirmed, enoughN = N >= 20;
   const fit = reagentOls(o, n), pb = reagentPassingBablok(o, n);
+  // Bland-Altman: khoảng giới hạn tương đồng (Limits of Agreement) = md ± 1.96·SD
+  // của hiệu số — CÙNG công thức `reagent-bland-svg.ts`'s `up`/`low` bản cũ
+  // (dùng đúng md/sdd đã tính ở trên, không tính lại/không đổi công thức).
+  const loaLower = md - 1.96 * sdd, loaUpper = md + 1.96 * sdd;
   const relPairs = o
     .map((value, index) => { const midpoint = (value + n[index]) / 2; return midpoint !== 0 ? Math.abs((value - n[index]) / midpoint) : null; })
     .filter((value): value is number => value != null);
@@ -149,7 +153,7 @@ export function calculateReagentComparison(dataset: ReagentComparisonDataset | n
   return {
     o, n, N, df, d, mO, mN, vO, vN, md, sdd, tStat, r, alpha, p2, p1: p2 / 2,
     tc2: reagentTCritical(df, alpha), tc1: reagentTCritical(df, 2 * alpha),
-    bias, biasT, fit, pb, mard, passP, passBias, passR2, passSlope, coverage, enoughN, passScreen, level,
+    bias, biasT, fit, pb, loaLower, loaUpper, mard, passP, passBias, passR2, passSlope, coverage, enoughN, passScreen, level,
   };
 }
 export type ReagentComparisonResult = ReturnType<typeof calculateReagentComparison>;
