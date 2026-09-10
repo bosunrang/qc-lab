@@ -24,7 +24,7 @@ import { ReagentToolIcon } from '../components/ReagentToolIcon';
 import { confirmDialog, infoDialog } from '../state/dialog-store';
 import { printHtmlToPdf } from '../lib/export';
 import { useStoreInvalidation } from '../lib/useStoreInvalidation';
-import { TEA_CATALOG } from '../data/tea-catalog';
+import { TEA_CATALOG } from '../../main/domain/tea-catalog';
 import type { ReagentComparisonResult, ReagentComparisonView, TeaRef } from '../../shared/qc-api';
 
 // App cũ dùng ĐÚNG HAI formatter khác nhau trên trang này, đối chiếu trực

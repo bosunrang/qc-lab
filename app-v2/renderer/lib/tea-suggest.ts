@@ -4,14 +4,14 @@
 //
 // App cũ: gõ tên/viết tắt/bí danh → tìm đúng analyte trong bảng TEa tham
 // chiếu → TỰ ĐIỀN tên chuẩn hoá, đơn vị, TEa% và 2 trường nguồn
-// (`teaSource`/`teaRefKey`). app-v2 có sẵn danh mục (`data/tea-catalog.ts`)
+// (`teaSource`/`teaRefKey`). app-v2 có sẵn danh mục (`main/domain/tea-catalog.ts`)
 // và bảng ghi đè (`tea_refs`) nhưng modal chưa dùng tới → người dùng phải tự
 // gõ đơn vị/TEa, và `tea_source`/`tea_ref_key` luôn rỗng khi thêm mới.
 //
 // Thứ tự ưu tiên TEa copy nguyên app cũ: **CLIA% trước, Ricos% sau**
 // (`tea = ref[2] != null ? ref[2] : ref[3]`) — KHÔNG lấy giá trị TEa PXN
 // (`lab`), vì đó là hồ sơ riêng của phòng, chọn ở trang Six Sigma.
-import { TEA_CATALOG, type TeaCatalogItem } from '../data/tea-catalog';
+import { TEA_CATALOG, type TeaCatalogItem } from '../../main/domain/tea-catalog';
 import type { TeaRef } from '../../shared/qc-api';
 
 export interface TeaSuggestion {

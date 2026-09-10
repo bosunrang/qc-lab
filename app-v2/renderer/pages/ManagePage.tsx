@@ -7,7 +7,7 @@ import { useManageStore } from '../store/manage-store';
 import { useStoreInvalidation } from '../lib/useStoreInvalidation';
 import { PageHeader } from '../components/PageHeader';
 import { useWestgardStore } from '../store/westgard-store';
-import { TEA_CATALOG } from '../data/tea-catalog';
+import { TEA_CATALOG } from '../../main/domain/tea-catalog';
 import { TABS, type TabId } from './manage/shared';
 import { HistoryTab } from './manage/HistoryTab';
 import { TeaRefsTab } from './manage/TeaRefsTab';

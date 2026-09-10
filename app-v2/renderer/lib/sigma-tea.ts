@@ -1,6 +1,8 @@
 import type { TeaRef, Test } from '../../shared/qc-api';
-import { TEA_CATALOG_WITH_CLIA_ABSOLUTE, type TeaCatalogItem } from '../data/tea-catalog';
-import { findCatalog, resolveTea, type ResolvedTeaCore, type SigmaTeaSourceCore } from './sigma-tea-core';
+import { TEA_CATALOG_WITH_CLIA_ABSOLUTE, type TeaCatalogItem } from '../../main/domain/tea-catalog';
+import { findCatalog, resolveTea, type ResolvedTeaCore, type SigmaTeaSourceCore } from '../../main/domain/sigma-tea-core';
+
+export { teaCriterionText } from '../../main/domain/sigma-tea-core';
 
 export type SigmaTeaSource = SigmaTeaSourceCore;
 export type ResolvedSigmaTea = Omit<ResolvedTeaCore, 'catalog'> & { catalog: TeaCatalogItem | null };
@@ -14,3 +16,4 @@ export function findTeaCatalog(test: Pick<Test, 'name' | 'tea_ref_key'>): TeaCat
 export function resolveSigmaTea(test: Test, refs: TeaRef[], source: SigmaTeaSource, targetMean?: number | null): ResolvedSigmaTea {
   return resolveTea(test, refs, TEA_CATALOG_WITH_CLIA_ABSOLUTE, source, targetMean);
 }
+

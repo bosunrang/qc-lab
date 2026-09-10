@@ -296,8 +296,8 @@ const actionOf = (r) => rulesV2.defaultRuleAction(r, ON.has(r));
   const run = (code) => vm.runInContext(code, ctx);
   run('state.teaRefs = [];');   // không có hồ sơ TEa PXN — so đúng lớp catalog tích hợp
 
-  const { TEA_CATALOG_WITH_CLIA_ABSOLUTE } = await import(tsUrl('app-v2/renderer/data/tea-catalog.ts'));
-  const { resolveTea } = await import(tsUrl('app-v2/renderer/lib/sigma-tea-core.ts'));
+  const { TEA_CATALOG_WITH_CLIA_ABSOLUTE } = await import(tsUrl('app-v2/main/domain/tea-catalog.ts'));
+  const { resolveTea, teaCriterionText } = await import(tsUrl('app-v2/main/domain/sigma-tea-core.ts'));
   const oldCatalog = run('TEA_ANALYTE_CATALOG.map(r=>({id:r.analyteId,name:r.name,unit:r.unit,clia:r.tea.clia,ricos:r.tea.ricos,cliaAbs:r.tea.cliaAbsolute,cliaAbsUnit:r.tea.cliaAbsoluteUnit}))');
   const byIdV2 = new Map(TEA_CATALOG_WITH_CLIA_ABSOLUTE.map(r => [r.id, r]));
 
@@ -349,6 +349,48 @@ const actionOf = (r) => rulesV2.defaultRuleAction(r, ON.has(r));
     const linked = resolveTea({ name: custom.name, tea_ref_key: 'qclab-glucose', unit: custom.unit, tea: 0 }, [], TEA_CATALOG_WITH_CLIA_ABSOLUTE, 'ricos');
     assert.equal(linked.value, oldVal, 'gán tea_ref_key thì ra đúng con số app cũ');
     checks += 3;
+  }
+
+  // NHÃN tiêu chí, không chỉ giá trị. 924 phép trên chỉ so CON SỐ, nên một
+  // `clia_rule` suy sai vẫn cho cùng số mà in sai chữ (mặc định cứng
+  // 'greater-of' in "mức lớn hơn giữa ±—% và ±4.0000 mmol/L" cho một analyte
+  // chỉ có giới hạn tuyệt đối). Thẻ "Thiết lập phân tích" in đúng chuỗi này.
+  for (const o of oldCatalog) {
+    const v = byIdV2.get(o.id);
+    const oldText = run(`sgTeaCriterionText(${JSON.stringify({ name: o.name, unit: o.unit, analyteId: o.id, tea: 0, teaSource: 'clia' })}, 'clia')`);
+    const v2Text = teaCriterionText(resolveTea({ name: v.name, tea_ref_key: v.id, unit: v.unit, tea: 0 }, [], TEA_CATALOG_WITH_CLIA_ABSOLUTE, 'clia'));
+    // pH là dòng dữ liệu chết đã chốt ở trên (`cliaAbsolute` 0.04 nhưng
+    // `cliaAbsoluteUnit` RỖNG nên app cũ cũng không bao giờ áp được). app cũ
+    // vẫn in một câu quy lỗi cho đơn vị; app-v2 bỏ hẳn dòng đó nên nói đúng
+    // hơn là "chưa có". Chốt riêng thay vì ép hai chuỗi giống nhau.
+    if (o.id === 'qclab-blood-gas-ph') {
+      assert.match(oldText, /không áp dụng giới hạn tuyệt đối/, 'app cũ: pH vẫn kéo theo câu lệch đơn vị');
+      assert.equal(v2Text, 'chưa có', 'app-v2: pH không có tiêu chí CLIA nào để in');
+      checks += 2;
+      continue;
+    }
+    same(`teaCriterionText:${o.id}`, oldText, v2Text);
+  }
+
+  // Cổng TRUY VẾT của nguồn EFLM. `tea` là MỘT ô nhập tay dùng chung cho
+  // mọi nguồn, nên nếu nhận nó vô điều kiện thì một xét nghiệm khai nguồn
+  // CLIA nhưng có `tea` gõ tay sẽ hiện thành "TEa EFLM đã truy vết" — sai
+  // hồ sơ truy xuất. app cũ mở cổng khi `teaSource==='eflm'` HOẶC có ít
+  // nhất một dấu vết tra cứu (analyte/tài liệu/ngày); quét đủ tổ hợp.
+  for (const teaSource of ['eflm', 'clia', '']) {
+    for (const trace of [{}, { eflmAnalyte: 'Glucose' }, { eflmRef: 'https://biologicalvariation.eu' }, { eflmLookupDate: '2026-09-01' }, { eflmAnalyte: 'Glucose', eflmRef: 'x', eflmLookupDate: '2026-09-01' }]) {
+      for (const tea of [0, 5.5, -1]) {
+        const old = { name: 'Glucose (GLU)', unit: 'mmol/L', analyteId: 'qclab-glucose', tea, teaSource, ...trace };
+        const oldVal = run(`sgTeaBySource(${JSON.stringify(old)}, 'eflm')`);
+        const r = resolveTea({
+          name: old.name, tea_ref_key: old.analyteId, unit: old.unit, tea,
+          tea_source: teaSource, eflm_analyte: trace.eflmAnalyte || '', eflm_ref: trace.eflmRef || '', eflm_lookup_date: trace.eflmLookupDate || '',
+        }, [], TEA_CATALOG_WITH_CLIA_ABSOLUTE, 'eflm');
+        checks++;
+        assert.equal(r.value == null ? 0 : r.value, oldVal,
+          `lệch cổng EFLM tại teaSource=${JSON.stringify(teaSource)} trace=${JSON.stringify(trace)} tea=${tea}`);
+      }
+    }
   }
 }
 

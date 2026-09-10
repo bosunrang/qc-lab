@@ -4912,6 +4912,97 @@ Verify: `app-v2:typecheck` sạch, `app-v2:test` 71/71, `app-v2:build` sạch,
 `app-v2:css-parity` đạt, `app-v2:style-parity` 18/18, `app-v2:ui-parity`
 **79/79 surface đạt** (57 vấn đề → 0).
 
+**TEa của kỳ Six Sigma phải giải lại tại Mean của TỪNG mức — 4 lỗi cùng một
+gốc (2026-09-10).** Người dùng hỏi "nghiệp vụ nào đúng" về khác biệt Sigma
+0,29/0,56 (app cũ) vs 2,67/1,89 (app-v2) mà đợt trước đã ghi là "khác biệt
+thiết kế thật". **Ghi chú đó SAI, và con số 10% cũng chỉ là hiện vật của bộ
+seed**: app cũ cũng chốt snapshot TEa theo mức và cũng không ghi đè
+(`sgSetLevelTeaSnapshot(..., force = false)`); khác biệt duy nhất là chuyện
+gì xảy ra khi snapshot theo mức CHƯA có. app cũ điền nó từ nguồn đang khai
+tại Mean của chính mức đó (`sgReconcileAllTeaSnapshots()`), app-v2 rơi thẳng
+về `sigma_data.tea` — MỘT con số dùng chung cho cả kỳ. Với tiêu chí CLIA dạng
+TUYỆT ĐỐI (Sodium ±4,0000 mmol/L) thì TEa% = |giới hạn / Mean| × 100, tức
+mỗi mức PHẢI ra một số khác nhau (2,857% ở Mean 140, 4,000% ở Mean 100) — một
+con số dùng chung chỉ có thể đúng tại đúng một Mean. Đây là lỗi app-v2, và
+nó đổi kết luận đọc được: "chấp nhận được" thành "dưới 3σ, phải siết luật".
+
+**Kéo `sigma-tea-core.ts` + `tea-catalog.ts` từ `renderer/` về
+`main/domain/`** (`git mv`, 7 file import đổi đường dẫn) — main process phải
+giải được TEa chứ không chỉ renderer. `sigma-tea-core.ts` vẫn KHÔNG import gì
+để test đối chiếu nạp thẳng được trên `.ts` qua type-stripping; đó cũng là lý
+do hàm định dạng nhãn tiêu chí (dưới) nằm ở file này thay vì ở adapter
+renderer.
+
+**4 lỗi đã sửa, tất cả đều đổi số hoặc đổi chữ người dùng đọc:**
+1. **`computeLevel()` xếp lại thứ tự ưu tiên TEa**: snapshot `lv_json.tea` của
+   chính mức → GIẢI từ nguồn đang khai tại Mean của mức đó → mới đến
+   `periodTea`. Bước giữa trước đây KHÔNG có. `makeLevelTeaResolver(testId)`
+   đọc một lượt cấu hình xét nghiệm + hồ sơ TEa PXN + Mean hiện hành của từng
+   mức rồi trả về hàm thuần; Mean ưu tiên snapshot của kỳ (`stored.targetMean`)
+   rồi mới tới Mean hiện hành, đúng `sgLevelTarget()` app cũ. Nối vào cả
+   `listPeriods` và 3 đường trả kỳ sau khi ghi — thiếu 3 đường đó thì ngay sau
+   khi lưu renderer nhận TEa khác lần đọc kế tiếp.
+2. **Thẻ "Khuyến nghị cải thiện" dùng TEa CẤP KỲ** (`tea={displayPeriod.tea}`)
+   nên in "giảm CV ≤ 2.00%" trong khi app cũ in "≤ 0.21%" — cùng lớp lỗi,
+   khác chỗ gọi. Đổi sang `tea={lv.tea}` (TEa của chính mức, đã giải xong ở
+   main).
+3. **Cổng truy vết EFLM thiếu hẳn**: `resolveTea(source='eflm')` trả
+   `test.tea` vô điều kiện. Nhưng `tea` là MỘT ô nhập tay dùng chung cho mọi
+   nguồn, nên một xét nghiệm khai nguồn CLIA có `tea` gõ tay cũng hiện thành
+   "TEa EFLM đã truy vết" — sai hồ sơ truy xuất. Port `hasEflmTrace` app cũ
+   (`teaSource === 'eflm'` HOẶC có analyte/tài liệu/ngày tra cứu);
+   `TeaTestCore` nhận thêm 4 trường đó và `makeLevelTeaResolver` phải SELECT
+   thêm 4 cột — thiếu bước SQL này thì cổng luôn mở.
+4. **Nhãn tiêu chí CLIA in % đã quy đổi thay vì giới hạn tuyệt đối.** Thẻ
+   "Thiết lập phân tích" in "2.86%" trong khi app cũ in "±4.0000 mmol/L" —
+   một số % ở chỗ chưa gắn với mức QC nào là nói sai (nó chỉ đúng tại một
+   Mean). Thêm `criterionDetail` có cấu trúc (`rule`/`percent`/`absolute`/
+   `unit`/`absoluteUsable`/`unitMismatch`/`needsTarget`) vào `ResolvedTeaCore`
+   và `teaCriterionText()` port `sgTeaCriterionText()` app cũ; câu nhắc đổi
+   sang đúng văn app cũ ("Tiêu chí CLIA đang dùng: … TEa% được tính riêng tại
+   Mean mục tiêu của từng mức QC."). **Lỗi ẩn phát hiện nhờ chính bản sửa
+   này**: `clia_rule` rỗng bị mặc định CỨNG thành `'greater-of'`, cho ra CÙNG
+   CON SỐ (nhánh greater-of tự rơi về absolute khi thiếu %) nhưng in
+   "mức lớn hơn giữa ±—% và ±4.0000 mmol/L". Suy quy tắc từ dữ liệu như
+   `sgTeaInfo()` app cũ (chỉ có tuyệt đối là `absolute`, có cả hai mới là
+   `greater-of`). Cũng sửa nhãn trục thời gian của biểu đồ xu hướng: app-v2 in
+   `09/26`, app cũ in `09/2026`.
+
+**Mở rộng bộ đối chiếu app cũ — 2305 → 2428 phép**, vì 924 phép cũ chỉ so
+CON SỐ nên không thể thấy 2 trong 4 lỗi trên: thêm **45 tổ hợp cổng EFLM**
+(3 `teaSource` × 5 dạng dấu vết × 3 giá trị `tea`) và **NHÃN tiêu chí CLIA
+cho 76/77 analyte** (pH chốt riêng — dòng dữ liệu chết đã ghi ở đợt trước:
+`cliaAbsolute` 0,04 nhưng `cliaAbsoluteUnit` RỖNG nên app cũ cũng không bao
+giờ áp được; app cũ vẫn in một câu quy lỗi cho đơn vị, app-v2 nói đúng hơn là
+"chưa có"). `app-v2/tests/sigma-level-tea.test.mjs` (mới, 6 nhóm,
+end-to-end qua `openDatabase(':memory:')` + handler thật) giữ thứ tự ưu tiên
+sau khi app cũ bị cắt: giải đúng 4/140 và 4/100 ra Sigma 0,29/0,56 (số ĐO TỪ
+app cũ), snapshot theo mức thắng mọi thứ, đổi Mean hôm nay không viết lại kỳ
+đã chốt, nguồn dạng % không phụ thuộc mức, lệch đơn vị và mức thiếu Mean mới
+rơi về `periodTea`.
+
+Cả 4 bản sửa đều được chứng minh CÓ khả năng bắt lỗi: hoàn tác tạm từng cái
+→ test FAIL đúng chỗ (`lệch cổng EFLM tại teaSource="clia"`,
+`teaCriterionText:qclab-calcium`, nhóm mục 1 của `sigma-level-tea`), rồi phục
+hồi.
+
+**`docs/validation/SIGMA-WESTGARD-AUDIT-2026-09-10.md`** (mới) là bản rà soát
+sâu Sigma/Westgard cùng ngày, kèm một BẢNG TRẠNG THÁI ở đầu nói mục nào đã
+xử lý — để lần đọc sau không sửa lại thứ đã sửa. 3 mục còn mở trong đó
+(cohort IQC không kiểm trạng thái in-control; điểm bị loại CHỈ bởi luật liên
+mức vẫn `accepted:true`; bảng gợi ý Sigma Rules và ý nghĩa `u(Cref)`) đều đã
+được đối chiếu và KHỚP app cũ, nên là câu hỏi SẢN PHẨM chung cho hai bản chứ
+không phải lỗi port — sửa đi là lệch golden master có chủ đích, cần quyết
+định riêng.
+
+Verify: `app-v2:typecheck` sạch, `app-v2:test` **72/72** (bộ đối chiếu app cũ
+2428 phép), `app-v2:build` sạch, `app-v2:css-parity` đạt,
+`app-v2:style-parity` 18/18, `app-v2:ui-parity` **79/79 surface đạt** —
+`sigma` từ 3 class/11 dòng xuống **3 class/1 dòng**, baseline siết bằng
+`--update-baseline` và `surfaceNotes.sigma` viết lại theo số đo mới (1 dòng
+còn lại là dòng "Kỳ đang xem": app cũ in một con số TEa cho cả kỳ, app-v2 in
+"TEa theo mức QC" — hệ quả có chủ đích của chính bản sửa này).
+
 **Tiêu chí cắt còn lại đúng 1 mục**: Giai đoạn D xong (`app-v2:ui-parity`
 xanh với baseline 0 cho mọi surface). Mục "đối chiếu Westgard/Sigma khớp
 100%" nay ĐẠT, và từ đây nó là gate sống chạy trong `app-v2:test` chứ không

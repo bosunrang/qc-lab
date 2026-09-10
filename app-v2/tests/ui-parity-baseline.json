@@ -1,11 +1,11 @@
 {
   "note": "Baseline gate UI parity — CHỈ được siết xuống, không nâng lên bằng tay. Sinh bằng: npm run app-v2:ui-parity -- --update-baseline",
   "goldenMaster": "app cũ tại working tree ngày 2026-09-01",
-  "updatedAt": "2026-09-10T13:20:12.020Z",
+  "updatedAt": "2026-09-10T16:30:14.863Z",
   "surfaceNotes": {
     "settings": "Hoàn tất C2 ngày 2026-09-07: Firebase và Firebase Rules có IPC thật, xác thực Email/Password ở main process, snapshot checksum và xử lý xung đột; 4 viewport về 0/0.",
     "entry": "Còn đúng 1 class `danger` (2026-09-10): nút hủy điểm QC trong bảng điểm. app cũ là `btn danger sm`; app-v2 dùng nút icon `.qc-row-void` — cùng quyết định \"giữ nút icon\" của người dùng như các surface hàng dữ liệu khác. Mọi dòng chữ đã khớp: \"Khoảng xem … · N mức QC\" (trước đây đếm CỘT nên ghi \"N cột QC\") và thẻ biểu đồ in SỐ ĐIỂM ĐƯỢC CHẤP NHẬN đúng như app cũ (trước đây in tổng số điểm kèm hậu tố \"· N chấp nhận\"; tổng số vẫn hiện ở panel \"Điểm trong khoảng xem\" bên dưới). Ba hạng mục backend từng thiếu — cột song song 2 lô, Workflow dải QC/Về dải nhà sản xuất, điều hướng bàn phím — hoàn tất 2026-09-06.",
-    "sigma": "Còn 3 class / 11 dòng (2026-09-10) — TỪ 73 class/90 dòng lúc mở D3.6 và 7/32 trước đợt này. Hai lý do, không còn lý do nào là nợ CSS hay nợ dữ liệu TEa: (1) **Panel \"Thiết kế QC theo Sigma (OPSpecs)\"** — 3 class `muted`/ `alert-block`/`flow-item` cùng vài dòng prose của app cũ. app-v2 có panel OPSpecs RIÊNG (`sg-opspec-table`/`sg-governing-rule`/`sg-opspec-note`) với bố cục bảng thay vì khối văn xuôi, nên chữ không khớp từng dòng. (2) **TEa của KỲ: snapshot vs giải lại** — app cũ hiện \"TEa 2.857142857142857%\" và Sigma 0.29/0.56 vì nó GIẢI LẠI tiêu chí CLIA tuyệt đối (±4,0000 mmol/L) tại Mean của từng mức mỗi lần vẽ; app-v2 hiện \"TEa 10.00%\" và Sigma 2.67/1.89 vì kỳ giữ SNAPSHOT TEa riêng (quyết định đã chốt: kỳ cũ không bị kéo lại theo Bảng TEa tham chiếu hôm nay, giữ truy xuất lịch sử). Bộ seed cố tình ghi `tea: 10` cho kỳ trong khi nguồn là `clia` — một tổ hợp mà luồng thật không tạo ra (chọn nguồn CLIA thì TEa tự điền từ tiêu chí), nên con số 10% chỉ là hệ quả của seed. Phần LỚP GIẢI TEa của hai bản đã được đối chiếu trực tiếp và khớp 924/924 phép (mục 10 của `app-v2/tests/cross-app-westgard-sigma.test.mjs`); panel \"Thiết lập phân tích\" của app-v2 giờ cũng hiện đúng \"CLIA PT (CMS-3355-F) · 2.86%\" như app cũ. Nút \"Nạp CV lô\" đã có từ trước và tầng cohort cũng đã được đối chiếu (mục 11 của cùng file test).",
+    "sigma": "Còn 3 class / 1 dòng (2026-09-10) — TỪ 73 class/90 dòng lúc mở D3.6, 7/32 trước đợt seed, 3/11 sau đợt đó. Hai lý do, không còn lý do nào là nợ CSS, nợ dữ liệu TEa hay nợ lớp giải TEa: (1) **Panel \"Thiết kế QC theo Sigma (OPSpecs)\"** — 3 class `muted`/`alert-block`/`flow-item` của khối văn xuôi app cũ. app-v2 có panel OPSpecs RIÊNG (`sg-opspec-table`/`sg-governing-rule`/`sg-opspec-note`) dựng dạng BẢNG, nên chữ không khớp từng dòng. (2) **Dòng \"Kỳ đang xem\"** — app cũ in một con số TEa duy nhất cho cả kỳ (\"TEa 2.857142857142857%\"), app-v2 in \"TEa theo mức QC\". Đây là hệ quả CÓ CHỦ ĐÍCH của bản sửa 2026-09-10: với tiêu chí CLIA dạng TUYỆT ĐỐI (Sodium ±4,0000 mmol/L) thì TEa% = |giới hạn / Mean| × 100, tức MỖI MỨC một con số khác nhau (2,857% ở Mean 140 và 4,000% ở Mean 100). In một số % chung cho cả kỳ ở đầu panel sẽ không đối chiếu được với cột Sigma của từng mức. Số TEa của từng mức vẫn hiện đủ trong bảng kỳ và trong thẻ trạng thái. Đã đối chiếu trực tiếp với app cũ và khớp: lớp giải TEa (giá trị) 924/924 phép, NHÃN tiêu chí CLIA 76/77 analyte (pH là dữ liệu chết, chốt riêng), cổng truy vết EFLM 45/45 tổ hợp, tầng cohort IQC — xem mục 10 và 11 của `app-v2/tests/cross-app-westgard-sigma.test.mjs`. Thẻ \"Thiết lập phân tích\" giờ in đúng \"CLIA PT (CMS-3355-F) · ±4.0000 mmol/L\" và câu nhắc \"Tiêu chí CLIA đang dùng: ±4.0000 mmol/L. TEa% được tính riêng tại Mean mục tiêu của từng mức QC.\" y như app cũ.",
     "reagent": "ĐẠT 0/0 trên cả 4 viewport (2026-09-10). Trước đó còn 18 dòng là NHÃN TRỤC biểu đồ (app cũ vẽ SVG có text node thật, app-v2 vẽ canvas nên nhãn nằm trong bitmap); chúng tự khớp lại sau khi seed hai bên cùng có TEa/`tea_ref_key` — tức phần lệch còn lại lúc đó là do DỮ LIỆU, không phải do canvas. Tính năng \"Chọn nhanh\" người thực hiện/loại mẫu đã port đủ từ 2026-09-04 (IPC `list/add/removeReagentQuickValue` lưu ở `app_meta`, nút `.rc-icon-btn` + `QuickPickerModal`).",
     "westgard": "Con 1 dong (2026-09-02, D3.9): cau gioi thieu panel bieu do cua app cu ket thuc bang ở muục “Bật \"Xem lô cũ\"” — app-v2 CHUA co cong tac do (them duong cua lo da chuyen tiep vao Levey-Jennings), thuoc cung nhom voi cot song song 2 lo da hoan tu Giai doan B2 (can cot phan biet diem cua lo nao trong qc_points). Cau van cua app-v2 chi noi dung phan NO THAT SU LAM; copy nguyen van cau cu se hua mot cong tac khong ton tai.",
     "manage:modal-lot": "Ô \"Ghi chú\" của 3 modal này (lô QC, Panel QC, nhóm lô) đã được BỎ có chủ đích ở app-v2 — quyết định sản phẩm, không phải thiếu sót; app cũ vẫn còn nên gate đếm là 1 dòng lệch mỗi modal. Riêng modal lô còn 2 dòng nữa là nhãn ngày: app cũ ghi \"Ngày mở (dd/mm/yyyy)\"/\"Hạn sử dụng (dd/mm/yyyy)\", app-v2 bỏ hậu tố định dạng vì <DateField> đã tự hiện dd/mm/yyyy trong ô.",
@@ -233,19 +233,19 @@
     },
     "sigma/desktop": {
       "missingClasses": 3,
-      "missingTextLines": 11
+      "missingTextLines": 1
     },
     "sigma/compact": {
       "missingClasses": 3,
-      "missingTextLines": 11
+      "missingTextLines": 1
     },
     "sigma/tablet": {
       "missingClasses": 3,
-      "missingTextLines": 11
+      "missingTextLines": 1
     },
     "sigma/mobile": {
       "missingClasses": 3,
-      "missingTextLines": 11
+      "missingTextLines": 1
     },
     "reagent/desktop": {
       "missingClasses": 0,

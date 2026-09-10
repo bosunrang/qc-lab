@@ -22,7 +22,7 @@ function levelsOf(periods: SigmaPeriodView[]): number[] {
     .map((level) => level.level)))).sort((a, b) => a - b);
 }
 
-function periodLabel(period: string): string { return `${period.slice(5)}/${period.slice(2, 4)}`; }
+function periodLabel(period: string): string { return period.split('-').reverse().join('/'); }
 function periodTitle(period: string): string { return `Kỳ ${period.slice(5)}/${period.slice(0, 4)}`; }
 
 function EmptyChart({ kind }: { kind: 'trend' | 'mdc' }) {

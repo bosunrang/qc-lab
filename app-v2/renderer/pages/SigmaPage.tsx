@@ -19,7 +19,7 @@ import { SigmaTrendChart, SigmaMdcChart } from '../components/SigmaCharts';
 import { exportTableXlsx, printHtmlToPdf } from '../lib/export';
 import { confirmDialog, infoDialog } from '../state/dialog-store';
 import type { SigmaCohortView, SigmaEqaRound, SigmaLevelResult, SigmaPeriodView, Test } from '../../shared/qc-api';
-import { resolveSigmaTea, type SigmaTeaSource } from '../lib/sigma-tea';
+import { resolveSigmaTea, teaCriterionText, type SigmaTeaSource } from '../lib/sigma-tea';
 
 function rmsOf(values: number[]): number {
   if (!values.length) return 0;
@@ -182,10 +182,14 @@ export function SigmaPage() {
   }, [test?.id, test?.tea_source]);
   const teaSourceValueText = (source: string): string => {
     if (!test) return 'chưa có';
-    const resolved = resolveSigmaTea(test, teaRefs, source as SigmaTeaSource, sourceTargetMean);
-    return resolved.value != null ? `${resolved.value.toFixed(2)}%` : 'chưa có';
+    return teaCriterionText(resolveSigmaTea(test, teaRefs, source as SigmaTeaSource, sourceTargetMean));
   };
-  const teaHint = `TEa đang dùng: ${teaSourceValueText(teaSource)} · nguồn ${TEA_SOURCES.find((s) => s.value === teaSource)?.label || '—'}.${teaResolution?.note ? ` ${teaResolution.note}` : ''}`;
+  // Câu nhắc của nguồn CLIA phải nói rõ TEa% được giải RIÊNG tại Mean của
+  // từng mức QC — nếu in một con số % chung cho cả xét nghiệm thì người đọc
+  // sẽ đối chiếu sai với cột Sigma của từng mức.
+  const teaHint = teaSource === 'clia'
+    ? `Tiêu chí CLIA đang dùng: ${teaSourceValueText('clia')}. TEa% được tính riêng tại Mean mục tiêu của từng mức QC.${teaResolution?.note ? ` ${teaResolution.note}` : ''}`
+    : `TEa đang dùng: ${teaSourceValueText(teaSource)} · nguồn ${TEA_SOURCES.find((s) => s.value === teaSource)?.label || '—'}.${teaResolution?.note ? ` ${teaResolution.note}` : ''}`;
   const configuredTea = teaResolution?.value ?? null;
   const configuredTeaSource = teaResolution?.criterion || '';
   const targetMeanForLevel = (levelNumber: number) => (levelsByTestId[testId] || []).find((level) => level.level === levelNumber)?.mean ?? null;
@@ -445,7 +449,7 @@ export function SigmaPage() {
                     );
                   })}
                 </div></div>
-                {displayPeriod.levels.map((lv) => <ImprovementCard key={lv.level} level={lv.level} result={lv} tea={displayPeriod.tea} />)}
+                {displayPeriod.levels.map((lv) => <ImprovementCard key={lv.level} level={lv.level} result={lv} tea={lv.tea} />)}
               </>
             )}
         </div>

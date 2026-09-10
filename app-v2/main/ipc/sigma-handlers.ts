@@ -7,6 +7,8 @@ import type { Db } from '../db/sqlite-like';
 import type { Test } from '../../shared/qc-api';
 import { sigmaMetric, uncertaintyBudget, eqaRoundsStats, sigmaQualityDesign, type SigmaMetricResult, type UncertaintyBudgetResult } from '../domain/sigma-metrics';
 import { buildSigmaCohorts, type SigmaCohort, type SigmaCohortPoint } from '../domain/sigma-cohort';
+import { resolveTea, type SigmaTeaSourceCore, type TeaRefCore } from '../domain/sigma-tea-core';
+import { TEA_CATALOG_WITH_CLIA_ABSOLUTE } from '../domain/tea-catalog';
 import { isoLocalDate } from '../domain/local-date';
 import { cleanId, cleanText, finiteNumber } from '../domain/text-utils';
 import { type Actor, type IpcResult, writeAudit, notifyChanged, requireWrite, requireAdmin } from './shared';
@@ -74,11 +76,26 @@ function readStoredLevels(raw: string): StoredLevel[] {
  * LUÔN thắng giá trị `biasEqa` đơn lẻ cũ (không dùng song song 2 nguồn) —
  * `eqaRoundsStats()` cũng cho `biasRefU` (u(Cref)) feed thẳng vào
  * `uncertaintyBudget()`, thứ mà 1 con số `biasEqa` đơn lẻ không bao giờ có. */
-function computeLevel(stored: StoredLevel, periodTea: number | null): SigmaLevelResult {
-  // CLIA có giới hạn tuyệt đối phải quy đổi trên Mean của TỪNG mức QC. Từ
-  // v2.2 snapshot này được lưu trong lv_json; bản ghi cũ vẫn đọc đúng nhờ
-  // fallback periodTea, nhưng không được tự áp lại TEa cấu hình mới.
-  const tea = stored.tea ?? periodTea;
+/** Thứ tự lấy TEa của một mức, KHÔNG được đảo:
+ *   1. snapshot `lv_json.tea` của chính mức đó — kỳ đã chốt thì không bị kéo
+ *      lại theo Bảng TEa tham chiếu hôm nay (cùng nguyên tắc `force=false`
+ *      trong `sgSetLevelTeaSnapshot()` của app cũ);
+ *   2. GIẢI từ nguồn TEa đang khai, tại Mean của CHÍNH mức đó;
+ *   3. mới đến `periodTea` (một con số dùng chung cho cả kỳ).
+ *
+ * Bước 2 trước đây KHÔNG có, và đó là lỗi nghiệp vụ thật: với tiêu chí CLIA
+ * dạng TUYỆT ĐỐI (vd Sodium ±4,0000 mmol/L) thì TEa% = |giới hạn / Mean| ×
+ * 100, tức mỗi mức phải ra MỘT SỐ KHÁC NHAU. Rơi thẳng về `periodTea` nghĩa
+ * là dùng một TEa% dùng chung, chỉ có thể đúng tại đúng một Mean. Đo được với
+ * bộ seed của gate parity: Mean 140/100 cho ra TEa 2,857%/4,000% và Sigma
+ * 0,29/0,56 ở app cũ, còn app-v2 dùng 10% cho cả hai mức nên ra 2,67/1,89 —
+ * một bên đọc là "chấp nhận được", một bên là "dưới 3σ, phải siết luật".
+ * Bản ghi thiếu snapshot theo mức là chuyện có thật: kỳ tạo ở bản v1 (xem
+ * comment của `StoredLevel.tea`), kỳ ghi qua IPC bởi caller không truyền TEa
+ * theo mức, dữ liệu di trú hoặc đồng bộ về. Với nguồn dạng % (Ricos/EFLM/
+ * PXN) thì bước 2 và bước 3 cho cùng kết quả nên không đổi gì. */
+function computeLevel(stored: StoredLevel, periodTea: number | null, resolveLevelTea?: (level: number, targetMean: number | null) => number | null): SigmaLevelResult {
+  const tea = stored.tea ?? (resolveLevelTea ? resolveLevelTea(stored.level, stored.targetMean ?? null) : null) ?? periodTea;
   const roundsStats = stored.eqaRounds && stored.eqaRounds.length ? eqaRoundsStats(stored.eqaRounds.map((round) => round.bias)) : null;
   const biasEqa = roundsStats ? roundsStats.rms : stored.biasEqa;
   const biasRefU = roundsStats ? roundsStats.biasRefU : null;
@@ -98,10 +115,41 @@ export function createSigmaHandlers(db: Db) {
     const rows = db.prepare('SELECT * FROM sigma_data WHERE test_id=? ORDER BY period ASC').all(testId) as {
       id: string; test_id: string; period: string; tea: number | null; tea_source: string; lv_json: string;
     }[];
+    const resolveLevelTea = makeLevelTeaResolver(testId);
     return rows.map(r => {
       const stored = readStoredLevels(r.lv_json);
-      return { id: r.id, testId: r.test_id, period: r.period, tea: r.tea, teaSource: r.tea_source, levels: stored.map(s => computeLevel(s, r.tea)) };
+      const resolve = (level: number, targetMean: number | null) => resolveLevelTea(r.tea_source, level, targetMean);
+      return { id: r.id, testId: r.test_id, period: r.period, tea: r.tea, teaSource: r.tea_source, levels: stored.map(s => computeLevel(s, r.tea, resolve)) };
     });
+  }
+
+  /** Bộ giải TEa theo mức cho MỘT xét nghiệm: đọc một lượt cấu hình xét
+   * nghiệm, lớp phủ hồ sơ TEa của phòng xét nghiệm và Mean hiện hành của từng
+   * mức, rồi trả về hàm thuần. Mean ưu tiên snapshot của kỳ
+   * (`stored.targetMean`, truyền vào từ ngoài) rồi mới tới Mean hiện hành —
+   * đúng `sgLevelTarget()` của app cũ. */
+  function makeLevelTeaResolver(testId: string): (source: string, level: number, targetMean: number | null) => number | null {
+    // Phải đọc cả 4 cột truy vết EFLM: cổng `hasTrace` của `resolveTea()`
+    // đọc chúng, thiếu thì mọi xét nghiệm có `tea` đều được coi là "TEa EFLM
+    // đã truy vết".
+    const test = db.prepare('SELECT name,tea_ref_key,unit,tea,tea_source,eflm_analyte,eflm_ref,eflm_lookup_date FROM tests WHERE id=?').get(testId) as
+      { name: string; tea_ref_key: string; unit: string; tea: number | null; tea_source: string; eflm_analyte: string; eflm_ref: string; eflm_lookup_date: string } | undefined;
+    if (!test) return () => null;
+    const refs = db.prepare('SELECT name,analyte_id,aliases_json,lab,lab_source,clia,ricos,clia_rule,clia_absolute,clia_absolute_unit FROM tea_refs').all() as TeaRefCore[];
+    const means = new Map<number, number | null>(
+      (db.prepare('SELECT level,mean FROM test_levels WHERE test_id=?').all(testId) as { level: number; mean: number | null }[])
+        .map((row) => [row.level, row.mean]),
+    );
+    const shape = {
+      name: test.name || '', tea_ref_key: test.tea_ref_key || '', unit: test.unit || '', tea: Number(test.tea) || 0,
+      tea_source: test.tea_source || '', eflm_analyte: test.eflm_analyte || '', eflm_ref: test.eflm_ref || '', eflm_lookup_date: test.eflm_lookup_date || '',
+    };
+    return (source, level, targetMean) => {
+      if (source !== 'lab' && source !== 'eflm' && source !== 'clia' && source !== 'ricos') return null;
+      const mean = targetMean ?? means.get(level) ?? null;
+      const value = resolveTea(shape, refs, TEA_CATALOG_WITH_CLIA_ABSOLUTE, source as SigmaTeaSourceCore, mean).value;
+      return value != null && value > 0 ? value : null;
+    };
   }
 
   function listCohorts(testId: string, period: string, levels: number[]): SigmaCohort[] {
@@ -202,7 +250,8 @@ export function createSigmaHandlers(db: Db) {
     }
     writeAudit(db, actor, existing ? 'Sửa kỳ Six Sigma' : 'Thêm kỳ Six Sigma', `Kỳ ${period} của xét nghiệm "${test.name}"`, test.name);
     notifyChanged(['sigma_data'], [testId]);
-    return { ok: true, data: { id, testId, period, tea, teaSource, levels: stored.map(s => computeLevel(s, tea)) } };
+    const resolveSaved = makeLevelTeaResolver(testId);
+    return { ok: true, data: { id, testId, period, tea, teaSource, levels: stored.map(s => computeLevel(s, tea, (level, targetMean) => resolveSaved(teaSource, level, targetMean))) } };
   }
 
   /** Đổi kỳ phải là một giao dịch duy nhất. Không dùng "lưu mới rồi xoá cũ"
@@ -216,7 +265,8 @@ export function createSigmaHandlers(db: Db) {
     if (!row) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy kỳ Six Sigma.' } };
     if (row.period === period) {
       const stored = readStoredLevels(row.lv_json);
-      return { ok: true, data: { id: row.id, testId: row.test_id, period: row.period, tea: row.tea, teaSource: row.tea_source, levels: stored.map((level) => computeLevel(level, row.tea)) } };
+      const resolveSame = makeLevelTeaResolver(row.test_id);
+      return { ok: true, data: { id: row.id, testId: row.test_id, period: row.period, tea: row.tea, teaSource: row.tea_source, levels: stored.map((level) => computeLevel(level, row.tea, (lv, targetMean) => resolveSame(row.tea_source, lv, targetMean))) } };
     }
     const nextId = `${row.test_id}:${period}`;
     if (db.prepare('SELECT 1 FROM sigma_data WHERE id=?').get(nextId)) return { ok: false, error: { code: 'duplicate-period', message: `Đã có kỳ Sigma ${period}. Hãy cập nhật kỳ hiện có.` } };
@@ -232,7 +282,8 @@ export function createSigmaHandlers(db: Db) {
     writeAudit(db, actor, 'Đổi kỳ Six Sigma', `Đổi kỳ ${row.period} thành ${period} của xét nghiệm "${test?.name || ''}"`, test?.name || '');
     notifyChanged(['sigma_data'], [row.test_id]);
     const stored = readStoredLevels(row.lv_json);
-    return { ok: true, data: { id: nextId, testId: row.test_id, period, tea: row.tea, teaSource: row.tea_source, levels: stored.map((level) => computeLevel(level, row.tea)) } };
+    const resolveRenamed = makeLevelTeaResolver(row.test_id);
+    return { ok: true, data: { id: nextId, testId: row.test_id, period, tea: row.tea, teaSource: row.tea_source, levels: stored.map((level) => computeLevel(level, row.tea, (lv, targetMean) => resolveRenamed(row.tea_source, lv, targetMean))) } };
   }
 
   /** Xoá 1 kỳ Sigma — chỉ admin, khớp `sgDelPeriod` app cũ. */

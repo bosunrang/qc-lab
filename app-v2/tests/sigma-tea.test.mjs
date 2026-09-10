@@ -2,7 +2,7 @@
 // tuyệt đối là nghiệp vụ lâm sàng: chỉ quy đổi khi Mean + đơn vị hợp lệ và
 // không được thay bằng nhánh Ricos một cách im lặng.
 import assert from 'node:assert/strict';
-import { findCatalog, resolveTea } from '../renderer/lib/sigma-tea-core.ts';
+import { findCatalog, resolveTea } from '../main/domain/sigma-tea-core.ts';
 
 const sodium = {
   id: 't-na', name: 'Sodium', tea_ref_key: '', unit: 'mmol/L', tea: 0,

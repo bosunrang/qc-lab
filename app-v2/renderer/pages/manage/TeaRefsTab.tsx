@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { DateField } from '../../components/DateField';
 import { RowActionButton } from '../../components/RowActionButton';
-import { TEA_CATALOG, TEA_SOURCE_CARDS } from '../../data/tea-catalog';
+import { TEA_CATALOG, TEA_SOURCE_CARDS } from '../../../main/domain/tea-catalog';
 import { useManageStore } from '../../store/manage-store';
 import { confirmDialog, infoDialog } from '../../state/dialog-store';
 import { useAuthStore } from '../../store/auth-store';
