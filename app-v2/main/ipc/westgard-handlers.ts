@@ -1,13 +1,24 @@
 // IPC handler cho trang Phan tich Westgard: tong quan tat ca xet nghiem/muc
 // theo verdict te nhat hien tai, xem chi tiet 1 muc kem CUSUM, bat/tat tung
 // luat rieng cho 1 xet nghiem.
-import type { Db } from '../db/open-database';
-import { westgard, combinedWestgardByPoint, cusum, acceptedPoints, type QcPointLike, type RuleVerdict } from '../domain/westgard-engine';
+import type { Db } from '../db/sqlite-like';
+import { westgard, combinedWestgardByPoint, cusumScan, acceptedPoints, type QcPointLike, type RuleVerdict, type CusumResult } from '../domain/westgard-engine';
 import { parseRuleActions, serializeRuleActions, makeIsOnLayered, makeRuleActionLayered, isRuleAction, globalRuleList, parseRuleScopes, makeScopeOf, type RuleAction, type RuleActionsMap } from '../domain/rule-config';
 import { WG_RULE_REGISTRY, defaultRuleAction, errorTypeDetail } from '../domain/westgard-rules';
+import { compareQcPointOrder } from '../domain/sort-order';
+import { isoLocalDate } from '../domain/local-date';
 import { type Actor, type IpcResult, writeAudit, notifyChanged, requireWrite } from './shared';
 
 const VERDICT_RANK: Record<RuleVerdict, number> = { ok: 0, warn: 1, rej: 2 };
+/** CUSUM vượt h là tín hiệu drift/shift cần theo dõi, KHÔNG phải luật
+ * Westgard loại bỏ một điểm. Nhãn này đi tới bảng và luồng NCE như cảnh báo
+ * sai số hệ thống; chuỗi accepted vẫn chỉ do Westgard quyết định. */
+function cusumSignalAt(cs: CusumResult, index: number): 'CUSUM +h' | 'CUSUM −h' | 'CUSUM ±h' | null {
+  if (cs.flags[index] !== 'rej') return null;
+  if (cs.cPos[index] >= cs.h) return 'CUSUM +h';
+  if (cs.cNeg[index] <= -cs.h) return 'CUSUM −h';
+  return 'CUSUM ±h';
+}
 /** Cấu hình luật CHUNG toàn phòng xét nghiệm — app cũ để ở `state.westgardRules`
  * (một object DUY NHẤT cho cả app, sửa từ panel "Cấu hình chung của luật" của
  * trang Phân tích Westgard). app-v2 chưa có khái niệm state toàn cục nên dùng
@@ -16,14 +27,10 @@ const VERDICT_RANK: Record<RuleVerdict, number> = { ok: 0, warn: 1, rej: 2 };
  * khối. */
 const RULES_META_KEY = 'westgardRules';
 
-export interface TestSummary {
-  testId: string; testName: string; instrumentName: string; unit: string; decimalPlaces: number;
-  levels: {
-    level: number; mean: number | null; sd: number | null; qcLotId: string | null; lot: string; exp: string;
-    worstVerdict: RuleVerdict; pointCount: number; todayPointCount: number;
-    latest: { id: string; date: string; runId: string; val: number } | null;
-  }[];
-}
+// Nguồn duy nhất: hợp đồng dùng chung.
+import type { TestSummary } from '../../shared/qc-api';
+
+export type { TestSummary };
 
 export interface LevelAnalysis {
   points: {
@@ -33,6 +40,8 @@ export interface LevelAnalysis {
      * không phải "Đạt". Trước đây app-v2 gán cứng 'ok', hiện sai kết luận
      * ngay dưới banner cảnh báo "chưa có Mean/SD". */
     verdict: RuleVerdict | 'none'; rules: string[]; accepted: boolean;
+    /** CUSUM vượt ±h: cảnh báo xu hướng (không đổi verdict/accepted Westgard). */
+    cusumSignal: 'CUSUM +h' | 'CUSUM −h' | 'CUSUM ±h' | null;
     /** Luật mà điểm này là BẰNG CHỨNG LỊCH SỬ (điểm trước đó cấu thành 1 luật
      * nhiều điểm như 2-2s/4-1s/6x cho lần vi phạm SAU), không phải chính điểm
      * bị gắn luật — port `supportRules` app cũ (`PointsTable`'s cột "Luật /
@@ -42,7 +51,9 @@ export interface LevelAnalysis {
      * app cũ (tính ở main, không phải renderer tự đoán theo `rules[0]`). */
     errorType: string; errorDesc: string;
   }[];
-  cusum: { cPos: number[]; cNeg: number[]; flags: RuleVerdict[] };
+  /** `h` phải đi cùng chuỗi CUSUM tới renderer: nếu bỏ nó ở IPC, canvas sẽ
+   * rơi về ±4 dù xét nghiệm đã cấu hình một ngưỡng khác. */
+  cusum: { cPos: number[]; cNeg: number[]; flags: RuleVerdict[]; k: number; h: number; ma: number[] };
   /** Xét nghiệm có bật CUSUM không (`tests.cusum_on`) — trang chỉ vẽ/tính
    * CUSUM khi true, đúng `CusumPage` app cũ (`if(!cusum.on) return <Chưa bật...>`). */
   cusumOn: boolean;
@@ -51,7 +62,7 @@ export interface LevelAnalysis {
 export function createWestgardHandlers(db: Db) {
   type ActivePoint = QcPointLike & { id: string; date: string; run_id: string; val: number; qcMean: number | null; qcSd: number | null };
   type ActiveLevel = { level: number; mean: number | null; sd: number | null; qc_lot_id: string | null; lot_no: string; exp: string; pts: ActivePoint[] };
-  const pointOrder = (a: ActivePoint, b: ActivePoint) => a.date.localeCompare(b.date) || a.run_id.localeCompare(b.run_id, 'vi', { numeric: true });
+  const pointOrder = compareQcPointOrder;
 
   function activeLevels(testId: string): ActiveLevel[] {
     const levels = db.prepare(`SELECT tl.level,tl.mean,tl.sd,tl.qc_lot_id,COALESCE(ql.lot_no,'') lot_no,COALESCE(ql.exp,'') exp
@@ -136,13 +147,15 @@ export function createWestgardHandlers(db: Db) {
     // trực tiếp mảng `summaries` này, không tự sắp lại) hiện SAI thứ tự so
     // với "Danh mục xét nghiệm" ở Cấu hình chung.
     const tests = db.prepare(`
-      SELECT t.id as test_id, t.name as test_name, t.unit, t.decimal_places, i.name as instrument_name
+      SELECT t.id as test_id, t.name as test_name, t.unit, t.decimal_places, t.cusum_on, t.cusum_k, t.cusum_h, i.name as instrument_name
       FROM tests t LEFT JOIN instruments i ON i.id = t.instrument_id
       ORDER BY t.rowid
-    `).all() as { test_id: string; test_name: string; unit: string; decimal_places: number; instrument_name: string }[];
+    `).all() as { test_id: string; test_name: string; unit: string; decimal_places: number; cusum_on: number; cusum_k: number; cusum_h: number; instrument_name: string }[];
 
+    // Một mốc `hôm nay` cho cả lượt: theo GIỜ ĐỊA PHƯƠNG (xem local-date.ts)
+    // và tính MỘT lần, không dựng lại Date cho từng xét nghiệm.
+    const today = isoLocalDate();
     return tests.map(t => {
-      const today = new Date().toISOString().slice(0, 10);
       const active = activeEvaluation(t.test_id);
       const byPoint = combinedWestgardByPoint(active.levels.map((lv) => ({ level: lv.level, pts: lv.pts, mean: lv.mean, sd: lv.sd })), active.within, active.across, active.actionOf);
       const levels = active.levels.map(lv => {
@@ -162,6 +175,17 @@ export function createWestgardHandlers(db: Db) {
           for (const flag of result) if (VERDICT_RANK[flag.level] > VERDICT_RANK[worstVerdict]) worstVerdict = flag.level;
           const lastFlag = result.at(-1);
           if (lastFlag) { latestVerdict = lastFlag.level; latestRules = lastFlag.rules.slice(); }
+          // CUSUM là cảnh báo xu hướng: vào danh sách cần xử lý/NCE, nhưng
+          // không tự biến điểm QC thành reject và không làm bẩn accepted set.
+          if (t.cusum_on) {
+            const cs = cusumScan(points, lv.mean, lv.sd, t.cusum_k, t.cusum_h);
+            for (let i = 0; i < points.length; i++) if (cusumSignalAt(cs, i) && worstVerdict === 'ok') worstVerdict = 'warn';
+            const signal = cusumSignalAt(cs, points.length - 1);
+            if (signal) {
+              if (latestVerdict === 'ok') latestVerdict = 'warn';
+              latestRules = [...new Set([...latestRules, signal])];
+            }
+          }
         }
         const last = points.at(-1);
         // CV QUAN SÁT ĐƯỢC của chính các điểm QC (không phải CV từ Mean/SD
@@ -196,9 +220,14 @@ export function createWestgardHandlers(db: Db) {
     // hợp lệ — trước đây luôn tính với k=0.5/h=4 mặc định bất kể cấu hình thật
     // của xét nghiệm, và trang luôn cho vẽ dù người dùng chưa bật CUSUM.
     const cusumOn = !!test?.cusum_on;
+    const configuredH = Number(test?.cusum_h);
+    const fallbackH = Number.isFinite(configuredH) && configuredH > 0 ? configuredH : 4;
+    const configuredK = Number(test?.cusum_k);
+    const fallbackK = Number.isFinite(configuredK) && configuredK > 0 ? configuredK : 0.5;
+    // MA(5) chỉ để quan sát xu hướng, không tham gia kết luận Westgard/CUSUM.
     const cs = hasTarget && cusumOn
-      ? cusum(asWestgard, levelRow!.mean, levelRow!.sd, test!.cusum_k, test!.cusum_h)
-      : { cPos: rows.map(() => 0), cNeg: rows.map(() => 0), flags: rows.map(() => 'ok' as RuleVerdict) };
+      ? cusumScan(asWestgard, levelRow!.mean, levelRow!.sd, test!.cusum_k, test!.cusum_h, 5)
+      : { cPos: rows.map(() => 0), cNeg: rows.map(() => 0), flags: rows.map(() => 'ok' as RuleVerdict), k: fallbackK, h: fallbackH, ma: rows.map(() => 0) };
     // Cờ `accepted`: điểm có nằm trong CHUỖI ĐƯỢC CHẤP NHẬN hay không (xem
     // acceptedPoints() trong domain). Trang Nhập QC dùng cờ này cho biểu đồ/
     // thống kê, đúng như app cũ, thay vì tự chạy lại luật ở renderer.
@@ -210,12 +239,13 @@ export function createWestgardHandlers(db: Db) {
       // Mức CHƯA có Mean/SD hợp lệ — port `levelTargetOk()` app cũ: điểm
       // CHƯA ĐƯỢC ĐÁNH GIÁ ('none'), không phải 'ok'; Z không có nghĩa (giữ
       // NaN, renderer tự hiện '—' thay vì "NaNs").
-      if (!hasTarget) return { id: r.id, date: r.date, runId: r.run_id, val: r.val, z: NaN, verdict: 'none' as const, rules: [], supportRules: [], accepted: false, errorType: '—', errorDesc: '' };
+      if (!hasTarget) return { id: r.id, date: r.date, runId: r.run_id, val: r.val, z: NaN, verdict: 'none' as const, rules: [], cusumSignal: null, supportRules: [], accepted: false, errorType: '—', errorDesc: '' };
       const flag = byPoint.get(r)!; const rules = flag.rules;
       const detail = errorTypeDetail(rules);
-      return { id: r.id, date: r.date, runId: r.run_id, val: r.val, z: flag.z, verdict: flag.level, rules, supportRules: flag.supportRules, accepted: acceptedIds.has(r.id), errorType: detail.type, errorDesc: detail.desc };
+      const cusumSignal = cusumSignalAt(cs, i);
+      return { id: r.id, date: r.date, runId: r.run_id, val: r.val, z: flag.z, verdict: flag.level, rules, cusumSignal, supportRules: flag.supportRules, accepted: acceptedIds.has(r.id), errorType: cusumSignal ? 'SE' : detail.type, errorDesc: cusumSignal ? 'Xu hướng CUSUM vượt ngưỡng quyết định; cần rà soát nguyên nhân hệ thống.' : detail.desc };
     });
-    return { points, cusum: { cPos: cs.cPos, cNeg: cs.cNeg, flags: cs.flags }, cusumOn };
+    return { points, cusum: { cPos: cs.cPos, cNeg: cs.cNeg, flags: cs.flags, k: cs.k, h: cs.h, ma: cs.ma || [] }, cusumOn };
   }
 
   /** Mean/SD của 1 LÔ CỤ THỂ cho 1 mức — dùng cho tab "Nhóm lô đã dừng/lưu
@@ -303,9 +333,9 @@ export function createWestgardHandlers(db: Db) {
       const points = rows.map((r, i) => {
         const rules = wg.F[i].rules;
         const detail = errorTypeDetail(rules);
-        return { id: r.id, date: r.date, runId: r.run_id, val: r.val, z: wg.zs[i], verdict: wg.F[i].level, rules, supportRules: wg.F[i].supportRules, accepted: false, errorType: detail.type, errorDesc: detail.desc };
+        return { id: r.id, date: r.date, runId: r.run_id, val: r.val, z: wg.zs[i], verdict: wg.F[i].level, rules, cusumSignal: null, supportRules: wg.F[i].supportRules, accepted: false, errorType: detail.type, errorDesc: detail.desc };
       });
-      blocks.push({ level: lot.level, lotId: lot.id, lotNo: lot.lot_no, mean: target.mean, sd: target.sd, analysis: { points, cusum: { cPos: [], cNeg: [], flags: [] }, cusumOn: false } });
+      blocks.push({ level: lot.level, lotId: lot.id, lotNo: lot.lot_no, mean: target.mean, sd: target.sd, analysis: { points, cusum: { cPos: [], cNeg: [], flags: [], k: 0.5, h: 4, ma: [] }, cusumOn: false } });
     }
     blocks.sort((a, b) => a.level - b.level);
     return blocks;

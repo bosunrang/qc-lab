@@ -272,13 +272,15 @@ export function HistoryTab() {
             <h4 className="flow-panel space-after-section">Điểm QC đã nhập ({detailPoints.length})</h4>
             {detailPoints.length ? (
               <table className="history-detail-table hist-points-table">
-                <thead><tr><th>Ngày</th><th>Lần chạy</th><th className="num">Giá trị</th><th className="num">Z</th><th className="num">Mean lúc nhập</th><th className="num">SD lúc nhập</th><th>Kết luận</th><th>Người thực hiện</th></tr></thead>
+                <thead><tr><th>Ngày</th><th>Lần chạy</th><th className="num">Giá trị</th><th className="num">Z</th><th className="num">Mean lúc nhập</th><th className="num">SD lúc nhập</th><th>Phân loại Z-score</th><th>Người thực hiện</th></tr></thead>
                 <tbody>{detailPoints.slice().sort((a, b) => a.date.localeCompare(b.date) || String(a.run_id).localeCompare(String(b.run_id), 'vi', { numeric: true })).map((point) => {
                   const mean = point.qc_mean ?? detail.mean;
                   const sd = point.qc_sd && point.qc_sd > 0 ? point.qc_sd : detail.sd;
                   const z = mean != null && sd ? (point.val - mean) / sd : NaN;
                   const abs = Math.abs(z);
-                  const verdict = !Number.isFinite(z) ? '—' : abs > 3 ? 'Loại bỏ' : abs > 2 ? 'Cảnh báo' : 'Đạt';
+                  // Nhãn đọc nhanh theo dải Z, không phải verdict Westgard
+                  // (chuỗi/luật liên mức chỉ có ở trang Phân tích Westgard).
+                  const verdict = !Number.isFinite(z) ? '—' : abs > 3 ? 'Ngoài ±3s' : abs > 2 ? 'Ngoài ±2s' : 'Trong ±2s';
                   return (
                     <tr key={point.id}>
                       <td>{vnDate(point.date)}</td>
@@ -287,7 +289,7 @@ export function HistoryTab() {
                       <td className="num">{Number.isFinite(z) ? `${z >= 0 ? '+' : ''}${z.toFixed(2)}s` : '—'}</td>
                       <td className="num">{mean != null ? fmt(mean, decimals) : '—'}</td>
                       <td className="num">{sd ? fmt(sd, decimals) : '—'}</td>
-                      <td><span className={`tag ${verdict === 'Loại bỏ' ? 'rej' : verdict === 'Cảnh báo' ? 'warn' : 'ok'}`}>{verdict}</span></td>
+                      <td><span title="Phân loại theo Z-score, không phải kết luận Westgard" className={`tag ${verdict === 'Ngoài ±3s' ? 'rej' : verdict === 'Ngoài ±2s' ? 'warn' : 'ok'}`}>{verdict}</span></td>
                       <td>{point.operator_username || point.operator_name || '—'}</td>
                     </tr>
                   );

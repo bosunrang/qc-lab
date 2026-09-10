@@ -4,14 +4,14 @@
 // thời" ở đó. Không có session token/cookie: app chạy 1 cửa sổ Electron duy
 // nhất, main process tự giữ actor đang đăng nhập trong bộ nhớ (index.ts),
 // module này chỉ lo xác thực + CRUD tài khoản.
-import type { Db } from '../db/open-database';
+import type { Db } from '../db/sqlite-like';
 import { uid } from '../domain/text-utils';
 import { hashPassword, verifyPassword } from '../domain/password-hash';
 import {
   validateUserCreate, validateUserUpdate, validateNewPassword, validateLoginInput, validateSetAvatar,
   type UserCreateInput, type UserUpdateInput, type LoginInput,
 } from '../domain/auth-validation';
-import { roleLabel } from '../domain/page-roles';
+import { roleLabel, roleOf } from '../domain/page-roles';
 import { type Actor, type IpcResult, writeAudit, notifyChanged } from './shared';
 
 interface UserRow {
@@ -20,15 +20,17 @@ interface UserRow {
   must_change_password: number; avatar: string;
 }
 
-export interface PublicUser {
-  id: string; username: string; name: string; initials: string; role: string;
-  /** `null` = KHÔNG thu hẹp, tài khoản được xem đủ các thẻ của vai trò
-   * (`page_perms_json` là NULL trong DB). Mảng = danh sách thẻ đã thu hẹp.
-   * Phân biệt 2 trạng thái này là cần thiết: mảng rỗng sẽ khoá cứng tài
-   * khoản khỏi mọi trang, nên nó không bao giờ được lưu (validate chặn). */
-  pagePerms: string[] | null;
-  active: boolean; mustChangePassword: boolean; avatar: string;
-}
+// `PublicUser` (và các kiểu dữ liệu dùng chung khác) có NGUỒN DUY NHẤT là
+// `shared/qc-api.d.ts` — hợp đồng IPC giữa 2 tiến trình. Trước 2026-09-10
+// file này tự khai một `PublicUser` riêng với `role: string`, trong khi hợp
+// đồng khai `role: 'admin'|'technician'|'viewer'`: hai khai báo song song
+// cùng tên, âm thầm lệch nhau. Không gate nào thấy vì `ipcRenderer.invoke()`
+// trả `Promise<any>`. Import type từ `.d.ts` KHÔNG emit gì nên `rootDir` của
+// tsconfig.app-v2-main.json không bị ảnh hưởng (đã kiểm chứng: file build ra
+// vẫn ở đúng `app-v2-dist/main/ipc/`).
+import type { PublicUser } from '../../shared/qc-api';
+
+export type { PublicUser };
 
 function parsePagePerms(value: string | null): string[] | null {
   if (!value) return null;
@@ -40,7 +42,11 @@ function parsePagePerms(value: string | null): string[] | null {
 
 function toPublicUser(row: UserRow): PublicUser {
   return {
-    id: row.id, username: row.username, name: row.name, initials: row.initials || '', role: row.role,
+    id: row.id, username: row.username, name: row.name, initials: row.initials || '',
+    // `users.role` trong SQLite là TEXT tự do; hợp đồng khai union 3 vai trò.
+    // `roleOf()` đưa mọi giá trị lạ/rỗng về 'viewer' (hẹp nhất) thay vì ép
+    // kiểu bừa — cùng quy tắc mà renderer dùng, xem `page-roles.ts`.
+    role: roleOf(row.role),
     pagePerms: parsePagePerms(row.page_perms_json), active: !!row.active, mustChangePassword: !!row.must_change_password,
     avatar: row.avatar || '',
   };

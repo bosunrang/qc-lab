@@ -155,7 +155,7 @@ Dashboard chỉ được coi là mẫu đạt khi:
 |---|---|---|
 | D3.1 | Người dùng | Khôi phục layout tạo tài khoản + quyền theo trang; phụ thuộc A2 `pagePerms` |
 | D3.2 | Báo cáo | Search/range/NCE appendix/lock panel/print-export đúng golden master |
-| D3.3 | Cài đặt | Unit/brand/admin tools/LIS; Firebase hiện ngoại lệ sản phẩm đã ghi rõ |
+| D3.3 | Cài đặt | Unit/brand/admin tools/LIS/Firebase Rules; đồng bộ Firebase chạy qua IPC main process |
 | D3.4 | Cấu hình chung | 8 tab, toàn bộ modal và breakpoint của `professional-config.css` |
 | D3.5 | Nhập QC | Sheet/cây/chart + song song 2 lô + workflow đổi dải Mean/SD |
 | D3.6 | Six Sigma | Bảng kỳ, Bias/MU và toàn bộ modal/legend/print-export |
@@ -277,7 +277,7 @@ việc kiểu này khó ước lượng theo lịch chính xác), dùng S/M/L/XL
 | 7 | Người dùng/Auth | **S** | Modal sửa quyền dạng checkbox theo trang (phụ thuộc A2 `pagePerms`) |
 | 8 | Nhật ký hoạt động | **S** | Lưu trữ log cũ (12/24/36 tháng) + xuất CSV; nút xác minh chuỗi hash thủ công |
 | 9 | Tổng quan/Dashboard | **S** | Sống nhờ `store:changed` (A1) thay vì fetch 1 lần; UI đẹp hơn cho 3 khối cảnh báo đã có domain |
-| 10 | Cài đặt | **M** | Logo/brand ảnh; kết nối Firebase (Giai đoạn C); LIS Gateway settings; backup/restore UI (Giai đoạn C); kiểm tra dung lượng lưu trữ |
+| 10 | Cài đặt | **M** | Logo/brand ảnh; kết nối Firebase; LIS Gateway settings; backup/restore UI; kiểm tra dung lượng lưu trữ |
 | 11 | Báo cáo | **M** | In báo cáo (`printToPDF`, Giai đoạn C); xuất Excel/CSV; phụ lục NCE trong báo cáo in |
 
 ## Giai đoạn C — hạng mục hạ tầng lớn, độc lập theo trang
@@ -287,7 +287,7 @@ Mỗi mục cần hỏi người dùng xác nhận phạm vi/độ ưu tiên tr�
 | Hạng mục | Cỡ | Ghi chú |
 |---|---|---|
 | In ấn & xuất Excel/CSV | **M–L** | Cần chốt trước: (a) port nguyên bộ máy ZIP/OOXML viết tay của bản cũ (rủi ro thấp, logic đã đúng/đã test) hay (b) dùng thư viện npm thật như `exceljs` (main process giờ là Node thật, không còn ràng buộc "0 dependency" của app cũ chạy trong trình duyệt). In PDF dùng `webContents.printToPDF`, không có rào cản. |
-| Đồng bộ Firebase | **XL** | LỚN NHẤT còn lại. Port gần nguyên văn `state-merge.ts`/`array-merge.ts`/`retry-scheduler.ts`, đổi luồng: đọc SQLite → dựng payload JSON tạm → merge JS (logic không đổi) → ghi lại SQLite trong 1 transaction, KHÔNG merge bằng SQL thuần. Dùng Firebase JS SDK modular qua npm thật (gói `firebase` đã có trong `dependencies` gốc nhưng chưa import ở đâu trong `app-v2/`). Auth ẩn danh như cũ, session lưu `userData` giữ UID ổn định. |
+| Đồng bộ Firebase | **XL** | Hoàn thiện qua REST ở main process: Email/Password, RTDB Rules, snapshot SQLite có checksum, xung đột bắt buộc chọn hướng và đẩy nền sau thao tác ghi. Mật khẩu/token không lưu hoặc đi qua renderer. |
 | Backup/restore | **M** | Xuất toàn bộ DB ra file JSON/gói có chữ ký (giữ định dạng SHA-256 như bản cũ để tương thích khi cần đọc backup cũ); nhập lại có xác nhận + reauth. |
 | Di trú dữ liệu từ app cũ | **L** | **Bắt buộc trước khi bàn cắt sang thật** — các phòng xét nghiệm đang dùng app cũ có dữ liệu QC thật trong `localStorage`/IndexedDB. Đọc backup JSON app cũ → map field sang bảng SQLite → validate tương đương `validateStateInvariants()` → ghi 1 lần. Chưa có dòng code nào. |
 | LIS Gateway | **S** | Ưu tiên thấp nhất — gateway giao tiếp qua HTTP/JSON độc lập, có thể trỏ sang app-v2 sau khi Entry xong. |
@@ -345,7 +345,7 @@ Trạng thái: ⬜ Chưa bắt đầu · 🟨 Đang làm · ✅ Xong (đã qua D
 | B10 | Cài đặt | M | 🟨 | Logo+dung lượng lưu trữ xong (sửa 1 bug CSP img-src thật); Firebase/LIS/backup chờ Giai đoạn C |
 | B11 | Báo cáo | M | 🟨 | Khoá/mở kỳ qua reauth thật + xuất CSV xong; in PDF/xuất Excel chờ Giai đoạn C |
 | C1 | In ấn & xuất Excel/CSV | M–L | 🟨 | Cơ chế xong (exceljs thật + printToPDF thật, verify file thật trên đĩa), mới áp dụng cho Báo cáo — Sigma/Westgard chưa nối |
-| C2 | Đồng bộ Firebase | XL | ⏸️ | TẠM DỪNG theo quyết định người dùng — cần thông tin dự án Firebase thật |
+| C2 | Đồng bộ Firebase | XL | ✅ | 2026-09-07: UI + Rules parity, xác thực Email/Password qua main process, backup SQLite có checksum, chọn hướng khi hai nguồn khác nhau và tự đẩy nền sau mọi audit write. Cần config/ACL Firebase thật của đơn vị chỉ khi vận hành. |
 | C6 | Chặn ĐỌC nhật ký hoạt động theo vai trò | S | ⬜ | `audit:query`/`exportCsv`/`verifyChainNow` còn mở cho mọi vai trò đã đăng nhập (route đã chặn, IPC chưa). Đòi đổi 3 hàm sang trả `IpcResult` — lỗ bảo mật ĐỌC, không phải toàn vẹn dữ liệu |
 | C3 | Backup/restore | M | ✅ | Định dạng riêng `qclab-v2-backup` (khác bản cũ, cố ý — xem CLAUDE.md), transaction thật + snapshot an toàn trước khi ghi đè, verify Electron thật (dữ liệu thay thế đúng) |
 | C4 | Di trú dữ liệu từ app cũ | L | ✅ ⏸️ | Xong nhưng **ĐÓNG BĂNG 2026-09-02**: người dùng chốt KHÔNG di trú (app chưa có dữ liệu thật). Giữ code làm đường lùi, KHÔNG đầu tư thêm — 2 giới hạn đã biết (tea_ref_key để trống, section suy từ máy) cố ý KHÔNG sửa vì sẽ không bao giờ chạy. Đừng xoá: `main/db/table-io.ts` dùng chung với C3, xoá C4 mà xoá cả file đó là vỡ backup |
@@ -358,12 +358,12 @@ Trạng thái: ⬜ Chưa bắt đầu · 🟨 Đang làm · ✅ Xong (đã qua D
 | D2 | Dashboard golden-master parity | M | ✅ | 2026-09-02: 0 class / 0 dòng chữ lệch trên cả 4 viewport, baseline siết về 0. Sửa 9 mục, trong đó **3 lệch NGHIỆP VỤ thật** (báo động theo điểm cuối chứ không phải điểm xấu nhất; 1 dòng mỗi MỨC; % hoàn tất theo xét nghiệm) — xem CLAUDE.md |
 | D3.1 | Người dùng | M | ✅ | 2026-09-02: 0/0 lệch trên cả 4 viewport ngay lượt đầu (từ 16 class/36 dòng). Form thêm inline 2 thẻ + bảng 4 cột + lưới thẻ quyền; thêm `deleteUser` (app cũ có nút Xóa, app-v2 chưa có đường nào) — xem CLAUDE.md |
 | D3.2 | Báo cáo | M | ✅ | 2026-09-02: 0/0 cả 4 viewport (từ 13 class/32 dòng). Bỏ panel "Xem lại điểm QC" tự thêm; thêm phụ lục NCE cho PDF/Excel/CSV; mở khoá qua modal lý do. **Kéo theo sửa D1: `DateField` viết lại theo DOM `.datebox` app cũ** — xem CLAUDE.md |
-| D3.3 | Cài đặt | M | ✅ | 2026-09-02: từ 29 class/67 dòng xuống 11/30 — phần còn lại là 2 panel Firebase (ngoại lệ sản phẩm, C2 tạm dừng) + 2 dòng chữ cố ý nói đúng thực tế. Thêm 3 tính năng app cũ có mà app-v2 chưa có: kiểm tra backup, xoá sạch dữ liệu, tự động lấy hàng chờ LIS mỗi 5 phút. Xem CLAUDE.md |
+| D3.3 | Cài đặt | M | ✅ | 2026-09-07: Firebase hoàn tất; thẻ Đồng bộ/Firebase Rules về 0 class/0 dòng thiếu so với app cũ. Thêm xác thực Email/Password, Rules có thể copy, snapshot checksum, xử lý xung đột an toàn, tự đẩy nền. Logo, backup, kiểm tra backup, xoá sạch, di trú và LIS vẫn giữ nguyên. |
 | D3.4 | Cấu hình chung | L | 🟨 | 2026-09-02: người dùng tự port (0 class lệch, 8 tab đủ); tôi rà soát + sửa 2 lỗi CỦA GATE (seed cho 2 bản khác dữ liệu; gate chỉ đo 1/8 tab → nay 48 surface) + vá thiếu sót: 3/8 tab về 0/0, thêm 4 handler xoá/dừng. Còn 5 surface (xoá xét nghiệm/panel, ma trận Mean/SD, tab Lịch sử, danh mục TEa) — lý do trong surfaceNotes |
 | D3.4b | Cấu hình chung — rà nghiệp vụ + giao diện | L | ✅ | 2026-09-03: **8/8 tab về 0 class/0 dòng** (baseline 5 surface còn lệch → 0). Bắt được 4 CONTROL CHẾT ở tab Mean/SD (checkbox "Dùng", "Chọn/Bỏ chọn tất cả", **"Lưu Mean/SD mức này"** không có onClick — bảng không thể lưu) và port đủ `syncTargetRange`/`toggleTargetRow`/`targetCheckAll`/`saveTargetMatrix` + `normalizeTargetPick`. Thêm 4 IPC app cũ có mà app-v2 chưa từng có: `config:removeTest` (chặn khi còn điểm QC thuộc kỳ đã khoá), `config:removePanel`, `config:setTeaRefValue`, `config:restoreTeaRefDefaults` (sửa TEa CLIA%/Ricos% ngay trên bảng như app cũ). Viết lại tab Lịch sử dữ liệu theo đúng khung/10 cột app cũ + modal Chi tiết. Sửa lệch CẤU TRÚC chung 6/8 tab (toolbar phải nằm NGOÀI panel) + 8 nhóm CSS thiếu/sai — xem CLAUDE.md mục D3.4b |
 | D3.4c | Cấu hình chung — dọn giao diện và luồng máy | M | ✅ | 2026-09-06: đồng bộ nền header, viền bảng/ô chọn, kích thước modal và khoảng cách form; bỏ ghi chú không dùng ở Panel/Lô/Nhóm lô; gỡ khung lồng dư thừa ở trạng thái rỗng và bảng lô; làm rõ lịch sử bằng nhãn **xét nghiệm — máy** không kèm khu vực. Sửa lỗi danh mục tách cùng xét nghiệm sau khi đổi cấu hình một máy: bảng nay gom theo tên + đơn vị, không lệ thuộc `analyte_id` cũ có thể không đồng nhất giữa máy. `typecheck`, 44 test, renderer build và các gate giao diện đều đạt. |
 | D3.5 | Nhập QC | XL | ✅ | 2026-09-02: **0/0 cả 4 viewport** (từ 77 class/104 dòng — surface lớn nhất tới nay). Gate tự bắt lỗi manifest (`.entry-layout` không tồn tại ở bản nào); 2/3 phần lệch chỉ vì app-v2 không tự chọn xét nghiệm như app cũ. Dựng lại cây máy→NHÓM LÔ→xét nghiệm, port `acceptedPoints()` (chuỗi điểm được chấp nhận — biểu đồ/thống kê app cũ dùng tập này) + IPC `entry:setDayNote`, đóng luôn điều hướng chéo trang còn treo từ D2. Ba phần backend từng còn thiếu — song song 2 lô, workflow đổi dải và điều hướng bàn phím — đã hoàn tất trong B2, chốt ngày 2026-09-06. |
-| D3.6 | Six Sigma | L | 🟨 | 2026-09-02: từ **73 class/90 dòng xuống 7/32**. Seed CHƯA HỀ có dữ liệu Sigma ở cả 2 bản (lỗi đo lường lần 3) + app-v2 không tự chọn xét nghiệm (như D3.5). Port setup panel/thẻ Tình trạng/khuyến nghị cải thiện/bảng kỳ đầy đủ/panel MU + 2 biểu đồ canvas mới, thêm IPC `sigma:removePeriod`. Còn lại 4 lý do: danh mục TEa tích hợp, panel OPSpecs, nút "Nạp CV lô", nhãn trục canvas-vs-SVG — chi tiết trong `surfaceNotes` |
+| D3.6 | Six Sigma | L | ✅ | 2026-09-09: hoàn tất nghiệp vụ và UI: Bias RMS/EQA truy vết, MU, chọn cohort IQC theo lô, OPSpecs chỉ-gợi-ý, bảng kỳ/biểu đồ/print-export và TEa 4 nguồn. Catalog giữ đủ giới hạn CLIA tuyệt đối; chỉ quy đổi ra % khi Mean + đơn vị hợp lệ, có test oracle. Nhãn trục canvas cố ý được thay bằng chú giải DOM đọc được. |
 | D3.7 | So sánh hoá chất | M | 🟨 | 2026-09-03: từ **26 class/58 dòng xuống 1/18**. Seed CHƯA HỀ có phép so sánh nào ở cả 2 bản (lỗi đo lường lần 4 — thêm `REAGENT_SEED` 24 cặp lệch +1%). Trang được VIẾT LẠI TOÀN BỘ đúng bố cục app cũ: `rc-toolbar-panel` → `rc-entry-grid` (thông tin 10 trường + bảng cặp mẫu có TB/Hiệu tính sẵn) → `rc-stats-panel` → `rc-crit-panel` (6 tiêu chí + banner kết luận) → `rc-chart-panel` kèm chú giải. Tách 2 hàm định dạng khác nhau (`fmt` cắt số 0 cho thống kê, `fmtFixed` giữ số 0 cho bảng cặp) đúng app cũ. Còn 1 class `rc-icon-btn` (3 danh sách chọn nhanh lô/xét nghiệm/mẫu) + 18 dòng là NHÃN TRỤC biểu đồ (app cũ vẽ SVG có text node, app-v2 vẽ canvas — cùng lý do đã ghi ở D3.6) |
 | D3.8 | Khắc phục sự cố | XL | ✅ | 2026-09-03: **0/0 cả 4 viewport** (từ 42 class/66 dòng). Panel "Sự cố cần xử lý" dựng lại theo NHÓM (xét nghiệm + ngày, `issue-group`/`issue-group-h`/`issue-group-count`) thay danh sách phẳng, và KHÔNG ẩn hàng khi đã có hồ sơ NCE — app cũ đổi nút thành "Tiếp tục hồ sơ", khớp hồ sơ bằng `point_id` chứ không bằng test+mức. Bảng nhật ký đổi từ 7 cột phẳng sang 5 cột xếp tầng đúng app cũ + nút "Xuất CSV nhật ký" + nút "Hủy hồ sơ" (có lưu vết). Form dùng `action-form-panel` có đầu panel + 2 trạng thái rỗng |
 | D3.9 | Westgard | M | 🟨 | 2026-09-03: từ **18 class/31 dòng xuống 0/1**. Thêm ô "Tìm nhanh" + bộ đếm khớp/tổng + nhãn xét nghiệm kèm LOT (`testPickerLabel`), 2 nút Xuất Excel/In PDF, nút "Khôi phục mặc định" (dùng `WG_OFF_BY_DEFAULT`), cột "Loại sai số" SE/RE kèm mô tả luật (`errorTypeOf`), Z có dấu + hậu tố `s`, nhãn `rej` = "Loại bỏ", class canvas `wgLJMulti`. Còn đúng 1 dòng: câu giới thiệu biểu đồ của app cũ nhắc công tắc "Xem lô cũ" — app-v2 chưa có tính năng đó (cùng nhóm với cột song song 2 lô đã hoãn từ Giai đoạn B2), câu của app-v2 chỉ nói phần nó thật sự làm thay vì hứa một công tắc không tồn tại |
@@ -406,10 +406,9 @@ cắt sản phẩm. Việc đang làm theo đúng thứ tự:
    trang D3, tra thẳng hàm dựng dữ liệu của app cũ trước, đừng chỉ so CSS.
 4. ~~D3.1: Người dùng~~ — XONG 2026-09-02 (0/0, đóng luôn A2 pagePerms).
    ~~D3.2: Báo cáo~~ — XONG 2026-09-02 (0/0, kéo theo sửa `DateField` ở D1).
-   ~~D3.3: Cài đặt~~ — XONG 2026-09-02. Đây là surface ĐẦU TIÊN không về 0
-   được: baseline 11 class/30 dòng, trong đó 11/11 class và 28/30 dòng là 2
-   panel Firebase (ngoại lệ sản phẩm, C2 tạm dừng), 2 dòng còn lại cố ý nói
-   đúng thực tế app-v2. Siết về 0 chỉ khi C2 được làm.
+   ~~D3.3: Cài đặt~~ — HOÀN TẤT 2026-09-07. Firebase và Firebase Rules đã
+   được nối bằng IPC main process, giao diện về 0 class/0 dòng thiếu; phần
+   đồng bộ dùng snapshot SQLite có checksum và bắt chọn hướng khi có xung đột.
    Tiếp theo là D3.4 Cấu hình chung.
 5. Sau mỗi trang, dừng báo kết quả và đi tiếp D1/D3 theo bảng trên; component
    nền tảng phát hiện thiếu trong lúc làm Dashboard được đưa về D1 ngay,
@@ -420,8 +419,9 @@ cắt sản phẩm. Việc đang làm theo đúng thứ tự:
 vào → port JSX/CSS → chạy lại tới khi `missingClasses`/`missingTextLines` về
 0 → `--update-baseline` để siết. Baseline CHỈ được đi xuống.
 
-**C2 (Firebase) vẫn TẠM DỪNG** vì thiếu thông tin dự án thật. Đây là ngoại lệ
-tính năng đã biết của trang Cài đặt, không được dùng làm lý do chặn các phần
-giao diện còn lại. **A2** đã tách làm 2: chặn route + quyền ghi theo vai trò
+**C2 (Firebase) đã hoàn tất 2026-09-07.** App không gắn cứng một dự án: quản
+trị viên dán config/ACL Firebase thật của đơn vị tại thẻ Cài đặt khi vận hành.
+Mật khẩu và token chỉ ở bộ nhớ của main process; snapshot có checksum và xung
+đột bắt buộc người dùng chọn nguồn trước khi thay thế dữ liệu. **A2** đã tách làm 2: chặn route + quyền ghi theo vai trò
 XONG ở D0b; `pagePerms` tuỳ biến theo từng TÀI KHOẢN vẫn kéo vào D3.1 vì đó
 là một phần nhìn thấy và tương tác được của trang Người dùng cũ.

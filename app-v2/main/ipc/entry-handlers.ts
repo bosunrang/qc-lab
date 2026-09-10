@@ -1,7 +1,14 @@
 // IPC handler cho module Entry (nhập/hủy điểm QC). Lô đang vận hành được đánh
 // giá đa mức; lô mới trong chuyển tiếp được đánh giá riêng từng mức và không
 // làm thay đổi verdict chính cho tới khi hồ sơ được chấp nhận.
-import type { Db } from '../db/open-database';
+import type { Db } from '../db/sqlite-like';
+// 3 kiểu dữ liệu trả về lấy từ HỢP ĐỒNG dùng chung thay vì khai lại: bản khai
+// cũ ở đây dùng `voided: number` trong khi hợp đồng khai `0 | 1`, và renderer
+// tin theo hợp đồng — hai khai báo song song cùng tên là đúng loại drift mà
+// đợt 2026-09-10 đi gỡ.
+import type { QcPointView, ParallelEntryColumn, PreviousLotSeries } from '../../shared/qc-api';
+
+export type { QcPointView, ParallelEntryColumn, PreviousLotSeries };
 import { uid } from '../domain/text-utils';
 import { validateQcPointInput, validateVoidInput, type QcPointInput, type VoidPointInput } from '../domain/entry-validation';
 import { combinedWestgardByPoint, westgardByPoint, type RuleVerdict } from '../domain/westgard-engine';
@@ -10,11 +17,17 @@ import { errorType, WG_RULE_REGISTRY } from '../domain/westgard-rules';
 import { evaluateRangeCandidate, validateRangeReason } from '../domain/range-workflow';
 import { appendMeanSdHistory } from '../domain/manage-validation';
 import { ymOfDate } from '../domain/period-lock-validation';
+import { compareQcPointOrder } from '../domain/sort-order';
+import { isoLocalDateAfter } from '../domain/local-date';
 import { type Actor, type IpcResult, nowIso, writeAudit, notifyChanged, requireWrite } from './shared';
 
 interface QcPointRow {
   id: string; test_id: string; level: number; date: string; run_id: string; val: number;
-  note: string; operator_name: string; voided: number; void_reason: string;
+  note: string; operator_name: string;
+  /** Cột INTEGER trong SQLite nhưng chỉ nhận 0/1 — khai hẹp cho khớp hợp
+   * đồng `shared/qc-api.d.ts`, nơi renderer đọc nó như cờ nhị phân. */
+  voided: 0 | 1;
+  void_reason: string;
 }
 type ActivePoint = QcPointRow & { lot: string; qc_mean: number | null; qc_sd: number | null; runId: string; qcMean: number | null; qcSd: number | null };
 type ActiveLevel = { level: number; mean: number | null; sd: number | null; lot: string; pts: ActivePoint[] };
@@ -28,16 +41,6 @@ export interface RangeCandidateView {
   eligible: boolean; canRevert: boolean;
 }
 
-export interface QcPointView extends QcPointRow { verdict: RuleVerdict; rules: string[] }
-export interface ParallelEntryColumn {
-  transitionId: string; level: number; lotId: string; lot: string; startDate: string;
-  mean: number; sd: number; low: number | null; high: number | null; exp: string;
-  points: QcPointView[];
-}
-export interface PreviousLotSeries {
-  level: number; lotId: string; lot: string; mean: number; sd: number;
-  points: QcPointView[];
-}
 
 export function createEntryHandlers(db: Db) {
   function inTransaction<T>(work: () => T): T {
@@ -114,8 +117,7 @@ export function createEntryHandlers(db: Db) {
     const configs = db.prepare(`SELECT tl.level,tl.mean,tl.sd,COALESCE(ql.lot_no,'') lot FROM test_levels tl LEFT JOIN qc_lots ql ON ql.id=tl.qc_lot_id WHERE tl.test_id=? ORDER BY tl.level`).all(testId) as Omit<ActiveLevel, 'pts'>[];
     const levels = configs.map((config) => {
       const rows = db.prepare('SELECT * FROM qc_points WHERE test_id=? AND level=? AND voided=0 AND lot=?').all(testId, config.level, config.lot) as unknown as Omit<ActivePoint, 'runId' | 'qcMean' | 'qcSd'>[];
-      const pts = rows.map((p) => ({ ...p, runId: p.run_id, qcMean: p.qc_mean, qcSd: p.qc_sd }))
-        .sort((a, b) => a.date.localeCompare(b.date) || a.run_id.localeCompare(b.run_id, 'vi', { numeric: true }));
+      const pts = rows.map((p) => ({ ...p, runId: p.run_id, qcMean: p.qc_mean, qcSd: p.qc_sd })).sort(compareQcPointOrder);
       return { ...config, pts };
     });
     const overrides = parseRuleActions(test?.rule_actions_json);
@@ -131,8 +133,7 @@ export function createEntryHandlers(db: Db) {
   function pointsForLot(testId: string, level: number, lot: string): ActivePoint[] {
     const rows = db.prepare('SELECT * FROM qc_points WHERE test_id=? AND level=? AND voided=0 AND lot=? ORDER BY date,run_id')
       .all(testId, level, lot) as unknown as Omit<ActivePoint, 'runId' | 'qcMean' | 'qcSd'>[];
-    return rows.map((point) => ({ ...point, runId: point.run_id, qcMean: point.qc_mean, qcSd: point.qc_sd }))
-      .sort((a, b) => a.date.localeCompare(b.date) || a.run_id.localeCompare(b.run_id, 'vi', { numeric: true }));
+    return rows.map((point) => ({ ...point, runId: point.run_id, qcMean: point.qc_mean, qcSd: point.qc_sd })).sort(compareQcPointOrder);
   }
 
   /** Cột lô song song đúng `parallelLotForLevel()` app cũ: chỉ hồ sơ active,
@@ -455,7 +456,7 @@ export function createEntryHandlers(db: Db) {
         else {
           const id = uid();
           nceId = nextDailyNceId(nowIso().slice(0, 10));
-          const dueDate = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+          const dueDate = isoLocalDateAfter(7);
           const correction = `Hủy điểm QC mức ${point.level}, ngày ${point.date}, giá trị ${point.val.toFixed(test?.decimal_places ?? 2)}, lần chạy ${point.run_id}. Lý do: ${composedReason}`;
           const now = nowIso();
           db.prepare(`INSERT INTO actions(id,date,created_at,updated_at,created_by_user_id,created_by_username,test_id,level,lot,point_id,rule,error_type,qc_verdict,nce_id,protocol_version,approval_status,effectiveness_status,record_status,due_date,detail_json)

@@ -24,6 +24,7 @@ import { confirmDialog, reauthDialog } from '../state/dialog-store';
 import { extremeQcPointDeviation, voidNceChoice, type VoidKind } from '../../main/domain/entry-validation';
 import type { QcPointView, TestLevel, TestSummary } from '../../shared/qc-api';
 import { handleSheetKeyDown } from '../lib/entry-sheet-navigation';
+import { nextSharedRunId } from '../lib/entry-run-id';
 
 /** `reportLabels.stateName()` app cũ — nhãn NGẮN dùng riêng cho cây điều
  * hướng ('Loại', không phải 'Loại bỏ'). */
@@ -35,9 +36,8 @@ const TREE_STATE: Record<string, string> = { rej: 'Loại', warn: 'Cảnh báo',
  * trừ `.today`); `has-data` khi ngày có ít nhất 1 điểm. Trước 2026-09-03
  * app-v2 gán `missing` cho ngày KHÔNG có điểm nào, nên ngày TƯƠNG LAI bị kẻ
  * vệt cam còn ngày quá khứ mới nhập 1/2 mức thì không — ngược hẳn app cũ. */
-function rowClass(date: string, isToday: boolean, doneLevels: number, liveLevels: number, hasPoint: boolean): string {
-  const today = new Date().toISOString().slice(0, 10);
-  return [isToday ? 'today' : '', date <= today && doneLevels < liveLevels ? 'missing' : '', hasPoint ? 'has-data' : '']
+function rowClass(date: string, today: string, doneLevels: number, liveLevels: number, hasPoint: boolean): string {
+  return [date === today ? 'today' : '', date <= today && doneLevels < liveLevels ? 'missing' : '', hasPoint ? 'has-data' : '']
     .filter(Boolean).join(' ');
 }
 
@@ -456,6 +456,18 @@ export function EntryPage() {
     return column.points.filter((point) => point.date === date && !point.voided);
   }
 
+  /** Lấp vào lần chạy đang thiếu của mức này trước, để cùng đợt chạy có cùng
+   * runId giữa các mức và engine ghép được các luật Westgard liên mức. Lô
+   * song song là chuỗi độc lập, không được trộn với lô đang vận hành. */
+  function sharedRunIdFor(column: EntryColumn, date: string): string {
+    const cohort = entryColumns.filter((item) => item.parallel === column.parallel);
+    return nextSharedRunId(
+      date,
+      pointsForColumnDay(column, date).map((point) => point.run_id),
+      cohort.flatMap((item) => pointsForColumnDay(item, date).map((point) => point.run_id)),
+    );
+  }
+
   async function submitVoid() {
     if (!voiding) return;
     if (voidChoice.reasonRequired && voidReason.trim().length < 5) { setVoidErr('Cần ghi lý do hủy tối thiểu 5 ký tự.'); return; }
@@ -600,7 +612,7 @@ export function EntryPage() {
                         const worst = !levelReps.length ? null : levelReps.some((p) => p.verdict === 'rej') ? 'rej' : levelReps.some((p) => p.verdict === 'warn') ? 'warn' : 'ok';
                         const isToday = date === todayStr;
                         return (
-                          <tr key={date} className={rowClass(date, isToday, levels.filter((l) => pointsForDay(l.level, date).length).length, levels.length, dayPoints.length > 0)}>
+                          <tr key={date} className={rowClass(date, todayStr, levels.filter((l) => pointsForDay(l.level, date).length).length, levels.length, dayPoints.length > 0)}>
                             <td><div>{Number(date.slice(8, 10))}</div>{isToday && <div><b>Hôm nay</b></div>}</td>
                             {entryColumns.map((column, columnIndex) => {
                               const runs = pointsForColumnDay(column, date);
@@ -633,7 +645,7 @@ export function EntryPage() {
                                       </div>
                                     ))}
                                     {showInput && <RunSlot date={date} level={column.level} columnKey={column.key} columnOrder={columnIndex} onCommit={async (val) => {
-                                      const saved = await commitRun(column, date, `${date}-${runs.length + 1}`, val);
+                                      const saved = await commitRun(column, date, sharedRunIdFor(column, date), val);
                                       if (saved) setExtraRuns((s) => { const next = new Set(s); next.delete(slotKey); return next; });
                                       return saved;
                                     }} />}
@@ -729,7 +741,7 @@ export function EntryPage() {
                           })()}
                         </div>
                         <div className="chart-scroll">
-                          <QcChart className="entryLJStack" mode="lj" mean={column.mean} sd={column.sd} responsiveHeight
+                          <QcChart className="entryLJStack" mode="lj" mean={column.mean} sd={column.sd} lot={column.lot} responsiveHeight
                             decimals={decimals} height={300}
                             points={chartPoints} />
                         </div>

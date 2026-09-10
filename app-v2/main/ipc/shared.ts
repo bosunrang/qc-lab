@@ -5,8 +5,10 @@
 // nce/reagent/sigma/westgard-handlers.ts mỗi file tự khai báo lại y hệt —
 // gom về đây khi thêm handler thứ 7 (auth-handlers.ts) thay vì nhân bản lần
 // nữa.
-import type { BrowserWindow } from 'electron';
-import type { Db } from '../db/open-database';
+import type { Db } from '../db/sqlite-like';
+// Kiểu dòng nhật ký lấy từ hợp đồng dùng chung — trước đây hàm này trả
+// `{id: unknown, ...}` nên renderer nhận `unknown` cho mọi trường.
+import type { ActivityEntry } from '../../shared/qc-api';
 import { uid } from '../domain/text-utils';
 import { auditEntryHash } from '../domain/audit-chain';
 import { canWriteRole, isAdminRole } from '../domain/page-roles';
@@ -17,14 +19,33 @@ export type IpcResult<T> = { ok: true; data: T } | { ok: false; error: { code: s
 
 export function nowIso(): string { return new Date().toISOString(); }
 
+/** Đích nhận `store:changed`. Khai dạng CẤU TRÚC (không `import type
+ * { BrowserWindow } from 'electron'`) vì bản xem trước qua trình duyệt chạy
+ * chính các handler này và cần đăng ký đích riêng của nó — xem
+ * `renderer/browser-mock/real-api.ts`. `BrowserWindow` thật khớp sẵn hình
+ * dạng này, nên `main/index.ts` không phải đổi gì. */
+export interface BroadcastTarget {
+  webContents: { send(channel: string, payload: unknown): void };
+  /** Chỉ `BrowserWindow` của Electron có; đích của bản xem trước không —
+   * thiếu thì coi như còn sống. */
+  isDestroyed?(): boolean;
+}
+
 // Cửa sổ chính duy nhất của app (app 1-cửa-sổ, không cần theo dõi nhiều
 // BrowserWindow) — gán đúng 1 lần từ main/index.ts ngay sau khi tạo `win`.
 // notifyChanged() no-op an toàn nếu gọi trước khi cửa sổ tồn tại (không nên
 // xảy ra vì mọi handler chỉ chạy sau khi renderer đã load).
-let broadcastWindow: BrowserWindow | null = null;
+let broadcastWindow: BroadcastTarget | null = null;
+let cloudChangeNotifier: (() => void) | null = null;
 
-export function setBroadcastWindow(win: BrowserWindow): void {
+export function setBroadcastWindow(win: BroadcastTarget): void {
   broadcastWindow = win;
+}
+
+/** Điểm móc duy nhất cho đồng bộ cloud: mọi thao tác ghi hợp lệ đều đi qua
+ * writeAudit(), nên Firebase không phụ thuộc việc từng handler nhớ tự đẩy. */
+export function setCloudChangeNotifier(notifier: (() => void) | null): void {
+  cloudChangeNotifier = notifier;
 }
 
 export interface StoreChangedPayload { tables: string[]; testIds: string[] }
@@ -34,7 +55,7 @@ export interface StoreChangedPayload { tables: string[]; testIds: string[] }
  * Renderer lọc theo `tables`/`testIds` ở `useStoreInvalidation()`, không lọc
  * ở đây — main không cần biết trang nào đang mở. */
 export function notifyChanged(tables: string[], testIds: string[] = []): void {
-  if (!broadcastWindow || broadcastWindow.isDestroyed()) return;
+  if (!broadcastWindow || broadcastWindow.isDestroyed?.()) return;
   const payload: StoreChangedPayload = { tables, testIds };
   broadcastWindow.webContents.send('store:changed', payload);
 }
@@ -92,11 +113,13 @@ export function requireAdmin(actor: Actor): PermissionDenied | null {
  * đúng shape `AuditEntry` mà audit-chain.ts (hash/verify/relink) mong đợi.
  * Đây là ranh giới DUY NHẤT cần ánh xạ; mọi nơi khác đọc activity qua hàm
  * này, không tự SELECT * rồi dùng thẳng. */
-export function rowToAuditEntry(row: Record<string, unknown>) {
+export function rowToAuditEntry(row: Record<string, unknown>): ActivityEntry {
   return {
-    id: row.id, seq: row.seq, ts: row.ts, user: row.user, username: row.username,
-    userId: row.user_id, role: row.role, type: row.type, detail: row.detail, target: row.target,
-    clientId: row.client_id, prevHash: row.prev_hash, hash: row.hash,
+    id: String(row.id ?? ''), seq: Number(row.seq ?? 0), ts: String(row.ts ?? ''),
+    user: String(row.user ?? ''), username: String(row.username ?? ''),
+    userId: String(row.user_id ?? ''), role: String(row.role ?? ''), type: String(row.type ?? ''),
+    detail: String(row.detail ?? ''), target: String(row.target ?? ''),
+    clientId: String(row.client_id ?? ''), prevHash: String(row.prev_hash ?? ''), hash: String(row.hash ?? ''),
   };
 }
 
@@ -117,4 +140,5 @@ export function writeAudit(db: Db, actor: Actor, type: string, detail: string, t
       clientId: entry.clientId, prevHash: entry.prevHash, hash: entry.hash,
     });
   notifyChanged(['activity']);
+  cloudChangeNotifier?.();
 }

@@ -5,7 +5,7 @@
 // phục hồi backup (C3) nên dùng lại ĐÚNG transaction xoá-rồi-nạp
 // (`restoreAllTables`) và ĐÚNG cơ chế an toàn (chốt 1 bản backup trước khi
 // ghi đè) từ `table-io.ts`.
-import type { Db } from '../db/open-database';
+import type { Db } from '../db/sqlite-like';
 import { writeSafetySnapshot, restoreAllTables } from '../db/table-io';
 import { mapLegacyStateToTables, parseLegacyBackupEnvelope, summarizeMappedTables, type MigrationSummary } from '../domain/migrate-legacy';
 import { type Actor, type IpcResult, writeAudit, notifyChanged } from './shared';

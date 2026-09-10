@@ -4,11 +4,16 @@
 // nhật ký audit cũ sẽ không verify được nếu có ngày cần chuyển dữ liệu.
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import {
-  auditCanonical, auditSha256, auditEntryHash, verifyAuditChain, relinkAuditChain, lastHashOf,
-} from '../main/domain/audit-chain.ts';
 
 const require = createRequire(import.meta.url);
+// Đọc bản ĐÃ BUILD thay vì import thẳng `.ts`: từ 2026-09-09 `audit-chain.ts`
+// import `./sha256` (tách `node:crypto` ra để bản xem trước trình duyệt thay
+// được bằng bản JS thuần — xem sha256.ts/sha256-browser.ts), mà Node's ESM
+// type-stripping không resolve được import không có đuôi file kiểu CommonJS.
+// Đây đúng là quy ước mà phần lớn test app-v2 đã dùng.
+const {
+  auditCanonical, auditSha256, auditEntryHash, verifyAuditChain, relinkAuditChain, lastHashOf,
+} = require('../../app-v2-dist/main/domain/audit-chain.js');
 const QCCore = require('../../assets/core.js');
 
 // 1) canonicalJSON phải khớp bản cũ hệt nhau cho nhiều shape khác nhau.

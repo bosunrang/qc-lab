@@ -1,11 +1,7 @@
 /* Phân tích Westgard — sao chép gần nguyên văn assets/professional-westgard.css
    bản cũ (đọc trực tiếp file gốc, không gõ lại từ tóm tắt — xem CLAUDE.md mục
    "Sao chép giao diện app cũ"). Chỉ giữ lại các rule khớp với class đang
-   THẬT SỰ dùng trong WestgardPage.tsx — không copy nguyên văn phần
-   `.panel.wg-prev-lot`/`.wg-export-actions`/`.wg-prev-toggle`/`.wg-rule-reset`/
-   `.wg-row-window`/`.wg-panel-intro` vì các tính năng đó (lô cũ song song,
-   xuất Excel/in PDF, phân trang bảng điểm) CHƯA được wire vào trang này —
-   thêm lại đúng nguyên văn khi các tính năng đó được làm. */
+   THẬT SỰ dùng trong WestgardPage.tsx. */
 
 .wg-test-picker{
   display:grid; grid-template-columns:minmax(240px,1fr) minmax(300px,1.15fr); gap:12px; align-items:end; margin:var(--panel-content-gap) var(--space-panel) 0; max-width:760px;
@@ -19,9 +15,15 @@
 .wg-rules{
   margin:12px var(--space-panel) 0;
 }
-.panel>h3:has(.wg-lot-name){
-  justify-content:space-between; gap:14px;
-}
+/* Header đã có `margin-bottom: var(--panel-content-gap)`. Tab chọn vùng
+   xem phải bắt đầu ngay sau nhịp đó như app cũ; cộng thêm margin-top ở JSX
+   làm khoảng cách từ đường viền header tới tab bị gấp đôi. */
+.wg-archive-view-mode{margin:0 var(--space-panel);}
+/* Ghi chú là hàng riêng dưới ba ô chọn như app cũ, nhưng không bị giới hạn
+   chiều rộng nên câu không bị ngắt vô cớ ở phần "nhóm lô còn hoạt động". */
+.wg-archive-note{margin:12px var(--space-panel) 14px;max-width:none;}
+.panel.wg-prev-lot{background:#f7f9fa;border:1px dashed var(--line);}
+.panel.wg-prev-lot .wg-lot-name{color:#8f5a52;}
 .wg-level-title{
   display:flex; align-items:baseline; gap:8px; min-width:0;
 }
@@ -70,6 +72,9 @@
 .wg-guide .warn{
   color:var(--warning-ink); font-weight:800;
 }
+.wg-guide .alert.info{
+  background:var(--info-bg); color:var(--info-ink); border-left-color:var(--info-accent);
+}
 .wg-guide .rej{
   color:var(--red); font-weight:800;
 }
@@ -82,8 +87,8 @@
 .wg-error-type small{
   color:var(--muted); font-size:var(--type-caption);
 }
-.panel > table.wg-table, .panel > h3:first-child + table.wg-table, .panel > h3:first-child ~ table.wg-table, .wg-table{
-  width:calc(100% - 32px) !important; min-width:920px !important; table-layout:fixed !important;
+.wg-table{
+  width:100% !important; min-width:920px !important; margin:0 !important; table-layout:fixed !important;
 }
 .wg-table th:nth-child(1), .wg-table td:nth-child(1){
   width:7%
@@ -113,9 +118,57 @@
   margin-bottom:16px !important;
 }
 
+/* Header/bảng của riêng Westgard dùng đúng strip và nhịp chữ của app cũ;
+   scope bằng class để không làm đổi hierarchy của các trang khác. */
+.wg-setup-panel > h2.panel-title:first-child,
+.wg-multi-panel > h2.panel-title:first-child{
+  min-height:0;
+  padding:10px 14px;
+  background:#eef2f4;
+  font-size:14px;
+  font-weight:800;
+  line-height:21px;
+}
+.wg-cusum-heading{
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  min-height:0; padding:10px 14px; background:#eef2f4; border-bottom:1px solid var(--line);
+}
+.wg-cusum-heading .panel-title{
+  min-height:0; margin:0; padding:0; background:transparent;
+  font-size:14px; font-weight:800; line-height:21px;
+}
+.wg-cusum-view-mode{flex:0 0 auto;}
+.wg-cusum-switch-panel{margin-bottom:12px;}
+.wg-guide thead th,
+.wg-table thead th{background:#eef2f4;}
+
+/* Cùng kích thước HIỂN THỊ với `canvas.entryLJStack`: không để quy tắc
+   canvas dùng chung ép về tối đa 1320px. Nếu bị thu nhỏ sau khi vẽ, chữ và
+   đường bitmap sẽ mờ; vẽ vừa khít khung mới giữ được độ nét theo DPR. */
+.chart-scroll canvas.wgLJMulti,
+.chart-scroll canvas.wgLJMultiArchived,
+.chart-scroll canvas.cusumChart,
+.chart-scroll canvas.wgCusumMulti{width:100%;max-width:none;}
+
+/* `.wg-table` được đặt TRONG `.chart-scroll`, không trực tiếp trong panel.
+   Công thức width cũ trừ thêm 32px lần nữa nên lề phải bị rộng hơn lề trái.
+   Mỗi thẻ mức dùng cùng một khung 14px, bảng lấp đầy chính xác phần trong. */
+.wg-level-panel > .chart-scroll{box-sizing:border-box;padding:14px;}
+/* Trạng thái lô lịch sử chưa có điểm chỉ là thông tin trong thẻ, không dựng
+   thêm một hộp có viền lồng bên trong thẻ mức. */
+.wg-empty-message{display:grid;gap:4px;padding:28px var(--space-panel);text-align:center;color:var(--muted);font-size:var(--type-body-sm);line-height:1.55;}
+.wg-empty-message b{color:var(--ink);font-weight:700;}
+.wg-empty-message .empty-actions{margin-top:var(--space-lg);display:flex;justify-content:center;}
+
+/* Hai chế độ biểu đồ là hàng cuối trong thẻ thiết lập. Giữ chiều cao thẻ,
+   nâng hàng tab lên để có khoảng thở với đường viền dưới thay vì kéo viền
+   xuống thấp hơn. */
+.wg-chart-mode{margin:12px var(--space-panel) 0; transform:translateY(-14px);}
+
 @media(max-width:760px){
-.panel > table.wg-table, .panel > h3:first-child + table.wg-table, .panel > h3:first-child ~ table.wg-table, .wg-table{
-  width:calc(100% - 24px) !important; min-width:820px !important;
+.wg-export-actions{flex-wrap:wrap}
+.wg-table{
+  width:100% !important; min-width:820px !important; margin:0 !important;
 }
 .wg-guide{
   margin-bottom:12px !important;
@@ -129,6 +182,8 @@
 .wg-rules{
   margin-left:12px;margin-right:12px
 }
+.wg-cusum-heading{align-items:flex-start; flex-direction:column;}
+.wg-cusum-view-mode{align-self:flex-end;}
 .wg-level-meta{
   width:100%;margin-left:0;white-space:normal
 }
@@ -153,11 +208,11 @@
 /* Bù class app cũ CÓ CSS mà app-v2 để trống (2026-09-03, xem ghi chú cùng
    loại ở các file khác). Giá trị copy nguyên từ `assets/*.css`. */
 .wg-panel-intro{margin:var(--panel-content-gap) 16px 8px;}
-.wg-test-picker .wg-excel-btn,.wg-test-picker .wg-print-btn{width:auto;min-height:36px;padding:8px 9px;white-space:nowrap;background:var(--teal);border:none;color:var(--on-accent);}
+.wg-test-picker .wg-excel-btn,.wg-test-picker .wg-print-btn{width:auto;min-height:38px;padding:8px 9px;white-space:nowrap;background:var(--teal);border:none;color:var(--on-accent);}
 .wg-test-picker .wg-excel-btn:hover,.wg-test-picker .wg-print-btn:hover{background:var(--teal-deep);border:none;color:var(--on-accent);}
 .wg-rule-item{display:inline-flex;align-items:center;gap:8px;margin:4px 12px 4px 0;font-size:var(--type-body-sm);vertical-align:middle;}
 .wg-rule-item label{display:inline-flex;align-items:center;gap:6px;margin:0;}
 .wg-rule-item input{width:auto;}
 .wg-rule-reset{display:flex;margin-top:8px;}
-.wg-rule-reset .btn{border-color:#b9dadd;background:#eef8f8;color:#0a6f72;font-weight:800;}
-.wg-rule-reset .btn:hover{background:#dff1f1;border-color:#8ec8cc;color:#075f62;}
+.wg-rule-reset .btn{border-color:#b9dadd;background:transparent;color:#0a6f72;font-weight:800;}
+.wg-rule-reset .btn:hover{background:transparent;border-color:#8ec8cc;color:#075f62;}

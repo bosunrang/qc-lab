@@ -1,9 +1,13 @@
 {
-  // Build bản giả lập trình duyệt (renderer/browser-mock/*) sang CommonJS để
-  // chạy được trong Node — CHỈ dùng cho test đối chiếu mock ↔ handler thật
-  // (app-v2/tests/mock-parity.test.mjs, hạng mục C7 trong docs/APP-V2-PLAN.md).
-  // Cần lượt build RIÊNG vì tsconfig.app-v2-renderer.json phát ESM+JSX cho
-  // Vite, còn tsconfig.app-v2-main.json chỉ include app-v2/main.
+  // Build phần `renderer/browser-mock/*` chạy được ngoài trình duyệt sang
+  // CommonJS để test bằng Node — hiện chỉ còn `sqlite-shim.ts` (lớp bọc
+  // sql.js, xem app-v2/tests/sqlite-shim.test.mjs). Cần lượt build RIÊNG vì
+  // tsconfig.app-v2-renderer.json phát ESM+JSX cho Vite, còn
+  // tsconfig.app-v2-main.json chỉ include app-v2/main.
+  //
+  // `api.ts`/`store.ts`/`permission-policy.ts` (bản giả lập viết tay) đã bị
+  // xoá 2026-09-09: bản xem trước giờ chạy CHÍNH handler thật — xem
+  // renderer/browser-mock/real-api.ts.
   "compilerOptions": {
     "target": "es2022",
     "lib": ["es2022", "dom"],
@@ -16,5 +20,5 @@
     "esModuleInterop": true,
     "types": ["node"]
   },
-  "include": ["app-v2/renderer/browser-mock/api.ts", "app-v2/renderer/browser-mock/permission-policy.ts"]
+  "include": ["app-v2/renderer/browser-mock/sqlite-shim.ts"]
 }

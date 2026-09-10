@@ -2,7 +2,12 @@
 // nghiệm, mức QC. Renderer KHÔNG bao giờ chạm SQLite trực tiếp — chỉ gọi các
 // hàm named ở đây qua preload/ipcMain. Mỗi thao tác ghi chạy trong 1
 // transaction + ghi 1 dòng audit.
-import type { Db } from '../db/open-database';
+import type { Db } from '../db/sqlite-like';
+// Kiểu dữ liệu trả về lấy từ HỢP ĐỒNG dùng chung, không khai lại: trước
+// 2026-09-10 các hàm này khai `IpcResult<unknown>` nên renderer tin vào
+// một hình dạng mà không gì bảo đảm.
+import type { Instrument, LotGroup, LotTransition, QcLot, QcPanel, TeaRef, Test, TestLevel } from '../../shared/qc-api';
+
 import { cleanId, cleanText, uid, sameText } from '../domain/text-utils';
 import {
   validateInstrument, validateTest, validateTestLevel, appendMeanSdHistory,
@@ -13,6 +18,7 @@ import {
 import { validateTeaRef, TEA_LAB_SOURCE_LABELS, type TeaRefInput } from '../domain/tea-ref-validation';
 import { parseRuleScopes, serializeRuleScopes, effectiveScopeList, type RuleScopesMap } from '../domain/rule-config';
 import { RULE_SCOPES, WG_RULE_REGISTRY, type RuleScope } from '../domain/westgard-rules';
+import { isoLocalDate } from '../domain/local-date';
 import { type Actor, type IpcResult, nowIso, writeAudit, rowToAuditEntry, notifyChanged, requireAdmin } from './shared';
 import { ymOfDate } from '../domain/period-lock-validation';
 
@@ -33,7 +39,7 @@ export function createConfigHandlers(db: Db) {
     return db.prepare('SELECT * FROM instruments ORDER BY name').all();
   }
 
-  function saveInstrument(input: { id?: string; data: InstrumentInput }, actor: Actor): IpcResult<unknown> {
+  function saveInstrument(input: { id?: string; data: InstrumentInput }, actor: Actor): IpcResult<Instrument> {
     const denied = requireAdmin(actor); if (denied) return denied;
     const id = input.id || '';
     const existingNames = (db.prepare('SELECT name FROM instruments WHERE id != ?').all(id) as { name: string }[]).map(r => r.name);
@@ -99,7 +105,7 @@ export function createConfigHandlers(db: Db) {
   /** Form danh mục mới cho phép gán một analyte vào nhiều máy. Mỗi máy vẫn
    * là một hàng `tests` riêng để Mean/SD, lô, điểm QC và Westgard không bị
    * trộn; `analyte_id` chỉ gom các hàng đó thành một mục ở giao diện. */
-  function saveTestAssignments(input: { id?: string; data: TestInput }, actor: Actor): IpcResult<unknown> {
+  function saveTestAssignments(input: { id?: string; data: TestInput }, actor: Actor): IpcResult<Test> {
     const instrumentIds = [...new Set((Array.isArray(input.data.instrumentIds) ? input.data.instrumentIds : [])
       .map(cleanId).filter(Boolean))];
     if (!instrumentIds.length) return { ok: false, error: { code: 'missing-instrument', message: 'Chọn ít nhất một máy xét nghiệm.' } };
@@ -190,13 +196,13 @@ export function createConfigHandlers(db: Db) {
         : `${existingAssignments.length ? 'Cập nhật' : 'Tạo'} xét nghiệm "${prepared[0].data.name}" trên ${savedIds.length} máy`;
       writeAudit(db, actor, action, detail, prepared[0].data.name);
       const representativeId = input.id && savedIds.includes(input.id) ? input.id : savedIds[0];
-      return db.prepare('SELECT * FROM tests WHERE id=?').get(representativeId) as Record<string, unknown>;
+      return db.prepare('SELECT * FROM tests WHERE id=?').get(representativeId) as Test;
     });
     notifyChanged(['tests', 'test_levels'], savedIds);
     return { ok: true, data: { ...saved, assignment_ids: savedIds } };
   }
 
-  function saveTest(input: { id?: string; data: TestInput }, actor: Actor): IpcResult<unknown> {
+  function saveTest(input: { id?: string; data: TestInput }, actor: Actor): IpcResult<Test> {
     const denied = requireAdmin(actor); if (denied) return denied;
     if (Array.isArray(input.data.instrumentIds)) return saveTestAssignments(input, actor);
     const id = input.id || '';
@@ -260,7 +266,7 @@ export function createConfigHandlers(db: Db) {
     return db.prepare('SELECT * FROM test_levels WHERE test_id=? ORDER BY level').all(testId);
   }
 
-  function saveTestLevel(input: { testId: string; data: TestLevelInput }, actor: Actor): IpcResult<unknown> {
+  function saveTestLevel(input: { testId: string; data: TestLevelInput }, actor: Actor): IpcResult<TestLevel> {
     const denied = requireAdmin(actor); if (denied) return denied;
     const testId = cleanId(input.testId);
     const test = db.prepare('SELECT id,name FROM tests WHERE id=?').get(testId) as { id: string; name: string } | undefined;
@@ -286,7 +292,7 @@ export function createConfigHandlers(db: Db) {
     // đã tồn tại là cập nhật, không phải tạo mới; mức KHÁC chưa có thì tạo mới.
     // Trang "Lịch sử dữ liệu" đọc `mean_sd_history_json` — chốt giá trị CŨ
     // vào lịch sử trước khi ghi đè, không âm thầm mất dấu vết thay đổi target.
-    const today = new Date().toISOString().slice(0, 10);
+    const today = isoLocalDate();
     const saved = inTransaction(() => {
       if (existing) {
         const lotChanged = existing.qc_lot_id !== (qcLotId || null);
@@ -382,7 +388,7 @@ export function createConfigHandlers(db: Db) {
     return { ok: true, data: { rename: { oldLotNo: existing.lot_no, newLotNo, affected: rows.length, lockedCount, lockedPeriods } } };
   }
 
-  function saveLot(input: { id?: string; data: LotInput }, actor: Actor): IpcResult<unknown> {
+  function saveLot(input: { id?: string; data: LotInput }, actor: Actor): IpcResult<QcLot> {
     const denied = requireAdmin(actor); if (denied) return denied;
     const id = input.id || '';
     const result = validateLot(input.data);
@@ -415,8 +421,8 @@ export function createConfigHandlers(db: Db) {
         db.prepare(`UPDATE qc_lots SET group_id=?,lot_no=?,level=?,description=?,supplier=?,program=?,exp=?,opened=?,active=?,depleted=?,note=? WHERE id=?`)
           .run(groupId || null, lotNo, level, description, supplier, program, exp, opened, active ? 1 : 0, depleted ? 1 : 0, note, id);
         if (renaming) {
-          renamed = (db.prepare('UPDATE qc_points SET lot=? WHERE level=? AND lot=?')
-            .run(lotNo, before!.level, before!.lot_no) as { changes?: number }).changes || 0;
+          renamed = Number(db.prepare('UPDATE qc_points SET lot=? WHERE level=? AND lot=?')
+            .run(lotNo, before!.level, before!.lot_no).changes || 0);
         }
         writeAudit(db, actor, 'Sửa lô QC',
           renaming ? `Đổi số lô "${before!.lot_no}" → "${lotNo}" mức ${level}, cập nhật ${renamed} điểm QC`
@@ -449,7 +455,7 @@ export function createConfigHandlers(db: Db) {
   }
 
   function listLotGroups() {
-    const groups = db.prepare('SELECT * FROM lot_groups ORDER BY name').all() as { id: string; archived_lot_ids_json: string }[];
+    const groups = db.prepare('SELECT * FROM lot_groups ORDER BY name').all() as (Omit<LotGroup, 'lotIds' | 'inUse'> & { archived_lot_ids_json: string })[];
     return groups.map(g => {
       const liveLotIds = (db.prepare('SELECT id FROM qc_lots WHERE group_id=?').all(g.id) as { id: string }[]).map(r => r.id);
       // Nhóm "Đã lưu trữ" hiện lotIds từ ẢNH CHỤP đã chốt lúc lưu trữ (giữ
@@ -469,7 +475,7 @@ export function createConfigHandlers(db: Db) {
     });
   }
 
-  function saveLotGroup(input: { id?: string; data: LotGroupInput }, actor: Actor): IpcResult<unknown> {
+  function saveLotGroup(input: { id?: string; data: LotGroupInput }, actor: Actor): IpcResult<LotGroup> {
     const denied = requireAdmin(actor); if (denied) return denied;
     const id = input.id || '';
     const lotRows = db.prepare('SELECT id, lot_no FROM qc_lots').all() as { id: string; lot_no: string }[];
@@ -527,16 +533,20 @@ export function createConfigHandlers(db: Db) {
       return { ok: false, error: { code: 'save-failed', message: e instanceof Error ? e.message : 'Lưu nhóm lô QC thất bại.' } };
     }
     notifyChanged(['lot_groups', 'qc_lots']);
-    return { ok: true, data: { ...(db.prepare('SELECT * FROM lot_groups WHERE id=?').get(groupId) as object), lotIds: validLotIds } };
+    // Ép về đúng kiểu hợp đồng thay vì `as object`: spread một `object` cho ra
+    // `{}` nên TypeScript không còn thấy field nào, và hợp đồng
+    // `IpcResult<LotGroup>` trở thành vô nghĩa.
+    const groupRow = db.prepare('SELECT * FROM lot_groups WHERE id=?').get(groupId) as Omit<LotGroup, 'lotIds' | 'inUse'>;
+    return { ok: true, data: { ...groupRow, lotIds: validLotIds, inUse: lotGroupInUse(validLotIds) } };
   }
 
   // ---- Panel QC ----
   function listPanels() {
-    const panels = db.prepare('SELECT * FROM qc_panels ORDER BY name').all() as { id: string }[];
+    const panels = db.prepare('SELECT * FROM qc_panels ORDER BY name').all() as Omit<QcPanel, 'testIds'>[];
     return panels.map(p => ({ ...p, testIds: (db.prepare('SELECT test_id FROM qc_panel_tests WHERE panel_id=?').all(p.id) as { test_id: string }[]).map(r => r.test_id) }));
   }
 
-  function savePanel(input: { id?: string; data: PanelInput }, actor: Actor): IpcResult<unknown> {
+  function savePanel(input: { id?: string; data: PanelInput }, actor: Actor): IpcResult<QcPanel> {
     const denied = requireAdmin(actor); if (denied) return denied;
     const id = input.id || '';
     const knownInstrumentIds = new Set((db.prepare('SELECT id FROM instruments').all() as { id: string }[]).map(r => r.id));
@@ -587,7 +597,8 @@ export function createConfigHandlers(db: Db) {
       return { ok: false, error: { code: 'save-failed', message: e instanceof Error ? e.message : 'Lưu Panel QC thất bại.' } };
     }
     notifyChanged(['qc_panels', 'qc_panel_tests']);
-    return { ok: true, data: { ...(db.prepare('SELECT * FROM qc_panels WHERE id=?').get(panelId) as object), testIds: validTestIds } };
+    const panelRow = db.prepare('SELECT * FROM qc_panels WHERE id=?').get(panelId) as Omit<QcPanel, 'testIds'>;
+    return { ok: true, data: { ...panelRow, testIds: validTestIds } };
   }
 
   // ---- Chuyển tiếp lô ----
@@ -618,7 +629,7 @@ export function createConfigHandlers(db: Db) {
   function createLotTransition(
     input: { id?: string; data: LotTransitionInput & { criteria?: { testId: string; level: number; mean: number; sd: number; low?: number | null; high?: number | null }[] } },
     actor: Actor,
-  ): IpcResult<unknown> {
+  ): IpcResult<LotTransition> {
     const denied = requireAdmin(actor); if (denied) return denied;
     const result = validateLotTransition(input.data);
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
@@ -778,7 +789,7 @@ export function createConfigHandlers(db: Db) {
     return m ? `${m[3]}/${m[2]}/${m[1]}` : value;
   }
 
-  function saveTeaRef(input: { id?: string; data: TeaRefInput }, actor: Actor): IpcResult<unknown> {
+  function saveTeaRef(input: { id?: string; data: TeaRefInput }, actor: Actor): IpcResult<TeaRef> {
     const denied = requireAdmin(actor); if (denied) return denied;
     const id = input.id || '';
     const result = validateTeaRef(input.data);
@@ -842,15 +853,15 @@ export function createConfigHandlers(db: Db) {
     }
     const name = String(input.name || analyteId);
     const existing = db.prepare('SELECT * FROM tea_refs WHERE analyte_id=?').get(analyteId) as
-      { id: string; clia: number | null; ricos: number | null; lab: number | null } | undefined;
+      { id: string; clia: number | null; ricos: number | null; lab: number | null; clia_absolute: number | null } | undefined;
     if (!existing && value == null) return { ok: true, data: { analyteId } };
     const label = field === 'clia' ? 'CLIA' : 'Ricos';
     inTransaction(() => {
       if (existing) {
         db.prepare(`UPDATE tea_refs SET ${field}=? WHERE id=?`).run(value, existing.id);
-        const after = db.prepare('SELECT clia, ricos, lab FROM tea_refs WHERE id=?').get(existing.id) as
-          { clia: number | null; ricos: number | null; lab: number | null };
-        if (after.clia == null && after.ricos == null && after.lab == null) db.prepare('DELETE FROM tea_refs WHERE id=?').run(existing.id);
+        const after = db.prepare('SELECT clia, ricos, lab, clia_absolute FROM tea_refs WHERE id=?').get(existing.id) as
+          { clia: number | null; ricos: number | null; lab: number | null; clia_absolute: number | null };
+        if (after.clia == null && after.ricos == null && after.lab == null && after.clia_absolute == null) db.prepare('DELETE FROM tea_refs WHERE id=?').run(existing.id);
       } else {
         const newId = cleanId(uid());
         db.prepare(`INSERT INTO tea_refs(id,analyte_id,name,unit,section,${field}) VALUES (?,?,?,?,?,?)`)
@@ -871,7 +882,7 @@ export function createConfigHandlers(db: Db) {
    * app-v2 trước đó thiếu hẳn nghiệp vụ này và nút toolbar mở sai modal (mở
    * "Thêm hồ sơ TEa"), phát hiện khi dò trigger modal cho gate parity. */
   function addTeaAnalyte(
-    input: { name: unknown; abbreviation?: unknown; matrix?: unknown; unit?: unknown; section?: unknown; clia?: unknown; ricos?: unknown },
+    input: { name: unknown; abbreviation?: unknown; matrix?: unknown; unit?: unknown; section?: unknown; clia?: unknown; ricos?: unknown; cliaRule?: unknown; cliaAbsolute?: unknown; cliaAbsoluteUnit?: unknown },
     actor: Actor,
   ): IpcResult<{ analyteId: string }> {
     const denied = requireAdmin(actor); if (denied) return denied;
@@ -888,11 +899,15 @@ export function createConfigHandlers(db: Db) {
     const analyteId = cleanId(name.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || uid());
     const existing = db.prepare('SELECT id FROM tea_refs WHERE analyte_id=?').get(analyteId) as { id: string } | undefined;
     if (existing) return { ok: false, error: { code: 'duplicate', message: `Đã có xét nghiệm tham chiếu "${name}".` } };
+    const cliaRule = ['percent', 'absolute', 'greater-of'].includes(String(input.cliaRule || '')) ? String(input.cliaRule) : '';
+    const cliaAbsolute = num(input.cliaAbsolute);
+    if (cliaRule === 'absolute' && cliaAbsolute == null) return { ok: false, error: { code: 'missing-clia-absolute', message: 'Nhập giới hạn CLIA tuyệt đối khi chọn quy tắc tuyệt đối.' } };
     inTransaction(() => {
-      db.prepare(`INSERT INTO tea_refs(id,analyte_id,name,abbreviation,matrix,unit,section,clia,ricos)
-        VALUES (?,?,?,?,?,?,?,?,?)`).run(
+      db.prepare(`INSERT INTO tea_refs(id,analyte_id,name,abbreviation,matrix,unit,section,clia,ricos,clia_rule,clia_absolute,clia_absolute_unit)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).run(
         cleanId(uid()), analyteId, name, cleanText(input.abbreviation, 40).trim(), cleanText(input.matrix, 80).trim(),
-        cleanText(input.unit, 40).trim(), cleanText(input.section, 80).trim(), num(input.clia), num(input.ricos),
+        cleanText(input.unit, 40).trim(), cleanText(input.section, 80).trim(), num(input.clia), num(input.ricos), cliaRule, cliaAbsolute,
+        cleanText(input.cliaAbsoluteUnit, 40).trim() || cleanText(input.unit, 40).trim(),
       );
       writeAudit(db, actor, 'Thêm xét nghiệm tham chiếu', `Thêm "${name}" vào bảng TEa tham chiếu`, name);
     });
@@ -910,7 +925,7 @@ export function createConfigHandlers(db: Db) {
     if (!existing) return { ok: true, data: { analyteId } };
     inTransaction(() => {
       if (existing.lab == null) db.prepare('DELETE FROM tea_refs WHERE id=?').run(existing.id);
-      else db.prepare('UPDATE tea_refs SET clia=NULL, ricos=NULL WHERE id=?').run(existing.id);
+      else db.prepare('UPDATE tea_refs SET clia=NULL, ricos=NULL, clia_rule=\'\', clia_absolute=NULL, clia_absolute_unit=\'\' WHERE id=?').run(existing.id);
       writeAudit(db, actor, 'Khôi phục TEa tham chiếu', `Bỏ ghi đè CLIA/Ricos của "${existing.name}"`, existing.name);
     });
     notifyChanged(['tea_refs']);
@@ -942,12 +957,12 @@ export function createConfigHandlers(db: Db) {
   function removeTeaLabProfile(input: { id: unknown }, actor: Actor): IpcResult<{ id: string; removedRecord: boolean }> {
     const denied = requireAdmin(actor); if (denied) return denied;
     const id = String(input.id || '');
-    const existing = db.prepare('SELECT id, name, clia, ricos, abbreviation, matrix, lab FROM tea_refs WHERE id=?').get(id) as
-      { id: string; name: string; clia: number | null; ricos: number | null; abbreviation: string; matrix: string; lab: number | null } | undefined;
+    const existing = db.prepare('SELECT id, name, clia, ricos, clia_absolute, abbreviation, matrix, lab FROM tea_refs WHERE id=?').get(id) as
+      { id: string; name: string; clia: number | null; ricos: number | null; clia_absolute: number | null; abbreviation: string; matrix: string; lab: number | null } | undefined;
     if (!existing) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy hồ sơ TEa.' } };
     if (existing.lab == null) return { ok: true, data: { id, removedRecord: false } };
     const isCustomAnalyte = !!(existing.abbreviation || existing.matrix);
-    const removedRecord = !isCustomAnalyte && existing.clia == null && existing.ricos == null;
+    const removedRecord = !isCustomAnalyte && existing.clia == null && existing.ricos == null && existing.clia_absolute == null;
     inTransaction(() => {
       db.prepare(`UPDATE tea_refs SET lab=NULL, lab_source='', lab_prepared_by='', lab_next_review_date='', sources_json='{}' WHERE id=?`).run(id);
       if (removedRecord) db.prepare('DELETE FROM tea_refs WHERE id=?').run(id);

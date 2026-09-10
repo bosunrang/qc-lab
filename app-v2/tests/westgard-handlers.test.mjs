@@ -19,7 +19,7 @@ const westgardHandlers = createWestgardHandlers(db);
 const actor = { userId: 'u1', username: 'admin', name: 'Quan tri vien', role: 'admin', clientId: 'test-client' };
 
 const instrument = config.saveInstrument({ data: { name: 'May A' } }, actor).data;
-const test = config.saveTest({ data: { name: 'Glucose', instrumentId: instrument.id, unit: 'mg/dL' } }, actor).data;
+const test = config.saveTest({ data: { name: 'Glucose', instrumentId: instrument.id, unit: 'mg/dL', cusumOn: true, cusumK: 0.5, cusumH: 6 } }, actor).data;
 config.saveTestLevel({ testId: test.id, data: { level: 1, mean: 10, sd: 1 } }, actor);
 makeOperationalQc(db, { testId: test.id, instrumentId: instrument.id, assignments: [{ level: 1 }] });
 
@@ -49,6 +49,9 @@ assert.equal(analysis.points[0].verdict, 'rej');
 assert.ok(analysis.points[0].rules.includes('1-3s'));
 assert.equal(analysis.points[0].z, 4); // (14-10)/1
 assert.equal(analysis.cusum.cPos.length, 1);
+assert.equal(analysis.cusum.h, 6, 'nguong h cau hinh phai duoc giu den renderer, khong roi ve mac dinh 4');
+assert.equal(analysis.cusum.k, 0.5);
+assert.equal(analysis.cusum.ma.length, 1, 'CUSUM phai gui kem MA(5) chi de ve xu huong');
 const ruleSettings = westgardHandlers.listRuleSettings();
 assert.ok(ruleSettings.some(r => r.id === '1-3s' && r.on === true));
 
@@ -90,7 +93,20 @@ assert.equal(followShared.data.action, '');
 const storedActions = JSON.parse(db.prepare('SELECT rule_actions_json FROM tests WHERE id=?').get(test.id).rule_actions_json);
 assert.equal(Object.hasOwn(storedActions, '1-3s'), false, 'chon theo cau hinh chung phai xoa ghi de rieng');
 
-// 9) Xet nghiem/luat/hanh dong khong hop le phai bi chan
+// 9) CUSUM vượt h phải trở thành CẢNH BÁO xu hướng để đi vào luồng NCE,
+// nhưng không được tự loại điểm QC bình thường. Hai điểm trước đã đưa C+
+// đến 5.5; điểm z=+1 này chạm h=6.
+const trendPoint = entry.addPoint({ data: { testId: test.id, level: 1, date: '2026-08-03', val: 11, runId: '2026-08-03-1' } }, actor);
+assert.equal(trendPoint.ok, true);
+const trendAnalysis = westgardHandlers.analyzeLevel(test.id, 1);
+assert.equal(trendAnalysis.points.at(-1).verdict, 'ok', 'CUSUM không tự đổi Westgard verdict');
+assert.equal(trendAnalysis.points.at(-1).accepted, true, 'CUSUM không tự loại khỏi chuỗi accepted');
+assert.equal(trendAnalysis.points.at(-1).cusumSignal, 'CUSUM +h');
+const trendSummary = westgardHandlers.listTestSummaries()[0].levels[0];
+assert.equal(trendSummary.latestVerdict, 'warn', 'CUSUM phải tạo cảnh báo cho luồng xử lý');
+assert.ok(trendSummary.latestRules.includes('CUSUM +h'));
+
+// 10) Xet nghiem/luat/hanh dong khong hop le phai bi chan
 const badTest = westgardHandlers.saveRuleAction('khong-ton-tai', '1-3s', true, actor);
 assert.equal(badTest.ok, false);
 assert.equal(badTest.error.code, 'not-found');

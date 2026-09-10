@@ -1,7 +1,7 @@
 // Giai đoạn C5 (docs/APP-V2-PLAN.md) — IPC cho LIS Gateway prototype. Cấu
 // hình (enabled/url/token) lưu ở `app_meta` (thay `localStorage` bản cũ).
 // Gateway server (`lis-gateway/`) đứng ĐỘC LẬP, không đổi gì ở đó.
-import type { Db } from '../db/open-database';
+import type { Db } from '../db/sqlite-like';
 import { createEntryHandlers } from './entry-handlers';
 import {
   DEFAULT_LIS_GATEWAY_SETTINGS, normalizeGatewayUrl, resultToPointInput,

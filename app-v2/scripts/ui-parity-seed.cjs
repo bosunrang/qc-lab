@@ -185,3 +185,216 @@ function buildParitySeeds() {
 }
 
 module.exports = { buildParitySeeds };
+
+/** Nạp seed vào bản xem trước app-v2 QUA CHÍNH `window.qcApi`.
+ *
+ * Trước 2026-09-09 gate nhồi thẳng một blob JSON vào
+ * `localStorage['qclab-v2-browser-preview']` — hình dạng nội bộ của bản giả
+ * lập viết tay (`browser-mock/store.ts`). Bản giả lập đó đã bị xoá: bản xem
+ * trước giờ chạy CHÍNH các handler `main/ipc/*` trên SQLite thật, nên không
+ * còn blob nào để nhồi.
+ *
+ * Seed đi qua API thật có 2 hệ quả CÓ CHỦ ĐÍCH, không phải tác dụng phụ:
+ * - Dữ liệu phải HỢP LỆ theo nghiệp vụ thật (nhóm lô ≥2 lô; mức QC phải
+ *   thuộc Panel + nhóm lô đang vận hành mới nhập được điểm). Seed nào không
+ *   qua nổi là seed sai, không phải gate sai.
+ * - Nhật ký hoạt động của v2 là các dòng THẬT do chính seed sinh ra, thay vì
+ *   2 dòng nhồi tay. Surface `audit` vì thế lệch app cũ và được chốt lại
+ *   trong baseline.
+ *
+ * ID do handler tự sinh (`uid()`), không dùng lại id cố định của seed — gate
+ * so class + dòng chữ nên id không lọt vào phép đo.
+ */
+async function seedV2ViaApi(page, v2) {
+  await page.waitForFunction(() => typeof window.qcApi !== 'undefined', null, { timeout: 30000 });
+  const result = await page.evaluate(async (seed) => {
+    const api = window.qcApi;
+    const need = (step, r) => {
+      if (!r || r.ok !== true) {
+        throw new Error('[seed] ' + step + ': ' + (r && r.error ? r.error.code + ' - ' + r.error.message : 'that bai'));
+      }
+      return r.data;
+    };
+
+    const PASSWORD = 'Demo1234!';
+    const admin = seed.users.find((u) => u.role === 'admin') || seed.users[0];
+    need('bootstrapAdmin', await api.bootstrapAdmin({
+      data: { username: admin.username, name: admin.name, password: PASSWORD },
+    }));
+    need('login', await api.login({ data: { username: admin.username, password: PASSWORD } }));
+
+    for (const user of seed.users) {
+      if (user.username === admin.username) continue;
+      need('createUser', await api.createUser({
+        data: { username: user.username, name: user.name, password: PASSWORD, role: user.role },
+      }));
+    }
+
+    // Hồ sơ phòng xét nghiệm: tên/khoa hiện ở phụ đề MỌI trang (PageHeader)
+    // và ở trang Cài đặt. Blob localStorage cũ mang sẵn bảng `lab`; qua API
+    // thì phải gọi tường minh, thiếu là dashboard/settings lệch ngay.
+    need('saveLabProfile', await api.saveLabProfile({
+      data: {
+        name: seed.lab.name, dept: seed.lab.dept, address: seed.lab.address,
+        brandTitle: seed.lab.brand_title, brandSub: seed.lab.brand_sub, logoText: seed.lab.logo_text,
+      },
+    }));
+
+    for (const row of seed.instruments) {
+      need('saveInstrument', await api.saveInstrument({
+        data: {
+          name: row.name, manufacturer: row.manufacturer, serial: row.serial,
+          section: row.section, active: !!row.active,
+        },
+      }));
+    }
+    const instrumentIdByName = new Map((await api.listInstruments()).map((i) => [i.name, i.id]));
+
+    for (const row of seed.tests) {
+      const oldInstrument = seed.instruments.find((i) => i.id === row.instrument_id);
+      need('saveTest', await api.saveTest({
+        data: {
+          name: row.name,
+          instrumentId: instrumentIdByName.get(oldInstrument ? oldInstrument.name : ''),
+          unit: row.unit, decimalPlaces: row.decimal_places,
+          tea: row.tea == null ? undefined : row.tea,
+          section: row.section, teaSource: row.tea_source, teaRefKey: row.tea_ref_key,
+          method: row.method, reagent: row.reagent,
+          cusumOn: !!row.cusum_on, cusumK: row.cusum_k, cusumH: row.cusum_h, active: !!row.active,
+        },
+      }));
+    }
+    const testIdByName = new Map((await api.listTests()).map((t) => [t.name, t.id]));
+    const testIdBySeedId = new Map(seed.tests.map((t) => [t.id, testIdByName.get(t.name)]));
+
+    for (const row of seed.qcLots) {
+      need('saveLot', await api.saveLot({
+        data: {
+          lotNo: row.lot_no, level: row.level, description: row.description, supplier: row.supplier,
+          program: row.program, exp: row.exp, opened: row.opened, active: !!row.active,
+          depleted: !!row.depleted, note: row.note,
+        },
+      }));
+    }
+    const lotIdByNo = new Map((await api.listLots()).map((l) => [l.lot_no, l.id]));
+    const lotIdBySeedId = new Map(seed.qcLots.map((l) => [l.id, lotIdByNo.get(l.lot_no)]));
+
+    for (const group of seed.lotGroups) {
+      need('saveLotGroup', await api.saveLotGroup({
+        data: {
+          name: group.name, manufacturer: group.manufacturer, material: group.material,
+          catalog: group.catalog, note: group.note, active: group.active !== 0,
+          status: group.status === 'active' ? '' : (group.status || ''),
+          lotIds: group.lotIds.map((id) => lotIdBySeedId.get(id)).filter(Boolean),
+        },
+      }));
+    }
+
+    for (const panel of seed.qcPanels) {
+      const oldInstrument = seed.instruments.find((i) => i.id === panel.instrument_id);
+      need('savePanel', await api.savePanel({
+        data: {
+          name: panel.name,
+          instrumentId: instrumentIdByName.get(oldInstrument ? oldInstrument.name : ''),
+          note: panel.note, active: panel.active !== 0,
+          testIds: panel.testIds.map((id) => testIdBySeedId.get(id)).filter(Boolean),
+        },
+      }));
+    }
+
+    // Mean/SD + gán lô PHẢI đứng trước addPoint: `addPoint` từ chối mức chưa
+    // thuộc Panel và nhóm lô đang vận hành (`level-not-operational`).
+    for (const level of seed.testLevels) {
+      need('saveTestLevel', await api.saveTestLevel({
+        testId: testIdBySeedId.get(level.test_id),
+        data: {
+          level: level.level, mean: level.mean, sd: level.sd,
+          low: level.low, high: level.high, qcLotId: lotIdBySeedId.get(level.qc_lot_id),
+        },
+      }));
+    }
+
+    let points = 0;
+    for (const point of seed.qcPoints) {
+      need('addPoint', await api.addPoint({
+        data: {
+          testId: testIdBySeedId.get(point.test_id), level: point.level, date: point.date,
+          val: point.val, runId: point.run_id, note: point.note, operatorName: point.operator_name,
+        },
+      }));
+      points++;
+    }
+
+    for (const period of seed.sigmaPeriods) {
+      const testId = testIdBySeedId.get(period.testId);
+      need('setSigmaTracking', await api.setSigmaTracking({ testId, tracked: true }));
+      // Hai hàm này nhận input PHẲNG (không bọc `data`), và trường nguồn TEa
+      // tên là `source` chứ không phải `teaSource` — chữ ký thật của
+      // `sigma-handlers.ts`, không suy từ tên field của seed.
+      need('saveSigmaTeaConfig', await api.saveSigmaTeaConfig({
+        testId, source: period.teaSource, tea: period.tea,
+      }));
+      need('saveSigmaPeriod', await api.saveSigmaPeriod({
+        testId, period: period.period, tea: period.tea,
+        teaSource: period.teaSource, levels: period.levels,
+      }));
+    }
+
+    for (const comparison of seed.reagentComparisons) {
+      const created = need('createReagentComparison', await api.createReagentComparison({
+        data: { name: comparison.reagent, unit: comparison.unit },
+      }));
+      const id = created && created.id ? created.id : (await api.listReagentComparisons())[0].id;
+      need('saveReagentMetadata', await api.saveReagentMetadata({
+        id,
+        data: {
+          reagent: comparison.reagent, lotOld: comparison.lot_old, lotNew: comparison.lot_new,
+          date: comparison.date, operator: comparison.operator, sampleType: comparison.sample_type,
+          unit: comparison.unit, biasTarget: comparison.bias_target, alpha: comparison.alpha,
+          coverageConfirmed: comparison.coverage_confirmed === 1,
+        },
+      }));
+      // `saveRows` đọc `payload.rows`, KHÔNG phải `payload.data.rows`.
+      need('saveReagentRows', await api.saveReagentRows({
+        id, rows: JSON.parse(comparison.rows_json),
+      }));
+    }
+
+    for (const record of seed.nceRecords) {
+      const detail = JSON.parse(record.detail_json || '{}');
+      const created = need('createNce', await api.createNce({
+        data: {
+          testId: testIdBySeedId.get(record.test_id), level: record.level, lot: record.lot,
+          date: record.date, rule: record.rule, errorType: record.error_type,
+          correction: detail.correction, dueDate: record.due_date,
+        },
+      }));
+      // `owner` (người phụ trách) KHÔNG thuộc `NceCreateInput` — nó nằm trong
+      // `protocol`, lưu qua `saveNceProtocol`. `nceApprovalReadiness` chỉ gác
+      // bước DUYỆT nên lưu nháp chỉ với `owner` là hợp lệ. Thiếu bước này thì
+      // dòng "Phụ trách: ..." trên trang Khắc phục sự cố hiện "—".
+      if (detail.owner) {
+        need('saveNceProtocol', await api.saveNceProtocol({
+          data: { id: created.id, owner: detail.owner, correction: detail.correction },
+        }));
+      }
+    }
+
+    return { points, tests: testIdByName.size, lots: lotIdByNo.size };
+  }, v2);
+
+  // Buộc ghi xuống IndexedDB TRƯỚC khi tải lại: `persist()` gộp 250ms, nên
+  // reload ngay sẽ cắt ngang và trang mới mở với database rỗng.
+  await page.evaluate(async () => {
+    const flush = window.__qcPreviewFlush;
+    if (typeof flush !== 'function') throw new Error('[seed] thiếu __qcPreviewFlush — bản xem trước chưa nạp?');
+    await flush();
+  });
+
+  // Tải lại để app đọc lại từ đầu đúng như một phiên mới.
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForFunction(() => typeof window.qcApi !== 'undefined', null, { timeout: 30000 });
+  return result;
+}
+
+module.exports.seedV2ViaApi = seedV2ViaApi;

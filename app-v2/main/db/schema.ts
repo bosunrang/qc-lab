@@ -3,6 +3,8 @@
 // cột JSON. Nguyên tắc: tách bảng quan hệ thật khi có truy vấn
 // WHERE/JOIN/sort thật cần (đặc biệt `qc_points`); giữ cột *_json khi cấu
 // trúc luôn đọc/ghi nguyên khối theo cha, không filter xuyên hàng.
+import type { SqliteLike } from './sqlite-like';
+
 export const SCHEMA_VERSION = 1;
 
 export const SCHEMA_SQL = `
@@ -135,6 +137,11 @@ CREATE TABLE IF NOT EXISTS tests (
   tea REAL NOT NULL DEFAULT 0,
   tea_source TEXT NOT NULL DEFAULT '',
   tea_ref_key TEXT NOT NULL DEFAULT '',
+  eflm_analyte TEXT NOT NULL DEFAULT '',
+  eflm_aps TEXT NOT NULL DEFAULT 'desirable',
+  eflm_lookup_date TEXT NOT NULL DEFAULT '',
+  eflm_ref TEXT NOT NULL DEFAULT '',
+  sigma_tracked INTEGER NOT NULL DEFAULT 1,
   active INTEGER NOT NULL DEFAULT 1,
   rule_actions_json TEXT NOT NULL DEFAULT '{}',
   rule_scopes_json TEXT NOT NULL DEFAULT '{}',
@@ -340,6 +347,12 @@ export function applySchema(db: { exec: (sql: string) => void; prepare?: (sql: s
     if (!cols.some((c) => c.name === 'analyte_id')) {
       db.exec("ALTER TABLE tests ADD COLUMN analyte_id TEXT NOT NULL DEFAULT '';");
     }
+    if (!cols.some((c) => c.name === 'sigma_tracked')) {
+      db.exec('ALTER TABLE tests ADD COLUMN sigma_tracked INTEGER NOT NULL DEFAULT 1;');
+    }
+    for (const [name, sql] of [['eflm_analyte', "TEXT NOT NULL DEFAULT ''"], ['eflm_aps', "TEXT NOT NULL DEFAULT 'desirable'"], ['eflm_lookup_date', "TEXT NOT NULL DEFAULT ''"], ['eflm_ref', "TEXT NOT NULL DEFAULT ''"]] as const) {
+      if (!cols.some((c) => c.name === name)) db.exec(`ALTER TABLE tests ADD COLUMN ${name} ${sql};`);
+    }
     const groupCols = db.prepare("PRAGMA table_info('lot_groups')").all() as { name: string }[];
     if (!groupCols.some((c) => c.name === 'archived_lot_ids_json')) {
       db.exec("ALTER TABLE lot_groups ADD COLUMN archived_lot_ids_json TEXT NOT NULL DEFAULT '';");
@@ -353,4 +366,21 @@ export function applySchema(db: { exec: (sql: string) => void; prepare?: (sql: s
       db.exec("ALTER TABLE test_levels ADD COLUMN mean_sd_effective_from TEXT NOT NULL DEFAULT '';");
     }
   }
+}
+
+/** Chèn các dòng khởi tạo bắt buộc cho một database CÒN RỖNG: mốc
+ * `schemaVersion` trong `app_meta` và dòng `lab` id=1 (hồ sơ phòng xét
+ * nghiệm, mọi trang Cài đặt đều đọc/ghi đúng dòng này).
+ *
+ * Tách ra khỏi `openDatabase()` (2026-09-09) vì bản xem trước qua trình duyệt
+ * mở SQLite bằng sql.js/WASM chứ không qua `node:sqlite`, nên không gọi được
+ * `openDatabase()` — mà nếu nó tự chèn lại 2 dòng này thì đó lại đúng là kiểu
+ * nhân bản logic mà cả đợt này đang đi gỡ. Idempotent: chỉ chạy khi chưa có
+ * mốc `schemaVersion`.
+ */
+export function seedInitialRows(db: SqliteLike): void {
+  const row = db.prepare("SELECT value FROM app_meta WHERE key='schemaVersion'").get() as { value: string } | undefined;
+  if (row) return;
+  db.prepare("INSERT INTO app_meta(key,value) VALUES('schemaVersion',?)").run(String(SCHEMA_VERSION));
+  db.prepare('INSERT OR IGNORE INTO lab(id) VALUES (1)').run();
 }

@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 
 const { loadSandbox, run } = require('../../tests/helpers/sandbox.js');
-const { calculateReagentComparison } = require('../../app-v2-dist/main/domain/reagent-stats.js');
+const { calculateReagentComparison, reagentValidPairs } = require('../../app-v2-dist/main/domain/reagent-stats.js');
 
 const ctx = loadSandbox(['core.js', 'generated/modular-pilot.js']);
 run(ctx, 'function esc(s){return s==null?"":String(s);} function escAttr(s){return esc(s);}');
@@ -74,6 +74,23 @@ function compare(rows, overrides = {}) {
   const rows = oldVals.map(v => [v, v * 1.1]);
   const R = compare(rows);
   close(R.bias, 10, 1e-6);
+}
+
+// Case 6: du lieu qua IPC/import phai la so HOAN CHINH va huu han. Khong
+// duoc coi "12abc", Infinity hay chuoi trang la mot cap hop le.
+{
+  const pairs = reagentValidPairs([['12abc', '13'], ['Infinity', '14'], [' ', '15'], ['12.5', '13.5'], [-2, '-1']]);
+  assert.deepEqual(pairs.o, [12.5, -2]);
+  assert.deepEqual(pairs.n, [13.5, -1]);
+}
+
+// Case 7: alpha >= .5 khong co nghia cho t critical mot phia (ham hien thi
+// suy ra no tu p-value hai phia = 2 × alpha), nen du lieu cu khong hop le
+// phai quay ve mac dinh an toan thay vi tinh ra chi so sai.
+{
+  const rows = [[10, 10.1], [20, 20.1], [30, 30.1], [40, 40.1], [50, 50.1]];
+  const R = calculateReagentComparison(makeDs(rows, { alpha: 0.8 }), 5);
+  assert.equal(R.alpha, 0.05);
 }
 
 console.log('app-v2 reagent-stats oracle tests passed');

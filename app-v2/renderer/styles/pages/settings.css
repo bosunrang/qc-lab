@@ -1,8 +1,8 @@
 /* Trang Cài đặt — port từ assets/professional-settings.css + phần
    .admin-tools/.brand-preview/.file-pick nằm rải ở assets/app.css và
    .admin-tool ở assets/components.css của app cũ (Giai đoạn D3.3).
-   KHÔNG port CSS của 2 panel Firebase (`.firebase-*`, `.rules-*`) — app-v2
-   chưa có Firebase (C2 tạm dừng), thêm CSS cho panel không tồn tại là rác. */
+   Firebase/Rules được hoàn thiện ở C2: giữ cấu trúc lưới và trạng thái của
+   app cũ, nhưng toàn bộ thao tác vẫn đi qua IPC an toàn ở main process. */
 
 .settings-profile-grid{
   display:grid;
@@ -51,6 +51,19 @@
   margin-top:6px;
 }
 
+/* `.panel` không có padding để tiêu đề nền xám chạm đúng viền. Vì vậy nội
+   dung `grid2` của thẻ Logo phải tự mang lề trong, nếu không ô nhập sẽ dính
+   vào cạnh trái/phải của thẻ. */
+.settings-profile-grid > .panel > .grid2{
+  /* Tiêu đề panel đã có khoảng hở dưới; chỉ thêm lề ngang để form Logo
+     thẳng hàng theo trục dọc với form Thông tin đơn vị bên cạnh. */
+  margin:0 16px;
+}
+.settings-profile-grid > .panel > .grid2 > div > label:first-child{
+  /* Cùng với `.settings-unit-fields label`: nhãn đầu tiên không được mang
+     margin-top mặc định, nếu không toàn bộ form Logo thấp hơn 8px. */
+  margin-top:0;
+}
 
 .brand-preview{
   display:flex;
@@ -108,6 +121,49 @@
 .lis-gateway-panel .alert{margin:0}
 .lis-queue-table td.num,.lis-queue-table th.num{text-align:center}
 
+/* Giữ góc bo của panel khi dải nền `.panel-title` bám sát mép (margin âm bù
+   padding panel — xem app.css). Port từ `assets/professional-settings.css`.
+   Các rule `.firebase-sync-panel > label`/`> .hint` của bản cũ KHÔNG cần port:
+   app-v2 bọc nội dung trong `.firebase-body` nên không có label nào là con
+   trực tiếp của panel. */
+.firebase-sync-panel{overflow:hidden}
+.firebase-body{display:grid;gap:10px;margin:var(--panel-content-gap) 16px 0}
+.firebase-auth-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.firebase-auth-grid > div:last-child{grid-column:1 / -1}
+.firebase-auth-grid label,.firebase-body > label{margin-top:0}
+/* Ô dán cấu hình vẫn cao để đọc dễ, nhưng dùng đúng cỡ/chữ/line-height của
+   textarea hệ thống; khối Firebase Rules bên dưới mới là vùng monospace. */
+.firebase-config-input{width:100%;min-height:168px;resize:vertical;font-family:var(--sans);font-size:var(--type-body);line-height:normal}
+.firebase-actions{display:flex;gap:8px;flex-wrap:wrap}
+.firebase-rules-panel{margin-bottom:16px}
+.firebase-guide{margin:var(--panel-content-gap) 16px 0;border:1px solid var(--line);border-radius:var(--surface-radius);background:var(--surface-card-soft)}
+.firebase-guide summary{padding:11px 13px;cursor:pointer;color:var(--ink);font-weight:750}
+.firebase-guide-body{padding:0 13px 13px;color:var(--muted);font-size:var(--type-body-sm);line-height:1.6}
+.firebase-guide-body p{margin:7px 0}
+.fb-step{display:grid;grid-template-columns:25px minmax(0,1fr);gap:9px;padding:8px 0;border-top:1px solid var(--line)}
+.fb-step:first-child{border-top:0;padding-top:0}.fb-step:last-child{padding-bottom:0}
+.fb-num{width:25px;height:25px;border-radius:50%;display:grid;place-items:center;background:var(--teal);color:white;font-size:12px;font-weight:800}
+.fb-step-body h4{margin:1px 0 2px;color:var(--ink);font-size:var(--type-body-sm)}
+.rules-tools{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 16px 0;color:var(--muted);font-size:var(--type-body-sm)}
+/* Giữ font monospace để Rules không mất cấu trúc, nhưng bề mặt phải theo app
+   cũ: nền sáng, chữ màu hệ thống — không dùng khối code nền đen. */
+.rules-code{max-height:360px;overflow:auto;margin:8px 16px 16px;padding:14px;border:1px solid #dbe7ed;border-radius:var(--radius-md);background:var(--surface-card-soft);color:var(--ink);font:var(--type-caption)/1.55 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre}
+
+/* H2 trong React được browser stylesheet nâng lên 1.5em. Các tiêu đề panel
+   chuẩn của hệ thống dùng 14px/800, strip #eef2f4 và padding 10×14px. Scope
+   theo Cài đặt để không làm đổi hierarchy của những trang khác. */
+.settings-profile-grid > .panel > h2.panel-title:first-child,
+.settings-cloud-grid > .panel > h2.panel-title:first-child,
+.settings-admin-panel > h2.panel-title:first-child,
+.firebase-rules-panel > h2.panel-title:first-child{
+  min-height:0;
+  padding:10px 14px;
+  background:#eef2f4;
+  font-size:14px;
+  font-weight:800;
+  line-height:21px;
+}
+
 @media(max-width:1150px){
 .settings-profile-grid, .settings-cloud-grid{
   grid-template-columns:1fr;
@@ -129,5 +185,13 @@
   margin-left:12px;
 }
 
+.settings-profile-grid > .panel > .grid2{
+  margin-right:12px;
+  margin-left:12px;
+}
+
 .lis-gateway-body{margin-right:12px;margin-left:12px}
+.firebase-body{margin-right:12px;margin-left:12px}
+.firebase-guide,.rules-code{margin-right:12px;margin-left:12px}
+.rules-tools{margin-right:12px;margin-left:12px;align-items:flex-start;flex-direction:column}
 }

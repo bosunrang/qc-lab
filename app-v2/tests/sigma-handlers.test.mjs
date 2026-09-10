@@ -17,6 +17,28 @@ const actor = { userId: 'u1', username: 'admin', name: 'Quan tri vien', role: 'a
 const instrument = config.saveInstrument({ data: { name: 'May A' } }, actor).data;
 const test = config.saveTest({ data: { name: 'Glucose', instrumentId: instrument.id, unit: 'mg/dL' } }, actor).data;
 
+// Nút Thêm/Xóa trong Sigma chỉ bật/tắt theo dõi, không xóa danh mục xét nghiệm.
+const untracked = sigmaHandlers.setTracking({ testId: test.id, tracked: false }, actor);
+assert.equal(untracked.ok, true);
+assert.equal(db.prepare('SELECT sigma_tracked FROM tests WHERE id=?').get(test.id).sigma_tracked, 0);
+const retracked = sigmaHandlers.setTracking({ testId: test.id, tracked: true }, actor);
+assert.equal(retracked.ok, true);
+assert.equal(db.prepare('SELECT sigma_tracked FROM tests WHERE id=?').get(test.id).sigma_tracked, 1);
+
+// TEa/EFLM được chỉnh tại Sigma nhưng là cấu hình cho kỳ SAU; không đụng dữ
+// liệu kỳ đã lưu. Các trường truy xuất phải được lưu cùng xét nghiệm.
+const teaConfig = sigmaHandlers.saveTeaConfig({ testId: test.id, source: 'eflm', tea: 5.5, eflmAnalyte: 'Glucose', eflmAps: 'desirable', eflmLookupDate: '2026-09-09', eflmRef: 'https://biologicalvariation.eu' }, actor);
+assert.equal(teaConfig.ok, true);
+assert.equal(teaConfig.data.tea_source, 'eflm');
+assert.equal(teaConfig.data.tea, 5.5);
+assert.equal(teaConfig.data.eflm_analyte, 'Glucose');
+// Đổi nguồn riêng không được xoá metadata EFLM đã nhập; đây là lời gọi từ
+// dropdown thật, không kèm lại toàn bộ form EFLM.
+const switchTeaSource = sigmaHandlers.saveTeaConfig({ testId: test.id, source: 'lab' }, actor);
+assert.equal(switchTeaSource.ok, true);
+assert.equal(switchTeaSource.data.eflm_analyte, 'Glucose');
+assert.equal(switchTeaSource.data.eflm_ref, 'https://biologicalvariation.eu');
+
 // 1) Ky khong hop le
 const badPeriod = sigmaHandlers.savePeriod({ testId: test.id, period: '2026/08', levels: [{ level: 1, cv: 2 }] }, actor);
 assert.equal(badPeriod.ok, false);
@@ -39,11 +61,36 @@ assert.ok(Math.abs(lv.sigma.sigma - (15 - 1.2) / 3) < 1e-9);
 assert.ok(lv.mu, 'phai tinh duoc MU khi co CV');
 assert.equal(lv.mu.complete, true, 'du ca 3 thanh phan (cv/bias/cal) phai la complete');
 
-// 3) listPeriods phai tra dung 1 ky, tinh LAI dung nhu luc luu
+// CLIA có giới hạn tuyệt đối phải chụp TEa theo TỪNG mức QC. Nếu dùng chung
+// tea của kỳ, hai mức có Mean khác nhau sẽ bị tính Sigma/MDC/MU sai.
+const perLevelTea = sigmaHandlers.savePeriod({
+  testId: test.id, period: '2026-06', tea: 4,
+  levels: [{ level: 1, tea: 2, targetMean: 100, cv: 1, biasEqa: 0.5 }, { level: 2, tea: 8, targetMean: 200, cv: 1, biasEqa: 0.5 }],
+}, actor);
+assert.equal(perLevelTea.ok, true);
+assert.equal(perLevelTea.data.levels[0].tea, 2);
+assert.equal(perLevelTea.data.levels[1].tea, 8);
+assert.equal(perLevelTea.data.levels[0].sigma.sigma, 1.5);
+assert.equal(perLevelTea.data.levels[1].sigma.sigma, 7.5);
+assert.equal(perLevelTea.data.levels[0].targetMean, 100);
+assert.equal(perLevelTea.data.levels[1].targetMean, 200);
+assert.ok(Math.abs(perLevelTea.data.levels[1].mu.absoluteU - perLevelTea.data.levels[0].mu.absoluteU * 2) < 1e-9, 'MU tuyệt đối phải dùng Mean đã chốt của đúng mức');
+
+// Nút "+ Thêm kỳ" chỉ tạo mới như app cũ, không được ghi đè kỳ hiện hữu.
+const duplicateCreate = sigmaHandlers.savePeriod({
+  testId: test.id, period: '2026-08', tea: 15, teaSource: 'CLIA', createOnly: true,
+  levels: [{ level: 1, cv: 99, biasEqa: 1.2, uCal: 0.5 }],
+}, actor);
+assert.equal(duplicateCreate.ok, false);
+assert.equal(duplicateCreate.error.code, 'duplicate-period');
+assert.equal(sigmaHandlers.listPeriods(test.id).find((period) => period.period === '2026-08').levels[0].cv, 3, 'tao trung ky khong duoc ghi de so lieu da luu');
+
+// 3) listPeriods phai tra dung cac ky da luu (2026-06 tu case TEa theo muc
+// o tren + 2026-08), sap tang dan theo ky, va tinh LAI dung nhu luc luu.
 const periods = sigmaHandlers.listPeriods(test.id);
-assert.equal(periods.length, 1);
-assert.equal(periods[0].period, '2026-08');
-assert.ok(Math.abs(periods[0].levels[0].sigma.sigma - lv.sigma.sigma) < 1e-9);
+assert.deepEqual(periods.map((period) => period.period), ['2026-06', '2026-08']);
+const august = periods.find((period) => period.period === '2026-08');
+assert.ok(Math.abs(august.levels[0].sigma.sigma - lv.sigma.sigma) < 1e-9);
 
 // 4) Luu lai CUNG ky (thang 08) phai CAP NHAT, khong tao dong moi
 const resaved = sigmaHandlers.savePeriod({
@@ -51,8 +98,19 @@ const resaved = sigmaHandlers.savePeriod({
   levels: [{ level: 1, cv: 4, biasEqa: 0.5, uCal: 0.3 }],
 }, actor);
 assert.equal(resaved.ok, true);
-assert.equal(sigmaHandlers.listPeriods(test.id).length, 1, 'van dung 1 ky, khong nhan doi');
-assert.equal(sigmaHandlers.listPeriods(test.id)[0].levels[0].cv, 4);
+const afterResave = sigmaHandlers.listPeriods(test.id);
+assert.equal(afterResave.filter((period) => period.period === '2026-08').length, 1, 'van dung 1 ky 2026-08, khong nhan doi');
+assert.equal(afterResave.find((period) => period.period === '2026-08').levels[0].cv, 4);
+
+// 4b) Đổi kỳ là một giao dịch riêng: không được tạo bản mới rồi để lại bản
+// cũ (KTV có quyền sửa nhưng không có quyền xóa kỳ).
+const renamed = sigmaHandlers.renamePeriod({ id: resaved.data.id, period: '2026-07' }, actor);
+assert.equal(renamed.ok, true);
+assert.equal(renamed.data.period, '2026-07');
+const afterRename = sigmaHandlers.listPeriods(test.id);
+assert.equal(afterRename.some((period) => period.period === '2026-08'), false, 'doi ky khong duoc de lai ban ghi cu');
+assert.equal(afterRename.filter((period) => period.period === '2026-07').length, 1);
+assert.equal(afterRename.find((period) => period.period === '2026-07').id, `${test.id}:2026-07`);
 
 // 5) Ky KHONG co u(cal) phai bi danh dau "chua du" (missing), KHONG duoc coi
 // nhu 0 - dung dung nguyen tac da chot trong ke hoach kien truc.
@@ -64,18 +122,54 @@ assert.equal(noCoA.data.levels[0].mu.complete, false);
 assert.ok(noCoA.data.levels[0].mu.missing.includes('u(cal)'));
 assert.equal(noCoA.data.levels[0].mu.uCal, null, 'u(cal) chua danh gia phai la null, khong duoc la 0');
 
-// 6) Nhieu vong EQA/EQC -> Bias% dung RMS, KHONG dung trung binh cong co dau
-// (2 vong doi dau [-2,2] trung binh cong = 0, RMS phai la 2).
+// Không được giả định Bias = 0 khi EQA/EQC chưa có: Sigma phải để trống để
+// tránh kết luận năng lực quá lạc quan.
+const missingBias = sigmaHandlers.savePeriod({
+  testId: test.id, period: '2026-09', tea: 15, levels: [{ level: 1, cv: 3 }],
+}, actor);
+assert.equal(missingBias.ok, true);
+assert.equal(missingBias.data.levels[0].sigma, null);
+
+// 6) Mỗi vòng EQA/EQC phải truy vết được KQ PXN + Target; Bias% được tính
+// lại từ cặp đó. Nhiều vòng dùng RMS, không dùng trung bình cộng có dấu.
 const eqaSaved = sigmaHandlers.savePeriod({
   testId: test.id, period: '2026-10', tea: 15,
-  levels: [{ level: 1, cv: 3, eqaRounds: [-2, 2], uCal: 0.5 }],
+  levels: [{ level: 1, cv: 3, eqaRounds: [{ lab: 98, target: 100 }, { lab: 102, target: 100 }], uCal: 0.5 }],
 }, actor);
 assert.equal(eqaSaved.ok, true);
 const eqaLv = eqaSaved.data.levels[0];
 assert.ok(Math.abs(eqaLv.biasEqa - 2) < 1e-9, 'bias phai la RMS=2, khong phai trung binh cong=0');
 assert.equal(eqaLv.mixedSigns, true, 'phai bao dau trai nhau de canh bao tren UI');
-assert.deepEqual(eqaLv.eqaRounds, [-2, 2]);
+assert.deepEqual(eqaLv.eqaRounds, [{ lab: 98, target: 100, bias: -2 }, { lab: 102, target: 100, bias: 2 }]);
 // u(bias) phai tinh duoc tu bias RMS + biasRefU (SD giua cac vong/can(n))
 assert.ok(eqaLv.mu.uBias != null, 'co eqaRounds phai tinh duoc u(bias), khong con null');
+
+// 7) Chặn dữ liệu số không hợp lệ ngay ở IPC, thay vì lưu NaN vào JSON rồi
+// làm biểu đồ/bảng Sigma mất định dạng ở lần đọc sau.
+const badCv = sigmaHandlers.savePeriod({ testId: test.id, period: '2026-11', tea: 15, levels: [{ level: 1, cv: 0 }] }, actor);
+assert.equal(badCv.ok, false);
+assert.equal(badCv.error.code, 'invalid-cv');
+const duplicateLevel = sigmaHandlers.savePeriod({ testId: test.id, period: '2026-11', tea: 15, levels: [{ level: 1, cv: 2 }, { level: 1, cv: 3 }] }, actor);
+assert.equal(duplicateLevel.ok, false);
+assert.equal(duplicateLevel.error.code, 'duplicate-level');
+const badEqa = sigmaHandlers.savePeriod({ testId: test.id, period: '2026-11', tea: 15, levels: [{ level: 1, cv: 2, eqaRounds: [{ lab: 99, target: 0 }] }] }, actor);
+assert.equal(badEqa.ok, false);
+assert.equal(badEqa.error.code, 'invalid-eqa-round');
+
+// Kỳ đời cũ từng chỉ lưu Bias%; handler vẫn đọc được để lịch sử không mất.
+const legacyEqa = sigmaHandlers.savePeriod({ testId: test.id, period: '2026-12', tea: 15, levels: [{ level: 1, cv: 3, eqaRounds: [-2, 2] }] }, actor);
+assert.equal(legacyEqa.ok, true);
+assert.deepEqual(legacyEqa.data.levels[0].eqaRounds, [{ lab: null, target: null, bias: -2 }, { lab: null, target: null, bias: 2 }]);
+
+// 8) Nạp CV lô đọc toàn bộ vòng đời lô, nhưng phải có dữ liệu ngay trong kỳ.
+for (let i = 0; i < 20; i++) {
+  db.prepare('INSERT INTO qc_points(id,test_id,level,date,run_id,lot,val,qc_mean,qc_sd) VALUES (?,?,?,?,?,?,?,?,?)')
+    .run(`p${i}`, test.id, 1, `2026-08-${String(i + 1).padStart(2, '0')}`, '', 'LOT-SG', 100 + (i % 2), 100, 2);
+}
+const cohorts = sigmaHandlers.listCohorts(test.id, '2026-08', [1]);
+assert.equal(cohorts.length, 1);
+assert.equal(cohorts[0].lot, 'LOT-SG');
+assert.equal(cohorts[0].status, 'provisional');
+assert.ok(cohorts[0].cv > 0);
 
 console.log('app-v2 sigma-handlers end-to-end tests passed');

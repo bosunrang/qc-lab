@@ -45,6 +45,7 @@
     "@types/node": "^26.4.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",
+    "@types/sql.js": "^1.4.11",
     "axe-core": "^4.12.1",
     "electron": "^43.2.0",
     "electron-builder": "^26.15.3",
@@ -52,6 +53,7 @@
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.3",
+    "sql.js": "^1.14.2",
     "typescript": "^7.0.2",
     "vite": "^8.2.1",
     "zustand": "^5.0.15"

@@ -1,7 +1,13 @@
 // Danh mục TEa chuẩn port nguyên giá trị CLIA/Ricos từ app cũ
 // (`TEA_ANALYTE_CATALOG`). Đây là dữ liệu tham chiếu chỉ đọc; hồ sơ TEa PXN
 // trong SQLite được hiển thị như lớp phủ riêng, không ghi đè catalog này.
-export type TeaCatalogItem = { id: string; name: string; abbr: string; unit: string; section: string; clia: number | null; ricos: number | null };
+export type TeaCatalogItem = {
+  id: string; name: string; abbr: string; unit: string; section: string;
+  clia: number | null; ricos: number | null;
+  /** Giới hạn CLIA tuyệt đối (CMS-3355-F), chỉ dùng khi đơn vị xét nghiệm
+   * khớp chính xác. Không thay thế giới hạn phần trăm nếu cả hai cùng có. */
+  cliaAbsolute?: number; cliaAbsoluteUnit?: string;
+};
 type TeaCatalogSeed = readonly [
   id: string,
   name: string,
@@ -35,6 +41,30 @@ export const TEA_CATALOG: readonly TeaCatalogItem[] = TEA_CATALOG_ROWS.map(
     ricos,
   }),
 );
+
+/** Các giới hạn tuyệt đối có trong `TEA_ANALYTE_CATALOG` của app cũ. Tách
+ * riêng khỏi tuple 77 dòng giúp phần danh mục dễ rà soát; giá trị là nguồn
+ * tham chiếu, tuyệt đối không phải TEa% đã quy đổi. */
+const CLIA_ABSOLUTE: Readonly<Record<string, readonly [number, string]>> = {
+  'qclab-alt': [6, 'U/L'], 'qclab-ast': [6, 'U/L'],
+  'qclab-bilirubin-total': [6.84, 'µmol/L'], 'qclab-calcium': [0.2495, 'mmol/L'],
+  'qclab-creatinine': [17.68, 'µmol/L'], 'qclab-ggt': [5, 'U/L'],
+  'qclab-glucose': [0.3331, 'mmol/L'], 'qclab-hdl-c': [0.1552, 'mmol/L'],
+  'qclab-phosphate': [0.0969, 'mmol/L'], 'qclab-potassium': [0.3, 'mmol/L'],
+  'qclab-sodium': [4, 'mmol/L'], 'qclab-troponin-i': [0.9, 'ng/mL'],
+  'qclab-troponin-t': [0.2, 'ng/mL'], 'qclab-cea': [1, 'ng/mL'],
+  'qclab-folate': [1, 'ng/mL'], 'qclab-fsh': [2, 'IU/L'],
+  'qclab-hcg': [3, 'mIU/mL'], 'qclab-psa': [0.2, 'ng/mL'],
+  'qclab-ft4': [3.861, 'pmol/L'], 'qclab-t4-total': [12.87, 'nmol/L'],
+  'qclab-testosterone': [0.694, 'nmol/L'], 'qclab-tsh': [0.2, 'mIU/L'],
+  'qclab-vitamin-b12': [30, 'pg/mL'], 'qclab-blood-gas-pco2': [5, 'mmHg'],
+  'qclab-blood-gas-po2': [15, 'mmHg'],
+};
+
+export const TEA_CATALOG_WITH_CLIA_ABSOLUTE: readonly TeaCatalogItem[] = TEA_CATALOG.map((item) => {
+  const absolute = CLIA_ABSOLUTE[item.id];
+  return absolute ? { ...item, cliaAbsolute: absolute[0], cliaAbsoluteUnit: absolute[1] } : item;
+});
 
 export const TEA_SOURCE_CARDS = [
   { label: 'CLIA PT (CMS-3355-F)', detail: 'CMS-3355-F / 42 CFR §§493.931, 493.941 · hiệu lực 11/07/2024 · rà soát 16/07/2026', tag: 'Hiện hành', tone: 'reference', url: 'https://www.ecfr.gov/current/title-42/chapter-IV/subchapter-G/part-493/subpart-I' },

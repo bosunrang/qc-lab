@@ -1,23 +1,6 @@
-/* Khắc phục sự cố — hợp nhất từ assets/professional-reports.css (đọc trực
-   tiếp file gốc — xem CLAUDE.md mục "Sao chép giao diện app cũ"). Chỉ giữ
-   rule khớp class THẬT dùng trong ActionsPage.tsx hiện tại: "Sự cố cần xử
-   lý" (`.issue-*`), "Nhật ký khắc phục" (`.action-log-*`, `.action-chip`),
-   tiêu đề từng phần trong modal (`.action-form-section-title`).
-
-   CHƯA áp dụng (bỏ, có ghi chú) vì form 8 phần của ActionsPage.tsx hiện dùng
-   `.field-row`/`.field`/`<textarea>` chung thay vì layout lưới riêng của bản
-   cũ — `.action-immediate-grid`/`.action-cause-grid`/`.action-release-grid`/
-   `.action-effectiveness-grid`/`.action-residual-grid`/`.action-risk-*`/
-   `.action-investigation-*` (bộ câu hỏi điều tra dạng lưới có chip trạng
-   thái ok/abnormal/na — form app-v2 chỉ có 1 ô textarea tự do), `.sugg-row`/
-   `.sugg-chip`/`.action-suggestions` (bản cũ có khung gợi ý đóng/mở riêng,
-   app-v2 dùng chip phẳng luôn hiện — style riêng cho chip xem ở
-   `app.css`/inline), `.action-incident-banner`, `.action-guide-*` (modal
-   "Quy trình 8 bước" hiện dùng `<Modal>`+`<ol>` chung, không port bố cục thẻ
-   đánh số riêng), `.action-detail-*` (chi tiết hồ sơ hiện dùng `<p>` phẳng
-   theo từng SectionTitle, không port bố cục lưới 2 cột). Đây là khoảng cách
-   kiến trúc JSX, không chỉ CSS — để dành cho một đợt viết lại form/modal chi
-   tiết riêng nếu cần khớp pixel-perfect. */
+/* Khắc phục sự cố — port từ `assets/professional-reports.css`. Form
+   protocol-v3 nằm trong panel (không bó trong modal) với cấu trúc lưới tương
+   ứng app cũ; các rule đầu file phục vụ Sự cố cần xử lý và Nhật ký. */
 
 .action-log-panel{overflow:hidden;}
 .action-log-table{width:100%;min-width:1040px;margin:0;border:0;border-radius:0;table-layout:fixed;}
@@ -67,3 +50,59 @@
 .issue-group.rej{border-left:4px solid var(--danger-accent);}
 .issue-group.warn{border-left:4px solid var(--warning-accent);}
 @media(max-width:640px){.action-form-panel-head{align-items:flex-start;flex-direction:column;}}
+
+/* Protocol NCE v3 — port cấu trúc desktop của `professional-reports.css`.
+   Các lưới dùng gap 10px bên trong một panel có inset 14px, khớp quy tắc
+   spacing chung; không đặt breakpoint mobile vì app-v2 hiện phục vụ desktop. */
+.action-form-body{padding:var(--panel-content-gap);}
+.action-incident-banner{padding:10px 14px;margin-bottom:14px;border:1px solid var(--line);border-left:3px solid var(--teal);border-radius:0 var(--radius-md) var(--radius-md) 0;background:var(--section-head-bg);}
+.action-incident-banner b{display:block;color:var(--ink);font-size:var(--type-body);}
+.action-incident-banner div{margin-top:3px;color:var(--muted);font-size:var(--type-meta);line-height:1.45;}
+.action-form-section{padding:16px 0;border-top:1px solid var(--line);}
+.action-form-section:first-of-type{padding-top:0;border-top:0;}
+summary.action-form-section-title{display:flex;align-items:center;gap:10px;margin:0;padding:4px 0;cursor:pointer;list-style:none;}
+summary.action-form-section-title::-webkit-details-marker{display:none;}
+summary.action-form-section-title::after{content:'';flex:none;width:8px;height:8px;margin-left:2px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg) translate(-2px,-2px);transition:transform .15s ease;}
+details[open]>summary.action-form-section-title{margin-bottom:12px;}
+details[open]>summary.action-form-section-title::after{transform:rotate(-135deg) translate(-2px,-2px);}
+summary.action-form-section-title .action-chip{margin-left:auto;}
+.action-form-section-title>span{display:inline-flex;align-items:center;justify-content:center;flex:none;min-width:30px;height:30px;padding:0 7px;border-radius:var(--radius-pill);background:var(--teal);color:var(--on-accent);font-size:var(--type-meta);font-weight:850;}
+.action-form-section-title b,.action-form-section-title small{display:block;}
+.action-form-section-title b,.action-investigation-head b,.action-form-submit b{font-size:var(--type-body);}
+.action-form-section-title small,.action-form-submit span{margin-top:2px;color:var(--muted);font-size:var(--type-caption);line-height:1.4;}
+.action-ident-groups{display:grid;gap:10px;}
+.action-ident-group{padding:12px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--surface-subtle);}
+.action-ident-group-title{display:flex;align-items:baseline;gap:8px;margin-bottom:9px;}
+.action-ident-group-title b{color:var(--ink);font-size:var(--type-meta);}
+.action-ident-group-title small{color:var(--muted);font-size:var(--type-caption);}
+.action-form-main{display:grid;grid-template-columns:minmax(260px,1.25fr) 110px minmax(180px,.85fr);gap:10px;}
+.action-form-meta{display:grid;grid-template-columns:150px minmax(140px,.7fr) 1fr 1fr 1.1fr minmax(180px,1fr) 170px;gap:10px;}
+.action-immediate-grid{display:grid;grid-template-columns:minmax(220px,.75fr) minmax(250px,1fr) minmax(360px,1.35fr);align-items:start;gap:10px;}
+.action-immediate-grid textarea,.action-cause-grid textarea,.action-effectiveness-grid textarea,.action-patient-grid textarea{min-height:40px;height:40px;resize:vertical;}
+.action-risk-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) minmax(260px,1.8fr);align-items:end;gap:10px;}
+.action-investigation-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+.action-investigation-item{display:grid;grid-template-columns:minmax(140px,.6fr) minmax(170px,.7fr) minmax(220px,1fr);align-items:end;gap:10px;min-width:0;padding:13px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);}
+.action-investigation-item:last-child{grid-column:1/-1;}
+.action-investigation-head{min-width:0;padding-bottom:8px;}
+.action-investigation-note{min-width:0;}
+/* Cột giữa của `.action-investigation-item`. CỐ Ý KHÁC app cũ: bản cũ để
+   `grid-template-columns:repeat(3,...)` vì mỗi câu hỏi điều tra là 3 NÚT
+   `.action-choice`; app-v2 dùng 1 `<select>` 5 lựa chọn (`NCE_CHECKS`), nên
+   port lưới 3 cột sang đây sẽ bóp select còn 1/3 cột. Giữ đúng ý nghĩa
+   (select chiếm đủ cột, ngang bằng ô ghi chú bên cạnh). */
+.action-investigation-choices{min-width:0;}
+.action-investigation-choices select{width:100%;}
+.action-investigation-note input{width:100%;}
+.action-cause-grid{display:grid;grid-template-columns:minmax(190px,.7fr) minmax(280px,1fr) minmax(360px,1.3fr);align-items:start;gap:10px;}
+.action-cause-second-row{display:grid;grid-template-columns:210px minmax(160px,1fr) minmax(160px,1fr);align-items:start;gap:10px;margin-top:10px;}
+.action-release-block,.action-residual-block{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);}
+.action-release-title{display:flex;align-items:baseline;gap:8px;margin-bottom:9px;}
+.action-release-title b{color:var(--ink);font-size:var(--type-meta);}
+.action-release-title small{color:var(--muted);font-size:var(--type-caption);}
+.action-release-grid{display:grid;grid-template-columns:minmax(250px,1.2fr) 190px minmax(180px,.8fr) minmax(280px,1.35fr);align-items:start;gap:10px;}
+.action-patient-grid{display:grid;grid-template-columns:300px minmax(360px,1fr);align-items:start;gap:10px;}
+.action-effectiveness-grid{display:grid;grid-template-columns:240px 200px minmax(360px,1fr);align-items:start;gap:10px;}
+.action-residual-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) minmax(280px,1.7fr);align-items:end;gap:10px;}
+.action-form-submit{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px;border:1px solid var(--section-head-border);border-radius:var(--radius-md);background:var(--section-head-bg);}
+.action-form-submit b,.action-form-submit span{display:block;}
+.action-submit-buttons{display:flex;align-items:center;gap:8px;flex:none;}

@@ -1,11 +1,14 @@
 // Chuỗi hash tamper-evident cho nhật ký hoạt động — tham khảo thuật toán từ
 // bản cũ (src/domain/core/qc-core.ts's auditCanonicalCore/auditSha256Core/
-// verifyAuditChain), nhưng dùng `node:crypto` thật thay vì SHA-256 tự viết
-// tay bằng JS (bản cũ phải tự viết vì core.js còn chạy trong trình duyệt;
-// app mới CHỈ chạy trong main process Electron/Node nên dùng crypto chuẩn
-// của Node — nhanh hơn, ít rủi ro sai sót hơn, cùng thuật toán SHA-256 tiêu
-// chuẩn nên cho ra hash giống hệt bản cũ với cùng input).
-import { createHash } from 'node:crypto';
+// verifyAuditChain). Cùng thuật toán SHA-256 tiêu chuẩn nên cho ra hash
+// giống hệt bản cũ với cùng input.
+//
+// Hàm băm được import từ `./sha256` chứ KHÔNG gọi `node:crypto` tại chỗ nữa
+// (đổi 2026-09-09): đây là file thuần được bản xem trước qua trình duyệt
+// dùng lại, và `sha256.ts` là bản `node:crypto` cho main process còn
+// `sha256-browser.ts` là bản JS thuần được Vite thay vào khi build renderer.
+// Xem comment đầu 2 file đó.
+import { sha256Hex } from './sha256';
 
 export interface AuditEntry {
   id: string;
@@ -33,7 +36,7 @@ export function auditCanonical(value: unknown): string {
 }
 
 export function auditSha256(text: string): string {
-  return createHash('sha256').update(text, 'utf8').digest('hex');
+  return sha256Hex(text);
 }
 
 /** hash = sha256(prevHash + '|' + canonicalJSON(payload không gồm hash/prevHash)). */

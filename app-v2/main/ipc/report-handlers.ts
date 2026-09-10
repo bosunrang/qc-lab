@@ -1,7 +1,7 @@
 // IPC handler cho trang Bao cao: khoa/mo khoa ky bao cao + xem lai diem QC
 // theo khoang ngay. Pham vi rut gon: chua co in an/xuat Excel/CSV nhu ban cu
 // (xem CLAUDE.md "con thieu") - chi co bang xem va khoa ky.
-import type { Db } from '../db/open-database';
+import type { Db } from '../db/sqlite-like';
 import { uid } from '../domain/text-utils';
 import { validateLockPeriod, validateUnlockPeriod, type LockPeriodInput, type UnlockPeriodInput } from '../domain/period-lock-validation';
 import { type Actor, type IpcResult, nowIso, writeAudit, notifyChanged, requireAdmin } from './shared';

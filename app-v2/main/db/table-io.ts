@@ -6,7 +6,7 @@
 // định dạng app cũ), không phải chép lại lần hai.
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { Db } from './open-database';
+import type { Db } from './sqlite-like';
 import { SCHEMA_VERSION } from './schema';
 import { buildBackupEnvelope } from '../domain/backup';
 

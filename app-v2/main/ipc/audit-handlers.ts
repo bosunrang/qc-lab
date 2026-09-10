@@ -2,9 +2,11 @@
 // (đã ghi sẵn từ module đầu tiên qua shared.ts's writeAudit) qua bộ lọc/phân
 // trang THUẦN đã được port sẵn từ bản cũ trong domain/audit-filter.ts nhưng
 // chưa từng được nối vào IPC/renderer nào — đây là lần đầu.
-import type { Db } from '../db/open-database';
+import type { Db } from '../db/sqlite-like';
+// Hình dạng trang nhật ký lấy từ hợp đồng dùng chung (đã có `total`).
+import type { ActivityPage } from '../../shared/qc-api';
 import { rowToAuditEntry, type Actor, type IpcResult, writeAudit, requireAdmin } from './shared';
-import { filterActivity, paginateActivity, type ActivityLike, type ActivityPage } from '../domain/audit-filter';
+import { filterActivity, paginateActivity, type ActivityLike } from '../domain/audit-filter';
 
 type ActivityRow = ActivityLike & { id: string };
 import { verifyAuditChain, type ChainVerifyResult } from '../domain/audit-chain';
@@ -42,12 +44,16 @@ export function createAuditHandlers(db: Db) {
    * `filterActivity()` tự đảo về mới-nhất-trước ở bước cuối, truyền nhầm
    * mảng đã DESC sẵn (như `config.listActivity()`) sẽ đảo ngược 2 lần thành
    * cũ-nhất-trước, sai với quy ước hiển thị của bản cũ. */
-  function query(input: AuditQueryInput): ActivityPage<ActivityLike> & { total: number } {
+  function query(input: AuditQueryInput): ActivityPage {
     const all = allChronological();
     const filtered = filterActivity(all, String(input.query || ''), String(input.from || ''), String(input.to || ''));
     // `total` = TOÀN BỘ nhật ký (không phụ thuộc bộ lọc) — trang Nhật ký của
     // app cũ hiện cả "N dòng hoạt động đã ghi nhận" và "khớp/tổng".
-    return { ...paginateActivity(filtered, Number(input.page) || 1, Number(input.pageSize) || 25), total: all.length };
+    const page = paginateActivity(filtered, Number(input.page) || 1, Number(input.pageSize) || 25);
+    // `paginateActivity` là hàm thuần generic trên `ActivityLike`; hợp đồng
+    // khai `rows: ActivityEntry[]`. Hai hình dạng khớp nhau ở runtime (cùng
+    // do `rowToAuditEntry` dựng), ép một lần ở ranh giới IPC.
+    return { ...page, rows: page.rows as ActivityPage['rows'], total: all.length };
   }
 
   function exportCsv(input: AuditQueryInput): string {

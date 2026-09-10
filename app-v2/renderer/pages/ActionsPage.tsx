@@ -1,8 +1,7 @@
-// Khắc phục sự cố (NCE/CAPA) — Giai đoạn B5 (docs/APP-V2-PLAN.md): form 8
-// phần (nhận diện → điều tra → nguyên nhân → khắc phục → rerun →
-// release-to-service → hiệu lực → residual-risk), chip gợi ý theo
-// causeCategory (SE/RE — tập rút gọn, không port hết ACT_SUGGEST bản cũ),
-// duyệt/trả lại/huỷ/mở lại vòng tiếp theo, hướng dẫn quy trình 8 bước.
+// Khắc phục sự cố (NCE/CAPA): protocol-v3 8 phần port theo luồng app cũ
+// (nhận diện → kiểm soát → FMEA → checklist → nguyên nhân/hành động →
+// release → ảnh hưởng bệnh nhân → hiệu lực/rủi ro còn lại). JSX chỉ giữ
+// state trình bày; điều kiện khép vòng được xác thực lại ở main process.
 import { useEffect, useMemo, useState } from 'react';
 import { useManageStore } from '../store/manage-store';
 import { useNceStore } from '../store/nce-store';
@@ -15,12 +14,12 @@ import { PageHeader } from '../components/PageHeader';
 import { useAuthStore } from '../store/auth-store';
 import { canWrite } from '../lib/permissions';
 import type { NceRecord, NceDetail, QcPointView } from '../../shared/qc-api';
-import { vnDate as formatVnDate } from '../lib/format';
+import { vnDate as formatVnDate, todayIso } from '../lib/format';
 
 /** Luật thuộc SAI SỐ HỆ THỐNG — port `WG_RULE_REGISTRY[].err === 'SE'` app
  * cũ; luật còn lại tính là sai số ngẫu nhiên (RE), đúng cách `errorType()`
  * phân loại. */
-const SE_RULES = ['2-2s', '4-1s', '10x', '8x', '6x', '2of3-2s', '3-1s', '7T'];
+const SE_RULES = ['2-2s', '4-1s', '10x', '8x', '6x', '2of3-2s', '3-1s', '7T', 'CUSUM +h', 'CUSUM −h', 'CUSUM ±h'];
 /** Nhãn trạng thái NGẮN của app cũ (`reportLabels.stateName`). */
 const TREE_STATE: Record<string, string> = { rej: 'Loại', warn: 'Cảnh báo', ok: 'Đạt', none: 'Chưa có' };
 /** `formatDateTimeVN()` app cũ: giờ:phút rồi tới ngày, theo locale vi-VN. */
@@ -33,11 +32,6 @@ function formatDateTimeVN(value: string): string {
 const vnDate = (iso: string) => formatVnDate(iso, '—');
 
 const VERDICT_LABEL: Record<string, string> = { warn: 'Cảnh báo', rej: 'Vi phạm' };
-
-const CAUSE_CHIPS: Record<'SE' | 'RE', string[]> = {
-  SE: ['Hiệu chuẩn lại máy', 'Kiểm tra lô hóa chất/QC mới', 'Kiểm tra nhiệt độ bảo quản', 'Xem lại Mean/SD đang áp dụng'],
-  RE: ['Kiểm tra thao tác hút mẫu', 'Kiểm tra bọt khí trong đường ống/ống mẫu', 'Kiểm tra pipet/kim hút', 'Đào tạo lại kỹ thuật viên'],
-};
 
 const GUIDE_STEPS = [
   '1. Nhận diện sự cố — ghi nhận xét nghiệm/mức/lô/luật vi phạm.',
@@ -54,12 +48,14 @@ function parseDetail(json: string): NceDetail {
   try { return JSON.parse(json || '{}'); } catch { return {}; }
 }
 
+/** Dòng NCE phải gắn vào đúng điểm đã tạo cảnh báo, không chỉ test+mức. */
+type NcePrefill = { testId: string; level: number; pointId: string; lot: string; date: string; rule: string; errorType: 'SE' | 'RE' };
+
 export function ActionsPage() {
   const { tests, loadTests } = useManageStore();
   const store = useNceStore();
   const { summaries, loadSummaries } = useWestgardStore();
-  const [creating, setCreating] = useState(false);
-  const [prefill, setPrefill] = useState<{ testId: string; level: number } | null>(null);
+  const [form, setForm] = useState<{ prefill: NcePrefill | null; record: NceRecord | null } | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const writable = canWrite(useAuthStore((s) => s.user)?.role);
 
@@ -110,7 +106,7 @@ export function ActionsPage() {
     const groups: {
       key: string; testName: string; date: string; severity: 'warn' | 'rej'; count: number;
       items: {
-        key: string; testId: string; level: number; severity: 'warn' | 'rej';
+        key: string; testId: string; level: number; pointId: string; lot: string; date: string; rule: string; errorType: 'SE' | 'RE'; severity: 'warn' | 'rej';
         levelLabel: string; state: string; meta: string; footer: string;
         openRecordId: string | null;
       }[];
@@ -126,8 +122,10 @@ export function ActionsPage() {
             ? store.records.find((r) => r.record_status === 'active' && r.point_id === lv.latest!.id)
             : undefined;
           const err = lv.latestRules.some((r) => SE_RULES.includes(r)) ? 'SE — Sai số hệ thống' : 'RE — Sai số ngẫu nhiên';
+          const errorType: 'SE' | 'RE' = lv.latestRules.some((r) => SE_RULES.includes(r)) ? 'SE' : 'RE';
           return {
             key: `${s.testId}:${lv.level}`, testId: s.testId, level: lv.level,
+            pointId: lv.latest!.id, lot: lv.lot, date: lv.latest!.date, rule: lv.latestRules.join(', '), errorType,
             severity: lv.latestVerdict as 'warn' | 'rej',
             levelLabel: `M${lv.level} · Lô ${lv.lot || '—'}`,
             state: TREE_STATE[lv.latestVerdict],
@@ -174,8 +172,8 @@ export function ActionsPage() {
                         <div className="hint">{item.severity === 'rej' ? 'Hướng ngẫu nhiên: bọt khí, thể tích hút, mẫu QC pha/bảo quản, điện áp, thao tác.' : 'Theo dõi thêm điểm QC tiếp theo trước khi kết luận.'}</div>
                       </div>
                       {item.openRecordId
-                        ? <button type="button" className="btn ghost sm" onClick={() => setDetailId(item.openRecordId!)}>Tiếp tục hồ sơ</button>
-                        : <button type="button" className="btn ghost sm" onClick={() => { setPrefill({ testId: item.testId, level: item.level }); setCreating(true); }}>Lập hồ sơ</button>}
+                        ? <button type="button" className="btn ghost sm" onClick={() => setForm({ prefill: null, record: store.records.find((r) => r.id === item.openRecordId) || null })}>Tiếp tục hồ sơ</button>
+                        : <button type="button" className="btn ghost sm" onClick={() => setForm({ prefill: { testId: item.testId, level: item.level, pointId: item.pointId, lot: item.lot, date: item.date, rule: item.rule, errorType: item.errorType }, record: null })}>Lập hồ sơ</button>}
                     </div>
                   ))}
                 </div>
@@ -189,13 +187,13 @@ export function ActionsPage() {
           <h2 className="panel-title">Lập hồ sơ sự không phù hợp (NCE)</h2>
           <button type="button" className="btn ghost sm" onClick={() => setShowGuide(true)}>Quy trình 8 bước</button>
         </div>
-        <div className="empty">
+        {form ? <NceProtocolForm prefill={form.prefill} record={form.record} onClose={() => setForm(null)} /> : <div className="empty">
           <b>{issueCount ? 'Chọn một sự cố để lập hồ sơ' : 'Không có vi phạm nào cần lập hồ sơ'}</b>
           <p>{issueCount
             ? `Có ${issueCount} sự cố ở trên — bấm "Lập hồ sơ" ngay trên dòng cần xử lý để hồ sơ được gắn đúng điểm QC và tự theo dõi QC chạy lại.`
             : 'Hồ sơ NCE thường bắt đầu từ một vi phạm QC. Khi không có vi phạm nào, chỉ mở hồ sơ khi thực sự cần ghi nhận sự không phù hợp khác.'}</p>
-          {writable && <button type="button" className="btn ghost" onClick={() => { setPrefill(null); setCreating(true); }}>Lập hồ sơ từ nguồn khác</button>}
-        </div>
+          {writable && <button type="button" className="btn ghost" onClick={() => setForm({ prefill: null, record: null })}>Lập hồ sơ từ nguồn khác</button>}
+        </div>}
       </div>
 
       <div className="panel action-log-panel">
@@ -237,7 +235,7 @@ export function ActionsPage() {
                       </div></td>
                       <td><div className="action-row-actions">
                         <button type="button" className="btn ghost sm" onClick={() => setDetailId(r.id)}>Chi tiết</button>
-                        {!cancelled && r.approval_status !== 'approved' && <button type="button" className="btn ghost sm" onClick={() => setDetailId(r.id)}>Tiếp tục</button>}
+                        {!cancelled && r.approval_status !== 'approved' && <button type="button" className="btn ghost sm" onClick={() => setForm({ prefill: null, record: r })}>Tiếp tục</button>}
                         {!cancelled && r.approval_status !== 'approved' && writable && <button type="button" className="btn danger sm" title="Hủy có lưu vết — không xóa dữ liệu" onClick={() => cancelRecord(r.id)}>Hủy hồ sơ</button>}
                       </div></td>
                     </tr>
@@ -254,7 +252,6 @@ export function ActionsPage() {
         )}
       </div>
 
-      {creating && <CreateModal prefill={prefill} onClose={() => setCreating(false)} />}
       {detailRecord && <DetailModal record={detailRecord} testName={testName(detailRecord.test_id)} onClose={() => setDetailId(null)} />}
       {showGuide && (
         <Modal title="Quy trình xử lý sự cố — 8 bước" onClose={() => setShowGuide(false)}>
@@ -265,74 +262,103 @@ export function ActionsPage() {
   );
 }
 
-function CreateModal({ prefill, onClose }: { prefill: { testId: string; level: number } | null; onClose: () => void }) {
-  const { tests } = useManageStore();
-  const { create } = useNceStore();
-  const [testId, setTestId] = useState(prefill?.testId || '');
-  const [level, setLevel] = useState(String(prefill?.level || 1));
-  const [lot, setLot] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [rule, setRule] = useState('');
-  const [errorType, setErrorType] = useState('');
-  const [investigation, setInvestigation] = useState('');
-  const [causeCategory, setCauseCategory] = useState<'SE' | 'RE' | ''>('');
-  const [causeDescription, setCauseDescription] = useState('');
-  const [correction, setCorrection] = useState('');
-  const [dueDate, setDueDate] = useState('');
-  const [err, setErr] = useState<string | null>(null);
+const NCE_SOURCES = [['', '— Chọn nguồn —'], ['iqc', 'Nội kiểm IQC'], ['eqa', 'Ngoại kiểm EQA'], ['instrument', 'Cảnh báo thiết bị'], ['clinical', 'Phản hồi lâm sàng'], ['audit', 'Đánh giá / audit'], ['other', 'Nguồn khác']];
+const NCE_PHASES = [['', '— Chọn giai đoạn —'], ['pre', 'Trước xét nghiệm'], ['exam', 'Trong xét nghiệm'], ['post', 'Sau xét nghiệm']];
+const NCE_RISK = [['', '— Phân loại —'], ['low', 'Thấp'], ['medium', 'Trung bình'], ['high', 'Cao'], ['critical', 'Nghiêm trọng']];
+const NCE_CHECKS = [['', 'Chưa đánh giá'], ['ok', 'Đạt'], ['abnormal', 'Bất thường'], ['na', 'Không áp dụng'], ['not-needed', 'Không cần']];
+const NCE_CAUSES = [['', '— Chưa xác định —'], ['qc', 'Vật liệu QC'], ['operator', 'Thao tác'], ['instrument', 'Thiết bị'], ['reagent', 'Hóa chất / calibrator'], ['calibration', 'Hiệu chuẩn'], ['environment', 'Môi trường'], ['unknown', 'Chưa xác định']];
+const NCE_PATIENT = [['', '— Chọn kết luận —'], ['none', 'Không có mẫu/kết quả bị ảnh hưởng'], ['held', 'Đã giữ kết quả để rà soát'], ['affected', 'Có kết quả cần xử lý lại']];
+const NCE_CHECK_ROWS = [['qcMaterial', 'Vật liệu QC'], ['instrument', 'Máy phân tích'], ['reagent', 'Hóa chất / calibrator'], ['calibration', 'Hiệu chuẩn'], ['lotToLot', 'So sánh lot-to-lot']] as const;
+
+function protocolDefaults(detail?: NceDetail, record?: NceRecord | null): NceDetail {
+  return { eventSource: '', processPhase: '', owner: '', containmentStatus: '', containmentNote: '', correction: '', investigation: '', riskSeverity: 0, riskOccurrence: 0, riskDetectability: 0, riskLevel: '', riskBasis: '', qcMaterialStatus: '', qcMaterialNote: '', instrumentStatus: '', instrumentNote: '', reagentStatus: '', reagentNote: '', calibrationStatus: '', calibrationNote: '', lotToLotStatus: '', lotToLotNote: '', causeCategory: '', cause: '', action: '', biasBefore: '', biasAfter: '', actionCompletedDate: record?.action_completed_date || '', releaseStatus: '', releaseDate: '', releaseBy: '', releaseNote: '', patientImpact: '', patientAction: '', effectivenessStatus: record?.effectiveness_status || 'pending', effectivenessDate: '', effectivenessNote: '', residualSeverity: 0, residualOccurrence: 0, residualDetectability: 0, residualRiskLevel: '', residualRiskBasis: '', ...detail };
+}
+function riskScore(a?: number, b?: number, c?: number): string { return a && b && c ? String(a * b * c) : '—'; }
+function NceSelect({ value, onChange, options, disabled = false }: { value: string; onChange: (value: string) => void; options: string[][]; disabled?: boolean }) {
+  return <select disabled={disabled} value={value} onChange={(event) => onChange(event.target.value)}>{options.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>;
+}
+
+/** Form protocol-v3 đặt ngay trong panel như app cũ. Modal chỉ còn dùng cho
+ * xem chi tiết/bằng chứng, tránh một form dài bị bó hẹp trong cửa sổ popup. */
+function NceProtocolForm({ prefill, record, onClose }: { prefill: NcePrefill | null; record: NceRecord | null; onClose: () => void }) {
+  const { tests } = useManageStore(); const store = useNceStore();
+  const old = record ? parseDetail(record.detail_json) : {};
+  const [protocol, setProtocol] = useState<NceDetail>(() => protocolDefaults(old, record));
+  const [testId, setTestId] = useState(record?.test_id || prefill?.testId || '');
+  const [level, setLevel] = useState(String(record?.level ?? prefill?.level ?? 1)); const [lot, setLot] = useState(record?.lot || prefill?.lot || '');
+  const [date, setDate] = useState(record?.date || prefill?.date || todayIso()); const [rule, setRule] = useState(record?.rule || prefill?.rule || '');
+  const [errorType, setErrorType] = useState(record?.error_type || prefill?.errorType || ''); const [dueDate, setDueDate] = useState(record?.due_date || '');
+  const [error, setError] = useState(''); const [saving, setSaving] = useState(false);
+  const readOnly = record?.record_status === 'cancelled' || record?.approval_status === 'approved';
+  const set = <K extends keyof NceDetail>(key: K, value: NceDetail[K]) => setProtocol((current) => ({ ...current, [key]: value }));
+  const number = <K extends keyof NceDetail>(key: K, value: string) => set(key, (Number(value) || 0) as NceDetail[K]);
+  const initialRpn = riskScore(protocol.riskSeverity, protocol.riskOccurrence, protocol.riskDetectability);
+  const residualRpn = riskScore(protocol.residualSeverity, protocol.residualOccurrence, protocol.residualDetectability);
 
   async function submit() {
-    const result = await create({
-      testId: testId || undefined, level: testId ? Number(level) : undefined, lot: lot || undefined, date,
-      rule: rule || undefined, errorType: errorType || undefined, correction, dueDate: dueDate || undefined,
-      investigation: investigation || undefined, causeCategory: causeCategory || undefined, causeDescription: causeDescription || undefined,
-    });
-    if (!result.ok) { setErr(result.error.message); return; }
+    setError(''); setSaving(true);
+    const result = record
+      ? await store.saveProtocol(record.id, dueDate, protocol)
+      : await store.create({ testId, level: Number(level) || 1, lot, date, pointId: prefill?.pointId, rule, errorType, correction: protocol.correction || '', dueDate, investigation: protocol.investigation, causeCategory: protocol.causeCategory, causeDescription: protocol.cause, protocol });
+    setSaving(false);
+    if (!result.ok) { setError(result.error.message); return; }
     onClose();
   }
+  const disabled = !!readOnly || saving;
+  const field = (label: string, child: React.ReactNode) => <div className="field"><label>{label}</label>{child}</div>;
+  const scale = (key: keyof NceDetail, label: string) => field(label, <NceSelect disabled={disabled} value={String(protocol[key] || '')} onChange={(value) => number(key, value)} options={[['0', '—'], ['1', '1'], ['2', '2'], ['3', '3'], ['4', '4'], ['5', '5']]} />);
 
-  return (
-    <Modal title="Mở hồ sơ khắc phục sự cố mới" onClose={onClose} width={560}
-      footer={<><button className="btn ghost" onClick={onClose}>Hủy</button><button className="btn teal" onClick={submit}>Tạo hồ sơ</button></>}>
-      {err && <p className="field-error">{err}</p>}
-
-      <SectionTitle n={1} title="Nhận diện sự cố" />
-      <div className="field-row">
-        <div className="field"><label>Xét nghiệm</label><select value={testId} onChange={(e) => setTestId(e.target.value)}><option value="">(không gắn)</option>{tests.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
-        <div className="field"><label>Mức</label><input value={level} onChange={(e) => setLevel(e.target.value)} style={{ width: 60 }} /></div>
-        <div className="field"><label>Lô</label><input value={lot} onChange={(e) => setLot(e.target.value)} /></div>
-      </div>
-      <div className="field-row">
-        <DateField label="Ngày xảy ra" value={date} onChange={setDate} />
-        <div className="field"><label>Luật vi phạm</label><input placeholder="vd 1-3s" value={rule} onChange={(e) => setRule(e.target.value)} /></div>
-        <div className="field"><label>Loại lỗi</label>
-          <select value={errorType} onChange={(e) => setErrorType(e.target.value)}><option value="">—</option><option value="SE">SE — hệ thống</option><option value="RE">RE — ngẫu nhiên</option></select>
+  return <div className="action-form-body">
+    {error && <div className="alert danger">{error}</div>}
+    <div className="action-incident-banner"><b>{record ? `Đang tiếp tục hồ sơ ${record.nce_id}` : 'Đang lập hồ sơ NCE'}</b><div>{tests.find((test) => test.id === testId)?.name || 'Chưa chọn xét nghiệm'} · M{level} · Lô {lot || '—'} · {date}</div></div>
+    <div className="action-ident-groups">
+      <div className="action-ident-group"><div className="action-ident-group-title"><b>Đối tượng QC</b><small>{record ? 'Khóa theo hồ sơ đã mở để bảo toàn bằng chứng' : 'Sự cố có thể gắn vào dòng vi phạm QC hoặc tạo từ nguồn khác'}</small></div>
+        <div className="action-form-main">
+          {field('Xét nghiệm', <select disabled={!!record || disabled} value={testId} onChange={(event) => setTestId(event.target.value)}><option value="">— Chọn xét nghiệm —</option>{tests.map((test) => <option key={test.id} value={test.id}>{test.name}</option>)}</select>)}
+          {field('Mức QC', <input disabled={!!record || disabled} value={level} onChange={(event) => setLevel(event.target.value)} />)}
+          {field('Lô QC', <input disabled={!!record || disabled} value={lot} onChange={(event) => setLot(event.target.value)} />)}
         </div>
       </div>
-
-      <SectionTitle n={2} title="Điều tra" />
-      <div className="field"><textarea rows={2} placeholder="Đã kiểm tra những gì?" value={investigation} onChange={(e) => setInvestigation(e.target.value)} /></div>
-
-      <SectionTitle n={3} title="Nguyên nhân" />
-      <div className="field">
-        <label>Phân loại</label>
-        <select value={causeCategory} onChange={(e) => setCauseCategory(e.target.value as never)}><option value="">Chưa xác định</option><option value="SE">SE — sai số hệ thống</option><option value="RE">RE — sai số ngẫu nhiên</option></select>
-      </div>
-      {(causeCategory === 'SE' || causeCategory === 'RE') && (
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 'var(--space-sm)' }}>
-          {CAUSE_CHIPS[causeCategory].map((c) => (
-            <button type="button" key={c} className="badge neutral" style={{ cursor: 'pointer', border: 'none' }}
-              onClick={() => setCauseDescription((d) => (d ? `${d}; ${c}` : c))}>{c}</button>
-          ))}
+      <div className="action-ident-group"><div className="action-ident-group-title"><b>Phân loại và phân công</b><small>Ghi rõ nguồn phát hiện, giai đoạn và người chịu trách nhiệm</small></div>
+        <div className="action-form-meta">
+          {field('Ngày ghi nhận', <DateField value={date} onChange={setDate} disabled={!!record || disabled} />)}
+          {field('Luật vi phạm', <input disabled={!!record || disabled} value={rule} onChange={(event) => setRule(event.target.value)} />)}
+          {field('Nguồn phát hiện', <NceSelect disabled={disabled} value={protocol.eventSource || ''} onChange={(value) => set('eventSource', value as never)} options={NCE_SOURCES} />)}
+          {field('Giai đoạn', <NceSelect disabled={disabled} value={protocol.processPhase || ''} onChange={(value) => set('processPhase', value as never)} options={NCE_PHASES} />)}
+          {field('Loại sai số', <select disabled={!!record || disabled} value={errorType} onChange={(event) => setErrorType(event.target.value)}><option value="">—</option><option value="SE">SE — hệ thống</option><option value="RE">RE — ngẫu nhiên</option></select>)}
+          {field('Người phụ trách', <input disabled={disabled} value={protocol.owner || ''} onChange={(event) => set('owner', event.target.value)} placeholder="Họ tên" />)}
+          {field('Hạn hoàn thành', <DateField value={dueDate} onChange={setDueDate} disabled={disabled} />)}
         </div>
-      )}
-      <div className="field"><textarea rows={2} placeholder="Mô tả nguyên nhân cụ thể" value={causeDescription} onChange={(e) => setCauseDescription(e.target.value)} /></div>
-
-      <SectionTitle n={4} title="Khắc phục" />
-      <div className="field"><label>Xử lý tức thời (≥10 ký tự)</label><textarea rows={2} value={correction} onChange={(e) => setCorrection(e.target.value)} /></div>
-      <DateField label="Hạn hoàn thành" value={dueDate} onChange={setDueDate} />
-    </Modal>
-  );
+      </div>
+    </div>
+    <details className="action-form-section" open><summary className="action-form-section-title"><span>1</span><div><b>Kiểm soát và xử lý tức thời</b><small>Phần tối thiểu bắt buộc để lưu hồ sơ đang điều tra</small></div></summary>
+      <div className="action-immediate-grid">
+        {field('Phạm vi kiểm soát', <NceSelect disabled={disabled} value={protocol.containmentStatus || ''} onChange={(value) => set('containmentStatus', value as never)} options={[['', '— Chọn —'], ['held', 'Đã dừng/giữ kết quả liên quan'], ['none', 'Không có kết quả bệnh nhân liên quan']]} />)}
+        {field('Ghi chú phạm vi', <input disabled={disabled} value={protocol.containmentNote || ''} onChange={(event) => set('containmentNote', event.target.value)} placeholder="VD: Giữ kết quả từ 08:00 đến khi QC đạt" />)}
+        {field('Xử lý tức thời đã thực hiện', <textarea disabled={disabled} rows={2} value={protocol.correction || ''} onChange={(event) => set('correction', event.target.value)} placeholder="Dừng trả kết quả, cô lập vật liệu và thông báo phụ trách…" />)}
+      </div>
+    </details>
+    <details className="action-form-section" open><summary className="action-form-section-title"><span>2</span><div><b>Đánh giá nguy cơ FMEA</b><small>RPN = S × O × D; nêu căn cứ theo SOP của đơn vị</small></div><span className="action-chip neutral">RPN {initialRpn}</span></summary>
+      <div className="action-risk-grid">{scale('riskSeverity', 'Mức độ ảnh hưởng (S)')}{scale('riskOccurrence', 'Khả năng xảy ra (O)')}{scale('riskDetectability', 'Khả năng không phát hiện (D)')}
+        {field('Phân loại theo SOP', <NceSelect disabled={disabled} value={protocol.riskLevel || ''} onChange={(value) => set('riskLevel', value as never)} options={NCE_RISK} />)}
+        {field('Căn cứ phân loại', <input disabled={disabled} value={protocol.riskBasis || ''} onChange={(event) => set('riskBasis', event.target.value)} placeholder="VD: SOP-QC-07, ma trận nguy cơ bảng 3" />)}
+      </div>
+    </details>
+    <details className="action-form-section" open><summary className="action-form-section-title"><span>3</span><div><b>Checklist điều tra</b><small>Ghi rõ bằng chứng khi bất thường hoặc không áp dụng</small></div></summary>
+      <div className="action-investigation-grid">{NCE_CHECK_ROWS.map(([key, label]) => <div className="action-investigation-item" key={key}><div className="action-investigation-head"><b>{label}</b></div><div className="action-investigation-choices"><NceSelect disabled={disabled} value={String(protocol[`${key}Status` as keyof NceDetail] || '')} onChange={(value) => set(`${key}Status` as keyof NceDetail, value as never)} options={NCE_CHECKS} /></div><div className="action-investigation-note"><input disabled={disabled} value={String(protocol[`${key}Note` as keyof NceDetail] || '')} onChange={(event) => set(`${key}Note` as keyof NceDetail, event.target.value as never)} placeholder="Ghi chú / bằng chứng" /></div></div>)}</div>
+    </details>
+    <details className="action-form-section" open><summary className="action-form-section-title"><span>4–6</span><div><b>Nguyên nhân gốc, hành động và trở lại dịch vụ</b><small>Tách hành động phòng ngừa tái diễn khỏi xử lý tức thời</small></div></summary>
+      <div className="action-cause-grid">{field('Nhóm nguyên nhân', <NceSelect disabled={disabled} value={protocol.causeCategory || ''} onChange={(value) => set('causeCategory', value as never)} options={NCE_CAUSES} />)}{field('Nguyên nhân gốc hoặc nghi ngờ', <textarea disabled={disabled} rows={2} value={protocol.cause || ''} onChange={(event) => set('cause', event.target.value)} />)}{field('Hành động khắc phục', <textarea disabled={disabled} rows={2} value={protocol.action || ''} onChange={(event) => set('action', event.target.value)} />)}</div>
+      <div className="action-cause-second-row">{field('Ngày hoàn thành hành động', <DateField value={protocol.actionCompletedDate || ''} onChange={(value) => set('actionCompletedDate', value)} disabled={disabled} />)}{field('Bias trước (%)', <input disabled={disabled} value={protocol.biasBefore || ''} onChange={(event) => set('biasBefore', event.target.value)} />)}{field('Bias sau (%)', <input disabled={disabled} value={protocol.biasAfter || ''} onChange={(event) => set('biasAfter', event.target.value)} />)}</div>
+      {protocol.containmentStatus === 'held' && <div className="action-release-block"><div className="action-release-title"><b>Cho phép hoạt động/trả kết quả trở lại</b><small>Chỉ được cho phép sau khi có bằng chứng QC rerun đạt</small></div><div className="action-release-grid">{field('Quyết định', <NceSelect disabled={disabled} value={protocol.releaseStatus || ''} onChange={(value) => set('releaseStatus', value as never)} options={[['', '— Chưa quyết định —'], ['released', 'Đã cho phép trở lại']]} />)}{field('Ngày cho phép', <DateField value={protocol.releaseDate || ''} onChange={(value) => set('releaseDate', value)} disabled={disabled} />)}{field('Người cho phép', <input disabled={disabled} value={protocol.releaseBy || ''} onChange={(event) => set('releaseBy', event.target.value)} />)}{field('Căn cứ', <input disabled={disabled} value={protocol.releaseNote || ''} onChange={(event) => set('releaseNote', event.target.value)} placeholder="QC chạy lại được chấp nhận" />)}</div></div>}
+    </details>
+    <details className="action-form-section" open><summary className="action-form-section-title"><span>7</span><div><b>Đánh giá ảnh hưởng bệnh nhân</b><small>Ghi rõ phạm vi và cách xử lý khi có kết quả liên quan</small></div></summary><div className="action-patient-grid">{field('Kết luận ảnh hưởng', <NceSelect disabled={disabled} value={protocol.patientImpact || ''} onChange={(value) => set('patientImpact', value as never)} options={NCE_PATIENT} />)}{field('Xử lý mẫu/kết quả liên quan', <textarea disabled={disabled} rows={2} value={protocol.patientAction || ''} onChange={(event) => set('patientAction', event.target.value)} />)}</div></details>
+    <details className="action-form-section" open><summary className="action-form-section-title"><span>8</span><div><b>Đánh giá hiệu lực và nguy cơ còn lại</b><small>Kết luận “hiệu quả” bắt buộc có FMEA còn lại, không vượt RPN ban đầu</small></div><span className="action-chip neutral">RPN {residualRpn}</span></summary>
+      <div className="action-effectiveness-grid">{field('Kết luận hiệu lực', <NceSelect disabled={disabled} value={protocol.effectivenessStatus || 'pending'} onChange={(value) => set('effectivenessStatus', value as never)} options={[['pending', 'Chưa đánh giá'], ['effective', 'Có hiệu lực'], ['ineffective', 'Không hiệu lực']]} />)}{field('Ngày đánh giá', <DateField value={protocol.effectivenessDate || ''} onChange={(value) => set('effectivenessDate', value)} disabled={disabled} />)}{field('Bằng chứng/nhận xét', <textarea disabled={disabled} rows={2} value={protocol.effectivenessNote || ''} onChange={(event) => set('effectivenessNote', event.target.value)} />)}</div>
+      {protocol.effectivenessStatus === 'effective' && <div className="action-residual-block"><div className="action-release-title"><b>Nguy cơ còn lại sau khắc phục</b><small>Dùng cùng thang điểm và SOP với đánh giá ban đầu</small></div><div className="action-residual-grid">{scale('residualSeverity', 'Mức độ (S)')}{scale('residualOccurrence', 'Khả năng xảy ra (O)')}{scale('residualDetectability', 'Khả năng không phát hiện (D)')}{field('Phân loại theo SOP', <NceSelect disabled={disabled} value={protocol.residualRiskLevel || ''} onChange={(value) => set('residualRiskLevel', value as never)} options={NCE_RISK} />)}{field('Căn cứ đánh giá lại', <input disabled={disabled} value={protocol.residualRiskBasis || ''} onChange={(event) => set('residualRiskBasis', event.target.value)} />)}</div></div>}
+    </details>
+    <div className="action-form-submit"><div><b>{record ? 'Cập nhật tiến độ hồ sơ' : 'Lưu hồ sơ đang điều tra'}</b><span>Có thể lưu dở; khi duyệt, hệ thống sẽ kiểm đầy đủ protocol và tính độc lập người duyệt.</span></div><div className="action-submit-buttons"><button type="button" className="btn ghost" onClick={onClose}>Đóng</button>{!readOnly && <button type="button" className="btn teal" disabled={saving} onClick={submit}>{saving ? 'Đang lưu…' : record ? 'Lưu thay đổi' : 'Lập hồ sơ NCE'}</button>}</div></div>
+  </div>;
 }
 
 function SectionTitle({ n, title }: { n?: number; title: string }) {

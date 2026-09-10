@@ -10,21 +10,51 @@ export interface PreparedReagentMetadata {
   sampleType: string; unit: string; biasTarget: number; alpha: number; coverageConfirmed: boolean;
 }
 
+export type ReagentMetadataValidation =
+  | { ok: true; data: PreparedReagentMetadata }
+  | { ok: false; error: { code: 'invalid-bias-target' | 'invalid-alpha'; message: string } };
+
 export function prepareReagentMetadata(input: ReagentMetadataInput, existing?: Partial<PreparedReagentMetadata>): PreparedReagentMetadata {
   const biasTargetNum = Number(input.biasTarget);
   const alphaNum = Number(input.alpha);
+  // Mỗi ô trên giao diện lưu độc lập khi rời ô. Vì vậy input thường CHỈ có
+  // một field; field không có trong input phải giữ nguyên dữ liệu đã lưu,
+  // còn field có mặt với chuỗi rỗng mới là yêu cầu xoá giá trị đó.
+  const has = (field: keyof ReagentMetadataInput) => Object.prototype.hasOwnProperty.call(input, field);
+  const text = (field: 'reagent' | 'lotOld' | 'lotNew' | 'date' | 'operator' | 'sampleType' | 'unit', max: number, fallback = '') =>
+    has(field) ? cleanText(input[field], max).trim() : String(existing?.[field] ?? fallback);
   return {
-    reagent: cleanText(input.reagent, 120).trim() || existing?.reagent || 'Hóa chất mới',
-    lotOld: cleanText(input.lotOld, 80).trim(),
-    lotNew: cleanText(input.lotNew, 80).trim(),
-    date: cleanText(input.date, 20).trim(),
-    operator: cleanText(input.operator, 120).trim(),
-    sampleType: cleanText(input.sampleType, 120).trim() || 'Mẫu bệnh nhân',
-    unit: cleanText(input.unit, 40).trim(),
+    reagent: text('reagent', 120) || existing?.reagent || 'Hóa chất mới',
+    lotOld: text('lotOld', 80),
+    lotNew: text('lotNew', 80),
+    date: text('date', 20),
+    operator: text('operator', 120),
+    sampleType: text('sampleType', 120, 'Mẫu bệnh nhân') || 'Mẫu bệnh nhân',
+    unit: text('unit', 40),
     biasTarget: input.biasTarget == null || input.biasTarget === '' || !Number.isFinite(biasTargetNum) ? (existing?.biasTarget ?? 6) : biasTargetNum,
     alpha: input.alpha == null || input.alpha === '' || !Number.isFinite(alphaNum) ? (existing?.alpha ?? 0.05) : alphaNum,
-    coverageConfirmed: !!input.coverageConfirmed,
+    coverageConfirmed: has('coverageConfirmed') ? !!input.coverageConfirmed : !!existing?.coverageConfirmed,
   };
+}
+
+/** Rào chắn ở domain, không chỉ dựa vào `<input type=number>`: API/import
+ * vẫn có thể gửi 0, số âm hoặc alpha không dùng được cho t-test. Chuỗi rỗng
+ * giữ nguyên cấu hình cũ để phù hợp cơ chế lưu từng ô khi blur. `tc1` được
+ * suy ra từ p-value hai phía ở mức `2 × alpha`, do đó alpha phải nhỏ hơn .5.
+ */
+export function validateReagentMetadata(input: ReagentMetadataInput, existing?: Partial<PreparedReagentMetadata>): ReagentMetadataValidation {
+  const has = (field: keyof ReagentMetadataInput) => Object.prototype.hasOwnProperty.call(input, field);
+  const positive = (value: unknown) => Number.isFinite(Number(value)) && Number(value) > 0;
+  if (has('biasTarget') && input.biasTarget !== '' && input.biasTarget != null && !positive(input.biasTarget)) {
+    return { ok: false, error: { code: 'invalid-bias-target', message: 'Bias mong muốn phải là số lớn hơn 0.' } };
+  }
+  if (has('alpha') && input.alpha !== '' && input.alpha != null) {
+    const alpha = Number(input.alpha);
+    if (!Number.isFinite(alpha) || alpha <= 0 || alpha >= 0.5) {
+      return { ok: false, error: { code: 'invalid-alpha', message: 'Mức ý nghĩa α phải lớn hơn 0 và nhỏ hơn 0,5.' } };
+    }
+  }
+  return { ok: true, data: prepareReagentMetadata(input, existing) };
 }
 
 // "Chọn nhanh" người thực hiện/loại mẫu — port `reagent-comparison-service.ts`

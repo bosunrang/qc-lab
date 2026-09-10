@@ -19,6 +19,18 @@ export function dpmoFromSigma(sigma: number): number {
 
 export interface SigmaMetricResult { tea: number; bias: number; cv: number; sigma: number; dpmo: number; yieldPercent: number }
 
+/** Westgard Sigma Rules dùng CHỈ như gợi ý thiết kế QC (OPSpecs); không tự
+ * thay đổi cấu hình luật đang vận hành. Port nguyên ngưỡng của app cũ. */
+export function sigmaQualityDesign(value: unknown): { capable: boolean; rules: string[]; n: number; r: number; risk: string; plan: string } | null {
+  const sigma = Number(value);
+  if (!Number.isFinite(sigma)) return null;
+  if (sigma >= 6) return { capable: true, rules: ['1-3s'], n: 2, r: 1, risk: 'Thấp', plan: 'Thiết kế QC theo đánh giá nguy cơ; không tự động giảm tần suất.' };
+  if (sigma >= 5) return { capable: true, rules: ['1-3s', '2-2s', 'R4s', '4-1s'], n: 4, r: 1, risk: 'Thấp–trung bình', plan: 'Xác nhận bằng dữ liệu ổn định và SOP trước khi đơn giản hóa QC.' };
+  if (sigma >= 4) return { capable: true, rules: ['1-3s', '2-2s', 'R4s', '4-1s', '8x'], n: 8, r: 1, risk: 'Trung bình', plan: 'Cân nhắc đa quy tắc và tăng giám sát theo nguy cơ.' };
+  if (sigma >= 3) return { capable: true, rules: ['1-3s', '2-2s', 'R4s', '4-1s', '6x'], n: 8, r: 1, risk: 'Cao', plan: 'Tăng cường QC và ưu tiên cải thiện phương pháp.' };
+  return { capable: false, rules: ['1-3s', '2-2s', 'R4s', '4-1s', '6x'], n: 8, r: 1, risk: 'Rất cao', plan: 'Không dùng Sigma để hợp thức hóa vận hành; cần khắc phục phương pháp.' };
+}
+
 export function sigmaMetric(tea: unknown, bias: unknown, cv: unknown): SigmaMetricResult | null {
   const teaN = Number(tea);
   const biasN = Number(bias);
@@ -43,7 +55,12 @@ export function eqaRoundsStats(rounds: readonly unknown[]): EqaRoundsStats | nul
   if (!values.length) return null;
   const n = values.length;
   const mean = values.reduce((s, v) => s + v, 0) / n;
-  const rms = Math.sqrt(values.reduce((s, v) => s + v * v, 0) / n);
+  // MỘT vòng duy nhất giữ NGUYÊN DẤU của vòng đó (khớp `SigmaBiasService.stats()`
+  // app cũ: `valid.length === 1 ? valid[0].bias : sqrt(...)`). Sigma và MU đều
+  // lấy |bias| nên con số không đổi, nhưng bảng Bias EQA% phải cho thấy phương
+  // pháp lệch về phía nào — `sqrt(v²)` sẽ biến −2% thành +2% và mất thông tin đó.
+  // Từ 2 vòng trở lên mới dùng RMS, vì lúc đó dấu trái nhau có thể triệt tiêu.
+  const rms = n === 1 ? values[0] : Math.sqrt(values.reduce((s, v) => s + v * v, 0) / n);
   const mixedSigns = values.some((v) => v > 0) && values.some((v) => v < 0);
   let biasRefU: number | null = null;
   if (n > 1) {

@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import * as path from 'node:path';
 import { openDatabase } from './db/open-database';
-import { type Actor, writeAudit, setBroadcastWindow } from './ipc/shared';
+import { type Actor, writeAudit, setBroadcastWindow, setCloudChangeNotifier } from './ipc/shared';
 import { createConfigHandlers } from './ipc/config-handlers';
 import { createEntryHandlers } from './ipc/entry-handlers';
 import { createWestgardHandlers } from './ipc/westgard-handlers';
@@ -16,6 +16,7 @@ import { buildXlsxBase64, printHtmlToPdf, type ExportTableInput } from './ipc/ex
 import { createBackupHandlers } from './ipc/backup-handlers';
 import { createMigrationHandlers } from './ipc/migration-handlers';
 import { createLisHandlers } from './ipc/lis-handlers';
+import { createFirebaseHandlers } from './ipc/firebase-handlers';
 
 function createWindow(): void {
   const userDataDir = app.getPath('userData');
@@ -34,6 +35,8 @@ function createWindow(): void {
   const backup = createBackupHandlers(db, userDataDir);
   const migration = createMigrationHandlers(db, userDataDir);
   const lis = createLisHandlers(db);
+  const firebase = createFirebaseHandlers(db, userDataDir);
+  setCloudChangeNotifier(firebase.onDataChanged);
 
   // Danh tính đang đăng nhập: app 1 cửa sổ duy nhất nên giữ ngay trong bộ nhớ
   // main process, không cần session token/cookie. requireActor() là ranh
@@ -132,11 +135,16 @@ function createWindow(): void {
   ipcMain.handle('westgard:listArchivedGroupTests', (_event, groupId) => westgardHandlers.listArchivedGroupTests(groupId));
 
   ipcMain.handle('sigma:listPeriods', (_event, testId) => sigmaHandlers.listPeriods(testId));
+  ipcMain.handle('sigma:listCohorts', (_event, testId, period, levels) => sigmaHandlers.listCohorts(testId, period, levels));
+  ipcMain.handle('sigma:setTracking', (_event, input) => sigmaHandlers.setTracking(input, requireActor()));
+  ipcMain.handle('sigma:saveTeaConfig', (_event, input) => sigmaHandlers.saveTeaConfig(input, requireActor()));
   ipcMain.handle('sigma:savePeriod', (_event, input) => sigmaHandlers.savePeriod(input, requireActor()));
+  ipcMain.handle('sigma:renamePeriod', (_event, input) => sigmaHandlers.renamePeriod(input, requireActor()));
   ipcMain.handle('sigma:removePeriod', (_event, input) => sigmaHandlers.removePeriod(input, requireActor()));
 
   ipcMain.handle('nce:listRecords', () => nceHandlers.listRecords());
   ipcMain.handle('nce:create', (_event, input) => nceHandlers.create(input, requireActor()));
+  ipcMain.handle('nce:saveProtocol', (_event, input) => nceHandlers.saveProtocol(input, requireActor()));
   ipcMain.handle('nce:approve', (_event, input) => nceHandlers.approve(input, requireActor()));
   ipcMain.handle('nce:returnForRevision', (_event, input) => nceHandlers.returnForRevision(input, requireActor()));
   ipcMain.handle('nce:cancel', (_event, input) => nceHandlers.cancel(input, requireActor()));
@@ -158,6 +166,10 @@ function createWindow(): void {
   ipcMain.handle('settings:getLabProfile', () => settings.getLabProfile());
   ipcMain.handle('settings:saveLabProfile', (_event, input) => settings.saveLabProfile(input, requireActor()));
   ipcMain.handle('settings:getStorageInfo', () => settings.getStorageInfo());
+  ipcMain.handle('firebase:getSettings', () => firebase.settings());
+  ipcMain.handle('firebase:connect', (_event, input) => firebase.connect(input, requireActor()));
+  ipcMain.handle('firebase:sync', (_event, input) => firebase.sync(input, requireActor()));
+  ipcMain.handle('firebase:disconnect', () => firebase.disconnect(requireActor()));
 
   ipcMain.handle('report:listPeriodLocks', () => report.listPeriodLocks());
   ipcMain.handle('report:lockPeriod', (_event, input) => report.lockPeriod(input, requireActor()));

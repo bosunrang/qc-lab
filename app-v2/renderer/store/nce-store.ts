@@ -2,18 +2,19 @@
 // Mọi hàm ghi trả `IpcResult` để form hiển thị đúng lỗi validate của chính
 // nó, không dùng field `error` dùng chung nữa (khác bản thí điểm cũ).
 import { create } from 'zustand';
-import type { NceRecord, IpcResult } from '../../shared/qc-api';
+import type { NceRecord, NceDetail, IpcResult } from '../../shared/qc-api';
 
 interface NceCreateData {
   testId?: string; level?: number; lot?: string; date: string; pointId?: string; rule?: string;
   errorType?: string; correction: string; dueDate?: string;
-  investigation?: string; causeCategory?: 'SE' | 'RE' | ''; causeDescription?: string;
+  investigation?: string; causeCategory?: string; causeDescription?: string; protocol?: Partial<NceDetail>;
 }
 
 interface NceState {
   records: NceRecord[];
   load: () => Promise<void>;
   create: (data: NceCreateData) => Promise<IpcResult<NceRecord>>;
+  saveProtocol: (id: string, dueDate: string, protocol: Partial<NceDetail>) => Promise<IpcResult<NceRecord>>;
   approve: (id: string) => Promise<IpcResult<NceRecord>>;
   returnForRevision: (id: string, note: string) => Promise<IpcResult<NceRecord>>;
   cancel: (id: string, note: string) => Promise<IpcResult<NceRecord>>;
@@ -31,6 +32,11 @@ export const useNceStore = create<NceState>((set, get) => ({
 
   create: async (data) => {
     const result = await window.qcApi.createNce({ data });
+    if (result.ok) await get().load();
+    return result;
+  },
+  saveProtocol: async (id, dueDate, protocol) => {
+    const result = await window.qcApi.saveNceProtocol({ data: { id, dueDate, protocol } });
     if (result.ok) await get().load();
     return result;
   },

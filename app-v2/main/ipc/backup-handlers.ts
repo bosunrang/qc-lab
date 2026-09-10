@@ -1,7 +1,7 @@
 // Giai đoạn C3 (docs/APP-V2-PLAN.md) — xuất/phục hồi toàn bộ dữ liệu app-v2.
 // Đọc/ghi bảng qua `main/db/table-io.ts` (tách ra khi Giai đoạn C4 cần dùng
 // lại đúng transaction phục hồi này cho dữ liệu đã ánh xạ từ app cũ).
-import type { Db } from '../db/open-database';
+import type { Db } from '../db/sqlite-like';
 import { SCHEMA_VERSION } from '../db/schema';
 import { listTableNames, dumpAllTables, restoreAllTables, writeSafetySnapshot } from '../db/table-io';
 import { buildBackupEnvelope, validateBackupEnvelope } from '../domain/backup';

@@ -17,6 +17,21 @@ const instrument = h.saveInstrument({ data: { name: 'Máy A' } }, actor).data;
 const test1 = h.saveTest({ data: { name: 'Glucose', instrumentId: instrument.id, teaRefKey: 'qclab-glucose' } }, actor).data;
 const test2 = h.saveTest({ data: { name: 'Ure', instrumentId: instrument.id } }, actor).data;
 
+// TEa CLIA tự khai phải lưu đủ quy tắc + giới hạn tuyệt đối; đây là dữ liệu
+// đầu vào cho resolver Sigma, không phải chỉ là metadata của biểu mẫu.
+const customTea = h.addTeaAnalyte({
+  name: 'Marker tuyệt đối', unit: 'L', clia: '3', cliaRule: 'greater-of', cliaAbsolute: '0.05', cliaAbsoluteUnit: 'liter',
+}, actor);
+assert.equal(customTea.ok, true);
+const savedCustomTea = h.listTeaRefs().find((item) => item.analyte_id === customTea.data.analyteId);
+assert.equal(savedCustomTea?.clia_rule, 'greater-of');
+assert.equal(savedCustomTea?.clia_absolute, 0.05);
+assert.equal(savedCustomTea?.clia_absolute_unit, 'liter');
+assert.equal(h.removeTeaRef({ id: savedCustomTea.id }, actor).ok, true, 'dọn fixture để các kiểm tra TEa bên dưới giữ đúng ngữ cảnh');
+const invalidAbsoluteTea = h.addTeaAnalyte({ name: 'Marker thiếu ngưỡng', cliaRule: 'absolute' }, actor);
+assert.equal(invalidAbsoluteTea.ok, false);
+assert.equal(invalidAbsoluteTea.error.code, 'missing-clia-absolute');
+
 // ---- Lô QC ----
 const lot1 = h.saveLot({ data: { lotNo: 'L1', level: 1 } }, actor);
 assert.equal(lot1.ok, true);

@@ -5,19 +5,49 @@
 // C3 (round-trip cùng định dạng), đây là ánh xạ giữa 2 hình dạng dữ liệu
 // khác nhau nên có bước "xem trước số lượng" riêng trước khi xác nhận.
 // Giai đoạn C5: client cho LIS Gateway prototype (`main/ipc/lis-handlers.ts`)
-// — gateway server độc lập (`lis-gateway/`), không đổi gì ở đó. Firebase
-// (C2) vẫn tạm dừng theo quyết định người dùng.
+// — gateway server độc lập (`lis-gateway/`), không đổi gì ở đó. Firebase C2
+// hoàn tất: xác thực và đồng bộ chạy ở main process, xem firebase-handlers.ts.
 import { useEffect, useRef, useState } from 'react';
 import { useSettingsStore } from '../store/settings-store';
 import { infoDialog, confirmDialog, reauthDialog } from '../state/dialog-store';
 import { Modal } from '../components/Modal';
 import { PageHeader } from '../components/PageHeader';
-import type { MigrationSummary, LisGatewaySettings, LisQueueRecord } from '../../shared/qc-api';
+import type { LisGatewaySettings, LisQueueRecord, FirebaseSettings } from '../../shared/qc-api';
 
 const LOGO_SIZE = 96;
 /** Chu kỳ tự động kiểm tra hàng chờ LIS — copy `LIS_POLL_MS` app cũ. */
 const LIS_POLL_MS = 5 * 60 * 1000;
 const LIS_STATUS_LABEL: Record<string, string> = { off: 'Đang tắt', idle: 'Chưa kiểm tra', ok: 'Đã kết nối', error: 'Lỗi kết nối' };
+const FIREBASE_CONFIG_PLACEHOLDER = `const firebaseConfig = {
+  apiKey: "...",
+  authDomain: "yourapp.firebaseapp.com",
+  databaseURL: "https://yourapp-default-rtdb.firebaseio.com",
+  projectId: "yourapp",
+  appId: "..."
+};`;
+const FIREBASE_RULES = `{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "qclab-acl": {
+      "$labCode": {
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": false
+        }
+      }
+    },
+    "qclab-shared": {
+      "$labCode": {
+        ".read":  "auth != null && root.child('qclab-acl').child($labCode).child(auth.uid).exists()",
+        ".write": "auth != null && root.child('qclab-acl').child($labCode).child(auth.uid).exists()",
+        ".validate": "newData.hasChildren(['_ts'])",
+        "_ts": { ".validate": "newData.isNumber()" },
+        "_client": { ".validate": "newData.isString()" }
+      }
+    }
+  }
+}`;
 
 function formatBytes(bytes: number): string {
   if (bytes <= 0) return '0 B';
@@ -43,20 +73,24 @@ export function SettingsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const backupFileInputRef = useRef<HTMLInputElement>(null);
   const verifyFileInputRef = useRef<HTMLInputElement>(null);
-  const migrationFileInputRef = useRef<HTMLInputElement>(null);
-  const [migrationPreview, setMigrationPreview] = useState<{ json: string; summary: MigrationSummary } | null>(null);
-
   const [lisEnabled, setLisEnabled] = useState(false);
   const [lisUrl, setLisUrl] = useState('');
   const [lisToken, setLisToken] = useState('');
   const [lisErr, setLisErr] = useState<string | null>(null);
   const [lisQueue, setLisQueue] = useState<{ pending: LisQueueRecord[]; unresolved: LisQueueRecord[] } | null>(null);
   const [lisQueueOpen, setLisQueueOpen] = useState(false);
+  const [firebase, setFirebase] = useState<FirebaseSettings | null>(null);
+  const [fbCode, setFbCode] = useState('khoaXN');
+  const [fbEmail, setFbEmail] = useState('');
+  const [fbPassword, setFbPassword] = useState('');
+  const [fbConfig, setFbConfig] = useState('');
+  const [fbBusy, setFbBusy] = useState(false);
 
   useEffect(() => {
     load(); loadStorage();
     window.qcApi.backupStatus().then(setBackupInfo);
     window.qcApi.getLisSettings().then((s: LisGatewaySettings) => { setLisEnabled(s.enabled); setLisUrl(s.url); setLisToken(s.token); });
+    window.qcApi.getFirebaseSettings().then((s) => { setFirebase(s); setFbCode(s.labCode || 'khoaXN'); setFbEmail(s.email); setFbConfig(s.config); });
   }, [load, loadStorage]);
 
   // Bật LIS = TỰ ĐỘNG kiểm tra hàng chờ mỗi 5 phút, đúng như nhãn app cũ
@@ -158,44 +192,58 @@ export function SettingsPage() {
     await infoDialog(`Đã phục hồi thành công. Bản sao lưu dữ liệu trước khi phục hồi được lưu tại:\n${result.data.preRestoreSnapshotPath}`, { type: 'success' });
   }
 
-  // Giai đoạn C4 — di trú từ backup app CŨ ('qclab-backup'). Khác luồng
-  // backup C3 ở trên: hình dạng dữ liệu 2 bên khác nhau nên XEM TRƯỚC số
-  // lượng (preview, không ghi DB) trước khi hỏi xác nhận — người dùng cần
-  // biết "sẽ nhập bao nhiêu" trước khi quyết định thay thế toàn bộ dữ liệu
-  // app-v2 hiện có.
-  async function pickMigrationFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    setMigrationPreview(null);
-    const json = await file.text();
-    const result = await window.qcApi.previewLegacyBackup({ data: { json } });
-    if (!result.ok) { setErr(result.error.message); return; }
-    setErr(null);
-    setMigrationPreview({ json, summary: result.data });
-  }
-
-  async function confirmMigration() {
-    if (!migrationPreview) return;
-    const s = migrationPreview.summary;
-    if (!(await confirmDialog(
-      `Sẽ nhập: ${s.instruments} máy, ${s.tests} xét nghiệm, ${s.qcLots} lô QC, ${s.qcPoints} điểm QC, ${s.users} người dùng, ${s.activity} dòng nhật ký, ${s.actions} hồ sơ NCE.\n\n` +
-      'Thao tác này sẽ THAY THẾ TOÀN BỘ dữ liệu app-v2 hiện có bằng dữ liệu đã di trú từ app cũ. Một bản sao lưu an toàn của dữ liệu hiện tại sẽ được tự động tạo trước khi ghi đè. Tiếp tục?',
-      { title: 'Di trú dữ liệu từ app cũ', danger: true, confirmLabel: 'Di trú' },
-    ))) return;
-    if (!(await reauthDialog({ title: 'Xác thực trước khi di trú', message: 'Di trú dữ liệu là thao tác không thể huỷ ngang — xác thực lại mật khẩu.' }))) return;
-    const result = await window.qcApi.importLegacyBackup({ data: { json: migrationPreview.json } });
-    if (!result.ok) { setErr(result.error.message); return; }
-    setMigrationPreview(null);
-    await infoDialog(`Đã di trú thành công. Bản sao lưu dữ liệu trước khi di trú được lưu tại:\n${result.data.preMigrationSnapshotPath}`, { type: 'success' });
-  }
-
   // Giai đoạn C5 — LIS Gateway (xem main/ipc/lis-handlers.ts).
   async function saveLisSettings() {
     setLisErr(null);
     const result = await window.qcApi.saveLisSettings({ data: { enabled: lisEnabled, url: lisUrl, token: lisToken } });
     if (!result.ok) { setLisErr(result.error.message); return; }
     await infoDialog('Đã lưu cấu hình LIS Gateway.', { type: 'success' });
+  }
+
+  async function refreshFirebase() {
+    const latest = await window.qcApi.getFirebaseSettings();
+    setFirebase(latest); setFbCode(latest.labCode || 'khoaXN'); setFbEmail(latest.email); setFbConfig(latest.config);
+  }
+
+  async function connectFirebase() {
+    setFbBusy(true); setErr(null);
+    try {
+      const result = await window.qcApi.connectFirebase({ data: { labCode: fbCode, email: fbEmail, password: fbPassword, config: fbConfig } });
+      setFbPassword('');
+      if (!result.ok) { setErr(result.error.message); return; }
+      if (result.data.state === 'conflict') {
+        const push = await confirmDialog(
+          'Cả máy này và Firebase đều có dữ liệu khác nhau. Chọn “Đẩy dữ liệu máy” để ghi đè bản đám mây. Chọn “Hủy” để giữ nguyên và chọn tải dữ liệu đám mây ở bước tiếp theo.',
+          { title: 'Chọn hướng đồng bộ', danger: true, confirmLabel: 'Đẩy dữ liệu máy' },
+        );
+        if (push) {
+          const synced = await window.qcApi.syncFirebase({ data: { direction: 'push' } });
+          if (!synced.ok) { setErr(synced.error.message); return; }
+          await infoDialog('Đã ghi dữ liệu trên máy lên Firebase.', { type: 'success' });
+        } else if (await confirmDialog('Tải dữ liệu từ Firebase sẽ thay thế dữ liệu trên máy. Một backup an toàn sẽ được tạo tự động. Tiếp tục?', { title: 'Tải từ Firebase', danger: true, confirmLabel: 'Tải dữ liệu đám mây' })) {
+          if (!(await reauthDialog({ title: 'Xác thực trước khi tải Firebase', message: 'Tải dữ liệu đám mây sẽ thay thế dữ liệu cục bộ — xác thực lại mật khẩu.' }))) return;
+          const synced = await window.qcApi.syncFirebase({ data: { direction: 'pull' } });
+          if (!synced.ok) { setErr(synced.error.message); return; }
+          await infoDialog('Đã tải dữ liệu từ Firebase. Nếu tài khoản hiện tại không còn trong dữ liệu đám mây, hãy đăng nhập lại.', { type: 'success' });
+        }
+      } else {
+        await infoDialog(result.data.state === 'pushed' ? 'Đã kết nối và đưa dữ liệu hiện tại lên Firebase.' : 'Đã kết nối Firebase; dữ liệu đã đồng bộ.', { type: 'success' });
+      }
+      await refreshFirebase();
+    } finally { setFbBusy(false); }
+  }
+
+  async function disconnectFirebase() {
+    if (!(await confirmDialog('Ngắt Firebase? Dữ liệu vẫn được giữ nguyên trên máy.', { title: 'Ngắt đồng bộ đám mây' }))) return;
+    const result = await window.qcApi.disconnectFirebase();
+    if (!result.ok) { setErr(result.error.message); return; }
+    await refreshFirebase();
+    await infoDialog('Đã ngắt Firebase.', { type: 'success' });
+  }
+
+  async function copyFirebaseRules() {
+    try { await navigator.clipboard.writeText(FIREBASE_RULES); await infoDialog('Đã copy Firebase Rules.', { type: 'success' }); }
+    catch { await infoDialog('Không copy được tự động. Bạn có thể chọn nội dung Rules để copy.', { type: 'warn' }); }
   }
 
   async function openLisQueue() {
@@ -278,11 +326,8 @@ export function SettingsPage() {
 
   return (
     <>
-      {/* Tiêu đề giống app cũ. PHỤ ĐỀ cố ý khác: bản cũ ghi "kết nối
-          Firebase" mà app-v2 chưa có Firebase (C2 tạm dừng) — copy nguyên
-          văn sẽ hứa một tính năng không tồn tại. Đây là 1 trong 3 khác biệt
-          đã ghi vào baseline gate của trang này, xem CLAUDE.md D3.3. */}
-      <PageHeader title="Cài đặt & Đồng bộ" subtitle="Thông tin đơn vị, logo, backup, di trú dữ liệu và LIS Gateway" />
+      {/* Tiêu đề/phụ đề đã trở về đúng app cũ từ khi C2 Firebase hoàn tất. */}
+      <PageHeader title="Cài đặt & Đồng bộ" subtitle="Thông tin đơn vị, backup và kết nối Firebase" />
       {err && <p className="field-error">{err}</p>}
 
       <div className="settings-profile-grid">
@@ -326,7 +371,7 @@ export function SettingsPage() {
         </div>
       </div>
 
-      <div className="panel">
+      <div className="panel settings-admin-panel">
         <h2 className="panel-title">Quản trị dữ liệu</h2>
         <div className="admin-tools">
           <div className="admin-tool">
@@ -348,7 +393,7 @@ export function SettingsPage() {
           </div>
           <div className="admin-tool">
             <b>Dung lượng cục bộ</b>
-            <span>Xem dung lượng file dữ liệu SQLite mà phần mềm đang dùng.</span>
+            <span>Xem số điểm QC và dung lượng trình duyệt đang dùng.</span>
             <button className="btn ghost" onClick={checkStorage}>Kiểm tra dung lượng</button>
           </div>
           <div className="admin-tool">
@@ -359,29 +404,22 @@ export function SettingsPage() {
         </div>
       </div>
 
-      {/* App cũ đặt 2 panel [Đồng bộ đám mây] [LIS Gateway] cạnh nhau ở đây.
-          app-v2 chưa có Firebase nên ô bên trái là panel Di trú dữ liệu (thứ
-          app cũ không có) — giữ lưới 2 cột để không để trống nửa trang. */}
       <div className="settings-cloud-grid">
-        <div className="panel">
-          <h2 className="panel-title">Di trú dữ liệu từ app cũ</h2>
-          <div className="lis-gateway-body">
-            <div className="hint">
-              Nhập dữ liệu từ 1 file backup của app QC Lab CŨ (định dạng khác, không phải backup app-v2 ở trên) — máy/xét nghiệm/mức QC, toàn bộ điểm QC, người dùng (giữ nguyên mật khẩu), nhật ký hoạt động (giữ nguyên chuỗi xác thực), lô/nhóm lô, Panel QC, chuyển tiếp lô, hồ sơ NCE, so sánh hoá chất, khoá kỳ báo cáo, bảng TEa tham chiếu.
+        <div className="panel firebase-sync-panel">
+          <h2 className="panel-title">Đồng bộ đám mây (Firebase Realtime Database)</h2>
+          <div className="firebase-body">
+            <div className="firebase-auth-grid">
+              <div><label htmlFor="fbCode">Mã phòng</label><input id="fbCode" value={fbCode} onChange={(e) => setFbCode(e.target.value)} /></div>
+              <div><label htmlFor="fbEmail">Email Firebase Authentication</label><input id="fbEmail" type="email" autoComplete="username" value={fbEmail} onChange={(e) => setFbEmail(e.target.value)} /></div>
+              <div><label htmlFor="fbPassword">Mật khẩu Firebase</label><input id="fbPassword" type="password" autoComplete="current-password" value={fbPassword} onChange={(e) => setFbPassword(e.target.value)} placeholder="Chỉ dùng để đăng nhập, không lưu" /></div>
             </div>
-            {migrationPreview && (
-              <div className="alert">
-                Sẽ nhập: <b>{migrationPreview.summary.instruments}</b> máy, <b>{migrationPreview.summary.tests}</b> xét nghiệm,{' '}
-                <b>{migrationPreview.summary.qcLots}</b> lô QC, <b>{migrationPreview.summary.qcPoints}</b> điểm QC,{' '}
-                <b>{migrationPreview.summary.users}</b> người dùng, <b>{migrationPreview.summary.activity}</b> dòng nhật ký,{' '}
-                <b>{migrationPreview.summary.actions}</b> hồ sơ NCE, <b>{migrationPreview.summary.reagentTests}</b> so sánh hoá chất.
-              </div>
-            )}
+            <label htmlFor="fbConfig">Firebase config (dán nguyên đoạn từ tab Config của Firebase console)</label>
+            <textarea id="fbConfig" className="firebase-config-input" value={fbConfig} onChange={(e) => setFbConfig(e.target.value)} placeholder={FIREBASE_CONFIG_PLACEHOLDER} />
+            <div className={`alert${firebase?.connected ? ' ok' : ''}`}>{firebase?.status || 'Chưa kết nối'} · {firebase?.dataPath || 'qclab-shared/{mã-phòng}'}</div>
           </div>
-          <div className="settings-panel-actions">
-            <input ref={migrationFileInputRef} type="file" accept="application/json" style={{ display: 'none' }} onChange={pickMigrationFile} />
-            <button className="btn ghost" onClick={() => migrationFileInputRef.current?.click()}>Chọn file backup app cũ</button>
-            {migrationPreview && <button className="btn danger" onClick={confirmMigration}>Di trú dữ liệu</button>}
+          <div className="firebase-actions settings-panel-actions">
+            <button className="btn teal" disabled={fbBusy} onClick={connectFirebase}>{fbBusy ? 'Đang kết nối…' : 'Lưu & kết nối'}</button>
+            <button className="btn ghost" onClick={disconnectFirebase}>Ngắt đám mây</button>
           </div>
         </div>
 
@@ -403,6 +441,19 @@ export function SettingsPage() {
             <button className="btn ghost" onClick={openLisQueue}>Xem hàng chờ QC</button>
           </div>
         </div>
+      </div>
+
+      <div className="panel firebase-rules-panel">
+        <h2 className="panel-title">Firebase Rules</h2>
+        <details className="firebase-guide"><summary>Hướng dẫn Firebase chi tiết</summary><div className="firebase-guide-body">
+          <div className="fb-step"><div className="fb-num">1</div><div className="fb-step-body"><h4>Bật đăng nhập Email/Password</h4><p>Firebase Console → Authentication → Sign-in method: tắt <b>Anonymous</b>, bật <b>Email/Password</b>.</p></div></div>
+          <div className="fb-step"><div className="fb-num">2</div><div className="fb-step-body"><h4>Tạo tài khoản, lấy UID</h4><p>Authentication → Users → Add user — mỗi máy/người 1 tài khoản, sau đó copy <b>User UID</b>.</p></div></div>
+          <div className="fb-step"><div className="fb-num">3</div><div className="fb-step-body"><h4>Thêm UID vào danh sách được phép</h4><p>Realtime Database → Data, tạo đúng cấu trúc theo mã phòng (labCode) đang dùng.</p></div></div>
+          <div className="fb-step"><div className="fb-num">4</div><div className="fb-step-body"><h4>Dán Rules</h4><p>Realtime Database → Rules → dán nguyên nội dung khung <b>Firebase Rules</b> bên dưới → Publish.</p></div></div>
+          <div className="fb-step"><div className="fb-num">5</div><div className="fb-step-body"><h4>Kết nối trong app</h4><p>Nhập labCode, email/mật khẩu, dán Firebase config → bấm <b>Lưu &amp; kết nối</b>.</p></div></div>
+        </div></details>
+        <div className="rules-tools"><span>Copy cố định vào Realtime Database → Rules. Không sửa <code>$labCode</code> hoặc <code>$uid</code>.</span><button className="btn ghost sm" onClick={copyFirebaseRules}>Copy rules</button></div>
+        <pre className="rules-code" tabIndex={0}>{FIREBASE_RULES}</pre>
       </div>
 
       {lisQueueOpen && lisQueue && (

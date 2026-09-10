@@ -155,6 +155,9 @@ export function mapLegacyStateToTables(legacy: LegacyState): MappedTables {
     method: cleanText(t.method, 200), reagent: cleanText(t.reagent, 200),
     tea: Math.max(0, finiteNumber(t.tea, 0)), tea_source: cleanText(t.teaSource, 200),
     tea_ref_key: '', // chưa suy được key khớp bảng tea_refs — cần rà soát thủ công sau di trú (ghi ở docs/APP-V2-PLAN.md)
+    sigma_tracked: bool01(t.sgTracked),
+    eflm_analyte: cleanText(t.eflmAnalyte, 160), eflm_aps: cleanText(t.eflmAps, 20) || 'desirable',
+    eflm_lookup_date: cleanText(t.eflmLookupDate, 10), eflm_ref: cleanText(t.eflmRef, 500),
     active: bool01(t.active),
     rule_actions_json: JSON.stringify(obj(t.ruleActions)), rule_scopes_json: JSON.stringify(obj(t.ruleScopes)),
     cusum_on: t.cusum && t.cusum.on ? 1 : 0,

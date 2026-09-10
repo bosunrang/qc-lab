@@ -43,6 +43,11 @@ export interface Test {
   section: string;
   tea_source: string;
   tea_ref_key: string;
+  eflm_analyte: string;
+  eflm_aps: string;
+  eflm_lookup_date: string;
+  eflm_ref: string;
+  sigma_tracked: 0 | 1;
   method: string;
   reagent: string;
   cusum_on: 0 | 1;
@@ -95,7 +100,8 @@ export interface TeaRef {
    * sẵn — khai đủ ở đây vì bảng TEa tham chiếu cần chúng: `analyte_id` khoá
    * theo analyte của danh mục tích hợp, `clia`/`ricos` là GHI ĐÈ của phòng
    * xét nghiệm lên giá trị mặc định (null = dùng mặc định). */
-  analyte_id?: string; clia?: number | null; ricos?: number | null;
+  analyte_id?: string; aliases_json?: string; clia?: number | null; ricos?: number | null;
+  clia_rule?: 'percent' | 'absolute' | 'greater-of' | ''; clia_absolute?: number | null; clia_absolute_unit?: string;
 }
 
 export interface RuleScopeItem { id: string; scope: 'within' | 'across' | 'both'; scopeMin: number; desc: string }
@@ -214,9 +220,11 @@ export interface LevelAnalysis {
     id: string; date: string; runId: string; val: number; z: number;
     /** 'none' khi mức chưa có Mean/SD hợp lệ — điểm CHƯA ĐƯỢC ĐÁNH GIÁ. */
     verdict: 'ok' | 'warn' | 'rej' | 'none'; rules: string[]; supportRules: string[]; accepted: boolean;
+    /** CUSUM vượt ±h là cảnh báo xu hướng độc lập, không tự loại điểm QC. */
+    cusumSignal: 'CUSUM +h' | 'CUSUM −h' | 'CUSUM ±h' | null;
     errorType: string; errorDesc: string;
   }[];
-  cusum: { cPos: number[]; cNeg: number[]; flags: ('ok' | 'warn' | 'rej')[] };
+  cusum: { cPos: number[]; cNeg: number[]; flags: ('ok' | 'warn' | 'rej')[]; k: number; h: number; ma: number[] };
   cusumOn: boolean;
 }
 
@@ -269,27 +277,48 @@ export interface UncertaintyBudgetResult {
   target: number | null; absoluteUc: number | null; absoluteU: number | null;
   tea: number | null; teaRatio: number | null; withinTea: boolean | null;
 }
+export interface SigmaEqaRound { lab: number | null; target: number | null; bias: number }
 export interface SigmaLevelResult {
-  level: number; cv: number | null; biasEqa: number | null; eqaRounds: number[]; mixedSigns: boolean; uCal: number | null;
+  level: number; /** TEa% đã chụp tại đúng mức QC; null chỉ với kỳ lịch sử chưa có snapshot. */ tea: number | null; /** Mean mục tiêu cùng lúc chụp kỳ, để quy đổi U% ra đơn vị xét nghiệm. */ targetMean: number | null; cv: number | null; biasEqa: number | null; eqaRounds: SigmaEqaRound[]; mixedSigns: boolean; uCal: number | null;
+  cvSource: 'manual' | 'iqc-cohort'; cohortN: number | null; sourceLot: string; sourceStart: string; sourceEnd: string; cohortStatus: string;
   sigma: SigmaMetricResult | null; mu: UncertaintyBudgetResult | null;
+  qualityDesign: { capable: boolean; rules: string[]; n: number; r: number; risk: string; plan: string } | null;
 }
 export interface SigmaPeriodView { id: string; testId: string; period: string; tea: number | null; teaSource: string; levels: SigmaLevelResult[] }
+export interface SigmaCohortView {
+  level: number; lot: string; n: number; cv: number | null; start: string; end: string;
+  targetMean: number | null; targetSd: number | null; issues: string[];
+  excluded: { voided: number; invalidValue: number }; status: 'insufficient' | 'provisional' | 'eligible' | 'unstable';
+}
 
 export interface NceRecord {
-  id: string; date: string; created_at: string; updated_at?: string; test_id: string | null; level: number | null; lot: string;
+  id: string; date: string; created_at: string; updated_at?: string; created_by_user_id?: string; test_id: string | null; level: number | null; lot: string;
   point_id: string | null; rule: string; error_type: string; nce_id: string; parent_nce_id: string; follow_up_nce_id: string; protocol_version: number;
   approval_status: 'pending' | 'approved' | 'returned'; effectiveness_status: 'pending' | 'effective' | 'ineffective';
-  record_status: 'active' | 'cancelled'; due_date: string; action_completed_date: string; detail_json: string;
+  record_status: 'active' | 'cancelled'; risk_level?: string; due_date: string; action_completed_date: string; detail_json: string;
 }
 
 export interface NceDetail {
-  correction?: string; investigation?: string; causeCategory?: 'SE' | 'RE' | ''; causeDescription?: string;
+  correction?: string; investigation?: string;
+  /** Nhóm nguyên nhân gốc, tách khỏi `NceRecord.error_type` (SE/RE). */
+  causeCategory?: 'qc' | 'operator' | 'instrument' | 'reagent' | 'calibration' | 'environment' | 'unknown' | '';
+  cause?: string; /** Tên cũ để đọc dữ liệu thí điểm trước protocol-v3. */ causeDescription?: string; action?: string;
   /** Người phụ trách hồ sơ — app cũ lưu ở trường `by` của bản ghi; app-v2
    * chưa có cột riêng nên giữ trong `detail_json` (mục còn treo từ D2). */
   owner?: string;
   releaseDecision?: 'held' | 'released'; releaseNote?: string; releaseDecidedAt?: string; releaseDecidedBy?: string;
   rerunPointId?: string; rerunNote?: string; rerunSnapshot?: { date: string; runId: string; val: number; level: number };
   effectivenessNote?: string; residualRisk?: string;
+  eventSource?: 'iqc' | 'eqa' | 'instrument' | 'clinical' | 'audit' | 'other' | '';
+  processPhase?: 'pre' | 'exam' | 'post' | '';
+  containmentStatus?: 'held' | 'none' | ''; containmentNote?: string;
+  riskSeverity?: number; riskOccurrence?: number; riskDetectability?: number; riskLevel?: 'low' | 'medium' | 'high' | 'critical' | ''; riskBasis?: string;
+  qcMaterialStatus?: string; qcMaterialNote?: string; instrumentStatus?: string; instrumentNote?: string; reagentStatus?: string; reagentNote?: string; calibrationStatus?: string; calibrationNote?: string; lotToLotStatus?: string; lotToLotNote?: string;
+  biasBefore?: string; biasAfter?: string; actionCompletedDate?: string;
+  releaseStatus?: 'released' | ''; releaseDate?: string; releaseBy?: string;
+  patientImpact?: 'none' | 'held' | 'affected' | ''; patientAction?: string;
+  effectivenessStatus?: 'pending' | 'effective' | 'ineffective'; effectivenessDate?: string;
+  residualSeverity?: number; residualOccurrence?: number; residualDetectability?: number; residualRiskLevel?: 'low' | 'medium' | 'high' | 'critical' | ''; residualRiskBasis?: string;
   reopenedFrom?: string; reopenNote?: string; returnNote?: string; cancelReason?: string; cancelledBy?: string; cancelledAt?: string;
 }
 
@@ -324,6 +353,11 @@ export interface LabProfile {
   id: number; name: string; dept: string; address: string;
   brand_title: string; brand_sub: string; logo_text: string; logo_data: string;
 }
+export interface FirebaseSettings {
+  labCode: string; email: string; config: string; connected: boolean; status: string; dataPath: string;
+}
+export interface FirebaseConnectResult { state: 'pushed' | 'in-sync' | 'conflict'; remoteUpdatedAt: string }
+export interface FirebaseSyncResult { state: 'pushed' | 'pulled'; remoteUpdatedAt: string }
 
 export interface PeriodLockRow { id: string; ym: string; locked_at: string; locked_by: string; note: string }
 
@@ -374,7 +408,7 @@ export interface QcApi {
   restoreTeaRefDefaults(input: { analyteId: string }): Promise<IpcResult<{ analyteId: string }>>;
   /** Thêm 1 DÒNG analyte mới vào bảng TEa tham chiếu (khác `saveTeaRef` —
    * đó là hồ sơ TEa CHUẨN HOÁ của PXN, bắt buộc 6 trường). */
-  addTeaAnalyte(input: { name: string; abbreviation?: string; matrix?: string; unit?: string; section?: string; clia?: string; ricos?: string }): Promise<IpcResult<{ analyteId: string }>>;
+  addTeaAnalyte(input: { name: string; abbreviation?: string; matrix?: string; unit?: string; section?: string; clia?: string; ricos?: string; cliaRule?: 'percent' | 'absolute' | 'greater-of'; cliaAbsolute?: string; cliaAbsoluteUnit?: string }): Promise<IpcResult<{ analyteId: string }>>;
   removeTest(input: { id: string; ids?: string[] }): Promise<IpcResult<{ id: string; pointsCount: number }>>;
   removePanel(input: { id: string }): Promise<IpcResult<{ id: string }>>;
   removeLot(input: { id: string }): Promise<IpcResult<{ id: string }>>;
@@ -383,8 +417,11 @@ export interface QcApi {
   stopLotGroup(input: { id: string }): Promise<IpcResult<{ id: string }>>;
   /** Kích hoạt nhóm lô: áp Mean/SD ĐÃ LƯU của từng lô trong nhóm sang các
    * mức QC tương ứng và dừng nhóm bị thay thế. 3 trạng thái như app cũ:
-   * `applied` / `already-active` / lỗi `unready` (chưa có Mean/SD nào). */
-  activateLotGroup(input: { id: string }): Promise<IpcResult<{ status: 'applied' | 'already-active'; applied: number; stoppedGroups: string[] }>>;
+   * `applied` / `already-active` / `unready` (chưa mức nào có Mean/SD hợp lệ
+   * cho lô của nhóm — KHÔNG đụng gì tới cấu hình). `unready` là một nhánh
+   * THÀNH CÔNG trả về, không phải mã lỗi: hợp đồng thiếu nó tới 2026-09-10
+   * nên renderer không biết nhánh đó tồn tại. */
+  activateLotGroup(input: { id: string }): Promise<IpcResult<{ status: 'applied' | 'already-active' | 'unready'; applied: number; stoppedGroups: string[] }>>;
   removeLotTransition(input: { id: string }): Promise<IpcResult<{ id: string }>>;
   saveLotGroup(input: { id?: string; data: LotGroupDraft }): Promise<IpcResult<LotGroup>>;
   listPanels(): Promise<QcPanel[]>;
@@ -439,10 +476,16 @@ export interface QcApi {
   listArchivedBlocks(testId: string, groupId: string): Promise<ArchivedBlock[]>;
   listArchivedGroupTests(groupId: string): Promise<{ id: string; label: string }[]>;
   listSigmaPeriods(testId: string): Promise<SigmaPeriodView[]>;
-  saveSigmaPeriod(input: { testId: string; period: string; tea?: number; teaSource?: string; levels: { level: number; cv?: number; biasEqa?: number; eqaRounds?: number[]; uCal?: number; muBiasMode?: 'include' | 'exclude' }[] }): Promise<IpcResult<SigmaPeriodView>>;
+  listSigmaCohorts(testId: string, period: string, levels: number[]): Promise<SigmaCohortView[]>;
+  setSigmaTracking(input: { testId: string; tracked: boolean }): Promise<IpcResult<{ testId: string; tracked: boolean }>>;
+  saveSigmaTeaConfig(input: { testId: string; source: string; tea?: number; eflmAnalyte?: string; eflmAps?: string; eflmLookupDate?: string; eflmRef?: string }): Promise<IpcResult<Test>>;
+  saveSigmaPeriod(input: { testId: string; period: string; tea?: number; teaSource?: string; levels: { level: number; /** Snapshot TEa% riêng của mức QC, cần thiết cho tiêu chí CLIA tuyệt đối. */ tea?: number; /** Mean mục tiêu chụp cùng kỳ, dùng đổi U% sang đơn vị. */ targetMean?: number; cv?: number; biasEqa?: number; eqaRounds?: Array<{ lab: number | null; target: number | null; bias?: number }>; uCal?: number; muBiasMode?: 'include' | 'exclude'; cvSource?: 'manual' | 'iqc-cohort'; cohortN?: number; sourceLot?: string; sourceStart?: string; sourceEnd?: string; cohortStatus?: string }[]; createOnly?: boolean }): Promise<IpcResult<SigmaPeriodView>>;
+  renameSigmaPeriod(input: { id: string; period: string }): Promise<IpcResult<SigmaPeriodView>>;
   removeSigmaPeriod(input: { data: { id: string } }): Promise<IpcResult<{ id: string }>>;
   listNceRecords(): Promise<NceRecord[]>;
-  createNce(input: { data: { testId?: string; level?: number; lot?: string; date: string; pointId?: string; rule?: string; errorType?: string; correction: string; dueDate?: string; investigation?: string; causeCategory?: 'SE' | 'RE' | ''; causeDescription?: string } }): Promise<IpcResult<NceRecord>>;
+  createNce(input: { data: { testId?: string; level?: number; lot?: string; date: string; pointId?: string; rule?: string; errorType?: string; correction: string; dueDate?: string; investigation?: string; causeCategory?: string; causeDescription?: string; protocol?: Partial<NceDetail> } }): Promise<IpcResult<NceRecord>>;
+  /** Lưu tiến độ protocol-v3; phê duyệt vẫn có cổng đầy đủ ở main process. */
+  saveNceProtocol(input: { data: { id: string; dueDate?: string; protocol: Partial<NceDetail> } }): Promise<IpcResult<NceRecord>>;
   approveNce(input: { data: { id: string } }): Promise<IpcResult<NceRecord>>;
   returnNce(input: { data: { id: string; note: string } }): Promise<IpcResult<NceRecord>>;
   cancelNce(input: { data: { id: string; note: string } }): Promise<IpcResult<NceRecord>>;
@@ -464,6 +507,10 @@ export interface QcApi {
   getLabProfile(): Promise<LabProfile>;
   saveLabProfile(input: { data: { name?: string; dept?: string; address?: string; brandTitle?: string; brandSub?: string; logoText?: string; logoData?: string; clearLogo?: boolean } }): Promise<IpcResult<LabProfile>>;
   getStorageInfo(): Promise<{ dbFileBytes: number; path: string }>;
+  getFirebaseSettings(): Promise<FirebaseSettings>;
+  connectFirebase(input: { data: { labCode?: string; email?: string; password?: string; config?: string } }): Promise<IpcResult<FirebaseConnectResult>>;
+  syncFirebase(input: { data: { direction: 'push' | 'pull' } }): Promise<IpcResult<FirebaseSyncResult>>;
+  disconnectFirebase(): Promise<IpcResult<null>>;
   listPeriodLocks(): Promise<PeriodLockRow[]>;
   lockPeriod(input: { data: { ym: string; note?: string } }): Promise<IpcResult<PeriodLockRow>>;
   unlockPeriod(input: { data: { ym: string; note: string } }): Promise<IpcResult<{ ym: string }>>;

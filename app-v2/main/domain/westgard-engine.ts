@@ -7,6 +7,7 @@
 // 3-1s/4-1s/6x… đi theo thứ tự run rồi level.
 import { WG_RUN_RULES, defaultRuleAction, wgScanRuns } from './westgard-rules';
 import type { RuleAction } from './rule-config';
+import { compareRunId } from './sort-order';
 
 export interface StatsResult { n: number; m: number; sd: number; cv: number }
 
@@ -165,18 +166,27 @@ export function westgardMultiByPoint<T extends QcPointLike>(levelSets: readonly 
   type Item = { p: T; z: number; level: number; run: string };
   const flags = new Map<T, string[]>() as MultiWestgardResult<T>;
   const support = new Map<T, string[]>(); flags.support = support;
-  const runs = new Map<string, Item[]>();
+  // Gộp trùng mức NGAY khi nạp (Map theo `level`, giá trị sau đè giá trị
+  // trước — đúng ngữ nghĩa `new Map(items.map(i => [i.level, i]))` của bản
+  // gốc, và Map giữ nguyên vị trí của lần đầu gặp key). Trước đây phép gộp
+  // này chạy HAI lần cho mỗi lần chạy (một lần trong vòng lặp per-run, một
+  // lần nữa khi dựng `seq`), tức 3 mảng + 2 Map rác cho mỗi lần chạy —
+  // với 730 lần chạy × 50 xét nghiệm đó là phần chi phí lớn nhất của
+  // `listTestSummaries()`. Kết quả trả về không đổi.
+  const runs = new Map<string, Map<number, Item>>();
   for (const set of levelSets || []) for (const point of set.pts || []) {
     const z = pointZ(point, set.mean, set.sd); if (!Number.isFinite(z)) continue;
     const run = String(point.runId || point.date || '').slice(0, 120);
-    const list = runs.get(run) || []; list.push({ p: point, z, level: set.level, run }); runs.set(run, list);
+    let byLevel = runs.get(run);
+    if (!byLevel) { byLevel = new Map<number, Item>(); runs.set(run, byLevel); }
+    byLevel.set(set.level, { p: point, z, level: set.level, run });
   }
   const addRule = (map: Map<T, string[]>, point: T, rule: string) => { const list = map.get(point) || []; if (!list.includes(rule)) list.push(rule); map.set(point, list); };
   const add = (items: Item[], rule: string) => items.forEach((item) => addRule(flags, item.p, rule));
-  const orderedRuns = [...runs.keys()].sort((a, b) => a.localeCompare(b, 'vi', { numeric: true }));
-  for (const itemsRaw of runs.values()) {
-    const items = [...new Map(itemsRaw.map((item) => [item.level, item])).values()];
-    if (items.length < 2) continue;
+  const orderedRuns = [...runs.keys()].sort(compareRunId);
+  for (const byLevel of runs.values()) {
+    if (byLevel.size < 2) continue;
+    const items = [...byLevel.values()];
     const pos2 = items.filter((item) => item.z > 2), neg2 = items.filter((item) => item.z < -2);
     if (isOn('R4s')) {
       const lo = items.reduce((a, b) => b.z < a.z ? b : a), hi = items.reduce((a, b) => b.z > a.z ? b : a);
@@ -188,7 +198,7 @@ export function westgardMultiByPoint<T extends QcPointLike>(levelSets: readonly 
       if (isOn('3-1s')) { const pos1 = items.filter((item) => item.z > 1), neg1 = items.filter((item) => item.z < -1); if (pos1.length >= 3) add(pos1, '3-1s'); if (neg1.length >= 3) add(neg1, '3-1s'); }
     }
   }
-  const seq = orderedRuns.flatMap((run) => [...new Map((runs.get(run) || []).map((item) => [item.level, item])).values()].sort((a, b) => a.level - b.level));
+  const seq = orderedRuns.flatMap((run) => [...(runs.get(run)?.values() ?? [])].sort((a, b) => a.level - b.level));
   wgScanRuns(seq.map((item) => item.z), WG_RUN_RULES.filter(([rule]) => rule !== '2-2s'), isOn, (indices, rule) => {
     const items = indices.map((index) => seq[index]), triggerRun = items.at(-1)?.run;
     for (const item of items) addRule(item.run === triggerRun ? flags : support, item.p, rule);
@@ -238,8 +248,17 @@ export function cusumScan(points: readonly QcPointLike[], mean: unknown, sd: unk
   const flags: RuleVerdict[] = [];
   const ma: number[] = [];
   const queue: number[] = [];
+  let targetKey = '';
   (points || []).forEach(p => {
-    const z = pointZ(p, meanN, sdN);
+    const target = pointTarget(p, meanN, sdN);
+    // CUSUM chỉ có ý nghĩa trong một baseline ổn định. Điểm QC lưu snapshot
+    // Mean/SD để bảo toàn lịch sử, nhưng không được phép mang phần cộng dồn
+    // của dải CŨ sang dải MỚI (kể cả vẫn cùng lô QC). Reset cả C+/C− và MA.
+    if (target.key !== targetKey) {
+      cPos = 0; cNeg = 0; maSum = 0; maCount = 0; queue.length = 0;
+      targetKey = target.key;
+    }
+    const z = target.z;
     if (Number.isFinite(z)) { cPos = Math.max(0, cPos + z - kFinal); cNeg = Math.min(0, cNeg + z + kFinal); }
     cPosArr.push(cPos);
     cNegArr.push(cNeg);

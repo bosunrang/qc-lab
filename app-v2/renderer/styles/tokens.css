@@ -70,9 +70,9 @@
   --muted:var(--gray-600);
   --line:var(--gray-200);
   --line2:var(--gray-200);
-  /* Dùng cùng nền rất nhạt của header modal "Thêm xét nghiệm" cho mọi
-     header panel/bảng. Header trang chính vẫn có nền riêng trong app.css. */
-  --section-head-bg:var(--gray-25);
+  /* Giữ đúng tầng nền của header panel/bảng bản cũ. Modal có nền riêng;
+     không dùng nền modal để làm nhạt toàn bộ các panel Sigma. */
+  --section-head-bg:var(--gray-100);
   --section-head-border:var(--gray-200);
   --section-head-ink:var(--gray-900);
   --section-head-size:var(--type-subhead);

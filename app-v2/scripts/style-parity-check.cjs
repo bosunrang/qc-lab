@@ -28,7 +28,7 @@ const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
 const { openSeededSession } = require('../../scripts/lib/seed-browser-session');
-const { buildParitySeeds } = require('./ui-parity-seed.cjs');
+const { buildParitySeeds, seedV2ViaApi } = require('./ui-parity-seed.cjs');
 
 const ROOT = path.join(__dirname, '..', '..');
 const V2_ROOT = path.join(ROOT, 'app-v2-dist', 'renderer');
@@ -48,6 +48,18 @@ const SELECTORS = [
   '.panel', '.panel-title', '.empty', '.empty-title', '.alert', '.dayseg button',
 ];
 
+/** Nới CSP CHỈ khi gate phục vụ bản build.
+ *
+ * `index.html` khai `script-src 'self'` — đúng cho bản Electron đóng gói,
+ * nhưng chặn `WebAssembly.instantiate`, mà bản xem trước dùng SQLite biên
+ * dịch sang WASM (sql.js) từ 2026-09-09. Electron thật không cần WASM (nó có
+ * `node:sqlite`), nên nới ở đây thay vì hạ CSP của sản phẩm — cùng lý do
+ * `vite.app-v2-renderer.config.mjs` chỉ nới CSP khi `ctx.server` tồn tại.
+ */
+function relaxCspForWasm(html) {
+  return html.replace(/script-src 'self'/, "script-src 'self' 'wasm-unsafe-eval'");
+}
+
 function startV2Server() {
   return new Promise((resolve, reject) => {
     const server = http.createServer((request, response) => {
@@ -59,8 +71,10 @@ function startV2Server() {
         if (error) { response.writeHead(404); response.end('Not found'); return; }
         const ext = path.extname(file);
         const type = ext === '.html' ? 'text/html; charset=utf-8' : ext === '.js' ? 'text/javascript; charset=utf-8'
-          : ext === '.css' ? 'text/css; charset=utf-8' : ext === '.woff2' ? 'font/woff2' : 'application/octet-stream';
-        response.writeHead(200, { 'Content-Type': type }); response.end(data);
+          : ext === '.css' ? 'text/css; charset=utf-8' : ext === '.woff2' ? 'font/woff2'
+          : ext === '.wasm' ? 'application/wasm' : 'application/octet-stream';
+        response.writeHead(200, { 'Content-Type': type });
+        response.end(ext === '.html' ? relaxCspForWasm(data.toString('utf8')) : data);
       });
     });
     server.on('error', reject);
@@ -103,8 +117,9 @@ async function main() {
   try {
     const port = server.address().port;
     v2Page = await oldSession.browser.newPage();
-    await v2Page.addInitScript((seed) => localStorage.setItem('qclab-v2-browser-preview', JSON.stringify(seed)), seeds.v2);
+    // Seed qua chính `window.qcApi` — xem ghi chú ở `seedV2ViaApi`.
     await v2Page.goto(`http://127.0.0.1:${port}/index.html#/dashboard`, { waitUntil: 'load' });
+    await seedV2ViaApi(v2Page, seeds.v2);
     await v2Page.waitForTimeout(2500);
     const viewport = { width: 1440, height: 2000 };
     await oldSession.page.setViewportSize(viewport);

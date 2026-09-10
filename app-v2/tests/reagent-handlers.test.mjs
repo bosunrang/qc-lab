@@ -30,6 +30,31 @@ assert.equal(metaSaved.ok, true);
 assert.equal(metaSaved.data.lot_old, 'L1');
 assert.equal(metaSaved.data.bias_target, 8);
 assert.equal(metaSaved.data.coverage_confirmed, 1);
+// Giao diện lưu từng ô riêng khi rời ô: cập nhật một field không được xoá
+// lô, ngưỡng, coverage hay đơn vị đã có từ lượt lưu trước.
+const partialMetaSaved = reagent.saveMetadata({ id: created.data.id, data: { operator: 'KTV A' } }, actor);
+assert.equal(partialMetaSaved.ok, true);
+assert.equal(partialMetaSaved.data.operator, 'KTV A');
+assert.equal(partialMetaSaved.data.lot_old, 'L1');
+assert.equal(partialMetaSaved.data.lot_new, 'L2');
+assert.equal(partialMetaSaved.data.unit, 'mmol/L');
+assert.equal(partialMetaSaved.data.bias_target, 8);
+assert.equal(partialMetaSaved.data.coverage_confirmed, 1);
+// Rời ô mà không sửa gì không được ghi thêm một audit giả, nếu không nhật ký
+// sẽ đầy các dòng "cập nhật" vô nghĩa trong thao tác nhập liệu thường ngày.
+const auditBeforeNoop = db.prepare('SELECT COUNT(*) AS c FROM activity').get().c;
+const sameMetaSaved = reagent.saveMetadata({ id: created.data.id, data: { operator: 'KTV A' } }, actor);
+assert.equal(sameMetaSaved.ok, true);
+assert.equal(db.prepare('SELECT COUNT(*) AS c FROM activity').get().c, auditBeforeNoop);
+const badBias = reagent.saveMetadata({ id: created.data.id, data: { biasTarget: 0 } }, actor);
+assert.equal(badBias.ok, false);
+assert.equal(badBias.error.code, 'invalid-bias-target');
+const badAlpha = reagent.saveMetadata({ id: created.data.id, data: { alpha: 1 } }, actor);
+assert.equal(badAlpha.ok, false);
+assert.equal(badAlpha.error.code, 'invalid-alpha');
+const badOneTailAlpha = reagent.saveMetadata({ id: created.data.id, data: { alpha: 0.5 } }, actor);
+assert.equal(badOneTailAlpha.ok, false);
+assert.equal(badOneTailAlpha.error.code, 'invalid-alpha');
 
 // 4) Nhap so lieu day du (20 cap, bias 1%) -> tinh duoc thong ke, dat sang loc
 const oldVals = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 15, 25, 35, 45, 55, 65, 75, 85, 95, 105];
@@ -52,6 +77,22 @@ assert.equal(removedLast.error.code, 'last-comparison');
 const notFound = reagent.saveMetadata({ id: 'khong-ton-tai', data: {} }, actor);
 assert.equal(notFound.ok, false);
 assert.equal(notFound.error.code, 'not-found');
+const malformedSave = reagent.saveRows(null, actor);
+assert.equal(malformedSave.ok, false);
+assert.equal(malformedSave.error.code, 'not-found');
+const malformedQuickList = reagent.listQuickValues(null);
+assert.equal(malformedQuickList.ok, false);
+assert.equal(malformedQuickList.error.code, 'invalid-type');
+
+// 6b) IPC phai xu ly payload tao toi thieu/khong dung kieu ma khong crash.
+const fallbackCreated = reagent.createComparison(null, actor);
+assert.equal(fallbackCreated.ok, true);
+assert.equal(fallbackCreated.data.reagent, 'Hóa chất mới');
+// Bản ghi lỗi từ backup cũ không được làm trang So sánh hóa chất crash.
+db.prepare('UPDATE reagent_tests SET rows_json=? WHERE id=?').run('{"khong":"phai mang cap"}', fallbackCreated.data.id);
+const recovered = reagent.listComparisons().find((row) => row.id === fallbackCreated.data.id);
+assert.equal(recovered.result, null);
+assert.deepEqual(recovered.rows, [['', ''], ['', ''], ['', ''], ['', ''], ['', '']]);
 
 // 7) "Chon nhanh" nguoi thuc hien/loai mau — 1 danh sach CHUNG cho toan app.
 // Loai mau co san 3 gia tri mac dinh; nguoi thuc hien bat dau rong.

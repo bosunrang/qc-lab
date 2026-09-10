@@ -111,10 +111,20 @@ export function reagentTCritical(degreesOfFreedom: number, alpha: number): numbe
 export function reagentValidPairs(rows: readonly (readonly unknown[] | null | undefined)[] | null | undefined) {
   const o: number[] = [], n: number[] = [];
   (rows || []).forEach(row => {
-    const oldValue = Number.parseFloat(String(row?.[0] ?? '')), newValue = Number.parseFloat(String(row?.[1] ?? ''));
-    if (!Number.isNaN(oldValue) && !Number.isNaN(newValue)) { o.push(oldValue); n.push(newValue); }
+    const oldValue = reagentFiniteCell(row?.[0]), newValue = reagentFiniteCell(row?.[1]);
+    if (oldValue != null && newValue != null) { o.push(oldValue); n.push(newValue); }
   });
   return { o, n };
+}
+
+/** Chỉ nhận một số hoàn chỉnh, hữu hạn. `parseFloat('12abc')` và
+ * `parseFloat('Infinity')` từng biến dữ liệu lỗi thành cặp hợp lệ, làm sai
+ * n, Bias và quyết định sàng lọc khi dữ liệu đến từ IPC/import thay vì ô số. */
+function reagentFiniteCell(value: unknown): number | null {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
 }
 
 export type ReagentComparisonDataset = {
@@ -133,7 +143,9 @@ export function calculateReagentComparison(dataset: ReagentComparisonDataset | n
   const degenerate = dRange < 1e-9 * (Math.abs(mO) + Math.abs(mN) + 1);
   const tStat = degenerate ? (md === 0 ? 0 : md > 0 ? Infinity : -Infinity) : md / (sdd / Math.sqrt(N));
   const r = reagentPearson(o, n);
-  const alpha = Number.parseFloat(String(test.alpha ?? '')) || 0.05;
+  const requestedAlpha = Number(test.alpha);
+  // Cũng bảo vệ dữ liệu cũ/import trực tiếp chưa đi qua metadata validation.
+  const alpha = Number.isFinite(requestedAlpha) && requestedAlpha > 0 && requestedAlpha < 0.5 ? requestedAlpha : 0.05;
   const p2 = Number.isFinite(tStat) ? reagentTwoSidedPValue(tStat, df) : 0;
   const bias = mO ? Math.abs((mO - mN) / Math.abs(mO)) * 100 : mN ? Infinity : 0;
   const biasT = Number.parseFloat(String(test.biasTarget ?? '')) || 6;

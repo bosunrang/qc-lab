@@ -35,7 +35,7 @@ const ADMIN_ONLY: readonly Role[] = ['admin'];
 /** Thứ tự, id, nhãn và danh sách vai trò khớp ĐÚNG `ROUTER_PAGE_DEFS` app cũ.
  * Nhãn được dùng ở 2 nơi nhìn thấy được: sidebar và lưới "Thẻ được phép
  * dùng" của trang Người dùng — nên phải giữ nguyên văn app cũ, kể cả
- * "Cài đặt & Đám mây" (app-v2 chưa có Firebase, C2 đang TẠM DỪNG chứ không
+ * "Cài đặt & Đám mây" (Firebase C2 đã hoàn tất; tên giữ nguyên để khớp
  * bị bỏ; đổi nhãn ở đây là lệch golden master ngay trong lưới quyền). */
 export const PAGE_DEFS: readonly PageDef[] = [
   { id: 'dash', path: '/dashboard', label: 'Tổng quan', roles: ALL },

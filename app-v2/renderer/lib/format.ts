@@ -13,3 +13,13 @@ export function vnDate(value: string | null | undefined, fallback?: string): str
   if (match) return `${match[3]}/${match[2]}/${match[1]}`;
   return fallback === undefined ? text : fallback;
 }
+
+/** Hôm nay theo GIỜ ĐỊA PHƯƠNG, dạng ISO `yyyy-mm-dd`.
+ * `new Date().toISOString().slice(0,10)` cho ngày UTC — ở VN (UTC+7) từ 00:00
+ * tới 07:00 nó vẫn là NGÀY HÔM TRƯỚC, làm ca QC sáng sớm bị đánh dấu sai
+ * (hàng "Hôm nay"/vệt cam "thiếu QC" của bảng nhập, bộ lọc NCE quá hạn).
+ * Cùng nguyên tắc giờ địa phương đã chốt cho LIS Gateway. */
+export function todayIso(at: Date = new Date()): string {
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`;
+}

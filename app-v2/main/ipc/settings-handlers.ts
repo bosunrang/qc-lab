@@ -4,8 +4,8 @@
 // vi rut gon: Firebase connection/LIS Gateway settings/backup-restore vẫn
 // CHƯA làm — thuộc Giai đoạn C (docs/APP-V2-PLAN.md), cần đồng bộ Firebase/
 // hạ tầng backup thật trước, không phải chỉ thêm form.
-import { statSync } from 'node:fs';
-import type { Db } from '../db/open-database';
+import { dbFileBytes } from './db-file-size';
+import type { Db } from '../db/sqlite-like';
 import { prepareLabProfile, type LabProfileInput } from '../domain/settings-validation';
 import { type Actor, type IpcResult, writeAudit, notifyChanged, requireAdmin } from './shared';
 
@@ -39,12 +39,7 @@ export function createSettingsHandlers(db: Db, dbPath: string) {
    * liệu giờ nằm trong 1 file SQLite thật). `:memory:` (test) không có file
    * thật trên đĩa nên trả 0 thay vì ném lỗi. */
   function getStorageInfo(): StorageInfo {
-    if (dbPath === ':memory:') return { dbFileBytes: 0, path: dbPath };
-    try {
-      return { dbFileBytes: statSync(dbPath).size, path: dbPath };
-    } catch {
-      return { dbFileBytes: 0, path: dbPath };
-    }
+    return { dbFileBytes: dbFileBytes(dbPath), path: dbPath };
   }
 
   return { getLabProfile, saveLabProfile, getStorageInfo };

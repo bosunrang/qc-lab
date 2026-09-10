@@ -39,8 +39,9 @@ export const useWestgardStore = create<WestgardState>((set, get) => ({
     set({ ruleSettings: await window.qcApi.listRuleSettings() });
   },
   // Bật/tắt 1 luật ở tầng CHUNG đổi verdict của MỌI xét nghiệm trong hệ
-  // thống (đúng app cũ's `wgSet()`/`state.westgardRules`) — nạp lại cả danh
-  // sách tổng quan lẫn phân tích mức đang xem để phản ánh đúng ngay.
+  // thống (đúng app cũ's `wgSet()`/`state.westgardRules`). Store nạp lại
+  // danh sách tổng quan; WestgardPage nạp lại phân tích các mức đang xem vì
+  // chỉ trang đó biết test/mức hiện hành.
   saveRuleSetting: async (ruleId: string, on: boolean) => {
     await window.qcApi.saveRuleSetting(ruleId, on);
     await get().loadRuleSettings();

@@ -31,24 +31,24 @@ body{background:var(--bg);color:var(--ink);font-size:var(--type-subhead);line-he
    thanh điều hướng: trang scroll ở cấp document (body), không phải cuộn
    nội bộ trong `main` — `.head`'s `position:sticky;top:0` (dòng dưới) vẫn
    đúng nhờ cùng cơ chế này, chỉ riêng `aside` bị bỏ sót. */
-aside{background:var(--sidebar-bg);color:#cdd8e0;padding:0 12px 12px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;min-width:0;max-width:100vw;border-right:1px solid #294656;z-index:5;}
+aside{background:var(--sidebar-bg);color:#cdd8e0;padding:16px 12px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;min-width:0;max-width:100vw;border-right:1px solid #294656;z-index:5;}
 @media(max-width:900px){aside{position:sticky;top:0;z-index:30;height:auto;padding:12px;border-right:0;border-bottom:1px solid #294656;}}
 
-.brand-row{height:76px;display:flex;align-items:center;gap:6px;border-bottom:1px solid rgba(123,151,166,.34);position:relative;padding:0 4px;}
+.brand-row{display:flex;align-items:flex-start;justify-content:space-between;gap:6px;position:relative;padding:0 8px;}
 .brand{display:flex;align-items:center;color:var(--on-accent);position:relative;gap:13px;font-weight:800;font-size:var(--type-heading-sm);min-width:0;flex:1 1 auto;}
 .brand-copy{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.brand small{display:block;max-width:100%;overflow:hidden;color:#8ea3b2;font-weight:600;font-size:var(--type-caption);text-transform:uppercase;letter-spacing:.08em;margin-top:2px;text-overflow:ellipsis;white-space:nowrap;}
+.brand small{display:block;max-width:100%;overflow:hidden;color:#8ea3b2;font-weight:600;font-size:var(--type-overline);text-transform:uppercase;letter-spacing:.08em;margin-top:2px;text-overflow:ellipsis;white-space:nowrap;}
 .brand-mark{color:var(--on-accent);display:flex;align-items:center;justify-content:center;font-weight:900;position:relative;flex:0 0 42px;width:42px;height:42px;border-radius:var(--radius-lg);background:var(--teal);overflow:hidden;}
 .brand-mark img{display:block;width:100%;height:100%;object-fit:cover;border-radius:inherit;}
 
-.nav-toggle{margin-left:auto;flex:none;width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:rgba(47,179,166,.14);border:1px solid rgba(47,179,166,.35);border-radius:var(--radius-md);color:#6fd1c4;cursor:pointer;padding:0;transition:.18s ease;}
+.nav-toggle{margin-left:auto;flex:none;width:30px;height:30px;display:flex;align-items:center;justify-content:center;background:rgba(47,179,166,.14);border:1px solid rgba(47,179,166,.35);border-radius:var(--radius-md);color:#6fd1c4;cursor:pointer;padding:0;transition:.18s ease;}
 .nav-toggle:hover{background:rgba(47,179,166,.24);}
 .nav-toggle svg{width:16px;height:16px;}
 .app-shell.nav-collapsed .brand-row{justify-content:center;}
 .app-shell.nav-collapsed .nav-toggle{position:absolute;right:-25px;background:var(--panel);border:1px solid var(--line);color:var(--ink);box-shadow:var(--surface-shadow);z-index:2;}
 .app-shell.nav-collapsed .nav-toggle svg{transform:rotate(180deg);}
 
-.cloud{display:grid;grid-template-columns:8px minmax(0,1fr);column-gap:8px;row-gap:1px;align-items:center;min-width:0;margin:14px 4px 2px;padding:9px 10px;border:1px solid rgba(126,149,165,.18);border-radius:9px;background:rgba(255,255,255,.035);font-weight:740;line-height:1.25;font-size:var(--type-caption);color:#9db0bc;white-space:nowrap;}
+.cloud{display:grid;grid-template-columns:8px minmax(0,1fr);column-gap:8px;row-gap:1px;align-items:center;min-width:0;margin:10px 8px 2px;padding:7px 9px;border:1px solid rgba(126,149,165,.18);border-radius:9px;background:rgba(255,255,255,.035);font-weight:740;line-height:1.25;font-size:var(--type-caption);color:#9db0bc;white-space:nowrap;}
 .cloud:before{content:"";grid-row:1/3;width:7px;height:7px;border-radius:50%;background:#7e96a5;}
 .app-shell.nav-collapsed .cloud{grid-template-columns:7px;justify-content:center;padding:9px 0;}
 .app-shell.nav-collapsed .cloud-label{display:none;}
@@ -82,15 +82,15 @@ nav a.active .ic{color:#6fd1c4;}
 main{height:100vh;overflow-y:auto;width:100%;max-width:100%;min-width:0;padding:0 clamp(14px,2vw,30px) 56px;box-sizing:border-box;overscroll-behavior-y:contain;}
 @media(max-width:900px){main{padding:0 14px 44px;}}
 
-/* Header theo app Cost: cao cố định 82px trên desktop, nội dung canh giữa
-   theo chiều dọc. Màn hình hẹp được trở lại chiều cao tự động bên dưới. */
-.head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:clamp(10px,1.4vw,18px);position:sticky;top:0;z-index:90;box-sizing:border-box;height:82px;min-height:82px;margin:0 calc(-1 * clamp(14px,2vw,30px)) var(--page-header-gap);padding:0 clamp(14px,2vw,30px);background:linear-gradient(180deg,rgba(243,246,248,.98) 0%,rgba(243,246,248,.94) 100%);backdrop-filter:blur(8px);border-bottom:1px solid #d8e4ea;}
+/* Header của app cũ có chiều cao theo nội dung: khoảng thở trên giúp tiêu đề
+   đứng đúng nhịp với sidebar, không dùng thanh cố định 82px của thử nghiệm v2. */
+.head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:clamp(10px,1.4vw,18px);position:sticky;top:0;z-index:90;box-sizing:border-box;margin:0 calc(-1 * clamp(14px,2vw,30px)) var(--page-header-gap);padding:clamp(14px,2vw,28px) clamp(14px,2vw,30px) 16px;background:linear-gradient(180deg,rgba(243,246,248,.98) 0%,rgba(243,246,248,.94) 100%);backdrop-filter:blur(8px);border-bottom:1px solid #d8e4ea;}
 /* Khoảng hở dưới header nằm trên chính `.head` như app cũ
    (`professional-base.css`: `margin:0 calc(...) 22px`). Bản trước dùng
    `main > .head + *{margin-top:...}` — KHÔNG khớp được, vì mọi trang app-v2
    bọc nội dung trong một <div> vô danh nên `.head` không phải con trực tiếp
    của <main>; hệ quả là mọi trang mất đúng 22px khoảng hở dưới tiêu đề. */
-@media(max-width:760px){.head{height:auto;min-height:82px;align-items:stretch;flex-direction:column;padding:14px 16px;}}
+@media(max-width:760px){.head{align-items:stretch;flex-direction:column;padding:14px 16px;}}
 .head h1{font-size:var(--type-page-title);font-weight:800;letter-spacing:-.02em;line-height:1.12;}
 .head p{margin-top:5px;color:var(--muted);font-size:var(--type-body-sm);max-width:72ch;font-weight:500;line-height:1.55;}
 .head-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
@@ -145,7 +145,17 @@ main{height:100vh;overflow-y:auto;width:100%;max-width:100%;min-width:0;padding:
   border-bottom:1px solid var(--section-head-border);
   box-sizing:border-box;
 }
-.panel>h2.panel-title:first-child{display:flex;align-items:center;}
+/* Không để h2 mặc định của trình duyệt (1.5em, khoảng 21px) phá vỡ thang
+   chữ của panel. Mọi header panel dùng cùng cấp section/subhead 14px; tên
+   trang vẫn dùng --type-page-title ở .head h1. */
+.panel>h2.panel-title:first-child{
+  display:flex;
+  align-items:center;
+  color:var(--section-head-ink);
+  font-size:var(--section-head-size);
+  font-weight:800;
+  line-height:1.35;
+}
 
 /* Input/select/textarea/label — style THẲNG selector chung (bản cũ,
    components.css, không scope theo `.field`), vì rất nhiều nơi trong app-v2
@@ -162,6 +172,8 @@ td{font-size:var(--table-body-size);}
 input:not([type="checkbox"]):not([type="radio"]),select{width:100%;height:36px;min-height:36px;padding:var(--space-sm) var(--space-md);border:1px solid var(--line);border-radius:var(--surface-radius);background:var(--panel);box-shadow:inset 0 1px 0 rgba(19,32,42,.02);color:var(--ink);font-weight:400;}
 textarea{width:100%;padding:var(--space-sm) var(--space-md);min-height:38px;border:1px solid var(--line);border-radius:var(--surface-radius);background:var(--panel);box-shadow:inset 0 1px 0 rgba(19,32,42,.02);color:var(--ink);font-weight:400;}
 input:not([type="checkbox"]):not([type="radio"]):focus,select:focus,textarea:focus{outline:none;border-color:var(--focus-outline);box-shadow:none;}
+input:not([type="checkbox"]):not([type="radio"])[readonly],textarea[readonly]{background:#f5f8fa;color:#506673;border-color:#d5dee4;}
+input:not([type="checkbox"]):not([type="radio"]):disabled,select:disabled,textarea:disabled{background:var(--bg);color:#8a9aa5;border-color:#d8e0e5;cursor:not-allowed;}
 label{display:block;font-size:var(--type-caption);color:var(--muted);margin:var(--space-sm) 0 var(--space-2xs);font-weight:760;}
 
 /* App cũ KHÔNG có class `.field` — mỗi ô là một `<div>` thường: nhãn là
@@ -416,6 +428,12 @@ td .hint{margin-top:2px;color:var(--muted);}
 .dayseg button.on{background:#1c3442;color:var(--on-accent);}
 .chart-scroll{width:100%;overflow-x:auto;padding:16px 8px 20px 0;}
 .chart-scroll canvas{width:100%;max-width:1320px;min-width:0;margin:0 auto;display:block;height:auto;}
+/* Tooltip điểm QC trên canvas Levey-Jennings — cùng nội dung và tương phản
+   với `.qc-tooltip` của app cũ, nhưng render bởi React thay vì chèn HTML tay. */
+.qc-chart-tooltip{position:fixed;z-index:1200;pointer-events:none;max-width:236px;padding:8px 10px;border-radius:var(--surface-radius);background:#14202b;color:var(--on-accent);box-shadow:0 12px 28px rgba(20,33,43,.22);font-size:var(--type-meta);line-height:1.45;}
+.qc-chart-tooltip b{display:block;margin-bottom:2px;font-weight:800;}
+.qc-chart-tooltip strong{font-weight:800;}
+.qc-chart-tooltip .muted{color:#d8e3ea;}
 
 /* Đăng nhập/Khởi tạo tài khoản quản trị — layout giống hệt bố cục
    .auth-card/.auth-head/.brand-mark của app cũ (assets/components.css +

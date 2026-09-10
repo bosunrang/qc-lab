@@ -12,6 +12,7 @@ const QCCore = require('../../assets/core.js');
 const {
   stats, pointTarget, pointZ, westgard, westgardByPoint, westgardMultiByPoint,
   combinedWestgardByPoint, cusum,
+  cusumScan,
 } = require('../../app-v2-dist/main/domain/westgard-engine.js');
 
 // 1) stats()
@@ -96,6 +97,19 @@ for (const s of scenarios) {
   const newR = cusum(points, 10, 1, 0.5, 4);
   const oldR = QCCore.cusum(points, 10, 1, 0.5, 4);
   assert.deepEqual(newR, oldR, 'cusum() lech ban cu');
+}
+
+// 7b) Đổi Mean/SD trong cùng lô là một baseline mới: CUSUM/MA phải bắt đầu
+// lại, không mang phần cộng dồn của dải trước sang dải sau.
+{
+  const points = [
+    { val: 11, qcMean: 10, qcSd: 1 }, { val: 11, qcMean: 10, qcSd: 1 }, { val: 11, qcMean: 10, qcSd: 1 },
+    { val: 21, qcMean: 20, qcSd: 1 },
+  ];
+  const result = cusumScan(points, 10, 1, 0.5, 4, 5);
+  assert.deepEqual(result.cPos, [0.5, 1, 1.5, 0.5], 'đổi baseline phải reset CUSUM+');
+  assert.deepEqual(result.cNeg, [0, 0, 0, 0]);
+  assert.equal(result.ma.at(-1), 1, 'MA cũng phải khởi động lại cùng baseline mới');
 }
 
 // 8) R4s liên mức: hai mức trái phía trong CÙNG run, chênh >4SD, phải gắn

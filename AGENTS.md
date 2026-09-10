@@ -4040,6 +4040,17 @@ tới: cần thêm `cliaAbsolute`/`cliaAbsoluteUnit` vào `tea-catalog.ts` cho 9
 analyte trên + hàm quy đổi tuyệt đối→% theo đơn vị khớp (đã có công thức
 trong "Confirmed business-logic decisions").
 
+**Six Sigma — chốt lại lớp giải TEa (2026-09-09).** Đã port các giới hạn
+CLIA tuyệt đối còn thiếu từ `TEA_ANALYTE_CATALOG` (26 analyte, không phải 9
+như ghi chú ban đầu) vào `renderer/data/tea-catalog.ts` và nối chúng vào
+`renderer/lib/sigma-tea-core.ts`. Khi tạo kỳ, nguồn Lab/EFLM/CLIA/Ricos được
+giải lại từ đúng nguồn hiện hành; đổi nguồn không tái sử dụng con số TEa còn
+lại từ nguồn trước. Với CLIA, giới hạn tuyệt đối chỉ được đổi sang % nếu đơn
+vị xét nghiệm khớp và có Mean QC khác 0; nếu đồng thời có giới hạn %, lấy
+giới hạn lớn hơn. Thiếu Mean hoặc lệch đơn vị không bị "đoán" TEa — UI nêu
+lý do. `tests/sigma-tea.test.mjs` khóa Sodium (±4 mmol/L ở Mean 100 = 4%),
+nhánh thiếu Mean, lệch đơn vị, Ricos và Lab override.
+
 2 mục còn treo có chủ đích khác của Cấu hình chung, không liên quan Six
 Sigma: cột "Hành động" nâng cao của bảng luật Westgard (Cảnh báo/Loại bỏ
 riêng từng luật — lưu được nhưng chưa nối vào engine, engine chưa hỗ trợ
@@ -4402,6 +4413,189 @@ và nút “Chọn tất cả” bỏ qua hàng bị khoá, đúng `targetRowSta
 Electron thật đã xác nhận đủ: chặn trùng analyte cùng máy, cho phép khác máy,
 tự sinh tên nhóm, chặn lô sai mức và hiển thị “Lô đã hết dùng” trên hàng bị
 khóa.
+
+**Bản xem trước trình duyệt chạy CHÍNH handler thật — xoá bản giả lập viết
+tay (2026-09-09).** `renderer/browser-mock/api.ts` (1.748 dòng) là bản cài
+đặt THỨ HAI của toàn bộ tầng điều phối: cùng thứ tự cổng, cùng thông báo,
+cùng công thức như `main/ipc/*`, chỉ khác `db.prepare(...).get()` ↔
+`array.find()`. Nó là nguồn của 18 lệch hành vi mà hạng mục C7 phải đi bắt
+từng cái, và chi phí đó vĩnh viễn: mỗi handler mới phải viết hai lần, lệch
+chỉ lộ khi ai đó nghĩ ra đúng bước test. Nay bản xem trước gọi thẳng
+`createConfigHandlers(db)`/`createEntryHandlers(db)`/… trên SQLite thật
+(sql.js/WASM trong IndexedDB) — `api.ts`, `store.ts`, `permission-policy.ts`
+và `tests/mock-parity.test.mjs` (675 dòng) đã xoá; **net −1.665 dòng**.
+
+**Bề mặt phải bắc cầu chỉ có 2 hàm + 3 method**, đo bằng grep toàn
+`main/ipc`+`main/db` trước khi code: `db.prepare()` (321 chỗ), `db.exec()`
+(68), và trên statement chỉ `.get()` (118), `.run()` (56), `.all()` (43).
+Nhờ vậy `browser-mock/sqlite-shim.ts` chỉ ~145 dòng. `main/db/sqlite-like.ts`
+(mới) giữ hợp đồng CẤU TRÚC đó; 16 file handler đổi `import type { Db }`
+sang file này để `tsc` của renderer không phải resolve `node:sqlite`.
+`open-database.ts` giữ một dòng kiểm tra tĩnh `const conn: SqliteLike = db`
+— nó trả công ngay: bắt được `changes` của `node:sqlite` là `number | bigint`
+chứ không phải `number` (2 chỗ đọc `.changes` phải bọc `Number()`).
+
+**Ba primitive có bản song song, KHÔNG phải bản giả lập** — thuật toán giống
+hệt, chốt bằng test lấy `node:crypto` làm oracle:
+- `sha256.ts` (`node:crypto`) ↔ `sha256-browser.ts` (JS thuần, đồng bộ). Vì
+  sao không WebCrypto: `crypto.subtle.digest` async, còn `writeAudit()` đồng
+  bộ và chạy trong transaction SQLite.
+- `password-hash.ts` (600.000 vòng) ↔ `password-hash-browser.ts` (20.000
+  vòng). PBKDF2-HMAC-SHA256 THẬT, chỉ khác số vòng vì 600k bằng JS thuần mất
+  **5,3 giây** mỗi lần đăng nhập (đo được 112.889 hash/giây). Số vòng nằm
+  trong chuỗi lưu `pbkdf2$<iter>$<salt>$<hash>` nên **tương thích hai chiều**:
+  bản trình duyệt kiểm được hash 600k của Electron và ngược lại — có test.
+- `ipc/db-file-size.ts` (`node:fs`) ↔ `db-file-size-browser.ts`. Tách vì đó
+  là dòng `node:fs` DUY NHẤT trong 10 nhóm handler mà bản xem trước dùng lại.
+
+Thay module do plugin `swap-node-only-modules-for-browser`
+(`vite.app-v2-renderer.config.mjs`). **Hai bẫy đã trả giá**: (1) thiếu
+`enforce:'pre'` thì resolver nội bộ của Vite giải trước và plugin không bao
+giờ được hỏi tới — `app-v2:build` vẫn XANH, chỉ mở tab mới thấy `node:crypto
+has been externalized`; (2) khớp cả chuỗi import thì bỏ lọt, vì cùng module
+được import bằng đường khác nhau (`audit-chain.ts` viết `'./sha256'`,
+`auth-handlers.ts` viết `'../domain/password-hash'`) — khớp theo TÊN MODULE.
+
+**Bẫy thứ ba, nghiêm trọng nhất**: `writeAudit()` là chỗ DUY NHẤT trong repo
+dùng tham số ĐẶT TÊN (`VALUES (@id,@seq)` + `.run({...})`). `node:sqlite`
+nhận object KHÔNG prefix, sql.js đòi key CÓ prefix — không dịch thì sql.js
+ném `tried to bind a value of an unknown type ([object Object])`, và vì mọi
+thao tác ghi đều đi qua `writeAudit()`, app vỡ ngay ở bước đăng nhập. Đã
+thêm test riêng trong `tests/sqlite-shim.test.mjs`.
+
+**Hai lỗi của bản giả lập cũ nay đúng theo cấu trúc**: `onStoreChanged()` trả
+`() => {}` và KHÔNG BAO GIỜ gọi callback (mọi `useStoreInvalidation()` vô
+hiệu ở bản xem trước — `mock-parity` không thấy vì nó chỉ chốt "trả về hàm
+huỷ đăng ký gọi được"), và chuỗi hash audit không bao giờ được băm
+(`verifyActivityChainNow()` luôn `checked: 0`). Nay `real-api.ts` đăng ký một
+`BroadcastTarget` thật qua `setBroadcastWindow()` — `shared.ts` đổi kiểu tham
+số đó từ `BrowserWindow` của electron sang một interface cấu trúc
+(`isDestroyed?()` tuỳ chọn) nên `main/index.ts` không phải đổi gì.
+
+**`sessionActor` phải sống qua F5.** Trong Electron nó nằm ở main process nên
+tải lại renderer không mất đăng nhập; ở bản xem trước "main process" chính là
+tab. Ghi id phiên vào `sessionStorage` (không lưu mật khẩu) rồi khôi phục
+bằng `auth.getUser()` — thiếu bước này thì mọi surface của gate parity lệch
+vì app quay về màn hình đăng nhập.
+
+**Seam thay cho `mock-parity`**: `real-api.ts` dùng `satisfies QcApiSurface`
+(`{[K in keyof QcApi]: (...args:any[]) => unknown}`) — bắt thiếu/thừa/sai tên
+122 hàm ngay ở `tsc`. KHÔNG dùng thẳng `QcApi` được vì **hợp đồng
+`shared/qc-api.d.ts` và handler thật đã DRIFT từ trước**: `saveInstrument()`
+khai trả `IpcResult<unknown>` trong khi hợp đồng hứa `IpcResult<Instrument>`;
+`PublicUser` được khai HAI LẦN (`role: string` vs `role: 'admin'|'technician'
+|'viewer'`) — 41 lỗi kiểu. Trước đây không gate nào thấy vì
+`ipcRenderer.invoke()` trả `Promise<any>` và bản giả lập tự cài đặt THEO hợp
+đồng nên luôn "khớp" hợp đồng mà không ai so nó với handler. **Dọn drift này
+là một đợt riêng, chưa làm.** Thêm `tests/browser-preview-coverage.test.mjs`
+(source scanner) canh thứ `tsc` không thấy: ngưỡng 14 hàm được phép trả
+`not-available-in-browser-preview`, siết xuống khi nối thêm handler — nó đã
+tự bắt lỗi ngay lần chạy đầu (`saveLisSettings` bị xếp nhầm vào nhóm
+not-available trong khi nó chạy được thật).
+
+**Gate parity phải seed QUA API thật.** `ui-parity`/`style-parity` trước đây
+nhồi blob JSON vào `localStorage['qclab-v2-browser-preview']` — hình dạng nội
+bộ của `store.ts` đã xoá. Nay `seedV2ViaApi()` (`ui-parity-seed.cjs`) gọi
+`window.qcApi` tuần tự. Ba thứ phải sửa để nó chạy: (a) server tĩnh của gate
+phải trả `application/wasm` và **nới CSP thêm `'wasm-unsafe-eval'`** khi phục
+vụ `index.html` — CSP `script-src 'self'` của bản build chặn
+`WebAssembly.instantiate`, và Electron thật không cần WASM nên KHÔNG hạ CSP
+sản phẩm; (b) phải `await window.__qcPreviewFlush()` trước `page.reload()` vì
+`persist()` gộp 250ms, reload sớm làm trang mới mở với database RỖNG; (c)
+gọi đúng chữ ký thật — `saveSigmaTeaConfig` nhận input PHẲNG với trường
+`source` (không phải `data.teaSource`), `createReagentComparison` nhận
+`data.name` (không phải `reagent`), `saveReagentRows` đọc `payload.rows`
+(không phải `data.rows`), và `owner` của NCE nằm trong `protocol`
+(`saveNceProtocol`) chứ không thuộc `NceCreateInput`.
+
+Seed qua API còn có tác dụng phụ tốt: dữ liệu buộc phải HỢP LỆ theo nghiệp vụ
+thật (nhóm lô ≥2 lô; mức QC phải thuộc Panel + nhóm lô đang vận hành mới nhập
+được điểm). `±5SD` chỉ cảnh báo nên các điểm lệch của seed vẫn lưu được.
+
+Verify: `app-v2:typecheck` sạch, `app-v2:test` **69/69** (thêm
+`sqlite-shim.test.mjs` 7 nhóm, `sha256-parity.test.mjs` 4 nhóm gồm quét mọi
+độ dài 0..300, `password-hash-parity.test.mjs` 6 nhóm gồm tương thích 2
+chiều, `browser-preview-coverage.test.mjs` 3 nhóm), `app-v2:build` sạch,
+`app-v2:css-parity` đạt, `app-v2:style-parity` **18/18 đạt**, cộng kiểm chứng
+trong tab thật: 122/122 hàm; khởi tạo admin 378ms + đăng nhập 369ms bằng
+PBKDF2 thật; sai mật khẩu bị từ chối; chuỗi hash audit `ok:true, checked:7,
+legacy:0`; `store:changed` phát đúng cặp `activity`→`instruments`; vai trò
+chỉ-xem bị chặn `forbidden` ở cả `saveInstrument` lẫn `lockPeriod` và không
+ghi được gì; F5 giữ nguyên dữ liệu + phiên đăng nhập; đăng nhập qua UI vào
+đúng Dashboard.
+
+**Còn lại, KHÔNG che bằng baseline**: `app-v2:ui-parity` 72 vấn đề, gồm 64
+đã đỏ từ TRƯỚC đợt này (entry: "Khoảng xem…"/"Mức 2 · Lô 1102"/class
+`icon`,`danger`; westgard: `wg-view-mode` — thuộc phần chưa commit của đợt
+trước) và `manage:modal-panel/lot/lotgroup` thiếu dòng "Ghi chú" — MỚI, chưa
+xác minh nguyên nhân (nghi do id lô/panel giờ do handler tự sinh nên nút
+"Sửa" của gate mở đúng dòng khác), cố ý KHÔNG chốt baseline. Chỉ chốt
+baseline cho `audit` (8 dòng: nhật ký của v2 nay là dòng THẬT do seed sinh
+ra, app cũ vẫn 2 dòng nhồi tay) và `actions` (2 dòng: mã hồ sơ NCE do app-v2
+tự sinh qua `nextNceId`, không còn là `NCE-DEMO-001` cố định) — cả hai đều có
+`surfaceNotes` giải thích.
+
+**Chưa làm, đã biết**: file `.wasm` 658 kB nằm trong `app-v2-dist/renderer`
+vì gate parity phục vụ CHÍNH thư mục đó; khi app-v2 được đưa vào
+`build.files` của Electron thì cần loại nó khỏi gói (Electron dùng
+`node:sqlite`, không bao giờ tải WASM).
+
+**Bổ sung ngay sau đó (cùng ngày), từ chính việc chạy lại gate**: seed qua
+API thiếu 2 thứ mà blob localStorage cũ mang sẵn, và cả hai chỉ lộ ra ở gate
+chứ không ở test Node — (1) hồ sơ phòng xét nghiệm (`saveLabProfile`), thiếu
+thì phụ đề của MỌI trang (`PageHeader`) và trang Cài đặt đều lệch; (2)
+`backupStatus` trong `real-api.ts` bị viết bọc `{ok,data}` và thiếu
+`maxImportBytes`, trong khi handler thật trả object TRỰC TIẾP — sai hình dạng
+làm trang Cài đặt không dựng được thẻ sao lưu. Sau khi sửa, `ui-parity` còn
+**61 vấn đề, THẤP HƠN mức 64 trước đợt này**: seed đi qua nghiệp vụ thật còn
+tự sửa được vài lệch cũ. Toàn bộ 61 còn lại là phần đỏ sẵn từ trước (entry,
+westgard, manage, users) thuộc công việc chưa commit của đợt trước.
+
+Ô "Ghi chú" của 3 modal (lô QC, Panel QC, nhóm lô) đã được BỎ có chủ đích ở
+app-v2 — quyết định sản phẩm, KHÔNG phải thiếu sót; app cũ vẫn còn nên gate
+đếm 1 dòng lệch mỗi modal, đã chốt baseline kèm `surfaceNotes`. Đừng "sửa"
+bằng cách thêm lại ô đó.
+
+**Dọn drift `shared/qc-api.d.ts` ↔ handler thật (2026-09-10).** Ngay sau khi
+bản xem trước chuyển sang chạy handler thật, `satisfies QcApi` lộ ra **38 hàm
+lệch** giữa hợp đồng IPC và thứ handler thật sự trả về. Trước đó không gate
+nào thấy: `ipcRenderer.invoke()` trả `Promise<any>`, còn bản giả lập cũ tự
+cài đặt THEO hợp đồng nên luôn "khớp" hợp đồng mà chẳng ai so nó với handler.
+
+Nguyên tắc dọn: **`shared/qc-api.d.ts` là NGUỒN DUY NHẤT**, main `import type`
+từ đó. Cách này an toàn hơn vẻ ngoài — `import type` từ một `.d.ts` KHÔNG emit
+gì, nên `rootDir: app-v2/main` của `tsconfig.app-v2-main.json` không bị ảnh
+hưởng (kiểm chứng: file build ra vẫn ở đúng `app-v2-dist/main/ipc/`). Đã hợp
+nhất 5 kiểu từng được khai HAI LẦN: `PublicUser` (auth-handlers khai
+`role: string`, hợp đồng khai union 3 vai trò — nay ép qua `roleOf()` để vai
+trò lạ về `viewer` thay vì cast bừa), `NceRecord` (main dùng `string` cho 3
+trạng thái, hợp đồng dùng union; ngược lại hợp đồng THIẾU
+`created_by_user_id`/`risk_level` mà main có — lệch theo hai chiều ngược
+nhau), `QcPointView`/`ParallelEntryColumn`/`PreviousLotSeries` (`voided:
+number` vs `0 | 1`), `TestSummary`, `ActivityEntry`/`ActivityPage`.
+
+**9 hàm `config-handlers` khai `IpcResult<unknown>`** — hợp đồng hứa
+`IpcResult<Instrument>`/`<Test>`/`<QcLot>`/… Siết lại xong lộ ngay **4 chỗ
+trả thiếu field thật**: `saveLotGroup`/`savePanel` spread `{...(row as
+object)}` — spread một `object` cho ra `{}` nên TypeScript không thấy field
+nào và hợp đồng thành vô nghĩa; `saveTestAssignments` trả `Record<string,
+unknown>`; `rowToAuditEntry()` trả `{id: unknown, …}` nên renderer nhận
+`unknown` cho MỌI trường của dòng nhật ký.
+
+**Một drift có hậu quả nghiệp vụ**: `activateLotGroup()` có nhánh trả
+`'unready'` (chưa mức nào có Mean/SD hợp lệ, KHÔNG đụng cấu hình) nhưng hợp
+đồng chỉ khai `'applied' | 'already-active'` — renderer không biết nhánh đó
+tồn tại. Đã thêm vào hợp đồng và vào `manage-store.ts`.
+
+Sau khi dọn, `real-api.ts` dùng được `satisfies QcApi` THẬT (bỏ mapped type
+`QcApiSurface` chỉ so tên hàm, và bỏ luôn `as unknown as QcApi` ở `return`):
+từ nay thiếu hàm, thừa hàm, gõ sai tên HOẶC trả sai hình dạng đều đỏ ở `tsc`.
+Đây là seam thay thế cho `mock-parity.test.mjs` đã xoá, nhưng chặt hơn —
+mock-parity chỉ so hành vi trên các kịch bản có người nghĩ ra.
+
+Verify: `app-v2:typecheck` **0 lỗi**, `app-v2:test` 69/69, `app-v2:build`
+sạch, `app-v2:css-parity` đạt, `app-v2:style-parity` 18/18, `app-v2:ui-parity`
+61 vấn đề (toàn bộ là phần đỏ sẵn từ trước đợt này).
 
 ## Tests
 
@@ -8550,3 +8744,12 @@ leaves a dossier record.
   everything else reads that back, so a level can never show one U on screen and
   another on paper. The app does **not** judge MU pass/fail: the allowable limit
   (MAU) comes from the lab's SOP; it only puts U next to TEa and flags U > TEa.
+
+**Firebase của app-v2 (hoàn tất 2026-09-07).** Thẻ Cài đặt giờ port đủ hai
+panel Firebase của app cũ: kết nối Email/Password, Rules có thể copy và hướng
+dẫn ACL. Luồng chạy ở main process qua REST Identity Toolkit/Realtime
+Database; renderer không nhận token, password không được lưu. DB SQLite được
+đóng thành snapshot có checksum trước khi đẩy. Nếu cả máy và cloud đều có dữ
+liệu vận hành khác nhau, app dừng và bắt quản trị viên chọn đẩy hoặc tải (tải
+phải re-auth, tự chốt safety snapshot); sau kết nối, `writeAudit()` gom các
+thay đổi rồi tự đẩy nền. Không thay snapshot SQLite bằng merge SQL tuỳ tiện.

@@ -3,6 +3,7 @@
 // audit:query), đúng tinh thần "thí điểm": không phát minh domain mới cho
 // một trang chỉ đọc và gộp lại.
 import { create } from 'zustand';
+import { todayIso } from '../lib/format';
 import type { TestSummary, NceRecord, ActivityEntry, Test, QcLot } from '../../shared/qc-api';
 
 export interface OverdueAction extends NceRecord { testName: string }
@@ -32,7 +33,7 @@ export const useDashboardStore = create<DashboardState>((set) => ({
       window.qcApi.listLots(),
     ]);
     const testNameById = new Map<string, string>(tests.map((t: Test) => [t.id, t.name]));
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayIso();
     const overdueActions = nceRecords
       .filter(r => r.record_status === 'active' && r.approval_status === 'pending' && r.due_date && r.due_date < today)
       .map(r => ({ ...r, testName: (r.test_id && testNameById.get(r.test_id)) || '—' }))

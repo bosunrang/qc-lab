@@ -48,14 +48,14 @@ interface ManageState {
   removeLot: (id: string) => Promise<IpcResult<{ id: string }>>;
   removeLotGroup: (id: string) => Promise<IpcResult<{ id: string }>>;
   stopLotGroup: (id: string) => Promise<IpcResult<{ id: string }>>;
-  activateLotGroup: (id: string) => Promise<IpcResult<{ status: 'applied' | 'already-active'; applied: number; stoppedGroups: string[] }>>;
+  activateLotGroup: (id: string) => Promise<IpcResult<{ status: 'applied' | 'already-active' | 'unready'; applied: number; stoppedGroups: string[] }>>;
   removeLotTransition: (id: string) => Promise<IpcResult<{ id: string }>>;
   savePanel: (id: string | undefined, data: ApiInputData<'savePanel'>) => Promise<IpcResult<QcPanel>>;
   createLotTransition: (data: { panelId: string; fromLotId: string; toLotId: string; startDate?: string; note?: string; status?: 'planned' | 'active' | 'accepted' | 'rejected'; criteria?: { testId: string; level: number; mean: number; sd: number }[] }, id?: string) => Promise<IpcResult<LotTransition>>;
   saveTeaRef: (id: string | undefined, data: ApiInputData<'saveTeaRef'>) => Promise<IpcResult<TeaRef>>;
   removeTeaRef: (id: string) => Promise<IpcResult<{ id: string }>>;
   removeTeaLabProfile: (id: string) => Promise<IpcResult<{ id: string; removedRecord: boolean }>>;
-  addTeaAnalyte: (input: { name: string; abbreviation?: string; matrix?: string; unit?: string; section?: string; clia?: string; ricos?: string }) => Promise<IpcResult<{ analyteId: string }>>;
+  addTeaAnalyte: (input: { name: string; abbreviation?: string; matrix?: string; unit?: string; section?: string; clia?: string; ricos?: string; cliaRule?: 'percent' | 'absolute' | 'greater-of'; cliaAbsolute?: string; cliaAbsoluteUnit?: string }) => Promise<IpcResult<{ analyteId: string }>>;
   saveRuleAction: (testId: string, ruleId: string, action: 'inactive' | 'alert' | 'reject' | '') => Promise<IpcResult<{ ruleId: string; action: 'inactive' | 'alert' | 'reject' | '' }>>;
   saveRuleScope: (testId: string, ruleId: string, scope: 'within' | 'across' | 'both' | '', levelCount: number) => Promise<IpcResult<{ ruleId: string; scope: string }>>;
 }

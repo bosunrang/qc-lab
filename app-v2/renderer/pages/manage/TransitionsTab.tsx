@@ -72,9 +72,11 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
   // Chỉ những xét nghiệm ĐANG DÙNG lô cũ mới cần Mean/SD ứng viên — khớp
   // `inspectAcceptedLotTransition()` app cũ, không phải MỌI xét nghiệm của
   // Panel (rows nào không dùng lô cũ thì "Chấp nhận" cũng không đụng tới).
-  const draftTests = panels.find((p) => p.id === draftPanelId)?.testIds
-    .map((id) => tests.find((test) => test.id === id))
-    .filter((test): test is NonNullable<typeof test> => !!test)
+  // Dùng CÙNG cách lọc `tests` như bảng Mean/SD (TargetsTab), thay vì thứ
+  // tự bản ghi nối trong `qc_panel_tests`. Nhờ vậy Na/K/Cl và mọi panel khác
+  // giữ một thứ tự xuyên suốt giữa lúc cấu hình đích và lúc chuyển tiếp lô.
+  const draftTests = tests
+    .filter((test) => panels.find((panel) => panel.id === draftPanelId)?.testIds.includes(test.id))
     .filter((test) => (levelsByTestId[test.id] || []).some((level) => level.qc_lot_id === draftFromLotId)) || [];
   // Mean/SD ỨNG VIÊN đã lưu trong hồ sơ (criteria_json) — dùng để nạp lại
   // đúng giá trị khi mở "Sửa", vì lúc này test_levels VẪN LÀ số của lô CŨ

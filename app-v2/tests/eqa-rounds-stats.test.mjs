@@ -18,6 +18,15 @@ import { eqaRoundsStats } from '../main/domain/sigma-metrics.ts';
   assert.equal(r.mixedSigns, false);
 }
 
+// 1 vòng ÂM: giữ nguyên dấu (khớp SigmaBiasService.stats() app cũ) — Sigma/MU
+// lấy |bias| nên số không đổi, nhưng bảng phải cho thấy hướng lệch.
+{
+  const r = eqaRoundsStats([-2]);
+  assert.equal(r.rms, -2, '1 vòng âm phải giữ dấu, không được biến thành +2');
+  assert.equal(r.mean, -2);
+  assert.equal(r.mixedSigns, false);
+}
+
 // 2 vòng cùng dấu: rms = sqrt((1^2+3^2)/2) = sqrt(5) ~ 2.236
 {
   const r = eqaRoundsStats([1, 3]);

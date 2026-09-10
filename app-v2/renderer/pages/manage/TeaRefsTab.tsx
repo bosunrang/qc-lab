@@ -143,7 +143,7 @@ export function TeaRefsTab() {
               </tr>
             );
           })}
-          {visibleCustomRefs.map((ref) => <tr key={ref.id}><td><b>{ref.name}</b></td><td>{ref.unit || '—'}</td><td>{ref.section || '—'}</td><td>—</td><td>—</td><td><b>{formatTeaValue(ref.lab)}</b></td><td><div className="tea-ref-status"><span className="tag ok">TEa PXN</span><RowActionButton kind="edit" label={`Sửa TEa ${ref.name}`} onClick={() => { setErr(null); setEditing(ref.id); }} /><RowActionButton kind="delete" label={`Xóa TEa ${ref.name}`} onClick={() => remove(ref.id, ref.name)} /></div></td></tr>)}
+          {visibleCustomRefs.map((ref) => <tr key={ref.id}><td><b>{ref.name}</b></td><td>{ref.unit || '—'}</td><td>{ref.section || '—'}</td><td>{formatTeaValue(ref.clia)}</td><td>{formatTeaValue(ref.ricos)}</td><td><b>{formatTeaValue(ref.lab)}</b></td><td><div className="tea-ref-status"><span className={`tag ${ref.lab != null ? 'ok' : 'none'}`}>{ref.lab != null ? 'TEa PXN' : 'Tự thêm'}</span><RowActionButton kind="edit" label={`Sửa TEa ${ref.name}`} onClick={() => { setErr(null); setEditing(ref.id); }} /><RowActionButton kind="delete" label={`Xóa TEa ${ref.name}`} onClick={() => remove(ref.id, ref.name)} /></div></td></tr>)}
         </tbody>
       </table> : <EmptyState title="Không tìm thấy xét nghiệm">Thử tìm lại theo tên, đơn vị hoặc nhóm xét nghiệm.</EmptyState>}
       </div>
@@ -156,6 +156,8 @@ export function TeaRefsTab() {
             name: String(form.get('name') || ''), abbreviation: String(form.get('abbreviation') || ''),
             matrix: String(form.get('matrix') || ''), unit: String(form.get('unit') || ''),
             section: String(form.get('section') || ''), clia: String(form.get('clia') || ''), ricos: String(form.get('ricos') || ''),
+            cliaRule: String(form.get('cliaRule') || '') as 'percent' | 'absolute' | 'greater-of',
+            cliaAbsolute: String(form.get('cliaAbsolute') || ''), cliaAbsoluteUnit: String(form.get('cliaAbsoluteUnit') || ''),
           });
           if (!result.ok) { setAddErr(result.error.message); return; }
           setAdding(false);
@@ -177,6 +179,12 @@ export function TeaRefsTab() {
             <div className="field"><label>TEa CLIA %</label><input name="clia" type="number" step="any" /></div>
             <div className="field"><label>TEa Ricos %</label><input name="ricos" type="number" step="any" /></div>
           </div>
+          <div className="grid2">
+            <div className="field"><label>Quy tắc CLIA</label><select name="cliaRule" defaultValue="greater-of"><option value="greater-of">Lấy giá trị lớn hơn (% hoặc tuyệt đối)</option><option value="percent">Chỉ dùng %</option><option value="absolute">Chỉ dùng giới hạn tuyệt đối</option></select></div>
+            <div className="field"><label>Giới hạn CLIA tuyệt đối</label><input name="cliaAbsolute" type="number" step="any" placeholder="Ví dụ: 0.05" /></div>
+          </div>
+          <div className="field"><label>Đơn vị giới hạn tuyệt đối</label><input name="cliaAbsoluteUnit" placeholder="Mặc định dùng đơn vị xét nghiệm" /></div>
+          <div className="hint">Chỉ khai giới hạn tuyệt đối khi nguồn CLIA của analyte quy định đơn vị đo; hệ thống sẽ chỉ dùng khi đơn vị tương thích.</div>
           <div className="hint flow-item">Mỗi xét nghiệm dùng một tên quốc tế duy nhất; viết tắt được hiển thị trong ngoặc. TEa chuẩn hóa được lập thành hồ sơ riêng sau khi thêm dòng.</div>
         </form>
       </Modal>}

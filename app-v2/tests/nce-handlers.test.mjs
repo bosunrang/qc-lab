@@ -43,6 +43,18 @@ assert.equal(tooEarly.error.code, 'missing-completed-date');
 const completed = nce.setActionCompletedDate({ data: { id: created.data.id, actionCompletedDate: '2026-08-05' } }, actor);
 assert.equal(completed.ok, true);
 
+// 4.1) Protocol-v3 có thể lưu dần khi điều tra, nhưng phải đủ checklist,
+// FMEA, hành động và tác động bệnh nhân mới được khép vòng/duyệt.
+const protocolSaved = nce.saveProtocol({ data: { id: created.data.id, dueDate: '2026-08-10', protocol: {
+  eventSource: 'iqc', processPhase: 'exam', owner: 'KTV A', containmentStatus: 'none', correction: 'Giu ket qua, kiem tra lai may va lam lai QC',
+  riskSeverity: 2, riskOccurrence: 2, riskDetectability: 2, riskLevel: 'low', riskBasis: 'SOP-QC-07',
+  qcMaterialStatus: 'ok', instrumentStatus: 'ok', reagentStatus: 'ok', calibrationStatus: 'ok', lotToLotStatus: 'not-needed',
+  causeCategory: 'instrument', cause: 'Canh bao he thong khi may bat dau lech', action: 'Bao tri may va xac nhan lai hieu chuan',
+  patientImpact: 'none', effectivenessStatus: 'pending',
+  residualSeverity: 1, residualOccurrence: 1, residualDetectability: 1, residualRiskLevel: 'low', residualRiskBasis: 'Theo doi sau bao tri',
+} } }, actor);
+assert.equal(protocolSaved.ok, true);
+
 // 5) Danh gia "hieu qua" ma khong co du lieu rui ro con lai phai bi chan -
 // nguyen tac ISO/TS 20914 da chot: khong duoc bo qua buoc nay.
 const noResidualRisk = nce.markEffectiveness({ data: { id: created.data.id, status: 'effective', note: 'Khong tai dien sau 2 tuan' } }, actor);
@@ -56,9 +68,13 @@ const effective = nce.markEffectiveness({
 assert.equal(effective.ok, true);
 assert.equal(effective.data.effectiveness_status, 'effective');
 
-// 6) Duyet ho so
-const approved = nce.approve({ data: { id: created.data.id } }, actor);
-assert.equal(approved.ok, true);
+// 6) Người lập không được tự duyệt; người duyệt độc lập mới được phê duyệt.
+const selfApproved = nce.approve({ data: { id: created.data.id } }, actor);
+assert.equal(selfApproved.ok, false);
+assert.equal(selfApproved.error.code, 'self-approval');
+const reviewer = { ...actor, userId: 'u2', username: 'reviewer', name: 'Nguoi duyet' };
+const approved = nce.approve({ data: { id: created.data.id } }, reviewer);
+assert.equal(approved.ok, true, approved.ok ? '' : approved.error.message);
 assert.equal(approved.data.approval_status, 'approved');
 
 // 7) Ho so da duyet khong the huy
