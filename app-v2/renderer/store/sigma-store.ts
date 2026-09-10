@@ -11,6 +11,8 @@ export interface SigmaLevelSaveInput {
 }
 
 interface SigmaState {
+  setTracking: (testId: string, tracked: boolean) => Promise<IpcResult<{ testId: string; tracked: boolean }>>;
+  saveTeaConfig: (input: { testId: string; source: string; tea?: number; eflmAnalyte?: string; eflmAps?: string; eflmLookupDate?: string; eflmRef?: string }) => Promise<IpcResult<unknown>>;
   periods: SigmaPeriodView[];
   loadPeriods: (testId: string) => Promise<void>;
   loadCohorts: (testId: string, period: string, levels: number[]) => Promise<SigmaCohortView[]>;
@@ -20,6 +22,21 @@ interface SigmaState {
 }
 
 export const useSigmaStore = create<SigmaState>((set, get) => ({
+  /** Bật/tắt theo dõi Six Sigma (ghi `tests.sigma_tracked`, chỉ admin). */
+  setTracking: async (testId, tracked) => {
+    const result = await window.qcApi.setSigmaTracking({ testId, tracked });
+    if (result.ok) await get().loadPeriods(testId);
+    return result;
+  },
+
+  /** Nguồn + giá trị TEa: đổi TEa làm mọi kỳ Sigma tính lại, nên nạp lại
+   * danh sách kỳ ngay sau khi lưu. */
+  saveTeaConfig: async (input) => {
+    const result = await window.qcApi.saveSigmaTeaConfig(input);
+    if (result.ok) await get().loadPeriods(input.testId);
+    return result;
+  },
+
   periods: [],
 
   loadPeriods: async (testId) => set({ periods: await window.qcApi.listSigmaPeriods(testId) }),

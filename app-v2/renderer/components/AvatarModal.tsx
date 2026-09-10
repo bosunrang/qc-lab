@@ -10,7 +10,7 @@ import { Modal } from './Modal';
 const AVATAR_SIZE = 160;
 
 export function AvatarModal({ onClose }: { onClose: () => void }) {
-  const { user, refreshUser } = useAuthStore();
+  const { user, setAvatar, clearAvatar } = useAuthStore();
   const [fileName, setFileName] = useState('Chưa chọn ảnh nào');
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -36,8 +36,7 @@ export function AvatarModal({ onClose }: { onClose: () => void }) {
         const w = img.width * scale, h = img.height * scale;
         ctx.drawImage(img, (AVATAR_SIZE - w) / 2, (AVATAR_SIZE - h) / 2, w, h);
         setBusy(true);
-        await window.qcApi.setAvatar({ data: { dataUrl: canvas.toDataURL('image/png') } });
-        await refreshUser();
+        await setAvatar(canvas.toDataURL('image/png'));
         setBusy(false);
       };
       img.src = String(reader.result);
@@ -47,8 +46,7 @@ export function AvatarModal({ onClose }: { onClose: () => void }) {
 
   async function clear() {
     setBusy(true);
-    await window.qcApi.clearAvatar();
-    await refreshUser();
+    await clearAvatar();
     setBusy(false);
   }
 

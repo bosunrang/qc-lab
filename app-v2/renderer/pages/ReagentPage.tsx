@@ -13,6 +13,7 @@
 // Giai đoạn B6) — trang này chỉ trình bày, không tự tính lại thống kê nào.
 import { useEffect, useMemo, useState } from 'react';
 import { useReagentStore } from '../store/reagent-store';
+import { useManageStore } from '../store/manage-store';
 import { useAuthStore } from '../store/auth-store';
 import { canWrite, isAdmin } from '../lib/permissions';
 import { PageHeader } from '../components/PageHeader';
@@ -223,21 +224,24 @@ function CriteriaPanel({ result }: { result: ReagentComparisonResult | null }) {
  * cho toàn app, không theo từng phép so sánh) + ô thêm mới (Enter hoặc nút
  * "Thêm"), mỗi dòng có nút "Chọn" và nút xoá "✕". */
 function QuickPickerModal({ type, onPick, onClose }: { type: 'operator' | 'sampleType'; onPick: (value: string) => void; onClose: () => void }) {
-  const [items, setItems] = useState<string[]>([]);
+  // Danh sách CHUNG toàn app nên giữ ở store (`app_meta`), không phải state
+  // cục bộ của modal — nhờ vậy mở lại modal không phải gọi lại IPC, và mọi
+  // chỗ khác cần "chọn nhanh" đều đọc chung một nguồn.
+  const { quickValues, loadQuickValues, addQuickValue, removeQuickValue } = useReagentStore();
+  const items = quickValues[type];
   const [draft, setDraft] = useState('');
   const label = type === 'operator' ? 'người thực hiện' : 'loại mẫu';
 
-  useEffect(() => { window.qcApi.listReagentQuickValues({ type }).then((r) => { if (r.ok) setItems(r.data); }); }, [type]);
+  useEffect(() => { loadQuickValues(); }, [loadQuickValues]);
 
   async function add() {
     const value = draft.trim();
     if (!value) return;
-    const result = await window.qcApi.addReagentQuickValue({ type, value });
-    if (result.ok) { setItems(result.data.items); setDraft(''); }
+    const result = await addQuickValue(type, value);
+    if (result.ok) setDraft('');
   }
   async function removeItem(index: number) {
-    const result = await window.qcApi.removeReagentQuickValue({ type, index });
-    if (result.ok) setItems(result.data.items);
+    await removeQuickValue(type, index);
   }
 
   return (
@@ -288,10 +292,12 @@ function PickerModal({ comparisons, currentId, canDelete, onSelect, onRemove, on
 
 function CreateComparisonModal({ onClose, onCreate }: { onClose: () => void; onCreate: (name: string, unit: string) => Promise<boolean> }) {
   const [query, setQuery] = useState('');
-  const [teaRefs, setTeaRefs] = useState<TeaRef[]>([]);
+  const { teaRefs, loadTeaRefs } = useManageStore();
   const needle = query.trim().toLocaleLowerCase('vi');
 
-  useEffect(() => { window.qcApi.listTeaRefs().then(setTeaRefs); }, []);
+  // Bảng TEa tham chiếu do trang Cấu hình chung sở hữu — đọc qua store của
+  // nó để nếu ai sửa TEa ở đó thì danh sách gợi ý ở đây cũng đúng.
+  useEffect(() => { loadTeaRefs(); }, [loadTeaRefs]);
   const groups = useMemo(() => {
     const visible = makeTeaChoices(teaRefs).filter((item) => !needle || item.search.includes(needle));
     return visible.reduce<Record<string, TeaChoice[]>>((all, item) => {

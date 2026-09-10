@@ -129,7 +129,7 @@ function sigmaZone(value: number | null | undefined): { c: string; label: string
 
 export function SigmaPage() {
   const { tests, teaRefs, levelsByTestId, loadTests, loadTeaRefs, loadLevels, instruments, loadInstruments} = useManageStore();
-  const { periods, loadPeriods, loadCohorts, savePeriod, renamePeriod, removePeriod } = useSigmaStore();
+  const { periods, loadPeriods, loadCohorts, savePeriod, renamePeriod, removePeriod, setTracking: setSigmaTrackingStore, saveTeaConfig: saveTeaConfigStore } = useSigmaStore();
   // Vai trò chỉ-xem: vẫn đọc được bảng kỳ/Sigma/MU, không sửa được (main
   // chặn bằng requireWrite ở sigma-handlers.savePeriod).
   const writable = canWrite(useAuthStore((s) => s.user)?.role);
@@ -198,7 +198,7 @@ export function SigmaPage() {
     const nextSource = (patch.source ?? teaSource) as SigmaTeaSource;
     const resolved = resolveSigmaTea(test, teaRefs, nextSource, sourceTargetMean);
     if (patch.source) setTeaSource(patch.source);
-    const result = await window.qcApi.saveSigmaTeaConfig({
+    const result = await saveTeaConfigStore({
       testId: test.id, source: nextSource,
       // EFLM do người dùng nhập; catalog/hồ sơ Lab không được tái dùng số
       // TEa cũ của nguồn khác khi đổi nguồn.
@@ -335,7 +335,7 @@ export function SigmaPage() {
   }
 
   async function setTracking(nextTestId: string, tracked: boolean) {
-    const result = await window.qcApi.setSigmaTracking({ testId: nextTestId, tracked });
+    const result = await setSigmaTrackingStore(nextTestId, tracked);
     if (!result.ok) { await infoDialog(result.error.message, { type: 'warn' }); return; }
     await loadTests();
     if (tracked) { setTestId(nextTestId); setTrackingPickerOpen(false); }

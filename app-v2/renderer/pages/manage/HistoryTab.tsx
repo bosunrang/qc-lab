@@ -105,7 +105,7 @@ function testSearchValues(test: Test, levels: TestLevel[], lots: QcLot[], instru
 }
 
 export function HistoryTab() {
-  const { tests, instruments, lots, lotGroups, levelsByTestId, loadLevels } = useManageStore();
+  const { tests, instruments, lots, lotGroups, levelsByTestId, loadLevels, loadHistoryPoints } = useManageStore();
   const [testId, setTestId] = useState('');
   const [points, setPoints] = useState<QcPointView[]>([]);
   const [detail, setDetail] = useState<HistoryRow | null>(null);
@@ -130,8 +130,8 @@ export function HistoryTab() {
     let alive = true;
     if (!testId) { setPoints([]); return () => { alive = false; }; }
     (async () => {
-      const all = await window.qcApi.listEntryHistoryPoints(testId);
-      if (alive) setPoints(all);
+      await loadHistoryPoints(testId);
+      if (alive) setPoints(useManageStore.getState().historyPointsByTestId[testId] || []);
     })();
     return () => { alive = false; };
   }, [testId]);

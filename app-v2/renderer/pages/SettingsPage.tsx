@@ -9,6 +9,7 @@
 // hoàn tất: xác thực và đồng bộ chạy ở main process, xem firebase-handlers.ts.
 import { useEffect, useRef, useState } from 'react';
 import { useSettingsStore } from '../store/settings-store';
+import { useStoreInvalidation } from '../lib/useStoreInvalidation';
 import { infoDialog, confirmDialog, reauthDialog } from '../state/dialog-store';
 import { Modal } from '../components/Modal';
 import { PageHeader } from '../components/PageHeader';
@@ -57,7 +58,13 @@ function formatBytes(bytes: number): string {
 }
 
 export function SettingsPage() {
-  const { profile, storage, load, loadStorage, save } = useSettingsStore();
+  const {
+    profile, storage, backup: backupInfo, lis, lisQueue, firebase,
+    loadAll, loadStorage, save, loadFirebase,
+    exportBackup, importBackup, verifyBackup, resetOperationalData,
+    saveLis, pullLisQueue, importLisResult, rejectLisResult,
+    connectFirebase: connectFirebaseApi, syncFirebase, disconnectFirebase: disconnectFirebaseApi,
+  } = useSettingsStore();
   const [name, setName] = useState('');
   const [dept, setDept] = useState('');
   const [address, setAddress] = useState('');
@@ -68,7 +75,6 @@ export function SettingsPage() {
   const [pendingLogo, setPendingLogo] = useState<string | null>(null);
   const [logoText, setLogoText] = useState('');
   const [logoFileName, setLogoFileName] = useState('');
-  const [backupInfo, setBackupInfo] = useState<{ lastBackupAt: string | null; lastBackupBytes: number; maxImportBytes: number } | null>(null);
   const [lisStatus, setLisStatus] = useState<{ kind: 'off' | 'idle' | 'ok' | 'error'; detail: string }>({ kind: 'off', detail: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const backupFileInputRef = useRef<HTMLInputElement>(null);
@@ -77,21 +83,34 @@ export function SettingsPage() {
   const [lisUrl, setLisUrl] = useState('');
   const [lisToken, setLisToken] = useState('');
   const [lisErr, setLisErr] = useState<string | null>(null);
-  const [lisQueue, setLisQueue] = useState<{ pending: LisQueueRecord[]; unresolved: LisQueueRecord[] } | null>(null);
   const [lisQueueOpen, setLisQueueOpen] = useState(false);
-  const [firebase, setFirebase] = useState<FirebaseSettings | null>(null);
   const [fbCode, setFbCode] = useState('khoaXN');
   const [fbEmail, setFbEmail] = useState('');
   const [fbPassword, setFbPassword] = useState('');
   const [fbConfig, setFbConfig] = useState('');
   const [fbBusy, setFbBusy] = useState(false);
 
+  useEffect(() => { loadAll(); }, [loadAll]);
+
+  // Trang này đọc hồ sơ đơn vị (`lab`) và các mốc trong `app_meta` (sao lưu
+  // gần nhất, cấu hình LIS/Firebase) — đổi ở nơi khác thì phải tự cập nhật,
+  // đúng như các trang còn lại. Trước 2026-09-10 trang gọi thẳng
+  // `window.qcApi` nên invalidation không có đường nào chạm tới.
+  useStoreInvalidation(['lab', 'app_meta'], undefined, () => { loadAll(); });
+
+  // Ô nhập LIS/Firebase là NHÁP của người dùng: chỉ seed MỘT LẦN từ giá trị
+  // đã lưu, sau đó form thuộc về người gõ — cùng cờ `seeded` mà hồ sơ đơn vị
+  // đang dùng.
+  const [lisSeeded, setLisSeeded] = useState(false);
   useEffect(() => {
-    load(); loadStorage();
-    window.qcApi.backupStatus().then(setBackupInfo);
-    window.qcApi.getLisSettings().then((s: LisGatewaySettings) => { setLisEnabled(s.enabled); setLisUrl(s.url); setLisToken(s.token); });
-    window.qcApi.getFirebaseSettings().then((s) => { setFirebase(s); setFbCode(s.labCode || 'khoaXN'); setFbEmail(s.email); setFbConfig(s.config); });
-  }, [load, loadStorage]);
+    if (lisSeeded || !lis) return;
+    setLisEnabled(lis.enabled); setLisUrl(lis.url); setLisToken(lis.token); setLisSeeded(true);
+  }, [lis, lisSeeded]);
+  const [fbSeeded, setFbSeeded] = useState(false);
+  useEffect(() => {
+    if (fbSeeded || !firebase) return;
+    setFbCode(firebase.labCode || 'khoaXN'); setFbEmail(firebase.email); setFbConfig(firebase.config); setFbSeeded(true);
+  }, [firebase, fbSeeded]);
 
   // Bật LIS = TỰ ĐỘNG kiểm tra hàng chờ mỗi 5 phút, đúng như nhãn app cũ
   // hứa (`LIS_POLL_MS`). Trước Giai đoạn D3.3 app-v2 chỉ lấy hàng chờ khi
@@ -100,10 +119,9 @@ export function SettingsPage() {
     if (!lisEnabled) { setLisStatus({ kind: 'off', detail: 'Chưa bật' }); return; }
     let alive = true;
     const tick = async () => {
-      const result = await window.qcApi.pullLisQueue();
+      const result = await pullLisQueue();
       if (!alive) return;
       if (!result.ok) { setLisStatus({ kind: 'error', detail: result.error.message }); return; }
-      setLisQueue(result.data);
       setLisStatus({ kind: 'ok', detail: `${result.data.pending.length} chờ nhận · ${result.data.unresolved.length} chưa khớp` });
     };
     tick();
@@ -166,7 +184,7 @@ export function SettingsPage() {
   const currentLogo = pendingLogo || profile.logo_data;
 
   async function exportBackupFile() {
-    const result = await window.qcApi.exportBackup();
+    const result = await exportBackup();
     if (!result.ok) { setErr(result.error.message); return; }
     const blob = new Blob([result.data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -174,7 +192,6 @@ export function SettingsPage() {
     a.href = url; a.download = `qclab-v2-backup-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    setBackupInfo(await window.qcApi.backupStatus());
   }
 
   async function pickBackupFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -187,7 +204,7 @@ export function SettingsPage() {
       { title: 'Phục hồi từ backup', danger: true, confirmLabel: 'Phục hồi' },
     ))) return;
     if (!(await reauthDialog({ title: 'Xác thực trước khi phục hồi', message: 'Phục hồi từ backup là thao tác không thể huỷ ngang — xác thực lại mật khẩu.' }))) return;
-    const result = await window.qcApi.importBackup({ data: { json } });
+    const result = await importBackup(json);
     if (!result.ok) { setErr(result.error.message); return; }
     await infoDialog(`Đã phục hồi thành công. Bản sao lưu dữ liệu trước khi phục hồi được lưu tại:\n${result.data.preRestoreSnapshotPath}`, { type: 'success' });
   }
@@ -195,20 +212,19 @@ export function SettingsPage() {
   // Giai đoạn C5 — LIS Gateway (xem main/ipc/lis-handlers.ts).
   async function saveLisSettings() {
     setLisErr(null);
-    const result = await window.qcApi.saveLisSettings({ data: { enabled: lisEnabled, url: lisUrl, token: lisToken } });
+    const result = await saveLis({ enabled: lisEnabled, url: lisUrl, token: lisToken });
     if (!result.ok) { setLisErr(result.error.message); return; }
     await infoDialog('Đã lưu cấu hình LIS Gateway.', { type: 'success' });
   }
 
   async function refreshFirebase() {
-    const latest = await window.qcApi.getFirebaseSettings();
-    setFirebase(latest); setFbCode(latest.labCode || 'khoaXN'); setFbEmail(latest.email); setFbConfig(latest.config);
+    await loadFirebase();
   }
 
   async function connectFirebase() {
     setFbBusy(true); setErr(null);
     try {
-      const result = await window.qcApi.connectFirebase({ data: { labCode: fbCode, email: fbEmail, password: fbPassword, config: fbConfig } });
+      const result = await connectFirebaseApi({ labCode: fbCode, email: fbEmail, password: fbPassword, config: fbConfig });
       setFbPassword('');
       if (!result.ok) { setErr(result.error.message); return; }
       if (result.data.state === 'conflict') {
@@ -217,12 +233,12 @@ export function SettingsPage() {
           { title: 'Chọn hướng đồng bộ', danger: true, confirmLabel: 'Đẩy dữ liệu máy' },
         );
         if (push) {
-          const synced = await window.qcApi.syncFirebase({ data: { direction: 'push' } });
+          const synced = await syncFirebase('push');
           if (!synced.ok) { setErr(synced.error.message); return; }
           await infoDialog('Đã ghi dữ liệu trên máy lên Firebase.', { type: 'success' });
         } else if (await confirmDialog('Tải dữ liệu từ Firebase sẽ thay thế dữ liệu trên máy. Một backup an toàn sẽ được tạo tự động. Tiếp tục?', { title: 'Tải từ Firebase', danger: true, confirmLabel: 'Tải dữ liệu đám mây' })) {
           if (!(await reauthDialog({ title: 'Xác thực trước khi tải Firebase', message: 'Tải dữ liệu đám mây sẽ thay thế dữ liệu cục bộ — xác thực lại mật khẩu.' }))) return;
-          const synced = await window.qcApi.syncFirebase({ data: { direction: 'pull' } });
+          const synced = await syncFirebase('pull');
           if (!synced.ok) { setErr(synced.error.message); return; }
           await infoDialog('Đã tải dữ liệu từ Firebase. Nếu tài khoản hiện tại không còn trong dữ liệu đám mây, hãy đăng nhập lại.', { type: 'success' });
         }
@@ -235,7 +251,7 @@ export function SettingsPage() {
 
   async function disconnectFirebase() {
     if (!(await confirmDialog('Ngắt Firebase? Dữ liệu vẫn được giữ nguyên trên máy.', { title: 'Ngắt đồng bộ đám mây' }))) return;
-    const result = await window.qcApi.disconnectFirebase();
+    const result = await disconnectFirebaseApi();
     if (!result.ok) { setErr(result.error.message); return; }
     await refreshFirebase();
     await infoDialog('Đã ngắt Firebase.', { type: 'success' });
@@ -249,30 +265,28 @@ export function SettingsPage() {
   async function openLisQueue() {
     if (!lisEnabled) { setLisErr('Bật LIS Gateway và lưu cấu hình trước khi xem hàng chờ.'); return; }
     setLisErr(null);
-    const result = await window.qcApi.pullLisQueue();
+    const result = await pullLisQueue();
     if (!result.ok) { setLisErr(result.error.message); return; }
-    setLisQueue(result.data);
     setLisQueueOpen(true);
   }
 
   async function refreshLisQueue() {
-    const result = await window.qcApi.pullLisQueue();
-    if (!result.ok) { setLisErr(result.error.message); return; }
-    setLisQueue(result.data);
+    const result = await pullLisQueue();
+    if (!result.ok) setLisErr(result.error.message);
   }
 
   async function importLisRecord(record: LisQueueRecord) {
-    const result = await window.qcApi.importLisResult({ data: { record } });
+    // `importLisResult` của store tự làm mới hàng chờ TỪ NGUỒN THẬT sau khi
+    // ghi thành công (không tự suy đoán trạng thái mới) — xem settings-store.
+    const result = await importLisResult(record);
     if (!result.ok) { await infoDialog(result.error.message, { type: 'warn' }); return; }
     if (result.data.gatewayWarning) await infoDialog(result.data.gatewayWarning, { type: 'warn' });
-    await refreshLisQueue();
   }
 
   async function rejectLisRecord(messageId: string) {
     if (!(await confirmDialog('Bỏ kết quả QC này khỏi hàng chờ LIS?', { title: 'Hàng chờ LIS', danger: true }))) return;
-    const result = await window.qcApi.rejectLisResult({ data: { messageId } });
-    if (!result.ok) { await infoDialog(result.error.message, { type: 'warn' }); return; }
-    await refreshLisQueue();
+    const result = await rejectLisResult(messageId);
+    if (!result.ok) await infoDialog(result.error.message, { type: 'warn' });
   }
 
   /** "Kiểm tra backup" — chỉ đọc file, không đụng dữ liệu đang dùng. */
@@ -280,7 +294,7 @@ export function SettingsPage() {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    const result = await window.qcApi.verifyBackup({ data: { json: await file.text() } });
+    const result = await verifyBackup(await file.text());
     if (!result.ok) { await infoDialog(`File backup KHÔNG hợp lệ: ${result.error.message}`, { type: 'warn' }); return; }
     await infoDialog(
       `File backup hợp lệ (checksum khớp).\n\nSố bảng: ${result.data.tables}\nSố điểm QC: ${result.data.points}\nTổng số dòng: ${result.data.rows}\nPhiên bản schema: ${result.data.schemaVersion}\nXuất lúc: ${result.data.createdAt}`,
@@ -304,7 +318,15 @@ export function SettingsPage() {
 
   async function checkStorage() {
     await loadStorage();
-    const [info, summaries] = await Promise.all([window.qcApi.getStorageInfo(), window.qcApi.listTestSummaries()]);
+    // `listTestSummaries` thuộc Westgard, không phải dữ liệu của trang Cài
+    // đặt — đọc một lần cho đúng hộp thoại này, không cần đưa vào store.
+    // Dung lượng lấy từ store (vừa nạp lại ngay trên) thay vì gọi
+    // `getStorageInfo` lần thứ hai.
+    // Thuộc Westgard, không phải dữ liệu của trang Cài đặt — đọc một lần
+    // cho đúng hộp thoại này.
+    const summaries = await window.qcApi.listTestSummaries();
+    const info = useSettingsStore.getState().storage;
+    if (!info) return;
     const points = summaries.reduce((sum, test) => sum + test.levels.reduce((s, level) => s + level.pointCount, 0), 0);
     await infoDialog(`Số điểm QC đang lưu: ${points}.\nFile dữ liệu SQLite đang chiếm ${formatBytes(info.dbFileBytes)} trên đĩa.\n\n${info.path}`);
   }
@@ -318,7 +340,7 @@ export function SettingsPage() {
       { title: 'Xóa sạch dữ liệu test', danger: true, confirmLabel: 'Xóa sạch' },
     ))) return;
     if (!(await reauthDialog({ title: 'Xác thực trước khi xoá', message: 'Xoá sạch dữ liệu là thao tác không thể huỷ ngang — xác thực lại mật khẩu.' }))) return;
-    const result = await window.qcApi.resetOperationalData();
+    const result = await resetOperationalData();
     if (!result.ok) { setErr(result.error.message); return; }
     await loadStorage();
     await infoDialog(`Đã xoá ${result.data.clearedTables.length} bảng dữ liệu vận hành.\n\nBản sao lưu trước khi xoá: ${result.data.preResetSnapshotPath}`, { type: 'success' });

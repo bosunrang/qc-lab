@@ -7,9 +7,7 @@
 // thị lỗi validate của MÌNH, không dùng 1 field `error` dùng chung dễ lẫn
 // giữa các tab/modal đang mở.
 import { create } from 'zustand';
-import type {
-  Instrument, Test, TestLevel, QcLot, LotGroup, QcPanel, LotTransition, TeaRef, RuleScopeItem, IpcResult, QcApi,
-} from '../../shared/qc-api';
+import type { Instrument, Test, TestLevel, QcLot, LotGroup, QcPanel, LotTransition, TeaRef, RuleScopeItem, IpcResult, QcApi, QcPointView } from '../../shared/qc-api';
 
 type ApiInputData<K extends keyof QcApi> = QcApi[K] extends (...args: infer Args) => unknown
   ? Args[0] extends { data: infer Data } ? Data : never
@@ -32,6 +30,8 @@ interface ManageState {
   loadLotGroups: () => Promise<void>;
   loadPanels: () => Promise<void>;
   loadLotTransitions: () => Promise<void>;
+  historyPointsByTestId: Record<string, QcPointView[]>;
+  loadHistoryPoints: (testId: string) => Promise<void>;
   loadTeaRefs: () => Promise<void>;
   loadRuleScopes: (testId: string, levelCount: number) => Promise<void>;
 
@@ -74,6 +74,16 @@ export const useManageStore = create<ManageState>((set, get) => ({
   loadLotGroups: async () => set({ lotGroups: await window.qcApi.listLotGroups() }),
   loadPanels: async () => set({ panels: await window.qcApi.listPanels() }),
   loadLotTransitions: async () => set({ lotTransitions: await window.qcApi.listLotTransitions() }),
+  /** Mọi điểm QC chưa huỷ của một xét nghiệm — tab "Lịch sử dữ liệu" dùng,
+   * và CỐ Ý khác `entry:queryPoints` (chỉ trả điểm của lô đang vận hành):
+   * ở đây phải thấy cả điểm của lô đã chuyển tiếp. Để trong store để điểm
+   * nhập ở trang Nhập QC làm tab này tự cập nhật. */
+  historyPointsByTestId: {},
+  loadHistoryPoints: async (testId: string) => {
+    const points = await window.qcApi.listEntryHistoryPoints(testId);
+    set((state) => ({ historyPointsByTestId: { ...state.historyPointsByTestId, [testId]: points } }));
+  },
+
   loadTeaRefs: async () => set({ teaRefs: await window.qcApi.listTeaRefs() }),
   loadRuleScopes: async (testId, levelCount) => {
     const scopes = await window.qcApi.listRuleScopes(testId, levelCount);

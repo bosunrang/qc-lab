@@ -4,6 +4,11 @@ import { create } from 'zustand';
 import type { ReagentComparisonView, IpcResult } from '../../shared/qc-api';
 
 interface ReagentState {
+  quickValues: { operator: string[]; sampleType: string[] };
+  loadQuickValues: () => Promise<void>;
+  addQuickValue: (type: 'operator' | 'sampleType', value: string) => Promise<IpcResult<{ items: string[]; value: string }>>;
+  /** Xoá theo VỊ TRÍ, không theo giá trị — khớp `reagent-handlers`. */
+  removeQuickValue: (type: 'operator' | 'sampleType', index: number) => Promise<IpcResult<{ items: string[] }>>;
   comparisons: ReagentComparisonView[];
   load: () => Promise<void>;
   create: (name: string, unit: string) => Promise<IpcResult<ReagentComparisonView>>;
@@ -13,6 +18,30 @@ interface ReagentState {
 }
 
 export const useReagentStore = create<ReagentState>((set, get) => ({
+  /** "Chọn nhanh" người thực hiện / loại mẫu — 1 danh sách CHUNG toàn app,
+   * lưu ở `app_meta` (xem reagent-handlers). */
+  quickValues: { operator: [], sampleType: [] },
+  loadQuickValues: async () => {
+    const [operator, sampleType] = await Promise.all([
+      window.qcApi.listReagentQuickValues({ type: 'operator' }),
+      window.qcApi.listReagentQuickValues({ type: 'sampleType' }),
+    ]);
+    set({ quickValues: {
+      operator: operator.ok ? operator.data : [],
+      sampleType: sampleType.ok ? sampleType.data : [],
+    } });
+  },
+  addQuickValue: async (type, value) => {
+    const result = await window.qcApi.addReagentQuickValue({ type, value });
+    if (result.ok) await get().loadQuickValues();
+    return result;
+  },
+  removeQuickValue: async (type, index) => {
+    const result = await window.qcApi.removeReagentQuickValue({ type, index });
+    if (result.ok) await get().loadQuickValues();
+    return result;
+  },
+
   comparisons: [],
 
   load: async () => set({ comparisons: await window.qcApi.listReagentComparisons() }),

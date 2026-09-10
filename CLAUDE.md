@@ -4597,6 +4597,56 @@ Verify: `app-v2:typecheck` **0 lỗi**, `app-v2:test` 69/69, `app-v2:build`
 sạch, `app-v2:css-parity` đạt, `app-v2:style-parity` 18/18, `app-v2:ui-parity`
 61 vấn đề (toàn bộ là phần đỏ sẵn từ trước đợt này).
 
+**Món nợ "trang gọi thẳng `window.qcApi`" — 37 chỗ về 8 (2026-09-10).** Đây
+là nợ kiến trúc còn lại lớn nhất sau khi bỏ bản giả lập: trang gọi thẳng IPC
+thì `useStoreInvalidation()` không có đường nào chạm tới, nên dữ liệu đổi ở
+nơi khác không làm trang tự cập nhật — và thao tác GHI không qua store để
+lại chính store đó giữ dữ liệu cũ.
+
+Nặng nhất là `SettingsPage.tsx` với **20 chỗ**: `settings-store.ts` chỉ giữ
+hồ sơ đơn vị + dung lượng, còn backup/LIS/Firebase nằm trong `useState` cục
+bộ. Store nay gom đủ 5 nhóm dữ liệu backend của trang (thêm `backup`, `lis`,
+`lisQueue`, `firebase`) cùng `loadAll()`, và trang đăng ký
+`useStoreInvalidation(['lab','app_meta'])`. **RANH GIỚI đã chốt**: store giữ
+DỮ LIỆU TỪ BACKEND và các lời gọi IPC; state của FORM (tên đơn vị đang gõ,
+mật khẩu Firebase, ô URL LIS) vẫn ở trang — đó là nháp của người dùng. Hộp
+thoại xác nhận, tải Blob, đọc `<input type="file">` cũng ở trang: chúng là
+UI. Ô LIS/Firebase seed MỘT LẦN từ giá trị đã lưu bằng cờ `lisSeeded`/
+`fbSeeded`, cùng kiểu với cờ `seeded` mà hồ sơ đơn vị đang dùng.
+
+Các thao tác GHI được đưa về store kèm việc tự nạp lại đúng thứ chúng làm
+đổi: `entry-store.setDayNote` (nạp lại điểm của xét nghiệm, lấy danh sách
+mức từ chính state thay vì bắt caller truyền lại), `sigma-store.setTracking`/
+`saveTeaConfig` (đổi TEa làm mọi kỳ tính lại), `reagent-store` quick values,
+`auth-store.setAvatar`/`clearAvatar` (nạp lại `user` để avatar đổi ở mọi
+trang), `manage-store.loadHistoryPoints` (tab Lịch sử dữ liệu — điểm nhập ở
+trang Nhập QC nay làm tab này tự cập nhật).
+
+**8 chỗ CÒN LẠI là có chủ đích, mỗi chỗ có ghi chú lý do ngay tại dòng đó** —
+đừng "dọn" tiếp cho đủ 0: `ActionsPage.queryPoints` (ô chọn bằng chứng rerun
+trong modal), `LotsTab.previewLotRename` (chỉ ĐẾM để hỏi trước khi ghi),
+`DialogHost.verifyOwnPassword` (một phép kiểm, không phải dữ liệu),
+`ReportPage.queryReport`/`listNceRecords` (truy vấn TỨC THỜI cho đúng lần
+xuất/in — app cũ cũng không có bước "Xem" riêng; phần bảng hiển thị vẫn dùng
+`report-store.loadPoints`), `WestgardPage.listArchivedGroupTests`/
+`listArchivedBlocks` (dữ liệu chỉ-đọc của nhóm lô đã lưu trữ, không đổi
+trong lúc xem, vòng đời gắn với lựa chọn trong tab và có cờ huỷ),
+`SettingsPage.listTestSummaries` (thuộc Westgard, đọc một lần cho một hộp
+thoại).
+
+Trong lúc làm, chữ ký thật lộ ra vài chỗ tôi đoán sai — ghi lại để lần sau
+tra trước: `setAvatar` nhận `{data:{dataUrl}}` (không phải `avatar`),
+`removeReagentQuickValue` xoá theo **index** chứ không theo giá trị,
+`listReagentQuickValues` trả `IpcResult<string[]>` (phải mở `.ok` trước khi
+dùng), `saveSigmaTeaConfig` nhận input PHẲNG với trường `source`.
+
+Verify: `app-v2:typecheck` 0 lỗi, `app-v2:test` 69/69, `app-v2:build` sạch,
+`app-v2:css-parity` đạt, `app-v2:style-parity` 18/18, `app-v2:ui-parity` 61
+vấn đề — **Y NGUYÊN trước và sau refactor**, tức không đổi hành vi hiển thị;
+cộng kiểm chứng trong tab thật: trang Cài đặt render đủ 5 panel, hồ sơ đơn vị
+và form LIS (url + token + công tắc) seed đúng từ store, và lưu tên đơn vị
+qua nút "Lưu thông tin" ghi đúng vào SQLite.
+
 ## Tests
 
 No test framework. Each file under `tests/*.test.js` is a plain Node script

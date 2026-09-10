@@ -99,6 +99,8 @@ function ReauthForm({ title, message, onResolve }: { title: string; message?: st
   async function submit() {
     setBusy(true);
     setError(null);
+    // Xác thực lại mật khẩu: một phép kiểm, không phải dữ liệu — không có
+    // gì để giữ trong store.
     const result = await window.qcApi.verifyOwnPassword({ data: { password } });
     setBusy(false);
     setPassword('');

@@ -387,6 +387,8 @@ function DetailModal({ record, testName, onClose }: { record: NceRecord; testNam
 
   useEffect(() => {
     if (record.test_id && record.level != null) {
+      // Đọc TỨC THỜI cho ô chọn bằng chứng rerun trong modal chi tiết —
+      // không phải dữ liệu hiển thị của trang nên không đưa vào store.
       window.qcApi.queryPoints(record.test_id, record.level).then(setRerunPoints);
     }
   }, [record.test_id, record.level]);

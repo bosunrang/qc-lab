@@ -147,6 +147,9 @@ export function ReportPage() {
   /** Lấy dữ liệu theo lựa chọn hiện tại — app cũ không có bước "Xem" riêng,
    * mỗi lần xuất/in là truy vấn lại đúng lúc đó. */
   async function collect() {
+    // Truy vấn TỨC THỜI cho đúng lần xuất/in này (app cũ cũng không có bước
+    // "Xem" riêng) — kết quả không được hiển thị lâu dài nên không vào
+    // store; phần bảng hiển thị của trang dùng `report-store.loadPoints`.
     const points = await window.qcApi.queryReport({ testId: selectedId, from: start, to: end });
     if (!withNce) return { points, nce: null };
     const all = await window.qcApi.listNceRecords();

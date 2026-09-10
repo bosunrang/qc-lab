@@ -139,6 +139,9 @@ export function WestgardPage() {
     if (!archivedGroupId) { setArchivedTests([]); return; }
     let active = true;
     setArchivedTestsLoading(true);
+    // Dữ liệu CHỈ ĐỌC của nhóm lô đã lưu trữ: không đổi trong lúc xem, và
+    // có vòng đời gắn với lựa chọn trong tab này (kèm cờ huỷ) — giữ ở
+    // component thay vì store.
     window.qcApi.listArchivedGroupTests(archivedGroupId).then((items) => {
       if (!active) return;
       setArchivedTests(items);

@@ -3,7 +3,7 @@
 // đứng tên audit log; store này chỉ phản ánh lại cho UI, không phải nơi ra
 // quyết định quyền (mọi gate thật nằm ở main/ipc/auth-handlers.ts).
 import { create } from 'zustand';
-import type { PublicUser } from '../../shared/qc-api';
+import type { PublicUser, IpcResult } from '../../shared/qc-api';
 
 type Status = 'checking' | 'needs-bootstrap' | 'logged-out' | 'logged-in';
 
@@ -15,13 +15,15 @@ interface AuthState {
   bootstrapAdmin: (username: string, name: string, password: string) => Promise<void>;
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  setAvatar: (dataUrl: string) => Promise<IpcResult<{ avatar: string }>>;
+  clearAvatar: () => Promise<IpcResult<{ avatar: string }>>;
   clearError: () => void;
   /** Đọc lại tài khoản đang đăng nhập từ DB — dùng sau khi đổi/xoá ảnh đại
    * diện (main không trả lại toàn bộ `PublicUser`, chỉ trả avatar mới). */
   refreshUser: () => Promise<void>;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   status: 'checking',
   user: null,
   error: null,
@@ -43,6 +45,19 @@ export const useAuthStore = create<AuthState>((set) => ({
     const result = await window.qcApi.login({ data: { username, password } });
     if (!result.ok) { set({ error: result.error.message }); return; }
     set({ error: null, status: 'logged-in', user: result.data });
+  },
+
+  /** Ảnh đại diện LUÔN tự phục vụ (chỉ đổi của chính mình — xem
+   * auth-handlers). Nạp lại `user` để avatar trên mọi trang đổi ngay. */
+  setAvatar: async (dataUrl) => {
+    const result = await window.qcApi.setAvatar({ data: { dataUrl } });
+    if (result.ok) await get().refreshUser();
+    return result;
+  },
+  clearAvatar: async () => {
+    const result = await window.qcApi.clearAvatar();
+    if (result.ok) await get().refreshUser();
+    return result;
   },
 
   logout: async () => {

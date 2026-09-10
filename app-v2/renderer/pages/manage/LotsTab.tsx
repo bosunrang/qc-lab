@@ -117,6 +117,8 @@ export function LotsTab() {
     // khi gọi `saveLot` nên bấm Hủy là không còn dấu vết gì. Port đúng cách
     // `saveConfigLot()` app cũ hỏi.
     if (id) {
+      // Chỉ ĐẾM để hỏi người dùng trước khi ghi (không ghi gì, không hiển
+      // thị lâu dài) — đọc tức thời là đúng, không cần store.
       const preview = await window.qcApi.previewLotRename({ id, lotNo: data.lotNo });
       if (preview.ok && preview.data.rename && preview.data.rename.affected > 0) {
         const plan = preview.data.rename;

@@ -76,7 +76,7 @@ const ENTRY_TREE_COLLAPSE_KEY = 'qclab-v2-entry-tree-collapsed';
 export function EntryPage() {
   const { instruments, lots, lotGroups, tests, panels, levelsByTestId, loadInstruments, loadLevels, loadLots, loadLotGroups, loadTests, loadPanels } = useManageStore();
   const { summaries, loadSummaries } = useWestgardStore();
-  const { pointsByLevel, analysisByLevel, parallelColumns, previousLotSeries, voidedPoints, rangeCandidate, rangeError, loadTestData, resetTestData, loadRangeCandidate, applyLabRange, revertManufacturerRange, addPoint, voidPoint } = useEntryStore();
+  const { pointsByLevel, analysisByLevel, parallelColumns, previousLotSeries, voidedPoints, rangeCandidate, rangeError, loadTestData, resetTestData, loadRangeCandidate, applyLabRange, revertManufacturerRange, addPoint, voidPoint, setDayNote } = useEntryStore();
   // Vai trò "chỉ xem" vẫn MỞ được trang này (đúng như app cũ) nhưng không
   // thấy ô nhập/nút huỷ — main process cũng chặn (requireWrite), đây chỉ để
   // không hiện nút rồi mới báo lỗi.
@@ -322,7 +322,7 @@ export function EntryPage() {
   }
 
   async function saveDayNote(date: string, note: string) {
-    const result = await window.qcApi.setDayNote({ data: { testId, date, note } });
+    const result = await setDayNote(testId, date, note);
     setNoteErr(result.ok ? null : result.error.message);
   }
 

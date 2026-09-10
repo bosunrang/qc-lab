@@ -22,6 +22,7 @@ interface EntryState {
   loadTestData: (testId: string, levels: number[]) => Promise<void>;
   resetTestData: () => void;
   addPoint: (data: { testId: string; level: number; date: string; val: number; runId?: string; lotNo?: string; note?: string; operatorName?: string }) => Promise<IpcResult<QcPointView>>;
+  setDayNote: (testId: string, date: string, note: string) => Promise<IpcResult<{ note: string; updated: number }>>;
   voidPoint: (
     pointId: string, reason: string, kind: 'analytical' | 'data-entry' | 'other', openNce: boolean, testId: string, level: number,
   ) => Promise<IpcResult<{ id: string; nceId: string | null; reusedAction: boolean }>>;
@@ -67,6 +68,17 @@ export const useEntryStore = create<EntryState>((set, get) => ({
       pointsByLevel: {}, analysisByLevel: {}, parallelColumns: [], previousLotSeries: [], voidedPoints: [],
       rangeCandidate: null, rangeError: null,
     });
+  },
+
+  /** Ghi chú theo ngày nằm ở trường `note` của MỌI điểm còn hiệu lực trong
+   * ngày (xem entry-handlers). Nạp lại điểm sau khi lưu để bảng nhập hiện
+   * đúng ghi chú vừa đổi. */
+  setDayNote: async (testId, date, note) => {
+    const result = await window.qcApi.setDayNote({ data: { testId, date, note } });
+    // Nạp lại đúng các mức đang mở (lấy từ state thay vì bắt caller truyền
+    // lại) để bảng nhập hiện ngay ghi chú vừa lưu.
+    if (result.ok) await get().loadTestData(testId, Object.keys(get().pointsByLevel).map(Number));
+    return result;
   },
 
   addPoint: async (data) => {
