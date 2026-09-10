@@ -55,6 +55,15 @@ function buildParitySeeds() {
     ],
   };
   test.sgTracked = true;
+  // TEa của app-v2 được seed QUA API THẬT (`saveSigmaTeaConfig`), mà hàm đó
+  // ghi luôn `tests.tea`/`tests.tea_source` — nên bảng danh mục xét nghiệm của
+  // app-v2 có TEa trong khi app cũ không, tức gate báo lệch vì DỮ LIỆU chứ
+  // không vì code (lỗi cùng lớp với 4 lần seed lệch đã ghi ở CLAUDE.md, lần
+  // này do TÁC DỤNG PHỤ của một API thật chứ không do gán tay). Gán cùng giá
+  // trị cho app cũ — `t.tea`/`t.teaSource` đúng là chỗ app cũ lưu TEa theo
+  // từng xét nghiệm.
+  test.tea = SIGMA_SEED.tea;
+  test.teaSource = SIGMA_SEED.teaSource;
   old.sigmaData = {
     [test.id]: [{
       id: SIGMA_SEED.id, period: SIGMA_SEED.period, tea: SIGMA_SEED.tea, teaSource: SIGMA_SEED.teaSource,
@@ -111,8 +120,19 @@ function buildParitySeeds() {
       // `decimal_places: 2` khớp QC_DECIMALS_DEFAULT mà app cũ dùng khi test
       // không khai số thập phân — cùng KẾT QUẢ HIỂN THỊ, không phải bịa thêm.
       decimal_places: 2,
-      // app cũ: test seed KHÔNG có tea/section/teaSource/cusum → để trống.
-      tea: null, section: '', tea_source: '', tea_ref_key: '', method: '', reagent: row.reagent || '',
+      // `tea`/`tea_source` để trống Ở ĐÂY vì `seedV2ViaApi` ghi chúng qua
+      // `saveSigmaTeaConfig` (API thật); app cũ được gán cùng giá trị ở trên.
+      // `section`/`cusum` app cũ không có trong seed nên giữ trống.
+      tea: null, section: '', tea_source: '', method: '', reagent: row.reagent || '',
+      // `tea_ref_key` phải TRỎ ĐÚNG analyte trong danh mục TEa: app cũ tự khớp
+      // theo TÊN xét nghiệm (`sgRef`, exact-rồi-longest-prefix) nên nó giải được
+      // tiêu chí CLIA ±4.0000 mmol/L cho "Sodium (Na)" mà không cần khai gì;
+      // app-v2 CỐ Ý đòi liên kết tường minh (đoán theo tiền tố có ngày nuốt
+      // nhầm "CK" ↔ "CK-MB", xem mục 10 của `cross-app-westgard-sigma.test.mjs`).
+      // Để rỗng ở đây KHÔNG phải là "cùng một đầu vào": app cũ có TEa CLIA còn
+      // app-v2 không, nên trang Six Sigma của hai bên tính ra Sigma khác nhau vì
+      // DỮ LIỆU. Khai khoá tương đương chính là cách diễn đạt cùng ý định đó.
+      tea_ref_key: 'qclab-sodium',
       cusum_on: 0, cusum_k: 0.5, cusum_h: 4,
       active: 1, rule_actions_json: '{}', rule_scopes_json: '{}',
     })),

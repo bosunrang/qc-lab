@@ -260,11 +260,16 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
                   onChange={(event) => setSelectedAssignmentIds(current => ({ ...current, [key]: event.target.value }))}>
                   {assignments.map(assignment => {
                     const instrument = instruments.find(item => item.id === assignment.instrument_id);
-                    return <option key={assignment.id} value={assignment.id}>{instrument?.name || 'Máy không còn tồn tại'} — {instrument?.section || assignment.section || 'Chưa gán khu vực'}</option>;
+                    return <option key={assignment.id} value={assignment.id}>{instrument?.name || 'Máy không còn tồn tại'}</option>;
                   })}
-                </select></td>
+                </select>
+                {/* Khoa/Khu vực đi xuống dòng hint riêng, đúng cấu trúc app cũ
+                    (`<td>{row.instrument}<div class="hint">{section}</div></td>`) —
+                    trước đây ghép vào chính nhãn `<option>` nên cả hai dòng chữ
+                    của app cũ đều không khớp. */}
+                <div className="hint">{selectedInstrument?.section || selected.section || 'Chưa gán khoa/khu vực'}</div></td>
                 <td>{selected.reagent || '—'}</td>
-                <td className="num">{selected.tea || '—'}</td>
+                <td className="num">{selected.tea ? `${selected.tea}%` : '—'}</td>
                 <td><span className={`tag ${selected.active ? 'ok' : 'none'}`}>{selected.active ? 'Đang dùng' : 'Ngừng dùng'}</span></td>
                 <td><div className="manage-actions">
                   <RowActionButton kind="edit" label={`Sửa ${selected.name} trên ${selectedInstrument?.name || 'máy đã chọn'}`} onClick={() => { setErr(null); setAssigningMachines(false); setEditingSingleAssignment(true); setEditing(selected); }} />

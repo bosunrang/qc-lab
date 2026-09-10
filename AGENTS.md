@@ -4820,6 +4820,98 @@ cliaAbsolute-dùng-được`, `cohorts:2026-08:#5`, `cohortBiên:val rỗng/null
 `cohortBiên:ngày không tồn tại`, "nhóm lô không vận hành không được đổi kết
 luận"), rồi phục hồi.
 
+**Dọn 57 vấn đề đỏ của `app-v2:ui-parity` (2026-09-10).** Đây là phần đỏ tồn
+từ commit `4d5676c` ("hoàn thiện cấu hình chung", do người dùng tự làm) mà 2
+đợt trước cố ý KHÔNG chốt baseline. Gate về **79/79 surface đạt**.
+
+**Cách chẩn đoán, đáng ghi hơn danh sách sửa**: gate chỉ đo MỘT CHIỀU ("app cũ
+CÓ mà app-v2 THIẾU") và chỉ in 5 ví dụ, nên đọc riêng nó thì mọi cụm đều trông
+giống nhau ("thiếu class `ghost`/`sm`/`danger`, thiếu dòng Sửa/Xóa") mà không
+biết vì sao. Một công cụ đo tạm (không commit) mở CÙNG bộ seed trên 2 bản rồi
+in **đủ cả hai chiều** — thiếu VÀ THÊM, cho cả class lẫn dòng chữ — chỉ ra
+nguyên nhân ngay trong một lượt: `+"row-action","is-danger"` cạnh
+`-"ghost","sm","danger"` nói rõ đây là ĐỔI THIẾT KẾ nút, không phải mất nút;
+`+"EasyLyte Expand — Chưa gán khu vực"` cạnh `-"EasyLyte Expand"`/
+`-"Chưa gán khoa/khu vực"` nói rõ hai dòng bị GỘP vào một nhãn `<option>`.
+**Chiều "app-v2 có thêm" là thứ gate không đo và là thứ giải thích được phần
+gate đo.**
+
+**2 khác biệt CÓ CHỦ ĐÍCH, người dùng chốt GIỮ (2026-09-10) sau khi được hỏi
+rõ đánh đổi** — chốt baseline kèm `surfaceNotes`, KHÔNG sửa:
+- **Nút thao tác trên hàng dữ liệu là nút ICON** (`RowActionButton`,
+  `.row-action`/`.is-danger`, mẫu app Cost) thay vì nút CHỮ `btn ghost sm`
+  "Sửa" / `btn danger sm` "Xóa" của app cũ — 32/57 vấn đề đỏ đến từ đúng chỗ
+  này (Người dùng, 4 tab Cấu hình chung, nút hủy điểm ở Nhập QC). Nút vẫn có
+  `title` + `aria-label` đầy đủ. **Đừng nhồi chữ ẩn vào DOM cho gate xanh** —
+  đó là làm cho gate đẹp chứ không phải làm cho app đúng.
+- **Một xét nghiệm gán NHIỀU máy** (app cũ không có): cột "Máy xét nghiệm" của
+  tab Danh mục là `<select>` chọn máy, và modal xét nghiệm thay ô chọn một máy
+  + ô "Khoa / Khu vực" bằng lưới chọn nhiều máy ("Máy áp dụng *"). Không thể
+  vừa giữ tính năng vừa 0/0.
+
+**8 lệch THẬT đã sửa** (không thuộc 2 nhóm trên):
+1. **Seed lệch — lần thứ 5, và lần này do TÁC DỤNG PHỤ của một API thật**, khác
+   4 lần trước (gán tay giá trị "cho đẹp"). Từ 2026-09-09 seed app-v2 đi qua
+   `window.qcApi`; `saveSigmaTeaConfig()` ghi luôn `tests.tea`/`tests.tea_source`,
+   nên bảng Danh mục xét nghiệm của app-v2 có TEa còn app cũ không → gate báo
+   lệch vì DỮ LIỆU. Gán `test.tea`/`test.teaSource` cho app cũ (đúng chỗ app cũ
+   lưu TEa theo xét nghiệm).
+2. **Seed lệch #2, cùng gốc**: `tea_ref_key` để rỗng ở phía app-v2. App cũ tự
+   khớp analyte theo TÊN (`sgRef`) nên nó giải được tiêu chí CLIA ±4,0000
+   mmol/L cho "Sodium (Na)" mà không cần khai gì; app-v2 CỐ Ý đòi liên kết
+   tường minh (xem mục 10 của `cross-app-westgard-sigma.test.mjs`). Để rỗng
+   KHÔNG phải "cùng một đầu vào" — hệ quả là trang Six Sigma hai bên tính ra
+   Sigma khác nhau vì thiếu dữ liệu, không vì công thức. Khai khoá tương đương
+   → panel "Thiết lập phân tích" của app-v2 hiện đúng "CLIA PT (CMS-3355-F) ·
+   2.86%" như app cũ.
+3. Cột TEa của bảng Danh mục xét nghiệm thiếu dấu `%` (app cũ in `10%`).
+4. Nhãn `<option>` chọn máy GỘP tên máy với Khoa/Khu vực; tách ra: nhãn chỉ in
+   tên máy, Khoa/Khu vực xuống dòng `.hint` riêng đúng cấu trúc app cũ
+   (`<td>{instrument}<div class="hint">{section}</div></td>`), và dùng đúng câu
+   "Chưa gán khoa/khu vực". Vẫn giữ `<select>`, tức giữ tính năng.
+5. **Tab Lịch sử dữ liệu mất 2 bộ đếm `.target-lot-info`** ("N mốc lô/Mean-SD"
+   và "N điểm QC đã nhập") khi đổi sang khung `history-matrix-panel` — không
+   liên quan tính năng nhiều máy, thuần mất nội dung. Khôi phục.
+6. Cùng tab: nhãn và phụ đề về đúng câu app cũ ("Xét nghiệm", "Chọn một xét
+   nghiệm để xem…"), và tên máy chỉ được ghép vào nhãn khi CÓ xét nghiệm khác
+   TRÙNG TÊN — đúng quy ước `qcOperationalAccess.selectLabel()` của app cũ
+   (nhãn trần khi không nhập nhằng), nên vẫn phân biệt được cùng một xét
+   nghiệm chạy trên hai máy.
+7. Hai nút thu/mở cây danh mục ở Nhập QC thiếu class dùng chung của app cũ
+   (`btn teal icon entry-tree-expand` / `btn ghost icon entry-tree-toggle`).
+8. Nhập QC: dòng "Khoảng xem" đếm **CỘT** (`entryColumns.length`, phồng lên khi
+   có cột song song) thay vì đếm **MỨC QC** như app cũ
+   (`operationalLevels().length`); và thẻ biểu đồ in TỔNG số điểm kèm hậu tố
+   "· N chấp nhận" thay vì in SỐ ĐIỂM ĐƯỢC CHẤP NHẬN như app cũ — mà chuỗi
+   được chấp nhận mới đúng là chuỗi được vẽ và được tính Mean/SD/CV. Tổng số
+   điểm vẫn hiện ở panel "Điểm trong khoảng xem" ngay bên dưới.
+
+**Hai surface tự khớp lại nhờ sửa seed, không phải nhờ sửa CSS** — bằng chứng
+rằng một phần lời giải thích cũ đã sai: `reagent` từ 0 class/18 dòng về
+**0/0** (18 dòng đó từng được ghi là "nhãn trục biểu đồ canvas-vs-SVG", thực
+ra là lệch dữ liệu), và `sigma` từ 7 class/32 dòng xuống **3/11**. Hai
+`surfaceNotes` đó đã được viết lại theo số đo mới thay vì để nguyên mô tả cũ.
+
+**Còn lại của `sigma` (3 class/11 dòng), đã ghi rõ**: panel OPSpecs của app-v2
+là bảng (`sg-opspec-table`) chứ không phải khối văn xuôi như app cũ; và TEa của
+KỲ là **snapshot vs giải lại** — app cũ giải lại tiêu chí CLIA tuyệt đối tại
+Mean từng mức mỗi lần vẽ (TEa 2.857%, Sigma 0.29/0.56), app-v2 giữ snapshot
+riêng của kỳ (TEa 10%, Sigma 2.67/1.89) theo đúng quyết định "kỳ cũ không bị
+kéo lại theo Bảng TEa tham chiếu hôm nay". Con số 10% chỉ là hệ quả của seed
+ghi `tea: 10` trong khi nguồn là `clia` — tổ hợp mà luồng thật không tạo ra.
+
+**Tiêu chí cắt phải phát biểu lại.** Bản cũ ghi "Giai đoạn D xong = `ui-parity`
+xanh với baseline **0 cho mọi surface**". Sau quyết định 2026-09-10 (giữ nút
+icon + giữ tính năng nhiều máy), mốc đó KHÔNG BAO GIỜ đạt được và cũng không
+nên đạt. Mốc đúng từ đây: **gate `app-v2:ui-parity` XANH, và mọi surface có
+baseline khác 0 đều có `surfaceNotes` nêu lý do sản phẩm/kỹ thuật** — hiện
+49/79 surface khác 0, tất cả đều có ghi chú. Baseline chỉ được SIẾT xuống bằng
+`--update-baseline`, không nâng bằng tay.
+
+Verify: `app-v2:typecheck` sạch, `app-v2:test` 71/71, `app-v2:build` sạch,
+`app-v2:css-parity` đạt, `app-v2:style-parity` 18/18, `app-v2:ui-parity`
+**79/79 surface đạt** (57 vấn đề → 0).
+
 **Tiêu chí cắt còn lại đúng 1 mục**: Giai đoạn D xong (`app-v2:ui-parity`
 xanh với baseline 0 cho mọi surface). Mục "đối chiếu Westgard/Sigma khớp
 100%" nay ĐẠT, và từ đây nó là gate sống chạy trong `app-v2:test` chứ không

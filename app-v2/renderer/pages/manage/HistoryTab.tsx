@@ -196,21 +196,33 @@ export function HistoryTab() {
   return (
     <>
       <div className="rcfg-toolbar">
-        <div><h2>Lịch sử dữ liệu QC</h2><p>Chọn một xét nghiệm và máy để xem các lô/Mean-SD đã từng dùng.</p></div>
+        <div><h2>Lịch sử dữ liệu QC</h2><p>Chọn một xét nghiệm để xem các lô/Mean-SD đã từng dùng.</p></div>
         <div className="rcfg-tools"><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm theo xét nghiệm hoặc máy..." /></div>
       </div>
       <div className="panel target-matrix-panel history-matrix-panel">
       {!tests.length ? <EmptyHistory title="Chưa có xét nghiệm" message="Tạo xét nghiệm trước, sau đó cấu hình lô và Mean/SD." /> : <>
         <div className="target-selector history-selector">
-          <div><label>Xét nghiệm / Máy</label><select value={testId} onChange={(e) => setTestId(e.target.value)}>{tests.filter((test) => {
+          <div><label>Xét nghiệm</label><select value={testId} onChange={(e) => setTestId(e.target.value)}>{tests.filter((test) => {
             const q = query.trim().toLowerCase();
             const instrument = instruments.find((item) => item.id === test.instrument_id);
             return !q || testSearchValues(test, levelsByTestId[test.id] || [], lots, instrument?.name || '').some((v) => v.toLowerCase().includes(q));
           }).map((test) => {
             const instrument = instruments.find((item) => item.id === test.instrument_id);
             const machine = instrument?.name || 'Máy không còn tồn tại';
-            return <option key={test.id} value={test.id}>{test.name} — {machine}</option>;
+            // Chỉ ghép tên máy khi CÓ xét nghiệm khác cùng tên — đúng quy ước
+            // `qcOperationalAccess.selectLabel()` của app cũ (nhãn trần khi
+            // không nhập nhằng), vẫn phân biệt được cùng một xét nghiệm chạy
+            // trên hai máy khác nhau.
+            const ambiguous = tests.some((other) => other.id !== test.id && other.name === test.name);
+            return <option key={test.id} value={test.id}>{ambiguous ? `${test.name} · ${machine}` : test.name}</option>;
           })}</select></div>
+          {/* Hai bộ đếm này thuộc khung `.target-selector.history-selector` của
+              app cũ (`.target-lot-info`): số MỐC lô/Mean-SD đang hiện và TỔNG
+              số điểm QC của các mốc đó. Chúng bị bỏ khi tab này đổi sang khung
+              `history-matrix-panel`; thiếu chúng thì bảng 10 cột không nói được
+              quy mô dữ liệu đang xem. */}
+          <div className="target-lot-info"><b>{rows.length}</b><span>mốc lô/Mean-SD</span></div>
+          <div className="target-lot-info"><b>{rows.reduce((sum, row) => sum + pointsOf(row).length, 0)}</b><span>điểm QC đã nhập</span></div>
         </div>
         <div className="rcfg-list">
           {rows.length ? (

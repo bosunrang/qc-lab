@@ -508,13 +508,13 @@ export function EntryPage() {
         </div>
       ) : (
       <div className={`entrygrid${treeCollapsed ? ' tree-collapsed' : ''}`}>
-        <button type="button" className="entry-tree-expand" onClick={() => setTreeVisibility(false)}
+        <button type="button" className="btn teal icon entry-tree-expand" onClick={() => setTreeVisibility(false)}
           title="Hiện danh mục nội kiểm" aria-label="Hiện danh mục nội kiểm" aria-controls="entryTreePanel" aria-expanded={!treeCollapsed}><TreeToggleIcon /></button>
 
         <div className="tree" id="entryTreePanel">
           <div className="entry-tree-head">
             <h4>Danh mục nội kiểm</h4>
-            <button type="button" className="entry-tree-toggle" onClick={() => setTreeVisibility(true)}
+            <button type="button" className="btn ghost icon entry-tree-toggle" onClick={() => setTreeVisibility(true)}
               title="Ẩn danh mục nội kiểm" aria-label="Ẩn danh mục nội kiểm" aria-controls="entryTreePanel" aria-expanded={!treeCollapsed}><TreeToggleIcon /></button>
           </div>
           <div className="tree-tools">
@@ -698,7 +698,7 @@ export function EntryPage() {
                     </div>
                   </div>
                 </div>
-                <div className="hint lj-range">Khoảng xem: {vnDate(ljFrom)} – {vnDate(ljTo)} · {entryColumns.length} cột QC</div>
+                <div className="hint lj-range">Khoảng xem: {vnDate(ljFrom)} – {vnDate(ljTo)} · {levels.length} mức QC</div>
                 <div className="lj-stack">
                   {displayColumns.map((column) => {
                     const chartPoints = inLjWindow(column.chartPoints);
@@ -719,7 +719,7 @@ export function EntryPage() {
                           if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setFocusLevel(column.level); }
                         }}>
                         <div className="lj-mini-h">
-                          <b>Mức {column.level} · {column.previous ? 'Lô cũ ' : 'Lô '}{column.lot}{column.parallel && <span className="qc-parallel-label">Song song</span>}<span className="lj-point-count">{chartPoints.length === acceptedCount ? `${acceptedCount} điểm` : `${chartPoints.length} điểm · ${acceptedCount} chấp nhận`}</span></b>
+                          <b>Mức {column.level} · {column.previous ? 'Lô cũ ' : 'Lô '}{column.lot}{column.parallel && <span className="qc-parallel-label">Song song</span>}<span className="lj-point-count">{acceptedCount} điểm</span></b>
                           {previousChoices.length ? (
                             <button type="button" className="btn ghost sm qc-old-lot-toggle" onClick={() => togglePreviousLot(column.level)}>
                               {column.previous ? 'Xem lô mới' : 'Xem lô cũ'}
