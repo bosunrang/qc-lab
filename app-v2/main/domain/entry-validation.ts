@@ -5,6 +5,11 @@
 import { cleanId, cleanText, finiteNumber } from './text-utils';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+function isRealDate(text: string): boolean {
+  const [y, m, d] = text.split('-').map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
+}
 
 export interface QcPointInput {
   testId?: unknown;
@@ -51,7 +56,11 @@ export function validateQcPointInput(input: QcPointInput, knownLevels: readonly 
   const level = Math.round(finiteNumber(input.level, NaN));
   if (!knownLevels.includes(level)) return { ok: false, code: 'invalid-level', message: 'Mức QC không tồn tại cho xét nghiệm này.' };
   const date = cleanText(input.date, 20).trim();
-  if (!DATE_RE.test(date)) return { ok: false, code: 'invalid-date', message: 'Ngày không hợp lệ (định dạng YYYY-MM-DD).' };
+  // Kiểm cả tính hợp lệ trên LỊCH, không chỉ định dạng: `2026-02-31` khớp
+  // regex nhưng không tồn tại, và một điểm QC như vậy làm mốc thời gian của
+  // cohort Sigma/báo cáo thành vô nghĩa. App cũ chỉ kiểm định dạng ở đây rồi
+  // lọc lại ở tầng cohort — app-v2 chặn ngay ở cổng ghi duy nhất.
+  if (!DATE_RE.test(date) || !isRealDate(date)) return { ok: false, code: 'invalid-date', message: 'Ngày không hợp lệ (định dạng YYYY-MM-DD).' };
   const val = typeof input.val === 'number' ? input.val : parseFloat(String(input.val == null ? '' : input.val).trim());
   if (!Number.isFinite(val)) return { ok: false, code: 'invalid-value', message: 'Giá trị QC không hợp lệ.' };
   const runId = cleanText(input.runId, 120).trim() || `${date}-1`;

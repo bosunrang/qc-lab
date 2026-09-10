@@ -4041,8 +4041,12 @@ analyte trên + hàm quy đổi tuyệt đối→% theo đơn vị khớp (đã 
 trong "Confirmed business-logic decisions").
 
 **Six Sigma — chốt lại lớp giải TEa (2026-09-09).** Đã port các giới hạn
-CLIA tuyệt đối còn thiếu từ `TEA_ANALYTE_CATALOG` (26 analyte, không phải 9
-như ghi chú ban đầu) vào `renderer/data/tea-catalog.ts` và nối chúng vào
+CLIA tuyệt đối còn thiếu từ `TEA_ANALYTE_CATALOG` (25 analyte dùng được,
+không phải 9 như ghi chú ban đầu — app cũ có 26 dòng mang `cliaAbsolute`
+nhưng dòng pH (±0,04) để `cliaAbsoluteUnit` RỖNG, mà `sgUnitsMatch()` đòi
+cả hai đơn vị khác rỗng, nên chính app cũ cũng không bao giờ áp được nó —
+đây là dữ liệu chết, không phải thiếu sót của bản port) vào
+`renderer/data/tea-catalog.ts` và nối chúng vào
 `renderer/lib/sigma-tea-core.ts`. Khi tạo kỳ, nguồn Lab/EFLM/CLIA/Ricos được
 giải lại từ đúng nguồn hiện hành; đổi nguồn không tái sử dụng con số TEa còn
 lại từ nguồn trước. Với CLIA, giới hạn tuyệt đối chỉ được đổi sang % nếu đơn
@@ -4710,6 +4714,111 @@ Verify: `app-v2:typecheck` sạch, `app-v2:test` **70/70** (thêm
 nhóm), `app-v2:build` sạch, `app-v2:css-parity` đạt, `app-v2:style-parity`
 18/18, `app-v2:ui-parity` **61 vấn đề — Y NGUYÊN trước và sau**, tức thay đổi
 engine không đổi gì ở lớp hiển thị đang được đo.
+
+**Đối chiếu Westgard/Sigma — phần ĐƯỜNG DẪN DỮ LIỆU vào công thức
+(2026-09-10, tiếp ngay mục trên).** Mục trên chỉ chứng minh CÔNG THỨC khớp;
+một công thức đúng vẫn ra kết luận sai nếu đầu vào chọn sai. Ba lớp đầu vào
+còn lại được đối chiếu tiếp: TEa (Sigma), cohort IQC (nguồn CV), và tập mức
+QC (đầu vào đánh giá liên mức của Westgard). Bắt được **4 lệch thật**, tất cả
+đều đổi số/đổi kết luận chứ không phải đổi hiển thị.
+
+**(1) Lớp giải TEa — 924 phép khớp, lộ 1 dữ liệu chết và 1 khác biệt có chủ
+đích.** `cross-app-westgard-sigma.test.mjs` mục 10 so `sgTeaBySource()` app cũ
+(nạp bundle qua chính `tests/helpers/sandbox.js`) với `resolveTea()` app-v2
+cho 77 analyte × 2 nguồn (CLIA/Ricos) × 6 giá trị Mean — Mean là thứ quyết
+định việc quy đổi giới hạn CLIA TUYỆT ĐỐI sang %, nên phải quét cả `null`/0.
+Giá trị khớp 100%; bảng dữ liệu lệch đúng 1 dòng: `qclab-blood-gas-ph` có
+`cliaAbsolute: 0.04` ở app cũ mà app-v2 không có. Không port thiếu — dòng đó
+có `cliaAbsoluteUnit` RỖNG, mà `sgUnitsMatch()` của app cũ đòi CẢ HAI đơn vị
+khác rỗng, nên chính app cũ cũng không bao giờ áp được nó: **dữ liệu chết**.
+Test chốt đúng ranh giới đó (`cliaAbsolute-dùng-được`) thay vì đòi hai bảng
+giống nhau từng ô, và con số trong mục "Six Sigma — chốt lại lớp giải TEa" đã
+sửa từ "26 analyte" thành "25 analyte dùng được" kèm lý do. Khác biệt CÓ CHỦ
+ĐÍCH được chốt lại luôn: app cũ khớp tên theo exact-rồi-longest-prefix nên
+"Glucose (huyết tương)" tự thừa hưởng TEa của "Glucose"; app-v2 chỉ khớp
+tuyệt đối và đòi `tea_ref_key` tường minh — đoán theo tiền tố có ngày nuốt
+nhầm ("CK" ↔ "CK-MB"), mà TEa là tiêu chí lâm sàng. Test chứng minh cả hai
+chiều: chưa gán khoá thì app-v2 trả `null`, gán rồi thì ra ĐÚNG con số app cũ.
+
+**(2) Cohort IQC — `Number(null)` là 0, và 0 là số hữu hạn.** Đây là nguồn CV
+đi thẳng vào `Sigma = (TEa − |Bias|) / CV` khi người dùng bấm "Nạp CV lô".
+Hai bên khác hẳn chữ ký (app cũ: `cohortsForLevelByLot()` cho MỘT mức + một
+tầng chọn riêng `SigmaCohortSelectionService` lo cutoff và lọc "nhóm còn liên
+quan tới kỳ"; app-v2: `buildSigmaCohorts()` gộp cả ba việc), nên mục 11 của
+test ghép đủ hai tầng app cũ rồi mới so. **3 bug thật trong
+`sigma-cohort.ts`, cùng một gốc**: `uniqueFinite()` đưa thẳng
+`point[key]` qua `Number()`, mà `qc_points.qc_mean` là cột NULLABLE —
+`Number(null)` ra 0, 0 hữu hạn, nên một điểm THIẾU snapshot tự đẻ ra một
+"Mean mục tiêu thứ hai" và cả nhóm bị dán nhãn `Mean mục tiêu thay đổi` →
+`unstable` → **Sigma không dùng được nhóm đó**; nó cũng làm Mean mục tiêu 0
+THẬT (base excess) lẫn với "chưa ghi". Cùng bẫy ở phía giá trị đo:
+`Number.isFinite(Number(point.val))` cho `''`/`null` đi qua thành một lần
+chạy bằng 0, thay vì đếm là `invalidValue` như app cũ. Và app cũ lọc điểm có
+ngày KHÔNG TỒN TẠI trên lịch (`normalizeDate`) ở đúng tầng này, app-v2 không
+— một hàng `2026-02-31` làm `start`/`end` của nhóm thành vô nghĩa và kéo điểm
+vào một kỳ nó không thuộc về. Sửa cả ba theo đúng app cũ.
+- Cổng nhập điểm QC của **cả hai bản** chỉ kiểm ĐỊNH DẠNG `YYYY-MM-DD`
+  (`preparePointInput()` app cũ và `validateQcPointInput()` app-v2 dùng cùng
+  một regex lỏng), nên `2026-02-31` lưu được thật. app-v2 siết thêm ở cổng
+  ghi DUY NHẤT của `qc_points` (`isRealDate()`), đồng thời VẪN giữ lớp lọc ở
+  cohort như app cũ — dữ liệu di trú hoặc điểm nhập trước khi siết cổng vẫn
+  cần được phòng thủ.
+- 2 khác biệt hợp đồng CÓ CHỦ ĐÍCH, chốt bằng test: Mean = 0 thì app cũ trả
+  `cv: 0` còn app-v2 trả `cv: null` (cả hai hiện "—" trên giao diện, nhưng
+  `null` không thể bị ghi vào kỳ Sigma như "CV = 0%"); và `periodCutoff()`
+  chỉ nhận tháng 2 chữ số trong khi `normalizePeriod()` app cũ đệm "2026-6"
+  thành "2026-06" — không tiếp cận được từ luồng thật vì `sigma-handlers.ts`
+  chặn bằng CÙNG một regex ở cả đường ghi và đường đọc.
+
+**(3) Tập mức QC vào Westgard — lệch KẾT LUẬN LÂM SÀNG, không phải hiển
+thị.** `activeLevels()` trả MỌI dòng `test_levels`, trong khi app cũ dùng
+`operationalLevels()` (mức phải gắn lô thuộc nhóm lô CÒN VẬN HÀNH) cộng
+`qcOperationalAccess.lotPoints()` (xét nghiệm phải nằm trong Panel QC đang
+hoạt động). Tập mức này không phải một danh sách để hiển thị: nó là đầu vào
+của `combinedWestgardByPoint()` (đánh giá LIÊN MỨC theo cùng `run_id`) và
+`levels.length` là đầu vào của `makeScopeOf()` (một luật đổi within↔across
+theo SỐ mức). Đo trực tiếp bằng SQLite thật: xét nghiệm 2 mức, mức 2 thuộc
+nhóm lô ĐÃ DỪNG, cả hai mức lệch +2,5SD trong CÙNG một lần chạy → điểm của
+mức 1 nổ `2-2s` liên mức và bị kết luận **"Loại bỏ"**, trong khi app cũ chỉ
+cảnh báo `1-2s`. Sửa `activeLevels()` thành đúng hai cổng của app cũ, giữ
+nguyên sự phân biệt của app cũ giữa chúng: nhóm lô không vận hành thì mức bị
+LOẠI HẲN, còn Panel tắt thì mức VẪN nằm trong danh sách nhưng không điểm nào
+được đánh giá (`lotPoints()` thoát sớm). Nhóm lô đã dừng/lưu trữ đã có tab
+riêng (`listArchivedGroupTests`), đây không phải chỗ hiển thị chúng.
+`tests/westgard-active-levels.test.mjs` (mới) chốt cả 4 nhánh
+(`stopped`/`planned`/`active=0`/chưa gán lô) cộng một đối chứng "nhóm B còn
+vận hành thì 2-2s PHẢI nổ" — thiếu đối chứng đó thì một hàm luôn trả rỗng
+cũng qua sạch. Trang Nhập QC không bị ảnh hưởng: worksheet đọc cột từ
+`config:listTestLevels`, `summaries` chỉ tô màu verdict cho cây điều hướng.
+
+**(4) `wg-view-mode`** — app cũ đặt class này trên CẢ HAI dải `.dayseg` (chọn
+chế độ xem, và chọn LJ/CUSUM); app-v2 đặt tên riêng
+(`wg-archive-view-mode`/`wg-chart-mode`). Class này KHÔNG có rule CSS ở bên
+nào (`app-v2:css-parity` xác nhận: "23 class không bên nào có CSS"), nên đây
+thuần là lệch TÊN — thêm `wg-view-mode` vào đúng hai dải tương ứng, giữ tên
+riêng của app-v2 cho hai dải mà app cũ không có (`wg-cusum-view-mode`).
+
+**Bài học đo lường của đợt này (thuộc phép đo, không thuộc code)**: lượt so
+cohort đầu tiên báo 3 lệch "cv 0 vs null" mà nguyên nhân nằm trong CHÍNH bản
+chuẩn hoá của script — nó ép `cv === 0 → null` chỉ ở PHÍA APP CŨ, tức so hai
+quy ước khác nhau rồi kết luận engine lệch. Cùng lớp lỗi với bẫy `across`
+không đối xứng đã ghi ở mục trên: **khi hai bên dùng hai quy ước biểu diễn
+khác nhau cho "không có giá trị", phải chuẩn hoá ĐỐI XỨNG rồi chốt riêng khác
+biệt hợp đồng, không chuẩn hoá một phía.**
+
+Verify: `app-v2:typecheck` sạch, `app-v2:test` **71/71** (mục 10+11 của
+`cross-app-westgard-sigma.test.mjs` đưa số phép đối chiếu từ 1.194 lên
+**2.305**; `sigma-cohort.test.mjs` thêm 4 nhóm giữ 3 bug trên bị canh sau khi
+app cũ bị cắt; `entry-validation.test.mjs` thêm nhóm ngày-trên-lịch;
+`westgard-active-levels.test.mjs` mới), `app-v2:build` sạch,
+`app-v2:css-parity` đạt, `app-v2:style-parity` 18/18, `app-v2:ui-parity`
+**61 → 57 vấn đề** (westgard về sạch nhờ `wg-view-mode`; 57 còn lại là phần
+đỏ sẵn từ trước — manage 41, users 8, entry 8 — thuộc Giai đoạn D, cố ý KHÔNG
+chốt baseline). Cả 4 bản sửa đều được chứng minh CÓ khả năng bắt lỗi: hoàn
+tác tạm từng cái một → test FAIL đúng chỗ (`teaCatalog:qclab-sodium:
+cliaAbsolute-dùng-được`, `cohorts:2026-08:#5`, `cohortBiên:val rỗng/null`,
+`cohortBiên:ngày không tồn tại`, "nhóm lô không vận hành không được đổi kết
+luận"), rồi phục hồi.
 
 **Tiêu chí cắt còn lại đúng 1 mục**: Giai đoạn D xong (`app-v2:ui-parity`
 xanh với baseline 0 cho mọi surface). Mục "đối chiếu Westgard/Sigma khớp

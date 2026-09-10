@@ -272,7 +272,7 @@ export function WestgardPage() {
       <div className="panel wg-setup-panel">
         <h2 className="panel-title">Thiết lập phân tích</h2>
         {archivedGroups.length > 0 && (
-          <div className="dayseg wg-archive-view-mode">
+          <div className="dayseg wg-view-mode wg-archive-view-mode">
             <button className={view === 'current' ? 'on' : ''} onClick={() => setView('current')}>Xét nghiệm đang vận hành</button>
             <button className={view === 'archived' ? 'on' : ''} onClick={() => setView('archived')}>Nhóm lô đã dừng/lưu trữ ({archivedGroups.length})</button>
           </div>
@@ -339,7 +339,7 @@ export function WestgardPage() {
                   </div>
                 </details>
 
-                <div className="dayseg wg-chart-mode">
+                <div className="dayseg wg-view-mode wg-chart-mode">
                   <button className={chartMode === 'lj' ? 'on' : ''} onClick={() => setChartMode('lj')}>Levey-Jennings</button>
                   <button className={chartMode === 'cusum' ? 'on' : ''} onClick={() => setChartMode('cusum')}>Xu hướng CUSUM</button>
                 </div>
