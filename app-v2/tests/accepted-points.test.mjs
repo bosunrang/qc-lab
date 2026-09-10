@@ -59,4 +59,31 @@ const pt = (val, i) => ({ val, runId: `R${i}`, date: `2026-03-${String(i + 1).pa
 // 6) Mảng rỗng/không hợp lệ không được ném lỗi.
 assert.deepEqual(acceptedPoints([], MEAN, SD), []);
 
-console.log('accepted-points: 6 nhom kiem tra dat.');
+// 7) MỖI ĐIỂM DÙNG TARGET RIÊNG (snapshot `qcMean`/`qcSd` chốt lúc nhập),
+//    không phải Mean/SD hiện hành dùng chung — đúng `acceptedLotPoints()` app
+//    cũ, và nhất quán với `westgardByPoint()` mà `analyzeLevel()` dùng để
+//    tính verdict của CHÍNH những điểm này.
+//
+//    Bản đầu dùng Mean/SD chung nên sau khi ai đó sửa Mean/SD của mức, một
+//    điểm có thể hiện "Loại bỏ" mà vẫn `accepted:true`. Lệch này chỉ lộ ra
+//    khi đối chiếu trực tiếp với app cũ (cross-app-westgard-sigma.test.mjs);
+//    nhóm dưới đây giữ nó bị canh cả sau khi app cũ được cắt bỏ.
+{
+  // Điểm 106 lệch +3SD theo snapshot của chính nó (mean 100, sd 2) → phải bị
+  // loại, DÙ Mean/SD hiện hành (mean 106, sd 2) khiến nó nằm đúng tâm.
+  const snap = [
+    { val: 100, qcMean: 100, qcSd: 2, runId: 'R0' },
+    { val: 106.5, qcMean: 100, qcSd: 2, runId: 'R1' },
+    { val: 106, qcMean: 106, qcSd: 2, runId: 'R2' },
+  ];
+  assert.deepEqual(
+    acceptedPoints(snap, 106, 2).map(p => p.runId), ['R0', 'R2'],
+    'phai danh gia theo snapshot cua tung diem, khong phai Mean/SD hien hanh',
+  );
+  // Ngược lại: điểm nằm trong dải theo snapshot riêng vẫn được nhận dù lệch
+  // xa so với Mean/SD hiện hành.
+  const drift = [{ val: 140, qcMean: 140, qcSd: 3, runId: 'D0' }];
+  assert.deepEqual(acceptedPoints(drift, 100, 2).map(p => p.runId), ['D0'], 'snapshot rieng thi khong bi loai oan');
+}
+
+console.log('accepted-points: 7 nhom kiem tra dat.');

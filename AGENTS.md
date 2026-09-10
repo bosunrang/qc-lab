@@ -4647,6 +4647,75 @@ cộng kiểm chứng trong tab thật: trang Cài đặt render đủ 5 panel, 
 và form LIS (url + token + công tắc) seed đúng từ store, và lưu tên đơn vị
 qua nút "Lưu thông tin" ghi đúng vào SQLite.
 
+**Đối chiếu Westgard/Sigma giữa hai bản — tiêu chí cắt thứ hai, lần đầu chạy
+thật (2026-09-10).** Đây là mục đã nằm trong "Quyết định sản phẩm 2026-09-02"
+nhưng chưa từng được thực hiện: mọi test còn lại của app-v2 chốt hành vi
+app-v2 với CHÍNH NÓ, nên một công thức lâm sàng bị port lệch ngay từ đầu vẫn
+để cả bộ test xanh. `app-v2/tests/cross-app-westgard-sigma.test.mjs` (mới)
+chạy CÙNG input qua engine app cũ (`assets/core.js` UMD + 3 file
+`src/domain/**` nạp thẳng `.ts` qua type-stripping) và engine app-v2
+(`app-v2-dist/main/domain/*`), so **1.194 phép**: registry 13 luật (kể cả
+predicate của họ luật "N liên tiếp", so bằng cách chạy thử trên dải z chứ
+không so mã), `defaultRuleAction`/`defaultRuleScope`, `stats`/`pointTarget`/
+`pointZ`, `westgard`/`westgardByPoint`/`cusum` trên 29 chuỗi điểm,
+`westgardMultiByPoint` trên 62 bộ liên mức, `acceptedPoints` ↔
+`acceptedLotPoints`, `combinedWestgardByPoint` ↔ `activeWestgard`, `erf`/
+`normalCdf`/`dpmoFromSigma`/`sigmaMetric`, `eqaRoundsStats` ↔
+`SigmaBiasService.stats`, và `uncertaintyBudget`. PRNG cố định nên cùng bộ dữ
+liệu ở mọi lần chạy — lệch mới xuất hiện là do CODE đổi, không phải do rút
+trúng số khác.
+
+**Bắt được đúng 1 lệch nghiệp vụ thật: `acceptedPoints()` bỏ qua snapshot
+Mean/SD của từng điểm.** App cũ (`acceptedLotPoints`) gọi `pointTarget(p,
+level.mean, level.sd)` nên tôn trọng `qcMean`/`qcSd` đã chốt lúc nhập;
+app-v2 gọi `westgard(trial, mean, sd)` với Mean/SD HIỆN HÀNH dùng chung. Sai
+theo hai hướng cùng lúc, và hướng thứ hai nặng hơn: **bất nhất ngay bên
+trong `analyzeLevel()`** — verdict/z của CHÍNH những điểm đó đi qua
+`combinedWestgardByPoint()` → `westgardByPoint()` → `pointTarget()`, tức đã
+theo snapshot, trong khi cờ `accepted` (cùng handler, cách 15 dòng) lại theo
+Mean/SD hiện hành. Hệ quả: sau khi ai đó sửa Mean/SD của mức, một điểm có
+thể hiện "Loại bỏ" mà vẫn `accepted:true` — biểu đồ Levey-Jennings và thống
+kê Mean/SD/CV thực của trang Nhập QC lệch khỏi chính bảng điểm bên cạnh.
+Sửa bằng cách chuẩn hoá từng điểm qua `pointTarget` rồi chạy luật trên thang
+z (`mean=0/sd=1`), đúng cách `westgardByPoint` đã làm; cửa sổ 11 điểm giữ
+nguyên.
+
+**2 lệch còn lại KHÔNG sửa, và lý do được chốt bằng test chứ không bằng ghi
+chú:** `primaryErrorRule([])` và `primaryErrorRule(['luật-lạ'])` trả `''`/
+chính chuỗi đó ở app cũ nhưng `null` ở app-v2. Đây là khác biệt HỢP ĐỒNG,
+không phải khác biệt lâm sàng — app-v2 chỉ gọi hàm này bên trong
+`errorTypeDetail()`, mà nhánh đó đã thoát sớm khi `errorType()` trả `'—'`.
+Test chốt đúng tính chất tiếp cận được (luật lạ không bao giờ bị dán nhãn
+SE/RE, không sinh mô tả) thay vì ép hai chữ ký giống nhau.
+
+**Một bài học về chính phép đo, không phải về code**: lượt đầu báo 6 lệch,
+4 trong số đó là do TEST truyền `across` không đối xứng — `activeWestgard()`
+app cũ nhận SET luật liên mức đã lọc sẵn (caller lọc theo trạng thái bật),
+còn app-v2 nhận một predicate, nên truyền `ACROSS` thô cho bên này và
+`ACROSS ∩ ON` cho bên kia là đang so hai CẤU HÌNH khác nhau chứ không so hai
+engine. `3-1s`/`2of3-2s` mặc định TẮT nên chênh lệch rơi đúng vào 2 luật đó.
+Ghi lại ngay trong test để lần sửa sau không lặp lại.
+
+Cả hai test đều được chứng minh CÓ khả năng bắt lỗi (không chỉ chạy xanh):
+hoàn tác tạm bản sửa trong `app-v2-dist` → `cross-app-westgard-sigma` FAIL
+đúng `acceptedPoints#30:snapshot` và nhóm 7 mới thêm của
+`accepted-points.test.mjs` FAIL đúng câu "phải đánh giá theo snapshot của
+từng điểm"; phục hồi thì cả hai xanh lại. Nhóm 7 tồn tại vì
+`cross-app-westgard-sigma.test.mjs` **sẽ bị xoá cùng lúc với app cũ** (ghi rõ
+ở đầu file: khi `src/`+`assets/` biến mất thì xoá file này, đừng cố "sửa cho
+chạy") — nhóm 7 giữ cho lệch đó vẫn bị canh sau khi app cũ không còn.
+
+Verify: `app-v2:typecheck` sạch, `app-v2:test` **70/70** (thêm
+`cross-app-westgard-sigma.test.mjs`; `accepted-points.test.mjs` từ 6 lên 7
+nhóm), `app-v2:build` sạch, `app-v2:css-parity` đạt, `app-v2:style-parity`
+18/18, `app-v2:ui-parity` **61 vấn đề — Y NGUYÊN trước và sau**, tức thay đổi
+engine không đổi gì ở lớp hiển thị đang được đo.
+
+**Tiêu chí cắt còn lại đúng 1 mục**: Giai đoạn D xong (`app-v2:ui-parity`
+xanh với baseline 0 cho mọi surface). Mục "đối chiếu Westgard/Sigma khớp
+100%" nay ĐẠT, và từ đây nó là gate sống chạy trong `app-v2:test` chứ không
+phải một lần đối chiếu rồi thôi.
+
 ## Tests
 
 No test framework. Each file under `tests/*.test.js` is a plain Node script

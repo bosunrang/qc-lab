@@ -123,19 +123,34 @@ export function westgard(
  * Khác app cũ 1 chi tiết đã ghi rõ: app cũ hỏi `reject.has(rule)` theo bảng
  * hành động từng luật, app-v2 dùng `level === 'rej'` của chính engine (mô
  * hình rút gọn: hành động loại-bỏ/cảnh-báo nằm trong `WG_RULE_REGISTRY`).
- * Cửa sổ 11 điểm giữ nguyên như bản cũ. */
+ * Cửa sổ 11 điểm giữ nguyên như bản cũ.
+ *
+ * MỖI ĐIỂM DÙNG TARGET RIÊNG của nó (`pointTarget`, ưu tiên snapshot
+ * `qc_mean`/`qc_sd` đã chốt lúc nhập) — KHÔNG phải Mean/SD hiện hành dùng
+ * chung. Bản đầu dùng Mean/SD chung, sai theo hai hướng: (1) khác app cũ,
+ * nơi `acceptedLotPoints()` gọi `pointTarget(p, level.mean, level.sd)`; (2)
+ * bất nhất ngay trong `analyzeLevel()` — verdict/z của cùng những điểm đó đi
+ * qua `combinedWestgardByPoint()` → `westgardByPoint()` → `pointTarget()`,
+ * tức ĐÃ theo snapshot. Hệ quả cũ: sau khi ai đó sửa Mean/SD của mức, một
+ * điểm có thể hiện "Loại bỏ" mà vẫn `accepted:true` (hoặc ngược lại), làm
+ * biểu đồ Levey-Jennings và thống kê Mean/SD/CV thực của trang Nhập QC lệch
+ * khỏi chính bảng điểm bên cạnh. Đo được bằng đối chiếu trực tiếp với engine
+ * app cũ (xem `tests/cross-app-westgard-sigma.test.mjs`). */
 export function acceptedPoints<T extends QcPointLike>(
   points: readonly T[], mean: unknown, sd: unknown, isOn: (rule: string) => boolean = () => true,
   actionOf?: (rule: string) => RuleAction,
 ): T[] {
   const out: T[] = [];
-  const window: T[] = [];
+  // Cửa sổ giữ điểm ĐÃ CHUẨN HOÁ sang z (cùng cách `westgardByPoint` làm),
+  // nên chạy luật trên thang z với mean=0/sd=1.
+  const window: QcPointLike[] = [];
   for (const point of points || []) {
-    const trial = [...window, point];
-    const { F } = westgard(trial, mean, sd, isOn, actionOf);
+    const target = pointTarget(point, mean, sd);
+    const normalized: QcPointLike = { val: target.z, trendTarget: target.key };
+    const { F } = westgard([...window, normalized], 0, 1, isOn, actionOf);
     if (F[F.length - 1].level === 'rej') continue;
     out.push(point);
-    window.push(point);
+    window.push(normalized);
     if (window.length > 11) window.shift();
   }
   return out;
