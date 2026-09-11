@@ -13,6 +13,31 @@ import { isoLocalDate } from '../domain/local-date';
 import { type Actor, type IpcResult, writeAudit, notifyChanged, requireWrite } from './shared';
 
 const VERDICT_RANK: Record<RuleVerdict, number> = { ok: 0, warn: 1, rej: 2 };
+
+/** Tập id điểm NẰM TRONG chuỗi được chấp nhận của một mức.
+ *
+ * `listTestSummaries` (trang Tổng quan) và `analyzeLevel` (trang Phân tích)
+ * phải hiểu "chuỗi chấp nhận" GIỐNG HỆT nhau — hai bản sao của cùng đoạn này
+ * là nguồn của lớp lỗi "hai màn hình nói hai chuyện".
+ *
+ * `acceptedPoints()` chỉ quét luật TỪNG MỨC (`within`), nên một điểm bị loại
+ * CHỈ bởi luật LIÊN MỨC (R4s, hoặc 2-2s/2of3-2s/3-1s ở phạm vi across) vẫn
+ * lọt vào chuỗi: object trả về tự mâu thuẫn (`verdict:'rej'` kèm
+ * `accepted:true`) và điểm đó vào cả biểu đồ Levey-Jennings lẫn thống kê
+ * Mean/SD/CV thực. App cũ có cùng lỗ hổng (`acceptedLotPoints()` cũng chỉ
+ * nhận tập luật `within`) — `rejectsAcross` ở đây là lệch golden master CÓ
+ * CHỦ ĐÍCH. */
+function acceptedIdsOf<T extends QcPointLike & { id: string }>(
+  points: readonly T[], mean: unknown, sd: unknown,
+  byPoint: ReadonlyMap<T, { crossRules: string[] }>,
+  active: { within: (rule: string) => boolean; actionOf: (rule: string) => RuleAction },
+): Set<string> {
+  const rejectsAcross = (point: T) => {
+    const flag = byPoint.get(point);
+    return !!flag && flag.crossRules.some((rule) => active.actionOf(rule) === 'reject');
+  };
+  return new Set(acceptedPoints(points, mean, sd, active.within, active.actionOf, rejectsAcross).map(p => p.id));
+}
 /** CUSUM vượt h là tín hiệu drift/shift cần theo dõi, KHÔNG phải luật
  * Westgard loại bỏ một điểm. Nhãn này đi tới bảng và luồng NCE như cảnh báo
  * sai số hệ thống; chuỗi accepted vẫn chỉ do Westgard quyết định. */
@@ -176,13 +201,7 @@ export function createWestgardHandlers(db: Db) {
             // nhận và đặt lại theo mốc NCE hiệu quả. Chỉ tính khi xét nghiệm
             // BẬT CUSUM — `acceptedPoints()` không rẻ, và đa số xét nghiệm
             // không bật.
-            const rejectsAcross = (point: (typeof points)[number]) => {
-              const flag = byPoint.get(point);
-              return !!flag && flag.crossRules.some((rule) => active.actionOf(rule) === 'reject');
-            };
-            const acceptedIds = new Set(
-              acceptedPoints(points, lv.mean, lv.sd, active.within, active.actionOf, rejectsAcross).map(r => r.id),
-            );
+            const acceptedIds = acceptedIdsOf(points, lv.mean, lv.sd, byPoint, active);
             const cs = cusumForLevel(t.test_id, lv.level, points, acceptedIds, lv.mean, lv.sd, t.cusum_k, t.cusum_h, 0);
             for (let i = 0; i < points.length; i++) if (cusumSignalAt(cs, i) && worstVerdict === 'ok') worstVerdict = 'warn';
             const signal = cusumSignalAt(cs, points.length - 1);
@@ -291,21 +310,10 @@ export function createWestgardHandlers(db: Db) {
     // acceptedPoints() trong domain). Trang Nhập QC dùng cờ này cho biểu đồ/
     // thống kê, đúng như app cũ, thay vì tự chạy lại luật ở renderer.
     //
-    // `acceptedPoints()` chỉ quét luật TỪNG MỨC (`active.within`), nên một
-    // điểm bị loại CHỈ bởi luật LIÊN MỨC (R4s, hoặc 2-2s/2of3-2s/3-1s ở phạm
-    // vi across) vẫn lọt vào chuỗi: object trả về tự mâu thuẫn
-    // (`verdict: 'rej'` kèm `accepted: true`) và điểm đó vào cả biểu đồ
-    // Levey-Jennings lẫn thống kê Mean/SD/CV thực. App cũ có cùng lỗ hổng
-    // (`acceptedLotPoints()` cũng chỉ nhận tập luật `within`) — sửa ở đây là
-    // lệch golden master CÓ CHỦ ĐÍCH.
-    const rejectsAcross = (point: (typeof rows)[number]) => {
-      const flag = byPoint.get(point);
-      return !!flag && flag.crossRules.some((rule) => active.actionOf(rule) === 'reject');
-    };
-    const acceptedIds = new Set(
-      (hasTarget ? acceptedPoints(rows, levelRow!.mean, levelRow!.sd, active.within, active.actionOf, rejectsAcross) : rows)
-        .map(r => r.id),
-    );
+    // Chi tiết vì sao cần `rejectsAcross`: xem `acceptedIdsOf()` ở đầu file.
+    const acceptedIds = hasTarget
+      ? acceptedIdsOf(rows, levelRow!.mean, levelRow!.sd, byPoint, active)
+      : new Set(rows.map(r => r.id));
     // MA(5) chỉ để quan sát xu hướng, không tham gia kết luận Westgard/CUSUM.
     // Phải tính SAU `acceptedIds`: CUSUM chạy trên chuỗi được chấp nhận.
     const cs = hasTarget && cusumOn
