@@ -5003,6 +5003,115 @@ Verify: `app-v2:typecheck` sạch, `app-v2:test` **72/72** (bộ đối chiếu 
 còn lại là dòng "Kỳ đang xem": app cũ in một con số TEa cho cả kỳ, app-v2 in
 "TEa theo mức QC" — hệ quả có chủ đích của chính bản sửa này).
 
+**Đối chiếu luật Westgard với ĐỊNH NGHĨA CHUẨN, không chỉ với app cũ — 4 lỗi
+nghiệp vụ, tất cả đều lệch golden master CÓ CHỦ ĐÍCH (2026-09-11).** Người
+dùng hỏi "nghiệp vụ đã đúng chưa" rồi yêu cầu kiểm chuyên sâu luật Westgard
+TRƯỚC khi sửa. Đây là câu hỏi khác hẳn với thứ bộ gate đang trả lời: 2428 phép
+đối chiếu chỉ chứng minh hai bản GIỐNG NHAU, nếu app cũ định nghĩa sai thì cả
+hai vẫn xanh. Đọc thẳng https://westgard.com/westgard-rules/ rồi chạy từng
+luật trên engine đã build: **11/13 luật đúng chuẩn, 2 luật sai ở CẢ HAI BẢN.**
+
+**(1) `2of3-2s` bỏ sót cửa sổ, và tự mâu thuẫn với chính nó.** Định nghĩa:
+"reject when 2 out of 3 control measurements exceed the same mean plus 2s or
+mean minus 2s control limit" — KHÔNG đòi điểm mới nhất phải là một trong hai
+điểm vượt. `westgard-engine.ts` đòi `zs[i] > 2` mới xét nên chuỗi
+`[+2,1; +2,2; 0]` không nổ, trong khi `[+2,1; 0; +2,2]` lại nổ. Đáng chú ý
+hơn: nhánh LIÊN MỨC (`westgardMultiByPoint`, `pos2.length >= 2`) của CẢ HAI
+bản đã viết đúng — cùng một luật, cùng một bộ z, nhưng phạm vi within bỏ sót
+còn across bắt được. Nay quét cả cửa sổ `[i-2..i]`; điểm CHỐT cửa sổ mang kết
+luận, các điểm vượt còn lại là bằng chứng — đúng quy ước `wgScanRuns()` dùng
+cho 2-2s/4-1s/10x…, nhờ đó `acceptedPoints()` (quét tăng dần, chỉ đọc điểm mới
+nhất) vẫn đúng.
+
+**(2) `7T` đang là 8 điểm.** Định nghĩa: "reject when **seven** control
+measurements trend in the same direction" = 7 phép đo, 6 bước. Engine đợi
+`i >= 7` với vòng lặp 7 bước, tức 8 điểm; registry còn tự ghi "(8 điểm QC)".
+Chuỗi 7 điểm tăng liên tục trả `ok`. Nay `i >= 6` + sửa mô tả.
+
+Cả hai giống hệt app cũ (`src/domain/core/qc-core.ts:184-195`) nên **không
+phải lỗi port** — app cũ sai từ đầu, và chính `westgard-engine.test.mjs` đang
+KHOÁ hành vi sai đó ("can 8 diem"). **`app-v2/tests/westgard-standard.test.mjs`
+(mới) là bộ gate đúng cho câu hỏi này**: 154 phép kiểm theo NGUỒN NGOÀI cho cả
+13 luật, gồm biên "exceeds" (đúng 2SD/3SD chưa tính), điểm đúng bằng Mean
+không thuộc phía nào, và R4s chỉ within-run. Nó SỐNG TIẾP sau khi cắt app cũ,
+khác `cross-app-westgard-sigma.test.mjs` (sẽ bị xoá cùng lúc). Mục 4b của file
+cross-app chốt đúng hai lệch; nhánh đơn mức tắt 2 luật đó (`isOnShared`) để 11
+luật còn lại vẫn canh từng ký tự — để nguyên `isOnAll` thì mọi chuỗi có xu
+hướng sẽ lệch và che mất một lệch thật khác nếu có.
+
+**(3) `accepted:true` cho điểm bị luật LIÊN MỨC loại.** `acceptedPoints()` chỉ
+quét được luật từng mức (nó nhận chuỗi điểm của MỘT mức), mà `analyzeLevel()`
+gọi nó với đúng `active.within`. R4s có `scope:'across'` nên `within('R4s')`
+luôn false — chuỗi chấp nhận không bao giờ có cơ hội thấy nó. Đo bằng SQLite
+thật: 2 mức cùng lần chạy, mức 1 +2,5SD / mức 2 −2,5SD → `verdict:'rej'`,
+`rules:['1-2s','R4s']`, nhưng `accepted:true`; điểm đó vào cả biểu đồ
+Levey-Jennings lẫn thống kê Mean/SD/CV thực. Biến thể dễ bỏ sót hơn: `2-2s`
+(scope `'both'`) nổ ở nhánh liên mức trong khi chuỗi một mức chỉ có 1 điểm.
+Sửa: `CombinedPointFlag` thêm `crossRules` (tách riêng phần luật đến từ đánh
+giá liên mức), `acceptedPoints()` thêm cổng `rejectedOutside` — điểm khớp bị
+loại khỏi chuỗi VÀ khỏi cửa sổ đánh giá các điểm sau.
+**GIỮ NGUYÊN tính chất cốt lõi**: một lần chạy bị loại không "làm bẩn" chuỗi
+của những lần chạy sau. Vì vậy **KHÔNG** chốt bất biến "rej ⇒ !accepted" cho
+mọi điểm — `verdict` tính trên chuỗi THÔ, chuỗi chấp nhận tính trên cửa sổ đã
+dọn; hai con số trên hai cơ sở khác nhau là thiết kế có chủ đích của
+`acceptedPoints()`. Mục 4 của `tests/accepted-across-rules.test.mjs` chốt đúng
+sự phân biệt đó để lần đọc sau không "sửa" nhầm.
+
+**(4) Backend tin kết luận cohort IQC do renderer gửi lên.** `cohortStatus`
+quyết định một mức có được dùng cho gợi ý thiết kế QC hay không (`SigmaPage`
+lọc `cohortStatus === 'eligible'`), nhưng `savePeriod()` chỉ `cleanText()`
+chuỗi đó rồi lưu và chỉ kiểm `cohortN` là số nguyên không âm — nghĩa là
+`window.qcApi.saveSigmaPeriod({ … cohortStatus:'eligible', cohortN:999 })` là
+qua được. App đóng gói Electron bật F12 nên đây không phải giả thuyết API từ
+xa. Hợp đồng mới: người dùng CHỌN lô (`sourceLot`); mọi con số mô tả nhóm
+(`cv`/`cohortN`/`sourceStart`/`sourceEnd`/`cohortStatus`) do main tự dựng lại
+từ `qc_points` qua `listCohorts()`. Khai lô không tồn tại thì từ chối hẳn
+(`cohort-not-found`) thay vì lưu một nhóm ảo; CV nhập tay thì xoá sạch mô tả
+nhóm — trước đây một bản ghi có thể vừa nói "CV nhập tay" vừa khoe
+`cohortStatus: eligible`. Đường dùng thật không đổi giá trị vì `SigmaPage` vốn
+gán đúng những trường đó từ chính cohort (mục 5 của
+`tests/sigma-cohort-trust.test.mjs` chốt bằng round-trip).
+
+**(5) Nhãn loại sai số và mô tả luật không cùng một luật.** `errorTypeDetail()`
+lấy `type` theo `errorType()` (ưu tiên SE) nhưng lấy `desc` theo priority nhỏ
+nhất trên TOÀN BỘ danh sách, nên `['1-3s','2-2s']` in "SE — Sai số hệ thống"
+kèm mô tả "1 điểm QC vượt ±3SD" (một luật RE). Nay `desc` chọn primary CHỈ
+trong số các luật cùng lớp sai số với `type`. Giữ nguyên chính sách "có luật
+SE thì type là SE" của app cũ (SE là phát hiện đáng xử lý hơn cho hiệu chuẩn)
+và giữ nguyên hợp đồng của `errorType()`/`primaryErrorRule()` — chỉ
+`errorTypeDetail()` đổi, nên đường ghi `error_type` vào hồ sơ NCE
+(`entry-handlers.ts`) không đổi.
+
+**Một lỗi TEST không liên quan, bắt được nhờ chạy lại bộ gate**:
+`cross-app-westgard-sigma.test.mjs` hard-code `TODAY = '2026-09-10'` cho phía
+app-v2 trong khi `SigmaCohortSelectionService.cutoff()` của app cũ đọc ngày hệ
+thống — bài test tự đỏ từ 11/09 mà không có gì trong code đổi. Nay lấy đúng
+ngày hệ thống TỪ CHÍNH app cũ (`cutoff("2099-12")`). **Bài học: một hằng số
+ngày trong test đối chiếu với code đọc đồng hồ thật là một quả bom hẹn giờ.**
+
+**2 mặc định lệch chuẩn CÓ CHỦ ĐÍCH, không sửa, ghi lại để biết**: Westgard
+xếp `6x` và `7T` là luật LOẠI BỎ, app để cả hai là CẢNH BÁO (`alert:true`,
+`6x` còn bật mặc định) — `fix` của 6x tự ghi "Có thể nâng thành loại bỏ theo
+SOP từng xét nghiệm", và từ 2026-09-06 action đã cấu hình được theo từng xét
+nghiệm.
+
+**3 mục còn mở của bản rà soát, đều là câu hỏi SẢN PHẨM chứ không phải lỗi
+port** (xem bảng trạng thái ở đầu
+`docs/validation/SIGMA-WESTGARD-AUDIT-2026-09-10.md`): cohort IQC không kiểm
+trạng thái in-control (30 điểm có 1 điểm +40 SD vẫn `eligible` — **không** nên
+tự động loại điểm Westgard-reject khỏi CV vì tạo selection bias, cần workflow
+review có truy vết); bảng gợi ý Sigma Rules chưa nhận số mức QC nên N/R lệch
+bảng Westgard Sigma Rules; và `u(Cref)` đang là SEM của bias quan sát thay vì
+độ không đảm bảo của giá trị gán EQA/CRM.
+
+Verify từng mục một, mỗi mục một commit riêng: `app-v2:typecheck` sạch,
+`app-v2:test` **75/75** (thêm `westgard-standard` 154 phép kiểm,
+`accepted-across-rules`, `sigma-cohort-trust`; cross-app 2428 → **2442** phép),
+`app-v2:build` sạch, `app-v2:css-parity` đạt, `app-v2:ui-parity` **79/79**
+(không surface nào đổi so với baseline), `app-v2:style-parity` 18/18. Cả 4 bản
+sửa đều được chứng minh test BẮT ĐƯỢC lỗi bằng cách hoàn tác tạm rồi xác nhận
+đỏ đúng assertion, sau đó phục hồi.
+
 **Tiêu chí cắt còn lại đúng 1 mục**: Giai đoạn D xong (`app-v2:ui-parity`
 xanh với baseline 0 cho mọi surface). Mục "đối chiếu Westgard/Sigma khớp
 100%" nay ĐẠT, và từ đây nó là gate sống chạy trong `app-v2:test` chứ không

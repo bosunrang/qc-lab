@@ -4,7 +4,7 @@
 **Mốc mã nguồn:** `a8ba010784615faa42f824173db6a22f4b6017cf` cộng các thay đổi Sigma/TEa chưa commit đang có trong working tree  
 **Phạm vi:** công thức Sigma, nguồn TEa, chọn CV/Bias, gợi ý thiết kế QC, Westgard đơn mức/liên mức, CUSUM, tính điểm được chấp nhận, tính nhất quán giữa Entry/Westgard và tính truy vết lịch sử.
 
-## Trạng thái từng phát hiện (cập nhật 10/09/2026, sau đợt sửa cùng ngày)
+## Trạng thái từng phát hiện (cập nhật 11/09/2026)
 
 Phần thân dưới đây giữ NGUYÊN VĂN bản rà soát để truy xuất. Bảng này nói
 mục nào đã xử lý, để lần đọc sau không sửa lại thứ đã sửa:
@@ -15,11 +15,13 @@ mục nào đã xử lý, để lần đọc sau không sửa lại thứ đã s
 | TEa cấp kỳ không giải lại theo Mean từng mức (CLIA tuyệt đối) | **ĐÃ SỬA** — `computeLevel()` xếp thứ tự snapshot theo mức → giải tại Mean của mức → `periodTea`; `app-v2/tests/sigma-level-tea.test.mjs` + mục 10 của `cross-app-westgard-sigma.test.mjs` |
 | Cổng truy vết EFLM thiếu (mọi `tea` gõ tay đều thành "TEa EFLM") | **ĐÃ SỬA** — port `hasEflmTrace` app cũ, đối chiếu 45/45 tổ hợp |
 | Nhãn tiêu chí CLIA in % đã quy đổi thay vì giới hạn tuyệt đối | **ĐÃ SỬA** — `teaCriterionText()` + suy `clia_rule` từ dữ liệu, đối chiếu 76/77 analyte |
-| Điểm bị loại CHỈ bởi luật liên mức vẫn `accepted:true` | **GIỐNG APP CŨ** — `acceptedLotPoints()` app cũ cũng chỉ nhận tập luật `within` (đã đối chiếu trong mục 8 của `cross-app-westgard-sigma.test.mjs`). Đây là câu hỏi SẢN PHẨM, không phải lỗi port: đổi đi là lệch golden master có chủ đích, cần quyết định riêng |
-| Luật `2of3-2s` và `7T` | **GIỐNG APP CŨ** — mục 1/2 của `cross-app-westgard-sigma.test.mjs` so registry + predicate của cả 13 luật và 29 chuỗi điểm (có tổ hợp `7T`/`10x`) đều khớp. Nếu sai thì sai từ app cũ, sửa là lệch golden master |
+| Điểm bị loại CHỈ bởi luật liên mức vẫn `accepted:true` | **ĐÃ SỬA 11/09** (lệch golden master có chủ đích) — `CombinedPointFlag` thêm `crossRules`, `acceptedPoints()` thêm cổng `rejectedOutside`; điểm bị luật liên mức loại nay ra khỏi cả chuỗi lẫn cửa sổ. GIỮ tính chất "lần chạy bị loại không làm bẩn chuỗi sau", nên `verdict` (chuỗi thô) và `accepted` (cửa sổ đã dọn) vẫn có thể khác nhau — `app-v2/tests/accepted-across-rules.test.mjs` mục 4 chốt đúng sự phân biệt đó |
+| Luật `2of3-2s` và `7T` | **ĐÃ SỬA 11/09** (lệch golden master có chủ đích) — đối chiếu trực tiếp https://westgard.com/westgard-rules/ xác nhận bản rà soát đúng: "2 out of 3" không đòi điểm mới nhất phải là một trong hai điểm vượt, và 7T là BẢY phép đo (6 bước) chứ không phải 7 bước/8 điểm. Cả hai sai giống hệt app cũ nên KHÔNG phải lỗi port. `app-v2/tests/westgard-standard.test.mjs` (mới) chốt 154 phép kiểm theo nguồn ngoài cho cả 13 luật và SỐNG TIẾP sau khi cắt app cũ; mục 4b của `cross-app-westgard-sigma.test.mjs` chốt đúng hai lệch, nhánh đơn mức tắt 2 luật đó để 11 luật còn lại vẫn canh từng ký tự |
 | Cohort IQC không kiểm trạng thái in-control | **CHƯA SỬA** — tầng cohort đã đối chiếu khớp app cũ (mục 11), nên đây cũng là câu hỏi sản phẩm chung cho hai bản |
 | Bảng gợi ý Sigma Rules chưa đúng N/R theo số mức QC | **CHƯA SỬA** |
 | Mô hình MU gán sai ý nghĩa `u(Cref)` | **CHƯA SỬA** — `uncertaintyBudget()` đã đối chiếu khớp app cũ (mục 9) |
+| Nhãn loại sai số có thể tự mâu thuẫn ([P2]) | **ĐÃ SỬA 11/09** (lệch golden master có chủ đích) — `errorTypeDetail()` chọn `desc` theo luật có priority nhỏ nhất CHỈ trong số các luật cùng lớp sai số với `type`. Giữ nguyên chính sách "có luật SE thì type là SE" và hợp đồng của `errorType()`/`primaryErrorRule()` |
+| Backend tin metadata cohort do renderer gửi lên ([P2]) | **ĐÃ SỬA 11/09** — `savePeriod()` tự dựng lại cohort từ `qc_points` qua `listCohorts()`; người dùng chỉ chọn `sourceLot`, còn `cv`/`cohortN`/`sourceStart`/`sourceEnd`/`cohortStatus` do main tính. Lô không tồn tại thì từ chối (`cohort-not-found`); CV nhập tay thì xoá sạch mô tả nhóm. `app-v2/tests/sigma-cohort-trust.test.mjs` |
 ## Kết luận điều hành
 
 **Chưa nên coi nghiệp vụ Sigma/Westgard của app-v2 là đã được thẩm định để dùng làm căn cứ vận hành độc lập.** Lõi có nhiều phần làm đúng và thận trọng, nhưng còn ba lỗi mức cao có thể đổi kết luận QC hoặc làm đẹp/sai số liệu Sigma:
