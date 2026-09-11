@@ -35,7 +35,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const { westgard, westgardMultiByPoint } = require('../../app-v2-dist/main/domain/westgard-engine.js');
-const { WG_RULE_BY_ID } = require('../../app-v2-dist/main/domain/westgard-rules.js');
+const { WG_RULE_BY_ID, errorType, errorTypeDetail } = require('../../app-v2-dist/main/domain/westgard-rules.js');
 
 let checks = 0;
 // Mean=0/SD=1 nên `val` chính là z — đọc kịch bản trực tiếp bằng số SD.
@@ -149,6 +149,45 @@ check('2of3-2s', [2.1, 0, 0, 2.2], false, 'hai điểm vượt cách nhau quá x
   assert.match(WG_RULE_BY_ID['7T'].desc, /7 điểm/, 'mô tả 7T phải nói 7 điểm — bản cũ ghi "(8 điểm QC)" đúng theo engine sai');
   assert.equal(WG_RULE_BY_ID['R4s'].scope, 'across', 'R4s phải là luật liên mức trong một lần chạy');
   assert.equal(WG_RULE_BY_ID['R4s'].run, null, 'R4s KHÔNG được nằm trong họ luật quét chuỗi (sẽ thành between-run)');
+}
+
+// ------------------------------ Nhãn loại sai số phải tự nhất quán
+// `type` và `desc` phải mô tả CÙNG một luật. App cũ chọn `desc` theo luật có
+// priority nhỏ nhất trên TOÀN BỘ danh sách, nên `['1-3s','2-2s']` in
+// "SE — Sai số hệ thống" kèm mô tả của 1-3s (một luật RE).
+{
+  const seRules = Object.values(WG_RULE_BY_ID).filter((r) => r.err === 'SE').map((r) => r.id);
+  const reRules = Object.values(WG_RULE_BY_ID).filter((r) => r.err === 'RE').map((r) => r.id);
+  const descOf = (id) => WG_RULE_BY_ID[id].desc;
+
+  // Mọi tổ hợp 1 luật SE + 1 luật RE: type là SE (chính sách của app cũ, giữ
+  // nguyên) và desc PHẢI là mô tả của chính luật SE đó.
+  for (const se of seRules) for (const re of reRules) {
+    for (const combo of [[se, re], [re, se]]) {
+      const d = errorTypeDetail(combo);
+      checks += 2;
+      assert.match(d.type, /^SE/, `${combo.join('+')}: có luật SE thì type là SE`);
+      assert.equal(d.desc, descOf(se), `${combo.join('+')}: mô tả phải là của chính luật SE, không phải luật RE`);
+    }
+  }
+  // Chỉ RE thì desc là của luật RE.
+  for (const re of reRules) {
+    const d = errorTypeDetail([re, '1-2s']);
+    checks += 2;
+    assert.match(d.type, /^RE/);
+    assert.equal(d.desc, descOf(re));
+  }
+  // Luật không phân loại (1-2s) không tự sinh nhãn.
+  checks += 2;
+  assert.deepEqual(errorTypeDetail(['1-2s']), { type: '—', desc: '' });
+  assert.equal(errorType(['1-2s']), '—');
+  // Bất biến chung: desc luôn thuộc về một luật CÙNG lớp với type.
+  for (const combo of [['1-3s', '2-2s'], ['R4s', '4-1s'], ['1-3s', 'R4s'], ['2-2s', '10x'], ['1-2s', '1-3s', '6x']]) {
+    const d = errorTypeDetail(combo);
+    const owner = combo.find((id) => WG_RULE_BY_ID[id].desc === d.desc);
+    checks++;
+    assert.equal(WG_RULE_BY_ID[owner].err, d.type.slice(0, 2), `${combo.join('+')}: type và desc phải cùng một lớp sai số`);
+  }
 }
 
 assert.ok(checks >= 60, `số phép kiểm quá ít (${checks})`);

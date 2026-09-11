@@ -68,14 +68,23 @@ export function primaryErrorRule(ruleIds: readonly string[]): string | null {
   return rows.slice().sort((a, b) => a.priority - b.priority)[0].id;
 }
 
-/** Loại sai số + mô tả luật CHÍNH — port `errorTypeDetailParts()` app cũ:
- * `type` theo `errorType()` (3 nhánh SE/RE/'—', luật không phân loại như
- * `1-2s` KHÔNG bị dán nhãn RE), `desc` lấy theo luật có `priority` NHỎ NHẤT
- * (`primaryErrorRule`), không phải luật đầu tiên trong mảng. */
+/** Loại sai số + mô tả luật CHÍNH. `type` theo `errorType()` (3 nhánh
+ * SE/RE/'—', luật không phân loại như `1-2s` KHÔNG bị dán nhãn RE).
+ *
+ * `desc` lấy theo luật có `priority` NHỎ NHẤT — nhưng CHỈ trong số các luật
+ * CÙNG loại sai số với `type`. App cũ (`errorTypeDetailParts()`) chọn primary
+ * trên TOÀN BỘ danh sách, nên hai nửa có thể mô tả hai luật khác nhau: với
+ * `['1-3s','2-2s']`, `errorType()` trả SE (vì 2-2s là SE) còn primary lại là
+ * 1-3s (priority 1) — một luật RE. Bảng điểm khi đó in
+ * "SE — Sai số hệ thống" kèm mô tả "1 điểm QC vượt ±3SD", tự mâu thuẫn.
+ * Đây là lệch golden master CÓ CHỦ ĐÍCH; `errorType()` và `primaryErrorRule()`
+ * giữ nguyên hợp đồng cũ nên mọi chỗ khác không đổi. */
 export function errorTypeDetail(ruleIds: readonly string[]): { type: string; desc: string } {
   const type = errorType(ruleIds);
   if (type === '—') return { type, desc: '' };
-  const primary = primaryErrorRule(ruleIds);
+  const wanted: 'SE' | 'RE' = type.startsWith('SE') ? 'SE' : 'RE';
+  const sameClass = ruleIds.filter((id) => WG_RULE_BY_ID[id]?.err === wanted);
+  const primary = primaryErrorRule(sameClass.length ? sameClass : ruleIds);
   return { type, desc: primary ? WG_RULE_DESCRIPTIONS[primary] || '' : '' };
 }
 
