@@ -237,6 +237,35 @@ export function createSigmaHandlers(db: Db) {
       if (level.cohortN != null && (!Number.isInteger(level.cohortN) || level.cohortN < 0)) return { ok: false, error: { code: 'invalid-cohort', message: 'Số điểm IQC của lô không hợp lệ.' } };
     }
     if (new Set(stored.map((level) => level.level)).size !== stored.length) return { ok: false, error: { code: 'duplicate-level', message: 'Mỗi mức QC chỉ được có một bộ số liệu trong một kỳ.' } };
+    // KHÔNG tin kết luận cohort do renderer gửi lên. `cohortStatus` quyết
+    // định một mức có được dùng cho gợi ý thiết kế QC hay không
+    // (`SigmaPage.tsx` lọc theo `cohortStatus === 'eligible'`), mà app
+    // Electron có F12 nên gọi thẳng
+    // `window.qcApi.saveSigmaPeriod({ ... cohortStatus: 'eligible' })` là
+    // qua được — trước đây main chỉ `cleanText()` chuỗi đó rồi lưu.
+    //
+    // Người dùng CHỌN lô (`sourceLot`); mọi con số mô tả nhóm đó thì main tự
+    // dựng lại từ chính `qc_points` qua `listCohorts()`. Đường dùng thật
+    // không đổi giá trị: `SigmaPage` vốn gán `cv`/`cohortN`/`sourceStart`/
+    // `sourceEnd`/`cohortStatus` từ đúng cohort đó.
+    const fromCohort = stored.filter((level) => level.cvSource === 'iqc-cohort');
+    if (fromCohort.length) {
+      const cohorts = listCohorts(testId, period, fromCohort.map((level) => level.level));
+      for (const level of fromCohort) {
+        const found = cohorts.find((c) => c.level === level.level && c.lot === level.sourceLot);
+        if (!found) return { ok: false, error: { code: 'cohort-not-found', message: `Không tìm thấy nhóm IQC của lô "${level.sourceLot || '—'}" ở mức ${level.level} trong kỳ ${period}.` } };
+        level.cv = found.cv;
+        level.cohortN = found.n;
+        level.sourceStart = found.start;
+        level.sourceEnd = found.end;
+        level.cohortStatus = found.status;
+      }
+    }
+    // CV nhập tay thì KHÔNG được mang theo mô tả nhóm IQC — nếu không, một
+    // bản ghi có thể vừa nói "CV nhập tay" vừa khoe `cohortStatus: eligible`.
+    for (const level of stored) if (level.cvSource !== 'iqc-cohort') {
+      level.cohortN = null; level.sourceLot = ''; level.sourceStart = ''; level.sourceEnd = ''; level.cohortStatus = '';
+    }
     const teaSource = cleanText(input.teaSource, 200).trim();
     const id = `${testId}:${period}`;
     const existing = db.prepare('SELECT id FROM sigma_data WHERE id=?').get(id);
