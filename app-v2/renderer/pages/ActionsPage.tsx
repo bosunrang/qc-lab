@@ -2,7 +2,8 @@
 // (nhận diện → kiểm soát → FMEA → checklist → nguyên nhân/hành động →
 // release → ảnh hưởng bệnh nhân → hiệu lực/rủi ro còn lại). JSX chỉ giữ
 // state trình bày; điều kiện khép vòng được xác thực lại ở main process.
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useManageStore } from '../store/manage-store';
 import { useNceStore } from '../store/nce-store';
 import { useWestgardStore } from '../store/westgard-store';
@@ -52,11 +53,13 @@ function parseDetail(json: string): NceDetail {
 type NcePrefill = { testId: string; level: number; pointId: string; lot: string; date: string; rule: string; errorType: 'SE' | 'RE' };
 
 export function ActionsPage() {
+  const location = useLocation();
   const { tests, loadTests } = useManageStore();
   const store = useNceStore();
   const { summaries, loadSummaries } = useWestgardStore();
   const [form, setForm] = useState<{ prefill: NcePrefill | null; record: NceRecord | null } | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const requestedRecordId = useRef((location.state as { recordId?: string } | null)?.recordId || '');
   const writable = canWrite(useAuthStore((s) => s.user)?.role);
 
   /** Hủy hồ sơ ngay từ bảng nhật ký — app cũ có nút này trên từng dòng. Hủy
@@ -88,6 +91,14 @@ export function ActionsPage() {
   const [showGuide, setShowGuide] = useState(false);
 
   useEffect(() => { loadTests(); store.load(); loadSummaries(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!requestedRecordId.current) return;
+    const record = store.records.find(item => item.id === requestedRecordId.current);
+    if (record) {
+      requestedRecordId.current = '';
+      setForm({ prefill: null, record });
+    }
+  }, [store.records]);
   useStoreInvalidation(['actions'], undefined, store.load);
   useStoreInvalidation(['qc_points', 'tests'], undefined, loadSummaries);
 

@@ -3,16 +3,18 @@
 // Phần TÍNH TOÁN nằm ở `view-models/dashboard-view-model.ts` (đọc ghi chú
 // đầu file đó: báo động theo ĐIỂM CUỐI, 1 dòng cho mỗi MỨC, % hoàn tất theo
 // XÉT NGHIỆM) — file này chỉ dựng JSX.
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useDashboardStore, type OverdueAction } from '../store/dashboard-store';
 import { useStoreInvalidation } from '../lib/useStoreInvalidation';
 import { useSettingsStore } from '../store/settings-store';
 import { PageHeader } from '../components/PageHeader';
 import {
-  buildDashboardViewModel, normalizeDashboardSearch, levelTargetOk,
+  buildDashboardViewModel, normalizeDashboardSearch, levelTargetOk, dashboardTestRank,
   type DashboardStatus, type DashboardTestItem, type DashboardAlertItem,
 } from '../view-models/dashboard-view-model';
+import { useAuthStore } from '../store/auth-store';
+import { isAdmin } from '../lib/permissions';
 
 // Kiểu read-model đã gắn sẵn hồ sơ NCE của store (`OverdueAction` = NceRecord
 // + `testName` đã join) — `ReturnType<typeof f>` trần sẽ suy generic về đúng
@@ -45,12 +47,6 @@ function num2(value: number): string {
   return value.toFixed(2);
 }
 
-/** `actionOverdue().label` của app cũ: số ngày trọn giữa hôm nay và hạn. */
-function overdueLabel(dueDate: string, today: string): string {
-  const days = Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${dueDate}T00:00:00Z`)) / 86400000);
-  return Number.isFinite(days) ? `Quá hạn ${days} ngày` : 'Quá hạn';
-}
-
 function WestgardTag({ status }: { status: DashboardStatus }) {
   if (status === 'rej') return <span className="tag rej">Loại bỏ</span>;
   if (status === 'warn') return <span className="tag warn">Cảnh báo</span>;
@@ -78,7 +74,7 @@ function alertMeta(item: DashboardAlertItem) {
   return <>{dateText(item.point.date)} · {pointValue(item.point.val, item.test.decimalPlaces)} {item.test.unit || ''} · {item.rules.join(', ') || '—'}</>;
 }
 
-function FollowupPanel({ model, today }: { model: Model; today: string }) {
+function FollowupPanel({ model }: { model: Model }) {
   const navigate = useNavigate();
   const urgent = model.urgent.slice(0, 5), watch = model.watch.slice(0, 4);
   const overdue = model.overdueActions.slice(0, 4), noTarget = model.noTarget.slice(0, 4);
@@ -91,13 +87,13 @@ function FollowupPanel({ model, today }: { model: Model; today: string }) {
         <ShiftItem key={`u${item.key}`} tone="rej"
           title={<>{item.test.testName} · M{item.level.level}</>}
           meta={alertMeta(item)}
-          action={<button className="btn ghost sm" onClick={() => navigate('/entry', { state: { testId: item.test.testId } })}>Xem</button>} />
+          action={<button className="btn ghost sm" onClick={() => navigate('/entry', { state: { testId: item.test.testId, level: item.level.level } })}>Xem</button>} />
       ))}
       {overdue.map((record) => (
         <ShiftItem key={`o${record.id}`} tone="rej"
           title={<>{record.nce_id || 'Hồ sơ khắc phục'} · {record.testName || record.rule || 'Sự cố'}</>}
-          meta={<>{overdueLabel(record.due_date, today)} · hạn {dateText(record.due_date)} · phụ trách —</>}
-          action={<button className="btn ghost sm" onClick={() => navigate('/actions')}>Tiếp tục hồ sơ</button>} />
+          meta={<>{record.overdueLabel} · hạn {dateText(record.due_date)} · phụ trách {record.owner || '—'}</>}
+          action={<button className="btn ghost sm" onClick={() => navigate('/actions', { state: { recordId: record.id } })}>Tiếp tục hồ sơ</button>} />
       ))}
       {noTarget.map((item) => (
         <ShiftItem key={`m${item.key}`} tone="warn"
@@ -109,7 +105,7 @@ function FollowupPanel({ model, today }: { model: Model; today: string }) {
         <ShiftItem key={`w${item.key}`} tone="warn"
           title={<>{item.test.testName} · M{item.level.level}</>}
           meta={alertMeta(item)}
-          action={<button className="btn ghost sm" onClick={() => navigate('/entry', { state: { testId: item.test.testId } })}>Xem</button>} />
+          action={<button className="btn ghost sm" onClick={() => navigate('/entry', { state: { testId: item.test.testId, level: item.level.level } })}>Xem</button>} />
       ))}
     </div>
   );
@@ -151,21 +147,21 @@ function TestRow({ test }: { test: DashboardTestItem }) {
       <td className="num"><b>{test.totalPoints}</b></td>
       <td><WestgardTag status={test.status} /></td>
       <td><span className="dash-latest">{test.latest ? <>{dateText(test.latest.date)} · M{test.latest.level} · {pointValue(test.latest.val, test.decimalPlaces)}</> : 'Chưa có điểm'}</span></td>
-      <td><button className="btn ghost sm" onClick={() => navigate('/entry', { state: { testId: test.testId } })}>Xem QC</button></td>
+      <td><button className="btn ghost sm" onClick={() => navigate('/entry', { state: { testId: test.testId, level: test.levels[0]?.level } })}>Xem QC</button></td>
     </tr>
   );
 }
 
 function TestsPanel({ model }: { model: Model }) {
-  const [query, setQuery] = useState('');
-  const [status, setStatus] = useState<'all' | 'missing' | DashboardStatus>('all');
+  const { query, status, setQuery, setStatus } = useDashboardStore();
+  const admin = isAdmin(useAuthStore((state) => state.user)?.role);
   const visible = useMemo(() => {
     const normalized = normalizeDashboardSearch(query);
     return model.tests.filter(test => (status === 'all' || (status === 'missing' ? test.missingToday : test.status === status)) && (!normalized || test.search.includes(normalized)))
-      .sort((a, b) => (b.status === 'rej' ? 2 : b.status === 'warn' ? 1 : 0) - (a.status === 'rej' ? 2 : a.status === 'warn' ? 1 : 0) || a.testName.localeCompare(b.testName, 'vi'));
+      .sort((a, b) => dashboardTestRank(a) - dashboardTestRank(b) || a.testName.localeCompare(b.testName, 'vi'));
   }, [model.tests, query, status]);
   if (!model.tests.length) {
-    return <div className="panel"><div className="empty"><div className="empty-title">Chưa có xét nghiệm đang vận hành</div><div>Cần đưa xét nghiệm vào Panel QC, ghép Nhóm lô QC và gán Mean/SD trước khi theo dõi.</div><div className="empty-actions"><Link className="btn teal" to="/manage">Cấu hình Mean/SD</Link></div></div></div>;
+    return <div className="panel"><div className="empty-state analysis-empty-state"><b>Chưa có xét nghiệm đang vận hành</b><span>Cần đưa xét nghiệm vào Panel QC, ghép Nhóm lô QC và gán Mean/SD trước khi theo dõi.</span>{admin && <Link className="btn teal" to="/manage" state={{ tab: 'targets' }}>Cấu hình Mean/SD</Link>}</div></div>;
   }
   return <div className="panel"><div className="dash-test-toolbar"><h2 className="panel-title">Danh sách xét nghiệm</h2></div><div className="dash-test-filterbar">
     <div className="dash-test-tabs">{STATUS_TABS.map(([key, label]) => { const count = key === 'all' ? model.tests.length : model.tests.filter(test => key === 'missing' ? test.missingToday : test.status === key).length; return <button type="button" key={key} className={status === key ? 'on' : ''} onClick={() => setStatus(key)}>{label}<b>{count}</b></button>; })}</div>
@@ -189,5 +185,5 @@ export function DashboardPage() {
   const safePercent = Math.max(0, Math.min(100, Number.isFinite(model.kpi.completionPercent) ? model.kpi.completionPercent : 0));
   return <><PageHeader title="Tổng quan" subtitle={subtitle} /><div className="dash-hero"><div className="dash-status"><div className="eyebrow">Trạng thái trực ca · {dateText(today)}</div><h2>{model.mood}</h2><p>{model.moodText}</p><div className="dash-progress"><span style={{ width: `${safePercent}%` }} /></div><div className="hint flow-item">{model.kpi.completeTests}/{model.tests.length || 0} xét nghiệm đã đủ QC hôm nay · {safePercent}% hoàn tất</div></div><div className="dash-kpis">{[
     ['Xét nghiệm', model.tests.length, ''], ['Điểm QC', model.kpi.totalPoints, ''], ['Vi phạm', model.kpi.rejected, 'danger'], ['QC hôm nay', model.kpi.todayPoints, 'teal'],
-  ].map(([label, value, tone]) => <div className="dash-kpi" key={String(label)}><div className="k">{label}</div><div className={`v ${tone}`}>{value}</div></div>)}</div></div><div className="dash-main"><div className="panel"><h2 className="panel-title">Cần xử lý / Theo dõi</h2><FollowupPanel model={model} today={today} /></div><div className="panel"><h2 className="panel-title">Lô &amp; hạn dùng</h2><div className="dash-list"><ExpiringLots model={model} /></div></div></div><TestsPanel model={model} /></>;
+  ].map(([label, value, tone]) => <div className="dash-kpi" key={String(label)}><div className="k">{label}</div><div className={`v ${tone}`}>{value}</div></div>)}</div></div><div className="dash-main"><div className="panel"><h2 className="panel-title">Cần xử lý / Theo dõi</h2><FollowupPanel model={model} /></div><div className="panel"><h2 className="panel-title">Lô &amp; hạn dùng</h2><div className="dash-list"><ExpiringLots model={model} /></div></div></div><TestsPanel model={model} /></>;
 }

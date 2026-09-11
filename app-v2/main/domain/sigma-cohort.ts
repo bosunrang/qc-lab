@@ -2,15 +2,20 @@
 // mức/cùng lô; không giới hạn theo tháng vì vòng đời lô có thể đi qua nhiều
 // kỳ, nhưng một nhóm phải còn dữ liệu trong chính kỳ đang đánh giá.
 export interface SigmaCohortPoint {
+  id?: string;
   level: number; date: string; lot: string; val: number; voided?: number;
   qc_mean?: number | null; qc_sd?: number | null;
 }
 
-export type SigmaCohortStatus = 'insufficient' | 'provisional' | 'eligible' | 'unstable';
+export type SigmaCohortStatus = 'insufficient' | 'provisional' | 'eligible' | 'unstable' | 'out-of-control';
 export interface SigmaCohort {
   level: number; lot: string; n: number; cv: number | null; start: string; end: string;
   targetMean: number | null; targetSd: number | null; issues: string[];
-  excluded: { voided: number; invalidValue: number }; status: SigmaCohortStatus;
+  excluded: { voided: number; invalidValue: number };
+  /** Điểm vượt ±3SD trong nhóm, và trong đó bao nhiêu điểm CHƯA có hồ sơ
+   * khắc phục đã duyệt + kết luận hiệu quả. Không điểm nào bị loại khỏi CV. */
+  outOfControl: { rejected: number; unresolved: number };
+  status: SigmaCohortStatus;
 }
 
 /** `today` là THAM SỐ BẮT BUỘC, không có mặc định: mốc "hôm nay" phải theo
@@ -38,7 +43,17 @@ function isCalendarDate(text: string): boolean {
   return d.getUTCFullYear() === Number(m[1]) && d.getUTCMonth() === Number(m[2]) - 1 && d.getUTCDate() === Number(m[3]);
 }
 
-export function cohortStatus(n: number, issues: string[]): SigmaCohortStatus {
+/** ISO/TS 20914 lấy u(Rw) từ dữ liệu IQC "đại diện cho hoạt động thường quy
+ * ĐÃ ĐƯỢC thẩm định sau khi quản lý QC" — tức dữ liệu trong tầm kiểm soát,
+ * mọi lần mất kiểm soát đã được điều tra và xử lý. Một nhóm 30 điểm có 1 điểm
+ * +40 SD chưa ai đụng tới KHÔNG thoả điều kiện đó, nên không được `eligible`.
+ *
+ * CỐ Ý KHÔNG tự loại điểm mất kiểm soát ra khỏi CV: loại theo kết quả là
+ * selection bias, CV sẽ đẹp giả và MU/Sigma lạc quan hơn thực tế. Điểm vẫn
+ * nằm trong CV; thứ bị chặn là việc dùng nhóm đó để ĐỀ XUẤT thiết kế QC, cho
+ * tới khi có hồ sơ khắc phục đã duyệt và kết luận hiệu quả. */
+export function cohortStatus(n: number, issues: string[], unresolvedOutOfControl = 0): SigmaCohortStatus {
+  if (unresolvedOutOfControl > 0) return 'out-of-control';
   if (issues.length) return 'unstable';
   if (n < 20) return 'insufficient';
   if (n < 30) return 'provisional';
@@ -62,7 +77,11 @@ function uniqueFinite(points: SigmaCohortPoint[], key: 'qc_mean' | 'qc_sd', posi
   return values;
 }
 
-export function buildSigmaCohorts(points: SigmaCohortPoint[], period: string, levels: number[], today: string): SigmaCohort[] {
+/** `resolvedPointIds` = id các điểm QC đã có hồ sơ NCE ĐƯỢC DUYỆT và kết luận
+ * HIỆU QUẢ (`approval_status='approved'` + `effectiveness_status='effective'`,
+ * hồ sơ chưa bị huỷ). Truyền từ handler vì file này cố ý không import gì —
+ * xem ghi chú của `periodCutoff()`. */
+export function buildSigmaCohorts(points: SigmaCohortPoint[], period: string, levels: number[], today: string, resolvedPointIds?: ReadonlySet<string>): SigmaCohort[] {
   const cutoff = periodCutoff(period, today);
   const start = `${period}-01`;
   if (!cutoff) return [];
@@ -93,19 +112,36 @@ export function buildSigmaCohorts(points: SigmaCohortPoint[], period: string, le
     const values = valid.map((point) => Number(point.val));
     const mean = values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
     const sd = values.length > 1 ? Math.sqrt(values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (values.length - 1)) : 0;
+    // Mất kiểm soát dạng THÔ: |z| ≥ 3 theo chính snapshot Mean/SD của điểm
+    // (tiêu chí 1-3s). CỐ Ý không chạy toàn bộ multirule ở đây — file này
+    // không import engine Westgard để test oracle nạp thẳng `.ts` được, và
+    // cổng này chỉ nhằm chặn nhóm có điểm lệch thô chưa xử lý. Một nhóm qua
+    // được cổng VẪN cần người phụ trách rà soát biểu đồ trước khi dùng.
+    const outOfControl = { rejected: 0, unresolved: 0 };
+    for (const point of valid) {
+      const mean = point.qc_mean, sd = point.qc_sd;
+      if (mean == null || sd == null || String(mean).trim() === '' || String(sd).trim() === '') continue;
+      const m = Number(mean), s = Number(sd);
+      if (!Number.isFinite(m) || !Number.isFinite(s) || s <= 0) continue;
+      if (Math.abs((Number(point.val) - m) / s) < 3) continue;
+      outOfControl.rejected++;
+      const id = String(point.id || '');
+      if (!id || !resolvedPointIds?.has(id)) outOfControl.unresolved++;
+    }
     const targetMeans = uniqueFinite(valid, 'qc_mean');
     const targetSds = uniqueFinite(valid, 'qc_sd', true);
     const issues: string[] = [];
     if (!lot) issues.push('Thiếu mã lô QC');
     if (targetMeans.length > 1) issues.push('Mean mục tiêu thay đổi');
     if (targetSds.length > 1) issues.push('SD mục tiêu thay đổi');
+    if (outOfControl.unresolved > 0) issues.push(`${outOfControl.unresolved} điểm vượt ±3SD chưa có hồ sơ khắc phục hiệu quả`);
     out.push({
       level: Number(levelText), lot, n: values.length,
       cv: mean ? sd / Math.abs(mean) * 100 : null,
       start: valid[0]?.date || '', end: valid[valid.length - 1]?.date || '',
       targetMean: targetMeans.length === 1 ? targetMeans[0] : null,
       targetSd: targetSds.length === 1 ? targetSds[0] : null,
-      issues, excluded, status: cohortStatus(values.length, issues),
+      issues, excluded, outOfControl, status: cohortStatus(values.length, issues, outOfControl.unresolved),
     });
   }
   return out.sort((a, b) => a.level - b.level || a.start.localeCompare(b.start) || a.lot.localeCompare(b.lot, 'vi'));

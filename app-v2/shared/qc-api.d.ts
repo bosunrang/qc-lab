@@ -104,7 +104,16 @@ export interface TeaRef {
   clia_rule?: 'percent' | 'absolute' | 'greater-of' | ''; clia_absolute?: number | null; clia_absolute_unit?: string;
 }
 
-export interface RuleScopeItem { id: string; scope: 'within' | 'across' | 'both'; scopeMin: number; desc: string }
+export interface RuleScopeItem {
+  id: string; scope: 'within' | 'across' | 'both'; scopeMin: number; desc: string;
+  /** Giá trị mà ô "Phạm vi SOP khuyến nghị" thực sự rơi về, đã tính theo số
+   * mức ĐANG VẬN HÀNH của chính xét nghiệm này (main tự đếm). */
+  defaultScope: 'within' | 'across' | 'both';
+  /** Giá trị mà ô "Theo cấu hình chung" thực sự rơi về. */
+  defaultAction: 'inactive' | 'alert' | 'reject';
+  /** Hành động HIỆU LỰC sau khi tính ghi đè riêng của xét nghiệm. */
+  action: 'inactive' | 'alert' | 'reject';
+}
 
 export interface TestLevel {
   id: string;
@@ -272,23 +281,38 @@ export interface ArchivedBlock {
 
 export interface SigmaMetricResult { tea: number; bias: number; cv: number; sigma: number; dpmo: number; yieldPercent: number }
 export interface UncertaintyBudgetResult {
-  k: number; uRw: number; uBias: number | null; uCal: number | null; bias: number | null; biasRefU: number | null;
+  k: number; uRw: number; uBias: number | null; uCal: number | null; bias: number | null;
+  /** Độ không đảm bảo của GIÁ TRỊ GÁN EQA/CRM (%) — do nhà cung cấp công bố, không suy từ chuỗi bias quan sát. */
+  uCref: number | null;
   includeBias: boolean; uc: number; U: number; shares: Record<string, number | null>; complete: boolean; missing: string[];
   target: number | null; absoluteUc: number | null; absoluteU: number | null;
   tea: number | null; teaRatio: number | null; withinTea: boolean | null;
 }
 export interface SigmaEqaRound { lab: number | null; target: number | null; bias: number }
 export interface SigmaLevelResult {
-  level: number; /** TEa% đã chụp tại đúng mức QC; null chỉ với kỳ lịch sử chưa có snapshot. */ tea: number | null; /** Mean mục tiêu cùng lúc chụp kỳ, để quy đổi U% ra đơn vị xét nghiệm. */ targetMean: number | null; cv: number | null; biasEqa: number | null; eqaRounds: SigmaEqaRound[]; mixedSigns: boolean; uCal: number | null;
+  level: number; /** TEa% đã chụp tại đúng mức QC; null chỉ với kỳ lịch sử chưa có snapshot. */ tea: number | null; /** Mean mục tiêu cùng lúc chụp kỳ, để quy đổi U% ra đơn vị xét nghiệm. */ targetMean: number | null; cv: number | null; biasEqa: number | null; eqaRounds: SigmaEqaRound[]; mixedSigns: boolean;
+  /** Sai số chuẩn của chính ước lượng bias (SD giữa các vòng / căn n) — CHỈ tham khảo, KHÔNG phải u(Cref). */ biasSem: number | null;
+  uCref: number | null; uCal: number | null;
   cvSource: 'manual' | 'iqc-cohort'; cohortN: number | null; sourceLot: string; sourceStart: string; sourceEnd: string; cohortStatus: string;
   sigma: SigmaMetricResult | null; mu: UncertaintyBudgetResult | null;
-  qualityDesign: { capable: boolean; rules: string[]; n: number; r: number; risk: string; plan: string } | null;
+  /** Goi y thiet ke QC theo bang Westgard Sigma Rules. `levels` la BANG duoc
+   * ap (Westgard cong bo hai bang khac nhau cho 2 muc va 3 muc QC);
+   * `levelCount` la so muc QC that cua xet nghiem. */
+  qualityDesign: {
+    capable: boolean; tier: string; levels: 2 | 3; levelCount: number;
+    rules: string[]; n: number; r: number;
+    alternatives: { n: number; r: number; note?: string }[];
+    risk: string; plan: string;
+  } | null;
 }
 export interface SigmaPeriodView { id: string; testId: string; period: string; tea: number | null; teaSource: string; levels: SigmaLevelResult[] }
 export interface SigmaCohortView {
   level: number; lot: string; n: number; cv: number | null; start: string; end: string;
   targetMean: number | null; targetSd: number | null; issues: string[];
-  excluded: { voided: number; invalidValue: number }; status: 'insufficient' | 'provisional' | 'eligible' | 'unstable';
+  excluded: { voided: number; invalidValue: number };
+  /** Diem vuot +/-3SD trong nhom, va bao nhieu trong so do CHUA co ho so khac phuc da duyet + ket luan hieu qua. Khong diem nao bi loai khoi CV. */
+  outOfControl: { rejected: number; unresolved: number };
+  status: 'insufficient' | 'provisional' | 'eligible' | 'unstable' | 'out-of-control';
 }
 
 export interface NceRecord {
@@ -353,6 +377,14 @@ export interface LabProfile {
   id: number; name: string; dept: string; address: string;
   brand_title: string; brand_sub: string; logo_text: string; logo_data: string;
 }
+export interface StorageInfo {
+  dbFileBytes: number;
+  path: string;
+  engine: 'SQLite';
+  sqliteVersion: string;
+  schemaVersion: number;
+  storageMode: 'file' | 'memory' | 'browser-preview';
+}
 export interface FirebaseSettings {
   labCode: string; email: string; config: string; connected: boolean; status: string; dataPath: string;
 }
@@ -393,7 +425,7 @@ export interface QcApi {
   listTestLevels(testId: string): Promise<TestLevel[]>;
   saveTestLevel(input: { testId: string; data: TestLevelDraft }): Promise<IpcResult<TestLevel>>;
   listActivity(limit?: number): Promise<ActivityEntry[]>;
-  listRuleScopes(testId: string, levelCount: number): Promise<RuleScopeItem[]>;
+  listRuleScopes(testId: string): Promise<RuleScopeItem[]>;
   saveRuleScope(testId: string, ruleId: string, scope: 'within' | 'across' | 'both' | ''): Promise<IpcResult<{ ruleId: string; scope: string }>>;
   listLots(): Promise<QcLot[]>;
   saveLot(input: { id?: string; data: QcLotDraft }): Promise<IpcResult<QcLot>>;
@@ -475,11 +507,14 @@ export interface QcApi {
   resetRuleSettings(): Promise<IpcResult<RuleSetting[]>>;
   listArchivedBlocks(testId: string, groupId: string): Promise<ArchivedBlock[]>;
   listArchivedGroupTests(groupId: string): Promise<{ id: string; label: string }[]>;
+  /** Chuỗi lô cũ của từng mức đang vận hành — công tắc "Xem lô cũ" trên trang
+   * Phân tích Westgard. Cùng hình dạng `ArchivedBlock` với tab nhóm lô đã dừng. */
+  listPreviousLotBlocks(testId: string): Promise<ArchivedBlock[]>;
   listSigmaPeriods(testId: string): Promise<SigmaPeriodView[]>;
   listSigmaCohorts(testId: string, period: string, levels: number[]): Promise<SigmaCohortView[]>;
   setSigmaTracking(input: { testId: string; tracked: boolean }): Promise<IpcResult<{ testId: string; tracked: boolean }>>;
   saveSigmaTeaConfig(input: { testId: string; source: string; tea?: number; eflmAnalyte?: string; eflmAps?: string; eflmLookupDate?: string; eflmRef?: string }): Promise<IpcResult<Test>>;
-  saveSigmaPeriod(input: { testId: string; period: string; tea?: number; teaSource?: string; levels: { level: number; /** Snapshot TEa% riêng của mức QC, cần thiết cho tiêu chí CLIA tuyệt đối. */ tea?: number; /** Mean mục tiêu chụp cùng kỳ, dùng đổi U% sang đơn vị. */ targetMean?: number; cv?: number; biasEqa?: number; eqaRounds?: Array<{ lab: number | null; target: number | null; bias?: number }>; uCal?: number; muBiasMode?: 'include' | 'exclude'; cvSource?: 'manual' | 'iqc-cohort'; cohortN?: number; sourceLot?: string; sourceStart?: string; sourceEnd?: string; cohortStatus?: string }[]; createOnly?: boolean }): Promise<IpcResult<SigmaPeriodView>>;
+  saveSigmaPeriod(input: { testId: string; period: string; tea?: number; teaSource?: string; levels: { level: number; /** Snapshot TEa% riêng của mức QC, cần thiết cho tiêu chí CLIA tuyệt đối. */ tea?: number; /** Mean mục tiêu chụp cùng kỳ, dùng đổi U% sang đơn vị. */ targetMean?: number; cv?: number; biasEqa?: number; eqaRounds?: Array<{ lab: number | null; target: number | null; bias?: number }>; uCref?: number; uCal?: number; muBiasMode?: 'include' | 'exclude'; cvSource?: 'manual' | 'iqc-cohort'; cohortN?: number; sourceLot?: string; sourceStart?: string; sourceEnd?: string; cohortStatus?: string }[]; createOnly?: boolean }): Promise<IpcResult<SigmaPeriodView>>;
   renameSigmaPeriod(input: { id: string; period: string }): Promise<IpcResult<SigmaPeriodView>>;
   removeSigmaPeriod(input: { data: { id: string } }): Promise<IpcResult<{ id: string }>>;
   listNceRecords(): Promise<NceRecord[]>;
@@ -506,7 +541,7 @@ export interface QcApi {
   removeReagentQuickValue(input: { type: 'operator' | 'sampleType'; index: number }): Promise<IpcResult<{ items: string[] }>>;
   getLabProfile(): Promise<LabProfile>;
   saveLabProfile(input: { data: { name?: string; dept?: string; address?: string; brandTitle?: string; brandSub?: string; logoText?: string; logoData?: string; clearLogo?: boolean } }): Promise<IpcResult<LabProfile>>;
-  getStorageInfo(): Promise<{ dbFileBytes: number; path: string }>;
+  getStorageInfo(): Promise<StorageInfo>;
   getFirebaseSettings(): Promise<FirebaseSettings>;
   connectFirebase(input: { data: { labCode?: string; email?: string; password?: string; config?: string } }): Promise<IpcResult<FirebaseConnectResult>>;
   syncFirebase(input: { data: { direction: 'push' | 'pull' } }): Promise<IpcResult<FirebaseSyncResult>>;

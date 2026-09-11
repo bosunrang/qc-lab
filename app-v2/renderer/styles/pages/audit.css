@@ -80,42 +80,6 @@
   color:#41545f; line-height:1.5; word-break:break-word; white-space:normal; text-align:center;
 }
 
-@media(max-width:760px){
-.audit-log-head{
-  align-items:stretch; flex-direction:column; padding:10px 12px;
-}
-.audit-log-head > input[type="search"]{
-  width:100%;
-}
-.audit-filterbar{
-  margin:var(--panel-content-gap) 12px 10px;
-}
-.audit-filterbar > div{
-  flex:1 1 calc(50% - 5px); min-width:130px;
-}
-.audit-filterbar .audit-filter-summary{
-  flex-basis:100%; margin-left:0; text-align:right;
-}
-.audit-pagination{
-  align-items:stretch; flex-direction:column; margin:12px;
-}
-.audit-pagination > div{
-  justify-content:space-between;
-}
-.audit-detail{
-  white-space:normal; max-width:240px;
-}
-.audit-table-wrap{
-  margin-right:12px; margin-left:12px;
-}
-.audit-table-wrap .audit-table{
-  width:max-content; max-width:none; min-width:100%; table-layout:auto;
-}
-.audit-table th, .audit-table td{
-  width:auto !important; white-space:nowrap;
-}
-}
-
 /* Bù class app cũ CÓ CSS mà app-v2 để trống (2026-09-03, xem ghi chú cùng
    loại ở các file khác). Giá trị copy nguyên từ `assets/*.css`. */
 /* app-v2 mới port 2/9 rule `.audit-filterbar` của app cũ — thiếu chính phần
@@ -126,6 +90,5 @@
 .audit-filterbar input,
 .audit-filterbar select{min-height:36px;height:36px;}
 .audit-filterbar > .audit-filter-summary{align-self:flex-end;min-width:0;margin-left:auto;color:var(--muted);font-size:var(--type-meta);font-weight:750;line-height:1.2;text-align:right;}
-@media(max-width:760px){.audit-filterbar{margin:var(--panel-content-gap) 12px 10px;}}
 .audit-filterbar .audit-date{width:170px;height:36px;}
 .audit-filterbar .audit-date .date-text{max-width:none;min-width:0;height:34px;flex:1;}

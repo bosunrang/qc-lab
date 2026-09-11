@@ -22,7 +22,7 @@
 //    `dashboardKpis()`: `completeTests = testCount - missingToday`,
 //    `completionPercent = completeTests/testCount`. Bản trước chia theo tổng
 //    số MỨC nên 1 xét nghiệm 2 mức mới nhập 1 mức ra 50% thay vì 0%.
-import type { NceRecord, QcLot, TestSummary } from '../../shared/qc-api';
+import type { NceDetail, NceRecord, QcLot, QcPanel, Test, TestSummary } from '../../shared/qc-api';
 
 const RANK = { ok: 0, warn: 1, rej: 2 } as const;
 
@@ -52,8 +52,54 @@ export interface DashboardMissingTargetItem { key: string; test: DashboardTestIt
 
 export interface DashboardExpiringLot { key: string; lot: string; level: number; days: number; count: number }
 
+export interface DashboardOverdueInfo { overdue: boolean; days: number; label: string; owner: string }
+
 export function normalizeDashboardSearch(value: unknown): string {
   return String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().trim();
+}
+
+/** Port `operationalTests()` app cũ cho riêng Tổng quan. `listTestSummaries`
+ * còn được Westgard/Entry dùng nên cố ý trả cả xét nghiệm chưa vận hành;
+ * Dashboard phải áp đủ 3 cổng: xét nghiệm active, nằm trong Panel active và
+ * có ít nhất một mức thuộc nhóm lô đang vận hành. Điều kiện cuối đã được
+ * `listTestSummaries()` thể hiện bằng `levels.length > 0`. */
+export function operationalDashboardSummaries(summaries: TestSummary[], tests: Test[], panels: QcPanel[]): TestSummary[] {
+  const activeTests = new Set(tests.filter(test => test.active !== 0).map(test => test.id));
+  const order = new Map<string, number>();
+  for (const panel of panels) {
+    if (panel.active === 0) continue;
+    for (const testId of panel.testIds) if (!order.has(testId)) order.set(testId, order.size);
+  }
+  return summaries
+    .filter(summary => activeTests.has(summary.testId) && order.has(summary.testId) && summary.levels.length > 0)
+    .sort((a, b) => order.get(a.testId)! - order.get(b.testId)!);
+}
+
+/** Port `actionOverdue()` app cũ sang cấu trúc NCE của app-v2. Một hồ sơ
+ * nháp chưa có người phụ trách không được tính quá hạn; hồ sơ bị trả lại vẫn
+ * quá hạn cho tới khi được duyệt khép vòng; hồ sơ đã hủy/đã duyệt thì không. */
+export function dashboardNceOverdue(record: NceRecord | null | undefined, today: string): DashboardOverdueInfo {
+  let detail: NceDetail = {};
+  try { detail = JSON.parse(record?.detail_json || '{}') as NceDetail; } catch { /* dữ liệu cũ lỗi JSON được coi là hồ sơ chưa ghi đủ */ }
+  const due = String(record?.due_date || '').trim();
+  const owner = String(detail.owner || '').trim();
+  const recorded = owner.length > 0 && String(detail.correction || '').trim().length >= 5;
+  if (!record || !due || record.record_status === 'cancelled' || record.approval_status === 'approved' || !recorded || due >= today) {
+    return { overdue: false, days: 0, label: '', owner };
+  }
+  const days = Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${due}T00:00:00Z`)) / 86400000);
+  if (!Number.isFinite(days) || days <= 0) return { overdue: false, days: 0, label: '', owner };
+  return { overdue: true, days, label: `Quá hạn ${days} ngày`, owner };
+}
+
+/** Thứ tự bảng xét nghiệm app cũ: loại bỏ → cảnh báo → chưa đủ QC hôm nay
+ * → đạt → trạng thái khác. */
+export function dashboardTestRank(test: Pick<DashboardTestItem, 'status' | 'todayCount' | 'levels'>): number {
+  if (test.status === 'rej') return 0;
+  if (test.status === 'warn') return 1;
+  if (test.todayCount < test.levels.length) return 2;
+  if (test.status === 'ok') return 3;
+  return 4;
 }
 
 /** Port `qcDateFormat.daysToExpiry()` của app cũ: chuỗi `YYYY-MM-DD` được

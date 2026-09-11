@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { TestSummary, LevelAnalysis, RuleSetting } from '../../shared/qc-api';
+import type { TestSummary, LevelAnalysis, RuleSetting, ArchivedBlock } from '../../shared/qc-api';
 
 // `analysisByLevel` + `loadAnalysis(testId, levels)` nạp MỌI mức của một xét
 // nghiệm trong 1 lượt — cùng quy ước `entry-store.ts` đã dùng, vì trang
@@ -11,6 +11,10 @@ import type { TestSummary, LevelAnalysis, RuleSetting } from '../../shared/qc-ap
 interface WestgardState {
   summaries: TestSummary[];
   analysisByLevel: Record<number, LevelAnalysis>;
+  /** Chuỗi lô cũ của xét nghiệm đang xem (công tắc "Xem lô cũ"). Nạp cùng
+   * nhịp với `analysisByLevel` để `useStoreInvalidation` của trang chạm tới
+   * được — thêm/huỷ điểm hay đổi Mean/SD đều làm số liệu lô cũ đổi theo. */
+  previousLotBlocks: ArchivedBlock[];
   ruleSettings: RuleSetting[];
   loadSummaries: () => Promise<void>;
   loadAnalysis: (testId: string, levels: number[]) => Promise<void>;
@@ -22,6 +26,7 @@ interface WestgardState {
 export const useWestgardStore = create<WestgardState>((set, get) => ({
   summaries: [],
   analysisByLevel: {},
+  previousLotBlocks: [],
   ruleSettings: [],
 
   loadSummaries: async () => {
@@ -29,11 +34,14 @@ export const useWestgardStore = create<WestgardState>((set, get) => ({
     set({ summaries });
   },
   loadAnalysis: async (testId: string, levels: number[]) => {
-    if (!testId || !levels.length) { set({ analysisByLevel: {} }); return; }
-    const results = await Promise.all(levels.map((level) => window.qcApi.analyzeLevel(testId, level)));
+    if (!testId || !levels.length) { set({ analysisByLevel: {}, previousLotBlocks: [] }); return; }
+    const [results, previousLotBlocks] = await Promise.all([
+      Promise.all(levels.map((level) => window.qcApi.analyzeLevel(testId, level))),
+      window.qcApi.listPreviousLotBlocks(testId),
+    ]);
     const analysisByLevel: Record<number, LevelAnalysis> = {};
     levels.forEach((level, i) => { analysisByLevel[level] = results[i]; });
-    set({ analysisByLevel });
+    set({ analysisByLevel, previousLotBlocks });
   },
   loadRuleSettings: async () => {
     set({ ruleSettings: await window.qcApi.listRuleSettings() });

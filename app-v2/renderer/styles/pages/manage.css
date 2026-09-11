@@ -184,8 +184,6 @@
 .target-selector select,.target-selector input{height:36px;}
 .target-selector.history-selector{grid-template-columns:minmax(280px,460px);}
 .target-matrix-panel .target-selector:not(.history-selector){grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));}
-@media(max-width:640px){.target-selector.history-selector{grid-template-columns:1fr;}}
-@media(max-width:760px){.target-matrix-panel .target-selector:not(.history-selector){grid-template-columns:1fr;}}
 .target-selector.field{max-width:none!important;}
 .target-selector .field{margin:0;}
 .target-matrix-panel .target-selector.target-config-selector{grid-template-columns:minmax(240px,380px) minmax(200px,280px);justify-content:start;margin:0;padding:12px 14px;border-bottom:1px solid var(--section-head-border);background:var(--section-head-bg);align-items:end;}
@@ -449,9 +447,6 @@
 .rcfg-group-modal .lot-level-picker{grid-template-columns:1fr;gap:10px;max-height:none;overflow:visible;padding:10px;}
 .rcfg-group-modal.levels-2 .lot-level-picker{grid-template-columns:repeat(2,minmax(0,1fr));}
 .rcfg-group-modal.levels-3plus .lot-level-picker{grid-template-columns:repeat(3,minmax(0,1fr));}
-@media(max-width:900px){.rcfg-group-modal .lot-level-picker{grid-template-columns:repeat(2,minmax(0,1fr));}
-.rcfg-group-modal.levels-1 .lot-level-picker{grid-template-columns:1fr;}}
-@media(max-width:760px){.rcfg-modal,.rcfg-assay-modal{width:100%;}}
 .lot-level-col{display:grid;align-content:start;gap:7px;min-width:0;}
 /* Port nguyên app cũ. `text-transform:uppercase` (bản trước) không chỉ làm
    lệch hình: `innerText` của Chromium trả về CHỮ ĐÃ BIẾN ĐỔI, nên gate
@@ -475,7 +470,7 @@
 @media(max-width:1280px){ .config-shell{ grid-template-columns:180px minmax(0,1fr); } }
 @media(max-width:1150px){
   .config-shell{ grid-template-columns:1fr; min-height:auto; }
-  .config-shell-nav{ display:flex; flex-direction:row; align-items:center; overflow-x:auto; overflow-y:hidden; border-right:0; border-bottom:1px solid #d5dee3; -webkit-overflow-scrolling:touch; }
+  .config-shell-nav{ display:flex; flex-direction:row; align-items:center; overflow-x:auto; overflow-y:hidden; border-right:0; border-bottom:1px solid #d5dee3;  }
   .rcfg-title{ display:none; }
   .config-shell-nav button{ flex:0 0 auto; width:auto; min-width:max-content; grid-template-columns:auto auto; min-height:44px; padding:7px 13px; }
   .rcfg-toolbar{ align-items:stretch; flex-direction:column; }
@@ -483,33 +478,6 @@
   .rcfg-tools input{ max-width:none; }
 }
 @media(max-width:1280px){.lot-config-grid{grid-template-columns:1fr;}}
-@media(max-width:900px){.tea-source-registry{grid-template-columns:1fr;margin-left:10px;margin-right:10px;}}
-@media(max-width:760px){
-  .manage-actions{ justify-content:flex-start; }
-  .rcfg-toolbar{ justify-content:flex-start; }
-  .rcfg-toolbar>div:first-child,.rcfg-tools,.rcfg-tools input{ flex:0 1 auto; }
-  .rcfg-list>table{width:max-content;min-width:100%;table-layout:auto;}
-  .config-shell-main>.panel>.rcfg-toolbar:first-child+table{width:max-content!important;min-width:calc(100% - (2 * var(--space-panel)))!important;}
-  .target-table{width:max-content!important;min-width:calc(100% - (2 * var(--space-panel)))!important;}
-  .target-config-selector{grid-template-columns:1fr;}
-  .history-selector{grid-template-columns:1fr;}
-  .target-level-toolbar{align-items:flex-start;flex-direction:column;}
-  .assay-setup-layout{grid-template-columns:1fr;}
-  .assay-main-grid,.assay-detail-grid{grid-template-columns:1fr 1fr;}
-  .assay-main-grid .assay-name{grid-column:span 2;}
-  .assay-machine-picker{grid-template-columns:1fr;max-height:220px;}
-  .assay-rule-row .cfg-assay-scope{grid-column:2;}
-  .assay-cusum-grid{grid-template-columns:1fr;}
-  .assay-rule-head{display:none;}
-  .assay-rule-row{grid-template-columns:54px 1fr;}
-  .assay-rule-row select:last-child{grid-column:2;}
-  .panel-qc-main-grid{grid-template-columns:1fr;}
-  .lot-trans-row3{grid-template-columns:1fr;}
-  .lot-trans-row2{flex-wrap:wrap;}
-  .lot-trans-row2>div{width:100%;}
-  .tea-form-primary,.tea-form-dates,.tea-form-people{grid-template-columns:1fr;}
-}
-
 /* Bù class app cũ CÓ CSS mà app-v2 để trống (2026-09-03, quét bằng đối
    chiếu selector 2 bên; gate UI parity không thấy vì nó so TẬP class
    trong DOM — class vẫn có ở cả 2 bản, chỉ bên app-v2 là không có rule
@@ -517,7 +485,13 @@
 .lot-config-left,.lot-config-right{border:1px solid #d7e2e7;background:var(--panel);overflow:hidden;min-width:0;max-width:100%;border-radius:var(--radius-lg);box-shadow:none;contain:paint;}
 .lot-config-left:has(> .lot-table){padding:0;}
 .lot-config-left > .lot-table{margin:0;border:0;border-radius:0;border-collapse:collapse;border-spacing:0;width:100%;min-width:0;table-layout:fixed;background:transparent;}
-@media(max-width:760px){.lot-config-left > .lot-table{width:max-content;min-width:100%;table-layout:auto;}}
+/* Dùng cùng 3 tầng nền của cụm Mean/SD: mặt thẻ trắng, phần điều khiển và
+   header bảng chỉ xám rất nhẹ. Nhờ vậy tiêu đề không bị nặng như một dải màu
+   đặc, đồng thời thân bảng không còn sọc nền xen kẽ. */
+.lot-config-grid > :is(.lot-config-left,.lot-config-right) > .rcfg-panel-h,
+.lot-config-left > .lot-table thead th{background:#f7fafb;}
+.lot-config-left > .lot-table thead th{color:var(--muted);}
+.lot-config-left > .lot-table tbody tr{background:var(--panel);}
 .transition-list{overflow-x:auto;}
 /* Empty state ở các thẻ chính dùng trực tiếp viền/nền của panel ngoài. Các
    empty state trong modal và bộ chọn dữ liệu không khớp selector này, nên
@@ -578,7 +552,7 @@ button.btn.ghost.btn-stop-tint,button.btn.ghost.btn-stop-tint:hover{color:var(--
 .target-matrix-panel .target-lot-info b{font-size:var(--type-subhead);color:var(--success-ink);font-weight:800;}
 .target-matrix-panel .target-lot-info span{color:var(--success-ink);font-size:var(--type-meta);font-weight:750;}
 .target-matrix-panel .target-table{margin-top:0;border-top:0;border-top-left-radius:0;border-top-right-radius:0;margin-bottom:14px;}
-.target-table{display:block;max-width:100%;overflow-x:auto;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;padding-bottom:0;contain:paint;}
+.target-table{display:block;max-width:100%;overflow-x:auto;overflow-y:auto;overscroll-behavior-x:contain;padding-bottom:0;contain:paint;}
 
 /* Modal "Chi tiết" của tab Lịch sử dữ liệu (2026-09-03) — port từ
    `assets/professional-config.css`. */
@@ -586,7 +560,6 @@ button.btn.ghost.btn-stop-tint,button.btn.ghost.btn-stop-tint:hover{color:var(--
 .history-detail-table th,.history-detail-table td{text-align:center;vertical-align:middle;padding-left:14px;padding-right:14px;}
 .history-detail-table th:first-child,.history-detail-table td:first-child{text-align:left;}
 .rcfg-history-detail-modal .history-detail-table{width:100%;min-width:0;table-layout:fixed;}
-@media(max-width:760px){.rcfg-history-detail-modal .history-detail-table{width:max-content;min-width:100%;table-layout:auto;}}
 .modal.rcfg-history-detail-modal{width:min(1160px,94vw);max-width:94vw;}
 .modal.rcfg-history-detail-modal .modal-b{max-height:72vh;overflow:auto;}
 

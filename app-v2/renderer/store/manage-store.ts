@@ -33,7 +33,7 @@ interface ManageState {
   historyPointsByTestId: Record<string, QcPointView[]>;
   loadHistoryPoints: (testId: string) => Promise<void>;
   loadTeaRefs: () => Promise<void>;
-  loadRuleScopes: (testId: string, levelCount: number) => Promise<void>;
+  loadRuleScopes: (testId: string) => Promise<void>;
 
   saveInstrument: (id: string | undefined, data: ApiInputData<'saveInstrument'>) => Promise<IpcResult<Instrument>>;
   removeInstrument: (id: string) => Promise<IpcResult<{ id: string }>>;
@@ -57,7 +57,7 @@ interface ManageState {
   removeTeaLabProfile: (id: string) => Promise<IpcResult<{ id: string; removedRecord: boolean }>>;
   addTeaAnalyte: (input: { name: string; abbreviation?: string; matrix?: string; unit?: string; section?: string; clia?: string; ricos?: string; cliaRule?: 'percent' | 'absolute' | 'greater-of'; cliaAbsolute?: string; cliaAbsoluteUnit?: string }) => Promise<IpcResult<{ analyteId: string }>>;
   saveRuleAction: (testId: string, ruleId: string, action: 'inactive' | 'alert' | 'reject' | '') => Promise<IpcResult<{ ruleId: string; action: 'inactive' | 'alert' | 'reject' | '' }>>;
-  saveRuleScope: (testId: string, ruleId: string, scope: 'within' | 'across' | 'both' | '', levelCount: number) => Promise<IpcResult<{ ruleId: string; scope: string }>>;
+  saveRuleScope: (testId: string, ruleId: string, scope: 'within' | 'across' | 'both' | '') => Promise<IpcResult<{ ruleId: string; scope: string }>>;
 }
 
 export const useManageStore = create<ManageState>((set, get) => ({
@@ -85,8 +85,8 @@ export const useManageStore = create<ManageState>((set, get) => ({
   },
 
   loadTeaRefs: async () => set({ teaRefs: await window.qcApi.listTeaRefs() }),
-  loadRuleScopes: async (testId, levelCount) => {
-    const scopes = await window.qcApi.listRuleScopes(testId, levelCount);
+  loadRuleScopes: async (testId) => {
+    const scopes = await window.qcApi.listRuleScopes(testId);
     set((s) => ({ ruleScopesByTestId: { ...s.ruleScopesByTestId, [testId]: scopes } }));
   },
 
@@ -206,9 +206,9 @@ export const useManageStore = create<ManageState>((set, get) => ({
     if (result.ok) await get().loadTests();
     return result;
   },
-  saveRuleScope: async (testId, ruleId, scope, levelCount) => {
+  saveRuleScope: async (testId, ruleId, scope) => {
     const result = await window.qcApi.saveRuleScope(testId, ruleId, scope);
-    if (result.ok) await get().loadRuleScopes(testId, levelCount);
+    if (result.ok) await get().loadRuleScopes(testId);
     return result;
   },
 }));

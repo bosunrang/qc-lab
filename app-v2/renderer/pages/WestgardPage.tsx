@@ -11,7 +11,7 @@ import { useManageStore } from '../store/manage-store';
 import { useWestgardStore } from '../store/westgard-store';
 import { useStoreInvalidation } from '../lib/useStoreInvalidation';
 import { useAuthStore } from '../store/auth-store';
-import { canWrite } from '../lib/permissions';
+import { canWrite, isAdmin } from '../lib/permissions';
 import { QcChart, QcMultiChart, QcMultiCusumChart, type QcMultiLevelSeries, type QcMultiCusumSeries } from '../components/QcChart';
 import { PageHeader } from '../components/PageHeader';
 import { exportTableXlsx, printHtmlToPdf } from '../lib/export';
@@ -30,15 +30,21 @@ const zCell = (z: number) => Number.isFinite(z) ? Number(z.toFixed(2)) : '—';
 
 export function WestgardPage() {
   const { tests, instruments, lots, levelsByTestId, loadTests, loadInstruments, loadLevels, loadLots, lotGroups, loadLotGroups } = useManageStore();
-  const { summaries, loadSummaries, ruleSettings, loadRuleSettings, saveRuleSetting, resetRuleSettings, analysisByLevel, loadAnalysis } = useWestgardStore();
+  const { summaries, loadSummaries, ruleSettings, loadRuleSettings, saveRuleSetting, resetRuleSettings, analysisByLevel, loadAnalysis, previousLotBlocks } = useWestgardStore();
   // Bật/tắt luật ghi vào cấu hình CHUNG (`app_meta.westgardRules`) — vai trò
   // chỉ-xem thấy đúng trạng thái luật nhưng không đổi được (checkbox
   // disabled, không ẩn, để bảng hướng dẫn giữ nguyên bố cục như app cũ).
-  const writable = canWrite(useAuthStore((s) => s.user)?.role);
+  const role = useAuthStore((s) => s.user)?.role;
+  const writable = canWrite(role);
+  const admin = isAdmin(role);
   const [view, setView] = useState<'current' | 'archived'>('current');
   const [testId, setTestId] = useState('');
   const [query, setQuery] = useState('');
   const [chartMode, setChartMode] = useState<'lj' | 'cusum'>('lj');
+  // Công tắc "Xem lô cũ" theo TỪNG mức, khoá `testId|level` đúng như
+  // `wgPrevOpen` app cũ — gộp testId vào khoá để lựa chọn của xét nghiệm này
+  // không dính sang xét nghiệm khác cùng số mức.
+  const [prevOpen, setPrevOpen] = useState<ReadonlySet<string>>(new Set());
   // Khi có từ hai mức, CUSUM có thể xem chung để so sánh hoặc tách theo mức
   // để rà soát. Dù ở cách xem nào, chuỗi CUSUM luôn được tính độc lập ở main.
   const [cusumView, setCusumView] = useState<'summary' | 'levels'>('summary');
@@ -210,11 +216,29 @@ export function WestgardPage() {
   const navigate = useNavigate();
   // Vẫn là MỘT biểu đồ tổng hợp hai mức: dữ liệu quy đổi về Z-score chung,
   // chỉ đồng bộ kích thước/co giãn với biểu đồ ở trang Nhập QC.
-  const showMultiChart = levels.length >= 2;
+  const prevBlocksFor = (level: number) => previousLotBlocks.filter((b) => b.level === level);
+  const isPrevOpen = (level: number) => prevOpen.has(`${testId}|${level}`);
+  const togglePrevLot = (level: number) => setPrevOpen((current) => {
+    const next = new Set(current), key = `${testId}|${level}`;
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
+  // Bật "Xem lô cũ" THÊM một đường cho lô đã chuyển tiếp (không thay đường
+  // hiện hành) — đúng `buildMultiViews()` app cũ; riêng BẢNG của mức thì
+  // THAY hẳn sang lô cũ. Hai hành vi khác nhau có chủ đích.
   const multiSeries: QcMultiLevelSeries[] = useMemo(
-    () => levels.map((l) => ({ level: l.level, lot: lotLabelFor(l.level), points: analysisByLevel[l.level]?.points || [] })),
-    [levels, lots, analysisByLevel],
+    () => levels.flatMap((l) => {
+      const current = { level: l.level, lot: lotLabelFor(l.level), points: analysisByLevel[l.level]?.points || [] };
+      if (!prevOpen.has(`${testId}|${l.level}`)) return [current];
+      return [current, ...previousLotBlocks.filter((b) => b.level === l.level).map((b) => ({
+        level: l.level, lot: b.lotNo, label: `M${l.level}·cũ ${b.lotNo}`, points: b.analysis.points,
+      }))];
+    }),
+    [levels, lots, analysisByLevel, prevOpen, previousLotBlocks, testId],
   );
+  // Như app cũ: đếm SỐ ĐƯỜNG chứ không đếm số mức — một xét nghiệm 1 mức đang
+  // mở lô cũ cũng có 2 đường để so sánh.
+  const showMultiChart = multiSeries.length >= 2;
   // Chuỗi CUSUM của từng mức đã được main tính ĐỘC LẬP. Cấu trúc này chỉ
   // ghép chúng vào một khung vẽ chung, không trộn dữ liệu giữa các mức.
   const multiCusumSeries: QcMultiCusumSeries[] = useMemo(
@@ -263,6 +287,20 @@ export function WestgardPage() {
     // `saveRuleSetting` đã nạp lại danh sách/bộ công tắc chung; bảng và biểu
     // đồ mức đang mở là dữ liệu dẫn xuất riêng nên phải tính lại tức thời.
     await loadAnalysis(testId, levelNums);
+  }
+
+  // Khi chưa có bất kỳ xét nghiệm nào, không dựng một panel thiết lập toàn
+  // ô disabled rồi thêm dòng nhắc mỏng bên dưới. Giữ cùng cấu trúc trạng
+  // thái rỗng của trang Sigma để hai màn phân tích có một ngôn ngữ UI.
+  if (!summaries.length && !archivedGroups.length) {
+    return <>
+      <PageHeader title="Phân tích Westgard" subtitle="Đối chiếu luật theo mức QC, lô và lần chạy" />
+      <div className="panel"><div className="empty-state analysis-empty-state">
+        <b>Chưa có xét nghiệm nào để phân tích Westgard</b>
+        <span>{admin ? 'Hãy thêm xét nghiệm trong Cấu hình chung để bắt đầu phân tích.' : 'Liên hệ quản trị viên để thêm xét nghiệm từ Cấu hình chung.'}</span>
+        {admin && <button className="btn teal" onClick={() => navigate('/manage', { state: { tab: 'tests' } })}>Mở Cấu hình chung</button>}
+      </div></div>
+    </>;
   }
 
   return (
@@ -431,24 +469,40 @@ export function WestgardPage() {
       {view === 'current' && testId && chartMode === 'lj' && showMultiChart && (
         <div className="panel wg-multi-panel">
           <h2 className="panel-title">Levey-Jennings tổng hợp</h2>
-          <div className="hint wg-panel-intro">Biểu đồ quy đổi các mức QC về Z-score để so sánh trên cùng trục; kết luận Đạt/Cảnh báo/Loại bỏ được tính theo bộ luật Westgard đang bật cho xét nghiệm.</div>
+          <div className="hint wg-panel-intro">Biểu đồ quy đổi các mức QC về Z-score để so sánh trên cùng trục; kết luận Đạt/Cảnh báo/Loại bỏ được tính theo bộ luật Westgard đang bật cho xét nghiệm. Bật "Xem lô cũ" ở mức tương ứng để thêm đường của lô đã chuyển tiếp.</div>
           <div className="chart-scroll"><QcMultiChart className="wgLJMulti" series={multiSeries} height={300} responsiveHeight /></div>
         </div>
       )}
       {view === 'current' && testId && chartMode === 'lj' && levels.map((l) => {
-        const analysis = analysisByLevel[l.level];
-        const noTarget = l.mean == null || l.sd == null;
+        // Mở "Xem lô cũ" thì bảng của mức THAY hẳn sang lô đã chuyển tiếp
+        // (Mean/SD, điểm và kết luận đều của lô đó) — port `wgLotBlockModel()`
+        // app cũ. Chỉ lấy lô gần nhất như bản cũ; các lô xa hơn vẫn nằm ở tab
+        // "Nhóm lô đã dừng".
+        const prevBlocks = prevBlocksFor(l.level);
+        const prevBlock = prevBlocks.length && isPrevOpen(l.level) ? prevBlocks[0] : null;
+        const analysis = prevBlock ? prevBlock.analysis : analysisByLevel[l.level];
+        const noTarget = !prevBlock && (l.mean == null || l.sd == null);
         const pointCount = analysis?.points.length || 0;
+        const meanText = prevBlock ? prevBlock.mean.toFixed(2) : l.mean != null ? l.mean.toFixed(2) : '—';
+        const sdText = prevBlock ? prevBlock.sd.toFixed(2) : l.sd != null ? l.sd.toFixed(2) : '—';
         return (
-          <div className="panel" key={l.level}>
+          <div className={`panel${prevBlock ? ' wg-level-panel wg-prev-lot' : ''}`} key={l.level}>
             <h3>
-              <div className="wg-level-title"><span>Mức {l.level}</span><span className="wg-lot-name">Lô {lotLabelFor(l.level)}</span></div>
-              <div className="wg-level-meta"><span>Mean {l.mean != null ? l.mean.toFixed(2) : '—'}</span><span>SD {l.sd != null ? l.sd.toFixed(2) : '—'}</span><span>{pointCount} điểm</span></div>
+              <div className="wg-level-title"><span>Mức {l.level}</span><span className="wg-lot-name">{prevBlock ? `Lô cũ ${prevBlock.lotNo}` : `Lô ${lotLabelFor(l.level)}`}</span></div>
+              <div className="wg-level-meta">
+                {prevBlock && <span className="tag rej">Đã chuyển tiếp</span>}
+                <span>Mean {meanText}</span><span>SD {sdText}</span><span>{pointCount} điểm</span>
+                {!!prevBlocks.length && (
+                  <button className="btn ghost sm wg-prev-toggle" onClick={() => togglePrevLot(l.level)}>
+                    {prevBlock ? 'Xem lô mới' : 'Xem lô cũ'}
+                  </button>
+                )}
+              </div>
             </h3>
             {!pointCount ? (
               <div className="wg-empty-message">
                 <b>Chưa có dữ liệu</b>
-                <span>LOT đang dùng chưa có điểm QC. Bạn có thể nhập điểm mới.</span>
+                <span>LOT đang dùng chưa có điểm QC. Bạn có thể {prevBlocks.length ? 'chọn LOT cũ hoặc nhập điểm mới' : 'nhập điểm mới'}.</span>
                 <div className="empty-actions"><button className="btn teal" onClick={() => navigate('/entry', { state: { testId } })}>Nhập QC</button></div>
               </div>
             ) : (
@@ -456,22 +510,24 @@ export function WestgardPage() {
                 {noTarget && <div className="alert warn wg-target-warning"><b>Mức {l.level} chưa có Mean/SD hợp lệ</b> — điểm QC mức này không được đánh giá Westgard.</div>}
                 <div className="chart-scroll">
                   <table className="wg-table">
-                    <thead><tr><th>#</th><th>Ngày</th><th className="num">Giá trị</th><th className="num">Z</th><th>Kết luận</th><th>Luật / bằng chứng</th><th>Loại sai số</th></tr></thead>
+                    <thead><tr><th>#</th><th>Ngày</th><th className="num">Giá trị</th><th className="num">Z</th><th className="wg-verdict-head">Kết luận</th><th className="wg-evidence-head">Luật / bằng chứng</th><th>Loại sai số</th></tr></thead>
                     <tbody>
                       {(analysis?.points || []).map((p, i) => (
                         <tr key={p.id}>
                           <td>{i + 1}</td><td>{vnDate(p.date)}</td>
                           <td className="num">{p.val.toFixed(currentSummary?.decimalPlaces ?? 2)}</td>
                           <td className="num">{zText(p.z)}</td>
-                          <td>
+                          <td className="wg-verdict-cell">
                             <span className={`tag ${p.verdict}`}>{VERDICT_LABEL[p.verdict]}</span>
                             {p.cusumSignal && <span className="tag warn" title="Tín hiệu xu hướng CUSUM; không tự loại điểm QC">Cảnh báo CUSUM</span>}
                           </td>
-                          <td>
+                          <td className="wg-evidence-cell">
+                            <div className="wg-rule-chips">
                             {p.rules.map((r) => <span className="pill" key={r}>{r}</span>)}
                             {p.cusumSignal && <span className="pill warn" title="CUSUM vượt ngưỡng h; cần rà soát xu hướng">{p.cusumSignal}</span>}
-                            {p.supportRules.map((r) => <span className="pill hint" key={`s-${r}`} title="Điểm lịch sử cấu thành quy tắc — chỉ là bằng chứng">↩{r}</span>)}
+                            {p.supportRules.map((r) => <span className="pill hint wg-support-rule" key={`s-${r}`} title="Điểm lịch sử cấu thành quy tắc — chỉ là bằng chứng" aria-label={`Bằng chứng lịch sử cho luật ${r}`}><span aria-hidden="true">↩</span><span>{r}</span></span>)}
                             {!p.rules.length && !p.cusumSignal && !p.supportRules.length && '—'}
+                            </div>
                           </td>
                           <td className="hint">{p.errorType !== '—' ? <div className="wg-error-type"><b>{p.errorType}</b><small>{p.errorDesc}</small></div> : '—'}</td>
                         </tr>
@@ -522,18 +578,20 @@ export function WestgardPage() {
             <>
               <div className="chart-scroll">
                 <table className="wg-table">
-                <thead><tr><th>#</th><th>Ngày</th><th className="num">Giá trị</th><th className="num">Z</th><th>Kết luận</th><th>Luật / bằng chứng</th><th>Loại sai số</th></tr></thead>
+                <thead><tr><th>#</th><th>Ngày</th><th className="num">Giá trị</th><th className="num">Z</th><th className="wg-verdict-head">Kết luận</th><th className="wg-evidence-head">Luật / bằng chứng</th><th>Loại sai số</th></tr></thead>
                 <tbody>
                   {b.analysis.points.map((p, i) => (
                     <tr key={p.id}>
                       <td>{i + 1}</td><td>{vnDate(p.date)}</td>
                       <td className="num">{p.val.toFixed(archivedDecimals)}</td>
                       <td className="num">{zText(p.z)}</td>
-                      <td><span className={`tag ${p.verdict}`}>{VERDICT_LABEL[p.verdict]}</span></td>
-                      <td>
+                      <td className="wg-verdict-cell"><span className={`tag ${p.verdict}`}>{VERDICT_LABEL[p.verdict]}</span></td>
+                      <td className="wg-evidence-cell">
+                        <div className="wg-rule-chips">
                         {p.rules.map((r) => <span className="pill" key={r}>{r}</span>)}
-                        {p.supportRules.map((r) => <span className="pill hint" key={`s-${r}`} title="Điểm lịch sử cấu thành quy tắc — chỉ là bằng chứng">↩{r}</span>)}
+                        {p.supportRules.map((r) => <span className="pill hint wg-support-rule" key={`s-${r}`} title="Điểm lịch sử cấu thành quy tắc — chỉ là bằng chứng" aria-label={`Bằng chứng lịch sử cho luật ${r}`}><span aria-hidden="true">↩</span><span>{r}</span></span>)}
                         {!p.rules.length && !p.supportRules.length && '—'}
+                        </div>
                       </td>
                       <td className="hint">{p.errorType !== '—' ? <div className="wg-error-type"><b>{p.errorType}</b><small>{p.errorDesc}</small></div> : '—'}</td>
                     </tr>

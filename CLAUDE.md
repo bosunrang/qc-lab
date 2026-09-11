@@ -79,6 +79,13 @@ nghiệm gán nhiều máy…). Từ đây:
   app-v2 (token, component dùng chung, CSS trong `renderer/styles/`).
 - Nếu thấy một chi tiết giao diện có vẻ nên đổi, **hỏi trước**; đừng tự đổi.
 - Cải tiến giao diện về sau của người dùng KHÔNG liên quan gì tới app cũ.
+**app-v2 là ứng dụng DESKTOP — không hỗ trợ mobile/tablet (chốt 2026-09-11).**
+Cửa sổ Electron có `minWidth: 1024` / `minHeight: 700`, và toàn bộ CSS
+`@media(max-width:N)` với N ≤ 980 đã bị gỡ (57 khối). Chỉ còn 1050/1150/1280 —
+đó là laptop hẹp, vẫn là desktop. `minWidth` chính là thứ làm việc gỡ đó AN
+TOÀN: dưới mức đó không còn bố cục nào đỡ, nên cửa sổ không được phép nhỏ hơn.
+Đừng thêm lại breakpoint < 1024, và đừng thêm `viewport` hẹp hơn vào
+`app-v2/ui-parity.manifest.json`.
 
 Ba gate parity từng tồn tại để ép app-v2 giống app cũ. Chúng chính là cơ chế
 đã khiến mọi cải tiến của người dùng bị kéo ngược. Trạng thái hiện tại:
@@ -90,13 +97,17 @@ Ba gate parity từng tồn tại để ép app-v2 giống app cũ. Chúng chín
 | `app-v2:css-parity` | **Đã viết lại**: chỉ tìm class dùng trong `renderer/**/*.tsx` mà không có rule CSS nào trong `app-v2/renderer/styles/` (class chết). Không còn tham chiếu `assets/*.css`. |
 
 **2. Nghiệp vụ: app cũ là bản ĐỐI CHIẾU, không phải chân lý.**
-Khớp app cũ KHÔNG chứng minh là đúng — đợt rà 10–11/09/2026 tìm ra 4 khiếm
+Khớp app cũ KHÔNG chứng minh là đúng — đợt rà 10–11/09/2026 tìm ra 5 khiếm
 khuyết mà CẢ HAI bản đều sai (cửa sổ `2of3-2s`, số điểm `7T`, snapshot trong
-`acceptedPoints()`, mức độ `6x`/`7T`). Thứ tự căn cứ:
+`acceptedPoints()`, mức độ `6x`/`7T`, và phạm vi họ luật đếm chuỗi — xem dưới).
+Thứ tự căn cứ:
 
 1. Định nghĩa chuẩn (https://westgard.com/westgard-rules/, ISO 15189,
-   ISO/TS 20914, CLIA/EFLM) — `app-v2/tests/westgard-standard.test.mjs` là
-   gate cho lớp này và SỐNG TIẾP sau khi cắt app cũ.
+   ISO/TS 20914, Nordtest TR 537, CLIA/EFLM) — gate cho lớp này là
+   `app-v2/tests/westgard-standard.test.mjs` (13 luật + phạm vi),
+   `sigma-qc-design.test.mjs` (bảng Westgard Sigma Rules theo số mức QC),
+   `sigma-metrics.test.mjs` (ngân sách MU) và `sigma-cohort.test.mjs` (cohort
+   IQC phải trong tầm kiểm soát). Tất cả SỐNG TIẾP sau khi cắt app cũ.
 2. Quyết định sản phẩm của người dùng đã ghi trong `docs/APP-V2-PLAN.md`.
 3. App cũ — dùng để PHÁT HIỆN lệch
    (`app-v2/tests/cross-app-westgard-sigma.test.mjs`, 2442 phép đối chiếu).

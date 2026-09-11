@@ -79,13 +79,3 @@
   font-size:var(--type-body-sm);
 }
 
-@media(max-width:760px){
-.report-nce-option span{
-  white-space:normal;
-  flex-wrap:wrap;
-}
-
-.report-lock-controls{
-  grid-template-columns:1fr;
-}
-}

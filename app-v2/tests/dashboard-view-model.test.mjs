@@ -11,6 +11,7 @@
 import assert from 'node:assert/strict';
 import {
   buildDashboardViewModel, normalizeDashboardSearch, daysToExpiry, dashboardShiftStatus, levelTargetOk,
+  dashboardNceOverdue, dashboardTestRank, operationalDashboardSummaries,
 } from '../renderer/view-models/dashboard-view-model.ts';
 
 function level(over = {}) {
@@ -115,5 +116,52 @@ assert.equal(levelTargetOk(level()), true);
 // ── 8) Tìm kiếm bỏ dấu ───────────────────────────────────────────────────
 assert.equal(normalizeDashboardSearch('Điện Giải'), 'dien giai');
 assert.equal(normalizeDashboardSearch(null), '');
+
+// ── 9) Chỉ lấy xét nghiệm thực sự đang vận hành ──────────────────────────
+const operationalSource = [
+  { testId: 'T1', testName: 'Panel trước', levels: [level()] },
+  { testId: 'T2', testName: 'Panel sau', levels: [level()] },
+  { testId: 'T3', testName: 'Test tắt', levels: [level()] },
+  { testId: 'T4', testName: 'Không có nhóm lô', levels: [] },
+  { testId: 'T5', testName: 'Panel tắt', levels: [level()] },
+];
+const operational = operationalDashboardSummaries(
+  operationalSource,
+  [
+    { id: 'T1', active: 1 }, { id: 'T2', active: 1 }, { id: 'T3', active: 0 },
+    { id: 'T4', active: 1 }, { id: 'T5', active: 1 },
+  ],
+  [
+    { id: 'P0', active: 0, testIds: ['T5'] },
+    { id: 'P1', active: 1, testIds: ['T2'] },
+    { id: 'P2', active: 1, testIds: ['T1', 'T3', 'T4'] },
+  ],
+);
+assert.deepEqual(operational.map(item => item.testId), ['T2', 'T1'], 'lọc đủ active/panel/nhóm lô và giữ thứ tự Panel');
+
+// ── 10) Hồ sơ quá hạn: đã ghi thật, chưa khép vòng ──────────────────────
+const nce = (over = {}) => ({
+  id: 'N1', due_date: '2026-09-01', record_status: 'active', approval_status: 'pending',
+  detail_json: JSON.stringify({ owner: 'Nguyễn An', correction: 'Đã kiểm tra lại QC' }),
+  ...over,
+});
+assert.deepEqual(dashboardNceOverdue(nce(), '2026-09-04'), {
+  overdue: true, days: 3, label: 'Quá hạn 3 ngày', owner: 'Nguyễn An',
+});
+assert.equal(dashboardNceOverdue(nce({ approval_status: 'returned' }), '2026-09-04').overdue, true, 'hồ sơ bị trả lại vẫn chưa khép vòng');
+assert.equal(dashboardNceOverdue(nce({ approval_status: 'approved' }), '2026-09-04').overdue, false);
+assert.equal(dashboardNceOverdue(nce({ record_status: 'cancelled' }), '2026-09-04').overdue, false);
+assert.equal(dashboardNceOverdue(nce({ detail_json: JSON.stringify({ correction: 'Đã xử lý' }) }), '2026-09-04').overdue, false, 'nháp chưa có người phụ trách không tính quá hạn');
+assert.equal(dashboardNceOverdue(nce({ due_date: '2026-09-04' }), '2026-09-04').overdue, false, 'đến hạn hôm nay chưa phải quá hạn');
+
+// ── 11) Thứ tự bảng: loại → cảnh báo → chưa QC → đạt ───────────────────
+assert.deepEqual([
+  { status: 'ok', todayCount: 1, levels: [level()] },
+  { status: 'ok', todayCount: 0, levels: [level()] },
+  { status: 'warn', todayCount: 1, levels: [level()] },
+  { status: 'rej', todayCount: 1, levels: [level()] },
+].sort((a, b) => dashboardTestRank(a) - dashboardTestRank(b)).map(item => `${item.status}:${item.todayCount}`), [
+  'rej:1', 'warn:1', 'ok:0', 'ok:1',
+]);
 
 console.log('app-v2 dashboard view-model tests passed');

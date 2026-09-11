@@ -24,8 +24,18 @@ function testCatalogKey(test: Test): string {
  * trang Phân tích Westgard khi CUSUM chưa bật). Chỉ mở 1 LẦN cho mỗi giá trị
  * — không phụ thuộc `tests` (mảng đổi tham chiếu mỗi lần store nạp lại) để
  * tránh việc form đang sửa dở bị reset mở lại liên tục. */
+// Nhãn của hai ô "để trống" trong bảng luật nâng cao. Phải khớp từng chữ với
+// các <option> tường minh ngay bên dưới, để "Theo chuẩn — Cả hai phạm vi" và
+// lựa chọn "Cả hai phạm vi" đọc ra cùng một thứ.
+const SCOPE_LABELS: Record<string, string> = {
+  within: 'Chỉ trong từng mức', across: 'Chỉ chéo mức/lần chạy', both: 'Cả hai phạm vi',
+};
+const ACTION_LABELS: Record<string, string> = {
+  inactive: 'Không dùng', alert: 'Cảnh báo', reject: 'Loại bỏ',
+};
+
 export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string; onNeedInstrument?: () => void } = {}) {
-  const { tests, instruments, teaRefs, saveTest, removeTest, saveRuleAction, saveRuleScope } = useManageStore();
+  const { tests, instruments, teaRefs, saveTest, removeTest, saveRuleAction, saveRuleScope, ruleScopesByTestId, loadRuleScopes } = useManageStore();
   // Gợi ý TEa: danh mục tích hợp đã phủ ghi đè của phòng xét nghiệm.
   const suggestions = useMemo(() => teaSuggestions(teaRefs), [teaRefs]);
 
@@ -96,6 +106,16 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
     () => editing !== 'new' && editing ? parseRuleConfig(editing.rule_scopes_json) : {},
     [editing],
   );
+  // Giá trị THẬT mà hai ô "để trống" rơi về, do main tính theo số mức đang
+  // vận hành + cấu hình chung. Không có nó thì modal chỉ nói "Theo cấu hình
+  // chung"/"Phạm vi SOP khuyến nghị" mà không nơi nào đọc ra được luật đang
+  // chạy thế nào — đúng chỗ đã giấu lỗi phạm vi `6x` (mục 3.4 kế hoạch).
+  const editingId = editing !== 'new' && editing ? editing.id : '';
+  useEffect(() => { if (editingId) void loadRuleScopes(editingId); }, [editingId, loadRuleScopes]);
+  const ruleHints = useMemo(() => {
+    const rows = editingId ? ruleScopesByTestId[editingId] : undefined;
+    return Object.fromEntries((rows || []).map((r) => [r.id, r]));
+  }, [editingId, ruleScopesByTestId]);
 
   function openNew() {
     // App cũ mở thẳng form tạo máy nếu chưa có máy; tránh đưa người dùng vào
@@ -211,7 +231,7 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
           }
           const scope = String(fd.get(`ruleScope:${rule}`) || '');
           if (scope !== (ruleScopes[rule] || '')) {
-            const scopeResult = await saveRuleScope(testId, rule, scope as '' | 'within' | 'across' | 'both', 2);
+            const scopeResult = await saveRuleScope(testId, rule, scope as '' | 'within' | 'across' | 'both');
             if (!scopeResult.ok) { setErr(scopeResult.error.message); return; }
           }
         }
@@ -253,21 +273,22 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
             {visible.map(({ key, test: t, assignments }, i) => {
               const selected = assignments.find(item => item.id === selectedAssignmentIds[key]) || assignments[0];
               const selectedInstrument = instruments.find(item => item.id === selected.instrument_id);
+              const instrumentOptionLabel = (assignment: Test) => {
+                const instrument = instruments.find(item => item.id === assignment.instrument_id);
+                const section = instrument?.section || assignment.section;
+                const name = instrument?.name || 'Máy không còn tồn tại';
+                return section ? `${name} · ${section}` : name;
+              };
               return <tr key={key}>
                 <td className="num">{i + 1}</td>
                 <td><b>{selected.name}</b><div className="hint">{selected.method || 'Chưa nhập phương pháp'}{selected.unit ? ' · ' + selected.unit : ''}</div></td>
                 <td><select className="assay-machine-select" value={selected.id} aria-label={`Chọn máy cho ${selected.name}`}
                   onChange={(event) => setSelectedAssignmentIds(current => ({ ...current, [key]: event.target.value }))}>
                   {assignments.map(assignment => {
-                    const instrument = instruments.find(item => item.id === assignment.instrument_id);
-                    return <option key={assignment.id} value={assignment.id}>{instrument?.name || 'Máy không còn tồn tại'}</option>;
+                    return <option key={assignment.id} value={assignment.id}>{instrumentOptionLabel(assignment)}</option>;
                   })}
                 </select>
-                {/* Khoa/Khu vực đi xuống dòng hint riêng, đúng cấu trúc app cũ
-                    (`<td>{row.instrument}<div class="hint">{section}</div></td>`) —
-                    trước đây ghép vào chính nhãn `<option>` nên cả hai dòng chữ
-                    của app cũ đều không khớp. */}
-                <div className="hint">{selectedInstrument?.section || selected.section || 'Chưa gán khoa/khu vực'}</div></td>
+                </td>
                 <td>{selected.reagent || '—'}</td>
                 <td className="num">{selected.tea ? `${selected.tea}%` : '—'}</td>
                 <td><span className={`tag ${selected.active ? 'ok' : 'none'}`}>{selected.active ? 'Đang dùng' : 'Ngừng dùng'}</span></td>
@@ -293,7 +314,7 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
                   </div>
                   <div className="assay-card-body">
                     <div className="assay-main-grid">
-                    <div className="field assay-name">
+                    <div className="field">
                       <label>Tên xét nghiệm <span className="req">*</span></label>
                       <div className="assay-name-picker">
                         <input ref={nameInputRef} name="name" autoComplete="off"
@@ -374,10 +395,11 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
                   <div className="assay-rule-head" aria-hidden="true"><span>Luật</span><span>Hành động</span><span>Phạm vi áp dụng</span></div>
                   <div className="assay-rule-grid">
                     {WESTGARD_RULES.map((id) => {
+                      const hint = ruleHints[id];
                       return <div className="assay-rule-row" key={id}>
                         <b>{id}</b>
-                        <select className="cfg-assay-rule" name={`ruleAction:${id}`} aria-label={`Hành động ${id}`} defaultValue={ruleActions[id] || ''}><option value="">Theo cấu hình chung</option><option value="inactive">Không dùng</option><option value="alert">Cảnh báo</option><option value="reject">Loại bỏ</option></select>
-                        <select className="cfg-assay-scope" name={`ruleScope:${id}`} aria-label={`Phạm vi ${id}`} defaultValue={ruleScopes[id] || ''}><option value="">Phạm vi SOP khuyến nghị</option><option value="within">Chỉ trong từng mức</option><option value="across">Chỉ chéo mức/lần chạy</option><option value="both">Cả hai phạm vi</option></select>
+                        <select className="cfg-assay-rule" name={`ruleAction:${id}`} aria-label={`Hành động ${id}`} defaultValue={ruleActions[id] || ''}><option value="">{hint ? `Theo cấu hình chung — ${ACTION_LABELS[hint.defaultAction]}` : 'Theo cấu hình chung'}</option><option value="inactive">Không dùng</option><option value="alert">Cảnh báo</option><option value="reject">Loại bỏ</option></select>
+                        <select className="cfg-assay-scope" name={`ruleScope:${id}`} aria-label={`Phạm vi ${id}`} defaultValue={ruleScopes[id] || ''}><option value="">{hint ? `Theo chuẩn — ${SCOPE_LABELS[hint.defaultScope]}` : 'Phạm vi SOP khuyến nghị'}</option><option value="within">Chỉ trong từng mức</option><option value="across">Chỉ chéo mức/lần chạy</option><option value="both">Cả hai phạm vi</option></select>
                       </div>;
                     })}
                   </div>

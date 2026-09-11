@@ -11,16 +11,6 @@
       "id": "compact",
       "width": 1150,
       "height": 820
-    },
-    {
-      "id": "tablet",
-      "width": 980,
-      "height": 760
-    },
-    {
-      "id": "mobile",
-      "width": 760,
-      "height": 900
     }
   ],
   "pages": [
@@ -312,5 +302,6 @@
         ".audit-log-panel"
       ]
     }
-  ]
+  ],
+  "note": "app-v2 la ung dung desktop: bo cuc mobile/tablet da bi go 2026-09-11, cua so Electron co minWidth 1024. Khong them lai viewport hep hon 1024."
 }

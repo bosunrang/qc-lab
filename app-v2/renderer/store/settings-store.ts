@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type {
   LabProfile, IpcResult, LisGatewaySettings, LisQueueRecord, FirebaseSettings,
-  FirebaseConnectResult, FirebaseSyncResult,
+  FirebaseConnectResult, FirebaseSyncResult, StorageInfo,
 } from '../../shared/qc-api';
 
 /** Trang Cài đặt gom 5 nhóm dữ liệu backend độc lập: hồ sơ đơn vị, dung
@@ -22,7 +22,7 @@ import type {
  */
 interface SettingsState {
   profile: LabProfile | null;
-  storage: { dbFileBytes: number; path: string } | null;
+  storage: StorageInfo | null;
   backup: { lastBackupAt: string | null; lastBackupBytes: number; maxImportBytes: number } | null;
   lis: LisGatewaySettings | null;
   lisQueue: { pending: LisQueueRecord[]; unresolved: LisQueueRecord[] } | null;

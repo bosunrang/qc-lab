@@ -35,7 +35,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const { westgard, westgardMultiByPoint } = require('../../app-v2-dist/main/domain/westgard-engine.js');
-const { WG_RULE_BY_ID, errorType, errorTypeDetail } = require('../../app-v2-dist/main/domain/westgard-rules.js');
+const { WG_RULE_BY_ID, errorType, errorTypeDetail, defaultRuleScope } = require('../../app-v2-dist/main/domain/westgard-rules.js');
 
 let checks = 0;
 // Mean=0/SD=1 nên `val` chính là z — đọc kịch bản trực tiếp bằng số SD.
@@ -116,7 +116,7 @@ check('2of3-2s', [2.1, 0, 0, 2.2], false, 'hai điểm vượt cách nhau quá x
   check('7T', rise(7).map((z) => -z), true, 'bảy điểm giảm dần cũng nổ');
   check('7T', [-3, -2.5, -2, -2, -1.5, -1, -0.5], false, 'hai điểm bằng nhau là đứt xu hướng');
   checks += 2;
-  assert.equal(flags(rise(7), '7T')[6].level, 'warn', '7T là cảnh báo theo mặc định của app (SOP có thể nâng thành loại bỏ)');
+  assert.equal(flags(rise(7), '7T')[6].level, 'rej', '7T là luật LOẠI BỎ theo Westgard (SOP có thể hạ xuống cảnh báo cho từng xét nghiệm)');
   const changed = rise(7).map((z, i) => ({ val: z, trendTarget: i < 3 ? 'a' : 'b' }));
   assert.equal(westgard(changed, 0, 1, only('7T')).F.some((f) => f.rules.includes('7T')), false, 'đổi dải mục tiêu giữa chuỗi thì không còn là một xu hướng');
 }
@@ -141,6 +141,59 @@ check('2of3-2s', [2.1, 0, 0, 2.2], false, 'hai điểm vượt cách nhau quá x
   m([2.1, 2.2, 0], '2of3-2s', true, '2 trong 3 mức cùng vượt +2SD trong một lần chạy');
   m([1.1, 1.2, 1.3], '3-1s', true, '3 mức cùng vượt +1SD trong một lần chạy');
   m([2.1, 2.2], '2-2s', true, '2 mức cùng vượt +2SD trong một lần chạy');
+
+  // ---- Chuỗi GỘP qua nhiều lần chạy (Westgard, "Multirule Interpretation")
+  //   41s: "can be applied 'across materials and across runs'" — 2 điểm lần
+  //        chạy này + 2 điểm lần chạy trước.
+  //   10x: "applied to both control measurements in a run for the last five
+  //        runs, OR to the measurements on just one material for the last ten
+  //        runs" — chính là lý do họ đếm chuỗi phải là `both`.
+  //   22s: "can also be applied to the last two measurements 'within a
+  //        material and across runs'".
+  // Chuỗi gộp xếp theo LẦN CHẠY rồi tới MỨC, nên 2 mức × 2 lần chạy = 4 điểm
+  // liên tiếp đúng như mô tả trên.
+  const twoLevels = (runs) => [
+    { level: 1, pts: runs.map(([a], i) => ({ val: a, runId: `R${i + 1}` })), mean: 0, sd: 1 },
+    { level: 2, pts: runs.map(([, b], i) => ({ val: b, runId: `R${i + 1}` })), mean: 0, sd: 1 },
+  ];
+  const firedIn = (runs, id) => {
+    const sets = twoLevels(runs);
+    const map = westgardMultiByPoint(sets, only(id));
+    return sets.some((set) => set.pts.some((point) => (map.get(point) || []).includes(id)));
+  };
+  const seq = (runs, id, want, why) => { checks++; assert.equal(firedIn(runs, id), want, `${id} chuỗi gộp — ${why}`); };
+
+  seq([[1.2, 1.3], [1.4, 1.5]], '4-1s', true, '2 mức × 2 lần chạy = 4 điểm cùng phía vượt 1SD');
+  seq([[1.2, 1.3], [1.4, 0.5]], '4-1s', false, 'điểm cuối chưa vượt 1SD thì chưa đủ 4');
+  seq([[1.2, -1.3], [1.4, -1.5]], '4-1s', false, 'phải CÙNG phía, xen kẽ dấu không tính');
+  seq([[0.5, 0.6], [0.7, 0.8], [0.9, 0.4], [0.3, 0.2], [0.1, 0.5]], '10x',
+    true, '5 lần chạy × 2 mức = 10 phép đo cùng phía Mean');
+  seq([[0.5, 0.6], [0.7, 0.8], [0.9, 0.4], [0.3, 0.2], [0.1, -0.5]], '10x',
+    false, 'một điểm khác phía làm đứt chuỗi 10');
+  // 22s "within a material and across runs" do KÊNH TỪNG MỨC lo, không phải
+  // kênh liên mức: chuỗi gộp CỐ Ý loại 2-2s
+  // (`WG_RUN_RULES.filter(rule !== '2-2s')`), nếu không thì hai điểm cùng một
+  // lần chạy sẽ bị tính hai lần — một lần ở nhánh "2 mức cùng vượt" ngay bên
+  // trên, một lần nữa vì chúng nằm cạnh nhau trong chuỗi gộp.
+  // Ca phân biệt: hai điểm này NẰM CẠNH NHAU trong chuỗi gộp (mức 2 của lần
+  // chạy trước + mức 1 của lần chạy này) và đều vượt +2SD, nhưng chúng không
+  // cùng một lần chạy VÀ cũng không cùng một mức — ghép chúng thành "2 phép
+  // đo liên tiếp" là vô nghĩa. Bỏ bộ lọc `2-2s` khỏi chuỗi gộp là ca này nổ.
+  seq([[0.1, 2.2], [2.3, 0.2]], '2-2s', false, 'chéo cả mức lẫn lần chạy không phải 2-2s');
+  seq([[2.1, 0.1], [2.2, 0.2]], '2-2s', false, 'chuỗi gộp không lặp lại 2-2s; kênh từng mức mới lo việc này');
+  checks++;
+  assert.equal(flags([2.1, 2.2], '2-2s')[1].level, 'rej',
+    '22s qua hai lần chạy của CÙNG một mức phải nổ ở kênh từng mức');
+
+  // Với 3 mức QC, Westgard khuyến cáo dùng bộ 13s/2of3-2s/R4s/31s/6x/9x vì
+  // "The 22s, 41s, and 10x rules ... just don't fit with multiples of 3".
+  // Đây là khuyến cáo THIẾT KẾ (chọn luật nào cho bao nhiêu mức), app đưa vào
+  // bảng gợi ý ở `sigma-qc-design.test.mjs`, KHÔNG chặn ở engine — phòng xét
+  // nghiệm vẫn được bật luật họ muốn. Chốt ở đây để không ai "sửa" engine
+  // theo hướng tự tắt luật.
+  checks++;
+  assert.equal(firedMulti([1.1, 1.2, 1.3], '3-1s'), true,
+    '3 mức: 31s vẫn là luật dùng được, không bị engine tự chặn');
 }
 
 // ------------------------------------ Hàng rào: mô tả registry phải khớp luật
@@ -188,6 +241,47 @@ check('2of3-2s', [2.1, 0, 0, 2.2], false, 'hai điểm vượt cách nhau quá x
     checks++;
     assert.equal(WG_RULE_BY_ID[owner].err, d.type.slice(0, 2), `${combo.join('+')}: type và desc phải cùng một lớp sai số`);
   }
+}
+
+// ---------------------------------------------------------------- PHẠM VI LUẬT
+// Thuật ngữ của app đọc NGƯỢC so với tài liệu Westgard, nên ghi lại ở đây:
+//   `within` = trong TỪNG mức QC, qua nhiều lần chạy ≈ Westgard "across runs"
+//   `across` = chéo các mức trong CÙNG lần chạy      ≈ Westgard "across materials"
+//
+// Định nghĩa chuẩn cho họ đếm chuỗi liên tiếp nói rõ CẢ HAI chiều đều hợp lệ,
+// và chiều cơ bản là qua nhiều lần chạy của cùng một mức:
+//   4-1s "These 4 may be from one control material or they may ALSO be the
+//         last 2 points from a high level control material and the last 2
+//         points from a normal level control material, thus the rule may
+//         also be applied across materials."
+//   10x  "The 10x rule usually has to be applied ACROSS RUNS and OFTEN
+//         across materials."
+// → cả họ phải là `both`. Để `across` thuần là bỏ sót đúng ca lâm sàng hay
+// gặp nhất: MỘT mức trôi dần một phía trong khi mức kia ổn định quanh Mean,
+// chuỗi gộp liên mức xen kẽ dấu nên không luật nào nổ.
+{
+  const COUNTING = ['2-2s', '3-1s', '4-1s', '6x', '8x', '9x', '10x', '12x'];
+  for (const id of COUNTING) {
+    const min = WG_RULE_BY_ID[id].scopeMin;
+    checks += 2;
+    assert.equal(WG_RULE_BY_ID[id].scope, 'both', `${id}: họ đếm chuỗi phải nhìn cả hai chiều`);
+    assert.equal(defaultRuleScope(id, min), 'both', `${id}: đủ số mức thì vẫn giữ cả hai chiều`);
+  }
+  // Hai ngoại lệ, mỗi cái có câu chữ riêng trong định nghĩa chuẩn.
+  checks += 2;
+  assert.equal(WG_RULE_BY_ID['R4s'].scope, 'across',
+    'R4s: "should only be interpreted within-run, not between-run"');
+  assert.equal(WG_RULE_BY_ID['7T'].scope, 'within',
+    '7T: xu hướng tăng/giảm chỉ có nghĩa trong cùng một mức');
+
+  // Chuỗi cùng phía Mean trong CHÍNH một mức phải nổ 6x — đây là hành vi mà
+  // `scope: 'across'` từng bỏ sót (phát hiện từ dữ liệu thật 2026-09-11).
+  const drift = Array.from({ length: 6 }, () => ({ val: 0.5, trendTarget: 'same' }));
+  checks += 2;
+  assert.equal(westgard(drift, 0, 1, (r) => r === '6x').F.at(-1).level, 'rej',
+    '6 điểm liên tiếp cùng phía Mean trong một mức: 6x phải nổ');
+  assert.equal(westgard(drift.slice(0, 5), 0, 1, (r) => r === '6x').F.at(-1).level, 'ok',
+    '5 điểm thì chưa đủ — không được nổ sớm');
 }
 
 assert.ok(checks >= 60, `số phép kiểm quá ít (${checks})`);

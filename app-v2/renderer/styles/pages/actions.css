@@ -34,8 +34,6 @@
 .action-form-section-title>span{display:inline-flex;align-items:center;justify-content:center;flex:none;min-width:30px;height:30px;padding:0 7px;border-radius:var(--radius-pill);background:var(--teal);color:var(--on-accent);font-size:var(--type-meta);font-weight:850;}
 .action-form-section-title b{display:block;font-size:var(--type-body);}
 
-@media(max-width:640px){ .issue-row{ flex-direction:column; align-items:stretch; } }
-
 /* Bù class app cũ CÓ CSS mà app-v2 để trống (2026-09-03, quét bằng đối
    chiếu selector 2 bên; gate UI parity không thấy vì nó so TẬP class
    trong DOM — class vẫn có ở cả 2 bản, chỉ bên app-v2 là không có rule
@@ -49,8 +47,6 @@
 .issue-group{border:1px solid var(--line);border-radius:var(--surface-radius);overflow:hidden;background:var(--panel);}
 .issue-group.rej{border-left:4px solid var(--danger-accent);}
 .issue-group.warn{border-left:4px solid var(--warning-accent);}
-@media(max-width:640px){.action-form-panel-head{align-items:flex-start;flex-direction:column;}}
-
 /* Protocol NCE v3 — port cấu trúc desktop của `professional-reports.css`.
    Các lưới dùng gap 10px bên trong một panel có inset 14px, khớp quy tắc
    spacing chung; không đặt breakpoint mobile vì app-v2 hiện phục vụ desktop. */

@@ -107,4 +107,51 @@ function scenario({ source = 'clia', periodTea = 10, levelTea } = {}) {
   assert.equal(m2.tea, 10, 'muc thieu Mean roi ve TEa cap ky');
 }
 
+// Kỳ được tạo lúc nguồn TEa CHƯA giải được (chọn "TEa chuẩn hóa của PXN" mà
+// chưa có hồ sơ) chốt `tea = null`. Một snapshot NULL không phải lịch sử cần
+// bảo vệ — nó có nghĩa "chưa bao giờ giải được". Trước 2026-09-11 kỳ đó ghim
+// vĩnh viễn vào nguồn đã chốt, nên sau khi phòng xét nghiệm đổi nguồn sang
+// Ricos thì panel "Thiết lập phân tích" hiện đúng 0,73% mà bảng kỳ vẫn báo
+// "Thiếu TEa" — đúng lỗi người dùng báo.
+{
+  const db = openDatabase(':memory:');
+  const config = createConfigHandlers(db);
+  const sigma = createSigmaHandlers(db);
+  const inst = config.saveInstrument({ data: { name: 'May A' } }, actor).data;
+  const test = config.saveTest({ data: { name: 'Sodium (Na)', instrumentId: inst.id, unit: 'mmol/L' } }, actor).data;
+  config.saveTestLevel({ testId: test.id, data: { level: 1, mean: 140, sd: 2.5 } }, actor);
+
+  // Nguồn "lab" nhưng KHÔNG có hồ sơ TEa PXN nào → không giải được.
+  sigma.saveTeaConfig({ testId: test.id, source: 'lab' }, actor);
+  const saved = sigma.savePeriod({
+    testId: test.id, period: '2026-09', teaSource: 'lab',
+    levels: [{ level: 1, cv: 0.21388015, biasEqa: 1.5 }],
+  }, actor);
+  assert.equal(saved.ok, true);
+  assert.equal(saved.data.levels[0].tea, null, 'chua khai nguon thi TEa phai la null');
+  assert.equal(saved.data.levels[0].sigma, null, 'thieu TEa thi khong co Sigma');
+
+  // Phòng xét nghiệm đổi nguồn sang Ricos (Sodium: 0,73%).
+  sigma.saveTeaConfig({ testId: test.id, source: 'ricos' }, actor);
+  const after = sigma.listPeriods(test.id)[0].levels[0];
+  assert.equal(after.tea, 0.73, 'ky khong co snapshot phai giai lai theo nguon DANG KHAI');
+  assert.ok(after.sigma, 'Sigma phai tinh duoc sau khi da co TEa');
+  assert.equal(round(after.sigma.sigma, 2), round((0.73 - 1.5) / 0.21388015, 2), 'Sigma dung cong thuc (TEa - |Bias|)/CV');
+}
+
+// Bậc fallback KHÔNG được kéo lại kỳ đã có snapshot thật — đó mới là lịch sử.
+{
+  const { sigma, test, db } = scenario({ source: 'clia', periodTea: 10, levelTea: 9 });
+  sigma.saveTeaConfig({ testId: test.id, source: 'ricos' }, actor);
+  assert.equal(sigma.listPeriods(test.id)[0].levels[0].tea, 9, 'snapshot theo muc phai thang moi bac khac');
+
+  // Không có snapshot theo mức nhưng CÓ snapshot cấp kỳ: kỳ giữ con số đó,
+  // không rơi xuống bậc fallback.
+  db.prepare("UPDATE sigma_data SET tea_source=? WHERE test_id=?").run('lab', test.id);
+  const rows = sigma.listPeriods(test.id)[0].levels;
+  assert.equal(rows[0].tea, 9, 'van la snapshot theo muc');
+  db.prepare("UPDATE sigma_data SET lv_json=? WHERE test_id=?")
+    .run(JSON.stringify([{ level: 1, cv: 3, biasEqa: 2 }, { level: 2, cv: 4.5, biasEqa: -1.5 }]), test.id);
+  assert.equal(sigma.listPeriods(test.id)[0].levels[0].tea, 10, 'snapshot cap ky phai thang bac fallback');
+}
 console.log('app-v2 sigma level-TEa end-to-end tests passed');

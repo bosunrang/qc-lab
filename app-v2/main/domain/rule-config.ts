@@ -114,7 +114,31 @@ export function makeScopeOf(overrides: RuleScopesMap, levelCount: number): (rule
   return (ruleId: string) => overrides[ruleId] || defaultRuleScope(ruleId, levelCount);
 }
 
-export function effectiveScopeList(overrides: RuleScopesMap, levelCount: number): { id: string; scope: RuleScope; scopeMin: number; desc: string }[] {
+/** Trạng thái HIỆU LỰC của từng luật cho MỘT xét nghiệm, kèm giá trị mà ô
+ * "để trống" thực sự rơi về — `defaultScope` (phạm vi khuyến nghị theo số mức
+ * đang vận hành) và `defaultAction` (hành động theo cấu hình chung toàn phòng
+ * xét nghiệm).
+ *
+ * Hai trường `default*` tồn tại vì modal "Sửa xét nghiệm" trước đây chỉ ghi
+ * "Phạm vi SOP khuyến nghị"/"Theo cấu hình chung" mà không nói khuyến nghị đó
+ * LÀ GÌ — người dùng không có màn hình nào đọc ra được luật đang chạy phạm vi
+ * nào. Đó chính là lý do `6x` chạy sai phạm vi một thời gian dài mà không ai
+ * thấy (xem mục 3.4 `docs/APP-V2-PLAN.md`). */
+export function effectiveRuleConfigList(
+  overrides: RuleScopesMap, levelCount: number, globalRules: RuleActionsMap = {}, actionOverrides: RuleActionsMap = {},
+): { id: string; scope: RuleScope; scopeMin: number; desc: string; defaultScope: RuleScope; defaultAction: RuleAction; action: RuleAction }[] {
   const scopeOf = makeScopeOf(overrides, levelCount);
-  return WG_RULES.map(id => ({ id, scope: scopeOf(id), scopeMin: WG_RULE_BY_ID[id]?.scopeMin ?? 2, desc: WG_RULE_BY_ID[id]?.desc ?? '' }));
+  // `defaultAction` = phân giải KHI xét nghiệm không có ghi đè riêng, nên
+  // truyền `{}` ở tham số overrides — đúng thứ ô "Theo cấu hình chung" hứa.
+  const defaultActionOf = makeRuleActionLayered(globalRules, {});
+  const actionOf = makeRuleActionLayered(globalRules, actionOverrides);
+  return WG_RULES.map(id => ({
+    id,
+    scope: scopeOf(id),
+    scopeMin: WG_RULE_BY_ID[id]?.scopeMin ?? 2,
+    desc: WG_RULE_BY_ID[id]?.desc ?? '',
+    defaultScope: defaultRuleScope(id, levelCount),
+    defaultAction: defaultActionOf(id),
+    action: actionOf(id),
+  }));
 }

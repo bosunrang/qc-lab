@@ -1,43 +1,57 @@
-// Dashboard KHÔNG có module/domain riêng — chỉ tổng hợp lại dữ liệu đã có
-// sẵn từ 3 IPC đã tồn tại (westgard:listTestSummaries, nce:listRecords,
-// audit:query), đúng tinh thần "thí điểm": không phát minh domain mới cho
-// một trang chỉ đọc và gộp lại.
+// Dashboard KHÔNG có module/domain riêng — chỉ tổng hợp lại dữ liệu từ các
+// IPC đã có. Quy tắc trình bày/ lọc nghiệp vụ thuần nằm trong view-model.
 import { create } from 'zustand';
 import { todayIso } from '../lib/format';
-import type { TestSummary, NceRecord, ActivityEntry, Test, QcLot } from '../../shared/qc-api';
+import { dashboardNceOverdue, operationalDashboardSummaries, type DashboardStatus } from '../view-models/dashboard-view-model';
+import type { TestSummary, NceRecord, Test, QcLot } from '../../shared/qc-api';
 
-export interface OverdueAction extends NceRecord { testName: string }
+export type DashboardFilterStatus = 'all' | 'missing' | DashboardStatus;
+export interface OverdueAction extends NceRecord { testName: string; overdueDays: number; overdueLabel: string; owner: string }
 
 interface DashboardState {
   testSummaries: TestSummary[];
   overdueActions: OverdueAction[];
-  recentActivity: ActivityEntry[];
   lots: QcLot[];
+  query: string;
+  status: DashboardFilterStatus;
   loading: boolean;
+  setQuery: (query: string) => void;
+  setStatus: (status: DashboardFilterStatus) => void;
   load: () => Promise<void>;
 }
 
 export const useDashboardStore = create<DashboardState>((set) => ({
   testSummaries: [],
   overdueActions: [],
-  recentActivity: [],
   lots: [],
+  query: '',
+  status: 'all',
   loading: true,
+  setQuery: (query) => set({ query }),
+  setStatus: (status) => set({ status }),
 
   load: async () => {
-    const [testSummaries, nceRecords, tests, activityPage, lots] = await Promise.all([
+    const [allSummaries, nceRecords, tests, panels, lots] = await Promise.all([
       window.qcApi.listTestSummaries(),
       window.qcApi.listNceRecords(),
       window.qcApi.listTests(),
-      window.qcApi.queryActivity({ page: 1, pageSize: 5 }),
+      window.qcApi.listPanels(),
       window.qcApi.listLots(),
     ]);
+    const testSummaries = operationalDashboardSummaries(allSummaries, tests, panels);
     const testNameById = new Map<string, string>(tests.map((t: Test) => [t.id, t.name]));
     const today = todayIso();
     const overdueActions = nceRecords
-      .filter(r => r.record_status === 'active' && r.approval_status === 'pending' && r.due_date && r.due_date < today)
-      .map(r => ({ ...r, testName: (r.test_id && testNameById.get(r.test_id)) || '—' }))
-      .sort((a, b) => a.due_date.localeCompare(b.due_date));
-    set({ testSummaries, overdueActions, recentActivity: activityPage.rows, lots, loading: false });
+      .map(record => ({ record, info: dashboardNceOverdue(record, today) }))
+      .filter(item => item.info.overdue)
+      .sort((a, b) => b.info.days - a.info.days)
+      .map(({ record, info }) => ({
+        ...record,
+        testName: (record.test_id && testNameById.get(record.test_id)) || '—',
+        overdueDays: info.days,
+        overdueLabel: info.label,
+        owner: info.owner,
+      }));
+    set({ testSummaries, overdueActions, lots, loading: false });
   },
 }));

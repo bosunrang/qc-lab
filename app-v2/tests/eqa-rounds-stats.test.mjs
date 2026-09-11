@@ -7,14 +7,20 @@
 import assert from 'node:assert/strict';
 import { eqaRoundsStats } from '../main/domain/sigma-metrics.ts';
 
-// 1 vòng duy nhất: rms=mean=giá trị đó, biasRefU=null (không tính được SD
+// `biasSem` (trước 11/09 tên là `biasRefU`) là SAI SỐ CHUẨN của chính ước
+// lượng bias — SD giữa các vòng / căn(n). Nó KHÔNG phải u(Cref): Nordtest
+// TR 537 định nghĩa u(Cref) là độ không đảm bảo của GIÁ TRỊ GÁN do nhà cung
+// cấp EQA/CRM công bố, không suy được từ chuỗi bias của chính mình. Đổi tên
+// để chỗ gọi không tưởng đây là u(Cref) rồi nạp thẳng vào ngân sách MU.
+//
+// 1 vòng duy nhất: rms=mean=giá trị đó, biasSem=null (không tính được SD
 // giữa các vòng với n=1).
 {
   const r = eqaRoundsStats([2]);
   assert.equal(r.rms, 2);
   assert.equal(r.mean, 2);
   assert.equal(r.n, 1);
-  assert.equal(r.biasRefU, null);
+  assert.equal(r.biasSem, null);
   assert.equal(r.mixedSigns, false);
 }
 
@@ -35,7 +41,7 @@ import { eqaRoundsStats } from '../main/domain/sigma-metrics.ts';
   assert.equal(r.mixedSigns, false);
   // SD mau (n-1) cua [1,3]: mean=2, variance=((1-2)^2+(3-2)^2)/1=2, sd=sqrt(2)
   // bias RefU = sd/sqrt(2)
-  assert.ok(Math.abs(r.biasRefU - Math.sqrt(2) / Math.sqrt(2)) < 1e-9);
+  assert.ok(Math.abs(r.biasSem - Math.sqrt(2) / Math.sqrt(2)) < 1e-9);
 }
 
 // Dấu trái nhau: trung bình cộng CÓ THỂ về gần 0 (dễ gây nhầm "không lệch"),

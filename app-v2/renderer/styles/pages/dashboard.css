@@ -17,7 +17,7 @@
 .dash-kpi .v.danger{color:var(--red);}.dash-kpi .v.teal{color:var(--teal);}
 .dash-main{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--gap-panel);align-items:stretch;margin-bottom:var(--gap-group);}
 .dash-main .panel{min-height:0;margin:0;padding-bottom:4px;}
-.dash-main .panel>.panel-title:first-child{margin:calc(-1 * var(--space-panel)) calc(-1 * var(--space-panel)) var(--panel-content-gap);padding:var(--space-md) var(--space-panel);min-height:var(--panel-header-min-height);background:var(--section-head-bg);border-bottom:1px solid var(--section-head-border);font-size:var(--section-head-size);display:flex;align-items:center;}
+.dash-main .panel>.panel-title:first-child{margin:0 0 var(--panel-content-gap);padding:10px 14px;min-height:0;background:var(--section-head-bg);border-bottom:1px solid var(--section-head-border);font-size:var(--section-head-size);line-height:21px;display:flex;align-items:center;}
 .dash-list{display:grid;gap:10px;margin:var(--panel-content-gap) 0 0;}
 .dash-list .shift-item.rej{border-color:var(--danger-border);border-left:5px solid var(--danger-accent);background:var(--danger-bg);color:var(--danger-ink);}
 .dash-list .shift-item.warn{border-color:var(--warning-border);border-left:5px solid var(--warning-accent);background:var(--warning-bg);color:var(--warning-ink);}
@@ -44,7 +44,4 @@
 .dash-loading-bar{height:6px;margin-top:18px;border-radius:99px;background:color-mix(in srgb,var(--teal) 14%,transparent);overflow:hidden}.dash-loading-bar span{display:block;width:38%;height:100%;border-radius:inherit;background:var(--teal);animation:dash-loading-slide 1.15s ease-in-out infinite}@keyframes dash-loading-slide{0%{transform:translateX(-110%)}50%{transform:translateX(100%)}100%{transform:translateX(300%)}}
 @media(max-width:1280px){.dash-hero{grid-template-columns:minmax(0,1fr) minmax(260px,.82fr);}}
 @media(max-width:1150px){.dash-hero{grid-template-columns:1fr;}}
-@media(max-width:980px){.dash-kpis{grid-template-columns:repeat(4,minmax(0,1fr));}.dash-main{grid-template-columns:1fr;}}
-@media(max-width:900px){.dash-kpis{grid-template-columns:repeat(2,minmax(0,1fr));}}
-@media(max-width:760px){.dash-test-toolbar{padding:12px 15px}.dash-test-filterbar{align-items:stretch;flex-direction:column}.dash-test-search{min-width:0;width:100%;max-width:none}.dash-status{padding:14px}.shift-item{align-items:flex-start;flex-direction:column}.shift-item .btn{align-self:flex-end}}
 @media(prefers-reduced-motion:reduce){.dash-loading-bar span{animation:none}}

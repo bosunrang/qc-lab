@@ -91,4 +91,59 @@ assert.ok(unstable.issues.includes('Mean mục tiêu thay đổi'));
   assert.equal(cohort.cv, null, 'Mean 0 thi CV la null');
 }
 
+// (5) TRONG TẦM KIỂM SOÁT — ISO/TS 20914 lấy u(Rw) từ dữ liệu IQC "đại diện
+//     cho hoạt động thường quy ĐÃ được thẩm định sau khi quản lý QC". Một
+//     nhóm 30 điểm có 1 điểm +40 SD chưa ai đụng tới không thoả điều kiện đó.
+//     Trước 11/09/2026 nhóm như vậy vẫn được gắn `eligible` và vẫn chi phối
+//     khuyến nghị thiết kế QC — app cũ cũng vậy, nên `cross-app` không thấy.
+{
+  const base = [];
+  for (let i = 0; i < 30; i++) base.push({ id: `p${i}`, level: 1, lot: 'L', date: `2026-08-${String(i % 28 + 1).padStart(2, '0')}`, val: 100 + (i % 2), qc_mean: 100, qc_sd: 2 });
+
+  // Không có điểm lệch: vẫn `eligible` như trước.
+  {
+    const [c] = buildSigmaCohorts(base, '2026-08', [1], '2026-09-07');
+    assert.equal(c.status, 'eligible');
+    assert.deepEqual(c.outOfControl, { rejected: 0, unresolved: 0 });
+  }
+
+  // 1 điểm +40 SD chưa xử lý: KHÔNG được `eligible` nữa.
+  const withOutlier = [...base, { id: 'bad', level: 1, lot: 'L', date: '2026-08-15', val: 180, qc_mean: 100, qc_sd: 2 }];
+  {
+    const [c] = buildSigmaCohorts(withOutlier, '2026-08', [1], '2026-09-07');
+    assert.equal(c.status, 'out-of-control', 'nhóm có điểm mất kiểm soát chưa xử lý không được eligible');
+    assert.deepEqual(c.outOfControl, { rejected: 1, unresolved: 1 });
+    assert.ok(c.issues.some((item) => item.includes('±3SD')), `mong doi issue ve ±3SD, nhan duoc ${c.issues}`);
+    // KHÔNG được tự loại điểm đó ra khỏi CV — loại theo kết quả là selection
+    // bias, CV sẽ đẹp giả. Điểm vẫn nằm trong n và vẫn kéo CV lên.
+    assert.equal(c.n, 31, 'điểm mất kiểm soát vẫn nằm trong nhóm');
+    const clean = buildSigmaCohorts(base, '2026-08', [1], '2026-09-07')[0];
+    assert.ok(c.cv > clean.cv, 'CV phải phản ánh cả điểm lệch, không được làm đẹp');
+  }
+
+  // Điểm đó đã có hồ sơ khắc phục duyệt xong + kết luận hiệu quả: hết chặn.
+  {
+    const [c] = buildSigmaCohorts(withOutlier, '2026-08', [1], '2026-09-07', new Set(['bad']));
+    assert.equal(c.status, 'eligible', 'đã xử lý trọn vẹn thì nhóm dùng lại được');
+    assert.deepEqual(c.outOfControl, { rejected: 1, unresolved: 0 }, 'vẫn ghi nhận là đã từng mất kiểm soát');
+    assert.equal(c.n, 31, 'xử lý xong cũng KHÔNG loại điểm khỏi CV');
+  }
+
+  // Đúng 3,0 SD là "vượt" theo 1-3s? Không — Westgard nói "exceeds", nên đúng
+  // biên chưa tính. Dùng cùng quy ước với engine luật.
+  {
+    const edge = [...base, { id: 'e', level: 1, lot: 'L', date: '2026-08-16', val: 106, qc_mean: 100, qc_sd: 2 }];
+    const [c] = buildSigmaCohorts(edge, '2026-08', [1], '2026-09-07');
+    assert.equal(c.outOfControl.rejected, 1, '|z| = 3 đúng bằng vẫn bị coi là mất kiểm soát ở cổng thô này');
+  }
+
+  // Điểm thiếu snapshot Mean/SD thì không kết luận được gì — bỏ qua, không
+  // đoán bằng Mean/SD hiện hành (đó là cách sửa lịch sử).
+  {
+    const noSnap = [...base, { id: 'n', level: 1, lot: 'L', date: '2026-08-17', val: 180, qc_mean: null, qc_sd: null }];
+    const [c] = buildSigmaCohorts(noSnap, '2026-08', [1], '2026-09-07');
+    assert.equal(c.outOfControl.rejected, 0, 'thiếu snapshot thì không dán nhãn mất kiểm soát');
+    assert.equal(c.status, 'eligible');
+  }
+}
 console.log('app-v2 sigma-cohort oracle tests passed');

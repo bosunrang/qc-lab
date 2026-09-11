@@ -64,8 +64,31 @@ function currentPeriod(): string {
   const now = new Date();
   return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 7);
 }
+/** Sigma = (TEa − |Bias|) / CV cần ĐỦ BA đầu vào. Thiếu cái nào thì phải nói
+ * đích danh cái đó: thông báo cũ ("Chưa nhập CV hoặc Bias được chọn" /
+ * "Chưa đủ dữ liệu") không hề nhắc TEa, nên khi CV và Bias đã nhập đủ mà TEa
+ * chưa có thì người dùng không có cách nào biết còn thiếu gì. */
+function missingSigmaInputs(level: SigmaLevelResult): string[] {
+  const missing: string[] = [];
+  if (level.tea == null) missing.push('TEa');
+  if (level.cv == null) missing.push('CV IQC%');
+  if (level.biasEqa == null) missing.push('Bias EQA%');
+  return missing;
+}
+
 function cohortStatusLabel(status: SigmaCohortView['status'] | string): string {
-  return status === 'eligible' ? 'Đủ dữ liệu' : status === 'provisional' ? 'Tạm thời (20–29)' : status === 'insufficient' ? 'Chưa đủ (<20)' : 'Không ổn định';
+  return status === 'eligible' ? 'Đủ dữ liệu' : status === 'provisional' ? 'Tạm thời (20–29)' : status === 'insufficient' ? 'Chưa đủ (<20)'
+    : status === 'out-of-control' ? 'Mất kiểm soát chưa xử lý' : 'Không ổn định';
+}
+
+/** N/R của thiết kế QC, kèm phương án tương đương mà Westgard nêu sẵn.
+ * Westgard công bố HAI bảng khác nhau cho 2 mức và 3 mức QC, nên phải nói rõ
+ * bảng nào đang áp — nếu không, một phòng chạy 3 mức sẽ đọc N/R của bảng 2
+ * mức mà không biết. */
+function designRunText(design: { n: number; r: number; alternatives: { n: number; r: number; note?: string }[] }): string {
+  const one = (n: number, r: number) => `N=${n}` + (r > 1 ? ` · R=${r}` : '');
+  const alts = design.alternatives.map((alt) => one(alt.n, alt.r) + (alt.note ? ` (${alt.note})` : ''));
+  return [one(design.n, design.r), ...alts].join(' hoặc ');
 }
 
 /** Port `sgTips()` app cũ — thẻ khuyến nghị cải thiện, chỉ hiện khi Sigma
@@ -187,9 +210,15 @@ export function SigmaPage() {
   // Câu nhắc của nguồn CLIA phải nói rõ TEa% được giải RIÊNG tại Mean của
   // từng mức QC — nếu in một con số % chung cho cả xét nghiệm thì người đọc
   // sẽ đối chiếu sai với cột Sigma của từng mức.
+  // Thiếu TEa là nguyên nhân phổ biến nhất làm Sigma không tính được, mà bản
+  // thân dòng "TEa đang dùng: chưa có" không nói phải làm gì để có. Nói luôn
+  // hai đường xử lý: đổi nguồn, hoặc tạo hồ sơ TEa PXN ở Cấu hình chung.
+  const teaMissingHint = teaResolution?.value == null
+    ? ' Chưa có TEa thì KHÔNG tính được Sigma dù đã nhập đủ CV và Bias. Cách xử lý: đổi “Nguồn TEa” sang CLIA/Ricos/EFLM (xét nghiệm phải được gán analyte trong Bảng TEa tham chiếu), hoặc tạo hồ sơ TEa chuẩn hóa của phòng xét nghiệm ở Cấu hình chung → Bảng TEa tham chiếu.'
+    : '';
   const teaHint = teaSource === 'clia'
-    ? `Tiêu chí CLIA đang dùng: ${teaSourceValueText('clia')}. TEa% được tính riêng tại Mean mục tiêu của từng mức QC.${teaResolution?.note ? ` ${teaResolution.note}` : ''}`
-    : `TEa đang dùng: ${teaSourceValueText(teaSource)} · nguồn ${TEA_SOURCES.find((s) => s.value === teaSource)?.label || '—'}.${teaResolution?.note ? ` ${teaResolution.note}` : ''}`;
+    ? `Tiêu chí CLIA đang dùng: ${teaSourceValueText('clia')}. TEa% được tính riêng tại Mean mục tiêu của từng mức QC.${teaResolution?.note ? ` ${teaResolution.note}` : ''}${teaMissingHint}`
+    : `TEa đang dùng: ${teaSourceValueText(teaSource)} · nguồn ${TEA_SOURCES.find((s) => s.value === teaSource)?.label || '—'}.${teaResolution?.note ? ` ${teaResolution.note}` : ''}${teaMissingHint}`;
   const configuredTea = teaResolution?.value ?? null;
   const configuredTeaSource = teaResolution?.criterion || '';
   const targetMeanForLevel = (levelNumber: number) => (levelsByTestId[testId] || []).find((level) => level.level === levelNumber)?.mean ?? null;
@@ -230,7 +259,7 @@ export function SigmaPage() {
   function levelPayload(level: SigmaLevelResult): SigmaLevelSaveInput {
     return {
       level: level.level, tea: level.tea ?? undefined, targetMean: level.targetMean ?? undefined, cv: level.cv ?? undefined, biasEqa: level.biasEqa ?? undefined,
-      eqaRounds: level.eqaRounds.map(({ lab, target, bias }) => ({ lab, target, bias })), uCal: level.uCal ?? undefined,
+      eqaRounds: level.eqaRounds.map(({ lab, target, bias }) => ({ lab, target, bias })), uCref: level.uCref ?? undefined, uCal: level.uCal ?? undefined,
       muBiasMode: level.mu?.includeBias === false ? 'exclude' : 'include', cvSource: level.cvSource, cohortN: level.cohortN ?? undefined,
       sourceLot: level.sourceLot, sourceStart: level.sourceStart, sourceEnd: level.sourceEnd, cohortStatus: level.cohortStatus,
     };
@@ -348,7 +377,7 @@ export function SigmaPage() {
   if (!sigmaTests.length) {
     return <>
       <PageHeader title="Six Sigma & Sai số" subtitle="Đánh giá hiệu năng phương pháp theo TEa, CV IQC và Bias EQA/EQC" />
-      <div className="panel"><div className="empty-state sg-empty-state">
+      <div className="panel"><div className="empty-state analysis-empty-state">
         <b>Chưa có xét nghiệm nào trong Sigma</b>
         <span>{admin ? 'Bấm “+ Thêm xét nghiệm” để chọn từ danh mục đã khai báo trong Cấu hình chung.' : 'Liên hệ quản trị viên để thêm xét nghiệm từ Cấu hình chung.'}</span>
         {admin && <button className="btn teal" onClick={() => setTrackingPickerOpen(true)}>+ Thêm xét nghiệm</button>}
@@ -443,7 +472,7 @@ export function SigmaPage() {
                         <div className="sub">
                           {lv.sigma
                             ? <>CV IQC {lv.cv != null ? lv.cv.toFixed(2) : '—'}% · Bias EQA/EQC{lv.eqaRounds && lv.eqaRounds.length > 1 ? ' (RMS)' : ''} {lv.biasEqa != null ? lv.biasEqa.toFixed(2) : '—'}%<br />DPMO {formatDpmo(lv.sigma.dpmo)} · Yield {lv.sigma.yieldPercent.toFixed(4)}%</>
-                            : 'Chưa nhập CV hoặc Bias được chọn'}
+                            : `Chưa tính được Sigma — còn thiếu ${missingSigmaInputs(lv).join(', ')}`}
                         </div>
                       </div>
                     );
@@ -550,7 +579,7 @@ export function SigmaPage() {
                                 <span className={`tag${lv.sigma ? ` sg-zone ${lv.sigma.sigma >= 3 ? 'ok' : 'rej'}` : ''}`} style={lv.sigma ? { ['--sg-color' as never]: zone.c, color: zone.c, borderColor: zone.c } : undefined}>
                                   {lv.sigma ? lv.sigma.sigma.toFixed(2) : '—'}
                                 </span>
-                                <div className="sg-cell-meta" style={{ color: zone.c }}>{lv.sigma ? zone.label : 'Chưa đủ dữ liệu'}</div>
+                                <div className="sg-cell-meta" style={{ color: zone.c }}>{lv.sigma ? zone.label : `Thiếu ${missingSigmaInputs(lv).join(', ')}`}</div>
                               </div>
                             ) : '—'}
                           </td>
@@ -592,14 +621,14 @@ export function SigmaPage() {
                   {!lv.sigma ? <><td>—</td><td>Chưa đủ CV/Bias</td><td>Chưa đánh giá</td></>
                     : !eligible ? <><td><span className="hint">Chưa đủ dữ liệu</span></td><td>{lv.cvSource === 'iqc-cohort' ? cohortStatusLabel(lv.cohortStatus) : 'CV nhập tay'}</td><td>Không dùng để đề xuất QC</td></>
                       : !design ? <><td>—</td><td>—</td><td>—</td></>
-                        : <><td><b>{design.rules.join(' / ')}</b><div className="sg-cell-meta">N={design.n}{design.r > 1 ? ` · R=${design.r}` : ''} điểm/lần chạy</div></td><td>{design.risk}</td><td>{design.plan}</td></>}
+                        : <><td><b>{design.rules.join(' / ')}</b><div className="sg-cell-meta">{designRunText(design)} · bảng {design.levels} mức</div></td><td>{design.risk}</td><td>{design.plan}</td></>}
                 </tr>;
               })}
             </tbody></table></div>
             {governingLevel?.qualityDesign ? (
               <div className="alert info sg-governing-rule">
                 <b>Thiết kế QC dùng chung cho xét nghiệm</b>
-                <div>Mức quyết định: Mức {governingLevel.level} · Sigma {governingLevel.sigma?.sigma.toFixed(2)}. Áp dụng tham khảo: <b>{governingLevel.qualityDesign.rules.join(' / ')}</b> · N={governingLevel.qualityDesign.n}{governingLevel.qualityDesign.r > 1 ? ` · R=${governingLevel.qualityDesign.r}` : ''} điểm/lần chạy.</div>
+                <div>Mức quyết định: Mức {governingLevel.level} · Sigma {governingLevel.sigma?.sigma.toFixed(2)}. Áp dụng tham khảo: <b>{governingLevel.qualityDesign.rules.join(' / ')}</b> · {designRunText(governingLevel.qualityDesign)} · theo bảng Westgard Sigma Rules cho <b>{governingLevel.qualityDesign.levels} mức QC</b> (xét nghiệm đang có {governingLevel.qualityDesign.levelCount} mức).</div>
               </div>
             ) : <div className="hint sg-governing-rule">Chưa có mức IQC đủ điều kiện (≥30 điểm, cùng lô và Mean/SD ổn định) để đưa ra thiết kế QC dùng chung.</div>}
             <div className="alert info sg-opspec-note">Gợi ý theo <b>Westgard Sigma Rules</b> chỉ là điểm khởi đầu. Người phụ trách phải rà soát nguy cơ, độ ổn định hệ thống, khối lượng mẫu và hậu quả lâm sàng trước khi tự cấu hình luật Westgard.</div>
@@ -613,13 +642,14 @@ export function SigmaPage() {
           <div className="sg-collapse-body">
             <div className="sg-mu-table-wrap">
               <table className="sg-mu-summary-table">
-                <thead><tr><th>Mức</th><th className="num">Mean mục tiêu</th><th className="num">u(Rw)</th><th className="num">u(bias)</th><th className="num">u(cal)</th><th className="num">u_c</th><th className="num">U (k=2)</th><th className="num">U tại Mean</th><th className="num">U / TEa</th><th>Trạng thái</th><th>Thành phần thiếu</th><th>Thao tác</th></tr></thead>
+                <thead><tr><th>Mức</th><th className="num">Mean mục tiêu</th><th className="num">u(Rw)</th><th className="num">u(Cref)</th><th className="num">u(bias)</th><th className="num">u(cal)</th><th className="num">u_c</th><th className="num">U (k=2)</th><th className="num">U tại Mean</th><th className="num">U / TEa</th><th>Trạng thái</th><th>Thành phần thiếu</th><th>Thao tác</th></tr></thead>
                 <tbody>
                   {displayPeriod.levels.map((lv) => (
                     <tr key={lv.level}>
                       <td>Mức {lv.level}</td>
                       <td className="num">{lv.targetMean != null ? `${lv.targetMean}${test?.unit ? ` ${test.unit}` : ''}` : '—'}</td>
                       <td className="num">{lv.mu?.uRw != null ? lv.mu.uRw.toFixed(4) : '—'}</td>
+                      <td className="num">{lv.mu?.uCref != null ? lv.mu.uCref.toFixed(4) : '—'}</td>
                       <td className="num">{lv.mu?.uBias != null ? lv.mu.uBias.toFixed(4) : '—'}</td>
                       <td className="num">{lv.mu?.uCal != null ? lv.mu.uCal.toFixed(4) : '—'}</td>
                       <td className="num">{lv.mu?.uc != null ? lv.mu.uc.toFixed(4) : '—'}</td>
@@ -678,9 +708,9 @@ export function SigmaPage() {
         <MuModal
           level={muModal.level}
           onClose={() => setMuModal(null)}
-          onSubmit={async (uCal, muBiasMode) => {
+          onSubmit={async (uCref, uCal, muBiasMode) => {
             const result = await savePeriod(testId, muModal.period.period, muModal.period.tea ?? undefined, muModal.period.teaSource,
-              levelsPayloadFrom(muModal.period, muModal.level.level, { uCal, muBiasMode }));
+              levelsPayloadFrom(muModal.period, muModal.level.level, { uCref, uCal, muBiasMode }));
             if (result.ok) setMuModal(null);
             return result;
           }}
@@ -705,16 +735,46 @@ export function SigmaPage() {
 }
 
 function SigmaTrackingModal({ tests, onClose, onTrack }: { tests: Test[]; onClose: () => void; onTrack: (id: string) => void }) {
+  const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const q = query.trim().toLocaleLowerCase('vi');
   const rows = tests.filter((test) => !q || [test.name, test.unit, test.section].some((value) => value.toLocaleLowerCase('vi').includes(q)));
+  const availableCount = tests.filter((test) => test.sigma_tracked === 0).length;
+  function openTestCatalog() {
+    onClose();
+    navigate('/manage', { state: { tab: 'tests' } });
+  }
   return <Modal title="Thêm xét nghiệm vào Six Sigma" onClose={onClose} className="sg-tracking-modal" footer={<button className="btn ghost" onClick={onClose}>Đóng</button>}>
-    <div className="field"><label>Tìm xét nghiệm</label><input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tên xét nghiệm, khoa hoặc đơn vị..." /></div>
-    <div className="sg-tracking-list">
-      {rows.map((test) => <div className="sg-tracking-row" key={test.id}><div><b>{test.name}</b><span>{[test.section, test.unit].filter(Boolean).join(' · ') || 'Chưa có thông tin bổ sung'}</span></div>
-        {test.sigma_tracked !== 0 ? <span className="badge">Đang theo dõi</span> : <button className="btn teal sm" onClick={() => onTrack(test.id)}>Thêm</button>}
+    <div className="sg-tracking-toolbar">
+      <div className="sg-tracking-heading">
+        <div><b>Chọn từ danh mục xét nghiệm</b><span className="sg-tracking-subtitle">Thêm xét nghiệm cần theo dõi hiệu năng bằng Six Sigma.</span></div>
+        <span className="sg-tracking-count">{availableCount} có thể thêm</span>
+      </div>
+      <label htmlFor="sgTrackingSearch">Tìm xét nghiệm</label>
+      <div className="sg-tracking-search">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.3" /><path d="m15.5 15.5 4.2 4.2" /></svg>
+        <input id="sgTrackingSearch" className="sg-tracking-search-input" type="text" autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tên xét nghiệm, khoa hoặc đơn vị..." />
+        {query && <button type="button" aria-label="Xóa từ khóa tìm kiếm" onClick={() => setQuery('')}>✕</button>}
+      </div>
+    </div>
+    <div className="sg-tracking-list" aria-live="polite">
+      {rows.map((test) => <div className="sg-tracking-row" key={test.id}>
+        <div className="sg-tracking-test">
+          <span className="sg-tracking-mark" aria-hidden="true">Σ</span>
+          <div><b>{test.name}</b><span>{[test.section, test.unit].filter(Boolean).join(' · ') || 'Chưa có thông tin bổ sung'}</span></div>
+        </div>
+        {test.sigma_tracked !== 0 ? <span className="badge ok">Đang theo dõi</span> : <button className="btn teal sm" onClick={() => onTrack(test.id)}>+ Thêm</button>}
       </div>)}
-      {!rows.length && <p className="empty-state">Không tìm thấy xét nghiệm phù hợp.</p>}
+      {!rows.length && <div className="sg-tracking-empty" role="status">
+        <div className="sg-tracking-empty-icon" aria-hidden="true">
+          <svg viewBox="0 0 32 32"><path d="M8 6h16M10 6v7l-5 10.2A2 2 0 0 0 6.8 26h18.4a2 2 0 0 0 1.8-2.8L22 13V6" /><path d="M8.2 20h15.6" /><path d="M13 15.5h6" /></svg>
+        </div>
+        <b>{tests.length ? 'Không tìm thấy xét nghiệm phù hợp' : 'Danh mục xét nghiệm đang trống'}</b>
+        <p>{tests.length ? 'Thử tên xét nghiệm, khoa hoặc đơn vị khác.' : 'Hãy khai báo xét nghiệm trong Cấu hình chung trước khi thêm vào Six Sigma.'}</p>
+        {tests.length
+          ? <button type="button" className="btn ghost sm" onClick={() => setQuery('')}>Xóa từ khóa</button>
+          : <button type="button" className="btn teal sm" onClick={openTestCatalog}>Mở Cấu hình chung</button>}
+      </div>}
     </div>
   </Modal>;
 }
@@ -814,14 +874,15 @@ function CohortModal({ period, cohorts, onClose, onSubmit }: {
 
 function MuModal({ level, onClose, onSubmit }: {
   level: SigmaLevelResult; onClose: () => void;
-  onSubmit: (uCal: number | undefined, muBiasMode: 'include' | 'exclude') => Promise<{ ok: boolean; error?: { message: string } }>;
+  onSubmit: (uCref: number | undefined, uCal: number | undefined, muBiasMode: 'include' | 'exclude') => Promise<{ ok: boolean; error?: { message: string } }>;
 }) {
+  const [uCref, setUCref] = useState(level.uCref != null ? String(level.uCref) : '');
   const [uCal, setUCal] = useState(level.uCal != null ? String(level.uCal) : '');
   const [includeBias, setIncludeBias] = useState(level.mu?.includeBias !== false);
   const [err, setErr] = useState<string | null>(null);
 
   async function submit() {
-    const result = await onSubmit(uCal === '' ? undefined : Number(uCal), includeBias ? 'include' : 'exclude');
+    const result = await onSubmit(uCref === '' ? undefined : Number(uCref), uCal === '' ? undefined : Number(uCal), includeBias ? 'include' : 'exclude');
     if (!result.ok) setErr(result.error?.message || 'Lỗi không xác định.');
   }
 
@@ -833,13 +894,17 @@ function MuModal({ level, onClose, onSubmit }: {
         <thead><tr><th>Thành phần</th><th>Giá trị</th></tr></thead>
         <tbody>
           <tr><td>u(Rw) — từ CV%</td><td>{level.cv != null ? level.cv.toFixed(3) : <span className="badge warn">Chưa có</span>}</td></tr>
-          <tr><td>u(bias)</td><td>{level.mu?.uBias != null ? level.mu.uBias.toFixed(3) : <span className="badge warn">Chưa có</span>}</td></tr>
+          <tr><td>Bias quan sát (RMS các vòng EQA)</td><td>{level.biasEqa != null ? Math.abs(level.biasEqa).toFixed(3) : <span className="badge warn">Chưa có</span>}</td></tr>
+          <tr><td>u(Cref) — giá trị gán EQA/CRM</td><td>{level.mu?.uCref != null ? level.mu.uCref.toFixed(3) : <span className="badge warn">Chưa đánh giá</span>}</td></tr>
+          <tr><td>u(bias) = √(bias² + u(Cref)²)</td><td>{level.mu?.uBias != null ? level.mu.uBias.toFixed(3) : <span className="badge warn">Chưa có</span>}</td></tr>
           <tr><td>u(cal)</td><td>{level.mu?.uCal != null ? level.mu.uCal.toFixed(3) : <span className="badge warn">Chưa đánh giá</span>}</td></tr>
         </tbody>
       </table>
       <label className="sg-mu-bias-toggle">
         <input type="checkbox" checked={includeBias} onChange={(e) => setIncludeBias(e.target.checked)} /> Đưa u(bias) vào ngân sách
       </label>
+      <div className="field"><label>u(Cref) % — độ không đảm bảo của giá trị gán, từ báo cáo EQA/chứng chỉ CRM</label><input type="number" step="0.001" min="0" value={uCref} onChange={(e) => setUCref(e.target.value)} /></div>
+      <p className="hint">Chứng chỉ CRM ghi U(Cref) mở rộng thì lấy U(Cref)/2. Kết quả EQA/PT theo ISO 13528 thì lấy U/2 của giá trị gán vòng đó. Đây là con số do nhà cung cấp công bố — KHÔNG suy từ độ phân tán của chính các vòng bias (số đó chỉ cho biết ước lượng bias ổn định tới đâu{level.biasSem != null ? `, hiện là ${level.biasSem.toFixed(3)}%` : ''}). Bỏ trống thì u(Cref) VẮNG MẶT và ngân sách bị đánh dấu chưa đủ, không được coi là 0.</p>
       <div className="field"><label>u(cal) — từ CoA hiệu chuẩn (0 là kết luận hợp lệ, khác với bỏ trống)</label><input type="number" step="0.001" value={uCal} onChange={(e) => setUCal(e.target.value)} /></div>
       {level.mu && (
         <p className="sg-mu-preview">

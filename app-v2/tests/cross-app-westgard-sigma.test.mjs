@@ -8,6 +8,15 @@
 // chỉ phép so trực tiếp với bản đang dùng thật mới thấy. Nó đã bắt được đúng
 // một lệch như vậy: `acceptedPoints()` bỏ qua snapshot Mean/SD per-point.
 //
+// KHÔNG PHẢI ORACLE ĐÚNG/SAI. Bằng nhau ở đây chỉ có nghĩa "không trôi trong
+// lúc port", không có nghĩa app cũ đúng: đợt rà soát 10-11/09 tìm ra 4 lỗi mà
+// HAI BẢN sai giống hệt nhau (2of3-2s, 7T, snapshot của acceptedPoints, mức
+// độ 6x/7T). app-v2 đang được vừa đối chiếu vừa CẢI TIẾN, nên khi hai bên
+// lệch, căn cứ là NGUỒN NGOÀI (Westgard/CLSI/ISO) — xem
+// `tests/westgard-standard.test.mjs`, bộ gate sống tiếp sau khi cắt app cũ.
+// Mỗi lệch có chủ đích phải được chốt tường minh ở mục 4b/4c thay vì nới
+// lỏng phép so, để lệch NGOÀI Ý MUỐN vẫn bị bắt.
+//
 // VÒNG ĐỜI: file này sống tới lúc cắt bỏ app cũ — khi `src/`+`assets/` bị
 // xoá thì xoá file này cùng lúc, đừng cố "sửa cho chạy".
 //
@@ -52,13 +61,30 @@ const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed
 const gauss = () => { let s = 0; for (let i = 0; i < 12; i++) s += rnd(); return s - 6; };
 
 // ---------------------------------------------------------------- 1. Registry
+// 2 luật app-v2 CỐ Ý đổi MỨC ĐỘ so với app cũ (cảnh báo → loại bỏ), xem mục
+// 4c. Khác hẳn `DIVERGED` ở mục 4a/4b — chỗ đó là lệch ĐIỀU KIỆN KÍCH HOẠT
+// (luật nổ sai lúc), còn đây luật nổ đúng lúc, chỉ khác kết luận sau đó.
+const SEVERITY_DIVERGED = new Set(['6x', '7T']);
+
+// 6 luật app-v2 CỐ Ý đổi PHẠM VI so với app cũ (`across` thuần → `both`).
+// Lệch thứ ba, khác cả hai loại trên: luật nổ đúng lúc VÀ kết luận đúng, chỉ
+// khác ở chỗ nó có được PHÉP nhìn chuỗi trong TỪNG mức hay không. Xem mục 4d.
+const SCOPE_DIVERGED = new Set(['3-1s', '6x', '8x', '9x', '10x', '12x']);
+
 {
   const rOld = OLD.WG_RULE_REGISTRY, rV2 = rulesV2.WG_RULE_REGISTRY;
   same('registry:ids', rOld.map(r => r.id), rV2.map(r => r.id));
   // `desc` của 7T CỐ Ý lệch: app cũ ghi "(8 điểm QC)" đúng như engine cũ
   // làm, app-v2 sửa cả engine lẫn mô tả về đúng định nghĩa Westgard (BẢY
   // phép đo). Chốt riêng ở ngay dưới thay vì bỏ hẳn trường này.
-  const pick = (o) => o && ({ ...(o.id === '7T' ? {} : { desc: o.desc }), err: o.err, defaultOn: o.defaultOn, alert: o.alert, scope: o.scope, scopeMin: o.scopeMin, priority: o.priority, fix: o.fix });
+  // `alert`/`fix` của 6x và 7T CỐ Ý lệch: Westgard xếp cả hai là luật LOẠI
+  // BỎ, app cũ để cả hai là cảnh báo. Bỏ 2 trường đó khỏi phép so nguyên
+  // hàng rồi chốt riêng ở mục 4c — mọi trường khác vẫn canh từng ký tự.
+  const pick = (o) => o && ({
+    ...(o.id === '7T' ? {} : { desc: o.desc }), err: o.err, defaultOn: o.defaultOn,
+    ...(SEVERITY_DIVERGED.has(o.id) ? {} : { alert: o.alert, fix: o.fix }),
+    ...(SCOPE_DIVERGED.has(o.id) ? {} : { scope: o.scope }), scopeMin: o.scopeMin, priority: o.priority,
+  });
   assert.match(rOld.find((r) => r.id === '7T').desc, /8 điểm QC/, 'app cũ: 7T mô tả theo 8 điểm');
   assert.equal(rulesV2.WG_RULE_BY_ID['7T'].desc, '7 điểm QC liên tiếp tăng dần hoặc giảm dần', 'app-v2: 7T mô tả theo 7 điểm');
   checks += 2;
@@ -77,7 +103,8 @@ const gauss = () => { let s = 0; for (let i = 0; i < 12; i++) s += rnd(); return
   }
   same('WG_RULES', OLD.WG_RULES, rulesV2.WG_RULES);
   same('WG_DEFAULT_ON', [...OLD.WG_DEFAULT_ON].sort(), [...rulesV2.WG_DEFAULT_ON].sort());
-  same('WG_ALERT_RULES', OLD.WG_ALERT_RULES, rulesV2.WG_ALERT_RULES);
+  same('WG_ALERT_RULES:trừ-2-luật-đổi-mức-độ',
+    OLD.WG_ALERT_RULES.filter((r) => !SEVERITY_DIVERGED.has(r)), rulesV2.WG_ALERT_RULES);
   const dropTrend = (o) => Object.fromEntries(Object.entries(o).filter(([id]) => id !== '7T'));
   same('WG_RULE_DESCRIPTIONS', dropTrend(OLD.WG_RULE_DESCRIPTIONS), dropTrend(rulesV2.WG_RULE_DESCRIPTIONS));
 }
@@ -85,8 +112,12 @@ const gauss = () => { let s = 0; for (let i = 0; i < 12; i++) s += rnd(); return
 // -------------------------------------------- 2. Chính sách luật + loại sai số
 {
   for (const id of OLD.WG_RULES) {
-    for (const on of [true, false]) same(`defaultRuleAction:${id}:${on}`, OLD.defaultRuleAction(id, on), rulesV2.defaultRuleAction(id, on));
-    for (const n of [0, 1, 2, 3, 4, 6]) same(`defaultRuleScope:${id}:${n}`, OLD.defaultRuleScope(id, n), rulesV2.defaultRuleScope(id, n));
+    // Mức độ của 6x/7T chốt riêng ở mục 4c (lệch có chủ đích).
+    if (!SEVERITY_DIVERGED.has(id))
+      for (const on of [true, false]) same(`defaultRuleAction:${id}:${on}`, OLD.defaultRuleAction(id, on), rulesV2.defaultRuleAction(id, on));
+    // Phạm vi của họ đếm chuỗi chốt riêng ở mục 4d (lệch có chủ đích).
+    if (!SCOPE_DIVERGED.has(id))
+      for (const n of [0, 1, 2, 3, 4, 6]) same(`defaultRuleScope:${id}:${n}`, OLD.defaultRuleScope(id, n), rulesV2.defaultRuleScope(id, n));
   }
   const combos = [['1-2s'], ['1-3s'], ['R4s'], ['2-2s', '1-2s'], ['7T', '10x'], ['1-3s', 'R4s', '4-1s']];
   for (const c of combos) {
@@ -210,6 +241,75 @@ series.forEach((pts, i) => {
   }
 }
 
+// ------------- 4c. LỆCH MỨC ĐỘ có chủ đích: 6x và 7T là luật LOẠI BỎ
+// Westgard xếp `6x` và `7T` vào nhóm luật loại bỏ; app cũ để cả hai là cảnh
+// báo. Quyết định người dùng 2026-09-11: bỏ lệch chuẩn đó — mặc định theo
+// đúng Westgard, phòng xét nghiệm nào muốn cảnh báo thì tự hạ mức độ cho
+// TỪNG xét nghiệm ở cột "Hành động" (modal Danh mục xét nghiệm), nên vẫn
+// làm được mà không phải sửa mặc định toàn app.
+//
+// Đây là lệch KẾT LUẬN, không phải lệch điều kiện kích hoạt: cả hai bản đều
+// nổ luật ở cùng một chỗ (mục 4a/4b đã canh), chỉ khác điểm đó bị kết luận
+// "Cảnh báo" hay "Loại bỏ".
+{
+  for (const id of SEVERITY_DIVERGED) {
+    assert.equal(OLD.defaultRuleAction(id, true), 'alert', `app cũ: ${id} chỉ cảnh báo`);
+    assert.equal(rulesV2.defaultRuleAction(id, true), 'reject', `app-v2: ${id} phải là loại bỏ`);
+    // Tắt luật thì vẫn là "không dùng" ở cả hai bên — đổi mức độ không được
+    // đụng tới nhánh này.
+    same(`defaultRuleAction:${id}:false`, OLD.defaultRuleAction(id, false), rulesV2.defaultRuleAction(id, false));
+    checks += 2;
+  }
+  assert.deepEqual(rulesV2.WG_ALERT_RULES, ['1-2s'],
+    'chỉ còn 1-2s là luật cảnh báo — đúng Westgard');
+  checks += 1;
+
+  // Hạ xuống cảnh báo theo TỪNG xét nghiệm phải thật sự đổi kết luận, nếu
+  // không thì lời hứa "muốn cảnh báo thì cấu hình trong xét nghiệm" là suông.
+  const six = Array.from({ length: 6 }, () => ({ val: 0.5, trendTarget: 'same' }));
+  const only6x = (r) => r === '6x';
+  assert.equal(wgV2.westgard(six, 0, 1, only6x, () => 'reject').F.at(-1).level, 'rej',
+    'mặc định mới: 6x loại bỏ');
+  assert.equal(wgV2.westgard(six, 0, 1, only6x, () => 'alert').F.at(-1).level, 'warn',
+    'ghi đè theo xét nghiệm: hạ 6x xuống cảnh báo vẫn chạy');
+  checks += 2;
+}
+
+// ------------- 4d. LỆCH PHẠM VI có chủ đích: họ đếm chuỗi nhìn CẢ HAI chiều
+// Định nghĩa chuẩn cho phép đếm chuỗi theo cả hai chiều, và chiều CƠ BẢN là
+// qua nhiều lần chạy của CÙNG một mức:
+//   4-1s "These 4 may be from one control material or they may ALSO be ...
+//         across materials."
+//   10x  "usually has to be applied ACROSS RUNS and OFTEN across materials."
+// app cũ để `2-2s`/`4-1s` là `both` nhưng `3-1s`/`6x`/`8x`/`9x`/`10x`/`12x`
+// là `across` THUẦN — tự mâu thuẫn trong cùng một họ luật. Hệ quả thật, phát
+// hiện từ dữ liệu người dùng 2026-09-11: một mức trôi dần một phía trong khi
+// mức kia ổn định quanh Mean thì KHÔNG luật nào bắt, vì chuỗi gộp liên mức bị
+// xen kẽ dấu nên triệt tiêu tín hiệu.
+{
+  const withinOf = (mod, id, n) => ['within', 'both'].includes(mod.defaultRuleScope(id, n));
+  for (const id of SCOPE_DIVERGED) {
+    const min = rulesV2.WG_RULE_BY_ID[id].scopeMin;
+    assert.equal(OLD.defaultRuleScope(id, min), 'across', `app cũ: ${id} chỉ nhìn chéo mức`);
+    assert.equal(rulesV2.defaultRuleScope(id, min), 'both', `app-v2: ${id} phải nhìn cả hai chiều`);
+    // Dưới ngưỡng scopeMin thì cả hai bản đều rơi về `within` — đổi phạm vi
+    // KHÔNG được đụng tới nhánh đó.
+    same(`defaultRuleScope:${id}:${min - 1}`, OLD.defaultRuleScope(id, min - 1), rulesV2.defaultRuleScope(id, min - 1));
+    checks += 2;
+  }
+
+  // Hệ quả end-to-end, đúng tình huống đã gặp: 7 điểm của MỘT mức đều nằm
+  // cùng một phía Mean, xét nghiệm có 2 mức. Chỉ khác nhau ở chỗ `6x` có
+  // được phép chạy trên chuỗi từng mức hay không.
+  const drift = Array.from({ length: 7 }, () => ({ val: 0.5, trendTarget: 'same' }));
+  const isOn = (mod) => (r) => r === '6x' && withinOf(mod, '6x', 2);
+  assert.equal(wgV2.westgard(drift, 0, 1, isOn(OLD), () => 'reject').F.at(-1).level, 'ok',
+    'app cũ: 6x không nhìn chuỗi từng mức nên bỏ sót drift một mức');
+  assert.equal(wgV2.westgard(drift, 0, 1, isOn(rulesV2), () => 'reject').F.at(-1).level, 'rej',
+    'app-v2: 6x bắt được drift trong chính mức đó');
+  checks += 2;
+}
+
 // ------------------------------------------------ 5. Luật liên mức (một lần chạy)
 function makeLevelSets(nLevels, nRuns, opt = {}) {
   const sets = [];
@@ -245,7 +345,12 @@ multiCases.forEach((sets, i) => {
 const ON = new Set(OLD.WG_RULES.filter(r => OLD.WG_DEFAULT_ON.has(r)));
 const REJECT = new Set(OLD.WG_RULES.filter(r => OLD.defaultRuleAction(r, true) === 'reject'));
 const isOn = (r) => ON.has(r);
-const actionOf = (r) => rulesV2.defaultRuleAction(r, ON.has(r));
+// Mục 6 so ENGINE, không so bảng chính sách: dùng CHÍNH mức độ của app cũ cho
+// cả hai bên. Nếu để app-v2 dùng bảng mới (6x/7T đã thành loại bỏ, mục 4c) thì
+// mọi chuỗi có 6 điểm cùng phía sẽ lệch vì CHÍNH SÁCH khác nhau, che mất một
+// lệch THUẬT TOÁN thật nếu có — đúng bài học "chuẩn hoá ĐỐI XỨNG" đã ghi cho
+// bẫy `across`/`cv 0 vs null` ở các đợt trước.
+const actionOf = (r) => OLD.defaultRuleAction(r, ON.has(r));
 
 {
   const cases = [];
@@ -267,6 +372,18 @@ const actionOf = (r) => rulesV2.defaultRuleAction(r, ON.has(r));
       wgV2.acceptedPoints(c.pts, 100, 5, isOn, actionOf).map(p => p.id));
   });
   assert.ok(snapCases >= 9, 'phải còn nhánh snapshot — nó là nhánh đã bắt được lệch thật');
+
+  // Hệ quả THẬT của mục 4c, chốt riêng vì phép so ở trên cố ý dùng chính sách
+  // cũ: với bảng mặc định MỚI, một điểm nổ 6x bị loại khỏi chuỗi được chấp
+  // nhận (và khỏi cửa sổ đánh giá các điểm sau) — tức biểu đồ Levey-Jennings
+  // và Mean/SD/CV thực của trang Nhập QC đổi theo, không chỉ đổi nhãn.
+  const sixSameSide = Array.from({ length: 6 }, (_, i) => ({ id: `s${i}`, val: 100.5 }));
+  const v2Policy = (r) => rulesV2.defaultRuleAction(r, r === '6x');
+  const keptNow = wgV2.acceptedPoints(sixSameSide, 100, 5, (r) => r === '6x', v2Policy).map((p) => p.id);
+  const keptAsAlert = wgV2.acceptedPoints(sixSameSide, 100, 5, (r) => r === '6x', () => 'alert').map((p) => p.id);
+  assert.equal(keptNow.length, 5, 'mặc định mới: điểm thứ 6 nổ 6x bị loại khỏi chuỗi chấp nhận');
+  assert.equal(keptAsAlert.length, 6, 'hạ 6x xuống cảnh báo theo xét nghiệm thì giữ lại đủ 6 điểm');
+  checks += 2;
 }
 
 {
@@ -303,6 +420,40 @@ const actionOf = (r) => rulesV2.defaultRuleAction(r, ON.has(r));
   cases.forEach(([tea, bias, cv], i) => same(`sigmaMetric#${i}`, OLD.sigmaMetric(tea, bias, cv), sgV2.sigmaMetric(tea, bias, cv)));
 }
 
+// ----------- 7b. LỆCH CÓ CHỦ ĐÍCH: bảng gợi ý thiết kế QC theo số mức QC
+// Westgard công bố HAI bảng Sigma Rules, một cho 2 mức QC và một cho 3 mức,
+// khác nhau cả bộ luật lẫn N/R:
+//   2 mức: 5σ 1-3s/2-2s/R4s N=2 R=1 · 4σ +4-1s N=4 R=1 · <4σ +8x N=4 R=2
+//   3 mức: 5σ 1-3s/2of3-2s/R4s N=3 R=1 · 4σ +3-1s N=3 R=1 · <4σ +6x N=6 R=1
+// `QCCore.westgardSigmaRules(sigma)` của app cũ chỉ nhận sigma nên dùng MỘT
+// bảng pha trộn hai bảng đó (thêm 4-1s ở 5σ, thêm 8x ở 4σ, lấy 6x — luật của
+// bảng 3 mức — cho dưới 4σ, và N=8 ở 4σ/3σ, con số không có trong bảng nào).
+// app-v2 nhận thêm số mức QC. Chốt đúng sự lệch này ở đây để lần đọc sau
+// không "sửa cho khớp app cũ"; bảng đúng được khoá theo nguồn ngoài ở
+// app-v2/tests/sigma-qc-design.test.mjs.
+{
+  for (const sigma of [6.5, 5.2, 4.3, 3.2]) {
+    const old = OLD.westgardSigmaRules(sigma);
+    const two = sgV2.sigmaQualityDesign(sigma, 2);
+    const three = sgV2.sigmaQualityDesign(sigma, 3);
+    // app cũ trả CÙNG một thứ cho 2 mức và 3 mức — đó chính là lỗi.
+    assert.notDeepEqual([three.rules, three.n, three.r], [old.rules, old.n, old.r],
+      `Sigma ${sigma}: bảng 3 mức của app-v2 phải KHÁC bảng duy nhất của app cũ`);
+    // Ở tier ≥6σ hai bên trùng nhau một cách hợp lệ (1-3s, N=2 R=1 cho 2 mức).
+    if (sigma < 6) {
+      assert.notDeepEqual([two.rules, two.n, two.r], [old.rules, old.n, old.r],
+        `Sigma ${sigma}: bảng 2 mức của app-v2 cũng phải khác app cũ (app cũ thêm luật/N sai)`);
+    }
+    checks += 2;
+  }
+  // app cũ nói "phương pháp chưa đủ năng lực (<3σ)" cho một Sigma CHƯA TÍNH
+  // ĐƯỢC, vì `Number(null)` ra 0. app-v2 trả null.
+  assert.ok(OLD.westgardSigmaRules(null) && OLD.westgardSigmaRules(null).capable === false,
+    'app cũ trả thiết kế tier <3 cho sigma null');
+  assert.equal(sgV2.sigmaQualityDesign(null, 2), null, 'app-v2 không suy kết luận lâm sàng từ dữ liệu trống');
+  checks += 2;
+}
+
 // -------------------------------------------- 8. Bias EQA/EQC nhiều vòng (RMS)
 {
   // Hai bên nhận input KHÁC hình dạng: app cũ nhận cặp {lab,target} rồi tự
@@ -323,14 +474,36 @@ const actionOf = (r) => rulesV2.defaultRuleAction(r, ON.has(r));
     const near = (a, b2, what) => assert.ok(Math.abs(a - b2) < 1e-9, `lệch ${what} tại eqaRounds#${i}: ${a} vs ${b2}`);
     near(o.rms, v.rms, 'RMS');
     near(o.signedMean, v.mean, 'trung bình có dấu');
+    // App cũ gọi số này là `referenceUncertainty` và nạp thẳng vào u(bias)
+    // như thể nó là u(Cref). Thật ra nó là SAI SỐ CHUẨN của chính ước lượng
+    // bias (SD giữa các vòng / căn n) — app-v2 đổi tên thành `biasSem` và chỉ
+    // dùng làm chỉ số tham khảo. Con số thì vẫn phải khớp (cùng công thức);
+    // chỗ hai bên khác nhau là dùng nó để LÀM GÌ, chốt ở mục 9.
     const refOld = biasOld.referenceUncertainty(rounds);
-    if (refOld == null) assert.equal(v.biasRefU, null, `u(Cref) phải null tại eqaRounds#${i}`);
-    else near(refOld, v.biasRefU, 'u(Cref)');
+    if (refOld == null) assert.equal(v.biasSem, null, `biasSem phải null tại eqaRounds#${i}`);
+    else near(refOld, v.biasSem, 'sai số chuẩn của ước lượng bias');
   });
 }
 
 // ---------------------------------------------- 9. Ngân sách độ không đảm bảo
+//
+// LỆCH CÓ CHỦ ĐÍCH (11/09/2026): hai bên đặt tên và lấy nguồn khác nhau cho
+// số hạng thứ hai của u(bias) = √(bias² + u(Cref)²).
+//   - app cũ: `biasRefU`, SUY từ SD chuỗi bias quan sát / căn(n).
+//   - app-v2: `uCref`, NHẬP từ báo cáo EQA/chứng chỉ CRM (Nordtest TR 537:
+//     u(Cref) là độ không đảm bảo của GIÁ TRỊ GÁN; CRM lấy U(Cref)/2, PT
+//     theo ISO 13528 lấy U/2 của giá trị gán vòng đó).
+// Hai đại lượng khác hẳn nhau, nhưng đứng CÙNG MỘT CHỖ trong công thức. Nên
+// ở đây chuẩn hoá ĐỐI XỨNG — truyền cùng một con số vào `biasRefU` của app
+// cũ và `uCref` của app-v2, bỏ đúng 2 khoá tên khác nhau + `missing`/
+// `complete` ở CẢ HAI phía — rồi so phần PHÉP TÍNH. Khác biệt hợp đồng
+// (app-v2 đòi u(Cref) mới coi là đủ) chốt riêng ở cuối mục.
 {
+  const stripMu = (r) => {
+    if (!r) return r;
+    const { biasRefU, uCref, missing, complete, ...rest } = r;
+    return rest;
+  };
   const cases = [
     {}, { cv: 0 }, { cv: 3 }, { cv: 3, bias: 2 }, { cv: 3, bias: 2, uCal: 0.4 },
     { cv: 3, bias: 2, uCal: 0 }, { cv: 3, bias: -2, biasRefU: 1, uCal: 0.4 },
@@ -339,7 +512,27 @@ const actionOf = (r) => rulesV2.defaultRuleAction(r, ON.has(r));
     { cv: 3, bias: '', uCal: '' }, { cv: '3', bias: '2', uCal: '0.4', target: -100 },
   ];
   for (let i = 0; i < 40; i++) cases.push({ cv: rnd() * 6, bias: (rnd() - 0.5) * 6, biasRefU: rnd() * 2, uCal: rnd() * 2, tea: rnd() * 15, target: rnd() * 200 });
-  cases.forEach((c, i) => same(`uncertaintyBudget#${i}`, OLD.uncertaintyBudget(c), sgV2.uncertaintyBudget(c)));
+  cases.forEach((c, i) => {
+    const { biasRefU, ...rest } = c;
+    const oldInput = biasRefU === undefined ? c : { ...rest, biasRefU };
+    const v2Input = biasRefU === undefined ? c : { ...rest, uCref: biasRefU };
+    same(`uncertaintyBudget#${i}`, stripMu(OLD.uncertaintyBudget(oldInput)), stripMu(sgV2.uncertaintyBudget(v2Input)));
+  });
+
+  // Khác biệt hợp đồng, chốt tường minh: có bias mà CHƯA có u(Cref) thì app
+  // cũ vẫn báo ngân sách "đủ" (vì nó tự suy ra một con số), app-v2 báo thiếu.
+  {
+    const input = { cv: 3, bias: 1.2, uCal: 0.5 };
+    assert.equal(OLD.uncertaintyBudget(input).complete, true, 'app cũ coi ngân sách là đủ khi chưa có u(Cref)');
+    const v2 = sgV2.uncertaintyBudget(input);
+    assert.equal(v2.complete, false, 'app-v2 phải báo chưa đủ khi thiếu u(Cref)');
+    assert.ok(v2.missing.includes('u(Cref)'), 'app-v2 phải nêu đích danh u(Cref)');
+    // Nhưng khi đã nhập u(Cref) thì hai bên ra CÙNG một con số.
+    same('uncertaintyBudget:uCref-da-nhap',
+      stripMu(OLD.uncertaintyBudget({ ...input, biasRefU: 0.3 })),
+      stripMu(sgV2.uncertaintyBudget({ ...input, uCref: 0.3 })));
+    checks += 3;
+  }
 }
 
 // ------------------------------------------------------ 10. Lớp giải TEa
@@ -482,7 +675,14 @@ const actionOf = (r) => rulesV2.defaultRuleAction(r, ON.has(r));
   const norm = (c) => ({
     level: c.level, lot: c.lot, n: c.n, cv: Math.round((c.cv == null ? 0 : c.cv) * 1e9) / 1e9,
     start: c.start, end: c.end, targetMean: c.targetMean, targetSd: c.targetSd,
-    issues: (c.issues || []).map((i) => ISSUE[i] || i).sort(), excluded: c.excluded,
+    // LỆCH CÓ CHỦ ĐÍCH (11/09/2026): app-v2 thêm một cổng app cũ KHÔNG có —
+    // nhóm còn điểm vượt ±3SD chưa có hồ sơ khắc phục hiệu quả thì không được
+    // `eligible` (ISO/TS 20914: u(Rw) phải lấy từ dữ liệu IQC đại diện cho
+    // hoạt động thường quy ĐÃ được thẩm định sau khi quản lý QC). Bỏ đúng issue
+    // đó ở CẢ HAI phía — app cũ không bao giờ sinh ra nó nên đây là cùng một
+    // phép lọc, không phải chuẩn hoá một chiều. Cổng mới được chốt riêng ở
+    // app-v2/tests/sigma-cohort.test.mjs mục (5).
+    issues: (c.issues || []).map((i) => ISSUE[i] || i).filter((i) => !i.includes('±3SD')).sort(), excluded: c.excluded,
   });
   const oldCohorts = (pts, period, levels) => {
     run('state.data = { XT: ' + JSON.stringify(pts) + ' };');

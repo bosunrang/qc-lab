@@ -24,6 +24,20 @@
 .wg-archive-note{margin:12px var(--space-panel) 14px;max-width:none;}
 .panel.wg-prev-lot{background:#f7f9fa;border:1px dashed var(--line);}
 .panel.wg-prev-lot .wg-lot-name{color:#8f5a52;}
+.wg-prev-toggle{margin-left:8px;padding:3px 10px;font-size:var(--type-caption);font-weight:700;}
+/* Kết luận + "Cảnh báo CUSUM" xếp dọc, không nằm cạnh nhau: hai chip nói hai
+   chuyện khác nhau (điểm bị loại hay không / xu hướng CUSUM có vượt ngưỡng).
+   Giữ ô là `table-cell` — đặt `display:flex` trực tiếp lên <td> khiến nó rời
+   thuật toán bố cục bảng và các chip bị dồn về mép trái của cột. */
+.wg-table th.wg-verdict-head,.wg-table td.wg-verdict-cell{text-align:center;vertical-align:middle;}
+.wg-table td.wg-verdict-cell{display:table-cell;}
+.wg-table .wg-verdict-cell>.tag{display:table;width:max-content;margin:0 auto;}
+.wg-table .wg-verdict-cell>.tag+.tag{margin-top:4px;}
+.wg-support-rule{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;}
+.wg-rule-chips{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-xs) 3px;}
+.wg-rule-chips>.pill{margin:0;}
+.wg-table th.wg-evidence-head,.wg-table td.wg-evidence-cell{text-align:center;vertical-align:middle;}
+.wg-table .wg-evidence-cell>.wg-rule-chips{justify-content:center;}
 .wg-level-title{
   display:flex; align-items:baseline; gap:8px; min-width:0;
 }
@@ -164,33 +178,6 @@
    nâng hàng tab lên để có khoảng thở với đường viền dưới thay vì kéo viền
    xuống thấp hơn. */
 .wg-chart-mode{margin:12px var(--space-panel) 0; transform:translateY(-14px);}
-
-@media(max-width:760px){
-.wg-export-actions{flex-wrap:wrap}
-.wg-table{
-  width:100% !important; min-width:820px !important; margin:0 !important;
-}
-.wg-guide{
-  margin-bottom:12px !important;
-}
-.wg-test-picker{
-  grid-template-columns:1fr;margin-left:12px;margin-right:12px
-}
-.wg-test-picker.wg-test-picker-3{
-  grid-template-columns:1fr;max-width:none
-}
-.wg-rules{
-  margin-left:12px;margin-right:12px
-}
-.wg-cusum-heading{align-items:flex-start; flex-direction:column;}
-.wg-cusum-view-mode{align-self:flex-end;}
-.wg-level-meta{
-  width:100%;margin-left:0;white-space:normal
-}
-.panel>h3:first-child:has(.wg-level-title){
-  flex-wrap:wrap
-}
-}
 
 /* Bản cũ dùng `.panel>h3:first-child:has(.wg-lot-name/.wg-level-title)` để
    biến thẻ h3 đầu panel thành dải tiêu đề xám (giống .panel-head) — app-v2

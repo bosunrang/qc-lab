@@ -216,4 +216,23 @@ const sanitizedScopes = h.listRuleScopes(test1.id, 2);
 assert.equal(sanitizedScopes.find(s => s.id === '2-2s').scope, 'both');
 assert.equal(sanitizedScopes.find(s => s.id === '1-3s').scope, 'within');
 
+// Hai ô "để trống" của modal Sửa xét nghiệm phải NÓI RA giá trị thật mà chúng
+// rơi về. Bất biến sống còn: `defaultScope`/`defaultAction` là giá trị KHI
+// KHÔNG có ghi đè riêng — ghi đè của chính xét nghiệm không được che mất nó,
+// nếu không nhãn sẽ lặp lại đúng thứ người dùng vừa chọn và vô nghĩa.
+db.prepare('UPDATE tests SET rule_scopes_json=?, rule_actions_json=? WHERE id=?')
+  .run(JSON.stringify({ '6x': 'within' }), JSON.stringify({ '6x': 'alert' }), test1.id);
+const hints = h.listRuleScopes(test1.id, 2);
+const hint6x = hints.find(r => r.id === '6x');
+assert.equal(hint6x.scope, 'within', 'scope hieu luc phai theo ghi de rieng');
+assert.equal(hint6x.defaultScope, 'both', 'defaultScope la chuan cua ho dem chuoi, khong phai ghi de');
+assert.equal(hint6x.action, 'alert', 'action hieu luc phai theo ghi de rieng');
+assert.equal(hint6x.defaultAction, 'reject', 'defaultAction la muc do chuan, khong phai ghi de');
+
+// Không truyền số mức: main tự đếm mức đang vận hành, không nhận từ renderer.
+const selfCounted = h.listRuleScopes(test1.id);
+assert.equal(selfCounted.length, hints.length, 'goi khong tham so van tra du danh sach luat');
+assert.ok(selfCounted.every(r => r.defaultScope && r.defaultAction), 'moi luat phai co day du hai gia tri mac dinh');
+db.prepare('UPDATE tests SET rule_scopes_json=?, rule_actions_json=? WHERE id=?').run('{}', '{}', test1.id);
+
 console.log('app-v2 config-lots-handlers end-to-end tests passed');

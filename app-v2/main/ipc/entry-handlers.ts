@@ -3,6 +3,7 @@
 // làm thay đổi verdict chính cho tới khi hồ sơ được chấp nhận.
 import type { Db } from '../db/sqlite-like';
 import { listOperationalLevels, isTestInActivePanel, countOperationalLevels, OPERATIONAL_LOT_GROUP_SQL } from '../db/operational-levels';
+import { listPreviousLotSeriesData } from '../db/lot-lineage';
 // 3 kiểu dữ liệu trả về lấy từ HỢP ĐỒNG dùng chung thay vì khai lại: bản khai
 // cũ ở đây dùng `voided: number` trong khi hợp đồng khai `0 | 1`, và renderer
 // tin theo hợp đồng — hai khai báo song song cùng tên là đúng loại drift mà
@@ -191,46 +192,22 @@ export function createEntryHandlers(db: Db) {
   function listPreviousLotSeries(testId: string): PreviousLotSeries[] {
     const test = db.prepare('SELECT rule_actions_json,rule_scopes_json FROM tests WHERE id=?').get(testId) as { rule_actions_json: string; rule_scopes_json: string } | undefined;
     if (!test) return [];
-    const configs = db.prepare(`SELECT level,qc_lot_id,mean_sd_history_json FROM test_levels WHERE test_id=? ORDER BY level`).all(testId) as
-      { level: number; qc_lot_id: string | null; mean_sd_history_json: string }[];
     const overrides = parseRuleActions(test.rule_actions_json);
     const on = makeIsOnLayered(globalRules(), overrides);
     const actionOf = makeRuleActionLayered(globalRules(), overrides);
-    // Như trên: `configs` quyết định CHUỖI nào được hiển thị, còn phạm vi luật
-    // phải theo số mức đang vận hành để không lệch với chuỗi chính.
+    // Phạm vi luật theo SỐ mức đang vận hành, để không lệch với chuỗi chính.
     const scope = makeScopeOf(parseRuleScopes(test.rule_scopes_json), countOperationalLevels(db, testId));
     const within = (rule: string) => on(rule) && ['within', 'both'].includes(scope(rule));
-    const out: PreviousLotSeries[] = [];
-
-    for (const config of configs) {
-      if (!config.qc_lot_id) continue;
-      let history: { qcLotId?: string; mean?: number | null; sd?: number | null }[] = [];
-      try { const parsed = JSON.parse(config.mean_sd_history_json || '[]'); if (Array.isArray(parsed)) history = parsed; } catch { /* bỏ mốc hỏng */ }
-      let currentLotId: string | null = config.qc_lot_id;
-      const seen = new Set<string>();
-      while (currentLotId && !seen.has(currentLotId)) {
-        seen.add(currentLotId);
-        const transition = db.prepare(`SELECT tr.from_lot_id
-          FROM lot_transitions tr JOIN qc_panel_tests pt ON pt.panel_id=tr.panel_id AND pt.test_id=?
-          WHERE tr.to_lot_id=? AND tr.status='accepted'
-          ORDER BY tr.approved_at DESC,tr.rowid DESC LIMIT 1`).get(testId, currentLotId) as { from_lot_id: string } | undefined;
-        if (!transition) break;
-        const previous = db.prepare('SELECT id,lot_no,level FROM qc_lots WHERE id=?').get(transition.from_lot_id) as { id: string; lot_no: string; level: number } | undefined;
-        if (!previous || previous.level !== config.level) break;
-        const points = pointsForLot(testId, config.level, previous.lot_no);
-        const saved = [...history].reverse().find((item) => item.qcLotId === previous.id && item.mean != null && item.sd != null && Number(item.sd) > 0);
-        const snap = [...points].reverse().find((point) => point.qc_mean != null && point.qc_sd != null && Number(point.qc_sd) > 0);
-        const mean = saved?.mean != null ? Number(saved.mean) : snap?.qc_mean != null ? Number(snap.qc_mean) : NaN;
-        const sd = saved?.sd != null ? Number(saved.sd) : snap?.qc_sd != null ? Number(snap.qc_sd) : NaN;
-        if (points.length && Number.isFinite(mean) && Number.isFinite(sd) && sd > 0) {
-          const result = westgardByPoint(points, mean, sd, within, actionOf);
-          out.push({ level: config.level, lotId: previous.id, lot: previous.lot_no, mean, sd,
-            points: points.map((point, index) => ({ ...point, verdict: result.F[index]?.level || 'ok', rules: result.F[index]?.rules || [] })) });
-        }
-        currentLotId = previous.id;
-      }
-    }
-    return out;
+    // Chọn lô/Mean/SD/điểm ở `db/lot-lineage.ts` — dùng chung với trang Phân
+    // tích Westgard để hai trang không chỉ ra hai lô cũ khác nhau. Ở đây chỉ
+    // còn phần riêng: chạy luật within rồi đóng gói theo `QcPointView`.
+    return listPreviousLotSeriesData(db, testId).map((series) => {
+      const result = westgardByPoint(series.points, series.mean, series.sd, within, actionOf);
+      return {
+        level: series.level, lotId: series.lotId, lot: series.lot, mean: series.mean, sd: series.sd,
+        points: series.points.map((point, index) => ({ ...point, verdict: result.F[index]?.level || 'ok', rules: result.F[index]?.rules || [] })) as unknown as PreviousLotSeries['points'],
+      };
+    });
   }
 
   /** Danh sach diem QC cua 1 muc, kem verdict Westgard tinh theo Mean/SD hien

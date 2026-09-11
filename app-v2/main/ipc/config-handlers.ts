@@ -16,8 +16,10 @@ import {
   type LotInput, type LotGroupInput, type PanelInput, type LotTransitionInput, type PreparedLotTransition,
 } from '../domain/manage-validation';
 import { validateTeaRef, TEA_LAB_SOURCE_LABELS, type TeaRefInput } from '../domain/tea-ref-validation';
-import { parseRuleScopes, serializeRuleScopes, effectiveScopeList, type RuleScopesMap } from '../domain/rule-config';
+import { parseRuleScopes, serializeRuleScopes, parseRuleActions, effectiveRuleConfigList, type RuleScopesMap } from '../domain/rule-config';
 import { RULE_SCOPES, WG_RULE_REGISTRY, type RuleScope } from '../domain/westgard-rules';
+import { readGlobalRules } from '../db/rule-settings';
+import { countOperationalLevels } from '../db/operational-levels';
 import { isoLocalDate } from '../domain/local-date';
 import { type Actor, type IpcResult, nowIso, writeAudit, rowToAuditEntry, notifyChanged, requireAdmin } from './shared';
 import { ymOfDate } from '../domain/period-lock-validation';
@@ -336,9 +338,18 @@ export function createConfigHandlers(db: Db) {
   /** Phạm vi áp dụng (within/across) từng luật, theo xét nghiệm — lưu ở
    * `tests.rule_scopes_json` và được Entry/Westgard thực thi. Chuỗi rỗng xoá
    * ghi đè để quay lại phạm vi SOP khuyến nghị. */
-  function listRuleScopes(testId: string, levelCount: number) {
-    const row = db.prepare('SELECT rule_scopes_json FROM tests WHERE id=?').get(testId) as { rule_scopes_json: string } | undefined;
-    return effectiveScopeList(parseRuleScopes(row ? row.rule_scopes_json : null), levelCount);
+  function listRuleScopes(testId: string, levelCount?: number) {
+    const row = db.prepare('SELECT rule_scopes_json, rule_actions_json FROM tests WHERE id=?').get(testId) as
+      { rule_scopes_json: string; rule_actions_json: string } | undefined;
+    // Số mức do MAIN tự đếm, không nhận từ renderer: phạm vi khuyến nghị phụ
+    // thuộc số mức ĐANG VẬN HÀNH (`operational-levels.ts`, dùng chung với
+    // Entry/Westgard), thứ renderer không có cách nào biết đúng. Tham số chỉ
+    // để test bơm số mức giả khi kiểm nhánh sanitize.
+    const levels = levelCount ?? countOperationalLevels(db, testId);
+    return effectiveRuleConfigList(
+      parseRuleScopes(row ? row.rule_scopes_json : null), levels,
+      readGlobalRules(db), parseRuleActions(row ? row.rule_actions_json : null),
+    );
   }
 
   function saveRuleScope(testId: string, ruleId: string, scope: RuleScope | '', actor: Actor): IpcResult<{ ruleId: string; scope: RuleScope | '' }> {

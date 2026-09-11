@@ -156,14 +156,6 @@
 .rc-chart-legend .bias{background:var(--amber);}
 .rc-chart-legend .limit{background:var(--red);}
 
-@media(max-width:760px){
-  .rc-stats-panel>.rc-stats-content{padding:var(--panel-content-gap) 12px 12px;}
-  .rc-crit-panel>.rc-criteria-content{margin:var(--panel-content-gap) 12px 12px;}
-  .rc-crit-panel>.rc-verdict-wrap{padding:0 12px 12px;}
-  .rc-stat-kpis{grid-template-columns:1fr;}
-  .rc-charts{grid-template-columns:1fr;}
-}
-
 /* Bù class app cũ CÓ CSS mà app-v2 để trống (2026-09-03, xem ghi chú cùng
    loại ở các file khác). Giá trị copy nguyên từ `assets/*.css`. */
 .rc-toolbar button.rc-add-btn,.rc-toolbar button.rc-delete-btn,.rc-toolbar button.rc-find-btn,
@@ -190,7 +182,6 @@
 .refrow .meta{display:block;margin-top:2px;color:var(--muted);font-size:var(--type-meta);font-weight:500;}
 .rc-create-typed{color:var(--teal);font-weight:750;}
 .rc-quick-add{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin-top:12px;}
-@media(max-width:760px){.rc-quick-add{grid-template-columns:1fr;}}
 /* Nút icon "Chọn nhanh" cạnh ô Người thực hiện/Loại mẫu — kích thước/lưới
    (`.rc-quick-field`/`.rc-icon-btn` width/height) đã có sẵn ở `pages.css` từ
    trước (chuẩn bị sẵn cho tính năng này), chỉ thiếu phần MÀU/VIỀN/con trỏ —

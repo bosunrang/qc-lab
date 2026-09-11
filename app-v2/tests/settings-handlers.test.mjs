@@ -63,5 +63,9 @@ assert.equal(cleared.data.logo_data, '');
 const storage = settings.getStorageInfo();
 assert.equal(storage.dbFileBytes, 0);
 assert.equal(storage.path, ':memory:');
+assert.equal(storage.engine, 'SQLite');
+assert.match(storage.sqliteVersion, /^\d+\.\d+/);
+assert.equal(storage.schemaVersion, 1);
+assert.equal(storage.storageMode, 'memory');
 
 console.log('app-v2 settings-handlers end-to-end tests passed');

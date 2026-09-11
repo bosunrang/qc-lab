@@ -51,7 +51,7 @@ assert.equal(badTea.error.code, 'invalid-tea');
 // 2) Luu ky hop le: TEa=15, Muc 1 co CV=3, Bias=1.2, u(cal)=0.5
 const saved = sigmaHandlers.savePeriod({
   testId: test.id, period: '2026-08', tea: 15, teaSource: 'CLIA',
-  levels: [{ level: 1, cv: 3, biasEqa: 1.2, uCal: 0.5 }],
+  levels: [{ level: 1, cv: 3, biasEqa: 1.2, uCref: 0.3, uCal: 0.5 }],
 }, actor);
 assert.equal(saved.ok, true);
 const lv = saved.data.levels[0];
@@ -59,7 +59,13 @@ assert.ok(lv.sigma, 'phai tinh duoc sigma khi co du TEa/CV/Bias');
 // sigma = (15 - |1.2|) / 3
 assert.ok(Math.abs(lv.sigma.sigma - (15 - 1.2) / 3) < 1e-9);
 assert.ok(lv.mu, 'phai tinh duoc MU khi co CV');
-assert.equal(lv.mu.complete, true, 'du ca 3 thanh phan (cv/bias/cal) phai la complete');
+// u(Cref) la thanh phan THU TU cua ngan sach (Nordtest: u(bias) = sqrt(bias^2
+// + u(Cref)^2)). Truoc 11/09 no duoc SUY tu SD chuoi bias nen khong bao gio
+// thieu -> ngan sach luon "du" mot cach gia tao.
+assert.equal(lv.mu.complete, true, 'du ca 4 thanh phan (cv/bias/Cref/cal) phai la complete');
+assert.ok(Math.abs(lv.mu.uCref - 0.3) < 1e-12, 'u(Cref) phai la so da nhap, khong suy tu chuoi bias');
+// u(bias) = sqrt(1.2^2 + 0.3^2)
+assert.ok(Math.abs(lv.mu.uBias - Math.sqrt(1.2 * 1.2 + 0.3 * 0.3)) < 1e-12, 'u(bias) phai ghep u(Cref) theo Nordtest');
 
 // CLIA có giới hạn tuyệt đối phải chụp TEa theo TỪNG mức QC. Nếu dùng chung
 // tea của kỳ, hai mức có Mean khác nhau sẽ bị tính Sigma/MDC/MU sai.
@@ -120,6 +126,22 @@ const noCoA = sigmaHandlers.savePeriod({
 assert.equal(noCoA.ok, true);
 assert.equal(noCoA.data.levels[0].mu.complete, false);
 assert.ok(noCoA.data.levels[0].mu.missing.includes('u(cal)'));
+// Cung nguyen tac cho u(Cref): chua co bao cao EQA/chung chi thi VANG MAT.
+assert.ok(noCoA.data.levels[0].mu.missing.includes('u(Cref)'), 'thieu u(Cref) phai vao missing[]');
+assert.equal(noCoA.data.levels[0].mu.uCref, null, 'u(Cref) chua danh gia phai la null, khong duoc la 0');
+// Nhung o che do ISO/TS 20914 (bias da hieu chinh, khong cong vao ngan sach)
+// thi u(Cref) khong con y nghia -> khong duoc doi.
+const noBiasBranch = sigmaHandlers.savePeriod({
+  testId: test.id, period: '2026-09', tea: 15,
+  levels: [{ level: 1, cv: 3, biasEqa: 1.2, uCal: 0.5, muBiasMode: 'exclude' }],
+}, actor);
+assert.equal(noBiasBranch.ok, true);
+assert.ok(!noBiasBranch.data.levels[0].mu.missing.includes('u(Cref)'), 'tat nhanh bias thi khong doi u(Cref)');
+assert.equal(noBiasBranch.data.levels[0].mu.complete, true);
+// u(Cref) am bi chan ngay o IPC.
+const badUCref = sigmaHandlers.savePeriod({ testId: test.id, period: '2026-09', tea: 15, levels: [{ level: 1, cv: 3, uCref: -1 }] }, actor);
+assert.equal(badUCref.ok, false);
+assert.equal(badUCref.error.code, 'invalid-u-cref');
 assert.equal(noCoA.data.levels[0].mu.uCal, null, 'u(cal) chua danh gia phai la null, khong duoc la 0');
 
 // Không được giả định Bias = 0 khi EQA/EQC chưa có: Sigma phải để trống để
@@ -141,7 +163,7 @@ const eqaLv = eqaSaved.data.levels[0];
 assert.ok(Math.abs(eqaLv.biasEqa - 2) < 1e-9, 'bias phai la RMS=2, khong phai trung binh cong=0');
 assert.equal(eqaLv.mixedSigns, true, 'phai bao dau trai nhau de canh bao tren UI');
 assert.deepEqual(eqaLv.eqaRounds, [{ lab: 98, target: 100, bias: -2 }, { lab: 102, target: 100, bias: 2 }]);
-// u(bias) phai tinh duoc tu bias RMS + biasRefU (SD giua cac vong/can(n))
+// u(bias) phai tinh duoc tu bias RMS (u(Cref) chua nhap thi vang mat, xem muc 5)
 assert.ok(eqaLv.mu.uBias != null, 'co eqaRounds phai tinh duoc u(bias), khong con null');
 
 // 7) Chặn dữ liệu số không hợp lệ ngay ở IPC, thay vì lưu NaN vào JSON rồi

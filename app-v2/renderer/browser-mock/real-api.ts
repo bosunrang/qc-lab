@@ -180,7 +180,7 @@ export async function createRealBrowserApi(): Promise<QcApi> {
     listTestLevels: async (testId: string) => config.listTestLevels(testId),
     saveTestLevel: async (input) => config.saveTestLevel(input, requireActor()),
     listActivity: async (limit?: number) => config.listActivity(limit),
-    listRuleScopes: async (testId: string, levelCount: number) => config.listRuleScopes(testId, levelCount),
+    listRuleScopes: async (testId: string) => config.listRuleScopes(testId),
     saveRuleScope: async (testId: string, ruleId: string, scope) => config.saveRuleScope(testId, ruleId, scope, requireActor()),
     listLots: async () => config.listLots(),
     saveLot: async (input) => config.saveLot(input, requireActor()),
@@ -234,6 +234,7 @@ export async function createRealBrowserApi(): Promise<QcApi> {
     resetRuleSettings: async () => westgard.resetRuleSettings(requireActor()),
     listArchivedBlocks: async (testId: string, groupId: string) => westgard.listArchivedBlocks(testId, groupId),
     listArchivedGroupTests: async (groupId: string) => westgard.listArchivedGroupTests(groupId),
+    listPreviousLotBlocks: async (testId: string) => westgard.listPreviousLotBlocks(testId),
 
     // sigma
     listSigmaPeriods: async (testId: string) => sigma.listPeriods(testId),

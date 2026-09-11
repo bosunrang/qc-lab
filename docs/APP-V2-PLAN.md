@@ -33,6 +33,24 @@ tác trên hàng dạng icon (`.row-action`), một xét nghiệm gán được 
 - Thấy chi tiết giao diện nào có vẻ nên đổi thì **hỏi trước**, không tự đổi.
 - Cải tiến giao diện về sau của người dùng **không liên quan gì tới app cũ**.
 
+**Quy ước bàn phím trong modal (chốt 2026-09-11).** Enter = bấm **nút chính**,
+định nghĩa là nút `.btn.teal` trong `.modal-f`. Cài đặt MỘT chỗ ở
+`components/Modal.tsx`, không phải từng modal — ~20 modal đều cần, mỗi modal tự
+viết một bản sẽ lệch nhau. Bốn cổng loại trừ, mỗi cổng là một lỗi thật nếu
+thiếu: bộ gõ tiếng Việt đang dựng ký tự (`isComposing`), ô đã tự xử lý Enter
+(`defaultPrevented`), `textarea`/`contenteditable` (Enter là xuống dòng), và
+`button`/`a` (Enter đã là bấm chính nó).
+
+- **Nút `danger` KHÔNG nhận Enter** — "Hủy điểm này", "Xác nhận mở khóa" là
+  thao tác không rút lại được, phải bấm chuột. Modal chỉ có nút "Đóng" (picker,
+  hướng dẫn) cũng không có gì để chạy.
+- **`DateField`: Enter CHỐT ngày đang gõ rồi dừng ở đó**, không lưu modal luôn.
+  Ô ngày chỉ commit khi blur; để Enter nổi bọt lên `Modal` là modal lưu TRƯỚC
+  khi commit và ngày vừa gõ mất im lặng. Bấm Enter lần nữa mới lưu.
+- `preventDefault()` trong `Modal` là thứ chặn submit chạy HAI lần với modal
+  dùng `<form>` thật: nó huỷ implicit submission của trình duyệt trước khi gọi
+  `click()`. Đã đo bằng bộ đếm lời gọi trong trình duyệt thật: đúng 1 lần.
+
 Vì sao phải viết thành nguyên tắc: ba gate parity cũ đều đo theo chiều "app cũ
 CÓ mà app-v2 THIẾU", nên mọi cải tiến giao diện của người dùng đều làm gate đỏ,
 và phản xạ "làm cho gate xanh" chính là kéo ngược cải tiến đó về app cũ. Đã xảy
@@ -44,14 +62,52 @@ ra ít nhất 3 lần. Đó là lỗi cơ chế, không phải lỗi trí nhớ 
 | `app-v2:ui-parity` | FAIL nếu app-v2 thiếu class/dòng chữ so app cũ | **chỉ báo cáo**, luôn exit 0 |
 | `app-v2:css-parity` | FAIL nếu app cũ có rule CSS mà app-v2 không | **class chết**: FAIL khi class dùng trong `.tsx` không có rule nào trong `app-v2/renderer/styles/`; không còn đọc `assets/` |
 
+### 1.1b Desktop-only — đã gỡ bố cục mobile (2026-09-11)
+
+Người dùng chốt app đi theo hướng **desktop**. Đã gỡ:
+
+- **57 khối `@media(max-width:N)` với N ≤ 980** (520/560/640/760/900/980) khỏi
+  `app-v2/renderer/styles/**` — bố cục xếp dọc cho điện thoại/tablet, modal
+  biến thành bottom-sheet, cỡ chữ bảng thu nhỏ, sidebar ẩn hoàn toàn.
+- **2 prelude chỉ tồn tại để CHẶN nhánh mobile** được gỡ bỏ hoặc viết lại:
+  `@media(min-width:761px) and (min-height:481px)` và `@media(min-width:500px)`
+  (luôn đúng → bỏ lớp bọc); `@media(min-width:901px) and (max-width:1050px)`
+  → `@media(max-width:1050px)`.
+- **`-webkit-overflow-scrolling:touch`** (5 chỗ) — thuộc tính chỉ có tác dụng
+  trên iOS Safari, chết trong Electron. Giữ `overscroll-behavior-x:contain`:
+  cái đó CÓ tác dụng trên desktop (chặn cuộn ngang lan ra ngoài/gesture lùi
+  trang trên trackpad).
+- **Class `assay-name`** — CSS duy nhất của nó nằm trong khối mobile đã gỡ, ở
+  desktop không có tác dụng gì. Gate "class chết" bắt được đúng nó cùng với
+  `cfg-assay-scope` (class này là ĐỊNH DANH, giữ lại và ghi vào baseline như
+  `cfg-assay-rule` đã làm).
+
+**Giữ lại có chủ đích:** `@media(max-width:1050px)` (thu gọn sidebar),
+`1150px` (Cấu hình chung đổi sidebar dọc thành thanh tab ngang), `1280px` —
+đó là **laptop hẹp**, vẫn là desktop thật. Và `prefers-reduced-motion` là
+accessibility, không phải mobile.
+
+**Điều làm cho việc gỡ này an toàn, không chỉ là "chưa ai thử":** cửa sổ
+Electron nay có `minWidth: 1024` / `minHeight: 700` (`app-v2/main/index.ts`).
+Dưới mức đó không còn bố cục nào đỡ, nên cửa sổ không được phép nhỏ hơn.
+Chọn 1024 (không phải 980) để mọi khối đã gỡ không bao giờ khớp lại được, kể
+cả khi trừ viền cửa sổ. `minHeight: 700` vẫn vừa màn hình 1366×768.
+
+`app-v2/ui-parity.manifest.json` bỏ 2 viewport `tablet` (980×760) và `mobile`
+(760×900), còn `desktop` 1440×900 + `compact` 1150×820; baseline bỏ 36 surface
+tương ứng. **Đừng thêm lại breakpoint < 1024 hay viewport hẹp hơn.**
+
+---
+
 ### 1.2 Nghiệp vụ — app cũ là bản ĐỐI CHIẾU, không phải chân lý
 
-Khớp app cũ không chứng minh là đúng. Đợt rà 10–11/09 tìm ra **4 khiếm khuyết
+Khớp app cũ không chứng minh là đúng. Đợt rà 10–11/09 tìm ra **5 khiếm khuyết
 mà CẢ HAI bản đều sai**: cửa sổ `2of3-2s`, số điểm `7T`, snapshot trong
-`acceptedPoints()`, mức độ `6x`/`7T`. Thứ tự căn cứ khi có tranh chấp:
+`acceptedPoints()`, mức độ `6x`/`7T`, và **phạm vi họ luật đếm chuỗi** (mục
+3.4). Thứ tự căn cứ khi có tranh chấp:
 
 1. **Định nghĩa chuẩn** — westgard.com, ISO 15189, ISO/TS 20914, CLIA/EFLM.
-   Gate: `app-v2/tests/westgard-standard.test.mjs` (154 phép kiểm, sống tiếp
+   Gate: `app-v2/tests/westgard-standard.test.mjs` (174 phép kiểm, sống tiếp
    sau khi cắt app cũ).
 2. **Quyết định sản phẩm** của người dùng, ghi trong tài liệu này.
 3. **App cũ** — chỉ dùng để PHÁT HIỆN lệch khi port
@@ -132,6 +188,17 @@ Thẻ lớn nhất. Đối chiếu từng tab:
 - Trùng xét nghiệm xét theo `(máy, teaRefKey hoặc tên)` — cùng Glucose trên hai
   máy là hợp lệ.
 - Xoá xét nghiệm bị **từ chối** khi còn điểm QC thuộc kỳ báo cáo đã khoá.
+- **Bảng luật nâng cao phải NÓI RA mặc định đang là gì** (2026-09-11): hai ô
+  để trống hiện "Theo cấu hình chung — Loại bỏ"/"Theo chuẩn — Cả hai phạm vi"
+  thay vì chỉ "Theo cấu hình chung"/"Phạm vi SOP khuyến nghị". Trước đó không
+  màn hình nào đọc ra được một luật đang chạy phạm vi/mức độ nào — chính chỗ
+  đã giấu lỗi phạm vi `6x` (mục 3.4). Số mức do MAIN tự đếm
+  (`countOperationalLevels`), renderer không được truyền vào: phạm vi khuyến
+  nghị phụ thuộc số mức ĐANG VẬN HÀNH, thứ renderer không biết đúng —
+  `TestsTab` từng truyền cứng `2`. `app_meta.westgardRules` chuyển thành module
+  dùng chung `main/db/rule-settings.ts` vì nay có HAI handler đọc nó
+  (`westgard-handlers` cho panel cấu hình chung, `config-handlers` cho nhãn
+  này); nhân bản SQL ở đây là lớp lỗi "hai màn hình nói hai chuyện".
 
 **Còn lại (2 mục, đều đã chốt lý do):**
 1. **Nhánh "Dự kiến" khi lưu Mean/SD sang nhóm lô khác** — app cũ có 3 lựa chọn
@@ -195,6 +262,33 @@ PDF.
   phạm vi, gợi ý khắc phục.
 - Phạm vi `within`/`across`/`both` được **thực thi thật** từ 2026-09-06;
   `makeScopeOf()` phụ thuộc SỐ mức **đang vận hành**.
+- **Luật liên mức đã đối chiếu chuẩn (2026-09-11).** Nguồn: Westgard, "The
+  Multirule Interpretation". Ba điều chốt lại, đều đã có test ở
+  `westgard-standard.test.mjs` (183 phép kiểm):
+  - Chuỗi GỘP xếp theo LẦN CHẠY rồi tới MỨC, nên `4-1s` = 2 mức × 2 lần chạy
+    (*"across materials and across runs"*) và `10x` = 5 lần chạy × 2 mức, hoặc
+    10 lần chạy của một mức (*"or to the measurements on just one material for
+    the last ten runs"*) — câu sau là căn cứ TRỰC TIẾP cho việc họ đếm chuỗi
+    phải là `both`.
+  - `2-2s` CỐ Ý bị loại khỏi chuỗi gộp
+    (`WG_RUN_RULES.filter(rule !== '2-2s')`): *"within a material and across
+    runs"* đã do kênh TỪNG MỨC lo. Không loại thì mức 2 của lần chạy trước ghép
+    với mức 1 của lần chạy này thành "2 phép đo liên tiếp" — chéo cả mức lẫn
+    lần chạy, vô nghĩa. Có ca phân biệt riêng cho chính điều này.
+  - `R4s` chỉ within-run, đúng *"should only be interpreted within-run"*.
+  Ghi chú thiết kế: với 3 mức QC, Westgard khuyến cáo bộ
+  `13s/2of3-2s/R4s/31s/6x/9x` vì *"The 22s, 41s, and 10x rules ... just don't
+  fit with multiples of 3"*. Đó là khuyến cáo CHỌN LUẬT, đã nằm ở bảng gợi ý
+  (`sigma-qc-design.test.mjs`); engine KHÔNG tự tắt luật nào — phòng xét nghiệm
+  vẫn được bật theo SOP của họ.
+- **Còn treo:** luật liên mức chạy trên MỌI điểm chưa huỷ, kể cả điểm đã bị
+  Westgard loại và chạy lại — khác CUSUM (đã chuyển sang chuỗi chấp nhận
+  2026-09-11). Chưa sửa vì có phụ thuộc vòng thật: `acceptedPoints()` cần biết
+  điểm nào bị luật liên mức loại (`rejectsAcross`), mà luật liên mức lại cần
+  biết chuỗi chấp nhận. Phạm vi ảnh hưởng hẹp hơn CUSUM (các luật trong-run
+  R4s/2-2s/2of3-2s/3-1s chỉ nhìn một lần chạy nên không bị); chỉ chuỗi gộp
+  (`4-1s`/`6x`/`10x`…) mới đọc điểm cũ đã bị loại. Cần một phương án 2 pha
+  trước khi đụng vào.
 - Tập "mức QC đang vận hành" dùng chung với thẻ Nhập QC qua
   `main/db/operational-levels.ts` — nhóm lô không vận hành thì mức bị loại
   HẲN; Panel tắt thì mức còn trong danh sách nhưng không điểm nào được đánh
@@ -202,6 +296,37 @@ PDF.
 - Theo chuẩn Westgard, `2of3-2s` là "2 trong 3 điểm bất kỳ" (không đòi điểm mới
   nhất phải vượt) và `7T` là **7 phép đo** (6 bước). Cả hai lệch app cũ có chủ
   đích.
+- **CUSUM (rà soát 2026-09-11).** Công thức tabular khớp NIST
+  (`C+ = max(0, C+ + z − k)`, `C− = min(0, C− + z + k)`), mặc định k=0,5/h=4
+  khớp Minitab, khởi tạo 0, đặt lại khi đổi baseline Mean/SD, bỏ điểm đã huỷ,
+  và KHÔNG đổi verdict Westgard (CUSUM là cảnh báo xu hướng). Hai điểm đã sửa:
+  - **Chạy trên CHUỖI ĐƯỢC CHẤP NHẬN**, không phải mọi điểm chưa huỷ. Điểm đã
+    bị Westgard loại đã được chạy lại; để nó tiếp tục đẩy C+ là đếm MỘT sự cố
+    hai lần, và làm hai nửa của cùng một bảng nói về hai chuỗi khác nhau.
+    Điểm ngoài chuỗi thừa kế C+/C− của điểm trước và không mang cờ CUSUM.
+  - **Đặt lại theo mốc NCE đã duyệt + kết luận hiệu quả**
+    (`action_completed_date`, không phải ngày đánh giá hiệu lực). Thực hành
+    CUSUM chuẩn đặt lại sau khi nguyên nhân bị loại bỏ; không có mốc này thì
+    C+ chỉ trôi về 0,5/điểm — đo được: drift 8 điểm ở +1,5SD rồi trở lại hoàn
+    toàn bình thường vẫn để lại **8 điểm mang cờ**. Đúng lớp lỗi "đã khắc phục
+    xong vẫn đỏ mãi" mà mục 3.1 đã tránh có chủ đích. Hồ sơ chưa duyệt hoặc
+    chưa kết luận hiệu quả KHÔNG đặt lại — nếu không, chỉ cần mở một hồ sơ là
+    cờ tự biến mất.
+- **Phạm vi họ luật đếm chuỗi là `both`, không phải `across` thuần** (sửa
+  2026-09-11 sau khi người dùng gặp ca thật: 7 điểm Mức 1 đều cùng phía Mean
+  mà không luật nào nổ). Lưu ý thuật ngữ đọc ngược so với tài liệu Westgard:
+  `within` của app = "across runs" của Westgard (trong TỪNG mức, qua nhiều lần
+  chạy), `across` của app = "across materials" (chéo mức trong cùng lần chạy).
+  Định nghĩa chuẩn cho phép đếm CẢ HAI chiều và lấy chiều qua-nhiều-lần-chạy
+  làm cơ bản — `4-1s`: *"may be from one control material or ... may ALSO be
+  applied across materials"*; `10x`: *"usually has to be applied ACROSS RUNS
+  and OFTEN across materials"*. app cũ để `2-2s`/`4-1s` là `both` nhưng
+  `3-1s`/`6x`/`8x`/`9x`/`10x`/`12x` là `across` thuần — tự mâu thuẫn trong
+  cùng một họ, và bỏ sót đúng ca một mức trôi dần trong khi mức kia ổn định
+  (chuỗi gộp xen kẽ dấu nên triệt tiêu tín hiệu). Hai ngoại lệ giữ nguyên:
+  `R4s` là `across` (*"should only be interpreted within-run"*), `7T` là
+  `within` (gộp mức tạo răng cưa giả). Chốt ở `westgard-standard.test.mjs`
+  và mục 4d của `cross-app-westgard-sigma.test.mjs`.
 
 **Còn lại (2 mục):**
 1. **"Xem lô cũ" trên trang Westgard** — `listPreviousLotBlocks` + test đã viết
@@ -233,22 +358,36 @@ biểu đồ xu hướng + MDC, xuất Excel/in PDF.
 - Bias nhiều vòng EQA dùng **RMS**, không dùng trung bình cộng có dấu.
 - TEa giải lại **tại Mean của TỪNG MỨC** khi nguồn là CLIA dạng giới hạn tuyệt
   đối (Sodium ±4 mmol/L ở Mean 140 = 2,857%; ở Mean 100 = 4,000%). Thứ tự ưu
-  tiên: snapshot của mức → giải từ nguồn đang khai → TEa cấp kỳ.
+  tiên: snapshot của mức → giải theo nguồn **đã chốt của kỳ** → TEa cấp kỳ →
+  giải theo nguồn **đang khai của xét nghiệm**. Bậc cuối thêm 2026-09-11: một
+  kỳ tạo lúc nguồn TEa chưa giải được sẽ chốt `tea = null`, mà snapshot NULL
+  không phải lịch sử cần bảo vệ — ghim vào nó thì kỳ đó vĩnh viễn không tính
+  được Sigma kể cả sau khi đã khai nguồn, và người dùng không có cách nào biết
+  phải xoá kỳ rồi tạo lại. Mọi snapshot THẬT (một con số) vẫn thắng bậc này nên
+  kỳ lịch sử không bị kéo theo cấu hình hôm nay (`sigma-level-tea.test.mjs`).
 - Thành phần MU chưa đánh giá để `null` và vào `missing[]`, **không đọc là 0**.
   `uCal: 0` là kết luận hợp lệ, khác "chưa nhập".
 - Backend **tự dựng lại** mô tả cohort từ `qc_points`; renderer chỉ chọn lô.
+- **Tra analyte cho TEa là khớp TUYỆT ĐỐI, không đoán theo tiền tố** (app cũ
+  dùng exact-rồi-longest-prefix nên "Glucose (huyết tương)" tự thừa hưởng TEa
+  của "Glucose" — lệch có chủ đích: thừa hưởng sai còn tệ hơn báo "chưa có").
+  Tập tên hợp lệ gồm mã/tên/viết tắt/alias **và dạng `Tên (Viết tắt)`** — đó là
+  định dạng ô "Tên xét nghiệm" tự sinh khi gợi ý analyte. Sửa 2026-09-11 sau
+  phản hồi người dùng: trước đó một xét nghiệm tên "Sodium (Na)" mà chưa gán
+  `tea_ref_key` không tra được analyte của chính nó, và trang Six Sigma chỉ nói
+  "chưa có" (`sigma-tea.test.mjs`). Hồ sơ TEa PXN của analyte có sẵn cũng được
+  khớp thêm theo `analyte_id` của dòng danh mục đã tra ra, không chỉ theo tên.
+- Thiếu bất kỳ đầu vào nào trong ba (TEa/CV/Bias) thì thông báo phải **nói đích
+  danh** thứ còn thiếu, không nói chung chung "chưa đủ dữ liệu".
 
-**Còn lại (3 mục — đều là câu hỏi SẢN PHẨM chung cho cả hai bản, không phải lỗi
-port; cần người dùng quyết trước khi code):**
-1. **Cohort IQC không kiểm trạng thái in-control.** 30 điểm có 1 điểm +40 SD
-   vẫn `eligible` và vẫn chi phối khuyến nghị QC. **Không nên** tự động loại
-   điểm Westgard-reject khỏi CV (tạo selection bias); cần workflow review có
-   truy vết. ⬜
-2. **Bảng gợi ý Sigma Rules chưa nhận số mức QC.** `sigmaQualityDesign(sigma)`
-   chỉ nhận sigma nên N/R lệch bảng Westgard Sigma Rules (2 mức và 3 mức có
-   thiết kế khác nhau: 3 mức dùng `2of3-2s`/`3-1s`/`6x`, N=6…). ⬜
-3. **`u(Cref)` đang là SEM của chuỗi bias quan sát**, trong khi Nordtest định
-   nghĩa là độ không đảm bảo của **giá trị gán** EQA/CRM. ⬜
+**Ba mục áp chuẩn quốc tế — ĐÃ LÀM 2026-09-11** (chi tiết ở mục 4.1):
+1. ✅ **Bảng gợi ý Sigma Rules theo số mức QC** — Westgard công bố hai bảng
+   khác nhau cho 2 mức và 3 mức; cả hai bản trước đó dùng một bảng pha trộn.
+2. ✅ **`u(Cref)` đúng nghĩa Nordtest** — độ không đảm bảo của **giá trị gán**
+   EQA/CRM, nhập từ báo cáo nhà cung cấp, không suy từ chuỗi bias quan sát.
+3. ✅ **Cohort IQC kiểm trong tầm kiểm soát** — nhóm còn điểm vượt ±3SD chưa
+   có hồ sơ khắc phục hiệu quả thì không được `eligible`; **không** tự loại
+   điểm khỏi CV (selection bias).
 
 ---
 
@@ -397,19 +536,101 @@ việc dùng app.
 | 2 | Commit mức độ `6x`/`7T` theo chuẩn | Westgard | dọn việc dở | **1** |
 | 3 | Điều hướng bàn phím cây + worksheet | Nhập QC | tính năng | 2 |
 | 4 | Chặn quyền 3 hàm đọc nhật ký | Nhật ký | bảo mật đọc | 2 |
-| 5 | Sigma Rules theo số mức QC (N/R) | Six Sigma | cần quyết định | 3 |
-| 6 | Cohort IQC kiểm in-control | Six Sigma | cần quyết định | 3 |
-| 7 | `u(Cref)` đúng nghĩa Nordtest | Six Sigma | cần quyết định | 3 |
+| ~~5~~ | ~~Sigma Rules theo số mức QC (N/R)~~ | Six Sigma | ✅ xong 11/09 | — |
+| ~~6~~ | ~~Cohort IQC kiểm in-control~~ | Six Sigma | ✅ xong 11/09 | — |
+| ~~7~~ | ~~`u(Cref)` đúng nghĩa Nordtest~~ | Six Sigma | ✅ xong 11/09 | — |
 | 8 | Nhánh "Dự kiến" Mean/SD sang nhóm lô khác | Cấu hình chung | tính năng | 4 |
 
-Ba mục Six Sigma (5–7) là **câu hỏi sản phẩm**, không phải lỗi port — app cũ
-cũng như vậy. Sửa chúng là lệch app cũ có chủ đích, cần người dùng quyết trước.
+Ba mục Six Sigma (5–7) đã làm xong ngày 2026-09-11 — xem 4.1. Cả ba là **lệch
+app cũ có chủ đích**: app cũ cũng sai như nhau nên `cross-app` không thể phát
+hiện, và ba lệch đó nay được chốt tường minh trong bộ test.
 
 **Ngoài phạm vi, đã đóng băng:** di trú dữ liệu từ app cũ (C4 — người dùng chốt
 cắt thẳng, không di trú), gợi ý Bias tự động ở NCE, phân trang bảng điểm
 Westgard.
 
 ---
+
+### 4.1 Áp chuẩn quốc tế cho Six Sigma (2026-09-11)
+
+Người dùng yêu cầu "vừa đối chiếu app cũ vừa đọc tài liệu Sigma chuẩn để áp
+dụng chuẩn quốc tế". Ba mục dưới đây **app cũ cũng sai y hệt**, nên bộ đối
+chiếu `cross-app` không thể phát hiện — mỗi mục nay có một bài test chốt theo
+NGUỒN NGOÀI, sống tiếp sau khi cắt app cũ.
+
+**(1) Bảng Westgard Sigma Rules theo SỐ MỨC QC.**
+Nguồn: [Westgard Sigma Rules](https://www.westgard.com/lessons/westgard-rules/westgard-rules/westgard-sigma-rules.html).
+Westgard công bố HAI bảng khác nhau:
+
+| Sigma | 2 mức QC | 3 mức QC |
+|---|---|---|
+| ≥6 | `1-3s` · N=2 R=1 | `1-3s` · N=3 R=1 |
+| 5–6 | `1-3s/2-2s/R4s` · N=2 R=1 | `1-3s/2of3-2s/R4s` · N=3 R=1 |
+| 4–5 | +`4-1s` · N=4 R=1 (hoặc N=2 R=2) | +`3-1s` · N=3 R=1 |
+| <4 | +`8x` · N=4 R=2 (hoặc N=2 R=4) | +`6x` · N=6 R=1 (hoặc N=3 R=2); `9x` thay `6x` → N=3 R=3 |
+
+`QCCore.westgardSigmaRules(sigma)` của app cũ chỉ nhận sigma, nên dùng MỘT
+bảng pha trộn: thêm `4-1s` ở 5σ, thêm `8x` ở 4σ, lấy `6x` (luật của bảng 3
+mức) cho dưới 4σ, và N=8 ở 4σ/3σ — con số không có trong bảng nào. Hệ quả:
+phòng chạy 3 mức nhận gợi ý của bảng 2 mức, và mọi tier từ 5σ xuống bị đề nghị
+nhiều luật + nhiều điểm QC hơn Westgard khuyến nghị.
+
+`sigmaQualityDesign(sigma, levelCount)` nay trả đúng hai bảng, kèm `levels`
+(bảng nào được áp), `levelCount` (số mức thật), `tier` và `alternatives`. Giao
+diện OPSpecs nói rõ "theo bảng Westgard Sigma Rules cho N mức QC". Sigma chưa
+tính được thì trả `null` thay vì tier `<3` — app cũ nói "phương pháp chưa đủ
+năng lực" cho một ô trống, vì `Number(null)` ra 0.
+
+Test: `app-v2/tests/sigma-qc-design.test.mjs` (50 phép kiểm theo bảng công bố).
+
+**(2) `u(Cref)` — độ không đảm bảo của GIÁ TRỊ GÁN.**
+Nguồn: Nordtest TR 537 — `u(bias) = √(RMS_bias² + u(Cref)²)`, trong đó
+`u(Cref)` là độ không đảm bảo của giá trị chứng nhận/giá trị gán: chứng chỉ
+CRM lấy `U(Cref)/2`; kết quả PT/EQA theo ISO 13528 lấy `U/2` của giá trị gán.
+
+Cả hai bản trước đó nạp vào chỗ đó **SD của chuỗi bias quan sát / √n** — sai số
+chuẩn của chính ước lượng bias, một đại lượng khác hẳn, và là con số app tự
+suy ra nên ngân sách MU **luôn "đủ thành phần" một cách giả tạo**.
+
+Nay: `uCref` là một ô nhập riêng trong modal MU (có ghi rõ lấy số ở đâu), lưu
+theo từng mức; thiếu thì **vắng mặt** và ngân sách bị đánh dấu chưa đủ, đúng
+nguyên tắc đã áp cho `u(cal)` — không đọc là 0. Số SEM cũ được giữ lại dưới
+tên đúng của nó (`biasSem`) làm chỉ số tham khảo, không vào ngân sách.
+
+Ghi chú mô hình: app dùng `u_c = √(u(Rw)² + u(bias)² + u(cal)²)` — HỖN HỢP có
+chủ đích. ISO/TS 20914 lấy `√(u(Rw)² + u(cal)²)` và đòi bias phải được **hiệu
+chỉnh**; Nordtest cộng `u(bias)` khi bias không hiệu chỉnh. Công tắc
+"Đưa u(bias) vào ngân sách" chính là chỗ chọn giữa hai nhánh, và đó là quyết
+định của người phụ trách — phần mềm không tự chọn. Tắt nhánh bias thì không
+đòi `u(Cref)` nữa.
+
+Test: `app-v2/tests/sigma-metrics.test.mjs` (viết lại theo công thức thay vì so
+với app cũ), `sigma-handlers.test.mjs`, và mục 9 của `cross-app` chốt lệch.
+
+**(3) Cohort IQC phải TRONG TẦM KIỂM SOÁT.**
+ISO/TS 20914 lấy `u(Rw)` từ dữ liệu IQC 6–12 tháng **đại diện cho hoạt động
+thường quy đã được thẩm định sau khi quản lý QC** — tức mọi lần mất kiểm soát
+đã được điều tra và xử lý. Một nhóm 30 điểm có 1 điểm +40 SD chưa ai đụng tới
+không thoả điều kiện đó, nhưng cả hai bản vẫn gắn `eligible` và vẫn cho nó chi
+phối khuyến nghị thiết kế QC.
+
+Nay có trạng thái mới `out-of-control`: nhóm còn điểm vượt ±3SD **chưa** có hồ
+sơ NCE đã duyệt + kết luận hiệu quả (khớp theo `point_id` đã có sẵn) thì không
+được `eligible`. Hai quyết định quan trọng:
+
+- **KHÔNG tự loại điểm mất kiểm soát khỏi CV.** Loại theo kết quả là selection
+  bias — CV sẽ đẹp giả và MU/Sigma lạc quan hơn thực tế. Điểm vẫn nằm trong
+  CV; thứ bị chặn là dùng nhóm đó để ĐỀ XUẤT thiết kế QC.
+- **Cổng này là cổng THÔ (`1-3s`)**, không chạy toàn bộ multirule — module
+  cohort cố ý không import engine Westgard. Một nhóm qua được cổng VẪN cần
+  người phụ trách rà soát biểu đồ trước khi dùng.
+
+Test: `app-v2/tests/sigma-cohort.test.mjs` mục (5).
+
+**Verify chung:** `app-v2:typecheck` sạch, `app-v2:test` **78/78** (thêm
+`sigma-qc-design.test.mjs`; `cross-app` lên 2463 phép), `app-v2:build` sạch,
+`app-v2:css-parity` đạt. Cả ba bản sửa đều được chứng minh test BẮT ĐƯỢC lỗi
+bằng cách hoàn tác tạm rồi xác nhận đỏ đúng assertion, sau đó phục hồi.
 
 ## 5. Quy trình làm việc
 

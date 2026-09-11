@@ -14,7 +14,14 @@ export interface LabProfile {
   brand_title: string; brand_sub: string; logo_text: string; logo_data: string;
 }
 
-export interface StorageInfo { dbFileBytes: number; path: string }
+export interface StorageInfo {
+  dbFileBytes: number;
+  path: string;
+  engine: 'SQLite';
+  sqliteVersion: string;
+  schemaVersion: number;
+  storageMode: 'file' | 'memory' | 'browser-preview';
+}
 
 export function createSettingsHandlers(db: Db, dbPath: string) {
   function getLabProfile(): LabProfile {
@@ -34,12 +41,26 @@ export function createSettingsHandlers(db: Db, dbPath: string) {
     return { ok: true, data: getLabProfile() };
   }
 
-  /** Kích thước file SQLite thật trên đĩa — thay cho khái niệm "dung lượng
-   * localStorage/IndexedDB" của bản cũ (không còn ý nghĩa ở app-v2, mọi dữ
-   * liệu giờ nằm trong 1 file SQLite thật). `:memory:` (test) không có file
-   * thật trên đĩa nên trả 0 thay vì ném lỗi. */
+  /** Đọc trạng thái trực tiếp từ chính kết nối SQLite thay vì để renderer
+   * ghi cứng tên engine/schema. Bản Electron dùng file SQLite trên đĩa;
+   * bản preview dùng sql.js/WASM và lưu ảnh database trong IndexedDB;
+   * `:memory:` chỉ dành cho test. */
   function getStorageInfo(): StorageInfo {
-    return { dbFileBytes: dbFileBytes(dbPath), path: dbPath };
+    const versionRow = db.prepare('SELECT sqlite_version() AS sqlite_version').get() as { sqlite_version?: unknown } | undefined;
+    const schemaRow = db.prepare("SELECT value FROM app_meta WHERE key='schemaVersion'").get() as { value?: unknown } | undefined;
+    const sqliteVersion = String(versionRow?.sqlite_version ?? '').trim();
+    const parsedSchemaVersion = Number(schemaRow?.value);
+    if (!sqliteVersion) throw new Error('Kết nối dữ liệu hiện tại không trả về phiên bản SQLite.');
+    return {
+      dbFileBytes: dbFileBytes(dbPath),
+      path: dbPath,
+      engine: 'SQLite',
+      sqliteVersion,
+      schemaVersion: Number.isFinite(parsedSchemaVersion) ? parsedSchemaVersion : 0,
+      storageMode: dbPath === ':memory:'
+        ? 'memory'
+        : dbPath.startsWith('IndexedDB:') ? 'browser-preview' : 'file',
+    };
   }
 
   return { getLabProfile, saveLabProfile, getStorageInfo };

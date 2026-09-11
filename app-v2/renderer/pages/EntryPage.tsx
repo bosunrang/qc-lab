@@ -168,7 +168,7 @@ export function EntryPage() {
   // `location.state.testId` là đường điều hướng chéo trang: Tổng quan bấm
   // "Xem QC" thì mở đúng xét nghiệm đó, đúng `dashboardGoEntryFollowup()` của
   // app cũ (mục còn treo từ Giai đoạn D2).
-  const navState = useLocation().state as { testId?: string } | null;
+  const navState = useLocation().state as { testId?: string; level?: number } | null;
   useEffect(() => {
     if (!summaries.length) return;
     const wanted = navState?.testId;
@@ -180,6 +180,10 @@ export function EntryPage() {
     const first = summaries.find((s) => isOperationalTest(s));
     if (first) selectLeaf(first.testId);
   }, [summaries, navState?.testId, tests, panels, lots, lotGroups]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const wantedLevel = Number(navState?.level);
+    if (navState?.testId === testId && Number.isFinite(wantedLevel) && levelNums.includes(wantedLevel)) setFocusLevel(wantedLevel);
+  }, [testId, levelNums, navState?.testId, navState?.level]);
 
   /** Nhóm lô có đang "hoạt động" không — port `qcLotGroupOperational()` app
    * cũ: `active!==false && status!=='stopped' && status!=='planned'`. Nhóm
@@ -490,9 +494,9 @@ export function EntryPage() {
   // trái." trước đây là thông báo DUY NHẤT cho mọi trường hợp trống — sai
   // với 2 thông báo tách biệt của app cũ.
   const emptyState = !tests.length
-    ? { title: 'Chưa có xét nghiệm', message: 'Cần khai báo xét nghiệm và mức QC trước khi nhập kết quả.', linkLabel: 'Thêm xét nghiệm' }
+    ? { title: 'Chưa có xét nghiệm', message: 'Cần khai báo xét nghiệm và mức QC trước khi nhập kết quả.', linkLabel: 'Thêm xét nghiệm', tab: 'tests' }
     : !summaries.some((s) => isOperationalTest(s))
-      ? { title: 'Chưa có xét nghiệm sẵn sàng nhập', message: 'Cần đưa xét nghiệm vào Panel QC, ghép Nhóm lô QC và gán Mean/SD trước khi nhập kết quả.', linkLabel: 'Cấu hình Mean/SD' }
+      ? { title: 'Chưa có xét nghiệm sẵn sàng nhập', message: 'Cần đưa xét nghiệm vào Panel QC, ghép Nhóm lô QC và gán Mean/SD trước khi nhập kết quả.', linkLabel: 'Cấu hình Mean/SD', tab: 'targets' }
       : null;
 
   return (
@@ -500,10 +504,10 @@ export function EntryPage() {
       <PageHeader title="Nhập QC" subtitle="Ghi nhận kết quả theo ngày, mức QC và lô đang vận hành" />
       {emptyState ? (
         <div className="panel">
-          <div className="empty">
-            <div className="empty-title">{emptyState.title}</div>
-            <div>{emptyState.message}</div>
-            {admin && <div className="empty-actions"><Link className="btn teal" to="/manage">{emptyState.linkLabel}</Link></div>}
+          <div className="empty-state analysis-empty-state">
+            <b>{emptyState.title}</b>
+            <span>{emptyState.message}</span>
+            {admin && <Link className="btn teal" to="/manage" state={{ tab: emptyState.tab }}>{emptyState.linkLabel}</Link>}
           </div>
         </div>
       ) : (

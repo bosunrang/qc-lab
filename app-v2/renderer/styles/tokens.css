@@ -161,13 +161,6 @@
   --scrollbar-thumb-hover:color-mix(in srgb, var(--scrollbar-thumb-base) 82%, black);
 }
 
-@media(max-width:760px){
-  :root{
-    --table-head-size:12.5px;
-    --table-body-size:12.5px;
-  }
-}
-
 *,*::before,*::after{box-sizing:border-box;}
 html,body,#root{height:100%;}
 body{margin:0;font-family:var(--sans);font-size:var(--type-body);color:var(--ink);background:var(--bg);}

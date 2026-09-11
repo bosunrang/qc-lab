@@ -6,7 +6,7 @@ import { create } from 'zustand';
 import type { SigmaPeriodView, SigmaCohortView, IpcResult } from '../../shared/qc-api';
 
 export interface SigmaLevelSaveInput {
-  level: number; /** TEa% snapshot của riêng mức QC (CLIA tuyệt đối phụ thuộc Mean). */ tea?: number; /** Mean mục tiêu tại thời điểm đánh giá, dùng đổi MU% sang đơn vị. */ targetMean?: number; cv?: number; biasEqa?: number; eqaRounds?: Array<{ lab: number | null; target: number | null; bias?: number }>; uCal?: number; muBiasMode?: 'include' | 'exclude';
+  level: number; /** TEa% snapshot của riêng mức QC (CLIA tuyệt đối phụ thuộc Mean). */ tea?: number; /** Mean mục tiêu tại thời điểm đánh giá, dùng đổi MU% sang đơn vị. */ targetMean?: number; cv?: number; biasEqa?: number; eqaRounds?: Array<{ lab: number | null; target: number | null; bias?: number }>; /** u(Cref)% - do khong dam bao cua GIA TRI GAN EQA/CRM, do nha cung cap cong bo. */ uCref?: number; uCal?: number; muBiasMode?: 'include' | 'exclude';
   cvSource?: 'manual' | 'iqc-cohort'; cohortN?: number; sourceLot?: string; sourceStart?: string; sourceEnd?: string; cohortStatus?: string;
 }
 

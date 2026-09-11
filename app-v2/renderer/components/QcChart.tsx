@@ -301,7 +301,9 @@ const MULTI_CUSUM_COLORS = [
   ['#0e8f8f', '#5369a6'], ['#7a4f9a', '#c47d12'], ['#2f7d5b', '#9a5b3c'],
 ] as const;
 
-export interface QcMultiLevelSeries { level: number; lot?: string; points: QcChartPoint[] }
+/** `label` chỉ cần khi một mức có NHIỀU đường (mức hiện hành + lô cũ khi bật
+ * "Xem lô cũ"): thiếu nó chú giải in "Mức 1" hai lần với hai màu. */
+export interface QcMultiLevelSeries { level: number; lot?: string; label?: string; points: QcChartPoint[] }
 
 /** Biểu đồ "Levey-Jennings tổng hợp" — quy đổi MỌI mức về Z-score để so sánh
  * trên cùng trục, mỗi mức 1 màu (port `drawLJMultiZ` app cũ, đơn giản hoá
@@ -461,7 +463,7 @@ function drawMulti(ctx: CanvasRenderingContext2D, width: number, height: number,
   ctx.font = '800 11.5px Manrope,system-ui,sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
   series.forEach((s, li) => {
     const color = MULTI_COLORS[li % MULTI_COLORS.length];
-    const label = `Mức ${s.level}`;
+    const label = s.label || `Mức ${s.level}`;
     ctx.fillStyle = color; ctx.fillRect(lx, ly - 2, 18, 4);
     ctx.fillStyle = '#17212b'; ctx.fillText(label, lx + 25, ly);
     lx += 25 + ctx.measureText(label).width + 18;

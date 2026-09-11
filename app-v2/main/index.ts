@@ -83,7 +83,7 @@ function createWindow(): void {
   ipcMain.handle('config:listTestLevels', (_event, testId) => config.listTestLevels(testId));
   ipcMain.handle('config:saveTestLevel', (_event, input) => config.saveTestLevel(input, requireActor()));
   ipcMain.handle('config:listActivity', (_event, limit) => config.listActivity(limit));
-  ipcMain.handle('config:listRuleScopes', (_event, testId, levelCount) => config.listRuleScopes(testId, levelCount));
+  ipcMain.handle('config:listRuleScopes', (_event, testId) => config.listRuleScopes(testId));
   ipcMain.handle('config:saveRuleScope', (_event, testId, ruleId, scope) => config.saveRuleScope(testId, ruleId, scope, requireActor()));
   ipcMain.handle('config:listLots', () => config.listLots());
   ipcMain.handle('config:saveLot', (_event, input) => config.saveLot(input, requireActor()));
@@ -133,6 +133,7 @@ function createWindow(): void {
   ipcMain.handle('westgard:resetRuleSettings', () => westgardHandlers.resetRuleSettings(requireActor()));
   ipcMain.handle('westgard:listArchivedBlocks', (_event, testId, groupId) => westgardHandlers.listArchivedBlocks(testId, groupId));
   ipcMain.handle('westgard:listArchivedGroupTests', (_event, groupId) => westgardHandlers.listArchivedGroupTests(groupId));
+  ipcMain.handle('westgard:listPreviousLotBlocks', (_event, testId) => westgardHandlers.listPreviousLotBlocks(testId));
 
   ipcMain.handle('sigma:listPeriods', (_event, testId) => sigmaHandlers.listPeriods(testId));
   ipcMain.handle('sigma:listCohorts', (_event, testId, period, levels) => sigmaHandlers.listCohorts(testId, period, levels));
@@ -179,6 +180,12 @@ function createWindow(): void {
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
+    // app-v2 là ứng dụng DESKTOP: không hỗ trợ bố cục mobile/tablet.
+    // Toàn bộ CSS `@media(max-width:N)` với N <= 980 đã bị gỡ (2026-09-11),
+    // nên cửa sổ hẹp hơn mức này sẽ không có bố cục nào đỡ. Chặn ở đây là
+    // thứ làm cho việc gỡ đó AN TOÀN, không chỉ là chưa ai thử.
+    minWidth: 1024,
+    minHeight: 700,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

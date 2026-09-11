@@ -50,6 +50,17 @@ const FIREBASE_RULES = `{
   }
 }`;
 
+function DataAdminIcon() {
+  return (
+    <svg className="settings-admin-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <ellipse cx="10" cy="5" rx="6.5" ry="2.5" />
+      <path d="M3.5 5v5c0 1.4 2.9 2.5 6.5 2.5.7 0 1.4 0 2-.1M3.5 10v5c0 1.4 2.9 2.5 6.5 2.5h1.2" />
+      <path d="M16.7 12.4a4.2 4.2 0 1 1-1.8 7.9 4.2 4.2 0 0 1 1.8-7.9Z" />
+      <path d="m15.1 16.6 1.1 1.1 2.2-2.3" />
+    </svg>
+  );
+}
+
 function formatBytes(bytes: number): string {
   if (bytes <= 0) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB'];
@@ -394,7 +405,17 @@ export function SettingsPage() {
       </div>
 
       <div className="panel settings-admin-panel">
-        <h2 className="panel-title">Quản trị dữ liệu</h2>
+        <div className="panel-head settings-admin-head">
+          <h2 className="settings-admin-title"><DataAdminIcon />Quản trị dữ liệu</h2>
+          <span
+            className={`settings-db-badge${storage ? ' is-ok' : ''}`}
+            title={storage
+              ? `${storage.engine} ${storage.sqliteVersion} · schema ${storage.schemaVersion} · ${storage.path}`
+              : 'Đang truy vấn trạng thái cơ sở dữ liệu'}
+          >
+            {storage ? `${storage.engine} · schema ${storage.schemaVersion}` : 'Đang kiểm tra…'}
+          </span>
+        </div>
         <div className="admin-tools">
           <div className="admin-tool">
             <b>Xuất backup</b>

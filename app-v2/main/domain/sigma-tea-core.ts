@@ -34,22 +34,40 @@ function aliasesOf(value: { aliases?: readonly string[]; aliases_json?: string }
   try { const parsed = JSON.parse(value.aliases_json || '[]'); return Array.isArray(parsed) ? parsed.filter((alias): alias is string => typeof alias === 'string') : []; } catch { return []; }
 }
 
+/** Mọi cách gọi HỢP LỆ của một dòng danh mục. Ngoài mã/tên/viết tắt/alias,
+ * phải có cả dạng `Tên (Viết tắt)` — đó chính là định dạng mà ô "Tên xét
+ * nghiệm" ở Cấu hình chung TỰ SINH khi gợi ý analyte ("Sodium (Na)"). Thiếu
+ * nó thì một xét nghiệm mang đúng tên do app đặt ra lại không tra được
+ * analyte của mình, và trang Six Sigma chỉ nói "chưa có" mà không nói vì sao.
+ *
+ * Vẫn là khớp TUYỆT ĐỐI, không phải đoán theo tiền tố: "CK" không bao giờ
+ * khớp "CK-MB", vì mỗi ứng viên phải bằng nhau nguyên chuỗi sau khi chuẩn
+ * hoá. Đây là điều kiện không được nới, TEa là tiêu chí lâm sàng. */
+function catalogAliases(item: TeaCatalogCore): string[] {
+  const names = [item.id, item.name, item.abbr, ...aliasesOf(item)];
+  if (item.name && item.abbr && key(item.abbr) !== key(item.name)) names.push(`${item.name} (${item.abbr})`);
+  return names;
+}
+
 export function findCatalog<T extends TeaCatalogCore>(test: Pick<TeaTestCore, 'name' | 'tea_ref_key'>, catalog: readonly T[]): T | null {
   const wanted = key(test.tea_ref_key || test.name);
   if (!wanted) return null;
-  // TEa là tiêu chí lâm sàng: không "đoán gần đúng" bằng startsWith (CK có
-  // thể nuốt CK-MB). Chỉ nhận mã/tên/viết tắt/alias khớp tuyệt đối.
-  return catalog.find((item) => [item.id, item.name, item.abbr, ...aliasesOf(item)].some((value) => key(value) === wanted)) || null;
+  return catalog.find((item) => catalogAliases(item).some((value) => key(value) === wanted)) || null;
 }
 
-function findRef(test: Pick<TeaTestCore, 'name' | 'tea_ref_key'>, refs: readonly TeaRefCore[]): TeaRefCore | null {
+/** `catalogId` là dòng danh mục đã tra được cho xét nghiệm này. Cần nó vì hồ
+ * sơ TEa PXN của một analyte CÓ SẴN được lưu với `analyte_id` của danh mục và
+ * `name` là tên danh mục ("Sodium"), trong khi xét nghiệm mang tên app tự sinh
+ * ("Sodium (Na)") — so tên trần thì không bao giờ gặp nhau. */
+function findRef(test: Pick<TeaTestCore, 'name' | 'tea_ref_key'>, refs: readonly TeaRefCore[], catalogId?: string): TeaRefCore | null {
   const wanted = key(test.tea_ref_key || test.name);
-  return refs.find((ref) => [ref.analyte_id || '', ref.name, ...aliasesOf(ref)].some((value) => key(value) === wanted)) || null;
+  const keys = new Set([wanted, catalogId ? key(catalogId) : ''].filter(Boolean));
+  return refs.find((ref) => [ref.analyte_id || '', ref.name, ...aliasesOf(ref)].some((value) => keys.has(key(value)))) || null;
 }
 
 export function resolveTea<T extends TeaCatalogCore>(test: TeaTestCore, refs: readonly TeaRefCore[], catalogRows: readonly T[], source: SigmaTeaSourceCore, targetMean?: number | null): ResolvedTeaCore<T> {
   const catalog = findCatalog(test, catalogRows);
-  const ref = findRef(test, refs);
+  const ref = findRef(test, refs, catalog?.id);
   if (source === 'eflm') {
     const hasTrace = test.tea_source === 'eflm' || !!(test.eflm_analyte || test.eflm_ref || test.eflm_lookup_date);
     const value = Number(test.tea);

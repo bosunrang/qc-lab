@@ -89,7 +89,16 @@ export function DateField({ label, value, onChange, defaultValue, name, id, disa
       <input ref={textRef} id={id} className="date-text" inputMode="numeric" placeholder="dd/mm/yyyy"
         disabled={disabled} aria-label={label} defaultValue={formatDateDisplay(iso)}
         key={isControlled ? iso : undefined}
-        onBlur={(e) => commit(parseDateInput(e.target.value))} />
+        onBlur={(e) => commit(parseDateInput(e.target.value))}
+        onKeyDown={(e) => {
+          // Enter CHỐT ngày đang gõ rồi DỪNG ở đây (preventDefault), không để
+          // nổi bọt lên `Modal` — nếu không, modal sẽ lưu TRƯỚC khi `onBlur`
+          // kịp commit và ngày vừa gõ bị mất im lặng. Cùng quy ước với ô năm
+          // của lịch chọn ngày. Bấm Enter lần nữa mới là lưu modal.
+          if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+          e.preventDefault();
+          commit(parseDateInput(e.currentTarget.value));
+        }} />
       <span className="datepick" title="Chọn ngày" onClick={openPicker}><CalendarIcon /></span>
       <input ref={nativeRef} name={name} className="native-date" type="date" lang="vi" title="Chọn ngày"
         disabled={disabled} value={iso} onChange={(e) => commit(e.target.value)} />

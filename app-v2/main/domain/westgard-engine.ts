@@ -110,7 +110,10 @@ export function westgard(
       let inc = true;
       let dec = true;
       for (let k = i - 5; k <= i; k++) { if (!(zs[k] > zs[k - 1])) inc = false; if (!(zs[k] < zs[k - 1])) dec = false; }
-      if (inc || dec) { set(i, 'warn', '7T'); for (let k = i - 6; k < i; k++) support(k, '7T'); }
+      // 'rej' khớp `defaultRuleAction('7T')` — mức độ mặc định CHỈ được khai ở
+      // `WG_RULE_REGISTRY`; giá trị ở đây là nhánh dự phòng khi caller không
+      // truyền `actionOf`, để nó nói khác registry là tự mâu thuẫn.
+      if (inc || dec) { set(i, 'rej', '7T'); for (let k = i - 6; k < i; k++) support(k, '7T'); }
     }
   }
   wgScanRuns(zs, WG_RUN_RULES, isOn, (idx, rule) => {
@@ -272,7 +275,19 @@ export interface CusumResult { cPos: number[]; cNeg: number[]; flags: RuleVerdic
 
 // Tabular CUSUM (hai phia) tren chuoi z-score chuan hoa qua pointZ - bat
 // drift/shift nho keo dai ma rule don diem kho thay.
-export function cusumScan(points: readonly QcPointLike[], mean: unknown, sd: unknown, k = 0.5, h = 4, maWindow = 0): CusumResult {
+export function cusumScan(
+  points: readonly QcPointLike[], mean: unknown, sd: unknown, k = 0.5, h = 4, maWindow = 0,
+  /** Trả `true` để ĐẶT LẠI C+/C− (và MA) NGAY TRƯỚC điểm này — dùng cho mốc
+   * "sự cố đã khắc phục xong và được kết luận hiệu quả".
+   *
+   * Vì sao cần: thực hành CUSUM chuẩn đặt lại chuỗi cộng dồn sau khi tín hiệu
+   * đã được điều tra và nguyên nhân bị loại bỏ. Không đặt lại thì C+ chỉ trôi
+   * về 0,5 mỗi điểm, nên một đợt drift đã khắc phục xong vẫn kéo cờ thêm
+   * nhiều điểm nữa — đo được: drift 8 điểm ở +1,5SD rồi trở lại hoàn toàn
+   * bình thường vẫn để lại 8 điểm mang cờ. Đó đúng là lớp lỗi "đã khắc phục
+   * xong vẫn đỏ mãi" mà trang Tổng quan đã tránh có chủ đích. */
+  resetBefore?: (point: QcPointLike, index: number) => boolean,
+): CusumResult {
   const meanN = Number(mean);
   const sdN = Number(sd);
   const kAbs = Math.abs(Number(k));
@@ -290,8 +305,9 @@ export function cusumScan(points: readonly QcPointLike[], mean: unknown, sd: unk
   const ma: number[] = [];
   const queue: number[] = [];
   let targetKey = '';
-  (points || []).forEach(p => {
+  (points || []).forEach((p, index) => {
     const target = pointTarget(p, meanN, sdN);
+    if (resetBefore?.(p, index)) { cPos = 0; cNeg = 0; maSum = 0; maCount = 0; queue.length = 0; }
     // CUSUM chỉ có ý nghĩa trong một baseline ổn định. Điểm QC lưu snapshot
     // Mean/SD để bảo toàn lịch sử, nhưng không được phép mang phần cộng dồn
     // của dải CŨ sang dải MỚI (kể cả vẫn cùng lô QC). Reset cả C+/C− và MA.
@@ -314,6 +330,9 @@ export function cusumScan(points: readonly QcPointLike[], mean: unknown, sd: unk
   return window ? { cPos: cPosArr, cNeg: cNegArr, flags, k: kFinal, h: hFinal, ma } : { cPos: cPosArr, cNeg: cNegArr, flags, k: kFinal, h: hFinal };
 }
 
-export function cusum(points: readonly QcPointLike[], mean: unknown, sd: unknown, k = 0.5, h = 4): CusumResult {
-  return cusumScan(points, mean, sd, k, h, 0);
+export function cusum(
+  points: readonly QcPointLike[], mean: unknown, sd: unknown, k = 0.5, h = 4,
+  resetBefore?: (point: QcPointLike, index: number) => boolean,
+): CusumResult {
+  return cusumScan(points, mean, sd, k, h, 0, resetBefore);
 }

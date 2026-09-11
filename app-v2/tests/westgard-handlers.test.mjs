@@ -93,11 +93,33 @@ assert.equal(followShared.data.action, '');
 const storedActions = JSON.parse(db.prepare('SELECT rule_actions_json FROM tests WHERE id=?').get(test.id).rule_actions_json);
 assert.equal(Object.hasOwn(storedActions, '1-3s'), false, 'chon theo cau hinh chung phai xoa ghi de rieng');
 
-// 9) CUSUM vượt h phải trở thành CẢNH BÁO xu hướng để đi vào luồng NCE,
-// nhưng không được tự loại điểm QC bình thường. Hai điểm trước đã đưa C+
-// đến 5.5; điểm z=+1 này chạm h=6.
+// 9) CUSUM chạy trên CHUỖI ĐƯỢC CHẤP NHẬN (chốt 2026-09-11): điểm đã bị
+// Westgard loại KHÔNG được nuôi C+ nữa — nó đã được chạy lại, tính tiếp là
+// đếm MỘT sự cố hai lần và làm hai nửa của cùng một bảng nói hai chuỗi khác
+// nhau. Lúc này `1-2s` đang là LOẠI BỎ nên cả điểm z=+4 lẫn z=+2.5 đều ngoài
+// chuỗi; chỉ còn điểm z=+1 này, C+ = 0.5, còn xa h=6.
 const trendPoint = entry.addPoint({ data: { testId: test.id, level: 1, date: '2026-08-03', val: 11, runId: '2026-08-03-1' } }, actor);
 assert.equal(trendPoint.ok, true);
+const beforeTrend = westgardHandlers.analyzeLevel(test.id, 1);
+assert.equal(beforeTrend.points.at(-1).cusumSignal, null, 'diem bi Westgard loai khong duoc nuoi CUSUM');
+
+// Hạ `1-3s`/`1-2s` xuống CẢNH BÁO: điểm z=+4 trở lại chuỗi chấp nhận (cảnh
+// báo không loại điểm) nên C+ khởi động từ 3.5. Điểm z=+2.5 thì KHÔNG — nó
+// vẫn bị `2-2s` loại (hai điểm liên tiếp cùng phía vượt 2SD), và đó đúng là
+// điều cần: cùng một dữ liệu, chỉ điểm NẰM TRONG chuỗi mới nuôi C+.
+for (const rule of ['1-3s', '1-2s']) {
+  const back = westgardHandlers.saveRuleAction(test.id, rule, 'alert', actor);
+  assert.equal(back.ok, true);
+}
+// Hai điểm z=+1.5: C+ = 3.5 → 4.0 → 5.0 → 6.0, chạm h=6 ở đúng điểm cuối.
+// Mức z chọn để không luật nào khác che mất phép kiểm: |z|<2 nên `1-2s`
+// không nổ, và điểm z=+1 ở giữa đã cắt chuỗi `4-1s`.
+for (const [day, val] of [['2026-08-04', 11.5], ['2026-08-05', 11.5]]) {
+  const added = entry.addPoint({ data: { testId: test.id, level: 1, date: day, val, runId: `${day}-1` } }, actor);
+  assert.equal(added.ok, true);
+}
+// CUSUM vượt h phải thành CẢNH BÁO xu hướng để đi vào luồng NCE, nhưng không
+// được tự loại điểm QC bình thường.
 const trendAnalysis = westgardHandlers.analyzeLevel(test.id, 1);
 assert.equal(trendAnalysis.points.at(-1).verdict, 'ok', 'CUSUM không tự đổi Westgard verdict');
 assert.equal(trendAnalysis.points.at(-1).accepted, true, 'CUSUM không tự loại khỏi chuỗi accepted');
@@ -105,6 +127,26 @@ assert.equal(trendAnalysis.points.at(-1).cusumSignal, 'CUSUM +h');
 const trendSummary = westgardHandlers.listTestSummaries()[0].levels[0];
 assert.equal(trendSummary.latestVerdict, 'warn', 'CUSUM phải tạo cảnh báo cho luồng xử lý');
 assert.ok(trendSummary.latestRules.includes('CUSUM +h'));
+
+// 9b) Mốc NCE ĐÃ DUYỆT + kết luận HIỆU QUẢ phải ĐẶT LẠI chuỗi cộng dồn
+// (chốt 2026-09-11). Không có mốc này thì C+ chỉ trôi về 0.5 mỗi điểm, nên
+// một đợt drift đã khắc phục xong vẫn kéo cờ thêm nhiều điểm — cùng lớp lỗi
+// "đã khắc phục xong vẫn đỏ mãi" mà trang Tổng quan đã tránh có chủ đích.
+// Mốc lấy `action_completed_date` (lúc nguyên nhân thật sự được xử lý), nên
+// điểm 2026-08-05 mở lại chuỗi từ 0: C+ = max(0, 1.5 - 0.5) = 1.0 < h.
+db.prepare(`INSERT INTO actions(id,date,created_at,updated_at,test_id,level,nce_id,
+  approval_status,effectiveness_status,record_status,action_completed_date)
+  VALUES('nce-fix','2026-08-04','2026-08-04','2026-08-04',?,1,'NCE-1',
+  'approved','effective','active','2026-08-04')`).run(test.id);
+const afterFix = westgardHandlers.analyzeLevel(test.id, 1);
+assert.equal(afterFix.points.at(-1).cusumSignal, null, 'NCE hieu qua phai dat lai CUSUM');
+assert.equal(afterFix.cusum.cPos.at(-1), 1, 'C+ phai bat dau lai tu 0 sau moc khac phuc');
+// Hồ sơ CHƯA duyệt hoặc chưa kết luận hiệu quả thì KHÔNG được đặt lại —
+// nếu không, chỉ cần mở một hồ sơ là cờ tự biến mất.
+db.prepare("UPDATE actions SET approval_status='pending' WHERE id='nce-fix'").run();
+const pendingFix = westgardHandlers.analyzeLevel(test.id, 1);
+assert.equal(pendingFix.points.at(-1).cusumSignal, 'CUSUM +h', 'NCE chua duyet khong duoc dat lai CUSUM');
+db.prepare("DELETE FROM actions WHERE id='nce-fix'").run();
 
 // 10) Xet nghiem/luat/hanh dong khong hop le phai bi chan
 const badTest = westgardHandlers.saveRuleAction('khong-ton-tai', '1-3s', true, actor);

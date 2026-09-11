@@ -111,6 +111,12 @@
 .admin-tool span{color:var(--muted);font-size:var(--type-body-sm);line-height:1.55}
 .admin-tool .btn{width:100%;align-self:end}
 
+.settings-admin-head{flex-wrap:nowrap}
+.settings-admin-title{display:flex;align-items:center;gap:8px;margin:0;color:var(--section-head-ink);font-size:14px;line-height:21px}
+.settings-admin-icon{width:21px;height:21px;flex:none;fill:none;stroke:var(--teal);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.settings-db-badge{display:inline-flex;align-items:center;min-height:25px;padding:3px 10px;border:1px solid var(--line-strong);border-radius:var(--radius-pill);background:var(--panel);color:var(--muted);font-size:var(--type-caption);font-weight:750;line-height:1;white-space:nowrap}
+.settings-db-badge.is-ok{border-color:var(--teal-300);background:#f2fbfb;color:var(--teal-deep)}
+
 .lis-gateway-body{display:grid;gap:10px;margin:var(--panel-content-gap) 16px 0}
 /* 1 cột (không phải lưới ngang) vì panel này nằm trong .settings-cloud-grid,
    chỉ còn nửa bề rộng trang — giữ đúng lý do app cũ ghi tại chỗ. */
@@ -154,7 +160,7 @@
    theo Cài đặt để không làm đổi hierarchy của những trang khác. */
 .settings-profile-grid > .panel > h2.panel-title:first-child,
 .settings-cloud-grid > .panel > h2.panel-title:first-child,
-.settings-admin-panel > h2.panel-title:first-child,
+.settings-admin-panel > .settings-admin-head:first-child,
 .firebase-rules-panel > h2.panel-title:first-child{
   min-height:0;
   padding:10px 14px;
@@ -170,28 +176,3 @@
 }
 }
 
-@media(max-width:900px){
-.admin-tools{grid-template-columns:1fr}
-.admin-tool{min-height:0;grid-template-rows:auto auto auto}
-}
-
-@media(max-width:760px){
-.settings-unit-fields{
-  margin:12px 12px 0;
-}
-
-.settings-panel-actions{
-  margin-right:12px;
-  margin-left:12px;
-}
-
-.settings-profile-grid > .panel > .grid2{
-  margin-right:12px;
-  margin-left:12px;
-}
-
-.lis-gateway-body{margin-right:12px;margin-left:12px}
-.firebase-body{margin-right:12px;margin-left:12px}
-.firebase-guide,.rules-code{margin-right:12px;margin-left:12px}
-.rules-tools{margin-right:12px;margin-left:12px;align-items:flex-start;flex-direction:column}
-}
