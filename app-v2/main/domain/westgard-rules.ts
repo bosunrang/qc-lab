@@ -35,7 +35,7 @@ const REGISTRY: WgRuleDef[] = [
   { id: '9x', desc: '9 điểm liên tiếp nằm cùng một phía so với Mean', err: 'SE', defaultOn: false, alert: false, scope: 'across', scopeMin: 2, priority: 9, run: [9, z => z > 0, z => z < 0], fix: 'Biến thể phù hợp khi chạy 3 mức QC qua nhiều lần chạy.' },
   { id: '10x', desc: '10 điểm liên tiếp nằm cùng một phía so với Mean', err: 'SE', defaultOn: true, alert: false, scope: 'across', scopeMin: 2, priority: 10, run: [10, z => z > 0, z => z < 0], fix: 'Nghi dịch chuyển nền, xem lại Mean/SD, lô mới, hiệu chuẩn.' },
   { id: '12x', desc: '12 điểm liên tiếp nằm cùng một phía so với Mean', err: 'SE', defaultOn: false, alert: false, scope: 'across', scopeMin: 2, priority: 11, run: [12, z => z > 0, z => z < 0], fix: 'Biến thể ít nhạy hơn 8x/10x, dùng để theo dõi bias dài hơn.' },
-  { id: '7T', desc: '7 lần tăng dần hoặc giảm dần liên tiếp (8 điểm QC)', err: 'SE', defaultOn: false, alert: true, scope: 'within', scopeMin: 2, priority: 12, run: null, fix: 'Theo dõi xu hướng, kiểm tra bảo quản QC, thuốc thử, môi trường.' },
+  { id: '7T', desc: '7 điểm QC liên tiếp tăng dần hoặc giảm dần', err: 'SE', defaultOn: false, alert: true, scope: 'within', scopeMin: 2, priority: 12, run: null, fix: 'Theo dõi xu hướng, kiểm tra bảo quản QC, thuốc thử, môi trường.' },
   { id: '2of3-2s', desc: 'Trong 3 kết quả, có ít nhất 2 điểm cùng phía vượt ±2SD', err: 'SE', defaultOn: false, alert: false, scope: 'across', scopeMin: 3, priority: 4, run: null, fix: 'Nghi sai số hệ thống; đặc biệt hữu ích khi chạy 3 mức QC.' },
 ];
 REGISTRY.forEach(r => { if (r.run) Object.freeze(r.run); Object.freeze(r); });

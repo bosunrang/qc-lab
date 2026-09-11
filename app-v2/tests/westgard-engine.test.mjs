@@ -55,25 +55,36 @@ const scenarios = [
   { name: '10x muoi diem cung phia', vals: [10, ...Array.from({ length: 10 }, (_, i) => 10.1 + i * 0.01), 10] },
   { name: 'binh thuong khong vi pham gi', vals: [10, 9.9, 10.1, 9.95, 10.05] },
 ];
+// `2of3-2s` va `7T` CO Y lech ban cu (app-v2 sua theo dung dinh nghia
+// Westgard - xem tests/westgard-standard.test.mjs va muc 4b cua
+// cross-app-westgard-sigma.test.mjs). Tat 2 luat do khi doi chieu de 11 luat
+// con lai van duoc canh tung ky tu voi ban cu.
+const isOnShared = (r) => r !== '2of3-2s' && r !== '7T';
 for (const s of scenarios) {
   const points = makePoints(s.vals);
-  const newR = westgard(points, 10, 1);
-  const oldR = QCCore.westgard(points, 10, 1);
+  const newR = westgard(points, 10, 1, isOnShared);
+  const oldR = QCCore.westgard(points, 10, 1, isOnShared);
   assert.deepEqual(newR, oldR, `westgard() lech ban cu o kich ban "${s.name}": moi=${JSON.stringify(newR)} cu=${JSON.stringify(oldR)}`);
 }
 
-// 4) 7T - xu huong tang/giam 7 buoc lien tiep (can 8 diem, cung trendTarget)
+// 4) 7T - BAY phep do QC cung chieu (6 buoc), cung trendTarget. Ban cu doi
+//    TAM diem nen khong no o chuoi 7 diem - chot dung khac biet do.
 {
-  const trendPoints = Array.from({ length: 8 }, (_, i) => ({ val: 10 + i * 0.15, trendTarget: 'same' }));
-  const newR = westgard(trendPoints, 10, 1);
-  const oldR = QCCore.westgard(trendPoints, 10, 1);
-  assert.deepEqual(newR, oldR, '7T scenario lech ban cu');
+  const rising = (n) => Array.from({ length: n }, (_, i) => ({ val: 10 + i * 0.15, trendTarget: 'same' }));
+  const only7T = (r) => r === '7T';
+  const fired = (engine, pts) => engine(pts, 10, 1, only7T).F.some((f) => f.rules.includes('7T'));
+  assert.equal(fired(westgard, rising(7)), true, 'app-v2: 7 diem tang phai no 7T');
+  assert.equal(fired((p, m, s, o) => QCCore.westgard(p, m, s, o), rising(7)), false, 'ban cu: 7 diem tang khong no (dang doi 8 diem)');
+  assert.equal(fired(westgard, rising(6)), false, 'app-v2: 6 diem chua du');
+  // Doi trendTarget giua chuoi phai cat dut xu huong.
+  const broken = rising(7).map((p, i) => ({ ...p, trendTarget: i < 3 ? 'a' : 'b' }));
+  assert.equal(fired(westgard, broken), false, 'doi Mean/SD giua chuoi thi khong con la mot xu huong');
 }
 
 // 5) isOn tat mot so luat - phai giong het khi cung mot ham loc
 {
   const points = makePoints([10, 12.1, 12.2, 10]);
-  const isOn = (rule) => rule !== '2-2s';
+  const isOn = (rule) => rule !== '2-2s' && isOnShared(rule);
   const newR = westgard(points, 10, 1, isOn);
   const oldR = QCCore.westgard(points, 10, 1, isOn);
   assert.deepEqual(newR, oldR, 'westgard() voi isOn tuy chinh phai giong het ban cu');

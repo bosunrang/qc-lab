@@ -55,7 +55,13 @@ const gauss = () => { let s = 0; for (let i = 0; i < 12; i++) s += rnd(); return
 {
   const rOld = OLD.WG_RULE_REGISTRY, rV2 = rulesV2.WG_RULE_REGISTRY;
   same('registry:ids', rOld.map(r => r.id), rV2.map(r => r.id));
-  const pick = (o) => o && ({ desc: o.desc, err: o.err, defaultOn: o.defaultOn, alert: o.alert, scope: o.scope, scopeMin: o.scopeMin, priority: o.priority, fix: o.fix });
+  // `desc` của 7T CỐ Ý lệch: app cũ ghi "(8 điểm QC)" đúng như engine cũ
+  // làm, app-v2 sửa cả engine lẫn mô tả về đúng định nghĩa Westgard (BẢY
+  // phép đo). Chốt riêng ở ngay dưới thay vì bỏ hẳn trường này.
+  const pick = (o) => o && ({ ...(o.id === '7T' ? {} : { desc: o.desc }), err: o.err, defaultOn: o.defaultOn, alert: o.alert, scope: o.scope, scopeMin: o.scopeMin, priority: o.priority, fix: o.fix });
+  assert.match(rOld.find((r) => r.id === '7T').desc, /8 điểm QC/, 'app cũ: 7T mô tả theo 8 điểm');
+  assert.equal(rulesV2.WG_RULE_BY_ID['7T'].desc, '7 điểm QC liên tiếp tăng dần hoặc giảm dần', 'app-v2: 7T mô tả theo 7 điểm');
+  checks += 2;
   for (const r of rOld) {
     const v = rV2.find(x => x.id === r.id);
     same(`registry:${r.id}`, pick(r), pick(v));
@@ -72,7 +78,8 @@ const gauss = () => { let s = 0; for (let i = 0; i < 12; i++) s += rnd(); return
   same('WG_RULES', OLD.WG_RULES, rulesV2.WG_RULES);
   same('WG_DEFAULT_ON', [...OLD.WG_DEFAULT_ON].sort(), [...rulesV2.WG_DEFAULT_ON].sort());
   same('WG_ALERT_RULES', OLD.WG_ALERT_RULES, rulesV2.WG_ALERT_RULES);
-  same('WG_RULE_DESCRIPTIONS', OLD.WG_RULE_DESCRIPTIONS, rulesV2.WG_RULE_DESCRIPTIONS);
+  const dropTrend = (o) => Object.fromEntries(Object.entries(o).filter(([id]) => id !== '7T'));
+  same('WG_RULE_DESCRIPTIONS', dropTrend(OLD.WG_RULE_DESCRIPTIONS), dropTrend(rulesV2.WG_RULE_DESCRIPTIONS));
 }
 
 // -------------------------------------------- 2. Chính sách luật + loại sai số
@@ -130,6 +137,12 @@ function makeSeries(n, opt = {}) {
 }
 const isOnAll = () => true;
 const isOnDefault = (r) => OLD.WG_DEFAULT_ON.has(r);
+// 2 luật app-v2 CỐ Ý sửa cho đúng định nghĩa Westgard (xem mục 4b). Tắt
+// chúng khi so nhánh ĐƠN MỨC để 11 luật còn lại vẫn được canh từng ký tự với
+// app cũ — nếu để nguyên `isOnAll` thì mọi chuỗi có xu hướng/2 điểm vượt sẽ
+// lệch và che mất một lệch thật khác nếu có.
+const DIVERGED = new Set(['2of3-2s', '7T']);
+const isOnShared = (r) => !DIVERGED.has(r);
 const series = [[], [{ val: 100 }]];
 for (const opt of [{}, { trend: 1 }, { shift: 1 }, { spike: 1 }, { trend: 1, spike: 1 }])
   for (const n of [3, 8, 12, 20, 40]) series.push(makeSeries(n, opt));
@@ -138,18 +151,64 @@ series.push(Array.from({ length: 14 }, () => ({ val: 100.5 })));                
 series.push(Array.from({ length: 14 }, (_, i) => ({ val: 100 + (i % 2 ? 0.5 : 0.6) })));
 
 series.forEach((pts, i) => {
-  same(`westgard#${i}:mọi-luật`, OLD.westgard(pts, 100, 5, isOnAll), wgV2.westgard(pts, 100, 5, isOnAll));
+  same(`westgard#${i}:11-luật-chung`, OLD.westgard(pts, 100, 5, isOnShared), wgV2.westgard(pts, 100, 5, isOnShared));
   same(`westgard#${i}:mặc-định`, OLD.westgard(pts, 100, 5, isOnDefault), wgV2.westgard(pts, 100, 5, isOnDefault));
   same(`westgard#${i}:sd=0`, OLD.westgard(pts, 100, 0, isOnAll), wgV2.westgard(pts, 100, 0, isOnAll));
-  same(`westgardByPoint#${i}`, OLD.westgardByPoint(pts, 100, 5, isOnAll), wgV2.westgardByPoint(pts, 100, 5, isOnAll));
+  same(`westgardByPoint#${i}`, OLD.westgardByPoint(pts, 100, 5, isOnShared), wgV2.westgardByPoint(pts, 100, 5, isOnShared));
   // Mỗi điểm mang snapshot Mean/SD riêng → đổi target giữa chuỗi, phải cắt
   // đứt xu hướng 7T ở đúng chỗ đổi (cả hai bên).
   const snap = pts.map((p, j) => ({ ...p, qcMean: j < pts.length / 2 ? 100 : 102, qcSd: 5 }));
-  same(`westgardByPoint-snapshot#${i}`, OLD.westgardByPoint(snap, 100, 5, isOnAll), wgV2.westgardByPoint(snap, 100, 5, isOnAll));
+  same(`westgardByPoint-snapshot#${i}`, OLD.westgardByPoint(snap, 100, 5, isOnShared), wgV2.westgardByPoint(snap, 100, 5, isOnShared));
   for (const [k, h] of [[0.5, 4], [1, 5], [0.25, 3]]) {
     same(`cusum#${i}:k=${k},h=${h}`, OLD.cusum(pts, 100, 5, k, h), wgV2.cusum(pts, 100, 5, k, h));
   }
 });
+
+// --------------- 4b. HAI LỆCH CÓ CHỦ ĐÍCH so với app cũ (đúng chuẩn Westgard)
+// Nguồn: https://westgard.com/westgard-rules/
+//   2of3-2s — "Reject when 2 out of 3 control measurements exceed the same
+//              mean plus 2s or mean minus 2s control limit." KHÔNG đòi điểm
+//              mới nhất phải là một trong hai điểm vượt.
+//   7T      — "Reject when seven control measurements trend in the same
+//              direction." BẢY phép đo (6 bước), không phải 7 bước/8 điểm.
+// App cũ sai cả hai; app-v2 sửa. Khi app cũ bị cắt, hành vi đúng vẫn được
+// canh bởi `tests/westgard-standard.test.mjs`.
+{
+  const z = (arr) => arr.map((v) => ({ val: v, trendTarget: 'same' }));
+  const only = (...ids) => (r) => ids.includes(r);
+  const rulesAt = (engine, pts, isOn) => engine.westgard(pts, 0, 1, isOn).F.map((f) => f.rules);
+  const has = (rows, id) => rows.some((r) => r.includes(id));
+
+  // (a) 2of3-2s: cửa sổ [+2,1; +2,2; 0] — hai điểm ĐẦU cùng phía vượt +2SD.
+  {
+    const pts = z([2.1, 2.2, 0]);
+    const on = only('2of3-2s');
+    assert.equal(has(rulesAt(OLD, pts, on), '2of3-2s'), false, 'app cũ: bỏ sót cửa sổ 2-trong-3 khi điểm mới nhất không vượt');
+    const v2 = rulesAt(wgV2, pts, on);
+    assert.equal(has(v2, '2of3-2s'), true, 'app-v2: phải nổ 2of3-2s');
+    assert.deepEqual(v2[2], ['2of3-2s'], 'điểm chốt cửa sổ mang kết luận, đúng quy ước wgScanRuns');
+    checks += 3;
+  }
+  // Các cửa sổ app cũ VẪN bắt được phải giữ nguyên kết quả — bản sửa chỉ
+  // THÊM cửa sổ bị bỏ sót, không đổi cái đang đúng.
+  for (const arr of [[2.1, 0, 2.2], [0, 2.1, 2.2], [-2.1, 0, -2.2], [2.1, 0, 0], [2.1, -2.2, 0]]) {
+    const pts = z(arr), on = only('2of3-2s');
+    same(`2of3-2s:giữ-nguyên:${arr.join(',')}`, rulesAt(OLD, pts, on), rulesAt(wgV2, pts, on));
+  }
+
+  // (b) 7T: bảy điểm tăng liên tục.
+  {
+    const on = only('7T');
+    const seven = z([-3, -2, -1, 0, 1, 2, 2.5]);
+    assert.equal(has(rulesAt(OLD, seven, on), '7T'), false, 'app cũ: 7 điểm tăng KHÔNG nổ (đang đòi 8 điểm)');
+    assert.equal(has(rulesAt(wgV2, seven, on), '7T'), true, 'app-v2: 7 điểm tăng phải nổ');
+    const six = z([-3, -2, -1, 0, 1, 2]);
+    assert.equal(has(rulesAt(wgV2, six, on), '7T'), false, 'app-v2: 6 điểm thì chưa đủ');
+    const down = z([2.5, 2, 1, 0, -1, -2, -3]);
+    assert.equal(has(rulesAt(wgV2, down, on), '7T'), true, 'app-v2: bảy điểm GIẢM cũng nổ');
+    checks += 4;
+  }
+}
 
 // ------------------------------------------------ 5. Luật liên mức (một lần chạy)
 function makeLevelSets(nLevels, nRuns, opt = {}) {
@@ -408,7 +467,12 @@ const actionOf = (r) => rulesV2.defaultRuleAction(r, ON.has(r));
   const run = (code) => vm.runInContext(code, ctx);
   const { buildSigmaCohorts, periodCutoff } = await import(tsUrl('app-v2/main/domain/sigma-cohort.ts'));
 
-  const TODAY = '2026-09-10';
+  // Lấy ĐÚNG "hôm nay" mà app cũ đang dùng thay vì hard-code: `cutoff()` của
+  // app cũ đọc ngày hệ thống, nên một hằng số ngày sẽ làm bài test tự đỏ vào
+  // hôm sau mà không có gì trong code đổi (đã xảy ra thật). Kỳ 2099-12 chắc
+  // chắn nằm sau hôm nay nên `cutoff()` trả về chính ngày hệ thống.
+  const TODAY = run('SigmaCohortSelectionService.cutoff("2099-12")');
+  assert.match(TODAY, /^\d{4}-\d{2}-\d{2}$/, 'không lấy được ngày hệ thống từ app cũ');
   const ISSUE = { 'missing-lot': 'Thiếu mã lô QC', 'mixed-target-mean': 'Mean mục tiêu thay đổi', 'mixed-target-sd': 'SD mục tiêu thay đổi' };
   // Tên trường lệch (`qcMean` ↔ `qc_mean`), nên dựng MỘT bộ điểm rồi ánh xạ.
   const toV2 = (pts) => pts.map((p) => ({ level: p.level, date: p.date, lot: p.lot, val: p.val, voided: p.voided ? 1 : 0, qc_mean: p.qcMean ?? null, qc_sd: p.qcSd ?? null }));

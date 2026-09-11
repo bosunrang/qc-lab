@@ -87,18 +87,30 @@ export function westgard(
     const a = Math.abs(zs[i]);
     if (isOn('1-3s') && a > 3) set(i, 'rej', '1-3s');
     else if (isOn('1-2s') && a > 2) set(i, 'warn', '1-2s');
+    // 2of3-2s: "2 trong 3 kết quả cùng vượt một phía ±2SD" — quét CẢ cửa sổ
+    // [i-2..i], KHÔNG đòi điểm hiện tại phải là một trong hai điểm vượt.
+    // App cũ đòi `zs[i]` vượt nên bỏ sót cửa sổ kiểu [+2,1; +2,2; 0]; chính
+    // nhánh LIÊN MỨC của app cũ (`westgardMultiByPoint`) lại đếm đúng
+    // `pos2.length >= 2`, nên cùng một luật cho hai kết quả khác nhau tuỳ
+    // phạm vi. Đây là lệch golden master CÓ CHỦ ĐÍCH, xem
+    // `tests/westgard-standard.test.mjs`.
     if (isOn('2of3-2s') && i >= 2) {
       const pos: number[] = [];
       const neg: number[] = [];
-      for (let k = i - 2; k < i; k++) { if (zs[k] > 2) pos.push(k); if (zs[k] < -2) neg.push(k); }
-      if (zs[i] > 2 && pos.length >= 1) { set(i, 'rej', '2of3-2s'); pos.forEach(k => support(k, '2of3-2s')); }
-      if (zs[i] < -2 && neg.length >= 1) { set(i, 'rej', '2of3-2s'); neg.forEach(k => support(k, '2of3-2s')); }
+      for (let k = i - 2; k <= i; k++) { if (zs[k] > 2) pos.push(k); if (zs[k] < -2) neg.push(k); }
+      // Điểm CHỐT cửa sổ mang kết luận loại bỏ, các điểm vượt còn lại là bằng
+      // chứng — cùng quy ước `wgScanRuns()` dùng cho 2-2s/4-1s/10x…, nhờ đó
+      // `acceptedPoints()` (quét tăng dần, chỉ đọc điểm mới nhất) vẫn đúng.
+      if (pos.length >= 2) { set(i, 'rej', '2of3-2s'); pos.forEach(k => support(k, '2of3-2s')); }
+      if (neg.length >= 2) { set(i, 'rej', '2of3-2s'); neg.forEach(k => support(k, '2of3-2s')); }
     }
-    if (isOn('7T') && i >= 7 && sameTrendTarget(points, i - 7, i)) {
+    // 7T: Westgard định nghĩa là BẢY phép đo QC cùng chiều (6 bước), không
+    // phải bảy bước/tám điểm như app cũ. Xem ghi chú lệch golden master ở trên.
+    if (isOn('7T') && i >= 6 && sameTrendTarget(points, i - 6, i)) {
       let inc = true;
       let dec = true;
-      for (let k = i - 6; k <= i; k++) { if (!(zs[k] > zs[k - 1])) inc = false; if (!(zs[k] < zs[k - 1])) dec = false; }
-      if (inc || dec) { set(i, 'warn', '7T'); for (let k = i - 7; k < i; k++) support(k, '7T'); }
+      for (let k = i - 5; k <= i; k++) { if (!(zs[k] > zs[k - 1])) inc = false; if (!(zs[k] < zs[k - 1])) dec = false; }
+      if (inc || dec) { set(i, 'warn', '7T'); for (let k = i - 6; k < i; k++) support(k, '7T'); }
     }
   }
   wgScanRuns(zs, WG_RUN_RULES, isOn, (idx, rule) => {
