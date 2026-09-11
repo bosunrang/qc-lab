@@ -49,7 +49,11 @@ for (const file of walk(RENDERER, '.tsx')) {
   const text = fs.readFileSync(file, 'utf8');
   for (const match of text.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\})/g)) {
     const raw = (match[1] || match[2] || '').replace(/\$\{[^}]*\}/g, ' ');
-    for (const cls of raw.split(/\s+/)) if (/^[a-z][a-z0-9-]{2,}$/i.test(cls)) usedClasses.add(cls);
+    // Bỏ token KẾT THÚC bằng '-': đó là tiền tố của class ghép động
+    // (`className={`levels-${n}`}` → sau khi xoá ${...} còn lại 'levels-'),
+    // không phải một class hoàn chỉnh. Class thật (`levels-2`) có rule CSS
+    // riêng; đếm phần cụt là báo chết oan cho code đang chạy đúng.
+    for (const cls of raw.split(/\s+/)) if (/^[a-z][a-z0-9-]{2,}$/i.test(cls) && !cls.endsWith('-')) usedClasses.add(cls);
   }
 }
 

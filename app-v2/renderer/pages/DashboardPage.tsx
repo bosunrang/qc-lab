@@ -170,7 +170,7 @@ function TestsPanel({ model }: { model: Model }) {
 }
 
 function LoadingView({ subtitle }: { subtitle: string }) {
-  return <><PageHeader title="Tổng quan" subtitle={subtitle} /><div className="dash-hero dash-analysis-loading"><div className="dash-status"><div className="eyebrow">Đang chuẩn bị dữ liệu</div><h2>Phân tích Westgard chạy nền</h2><p>Bạn có thể tiếp tục sử dụng ứng dụng. Tổng quan sẽ tự cập nhật khi phân tích hoàn tất.</p><div className="dash-loading-bar"><span /></div></div><div className="dash-kpis">{['Xét nghiệm', 'Điểm QC', 'Đang xử lý', 'Giao diện'].map(label => <div className="dash-kpi" key={label}><div className="k">{label}</div><div className="v">—</div></div>)}</div></div></>;
+  return <><PageHeader title="Tổng quan" subtitle={subtitle} /><div className="dash-hero"><div className="dash-status"><div className="eyebrow">Đang chuẩn bị dữ liệu</div><h2>Phân tích Westgard chạy nền</h2><p>Bạn có thể tiếp tục sử dụng ứng dụng. Tổng quan sẽ tự cập nhật khi phân tích hoàn tất.</p><div className="dash-loading-bar"><span /></div></div><div className="dash-kpis">{['Xét nghiệm', 'Điểm QC', 'Đang xử lý', 'Giao diện'].map(label => <div className="dash-kpi" key={label}><div className="k">{label}</div><div className="v">—</div></div>)}</div></div></>;
 }
 
 export function DashboardPage() {

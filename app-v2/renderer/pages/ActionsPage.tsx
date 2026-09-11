@@ -162,7 +162,7 @@ export function ActionsPage() {
       <PageHeader title="Khắc phục sự cố" subtitle="Điều tra nguyên nhân, ghi nhận, chạy lại QC và phê duyệt khép vòng" />
 
 
-      <div className="panel action-issues-panel">
+      <div className="panel">
         <h2 className="panel-title">Sự cố cần xử lý</h2>
         <div className="dash-list">
           {!issueGroups.length

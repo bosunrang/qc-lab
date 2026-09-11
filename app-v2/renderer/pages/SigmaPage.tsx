@@ -589,9 +589,9 @@ export function SigmaPage() {
                     <td className="sg-row-action sg-action-col">
                       <div className="sg-row-action-buttons">
                         {writable && <button className="btn ghost sm sg-row-cv" title={`Chọn CV IQC theo lô cho ${vnPeriod(p.period)}`} onClick={() => openCohorts(p)}>Nạp CV lô</button>}
-                        <button className="btn ghost sm sg-row-export" title={`Xuất Excel riêng kỳ ${vnPeriod(p.period)}`} onClick={() => exportPeriod(p)}><DownloadIcon />Excel</button>
-                        <button className="btn ghost sm sg-row-print" title={`Tạo bản in PDF riêng kỳ ${vnPeriod(p.period)}`} onClick={() => printPeriod(p)}><PrintIcon />In PDF</button>
-                        {admin && <button className="btn danger sm sg-row-delete" title={`Xóa kỳ ${vnPeriod(p.period)}`} onClick={() => removePeriodRow(p)}><TrashIcon />Xóa</button>}
+                        <button className="btn ghost sm" title={`Xuất Excel riêng kỳ ${vnPeriod(p.period)}`} onClick={() => exportPeriod(p)}><DownloadIcon />Excel</button>
+                        <button className="btn ghost sm" title={`Tạo bản in PDF riêng kỳ ${vnPeriod(p.period)}`} onClick={() => printPeriod(p)}><PrintIcon />In PDF</button>
+                        {admin && <button className="btn danger sm" title={`Xóa kỳ ${vnPeriod(p.period)}`} onClick={() => removePeriodRow(p)}><TrashIcon />Xóa</button>}
                       </div>
                     </td>
                   </tr>
@@ -601,8 +601,8 @@ export function SigmaPage() {
           </div> : <div className="empty sg-period-empty">Chưa có kỳ nào.</div>}
           {periods.length > 0 && (
             <div className="sg-data-foot">
-              <button className="btn teal sg-combined-export" title="Xuất báo cáo Excel tổng hợp để so sánh Sigma giữa các kỳ" onClick={exportAllPeriods}><DownloadIcon />Xuất Excel</button>
-              <button className="btn teal sg-combined-print" title="Tạo bản in PDF tổng hợp để so sánh Sigma giữa các kỳ" onClick={printAllPeriods}><PrintIcon />Xuất PDF</button>
+              <button className="btn teal" title="Xuất báo cáo Excel tổng hợp để so sánh Sigma giữa các kỳ" onClick={exportAllPeriods}><DownloadIcon />Xuất Excel</button>
+              <button className="btn teal" title="Tạo bản in PDF tổng hợp để so sánh Sigma giữa các kỳ" onClick={printAllPeriods}><PrintIcon />Xuất PDF</button>
             </div>
           )}
         </div>
@@ -890,7 +890,7 @@ function MuModal({ level, onClose, onSubmit }: {
     <Modal title="Ngân sách độ không đảm bảo đo (MU)" onClose={onClose} className="sg-eqa-modal sg-mu-modal"
       footer={<><button className="btn ghost" onClick={onClose}>Hủy</button><button className="btn teal" onClick={submit}>Áp dụng ngân sách MU</button></>}>
       {err && <p className="field-error">{err}</p>}
-      <table className="data-table sg-mu-detail-table">
+      <table className="sg-mu-detail-table">
         <thead><tr><th>Thành phần</th><th>Giá trị</th></tr></thead>
         <tbody>
           <tr><td>u(Rw) — từ CV%</td><td>{level.cv != null ? level.cv.toFixed(3) : <span className="badge warn">Chưa có</span>}</td></tr>

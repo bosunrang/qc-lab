@@ -179,7 +179,7 @@ export function LotsTab() {
       <div className="lot-config-grid">
       <div className="panel rcfg-list lot-config-left">
         <div className="rcfg-panel-h"><h3>Lô QC</h3><button className="btn teal sm" onClick={() => { setLotErr(null); setEditingLot('new'); }}>Thêm lô QC</button></div>
-        {lots.length ? <table className="data-table lot-table">
+        {lots.length ? <table className="lot-table">
           <thead><tr><th>Số lô</th><th>Mức</th><th>Hạn dùng</th><th>Trạng thái</th><th className="num">Gán</th><th>Thao tác</th></tr></thead>
           <tbody>
             {lots.map((l) => (

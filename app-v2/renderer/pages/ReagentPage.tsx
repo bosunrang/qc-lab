@@ -507,7 +507,7 @@ export function ReagentPage() {
                   <div className="rc-idx">{i + 1}</div>
                   <input {...wp} type="number" step="any" placeholder="–" value={row[0]} onChange={(e) => updateCell(i, 0, e.target.value)} onBlur={() => store.saveRows(current.id, rowsDraft)} />
                   <input {...wp} type="number" step="any" placeholder="–" value={row[1]} onChange={(e) => updateCell(i, 1, e.target.value)} onBlur={() => store.saveRows(current.id, rowsDraft)} />
-                  <div className="rc-calc avg">{both ? fmtFixed((o + nv) / 2) : '–'}</div>
+                  <div className="rc-calc">{both ? fmtFixed((o + nv) / 2) : '–'}</div>
                   <div className={`rc-calc dif${dif != null && dif < 0 ? ' neg' : ''}`}>{dif != null ? fmtFixed(dif) : '–'}</div>
                   {writable
                     ? <button className="x" title="Xóa dòng" onClick={() => commitRows(rowsDraft.filter((_, j) => j !== i))}>✕</button>

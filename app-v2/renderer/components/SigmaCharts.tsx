@@ -107,7 +107,7 @@ export function SigmaMdcChart({ periods }: { periods: SigmaPeriodView[] }) {
     }),
   }));
 
-  return <div className="sg-svg-chart sg-mdc-chart"><svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" role="img" aria-label="Biểu đồ quyết định phương pháp MDC">
+  return <div className="sg-svg-chart"><svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" role="img" aria-label="Biểu đồ quyết định phương pháp MDC">
     <rect x={L} y={T} width={W - L - R} height={H - T - B} fill="#fff" stroke="#dce3e9" />
     {[0, 20, 40, 60, 80, 100].map((value) => <g key={value}><line x1={L} y1={py(value)} x2={W - R} y2={py(value)} stroke="#e5ecef" strokeWidth=".7" /><text x={L - 7} y={py(value) + 3} fontSize="10.5" fill="#70818d" textAnchor="end">{value}</text></g>)}
     {[0, 10, 20, 30, 40, 50, 60].map((value) => <text key={value} x={px(value)} y={H - B + 15} fontSize="10.5" fill="#70818d" textAnchor="middle">{value}</text>)}

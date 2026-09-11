@@ -51,7 +51,7 @@ export function AvatarModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <Modal title="Ảnh đại diện" onClose={onClose} className="avatar-modal"
+    <Modal title="Ảnh đại diện" onClose={onClose}
       footer={<><button type="button" className="btn ghost" disabled={busy || !user?.avatar} onClick={clear}>Xóa ảnh</button><button type="button" className="btn teal" onClick={onClose}>Đóng</button></>}>
       <div className="avatar-modal-preview">
         {user?.avatar ? <img src={user.avatar} alt="Ảnh đại diện" /> : <div className="avatar-modal-initial">{(user?.name || user?.username || 'U').trim().charAt(0).toUpperCase() || 'U'}</div>}

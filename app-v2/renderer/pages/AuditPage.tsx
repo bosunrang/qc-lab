@@ -62,7 +62,7 @@ export function AuditPage() {
           <button className="btn teal sm" onClick={onExport}>Xuất CSV nhật ký</button>
           {result.resultTo > 0 && <button className="btn ghost sm" onClick={() => setArchiving(true)}>Lưu trữ nhật ký cũ</button>}
         </div>
-        <div className="hint audit-summary-status flow-item">
+        <div className="hint flow-item">
           {result.total} dòng hoạt động đã ghi nhận.{' '}
           {!chain ? (
             <>

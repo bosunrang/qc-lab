@@ -398,8 +398,8 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
                       const hint = ruleHints[id];
                       return <div className="assay-rule-row" key={id}>
                         <b>{id}</b>
-                        <select className="cfg-assay-rule" name={`ruleAction:${id}`} aria-label={`Hành động ${id}`} defaultValue={ruleActions[id] || ''}><option value="">{hint ? `Theo cấu hình chung — ${ACTION_LABELS[hint.defaultAction]}` : 'Theo cấu hình chung'}</option><option value="inactive">Không dùng</option><option value="alert">Cảnh báo</option><option value="reject">Loại bỏ</option></select>
-                        <select className="cfg-assay-scope" name={`ruleScope:${id}`} aria-label={`Phạm vi ${id}`} defaultValue={ruleScopes[id] || ''}><option value="">{hint ? `Theo chuẩn — ${SCOPE_LABELS[hint.defaultScope]}` : 'Phạm vi SOP khuyến nghị'}</option><option value="within">Chỉ trong từng mức</option><option value="across">Chỉ chéo mức/lần chạy</option><option value="both">Cả hai phạm vi</option></select>
+                        <select name={`ruleAction:${id}`} aria-label={`Hành động ${id}`} defaultValue={ruleActions[id] || ''}><option value="">{hint ? `Theo cấu hình chung — ${ACTION_LABELS[hint.defaultAction]}` : 'Theo cấu hình chung'}</option><option value="inactive">Không dùng</option><option value="alert">Cảnh báo</option><option value="reject">Loại bỏ</option></select>
+                        <select name={`ruleScope:${id}`} aria-label={`Phạm vi ${id}`} defaultValue={ruleScopes[id] || ''}><option value="">{hint ? `Theo chuẩn — ${SCOPE_LABELS[hint.defaultScope]}` : 'Phạm vi SOP khuyến nghị'}</option><option value="within">Chỉ trong từng mức</option><option value="across">Chỉ chéo mức/lần chạy</option><option value="both">Cả hai phạm vi</option></select>
                       </div>;
                     })}
                   </div>

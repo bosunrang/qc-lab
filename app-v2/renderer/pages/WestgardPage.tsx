@@ -310,7 +310,7 @@ export function WestgardPage() {
       <div className="panel wg-setup-panel">
         <h2 className="panel-title">Thiết lập phân tích</h2>
         {archivedGroups.length > 0 && (
-          <div className="dayseg wg-view-mode wg-archive-view-mode">
+          <div className="dayseg wg-archive-view-mode">
             <button className={view === 'current' ? 'on' : ''} onClick={() => setView('current')}>Xét nghiệm đang vận hành</button>
             <button className={view === 'archived' ? 'on' : ''} onClick={() => setView('archived')}>Nhóm lô đã dừng/lưu trữ ({archivedGroups.length})</button>
           </div>
@@ -377,7 +377,7 @@ export function WestgardPage() {
                   </div>
                 </details>
 
-                <div className="dayseg wg-view-mode wg-chart-mode">
+                <div className="dayseg wg-chart-mode">
                   <button className={chartMode === 'lj' ? 'on' : ''} onClick={() => setChartMode('lj')}>Levey-Jennings</button>
                   <button className={chartMode === 'cusum' ? 'on' : ''} onClick={() => setChartMode('cusum')}>Xu hướng CUSUM</button>
                 </div>
@@ -542,19 +542,19 @@ export function WestgardPage() {
       })}
 
       {view === 'archived' && archivedGroupId && archivedTestsLoading && (
-        <div className="panel wg-archived-empty"><p className="empty-state">Đang nạp xét nghiệm và dữ liệu lịch sử của nhóm lô...</p></div>
+        <div className="panel"><p className="empty-state">Đang nạp xét nghiệm và dữ liệu lịch sử của nhóm lô...</p></div>
       )}
 
       {view === 'archived' && archivedGroupId && !archivedTestsLoading && !archivedTestId && !archivedTests.length && (
-        <div className="panel wg-archived-empty"><div className="empty"><div className="empty-title">Không tìm thấy xét nghiệm nào</div><div>Nhóm lô này không gắn với xét nghiệm/mức nào có Mean/SD lịch sử hợp lệ.</div></div></div>
+        <div className="panel"><div className="empty"><div className="empty-title">Không tìm thấy xét nghiệm nào</div><div>Nhóm lô này không gắn với xét nghiệm/mức nào có Mean/SD lịch sử hợp lệ.</div></div></div>
       )}
 
       {view === 'archived' && archivedTestId && archivedBlocksLoading && (
-        <div className="panel wg-archived-empty"><p className="empty-state">Đang đánh giá Westgard cho dữ liệu lịch sử...</p></div>
+        <div className="panel"><p className="empty-state">Đang đánh giá Westgard cho dữ liệu lịch sử...</p></div>
       )}
 
       {view === 'archived' && archivedTestId && !archivedBlocksLoading && !archivedBlocks.length && (
-        <div className="panel wg-archived-empty"><div className="empty"><div className="empty-title">Chưa có dữ liệu phân tích</div><div>Không có lô nào của nhóm này có Mean/SD lịch sử hợp lệ cho xét nghiệm đã chọn.</div></div></div>
+        <div className="panel"><div className="empty"><div className="empty-title">Chưa có dữ liệu phân tích</div><div>Không có lô nào của nhóm này có Mean/SD lịch sử hợp lệ cho xét nghiệm đã chọn.</div></div></div>
       )}
 
       {view === 'archived' && archivedTestId && archivedBlocks.length >= 2 && (

@@ -139,7 +139,7 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
           <div className="rcfg-tools"><button className="btn teal" onClick={openNew}>＋ Thêm hồ sơ chuyển lô</button></div>
         </div>
       <div className="panel rcfg-list transition-list">
-        {lotTransitions.length ? <table className="data-table transition-table">
+        {lotTransitions.length ? <table className="transition-table">
           <thead><tr><th>Panel QC</th><th>Chuyển lô</th><th>Bắt đầu</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
           <tbody>
             {lotTransitions.map((tr) => {

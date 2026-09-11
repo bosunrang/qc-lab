@@ -513,7 +513,7 @@ export function SettingsPage() {
           {lisQueue.pending.length === 0
             ? <p className="empty-state">Không có kết quả nào chờ nhận.</p>
             : (
-              <table className="data-table">
+              <table>
                 <thead><tr><th>Xét nghiệm</th><th>Mức</th><th>Lô</th><th>Giá trị</th><th></th></tr></thead>
                 <tbody>
                   {lisQueue.pending.map((r) => (
@@ -532,7 +532,7 @@ export function SettingsPage() {
           {lisQueue.unresolved.length === 0
             ? <p className="empty-state">Không có bản ghi nào chưa khớp.</p>
             : (
-              <table className="data-table">
+              <table>
                 <thead><tr><th>Máy/Mã xét nghiệm</th><th>Lý do</th><th></th></tr></thead>
                 <tbody>
                   {lisQueue.unresolved.map((r) => (

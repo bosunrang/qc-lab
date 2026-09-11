@@ -106,11 +106,11 @@ export function PanelsTab({ onGoTests, onGoInstruments }: { onGoTests?: () => vo
                 </div>
               </div>
               <label className="panel-test-label">Chọn xét nghiệm trong panel</label>
-              <div className="panel-test-picker group-lot-picker assay-group-picker">
+              <div className="panel-test-picker group-lot-picker">
                 {instrumentId && !visibleTests.length && <div className="empty-state">Máy này chưa có xét nghiệm.</div>}
                 {visibleTests.map((t) => (
                   <label key={t.id}>
-                    <input className="cfg-panel-test" type="checkbox" checked={checked.has(t.id)} onChange={(e) => {
+                    <input type="checkbox" checked={checked.has(t.id)} onChange={(e) => {
                       setChecked((prev) => { const next = new Set(prev); if (e.target.checked) next.add(t.id); else next.delete(t.id); return next; });
                     }} />
                     <span><b>{t.name}</b><small>{instruments.find((i) => i.id === t.instrument_id)?.name || '—'} · {t.unit || 'Chưa có đơn vị'}</small></span>
