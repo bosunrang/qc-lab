@@ -257,8 +257,20 @@ export function createWestgardHandlers(db: Db) {
     // Cờ `accepted`: điểm có nằm trong CHUỖI ĐƯỢC CHẤP NHẬN hay không (xem
     // acceptedPoints() trong domain). Trang Nhập QC dùng cờ này cho biểu đồ/
     // thống kê, đúng như app cũ, thay vì tự chạy lại luật ở renderer.
+    //
+    // `acceptedPoints()` chỉ quét luật TỪNG MỨC (`active.within`), nên một
+    // điểm bị loại CHỈ bởi luật LIÊN MỨC (R4s, hoặc 2-2s/2of3-2s/3-1s ở phạm
+    // vi across) vẫn lọt vào chuỗi: object trả về tự mâu thuẫn
+    // (`verdict: 'rej'` kèm `accepted: true`) và điểm đó vào cả biểu đồ
+    // Levey-Jennings lẫn thống kê Mean/SD/CV thực. App cũ có cùng lỗ hổng
+    // (`acceptedLotPoints()` cũng chỉ nhận tập luật `within`) — sửa ở đây là
+    // lệch golden master CÓ CHỦ ĐÍCH.
+    const rejectsAcross = (point: (typeof rows)[number]) => {
+      const flag = byPoint.get(point);
+      return !!flag && flag.crossRules.some((rule) => active.actionOf(rule) === 'reject');
+    };
     const acceptedIds = new Set(
-      (hasTarget ? acceptedPoints(rows, levelRow!.mean, levelRow!.sd, active.within, active.actionOf) : rows)
+      (hasTarget ? acceptedPoints(rows, levelRow!.mean, levelRow!.sd, active.within, active.actionOf, rejectsAcross) : rows)
         .map(r => r.id),
     );
     const points = rows.map((r, i) => {

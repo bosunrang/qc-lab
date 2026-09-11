@@ -151,12 +151,19 @@ export function westgard(
 export function acceptedPoints<T extends QcPointLike>(
   points: readonly T[], mean: unknown, sd: unknown, isOn: (rule: string) => boolean = () => true,
   actionOf?: (rule: string) => RuleAction,
+  /** Điểm đã bị một luật NGOÀI phạm vi chuỗi này loại (thực tế: luật LIÊN
+   * MỨC, chỉ thấy được khi xét cả lần chạy). Bị loại khỏi chuỗi VÀ khỏi cửa
+   * sổ đánh giá các điểm sau — cùng ngữ nghĩa "lần chạy bị loại thì chạy
+   * lại, kết quả cũ không dùng" mà hàm này vốn áp cho luật từng mức. Thiếu
+   * cổng này thì một điểm có thể vừa `verdict: 'rej'` vừa `accepted: true`. */
+  rejectedOutside?: (point: T) => boolean,
 ): T[] {
   const out: T[] = [];
   // Cửa sổ giữ điểm ĐÃ CHUẨN HOÁ sang z (cùng cách `westgardByPoint` làm),
   // nên chạy luật trên thang z với mean=0/sd=1.
   const window: QcPointLike[] = [];
   for (const point of points || []) {
+    if (rejectedOutside?.(point)) continue;
     const target = pointTarget(point, mean, sd);
     const normalized: QcPointLike = { val: target.z, trendTarget: target.key };
     const { F } = westgard([...window, normalized], 0, 1, isOn, actionOf);
@@ -233,7 +240,13 @@ export function westgardMultiByPoint<T extends QcPointLike>(levelSets: readonly 
   return flags;
 }
 
-export interface CombinedPointFlag extends PointFlag { z: number }
+export interface CombinedPointFlag extends PointFlag {
+  z: number;
+  /** Phần luật đến TỪ đánh giá liên mức (một lần chạy). Tách riêng khỏi
+   * `rules` vì `acceptedPoints()` chỉ quét được luật từng mức — caller cần
+   * biết luật nào nằm ngoài tầm nhìn đó để loại điểm cho đúng. */
+  crossRules: string[];
+}
 
 /** Ghép luật từng mức và luật liên mức thành một kết luận duy nhất cho mỗi
  * điểm, cùng mô hình `createActiveWestgard()` của app cũ. */
@@ -246,10 +259,11 @@ export function combinedWestgardByPoint<T extends QcPointLike>(
   const out = new Map<T, CombinedPointFlag>();
   for (const { set, result } of singles) set.pts.forEach((point, index) => {
     const one = result.F[index] || { level: 'ok' as const, rules: [], supportRules: [] };
-    const rules = [...new Set([...one.rules, ...(cross.get(point) || [])])];
+    const crossRules = cross.get(point) || [];
+    const rules = [...new Set([...one.rules, ...crossRules])];
     const supportRules = [...new Set([...one.supportRules, ...(cross.support.get(point) || [])])].filter((rule) => !rules.includes(rule));
     const level: RuleVerdict = rules.some((rule) => (actionOf?.(rule) || defaultRuleAction(rule, true)) === 'reject') ? 'rej' : rules.length ? 'warn' : 'ok';
-    out.set(point, { level, rules, supportRules, z: result.zs[index] });
+    out.set(point, { level, rules, supportRules, crossRules: [...crossRules], z: result.zs[index] });
   });
   return out;
 }
