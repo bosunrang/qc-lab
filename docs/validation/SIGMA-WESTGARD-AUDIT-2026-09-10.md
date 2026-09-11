@@ -11,7 +11,7 @@ mục nào đã xử lý, để lần đọc sau không sửa lại thứ đã s
 
 | Phát hiện | Trạng thái |
 | --- | --- |
-| Entry và Westgard không dùng cùng tập "mức QC đang vận hành" | **ĐÃ SỬA** — `activeLevels()` port đủ 2 cổng của `canEnterQcForLevel()` app cũ (nhóm lô còn vận hành + Panel QC đang hoạt động); `app-v2/tests/westgard-active-levels.test.mjs` chốt cả 4 nhánh kèm đối chứng |
+| Entry và Westgard không dùng cùng tập "mức QC đang vận hành" | **ĐÃ SỬA ĐỦ 11/09** — bản 10/09 chỉ sửa PHÍA WESTGARD; `entry-handlers.activeEvaluation()` vẫn đọc mọi dòng `test_levels` nên ca lệch trong mục [P1] dưới đây tái hiện nguyên vẹn (Entry `rej [1-2s,2-2s]` vs Westgard `warn [1-2s]`), kèm biến thể chưa từng ghi nhận: NGAY TRONG trang Nhập QC, cây điều hướng (`listTestSummaries()`) nói "0 điểm / Đạt" còn bảng worksheet (`queryPoints()`) nói "Loại bỏ". Nay hai cổng nằm ở `app-v2/main/db/operational-levels.ts` — nguồn DUY NHẤT cho cả hai handler, cộng SỐ mức dùng cho `makeScopeOf()` ở cả `listParallelColumns`/`listPreviousLotSeries`. `app-v2/tests/entry-westgard-symmetry.test.mjs` (mới) khoá tính đối xứng; `westgard-active-levels.test.mjs` chỉ soi MỘT phía nên không thể bắt loại lệch này |
 | TEa cấp kỳ không giải lại theo Mean từng mức (CLIA tuyệt đối) | **ĐÃ SỬA** — `computeLevel()` xếp thứ tự snapshot theo mức → giải tại Mean của mức → `periodTea`; `app-v2/tests/sigma-level-tea.test.mjs` + mục 10 của `cross-app-westgard-sigma.test.mjs` |
 | Cổng truy vết EFLM thiếu (mọi `tea` gõ tay đều thành "TEa EFLM") | **ĐÃ SỬA** — port `hasEflmTrace` app cũ, đối chiếu 45/45 tổ hợp |
 | Nhãn tiêu chí CLIA in % đã quy đổi thay vì giới hạn tuyệt đối | **ĐÃ SỬA** — `teaCriterionText()` + suy `clia_rule` từ dữ liệu, đối chiếu 76/77 analyte |

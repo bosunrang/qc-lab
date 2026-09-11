@@ -2,6 +2,7 @@
 // theo verdict te nhat hien tai, xem chi tiet 1 muc kem CUSUM, bat/tat tung
 // luat rieng cho 1 xet nghiem.
 import type { Db } from '../db/sqlite-like';
+import { listOperationalLevels, isTestInActivePanel } from '../db/operational-levels';
 import { westgard, combinedWestgardByPoint, cusumScan, acceptedPoints, type QcPointLike, type RuleVerdict, type CusumResult } from '../domain/westgard-engine';
 import { parseRuleActions, serializeRuleActions, makeIsOnLayered, makeRuleActionLayered, isRuleAction, globalRuleList, parseRuleScopes, makeScopeOf, type RuleAction, type RuleActionsMap } from '../domain/rule-config';
 import { WG_RULE_REGISTRY, defaultRuleAction, errorTypeDetail } from '../domain/westgard-rules';
@@ -64,35 +65,15 @@ export function createWestgardHandlers(db: Db) {
   type ActiveLevel = { level: number; mean: number | null; sd: number | null; qc_lot_id: string | null; lot_no: string; exp: string; pts: ActivePoint[] };
   const pointOrder = compareQcPointOrder;
 
-  /** Mức QC ĐANG VẬN HÀNH của một xét nghiệm — port `operationalLevels()` +
-   * `qcOperationalAccess.lotPoints()` của app cũ, KHÔNG phải "mọi dòng trong
-   * `test_levels`".
-   *
-   * Vì sao quan trọng hơn một bộ lọc danh sách: tập mức này là đầu vào của
-   * `combinedWestgardByPoint()` (đánh giá LIÊN MỨC theo cùng `run_id`) và
-   * `levels.length` là đầu vào của `makeScopeOf()` (một luật chuyển
-   * within↔across theo SỐ mức). Trước bản sửa 2026-09-10, một mức thuộc nhóm
-   * lô ĐÃ DỪNG vẫn được kéo vào: đo được điểm mức 1 nổ `2-2s` liên mức với
-   * điểm của mức đã dừng và bị kết luận "Loại bỏ", trong khi app cũ chỉ cảnh
-   * báo `1-2s` — tức lệch KẾT LUẬN LÂM SÀNG, không phải lệch hiển thị.
-   *
-   * Hai cổng, đúng như app cũ tách chúng:
-   *  - mức phải gắn lô thuộc nhóm lô còn vận hành (`lot_groups.active<>0` và
-   *    `status` không phải `stopped`/`planned`) → mức KHÔNG thoả bị loại hẳn;
-   *  - xét nghiệm phải nằm trong một Panel QC đang hoạt động → app cũ vẫn giữ
-   *    mức trong danh sách nhưng trả VỀ RỖNG điểm (`lotPoints` thoát sớm),
-   *    nên giữ y nguyên cách đó thay vì cũng loại mức.
+  /** Mức QC ĐANG VẬN HÀNH của một xét nghiệm — hai cổng nằm ở
+   * `db/operational-levels.ts` (nguồn DUY NHẤT, dùng chung với Nhập QC; lý do
+   * và ca lệch đã đo được ghi ở đầu file đó). Ở đây chỉ còn phần riêng của
+   * trang này: nạp điểm chưa hủy của đúng lô đang gán từng mức.
    * Nhóm lô đã dừng/lưu trữ có tab riêng (`listArchivedGroupTests`), đây
    * không phải chỗ hiển thị chúng. */
   function activeLevels(testId: string): ActiveLevel[] {
-    const levels = db.prepare(`SELECT tl.level,tl.mean,tl.sd,tl.qc_lot_id,COALESCE(ql.lot_no,'') lot_no,COALESCE(ql.exp,'') exp
-      FROM test_levels tl
-      JOIN qc_lots ql ON ql.id=tl.qc_lot_id
-      JOIN lot_groups lg ON lg.id=ql.group_id
-      WHERE tl.test_id=? AND lg.active<>0 AND lg.status<>'stopped' AND lg.status<>'planned'
-      ORDER BY tl.level`).all(testId) as Omit<ActiveLevel, 'pts'>[];
-    const inActivePanel = !!db.prepare(`SELECT 1 FROM qc_panel_tests pt JOIN qc_panels p ON p.id=pt.panel_id
-      WHERE pt.test_id=? AND p.active<>0 LIMIT 1`).get(testId);
+    const levels = listOperationalLevels(db, testId);
+    const inActivePanel = isTestInActivePanel(db, testId);
     return levels.map((level) => {
       const rows = inActivePanel ? db.prepare(`SELECT id,date,run_id,val,qc_mean,qc_sd FROM qc_points
         WHERE test_id=? AND level=? AND voided=0 AND lot=?`).all(testId, level.level, level.lot_no) as

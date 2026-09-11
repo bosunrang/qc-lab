@@ -2,6 +2,7 @@
 // giá đa mức; lô mới trong chuyển tiếp được đánh giá riêng từng mức và không
 // làm thay đổi verdict chính cho tới khi hồ sơ được chấp nhận.
 import type { Db } from '../db/sqlite-like';
+import { listOperationalLevels, isTestInActivePanel, countOperationalLevels, OPERATIONAL_LOT_GROUP_SQL } from '../db/operational-levels';
 // 3 kiểu dữ liệu trả về lấy từ HỢP ĐỒNG dùng chung thay vì khai lại: bản khai
 // cũ ở đây dùng `voided: number` trong khi hợp đồng khai `0 | 1`, và renderer
 // tin theo hợp đồng — hai khai báo song song cùng tên là đúng loại drift mà
@@ -97,8 +98,7 @@ export function createEntryHandlers(db: Db) {
     return !!db.prepare(`SELECT 1
       FROM qc_lots ql
       JOIN lot_groups lg ON lg.id=ql.group_id
-      WHERE ql.id=? AND lg.active<>0
-        AND lg.status<>'stopped' AND lg.status<>'planned'`).get(qcLotId);
+      WHERE ql.id=? AND ${OPERATIONAL_LOT_GROUP_SQL}`).get(qcLotId);
   }
 
   /** Cấu hình luật CHUNG toàn phòng xét nghiệm — cùng khoá `app_meta` mà
@@ -111,14 +111,23 @@ export function createEntryHandlers(db: Db) {
 
   /** Một nguồn dữ liệu duy nhất cho Nhập QC: chỉ điểm chưa hủy thuộc đúng lô
    * đang gán của từng mức, sắp lần chạy theo số tự nhiên, rồi ghép luật
-   * within/across. */
+   * within/across.
+   *
+   * Tập mức lấy từ `db/operational-levels.ts` — CÙNG tập mà trang Phân tích
+   * Westgard dùng. Trước đây hàm này đọc MỌI dòng `test_levels` (không cổng
+   * nào), nên hai trang cho hai kết luận khác nhau trên cùng một điểm QC và
+   * ngay trong trang này cây điều hướng cũng lệch với bảng worksheet — xem
+   * ghi chú đầu `db/operational-levels.ts` và
+   * `tests/entry-westgard-symmetry.test.mjs`. */
   function activeEvaluation(testId: string) {
     const test = db.prepare('SELECT rule_actions_json,rule_scopes_json FROM tests WHERE id=?').get(testId) as { rule_actions_json: string; rule_scopes_json: string } | undefined;
-    const configs = db.prepare(`SELECT tl.level,tl.mean,tl.sd,COALESCE(ql.lot_no,'') lot FROM test_levels tl LEFT JOIN qc_lots ql ON ql.id=tl.qc_lot_id WHERE tl.test_id=? ORDER BY tl.level`).all(testId) as Omit<ActiveLevel, 'pts'>[];
-    const levels = configs.map((config) => {
-      const rows = db.prepare('SELECT * FROM qc_points WHERE test_id=? AND level=? AND voided=0 AND lot=?').all(testId, config.level, config.lot) as unknown as Omit<ActivePoint, 'runId' | 'qcMean' | 'qcSd'>[];
+    const inActivePanel = isTestInActivePanel(db, testId);
+    const levels: ActiveLevel[] = listOperationalLevels(db, testId).map((config) => {
+      const rows = inActivePanel
+        ? db.prepare('SELECT * FROM qc_points WHERE test_id=? AND level=? AND voided=0 AND lot=?').all(testId, config.level, config.lot_no) as unknown as Omit<ActivePoint, 'runId' | 'qcMean' | 'qcSd'>[]
+        : [];
       const pts = rows.map((p) => ({ ...p, runId: p.run_id, qcMean: p.qc_mean, qcSd: p.qc_sd })).sort(compareQcPointOrder);
-      return { ...config, pts };
+      return { level: config.level, mean: config.mean, sd: config.sd, lot: config.lot_no, pts };
     });
     const overrides = parseRuleActions(test?.rule_actions_json);
     const on = makeIsOnLayered(globalRules(), overrides);
@@ -142,7 +151,9 @@ export function createEntryHandlers(db: Db) {
   function listParallelColumns(testId: string): ParallelEntryColumn[] {
     const test = db.prepare('SELECT rule_actions_json,rule_scopes_json FROM tests WHERE id=?').get(testId) as { rule_actions_json: string; rule_scopes_json: string } | undefined;
     if (!test) return [];
-    const levelCount = (db.prepare('SELECT COUNT(*) c FROM test_levels WHERE test_id=?').get(testId) as { c: number }).c;
+    // Phạm vi within/across phải giống MỌI endpoint khác của xét nghiệm này,
+    // nên đếm mức ĐANG VẬN HÀNH chứ không phải mọi dòng `test_levels`.
+    const levelCount = countOperationalLevels(db, testId);
     const overrides = parseRuleActions(test.rule_actions_json);
     const on = makeIsOnLayered(globalRules(), overrides);
     const actionOf = makeRuleActionLayered(globalRules(), overrides);
@@ -185,7 +196,9 @@ export function createEntryHandlers(db: Db) {
     const overrides = parseRuleActions(test.rule_actions_json);
     const on = makeIsOnLayered(globalRules(), overrides);
     const actionOf = makeRuleActionLayered(globalRules(), overrides);
-    const scope = makeScopeOf(parseRuleScopes(test.rule_scopes_json), configs.length);
+    // Như trên: `configs` quyết định CHUỖI nào được hiển thị, còn phạm vi luật
+    // phải theo số mức đang vận hành để không lệch với chuỗi chính.
+    const scope = makeScopeOf(parseRuleScopes(test.rule_scopes_json), countOperationalLevels(db, testId));
     const within = (rule: string) => on(rule) && ['within', 'both'].includes(scope(rule));
     const out: PreviousLotSeries[] = [];
 
