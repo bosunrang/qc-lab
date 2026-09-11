@@ -64,6 +64,19 @@ assert.equal(after.map((point) => point.val).sort((x, y) => x - y).join(','), '9
 config.saveLot({ id: lotOld.id, data: { lotNo: 'L-MOI', level: 1, supplier: 'Randox' } }, actor);
 assert.equal(entry.queryPoints(test.id, 1).every((point) => point.lot === 'L-MOI'), true);
 
+// ...và KHÔNG gỡ lô khỏi nhóm lô. Form "Sửa lô QC" không có ô chọn nhóm
+// (membership do modal Nhóm lô QC quản lý) nên nó không gửi `groupId`; trước
+// 2026-09-11 `saveLot` ghi thẳng `group_id=NULL` trong trường hợp đó, nên chỉ
+// sửa mỗi ô Nhà cung cấp là lô LẶNG LẼ rời nhóm. Không dừng ở thẻ nhóm lô
+// thiếu một lô: mức QC gắn lô đó hết "đang vận hành" ngay lập tức, biến mất
+// khỏi Tổng quan/Westgard và ngừng được đánh giá ở Nhập QC.
+{
+  const groupedLots = config.listLots().filter((lot) => lot.id === lotOld.id);
+  assert.equal(groupedLots.length, 1);
+  assert.notEqual(groupedLots[0].group_id, null, 'sua lo khong duoc go lo khoi nhom lo');
+  assert.equal(entry.queryPoints(test.id, 1).length, 2, 'muc QC van phai dang van hanh sau khi sua lo');
+}
+
 // Kỳ đã khoá vẫn được đếm và báo rõ (đổi nhãn lô là thao tác được PHÉP, khác
 // xoá xét nghiệm — nhưng người dùng phải biết nó chạm vào kỳ đã chốt).
 report.lockPeriod({ data: { ym: '2026-03', note: 'chot ky' } }, actor);

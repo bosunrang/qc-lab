@@ -394,9 +394,9 @@ export function createConfigHandlers(db: Db) {
     const result = validateLot(input.data);
     if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
     const { groupId, lotNo, level, description, supplier, program, exp, opened, active, depleted, note } = result.data;
-    let before: { lot_no: string; level: number } | undefined;
+    let before: { lot_no: string; level: number; group_id: string | null } | undefined;
     if (id) {
-      before = db.prepare('SELECT lot_no, level FROM qc_lots WHERE id=?').get(id) as { lot_no: string; level: number } | undefined;
+      before = db.prepare('SELECT lot_no, level, group_id FROM qc_lots WHERE id=?').get(id) as { lot_no: string; level: number; group_id: string | null } | undefined;
       if (!before) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy lô QC cần cập nhật.' } };
       // Đổi mức của lô đang gán Mean/SD cho xét nghiệm — chặn TRƯỚC cổng
       // trùng số lô để người dùng nhận đúng hướng dẫn gỡ liên kết trước.
@@ -418,8 +418,17 @@ export function createConfigHandlers(db: Db) {
       let renamed = 0;
       db.exec('BEGIN');
       try {
+        // KHÔNG gửi `groupId` nghĩa là "giữ nguyên nhóm", không phải "gỡ khỏi
+        // nhóm" — cùng ngữ nghĩa `prepareLabProfile(existing)` dùng cho logo.
+        // Form "Sửa lô QC" không có ô chọn nhóm (membership do modal Nhóm lô
+        // QC quản lý), nên nó không gửi trường này; trước bản sửa, mỗi lần
+        // sửa một lô là `group_id` bị ghi NULL và lô LẶNG LẼ rơi khỏi nhóm.
+        // Hậu quả không dừng ở thẻ nhóm lô thiếu một lô: mức QC gắn lô đó lập
+        // tức hết "đang vận hành", nên biến mất khỏi Tổng quan/Westgard và
+        // ngừng được đánh giá ở Nhập QC. Đo được: nhóm 2 lô còn 1 lô sau khi
+        // chỉ sửa mỗi ô Nhà cung cấp.
         db.prepare(`UPDATE qc_lots SET group_id=?,lot_no=?,level=?,description=?,supplier=?,program=?,exp=?,opened=?,active=?,depleted=?,note=? WHERE id=?`)
-          .run(groupId || null, lotNo, level, description, supplier, program, exp, opened, active ? 1 : 0, depleted ? 1 : 0, note, id);
+          .run(groupId || before?.group_id || null, lotNo, level, description, supplier, program, exp, opened, active ? 1 : 0, depleted ? 1 : 0, note, id);
         if (renaming) {
           renamed = Number(db.prepare('UPDATE qc_points SET lot=? WHERE level=? AND lot=?')
             .run(lotNo, before!.level, before!.lot_no).changes || 0);

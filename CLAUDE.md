@@ -5112,6 +5112,64 @@ Verify từng mục một, mỗi mục một commit riêng: `app-v2:typecheck` s
 sửa đều được chứng minh test BẮT ĐƯỢC lỗi bằng cách hoàn tác tạm rồi xác nhận
 đỏ đúng assertion, sau đó phục hồi.
 
+**Entry ↔ Westgard: đóng nốt nửa còn lại của mục P1, và một bug lô im lặng
+lộ ra theo (2026-09-11).** Bản 10/09 đánh dấu mục "Entry và Westgard không
+dùng cùng tập mức QC đang vận hành" là ĐÃ SỬA, nhưng chỉ sửa PHÍA WESTGARD:
+`entry-handlers.activeEvaluation()` — hàm tính verdict cho bảng nhập QC và
+biểu đồ — vẫn đọc MỌI dòng `test_levels`, không cổng nào. `canEnterQcForLevel()`
+có tồn tại nhưng CHỈ chạy lúc GHI (`addPoint`/`voidPoint`), không chạy lúc
+ĐÁNH GIÁ. Dựng lại bằng SQLite thật, ca lệch trong bản rà soát tái hiện
+nguyên vẹn — và lộ thêm một biến thể chưa từng ghi nhận:
+
+```
+nhóm lô mức 2 = "stopped"   Westgard: warn [1-2s]  |  Entry: rej [1-2s,2-2s]
+Panel QC tắt                cây Nhập QC: "0 điểm / Đạt"  |  bảng worksheet CÙNG MÀN HÌNH: "Loại bỏ"
+```
+
+Biến thể thứ hai là mâu thuẫn NGAY TRONG một trang: cây điều hướng đọc
+`listTestSummaries()` (đã có cổng từ 10/09) còn ô worksheet đọc `queryPoints()`
+(chưa có). **Lý do 75/75 test vẫn xanh suốt thời gian đó**:
+`tests/westgard-active-levels.test.mjs` chỉ gọi `westgard-handlers` — một bài
+test chỉ soi MỘT phía không bao giờ bắt được lệch giữa HAI phía. Đó đúng là
+đề nghị "thêm test đối xứng Entry ↔ Westgard" trong bản rà soát, chưa từng
+được làm.
+
+`main/db/operational-levels.ts` (mới) là nguồn DUY NHẤT: `listOperationalLevels()`
+(mức phải gắn lô thuộc nhóm còn vận hành → loại HẲN nếu không thoả),
+`isTestInActivePanel()` (Panel tắt thì GIỮ mức trong danh sách nhưng không
+điểm nào được đánh giá — app cũ tách hai cổng đúng như vậy),
+`countOperationalLevels()` và hằng `OPERATIONAL_LOT_GROUP_SQL` dùng chung cho
+cả cổng GHI. Đặt ở `main/db/` chứ không nhân bản SQL theo quy ước "mỗi handler
+tự SQL" vì chính việc nhân bản đã gây ra nửa-sửa này — cùng lý do
+`db/table-io.ts` được tách ra khi sao lưu và di trú cần chung một transaction.
+Cả `listParallelColumns` lẫn `listPreviousLotSeries` cũng chuyển sang đếm mức
+VẬN HÀNH cho `makeScopeOf()`: phạm vi within/across là thuộc tính của thiết kế
+QC đang chạy, phải giống nhau ở mọi endpoint, bất kể endpoint đó chọn hiển thị
+chuỗi điểm nào.
+
+**Bug thật lộ ra khi test `config-lot-lifecycle` đỏ theo** — không phải bản
+sửa làm hỏng, mà nó gỡ lớp che: `saveLot()` ghi `group_id = groupId || null`,
+trong khi form "Sửa lô QC" KHÔNG có ô chọn nhóm (membership do modal Nhóm lô
+QC quản lý) nên không gửi `groupId` — grep xác nhận KHÔNG caller nào trong
+toàn repo từng gửi trường đó. Đo được: nhóm 2 lô còn 1 lô sau khi chỉ sửa mỗi
+ô Nhà cung cấp. Hậu quả không dừng ở thẻ nhóm thiếu một lô — mức QC gắn lô đó
+lập tức hết "đang vận hành" nên biến mất khỏi Tổng quan/Westgard; trước bản
+sửa Entry vẫn chấm điểm cho nó, nên triệu chứng bị che một nửa. Sửa theo đúng
+ngữ nghĩa `prepareLabProfile(existing)` đã dùng cho logo: KHÔNG gửi nghĩa là
+"giữ nguyên", không phải "gỡ". Sửa ở main chứ không ở form, để mọi nguồn gọi
+(kể cả IPC trực tiếp) đều an toàn.
+
+Verify: `app-v2:typecheck` sạch, `app-v2:test` **76/76** (thêm
+`tests/entry-westgard-symmetry.test.mjs` — so verdict/luật/số điểm của CÙNG
+một điểm qua hai đường đọc trên mọi trạng thái nhóm lô/Panel, kèm nhánh ĐỐI
+CHỨNG chứng minh dữ liệu thật sự đủ điều kiện nổ `2-2s` để một cài đặt luôn
+trả rỗng không "đối xứng" một cách vô nghĩa; và một assertion mới trong
+`config-lot-lifecycle.test.mjs` khoá riêng NGUYÊN NHÂN `group_id` thay vì chỉ
+triệu chứng), `app-v2:build` sạch, `app-v2:css-parity` đạt, `app-v2:ui-parity`
+**79/79**, `app-v2:style-parity` 18/18. Cả hai bản sửa đều được chứng minh test
+BẮT ĐƯỢC lỗi bằng cách hoàn tác tạm rồi xác nhận đỏ đúng assertion, sau đó
+phục hồi.
+
 **Tiêu chí cắt còn lại đúng 1 mục**: Giai đoạn D xong (`app-v2:ui-parity`
 xanh với baseline 0 cho mọi surface). Mục "đối chiếu Westgard/Sigma khớp
 100%" nay ĐẠT, và từ đây nó là gate sống chạy trong `app-v2:test` chứ không
