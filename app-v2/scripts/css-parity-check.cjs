@@ -1,37 +1,36 @@
 'use strict';
-// Gate CSS parity — bù ĐÚNG điểm mù của `app-v2:ui-parity` (2026-09-03).
+// Gate "class chết" của app-v2 — viết lại 2026-09-11.
 //
-// Gate UI parity so TẬP class trong vùng nội dung của app cũ với app-v2 theo
-// chiều "cũ CÓ mà v2 THIẾU". Nghĩa là một class CÓ trong DOM app-v2 (nên
-// không bị coi là thiếu) mà KHÔNG có rule CSS nào trong app-v2 vẫn qua gate —
-// dù app cũ có rule thật và hiển thị hoàn toàn khác. Lần rà đầu tiên bằng
-// công cụ này tìm ra 30 class như vậy, trong đó có những thứ làm vỡ hẳn bố
-// cục: `.sg-setup-fields` (lưới 3 cột của panel "Thiết lập phân tích" Six
-// Sigma), `.action-form-panel-head`, `.issue-group`, `.lot-config-left/right`,
-// `.wg-rule-item`, `.qc-note-input`, `.range-band-note`, `.rc-*-btn`.
+// BẢN CŨ so class của app-v2 với `assets/*.css` của app cũ: "app cũ có rule mà
+// app-v2 không có" = FAIL. Nghĩa là nó khẳng định app-v2 PHẢI giống app cũ về
+// giao diện — đúng cơ chế đã kéo ngược mọi cải tiến giao diện của người dùng.
+// Quyết định 2026-09-11: app cũ chỉ là tham khảo, app-v2 viết code mới. Gate
+// này vì vậy không còn đọc `assets/` nữa.
 //
-// Cách đo: lấy mọi class xuất hiện trong `className` của
-// `app-v2/renderer/**/*.tsx`, rồi FAIL nếu class đó có selector trong
-// `assets/*.css` (app cũ style thật) mà không có selector nào trong
-// `app-v2/renderer/styles/**/*.css`.
+// Việc nó làm bây giờ, và CHỈ việc đó: tìm class được dùng trong
+// `app-v2/renderer/**/*.tsx` mà KHÔNG có rule nào trong
+// `app-v2/renderer/styles/**/*.css`. Đây là lỗi thật và tự đứng vững, không
+// cần so với bản nào khác: hoặc CSS bị quên, hoặc class đã chết sau một lần
+// đổi tên.
 //
-// GIỚI HẠN đã biết, ghi rõ để không ai tưởng gate này mạnh hơn thực tế:
-//   - Chỉ kiểm "CÓ rule hay KHÔNG", không so GIÁ TRỊ rule. Một rule copy sai
-//     giá trị, hoặc copy đúng nhưng đặt sai ngữ cảnh `@media` (đã gặp thật:
-//     2 rule `.sg-data-head` mobile của app cũ bị copy ra ngoài media nên
-//     desktop cũng xếp dọc), gate này KHÔNG thấy — phải đo bằng
-//     `getBoundingClientRect()`/ảnh chụp.
-//   - Chỉ đọc `className="..."`/`className={`...`}`; class dựng động hoàn
-//     toàn bằng biến sẽ bị bỏ qua.
-//   - Class KHÔNG bên nào có CSS được liệt kê riêng, KHÔNG tính là lỗi (phần
-//     lớn là class chỉ dùng để test/định danh, vd `entryLJStack`).
+// Ratchet theo `app-v2/tests/css-dead-class-baseline.json` (cùng quy ước với
+// `tests/a11y-ratchet.json`/`css-hex-ratchet` của repo gốc): danh sách hiện có
+// là class dùng làm ĐỊNH DANH cho JS/test chứ không phải để style (`tm-mean`,
+// `cfg-assay-rule`…) lẫn class thật sự đã chết chưa dọn. Class MỚI không có
+// rule thì FAIL. Siết baseline bằng
+// `node app-v2/scripts/css-parity-check.cjs --update-baseline`, không sửa tay
+// để cho qua.
+//
+// GIỚI HẠN: chỉ đọc `className="..."`/`className={`...`}`; class dựng hoàn
+// toàn bằng biến bị bỏ qua. Chỉ kiểm "CÓ rule hay KHÔNG", không kiểm giá trị
+// rule hay ngữ cảnh `@media`.
 const fs = require('node:fs');
 const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..', '..');
 const RENDERER = path.join(ROOT, 'app-v2', 'renderer');
 const V2_STYLES = path.join(RENDERER, 'styles');
-const OLD_CSS_DIR = path.join(ROOT, 'assets');
+const BASELINE = path.join(ROOT, 'app-v2', 'tests', 'css-dead-class-baseline.json');
 
 function walk(dir, ext, out = []) {
   for (const name of fs.readdirSync(dir)) {
@@ -55,21 +54,31 @@ for (const file of walk(RENDERER, '.tsx')) {
 }
 
 const v2Css = stripComments(readAll(walk(V2_STYLES, '.css')));
-const oldCss = stripComments(readAll(
-  fs.readdirSync(OLD_CSS_DIR).filter((f) => f.endsWith('.css')).map((f) => path.join(OLD_CSS_DIR, f)),
-));
-const hasRule = (css, cls) => new RegExp('\\.' + cls.replace(/-/g, '\\-') + '(?![\\w-])').test(css);
+const hasRule = (cls) => new RegExp('\\.' + cls.replace(/-/g, '\\-') + '(?![\\w-])').test(v2Css);
 
-const missing = [...usedClasses].filter((c) => hasRule(oldCss, c) && !hasRule(v2Css, c)).sort();
-const neither = [...usedClasses].filter((c) => !hasRule(oldCss, c) && !hasRule(v2Css, c)).sort();
+const dead = [...usedClasses].filter((cls) => !hasRule(cls)).sort();
+const baseline = fs.existsSync(BASELINE) ? JSON.parse(fs.readFileSync(BASELINE, 'utf8')) : { allowed: [] };
+const allowed = new Set(baseline.allowed || []);
 
-console.log(`CSS parity: ${usedClasses.size} class app-v2 đang dùng.`);
-console.log(`  ${neither.length} class không bên nào có CSS (bỏ qua): ${neither.join(', ') || '—'}`);
-if (missing.length) {
-  console.error(`\nFAIL: ${missing.length} class app cũ CÓ CSS mà app-v2 KHÔNG có rule nào:`);
-  for (const cls of missing) console.error('  - ' + cls);
-  console.error('\nPort rule tương ứng từ assets/*.css sang app-v2/renderer/styles/, giữ nguyên');
-  console.error('ngữ cảnh @media của bản cũ (rule mobile copy ra ngoài media sẽ đè lên desktop).');
+if (process.argv.includes('--update-baseline')) {
+  fs.writeFileSync(BASELINE, JSON.stringify({
+    note: 'Class dùng trong renderer mà không có rule CSS nào trong app-v2/renderer/styles. Phần lớn là class định danh cho JS/test; phần còn lại là class chết chưa dọn. Chỉ siết xuống, không nới thêm bằng tay.',
+    allowed: dead,
+  }, null, 2) + '\n');
+  console.log(`Đã ghi baseline: ${dead.length} class không có rule CSS.`);
+  process.exit(0);
+}
+
+const added = dead.filter((cls) => !allowed.has(cls));
+const fixed = [...allowed].filter((cls) => usedClasses.has(cls) && hasRule(cls)).sort();
+
+console.log(`Class chết: ${usedClasses.size} class app-v2 đang dùng, ${dead.length} không có rule CSS (baseline ${allowed.size}).`);
+if (fixed.length) console.log(`  ${fixed.length} class trong baseline nay đã có CSS — chạy --update-baseline để siết: ${fixed.join(', ')}`);
+if (added.length) {
+  console.error(`\nFAIL: ${added.length} class MỚI không có rule CSS nào trong app-v2/renderer/styles/:`);
+  for (const cls of added) console.error('  - ' + cls);
+  console.error('\nHoặc viết CSS cho nó, hoặc bỏ class khỏi JSX. Nếu đây là class định danh');
+  console.error('cố ý không style, chạy --update-baseline để ghi nhận.');
   process.exit(1);
 }
-console.log('CSS parity: đạt — mọi class app cũ style thật đều có rule ở app-v2.');
+console.log('Class chết: đạt — không có class mới nào thiếu CSS.');

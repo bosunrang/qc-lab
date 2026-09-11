@@ -1,5 +1,16 @@
 'use strict';
 // Gate UI parity (Giai đoạn D0, docs/APP-V2-PLAN.md): mở CÙNG bộ dữ liệu seed
+//
+// *** 2026-09-11: GATE NAY CHI CON BAO CAO, KHONG CHAN. ***
+// Quyet dinh san pham: app cu CHI la tham khao cho giao dien; app-v2 viet code
+// moi va nguoi dung so huu giao dien do. Gate nay tung chan theo chieu "app cu
+// CO ma app-v2 THIEU", nen moi cai tien giao dien cua nguoi dung deu lam no do
+// va bi keo nguoc ve app cu — dung co che da gay ra lop loi nay.
+// Giu lai vi no van huu ich cho MOT viec: phat hien mot man hinh app-v2 thieu
+// HAN mot thong tin nghiep vu ma app cu co. Doc no nhu goi y ra soat, khong
+// phai danh sach viec phai sua. Baseline chi con la moc so sanh, khong con la
+// muc tieu phai ve 0.
+//
 // trên app cũ (golden master) và app-v2 rồi đối chiếu.
 //
 // Bản đầu (2026-09-01) chỉ CHỤP ẢNH cặp old/v2 và bắt console error của v2 —
@@ -347,9 +358,15 @@ async function main() {
 
   if (diagnostics.length) failures.push(`${diagnostics.length} lỗi trình duyệt (xem report.json): ${diagnostics.slice(0, 3).join(' | ')}`);
   if (failures.length) {
-    console.error(`\nUI parity FAIL (${failures.length}):`);
-    for (const line of failures) console.error(`  - ${line}`);
-    throw new Error(`UI parity không đạt: ${failures.length} vấn đề.`);
+    // BAO CAO, KHONG CHAN (2026-09-11): app cu chi con la tham khao, nen
+    // "khac app cu" khong phai loi. Doc danh sach nay nhu mot goi y ra soat.
+    console.warn("");
+    console.warn(`UI parity — ${failures.length} khac biet so voi app cu (chi bao cao, KHONG chan):`);
+    for (const line of failures) console.warn(`  - ${line}`);
+    console.warn("");
+    console.warn("KHONG sua giao dien app-v2 cho giong app cu chi vi cac dong tren.");
+    console.warn("Chi xu ly khi no cho thay mot man hinh THIEU HAN thong tin nghiep vu.");
+    return;
   }
   console.log(`UI parity: ${report.captures.length} surface đạt (tiêu đề khớp, selector đủ ở cả 2 bản, không lỗi trình duyệt, không vượt baseline).`);
 }

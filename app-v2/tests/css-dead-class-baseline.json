@@ -1,0 +1,28 @@
+{
+  "note": "Class dùng trong renderer mà không có rule CSS nào trong app-v2/renderer/styles. Phần lớn là class định danh cho JS/test; phần còn lại là class chết chưa dọn. Chỉ siết xuống, không nới thêm bằng tay.",
+  "allowed": [
+    "action-issues-panel",
+    "assay-group-picker",
+    "audit-summary-status",
+    "avatar-modal",
+    "avg",
+    "cfg-assay-rule",
+    "cfg-panel-test",
+    "dash-analysis-loading",
+    "data-table",
+    "levels-",
+    "sg-combined-export",
+    "sg-combined-print",
+    "sg-mdc-chart",
+    "sg-row-delete",
+    "sg-row-export",
+    "sg-row-print",
+    "tm-high",
+    "tm-low",
+    "tm-mean",
+    "tm-sd",
+    "tm-use",
+    "wg-archived-empty",
+    "wg-view-mode"
+  ]
+}
