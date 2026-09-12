@@ -167,7 +167,7 @@ Thẻ lớn nhất. Đối chiếu từng tab:
 | Danh mục xét nghiệm | CRUD xét nghiệm, TEa, CUSUM, 13 luật Westgard theo xét nghiệm | ✅ + 🔷 gán **nhiều máy** cho một xét nghiệm (app cũ chỉ 1) |
 | Panel QC | CRUD panel, gán xét nghiệm | ✅ `savePanel`/`removePanel` |
 | Lô & Nhóm QC | CRUD lô/nhóm lô, dừng/kích hoạt nhóm, đổi số lô | ✅ |
-| Mean/SD | Ma trận gán Mean/SD/giới hạn theo (mức, lô) | 🟨 xem dưới |
+| Mean/SD | Ma trận gán Mean/SD/giới hạn theo (mức, lô) | ✅ gồm cả nhánh "Dự kiến" |
 | Chuyển tiếp lô | Vòng đời `planned → active → accepted/rejected` | ✅ |
 | Lịch sử dữ liệu | Mốc Mean/SD theo lô + modal chi tiết + điểm QC | ✅ |
 | Bảng TEa tham chiếu | 77 analyte CLIA/Ricos + ghi đè + hồ sơ TEa PXN | ✅ |
@@ -200,14 +200,48 @@ Thẻ lớn nhất. Đối chiếu từng tab:
   (`westgard-handlers` cho panel cấu hình chung, `config-handlers` cho nhãn
   này); nhân bản SQL ở đây là lớp lỗi "hai màn hình nói hai chuyện".
 
-**Còn lại (2 mục, đều đã chốt lý do):**
-1. **Nhánh "Dự kiến" khi lưu Mean/SD sang nhóm lô khác** — app cũ có 3 lựa chọn
-   (Hủy / Dự kiến / Chuyển qua nhóm này), app-v2 chỉ có Hủy/Chuyển. "Dự kiến"
-   cần chỗ lưu Mean/SD ứng viên chưa áp ở tầng mức QC. ⬜
-2. Cột "Hành động" của bảng luật Westgard nâng cao **đã nối** từ 2026-09-06
-   (`inactive`/`alert`/`reject`, phân giải 3 lớp: ghi đè theo xét nghiệm →
-   cấu hình chung → mặc định registry). Ghi chú cũ nói "chưa nối" là **đã lỗi
-   thời**, đừng làm lại.
+- **Mean/SD "Dự kiến" (làm 2026-09-12) — port đúng nghiệp vụ app cũ.** Người
+  dùng chốt luồng: *"nhóm lô mới thì set Mean/SD rồi Kích hoạt; nhóm đang dùng
+  chuyển sang nhóm mới là chuyển HẾT; chuyển một mức thì tự vào thẻ Chuyển tiếp
+  lô"*. Bảng Mean/SD có 3 đường đi khi mức QC đang gắn lô của nhóm KHÁC (nguyên
+  văn `targetSwitchModalHtml()` app cũ): **Hủy / Dự kiến / Chuyển qua nhóm lô
+  này**.
+  - **Dự kiến** = chỉ lưu Mean/SD đã nhập cho nhóm lô mới, **chưa áp dụng** —
+    nhóm đang dùng vẫn chạy bình thường; nhóm nhận số mang nhãn `planned`
+    ("Dự kiến" trên thẻ ở tab Lô & Nhóm QC, port `group.status='planned'`).
+    Bấm **Kích hoạt** ở tab Lô & Nhóm QC mới áp vào `test_levels`, rồi **xoá**
+    dòng dự kiến (giữ lại sẽ áp đè lại chính số đó ở lần kích hoạt sau).
+  - **Chuyển qua nhóm lô này** = áp ngay; nhóm bị thay đánh dấu "Đã dừng", nhóm
+    vừa nhận gỡ nhãn (port `commitTargetMatrix(mode:'switch')`).
+  - Lưu ở **bảng riêng `planned_targets`**, KHÔNG nhét cờ `planned` vào
+    `mean_sd_history_json` như app cũ: lịch sử là các giai đoạn ĐÃ có hiệu lực
+    (trang Lịch sử dữ liệu, cảnh báo điểm QC và `lotTargetSnapshot()` đều đọc
+    nó) — trộn số chưa từng áp vào đó là đúng lớp lỗi "áp nhầm số chưa duyệt".
+  - Thứ tự ưu tiên khi kích hoạt: **số dự kiến → rồi mới tới lịch sử** (nhóm
+    từng dùng rồi quay lại). Ngược lại sẽ áp số CŨ đè lên số vừa chuẩn bị.
+  - Lô ĐANG DÙNG thì bị từ chối (`planned-current-lot`) — không tạo hai nguồn
+    sự thật cho cùng một lô đang vận hành; lưu thẳng Mean/SD thay vì dự kiến.
+  - **Lệch app cũ CÓ CHỦ ĐÍCH — chỉ dừng/đánh nhãn nhóm khi nó thật sự hết được
+    dùng.** App cũ dừng nhóm cũ ngay khi có mức QC chuyển đi, và đánh nhãn
+    `planned` cho nhóm nhận số dù nhóm đó đang chạy. Cả `stopped` lẫn `planned`
+    đều bị loại khỏi "mức QC đang vận hành", nên những xét nghiệm Ở LẠI nhóm đó
+    **biến mất khỏi thẻ Nhập QC và Westgard** dù lô của chúng còn nguyên — dựng
+    lại được: 3 xét nghiệm dùng nhóm A, chỉ 1 có Mean/SD cho nhóm B, kích hoạt B
+    → 2 xét nghiệm còn lại mất sạch mức QC. Cả hai đường (kích hoạt nhóm và
+    "Chuyển qua nhóm lô này") nay đều kiểm `lotGroupInUse()` trước khi đổi
+    trạng thái. Với luồng đã chốt ("chuyển là chuyển hết") kết quả giống app cũ;
+    khác biệt chỉ lộ ra đúng ở ca chuyển dở dang — ca mà app cũ làm hỏng.
+  - Di trú từ app cũ tách đôi luôn: mốc `meanSdHistory[].planned` vào
+    `planned_targets`, không vào lịch sử (`migrate-legacy.ts`).
+  - Gate: `app-v2/tests/planned-targets.test.mjs` (10 nhóm phép kiểm; đã chứng
+    minh bắt được lỗi bằng cách đảo thứ tự ưu tiên và gỡ cổng `lotGroupInUse`)
+    + phần mới của `migrate-legacy.test.mjs`.
+- Cột "Hành động" của bảng luật Westgard nâng cao **đã nối** từ 2026-09-06
+  (`inactive`/`alert`/`reject`, phân giải 3 lớp: ghi đè theo xét nghiệm →
+  cấu hình chung → mặc định registry). Ghi chú cũ nói "chưa nối" là **đã lỗi
+  thời**, đừng làm lại.
+
+**Còn lại:** không. ✅
 
 ---
 
@@ -548,9 +582,8 @@ khoá/mở, đặt lại mật khẩu, đổi ảnh đại diện, xoá tài kho
 
 ## 4. Tổng kết rà soát
 
-**Nghiệp vụ app-v2 về cơ bản đã đầy đủ so với app cũ.** Rà lại toàn bộ thao tác
-người dùng bấm được ở app cũ, 8 mục thiếu ban đầu nay còn **1 mục** (ưu tiên 4,
-không chặn việc dùng app).
+**Nghiệp vụ app-v2 đã đầy đủ so với app cũ.** Rà lại toàn bộ thao tác người
+dùng bấm được ở app cũ, cả **8 mục thiếu ban đầu đều đã xong** (2026-09-12).
 
 | # | Mục | Thẻ | Loại | Ưu tiên |
 |---|---|---|---|---|
@@ -561,7 +594,7 @@ không chặn việc dùng app).
 | ~~5~~ | ~~Sigma Rules theo số mức QC (N/R)~~ | Six Sigma | ✅ xong 11/09 | — |
 | ~~6~~ | ~~Cohort IQC kiểm in-control~~ | Six Sigma | ✅ xong 11/09 | — |
 | ~~7~~ | ~~`u(Cref)` đúng nghĩa Nordtest~~ | Six Sigma | ✅ xong 11/09 | — |
-| 8 | Nhánh "Dự kiến" Mean/SD sang nhóm lô khác | Cấu hình chung | tính năng | 4 |
+| ~~8~~ | ~~Nhánh "Dự kiến" Mean/SD sang nhóm lô khác~~ | Cấu hình chung | ✅ xong 12/09 | — |
 
 Ba mục Six Sigma (5–7) đã làm xong ngày 2026-09-11 — xem 4.1. Cả ba là **lệch
 app cũ có chủ đích**: app cũ cũng sai như nhau nên `cross-app` không thể phát

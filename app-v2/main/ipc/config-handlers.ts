@@ -6,7 +6,7 @@ import type { Db } from '../db/sqlite-like';
 // Kiểu dữ liệu trả về lấy từ HỢP ĐỒNG dùng chung, không khai lại: trước
 // 2026-09-10 các hàm này khai `IpcResult<unknown>` nên renderer tin vào
 // một hình dạng mà không gì bảo đảm.
-import type { Instrument, LotGroup, LotTransition, QcLot, QcPanel, TeaRef, Test, TestLevel } from '../../shared/qc-api';
+import type { Instrument, LotGroup, LotTransition, PlannedTarget, QcLot, QcPanel, TeaRef, Test, TestLevel } from '../../shared/qc-api';
 
 import { cleanId, cleanText, uid, sameText } from '../domain/text-utils';
 import {
@@ -268,6 +268,24 @@ export function createConfigHandlers(db: Db) {
     return db.prepare('SELECT * FROM test_levels WHERE test_id=? ORDER BY level').all(testId);
   }
 
+  /** Sau khi một mức QC rời lô của nhóm A sang lô của nhóm B: nhóm A nếu
+   * KHÔNG CÒN mức nào dùng nữa thì đánh dấu "Đã dừng"; nhóm B đang chạy thật
+   * nên gỡ mọi nhãn (`stopped`/`planned`). Port `commitTargetMatrix` app cũ,
+   * nhưng có MỘT khác biệt có chủ đích: app cũ dừng nhóm A ngay cả khi nhóm đó
+   * còn xét nghiệm khác đang dùng — mà nhóm `stopped` bị loại khỏi "mức QC
+   * đang vận hành", nên những xét nghiệm ở lại sẽ biến mất khỏi thẻ Nhập QC và
+   * Westgard. Ở đây chỉ dừng khi nhóm thật sự hết được dùng. */
+  function syncLotGroupStatusAfterMove(fromLotId: string, toLotId: string, at: string): void {
+    const groupIdOf = (lotId: string) => (db.prepare('SELECT group_id FROM qc_lots WHERE id=?').get(lotId) as { group_id: string | null } | undefined)?.group_id || '';
+    const fromGroup = groupIdOf(fromLotId);
+    const toGroup = groupIdOf(toLotId);
+    if (fromGroup && fromGroup !== toGroup) {
+      const remaining = (db.prepare('SELECT id FROM qc_lots WHERE group_id=?').all(fromGroup) as { id: string }[]).map((r) => r.id);
+      if (!lotGroupInUse(remaining)) db.prepare("UPDATE lot_groups SET status='stopped', stopped_at=? WHERE id=?").run(at, fromGroup);
+    }
+    if (toGroup) db.prepare("UPDATE lot_groups SET status='', stopped_at='' WHERE id=? AND status<>''").run(toGroup);
+  }
+
   function saveTestLevel(input: { testId: string; data: TestLevelInput }, actor: Actor): IpcResult<TestLevel> {
     const denied = requireAdmin(actor); if (denied) return denied;
     const testId = cleanId(input.testId);
@@ -323,11 +341,115 @@ export function createConfigHandlers(db: Db) {
         db.prepare("INSERT INTO test_levels(id,test_id,level,mean,sd,low,high,qc_lot_id,mfg_mean,mfg_sd,applied,mean_sd_effective_from) VALUES (?,?,?,?,?,?,?,?,?,?,'mfg',?)")
           .run(levelId, testId, level, mean, sd, low, high, qcLotId || null, mean, sd, selectedLot?.opened || today);
       }
+      // Lô vừa trở thành lô ĐANG DÙNG thì Mean/SD đã nhập sẵn cho đúng lô đó
+      // hết nghĩa — giữ lại sẽ thành số mồ côi, và lần kích hoạt nhóm sau đó
+      // áp đè một giá trị cũ hơn cả giá trị vừa lưu.
+      if (qcLotId) db.prepare('DELETE FROM planned_targets WHERE test_id=? AND level=? AND qc_lot_id=?').run(testId, level, qcLotId);
+      // Đổi lô sang nhóm khác thì trạng thái 2 nhóm phải đi theo — port
+      // `commitTargetMatrix(mode:'switch')` app cũ: nhóm bị thay đánh dấu
+      // "Đã dừng", nhóm vừa nhận gỡ nhãn (đang chạy thật rồi).
+      if (existing && qcLotId && existing.qc_lot_id && existing.qc_lot_id !== qcLotId) {
+        syncLotGroupStatusAfterMove(existing.qc_lot_id, qcLotId, today);
+      }
       writeAudit(db, actor, existing ? 'Sửa mức QC' : 'Thêm mức QC', `Mức ${level} của xét nghiệm "${test.name}": Mean=${mean ?? '—'} SD=${sd ?? '—'}`, test.name);
       return db.prepare('SELECT * FROM test_levels WHERE id=?').get(levelId);
     });
-    notifyChanged(['test_levels'], [testId]);
+    notifyChanged(['test_levels', 'lot_groups', 'planned_targets'], [testId]);
     return { ok: true, data: saved };
+  }
+
+  // ── Mean/SD "Dự kiến" ────────────────────────────────────────────────────
+  // Nhập sẵn Mean/SD cho lô của một nhóm lô CHƯA dùng, mức QC vẫn chạy lô cũ
+  // như thường; tới lúc thật sự bắt đầu dùng thì bấm "Kích hoạt nhóm lô" ở
+  // tab Lô & Nhóm QC, khi đó `activateLotGroup()` mới áp số này vào
+  // `test_levels`. Khác "Lưu và chuyển lô" (đổi lô NGAY) và khác hồ sơ
+  // Chuyển tiếp lô (có chạy song song + cổng chấp nhận, dành cho việc thay lô
+  // đang vận hành): đây là đường chuẩn bị trước cho một nhóm lô mới tinh.
+  function groupOfLot(lotId: string): string {
+    return (db.prepare('SELECT group_id FROM qc_lots WHERE id=?').get(lotId) as { group_id: string | null } | undefined)?.group_id || '';
+  }
+
+  function listPlannedTargets(): PlannedTarget[] {
+    return db.prepare('SELECT * FROM planned_targets ORDER BY test_id, level').all() as PlannedTarget[];
+  }
+
+  function savePlannedTargets(
+    input: { items?: { testId: unknown; level: unknown; qcLotId: unknown; mean: unknown; sd: unknown; low: unknown; high: unknown }[];
+      remove?: { testId: unknown; level: unknown; qcLotId: unknown }[] },
+    actor: Actor,
+  ): IpcResult<{ saved: number; removed: number }> {
+    const denied = requireAdmin(actor); if (denied) return denied;
+    const items = Array.isArray(input.items) ? input.items : [];
+    const remove = Array.isArray(input.remove) ? input.remove : [];
+    if (!items.length && !remove.length) {
+      return { ok: false, error: { code: 'empty', message: 'Chưa chọn xét nghiệm nào để lưu Mean/SD dự kiến.' } };
+    }
+    // Validate TOÀN BỘ trước khi ghi dòng nào: một hàng sai không được để lại
+    // nửa số đã lưu, nửa chưa.
+    const prepared: { id: string; testId: string; level: number; lotId: string; lotNo: string;
+      mean: number; sd: number; low: number | null; high: number | null }[] = [];
+    for (const item of items) {
+      const testId = cleanId(item.testId);
+      const test = db.prepare('SELECT id,name FROM tests WHERE id=?').get(testId) as { id: string; name: string } | undefined;
+      if (!test) return { ok: false, error: { code: 'not-found', message: 'Không tìm thấy xét nghiệm.' } };
+      const result = validateTestLevel({ level: item.level, mean: item.mean, sd: item.sd, low: item.low, high: item.high, qcLotId: item.qcLotId });
+      if (!result.ok) return { ok: false, error: { code: result.code, message: result.message } };
+      const { level, mean, sd, low, high, qcLotId } = result.data;
+      if (!qcLotId || mean == null || sd == null) {
+        return { ok: false, error: { code: 'missing-target', message: 'Mean/SD dự kiến phải có đủ lô QC, Mean và SD.' } };
+      }
+      const lot = db.prepare('SELECT id, lot_no, level, depleted FROM qc_lots WHERE id=?').get(qcLotId) as
+        { id: string; lot_no: string; level: number; depleted: number } | undefined;
+      if (!lot) return { ok: false, error: { code: 'missing-lot', message: 'Không tìm thấy lô QC đã chọn.' } };
+      if (lot.level !== level) {
+        return { ok: false, error: { code: 'wrong-lot-level', message: `Lô QC đã chọn thuộc Mức ${lot.level}, không thể gán cho Mức ${level}.` } };
+      }
+      if (lot.depleted) return { ok: false, error: { code: 'depleted-lot', message: 'Lô QC đã hết dùng, không thể đặt Mean/SD dự kiến.' } };
+      // Lô ĐANG DÙNG thì không có gì để "dự kiến" — lưu vào đây sẽ tạo hai
+      // nguồn sự thật cho cùng một lô đang vận hành.
+      const live = db.prepare('SELECT qc_lot_id FROM test_levels WHERE test_id=? AND level=?').get(testId, level) as { qc_lot_id: string | null } | undefined;
+      if (live && live.qc_lot_id === qcLotId) {
+        return { ok: false, error: { code: 'planned-current-lot', message: `"${test.name}" đang dùng chính lô ${lot.lot_no} ở Mức ${level} — hãy lưu thẳng Mean/SD thay vì đặt dự kiến.` } };
+      }
+      prepared.push({ id: `${testId}:${level}:${qcLotId}`, testId, level, lotId: qcLotId, lotNo: lot.lot_no, mean, sd, low, high });
+    }
+
+    const at = nowIso();
+    const removedIds = remove
+      .map((item) => ({ testId: cleanId(item.testId), level: Number(item.level), lotId: cleanId(item.qcLotId) }))
+      .filter((key) => key.testId && key.lotId && Number.isFinite(key.level))
+      .map((key) => `${key.testId}:${key.level}:${key.lotId}`);
+    const removed = inTransaction(() => {
+      let count = 0;
+      for (const id of removedIds) {
+        count += db.prepare('DELETE FROM planned_targets WHERE id=?').run(id).changes ? 1 : 0;
+      }
+      for (const row of prepared) {
+        db.prepare(`INSERT INTO planned_targets(id,test_id,level,qc_lot_id,mean,sd,low,high,saved_at,saved_by)
+          VALUES (?,?,?,?,?,?,?,?,?,?)
+          ON CONFLICT(id) DO UPDATE SET mean=excluded.mean, sd=excluded.sd, low=excluded.low, high=excluded.high,
+            saved_at=excluded.saved_at, saved_by=excluded.saved_by`)
+          .run(row.id, row.testId, row.level, row.lotId, row.mean, row.sd, row.low, row.high, at, actor.username || actor.name || '');
+      }
+      // Nhãn "Dự kiến" trên thẻ nhóm lô — port `options.group.status='planned'`
+      // app cũ, để ở tab Lô & Nhóm QC nhìn ra ngay nhóm nào đã có sẵn Mean/SD
+      // chờ kích hoạt. Chỉ đặt cho nhóm CHƯA được dùng: nhóm `planned` bị loại
+      // khỏi "mức QC đang vận hành", nên gắn nhãn này lên một nhóm đang chạy
+      // sẽ làm các xét nghiệm của nó biến mất khỏi Nhập QC/Westgard.
+      for (const groupId of new Set(prepared.map((row) => groupOfLot(row.lotId)).filter(Boolean))) {
+        const lotIds = (db.prepare('SELECT id FROM qc_lots WHERE group_id=?').all(groupId) as { id: string }[]).map((r) => r.id);
+        if (!lotGroupInUse(lotIds)) db.prepare("UPDATE lot_groups SET status='planned', stopped_at='' WHERE id=?").run(groupId);
+      }
+      if (prepared.length || count) {
+        const lotNos = [...new Set(prepared.map((row) => row.lotNo))].join(', ');
+        writeAudit(db, actor, 'Lưu Mean/SD dự kiến',
+          `${prepared.length} mức QC${lotNos ? ` cho lô ${lotNos}` : ''}${count ? `, bỏ ${count} mục dự kiến` : ''} — chưa áp vào cấu hình đang chạy`,
+          'Mean/SD dự kiến');
+      }
+      return count;
+    });
+    notifyChanged(['planned_targets', 'lot_groups'], [...new Set(prepared.map((row) => row.testId))]);
+    return { ok: true, data: { saved: prepared.length, removed } };
   }
 
   function listActivity(limit = 200) {
@@ -1211,7 +1333,14 @@ export function createConfigHandlers(db: Db) {
           low: number | null; high: number | null; applied: 'mfg' | 'lab'; mean_sd_effective_from: string; mean_sd_history_json: string | null }[];
       for (const level of levels) {
         if (level.qc_lot_id === lot.id) continue; // đã dùng đúng lô này
-        const snapshot = lotTargetSnapshot(level, lot.id);
+        // Ưu tiên số ĐÃ NHẬP DỰ KIẾN cho đúng (xét nghiệm, mức, lô) này; chỉ
+        // khi không có mới tìm ngược trong lịch sử (nhóm từng dùng rồi quay
+        // lại). Ngược thứ tự sẽ áp số CŨ đè lên số người dùng vừa chuẩn bị.
+        const plannedRow = db.prepare('SELECT mean, sd, low, high FROM planned_targets WHERE test_id=? AND level=? AND qc_lot_id=?')
+          .get(level.test_id, lot.level, lot.id) as { mean: number | null; sd: number | null; low: number | null; high: number | null } | undefined;
+        const snapshot = plannedRow && plannedRow.mean != null && plannedRow.sd != null && plannedRow.sd > 0
+          ? { mean: plannedRow.mean, sd: plannedRow.sd, low: plannedRow.low, high: plannedRow.high }
+          : lotTargetSnapshot(level, lot.id);
         if (!snapshot || !(snapshot.sd > 0)) continue;
         candidates.push({
           levelId: level.id, testId: level.test_id, lotId: lot.id, lotNo: lot.lot_no, level: lot.level,
@@ -1238,14 +1367,21 @@ export function createConfigHandlers(db: Db) {
       return { ok: true, data: { status: 'already-active', applied: 0, stoppedGroups: [] } };
     }
 
-    // Nhóm lô nào đang giữ các mức bị thay thế thì bị DỪNG — một mức chỉ
-    // thuộc một nhóm lô đang chạy tại một thời điểm.
-    const stoppedIds = new Set<string>();
+    // Nhóm lô nào đang giữ các mức bị thay thế thì bị DỪNG — nhưng chỉ khi
+    // nó KHÔNG CÒN mức QC nào dùng nữa (kiểm lại SAU khi đã áp, bên trong
+    // transaction). App cũ dừng ngay không kiểm: nếu chỉ một phần xét nghiệm
+    // có Mean/SD cho lô mới thì nhóm cũ vẫn bị gắn "Đã dừng" trong khi những
+    // xét nghiệm ở lại vẫn dùng lô của nó — mà nhóm `stopped` bị loại khỏi
+    // "mức QC đang vận hành", nên các xét nghiệm đó BIẾN MẤT khỏi thẻ Nhập QC
+    // và Westgard (dựng lại được: 3 xét nghiệm dùng nhóm A, chỉ 1 có số cho
+    // nhóm B, kích hoạt B → 2 xét nghiệm còn lại mất sạch mức QC).
+    const replacedGroupIds = new Set<string>();
     for (const candidate of candidates) {
       if (!candidate.prevLotId) continue;
       const owner = db.prepare('SELECT group_id FROM qc_lots WHERE id=?').get(candidate.prevLotId) as { group_id: string | null } | undefined;
-      if (owner && owner.group_id && owner.group_id !== id) stoppedIds.add(owner.group_id);
+      if (owner && owner.group_id && owner.group_id !== id) replacedGroupIds.add(owner.group_id);
     }
+    const stoppedIds = new Set<string>();
     const at = nowIso();
     db.exec('BEGIN');
     try {
@@ -1268,9 +1404,16 @@ export function createConfigHandlers(db: Db) {
                 effectiveFrom: candidate.prevEffectiveFrom || oldLot?.opened || '', effectiveTo: nextFrom,
                 source: candidate.prevApplied }, at),
             nextFrom, candidate.levelId);
+        // Đã áp rồi thì hàng dự kiến hết vai trò; giữ lại sẽ áp lại đúng số
+        // đó ở lần kích hoạt sau, đè lên mọi thay đổi Mean/SD ở giữa.
+        db.prepare('DELETE FROM planned_targets WHERE test_id=? AND level=? AND qc_lot_id=?')
+          .run(candidate.testId, candidate.level, candidate.lotId);
       }
-      for (const stoppedId of stoppedIds) {
-        db.prepare("UPDATE lot_groups SET status='stopped', stopped_at=? WHERE id=?").run(at, stoppedId);
+      for (const groupId of replacedGroupIds) {
+        const lotIds = (db.prepare('SELECT id FROM qc_lots WHERE group_id=?').all(groupId) as { id: string }[]).map((r) => r.id);
+        if (lotGroupInUse(lotIds)) continue; // còn xét nghiệm khác dùng → vẫn đang chạy
+        db.prepare("UPDATE lot_groups SET status='stopped', stopped_at=? WHERE id=?").run(at, groupId);
+        stoppedIds.add(groupId);
       }
       db.prepare("UPDATE lot_groups SET status='', stopped_at='' WHERE id=?").run(id);
       writeAudit(db, actor, 'Kích hoạt nhóm lô QC',
@@ -1278,7 +1421,7 @@ export function createConfigHandlers(db: Db) {
         + (stoppedIds.size ? `, dừng ${stoppedIds.size} nhóm lô bị thay thế` : ''), group.name);
       db.exec('COMMIT');
     } catch (error) { db.exec('ROLLBACK'); throw error; }
-    notifyChanged(['lot_groups', 'qc_lots', 'test_levels', 'tests']);
+    notifyChanged(['lot_groups', 'qc_lots', 'test_levels', 'tests', 'planned_targets']);
     return { ok: true, data: { status: 'applied', applied: candidates.length, stoppedGroups: [...stoppedIds] } };
   }
 
@@ -1318,6 +1461,7 @@ export function createConfigHandlers(db: Db) {
     setTeaRefValue, restoreTeaRefDefaults, addTeaAnalyte, removeTest, removePanel, listLots, saveLot, previewLotRename, removeLot, listLotGroups, saveLotGroup, removeLotGroup, stopLotGroup, activateLotGroup, listPanels, savePanel,
     listLotTransitions, createLotTransition, removeLotTransition,
     listTeaRefs, saveTeaRef, removeTeaRef, removeTeaLabProfile,
+    listPlannedTargets, savePlannedTargets,
   };
 }
 

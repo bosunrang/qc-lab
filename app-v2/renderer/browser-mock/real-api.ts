@@ -179,6 +179,8 @@ export async function createRealBrowserApi(): Promise<QcApi> {
     saveTest: async (input) => config.saveTest(input, requireActor()),
     listTestLevels: async (testId: string) => config.listTestLevels(testId),
     saveTestLevel: async (input) => config.saveTestLevel(input, requireActor()),
+    listPlannedTargets: async () => config.listPlannedTargets(),
+    savePlannedTargets: async (input) => config.savePlannedTargets(input, requireActor()),
     listActivity: async (limit?: number) => config.listActivity(limit),
     listRuleScopes: async (testId: string) => config.listRuleScopes(testId),
     saveRuleScope: async (testId: string, ruleId: string, scope) => config.saveRuleScope(testId, ruleId, scope, requireActor()),

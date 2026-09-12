@@ -168,6 +168,25 @@ CREATE TABLE IF NOT EXISTS test_levels (
   UNIQUE (test_id, level)
 );
 
+-- Mean/SD "Dự kiến": số đã nhập sẵn cho lô của một nhóm lô CHƯA dùng đến,
+-- chờ tới khi bấm "Kích hoạt nhóm lô" mới áp vào test_levels. Bảng RIÊNG,
+-- KHÔNG nhét cờ planned vào mean_sd_history_json như app cũ: lịch sử là
+-- những giai đoạn ĐÃ có hiệu lực (trang Lịch sử dữ liệu, cảnh báo điểm QC và
+-- lotTargetSnapshot() đều đọc nó), trộn số chưa từng áp vào đó là mời gọi
+-- đúng lớp lỗi "áp nhầm số chưa duyệt". Xoá lô/xét nghiệm thì hàng dự kiến
+-- theo nó biến mất luôn (ON DELETE CASCADE) — số dự kiến cho một lô không
+-- còn tồn tại thì vô nghĩa.
+CREATE TABLE IF NOT EXISTS planned_targets (
+  id TEXT PRIMARY KEY, -- '<testId>:<level>:<lotId>'
+  test_id TEXT NOT NULL REFERENCES tests(id) ON DELETE CASCADE,
+  level INTEGER NOT NULL,
+  qc_lot_id TEXT NOT NULL REFERENCES qc_lots(id) ON DELETE CASCADE,
+  mean REAL, sd REAL, low REAL, high REAL,
+  saved_at TEXT NOT NULL DEFAULT '',
+  saved_by TEXT NOT NULL DEFAULT '',
+  UNIQUE (test_id, level, qc_lot_id)
+);
+
 -- Bảng nóng nhất của toàn hệ thống: mọi Levey-Jennings/Westgard/Sigma/CUSUM
 -- đều truy vấn theo (test_id, level, date). KHÔNG có "xoá thật" — chỉ có
 -- voided (soft-delete), khớp chính sách sản phẩm "không xoá dữ liệu QC".

@@ -83,6 +83,7 @@ export interface MappedTables {
   lot_transitions: Record<string, unknown>[];
   tests: Record<string, unknown>[];
   test_levels: Record<string, unknown>[];
+  planned_targets: Record<string, unknown>[];
   qc_points: Record<string, unknown>[];
   sigma_data: Record<string, unknown>[];
   users: Record<string, unknown>[];
@@ -165,6 +166,12 @@ export function mapLegacyStateToTables(legacy: LegacyState): MappedTables {
   })).filter((x) => x.id && x.name);
 
   const test_levels: Record<string, unknown>[] = [];
+  // Mốc Mean/SD "dự kiến" của app cũ (`meanSdHistory[].planned === true`) KHÔNG
+  // phải lịch sử: đó là số nhập sẵn cho một lô chưa dùng. app-v2 có bảng riêng
+  // cho việc đó (`planned_targets`) nên di trú tách đôi — để lẫn vào lịch sử
+  // thì `lotTargetSnapshot()` sẽ coi số chưa từng áp là một giai đoạn đã có
+  // hiệu lực.
+  const planned_targets: Record<string, unknown>[] = [];
   arr(legacy.tests).forEach((t) => {
     const testId = cleanId(t.id);
     if (!testId) return;
@@ -176,8 +183,21 @@ export function mapLegacyStateToTables(legacy: LegacyState): MappedTables {
       // thật thay vì để trống, tránh cột "Hiệu lực" hiện "Không giới hạn"
       // ngay sau khi di trú dù dữ liệu gốc có ngày rõ ràng.
       const currentHistoryEntry = currentLotId
-        ? arr(l.meanSdHistory).find((h) => cleanId(h.qcLotId) === currentLotId)
+        ? arr(l.meanSdHistory).find((h) => cleanId(h.qcLotId) === currentLotId && !h.planned)
         : undefined;
+      arr(l.meanSdHistory).filter((h) => h.planned).forEach((h) => {
+        const lotId = cleanId(h.qcLotId);
+        const sd = Math.max(0, finiteNumber(h.sd, 0));
+        // Lô đang dùng thì không còn là "dự kiến"; SD=0 là bản ghi hỏng.
+        if (!lotId || lotId === currentLotId || !(sd > 0)) return;
+        planned_targets.push({
+          id: `${testId}:${level}:${lotId}`, test_id: testId, level, qc_lot_id: lotId,
+          mean: finiteNumber(h.mean, 0), sd,
+          low: h.low == null ? null : finiteNumber(h.low, 0),
+          high: h.high == null ? null : finiteNumber(h.high, 0),
+          saved_at: '', saved_by: '',
+        });
+      });
       test_levels.push({
         id: `${testId}:${level}`, test_id: testId, level,
         qc_lot_id: cleanId(l.qcLotId) || null,
@@ -189,7 +209,7 @@ export function mapLegacyStateToTables(legacy: LegacyState): MappedTables {
         mfg_mean: l.mfgMean == null ? null : finiteNumber(l.mfgMean, null as unknown as number),
         mfg_sd: l.mfgSd == null ? null : finiteNumber(l.mfgSd, null as unknown as number),
         applied: l.applied === 'lab' ? 'lab' : 'mfg',
-        mean_sd_history_json: JSON.stringify(arr(l.meanSdHistory).map((h) => ({
+        mean_sd_history_json: JSON.stringify(arr(l.meanSdHistory).filter((h) => !h.planned).map((h) => ({
           id: cleanId(h.id) || undefined, qcLotId: cleanId(h.qcLotId), lot: cleanText(h.lot),
           mean: finiteNumber(h.mean, 0), sd: Math.max(0, finiteNumber(h.sd, 0)),
           low: h.low == null ? null : finiteNumber(h.low, 0), high: h.high == null ? null : finiteNumber(h.high, 0),
@@ -361,6 +381,7 @@ export function mapLegacyStateToTables(legacy: LegacyState): MappedTables {
       logo_text: cleanText(lab.logoText, 8).slice(0, 4) || 'QC', logo_data: cleanText(lab.logoData, 120000),
     }],
     instruments, lot_groups, qc_lots, qc_panels, qc_panel_tests, lot_transitions, tests, test_levels,
+    planned_targets,
     qc_points, sigma_data, users, activity, actions, reagent_tests, period_locks, tea_refs,
   };
 }

@@ -32,6 +32,7 @@ const legacyState = {
   qcLots: [
     { id: 'lot1', groupId: 'grp1', lotNo: 'L001', level: 1, description: '', supplier: 'BioRad', program: '', exp: '2027-01-01', opened: '2026-01-01', active: true },
     { id: 'lot2', groupId: 'grp1', lotNo: 'L002', level: 2, description: '', supplier: 'BioRad', program: '', exp: '2027-01-01', opened: '2026-01-01', active: true },
+    { id: 'lot3', groupId: 'grp2', lotNo: 'L003', level: 1, description: '', supplier: 'BioRad', program: '', exp: '2027-06-01', opened: '', active: true },
   ],
   qcPanels: [{ id: 'pan1', name: 'Panel 1', instrumentId: 'ins1', testIds: ['t1'], note: '', active: true }],
   lotTransitions: [{ id: 'tr1', panelId: 'pan1', fromLotId: 'lot1', toLotId: 'lot2', startDate: '2026-02-01', status: 'planned', criteria: 'Song song 20 ngay', conclusion: '', approvedAt: '', approvedBy: '', note: '' }],
@@ -41,7 +42,12 @@ const legacyState = {
     ruleActions: { '1-3s': 'reject' }, ruleScopes: { '1-3s': 'within' },
     cusum: { on: true, k: 0.5, h: 4 },
     levels: [
-      { level: 1, qcLotId: 'lot1', mean: 100, sd: 2, low: 96, high: 104, rangeK: 2, mfgMean: 100, mfgSd: 2, applied: 'mfg', meanSdHistory: [{ id: 'h1', qcLotId: 'lot1', lot: 'L001', mean: 100, sd: 2, effectiveFrom: '2026-01-01', source: 'mfg', note: '' }] },
+      { level: 1, qcLotId: 'lot1', mean: 100, sd: 2, low: 96, high: 104, rangeK: 2, mfgMean: 100, mfgSd: 2, applied: 'mfg', meanSdHistory: [
+        { id: 'h1', qcLotId: 'lot1', lot: 'L001', mean: 100, sd: 2, effectiveFrom: '2026-01-01', source: 'mfg', note: '' },
+        // Mốc "dự kiến" app cũ: số nhập sẵn cho lô chưa dùng, KHÔNG phải một
+        // giai đoạn đã có hiệu lực.
+        { id: 'h2', qcLotId: 'lot3', lot: 'L003', mean: 105, sd: 2.5, effectiveFrom: '', effectiveTo: '', source: 'mfg', planned: true, note: 'Du kien' },
+      ] },
     ],
   }],
   data: {
@@ -89,7 +95,7 @@ assert.equal(mapped.lab[0].name, 'PXN Test');
 assert.equal(mapped.instruments[0].id, 'ins1');
 assert.equal(mapped.instruments[0].active, 1);
 assert.equal(mapped.lot_groups[0].id, 'grp1');
-assert.equal(mapped.qc_lots.length, 2);
+assert.equal(mapped.qc_lots.length, 3); // lot1, lot2 va lot3 (lo cua moc Mean/SD du kien)
 assert.equal(mapped.qc_panels[0].instrument_id, 'ins1');
 assert.deepEqual(mapped.qc_panel_tests, [{ panel_id: 'pan1', test_id: 't1' }]);
 assert.equal(mapped.lot_transitions[0].from_lot_id, 'lot1');
@@ -98,7 +104,15 @@ assert.equal(mapped.tests[0].section, 'Sinh hoa', 'section suy tu instrument vi 
 assert.equal(mapped.tests[0].cusum_on, 1);
 const level1 = mapped.test_levels.find(l => l.id === 't1:1');
 assert.equal(level1.mean, 100);
-assert.equal(JSON.parse(level1.mean_sd_history_json).length, 1);
+// Mốc "dự kiến" phải TÁCH khỏi lịch sử: lịch sử chỉ giữ giai đoạn đã có hiệu
+// lực, còn số dự kiến sang bảng riêng `planned_targets` — để lẫn thì
+// `lotTargetSnapshot()` sẽ áp một giá trị chưa từng được duyệt.
+assert.equal(JSON.parse(level1.mean_sd_history_json).length, 1, 'moc du kien khong duoc nam trong lich su');
+assert.equal(mapped.planned_targets.length, 1);
+assert.deepEqual(
+  { ...mapped.planned_targets[0], saved_at: '', saved_by: '' },
+  { id: 't1:1:lot3', test_id: 't1', level: 1, qc_lot_id: 'lot3', mean: 105, sd: 2.5, low: null, high: null, saved_at: '', saved_by: '' },
+);
 assert.equal(mapped.qc_points.length, 2);
 const voidedPoint = mapped.qc_points.find(p => p.id === 'p2');
 assert.equal(voidedPoint.voided, 1);

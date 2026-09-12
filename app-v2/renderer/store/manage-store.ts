@@ -7,11 +7,15 @@
 // thị lỗi validate của MÌNH, không dùng 1 field `error` dùng chung dễ lẫn
 // giữa các tab/modal đang mở.
 import { create } from 'zustand';
-import type { Instrument, Test, TestLevel, QcLot, LotGroup, QcPanel, LotTransition, TeaRef, RuleScopeItem, IpcResult, QcApi, QcPointView } from '../../shared/qc-api';
+import type { Instrument, Test, TestLevel, QcLot, LotGroup, QcPanel, LotTransition, TeaRef, RuleScopeItem, IpcResult, QcApi, QcPointView, PlannedTarget } from '../../shared/qc-api';
 
 type ApiInputData<K extends keyof QcApi> = QcApi[K] extends (...args: infer Args) => unknown
   ? Args[0] extends { data: infer Data } ? Data : never
   : never;
+
+/** Tham số thô của một hàm `QcApi` (khác `ApiInputData`: dùng cho hàm KHÔNG
+ * bọc dữ liệu trong `{ data }`). */
+type ApiInputArg<K extends keyof QcApi> = QcApi[K] extends (...args: infer Args) => unknown ? Args[0] : never;
 
 interface ManageState {
   instruments: Instrument[];
@@ -23,6 +27,11 @@ interface ManageState {
   lotTransitions: LotTransition[];
   teaRefs: TeaRef[];
   ruleScopesByTestId: Record<string, RuleScopeItem[]>;
+  /** Mean/SD "Dự kiến" của các lô chưa dùng — bảng riêng, không nằm trong
+   * `levelsByTestId` (đó là cấu hình ĐANG CHẠY). */
+  plannedTargets: PlannedTarget[];
+  loadPlannedTargets: () => Promise<void>;
+  savePlannedTargets: (input: ApiInputArg<'savePlannedTargets'>) => Promise<IpcResult<{ saved: number; removed: number }>>;
   loadInstruments: () => Promise<void>;
   loadTests: () => Promise<void>;
   loadLevels: (testId: string) => Promise<void>;
@@ -62,7 +71,14 @@ interface ManageState {
 
 export const useManageStore = create<ManageState>((set, get) => ({
   instruments: [], tests: [], levelsByTestId: {},
-  lots: [], lotGroups: [], panels: [], lotTransitions: [], teaRefs: [], ruleScopesByTestId: {},
+  lots: [], lotGroups: [], panels: [], lotTransitions: [], teaRefs: [], ruleScopesByTestId: {}, plannedTargets: [],
+
+  loadPlannedTargets: async () => set({ plannedTargets: await window.qcApi.listPlannedTargets() }),
+  savePlannedTargets: async (input) => {
+    const result = await window.qcApi.savePlannedTargets(input);
+    if (result.ok) await get().loadPlannedTargets();
+    return result;
+  },
 
   loadInstruments: async () => set({ instruments: await window.qcApi.listInstruments() }),
   loadTests: async () => set({ tests: await window.qcApi.listTests() }),

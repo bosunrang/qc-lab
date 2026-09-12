@@ -75,6 +75,16 @@ export interface LotGroup {
   inUse: boolean;
 }
 
+/** Mean/SD "Dự kiến": số đã nhập sẵn cho lô của một nhóm lô CHƯA dùng, chờ
+ * tới khi bấm "Kích hoạt nhóm lô" mới áp vào `test_levels`. Bảng riêng
+ * (`planned_targets`), KHÔNG phải một mốc trong lịch sử Mean/SD — xem
+ * `main/db/schema.ts`. */
+export interface PlannedTarget {
+  id: string; test_id: string; level: number; qc_lot_id: string;
+  mean: number | null; sd: number | null; low: number | null; high: number | null;
+  saved_at: string; saved_by: string;
+}
+
 export interface QcPanel {
   id: string; name: string; instrument_id: string; note: string; active: 0 | 1; testIds: string[];
 }
@@ -424,6 +434,13 @@ export interface QcApi {
   saveTest(input: { id?: string; data: TestDraft }): Promise<IpcResult<Test>>;
   listTestLevels(testId: string): Promise<TestLevel[]>;
   saveTestLevel(input: { testId: string; data: TestLevelDraft }): Promise<IpcResult<TestLevel>>;
+  listPlannedTargets(): Promise<PlannedTarget[]>;
+  /** Lưu (upsert) Mean/SD dự kiến cho các (xét nghiệm, mức, lô) trong `items`
+   * và bỏ những mục nêu trong `remove`. Không đụng tới mức QC đang chạy. */
+  savePlannedTargets(input: {
+    items?: { testId: string; level: number; qcLotId: string; mean: number | null; sd: number | null; low: number | null; high: number | null }[];
+    remove?: { testId: string; level: number; qcLotId: string }[];
+  }): Promise<IpcResult<{ saved: number; removed: number }>>;
   listActivity(limit?: number): Promise<ActivityEntry[]>;
   listRuleScopes(testId: string): Promise<RuleScopeItem[]>;
   saveRuleScope(testId: string, ruleId: string, scope: 'within' | 'across' | 'both' | ''): Promise<IpcResult<{ ruleId: string; scope: string }>>;

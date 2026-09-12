@@ -82,6 +82,8 @@ function createWindow(): void {
   ipcMain.handle('config:saveTest', (_event, input) => config.saveTest(input, requireActor()));
   ipcMain.handle('config:listTestLevels', (_event, testId) => config.listTestLevels(testId));
   ipcMain.handle('config:saveTestLevel', (_event, input) => config.saveTestLevel(input, requireActor()));
+  ipcMain.handle('config:listPlannedTargets', () => config.listPlannedTargets());
+  ipcMain.handle('config:savePlannedTargets', (_event, input) => config.savePlannedTargets(input, requireActor()));
   ipcMain.handle('config:listActivity', (_event, limit) => config.listActivity(limit));
   ipcMain.handle('config:listRuleScopes', (_event, testId) => config.listRuleScopes(testId));
   ipcMain.handle('config:saveRuleScope', (_event, testId, ruleId, scope) => config.saveRuleScope(testId, ruleId, scope, requireActor()));

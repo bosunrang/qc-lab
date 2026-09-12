@@ -27,12 +27,12 @@ export function ManagePage() {
   const [tab, setTab] = useState<TabId>(navState?.tab || 'instruments');
   const [instrumentCreateRequest, setInstrumentCreateRequest] = useState(0);
   const store = useManageStore();
-  const { loadInstruments, loadTests, loadLots, loadLotGroups, loadPanels, loadLotTransitions, loadTeaRefs } = store;
+  const { loadInstruments, loadTests, loadLots, loadLotGroups, loadPanels, loadLotTransitions, loadTeaRefs, loadPlannedTargets } = store;
 
   useEffect(() => {
     loadInstruments(); loadTests(); loadLots(); loadLotGroups();
-    loadPanels(); loadLotTransitions(); loadTeaRefs();
-  }, [loadInstruments, loadTests, loadLots, loadLotGroups, loadPanels, loadLotTransitions, loadTeaRefs]);
+    loadPanels(); loadLotTransitions(); loadTeaRefs(); loadPlannedTargets();
+  }, [loadInstruments, loadTests, loadLots, loadLotGroups, loadPanels, loadLotTransitions, loadTeaRefs, loadPlannedTargets]);
 
   useStoreInvalidation(['instruments'], undefined, store.loadInstruments);
   useStoreInvalidation(['tests'], undefined, store.loadTests);
@@ -40,6 +40,7 @@ export function ManagePage() {
   useStoreInvalidation(['qc_panels', 'qc_panel_tests'], undefined, store.loadPanels);
   useStoreInvalidation(['lot_transitions'], undefined, store.loadLotTransitions);
   useStoreInvalidation(['tea_refs'], undefined, store.loadTeaRefs);
+  useStoreInvalidation(['planned_targets', 'test_levels'], undefined, store.loadPlannedTargets);
 
   // Đúng `counts` của app cũ (manage-page-controller.ts): tab Lô hiện
   // "số lô / số nhóm" dạng chuỗi, không phải 1 con số.

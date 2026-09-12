@@ -22,6 +22,7 @@ export function DialogHost() {
     if (dialog.kind === 'confirm') dialog.resolve(false);
     else if (dialog.kind === 'info') dialog.resolve();
     else if (dialog.kind === 'reauth') dialog.resolve(false);
+    else if (dialog.kind === 'choice') dialog.resolve(null);
     closeDialog();
   }, boxRef);
 
@@ -47,6 +48,38 @@ export function DialogHost() {
           <div className="confirm-modal-actions">
             <button type="button" className="btn ghost" onClick={() => { dialog.resolve(false); close(); }}>{cancelLabel}</button>
             <button type="button" className={`btn ${danger ? 'danger' : 'teal'}`} onClick={() => { dialog.resolve(true); close(); }}>{confirmLabel}</button>
+          </div>
+        </div>
+      </div>,
+      root,
+    );
+  }
+
+  if (dialog.kind === 'choice') {
+    const { title = '', message, options, cancelLabel = 'Hủy' } = dialog.opts;
+    return createPortal(
+      <div className="modal-bg dialog-layer" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) { dialog.resolve(null); close(); } }}>
+        <div className="modal confirm-modal" ref={boxRef} role="dialog" aria-modal="true" aria-labelledby="dialog-title" tabIndex={-1}>
+          <div className="confirm-modal-h">
+            <div />
+            <button type="button" className="modal-close" aria-label="Đóng hộp thoại" onClick={() => { dialog.resolve(null); close(); }}>✕</button>
+          </div>
+          {title && <h3 className="confirm-modal-title" id="dialog-title">{title}</h3>}
+          <div className="confirm-modal-body">
+            <div className="confirm-modal-icon info" aria-hidden="true">!</div>
+            <div className="confirm-modal-text">
+              <b id={title ? undefined : 'dialog-title'}>{message}</b>
+              {options.filter((option) => option.hint).map((option) => (
+                <p key={option.key}><b>{option.label}</b> — {option.hint}</p>
+              ))}
+            </div>
+          </div>
+          <div className="confirm-modal-actions">
+            <button type="button" className="btn ghost" onClick={() => { dialog.resolve(null); close(); }}>{cancelLabel}</button>
+            {options.map((option) => (
+              <button key={option.key} type="button" className={`btn ${option.variant || 'teal'}`}
+                onClick={() => { dialog.resolve(option.key); close(); }}>{option.label}</button>
+            ))}
           </div>
         </div>
       </div>,

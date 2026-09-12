@@ -2,13 +2,14 @@
 // (2026-09-03) khi file đó lên 1121 dòng gồm 6 tab. Phần dùng chung ở ./shared.
 import { useEffect, useMemo, useState } from 'react';
 import { useManageStore } from '../../store/manage-store';
-import { confirmDialog, reauthDialog, infoDialog } from '../../state/dialog-store';
+import { confirmDialog, reauthDialog, infoDialog, choiceDialog } from '../../state/dialog-store';
 import { normalizeTargetPick, syncTargetRange } from '../../lib/target-range';
 import { EmptyState } from './shared';
 import type { QcPanel } from '../../../shared/qc-api';
 
 export function TargetsTab() {
-  const { tests, lots, panels, lotGroups: allLotGroups, instruments, levelsByTestId, loadLevels, saveTestLevel } = useManageStore();
+  const { tests, lots, panels, lotGroups: allLotGroups, instruments, levelsByTestId, loadLevels, saveTestLevel,
+    plannedTargets, savePlannedTargets } = useManageStore();
   // Nhóm lô "Đã lưu trữ" (`active===0`)/"Đã dừng" (`status==='stopped'`)
   // không còn là nơi gán Mean/SD hợp lý — người dùng yêu cầu ẩn khỏi bảng
   // chọn của tab này (khác tab "Lô & Nhóm QC", nơi vẫn cần thấy MỌI nhóm để
@@ -49,6 +50,11 @@ export function TargetsTab() {
     if (!groupLevels.length) return;
     if (!groupLevels.includes(level)) setLevel(groupLevels[0]);
   }, [groupLevels, level]);
+
+  /** Mean/SD DỰ KIẾN của đúng (xét nghiệm, mức, lô) — số đã nhập sẵn cho lô
+   * chưa dùng, chờ "Kích hoạt nhóm lô". Khác `target` (cấu hình ĐANG CHẠY). */
+  const plannedFor = (testId: string, lotId: string) =>
+    plannedTargets.find((item) => item.test_id === testId && item.level === level && item.qc_lot_id === lotId);
 
   const rows = panelTests.map((test) => ({ test, target: (levelsByTestId[test.id] || []).find((item) => item.level === level) }));
   const linked = rows.filter(({ target }) => target?.qc_lot_id && groupLots.some((lot) => lot.id === target.qc_lot_id)).length;
@@ -121,17 +127,43 @@ export function TargetsTab() {
     if (!picked.length && !unlink.length) { await infoDialog('Chưa chọn xét nghiệm nào để lưu Mean/SD.', { title: 'Chưa lưu được Mean/SD' }); return; }
 
     const switching = picked.filter((item) => item.switching);
+    // 3 đường đi khi mức QC đang gắn lô của nhóm KHÁC — port nguyên văn
+    // `targetSwitchModalHtml()` app cũ (Hủy / Dự kiến / Chuyển qua nhóm lô
+    // này), không phải `confirmDialog` 2 nút.
+    let mode: 'switch' | 'planned' = 'switch';
     if (switching.length) {
-      const ok = await confirmDialog(
-        `${switching.length} xét nghiệm (${switching.map((item) => item.name).join(', ')}) đang gắn lô khác ở mức này. Lưu tiếp sẽ chuyển các mức đó sang lô của nhóm đang chọn; Mean/SD cũ được chốt vào lịch sử dữ liệu.`,
-        { title: 'Ghi Mean/SD sang lô khác', confirmLabel: 'Lưu và chuyển lô' },
-      );
-      if (!ok) return;
+      const choice = await choiceDialog({
+        title: `Áp dụng nhóm lô ${selectedGroup?.name || ''}?`,
+        message: `${switching.length} dòng (${switching.map((item) => item.name).join(', ')}) hiện đang dùng một nhóm lô khác. Chọn cách áp dụng Mean/SD vừa nhập:`,
+        options: [
+          { key: 'planned', label: 'Dự kiến', variant: 'ghost', hint: 'chỉ lưu lại Mean/SD đã nhập cho nhóm lô mới, chưa áp dụng — nhóm lô đang dùng vẫn tiếp tục như bình thường.' },
+          { key: 'switch', label: 'Chuyển qua nhóm lô này', variant: 'teal', hint: 'áp dụng ngay cho các dòng trên, nhóm lô đang dùng trước đó sẽ được đánh dấu "Đã dừng" (vẫn xem/nhập được nếu cần, không bị khóa).' },
+        ],
+      });
+      if (!choice) return;
+      mode = choice === 'planned' ? 'planned' : 'switch';
     }
     if (!await reauthDialog({ title: 'Xác thực Mean/SD', message: 'Nhập lại mật khẩu trước khi lưu Mean/SD cho lô QC.' })) return;
 
     setSaving(true);
     try {
+      if (mode === 'planned') {
+        // Hàng đang gắn lô khác -> lưu DỰ KIẾN; hàng chưa gắn lô nào (không
+        // có gì để giữ nguyên) vẫn lưu thẳng như thường.
+        const result = await savePlannedTargets({
+          items: switching.map((item) => ({ testId: item.testId, level: item.level, qcLotId: item.qcLotId, mean: item.mean, sd: item.sd, low: item.low, high: item.high })),
+        });
+        if (!result.ok) { await infoDialog(result.error.message, { title: 'Chưa lưu được Mean/SD dự kiến' }); return; }
+        for (const item of picked.filter((row) => !row.switching)) {
+          const saved = await saveTestLevel(item.testId, { level: item.level, mean: item.mean, sd: item.sd, low: item.low, high: item.high, qcLotId: item.qcLotId });
+          if (!saved.ok) { await infoDialog(saved.error.message, { title: 'Chưa lưu được Mean/SD' }); return; }
+        }
+        await infoDialog(
+          `Đã lưu Mean/SD dự kiến cho ${result.data.saved} xét nghiệm ở mức ${level}. Nhóm lô đang dùng vẫn tiếp tục như bình thường — vào tab "Lô & Nhóm QC" bấm "Kích hoạt" khi bắt đầu dùng nhóm lô này.`,
+          { type: 'success', title: 'Đã lưu Mean/SD dự kiến' },
+        );
+        return;
+      }
       for (const item of picked) {
         const result = await saveTestLevel(item.testId, { level: item.level, mean: item.mean, sd: item.sd, low: item.low, high: item.high, qcLotId: item.qcLotId });
         if (!result.ok) { await infoDialog(result.error.message, { title: 'Chưa lưu được Mean/SD' }); return; }
@@ -177,8 +209,14 @@ export function TargetsTab() {
               // tiên của mức. `targetRowState()` app cũ khoá lô `depleted`.
               const rowLot = linkedLot || levelLots.find((lot) => !lot.depleted) || levelLots[0];
               const locked = !!rowLot?.depleted;
+              // Số DỰ KIẾN (nếu có) là thứ phải hiện trong 4 ô, không phải số
+              // của lô đang chạy: người dùng vào lại nhóm lô này chính là để
+              // xem/sửa số mình đã chuẩn bị.
+              const planned = rowLot ? plannedFor(test.id, rowLot.id) : undefined;
               const status = locked
                 ? <b className="tag none">Lô đã hết dùng</b>
+                : planned
+                ? <b className="tag warn">Dự kiến · chờ kích hoạt</b>
                 : !target?.qc_lot_id
                 ? <b className="tag none">Chưa gán</b>
                 : linkedLot ? <b className="tag ok">Đã gán</b> : <b className="tag warn">Đang dùng {lots.find((lot) => lot.id === target.qc_lot_id)?.lot_no || 'lô khác'}</b>;
@@ -197,14 +235,20 @@ export function TargetsTab() {
               // chọn) mặc định BỎ TICK — trước đây LUÔN tick sẵn, khiến bấm
               // "Lưu Mean/SD mức này" vô tình chuyển cả những xét nghiệm KHÔNG
               // liên quan sang lô của nhóm đang xem.
-              const checked = !locked && (!target?.qc_lot_id || !!linkedLot);
-              return <div className="target-row" key={`${test.id}:${level}:${lotId}`} data-test={test.id} data-lot={lotId} data-decimals={decimals} data-k={k}>
+              // Hàng đã có số dự kiến thì mặc định TICK sẵn — nếu không, bấm
+              // "Lưu Mean/SD mức này" sẽ âm thầm bỏ qua đúng thứ người dùng
+              // vừa chuẩn bị lần trước.
+              const checked = !locked && (!target?.qc_lot_id || !!linkedLot || !!planned);
+              const shownMean = planned ? planned.mean : target?.mean;
+              const shownSd = planned ? planned.sd : target?.sd;
+              const shownReady = shownMean != null && shownSd != null && shownSd > 0;
+              return <div className="target-row" key={`${test.id}:${level}:${lotId}:${planned ? `p${planned.mean}/${planned.sd}` : 'live'}`} data-test={test.id} data-lot={lotId} data-decimals={decimals} data-k={k}>
               <label className="lot-assay-check" title={locked ? 'Lô QC đã hết dùng' : ''}><input className="tm-use" type="checkbox" disabled={locked} defaultChecked={checked} onChange={(e) => toggleTargetRow(e.currentTarget)} /><span /></label>
               <div className="lot-assay-name"><b>{test.name}</b><small>{test.unit || 'Chưa có đơn vị'}</small></div>
-              <input className="tm-mean" type="number" step="any" disabled={!checked} defaultValue={target?.mean ?? ''} placeholder="Trung bình" onChange={(e) => syncTargetRange(e.currentTarget, 'target')} />
-              <input className="tm-low" type="number" step="any" disabled={!checked} defaultValue={ready ? (target!.mean! - k * target!.sd!).toFixed(decimals) : ''} placeholder="Giới hạn dưới" onChange={(e) => syncTargetRange(e.currentTarget, 'limits')} />
-              <input className="tm-high" type="number" step="any" disabled={!checked} defaultValue={ready ? (target!.mean! + k * target!.sd!).toFixed(decimals) : ''} placeholder="Giới hạn trên" onChange={(e) => syncTargetRange(e.currentTarget, 'limits')} />
-              <input className="tm-sd" type="number" step="any" disabled={!checked} defaultValue={target?.sd ?? ''} placeholder="Độ lệch chuẩn" onChange={(e) => syncTargetRange(e.currentTarget, 'target')} />
+              <input className="tm-mean" type="number" step="any" disabled={!checked} defaultValue={shownMean ?? ''} placeholder="Trung bình" onChange={(e) => syncTargetRange(e.currentTarget, 'target')} />
+              <input className="tm-low" type="number" step="any" disabled={!checked} defaultValue={shownReady ? (shownMean! - k * shownSd!).toFixed(decimals) : ''} placeholder="Giới hạn dưới" onChange={(e) => syncTargetRange(e.currentTarget, 'limits')} />
+              <input className="tm-high" type="number" step="any" disabled={!checked} defaultValue={shownReady ? (shownMean! + k * shownSd!).toFixed(decimals) : ''} placeholder="Giới hạn trên" onChange={(e) => syncTargetRange(e.currentTarget, 'limits')} />
+              <input className="tm-sd" type="number" step="any" disabled={!checked} defaultValue={shownSd ?? ''} placeholder="Độ lệch chuẩn" onChange={(e) => syncTargetRange(e.currentTarget, 'target')} />
               <span>{status}</span>
             </div>;
             })}
