@@ -211,7 +211,7 @@ Thẻ lớn nhất. Đối chiếu từng tab:
 
 ---
 
-### 3.3 Nhập QC — 🟨
+### 3.3 Nhập QC — ✅
 
 **Nghiệp vụ:** cây điều hướng (máy → nhóm lô → xét nghiệm), bảng worksheet theo
 tháng (mỗi hàng 1 ngày, mỗi cột 1 mức), nhiều lần chạy trong ngày, ghi chú theo
@@ -239,13 +239,20 @@ ngày, biểu đồ Levey-Jennings, cửa sổ ngày, huỷ điểm có phân lo
   thực: điểm bị loại rời khỏi cả chuỗi LẪN cửa sổ đánh giá các điểm sau. Điểm
   bị loại CHỈ bởi luật liên mức cũng bị loại (sửa 11/09).
 
-**Còn lại (1 mục):**
-- **Điều hướng bàn phím trong CÂY** (`entryTreeKey` app cũ: mũi tên di chuyển
-  giữa các nút của cây). ⬜ — đây là tính năng thao tác thật, không phải trang
-  trí. Nửa BẢNG WORKSHEET đã xong 2026-09-11 (`2f370e5`):
-  `renderer/lib/entry-sheet-navigation.ts` + `tests/entry-sheet-navigation.test.mjs`
+**Điều hướng bàn phím — đã xong cả hai nửa:**
+- **Bảng worksheet** (2026-09-11, `2f370e5`): `renderer/lib/entry-sheet-navigation.ts`
   — mũi tên trái/phải đi ngang giữa các mức cùng ngày, lên/xuống và Enter đi
   dọc giữa các ngày cùng một mức.
+- **Cây danh mục** (2026-09-12): `renderer/lib/entry-tree-navigation.ts` —
+  Enter/Space kích hoạt nút, ArrowRight mở nhóm đang đóng, ArrowLeft đóng nhóm
+  đang mở, ArrowUp/Down đi giữa các nút đang thấy (quay vòng), Home/End về nút
+  đầu/cuối. Trước đó mọi `.tnode` đều không focus được: cả cây chỉ dùng được
+  bằng chuột. Lệch app cũ có chủ đích: nút MÁY của app-v2 luôn mở và không có
+  hành vi bấm nên KHÔNG nhận focus — không dựng điểm dừng bàn phím cho một nút
+  không làm gì. Thêm `.tree .tnode:focus-visible` (viền teal) vì nút vừa mới
+  focus được lần đầu.
+
+**Còn lại:** không. ✅
 
 ---
 
@@ -539,14 +546,14 @@ khoá/mở, đặt lại mật khẩu, đổi ảnh đại diện, xoá tài kho
 ## 4. Tổng kết rà soát
 
 **Nghiệp vụ app-v2 về cơ bản đã đầy đủ so với app cũ.** Rà lại toàn bộ thao tác
-người dùng bấm được ở app cũ, 8 mục thiếu ban đầu nay còn **2 mục**, và không
-mục nào chặn việc dùng app.
+người dùng bấm được ở app cũ, 8 mục thiếu ban đầu nay còn **1 mục** (ưu tiên 4,
+không chặn việc dùng app).
 
 | # | Mục | Thẻ | Loại | Ưu tiên |
 |---|---|---|---|---|
 | ~~1~~ | ~~"Xem lô cũ" trên trang Westgard~~ | Westgard | ✅ xong 11/09 (`ef6435b`) | — |
 | ~~2~~ | ~~Mức độ `6x`/`7T` theo chuẩn~~ | Westgard | ✅ xong 11/09 (`ef6435b`) | — |
-| 3 | Điều hướng bàn phím **cây** (bảng worksheet đã xong 11/09, `2f370e5`) | Nhập QC | tính năng | 2 |
+| ~~3~~ | ~~Điều hướng bàn phím cây + worksheet~~ | Nhập QC | ✅ worksheet 11/09 (`2f370e5`), cây 12/09 | — |
 | ~~4~~ | ~~Chặn quyền 3 hàm đọc nhật ký~~ | Nhật ký | ✅ xong 12/09 | — |
 | ~~5~~ | ~~Sigma Rules theo số mức QC (N/R)~~ | Six Sigma | ✅ xong 11/09 | — |
 | ~~6~~ | ~~Cohort IQC kiểm in-control~~ | Six Sigma | ✅ xong 11/09 | — |
@@ -673,8 +680,7 @@ Tiêu chí còn lại:
 
 1. ✅ Đối chiếu Westgard/Sigma giữa hai bản — đã đạt, và nay là **gate sống**
    chạy trong `app-v2:test`, không phải một lần đối chiếu rồi thôi.
-2. 🟨 Hết 4 mục ưu tiên 1–2 ở bảng mục 4 — còn đúng **1**: điều hướng bàn
-   phím trong CÂY của thẻ Nhập QC (mục 3).
+2. ✅ Hết 4 mục ưu tiên 1–2 ở bảng mục 4 (xong 2026-09-12).
 3. ⬜ Người dùng xác nhận giao diện app-v2 đã đủ dùng (tiêu chí này thuộc về
    người dùng, **không** đo bằng gate parity).
 

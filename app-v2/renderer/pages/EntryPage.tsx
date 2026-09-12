@@ -24,6 +24,7 @@ import { confirmDialog, reauthDialog } from '../state/dialog-store';
 import { extremeQcPointDeviation, voidNceChoice, type VoidKind } from '../../main/domain/entry-validation';
 import type { QcPointView, TestLevel, TestSummary } from '../../shared/qc-api';
 import { handleSheetKeyDown } from '../lib/entry-sheet-navigation';
+import { handleTreeKeyDown } from '../lib/entry-tree-navigation';
 import { nextSharedRunId } from '../lib/entry-run-id';
 
 /** `reportLabels.stateName()` app cũ — nhãn NGẮN dùng riêng cho cây điều
@@ -539,6 +540,7 @@ export function EntryPage() {
                   return (
                     <div key={groupKey}>
                       <div className={`tnode tn-test${open ? ' open' : ''}`} role="treeitem" aria-expanded={open}
+                        tabIndex={0} onKeyDown={handleTreeKeyDown}
                         onClick={() => setOpenTests((s) => { const next = new Set(s); next.has(groupKey) ? next.delete(groupKey) : next.add(groupKey); return next; })}>
                         <span className="caret" aria-hidden="true">{open ? '−' : '+'}</span>{group.name}
                         <span className={`state ${groupWorst === 'none' ? '' : groupWorst}`}>{TREE_STATE[groupWorst]}</span>
@@ -547,6 +549,7 @@ export function EntryPage() {
                         const state = latestOf(s);
                         return (
                           <div key={s.testId} className={`tnode tn-config${testId === s.testId ? ' on' : ''}`} role="treeitem"
+                            tabIndex={0} onKeyDown={handleTreeKeyDown}
                             aria-current={testId === s.testId ? 'true' : 'false'} onClick={() => selectLeaf(s.testId)}>
                             <span className="config-name">{s.testName}</span>
                             <span className={`state ${state === 'none' ? '' : state}`}>{TREE_STATE[state]}</span>

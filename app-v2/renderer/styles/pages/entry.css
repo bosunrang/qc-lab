@@ -29,6 +29,9 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
 .tree-empty{font-size:var(--type-meta);padding:14px 8px;text-align:center;border:1px solid var(--line);border-radius:var(--radius-md);color:var(--muted);}
 .tnode{display:flex;align-items:center;gap:4px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:32px;padding:6px 8px;border-radius:var(--surface-radius);font-size:var(--type-body);}
 .tnode:hover{background:var(--section-head-bg);}
+/* Nút cây nhận focus được từ 2026-09-12 (điều hướng bàn phím) — phải THẤY
+   được đang đứng ở đâu, nếu không phím mũi tên chỉ di chuyển trong bóng tối. */
+.tree .tnode:focus-visible{outline:2px solid var(--focus-outline);outline-offset:-2px;background:var(--section-head-bg);}
 .tree .tnode{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:6px;min-width:0;overflow:visible;text-overflow:clip;white-space:nowrap;}
 .tree .tn-machine{margin-left:0;color:var(--card-head-ink);overflow-wrap:normal;font-weight:700;}
 .tree .tn-test{margin-left:18px;padding-left:8px;color:#28414e;overflow-wrap:normal;font-weight:700;}
