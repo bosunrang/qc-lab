@@ -353,7 +353,7 @@ PDF.
 
 ---
 
-### 3.5 Six Sigma — 🟨
+### 3.5 Six Sigma — ✅
 
 **Nghiệp vụ:** theo dõi xét nghiệm, kỳ đánh giá theo tháng, CV từ cohort IQC
 hoặc nhập tay, Bias% từ nhiều vòng EQA/EQC (RMS), TEa theo 4 nguồn, thẻ tình
@@ -399,6 +399,9 @@ biểu đồ xu hướng + MDC, xuất Excel/in PDF.
 3. ✅ **Cohort IQC kiểm trong tầm kiểm soát** — nhóm còn điểm vượt ±3SD chưa
    có hồ sơ khắc phục hiệu quả thì không được `eligible`; **không** tự loại
    điểm khỏi CV (selection bias).
+
+**Còn lại:** không. ✅ (thẻ này để 🟨 tới 2026-09-12 là do sót cập nhật sau khi
+ba mục trên xong ngày 11/09, không phải còn việc chưa làm.)
 
 ---
 

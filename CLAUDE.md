@@ -130,6 +130,14 @@ mỗi trang 1 store).
   `import type` từ đó; `preload.ts` và `renderer/browser-mock/real-api.ts` đều
   `satisfies QcApi`. Đây là seam duy nhất bắt lệch tên/chữ ký/hình dạng trả về
   ở `tsc` — thiếu hàm, thừa hàm, sai tên, trả sai hình dạng đều đỏ ngay.
+  **Quy ước tên trường (có chủ đích, đừng "sửa cho nhất quán"):** kiểu ĐỌC là
+  HÀNG SQLite nên giữ nguyên `snake_case` của cột (`QcPanel.instrument_id`,
+  `Test.decimal_places`) — handler ép thẳng `SELECT *` sang kiểu đó, không
+  qua mapper; kiểu GHI (`*Draft`) là dữ liệu form nên `camelCase`
+  (`QcPanelDraft.instrumentId`). Field `camelCase` trong một kiểu đọc nghĩa là
+  handler TỰ TÍNH nó (`QcPanel.testIds`, `LotGroup.lotIds`/`inUse`,
+  `Test.assignment_ids` chỉ có trên kết quả `saveTest`). Rà 2026-09-12 toàn
+  bộ 8 kiểu đọc theo bảng so với cột thật (`PRAGMA table_info`): không lệch.
 - **Schema SQLite** (`main/db/schema.ts`, `applySchema()` idempotent) thiết kế
   đủ cho TOÀN BỘ ứng dụng từ đầu. Thêm cột `NOT NULL` sau này phải dùng
   `ALTER TABLE` idempotent **và** cập nhật row-builder tương ứng trong
