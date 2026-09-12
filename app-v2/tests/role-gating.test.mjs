@@ -129,4 +129,28 @@ assert.ok(entry.queryPoints(test.id, 1).length > 0, 'doc diem QC khong bi chan')
 assert.ok(report.queryReport({ testId: test.id }).length > 0, 'doc bao cao khong bi chan');
 assert.ok(westgard.listTestSummaries().length > 0, 'doc tong quan Westgard khong bi chan');
 
+// ── 7) Ngoai le cua muc 6: ĐỌC nhat ky hoat dong la ADMIN-ONLY ───────────
+// Trang Nhat ky la ADMIN_ONLY trong page-roles.ts, va noi dung nhat ky la ten
+// tai khoan + moi thao tac cua tung nguoi. Chan o renderer thoi thi goi thang
+// window.qcApi.queryActivity() tu DevTools van doc duoc toan bo - day la ly do
+// 3 ham DOC nay tra IpcResult thay vi tra thang du lieu.
+const beforeAuditRead = activityCount();
+for (const [role, who] of [['viewer', viewer], ['KTV', tech], ['vai tro la', unknown]]) {
+  assertForbidden(audit.query({}, who), role + ' queryActivity');
+  assertForbidden(audit.exportCsv({}, who), role + ' exportActivityCsv');
+  assertForbidden(audit.verifyChainNow(who), role + ' verifyActivityChainNow');
+}
+assert.equal(activityCount(), beforeAuditRead, 'doc nhat ky bi chan KHONG duoc de ra dong audit rac');
+
+const adminRead = audit.query({}, admin);
+assert.equal(adminRead.ok, true, 'admin phai doc duoc nhat ky');
+assert.ok(adminRead.data.rows.length > 0, 'admin phai thay duoc cac dong da ghi o tren');
+const adminCsv = audit.exportCsv({}, admin);
+assert.equal(adminCsv.ok, true, 'admin phai xuat duoc CSV nhat ky');
+assert.ok(adminCsv.data.startsWith('seq,ts,user'), 'CSV phai co header dung');
+const adminVerify = audit.verifyChainNow(admin);
+assert.equal(adminVerify.ok, true, 'admin phai kiem duoc chuoi hash');
+// Hai tang ok: .ok la cong quyen, .data.ok moi la ket luan chuoi hash.
+assert.equal(adminVerify.data.ok, true, 'chuoi hash phai con nguyen ven');
+
 console.log('app-v2 role-gating end-to-end tests passed');

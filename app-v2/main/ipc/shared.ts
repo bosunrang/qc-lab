@@ -77,15 +77,15 @@ export function notifyChanged(tables: string[], testIds: string[] = []): void {
 // Mean/SD/TEa), khoá-mở kỳ báo cáo, xoá phép so sánh hoá chất, cài đặt,
 // lưu trữ nhật ký hoạt động và xuất backup.
 //
-// CHƯA chặn: các hàm ĐỌC (`audit:query`/`audit:exportCsv`/
-// `audit:verifyChainNow`) vẫn mở cho mọi vai trò đã đăng nhập. Trang Nhật ký
-// hoạt động là admin-only nên UI không vào được (router.tsx chặn route từ
-// bản này), nhưng gọi thẳng `window.qcApi.queryActivity()` thì vẫn đọc được.
-// Chặn cho đúng đòi đổi 3 hàm đó sang trả `IpcResult` (giờ trả thẳng dữ
-// liệu) — kéo theo `shared/qc-api.d.ts`, `preload.ts`, `audit-store.ts`,
-// `AuditPage.tsx` và bản giả lập trình duyệt. Đây là lỗ BẢO MẬT ĐỌC, không
-// phải toàn vẹn dữ liệu; để lại làm một lượt riêng, đã ghi trong
-// docs/APP-V2-PLAN.md.
+// Chặn ĐỌC: mặc định các hàm đọc KHÔNG bị chặn (6 trang mở cho mọi vai trò),
+// trừ đúng hai chỗ mà bản thân DỮ LIỆU là thứ chỉ admin được xem: xuất backup
+// (chứa chuỗi mật khẩu PBKDF2 của mọi người dùng) và 3 hàm đọc nhật ký hoạt
+// động `audit:query`/`audit:exportCsv`/`audit:verifyChainNow` (chặn từ
+// 2026-09-12). Trang Nhật ký là ADMIN_ONLY trong `page-roles.ts`, nhưng
+// route guard của renderer chỉ là hiển thị — trước bản đó, gọi thẳng
+// `window.qcApi.queryActivity()` từ DevTools vẫn đọc được toàn bộ nhật ký.
+// Vì thế 3 hàm đó trả `IpcResult` thay vì trả thẳng dữ liệu như các hàm đọc
+// khác; `role-gating.test.mjs` mục 7 khoá lại.
 export type PermissionDenied = { ok: false; error: { code: string; message: string } };
 
 // Không tự so chuỗi vai trò ở đây — dùng chung đúng 1 định nghĩa với

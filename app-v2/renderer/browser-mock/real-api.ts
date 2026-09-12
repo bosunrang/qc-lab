@@ -207,9 +207,9 @@ export async function createRealBrowserApi(): Promise<QcApi> {
     removeTeaLabProfile: async (input) => config.removeTeaLabProfile(input, requireActor()),
 
     // audit
-    queryActivity: async (input) => audit.query(input),
-    exportActivityCsv: async (input) => audit.exportCsv(input),
-    verifyActivityChainNow: async () => audit.verifyChainNow(),
+    queryActivity: async (input) => audit.query(input, requireActor()),
+    exportActivityCsv: async (input) => audit.exportCsv(input, requireActor()),
+    verifyActivityChainNow: async () => audit.verifyChainNow(requireActor()),
     archiveActivity: async (input) => audit.archive(input, requireActor()),
 
     // entry

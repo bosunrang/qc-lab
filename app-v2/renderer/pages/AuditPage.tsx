@@ -26,7 +26,7 @@ function formatDateTimeVN(value: string): string {
 }
 
 export function AuditPage() {
-  const { result, query, from, to, pageSize, load, setQuery, setRange, setPage, setPageSize, clearFilters, exportCsv, verifyChainNow, archive } = useAuditStore();
+  const { result, error, query, from, to, pageSize, load, setQuery, setRange, setPage, setPageSize, clearFilters, exportCsv, verifyChainNow, archive } = useAuditStore();
   const [archiving, setArchiving] = useState(false);
   const [chain, setChain] = useState<{ ok: boolean; checked: number; legacy: number; brokenIndex: number; reason: string } | null>(null);
   /** Ngưỡng tự kiểm chuỗi hash — app cũ (`AUDIT_AUTO_VERIFY_MAX`) tự kiểm khi
@@ -38,17 +38,22 @@ export function AuditPage() {
   // Tự kiểm chuỗi hash khi nhật ký còn nhỏ, đúng app cũ.
   useEffect(() => {
     if (chain || !result.total || result.total > AUTO_VERIFY_MAX) return;
-    verifyChainNow().then(setChain);
+    // `r.ok` là cổng quyền, `r.data.ok` mới là kết luận chuỗi hash. Bị chặn
+    // thì im lặng — băng lỗi phía trên đã nói rõ lý do, không cần lặp lại.
+    verifyChainNow().then((r) => { if (r.ok) setChain(r.data); });
   }, [result.total, chain]); // eslint-disable-line react-hooks/exhaustive-deps
   useStoreInvalidation(['activity'], undefined, load);
 
   async function onExport() {
     const csv = await exportCsv();
-    downloadCsv(csv, `nhat-ky-hoat-dong-${new Date().toISOString().slice(0, 10)}.csv`);
+    if (!csv.ok) { await infoDialog(csv.error.message); return; }
+    downloadCsv(csv.data, `nhat-ky-hoat-dong-${new Date().toISOString().slice(0, 10)}.csv`);
   }
 
   async function onVerify() {
-    setChain(await verifyChainNow());
+    const r = await verifyChainNow();
+    if (!r.ok) { await infoDialog(r.error.message); return; }
+    setChain(r.data);
   }
 
   const hasFilter = !!(query || from || to);
@@ -56,6 +61,7 @@ export function AuditPage() {
   return (
     <div>
       <PageHeader title="Nhật ký hoạt động" subtitle="Lưu vết các thao tác quan trọng; chỉ quản trị viên được xem" />
+      {error && <div className="panel"><p className="field-error" style={{ margin: 'var(--space-panel)' }}>{error}</p></div>}
       <div className="panel">
         <div className="panel-head"><h2>Công cụ</h2></div>
         <div className="row-flex" style={{ margin: '0 var(--space-panel)' }}>
@@ -150,7 +156,10 @@ function ArchiveModal({ onClose }: { onClose: () => void }) {
     // Xuất CSV toàn bộ log HIỆN CÓ trước khi cắt — người dùng luôn có bản sao
     // trước khi phần cũ biến mất khỏi bảng sống.
     const csv = await exportCsv();
-    downloadCsv(csv, `luu-tru-nhat-ky-truoc-khi-cat-${new Date().toISOString().slice(0, 10)}.csv`);
+    // Không xuất được bản sao thì DỪNG, không cắt: bước cắt là không thể
+    // hoàn tác, chạy nó khi bản sao thất bại là mất dữ liệu thật.
+    if (!csv.ok) { setErr(csv.error.message); return; }
+    downloadCsv(csv.data, `luu-tru-nhat-ky-truoc-khi-cat-${new Date().toISOString().slice(0, 10)}.csv`);
     const result = await archive(Number(months) as 12 | 24 | 36);
     if (!result.ok) { setErr(result.error.message); return; }
     await infoDialog(result.data.removedCount > 0 ? `Đã lưu trữ ${result.data.removedCount} dòng cũ hơn ${months} tháng.` : 'Không có dòng nào cũ hơn mốc đã chọn.', { type: 'success' });

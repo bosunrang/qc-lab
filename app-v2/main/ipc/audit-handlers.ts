@@ -2,6 +2,14 @@
 // (đã ghi sẵn từ module đầu tiên qua shared.ts's writeAudit) qua bộ lọc/phân
 // trang THUẦN đã được port sẵn từ bản cũ trong domain/audit-filter.ts nhưng
 // chưa từng được nối vào IPC/renderer nào — đây là lần đầu.
+//
+// CẢ 4 hàm đều là admin-only, kể cả 3 hàm ĐỌC (`query`/`exportCsv`/
+// `verifyChainNow`): trang Nhật ký là ADMIN_ONLY trong `page-roles.ts`, và
+// nhật ký chứa tên tài khoản + mọi thao tác của từng người — chặn ở renderer
+// thôi thì gọi thẳng `window.qcApi.queryActivity()` từ DevTools vẫn đọc
+// được toàn bộ. Đây là lý do 3 hàm đó trả `IpcResult` chứ không trả thẳng
+// dữ liệu như các hàm đọc khác của app (điểm QC, báo cáo, Westgard — những
+// trang mở cho mọi vai trò).
 import type { Db } from '../db/sqlite-like';
 // Hình dạng trang nhật ký lấy từ hợp đồng dùng chung (đã có `total`).
 import type { ActivityPage } from '../../shared/qc-api';
@@ -44,7 +52,8 @@ export function createAuditHandlers(db: Db) {
    * `filterActivity()` tự đảo về mới-nhất-trước ở bước cuối, truyền nhầm
    * mảng đã DESC sẵn (như `config.listActivity()`) sẽ đảo ngược 2 lần thành
    * cũ-nhất-trước, sai với quy ước hiển thị của bản cũ. */
-  function query(input: AuditQueryInput): ActivityPage {
+  function query(input: AuditQueryInput, actor: Actor): IpcResult<ActivityPage> {
+    const denied = requireAdmin(actor); if (denied) return denied;
     const all = allChronological();
     const filtered = filterActivity(all, String(input.query || ''), String(input.from || ''), String(input.to || ''));
     // `total` = TOÀN BỘ nhật ký (không phụ thuộc bộ lọc) — trang Nhật ký của
@@ -53,19 +62,24 @@ export function createAuditHandlers(db: Db) {
     // `paginateActivity` là hàm thuần generic trên `ActivityLike`; hợp đồng
     // khai `rows: ActivityEntry[]`. Hai hình dạng khớp nhau ở runtime (cùng
     // do `rowToAuditEntry` dựng), ép một lần ở ranh giới IPC.
-    return { ...page, rows: page.rows as ActivityPage['rows'], total: all.length };
+    return { ok: true, data: { ...page, rows: page.rows as ActivityPage['rows'], total: all.length } };
   }
 
-  function exportCsv(input: AuditQueryInput): string {
+  function exportCsv(input: AuditQueryInput, actor: Actor): IpcResult<string> {
+    const denied = requireAdmin(actor); if (denied) return denied;
     const filtered = filterActivity(allChronological(), String(input.query || ''), String(input.from || ''), String(input.to || ''));
-    return toCsv(filtered);
+    return { ok: true, data: toCsv(filtered) };
   }
 
   /** Đọc lại đúng anchor đã lưu (`app_meta.activityAnchor`, rỗng nếu log
    * chưa từng bị cắt) — không xác minh từ đầu chuỗi (seq=1) như thể log
    * chưa từng lưu trữ, sẽ báo sai "chuỗi bị phá" ngay sau khi lưu trữ hợp lệ. */
-  function verifyChainNow(): ChainVerifyResult {
-    return verifyAuditChain(allChronological(), getAnchor(db));
+  /** Lưu ý hai tầng `ok`: `result.ok` là CỔNG QUYỀN (false = không phải
+   * admin), `result.data.ok` mới là kết luận chuỗi hash còn nguyên vẹn hay
+   * không. Đọc nhầm tầng sẽ báo "audit bị sửa" cho một lỗi phân quyền. */
+  function verifyChainNow(actor: Actor): IpcResult<ChainVerifyResult> {
+    const denied = requireAdmin(actor); if (denied) return denied;
+    return { ok: true, data: verifyAuditChain(allChronological(), getAnchor(db)) };
   }
 
   /** Lưu trữ nhật ký cũ hơn `months` tháng: xoá khỏi bảng sống, cập nhật

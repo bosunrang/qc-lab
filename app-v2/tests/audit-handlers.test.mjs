@@ -15,6 +15,13 @@ const config = createConfigHandlers(db);
 const audit = createAuditHandlers(db);
 const actor = { userId: 'u1', username: 'admin', name: 'Quan tri vien', role: 'admin', clientId: 'test-client' };
 
+// 3 ham DOC nhat ky la admin-only tu 2026-09-12 nen tra IpcResult. Boc lai
+// cho gon, va assert .ok ngay tai day: mot loi phan quyen khong duoc lang le
+// tro thanh "khong co dong nao" trong cac phep kiem ben duoi.
+function query(input) { const r = audit.query(input, actor); assert.equal(r.ok, true, JSON.stringify(r)); return r.data; }
+function exportCsv(input) { const r = audit.exportCsv(input, actor); assert.equal(r.ok, true, JSON.stringify(r)); return r.data; }
+function verifyChainNow() { const r = audit.verifyChainNow(actor); assert.equal(r.ok, true, JSON.stringify(r)); return r.data; }
+
 // Tao vai thao tac de co du dong audit (moi lan goi ghi dung 1 dong)
 const i1 = config.saveInstrument({ data: { name: 'May A' } }, actor).data;
 const i2 = config.saveInstrument({ data: { name: 'May B' } }, actor).data;
@@ -22,41 +29,41 @@ config.saveTest({ data: { name: 'Glucose', instrumentId: i1.id } }, actor);
 config.saveTest({ data: { name: 'Ure', instrumentId: i2.id } }, actor);
 
 // 1) query() khong tham so tra ve TAT CA, moi-nhat-truoc (seq giam dan)
-const all = audit.query({});
+const all = query({});
 assert.equal(all.rows.length, 4, 'phai co dung 4 dong audit (2 may + 2 xet nghiem)');
 assert.ok(all.rows[0].seq > all.rows[all.rows.length - 1].seq, 'phai sap moi nhat truoc');
 assert.equal(all.page, 1);
 assert.equal(all.pageCount, 1);
 
 // 2) Loc theo van ban (khong phan biet dau/hoa-thuong, khop text-utils.textKey)
-const filtered = audit.query({ query: 'glucose' });
+const filtered = query({ query: 'glucose' });
 assert.equal(filtered.rows.length, 1);
 assert.equal(filtered.rows[0].detail.includes('Glucose'), true);
 
 // 3) Loc khong khop tra ve rong, khong loi
-const none = audit.query({ query: 'khong-ton-tai-xyz' });
+const none = query({ query: 'khong-ton-tai-xyz' });
 assert.equal(none.rows.length, 0);
 assert.equal(none.pageCount, 1);
 assert.equal(none.resultFrom, 0);
 
 // 4) Phan trang: pageSize=2 phai chia dung 4 dong thanh 2 trang
-const page1 = audit.query({ page: 1, pageSize: 2 });
+const page1 = query({ page: 1, pageSize: 2 });
 assert.equal(page1.rows.length, 2);
 assert.equal(page1.pageCount, 2);
-const page2 = audit.query({ page: 2, pageSize: 2 });
+const page2 = query({ page: 2, pageSize: 2 });
 assert.equal(page2.rows.length, 2);
 // 2 trang gop lai phai dung 4 dong, khong trung/thieu
 const seqSeen = new Set([...page1.rows, ...page2.rows].map(r => r.seq));
 assert.equal(seqSeen.size, 4);
 
 // 5) exportCsv() tra dung header + so dong khop voi query() cung bo loc
-const csv = audit.exportCsv({ query: 'glucose' });
+const csv = exportCsv({ query: 'glucose' });
 const csvLines = csv.split('\n');
 assert.equal(csvLines[0], 'seq,ts,user,username,role,type,detail,target');
 assert.equal(csvLines.length, 2, 'header + 1 dong khop "glucose"');
 
 // 6) verifyChainNow() phai OK khi chuoi chua bi dung tay
-const verify1 = audit.verifyChainNow();
+const verify1 = verifyChainNow();
 assert.equal(verify1.ok, true, JSON.stringify(verify1));
 assert.equal(verify1.checked, 4);
 
@@ -68,7 +75,7 @@ assert.equal(badMonths.error.code, 'invalid-months');
 // Chen thang mot dong THAT CU (3 nam truoc) truc tiep vao DB de mo phong nhat
 // ky da ton tai lau - dung hash-chain that (noi tiep hash cuoi hien tai) de
 // khong tu pha chuoi cua chinh mini truoc khi test archive.
-const beforeArchive = audit.query({});
+const beforeArchive = query({});
 const { auditEntryHash } = require('../../app-v2-dist/main/domain/audit-chain.js');
 const oldTs = new Date(); oldTs.setFullYear(oldTs.getFullYear() - 3);
 const oldEntry = {
@@ -87,14 +94,14 @@ for (const e of relinked) {
   db.prepare(`INSERT INTO activity(id,seq,ts,user,username,user_id,role,type,detail,target,client_id,prev_hash,hash)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(e.id, e.seq, e.ts, e.user, e.username, e.userId || 'u1', e.role, e.type, e.detail, e.target || '', e.clientId || 'test-client', e.prevHash, e.hash);
 }
-assert.equal(audit.verifyChainNow().ok, true, 'chuoi phai van hop le sau khi noi lai voi dong cu chen dau');
+assert.equal(verifyChainNow().ok, true, 'chuoi phai van hop le sau khi noi lai voi dong cu chen dau');
 
 const archived = audit.archive({ data: { months: 12 } }, actor);
 assert.equal(archived.ok, true);
 assert.equal(archived.data.removedCount, 1, 'chi dong 3 nam truoc moi cu hon 12 thang');
-const afterArchiveVerify = audit.verifyChainNow();
+const afterArchiveVerify = verifyChainNow();
 assert.equal(afterArchiveVerify.ok, true, 'chuoi phai van xac minh duoc TU ANCHOR sau khi cat, khong bao "bi pha"');
-const afterArchiveQuery = audit.query({});
+const afterArchiveQuery = query({});
 assert.ok(!afterArchiveQuery.rows.some(r => r.detail === 'Diem cu 3 nam truoc'), 'dong cu phai bien mat khoi bang song');
 
 console.log('app-v2 audit-handlers end-to-end tests passed');

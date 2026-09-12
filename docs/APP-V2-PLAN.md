@@ -240,9 +240,12 @@ ngày, biểu đồ Levey-Jennings, cửa sổ ngày, huỷ điểm có phân lo
   bị loại CHỈ bởi luật liên mức cũng bị loại (sửa 11/09).
 
 **Còn lại (1 mục):**
-- **Điều hướng bàn phím** trong cây và bảng worksheet (`entryTreeKey`/
-  `entrySheetKey` của app cũ: mũi tên di chuyển giữa ô/nút). app-v2 mới có 2
-  `onKeyDown`. ⬜ — đây là tính năng thao tác thật, không phải trang trí.
+- **Điều hướng bàn phím trong CÂY** (`entryTreeKey` app cũ: mũi tên di chuyển
+  giữa các nút của cây). ⬜ — đây là tính năng thao tác thật, không phải trang
+  trí. Nửa BẢNG WORKSHEET đã xong 2026-09-11 (`2f370e5`):
+  `renderer/lib/entry-sheet-navigation.ts` + `tests/entry-sheet-navigation.test.mjs`
+  — mũi tên trái/phải đi ngang giữa các mức cùng ngày, lên/xuống và Enter đi
+  dọc giữa các ngày cùng một mức.
 
 ---
 
@@ -328,15 +331,16 @@ PDF.
   `within` (gộp mức tạo răng cưa giả). Chốt ở `westgard-standard.test.mjs`
   và mục 4d của `cross-app-westgard-sigma.test.mjs`.
 
-**Còn lại (2 mục):**
-1. **"Xem lô cũ" trên trang Westgard** — `listPreviousLotBlocks` + test đã viết
-   xong nhưng **chưa commit**, đang nằm trong working tree cùng
-   `main/db/lot-lineage.ts`. 🟨 → cần commit.
-2. **Mức độ `6x`/`7T`** — Westgard xếp cả hai là LOẠI BỎ; app cũ để cảnh báo.
-   Người dùng chốt 2026-09-11: **theo chuẩn, mặc định loại bỏ**; ai cần cảnh
-   báo thì hạ mức độ theo từng xét nghiệm trong thẻ Cấu hình chung. Thay đổi đã
-   viết, **chưa commit**. 🟨
-3. Bảng điểm hiện toàn bộ dòng; app cũ có nút "hiện thêm N dòng"
+**Đã xong 2026-09-11 (`ef6435b`), trước đó ghi là "chưa commit":**
+- **"Xem lô cũ" trên trang Westgard** — `listPreviousLotBlocks` +
+  `main/db/lot-lineage.ts` + test. ✅
+- **Mức độ `6x`/`7T`** — Westgard xếp cả hai là LOẠI BỎ; app cũ để cảnh báo.
+  Người dùng chốt 2026-09-11: **theo chuẩn, mặc định loại bỏ**
+  (`alert: false` trong `WG_RULE_REGISTRY`); ai cần cảnh báo thì hạ mức độ
+  theo từng xét nghiệm trong thẻ Cấu hình chung. ✅
+
+**Còn lại (1 mục):**
+1. Bảng điểm hiện toàn bộ dòng; app cũ có nút "hiện thêm N dòng"
    (`wgLoadMoreRows`). Vấn đề hiệu năng khi chuỗi rất dài, không phải nghiệp
    vụ. ⬜ chờ khi có dữ liệu thật đủ lớn.
 
@@ -466,11 +470,19 @@ xuất CSV, xác minh chuỗi, lưu trữ log cũ (12/24/36 tháng).
   .activityAnchor`; xác minh seed từ anchor. Xoá log mà giữ anchor (hoặc ngược
   lại) sẽ phá chuỗi ngay dòng đầu.
 - Lưu trữ **tự tải CSV toàn bộ log trước** khi xoá, và qua xác thực lại.
+- **Cả 4 hàm đều admin-only, kể cả 3 hàm ĐỌC** (chặn 2026-09-12). Trang Nhật
+  ký là `ADMIN_ONLY`, nhưng route guard của renderer chỉ là hiển thị — trước
+  bản này gọi thẳng `window.qcApi.queryActivity()` từ DevTools vẫn đọc được
+  toàn bộ nhật ký (tên tài khoản + mọi thao tác của từng người). Vì thế 3 hàm
+  đó trả `IpcResult` thay vì trả thẳng dữ liệu như các hàm đọc khác; với
+  `verifyChainNow`, `.ok` là cổng quyền còn `.data.ok` mới là kết luận chuỗi
+  hash. Khoá ở `role-gating.test.mjs` mục 7 (đã chứng minh test bắt được lỗi
+  bằng cách gỡ tạm cổng quyền). Hai chỗ bị chặn đọc trong toàn app là đây và
+  xuất backup — mọi hàm đọc khác vẫn mở cho mọi vai trò.
+- Không xuất được bản sao CSV thì **không cắt log**: modal lưu trữ dừng lại và
+  báo lỗi, vì bước cắt không thể hoàn tác.
 
-**Còn lại:** 3 hàm ĐỌC (`query`/`exportCsv`/`verifyChainNow`) chưa chặn theo vai
-trò — route đã chặn nên UI không vào được, nhưng gọi thẳng
-`window.qcApi.queryActivity()` vẫn đọc được. Là lỗ **bảo mật đọc**, không phải
-toàn vẹn dữ liệu. ⬜
+**Còn lại:** không. ✅
 
 ---
 
@@ -527,15 +539,15 @@ khoá/mở, đặt lại mật khẩu, đổi ảnh đại diện, xoá tài kho
 ## 4. Tổng kết rà soát
 
 **Nghiệp vụ app-v2 về cơ bản đã đầy đủ so với app cũ.** Rà lại toàn bộ thao tác
-người dùng bấm được ở app cũ, chỉ còn **8 mục** chưa có, và không mục nào chặn
-việc dùng app.
+người dùng bấm được ở app cũ, 8 mục thiếu ban đầu nay còn **2 mục**, và không
+mục nào chặn việc dùng app.
 
 | # | Mục | Thẻ | Loại | Ưu tiên |
 |---|---|---|---|---|
-| 1 | Commit "Xem lô cũ" trên trang Westgard | Westgard | dọn việc dở | **1** |
-| 2 | Commit mức độ `6x`/`7T` theo chuẩn | Westgard | dọn việc dở | **1** |
-| 3 | Điều hướng bàn phím cây + worksheet | Nhập QC | tính năng | 2 |
-| 4 | Chặn quyền 3 hàm đọc nhật ký | Nhật ký | bảo mật đọc | 2 |
+| ~~1~~ | ~~"Xem lô cũ" trên trang Westgard~~ | Westgard | ✅ xong 11/09 (`ef6435b`) | — |
+| ~~2~~ | ~~Mức độ `6x`/`7T` theo chuẩn~~ | Westgard | ✅ xong 11/09 (`ef6435b`) | — |
+| 3 | Điều hướng bàn phím **cây** (bảng worksheet đã xong 11/09, `2f370e5`) | Nhập QC | tính năng | 2 |
+| ~~4~~ | ~~Chặn quyền 3 hàm đọc nhật ký~~ | Nhật ký | ✅ xong 12/09 | — |
 | ~~5~~ | ~~Sigma Rules theo số mức QC (N/R)~~ | Six Sigma | ✅ xong 11/09 | — |
 | ~~6~~ | ~~Cohort IQC kiểm in-control~~ | Six Sigma | ✅ xong 11/09 | — |
 | ~~7~~ | ~~`u(Cref)` đúng nghĩa Nordtest~~ | Six Sigma | ✅ xong 11/09 | — |
@@ -661,7 +673,8 @@ Tiêu chí còn lại:
 
 1. ✅ Đối chiếu Westgard/Sigma giữa hai bản — đã đạt, và nay là **gate sống**
    chạy trong `app-v2:test`, không phải một lần đối chiếu rồi thôi.
-2. ⬜ Hết 4 mục ưu tiên 1–2 ở bảng mục 4.
+2. 🟨 Hết 4 mục ưu tiên 1–2 ở bảng mục 4 — còn đúng **1**: điều hướng bàn
+   phím trong CÂY của thẻ Nhập QC (mục 3).
 3. ⬜ Người dùng xác nhận giao diện app-v2 đã đủ dùng (tiêu chí này thuộc về
    người dùng, **không** đo bằng gate parity).
 

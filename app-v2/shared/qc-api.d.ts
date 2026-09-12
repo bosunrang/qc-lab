@@ -479,9 +479,14 @@ export interface QcApi {
    * `removedRecord` cho biết dòng có bị xoá luôn không (chỉ khi đó là
    * analyte KHÔNG tự thêm và không còn CLIA/Ricos% ghi đè nào khác). */
   removeTeaLabProfile(input: { id: string }): Promise<IpcResult<{ id: string; removedRecord: boolean }>>;
-  queryActivity(input: { query?: string; from?: string; to?: string; page?: number; pageSize?: number }): Promise<ActivityPage>;
-  exportActivityCsv(input: { query?: string; from?: string; to?: string }): Promise<string>;
-  verifyActivityChainNow(): Promise<{ ok: boolean; checked: number; legacy: number; brokenIndex: number; reason: string }>;
+  /** 3 hàm đọc nhật ký trả `IpcResult` (khác mọi hàm đọc khác của app, trả
+   * thẳng dữ liệu) vì trang Nhật ký là ADMIN_ONLY và nội dung nhật ký là dữ
+   * liệu nhạy cảm — cổng quyền nằm ở main, xem `audit-handlers.ts`. Với
+   * `verifyActivityChainNow`, `.ok` ngoài là cổng quyền, `.data.ok` mới là
+   * kết luận chuỗi hash. */
+  queryActivity(input: { query?: string; from?: string; to?: string; page?: number; pageSize?: number }): Promise<IpcResult<ActivityPage>>;
+  exportActivityCsv(input: { query?: string; from?: string; to?: string }): Promise<IpcResult<string>>;
+  verifyActivityChainNow(): Promise<IpcResult<{ ok: boolean; checked: number; legacy: number; brokenIndex: number; reason: string }>>;
   archiveActivity(input: { data: { months: 12 | 24 | 36 } }): Promise<IpcResult<{ removedCount: number }>>;
   queryPoints(testId: string, level: number): Promise<QcPointView[]>;
   /** Mọi điểm chưa hủy của xét nghiệm, gồm cả các lô lịch sử. */

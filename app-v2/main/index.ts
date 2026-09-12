@@ -108,9 +108,9 @@ function createWindow(): void {
   ipcMain.handle('config:saveTeaRef', (_event, input) => config.saveTeaRef(input, requireActor()));
   ipcMain.handle('config:removeTeaRef', (_event, input) => config.removeTeaRef(input, requireActor()));
   ipcMain.handle('config:removeTeaLabProfile', (_event, input) => config.removeTeaLabProfile(input, requireActor()));
-  ipcMain.handle('audit:query', (_event, input) => audit.query(input));
-  ipcMain.handle('audit:exportCsv', (_event, input) => audit.exportCsv(input));
-  ipcMain.handle('audit:verifyChainNow', () => audit.verifyChainNow());
+  ipcMain.handle('audit:query', (_event, input) => audit.query(input, requireActor()));
+  ipcMain.handle('audit:exportCsv', (_event, input) => audit.exportCsv(input, requireActor()));
+  ipcMain.handle('audit:verifyChainNow', () => audit.verifyChainNow(requireActor()));
   ipcMain.handle('audit:archive', (_event, input) => audit.archive(input, requireActor()));
 
   ipcMain.handle('entry:queryPoints', (_event, testId, level) => entry.queryPoints(testId, level));
