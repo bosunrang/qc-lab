@@ -233,7 +233,6 @@ td.num,th.num{font-variant-numeric:tabular-nums;text-align:right;font-weight:650
 .modal-bg{position:fixed;inset:0;background:rgba(20,33,43,.45);display:flex;align-items:center;justify-content:center;z-index:900;padding:var(--space-xl);}
 #dialogRoot .modal-bg,.modal-bg.dialog-layer{z-index:1100;background:rgba(21,35,44,.54);backdrop-filter:blur(2px);}
 .modal{background:var(--panel);border-radius:13px;width:560px;max-width:100%;max-height:86vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.32);}
-.modal.dialog-box{width:auto;min-width:320px;max-width:440px;}
 .modal-h{display:flex;align-items:center;justify-content:space-between;padding:var(--space-section) var(--modal-inline-padding);border-bottom:1px solid var(--line);background:var(--surface-subtle);}
 .modal-h h3{margin:0;min-height:0;color:var(--card-head-ink);font-size:var(--section-head-size);font-weight:800;letter-spacing:0;text-transform:none;}
 .modal-b{padding:var(--panel-content-gap) var(--modal-inline-padding);overflow:auto;}
@@ -286,10 +285,6 @@ td.num,th.num{font-variant-numeric:tabular-nums;text-align:right;font-weight:650
    định (bản cũ chuyển 4 cột ở ≤980px rồi về 2 cột ở ≤900px — app-v2 giữ 2
    cột cố định vì Dashboard chỉ có 4 thẻ, đơn giản hơn nhưng cùng mật độ
    thị giác). */
-.kpi-row{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-lg);}
-.kpi-card{background:var(--panel);border:1px solid #d3dde3;border-radius:var(--surface-radius);box-shadow:var(--surface-shadow);padding:14px 15px;position:relative;overflow:hidden;}
-.kpi-card .kpi-value{font-size:var(--type-kpi);font-weight:850;letter-spacing:-.01em;line-height:1.05;margin-top:6px;font-variant-numeric:tabular-nums;color:var(--ink);}
-.kpi-card .kpi-label{font-size:var(--type-caption);font-weight:800;color:var(--muted);letter-spacing:0;}
 .empty-state{color:var(--muted);font-size:var(--type-body-sm);line-height:1.55;text-align:center;}
 /* Trạng thái rỗng cấp trang dùng chung cho các màn phân tích/nhập QC. Panel
    bên ngoài đã có viền và nền trắng, nên không dựng thêm hộp `.empty` xám. */

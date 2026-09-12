@@ -88,7 +88,6 @@
 .rcfg-modal{width:700px;}
 .tea-lab-profile-modal{width:min(660px,calc(100vw - 24px));}
 .tea-lab-profile-modal textarea{width:100%;resize:vertical;}
-.tea-lab-profile-modal textarea.tea-lab-reason{height:38px;min-height:38px;overflow-y:auto;}
 .rcfg-assay-modal{width:min(860px,calc(100vw - 32px));}
 .rcfg-assay-modal .modal-b{scrollbar-gutter:stable;}
 .lot-trans-modal{width:min(1040px,94vw);}
@@ -137,7 +136,6 @@
 .rcfg-list th,.rcfg-list td{vertical-align:middle;text-align:center;}
 .rcfg-list th:first-child,.rcfg-list td:first-child{text-align:left;}
 
-.lot-config-toolbar{min-height:72px;padding:14px 18px;box-sizing:border-box;background:var(--section-head-bg);border-bottom:1px solid var(--section-head-border);}
 /* App cũ: gap 14px + padding 14px + nền #f6f9fa (không phải 16px). */
 .lot-config-grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(360px,1fr);gap:14px;align-items:start;padding:14px;background:#f6f9fa;}
 @media(max-width:1280px){.lot-config-grid{grid-template-columns:1fr;}}
@@ -188,10 +186,6 @@
 .target-selector .field{margin:0;}
 .target-matrix-panel .target-selector.target-config-selector{grid-template-columns:minmax(240px,380px) minmax(200px,280px);justify-content:start;margin:0;padding:12px 14px;border-bottom:1px solid var(--section-head-border);background:var(--section-head-bg);align-items:end;}
 .target-config-selector .field{margin:0;}
-.target-matrix-head{display:flex!important;align-items:center;min-height:72px!important;margin:0!important;padding:14px 18px!important;background:var(--section-head-bg)!important;border-bottom:1px solid var(--section-head-border)!important;}
-.target-matrix-head h2{margin:0;color:var(--section-head-ink);font-size:var(--type-heading-sm);font-weight:800;}.target-matrix-head p{margin:2px 0 0;color:var(--muted);font-size:var(--type-body-sm);}
-.target-matrix-table-card{margin:var(--space-panel);border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);overflow:hidden;}
-.target-matrix-table-card .target-summary{margin:0;padding:10px 12px;border-bottom:1px solid var(--line);background:var(--panel);}
 /* Bảng Mean/SD của app cũ KHÔNG phải <table>: `.target-table` là hộp cuộn,
    còn `.target-head`/`.target-row` là LƯỚI 7 cột (professional-config.css).
    app-v2 từng dùng <table> ở bản thí điểm nên CSS cũ ở đây style theo bảng
@@ -214,9 +208,6 @@
 .target-row{min-height:56px;padding:8px 10px;border-bottom:1px solid var(--surface-neutral);}
 .target-row:last-child{border-bottom:0;}
 .target-row:hover{background:#f7fbfb;}
-.target-row-locked{background:var(--danger-bg);}
-.target-row-locked:hover{background:var(--danger-bg);}
-.target-row-locked .lot-assay-name b{color:var(--danger-ink);}
 .target-head>*,.target-row>*{min-width:0;}
 .target-head>span,.target-row>span{display:flex;align-items:center;}
 .target-row input[type=number]{min-width:0;width:116px;max-width:100%;height:34px;margin:0;justify-self:center;background:var(--panel);color:var(--ink);text-align:center;font-variant-numeric:tabular-nums;appearance:textfield;-moz-appearance:textfield;}
@@ -224,9 +215,6 @@
 .target-row input[type=number]::-webkit-outer-spin-button{margin:0;-webkit-appearance:none;}
 .target-row input:disabled{border-color:#e5eaed;background:#f0f3f4;color:#a1aeb6;}
 .target-table select,.target-table input{max-width:100%;}
-.target-matrix-table{margin-top:10px!important;table-layout:fixed;}
-.target-matrix-table th:nth-child(1){width:58px;}.target-matrix-table th:nth-child(2){width:25%;}.target-matrix-table th:nth-child(3),.target-matrix-table th:nth-child(4),.target-matrix-table th:nth-child(5),.target-matrix-table th:nth-child(6){width:14%;}.target-matrix-table th:nth-child(7){width:100px;}
-.target-matrix-table td{padding:8px 10px;}.target-matrix-table input[type=number]{width:116px;max-width:100%;margin:0;text-align:center;font-variant-numeric:tabular-nums;}.target-use input{width:17px;height:17px;accent-color:var(--teal);}.target-assay{text-align:left!important;}.target-assay b,.target-assay small{display:block;}.target-assay small{margin-top:3px;color:var(--muted);font-size:var(--type-caption);}.target-assay select{display:inline;width:auto;max-width:150px;height:auto;min-height:0;margin-left:3px;padding:0;border:0;background:transparent;color:var(--teal);font:inherit;font-weight:700;}.target-calculated{font-variant-numeric:tabular-nums;color:var(--muted);}
 .target-level-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:10px 14px 0;padding:10px 12px;border:1px solid #d7e1e6;border-radius:var(--radius-md) var(--radius-md) 0 0;background:#f7fafb;}.target-level-toolbar>div:first-child{display:flex;align-items:center;gap:8px;min-width:0;color:#294653;font-size:var(--type-meta);}
 /* App cũ chỉ đặt `flex:0 0 auto` cho .dayseg ở đây, dùng nguyên kiểu
    segmented dùng chung (nền #1c3442 khi active, không viền/bo từng nút).
@@ -238,8 +226,6 @@
 .target-summary span.ok{border-color:var(--success-border);background:var(--success-bg);color:var(--success-ink);}
 .target-summary span.warn{border-color:var(--warning-border);background:var(--warning-bg);color:var(--warning-ink);}
 .target-summary b{font-size:var(--type-body-sm);}
-.target-hidden-lot{display:none!important;}
-.history-summary{margin-top:var(--gap-content);}
 
 /* Port đúng % bề rộng + canh lề app cũ (professional-config.css) — bản
    trước app-v2 tự đặt tỷ lệ khác (19/29/18/18/16, không cột nào canh trái)
@@ -252,8 +238,6 @@
 .transition-table th:nth-child(5),.transition-table td:nth-child(5){width:22%;}
 .transition-table .hint{line-height:1.35;}
 .transition-table td:last-child,.tea-ref-table td:last-child{white-space:nowrap;}
-.transition-toolbar{min-height:72px;margin:0;padding:14px 18px;box-sizing:border-box;background:var(--section-head-bg);border-bottom:1px solid var(--section-head-border);}
-.transition-toolbar .rcfg-tools{flex:0 0 auto;}
 
 /* Hộp thoại chuyển tiếp lô: giữ cấu trúc 3 + 2 trường và vùng Mean/SD
    bên trong như app cũ. Các ô Mean/SD hiện là giao diện đối chiếu; luồng
@@ -267,9 +251,8 @@
 .lot-trans-modal .lot-trans-row2+.field{margin-top:var(--space-panel);}
 /* Dòng nhắc chọn Panel/lô dùng `.hint.flow-section` dùng chung như app cũ. */
 
-.history-toolbar{min-height:72px;margin:0;padding:14px 18px;box-sizing:border-box;background:var(--section-head-bg);border-bottom:1px solid var(--section-head-border);}
 .history-selector{display:grid;grid-template-columns:minmax(240px,320px);gap:var(--gap-content);align-items:end;padding:12px 14px;border-bottom:1px solid var(--section-head-border);background:var(--section-head-bg);}
-.history-selector .field{margin:0;}.history-info{display:grid;gap:2px;padding:4px 0;color:var(--muted);}.history-info b{color:var(--teal);font-size:var(--type-subhead);font-variant-numeric:tabular-nums;}.history-info span{font-size:var(--type-caption);font-weight:700;}
+.history-selector .field{margin:0;}
 .history-list table{margin:0!important;}.history-table th,.history-table td{text-align:center;vertical-align:middle;}
 /* 10 cột đúng bằng 100% (port nguyên % từ assets/professional-config.css) —
    bản trước chỉ khai 9 cột cộng lại đã 104%, không còn % nào cho cột 10
@@ -314,7 +297,6 @@
 .tea-source-card a { color: var(--tealink); font-size: var(--type-meta); font-weight: 750; text-decoration: none; }
 .tea-source-card.retired { background: var(--warning-bg); border-color: var(--warning-border); }
 .tea-source-card.retired b { color: var(--warning-ink); }
-.tea-table-wrap { margin: 14px 16px 18px; overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-md); }
 .tea-ref-table { width: 100%; min-width: 920px; table-layout: fixed; margin: 0 !important; border: 0 !important; }
 .tea-ref-table th, .tea-ref-table td { text-align: center; vertical-align: middle; }
 .tea-ref-table thead th { height: 42px; background: var(--section-head-bg); color: var(--card-head-ink); }
@@ -521,7 +503,7 @@ button.btn.ghost.btn-stop-tint,button.btn.ghost.btn-stop-tint:hover{color:var(--
 
 /* Bù các rule app cũ CÓ mà app-v2 mới port MỘT PHẦN (2026-09-03). Gate
    `app-v2:css-parity` không thấy vì nó chỉ kiểm "class có rule nào hay
-   không" — `.lot-assay-name`/`.target-actions`/`.target-lot-info` đã có 1-2
+   không" — `.lot-assay-name`/`.target-actions` đã có 1-2
    rule ở app-v2 nên coi là đủ, trong khi thiếu đúng những rule quyết định
    BỐ CỤC (grid/flex). Hệ quả nhìn thấy được: tên xét nghiệm + đơn vị nằm
    cùng dòng và 3 nút cuối bảng Mean/SD dính liền nhau
@@ -547,10 +529,6 @@ button.btn.ghost.btn-stop-tint,button.btn.ghost.btn-stop-tint:hover{color:var(--
 .target-head>span:first-child,.target-row>.lot-assay-check{justify-content:center;}
 .target-head>span:nth-child(2),.target-row>.lot-assay-name{justify-content:flex-start;padding-left:12px;text-align:left;}
 .target-actions{justify-content:flex-end;margin-top:0;padding:12px 14px;border-top:0;background:var(--panel);}
-.target-lot-info{justify-content:flex-start;white-space:normal;}
-.target-matrix-panel .target-lot-info{display:flex;align-items:baseline;justify-content:center;gap:8px;padding:6px 14px;border:1px solid var(--success-border);border-radius:var(--radius-pill);background:var(--success-bg);color:var(--success-ink);font-size:var(--type-caption);font-weight:750;}
-.target-matrix-panel .target-lot-info b{font-size:var(--type-subhead);color:var(--success-ink);font-weight:800;}
-.target-matrix-panel .target-lot-info span{color:var(--success-ink);font-size:var(--type-meta);font-weight:750;}
 .target-matrix-panel .target-table{margin-top:0;border-top:0;border-top-left-radius:0;border-top-right-radius:0;margin-bottom:14px;}
 .target-table{display:block;max-width:100%;overflow-x:auto;overflow-y:auto;overscroll-behavior-x:contain;padding-bottom:0;contain:paint;}
 
@@ -585,11 +563,6 @@ button.btn.ghost.btn-stop-tint,button.btn.ghost.btn-stop-tint:hover{color:var(--
   min-height:34px!important;
 }
 
-/* Đây là selector chữ nằm trong tên xét nghiệm, không phải một ô form. */
-.config-shell .target-assay select{
-  height:auto!important;
-  min-height:0!important;
-}
 .history-detail-heading{margin-top:0;margin-bottom:var(--panel-content-gap);}
 .space-after-section{margin-bottom:var(--space-section);}
 /* .hist-meansd-table ("Mean/SD đã dùng") và .hist-points-table ("Điểm QC đã

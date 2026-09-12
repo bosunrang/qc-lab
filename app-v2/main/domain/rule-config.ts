@@ -30,16 +30,6 @@ export function serializeRuleActions(overrides: RuleActionsMap): string {
   return JSON.stringify(overrides);
 }
 
-/** Tra ve ham isOn(ruleId) dung cho westgard()/cusumScan - moi luat mac dinh
- * theo WG_DEFAULT_ON, tru khi xet nghiem tu ghi de qua overrides. */
-export function makeIsOn(overrides: RuleActionsMap): (ruleId: string) => boolean {
-  return (ruleId: string) => {
-    const override = overrides[ruleId];
-    if (isRuleAction(override)) return override !== 'inactive';
-    return typeof override === 'boolean' ? override : WG_DEFAULT_ON.has(ruleId);
-  };
-}
-
 /** Phân giải luật ĐÚNG 2 TẦNG như app cũ (`resolveRuleAction(rule,
  * enabled(rule), test.ruleActions[rule])`):
  *   1. Ghi đè RIÊNG của xét nghiệm (`tests.rule_actions_json`) — chỉnh ở
@@ -68,11 +58,6 @@ export function makeRuleActionLayered(globalRules: RuleActionsMap, overrides: Ru
     if (typeof shared === 'boolean') return defaultRuleAction(ruleId, shared);
     return defaultRuleAction(ruleId, WG_DEFAULT_ON.has(ruleId));
   };
-}
-
-export function effectiveRuleList(overrides: RuleActionsMap): { id: string; on: boolean }[] {
-  const isOn = makeIsOn(overrides);
-  return WG_RULES.map(id => ({ id, on: isOn(id) }));
 }
 
 /** Danh sách trạng thái luật CHUNG (không tính ghi đè theo xét nghiệm) — panel

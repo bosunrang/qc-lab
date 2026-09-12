@@ -125,7 +125,6 @@
 .lis-gateway-toggle{display:flex;align-items:center;gap:8px;min-height:38px;padding:8px 10px;border:1px solid var(--line);border-radius:var(--surface-radius);background:var(--surface-card-soft);color:#365563;font-size:var(--type-body-sm);font-weight:750}
 .lis-gateway-toggle input{flex:none}
 .lis-gateway-panel .alert{margin:0}
-.lis-queue-table td.num,.lis-queue-table th.num{text-align:center}
 
 /* Giữ góc bo của panel khi dải nền `.panel-title` bám sát mép (margin âm bù
    padding panel — xem app.css). Port từ `assets/professional-settings.css`.

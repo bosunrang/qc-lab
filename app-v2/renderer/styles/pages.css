@@ -18,7 +18,7 @@
 .action-log-wrap {margin:0 16px 16px; overflow-x:auto; border:1px solid #d7e3e9; border-radius:var(--radius-md); background:var(--panel);}
 .action-date, .action-test {font-weight:800; color:#153043;}
 .action-time {margin-top:4px; color:#607486; font-size:var(--type-meta); line-height:1.35; font-weight:600;}
-.action-sub, .action-rule, .action-note {margin-top:4px; color:#607486; font-size:var(--type-meta); line-height:1.35;}
+.action-sub, .action-rule {margin-top:4px; color:#607486; font-size:var(--type-meta); line-height:1.35;}
 .action-text {color:#243848; line-height:1.45;}
 .action-status-stack {display:flex; flex-direction:column; align-items:flex-start; gap:6px;}
 .action-row-actions {display:flex; flex-direction:column; align-items:stretch; gap:7px;}
