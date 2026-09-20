@@ -5,7 +5,7 @@ import type { Db } from '../db/sqlite-like';
 import { listOperationalLevels, isTestInActivePanel } from '../db/operational-levels';
 import { readGlobalRules, writeGlobalRules } from '../db/rule-settings';
 import { listPreviousLotSeriesData } from '../db/lot-lineage';
-import { westgard, westgardByPoint, combinedWestgardByPoint, cusumScan, acceptedPoints, type QcPointLike, type RuleVerdict, type CusumResult } from '../domain/westgard-engine';
+import { westgardByPoint, combinedWestgardByPoint, cusumScan, acceptedPoints, type QcPointLike, type RuleVerdict, type CusumResult } from '../domain/westgard-engine';
 import { parseRuleActions, serializeRuleActions, makeIsOnLayered, makeRuleActionLayered, isRuleAction, globalRuleList, parseRuleScopes, makeScopeOf, type RuleAction, type RuleActionsMap } from '../domain/rule-config';
 import { WG_RULE_REGISTRY, defaultRuleAction, errorTypeDetail } from '../domain/westgard-rules';
 import { compareQcPointOrder } from '../domain/sort-order';
@@ -406,21 +406,36 @@ export function createWestgardHandlers(db: Db) {
     const overrides = ruleActionsFor(testId);
     const isOn = makeIsOnLayered(globalRules(), overrides);
     const actionOf = makeRuleActionLayered(globalRules(), overrides);
-    const blocks: { level: number; lotId: string; lotNo: string; mean: number; sd: number; analysis: LevelAnalysis }[] = [];
-    for (const lot of lotsOfArchivedGroup(groupId)) {
+    const lots = lotsOfArchivedGroup(groupId);
+    const test = db.prepare('SELECT rule_scopes_json FROM tests WHERE id=?').get(testId) as { rule_scopes_json: string } | undefined;
+    // Phạm vi mặc định phụ thuộc SỐ MỨC của chính nhóm lô lịch sử, không phụ
+    // thuộc panel đang vận hành hôm nay (có thể đã thay đổi số mức QC).
+    const scope = makeScopeOf(parseRuleScopes(test?.rule_scopes_json), new Set(lots.map(lot => lot.level)).size);
+    const within = (rule: string) => isOn(rule) && ['within', 'both'].includes(scope(rule));
+    const across = (rule: string) => isOn(rule) && ['across', 'both'].includes(scope(rule));
+    const archived = lots.flatMap((lot) => {
       const target = lotMeanSd(testId, lot.level, lot.id);
-      if (!target) continue;
+      if (!target) return [];
       const rows = db.prepare('SELECT id, date, run_id, val FROM qc_points WHERE test_id=? AND level=? AND lot=? AND voided=0 ORDER BY date, run_id')
         .all(testId, lot.level, lot.lot_no) as { id: string; date: string; run_id: string; val: number }[];
-      const asWestgard: QcPointLike[] = rows.map(r => ({ val: r.val, runId: r.run_id, date: r.date }));
-      const wg = westgard(asWestgard, target.mean, target.sd, isOn, actionOf);
-      const points = rows.map((r, i) => {
-        const rules = wg.F[i].rules;
-        const detail = errorTypeDetail(rules);
-        return { id: r.id, date: r.date, runId: r.run_id, val: r.val, z: wg.zs[i], verdict: wg.F[i].level, rules, cusumSignal: null, supportRules: wg.F[i].supportRules, accepted: false, errorType: detail.type, errorDesc: detail.desc };
+      const points = rows.map(row => ({ ...row, runId: row.run_id, qcMean: target.mean, qcSd: target.sd }));
+      return [{ lot, target, points }];
+    });
+    // Không được gọi `westgard()` theo từng block ở đây: như vậy R4s/2-2s/
+    // 2of3-2s/3-1s của CÙNG nhóm lô bị mất khỏi lịch sử. Dùng đúng đường
+    // đánh giá ghép như dữ liệu đang vận hành rồi chỉ tách kết quả để vẽ UI.
+    const byPoint = combinedWestgardByPoint(
+      archived.map(item => ({ level: item.lot.level, pts: item.points, mean: item.target.mean, sd: item.target.sd })),
+      within, across, actionOf,
+    );
+    const blocks = archived.map((item) => {
+      const points = item.points.map((point) => {
+        const flag = byPoint.get(point)!;
+        const detail = errorTypeDetail(flag.rules);
+        return { id: point.id, date: point.date, runId: point.run_id, val: point.val, z: flag.z, verdict: flag.level, rules: flag.rules, cusumSignal: null, supportRules: flag.supportRules, accepted: false, errorType: detail.type, errorDesc: detail.desc };
       });
-      blocks.push({ level: lot.level, lotId: lot.id, lotNo: lot.lot_no, mean: target.mean, sd: target.sd, analysis: { points, cusum: { cPos: [], cNeg: [], flags: [], k: 0.5, h: 4, ma: [] }, cusumOn: false } });
-    }
+      return { level: item.lot.level, lotId: item.lot.id, lotNo: item.lot.lot_no, mean: item.target.mean, sd: item.target.sd, analysis: { points, cusum: { cPos: [], cNeg: [], flags: [], k: 0.5, h: 4, ma: [] }, cusumOn: false } };
+    });
     blocks.sort((a, b) => a.level - b.level);
     return blocks;
   }

@@ -93,7 +93,7 @@ export function TeaRefsTab() {
 
   return (
     <>
-      <div className="rcfg-toolbar tea-toolbar"><div><h2>Bảng TEa tham chiếu</h2><p>Tổng hợp TEa từ các nguồn tham chiếu, dùng thống nhất khi tính Sigma.</p></div><div className="rcfg-tools"><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm theo tên xét nghiệm, nhóm, đơn vị..." /><button className="btn teal" onClick={() => { setAddErr(null); setAdding(true); }}>＋ Thêm xét nghiệm</button></div></div>
+      <div className="rcfg-toolbar"><div><h2>Bảng TEa tham chiếu</h2><p>Tổng hợp TEa từ các nguồn tham chiếu, dùng thống nhất khi tính Sigma.</p></div><div className="rcfg-tools"><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm theo tên xét nghiệm, nhóm, đơn vị..." /><button className="btn teal" onClick={() => { setAddErr(null); setAdding(true); }}>＋ Thêm xét nghiệm</button></div></div>
       <div className="tea-source-registry">{TEA_SOURCE_CARDS.map((source) => <div className={`tea-source-card ${source.tone}`} key={source.label}><div><b>{source.label}</b><span className={`tag ${source.tone === 'dynamic' ? 'ok' : source.tone === 'retired' ? 'warn' : 'none'}`}>{source.tag}</span></div><p>{source.detail}</p><a href={source.url} target="_blank" rel="noreferrer">Mở nguồn chính thức</a></div>)}</div>
       <div className="panel rcfg-list tea-ref-panel">
       {visibleCatalog.length || visibleCustomRefs.length ? <table className="tea-ref-table">
@@ -154,7 +154,7 @@ export function TeaRefsTab() {
           const form = new FormData(event.currentTarget);
           const result = await addTeaAnalyte({
             name: String(form.get('name') || ''), abbreviation: String(form.get('abbreviation') || ''),
-            matrix: String(form.get('matrix') || ''), unit: String(form.get('unit') || ''),
+            unit: String(form.get('unit') || ''),
             section: String(form.get('section') || ''), clia: String(form.get('clia') || ''), ricos: String(form.get('ricos') || ''),
             cliaRule: String(form.get('cliaRule') || '') as 'percent' | 'absolute' | 'greater-of',
             cliaAbsolute: String(form.get('cliaAbsolute') || ''), cliaAbsoluteUnit: String(form.get('cliaAbsoluteUnit') || ''),
@@ -166,10 +166,6 @@ export function TeaRefsTab() {
           <div className="grid2">
             <div className="field"><label>Tên quốc tế <span className="req">*</span></label><input name="name" placeholder="VD: Creatine kinase-MB" autoFocus /></div>
             <div className="field"><label>Viết tắt</label><input name="abbreviation" placeholder="VD: CK-MB" /></div>
-          </div>
-          <div className="grid2">
-            <div className="field"><label>Loại mẫu (matrix)</label><input name="matrix" placeholder="VD: Serum/Plasma" /></div>
-            <div />
           </div>
           <div className="grid2">
             <div className="field"><label>Đơn vị</label><input name="unit" placeholder="U/L" /></div>
@@ -184,7 +180,7 @@ export function TeaRefsTab() {
             <div className="field"><label>Giới hạn CLIA tuyệt đối</label><input name="cliaAbsolute" type="number" step="any" placeholder="Ví dụ: 0.05" /></div>
           </div>
           <div className="field"><label>Đơn vị giới hạn tuyệt đối</label><input name="cliaAbsoluteUnit" placeholder="Mặc định dùng đơn vị xét nghiệm" /></div>
-          <div className="hint">Chỉ khai giới hạn tuyệt đối khi nguồn CLIA của analyte quy định đơn vị đo; hệ thống sẽ chỉ dùng khi đơn vị tương thích.</div>
+          <div className="hint flow-note">Chỉ khai giới hạn tuyệt đối khi nguồn CLIA của analyte quy định đơn vị đo; hệ thống sẽ chỉ dùng khi đơn vị tương thích.</div>
           <div className="hint flow-item">Mỗi xét nghiệm dùng một tên quốc tế duy nhất; viết tắt được hiển thị trong ngoặc. TEa chuẩn hóa được lập thành hồ sơ riêng sau khi thêm dòng.</div>
         </form>
       </Modal>}

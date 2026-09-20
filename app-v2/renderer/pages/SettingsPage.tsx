@@ -377,10 +377,10 @@ export function SettingsPage() {
         <div className="panel">
           <h2 className="panel-title">Logo &amp; tên phần mềm</h2>
           <div className="grid2">
-            <div>
-              <label htmlFor="brandTitle">Tên hiển thị</label><input id="brandTitle" aria-label="Tên hiển thị" value={brandTitle} onChange={(e) => setBrandTitle(e.target.value)} />
-              <label htmlFor="brandSub">Dòng phụ</label><input id="brandSub" aria-label="Dòng phụ" value={brandSub} onChange={(e) => setBrandSub(e.target.value)} />
-              <label htmlFor="logoText">Chữ trong logo khi chưa dùng ảnh</label><input id="logoText" aria-label="Chữ trong logo khi chưa dùng ảnh" maxLength={4} value={logoText} onChange={(e) => setLogoText(e.target.value)} />
+            <div className="settings-brand-fields">
+              <div><label htmlFor="brandTitle">Tên hiển thị</label><input id="brandTitle" aria-label="Tên hiển thị" value={brandTitle} onChange={(e) => setBrandTitle(e.target.value)} /></div>
+              <div><label htmlFor="brandSub">Dòng phụ</label><input id="brandSub" aria-label="Dòng phụ" value={brandSub} onChange={(e) => setBrandSub(e.target.value)} /></div>
+              <div><label htmlFor="logoText">Chữ trong logo khi chưa dùng ảnh</label><input id="logoText" aria-label="Chữ trong logo khi chưa dùng ảnh" maxLength={4} value={logoText} onChange={(e) => setLogoText(e.target.value)} /></div>
             </div>
             <div>
               <label>Logo hiện tại</label>

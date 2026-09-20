@@ -1,10 +1,8 @@
-// Six Sigma — viết lại theo đúng bố cục app cũ (professional-sigma.css +
-// SigmaPage.tsx cũ): panel "Thiết lập phân tích"/"Tình trạng" 2 cột, bảng kỳ
-// có header 2 hàng (rowSpan/colSpan theo từng mức: CV%/Bias%/Sigma lặp lại
-// mỗi mức), thẻ Sigma 5 bậc màu (sigmaZone), modal Bias% (RMS, cảnh báo lệch
-// dấu) và modal MU (bảng 3 thành phần). Bộ chọn xét nghiệm CHỈ lấy từ Cấu
+// Six Sigma — thiết lập nguồn TEa, trạng thái cấu hình, không gian làm việc
+// theo kỳ (CV/Bias có nguồn gốc theo từng mức QC), modal Bias% RMS có cảnh
+// báo lệch dấu và modal MU ba thành phần. Bộ chọn xét nghiệm CHỈ lấy từ Cấu
 // hình chung — không tạo xét nghiệm trong Sigma (nguyên tắc đã chốt).
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useManageStore } from '../store/manage-store';
 import { useSigmaStore, type SigmaLevelSaveInput } from '../store/sigma-store';
@@ -26,7 +24,7 @@ function rmsOf(values: number[]): number {
   return Math.sqrt(values.reduce((s, v) => s + v * v, 0) / values.length);
 }
 
-/** Dải năm của select kỳ — 11 năm từ (năm nay − 5), cùng dải app cũ dùng. */
+/** Dải năm cho bộ lọc và hộp thêm kỳ: năm nay ± 5. */
 const PERIOD_YEARS = Array.from({ length: 11 }, (_, i) => new Date().getFullYear() - 5 + i);
 
 /** 4 nguồn TEa của app cũ (`TEA_SOURCE_REGISTRY`). Giá trị cấu hình của xét
@@ -57,6 +55,10 @@ function escapeHtml(value: unknown): string {
   return String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character] || character));
 }
 function vnDate(date: string): string { return /^\d{4}-\d{2}-\d{2}$/.test(date) ? `${date.slice(8, 10)}/${date.slice(5, 7)}/${date.slice(0, 4)}` : '—'; }
+/** Chỉ rút gọn khi hiển thị trong control; giá trị lưu và tính Sigma vẫn giữ
+ * nguyên độ chính xác. Dùng chung cả lúc khôi phục sau khi lưu lỗi để ô không
+ * bất ngờ hiện lại một dãy thập phân dài. */
+function editablePercent(value: number | null | undefined): string { return value != null ? value.toFixed(2) : ''; }
 /** Tháng hiện hành theo múi giờ máy, tương đương `isoMonth()` ở app cũ.
  * Không dùng `toISOString()` trực tiếp vì rạng sáng ở Việt Nam có thể rơi về
  * tháng trước theo UTC. */
@@ -79,6 +81,12 @@ function missingSigmaInputs(level: SigmaLevelResult): string[] {
 function cohortStatusLabel(status: SigmaCohortView['status'] | string): string {
   return status === 'eligible' ? 'Đủ dữ liệu' : status === 'provisional' ? 'Tạm thời (20–29)' : status === 'insufficient' ? 'Chưa đủ (<20)'
     : status === 'out-of-control' ? 'Mất kiểm soát chưa xử lý' : 'Không ổn định';
+}
+
+/** Màu trạng thái dùng bộ badge chung, để bảng chọn cohort không tự tạo một
+ * ngôn ngữ cảnh báo riêng với phần còn lại của ứng dụng. */
+function cohortStatusTone(status: SigmaCohortView['status'] | string): 'ok' | 'warn' | 'rej' {
+  return status === 'eligible' ? 'ok' : status === 'provisional' || status === 'insufficient' ? 'warn' : 'rej';
 }
 
 /** N/R của thiết kế QC, kèm phương án tương đương mà Westgard nêu sẵn.
@@ -152,22 +160,22 @@ function sigmaZone(value: number | null | undefined): { c: string; label: string
 
 export function SigmaPage() {
   const { tests, teaRefs, levelsByTestId, loadTests, loadTeaRefs, loadLevels, instruments, loadInstruments} = useManageStore();
-  const { periods, loadPeriods, loadCohorts, savePeriod, renamePeriod, removePeriod, setTracking: setSigmaTrackingStore, saveTeaConfig: saveTeaConfigStore } = useSigmaStore();
+  const { periods, loadPeriods, loadCohorts, savePeriod, removePeriod, setTracking: setSigmaTrackingStore, saveTeaConfig: saveTeaConfigStore } = useSigmaStore();
   // Vai trò chỉ-xem: vẫn đọc được bảng kỳ/Sigma/MU, không sửa được (main
   // chặn bằng requireWrite ở sigma-handlers.savePeriod).
   const writable = canWrite(useAuthStore((s) => s.user)?.role);
   const [testId, setTestId] = useState('');
-  /** Kỳ đang được CHỌN ĐỂ XEM trong panel "Tình trạng"/MU — app cũ cho bấm
-   * vào bất kỳ hàng nào trong bảng kỳ để xem lại (`sgSelectPeriod`,
-   * `ui().sgSelectedPeriods[testId]`), không phải luôn cố định vào kỳ mới
-   * nhất. `null` = chưa chọn, rơi về kỳ mới nhất (`latestPeriod`). Reset khi
-   * đổi xét nghiệm vì danh sách kỳ đổi hẳn sang tập khác. */
+  /** Kỳ được chọn điều khiển workspace, OPSpecs và MU. `null` rơi về kỳ mới
+   * nhất; khi đổi xét nghiệm, danh sách kỳ và lựa chọn đều phải được đặt lại. */
   const [selectedPeriodId, setSelectedPeriodId] = useState<string | null>(null);
-  useEffect(() => { setSelectedPeriodId(null); }, [testId]);
+  const [historyMonthFilter, setHistoryMonthFilter] = useState('');
+  const [historyYearFilter, setHistoryYearFilter] = useState('');
+  useEffect(() => { setSelectedPeriodId(null); setHistoryMonthFilter(''); setHistoryYearFilter(''); }, [testId]);
   const [trackingPickerOpen, setTrackingPickerOpen] = useState(false);
   const [biasModal, setBiasModal] = useState<{ period: SigmaPeriodView; level: SigmaLevelResult } | null>(null);
   const [muModal, setMuModal] = useState<{ period: SigmaPeriodView; level: SigmaLevelResult } | null>(null);
   const [cohortModal, setCohortModal] = useState<{ period: SigmaPeriodView; cohorts: SigmaCohortView[] } | null>(null);
+  const [addPeriodOpen, setAddPeriodOpen] = useState(false);
   const [teaSource, setTeaSource] = useState('lab');
   const navigate = useNavigate();
 
@@ -248,7 +256,17 @@ export function SigmaPage() {
   const operationalLevels = (levelsByTestId[testId] || []).map((l) => l.level).sort((a, b) => a - b);
   const tableLevels = operationalLevels.length ? operationalLevels : Array.from(new Set(periods.flatMap((p) => p.levels.map((lv) => lv.level)))).sort((a, b) => a - b);
   const latestPeriod = periods[periods.length - 1];
-  const displayPeriod = periods.find((p) => p.id === selectedPeriodId) || latestPeriod;
+  const historyYears = Array.from(new Set(periods.map((period) => period.period.slice(0, 4)))).sort((left, right) => right.localeCompare(left));
+  const filteredPeriods = periods.filter((period) =>
+    (!historyMonthFilter || period.period.slice(5, 7) === historyMonthFilter)
+    && (!historyYearFilter || period.period.slice(0, 4) === historyYearFilter),
+  );
+  const selectedPeriod = periods.find((period) => period.id === selectedPeriodId);
+  const displayPeriod = selectedPeriod && filteredPeriods.some((period) => period.id === selectedPeriod.id)
+    ? selectedPeriod : filteredPeriods[filteredPeriods.length - 1] || selectedPeriod || latestPeriod;
+  useEffect(() => {
+    if (displayPeriod && selectedPeriodId !== displayPeriod.id) setSelectedPeriodId(displayPeriod.id);
+  }, [displayPeriod?.id, selectedPeriodId]);
   const hasChartData = periods.some((period) => period.levels.some((level) => Number.isFinite(level.sigma?.sigma)));
   // Thiết kế QC chung phải lấy mức IQC hợp lệ có Sigma thấp nhất: đó là mức
   // chi phối nguy cơ. Không lấy CV nhập tay hay cohort chưa đủ 30 điểm.
@@ -274,19 +292,6 @@ export function SigmaPage() {
     if (values.length === 1) return `${values[0].toFixed(2)}%`;
     if (values.length > 1) return 'theo mức QC';
     return '—';
-  }
-
-  /** Đổi tháng/năm qua một IPC transaction để KTV không thể lưu bản mới mà
-   * kẹt ở bước xóa bản cũ (xóa kỳ vẫn là quyền riêng của quản trị viên). */
-  async function changePeriodPart(period: SigmaPeriodView, part: 'month' | 'year', value: string) {
-    const year = part === 'year' ? String(Number(value)).padStart(4, '0') : period.period.slice(0, 4);
-    const month = part === 'month' ? String(Number(value)).padStart(2, '0') : period.period.slice(5, 7);
-    const next = `${year}-${month}`;
-    if (next === period.period) return;
-    if (periods.some((p) => p.period === next)) { await infoDialog(`Đã có kỳ Sigma ${next}. Hãy cập nhật kỳ hiện có.`, { type: 'warn' }); return; }
-    const saved = await renamePeriod(period.id, testId, next);
-    if (!saved.ok) { await infoDialog(saved.error.message, { type: 'warn' }); return; }
-    setSelectedPeriodId(saved.data.id);
   }
 
   async function removePeriodRow(period: SigmaPeriodView) {
@@ -336,14 +341,12 @@ export function SigmaPage() {
     return true;
   }
 
-  /** App cũ thêm kỳ không qua form: lấy tháng hiện tại và snapshot TEa hiện
-   * hành, giữ dữ liệu của kỳ cũ bất biến. V2 vẫn lưu qua Zustand → IPC →
-   * SQLite/audit, chỉ port đúng luồng thao tác ở renderer. */
-  async function addCurrentPeriod() {
-    const period = currentPeriod();
+  /** Kỳ mới chụp cấu hình đang hiệu lực tại thời điểm tạo. Người dùng có thể
+   * chọn trực tiếp một kỳ trước đó, thay vì phải thêm kỳ hiện tại rồi đổi tên
+   * bản ghi. Hành vi lưu/snapshot vẫn đi qua cùng IPC transaction như trước. */
+  async function addPeriod(period: string) {
     if (periods.some((item) => item.period === period)) {
-      await infoDialog(`Đã có kỳ Sigma ${period}. Hãy cập nhật kỳ hiện có.`, { type: 'warn' });
-      return;
+      return { ok: false as const, error: { code: 'duplicate-period', message: `Đã có kỳ Sigma ${period}. Hãy cập nhật kỳ hiện có.` } };
     }
     const result = await savePeriod(
       testId,
@@ -353,11 +356,9 @@ export function SigmaPage() {
       operationalLevels.map((level) => ({ level, tea: teaForLevel(level) ?? undefined, targetMean: targetMeanForLevel(level) ?? undefined })),
       true,
     );
-    if (!result.ok) {
-      await infoDialog(result.error.message, { type: 'warn' });
-      return;
-    }
+    if (!result.ok) return result;
     setSelectedPeriodId(result.data.id);
+    return result;
   }
 
   async function commitBias(period: SigmaPeriodView, level: number, value: string): Promise<boolean> {
@@ -450,8 +451,16 @@ export function SigmaPage() {
             <div><label>Ngày tra cứu</label><input type="date" disabled={!writable} defaultValue={test.eflm_lookup_date} onBlur={(e) => saveTeaConfig({ eflmLookupDate: e.currentTarget.value })} /></div>
             <div><label>Link/tài liệu EFLM</label><input disabled={!writable} defaultValue={test.eflm_ref} placeholder="biologicalvariation.eu / bản in PDF" onBlur={(e) => saveTeaConfig({ eflmRef: e.currentTarget.value })} /></div>
           </div>}
-          <div className="hint sg-sigma-input-note">
-            {teaHint} Mỗi mức dùng <b>CV từ IQC</b> và <b>Bias từ EQA/EQC</b>; nhiều vòng EQA được tổng hợp bằng <b>RMS</b> để tránh triệt tiêu dấu. Dữ liệu IQC không được dùng để tính Bias. Quy tắc thận trọng của phần mềm: &lt;20 điểm chỉ hiển thị ước tính, 20–29 điểm là tạm thời, ≥30 điểm mới dùng để gợi ý QC. DPMO/Yield chỉ là quy đổi tham khảo với dịch 1,5σ.
+          <div className="alert info sg-sigma-input-note">
+            <div className="sg-sigma-note-list">
+              <p>{teaHint}</p>
+              <ul>
+                <li>Mỗi mức dùng <b>CV từ IQC</b> và <b>Bias từ EQA/EQC</b>.</li>
+                <li>Nhiều vòng EQA được tổng hợp bằng <b>RMS</b> để tránh triệt tiêu dấu; dữ liệu IQC không được dùng để tính Bias.</li>
+                <li>Quy tắc thận trọng: &lt;20 điểm chỉ hiển thị ước tính, 20–29 điểm là tạm thời, ≥30 điểm mới dùng để gợi ý QC.</li>
+                <li>DPMO/Yield chỉ là quy đổi tham khảo với dịch 1,5σ.</li>
+              </ul>
+            </div>
           </div>
         </div>
         <div className="panel">
@@ -488,13 +497,7 @@ export function SigmaPage() {
         <div className="panel">
           <div className="sg-data-head">
             <h2 className="panel-title">Số liệu theo kỳ</h2>
-            <div className="sg-data-head-actions">
-              {writable && displayPeriod?.levels.map((lv) => (
-                <button key={lv.level} className="btn ghost sm" title={`Tính Bias% từ các vòng EQA/EQC cho mức ${lv.level}`}
-                  onClick={() => setBiasModal({ period: displayPeriod, level: lv })}><CalcIcon />Bias EQA% Mức {lv.level}</button>
-              ))}
-              {writable && operationalLevels.length > 0 && <button className="btn teal sm" onClick={addCurrentPeriod}>+ Thêm kỳ</button>}
-            </div>
+            {writable && operationalLevels.length > 0 && <div className="sg-data-head-actions"><button className="btn teal sm" onClick={() => setAddPeriodOpen(true)}>+ Thêm kỳ</button></div>}
           </div>
           {operationalLevels.length === 0 && (
             <div className="alert warn sg-historical-level-note">
@@ -502,103 +505,64 @@ export function SigmaPage() {
               {admin && <button className="btn teal sm" onClick={() => navigate('/manage', { state: { tab: 'mean-sd' } })}>Cấu hình Mean/SD</button>}
             </div>
           )}
-          {periods.length > 0 ? <div className="sg-simple-table-wrap">
-            <table className="sg-simple-table" style={{ minWidth: 368 + tableLevels.length * 295 }}>
-              <colgroup>
-                <col style={{ width: 140 }} />
-                {tableLevels.flatMap((level) => [
-                  <col key={`${level}-cv`} style={{ width: 100 }} />,
-                  <col key={`${level}-bias`} style={{ width: 100 }} />,
-                  <col key={`${level}-sigma`} style={{ width: 95 }} />,
-                ])}
-                <col style={{ width: 228 }} />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th rowSpan={2}>Kỳ / Năm</th>
-                  {tableLevels.map((lv) => <th key={lv} colSpan={3} className="sg-group-start">Mức {lv}</th>)}
-                  <th rowSpan={2} className="sg-action-col">Thao tác</th>
-                </tr>
-                <tr>
-                  {tableLevels.map((lv) => (
-                    <Fragment key={lv}>
-                      <th className="sg-group-start">CV IQC%</th>
-                      <th>Bias EQA%</th>
-                      <th>Sigma</th>
-                    </Fragment>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {periods.map((p) => (
-                  <tr key={p.id} className={`sg-period-row${p.id === displayPeriod?.id ? ' sg-period-selected' : ''}`}
-                    tabIndex={0} aria-selected={p.id === displayPeriod?.id ? 'true' : 'false'} aria-label={`Chọn kỳ ${vnPeriod(p.period)} để xem tình trạng`}
-                    onClick={(e) => { if ((e.target as HTMLElement).closest('button, input, select')) return; setSelectedPeriodId(p.id); }}
-                    onKeyDown={(e) => { if (e.target !== e.currentTarget) return; if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedPeriodId(p.id); } }}>
-                    <td className="sg-period-cell">
-                      <div className="sg-period-select-wrap">
-                        <div className="sg-period-controls">
-                          <select className="sg-period-month" aria-label="Tháng của kỳ" disabled={!writable}
-                            value={Number(p.period.slice(5, 7))} onChange={(e) => changePeriodPart(p, 'month', e.target.value)}>
-                            {Array.from({ length: 12 }, (_, i) => i + 1).map((x) => <option key={x} value={x}>{String(x).padStart(2, '0')}</option>)}
-                          </select>
-                          <select className="sg-period-year" aria-label="Năm của kỳ" disabled={!writable}
-                            value={Number(p.period.slice(0, 4))} onChange={(e) => changePeriodPart(p, 'year', e.target.value)}>
-                            {PERIOD_YEARS.map((x) => <option key={x} value={x}>{x}</option>)}
-                          </select>
-                        </div>
+          {periods.length > 0 && displayPeriod ? <div className="sg-period-workspace">
+            <div className="sg-period-history" role="navigation" aria-label="Lịch sử kỳ Sigma">
+              <div className="sg-period-history-filter">
+                <select value={historyMonthFilter} onChange={(event) => setHistoryMonthFilter(event.target.value)} aria-label="Lọc lịch sử theo kỳ" title="Lọc theo kỳ">
+                  <option value="">Tất cả</option>
+                  {Array.from({ length: 12 }, (_, index) => index + 1).map((value) => <option key={value} value={String(value).padStart(2, '0')}>{String(value).padStart(2, '0')}</option>)}
+                </select>
+                <select value={historyYearFilter} onChange={(event) => setHistoryYearFilter(event.target.value)} aria-label="Lọc lịch sử theo năm" title="Lọc theo năm">
+                  <option value="">Tất cả năm</option>
+                  {historyYears.map((year) => <option key={year} value={year}>{year}</option>)}
+                </select>
+              </div>
+              <div className="sg-period-history-list">
+                {filteredPeriods.map((p) => {
+                  const complete = p.levels.length > 0 && p.levels.every((lv) => lv.sigma != null);
+                  return <button type="button" key={p.id} className={`sg-period-history-item${p.id === displayPeriod.id ? ' is-selected' : ''}`}
+                    aria-pressed={p.id === displayPeriod.id} onClick={() => setSelectedPeriodId(p.id)}>
+                    <b>{vnPeriod(p.period)}</b>
+                    <span>{complete ? p.levels.map((lv) => `M${lv.level} σ ${lv.sigma?.sigma.toFixed(2)}`).join(' · ') : 'Chưa đủ dữ liệu Sigma'}</span>
+                  </button>;
+                })}
+                {!filteredPeriods.length && <p className="sg-period-history-empty">Không có kỳ phù hợp.</p>}
+              </div>
+            </div>
+            <section className="sg-period-workbench" key={displayPeriod.id} aria-label={`Chi tiết kỳ ${vnPeriod(displayPeriod.period)}`}>
+              <div className="sg-level-matrix-wrap">
+                <div className="sg-level-matrix" role="table" aria-label={`Dữ liệu Sigma kỳ ${vnPeriod(displayPeriod.period)}`}>
+                  <div className="sg-level-matrix-head" role="row"><span>Mức QC</span><span>CV IQC</span><span>Bias EQA/EQC</span><span>Sigma</span></div>
+                  {displayPeriod.levels.map((lv) => {
+                    const zone = sigmaZone(lv.sigma?.sigma);
+                    const cvSource = lv.cvSource === 'iqc-cohort' ? `Lô ${lv.sourceLot || '—'} · n=${lv.cohortN ?? 0}` : 'Nhập tay';
+                    const biasSource = lv.eqaRounds.length ? `${lv.eqaRounds.length} vòng EQA · RMS` : 'Nhập tay';
+                    return <div className="sg-level-row" role="row" key={lv.level}>
+                      <div className="sg-level-identity" role="cell"><b>Mức {lv.level}</b><span>TEa {lv.tea != null ? `${lv.tea.toFixed(2)}%` : 'chưa có'}</span></div>
+                      <div className="sg-level-cell" role="cell">
+                        <div className="sg-level-input-row"><input key={`cv-${displayPeriod.id}-${lv.level}-${lv.cv ?? ''}`} className="sg-number" type="number" step="0.01" defaultValue={editablePercent(lv.cv)} placeholder="CV%" disabled={!writable} aria-label={`CV IQC mức ${lv.level}`} onBlur={async (e) => {
+                          if (!(await commitCv(displayPeriod, lv.level, e.currentTarget.value))) e.currentTarget.value = editablePercent(lv.cv);
+                        }} />{writable && <button className="btn ghost" title={`Chọn CV IQC theo lô cho ${vnPeriod(displayPeriod.period)}`} onClick={() => openCohorts(displayPeriod)}><DownloadIcon />Nạp lô</button>}</div>
+                        <span className="sg-level-source" title={lv.cvSource === 'iqc-cohort' ? `CV lấy từ lô ${lv.sourceLot}, ${lv.cohortN ?? 0} điểm (${vnDate(lv.sourceStart)}–${vnDate(lv.sourceEnd)})` : undefined}>{cvSource}</span>
                       </div>
-                    </td>
-                    {tableLevels.map((levelNum) => {
-                      const lv = p.levels.find((x) => x.level === levelNum);
-                      const zone = sigmaZone(lv?.sigma?.sigma);
-                      return (
-                        <Fragment key={levelNum}>
-                          <td className="sg-group-start">
-                            {lv
-                              ? <div className="sg-cell-stack"><input className="sg-number" type="number" step="0.01" defaultValue={lv.cv ?? ''} placeholder="CV%" disabled={!writable} onBlur={async (e) => {
-                                if (!(await commitCv(p, levelNum, e.currentTarget.value))) e.currentTarget.value = lv.cv != null ? String(lv.cv) : '';
-                              }} />
-                                {lv.cvSource === 'iqc-cohort' && <div className="sg-cell-meta" title={`CV lấy từ lô ${lv.sourceLot}, ${lv.cohortN ?? 0} điểm (${vnDate(lv.sourceStart)}–${vnDate(lv.sourceEnd)})`}>Lô {lv.sourceLot || '—'} · n={lv.cohortN ?? 0}</div>}</div>
-                              : '—'}
-                          </td>
-                          <td>
-                            {lv ? (
-                              <div className="sg-cell-stack">
-                                <input className="sg-number" type="number" step="any" defaultValue={lv.biasEqa ?? ''} disabled={!writable} placeholder="Bias%" onBlur={async (e) => {
-                                  if (!(await commitBias(p, levelNum, e.currentTarget.value))) e.currentTarget.value = lv.biasEqa != null ? String(lv.biasEqa) : '';
-                                }} />
-                                {lv.mixedSigns && <span className="badge warn" title="Các vòng EQA lệch dấu nhau">±</span>}
-                                <div className="sg-cell-meta sg-cell-meta-empty" aria-hidden="true">&nbsp;</div>
-                              </div>
-                            ) : '—'}
-                          </td>
-                          <td className="sg-result-cell">
-                            {lv ? (
-                              <div className="sg-cell-stack">
-                                <span className={`tag${lv.sigma ? ` sg-zone ${lv.sigma.sigma >= 3 ? 'ok' : 'rej'}` : ''}`} style={lv.sigma ? { ['--sg-color' as never]: zone.c, color: zone.c, borderColor: zone.c } : undefined}>
-                                  {lv.sigma ? lv.sigma.sigma.toFixed(2) : '—'}
-                                </span>
-                                <div className="sg-cell-meta" style={{ color: zone.c }}>{lv.sigma ? zone.label : `Thiếu ${missingSigmaInputs(lv).join(', ')}`}</div>
-                              </div>
-                            ) : '—'}
-                          </td>
-                        </Fragment>
-                      );
-                    })}
-                    <td className="sg-row-action sg-action-col">
-                      <div className="sg-row-action-buttons">
-                        {writable && <button className="btn ghost sm sg-row-cv" title={`Chọn CV IQC theo lô cho ${vnPeriod(p.period)}`} onClick={() => openCohorts(p)}>Nạp CV lô</button>}
-                        <button className="btn ghost sm" title={`Xuất Excel riêng kỳ ${vnPeriod(p.period)}`} onClick={() => exportPeriod(p)}><DownloadIcon />Excel</button>
-                        <button className="btn ghost sm" title={`Tạo bản in PDF riêng kỳ ${vnPeriod(p.period)}`} onClick={() => printPeriod(p)}><PrintIcon />In PDF</button>
-                        {admin && <button className="btn danger sm" title={`Xóa kỳ ${vnPeriod(p.period)}`} onClick={() => removePeriodRow(p)}><TrashIcon />Xóa</button>}
+                      <div className="sg-level-cell" role="cell">
+                        <div className="sg-level-input-row"><input key={`bias-${displayPeriod.id}-${lv.level}-${lv.biasEqa ?? ''}`} className="sg-number" type="number" step="any" defaultValue={editablePercent(lv.biasEqa)} disabled={!writable} placeholder="Bias%" aria-label={`Bias EQA mức ${lv.level}`} onBlur={async (e) => {
+                          if (!(await commitBias(displayPeriod, lv.level, e.currentTarget.value))) e.currentTarget.value = editablePercent(lv.biasEqa);
+                        }} />{writable && <button className="btn ghost" title={`Nhập hoặc rà soát các vòng EQA/EQC cho mức ${lv.level}`} onClick={() => setBiasModal({ period: displayPeriod, level: lv })}><CalcIcon />Chi tiết</button>}</div>
+                        <span className="sg-level-source">{biasSource}</span>
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div> : <div className="empty sg-period-empty">Chưa có kỳ nào.</div>}
+                      <div className="sg-level-cell sg-level-sigma" role="cell"><b style={{ color: zone.c }}>{lv.sigma ? lv.sigma.sigma.toFixed(2) : '—'}</b><span style={{ color: zone.c }}>{lv.sigma ? zone.label : `Thiếu ${missingSigmaInputs(lv).join(', ')}`}</span></div>
+                    </div>;
+                  })}
+                </div>
+              </div>
+              <div className="sg-period-workbench-foot">
+                <button className="btn ghost sm" title={`Xuất Excel riêng kỳ ${vnPeriod(displayPeriod.period)}`} onClick={() => exportPeriod(displayPeriod)}><DownloadIcon />Excel</button>
+                <button className="btn ghost sm" title={`Tạo bản in PDF riêng kỳ ${vnPeriod(displayPeriod.period)}`} onClick={() => printPeriod(displayPeriod)}><PrintIcon />In PDF</button>
+                {admin && <RowActionButton kind="delete" label={`Xóa kỳ ${vnPeriod(displayPeriod.period)}`} onClick={() => removePeriodRow(displayPeriod)} />}
+              </div>
+            </section>
+          </div> : <div className="empty sg-period-empty">Chưa có kỳ nào. Hãy thêm kỳ đánh giá để bắt đầu.</div>}
           {periods.length > 0 && (
             <div className="sg-data-foot">
               <button className="btn teal" title="Xuất báo cáo Excel tổng hợp để so sánh Sigma giữa các kỳ" onClick={exportAllPeriods}><DownloadIcon />Xuất Excel</button>
@@ -704,6 +668,18 @@ export function SigmaPage() {
         />
       )}
 
+      {addPeriodOpen && (
+        <AddSigmaPeriodModal
+          periods={periods.map((period) => period.period)}
+          onClose={() => setAddPeriodOpen(false)}
+          onSubmit={async (period) => {
+            const result = await addPeriod(period);
+            if (result.ok) setAddPeriodOpen(false);
+            return result;
+          }}
+        />
+      )}
+
       {muModal && (
         <MuModal
           level={muModal.level}
@@ -779,6 +755,44 @@ function SigmaTrackingModal({ tests, onClose, onTrack }: { tests: Test[]; onClos
   </Modal>;
 }
 
+function AddSigmaPeriodModal({ periods, onClose, onSubmit }: {
+  periods: string[]; onClose: () => void;
+  onSubmit: (period: string) => Promise<{ ok: boolean; error?: { message: string } }>;
+}) {
+  const initial = currentPeriod();
+  const [month, setMonth] = useState(initial.slice(5, 7));
+  const [year, setYear] = useState(initial.slice(0, 4));
+  const [error, setError] = useState<string | null>(null);
+  const period = `${year}-${month}`;
+  const duplicate = periods.includes(period);
+
+  async function submit() {
+    if (duplicate) { setError(`Kỳ ${vnPeriod(period)} đã tồn tại. Hãy chọn một kỳ khác.`); return; }
+    const result = await onSubmit(period);
+    if (!result.ok) setError(result.error?.message || 'Không thể thêm kỳ Sigma.');
+  }
+
+  return <Modal title="Thêm kỳ Sigma" onClose={onClose} className="sg-add-period-modal"
+    footer={<><button className="btn ghost" onClick={onClose}>Hủy</button><button className="btn teal" onClick={submit}>Thêm kỳ</button></>}>
+    <div className="sg-add-period-form">
+      <p className="hint">Chọn trực tiếp kỳ cần nhập, kể cả kỳ trước đó. Kỳ đã tồn tại sẽ không bị ghi đè.</p>
+      <div className="sg-add-period-picker">
+        <label>Tháng
+          <select value={month} onChange={(event) => { setMonth(event.target.value); setError(null); }} aria-label="Tháng kỳ mới">
+            {Array.from({ length: 12 }, (_, index) => index + 1).map((value) => <option key={value} value={String(value).padStart(2, '0')}>{String(value).padStart(2, '0')}</option>)}
+          </select>
+        </label>
+        <label>Năm
+          <select value={year} onChange={(event) => { setYear(event.target.value); setError(null); }} aria-label="Năm kỳ mới">
+            {PERIOD_YEARS.map((value) => <option key={value} value={value}>{value}</option>)}
+          </select>
+        </label>
+      </div>
+      {error && <p className="field-error">{error}</p>}
+    </div>
+  </Modal>;
+}
+
 function BiasModal({ initialRounds, onClose, onSubmit }: {
   initialRounds: SigmaEqaRound[]; onClose: () => void;
   onSubmit: (rounds: Array<{ lab: number; target: number }>) => Promise<{ ok: boolean; error?: { message: string } }>;
@@ -812,7 +826,7 @@ function BiasModal({ initialRounds, onClose, onSubmit }: {
       {err && <p className="field-error">{err}</p>}
       <div className="sg-eqa-table-wrap">
         <table className="sg-eqa-table">
-          <thead><tr><th>#</th><th>KQ PXN</th><th>Target EQA</th><th>Bias%</th><th></th></tr></thead>
+          <thead><tr><th>#</th><th>KQ PXN</th><th>Target EQA</th><th>Bias%</th><th>Thao tác</th></tr></thead>
           <tbody>
             {rounds.map((v, i) => {
                 const lab = Number(v.lab), target = Number(v.target);
@@ -862,11 +876,11 @@ function CohortModal({ period, cohorts, onClose, onSubmit }: {
     footer={<><button className="btn ghost" onClick={onClose}>Hủy</button><button className="btn teal" onClick={submit}>Dùng dữ liệu đã chọn</button></>}>
     {err && <p className="field-error">{err}</p>}
     <div className="hint space-after-item">Dữ liệu IQC được gom xuyên tháng nhưng luôn tách theo lô và mức QC. Dữ liệu được tính đến hết kỳ đang chọn; đổi Mean/SD mục tiêu sẽ được đánh dấu không ổn định.</div>
-    <div className="sg-cohort-table-wrap"><table className="sg-cohort-table"><thead><tr><th>Mức</th><th>Lô QC</th><th>Khoảng dữ liệu</th><th>n</th><th>CV</th><th>Trạng thái</th></tr></thead><tbody>
+    <div className="sg-cohort-table-wrap"><table className="sg-cohort-table"><thead><tr><th>Mức</th><th>Lô QC</th><th>Khoảng dữ liệu</th><th className="num">n</th><th className="num">CV</th><th>Trạng thái</th></tr></thead><tbody>
       {period.levels.flatMap((level) => {
         const rows = byLevel.get(level.level) || [];
         if (!rows.length) return <tr key={level.level}><td>Mức {level.level}</td><td colSpan={5} className="hint">Chưa có điểm IQC hợp lệ theo lô trong kỳ này.</td></tr>;
-        return rows.map((cohort, index) => <tr key={`${level.level}:${cohort.lot}:${cohort.start}`}><td>{index === 0 ? `Mức ${level.level}` : ''}</td><td><label><input type="radio" name={`cohort-${level.level}`} checked={choices[level.level] === cohort.lot} onChange={() => setChoices((old) => ({ ...old, [level.level]: cohort.lot }))} /> Lô {cohort.lot || '—'}</label></td><td>{vnDate(cohort.start)}–{vnDate(cohort.end)}</td><td className="num">{cohort.n}</td><td className="num">{cohort.cv != null ? `${cohort.cv.toFixed(2)}%` : '—'}</td><td>{cohortStatusLabel(cohort.status)}{cohort.issues.length ? <div className="sg-cohort-issue">{cohort.issues.join(' · ')}</div> : null}</td></tr>);
+        return rows.map((cohort, index) => <tr key={`${level.level}:${cohort.lot}:${cohort.start}`}><td>{index === 0 ? `Mức ${level.level}` : ''}</td><td><label><input type="radio" name={`cohort-${level.level}`} checked={choices[level.level] === cohort.lot} onChange={() => setChoices((old) => ({ ...old, [level.level]: cohort.lot }))} /> Lô {cohort.lot || '—'}</label></td><td>{vnDate(cohort.start)}–{vnDate(cohort.end)}</td><td className="num">{cohort.n}</td><td className="num">{cohort.cv != null ? `${cohort.cv.toFixed(2)}%` : '—'}</td><td><span className={`badge ${cohortStatusTone(cohort.status)}`}>{cohortStatusLabel(cohort.status)}</span>{cohort.issues.length ? <div className="sg-cohort-issue">{cohort.issues.join(' · ')}</div> : null}</td></tr>);
       })}
     </tbody></table></div>
   </Modal>;
@@ -904,7 +918,10 @@ function MuModal({ level, onClose, onSubmit }: {
         <input type="checkbox" checked={includeBias} onChange={(e) => setIncludeBias(e.target.checked)} /> Đưa u(bias) vào ngân sách
       </label>
       <div className="field"><label>u(Cref) % — độ không đảm bảo của giá trị gán, từ báo cáo EQA/chứng chỉ CRM</label><input type="number" step="0.001" min="0" value={uCref} onChange={(e) => setUCref(e.target.value)} /></div>
-      <p className="hint">Chứng chỉ CRM ghi U(Cref) mở rộng thì lấy U(Cref)/2. Kết quả EQA/PT theo ISO 13528 thì lấy U/2 của giá trị gán vòng đó. Đây là con số do nhà cung cấp công bố — KHÔNG suy từ độ phân tán của chính các vòng bias (số đó chỉ cho biết ước lượng bias ổn định tới đâu{level.biasSem != null ? `, hiện là ${level.biasSem.toFixed(3)}%` : ''}). Bỏ trống thì u(Cref) VẮNG MẶT và ngân sách bị đánh dấu chưa đủ, không được coi là 0.</p>
+      <details className="alert info sg-mu-help">
+        <summary>Hướng dẫn xác định u(Cref)</summary>
+        <p>Chứng chỉ CRM ghi U(Cref) mở rộng thì lấy U(Cref)/2. Kết quả EQA/PT theo ISO 13528 thì lấy U/2 của giá trị gán vòng đó. Đây là con số do nhà cung cấp công bố — không suy từ độ phân tán của chính các vòng bias (số đó chỉ cho biết ước lượng bias ổn định tới đâu{level.biasSem != null ? `, hiện là ${level.biasSem.toFixed(3)}%` : ''}). Bỏ trống nghĩa là u(Cref) vắng mặt và ngân sách bị đánh dấu chưa đủ, không được coi là 0.</p>
+      </details>
       <div className="field"><label>u(cal) — từ CoA hiệu chuẩn (0 là kết luận hợp lệ, khác với bỏ trống)</label><input type="number" step="0.001" value={uCal} onChange={(e) => setUCal(e.target.value)} /></div>
       {level.mu && (
         <p className="sg-mu-preview">

@@ -48,6 +48,13 @@ const badTea = sigmaHandlers.savePeriod({ testId: test.id, period: '2026-08', te
 assert.equal(badTea.ok, false);
 assert.equal(badTea.error.code, 'invalid-tea');
 
+// Handler la ranh gioi tin cay: goi IPC truc tiep khong duoc chen mot nguon
+// TEa tuy y vao du lieu lich su, du giao dien chi hien bon nguon hop le.
+const badTeaSource = sigmaHandlers.savePeriod({ testId: test.id, period: '2026-08', tea: 15, teaSource: 'nguon-tu-tao', levels: [{ level: 1, cv: 2 }] }, actor);
+assert.equal(badTeaSource.ok, false);
+assert.equal(badTeaSource.error.code, 'invalid-tea-source');
+assert.equal(sigmaHandlers.listPeriods(test.id).length, 0, 'nguồn TEa không hợp lệ không được tạo hay sửa kỳ');
+
 // 2) Luu ky hop le: TEa=15, Muc 1 co CV=3, Bias=1.2, u(cal)=0.5
 const saved = sigmaHandlers.savePeriod({
   testId: test.id, period: '2026-08', tea: 15, teaSource: 'CLIA',
@@ -82,7 +89,7 @@ assert.equal(perLevelTea.data.levels[0].targetMean, 100);
 assert.equal(perLevelTea.data.levels[1].targetMean, 200);
 assert.ok(Math.abs(perLevelTea.data.levels[1].mu.absoluteU - perLevelTea.data.levels[0].mu.absoluteU * 2) < 1e-9, 'MU tuyệt đối phải dùng Mean đã chốt của đúng mức');
 
-// Nút "+ Thêm kỳ" chỉ tạo mới như app cũ, không được ghi đè kỳ hiện hữu.
+// Nút "+ Thêm kỳ" chỉ tạo mới, không được ghi đè kỳ hiện hữu.
 const duplicateCreate = sigmaHandlers.savePeriod({
   testId: test.id, period: '2026-08', tea: 15, teaSource: 'CLIA', createOnly: true,
   levels: [{ level: 1, cv: 99, biasEqa: 1.2, uCal: 0.5 }],

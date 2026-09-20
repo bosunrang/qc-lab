@@ -20,7 +20,8 @@ import { entryTreeKeyCommand, treeNavigationTarget, isTreeNavigationKey } from '
   // ĐÃ MỞ sẽ đóng sập nó lại — ngược hẳn ý người dùng.
   assert.equal(entryTreeKeyCommand('ArrowRight', 'true'), null, 'mũi tên phải trên nhóm đã mở không làm gì');
   assert.equal(entryTreeKeyCommand('ArrowLeft', 'false'), null, 'mũi tên trái trên nhóm đã đóng không làm gì');
-  // Nút LÁ (xét nghiệm) không có aria-expanded → trái/phải không đụng tới.
+  // Nút LÁ (xét nghiệm) không có aria-expanded → trái/phải không đụng tới;
+  // máy và nhóm lô đều có aria-expanded nên dùng cùng nhánh mở/đóng ở trên.
   assert.equal(entryTreeKeyCommand('ArrowRight', null), null, 'nút lá không mở-đóng được');
   assert.equal(entryTreeKeyCommand('ArrowLeft', null), null, 'nút lá không mở-đóng được');
 }

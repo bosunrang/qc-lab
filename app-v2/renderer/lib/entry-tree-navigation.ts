@@ -11,10 +11,9 @@ import type { KeyboardEvent } from 'react';
 //   • ArrowRight     → MỞ nhóm đang đóng;  ArrowLeft → ĐÓNG nhóm đang mở.
 //   • ArrowUp/Down   → đi giữa các nút đang thấy, QUAY VÒNG ở hai đầu.
 //   • Home / End     → về nút đầu / cuối.
-// Khác app cũ một điểm có chủ đích: nút MÁY (`.tn-machine`) của app-v2 luôn
-// mở và không có hành vi bấm, nên nó KHÔNG nhận focus (không dựng điểm dừng
-// bàn phím cho một nút không làm gì). Vì thế danh sách điều hướng lấy theo
-// `[tabindex="0"]`, không phải mọi `.tnode`.
+// Nút MÁY (`.tn-machine`) và nhóm lô đều mở/đóng được; vì vậy cả hai nhận
+// focus và dùng chung Enter/Space/mũi tên với nút xét nghiệm. Danh sách điều
+// hướng lấy theo `[tabindex="0"]`, không phải mọi `.tnode`.
 export type EntryTreeCommand = 'toggle' | 'navigate' | null;
 export type EntryTreeNavigationKey = 'ArrowDown' | 'ArrowUp' | 'Home' | 'End';
 

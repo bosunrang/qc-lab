@@ -56,6 +56,16 @@ CREATE TABLE IF NOT EXISTS qc_panels (
 CREATE TABLE IF NOT EXISTS qc_panel_tests (
   panel_id TEXT NOT NULL REFERENCES qc_panels(id) ON DELETE CASCADE,
   test_id TEXT NOT NULL REFERENCES tests(id) ON DELETE CASCADE,
+  -- Thứ tự xét nghiệm TRONG panel là dữ liệu nghiệp vụ, không phải chi tiết
+  -- trình bày: người dùng tick Na/K/Cl đúng thứ tự trả kết quả của bảng điện
+  -- giải. Trước 2026-09-13 không có cột này, và câu đọc không ORDER BY nên
+  -- SQLite trả theo index khoá chính, tức SẮP THEO test_id — một chuỗi
+  -- ngẫu nhiên 7 ký tự. Hai panel cùng 3 xét nghiệm hiện ra hai thứ tự khác
+  -- nhau, không thứ tự nào là của người dùng.
+  -- Để NULL được (không NOT NULL) là có chủ đích: restoreAllTables() bind
+  -- null cho field vắng mặt, nên backup xuất TRƯỚC khi có cột này vẫn phục
+  -- hồi được; mọi câu đọc tie-break bằng rowid cho đúng các dòng đó.
+  position INTEGER,
   PRIMARY KEY (panel_id, test_id)
 );
 
@@ -383,6 +393,18 @@ export function applySchema(db: { exec: (sql: string) => void; prepare?: (sql: s
     const levelCols = db.prepare("PRAGMA table_info('test_levels')").all() as { name: string }[];
     if (!levelCols.some((c) => c.name === 'mean_sd_effective_from')) {
       db.exec("ALTER TABLE test_levels ADD COLUMN mean_sd_effective_from TEXT NOT NULL DEFAULT '';");
+    }
+    const panelTestCols = db.prepare("PRAGMA table_info('qc_panel_tests')").all() as { name: string }[];
+    if (!panelTestCols.some((c) => c.name === 'position')) {
+      db.exec('ALTER TABLE qc_panel_tests ADD COLUMN position INTEGER;');
+      // Lấp lại từ `rowid`: handler LUÔN chèn theo đúng thứ tự người dùng
+      // tick (`for (const testId of validTestIds)`), nên thứ tự đó vẫn nằm
+      // nguyên trong DB — chỉ là chưa ai đọc theo nó. Nhờ vậy panel đã tạo
+      // trước bản này lấy lại đúng thứ tự cũ, người dùng không phải tick lại.
+      db.exec(`UPDATE qc_panel_tests SET position = (
+        SELECT COUNT(*) FROM qc_panel_tests older
+        WHERE older.panel_id = qc_panel_tests.panel_id AND older.rowid < qc_panel_tests.rowid
+      );`);
     }
   }
 }

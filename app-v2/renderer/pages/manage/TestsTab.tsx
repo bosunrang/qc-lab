@@ -306,7 +306,6 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
             footer={<><button className="btn ghost" onClick={() => setEditing(null)}>Hủy</button><button className="btn teal" type="submit" form="test-form">{editing === 'new' ? 'Thêm xét nghiệm' : assigningMachines ? 'Gán thêm máy' : 'Lưu thay đổi'}</button></>}>
             <form id="test-form" onSubmit={(e) => { e.preventDefault(); submit(e.currentTarget); }}>
               {err && <p className="field-error">{err}</p>}
-              <div className="assay-form-heading"><h4>Thông tin xét nghiệm</h4></div>
               <div className="assay-setup-layout">
                 <section className="assay-config-card assay-settings-column">
                   <div className="assay-card-head">
@@ -383,7 +382,6 @@ export function TestsTab({ openTestId, onNeedInstrument }: { openTestId?: string
                       })}
                       {!instruments.length && <p className="empty-state">Chưa có máy xét nghiệm. Hãy thêm máy trước khi tạo xét nghiệm.</p>}
                     </div>
-                    {assigningMachines && <small className="assay-machine-help">Máy đã gán được khóa để bảo toàn lịch sử QC. Chọn một hoặc nhiều máy mới.</small>}
                   </div>
                 </section>
               </div>

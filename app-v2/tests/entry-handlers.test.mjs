@@ -39,6 +39,13 @@ const p1 = entry.addPoint({ data: { testId: test.id, level: 1, date: '2026-08-01
 assert.equal(p1.ok, true);
 assert.equal(p1.data.verdict, 'ok');
 
+// Cổng ghi phải chặn trùng cùng mức/lô/ngày/run, kể cả khi caller không đi
+// qua worksheet (LIS và IPC trực tiếp). Điểm voided được phép dùng lại run.
+const duplicateRun = entry.addPoint({ data: { testId: test.id, level: 1, date: '2026-08-01', val: 10.2, runId: '2026-08-01-1' } }, actor);
+assert.equal(duplicateRun.ok, false);
+assert.equal(duplicateRun.error.code, 'duplicate-run');
+assert.equal(entry.queryPoints(test.id, 1).length, 1, 'từ chối trùng không được tạo thêm điểm QC');
+
 // 2) Them diem vuot 3SD -> phai bi 'rej' voi luat 1-3s
 const p2 = entry.addPoint({ data: { testId: test.id, level: 1, date: '2026-08-02', val: 14, runId: '2026-08-02-1' } }, actor);
 assert.equal(p2.ok, true);
@@ -78,11 +85,14 @@ const voidAgain = entry.voidPoint({ data: { pointId: p2.data.id, reason: 'Nhap s
 assert.equal(voidAgain.ok, false);
 assert.equal(voidAgain.error.code, 'already-voided');
 
-// 8) Audit: 2 lan them diem thanh cong + 1 lan huy thanh cong = 3 dong (khong
+const rerunAfterVoid = entry.addPoint({ data: { testId: test.id, level: 1, date: '2026-08-02', val: 10.2, runId: '2026-08-02-1' } }, actor);
+assert.equal(rerunAfterVoid.ok, true, 'điểm đã hủy không được chặn lần chạy thay thế cùng run ID');
+
+// 8) Audit: 3 lần thêm điểm thành công + 1 lần hủy thành công = 4 dòng (không
 // tinh cac thao tac config o buoc chuan bi)
 const activity = config.listActivity();
 const entryRelated = activity.filter(a => a.type === 'Nhập QC' || a.type === 'Hủy điểm QC');
-assert.equal(entryRelated.length, 3, 'chi thao tac thanh cong moi ghi audit');
+assert.equal(entryRelated.length, 4, 'chi thao tac thanh cong moi ghi audit');
 
 // 9) Huy voi kind='analytical' (mac dinh) -> TU MO 1 ho so NCE moi, gan dung
 // pointId/rule/errorType/qcVerdict cua diem vua huy (diem p2 vuot 3SD, luat

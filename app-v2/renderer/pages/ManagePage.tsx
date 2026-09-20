@@ -1,4 +1,4 @@
-// Khung trang "Cấu hình chung": sidebar 8 tab + toolbar, mỗi tab một file
+// Khung trang "Cấu hình chung": dải tab ngang + toolbar, mỗi tab một file
 // trong ./manage (tách 2026-09-03; trước đó 6 tab nằm chung file này, 1121
 // dòng). Phần dùng chung giữa các tab ở ./manage/shared.
 import { useEffect, useState } from 'react';
@@ -8,7 +8,7 @@ import { useStoreInvalidation } from '../lib/useStoreInvalidation';
 import { PageHeader } from '../components/PageHeader';
 import { useWestgardStore } from '../store/westgard-store';
 import { TEA_CATALOG } from '../../main/domain/tea-catalog';
-import { TABS, type TabId } from './manage/shared';
+import { ConfigTabIcon, TABS, type TabId } from './manage/shared';
 import { HistoryTab } from './manage/HistoryTab';
 import { TeaRefsTab } from './manage/TeaRefsTab';
 import { InstrumentsTab } from './manage/InstrumentsTab';
@@ -70,17 +70,15 @@ export function ManagePage() {
     <>
       <PageHeader title="Cấu hình chung" subtitle="Quản lý máy, Panel QC, lô QC, Mean/SD và luật QC" />
       <div className="config-shell">
-        <aside className="config-shell-nav" aria-label="Danh mục cấu hình">
-          <div className="rcfg-title">CẤU HÌNH CHUNG</div>
-          {TABS.map((t) => (
-            <button key={t.id} className={tab === t.id ? 'on' : ''} onClick={() => setTab(t.id)}>
-              {/* App cũ luôn render `<small>` và để TRỐNG khi số đếm = 0
-                  (`count: counts[id] || ''`) — app-v2 in số 0 nên sidebar có
-                  thêm một dòng chữ "0" mà bản cũ không có. */}
-              <b>{t.label}</b><small>{counts[t.id] || ''}</small>
-            </button>
-          ))}
-        </aside>
+        <nav className="config-shell-tabs" aria-label="Danh mục cấu hình">
+          <div className="config-shell-tabs-scroll">
+            {TABS.map((t) => (
+              <button key={t.id} type="button" className={tab === t.id ? 'on' : ''} aria-current={tab === t.id ? 'page' : undefined} onClick={() => setTab(t.id)}>
+                <ConfigTabIcon id={t.id} /><b>{t.label}</b>{counts[t.id] ? <small aria-label={`Có ${counts[t.id]} mục`}>{counts[t.id]}</small> : null}
+              </button>
+            ))}
+          </div>
+        </nav>
         <section className="config-shell-main">
           {tab === 'instruments' && <InstrumentsTab createRequest={instrumentCreateRequest} onCreateRequestHandled={() => setInstrumentCreateRequest(0)} />}
           {tab === 'tests' && <TestsTab openTestId={navState?.editTestId} onNeedInstrument={() => {
@@ -97,10 +95,3 @@ export function ManagePage() {
     </>
   );
 }
-
-// App cũ dùng `.grid2` (lưới 2 cột dùng chung, 1 cột ở ≤760px) cho mọi hàng
-// 2 ô trong modal — `.field-row` là tên app-v2 tự đặt, gate parity báo
-// thiếu class `grid2` trong modal máy xét nghiệm/Panel QC vì vậy.
-function FieldRow({ children }: { children: React.ReactNode }) { return <div className="grid2">{children}</div>; }
-
-// ---------------- Máy xét nghiệm ----------------

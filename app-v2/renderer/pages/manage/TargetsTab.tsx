@@ -192,11 +192,11 @@ export function TargetsTab() {
       <div className="panel target-matrix-panel">
       {!tests.length ? <EmptyState title="Chưa có xét nghiệm">Tạo xét nghiệm trước, sau đó quay lại nhập Mean/SD theo nhóm lô.</EmptyState> : <>
       <div className="target-selector target-config-selector">
-        <div><label>Panel QC</label><select value={panelId} onChange={(e) => { setPanelId(e.target.value); setLevel(1); }}>{panels.length ? panels.map((item) => <option key={item.id} value={item.id}>{panelLabel(item)}</option>) : <option value="">Chưa có panel</option>}</select></div>
-        <div><label>Nhóm lô QC</label><select value={groupId} onChange={(e) => setGroupId(e.target.value)}>{lotGroups.length ? lotGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>) : <option value="">Không tìm thấy nhóm lô QC phù hợp</option>}</select></div>
+        <div className="target-config-panel-field"><label>Panel QC</label><select value={panelId} onChange={(e) => { setPanelId(e.target.value); setLevel(1); }}>{panels.length ? panels.map((item) => <option key={item.id} value={item.id}>{panelLabel(item)}</option>) : <option value="">Chưa có panel</option>}</select></div>
+        <div className="target-config-group-field"><label>Nhóm lô QC</label><select value={groupId} onChange={(e) => setGroupId(e.target.value)}>{lotGroups.length ? lotGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>) : <option value="">Không tìm thấy nhóm lô QC phù hợp</option>}</select></div>
+        {panel && selectedGroup ? <div className="target-summary"><span className="ok"><b>{linked}</b> đã gán mức này</span><span className={other ? 'warn' : 'none'}><b>{other}</b> đang dùng lô khác</span><span className={empty ? 'warn' : 'none'}><b>{empty}</b> chưa gán lô</span><span className={missing ? 'warn' : 'ok'}><b>{missing}</b> thiếu Mean/SD</span></div> : null}
       </div>
       {panel && selectedGroup ? <>
-        <div className="target-summary"><span className="ok"><b>{linked}</b> đã gán mức này</span><span className={other ? 'warn' : 'none'}><b>{other}</b> đang dùng lô khác</span><span className={empty ? 'warn' : 'none'}><b>{empty}</b> chưa gán lô</span><span className={missing ? 'warn' : 'ok'}><b>{missing}</b> thiếu Mean/SD</span></div>
         <div className="target-level-toolbar"><div><b>Mức {level}</b><span className="target-level-lot">{levelLots.map((lot) => lot.lot_no).join(' / ') || '—'}</span></div><div className="dayseg">{groupLevels.map((item) => <button type="button" key={item} className={item === level ? 'on' : ''} onClick={() => setLevel(item)}>Mức {item}</button>)}</div></div>
           <div className="target-table">
             <div className="target-head"><span>Dùng</span><span>Xét nghiệm</span><span>Trung bình mục tiêu</span><span>Giới hạn dưới</span><span>Giới hạn trên</span><span>Độ lệch chuẩn</span><span>Trạng thái</span></div>

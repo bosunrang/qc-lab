@@ -1,16 +1,6 @@
-// Báo cáo — Giai đoạn D3.2 (docs/APP-V2-PLAN.md): viết lại theo golden
-// master `src/react/pages/ReportPage.tsx`. Khác bản B11/C1 trước đó ở 4 điểm
-// CẤU TRÚC, không chỉ CSS:
-//   1. Panel "Báo cáo nội kiểm theo ngày" là 1 lưới `.grid4` (tìm kiếm · ô
-//      chọn xét nghiệm kèm bộ đếm khớp/tổng · từ ngày · đến ngày), tiếp theo
-//      là tuỳ chọn "Kèm phụ lục NCE" rồi 3 nút teal (In · Excel · CSV).
-//   2. Panel "Khóa kỳ báo cáo" dùng `.report-lock-controls` (2 ô chọn
-//      Tháng/Năm + 1 nút), và danh sách kỳ đã khoá là `.period-lock-list`
-//      gồm các `.period-lock-row` — KHÔNG phải `<table>`.
-//   3. Mở khoá đi qua MODAL nhập lý do, không phải ô input nằm trong bảng.
-//   4. BỎ panel "Xem lại điểm QC" — app cũ không có; đó là thứ bản thí điểm
-//      app-v2 tự thêm. Xuất/in giờ tự truy vấn dữ liệu theo lựa chọn hiện
-//      tại, đúng cách app cũ làm (chọn → xuất, không cần bấm "Xem" trước).
+// Báo cáo & Biểu mẫu — bố cục Clinical Precision.
+// Bộ lọc, tuỳ chọn xuất và thao tác được gom thành các vùng rõ ràng; khóa kỳ
+// giữ dạng điều khiển theo tháng/năm và danh sách kỳ, không dùng bảng dữ liệu.
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useWestgardStore } from '../store/westgard-store';
@@ -217,32 +207,36 @@ export function ReportPage() {
       {summaries.length ? (
         <div className="panel">
           <h2 className="panel-title">Báo cáo nội kiểm theo ngày</h2>
-          <div className="grid4">
-            <div>
-              <label htmlFor="reportSearch">Tìm xét nghiệm</label>
-              <input id="reportSearch" type="search" placeholder="Tìm tên xét nghiệm" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <div className="report-panel-body">
+            <div className="grid4 report-filter-grid">
+              <div className="field">
+                <label htmlFor="reportSearch">Tìm xét nghiệm</label>
+                <input id="reportSearch" type="search" placeholder="Tìm tên xét nghiệm" value={query} onChange={(e) => setQuery(e.target.value)} />
+              </div>
+              <div className="field">
+                <label htmlFor="rTest">Xét nghiệm <span id="reportTestCount" className="hint">({matched.length}/{summaries.length})</span></label>
+                <select id="rTest" aria-label="Xét nghiệm" disabled={!matched.length} value={selectedId} onChange={(e) => setTestId(e.target.value)}>
+                  {matched.length
+                    ? matched.map((t) => <option value={t.testId} key={t.testId}>{testSelectLabel(t, summaries)}</option>)
+                    : <option value="">Không tìm thấy xét nghiệm phù hợp</option>}
+                </select>
+              </div>
+              <div className="field"><label htmlFor="rStartDate">Từ ngày</label><DateField id="rStartDate" value={start} onChange={setStart} /></div>
+              <div className="field"><label htmlFor="rEndDate">Đến ngày</label><DateField id="rEndDate" value={end} onChange={setEnd} /></div>
             </div>
-            <div>
-              <label htmlFor="rTest">Xét nghiệm <span id="reportTestCount" className="hint">({matched.length}/{summaries.length})</span></label>
-              <select id="rTest" aria-label="Xét nghiệm" disabled={!matched.length} value={selectedId} onChange={(e) => setTestId(e.target.value)}>
-                {matched.length
-                  ? matched.map((t) => <option value={t.testId} key={t.testId}>{testSelectLabel(t, summaries)}</option>)
-                  : <option value="">Không tìm thấy xét nghiệm phù hợp</option>}
-              </select>
+            <div className="report-export-bar">
+              <div className="report-export-options">
+                <label className="report-nce-option">
+                  <input id="reportNceAppendix" type="checkbox" checked={withNce} onChange={(e) => setWithNce(e.target.checked)} />
+                  <span><b>Kèm phụ lục NCE</b><small>Áp dụng cho PDF và Excel</small></span>
+                </label>
+              </div>
+              <div className="report-actions">
+                <button className="btn teal" disabled={disabled} onClick={printReport}><PrintIcon />Tạo báo cáo &amp; In</button>
+                <button className="btn ghost" disabled={disabled} onClick={exportXlsx}>Xuất Excel</button>
+                <button className="btn ghost" disabled={disabled} onClick={exportCsv}>Xuất CSV</button>
+              </div>
             </div>
-            <div><label htmlFor="rStartDate">Từ ngày</label><DateField id="rStartDate" value={start} onChange={setStart} /></div>
-            <div><label htmlFor="rEndDate">Đến ngày</label><DateField id="rEndDate" value={end} onChange={setEnd} /></div>
-          </div>
-          <div className="report-export-options">
-            <label className="report-nce-option">
-              <input id="reportNceAppendix" type="checkbox" checked={withNce} onChange={(e) => setWithNce(e.target.checked)} />
-              <span><b>Kèm phụ lục NCE</b><small>(Áp dụng cho PDF và Excel)</small></span>
-            </label>
-          </div>
-          <div className="report-actions">
-            <button className="btn teal" disabled={disabled} onClick={printReport}><PrintIcon />Tạo báo cáo &amp; In</button>
-            <button className="btn teal" disabled={disabled} onClick={exportXlsx}>Xuất Excel</button>
-            <button className="btn teal" disabled={disabled} onClick={exportCsv}>Xuất CSV</button>
           </div>
         </div>
       ) : (
@@ -257,37 +251,39 @@ export function ReportPage() {
 
       <div className="panel">
         <h2 className="panel-title">Khóa kỳ báo cáo</h2>
-        <div className="hint">Khóa 1 kỳ (theo tháng) sẽ chặn sửa/hủy điểm QC của kỳ đó ở <b>mọi xét nghiệm</b> — nên làm sau khi đã xuất xong báo cáo chính thức của kỳ.</div>
-        <div className="report-lock-controls">
-          <div>
-            <label>Tháng</label>
-            <select aria-label="Tháng" disabled={!admin} value={month} onChange={(e) => setLockYm(`${year}-${String(Number(e.target.value)).padStart(2, '0')}`)}>
-              {MONTHS.map((m) => <option value={m} key={m}>Tháng {m}</option>)}
-            </select>
-          </div>
-          <div>
-            <label>Năm</label>
-            <select aria-label="Năm" disabled={!admin} value={year} onChange={(e) => setLockYm(`${e.target.value}-${String(month).padStart(2, '0')}`)}>
-              {years.map((y) => <option value={y} key={y}>{y}</option>)}
-            </select>
-          </div>
-          <div style={{ alignSelf: 'end' }}>
-            {admin
-              ? (already ? <button className="btn ghost" disabled>Kỳ này đã khóa</button> : <button className="btn teal" onClick={submitLock}>Khóa kỳ này</button>)
-              : <span className="hint">Chỉ admin mới khóa/mở khóa được kỳ báo cáo.</span>}
-          </div>
-        </div>
-        <div className="flow-panel">
-          {locks.length ? (
-            <div className="period-lock-list">
-              {locks.map((l) => (
-                <div className="period-lock-row" key={l.ym}>
-                  <div><b>Kỳ {monthVN(l.ym)}</b><span className="hint"> · Khóa bởi {l.locked_by || '—'}{l.locked_at ? ` lúc ${dateTimeVN(l.locked_at)}` : ''}</span></div>
-                  {admin ? <button className="btn ghost sm" onClick={() => setUnlocking(l.ym)}>Mở khóa</button> : null}
-                </div>
-              ))}
+        <div className="report-panel-body">
+          <div className="report-lock-description">Khóa một kỳ theo tháng sẽ chặn sửa hoặc hủy điểm QC của kỳ đó ở <b>mọi xét nghiệm</b>. Chỉ nên khóa sau khi đã xuất xong báo cáo chính thức.</div>
+          <div className="report-lock-controls">
+            <div className="field">
+              <label>Tháng</label>
+              <select aria-label="Tháng" disabled={!admin} value={month} onChange={(e) => setLockYm(`${year}-${String(Number(e.target.value)).padStart(2, '0')}`)}>
+                {MONTHS.map((m) => <option value={m} key={m}>Tháng {m}</option>)}
+              </select>
             </div>
-          ) : <div className="hint">Chưa có kỳ nào được khóa.</div>}
+            <div className="field">
+              <label>Năm</label>
+              <select aria-label="Năm" disabled={!admin} value={year} onChange={(e) => setLockYm(`${e.target.value}-${String(month).padStart(2, '0')}`)}>
+                {years.map((y) => <option value={y} key={y}>{y}</option>)}
+              </select>
+            </div>
+            <div className="report-lock-action">
+              {admin
+                ? (already ? <button className="btn ghost" disabled>Kỳ này đã khóa</button> : <button className="btn teal" onClick={submitLock}>Khóa kỳ này</button>)
+                : <span className="hint">Chỉ admin mới khóa/mở khóa được kỳ báo cáo.</span>}
+            </div>
+          </div>
+          <div className="report-lock-list-wrap">
+            {locks.length ? (
+              <div className="period-lock-list">
+                {locks.map((l) => (
+                  <div className="period-lock-row" key={l.ym}>
+                    <div><b>Kỳ {monthVN(l.ym)}</b><span className="hint"> · Khóa bởi {l.locked_by || '—'}{l.locked_at ? ` lúc ${dateTimeVN(l.locked_at)}` : ''}</span></div>
+                    {admin ? <button className="btn ghost sm" onClick={() => setUnlocking(l.ym)}>Mở khóa</button> : null}
+                  </div>
+                ))}
+              </div>
+            ) : <div className="report-empty-note" role="status">Chưa khóa kỳ nào</div>}
+          </div>
         </div>
       </div>
 

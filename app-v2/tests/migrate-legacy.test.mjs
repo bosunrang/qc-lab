@@ -97,7 +97,19 @@ assert.equal(mapped.instruments[0].active, 1);
 assert.equal(mapped.lot_groups[0].id, 'grp1');
 assert.equal(mapped.qc_lots.length, 3); // lot1, lot2 va lot3 (lo cua moc Mean/SD du kien)
 assert.equal(mapped.qc_panels[0].instrument_id, 'ins1');
-assert.deepEqual(mapped.qc_panel_tests, [{ panel_id: 'pan1', test_id: 't1' }]);
+assert.deepEqual(mapped.qc_panel_tests, [{ panel_id: 'pan1', test_id: 't1', position: 0 }]);
+// Thứ tự xét nghiệm trong panel là DỮ LIỆU, không phải trình bày: người dùng
+// tick Na/K/Cl đúng thứ tự trả kết quả. Di trú phải chép nguyên thứ tự
+// `testIds` của app cũ sang cột `position`, không sắp lại theo tên hay id.
+assert.deepEqual(
+  mapLegacyStateToTables({ qcPanels: [{ id: 'pan9', name: 'Điện giải', instrumentId: 'ins1', testIds: ['na', 'k', 'cl'] }] }).qc_panel_tests,
+  [
+    { panel_id: 'pan9', test_id: 'na', position: 0 },
+    { panel_id: 'pan9', test_id: 'k', position: 1 },
+    { panel_id: 'pan9', test_id: 'cl', position: 2 },
+  ],
+  'di tru phai giu nguyen thu tu testIds cua app cu',
+);
 assert.equal(mapped.lot_transitions[0].from_lot_id, 'lot1');
 assert.ok(JSON.parse(mapped.lot_transitions[0].criteria_json).legacyCriteria.includes('Song song'));
 assert.equal(mapped.tests[0].section, 'Sinh hoa', 'section suy tu instrument vi test cu khong co truong nay');

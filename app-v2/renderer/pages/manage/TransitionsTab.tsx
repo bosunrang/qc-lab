@@ -69,15 +69,16 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
   const [draftFromLotId, setDraftFromLotId] = useState('');
   const [draftToLotId, setDraftToLotId] = useState('');
   const draftPanel = panels.find((panel) => panel.id === draftPanelId);
-  // Chỉ những xét nghiệm ĐANG DÙNG lô cũ mới cần Mean/SD ứng viên — khớp
-  // `inspectAcceptedLotTransition()` app cũ, không phải MỌI xét nghiệm của
-  // Panel (rows nào không dùng lô cũ thì "Chấp nhận" cũng không đụng tới).
-  // Dùng CÙNG cách lọc `tests` như bảng Mean/SD (TargetsTab), thay vì thứ
-  // tự bản ghi nối trong `qc_panel_tests`. Nhờ vậy Na/K/Cl và mọi panel khác
-  // giữ một thứ tự xuyên suốt giữa lúc cấu hình đích và lúc chuyển tiếp lô.
+  // Chỉ xét nghiệm thuộc Panel và ĐANG dùng lô cũ mới là đối tượng của một
+  // hồ sơ chuyển lô. Đây là điều kiện của app cũ: khi không có dòng nào thì
+  // không thể chuyển tiếp (hay thay lô) cho Panel đó.
   const draftTests = tests
-    .filter((test) => panels.find((panel) => panel.id === draftPanelId)?.testIds.includes(test.id))
+    .filter((test) => draftPanel?.testIds.includes(test.id))
     .filter((test) => (levelsByTestId[test.id] || []).some((level) => level.qc_lot_id === draftFromLotId)) || [];
+  const draftFromLot = lots.find((lot) => lot.id === draftFromLotId);
+  const draftToLot = lots.find((lot) => lot.id === draftToLotId);
+  const targetTableReady = Boolean(draftPanel && draftFromLot && draftToLot
+    && draftFromLotId !== draftToLotId && draftFromLot.level === draftToLot.level && draftTests.length);
   // Mean/SD ỨNG VIÊN đã lưu trong hồ sơ (criteria_json) — dùng để nạp lại
   // đúng giá trị khi mở "Sửa", vì lúc này test_levels VẪN LÀ số của lô CŨ
   // (chưa "Chấp nhận" thì chưa áp gì cả — xem config-handlers.ts).
@@ -194,22 +195,21 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
                   </select>
                 </div>
               </div>
-              <section aria-label="Mean SD cho lô mới">
+              <section className="lot-transition-targets" aria-label="Mean SD cho lô mới">
                 {/* Đúng cấu trúc app cũ: `.lot-trans-target-head-row` +
                     `.target-table.lot-trans-target-table` dùng lại `.target-head`/
                     `.target-row` của bảng Mean/SD (cùng CSS, cùng `syncTargetRange`). */}
                 <div className="lot-trans-target-head-row">
-                  <label>Mean/SD cho lô mới {lots.find((lot) => lot.id === draftToLotId)?.lot_no || ''}</label>
-                  {draftPanel && draftFromLotId && draftToLotId && draftTests.length ? <input type="search" className="lot-trans-target-search" placeholder="Tìm xét nghiệm..."
+                  <label>Mean/SD cho lô mới {draftToLot?.lot_no || ''}</label>
+                  {targetTableReady ? <input type="search" className="lot-trans-target-search" placeholder="Tìm xét nghiệm..."
                     value={targetQuery} onChange={(event) => setTargetQuery(event.target.value)} /> : null}
                 </div>
-                {draftPanel && draftFromLotId && draftToLotId && draftTests.length ? <div className="target-table lot-trans-target-table">
+                {targetTableReady ? <div className="target-table lot-trans-target-table">
                   <div className="target-head"><span></span><span>Xét nghiệm</span><span>Trung bình mục tiêu</span><span>Giới hạn dưới</span><span>Giới hạn trên</span><span>Độ lệch chuẩn</span><span>Trạng thái</span></div>
                   {draftTests
                     .filter((test) => !targetQuery.trim() || `${test.name} ${test.unit}`.toLowerCase().includes(targetQuery.trim().toLowerCase()))
                     .map((test) => {
-                      const toLot = lots.find((lot) => lot.id === draftToLotId);
-                      const levelNo = toLot ? toLot.level : 1;
+                      const levelNo = draftToLot?.level ?? 1;
                       // Ưu tiên Mean/SD ỨNG VIÊN đã lưu trong hồ sơ (khi sửa)
                       // — test_levels vẫn là số của lô CŨ cho tới khi "Chấp
                       // nhận", nên không dùng nó làm giá trị hiện tại ở đây.
@@ -239,7 +239,11 @@ export function TransitionsTab({ onGoPanels, onGoLots }: { onGoPanels?: () => vo
                         <span><b className={`tag ${saved ? 'ok' : 'none'}`}>{status}</b></span>
                       </div>;
                     })}
-                </div> : <div className="hint flow-section">Chọn Panel QC, Lô cũ và Lô mới (khác nhau, cùng mức) để nhập Mean/SD cho lô mới.</div>}
+                </div> : <div className="hint flow-section">{draftPanel && draftFromLot && draftToLot && draftFromLot.level !== draftToLot.level
+                  ? 'Lô cũ và lô mới phải cùng mức QC để nhập Mean/SD chuyển tiếp.'
+                  : draftPanel && draftFromLot && draftToLot && !draftTests.length
+                    ? `Panel QC đã chọn không có xét nghiệm nào đang dùng lô cũ ${draftFromLot.lot_no}.`
+                    : 'Chọn Panel QC, Lô cũ và Lô mới (khác nhau, cùng mức) để nhập Mean/SD cho lô mới.'}</div>}
               </section>
             </form>
           </Modal>

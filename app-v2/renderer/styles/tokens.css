@@ -1,8 +1,19 @@
-/* Design tokens — sao chép NGUYÊN VẸN từ assets/tokens.css của app cũ (giá
-   trị VÀ tên biến, không chỉ giá trị như quyết định Giai đoạn A1 trước đây)
-   — xem CLAUDE.md mục "Sao chép giao diện app cũ", quyết định "100%"
-   2026-09-01 đã ghi đè quyết định "dựng lại gọn" của A1. Giữ đúng cấu trúc
-   comment gốc để bất kỳ ai quen CSS app cũ cũng đọc được ngay. */
+/* Hệ thiết kế QC Lab v2 — Clinical Precision, dựng lại theo chuẩn 2026-09-19.
+   Đây là hệ giao diện độc lập của QC Lab: rõ ràng như phần mềm y khoa, nhưng
+   đủ tinh gọn và hiện đại cho một ứng dụng desktop dùng hằng ngày.
+   Tài liệu đầy đủ: docs/DESIGN-SYSTEM.md.
+
+   File này có 4 lớp, đọc từ trên xuống:
+     1. Primitive  — dải màu, thang chữ, lưới khoảng cách. KHÔNG dùng ở CSS trang.
+     2. Vai trò    — surface/border/text/accent/trạng thái. ĐÂY là thứ được dùng.
+     3. Component  — kích thước dùng chung của control/panel/bảng/modal.
+     4. Bí danh    — cầu tạm cho CSS chưa chuyển; đích đến là xoá sạch lớp này.
+
+   Ba quy tắc không thương lượng:
+     · Không viết hex trực tiếp ngoài Lớp 1.
+     · Không dùng độ đậm ngoài 400/500/600/700 (chỉ 4 weight font được nạp).
+     · Không dùng khoảng cách lẻ ngoài thang --space-*.
+   Cả ba đều được khoá bằng app-v2/tests/design-system.test.mjs. */
 
 @font-face{font-family:"Manrope";font-style:normal;font-weight:400;font-display:swap;src:url("./fonts/manrope-400-latin.woff2") format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}
 @font-face{font-family:"Manrope";font-style:normal;font-weight:400;font-display:swap;src:url("./fonts/manrope-400-vietnamese.woff2") format("woff2");unicode-range:U+0102-0103,U+0110-0111,U+0128-0129,U+0168-0169,U+01A0-01A1,U+01AF-01B0,U+0300-0301,U+0303-0304,U+0308-0309,U+0323,U+0329,U+1EA0-1EF9,U+20AB;}
@@ -12,165 +23,439 @@
 @font-face{font-family:"Manrope";font-style:normal;font-weight:600;font-display:swap;src:url("./fonts/manrope-600-vietnamese.woff2") format("woff2");unicode-range:U+0102-0103,U+0110-0111,U+0128-0129,U+0168-0169,U+01A0-01A1,U+01AF-01B0,U+0300-0301,U+0303-0304,U+0308-0309,U+0323,U+0329,U+1EA0-1EF9,U+20AB;}
 @font-face{font-family:"Manrope";font-style:normal;font-weight:700;font-display:swap;src:url("./fonts/manrope-700-latin.woff2") format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}
 @font-face{font-family:"Manrope";font-style:normal;font-weight:700;font-display:swap;src:url("./fonts/manrope-700-vietnamese.woff2") format("woff2");unicode-range:U+0102-0103,U+0110-0111,U+0128-0129,U+0168-0169,U+01A0-01A1,U+01AF-01B0,U+0300-0301,U+0303-0304,U+0308-0309,U+0323,U+0329,U+1EA0-1EF9,U+20AB;}
-@font-face{font-family:"Manrope";font-style:normal;font-weight:800;font-display:swap;src:url("./fonts/manrope-800-latin.woff2") format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}
-@font-face{font-family:"Manrope";font-style:normal;font-weight:800;font-display:swap;src:url("./fonts/manrope-800-vietnamese.woff2") format("woff2");unicode-range:U+0102-0103,U+0110-0111,U+0128-0129,U+0168-0169,U+01A0-01A1,U+01AF-01B0,U+0300-0301,U+0303-0304,U+0308-0309,U+0323,U+0329,U+1EA0-1EF9,U+20AB;}
 
 :root{
-  /* Quy tắc spacing toàn app:
-     8 = control/nhãn, 12 = nội dung trong khối, 16 = panel cùng cấp,
-     22 = nhóm lớn và phần sau PageHeader. */
-  --gap-control:8px;
-  --gap-content:12px;
-  --gap-panel:16px;
-  --gap-group:22px;
-  /* Khoảng hở ngay sau PageHeader sticky — khớp nhịp nhóm lớn. */
-  --page-header-gap:22px;
-  /* Thanh điều hướng theo app Cost: tối đa 258px khi mở, vẫn co
-     theo viewport và chỉ còn icon khi thu gọn. */
+  /* ═══════════════════════════════════════════════════════════════════
+     LỚP 1 — PRIMITIVE. Giá trị thô, KHÔNG dùng trực tiếp trong CSS trang.
+
+     Bảng Clinical Precision: clinical navy + mineral teal + cool neutral.
+     Mọi mã nằm tập trung tại đây; CSS trang chỉ được dùng token vai trò.
+     ═══════════════════════════════════════════════════════════════════ */
+  --white:#ffffff;
+  --gray-0:#ffffff;
+  --gray-25:#fbfcfd;
+  --gray-50:#f5f8fa;
+  --gray-100:#edf2f4;
+  --gray-200:#dce5e9;
+  --gray-300:#c5d1d7;
+  --gray-600:#536a76;
+  --gray-900:#172b35;
+
+  --teal-100:#e2f1f0;
+  /* Bốn bậc lấp vào khoảng trống giữa teal-100 và teal-500. Giá trị là mã
+     có sẵn trong app, chọn làm đại diện cho từng cụm biến thể — trước đây
+     mỗi chỗ tự viết một mã hơi khác nhau. */
+  --teal-50:#eff8f7;
+  --teal-200:#c3dedd;
+  --teal-300:#97c8c6;
+  --teal-400:#68aeab;
+  --teal-450:#3f9694;
+  --teal-500:#0b7c83;
+  --teal-600:#086871;
+  --teal-700:#07545c;
+
+  --blue-100:#e9f2f8;
+  --blue-300:#aacadd;
+  --blue-500:#3b759b;
+  --blue-600:#285d82;
+
+  --amber-100:#fbf0dd;
+  --amber-300:#e5c07a;
+  --amber-500:#b96b0b;
+  --amber-600:#7a4508;
+
+  --red-100:#f8e8e7;
+  --red-300:#e0aaa6;
+  --red-200:#eecbc8;
+  --red-500:#b23a3a;
+  --red-600:#9f3030;
+
+  /* Màu chữ vai trò: tối ưu độ rõ trên bốn bề mặt sáng của ứng dụng. */
+  --ink-strong:#173740;
+  --ink-body:#344b55;
+  --ink-subtle:#536a76;
+  --ink-faint:#70818a;
+  --ink-button:#263f49;
+  --ink-button-muted:#405762;
+  --ink-accent:#0b5f66;
+  --ink-success:#08695f;
+  --ink-info:#2b5e7f;
+  --ink-warning:#7a4508;
+  --ink-disabled:#6f818a;
+  --ink-placeholder:#70818a;
+  --ink-readonly:#4a626e;
+  --ink-archived:#8a5550;
+  --ink-filter:#36535f;
+  --ink-filter-active:#075f66;
+  --ink-filter-count:#4f6874;
+
+  /* Màu chuyên dụng cho biểu tượng phân tích, tách khỏi màu giao diện. */
+  --indigo-300:#cad1e5;  /* viền ô biểu tượng MDC ở Sigma */
+  --indigo-600:#5c6eaa;  /* nét biểu tượng MDC ở Sigma */
+  --ink-icon:#4e7884;    /* nét biểu tượng trong ô trống biểu đồ Sigma */
+
+  /* Bề mặt tối của sidebar là hệ màu độc lập với vùng nội dung. */
+  --dark-text:#d3dee4;
+  --dark-text-muted:#9fb2bc;
+  --dark-text-soft:#aac0c9;
+  --dark-text-group:#92a8b3;
+  --dark-text-link:#c9d7de;
+  --dark-icon:#8ea5b0;
+  --dark-accent:#6ccfc2;
+  --dark-accent-bar:#2fb3a6;   /* thanh dọc của mục đang mở — KHÁC màu icon */
+  --dark-surface-active:#203b43;
+  --dark-tooltip:#183641;
+  --dark-line:#294b58;
+  --dark-on-light:#dde8ec;
+
+  /* Nền/đường kẻ riêng của khung sườn, không thuộc dải xám. */
+  --canvas:#f3f6f8;
+  --thead-bg:#edf2f4;
+  --thead-line:#d9e4e8;
+  --scrollbar-thumb-base:#a4b3bb;
+  --auth-overlay-from:#142f3b;
+  --auth-overlay-to:#183a46;
+  --shadow-ink-faint:rgba(23,43,53,.055);
+  --shadow-ink-soft:rgba(23,43,53,.09);
+  --shadow-ink-medium:rgba(23,43,53,.16);
+
+  /* Cỡ chữ: 8 bậc, SỐ NGUYÊN, gốc 14px cho app dữ liệu dày. */
+  --text-2xs:11px;   /* overline, mã, badge rất nhỏ */
+  --text-xs:12px;    /* caption, nhãn form, header cột bảng */
+  --text-sm:13px;    /* chữ phụ, thân bảng */
+  --text-base:14px;  /* thân chữ, control, nút */
+  --text-md:16px;    /* tiêu đề panel */
+  --text-lg:20px;    /* tiêu đề modal/dialog */
+  --text-xl:24px;    /* tiêu đề trang */
+  --text-2xl:30px;   /* số KPI */
+
+  /* Độ đậm: đúng 4 nấc, tất cả đều có file .woff2 trong ./fonts. */
+  --weight-normal:400;
+  --weight-medium:500;
+  --weight-semibold:600;
+  --weight-bold:700;
+
+  /* Dãn dòng: 5 bậc theo vai trò. */
+  --leading-none:1;
+  --leading-display:1.15;
+  --leading-heading:1.3;
+  --leading-snug:1.4;
+  --leading-body:1.55;
+
+  /* Khoảng cách: lưới 4px, cộng nửa bậc 2/6/10/14 cho mật độ dày. */
+  --space-0:0;
+  --space-0-5:2px;  --space-1:4px;    --space-1-5:6px;  --space-2:8px;
+  --space-2-5:10px; --space-3:12px;   --space-3-5:14px; --space-4:16px;
+  --space-5:20px;   --space-6:24px;   --space-8:32px;
+
+  /* Bo góc: một bậc thống nhất 8px; pill giữ nguyên vì là hình dạng, không
+     phải một biến thể của góc bo. */
+  --radius-xs:8px; --radius-sm:8px; --radius-md:8px; --radius-lg:8px; --radius-full:999px;
+
+  --font-sans:"Manrope",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --font-mono:"Manrope",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+
+  /* ═══════════════════════════════════════════════════════════════════
+     LỚP 2 — VAI TRÒ NGỮ NGHĨA. Đây là thứ CSS trang được phép dùng.
+     Mỗi token nói NÓ DÙNG ĐỂ LÀM GÌ, không nói nó màu gì.
+     ═══════════════════════════════════════════════════════════════════ */
+  --surface-page:var(--canvas);
+  --surface:var(--white);
+  --surface-subtle:var(--gray-25);
+  --surface-section-header:var(--gray-50);
+  --surface-sunken:var(--gray-100);
+  --surface-inverse:var(--gray-900);
+  --surface-inverse-soft:var(--dark-tooltip);
+  --surface-overlay:rgba(20,36,46,.55);
+
+  --border-subtle:var(--gray-200);
+  --border:var(--gray-300);
+  --border-strong:var(--gray-600);
+  /* Bề mặt có ranh giới dùng viền 1px rõ; đường chia nội bộ nhẹ hơn. */
+  --surface-border:var(--border);
+  --surface-divider:var(--border-subtle);
+  --shadow-panel:0 1px 2px var(--shadow-ink-faint),0 10px 28px var(--shadow-ink-faint);
+  --shadow-panel-hover:0 2px 5px var(--shadow-ink-soft),0 14px 34px var(--shadow-ink-faint);
+  --shadow-floating:0 18px 54px var(--shadow-ink-medium);
+  --shadow-dialog:0 28px 80px rgba(12,27,36,.32),0 2px 8px rgba(12,27,36,.08);
+  --shadow-popover:0 18px 42px rgba(18,32,43,.22);
+  --shadow-menu:0 14px 32px rgba(18,32,43,.2);
+  --shadow-tooltip:0 12px 28px rgba(20,33,43,.22);
+  --shadow-tooltip-compact:0 8px 22px rgba(17,43,51,.22);
+  --shadow-card-subtle:0 1px 2px rgba(20,33,43,.05);
+  --shadow-icon:0 2px 8px rgba(20,36,46,.06);
+  --shadow-icon-tight:0 2px 7px rgba(20,36,46,.06);
+  --shadow-control-hover:0 2px 8px rgba(21,104,105,.08);
+  --shadow-control-subtle:0 1px 2px rgb(27 57 70 / .035);
+  --control-inset-highlight:inset 0 1px 0 rgba(255,255,255,.92);
+  --surface-elevated-translucent:rgba(255,255,255,.68);
+
+  --text-primary:var(--gray-900);
+  --text-secondary:var(--ink-body);
+  --text-tertiary:var(--gray-600);
+  --text-disabled:var(--ink-disabled);
+  --text-inverse:var(--white);
+  --text-link:var(--ink-accent);
+
+  --accent:var(--teal-500);
+  --accent-hover:var(--teal-600);
+  --accent-active:var(--teal-700);
+  --accent-text:var(--teal-700);
+  --accent-surface:var(--teal-100);
+  --accent-surface-strong:var(--teal-100);
+  --accent-border:var(--teal-300);
+  --accent-border-soft:var(--teal-200);
+  --accent-border-strong:var(--teal-400);
+  --accent-border-hover:var(--teal-450);
+  --accent-surface-tint:var(--teal-50);
+  --accent-surface-selected:rgba(12,111,120,.10);
+  --accent-control-surface:rgba(11,116,125,.12);
+  --accent-control-surface-hover:rgba(11,116,125,.22);
+  --accent-control-border:rgba(11,116,125,.35);
+  --on-accent:var(--white);
+  --on-accent-border:rgba(255,255,255,.18);
+  --on-accent-inset-border:inset 0 0 0 1px rgba(255,255,255,.10);
+
+  /* Trạng thái — 5 họ, cùng một khuôn 4 vai trò.
+     "Đạt" dùng chính họ teal thương hiệu (quyết định sản phẩm). */
+  --success-text:var(--teal-600);    --success-surface:var(--teal-100);
+  --success-border:var(--teal-300);  --success-accent:var(--teal-500);
+  --info-text:var(--blue-600);       --info-surface:var(--blue-100);
+  --info-border:var(--blue-300);     --info-accent:var(--blue-500);
+  --warning-text:var(--amber-600);   --warning-surface:var(--amber-100);
+  --warning-border:var(--amber-300); --warning-accent:var(--amber-500);
+  --danger-text:var(--red-600);      --danger-surface:var(--red-100);
+  --danger-border:var(--red-300);    --danger-accent:var(--red-500);
+  --danger-border-soft:var(--red-200);
+  --icon-ink-muted:var(--ink-icon);
+  --icon-ink-alt:var(--indigo-600);
+  --icon-border-alt:var(--indigo-300);
+  --neutral-text:var(--gray-600);    --neutral-surface:var(--gray-100);
+  --neutral-border:var(--gray-200);  --neutral-accent:var(--gray-600);
+
+  --sidebar-bg:var(--gray-900);
+  --sidebar-border:var(--dark-line);
+  --sidebar-text:var(--dark-text);
+  --sidebar-text-muted:var(--dark-text-muted);
+  --sidebar-icon:var(--dark-icon);
+  --sidebar-active-bg:var(--dark-surface-active);
+  --sidebar-active-bar:var(--dark-accent-bar);
+  --sidebar-active-ink:var(--white);
+  --sidebar-active-accent:var(--dark-accent);
+  --sidebar-toggle-surface:rgba(47,179,166,.14);
+  --sidebar-toggle-surface-hover:rgba(47,179,166,.24);
+  --sidebar-toggle-border:rgba(47,179,166,.35);
+  --sidebar-status-surface:rgba(255,255,255,.035);
+  --sidebar-status-border:rgba(126,149,165,.18);
+  --sidebar-group-divider:linear-gradient(90deg,rgba(126,149,165,.26),rgba(126,149,165,0));
   --sidebar-expanded-width:clamp(208px,17vw,258px);
   --sidebar-collapsed-width:78px;
-  --gray-0:#ffffff;
-  --gray-25:#f9fbfc;
-  --gray-50:#f2f5f7;
-  --gray-100:#eef2f4;
-  --gray-200:#dde4e8;
-  --gray-300:#c7d2d8;
-  --gray-600:#506674;
-  --gray-900:#14242e;
 
-  --teal-500:#0b747d;
-  --teal-600:#0f5f68;
-  --teal-700:#064f57;
-  --teal-300:#9fcfcd;
-  --teal-100:#e8f2f5;
-  --blue-600:#2f5878;
-  --blue-500:#4f789d;
-  --blue-300:#b7cfdf;
-  --blue-100:#eaf2f8;
-  --amber-600:#944f00;
-  --amber-500:#dd8b1f;
-  --amber-300:#e4c273;
-  --amber-100:#fbf0db;
-  --red-600:#a43a33;
-  --red-500:#b93a32;
-  --red-300:#e2a8a2;
-  --red-100:#f7e4e2;
+  /* Focus — MỘT vòng cho cả app. */
+  /* teal-500 chứ không phải teal nhạt: vòng focus phải đạt 3:1 với nền
+     (WCAG 1.4.11).
+     Bàn phím chỉ dùng vòng này; click chuột chỉ đổi một viền accent, để
+     không có hai đường teal song song quanh cùng một control. */
+  --focus-ring:var(--teal-500);
+  --focus-ring-width:2px;
+  /* Âm đúng bằng độ dày vòng: vòng teal nằm đè lên viền control thay vì
+     bao thêm một lớp bên ngoài. Không đổi kích thước và không tạo hai viền. */
+  --focus-ring-offset:-2px;
 
-  --focus-ring:var(--teal-300);
-  --scrollbar-thumb-base:#a6b3bb;
-  --auth-overlay-from:#17303f;
-  --auth-overlay-to:#1a3444;
+  /* ═══════════════════════════════════════════════════════════════════
+     LỚP 3 — TOKEN COMPONENT.
+     ═══════════════════════════════════════════════════════════════════ */
+  /* Control có năm mật độ có chủ đích: nút cực gọn 28, hàng dữ liệu 30,
+     toolbar 32, ô bảng 34 và form chuẩn 40. Không đặt số mới tại trang. */
+  --control-h-row:30px;
+  --control-h-compact:32px;
+  --control-h-table:34px;
+  --control-h:40px;
+  --control-h-sm:28px;
+  --control-padding-x:var(--space-3);
+  --control-radius:var(--radius-sm);
+  --button-padding-x:var(--space-3-5);
+  --button-font-size:var(--text-base);
+  --button-font-weight:var(--weight-semibold);
 
-  --bg:var(--gray-50);
-  --panel:var(--gray-0);
-  --on-accent:var(--gray-0);
-  --panel2:var(--gray-100);
-  --ink:var(--gray-900);
-  --sidebar-bg:var(--gray-900);
-  --muted:var(--gray-600);
-  --line:var(--gray-200);
-  --line2:var(--gray-200);
-  /* Giữ đúng tầng nền của header panel/bảng bản cũ. Modal có nền riêng;
-     không dùng nền modal để làm nhạt toàn bộ các panel Sigma. */
-  --section-head-bg:var(--gray-100);
-  --section-head-border:var(--gray-200);
-  --section-head-ink:var(--gray-900);
-  --section-head-size:var(--type-subhead);
-  --panel-header-min-height:44px;
-  --subpanel-header-min-height:42px;
-  --panel-content-gap:var(--space-section);
-  --card-head-bg:var(--gray-100);
-  --card-head-border:var(--gray-200);
-  --card-head-ink:var(--gray-900);
-  --card-head-active:var(--gray-100);
-  --teal:var(--teal-500);
-  --teal-deep:var(--teal-700);
-  --tealink:var(--teal-700);
-  --amber:var(--amber-600);
-  --red:var(--red-600);
-  --neutral-ink:var(--gray-600);
-  --neutral-bg:var(--gray-100);
-  --neutral-border:var(--gray-200);
-  --success-ink:var(--teal-600);
-  --success-bg:var(--teal-100);
-  --success-border:var(--teal-300);
-  --success-accent:var(--teal-500);
-  --info-ink:var(--blue-600);
-  --info-bg:var(--blue-100);
-  --info-border:var(--blue-300);
-  --info-accent:var(--blue-500);
-  --warning-ink:var(--amber-600);
-  --warning-bg:var(--amber-100);
-  --warning-border:var(--amber-300);
-  --warning-accent:var(--amber-500);
-  --danger-ink:var(--red-600);
-  --danger-bg:var(--red-100);
-  --danger-border:var(--red-300);
-  --danger-accent:var(--red-500);
-  --line-strong:var(--gray-300);
-  --surface-subtle:var(--gray-25);
-  --surface-neutral:var(--neutral-bg);
-  --focus-border:var(--focus-ring);
-  --focus-outline:color-mix(in srgb, var(--teal) 68%, var(--gray-600));
-  --mono:"Manrope",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-  --sans:"Manrope",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-  --surface-card-soft:var(--gray-25);
-  --surface-border-soft:var(--gray-200);
-  --surface-shadow:none;
-  --surface-radius:7px;
-  --radius-sm:6px;
-  --radius-md:8px;
-  --radius-lg:10px;
-  --radius-pill:999px;
-  --space-2xs:4px;
-  --space-xs:6px;
-  --space-sm:8px;
-  --space-md:10px;
-  --space-lg:12px;
-  --space-section:14px;
-  --space-panel:16px;
-  /* Alias tương thích cho CSS đã có; code mới dùng --gap-* ở trên. */
-  --space-grid:var(--gap-panel);
-  --space-group:var(--gap-group);
-  --space-modal:18px;
-  --space-xl:20px;
-  --space-2xl:24px;
-  --panel-inline-padding:var(--space-panel);
-  --modal-inline-padding:var(--space-modal);
-  --table-cell-block-padding:var(--space-md);
-  --table-cell-inline-padding:var(--space-lg);
-  --type-overline:10.5px;
-  --type-caption:11.5px;
-  --type-meta:12.5px;
-  --type-body-sm:13px;
-  --type-body:13.5px;
-  --type-subhead:14px;
-  --type-heading-sm:16px;
-  --type-dialog-title:18px;
-  --type-symbol-lg:20px;
-  --type-symbol-xl:22px;
-  --type-heading-lg:24px;
-  --type-page-title:26px;
-  --type-kpi:30px;
-  --surface-head-size:var(--type-body-sm);
-  --table-head-size:var(--type-body-sm);
-  --table-body-size:var(--type-body-sm);
+  --panel-radius:var(--radius-lg);
+  --panel-padding:var(--space-5);
+  --panel-content-gap:var(--space-4);
+  --panel-header-h:48px;
+  --subpanel-header-h:44px;
+  --panel-shadow:var(--shadow-panel);
+
+
+  /* Thang tiêu đề — MỖI CẤP CẤU TRÚC MỘT CỠ, không tuỳ trang.
+     Trước khi chuẩn hoá, header khối con trong panel ra 3 cỡ khác nhau tuỳ
+     trang, và tiêu đề hộp thoại ra 3 cỡ. */
+  --title-page:var(--text-xl);      /* tên trang (.head h1) */
+  --title-page-weight:var(--weight-bold);
+  --title-hero:var(--text-xl);      /* khối hero Tổng quan — cùng cỡ tên trang
+                                       nhưng khác vai trò, giữ có chủ đích */
+  --title-panel:var(--text-md);     /* header panel, modal, hộp thoại */
+  --title-panel-weight:var(--weight-semibold);
+  --title-sub:var(--text-base);     /* header khối con trong panel */
+  --title-sub-weight:var(--weight-semibold);
+  --title-card:var(--text-sm);      /* header thẻ nhỏ / nhóm trường */
+  --title-card-weight:var(--weight-semibold);
+  --title-overline:var(--text-2xs); /* nhãn nhóm, chữ hoa */
+  --title-overline-weight:var(--weight-semibold);
+  --title-overline-tracking:.06em;
+
+  --table-header-h:40px;
+  --table-row-h:44px;
+  --table-radius:var(--radius-md);
+  --table-cell-px:var(--space-3);
+  --table-cell-py:var(--space-2-5);
+  --table-cell-px-compact:var(--space-2);
+  --table-cell-py-compact:var(--space-1-5);
+  --table-head-size:var(--text-sm);
+  --table-head-weight:var(--weight-semibold);
+  --table-head-tracking:.02em;
+  --table-body-size:var(--text-sm);
+  /* Tầng thứ hai cho BẢNG NHỎ: bảng gọn nằm trong panel (Sigma, hướng dẫn
+     Westgard, ma trận lô). Header nhỏ và thưa chữ hơn để không tranh chấp với
+     header panel ngay phía trên nó. */
+  --table-header-h-sm:30px;
+  --table-head-size-sm:var(--text-2xs);
+  --table-head-tracking-sm:.04em;
+
+  --modal-padding:var(--space-5);
+  --field-label-gap:var(--space-1);
+  --form-row-gap:var(--space-3);
+  --toolbar-gap:var(--space-2);
+  --page-header-gap:var(--space-6);
+
   --scrollbar-size:8px;
   --scrollbar-track:var(--gray-100);
   --scrollbar-thumb:var(--scrollbar-thumb-base);
   --scrollbar-thumb-hover:color-mix(in srgb, var(--scrollbar-thumb-base) 82%, black);
+
+  /* ═══════════════════════════════════════════════════════════════════
+     LỚP 4 — BÍ DANH TẠM cho CSS chưa chuyển. Mỗi trang chuyển xong thì xoá
+     dần bí danh tương ứng. Không thêm tên mới vào đây.
+     ═══════════════════════════════════════════════════════════════════ */
+  --bg:var(--surface-page);
+  --panel:var(--surface);
+  --panel2:var(--surface-sunken);
+  --ink:var(--text-primary);
+  --muted:var(--text-tertiary);
+  --line:var(--border-subtle);
+  --line2:var(--border-subtle);
+  --line-strong:var(--border);
+  --teal:var(--accent);
+  --teal-deep:var(--accent-active);
+  --tealink:var(--accent-text);
+  --amber:var(--warning-text);
+  --red:var(--danger-text);
+
+  --section-head-bg:var(--surface-section-header);
+  --section-head-border:var(--border-subtle);
+  --section-head-ink:var(--text-primary);
+  --section-heading-weight:var(--weight-semibold);
+  --card-head-border:var(--border-subtle);
+  --card-head-ink:var(--text-primary);
+  --card-head-active:var(--accent-surface-tint);
+  --panel-header-min-height:var(--panel-header-h);
+  --subpanel-header-min-height:var(--subpanel-header-h);
+  --panel-inline-padding:var(--panel-padding);
+  --modal-inline-padding:var(--modal-padding);
+  --surface-shadow:var(--panel-shadow);
+  --surface-card-soft:var(--surface-subtle);
+  --surface-soft:var(--surface-subtle);
+  --surface-neutral:var(--surface-sunken);
+
+  --table-head-bg:var(--thead-bg);
+  --table-head-ink:var(--ink-subtle);
+  --table-head-border:var(--thead-line);
+  --table-head-letter-spacing:var(--table-head-tracking);
+  --table-header-height:var(--table-header-h);
+  --table-cell-block-padding:var(--table-cell-py);
+  --table-cell-inline-padding:var(--table-cell-px);
+
+  --text-strong:var(--ink-strong);
+  --text-body:var(--ink-body);
+  --text-input:var(--text-primary);
+  --text-subtle:var(--ink-subtle);
+  --text-faint:var(--ink-faint);
+  --text-button:var(--ink-button);
+  --text-button-muted:var(--ink-button-muted);
+  --text-readonly:var(--ink-readonly);
+  --text-pill:var(--text-tertiary);
+  --text-placeholder:var(--ink-placeholder);
+  --text-archived:var(--ink-archived);
+  --text-on-dark-muted:var(--dark-on-light);
+  --text-accent:var(--ink-accent);
+  --text-success:var(--ink-success);
+  --text-info:var(--ink-info);
+  --text-warning:var(--ink-warning);
+  --text-danger:var(--danger-text);
+  --filter-text:var(--ink-filter);
+  --filter-active-text:var(--ink-filter-active);
+  --filter-count-text:var(--ink-filter-count);
+
+  --neutral-ink:var(--neutral-text);
+  --neutral-bg:var(--neutral-surface);
+  --success-ink:var(--success-text);
+  --success-bg:var(--success-surface);
+  --info-ink:var(--info-text);
+  --info-bg:var(--info-surface);
+  --warning-ink:var(--warning-text);
+  --warning-bg:var(--warning-surface);
+  --danger-ink:var(--danger-text);
+  --danger-bg:var(--danger-surface);
+
+  --sidebar-active-icon:var(--sidebar-active-accent);
+  --sidebar-cloud-text:var(--dark-text-soft);
+  --sidebar-group-text:var(--dark-text-group);
+  --sidebar-link-text:var(--dark-text-link);
+
+  --control-height:var(--control-h);
+  --button-height:var(--control-h);
+  --button-inline-padding:var(--button-padding-x);
+  --sans:var(--font-sans);
+  --mono:var(--font-mono);
+
+  --gap-control:var(--space-2);
+  --gap-content:var(--space-4);
+  --gap-panel:var(--space-5);
+  --gap-group:var(--space-6);
+  --space-2xs:var(--space-1);
+  --space-xs:var(--space-1-5);
+  --space-sm:var(--space-2);
+  --space-md:var(--space-2-5);
+  --space-lg:var(--space-3);
+  --space-section:var(--space-4);
+  --space-panel:var(--space-4);
+  --space-xl:var(--space-5);
+  --space-modal:var(--space-5);
+  --radius-pill:var(--radius-full);
+
+  --line-display:var(--leading-display);
+  --line-heading:var(--leading-heading);
+  --line-compact:var(--leading-snug);
+  --line-body:var(--leading-body);
 }
 
 *,*::before,*::after{box-sizing:border-box;}
+/* Thanh cuộn dùng chung, port nguyên quy cách app cũ: mảnh 8px, track xám
+   rất nhạt và thumb bo tròn có viền cùng màu track. Áp cho cả trục dọc lẫn
+   kéo ngang của mọi vùng cuộn (bảng, biểu đồ, modal, textarea); từng vùng
+   cố ý ẩn scrollbar vẫn có selector riêng ghi đè. */
+*{scrollbar-width:thin;scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track);}
+*::-webkit-scrollbar{width:var(--scrollbar-size);height:var(--scrollbar-size);}
+*::-webkit-scrollbar-track{background:var(--scrollbar-track);border-radius:var(--radius-pill);}
+*::-webkit-scrollbar-thumb{background:var(--scrollbar-thumb);border:2px solid var(--scrollbar-track);border-radius:var(--radius-pill);background-clip:padding-box;}
+*::-webkit-scrollbar-thumb:hover{background:var(--scrollbar-thumb-hover);}
+*::-webkit-scrollbar-button{display:none;width:0;height:0;}
 html,body,#root{height:100%;}
-body{margin:0;font-family:var(--sans);font-size:var(--type-body);color:var(--ink);background:var(--bg);}
+body{margin:0;font-family:var(--sans);font-size:var(--text-base);color:var(--ink);background:var(--bg);}
 h1,h2,h3,h4,p{margin:0;}
-/* App cũ KHÔNG có `font:inherit` cho form control — nó chỉ đặt
-   `font-family` và cỡ chữ TƯỜNG MINH (xem app.css). `font:inherit` làm ô
-   nhập thừa hưởng cả font-weight của khối cha, nên input trong toolbar
-   (font-weight:800) bị in đậm và lệch cỡ so với golden master. */
-/* Chỉ đặt font-family như app cũ. `color:inherit` cũng bị bỏ: nó làm
-   checkbox/radio thừa hưởng màu chữ của khối cha (đo được ô tick trong
-   bảng Mean/SD ra màu --muted, app cũ là màu mặc định của trình duyệt). */
+/* Không dùng `font:inherit` cho form control: thuộc tính này làm ô nhập
+   thừa hưởng cả font-weight của khối cha, nên input trong toolbar có thể
+   bị in đậm ngoài ý muốn. Component tự khai báo cỡ và độ đậm chữ. */
+/* Chỉ đặt font-family. `color:inherit` cũng bị bỏ để checkbox/radio không
+   vô tình thừa hưởng màu chữ phụ của khối cha. */
 button,input,select,textarea{font-family:var(--sans);}
 table{border-collapse:collapse;width:100%;}

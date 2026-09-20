@@ -3,6 +3,7 @@ coverage/
 dist/
 app-v2-dist/
 .cache/
+.tmp-edits/
 *.log
 *.tmp
 *.bak

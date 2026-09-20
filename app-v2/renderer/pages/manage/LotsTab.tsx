@@ -178,7 +178,7 @@ export function LotsTab() {
       </div>
       <div className="lot-config-grid">
       <div className="panel rcfg-list lot-config-left">
-        <div className="rcfg-panel-h"><h3>Lô QC</h3><button className="btn teal sm" onClick={() => { setLotErr(null); setEditingLot('new'); }}>Thêm lô QC</button></div>
+        <div className="rcfg-panel-h"><h3>Lô QC</h3><button className="btn teal sm" onClick={() => { setLotErr(null); setEditingLot('new'); }}>+ Thêm lô</button></div>
         {lots.length ? <table className="lot-table">
           <thead><tr><th>Số lô</th><th>Mức</th><th>Hạn dùng</th><th>Trạng thái</th><th className="num">Gán</th><th>Thao tác</th></tr></thead>
           <tbody>
@@ -198,7 +198,7 @@ export function LotsTab() {
       </div>
 
       <div className="panel rcfg-list lot-config-right">
-        <div className="rcfg-panel-h"><h3>Nhóm lô QC</h3><button className="btn teal sm" onClick={openNewGroup}>Thêm nhóm lô</button></div>
+        <div className="rcfg-panel-h"><h3>Nhóm lô QC</h3><button className="btn teal sm" onClick={openNewGroup}>+ Thêm nhóm lô</button></div>
         {lotGroups.length ? <div className="lot-group-list">{[...lotGroups].sort((a, b) => groupSortPriority(a) - groupSortPriority(b)).map((g) => {
           const groupLots = lots.filter((lot) => g.lotIds.includes(lot.id));
           // `archived` (nhóm "Đã lưu trữ" do CHẤP NHẬN chuyển tiếp lô tạo ra,
@@ -281,7 +281,7 @@ export function LotsTab() {
                     // cũ), chỉ chặn thêm mới một lô đã hết dùng.
                     const locked = !!lot.depleted && !groupChecked.has(lot.id);
                     return <label className={lot.depleted ? 'lot-opt-depleted' : ''} title={locked ? 'Lô đã hết QC — không thể chọn' : undefined} key={lot.id}>
-                      <input className="cfg-group-lot" type="checkbox" checked={groupChecked.has(lot.id)} disabled={locked} onChange={(e) => {
+                      <input type="checkbox" checked={groupChecked.has(lot.id)} disabled={locked} onChange={(e) => {
                         const next = new Set(groupChecked);
                         if (e.target.checked) next.add(lot.id); else next.delete(lot.id);
                         setGroupChecked(next);

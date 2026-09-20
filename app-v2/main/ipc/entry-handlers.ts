@@ -368,6 +368,16 @@ export function createEntryHandlers(db: Db) {
     const targetLot = parallel?.lot || currentLot;
     const targetMean = parallel?.mean ?? levelRow?.mean ?? null;
     const targetSd = parallel?.sd ?? levelRow?.sd ?? null;
+    // Một mức/lô chỉ có MỘT kết quả trong một lần chạy. UI luôn sinh run ID
+    // chung đúng quy tắc này, nhưng LIS và mọi lời gọi IPC cũng phải bị chặn
+    // tại cổng ghi; nếu không engine liên mức chỉ giữ điểm cuối cùng của mức
+    // đó khi nhóm theo run ID.
+    const duplicateRun = db.prepare(`SELECT id FROM qc_points
+      WHERE test_id=? AND level=? AND lot=? AND date=? AND run_id=? AND voided=0 LIMIT 1`)
+      .get(testId, level, targetLot, date, runId) as { id: string } | undefined;
+    if (duplicateRun) {
+      return { ok: false, error: { code: 'duplicate-run', message: `Mức ${level}, lô ${targetLot || 'đang dùng'} đã có kết quả ở lần chạy ${runId}. Hãy tạo lần chạy bổ sung.` } };
+    }
     // Ghi chú theo ngày KẾ THỪA từ điểm khác cùng ngày/cùng xét nghiệm đã có
     // ghi chú (port `addPoint()` bản cũ, dòng dựng `dayNote`) — ghi chú theo
     // ngày không có cột riêng, nằm ở `note` của MỌI điểm còn hiệu lực trong

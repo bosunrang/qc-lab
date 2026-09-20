@@ -20,15 +20,8 @@ import { confirmDialog, infoDialog } from '../state/dialog-store';
 import { PAGE_DEFS, ROLE_LIST, rolePageIds, roleLabel } from '../lib/permissions';
 import type { PublicUser } from '../../shared/qc-api';
 
-/** Lưới "Thẻ được phép dùng" — port `userPermissionChecksHtml()` app cũ sang
- * JSX thật (app cũ dựng chuỗi HTML rồi `dangerouslySetInnerHTML` vì
- * `syncUserPermChecks()` bật/tắt checkbox trực tiếp trên DOM; app-v2 giữ
- * `selected` trong state React nên không cần thao tác DOM nào).
- *
- * Hành vi khi ĐỔI VAI TRÒ copy đúng `syncUserPermChecks()`: thẻ không còn
- * được phép thì bị bỏ chọn; thẻ MỚI được phép thì KHÔNG tự động chọn (vẫn
- * bật lên cho người dùng tự tick). Nghe hơi lạ nhưng đó là hành vi thật của
- * app cũ — đổi ở đây là lệch golden master. */
+/** Lưới "Thẻ được phép dùng" dùng state React. Khi đổi vai trò, thẻ không còn
+ * hợp lệ bị bỏ chọn; thẻ mới được phép vẫn chờ quản trị viên chủ động chọn. */
 function PermGrid({ groupId, role, selected, onToggle }: {
   groupId: string; role: string; selected: ReadonlySet<string>; onToggle: (id: string, on: boolean) => void;
 }) {

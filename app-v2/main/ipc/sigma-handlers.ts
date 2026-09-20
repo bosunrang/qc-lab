@@ -14,6 +14,7 @@ import { cleanId, cleanText, finiteNumber } from '../domain/text-utils';
 import { type Actor, type IpcResult, writeAudit, notifyChanged, requireWrite, requireAdmin } from './shared';
 
 const PERIOD_RE = /^\d{4}-\d{2}$/;
+const TEA_SOURCES = new Set(['lab', 'eflm', 'clia', 'ricos']);
 
 export interface SigmaLevelInput {
   level: number; tea?: unknown; targetMean?: unknown; cv?: unknown; biasEqa?: unknown; eqaRounds?: unknown[]; uCref?: unknown; uCal?: unknown; muBiasMode?: 'include' | 'exclude';
@@ -211,7 +212,7 @@ export function createSigmaHandlers(db: Db) {
   function saveTeaConfig(input: { testId?: unknown; source?: unknown; tea?: unknown; eflmAnalyte?: unknown; eflmAps?: unknown; eflmLookupDate?: unknown; eflmRef?: unknown }, actor: Actor): IpcResult<Test> {
     const denied = requireWrite(actor); if (denied) return denied;
     const testId = cleanId(input?.testId), source = cleanText(input?.source, 20).trim();
-    if (!['lab', 'eflm', 'clia', 'ricos'].includes(source)) return { ok: false, error: { code: 'invalid-tea-source', message: 'Nguồn TEa không hợp lệ.' } };
+    if (!TEA_SOURCES.has(source)) return { ok: false, error: { code: 'invalid-tea-source', message: 'Nguồn TEa không hợp lệ.' } };
     const test = db.prepare('SELECT * FROM tests WHERE id=?').get(testId) as {
       id: string; name: string; tea: number; eflm_analyte: string; eflm_aps: string; eflm_lookup_date: string; eflm_ref: string;
     } | undefined;
@@ -301,10 +302,15 @@ export function createSigmaHandlers(db: Db) {
     for (const level of stored) if (level.cvSource !== 'iqc-cohort') {
       level.cohortN = null; level.sourceLot = ''; level.sourceStart = ''; level.sourceEnd = ''; level.cohortStatus = '';
     }
+    // Nguồn là một phần của khả năng truy xuất TEa của kỳ. So không phân
+    // biệt hoa/thường để nhận dữ liệu cũ, nhưng giữ nguyên chuỗi đã lưu vì
+    // việc đổi nó có thể làm thay đổi cách diễn giải kỳ lịch sử. Chuỗi rỗng
+    // vẫn dành cho kỳ cũ chưa từng có metadata nguồn.
     const teaSource = cleanText(input.teaSource, 200).trim();
+    if (teaSource && !TEA_SOURCES.has(teaSource.toLowerCase())) return { ok: false, error: { code: 'invalid-tea-source', message: 'Nguồn TEa không hợp lệ.' } };
     const id = `${testId}:${period}`;
     const existing = db.prepare('SELECT id FROM sigma_data WHERE id=?').get(id);
-    // Nút "+ Thêm kỳ" của app cũ chỉ tạo kỳ hiện tại, tuyệt đối không ghi đè
+    // Luồng "+ Thêm kỳ" chọn trực tiếp tháng/năm nhưng tuyệt đối không ghi đè
     // bản đã có. Cổng lưu chung vẫn cho phép cập nhật CV/Bias/MU của kỳ cũ.
     if (existing && input.createOnly === true) return { ok: false, error: { code: 'duplicate-period', message: `Đã có kỳ Sigma ${period}. Hãy cập nhật kỳ hiện có.` } };
     if (existing) {

@@ -1,20 +1,16 @@
-/* Nhật ký hoạt động — sao chép gần nguyên văn assets/professional-audit.css
-   bản cũ (đọc trực tiếp file gốc — xem CLAUDE.md mục "Sao chép giao diện app
-   cũ"). Bỏ `.audit-filterbar .audit-date` (DateField app-v2 dùng
-   `<input type="date">` chuẩn, không phải `.datebox` tự vẽ như bản cũ — quyết
-   định đã chốt từ Giai đoạn A1, xem DateField.tsx). */
+/* Nhật ký hoạt động — bảng truy vết và bộ lọc theo hệ Clinical Precision. */
 
 .audit-table{
   table-layout:fixed;
 }
 .audit-log-head{
-  min-height:var(--panel-header-min-height); display:flex; align-items:center; justify-content:space-between; gap:12px; padding:5px 14px; border-bottom:1px solid var(--section-head-border); background:var(--section-head-bg);
+  min-height:var(--panel-header-min-height); display:flex; align-items:center; justify-content:space-between; gap:12px; padding:4px 14px; border-bottom:1px solid var(--section-head-border); background:var(--section-head-bg);
 }
 .audit-log-head h2.panel-title{
-  margin:0; color:var(--section-head-ink); font-size:var(--section-head-size); font-weight:800;
+  margin:0; color:var(--section-head-ink); font-size:var(--title-panel); font-weight:var(--section-heading-weight);
 }
 .audit-log-head > input[type="search"]{
-  width:min(320px,42vw); min-height:36px; height:36px;
+  width:min(320px,42vw); min-height:var(--control-h); height:var(--control-h);
 }
 .audit-filterbar{
   display:flex; align-items:flex-end; gap:10px; flex-wrap:wrap; margin:var(--panel-content-gap) 16px 10px;
@@ -27,10 +23,10 @@
 }
 .audit-filterbar input,
 .audit-filterbar select{
-  min-height:36px; height:36px;
+  min-height:var(--control-h); height:var(--control-h);
 }
 .audit-filterbar > .audit-filter-summary{
-  align-self:flex-end; min-width:0; margin-left:auto; color:var(--muted); font-size:var(--type-meta); font-weight:750; line-height:1.2; text-align:right;
+  align-self:flex-end; min-width:0; margin-left:auto; color:var(--muted); font-size:var(--text-sm); font-weight:var(--weight-bold); line-height:var(--leading-display); text-align:right;
 }
 .audit-clear-filter{
   align-self:flex-end;
@@ -42,7 +38,7 @@
   display:flex; align-items:center; gap:8px;
 }
 .audit-pagination b{
-  min-width:82px; color:var(--muted); font-size:var(--type-meta); text-align:center;
+  min-width:82px; color:var(--muted); font-size:var(--text-sm); text-align:center;
 }
 .audit-table-wrap{
   margin:0 16px; overflow-x:auto;
@@ -71,13 +67,13 @@
   display:flex; flex-direction:column; align-items:center; gap:2px;
 }
 .audit-seq{
-  font-size:var(--type-overline); font-weight:700; color:var(--muted);
+  font-size:var(--text-2xs); font-weight:700; color:var(--muted);
 }
 .audit-time{
-  font-weight:600; color:#2c3e48;
+  font-weight:600; color:var(--text-body);
 }
 .audit-detail{
-  color:#41545f; line-height:1.5; word-break:break-word; white-space:normal; text-align:center;
+  color:var(--text-subtle); line-height:var(--leading-body); word-break:break-word; white-space:normal; text-align:center;
 }
 
 /* Bù class app cũ CÓ CSS mà app-v2 để trống (2026-09-03, xem ghi chú cùng
@@ -88,7 +84,7 @@
 .audit-filterbar > div{min-width:150px;}
 .audit-filterbar label{margin-top:0;}
 .audit-filterbar input,
-.audit-filterbar select{min-height:36px;height:36px;}
-.audit-filterbar > .audit-filter-summary{align-self:flex-end;min-width:0;margin-left:auto;color:var(--muted);font-size:var(--type-meta);font-weight:750;line-height:1.2;text-align:right;}
-.audit-filterbar .audit-date{width:170px;height:36px;}
-.audit-filterbar .audit-date .date-text{max-width:none;min-width:0;height:34px;flex:1;}
+.audit-filterbar select{min-height:var(--control-h);height:var(--control-h);}
+.audit-filterbar > .audit-filter-summary{align-self:flex-end;min-width:0;margin-left:auto;color:var(--muted);font-size:var(--text-sm);font-weight:var(--weight-bold);line-height:var(--leading-display);text-align:right;}
+.audit-filterbar .audit-date{width:170px;height:var(--control-h);}
+.audit-filterbar .audit-date .date-text{max-width:none;min-width:0;height:var(--control-h-table);flex:1;}

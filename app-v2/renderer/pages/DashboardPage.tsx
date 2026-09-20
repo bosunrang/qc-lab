@@ -1,6 +1,5 @@
-// Tổng quan — Giai đoạn D2 (docs/APP-V2-PLAN.md): bố cục + từng chuỗi chữ
-// port theo golden master `src/react/pages/DashboardPage.tsx` của app cũ.
-// Phần TÍNH TOÁN nằm ở `view-models/dashboard-view-model.ts` (đọc ghi chú
+// Tổng quan Clinical Precision. Phần TÍNH TOÁN nằm ở
+// `view-models/dashboard-view-model.ts` (đọc ghi chú
 // đầu file đó: báo động theo ĐIỂM CUỐI, 1 dòng cho mỗi MỨC, % hoàn tất theo
 // XÉT NGHIỆM) — file này chỉ dựng JSX.
 import { useEffect, useMemo, type ReactNode } from 'react';
@@ -166,7 +165,7 @@ function TestsPanel({ model }: { model: Model }) {
   return <div className="panel"><div className="dash-test-toolbar"><h2 className="panel-title">Danh sách xét nghiệm</h2></div><div className="dash-test-filterbar">
     <div className="dash-test-tabs">{STATUS_TABS.map(([key, label]) => { const count = key === 'all' ? model.tests.length : model.tests.filter(test => key === 'missing' ? test.missingToday : test.status === key).length; return <button type="button" key={key} className={status === key ? 'on' : ''} onClick={() => setStatus(key)}>{label}<b>{count}</b></button>; })}</div>
     <div className="dash-test-search"><input type="search" placeholder="Tìm xét nghiệm, máy, lô..." value={query} onChange={event => setQuery(event.target.value)} aria-label="Tìm xét nghiệm" /><span>{visible.length}/{model.tests.length}</span></div>
-  </div>{visible.length ? <div className="dash-test-list"><table><thead><tr><th>Xét nghiệm</th><th>Mức QC / lô</th><th>QC hôm nay</th><th className="num">Tổng điểm</th><th>Westgard</th><th>Gần nhất</th><th><span className="sr-only">Thao tác</span></th></tr></thead><tbody>{visible.map(test => <TestRow test={test} key={test.testId} />)}</tbody></table></div> : <div className="dash-test-empty">Không tìm thấy xét nghiệm phù hợp.</div>}</div>;
+  </div>{visible.length ? <div className="dash-test-list"><table className="dash-test-table"><colgroup><col className="dash-col-test" /><col className="dash-col-levels" /><col className="dash-col-today" /><col className="dash-col-points" /><col className="dash-col-westgard" /><col className="dash-col-latest" /><col className="dash-col-actions" /></colgroup><thead><tr><th>Xét nghiệm</th><th>Mức QC / lô</th><th>QC hôm nay</th><th className="num">Tổng điểm</th><th>Westgard</th><th>Gần nhất</th><th><span className="sr-only">Thao tác</span></th></tr></thead><tbody>{visible.map(test => <TestRow test={test} key={test.testId} />)}</tbody></table></div> : <div className="dash-test-empty">Không tìm thấy xét nghiệm phù hợp.</div>}</div>;
 }
 
 function LoadingView({ subtitle }: { subtitle: string }) {

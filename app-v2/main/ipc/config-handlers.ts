@@ -685,7 +685,11 @@ export function createConfigHandlers(db: Db) {
   // ---- Panel QC ----
   function listPanels() {
     const panels = db.prepare('SELECT * FROM qc_panels ORDER BY name').all() as Omit<QcPanel, 'testIds'>[];
-    return panels.map(p => ({ ...p, testIds: (db.prepare('SELECT test_id FROM qc_panel_tests WHERE panel_id=?').all(p.id) as { test_id: string }[]).map(r => r.test_id) }));
+    // `ORDER BY` là BẮT BUỘC, không phải trang trí: thiếu nó thì SQLite đọc
+    // thẳng từ index khoá chính `(panel_id, test_id)` và trả về theo test_id
+    // ngẫu nhiên. `rowid` là chốt phụ cho dòng `position` NULL (backup cũ
+    // phục hồi lại) — thứ tự chèn chính là thứ tự trong backup.
+    return panels.map(p => ({ ...p, testIds: (db.prepare('SELECT test_id FROM qc_panel_tests WHERE panel_id=? ORDER BY position, rowid').all(p.id) as { test_id: string }[]).map(r => r.test_id) }));
   }
 
   function savePanel(input: { id?: string; data: PanelInput }, actor: Actor): IpcResult<QcPanel> {
@@ -731,7 +735,11 @@ export function createConfigHandlers(db: Db) {
         db.prepare('INSERT INTO qc_panels(id,name,instrument_id,note,active) VALUES (?,?,?,?,?)').run(panelId, name, instrumentId, note, active ? 1 : 0);
       }
       db.prepare('DELETE FROM qc_panel_tests WHERE panel_id=?').run(panelId);
-      for (const testId of validTestIds) db.prepare('INSERT INTO qc_panel_tests(panel_id,test_id) VALUES (?,?)').run(panelId, testId);
+      // Vị trí ghi TƯỜNG MINH theo thứ tự `validTestIds` — thứ tự người dùng
+      // tick trong modal. Đừng sắp lại theo tên ở bất kỳ tầng nào.
+      validTestIds.forEach((testId, position) => {
+        db.prepare('INSERT INTO qc_panel_tests(panel_id,test_id,position) VALUES (?,?,?)').run(panelId, testId, position);
+      });
       writeAudit(db, actor, id ? 'Sửa Panel QC' : 'Thêm Panel QC', `Panel "${name}" (${validTestIds.length} xét nghiệm)`, name);
       db.exec('COMMIT');
     } catch (e) {
@@ -808,7 +816,8 @@ export function createConfigHandlers(db: Db) {
       // phải có Mean/SD ứng viên hợp lệ mới cho chấp nhận — port nguyên văn
       // 2 nhánh lỗi của `ManageLotTransitionCommand.acceptanceGate()`.
       const panelTests = db.prepare(`SELECT t.id, t.name FROM tests t
-        JOIN qc_panel_tests pt ON pt.test_id=t.id WHERE pt.panel_id=?`).all(panelId) as { id: string; name: string }[];
+        JOIN qc_panel_tests pt ON pt.test_id=t.id WHERE pt.panel_id=?
+        ORDER BY pt.position, pt.rowid`).all(panelId) as { id: string; name: string }[];
       const rows = panelTests
         .map((t) => ({ t, level: db.prepare('SELECT level FROM test_levels WHERE test_id=? AND qc_lot_id=?').get(t.id, fromLotId) as { level: number } | undefined }))
         .filter((row) => row.level);

@@ -1,13 +1,11 @@
-/* Tách thành file riêng theo từng trang từ 2026-09-01 (xem CLAUDE.md mục
-   "Sao chép giao diện app cũ"), mirroring quy ước professional-*.css của app
-   cũ — xem app-v2/renderer/styles/pages/*.css. File này không còn CSS riêng
-   nào; giữ lại (rỗng) để index.html khỏi phải sửa nếu sau này cần thêm CSS
-   thật sự dùng chung nhiều trang mà không thuộc app.css. */
+/* Quy tắc dùng chung giữa nhiều trang. Bố cục riêng của từng nghiệp vụ nằm ở
+   app-v2/renderer/styles/pages/*.css; token và component nền nằm ở tokens.css
+   + app.css theo hệ Clinical Precision. */
 
 /* CSS riêng So sánh hóa chất đã chuyển về `pages/reagent.css`. */
 .sg-eflm-box > div,.lot-table,.top-user .meta,.action-form-main > div,.range-summary-panel > h3:first-child > span{min-width:0;}
 .config-shell-main .empty .empty-actions{margin-top:12px;}
-.dash-main .panel>.dash-list>.shift-item,.dash-main .panel>.dash-list>.hint{margin:0!important;}
+.dash-main .panel>.dash-list>.shift-item,.dash-main .panel>.dash-list>.hint{margin:0;}
 
 /* ── D3.8: Khắc phục sự cố — port từ assets/professional-reports.css +
    professional-dashboard.css (nhóm sự cố, bảng nhật ký). */
@@ -15,33 +13,30 @@
 .panel>.panel-title:first-child+.action-log-tools {margin:0;}
 .action-date {display:flex; width:100%;}
 .action-log-panel .action-log-tools {display:flex; justify-content:flex-end; padding:var(--panel-content-gap) 16px 10px;}
-.action-log-wrap {margin:0 16px 16px; overflow-x:auto; border:1px solid #d7e3e9; border-radius:var(--radius-md); background:var(--panel);}
-.action-date, .action-test {font-weight:800; color:#153043;}
-.action-time {margin-top:4px; color:#607486; font-size:var(--type-meta); line-height:1.35; font-weight:600;}
-.action-sub, .action-rule {margin-top:4px; color:#607486; font-size:var(--type-meta); line-height:1.35;}
-.action-text {color:#243848; line-height:1.45;}
+.action-log-wrap {margin:0 16px 16px; overflow-x:auto; border:1px solid var(--surface-border); border-radius:var(--radius-md); background:var(--panel);}
+.action-date, .action-test {font-weight:var(--weight-bold); color:var(--ink);}
+.action-time {margin-top:4px; color:var(--muted); font-size:var(--text-sm); line-height:var(--leading-snug); font-weight:600;}
+.action-sub, .action-rule {margin-top:4px; color:var(--muted); font-size:var(--text-sm); line-height:var(--leading-snug);}
+.action-text {color:var(--ink); line-height:var(--leading-snug);}
 .action-status-stack {display:flex; flex-direction:column; align-items:flex-start; gap:6px;}
-.action-row-actions {display:flex; flex-direction:column; align-items:stretch; gap:7px;}
-.action-row-actions .btn {justify-content:center; min-height:32px;}
+.action-row-actions {display:flex; flex-direction:column; align-items:stretch; gap:6px;}
+.action-row-actions .btn {justify-content:center; min-height:var(--control-h-compact);}
 .action-row-actions .btn.icon {width:100%; min-width:0;}
 .action-date {white-space:nowrap;}
 .action-chipline {margin-top:6px;}
 .action-chipline {display:flex; align-items:center; flex-wrap:wrap; gap:6px;}
 .action-chipline .action-chip {max-width:none; white-space:nowrap;}
 .issue-group-h {display:flex; align-items:baseline; justify-content:space-between; gap:10px; padding:10px 14px; background:var(--section-head-bg); border-bottom:1px solid var(--section-head-border);}
-.issue-group-h b {color:var(--ink); font-size:var(--type-body-sm);}
-.issue-group-date {margin-left:8px; color:var(--muted); font-size:var(--type-meta); font-weight:650;}
-.issue-group-count {flex:none; color:var(--muted); font-size:var(--type-caption); font-weight:700; white-space:nowrap;}
-.action-chipline .action-chip {max-width:100%; white-space:normal;}
-.action-submit-buttons {align-items:stretch; flex-direction:column-reverse;}
+.issue-group-h b {color:var(--ink); font-size:var(--text-sm);}
+.issue-group-date {margin-left:8px; color:var(--muted); font-size:var(--text-sm); font-weight:700;}
+.issue-group-count {flex:none; color:var(--muted); font-size:var(--text-xs); font-weight:700; white-space:nowrap;}
 .dash-list {display:grid;}
-.dash-list .shift-item.rej {border-color:var(--danger-border); border-left:5px solid var(--danger-accent); background:var(--danger-bg); color:var(--danger-ink);}
-.dash-list .shift-item.warn {border-color:var(--warning-border); border-left:5px solid var(--warning-accent); background:var(--warning-bg); color:var(--warning-ink);}
+.dash-list .shift-item.rej {border-color:var(--danger-border); border-left:3px solid var(--danger-accent); background:var(--danger-bg); color:var(--danger-ink);}
+.dash-list .shift-item.warn {border-color:var(--warning-border); border-left:3px solid var(--warning-accent); background:var(--warning-bg); color:var(--warning-ink);}
 .dash-list .shift-item.rej .meta {color:var(--danger-ink);}
 .dash-list .shift-item.warn .meta {color:var(--warning-ink);}
 .dash-list {gap:10px;}
 .dash-main .panel > .alert, .panel > .panel-title:first-child + .dash-list, .panel > .panel-title:first-child ~ .dash-list {margin:var(--panel-content-gap) 16px 14px;}
-.dash-main .panel .alert, .dash-list {margin-left:12px; margin-right:12px;}
 
 /* ── D3.9: Phân tích Westgard — port từ assets/professional-westgard.css. */
 .wg-export-actions { display: flex; align-items: center; gap: 8px; min-height: 38px; }

@@ -43,6 +43,17 @@ export function PanelsTab({ onGoTests, onGoInstruments }: { onGoTests?: () => vo
   }
   const visibleTests = useMemo(() => tests.filter((t) => t.instrument_id === instrumentId), [tests, instrumentId]);
   const visiblePanels = panels.filter((p) => !query || p.name.toLowerCase().includes(query.toLowerCase()));
+  const [shownTestId, setShownTestId] = useState<Record<string, string>>({});
+  /** Xét nghiệm của panel, GIỮ NGUYÊN thứ tự đã lưu trong `testIds`.
+   *
+   * KHÔNG sắp theo tên. Bản đầu (2026-09-13) có `sort` theo a–z với lý do
+   * "thứ tự tick lúc tạo không có nghĩa gì" — sai: người dùng tick Na/K/Cl
+   * đúng thứ tự trả kết quả của bảng điện giải, sắp a–z biến nó thành
+   * Cl/K/Na. Thứ tự trong panel là thứ tự người dùng đặt; đừng sắp lại. */
+  const panelTests = (panel: QcPanel): { id: string; name: string }[] => panel.testIds
+    // Xét nghiệm đã bị xoá mà panel còn trỏ tới: hiện id thay vì bỏ dòng, để
+    // người dùng thấy panel đang thừa một mục cần dọn.
+    .map((id) => { const test = tests.find((t) => t.id === id); return { id, name: test ? test.name : id }; });
 
   async function submit(form: HTMLFormElement) {
     const fd = new FormData(form);
@@ -71,7 +82,15 @@ export function PanelsTab({ onGoTests, onGoInstruments }: { onGoTests?: () => vo
               {visiblePanels.map((p) => (
                 <tr key={p.id}>
                   <td>{p.name}</td><td>{instruments.find((i) => i.id === p.instrument_id)?.name || '—'}</td>
-                  <td>{p.testIds.map((tid) => <span className="pill" key={tid}>{tests.find((t) => t.id === tid)?.name || tid}</span>)}{!p.testIds.length && '—'}</td>
+                  <td>{(() => {
+                    const rows = panelTests(p);
+                    if (!rows.length) return <span className="cell-missing">Chưa chọn xét nghiệm</span>;
+                    const shown = rows.find((t) => t.id === shownTestId[p.id]) || rows[0];
+                    return <select className="panel-test-select" value={shown.id} aria-label={`Xem các xét nghiệm trong Panel QC ${p.name}`}
+                      onChange={(event) => setShownTestId((current) => ({ ...current, [p.id]: event.target.value }))}>
+                      {rows.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>;
+                  })()}</td>
                   <td className="num">{p.testIds.length}</td>
                   <td><span className={`tag ${p.active ? 'ok' : 'none'}`}>{p.active ? 'Đang dùng' : 'Ngừng'}</span></td>
                   <td><div className="manage-actions"><RowActionButton kind="edit" label={`Sửa Panel QC ${p.name}`} onClick={() => openEdit(p)} /><RowActionButton kind="delete" label={`Xóa Panel QC ${p.name}`} onClick={() => removePanelRow(p)} /></div></td>

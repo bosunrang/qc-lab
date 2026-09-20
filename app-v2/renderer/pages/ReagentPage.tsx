@@ -1,8 +1,5 @@
-// So sánh hóa chất — Giai đoạn D3.7 (docs/APP-V2-PLAN.md): bố cục + từng
-// chuỗi chữ port theo golden master `src/react/pages/ReagentPage.tsx` +
-// `src/presentation/reagent/reagent-result-html.ts` của app cũ.
-//
-// Cấu trúc app cũ, giữ nguyên tên panel/class: "Thiết lập so sánh"
+// So sánh hóa chất — workspace Clinical Precision, giữ tên class nghiệp vụ:
+// "Thiết lập so sánh"
 // (`rc-toolbar-panel`) → lưới 2 cột `rc-entry-grid` gồm "Thông tin đánh giá"
 // (`rc-info-panel`, 10 trường) và "Dữ liệu đo bắt cặp" (`rc-pair-panel`, lưới
 // có 2 cột tính sẵn Trung bình/Hiệu số) → "Kết quả thống kê"

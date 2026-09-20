@@ -1,9 +1,6 @@
-// Layout khung — sao chép bố cục sidebar của app cũ (router-shell-controller.ts
-// + professional-base.css): brand row (logo/tên phòng XN + nút thu gọn),
-// trạng thái "Đang chạy cục bộ", 3 nhóm điều hướng có tiêu đề + icon, active
-// state viền trái teal. Topbar/tiêu đề trang KHÔNG nằm ở đây — app cũ lặp lại
-// `.head` (PageHeader) ở đầu MỖI trang (không phải 1 shell cố định), giữ đúng
-// để `.head` sticky theo scroll riêng của từng trang — xem PageHeader.tsx.
+// Khung Clinical Precision: brand, trạng thái vận hành và ba nhóm điều hướng
+// nằm trong sidebar tối. PageHeader được từng route dựng ở đầu nội dung để
+// sticky theo đúng vùng cuộn của trang, còn AppShell chỉ sở hữu navigation.
 //
 // Ẩn/hiện mục điều hướng theo vai trò CHỈ LÀ HIỂN THỊ. Bảng vai trò theo
 // trang không còn ở đây — đã gom về lib/permissions.ts (PAGE_DEFS) để
@@ -19,8 +16,7 @@ import { DialogHost } from './DialogHost';
 import { DatePickerPopup } from './DatePickerPopup';
 import { NavIcon } from './NavIcon';
 
-// Chỉ còn cách NHÓM các mục (3 tiêu đề nhóm của app cũ) — nhãn/route/vai trò
-// đọc từ PAGE_DEFS, không khai lại.
+// Cấu trúc nhóm điều hướng; nhãn/route/vai trò đọc từ PAGE_DEFS, không khai lại.
 const NAV_GROUPS: { label: string; ids: string[] }[] = [
   { label: 'Theo dõi', ids: ['dash', 'entry', 'westgard', 'sigma'] },
   { label: 'Vận hành', ids: ['reagent', 'actions', 'report'] },

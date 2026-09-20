@@ -129,7 +129,10 @@ export function mapLegacyStateToTables(legacy: LegacyState): MappedTables {
   arr(legacy.qcPanels).forEach((x) => {
     const panelId = cleanId(x.id);
     if (!panelId) return;
-    arr(x.testIds).forEach((tid) => { const testId = cleanId(tid); if (testId) qc_panel_tests.push({ panel_id: panelId, test_id: testId }); });
+    // `position` theo đúng thứ tự `testIds` của app cũ. Bỏ trống thì
+    // `restoreAllTables()` bind null và panel di trú sang mất thứ tự gốc.
+    let position = 0;
+    arr(x.testIds).forEach((tid) => { const testId = cleanId(tid); if (testId) qc_panel_tests.push({ panel_id: panelId, test_id: testId, position: position++ }); });
   });
 
   const lot_transitions = arr(legacy.lotTransitions).map((x) => ({

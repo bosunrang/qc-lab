@@ -47,8 +47,7 @@ export function DatePickerPopup() {
     // DOM) — `onDocClick` không bao giờ chạy, lịch bị "mồ côi" và nổi lại
     // trên nền đã tối, phải bấm thêm 1 lần nữa (lúc này không còn modal chắn
     // đường) mới đóng được. Dùng CÙNG loại sự kiện với Modal.tsx (mousedown)
-    // để cả hai đóng trong CÙNG một lượt xử lý, trước khi bất kỳ DOM nào bị
-    // gỡ — đúng cách app "Quản lý cước phí" (DateInput.tsx) đã làm.
+    // để cả hai đóng trong CÙNG một lượt xử lý, trước khi bất kỳ DOM nào bị gỡ.
     const onDocMouseDown = (event: MouseEvent) => {
       // composedPath() (KHÔNG phải target.closest()): một click bên trong
       // popup có thể tự đổi mode (vd chọn tháng) khiến React render lại và GỠ

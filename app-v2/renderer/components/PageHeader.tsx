@@ -1,14 +1,6 @@
-// Tiêu đề trang — sao chép nguyên bố cục src/react/components/PageHeader.tsx
-// bản cũ (tiêu đề+phụ đề bên trái, khối người dùng+nút đăng xuất bên phải,
-// cùng 1 hàng `.head`, sticky theo CSS ở app.css). Mỗi trong 11 trang tự gọi
-// component này ở đầu nội dung — KHÔNG đưa vào AppShell (bản cũ cũng không
-// đưa vào 1 shell cố định, mà lặp lại y hệt ở đầu mỗi trang; giữ đúng cấu
-// trúc đó để `.head` sticky theo scroll của TỪNG trang, không phải 1 topbar
-// cố định toàn app).
-//
-// Avatar bấm được (2026-09-04) — trước đó chỉ còn `aria-hidden`, mất hẳn
-// tính năng "Đổi ảnh đại diện" của app cũ (`role="button" tabIndex={0}` +
-// onClick/onKeyDown mở `<AvatarModal>`, xem `PageHeader.tsx` app cũ).
+// Topbar Clinical Precision dùng chung: ngữ cảnh trang ở trái, tài khoản và
+// hành động phiên ở phải. Component nằm trong từng route để sticky theo vùng
+// cuộn nội dung; avatar giữ đủ tương tác chuột và bàn phím.
 import { useState } from 'react';
 import { useAuthStore } from '../store/auth-store';
 import { AvatarModal } from './AvatarModal';

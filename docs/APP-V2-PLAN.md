@@ -263,6 +263,9 @@ ngày, biểu đồ Levey-Jennings, cửa sổ ngày, huỷ điểm có phân lo
 - Cổng ghi: xét nghiệm còn hoạt động **và** thuộc Panel QC đang hoạt động
   **và** mức đang nhập gắn lô thuộc nhóm còn vận hành **và** kỳ báo cáo chưa
   khoá. Cổng nằm ở handler nên LIS và mọi lời gọi IPC đều chung ranh giới.
+- Mỗi tổ hợp **xét nghiệm + mức + lô + ngày + run ID** chỉ ghi một điểm còn
+  hiệu lực. Điểm đã huỷ có thể nhập lại cùng run ID; mọi nguồn ghi khác, kể
+  cả LIS, đều bị chặn trùng ngay tại `addPoint()`.
 - Huỷ điểm có 3 loại: `analytical` (luôn mở/dùng lại hồ sơ NCE gắn đúng
   `point_id`), `data-entry` (không mở NCE), `other` (người dùng chọn, bắt buộc
   lý do ≥5 ký tự).
@@ -337,6 +340,11 @@ PDF.
   `main/db/operational-levels.ts` — nhóm lô không vận hành thì mức bị loại
   HẲN; Panel tắt thì mức còn trong danh sách nhưng không điểm nào được đánh
   giá. `tests/entry-westgard-symmetry.test.mjs` khoá tính đối xứng.
+- Tab **nhóm lô đã dừng** cũng chạy đường ghép `combinedWestgardByPoint()`,
+  không đánh giá rời từng block: vì vậy các luật liên mức như `R4s`, `2-2s`,
+  `2of3-2s`, `3-1s` của chính lần chạy lịch sử vẫn được kết luận đúng. Phạm vi
+  mặc định lấy theo số mức của nhóm lô lịch sử (không theo panel hiện hành);
+  `westgard-archived.test.mjs` khoá ca `+2,5SD/-2,5SD` cùng run.
 - Theo chuẩn Westgard, `2of3-2s` là "2 trong 3 điểm bất kỳ" (không đòi điểm mới
   nhất phải vượt) và `7T` là **7 phép đo** (6 bước). Cả hai lệch app cũ có chủ
   đích.
@@ -603,6 +611,35 @@ hiện, và ba lệch đó nay được chốt tường minh trong bộ test.
 **Ngoài phạm vi, đã đóng băng:** di trú dữ liệu từ app cũ (C4 — người dùng chốt
 cắt thẳng, không di trú), gợi ý Bias tự động ở NCE, phân trang bảng điểm
 Westgard.
+
+---
+
+### 4.2 Clinical Precision — hệ giao diện độc lập của QC Lab (2026-09-19) — 🟨
+
+Người dùng quyết định **dừng toàn bộ kế hoạch chỉnh giao diện dựa trên app cũ
+hoặc app cước phí**. Từ mốc này QC Lab có hệ giao diện riêng, ưu tiên cảm giác
+chính xác, sạch, tin cậy và chuyên nghiệp của phần mềm y khoa desktop.
+
+- ✅ Hệ token bốn lớp trong `renderer/styles/tokens.css`: primitive → vai trò
+  → component → alias chuyển tiếp; CSS trang không được viết màu/cỡ chữ/bo
+  góc tuỳ ý.
+- ✅ Font Manrope với đúng bốn weight 400/500/600/700; thang chữ nguyên pixel,
+  tương phản và focus được khóa bằng `tests/design-system.test.mjs`.
+- ✅ Khung mới: sidebar navy có chiều sâu nhẹ, topbar trắng trong, khoảng lề
+  trang rộng hơn và điều hướng active rõ nhưng không phủ teal khắp màn hình.
+- ✅ Bề mặt mới: panel trắng, bo 8px, viền nhẹ và bóng rất mỏng; header panel
+  dùng nền trắng thay cho các dải xám nặng. Trạng thái chọn/cảnh báo mới dùng
+  bề mặt màu.
+- ✅ Control và form chuẩn cao 40px; nhãn 12px/600, nội dung 14px/400.
+  Bảng có header 40px, hàng danh sách 44px, nền trắng và hover teal rất nhạt.
+- ✅ Dashboard là màn tham chiếu đầu tiên của ngôn ngữ mới: khối tiến độ có
+  tint teal nhẹ, KPI trắng có accent mảnh, danh sách và bộ lọc dùng cùng nhịp.
+- ✅ Bảng màu Clinical Precision chốt lại theo ba họ: clinical navy
+  (`#172b35`), mineral teal (`#0b7c83`) và cool neutral. Toàn bộ cặp chữ/nền,
+  trạng thái, nút và focus đạt gate tương phản, không còn ngoại lệ WCAG cũ.
+- 🟨 Tiếp tục rà trực quan từng nhóm màn nghiệp vụ (Nhập QC, Westgard, Sigma,
+  Cấu hình, Báo cáo, Cài đặt) để loại các override bố cục cũ còn sót; không
+  mở lại việc “làm giống” bất kỳ ứng dụng nào khác.
 
 ---
 

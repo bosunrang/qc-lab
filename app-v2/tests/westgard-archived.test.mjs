@@ -28,8 +28,10 @@ const oldOperational = makeOperationalQc(db, {
   assignments: [{ level: 1, lotId: oldM1.id }, { level: 2, lotId: oldM2.id }],
 });
 
-assert.equal(entry.addPoint({ data: { testId: test.id, level: 1, date: '2026-09-01', runId: 'old-run-1', val: 102 } }, actor).ok, true);
-assert.equal(entry.addPoint({ data: { testId: test.id, level: 2, date: '2026-09-01', runId: 'old-run-1', val: 196 } }, actor).ok, true);
+// Cùng run: +2,5SD và -2,5SD. Lịch sử phải giữ được R4s liên mức, không
+// chỉ tính hai chuỗi độc lập theo từng mức.
+assert.equal(entry.addPoint({ data: { testId: test.id, level: 1, date: '2026-09-01', runId: 'old-run-1', val: 105 } }, actor).ok, true);
+assert.equal(entry.addPoint({ data: { testId: test.id, level: 2, date: '2026-09-01', runId: 'old-run-1', val: 190 } }, actor).ok, true);
 assert.equal(config.stopLotGroup({ id: oldOperational.groupId }, actor).ok, true);
 
 // Chuyển hẳn sang lô mới có Mean/SD khác: quá trình này phải chốt target cũ
@@ -51,7 +53,9 @@ assert.deepEqual(blocks.map((block) => [block.level, block.lotNo, block.mean, bl
   [1, 'OLD-M1', 100, 2],
   [2, 'OLD-M2', 200, 4],
 ]);
-assert.equal(blocks[0].analysis.points[0].z, 1, 'Z của lô cũ phải dùng Mean/SD cũ: (102-100)/2');
-assert.equal(blocks[1].analysis.points[0].z, -1, 'Z của lô cũ phải dùng Mean/SD cũ: (196-200)/4');
+assert.equal(blocks[0].analysis.points[0].z, 2.5, 'Z của lô cũ phải dùng Mean/SD cũ: (105-100)/2');
+assert.equal(blocks[1].analysis.points[0].z, -2.5, 'Z của lô cũ phải dùng Mean/SD cũ: (190-200)/4');
+assert.ok(blocks.every((block) => block.analysis.points[0].rules.includes('R4s')), 'R4s liên mức của nhóm lô đã dừng phải được giữ lại');
+assert.deepEqual(blocks.map((block) => block.analysis.points[0].verdict), ['rej', 'rej'], 'cả hai điểm cấu thành R4s lịch sử phải bị loại');
 
 console.log('app-v2 archived Westgard history end-to-end tests passed');

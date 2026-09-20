@@ -199,7 +199,7 @@ export function HistoryTab() {
         <div><h2>Lịch sử dữ liệu QC</h2><p>Chọn một xét nghiệm và máy để xem các lô/Mean-SD đã từng dùng.</p></div>
         <div className="rcfg-tools"><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm theo xét nghiệm hoặc máy..." /></div>
       </div>
-      <div className="panel target-matrix-panel history-matrix-panel">
+      <div className="panel target-matrix-panel">
       {!tests.length ? <EmptyHistory title="Chưa có xét nghiệm" message="Tạo xét nghiệm trước, sau đó cấu hình lô và Mean/SD." /> : <>
         <div className="target-selector history-selector">
           <div><label>Xét nghiệm / Máy</label><select value={testId} onChange={(e) => setTestId(e.target.value)}>{tests.filter((test) => {

@@ -1,12 +1,11 @@
-// Nhập QC — viết lại theo đúng bố cục app cũ (professional-entry.css +
-// EntryPage.tsx cũ): cây xét nghiệm bên trái (máy > xét nghiệm > mức, trạng
+// Nhập QC — cây xét nghiệm bên trái (máy > xét nghiệm > mức, trạng
 // thái theo màu), bảng "worksheet" theo lịch tháng (mỗi hàng 1 ngày, mỗi cột
 // 1 mức, nhập trực tiếp vào ô), biểu đồ Levey-Jennings dạng xếp chồng (mỗi
 // mức 1 thẻ mini), 2 panel gấp lại "Điểm trong khoảng xem"/"Thống kê toàn bộ".
 // Cột "song song 2 lô" chỉ xuất hiện khi hồ sơ chuyển lô đang hoạt động;
 // điểm lô mới được đánh giá độc lập và không quyết định kết luận lô chính.
 // "Thống kê toàn bộ & Dải kiểm soát" đã port nghiệp vụ dải PXN:
-// chỉ mức đang chọn + lô đang vận hành, cổng 20 kết quả/20 ngày, không có
+// mức chọn ngay tại bảng này + lô đang vận hành, cổng 20 kết quả/20 ngày, không có
 // cảnh báo/loại bỏ, xác thực lại, lưu lịch sử và hoàn dải nhà sản xuất.
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -63,6 +62,17 @@ function TreeToggleIcon() {
   );
 }
 
+/** Dấu mở/đóng của từng nhánh cây: SVG giữ nét +/− sắc, đối xứng và không
+ * chịu ảnh hưởng baseline của font như ký tự văn bản. */
+function TreeNodeToggleIcon({ open }: { open: boolean }) {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" aria-hidden="true">
+      <path d="M3 8h10" />
+      {!open && <path d="M8 3v10" />}
+    </svg>
+  );
+}
+
 function TrashIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -87,11 +97,18 @@ export function EntryPage() {
 
   const [machineFilter, setMachineFilter] = useState('');
   const [search, setSearch] = useState('');
+  // Máy mặc định mở; chỉ giữ các máy người dùng đã chủ động thu gọn để cây
+  // vẫn hiển thị đủ dữ liệu ngay lần đầu vào trang.
+  const [closedMachines, setClosedMachines] = useState<Set<string>>(new Set());
   const [openTests, setOpenTests] = useState<Set<string>>(new Set());
   /** Mức QC đang chọn — app cũ giữ trong `entrySel.level` và tô viền teal thẻ
    * biểu đồ tương ứng (`.lj-mini.on`, `entryFocusLevel`). Mặc định là mức đầu
    * tiên của xét nghiệm, đúng như `entrySelectionState.pick()`. */
   const [focusLevel, setFocusLevel] = useState<number | null>(null);
+  /** Mức riêng của "Thống kê toàn bộ & Dải kiểm soát". Không dùng lựa chọn
+   * biểu đồ làm điều kiện ngầm: người dùng có thể giữ biểu đồ đang xem và đổi
+   * trực tiếp mức cần thống kê/dựng dải ở thanh chọn trên chính bảng này. */
+  const [rangeLevel, setRangeLevel] = useState<number | null>(null);
   const [treeCollapsed, setTreeCollapsed] = useState(() => {
     try { return localStorage.getItem(ENTRY_TREE_COLLAPSE_KEY) === '1'; } catch { return false; }
   });
@@ -143,18 +160,19 @@ export function EntryPage() {
   // Đổi xét nghiệm thì mức đang chọn rơi về mức đầu tiên (app cũ:
   // `entrySelectionState.pick()` luôn set lại `level` khi chọn xét nghiệm).
   useEffect(() => {
-    if (!levelNums.length) { setFocusLevel(null); return; }
+    if (!levelNums.length) { setFocusLevel(null); setRangeLevel(null); return; }
     setFocusLevel((cur) => (cur != null && levelNums.includes(cur) ? cur : levelNums[0]));
+    setRangeLevel((cur) => (cur != null && levelNums.includes(cur) ? cur : levelNums[0]));
   }, [testId, levelNums]);
   useEffect(() => { setPreviousLotOpen({}); }, [testId]);
   useEffect(() => {
     if (testId) loadTestData(testId, levelNums);
     else resetTestData();
   }, [testId, levelNums, loadTestData, resetTestData]);
-  useEffect(() => { if (testId && focusLevel != null) loadRangeCandidate(testId, focusLevel); }, [testId, focusLevel, loadRangeCandidate]);
+  useEffect(() => { if (testId && rangeLevel != null) loadRangeCandidate(testId, rangeLevel); }, [testId, rangeLevel, loadRangeCandidate]);
   useStoreInvalidation(['qc_points', 'test_levels', 'lot_transitions'], testId || undefined, () => {
     if (testId && levelNums.length) loadTestData(testId, levelNums);
-    if (testId && focusLevel != null) loadRangeCandidate(testId, focusLevel);
+    if (testId && rangeLevel != null) loadRangeCandidate(testId, rangeLevel);
   });
 
   const currentSummary = summaries.find((s) => s.testId === testId);
@@ -338,7 +356,24 @@ export function EntryPage() {
   }
 
   function selectLeaf(id: string) {
-    setTestId(id); setOpenTests((s) => new Set(s).add(id));
+    // Xét nghiệm đang chọn và nhóm lô đang MỞ là hai trạng thái độc lập:
+    // người dùng vẫn cần thu gọn được nhóm chứa xét nghiệm đang xem. Bản đầu
+    // vô tình dùng `testId` để ép nhóm đó mở mãi, nên bấm dấu − không có tác
+    // dụng. Khi chọn một xét nghiệm (kể cả khi mở trang từ Dashboard), chỉ
+    // mở nhóm chứa nó một lần; sau đó nút nhóm toàn quyền đóng/mở.
+    setTestId(id);
+    setOpenTests((current) => {
+      const next = new Set(current);
+      for (const [, groups] of tree) {
+        for (const [groupKey, group] of groups) {
+          if (group.tests.some((test) => test.testId === id)) {
+            next.add(groupKey);
+            return next;
+          }
+        }
+      }
+      return next;
+    });
     setViewYear(today.getFullYear()); setViewMonth(today.getMonth() + 1);
   }
 
@@ -383,14 +418,14 @@ export function EntryPage() {
   })();
 
   async function submitRangeWorkflow() {
-    if (!testId || focusLevel == null || !rangeMode) return;
+    if (!testId || rangeLevel == null || !rangeMode) return;
     const minimum = rangeMode === 'apply' ? 10 : 5;
     if (rangeReason.trim().length < minimum) { setRangeSubmitError(`Cần ghi lý do tối thiểu ${minimum} ký tự.`); return; }
     const verified = await reauthDialog({ title: 'Xác thực thay đổi dải QC', message: 'Nhập lại mật khẩu để xác nhận thay đổi Mean/SD đang dùng.' });
     if (!verified) return;
     const result = rangeMode === 'apply'
-      ? await applyLabRange(testId, focusLevel, rangeReason.trim(), rangeCauseConfirmed, rangeBias === '' ? undefined : Number(rangeBias))
-      : await revertManufacturerRange(testId, focusLevel, rangeReason.trim());
+      ? await applyLabRange(testId, rangeLevel, rangeReason.trim(), rangeCauseConfirmed, rangeBias === '' ? undefined : Number(rangeBias))
+      : await revertManufacturerRange(testId, rangeLevel, rangeReason.trim());
     if (!result.ok) { setRangeSubmitError(result.error.message); return; }
     await Promise.all([loadLevels(testId), loadTestData(testId, levelNums), loadSummaries()]);
     setRangeMode(null); setRangeReason(''); setRangeSubmitError(null);
@@ -530,11 +565,18 @@ export function EntryPage() {
             </select>
           </div>
           <div role="tree">
-            {tree.map(([machine, groups]) => (
+            {tree.map(([machine, groups]) => {
+              const machineKey = `machine:${machine}`;
+              const machineOpen = !closedMachines.has(machineKey);
+              return (
               <div key={machine}>
-                <div className="tnode tn-machine" role="treeitem" aria-expanded="true"><span className="caret" aria-hidden="true">−</span>{machine}</div>
-                {groups.map(([groupKey, group]) => {
-                  const open = openTests.has(groupKey) || group.tests.some((s) => s.testId === testId);
+                <div className="tnode tn-machine" role="treeitem" aria-expanded={machineOpen}
+                  tabIndex={0} onKeyDown={handleTreeKeyDown}
+                  onClick={() => setClosedMachines((current) => { const next = new Set(current); next.has(machineKey) ? next.delete(machineKey) : next.add(machineKey); return next; })}>
+                  <span className="caret" aria-hidden="true"><TreeNodeToggleIcon open={machineOpen} /></span>{machine}
+                </div>
+                {machineOpen && groups.map(([groupKey, group]) => {
+                  const open = openTests.has(groupKey);
                   const rank = { none: -1, ok: 0, warn: 1, rej: 2 } as const;
                   const groupWorst = group.tests.reduce<'ok' | 'warn' | 'rej' | 'none'>((acc, s) => rank[latestOf(s)] > rank[acc] ? latestOf(s) : acc, 'none');
                   return (
@@ -542,7 +584,7 @@ export function EntryPage() {
                       <div className={`tnode tn-test${open ? ' open' : ''}`} role="treeitem" aria-expanded={open}
                         tabIndex={0} onKeyDown={handleTreeKeyDown}
                         onClick={() => setOpenTests((s) => { const next = new Set(s); next.has(groupKey) ? next.delete(groupKey) : next.add(groupKey); return next; })}>
-                        <span className="caret" aria-hidden="true">{open ? '−' : '+'}</span>{group.name}
+                        <span className="caret" aria-hidden="true"><TreeNodeToggleIcon open={open} /></span>{group.name}
                         <span className={`state ${groupWorst === 'none' ? '' : groupWorst}`}>{TREE_STATE[groupWorst]}</span>
                       </div>
                       {open && group.tests.map((s) => {
@@ -560,7 +602,8 @@ export function EntryPage() {
                   );
                 })}
               </div>
-            ))}
+              );
+            })}
             {!tree.length && <div className="tree-empty">Không có xét nghiệm phù hợp.</div>}
           </div>
         </div>
@@ -617,6 +660,7 @@ export function EntryPage() {
                         const warnRules = Array.from(new Set(levelReps.filter((p) => p.verdict === 'warn').flatMap((p) => p.rules)));
                         const rejRules = Array.from(new Set(levelReps.filter((p) => p.verdict === 'rej').flatMap((p) => p.rules)));
                         const worst = !levelReps.length ? null : levelReps.some((p) => p.verdict === 'rej') ? 'rej' : levelReps.some((p) => p.verdict === 'warn') ? 'warn' : 'ok';
+                        const dayNote = dayPoints.find((p) => p.note)?.note || '';
                         const isToday = date === todayStr;
                         return (
                           <tr key={date} className={rowClass(date, todayStr, levels.filter((l) => pointsForDay(l.level, date).length).length, levels.length, dayPoints.length > 0)}>
@@ -673,9 +717,9 @@ export function EntryPage() {
                             <td>{rejRules.join(', ') || '—'}</td>
                             <td>{worst == null ? '—' : worst === 'rej' ? <span className="tag rej">R</span> : worst === 'warn' ? <span className="tag warn">W(A)</span> : <span className="tag ok">A</span>}</td>
                             <td>{!dayPoints.length ? '—' : writable
-                              ? <textarea className="qc-note-input" rows={1} placeholder="Ghi chú" defaultValue={dayPoints.find((p) => p.note)?.note || ''}
+                              ? <textarea key={`note:${testId}:${date}:${dayNote}`} className="qc-note-input" rows={1} placeholder="Ghi chú" defaultValue={dayNote}
                                   onBlur={(e) => saveDayNote(date, e.target.value)} />
-                              : (dayPoints.find((p) => p.note)?.note || '—')}</td>
+                              : (dayNote || '—')}</td>
                           </tr>
                         );
                       })}
@@ -757,9 +801,9 @@ export function EntryPage() {
                   })}
                 </div>
                 <div className="legend">
-                  <span><span className="dot" style={{ background: '#0e8f8f' }} /> Trong ±2SD</span>
-                  <span><span className="dot" style={{ background: '#dd8b1f' }} /> Cảnh báo 2–3SD</span>
-                  <span><span className="dot" style={{ background: '#c5221f' }} /> Loại bỏ ngoài 3SD</span>
+                  <span><span className="dot qc-legend-ok" /> Trong ±2SD</span>
+                  <span><span className="dot qc-legend-warn" /> Cảnh báo 2–3SD</span>
+                  <span><span className="dot qc-legend-rej" /> Loại bỏ ngoài 3SD</span>
                 </div>
               </div>
 
@@ -824,7 +868,16 @@ export function EntryPage() {
               </section>
 
               <section className="panel entry-secondary-panel range-summary-panel">
-                <div className="entry-secondary-summary"><span>Thống kê toàn bộ &amp; Dải kiểm soát</span><small>{rangeSummaryText}</small></div>
+                <div className="entry-secondary-summary range-summary-header">
+                  <span>Thống kê toàn bộ &amp; Dải kiểm soát</span>
+                  <small>{rangeSummaryText}</small>
+                  {levelNums.length > 1 && (
+                    <div className="dayseg" role="tablist" aria-label="Chọn mức QC cho thống kê và dải kiểm soát">
+                      {levelNums.map((level) => <button type="button" key={level} role="tab" aria-selected={rangeLevel === level}
+                        className={rangeLevel === level ? 'on' : ''} onClick={() => setRangeLevel(level)}>Mức {level}</button>)}
+                    </div>
+                  )}
+                </div>
                 <div className="entry-secondary-body">
                   {rangeCandidate ? (
                     <>
