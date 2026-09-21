@@ -59,11 +59,11 @@ main:has(.config-shell){padding-bottom:16px;}
 .rcfg-toolbar p{margin:2px 0 0;max-width:520px;color:var(--text-faint);font-size:var(--text-sm);font-weight:500;}
 .rcfg-toolbar>div:first-child{flex:1 1 320px;min-width:min(100%,260px);}
 .rcfg-tools{display:flex;align-items:center;gap:8px;flex:1 1 300px;min-width:0;justify-content:flex-end;flex-wrap:wrap;}
-/* Ô tìm kiếm và nút chính cùng cao 40px, nền trắng: header không còn dải xám
+/* Ô tìm kiếm và nút chính cùng cao 36px, nền trắng: header không còn dải xám
    nên ô nền xám cũ (`--surface-subtle`) sẽ thành mảng màu duy nhất trôi nổi
    trên nền trang. */
-.rcfg-tools input{height:var(--control-h);min-height:var(--control-h);width:auto;flex:1 1 220px;max-width:320px;border-color:var(--border-subtle);background:var(--panel);box-shadow:none;}
-.rcfg-toolbar .btn.teal{min-height:var(--control-h);padding-inline:14px;border-radius:var(--radius-sm);box-shadow:none;}
+.rcfg-tools input{height:var(--control-h-config);min-height:var(--control-h-config);width:auto;flex:1 1 220px;max-width:320px;border-color:var(--border-subtle);background:var(--panel);box-shadow:none;}
+.rcfg-toolbar .btn.teal{min-height:var(--control-h-config);padding-inline:14px;border-radius:var(--radius-sm);box-shadow:none;}
 
 /* Nhịp bảng kiểu LIMS (điểm (3) của khối chuẩn ở trên): đầu bảng 40px chữ
    13px, hàng tối thiểu 44px chữ 13px, một hàng một dòng. Không kẻ sọc xen
@@ -77,8 +77,8 @@ main:has(.config-shell){padding-bottom:16px;}
 .config-shell-main .rcfg-list>table tbody tr:hover{background:var(--surface-subtle);}
 /* 44px là SÀN, không phải khuôn. `height` trên ô bảng được trình duyệt hiểu
    là chiều cao tối thiểu, nên hàng một dòng chữ đúng 44px, còn hàng có ô hai
-   dòng, `<select>` hay ô nhập 34px thì tự cao lên theo nội dung. Đệm dọc 4px là phần bắt buộc phải có: để 0 thì `<select>`
-   34px trong hàng 44px gần như dính vào đường kẻ hàng (đã thấy ở thẻ Danh mục
+   dòng, `<select>` hay ô nhập 36px thì tự cao lên theo nội dung. Đệm dọc 4px là phần bắt buộc phải có: để 0 thì `<select>`
+   36px trong hàng 44px gần như dính vào đường kẻ hàng (đã thấy ở thẻ Danh mục
    xét nghiệm) — thẻ Máy xét nghiệm không lộ ra vì mọi ô của nó chỉ có chữ. */
 .config-shell-main .rcfg-list>table tbody td{height:var(--table-row-h);padding-block:4px;border-bottom:1px solid var(--border-subtle);font-size:var(--text-sm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 /* `height` của ô bảng là chiều cao TỐI THIỂU, nên ô hai dòng (tên + `.hint`)
@@ -324,7 +324,7 @@ main:has(.config-shell){padding-bottom:16px;}
    chỉ một đường kẻ ngăn với bảng bên dưới. */
 .target-selector{display:grid;gap:10px;padding:12px 14px;border-bottom:1px solid var(--table-head-border);background:var(--panel);align-items:end;}
 .target-selector label{margin-top:0;}
-.target-selector select,.target-selector input{height:var(--control-h);}
+.target-selector select,.target-selector input{height:var(--control-h-config);}
 .target-selector.history-selector{grid-template-columns:minmax(240px,320px);}
 .target-matrix-panel .target-selector:not(.history-selector){grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));}
 .target-selector.field{max-width:none;}
@@ -582,7 +582,9 @@ main:has(.config-shell){padding-bottom:16px;}
 .lot-level-col b{color:var(--ink);font-size:var(--text-sm);font-weight:var(--weight-bold);}
 .lot-level-col small{color:var(--muted);font-size:var(--text-xs);}
 .lot-opt-depleted{opacity:.62;}
-.rcfg-group-modal .lot-level-picker+.field{margin-top:var(--space-panel);}
+/* Bộ chọn lô và tên nhóm là hai hàng liên tiếp của cùng form; `row-gap` 12px
+   trên #lot-group-form đã đủ nhịp. Không cộng thêm khoảng cách panel ở đây. */
+.rcfg-group-modal .lot-level-picker+.field{margin-top:0;}
 
 @media(max-width:1150px){
   .config-shell{min-height:auto;}
@@ -680,21 +682,30 @@ button.btn.ghost.btn-stop-tint,button.btn.ghost.btn-stop-tint:hover{color:var(--
    textarea và nút icon thao tác hàng giữ kích thước chuyên biệt. */
 .config-shell input:not([type="checkbox"]):not([type="radio"]),
 .config-shell select,
-.config-shell button.btn,
-.rcfg-modal input:not([type="checkbox"]):not([type="radio"]),
-.rcfg-modal select,
+.config-shell button.btn{
+  height:var(--control-h-config);
+  min-height:var(--control-h-config);
+}
+.rcfg-modal input:not([type="checkbox"]):not([type="radio"]){
+  height:var(--control-h-config);
+  min-height:var(--control-h-config);
+}
 .rcfg-modal button.btn{
-  height:var(--control-h);
-  min-height:var(--control-h);
+  height:var(--button-height);
+  min-height:var(--button-height);
+}
+.rcfg-modal select{
+  height:var(--control-h-select);
+  min-height:var(--control-h-select);
 }
 .rcfg-modal .datebox{
   box-sizing:border-box;
-  height:var(--control-h);
-  min-height:var(--control-h);
+  height:var(--control-h-date);
+  min-height:var(--control-h-date);
 }
 .rcfg-modal .datebox input.date-text{
-  height:var(--control-h-table);
-  min-height:var(--control-h-table);
+  height:var(--control-h-date);
+  min-height:var(--control-h-date);
 }
 
 .history-detail-heading{margin-top:0;margin-bottom:var(--panel-content-gap);}

@@ -199,6 +199,15 @@ export interface ActivityPage {
   filteredCount: number; total: number;
 }
 
+export interface ActivityArchivePreview {
+  months: number;
+  cutoffIso: string;
+  removedCount: number;
+  retainedCount: number;
+  /** CSV của đúng phần sẽ bị gỡ, gồm PrevHash và Hash để đối chiếu độc lập. */
+  csv: string;
+}
+
 export interface QcPointView {
   id: string; test_id: string; level: number; date: string; run_id: string; val: number;
   note: string; operator_name: string; voided: 0 | 1; void_reason: string;
@@ -496,15 +505,16 @@ export interface QcApi {
    * `removedRecord` cho biết dòng có bị xoá luôn không (chỉ khi đó là
    * analyte KHÔNG tự thêm và không còn CLIA/Ricos% ghi đè nào khác). */
   removeTeaLabProfile(input: { id: string }): Promise<IpcResult<{ id: string; removedRecord: boolean }>>;
-  /** 3 hàm đọc nhật ký trả `IpcResult` (khác mọi hàm đọc khác của app, trả
+  /** 4 hàm đọc nhật ký trả `IpcResult` (khác mọi hàm đọc khác của app, trả
    * thẳng dữ liệu) vì trang Nhật ký là ADMIN_ONLY và nội dung nhật ký là dữ
    * liệu nhạy cảm — cổng quyền nằm ở main, xem `audit-handlers.ts`. Với
    * `verifyActivityChainNow`, `.ok` ngoài là cổng quyền, `.data.ok` mới là
    * kết luận chuỗi hash. */
   queryActivity(input: { query?: string; from?: string; to?: string; page?: number; pageSize?: number }): Promise<IpcResult<ActivityPage>>;
+  previewArchiveActivity(input: { data: { months: 12 | 24 | 36 } }): Promise<IpcResult<ActivityArchivePreview>>;
   exportActivityCsv(input: { query?: string; from?: string; to?: string }): Promise<IpcResult<string>>;
   verifyActivityChainNow(): Promise<IpcResult<{ ok: boolean; checked: number; legacy: number; brokenIndex: number; reason: string }>>;
-  archiveActivity(input: { data: { months: 12 | 24 | 36 } }): Promise<IpcResult<{ removedCount: number }>>;
+  archiveActivity(input: { data: { months: 12 | 24 | 36 } }): Promise<IpcResult<{ removedCount: number; retainedCount: number; cutoffIso: string }>>;
   queryPoints(testId: string, level: number): Promise<QcPointView[]>;
   /** Mọi điểm chưa hủy của xét nghiệm, gồm cả các lô lịch sử. */
   listEntryHistoryPoints(testId: string): Promise<QcPointView[]>;

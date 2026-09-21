@@ -179,11 +179,17 @@ export function WestgardPage() {
     return () => { active = false; };
   }, [archivedGroupId, archivedTestId, archivedRefresh]);
   const archivedDecimals = tests.find((t) => t.id === archivedTestId)?.decimal_places ?? 2;
-  /** Nhãn xét nghiệm trong ô chọn — app cũ ghép kèm LOT các mức:
-   * "Sodium (Na) · LOT 1101/1102". */
+  /** Nhãn xét nghiệm trong ô chọn: LOT phân biệt dải QC, còn tên máy phân biệt
+   * cùng một xét nghiệm được gán cho nhiều máy. */
   const testPickerLabel = (s: typeof summaries[number]) => {
     const lots = Array.from(new Set(s.levels.map((lv) => lv.lot).filter(Boolean)));
-    return lots.length ? `${s.testName} · LOT ${lots.join('/')}` : s.testName;
+    const label = lots.length ? `${s.testName} · LOT ${lots.join('/')}` : s.testName;
+    return s.instrumentName ? `${label} · ${s.instrumentName}` : label;
+  };
+  const archivedTestPickerLabel = (item: typeof archivedTestOptions[number]) => {
+    const instrumentName = tests.find((test) => test.id === item.id)?.instrument_id;
+    const instrument = instruments.find((candidate) => candidate.id === instrumentName)?.name;
+    return instrument ? `${item.label} · ${instrument}` : item.label;
   };
   /** Lọc theo ô "Tìm nhanh" — tên xét nghiệm, LOT hoặc máy, đúng bộ field
    * app cũ dùng. */
@@ -396,7 +402,7 @@ export function WestgardPage() {
               <div className="field"><label>Chọn xét nghiệm <span className="hint">({archivedMatchedTests.length || archivedOrderedTests.length}/{archivedOrderedTests.length})</span></label>
                 <select value={archivedTestId} disabled={archivedTestsLoading || !archivedTestOptions.length} onChange={(e) => setArchivedTestId(e.target.value)}>
                   {!archivedTestOptions.length && <option value="">{archivedTestsLoading ? 'Đang nạp xét nghiệm...' : 'Nhóm lô này chưa dùng cho xét nghiệm nào'}</option>}
-                  {archivedTestOptions.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+                  {archivedTestOptions.map((t) => <option key={t.id} value={t.id}>{archivedTestPickerLabel(t)}</option>)}
                 </select>
               </div>
               <div className="field"><label>Nhóm lô đã dừng/lưu trữ <span className="hint">({archivedGroupOptions.length}/{archivedGroups.length})</span></label>

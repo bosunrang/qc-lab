@@ -210,6 +210,7 @@ export async function createRealBrowserApi(): Promise<QcApi> {
 
     // audit
     queryActivity: async (input) => audit.query(input, requireActor()),
+    previewArchiveActivity: async (input) => audit.previewArchive(input, requireActor()),
     exportActivityCsv: async (input) => audit.exportCsv(input, requireActor()),
     verifyActivityChainNow: async () => audit.verifyChainNow(requireActor()),
     archiveActivity: async (input) => audit.archive(input, requireActor()),

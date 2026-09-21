@@ -137,6 +137,7 @@ assert.ok(westgard.listTestSummaries().length > 0, 'doc tong quan Westgard khong
 const beforeAuditRead = activityCount();
 for (const [role, who] of [['viewer', viewer], ['KTV', tech], ['vai tro la', unknown]]) {
   assertForbidden(audit.query({}, who), role + ' queryActivity');
+  assertForbidden(audit.previewArchive({ data: { months: 12 } }, who), role + ' previewArchiveActivity');
   assertForbidden(audit.exportCsv({}, who), role + ' exportActivityCsv');
   assertForbidden(audit.verifyChainNow(who), role + ' verifyActivityChainNow');
 }
@@ -147,7 +148,7 @@ assert.equal(adminRead.ok, true, 'admin phai doc duoc nhat ky');
 assert.ok(adminRead.data.rows.length > 0, 'admin phai thay duoc cac dong da ghi o tren');
 const adminCsv = audit.exportCsv({}, admin);
 assert.equal(adminCsv.ok, true, 'admin phai xuat duoc CSV nhat ky');
-assert.ok(adminCsv.data.startsWith('seq,ts,user'), 'CSV phai co header dung');
+assert.ok(adminCsv.data.startsWith('Seq,Thời gian,Người dùng'), 'CSV phai co header audit day du');
 const adminVerify = audit.verifyChainNow(admin);
 assert.equal(adminVerify.ok, true, 'admin phai kiem duoc chuoi hash');
 // Hai tang ok: .ok la cong quyen, .data.ok moi la ket luan chuoi hash.

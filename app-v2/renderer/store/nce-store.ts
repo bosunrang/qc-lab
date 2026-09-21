@@ -3,6 +3,7 @@
 // nó, không dùng field `error` dùng chung nữa (khác bản thí điểm cũ).
 import { create } from 'zustand';
 import type { NceRecord, NceDetail, IpcResult } from '../../shared/qc-api';
+import { latestNceSigmaBias, type NceBiasSuggestion } from '../../main/domain/nce-bias-suggestion';
 
 interface NceCreateData {
   testId?: string; level?: number; lot?: string; date: string; pointId?: string; rule?: string;
@@ -13,6 +14,8 @@ interface NceCreateData {
 interface NceState {
   records: NceRecord[];
   load: () => Promise<void>;
+  /** Gợi ý chỉ-đọc từ kỳ Sigma gần nhất, không ghi gì vào hồ sơ NCE. */
+  latestSigmaBias: (testId: string, level: number) => Promise<NceBiasSuggestion | null>;
   create: (data: NceCreateData) => Promise<IpcResult<NceRecord>>;
   saveProtocol: (id: string, dueDate: string, protocol: Partial<NceDetail>) => Promise<IpcResult<NceRecord>>;
   approve: (id: string) => Promise<IpcResult<NceRecord>>;
@@ -29,6 +32,7 @@ export const useNceStore = create<NceState>((set, get) => ({
   records: [],
 
   load: async () => set({ records: await window.qcApi.listNceRecords() }),
+  latestSigmaBias: async (testId, level) => latestNceSigmaBias(await window.qcApi.listSigmaPeriods(testId), level),
 
   create: async (data) => {
     const result = await window.qcApi.createNce({ data });

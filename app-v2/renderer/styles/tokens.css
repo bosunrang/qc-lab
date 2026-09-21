@@ -40,6 +40,7 @@
   --gray-300:#c5d1d7;
   --gray-600:#536a76;
   --gray-900:#172b35;
+  --navy-950:#14242e;
 
   --teal-100:#e2f1f0;
   /* Bốn bậc lấp vào khoảng trống giữa teal-100 và teal-500. Giá trị là mã
@@ -109,7 +110,7 @@
   --dark-on-light:#dde8ec;
 
   /* Nền/đường kẻ riêng của khung sườn, không thuộc dải xám. */
-  --canvas:#f3f6f8;
+  --canvas:#f5f7f9;
   --thead-bg:#edf2f4;
   --thead-line:#d9e4e8;
   --scrollbar-thumb-base:#a4b3bb;
@@ -233,7 +234,8 @@
   --neutral-text:var(--gray-600);    --neutral-surface:var(--gray-100);
   --neutral-border:var(--gray-200);  --neutral-accent:var(--gray-600);
 
-  --sidebar-bg:var(--gray-900);
+  /* Sidebar navy đặc để cạnh điều hướng rõ, không bị mờ bởi gradient. */
+  --sidebar-bg:var(--navy-950);
   --sidebar-border:var(--dark-line);
   --sidebar-text:var(--dark-text);
   --sidebar-text-muted:var(--dark-text-muted);
@@ -257,19 +259,26 @@
      Bàn phím chỉ dùng vòng này; click chuột chỉ đổi một viền accent, để
      không có hai đường teal song song quanh cùng một control. */
   --focus-ring:var(--teal-500);
-  --focus-ring-width:2px;
+  --focus-ring-width:1px;
   /* Âm đúng bằng độ dày vòng: vòng teal nằm đè lên viền control thay vì
      bao thêm một lớp bên ngoài. Không đổi kích thước và không tạo hai viền. */
-  --focus-ring-offset:-2px;
+  --focus-ring-offset:-1px;
 
   /* ═══════════════════════════════════════════════════════════════════
      LỚP 3 — TOKEN COMPONENT.
      ═══════════════════════════════════════════════════════════════════ */
-  /* Control có năm mật độ có chủ đích: nút cực gọn 28, hàng dữ liệu 30,
-     toolbar 32, ô bảng 34 và form chuẩn 40. Không đặt số mới tại trang. */
+  /* Control có sáu mật độ có chủ đích: nút cực gọn 28, hàng dữ liệu 30,
+     toolbar 32, ô bảng gọn 34, select/tìm nhanh/ô dữ liệu/vùng Cấu hình/ô ngày 36 và form chuẩn 40.
+     Không đặt số mới tại trang. */
   --control-h-row:30px;
   --control-h-compact:32px;
   --control-h-table:34px;
+  --control-h-select:36px;
+  --control-h-search:36px;
+  --control-h-data:36px;
+  --control-h-config:36px;
+  --control-h-action:36px;
+  --control-h-date:36px;
   --control-h:40px;
   --control-h-sm:28px;
   --control-padding-x:var(--space-3);
@@ -314,12 +323,11 @@
   --table-head-weight:var(--weight-semibold);
   --table-head-tracking:.02em;
   --table-body-size:var(--text-sm);
-  /* Tầng thứ hai cho BẢNG NHỎ: bảng gọn nằm trong panel (Sigma, hướng dẫn
-     Westgard, ma trận lô). Header nhỏ và thưa chữ hơn để không tranh chấp với
-     header panel ngay phía trên nó. */
+  /* BẢNG GỌN nằm trong panel (Sigma, hướng dẫn Westgard, ma trận lô) chỉ khác
+     nhịp cao/đệm; typography giữ cùng chuẩn bảng để không có hệ chữ thứ hai. */
   --table-header-h-sm:30px;
-  --table-head-size-sm:var(--text-2xs);
-  --table-head-tracking-sm:.04em;
+  --table-head-size-sm:var(--table-head-size);
+  --table-head-tracking-sm:var(--table-head-tracking);
 
   --modal-padding:var(--space-5);
   --field-label-gap:var(--space-1);
@@ -412,7 +420,7 @@
   --sidebar-link-text:var(--dark-text-link);
 
   --control-height:var(--control-h);
-  --button-height:var(--control-h);
+  --button-height:var(--control-h-action);
   --button-inline-padding:var(--button-padding-x);
   --sans:var(--font-sans);
   --mono:var(--font-mono);

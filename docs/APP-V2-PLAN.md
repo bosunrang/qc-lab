@@ -630,7 +630,9 @@ chính xác, sạch, tin cậy và chuyên nghiệp của phần mềm y khoa de
 - ✅ Bề mặt mới: panel trắng, bo 8px, viền nhẹ và bóng rất mỏng; header panel
   dùng nền trắng thay cho các dải xám nặng. Trạng thái chọn/cảnh báo mới dùng
   bề mặt màu.
-- ✅ Control và form chuẩn cao 40px; nhãn 12px/600, nội dung 14px/400.
+- ✅ Input form chuẩn cao 40px, nút thao tác chuẩn cao 36px; select, ô ngày, ô tìm nhanh và ô nhập trực tiếp
+  trong hàng dữ liệu cao 36px. Vùng Cấu hình chung dùng control 36px để bảng dày
+  dữ liệu cân đối. Nhãn 12px/600, nội dung 14px/400.
   Bảng có header 40px, hàng danh sách 44px, nền trắng và hover teal rất nhạt.
 - ✅ Dashboard là màn tham chiếu đầu tiên của ngôn ngữ mới: khối tiến độ có
   tint teal nhẹ, KPI trắng có accent mảnh, danh sách và bộ lọc dùng cùng nhịp.

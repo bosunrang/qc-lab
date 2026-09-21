@@ -54,6 +54,7 @@ const api = {
   removeTeaRef: (input: unknown) => ipcRenderer.invoke('config:removeTeaRef', input),
   removeTeaLabProfile: (input: unknown) => ipcRenderer.invoke('config:removeTeaLabProfile', input),
   queryActivity: (input: unknown) => ipcRenderer.invoke('audit:query', input),
+  previewArchiveActivity: (input: unknown) => ipcRenderer.invoke('audit:previewArchive', input),
   exportActivityCsv: (input: unknown) => ipcRenderer.invoke('audit:exportCsv', input),
   verifyActivityChainNow: () => ipcRenderer.invoke('audit:verifyChainNow'),
   archiveActivity: (input: unknown) => ipcRenderer.invoke('audit:archive', input),

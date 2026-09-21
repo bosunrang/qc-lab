@@ -157,6 +157,7 @@ async function createWindow(): Promise<void> {
   ipcMain.handle('config:removeTeaRef', (_event, input) => config.removeTeaRef(input, requireActor()));
   ipcMain.handle('config:removeTeaLabProfile', (_event, input) => config.removeTeaLabProfile(input, requireActor()));
   ipcMain.handle('audit:query', (_event, input) => audit.query(input, requireActor()));
+  ipcMain.handle('audit:previewArchive', (_event, input) => audit.previewArchive(input, requireActor()));
   ipcMain.handle('audit:exportCsv', (_event, input) => audit.exportCsv(input, requireActor()));
   ipcMain.handle('audit:verifyChainNow', () => audit.verifyChainNow(requireActor()));
   ipcMain.handle('audit:archive', (_event, input) => audit.archive(input, requireActor()));

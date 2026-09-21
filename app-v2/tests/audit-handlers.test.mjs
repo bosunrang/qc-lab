@@ -9,6 +9,7 @@ const require = createRequire(import.meta.url);
 const { openDatabase } = require('../../app-v2-dist/main/db/open-database.js');
 const { createConfigHandlers } = require('../../app-v2-dist/main/ipc/config-handlers.js');
 const { createAuditHandlers } = require('../../app-v2-dist/main/ipc/audit-handlers.js');
+const { writeAudit, AUDIT_HARD_CAP, AUDIT_ROTATE_TO } = require('../../app-v2-dist/main/ipc/shared.js');
 
 const db = openDatabase(':memory:');
 const config = createConfigHandlers(db);
@@ -56,11 +57,13 @@ assert.equal(page2.rows.length, 2);
 const seqSeen = new Set([...page1.rows, ...page2.rows].map(r => r.seq));
 assert.equal(seqSeen.size, 4);
 
-// 5) exportCsv() tra dung header + so dong khop voi query() cung bo loc
+// 5) CSV là hồ sơ audit hoàn chỉnh: luôn theo thứ tự ghi, không lệ thuộc
+// bộ lọc giao diện, và phải giữ đủ hai hash để kiểm chứng độc lập.
 const csv = exportCsv({ query: 'glucose' });
 const csvLines = csv.split('\n');
-assert.equal(csvLines[0], 'seq,ts,user,username,role,type,detail,target');
-assert.equal(csvLines.length, 2, 'header + 1 dong khop "glucose"');
+assert.equal(csvLines[0], 'Seq,Thời gian,Người dùng,Tên đăng nhập,Vai trò,Hành động,Đối tượng,Chi tiết,PrevHash,Hash');
+assert.equal(csvLines.length, 5, 'header + toan bo 4 dong, khong theo bo loc');
+assert.match(csvLines[1], /Quản trị/, 'CSV phải xuất nhãn vai trò tiếng Việt');
 
 // 6) verifyChainNow() phai OK khi chuoi chua bi dung tay
 const verify1 = verifyChainNow();
@@ -103,5 +106,54 @@ const afterArchiveVerify = verifyChainNow();
 assert.equal(afterArchiveVerify.ok, true, 'chuoi phai van xac minh duoc TU ANCHOR sau khi cat, khong bao "bi pha"');
 const afterArchiveQuery = query({});
 assert.ok(!afterArchiveQuery.rows.some(r => r.detail === 'Diem cu 3 nam truoc'), 'dong cu phai bien mat khoi bang song');
+
+// 9) Xem trước phải xuất ĐÚNG đoạn bị gỡ, giữ hash; khi mốc cắt làm rỗng
+// bảng sống, dòng audit kế tiếp phải khởi đầu chuỗi mới thay vì giữ anchor cũ.
+const preview = audit.previewArchive({ data: { months: 12 } }, actor);
+assert.equal(preview.ok, true);
+assert.equal(preview.data.removedCount, 0, 'sau cat khong con dong cu de preview');
+
+const onlyOld = query({}).rows.map((entry, index) => ({ ...entry, id: `all-old-${index}`, seq: index + 1, ts: oldTs.toISOString() }));
+const allOldRelinked = relinkAuditChain(onlyOld, '');
+db.exec('DELETE FROM activity');
+for (const e of allOldRelinked) {
+  db.prepare(`INSERT INTO activity(id,seq,ts,user,username,user_id,role,type,detail,target,client_id,prev_hash,hash)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(e.id, e.seq, e.ts, e.user, e.username, e.userId || 'u1', e.role, e.type, e.detail, e.target || '', e.clientId || 'test-client', e.prevHash, e.hash);
+}
+const allOldPreview = audit.previewArchive({ data: { months: 12 } }, actor);
+assert.equal(allOldPreview.ok, true);
+assert.equal(allOldPreview.data.removedCount, allOldRelinked.length);
+assert.equal(allOldPreview.data.retainedCount, 0);
+assert.match(allOldPreview.data.csv, /PrevHash,Hash/);
+const allOldArchived = audit.archive({ data: { months: 12 } }, actor);
+assert.equal(allOldArchived.ok, true);
+assert.equal(allOldArchived.data.retainedCount, 0);
+assert.equal(verifyChainNow().ok, true, 'cat het log phai khoi dau chuoi hash moi hop le');
+
+// 10) Phòng khi người dùng quên lưu trữ thủ công: đúng giới hạn app cũ,
+// vượt 50.000 dòng tự giữ 40.000 dòng mới nhất + 1 dòng giải thích; anchor
+// phải nối đúng vào dòng đầu còn lại để verifier không báo sai.
+db.exec("DELETE FROM activity; DELETE FROM app_meta WHERE key='activityAnchor'");
+const seedInsert = db.prepare(`INSERT INTO activity(id,seq,ts,user,username,user_id,role,type,detail,target,client_id,prev_hash,hash)
+  VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+const rotationSeed = [];
+let previousHash = '';
+for (let seq = 1; seq <= AUDIT_HARD_CAP; seq++) {
+  const entry = {
+    id: `rotation-${seq}`, seq, ts: '2020-01-01T00:00:00.000Z', user: 'Quan tri vien', username: 'admin', userId: 'u1',
+    role: 'admin', type: 'Thao tác cũ', detail: `Dòng ${seq}`, target: '', clientId: 'test-client', prevHash: previousHash, hash: '',
+  };
+  entry.hash = auditEntryHash(entry);
+  previousHash = entry.hash;
+  rotationSeed.push(entry);
+  seedInsert.run(entry.id, entry.seq, entry.ts, entry.user, entry.username, entry.userId, entry.role, entry.type, entry.detail, entry.target, entry.clientId, entry.prevHash, entry.hash);
+}
+writeAudit(db, actor, 'Thao tác làm vượt ngưỡng', 'Kiểm tra tự xoay vòng', 'Nhật ký');
+const rotatedRows = db.prepare('SELECT * FROM activity ORDER BY seq ASC').all();
+assert.equal(rotatedRows.length, AUDIT_ROTATE_TO + 1, 'giữ 40.000 dòng mới nhất và thêm 1 dòng báo xoay vòng');
+// Dòng thao tác vừa ghi là dòng 50.001, nên phải cắt 10.001 dòng (index 0…10000).
+assert.equal(db.prepare("SELECT value FROM app_meta WHERE key='activityAnchor'").get().value, rotationSeed[AUDIT_HARD_CAP - AUDIT_ROTATE_TO].hash);
+assert.equal(rotatedRows.at(-1).type, 'Xoay vòng nhật ký hoạt động');
+assert.equal(verifyChainNow().ok, true, 'chuỗi phải hợp lệ sau xoay vòng tự động');
 
 console.log('app-v2 audit-handlers end-to-end tests passed');

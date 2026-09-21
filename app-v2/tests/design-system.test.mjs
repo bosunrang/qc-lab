@@ -56,9 +56,10 @@ test('bảng màu Clinical Precision giữ đúng các neo nhận diện', () =>
     '--teal-700': '#07545c',
     '--teal-300': '#97c8c6',
     '--teal-100': '#e2f1f0',
-    '--gray-900': '#172b35',   // mực chữ + nền sidebar
+    '--gray-900': '#172b35',   // mực chữ + nền tối chung
+    '--navy-950': '#14242e',   // nền sidebar navy đặc
     '--gray-200': '#dce5e9',   // đường kẻ
-    '--canvas': '#f3f6f8',     // nền trang
+    '--canvas': '#f5f7f9',     // nền trang
     '--red-600': '#9f3030',
     '--amber-600': '#7a4508',
     '--blue-600': '#285d82',
@@ -131,15 +132,14 @@ test('tiêu đề và header bảng đi theo thang, không tự đặt cỡ', ()
     ['24px', '24px', '16px', '14px', '13px', '11px'],
     'thang tiêu đề 6 cấp',
   );
-  // Hai tầng header bảng: bảng dữ liệu lớn vs bảng gọn nằm trong panel.
+  // Một hệ typography bảng; bảng gọn trong panel chỉ thu nhịp cao/đệm.
   assert.equal(flat('--table-head-size'), '13px');
-  assert.equal(flat('--table-head-size-sm'), '11px');
+  assert.equal(flat('--table-head-size-sm'), '13px');
   assert.equal(flat('--table-header-h'), '40px');
   assert.equal(flat('--table-header-h-sm'), '30px');
   assert.equal(flat('--table-radius'), '8px', 'bảng dữ liệu chỉ bo nhẹ 8px');
-  // Bảng nhỏ phải thưa chữ hơn bảng lớn, nếu không nó không lùi được về sau
-  // header panel ngay phía trên.
-  assert.ok(parseFloat(flat('--table-head-tracking-sm')) > parseFloat(flat('--table-head-tracking')));
+  assert.equal(flat('--table-head-tracking-sm'), flat('--table-head-tracking'),
+    'bảng gọn không tự đổi typography so với bảng chính');
 
   // Mọi khai báo cỡ chữ trong CSS trang phải trỏ vào thang, không viết tên
   // riêng. 16 alias cũ (--type-*, --section-head-size…) đã bị xoá; danh sách
@@ -170,6 +170,8 @@ test('hai mật độ bảng không bị rule trang ghi đè ngược', () => {
 
   // Bảng danh sách Cấu hình, ma trận mục tiêu và OPSpecs là bảng lớn: 13px/40px.
   assert.match(manage, /\.rcfg-list>table thead th\{[^}]*font-size:var\(--table-head-size\)/);
+  assert.match(manage, /\.config-shell input[^}]*height:var\(--control-h-config\)[^}]*min-height:var\(--control-h-config\)/,
+    'toàn bộ control trong Cấu hình dùng mật độ 36px, không kéo theo modal');
   assert.match(manage, /\.target-head\{[^}]*font-size:var\(--table-head-size\)[^}]*letter-spacing:var\(--table-head-tracking\)/);
   assert.match(sigma, /\.sg-opspec-table th\{[^}]*height:var\(--table-header-h\)[^}]*font-size:var\(--table-head-size\)[^}]*letter-spacing:var\(--table-head-tracking\)/);
   assert.match(sigma, /\.sg-opspec-table td\{[^}]*height:var\(--table-row-h\)[^}]*vertical-align:middle/);
@@ -177,15 +179,17 @@ test('hai mật độ bảng không bị rule trang ghi đè ngược', () => {
     'workspace kỳ dùng header dữ liệu chuẩn 40px/13px');
   assert.match(sigma, /\.sg-period-history-item\.is-selected\{[^}]*border-color:var\(--accent-border\)[^}]*border-left:3px solid var\(--teal\)[^}]*background:var\(--accent-surface\)[^}]*color:var\(--text-accent\);\}/,
     'kỳ đang chọn dùng vạch active teal 3px cùng viền và nền accent chung');
-  assert.match(sigma, /\.sg-level-input-row input\.sg-number\{[^}]*height:var\(--control-h\)[^}]*font-size:var\(--text-base\)[^}]*font-weight:var\(--weight-normal\)/,
-    'CV/Bias trong phiếu kỳ là control nhập liệu 40px, không giả làm ô bảng đọc');
+  assert.match(sigma, /\.sg-level-input-row input\.sg-number\{[^}]*height:var\(--control-h-data\)[^}]*font-size:var\(--text-base\)[^}]*font-weight:var\(--weight-normal\)/,
+    'CV/Bias trong hàng dữ liệu Sigma dùng control 36px, cân với bảng đọc');
+  assert.match(sigma, /\.sg-level-input-row \.btn\{height:var\(--control-h-data\);min-height:var\(--control-h-data\);\}/,
+    'nút cạnh ô CV/Bias cùng dùng 36px, không giữ control 40px trong hàng dữ liệu');
   assert.match(sigma, /\.sg-period-history-list\{[^}]*grid-auto-rows:58px[^}]*max-height:244px[^}]*overflow-y:auto/,
     'lịch sử kỳ hiển thị tối đa bốn mục rồi cuộn nội bộ, không kéo dài panel');
   assert.doesNotMatch(readFileSync(join(ROOT, 'renderer', 'pages', 'SigmaPage.tsx'), 'utf8'), /Ngân sách MU/,
     'MU chỉ được đánh giá ở bảng chi tiết bên dưới, không lặp lại trong workspace Sigma');
   assert.doesNotMatch(readFileSync(join(ROOT, 'renderer', 'pages', 'SigmaPage.tsx'), 'utf8'), /<aside className="sg-period-history"/,
     'lịch sử kỳ không dùng thẻ aside vì selector sidebar toàn cục sẽ biến nó thành nền tối cao toàn viewport');
-  // Cohort và cặp mẫu là bảng phụ: 11px/.04em/30px.
+  // Cohort và cặp mẫu là bảng phụ: cùng chữ 13px/.02em, chỉ header 30px.
   for (const selector of ['\\.sg-cohort-table th']) {
     assert.match(sigma, new RegExp(`${selector}\\{[^}]*font-size:var\\(--table-head-size-sm\\)[^}]*letter-spacing:var\\(--table-head-tracking-sm\\)[^}]*height:var\\(--table-header-h-sm\\)`));
   }
@@ -276,9 +280,23 @@ test('Nhập QC không rò kiểu dáng sang Sigma và không giữ dữ liệu 
 
 test('mật độ control dùng token component, không viết lại số chuẩn tại trang', () => {
   assert.deepEqual(
-    ['sm', 'row', 'compact', 'table', ''].map((k) => TOKEN[`--control-h${k ? `-${k}` : ''}`]),
-    ['28px', '30px', '32px', '34px', '40px'],
+    ['sm', 'row', 'compact', 'table', 'select', 'search', 'data', 'config', 'date', ''].map((k) => TOKEN[`--control-h${k ? `-${k}` : ''}`]),
+    ['28px', '30px', '32px', '34px', '36px', '36px', '36px', '36px', '36px', '40px'],
   );
+  const app = readFileSync(join(STYLE_DIR, 'app.css'), 'utf8');
+  assert.match(app, /select\{height:var\(--control-h-select\);min-height:var\(--control-h-select\);\}/,
+    'select chuẩn toàn app dùng 36px, tách khỏi input form 40px');
+  assert.match(app, /input\[type="search"\][^{]*\{height:var\(--control-h-search\);min-height:var\(--control-h-search\);\}/,
+    'ô tìm nhanh toàn app dùng 36px, tách khỏi input nhập liệu 40px');
+  assert.match(app, /input\[type="date"\][^{]*\{height:var\(--control-h-date\);min-height:var\(--control-h-date\);\}/,
+    'ô ngày gốc toàn app dùng 36px');
+  assert.match(app, /\.datebox input\.date-text\{[^}]*height:var\(--control-h-date\)[^}]*min-height:var\(--control-h-date\)/,
+    'DatePicker dùng chung cao 36px');
+  for (const name of ['audit.css', 'entry.css', 'manage.css', 'reagent.css']) {
+    const css = readFileSync(join(STYLE_DIR, 'pages', name), 'utf8');
+    assert.doesNotMatch(css, /(?:datebox|date-text)[^{]*\{[^}]*height:var\(--control-h(?:;|\))/,
+      `${name} không được đè DatePicker về chiều cao form 40px`);
+  }
   const common = /(?<![-\w])(?:min-)?height\s*:\s*(?:28|30|32|34|36|40)px/g;
   const raw = PAGE_CSS.flatMap((file) => [...readFileSync(file, 'utf8')
     .replace(/\/\*[\s\S]*?\*\//g, '')
@@ -393,7 +411,7 @@ test('mọi padding/margin/gap đều nằm trên thang khoảng cách', () => {
 
 test('chỉ có một vòng focus dùng chung', () => {
   const appCss = readFileSync(join(STYLE_DIR, 'app.css'), 'utf8');
-  assert.equal(TOKEN['--focus-ring-offset'], '-2px',
+  assert.equal(TOKEN['--focus-ring-offset'], '-1px',
     'vòng focus phải nằm đè lên viền control, không bao thêm viền thứ hai');
   assert.match(
     appCss,

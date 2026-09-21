@@ -46,8 +46,8 @@ chúng chỉ được khai báo ở `tokens.css`, không được tự pha ở s
 
 Clinical Precision dùng một bảng màu độc lập, chốt ngày 2026-09-19:
 
-- **clinical navy** `#172b35` cho mực chính và sidebar — đủ sâu nhưng không
-  đen gắt;
+- **clinical navy** `#172b35` cho mực chính và navy sâu `#14242e` cho sidebar
+  — đủ sâu nhưng không đen gắt;
 - **mineral teal** `#0b7c83` cho hành động chính, mục đang chọn và trạng thái
   Đạt — sạch hơn teal xám cũ;
 - **cool neutral** từ `#fbfcfd` tới `#536a76` cho nền, viền và chữ phụ — giữ
@@ -55,7 +55,7 @@ Clinical Precision dùng một bảng màu độc lập, chốt ngày 2026-09-19
 - xanh lam/amber/đỏ chỉ dùng cho thông tin/cảnh báo/nguy hiểm, không dùng để
   trang trí.
 
-Màu được phân phối theo vai trò, không theo trang: nền trang `#f3f6f8`, panel
+Màu được phân phối theo vai trò, không theo trang: nền trang `#f5f7f9`, panel
 trắng, header bảng `#edf2f4`, viền `#dce5e9`. Teal đậm chỉ xuất hiện ở nút
 chính, focus, selection và trạng thái; các vùng nội dung lớn không tô teal.
 
@@ -128,16 +128,16 @@ chung, 13px ở Cài đặt. Tiêu đề hộp thoại thì 20 / 16 / 16.
 | `--title-card` | 13 | 600 | header thẻ nhỏ, nhóm trường |
 | `--title-overline` | 11 | 600 | nhãn nhóm, chữ hoa, giãn .06em |
 
-### Header bảng — hai tầng
+### Header bảng — một hệ chữ, hai mật độ
 
 | | cỡ | đậm | giãn chữ | cao | dùng cho |
 |---|---|---|---|---|---|
 | bảng lớn | 13 | 600 | .02em | 40 | phiếu QC, danh mục, nhật ký NCE, danh sách Tổng quan, lịch sử Mean/SD, ma trận Mean/SD |
-| bảng nhỏ | 11 | 600 | .04em | 30 | 4 bảng Sigma, hướng dẫn luật Westgard, cặp mẫu So sánh hoá chất, bảng mục tiêu trong modal chuyển lô |
+| bảng gọn | 13 | 600 | .02em | 30 | 4 bảng Sigma, hướng dẫn luật Westgard, cặp mẫu So sánh hoá chất, bảng mục tiêu trong modal chuyển lô |
 
-Lý do tách: header bảng lớn 13px/600 cần dễ quét như dữ liệu trong bảng; header
-bảng nhỏ 11px/600 nằm ngay dưới header panel 16px đậm thì phải nhỏ và thưa chữ
-hơn để lùi về đúng vai trò "nhãn cột", thay vì thành một tiêu đề nữa.
+Bảng gọn chỉ thu chiều cao header và padding để tiết kiệm không gian trong panel;
+không thu nhỏ cỡ hoặc thay đổi giãn chữ. Nhờ vậy mọi bảng giữ một chuẩn đọc 13px,
+nhất quán khi người dùng chuyển giữa các thẻ.
 
 ### Không còn tên cỡ chữ song song
 
@@ -178,11 +178,14 @@ Mọi thành phần có góc bo dùng `8px` (`--radius-xs`, `--radius-sm`,
 
 ## Component
 
-Control chuẩn dùng `--control-h: 40px` cho input, select **và** nút. Bốn mật
-độ ngoại lệ cũng là token component, không viết số tại trang: `--control-h-row`
-30px (hành động hàng), `--control-h-compact` 32px (toolbar) và
-`--control-h-table` 34px (ô bảng). Form dùng chung chuẩn `--control-h: 40px`.
-`--control-h-sm: 28px` chỉ dành cho nút cực gọn trong hàng bảng. Trước đây nút
+Input form chuẩn dùng `--control-h: 40px`; nút thao tác chuẩn dùng
+`--control-h-action: 36px`. Select và ô tìm nhanh chuẩn
+dùng `--control-h-select` / `--control-h-search: 36px` để gọn hơn khi quét dữ liệu. Ô nhập trực tiếp trong
+hàng dữ liệu dùng `--control-h-data: 36px`; các control trong Cấu hình chung cũng dùng
+`--control-h-config: 36px`. Các mật độ ngoại lệ vẫn
+là token component, không viết số tại trang: `--control-h-row` 30px (hành động
+hàng), `--control-h-compact` 32px (toolbar) và `--control-h-table` 34px (ô
+bảng). `--control-h-sm: 28px` chỉ dành cho nút cực gọn trong hàng bảng. Trước đây nút
 cao 37px còn input 36px.
 
 Panel: `--panel-padding 20`, `--panel-content-gap 16` (header → nội dung đầu
@@ -217,7 +220,7 @@ Focus: **một** vòng focus cho cả app, khai đúng một lần trong `app.cs
                outline-offset:var(--focus-ring-offset);}
 ```
 
-`--focus-ring-offset: -2px` bằng đúng độ dày vòng, nên viền teal nằm đè lên
+`--focus-ring-offset: -1px` bằng đúng độ dày vòng, nên viền teal nằm đè lên
 đường viền control thay vì bao thêm một lớp bên ngoài. Control không đổi kích
 thước và không còn cảm giác hai viền. Nơi nào cần khác thì **chỉ được đổi
 `outline-offset`** (hàng bảng, ô trong lưới). Cấm tắt outline, cấm tự vẽ vòng

@@ -272,8 +272,8 @@ button.entry-tree-expand{display:none;position:absolute;left:-14px;top:18px;z-in
    là thiếu, không copy cả file. */
 .lj-date-field { display: grid; grid-template-columns: 54px 164px; gap: 8px; align-items: center; margin: 0; }
 .lj-date-field .hint { display: flex; align-items: center; justify-content: flex-end; height: var(--control-h); white-space: nowrap; line-height:var(--leading-none); }
-.lj-date-field .datebox { width: 164px; height: var(--control-h); }
-.lj-date-field .datebox input.date-text { height: var(--control-h-table); padding-top: 0; padding-bottom: 0; }
+.lj-date-field .datebox { width: 164px; height: var(--control-h-date); }
+.lj-date-field .datebox input.date-text { height: var(--control-h-date); padding-top: 0; padding-bottom: 0; }
 
 .qc-month-picker select, .qc-current-month, .qc-today-jump { height: var(--control-h-compact); min-height: var(--control-h-compact); padding: 0 10px; font-size: var(--text-sm); }
 .qc-today-jump { white-space: nowrap; min-width: 104px; }

@@ -729,7 +729,7 @@ function SigmaTrackingModal({ tests, onClose, onTrack }: { tests: Test[]; onClos
       <label htmlFor="sgTrackingSearch">Tìm xét nghiệm</label>
       <div className="sg-tracking-search">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.3" /><path d="m15.5 15.5 4.2 4.2" /></svg>
-        <input id="sgTrackingSearch" className="sg-tracking-search-input" type="text" autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tên xét nghiệm, khoa hoặc đơn vị..." />
+        <input id="sgTrackingSearch" className="sg-tracking-search-input" type="search" autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tên xét nghiệm, khoa hoặc đơn vị..." />
         {query && <button type="button" aria-label="Xóa từ khóa tìm kiếm" onClick={() => setQuery('')}>✕</button>}
       </div>
     </div>

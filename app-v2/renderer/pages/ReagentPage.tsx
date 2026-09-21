@@ -16,6 +16,7 @@ import { canWrite, isAdmin } from '../lib/permissions';
 import { PageHeader } from '../components/PageHeader';
 import { DateField } from '../components/DateField';
 import { Modal } from '../components/Modal';
+import { RowActionButton } from '../components/RowActionButton';
 import { ReagentChart } from '../components/ReagentChart';
 import { ReagentToolIcon } from '../components/ReagentToolIcon';
 import { confirmDialog, infoDialog } from '../state/dialog-store';
@@ -249,7 +250,7 @@ function QuickPickerModal({ type, onPick, onClose }: { type: 'operator' | 'sampl
           <span><b>{name}</b></span>
           <span className="acts">
             <button type="button" className="btn teal sm" onClick={() => onPick(name)}>Chọn</button>
-            <button type="button" className="x" title="Xóa" aria-label={`Xoá ${name}`} onClick={() => removeItem(i)}>✕</button>
+            <RowActionButton kind="delete" label={`Xóa ${name}`} onClick={() => removeItem(i)} />
           </span>
         </div>
       ))}
@@ -271,14 +272,14 @@ function PickerModal({ comparisons, currentId, canDelete, onSelect, onRemove, on
   const rows = comparisons.filter((c) => !needle || comparisonLabel(c).toLowerCase().includes(needle));
   return (
     <Modal title="Chọn phép so sánh" onClose={onClose} width={560} footer={<button className="btn ghost" onClick={onClose}>Đóng</button>}>
-      <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm phép so sánh..." autoFocus />
+      <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm phép so sánh..." autoFocus />
       <div className="flow-control rc-picker-list">
         {rows.length ? rows.map((comparison) => (
           <div className={`mrow ${comparison.id === currentId ? 'on' : ''}`} key={comparison.id}>
             <span><b>{comparisonLabel(comparison)}</b><div className="hint flow-tight">{comparison.unit || 'Chưa có đơn vị'} {comparison.rows.length ? `· ${comparison.rows.length} dòng` : ''}</div></span>
             <span className="acts">
               <button className={`btn ${comparison.id === currentId ? 'teal' : 'ghost'} sm`} onClick={() => onSelect(comparison.id)}>{comparison.id === currentId ? 'Đang chọn' : 'Chọn'}</button>
-              {canDelete && comparisons.length > 1 && <button className="x" title={`Xóa ${comparison.reagent}`} aria-label={`Xóa ${comparison.reagent}`} onClick={() => onRemove(comparison.id)}>✕</button>}
+              {canDelete && comparisons.length > 1 && <RowActionButton kind="delete" label={`Xóa ${comparison.reagent}`} onClick={() => onRemove(comparison.id)} />}
             </span>
           </div>
         )) : <div className="empty rc-picker-empty">Không có phép so sánh phù hợp.</div>}
@@ -309,7 +310,7 @@ function CreateComparisonModal({ onClose, onCreate }: { onClose: () => void; onC
 
   return (
     <Modal title="Thêm hóa chất" onClose={onClose} width={560} footer={<button className="btn ghost" onClick={onClose}>Đóng</button>}>
-      <input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); create(query.trim() || 'Hóa chất mới'); } }} placeholder="Tìm xét nghiệm hoặc gõ tên hóa chất mới..." autoFocus />
+      <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); create(query.trim() || 'Hóa chất mới'); } }} placeholder="Tìm xét nghiệm hoặc gõ tên hóa chất mới..." autoFocus />
       <div className="flow-control">
         <button className="refrow rc-create-typed" onClick={() => create(query.trim() || 'Hóa chất mới')}>+ Tạo {query.trim() ? `"${query.trim()}"` : 'hóa chất trống'}</button>
       </div>
@@ -507,7 +508,7 @@ export function ReagentPage() {
                   <div className="rc-calc">{both ? fmtFixed((o + nv) / 2) : '–'}</div>
                   <div className={`rc-calc dif${dif != null && dif < 0 ? ' neg' : ''}`}>{dif != null ? fmtFixed(dif) : '–'}</div>
                   {writable
-                    ? <button className="x" title="Xóa dòng" onClick={() => commitRows(rowsDraft.filter((_, j) => j !== i))}>✕</button>
+                    ? <RowActionButton kind="delete" label={`Xóa dòng mẫu ${i + 1}`} onClick={() => commitRows(rowsDraft.filter((_, j) => j !== i))} />
                     : <span></span>}
                 </div>
               );

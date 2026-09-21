@@ -548,17 +548,17 @@ export function EntryPage() {
         </div>
       ) : (
       <div className={`entrygrid${treeCollapsed ? ' tree-collapsed' : ''}`}>
-        <button type="button" className="btn teal icon entry-tree-expand" onClick={() => setTreeVisibility(false)}
+        <button type="button" className="btn teal entry-tree-expand" onClick={() => setTreeVisibility(false)}
           title="Hiện danh mục nội kiểm" aria-label="Hiện danh mục nội kiểm" aria-controls="entryTreePanel" aria-expanded={!treeCollapsed}><TreeToggleIcon /></button>
 
         <div className="tree" id="entryTreePanel">
           <div className="entry-tree-head">
             <h4>Danh mục nội kiểm</h4>
-            <button type="button" className="btn ghost icon entry-tree-toggle" onClick={() => setTreeVisibility(true)}
+            <button type="button" className="btn ghost entry-tree-toggle" onClick={() => setTreeVisibility(true)}
               title="Ẩn danh mục nội kiểm" aria-label="Ẩn danh mục nội kiểm" aria-controls="entryTreePanel" aria-expanded={!treeCollapsed}><TreeToggleIcon /></button>
           </div>
           <div className="tree-tools">
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm test, máy..." />
+            <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm test, máy..." />
             <select value={machineFilter} onChange={(e) => setMachineFilter(e.target.value)}>
               <option value="">Tất cả máy</option>
               {instruments.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}

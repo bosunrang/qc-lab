@@ -27,7 +27,7 @@
 }
 
 .rc-toolbar-selcol label { margin: 0 0 var(--field-label-gap); }
-.rc-toolbar-selcol select { width: 100%; max-width: none; height: var(--control-h); font-weight: 500; }
+.rc-toolbar-selcol select { width: 100%; max-width: none; height: var(--control-h-select); font-weight: 500; }
 .rc-toolbar-primary { flex: 0 0 auto; align-self: flex-end; }
 .rc-toolbar-primary > div, .rc-toolbar-secondary { display: flex; flex-wrap: wrap; gap: 8px; }
 .rc-toolbar-secondary { align-self: flex-end; margin-left: auto; }
@@ -48,7 +48,7 @@
 .rc-quick-field { display: grid; grid-template-columns: minmax(0, 1fr) 36px; gap: 8px; align-items: center; }
 
 .rc-pair-wrap { overflow-x: auto; overflow-y: hidden; background: var(--panel); }
-.rc-pair-head, .rc-pair-row { display: grid; grid-template-columns: 44px minmax(100px, 1.25fr) minmax(100px, 1.25fr) minmax(78px, .7fr) minmax(108px, .85fr) 28px; gap: 8px; align-items: center; min-width: 600px; }
+.rc-pair-head, .rc-pair-row { display: grid; grid-template-columns: 44px minmax(100px, 1.25fr) minmax(100px, 1.25fr) minmax(78px, .7fr) minmax(108px, .85fr) 30px; gap: 8px; align-items: center; min-width: 600px; }
 .rc-pair-head { min-height: var(--table-header-h-sm); padding: var(--table-cell-py-compact) var(--table-cell-px-compact); background: var(--table-head-bg); border-bottom: 1px solid var(--table-head-border); color: var(--table-head-ink); font-size: var(--table-head-size-sm); letter-spacing: var(--table-head-tracking-sm); font-weight: var(--table-head-weight); line-height:var(--leading-snug); text-align: center; }
 .rc-pair-row { min-height: 52px; padding: 8px 12px; border-bottom: 1px solid var(--line2); background: var(--panel); }
 .rc-pair-row:last-child { border-bottom: 0; }
@@ -63,16 +63,16 @@
 .rc-idx{width:34px;height:var(--control-h-table);margin:0 auto;display:flex;align-items:center;justify-content:center;border-radius:var(--radius-sm);background:var(--surface-subtle);color:var(--card-head-ink);font-size:var(--text-sm);font-weight:var(--weight-bold);}
 .rc-calc{text-align:center;color:var(--teal);font-variant-numeric:tabular-nums;font-size:var(--table-body-size);font-weight:var(--weight-bold);letter-spacing:0;}
 .rc-calc.neg{color:var(--text-warning);}
-.rc-pair-panel .rc-pair-row .x:hover{background:var(--danger-ink);color:var(--on-accent);}
 .rc-coverage-cell,.rc-info-panel .rc-coverage-cell{grid-column:1 / -1;}
 .rc-coverage-check{gap:8px;width:auto;max-width:100%;margin:2px 0 0;padding:0;border:0;border-radius:0;background:transparent;color:var(--text-body);font-size:var(--text-sm);font-weight:var(--weight-bold);line-height:var(--leading-snug);cursor:pointer;}
 .rc-coverage-check input[type="checkbox"]{flex:0 0 auto;width:17px;height:17px;min-height:17px;margin:0;padding:0;accent-color:var(--teal);box-shadow:none;cursor:pointer;}
 .rc-coverage-check span{min-width:0;line-height:var(--leading-snug);}
 .rc-info-panel>.rc-info-grid{margin:0;grid-template-columns:1fr 1fr;}
 .rc-info-panel .rc-field label{margin:0 0 var(--field-label-gap);}
-.rc-field input,.rc-field .datebox,.rc-info-panel .rc-field>input,.rc-info-panel .rc-quick-field input{height:var(--control-h);}
-.rc-info-panel .rc-date-field .datebox{display:grid;grid-template-columns:minmax(0,1fr) 36px;width:100%;max-width:none;height:var(--control-h);}
-.rc-info-panel .rc-date-field .datebox input.date-text{max-width:none;height:var(--control-h-table);min-width:0;border:0;border-radius:0;background:transparent;box-shadow:none;}
+.rc-field input,.rc-info-panel .rc-field>input,.rc-info-panel .rc-quick-field input{height:var(--control-h);}
+.rc-field .datebox{height:var(--control-h-date);}
+.rc-info-panel .rc-date-field .datebox{display:grid;grid-template-columns:minmax(0,1fr) 36px;width:100%;max-width:none;height:var(--control-h-date);}
+.rc-info-panel .rc-date-field .datebox input.date-text{max-width:none;height:var(--control-h-date);min-width:0;border:0;border-radius:0;background:transparent;box-shadow:none;}
 .rc-info-panel .rc-date-field .datebox input.date-text:focus{border:0;box-shadow:none;}
 .rc-info-panel .rc-date-field .datebox .datepick{width:36px;min-width:36px;border-left:1px solid var(--line);background:var(--surface-subtle);}
 .rc-info-panel .rc-quick-field{display:grid;grid-template-columns:minmax(0,1fr) 36px;gap:8px;align-items:center;}
@@ -91,10 +91,9 @@
 .rc-pair-panel .rc-calc{min-height:var(--control-h);display:flex;align-items:center;justify-content:center;border-radius:var(--radius-md);color:var(--ink);font-size:var(--table-body-size);font-weight:var(--weight-bold);}
 .rc-pair-panel .rc-calc.dif{color:var(--teal);}
 .rc-pair-panel .rc-calc.neg{color:var(--warning-ink);}
-.rc-pair-panel .rc-pair-row .x{width:32px;height:var(--control-h-compact);color:var(--muted);font-size:var(--text-sm);}
 .rc-pair-actions{display:flex;flex-wrap:wrap;gap:8px;}
 .rc-pair-panel .rc-pair-actions{margin:0 var(--panel-content-gap);padding:0 0 var(--panel-content-gap);}
-.rc-pair-panel .rc-pair-actions .btn{min-height:var(--control-h);padding:0 14px;font-size:var(--text-sm);}
+.rc-pair-panel .rc-pair-actions .btn{min-height:var(--button-height);padding:0 14px;font-size:var(--text-sm);}
 .rc-pair-panel>.hint{margin:0 var(--panel-content-gap) var(--panel-content-gap);color:var(--muted);font-size:var(--text-sm);}
 .rc-info-panel,.rc-pair-panel,.rc-stats-panel,.rc-crit-panel,.rc-chart-panel,.rc-stat-card,.rc-stat-section,.rc-chart-box{border-radius:var(--radius-md);}
 .rc-info-panel::before,.rc-pair-panel::before,.rc-stats-panel::before,.rc-crit-panel::before,.rc-chart-panel::before,.rc-info-panel>.panel-title:first-child::before,.rc-pair-panel>.panel-title:first-child::before,.rc-stats-panel>.panel-title:first-child::before,.rc-crit-panel>.panel-title:first-child::before,.rc-chart-panel>.panel-title:first-child::before,.rc-pair-panel .rc-pair-head::before{display:none;}
@@ -154,7 +153,7 @@
 /* Bù class app cũ CÓ CSS mà app-v2 để trống (2026-09-03, xem ghi chú cùng
    loại ở các file khác). Giá trị copy nguyên từ `assets/*.css`. */
 .rc-toolbar button.rc-add-btn,.rc-toolbar button.rc-delete-btn,.rc-toolbar button.rc-find-btn,
-.rc-toolbar button.rc-report-btn,.rc-toolbar button.rc-report-main{min-height:var(--control-h);padding:0 16px;white-space:nowrap;}
+.rc-toolbar button.rc-report-btn,.rc-toolbar button.rc-report-main{min-height:var(--button-height);padding:0 16px;white-space:nowrap;}
 .rc-toolbar .btn svg{width:15px;height:15px;flex:0 0 auto;}
 .rc-toolbar .rc-add-btn{background:var(--teal);border-color:var(--teal);color:var(--on-accent);}
 .rc-toolbar .rc-add-btn,.rc-toolbar .rc-report-main{justify-content:center;}
@@ -167,6 +166,10 @@
 .mrow{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;border:1px solid var(--surface-border);border-radius:var(--radius-md);margin-bottom:6px;font-variant-numeric:tabular-nums;font-size:var(--text-sm);}
 .mrow.on{border-color:var(--teal);background:var(--panel2);}
 .mrow .acts{display:flex;gap:6px;align-items:center;}
+/* Danh sách chọn nhanh là vùng thao tác trong modal, không phải hàng bảng:
+   nút xóa cùng mật độ 36px với nút Chọn bên cạnh. */
+.mrow .btn.sm,.mrow .row-action{height:var(--control-h-action);min-height:var(--control-h-action);}
+.mrow .row-action{width:var(--control-h-action);flex-basis:var(--control-h-action);}
 .mrow b{color:var(--ink);font-size:var(--text-base);font-weight:700;}
 .rc-picker-list{max-height:360px;overflow:auto;}
 .rc-picker-empty{padding:16px;}
@@ -176,7 +179,10 @@
 .refrow:hover{border-color:var(--teal);background:var(--panel2);}
 .refrow .meta{display:block;margin-top:2px;color:var(--muted);font-size:var(--text-sm);font-weight:500;}
 .rc-create-typed{color:var(--teal);font-weight:var(--weight-bold);}
+/* Hàng thêm nhanh là một control ghép: ô nhập và nút phải cùng 36px.
+   `.btn.sm` mặc định 32px làm nút "Thêm" thấp hơn ô nhập 40px. */
 .rc-quick-add{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin-top:12px;}
+.rc-quick-add input:not([type="checkbox"]):not([type="radio"]),.rc-quick-add .btn{height:var(--control-h-action);min-height:var(--control-h-action);}
 /* Nút icon "Chọn nhanh" cạnh ô Người thực hiện/Loại mẫu — kích thước/lưới
    (`.rc-quick-field`/`.rc-icon-btn` width/height) đã có sẵn ở `pages.css` từ
    trước (chuẩn bị sẵn cho tính năng này), chỉ thiếu phần MÀU/VIỀN/con trỏ —

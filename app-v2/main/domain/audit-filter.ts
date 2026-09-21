@@ -1,9 +1,9 @@
 // Loc/phan trang nhat ky hoat dong - port tu
 // src/presentation/audit/activity-audit-filter.ts + activity-audit-pagination.ts
-// + activity-audit-date-range.ts cua ban cu, rut gon deps (khong can inject
-// searchText/formatDateTime/roleLabel vi app-v2 chi chay o main process,
-// khong co i18n role label rieng o tang nay).
+// + activity-audit-date-range.ts cua ban cu.
 import { textKey } from './text-utils';
+import { roleLabel } from './page-roles';
+import { formatAuditDateTimeVN } from './audit-format';
 
 export interface ActivityLike {
   seq: number; ts: string; user: string; username: string; role: string;
@@ -26,8 +26,8 @@ export function filterActivity(items: ActivityLike[], query: string, from: strin
     if (end && (!date || date > end)) return false;
     if (!text) return true;
     return textKey([
-      activity.seq, activity.ts, activity.user, activity.username,
-      activity.role, activity.type, activity.target, activity.detail,
+      activity.seq, formatAuditDateTimeVN(activity.ts), activity.user, activity.username,
+      roleLabel(activity.role), activity.type, activity.target, activity.detail,
     ].join(' ')).includes(text);
   }).slice().reverse();
 }
