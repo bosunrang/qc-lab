@@ -26,29 +26,6 @@ const FIREBASE_CONFIG_PLACEHOLDER = `const firebaseConfig = {
   projectId: "yourapp",
   appId: "..."
 };`;
-const FIREBASE_RULES = `{
-  "rules": {
-    ".read": false,
-    ".write": false,
-    "qclab-acl": {
-      "$labCode": {
-        "$uid": {
-          ".read": "auth != null && auth.uid === $uid",
-          ".write": false
-        }
-      }
-    },
-    "qclab-shared": {
-      "$labCode": {
-        ".read":  "auth != null && root.child('qclab-acl').child($labCode).child(auth.uid).exists()",
-        ".write": "auth != null && root.child('qclab-acl').child($labCode).child(auth.uid).exists()",
-        ".validate": "newData.hasChildren(['_ts'])",
-        "_ts": { ".validate": "newData.isNumber()" },
-        "_client": { ".validate": "newData.isString()" }
-      }
-    }
-  }
-}`;
 
 function DataAdminIcon() {
   return (
@@ -61,16 +38,9 @@ function DataAdminIcon() {
   );
 }
 
-function formatBytes(bytes: number): string {
-  if (bytes <= 0) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
-  return `${(bytes / 1024 ** i).toFixed(i === 0 ? 0 : 2)} ${units[i]}`;
-}
-
 export function SettingsPage() {
   const {
-    profile, storage, backup: backupInfo, lis, lisQueue, firebase,
+    profile, backup: backupInfo, lis, lisQueue, firebase,
     loadAll, loadStorage, save, loadFirebase,
     exportBackup, importBackup, verifyBackup, resetOperationalData,
     saveLis, pullLisQueue, importLisResult, rejectLisResult,
@@ -89,7 +59,6 @@ export function SettingsPage() {
   const [lisStatus, setLisStatus] = useState<{ kind: 'off' | 'idle' | 'ok' | 'error'; detail: string }>({ kind: 'off', detail: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const backupFileInputRef = useRef<HTMLInputElement>(null);
-  const verifyFileInputRef = useRef<HTMLInputElement>(null);
   const [lisEnabled, setLisEnabled] = useState(false);
   const [lisUrl, setLisUrl] = useState('');
   const [lisToken, setLisToken] = useState('');
@@ -210,8 +179,10 @@ export function SettingsPage() {
     e.target.value = '';
     if (!file) return;
     const json = await file.text();
+    const verified = await verifyBackup(json);
+    if (!verified.ok) { await infoDialog(`File backup KHÔNG hợp lệ: ${verified.error.message}`, { type: 'warn' }); return; }
     if (!(await confirmDialog(
-      'Phục hồi từ backup sẽ THAY THẾ TOÀN BỘ dữ liệu hiện có bằng nội dung trong file này. Một bản sao lưu an toàn của dữ liệu hiện tại sẽ được tự động tạo trước khi ghi đè. Tiếp tục?',
+      `File backup hợp lệ (${verified.data.points} điểm QC, checksum khớp). Phục hồi sẽ THAY THẾ TOÀN BỘ dữ liệu hiện có. Một bản sao lưu an toàn được tạo trước khi ghi đè. Tiếp tục?`,
       { title: 'Phục hồi từ backup', danger: true, confirmLabel: 'Phục hồi' },
     ))) return;
     if (!(await reauthDialog({ title: 'Xác thực trước khi phục hồi', message: 'Phục hồi từ backup là thao tác không thể huỷ ngang — xác thực lại mật khẩu.' }))) return;
@@ -268,10 +239,6 @@ export function SettingsPage() {
     await infoDialog('Đã ngắt Firebase.', { type: 'success' });
   }
 
-  async function copyFirebaseRules() {
-    try { await navigator.clipboard.writeText(FIREBASE_RULES); await infoDialog('Đã copy Firebase Rules.', { type: 'success' }); }
-    catch { await infoDialog('Không copy được tự động. Bạn có thể chọn nội dung Rules để copy.', { type: 'warn' }); }
-  }
 
   async function openLisQueue() {
     if (!lisEnabled) { setLisErr('Bật LIS Gateway và lưu cấu hình trước khi xem hàng chờ.'); return; }
@@ -300,19 +267,6 @@ export function SettingsPage() {
     if (!result.ok) await infoDialog(result.error.message, { type: 'warn' });
   }
 
-  /** "Kiểm tra backup" — chỉ đọc file, không đụng dữ liệu đang dùng. */
-  async function pickVerifyFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    const result = await verifyBackup(await file.text());
-    if (!result.ok) { await infoDialog(`File backup KHÔNG hợp lệ: ${result.error.message}`, { type: 'warn' }); return; }
-    await infoDialog(
-      `File backup hợp lệ (checksum khớp).\n\nSố bảng: ${result.data.tables}\nSố điểm QC: ${result.data.points}\nTổng số dòng: ${result.data.rows}\nPhiên bản schema: ${result.data.schemaVersion}\nXuất lúc: ${result.data.createdAt}`,
-      { type: 'success' },
-    );
-  }
-
   // Port `backupReminder.statusText()/capacityText()` app cũ — giữ nguyên
   // từng chuỗi để lời nhắc sao lưu đọc giống nhau ở 2 bản.
   function backupStatusText(): string {
@@ -325,21 +279,6 @@ export function SettingsPage() {
     if (!backupInfo?.lastBackupBytes) return `Khuyến nghị dưới ${limit} MB.`;
     const mb = (backupInfo.lastBackupBytes / 1024 / 1024).toFixed(1);
     return `Backup gần nhất ${mb} MB (khuyến nghị dưới ${limit} MB).`;
-  }
-
-  async function checkStorage() {
-    await loadStorage();
-    // `listTestSummaries` thuộc Westgard, không phải dữ liệu của trang Cài
-    // đặt — đọc một lần cho đúng hộp thoại này, không cần đưa vào store.
-    // Dung lượng lấy từ store (vừa nạp lại ngay trên) thay vì gọi
-    // `getStorageInfo` lần thứ hai.
-    // Thuộc Westgard, không phải dữ liệu của trang Cài đặt — đọc một lần
-    // cho đúng hộp thoại này.
-    const summaries = await window.qcApi.listTestSummaries();
-    const info = useSettingsStore.getState().storage;
-    if (!info) return;
-    const points = summaries.reduce((sum, test) => sum + test.levels.reduce((s, level) => s + level.pointCount, 0), 0);
-    await infoDialog(`Số điểm QC đang lưu: ${points}.\nFile dữ liệu SQLite đang chiếm ${formatBytes(info.dbFileBytes)} trên đĩa.\n\n${info.path}`);
   }
 
   /** "Xóa sạch dữ liệu test" — xoá dữ liệu vận hành, GIỮ tài khoản + nhật ký
@@ -405,17 +344,7 @@ export function SettingsPage() {
       </div>
 
       <div className="panel settings-admin-panel">
-        <div className="panel-head settings-admin-head">
-          <h2 className="settings-admin-title"><DataAdminIcon />Quản trị dữ liệu</h2>
-          <span
-            className={`settings-db-badge${storage ? ' is-ok' : ''}`}
-            title={storage
-              ? `${storage.engine} ${storage.sqliteVersion} · schema ${storage.schemaVersion} · ${storage.path}`
-              : 'Đang truy vấn trạng thái cơ sở dữ liệu'}
-          >
-            {storage ? `${storage.engine} · schema ${storage.schemaVersion}` : 'Đang kiểm tra…'}
-          </span>
-        </div>
+        <h2 className="settings-admin-title"><DataAdminIcon />Quản trị dữ liệu</h2>
         <div className="admin-tools">
           <div className="admin-tool">
             <b>Xuất backup</b>
@@ -424,20 +353,9 @@ export function SettingsPage() {
           </div>
           <div className="admin-tool">
             <b>Nhập backup</b>
-            <span>Khôi phục dữ liệu từ file backup đã xuất. Chỉ quản trị viên được nhập.</span>
+            <span>Chọn file để kiểm tra tự động rồi khôi phục dữ liệu. Chỉ quản trị viên được nhập.</span>
             <button className="btn ghost" onClick={() => backupFileInputRef.current?.click()}>Chọn file backup</button>
             <input ref={backupFileInputRef} type="file" accept="application/json" style={{ display: 'none' }} onChange={pickBackupFile} />
-          </div>
-          <div className="admin-tool">
-            <b>Kiểm tra backup</b>
-            <span>Kiểm tra checksum, cấu trúc và số điểm — không ảnh hưởng dữ liệu đang dùng.</span>
-            <button className="btn ghost" onClick={() => verifyFileInputRef.current?.click()}>Chọn file để kiểm tra</button>
-            <input ref={verifyFileInputRef} type="file" accept="application/json" style={{ display: 'none' }} onChange={pickVerifyFile} />
-          </div>
-          <div className="admin-tool">
-            <b>Dung lượng cục bộ</b>
-            <span>Xem số điểm QC và dung lượng trình duyệt đang dùng.</span>
-            <button className="btn ghost" onClick={checkStorage}>Kiểm tra dung lượng</button>
           </div>
           <div className="admin-tool">
             <b>Xóa sạch dữ liệu test</b>
@@ -474,7 +392,7 @@ export function SettingsPage() {
               <div><label htmlFor="lisGatewayToken">Bearer token{lisToken ? ' (đã lưu)' : ''}</label><input id="lisGatewayToken" type="password" autoComplete="off" value={lisToken} onChange={(e) => setLisToken(e.target.value)} placeholder="Dán token in ra khi chạy npm run lis:gateway" /></div>
               <label className="lis-gateway-toggle"><input id="lisGatewayEnabled" type="checkbox" checked={lisEnabled} onChange={(e) => setLisEnabled(e.target.checked)} /><span>Tự động kiểm tra hàng chờ mỗi 5 phút</span></label>
             </div>
-            <div id="lisGatewayStatus" className={`alert${lisStatus.kind === 'ok' ? ' ok' : lisStatus.kind === 'error' ? ' rej' : ''}`}>
+            <div id="lisGatewayStatus" className={`alert lis-gateway-status${lisStatus.kind === 'ok' ? ' ok' : lisStatus.kind === 'error' ? ' rej' : ''}`}>
               {LIS_STATUS_LABEL[lisStatus.kind]}{lisErr ? ` · ${lisErr}` : lisStatus.detail ? ` · ${lisStatus.detail}` : ''}
             </div>
             <div className="hint">Lấy kết quả nội kiểm mà middleware LIS đã đẩy vào Gateway. Kết quả KHÔNG tự thành điểm QC — phải mở hàng chờ và xác nhận từng dòng thì mới ghi vào dữ liệu nội kiểm. Không nhận dữ liệu bệnh nhân. Prototype chỉ cho phép localhost:8787.</div>
@@ -486,18 +404,7 @@ export function SettingsPage() {
         </div>
       </div>
 
-      <div className="panel firebase-rules-panel">
-        <h2 className="panel-title">Firebase Rules</h2>
-        <details className="firebase-guide"><summary>Hướng dẫn Firebase chi tiết</summary><div className="firebase-guide-body">
-          <div className="fb-step"><div className="fb-num">1</div><div className="fb-step-body"><h4>Bật đăng nhập Email/Password</h4><p>Firebase Console → Authentication → Sign-in method: tắt <b>Anonymous</b>, bật <b>Email/Password</b>.</p></div></div>
-          <div className="fb-step"><div className="fb-num">2</div><div className="fb-step-body"><h4>Tạo tài khoản, lấy UID</h4><p>Authentication → Users → Add user — mỗi máy/người 1 tài khoản, sau đó copy <b>User UID</b>.</p></div></div>
-          <div className="fb-step"><div className="fb-num">3</div><div className="fb-step-body"><h4>Thêm UID vào danh sách được phép</h4><p>Realtime Database → Data, tạo đúng cấu trúc theo mã phòng (labCode) đang dùng.</p></div></div>
-          <div className="fb-step"><div className="fb-num">4</div><div className="fb-step-body"><h4>Dán Rules</h4><p>Realtime Database → Rules → dán nguyên nội dung khung <b>Firebase Rules</b> bên dưới → Publish.</p></div></div>
-          <div className="fb-step"><div className="fb-num">5</div><div className="fb-step-body"><h4>Kết nối trong app</h4><p>Nhập labCode, email/mật khẩu, dán Firebase config → bấm <b>Lưu &amp; kết nối</b>.</p></div></div>
-        </div></details>
-        <div className="rules-tools"><span>Copy cố định vào Realtime Database → Rules. Không sửa <code>$labCode</code> hoặc <code>$uid</code>.</span><button className="btn ghost sm" onClick={copyFirebaseRules}>Copy rules</button></div>
-        <pre className="rules-code" tabIndex={0}>{FIREBASE_RULES}</pre>
-      </div>
+      <p className="settings-firebase-help"><a href="./firebase-guide.html" target="_blank" rel="noreferrer">Mở hướng dẫn thiết lập Firebase và Firebase Rules</a></p>
 
       {lisQueueOpen && lisQueue && (
         <Modal

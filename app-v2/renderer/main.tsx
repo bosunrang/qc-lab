@@ -1,6 +1,7 @@
 import { createRoot } from 'react-dom/client';
 import { AppRouter } from './router';
 import { installBrowserMockIfNeeded } from './browser-mock/install';
+import { createLanHttpApi } from './lan/http-api';
 
 // Chỉ cài khi KHÔNG chạy trong Electron thật (vd `vite dev` mở qua
 // localhost) — xem docs/APP-V2-PLAN.md mục "Xem qua localhost". Trong
@@ -12,7 +13,9 @@ import { installBrowserMockIfNeeded } from './browser-mock/install';
 const rootEl = document.getElementById('root');
 
 async function start(): Promise<void> {
-  const installed = await installBrowserMockIfNeeded();
+  const lan = location.port === '3100' && typeof window.qcApi === 'undefined';
+  if (lan) window.qcApi = createLanHttpApi();
+  const installed = lan ? false : await installBrowserMockIfNeeded();
   if (!rootEl) return;
   if (installed) rootEl.textContent = '';
   createRoot(rootEl).render(<AppRouter />);

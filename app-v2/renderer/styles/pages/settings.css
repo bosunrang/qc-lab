@@ -128,8 +128,8 @@
   letter-spacing:.06em;
 }
 
-/* 5 thẻ công cụ quản trị: lưới 3 cột, mỗi thẻ cao đều nhau và nút luôn dính
-   đáy thẻ (`grid-template-rows:auto minmax(66px,1fr) auto`) — nhờ vậy 5 thẻ
+/* 3 thẻ công cụ quản trị: lưới 3 cột, mỗi thẻ cao đều nhau và nút luôn dính
+   đáy thẻ (`grid-template-rows:auto minmax(66px,1fr) auto`) — nhờ vậy 3 thẻ
    có độ dài mô tả khác nhau vẫn thẳng hàng nút. */
 .admin-tools{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:var(--panel-content-gap) 16px 16px;align-items:stretch}
 .admin-tool{
@@ -140,13 +140,10 @@
 .admin-tool span{color:var(--muted);font-size:var(--text-sm);line-height:var(--leading-body)}
 .admin-tool .btn{width:100%;align-self:end}
 
-.settings-admin-head{flex-wrap:nowrap}
 .settings-admin-title{display:flex;align-items:center;gap:8px;margin:0;color:var(--section-head-ink);font-size:var(--title-panel);font-weight:var(--section-heading-weight);line-height:var(--line-heading)}
 .settings-admin-icon{width:21px;height:21px;flex:none;fill:none;stroke:var(--teal);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
-.settings-db-badge{display:inline-flex;align-items:center;min-height:25px;padding:2px 10px;border:1px solid var(--surface-border);border-radius:var(--radius-pill);background:var(--panel);color:var(--muted);font-size:var(--text-xs);font-weight:var(--weight-bold);line-height:var(--leading-none);white-space:nowrap}
-.settings-db-badge.is-ok{border-color:var(--accent-border);background:var(--accent-surface);color:var(--teal-deep)}
 
-.lis-gateway-body{display:grid;gap:var(--gap-content);margin:var(--panel-content-gap) 16px 0}
+.lis-gateway-body{display:grid;gap:var(--gap-control);margin:var(--panel-content-gap) 16px 0}
 /* 1 cột (không phải lưới ngang) vì panel này nằm trong .settings-cloud-grid,
    chỉ còn nửa bề rộng trang — giữ đúng lý do app cũ ghi tại chỗ. */
 .lis-gateway-grid{display:grid;grid-template-columns:1fr;gap:var(--gap-content)}
@@ -154,6 +151,9 @@
 .lis-gateway-toggle{display:flex;align-items:center;gap:8px;min-height:38px;padding:8px 10px;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface-card-soft);color:var(--text-body);font-size:var(--text-sm);font-weight:var(--weight-bold)}
 .lis-gateway-toggle input{flex:none}
 .lis-gateway-panel .alert{margin:0}
+.lis-gateway-status{width:100%;min-height:var(--control-h-row);align-items:center;border:1px solid var(--surface-border);border-left-width:1px;background:var(--surface-card-soft);color:var(--muted);font-weight:var(--weight-semibold)}
+.lis-gateway-status.ok{border-color:var(--success-border);border-left-color:var(--success-border)}
+.lis-gateway-status.rej{border-color:var(--danger-border);border-left-color:var(--danger-border)}
 
 /* Giữ góc bo của panel khi dải nền `.panel-title` bám sát mép (margin âm bù
    padding panel — xem app.css). Port từ `assets/professional-settings.css`.
@@ -169,26 +169,14 @@
    textarea hệ thống; khối Firebase Rules bên dưới mới là vùng monospace. */
 .firebase-config-input{width:100%;min-height:168px;resize:vertical;font-family:var(--sans);font-size:var(--text-base);line-height:var(--leading-body)}
 .firebase-actions{display:flex;gap:8px;flex-wrap:wrap}
-.firebase-rules-panel{margin-bottom:16px}
-.firebase-guide{margin:var(--panel-content-gap) 16px 0;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface-card-soft)}
-.firebase-guide summary{padding:10px 12px;cursor:pointer;color:var(--ink);font-weight:var(--weight-bold)}
-.firebase-guide-body{padding:0 12px 12px;color:var(--muted);font-size:var(--text-sm);line-height:var(--leading-body)}
-.firebase-guide-body p{margin:6px 0}
-.fb-step{display:grid;grid-template-columns:25px minmax(0,1fr);gap:8px;padding:8px 0;border-top:1px solid var(--line)}
-.fb-step:first-child{border-top:0;padding-top:0}.fb-step:last-child{padding-bottom:0}
-.fb-num{width:25px;height:25px;border-radius:50%;display:grid;place-items:center;background:var(--teal);color:var(--on-accent);font-size:var(--text-xs);font-weight:var(--weight-semibold)}
-.fb-step-body h4{margin:2px 0 2px;color:var(--ink);font-size:var(--title-card);font-weight:var(--title-card-weight)}
-.rules-tools{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 16px 0;color:var(--muted);font-size:var(--text-sm)}
-/* Giữ font monospace để Rules không mất cấu trúc, nhưng bề mặt phải theo app
-   cũ: nền sáng, chữ màu hệ thống — không dùng khối code nền đen. */
-.rules-code{max-height:360px;overflow:auto;margin:8px 16px 16px;padding:14px;border:1px solid var(--surface-border);border-radius:var(--radius-md);background:var(--surface-card-soft);color:var(--ink);font:var(--text-xs)/var(--leading-body) ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre}
+.settings-firebase-help{margin:0 0 16px;color:var(--muted);font-size:var(--text-sm)}
+.settings-firebase-help a{color:var(--accent);font-weight:var(--weight-semibold)}
 
 /* Cố định cấp tiêu đề panel Cài đặt theo token Clinical Precision, không để
    stylesheet mặc định của trình duyệt nâng H2 lên 1.5em. */
 .settings-profile-grid > .panel > h2.panel-title:first-child,
 .settings-cloud-grid > .panel > h2.panel-title:first-child,
-.settings-admin-panel > .settings-admin-head:first-child,
-.firebase-rules-panel > h2.panel-title:first-child{
+.settings-admin-panel > h2.settings-admin-title:first-child{
   min-height:var(--panel-header-min-height);
   padding:10px 14px;
   background:var(--surface-subtle);

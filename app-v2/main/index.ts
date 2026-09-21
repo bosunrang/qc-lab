@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import * as path from 'node:path';
 import { openDatabase } from './db/open-database';
-import { type Actor, writeAudit, setBroadcastWindow, setCloudChangeNotifier } from './ipc/shared';
+import { type Actor, writeAudit, setBroadcastWindow, setCloudChangeNotifier, setLanChangeNotifier } from './ipc/shared';
 import { createConfigHandlers } from './ipc/config-handlers';
 import { createEntryHandlers } from './ipc/entry-handlers';
 import { createWestgardHandlers } from './ipc/westgard-handlers';
@@ -17,8 +17,19 @@ import { createBackupHandlers } from './ipc/backup-handlers';
 import { createMigrationHandlers } from './ipc/migration-handlers';
 import { createLisHandlers } from './ipc/lis-handlers';
 import { createFirebaseHandlers } from './ipc/firebase-handlers';
+import { LanHttpServer } from './lan/http-server';
 
-function createWindow(): void {
+async function createWindow(): Promise<void> {
+  // Giữ bản đồ handler IPC để HTTP LAN gọi ĐÚNG cùng cổng nghiệp vụ. Đây là
+  // cầu nối tạm thời khi renderer web thay IPC; không sao chép validation hay
+  // SQL sang server HTTP.
+  type IpcHandler = (event: unknown, ...args: unknown[]) => unknown;
+  const lanHandlers = new Map<string, IpcHandler>();
+  const electronHandle = ipcMain.handle.bind(ipcMain);
+  (ipcMain as unknown as { handle: (channel: string, handler: IpcHandler) => void }).handle = (channel, handler) => {
+    lanHandlers.set(channel, handler);
+    electronHandle(channel, handler as never);
+  };
   const userDataDir = app.getPath('userData');
   const dbPath = path.join(userDataDir, 'qclab.sqlite');
   const db = openDatabase(dbPath);
@@ -43,12 +54,47 @@ function createWindow(): void {
   // giới bắt buộc đăng nhập cho MỌI thao tác ghi ở các module khác — trước
   // khi có module này, các thao tác đó đứng tên TEMP_ACTOR cố định.
   let sessionActor: Actor | null = null;
+  let lanCalls = Promise.resolve();
   function toActor(user: PublicUser): Actor {
     return { userId: user.id, username: user.username, name: user.name, role: user.role, clientId: 'app-v2-desktop' };
   }
   function requireActor(): Actor {
     if (!sessionActor) throw new Error('Chưa đăng nhập.');
     return sessionActor;
+  }
+
+  /** IPC handlers đóng Actor qua `requireActor()`. Với HTTP nhiều người dùng,
+   * tuần tự hoá phần đổi actor trong bộ nhớ để một lệnh không thể chạy bằng
+   * danh tính của request khác. SQLite vẫn là nơi thực thi transaction. */
+  async function invokeLan(channel: string, args: unknown[], actor: Actor): Promise<unknown> {
+    // Tên hàm QcApi được giữ cho renderer, còn IPC có namespace. Không suy
+    // đoán mơ hồ: `getSettings` tồn tại cả Firebase và LIS.
+    const routes: Record<string, string> = {
+      resetUserPassword: 'auth:resetPassword', verifyOwnPassword: 'auth:verifyPassword',
+      listEntryHistoryPoints: 'entry:listHistoryPoints', listVoidedEntryPoints: 'entry:listVoidedPoints', listParallelEntryColumns: 'entry:listParallelColumns', listPreviousEntryLotSeries: 'entry:listPreviousLotSeries', getRangeCandidate: 'entry:rangeCandidate',
+      listSigmaPeriods: 'sigma:listPeriods', listSigmaCohorts: 'sigma:listCohorts', setSigmaTracking: 'sigma:setTracking', saveSigmaTeaConfig: 'sigma:saveTeaConfig', saveSigmaPeriod: 'sigma:savePeriod', renameSigmaPeriod: 'sigma:renamePeriod', removeSigmaPeriod: 'sigma:removePeriod',
+      listNceRecords: 'nce:listRecords', returnNce: 'nce:returnForRevision', setNceCompletedDate: 'nce:setActionCompletedDate', markNceEffectiveness: 'nce:markEffectiveness', setNceReleaseDecision: 'nce:setReleaseDecision', setNceRerunEvidence: 'nce:setRerunEvidence', reopenNce: 'nce:reopen',
+      listReagentComparisons: 'reagent:listComparisons', createReagentComparison: 'reagent:createComparison', saveReagentMetadata: 'reagent:saveMetadata', saveReagentRows: 'reagent:saveRows', removeReagentComparison: 'reagent:removeComparison', listReagentQuickValues: 'reagent:listQuickValues', addReagentQuickValue: 'reagent:addQuickValue', removeReagentQuickValue: 'reagent:removeQuickValue',
+      getFirebaseSettings: 'firebase:getSettings', resetOperationalData: 'backup:resetAll', previewLegacyBackup: 'migration:previewLegacyBackup', importLegacyBackup: 'migration:importLegacyBackup',
+      getLisSettings: 'lis:getSettings', saveLisSettings: 'lis:saveSettings', pullLisQueue: 'lis:pullQueue', importLisResult: 'lis:importResult', rejectLisResult: 'lis:rejectResult',
+    };
+    const target = routes[channel] || [...lanHandlers.keys()].find((name) => name.endsWith(`:${channel}`));
+    const handler = target ? lanHandlers.get(target) : undefined;
+    if (!handler || channel === 'auth:bootstrapAdmin') {
+      return { ok: false, error: { code: 'unknown-operation', message: 'Thao tác không được mở qua mạng nội bộ.' } };
+    }
+    let result: unknown;
+    let failure: unknown;
+    lanCalls = lanCalls.then(async () => {
+      const previous = sessionActor;
+      sessionActor = actor;
+      try { result = await handler({} as never, ...args); }
+      catch (error) { failure = error; }
+      finally { sessionActor = previous; }
+    });
+    await lanCalls;
+    if (failure) throw failure;
+    return result;
   }
 
   ipcMain.handle('auth:hasAnyUsers', () => auth.hasAnyUsers());
@@ -218,6 +264,17 @@ function createWindow(): void {
   ipcMain.handle('lis:pullQueue', () => lis.pullQueue());
   ipcMain.handle('lis:importResult', (_event, input) => lis.importResult(input, requireActor()));
   ipcMain.handle('lis:rejectResult', (_event, input) => lis.rejectResult(input, requireActor()));
+
+  const lan = new LanHttpServer<PublicUser>({
+    login: (input) => auth.login(input as { data: { username: string; password: string } }),
+    actorOf: toActor,
+    currentUser: (actor) => auth.getUser(actor.userId),
+    invoke: invokeLan,
+    staticDir: path.join(__dirname, '..', 'renderer'),
+  });
+  const lanPort = await lan.start(Number(process.env.QC_LAN_PORT) || 3100);
+  setLanChangeNotifier((payload) => lan.publishChanged(payload));
+  console.log(`QC Lab LAN server is listening on port ${lanPort}`);
 
   const devServerUrl = process.env.APP_V2_DEV_SERVER_URL;
   if (devServerUrl) win.loadURL(devServerUrl);

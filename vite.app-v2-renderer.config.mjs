@@ -87,5 +87,11 @@ export default defineConfig({
   build: {
     outDir: '../../app-v2-dist/renderer',
     emptyOutDir: true,
+    rollupOptions: {
+      input: {
+        index: fileURLToPath(new URL('./app-v2/renderer/index.html', import.meta.url)),
+        'firebase-guide': fileURLToPath(new URL('./app-v2/renderer/firebase-guide.html', import.meta.url)),
+      },
+    },
   },
 });

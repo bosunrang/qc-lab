@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Hướng dẫn thiết lập Firebase — QC Lab</title>
+  <style>body{margin:0;background:#f3f6f7;color:#172b35;font:15px/1.55 Arial,sans-serif}.wrap{max-width:900px;margin:40px auto;padding:0 24px}article{background:#fff;border:1px solid #d9e2e6;border-radius:10px;padding:32px;box-shadow:0 3px 14px #172b3512}h1{margin-top:0}h2{margin-top:32px;color:#0b7c83}pre{overflow:auto;padding:18px;background:#f6f8f9;border:1px solid #d9e2e6;border-radius:7px;font:13px/1.45 Consolas,monospace}li{margin:10px 0}.note{padding:12px 14px;border-left:3px solid #0b7c83;background:#eef8f8}</style>
+</head>
+<body><main class="wrap"><article>
+  <h1>Thiết lập Firebase cho QC Lab</h1>
+  <p>Tài liệu này dành cho quản trị viên thiết lập đồng bộ Firebase Realtime Database lần đầu.</p>
+  <ol>
+    <li>Trong Firebase Console, vào <b>Authentication → Sign-in method</b>, tắt Anonymous và bật <b>Email/Password</b>.</li>
+    <li>Vào <b>Authentication → Users</b>, tạo một tài khoản cho mỗi máy/người dùng và lưu lại <b>User UID</b>.</li>
+    <li>Trong Realtime Database → Data, tạo ACL theo mã phòng đang dùng: <code>qclab-acl/{mã-phòng}/{UID}: true</code>.</li>
+    <li>Vào Realtime Database → Rules, dán toàn bộ Rules bên dưới và Publish.</li>
+    <li>Quay lại QC Lab → Cài đặt &amp; Đồng bộ, nhập mã phòng, email/mật khẩu và dán Firebase config từ Project settings → Your apps.</li>
+  </ol>
+  <p class="note">Không thay tên <code>$labCode</code> hoặc <code>$uid</code>. Mỗi tài khoản chỉ có quyền với mã phòng được đặt trong ACL.</p>
+  <h2>Firebase Rules</h2>
+  <pre>{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "qclab-acl": {
+      "$labCode": { "$uid": { ".read": "auth != null &amp;&amp; auth.uid === $uid", ".write": false } }
+    },
+    "qclab-shared": {
+      "$labCode": {
+        ".read": "auth != null &amp;&amp; root.child('qclab-acl').child($labCode).child(auth.uid).exists()",
+        ".write": "auth != null &amp;&amp; root.child('qclab-acl').child($labCode).child(auth.uid).exists()",
+        ".validate": "newData.hasChildren(['_ts'])",
+        "_ts": { ".validate": "newData.isNumber()" },
+        "_client": { ".validate": "newData.isString()" }
+      }
+    }
+  }
+}</pre>
+</article></main></body></html>

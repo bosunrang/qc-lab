@@ -37,6 +37,7 @@ export interface BroadcastTarget {
 // xảy ra vì mọi handler chỉ chạy sau khi renderer đã load).
 let broadcastWindow: BroadcastTarget | null = null;
 let cloudChangeNotifier: (() => void) | null = null;
+let lanChangeNotifier: ((payload: StoreChangedPayload) => void) | null = null;
 
 export function setBroadcastWindow(win: BroadcastTarget): void {
   broadcastWindow = win;
@@ -47,6 +48,7 @@ export function setBroadcastWindow(win: BroadcastTarget): void {
 export function setCloudChangeNotifier(notifier: (() => void) | null): void {
   cloudChangeNotifier = notifier;
 }
+export function setLanChangeNotifier(notifier: ((payload: StoreChangedPayload) => void) | null): void { lanChangeNotifier = notifier; }
 
 export interface StoreChangedPayload { tables: string[]; testIds: string[] }
 
@@ -58,6 +60,7 @@ export function notifyChanged(tables: string[], testIds: string[] = []): void {
   if (!broadcastWindow || broadcastWindow.isDestroyed?.()) return;
   const payload: StoreChangedPayload = { tables, testIds };
   broadcastWindow.webContents.send('store:changed', payload);
+  lanChangeNotifier?.(payload);
 }
 
 // ── Quyền ghi ──────────────────────────────────────────────────────────────
