@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const { filterActivity, paginateActivity, updateAuditDateRange } = require('../../app-dist/main/domain/audit-filter.js');
+const { formatAuditDetailVN } = require('../../app-dist/main/domain/audit-format.js');
+const rows = [{ seq: 1, ts: '2026-08-01T08:00:00.000Z', user: 'Nguyễn A', username: 'a', role: 'admin', type: 'Tạo', detail: 'Cobas', target: '', prevHash: '', hash: '' }, { seq: 2, ts: '2026-08-05T08:00:00.000Z', user: 'Trần B', username: 'b', role: 'admin', type: 'Sửa', detail: 'Glucose', target: '', prevHash: '', hash: '' }];
+assert.deepEqual(filterActivity(rows, 'glucose', '', '').map(row => row.seq), [2]);
+assert.deepEqual(filterActivity(rows, '', '2026-08-02', '2026-08-06').map(row => row.seq), [2]);
+assert.deepEqual(paginateActivity(rows, 1, 1).rows, [rows[0]]);
+assert.deepEqual(updateAuditDateRange({ from: '2026-08-10', to: '' }, 'to', '2026-08-05'), { from: '2026-08-05', to: '2026-08-05' });
+assert.equal(formatAuditDetailVN('Điểm QC mức 1, ngày 2026-09-06, giá trị 3.69'), 'Điểm QC mức 1, ngày 06/09/2026, giá trị 3.69');
+console.log('app audit-filter tests passed');

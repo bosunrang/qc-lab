@@ -1,1 +1,0 @@
-export function createLeveyJenningsLegendLayout(measure:(text:string)=>number){return(levels:any[],colors:string[],startX:number)=>{let x=startX;return levels.map((level,index)=>{const label=level.label||`Mức ${level.level}`,item={x,color:colors[index%colors.length],label};x+=25+measure(label)+20;return item;});};}

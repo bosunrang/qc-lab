@@ -1,1 +1,0 @@
-export const LEVEY_JENNINGS_COLORS=Object.freeze({okBand:'#e8f6ef',okMid:'#ffffff',warnBand:'#fff3cf',rejectBand:'#f9d6d5',grid:'#5d6b76',mean:'#17212b',line:'#0e8f8f',okPoint:'#0e8f8f',warnPoint:'#dd8b1f',rejectPoint:'#c5221f'});

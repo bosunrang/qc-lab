@@ -1,0 +1,92 @@
+/* Trang Người dùng — port từ assets/professional-users.css của app cũ
+   (Giai đoạn D3.1). Giữ đúng giá trị: bề rộng 4 cột của .user-table, thẻ
+   .user-create-card, lưới checkbox .user-perm-grid và 2 breakpoint 980/760px.
+   Token dùng lại của app (tokens.css) — các mã hex một-lần ở đây giữ
+   nguyên như app cũ vì app cũ cũng không tách token cho chúng. */
+
+.user-table{
+  width:100%; min-width:0; table-layout:fixed;
+}
+
+.user-table th, .user-table td{
+  padding-left:14px; padding-right:14px;
+}
+
+.user-table th:not(:first-child), .user-table td:not(:first-child){
+  text-align:center;
+}
+
+.user-table th:nth-child(1), .user-table td:nth-child(1){width:24%}
+.user-table th:nth-child(2), .user-table td:nth-child(2),
+.user-table th:nth-child(3), .user-table td:nth-child(3){width:16%}
+.user-table th:nth-child(4), .user-table td:nth-child(4){width:44%}
+
+.user-row-actions{
+  display:flex;flex-wrap:nowrap;gap:6px;align-items:center;justify-content:center;white-space:nowrap;
+}
+
+.user-create-card{
+  background:var(--panel); border:1px solid var(--surface-border); border-radius:var(--radius-lg); overflow:hidden; box-shadow:var(--shadow-card-subtle);
+}
+
+.user-table-wrap{
+  min-width:0; overflow-x:auto;
+}
+
+.user-table-wrap > .user-table{
+  min-width:620px;
+}
+
+.user-create-card-title{
+  margin:0; padding:10px 16px; border-bottom:1px solid var(--section-head-border); background:var(--section-head-bg); color:var(--section-head-ink); font-size:var(--title-panel); font-weight:var(--section-heading-weight); letter-spacing:0; text-transform:none;
+}
+
+.user-create-fields{
+  display:grid; grid-template-columns:1fr; gap:var(--gap-content); padding:var(--panel-content-gap) 16px 16px;
+}
+
+.user-create-fields label{
+  margin-top:0;
+}
+
+.user-create-actions .btn{
+  min-width:88px;
+}
+
+.user-create-hint{
+  margin:0 16px 16px;
+}
+
+.user-perm-block{
+  margin-top:0; min-width:0; padding:var(--panel-content-gap) 16px 16px;
+}
+
+.user-perm-grid{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:8px; margin-top:8px;
+}
+
+.user-perm-grid label{
+  display:flex; align-items:center; gap:8px; min-height:38px; margin:0; padding:8px 10px; border:1px solid var(--surface-border); border-radius:var(--radius-md); background:var(--surface-card-soft); color:var(--text-strong); font-size:var(--text-sm); font-weight:var(--weight-bold); cursor:pointer; box-shadow:none;
+}
+
+.user-perm-grid label.disabled{
+  opacity:.46; background:var(--surface-subtle); cursor:not-allowed;
+}
+
+.user-perm-grid input[type="checkbox"]{
+  appearance:auto; -webkit-appearance:checkbox; box-sizing:border-box; width:17px; min-width:17px; max-width:17px; height:17px; min-height:0; flex:0 0 17px; margin:0; padding:0; border:1px solid var(--border); border-radius:var(--radius-xs); background:var(--panel); box-shadow:none; accent-color:var(--teal);
+}
+
+
+.user-create-actions{
+  margin-top:2px;
+}
+
+/* "Danh sách người dùng" sống ở panel riêng bên dưới, nên .user-create-layout
+   chỉ còn 2 thẻ: Thông tin tài khoản (hẹp, vài field ngắn) và Thẻ được phép
+   dùng (rộng hơn, chứa lưới checkbox). align-items:stretch để thẻ phải cao
+   bằng thẻ trái thay vì dừng sớm để lại khoảng trắng — khác với các cặp 2 cột
+   trên trang Cài đặt vốn cố tình dùng align-items:start. */
+.user-create-layout{
+  display:grid; grid-template-columns:minmax(280px,360px) minmax(0,1fr); gap:20px; align-items:stretch; margin:var(--panel-content-gap) 16px 16px; padding:0;
+}

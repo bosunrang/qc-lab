@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const { calculateReagentComparison, reagentValidPairs } = require('../../app-dist/main/domain/reagent-stats.js');
+const values = [10, 20, 30, 40, 50, 60];
+const result = calculateReagentComparison({ rows: values.map(value => [value, value * 1.01]), test: { biasTarget: 6, alpha: .05, coverageConfirmed: true } }, 5);
+assert.equal(result.N, 6); assert.ok(Math.abs(result.bias - 1) < 1e-9); assert.equal(result.enoughN, false);
+assert.equal(calculateReagentComparison({ rows: [[10, 10], [20, 20]] }, 5), null);
+assert.deepEqual(reagentValidPairs([['12abc', '13'], ['12.5', '13.5'], [-2, '-1']]), { o: [12.5, -2], n: [13.5, -1] });
+console.log('app reagent-stats tests passed');

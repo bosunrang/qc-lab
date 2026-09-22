@@ -1,1 +1,0 @@
-export function createDashboardLevelData({stats}:{stats:(values:number[])=>any}){return(views:any[],today:string)=>views.map(view=>({l:view.l,pts:view.pts,st:stats(view.pts.map((point:any)=>point.val)),todayLevel:view.pts.some((point:any)=>point.date===today)}));}

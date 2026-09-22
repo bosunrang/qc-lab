@@ -1,1 +1,0 @@
-export function createDashboardOverdueActions({overdue}:{overdue:(action:any)=>{overdue:boolean,days:number}}){return(actions:any[],today:string)=>actions.map((action,index)=>({action,index})).filter(item=>item.action.dueDate&&item.action.dueDate<today).map(item=>({...item,info:overdue(item.action)})).filter(item=>item.info.overdue).sort((a,b)=>b.info.days-a.info.days);}

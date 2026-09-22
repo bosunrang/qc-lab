@@ -1,0 +1,197 @@
+/* Phân tích Westgard — workspace biểu đồ và bảng bằng chứng theo hệ
+   Clinical Precision. */
+
+.wg-test-picker{
+  display:grid; grid-template-columns:minmax(240px,1fr) minmax(300px,1.15fr); gap:var(--space-3); align-items:end; margin:var(--panel-content-gap) var(--panel-padding) 0; max-width:760px;
+}
+.wg-test-picker label{
+  margin-top:0;
+}
+.wg-test-picker.wg-test-picker-3{
+  grid-template-columns:minmax(200px,0.9fr) minmax(220px,1fr) minmax(270px,auto); max-width:1100px;
+}
+.wg-rules{
+  margin:var(--space-3) var(--panel-padding) 0;
+}
+/* Header đã có `margin-bottom: var(--panel-content-gap)`. Tab chọn vùng
+   xem bắt đầu ngay sau nhịp đó; cộng thêm margin-top ở JSX sẽ làm khoảng
+   cách từ đường viền header tới tab bị gấp đôi. */
+.wg-archive-view-mode{margin:0 var(--panel-padding);}
+/* Ghi chú là hàng riêng dưới ba ô chọn và không bị giới hạn chiều rộng, để
+   câu không bị ngắt vô cớ ở phần "nhóm lô còn hoạt động". */
+.wg-archive-note{margin:var(--space-3) var(--panel-padding) var(--space-3-5);max-width:none;}
+.panel.wg-prev-lot{background:var(--surface-subtle);border:1px dashed var(--surface-divider);}
+.panel.wg-prev-lot .wg-lot-name{color:var(--text-archived);}
+.wg-prev-toggle{margin-left:var(--space-2);padding:var(--space-0-5) var(--space-2-5);font-size:var(--text-xs);font-weight:var(--weight-bold);}
+/* Kết luận + "Cảnh báo CUSUM" xếp dọc, không nằm cạnh nhau: hai chip nói hai
+   chuyện khác nhau (điểm bị loại hay không / xu hướng CUSUM có vượt ngưỡng).
+   Giữ ô là `table-cell` — đặt `display:flex` trực tiếp lên <td> khiến nó rời
+   thuật toán bố cục bảng và các chip bị dồn về mép trái của cột. */
+.wg-table th.wg-verdict-head,.wg-table td.wg-verdict-cell{text-align:center;vertical-align:middle;}
+.wg-table td.wg-verdict-cell{display:table-cell;}
+.wg-table .wg-verdict-cell>.tag{display:table;width:max-content;margin:0 auto;}
+.wg-table .wg-verdict-cell>.tag+.tag{margin-top:var(--space-1);}
+.wg-support-rule{display:inline-flex;align-items:center;gap:var(--space-1);white-space:nowrap;}
+.wg-rule-chips{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-1-5) var(--space-0-5);}
+.wg-rule-chips>.pill{margin:0;}
+.wg-table th.wg-evidence-head,.wg-table td.wg-evidence-cell{text-align:center;vertical-align:middle;}
+.wg-table .wg-evidence-cell>.wg-rule-chips{justify-content:center;}
+.wg-level-title{
+  display:flex; align-items:baseline; gap:var(--space-2); min-width:0;
+}
+.wg-level-meta{
+  display:flex; align-items:center; gap:var(--space-1-5); margin-left:auto; color:var(--text-tertiary); font-size:var(--text-xs); font-weight:var(--weight-bold); white-space:nowrap;
+}
+.wg-level-meta span+span:before{
+  content:"|"; margin-right:var(--space-1-5); color:var(--text-disabled);
+}
+.wg-observed-meta{color:var(--text-secondary);font-weight:var(--weight-semibold);}
+.wg-lot-name{
+  font-size:var(--text-sm); font-weight:var(--weight-bold); color:var(--text-secondary);
+}
+.wg-lot-name.is-current{color:var(--text-accent);}
+.wg-guide{
+  margin:var(--space-3) var(--panel-padding) 0; border:1px solid var(--surface-border); border-radius:var(--radius-md); background:var(--surface); overflow:hidden;
+}
+.wg-guide summary{
+  cursor:pointer; padding:var(--space-2-5) var(--table-cell-px); font-size:var(--text-sm); font-weight:var(--weight-bold); color:var(--text-primary); list-style:none;
+}
+.wg-guide summary::-webkit-details-marker{
+  display:none;
+}
+.wg-guide summary:after{
+  content:"+"; float:right; color:var(--text-tertiary); font-weight:var(--weight-bold);
+}
+.wg-guide[open] summary:after{
+  content:"-";
+}
+.wg-guide .chart-scroll{
+  padding:0 var(--table-cell-px) var(--space-3-5);
+}
+.wg-guide table{
+  width:100%; min-width:760px; margin:0; border:1px solid var(--surface-border); border-radius:var(--table-radius); table-layout:fixed;
+}
+.wg-guide th,.wg-guide td{
+  padding:var(--table-cell-py) var(--table-cell-px-compact); font-size:var(--table-body-size); vertical-align:top;
+}
+.wg-guide th{font-size:var(--table-head-size-sm);letter-spacing:var(--table-head-tracking-sm);height:var(--table-header-h-sm);}
+.wg-guide td:first-child{
+  font-weight:var(--weight-bold); white-space:nowrap;
+}
+.wg-guide th:nth-child(1),.wg-guide td:nth-child(1){width:8%}
+.wg-guide th:nth-child(2),.wg-guide td:nth-child(2){width:28%}
+.wg-guide th:nth-child(3),.wg-guide td:nth-child(3){width:14%; text-align:center; vertical-align:middle}
+.wg-guide th:nth-child(4),.wg-guide td:nth-child(4){width:50%}
+.wg-guide td:nth-child(3){white-space:nowrap}
+.wg-guide .warn{
+  color:var(--warning-text); font-weight:var(--weight-bold);
+}
+.wg-guide .rej{
+  color:var(--danger-text); font-weight:var(--weight-bold);
+}
+.wg-error-type{
+  display:grid; gap:var(--space-0-5); line-height:var(--leading-snug);
+}
+.wg-error-type b{
+  color:var(--text-secondary); font-weight:var(--weight-bold);
+}
+.wg-error-type small{
+  color:var(--text-tertiary); font-size:var(--text-xs);
+}
+.wg-table{
+  width:100%; min-width:920px; margin:0; table-layout:fixed;
+}
+.wg-table th:nth-child(1), .wg-table td:nth-child(1){
+  width:7%
+}
+.wg-table th, .wg-table td, .wg-table th:nth-child(7), .wg-table td:nth-child(7){
+  text-align:center;
+}
+.wg-table th:nth-child(2), .wg-table td:nth-child(2){
+  width:16%
+}
+.wg-table th:nth-child(3), .wg-table td:nth-child(3), .wg-table th:nth-child(5), .wg-table td:nth-child(5){
+  width:15%
+}
+.wg-table th:nth-child(4), .wg-table td:nth-child(4){
+  width:13%
+}
+.wg-table th:nth-child(6), .wg-table td:nth-child(6){
+  width:14%
+}
+.wg-table th:nth-child(7), .wg-table td:nth-child(7){
+  width:20%
+}
+.wg-table .wg-error-type{
+  justify-items:center; text-align:center;
+}
+
+/* Header/bảng được scope theo Westgard để không làm đổi hierarchy của các
+   trang khác. */
+.wg-setup-panel > h2.panel-title:first-child,
+.wg-multi-panel > h2.panel-title:first-child{
+  min-height:var(--panel-header-h);
+  display:flex;
+  align-items:center;
+  padding:var(--space-2-5) var(--panel-padding);
+  background:var(--surface-section-header);
+  font-size:var(--title-panel);
+  font-weight:var(--title-panel-weight);
+  line-height:var(--line-heading);
+}
+.wg-cusum-heading{
+  display:flex; align-items:center; justify-content:space-between; gap:var(--space-3);
+  min-height:var(--panel-header-h); padding:var(--space-2-5) var(--panel-padding); background:var(--surface-section-header); border-bottom:1px solid var(--surface-divider);
+}
+.wg-cusum-heading .panel-title{
+  min-height:0; margin:0; padding:0; background:transparent;
+  font-size:var(--title-panel); font-weight:var(--title-panel-weight); line-height:var(--line-heading);
+}
+.wg-cusum-view-mode{flex:0 0 auto;}
+.wg-cusum-switch-panel{margin-bottom:var(--space-3);}
+
+/* Cùng kích thước HIỂN THỊ với `canvas.entryLJStack`: không để quy tắc
+   canvas dùng chung ép về tối đa 1320px. Nếu bị thu nhỏ sau khi vẽ, chữ và
+   đường bitmap sẽ mờ; vẽ vừa khít khung mới giữ được độ nét theo DPR. */
+.chart-scroll canvas.wgLJMulti,
+.chart-scroll canvas.wgLJMultiArchived,
+.chart-scroll canvas.cusumChart,
+.chart-scroll canvas.wgCusumMulti{width:100%;max-width:none;}
+
+/* `.wg-table` được đặt TRONG `.chart-scroll`, không trực tiếp trong panel.
+   Công thức width cũ trừ thêm 32px lần nữa nên lề phải bị rộng hơn lề trái.
+   Mỗi thẻ mức dùng cùng một khung 14px, bảng lấp đầy chính xác phần trong. */
+.wg-level-panel > .chart-scroll{box-sizing:border-box;padding:var(--panel-padding);}
+/* Trạng thái lô lịch sử chưa có điểm chỉ là thông tin trong thẻ, không dựng
+   thêm một hộp có viền lồng bên trong thẻ mức. */
+.wg-empty-message{display:grid;gap:var(--space-1);padding:var(--space-6) var(--panel-padding);text-align:center;color:var(--text-tertiary);font-size:var(--text-sm);line-height:var(--leading-body);}
+.wg-empty-message b{color:var(--text-primary);font-weight:var(--weight-bold);}
+.wg-empty-message .empty-actions{margin-top:var(--space-lg);display:flex;justify-content:center;}
+
+/* Hai chế độ biểu đồ là một section độc lập sau phần hướng dẫn. Không dịch
+   chuyển bằng transform vì offset làm tab đè lên viền của <details>. */
+.wg-chart-control{margin:var(--space-section) var(--panel-padding);}
+.wg-chart-mode-label{display:block;margin-bottom:var(--field-label-gap);color:var(--text-secondary);font-size:var(--text-xs);font-weight:var(--weight-semibold);}
+/* Giữ tab chọn biểu đồ ở đúng kích thước nội dung trong vùng điều khiển
+   Westgard. Class này cũng là điểm neo riêng của phần chuyển LJ/CUSUM, thay
+   vì dựa vào `.dayseg` dùng chung ở các màn khác. */
+.wg-chart-mode{display:inline-flex;max-width:100%;}
+
+/* Tiêu đề mức QC dùng trực tiếp `.wg-level-title`/`.wg-lot-name` trong
+   `<h3>`. Selector bám đúng cấu trúc JSX: mỗi panel Westgard có một h3 làm
+   tiêu đề, nên không cần guard `:first-child`. */
+.panel>h3:has(.wg-level-title){
+  display:flex; align-items:baseline; justify-content:space-between; gap:var(--space-3-5); flex-wrap:wrap;
+  min-height:var(--panel-header-h); margin:0; padding:var(--space-md) var(--panel-padding);
+  background:var(--surface-section-header); border-bottom:1px solid var(--surface-divider);
+}
+.wg-level-title{font-size:var(--title-panel);font-weight:var(--title-panel-weight);color:var(--text-primary);}
+.wg-target-warning{margin:var(--panel-content-gap) var(--panel-padding) 0;}
+
+/* Quy tắc bố cục riêng của workspace Westgard. */
+.wg-panel-intro{margin:var(--panel-content-gap) var(--panel-padding) var(--space-2);}
+.wg-rule-item{display:inline-flex;align-items:center;gap:var(--space-2);margin:var(--space-1) var(--space-3) var(--space-1) 0;font-size:var(--text-sm);vertical-align:middle;}
+.wg-rule-item label{display:inline-flex;align-items:center;gap:var(--space-1-5);margin:0;}
+.wg-rule-item input{width:auto;}
+.wg-rule-reset{display:inline-flex;vertical-align:middle;margin:var(--space-1) 0;}
+.wg-rule-reset .btn{height:auto;min-height:0;padding:var(--space-1) var(--space-2);border-radius:var(--radius-pill);font-size:var(--text-xs);line-height:var(--line-body);}

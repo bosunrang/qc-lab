@@ -1,0 +1,18 @@
+/* Quy tắc dùng chung giữa nhiều trang. Bố cục riêng của từng nghiệp vụ nằm ở
+   app/renderer/styles/pages/*.css; token và component nền nằm ở tokens.css
+   + app.css theo hệ Clinical Precision. */
+
+/* CSS riêng So sánh hóa chất đã chuyển về `pages/reagent.css`. */
+.sg-eflm-box > div,.lot-table,.top-user .meta,.range-summary-panel > h3:first-child > span{min-width:0;}
+.config-shell-main .empty .empty-actions{margin-top:12px;}
+.dash-main .panel>.dash-list>.shift-item,.dash-main .panel>.dash-list>.hint{margin:0;}
+
+.dash-list {display:grid;gap:10px;}
+.dash-list .shift-item.rej {border-color:var(--danger-border); border-left:3px solid var(--danger-accent); background:var(--danger-bg); color:var(--danger-ink);}
+.dash-list .shift-item.warn {border-color:var(--warning-border); border-left:3px solid var(--warning-accent); background:var(--warning-bg); color:var(--warning-ink);}
+.dash-list .shift-item.rej .meta {color:var(--danger-ink);}
+.dash-list .shift-item.warn .meta {color:var(--warning-ink);}
+.dash-main .panel > .alert, .panel > .panel-title:first-child + .dash-list, .panel > .panel-title:first-child ~ .dash-list {margin:var(--panel-content-gap) 16px 14px;}
+
+/* ── D3.9: Phân tích Westgard — port từ assets/professional-westgard.css. */
+.wg-export-actions { display: flex; align-items: center; gap: 8px; min-height: 38px; }

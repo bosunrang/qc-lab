@@ -1,1 +1,0 @@
-export function leveyJenningsPointStyle(status:string,colors:{okPoint:string;warnPoint:string;rejectPoint:string}){return{color:status==='rej'?colors.rejectPoint:status==='warn'?colors.warnPoint:colors.okPoint,radius:status==='ok'?4:5};}

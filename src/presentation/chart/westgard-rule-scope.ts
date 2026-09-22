@@ -1,1 +1,0 @@
-export function createWestgardRuleScope(deps:{within?:(test:any,rule:string)=>boolean;across?:(test:any,rule:string)=>boolean;default:(test:any,rule:string)=>boolean}){return{within:(test:any,rule:string)=>deps.within?deps.within(test,rule):deps.default(test,rule),across:(test:any,rule:string)=>deps.across?deps.across(test,rule):deps.default(test,rule)};}

@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const { stats, pointTarget, pointZ, westgard, cusumScan } = require('../../app-dist/main/domain/westgard-engine.js');
+assert.deepEqual(stats([9, 10, 11]), { n: 3, m: 10, sd: 1, cv: 10 });
+assert.equal(stats([]), null);
+assert.equal(pointTarget({ val: 12, qcMean: 10, qcSd: 1 }, 11, 2).z, 2);
+assert.equal(pointZ({ val: 12 }, 10, 1), 2);
+const verdict = westgard([{ val: 10 }, { val: 14 }], 10, 1, rule => rule === '1-3s');
+assert.deepEqual(verdict.F[1], { level: 'rej', rules: ['1-3s'], supportRules: [] });
+assert.deepEqual(cusumScan([{ val: 11 }, { val: 11 }], 10, 1, .5, 4, 5).cPos, [.5, 1]);
+console.log('app westgard-engine tests passed');

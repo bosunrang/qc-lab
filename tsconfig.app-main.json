@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "lib": ["es2022"],
+    "module": "commonjs",
+    "strict": true,
+    "noEmitOnError": true,
+    "rootDir": "app/main",
+    "outDir": "app-dist/main",
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "types": ["node"]
+  },
+  "include": ["app/main/**/*.ts"]
+}

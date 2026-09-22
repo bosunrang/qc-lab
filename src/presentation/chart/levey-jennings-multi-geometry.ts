@@ -1,1 +1,0 @@
-export function leveyJenningsMultiGeometry({width,height}:{width:number,height:number}){const padL=56,padR=78,padT=44,padB=46,markPad=10,cw=width-padL-padR,ch=height-padT-padB,y=(z:number)=>padT+(3.25-z)/6.5*ch,clampY=(z:number)=>Math.max(padT,Math.min(padT+ch,y(z)));return{padL,padR,padT,padB,markPad,cw,ch,y,clampY};}

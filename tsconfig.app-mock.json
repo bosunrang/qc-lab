@@ -1,0 +1,24 @@
+{
+  // Build phần `renderer/browser-mock/*` chạy được ngoài trình duyệt sang
+  // CommonJS để test bằng Node — hiện chỉ còn `sqlite-shim.ts` (lớp bọc
+  // sql.js, xem app/tests/sqlite-shim.test.mjs). Cần lượt build RIÊNG vì
+  // tsconfig.app-renderer.json phát ESM+JSX cho Vite, còn
+  // tsconfig.app-main.json chỉ include app/main.
+  //
+  // `api.ts`/`store.ts`/`permission-policy.ts` (bản giả lập viết tay) đã bị
+  // xoá 2026-09-09: bản xem trước giờ chạy CHÍNH handler thật — xem
+  // renderer/browser-mock/real-api.ts.
+  "compilerOptions": {
+    "target": "es2022",
+    "lib": ["es2022", "dom"],
+    "module": "commonjs",
+    "strict": true,
+    "noEmitOnError": true,
+    "rootDir": "app",
+    "outDir": "app-dist/mock",
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "types": ["node"]
+  },
+  "include": ["app/renderer/browser-mock/sqlite-shim.ts"]
+}

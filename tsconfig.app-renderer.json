@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "verbatimModuleSyntax": true,
+    // Cần "node" vì bản xem trước import chính các handler `main/ipc/*`
+    // (browser-mock/real-api.ts), mà vài module trong đó vẫn khai
+    // `node:crypto`/`node:fs` — khi BUILD, plugin
+    // `swap-node-only-modules-for-browser` (vite.app-renderer.config.mjs)
+    // đã thay chúng bằng bản trình duyệt, nhưng `tsc` không biết plugin nên
+    // vẫn kiểm bản gốc. Renderer KHÔNG chạy code Node: kiểm chứng thật là
+    // mở tab và xác nhận không có lỗi "node:... has been externalized".
+    "types": ["node"]
+  },
+  "include": ["app/renderer/**/*.ts", "app/renderer/**/*.tsx", "app/shared/**/*.ts"]
+}

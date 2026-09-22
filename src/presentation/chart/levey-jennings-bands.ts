@@ -1,2 +1,0 @@
-const BANDS=Object.freeze([{low:3,high:3.25,color:'rejectBand'},{low:-3.25,high:-3,color:'rejectBand'},{low:2,high:3,color:'warnBand'},{low:-3,high:-2,color:'warnBand'},{low:-2,high:2,color:'okBand'},{low:-1,high:1,color:'okMid'}]);
-export function leveyJenningsBandRects(input:{mean:number;sd:number;width:number;y:(value:number)=>number}){return BANDS.map(band=>{const top=input.y(input.mean+band.high*input.sd);return{color:band.color,top,height:input.y(input.mean+band.low*input.sd)-top,width:input.width};});}

@@ -1,1 +1,0 @@
-export function createPostRenderPageActions(deps:{requestFrame:(work:()=>void)=>unknown}){const run=(page:string,actions:{reagent:()=>void,sigma:()=>void})=>{if(page==='reagent')deps.requestFrame(actions.reagent);if(page==='sigma')deps.requestFrame(actions.sigma);};return{run};}

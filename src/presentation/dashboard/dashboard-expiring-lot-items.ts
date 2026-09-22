@@ -1,1 +1,0 @@
-export function dashboardExpiringLotItems(items:any[],daysToExpiry:(value:any)=>number|null,limit=30){const result:any[]=[];items.forEach(item=>item.levelData.forEach((level:any)=>{const days=daysToExpiry(level.l.exp);if(days!=null&&days<=limit)result.push({t:item.t,l:level.l,d:days});}));return result;}

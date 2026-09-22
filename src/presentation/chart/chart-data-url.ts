@@ -1,1 +1,0 @@
-export function createChartDataUrl(deps:{createCanvas:()=>any}){return(input:{width:number;height:number;render:(canvas:any)=>void})=>{const canvas=deps.createCanvas();canvas.width=input.width;canvas.height=input.height;input.render(canvas);return canvas.toDataURL('image/png');};}
