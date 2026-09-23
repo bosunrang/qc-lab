@@ -30,4 +30,24 @@ assert.equal(extremeQcPointDeviation('x', 10, 1), null, 'giá trị không phả
   assert.equal(validateQcPointInput({ ...base, date: '2024-02-29' }, [1]).ok, true, 'năm nhuận thật thì qua');
 }
 
+// Giá trị QC phải là MỘT SỐ ĐẦY ĐỦ. `parseFloat()` đọc tới đâu hay tới đó rồi
+// bỏ phần còn lại, nên `"12,5"` (dấu phẩy thập phân, cách gõ quen thuộc ở VN)
+// lưu thành 12 mà không một cảnh báo nào. Renderer gửi `number` nên không
+// dính, nhưng đây là cổng ghi DUY NHẤT — LIS và client LAN đi cùng đường này.
+{
+  const { validateQcPointInput } = require('../../app-dist/main/domain/entry-validation.js');
+  const base = { testId: 'T1', level: 1, date: '2026-08-01' };
+  for (const [val, expected] of [[12.5, 12.5], ['12.5', 12.5], [' 12.5 ', 12.5], ['-0.75', -0.75], ['+3', 3], ['.5', 0.5], ['1.2e5', 120000]]) {
+    const result = validateQcPointInput({ ...base, val }, [1]);
+    assert.equal(result.ok, true, `số hợp lệ phải qua: ${JSON.stringify(val)}`);
+    assert.equal(result.data.val, expected, `đọc đúng giá trị: ${JSON.stringify(val)}`);
+  }
+  for (const val of ['12,5', '12.5abc', '12 5', '0x10', '1.2.3', '', '  ', 'abc', null, undefined, {}, '--4']) {
+    const result = validateQcPointInput({ ...base, val }, [1]);
+    assert.equal(result.ok, false, `chuỗi không phải số phải bị chặn: ${JSON.stringify(val)}`);
+    assert.equal(result.code, 'invalid-value');
+  }
+  assert.equal(validateQcPointInput({ ...base, val: NaN }, [1]).ok, false, 'NaN vẫn bị chặn');
+}
+
 console.log('app entry-validation ±5SD oracle tests passed');

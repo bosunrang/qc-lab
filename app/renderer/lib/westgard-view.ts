@@ -35,7 +35,10 @@ export function westgardExportRows(blocks: ReturnType<typeof displayedWestgardBl
     `Mức ${block.level}`, block.lot, point.date.split('-').reverse().join('/'), point.runId, point.val,
     point.targetMean ?? '—', point.targetSd ?? '—', Number.isFinite(point.z) ? Number(point.z.toFixed(2)) : '—',
     verdictLabels[point.verdict] + (point.cusumSignal ? ' · Cảnh báo CUSUM' : ''),
-    point.runRejected ? 'Có' : 'Không', point.accepted ? 'Có' : 'Không',
+    // Nêu luôn MỨC làm hỏng lần chạy khi chính điểm này không vi phạm — với
+    // điểm tự bị loại thì cột "Kết luận điểm" đã nói rồi, không lặp.
+    point.runRejected ? (point.verdict !== 'rej' && point.runRejectedBy?.length ? `Có (${point.runRejectedBy.map(level => `Mức ${level}`).join(', ')})` : 'Có') : 'Không',
+    point.accepted ? 'Có' : 'Không',
     [...point.rules, point.cusumSignal].filter(Boolean).join(', '), point.supportRules.join(', '),
   ]));
 }

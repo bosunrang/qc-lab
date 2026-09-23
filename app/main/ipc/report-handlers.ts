@@ -1,17 +1,19 @@
-// IPC handler cho trang Bao cao: khoa/mo khoa ky bao cao + xem lai diem QC
-// theo khoang ngay. Pham vi rut gon: chua co in an/xuat Excel/CSV nhu ban cu
-// (xem CLAUDE.md "con thieu") - chi co bang xem va khoa ky.
+// IPC handler cho trang Báo cáo: khoá/mở khoá kỳ báo cáo + đọc lại điểm QC
+// theo khoảng ngày. Việc dựng tệp (CSV/Excel/PDF) nằm ở renderer qua
+// `export:tableXlsx`/`print:htmlToPdf` — xem `docs/APP-PLAN.md` mục 3.8.
 import type { Db } from '../db/sqlite-like';
 import { uid } from '../domain/text-utils';
 import { validateLockPeriod, validateUnlockPeriod, type LockPeriodInput, type UnlockPeriodInput } from '../domain/period-lock-validation';
 import { type Actor, type IpcResult, nowIso, writeAudit, notifyChanged, requireAdmin } from './shared';
+// Kiểu hàng báo cáo lấy từ HỢP ĐỒNG dùng chung thay vì khai lại ở đây — bản
+// trước có hai khai báo song song cùng tên và bản ở đây thiếu cột `lot`.
+import type { ReportPointRow } from '../../shared/qc-api';
+
+export type { ReportPointRow };
 
 export interface PeriodLockRow { id: string; ym: string; locked_at: string; locked_by: string; note: string }
 
-export interface ReportPointRow {
-  id: string; test_id: string; level: number; date: string; run_id: string; val: number;
-  note: string; operator_name: string; voided: 0 | 1; void_reason: string;
-}
+
 
 export function createReportHandlers(db: Db) {
   function listPeriodLocks(): PeriodLockRow[] {
@@ -47,17 +49,24 @@ export function createReportHandlers(db: Db) {
     return { ok: true, data: { ym } };
   }
 
-  /** Xem lại điểm QC của 1 xét nghiệm (mọi mức) trong khoảng ngày — dùng cho
-   * bảng xem lại của trang Báo cáo, không tính verdict Westgard (đó là việc
-   * của trang Phân tích Westgard, xem "Confirmed business-logic decisions"
-   * trong CLAUDE.md — 2 con số Sigma/verdict của Báo cáo và Westgard cố ý
-   * tách biệt). */
+  /** Điểm QC của 1 xét nghiệm (mọi mức, MỌI lô) trong khoảng ngày.
+   *
+   * Trả cả điểm ĐÃ HUỶ kèm `void_reason` — báo cáo là hồ sơ, dấu vết huỷ phải
+   * còn trong đó, không lọc đi.
+   *
+   * KHÔNG tính verdict Westgard: đánh giá luật cần cả tập mức cùng lần chạy
+   * và thuộc trang Phân tích Westgard (trang đó có bản xuất riêng, kèm cột
+   * "Lần chạy bị loại"/"Dùng thống kê"). Quyết định này ghi ở `docs/APP-PLAN.md`
+   * mục 3.8. */
   function queryReport(input: { testId?: unknown; from?: unknown; to?: unknown }): ReportPointRow[] {
     const testId = String(input.testId || '');
     const from = String(input.from || '');
     const to = String(input.to || '');
     if (!testId) return [];
-    let sql = 'SELECT * FROM qc_points WHERE test_id=?';
+    // Liệt kê ĐÚNG các cột hợp đồng khai, không `SELECT *`: hàng báo cáo đi
+    // thẳng ra tệp xuất nên không được mang theo cột không ai kiểm.
+    let sql = `SELECT id,test_id,level,date,run_id,lot,val,note,operator_name,voided,void_reason
+      FROM qc_points WHERE test_id=?`;
     const params: (string | number)[] = [testId];
     if (from) { sql += ' AND date>=?'; params.push(from); }
     if (to) { sql += ' AND date<=?'; params.push(to); }

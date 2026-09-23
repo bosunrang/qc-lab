@@ -20,7 +20,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useManageStore } from '../../store/manage-store';
 import { Modal } from '../../components/Modal';
-import type { QcPointView, Test, TestLevel, QcLot } from '../../../shared/qc-api';
+import type { HistoryQcPointView, Test, TestLevel, QcLot } from '../../../shared/qc-api';
 import { vnDate } from '../../lib/format';
 import { EmptyState } from './shared';
 
@@ -107,7 +107,7 @@ function testSearchValues(test: Test, levels: TestLevel[], lots: QcLot[], instru
 export function HistoryTab() {
   const { tests, instruments, lots, lotGroups, levelsByTestId, loadLevels, loadHistoryPoints } = useManageStore();
   const [testId, setTestId] = useState('');
-  const [points, setPoints] = useState<QcPointView[]>([]);
+  const [points, setPoints] = useState<HistoryQcPointView[]>([]);
   const [detail, setDetail] = useState<HistoryRow | null>(null);
   const [query, setQuery] = useState('');
 

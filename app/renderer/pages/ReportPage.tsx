@@ -59,17 +59,28 @@ function csvCell(value: unknown): string {
   return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-const POINT_HEADERS = ['Ngày', 'Mức', 'Lần chạy', 'Giá trị', 'Người thực hiện', 'Trạng thái'];
-const NCE_HEADERS = ['Mã NCE', 'Ngày', 'Mức', 'Luật', 'Loại sai số', 'Hạn xử lý', 'Duyệt', 'Hiệu lực'];
+// Số lô đứng ngay sau Mức: hai thứ cùng định danh VẬT LIỆU KIỂM của dòng đó.
+// Thiếu nó, một báo cáo bắc qua lần đổi lô liệt kê điểm của cả hai lô mà
+// không phân biệt được — mà số lô là định danh bắt buộc của vật liệu kiểm
+// trong hồ sơ nội kiểm ISO 15189.
+const POINT_HEADERS = ['Ngày', 'Mức', 'Lô', 'Lần chạy', 'Giá trị', 'Người thực hiện', 'Trạng thái'];
+const NCE_HEADERS = ['Mã NCE', 'Ngày', 'Mức', 'Luật', 'Loại sai số', 'Hạn xử lý', 'Trạng thái hồ sơ', 'Duyệt', 'Hiệu lực'];
+
+/** Hồ sơ ĐÃ HUỶ vẫn nằm trong phụ lục (nó là dấu vết, không được lọc đi)
+ * nhưng phải nói rõ ra. Bản trước chỉ in `approval_status`/`effectiveness_status`,
+ * nên một hồ sơ đã huỷ hiện y hệt hồ sơ đang chờ duyệt — thẻ Khắc phục sự cố
+ * thì hiển thị và xuất `record_status`, chỉ báo cáo là mất. */
+const NCE_RECORD_STATUS: Record<string, string> = { cancelled: 'Đã huỷ', active: 'Đang hiệu lực' };
 
 function pointRow(p: ReportPointRow): (string | number)[] {
-  return [vnDate(p.date), p.level, p.run_id, p.val, p.operator_name || '—', p.voided ? `Đã huỷ: ${p.void_reason}` : 'Hợp lệ'];
+  return [vnDate(p.date), p.level, p.lot || '—', p.run_id, p.val, p.operator_name || '—', p.voided ? `Đã huỷ: ${p.void_reason}` : 'Hợp lệ'];
 }
 function nceRow(r: NceRecord): string[] {
   // Cột lưu MÃ (`SE`/`RE`/`''`); bảng in đọc ra nhãn. Dữ liệu cũ có thể còn
   // chuỗi dài nên vẫn đi qua `normalizeErrorClass()`.
   return [r.nce_id || '—', vnDate(r.date), r.level == null ? '—' : `M${r.level}`, r.rule || '—', ERROR_CLASS_LABEL[normalizeErrorClass(r.error_type)],
-    r.due_date ? vnDate(r.due_date) : '—', r.approval_status, r.effectiveness_status];
+    r.due_date ? vnDate(r.due_date) : '—', NCE_RECORD_STATUS[r.record_status] || r.record_status || '—',
+    r.approval_status, r.effectiveness_status];
 }
 
 /** Trang in — tĩnh, tự đứng một mình (cửa sổ in ở main process nạp qua
@@ -96,8 +107,15 @@ function buildPrintHtml(label: string, from: string, to: string, points: ReportP
   ${appendix}</body></html>`;
 }
 
+/** CSV ghi kèm BOM UTF-8.
+ *
+ * `type: 'text/csv;charset=utf-8'` chỉ là MIME của Blob — Excel trên Windows
+ * KHÔNG đọc MIME khi mở một tệp cục bộ, nó đoán mã hoá theo codepage hệ
+ * thống. Thiếu BOM thì toàn bộ tiếng Việt trong báo cáo ("Người thực hiện",
+ * "Đã huỷ", tên xét nghiệm) mở ra là ký tự rác. Bản xuất Excel đi qua
+ * `exceljs` nên không dính; chỉ nhánh CSV này cần. */
 function download(content: string, filename: string, type: string) {
-  const url = URL.createObjectURL(new Blob([content], { type }));
+  const url = URL.createObjectURL(new Blob(['﻿', content], { type }));
   const a = document.createElement('a');
   a.href = url; a.download = filename;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
@@ -132,7 +150,11 @@ export function ReportPage() {
   useEffect(() => { if (selectedId !== testId) setTestId(selectedId); }, [selectedId, testId]);
 
   const selected = matched.find((t) => t.testId === selectedId) || null;
-  const disabled = !matched.length || busy;
+  // Đảo ngược Từ/Đến thì mọi truy vấn trả rỗng và báo cáo in ra một bảng
+  // trắng — trông y như "kỳ này không có dữ liệu". Chặn ở nút xuất và nói rõ
+  // lý do, thay vì để người dùng tự đoán.
+  const rangeInvalid = !!start && !!end && start > end;
+  const disabled = !matched.length || busy || rangeInvalid;
   const year = Number(lockYm.slice(0, 4)) || new Date().getFullYear();
   const month = Number(lockYm.slice(5, 7)) || 1;
   const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 3 + i);
@@ -142,8 +164,8 @@ export function ReportPage() {
    * mỗi lần xuất/in là truy vấn lại đúng lúc đó. */
   async function collect() {
     // Truy vấn TỨC THỜI cho đúng lần xuất/in này (app cũ cũng không có bước
-    // "Xem" riêng) — kết quả không được hiển thị lâu dài nên không vào
-    // store; phần bảng hiển thị của trang dùng `report-store.loadPoints`.
+    // "Xem" riêng) — trang không có bảng xem trước, dữ liệu chỉ tồn tại đủ
+    // lâu để dựng tệp nên không vào store.
     const points = await window.qcApi.queryReport({ testId: selectedId, from: start, to: end });
     if (!withNce) return { points, nce: null };
     const all = await window.qcApi.listNceRecords();
@@ -156,7 +178,13 @@ export function ReportPage() {
     try { await work(); } finally { setBusy(false); }
   }
 
-  const stamp = () => `${selectedId}-${isoToday()}`;
+  /** Tên tệp theo TÊN xét nghiệm, không phải `testId` (một uid ngẫu nhiên):
+   * đây là hồ sơ đem lưu, `bao-cao-9f3a12c4…-2026-09-23.pdf` thì không tra
+   * lại được. Bỏ ký tự không hợp lệ trong tên tệp trên Windows. */
+  const stamp = () => {
+    const name = (selected?.testName || 'xet-nghiem').replace(/[\/:*?"<>|]+/g, '-').trim() || 'xet-nghiem';
+    return `${name}-${isoToday()}`;
+  };
 
   function printReport() {
     return run(async () => {
@@ -228,6 +256,7 @@ export function ReportPage() {
               <div className="field"><label htmlFor="rStartDate">Từ ngày</label><DateField id="rStartDate" value={start} onChange={setStart} /></div>
               <div className="field"><label htmlFor="rEndDate">Đến ngày</label><DateField id="rEndDate" value={end} onChange={setEnd} /></div>
             </div>
+            {rangeInvalid && <div className="alert warn report-range-error" role="alert">Từ ngày ({vnDate(start)}) đang sau Đến ngày ({vnDate(end)}) — báo cáo sẽ không có dòng nào. Hãy đổi lại khoảng ngày.</div>}
             <div className="report-export-bar">
               <div className="report-export-options">
                 <label className="report-nce-option">

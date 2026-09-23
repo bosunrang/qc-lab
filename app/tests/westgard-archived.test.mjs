@@ -57,5 +57,10 @@ assert.equal(blocks[0].analysis.points[0].z, 2.5, 'Z của lô cũ phải dùng 
 assert.equal(blocks[1].analysis.points[0].z, -2.5, 'Z của lô cũ phải dùng Mean/SD cũ: (190-200)/4');
 assert.ok(blocks.every((block) => block.analysis.points[0].rules.includes('R4s')), 'R4s liên mức của nhóm lô đã dừng phải được giữ lại');
 assert.deepEqual(blocks.map((block) => block.analysis.points[0].verdict), ['rej', 'rej'], 'cả hai điểm cấu thành R4s lịch sử phải bị loại');
+// Lý do loại theo LẦN CHẠY cũng phải đi kèm ở tab lô lịch sử, đúng trường mà
+// `entry:queryPoints` trả — ba đường đọc mô tả cùng một điểm bằng cùng hình
+// dạng, nếu không màn hình chỉ bớt được điểm khỏi thống kê mà không nói vì sao.
+assert.deepEqual(blocks.map((block) => block.analysis.points[0].runRejectedBy), [[1, 2], [1, 2]],
+  'cả hai mức của lần chạy R4s đều là lý do lần chạy bị loại');
 
 console.log('app archived Westgard history end-to-end tests passed');

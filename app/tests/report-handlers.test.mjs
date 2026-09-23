@@ -70,4 +70,55 @@ const rowsRanged = report.queryReport({ testId: testA.id, from: '2026-08-01', to
 assert.equal(rowsRanged.length, 2, 'loc theo khoang ngay phai chi con 2 diem trong thang 8');
 assert.ok(rowsRanged.every(r => r.test_id === testA.id), 'khong duoc lan diem cua Test B khac');
 
+// Điểm ĐÃ HUỶ phải còn trong báo cáo kèm lý do — báo cáo là hồ sơ, không
+// phải bảng dữ liệu sạch. Trang in gạch ngang những dòng này.
+{
+  const voidedRows = report.queryReport({ testId: testA.id, from: '', to: '' });
+  assert.ok(voidedRows.every(row => 'voided' in row && 'void_reason' in row), 'báo cáo phải mang theo dấu vết huỷ');
+}
+
+// Số lô phải đi theo từng dòng báo cáo: một báo cáo bắc qua lần đổi lô liệt
+// kê điểm của CẢ HAI lô, thiếu cột này thì không phân biệt được — mà số lô là
+// định danh bắt buộc của vật liệu kiểm trong hồ sơ nội kiểm ISO 15189.
+{
+  const withLot = report.queryReport({ testId: testA.id, from: '', to: '' });
+  assert.ok(withLot.length, 'phải có dòng để kiểm');
+  assert.ok(withLot.every(row => 'lot' in row), 'mỗi dòng báo cáo phải mang số lô');
+  // Và KHÔNG kéo theo cột ngoài hợp đồng: hàng này đi thẳng ra tệp xuất.
+  const allowed = new Set(['id', 'test_id', 'level', 'date', 'run_id', 'lot', 'val', 'note', 'operator_name', 'voided', 'void_reason']);
+  for (const key of Object.keys(withLot[0])) assert.ok(allowed.has(key), `cột ngoài hợp đồng lọt vào báo cáo: ${key}`);
+}
+
+// Xuất CSV phải có BOM UTF-8. Blob `type: text/csv;charset=utf-8` KHÔNG đủ:
+// Excel trên Windows đoán mã hoá theo codepage hệ thống khi mở tệp cục bộ,
+// thiếu BOM thì toàn bộ tiếng Việt trong báo cáo mở ra là ký tự rác.
+{
+  const { readFileSync } = await import('node:fs');
+  const page = readFileSync(new URL('../renderer/pages/ReportPage.tsx', import.meta.url), 'utf8');
+  assert.match(page, /new Blob\(\['\ufeff', content\], \{ type \}\)/, 'CSV phải ghi kèm BOM UTF-8');
+  // Tên tệp theo tên xét nghiệm, không phải uid — đây là hồ sơ đem lưu.
+  assert.match(page, /selected\?\.testName \|\| 'xet-nghiem'/);
+  assert.doesNotMatch(page, /`\$\{selectedId\}-\$\{isoToday\(\)\}`/, 'không đặt tên tệp bằng testId');
+
+  // Cột Lô đứng ngay sau Mức trong cả tiêu đề lẫn dòng dữ liệu.
+  assert.match(page, /const POINT_HEADERS = \['Ngày', 'Mức', 'Lô', 'Lần chạy', 'Giá trị', 'Người thực hiện', 'Trạng thái'\];/);
+  assert.match(page, /p\.level, p\.lot \|\| '—', p\.run_id/);
+
+  // Phụ lục NCE phải nói rõ hồ sơ đã huỷ — giữ dòng (nó là dấu vết) nhưng
+  // không để nó hiện y hệt hồ sơ đang chờ duyệt.
+  assert.match(page, /'Hạn xử lý', 'Trạng thái hồ sơ', 'Duyệt', 'Hiệu lực'/);
+  assert.match(page, /cancelled: 'Đã huỷ', active: 'Đang hiệu lực'/);
+  assert.match(page, /NCE_RECORD_STATUS\[r\.record_status\]/, 'nceRow() phải sinh ô trạng thái hồ sơ');
+  // Số ô `nceRow()` sinh ra phải khớp số cột tiêu đề, nếu không bảng lệch cột.
+  const headerCount = (/const NCE_HEADERS = \[([^\]]+)\]/.exec(page)?.[1] || '').split(',').length;
+  const cellCount = (/function nceRow\(r: NceRecord\): string\[\] \{[\s\S]*?return \[([\s\S]*?)\];/.exec(page)?.[1] || '')
+    .split(/,(?![^[(]*[\])])/).length;
+  assert.equal(headerCount, 9);
+  assert.equal(cellCount, headerCount, 'số ô nceRow() phải khớp số cột NCE_HEADERS');
+
+  // Khoảng ngày đảo ngược bị chặn ở nút xuất, kèm giải thích.
+  assert.match(page, /const rangeInvalid = !!start && !!end && start > end;/);
+  assert.match(page, /const disabled = !matched\.length \|\| busy \|\| rangeInvalid;/);
+}
+
 console.log('app report-handlers end-to-end tests passed');

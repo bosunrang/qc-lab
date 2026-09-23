@@ -38,6 +38,23 @@ export interface PreparedQcPoint {
 
 export type ValidationResult<T> = { ok: true; data: T } | { ok: false; code: string; message: string };
 
+/** Một CHUỖI SỐ đầy đủ, không có phần thừa phía sau. Cho phép dấu, phần thập
+ * phân và ký hiệu mũ (một số máy gửi `1.2e5` cho đếm tế bào). */
+const QC_VALUE_RE = /^[+-]?(\d+(\.\d+)?|\.\d+)([eE][+-]?\d+)?$/;
+
+/** Đọc giá trị QC từ dữ liệu THÔ của mọi nguồn ghi. KHÔNG dùng `parseFloat()`:
+ * hàm đó đọc tới đâu hay tới đó rồi bỏ phần còn lại, nên `"12,5"` thành 12,
+ * `"12.5abc"` thành 12.5 và `"12 5"` thành 12 — client LAN gõ dấu phẩy thập
+ * phân sẽ lưu 12 thay vì 12,5 mà không có lấy một cảnh báo. Đây là cổng ghi
+ * DUY NHẤT của điểm QC nên nó phải từ chối chuỗi không phải số, không được
+ * tự đoán ý người gõ. Renderer đã gửi `number` nên nhánh này chỉ áp cho LIS
+ * và các lời gọi IPC/LAN trực tiếp. */
+export function parseQcValue(value: unknown): number {
+  if (typeof value === 'number') return value;
+  const text = String(value ?? '').trim();
+  return QC_VALUE_RE.test(text) ? Number(text) : NaN;
+}
+
 /** Cảnh báo dữ liệu bất thường trước khi lưu — port đúng ngưỡng app cũ:
  * chỉ cảnh báo khi |Z| > 5, còn đúng ±5SD vẫn được lưu bình thường. Đây là
  * cảnh báo có thể xác nhận "Vẫn lưu", không phải luật Westgard hay lỗi
@@ -61,7 +78,7 @@ export function validateQcPointInput(input: QcPointInput, knownLevels: readonly 
   // cohort Sigma/báo cáo thành vô nghĩa. App cũ chỉ kiểm định dạng ở đây rồi
   // lọc lại ở tầng cohort — app chặn ngay ở cổng ghi duy nhất.
   if (!DATE_RE.test(date) || !isRealDate(date)) return { ok: false, code: 'invalid-date', message: 'Ngày không hợp lệ (định dạng YYYY-MM-DD).' };
-  const val = typeof input.val === 'number' ? input.val : parseFloat(String(input.val == null ? '' : input.val).trim());
+  const val = parseQcValue(input.val);
   if (!Number.isFinite(val)) return { ok: false, code: 'invalid-value', message: 'Giá trị QC không hợp lệ.' };
   const runId = cleanText(input.runId, 120).trim() || `${date}-1`;
   return {

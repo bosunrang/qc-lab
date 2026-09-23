@@ -78,6 +78,9 @@ test('WG11/12: chart and invalidation wiring use the shared run key and all eval
 test('WG11: actual canvas drawing places same-day runs at distinct increasing X coordinates', () => {
   const source = readFileSync(new URL('../renderer/components/QcChart.tsx', import.meta.url), 'utf8');
   const sections = [
+    // `drawMulti` dùng chung helper này với `drawLJ` — nạp kèm, nếu không
+    // sandbox ném ReferenceError thay vì kiểm được toạ độ.
+    source.slice(source.indexOf('function isRunCollateral('), source.indexOf('export interface QcChartCusum')),
     source.slice(source.indexOf('function geometry('), source.indexOf('function ticksOf(')),
     source.slice(source.indexOf('function drawMulti('), source.indexOf('function drawCusum(')),
     source.slice(source.indexOf('function drawMultiCusum(')),
@@ -95,4 +98,28 @@ test('WG11: actual canvas drawing places same-day runs at distinct increasing X 
   context.drawMultiCusum(canvas, 1000, 300, [{ level: 1, points, cusum: { cPos: [1, 2, 3], cNeg: [0, 0, 0], ma: [], flags: ['ok', 'ok', 'ok'], k: 0.5, h: 4 } }]);
   assert.equal(circles.length, 6);
   assert.ok(circles[0].x < circles[2].x && circles[2].x < circles[4].x);
+});
+
+test('WG17: lý do lần chạy bị loại đọc từ main, không tự dò lại ở renderer', () => {
+  // Điểm TỰ NÓ đạt nhưng cả lần chạy bị Mức 2 làm hỏng.
+  const collateral = { id: 'p1', date: '2026-09-01', runId: 'run1', val: 100, z: 0.2, targetMean: 100, targetSd: 2,
+    verdict: 'ok', runRejected: true, runRejectedBy: [2], accepted: false, rules: [], supportRules: [], cusumSignal: null };
+  const blocks = displayedWestgardBlocks([{ level: 1, mean: 100, sd: 2, lot: 'L1' }], { 1: { points: [collateral] } }, [], () => false);
+  const row = westgardExportRows(blocks)[0];
+  assert.equal(row[8], 'Đạt', 'kết luận riêng của điểm không đổi');
+  assert.equal(row[9], 'Có (Mức 2)', 'cột "Lần chạy bị loại" nêu luôn mức làm hỏng');
+  assert.equal(row[10], 'Không', 'và điểm không vào thống kê');
+
+  // Điểm TỰ vi phạm thì cột "Kết luận điểm" đã nói rồi, không lặp lại mức.
+  const selfRejected = { ...collateral, verdict: 'rej', rules: ['1-3s'], runRejectedBy: [1] };
+  const selfRow = westgardExportRows(displayedWestgardBlocks([{ level: 1, mean: 100, sd: 2, lot: 'L1' }], { 1: { points: [selfRejected] } }, [], () => false))[0];
+  assert.equal(selfRow[9], 'Có');
+
+  // Nhãn trên bảng phải ĐỌC `runRejectedBy`, không quét lại `analysisByLevel`:
+  // bản dò lại chỉ nêu được một mức, và khi bảng đang mở "Xem lô cũ" thì nó
+  // tra nhầm sang chuỗi của lô đang chạy.
+  const page = readFileSync(new URL('../renderer/pages/WestgardPage.tsx', import.meta.url), 'utf8');
+  assert.match(page, /const runExclusionLabel = \(point: \{ runRejectedBy\?: number\[\] \}\)/);
+  assert.equal((page.match(/runExclusionLabel\(p\)/g) || []).length, 2, 'cả bảng lô hiện hành lẫn tab nhóm lô đã dừng đều dùng chung nhãn');
+  assert.doesNotMatch(page, /candidate\.verdict === 'rej'/, 'không còn vòng dò lại ở renderer');
 });

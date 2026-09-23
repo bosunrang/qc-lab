@@ -7,7 +7,7 @@
 // thị lỗi validate của MÌNH, không dùng 1 field `error` dùng chung dễ lẫn
 // giữa các tab/modal đang mở.
 import { create } from 'zustand';
-import type { Instrument, Test, TestLevel, QcLot, LotGroup, QcPanel, LotTransition, TeaRef, RuleScopeItem, IpcResult, QcApi, QcPointView, PlannedTarget } from '../../shared/qc-api';
+import type { Instrument, Test, TestLevel, QcLot, LotGroup, QcPanel, LotTransition, TeaRef, RuleScopeItem, IpcResult, QcApi, HistoryQcPointView, PlannedTarget } from '../../shared/qc-api';
 
 type ApiInputData<K extends keyof QcApi> = QcApi[K] extends (...args: infer Args) => unknown
   ? Args[0] extends { data: infer Data } ? Data : never
@@ -39,7 +39,7 @@ interface ManageState {
   loadLotGroups: () => Promise<void>;
   loadPanels: () => Promise<void>;
   loadLotTransitions: () => Promise<void>;
-  historyPointsByTestId: Record<string, QcPointView[]>;
+  historyPointsByTestId: Record<string, HistoryQcPointView[]>;
   loadHistoryPoints: (testId: string) => Promise<void>;
   loadTeaRefs: () => Promise<void>;
   loadRuleScopes: (testId: string) => Promise<void>;

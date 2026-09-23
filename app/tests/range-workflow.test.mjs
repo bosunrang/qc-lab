@@ -68,8 +68,12 @@ db.prepare('UPDATE tests SET tea=8 WHERE id=?').run(test.id);
 assert.equal(entry.applyLabRange({ data: { testId: test.id, level: 1, reason: 'Thiết lập lại sau sai số hệ thống', causeConfirmed: true, bias: 2.1 } }, actor).error.code, 'bias-out-of-range');
 assert.equal(entry.applyLabRange({ data: { testId: test.id, level: 1, reason: 'Thiết lập lại sau sai số hệ thống', causeConfirmed: true, bias: 2 } }, actor).ok, true);
 
-// Một điểm cảnh báo vẫn tham gia phép tính nhưng chặn điều kiện; app không
-// được tự bỏ nó để làm đẹp SD.
+// Một điểm cảnh báo `1-2s` vẫn tham gia phép tính (app không tự bỏ nó để làm
+// đẹp SD) nhưng KHÔNG còn chặn điều kiện — sửa 23/09/2026 theo CLSI C24-Ed4.
+// Với giới hạn ±2SD, dữ liệu in-control chuẩn phải có ~4,6% điểm nằm ngoài,
+// nên đòi `warnings === 0` là đòi một thứ thống kê không cho phép tồn tại:
+// xác suất đạt là 0,9545^n — 39% ở n=20 và 6% ở n=60, tức càng gom nhiều dữ
+// liệu càng khó lập dải. Xem ghi chú ở `evaluateRangeCandidate()`.
 const lot2 = config.saveLot({ data: { lotNo: 'LOT-WARN', level: 2 } }, actor).data;
 config.saveTestLevel({ testId: test.id, data: { level: 2, mean: 20, sd: 1, qcLotId: lot2.id } }, actor);
 makeOperationalQc(db, { testId: test.id, instrumentId: instrument.id, assignments: [{ level: 2, lotId: lot2.id }] });
@@ -80,7 +84,27 @@ for (let day = 1; day <= 20; day++) {
 }
 const warned = entry.rangeCandidate(test.id, 2);
 assert.equal(warned.data.proposed.n, 20);
-assert.ok(warned.data.proposed.warnings > 0 || warned.data.proposed.rejected > 0);
-assert.equal(warned.data.eligible, false);
+assert.equal(warned.data.proposed.warnings, 1, 'điểm +2,5SD vẫn được đếm là cảnh báo');
+assert.equal(warned.data.proposed.rejected, 0, 'cảnh báo 1-2s không phải điểm bị loại');
+assert.equal(warned.data.eligible, true, 'một cảnh báo 1-2s lẻ không được chặn việc lập dải');
+// Và nó VẪN nằm trong phép tính, không bị lọc lén để SD đẹp hơn.
+assert.ok(warned.data.proposed.sd > 0.5, 'điểm cảnh báo vẫn tham gia tính SD');
+
+// Ngược lại: một LẦN CHẠY bị loại thì chặn, kể cả khi chính mức này đạt.
+// Mức 3 vượt +4SD ngày 10/08 nên cả lần chạy `2026-08-10-1` mất hiệu lực —
+// điểm Mức 2 cùng lần chạy đó không còn là dữ liệu in-control dù verdict
+// riêng của nó vẫn là 'ok'.
+const lot3 = config.saveLot({ data: { lotNo: 'LOT-RUN', level: 3 } }, actor).data;
+config.saveTestLevel({ testId: test.id, data: { level: 3, mean: 30, sd: 1, qcLotId: lot3.id } }, actor);
+makeOperationalQc(db, { testId: test.id, instrumentId: instrument.id, assignments: [{ level: 3, lotId: lot3.id }] });
+assert.equal(entry.addPoint({ data: { testId: test.id, level: 3, date: '2026-08-10', val: 34 } }, actor).ok, true);
+
+const collateral = entry.queryPoints(test.id, 2).find((point) => point.date === '2026-08-10');
+assert.equal(collateral.verdict, 'ok', 'điểm Mức 2 tự nó không vi phạm gì');
+assert.deepEqual(collateral.runRejectedBy, [3], 'nhưng lần chạy của nó bị Mức 3 làm hỏng');
+const blocked = entry.rangeCandidate(test.id, 2);
+assert.equal(blocked.data.proposed.n, 20, 'không lọc lén điểm ra khỏi phép tính');
+assert.equal(blocked.data.proposed.rejected, 1, 'đếm điểm thuộc lần chạy bị loại');
+assert.equal(blocked.data.eligible, false, 'lần chạy bị loại thì chưa được lập dải');
 
 console.log('app range workflow end-to-end tests passed');

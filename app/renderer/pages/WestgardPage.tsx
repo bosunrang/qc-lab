@@ -80,6 +80,21 @@ export function WestgardPage() {
   const analysisByLevel = analysisTestId === testId ? loadedAnalysis : {};
   const previousLotBlocks = analysisTestId === testId ? loadedPrevious : [];
   const analysisReady = analysisTestId === testId && !analysisLoading && !analysisError;
+  /** Nhãn cho điểm tự nó đạt nhưng cả lần chạy bị loại. Nêu rõ MỨC nguồn để
+   * không bị hiểu nhầm là chính điểm đang xem sai.
+   *
+   * Đọc thẳng `runRejectedBy` do main trả (`rejectedLevelsByRun()`), KHÔNG tự
+   * dò lại. Bản trước quét `analysisByLevel` tìm mức khác có điểm cùng
+   * ngày + mã run mang verdict 'rej' — một bản sao thứ hai của cùng một phép
+   * tính, và sai ở hai chỗ: chỉ nêu được MỘT mức dù nhiều mức cùng hỏng, và
+   * khi bảng đang mở "Xem lô cũ" thì điểm hiển thị là của lô đã chuyển tiếp
+   * trong khi vòng dò vẫn đọc điểm của LÔ ĐANG CHẠY — tra nhầm chuỗi, nên
+   * gần như luôn rơi về nhãn chung chung. Tab "Nhóm lô đã dừng" thậm chí
+   * không gọi nó, chỉ in cứng nhãn chung. */
+  const runExclusionLabel = (point: { runRejectedBy?: number[] }) => {
+    const by = point.runRejectedBy || [];
+    return by.length ? `Lần chạy bị loại ở ${by.map((level) => `Mức ${level}`).join(', ')}` : 'Lần chạy bị loại ở mức khác';
+  };
   const levelNums = useMemo(() => levels.map((l) => l.level), [levels]);
   useEffect(() => { if (testId) loadLevels(testId); }, [testId, loadLevels]);
   useEffect(() => { loadAnalysis(testId, levelNums); }, [testId, levelNums.join(','), loadAnalysis]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -92,7 +107,16 @@ export function WestgardPage() {
     void loadRuleSettings();
     void loadLots();
     void loadLotGroups();
-    if (testId) void loadLevels(testId).then(() => { if (selectedTestRef.current === testId) return loadAnalysis(testId, useManageStore.getState().levelsByTestId[testId]?.map(level => level.level) || []); });
+    // Lọc theo cờ `operational` đúng như tập mức đang render: `listTestLevels()`
+    // cố ý trả về đủ mọi mức (Bảng Mean/SD và Lịch sử cần mức đã dừng), nên
+    // truyền thẳng danh sách thô vào đây là gọi `analyzeLevel` cho cả những
+    // mức không bao giờ được vẽ, và nhét vào `analysisByLevel` các khoá không
+    // ai đọc.
+    if (testId) void loadLevels(testId).then(() => {
+      if (selectedTestRef.current !== testId) return;
+      const operational = (useManageStore.getState().levelsByTestId[testId] || []).filter(level => level.operational !== 0);
+      return loadAnalysis(testId, operational.map(level => level.level));
+    });
   });
 
   const archivedGroups = useMemo(
@@ -493,7 +517,7 @@ export function WestgardPage() {
         <div className="panel wg-multi-panel">
           <h2 className="panel-title">Levey-Jennings tổng hợp</h2>
           <div className="hint wg-panel-intro">Biểu đồ quy đổi các mức QC về Z-score để so sánh trên cùng trục; kết luận Đạt/Cảnh báo/Loại bỏ được tính theo bộ luật Westgard đang bật cho xét nghiệm. Bật "Xem lô cũ" ở mức tương ứng để thêm đường của lô đã chuyển tiếp.</div>
-          <div className="chart-scroll"><QcMultiChart className="wgLJMulti" series={multiSeries} height={300} responsiveHeight /></div>
+          <div className="chart-scroll"><QcMultiChart className="wgLJMulti" series={multiSeries} height={300} responsiveHeight decimals={currentSummary?.decimalPlaces ?? 2} /></div>
         </div>
       )}
       {view === 'current' && testId && chartMode === 'lj' && levels.map((l) => {
@@ -545,7 +569,7 @@ export function WestgardPage() {
                           <td className="num">{p.val.toFixed(currentSummary?.decimalPlaces ?? 2)}</td>
                           <td className="num">{zText(p.z)}</td>
                           <td className="wg-verdict-cell">
-                            <span className={`tag ${p.verdict}`}>{VERDICT_LABEL[p.verdict]}</span>{p.runRejected && p.verdict !== 'rej' && <span className="tag rej" title="Mức khác trong cùng lần chạy bị loại; điểm này không dùng cho thống kê">Lần chạy bị loại</span>}
+                            <span className={`tag ${p.verdict}`}>{VERDICT_LABEL[p.verdict]}</span>{p.runRejected && p.verdict !== 'rej' && <span className="tag none" title="Điểm này đạt riêng lẻ nhưng không được dùng cho thống kê vì một mức khác trong cùng run bị loại">{runExclusionLabel(p)}</span>}
                             {p.cusumSignal && <span className="tag warn" title="Tín hiệu xu hướng CUSUM; không tự loại điểm QC">Cảnh báo CUSUM</span>}
                           </td>
                           <td className="wg-evidence-cell">
@@ -588,7 +612,7 @@ export function WestgardPage() {
         <div className="panel wg-multi-panel">
           <h2 className="panel-title">Levey-Jennings tổng hợp</h2>
           <div className="hint wg-panel-intro">Biểu đồ quy đổi từng mức về Z-score theo Mean/SD đã chốt của chính lô để so sánh trên cùng trục; kết luận được đánh giá lại theo bộ luật Westgard đang bật.</div>
-          <div className="chart-scroll"><QcMultiChart className="wgLJMultiArchived" height={300} responsiveHeight
+          <div className="chart-scroll"><QcMultiChart className="wgLJMultiArchived" height={300} responsiveHeight decimals={archivedDecimals}
             series={archivedBlocks.map((b) => ({ level: b.level, lot: b.lotNo, points: b.analysis.points }))} /></div>
         </div>
       )}
@@ -612,7 +636,7 @@ export function WestgardPage() {
                       <td title={`Mã lần chạy: ${p.runId}`}>{i + 1}</td><td title={`Mã lần chạy: ${p.runId}`}>{vnDate(p.date)}<small className="hint" style={{ display: 'block' }}>{runLabel(p.runId)}</small></td>
                       <td className="num">{p.val.toFixed(archivedDecimals)}</td>
                       <td className="num">{zText(p.z)}</td>
-                      <td className="wg-verdict-cell"><span className={`tag ${p.verdict}`}>{VERDICT_LABEL[p.verdict]}</span>{p.runRejected && p.verdict !== 'rej' && <span className="tag rej" title="Mức khác trong cùng lần chạy bị loại; điểm này không dùng cho thống kê">Lần chạy bị loại</span>}</td>
+                      <td className="wg-verdict-cell"><span className={`tag ${p.verdict}`}>{VERDICT_LABEL[p.verdict]}</span>{p.runRejected && p.verdict !== 'rej' && <span className="tag none" title="Điểm này đạt riêng lẻ nhưng không được dùng cho thống kê vì một mức khác trong cùng run bị loại">{runExclusionLabel(p)}</span>}</td>
                       <td className="wg-evidence-cell">
                         <div className="wg-rule-chips">
                         {p.rules.map((r) => <span className="pill" key={r}>{r}</span>)}

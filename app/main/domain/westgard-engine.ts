@@ -298,6 +298,16 @@ export interface CombinedPointFlag extends PointFlag {
   crossRules: string[];
 }
 
+/** Trong danh sách luật đã nổ, luật nào THỰC SỰ gây LOẠI BỎ sau khi áp hành
+ * động ghi đè của phòng xét nghiệm. Phép phân giải giống hệt chỗ tính `level`
+ * bên dưới — tách ra làm một hàm để nơi thứ hai (bảng nhập QC tách cột "Vi
+ * phạm cảnh báo"/"Vi phạm loại bỏ") không dựng bản sao thứ hai của cùng một
+ * quy tắc. Ví dụ điểm z=2,5 nổ `2-2s`: `rules` là `['1-2s','2-2s']` nhưng chỉ
+ * `2-2s` là căn cứ loại bỏ, `1-2s` vẫn chỉ là cảnh báo. */
+export function rejectingRules(rules: readonly string[], actionOf?: (rule: string) => RuleAction): string[] {
+  return rules.filter((rule) => (actionOf?.(rule) || defaultRuleAction(rule, true)) === 'reject');
+}
+
 /** Ghép luật từng mức và luật liên mức thành một kết luận duy nhất cho mỗi
  * điểm, cùng mô hình `createActiveWestgard()` của app cũ. */
 export function combinedWestgardByPoint<T extends QcPointLike>(
@@ -332,9 +342,37 @@ export function combinedWestgardByPoint<T extends QcPointLike>(
     const crossRules = cross.get(point) || [];
     const rules = [...new Set([...one.rules, ...crossRules])];
     const supportRules = [...new Set([...one.supportRules, ...(cross.support.get(point) || [])])].filter((rule) => !rules.includes(rule));
-    const level: RuleVerdict = rules.some((rule) => (actionOf?.(rule) || defaultRuleAction(rule, true)) === 'reject') ? 'rej' : rules.length ? 'warn' : 'ok';
+    const level: RuleVerdict = rejectingRules(rules, actionOf).length ? 'rej' : rules.length ? 'warn' : 'ok';
     out.set(point, { level, rules, supportRules, crossRules: [...crossRules], z: result.zs[index] });
   });
+  return out;
+}
+
+/** MỨC NÀO làm hỏng từng lần chạy — khoá `qcRunKey()`, giá trị là các mức có
+ * điểm mang kết luận LOẠI BỎ trong lần chạy đó.
+ *
+ * `acceptedRunPoints()` loại CẢ lần chạy khi một mức bị loại, nhưng điểm của
+ * những mức còn lại vẫn giữ verdict riêng của chúng ('Đạt'). Không có bản đồ
+ * này thì màn hình chỉ nói được "Đạt" rồi lặng lẽ bỏ điểm đó khỏi n — người
+ * dùng thấy 11 chấm xanh mà thống kê ghi n=9 và không có cách nào biết vì
+ * sao. Tính ở đây, cạnh chính `acceptedRunPoints()`, để lý do và việc loại
+ * không thể nói hai chuyện khác nhau. */
+export function rejectedLevelsByRun<T extends QcPointLike>(
+  levelSets: readonly MultiLevelSet<T>[],
+  byPoint: ReadonlyMap<T, CombinedPointFlag>,
+): Map<string, number[]> {
+  const out = new Map<string, number[]>();
+  // Mức đọc từ TẬP MỨC chứ không từ điểm: hàng `qc_points` có cột `level`
+  // nhưng nhiều nơi chỉ SELECT những cột cần vẽ, và chính `levelSets` mới là
+  // thứ đã sinh ra `byPoint` — lấy cùng một nguồn thì không có đường lệch.
+  for (const set of levelSets || []) for (const point of set.pts || []) {
+    if (byPoint.get(point)?.level !== 'rej') continue;
+    const key = qcRunKey(point);
+    const levels = out.get(key) || [];
+    if (!levels.includes(set.level)) levels.push(set.level);
+    out.set(key, levels);
+  }
+  for (const levels of out.values()) levels.sort((a, b) => a - b);
   return out;
 }
 

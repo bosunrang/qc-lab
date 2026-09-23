@@ -44,6 +44,17 @@ function rowClass(date: string, today: string, doneLevels: number, liveLevels: n
 }
 
 const VERDICT_LABEL: Record<string, string> = { ok: 'Đạt', warn: 'Cảnh báo', rej: 'Loại bỏ', none: 'Chưa đánh giá' };
+
+/** Nhãn phụ cho điểm KHÔNG vào Mean/SD/CV thực mà TỰ NÓ không vi phạm: cả
+ * lần chạy bị loại vì một mức khác (`acceptedRunPoints()` loại theo run).
+ * Không có nhãn này thì điểm hiện "Đạt" rồi lặng lẽ bị trừ khỏi n — người
+ * dùng đếm 11 chấm trên hình mà thống kê ghi n=9 và không có cách nào biết
+ * vì sao. Điểm tự bị loại đã có nhãn "Loại bỏ" nên không lặp lại ở đây. */
+function runExcludedNote(point: QcPointView): string | null {
+  const by = point.runRejectedBy || [];
+  if (point.accepted !== false || point.verdict === 'rej' || !by.length) return null;
+  return `Lần chạy bị loại ở ${by.map((level) => `Mức ${level}`).join(', ')}`;
+}
 const vnDate = (iso: string) => formatVnDate(iso, iso || '—');
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
 const EMPTY_LEVELS: TestLevel[] = [];
@@ -157,7 +168,19 @@ export function EntryPage() {
   const [rangeBias, setRangeBias] = useState('');
 
   useEffect(() => { loadInstruments(); loadLots(); loadLotGroups(); loadSummaries(); loadTests(); loadPanels(); }, [loadInstruments, loadLots, loadLotGroups, loadSummaries, loadTests, loadPanels]);
-  const levels = levelsByTestId[testId] || EMPTY_LEVELS;
+  // `listTestLevels()` CỐ Ý trả về đủ mọi mức kèm cờ `operational` (Bảng
+  // Mean/SD và Lịch sử dữ liệu cần thấy cả mức đã dừng). Thẻ Nhập QC thì chỉ
+  // được dựng cột cho mức ĐANG VẬN HÀNH — cùng tập mà `listOperationalLevels()`
+  // gác ở main. Thiếu bộ lọc này thì một mức gắn lô thuộc nhóm đã dừng vẫn
+  // hiện ô nhập (gõ vào luôn bị `level-not-operational` chặn), cột luôn trống
+  // vì `queryPoints()` không trả điểm nào, và nặng nhất là `rowClass()` lấy
+  // `levels.length` làm số mức phải nhập đủ nên MỌI ngày quá khứ trong tháng
+  // bị kẻ vệt cam "còn thiếu" dù đã nhập đủ.
+  //
+  // Phải memo: `levelNums` là dependency của effect nạp dữ liệu, mảng mới mỗi
+  // lần render sẽ thành vòng lặp nạp vô hạn.
+  const allLevels = levelsByTestId[testId] || EMPTY_LEVELS;
+  const levels = useMemo(() => allLevels.filter((l) => l.operational !== 0), [allLevels]);
   const levelNums = useMemo(() => levels.map((l) => l.level), [levels]);
   useEffect(() => { if (testId) loadLevels(testId); }, [testId, loadLevels]);
   // Đổi xét nghiệm thì mức đang chọn rơi về mức đầu tiên (app cũ:
@@ -298,10 +321,18 @@ export function EntryPage() {
   const decimals = currentSummary?.decimalPlaces ?? 2;
   const valText = (val: number) => val.toFixed(decimals);
 
-  /** z-score so với Mean/SD ĐÍCH của mức, định dạng như app cũ:
-   * `+0.40s` / `-1.20s` (có dấu, hậu tố 's'). */
+  /** z-score của một điểm, định dạng như app cũ: `+0.40s` / `-1.20s` (có dấu,
+   * hậu tố 's').
+   *
+   * Ưu tiên Mean/SD đã CHỐT lúc nhập (`qc_mean`/`qc_sd`) đúng thứ tự mà
+   * `pointTarget()` ở domain dùng, rồi mới tới Mean/SD đang gán của mức. Lấy
+   * thẳng Mean/SD hiện hành thì sau một lần đổi dải, cùng một điểm hiện
+   * "Z = +3,80s · Đạt" — Z nói theo dải mới còn kết luận vẫn theo dải cũ.
+   * `HistoryTab` đã đọc đúng cặp cột này từ đầu. */
   function zText(point: QcPointView, level: { mean: number | null; sd: number | null }): string {
-    const mean = Number(level.mean), sd = Number(level.sd);
+    const hasSnapshot = point.qc_mean != null && point.qc_sd != null && point.qc_sd > 0;
+    const mean = hasSnapshot ? (point.qc_mean as number) : Number(level.mean);
+    const sd = hasSnapshot ? (point.qc_sd as number) : Number(level.sd);
     if (!Number.isFinite(mean) || !Number.isFinite(sd) || sd <= 0) return '—';
     const z = (point.val - mean) / sd;
     return `${z >= 0 ? '+' : ''}${z.toFixed(2)}s`;
@@ -321,10 +352,12 @@ export function EntryPage() {
   // trống (dòng "Khoảng xem: ..." luôn có 2 mốc ngày thật).
   useEffect(() => { if (!ljFrom && !ljTo) applyDayPreset(30); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** Điểm ĐƯỢC CHẤP NHẬN (cờ `accepted` do `analyzeLevel` tính, xem
-   * acceptedPoints() trong domain) và nằm trong khoảng xem — giữ đúng tập
-   * này cho số điểm và thống kê Mean/SD/CV thực. Biểu đồ vẽ thêm điểm bị loại
-   * để biến cố QC không biến mất khỏi hình. */
+  /** Điểm ĐƯỢC CHẤP NHẬN (cờ `accepted` do `analyzeLevel` tính qua
+   * `acceptedRunPoints()` — loại CẢ lần chạy khi một mức bị loại; không phải
+   * `acceptedPoints()`, hàm đó đã `@deprecated` và chỉ còn test đối chiếu
+   * dùng) và nằm trong khoảng xem — giữ đúng tập này cho số điểm và thống kê
+   * Mean/SD/CV thực. Biểu đồ vẽ thêm điểm bị loại để biến cố QC không biến
+   * mất khỏi hình. */
   function acceptedInWindow(level: number): QcPointView[] {
     const ids = new Set((analysisByLevel[level]?.points || []).filter((p) => p.accepted).map((p) => p.id));
     return inLjWindow((pointsByLevel[level] || []).filter((p) => !p.voided && ids.has(p.id)));
@@ -443,11 +476,16 @@ export function EntryPage() {
    * riêng do main process trả về; renderer chỉ dựng hình từ kết quả đó. */
   const entryColumns: EntryColumn[] = levels.flatMap((level) => {
     const analysis = analysisByLevel[level.level];
+    const rows = pointsByLevel[level.level] || [];
+    // `analyzeLevel` mang z + `accepted`; `queryPoints` mang LÝ DO lần chạy bị
+    // loại. Ghép theo id để biểu đồ nói được vì sao một chấm xanh không vào
+    // thống kê, thay vì chỉ âm thầm bớt nó khỏi n.
+    const runRejectedById = new Map(rows.map((point) => [point.id, point.runRejectedBy || []]));
     const main: EntryColumn = {
       key: `main:${level.level}:${lotLabelFor(level.level)}`,
       level: level.level, lot: lotLabelFor(level.level), mean: level.mean, sd: level.sd, exp: '',
-      parallel: false, applied: level.applied, points: pointsByLevel[level.level] || [],
-      chartPoints: analysis?.points || [],
+      parallel: false, applied: level.applied, points: rows,
+      chartPoints: (analysis?.points || []).map((point) => ({ ...point, runRejectedBy: runRejectedById.get(point.id) || [] })),
     };
     const candidate = parallelColumns.find((item) => item.level === level.level);
     if (!candidate) return [main];
@@ -457,6 +495,7 @@ export function EntryPage() {
       // `accepted` do main tính (loại CẢ lần chạy khi một mức của lô song song
       // bị loại), không phải cờ theo từng điểm — cùng ngữ nghĩa với cột chính.
       verdict: point.verdict, rules: point.rules, accepted: point.accepted === true,
+      runRejectedBy: point.runRejectedBy || [],
     }));
     return [main, {
       key: `parallel:${candidate.transitionId}:${candidate.level}:${candidate.lot}`,
@@ -480,6 +519,7 @@ export function EntryPage() {
         z: point.qc_mean != null && point.qc_sd != null && point.qc_sd > 0
           ? (point.val - point.qc_mean) / point.qc_sd : (point.val - previous.mean) / previous.sd,
         verdict: point.verdict, rules: point.rules, accepted: point.accepted === true,
+        runRejectedBy: point.runRejectedBy || [],
       })),
     };
   });
@@ -646,20 +686,43 @@ export function EntryPage() {
                         const oldDayPoints = previousLotSeries.flatMap((series) => series.points.filter((point) => point.date === date && !point.voided));
                         const dayPoints = [...oldDayPoints, ...entryColumns.flatMap((column) => pointsForColumnDay(column, date))];
                         const staff = Array.from(new Set(dayPoints.map((p) => p.operator_code || initialsFromName(p.operator_name)).filter(Boolean)));
-                        // Kết luận NGÀY tính theo lần chạy CUỐI CÙNG KHÔNG bị
-                        // loại của MỖI mức (port `summarizeRunStatus()` app
-                        // cũ) — không phải "tệ nhất trong mọi lần chạy". Sau
-                        // khi chạy lại đạt, ngày đó không còn coi là vi phạm
-                        // dù lần chạy đầu trong ngày từng bị loại bỏ.
-                        const levelReps = levels.map((l) => {
+                        // Kết luận NGÀY tính theo lần chạy CUỐI CÙNG ĐƯỢC
+                        // CHẤP NHẬN của MỖI mức — không phải "tệ nhất trong
+                        // mọi lần chạy". Sau khi chạy lại đạt, ngày đó không
+                        // còn coi là vi phạm dù lần chạy đầu từng bị loại.
+                        //
+                        // Mốc là `accepted` (lần chạy), KHÔNG phải verdict
+                        // riêng của điểm. Westgard/CLSI: lần chạy bị loại thì
+                        // MỌI mức trong lần chạy đó phải chạy lại, vì hệ
+                        // thống không ổn định trong suốt lần chạy. Lấy theo
+                        // verdict riêng thì chạy lại MỘT mức là đủ để ngày
+                        // đóng dấu "Chấp nhận", trong khi mức còn lại vẫn
+                        // chưa có kết quả hợp lệ nào.
+                        //
+                        // Mức CHƯA nhập gì thì bỏ qua: "chưa nhập" đã có vệt
+                        // cam của `rowClass()` lo, không được biến thành
+                        // "vi phạm".
+                        const dayReps = levels.flatMap((l) => {
                           const runs = pointsForDay(l.level, date);
-                          if (!runs.length) return null;
-                          const rev = [...runs].reverse();
-                          return rev.find((p) => p.verdict !== 'rej') || runs[runs.length - 1];
-                        }).filter((p): p is QcPointView => p != null);
-                        const warnRules = Array.from(new Set(levelReps.filter((p) => p.verdict === 'warn').flatMap((p) => p.rules)));
-                        const rejRules = Array.from(new Set(levelReps.filter((p) => p.verdict === 'rej').flatMap((p) => p.rules)));
-                        const worst = !levelReps.length ? null : levelReps.some((p) => p.verdict === 'rej') ? 'rej' : levelReps.some((p) => p.verdict === 'warn') ? 'warn' : 'ok';
+                          if (!runs.length) return [];
+                          const settled = [...runs].reverse().find((p) => p.accepted !== false);
+                          // Chưa có lần chạy nào đạt thì vẫn lấy lần chạy
+                          // cuối làm đại diện để còn hiện luật đã vi phạm.
+                          return [{ level: l.level, point: settled || runs[runs.length - 1], settled: !!settled }];
+                        });
+                        const levelReps = dayReps.map((item) => item.point);
+                        const pendingLevels = dayReps.filter((item) => !item.settled).map((item) => `Mức ${item.level}`);
+                        // Một điểm bị loại thường mang KÈM luật cảnh báo:
+                        // z=2,5 nổ `2-2s` thì `rules` là `['1-2s','2-2s']`.
+                        // Chia theo `rejectRules` (main phân giải qua bảng
+                        // hành động 3 lớp) để `1-2s` không bị in vào cột "Vi
+                        // phạm loại bỏ" chỉ vì đứng cùng điểm với `2-2s`.
+                        const rejRules = Array.from(new Set(levelReps.flatMap((p) => (p.verdict === 'rej' ? p.rejectRules ?? p.rules : []))));
+                        const rejRuleSet = new Set(rejRules);
+                        const warnRules = Array.from(new Set(levelReps.flatMap((p) => p.rules.filter((rule) => !rejRuleSet.has(rule)))));
+                        const worst = !dayReps.length ? null
+                          : pendingLevels.length ? 'rej'
+                          : levelReps.some((p) => p.verdict === 'warn') ? 'warn' : 'ok';
                         const dayNote = dayPoints.find((p) => p.note)?.note || '';
                         const isToday = date === todayStr;
                         return (
@@ -676,7 +739,12 @@ export function EntryPage() {
                               // lần chạy gần nhất bị loại bỏ (`shouldShowEmptyRun`),
                               // không cần bấm "+ Thêm" — nhắc chạy lại ngay.
                               const lastRun = runs[runs.length - 1];
-                              const autoOpen = !!lastRun && lastRun.verdict === 'rej';
+                              // Mở sẵn ô chạy lại khi lần chạy cuối của mức
+                              // này THUỘC một lần chạy đã bị loại — kể cả khi
+                              // chính điểm này đạt và mức khác mới là mức vi
+                              // phạm. `runRejectedBy` rỗng khi mức chưa có
+                              // Mean/SD, nên không mở ô vô hạn cho mức đó.
+                              const autoOpen = !!lastRun && (lastRun.runRejectedBy?.length ?? 0) > 0;
                               const extraOpen = extraRuns.has(slotKey) || autoOpen;
                               const showInput = writable && (!runs.length || extraOpen);
                               const showAddBtn = writable && runs.length > 0 && !extraOpen;
@@ -689,12 +757,22 @@ export function EntryPage() {
                                         <small>{zText(point, { mean, sd })} · Lô {lot}</small>
                                       </div>
                                     ))}
-                                    {runs.map((p) => (
-                                      <div className="qc-run-slot" key={p.id}>
-                                        <b className={`qc-value-chip${p.verdict !== 'ok' ? ' ' + p.verdict : ''}`}>{valText(p.val)}</b>
-                                        <small>{zText(p, column)} · {VERDICT_LABEL[p.verdict]}</small>
-                                      </div>
-                                    ))}
+                                    {runs.map((p) => {
+                                      // Ô này quá hẹp để thêm chữ, nên trạng
+                                      // thái "không vào thống kê" hiện bằng
+                                      // NÉT ĐỨT — cùng ngữ nghĩa với vòng
+                                      // rỗng trên biểu đồ: màu vẫn nói kết
+                                      // luận thật của điểm, phần đứt/rỗng nói
+                                      // nó không vào Mean/SD/CV. Lý do đầy đủ
+                                      // nằm ở tooltip.
+                                      const excluded = runExcludedNote(p);
+                                      return (
+                                        <div className="qc-run-slot" key={p.id} title={excluded || undefined}>
+                                          <b className={`qc-value-chip${p.verdict !== 'ok' ? ' ' + p.verdict : ''}${excluded ? ' run-excluded' : ''}`}>{valText(p.val)}</b>
+                                          <small>{zText(p, column)} · {VERDICT_LABEL[p.verdict]}</small>
+                                        </div>
+                                      );
+                                    })}
                                     {showInput && <RunSlot date={date} level={column.level} columnKey={column.key} columnOrder={columnIndex} onCommit={async (val) => {
                                       const saved = await commitRun(column, date, sharedRunIdFor(column, date), val);
                                       if (saved) setExtraRuns((s) => { const next = new Set(s); next.delete(slotKey); return next; });
@@ -715,7 +793,9 @@ export function EntryPage() {
                               : '—'}</td>
                             <td>{warnRules.join(', ') || '—'}</td>
                             <td>{rejRules.join(', ') || '—'}</td>
-                            <td>{worst == null ? '—' : worst === 'rej' ? <span className="tag rej">R</span> : worst === 'warn' ? <span className="tag warn">W(A)</span> : <span className="tag ok">A</span>}</td>
+                            <td>{worst == null ? '—' : worst === 'rej'
+                              ? <span className="tag rej" title={pendingLevels.length ? `${pendingLevels.join(', ')} chưa có lần chạy nào được chấp nhận trong ngày. Lần chạy bị loại thì mọi mức trong lần chạy đó phải chạy lại.` : undefined}>R</span>
+                              : worst === 'warn' ? <span className="tag warn">W(A)</span> : <span className="tag ok">A</span>}</td>
                             <td>{!dayPoints.length ? '—' : writable
                               ? <textarea key={`note:${testId}:${date}:${dayNote}`} className="qc-note-input" rows={1} placeholder="Ghi chú" defaultValue={dayNote}
                                   onBlur={(e) => saveDayNote(date, e.target.value)} />
@@ -783,10 +863,10 @@ export function EntryPage() {
                             const st = observedStats(acceptedPoints);
                             return (
                               <>
-                                <div className="lj-qc-stat"><span className="k">Mean thực</span><span className="v">{st.n ? st.mean.toFixed(2) : '—'}</span></div>
+                                <div className="lj-qc-stat"><span className="k">Mean thực</span><span className="v">{st.n ? st.mean.toFixed(decimals) : '—'}</span></div>
                                 <div className="lj-qc-stat"><span className="k">SD thực</span><span className="v">{st.n > 1 ? st.sd.toFixed(4) : '—'}</span></div>
                                 <div className="lj-qc-stat"><span className="k">CV thực</span><span className="v">{st.n > 1 && st.mean ? st.cv.toFixed(2) + '%' : '—'}</span></div>
-                                <div className="lj-qc-stat control"><span className="k">Mean mục tiêu</span><span className="v">{column.mean != null ? column.mean.toFixed(2) : '—'}</span></div>
+                                <div className="lj-qc-stat control"><span className="k">Mean mục tiêu</span><span className="v">{column.mean != null ? valText(column.mean) : '—'}</span></div>
                                 <div className="lj-qc-stat control"><span className="k">SD mục tiêu</span><span className="v">{column.sd != null ? column.sd.toFixed(4) : '—'}</span></div>
                               </>
                             );
@@ -805,18 +885,27 @@ export function EntryPage() {
                   <span><span className="dot qc-legend-ok" /> Trong ±2SD</span>
                   <span><span className="dot qc-legend-warn" /> Cảnh báo 2–3SD</span>
                   <span><span className="dot qc-legend-rej" /> Loại bỏ ngoài 3SD</span>
+                  <span><span className="dot qc-legend-excluded" /> Vòng rỗng · đạt nhưng lần chạy bị loại ở mức khác, không vào thống kê</span>
                 </div>
               </div>
 
               <section className="panel entry-secondary-panel qc-points-panel">
                 <div className="entry-secondary-summary"><span>Điểm trong khoảng xem</span><small>Tra cứu chi tiết, luật vi phạm và điểm đã hủy</small></div>
                 <div className="entry-secondary-body">
-                  <div className="hint qc-cumulative-note">Thống kê tích lũy tính từ đầu LOT; bảng bên dưới hiển thị theo khoảng xem {vnDate(ljFrom)} – {vnDate(ljTo)}.</div>
+                  <div className="hint qc-cumulative-note">Thống kê tích lũy tính từ đầu LOT trên các lần chạy được chấp nhận; bảng bên dưới hiển thị theo khoảng xem {vnDate(ljFrom)} – {vnDate(ljTo)}.</div>
                   <div className="qc-table-grid">
                     {displayColumns.map((column) => {
                       const all = column.points;
                       const active = inLjWindow(all.filter((p) => !p.voided));
-                      const cumulative = all.filter((p) => !p.voided && (!ljTo || p.date <= ljTo));
+                      // Mean/SD/CV tích lũy chỉ tính trên LẦN CHẠY ĐƯỢC CHẤP
+                      // NHẬN. Gộp cả dữ liệu mất kiểm soát vào thì chính sự
+                      // cố đó nống SD lên, và lần sau cùng một sự cố không
+                      // còn vượt ngưỡng nữa — hệ QC tự làm mù mình. Con số
+                      // "đã ghi nhận bao nhiêu" vẫn giữ riêng cho truy vết
+                      // ISO 15189, không trộn vào phép thống kê.
+                      const recorded = all.filter((p) => !p.voided && (!ljTo || p.date <= ljTo));
+                      const cumulative = recorded.filter((p) => p.accepted !== false);
+                      const excluded = recorded.length - cumulative.length;
                       const vals = cumulative.map((p) => p.val);
                       const n = vals.length;
                       const mean = n ? vals.reduce((a, b) => a + b, 0) / n : 0;
@@ -826,11 +915,12 @@ export function EntryPage() {
                         <div className={`qc-table-card${column.parallel ? ' qc-parallel-card' : ''}${column.previous ? ' qc-previous-card' : ''}`} key={column.key}>
                           <h4><span>Mức {column.level} · {column.previous ? 'Lô cũ ' : 'Lô '}{column.lot}{column.parallel && <span className="qc-parallel-label">Song song</span>}<span className="hint qc-table-count">{active.length} điểm trong khoảng</span></span></h4>
                           <div className="qc-cumulative">
-                            <div><span>N tích lũy</span><b>{n}</b></div>
-                            <div><span>Mean tích lũy</span><b>{n ? mean.toFixed(3) : '—'}</b></div>
-                            <div><span>SD tích lũy</span><b>{n > 1 ? sd.toFixed(3) : '—'}</b></div>
+                            <div><span>N dùng thống kê</span><b>{n}</b></div>
+                            <div><span>Mean tích lũy</span><b>{n ? mean.toFixed(decimals) : '—'}</b></div>
+                            <div><span>SD tích lũy</span><b>{n > 1 ? sd.toFixed(4) : '—'}</b></div>
                             <div><span>CV tích lũy</span><b>{n && mean ? cv.toFixed(2) + '%' : '—'}</b></div>
                           </div>
+                          <div className="hint qc-cumulative-source">Tổng ghi nhận {recorded.length}{excluded ? ` · ${excluded} điểm thuộc lần chạy bị loại, không vào thống kê` : ''}</div>
                           {active.length ? (
                             <table>
                               <thead><tr><th>Ngày</th><th className="num">Giá trị</th><th className="num">Z</th><th>Kết luận</th><th>Luật</th><th>Thao tác</th></tr></thead>
@@ -838,7 +928,10 @@ export function EntryPage() {
                                 {active.map((p) => (
                                   <tr key={p.id} className={p.verdict === 'rej' ? 'qc-point-rej' : p.verdict === 'warn' ? 'qc-point-warn' : ''}>
                                     <td>{vnDate(p.date)}</td><td className="num"><b>{valText(p.val)}</b></td><td className="num">{zText(p, column)}</td>
-                                    <td><span className={`tag ${p.verdict}`}>{VERDICT_LABEL[p.verdict]}</span></td>
+                                    <td>
+                                      <span className={`tag ${p.verdict}`}>{VERDICT_LABEL[p.verdict]}</span>
+                                      {runExcludedNote(p) && <span className="qc-run-excluded" title="Lần chạy bị loại thì mọi mức trong lần chạy đó phải chạy lại; kết quả cũ không vào Mean/SD/CV thực.">{runExcludedNote(p)}</span>}
+                                    </td>
                                     <td>{p.rules.length ? p.rules.map((r) => <span className="pill" key={r}>{r}</span>) : '—'}</td>
                                     <td className="qc-row-actions">{writable ? <button type="button" className="qc-row-void" title="Hủy điểm QC" aria-label={`Hủy điểm QC ngày ${vnDate(p.date)}`} onClick={() => { setVoidErr(null); setVoidReason(''); setVoidKind('analytical'); setVoidOpenNce(true); setVoiding(p); }}><TrashIcon /></button> : <span className="hint">—</span>}</td>
                                   </tr>
@@ -889,7 +982,7 @@ export function EntryPage() {
                           {rangeCandidate.proposed
                             ? rangeCandidate.eligible
                               ? ` Đủ điều kiện lập dải mới (${rangeCandidate.proposed.n} kết quả / ${rangeCandidate.proposed.days} ngày độc lập). Dải đề xuất: Mean=${rangeCandidate.proposed.mean.toFixed(decimals)} SD=${rangeCandidate.proposed.sd.toFixed(4)} CV=${rangeCandidate.proposed.cv.toFixed(2)}%.`
-                              : ` Cần ≥20 kết quả trên ≥20 ngày độc lập, không có điểm vi phạm/cảnh báo chưa xử lý — hiện ${rangeCandidate.proposed.n} kết quả / ${rangeCandidate.proposed.days} ngày, ${rangeCandidate.proposed.rejected} loại bỏ, ${rangeCandidate.proposed.warnings} cảnh báo.`
+                              : ` Cần ≥20 kết quả trên ≥20 ngày độc lập và không lần chạy nào bị loại — hiện ${rangeCandidate.proposed.n} kết quả / ${rangeCandidate.proposed.days} ngày, ${rangeCandidate.proposed.rejected} điểm thuộc lần chạy bị loại.`
                             : ' Chưa có dữ liệu của lô đang vận hành.'}
                         </div>
                       </div>
@@ -946,8 +1039,13 @@ export function EntryPage() {
               <div className="range-workflow-checks">
                 <div className={rangeCandidate.proposed.n >= 20 ? 'pass' : 'fail'}><b>Tổng số kết quả</b><span>{rangeCandidate.proposed.n} / tối thiểu 20</span></div>
                 <div className={rangeCandidate.proposed.days >= 20 ? 'pass' : 'fail'}><b>Số ngày độc lập</b><span>{rangeCandidate.proposed.days} / tối thiểu 20</span></div>
-                <div className={rangeCandidate.proposed.rejected === 0 ? 'pass' : 'fail'}><b>Điểm bị loại Westgard</b><span>{rangeCandidate.proposed.rejected} / yêu cầu 0</span></div>
-                <div className={rangeCandidate.proposed.warnings === 0 ? 'pass' : 'fail'}><b>Điểm cảnh báo</b><span>{rangeCandidate.proposed.warnings} / yêu cầu 0</span></div>
+                <div className={rangeCandidate.proposed.rejected === 0 ? 'pass' : 'fail'}><b>Điểm thuộc lần chạy bị loại</b><span>{rangeCandidate.proposed.rejected} / yêu cầu 0</span></div>
+                {/* Thông tin, KHÔNG phải điều kiện: với giới hạn ±2SD thì dữ
+                    liệu in-control chuẩn vẫn có ~4,6% điểm vượt ±2SD, và
+                    `1-2s` theo Westgard là luật cảnh báo chứ không phải căn
+                    cứ loại bỏ. Đòi bằng 0 thì càng gom nhiều dữ liệu càng khó
+                    lập dải (0,9545^n). */}
+                <div className="info"><b>Điểm cảnh báo 1-2s</b><span>{rangeCandidate.proposed.warnings} · không chặn</span></div>
               </div>
               <div className="range-workflow-compare">
                 <div><span>Dải hiện tại</span><b>Mean {rangeCandidate.current.mean?.toFixed(decimals) ?? '—'} · SD {rangeCandidate.current.sd?.toFixed(4) ?? '—'}</b></div>

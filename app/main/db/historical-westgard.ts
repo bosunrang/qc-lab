@@ -2,9 +2,9 @@ import type { Db } from './sqlite-like';
 import type { ArchivedBlock } from '../../shared/qc-api';
 import { listPreviousLotSeriesData } from './lot-lineage';
 import { evaluateQcSets } from './westgard-evaluation';
-import { acceptedRunPoints, pointTarget } from '../domain/westgard-engine';
+import { acceptedRunPoints, rejectedLevelsByRun, pointTarget } from '../domain/westgard-engine';
 import { errorTypeDetail } from '../domain/westgard-rules';
-import { compareQcPointOrder } from '../domain/sort-order';
+import { compareQcPointOrder, qcRunKey } from '../domain/sort-order';
 
 export function createHistoricalWestgard(db: Db) {
   /** Mean/SD của 1 LÔ CỤ THỂ cho 1 mức — dùng cho tab "Nhóm lô đã dừng/lưu
@@ -92,16 +92,18 @@ export function createHistoricalWestgard(db: Db) {
     // Scope phải dựa trên toàn bộ mức được lưu trong nhóm, kể cả mức chưa
     // tìm được Mean/SD để đánh giá. Nếu bỏ mức đó trước khi đếm, luật `both`
     // có thể bị đổi âm thầm thành `within` chỉ trên tab lịch sử.
-    const byPoint = evaluateQcSets(db, testId,
-      archived.map(item => ({ level: item.lot.level, key: `${item.lot.level}:${item.lot.id}`, pts: item.points, mean: item.target.mean, sd: item.target.sd })),
-      new Set(lots.map(lot => lot.level)).size,
-    );
+    const historicalSets = archived.map(item => ({ level: item.lot.level, key: `${item.lot.level}:${item.lot.id}`, pts: item.points, mean: item.target.mean, sd: item.target.sd }));
+    const byPoint = evaluateQcSets(db, testId, historicalSets, new Set(lots.map(lot => lot.level)).size);
     const accepted = acceptedRunPoints(byPoint);
+    // Lý do một điểm bị loại theo LẦN CHẠY, không chỉ cờ bị/không bị. Cùng
+    // trường mà `entry:queryPoints` trả, để tab "Xem lô cũ" nói được y hệt
+    // chuỗi đang vận hành thay vì chỉ lặng lẽ bớt điểm khỏi thống kê.
+    const rejectedBy = rejectedLevelsByRun(historicalSets, byPoint);
     const blocks = archived.map((item) => {
       const points = item.points.map((point) => {
         const flag = byPoint.get(point)!;
         const detail = errorTypeDetail(flag.rules);
-        return { id: point.id, date: point.date, runId: point.run_id, val: point.val, z: flag.z, verdict: flag.level, rules: flag.rules, cusumSignal: null, supportRules: flag.supportRules, accepted: accepted.has(point), runRejected: !accepted.has(point), targetMean: pointTarget(point, item.target.mean, item.target.sd).mean, targetSd: pointTarget(point, item.target.mean, item.target.sd).sd, errorType: detail.type, errorDesc: detail.desc };
+        return { id: point.id, date: point.date, runId: point.run_id, val: point.val, z: flag.z, verdict: flag.level, rules: flag.rules, cusumSignal: null, supportRules: flag.supportRules, accepted: accepted.has(point), runRejected: !accepted.has(point), runRejectedBy: rejectedBy.get(qcRunKey(point)) || [], targetMean: pointTarget(point, item.target.mean, item.target.sd).mean, targetSd: pointTarget(point, item.target.mean, item.target.sd).sd, errorType: detail.type, errorDesc: detail.desc };
       });
       return { level: item.lot.level, lotId: item.lot.id, lotNo: item.lot.lot_no, mean: item.target.mean, sd: item.target.sd, analysis: { points, cusum: { cPos: [], cNeg: [], flags: [], k: 0.5, h: 4, ma: [] }, cusumOn: false } };
     });

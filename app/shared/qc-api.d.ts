@@ -223,6 +223,20 @@ export interface QcPointView {
   id: string; test_id: string; level: number; date: string; run_id: string; val: number;
   note: string; operator_name: string; voided: 0 | 1; void_reason: string;
   verdict: 'ok' | 'warn' | 'rej'; rules: string[];
+  /** Tập con của `rules` thật sự gây LOẠI BỎ sau khi áp hành động ghi đè của
+   * phòng xét nghiệm (`rejectingRules()`). Một điểm z=2,5 nổ `2-2s` mang
+   * `rules=['1-2s','2-2s']` nhưng `rejectRules=['2-2s']` — `1-2s` vẫn chỉ là
+   * cảnh báo. Chỉ `entry:queryPoints` điền; nơi khác chỉ hiển thị `rules`
+   * nguyên khối nên để tuỳ chọn. */
+  rejectRules?: string[];
+  /** Các MỨC có điểm bị loại trong CÙNG lần chạy với điểm này (`qcRunKey` =
+   * ngày + mã run). Rỗng khi lần chạy không bị loại.
+   *
+   * Cần vì `accepted` một mình không giải thích được gì: một điểm `verdict:
+   * 'ok'` nhưng `accepted: false` là điểm bị loại THEO LẦN CHẠY do MỨC KHÁC
+   * vi phạm. Không có trường này, màn hình chỉ có thể nói "Đạt" rồi âm thầm
+   * trừ điểm đó khỏi n. */
+  runRejectedBy?: number[];
   /** `entry:queryPoints` trả nguyên hàng `qc_points` (`{...p}`) nên các cột
    * đã chốt lúc nhập cũng có sẵn — khai đủ ở đây thay vì để trang phải ép
    * kiểu: `lot`/`qc_mean`/`qc_sd` là số lô + Mean/SD ĐANG dùng tại thời
@@ -262,6 +276,10 @@ export interface LevelAnalysis {
     verdict: 'ok' | 'warn' | 'rej' | 'none'; rules: string[]; supportRules: string[]; accepted: boolean;
     /** Cả lần chạy bị loại khỏi thống kê, kể cả mức không tự vi phạm luật. */
     runRejected: boolean;
+    /** Các MỨC có điểm bị loại trong cùng lần chạy — LÝ DO của `runRejected`.
+     * Cùng ngữ nghĩa với `QcPointView.runRejectedBy`; hai đường đọc phải nói
+     * một chuyện về cùng một điểm. Rỗng khi lần chạy không bị loại. */
+    runRejectedBy?: number[];
     targetMean: number | null; targetSd: number | null;
     /** CUSUM vượt ±h là cảnh báo xu hướng độc lập, không tự loại điểm QC. */
     cusumSignal: 'CUSUM +h' | 'CUSUM −h' | 'CUSUM ±h' | null;
@@ -269,6 +287,22 @@ export interface LevelAnalysis {
   }[];
   cusum: { cPos: number[]; cNeg: number[]; flags: ('ok' | 'warn' | 'rej')[]; k: number; h: number; ma: number[] };
   cusumOn: boolean;
+}
+
+/** Điểm QC thô cho tab "Lịch sử dữ liệu": MỌI lô của xét nghiệm, KHÔNG kèm
+ * kết luận Westgard.
+ *
+ * Cố ý KHÔNG dùng lại `QcPointView`: trang đó đọc lại Mean/SD đã chốt của
+ * từng điểm rồi tự xếp theo dải Z (`Trong ±2s` / `Ngoài ±2s` / `Ngoài ±3s`),
+ * và ghi rõ trên giao diện rằng đây không phải kết luận Westgard. Bản trước
+ * vẫn trả một trường `verdict` cùng tên, cùng kiểu với verdict thật nhưng
+ * tính bằng ngưỡng z thuần — không ai đọc, chỉ nằm đó chờ người sửa sau
+ * tưởng nó là kết luận Westgard rồi đem đi dùng. */
+export interface HistoryQcPointView {
+  id: string; test_id: string; level: number; date: string; run_id: string; val: number;
+  lot: string; qc_mean: number | null; qc_sd: number | null;
+  note: string; operator_name: string; operator_username: string; operator_code: string;
+  voided: 0 | 1; void_reason: string;
 }
 
 export interface VoidedQcPointView {
@@ -444,6 +478,11 @@ export interface PeriodLockRow { id: string; ym: string; locked_at: string; lock
 
 export interface ReportPointRow {
   id: string; test_id: string; level: number; date: string; run_id: string; val: number;
+  /** Số lô vật liệu kiểm đã chốt trên chính điểm đó. Báo cáo bắc qua một lần
+   * đổi lô liệt kê điểm của CẢ HAI lô, nên thiếu cột này thì không phân biệt
+   * được — mà số lô là định danh bắt buộc của vật liệu kiểm trong hồ sơ nội
+   * kiểm ISO 15189. */
+  lot: string;
   note: string; operator_name: string; voided: 0 | 1; void_reason: string;
 }
 
@@ -548,7 +587,7 @@ export interface QcApi {
   archiveActivity(input: { data: { months: 12 | 24 | 36 } }): Promise<IpcResult<{ removedCount: number; retainedCount: number; cutoffIso: string }>>;
   queryPoints(testId: string, level: number): Promise<QcPointView[]>;
   /** Mọi điểm chưa hủy của xét nghiệm, gồm cả các lô lịch sử. */
-  listEntryHistoryPoints(testId: string): Promise<QcPointView[]>;
+  listEntryHistoryPoints(testId: string): Promise<HistoryQcPointView[]>;
   listVoidedEntryPoints(testId: string): Promise<VoidedQcPointView[]>;
   listParallelEntryColumns(testId: string): Promise<ParallelEntryColumn[]>;
   listPreviousEntryLotSeries(testId: string): Promise<PreviousLotSeries[]>;

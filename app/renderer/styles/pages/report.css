@@ -24,6 +24,12 @@
   width:100%;
 }
 
+/* Cảnh báo khoảng ngày đảo ngược — nằm giữa lưới bộ lọc và thanh xuất, dùng
+   cùng khoảng cách dọc với các khối khác trong thân panel. */
+.report-range-error{
+  margin:var(--space-4) 0 0;
+}
+
 .report-export-bar{
   display:flex;
   align-items:center;

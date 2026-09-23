@@ -18,7 +18,23 @@ import { qcRunKey, compareQcRunKey } from '../../main/domain/sort-order';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { vnDate, vnDayMonth } from '../lib/format';
 
-export interface QcChartPoint { date: string; runId: string; val: number; z: number; verdict: 'ok' | 'warn' | 'rej' | 'none'; rules: string[]; accepted?: boolean }
+export interface QcChartPoint {
+  date: string; runId: string; val: number; z: number;
+  verdict: 'ok' | 'warn' | 'rej' | 'none'; rules: string[];
+  /** Điểm có vào Mean/SD/CV thực hay không. `false` khi CẢ lần chạy bị loại. */
+  accepted?: boolean;
+  /** Mức nào trong cùng lần chạy đã bị loại — lý do một điểm "Đạt" vẫn không
+   * vào thống kê. Rỗng/không có nghĩa là không biết lý do nào. */
+  runRejectedBy?: number[];
+}
+
+/** Điểm KHÔNG vào thống kê nhưng TỰ NÓ không vi phạm: cả lần chạy bị loại vì
+ * một mức khác. Đây là ca dễ hiểu nhầm nhất của biểu đồ — chấm xanh nằm giữa
+ * dải mà vẫn bị trừ khỏi n. Điểm tự bị loại đã có màu đỏ riêng nên không gộp
+ * vào đây. */
+function isRunCollateral(point: QcChartPoint): boolean {
+  return point.accepted === false && point.verdict !== 'rej' && !!point.runRejectedBy?.length;
+}
 export interface QcChartCusum {
   cPos: number[]; cNeg: number[]; flags: ('ok' | 'warn' | 'rej')[];
   /** Tham số thật của xét nghiệm, được IPC giữ nguyên từ domain CUSUM. */
@@ -30,7 +46,7 @@ const VERDICT_TEXT: Record<QcChartPoint['verdict'], string> = { ok: 'Đạt', wa
 
 /** Tooltip điểm QC kiểu app cũ. Canvas không có phần tử điểm riêng để browser
  * tự hover, nên hit-test bằng đúng hình học đang dùng khi vẽ. */
-function LjTooltip({ hit }: { hit: LjHover | null }) {
+function LjTooltip({ hit, decimals = 2 }: { hit: LjHover | null; decimals?: number }) {
   if (!hit) return null;
   const { point, level } = hit;
   const z = Number.isFinite(point.z) ? `${point.z >= 0 ? '+' : ''}${point.z.toFixed(2)}s` : '—';
@@ -39,9 +55,12 @@ function LjTooltip({ hit }: { hit: LjHover | null }) {
     <b>{date}{level != null ? ` · Mức ${level}` : ''}</b>
     <div>Lần chạy: <strong>{point.runId || '—'}</strong></div>
     {hit.lot && <div>Lô: <strong>{hit.lot}</strong></div>}
-    <div>Giá trị: {Number.isFinite(point.val) ? point.val.toFixed(2) : '—'}</div>
+    {/* Số thập phân của CHÍNH xét nghiệm, không phải 2 cố định: một xét
+        nghiệm khai 0 hoặc 3 chữ số thì tooltip sẽ nói khác bảng bên cạnh. */}
+    <div>Giá trị: {Number.isFinite(point.val) ? point.val.toFixed(decimals) : '—'}</div>
     <div>Z: {z}</div>
     <div className="muted">Kết luận: {VERDICT_TEXT[point.verdict]}</div>
+    {isRunCollateral(point) && <div className="muted">Thống kê: không dùng — lần chạy bị loại ở {point.runRejectedBy!.map((level) => `Mức ${level}`).join(', ')}</div>}
     <div className="muted">Luật: {point.rules.length ? point.rules.join(', ') : 'Đạt'}</div>
   </div>;
 }
@@ -160,12 +179,15 @@ export function QcChart({ mode, points, cusum, mean, sd, lot, decimals = 2, heig
     if (!canvas || mode !== 'lj' || !points.length) { setLjHover(null); return; }
     const rect = canvas.getBoundingClientRect();
     const hasTarget = mean != null && sd != null && sd > 0;
-    const { x, clampY } = geometry(rect.width, rect.height, points.length, hasTarget ? mean : 0, hasTarget ? sd : 1);
+    const targetMean = hasTarget ? (mean as number) : 0, targetSd = hasTarget ? (sd as number) : 1;
+    const { x, clampY } = geometry(rect.width, rect.height, points.length, targetMean, targetSd);
     const px = event.clientX - rect.left, py = event.clientY - rect.top;
     let hit: QcChartPoint | null = null;
     let closest = 14;
     points.forEach((point, index) => {
-      const value = hasTarget ? point.val : point.z;
+      // Cùng `plotValue()` mà `drawLJ()` dùng — hai công thức riêng thì vùng
+      // bắt hover trôi khỏi chấm đang vẽ.
+      const value = plotValue(point, hasTarget, targetMean, targetSd);
       if (!Number.isFinite(value)) return;
       const distance = Math.hypot(px - x(index), py - clampY(value));
       if (distance <= closest) { closest = distance; hit = point; }
@@ -181,7 +203,7 @@ export function QcChart({ mode, points, cusum, mean, sd, lot, decimals = 2, heig
       <canvas ref={canvasRef} className={className} onPointerMove={(event) => { updateCusumTooltip(event); updateLjTooltip(event); }}
         onPointerLeave={() => { if (canvasRef.current) canvasRef.current.title = ''; setLjHover(null); }}
         style={{ width: '100%', height: responsiveHeight ? 'auto' : height, display: 'block' }} />
-      <LjTooltip hit={ljHover} />
+      <LjTooltip hit={ljHover} decimals={decimals} />
     </div>
   );
 }
@@ -197,6 +219,27 @@ function geometry(width: number, height: number, count: number, mean: number, sd
   const clampY = (value: number) => Math.max(padT, Math.min(padT + ch, y(value)));
   const x = (index: number) => (count <= 1 ? padL + cw / 2 : padL + markPad + (index / (count - 1)) * (cw - markPad * 2));
   return { padL, padT, cw, ch, markPad, y, clampY, x };
+}
+
+/** Toạ độ theo trục giá trị của MỘT điểm trên biểu đồ Levey-Jennings.
+ *
+ * Luôn đặt điểm theo `z` của chính nó, quy về thang của dải đang hiển thị —
+ * KHÔNG phải theo `val` trên Mean/SD hiện hành. `z` do main tính qua
+ * `pointTarget()`, tức theo Mean/SD đã CHỐT lúc nhập (`qc_mean`/`qc_sd`), y
+ * hệt cái đã quyết định màu Đạt/Cảnh báo/Loại bỏ của điểm.
+ *
+ * Nếu đặt theo `val` thì sau một lần "Thiết lập dải PXN"/"Hoàn dải NSX" (hoặc
+ * sửa Mean/SD ở Cấu hình chung), toàn bộ điểm cũ bị vẽ lại trên dải MỚI trong
+ * khi kết luận vẫn giữ theo dải CŨ: chấm đỏ nằm gọn trong ±2SD, chấm xanh lại
+ * ra ngoài ±3SD — hình vẽ nói ngược bảng ngay bên cạnh. Chính lớp lỗi mà
+ * snapshot Mean/SD từng điểm được sinh ra để chặn (xem `pointTarget()`).
+ *
+ * Đánh đổi có chủ đích: nhãn giá trị thật ở trục Y bên phải chỉ đúng cho dải
+ * đang dùng, nên một điểm thuộc dải cũ không nằm đúng vạch giá trị của nó.
+ * Tooltip vẫn in giá trị thật và z thật của điểm. */
+function plotValue(point: QcChartPoint, hasTarget: boolean, mean: number, sd: number): number {
+  if (!hasTarget) return point.z;
+  return Number.isFinite(point.z) ? mean + point.z * sd : point.val;
 }
 
 /** Nhãn trục X app cũ — `createLeveyJenningsTicks`: tối đa 5 mốc, nhãn dd/mm. */
@@ -265,7 +308,7 @@ function drawLJ(
     return;
   }
 
-  const valueOf = (p: QcChartPoint) => (hasTarget ? p.val : p.z);
+  const valueOf = (p: QcChartPoint) => plotValue(p, hasTarget, mean, sd);
   ctx.save();
   ctx.beginPath(); ctx.rect(padL, padT, cw, ch); ctx.clip();
   // Đường biểu đồ nối toàn bộ quan sát theo thời gian, kể cả điểm bị loại, để
@@ -285,7 +328,17 @@ function drawLJ(
     const radius = p.verdict === 'ok' ? 4 : 5;
     // Giữ trọn marker trong vùng vẽ khi giá trị nằm ngoài ±3.25SD.
     const px = x(i), py = Math.max(padT + radius, Math.min(padT + ch - radius, clampY(valueOf(p))));
-    ctx.fillStyle = p.verdict === 'rej' ? LJ.rejectPoint : p.verdict === 'warn' ? LJ.warnPoint : LJ.okPoint;
+    const color = p.verdict === 'rej' ? LJ.rejectPoint : p.verdict === 'warn' ? LJ.warnPoint : LJ.okPoint;
+    // Vòng RỖNG cho điểm bị loại theo lần chạy: màu vẫn nói đúng kết luận của
+    // chính điểm đó, phần rỗng nói nó không vào Mean/SD/CV. Không đổi hình
+    // điểm tự bị loại (đỏ đặc) — đó là biến cố, không phải hệ quả.
+    if (isRunCollateral(p)) {
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(px, py, radius, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = color; ctx.lineWidth = 2.2; ctx.stroke();
+      return;
+    }
+    ctx.fillStyle = color;
     ctx.beginPath(); ctx.arc(px, py, radius, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.8; ctx.stroke();
   });
@@ -312,7 +365,7 @@ export interface QcMultiLevelSeries { level: number; lot?: string; label?: strin
  * trục X: thay vì gộp theo "run" thật, dùng trục theo NGÀY chung của mọi mức
  * — cùng tinh thần "giống nội dung, khác cách vẽ" đã áp dụng cho `drawLJ`).
  * Chỉ hiện khi có ≥2 mức (trang gọi component này có điều kiện đó). */
-export function QcMultiChart({ series, height = 220, responsiveHeight = false, className }: { series: QcMultiLevelSeries[]; height?: number; responsiveHeight?: boolean; className?: string }) {
+export function QcMultiChart({ series, height = 220, responsiveHeight = false, className, decimals = 2 }: { series: QcMultiLevelSeries[]; height?: number; responsiveHeight?: boolean; className?: string; decimals?: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [ljHover, setLjHover] = useState<LjHover | null>(null);
@@ -386,7 +439,7 @@ export function QcMultiChart({ series, height = 220, responsiveHeight = false, c
     <div ref={wrapRef} style={{ width: '100%' }}>
       <canvas ref={canvasRef} className={className} onPointerMove={updateLjTooltip} onPointerLeave={() => setLjHover(null)}
         style={{ width: '100%', height: responsiveHeight ? 'auto' : height, display: 'block' }} />
-      <LjTooltip hit={ljHover} />
+      <LjTooltip hit={ljHover} decimals={decimals} />
     </div>
   );
 }
@@ -447,8 +500,19 @@ function drawMulti(ctx: CanvasRenderingContext2D, width: number, height: number,
     }
     pts.forEach((p) => {
       const px = x(dateIndex.get(qcRunKey(p))!), py = clampY(p.z);
-      ctx.fillStyle = p.verdict === 'rej' ? LJ.rejectPoint : p.verdict === 'warn' ? LJ.warnPoint : color;
-      ctx.beginPath(); ctx.arc(px, py, p.verdict === 'ok' ? 4 : 5, 0, Math.PI * 2); ctx.fill();
+      const radius = p.verdict === 'ok' ? 4 : 5;
+      const dotColor = p.verdict === 'rej' ? LJ.rejectPoint : p.verdict === 'warn' ? LJ.warnPoint : color;
+      // Cùng quy ước với `drawLJ()`: vòng rỗng = không vào thống kê vì cả lần
+      // chạy bị loại. Bảng ngay dưới biểu đồ này đã ghi "Lần chạy bị loại ở
+      // Mức N" cho đúng những điểm đó, hai chỗ phải nói một chuyện.
+      if (isRunCollateral(p)) {
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(px, py, radius, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = dotColor; ctx.lineWidth = 2.2; ctx.stroke();
+        return;
+      }
+      ctx.fillStyle = dotColor;
+      ctx.beginPath(); ctx.arc(px, py, radius, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.8; ctx.stroke();
     });
   });

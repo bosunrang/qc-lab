@@ -6,10 +6,10 @@ import { listOperationalLevels, isTestInActivePanel } from '../db/operational-le
 import { readGlobalRules, writeGlobalRules } from '../db/rule-settings';
 import { createHistoricalWestgard } from '../db/historical-westgard';
 import { evaluateQcSets, effectiveQcFixDates } from '../db/westgard-evaluation';
-import { cusumScan, acceptedRunPoints, pointTarget, type CombinedPointFlag, type QcPointLike, type RuleVerdict, type CusumResult } from '../domain/westgard-engine';
+import { cusumScan, acceptedRunPoints, rejectedLevelsByRun, pointTarget, type CombinedPointFlag, type QcPointLike, type RuleVerdict, type CusumResult } from '../domain/westgard-engine';
 import { parseRuleActions, serializeRuleActions, isRuleAction, globalRuleList, type RuleAction, type RuleActionsMap } from '../domain/rule-config';
 import { WG_RULE_REGISTRY, defaultRuleAction, errorTypeDetail, ERROR_CLASS_LABEL } from '../domain/westgard-rules';
-import { compareQcPointOrder } from '../domain/sort-order';
+import { compareQcPointOrder, qcRunKey } from '../domain/sort-order';
 import { isoLocalDate } from '../domain/local-date';
 import { type Actor, type IpcResult, writeAudit, notifyChanged, requireWrite } from './shared';
 
@@ -238,6 +238,10 @@ export function createWestgardHandlers(db: Db) {
     const cs = hasTarget && cusumOn
       ? cusumForLevel(testId, rows, acceptedIds, levelRow!.mean, levelRow!.sd, test!.cusum_k, test!.cusum_h, 5)
       : { cPos: rows.map(() => 0), cNeg: rows.map(() => 0), flags: rows.map(() => 'ok' as RuleVerdict), k: fallbackK, h: fallbackH, ma: rows.map(() => 0) };
+    // Lý do loại theo LẦN CHẠY — cùng trường mà `entry:queryPoints` và tab
+    // lô lịch sử trả, để ba đường đọc không mô tả cùng một điểm bằng ba hình
+    // dạng khác nhau.
+    const rejectedBy = rejectedLevelsByRun(active.levels, byPoint);
     const points = rows.map((r, i) => {
       // Mức CHƯA có Mean/SD hợp lệ — port `levelTargetOk()` app cũ: điểm
       // CHƯA ĐƯỢC ĐÁNH GIÁ ('none'), không phải 'ok'; Z không có nghĩa (giữ
@@ -246,7 +250,7 @@ export function createWestgardHandlers(db: Db) {
       const flag = byPoint.get(r)!; const rules = flag.rules;
       const detail = errorTypeDetail(rules);
       const cusumSignal = cusumSignalAt(cs, i);
-      return { id: r.id, date: r.date, runId: r.run_id, val: r.val, z: flag.z, verdict: flag.level, rules, cusumSignal, supportRules: flag.supportRules, accepted: acceptedIds.has(r.id), runRejected: !acceptedIds.has(r.id), targetMean: pointTarget(r, levelRow!.mean, levelRow!.sd).mean, targetSd: pointTarget(r, levelRow!.mean, levelRow!.sd).sd, errorType: cusumSignal ? ERROR_CLASS_LABEL.SE : detail.type, errorDesc: cusumSignal ? 'Xu hướng CUSUM vượt ngưỡng quyết định; cần rà soát nguyên nhân hệ thống.' : detail.desc };
+      return { id: r.id, date: r.date, runId: r.run_id, val: r.val, z: flag.z, verdict: flag.level, rules, cusumSignal, supportRules: flag.supportRules, accepted: acceptedIds.has(r.id), runRejected: !acceptedIds.has(r.id), runRejectedBy: rejectedBy.get(qcRunKey(r)) || [], targetMean: pointTarget(r, levelRow!.mean, levelRow!.sd).mean, targetSd: pointTarget(r, levelRow!.mean, levelRow!.sd).sd, errorType: cusumSignal ? ERROR_CLASS_LABEL.SE : detail.type, errorDesc: cusumSignal ? 'Xu hướng CUSUM vượt ngưỡng quyết định; cần rà soát nguyên nhân hệ thống.' : detail.desc };
     });
     return { points, cusum: { cPos: cs.cPos, cNeg: cs.cNeg, flags: cs.flags, k: cs.k, h: cs.h, ma: cs.ma || [] }, cusumOn };
   }

@@ -10,18 +10,19 @@ import { listPreviousLotSeriesData } from '../db/lot-lineage';
 // cũ ở đây dùng `voided: number` trong khi hợp đồng khai `0 | 1`, và renderer
 // tin theo hợp đồng — hai khai báo song song cùng tên là đúng loại drift mà
 // đợt 2026-09-10 đi gỡ.
-import type { QcPointView, ParallelEntryColumn, PreviousLotSeries } from '../../shared/qc-api';
+import type { QcPointView, HistoryQcPointView, ParallelEntryColumn, PreviousLotSeries } from '../../shared/qc-api';
 
-export type { QcPointView, ParallelEntryColumn, PreviousLotSeries };
+export type { QcPointView, HistoryQcPointView, ParallelEntryColumn, PreviousLotSeries };
 import { uid } from '../domain/text-utils';
 import { validateQcPointInput, validateVoidInput, type QcPointInput, type VoidPointInput } from '../domain/entry-validation';
-import { westgardByPoint, acceptedRunPoints, type RuleVerdict } from '../domain/westgard-engine';
+import { westgardByPoint, acceptedRunPoints, rejectingRules, rejectedLevelsByRun, type RuleVerdict } from '../domain/westgard-engine';
+import { readGlobalRules } from '../db/rule-settings';
 import { parseRuleActions, makeIsOnLayered, makeRuleActionLayered, parseRuleScopes, makeScopeOf } from '../domain/rule-config';
 import { errorClass, WG_RULE_REGISTRY } from '../domain/westgard-rules';
 import { evaluateRangeCandidate, validateRangeReason } from '../domain/range-workflow';
 import { appendMeanSdHistory } from '../domain/manage-validation';
 import { ymOfDate } from '../domain/period-lock-validation';
-import { compareQcPointOrder } from '../domain/sort-order';
+import { compareQcPointOrder, qcRunKey } from '../domain/sort-order';
 import { isoLocalDateAfter } from '../domain/local-date';
 import { initialsFromName } from '../domain/name-initials';
 import { type Actor, type IpcResult, nowIso, writeAudit, notifyChanged, requireWrite } from './shared';
@@ -105,14 +106,6 @@ export function createEntryHandlers(db: Db) {
       WHERE ql.id=? AND ${OPERATIONAL_LOT_GROUP_SQL}`).get(qcLotId);
   }
 
-  /** Cấu hình luật CHUNG toàn phòng xét nghiệm — cùng khoá `app_meta` mà
-   * `westgard-handlers.ts` dùng (xem chú thích ở đó). Đọc lại bằng SQL riêng
-   * ở đây thay vì import chéo handler, khớp quy ước "mỗi handler tự SQL". */
-  function globalRules(): ReturnType<typeof parseRuleActions> {
-    const row = db.prepare("SELECT value FROM app_meta WHERE key='westgardRules'").get() as { value: string } | undefined;
-    return parseRuleActions(row ? row.value : null);
-  }
-
   /** Một nguồn dữ liệu duy nhất cho Nhập QC: chỉ điểm chưa hủy thuộc đúng lô
    * đang gán của từng mức, sắp lần chạy theo số tự nhiên, rồi ghép luật
    * within/across.
@@ -133,12 +126,18 @@ export function createEntryHandlers(db: Db) {
       const pts = rows.map((p) => ({ ...p, runId: p.run_id, qcMean: p.qc_mean, qcSd: p.qc_sd })).sort(compareQcPointOrder);
       return { level: config.level, mean: config.mean, sd: config.sd, lot: config.lot_no, pts };
     });
+    // Cấu hình luật CHUNG đọc qua `db/rule-settings.ts` — module dùng chung
+    // được tách ra chính để không nơi nào tự dựng lại phép đọc khoá
+    // `app_meta` này (bản trước có một `globalRules()` riêng ở đây).
     const overrides = parseRuleActions(test?.rule_actions_json);
-    const on = makeIsOnLayered(globalRules(), overrides);
-    const actionOf = makeRuleActionLayered(globalRules(), overrides);
+    const global = readGlobalRules(db);
+    const on = makeIsOnLayered(global, overrides);
+    const actionOf = makeRuleActionLayered(global, overrides);
     const scope = makeScopeOf(parseRuleScopes(test?.rule_scopes_json), levels.length);
+    // Chỉ kênh TỪNG MỨC cần lộ ra ngoài (nhánh dựng lại verdict của điểm lô đã
+    // chuyển tiếp trong `voidPoint()`); kênh liên mức nằm trọn trong
+    // `evaluateQcSets()`.
     const within = (rule: string) => on(rule) && ['within', 'both'].includes(scope(rule));
-    const across = (rule: string) => on(rule) && ['across', 'both'].includes(scope(rule));
     const byPoint = evaluateQcSets(db, testId, levels);
     return { levels, byPoint, within, actionOf };
   }
@@ -189,17 +188,16 @@ export function createEntryHandlers(db: Db) {
     // mới trong cùng lần chạy. Không trộn với lô đang vận hành — đó là hai
     // dòng dữ liệu khác nhau, kết luận thẩm định lô mới không được lẫn với
     // kết luận thường quy.
-    const byPoint = evaluateQcSets(db, testId,
-      columns.map((column) => ({ level: column.row.level, key: `${column.row.level}:${column.row.lot_no}`, pts: column.pts, mean: column.target.mean, sd: column.target.sd })),
-      levelCount,
-    );
+    const parallelSets = columns.map((column) => ({ level: column.row.level, key: `${column.row.level}:${column.row.lot_no}`, pts: column.pts, mean: column.target.mean, sd: column.target.sd }));
+    const byPoint = evaluateQcSets(db, testId, parallelSets, levelCount);
     const accepted = acceptedRunPoints(byPoint);
+    const rejectedBy = rejectedLevelsByRun(parallelSets, byPoint);
     return columns.map(({ row, target, pts }) => ({
       transitionId: row.transition_id, level: row.level, lotId: row.lot_id, lot: row.lot_no, startDate: row.start_date,
       mean: target.mean, sd: target.sd, low: target.low ?? null, high: target.high ?? null, exp: row.exp || '',
       points: pts.map((point) => {
         const flag = byPoint.get(point);
-        return { ...point, verdict: flag?.level || 'ok', rules: flag?.rules || [], accepted: accepted.has(point) };
+        return { ...point, verdict: flag?.level || 'ok', rules: flag?.rules || [], accepted: accepted.has(point), runRejectedBy: rejectedBy.get(qcRunKey(point)) || [] };
       }),
     }));
   }
@@ -215,7 +213,15 @@ export function createEntryHandlers(db: Db) {
       const flags = new Map(block?.analysis.points.map(point => [point.id, point]));
       return {
         level: series.level, lotId: series.lotId, lot: series.lot, mean: series.mean, sd: series.sd,
-        points: series.points.map(point => ({ ...point, verdict: flags.get(point.id)?.verdict || 'none', rules: flags.get(point.id)?.rules || [], accepted: flags.get(point.id)?.accepted ?? false })) as unknown as PreviousLotSeries['points'],
+        points: series.points.map(point => ({
+          ...point,
+          verdict: flags.get(point.id)?.verdict || 'none',
+          rules: flags.get(point.id)?.rules || [],
+          accepted: flags.get(point.id)?.accepted ?? false,
+          // Lý do bị loại theo lần chạy đi kèm luôn, để cột "Xem lô cũ" nói
+          // được y hệt chuỗi đang vận hành thay vì chỉ bớt điểm khỏi thống kê.
+          runRejectedBy: flags.get(point.id)?.runRejectedBy || [],
+        })) as unknown as PreviousLotSeries['points'],
       };
     });
   }
@@ -228,24 +234,44 @@ export function createEntryHandlers(db: Db) {
   function queryPoints(testId: string, level: number): QcPointView[] {
     const active = activeEvaluation(testId), selected = active.levels.find((item) => item.level === level);
     if (!selected) return [];
+    // `accepted`/`runRejectedBy` đi kèm verdict NGAY TỪ ĐÂY. Trước đó chỉ
+    // `analyzeLevel()` biết một điểm có vào thống kê hay không, nên thẻ Nhập
+    // QC chỉ đọc được verdict riêng của điểm: một mức "Đạt" nằm trong lần
+    // chạy đã bị mức khác làm hỏng vẫn hiện xanh và vẫn bị lặng lẽ trừ khỏi
+    // n — người dùng thấy 11 chấm mà thống kê nói 9.
+    const accepted = acceptedRunPoints(active.byPoint);
+    const rejectedBy = rejectedLevelsByRun(active.levels, active.byPoint);
     return selected.pts.map((point) => {
       const flag = active.byPoint.get(point) || { level: 'ok' as RuleVerdict, rules: [] };
-      return { ...point, verdict: flag.level, rules: flag.rules };
+      // `rejectRules` tính Ở ĐÂY vì chỉ main mới có bảng hành động đã phân
+      // giải 3 lớp (ghi đè theo xét nghiệm → cấu hình chung → registry).
+      // Renderer dùng nó để không in một luật cảnh báo vào cột "Vi phạm loại
+      // bỏ" chỉ vì nó đứng cùng điểm với một luật loại bỏ khác.
+      return {
+        ...point, verdict: flag.level, rules: flag.rules,
+        rejectRules: rejectingRules(flag.rules, active.actionOf),
+        accepted: accepted.has(point),
+        runRejectedBy: rejectedBy.get(qcRunKey(point)) || [],
+      };
     });
   }
 
   /** Toàn bộ điểm chưa hủy của một xét nghiệm, không giới hạn ở lô đang
    * vận hành. Trang Lịch sử dữ liệu cần nguồn này để điểm của lô cũ vẫn
-   * còn nhìn thấy sau khi chấp nhận chuyển tiếp lô. */
-  function listHistoryPoints(testId: string): QcPointView[] {
-    const rows = db.prepare('SELECT * FROM qc_points WHERE test_id=? AND voided=0 ORDER BY level,date,run_id').all(testId) as unknown as
-      (QcPointRow & { lot: string; qc_mean: number | null; qc_sd: number | null })[];
-    return rows.map((point) => {
-      const z = point.qc_mean != null && point.qc_sd != null && point.qc_sd > 0
-        ? (point.val - point.qc_mean) / point.qc_sd : NaN;
-      const verdict: RuleVerdict = !Number.isFinite(z) || Math.abs(z) <= 2 ? 'ok' : Math.abs(z) <= 3 ? 'warn' : 'rej';
-      return { ...point, verdict, rules: [] };
-    });
+   * còn nhìn thấy sau khi chấp nhận chuyển tiếp lô.
+   *
+   * KHÔNG kèm kết luận Westgard, và đó là chủ đích — xem `HistoryQcPointView`.
+   * Bản trước trả một trường `verdict` tính bằng ngưỡng z thuần (|z|<=2 →
+   * 'ok', <=3 → 'warn', còn lại 'rej'), trùng tên và trùng kiểu với verdict
+   * THẬT của `queryPoints()` nhưng mang nghĩa khác hẳn. Không nơi nào đọc nó
+   * — `HistoryTab` tự tính lại từ `qc_mean`/`qc_sd` và dán nhãn rõ "Phân loại
+   * theo Z-score, không phải kết luận Westgard" — nên nó chỉ nằm chờ người
+   * sửa sau nhặt nhầm. Đánh giá Westgard thật đòi cả tập mức cùng lần chạy,
+   * không thể suy từ một điểm lẻ, nên endpoint này không dựng nó. */
+  function listHistoryPoints(testId: string): HistoryQcPointView[] {
+    return db.prepare(`SELECT id,test_id,level,date,run_id,lot,val,qc_mean,qc_sd,note,
+        operator_name,operator_username,operator_code,voided,void_reason
+      FROM qc_points WHERE test_id=? AND voided=0 ORDER BY level,date,run_id`).all(testId) as unknown as HistoryQcPointView[];
   }
 
   /** Danh sách audit điểm đã hủy dùng riêng cho khối tra cứu. Tách endpoint
@@ -265,7 +291,17 @@ export function createEntryHandlers(db: Db) {
     const lotRow = config.qc_lot_id ? db.prepare('SELECT lot_no FROM qc_lots WHERE id=?').get(config.qc_lot_id) as { lot_no: string } | undefined : undefined;
     const lot = lotRow?.lot_no || '';
     const active = activeEvaluation(testId), rows = active.levels.find((item) => item.level === level)?.pts || [];
-    const candidate = evaluateRangeCandidate(rows.map((point) => ({ date: point.date, val: point.val, verdict: active.byPoint.get(point)?.level || 'ok' })));
+    // Cổng dải PXN đếm theo LẦN CHẠY bị loại, không theo verdict riêng của
+    // mức: một điểm đạt nằm trong lần chạy đã hỏng vì mức khác vi phạm không
+    // phải dữ liệu in-control. Dùng `rejectedLevelsByRun()` thay vì
+    // `acceptedRunPoints()` để mức CHƯA có Mean/SD (z không hữu hạn nên không
+    // điểm nào "được chấp nhận") vẫn lập được dải lần đầu.
+    const rejectedRuns = rejectedLevelsByRun(active.levels, active.byPoint);
+    const candidate = evaluateRangeCandidate(rows.map((point) => ({
+      date: point.date, val: point.val,
+      verdict: active.byPoint.get(point)?.level || 'ok',
+      runRejected: (rejectedRuns.get(qcRunKey(point))?.length ?? 0) > 0,
+    })));
     const systematic = new Set(WG_RULE_REGISTRY.filter((rule) => rule.err === 'SE').map((rule) => rule.id));
     const nce = (db.prepare("SELECT nce_id,rule FROM actions WHERE test_id=? AND level=? AND record_status<>'cancelled' ORDER BY date DESC,created_at DESC").all(testId, level) as { nce_id: string; rule: string }[])
       .find((action) => action.rule.split(',').map((rule) => rule.trim()).some((rule) => systematic.has(rule)));

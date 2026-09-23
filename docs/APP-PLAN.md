@@ -267,13 +267,50 @@ ngày, biểu đồ Levey-Jennings, cửa sổ ngày, huỷ điểm có phân lo
 - Huỷ điểm có 3 loại: `analytical` (luôn mở/dùng lại hồ sơ NCE gắn đúng
   `point_id`), `data-entry` (không mở NCE), `other` (người dùng chọn, bắt buộc
   lý do ≥5 ký tự).
-- Kết luận NGÀY lấy **lần chạy cuối cùng không bị loại** của mỗi mức, không
-  phải "tệ nhất trong mọi lần chạy".
-- Lần chạy gần nhất trong ngày bị loại thì **tự mở ô nhập bổ sung**.
+- Kết luận NGÀY lấy **lần chạy cuối cùng được chấp nhận** của mỗi mức, không
+  phải "tệ nhất trong mọi lần chạy": chạy lại đạt thì ngày không còn là vi
+  phạm. Mức chưa nhập điểm nào bị bỏ qua — "chưa nhập" là việc của vệt cam
+  `rowClass()`, không được thành "vi phạm".
+- Lần chạy gần nhất của một mức thuộc lần chạy bị loại thì **tự mở ô nhập bổ
+  sung** cho mức đó.
 - **Cập nhật 22/09/2026:** `acceptedRunPoints()` lấy cùng kết luận ghép với
   bảng; nếu một mức bị loại, cả lần chạy (ngày + mã run) không vào thống kê
   Mean/SD/CV thực và CUSUM. Không đánh giá lại chuỗi đã lọc để nhận lại một
   điểm đang có kết luận Loại bỏ. `acceptedPoints()` chỉ giữ đối chiếu legacy.
+- **Cập nhật 23/09/2026 — "lần chạy được chấp nhận" áp cho CẢ thẻ Nhập QC.**
+  Đợt 22/09 mới đưa `acceptedRunPoints()` vào thống kê/CUSUM; bốn chỗ còn lại
+  của thẻ Nhập QC vẫn đọc verdict RIÊNG của từng điểm, nên cùng một màn hình
+  nói hai chuyện. Căn cứ chung: Westgard và CLSI C24-Ed4 — đơn vị mất kiểm
+  soát là **lần chạy**, và khắc phục xong phải chạy lại **mọi mức** của lần
+  chạy đó, không phải chỉ mức bị đỏ.
+  - `entry:queryPoints` trả kèm `accepted` và `runRejectedBy` (mức nào làm
+    hỏng lần chạy). Trước đó chỉ `analyzeLevel()` biết điều này nên thẻ Nhập
+    QC không có cách nào hiện ra.
+  - Bảng "Điểm trong khoảng xem" và biểu đồ LJ **nói ra** trạng thái đó: nhãn
+    "không dùng thống kê — lần chạy bị loại ở Mức N", marker vẽ **vòng rỗng**
+    (màu vẫn theo kết luận thật của chính điểm). Điểm TỰ vi phạm giữ chấm đặc
+    — nó là biến cố, không phải hệ quả.
+  - Kết luận ngày + ô nhắc chạy lại theo `accepted`/`runRejectedBy` (hai gạch
+    đầu dòng ngay trên). Ca đổi hành vi duy nhất: chạy lại CHỈ một mức thì
+    ngày hiện `R` cho tới khi mức còn lại cũng có kết quả trong lần chạy mới.
+  - "Thống kê tích lũy" tính trên lần chạy được chấp nhận, kèm dòng "Tổng ghi
+    nhận N · x điểm thuộc lần chạy bị loại" cho truy vết ISO 15189. Gộp dữ
+    liệu mất kiểm soát vào thì chính sự cố đó nống SD lên và che sự cố kế
+    tiếp.
+  - Cổng lập dải PXN đếm `rejected` theo **lần chạy** bị loại, và **bỏ
+    `warnings === 0`** khỏi điều kiện: với giới hạn ±2SD, dữ liệu in-control
+    chuẩn phải có ~4,6% điểm nằm ngoài, nên xác suất đạt là 0,9545^n — 39% ở
+    n=20, 6% ở n=60, tức càng gom nhiều dữ liệu càng khó lập dải. `1-2s` là
+    luật CẢNH BÁO; outlier thật vẫn bị chặn vì vượt ±3SD nổ `1-3s`. Số cảnh
+    báo vẫn hiện nhưng là dòng thông tin.
+  - Khoá ở `tests/entry-card-and-chart.test.mjs` (EN08–EN11) và
+    `tests/range-workflow.test.mjs`.
+- **Cùng đợt 23/09/2026, ba lỗi lệch giữa hai nửa màn hình:** bảng nhập lọc
+  mức theo cờ `operational` (mức thuộc nhóm lô đã dừng từng dựng cột nhập
+  chết và làm mọi ngày quá khứ bị kẻ vệt cam "còn thiếu"); cột Z và vị trí
+  chấm trên biểu đồ đọc Mean/SD **đã chốt lúc nhập** thay vì dải hiện hành
+  (sau một lần đổi dải, chấm đỏ từng nằm gọn trong ±2SD); cổng ghi dùng phép
+  đọc số chặt thay cho `parseFloat()` (`"12,5"` từng lưu thành 12).
 
 **Điều hướng bàn phím — đã xong cả hai nửa:**
 - **Bảng worksheet** (2026-09-11, `2f370e5`): `renderer/lib/entry-sheet-navigation.ts`
@@ -393,6 +430,25 @@ PDF.
   Người dùng chốt 2026-09-11: **theo chuẩn, mặc định loại bỏ**
   (`alert: false` trong `WG_RULE_REGISTRY`); ai cần cảnh báo thì hạ mức độ
   theo từng xét nghiệm trong thẻ Cấu hình chung. ✅
+
+**Rà lại 23/09/2026 — sau khi thẻ Nhập QC áp đủ "lần chạy được chấp nhận":**
+- Phần main đã đúng sẵn: `listTestSummaries()` và `analyzeLevel()` dùng
+  `acceptedIdsOf()` cho CV/CUSUM, `observedStats()` lọc theo `accepted`, xuất
+  Excel/PDF có sẵn cột "Lần chạy bị loại" + "Dùng thống kê", và Z/biểu đồ vốn
+  đã chạy trên `z` theo snapshot nên KHÔNG dính lỗi đổi dải của thẻ Nhập QC.
+- **Đã sửa:** nhãn "Lần chạy bị loại ở Mức N" trước đây được renderer TỰ DÒ
+  LẠI (quét `analysisByLevel` tìm mức khác có điểm cùng ngày + mã run mang
+  verdict `rej`) — một bản sao thứ hai của `rejectedLevelsByRun()`, sai ở hai
+  chỗ: chỉ nêu được MỘT mức dù nhiều mức cùng hỏng, và khi bảng đang mở "Xem
+  lô cũ" thì điểm hiển thị là của lô đã chuyển tiếp trong khi vòng dò vẫn đọc
+  chuỗi của LÔ ĐANG CHẠY. Tab "Nhóm lô đã dừng" thậm chí không gọi nó, chỉ in
+  cứng nhãn chung. Nay cả ba đường đọc (`entry:queryPoints`, `analyzeLevel`,
+  lô lịch sử) cùng trả `runRejectedBy`, renderer chỉ hiển thị.
+- Biểu đồ LJ tổng hợp dùng chung quy ước **vòng rỗng = không vào thống kê**
+  với thẻ Nhập QC, để hình và bảng ngay dưới nó không nói hai chuyện.
+- Cột "Lần chạy bị loại" khi xuất nêu luôn mức làm hỏng (`Có (Mức 2)`) cho
+  điểm tự nó đạt; điểm tự vi phạm giữ `Có` vì cột kết luận đã nói rồi.
+- Khoá ở `tests/westgard-view.test.mjs` (WG17) và `tests/westgard-archived.test.mjs`.
 
 **Còn lại (1 mục):**
 1. Bảng điểm hiện toàn bộ dòng; app cũ có nút "hiện thêm N dòng"
@@ -540,6 +596,31 @@ NCE tuỳ chọn, khoá/mở khoá kỳ báo cáo.
   chốt là hành động đáng cân nhắc hơn đóng nó.
 - Khoá kỳ **thực thi thật** ở `addPoint`/`voidPoint`, không chỉ là nhãn.
 - Cả khoá và mở khoá đều qua xác thực lại mật khẩu.
+
+**Rà lại 23/09/2026:**
+- Báo cáo là BẢNG LIỆT KÊ thuần (không Mean/SD/CV, không verdict Westgard),
+  nên không dính lớp lỗi "lần chạy được chấp nhận" mà thẻ Nhập QC mắc phải.
+  Verdict vẫn thuộc trang Phân tích Westgard — trang đó có bản xuất riêng kèm
+  cột "Lần chạy bị loại"/"Dùng thống kê".
+- **Thêm cột `Lô`** vào bảng điểm. Báo cáo bắc qua một lần đổi lô liệt kê
+  điểm của CẢ HAI lô; thiếu cột này thì không phân biệt được, mà số lô là
+  định danh bắt buộc của vật liệu kiểm trong hồ sơ ISO 15189. `queryReport()`
+  liệt kê đúng cột hợp đồng thay vì `SELECT *`, và dùng chung khai báo
+  `ReportPointRow` với `shared/qc-api.d.ts` (trước đó có hai bản song song,
+  bản ở handler thiếu `lot`).
+- **Phụ lục NCE thêm cột `Trạng thái hồ sơ`.** Hồ sơ đã huỷ VẪN nằm trong phụ
+  lục (nó là dấu vết, không lọc đi) nhưng trước đây hiện y hệt hồ sơ đang chờ
+  duyệt vì chỉ in `approval_status`/`effectiveness_status`.
+- **Xuất CSV ghi kèm BOM UTF-8.** `type: 'text/csv;charset=utf-8'` chỉ là MIME
+  của Blob; Excel trên Windows đoán mã hoá theo codepage hệ thống khi mở tệp
+  cục bộ, nên thiếu BOM là toàn bộ tiếng Việt thành ký tự rác. Nhánh Excel đi
+  qua `exceljs` nên không dính.
+- **Tên tệp theo TÊN xét nghiệm**, không phải `testId` (uid) — đây là hồ sơ
+  đem lưu. Và **chặn khoảng ngày đảo ngược** thay vì lặng lẽ in bảng trắng.
+- Dọn: `report-store` bỏ `points`/`loadPoints` không ai gọi (trang không có
+  bảng xem trước nào), và hai chú thích dẫn tới mục `CLAUDE.md` đã bị viết
+  lại từ lâu.
+- Khoá ở `tests/report-handlers.test.mjs`.
 
 **Còn lại:** không có mục nghiệp vụ nào.
 
