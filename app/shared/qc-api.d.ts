@@ -336,7 +336,7 @@ export interface SigmaLevelResult {
    * không phải `tea`: gửi giá trị đã giải sẽ đóng băng một con số có thể đến
    * từ bậc dự phòng (nguồn khác hẳn nguồn chốt của kỳ) và không kèm `teaBasis`
    * nào — hồ sơ khi đó mang một TEa không nguồn gốc. */
-  teaSnapshot: number | null; /** Mean mục tiêu cùng lúc chụp kỳ, để quy đổi U% ra đơn vị xét nghiệm. */ targetMean: number | null; cv: number | null; biasEqa: number | null; eqaRounds: SigmaEqaRound[]; mixedSigns: boolean;
+  teaSnapshot: number | null; /** Mean mục tiêu cùng lúc chụp kỳ, để quy đổi U% ra đơn vị xét nghiệm. */ targetMean: number | null; cv: number | null; biasEqa: number | null; /** Bias trung bình có dấu từ các vòng EQA; chỉ để truy xuất hướng lệch. */ biasMean: number | null; eqaRounds: SigmaEqaRound[]; mixedSigns: boolean;
   /** Sai số chuẩn của chính ước lượng bias (SD giữa các vòng / căn n) — CHỈ tham khảo, KHÔNG phải u(Cref). */ biasSem: number | null;
   uCref: number | null; uCal: number | null;
   cvSource: 'manual' | 'iqc-cohort'; cohortN: number | null; sourceLot: string; sourceStart: string; sourceEnd: string; cohortStatus: string;

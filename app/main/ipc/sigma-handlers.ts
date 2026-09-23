@@ -32,7 +32,7 @@ export interface SigmaEqaRound { lab: number | null; target: number | null; bias
 
 export interface SigmaLevelResult {
   muBiasMode?: 'include' | 'exclude'; cohortReviewed?: boolean; cohortReviewBy?: string; cohortReviewAt?: string; cohortStale?: boolean; teaCriterion?: string;
-  level: number; tea: number | null; teaSnapshot: number | null; targetMean: number | null; cv: number | null; biasEqa: number | null; eqaRounds: SigmaEqaRound[]; mixedSigns: boolean; biasSem: number | null; uCref: number | null; uCal: number | null;
+  level: number; tea: number | null; teaSnapshot: number | null; targetMean: number | null; cv: number | null; biasEqa: number | null; /** Trung bình Bias có dấu từ các vòng EQA; null khi nhập Bias tay. */ biasMean: number | null; eqaRounds: SigmaEqaRound[]; mixedSigns: boolean; biasSem: number | null; uCref: number | null; uCal: number | null;
   cvSource: 'manual' | 'iqc-cohort'; cohortN: number | null; sourceLot: string; sourceStart: string; sourceEnd: string; cohortStatus: string;
   sigma: SigmaMetricResult | null; mu: UncertaintyBudgetResult | null; qualityDesign: ReturnType<typeof sigmaQualityDesign>;
 }
@@ -132,7 +132,7 @@ function computeLevel(stored: StoredLevel, periodTea: number | null, resolveLeve
   const mu = stored.cv != null
     ? uncertaintyBudget({ cv: stored.cv, bias: biasEqa, uCref: stored.uCref, includeBias: stored.muBiasMode !== 'exclude', uCal: stored.uCal, tea: tea ?? undefined, target: stored.targetMean ?? undefined })
     : null;
-  return { level: stored.level, tea, teaSnapshot: stored.tea, targetMean: stored.targetMean, cv: stored.cv, biasEqa, eqaRounds: stored.eqaRounds || [], mixedSigns: roundsStats?.mixedSigns ?? false, biasSem, uCref: stored.uCref, uCal: stored.uCal,
+  return { level: stored.level, tea, teaSnapshot: stored.tea, targetMean: stored.targetMean, cv: stored.cv, biasEqa, biasMean: roundsStats?.mean ?? null, eqaRounds: stored.eqaRounds || [], mixedSigns: roundsStats?.mixedSigns ?? false, biasSem, uCref: stored.uCref, uCal: stored.uCal,
     muBiasMode: stored.muBiasMode || 'include', teaCriterion: [stored.teaBasis?.criterion, stored.teaBasis?.reference].filter(Boolean).join(' · '), cohortReviewed: !!stored.cohortReview,
     cohortReviewBy: stored.cohortReview?.by || '', cohortReviewAt: stored.cohortReview?.at || '',
     cvSource: stored.cvSource === 'iqc-cohort' ? 'iqc-cohort' : 'manual', cohortN: stored.cohortN ?? null, sourceLot: stored.sourceLot || '', sourceStart: stored.sourceStart || '', sourceEnd: stored.sourceEnd || '', cohortStatus: stored.cohortStatus || '',
@@ -435,7 +435,11 @@ export function createSigmaHandlers(db: Db) {
           return { ok: false, error: { code: 'cohort-tea-unresolved', message: 'Kỳ cũ thiếu tiêu chí TEa để đổi nồng độ. Hãy tạo đánh giá mới với nguồn TEa đã xác nhận.' } };
         }
         level.cohortFingerprint = cohortFingerprint(testId, period, level.level, level.sourceLot || '');
-        if (draft.cohortReviewed === true && found.status === 'eligible') {
+        // Xác nhận rà soát là dấu vết thao tác của người dùng, không phải kết
+        // luận rằng cohort đã đủ điều kiện dùng để thiết kế QC. Vì vậy vẫn
+        // lưu xác nhận cho nhóm n còn ít; `listPeriods()` độc lập chặn
+        // `qualityDesign` cho tới khi cohort đạt `eligible`.
+        if (draft.cohortReviewed === true) {
           if (draft.cohortFingerprint !== level.cohortFingerprint) return { ok: false, error: { code: 'cohort-changed', message: 'Dữ liệu IQC đã thay đổi hoặc chưa có dấu vết rà soát. Đóng hộp thoại, nạp lại lô và kiểm tra trước khi xác nhận.' } };
           level.cohortReview = { by: actor.name || actor.username, at: new Date().toISOString(), fingerprint: level.cohortFingerprint };
         }

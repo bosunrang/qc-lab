@@ -62,6 +62,16 @@ test('SG13: bảng Westgard Sigma Rules theo thiết kế QC đang vận hành, 
   assert.equal(b.n, a.n); assert.equal(b.r, a.r);
 });
 
+test('SG13b: một mức QC đang vận hành không được mượn bảng Sigma Rules cho hai mức', t => {
+  const { db, sigma, assay } = lab(t, [1]);
+  seedIqc(db, assay.id, 1, '08');
+  const saved = sigma.savePeriod({ testId: assay.id, period: '2026-08', teaSource: 'ricos', tea: 10, levels: reviewedCohortLevels(sigma, assay.id, '2026-08', [1]) }, actor);
+  assert.equal(saved.ok, true);
+  assert.equal(saved.data.levels[0].qualityDesign, null);
+  const page = readFileSync(new URL('../renderer/pages/SigmaPage.tsx', import.meta.url), 'utf8');
+  assert.match(page, /cần tối thiểu 2 mức QC đang vận hành/i);
+});
+
 test('SG13: không lập được kỳ cho mức chưa khai, nhưng mức cũ vẫn sửa được', t => {
   const { db, config, sigma, assay } = lab(t, [1]);
   const ghost = sigma.savePeriod({ testId: assay.id, period: '2026-08', teaSource: 'ricos', levels: [{ level: 1, cv: 2, biasEqa: 1 }, { level: 7, cv: 2, biasEqa: 1 }] }, actor);
@@ -105,7 +115,9 @@ test('SG15: cổng cohort dùng đúng ngưỡng > 3 SD của 1-3s', () => {
 });
 
 test('SG16: đổi cấu hình luật Westgard không gỡ hiệu lực rà soát IQC; đổi dữ liệu thì có', t => {
-  const { db, sigma, westgardHandlers, assay } = lab(t, [1]);
+  // Cần thiết kế 2 mức thực để có gợi ý Sigma Rules; ca này kiểm fingerprint
+  // Westgard, không kiểm nhánh một mức (đã có SG13b).
+  const { db, sigma, westgardHandlers, assay } = lab(t, [1, 2]);
   seedIqc(db, assay.id, 1, '08');
   assert.equal(sigma.savePeriod({ testId: assay.id, period: '2026-08', teaSource: 'ricos', tea: 10, levels: reviewedCohortLevels(sigma, assay.id, '2026-08', [1]) }, actor).ok, true);
   const read = () => sigma.listPeriods(assay.id)[0].levels[0];

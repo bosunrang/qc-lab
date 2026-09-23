@@ -61,10 +61,9 @@ export interface SigmaQcDesign {
  * đề nghị nhiều luật + nhiều điểm QC hơn Westgard thật sự khuyến nghị.
  *
  * `levelCount` là số mức QC thật của xét nghiệm trong kỳ đang xét. Westgard
- * chỉ công bố 2 bảng nên ≥3 mức dùng bảng 3 mức, còn lại dùng bảng 2 mức;
- * `levels` trả về cho biết bảng nào đã được áp. Thiếu `levelCount` thì giữ
- * bảng 2 mức — cấu hình phổ biến nhất, và là hành vi bảo toàn tương thích cho
- * caller cũ. */
+ * chỉ công bố bảng cho 2 và 3 mức: ≥3 mức dùng bảng 3 mức, đúng 2 mức dùng
+ * bảng 2 mức, còn 1 mức thì KHÔNG đưa gợi ý. Thiếu `levelCount` giữ bảng 2
+ * mức để tương thích caller cũ. */
 export function sigmaQualityDesign(value: unknown, levelCount?: unknown): SigmaQcDesign | null {
   // `Number(null)`/`Number("")` ra 0 - huu han - nen ban cu (va app cu) tra ve
   // thiet ke tier `<3` cho mot Sigma CHUA TINH DUOC, tuc noi "phuong phap khong
@@ -75,6 +74,9 @@ export function sigmaQualityDesign(value: unknown, levelCount?: unknown): SigmaQ
   if (!Number.isFinite(sigma)) return null;
   const countRaw = Number(levelCount);
   const count = Number.isFinite(countRaw) && countRaw > 0 ? Math.trunc(countRaw) : 2;
+  // Không giả vờ rằng một mức đang vận hành là thiết kế 2 mức. Bảng Westgard
+  // Sigma Rules không công bố khuyến nghị N/R cho trường hợp này.
+  if (count === 1) return null;
   const levels: 2 | 3 = count >= 3 ? 3 : 2;
   const base = { levels, levelCount: count };
 

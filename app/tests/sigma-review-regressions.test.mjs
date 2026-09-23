@@ -71,6 +71,14 @@ test('SG01b: sửa kỳ cũ dùng nguồn TEa hiện hành nếu mã snapshot đ
   assert.equal(payload[3], 'clia', 'snapshot nguồn hợp lệ phải được giữ nguyên');
 });
 
+test('SG01c: nạp CV theo lô xác nhận rà soát bằng hộp trung tâm và ghi audit', () => {
+  const cohort = section(page, 'function CohortModal(', 'function MuModal(');
+  assert.match(cohort, /confirmDialog\([\s\S]*title: 'Xác nhận rà soát IQC'[\s\S]*confirmLabel: 'Xác nhận và dùng dữ liệu'/);
+  assert.match(cohort, /onSubmit\(selected, true\)/);
+  assert.match(page, /onSubmit=\{async \(choices, cohortReviewed\) =>/);
+  assert.match(page, /refreshCohort: true, cohortReviewed, cohortFingerprint/);
+});
+
 test('SG02/11: actual blur handlers preserve unchanged values; switching test rejects stale writes', async t => {
   const { save } = scenario(t);
   const period = save([{ level: 1, cv: 0.57535596, eqaRounds: [{ lab: 102.345, target: 100 }] }]).data;
@@ -107,6 +115,15 @@ test('SG03: blank EQA is not zero; actual zero stays valid; partial objects cann
   assert.equal(save([{ level: 1, cv: 1, eqaRounds: zero.parsedRounds }]).data.levels[0].biasEqa, -100);
   assert.equal(save([{ level: 1, eqaRounds: [{ lab: '', target: 100, bias: 0 }] }]).ok, false);
   assert.equal(save([{ level: 1, eqaRounds: [{ lab: null, target: null, bias: -2 }] }]).ok, true);
+});
+
+test('SG03c: Bias RMS giữ thêm trung bình có dấu để truy xuất hướng lệch', t => {
+  const { save } = scenario(t);
+  const result = save([{ level: 1, eqaRounds: [{ lab: 97, target: 100 }, { lab: 95, target: 100 }] }]);
+  assert.equal(result.data.levels[0].biasEqa, Math.sqrt(17));
+  assert.equal(result.data.levels[0].biasMean, -4, 'RMS là độ lớn; trung bình có dấu phải còn để truy xuất');
+  assert.match(page, /Bias RMS EQA\/EQC/);
+  assert.match(page, /Bias TB có dấu%/);
 });
 
 test('SG03b: lỗi nhập Bias dùng thông báo trung tâm, không chen vào phía trên bảng', () => {

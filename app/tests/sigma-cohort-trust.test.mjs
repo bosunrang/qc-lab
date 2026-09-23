@@ -65,7 +65,24 @@ const savedLevel = (sigma, test) => sigma.listPeriods(test.id).find((p) => p.per
   assert.equal(lv.cohortN, 30);
 }
 
-// 3) Khai lô KHÔNG tồn tại: từ chối hẳn, không lưu một nhóm ảo.
+// 3) Rà soát IQC là hành động của người dùng, nên phải lưu được cả khi cohort
+//    còn thiếu điểm. Điều này không làm cohort được phép sinh thiết kế QC.
+{
+  const { sigma, test } = scenario(5);
+  const cohort = sigma.listCohorts(test.id, PERIOD, [1]).find((c) => c.lot === 'L1');
+  assert.ok(cohort, 'phải có nhóm để xác nhận rà soát');
+  const res = save(sigma, test, {
+    level: 1, cvSource: 'iqc-cohort', sourceLot: cohort.lot,
+    refreshCohort: true, cohortReviewed: true, cohortFingerprint: cohort.fingerprint,
+  });
+  assert.equal(res.ok, true, res.ok ? '' : res.error.message);
+  const lv = savedLevel(sigma, test);
+  assert.equal(lv.cohortStatus, 'insufficient');
+  assert.equal(lv.cohortReviewed, true, 'xác nhận phải được lưu dù n chưa đủ');
+  assert.equal(lv.qualityDesign, null, 'xác nhận không được mở gợi ý Sigma Rules');
+}
+
+// 4) Khai lô KHÔNG tồn tại: từ chối hẳn, không lưu một nhóm ảo.
 {
   const { sigma, test } = scenario(30);
   const res = save(sigma, test, { level: 1, cv: 0.5, cvSource: 'iqc-cohort', sourceLot: 'LO-KHONG-CO', cohortStatus: 'eligible' });
@@ -74,7 +91,7 @@ const savedLevel = (sigma, test) => sigma.listPeriods(test.id).find((p) => p.per
   assert.equal(sigma.listPeriods(test.id).length, 0, 'lần lưu bị từ chối không được để lại bản ghi');
 }
 
-// 4) CV nhập tay thì KHÔNG được mang theo mô tả nhóm IQC.
+// 5) CV nhập tay thì KHÔNG được mang theo mô tả nhóm IQC.
 {
   const { sigma, test } = scenario(30);
   const res = save(sigma, test, {
@@ -90,7 +107,7 @@ const savedLevel = (sigma, test) => sigma.listPeriods(test.id).find((p) => p.per
   assert.equal(lv.sourceLot, '');
 }
 
-// 5) Đường dùng THẬT không đổi giá trị: gửi đúng những gì `listCohorts()` trả
+// 6) Đường dùng THẬT không đổi giá trị: gửi đúng những gì `listCohorts()` trả
 //    về (chính là những gì SigmaPage gán) thì lưu lại y nguyên.
 {
   const { sigma, test } = scenario(30);
@@ -109,7 +126,7 @@ const savedLevel = (sigma, test) => sigma.listPeriods(test.id).find((p) => p.per
   assert.equal(lv.cohortStatus, cohort.status);
 }
 
-// 6) CV cũng phải là CV của nhóm thật, không phải số gửi lên — nếu không,
+// 7) CV cũng phải là CV của nhóm thật, không phải số gửi lên — nếu không,
 //    Sigma tính từ một CV bịa mà vẫn mang nhãn "lấy từ lô IQC".
 {
   const { sigma, test } = scenario(30);

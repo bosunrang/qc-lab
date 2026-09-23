@@ -433,7 +433,17 @@ biểu đồ xu hướng + MDC, xuất Excel/in PDF.
 **Quy tắc nghiệp vụ đã chốt:**
 - Sigma của thẻ này (CV/Bias đã được rà soát, có nguồn) **khác** Sigma trong
   báo cáo in (quan sát theo kỳ). Hai con số cố ý tách biệt.
-- Bias nhiều vòng EQA dùng **RMS**, không dùng trung bình cộng có dấu.
+- Bias nhiều vòng EQA dùng **RMS** để tính Sigma, không dùng trung bình cộng
+  có dấu — RMS mới là độ lớn sai số tổng hợp. Từ 23/09/2026 trung bình CÓ DẤU
+  (`biasMean`) được hiển thị KÈM THEO (dưới ô Bias khi có ≥2 vòng, và một cột
+  riêng khi xuất) để thấy hệ thống lệch về phía nào; nhãn đổi thành "Bias RMS
+  EQA%" để không ai đọc nhầm con số đang dùng. Công thức Sigma không đổi.
+- Bảng Westgard Sigma Rules chỉ có cho **2 và 3 mức**. Một mức đang vận hành
+  thì KHÔNG đưa gợi ý (`sigmaQualityDesign()` trả `null`), không mượn bảng 2
+  mức — đó là bịa ra một thiết kế QC không có trong chuẩn.
+- **Xác nhận rà soát IQC là dấu vết thao tác**, không phải kết luận rằng dữ
+  liệu đủ điều kiện: luôn được lưu kể cả khi cohort còn thiếu điểm. Cổng
+  `eligible` vẫn độc lập chặn `qualityDesign`.
 - TEa giải lại **tại Mean của TỪNG MỨC** khi nguồn là CLIA dạng giới hạn tuyệt
   đối (Sodium ±4 mmol/L ở Mean 140 = 2,857%; ở Mean 100 = 4,000%). Thứ tự ưu
   tiên: snapshot của mức → giải theo nguồn **đã chốt của kỳ** → TEa cấp kỳ →

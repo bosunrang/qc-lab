@@ -37,6 +37,36 @@ hành.
   vụ đã chốt, UI đã ghi nhãn "(RMS)" và có `mean`/`mixedSigns`. Cần người phụ
   trách quyết nếu muốn đổi.
 
+## Cập nhật 23/09/2026
+
+Ba mục còn treo của đợt trên đã được xử lý.
+
+- **SG13b — một mức QC không được mượn bảng của hai mức.** SG13/SG14 đã sửa
+  việc ĐẾM số mức, nhưng `sigmaQualityDesign()` vẫn rơi về `levels: 2` cho mọi
+  `levelCount < 3`, kể cả `= 1`. Westgard Sigma Rules chỉ công bố bảng cho **2
+  và 3 mức**; một mức không có khuyến nghị N/R nào trong chuẩn, nên đưa ra
+  bảng 2 mức là app tự bịa ra một thiết kế QC. Nay `count === 1` trả `null`,
+  trang Sigma nói thẳng "Cần tối thiểu 2 mức QC đang vận hành" ở cả cột thiết
+  kế từng mức lẫn dòng đề xuất dùng chung. `sigmaQualityDesign(5, 1) === null`
+  và ca `SG13b` khoá lại.
+- **SG21 — đã xử lý, KHÔNG đổi công thức.** Quyết định cũ giữ nguyên: Sigma
+  vẫn ăn **Bias RMS**, vì RMS mới là độ lớn sai số tổng hợp. Thứ được thêm là
+  **hiển thị** trung bình có dấu bên cạnh: `SigmaLevelResult.biasMean` (null
+  khi Bias nhập tay), hiện dưới ô Bias khi có ≥2 vòng, và một cột riêng "Bias
+  TB có dấu%" khi xuất. Mọi nhãn "Bias EQA%" đổi thành **"Bias RMS EQA%"** để
+  không ai đọc nhầm con số đang dùng là trung bình cộng. Người phụ trách giờ
+  thấy được hệ thống lệch về phía nào mà không phải mở từng vòng EQA.
+- **Xác nhận rà soát IQC tách khỏi cổng `eligible`.** Trước đây
+  `savePeriod()` chỉ ghi `cohortReview` khi `found.status === 'eligible'`, nên
+  một nhóm còn thiếu điểm thì người dùng bấm xác nhận mà không có gì được lưu
+  — không lỗi, không dấu vết, lần sau mở lại vẫn "Chưa xác nhận rà soát". Xác
+  nhận là **hành động của người dùng**, không phải kết luận về chất lượng dữ
+  liệu, nên nay luôn được ghi (kèm tên, thời điểm, fingerprint). Điều này
+  KHÔNG nới cổng: `listPeriods()` vẫn độc lập chặn `qualityDesign` cho tới khi
+  cohort đạt `eligible` — ca test khoá đúng cặp `cohortReviewed: true` +
+  `qualityDesign: null`. Hộp xác nhận chuyển sang `confirmDialog` trung tâm,
+  ghi rõ người dùng đang xác nhận điều gì.
+
 > **Một lần rà soát lại sau khi cập nhật:** đổi công thức `cohortFingerprint`
 > (SG16) làm MỌI `cohortFingerprint`/`cohortReview` đã lưu không còn khớp, nên
 > lần mở trang đầu tiên các mức lấy CV từ cohort sẽ hiện "Cần nạp và rà soát

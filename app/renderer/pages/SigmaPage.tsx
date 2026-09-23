@@ -82,7 +82,7 @@ function missingSigmaInputs(level: SigmaLevelResult): string[] {
   const missing: string[] = [];
   if (level.tea == null) missing.push('TEa');
   if (level.cv == null) missing.push('CV IQC%');
-  if (level.biasEqa == null) missing.push('Bias EQA%');
+  if (level.biasEqa == null) missing.push('Bias RMS EQA%');
   return missing;
 }
 
@@ -271,6 +271,7 @@ export function SigmaPage() {
   // số dòng đó là đầu vào chọn bảng Westgard Sigma Rules (2 mức hay 3 mức),
   // nên phải cùng một định nghĩa "mức đang chạy" với Nhập QC và Westgard.
   const operationalLevels = (levelsByTestId[testId] || []).filter((l) => l.operational !== 0).map((l) => l.level).sort((a, b) => a - b);
+  const hasSingleOperationalLevel = operationalLevels.length === 1;
   const tableLevels = operationalLevels.length ? operationalLevels : Array.from(new Set(periods.flatMap((p) => p.levels.map((lv) => lv.level)))).sort((a, b) => a - b);
   const latestPeriod = periods[periods.length - 1];
   const historyYears = Array.from(new Set(periods.map((period) => period.period.slice(0, 4)))).sort((left, right) => right.localeCompare(left));
@@ -331,10 +332,10 @@ export function SigmaPage() {
   /** Bảng xuất/in: 1 hàng cho mỗi (kỳ × mức) — cùng bộ cột với bảng trên
    * màn hình để người đọc file đối chiếu được. */
   const exportRows = (rows: SigmaPeriodView[]) => rows.flatMap((p) => p.levels.map((lv) => [
-    vnPeriod(p.period), `Mức ${lv.level}`, lv.tea ?? p.tea ?? '', lv.targetMean ?? '', lv.cv ?? '', lv.biasEqa ?? '', lv.sigma ? Number(lv.sigma.sigma.toFixed(2)) : '',
+    vnPeriod(p.period), `Mức ${lv.level}`, lv.tea ?? p.tea ?? '', lv.targetMean ?? '', lv.cv ?? '', lv.biasEqa ?? '', lv.biasMean ?? '', lv.sigma ? Number(lv.sigma.sigma.toFixed(2)) : '',
     lv.sigma ? formatDpmo(lv.sigma.dpmo) : '', ...sigmaMuExport(lv),
   ]));
-  const EXPORT_HEADERS = ['Kỳ', 'Mức', 'TEa% snapshot', 'Mean mục tiêu', 'CV IQC%', 'Bias EQA%', 'Sigma', 'DPMO tham khảo (dịch 1,5σ)', 'U (k=2)%', `U tại Mean (${test?.unit || 'đơn vị xét nghiệm'})`, 'U / TEa%', 'Trạng thái MU', 'Mô hình MU', 'u(Cref)%', 'u(cal)%', 'Tiêu chí TEa', 'Nguồn CV', 'Rà soát IQC'];
+  const EXPORT_HEADERS = ['Kỳ', 'Mức', 'TEa% snapshot', 'Mean mục tiêu', 'CV IQC%', 'Bias RMS EQA%', 'Bias TB có dấu%', 'Sigma', 'DPMO tham khảo (dịch 1,5σ)', 'U (k=2)%', `U tại Mean (${test?.unit || 'đơn vị xét nghiệm'})`, 'U / TEa%', 'Trạng thái MU', 'Mô hình MU', 'u(Cref)%', 'u(cal)%', 'Tiêu chí TEa', 'Nguồn CV', 'Rà soát IQC'];
 
   async function exportPeriod(period: SigmaPeriodView) {
     const error = await exportTableXlsx(`Sigma ${period.period}`, EXPORT_HEADERS, exportRows([period]), `sigma-${test?.name || 'xet-nghiem'}-${period.period}.xlsx`);
@@ -521,7 +522,7 @@ export function SigmaPage() {
                         <div className="grade">{lv.sigma ? `${sigmaDesignEligible(lv) ? '' : 'Ước tính · '}${zone.label}` : ''}</div>
                         <div className="sub">
                           {lv.sigma
-                            ? <>CV IQC {lv.cv != null ? lv.cv.toFixed(2) : '—'}% · Bias EQA/EQC{lv.eqaRounds && lv.eqaRounds.length > 1 ? ' (RMS)' : ''} {lv.biasEqa != null ? lv.biasEqa.toFixed(2) : '—'}%<br />DPMO {formatDpmo(lv.sigma.dpmo)} · Yield {lv.sigma.yieldPercent.toFixed(4)}%</>
+                            ? <>CV IQC {lv.cv != null ? lv.cv.toFixed(2) : '—'}% · {lv.eqaRounds.length ? 'Bias RMS EQA/EQC' : 'Bias EQA/EQC'} {lv.biasEqa != null ? lv.biasEqa.toFixed(2) : '—'}%{lv.eqaRounds.length > 1 && lv.biasMean != null ? ` · TB có dấu ${lv.biasMean.toFixed(2)}%` : ''}<br />DPMO {formatDpmo(lv.sigma.dpmo)} · Yield {lv.sigma.yieldPercent.toFixed(4)}%</>
                             : `Chưa tính được Sigma — còn thiếu ${missingSigmaInputs(lv).join(', ')}`}
                         </div>
                       </div>
@@ -573,7 +574,7 @@ export function SigmaPage() {
             <section className="sg-period-workbench" key={displayPeriod.id} aria-label={`Chi tiết kỳ ${vnPeriod(displayPeriod.period)}`}>
               <div className="sg-level-matrix-wrap">
                 <div className="sg-level-matrix" role="table" aria-label={`Dữ liệu Sigma kỳ ${vnPeriod(displayPeriod.period)}`}>
-                  <div className="sg-level-matrix-head" role="row"><span>Mức QC</span><span>CV IQC</span><span>Bias EQA/EQC</span><span>Sigma</span></div>
+                  <div className="sg-level-matrix-head" role="row"><span>Mức QC</span><span>CV IQC</span><span>Bias RMS EQA/EQC</span><span>Sigma</span></div>
                   {displayPeriod.levels.map((lv) => {
                     const zone = sigmaZone(lv.sigma?.sigma);
                     const cvSource = lv.cvSource === 'iqc-cohort' ? `Lô ${lv.sourceLot || '—'} · n=${lv.cohortN ?? 0}` : 'Nhập tay';
@@ -589,11 +590,12 @@ export function SigmaPage() {
                         {lv.cvSource === 'iqc-cohort' && <span className="sg-level-source">{lv.cohortStale ? 'Dữ liệu nền đã đổi — cần nạp lại' : lv.cohortReviewed ? `Đã rà soát: ${lv.cohortReviewBy}` : 'Chưa xác nhận rà soát IQC'}</span>}
                       </div>
                       <div className="sg-level-cell" role="cell">
-                        <div className="sg-level-input-row"><input key={`bias-${displayPeriod.id}-${lv.level}-${lv.biasEqa ?? ''}`} className="sg-number" type="number" step="any" defaultValue={editablePercent(lv.biasEqa)} disabled={!writable} placeholder="Bias%" aria-label={`Bias EQA mức ${lv.level}`} onBlur={async (e) => {
+                        <div className="sg-level-input-row"><input key={`bias-${displayPeriod.id}-${lv.level}-${lv.biasEqa ?? ''}`} className="sg-number" type="number" step="any" defaultValue={editablePercent(lv.biasEqa)} disabled={!writable} placeholder="Bias RMS%" aria-label={`Bias RMS EQA mức ${lv.level}`} onBlur={async (e) => {
                           const input = e.currentTarget;
                           if (!(await commitBias(displayPeriod, lv.level, input.value))) input.value = editablePercent(lv.biasEqa);
                         }} />{writable && <button className="btn ghost" title={`Nhập hoặc rà soát các vòng EQA/EQC cho mức ${lv.level}`} onClick={() => setBiasModal({ period: displayPeriod, level: lv })}><CalcIcon />Chi tiết</button>}</div>
                         <span className="sg-level-source">{biasSource}</span>
+                        {lv.eqaRounds.length > 1 && lv.biasMean != null && <span className="sg-level-source">TB có dấu: {lv.biasMean.toFixed(2)}%</span>}
                       </div>
                       <div className="sg-level-cell sg-level-sigma" role="cell"><b style={{ color: zone.c }}>{lv.sigma ? lv.sigma.sigma.toFixed(2) : '—'}</b><span style={{ color: zone.c }}>{lv.sigma ? zone.label : `Thiếu ${missingSigmaInputs(lv).join(', ')}`}</span></div>
                     </div>;
@@ -627,6 +629,7 @@ export function SigmaPage() {
                 const design = eligible ? lv.qualityDesign : null;
                 return <tr key={lv.level}><td>Mức {lv.level}</td><td className="num" style={{ color: sigmaZone(lv.sigma?.sigma).c }}>{lv.sigma?.sigma.toFixed(2) ?? '—'}</td>
                   {!lv.sigma ? <><td>—</td><td>Chưa đủ CV/Bias</td><td>Chưa đánh giá</td></>
+                    : hasSingleOperationalLevel ? <><td><span className="hint">Chưa áp dụng</span></td><td>Cần tối thiểu 2 mức QC đang vận hành</td><td>Không đưa gợi ý Sigma Rules</td></>
                     : !eligible ? <><td><span className="hint">Chưa đủ điều kiện</span></td><td>{lv.cvSource !== 'iqc-cohort' ? 'CV nhập tay' : lv.cohortStale ? 'Cần nạp và rà soát lại' : !lv.cohortReviewed ? 'Chưa xác nhận rà soát' : cohortStatusLabel(lv.cohortStatus)}</td><td>Không dùng để đề xuất QC</td></>
                       : !design ? <><td>—</td><td>—</td><td>—</td></>
                         : <><td><b>{design.rules.join(' / ')}</b><div className="sg-cell-meta">{designRunText(design)} · bảng {design.levels} mức</div></td><td>{design.risk}</td><td>{design.plan}</td></>}
@@ -638,7 +641,7 @@ export function SigmaPage() {
                 <b>Thiết kế QC dùng chung cho xét nghiệm</b>
                 <div>Mức quyết định: Mức {governingLevel.level} · Sigma {governingLevel.sigma?.sigma.toFixed(2)}. Áp dụng tham khảo: <b>{governingLevel.qualityDesign.rules.join(' / ')}</b> · {designRunText(governingLevel.qualityDesign)} · theo bảng Westgard Sigma Rules cho <b>{governingLevel.qualityDesign.levels} mức QC</b> (xét nghiệm đang có {governingLevel.qualityDesign.levelCount} mức).</div>
               </div>
-            ) : <div className="hint sg-governing-rule">Chưa đề xuất QC dùng chung: cần đủ đầu vào và xác nhận rà soát IQC cho tất cả mức; không bỏ qua mức thiếu dữ liệu hoặc mất kiểm soát.</div>}
+            ) : <div className="hint sg-governing-rule">{hasSingleOperationalLevel ? 'Chưa đề xuất QC dùng chung: cần tối thiểu 2 mức QC đang vận hành để áp dụng bảng Westgard Sigma Rules.' : 'Chưa đề xuất QC dùng chung: cần đủ đầu vào và xác nhận rà soát IQC cho tất cả mức; không bỏ qua mức thiếu dữ liệu hoặc mất kiểm soát.'}</div>}
             <div className="alert info sg-opspec-note">Gợi ý theo <b>Westgard Sigma Rules</b> chỉ là điểm khởi đầu. Người phụ trách phải rà soát nguy cơ, độ ổn định hệ thống, khối lượng mẫu và hậu quả lâm sàng trước khi tự cấu hình luật Westgard.</div>
           </div>
         </details>
@@ -684,10 +687,6 @@ export function SigmaPage() {
               <h3>Xu hướng Sigma theo kỳ</h3>
               <div className="chart-inner">
                 <SigmaTrendChart periods={periods} />
-                {hasChartData && <div className="legend">
-                  {tableLevels.map((lv) => <span key={lv}>Mức {lv}</span>)}
-                  <span>Mốc 3σ (tối thiểu)</span><span>Mốc 6σ (đẳng cấp thế giới)</span>
-                </div>}
               </div>
             </div>
             <div className="sg-chart-box">
@@ -737,11 +736,11 @@ export function SigmaPage() {
         />
       )}
       {cohortModal && (
-        <CohortModal period={cohortModal.period} cohorts={cohortModal.cohorts} onClose={() => setCohortModal(null)} onSubmit={async (choices) => {
+        <CohortModal period={cohortModal.period} cohorts={cohortModal.cohorts} onClose={() => setCohortModal(null)} onSubmit={async (choices, cohortReviewed) => {
           const levels = levelsPayloadFrom(cohortModal.period, -1, {}).map((level) => {
             const cohort = choices[level.level];
             return cohort && cohort.cv != null && cohort.cv > 0
-              ? { ...level, refreshCohort: true, cohortFingerprint: cohort.fingerprint, targetMean: cohort.targetMean ?? undefined, cv: cohort.cv, cvSource: 'iqc-cohort' as const, cohortN: cohort.n, sourceLot: cohort.lot, sourceStart: cohort.start, sourceEnd: cohort.end, cohortStatus: cohort.status }
+              ? { ...level, refreshCohort: true, cohortReviewed, cohortFingerprint: cohort.fingerprint, targetMean: cohort.targetMean ?? undefined, cv: cohort.cv, cvSource: 'iqc-cohort' as const, cohortN: cohort.n, sourceLot: cohort.lot, sourceStart: cohort.start, sourceEnd: cohort.end, cohortStatus: cohort.status }
               : level;
           });
           const result = await saveOwnedPeriod(cohortModal.period, levels);
@@ -903,14 +902,19 @@ function BiasModal({ initialRounds, onClose, onSubmit }: {
 
 function CohortModal({ period, cohorts, onClose, onSubmit }: {
   period: SigmaPeriodView; cohorts: SigmaCohortView[]; onClose: () => void;
-  onSubmit: (choices: Record<number, SigmaCohortView | undefined>) => Promise<{ ok: boolean; error?: { message: string } }>;
+  onSubmit: (choices: Record<number, SigmaCohortView | undefined>, cohortReviewed: boolean) => Promise<{ ok: boolean; error?: { message: string } }>;
 }) {
   const byLevel = useMemo(() => new Map(period.levels.map((level) => [level.level, cohorts.filter((cohort) => cohort.level === level.level)])), [period.levels, cohorts]);
   const [choices, setChoices] = useState<Record<number, string>>(() => Object.fromEntries(period.levels.map((level) => [level.level, level.sourceLot || byLevel.get(level.level)?.at(-1)?.lot || ''])));
   async function submit() {
     const selected: Record<number, SigmaCohortView | undefined> = {};
     for (const level of period.levels) selected[level.level] = byLevel.get(level.level)?.find((cohort) => cohort.lot === choices[level.level]);
-    const result = await onSubmit(selected);
+    const confirmed = await confirmDialog(
+      'Xác nhận bạn đã rà soát biểu đồ IQC/Westgard, xử lý các sự cố liên quan và chọn các lô đại diện theo SOP. Hệ thống sẽ lưu tên và thời điểm xác nhận.',
+      { title: 'Xác nhận rà soát IQC', confirmLabel: 'Xác nhận và dùng dữ liệu', cancelLabel: 'Quay lại', danger: false },
+    );
+    if (!confirmed) return;
+    const result = await onSubmit(selected, true);
     if (!result.ok) await infoDialog(result.error?.message || 'Không thể nạp CV từ IQC.', { title: 'Không thể dùng dữ liệu IQC', type: 'warn' });
   }
   return <Modal title={`Chọn dữ liệu CV IQC theo lô — ${vnPeriod(period.period)}`} onClose={onClose} className="sg-cohort-modal"

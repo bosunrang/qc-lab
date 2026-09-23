@@ -110,11 +110,10 @@ for (const levels of [2, 3]) {
 }
 
 // ---------------------------------------------------------------------------
-// 5) Chọn bảng theo SỐ MỨC THẬT. Westgard chỉ công bố 2 bảng, nên 1 mức rơi về
-//    bảng 2 mức và ≥4 mức rơi về bảng 3 mức; `levelCount` vẫn giữ số thật để
-//    giao diện nói rõ căn cứ.
+// 5) Chọn bảng theo SỐ MỨC THẬT. Westgard chỉ công bố bảng cho 2 và 3 mức:
+//    1 mức không được bịa ra khuyến nghị, còn ≥4 mức dùng bảng 3 mức.
 // ---------------------------------------------------------------------------
-eq([sigmaQualityDesign(5, 1).levels, sigmaQualityDesign(5, 1).levelCount], [2, 1], '1 mức → bảng 2 mức');
+eq(sigmaQualityDesign(5, 1), null, '1 mức → không có gợi ý Sigma Rules');
 eq([sigmaQualityDesign(5, 2).levels, sigmaQualityDesign(5, 2).levelCount], [2, 2], '2 mức → bảng 2 mức');
 eq([sigmaQualityDesign(5, 3).levels, sigmaQualityDesign(5, 3).levelCount], [3, 3], '3 mức → bảng 3 mức');
 eq([sigmaQualityDesign(5, 4).levels, sigmaQualityDesign(5, 4).levelCount], [3, 4], '4 mức → bảng 3 mức');
